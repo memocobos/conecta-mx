@@ -1398,8 +1398,13 @@ function selHotel(btn,e,n){
 function buildTransporteButtons(){
   var stepN=parseInt($$('w-hotel-n').textContent)+1;
   $$('w-transport-n').textContent=stepN;
+  var diasRestantes=Math.ceil((new Date(cur.ds+'T12:00:00')-new Date())/(1000*60*60*24));
   var h='';
-  h+='<button class="z-btn" data-t="bus" data-cost="2500" onclick="selTransporteBtn(this,2500,\'Autobús\')"><div class="z-name">🚌 Autobús</div><div class="z-price">$2,500</div></button>';
+  if(diasRestantes>15){
+    h+='<button class="z-btn" data-t="bus" data-cost="2500" onclick="selTransporteBtn(this,2500,\'Autobús\')"><div class="z-name">🚌 Autobús</div><div class="z-price">$2,500</div></button>';
+  } else {
+    h+='<button class="z-btn" data-t="bus" onclick="window.open(\'https://wa.me/528119771072?text='+encodeURIComponent('Hola! Quiero cotizar autobús para '+cur.a+' ('+cur.f+')')+'\',\'_blank\')"><div class="z-name">🚌 Autobús</div><div class="z-price" style="font-size:11px;color:rgba(255,255,255,.5)">Cotiza por WhatsApp</div></button>';
+  }
   h+='<button class="z-btn" data-t="avion" onclick="window.open(\'https://wa.me/528132321405?text='+encodeURIComponent('Hola! Quiero cotizar un vuelo para '+cur.a+' ('+cur.f+')')+'\',\'_blank\')"><div class="z-name">✈️ Avión</div><div class="z-price" style="font-size:11px;color:rgba(255,255,255,.5)">Cotiza por WhatsApp</div></button>';
   h+='<button class="z-btn" data-t="sin" data-cost="0" onclick="selTransporteBtn(this,0,\'Sin transporte\')" style="display:flex;align-items:center;justify-content:center"><div class="z-name" style="margin:0">🚶 Sin transporte</div></button>';
   $$('d-transport').innerHTML=h;

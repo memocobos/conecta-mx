@@ -176,7 +176,9 @@ body{font-family:'Montserrat',sans-serif;background:#000;color:#fff;min-height:1
 .bank-lbl{color:rgba(255,255,255,.32);font-weight:700;text-transform:uppercase;font-size:10px;letter-spacing:.07em}
 .bank-val{font-weight:900;color:#fff;font-family:monospace;font-size:13px}
 .bank-val.s{font-family:'Montserrat',sans-serif;font-size:12px}
-.bank-copy{cursor:pointer;font-size:14px;margin-left:6px;opacity:.5;transition:opacity .15s}.bank-copy:hover{opacity:1}
+.bank-copy{display:inline-block;background:#333;color:#fff;border:none;padding:3px 10px;font-size:9px;font-weight:700;font-family:'Montserrat',sans-serif;border-radius:20px;cursor:pointer;margin-left:8px;vertical-align:middle;text-transform:uppercase;letter-spacing:.04em;transition:background .15s}
+.bank-copy:hover{background:#444}
+.bank-copy.copied{background:rgba(136,234,78,.2);color:#88ea4e}
 .bank-link{font-weight:900;font-size:12px;color:#e8ff4c;text-decoration:none}
 .pol-row{display:flex;gap:10px;font-size:11px;color:rgba(255,255,255,.6);padding:.5rem 0;border-bottom:1px solid rgba(255,255,255,.06);line-height:1.55;font-weight:600;text-transform:uppercase}
 .pol-row:last-child{border-bottom:none}
@@ -973,8 +975,8 @@ function showDetail(id){
   // Bank info
   var b=cur.banco||BANCO_DEFAULT;
   var bH='<div class="bank-row"><span class="bank-lbl">Banco</span><span class="bank-val s">'+b.nombre+'</span></div>'+
-    '<div class="bank-row"><span class="bank-lbl">Tarjeta</span><span class="bank-val">'+b.tarjeta+' <span class="bank-copy" onclick="copiarDato(this,\''+b.tarjeta+'\')">📋</span></span></div>'+
-    '<div class="bank-row"><span class="bank-lbl">CLABE</span><span class="bank-val">'+b.clabe+' <span class="bank-copy" onclick="copiarDato(this,\''+b.clabe+'\')">📋</span></span></div>'+
+    '<div class="bank-row"><span class="bank-lbl">Tarjeta</span><span class="bank-val">'+b.tarjeta+' <span class="bank-copy" onclick="copiarDato(this,\''+b.tarjeta+'\')">Copiar</span></span></div>'+
+    '<div class="bank-row"><span class="bank-lbl">CLABE</span><span class="bank-val">'+b.clabe+' <span class="bank-copy" onclick="copiarDato(this,\''+b.clabe+'\')">Copiar</span></span></div>'+
     '<div class="bank-row"><span class="bank-lbl">Titular</span><span class="bank-val s">'+b.titular+'</span></div>';
   $$('d-bank').innerHTML=bH;
 
@@ -1300,7 +1302,9 @@ function buildZonaButtons(zonas){
     } else if(z.ag){
       h+='<button class="z-btn ag" disabled><div class="z-name">'+z.n+'</div><div class="z-ag">Agotado</div></button>';
     } else {
-      h+='<button class="z-btn'+(z.vip?' vip':'')+'" data-p="'+z.p+'" data-n="'+z.n+'"><div class="z-name">'+z.n+'</div><div class="z-price">'+fmt(z.p)+'</div></button>';
+      var showP=z.p;
+      if(selPkg==='stay'&&cur){showP=z.p-(cur.sep||500);if(showP<0)showP=z.p;}
+      h+='<button class="z-btn'+(z.vip?' vip':'')+'" data-p="'+z.p+'" data-n="'+z.n+'"><div class="z-name">'+z.n+'</div><div class="z-price">'+fmt(showP)+'</div></button>';
     }
   }
   $$('d-zonas').innerHTML=h;
@@ -1396,8 +1400,8 @@ function buildTransporteButtons(){
   $$('w-transport-n').textContent=stepN;
   var h='';
   h+='<button class="z-btn" data-t="bus" data-cost="2500" onclick="selTransporteBtn(this,2500,\'Autobús desde Reynosa\')"><div class="z-name">🚌 Autobús desde Reynosa</div><div class="z-price">$2,500</div></button>';
-  h+='<button class="z-btn" data-t="avion" onclick="window.open(\'https://wa.me/528119771072?text='+encodeURIComponent('Hola! Quiero cotizar un vuelo para '+cur.a+' ('+cur.f+')')+'\',\'_blank\')"><div class="z-name">✈️ Avión</div><div class="z-price" style="font-size:11px;color:rgba(255,255,255,.5)">Cotiza por WhatsApp</div></button>';
-  h+='<button class="z-btn" data-t="sin" data-cost="0" onclick="selTransporteBtn(this,0,\'Sin transporte\')"><div class="z-name">🚶 Sin transporte</div><div class="z-price">$0</div></button>';
+  h+='<button class="z-btn" data-t="avion" onclick="window.open(\'https://wa.me/528132321405?text='+encodeURIComponent('Hola! Quiero cotizar un vuelo para '+cur.a+' ('+cur.f+')')+'\',\'_blank\')"><div class="z-name">✈️ Avión</div><div class="z-price" style="font-size:11px;color:rgba(255,255,255,.5)">Cotiza por WhatsApp</div></button>';
+  h+='<button class="z-btn" data-t="sin" data-cost="0" onclick="selTransporteBtn(this,0,\'Sin transporte\')"><div class="z-name">🚶 Sin transporte</div><div class="z-price">&nbsp;</div></button>';
   $$('d-transport').innerHTML=h;
   $$('d-placeholder').style.display='block';
   $$('d-result').style.display='none';
@@ -1448,8 +1452,9 @@ function copiarAlPortapapeles(texto,btn,resetTxt){
 
 function copiarDato(el,valor){
   copiarAlPortapapeles(valor,null);
-  el.textContent='✅';
-  setTimeout(function(){el.textContent='📋';},1500);
+  el.textContent='¡Copiado! ✓';
+  el.classList.add('copied');
+  setTimeout(function(){el.textContent='Copiar';el.classList.remove('copied');},2000);
 }
 function aplicarPromo(){
   var code=document.getElementById('promo-input').value;
@@ -1589,7 +1594,7 @@ function calcular(){
     if(isCDMX(cur)){
       vueloBox.style.display='block';
       var vueloMsg='Hola, quiero cotizar mi vuelo para este paquete:\n\n'+_lastCotizacion;
-      vueloBtn.href='https://wa.me/528119771072?text='+encodeURIComponent(vueloMsg);
+      vueloBtn.href='https://wa.me/528132321405?text='+encodeURIComponent(vueloMsg);
       vueloBtn.textContent=cur.rideOnly?'🚌 ¿Cómo llego a CDMX? Cotiza tu traslado':'✈️ ¿Quieres cotizar tu vuelo?';
     } else {
       vueloBox.style.display='none';
@@ -1691,20 +1696,25 @@ function getChatSystemPrompt(){
     'Respondes en español, eres amigable, cordial y comercial. Ayudas a cotizar paquetes y dar información de eventos.\n\n'+
     'PAQUETES Y PRECIOS:\n'+
     'PLUS: todo incluido (transporte + hotel compartido + boleto + kit). Precio = precio de la zona elegida.\n'+
-    'RIDE: sin boleto (transporte + hotel compartido + kit). El cliente ya tiene su boleto.\n'+
-    'STAY: sin transporte (hotel compartido + boleto + kit). Precio = precio de la zona elegida MENOS $500. Ejemplo: si la zona cuesta $5,000, STAY cuesta $4,500. NUNCA digas que STAY cuesta lo mismo que PLUS.\n'+
+    'RIDE: sin boleto (transporte + hotel compartido + kit). El cliente ya tiene su boleto. RIDE MTY = $2,700. RIDE CDMX = $2,900.\n'+
+    'STAY: sin transporte (hotel compartido + boleto + kit). Precio = precio zona MENOS $500. Ejemplo: zona $5,000, STAY = $4,500. NUNCA digas que STAY cuesta lo mismo que PLUS. STAY solo disponible en MTY, NO existe en CDMX.\n'+
     'CHEAP: solo boleto + kit. Sin transporte ni hotel.\n\n'+
+    'TRANSPORTE CDMX:\n'+
+    'Eventos en CDMX ofrecen 3 opciones de transporte: Autobus desde Reynosa ($2,500), Avion (cotizar al 81 3232 1405), o Sin transporte.\n'+
+    'El transporte se suma al costo del paquete.\n\n'+
     'REGLAS ESTRICTAS:\n'+
-    'El hotel compartido (4 personas) SIEMPRE está INCLUIDO sin costo extra en PLUS, RIDE y STAY.\n'+
-    'Solo se cobra extra si el cliente quiere habitación Individual, Doble o Triple.\n'+
-    'NUNCA preguntes cuántas noches ni dónde quiere el hotel. El hotel es siempre cerca del venue del evento.\n'+
-    'NUNCA inventes precios. Solo usa los datos proporcionados. Si no tienes el dato exacto, di "te puedo dar más info por WhatsApp".\n'+
-    'NUNCA ofrezcas servicios que no existen (selección de hotel, noches adicionales, upgrades, etc.).\n'+
-    'Adapta tu lenguaje al género del cliente: terminaciones femeninas con nombres femeninos, masculinas con masculinos. Si no estás seguro, usa neutro.\n'+
+    'El hotel compartido (4 personas) SIEMPRE esta INCLUIDO sin costo extra en PLUS, RIDE y STAY.\n'+
+    'Solo se cobra extra si el cliente quiere habitacion Individual, Doble o Triple.\n'+
+    'NUNCA preguntes cuantas noches ni donde quiere el hotel. El hotel es siempre cerca del venue del evento.\n'+
+    'NUNCA inventes precios. Solo usa los datos proporcionados. Si no tienes el dato exacto, di "te puedo dar mas info por WhatsApp".\n'+
+    'NUNCA ofrezcas servicios que no existen (seleccion de hotel, noches adicionales, upgrades, etc.).\n'+
+    'Adapta tu lenguaje al genero del cliente: terminaciones femeninas con nombres femeninos, masculinas con masculinos. Si no estas seguro, usa neutro.\n'+
     'Si el usuario quiere hablar con una persona real, dile que puede contactar por WhatsApp.\n\n'+
-    'VUELOS:\n'+
-    'Conecta MX SÍ cotiza vuelos. NUNCA le digas al cliente que cotice directo con la aerolínea.\n'+
-    'Cuando pregunten por vuelos, responde algo como: "Si cotizamos vuelos! Para darte la mejor opcion con tu presupuesto y fechas, te conectamos con nuestro equipo. Te paso el contacto de WhatsApp para que te coticen tu vuelo?"\n\n'+
+    'CONTACTO:\n'+
+    'Reservas y dudas generales: WhatsApp 81 1977 1072\n'+
+    'Vuelos: WhatsApp 81 3232 1405\n'+
+    'Conecta MX SI cotiza vuelos. NUNCA le digas al cliente que cotice directo con la aerolinea.\n'+
+    'Cuando pregunten por vuelos: "Si cotizamos vuelos! Te paso el contacto de nuestro equipo de vuelos al 81 3232 1405 para que te coticen."\n\n'+
     'FORMATO OBLIGATORIO - SIGUE ESTO AL PIE DE LA LETRA:\n'+
     'NUNCA uses markdown: nada de **negrita**, *cursiva*, ## headers, ni listas con guion (-).\n'+
     'Para enfasis usa MAYUSCULAS en palabras clave como PLUS, STAY, RIDE, CHEAP.\n'+

@@ -1157,6 +1157,7 @@ function showDetail(id){
   for(var i=0;i<EV.length;i++){if(EV[i].id===id){cur=EV[i];break;}}
   if(!cur)return;
   selZ=null;selH=null;selViaj=0;selPkg=null;selFechaIdx=0;
+  if(cur.multifecha) cur._fechaIdx=0;
 
   $$('d-fecha').textContent=cur.f;
   $$('d-artist').textContent=cur.a;
@@ -1427,7 +1428,7 @@ function buildHotelButtons(){
 }
 
 function selFecha(btn,idx){
-  selFechaIdx=idx;selZ=null;
+  selFechaIdx=idx;cur._fechaIdx=idx;selZ=null;selH=null;
   var btns=$$('d-fechas').querySelectorAll('.f-btn');
   for(var i=0;i<btns.length;i++)btns[i].classList.remove('active');
   btn.classList.add('active');
@@ -1436,6 +1437,11 @@ function selFecha(btn,idx){
   } else if(selPkg==='cheap'){
     buildZonaButtons(cur.cheapZonas||cur.multifecha[idx].zonas);
   }
+  if(selPkg==='plus'||selPkg==='ride'||selPkg==='stay'){
+    buildHotelButtons();
+  }
+  $$('d-placeholder').style.display='block';
+  $$('d-result').style.display='none';
 }
 
 function selZona(btn,p,n){

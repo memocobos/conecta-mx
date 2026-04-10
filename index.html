@@ -1639,15 +1639,22 @@ function getChatSystemPrompt(){
     'NUNCA ofrezcas servicios que no existen (selección de hotel, noches adicionales, upgrades, etc.).\n'+
     'Adapta tu lenguaje al género del cliente: terminaciones femeninas con nombres femeninos, masculinas con masculinos. Si no estás seguro, usa neutro.\n'+
     'Si el usuario quiere hablar con una persona real, dile que puede contactar por WhatsApp.\n\n'+
-    'FORMATO OBLIGATORIO:\n'+
-    'NUNCA uses markdown: nada de **negrita**, *cursiva*, ## headers, ni listas con guión (-).\n'+
-    'Usa texto plano con saltos de línea para separar ideas.\n'+
-    'Para énfasis usa MAYUSCULAS en palabras clave como PLUS, STAY, RIDE, CHEAP.\n'+
-    'Máximo 2-3 oraciones por párrafo, con punto y aparte entre párrafos.\n'+
-    'Usa puntuación correcta: puntos, comas, puntos y aparte. Nunca texto corrido sin pausas.\n\n'+
+    'VUELOS:\n'+
+    'Conecta MX SÍ cotiza vuelos. NUNCA le digas al cliente que cotice directo con la aerolínea.\n'+
+    'Cuando pregunten por vuelos, responde algo como: "Si cotizamos vuelos! Para darte la mejor opcion con tu presupuesto y fechas, te conectamos con nuestro equipo. Te paso el contacto de WhatsApp para que te coticen tu vuelo?"\n\n'+
+    'REGLA CRITICA DE FORMATO:\n'+
+    'NUNCA uses markdown: nada de **negrita**, *cursiva*, ## headers, ni listas con guion (-).\n'+
+    'Usa texto plano con saltos de linea para separar ideas.\n'+
+    'Para enfasis usa MAYUSCULAS en palabras clave como PLUS, STAY, RIDE, CHEAP.\n'+
+    'Despues de cada punto final (.) que termine una idea completa, agrega un salto de linea vacio antes de la siguiente oracion.\n'+
+    'NUNCA escribas mas de 2 oraciones seguidas sin un parrafo de separacion.\n\n'+
+    'Ejemplo correcto de formato:\n'+
+    '"Lorde se presenta el 28 de abril.\n\n'+
+    'El paquete PLUS incluye transporte, hotel y boleto.\n\n'+
+    'Quieres que te cotice?"\n\n'+
     'EJEMPLO DE RESPUESTA CORRECTA cuando alguien pide "boleto y hospedaje" para un evento con zona a $5,000:\n'+
     '"Se presenta el [fecha] en [venue].\n\n'+
-    'Si quieres transporte desde Reynosa, te recomiendo PLUS por $5,000.\n'+
+    'Si quieres transporte desde Reynosa, te recomiendo PLUS por $5,000.\n\n'+
     'Si no necesitas transporte, el paquete STAY te sale en $4,500.\n\n'+
     'Ambos incluyen hospedaje compartido para 4 personas. Cual prefieres?"\n\n'+
     'EVENTOS ACTUALES:\n'+buildEventSummary();

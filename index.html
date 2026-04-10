@@ -842,12 +842,14 @@ function filterEvents(){
 }
 renderCatalog();
 
-// Deep link: ?evento=morat or #morat
+// Deep link: ?evento=morat, #morat, or /morat
 (function(){
   function norm(s){return(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[-_\s]+/g,'');}
-  var q=new URLSearchParams(window.location.search).get('evento')||window.location.hash.replace('#','');
+  var path=window.location.pathname.replace(/^\/|\/$/g,'');
+  var q=new URLSearchParams(window.location.search).get('evento')||window.location.hash.replace('#','')||path;
   if(!q)return;
   var key=norm(q);
+  if(!key)return;
   var found=null;
   for(var i=0;i<EV.length;i++){
     if(norm(EV[i].id)===key||norm(EV[i].a)===key||norm(EV[i].a).indexOf(key)>=0){found=EV[i];break;}

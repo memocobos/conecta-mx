@@ -398,7 +398,7 @@ body{font-family:'Montserrat',sans-serif;background:#000;color:#fff;min-height:1
 
   <!-- PASO 2: PAQUETE -->
   <div class="wiz-card" id="w-pkg-card" style="display:none">
-    <div class="wiz-lbl"><span class="wiz-num-badge">2</span>Elige tu paquete</div>
+    <div class="wiz-lbl"><span class="wiz-num-badge" id="w-pkg-n">2</span>Elige tu paquete</div>
     <div class="wiz-pkg-wrap" id="w-paquetes">
       <button class="wiz-btn wiz-pkg-btn" onclick="selPaquete(this,'plus')">
         <div class="pkg-top"><span class="pkg-name">PLUS</span><span class="pkg-tag pkg-tag-plus">Todo incluido</span></div>
@@ -425,7 +425,7 @@ body{font-family:'Montserrat',sans-serif;background:#000;color:#fff;min-height:1
 
   <!-- PASO 3: FECHA (multifecha) -->
   <div class="wiz-card" id="w-fecha-card" style="display:none">
-    <div class="wiz-lbl"><span class="wiz-num-badge" id="w-fecha-n">3</span>Elige tu fecha</div>
+    <div class="wiz-lbl"><span class="wiz-num-badge" id="w-fecha-n">3</span><span id="w-fecha-lbl">Elige tu fecha</span></div>
     <div class="fecha-sel" id="d-fechas"></div>
   </div>
 
@@ -571,7 +571,7 @@ var EV=[
   {id:'siddharta',c:'azul',img:'Siddharta',staticImg:'siddharta',a:'Siddharta',f:'12 nov 2026',ds:'2026-11-12',v:'Auditorio Citibanamex, Mty',sep:500,st:'',inc:['Boleto zona elegida','Transporte Reynosa-Mty','Hospedaje compartido','Kit Conecta'],banco:BANCO_DEFAULT,zonas:[{n:'General De Pie',p:4084},{n:'Platinum A',p:4876,vip:1},{n:'Perfiles A',p:4282}],hotel:HOTEL_MTY,pagos:[{l:'Separo',d:'Hoy',s:1}]},
   {id:'morat',c:'verde',img:'Morat',a:'Morat',f:'02 dic 2026',ds:'2026-12-02',v:'Arena Monterrey, Mty',sep:800,st:'',inc:['Boleto zona elegida','Transporte Reynosa-Mty','Hospedaje compartido','Kit Conecta'],banco:BANCO_DEFAULT,zonas:[{n:'Cancha VIP',p:6550,vip:1},{n:'Platino',p:6250},{n:'Oro',p:5950},{n:'Cancha General',p:5150},{n:'Barrera',p:5550},{n:'Butaca',p:5300},{n:'Preferente',p:4250},{n:'Luneta',p:4000},{n:'Balcón',p:3750}],hotel:HOTEL_MTY,pagos:[{l:'Separo',d:'Hoy',s:1}],cheapZonas:[{n:'Cancha VIP',p:4850,vip:1},{n:'Platino',p:4550},{n:'Oro',p:4250},{n:'Cancha General',p:3450},{n:'Barrera',p:3850},{n:'Butaca',p:3600},{n:'Preferente',p:2550},{n:'Luneta',p:2300},{n:'Balcón',p:2050}]},
   {id:'hilary',c:'rosa',img:'Hilary Duff',a:'Hilary Duff',f:'13 feb 2027',ds:'2027-02-13',v:'Por confirmar',sep:0,st:'pronto',inc:['Boleto','Transporte','Hospedaje','Kit Conecta'],banco:BANCO_DEFAULT,zonas:[],hotel:HOTEL_STD,pagos:[]},
-  {id:'edc2027',staticImg:'edc2027',c:'azul',img:'EDC Mexico',a:'Electric Daisy Carnival EDC 2027',f:'19, 20 y 21 feb 2027',ds:'2027-02-19',v:'Autódromo Hermanos Rodríguez, CDMX',sep:800,st:'',inc:['Boleto zona elegida','Traslados CDMX Hotel-Evento','Hospedaje compartido','Kit Conecta'],nota:'NO incluye vuelos.',banco:BANCO_DEFAULT,multifecha:[{lbl:'3 Días (19-21 Feb)',zonas:[{n:'General 3 días',p:9100},{n:'VIP',p:0,prox:1}],hotel:[{n:'Compartida 4 personas',e:0,viaj:[1,2,3,4]},{n:'Individual (1p)',e:6525,viaj:[1]},{n:'Doble (2p)',e:2175,viaj:[2]},{n:'Triple (3p)',e:725,viaj:[3]}]},{lbl:'Viernes 19 Feb',zonas:[{n:'General 1 día',p:4100},{n:'VIP',p:0,prox:1}],hotel:[{n:'Compartida 4 personas',e:0,viaj:[1,2,3,4]},{n:'Individual (1p)',e:2175,viaj:[1]},{n:'Doble (2p)',e:725,viaj:[2]},{n:'Triple (3p)',e:250,viaj:[3]}]},{lbl:'Sábado 20 Feb',zonas:[{n:'General 1 día',p:4100},{n:'VIP',p:0,prox:1}],hotel:[{n:'Compartida 4 personas',e:0,viaj:[1,2,3,4]},{n:'Individual (1p)',e:2175,viaj:[1]},{n:'Doble (2p)',e:725,viaj:[2]},{n:'Triple (3p)',e:250,viaj:[3]}]},{lbl:'Domingo 21 Feb',zonas:[{n:'General 1 día',p:4100},{n:'VIP',p:0,prox:1}],hotel:[{n:'Compartida 4 personas',e:0,viaj:[1,2,3,4]},{n:'Individual (1p)',e:2175,viaj:[1]},{n:'Doble (2p)',e:725,viaj:[2]},{n:'Triple (3p)',e:250,viaj:[3]}]}],zonas:[{n:'General 3 días',p:9100},{n:'General 1 día',p:4100},{n:'VIP',p:0,prox:1}],cheapZonas:[{n:'General 3 días',p:5300},{n:'General 1 día',p:2500},{n:'VIP',p:0,prox:1}],hotel:HOTEL_CDM,pagos:[{l:'Separo',d:'Hoy',s:1},{l:'Pago 1',d:'24 abr-1 may',s:0},{l:'Pago 2',d:'9-16 may',s:0},{l:'Pago 3',d:'24 may-1 jun',s:0},{l:'Pago 4',d:'9-16 jun',s:0},{l:'Pago 5',d:'24 jun-1 jul',s:0},{l:'Pago 6',d:'24 jul-1 ago',s:0},{l:'Pago 7',d:'24 ago-1 sep',s:0},{l:'Pago 8',d:'9-16 sep',s:0},{l:'Pago 9',d:'24 sep-1 oct',s:0},{l:'Pago 10',d:'9-16 oct',s:0}]},
+  {id:'edc2027',staticImg:'edc2027',c:'azul',img:'EDC Mexico',a:'Electric Daisy Carnival EDC 2027',f:'19, 20 y 21 feb 2027',ds:'2027-02-19',v:'Autódromo Hermanos Rodríguez, CDMX',sep:800,st:'',inc:['Boleto zona elegida','Traslados CDMX Hotel-Evento','Hospedaje compartido','Kit Conecta'],nota:'NO incluye vuelos.',banco:BANCO_DEFAULT,diaFirst:true,multifecha:[{lbl:'3 Días (19-21 Feb)',zonas:[{n:'General 3 días',p:9100}],cheapZonas:[{n:'General 3 días',p:5300}],hotel:[{n:'Compartida 4 personas',e:0,viaj:[1,2,3,4]},{n:'Individual (1p)',e:6525,viaj:[1]},{n:'Doble (2p)',e:2175,viaj:[2]},{n:'Triple (3p)',e:725,viaj:[3]}]},{lbl:'1 Día',zonas:[{n:'General 1 día',p:4100}],cheapZonas:[{n:'General 1 día',p:2500}],hotel:[{n:'Compartida 4 personas',e:0,viaj:[1,2,3,4]},{n:'Individual (1p)',e:2175,viaj:[1]},{n:'Doble (2p)',e:725,viaj:[2]},{n:'Triple (3p)',e:250,viaj:[3]}]},{lbl:'2 Días',zonas:[],prox:true}],zonas:[{n:'General 3 días',p:9100},{n:'General 1 día',p:4100}],cheapZonas:[{n:'General 3 días',p:5300},{n:'General 1 día',p:2500}],hotel:HOTEL_CDM,pagos:[{l:'Separo',d:'Hoy',s:1},{l:'Pago 1',d:'24 abr-1 may',s:0},{l:'Pago 2',d:'9-16 may',s:0},{l:'Pago 3',d:'24 may-1 jun',s:0},{l:'Pago 4',d:'9-16 jun',s:0},{l:'Pago 5',d:'24 jun-1 jul',s:0},{l:'Pago 6',d:'24 jul-1 ago',s:0},{l:'Pago 7',d:'24 ago-1 sep',s:0},{l:'Pago 8',d:'9-16 sep',s:0},{l:'Pago 9',d:'24 sep-1 oct',s:0},{l:'Pago 10',d:'9-16 oct',s:0}]},
   {id:'dalemix',c:'amarillo',a:'Dale Mixx',f:'Por confirmar',ds:'2027-12-31',v:'Por confirmar',sep:0,st:'por-confirmar',listOnly:true,inc:[],banco:BANCO_DEFAULT,zonas:[],hotel:[],pagos:[]},
   {id:'coronacap',c:'rojo',a:'Corona Capital',f:'Por confirmar',ds:'2027-12-31',v:'CDMX',sep:0,st:'por-confirmar',listOnly:true,inc:[],banco:BANCO_DEFAULT,zonas:[],hotel:[],pagos:[]},
   {id:'flowfest',c:'azul',a:'Coca Cola Flow Fest',f:'Por confirmar',ds:'2027-12-31',v:'CDMX',sep:0,st:'por-confirmar',listOnly:true,inc:[],banco:BANCO_DEFAULT,zonas:[],hotel:[],pagos:[]},
@@ -771,105 +771,6 @@ function getPaquetes(ev) {
 
 
 
-// ── Calcular ──────────────────────────────────────────────────────────────
-function calcular() {
-  if(!selZ || !cur || !selPkg) return;
-  var pkgDef = getPaquetes(cur).find(function(p){return p.id===selPkg;});
-  if(!pkgDef) return;
-  var cdmx = cur.v && cur.v.toLowerCase().indexOf('cdmx') >= 0;
-  var nViaj = selViaj || 1;
-  var hotelExtra = (selH && pkgDef.includesHotel) ? selH.e : 0;
-  var total = 0;
-  var desglose = [];
-
-  if(selPkg === 'plus') {
-    total = selZ.p + (hotelExtra * nViaj);
-    desglose.push({l:'Plus · ' + selZ.n, v: fmt(selZ.p)});
-
-  } else if(selPkg === 'ride') {
-    var rideTotal = pkgDef.basePrice * nViaj;
-    total = rideTotal + selZ.p + (hotelExtra * nViaj);
-    desglose.push({l:'Ride × ' + nViaj, v: fmt(rideTotal)});
-    desglose.push({l:'Boleto · ' + selZ.n, v: fmt(selZ.p)});
-
-  } else if(selPkg === 'stay') {
-    if(cdmx) {
-      total = selZ.p + (hotelExtra * nViaj);
-      desglose.push({l:'Stay · ' + selZ.n, v: fmt(selZ.p)});
-    } else {
-      var disc = 500 * nViaj;
-      var stayZone = Math.max(0, selZ.p - disc);
-      total = stayZone + (hotelExtra * nViaj);
-      desglose.push({l:'Stay · ' + selZ.n, v: fmt(stayZone)});
-    }
-
-  } else if(selPkg === 'cheap') {
-    total = selZ.p;
-    desglose.push({l:'Boleto + Kit · ' + selZ.n, v: fmt(selZ.p)});
-  }
-
-  if(hotelExtra > 0 && pkgDef.includesHotel && selH) {
-    desglose.push({l:'Habitación · ' + selH.n, v: '+' + fmt(hotelExtra * nViaj)});
-  }
-
-  var sep = cur.sep || 800;
-  var resto = total - sep;
-  var nP = cur.pagos.filter(function(p){return !p.s;}).length || 1;
-  var q = resto / nP;
-
-  $$('d-placeholder').style.display = 'none';
-  $$('d-result').style.display = 'block';
-  $$('r-q').textContent = fmt(q);
-  $$('r-np').textContent = 'durante ' + nP + (nP===1?' pago':' quincenas');
-  $$('r-paquete').textContent = pkgDef.name;
-  $$('r-viajeros').textContent = nViaj + (nViaj===1?' viajero':' viajeros');
-  $$('r-zona').textContent = selZ.n;
-
-  var hotelRow = $$('r-hotel-row');
-  if(hotelRow) {
-    if(pkgDef.includesHotel && selH) {
-      hotelRow.style.display = 'flex';
-      var _hPP = selViaj>0 ? Math.ceil(selH.e/selViaj) : selH.e;
-      $$('r-hotel').textContent = selH.n + (selH.e>0 ? ' (+'+fmt(_hPP)+'/persona)' : '');
-    } else {
-      hotelRow.style.display = 'none';
-    }
-  }
-
-  $$('r-total').textContent = fmt(total);
-  $$('r-sep').textContent = fmt(sep);
-  $$('r-resto').textContent = fmt(resto);
-
-  var desEl = $$('r-desglose');
-  if(desEl) {
-    var desH = '';
-    desglose.forEach(function(d){
-      desH += '<div class="sum-row"><span class="sum-lbl">'+d.l+'</span><span class="sum-val">'+d.v+'</span></div>';
-    });
-    desEl.innerHTML = desH;
-  }
-
-  var tH = '';
-  cur.pagos.forEach(function(p) {
-    tH += '<tr>' +
-      '<td style="color:rgba(255,255,255,.28);font-weight:700;font-size:10px;text-transform:uppercase;width:75px;padding:9px 4px">'+p.l+'</td>' +
-      '<td style="color:rgba(255,255,255,.5);font-weight:600;font-size:11px;padding:9px 4px">'+p.d+'</td>' +
-      '<td style="text-align:right;font-weight:900;color:#e8ff4c;font-size:13px;padding:9px 4px">'+(p.s?fmt(sep):fmt(q))+'</td>' +
-      '</tr>';
-  });
-  $$('r-tabla').innerHTML = tH;
-
-  var msg = 'Hola! Quiero cotizar para '+cur.a+' ('+cur.f+').\n' +
-    'Paquete: '+pkgDef.name+'\n' +
-    'Viajeros: '+nViaj+'\n' +
-    'Zona: '+selZ.n+' ('+fmt(selZ.p)+')\n' +
-    (pkgDef.includesHotel && selH ? 'Habitación: '+selH.n+'\n' : '') +
-    'Total: '+fmt(total)+'\n' +
-    'Pago quincenal: '+fmt(q)+'\n' +
-    'Separo con: '+fmt(sep)+'. ¿Qué sigue?';
-  $$('r-wa').href = 'https://wa.me/'+WA+'?text='+encodeURIComponent(msg);
-  $$('d-result').scrollIntoView({behavior:'smooth', block:'start'});
-}
 
 function goBack() {
   $$('page-detail').classList.remove('active');
@@ -995,19 +896,19 @@ function resetWizard(){
   $$('d-placeholder').style.display='block';
   $$('d-result').style.display='none';
   selZ=null;selH=null;selPkg=null;selFechaIdx=0;
+  $$('w-fecha-lbl').textContent='Elige tu fecha';
 }
 
 function selViajeros(btn,n){
-  selViaj=n;selZ=null;selH=null;selPkg=null;
+  selViaj=n;selZ=null;selH=null;selPkg=null;selFechaIdx=0;
+  if(cur)cur._fechaIdx=0;
   var btns=$$('w-viajeros').querySelectorAll('.wiz-btn');
   for(var i=0;i<btns.length;i++)btns[i].classList.remove('active');
   btn.classList.add('active');
 
-  // Update package prices and show step 2
-  updatePkgCards();
-  $$('w-pkg-card').style.display='block';
   // Reset downstream
   $$('w-fecha-card').style.display='none';
+  $$('w-pkg-card').style.display='none';
   $$('w-zona-card').style.display='none';
   $$('w-hotel-card').style.display='none';
   $$('w-inc-card').style.display='none';
@@ -1015,6 +916,20 @@ function selViajeros(btn,n){
   $$('d-result').style.display='none';
   var pb=$$('w-paquetes').querySelectorAll('.wiz-btn');
   for(var i=0;i<pb.length;i++)pb[i].classList.remove('active');
+
+  if(cur&&cur.diaFirst){
+    // diaFirst: step 2 = Dia
+    $$('w-fecha-n').textContent='2';
+    $$('w-fecha-lbl').textContent='Elige tu día';
+    buildFechaButtons();
+    $$('w-fecha-card').style.display='block';
+  } else {
+    // Normal: step 2 = Paquete
+    $$('w-pkg-n').textContent='2';
+    $$('w-fecha-lbl').textContent='Elige tu fecha';
+    updatePkgCards();
+    $$('w-pkg-card').style.display='block';
+  }
 }
 
 function updatePkgCards(){
@@ -1027,7 +942,13 @@ function updatePkgCards(){
     var costs=valid.map(function(h){return h.e;});
     return Math.min.apply(null,costs);
   }
-  var minZ=minP(cur);
+  var minZ;
+  if(cur.diaFirst&&cur.multifecha&&cur.multifecha[selFechaIdx]&&!cur.multifecha[selFechaIdx].prox){
+    var mfSel=cur.multifecha[selFechaIdx];
+    minZ=mfSel.zonas&&mfSel.zonas[0]?mfSel.zonas[0].p:0;
+  } else {
+    minZ=minP(cur);
+  }
   var mh=minHotel(selViaj);
 
   // PLUS includes: zone + hotel
@@ -1068,8 +989,12 @@ function updatePkgCards(){
 
   // CHEAP: boleto + kit only (prices TBD per event)
   var cheapBtn=document.getElementById('btn-cheap');
-  if(cur.cheapZonas){
-    var cheapMin=cur.cheapZonas.filter(function(z){return !z.ag&&z.p>0;});
+  var cheapSrc=cur.cheapZonas;
+  if(cur.diaFirst&&cur.multifecha&&cur.multifecha[selFechaIdx]&&cur.multifecha[selFechaIdx].cheapZonas){
+    cheapSrc=cur.multifecha[selFechaIdx].cheapZonas;
+  }
+  if(cheapSrc){
+    var cheapMin=cheapSrc.filter(function(z){return !z.ag&&z.p>0;});
     var cheapMinP=cheapMin.length>0?Math.min.apply(null,cheapMin.map(function(z){return z.p;})):0;
     $$('pi-cheap').textContent='Boleto · Kit Conecta';
     $$('pp-cheap').textContent=cheapMinP>0?fmt(cheapMinP):'Cotizar';
@@ -1091,7 +1016,6 @@ function selPaquete(btn,pkg){
   var hasHotel=(pkg==='plus'||pkg==='ride'||pkg==='stay');
   var hasZona=(pkg==='plus'||pkg==='stay'||pkg==='cheap');
   var hasFecha=!!cur.multifecha;
-  var stepN=3;
 
   // Update includes card
   var incTxt='';
@@ -1102,35 +1026,53 @@ function selPaquete(btn,pkg){
   $$('d-inc').innerHTML='<div style="font-size:11px;color:rgba(255,255,255,.6);font-weight:700;text-transform:uppercase;line-height:2">'+incTxt+'</div>';
   $$('w-inc-card').style.display='block';
 
-  // Show fecha if multifecha
-  if(hasFecha){
-    $$('w-fecha-n').textContent=stepN; stepN++;
-    buildFechaButtons();
-    $$('w-fecha-card').style.display='block';
+  if(cur.diaFirst){
+    // diaFirst: day already selected, auto-set zona, show hotel as step 4
+    var mf=cur.multifecha[selFechaIdx];
+    if(hasZona&&mf){
+      var z=(pkg==='cheap'&&mf.cheapZonas)?mf.cheapZonas[0]:mf.zonas[0];
+      if(z)selZ={n:z.n,p:z.p};
+    }
+    $$('w-fecha-card').style.display='block'; // keep day visible
+    $$('w-zona-card').style.display='none';   // skip zona step
+    if(hasHotel){
+      $$('w-hotel-n').textContent='4';
+      buildHotelButtons();
+      $$('w-hotel-card').style.display='block';
+    } else {
+      $$('w-hotel-card').style.display='none';
+      // CHEAP: no hotel, calculate directly
+      selH={n:'Sin hospedaje',e:0};
+      calcular();
+    }
   } else {
-    $$('w-fecha-card').style.display='none';
-  }
-
-  // Show zona if package includes boleto
-  if(hasZona){
-    $$('w-zona-n').textContent=stepN; stepN++;
-    var zonasToShow;
-    if(selPkg==='cheap'&&cur.cheapZonas){zonasToShow=cur.cheapZonas;}
-    else if(hasFecha){zonasToShow=cur.multifecha[selFechaIdx].zonas;}
-    else{zonasToShow=cur.zonas;}
-    buildZonaButtons(zonasToShow);
-    $$('w-zona-card').style.display='block';
-  } else {
-    $$('w-zona-card').style.display='none';
-  }
-
-  // Show hotel if package includes hospedaje
-  if(hasHotel){
-    $$('w-hotel-n').textContent=stepN;
-    buildHotelButtons();
-    $$('w-hotel-card').style.display='block';
-  } else {
-    $$('w-hotel-card').style.display='none';
+    // Normal flow
+    var stepN=3;
+    if(hasFecha){
+      $$('w-fecha-n').textContent=stepN; stepN++;
+      buildFechaButtons();
+      $$('w-fecha-card').style.display='block';
+    } else {
+      $$('w-fecha-card').style.display='none';
+    }
+    if(hasZona){
+      $$('w-zona-n').textContent=stepN; stepN++;
+      var zonasToShow;
+      if(selPkg==='cheap'&&cur.cheapZonas){zonasToShow=cur.cheapZonas;}
+      else if(hasFecha){zonasToShow=cur.multifecha[selFechaIdx].zonas;}
+      else{zonasToShow=cur.zonas;}
+      buildZonaButtons(zonasToShow);
+      $$('w-zona-card').style.display='block';
+    } else {
+      $$('w-zona-card').style.display='none';
+    }
+    if(hasHotel){
+      $$('w-hotel-n').textContent=stepN;
+      buildHotelButtons();
+      $$('w-hotel-card').style.display='block';
+    } else {
+      $$('w-hotel-card').style.display='none';
+    }
   }
 
   $$('d-placeholder').style.display='block';
@@ -1141,7 +1083,11 @@ function buildFechaButtons(){
   var fH='';
   for(var i=0;i<cur.multifecha.length;i++){
     var mf=cur.multifecha[i];
-    var allAg=mf.zonas.every(function(z){return z.ag;});
+    if(mf.prox){
+      fH+='<button class="f-btn f-ag" disabled>'+mf.lbl+'<br><small>Próximamente</small></button>';
+      continue;
+    }
+    var allAg=mf.zonas&&mf.zonas.length>0&&mf.zonas.every(function(z){return z.ag;});
     fH+='<button class="f-btn'+(allAg?' f-ag':'')+(i===selFechaIdx?' active':'')+'"'+(allAg?' disabled':'')+
       ' onclick="selFecha(this,'+i+')">'+mf.lbl+(allAg?'<br><small>Agotado</small>':'')+'</button>';
   }
@@ -1152,8 +1098,9 @@ function buildZonaButtons(zonas){
   var h='';
   for(var i=0;i<zonas.length;i++){
     var z=zonas[i];
-    if(z.prox){btn.disabled=true;btn.style.opacity='0.6';var zpEl=btn.querySelector('.zp');if(zpEl)zpEl.textContent='Próximamente';btn.style.fontStyle='italic';}
-    if(z.ag){
+    if(z.prox){
+      h+='<button class="z-btn ag" disabled style="opacity:.6;font-style:italic"><div class="z-name">'+z.n+'</div><div class="z-ag">Próximamente</div></button>';
+    } else if(z.ag){
       h+='<button class="z-btn ag" disabled><div class="z-name">'+z.n+'</div><div class="z-ag">Agotado</div></button>';
     } else {
       h+='<button class="z-btn'+(z.vip?' vip':'')+'" data-p="'+z.p+'" data-n="'+z.n+'"><div class="z-name">'+z.n+'</div><div class="z-price">'+fmt(z.p)+'</div></button>';
@@ -1207,20 +1154,36 @@ function buildHotelButtons(){
 }
 
 function selFecha(btn,idx){
-  selFechaIdx=idx;cur._fechaIdx=idx;selZ=null;selH=null;
+  selFechaIdx=idx;cur._fechaIdx=idx;selZ=null;selH=null;selPkg=null;
   var btns=$$('d-fechas').querySelectorAll('.f-btn');
   for(var i=0;i<btns.length;i++)btns[i].classList.remove('active');
   btn.classList.add('active');
-  if(selPkg==='plus'||selPkg==='stay'){
-    buildZonaButtons(cur.multifecha[idx].zonas);
-  } else if(selPkg==='cheap'){
-    buildZonaButtons(cur.cheapZonas||cur.multifecha[idx].zonas);
+
+  if(cur.diaFirst){
+    // diaFirst: after selecting day, show paquete as step 3
+    $$('w-pkg-n').textContent='3';
+    updatePkgCards();
+    $$('w-pkg-card').style.display='block';
+    $$('w-zona-card').style.display='none';
+    $$('w-hotel-card').style.display='none';
+    $$('w-inc-card').style.display='none';
+    $$('d-placeholder').style.display='block';
+    $$('d-result').style.display='none';
+    var pb=$$('w-paquetes').querySelectorAll('.wiz-btn');
+    for(var i=0;i<pb.length;i++)pb[i].classList.remove('active');
+  } else {
+    // Normal: fecha comes after paquete, rebuild zona/hotel
+    if(selPkg==='plus'||selPkg==='stay'){
+      buildZonaButtons(cur.multifecha[idx].zonas);
+    } else if(selPkg==='cheap'){
+      buildZonaButtons(cur.cheapZonas||cur.multifecha[idx].zonas);
+    }
+    if(selPkg==='plus'||selPkg==='ride'||selPkg==='stay'){
+      buildHotelButtons();
+    }
+    $$('d-placeholder').style.display='block';
+    $$('d-result').style.display='none';
   }
-  if(selPkg==='plus'||selPkg==='ride'||selPkg==='stay'){
-    buildHotelButtons();
-  }
-  $$('d-placeholder').style.display='block';
-  $$('d-result').style.display='none';
 }
 
 function selZona(btn,p,n){

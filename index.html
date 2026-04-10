@@ -176,6 +176,7 @@ body{font-family:'Montserrat',sans-serif;background:#000;color:#fff;min-height:1
 .bank-lbl{color:rgba(255,255,255,.32);font-weight:700;text-transform:uppercase;font-size:10px;letter-spacing:.07em}
 .bank-val{font-weight:900;color:#fff;font-family:monospace;font-size:13px}
 .bank-val.s{font-family:'Montserrat',sans-serif;font-size:12px}
+.bank-copy{cursor:pointer;font-size:14px;margin-left:6px;opacity:.5;transition:opacity .15s}.bank-copy:hover{opacity:1}
 .bank-link{font-weight:900;font-size:12px;color:#e8ff4c;text-decoration:none}
 .pol-row{display:flex;gap:10px;font-size:11px;color:rgba(255,255,255,.6);padding:.5rem 0;border-bottom:1px solid rgba(255,255,255,.06);line-height:1.55;font-weight:600;text-transform:uppercase}
 .pol-row:last-child{border-bottom:none}
@@ -465,6 +466,12 @@ body{font-family:'Montserrat',sans-serif;background:#000;color:#fff;min-height:1
     <div class="hotel-grid" id="d-hotel"></div>
   </div>
 
+  <!-- PASO: TRANSPORTE (solo CDMX) -->
+  <div class="wiz-card" id="w-transport-card" style="display:none">
+    <div class="wiz-lbl"><span class="wiz-num-badge" id="w-transport-n">5</span>¿Cómo llegarás al evento?</div>
+    <div class="zona-grid" id="d-transport"></div>
+  </div>
+
   <!-- INCLUYE -->
   <div class="card" id="w-inc-card" style="display:none">
     <div class="card-lbl">Tu paquete incluye</div>
@@ -492,6 +499,7 @@ body{font-family:'Montserrat',sans-serif;background:#000;color:#fff;min-height:1
       <div class="sum-row"><span class="sum-lbl">Paquete</span><span class="sum-val" id="r-pkg-lbl"></span></div>
       <div class="sum-row" id="r-zona-row"><span class="sum-lbl" id="r-zona-lbl">Zona</span><span class="sum-val" id="r-zona"></span></div>
       <div class="sum-row" id="r-hotel-row"><span class="sum-lbl">Habitación</span><span class="sum-val" id="r-hotel"></span></div>
+      <div class="sum-row" id="r-transport-row" style="display:none"><span class="sum-lbl">Transporte</span><span class="sum-val" id="r-transport"></span></div>
       <div class="sum-row"><span class="sum-lbl">Separo hoy</span><span class="sep-badge" id="r-sep"></span></div>
       <div class="sum-row"><span class="sum-lbl">Viajeros</span><span class="sum-val" id="r-viajeros"></span></div>
       <div class="sum-row"><span class="sum-lbl">Total del grupo</span><span class="sum-val" id="r-total"></span></div>
@@ -628,7 +636,7 @@ var EV=[
   {id:'comuna',c:'rosa',a:'Festival Comuna',f:'Por confirmar',ds:'2027-12-31',v:'Por confirmar',sep:0,st:'por-confirmar',listOnly:true,inc:[],banco:BANCO_DEFAULT,zonas:[],hotel:[],pagos:[]}
 ];
 
-var cur=null,selZ=null,selH=null,selViaj=0,selPkg=null,selFechaIdx=0,selBoleto=null,costoXPersona=0,total=0,sepActualCalc=0,resto=0;
+var cur=null,selZ=null,selH=null,selViaj=0,selPkg=null,selFechaIdx=0,selBoleto=null,selTransporte=null,costoXPersona=0,total=0,sepActualCalc=0,resto=0;
 var HOTEL_MTY=[
   {n:'Compartida (4 personas)',e:0,viaj:[1,2,3,4]},
   {n:'Individual',e:1960,viaj:[1]},
@@ -965,8 +973,8 @@ function showDetail(id){
   // Bank info
   var b=cur.banco||BANCO_DEFAULT;
   var bH='<div class="bank-row"><span class="bank-lbl">Banco</span><span class="bank-val s">'+b.nombre+'</span></div>'+
-    '<div class="bank-row"><span class="bank-lbl">Tarjeta</span><span class="bank-val">'+b.tarjeta+'</span></div>'+
-    '<div class="bank-row"><span class="bank-lbl">CLABE</span><span class="bank-val">'+b.clabe+'</span></div>'+
+    '<div class="bank-row"><span class="bank-lbl">Tarjeta</span><span class="bank-val">'+b.tarjeta+' <span class="bank-copy" onclick="copiarDato(this,\''+b.tarjeta+'\')">📋</span></span></div>'+
+    '<div class="bank-row"><span class="bank-lbl">CLABE</span><span class="bank-val">'+b.clabe+' <span class="bank-copy" onclick="copiarDato(this,\''+b.clabe+'\')">📋</span></span></div>'+
     '<div class="bank-row"><span class="bank-lbl">Titular</span><span class="bank-val s">'+b.titular+'</span></div>';
   $$('d-bank').innerHTML=bH;
 
@@ -990,15 +998,16 @@ function resetWizard(){
   $$('w-fecha-card').style.display='none';
   $$('w-zona-card').style.display='none';
   $$('w-hotel-card').style.display='none';
+  $$('w-transport-card').style.display='none';
   $$('w-inc-card').style.display='none';
   $$('d-placeholder').style.display='block';
   $$('d-result').style.display='none';
-  selZ=null;selH=null;selPkg=null;selFechaIdx=0;selBoleto=null;
+  selZ=null;selH=null;selPkg=null;selFechaIdx=0;selBoleto=null;selTransporte=null;
   $$('w-fecha-lbl').textContent='Elige tu fecha';
 }
 
 function selViajeros(btn,n){
-  selViaj=n;selZ=null;selH=null;selPkg=null;selFechaIdx=0;selBoleto=null;
+  selViaj=n;selZ=null;selH=null;selPkg=null;selFechaIdx=0;selBoleto=null;selTransporte=null;
   if(cur)cur._fechaIdx=0;
   var btns=$$('w-viajeros').querySelectorAll('.wiz-btn');
   for(var i=0;i<btns.length;i++)btns[i].classList.remove('active');
@@ -1011,6 +1020,7 @@ function selViajeros(btn,n){
   $$('w-fecha-card').style.display='none';
   $$('w-zona-card').style.display='none';
   $$('w-hotel-card').style.display='none';
+  $$('w-transport-card').style.display='none';
   $$('w-inc-card').style.display='none';
   $$('d-placeholder').style.display='block';
   $$('d-result').style.display='none';
@@ -1110,7 +1120,7 @@ function updatePkgCards(){
 
 function selPaquete(btn,pkg){
   if(pkg==='stay'&&isCDMX(cur))return; // disabled for CDMX
-  selPkg=pkg;selZ=null;selH=null;
+  selPkg=pkg;selZ=null;selH=null;selTransporte=null;
   var pb=$$('w-paquetes').querySelectorAll('.wiz-btn');
   for(var i=0;i<pb.length;i++)pb[i].classList.remove('active');
   btn.classList.add('active');
@@ -1141,15 +1151,21 @@ function selPaquete(btn,pkg){
     }
     // selZ already set by selBoletoBtn for plus/stay
     $$('w-zona-card').style.display='none';
+    $$('w-transport-card').style.display='none';
     if(hasHotel){
       $$('w-hotel-n').textContent='5';
       buildHotelButtons();
       $$('w-hotel-card').style.display='block';
     } else {
       $$('w-hotel-card').style.display='none';
-      // CHEAP: no hotel, calculate directly
       selH={n:'Sin hospedaje',e:0};
-      calcular();
+      // CHEAP CDMX: show transport, else calculate
+      if(isCDMX(cur)){
+        buildTransporteButtons();
+        $$('w-transport-card').style.display='block';
+      } else {
+        calcular();
+      }
     }
   } else {
     // Normal flow
@@ -1180,6 +1196,7 @@ function selPaquete(btn,pkg){
     } else {
       $$('w-hotel-card').style.display='none';
     }
+    $$('w-transport-card').style.display='none';
   }
 
   $$('d-placeholder').style.display='block';
@@ -1364,10 +1381,37 @@ function selHotel(btn,e,n){
   for(var i=0;i<btns.length;i++)btns[i].classList.remove('active');
   btn.classList.add('active');
   selH={n:n,e:e};
+  selTransporte=null;
+  if(isCDMX(cur)){
+    buildTransporteButtons();
+    $$('w-transport-card').style.display='block';
+  } else {
+    $$('w-transport-card').style.display='none';
+    calcular();
+  }
+}
+
+function buildTransporteButtons(){
+  var stepN=parseInt($$('w-hotel-n').textContent)+1;
+  $$('w-transport-n').textContent=stepN;
+  var h='';
+  h+='<button class="z-btn" data-t="bus" data-cost="2500" onclick="selTransporteBtn(this,2500,\'Autobús desde Reynosa\')"><div class="z-name">🚌 Autobús desde Reynosa</div><div class="z-price">$2,500</div></button>';
+  h+='<button class="z-btn" data-t="avion" onclick="window.open(\'https://wa.me/528119771072?text='+encodeURIComponent('Hola! Quiero cotizar un vuelo para '+cur.a+' ('+cur.f+')')+'\',\'_blank\')"><div class="z-name">✈️ Avión</div><div class="z-price" style="font-size:11px;color:rgba(255,255,255,.5)">Cotiza por WhatsApp</div></button>';
+  h+='<button class="z-btn" data-t="sin" data-cost="0" onclick="selTransporteBtn(this,0,\'Sin transporte\')"><div class="z-name">🚶 Sin transporte</div><div class="z-price">$0</div></button>';
+  $$('d-transport').innerHTML=h;
+  $$('d-placeholder').style.display='block';
+  $$('d-result').style.display='none';
+}
+
+function selTransporteBtn(btn,cost,name){
+  var btns=$$('d-transport').querySelectorAll('.z-btn');
+  for(var i=0;i<btns.length;i++)btns[i].classList.remove('active');
+  btn.classList.add('active');
+  selTransporte={n:name,cost:cost};
   calcular();
 }
 
-  
+
 
 function actualizarMapaBtn(){
   var btn=$$('w-mapa-btn');
@@ -1385,33 +1429,27 @@ function cerrarMapa(){
 document.addEventListener('keydown',function(e){if(e.key==='Escape')cerrarMapa();});
 
 function compartirCotizacion(){
-  var ev=cur;
-  if(!ev)return;
-  var pkgNames={plus:'PLUS — Todo incluido',ride:'RIDE — Sin boleto',stay:'STAY — Sin transporte',cheap:'CHEAP — Solo boleto'};
-  var texto='🎤 *'+ev.a+'*\n';
-  texto+='📅 '+ev.f+'\n';
-  texto+='📍 '+ev.v+'\n\n';
-  texto+='📦 *Paquete:* '+(pkgNames[selPkg]||selPkg)+'\n';
-  if(selZ) texto+='🎫 *Zona:* '+selZ.n+' ('+fmt(selZ.p)+')\n';
-  if(selH&&selH.e>0) texto+='🏨 *Habitación:* '+selH.n+' (+'+fmt(Math.ceil(selH.e/selViaj))+'/persona)\n';
-  texto+='👥 *Viajeros:* '+selViaj+(selViaj===1?' persona':' personas')+'\n\n';
-  texto+='💰 *Costo por persona:* '+fmt(costoXPersona)+'\n';
-  texto+='💵 *Total del grupo:* '+fmt(total)+'\n';
-  texto+='💳 *Separo hoy:* '+fmt(sepActualCalc)+'\n';
-  texto+='💸 *Resto a cubrir:* '+fmt(resto)+'\n\n';
-  texto+='👉 conectareynosa.netlify.app';
+  if(!cur||!_lastCotizacion)return;
+  var texto=_lastCotizacion+'\n\n👉 conectareynosa.netlify.app';
+  copiarAlPortapapeles(texto,document.getElementById('btn-share'),'📋 Copiar cotización');
+}
+
+function copiarAlPortapapeles(texto,btn,resetTxt){
   if(navigator.clipboard){
     navigator.clipboard.writeText(texto).then(function(){
-      var btn=document.getElementById('btn-share');
-      if(btn){btn.textContent='✅ ¡Copiado!';setTimeout(function(){btn.textContent='📋 Copiar cotización';},2500);}
+      if(btn){btn.textContent='✅ ¡Copiado!';setTimeout(function(){btn.textContent=resetTxt||'📋 Copiar';},2500);}
     });
   } else {
-    // fallback
     var ta=document.createElement('textarea');
     ta.value=texto;document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta);
-    var btn=document.getElementById('btn-share');
-    if(btn){btn.textContent='✅ ¡Copiado!';setTimeout(function(){btn.textContent='📋 Copiar cotización';},2500);}
+    if(btn){btn.textContent='✅ ¡Copiado!';setTimeout(function(){btn.textContent=resetTxt||'📋 Copiar';},2500);}
   }
+}
+
+function copiarDato(el,valor){
+  copiarAlPortapapeles(valor,null);
+  el.textContent='✅';
+  setTimeout(function(){el.textContent='📋';},1500);
 }
 function aplicarPromo(){
   var code=document.getElementById('promo-input').value;
@@ -1435,8 +1473,9 @@ function calcular(){
   var hasHotel=(selPkg==='plus'||selPkg==='ride'||selPkg==='stay');
   if(hasZona&&!selZ)return;
   if(hasHotel&&!selH)return;
-
   var cdmx=isCDMX(cur);
+  // CDMX events need transport selection before calculating
+  if(cdmx&&!selTransporte)return;
   var zonaP=selZ?selZ.p:0;
   var hotelRaw=selH?selH.e:0;
   // hotelPP: e is per-person cost; otherwise e is total group cost
@@ -1472,13 +1511,14 @@ function calcular(){
     }
   }
 
+  // Add transport cost for CDMX
+  var transportCost=selTransporte?selTransporte.cost:0;
+  total+=transportCost*selViaj;
+  costoXPersona+=transportCost;
+
   sepActualCalc=(selPkg==='cheap')?1000:(cur.sep*selViaj);
   resto=total-sepActualCalc;
-  var nP=cur.pagos.filter(function(p){return!p.s;}).length;
-  if(nP<=0)nP=1;
-  var q=resto/nP;
 
-  // costoXPersona already calculated above
   $$('d-placeholder').style.display='none';
   $$('d-result').style.display='block';
   var promoCard=document.getElementById('w-promo-card');if(promoCard)promoCard.style.display='block';
@@ -1493,8 +1533,7 @@ function calcular(){
   $$('r-pkg-lbl').textContent={plus:'PLUS — Todo incluido',ride:'RIDE — Sin boleto',stay:'STAY — Sin transporte',cheap:'CHEAP — Solo boleto'}[selPkg];
   $$('r-viajeros').textContent=selViaj+(selViaj===1?' persona':' personas');
   $$('r-total').textContent=fmt(total);
-  var sepActual=sepActualCalc;
-  $$('r-sep').textContent=fmt(sepActual);
+  $$('r-sep').textContent=fmt(sepActualCalc);
   $$('r-resto').textContent=fmt(resto);
 
   var zonaRow=$$('r-zona-row');
@@ -1512,19 +1551,25 @@ function calcular(){
     $$('r-hotel').textContent=hLbl;
   }
 
-  // Auto-generate payment calendar from today
+  // Transport row
+  var tRow=document.getElementById('r-transport-row');
+  if(tRow){
+    if(selTransporte&&selTransporte.cost>0){
+      tRow.style.display='flex';
+      document.getElementById('r-transport').textContent=selTransporte.n+' — '+fmt(selTransporte.cost)+'/persona';
+    } else {
+      tRow.style.display='none';
+    }
+  }
+
+  // Payment calendar
   var today=new Date();
   var eventDate=new Date(cur.ds+'T12:00:00');
-  
-  // Generate all quincena dates from today until event
-
-  
   var maxPagos=(selPkg==='cheap')?4:10;
   var quincenas=getQuincenas(today, eventDate, maxPagos);
   var nPagos=quincenas.length;
   var pagoQ=nPagos>0?Math.ceil(resto/nPagos):resto;
-  
-  var tH='<tr><td><b>Separo</b></td><td>Hoy</td><td><b>'+fmt(cur.sep)+'</b></td></tr>';
+  var tH='<tr><td><b>Separo</b></td><td>Hoy</td><td><b>'+fmt(sepActualCalc)+'</b></td></tr>';
   for(var i=0;i<quincenas.length;i++){
     tH+='<tr><td>Pago '+(i+1)+'</td><td>'+quincenas[i].lbl+'</td><td>'+fmt(pagoQ)+'</td></tr>';
   }
@@ -1532,39 +1577,57 @@ function calcular(){
     tH+='<tr><td colspan="3" style="color:#ff283b;text-align:center">Evento próximo — contactar para plan de pago</td></tr>';
   }
   $$('r-tabla').innerHTML=tH;
-  
-  // Update the quincenal display with new calculation
-  $$('r-np').textContent='por viajero';
 
-  var pkgNames={plus:'PLUS — Todo incluido',ride:'RIDE — Sin boleto',stay:'STAY — Sin transporte',cheap:'CHEAP — Solo boleto'};
-  var waMsg='Hola! Quiero reservar mi lugar 🎉'+
-    '\n\n🎤 *'+cur.a+'*'+
-    '\n📅 '+cur.f+
-    '\n📍 '+cur.v+
-    '\n\n📦 *Paquete:* '+pkgNames[selPkg]+
-    (selZ?'\n🎫 *Zona:* '+selZ.n+' ('+fmt(selZ.p)+')':'')+
-    (selH?'\n🏨 *Habitación:* '+selH.n+(selH.e>0?' (+'+fmt(selH.e)+')':''):'')+
-    '\n👥 *Viajeros:* '+selViaj+(selViaj===1?' persona':' personas')+
-    '\n\n💰 *Total:* '+fmt(total)+
-    '\n💵 *Por persona:* '+fmt(costoXPersona)+
-    '\n💳 *Separo hoy:* '+fmt(selPkg==="cheap"?1000:(cur.sep*selViaj))+
-    '\n\n¿Qué sigue para reservar?';
-  $$('r-wa').href='https://wa.me/'+WA+'?text='+encodeURIComponent(waMsg);
-  // Show vuelo CTA for CDMX events
+  // Build full message (shared by WA, copy, vuelo)
+  _lastCotizacion=buildCotizacionMsg(quincenas,pagoQ);
+  $$('r-wa').href='https://wa.me/'+WA+'?text='+encodeURIComponent(_lastCotizacion);
+
+  // Vuelo CTA
   var vueloBox=document.getElementById('r-vuelo-box');
   var vueloBtn=document.getElementById('r-vuelo');
   if(vueloBox&&vueloBtn){
     if(isCDMX(cur)){
       vueloBox.style.display='block';
-      var vueloMsg='Hola! Me interesa cotizar un vuelo para '+cur.a+' ('+cur.f+') en CDMX. ¿Me pueden dar informes?';
-      vueloBtn.href='https://wa.me/528132321405?text='+encodeURIComponent(vueloMsg);
-    vueloBtn.textContent=cur.rideOnly?'🚌 ¿Cómo llego a CDMX? Cotiza tu traslado':'✈️ ¿Quieres cotizar tu vuelo?';
+      var vueloMsg='Hola, quiero cotizar mi vuelo para este paquete:\n\n'+_lastCotizacion;
+      vueloBtn.href='https://wa.me/528119771072?text='+encodeURIComponent(vueloMsg);
+      vueloBtn.textContent=cur.rideOnly?'🚌 ¿Cómo llego a CDMX? Cotiza tu traslado':'✈️ ¿Quieres cotizar tu vuelo?';
     } else {
       vueloBox.style.display='none';
     }
   }
 
   setTimeout(function(){var el=$$('d-result');if(el&&el.scrollIntoView)el.scrollIntoView({behavior:'smooth',block:'start'});},100);
+}
+
+var _lastCotizacion='';
+function buildCotizacionMsg(quincenas,pagoQ){
+  var pkgNames={plus:'PLUS — Todo incluido',ride:'RIDE — Sin boleto',stay:'STAY — Sin transporte',cheap:'CHEAP — Solo boleto'};
+  var hoy=new Date();
+  var fechaHoy=hoy.getDate()+'/'+(hoy.getMonth()+1)+'/'+hoy.getFullYear();
+  var msg='Hola! Quiero reservar mi lugar 🎉'+
+    '\n\n🎤 *'+cur.a+'*'+
+    '\n📅 '+cur.f+
+    '\n📍 '+cur.v+
+    '\n\n📦 *Paquete:* '+pkgNames[selPkg]+
+    '\n👥 *Viajeros:* '+selViaj+(selViaj===1?' persona':' personas');
+  if(selZ) msg+='\n🎫 *Zona:* '+selZ.n+' ('+fmt(selZ.p)+')';
+  if(selH&&selH.e>0) msg+='\n🏨 *Habitación:* '+selH.n+' (+'+fmt(selH.e)+(cur.hotelPP?'/persona':'')+')';
+  else if(selH) msg+='\n🏨 *Habitación:* '+selH.n+' (incluida)';
+  if(selTransporte&&selTransporte.cost>0) msg+='\n🚌 *Transporte:* '+selTransporte.n+' (+'+fmt(selTransporte.cost)+'/persona)';
+  msg+='\n\n💰 *Costo por persona:* '+fmt(costoXPersona);
+  if(selViaj>1) msg+='\n💵 *Total del grupo:* '+fmt(total);
+  msg+='\n💳 *Separo hoy:* '+fmt(sepActualCalc);
+  msg+='\n💸 *Resto a cubrir:* '+fmt(resto);
+  if(quincenas&&quincenas.length>0){
+    msg+='\n\n📆 *Calendario de pagos:*';
+    msg+='\n  Separo — '+fmt(sepActualCalc)+' (hoy)';
+    for(var i=0;i<quincenas.length;i++){
+      msg+='\n  Pago '+(i+1)+' — '+fmt(pagoQ)+' ('+quincenas[i].lbl+')';
+    }
+  }
+  msg+='\n\n📋 Fecha de solicitud: '+fechaHoy;
+  msg+='\n\n¿Qué sigue para reservar?';
+  return msg;
 }
 
 function getQuincenas(from, until, max){

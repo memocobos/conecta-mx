@@ -736,7 +736,7 @@ function $$(id){ return document.getElementById(id); }
 // ── Package definitions ───────────────────────────────────────────────────
 function getPaquetes(ev) {
   var cdmx = ev.v && ev.v.toLowerCase().indexOf('cdmx') >= 0;
-  var zonas=(ev.multifecha?ev.multifecha.reduce(function(a,mf){return a.concat(mf.zonas);},ev.zonas||[]):(ev.zonas||[])).filter(function(z){return !z.prox;});
+  var zonas=(ev.multifecha?ev.multifecha.reduce(function(a,mf){return a.concat(mf.zonas);},ev.zonas||[]):(ev.zonas||[]));
   var avail = zonas.filter(function(z){return !z.ag && z.p > 0;});
   var plusMin = avail.length ? Math.min.apply(null, avail.map(function(z){return z.p;})) : 0;
 

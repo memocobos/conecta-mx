@@ -103,7 +103,7 @@ body{font-family:'Montserrat',sans-serif;background:#000;color:#fff;min-height:1
 .d-badge{display:inline-block;background:#e8ff4c;color:#000;font-size:9px;font-weight:900;padding:4px 12px;letter-spacing:.1em;text-transform:uppercase;margin-bottom:10px}
 .d-artist{font-size:22px;font-weight:900;color:#fff;text-transform:uppercase;line-height:1.05;margin-bottom:6px}
 .d-venue{font-size:11px;color:rgba(255,255,255,.55);font-weight:700;text-transform:uppercase}
-.d-body{padding:14px;display:flex;flex-direction:column}
+.d-body{padding:14px}
 .card{background:#1a1a1a;border:1px solid rgba(255,255,255,.09);padding:16px;margin-bottom:10px}
 .card-lbl{font-size:9px;font-weight:900;color:#e8ff4c;text-transform:uppercase;letter-spacing:.15em;margin-bottom:13px}
 .inc-pills{display:flex;flex-wrap:wrap;gap:6px}
@@ -396,10 +396,10 @@ body{font-family:'Montserrat',sans-serif;background:#000;color:#fff;min-height:1
     </div>
   </div>
 
-  <!-- PASO 2: DÍA / FECHA (multifecha) — aparece antes de paquete para diaFirst -->
-  <div class="wiz-card" id="w-fecha-card" style="display:none">
-    <div class="wiz-lbl"><span class="wiz-num-badge" id="w-fecha-n">3</span><span id="w-fecha-lbl">Elige tu fecha</span></div>
-    <div class="fecha-sel" id="d-fechas"></div>
+  <!-- PASO 2: DÍA (solo diaFirst, antes de paquete) -->
+  <div class="wiz-card" id="w-dia-card" style="display:none">
+    <div class="wiz-lbl"><span class="wiz-num-badge">2</span><span>Elige tu día</span></div>
+    <div class="fecha-sel" id="d-dias"></div>
   </div>
 
   <!-- PASO 2/3: PAQUETE -->
@@ -429,6 +429,12 @@ body{font-family:'Montserrat',sans-serif;background:#000;color:#fff;min-height:1
     </div>
   </div>
 
+  <!-- PASO 3: FECHA (flujo normal, después de paquete) -->
+  <div class="wiz-card" id="w-fecha-card" style="display:none">
+    <div class="wiz-lbl"><span class="wiz-num-badge" id="w-fecha-n">3</span><span id="w-fecha-lbl">Elige tu fecha</span></div>
+    <div class="fecha-sel" id="d-fechas"></div>
+  </div>
+
   <!-- PASO 3/4: ZONA -->
   <div class="wiz-card" id="w-zona-card" style="display:none">
     <div class="wiz-lbl"><span class="wiz-num-badge" id="w-zona-n">3</span>Elige tu zona</div>
@@ -439,6 +445,12 @@ body{font-family:'Montserrat',sans-serif;background:#000;color:#fff;min-height:1
   <div class="wiz-card" id="w-hotel-card" style="display:none">
     <div class="wiz-lbl"><span class="wiz-num-badge" id="w-hotel-n">4</span>Tipo de habitación</div>
     <div class="hotel-grid" id="d-hotel"></div>
+  </div>
+
+  <!-- INCLUYE -->
+  <div class="card" id="w-inc-card" style="display:none">
+    <div class="card-lbl">Tu paquete incluye</div>
+    <div class="inc-pills" id="d-inc"></div>
   </div>
 
   <!-- RESULTADO -->
@@ -475,11 +487,6 @@ body{font-family:'Montserrat',sans-serif;background:#000;color:#fff;min-height:1
     <div id="r-vuelo-box" style="display:none;margin-top:10px">
       <a class="vuelo-btn" id="r-vuelo" href="#" target="_blank" id="r-vuelo-txt">✈️ ¿Quieres cotizar tu vuelo?</a>
     </div>
-  </div>
-
-  <div class="card" id="w-inc-card" style="display:none">
-    <div class="card-lbl">Tu paquete incluye</div>
-    <div class="inc-pills" id="d-inc"></div>
   </div>
 
   <div class="card"><div class="card-lbl">Datos de pago</div><div id="d-bank"></div></div>
@@ -888,6 +895,7 @@ function resetWizard(){
   var btns=$$('w-viajeros').querySelectorAll('.wiz-btn');
   for(var i=0;i<btns.length;i++)btns[i].classList.remove('active');
   // Hide steps 2-5
+  $$('w-dia-card').style.display='none';
   $$('w-pkg-card').style.display='none';
   $$('w-fecha-card').style.display='none';
   $$('w-zona-card').style.display='none';
@@ -897,14 +905,6 @@ function resetWizard(){
   $$('d-result').style.display='none';
   selZ=null;selH=null;selPkg=null;selFechaIdx=0;
   $$('w-fecha-lbl').textContent='Elige tu fecha';
-  // Set visual order: diaFirst = fecha(1) → pkg(2), normal = pkg(1) → fecha(2)
-  if(cur&&cur.diaFirst){
-    $$('w-fecha-card').style.order='1';
-    $$('w-pkg-card').style.order='2';
-  } else {
-    $$('w-fecha-card').style.order='2';
-    $$('w-pkg-card').style.order='1';
-  }
 }
 
 function selViajeros(btn,n){
@@ -915,8 +915,9 @@ function selViajeros(btn,n){
   btn.classList.add('active');
 
   // Reset downstream
-  $$('w-fecha-card').style.display='none';
+  $$('w-dia-card').style.display='none';
   $$('w-pkg-card').style.display='none';
+  $$('w-fecha-card').style.display='none';
   $$('w-zona-card').style.display='none';
   $$('w-hotel-card').style.display='none';
   $$('w-inc-card').style.display='none';
@@ -926,15 +927,12 @@ function selViajeros(btn,n){
   for(var i=0;i<pb.length;i++)pb[i].classList.remove('active');
 
   if(cur&&cur.diaFirst){
-    // diaFirst: step 2 = Dia
-    $$('w-fecha-n').textContent='2';
-    $$('w-fecha-lbl').textContent='Elige tu día';
-    buildFechaButtons();
-    $$('w-fecha-card').style.display='block';
+    // diaFirst: step 2 = Dia (uses w-dia-card above paquete)
+    buildDiaButtons();
+    $$('w-dia-card').style.display='block';
   } else {
     // Normal: step 2 = Paquete
     $$('w-pkg-n').textContent='2';
-    $$('w-fecha-lbl').textContent='Elige tu fecha';
     updatePkgCards();
     $$('w-pkg-card').style.display='block';
   }
@@ -1041,7 +1039,6 @@ function selPaquete(btn,pkg){
       var z=(pkg==='cheap'&&mf.cheapZonas)?mf.cheapZonas[0]:mf.zonas[0];
       if(z)selZ={n:z.n,p:z.p};
     }
-    $$('w-fecha-card').style.display='block'; // keep day visible
     $$('w-zona-card').style.display='none';   // skip zona step
     if(hasHotel){
       $$('w-hotel-n').textContent='4';
@@ -1100,6 +1097,38 @@ function buildFechaButtons(){
       ' onclick="selFecha(this,'+i+')">'+mf.lbl+(allAg?'<br><small>Agotado</small>':'')+'</button>';
   }
   $$('d-fechas').innerHTML=fH;
+}
+
+function buildDiaButtons(){
+  var fH='';
+  for(var i=0;i<cur.multifecha.length;i++){
+    var mf=cur.multifecha[i];
+    if(mf.prox){
+      fH+='<button class="f-btn f-ag" disabled>'+mf.lbl+'<br><small>Próximamente</small></button>';
+      continue;
+    }
+    fH+='<button class="f-btn'+(i===selFechaIdx?' active':'')+'" onclick="selDia(this,'+i+')">'+mf.lbl+'</button>';
+  }
+  $$('d-dias').innerHTML=fH;
+}
+
+function selDia(btn,idx){
+  selFechaIdx=idx;cur._fechaIdx=idx;selZ=null;selH=null;selPkg=null;
+  var btns=$$('d-dias').querySelectorAll('.f-btn');
+  for(var i=0;i<btns.length;i++)btns[i].classList.remove('active');
+  btn.classList.add('active');
+  // Show paquete as step 3
+  $$('w-pkg-n').textContent='3';
+  updatePkgCards();
+  $$('w-pkg-card').style.display='block';
+  // Reset downstream
+  $$('w-zona-card').style.display='none';
+  $$('w-hotel-card').style.display='none';
+  $$('w-inc-card').style.display='none';
+  $$('d-placeholder').style.display='block';
+  $$('d-result').style.display='none';
+  var pb=$$('w-paquetes').querySelectorAll('.wiz-btn');
+  for(var i=0;i<pb.length;i++)pb[i].classList.remove('active');
 }
 
 function buildZonaButtons(zonas){
@@ -1162,36 +1191,21 @@ function buildHotelButtons(){
 }
 
 function selFecha(btn,idx){
-  selFechaIdx=idx;cur._fechaIdx=idx;selZ=null;selH=null;selPkg=null;
+  // Normal flow only (non-diaFirst events with multifecha)
+  selFechaIdx=idx;cur._fechaIdx=idx;selZ=null;selH=null;
   var btns=$$('d-fechas').querySelectorAll('.f-btn');
   for(var i=0;i<btns.length;i++)btns[i].classList.remove('active');
   btn.classList.add('active');
-
-  if(cur.diaFirst){
-    // diaFirst: after selecting day, show paquete as step 3
-    $$('w-pkg-n').textContent='3';
-    updatePkgCards();
-    $$('w-pkg-card').style.display='block';
-    $$('w-zona-card').style.display='none';
-    $$('w-hotel-card').style.display='none';
-    $$('w-inc-card').style.display='none';
-    $$('d-placeholder').style.display='block';
-    $$('d-result').style.display='none';
-    var pb=$$('w-paquetes').querySelectorAll('.wiz-btn');
-    for(var i=0;i<pb.length;i++)pb[i].classList.remove('active');
-  } else {
-    // Normal: fecha comes after paquete, rebuild zona/hotel
-    if(selPkg==='plus'||selPkg==='stay'){
-      buildZonaButtons(cur.multifecha[idx].zonas);
-    } else if(selPkg==='cheap'){
-      buildZonaButtons(cur.cheapZonas||cur.multifecha[idx].zonas);
-    }
-    if(selPkg==='plus'||selPkg==='ride'||selPkg==='stay'){
-      buildHotelButtons();
-    }
-    $$('d-placeholder').style.display='block';
-    $$('d-result').style.display='none';
+  if(selPkg==='plus'||selPkg==='stay'){
+    buildZonaButtons(cur.multifecha[idx].zonas);
+  } else if(selPkg==='cheap'){
+    buildZonaButtons(cur.cheapZonas||cur.multifecha[idx].zonas);
   }
+  if(selPkg==='plus'||selPkg==='ride'||selPkg==='stay'){
+    buildHotelButtons();
+  }
+  $$('d-placeholder').style.display='block';
+  $$('d-result').style.display='none';
 }
 
 function selZona(btn,p,n){

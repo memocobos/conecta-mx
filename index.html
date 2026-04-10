@@ -509,8 +509,8 @@ body{font-family:'Montserrat',sans-serif;background:#000;color:#fff;min-height:1
     </div>
     <div class="card"><div class="card-lbl">Calendario de pagos</div><table class="pagos-tbl" id="r-tabla"></table></div>
     <a class="wa-btn" id="r-wa" href="#">Reservar mi lugar en WhatsApp</a>
-    <button class="share-btn" onclick="compartirCotizacion()" style="display:none" id="btn-share">
-      📋 Copiar cotización
+    <button class="share-btn" onclick="generarImagenCotizacion()" style="display:none" id="btn-share">
+      ⬇️ Descargar cotización
     </button>
     <div id="r-vuelo-box" style="display:none;margin-top:10px">
       <a class="vuelo-btn" id="r-vuelo" href="#" target="_blank" id="r-vuelo-txt">✈️ ¿Quieres cotizar tu vuelo?</a>
@@ -1432,10 +1432,127 @@ function cerrarMapa(){
 }
 document.addEventListener('keydown',function(e){if(e.key==='Escape')cerrarMapa();});
 
-function compartirCotizacion(){
-  if(!cur||!_lastCotizacion)return;
-  var texto=_lastCotizacion+'\n\n👉 conectareynosa.netlify.app';
-  copiarAlPortapapeles(texto,document.getElementById('btn-share'),'📋 Copiar cotización');
+var _lastQuincenas=[],_lastPagoQ=0;
+
+function generarImagenCotizacion(){
+  if(!cur)return;
+  var W=420,sc=Math.max(window.devicePixelRatio||1,2);
+  var pkgNames={plus:'PLUS — Todo incluido',ride:'RIDE — Sin boleto',stay:'STAY — Sin transporte',cheap:'CHEAP — Solo boleto'};
+
+  // Collect rows
+  var rows=[];
+  rows.push({l:'Viajeros',v:selViaj+(selViaj===1?' persona':' personas')});
+  rows.push({l:'Paquete',v:pkgNames[selPkg]||selPkg});
+  if(selZ)rows.push({l:cur.diaFirst?'Boleto':'Zona',v:selZ.n+' — '+fmt(selZ.p)});
+  if(selH){var hv=selH.n;if(selH.e>0)hv+=' (+'+fmt(selH.e)+(cur.hotelPP?'/persona':'')+')';else hv+=' (incluida)';rows.push({l:'Habitación',v:hv});}
+  if(selTransporte&&selTransporte.cost>0)rows.push({l:'Transporte',v:selTransporte.n+' — '+fmt(selTransporte.cost)+'/persona'});
+
+  // Collect pagos
+  var pagos=[{l:'Separo',d:'Hoy',v:fmt(sepActualCalc),hi:true}];
+  for(var i=0;i<_lastQuincenas.length;i++)pagos.push({l:'Pago '+(i+1),d:_lastQuincenas[i].lbl,v:fmt(_lastPagoQ),hi:false});
+
+  // Calculate height
+  var hdrH=90,bodyPad=20,rowH=30,secH=32,totalBoxH=80,pagoRowH=24,footerH=40;
+  var bodyH=bodyPad+secH+(rows.length*rowH)+16+totalBoxH+20+secH+(pagos.length*pagoRowH)+bodyPad;
+  var H=hdrH+bodyH+footerH;
+
+  var c=document.createElement('canvas');
+  c.width=W*sc;c.height=H*sc;
+  var ctx=c.getContext('2d');
+  ctx.scale(sc,sc);
+
+  // ── HEADER ──
+  ctx.fillStyle='#cc0000';
+  ctx.fillRect(0,0,W,hdrH);
+  // Logo box
+  ctx.strokeStyle='#fff';ctx.lineWidth=2;
+  ctx.strokeRect(20,16,90,28);
+  ctx.font='900 16px Montserrat,Arial,sans-serif';
+  ctx.fillStyle='#fff';ctx.fillText('CONECTA',26,36);
+  ctx.fillStyle='#ccff00';ctx.fillText('MX.',87,36);
+  // Event name
+  ctx.fillStyle='#fff';ctx.font='900 18px Montserrat,Arial,sans-serif';
+  var evName=cur.a.length>30?cur.a.substring(0,28)+'…':cur.a;
+  ctx.fillText(evName,20,65);
+  // Date + venue
+  ctx.fillStyle='rgba(255,255,255,.7)';ctx.font='600 11px Montserrat,Arial,sans-serif';
+  ctx.fillText(cur.f+' · '+cur.v,20,82);
+
+  // ── BODY ──
+  var y=hdrH;
+  ctx.fillStyle='#0a0a0a';ctx.fillRect(0,y,W,bodyH);
+  y+=bodyPad;
+
+  // Section: Detalle
+  ctx.fillStyle='#ccff00';ctx.font='900 10px Montserrat,Arial,sans-serif';
+  ctx.fillText('DETALLE DEL PAQUETE',20,y+10);
+  y+=secH;
+
+  // Rows
+  for(var r=0;r<rows.length;r++){
+    ctx.fillStyle='rgba(255,255,255,.4)';ctx.font='600 11px Montserrat,Arial,sans-serif';
+    ctx.fillText(rows[r].l,20,y+12);
+    ctx.fillStyle='#fff';ctx.font='700 12px Montserrat,Arial,sans-serif';
+    ctx.fillText(rows[r].v,140,y+12);
+    // separator
+    ctx.fillStyle='rgba(255,255,255,.08)';ctx.fillRect(20,y+rowH-2,W-40,1);
+    y+=rowH;
+  }
+  y+=16;
+
+  // Total box
+  var bx=20,bw=W-40,by=y;
+  ctx.fillStyle='#ccff00';
+  ctx.beginPath();
+  ctx.roundRect(bx,by,bw,totalBoxH,10);
+  ctx.fill();
+  // Total label
+  ctx.fillStyle='#333';ctx.font='700 11px Montserrat,Arial,sans-serif';
+  ctx.fillText('Total del grupo',bx+16,by+20);
+  // Total amount
+  ctx.fillStyle='#0a0a0a';ctx.font='900 26px Montserrat,Arial,sans-serif';
+  ctx.fillText(fmt(total),bx+16,by+50);
+  // Per person
+  ctx.fillStyle='#555';ctx.font='600 11px Montserrat,Arial,sans-serif';
+  ctx.fillText(fmt(costoXPersona)+' por persona',bx+16,by+68);
+  y+=totalBoxH+20;
+
+  // Section: Pagos
+  ctx.fillStyle='#ccff00';ctx.font='900 10px Montserrat,Arial,sans-serif';
+  ctx.fillText('CALENDARIO DE PAGOS',20,y+10);
+  y+=secH;
+
+  for(var p=0;p<pagos.length;p++){
+    var pg=pagos[p];
+    ctx.fillStyle=pg.hi?'#ccff00':'rgba(255,255,255,.5)';
+    ctx.font=(pg.hi?'900':'600')+' 11px Montserrat,Arial,sans-serif';
+    ctx.fillText(pg.l,20,y+10);
+    ctx.fillText(pg.d,140,y+10);
+    ctx.fillStyle=pg.hi?'#ccff00':'rgba(255,255,255,.7)';
+    ctx.font='700 11px Montserrat,Arial,sans-serif';
+    ctx.fillText(pg.v,310,y+10);
+    y+=pagoRowH;
+  }
+
+  // ── FOOTER ──
+  y=hdrH+bodyH;
+  ctx.fillStyle='#111';ctx.fillRect(0,y,W,footerH);
+  ctx.fillStyle='rgba(255,255,255,.3)';ctx.font='600 9px Montserrat,Arial,sans-serif';
+  ctx.fillText('conectareynosa.netlify.app',20,y+24);
+  var hoy=new Date();
+  var meses=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+  var fechaGen=hoy.getDate()+' '+meses[hoy.getMonth()]+' '+hoy.getFullYear();
+  ctx.fillText('Generado '+fechaGen,W-140,y+24);
+
+  // Download
+  var link=document.createElement('a');
+  var slug=cur.id||'evento';
+  link.download='cotizacion-'+slug+'-'+hoy.getDate()+'-'+(hoy.getMonth()+1)+'-'+hoy.getFullYear()+'.png';
+  link.href=c.toDataURL('image/png');
+  link.click();
+
+  var btn=document.getElementById('btn-share');
+  if(btn){btn.textContent='✅ ¡Descargado!';setTimeout(function(){btn.textContent='⬇️ Descargar cotización';},2500);}
 }
 
 function copiarAlPortapapeles(texto,btn,resetTxt){
@@ -1583,6 +1700,8 @@ function calcular(){
   }
   $$('r-tabla').innerHTML=tH;
 
+  // Store for image generation
+  _lastQuincenas=quincenas;_lastPagoQ=pagoQ;
   // Build full message (shared by WA, copy, vuelo)
   _lastCotizacion=buildCotizacionMsg(quincenas,pagoQ);
   $$('r-wa').href='https://wa.me/'+WA+'?text='+encodeURIComponent(_lastCotizacion);

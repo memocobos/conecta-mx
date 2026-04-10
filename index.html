@@ -1371,6 +1371,7 @@ function buildZonaButtons(zonas){
   var h='';
   for(var i=0;i<zonas.length;i++){
     var z=zonas[i];
+    if(z.prox){btn.disabled=true;btn.style.opacity='0.6';var zpEl=btn.querySelector('.zp');if(zpEl)zpEl.textContent='Próximamente';btn.style.fontStyle='italic';}
     if(z.ag){
       h+='<button class="z-btn ag" disabled><div class="z-name">'+z.n+'</div><div class="z-ag">Agotado</div></button>';
     } else {

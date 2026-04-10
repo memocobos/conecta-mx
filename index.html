@@ -664,7 +664,7 @@ function renderCatalog(){
     if(!isAg&&_total>0&&_avail===0)isAg=true;
     var isUlt=st==='ultimos'||(!isAg&&!isSV&&!isPC2&&_pct<40&&_pct>0);
     var isPoca=!isAg&&!isUlt&&!isSV&&!isPC2&&_pct>=40&&_pct<60;
-    var hasZ=ev.zonas.length>0;
+    var _allZonas=(ev.multifecha?ev.multifecha.reduce(function(acc,mf){return acc.concat(mf.zonas);},ev.zonas||[]):(ev.zonas||[]));var hasZ=_allZonas.filter(function(z){return !z.ag&&!z.prox&&z.p>0;}).reduce(function(m,z){return z.p<m?z.p:m;},999999);
     var tagTxt=isAg?(z&&z.prox?'Próximamente':'Agotado'):isUlt?'Últimos lugares':isPoca?'Poca disponibilidad':isSV?'Solo viaje':isPC2?'Por confirmar':'Disponible';
     var tagCls=isAg?'tag':isUlt?'tu':isPoca?'tpoca':isSV?'tsv':isPC2?'tpc':'td';
     var priceH='';

@@ -1619,38 +1619,71 @@ function buildEventSummary(){
 function getChatSystemPrompt(){
   var charIntro=_chatChar?'Tu personaje es '+_chatChar.name+'. Mantén su personalidad de forma sutil sin exagerar. ':'';
   return charIntro+'Eres el asistente virtual de Conecta MX, agencia de viajes y boletos para conciertos en Reynosa, Tamaulipas, México. '+
-    'Respondes en español, eres amigable, cordial y comercial. Ayudas a cotizar paquetes y dar información de eventos. '+
-    'Paquetes disponibles: PLUS (todo incluido: transporte+hotel+boleto+kit), RIDE (sin boleto: transporte+hotel+kit), STAY (sin transporte: hotel+boleto+kit), CHEAP (solo boleto+kit). '+
-    'Adapta tu lenguaje al género del cliente: usa terminaciones femeninas (-a) con nombres femeninos y masculinas (-o) con masculinos. Si no estás seguro, usa lenguaje neutro. '+
-    'Si el usuario quiere hablar con una persona real, dile que puede contactar por WhatsApp. '+
-    'Si no sabes algo con certeza, sugiere contactar por WhatsApp para información más detallada. '+
-    'Sé conciso, máximo 2-3 oraciones por respuesta. '+
+    'Respondes en español, eres amigable, cordial y comercial. Ayudas a cotizar paquetes y dar información de eventos.\n\n'+
+    'PAQUETES:\n'+
+    '- PLUS: todo incluido (transporte + hotel compartido + boleto + kit). Precio = zona elegida.\n'+
+    '- RIDE: sin boleto (transporte + hotel compartido + kit). El cliente ya tiene su boleto.\n'+
+    '- STAY: sin transporte (hotel compartido + boleto + kit). Precio = zona elegida MENOS el separo/transporte (campo sep del evento, aprox $500).\n'+
+    '- CHEAP: solo boleto + kit. Sin transporte ni hotel.\n\n'+
+    'REGLAS ESTRICTAS:\n'+
+    '- El hotel compartido (4 personas) SIEMPRE está INCLUIDO sin costo extra en PLUS, RIDE y STAY.\n'+
+    '- Solo se cobra extra si el cliente quiere habitación Individual, Doble o Triple.\n'+
+    '- NUNCA preguntes cuántas noches ni dónde quiere el hotel. El hotel es siempre cerca del venue del evento.\n'+
+    '- NUNCA inventes precios. Solo usa los datos proporcionados. Si no tienes el dato exacto, di "te puedo dar más info por WhatsApp".\n'+
+    '- NUNCA ofrezcas servicios que no existen (selección de hotel, noches adicionales, upgrades, etc.).\n'+
+    '- Adapta tu lenguaje al género del cliente: terminaciones femeninas con nombres femeninos, masculinas con masculinos. Si no estás seguro, usa neutro.\n'+
+    '- Si el usuario quiere hablar con una persona real, dile que puede contactar por WhatsApp.\n\n'+
+    'FORMATO: Usa puntuación correcta: puntos, comas, puntos y aparte. Separa ideas en párrafos cortos. Nunca escribas texto corrido sin pausas. Máximo 3 oraciones por párrafo.\n\n'+
     'EVENTOS ACTUALES:\n'+buildEventSummary();
 }
 
-var _CHARS=[
-  {name:'Memo Cobos',w:3,msg:'¡Hola! Soy Memo Cobos, aunque me conocen como el Tío Conecta 😎 Hoy seré tu asistente de Conecta MX. ¿Con quién tengo el gusto?'},
-  {name:'Kenia Os',w:9.7,msg:'¡Hola! Soy Kenia Os y hoy seré tu asistente virtual de Conecta MX 🎵 ¿Con quién tengo el gusto?'},
-  {name:'Milo J',w:9.7,msg:'¡Hola! Soy Milo J y hoy seré tu asistente de Conecta MX 🎶 ¿Con quién tengo el gusto?'},
-  {name:'Abel Tesfaye',w:9.7,msg:'¡Hola! Soy Abel Tesfaye, aunque tal vez me conozcas como The Weeknd 🌙 Hoy seré tu asistente de Conecta MX. ¿Con quién tengo el gusto?'},
-  {name:'Dave Mustaine',w:9.7,msg:'¡Hola! Soy Dave Mustaine, frontman de Megadeth 🤘 Hoy seré tu asistente de Conecta MX. ¿Con quién tengo el gusto?'},
-  {name:'Ricardo Arjona',w:9.7,msg:'¡Hola! Soy Ricardo Arjona y hoy seré tu asistente de Conecta MX 🎸 ¿Con quién tengo el gusto?'},
-  {name:'Morat',w:9.7,msg:'¡Hola! Somos Morat y hoy seremos tus asistentes de Conecta MX 🎵 ¿Con quién tenemos el gusto?'},
-  {name:'Romeo Santos',w:9.7,msg:'¡Hola! Soy Romeo Santos y hoy seré tu asistente de Conecta MX 👑 ¿Con quién tengo el gusto?'},
-  {name:'Marco Antonio Solís',w:9.7,msg:'¡Hola! Soy Marco Antonio Solís y hoy seré tu asistente de Conecta MX 🎤 ¿Con quién tengo el gusto?'},
-  {name:'Young Miko',w:9.7,msg:'¡Hola! Soy Young Miko y hoy seré tu asistente de Conecta MX 🔥 ¿Con quién tengo el gusto?'},
-  {name:'Bruno Mars',w:9.7,msg:'¡Hola! Soy Bruno Mars y hoy seré tu asistente de Conecta MX 🎹 ¿Con quién tengo el gusto?'}
-];
+var _CHAR_EXCLUDE=['machaca','edc','emblema','coronacap','flowfest','arre','knotfest','warped','dalemix','comuna','pulsognp','nochegrandes'];
+var _CHAR_NAMES={'weeknd':{name:'Abel Tesfaye',extra:', aunque tal vez me conozcas como The Weeknd 🌙'},'megadeth':{name:'Dave Mustaine',extra:', frontman de Megadeth 🤘'},'soad':{name:'Serj Tankian',extra:', vocalista de System of a Down 🎤'}};
+var _CHAR_PLURAL=['morat'];
+var _MEMO={name:'Memo Cobos',w:3,msg:'¡Hola! Soy Memo Cobos, aunque me conocen como el Tío Conecta 😎 Hoy seré tu asistente de Conecta MX. ¿Con quién tengo el gusto?'};
+
+function buildChars(){
+  var chars=[_MEMO];
+  var today=new Date();
+  var artists=[];
+  for(var i=0;i<EV.length;i++){
+    var e=EV[i];
+    if(e.listOnly)continue;
+    if(_CHAR_EXCLUDE.indexOf(e.id)>=0)continue;
+    if(e.st==='agotado'||e.st==='proceso')continue;
+    var evDate=new Date(e.ds+'T23:59:59');
+    if(evDate<today)continue;
+    // Avoid duplicate names
+    var override=_CHAR_NAMES[e.id];
+    var aName=override?override.name:e.a.replace(/ - .*/,'').replace(/ Tour.*/,'');
+    if(artists.indexOf(aName)>=0)continue;
+    artists.push(aName);
+    var isPlural=_CHAR_PLURAL.indexOf(e.id)>=0;
+    var extra=override?override.extra:'';
+    var msg=isPlural
+      ?'¡Hola! Somos '+aName+extra+' y hoy seremos tus asistentes de Conecta MX 🎵 ¿Con quién tenemos el gusto?'
+      :'¡Hola! Soy '+aName+extra+' y hoy seré tu asistente de Conecta MX 🎵 ¿Con quién tengo el gusto?';
+    chars.push({name:aName,w:1,msg:msg});
+  }
+  // Distribute 97% among artists equally
+  if(chars.length>1){
+    var artistW=97/(chars.length-1);
+    for(var j=1;j<chars.length;j++) chars[j].w=artistW;
+  }
+  return chars;
+}
 
 function pickChar(){
-  var totalW=_CHARS.reduce(function(a,c){return a+c.w;},0);
+  var chars=buildChars();
+  if(chars.length<=1)return _MEMO;
+  var totalW=chars.reduce(function(a,c){return a+c.w;},0);
   var r=Math.random()*totalW;
   var acc=0;
-  for(var i=0;i<_CHARS.length;i++){
-    acc+=_CHARS[i].w;
-    if(r<=acc)return _CHARS[i];
+  for(var i=0;i<chars.length;i++){
+    acc+=chars[i].w;
+    if(r<=acc)return chars[i];
   }
-  return _CHARS[0];
+  return _MEMO;
 }
 
 function addChatMsg(txt,role){

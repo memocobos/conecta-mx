@@ -916,6 +916,7 @@ function selHotel(btn, e, n) {
 }
 
 function selFecha(btn, idx) {
+  cur._fechaIdx=cur._mfIdx||0;
   var btns = $$('d-fechas').querySelectorAll('.f-btn');
   for(var i=0;i<btns.length;i++) btns[i].classList.remove('active');
   btn.classList.add('active');
@@ -1149,7 +1150,7 @@ function filterEvents(){
 renderCatalog();
 
 function isCDMX(ev){ return ev.v && (ev.v.toUpperCase().includes('CDMX') || ev.v.toUpperCase().includes('CIUDAD DE MEXICO')); }
-function hotelList(ev){ return isCDMX(ev)?HOTEL_CDM:HOTEL_MTY; }
+function hotelList(ev){if(ev&&ev.multifecha&&cur&&cur._fechaIdx>=0){var mf=ev.multifecha[cur._fechaIdx];if(mf&&mf.hotel)return mf.hotel;}return isCDMX(ev)?HOTEL_CDM:HOTEL_MTY;}
 
 function showDetail(id){
   cur=null;

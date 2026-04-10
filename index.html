@@ -572,7 +572,6 @@ body{font-family:'Montserrat',sans-serif;background:#000;color:#fff;min-height:1
 @media(max-width:520px){.nav-sede{display:none}.nav-social{width:36px}.footer-contact{align-items:flex-start}}
 </style>
 
-<script src="config.js"></script>
 <script>
 var WA='528119771072';
 var BANCO_DEFAULT={nombre:'BBVA Bancomer',tarjeta:'4152 3139 7573 0487',clabe:'012822004639334319',titular:'Guillermo Alexander Cobos Vizcarra',link:''};
@@ -1599,7 +1598,6 @@ function getQuincenas(from, until, max){
 
 // ── Chatbot IA ──────────────────────────────────────────────────────────
 var _chatOpen=false,_chatReady=false,_chatHistory=[],_chatChar=null;
-var _CHAT_KEY=(window.CONECTA_CONFIG&&window.CONECTA_CONFIG.apiKey)||'';
 
 function buildEventSummary(){
   var lines=[];
@@ -1707,14 +1705,9 @@ function enviarChat(){
   for(var i=0;i<hist.length;i++){
     msgs.push(hist[i]);
   }
-  fetch('https://api.anthropic.com/v1/messages',{
+  fetch('/.netlify/functions/chat',{
     method:'POST',
-    headers:{
-      'Content-Type':'application/json',
-      'x-api-key':_CHAT_KEY,
-      'anthropic-version':'2023-06-01',
-      'anthropic-dangerous-direct-browser-access':'true'
-    },
+    headers:{'Content-Type':'application/json'},
     body:JSON.stringify({
       model:'claude-haiku-4-5-20251001',
       max_tokens:300,

@@ -1611,7 +1611,13 @@ function buildEventSummary(){
     var zTxt=availZ.map(function(z){return z.n+' $'+z.p;}).join(', ');
     if(!zTxt)zTxt='Zonas por confirmar';
     var stTxt=e.st==='agotado'?'AGOTADO':e.st==='proceso'?'EN PROCESO':'Disponible';
-    lines.push('- '+e.a+' | '+e.f+' | '+e.v+' | '+stTxt+' | Zonas: '+zTxt+' | Separo: $'+(e.sep||0));
+    var hTxt='';
+    var hl=e.hotel;
+    if(hl&&hl.length){
+      var hParts=hl.map(function(h){return h.n+': '+(h.e===0?'incluida sin costo extra':'+$'+h.e+' por persona');});
+      hTxt=' | Hotel: '+hParts.join(', ');
+    }
+    lines.push('- '+e.a+' | '+e.f+' | '+e.v+' | '+stTxt+' | Zonas: '+zTxt+' | Separo: $'+(e.sep||0)+hTxt);
   }
   return lines.join('\n');
 }

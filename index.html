@@ -594,7 +594,7 @@ var HOTEL_CDM=[
 ];
 function $$(id){return document.getElementById(id);}
 function fmt(n){var r=Math.round(n*100)/100;if(r===Math.round(r))return'$'+Math.round(r).toLocaleString('es-MX');return'$'+r.toLocaleString('es-MX',{minimumFractionDigits:2,maximumFractionDigits:2});}
-function minP(ev){var a=ev.zonas.filter(function(z){return!z.ag;});if(!a.length)return 0;return Math.min.apply(null,a.map(function(z){return z.p;}));}
+function minP(ev){var _z=(ev.multifecha?ev.multifecha.reduce(function(a,mf){return a.concat(mf.zonas);},ev.zonas||[]):(ev.zonas||[]));var a=_z.filter(function(z){return !z.ag&&!z.prox&&z.p>0;});if(!a.length)return 0;return Math.min.apply(null,a.map(function(z){return z.p;}));}
 
 var _imgCache={};
 function loadArtistImg(artistName,imgEl,fanart){

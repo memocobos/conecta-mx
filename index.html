@@ -842,6 +842,19 @@ function filterEvents(){
 }
 renderCatalog();
 
+// Deep link: ?evento=morat or #morat
+(function(){
+  function norm(s){return(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[-_\s]+/g,'');}
+  var q=new URLSearchParams(window.location.search).get('evento')||window.location.hash.replace('#','');
+  if(!q)return;
+  var key=norm(q);
+  var found=null;
+  for(var i=0;i<EV.length;i++){
+    if(norm(EV[i].id)===key||norm(EV[i].a)===key||norm(EV[i].a).indexOf(key)>=0){found=EV[i];break;}
+  }
+  if(found&&!found.listOnly) showDetail(found.id);
+})();
+
 function isCDMX(ev){ return ev.v && (ev.v.toUpperCase().includes('CDMX') || ev.v.toUpperCase().includes('CIUDAD DE MEXICO')); }
 function hotelList(ev){if(ev&&ev.multifecha&&cur&&cur._fechaIdx>=0){var mf=ev.multifecha[cur._fechaIdx];if(mf&&mf.hotel)return mf.hotel;}return isCDMX(ev)?HOTEL_CDM:HOTEL_MTY;}
 

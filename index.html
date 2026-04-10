@@ -800,7 +800,7 @@ function selViajeros(btn, n) {
   selViaj = n; selPkg = null; selZ = null; selH = null;
   document.querySelectorAll('.q-btn').forEach(function(b){ b.classList.remove('active'); });
   btn.classList.add('active');
-  renderPaquetes();
+  if(cur&&cur.multifecha){var _wf=document.getElementById('w-fecha');if(_wf){_wf.style.display='block';var _wp=document.getElementById('w-paquetes');if(_wp)_wp.style.display='none';}}else{renderPaquetes();}
   $$('q2-card').style.display = 'block';
   $$('q3-card').style.display = 'none';
   $$('q4-card').style.display = 'none';
@@ -964,7 +964,10 @@ function calcular() {
   } else if(selPkg === 'cheap') {
     total = selZ.p;
     desglose.push({l:'Boleto + Kit · ' + selZ.n, v: fmt(selZ.p)});
-  }
+  
+  var _wp2=document.getElementById('w-paquetes');if(_wp2)_wp2.style.display='block';
+  renderPaquetes();
+}
 
   if(hotelExtra > 0 && pkgDef.includesHotel && selH) {
     desglose.push({l:'Habitación · ' + selH.n, v: '+' + fmt(hotelExtra * nViaj)});

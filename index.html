@@ -56,6 +56,10 @@ body{font-family:'Montserrat',sans-serif;background:#000;color:#fff;min-height:1
 .ev-card.agotado .ev-img{filter:brightness(.25) grayscale(1)}
 .ev-card.proceso{position:relative}
 .ev-card.proceso::after{content:'EN PROCESO';position:absolute;inset:0;background:rgba(26,111,204,.80);display:grid;place-items:center;font-size:22px;font-weight:900;color:#fff;letter-spacing:.15em;z-index:10;pointer-events:none;font-family:'Montserrat',sans-serif}
+.ev-card.pasado{cursor:default;pointer-events:none;opacity:.55}
+.ev-card.pasado .ev-img{filter:brightness(.35) grayscale(.6)}
+.tpast{background:rgba(255,255,255,.08);color:rgba(255,255,255,.4)}
+.tpast::before{background:rgba(255,255,255,.2)}
 .ev-img{width:100%;width:100%;height:100%;object-fit:cover;object-position:center center;display:block;filter:brightness(.65)}
 .ev-img-wrap{position:relative;overflow:hidden;width:100%;aspect-ratio:1/1;background:#1a1a1a}
 .ev-img-wrap::after{content:'';position:absolute;bottom:0;left:0;right:0;height:60px;background:linear-gradient(transparent,#111)}
@@ -370,6 +374,7 @@ body{font-family:'Montserrat',sans-serif;background:#000;color:#fff;min-height:1
     <button class="fbtn" onclick="setFilter(this,'cdmx')">CDMX</button>
     <button class="fbtn" onclick="setFilter(this,'disp')">Disponibles</button>
     <button class="fbtn" onclick="setFilter(this,'ult')">Últimos</button>
+    <button class="fbtn" onclick="setFilter(this,'pasados')">Pasados</button>
   </div>
 </div>
 <div id="ev-list" class="ev-grid"></div>
@@ -673,31 +678,41 @@ function renderCatalog(){
       list.appendChild(lbl);
     }
     if(ev.listOnly){continue;}  // handled separately below
+    // Detect past events
+    var isPast=false;
+    if(ev.ds&&ev.ds!=='2027-12-31'){
+      var evDate=new Date(ev.ds+'T23:59:59');
+      isPast=evDate<new Date();
+    }
+    ev._past=isPast;
+    var isAg=false,isSV=false,isProc=false,isPC2=false,hasZ=false;
+    if(isPast){
+      // Past event: simple card, no semáforo
+      var tagTxt='Evento pasado';
+      var tagCls='tpast';
+    } else {
     var st=ev.st;
-    var isAg=st==='agotado'||!!ev.agotado;
-    var isSV=st==='solo-viaje';
-    var isProc=st==='proceso';
-    var isPC2=st==='por-confirmar';
+    isAg=st==='agotado'||!!ev.agotado;
+    isSV=st==='solo-viaje';
+    isProc=st==='proceso';
+    isPC2=st==='por-confirmar';
     // Auto-semáforo: calcula % de zonas disponibles
-var _zonas=(ev.multifecha?ev.multifecha.reduce(function(a,mf){return a.concat(mf.zonas);},ev.zonas||[]):(ev.zonas||[]));
+    var _zonas=(ev.multifecha?ev.multifecha.reduce(function(a,mf){return a.concat(mf.zonas);},ev.zonas||[]):(ev.zonas||[]));
     var _total=_zonas.length;
     var _avail=_zonas.filter(function(z){return !z.ag;}).length;
     var _pct=_total>0?(_avail/_total*100):100;
     if(!isAg&&_total>0&&_avail===0)isAg=true;
     var isUlt=st==='ultimos'||(!isAg&&!isSV&&!isPC2&&!isProc&&_pct<40&&_pct>0);
     var isPoca=!isAg&&!isUlt&&!isSV&&!isPC2&&!isProc&&_pct>=40&&_pct<60;
-    var hasZ=ev.zonas.length>0;
+    hasZ=ev.zonas.length>0;
     var tagTxt=isAg?'Agotado':isProc?'En Proceso':isUlt?'Últimos lugares':isPoca?'Poca disponibilidad':isSV?'Solo viaje':isPC2?'Por confirmar':'Disponible';
     var tagCls=isAg?'tag':isProc?'tproc':isUlt?'tu':isPoca?'tpoca':isSV?'tsv':isPC2?'tpc':'td';
+    }
     var priceH='';
-    if(isAg){priceH='<div style="height:4px"></div>';}
+    if(isPast){priceH='<div style="height:4px"></div>';}
+    else if(isAg){priceH='<div style="height:4px"></div>';}
     else if(!hasZ||isSV||isProc){priceH='<div><div class="ev-price-lbl">Informes</div><div class="ev-price-wa">Cotiza por WA</div></div>';}
     else{priceH='<div><div class="ev-price-lbl">Desde</div><div class="ev-price">'+fmt(minP(ev))+'</div></div>';}
-    var ctaH='';
-    if(!isAg){
-      if(hasZ&&!isSV&&!isProc){ctaH='<button class="ev-cta">Ver zonas</button>';}
-      else{ctaH='<button class="ev-cta ev-cta-wa">Info WA</button>';}
-    }
     var staticSrc=STATIC_IMGS[ev.id];
     var imgHTML='';
     if(staticSrc||ev.img){
@@ -707,7 +722,7 @@ var _zonas=(ev.multifecha?ev.multifecha.reduce(function(a,mf){return a.concat(mf
     }
     var card=document.createElement('div');
     card.setAttribute('data-id',ev.id);
-    card.className='ev-card'+(isAg?' agotado':'')+(isProc?' proceso':'');
+    card.className='ev-card'+(isPast?' pasado':'')+(isAg&&!isPast?' agotado':'')+(isProc&&!isPast?' proceso':'');
     card.innerHTML=imgHTML+
       '<div class="ev-body">'+
         '<div class="ev-top">'+
@@ -717,10 +732,10 @@ var _zonas=(ev.multifecha?ev.multifecha.reduce(function(a,mf){return a.concat(mf
         '</div>'+
         '<div class="ev-bottom">'+
           '<span class="ev-tag '+tagCls+'">'+tagTxt+'</span>'+
-          (isAg?'':priceH)+
+          (isPast||isAg?'':priceH)+
         '</div>'+
       '</div>';
-    if(!isAg){
+    if(!isPast&&!isAg){
       (function(evv,sv,proc){
         card.onclick=function(e){
           if(proc&&evv.waChannel){window.open(evv.waChannel,'_blank');}
@@ -845,10 +860,28 @@ function filterEvents(){
     if(!ev){card.style.display='none';continue;}
     // Text search
     var matchQ=!q||(ev.a.toLowerCase().includes(q))||(ev.v.toLowerCase().includes(q))||(ev.f.toLowerCase().includes(q));
-    // Location filter
+    // Past event detection
+    var evPast=!!ev._past;
+    // Location filter — past events only show in 'pasados' filter
     var isCdmx=ev.v&&(ev.v.toUpperCase().includes('CDMX')||ev.v.toUpperCase().includes('CIUDAD DE MEXICO'));
-    var matchLoc=(f==='all')||(f==='mty'&&!isCdmx)||(f==='cdmx'&&isCdmx)||(f==='disp'&&ev.st!=='agotado'&&!ev.agotado)||(f==='ult'&&ev.st==='ultimos');
+    var matchLoc;
+    if(f==='pasados'){
+      matchLoc=evPast;
+    } else {
+      if(evPast){matchLoc=false;}
+      else{matchLoc=(f==='all')||(f==='mty'&&!isCdmx)||(f==='cdmx'&&isCdmx)||(f==='disp'&&ev.st!=='agotado'&&!ev.agotado)||(f==='ult'&&ev.st==='ultimos');}
+    }
     card.style.display=(matchQ&&matchLoc)?'':'none';
+  }
+  // Auto-scroll to first visible result when searching
+  if(q){
+    var allCards=document.querySelectorAll('#ev-list .ev-card');
+    for(var j=0;j<allCards.length;j++){
+      if(allCards[j].style.display!=='none'){
+        allCards[j].scrollIntoView({behavior:'smooth',block:'center'});
+        break;
+      }
+    }
   }
 }
 renderCatalog();

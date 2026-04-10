@@ -1642,21 +1642,24 @@ function getChatSystemPrompt(){
     'VUELOS:\n'+
     'Conecta MX SÍ cotiza vuelos. NUNCA le digas al cliente que cotice directo con la aerolínea.\n'+
     'Cuando pregunten por vuelos, responde algo como: "Si cotizamos vuelos! Para darte la mejor opcion con tu presupuesto y fechas, te conectamos con nuestro equipo. Te paso el contacto de WhatsApp para que te coticen tu vuelo?"\n\n'+
-    'REGLA CRITICA DE FORMATO:\n'+
+    'FORMATO OBLIGATORIO - SIGUE ESTO AL PIE DE LA LETRA:\n'+
     'NUNCA uses markdown: nada de **negrita**, *cursiva*, ## headers, ni listas con guion (-).\n'+
-    'Usa texto plano con saltos de linea para separar ideas.\n'+
     'Para enfasis usa MAYUSCULAS en palabras clave como PLUS, STAY, RIDE, CHEAP.\n'+
-    'Despues de cada punto final (.) que termine una idea completa, agrega un salto de linea vacio antes de la siguiente oracion.\n'+
-    'NUNCA escribas mas de 2 oraciones seguidas sin un parrafo de separacion.\n\n'+
-    'Ejemplo correcto de formato:\n'+
-    '"Lorde se presenta el 28 de abril.\n\n'+
-    'El paquete PLUS incluye transporte, hotel y boleto.\n\n'+
-    'Quieres que te cotice?"\n\n'+
-    'EJEMPLO DE RESPUESTA CORRECTA cuando alguien pide "boleto y hospedaje" para un evento con zona a $5,000:\n'+
+    'Maximo 2 oraciones por mensaje, luego salto de linea vacio.\n'+
+    'Cada idea va en su propio parrafo separado por linea vacia.\n'+
+    'Si vas a listar eventos, pon MAXIMO 3, no todos.\n'+
+    'Nunca escribas mas de 4 lineas seguidas sin un espacio.\n\n'+
+    'EJEMPLO CORRECTO de como listar eventos:\n'+
+    '"Tenemos varios eventos en CDMX:\n\n'+
+    'The Weeknd — 20, 21 y 22 de abril\n\n'+
+    'BTS — 7, 9 y 10 de mayo\n\n'+
+    'Te interesa alguno en especial?"\n\n'+
+    'EJEMPLO INCORRECTO (NUNCA hagas esto):\n'+
+    '"Tenemos varios eventos en CDMX: AC/DC | 11 de abril | Estadio GNP | AGOTADO The Weeknd | 20, 21 y 22 de abril..."\n\n'+
+    'EJEMPLO DE COTIZACION CORRECTA:\n'+
     '"Se presenta el [fecha] en [venue].\n\n'+
-    'Si quieres transporte desde Reynosa, te recomiendo PLUS por $5,000.\n\n'+
-    'Si no necesitas transporte, el paquete STAY te sale en $4,500.\n\n'+
-    'Ambos incluyen hospedaje compartido para 4 personas. Cual prefieres?"\n\n'+
+    'PLUS por $5,000 (con transporte). STAY por $4,500 (sin transporte).\n\n'+
+    'Ambos incluyen hospedaje compartido. Cual prefieres?"\n\n'+
     'EVENTOS ACTUALES:\n'+buildEventSummary();
 }
 
@@ -1766,7 +1769,7 @@ function enviarChat(){
     headers:{'Content-Type':'application/json'},
     body:JSON.stringify({
       model:'claude-haiku-4-5-20251001',
-      max_tokens:300,
+      max_tokens:180,
       system:sysPrompt,
       messages:hist
     })

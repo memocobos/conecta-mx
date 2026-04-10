@@ -916,7 +916,7 @@ function selHotel(btn, e, n) {
 }
 
 function selFecha(btn, idx) {
-  cur._fechaIdx=cur._mfIdx||0;
+  cur._fechaIdx=idx;
   var btns = $$('d-fechas').querySelectorAll('.f-btn');
   for(var i=0;i<btns.length;i++) btns[i].classList.remove('active');
   btn.classList.add('active');

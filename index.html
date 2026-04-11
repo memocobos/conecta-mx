@@ -1053,7 +1053,7 @@ function updatePkgCards(){
   var hl=(cur.hotelOverride&&cur.hotel&&cur.hotel.length)?cur.hotel:hotelList(cur);
   // Get min hotel cost for n viajeros
   function minHotel(n){
-    var valid=hl.filter(function(h){return h.viaj.indexOf(n)>=0;});
+    var valid=hl.filter(function(h){return h.viaj?h.viaj.indexOf(n)>=0:true;});
     if(!valid.length)return 0;
     var costs=valid.map(function(h){return h.e;});
     return Math.min.apply(null,costs);

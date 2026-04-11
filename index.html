@@ -943,7 +943,7 @@ renderCatalog();
 })();
 
 function isCDMX(ev){ return ev.v && (ev.v.toUpperCase().includes('CDMX') || ev.v.toUpperCase().includes('CIUDAD DE MEXICO')); }
-function hotelList(ev){if(ev&&ev.multifecha&&cur&&cur._fechaIdx>=0){var mf=ev.multifecha[cur._fechaIdx];if(mf&&mf.hotel)return mf.hotel;}return isCDMX(ev)?HOTEL_CDM:HOTEL_MTY;}
+function hotelList(ev){if(ev&&ev.multifecha&&cur&&cur._fechaIdx>=0){var mf=ev.multifecha[cur._fechaIdx];if(mf&&mf.hotel)return mf.hotel;}if(ev&&ev.hotel&&Array.isArray(ev.hotel)&&ev.hotel.length>0)return ev.hotel;return isCDMX(ev)?HOTEL_CDM:HOTEL_MTY;}
 
 function showDetail(id){
   cur=null;

@@ -1345,7 +1345,7 @@ function buildHotelButtons(){
   var h='';
   for(var i=0;i<hl.length;i++){
     var hh=hl[i];
-    var valid=hh.viaj.indexOf(selViaj)>=0;
+    var valid=hh.viaj?hh.viaj.indexOf(selViaj)>=0:true;
     var cost=hh.e;
     var costPP=cur.hotelPP?cost:(selViaj>0?Math.ceil(cost/selViaj):cost);
     var costLbl=cost===0?'Sin costo extra':'+'+fmt(costPP)+' por persona';

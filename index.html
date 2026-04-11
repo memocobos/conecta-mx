@@ -8,6 +8,12 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
 <meta name="apple-mobile-web-app-title" content="Conecta Reynosa">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#0000cc">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-title" content="Conecta Reynosa">
+<link rel="apple-touch-icon" href="/icon-192.png">
 <title>CONECTA MX.</title>
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;900&display=swap" rel="stylesheet">
 <style>
@@ -2065,5 +2071,74 @@ function enviarChat(){
   <button onclick="cerrarMapa()" style="position:absolute;top:12px;right:16px;background:none;border:none;color:#fff;font-size:32px;cursor:pointer;z-index:10000;font-weight:900">✕</button>
   <img id="mapa-img" src="" style="max-width:94vw;max-height:90vh;object-fit:contain;border-radius:6px" onclick="event.stopPropagation()">
 </div>
+<div id="pwa-banner" style="display:none;position:fixed;bottom:80px;left:50%;transform:translateX(-50%);width:calc(100% - 32px);max-width:400px;background:#111;border:1.5px solid #ccff00;border-radius:12px;padding:14px 16px;z-index:9998;font-family:'Montserrat',sans-serif">
+  <button id="pwa-close" style="position:absolute;top:8px;right:10px;background:none;border:none;color:rgba(255,255,255,.4);font-size:18px;cursor:pointer">✕</button>
+  <div style="display:flex;align-items:center;gap:12px">
+    <img src="/icon-192.png" style="width:44px;height:44px;border-radius:10px;flex-shrink:0">
+    <div style="flex:1">
+      <div style="color:#fff;font-size:14px;font-weight:900">Instala Conecta Reynosa</div>
+      <div id="pwa-sub" style="color:rgba(255,255,255,.5);font-size:11px;margin-top:4px;line-height:1.4"></div>
+    </div>
+  </div>
+  <div id="pwa-action" style="margin-top:10px"></div>
+</div>
+<script>
+(function(){
+  if(window.matchMedia('(display-mode:standalone)').matches)return;
+  if(window.navigator.standalone)return;
+  if(localStorage.getItem('pwa-dismissed'))return;
+  var isMobile=/Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+  if(!isMobile)return;
+
+  if('serviceWorker' in navigator){navigator.serviceWorker.register('/sw.js');}
+
+  var banner=document.getElementById('pwa-banner');
+  var sub=document.getElementById('pwa-sub');
+  var action=document.getElementById('pwa-action');
+  var ua=navigator.userAgent;
+  var isIOS=/iPhone|iPad|iPod/i.test(ua);
+  var isSafari=isIOS&&/Safari/i.test(ua)&&!/CriOS|FxiOS|OPiOS/i.test(ua);
+  var isAndroid=/Android/i.test(ua);
+  var isChrome=/Chrome/i.test(ua)&&!/Edge|OPR|Samsung/i.test(ua);
+  var isSamsung=/Samsung/i.test(ua);
+  var isHuawei=/Huawei|HMSCore/i.test(ua);
+  var deferredPrompt=null;
+
+  window.addEventListener('beforeinstallprompt',function(e){
+    e.preventDefault();
+    deferredPrompt=e;
+  });
+
+  setTimeout(function(){
+    if(isAndroid&&deferredPrompt){
+      sub.textContent='Acceso rápido desde tu pantalla de inicio';
+      action.innerHTML='<button id="pwa-install" style="width:100%;background:#ccff00;color:#000;border:none;padding:10px;font-size:12px;font-weight:900;font-family:Montserrat,sans-serif;border-radius:8px;cursor:pointer;text-transform:uppercase;letter-spacing:.06em">📱 Instalar app</button>';
+      document.getElementById('pwa-install').onclick=function(){
+        deferredPrompt.prompt();
+        deferredPrompt.userChoice.then(function(){deferredPrompt=null;banner.style.display='none';});
+      };
+    } else if(isAndroid&&isSamsung){
+      sub.textContent='Abre ⋮ menú → Agregar a pantalla de inicio';
+    } else if(isAndroid&&isHuawei){
+      sub.textContent='Menú → Agregar a pantalla de inicio';
+    } else if(isAndroid){
+      sub.textContent='Abre ⋮ menú → Agregar a pantalla de inicio';
+    } else if(isIOS&&isSafari){
+      sub.textContent='Toca compartir ↑ → Agregar a pantalla de inicio';
+      action.innerHTML='<div style="background:rgba(204,255,0,.1);border:1px solid rgba(204,255,0,.2);border-radius:8px;padding:8px 12px;font-size:10px;color:#ccff00;text-align:center;margin-top:6px">Toca el botón <b>↑</b> de Safari → <b>Agregar a inicio</b></div>';
+    } else if(isIOS){
+      sub.textContent='Abre este link en Safari para instalar';
+    } else {
+      sub.textContent='Agrega la app a tu pantalla de inicio';
+    }
+    banner.style.display='block';
+  },5000);
+
+  document.getElementById('pwa-close').onclick=function(){
+    banner.style.display='none';
+    localStorage.setItem('pwa-dismissed','1');
+  };
+})();
+</script>
 </body>
 </html>

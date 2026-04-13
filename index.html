@@ -14,7 +14,8 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
 <meta name="apple-mobile-web-app-title" content="Conecta Reynosa">
 <link rel="apple-touch-icon" href="/icon-192.png">
-<title>CONECTA MX.</title>
+<title>Conecta Reynosa — Viaja a conciertos con expertos</title>
+<meta name="description" content="Conecta Reynosa: paquetes todo incluido para conciertos. Transporte, hotel y boletos desde Reynosa.">
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;900&display=swap" rel="stylesheet">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
@@ -556,7 +557,7 @@ body{font-family:'Montserrat',sans-serif;background:#000;color:#fff;min-height:1
   </div>
   <div class="ft-bottom">
     <p>Env&#237;a comprobante a <a href="https://facebook.com/ConectaRey">facebook.com/ConectaRey</a> &nbsp;&middot;&nbsp; Con tu nombre, evento y concepto del pago &nbsp;&middot;&nbsp; Sin comprobante el pago no se registra</p>
-    <p class="ft-copy">Conecta MX. Reynosa &copy; 2026</p>
+    <p class="ft-copy">Conecta Reynosa &copy; 2026</p>
   </div>
 </div>
 <a href="https://wa.me/528119771072" class="wa-float" target="_blank" title="Contactar por WhatsApp">
@@ -1892,7 +1893,7 @@ function buildEventSummary(){
 
 function getChatSystemPrompt(){
   var charIntro=_chatChar?'Tu personaje es '+_chatChar.name+'. Mantén su personalidad de forma sutil sin exagerar. ':'';
-  return charIntro+'Eres el asistente virtual de Conecta MX, agencia de viajes y boletos para conciertos en Reynosa, Tamaulipas, México. '+
+  return charIntro+'Eres el asistente virtual de Conecta Reynosa, agencia de viajes y boletos para conciertos en Reynosa, Tamaulipas, México. '+
     'Respondes en español, eres amigable, cordial y comercial. Ayudas a cotizar paquetes y dar información de eventos.\n\n'+
     'PAQUETES Y PRECIOS:\n'+
     'PLUS: todo incluido (transporte + hotel compartido + boleto + kit). Precio = precio de la zona elegida.\n'+
@@ -1913,7 +1914,7 @@ function getChatSystemPrompt(){
     'CONTACTO:\n'+
     'Reservas y dudas generales: WhatsApp 81 1977 1072\n'+
     'Vuelos: WhatsApp 81 3232 1405\n'+
-    'Conecta MX SI cotiza vuelos. NUNCA le digas al cliente que cotice directo con la aerolinea.\n'+
+    'Conecta Reynosa SI cotiza vuelos. NUNCA le digas al cliente que cotice directo con la aerolinea.\n'+
     'Cuando pregunten por vuelos: "Si cotizamos vuelos! Te paso el contacto de nuestro equipo de vuelos al 81 3232 1405 para que te coticen."\n\n'+
     'FORMATO OBLIGATORIO - SIGUE ESTO AL PIE DE LA LETRA:\n'+
     'NUNCA uses markdown: nada de **negrita**, *cursiva*, ## headers, ni listas con guion (-).\n'+
@@ -1939,7 +1940,7 @@ function getChatSystemPrompt(){
 var _CHAR_EXCLUDE=['machaca','edc','emblema','coronacap','flowfest','arre','knotfest','warped','dalemix','comuna','pulsognp','nochegrandes'];
 var _CHAR_NAMES={'weeknd':{name:'Abel Tesfaye',extra:', aunque tal vez me conozcas como The Weeknd 🌙'},'megadeth':{name:'Dave Mustaine',extra:', frontman de Megadeth 🤘'},'soad':{name:'Serj Tankian',extra:', vocalista de System of a Down 🎤'}};
 var _CHAR_PLURAL=['morat'];
-var _MEMO={name:'Memo Cobos',w:3,msg:'¡Hola! Soy Memo Cobos, aunque me conocen como el Tío Conecta 😎 Hoy seré tu asistente de Conecta MX. ¿Con quién tengo el gusto?'};
+var _MEMO={name:'Memo Cobos',w:3,msg:'¡Hola! Soy Memo Cobos, aunque me conocen como el Tío Conecta 😎 Hoy seré tu asistente de Conecta Reynosa. ¿Con quién tengo el gusto?'};
 
 function buildChars(){
   var chars=[_MEMO];
@@ -1960,8 +1961,8 @@ function buildChars(){
     var isPlural=_CHAR_PLURAL.indexOf(e.id)>=0;
     var extra=override?override.extra:'';
     var msg=isPlural
-      ?'¡Hola! Somos '+aName+extra+' y hoy seremos tus asistentes de Conecta MX 🎵 ¿Con quién tenemos el gusto?'
-      :'¡Hola! Soy '+aName+extra+' y hoy seré tu asistente de Conecta MX 🎵 ¿Con quién tengo el gusto?';
+      ?'¡Hola! Somos '+aName+extra+' y hoy seremos tus asistentes de Conecta Reynosa 🎵 ¿Con quién tenemos el gusto?'
+      :'¡Hola! Soy '+aName+extra+' y hoy seré tu asistente de Conecta Reynosa 🎵 ¿Con quién tengo el gusto?';
     chars.push({name:aName,w:1,msg:msg});
   }
   // Distribute 97% among artists equally
@@ -2069,7 +2070,7 @@ function enviarChat(){
 <button class="chat-fab" id="chat-fab" onclick="toggleChat()" title="Asistente virtual">💬</button>
 <div class="chat-panel" id="chat-panel">
   <div class="chat-head">
-    <span class="chat-head-title" id="chat-char-name">Conecta MX</span>
+    <span class="chat-head-title" id="chat-char-name">Conecta Reynosa</span>
     <button class="chat-close" onclick="toggleChat()">✕</button>
   </div>
   <div class="chat-msgs" id="chat-msgs"></div>

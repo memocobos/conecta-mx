@@ -759,7 +759,8 @@ function renderCatalog(){
     else if(isAg){priceH='<div style="height:4px"></div>';}
     else if(!hasZ||isSV||isProc){priceH='<div><div class="ev-price-lbl">Informes</div><div class="ev-price-wa">Cotiza por WA</div></div>';}
     else{priceH='<div><div class="ev-price-lbl">Desde</div><div class="ev-price">'+fmt(minP(ev))+'</div></div>';}
-    var staticSrc=STATIC_IMGS[ev.id];
+    var staticSrc=STATIC_IMGS[ev.id]||STATIC_IMGS[ev.staticImg];
+    if(!ev.img&&!staticSrc&&ev.a) ev.img=ev.a.replace(/ - .*/,'').replace(/ en .*/,'').replace(/ Mexico.*/,'');
     var imgHTML='';
     if(staticSrc||ev.img){
       imgHTML='<div class="ev-img-wrap"><img class="ev-img" src="'+(staticSrc||'')+'" alt="'+ev.a+'" /></div>';
@@ -919,6 +920,18 @@ function filterEvents(){
       else{matchLoc=(f==='all')||(f==='mty'&&!isCdmx)||(f==='cdmx'&&isCdmx)||(f==='disp'&&ev.st!=='agotado'&&!ev.agotado)||(f==='ult'&&ev.st==='ultimos');}
     }
     card.style.display=(matchQ&&matchLoc)?'':'none';
+  }
+  // Hide month labels with no visible events below them
+  var allEls=document.querySelectorAll('#ev-list > *');
+  for(var k=0;k<allEls.length;k++){
+    if(allEls[k].classList.contains('mes-label')||allEls[k].classList.contains('pc-section-label')){
+      var hasVisible=false;
+      for(var m=k+1;m<allEls.length;m++){
+        if(allEls[m].classList.contains('mes-label')||allEls[m].classList.contains('pc-section-label'))break;
+        if(allEls[m].classList.contains('ev-card')&&allEls[m].style.display!=='none'){hasVisible=true;break;}
+      }
+      allEls[k].style.display=hasVisible?'':'none';
+    }
   }
   // Auto-scroll to first visible result when searching
   if(q){

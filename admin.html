@@ -284,7 +284,7 @@ function fecha(f){ return f ? new Date(f+'T12:00:00').toLocaleDateString('es-MX'
 async function initApp() {
   showLoading('view-resumen');
   const [eventos, reservaciones, clientes] = await Promise.all([
-    atFetch('Eventos','&sort%5B0%5D%5Bfield%5D=Fecha&sort%5B0%5D%5Bdirection%5D=asc'),
+    atFetch('Eventos','&sort%5B0%5D%5Bfield%5D=Fecha%20de%20pago&sort%5B0%5D%5Bdirection%5D=asc'),
     atFetch('Reservaciones'),
     atFetch('Clientes')
   ]);
@@ -509,7 +509,7 @@ function initGastos() {
 }
 
 async function loadGastos() {
-  const gastos = await atFetch('Gastos', '&sort%5B0%5D%5Bfield%5D=Fecha&sort%5B0%5D%5Bdirection%5D=desc');
+  const gastos = await atFetch('Gastos', '&sort%5B0%5D%5Bfield%5D=Fecha%20de%20pago&sort%5B0%5D%5Bdirection%5D=desc');
   const eventosMap = {};
   eventosCache.forEach(e => eventosMap[e.id] = e.fields.Nombre);
 

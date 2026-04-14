@@ -571,7 +571,7 @@ async function registrarGasto() {
 
   const fields = {
     'Concepto': concepto, 'Monto': monto, 'Categoría': categoria,
-    'Fecha': fecha, 'Registrado por': currentUser,
+    'Fecha': fecha, 'Registrado por": currentRole==="admin"?"Memo":"Auxiliar",
     ...(notas && {'Notas': notas}),
     ...(eventoId && {'Evento': [eventoId]}),
   };

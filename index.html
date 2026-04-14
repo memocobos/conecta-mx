@@ -1209,12 +1209,20 @@ function selPaquete(btn,pkg){
   var hasZona=(pkg==='plus'||pkg==='stay'||pkg==='cheap');
   var hasFecha=!!cur.multifecha;
 
-  // Update includes card
+  // Update includes card — use cur.inc if available
   var incTxt='';
-  if(pkg==='plus')incTxt=isCDMX(cur)?'Traslados Hotel-Evento CDMX · Hospedaje · Boleto zona elegida · Kit Conecta':'Transporte Reynosa-Mty · Hospedaje · Boleto zona elegida · Kit Conecta';
-  else if(pkg==='ride')incTxt=isCDMX(cur)?'Traslados Hotel-Evento CDMX · Hospedaje · Kit Conecta (sin boleto)':'Transporte Reynosa-Mty · Hospedaje · Kit Conecta (sin boleto)';
-  else if(pkg==='stay')incTxt='Hospedaje · Boleto zona elegida · Kit Conecta';
-  else incTxt='Boleto zona elegida · Kit Conecta';
+  if(cur.inc&&cur.inc.length>0){
+    var incItems=cur.inc.slice();
+    if(pkg==='ride') incItems=incItems.filter(function(i){return i.toLowerCase().indexOf('boleto')<0;});
+    else if(pkg==='stay') incItems=incItems.filter(function(i){return i.toLowerCase().indexOf('transporte')<0&&i.toLowerCase().indexOf('traslado')<0;});
+    else if(pkg==='cheap') incItems=incItems.filter(function(i){return i.toLowerCase().indexOf('transporte')<0&&i.toLowerCase().indexOf('traslado')<0&&i.toLowerCase().indexOf('hospedaje')<0&&i.toLowerCase().indexOf('hotel')<0;});
+    incTxt=incItems.join(' · ');
+  } else {
+    if(pkg==='plus')incTxt=isCDMX(cur)?'Traslados Hotel-Evento CDMX · Hospedaje · Boleto zona elegida · Kit Conecta':'Transporte Reynosa-Mty · Hospedaje · Boleto zona elegida · Kit Conecta';
+    else if(pkg==='ride')incTxt=isCDMX(cur)?'Traslados Hotel-Evento CDMX · Hospedaje · Kit Conecta (sin boleto)':'Transporte Reynosa-Mty · Hospedaje · Kit Conecta (sin boleto)';
+    else if(pkg==='stay')incTxt='Hospedaje · Boleto zona elegida · Kit Conecta';
+    else incTxt='Boleto zona elegida · Kit Conecta';
+  }
   $$('d-inc').innerHTML='<div style="font-size:11px;color:rgba(255,255,255,.6);font-weight:700;text-transform:uppercase;line-height:2">'+incTxt+'</div>';
   $$('w-inc-card').style.display='block';
 

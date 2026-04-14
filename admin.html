@@ -245,7 +245,6 @@ function buildNav() {
       document.querySelectorAll('.view').forEach(el=>el.classList.remove('active'));
       document.getElementById('view-'+v).classList.add('active');
       if(v==='eventos' && !document.getElementById('evento-select').options.length > 1) populateEventoSelect();
-      if(v==="gastos") { loadGastos(); loadGastosEventos(); }
     };
     nav.appendChild(btn);
     if(i===0) document.getElementById('view-'+v).classList.add('active');
@@ -292,7 +291,6 @@ async function initApp() {
   reservCache = reservaciones;
   clientes.forEach(c => clientesCache[c.id] = c.fields);
   populateEventoSelect();
-      if(v==="gastos") { loadGastos(); loadGastosEventos(); }
   if(currentRole==='admin'||currentRole==='auxiliar') loadResumen();
   if(currentRole==='auxiliar') loadPagosRecientes();
   if(currentView==="gastos") { loadGastos(); loadGastosEventos(); }

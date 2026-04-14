@@ -492,7 +492,7 @@ function loadVendedor(){
 
 function loadGastosEventos() {
   const sel = document.getElementById('g-evento');
-  if(!sel || sel.options.length > 1) return;
+  if(!sel) return; while(sel.options.length > 1) sel.remove(1);
   eventosCache.forEach(e => {
     const opt = document.createElement('option');
     opt.value = e.id;

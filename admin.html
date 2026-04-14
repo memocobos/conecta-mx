@@ -1,0 +1,647 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Conecta Reynosa — Admin</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --negro: #000000;
+    --blanco: #ffffff;
+    --azul: #0000cd;
+    --rojo: #ff283b;
+    --amarillo: #e8ff4c;
+    --verde: #88ea4e;
+    --gris: #111111;
+    --gris2: #1a1a1a;
+    --gris3: #2a2a2a;
+    --texto-sec: #888888;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--negro); color: var(--blanco); font-family: 'Montserrat', sans-serif; min-height: 100vh; }
+
+  /* LOGIN */
+  #login-screen {
+    display: flex; align-items: center; justify-content: center;
+    min-height: 100vh; background: var(--negro);
+  }
+  .login-box {
+    width: 360px; padding: 40px;
+    border: 1px solid var(--gris3);
+    background: var(--gris);
+  }
+  .login-box h1 { font-family: 'Bebas Neue', sans-serif; font-size: 36px; letter-spacing: 2px; color: var(--amarillo); margin-bottom: 4px; }
+  .login-box p { font-size: 12px; color: var(--texto-sec); margin-bottom: 32px; text-transform: uppercase; letter-spacing: 1px; }
+  .login-box input {
+    width: 100%; background: var(--gris2); border: 1px solid var(--gris3);
+    color: var(--blanco); padding: 12px 16px; font-size: 14px;
+    font-family: 'Montserrat', sans-serif; margin-bottom: 12px; outline: none;
+  }
+  .login-box input:focus { border-color: var(--azul); }
+  .login-box button {
+    width: 100%; background: var(--azul); color: var(--blanco);
+    border: none; padding: 14px; font-size: 14px; font-weight: 700;
+    font-family: 'Montserrat', sans-serif; cursor: pointer;
+    text-transform: uppercase; letter-spacing: 2px;
+  }
+  .login-box button:hover { background: #0000a0; }
+  .login-error { color: var(--rojo); font-size: 12px; margin-top: 8px; display: none; }
+
+  /* MAIN APP */
+  #app { display: none; }
+
+  /* HEADER */
+  .header {
+    background: var(--gris); border-bottom: 1px solid var(--gris3);
+    padding: 0 24px; display: flex; align-items: center; justify-content: space-between;
+    height: 56px; position: sticky; top: 0; z-index: 100;
+  }
+  .header-logo { font-family: 'Bebas Neue', sans-serif; font-size: 22px; letter-spacing: 3px; color: var(--amarillo); }
+  .header-nav { display: flex; gap: 4px; }
+  .nav-btn {
+    padding: 6px 14px; font-size: 12px; font-weight: 600; font-family: 'Montserrat', sans-serif;
+    border: none; background: transparent; color: var(--texto-sec); cursor: pointer;
+    text-transform: uppercase; letter-spacing: 1px; border-radius: 2px;
+    transition: all .15s;
+  }
+  .nav-btn.active { background: var(--gris3); color: var(--blanco); }
+  .nav-btn:hover:not(.active) { color: var(--blanco); }
+  .header-right { display: flex; align-items: center; gap: 12px; }
+  .role-badge {
+    font-size: 11px; font-weight: 600; padding: 4px 10px;
+    background: var(--gris3); color: var(--texto-sec);
+    text-transform: uppercase; letter-spacing: 1px;
+  }
+  .logout-btn {
+    font-size: 11px; color: var(--texto-sec); background: none; border: none;
+    cursor: pointer; font-family: 'Montserrat', sans-serif; text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+  .logout-btn:hover { color: var(--rojo); }
+
+  /* VIEWS */
+  .view { display: none; padding: 24px; }
+  .view.active { display: block; }
+
+  /* METRIC CARDS */
+  .metrics-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 24px; }
+  .metric-card { background: var(--gris); border: 1px solid var(--gris3); padding: 20px; }
+  .metric-label { font-size: 11px; font-weight: 600; color: var(--texto-sec); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+  .metric-val { font-family: 'Bebas Neue', sans-serif; font-size: 32px; letter-spacing: 1px; }
+  .metric-sub { font-size: 11px; color: var(--texto-sec); margin-top: 4px; }
+  .metric-card.verde .metric-val { color: var(--verde); }
+  .metric-card.rojo .metric-val { color: var(--rojo); }
+  .metric-card.amarillo .metric-val { color: var(--amarillo); }
+  .metric-card.azul .metric-val { color: #4488ff; }
+
+  /* CARDS */
+  .card { background: var(--gris); border: 1px solid var(--gris3); padding: 20px; margin-bottom: 16px; }
+  .card-title { font-size: 11px; font-weight: 700; color: var(--texto-sec); text-transform: uppercase; letter-spacing: 2px; margin-bottom: 16px; }
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+
+  /* TABLA EVENTOS */
+  .ev-list { display: flex; flex-direction: column; gap: 0; }
+  .ev-row {
+    display: grid; grid-template-columns: 1fr 80px 120px 100px 110px;
+    align-items: center; padding: 10px 0;
+    border-bottom: 1px solid var(--gris3); gap: 12px;
+  }
+  .ev-row:last-child { border-bottom: none; }
+  .ev-nombre { font-size: 13px; font-weight: 600; }
+  .ev-fecha { font-size: 11px; color: var(--texto-sec); }
+  .ev-ciudad { font-size: 11px; }
+  .bar-wrap { height: 4px; background: var(--gris3); border-radius: 2px; overflow: hidden; }
+  .bar-fill { height: 100%; background: var(--verde); border-radius: 2px; }
+  .bar-fill.warn { background: var(--amarillo); }
+  .bar-fill.danger { background: var(--rojo); }
+  .ev-monto { font-size: 12px; font-weight: 700; text-align: right; }
+
+  /* BADGES */
+  .badge {
+    display: inline-block; font-size: 10px; font-weight: 700;
+    padding: 3px 8px; text-transform: uppercase; letter-spacing: 1px;
+  }
+  .badge-verde { background: rgba(136,234,78,.15); color: var(--verde); }
+  .badge-rojo { background: rgba(255,40,59,.15); color: var(--rojo); }
+  .badge-amarillo { background: rgba(232,255,76,.15); color: var(--amarillo); }
+  .badge-azul { background: rgba(0,0,205,.2); color: #4488ff; }
+  .badge-gris { background: var(--gris3); color: var(--texto-sec); }
+
+  /* TABLE */
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { font-size: 10px; font-weight: 700; color: var(--texto-sec); text-transform: uppercase; letter-spacing: 1px; padding: 0 8px 10px 0; border-bottom: 1px solid var(--gris3); text-align: left; }
+  td { padding: 9px 8px 9px 0; border-bottom: 1px solid var(--gris3); color: var(--blanco); }
+  tr:last-child td { border-bottom: none; }
+
+  /* SELECTOR */
+  select {
+    background: var(--gris2); border: 1px solid var(--gris3); color: var(--blanco);
+    padding: 8px 12px; font-size: 13px; font-family: 'Montserrat', sans-serif;
+    outline: none; margin-bottom: 16px; width: 100%;
+  }
+  select:focus { border-color: var(--azul); }
+
+  /* FORM */
+  .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; }
+  .form-group label { display: block; font-size: 11px; font-weight: 600; color: var(--texto-sec); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px; }
+  .form-group input, .form-group select {
+    width: 100%; background: var(--gris2); border: 1px solid var(--gris3);
+    color: var(--blanco); padding: 10px 12px; font-size: 13px;
+    font-family: 'Montserrat', sans-serif; outline: none; margin-bottom: 0;
+  }
+  .form-group input:focus, .form-group select:focus { border-color: var(--azul); }
+  .btn-primary {
+    background: var(--azul); color: var(--blanco); border: none;
+    padding: 12px 24px; font-size: 12px; font-weight: 700;
+    font-family: 'Montserrat', sans-serif; cursor: pointer;
+    text-transform: uppercase; letter-spacing: 2px; width: 100%;
+  }
+  .btn-primary:hover { background: #0000a0; }
+
+  /* LOADING */
+  .loading { text-align: center; padding: 40px; color: var(--texto-sec); font-size: 13px; }
+  .spinner {
+    width: 24px; height: 24px; border: 2px solid var(--gris3);
+    border-top-color: var(--azul); border-radius: 50%;
+    animation: spin .8s linear infinite; margin: 0 auto 12px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ALERTA */
+  .alerta-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--gris3); font-size: 13px; }
+  .alerta-row:last-child { border-bottom: none; }
+  .alerta-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+
+  @media (max-width: 768px) {
+    .metrics-grid { grid-template-columns: 1fr 1fr; }
+    .two-col { grid-template-columns: 1fr; }
+    .header-nav { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="login-screen">
+  <div class="login-box">
+    <h1>Conecta</h1>
+    <p>Reynosa — Panel de administración</p>
+    <input type="text" id="login-user" placeholder="Usuario" autocomplete="off">
+    <input type="password" id="login-pass" placeholder="Contraseña">
+    <button onclick="doLogin()">Entrar</button>
+    <div class="login-error" id="login-error">Usuario o contraseña incorrectos</div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app">
+  <div class="header">
+    <div class="header-logo">Conecta Reynosa</div>
+    <div class="header-nav" id="header-nav"></div>
+    <div class="header-right">
+      <div class="role-badge" id="role-label">Admin</div>
+      <button class="logout-btn" onclick="doLogout()">Salir</button>
+    </div>
+  </div>
+
+  <div id="view-resumen" class="view">
+    <div id="resumen-content"><div class="loading"><div class="spinner"></div>Cargando datos...</div></div>
+  </div>
+
+  <div id="view-eventos" class="view">
+    <div class="card">
+      <div class="card-title">Seleccionar evento</div>
+      <select id="evento-select" onchange="loadEvento(this.value)"><option value="">— Selecciona un evento —</option></select>
+    </div>
+    <div id="evento-content"></div>
+  </div>
+
+  <div id="view-pagos" class="view">
+    <div class="card">
+      <div class="card-title">Registrar pago</div>
+      <div class="form-grid">
+        <div class="form-group"><label>Cliente</label><input type="text" id="pago-cliente" placeholder="Nombre del cliente"></div>
+        <div class="form-group"><label>Evento</label><select id="pago-evento"><option value="">Seleccionar...</option></select></div>
+        <div class="form-group"><label>Monto ($)</label><input type="number" id="pago-monto" placeholder="0"></div>
+        <div class="form-group"><label>Método</label>
+          <select id="pago-metodo">
+            <option>Transferencia</option><option>Clip</option><option>Efectivo</option><option>Otro</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group" style="margin-bottom:16px"><label>Referencia (opcional)</label><input type="text" id="pago-ref" placeholder="Número de referencia"></div>
+      <button class="btn-primary" onclick="registrarPago()">Registrar pago</button>
+      <div id="pago-msg" style="margin-top:10px;font-size:12px;display:none"></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Últimos pagos registrados</div>
+      <div id="pagos-recientes"><div class="loading"><div class="spinner"></div>Cargando...</div></div>
+    </div>
+  </div>
+
+  <div id="view-vendedor" class="view">
+    <div id="vendedor-content"><div class="loading"><div class="spinner"></div>Cargando...</div></div>
+  </div>
+</div>
+
+<script>
+// Token movido al servidor
+const BASE = "app7B0djOaUn9T30m";
+
+const USERS = {
+  "memo":     { pass: "conecta2026", role: "admin",    label: "Memo — Admin" },
+  "auxiliar": { pass: "admin2026",   role: "auxiliar", label: "Auxiliar Admin" },
+  "coordi":   { pass: "coordi2026", role: "coordi",   label: "Coordinador" },
+  "ventas":   { pass: "ventas2026",  role: "vendedor", label: "Vendedor" },
+};
+
+const ROLES = {
+  admin:    { views: ["resumen","eventos","pagos"] },
+  auxiliar: { views: ["pagos","eventos"] },
+  coordi:   { views: ["eventos"] },
+  vendedor: { views: ["vendedor"] },
+};
+
+const VIEW_LABELS = { resumen:"Resumen", eventos:"Por evento", pagos:"Pagos", vendedor:"Mis ventas" };
+
+let currentRole = null;
+let eventosCache = [];
+let reservCache = [];
+
+// ── AUTH ──────────────────────────────────────────────────────────
+function doLogin() {
+  const u = document.getElementById('login-user').value.trim().toLowerCase();
+  const p = document.getElementById('login-pass').value;
+  const user = USERS[u];
+  if (!user || user.pass !== p) {
+    document.getElementById('login-error').style.display = 'block';
+    return;
+  }
+  currentRole = user.role;
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  document.getElementById('role-label').textContent = user.label;
+  buildNav();
+  initApp();
+}
+
+function doLogout() {
+  document.getElementById('login-screen').style.display = 'flex';
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('login-user').value = '';
+  document.getElementById('login-pass').value = '';
+}
+
+document.getElementById('login-pass').addEventListener('keydown', e => { if(e.key==='Enter') doLogin(); });
+
+// ── NAV ───────────────────────────────────────────────────────────
+function buildNav() {
+  const nav = document.getElementById('header-nav');
+  nav.innerHTML = '';
+  const views = ROLES[currentRole].views;
+  views.forEach((v, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'nav-btn' + (i === 0 ? ' active' : '');
+    btn.textContent = VIEW_LABELS[v];
+    btn.onclick = () => showView(v, btn);
+    nav.appendChild(btn);
+  });
+  showView(views[0]);
+}
+
+function showView(viewId, btn) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('view-' + viewId)?.classList.add('active');
+  if (btn) btn.classList.add('active');
+}
+
+// ── API ───────────────────────────────────────────────────────────
+async function atFetch(tabla, params = '') {
+  let records = [], offset = null;
+  do {
+    const url = `https://api.airtable.com/v0/${BASE}/${encodeURIComponent(tabla)}?pageSize=100${params}${offset ? '&offset=' + offset : ''}`;
+    const res = await fetch(url, { headers: { Authorization: `Bearer ${TOKEN}` } }).then(r => r.json());
+    records.push(...(res.records || []));
+    offset = res.offset;
+  } while (offset);
+  return records;
+}
+
+async function atPost(tabla, fields) {
+  const res = await fetch(`https://api.airtable.com/v0/${BASE}/${encodeURIComponent(tabla)}`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${TOKEN}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ records: [{ fields }] })
+  }).then(r => r.json());
+  return res;
+}
+
+function pesos(n) { return '$' + Math.round(n || 0).toLocaleString('es-MX'); }
+
+// ── INIT ──────────────────────────────────────────────────────────
+async function initApp() {
+  const [eventos, reservaciones] = await Promise.all([
+    atFetch('Eventos', '&sort%5B0%5D%5Bfield%5D=Fecha&sort%5B0%5D%5Bdirection%5D=asc'),
+    atFetch('Reservaciones')
+  ]);
+  eventosCache = eventos;
+  reservCache = reservaciones;
+
+  populateEventoSelects();
+
+  if (currentRole === 'admin' || currentRole === 'auxiliar') loadResumen();
+  if (currentRole === 'auxiliar') loadPagosRecientes();
+  if (currentRole === 'vendedor') loadVendedor();
+}
+
+function populateEventoSelects() {
+  const proximos = eventosCache.filter(e => e.fields.Status === 'Próximo');
+  ['evento-select', 'pago-evento'].forEach(id => {
+    const sel = document.getElementById(id);
+    if (!sel) return;
+    sel.innerHTML = '<option value="">— Seleccionar —</option>';
+    proximos.forEach(e => {
+      sel.innerHTML += `<option value="${e.id}">${e.fields.Nombre}</option>`;
+    });
+  });
+}
+
+// ── RESUMEN ───────────────────────────────────────────────────────
+async function loadResumen() {
+  const pagos = await atFetch('Pagos');
+  const totalCobrado = pagos.reduce((a, p) => a + (p.fields.Monto || 0), 0);
+
+  const totalPorCobrar = reservCache.reduce((a, r) => {
+    const resta = (r.fields['Total a pagar'] || 0) - (r.fields['Total abonado'] || 0);
+    return a + Math.max(0, resta);
+  }, 0);
+
+  const proximos = eventosCache.filter(e => e.fields.Status === 'Próximo');
+
+  let html = `
+  <div class="metrics-grid">
+    <div class="metric-card verde">
+      <div class="metric-label">Total cobrado</div>
+      <div class="metric-val">${pesos(totalCobrado)}</div>
+      <div class="metric-sub">${pagos.length} pagos registrados</div>
+    </div>
+    <div class="metric-card rojo">
+      <div class="metric-label">Por cobrar</div>
+      <div class="metric-val">${pesos(totalPorCobrar)}</div>
+      <div class="metric-sub">Saldo pendiente</div>
+    </div>
+    <div class="metric-card azul">
+      <div class="metric-label">Clientes activos</div>
+      <div class="metric-val">${reservCache.length}</div>
+      <div class="metric-sub">Reservaciones totales</div>
+    </div>
+    <div class="metric-card amarillo">
+      <div class="metric-label">Eventos próximos</div>
+      <div class="metric-val">${proximos.length}</div>
+      <div class="metric-sub">En agenda</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Próximos eventos — estado de cobranza</div>
+    <div class="ev-list">
+      <div class="ev-row" style="font-size:10px;color:var(--texto-sec);font-weight:700;text-transform:uppercase;letter-spacing:1px;padding-bottom:6px">
+        <span>Evento</span><span>Fecha</span><span style="padding:0 4px">Cobrado</span><span>Clientes</span><span style="text-align:right">Por cobrar</span>
+      </div>`;
+
+  for (const ev of proximos.slice(0, 12)) {
+    const reservsEv = reservCache.filter(r => r.fields.Evento?.[0] === ev.id);
+    const cobrado = reservsEv.reduce((a, r) => a + (r.fields['Total abonado'] || 0), 0);
+    const total = reservsEv.reduce((a, r) => a + (r.fields['Total a pagar'] || 0), 0);
+    const pct = total > 0 ? Math.round(cobrado / total * 100) : 0;
+    const falta = total - cobrado;
+    const barClass = pct >= 80 ? '' : pct >= 50 ? ' warn' : ' danger';
+    const montoColor = pct >= 80 ? 'var(--verde)' : pct >= 50 ? 'var(--amarillo)' : 'var(--rojo)';
+    const fecha = ev.fields.Fecha ? new Date(ev.fields.Fecha + 'T12:00:00').toLocaleDateString('es-MX', { day: 'numeric', month: 'short' }) : '—';
+
+    html += `<div class="ev-row">
+      <span class="ev-nombre">${ev.fields.Nombre}</span>
+      <span class="ev-fecha">${fecha}</span>
+      <div><div class="bar-wrap"><div class="bar-fill${barClass}" style="width:${pct}%"></div></div></div>
+      <span class="ev-ciudad" style="font-size:11px;color:var(--texto-sec)">${reservsEv.length} clientes</span>
+      <span class="ev-monto" style="color:${montoColor}">${pesos(falta)}</span>
+    </div>`;
+  }
+
+  html += `</div></div>`;
+
+  // Últimos pagos
+  const ultimos = [...pagos].sort((a,b) => new Date(b.createdTime) - new Date(a.createdTime)).slice(0, 6);
+  html += `<div class="two-col">
+    <div class="card">
+      <div class="card-title">Últimos pagos</div>`;
+  for (const p of ultimos) {
+    html += `<div class="alerta-row">
+      <div class="alerta-dot" style="background:var(--verde)"></div>
+      <span style="flex:1;font-size:12px">${p.fields.Referencia || 'Pago'}</span>
+      <span class="badge badge-verde">${pesos(p.fields.Monto)}</span>
+    </div>`;
+  }
+  html += `</div>
+    <div class="card">
+      <div class="card-title">Resumen por ciudad</div>`;
+
+  const mty = reservCache.filter(r => {
+    const ev = eventosCache.find(e => e.id === r.fields.Evento?.[0]);
+    return ev?.fields.Ciudad === 'MTY';
+  });
+  const cdmx = reservCache.filter(r => {
+    const ev = eventosCache.find(e => e.id === r.fields.Evento?.[0]);
+    return ev?.fields.Ciudad === 'CDMX';
+  });
+  const cobMTY = mty.reduce((a,r) => a + (r.fields['Total abonado']||0), 0);
+  const cobCDMX = cdmx.reduce((a,r) => a + (r.fields['Total abonado']||0), 0);
+
+  html += `
+    <div class="alerta-row"><div class="alerta-dot" style="background:#4488ff"></div>
+      <span style="flex:1;font-size:13px;font-weight:600">MTY</span>
+      <span style="font-size:12px;color:var(--texto-sec)">${mty.length} reserv.</span>
+      <span style="font-size:13px;font-weight:700;margin-left:12px">${pesos(cobMTY)}</span>
+    </div>
+    <div class="alerta-row"><div class="alerta-dot" style="background:var(--rojo)"></div>
+      <span style="flex:1;font-size:13px;font-weight:600">CDMX</span>
+      <span style="font-size:12px;color:var(--texto-sec)">${cdmx.length} reserv.</span>
+      <span style="font-size:13px;font-weight:700;margin-left:12px">${pesos(cobCDMX)}</span>
+    </div>
+  </div></div>`;
+
+  document.getElementById('resumen-content').innerHTML = html;
+}
+
+// ── EVENTO ────────────────────────────────────────────────────────
+async function loadEvento(eventoId) {
+  if (!eventoId) { document.getElementById('evento-content').innerHTML = ''; return; }
+  document.getElementById('evento-content').innerHTML = '<div class="loading"><div class="spinner"></div>Cargando...</div>';
+
+  const ev = eventosCache.find(e => e.id === eventoId);
+  const reservsEv = reservCache.filter(r => r.fields.Evento?.[0] === eventoId);
+  const showFinance = currentRole === 'admin' || currentRole === 'auxiliar';
+
+  const cobrado = reservsEv.reduce((a,r) => a + (r.fields['Total abonado']||0), 0);
+  const total = reservsEv.reduce((a,r) => a + (r.fields['Total a pagar']||0), 0);
+  const falta = total - cobrado;
+
+  // Contar tallas
+  const tallas = {};
+  for (const r of reservsEv) {
+    const clienteId = r.fields.Cliente?.[0];
+    // talla viene del cliente
+  }
+
+  let html = '';
+
+  if (showFinance) {
+    html += `<div class="metrics-grid">
+      <div class="metric-card azul"><div class="metric-label">Clientes</div><div class="metric-val">${reservsEv.length}</div></div>
+      <div class="metric-card verde"><div class="metric-label">Cobrado</div><div class="metric-val">${pesos(cobrado)}</div></div>
+      <div class="metric-card ${falta > 0 ? 'rojo' : 'verde'}"><div class="metric-label">Por cobrar</div><div class="metric-val">${pesos(falta)}</div></div>
+      <div class="metric-card amarillo"><div class="metric-label">Total esperado</div><div class="metric-val">${pesos(total)}</div></div>
+    </div>`;
+  } else {
+    html += `<div class="metrics-grid" style="grid-template-columns:1fr 1fr">
+      <div class="metric-card azul"><div class="metric-label">Clientes registrados</div><div class="metric-val">${reservsEv.length}</div></div>
+      <div class="metric-card amarillo"><div class="metric-label">Evento</div><div class="metric-val" style="font-size:20px">${ev?.fields.Ciudad || '—'}</div></div>
+    </div>`;
+  }
+
+  // Tabla viajeros
+  html += `<div class="card">
+    <div class="card-title">Lista de viajeros — ${ev?.fields.Nombre || ''}</div>
+    <div style="overflow-x:auto"><table>
+      <thead><tr>
+        <th style="width:30%">Nombre</th>
+        <th>Paquete</th>
+        <th>Zona</th>
+        <th>Habitación</th>`;
+  if (showFinance) html += `<th style="text-align:right">Total</th><th style="text-align:right">Abonado</th><th style="text-align:right">Resta</th>`;
+  html += `</tr></thead><tbody>`;
+
+  // Cargar nombres de clientes
+  const clienteIds = [...new Set(reservsEv.map(r => r.fields.Cliente?.[0]).filter(Boolean))];
+  const clientesMap = {};
+  if (clienteIds.length > 0) {
+    const formula = encodeURIComponent(`OR(${clienteIds.map(id=>`RECORD_ID()="${id}"`).join(',')})`);
+    const clientes = await atFetch('Clientes', `&filterByFormula=${formula}`);
+    clientes.forEach(c => clientesMap[c.id] = c.fields);
+  }
+
+  for (const r of reservsEv) {
+    const cliente = clientesMap[r.fields.Cliente?.[0]] || {};
+    const nombre = cliente['Nombre completo'] || '—';
+    const paq = r.fields.Paquete || '—';
+    const zona = r.fields['Zona / Boleto'] || '—';
+    const hab = r.fields['Habitación'] || '—';
+    const tot = r.fields['Total a pagar'] || 0;
+    const abo = r.fields['Total abonado'] || 0;
+    const resta = tot - abo;
+    const paqClass = paq === 'PLUS' ? 'badge-verde' : paq === 'RIDE' ? 'badge-azul' : paq === 'CHEAP' ? 'badge-amarillo' : 'badge-gris';
+
+    html += `<tr>
+      <td style="font-weight:600">${nombre}</td>
+      <td><span class="badge ${paqClass}">${paq}</span></td>
+      <td style="font-size:12px;color:var(--texto-sec)">${zona}</td>
+      <td style="font-size:12px">${hab}</td>`;
+    if (showFinance) {
+      const restaClass = resta <= 0 ? 'badge-verde' : resta > 2000 ? 'badge-rojo' : 'badge-amarillo';
+      html += `<td style="text-align:right;font-size:12px">${pesos(tot)}</td>
+               <td style="text-align:right;font-size:12px">${pesos(abo)}</td>
+               <td style="text-align:right"><span class="badge ${restaClass}">${pesos(resta)}</span></td>`;
+    }
+    html += `</tr>`;
+  }
+
+  html += `</tbody></table></div></div>`;
+  document.getElementById('evento-content').innerHTML = html;
+}
+
+// ── PAGOS ─────────────────────────────────────────────────────────
+async function loadPagosRecientes() {
+  const pagos = await atFetch('Pagos', '&sort%5B0%5D%5Bfield%5D=createdTime&sort%5B0%5D%5Bdirection%5D=desc&maxRecords=10');
+  let html = '';
+  for (const p of pagos) {
+    const fecha = new Date(p.createdTime).toLocaleDateString('es-MX', { day: 'numeric', month: 'short' });
+    html += `<div class="alerta-row">
+      <div class="alerta-dot" style="background:var(--verde)"></div>
+      <span style="flex:1;font-size:13px">${p.fields.Referencia || 'Pago'}</span>
+      <span style="font-size:11px;color:var(--texto-sec);margin-right:8px">${fecha}</span>
+      <span class="badge badge-verde">${pesos(p.fields.Monto)}</span>
+    </div>`;
+  }
+  document.getElementById('pagos-recientes').innerHTML = html || '<div style="color:var(--texto-sec);font-size:13px">Sin pagos recientes</div>';
+}
+
+async function registrarPago() {
+  const cliente = document.getElementById('pago-cliente').value.trim();
+  const eventoId = document.getElementById('pago-evento').value;
+  const monto = parseFloat(document.getElementById('pago-monto').value);
+  const metodo = document.getElementById('pago-metodo').value;
+  const ref = document.getElementById('pago-ref').value.trim();
+  const msg = document.getElementById('pago-msg');
+
+  if (!cliente || !eventoId || !monto) {
+    msg.style.display = 'block'; msg.style.color = 'var(--rojo)';
+    msg.textContent = 'Completa cliente, evento y monto.'; return;
+  }
+
+  // Buscar reservación
+  const formula = encodeURIComponent(`AND({Evento}="${eventoId}")`);
+  const reservs = reservCache.filter(r => r.fields.Evento?.[0] === eventoId);
+  
+  msg.style.display = 'block'; msg.style.color = 'var(--texto-sec)';
+  msg.textContent = 'Registrando...';
+
+  // Por ahora crear pago sin reservación si no se encuentra
+  const fields = {
+    Monto: monto,
+    Método: metodo,
+    'Registrado por': currentRole === 'admin' ? 'Memo' : 'Auxiliar',
+    Referencia: ref || `Pago manual — ${cliente}`,
+  };
+
+  const res = await atPost('Pagos', fields);
+  if (res.records) {
+    msg.style.color = 'var(--verde)';
+    msg.textContent = `✓ Pago de ${pesos(monto)} registrado correctamente`;
+    document.getElementById('pago-monto').value = '';
+    document.getElementById('pago-ref').value = '';
+    loadPagosRecientes();
+  } else {
+    msg.style.color = 'var(--rojo)';
+    msg.textContent = 'Error al registrar. Intenta de nuevo.';
+  }
+}
+
+// ── VENDEDOR ──────────────────────────────────────────────────────
+function loadVendedor() {
+  const proximos = eventosCache.filter(e => e.fields.Status === 'Próximo');
+  let html = `<div class="card">
+    <div class="card-title">Costos de paquetes — próximos eventos</div>
+    <table><thead><tr>
+      <th style="width:35%">Evento</th><th>Fecha</th><th>Ciudad</th>
+      <th style="text-align:right">PLUS</th><th style="text-align:right">RIDE</th><th style="text-align:right">CHEAP</th>
+    </tr></thead><tbody>`;
+
+  for (const ev of proximos) {
+    const fecha = ev.fields.Fecha ? new Date(ev.fields.Fecha + 'T12:00:00').toLocaleDateString('es-MX', { day: 'numeric', month: 'short' }) : '—';
+    html += `<tr>
+      <td style="font-weight:600">${ev.fields.Nombre}</td>
+      <td style="font-size:12px;color:var(--texto-sec)">${fecha}</td>
+      <td><span class="badge ${ev.fields.Ciudad === 'MTY' ? 'badge-azul' : 'badge-rojo'}">${ev.fields.Ciudad}</span></td>
+      <td style="text-align:right;font-weight:600">${ev.fields['Precio PLUS'] ? pesos(ev.fields['Precio PLUS']) : '—'}</td>
+      <td style="text-align:right">${pesos(ev.fields['Precio RIDE'])}</td>
+      <td style="text-align:right">${pesos(ev.fields['Precio CHEAP'])}</td>
+    </tr>`;
+  }
+  html += `</tbody></table></div>`;
+  document.getElementById('vendedor-content').innerHTML = html;
+}
+</script>
+</body>
+</html>

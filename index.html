@@ -1911,36 +1911,6 @@ function buildCotizacionMsg(quincenas,pagoQ){
     }
   }
   msg+='\n\n📋 Fecha de solicitud: '+fechaHoy;
-  // Datos bancarios según paquete
-  if(selPkg==='cheap'){
-    msg+='\n\n━━━━━━━━━━━━━━━ 💳 PAGOS ━━━━━━━━━━━━━━━';
-    msg+='\nDepósito o Transferencia';
-    msg+='\n🏧 Hey Banco / Banregio';
-    msg+='\n💳 Tarjeta: 4741 7429 2598 0792';
-    msg+='\n🔁 CLABE: 058597000035732769';
-    msg+='\n👤 Guillermo Alexander Cobos Vizcarra';
-  } else {
-    msg+='\n\n━━━━━━━━━━━━━━━ 💳 PAGOS ━━━━━━━━━━━━━━━';
-    msg+='\nDepósito o Transferencia';
-    msg+='\n🏧 BBVA Bancomer';
-    msg+='\n💳 Tarjeta: 4152 3139 7573 0487';
-    msg+='\n🔁 CLABE: 012822004639334319';
-    msg+='\n👤 Guillermo Alexander Cobos Vizcarra';
-  }
-  msg+='\n\n━━━━━━━━━━━━━━━ 📲 ENVÍA TU COMPROBANTE ━━━━━━━━━━━━━━━';
-  msg+='\nManda tu comprobante a nuestra página con:';
-  msg+='\n- Nombre del viajero';
-  msg+='\n- Nombre del evento';
-  msg+='\n- Concepto del pago (Separo, Pago 1, etc.)';
-  msg+='\n✍️ Escríbelos a mano o con app antes de enviarlo.';
-  msg+='\n👉 m.me/ConectaRey';
-  msg+='\n⚠️ Sin comprobante, el pago no se registra ni se valida.';
-  msg+='\n\n━━━━━━━━━━━━━━━ ⚠️ POLÍTICAS ━━━━━━━━━━━━━━━';
-  msg+='\n🚫 No hay reembolsos por cancelación del cliente, incumplimiento de pagos o cambios de fecha del concierto.';
-  msg+='\n🚫 No se permite cambiar de tour, ni cambiar entre paquete y solo boletos.';
-  msg+='\n🔄 Lugares transferibles a otra persona sin costo hasta 5 días antes del evento.';
-  msg+='\n⚠️ Errores en depósitos generan cargo de $350 (pregunta bien antes de depositar).';
-  msg+='\n✅ Reembolsos solo en caso de cancelación oficial del evento.';
   msg+='\n\n¿Qué sigue para reservar?';
   return msg;
 }

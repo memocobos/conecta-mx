@@ -578,7 +578,6 @@ async function registrarGasto() {
     'Monto': Number(monto),
     'Tipo': categoria,
     'Fecha': fecha,
-    'Registrado por': currentRole==='admin'?'Memo':'Auxiliar',
   };
   if(notas) fields['Notas'] = notas;
   if(eventoId) fields['Evento'] = [eventoId];

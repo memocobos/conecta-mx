@@ -335,7 +335,19 @@ async function loadEvento(eventoId) {
   const ev=eventosCache.find(e=>e.id===eventoId);
   const rs=reservCache.filter(r=>r.fields.Evento?.[0]===eventoId);
   const showFin=currentRole==='admin'||currentRole==='auxiliar';
-  const cob=rs.reduce((a,r)=>a+(r.fields['Total abonado']||0),0);
+
+  // Cargar pagos para calcular abonado real
+  const pagosEv = await atFetch('Pagos');
+  const reservIds = new Set(rs.map(r=>r.id));
+  const pagosPorReserv = {};
+  for(const p of pagosEv){
+    const rid = p.fields['Reservación']?.[0];
+    if(rid && reservIds.has(rid)){
+      pagosPorReserv[rid] = (pagosPorReserv[rid]||0) + (p.fields.Monto||0);
+    }
+  }
+
+  const cob=rs.reduce((a,r)=>a+(pagosPorReserv[r.id]||0),0);
   const tot=rs.reduce((a,r)=>a+(r.fields['Total a pagar']||0),0);
 
   let html='';
@@ -357,24 +369,34 @@ async function loadEvento(eventoId) {
 
   html+=`<div class="card"><div class="card-title">Lista de viajeros — ${ev?.fields.Nombre||''}</div>
   <div style="overflow-x:auto"><table><thead><tr>
-    <th style="width:28%">Nombre</th><th>Paquete</th><th>Zona</th><th>Habitación</th><th>Teléfono</th>`;
-  if(showFin) html+=`<th style="text-align:right">Total</th><th style="text-align:right">Abonado</th><th style="text-align:right">Resta</th>`;
+    <th>Nombre</th><th>Paquete</th><th>Zona</th><th>Habitación</th><th>Comparte con</th><th>Talla</th><th>Teléfono</th><th>Correo</th><th>Emergencia</th>`;
+  if(showFin) html+=`<th style="text-align:right">Total</th><th style="text-align:right">Abonado</th><th style="text-align:right">Resta</th><th>Status</th>`;
   html+=`</tr></thead><tbody>`;
 
   for(const r of rs){
     const cl=clientesMap[r.fields.Cliente?.[0]]||{};
     const paq=r.fields.Paquete||'—';
     const pc=paq==='PLUS'?'badge-verde':paq==='RIDE'?'badge-azul':paq==='CHEAP'?'badge-amarillo':'badge-gris';
-    const t=r.fields['Total a pagar']||0, a=r.fields['Total abonado']||0, re=t-a;
+    const t=r.fields['Total a pagar']||0;
+    const a=pagosPorReserv[r.id]||0;
+    const re=t-a;
+    const st=r.fields['Status pago']||'';
+    const stc=st==='Liquidado'?'badge-verde':st==='Baja'?'badge-rojo':st==='Saldo pendiente'?'badge-amarillo':'badge-gris';
     html+=`<tr>
-      <td style="font-weight:600">${cl['Nombre completo']||'—'}</td>
+      <td style="font-weight:600;min-width:160px">${cl['Nombre completo']||'—'}</td>
       <td><span class="badge ${pc}">${paq}</span></td>
-      <td style="font-size:12px;color:var(--texto-sec)">${r.fields['Zona / Boleto']||'—'}</td>
-      <td style="font-size:12px">${r.fields['Habitación']||'—'}</td>
-      <td style="font-size:12px;color:var(--texto-sec)">${cl['Teléfono']||'—'}</td>`;
-    if(showFin) html+=`<td style="text-align:right;font-size:12px">${pesos(t)}</td>
-      <td style="text-align:right;font-size:12px">${pesos(a)}</td>
-      <td style="text-align:right"><span class="badge ${re<=0?'badge-verde':re>2000?'badge-rojo':'badge-amarillo'}">${pesos(re)}</span></td>`;
+      <td style="font-size:12px;color:var(--texto-sec);min-width:80px">${r.fields['Zona / Boleto']||'—'}</td>
+      <td style="font-size:12px;min-width:90px">${r.fields['Habitación']||'—'}</td>
+      <td style="font-size:11px;color:var(--texto-sec);min-width:120px">${r.fields['Comparte habitación con']||'—'}</td>
+      <td style="font-size:12px;text-align:center">${cl['Talla de playera']||'—'}</td>
+      <td style="font-size:12px;color:var(--texto-sec);min-width:100px">${cl['Teléfono']||'—'}</td>
+      <td style="font-size:11px;color:var(--texto-sec);min-width:160px">${cl['Correo electrónico']||'—'}</td>
+      <td style="font-size:11px;color:var(--texto-sec);min-width:140px">${cl['Contacto de emergencia']||'—'}</td>`;
+    if(showFin) html+=`
+      <td style="text-align:right;font-size:12px;min-width:70px">${pesos(t)}</td>
+      <td style="text-align:right;font-size:12px;min-width:70px;color:var(--verde)">${pesos(a)}</td>
+      <td style="text-align:right;min-width:70px"><span class="badge ${re<=0?'badge-verde':re>2000?'badge-rojo':'badge-amarillo'}">${pesos(re)}</span></td>
+      <td><span class="badge ${stc}">${st||'—'}</span></td>`;
     html+=`</tr>`;
   }
   html+=`</tbody></table></div></div>`;

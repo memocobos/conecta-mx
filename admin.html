@@ -490,10 +490,11 @@ function loadVendedor(){
   document.getElementById('vendedor-content').innerHTML=html;
 }
 
-function loadGastosEventos() {
+async function loadGastosEventos() {
   const sel = document.getElementById('g-evento');
   if(!sel) return; while(sel.options.length > 1) sel.remove(1);
-  eventosCache.forEach(e => {
+  const todosEventos = eventosCache.length > 0 ? eventosCache : (await atFetch("Eventos")).filter(Boolean);
+  todosEventos.forEach(e => {
     const opt = document.createElement('option');
     opt.value = e.id;
     opt.textContent = e.fields.Nombre || e.id;

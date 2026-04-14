@@ -584,6 +584,15 @@ body{font-family:'Montserrat',sans-serif;background:#000;color:#fff;min-height:1
 <style>
 .wa-float{position:fixed;bottom:20px;right:20px;width:56px;height:56px;background:#25D366;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;text-decoration:none;z-index:999;box-shadow:0 4px 16px rgba(37,211,102,.4);transition:transform .2s,box-shadow .2s}
 .wa-float:hover{transform:scale(1.1);box-shadow:0 6px 20px rgba(37,211,102,.6)}
+.promo-modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:9997;align-items:center;justify-content:center}
+.promo-modal-box{border-radius:20px;padding:36px 28px;text-align:center;max-width:360px;width:calc(100% - 40px);position:relative;box-shadow:0 20px 60px rgba(0,0,0,.5)}
+.promo-modal-emoji{font-size:56px;line-height:1;margin-bottom:12px}
+.promo-modal-title{color:#fff;font-size:20px;font-weight:900;text-transform:uppercase;letter-spacing:.04em;line-height:1.3;margin-bottom:10px;text-shadow:0 2px 8px rgba(0,0,0,.3)}
+.promo-modal-desc{color:rgba(255,255,255,.85);font-size:13px;font-weight:600;line-height:1.5}
+.promo-modal-close{position:absolute;top:10px;right:14px;background:rgba(0,0,0,.3);border:none;color:#fff;font-size:20px;width:32px;height:32px;border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.promo-modal-close:hover{background:rgba(0,0,0,.5)}
+.promo-modal-sparkle{position:absolute;font-size:24px;animation:sparkle 1.5s ease-in-out infinite}
+@keyframes sparkle{0%,100%{opacity:.3;transform:scale(.8)}50%{opacity:1;transform:scale(1.2)}}
 .pago-modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:9998;align-items:center;justify-content:center}
 .pago-modal{background:#1a1a1a;border:1px solid rgba(255,255,255,.1);border-radius:16px;width:calc(100% - 32px);max-width:420px;padding:0;overflow:hidden;position:relative}
 .pago-modal-head{background:#111;padding:20px 24px;border-bottom:1px solid rgba(255,255,255,.08)}
@@ -667,7 +676,7 @@ var EV=[  {id:'acdc',c:'rojo',img:'AC/DC',a:'AC/DC - Power Up Tour',f:'11 abr 20
   {id:'zayn',mapa:'zayn',c:'azul',img:'Zayn',a:'Zayn - The First Solo Headline Arena Tour',f:'14 jun 2026',ds:'2026-06-14',v:'Estadio Borregos, Mty',sep:800,ride:2700,st:'',inc:['Boleto zona elegida','Transporte Reynosa-Mty','Hospedaje compartido','Kit Conecta'],banco:BANCO_DEFAULT,zonas:[{n:'General A',p:5900},{n:'Platino',p:6600,vip:1},{n:'Oro',p:5200},{n:'Plata',p:4000},{n:'Cancha B',p:0,ag:1}],hotel:HOTEL_STD,pagos:[{l:'Separo',d:'Hoy',s:1},{l:'Pago 1',d:'9-16 mar',s:0},{l:'Pago 2',d:'24 mar-1 abr',s:0},{l:'Pago 3',d:'9-16 abr',s:0},{l:'Pago 4',d:'24 abr-1 may',s:0},{l:'Pago 5',d:'9-16 may',s:0},{l:'Pago 6',d:'24 may-1 jun',s:0}],cheapZonas:[{n:'General A',p:4300},{n:'Platino',p:4950,vip:1},{n:'Oro',p:3600},{n:'Plata',p:2400},{n:'Cancha B',p:0,ag:1}]},
   {id:'rufus',ride:2900,cdmx:true,mapa:'rufus',c:'verde',img:'Rufus Du Sol',a:'Rüfüs Du Sol Mexico City',f:'4 jul 2026',ds:'2026-07-04',v:'Estadio GNP, CDMX',sep:800,st:'',inc:['Boleto zona elegida','Traslados CDMX','Hospedaje compartido','Kit Conecta'],nota:'NO incluye transporte a CDMX.',banco:BANCO_DEFAULT,zonas:[{n:'General A',p:5400},{n:'General B',p:3500},{n:'Zona GNP',p:0,ag:1},{n:'Verde B',p:0,ag:1},{n:'Naranja B',p:0,ag:1},{n:'Verde C',p:0,ag:1},{n:'Naranja C',p:0,ag:1}],cheapZonas:[{n:'General A',p:4600},{n:'General B',p:2600},{n:'Zona GNP',p:0,ag:1},{n:'Verde B',p:0,ag:1},{n:'Naranja B',p:0,ag:1},{n:'Verde C',p:0,ag:1},{n:'Naranja C',p:0,ag:1}],hotel:[{n:'Compartida',e:0},{n:'Triple',e:250},{n:'Doble',e:725},{n:'Individual',e:2175}],pagos:[{l:'Separo',d:'Hoy',s:1},{l:'Pago 1',d:'9-16 mar',s:0},{l:'Pago 2',d:'24 mar-1 abr',s:0},{l:'Pago 3',d:'9-16 abr',s:0},{l:'Pago 4',d:'24 abr-1 may',s:0},{l:'Pago 5',d:'9-16 may',s:0},{l:'Pago 6',d:'24 may-1 jun',s:0},{l:'Pago 7',d:'9-16 jun',s:0},{l:'Pago 8',d:'24 jun-1 jul',s:0}]},
   {id:'harry',ride:2900,cdmx:true,mapa:'harry',c:'rosa',img:'Harry Styles',a:'Harry Styles - Together Together Tour',f:'1, 7 y 8 ago 2026',ds:'2026-08-01',v:'Estadio GNP Seguros, CDMX',sep:1000,st:'ultimos',inc:['Boleto zona elegida','Traslados CDMX','Hospedaje compartido','Kit Conecta'],nota:'NO incluye vuelos. Vuelos y autobuses disponibles como extra.',banco:BANCO_HEY,multifecha:[{lbl:'1 Agosto',zonas:[{n:'Circle',p:0,vip:1,ag:1},{n:'Disco',p:0,vip:1,ag:1},{n:'Kiss Square',p:0,vip:1,ag:1},{n:'General A',p:0,ag:1},{n:'General B',p:0,ag:1},{n:'General C',p:6500},{n:'Zona GNP',p:0,ag:1},{n:'Verde B',p:0,ag:1},{n:'Naranja B',p:0,ag:1},{n:'Verde C',p:0,ag:1},{n:'Naranja C',p:0,ag:1},{n:'Box Oro',p:16000,vip:1}],cheapZonas:[{n:'General A',p:5000},{n:'Box Oro',p:13000,vip:1},{n:'General C',p:4500},{n:'Naranja C',p:4000},{n:'Circle',p:0,ag:1},{n:'Disco',p:0,ag:1},{n:'Kiss Square',p:0,ag:1},{n:'General B',p:0,ag:1},{n:'Zona GNP',p:0,ag:1},{n:'Verde B',p:0,ag:1},{n:'Naranja B',p:0,ag:1},{n:'Verde C',p:0,ag:1}]},{lbl:'7 Agosto',zonas:[{n:'Circle',p:0,vip:1,ag:1},{n:'Disco',p:0,vip:1,ag:1},{n:'Kiss Square',p:0,vip:1,ag:1},{n:'General A',p:7500},{n:'General B',p:0,ag:1},{n:'Zona GNP',p:0,ag:1},{n:'Verde B',p:0,ag:1},{n:'Naranja B',p:0,ag:1},{n:'Verde C',p:0,ag:1},{n:'Naranja C',p:0,ag:1}],cheapZonas:[{n:'General A',p:5000},{n:'Circle',p:0,ag:1},{n:'Disco',p:0,ag:1},{n:'Kiss Square',p:0,ag:1},{n:'General B',p:0,ag:1},{n:'Zona GNP',p:0,ag:1},{n:'Verde B',p:0,ag:1},{n:'Naranja B',p:0,ag:1},{n:'Verde C',p:0,ag:1},{n:'Naranja C',p:0,ag:1}]},{lbl:'8 Agosto',zonas:[{n:'Circle',p:0,vip:1,ag:1},{n:'Disco',p:0,vip:1,ag:1},{n:'Kiss Square',p:0,vip:1,ag:1},{n:'General A',p:7500},{n:'General B',p:0,ag:1},{n:'Zona GNP',p:0,ag:1},{n:'Verde B',p:0,ag:1},{n:'Naranja B',p:0,ag:1},{n:'Verde C',p:0,ag:1},{n:'Naranja C',p:0,ag:1}],cheapZonas:[{n:'General A',p:5000},{n:'Circle',p:0,ag:1},{n:'Disco',p:0,ag:1},{n:'Kiss Square',p:0,ag:1},{n:'General B',p:0,ag:1},{n:'Zona GNP',p:0,ag:1},{n:'Verde B',p:0,ag:1},{n:'Naranja B',p:0,ag:1},{n:'Verde C',p:0,ag:1},{n:'Naranja C',p:0,ag:1}]}],zonas:[{n:'Circle',p:0,vip:1,ag:1},{n:'Disco',p:0,vip:1,ag:1},{n:'Kiss Square',p:0,vip:1,ag:1},{n:'General A',p:7500},{n:'General B',p:0,ag:1},{n:'Zona GNP',p:0,ag:1},{n:'Verde B',p:0,ag:1},{n:'Naranja B',p:0,ag:1},{n:'Verde C',p:0,ag:1},{n:'Naranja C',p:0,ag:1}],cheapZonas:[{n:'General A',p:5000},{n:'Circle',p:0,ag:1},{n:'Disco',p:0,ag:1},{n:'Kiss Square',p:0,ag:1},{n:'General B',p:0,ag:1},{n:'Zona GNP',p:0,ag:1},{n:'Verde B',p:0,ag:1},{n:'Naranja B',p:0,ag:1},{n:'Verde C',p:0,ag:1},{n:'Naranja C',p:0,ag:1}],hotel:[{n:'Compartida',e:0},{n:'Doble',e:650},{n:'Triple',e:250},{n:'Individual',e:1960}],pagos:[{l:'Separo',d:'Hoy',s:1}]},
-  {id:'dalemix',staticImg:'dalemixx',mapa:'dalemixx',c:'amarillo',a:'Dale Mixx',f:'15 ago 2026',ds:'2026-08-15',v:'Parque Fundidora, Mty',sep:300,ride:2700,st:'',inc:['Boleto zona elegida','Transporte Reynosa-Mty','Hospedaje compartido','Comida incluida','Kit Conecta'],banco:BANCO_DEFAULT,zonas:[{n:'General',p:3900},{n:'VIP',p:0,prox:1,vip:1}],cheapZonas:[{n:'General',p:2250},{n:'VIP',p:0,prox:1,vip:1}],hotel:HOTEL_STD,pagos:[{l:'Separo',d:'Hoy',s:1}]},
+  {id:'dalemix',staticImg:'dalemixx',mapa:'dalemixx',promoModal:{emoji:'🍔',title:'¡ESTE EVENTO INCLUYE COMIDA GRATIS!',desc:'Paquete Plus — Come y disfruta dentro del evento sin gastar de más',colors:['#c026d3','#7c3aed']},c:'amarillo',a:'Dale Mixx',f:'15 ago 2026',ds:'2026-08-15',v:'Parque Fundidora, Mty',sep:300,ride:2700,st:'',inc:['Boleto zona elegida','Transporte Reynosa-Mty','Hospedaje compartido','Comida incluida','Kit Conecta'],banco:BANCO_DEFAULT,zonas:[{n:'General',p:3900},{n:'VIP',p:0,prox:1,vip:1}],cheapZonas:[{n:'General',p:2250},{n:'VIP',p:0,prox:1,vip:1}],hotel:HOTEL_STD,pagos:[{l:'Separo',d:'Hoy',s:1}]},
   {id:'rosalia',mapa:'rosalia',c:'rojo',img:'Rosalia',a:'Rosalía - Lux Tour',f:'19 ago 2026',ds:'2026-08-19',v:'Arena Monterrey, Mty',sep:1000,ride:2700,st:'',inc:['Boleto zona elegida','Transporte Reynosa-Mty','Hospedaje compartido','Kit Conecta'],banco:BANCO_DEFAULT,zonas:[{n:'Cancha VIP',p:7400,vip:1},{n:'Platino',p:7200},{n:'Cancha General',p:5300},{n:'Oro',p:0,ag:1},{n:'Barrera',p:0,ag:1},{n:'Butaca',p:0,ag:1},{n:'Preferente',p:0,ag:1},{n:'Luneta',p:0,ag:1},{n:'Balcón',p:0,ag:1}],cheapZonas:[{n:'Cancha VIP',p:5800,vip:1},{n:'Platino',p:5500},{n:'Cancha General',p:3700},{n:'Oro',p:0,ag:1},{n:'Barrera',p:0,ag:1},{n:'Butaca',p:0,ag:1},{n:'Preferente',p:0,ag:1},{n:'Luneta',p:0,ag:1},{n:'Balcón',p:0,ag:1}],hotel:[{n:'Compartida',e:0},{n:'Doble',e:650},{n:'Triple',e:250},{n:'Individual',e:1960}],pagos:[{l:'Separo',d:'Hoy',s:1}]},
   {id:'enjambre',staticImg:'enjambre',cdmx:true,c:'azul',img:'Enjambre',a:'Enjambre',f:'29 ago 2026',ds:'2026-08-29',v:'Estadio GNP',sep:0,st:'proceso',inc:[],banco:BANCO_DEFAULT,zonas:[],hotel:[],pagos:[],waChannel:'https://wa.me/528119771072'},
   {id:'warped',lineup:'warped',cdmx:true,hotelPP:true,staticImg:'warped',c:'verde',a:'Vans Warped Tour Mexico City',f:'12-13 sep 2026',ds:'2026-09-12',v:'Autodromo H. Rodriguez, CDMX',sep:800,st:'',inc:['Abono General 2 dias','Traslados CDMX','2 noches hospedaje','Kit Conecta'],nota:'NO incluye vuelos.',banco:BANCO_DEFAULT,zonas:[{n:'General',p:6400}],cheapZonas:[{n:'General',p:3900}],hotel:[{n:'Compartida',e:0},{n:'Triple',e:485},{n:'Doble',e:1450},{n:'Individual',e:4350}],pagos:[{l:'Separo',d:'Hoy',s:1},{l:'Pago 1',d:'9-16 abr',s:0},{l:'Pago 2',d:'24 abr-1 may',s:0},{l:'Pago 3',d:'9-16 may',s:0},{l:'Pago 4',d:'24 may-1 jun',s:0},{l:'Pago 5',d:'9-16 jun',s:0},{l:'Pago 6',d:'24 jun-1 jul',s:0},{l:'Pago 7',d:'9-16 jul',s:0},{l:'Pago 8',d:'24 jul-1 ago',s:0},{l:'Pago 9',d:'9-16 ago',s:0},{l:'Pago 10',d:'24 ago-1 sep',s:0}]},
@@ -1055,6 +1064,18 @@ function showDetail(id){
   $$('page-detail').classList.add('active');
   $$('nav-back').style.display='flex';
   window.scrollTo(0,0);
+  // Promo modal per event (once per session)
+  if(cur.promoModal&&!sessionStorage.getItem('promo_'+cur.id)){
+    setTimeout(function(){
+      var pm=document.getElementById('promo-modal-bg');
+      document.getElementById('promo-modal-emoji').textContent=cur.promoModal.emoji||'🎉';
+      document.getElementById('promo-modal-title').textContent=cur.promoModal.title;
+      document.getElementById('promo-modal-desc').textContent=cur.promoModal.desc;
+      var colors=cur.promoModal.colors||['#ff4bd1','#8b00ff'];
+      document.getElementById('promo-modal-box').style.background='linear-gradient(135deg,'+colors[0]+','+colors[1]+')';
+      pm.style.display='flex';
+    },400);
+  }
 }
 
 function resetWizard(){
@@ -1577,6 +1598,10 @@ function abrirModalPago(){
   $$('pago-btn-dudas').href='https://wa.me/'+WA+'?text='+encodeURIComponent(msgDudas);
   document.getElementById('pago-modal-bg').style.display='flex';
 }
+function cerrarPromoModal(){
+  document.getElementById('promo-modal-bg').style.display='none';
+  if(cur)sessionStorage.setItem('promo_'+cur.id,'1');
+}
 function cerrarModalPago(){
   document.getElementById('pago-modal-bg').style.display='none';
 }
@@ -1590,7 +1615,7 @@ function abrirLineup(id,nombre){
 function cerrarLineup(){
   document.getElementById('lineup-modal').style.display='none';
 }
-document.addEventListener('keydown',function(e){if(e.key==='Escape'){cerrarMapa();cerrarLineup();cerrarModalPago();}});
+document.addEventListener('keydown',function(e){if(e.key==='Escape'){cerrarMapa();cerrarLineup();cerrarModalPago();cerrarPromoModal();}});
 
 var _lastQuincenas=[],_lastPagoQ=0;
 
@@ -2164,6 +2189,17 @@ function enviarChat(){
   <div class="chat-input-wrap">
     <input class="chat-input" id="chat-input" placeholder="Escribe tu mensaje..." onkeydown="if(event.key==='Enter')enviarChat()">
     <button class="chat-send" id="chat-send" onclick="enviarChat()">Enviar</button>
+  </div>
+</div>
+<div class="promo-modal-bg" id="promo-modal-bg" onclick="cerrarPromoModal()">
+  <div class="promo-modal-box" id="promo-modal-box" onclick="event.stopPropagation()">
+    <button class="promo-modal-close" onclick="cerrarPromoModal()">✕</button>
+    <span class="promo-modal-sparkle" style="top:8px;left:12px;animation-delay:0s">✨</span>
+    <span class="promo-modal-sparkle" style="bottom:12px;right:16px;animation-delay:.5s">✨</span>
+    <span class="promo-modal-sparkle" style="top:40%;left:8px;animation-delay:1s">⭐</span>
+    <div class="promo-modal-emoji" id="promo-modal-emoji">🍔</div>
+    <div class="promo-modal-title" id="promo-modal-title"></div>
+    <div class="promo-modal-desc" id="promo-modal-desc"></div>
   </div>
 </div>
 <div class="pago-modal-bg" id="pago-modal-bg" onclick="cerrarModalPago()">

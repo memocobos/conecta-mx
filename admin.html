@@ -322,7 +322,6 @@ async function atFetch(tabla, params = '') {
   let records = [], offset = null;
   do {
     const url = `https://api.airtable.com/v0/${BASE}/${encodeURIComponent(tabla)}?pageSize=100${params}${offset ? '&offset=' + offset : ''}`;
-    const res = await fetch(url, { headers: { Authorization: `Bearer ${TOKEN}` } }).then(r => r.json());
     records.push(...(res.records || []));
     offset = res.offset;
   } while (offset);
@@ -332,7 +331,6 @@ async function atFetch(tabla, params = '') {
 async function atPost(tabla, fields) {
   const res = await fetch(`https://api.airtable.com/v0/${BASE}/${encodeURIComponent(tabla)}`, {
     method: 'POST',
-    headers: { Authorization: `Bearer ${TOKEN}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({ records: [{ fields }] })
   }).then(r => r.json());
   return res;

@@ -516,7 +516,7 @@ async function loadGastos() {
   const totales = {};
   let totalGeneral = 0;
   gastos.forEach(g => {
-    const cat = g.fields['Categoría'] || 'Otro';
+    const cat = g.fields['Tipo'] || 'Otro';
     const monto = g.fields.Monto || 0;
     totales[cat] = (totales[cat]||0) + monto;
     totalGeneral += monto;
@@ -544,9 +544,9 @@ async function loadGastos() {
     const f = g.fields;
     const ev = f.Evento?.[0] ? (eventosMap[f.Evento[0]]||'—') : 'General';
     html += `<tr>
-      <td style="font-size:12px;color:var(--texto-sec)">${f.Fecha||'—'}</td>
+      <td style="font-size:12px;color:var(--texto-sec)">${f['Fecha de pago']||'—'}</td>
       <td style="font-weight:600">${f.Concepto||'—'}</td>
-      <td><span class="badge badge-gris">${f['Categoría']||'—'}</span></td>
+      <td><span class="badge badge-gris">${f['Tipo']||'—'}</span></td>
       <td style="font-size:12px;color:var(--texto-sec)">${ev}</td>
       <td style="text-align:right;color:var(--rojo);font-weight:600">${pesos(f.Monto||0)}</td>
       <td style="font-size:12px;color:var(--texto-sec)">${f.Notas||'—'}</td>
@@ -576,8 +576,8 @@ async function registrarGasto() {
   const fields = {
     'Concepto': concepto,
     'Monto': monto,
-    'Categoría': categoria,
-    'Fecha': fecha,
+    'Tipo': categoria,
+    'Fecha de pago': fecha,
     'Registrado por': currentRole==='admin'?'Memo':'Auxiliar',
   };
   if(notas) fields['Notas'] = notas;

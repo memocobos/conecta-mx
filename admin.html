@@ -150,7 +150,37 @@
       <div id="pagos-recientes"><div class="loading"><div class="spinner"></div>Cargando...</div></div>
     </div>
   </div>
-  <div id="view-vendedor" class="view"><div id="vendedor-content"></div></div>
+  
+  <!-- GASTOS -->
+  <div id="view-gastos" class="view">
+    <div class="card" style="margin-bottom:16px">
+      <div class="card-title">Registrar gasto</div>
+      <div class="form-grid">
+        <div class="form-group"><label>Concepto *</label><input id="g-concepto" type="text" placeholder="Ej: Pago boletos Morat"></div>
+        <div class="form-group"><label>Monto *</label><input id="g-monto" type="number" placeholder="0.00"></div>
+        <div class="form-group"><label>Categoría *</label>
+          <select id="g-categoria">
+            <option value="">Seleccionar...</option>
+            <option>Boletos</option><option>Bus</option><option>Hotel</option><option>Kits</option>
+            <option>Estacionamiento</option><option>Pauta</option><option>Salarios</option>
+            <option>Contadora</option><option>Herramientas</option><option>Redes sociales</option><option>Otro</option>
+          </select>
+        </div>
+        <div class="form-group"><label>Fecha *</label><input id="g-fecha" type="date"></div>
+        <div class="form-group"><label>Evento (opcional)</label>
+          <select id="g-evento"><option value="">Gasto general / fijo</option></select>
+        </div>
+        <div class="form-group"><label>Notas</label><input id="g-notas" type="text" placeholder="Descripción adicional"></div>
+      </div>
+      <button onclick="registrarGasto()" style="margin-top:8px;background:var(--amarillo);color:#000;border:none;padding:10px 24px;border-radius:6px;font-weight:700;cursor:pointer;font-size:14px">Registrar gasto</button>
+      <div id="g-msg" style="margin-top:8px;font-size:13px"></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Gastos registrados</div>
+      <div id="gastos-lista"><div class="loading"><div class="spinner"></div>Cargando...</div></div>
+    </div>
+  </div>
+<div id="view-vendedor" class="view"><div id="vendedor-content"></div></div>
 </div>
 
 <script>
@@ -165,13 +195,13 @@ const USERS = {
 };
 
 const ROLES = {
-  admin:    { views: ["resumen","eventos","pagos"] },
-  auxiliar: { views: ["pagos","eventos"] },
+  admin:    { views: ["resumen","eventos","pagos","gastos"] },
+  auxiliar: { views: ["pagos","eventos","gastos"] },
   coordi:   { views: ["eventos"] },
   vendedor: { views: ["vendedor"] },
 };
 
-const VIEW_LABELS = { resumen:"Resumen", eventos:"Por evento", pagos:"Pagos", vendedor:"Mis ventas" };
+const VIEW_LABELS = { resumen:"Resumen", eventos:"Por evento", pagos:"Pagos", gastos:"Gastos", vendedor:"Mis ventas" };
 
 let currentRole = null;
 let eventosCache = [];
@@ -459,6 +489,101 @@ function loadVendedor(){
   html+=`</tbody></table></div>`;
   document.getElementById('vendedor-content').innerHTML=html;
 }
+
+function loadGastosEventos() {
+  const sel = document.getElementById('g-evento');
+  if(!sel || sel.options.length > 1) return;
+  eventosCache.forEach(e => {
+    const opt = document.createElement('option');
+    opt.value = e.id;
+    opt.textContent = e.fields.Nombre || e.id;
+    sel.appendChild(opt);
+  });
+  // Set today date
+  const fd = document.getElementById('g-fecha');
+  if(fd && !fd.value) fd.value = new Date().toISOString().split('T')[0];
+}
+
+async function loadGastos() {
+  const gastos = await atFetch('Gastos', '&sort%5B0%5D%5Bfield%5D=Fecha&sort%5B0%5D%5Bdirection%5D=desc');
+  const eventosMap = {};
+  eventosCache.forEach(e => eventosMap[e.id] = e.fields.Nombre);
+
+  const totales = {};
+  let totalGeneral = 0;
+  gastos.forEach(g => {
+    const cat = g.fields['Categoría'] || 'Otro';
+    const monto = g.fields.Monto || 0;
+    totales[cat] = (totales[cat]||0) + monto;
+    totalGeneral += monto;
+  });
+
+  let html = `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px;margin-bottom:16px">`;
+  Object.entries(totales).sort((a,b)=>b[1]-a[1]).forEach(([cat,tot]) => {
+    html += `<div style="background:var(--negro-suave);border-radius:6px;padding:10px 12px">
+      <div style="font-size:11px;color:var(--texto-sec)">${cat}</div>
+      <div style="font-size:16px;font-weight:700;color:var(--rojo)">${pesos(tot)}</div>
+    </div>`;
+  });
+  html += `<div style="background:var(--negro-suave);border-radius:6px;padding:10px 12px;border:1px solid var(--amarillo)40">
+    <div style="font-size:11px;color:var(--texto-sec)">TOTAL</div>
+    <div style="font-size:16px;font-weight:700;color:var(--amarillo)">${pesos(totalGeneral)}</div>
+  </div></div>`;
+
+  if(gastos.length === 0) { document.getElementById('gastos-lista').innerHTML='<div style="color:var(--texto-sec);font-size:13px">Sin gastos registrados aún.</div>'; return; }
+
+  html += `<div style="overflow-x:auto"><table><thead><tr>
+    <th>Fecha</th><th>Concepto</th><th>Categoría</th><th>Evento</th><th style="text-align:right">Monto</th><th>Notas</th>
+  </tr></thead><tbody>`;
+  gastos.forEach(g => {
+    const f = g.fields;
+    const ev = f.Evento?.[0] ? (eventosMap[f.Evento[0]]||'—') : 'General';
+    html += `<tr>
+      <td style="font-size:12px;color:var(--texto-sec)">${f.Fecha||'—'}</td>
+      <td style="font-weight:600">${f.Concepto||'—'}</td>
+      <td><span class="badge badge-gris">${f['Categoría']||'—'}</span></td>
+      <td style="font-size:12px;color:var(--texto-sec)">${ev}</td>
+      <td style="text-align:right;color:var(--rojo);font-weight:600">${pesos(f.Monto||0)}</td>
+      <td style="font-size:12px;color:var(--texto-sec)">${f.Notas||'—'}</td>
+    </tr>`;
+  });
+  html += '</tbody></table></div>';
+  document.getElementById('gastos-lista').innerHTML = html;
+}
+
+async function registrarGasto() {
+  const concepto = document.getElementById('g-concepto').value.trim();
+  const monto = parseFloat(document.getElementById('g-monto').value);
+  const categoria = document.getElementById('g-categoria').value;
+  const fecha = document.getElementById('g-fecha').value;
+  const eventoId = document.getElementById('g-evento').value;
+  const notas = document.getElementById('g-notas').value.trim();
+  const msg = document.getElementById('g-msg');
+
+  if(!concepto || !monto || !categoria || !fecha) {
+    msg.style.color='var(--rojo)'; msg.textContent='Llena todos los campos obligatorios (*)'; return;
+  }
+  msg.style.color='var(--texto-sec)'; msg.textContent='Guardando...';
+
+  const fields = {
+    'Concepto': concepto, 'Monto': monto, 'Categoría': categoria,
+    'Fecha': fecha, 'Registrado por': currentUser,
+    ...(notas && {'Notas': notas}),
+    ...(eventoId && {'Evento': [eventoId]}),
+  };
+
+  const res = await atPost('Gastos', fields);
+  if(res.id) {
+    msg.style.color='var(--verde)'; msg.textContent='✓ Gasto registrado';
+    document.getElementById('g-concepto').value='';
+    document.getElementById('g-monto').value='';
+    document.getElementById('g-notas').value='';
+    loadGastos();
+  } else {
+    msg.style.color='var(--rojo)'; msg.textContent='Error al guardar.';
+  }
+}
+
 </script>
 </body>
 </html>

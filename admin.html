@@ -293,7 +293,7 @@ async function initApp() {
   populateEventoSelect();
   if(currentRole==='admin'||currentRole==='auxiliar') loadResumen();
   if(currentRole==='auxiliar') loadPagosRecientes();
-  if(currentView==="gastos") { loadGastos(); loadGastosEventos(); }
+  
   if(currentRole==='vendedor') loadVendedor();
 }
 

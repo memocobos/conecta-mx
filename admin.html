@@ -155,7 +155,7 @@
 
 <script>
 // La función proxy de Netlify — el token vive en el servidor, no aquí
-const API = "/.netlify/functions/airtable-proxy";
+const API = "https://conectareynosa.mx/.netlify/functions/airtable-proxy";
 
 const USERS = {
   "memo":     { pass: "conecta2026", role: "admin",    label: "Memo — Admin" },
@@ -176,6 +176,7 @@ const VIEW_LABELS = { resumen:"Resumen", eventos:"Por evento", pagos:"Pagos", ve
 let currentRole = null;
 let eventosCache = [];
 let reservCache = [];
+let clientesCache = {};
 
 function doLogin() {
   const u = document.getElementById('login-user').value.trim().toLowerCase();
@@ -251,12 +252,14 @@ function fecha(f){ return f ? new Date(f+'T12:00:00').toLocaleDateString('es-MX'
 
 async function initApp() {
   showLoading('view-resumen');
-  const [eventos, reservaciones] = await Promise.all([
+  const [eventos, reservaciones, clientes] = await Promise.all([
     atFetch('Eventos','&sort%5B0%5D%5Bfield%5D=Fecha&sort%5B0%5D%5Bdirection%5D=asc'),
-    atFetch('Reservaciones')
+    atFetch('Reservaciones'),
+    atFetch('Clientes')
   ]);
   eventosCache = eventos;
   reservCache = reservaciones;
+  clientes.forEach(c => clientesCache[c.id] = c.fields);
   populateEventoSelect();
   if(currentRole==='admin'||currentRole==='auxiliar') loadResumen();
   if(currentRole==='auxiliar') loadPagosRecientes();
@@ -350,13 +353,7 @@ async function loadEvento(eventoId) {
     </div>`;
   }
 
-  const clienteIds=[...new Set(rs.map(r=>r.fields.Cliente?.[0]).filter(Boolean))];
-  const clientesMap={};
-  if(clienteIds.length){
-    const formula=encodeURIComponent(`OR(${clienteIds.map(id=>`RECORD_ID()="${id}"`).join(',')})`);
-    const clientes=await atFetch('Clientes',`&filterByFormula=${formula}`);
-    clientes.forEach(c=>clientesMap[c.id]=c.fields);
-  }
+  const clientesMap = clientesCache;
 
   html+=`<div class="card"><div class="card-title">Lista de viajeros — ${ev?.fields.Nombre||''}</div>
   <div style="overflow-x:auto"><table><thead><tr>

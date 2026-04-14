@@ -509,7 +509,7 @@ function initGastos() {
 }
 
 async function loadGastos() {
-  const gastos = await atFetch('Gastos', '&sort%5B0%5D%5Bfield%5D=Fecha%20de%20pago&sort%5B0%5D%5Bdirection%5D=desc');
+  const gastos = await atFetch('Gastos');
   const eventosMap = {};
   eventosCache.forEach(e => eventosMap[e.id] = e.fields.Nombre);
 

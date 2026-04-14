@@ -185,7 +185,7 @@
 
 <script>
 // La función proxy de Netlify — el token vive en el servidor, no aquí
-const API = "/.netlify/functions/airtable-proxy";
+const API = "https://conectareynosa.mx/.netlify/functions/airtable-proxy";
 
 const USERS = {
   "memo":     { pass: "conecta2026", role: "admin",    label: "Memo — Admin" },
@@ -293,7 +293,6 @@ async function initApp() {
   populateEventoSelect();
   if(currentRole==='admin'||currentRole==='auxiliar') loadResumen();
   if(currentRole==='auxiliar') loadPagosRecientes();
-  
   if(currentRole==='vendedor') loadVendedor();
 }
 
@@ -491,11 +490,10 @@ function loadVendedor(){
   document.getElementById('vendedor-content').innerHTML=html;
 }
 
-async function loadGastosEventos() {
+function loadGastosEventos() {
   const sel = document.getElementById('g-evento');
-  if(!sel) return; while(sel.options.length > 1) sel.remove(1);
-  const todosEventos = eventosCache.length > 0 ? eventosCache : (await atFetch("Eventos")).filter(Boolean);
-  todosEventos.forEach(e => {
+  if(!sel || sel.options.length > 1) return;
+  eventosCache.forEach(e => {
     const opt = document.createElement('option');
     opt.value = e.id;
     opt.textContent = e.fields.Nombre || e.id;
@@ -569,7 +567,7 @@ async function registrarGasto() {
 
   const fields = {
     'Concepto': concepto, 'Monto': monto, 'Categoría': categoria,
-    'Fecha': fecha, 'Registrado por': currentRole==="admin"?"Memo":"Auxiliar",
+    'Fecha': fecha, 'Registrado por': currentUser,
     ...(notas && {'Notas': notas}),
     ...(eventoId && {'Evento': [eventoId]}),
   };

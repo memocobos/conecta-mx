@@ -544,7 +544,7 @@ async function loadGastos() {
     const f = g.fields;
     const ev = f.Evento?.[0] ? (eventosMap[f.Evento[0]]||'—') : 'General';
     html += `<tr>
-      <td style="font-size:12px;color:var(--texto-sec)">${f['Fecha de pago']||'—'}</td>
+      <td style="font-size:12px;color:var(--texto-sec)">${f['Fecha']||'—'}</td>
       <td style="font-weight:600">${f.Concepto||'—'}</td>
       <td><span class="badge badge-gris">${f['Tipo']||'—'}</span></td>
       <td style="font-size:12px;color:var(--texto-sec)">${ev}</td>
@@ -577,7 +577,7 @@ async function registrarGasto() {
     'Concepto': concepto,
     'Monto': Number(monto),
     'Tipo': categoria,
-    'Fecha de pago': fecha,
+    'Fecha': fecha,
     'Registrado por': currentRole==='admin'?'Memo':'Auxiliar',
   };
   if(notas) fields['Notas'] = notas;

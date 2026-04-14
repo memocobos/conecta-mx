@@ -1563,9 +1563,10 @@ function abrirModalPago(){
       '<div class="pago-bank-row"><span class="pago-bank-lbl">Titular</span><span class="pago-bank-val" style="font-family:Montserrat,sans-serif;font-size:10px">Guillermo Alexander Cobos Vizcarra</span></div>';
   }
   $$('pago-bank-info').innerHTML=bankH;
-  var messengerMsg=encodeURIComponent(_lastCotizacion);
-  $$('pago-btn-comprobante').href='https://m.me/ConectaRey?text='+messengerMsg;
-  $$('pago-btn-dudas').href='https://wa.me/'+WA+'?text='+encodeURIComponent(_lastCotizacion);
+  var msgSinFinal=_lastCotizacion.replace(/\n\n¿Qué sigue para reservar\?$/,'');
+  var msgDudas=msgSinFinal+'\n\nTengo dudas sobre mi reservación, ¿me podrías ayudar?';
+  $$('pago-btn-comprobante').href='https://m.me/ConectaRey?text='+encodeURIComponent(msgSinFinal);
+  $$('pago-btn-dudas').href='https://wa.me/'+WA+'?text='+encodeURIComponent(msgDudas);
   document.getElementById('pago-modal-bg').style.display='flex';
 }
 function cerrarModalPago(){

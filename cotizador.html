@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cotizador — Conecta Reynosa</title>
+<style>
+:root {
+  --negro: #0a0a0a;
+  --negro-suave: #111111;
+  --negro-card: #161616;
+  --borde: #222222;
+  --texto: #f0f0f0;
+  --texto-sec: #888;
+  --azul: #0000cd;
+  --rojo: #ff283b;
+  --amarillo: #e8ff4c;
+  --verde: #88ea4e;
+  --rosa: #ff2d7a;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: var(--negro);
+  color: var(--texto);
+  font-family: 'Montserrat', sans-serif;
+  min-height: 100vh;
+}
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;900&display=swap');
+
+/* LAYOUT */
+.header {
+  background: var(--negro-suave);
+  border-bottom: 1px solid var(--borde);
+  padding: 16px 24px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.header-logo { font-size: 11px; font-weight: 900; letter-spacing: .15em; color: var(--azul); text-transform: uppercase; }
+.header-sep { color: var(--borde); font-size: 20px; }
+.header-title { font-size: 13px; font-weight: 700; color: var(--texto-sec); text-transform: uppercase; letter-spacing: .1em; }
+
+.container { max-width: 1100px; margin: 0 auto; padding: 24px; display: grid; grid-template-columns: 1fr 380px; gap: 24px; }
+@media(max-width:900px){ .container { grid-template-columns: 1fr; } }
+
+.section { background: var(--negro-card); border: 1px solid var(--borde); border-radius: 8px; padding: 20px; margin-bottom: 16px; }
+.section-title { font-size: 10px; font-weight: 700; letter-spacing: .15em; text-transform: uppercase; color: var(--texto-sec); margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+.section-title::after { content: ''; flex: 1; height: 1px; background: var(--borde); }
+
+.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.form-group { display: flex; flex-direction: column; gap: 6px; }
+.form-group.full { grid-column: 1/-1; }
+label { font-size: 11px; font-weight: 600; color: var(--texto-sec); text-transform: uppercase; letter-spacing: .05em; }
+input, select, textarea {
+  background: var(--negro-suave);
+  border: 1px solid var(--borde);
+  border-radius: 6px;
+  color: var(--texto);
+  font-family: inherit;
+  font-size: 13px;
+  padding: 8px 12px;
+  outline: none;
+  transition: border-color .15s;
+}
+input:focus, select:focus { border-color: var(--azul); }
+select option { background: var(--negro-suave); }
+
+/* TRANSPORT */
+.transport-row { display: grid; grid-template-columns: 1fr auto auto; gap: 8px; align-items: end; margin-bottom: 8px; }
+.btn-icon { background: var(--negro-suave); border: 1px solid var(--borde); border-radius: 6px; color: var(--texto-sec); cursor: pointer; font-size: 16px; padding: 8px 12px; transition: all .15s; }
+.btn-icon:hover { border-color: var(--rojo); color: var(--rojo); }
+.btn-add { background: none; border: 1px dashed var(--borde); border-radius: 6px; color: var(--texto-sec); cursor: pointer; font-size: 12px; font-weight: 600; padding: 8px; text-align: center; transition: all .15s; width: 100%; margin-top: 4px; }
+.btn-add:hover { border-color: var(--azul); color: var(--azul); }
+
+/* ZONES */
+.zone-row { display: grid; grid-template-columns: 1fr 120px auto; gap: 8px; align-items: end; margin-bottom: 8px; }
+
+/* KIT ITEMS */
+.kit-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+.kit-item { display: flex; align-items: center; gap: 8px; background: var(--negro-suave); border: 1px solid var(--borde); border-radius: 6px; padding: 8px 12px; cursor: pointer; transition: all .15s; }
+.kit-item input[type=checkbox] { accent-color: var(--amarillo); width: 14px; height: 14px; }
+.kit-item.active { border-color: var(--amarillo); }
+.kit-item label { font-size: 12px; font-weight: 600; color: var(--texto); cursor: pointer; text-transform: none; letter-spacing: 0; }
+
+/* SIDEBAR - RESULTS */
+.sidebar { position: sticky; top: 24px; }
+.result-card { background: var(--negro-card); border: 1px solid var(--borde); border-radius: 8px; padding: 20px; margin-bottom: 16px; }
+.result-event { font-size: 16px; font-weight: 900; margin-bottom: 4px; }
+.result-meta { font-size: 12px; color: var(--texto-sec); margin-bottom: 16px; }
+
+.cost-breakdown { margin-bottom: 16px; }
+.cost-row { display: flex; justify-content: space-between; font-size: 12px; padding: 4px 0; border-bottom: 1px solid var(--borde); color: var(--texto-sec); }
+.cost-row:last-child { border: none; font-weight: 700; font-size: 13px; color: var(--texto); }
+.cost-row span:last-child { color: var(--rojo); }
+
+/* ZONE RESULTS TABLE */
+.zones-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.zones-table th { font-size: 10px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--texto-sec); padding: 6px 8px; text-align: right; border-bottom: 1px solid var(--borde); }
+.zones-table th:first-child { text-align: left; }
+.zones-table td { padding: 6px 8px; border-bottom: 1px solid var(--borde); text-align: right; }
+.zones-table td:first-child { text-align: left; font-weight: 600; }
+.zones-table tr:last-child td { border: none; }
+.tag { display: inline-block; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 3px; letter-spacing: .05em; }
+.tag-plus { background: rgba(0,0,205,.2); color: #6699ff; }
+.tag-ride { background: rgba(136,234,78,.15); color: var(--verde); }
+.tag-stay { background: rgba(255,40,58,.15); color: var(--rojo); }
+.tag-cheap { background: rgba(232,255,76,.15); color: var(--amarillo); }
+
+.margin-bar { height: 4px; background: var(--borde); border-radius: 2px; margin-top: 4px; overflow: hidden; }
+.margin-fill { height: 100%; border-radius: 2px; transition: width .3s; }
+
+.btn-publish { width: 100%; background: var(--amarillo); color: #000; border: none; border-radius: 8px; cursor: pointer; font-family: inherit; font-size: 13px; font-weight: 900; letter-spacing: .1em; padding: 14px; text-transform: uppercase; transition: opacity .15s; margin-top: 8px; }
+.btn-publish:hover { opacity: .85; }
+.btn-publish:disabled { opacity: .4; cursor: not-allowed; }
+
+.alert { font-size: 12px; padding: 10px 12px; border-radius: 6px; margin-bottom: 12px; }
+.alert-warn { background: rgba(255,40,58,.1); border: 1px solid rgba(255,40,58,.3); color: var(--rojo); }
+.alert-ok { background: rgba(136,234,78,.1); border: 1px solid rgba(136,234,78,.3); color: var(--verde); }
+
+.pe-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--borde); font-size: 12px; }
+.pe-row:last-child { border: none; }
+.pe-num { font-size: 18px; font-weight: 900; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <span class="header-logo">Conecta Reynosa</span>
+  <span class="header-sep">/</span>
+  <span class="header-title">Cotizador de Eventos</span>
+</div>
+
+<div class="container">
+  <!-- LEFT: FORM -->
+  <div>
+
+    <!-- 1. Evento -->
+    <div class="section">
+      <div class="section-title">1 · Información del evento</div>
+      <div class="form-grid">
+        <div class="form-group full"><label>Nombre del evento</label><input id="ev-nombre" type="text" placeholder="Ej: Bad Bunny - Most Wanted Tour" oninput="calcular()"></div>
+        <div class="form-group"><label>Fecha</label><input id="ev-fecha" type="date" oninput="calcular()"></div>
+        <div class="form-group"><label>Ciudad</label>
+          <select id="ev-ciudad" onchange="calcular()">
+            <option value="MTY">Monterrey (MTY)</option>
+            <option value="CDMX">Ciudad de México (CDMX)</option>
+            <option value="OTRO">Otra ciudad</option>
+          </select>
+        </div>
+        <div class="form-group full"><label>Venue</label><input id="ev-venue" type="text" placeholder="Ej: Estadio BBVA" oninput="calcular()"></div>
+        <div class="form-group"><label>Noches de hotel</label>
+          <select id="ev-noches" onchange="calcular()">
+            <option value="1">1 noche</option>
+            <option value="2">2 noches</option>
+            <option value="3">3 noches</option>
+          </select>
+        </div>
+        <div class="form-group"><label>Precio hotel especial (opcional)</label><input id="ev-hotel-especial" type="number" placeholder="Dejar vacío = precio estándar" oninput="calcular()"></div>
+      </div>
+    </div>
+
+    <!-- 2. Transporte -->
+    <div class="section">
+      <div class="section-title">2 · Transporte</div>
+      <div id="unidades-container"></div>
+      <button class="btn-add" onclick="agregarUnidad()">+ Agregar unidad de transporte</button>
+    </div>
+
+    <!-- 3. Zonas y boletos -->
+    <div class="section">
+      <div class="section-title">3 · Zonas y costo de boletos</div>
+      <div id="zonas-container"></div>
+      <button class="btn-add" onclick="agregarZona()">+ Agregar zona</button>
+    </div>
+
+    <!-- 4. Kit -->
+    <div class="section">
+      <div class="section-title">4 · Kit Conecta</div>
+      <div class="form-grid" style="margin-bottom:12px">
+        <div class="form-group"><label>Costo base del kit ($)</label><input id="kit-costo" type="number" value="200" oninput="calcular()"></div>
+      </div>
+      <div class="kit-grid" id="kit-items">
+        <div class="kit-item" onclick="toggleKit(this)"><input type="checkbox" checked><label>Morral / Tote Bag</label></div>
+        <div class="kit-item" onclick="toggleKit(this)"><input type="checkbox" checked><label>Vaso</label></div>
+        <div class="kit-item" onclick="toggleKit(this)"><input type="checkbox"><label>Playera</label></div>
+        <div class="kit-item" onclick="toggleKit(this)"><input type="checkbox"><label>Cupón de comida</label></div>
+        <div class="kit-item" onclick="toggleKit(this)"><input type="checkbox"><label>Bebida / New Mix</label></div>
+        <div class="kit-item" onclick="toggleKit(this)"><input type="checkbox"><label>Otro item</label></div>
+      </div>
+    </div>
+
+    <!-- 5. Staff -->
+    <div class="section">
+      <div class="section-title">5 · Staff (coordinadores y creadora)</div>
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Zona boleto coordinador(es)</label>
+          <select id="staff-zona-coordi" onchange="calcular()">
+            <option value="">Seleccionar zona...</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Zona boleto creadora de contenido</label>
+          <select id="staff-zona-creadora" onchange="calcular()">
+            <option value="">Sin creadora</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Costo boleto creadora ($)</label>
+          <input id="staff-costo-creadora" type="number" placeholder="0" oninput="calcular()">
+        </div>
+        <div class="form-group">
+          <label>Estacionamiento por unidad ($)</label>
+          <input id="estacionamiento" type="number" placeholder="0" oninput="calcular()">
+        </div>
+      </div>
+    </div>
+
+    <!-- 6. Separo -->
+    <div class="section">
+      <div class="section-title">6 · Separo por paquete</div>
+      <div class="form-grid">
+        <div class="form-group"><label>Separo PLUS</label><input id="sep-plus" type="number" value="800" oninput="calcular()"></div>
+        <div class="form-group"><label>Separo STAY</label><input id="sep-stay" type="number" value="800" oninput="calcular()"></div>
+        <div class="form-group"><label>Separo RIDE</label><input id="sep-ride" type="number" value="1000" oninput="calcular()"></div>
+        <div class="form-group"><label>Separo CHEAP</label><input id="sep-cheap" type="number" value="1000" oninput="calcular()"></div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- RIGHT: RESULTS -->
+  <div class="sidebar">
+    <div class="result-card">
+      <div class="result-event" id="res-nombre">Nuevo evento</div>
+      <div class="result-meta" id="res-meta">—</div>
+
+      <div class="cost-breakdown" id="res-costos"></div>
+
+      <div class="section-title" style="margin-bottom:12px">Precio por zona y paquete</div>
+      <div style="overflow-x:auto">
+        <table class="zones-table" id="res-zonas">
+          <thead><tr>
+            <th>Zona</th>
+            <th><span class="tag tag-plus">PLUS</span></th>
+            <th><span class="tag tag-ride">RIDE</span></th>
+            <th><span class="tag tag-stay">STAY</span></th>
+            <th><span class="tag tag-cheap">CHEAP</span></th>
+          </tr></thead>
+          <tbody id="res-zonas-body">
+            <tr><td colspan="5" style="color:var(--texto-sec);font-size:12px;padding:12px 0">Agrega zonas para ver precios</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="result-card">
+      <div class="section-title" style="margin-bottom:12px">Punto de equilibrio</div>
+      <div id="res-pe"></div>
+    </div>
+
+    <button class="btn-publish" id="btn-publicar" onclick="publicar()" disabled>
+      Publicar en conectareynosa.mx
+    </button>
+    <div id="pub-msg" style="font-size:12px;text-align:center;margin-top:8px;color:var(--texto-sec)"></div>
+  </div>
+</div>
+
+<script>
+// ── STATE ──────────────────────────────────────────────────────────────────
+let unidades = [];
+let zonas = [];
+let unidadId = 0;
+let zonaId = 0;
+
+const TRANSPORTE = {
+  van:    { label: 'Van',          pax: 13, coordis: 1 },
+  bus37:  { label: 'Bus 37 pax',   pax: 37, coordis: 1 },
+  bus47:  { label: 'Bus 47 pax',   pax: 47, coordis: 1 },
+};
+
+const HOTEL_BASE = { MTY: 2500, CDMX: 2900, OTRO: 2500 };
+
+// ── INIT ───────────────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  agregarUnidad();
+  agregarZona();
+  calcular();
+});
+
+// ── TRANSPORTE ─────────────────────────────────────────────────────────────
+function agregarUnidad() {
+  const id = ++unidadId;
+  unidades.push({ id, tipo: 'bus37', costo: 0 });
+  renderUnidades();
+  calcular();
+}
+
+function removerUnidad(id) {
+  unidades = unidades.filter(u => u.id !== id);
+  renderUnidades();
+  calcular();
+}
+
+function renderUnidades() {
+  const c = document.getElementById('unidades-container');
+  c.innerHTML = unidades.map(u => `
+    <div class="transport-row">
+      <div class="form-group">
+        <label>Tipo de unidad</label>
+        <select onchange="updateUnidad(${u.id},'tipo',this.value)">
+          ${Object.entries(TRANSPORTE).map(([k,v]) => `<option value="${k}" ${u.tipo===k?'selected':''}>${v.label} (${v.pax} pax + 1 coordi)</option>`).join('')}
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Costo total ($)</label>
+        <input type="number" value="${u.costo||''}" placeholder="0" onchange="updateUnidad(${u.id},'costo',+this.value)">
+      </div>
+      <button class="btn-icon" onclick="removerUnidad(${u.id})" title="Quitar unidad">×</button>
+    </div>
+  `).join('');
+}
+
+function updateUnidad(id, field, val) {
+  const u = unidades.find(u => u.id === id);
+  if (u) { u[field] = val; calcular(); }
+}
+
+// ── ZONAS ──────────────────────────────────────────────────────────────────
+function agregarZona() {
+  const id = ++zonaId;
+  zonas.push({ id, nombre: '', costo: 0 });
+  renderZonas();
+  calcular();
+}
+
+function removerZona(id) {
+  zonas = zonas.filter(z => z.id !== id);
+  renderZonas();
+  calcular();
+}
+
+function renderZonas() {
+  const c = document.getElementById('zonas-container');
+  c.innerHTML = zonas.map(z => `
+    <div class="zone-row">
+      <div class="form-group">
+        <label>Nombre de la zona</label>
+        <input type="text" value="${z.nombre}" placeholder="Ej: Cancha VIP" onchange="updateZona(${z.id},'nombre',this.value)">
+      </div>
+      <div class="form-group">
+        <label>Costo boleto ($)</label>
+        <input type="number" value="${z.costo||''}" placeholder="0" onchange="updateZona(${z.id},'costo',+this.value)">
+      </div>
+      <button class="btn-icon" onclick="removerZona(${z.id})" title="Quitar zona">×</button>
+    </div>
+  `).join('');
+
+  // Update staff zone selectors
+  const zonaOpts = zonas.filter(z => z.nombre).map(z => `<option value="${z.costo}">${z.nombre}</option>`).join('');
+  document.getElementById('staff-zona-coordi').innerHTML = '<option value="">Sin boleto</option>' + zonaOpts;
+  document.getElementById('staff-zona-creadora').innerHTML = '<option value="">Sin creadora</option>' + zonaOpts;
+}
+
+function updateZona(id, field, val) {
+  const z = zonas.find(z => z.id === id);
+  if (z) { z[field] = val; renderZonas(); calcular(); }
+}
+
+// ── KIT ────────────────────────────────────────────────────────────────────
+function toggleKit(el) {
+  const cb = el.querySelector('input[type=checkbox]');
+  cb.checked = !cb.checked;
+  el.classList.toggle('active', cb.checked);
+  calcular();
+}
+
+// ── CALCULAR ───────────────────────────────────────────────────────────────
+function calcular() {
+  const ciudad = document.getElementById('ev-ciudad').value;
+  const noches = +document.getElementById('ev-noches').value || 1;
+  const hotelEsp = +document.getElementById('ev-hotel-especial').value || 0;
+  const kitCosto = +document.getElementById('kit-costo').value || 0;
+  const estac = +document.getElementById('estacionamiento').value || 0;
+
+  const hotelBase = hotelEsp || HOTEL_BASE[ciudad] || 2500;
+  const costoHotelPorPersona = (hotelBase * noches) / 4;
+
+  // Total pax across all units
+  const totalPax = unidades.reduce((s, u) => s + (TRANSPORTE[u.tipo]?.pax || 0), 0);
+  const totalCoordi = unidades.reduce((s, u) => s + (TRANSPORTE[u.tipo]?.coordis || 0), 0);
+  const totalUnidades = unidades.length;
+
+  // Transport cost per person
+  const costoTransTotal = unidades.reduce((s, u) => s + (u.costo || 0), 0);
+  const costoTransPP = totalPax > 0 ? costoTransTotal / totalPax : 0;
+
+  // Staff costs distributed among pax
+  const costoCordiZona = +document.getElementById('staff-zona-coordi').value || 0;
+  const costoCreadoraZona = +document.getElementById('staff-zona-creadora').value || 0;
+  const costoCreadoraInput = +document.getElementById('staff-costo-creadora').value || 0;
+  const costoCreadora = costoCreadoraInput || costoCreadoraZona;
+
+  // Hotel for choferes: 1 room (2500/4) per 2 choferes, divided among pax
+  const numChoferes = totalUnidades; // 1 chofer per unit
+  const habitChoferes = Math.ceil(numChoferes / 2);
+  const costoHotelChoferesPP = totalPax > 0 ? (habitChoferes * hotelBase * noches) / totalPax : 0;
+
+  // Coordi cost per pax (boleto + hotel compartida + transporte ya incluido)
+  const costoCordiPP = totalPax > 0 ? (costoCordiZona * totalCoordi + costoCreadora + costoHotelChoferesPP * totalPax) / totalPax : 0;
+
+  // Estacionamiento per pax
+  const costoEstacPP = totalPax > 0 ? (estac * totalUnidades) / totalPax : 0;
+
+  // GASTOS FIJOS por persona (sin boleto)
+  const gastosFijos = costoTransPP + costoHotelPorPersona + kitCosto + costoCordiPP + costoEstacPP;
+
+  // Update header
+  document.getElementById('res-nombre').textContent = document.getElementById('ev-nombre').value || 'Nuevo evento';
+  const fecha = document.getElementById('ev-fecha').value;
+  const venue = document.getElementById('ev-venue').value;
+  document.getElementById('res-meta').textContent = [
+    fecha ? new Date(fecha+'T12:00').toLocaleDateString('es-MX',{day:'numeric',month:'long',year:'numeric'}) : '',
+    venue || '',
+    ciudad
+  ].filter(Boolean).join(' · ');
+
+  // Cost breakdown
+  const pesos = n => '$' + Math.round(n).toLocaleString('es-MX');
+  document.getElementById('res-costos').innerHTML = `
+    <div style="font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--texto-sec);margin-bottom:8px">
+      Gastos fijos por persona (${totalPax} pax)
+    </div>
+    ${costoTransPP > 0 ? `<div class="cost-row"><span>Transporte</span><span>${pesos(costoTransPP)}</span></div>` : ''}
+    ${costoHotelPorPersona > 0 ? `<div class="cost-row"><span>Hotel (${noches} noche${noches>1?'s':''})</span><span>${pesos(costoHotelPorPersona)}</span></div>` : ''}
+    ${kitCosto > 0 ? `<div class="cost-row"><span>Kit Conecta</span><span>${pesos(kitCosto)}</span></div>` : ''}
+    ${costoCordiPP > 0 ? `<div class="cost-row"><span>Staff (coordi + creadora + choferes)</span><span>${pesos(costoCordiPP)}</span></div>` : ''}
+    ${costoEstacPP > 0 ? `<div class="cost-row"><span>Estacionamiento</span><span>${pesos(costoEstacPP)}</span></div>` : ''}
+    <div class="cost-row"><span>Total fijos / persona</span><span>${pesos(gastosFijos)}</span></div>
+  `;
+
+  // Zone calculations
+  const zonasValidas = zonas.filter(z => z.nombre && z.costo > 0);
+  const tbody = document.getElementById('res-zonas-body');
+
+  if (zonasValidas.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="5" style="color:var(--texto-sec);font-size:12px;padding:12px 0">Agrega zonas para ver precios</td></tr>';
+    document.getElementById('res-pe').innerHTML = '';
+    document.getElementById('btn-publicar').disabled = true;
+    return;
+  }
+
+  // Margen fijo por zona (puedes ajustar)
+  const MARGEN = 1000;
+
+  const rows = zonasValidas.map(z => {
+    const costoTotal = z.costo + gastosFijos;
+    const pricePlus  = Math.ceil((costoTotal + MARGEN) / 100) * 100;
+    const priceRide  = Math.ceil((z.costo * 0.05 + gastosFijos - costoHotelPorPersona + MARGEN) / 100) * 100;
+    // STAY = PLUS - transporte
+    const priceStay  = ciudad !== 'CDMX' ? Math.ceil((costoTotal + MARGEN - costoTransPP) / 100) * 100 : null;
+    // CHEAP = solo boleto + margen pequeño
+    const priceCheap = Math.ceil((z.costo + 500) / 100) * 100;
+
+    const margenPP = pricePlus - costoTotal;
+    const margenPct = costoTotal > 0 ? Math.round(margenPP / pricePlus * 100) : 0;
+    const color = margenPct >= 15 ? 'var(--verde)' : margenPct >= 8 ? 'var(--amarillo)' : 'var(--rojo)';
+
+    return `<tr>
+      <td>
+        <div style="font-weight:700">${z.nombre}</div>
+        <div class="margin-bar"><div class="margin-fill" style="width:${Math.min(margenPct*2,100)}%;background:${color}"></div></div>
+        <div style="font-size:10px;color:${color};margin-top:2px">${margenPct}% margen PLUS</div>
+      </td>
+      <td style="color:var(--texto)">${pesos(pricePlus)}</td>
+      <td style="color:var(--verde)">${pesos(Math.max(priceRide,0))}</td>
+      <td style="color:var(--texto-sec)">${priceStay ? pesos(priceStay) : '—'}</td>
+      <td style="color:var(--amarillo)">${pesos(priceCheap)}</td>
+    </tr>`;
+  }).join('');
+
+  tbody.innerHTML = rows;
+
+  // Punto de equilibrio (usando zona promedio)
+  const costoPromedioZona = zonasValidas.reduce((s,z) => s + z.costo, 0) / zonasValidas.length;
+  const costoTotalPromedio = costoPromedioZona + gastosFijos;
+  const precioPromedioPlus = Math.ceil((costoTotalPromedio + MARGEN) / 100) * 100;
+  const contribucion = precioPromedioPlus - costoTotalPromedio;
+  const costosFijosEvento = costoTransTotal + (totalCoordi * costoCordiZona) + costoCreadora;
+  const pe = contribucion > 0 ? Math.ceil(costosFijosEvento / contribucion) : 0;
+
+  document.getElementById('res-pe').innerHTML = `
+    <div class="pe-row">
+      <span style="color:var(--texto-sec)">Capacidad total</span>
+      <span class="pe-num">${totalPax} personas</span>
+    </div>
+    <div class="pe-row">
+      <span style="color:var(--texto-sec)">Punto de equilibrio (aprox)</span>
+      <span class="pe-num" style="color:var(--amarillo)">${pe} clientes</span>
+    </div>
+    <div class="pe-row">
+      <span style="color:var(--texto-sec)">Ocupación mínima</span>
+      <span class="pe-num" style="color:${totalPax>0&&pe/totalPax<0.6?'var(--verde)':'var(--rojo)'}">${totalPax > 0 ? Math.round(pe/totalPax*100) : 0}%</span>
+    </div>
+    <div class="pe-row">
+      <span style="color:var(--texto-sec)">Ganancia si llenas</span>
+      <span class="pe-num" style="color:var(--verde)">${pesos(contribucion * totalPax)}</span>
+    </div>
+  `;
+
+  document.getElementById('btn-publicar').disabled = !document.getElementById('ev-nombre').value || zonasValidas.length === 0;
+}
+
+// ── PUBLICAR ───────────────────────────────────────────────────────────────
+function publicar() {
+  const nombre = document.getElementById('ev-nombre').value;
+  const fecha  = document.getElementById('ev-fecha').value;
+  const ciudad = document.getElementById('ev-ciudad').value;
+  const venue  = document.getElementById('ev-venue').value;
+
+  const msg = document.getElementById('pub-msg');
+  msg.style.color = 'var(--amarillo)';
+  msg.textContent = 'Próximamente: publicación directa a la web. Por ahora copia los precios del cotizador.';
+
+  // TODO: conectar con GitHub API para actualizar array EV en index.html
+}
+</script>
+</body>
+</html>

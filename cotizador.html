@@ -339,6 +339,13 @@ select option{background:var(--ns)}
     <div class="g2">
       <div class="fg"><label>Separo PLUS ($)</label><input id="sep-plus" type="number" value="800" oninput="calcular()"></div>
       <div class="fg"><label>Separo RIDE ($)</label><input id="sep-ride" type="number" value="800" oninput="calcular()"></div>
+      <div class="fg full" style="margin-top:4px">
+        <label>Precio RIDE (precio fijo que cobras al cliente)</label>
+        <div style="display:flex;gap:8px">
+          <div class="fg" style="flex:1"><label style="font-size:9px">MTY</label><input id="ride-precio-mty" type="number" value="2700" oninput="calcular()"></div>
+          <div class="fg" style="flex:1"><label style="font-size:9px">CDMX</label><input id="ride-precio-cdmx" type="number" value="2900" oninput="calcular()"></div>
+        </div>
+      </div>
       <div class="fg"><label>Separo STAY ($)</label><input id="sep-stay" type="number" value="800" oninput="calcular()"></div>
       <div class="fg"><label>Separo CHEAP ($)</label><input id="sep-cheap" type="number" value="1000" oninput="calcular()"></div>
     </div>
@@ -510,7 +517,9 @@ function renderSubpaquetes() {
     const gastosFijosSpPP = transPP + hotelPP + kit + hotelChofPP;
     const costoTotalPP = costoPorDia * dias + gastosFijosSpPP;
     const pricePlus = Math.ceil((costoTotalPP + 1000) / 100) * 100;
-    const priceSinBoleto = Math.ceil((gastosFijosSpPP + 800) / 100) * 100; // RIDE
+    const priceSinBoleto = ciudad==='CDMX' 
+      ? (+document.getElementById('ride-precio-cdmx')?.value||2900)
+      : (+document.getElementById('ride-precio-mty')?.value||2700); // RIDE
     const priceSinTrans = Math.ceil((costoPorDia * dias + hotelPP + kit + hotelChofPP + 1000) / 100) * 100; // STAY
     const priceCheap = Math.ceil((costoPorDia * dias + 500) / 100) * 100;
     const margen = costoTotalPP > 0 ? Math.round((pricePlus - costoTotalPP) / pricePlus * 100) : 0;
@@ -937,6 +946,8 @@ function getData(){
     sepRide:document.getElementById('sep-ride').value,
     sepStay:document.getElementById('sep-stay').value,
     sepCheap:document.getElementById('sep-cheap').value,
+    rideMTY:document.getElementById('ride-precio-mty').value,
+    rideCDMX:document.getElementById('ride-precio-cdmx').value,
     savedAt:new Date().toISOString(),
   };
 }
@@ -999,6 +1010,8 @@ function loadCot(k){
   document.getElementById('sep-ride').value=d.sepRide||'800';
   document.getElementById('sep-stay').value=d.sepStay||'800';
   document.getElementById('sep-cheap').value=d.sepCheap||'1000';
+  document.getElementById('ride-precio-mty').value=d.rideMTY||'2700';
+  document.getElementById('ride-precio-cdmx').value=d.rideCDMX||'2900';
   setMode(d.modo||'estimado');
   hideModal();calcular();
 }

@@ -4,129 +4,157 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Cotizador — Conecta Reynosa</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;900&display=swap" rel="stylesheet">
 <style>
-:root{--negro:#0a0a0a;--negro-suave:#111;--negro-card:#161616;--borde:#222;--texto:#f0f0f0;--texto-sec:#777;--azul:#2255ff;--rojo:#ff283b;--amarillo:#e8ff4c;--verde:#88ea4e}
+:root{--n:#0a0a0a;--ns:#111;--nc:#161616;--b:#222;--bh:#333;--t:#f0f0f0;--ts:#666;--az:#2255ff;--ro:#ff283b;--am:#e8ff4c;--ve:#88ea4e}
 *{box-sizing:border-box;margin:0;padding:0}
-body{background:var(--negro);color:var(--texto);font-family:'Montserrat',sans-serif;min-height:100vh}
-.header{background:var(--negro-suave);border-bottom:1px solid var(--borde);padding:14px 24px;display:flex;align-items:center;justify-content:space-between}
-.header-left{display:flex;align-items:center;gap:12px}
-.logo{font-size:11px;font-weight:900;letter-spacing:.15em;color:var(--azul);text-transform:uppercase}
-.sep{color:var(--borde);font-size:18px}
-.page-title{font-size:12px;font-weight:700;color:var(--texto-sec);text-transform:uppercase;letter-spacing:.1em}
-.hactions{display:flex;gap:8px}
-.container{max-width:1200px;margin:0 auto;padding:20px;display:grid;grid-template-columns:1fr 400px;gap:20px}
-@media(max-width:900px){.container{grid-template-columns:1fr}}
-.card{background:var(--negro-card);border:1px solid var(--borde);border-radius:8px;padding:18px;margin-bottom:14px}
-.card-title{font-size:10px;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:var(--texto-sec);margin-bottom:14px;display:flex;align-items:center;gap:8px}
-.card-title::after{content:'';flex:1;height:1px;background:var(--borde)}
-.g2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+body{background:var(--n);color:var(--t);font-family:'Montserrat',sans-serif;min-height:100vh;font-size:13px}
+.hdr{background:var(--ns);border-bottom:1px solid var(--b);padding:13px 24px;display:flex;align-items:center;justify-content:space-between}
+.hdr-l{display:flex;align-items:center;gap:10px}
+.logo{font-size:11px;font-weight:900;letter-spacing:.15em;color:var(--az);text-transform:uppercase}
+.pg-title{font-size:11px;font-weight:700;color:var(--ts);text-transform:uppercase;letter-spacing:.1em}
+.wrap{max-width:1200px;margin:0 auto;padding:18px;display:grid;grid-template-columns:1fr 390px;gap:18px}
+@media(max-width:900px){.wrap{grid-template-columns:1fr}}
+.card{background:var(--nc);border:1px solid var(--b);border-radius:8px;padding:16px;margin-bottom:12px}
+.ct{font-size:10px;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:var(--ts);margin-bottom:12px;display:flex;align-items:center;gap:8px}
+.ct::after{content:'';flex:1;height:1px;background:var(--b)}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:9px}
 .full{grid-column:1/-1}
-.fg{display:flex;flex-direction:column;gap:5px}
-label{font-size:10px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--texto-sec)}
-input,select{background:var(--negro-suave);border:1px solid var(--borde);border-radius:6px;color:var(--texto);font-family:inherit;font-size:13px;padding:8px 11px;outline:none;transition:border-color .15s;width:100%}
+.fg{display:flex;flex-direction:column;gap:4px}
+label{font-size:10px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--ts)}
+input,select{background:var(--ns);border:1px solid var(--b);border-radius:5px;color:var(--t);font-family:inherit;font-size:12px;padding:7px 10px;outline:none;transition:border-color .15s;width:100%}
 input:focus,select:focus{border-color:#444}
-select option{background:var(--negro-suave)}
-.note{font-size:11px;color:var(--texto-sec);padding:7px 10px;background:rgba(255,255,255,.03);border-radius:4px;border-left:2px solid var(--borde)}
-.row-t{display:grid;grid-template-columns:1fr 1fr auto;gap:8px;align-items:end;margin-bottom:8px}
-.row-z{display:grid;grid-template-columns:1fr 100px 80px 80px auto;gap:8px;align-items:end;margin-bottom:8px}
-.row-z-head{display:grid;grid-template-columns:1fr 100px 80px 80px auto;gap:8px;margin-bottom:4px}
-.kit-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;margin-top:10px}
-.kit-chip{display:flex;align-items:center;gap:8px;background:var(--negro-suave);border:1px solid var(--borde);border-radius:6px;padding:8px 10px;cursor:pointer;user-select:none;transition:all .15s}
-.kit-chip:hover{border-color:#444}
-.kit-chip.on{border-color:var(--amarillo);background:rgba(232,255,76,.05)}
-.kit-chip input{width:14px;height:14px;accent-color:var(--amarillo);flex-shrink:0;cursor:pointer}
-.kname{font-size:12px;font-weight:600;flex:1}
-.kprice{font-size:11px;color:var(--texto-sec)}
-.btn-add{background:none;border:1px dashed var(--borde);border-radius:6px;color:var(--texto-sec);cursor:pointer;font-family:inherit;font-size:12px;font-weight:600;padding:8px;text-align:center;transition:all .15s;width:100%;margin-top:4px}
-.btn-add:hover{border-color:#555;color:var(--texto)}
-.btn-x{background:var(--negro-suave);border:1px solid var(--borde);border-radius:6px;color:var(--texto-sec);cursor:pointer;font-size:15px;padding:8px 11px;transition:all .15s;line-height:1}
-.btn-x:hover{border-color:var(--rojo);color:var(--rojo)}
-.btn{border:none;border-radius:6px;cursor:pointer;font-family:inherit;font-size:12px;font-weight:700;letter-spacing:.05em;padding:9px 16px;text-transform:uppercase;transition:all .15s}
-.btn-y{background:var(--amarillo);color:#000}
-.btn-y:hover{opacity:.85}
-.btn-g{background:var(--negro-suave);border:1px solid var(--borde);color:var(--texto-sec)}
-.btn-g:hover{border-color:#555;color:var(--texto)}
-.btn-pub{width:100%;padding:13px;font-size:13px;font-weight:900;letter-spacing:.1em;background:var(--amarillo);color:#000;border:none;border-radius:8px;cursor:pointer;font-family:inherit;text-transform:uppercase;transition:opacity .15s;margin-top:8px}
-.btn-pub:hover{opacity:.85}
-.btn-pub:disabled{opacity:.35;cursor:not-allowed}
-.mode-est{background:rgba(232,255,76,.15);color:var(--amarillo)}
-.mode-real{background:rgba(136,234,78,.15);color:var(--verde)}
-.mbadge{font-size:10px;font-weight:700;padding:3px 8px;border-radius:4px;letter-spacing:.05em;text-transform:uppercase}
-.sidebar{position:sticky;top:20px}
-.res-nombre{font-size:16px;font-weight:900;margin-bottom:3px}
-.res-meta{font-size:12px;color:var(--texto-sec);margin-bottom:14px}
-.crow{display:flex;justify-content:space-between;font-size:12px;padding:5px 0;border-bottom:1px solid var(--borde);color:var(--texto-sec)}
-.crow:last-child{border:none;font-weight:700;font-size:13px;color:var(--texto);padding-top:8px}
-.crow span:last-child{color:var(--rojo)}
-.crow.total span:last-child{color:var(--amarillo)}
-.zt{width:100%;border-collapse:collapse;font-size:12px}
-.zt th{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--texto-sec);padding:5px 6px;text-align:right;border-bottom:1px solid var(--borde)}
+select option{background:var(--ns)}
+.note{font-size:11px;color:var(--ts);padding:7px 10px;background:rgba(255,255,255,.03);border-radius:4px;border-left:2px solid var(--b);line-height:1.5}
+
+/* ROWS */
+.row-t{display:grid;grid-template-columns:1.5fr 1fr 1fr auto;gap:8px;align-items:end;margin-bottom:8px}
+.row-z{display:grid;grid-template-columns:1.2fr 90px 75px 75px auto;gap:7px;align-items:end;margin-bottom:7px}
+.row-z-h{display:grid;grid-template-columns:1.2fr 90px 75px 75px auto;gap:7px;margin-bottom:4px}
+
+/* KIT */
+.kit-g{display:grid;grid-template-columns:repeat(auto-fill,minmax(145px,1fr));gap:7px;margin-top:10px}
+.kc{display:flex;align-items:center;gap:7px;background:var(--ns);border:1px solid var(--b);border-radius:5px;padding:7px 9px;cursor:pointer;user-select:none;transition:all .15s}
+.kc:hover{border-color:var(--bh)}
+.kc.on{border-color:var(--am);background:rgba(232,255,76,.04)}
+.kc input{width:13px;height:13px;accent-color:var(--am);flex-shrink:0;cursor:pointer}
+.kn{font-size:11px;font-weight:700;flex:1}
+.kp{font-size:10px;color:var(--ts)}
+
+/* BUTTONS */
+.btn-add{background:none;border:1px dashed var(--b);border-radius:5px;color:var(--ts);cursor:pointer;font-family:inherit;font-size:11px;font-weight:700;padding:7px;text-align:center;transition:all .15s;width:100%;margin-top:4px}
+.btn-add:hover{border-color:#555;color:var(--t)}
+.bx{background:var(--ns);border:1px solid var(--b);border-radius:5px;color:var(--ts);cursor:pointer;font-size:14px;padding:7px 10px;transition:all .15s;line-height:1}
+.bx:hover{border-color:var(--ro);color:var(--ro)}
+.btn{border:none;border-radius:5px;cursor:pointer;font-family:inherit;font-size:11px;font-weight:700;letter-spacing:.05em;padding:8px 14px;text-transform:uppercase;transition:all .15s}
+.by{background:var(--am);color:#000}
+.by:hover{opacity:.85}
+.bg{background:var(--ns);border:1px solid var(--b);color:var(--ts)}
+.bg:hover{border-color:#555;color:var(--t)}
+.b-pub{width:100%;padding:12px;font-size:13px;font-weight:900;letter-spacing:.1em;background:var(--am);color:#000;border:none;border-radius:7px;cursor:pointer;font-family:inherit;text-transform:uppercase;transition:opacity .15s;margin-top:8px}
+.b-pub:hover{opacity:.85}
+.b-pub:disabled{opacity:.3;cursor:not-allowed}
+
+/* RESULTS */
+.sdb{position:sticky;top:18px}
+.r-nom{font-size:15px;font-weight:900;margin-bottom:2px}
+.r-meta{font-size:11px;color:var(--ts);margin-bottom:12px}
+.cr{display:flex;justify-content:space-between;font-size:12px;padding:4px 0;border-bottom:1px solid var(--b);color:var(--ts)}
+.cr:last-child{border:none;font-weight:700;font-size:13px;color:var(--t);padding-top:7px}
+.cr span:last-child{color:var(--ro)}
+.cr.tot span:last-child{color:var(--am)}
+.zt{width:100%;border-collapse:collapse;font-size:11px}
+.zt th{font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--ts);padding:4px 5px;text-align:right;border-bottom:1px solid var(--b)}
 .zt th:first-child{text-align:left}
-.zt td{padding:7px 6px;border-bottom:1px solid rgba(34,34,34,.6);text-align:right;vertical-align:top}
+.zt td{padding:7px 5px;border-bottom:1px solid rgba(34,34,34,.5);text-align:right;vertical-align:top}
 .zt td:first-child{text-align:left}
 .zt tr:last-child td{border:none}
-.tag{display:inline-block;font-size:9px;font-weight:700;padding:2px 5px;border-radius:3px;letter-spacing:.05em}
-.tp{background:rgba(34,85,255,.2);color:#7799ff}
-.tr2{background:rgba(136,234,78,.15);color:var(--verde)}
-.ts{background:rgba(255,40,58,.15);color:var(--rojo)}
-.tc{background:rgba(232,255,76,.15);color:var(--amarillo)}
-.mbar{height:3px;background:var(--borde);border-radius:2px;margin-top:3px;overflow:hidden}
-.mfill{height:100%;border-radius:2px;transition:width .3s}
-.pe-row{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--borde);font-size:12px}
-.pe-row:last-child{border:none}
-.pe-num{font-size:17px;font-weight:900}
-.saved-item{background:var(--negro-suave);border:1px solid var(--borde);border-radius:6px;padding:10px 14px;cursor:pointer;transition:border-color .15s;display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
-.saved-item:hover{border-color:#555}
+.tag{display:inline-block;font-size:9px;font-weight:700;padding:2px 4px;border-radius:3px;letter-spacing:.04em}
+.tp{background:rgba(34,85,255,.2);color:#88aaff}
+.tr2{background:rgba(136,234,78,.15);color:var(--ve)}
+.ts2{background:rgba(255,40,58,.15);color:var(--ro)}
+.tc{background:rgba(232,255,76,.15);color:var(--am)}
+.mb{height:3px;background:var(--b);border-radius:2px;margin-top:3px;overflow:hidden}
+.mf{height:100%;border-radius:2px;transition:width .3s}
+.pe-r{display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--b);font-size:11px}
+.pe-r:last-child{border:none}
+.pe-n{font-size:16px;font-weight:900}
+
+/* HAB TABLE */
+.hab-t{width:100%;border-collapse:collapse;font-size:11px;margin-top:8px}
+.hab-t th{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--ts);padding:4px 6px;border-bottom:1px solid var(--b);text-align:center}
+.hab-t th:first-child{text-align:left}
+.hab-t td{padding:5px 6px;border-bottom:1px solid rgba(34,34,34,.4);text-align:center;font-size:11px}
+.hab-t td:first-child{text-align:left;font-weight:600}
+.hab-t tr:last-child td{border:none}
+
+/* MODAL */
+.modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:100;padding:20px;overflow-y:auto}
+.modal-box{max-width:560px;margin:40px auto;background:var(--nc);border:1px solid var(--b);border-radius:10px;padding:22px}
+.sv-item{background:var(--ns);border:1px solid var(--b);border-radius:6px;padding:10px 12px;cursor:pointer;transition:border-color .15s;display:flex;justify-content:space-between;align-items:center;margin-bottom:7px}
+.sv-item:hover{border-color:#555}
+
+.mbadge{font-size:9px;font-weight:700;padding:2px 6px;border-radius:3px;letter-spacing:.05em;text-transform:uppercase}
+.m-est{background:rgba(232,255,76,.15);color:var(--am)}
+.m-real{background:rgba(136,234,78,.15);color:var(--ve)}
+
+.section-mini{background:rgba(255,255,255,.02);border:1px solid var(--b);border-radius:5px;padding:10px 12px;margin-top:8px}
+.section-mini-title{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--ts);margin-bottom:8px}
 </style>
 </head>
 <body>
 
-<div class="header">
-  <div class="header-left">
+<div class="hdr">
+  <div class="hdr-l">
     <span class="logo">Conecta Reynosa</span>
-    <span class="sep">/</span>
-    <span class="page-title">Cotizador de Eventos</span>
+    <span style="color:var(--b);font-size:16px">/</span>
+    <span class="pg-title">Cotizador de Eventos</span>
   </div>
-  <div class="hactions">
-    <button class="btn btn-g" onclick="showSaved()">📋 Mis cotizaciones</button>
-    <button class="btn btn-g" onclick="nuevaCotizacion()">+ Nueva</button>
+  <div style="display:flex;gap:7px">
+    <button class="btn bg" onclick="showSaved()">📋 Mis cotizaciones</button>
+    <button class="btn bg" onclick="nuevaCot()">+ Nueva</button>
   </div>
 </div>
 
-<div class="container">
+<div class="wrap">
 <div>
 
   <!-- MODO -->
   <div class="card">
     <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
       <div>
-        <div style="font-size:13px;font-weight:700;margin-bottom:2px">Modo de cotización</div>
-        <div style="font-size:12px;color:var(--texto-sec)">Estimado → para salir a venta · Real → costos exactos post-evento</div>
+        <div style="font-size:13px;font-weight:700;margin-bottom:2px">Modo</div>
+        <div style="font-size:11px;color:var(--ts)">Estimado = para salir a venta · Real = costos exactos post-evento</div>
       </div>
-      <div style="display:flex;gap:8px">
-        <button class="btn btn-y" id="btn-est" onclick="setMode('estimado')">Estimado</button>
-        <button class="btn btn-g" id="btn-real" onclick="setMode('real')">Real (post-evento)</button>
+      <div style="display:flex;gap:7px">
+        <button class="btn by" id="b-est" onclick="setMode('estimado')">Estimado</button>
+        <button class="btn bg" id="b-real" onclick="setMode('real')">Real (post-evento)</button>
       </div>
     </div>
   </div>
 
   <!-- 1. EVENTO -->
   <div class="card">
-    <div class="card-title">1 · Evento</div>
+    <div class="ct">1 · Evento</div>
     <div class="g2">
-      <div class="fg full"><label>Nombre del evento</label><input id="ev-nombre" type="text" placeholder="Ej: Bad Bunny — Most Wanted Tour" oninput="calcular()"></div>
+      <div class="fg full"><label>Nombre del evento</label><input id="ev-nom" type="text" placeholder="Ej: Bad Bunny — Most Wanted Tour" oninput="calcular()"></div>
       <div class="fg"><label>Fecha</label><input id="ev-fecha" type="date" oninput="calcular()"></div>
       <div class="fg"><label>Ciudad</label>
-        <select id="ev-ciudad" onchange="calcular()">
+        <select id="ev-ciudad" onchange="onCiudadChange()">
           <option value="MTY">Monterrey (MTY)</option>
           <option value="CDMX">Ciudad de México (CDMX)</option>
           <option value="OTRO">Otra ciudad</option>
         </select>
       </div>
       <div class="fg full"><label>Venue</label><input id="ev-venue" type="text" placeholder="Ej: Estadio BBVA" oninput="calcular()"></div>
+      <div class="fg"><label>Días del evento</label>
+        <select id="ev-dias" onchange="calcular()">
+          <option value="1">1 día</option>
+          <option value="2">2 días</option>
+          <option value="3">3 días</option>
+        </select>
+      </div>
       <div class="fg"><label>Noches de hotel</label>
         <select id="ev-noches" onchange="calcular()">
           <option value="1">1 noche</option>
@@ -134,86 +162,148 @@ select option{background:var(--negro-suave)}
           <option value="3">3 noches</option>
         </select>
       </div>
-      <div class="fg"><label>Costo habitación cuádruple ($)</label>
-        <input id="ev-hotel" type="number" placeholder="MTY=2500 · CDMX=2900" oninput="calcular()">
+      <div class="fg"><label>Costo hab cuádruple ($)</label>
+        <input id="ev-hotel" type="number" placeholder="MTY=2,500 · CDMX=2,900" oninput="calcular()">
+      </div>
+      <div class="fg" style="align-self:end">
+        <div class="note" id="info-hab">—</div>
       </div>
     </div>
   </div>
 
   <!-- 2. TRANSPORTE -->
   <div class="card">
-    <div class="card-title">2 · Transporte</div>
-    <div id="unidades-container"></div>
-    <button class="btn-add" onclick="agregarUnidad()">+ Agregar unidad</button>
+    <div class="ct">2 · Transporte</div>
+    <div id="unidades-c"></div>
+    <button class="btn-add" onclick="addUnidad()">+ Agregar unidad</button>
+    <div id="info-gastos-ruta" class="note" style="margin-top:10px;display:none"></div>
   </div>
 
   <!-- 3. ZONAS -->
   <div class="card">
-    <div class="card-title">3 · Zonas, boletos y pedido</div>
-    <div class="row-z-head">
+    <div class="ct">3 · Zonas, boletos y pedido</div>
+    <div class="row-z-h">
       <label>Zona</label><label>Costo boleto</label><label>Pedido</label><label>Vendidos</label><span></span>
     </div>
-    <div id="zonas-container"></div>
-    <button class="btn-add" onclick="agregarZona()">+ Agregar zona</button>
+    <div id="zonas-c"></div>
+    <button class="btn-add" onclick="addZona()">+ Agregar zona</button>
   </div>
 
   <!-- 4. KIT -->
   <div class="card">
-    <div class="card-title">4 · Kit Conecta</div>
-    <div class="note">Selecciona los items del kit para este evento. El costo se suma automáticamente.</div>
-    <div class="kit-grid">
-      <div class="kit-chip on" onclick="toggleKit(this)" data-cost="35"><input type="checkbox" checked onclick="event.stopPropagation()"><span class="kname">Morral</span><span class="kprice">$35</span></div>
-      <div class="kit-chip" onclick="toggleKit(this)" data-cost="80"><input type="checkbox" onclick="event.stopPropagation()"><span class="kname">Tote Bag</span><span class="kprice">$80</span></div>
-      <div class="kit-chip on" onclick="toggleKit(this)" data-cost="22"><input type="checkbox" checked onclick="event.stopPropagation()"><span class="kname">Vaso</span><span class="kprice">$22</span></div>
-      <div class="kit-chip" onclick="toggleKit(this)" data-cost="93"><input type="checkbox" onclick="event.stopPropagation()"><span class="kname">Playera</span><span class="kprice">$93</span></div>
-      <div class="kit-chip" onclick="toggleKit(this)" data-cost="90"><input type="checkbox" onclick="event.stopPropagation()"><span class="kname">Cupón de comida</span><span class="kprice">$90</span></div>
-      <div class="kit-chip" onclick="toggleKit(this)" data-cost="10"><input type="checkbox" onclick="event.stopPropagation()"><span class="kname">New Mix</span><span class="kprice">$10</span></div>
-      <div class="kit-chip" onclick="toggleKit(this)" data-cost="100"><input type="checkbox" onclick="event.stopPropagation()"><span class="kname">Conecta Lunch</span><span class="kprice">$100</span></div>
+    <div class="ct">4 · Kit Conecta</div>
+    <div class="note">Selecciona los items de este evento. El costo se calcula solo.</div>
+    <div class="kit-g">
+      <div class="kc on" onclick="tk(this)" data-cost="35"><input type="checkbox" checked onclick="event.stopPropagation()"><span class="kn">Morral</span><span class="kp">$35</span></div>
+      <div class="kc" onclick="tk(this)" data-cost="80"><input type="checkbox" onclick="event.stopPropagation()"><span class="kn">Tote Bag</span><span class="kp">$80</span></div>
+      <div class="kc on" onclick="tk(this)" data-cost="22"><input type="checkbox" checked onclick="event.stopPropagation()"><span class="kn">Vaso</span><span class="kp">$22</span></div>
+      <div class="kc" onclick="tk(this)" data-cost="93"><input type="checkbox" onclick="event.stopPropagation()"><span class="kn">Playera</span><span class="kp">$93</span></div>
+      <div class="kc" onclick="tk(this)" data-cost="90"><input type="checkbox" onclick="event.stopPropagation()"><span class="kn">Cupón de comida</span><span class="kp">$90</span></div>
+      <div class="kc" onclick="tk(this)" data-cost="10"><input type="checkbox" onclick="event.stopPropagation()"><span class="kn">New Mix</span><span class="kp">$10</span></div>
+      <div class="kc" onclick="tk(this)" data-cost="100"><input type="checkbox" onclick="event.stopPropagation()"><span class="kn">Conecta Lunch</span><span class="kp">$100</span></div>
     </div>
-    <div style="margin-top:12px;display:flex;align-items:center;gap:8px">
-      <span style="font-size:12px;color:var(--texto-sec)">Costo kit seleccionado:</span>
-      <span id="kit-total" style="font-size:14px;font-weight:700;color:var(--amarillo)">$57</span>
+    <div style="margin-top:10px;display:flex;align-items:center;gap:8px">
+      <span style="font-size:11px;color:var(--ts)">Costo kit:</span>
+      <span id="kit-tot" style="font-size:14px;font-weight:700;color:var(--am)">$57</span>
     </div>
   </div>
 
-  <!-- 5. STAFF -->
+  <!-- 5. COORDINADOR -->
   <div class="card">
-    <div class="card-title">5 · Staff</div>
+    <div class="ct">5 · Coordinador(es)</div>
     <div class="g2">
-      <div class="fg"><label>Zona boleto coordinador(es)</label>
-        <select id="staff-zona-coordi" onchange="onStaffChange('coordi')"><option value="0">Sin boleto</option></select>
-      </div>
-      <div class="fg"><label>Costo boleto coordi ($)</label>
-        <input id="staff-costo-coordi" type="number" placeholder="0" oninput="calcular()">
-      </div>
-      <div class="fg"><label>Zona boleto creadora</label>
-        <select id="staff-zona-creadora" onchange="onStaffChange('creadora')"><option value="0">Sin creadora / es local</option></select>
-      </div>
-      <div class="fg"><label>Costo boleto creadora ($)</label>
-        <input id="staff-costo-creadora" type="number" placeholder="0" oninput="calcular()">
-      </div>
-      <div class="fg"><label>Hotel staff (coordi + creadora)</label>
-        <select id="staff-hotel" onchange="calcular()">
-          <option value="compartida">Comparten con clientes ($0 extra)</option>
-          <option value="cuadruple">Cuádruple aparte</option>
-          <option value="doble">Doble aparte (~30% más)</option>
-          <option value="individual">Individual cada una</option>
+      <div class="fg">
+        <label>Tipo de coordinador</label>
+        <select id="coord-tipo" onchange="onCoordTipoChange()">
+          <option value="bus">Viaja en el bus desde Reynosa</option>
+          <option value="cdmx-local">Local CDMX (ubers)</option>
+          <option value="cdmx-vuelo">Vuela desde Reynosa a CDMX</option>
         </select>
       </div>
-      <div class="fg"><label>Estacionamiento por unidad ($)</label>
-        <input id="estacionamiento" type="number" placeholder="0" oninput="calcular()">
+      <div class="fg">
+        <label>Zona boleto coordinador(es)</label>
+        <select id="coord-zona" onchange="onCoordZona()"><option value="0">Sin boleto aún</option></select>
+      </div>
+      <div class="fg">
+        <label>Costo boleto coordi ($)</label>
+        <input id="coord-costo-boleto" type="number" placeholder="0" oninput="calcular()">
+      </div>
+      <div class="fg" id="coord-ubers-g" style="display:none">
+        <label>Presupuesto ubers coordi CDMX ($)</label>
+        <input id="coord-ubers" type="number" placeholder="500" oninput="calcular()">
+      </div>
+      <div class="fg" id="coord-vuelo-g" style="display:none">
+        <label>Vuelo ida y vuelta coordi ($)</label>
+        <input id="coord-vuelo" type="number" placeholder="0" oninput="calcular()">
+      </div>
+      <div class="fg">
+        <label>Hotel coordinador(es)</label>
+        <select id="coord-hotel" onchange="calcular()">
+          <option value="compartida">Comparte con clientes ($0 extra)</option>
+          <option value="aparte">Habitación aparte (cuádruple)</option>
+        </select>
       </div>
     </div>
-    <div id="info-choferes" class="note" style="margin-top:10px">—</div>
+    <div class="note" style="margin-top:8px">El kit del coordinador siempre va incluido en los gastos del evento.</div>
   </div>
 
-  <!-- 6. SEPARO -->
+  <!-- 6. CREADORA -->
   <div class="card">
-    <div class="card-title">6 · Separo</div>
+    <div class="ct">6 · Creadora de contenido</div>
+    <div class="g2">
+      <div class="fg">
+        <label>Tipo de creadora</label>
+        <select id="crea-tipo" onchange="onCreaTipoChange()">
+          <option value="ninguna">Sin creadora / por definir</option>
+          <option value="local">Local (vive en ciudad del evento)</option>
+          <option value="reynosa">Viaja desde Reynosa</option>
+        </select>
+      </div>
+      <div class="fg" id="crea-zona-g">
+        <label>Zona boleto creadora</label>
+        <select id="crea-zona" onchange="onCreaZona()"><option value="0">Sin boleto</option></select>
+      </div>
+      <div class="fg" id="crea-boleto-g">
+        <label>Costo boleto creadora ($)</label>
+        <input id="crea-costo-boleto" type="number" placeholder="0" oninput="calcular()">
+      </div>
+      <div class="fg" id="crea-kit-g">
+        <label>¿Incluye kit?</label>
+        <select id="crea-kit" onchange="calcular()">
+          <option value="si">Sí incluye kit</option>
+          <option value="no">No incluye kit</option>
+        </select>
+      </div>
+      <div class="fg" id="crea-hotel-g" style="display:none">
+        <label>Hotel creadora (viaja desde Reynosa)</label>
+        <select id="crea-hotel" onchange="calcular()">
+          <option value="compartida">Comparte con coordinadora / clientes</option>
+          <option value="aparte">Habitación aparte (cuádruple)</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <!-- 7. ESTACIONAMIENTO -->
+  <div class="card">
+    <div class="ct">7 · Otros gastos</div>
+    <div class="g2">
+      <div class="fg"><label>Estacionamiento por unidad ($)</label>
+        <input id="estac" type="number" placeholder="0" oninput="calcular()">
+      </div>
+      <div class="fg"><label>Otros gastos por persona ($)</label>
+        <input id="otros" type="number" placeholder="0" oninput="calcular()">
+      </div>
+    </div>
+  </div>
+
+  <!-- 8. SEPARO -->
+  <div class="card">
+    <div class="ct">8 · Separo por paquete</div>
     <div class="g2">
       <div class="fg"><label>Separo PLUS ($)</label><input id="sep-plus" type="number" value="800" oninput="calcular()"></div>
+      <div class="fg"><label>Separo RIDE ($)</label><input id="sep-ride" type="number" value="800" oninput="calcular()"></div>
       <div class="fg"><label>Separo STAY ($)</label><input id="sep-stay" type="number" value="800" oninput="calcular()"></div>
-      <div class="fg"><label>Separo RIDE ($)</label><input id="sep-ride" type="number" value="1000" oninput="calcular()"></div>
       <div class="fg"><label>Separo CHEAP ($)</label><input id="sep-cheap" type="number" value="1000" oninput="calcular()"></div>
     </div>
   </div>
@@ -221,389 +311,494 @@ select option{background:var(--negro-suave)}
 </div>
 
 <!-- SIDEBAR -->
-<div class="sidebar">
+<div class="sdb">
   <div class="card">
-    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:3px">
-      <div class="res-nombre" id="res-nombre">Nuevo evento</div>
-      <span class="mbadge mode-est" id="mode-badge">Estimado</span>
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:2px">
+      <div class="r-nom" id="r-nom">Nuevo evento</div>
+      <span class="mbadge m-est" id="mode-badge">Estimado</span>
     </div>
-    <div class="res-meta" id="res-meta">—</div>
-    <div id="res-costos"></div>
+    <div class="r-meta" id="r-meta">—</div>
+    <div id="r-costos"></div>
+  </div>
+
+  <!-- HABITACIONES -->
+  <div class="card">
+    <div class="ct" style="margin-bottom:8px">Precio habitaciones</div>
+    <div class="note" style="margin-bottom:6px;font-size:10px">Base cuádruple incluida en el paquete. El extra es lo que cobra al cliente por mejorar habitación.</div>
+    <table class="hab-t" id="hab-table">
+      <thead><tr><th>Tipo</th><th>$/persona</th><th>Extra vs cuádruple</th></tr></thead>
+      <tbody id="hab-body"></tbody>
+    </table>
   </div>
 
   <div class="card">
-    <div class="card-title" style="margin-bottom:10px">Precios por zona</div>
+    <div class="ct" style="margin-bottom:10px">Precios por zona</div>
     <div style="overflow-x:auto">
       <table class="zt">
         <thead><tr>
           <th>Zona</th>
           <th><span class="tag tp">PLUS</span></th>
           <th><span class="tag tr2">RIDE</span></th>
-          <th><span class="tag ts">STAY</span></th>
+          <th><span class="tag ts2">STAY</span></th>
           <th><span class="tag tc">CHEAP</span></th>
         </tr></thead>
-        <tbody id="res-zonas-body">
-          <tr><td colspan="5" style="color:var(--texto-sec);font-size:12px;padding:12px 0">Agrega zonas para ver precios</td></tr>
-        </tbody>
+        <tbody id="r-zonas"></tbody>
       </table>
     </div>
   </div>
 
   <div class="card">
-    <div class="card-title" style="margin-bottom:10px">Pedido y equilibrio</div>
-    <div id="res-pe"><div style="color:var(--texto-sec);font-size:12px">Agrega pedido de boletos para ver análisis</div></div>
+    <div class="ct" style="margin-bottom:10px">Pedido y equilibrio</div>
+    <div id="r-pe"><div style="color:var(--ts);font-size:11px">Agrega pedido de boletos para ver el análisis</div></div>
   </div>
 
-  <div style="display:flex;gap:8px;margin-bottom:8px">
-    <button class="btn btn-g" style="flex:1" onclick="guardarCotizacion()">💾 Guardar</button>
-    <button class="btn btn-g" style="flex:1" onclick="exportarResumen()">📋 Copiar resumen</button>
+  <div style="display:flex;gap:7px;margin-bottom:8px">
+    <button class="btn bg" style="flex:1" onclick="guardar()">💾 Guardar</button>
+    <button class="btn bg" style="flex:1" onclick="exportar()">📋 Copiar</button>
   </div>
-  <button class="btn-pub" id="btn-pub" onclick="publicar()" disabled>Publicar en la web →</button>
-  <div id="pub-msg" style="font-size:11px;text-align:center;margin-top:6px;color:var(--texto-sec)"></div>
+  <button class="b-pub" id="b-pub" onclick="publicar()" disabled>Publicar en la web →</button>
+  <div id="pub-msg" style="font-size:10px;text-align:center;margin-top:5px;color:var(--ts)"></div>
 </div>
 </div>
 
-<!-- MODAL SAVED -->
-<div id="modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:100;padding:20px;overflow-y:auto">
-  <div style="max-width:580px;margin:40px auto;background:var(--negro-card);border:1px solid var(--borde);border-radius:10px;padding:24px">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
-      <div style="font-size:15px;font-weight:900">Cotizaciones guardadas</div>
-      <button class="btn-x" onclick="hideModal()">×</button>
+<!-- MODAL -->
+<div class="modal" id="modal">
+  <div class="modal-box">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+      <div style="font-size:14px;font-weight:900">Cotizaciones guardadas</div>
+      <button class="bx" onclick="hideModal()">×</button>
     </div>
-    <div id="modal-content"></div>
+    <div id="modal-c"></div>
   </div>
 </div>
 
 <script>
-const TRANSPORTE = {
+// ── CONSTANTS ──────────────────────────────────────────────────────────────
+const TRP = {
   van:   {label:'Van (13 pax + 1 coordi + 1 chofer)',pax:13},
-  bus37: {label:'Bus 37 pax + 1 coordi + 1 chofer = 38 total',pax:37},
-  bus47: {label:'Bus 47 pax + 1 coordi + 1 chofer = 48 total',pax:47},
+  bus37: {label:'Bus 37 pax + 1 coordi + 1 chofer',pax:37},
+  bus47: {label:'Bus 47 pax + 1 coordi + 1 chofer',pax:47},
 };
-const HOTEL_DEF = {MTY:2500,CDMX:2900,OTRO:2500};
+const HDef = {MTY:2500,CDMX:2900,OTRO:2500};
+const GASTOS_RUTA = 3500; // por unidad por día en MTY
+
+// ── STATE ──────────────────────────────────────────────────────────────────
 let unidades=[],zonas=[],uId=0,zId=0,modo='estimado';
 
-document.addEventListener('DOMContentLoaded',()=>{agregarUnidad();agregarZona();calcular();});
+// ── INIT ───────────────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded',()=>{addUnidad();addZona();calcular();});
 
-// MODO
+// ── MODE ───────────────────────────────────────────────────────────────────
 function setMode(m){
   modo=m;
-  document.getElementById('btn-est').className='btn '+(m==='estimado'?'btn-y':'btn-g');
-  document.getElementById('btn-real').className='btn '+(m==='real'?'btn-y':'btn-g');
-  document.getElementById('mode-badge').className='mbadge '+(m==='real'?'mode-real':'mode-est');
-  document.getElementById('mode-badge').textContent=m==='real'?'Real (post-evento)':'Estimado';
+  document.getElementById('b-est').className='btn '+(m==='estimado'?'by':'bg');
+  document.getElementById('b-real').className='btn '+(m==='real'?'by':'bg');
+  document.getElementById('mode-badge').className='mbadge '+(m==='real'?'m-real':'m-est');
+  document.getElementById('mode-badge').textContent=m==='real'?'Real':'Estimado';
   calcular();
 }
 
-// TRANSPORTE
-function agregarUnidad(){unidades.push({id:++uId,tipo:'bus37',costo:0});renderUnidades();calcular();}
-function removerUnidad(id){unidades=unidades.filter(u=>u.id!==id);renderUnidades();calcular();}
-function updateUnidad(id,f,v){const u=unidades.find(u=>u.id===id);if(u){u[f]=f==='tipo'?v:+v;calcular();}}
-function renderUnidades(){
-  document.getElementById('unidades-container').innerHTML=unidades.map(u=>`
-    <div class="row-t">
-      <div class="fg"><label>Tipo de unidad</label>
-        <select onchange="updateUnidad(${u.id},'tipo',this.value)">
-          ${Object.entries(TRANSPORTE).map(([k,v])=>`<option value="${k}" ${u.tipo===k?'selected':''}>${v.label}</option>`).join('')}
-        </select>
-      </div>
-      <div class="fg"><label>Costo total ($)</label>
-        <input type="number" value="${u.costo||''}" placeholder="Estimado o real" onchange="updateUnidad(${u.id},'costo',this.value)">
-      </div>
-      <button class="btn-x" onclick="removerUnidad(${u.id})">×</button>
-    </div>`).join('');
+// ── CIUDAD ─────────────────────────────────────────────────────────────────
+function onCiudadChange(){
+  const c=document.getElementById('ev-ciudad').value;
+  // Suggest coordinator type
+  if(c==='CDMX'){
+    document.getElementById('coord-tipo').value='cdmx-local';
+  } else {
+    document.getElementById('coord-tipo').value='bus';
+  }
+  onCoordTipoChange();
+  calcular();
 }
 
-// ZONAS
-function agregarZona(){zonas.push({id:++zId,nombre:'',costo:0,pedido:0,vendidos:0});renderZonas();calcular();}
-function removerZona(id){zonas=zonas.filter(z=>z.id!==id);renderZonas();calcular();}
-function updateZona(id,f,v){const z=zonas.find(z=>z.id===id);if(z){z[f]=f==='nombre'?v:+v;actualizarStaffSelects();calcular();}}
-function renderZonas(){
-  document.getElementById('zonas-container').innerHTML=zonas.map(z=>`
-    <div class="row-z">
-      <input type="text" value="${z.nombre}" placeholder="Ej: Cancha VIP" oninput="updateZona(${z.id},'nombre',this.value)">
-      <input type="number" value="${z.costo||''}" placeholder="$0" onchange="updateZona(${z.id},'costo',this.value)">
-      <input type="number" value="${z.pedido||''}" placeholder="0" title="Pedido a matriz" onchange="updateZona(${z.id},'pedido',this.value)">
-      <input type="number" value="${z.vendidos||''}" placeholder="0" title="Vendidos hoy" onchange="updateZona(${z.id},'vendidos',this.value)">
-      <button class="btn-x" onclick="removerZona(${z.id})">×</button>
+// ── TRANSPORTE ─────────────────────────────────────────────────────────────
+function addUnidad(){unidades.push({id:++uId,tipo:'bus37',costo:0,gastosRuta:GASTOS_RUTA});renderUnidades();calcular();}
+function remUnidad(id){unidades=unidades.filter(u=>u.id!==id);renderUnidades();calcular();}
+function updUnidad(id,f,v){const u=unidades.find(u=>u.id===id);if(u){u[f]=f==='tipo'?v:+v;calcular();}}
+
+function renderUnidades(){
+  const ciudad=document.getElementById('ev-ciudad').value;
+  const esMTY=ciudad==='MTY'||ciudad==='OTRO';
+  document.getElementById('unidades-c').innerHTML=unidades.map(u=>`
+    <div class="row-t">
+      <div class="fg"><label>Tipo</label>
+        <select onchange="updUnidad(${u.id},'tipo',this.value)">
+          ${Object.entries(TRP).map(([k,v])=>`<option value="${k}" ${u.tipo===k?'selected':''}>${v.label}</option>`).join('')}
+        </select>
+      </div>
+      <div class="fg"><label>Renta ($)</label>
+        <input type="number" value="${u.costo||''}" placeholder="0" onchange="updUnidad(${u.id},'costo',this.value)">
+      </div>
+      ${esMTY?`<div class="fg"><label>Gastos ruta ($)</label>
+        <input type="number" value="${u.gastosRuta||GASTOS_RUTA}" placeholder="${GASTOS_RUTA}" onchange="updUnidad(${u.id},'gastosRuta',this.value)">
+      </div>`:'<div></div>'}
+      <button class="bx" onclick="remUnidad(${u.id})">×</button>
     </div>`).join('');
-  actualizarStaffSelects();
+
+  // Info gastos ruta
+  const infoEl=document.getElementById('info-gastos-ruta');
+  if(esMTY&&unidades.length>0){
+    infoEl.style.display='block';
+    const totalRuta=unidades.reduce((s,u)=>s+(u.gastosRuta||GASTOS_RUTA),0);
+    infoEl.textContent=`💡 Gastos de ruta (gasolina + casetas + imprevistos): $${totalRuta.toLocaleString('es-MX')} estimado. Puedes ajustar por unidad.`;
+  } else {
+    infoEl.style.display='none';
+  }
 }
-function actualizarStaffSelects(){
+
+// ── ZONAS ──────────────────────────────────────────────────────────────────
+function addZona(){zonas.push({id:++zId,nombre:'',costo:0,pedido:0,vendidos:0});renderZonas();calcular();}
+function remZona(id){zonas=zonas.filter(z=>z.id!==id);renderZonas();calcular();}
+function updZona(id,f,v){const z=zonas.find(z=>z.id===id);if(z){z[f]=f==='nombre'?v:+v;updStaffSelects();calcular();}}
+
+function renderZonas(){
+  document.getElementById('zonas-c').innerHTML=zonas.map(z=>`
+    <div class="row-z">
+      <input type="text" value="${z.nombre}" placeholder="Ej: Cancha VIP" oninput="updZona(${z.id},'nombre',this.value)">
+      <input type="number" value="${z.costo||''}" placeholder="$0" onchange="updZona(${z.id},'costo',this.value)">
+      <input type="number" value="${z.pedido||''}" placeholder="0" title="Pedido a matriz" onchange="updZona(${z.id},'pedido',this.value)">
+      <input type="number" value="${z.vendidos||''}" placeholder="0" title="Vendidos hoy" onchange="updZona(${z.id},'vendidos',this.value)">
+      <button class="bx" onclick="remZona(${z.id})">×</button>
+    </div>`).join('');
+  updStaffSelects();
+}
+
+function updStaffSelects(){
   const opts=zonas.filter(z=>z.nombre&&z.costo>0).map(z=>`<option value="${z.costo}">${z.nombre} ($${z.costo.toLocaleString('es-MX')})</option>`).join('');
-  ['coordi','creadora'].forEach(t=>{
-    const sel=document.getElementById(`staff-zona-${t}`);
-    const prev=sel.value;
-    const base=t==='creadora'?'<option value="0">Sin creadora / es local</option>':'<option value="0">Sin boleto</option>';
-    sel.innerHTML=base+opts;
-    sel.value=prev;
+  ['coord-zona','crea-zona'].forEach((id,i)=>{
+    const el=document.getElementById(id);
+    const prev=el.value;
+    el.innerHTML=(i===0?'<option value="0">Sin boleto aún</option>':'<option value="0">Sin boleto</option>')+opts;
+    el.value=prev;
   });
 }
 
-// KIT
-function toggleKit(el){
-  const cb=el.querySelector('input[type=checkbox]');
+// ── KIT ────────────────────────────────────────────────────────────────────
+function tk(el){
+  const cb=el.querySelector('input');
   cb.checked=!cb.checked;
   el.classList.toggle('on',cb.checked);
   calcular();
 }
-function getKitCost(){
+function getKit(){
   let t=0;
-  document.querySelectorAll('.kit-chip.on').forEach(el=>{t+=+(el.dataset.cost||0);});
-  document.getElementById('kit-total').textContent='$'+t.toLocaleString('es-MX');
+  document.querySelectorAll('.kc.on').forEach(el=>{t+=+(el.dataset.cost||0);});
+  document.getElementById('kit-tot').textContent='$'+t.toLocaleString('es-MX');
   return t;
 }
 
-// STAFF
-function onStaffChange(tipo){
-  const val=+document.getElementById(`staff-zona-${tipo}`).value||0;
-  document.getElementById(`staff-costo-${tipo}`).value=val||'';
+// ── COORD / CREADORA ───────────────────────────────────────────────────────
+function onCoordTipoChange(){
+  const t=document.getElementById('coord-tipo').value;
+  document.getElementById('coord-ubers-g').style.display=t==='cdmx-local'?'flex':'none';
+  document.getElementById('coord-vuelo-g').style.display=t==='cdmx-vuelo'?'flex':'none';
+  calcular();
+}
+function onCoordZona(){
+  document.getElementById('coord-costo-boleto').value=+document.getElementById('coord-zona').value||'';
+  calcular();
+}
+function onCreaTipoChange(){
+  const t=document.getElementById('crea-tipo').value;
+  const show=t!=='ninguna';
+  document.getElementById('crea-zona-g').style.display=show?'flex':'none';
+  document.getElementById('crea-boleto-g').style.display=show?'flex':'none';
+  document.getElementById('crea-kit-g').style.display=show?'flex':'none';
+  document.getElementById('crea-hotel-g').style.display=t==='reynosa'?'flex':'none';
+  calcular();
+}
+function onCreaZona(){
+  document.getElementById('crea-costo-boleto').value=+document.getElementById('crea-zona').value||'';
   calcular();
 }
 
-// CALCULAR
+// ── CALCULAR ───────────────────────────────────────────────────────────────
 function calcular(){
   const ciudad=document.getElementById('ev-ciudad').value;
   const noches=+document.getElementById('ev-noches').value||1;
+  const dias=+document.getElementById('ev-dias').value||1;
   const hotelInput=+document.getElementById('ev-hotel').value||0;
-  const hotelBase=hotelInput||HOTEL_DEF[ciudad]||2500;
-  const kit=getKitCost();
-  const estac=+document.getElementById('estacionamiento').value||0;
+  const hotelBase=hotelInput||HDef[ciudad]||2500;
+  const kit=getKit();
+  const estac=+document.getElementById('estac').value||0;
+  const otros=+document.getElementById('otros').value||0;
+  const esMTY=ciudad==='MTY'||ciudad==='OTRO';
 
-  const totalPax=unidades.reduce((s,u)=>s+(TRANSPORTE[u.tipo]?.pax||0),0);
+  // PAX
+  const totalPax=unidades.reduce((s,u)=>s+(TRP[u.tipo]?.pax||0),0);
   const totalUnidades=unidades.length;
-  const totalCoordi=totalUnidades;
-  const costoTransTotal=unidades.reduce((s,u)=>s+(u.costo||0),0);
+  const totalCoordi=totalUnidades; // 1 coordi por unidad
+
+  // TRANSPORTE
+  const costoRenta=unidades.reduce((s,u)=>s+(u.costo||0),0);
+  const costoRuta=esMTY?unidades.reduce((s,u)=>s+(u.gastosRuta||GASTOS_RUTA)*dias,0):0;
+  const costoTransTotal=costoRenta+costoRuta;
   const costoTransPP=totalPax>0?costoTransTotal/totalPax:0;
 
-  // Hotel clientes (cuádruple / 4)
-  const hotelClientePP=(hotelBase*noches)/4;
+  // HOTEL CLIENTES (cuádruple base)
+  const hotelCliPP=(hotelBase*noches)/4;
 
-  // Hotel choferes: 1 chofer por unidad, comparten de 2 en 2
+  // HOTEL CHOFERES (1 por unidad, comparten de 2 en 2)
   const numChoferes=totalUnidades;
-  const habitChoferes=Math.ceil(numChoferes/2);
-  const costoHotelChoferes=habitChoferes*hotelBase*noches;
-  const costoHotelChoferPP=totalPax>0?costoHotelChoferes/totalPax:0;
+  const habChoferes=Math.ceil(numChoferes/2);
+  const costoHotelChofTotal=habChoferes*hotelBase*noches;
+  const costoHotelChoferPP=totalPax>0?costoHotelChofTotal/totalPax:0;
 
-  // Hotel staff (coordi + creadora)
-  const staffHotelMode=document.getElementById('staff-hotel').value;
-  let costoHotelStaff=0;
-  if(staffHotelMode==='cuadruple') costoHotelStaff=hotelBase*noches;
-  else if(staffHotelMode==='doble') costoHotelStaff=hotelBase*noches*1.3;
-  else if(staffHotelMode==='individual') costoHotelStaff=hotelBase*noches*2;
-  const costoHotelStaffPP=totalPax>0?costoHotelStaff/totalPax:0;
+  // COORDINADOR
+  const coordTipo=document.getElementById('coord-tipo').value;
+  const coordBoleto=+document.getElementById('coord-costo-boleto').value||0;
+  const coordUbers=+document.getElementById('coord-ubers').value||0;
+  const coordVuelo=+document.getElementById('coord-vuelo').value||0;
+  const coordHotelMode=document.getElementById('coord-hotel').value;
+  const costoHotelCoordExtra=coordHotelMode==='aparte'?(hotelBase*noches):0;
 
-  // Staff boletos
-  const costoCordi=+document.getElementById('staff-costo-coordi').value||0;
-  const costoCreadora=+document.getElementById('staff-costo-creadora').value||0;
-  const costoStaffBoletos=(costoCordi*totalCoordi)+costoCreadora;
-  const costoStaffPP=totalPax>0?(costoStaffBoletos+costoHotelChoferes+costoHotelStaff)/totalPax:0;
+  let costoCoordTotal=0;
+  if(coordTipo==='bus') costoCoordTotal=(coordBoleto+kit)*totalCoordi;
+  else if(coordTipo==='cdmx-local') costoCoordTotal=(coordBoleto+kit+coordUbers)*totalCoordi;
+  else if(coordTipo==='cdmx-vuelo') costoCoordTotal=(coordBoleto+kit+coordVuelo)*totalCoordi;
+  costoCoordTotal+=costoHotelCoordExtra;
+  const costoCoordPP=totalPax>0?costoCoordTotal/totalPax:0;
 
-  // Estacionamiento
+  // CREADORA
+  const creaTipo=document.getElementById('crea-tipo').value;
+  const creaBoleto=+document.getElementById('crea-costo-boleto').value||0;
+  const creaKit=document.getElementById('crea-kit').value==='si'?kit:0;
+  const creaHotel=document.getElementById('crea-hotel').value;
+  let costoCreaTotal=0;
+  if(creaTipo==='local') costoCreaTotal=creaBoleto+creaKit;
+  else if(creaTipo==='reynosa'){
+    costoCreaTotal=creaBoleto+creaKit;
+    if(creaHotel==='aparte') costoCreaTotal+=hotelBase*noches;
+  }
+  const costoCreaPP=totalPax>0?costoCreaTotal/totalPax:0;
+
+  // ESTACIONAMIENTO
   const costoEstacPP=totalPax>0?(estac*totalUnidades)/totalPax:0;
 
-  // TOTAL GASTOS FIJOS POR PERSONA (sin boleto)
-  const gastosFijos=costoTransPP+hotelClientePP+kit+costoStaffPP+costoEstacPP;
+  // TOTAL GASTOS FIJOS / PERSONA (sin boleto)
+  const gastosFijos=costoTransPP+hotelCliPP+kit+costoHotelChoferPP+costoCoordPP+costoCreaPP+costoEstacPP+otros;
 
-  // Info choferes
-  document.getElementById('info-choferes').innerHTML=
-    `🚌 ${numChoferes} chofer${numChoferes!==1?'es':''} → ${habitChoferes} hab · $${Math.round(costoHotelChoferes).toLocaleString('es-MX')} total hotel choferes → <strong style="color:var(--amarillo)">$${Math.round(costoHotelChoferPP).toLocaleString('es-MX')} por cliente</strong>`;
-
-  // Header resultado
-  document.getElementById('res-nombre').textContent=document.getElementById('ev-nombre').value||'Nuevo evento';
-  const fecha=document.getElementById('ev-fecha').value;
-  const venue=document.getElementById('ev-venue').value;
-  document.getElementById('res-meta').textContent=[
-    fecha?new Date(fecha+'T12:00').toLocaleDateString('es-MX',{day:'numeric',month:'long',year:'numeric'}):'',
-    venue,ciudad
-  ].filter(Boolean).join(' · ');
-
-  // Desglose de costos
-  const p=n=>'$'+Math.round(n).toLocaleString('es-MX');
-  const filas=[
-    costoTransPP>0      && ['Transporte',p(costoTransPP)],
-    hotelClientePP>0    && [`Hotel clientes (${noches}n cuádruple)`,p(hotelClientePP)],
-    kit>0               && ['Kit Conecta',p(kit)],
-    costoStaffPP>0      && ['Staff + hotel choferes',p(costoStaffPP)],
-    costoEstacPP>0      && ['Estacionamiento',p(costoEstacPP)],
-  ].filter(Boolean);
-  document.getElementById('res-costos').innerHTML=`
-    <div style="font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--texto-sec);margin-bottom:8px">
-      Gastos fijos / persona ${totalPax>0?`(${totalPax} pax total)`:''}
-    </div>
-    ${filas.map(([l,v])=>`<div class="crow"><span>${l}</span><span>${v}</span></div>`).join('')}
-    <div class="crow total"><span>Total fijos sin boleto</span><span>${p(gastosFijos)}</span></div>
+  // Info habitaciones
+  const habPP=hotelCliPP;
+  const extraDoble=(hotelBase*noches)/2-habPP; // cada uno paga su cuota base + la mitad de los 2 lugares vacíos
+  const extraTriple=(hotelBase*noches)/3-habPP;
+  const extraIndiv=(hotelBase*noches)-habPP;
+  document.getElementById('info-hab').innerHTML=
+    `Hotel ${noches}n · Cuádruple base: <strong style="color:var(--t)">$${Math.round(habPP).toLocaleString('es-MX')}/persona</strong>`;
+  document.getElementById('hab-body').innerHTML=`
+    <tr><td>Cuádruple (base)</td><td>$${Math.round(habPP).toLocaleString('es-MX')}</td><td style="color:var(--ts)">—</td></tr>
+    <tr><td>Triple</td><td>$${Math.round(habPP+250).toLocaleString('es-MX')}</td><td style="color:var(--am)">+$250</td></tr>
+    <tr><td>Doble</td><td>$${Math.round(habPP+extraDoble).toLocaleString('es-MX')}</td><td style="color:var(--am)">+$${Math.round(extraDoble).toLocaleString('es-MX')}</td></tr>
+    <tr><td>Individual</td><td>$${Math.round(habPP+extraIndiv).toLocaleString('es-MX')}</td><td style="color:var(--am)">+$${Math.round(extraIndiv).toLocaleString('es-MX')}</td></tr>
   `;
 
-  // Tabla de zonas
+  // Header
+  document.getElementById('r-nom').textContent=document.getElementById('ev-nom').value||'Nuevo evento';
+  const fecha=document.getElementById('ev-fecha').value;
+  const venue=document.getElementById('ev-venue').value;
+  document.getElementById('r-meta').textContent=[
+    fecha?new Date(fecha+'T12:00').toLocaleDateString('es-MX',{day:'numeric',month:'long',year:'numeric'}):'',
+    venue,ciudad,`${dias} día${dias>1?'s':''} · ${noches} noche${noches>1?'s':''}`
+  ].filter(Boolean).join(' · ');
+
+  // Desglose costos
+  const p=n=>'$'+Math.round(n).toLocaleString('es-MX');
+  const filas=[
+    costoTransPP>0        &&[esMTY?`Transporte (renta + ruta × ${dias}d)`:'Transporte (van CDMX)',p(costoTransPP)],
+    hotelCliPP>0          &&[`Hotel clientes (${noches}n cuádruple)`,p(hotelCliPP)],
+    kit>0                 &&['Kit Conecta',p(kit)],
+    costoHotelChoferPP>0  &&[`Hotel choferes (${numChoferes} chofer${numChoferes>1?'es':''}, ${habChoferes} hab)`,p(costoHotelChoferPP)],
+    costoCoordPP>0        &&[`Coordinador${totalCoordi>1?'es':''} (boleto + kit${coordTipo==='cdmx-local'?'+ ubers':coordTipo==='cdmx-vuelo'?'+ vuelo':''})`,p(costoCoordPP)],
+    costoCreaPP>0         &&[`Creadora (${creaTipo==='local'?'local':'desde Reynosa'})`,p(costoCreaPP)],
+    costoEstacPP>0        &&['Estacionamiento',p(costoEstacPP)],
+    otros>0               &&['Otros',p(otros)],
+  ].filter(Boolean);
+  document.getElementById('r-costos').innerHTML=`
+    <div style="font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--ts);margin-bottom:7px">
+      Gastos fijos / persona ${totalPax>0?`(${totalPax} pax)`:''}
+    </div>
+    ${filas.map(([l,v])=>`<div class="cr"><span>${l}</span><span>${v}</span></div>`).join('')}
+    <div class="cr tot"><span>Total sin boleto</span><span>${p(gastosFijos)}</span></div>
+  `;
+
+  // Tabla zonas
   const zv=zonas.filter(z=>z.nombre&&z.costo>0);
-  const tbody=document.getElementById('res-zonas-body');
-  const peDiv=document.getElementById('res-pe');
+  const tbody=document.getElementById('r-zonas');
+  const peDiv=document.getElementById('r-pe');
 
   if(!zv.length){
-    tbody.innerHTML='<tr><td colspan="5" style="color:var(--texto-sec);font-size:12px;padding:12px 0">Agrega zonas para ver precios</td></tr>';
-    peDiv.innerHTML='<div style="color:var(--texto-sec);font-size:12px">Agrega zonas con pedido para ver análisis</div>';
-    document.getElementById('btn-pub').disabled=true;
+    tbody.innerHTML='<tr><td colspan="5" style="color:var(--ts);font-size:11px;padding:10px 0">Agrega zonas para ver precios</td></tr>';
+    peDiv.innerHTML='<div style="color:var(--ts);font-size:11px">Agrega pedido de boletos para ver el análisis</div>';
+    document.getElementById('b-pub').disabled=true;
     return;
   }
 
   tbody.innerHTML=zv.map(z=>{
-    const costoTotal=z.costo+gastosFijos;
-    const pricePlus=Math.ceil((costoTotal+1000)/100)*100;
-    const priceRide=Math.ceil((z.costo+costoTransPP+800)/100)*100;
-    const priceStay=ciudad!=='CDMX'?Math.ceil((costoTotal-costoTransPP+1000)/100)*100:null;
-    const priceCheap=Math.ceil((z.costo+500)/100)*100;
-    const margenPct=costoTotal>0?Math.round((pricePlus-costoTotal)/pricePlus*100):0;
-    const color=margenPct>=15?'var(--verde)':margenPct>=8?'var(--amarillo)':'var(--rojo)';
+    const costoTot=z.costo+gastosFijos;
+    // PLUS: boleto + todo
+    const pPlus=Math.ceil((costoTot+1000)/100)*100;
+    // RIDE: sin boleto = gastosFijos + margen
+    const pRide=Math.ceil((gastosFijos+800)/100)*100;
+    // STAY: sin transporte + boleto + margen
+    const pStay=Math.ceil((costoTot-costoTransPP+1000)/100)*100;
+    // CHEAP: solo boleto + margen mínimo
+    const pCheap=Math.ceil((z.costo+500)/100)*100;
+    const mgPct=costoTot>0?Math.round((pPlus-costoTot)/pPlus*100):0;
+    const col=mgPct>=15?'var(--ve)':mgPct>=8?'var(--am)':'var(--ro)';
     return `<tr>
       <td>
         <div style="font-weight:700">${z.nombre}</div>
-        ${z.pedido>0?`<div style="font-size:10px;color:var(--texto-sec);margin-top:1px">Pedido: ${z.pedido} · Vendidos: ${z.vendidos||0} · Restan: ${z.pedido-(z.vendidos||0)}</div>`:''}
-        <div class="mbar"><div class="mfill" style="width:${Math.min(margenPct*2,100)}%;background:${color}"></div></div>
-        <div style="font-size:10px;color:${color};margin-top:2px">${margenPct}% margen PLUS</div>
+        ${z.pedido>0?`<div style="font-size:9px;color:var(--ts);margin-top:1px">Pedido: ${z.pedido} · Vendidos: ${z.vendidos||0} · Restan: ${z.pedido-(z.vendidos||0)}</div>`:''}
+        <div class="mb"><div class="mf" style="width:${Math.min(mgPct*2,100)}%;background:${col}"></div></div>
+        <div style="font-size:9px;color:${col};margin-top:1px">${mgPct}% margen PLUS</div>
       </td>
-      <td style="color:var(--texto)">${p(pricePlus)}</td>
-      <td style="color:var(--verde)">${p(priceRide)}</td>
-      <td>${priceStay?p(priceStay):'<span style="color:var(--texto-sec)">—</span>'}</td>
-      <td style="color:var(--amarillo)">${p(priceCheap)}</td>
+      <td style="color:var(--t)">${p(pPlus)}</td>
+      <td style="color:var(--ve)">${p(pRide)}</td>
+      <td style="color:var(--ts)">${p(pStay)}</td>
+      <td style="color:var(--am)">${p(pCheap)}</td>
     </tr>`;
   }).join('');
 
-  // Punto de equilibrio
-  const totalPedido=zonas.reduce((s,z)=>s+(z.pedido||0),0);
-  const totalVendidos=zonas.reduce((s,z)=>s+(z.vendidos||0),0);
-  if(totalPedido>0){
-    const ingresoLleno=zv.reduce((s,z)=>s+(Math.ceil((z.costo+gastosFijos+1000)/100)*100)*(z.pedido||0),0);
+  // PE
+  const totPed=zonas.reduce((s,z)=>s+(z.pedido||0),0);
+  const totVend=zonas.reduce((s,z)=>s+(z.vendidos||0),0);
+  if(totPed>0){
+    const ingLleno=zv.reduce((s,z)=>s+(Math.ceil((z.costo+gastosFijos+1000)/100)*100)*(z.pedido||0),0);
     const costoLleno=zv.reduce((s,z)=>s+(z.costo+gastosFijos)*(z.pedido||0),0);
-    const costosFijosEvento=costoTransTotal+costoStaffBoletos+costoHotelChoferes+costoHotelStaff+(estac*totalUnidades);
-    const precioPromPP=totalPedido>0?ingresoLleno/totalPedido:0;
-    const costoVarPP=totalPedido>0?(costoLleno-costosFijosEvento)/totalPedido:0;
-    const contrib=precioPromPP-costoVarPP;
-    const pe=contrib>0?Math.ceil(costosFijosEvento/contrib):0;
-    const pctOcup=totalPedido>0?Math.round(pe/totalPedido*100):0;
-    const pctVend=totalPedido>0?Math.round(totalVendidos/totalPedido*100):0;
-    const margenLleno=ingresoLleno-costoLleno;
-    const superoPE=totalVendidos>=pe;
+    const costoFijosEv=costoTransTotal+(coordBoleto+kit)*totalCoordi+(costoUbersTotal=totalCoordi*coordUbers)+(coordVuelo*totalCoordi)+costoHotelChofTotal+costoHotelCoordExtra+costoHotelStaff+(estac*totalUnidades);
+    const precProm=totPed>0?ingLleno/totPed:0;
+    const costoVarPP=totPed>0?(costoLleno)/totPed:0;
+    const contrib=precProm-costoVarPP;
+    const pe=contrib>0?Math.ceil(costoFijosEv/contrib):0;
+    const pctOcup=totPed>0?Math.round(pe/totPed*100):0;
+    const pctVend=totPed>0?Math.round(totVend/totPed*100):0;
+    const mgLleno=ingLleno-costoLleno;
+    const ok=totVend>=pe;
     peDiv.innerHTML=`
-      <div class="pe-row"><span style="color:var(--texto-sec)">Boletos pedidos a matriz</span><span class="pe-num">${totalPedido}</span></div>
-      <div class="pe-row"><span style="color:var(--texto-sec)">Vendidos hasta hoy</span><span class="pe-num" style="color:var(--verde)">${totalVendidos} <span style="font-size:11px">(${pctVend}%)</span></span></div>
-      <div class="pe-row"><span style="color:var(--texto-sec)">Punto de equilibrio</span><span class="pe-num" style="color:${superoPE?'var(--verde)':'var(--amarillo)'}">${pe} <span style="font-size:11px">(${pctOcup}%)</span></span></div>
-      <div class="pe-row"><span style="color:var(--texto-sec)">${superoPE?'✓ Superaste el PE':'Faltan '+(pe-totalVendidos)+' para el PE'}</span>
-        <span style="font-size:12px;font-weight:700;color:${superoPE?'var(--verde)':'var(--rojo)'}">${superoPE?'¡Rentable!':'Riesgo'}</span>
+      <div class="pe-r"><span style="color:var(--ts)">Boletos pedidos a matriz</span><span class="pe-n">${totPed}</span></div>
+      <div class="pe-r"><span style="color:var(--ts)">Vendidos hoy</span><span class="pe-n" style="color:var(--ve)">${totVend} <span style="font-size:10px">(${pctVend}%)</span></span></div>
+      <div class="pe-r"><span style="color:var(--ts)">Punto de equilibrio</span><span class="pe-n" style="color:${ok?'var(--ve)':'var(--am)'}">${pe} <span style="font-size:10px">(${pctOcup}%)</span></span></div>
+      <div class="pe-r"><span style="color:var(--ts)">${ok?'✓ Superaste el PE':'Faltan '+(pe-totVend)+' para el PE'}</span>
+        <span style="font-size:11px;font-weight:700;color:${ok?'var(--ve)':'var(--ro)'}">${ok?'¡Rentable!':'Riesgo'}</span>
       </div>
-      <div class="pe-row"><span style="color:var(--texto-sec)">Ganancia si llenas todo</span><span class="pe-num" style="color:var(--verde)">$${Math.round(margenLleno).toLocaleString('es-MX')}</span></div>
-      <div class="pe-row"><span style="color:var(--texto-sec)">Por cliente adicional</span><span style="font-size:14px;font-weight:700;color:var(--amarillo)">~$${Math.round(contrib).toLocaleString('es-MX')}</span></div>
+      <div class="pe-r"><span style="color:var(--ts)">Ganancia si llenas</span><span class="pe-n" style="color:var(--ve)">$${Math.round(mgLleno).toLocaleString('es-MX')}</span></div>
+      <div class="pe-r"><span style="color:var(--ts)">Por cliente adicional</span><span style="font-size:13px;font-weight:700;color:var(--am)">~$${Math.round(contrib).toLocaleString('es-MX')}</span></div>
     `;
   } else {
-    peDiv.innerHTML='<div style="color:var(--texto-sec);font-size:12px">Agrega el pedido de boletos por zona para ver el análisis completo</div>';
+    peDiv.innerHTML='<div style="color:var(--ts);font-size:11px">Agrega el pedido de boletos por zona para ver el análisis completo</div>';
   }
 
-  document.getElementById('btn-pub').disabled=!document.getElementById('ev-nombre').value;
+  document.getElementById('b-pub').disabled=!document.getElementById('ev-nom').value;
 }
 
-// GUARDAR / CARGAR
+// ── GUARDAR / CARGAR ───────────────────────────────────────────────────────
 function getData(){
   return {
-    nombre:document.getElementById('ev-nombre').value,
+    nombre:document.getElementById('ev-nom').value,
     fecha:document.getElementById('ev-fecha').value,
     ciudad:document.getElementById('ev-ciudad').value,
     venue:document.getElementById('ev-venue').value,
     noches:document.getElementById('ev-noches').value,
+    dias:document.getElementById('ev-dias').value,
     hotel:document.getElementById('ev-hotel').value,
     modo,unidades:[...unidades],zonas:[...zonas],
-    kitItems:[...document.querySelectorAll('.kit-chip')].map(el=>({cost:+(el.dataset.cost||0),on:el.classList.contains('on')})),
-    staffCoordi:document.getElementById('staff-costo-coordi').value,
-    staffCreadora:document.getElementById('staff-costo-creadora').value,
-    staffHotel:document.getElementById('staff-hotel').value,
-    estac:document.getElementById('estacionamiento').value,
+    kitItems:[...document.querySelectorAll('.kc')].map(el=>({cost:+(el.dataset.cost||0),on:el.classList.contains('on')})),
+    coordTipo:document.getElementById('coord-tipo').value,
+    coordBoleto:document.getElementById('coord-costo-boleto').value,
+    coordUbers:document.getElementById('coord-ubers').value,
+    coordVuelo:document.getElementById('coord-vuelo').value,
+    coordHotel:document.getElementById('coord-hotel').value,
+    creaTipo:document.getElementById('crea-tipo').value,
+    creaBoleto:document.getElementById('crea-costo-boleto').value,
+    creaKit:document.getElementById('crea-kit').value,
+    creaHotel:document.getElementById('crea-hotel').value,
+    estac:document.getElementById('estac').value,
+    otros:document.getElementById('otros').value,
     sepPlus:document.getElementById('sep-plus').value,
-    sepStay:document.getElementById('sep-stay').value,
     sepRide:document.getElementById('sep-ride').value,
+    sepStay:document.getElementById('sep-stay').value,
     sepCheap:document.getElementById('sep-cheap').value,
     savedAt:new Date().toISOString(),
   };
 }
 
-function guardarCotizacion(){
+function guardar(){
   const d=getData();
   if(!d.nombre){alert('Ponle nombre al evento antes de guardar');return;}
   localStorage.setItem('cot_'+d.nombre.replace(/\s+/g,'_').toLowerCase(),JSON.stringify(d));
-  toast('✓ Cotización guardada');
+  toast('✓ Guardado');
 }
 
 function showSaved(){
   const keys=Object.keys(localStorage).filter(k=>k.startsWith('cot_'));
-  document.getElementById('modal-content').innerHTML=!keys.length
-    ?'<div style="color:var(--texto-sec);font-size:13px">No hay cotizaciones guardadas.</div>'
+  document.getElementById('modal-c').innerHTML=!keys.length
+    ?'<div style="color:var(--ts)">No hay cotizaciones guardadas.</div>'
     :keys.map(k=>{
       const d=JSON.parse(localStorage.getItem(k));
-      return `<div class="saved-item" onclick="loadCotizacion('${k}')">
+      return `<div class="sv-item" onclick="loadCot('${k}')">
         <div>
           <div style="font-size:13px;font-weight:700">${d.nombre}</div>
-          <div style="font-size:11px;color:var(--texto-sec)">${d.fecha||'Sin fecha'} · ${d.ciudad} · <span class="mbadge ${d.modo==='real'?'mode-real':'mode-est'}">${d.modo||'estimado'}</span></div>
+          <div style="font-size:10px;color:var(--ts)">${d.fecha||'Sin fecha'} · ${d.ciudad} · ${d.dias||1}d ${d.noches||1}n · <span class="mbadge ${d.modo==='real'?'m-real':'m-est'}">${d.modo||'estimado'}</span></div>
         </div>
-        <button class="btn-x" style="font-size:11px;padding:4px 8px" onclick="event.stopPropagation();deleteCot('${k}')">🗑</button>
+        <button class="bx" style="font-size:10px;padding:3px 7px" onclick="event.stopPropagation();delCot('${k}')">🗑</button>
       </div>`;
     }).join('');
   document.getElementById('modal').style.display='block';
 }
 
 function hideModal(){document.getElementById('modal').style.display='none';}
+function delCot(k){if(!confirm('¿Eliminar?'))return;localStorage.removeItem(k);showSaved();}
 
-function deleteCot(key){
-  if(!confirm('¿Eliminar esta cotización?'))return;
-  localStorage.removeItem(key);
-  showSaved();
-}
-
-function loadCotizacion(key){
-  const d=JSON.parse(localStorage.getItem(key));
+function loadCot(k){
+  const d=JSON.parse(localStorage.getItem(k));
   if(!d)return;
-  document.getElementById('ev-nombre').value=d.nombre||'';
+  document.getElementById('ev-nom').value=d.nombre||'';
   document.getElementById('ev-fecha').value=d.fecha||'';
   document.getElementById('ev-ciudad').value=d.ciudad||'MTY';
   document.getElementById('ev-venue').value=d.venue||'';
   document.getElementById('ev-noches').value=d.noches||'1';
+  document.getElementById('ev-dias').value=d.dias||'1';
   document.getElementById('ev-hotel').value=d.hotel||'';
   unidades=d.unidades||[];uId=unidades.length?Math.max(...unidades.map(u=>u.id)):0;
   zonas=d.zonas||[];zId=zonas.length?Math.max(...zonas.map(z=>z.id)):0;
   renderUnidades();renderZonas();
-  if(d.kitItems){
-    document.querySelectorAll('.kit-chip').forEach((el,i)=>{
-      if(d.kitItems[i]){
-        el.querySelector('input').checked=d.kitItems[i].on;
-        el.classList.toggle('on',d.kitItems[i].on);
-      }
-    });
-  }
-  document.getElementById('staff-costo-coordi').value=d.staffCoordi||'';
-  document.getElementById('staff-costo-creadora').value=d.staffCreadora||'';
-  document.getElementById('staff-hotel').value=d.staffHotel||'compartida';
-  document.getElementById('estacionamiento').value=d.estac||'';
+  if(d.kitItems) document.querySelectorAll('.kc').forEach((el,i)=>{if(d.kitItems[i]){el.querySelector('input').checked=d.kitItems[i].on;el.classList.toggle('on',d.kitItems[i].on);}});
+  document.getElementById('coord-tipo').value=d.coordTipo||'bus';
+  onCoordTipoChange();
+  document.getElementById('coord-costo-boleto').value=d.coordBoleto||'';
+  document.getElementById('coord-ubers').value=d.coordUbers||'';
+  document.getElementById('coord-vuelo').value=d.coordVuelo||'';
+  document.getElementById('coord-hotel').value=d.coordHotel||'compartida';
+  document.getElementById('crea-tipo').value=d.creaTipo||'ninguna';
+  onCreaTipoChange();
+  document.getElementById('crea-costo-boleto').value=d.creaBoleto||'';
+  document.getElementById('crea-kit').value=d.creaKit||'si';
+  document.getElementById('crea-hotel').value=d.creaHotel||'compartida';
+  document.getElementById('estac').value=d.estac||'';
+  document.getElementById('otros').value=d.otros||'';
   document.getElementById('sep-plus').value=d.sepPlus||'800';
+  document.getElementById('sep-ride').value=d.sepRide||'800';
   document.getElementById('sep-stay').value=d.sepStay||'800';
-  document.getElementById('sep-ride').value=d.sepRide||'1000';
   document.getElementById('sep-cheap').value=d.sepCheap||'1000';
   setMode(d.modo||'estimado');
   hideModal();calcular();
 }
 
-function nuevaCotizacion(){
-  if(!confirm('¿Nueva cotización? Guarda la actual primero si la necesitas.'))return;
-  document.getElementById('ev-nombre').value='';
-  document.getElementById('ev-fecha').value='';
-  document.getElementById('ev-venue').value='';
-  document.getElementById('ev-hotel').value='';
+function nuevaCot(){
+  if(!confirm('¿Nueva cotización? Guarda la actual si la necesitas.'))return;
+  ['ev-nom','ev-fecha','ev-venue','ev-hotel','coord-costo-boleto','coord-ubers','coord-vuelo','crea-costo-boleto','estac','otros'].forEach(id=>{document.getElementById(id).value='';});
   unidades=[];zonas=[];uId=0;zId=0;
-  agregarUnidad();agregarZona();setMode('estimado');calcular();
+  renderUnidades();renderZonas();
+  addUnidad();addZona();
+  setMode('estimado');calcular();
 }
 
-function exportarResumen(){
+function exportar(){
   const d=getData();
-  const txt=`COTIZACIÓN: ${d.nombre}\nFecha: ${d.fecha} | ${d.ciudad} | ${d.venue}\nModo: ${d.modo}\n\nZonas:\n`+
-    d.zonas.filter(z=>z.nombre&&z.costo>0).map(z=>`  ${z.nombre}: $${z.costo.toLocaleString('es-MX')} | Pedido: ${z.pedido||0} | Vendidos: ${z.vendidos||0}`).join('\n')+
-    '\n\nTransporte:\n'+d.unidades.map(u=>`  ${TRANSPORTE[u.tipo]?.label}: $${u.costo.toLocaleString('es-MX')}`).join('\n');
-  navigator.clipboard.writeText(txt).then(()=>toast('✓ Resumen copiado'));
+  const txt=`COTIZACIÓN: ${d.nombre}\nFecha: ${d.fecha} | ${d.ciudad} | ${d.venue}\n${d.dias}d · ${d.noches}n hotel | Modo: ${d.modo}\n\nZonas:\n`+
+    d.zonas.filter(z=>z.nombre&&z.costo>0).map(z=>`  ${z.nombre}: $${(+z.costo).toLocaleString('es-MX')} | Pedido: ${z.pedido||0} | Vendidos: ${z.vendidos||0}`).join('\n')+
+    '\n\nTransporte:\n'+d.unidades.map(u=>`  ${TRP[u.tipo]?.label}: renta $${(+u.costo).toLocaleString('es-MX')} + ruta $${(+(u.gastosRuta||3500)).toLocaleString('es-MX')}`).join('\n');
+  navigator.clipboard.writeText(txt).then(()=>toast('✓ Copiado'));
 }
 
 function publicar(){
@@ -612,7 +807,7 @@ function publicar(){
 
 function toast(msg){
   const t=document.createElement('div');
-  t.style.cssText='position:fixed;bottom:24px;right:24px;background:var(--negro-card);border:1px solid var(--verde);color:var(--verde);padding:10px 16px;border-radius:6px;font-size:13px;font-weight:700;z-index:999';
+  t.style.cssText='position:fixed;bottom:20px;right:20px;background:var(--nc);border:1px solid var(--ve);color:var(--ve);padding:9px 14px;border-radius:6px;font-size:12px;font-weight:700;z-index:999';
   t.textContent=msg;document.body.appendChild(t);setTimeout(()=>t.remove(),2500);
 }
 </script>

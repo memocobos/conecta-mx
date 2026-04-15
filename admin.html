@@ -290,7 +290,6 @@ async function initApp() {
   ]);
   eventosCache = eventos;
   reservCache = reservaciones;
-  if(currentView==="gastos") initGastos();
   clientes.forEach(c => clientesCache[c.id] = c.fields);
   populateEventoSelect();
   if(currentRole==='admin'||currentRole==='auxiliar') loadResumen();

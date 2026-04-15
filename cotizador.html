@@ -866,7 +866,9 @@ function calcular(){
     // PLUS: boleto + todo
     const pPlus=Math.ceil((costoTot+1000)/100)*100;
     // RIDE: sin boleto = gastosFijos + margen
-    const pRide=Math.ceil((gastosFijos+800)/100)*100;
+    const pRide = ciudad==='CDMX'
+      ? (+document.getElementById('ride-precio-cdmx').value||2900)
+      : (+document.getElementById('ride-precio-mty').value||2700);
     // STAY: sin transporte + boleto + margen
     const pStay=Math.ceil((costoTot-costoTransPP+1000)/100)*100;
     // CHEAP: solo boleto + margen mínimo

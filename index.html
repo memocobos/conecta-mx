@@ -938,6 +938,7 @@ function validarPromo(code){
   var hoy=new Date().toISOString().slice(0,10);
   if(hoy>p.expires)return {ok:false,msg:'Código expirado'};
   if(p.usos>=p.maxUsos)return {ok:false,msg:'Código agotado'};
+  if(cur&&!cur.promo)return {ok:false,msg:'Este código no aplica para este evento'};
   return {ok:true,pct:p.pct,desc:p.desc,code:c};
 }
 var PC_EVENTS=["Corona Capital", "Coca Cola Flow Fest", "Festival Arre", "Festival Comuna", "Justin Bieber", "Bad Bunny", "Sabrina Carpenter", "U2", "Festival Trópico", "Bahidora 2027", "Karol G", "Coldplay", "The Rolling Stones", "Tool", "Slipknot", "Luis Miguel", "Metallica", "Feid / Ferxxo", "Evanescence", "Marilyn Manson"];

@@ -1020,11 +1020,92 @@ function exportar(){
   navigator.clipboard.writeText(txt).then(()=>toast('✓ Copiado'));
 }
 
-function publicar(){
-  document.getElementById('pub-msg').textContent='Próximamente: publicación directa a conectareynosa.mx';
+async function publicar(){
+  const nombre = document.getElementById('ev-nom').value;
+  if(!nombre){alert('Ponle nombre al evento primero');return;}
+
+  const zv = zonas.filter(z=>z.nombre&&z.costo>0);
+  if(!zv.length){alert('Agrega al menos una zona con precio');return;}
+
+  const msg = document.getElementById('pub-msg');
+  const btn = document.getElementById('b-pub');
+  btn.disabled = true;
+  msg.style.color = 'var(--ts)';
+  msg.textContent = 'Preparando precios...';
+
+  // Calculate prices
+  const ciudad = document.getElementById('ev-ciudad').value;
+  const noches = +document.getElementById('ev-noches').value||1;
+  const hotelInput = +document.getElementById('ev-hotel').value||0;
+  const hotelBase = hotelInput||(ciudad==='CDMX'?2900:2500);
+  const kit = getKit();
+  const totalPax = unidades.reduce((s,u)=>s+(TRP[u.tipo]?.pax||0),0);
+  const costoTrans = unidades.reduce((s,u)=>s+(u.costo||0)+(ciudad!=='CDMX'?(u.gastosRuta||3500):0),0);
+  const transPP = totalPax>0?costoTrans/totalPax:0;
+  const hotelPP = (hotelBase*noches)/4;
+  const gf = transPP + hotelPP + kit;
+
+  const zonasPayload = zv.map(z=>({
+    n: z.nombre,
+    p: Math.ceil((z.costo+gf+1000)/100)*100,
+    ag: z.pedido>0&&z.vendidos>=z.pedido?1:0,
+  }));
+  const cheapPayload = zv.map(z=>({
+    n: z.nombre,
+    p: Math.ceil((z.costo+500)/100)*100,
+  }));
+
+  // Event id from nombre
+  const evId = nombre.toLowerCase()
+    .normalize('NFD').replace(/[̀-ͯ]/g,'')
+    .replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
+
+  // Show preview
+  msg.style.color='var(--am)';
+  msg.textContent=`Listo para publicar "${nombre}". Precios: ${zonasPayload.map(z=>z.n+' $'+z.p.toLocaleString('es-MX')).join(' · ')}`;
+
+  window._pubPayload = { eventoId: evId, zonas: zonasPayload, cheapZonas: cheapPayload, status: 'proceso' };
+
+  const existing = document.getElementById('confirm-pub-btn');
+  if(existing) existing.remove();
+  const cb = document.createElement('button');
+  cb.id = 'confirm-pub-btn';
+  cb.className = 'btn by';
+  cb.style.cssText = 'width:100%;margin-top:8px;font-size:12px';
+  cb.textContent = '✓ Confirmar y publicar en conectareynosa.mx';
+  cb.onclick = confirmarPublicacion;
+  document.getElementById('pub-msg').after(cb);
+  btn.disabled = false;
 }
 
-function toast(msg){
+async function confirmarPublicacion(){
+  const msg = document.getElementById('pub-msg');
+  const cb = document.getElementById('confirm-pub-btn');
+  if(cb) cb.remove();
+  msg.style.color='var(--ts)';
+  msg.textContent='Publicando en la web...';
+
+  try {
+    const res = await fetch('/.netlify/functions/github-publish', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(window._pubPayload)
+    });
+    const data = await res.json();
+    if(data.ok){
+      msg.style.color='var(--ve)';
+      msg.textContent=`✓ Publicado en conectareynosa.mx — commit ${data.commit}`;
+    } else {
+      msg.style.color='var(--ro)';
+      msg.textContent='Error: '+data.error;
+    }
+  } catch(e){
+    msg.style.color='var(--ro)';
+    msg.textContent='Error de conexión: '+e.message;
+  }
+}
+
+function toast(msg){function toast(msg){
   const t=document.createElement('div');
   t.style.cssText='position:fixed;bottom:20px;right:20px;background:var(--nc);border:1px solid var(--ve);color:var(--ve);padding:9px 14px;border-radius:6px;font-size:12px;font-weight:700;z-index:999';
   t.textContent=msg;document.body.appendChild(t);setTimeout(()=>t.remove(),2500);

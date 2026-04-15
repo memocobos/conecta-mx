@@ -583,7 +583,7 @@ async function registrarGasto() {
   if(eventoId) fields['Evento'] = [eventoId];
 
   const res = await atPost('Gastos', fields);
-  if(res.id) {
+  if(res.id || res.records?.[0]?.id) {
     msg.style.color='var(--verde)';
     msg.textContent='✓ Gasto registrado';
     document.getElementById('g-concepto').value='';

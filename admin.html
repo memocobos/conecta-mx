@@ -459,7 +459,7 @@ async function registrarPago(){
   msg.style.display='block';msg.style.color='var(--texto-sec)';msg.textContent='Registrando...';
   const res=await atPost('Pagos',{
     Monto:monto, Método:metodo,
-    'Registrado por':currentRole==='admin'?'Memo':'Auxiliar',
+    
     Referencia:ref||`${cliente} — ${eventosCache.find(e=>e.id===eventoId)?.fields.Nombre||''}`,
   });
   if(res.records){

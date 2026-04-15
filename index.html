@@ -861,8 +861,8 @@ function renderCatalog(){
           '<span class="ev-tag '+tagCls+'">'+tagTxt+'</span>'+
           (isPast||isAg?'':priceH)+
         '</div>'+
-        (ev.promo&&!isPast&&!isAg?'<div class="ev-promo-badge">🏷️ -5% con CONECTAREY</div>':'')+
-        (ev.flashPromo&&!isPast&&!isAg&&Date.now()<ev.flashPromo.expiresTs?'<div class="ev-flash-badge" data-flash-expires="'+ev.flashPromo.expiresTs+'">🔥 -'+ev.flashPromo.pct+'% solo hoy · '+ev.flashPromo.code+' · <span class="flash-timer"></span></div>':'')+
+        (ev.promo&&!isPast&&!isAg?'<div class="ev-promo-badge">🏷️ CONECTAREY</div>':'')+
+        (ev.flashPromo&&!isPast&&!isAg&&Date.now()<ev.flashPromo.expiresTs?'<div class="ev-flash-badge" data-flash-expires="'+ev.flashPromo.expiresTs+'">🔥 '+ev.flashPromo.code+' ·<span class="flash-timer"></span></div>':'')+
         (ev.lineup&&LINEUPS[ev.lineup]?'<button class="ev-lineup-btn" data-lineup="'+ev.lineup+'" onclick="event.stopPropagation();abrirLineup(\''+ev.lineup+'\',\''+ev.a.replace(/'/g,"\\'")+'\')">🎵 Ver Line Up</button>':'')+
       '</div>';
     if(!isPast&&!isAg){

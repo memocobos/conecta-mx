@@ -691,6 +691,11 @@ function renderZonas(){
   updStaffSelects();
 }
 
+function updZonaPrecio(id, field, val){
+  const z = zonas.find(z=>z.id===id);
+  if(z){ z[field]=val; calcular(); }
+}
+
 function updStaffSelects(){
   const opts=zonas.filter(z=>z.nombre&&z.costo>0).map(z=>`<option value="${z.costo}">${z.nombre} ($${z.costo.toLocaleString('es-MX')})</option>`).join('');
   ['coord-zona','crea-zona'].forEach((id,i)=>{
@@ -861,18 +866,15 @@ function calcular(){
     return;
   }
 
-  tbody.innerHTML=zv.map(z=>{
+   tbody.innerHTML=zv.map(z=>{
     const costoTot=z.costo+gastosFijos;
-    // PLUS: boleto + todo
-    const pPlus=Math.ceil((costoTot+1000)/100)*100;
-    // RIDE: sin boleto = gastosFijos + margen
-    const pRide = ciudad==='CDMX'
-      ? (+document.getElementById('ride-precio-cdmx').value||2900)
-      : (+document.getElementById('ride-precio-mty').value||2700);
-    // STAY: sin transporte + boleto + margen
-    const pStay=Math.ceil((costoTot-costoTransPP+1000)/100)*100;
-    // CHEAP: solo boleto + margen mínimo
-    const pCheap=Math.ceil((z.costo+500)/100)*100;
+    const pPlusCalc=Math.ceil((costoTot+1000)/100)*100;
+    const pStayCalc=Math.ceil((costoTot-costoTransPP+1000)/100)*100;
+    const pCheapCalc=Math.ceil((z.costo+500)/100)*100;
+    const pPlus=z.precioPlus||pPlusCalc;
+    const pStay=z.precioStay||pStayCalc;
+    const pCheap=z.precioCheap||pCheapCalc;
+    const pRide=ciudad==='CDMX'?(+document.getElementById('ride-precio-cdmx').value||2900):(+document.getElementById('ride-precio-mty').value||2700);
     const mgPct=costoTot>0?Math.round((pPlus-costoTot)/pPlus*100):0;
     const col=mgPct>=15?'var(--ve)':mgPct>=8?'var(--am)':'var(--ro)';
     return `<tr>
@@ -880,12 +882,12 @@ function calcular(){
         <div style="font-weight:700">${z.nombre}</div>
         ${z.pedido>0?`<div style="font-size:9px;color:var(--ts);margin-top:1px">Pedido: ${z.pedido} · Vendidos: ${z.vendidos||0} · Restan: ${z.pedido-(z.vendidos||0)}</div>`:''}
         <div class="mb"><div class="mf" style="width:${Math.min(mgPct*2,100)}%;background:${col}"></div></div>
-        <div style="font-size:9px;color:${col};margin-top:1px">${mgPct}% margen PLUS</div>
+        <div style="font-size:9px;color:${col};margin-top:1px">${mgPct}% margen · costo $${Math.round(costoTot).toLocaleString('es-MX')}</div>
       </td>
-      <td style="color:var(--t)">${p(pPlus)}</td>
-      <td style="color:var(--ve)">${p(pRide)}</td>
-      <td style="color:var(--ts)">${p(pStay)}</td>
-      <td style="color:var(--am)">${p(pCheap)}</td>
+      <td><input type="number" value="${pPlus}" style="width:82px;font-size:12px;font-weight:700;color:var(--t);background:var(--ns);border:1px solid ${col};border-radius:4px;padding:3px 6px;text-align:right" onchange="updZonaPrecio(${z.id},'precioPlus',+this.value)"></td>
+      <td style="color:var(--ve);font-size:12px">${p(pRide)}</td>
+      <td><input type="number" value="${pStay}" style="width:82px;font-size:12px;color:var(--ts);background:var(--ns);border:1px solid var(--b);border-radius:4px;padding:3px 6px;text-align:right" onchange="updZonaPrecio(${z.id},'precioStay',+this.value)"></td>
+      <td><input type="number" value="${pCheap}" style="width:82px;font-size:12px;color:var(--am);background:var(--ns);border:1px solid var(--b);border-radius:4px;padding:3px 6px;text-align:right" onchange="updZonaPrecio(${z.id},'precioCheap',+this.value)"></td>
     </tr>`;
   }).join('');
 

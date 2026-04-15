@@ -905,14 +905,12 @@ function getPaquetes(ev) {
 
   return [
     { id:'plus', name:'Plus', badge:'PLUS',
-      desc: cdmx ? 'Boleto + Traslados CDMX + Hospedaje + Kit Conecta'
-                 : 'Boleto + Transporte Reynosa-Mty + Hospedaje + Kit Conecta',
+      desc: 'Boleto + '+txtTransporte(cur)+' + Hospedaje + Kit Conecta',
       basePrice: 0, includesBoleto: true, includesHotel: true,
       priceLabel: plusMin ? 'Desde ' + fmt(plusMin) : 'Cotizar' },
 
     { id:'ride', name:'Ride', badge:'RIDE',
-      desc: cdmx ? 'Traslados CDMX + Hospedaje + Kit Conecta · sin boleto ni vuelo'
-                 : 'Transporte Reynosa-Mty + Hospedaje + Kit Conecta · sin boleto',
+      desc: txtTransporte(cur)+' + Hospedaje + Kit Conecta · sin boleto',
       basePrice: cdmx ? 2900 : 2700,
       includesBoleto: false, includesHotel: true,
       priceLabel: fmt(cdmx ? 2900 : 2700) + ' + boleto' },
@@ -1042,6 +1040,17 @@ filterEvents();
 })();
 
 function isCDMX(ev){ return ev.v && (ev.v.toUpperCase().includes('CDMX') || ev.v.toUpperCase().includes('CIUDAD DE MEXICO')); }
+function getCiudad(ev){
+  if(!ev||!ev.v)return 'Destino';
+  var v=ev.v;
+  if(v.toUpperCase().indexOf('CDMX')>=0||v.toUpperCase().indexOf('CIUDAD DE MEXICO')>=0)return 'CDMX';
+  if(v.toUpperCase().indexOf('MTY')>=0||v.toUpperCase().indexOf('MONTERREY')>=0)return 'Monterrey';
+  var parts=v.split(',');
+  if(parts.length>1)return parts[parts.length-1].trim();
+  var words=v.trim().split(/\s+/);
+  return words[words.length-1];
+}
+function txtTransporte(ev){return 'Transporte Reynosa-'+getCiudad(ev);}
 function hotelList(ev){if(ev&&ev.multifecha&&cur&&cur._fechaIdx>=0){var mf=ev.multifecha[cur._fechaIdx];if(mf&&mf.hotel)return mf.hotel;}return isCDMX(ev)?HOTEL_CDM:HOTEL_MTY;}
 
 function showDetail(id){
@@ -1197,13 +1206,13 @@ function updatePkgCards(){
 
   // PLUS includes: zone + hotel
   var plusMin=(minZ>0?minZ:0)+mh;
-  $$('pi-plus').textContent=(cdmx?'Traslados CDMX':'Transporte Reynosa-Mty')+' · Hospedaje · Boleto · Kit';
+  $$('pi-plus').textContent=txtTransporte(cur)+' · Hospedaje · Boleto · Kit';
   $$('pp-plus').textContent=plusMin>0?fmt(plusMin):'Cotizar';
 
   // RIDE: fixed cost (no boleto)
   var rideBase=cur.ride||(cdmx?2900:2700);
   var rideCost=rideBase+(mh>0?mh:0);
-  $$('pi-ride').textContent=(cdmx?'Traslados CDMX':'Transporte Reynosa-Mty')+' · Hospedaje · Kit';
+  $$('pi-ride').textContent=txtTransporte(cur)+' · Hospedaje · Kit';
   $$('pp-ride').textContent=fmt(rideCost);
 
   // STAY: disable for CDMX events
@@ -1285,8 +1294,8 @@ function selPaquete(btn,pkg){
     else if(pkg==='cheap') incItems=incItems.filter(function(i){return i.toLowerCase().indexOf('transporte')<0&&i.toLowerCase().indexOf('traslado')<0&&i.toLowerCase().indexOf('hospedaje')<0&&i.toLowerCase().indexOf('hotel')<0;});
     incTxt=incItems.join(' · ');
   } else {
-    if(pkg==='plus')incTxt=isCDMX(cur)?'Traslados Hotel-Evento CDMX · Hospedaje · Boleto zona elegida · Kit Conecta':'Transporte Reynosa-Mty · Hospedaje · Boleto zona elegida · Kit Conecta';
-    else if(pkg==='ride')incTxt=isCDMX(cur)?'Traslados Hotel-Evento CDMX · Hospedaje · Kit Conecta (sin boleto)':'Transporte Reynosa-Mty · Hospedaje · Kit Conecta (sin boleto)';
+    if(pkg==='plus')incTxt=txtTransporte(cur)+' · Hospedaje · Boleto zona elegida · Kit Conecta';
+    else if(pkg==='ride')incTxt=txtTransporte(cur)+' · Hospedaje · Kit Conecta (sin boleto)';
     else if(pkg==='stay')incTxt='Hospedaje · Boleto zona elegida · Kit Conecta';
     else incTxt='Boleto zona elegida · Kit Conecta';
   }

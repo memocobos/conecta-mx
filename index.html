@@ -140,6 +140,7 @@ body{font-family:'Montserrat',sans-serif;background:#000;color:#fff;min-height:1
 .f-btn:hover{border-color:rgba(232,255,76,.4)}
 .f-btn.active{border-color:#e8ff4c;background:rgba(232,255,76,.09);color:#e8ff4c}
 .f-btn.f-ag{opacity:.3;cursor:not-allowed;font-size:10px}
+.f-btn.f-prox{background:rgba(255,215,0,.08);border-color:rgba(255,215,0,.3);color:#FFD700;cursor:not-allowed;font-size:10px}
 .zona-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px}
 .z-btn{background:rgba(255,255,255,.04);border:2px solid rgba(255,255,255,.09);padding:12px;cursor:pointer;text-align:left;width:100%;font-family:'Montserrat',sans-serif}
 .z-btn:hover{border-color:rgba(232,255,76,.4)}
@@ -671,7 +672,7 @@ var LINEUPS=window.LINEUPS||{};
 var EV=[  {id:'acdc',c:'rojo',img:'AC/DC',a:'AC/DC - Power Up Tour',f:'11 abr 2026',ds:'2026-04-11',v:'Estadio GNP Seguros, CDMX',sep:1000,st:'agotado',inc:['Boleto Cancha A','Traslados CDMX','Hospedaje','Kit Conecta'],banco:BANCO_HEY,zonas:[{n:'Cancha A',p:7500}],hotel:HOTEL_CDM,pagos:[{l:'Separo',d:'Hoy',s:1},{l:'Liquidacion',d:'24 mar-1 abr',s:0}]},
   {id:'machaca',promo:true,mapa:'machaca',lineup:'machaca',staticImg:'machaca',c:'rojo',a:'Machaca Icons Edition',f:'18 abr 2026',ds:'2026-04-18',v:'Guadalupe, NL',sep:500,ride:2700,st:'',inc:['Boleto zona elegida','Transporte Reynosa-Mty','Hospedaje compartido','Comida gratis','Kit Conecta'],banco:BANCO_DEFAULT,zonas:[{n:'VIP',p:6200,vip:1},{n:'General',p:3900},{n:'Club',p:0,ag:1}],hotel:HOTEL_STD,pagos:[{l:'Separo',d:'Hoy',s:1},{l:'Liquidacion',d:'9-16 abr',s:0}],cheapZonas:[{n:'General',p:2350},{n:'VIP',p:4600,vip:1}]},
   {id:'weeknd',cdmx:true,mapa:'weeknd',ride:2900,c:'azul',img:'The Weeknd',a:'The Weeknd - After Hours Til Dawn',f:'20, 21 y 22 abr 2026',ds:'2026-04-20',v:'Estadio GNP Seguros, CDMX',sep:800,st:'ultimos',inc:['Traslados Hotel-Evento CDMX','Hospedaje compartido','Boleto zona elegida','Kit Conecta','Special Guest: Anitta'],nota:'NO incluye transporte a CDMX. Vuelos y autobuses disponibles como extra.',banco:BANCO_DEFAULT,multifecha:[{lbl:'20 Abril',zonas:[{n:'General',p:7000},{n:'Zona GNP',p:0,ag:1},{n:'Verde B',p:0,ag:1},{n:'Naranja B',p:0,ag:1},{n:'Verde C',p:0,ag:1},{n:'Naranja C',p:0,ag:1}],cheapZonas:[{n:'General',p:3500},{n:'Zona GNP',p:0,ag:1},{n:'Verde B',p:0,ag:1},{n:'Verde C',p:0,ag:1},{n:'Naranja B',p:0,ag:1},{n:'Naranja C',p:0,ag:1}]},{lbl:'21 Abril',zonas:[{n:'General',p:0,ag:1},{n:'Zona GNP',p:7700,vip:1},{n:'Verde B',p:0,ag:1},{n:'Naranja B',p:0,ag:1},{n:'Verde C',p:0,ag:1},{n:'Naranja C',p:0,ag:1}],cheapZonas:[{n:'Zona GNP',p:5000},{n:'Naranja C',p:2800},{n:'Beyond VIP',p:0,ag:1},{n:'Beyond',p:0,ag:1},{n:'Verde B',p:0,ag:1},{n:'Verde C',p:0,ag:1},{n:'Naranja B',p:0,ag:1}]},{lbl:'22 Abril',zonas:[{n:'General',p:0,ag:1},{n:'Zona GNP',p:0,ag:1},{n:'Verde B',p:0,ag:1},{n:'Naranja B',p:0,ag:1},{n:'Verde C',p:0,ag:1},{n:'Naranja C',p:0,ag:1}],cheapZonas:[{n:'Zona GNP',p:0,ag:1},{n:'Verde B',p:0,ag:1},{n:'Verde C',p:0,ag:1},{n:'Naranja B',p:0,ag:1},{n:'Naranja C',p:0,ag:1}]}],zonas:[{n:'General',p:7000},{n:'Zona GNP',p:0,ag:1},{n:'Verde B',p:0,ag:1},{n:'Verde C',p:0,ag:1},{n:'Naranja B',p:0,ag:1},{n:'Naranja C',p:0,ag:1}],cheapZonas:[{n:'General',p:3500},{n:'Zona GNP',p:0,ag:1},{n:'Verde B',p:0,ag:1},{n:'Verde C',p:0,ag:1},{n:'Naranja B',p:0,ag:1},{n:'Naranja C',p:0,ag:1}],hotel:[{n:'Compartida',e:0},{n:'Triple',e:200},{n:'Doble',e:600},{n:'Individual',e:1800}],pagos:[{l:'Separo',d:'Hoy',s:1},{l:'Pago 1',d:'24 mar-1 abr',s:0},{l:'Pago 2',d:'9-16 abr',s:0}]},
-  {id:'soda',promo:true,mapa:'soda',c:'verde',img:'Soda Stereo',a:'Soda Estereo - Tour Echoes',f:'21 abr 2026',ds:'2026-04-21',v:'Auditorio Citibanamex, Mty',sep:800,ride:2700,st:'ultimos',inc:['Boleto zona elegida','Transporte Reynosa-Mty','Hospedaje compartido','Kit Conecta'],banco:BANCO_DEFAULT,zonas:[{n:'Beyond VIP',p:0,vip:1,ag:1},{n:'Beyond',p:0,vip:1,ag:1},{n:'Platino',p:5200,vip:1},{n:'Platino B',p:0,ag:1},{n:'Perfiles',p:5100},{n:'Perfiles B',p:0,ag:1},{n:'Perfiles C',p:0,ag:1},{n:'Perfiles D',p:0,ag:1}],cheapZonas:[{n:'Platino',p:4000,vip:1},{n:'Perfiles',p:3700},{n:'Beyond VIP',p:0,ag:1},{n:'Beyond',p:0,ag:1},{n:'Platino B',p:0,ag:1},{n:'Perfiles B',p:0,ag:1},{n:'Perfiles C',p:0,ag:1},{n:'Perfiles D',p:0,ag:1}],hotel:[{n:'Compartida',e:0},{n:'Doble',e:650},{n:'Triple',e:250},{n:'Individual',e:1960}],pagos:[{l:'Separo',d:'Hoy',s:1},{l:'Liquidacion',d:'9-16 abr',s:0}]},
+  {id:'soda',promo:true,mapa:'soda',c:'verde',img:'Soda Stereo',a:'Soda Stereo - Tour Echoes',f:'21 abr 2026',ds:'2026-04-21',v:'Auditorio Citibanamex, Mty',sep:800,ride:2700,st:'ultimos',inc:['Boleto zona elegida','Transporte Reynosa-Mty','Hospedaje compartido','Kit Conecta'],banco:BANCO_DEFAULT,zonas:[{n:'Beyond VIP',p:0,vip:1,ag:1},{n:'Beyond',p:0,vip:1,ag:1},{n:'Platino',p:5200,vip:1},{n:'Platino B',p:0,ag:1},{n:'Perfiles',p:5100},{n:'Perfiles B',p:0,ag:1},{n:'Perfiles C',p:0,ag:1},{n:'Perfiles D',p:0,ag:1}],cheapZonas:[{n:'Platino',p:4000,vip:1},{n:'Perfiles',p:3700},{n:'Beyond VIP',p:0,ag:1},{n:'Beyond',p:0,ag:1},{n:'Platino B',p:0,ag:1},{n:'Perfiles B',p:0,ag:1},{n:'Perfiles C',p:0,ag:1},{n:'Perfiles D',p:0,ag:1}],hotel:[{n:'Compartida',e:0},{n:'Doble',e:650},{n:'Triple',e:250},{n:'Individual',e:1960}],pagos:[{l:'Separo',d:'Hoy',s:1},{l:'Liquidacion',d:'9-16 abr',s:0}]},
   {id:'lorde',promo:true,mapa:'lorde',c:'rosa',img:'Lorde',a:'Lorde - Ultrasound Tour',f:'28 abr 2026',ds:'2026-04-28',v:'Auditorio Citibanamex, Mty',sep:500,ride:2700,st:'',inc:['Boleto zona Beyond','Transporte Reynosa-Mty','Hospedaje compartido','Kit Conecta'],banco:BANCO_DEFAULT,zonas:[{n:'Beyond',p:5000,vip:1},{n:'Platino',p:0,ag:1},{n:'Platino B',p:0,ag:1},{n:'Perfiles',p:0,ag:1},{n:'Perfiles B',p:0,ag:1},{n:'Perfiles C',p:0,ag:1}],cheapZonas:[{n:'Beyond',p:2500,vip:1},{n:'Platino',p:0,ag:1},{n:'Platino B',p:0,ag:1},{n:'Perfiles',p:0,ag:1},{n:'Perfiles B',p:0,ag:1},{n:'Perfiles C',p:0,ag:1}],hotel:[{n:'Compartida',e:0},{n:'Doble',e:650},{n:'Triple',e:250},{n:'Individual',e:1960}],pagos:[{l:'Separo',d:'Hoy',s:1},{l:'Pago 3',d:'24 mar-1 abr',s:0},{l:'Pago 4',d:'9-16 abr',s:0}]},
   {id:'laura',promo:true,mapa:'laura',c:'rosa',img:'Laura Pausini',a:'Laura Pausini - Yo Canto World Tour',f:'7 may 2026',ds:'2026-05-07',v:'Arena Monterrey',sep:500,ride:2700,st:'',inc:['Boleto zona elegida','Transporte Reynosa-Mty','Hospedaje compartido','Kit Conecta'],banco:BANCO_DEFAULT,zonas:[{n:'VIP',p:0,ag:1,vip:1},{n:'Plata',p:6900},{n:'Plata B',p:6100},{n:'Barrera',p:5100},{n:'Butaca',p:4700},{n:'Preferente',p:4000},{n:'Luneta',p:3800},{n:'Balcon',p:3400}],cheapZonas:[{n:'Plata',p:5200},{n:'Oro',p:4400},{n:'Barrera',p:3400},{n:'Butaca',p:3000},{n:'Preferente',p:2300},{n:'Luneta',p:2100},{n:'Balcon',p:1700},{n:'VIP',p:0,ag:1,vip:1}],hotel:[{n:'Compartida',e:0},{n:'Doble',e:650},{n:'Triple',e:250},{n:'Individual',e:1960}],pagos:[{l:'Separo',d:'Hoy',s:1},{l:'Pago 1',d:'9-16 abr',s:0},{l:'Pago final',d:'24 abr-1 may',s:0}]},
   {id:'bts',cdmx:true,c:'azul',img:'BTS',a:'BTS - World Tour Arirang',f:'7, 9 y 10 may 2026',ds:'2026-05-07',v:'Estadio GNP Seguros, CDMX',sep:1000,st:'ultimos',inc:['Traslados Hotel-Evento CDMX','Hospedaje compartido','Kit Conecta'],nota:'NO incluye transporte a CDMX. Consulta opciones de traslado.',banco:BANCO_DEFAULT,multifecha:[{lbl:'7 Mayo',zonas:[{n:'Paquete RIDE',p:2900}]},{lbl:'9 Mayo',zonas:[{n:'Paquete RIDE',p:2900}]},{lbl:'10 Mayo',zonas:[{n:'Paquete RIDE',p:2900}]}],zonas:[{n:'General',p:2900}],rideOnly:true,ride:2900,hotel:HOTEL_CDM,pagos:[{l:'Separo',d:'Hoy',s:1}]},
@@ -692,7 +693,7 @@ var EV=[  {id:'acdc',c:'rojo',img:'AC/DC',a:'AC/DC - Power Up Tour',f:'11 abr 20
   {id:'harry',ride:2900,cdmx:true,mapa:'harry',c:'rosa',img:'Harry Styles',a:'Harry Styles - Together Together Tour',f:'1, 7 y 8 ago 2026',ds:'2026-08-01',v:'Estadio GNP Seguros, CDMX',sep:1000,st:'ultimos',inc:['Boleto zona elegida','Traslados CDMX','Hospedaje compartido','Kit Conecta'],nota:'NO incluye vuelos. Vuelos y autobuses disponibles como extra.',banco:BANCO_HEY,multifecha:[{lbl:'1 Agosto',zonas:[{n:'Circle',p:0,vip:1,ag:1},{n:'Disco',p:0,vip:1,ag:1},{n:'Kiss Square',p:0,vip:1,ag:1},{n:'General A',p:0,ag:1},{n:'General B',p:0,ag:1},{n:'General C',p:6500},{n:'Zona GNP',p:0,ag:1},{n:'Verde B',p:0,ag:1},{n:'Naranja B',p:0,ag:1},{n:'Verde C',p:0,ag:1},{n:'Naranja C',p:0,ag:1},{n:'Box Oro',p:16000,vip:1}],cheapZonas:[{n:'General A',p:5000},{n:'Box Oro',p:13000,vip:1},{n:'General C',p:4500},{n:'Naranja C',p:4000},{n:'Circle',p:0,ag:1},{n:'Disco',p:0,ag:1},{n:'Kiss Square',p:0,ag:1},{n:'General B',p:0,ag:1},{n:'Zona GNP',p:0,ag:1},{n:'Verde B',p:0,ag:1},{n:'Naranja B',p:0,ag:1},{n:'Verde C',p:0,ag:1}]},{lbl:'7 Agosto',zonas:[{n:'Circle',p:0,vip:1,ag:1},{n:'Disco',p:0,vip:1,ag:1},{n:'Kiss Square',p:0,vip:1,ag:1},{n:'General A',p:7500},{n:'General B',p:0,ag:1},{n:'Zona GNP',p:0,ag:1},{n:'Verde B',p:0,ag:1},{n:'Naranja B',p:0,ag:1},{n:'Verde C',p:0,ag:1},{n:'Naranja C',p:0,ag:1}],cheapZonas:[{n:'General A',p:5000},{n:'Circle',p:0,ag:1},{n:'Disco',p:0,ag:1},{n:'Kiss Square',p:0,ag:1},{n:'General B',p:0,ag:1},{n:'Zona GNP',p:0,ag:1},{n:'Verde B',p:0,ag:1},{n:'Naranja B',p:0,ag:1},{n:'Verde C',p:0,ag:1},{n:'Naranja C',p:0,ag:1}]},{lbl:'8 Agosto',zonas:[{n:'Circle',p:0,vip:1,ag:1},{n:'Disco',p:0,vip:1,ag:1},{n:'Kiss Square',p:0,vip:1,ag:1},{n:'General A',p:7500},{n:'General B',p:0,ag:1},{n:'Zona GNP',p:0,ag:1},{n:'Verde B',p:0,ag:1},{n:'Naranja B',p:0,ag:1},{n:'Verde C',p:0,ag:1},{n:'Naranja C',p:0,ag:1}],cheapZonas:[{n:'General A',p:5000},{n:'Circle',p:0,ag:1},{n:'Disco',p:0,ag:1},{n:'Kiss Square',p:0,ag:1},{n:'General B',p:0,ag:1},{n:'Zona GNP',p:0,ag:1},{n:'Verde B',p:0,ag:1},{n:'Naranja B',p:0,ag:1},{n:'Verde C',p:0,ag:1},{n:'Naranja C',p:0,ag:1}]}],zonas:[{n:'Circle',p:0,vip:1,ag:1},{n:'Disco',p:0,vip:1,ag:1},{n:'Kiss Square',p:0,vip:1,ag:1},{n:'General A',p:7500},{n:'General B',p:0,ag:1},{n:'Zona GNP',p:0,ag:1},{n:'Verde B',p:0,ag:1},{n:'Naranja B',p:0,ag:1},{n:'Verde C',p:0,ag:1},{n:'Naranja C',p:0,ag:1}],cheapZonas:[{n:'General A',p:5000},{n:'Circle',p:0,ag:1},{n:'Disco',p:0,ag:1},{n:'Kiss Square',p:0,ag:1},{n:'General B',p:0,ag:1},{n:'Zona GNP',p:0,ag:1},{n:'Verde B',p:0,ag:1},{n:'Naranja B',p:0,ag:1},{n:'Verde C',p:0,ag:1},{n:'Naranja C',p:0,ag:1}],hotel:[{n:'Compartida',e:0},{n:'Doble',e:650},{n:'Triple',e:250},{n:'Individual',e:1960}],pagos:[{l:'Separo',d:'Hoy',s:1}]},
   {id:'dalemix',staticImg:'dalemixx',promoModal:{emoji:'🍔',title:'¡ESTE EVENTO INCLUYE COMIDA GRATIS!',desc:'Paquete Plus — Come y disfruta dentro del evento sin gastar de más',colors:['#c026d3','#7c3aed']},c:'amarillo',a:'Dale Mixx',f:'15 ago 2026',ds:'2026-08-15',v:'Parque Fundidora, Mty',sep:300,ride:2700,st:'',inc:['Boleto zona elegida','Transporte Reynosa-Mty','Hospedaje compartido','Comida incluida','Kit Conecta'],banco:BANCO_DEFAULT,zonas:[{n:'General',p:3900},{n:'VIP',p:0,prox:1,vip:1}],cheapZonas:[{n:'General',p:2250},{n:'VIP',p:0,prox:1,vip:1}],hotel:HOTEL_STD,pagos:[{l:'Separo',d:'Hoy',s:1}]},
   {id:'rosalia',mapa:'rosalia',c:'rojo',img:'Rosalia',a:'Rosalía - Lux Tour',f:'19 ago 2026',ds:'2026-08-19',v:'Arena Monterrey, Mty',sep:1000,ride:2700,st:'',inc:['Boleto zona elegida','Transporte Reynosa-Mty','Hospedaje compartido','Kit Conecta'],banco:BANCO_DEFAULT,zonas:[{n:'Cancha VIP',p:7400,vip:1},{n:'Platino',p:7200},{n:'Cancha General',p:5300},{n:'Oro',p:0,ag:1},{n:'Barrera',p:0,ag:1},{n:'Butaca',p:0,ag:1},{n:'Preferente',p:0,ag:1},{n:'Luneta',p:0,ag:1},{n:'Balcón',p:0,ag:1}],cheapZonas:[{n:'Cancha VIP',p:5800,vip:1},{n:'Platino',p:5500},{n:'Cancha General',p:3700},{n:'Oro',p:0,ag:1},{n:'Barrera',p:0,ag:1},{n:'Butaca',p:0,ag:1},{n:'Preferente',p:0,ag:1},{n:'Luneta',p:0,ag:1},{n:'Balcón',p:0,ag:1}],hotel:[{n:'Compartida',e:0},{n:'Doble',e:650},{n:'Triple',e:250},{n:'Individual',e:1960}],pagos:[{l:'Separo',d:'Hoy',s:1}]},
-  {id:'enjambre',staticImg:'enjambre',c:'azul',img:'Enjambre',a:'Enjambre',f:'29 ago 2026',ds:'2026-08-29',v:'Estadio GNP',sep:0,st:'proceso',inc:[],banco:BANCO_DEFAULT,zonas:[],hotel:[],pagos:[],waChannel:'https://wa.me/528119771072'},
+  {id:'enjambre',staticImg:'enjambre',cdmx:true,c:'azul',img:'Enjambre',a:'Enjambre',f:'29 ago 2026',ds:'2026-08-29',v:'Estadio GNP, CDMX',sep:0,st:'proceso',inc:[],banco:BANCO_DEFAULT,zonas:[],hotel:[],pagos:[],waChannel:'https://wa.me/528119771072'},
   {id:'warped',promo:true,cdmx:true,hotelPP:true,staticImg:'warped',c:'verde',a:'Vans Warped Tour Mexico City',f:'12-13 sep 2026',ds:'2026-09-12',v:'Autodromo H. Rodriguez, CDMX',sep:800,st:'',inc:['Abono General 2 dias','Traslados CDMX','2 noches hospedaje','Kit Conecta'],nota:'NO incluye vuelos.',banco:BANCO_DEFAULT,zonas:[{n:'General',p:6400}],cheapZonas:[{n:'General',p:3900}],hotel:[{n:'Compartida',e:0},{n:'Triple',e:485},{n:'Doble',e:1450},{n:'Individual',e:4350}],pagos:[{l:'Separo',d:'Hoy',s:1},{l:'Pago 1',d:'9-16 abr',s:0},{l:'Pago 2',d:'24 abr-1 may',s:0},{l:'Pago 3',d:'9-16 may',s:0},{l:'Pago 4',d:'24 may-1 jun',s:0},{l:'Pago 5',d:'9-16 jun',s:0},{l:'Pago 6',d:'24 jun-1 jul',s:0},{l:'Pago 7',d:'9-16 jul',s:0},{l:'Pago 8',d:'24 jul-1 ago',s:0},{l:'Pago 9',d:'9-16 ago',s:0},{l:'Pago 10',d:'24 ago-1 sep',s:0}]},
   {id:'youngmiko',mapa:'youngmiko',c:'rosa',img:'Young Miko',a:'Young Miko - Late Checkout Tour',f:'19 sep 2026',ds:'2026-09-19',v:'Arena Monterrey, Mty',sep:500,ride:2700,st:'',inc:['Boleto zona elegida','Transporte Reynosa-Mty','Hospedaje compartido','Kit Conecta'],banco:BANCO_DEFAULT,zonas:[{n:'Cancha General',p:5300},{n:'Platino',p:6550,vip:1},{n:'Oro',p:5984},{n:'Super Palco',p:5150},{n:'Barrera',p:5600},{n:'Butaca',p:5250},{n:'Preferente',p:4900},{n:'Luneta',p:4200},{n:'Balcón',p:3860}],hotel:[{n:'Compartida',e:0},{n:'Doble',e:650},{n:'Triple',e:250},{n:'Individual',e:1960}],pagos:[{l:'Separo',d:'Hoy',s:1}],cheapZonas:[{n:'Cancha General',p:3600},{n:'Platino',p:4850,vip:1},{n:'Oro',p:4284},{n:'Barrera',p:3900},{n:'Butaca',p:3550},{n:'Preferente',p:3200},{n:'Luneta',p:2500},{n:'Balcón',p:2160}]},
   {id:'neighbourhood',mapa:'neighbourhood',c:'azul',img:'The Neighbourhood',a:'The Neighbourhood en Monterrey',f:'23 sep 2026',ds:'2026-09-23',v:'Auditorio Citibanamex, Mty',sep:500,ride:2700,st:'ultimos',inc:['Boleto zona elegida','Transporte Reynosa-Mty','Hospedaje compartido','Kit Conecta'],banco:BANCO_DEFAULT,zonas:[{n:'Beyond',p:5000,vip:1},{n:'Platino A',p:6000},{n:'Platino B',p:0,ag:1},{n:'Perfiles',p:0,ag:1},{n:'Perfiles B',p:4100},{n:'Perfiles C',p:3700}],cheapZonas:[{n:'Beyond',p:3500,vip:1},{n:'Platino A',p:4300},{n:'Perfiles B',p:2500},{n:'Perfiles C',p:2000},{n:'Platino B',p:0,ag:1},{n:'Perfiles',p:0,ag:1}],hotel:[{n:'Compartida',e:0},{n:'Doble',e:650},{n:'Triple',e:250},{n:'Individual',e:1960}],pagos:[{l:'Separo',d:'Hoy',s:1},{l:'Pago 1',d:'9-16 abr',s:0},{l:'Pago 2',d:'24 abr-1 may',s:0},{l:'Pago 3',d:'9-16 may',s:0},{l:'Pago 4',d:'24 may-1 jun',s:0},{l:'Pago 5',d:'9-16 jun',s:0},{l:'Pago 6',d:'24 jun-1 jul',s:0},{l:'Pago 7',d:'9-16 jul',s:0},{l:'Pago 8',d:'24 jul-1 ago',s:0}]},
@@ -941,7 +942,7 @@ function validarPromo(code){
   if(cur&&!cur.promo)return {ok:false,msg:'Este código no aplica para este evento'};
   return {ok:true,pct:p.pct,desc:p.desc,code:c};
 }
-var PC_EVENTS=["Corona Capital", "Coca Cola Flow Fest", "Festival Arre", "Festival Comuna", "Justin Bieber", "Bad Bunny", "Sabrina Carpenter", "U2", "Festival Trópico", "Bahidora 2027", "Karol G", "Coldplay", "The Rolling Stones", "Tool", "Slipknot", "Luis Miguel", "Metallica", "Feid / Ferxxo", "Evanescence", "Marilyn Manson"];
+var PC_EVENTS=["Justin Bieber", "Bad Bunny", "Sabrina Carpenter", "U2", "Festival Trópico", "Bahidora 2027", "Karol G", "Coldplay", "The Rolling Stones", "Tool", "Slipknot", "Luis Miguel", "Metallica", "Feid / Ferxxo", "Evanescence", "Marilyn Manson"];
 
 var _activeFilter='all';
 function setFilter(btn,f){
@@ -1204,13 +1205,14 @@ function updatePkgCards(){
     if(stayBtn){stayBtn.classList.remove('disabled');stayBtn.disabled=false;}
   }
   // STAY: plus - sep (transporte cost)
-  var stayDsc=cur.sep||500;
-  var stayCost=plusMin>0?(plusMin-stayDsc):0;
-  $$('pi-stay').textContent='Hospedaje · Boleto · Kit';
-  $$('pp-stay').textContent=stayCost>0?fmt(stayCost>0?stayCost:plusMin):'Cotizar';
+  if(!cur.rideOnly&&!cur.cheapOnly&&!isCDMX(cur)){
+    var stayDsc=cur.sep||500;
+    var stayCost=plusMin>0?(plusMin-stayDsc):0;
+    $$('pi-stay').textContent='Hospedaje · Boleto · Kit';
+    $$('pp-stay').textContent=stayCost>0?fmt(stayCost):'Cotizar';
+  }
 
   // CHEAP: boleto + kit only
-  var cheapBtn=document.getElementById('btn-cheap');
   var cheapMinP=0;
   var hasChp=false;
   if(cur.diaFirst&&selBoleto&&cur.multifecha&&cur.multifecha[selFechaIdx]&&cur.multifecha[selFechaIdx].cheapZonas){
@@ -1337,7 +1339,7 @@ function buildFechaButtons(){
   for(var i=0;i<cur.multifecha.length;i++){
     var mf=cur.multifecha[i];
     if(mf.prox){
-      fH+='<button class="f-btn f-ag" disabled>'+mf.lbl+'<br><small>Próximamente</small></button>';
+      fH+='<button class="f-btn f-prox" disabled>'+mf.lbl+'<br><small>🔄 Próximamente</small></button>';
       continue;
     }
     var allAg=mf.zonas&&mf.zonas.length>0&&mf.zonas.every(function(z){return z.ag;});
@@ -1393,7 +1395,7 @@ function buildDiaButtons(){
   for(var i=0;i<cur.multifecha.length;i++){
     var mf=cur.multifecha[i];
     if(mf.prox){
-      fH+='<button class="f-btn f-ag" disabled>'+mf.lbl+'<br><small>Próximamente</small></button>';
+      fH+='<button class="f-btn f-prox" disabled>'+mf.lbl+'<br><small>🔄 Próximamente</small></button>';
       continue;
     }
     fH+='<button class="f-btn'+(i===selFechaIdx?' active':'')+'" onclick="selDia(this,'+i+')">'+mf.lbl+'</button>';
@@ -1591,22 +1593,17 @@ function abrirModalPago(){
   if(!cur||!_lastCotizacion)return;
   $$('pago-subtitulo').textContent='Separa tu lugar en '+cur.a+' — '+cur.f;
   $$('pago-monto').textContent='💳 '+fmt(sepActualCalc);
-  var bankH='';
-  if(selPkg==='cheap'){
-    bankH='<div class="pago-bank-name">Hey Banco / Banregio</div>'+
-      '<div class="pago-bank-row"><span class="pago-bank-lbl">Tarjeta</span><span class="pago-bank-val">4741 7429 2598 0792</span></div>'+
-      '<div class="pago-bank-row"><span class="pago-bank-lbl">CLABE</span><span class="pago-bank-val">058597000035732769</span></div>'+
-      '<div class="pago-bank-row"><span class="pago-bank-lbl">Titular</span><span class="pago-bank-val" style="font-family:Montserrat,sans-serif;font-size:10px">Guillermo Alexander Cobos Vizcarra</span></div>';
-  } else {
-    bankH='<div class="pago-bank-name">BBVA Bancomer</div>'+
-      '<div class="pago-bank-row"><span class="pago-bank-lbl">Tarjeta</span><span class="pago-bank-val">4152 3139 7573 0487</span></div>'+
-      '<div class="pago-bank-row"><span class="pago-bank-lbl">CLABE</span><span class="pago-bank-val">012822004639334319</span></div>'+
-      '<div class="pago-bank-row"><span class="pago-bank-lbl">Titular</span><span class="pago-bank-val" style="font-family:Montserrat,sans-serif;font-size:10px">Guillermo Alexander Cobos Vizcarra</span></div>';
-  }
+  var b=(selPkg==='cheap')?BANCO_HEY:(cur.banco||BANCO_DEFAULT);
+  var bankH='<div class="pago-bank-name">'+b.nombre+'</div>'+
+    '<div class="pago-bank-row"><span class="pago-bank-lbl">Tarjeta</span><span class="pago-bank-val">'+b.tarjeta+'</span></div>'+
+    '<div class="pago-bank-row"><span class="pago-bank-lbl">CLABE</span><span class="pago-bank-val">'+b.clabe+'</span></div>'+
+    '<div class="pago-bank-row"><span class="pago-bank-lbl">Titular</span><span class="pago-bank-val" style="font-family:Montserrat,sans-serif;font-size:10px">'+b.titular+'</span></div>';
   $$('pago-bank-info').innerHTML=bankH;
   var msgSinFinal=_lastCotizacion.replace(/\n\n¿Qué sigue para reservar\?$/,'');
-  var msgDudas=msgSinFinal+'\n\nTengo dudas sobre mi reservación, ¿me podrías ayudar?';
-  $$('pago-btn-comprobante').href='https://m.me/ConectaRey?text='+encodeURIComponent(msgSinFinal);
+  var msgDudas=msgSinFinal+'\n\nTengo dudas sobre mi reservación, ¿me podrían ayudar?';
+  var isHey=(b===BANCO_HEY);
+  $$('pago-btn-comprobante').href=isHey?'https://wa.me/'+WA+'?text='+encodeURIComponent(msgSinFinal):'https://m.me/ConectaRey?text='+encodeURIComponent(msgSinFinal);
+  $$('pago-btn-comprobante').textContent=isHey?'📲 Ya pagué, enviar comprobante por WhatsApp':'📲 Ya pagué, enviar comprobante';
   $$('pago-btn-dudas').href='https://wa.me/'+WA+'?text='+encodeURIComponent(msgDudas);
   document.getElementById('pago-modal-bg').style.display='flex';
 }

@@ -1745,17 +1745,22 @@ function generarImagenCotizacion(){
   ctx.fillRect(0,0,W,hdrH);
   // Logo box
   ctx.strokeStyle='#fff';ctx.lineWidth=2;
-  ctx.strokeRect(20,16,90,28);
-  ctx.font='900 16px Montserrat,Arial,sans-serif';
-  ctx.fillStyle='#fff';ctx.fillText('CONECTA',26,36);
-  ctx.fillStyle='#ccff00';ctx.fillText('MX.',87,36);
+  ctx.font='900 14px Montserrat,Arial,sans-serif';
+  var cw=ctx.measureText('CONECTA').width;
+  var mw=ctx.measureText('MX.').width;
+  var boxW=cw+mw+16;
+  ctx.strokeRect(20,16,boxW,26);
+  ctx.fillStyle='#fff';ctx.fillText('CONECTA',28,35);
+  ctx.fillStyle='#ccff00';ctx.fillText('MX.',28+cw+4,35);
   // Event name
   ctx.fillStyle='#fff';ctx.font='900 18px Montserrat,Arial,sans-serif';
   var evName=cur.a.length>30?cur.a.substring(0,28)+'…':cur.a;
   ctx.fillText(evName,20,65);
   // Date + venue
   ctx.fillStyle='rgba(255,255,255,.7)';ctx.font='600 11px Montserrat,Arial,sans-serif';
-  ctx.fillText(cur.f+' · '+cur.v,20,82);
+  var fechaImg=cur.f;
+  if(cur.multifecha&&cur.multifecha[selFechaIdx]&&cur.multifecha[selFechaIdx].lbl)fechaImg=cur.multifecha[selFechaIdx].lbl;
+  ctx.fillText(fechaImg+' · '+cur.v,20,82);
 
   // ── BODY ──
   var y=hdrH;
@@ -1817,7 +1822,7 @@ function generarImagenCotizacion(){
   y=hdrH+bodyH;
   ctx.fillStyle='#111';ctx.fillRect(0,y,W,footerH);
   ctx.fillStyle='rgba(255,255,255,.3)';ctx.font='600 9px Montserrat,Arial,sans-serif';
-  ctx.fillText('conectareynosa.netlify.app',20,y+24);
+  ctx.fillText('conectareynosa.mx',20,y+24);
   var hoy=new Date();
   var meses=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
   var fechaGen=hoy.getDate()+' '+meses[hoy.getMonth()]+' '+hoy.getFullYear();

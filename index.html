@@ -111,9 +111,6 @@ body{font-family:'Montserrat',sans-serif;background:#000;color:#fff;min-height:1
 .nf-modal-emoji{font-size:48px;margin-bottom:12px}
 .nf-modal-title{color:#fff;font-size:20px;font-weight:900;margin-bottom:10px}
 .nf-modal-text{color:rgba(255,255,255,.6);font-size:12px;line-height:1.6;margin-bottom:20px}
-.nf-modal-input{width:100%;background:rgba(255,255,255,.06);border:1.5px solid rgba(204,255,0,.15);color:#fff;padding:12px 14px;font-size:14px;font-family:'Montserrat',sans-serif;border-radius:10px;margin-bottom:14px;outline:none;text-align:center}
-.nf-modal-input:focus{border-color:rgba(204,255,0,.4)}
-.nf-modal-input::placeholder{color:rgba(255,255,255,.25)}
 .nf-modal-btn{display:block;width:100%;background:#ccff00;color:#000;border:none;padding:14px;font-size:13px;font-weight:900;font-family:'Montserrat',sans-serif;text-transform:uppercase;letter-spacing:.06em;border-radius:10px;cursor:pointer;margin-bottom:10px;text-decoration:none;text-align:center}
 .nf-modal-btn:hover{background:#e0ff4c}
 .nf-modal-skip{color:rgba(255,255,255,.35);font-size:11px;cursor:pointer;border:none;background:none;font-family:'Montserrat',sans-serif}
@@ -868,7 +865,7 @@ function renderCatalog(){
     if(!isPast&&!isAg){
       (function(evv,sv,proc,nf){
         card.onclick=function(e){
-          if(nf){abrirNuevaFechaModal(evv);return;}
+          if(nf){abrirNuevaFechaModal();return;}
           if(proc&&evv.waChannel){window.open(evv.waChannel,'_blank');}
           else if(proc||sv){var msg='Hola! Me interesa el tour de '+evv.a+' ('+evv.f+'). Me dan informes?';window.open('https://wa.me/'+WA+'?text='+encodeURIComponent(msg),'_blank');}
           else{showDetail(evv.id);}
@@ -1642,24 +1639,11 @@ function abrirModalPago(){
   $$('pago-btn-dudas').href='https://wa.me/'+WA+'?text='+encodeURIComponent(msgDudas);
   document.getElementById('pago-modal-bg').style.display='flex';
 }
-var _nfEvento=null;
-function abrirNuevaFechaModal(ev){
-  _nfEvento=ev;
-  document.getElementById('nf-modal-title').textContent='🔄 Nueva fecha de '+ev.a.replace(/ - .*/,'');
-  document.getElementById('nf-modal-input').value='';
+function abrirNuevaFechaModal(){
   document.getElementById('nf-modal-bg').style.display='flex';
 }
 function cerrarNfModal(){
   document.getElementById('nf-modal-bg').style.display='none';
-}
-function enviarNfLead(){
-  var num=document.getElementById('nf-modal-input').value.trim();
-  if(!num){document.getElementById('nf-modal-input').style.borderColor='#ff283b';return false;}
-  var nombre=_nfEvento?_nfEvento.a.replace(/ - .*/,''):'el evento';
-  var msg='Hola, quiero que me avisen cuando salga la nueva fecha de '+nombre+' 🎶 Mi número es: '+num;
-  window.open('https://wa.me/'+WA+'?text='+encodeURIComponent(msg),'_blank');
-  cerrarNfModal();
-  return false;
 }
 
 function cerrarPromoModal(){
@@ -2285,10 +2269,9 @@ function enviarChat(){
   <div class="nf-modal" onclick="event.stopPropagation()">
     <button class="nf-modal-close" onclick="cerrarNfModal()">✕</button>
     <div class="nf-modal-emoji">🔄</div>
-    <div class="nf-modal-title" id="nf-modal-title">Nueva fecha próximamente</div>
-    <div class="nf-modal-text">Esta fecha está agotada pero viene una nueva. ¡Sé el primero en enterarte y reservar tu lugar!</div>
-    <input class="nf-modal-input" id="nf-modal-input" type="tel" placeholder="Tu número de WhatsApp (ej: 8681234567)">
-    <a class="nf-modal-btn" id="nf-modal-btn" href="#" target="_blank" onclick="return enviarNfLead()">📲 Avísame cuando salga</a>
+    <div class="nf-modal-title">Nueva fecha próximamente</div>
+    <div class="nf-modal-text">Esta fecha está agotada pero viene una nueva. Únete a nuestro canal de WhatsApp — ahí anunciamos las ventas antes que en cualquier otro lugar.</div>
+    <a class="nf-modal-btn" href="https://whatsapp.com/channel/0029Vb7JuO1IN9ipDaGVV92f" target="_blank" onclick="cerrarNfModal()">📲 Unirme al canal de WhatsApp</a>
     <button class="nf-modal-skip" onclick="cerrarNfModal();document.getElementById('ev-list').scrollIntoView({behavior:'smooth'})">Ver otros eventos</button>
   </div>
 </div>

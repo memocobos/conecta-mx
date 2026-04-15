@@ -78,6 +78,17 @@ select option{background:var(--ns)}
 .mb{height:3px;background:var(--b);border-radius:2px;margin-top:3px;overflow:hidden}
 .mf{height:100%;border-radius:2px;transition:width .3s}
 .pe-r{display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--b);font-size:11px}
+.tipo-btn{flex:1;padding:10px;border-radius:6px;border:1px solid var(--b);background:var(--ns);color:var(--ts);cursor:pointer;font-family:inherit;font-size:12px;font-weight:700;text-align:center;transition:all .15s}
+.tipo-btn.on{border-color:var(--am);background:rgba(232,255,76,.07);color:var(--am)}
+.abono-row{display:grid;grid-template-columns:110px 1fr 80px auto;gap:7px;align-items:end;margin-bottom:7px}
+.sp-card{background:var(--ns);border:1px solid var(--b);border-radius:6px;padding:12px;margin-bottom:8px}
+.sp-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.sp-title{font-size:12px;font-weight:700;color:var(--am)}
+.sp-g{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.sp-res{background:var(--nc);border:1px solid var(--b);border-radius:6px;padding:10px;margin-bottom:8px}
+.sp-rt{font-size:11px;font-weight:700;color:var(--am);margin-bottom:6px}
+.sp-rr{display:flex;justify-content:space-between;font-size:11px;padding:3px 0;color:var(--ts);border-bottom:1px solid rgba(34,34,34,.5)}
+.sp-rr:last-child{border:none;font-weight:700;color:var(--t)}
 .pe-r:last-child{border:none}
 .pe-n{font-size:16px;font-weight:900}
 
@@ -119,6 +130,31 @@ select option{background:var(--ns)}
 
 <div class="wrap">
 <div>
+
+  <!-- TIPO EVENTO -->
+  <div class="card">
+    <div class="ct">Tipo de evento</div>
+    <div style="display:flex;gap:8px;margin-bottom:0">
+      <button class="tipo-btn on" id="tb-concierto" onclick="setTipo('concierto')">🎤 Concierto<br><span style="font-size:10px;font-weight:400">Una fecha, cotización única</span></button>
+      <button class="tipo-btn" id="tb-festival" onclick="setTipo('festival')">🎪 Festival<br><span style="font-size:10px;font-weight:400">Varios días, sub-paquetes</span></button>
+    </div>
+  </div>
+
+  <!-- FESTIVAL CONFIG -->
+  <div id="festival-config" style="display:none">
+    <div class="card">
+      <div class="ct">Abonos disponibles</div>
+      <div class="note" style="margin-bottom:10px">Define los tipos de abono que vende la matriz. El sistema calcula el precio por día automáticamente.</div>
+      <div id="abonos-c"></div>
+      <button class="btn-add" onclick="addAbono()">+ Agregar tipo de abono</button>
+    </div>
+    <div class="card">
+      <div class="ct">Sub-paquetes del festival</div>
+      <div class="note" style="margin-bottom:10px">Cada sub-paquete tiene su propio transporte, hotel y precio. Agrégalos uno por uno.</div>
+      <div id="subpaquetes-c"></div>
+      <button class="btn-add" onclick="addSubpaquete()">+ Agregar sub-paquete</button>
+    </div>
+  </div>
 
   <!-- MODO -->
   <div class="card">
@@ -373,6 +409,189 @@ select option{background:var(--ns)}
 </div>
 
 <script>
+// ── FESTIVAL STATE ────────────────────────────────────────────────────────
+let tipoEvento = 'concierto';
+let abonos = [], subpaquetes = [];
+let aId = 0, spId = 0;
+
+function setTipo(t) {
+  tipoEvento = t;
+  document.getElementById('tb-concierto').className = 'tipo-btn' + (t==='concierto' ? ' on' : '');
+  document.getElementById('tb-festival').className = 'tipo-btn' + (t==='festival' ? ' on' : '');
+  document.getElementById('festival-config').style.display = t==='festival' ? 'block' : 'none';
+  calcular();
+}
+
+// ABONOS
+function addAbono() {
+  abonos.push({ id: ++aId, label: '', dias: 1, costo: 0 });
+  renderAbonos();
+}
+function remAbono(id) { abonos = abonos.filter(a => a.id !== id); renderAbonos(); updSpSelects(); }
+function updAbono(id, f, v) {
+  const a = abonos.find(a => a.id === id);
+  if (a) { a[f] = f === 'label' ? v : +v; updSpSelects(); }
+}
+function renderAbonos() {
+  document.getElementById('abonos-c').innerHTML = abonos.map(a => `
+    <div class="abono-row">
+      <div class="fg"><label>Días</label>
+        <select onchange="updAbono(${a.id},'dias',this.value)">
+          <option value="1" ${a.dias==1?'selected':''}>1 día</option>
+          <option value="2" ${a.dias==2?'selected':''}>2 días</option>
+          <option value="3" ${a.dias==3?'selected':''}>3 días</option>
+        </select>
+      </div>
+      <div class="fg"><label>Nombre del abono</label>
+        <input type="text" value="${a.label}" placeholder="Ej: Abono 3 días, Viernes, etc" oninput="updAbono(${a.id},'label',this.value)">
+      </div>
+      <div class="fg"><label>Costo ($)</label>
+        <input type="number" value="${a.costo||''}" placeholder="0" onchange="updAbono(${a.id},'costo',this.value)">
+      </div>
+      <button class="bx" onclick="remAbono(${a.id})">×</button>
+    </div>
+  `).join('');
+  updSpSelects();
+}
+
+// SUB-PAQUETES
+function addSubpaquete() {
+  subpaquetes.push({ id: ++spId, nombre: '', abonoId: 0, noches: 1, sinHotel: false, buses: [{ tipo: 'bus37', costo: 0, gastosRuta: 3500 }], pedido: 0, vendidos: 0 });
+  renderSubpaquetes();
+}
+function remSp(id) { subpaquetes = subpaquetes.filter(s => s.id !== id); renderSubpaquetes(); }
+function updSp(id, f, v) {
+  const s = subpaquetes.find(s => s.id === id);
+  if (s) {
+    if (f === 'nombre') s.nombre = v;
+    else if (f === 'sinHotel') s.sinHotel = v;
+    else if (f === 'abonoId') s.abonoId = +v;
+    else s[f] = +v;
+    renderSubpaquetes();
+    calcular();
+  }
+}
+function addSpBus(spId_) {
+  const s = subpaquetes.find(s => s.id === spId_);
+  if (s) { s.buses.push({ tipo: 'bus37', costo: 0, gastosRuta: 3500 }); renderSubpaquetes(); }
+}
+function remSpBus(spId_, idx) {
+  const s = subpaquetes.find(s => s.id === spId_);
+  if (s) { s.buses.splice(idx, 1); renderSubpaquetes(); }
+}
+function updSpBus(spId_, idx, f, v) {
+  const s = subpaquetes.find(s => s.id === spId_);
+  if (s && s.buses[idx]) { s.buses[idx][f] = f === 'tipo' ? v : +v; calcular(); }
+}
+
+function updSpSelects() {
+  // update abono selects in subpaquetes
+  renderSubpaquetes();
+}
+
+function renderSubpaquetes() {
+  const ciudad = document.getElementById('ev-ciudad').value;
+  const esMTY = ciudad === 'MTY' || ciudad === 'OTRO';
+  const abonoOpts = abonos.map(a => `<option value="${a.id}">${a.label || a.dias+'d'} — $${(+a.costo).toLocaleString('es-MX')}</option>`).join('');
+
+  document.getElementById('subpaquetes-c').innerHTML = subpaquetes.map(sp => {
+    const abono = abonos.find(a => a.id === sp.abonoId);
+    const costoPorDia = abono ? (+abono.costo / abono.dias) : 0;
+    const dias = abono ? abono.dias : 1;
+    const hotelBase = +document.getElementById('ev-hotel').value || (ciudad === 'CDMX' ? 2900 : 2500);
+    const hotelPP = sp.sinHotel ? 0 : (hotelBase * sp.noches) / 4;
+    const kit = getKit();
+    const totalPax = sp.buses.reduce((s, b) => s + (TRP[b.tipo]?.pax || 0), 0);
+    const costoTrans = sp.buses.reduce((s, b) => s + (b.costo || 0) + (esMTY ? (b.gastosRuta || 3500) * dias : 0), 0);
+    const transPP = totalPax > 0 ? costoTrans / totalPax : 0;
+    const numChof = sp.buses.length;
+    const habChof = Math.ceil(numChof / 2);
+    const hotelChofPP = totalPax > 0 ? (habChof * hotelBase * sp.noches) / totalPax : 0;
+    const gastosFijosSpPP = transPP + hotelPP + kit + hotelChofPP;
+    const costoTotalPP = costoPorDia * dias + gastosFijosSpPP;
+    const pricePlus = Math.ceil((costoTotalPP + 1000) / 100) * 100;
+    const priceSinBoleto = Math.ceil((gastosFijosSpPP + 800) / 100) * 100; // RIDE
+    const priceSinTrans = Math.ceil((costoPorDia * dias + hotelPP + kit + hotelChofPP + 1000) / 100) * 100; // STAY
+    const priceCheap = Math.ceil((costoPorDia * dias + 500) / 100) * 100;
+    const margen = costoTotalPP > 0 ? Math.round((pricePlus - costoTotalPP) / pricePlus * 100) : 0;
+    const col = margen >= 15 ? 'var(--ve)' : margen >= 8 ? 'var(--am)' : 'var(--ro)';
+
+    return `
+    <div class="sp-card">
+      <div class="sp-head">
+        <div class="sp-title">${sp.nombre || 'Sub-paquete sin nombre'}</div>
+        <button class="bx" style="font-size:11px;padding:3px 8px" onclick="remSp(${sp.id})">× Quitar</button>
+      </div>
+      <div class="sp-g" style="margin-bottom:10px">
+        <div class="fg full"><label>Nombre del sub-paquete</label>
+          <input type="text" value="${sp.nombre}" placeholder="Ej: 1 día viernes, 2 días, 3 días..." oninput="updSp(${sp.id},'nombre',this.value)">
+        </div>
+        <div class="fg"><label>Abono</label>
+          <select onchange="updSp(${sp.id},'abonoId',this.value)">
+            <option value="0">Seleccionar abono...</option>
+            ${abonoOpts}
+          </select>
+        </div>
+        <div class="fg"><label>Noches de hotel</label>
+          <select onchange="updSp(${sp.id},'noches',this.value)">
+            <option value="0" ${sp.noches==0?'selected':''}>Sin hotel</option>
+            <option value="1" ${sp.noches==1?'selected':''}>1 noche</option>
+            <option value="2" ${sp.noches==2?'selected':''}>2 noches</option>
+            <option value="3" ${sp.noches==3?'selected':''}>3 noches</option>
+          </select>
+        </div>
+        <div class="fg"><label>Pedido / Vendidos</label>
+          <div style="display:flex;gap:5px">
+            <input type="number" value="${sp.pedido||''}" placeholder="Pedido" onchange="updSp(${sp.id},'pedido',this.value)" style="flex:1">
+            <input type="number" value="${sp.vendidos||''}" placeholder="Vendidos" onchange="updSp(${sp.id},'vendidos',this.value)" style="flex:1">
+          </div>
+        </div>
+      </div>
+      <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--ts);margin-bottom:6px">Transporte de este sub-paquete</div>
+      ${sp.buses.map((b, i) => `
+        <div style="display:grid;grid-template-columns:1.5fr 1fr 1fr auto;gap:7px;align-items:end;margin-bottom:6px">
+          <div class="fg"><label>Tipo</label>
+            <select onchange="updSpBus(${sp.id},${i},'tipo',this.value)">
+              ${Object.entries(TRP).map(([k,v])=>`<option value="${k}" ${b.tipo===k?'selected':''}>${v.label}</option>`).join('')}
+            </select>
+          </div>
+          <div class="fg"><label>Renta ($)</label>
+            <input type="number" value="${b.costo||''}" placeholder="0" onchange="updSpBus(${sp.id},${i},'costo',this.value)">
+          </div>
+          ${esMTY ? `<div class="fg"><label>Gastos ruta ($)</label>
+            <input type="number" value="${b.gastosRuta||3500}" onchange="updSpBus(${sp.id},${i},'gastosRuta',this.value)">
+          </div>` : '<div></div>'}
+          <button class="bx" onclick="remSpBus(${sp.id},${i})">×</button>
+        </div>
+      `).join('')}
+      <button class="btn-add" style="margin-bottom:10px" onclick="addSpBus(${sp.id})">+ Bus</button>
+      ${abono ? `
+      <div style="background:var(--nc);border:1px solid var(--b);border-radius:5px;padding:10px;margin-top:4px">
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--ts);margin-bottom:6px">Precios calculados (${totalPax} pax · ${dias}d · ${sp.noches}n hotel)</div>
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;text-align:center">
+          <div style="background:rgba(34,85,255,.1);border-radius:4px;padding:7px">
+            <div style="font-size:9px;font-weight:700;color:#88aaff;text-transform:uppercase;letter-spacing:.05em">PLUS</div>
+            <div style="font-size:14px;font-weight:900;color:var(--t)">${'$'+Math.round(pricePlus).toLocaleString('es-MX')}</div>
+          </div>
+          <div style="background:rgba(136,234,78,.08);border-radius:4px;padding:7px">
+            <div style="font-size:9px;font-weight:700;color:var(--ve);text-transform:uppercase;letter-spacing:.05em">RIDE</div>
+            <div style="font-size:14px;font-weight:900;color:var(--t)">${'$'+Math.round(priceSinBoleto).toLocaleString('es-MX')}</div>
+          </div>
+          <div style="background:rgba(255,40,58,.08);border-radius:4px;padding:7px">
+            <div style="font-size:9px;font-weight:700;color:var(--ro);text-transform:uppercase;letter-spacing:.05em">STAY</div>
+            <div style="font-size:14px;font-weight:900;color:var(--t)">${'$'+Math.round(priceSinTrans).toLocaleString('es-MX')}</div>
+          </div>
+          <div style="background:rgba(232,255,76,.08);border-radius:4px;padding:7px">
+            <div style="font-size:9px;font-weight:700;color:var(--am);text-transform:uppercase;letter-spacing:.05em">CHEAP</div>
+            <div style="font-size:14px;font-weight:900;color:var(--t)">${'$'+Math.round(priceCheap).toLocaleString('es-MX')}</div>
+          </div>
+        </div>
+        <div style="margin-top:8px;font-size:10px;color:${col}">Margen PLUS: ${margen}% · Boleto ${dias}d: $${Math.round(costoPorDia*dias).toLocaleString('es-MX')} · Gastos fijos: $${Math.round(gastosFijosSpPP).toLocaleString('es-MX')}</div>
+      </div>` : '<div class="note">Selecciona un abono para ver los precios calculados</div>'}
+    </div>`;
+  }).join('');
+}
+
 // ── CONSTANTS ──────────────────────────────────────────────────────────────
 const TRP = {
   van:   {label:'Van (13 pax + 1 coordi + 1 chofer)',pax:13},

@@ -4,525 +4,616 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Cotizador — Conecta Reynosa</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;900&display=swap" rel="stylesheet">
 <style>
-:root {
-  --negro: #0a0a0a;
-  --negro-suave: #111111;
-  --negro-card: #161616;
-  --borde: #222222;
-  --texto: #f0f0f0;
-  --texto-sec: #888;
-  --azul: #0000cd;
-  --rojo: #ff283b;
-  --amarillo: #e8ff4c;
-  --verde: #88ea4e;
-  --rosa: #ff2d7a;
-}
-* { box-sizing: border-box; margin: 0; padding: 0; }
-body {
-  background: var(--negro);
-  color: var(--texto);
-  font-family: 'Montserrat', sans-serif;
-  min-height: 100vh;
-}
-@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;900&display=swap');
-
-/* LAYOUT */
-.header {
-  background: var(--negro-suave);
-  border-bottom: 1px solid var(--borde);
-  padding: 16px 24px;
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-.header-logo { font-size: 11px; font-weight: 900; letter-spacing: .15em; color: var(--azul); text-transform: uppercase; }
-.header-sep { color: var(--borde); font-size: 20px; }
-.header-title { font-size: 13px; font-weight: 700; color: var(--texto-sec); text-transform: uppercase; letter-spacing: .1em; }
-
-.container { max-width: 1100px; margin: 0 auto; padding: 24px; display: grid; grid-template-columns: 1fr 380px; gap: 24px; }
-@media(max-width:900px){ .container { grid-template-columns: 1fr; } }
-
-.section { background: var(--negro-card); border: 1px solid var(--borde); border-radius: 8px; padding: 20px; margin-bottom: 16px; }
-.section-title { font-size: 10px; font-weight: 700; letter-spacing: .15em; text-transform: uppercase; color: var(--texto-sec); margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
-.section-title::after { content: ''; flex: 1; height: 1px; background: var(--borde); }
-
-.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-.form-group { display: flex; flex-direction: column; gap: 6px; }
-.form-group.full { grid-column: 1/-1; }
-label { font-size: 11px; font-weight: 600; color: var(--texto-sec); text-transform: uppercase; letter-spacing: .05em; }
-input, select, textarea {
-  background: var(--negro-suave);
-  border: 1px solid var(--borde);
-  border-radius: 6px;
-  color: var(--texto);
-  font-family: inherit;
-  font-size: 13px;
-  padding: 8px 12px;
-  outline: none;
-  transition: border-color .15s;
-}
-input:focus, select:focus { border-color: var(--azul); }
-select option { background: var(--negro-suave); }
-
-/* TRANSPORT */
-.transport-row { display: grid; grid-template-columns: 1fr auto auto; gap: 8px; align-items: end; margin-bottom: 8px; }
-.btn-icon { background: var(--negro-suave); border: 1px solid var(--borde); border-radius: 6px; color: var(--texto-sec); cursor: pointer; font-size: 16px; padding: 8px 12px; transition: all .15s; }
-.btn-icon:hover { border-color: var(--rojo); color: var(--rojo); }
-.btn-add { background: none; border: 1px dashed var(--borde); border-radius: 6px; color: var(--texto-sec); cursor: pointer; font-size: 12px; font-weight: 600; padding: 8px; text-align: center; transition: all .15s; width: 100%; margin-top: 4px; }
-.btn-add:hover { border-color: var(--azul); color: var(--azul); }
-
-/* ZONES */
-.zone-row { display: grid; grid-template-columns: 1fr 120px auto; gap: 8px; align-items: end; margin-bottom: 8px; }
-
-/* KIT ITEMS */
-.kit-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
-.kit-item { display: flex; align-items: center; gap: 8px; background: var(--negro-suave); border: 1px solid var(--borde); border-radius: 6px; padding: 8px 12px; cursor: pointer; transition: all .15s; }
-.kit-item input[type=checkbox] { accent-color: var(--amarillo); width: 14px; height: 14px; }
-.kit-item.active { border-color: var(--amarillo); }
-.kit-item label { font-size: 12px; font-weight: 600; color: var(--texto); cursor: pointer; text-transform: none; letter-spacing: 0; }
-
-/* SIDEBAR - RESULTS */
-.sidebar { position: sticky; top: 24px; }
-.result-card { background: var(--negro-card); border: 1px solid var(--borde); border-radius: 8px; padding: 20px; margin-bottom: 16px; }
-.result-event { font-size: 16px; font-weight: 900; margin-bottom: 4px; }
-.result-meta { font-size: 12px; color: var(--texto-sec); margin-bottom: 16px; }
-
-.cost-breakdown { margin-bottom: 16px; }
-.cost-row { display: flex; justify-content: space-between; font-size: 12px; padding: 4px 0; border-bottom: 1px solid var(--borde); color: var(--texto-sec); }
-.cost-row:last-child { border: none; font-weight: 700; font-size: 13px; color: var(--texto); }
-.cost-row span:last-child { color: var(--rojo); }
-
-/* ZONE RESULTS TABLE */
-.zones-table { width: 100%; border-collapse: collapse; font-size: 12px; }
-.zones-table th { font-size: 10px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--texto-sec); padding: 6px 8px; text-align: right; border-bottom: 1px solid var(--borde); }
-.zones-table th:first-child { text-align: left; }
-.zones-table td { padding: 6px 8px; border-bottom: 1px solid var(--borde); text-align: right; }
-.zones-table td:first-child { text-align: left; font-weight: 600; }
-.zones-table tr:last-child td { border: none; }
-.tag { display: inline-block; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 3px; letter-spacing: .05em; }
-.tag-plus { background: rgba(0,0,205,.2); color: #6699ff; }
-.tag-ride { background: rgba(136,234,78,.15); color: var(--verde); }
-.tag-stay { background: rgba(255,40,58,.15); color: var(--rojo); }
-.tag-cheap { background: rgba(232,255,76,.15); color: var(--amarillo); }
-
-.margin-bar { height: 4px; background: var(--borde); border-radius: 2px; margin-top: 4px; overflow: hidden; }
-.margin-fill { height: 100%; border-radius: 2px; transition: width .3s; }
-
-.btn-publish { width: 100%; background: var(--amarillo); color: #000; border: none; border-radius: 8px; cursor: pointer; font-family: inherit; font-size: 13px; font-weight: 900; letter-spacing: .1em; padding: 14px; text-transform: uppercase; transition: opacity .15s; margin-top: 8px; }
-.btn-publish:hover { opacity: .85; }
-.btn-publish:disabled { opacity: .4; cursor: not-allowed; }
-
-.alert { font-size: 12px; padding: 10px 12px; border-radius: 6px; margin-bottom: 12px; }
-.alert-warn { background: rgba(255,40,58,.1); border: 1px solid rgba(255,40,58,.3); color: var(--rojo); }
-.alert-ok { background: rgba(136,234,78,.1); border: 1px solid rgba(136,234,78,.3); color: var(--verde); }
-
-.pe-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--borde); font-size: 12px; }
-.pe-row:last-child { border: none; }
-.pe-num { font-size: 18px; font-weight: 900; }
+:root{--negro:#0a0a0a;--negro-suave:#111;--negro-card:#161616;--borde:#222;--texto:#f0f0f0;--texto-sec:#777;--azul:#2255ff;--rojo:#ff283b;--amarillo:#e8ff4c;--verde:#88ea4e}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--negro);color:var(--texto);font-family:'Montserrat',sans-serif;min-height:100vh}
+.header{background:var(--negro-suave);border-bottom:1px solid var(--borde);padding:14px 24px;display:flex;align-items:center;justify-content:space-between}
+.header-left{display:flex;align-items:center;gap:12px}
+.logo{font-size:11px;font-weight:900;letter-spacing:.15em;color:var(--azul);text-transform:uppercase}
+.sep{color:var(--borde);font-size:18px}
+.page-title{font-size:12px;font-weight:700;color:var(--texto-sec);text-transform:uppercase;letter-spacing:.1em}
+.hactions{display:flex;gap:8px}
+.container{max-width:1200px;margin:0 auto;padding:20px;display:grid;grid-template-columns:1fr 400px;gap:20px}
+@media(max-width:900px){.container{grid-template-columns:1fr}}
+.card{background:var(--negro-card);border:1px solid var(--borde);border-radius:8px;padding:18px;margin-bottom:14px}
+.card-title{font-size:10px;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:var(--texto-sec);margin-bottom:14px;display:flex;align-items:center;gap:8px}
+.card-title::after{content:'';flex:1;height:1px;background:var(--borde)}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+.full{grid-column:1/-1}
+.fg{display:flex;flex-direction:column;gap:5px}
+label{font-size:10px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--texto-sec)}
+input,select{background:var(--negro-suave);border:1px solid var(--borde);border-radius:6px;color:var(--texto);font-family:inherit;font-size:13px;padding:8px 11px;outline:none;transition:border-color .15s;width:100%}
+input:focus,select:focus{border-color:#444}
+select option{background:var(--negro-suave)}
+.note{font-size:11px;color:var(--texto-sec);padding:7px 10px;background:rgba(255,255,255,.03);border-radius:4px;border-left:2px solid var(--borde)}
+.row-t{display:grid;grid-template-columns:1fr 1fr auto;gap:8px;align-items:end;margin-bottom:8px}
+.row-z{display:grid;grid-template-columns:1fr 100px 80px 80px auto;gap:8px;align-items:end;margin-bottom:8px}
+.row-z-head{display:grid;grid-template-columns:1fr 100px 80px 80px auto;gap:8px;margin-bottom:4px}
+.kit-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;margin-top:10px}
+.kit-chip{display:flex;align-items:center;gap:8px;background:var(--negro-suave);border:1px solid var(--borde);border-radius:6px;padding:8px 10px;cursor:pointer;user-select:none;transition:all .15s}
+.kit-chip:hover{border-color:#444}
+.kit-chip.on{border-color:var(--amarillo);background:rgba(232,255,76,.05)}
+.kit-chip input{width:14px;height:14px;accent-color:var(--amarillo);flex-shrink:0;cursor:pointer}
+.kname{font-size:12px;font-weight:600;flex:1}
+.kprice{font-size:11px;color:var(--texto-sec)}
+.btn-add{background:none;border:1px dashed var(--borde);border-radius:6px;color:var(--texto-sec);cursor:pointer;font-family:inherit;font-size:12px;font-weight:600;padding:8px;text-align:center;transition:all .15s;width:100%;margin-top:4px}
+.btn-add:hover{border-color:#555;color:var(--texto)}
+.btn-x{background:var(--negro-suave);border:1px solid var(--borde);border-radius:6px;color:var(--texto-sec);cursor:pointer;font-size:15px;padding:8px 11px;transition:all .15s;line-height:1}
+.btn-x:hover{border-color:var(--rojo);color:var(--rojo)}
+.btn{border:none;border-radius:6px;cursor:pointer;font-family:inherit;font-size:12px;font-weight:700;letter-spacing:.05em;padding:9px 16px;text-transform:uppercase;transition:all .15s}
+.btn-y{background:var(--amarillo);color:#000}
+.btn-y:hover{opacity:.85}
+.btn-g{background:var(--negro-suave);border:1px solid var(--borde);color:var(--texto-sec)}
+.btn-g:hover{border-color:#555;color:var(--texto)}
+.btn-pub{width:100%;padding:13px;font-size:13px;font-weight:900;letter-spacing:.1em;background:var(--amarillo);color:#000;border:none;border-radius:8px;cursor:pointer;font-family:inherit;text-transform:uppercase;transition:opacity .15s;margin-top:8px}
+.btn-pub:hover{opacity:.85}
+.btn-pub:disabled{opacity:.35;cursor:not-allowed}
+.mode-est{background:rgba(232,255,76,.15);color:var(--amarillo)}
+.mode-real{background:rgba(136,234,78,.15);color:var(--verde)}
+.mbadge{font-size:10px;font-weight:700;padding:3px 8px;border-radius:4px;letter-spacing:.05em;text-transform:uppercase}
+.sidebar{position:sticky;top:20px}
+.res-nombre{font-size:16px;font-weight:900;margin-bottom:3px}
+.res-meta{font-size:12px;color:var(--texto-sec);margin-bottom:14px}
+.crow{display:flex;justify-content:space-between;font-size:12px;padding:5px 0;border-bottom:1px solid var(--borde);color:var(--texto-sec)}
+.crow:last-child{border:none;font-weight:700;font-size:13px;color:var(--texto);padding-top:8px}
+.crow span:last-child{color:var(--rojo)}
+.crow.total span:last-child{color:var(--amarillo)}
+.zt{width:100%;border-collapse:collapse;font-size:12px}
+.zt th{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--texto-sec);padding:5px 6px;text-align:right;border-bottom:1px solid var(--borde)}
+.zt th:first-child{text-align:left}
+.zt td{padding:7px 6px;border-bottom:1px solid rgba(34,34,34,.6);text-align:right;vertical-align:top}
+.zt td:first-child{text-align:left}
+.zt tr:last-child td{border:none}
+.tag{display:inline-block;font-size:9px;font-weight:700;padding:2px 5px;border-radius:3px;letter-spacing:.05em}
+.tp{background:rgba(34,85,255,.2);color:#7799ff}
+.tr2{background:rgba(136,234,78,.15);color:var(--verde)}
+.ts{background:rgba(255,40,58,.15);color:var(--rojo)}
+.tc{background:rgba(232,255,76,.15);color:var(--amarillo)}
+.mbar{height:3px;background:var(--borde);border-radius:2px;margin-top:3px;overflow:hidden}
+.mfill{height:100%;border-radius:2px;transition:width .3s}
+.pe-row{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--borde);font-size:12px}
+.pe-row:last-child{border:none}
+.pe-num{font-size:17px;font-weight:900}
+.saved-item{background:var(--negro-suave);border:1px solid var(--borde);border-radius:6px;padding:10px 14px;cursor:pointer;transition:border-color .15s;display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.saved-item:hover{border-color:#555}
 </style>
 </head>
 <body>
 
 <div class="header">
-  <span class="header-logo">Conecta Reynosa</span>
-  <span class="header-sep">/</span>
-  <span class="header-title">Cotizador de Eventos</span>
+  <div class="header-left">
+    <span class="logo">Conecta Reynosa</span>
+    <span class="sep">/</span>
+    <span class="page-title">Cotizador de Eventos</span>
+  </div>
+  <div class="hactions">
+    <button class="btn btn-g" onclick="showSaved()">📋 Mis cotizaciones</button>
+    <button class="btn btn-g" onclick="nuevaCotizacion()">+ Nueva</button>
+  </div>
 </div>
 
 <div class="container">
-  <!-- LEFT: FORM -->
-  <div>
+<div>
 
-    <!-- 1. Evento -->
-    <div class="section">
-      <div class="section-title">1 · Información del evento</div>
-      <div class="form-grid">
-        <div class="form-group full"><label>Nombre del evento</label><input id="ev-nombre" type="text" placeholder="Ej: Bad Bunny - Most Wanted Tour" oninput="calcular()"></div>
-        <div class="form-group"><label>Fecha</label><input id="ev-fecha" type="date" oninput="calcular()"></div>
-        <div class="form-group"><label>Ciudad</label>
-          <select id="ev-ciudad" onchange="calcular()">
-            <option value="MTY">Monterrey (MTY)</option>
-            <option value="CDMX">Ciudad de México (CDMX)</option>
-            <option value="OTRO">Otra ciudad</option>
-          </select>
-        </div>
-        <div class="form-group full"><label>Venue</label><input id="ev-venue" type="text" placeholder="Ej: Estadio BBVA" oninput="calcular()"></div>
-        <div class="form-group"><label>Noches de hotel</label>
-          <select id="ev-noches" onchange="calcular()">
-            <option value="1">1 noche</option>
-            <option value="2">2 noches</option>
-            <option value="3">3 noches</option>
-          </select>
-        </div>
-        <div class="form-group"><label>Precio hotel especial (opcional)</label><input id="ev-hotel-especial" type="number" placeholder="Dejar vacío = precio estándar" oninput="calcular()"></div>
+  <!-- MODO -->
+  <div class="card">
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
+      <div>
+        <div style="font-size:13px;font-weight:700;margin-bottom:2px">Modo de cotización</div>
+        <div style="font-size:12px;color:var(--texto-sec)">Estimado → para salir a venta · Real → costos exactos post-evento</div>
+      </div>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-y" id="btn-est" onclick="setMode('estimado')">Estimado</button>
+        <button class="btn btn-g" id="btn-real" onclick="setMode('real')">Real (post-evento)</button>
       </div>
     </div>
-
-    <!-- 2. Transporte -->
-    <div class="section">
-      <div class="section-title">2 · Transporte</div>
-      <div id="unidades-container"></div>
-      <button class="btn-add" onclick="agregarUnidad()">+ Agregar unidad de transporte</button>
-    </div>
-
-    <!-- 3. Zonas y boletos -->
-    <div class="section">
-      <div class="section-title">3 · Zonas y costo de boletos</div>
-      <div id="zonas-container"></div>
-      <button class="btn-add" onclick="agregarZona()">+ Agregar zona</button>
-    </div>
-
-    <!-- 4. Kit -->
-    <div class="section">
-      <div class="section-title">4 · Kit Conecta</div>
-      <div class="form-grid" style="margin-bottom:12px">
-        <div class="form-group"><label>Costo base del kit ($)</label><input id="kit-costo" type="number" value="200" oninput="calcular()"></div>
-      </div>
-      <div class="kit-grid" id="kit-items">
-        <div class="kit-item" onclick="toggleKit(this)"><input type="checkbox" checked><label>Morral / Tote Bag</label></div>
-        <div class="kit-item" onclick="toggleKit(this)"><input type="checkbox" checked><label>Vaso</label></div>
-        <div class="kit-item" onclick="toggleKit(this)"><input type="checkbox"><label>Playera</label></div>
-        <div class="kit-item" onclick="toggleKit(this)"><input type="checkbox"><label>Cupón de comida</label></div>
-        <div class="kit-item" onclick="toggleKit(this)"><input type="checkbox"><label>Bebida / New Mix</label></div>
-        <div class="kit-item" onclick="toggleKit(this)"><input type="checkbox"><label>Otro item</label></div>
-      </div>
-    </div>
-
-    <!-- 5. Staff -->
-    <div class="section">
-      <div class="section-title">5 · Staff (coordinadores y creadora)</div>
-      <div class="form-grid">
-        <div class="form-group">
-          <label>Zona boleto coordinador(es)</label>
-          <select id="staff-zona-coordi" onchange="calcular()">
-            <option value="">Seleccionar zona...</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label>Zona boleto creadora de contenido</label>
-          <select id="staff-zona-creadora" onchange="calcular()">
-            <option value="">Sin creadora</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label>Costo boleto creadora ($)</label>
-          <input id="staff-costo-creadora" type="number" placeholder="0" oninput="calcular()">
-        </div>
-        <div class="form-group">
-          <label>Estacionamiento por unidad ($)</label>
-          <input id="estacionamiento" type="number" placeholder="0" oninput="calcular()">
-        </div>
-      </div>
-    </div>
-
-    <!-- 6. Separo -->
-    <div class="section">
-      <div class="section-title">6 · Separo por paquete</div>
-      <div class="form-grid">
-        <div class="form-group"><label>Separo PLUS</label><input id="sep-plus" type="number" value="800" oninput="calcular()"></div>
-        <div class="form-group"><label>Separo STAY</label><input id="sep-stay" type="number" value="800" oninput="calcular()"></div>
-        <div class="form-group"><label>Separo RIDE</label><input id="sep-ride" type="number" value="1000" oninput="calcular()"></div>
-        <div class="form-group"><label>Separo CHEAP</label><input id="sep-cheap" type="number" value="1000" oninput="calcular()"></div>
-      </div>
-    </div>
-
   </div>
 
-  <!-- RIGHT: RESULTS -->
-  <div class="sidebar">
-    <div class="result-card">
-      <div class="result-event" id="res-nombre">Nuevo evento</div>
-      <div class="result-meta" id="res-meta">—</div>
-
-      <div class="cost-breakdown" id="res-costos"></div>
-
-      <div class="section-title" style="margin-bottom:12px">Precio por zona y paquete</div>
-      <div style="overflow-x:auto">
-        <table class="zones-table" id="res-zonas">
-          <thead><tr>
-            <th>Zona</th>
-            <th><span class="tag tag-plus">PLUS</span></th>
-            <th><span class="tag tag-ride">RIDE</span></th>
-            <th><span class="tag tag-stay">STAY</span></th>
-            <th><span class="tag tag-cheap">CHEAP</span></th>
-          </tr></thead>
-          <tbody id="res-zonas-body">
-            <tr><td colspan="5" style="color:var(--texto-sec);font-size:12px;padding:12px 0">Agrega zonas para ver precios</td></tr>
-          </tbody>
-        </table>
+  <!-- 1. EVENTO -->
+  <div class="card">
+    <div class="card-title">1 · Evento</div>
+    <div class="g2">
+      <div class="fg full"><label>Nombre del evento</label><input id="ev-nombre" type="text" placeholder="Ej: Bad Bunny — Most Wanted Tour" oninput="calcular()"></div>
+      <div class="fg"><label>Fecha</label><input id="ev-fecha" type="date" oninput="calcular()"></div>
+      <div class="fg"><label>Ciudad</label>
+        <select id="ev-ciudad" onchange="calcular()">
+          <option value="MTY">Monterrey (MTY)</option>
+          <option value="CDMX">Ciudad de México (CDMX)</option>
+          <option value="OTRO">Otra ciudad</option>
+        </select>
+      </div>
+      <div class="fg full"><label>Venue</label><input id="ev-venue" type="text" placeholder="Ej: Estadio BBVA" oninput="calcular()"></div>
+      <div class="fg"><label>Noches de hotel</label>
+        <select id="ev-noches" onchange="calcular()">
+          <option value="1">1 noche</option>
+          <option value="2">2 noches</option>
+          <option value="3">3 noches</option>
+        </select>
+      </div>
+      <div class="fg"><label>Costo habitación cuádruple ($)</label>
+        <input id="ev-hotel" type="number" placeholder="MTY=2500 · CDMX=2900" oninput="calcular()">
       </div>
     </div>
+  </div>
 
-    <div class="result-card">
-      <div class="section-title" style="margin-bottom:12px">Punto de equilibrio</div>
-      <div id="res-pe"></div>
+  <!-- 2. TRANSPORTE -->
+  <div class="card">
+    <div class="card-title">2 · Transporte</div>
+    <div id="unidades-container"></div>
+    <button class="btn-add" onclick="agregarUnidad()">+ Agregar unidad</button>
+  </div>
+
+  <!-- 3. ZONAS -->
+  <div class="card">
+    <div class="card-title">3 · Zonas, boletos y pedido</div>
+    <div class="row-z-head">
+      <label>Zona</label><label>Costo boleto</label><label>Pedido</label><label>Vendidos</label><span></span>
     </div>
+    <div id="zonas-container"></div>
+    <button class="btn-add" onclick="agregarZona()">+ Agregar zona</button>
+  </div>
 
-    <button class="btn-publish" id="btn-publicar" onclick="publicar()" disabled>
-      Publicar en conectareynosa.mx
-    </button>
-    <div id="pub-msg" style="font-size:12px;text-align:center;margin-top:8px;color:var(--texto-sec)"></div>
+  <!-- 4. KIT -->
+  <div class="card">
+    <div class="card-title">4 · Kit Conecta</div>
+    <div class="note">Selecciona los items del kit para este evento. El costo se suma automáticamente.</div>
+    <div class="kit-grid">
+      <div class="kit-chip on" onclick="toggleKit(this)" data-cost="35"><input type="checkbox" checked onclick="event.stopPropagation()"><span class="kname">Morral</span><span class="kprice">$35</span></div>
+      <div class="kit-chip" onclick="toggleKit(this)" data-cost="80"><input type="checkbox" onclick="event.stopPropagation()"><span class="kname">Tote Bag</span><span class="kprice">$80</span></div>
+      <div class="kit-chip on" onclick="toggleKit(this)" data-cost="22"><input type="checkbox" checked onclick="event.stopPropagation()"><span class="kname">Vaso</span><span class="kprice">$22</span></div>
+      <div class="kit-chip" onclick="toggleKit(this)" data-cost="93"><input type="checkbox" onclick="event.stopPropagation()"><span class="kname">Playera</span><span class="kprice">$93</span></div>
+      <div class="kit-chip" onclick="toggleKit(this)" data-cost="90"><input type="checkbox" onclick="event.stopPropagation()"><span class="kname">Cupón de comida</span><span class="kprice">$90</span></div>
+      <div class="kit-chip" onclick="toggleKit(this)" data-cost="10"><input type="checkbox" onclick="event.stopPropagation()"><span class="kname">New Mix</span><span class="kprice">$10</span></div>
+      <div class="kit-chip" onclick="toggleKit(this)" data-cost="100"><input type="checkbox" onclick="event.stopPropagation()"><span class="kname">Conecta Lunch</span><span class="kprice">$100</span></div>
+    </div>
+    <div style="margin-top:12px;display:flex;align-items:center;gap:8px">
+      <span style="font-size:12px;color:var(--texto-sec)">Costo kit seleccionado:</span>
+      <span id="kit-total" style="font-size:14px;font-weight:700;color:var(--amarillo)">$57</span>
+    </div>
+  </div>
+
+  <!-- 5. STAFF -->
+  <div class="card">
+    <div class="card-title">5 · Staff</div>
+    <div class="g2">
+      <div class="fg"><label>Zona boleto coordinador(es)</label>
+        <select id="staff-zona-coordi" onchange="onStaffChange('coordi')"><option value="0">Sin boleto</option></select>
+      </div>
+      <div class="fg"><label>Costo boleto coordi ($)</label>
+        <input id="staff-costo-coordi" type="number" placeholder="0" oninput="calcular()">
+      </div>
+      <div class="fg"><label>Zona boleto creadora</label>
+        <select id="staff-zona-creadora" onchange="onStaffChange('creadora')"><option value="0">Sin creadora / es local</option></select>
+      </div>
+      <div class="fg"><label>Costo boleto creadora ($)</label>
+        <input id="staff-costo-creadora" type="number" placeholder="0" oninput="calcular()">
+      </div>
+      <div class="fg"><label>Hotel staff (coordi + creadora)</label>
+        <select id="staff-hotel" onchange="calcular()">
+          <option value="compartida">Comparten con clientes ($0 extra)</option>
+          <option value="cuadruple">Cuádruple aparte</option>
+          <option value="doble">Doble aparte (~30% más)</option>
+          <option value="individual">Individual cada una</option>
+        </select>
+      </div>
+      <div class="fg"><label>Estacionamiento por unidad ($)</label>
+        <input id="estacionamiento" type="number" placeholder="0" oninput="calcular()">
+      </div>
+    </div>
+    <div id="info-choferes" class="note" style="margin-top:10px">—</div>
+  </div>
+
+  <!-- 6. SEPARO -->
+  <div class="card">
+    <div class="card-title">6 · Separo</div>
+    <div class="g2">
+      <div class="fg"><label>Separo PLUS ($)</label><input id="sep-plus" type="number" value="800" oninput="calcular()"></div>
+      <div class="fg"><label>Separo STAY ($)</label><input id="sep-stay" type="number" value="800" oninput="calcular()"></div>
+      <div class="fg"><label>Separo RIDE ($)</label><input id="sep-ride" type="number" value="1000" oninput="calcular()"></div>
+      <div class="fg"><label>Separo CHEAP ($)</label><input id="sep-cheap" type="number" value="1000" oninput="calcular()"></div>
+    </div>
+  </div>
+
+</div>
+
+<!-- SIDEBAR -->
+<div class="sidebar">
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:3px">
+      <div class="res-nombre" id="res-nombre">Nuevo evento</div>
+      <span class="mbadge mode-est" id="mode-badge">Estimado</span>
+    </div>
+    <div class="res-meta" id="res-meta">—</div>
+    <div id="res-costos"></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title" style="margin-bottom:10px">Precios por zona</div>
+    <div style="overflow-x:auto">
+      <table class="zt">
+        <thead><tr>
+          <th>Zona</th>
+          <th><span class="tag tp">PLUS</span></th>
+          <th><span class="tag tr2">RIDE</span></th>
+          <th><span class="tag ts">STAY</span></th>
+          <th><span class="tag tc">CHEAP</span></th>
+        </tr></thead>
+        <tbody id="res-zonas-body">
+          <tr><td colspan="5" style="color:var(--texto-sec);font-size:12px;padding:12px 0">Agrega zonas para ver precios</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title" style="margin-bottom:10px">Pedido y equilibrio</div>
+    <div id="res-pe"><div style="color:var(--texto-sec);font-size:12px">Agrega pedido de boletos para ver análisis</div></div>
+  </div>
+
+  <div style="display:flex;gap:8px;margin-bottom:8px">
+    <button class="btn btn-g" style="flex:1" onclick="guardarCotizacion()">💾 Guardar</button>
+    <button class="btn btn-g" style="flex:1" onclick="exportarResumen()">📋 Copiar resumen</button>
+  </div>
+  <button class="btn-pub" id="btn-pub" onclick="publicar()" disabled>Publicar en la web →</button>
+  <div id="pub-msg" style="font-size:11px;text-align:center;margin-top:6px;color:var(--texto-sec)"></div>
+</div>
+</div>
+
+<!-- MODAL SAVED -->
+<div id="modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:100;padding:20px;overflow-y:auto">
+  <div style="max-width:580px;margin:40px auto;background:var(--negro-card);border:1px solid var(--borde);border-radius:10px;padding:24px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <div style="font-size:15px;font-weight:900">Cotizaciones guardadas</div>
+      <button class="btn-x" onclick="hideModal()">×</button>
+    </div>
+    <div id="modal-content"></div>
   </div>
 </div>
 
 <script>
-// ── STATE ──────────────────────────────────────────────────────────────────
-let unidades = [];
-let zonas = [];
-let unidadId = 0;
-let zonaId = 0;
-
 const TRANSPORTE = {
-  van:    { label: 'Van',          pax: 13, coordis: 1 },
-  bus37:  { label: 'Bus 37 pax',   pax: 37, coordis: 1 },
-  bus47:  { label: 'Bus 47 pax',   pax: 47, coordis: 1 },
+  van:   {label:'Van (13 pax + 1 coordi + 1 chofer)',pax:13},
+  bus37: {label:'Bus 37 pax + 1 coordi + 1 chofer = 38 total',pax:37},
+  bus47: {label:'Bus 47 pax + 1 coordi + 1 chofer = 48 total',pax:47},
 };
+const HOTEL_DEF = {MTY:2500,CDMX:2900,OTRO:2500};
+let unidades=[],zonas=[],uId=0,zId=0,modo='estimado';
 
-const HOTEL_BASE = { MTY: 2500, CDMX: 2900, OTRO: 2500 };
+document.addEventListener('DOMContentLoaded',()=>{agregarUnidad();agregarZona();calcular();});
 
-// ── INIT ───────────────────────────────────────────────────────────────────
-document.addEventListener('DOMContentLoaded', () => {
-  agregarUnidad();
-  agregarZona();
-  calcular();
-});
-
-// ── TRANSPORTE ─────────────────────────────────────────────────────────────
-function agregarUnidad() {
-  const id = ++unidadId;
-  unidades.push({ id, tipo: 'bus37', costo: 0 });
-  renderUnidades();
+// MODO
+function setMode(m){
+  modo=m;
+  document.getElementById('btn-est').className='btn '+(m==='estimado'?'btn-y':'btn-g');
+  document.getElementById('btn-real').className='btn '+(m==='real'?'btn-y':'btn-g');
+  document.getElementById('mode-badge').className='mbadge '+(m==='real'?'mode-real':'mode-est');
+  document.getElementById('mode-badge').textContent=m==='real'?'Real (post-evento)':'Estimado';
   calcular();
 }
 
-function removerUnidad(id) {
-  unidades = unidades.filter(u => u.id !== id);
-  renderUnidades();
-  calcular();
-}
-
-function renderUnidades() {
-  const c = document.getElementById('unidades-container');
-  c.innerHTML = unidades.map(u => `
-    <div class="transport-row">
-      <div class="form-group">
-        <label>Tipo de unidad</label>
+// TRANSPORTE
+function agregarUnidad(){unidades.push({id:++uId,tipo:'bus37',costo:0});renderUnidades();calcular();}
+function removerUnidad(id){unidades=unidades.filter(u=>u.id!==id);renderUnidades();calcular();}
+function updateUnidad(id,f,v){const u=unidades.find(u=>u.id===id);if(u){u[f]=f==='tipo'?v:+v;calcular();}}
+function renderUnidades(){
+  document.getElementById('unidades-container').innerHTML=unidades.map(u=>`
+    <div class="row-t">
+      <div class="fg"><label>Tipo de unidad</label>
         <select onchange="updateUnidad(${u.id},'tipo',this.value)">
-          ${Object.entries(TRANSPORTE).map(([k,v]) => `<option value="${k}" ${u.tipo===k?'selected':''}>${v.label} (${v.pax} pax + 1 coordi)</option>`).join('')}
+          ${Object.entries(TRANSPORTE).map(([k,v])=>`<option value="${k}" ${u.tipo===k?'selected':''}>${v.label}</option>`).join('')}
         </select>
       </div>
-      <div class="form-group">
-        <label>Costo total ($)</label>
-        <input type="number" value="${u.costo||''}" placeholder="0" onchange="updateUnidad(${u.id},'costo',+this.value)">
+      <div class="fg"><label>Costo total ($)</label>
+        <input type="number" value="${u.costo||''}" placeholder="Estimado o real" onchange="updateUnidad(${u.id},'costo',this.value)">
       </div>
-      <button class="btn-icon" onclick="removerUnidad(${u.id})" title="Quitar unidad">×</button>
-    </div>
-  `).join('');
+      <button class="btn-x" onclick="removerUnidad(${u.id})">×</button>
+    </div>`).join('');
 }
 
-function updateUnidad(id, field, val) {
-  const u = unidades.find(u => u.id === id);
-  if (u) { u[field] = val; calcular(); }
+// ZONAS
+function agregarZona(){zonas.push({id:++zId,nombre:'',costo:0,pedido:0,vendidos:0});renderZonas();calcular();}
+function removerZona(id){zonas=zonas.filter(z=>z.id!==id);renderZonas();calcular();}
+function updateZona(id,f,v){const z=zonas.find(z=>z.id===id);if(z){z[f]=f==='nombre'?v:+v;actualizarStaffSelects();calcular();}}
+function renderZonas(){
+  document.getElementById('zonas-container').innerHTML=zonas.map(z=>`
+    <div class="row-z">
+      <input type="text" value="${z.nombre}" placeholder="Ej: Cancha VIP" oninput="updateZona(${z.id},'nombre',this.value)">
+      <input type="number" value="${z.costo||''}" placeholder="$0" onchange="updateZona(${z.id},'costo',this.value)">
+      <input type="number" value="${z.pedido||''}" placeholder="0" title="Pedido a matriz" onchange="updateZona(${z.id},'pedido',this.value)">
+      <input type="number" value="${z.vendidos||''}" placeholder="0" title="Vendidos hoy" onchange="updateZona(${z.id},'vendidos',this.value)">
+      <button class="btn-x" onclick="removerZona(${z.id})">×</button>
+    </div>`).join('');
+  actualizarStaffSelects();
+}
+function actualizarStaffSelects(){
+  const opts=zonas.filter(z=>z.nombre&&z.costo>0).map(z=>`<option value="${z.costo}">${z.nombre} ($${z.costo.toLocaleString('es-MX')})</option>`).join('');
+  ['coordi','creadora'].forEach(t=>{
+    const sel=document.getElementById(`staff-zona-${t}`);
+    const prev=sel.value;
+    const base=t==='creadora'?'<option value="0">Sin creadora / es local</option>':'<option value="0">Sin boleto</option>';
+    sel.innerHTML=base+opts;
+    sel.value=prev;
+  });
 }
 
-// ── ZONAS ──────────────────────────────────────────────────────────────────
-function agregarZona() {
-  const id = ++zonaId;
-  zonas.push({ id, nombre: '', costo: 0 });
-  renderZonas();
+// KIT
+function toggleKit(el){
+  const cb=el.querySelector('input[type=checkbox]');
+  cb.checked=!cb.checked;
+  el.classList.toggle('on',cb.checked);
+  calcular();
+}
+function getKitCost(){
+  let t=0;
+  document.querySelectorAll('.kit-chip.on').forEach(el=>{t+=+(el.dataset.cost||0);});
+  document.getElementById('kit-total').textContent='$'+t.toLocaleString('es-MX');
+  return t;
+}
+
+// STAFF
+function onStaffChange(tipo){
+  const val=+document.getElementById(`staff-zona-${tipo}`).value||0;
+  document.getElementById(`staff-costo-${tipo}`).value=val||'';
   calcular();
 }
 
-function removerZona(id) {
-  zonas = zonas.filter(z => z.id !== id);
-  renderZonas();
-  calcular();
-}
+// CALCULAR
+function calcular(){
+  const ciudad=document.getElementById('ev-ciudad').value;
+  const noches=+document.getElementById('ev-noches').value||1;
+  const hotelInput=+document.getElementById('ev-hotel').value||0;
+  const hotelBase=hotelInput||HOTEL_DEF[ciudad]||2500;
+  const kit=getKitCost();
+  const estac=+document.getElementById('estacionamiento').value||0;
 
-function renderZonas() {
-  const c = document.getElementById('zonas-container');
-  c.innerHTML = zonas.map(z => `
-    <div class="zone-row">
-      <div class="form-group">
-        <label>Nombre de la zona</label>
-        <input type="text" value="${z.nombre}" placeholder="Ej: Cancha VIP" onchange="updateZona(${z.id},'nombre',this.value)">
-      </div>
-      <div class="form-group">
-        <label>Costo boleto ($)</label>
-        <input type="number" value="${z.costo||''}" placeholder="0" onchange="updateZona(${z.id},'costo',+this.value)">
-      </div>
-      <button class="btn-icon" onclick="removerZona(${z.id})" title="Quitar zona">×</button>
-    </div>
-  `).join('');
+  const totalPax=unidades.reduce((s,u)=>s+(TRANSPORTE[u.tipo]?.pax||0),0);
+  const totalUnidades=unidades.length;
+  const totalCoordi=totalUnidades;
+  const costoTransTotal=unidades.reduce((s,u)=>s+(u.costo||0),0);
+  const costoTransPP=totalPax>0?costoTransTotal/totalPax:0;
 
-  // Update staff zone selectors
-  const zonaOpts = zonas.filter(z => z.nombre).map(z => `<option value="${z.costo}">${z.nombre}</option>`).join('');
-  document.getElementById('staff-zona-coordi').innerHTML = '<option value="">Sin boleto</option>' + zonaOpts;
-  document.getElementById('staff-zona-creadora').innerHTML = '<option value="">Sin creadora</option>' + zonaOpts;
-}
+  // Hotel clientes (cuádruple / 4)
+  const hotelClientePP=(hotelBase*noches)/4;
 
-function updateZona(id, field, val) {
-  const z = zonas.find(z => z.id === id);
-  if (z) { z[field] = val; renderZonas(); calcular(); }
-}
+  // Hotel choferes: 1 chofer por unidad, comparten de 2 en 2
+  const numChoferes=totalUnidades;
+  const habitChoferes=Math.ceil(numChoferes/2);
+  const costoHotelChoferes=habitChoferes*hotelBase*noches;
+  const costoHotelChoferPP=totalPax>0?costoHotelChoferes/totalPax:0;
 
-// ── KIT ────────────────────────────────────────────────────────────────────
-function toggleKit(el) {
-  const cb = el.querySelector('input[type=checkbox]');
-  cb.checked = !cb.checked;
-  el.classList.toggle('active', cb.checked);
-  calcular();
-}
+  // Hotel staff (coordi + creadora)
+  const staffHotelMode=document.getElementById('staff-hotel').value;
+  let costoHotelStaff=0;
+  if(staffHotelMode==='cuadruple') costoHotelStaff=hotelBase*noches;
+  else if(staffHotelMode==='doble') costoHotelStaff=hotelBase*noches*1.3;
+  else if(staffHotelMode==='individual') costoHotelStaff=hotelBase*noches*2;
+  const costoHotelStaffPP=totalPax>0?costoHotelStaff/totalPax:0;
 
-// ── CALCULAR ───────────────────────────────────────────────────────────────
-function calcular() {
-  const ciudad = document.getElementById('ev-ciudad').value;
-  const noches = +document.getElementById('ev-noches').value || 1;
-  const hotelEsp = +document.getElementById('ev-hotel-especial').value || 0;
-  const kitCosto = +document.getElementById('kit-costo').value || 0;
-  const estac = +document.getElementById('estacionamiento').value || 0;
+  // Staff boletos
+  const costoCordi=+document.getElementById('staff-costo-coordi').value||0;
+  const costoCreadora=+document.getElementById('staff-costo-creadora').value||0;
+  const costoStaffBoletos=(costoCordi*totalCoordi)+costoCreadora;
+  const costoStaffPP=totalPax>0?(costoStaffBoletos+costoHotelChoferes+costoHotelStaff)/totalPax:0;
 
-  const hotelBase = hotelEsp || HOTEL_BASE[ciudad] || 2500;
-  const costoHotelPorPersona = (hotelBase * noches) / 4;
+  // Estacionamiento
+  const costoEstacPP=totalPax>0?(estac*totalUnidades)/totalPax:0;
 
-  // Total pax across all units
-  const totalPax = unidades.reduce((s, u) => s + (TRANSPORTE[u.tipo]?.pax || 0), 0);
-  const totalCoordi = unidades.reduce((s, u) => s + (TRANSPORTE[u.tipo]?.coordis || 0), 0);
-  const totalUnidades = unidades.length;
+  // TOTAL GASTOS FIJOS POR PERSONA (sin boleto)
+  const gastosFijos=costoTransPP+hotelClientePP+kit+costoStaffPP+costoEstacPP;
 
-  // Transport cost per person
-  const costoTransTotal = unidades.reduce((s, u) => s + (u.costo || 0), 0);
-  const costoTransPP = totalPax > 0 ? costoTransTotal / totalPax : 0;
+  // Info choferes
+  document.getElementById('info-choferes').innerHTML=
+    `🚌 ${numChoferes} chofer${numChoferes!==1?'es':''} → ${habitChoferes} hab · $${Math.round(costoHotelChoferes).toLocaleString('es-MX')} total hotel choferes → <strong style="color:var(--amarillo)">$${Math.round(costoHotelChoferPP).toLocaleString('es-MX')} por cliente</strong>`;
 
-  // Staff costs distributed among pax
-  const costoCordiZona = +document.getElementById('staff-zona-coordi').value || 0;
-  const costoCreadoraZona = +document.getElementById('staff-zona-creadora').value || 0;
-  const costoCreadoraInput = +document.getElementById('staff-costo-creadora').value || 0;
-  const costoCreadora = costoCreadoraInput || costoCreadoraZona;
-
-  // Hotel for choferes: 1 room (2500/4) per 2 choferes, divided among pax
-  const numChoferes = totalUnidades; // 1 chofer per unit
-  const habitChoferes = Math.ceil(numChoferes / 2);
-  const costoHotelChoferesPP = totalPax > 0 ? (habitChoferes * hotelBase * noches) / totalPax : 0;
-
-  // Coordi cost per pax (boleto + hotel compartida + transporte ya incluido)
-  const costoCordiPP = totalPax > 0 ? (costoCordiZona * totalCoordi + costoCreadora + costoHotelChoferesPP * totalPax) / totalPax : 0;
-
-  // Estacionamiento per pax
-  const costoEstacPP = totalPax > 0 ? (estac * totalUnidades) / totalPax : 0;
-
-  // GASTOS FIJOS por persona (sin boleto)
-  const gastosFijos = costoTransPP + costoHotelPorPersona + kitCosto + costoCordiPP + costoEstacPP;
-
-  // Update header
-  document.getElementById('res-nombre').textContent = document.getElementById('ev-nombre').value || 'Nuevo evento';
-  const fecha = document.getElementById('ev-fecha').value;
-  const venue = document.getElementById('ev-venue').value;
-  document.getElementById('res-meta').textContent = [
-    fecha ? new Date(fecha+'T12:00').toLocaleDateString('es-MX',{day:'numeric',month:'long',year:'numeric'}) : '',
-    venue || '',
-    ciudad
+  // Header resultado
+  document.getElementById('res-nombre').textContent=document.getElementById('ev-nombre').value||'Nuevo evento';
+  const fecha=document.getElementById('ev-fecha').value;
+  const venue=document.getElementById('ev-venue').value;
+  document.getElementById('res-meta').textContent=[
+    fecha?new Date(fecha+'T12:00').toLocaleDateString('es-MX',{day:'numeric',month:'long',year:'numeric'}):'',
+    venue,ciudad
   ].filter(Boolean).join(' · ');
 
-  // Cost breakdown
-  const pesos = n => '$' + Math.round(n).toLocaleString('es-MX');
-  document.getElementById('res-costos').innerHTML = `
+  // Desglose de costos
+  const p=n=>'$'+Math.round(n).toLocaleString('es-MX');
+  const filas=[
+    costoTransPP>0      && ['Transporte',p(costoTransPP)],
+    hotelClientePP>0    && [`Hotel clientes (${noches}n cuádruple)`,p(hotelClientePP)],
+    kit>0               && ['Kit Conecta',p(kit)],
+    costoStaffPP>0      && ['Staff + hotel choferes',p(costoStaffPP)],
+    costoEstacPP>0      && ['Estacionamiento',p(costoEstacPP)],
+  ].filter(Boolean);
+  document.getElementById('res-costos').innerHTML=`
     <div style="font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--texto-sec);margin-bottom:8px">
-      Gastos fijos por persona (${totalPax} pax)
+      Gastos fijos / persona ${totalPax>0?`(${totalPax} pax total)`:''}
     </div>
-    ${costoTransPP > 0 ? `<div class="cost-row"><span>Transporte</span><span>${pesos(costoTransPP)}</span></div>` : ''}
-    ${costoHotelPorPersona > 0 ? `<div class="cost-row"><span>Hotel (${noches} noche${noches>1?'s':''})</span><span>${pesos(costoHotelPorPersona)}</span></div>` : ''}
-    ${kitCosto > 0 ? `<div class="cost-row"><span>Kit Conecta</span><span>${pesos(kitCosto)}</span></div>` : ''}
-    ${costoCordiPP > 0 ? `<div class="cost-row"><span>Staff (coordi + creadora + choferes)</span><span>${pesos(costoCordiPP)}</span></div>` : ''}
-    ${costoEstacPP > 0 ? `<div class="cost-row"><span>Estacionamiento</span><span>${pesos(costoEstacPP)}</span></div>` : ''}
-    <div class="cost-row"><span>Total fijos / persona</span><span>${pesos(gastosFijos)}</span></div>
+    ${filas.map(([l,v])=>`<div class="crow"><span>${l}</span><span>${v}</span></div>`).join('')}
+    <div class="crow total"><span>Total fijos sin boleto</span><span>${p(gastosFijos)}</span></div>
   `;
 
-  // Zone calculations
-  const zonasValidas = zonas.filter(z => z.nombre && z.costo > 0);
-  const tbody = document.getElementById('res-zonas-body');
+  // Tabla de zonas
+  const zv=zonas.filter(z=>z.nombre&&z.costo>0);
+  const tbody=document.getElementById('res-zonas-body');
+  const peDiv=document.getElementById('res-pe');
 
-  if (zonasValidas.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="5" style="color:var(--texto-sec);font-size:12px;padding:12px 0">Agrega zonas para ver precios</td></tr>';
-    document.getElementById('res-pe').innerHTML = '';
-    document.getElementById('btn-publicar').disabled = true;
+  if(!zv.length){
+    tbody.innerHTML='<tr><td colspan="5" style="color:var(--texto-sec);font-size:12px;padding:12px 0">Agrega zonas para ver precios</td></tr>';
+    peDiv.innerHTML='<div style="color:var(--texto-sec);font-size:12px">Agrega zonas con pedido para ver análisis</div>';
+    document.getElementById('btn-pub').disabled=true;
     return;
   }
 
-  // Margen fijo por zona (puedes ajustar)
-  const MARGEN = 1000;
-
-  const rows = zonasValidas.map(z => {
-    const costoTotal = z.costo + gastosFijos;
-    const pricePlus  = Math.ceil((costoTotal + MARGEN) / 100) * 100;
-    const priceRide  = Math.ceil((z.costo * 0.05 + gastosFijos - costoHotelPorPersona + MARGEN) / 100) * 100;
-    // STAY = PLUS - transporte
-    const priceStay  = ciudad !== 'CDMX' ? Math.ceil((costoTotal + MARGEN - costoTransPP) / 100) * 100 : null;
-    // CHEAP = solo boleto + margen pequeño
-    const priceCheap = Math.ceil((z.costo + 500) / 100) * 100;
-
-    const margenPP = pricePlus - costoTotal;
-    const margenPct = costoTotal > 0 ? Math.round(margenPP / pricePlus * 100) : 0;
-    const color = margenPct >= 15 ? 'var(--verde)' : margenPct >= 8 ? 'var(--amarillo)' : 'var(--rojo)';
-
+  tbody.innerHTML=zv.map(z=>{
+    const costoTotal=z.costo+gastosFijos;
+    const pricePlus=Math.ceil((costoTotal+1000)/100)*100;
+    const priceRide=Math.ceil((z.costo+costoTransPP+800)/100)*100;
+    const priceStay=ciudad!=='CDMX'?Math.ceil((costoTotal-costoTransPP+1000)/100)*100:null;
+    const priceCheap=Math.ceil((z.costo+500)/100)*100;
+    const margenPct=costoTotal>0?Math.round((pricePlus-costoTotal)/pricePlus*100):0;
+    const color=margenPct>=15?'var(--verde)':margenPct>=8?'var(--amarillo)':'var(--rojo)';
     return `<tr>
       <td>
         <div style="font-weight:700">${z.nombre}</div>
-        <div class="margin-bar"><div class="margin-fill" style="width:${Math.min(margenPct*2,100)}%;background:${color}"></div></div>
+        ${z.pedido>0?`<div style="font-size:10px;color:var(--texto-sec);margin-top:1px">Pedido: ${z.pedido} · Vendidos: ${z.vendidos||0} · Restan: ${z.pedido-(z.vendidos||0)}</div>`:''}
+        <div class="mbar"><div class="mfill" style="width:${Math.min(margenPct*2,100)}%;background:${color}"></div></div>
         <div style="font-size:10px;color:${color};margin-top:2px">${margenPct}% margen PLUS</div>
       </td>
-      <td style="color:var(--texto)">${pesos(pricePlus)}</td>
-      <td style="color:var(--verde)">${pesos(Math.max(priceRide,0))}</td>
-      <td style="color:var(--texto-sec)">${priceStay ? pesos(priceStay) : '—'}</td>
-      <td style="color:var(--amarillo)">${pesos(priceCheap)}</td>
+      <td style="color:var(--texto)">${p(pricePlus)}</td>
+      <td style="color:var(--verde)">${p(priceRide)}</td>
+      <td>${priceStay?p(priceStay):'<span style="color:var(--texto-sec)">—</span>'}</td>
+      <td style="color:var(--amarillo)">${p(priceCheap)}</td>
     </tr>`;
   }).join('');
 
-  tbody.innerHTML = rows;
+  // Punto de equilibrio
+  const totalPedido=zonas.reduce((s,z)=>s+(z.pedido||0),0);
+  const totalVendidos=zonas.reduce((s,z)=>s+(z.vendidos||0),0);
+  if(totalPedido>0){
+    const ingresoLleno=zv.reduce((s,z)=>s+(Math.ceil((z.costo+gastosFijos+1000)/100)*100)*(z.pedido||0),0);
+    const costoLleno=zv.reduce((s,z)=>s+(z.costo+gastosFijos)*(z.pedido||0),0);
+    const costosFijosEvento=costoTransTotal+costoStaffBoletos+costoHotelChoferes+costoHotelStaff+(estac*totalUnidades);
+    const precioPromPP=totalPedido>0?ingresoLleno/totalPedido:0;
+    const costoVarPP=totalPedido>0?(costoLleno-costosFijosEvento)/totalPedido:0;
+    const contrib=precioPromPP-costoVarPP;
+    const pe=contrib>0?Math.ceil(costosFijosEvento/contrib):0;
+    const pctOcup=totalPedido>0?Math.round(pe/totalPedido*100):0;
+    const pctVend=totalPedido>0?Math.round(totalVendidos/totalPedido*100):0;
+    const margenLleno=ingresoLleno-costoLleno;
+    const superoPE=totalVendidos>=pe;
+    peDiv.innerHTML=`
+      <div class="pe-row"><span style="color:var(--texto-sec)">Boletos pedidos a matriz</span><span class="pe-num">${totalPedido}</span></div>
+      <div class="pe-row"><span style="color:var(--texto-sec)">Vendidos hasta hoy</span><span class="pe-num" style="color:var(--verde)">${totalVendidos} <span style="font-size:11px">(${pctVend}%)</span></span></div>
+      <div class="pe-row"><span style="color:var(--texto-sec)">Punto de equilibrio</span><span class="pe-num" style="color:${superoPE?'var(--verde)':'var(--amarillo)'}">${pe} <span style="font-size:11px">(${pctOcup}%)</span></span></div>
+      <div class="pe-row"><span style="color:var(--texto-sec)">${superoPE?'✓ Superaste el PE':'Faltan '+(pe-totalVendidos)+' para el PE'}</span>
+        <span style="font-size:12px;font-weight:700;color:${superoPE?'var(--verde)':'var(--rojo)'}">${superoPE?'¡Rentable!':'Riesgo'}</span>
+      </div>
+      <div class="pe-row"><span style="color:var(--texto-sec)">Ganancia si llenas todo</span><span class="pe-num" style="color:var(--verde)">$${Math.round(margenLleno).toLocaleString('es-MX')}</span></div>
+      <div class="pe-row"><span style="color:var(--texto-sec)">Por cliente adicional</span><span style="font-size:14px;font-weight:700;color:var(--amarillo)">~$${Math.round(contrib).toLocaleString('es-MX')}</span></div>
+    `;
+  } else {
+    peDiv.innerHTML='<div style="color:var(--texto-sec);font-size:12px">Agrega el pedido de boletos por zona para ver el análisis completo</div>';
+  }
 
-  // Punto de equilibrio (usando zona promedio)
-  const costoPromedioZona = zonasValidas.reduce((s,z) => s + z.costo, 0) / zonasValidas.length;
-  const costoTotalPromedio = costoPromedioZona + gastosFijos;
-  const precioPromedioPlus = Math.ceil((costoTotalPromedio + MARGEN) / 100) * 100;
-  const contribucion = precioPromedioPlus - costoTotalPromedio;
-  const costosFijosEvento = costoTransTotal + (totalCoordi * costoCordiZona) + costoCreadora;
-  const pe = contribucion > 0 ? Math.ceil(costosFijosEvento / contribucion) : 0;
-
-  document.getElementById('res-pe').innerHTML = `
-    <div class="pe-row">
-      <span style="color:var(--texto-sec)">Capacidad total</span>
-      <span class="pe-num">${totalPax} personas</span>
-    </div>
-    <div class="pe-row">
-      <span style="color:var(--texto-sec)">Punto de equilibrio (aprox)</span>
-      <span class="pe-num" style="color:var(--amarillo)">${pe} clientes</span>
-    </div>
-    <div class="pe-row">
-      <span style="color:var(--texto-sec)">Ocupación mínima</span>
-      <span class="pe-num" style="color:${totalPax>0&&pe/totalPax<0.6?'var(--verde)':'var(--rojo)'}">${totalPax > 0 ? Math.round(pe/totalPax*100) : 0}%</span>
-    </div>
-    <div class="pe-row">
-      <span style="color:var(--texto-sec)">Ganancia si llenas</span>
-      <span class="pe-num" style="color:var(--verde)">${pesos(contribucion * totalPax)}</span>
-    </div>
-  `;
-
-  document.getElementById('btn-publicar').disabled = !document.getElementById('ev-nombre').value || zonasValidas.length === 0;
+  document.getElementById('btn-pub').disabled=!document.getElementById('ev-nombre').value;
 }
 
-// ── PUBLICAR ───────────────────────────────────────────────────────────────
-function publicar() {
-  const nombre = document.getElementById('ev-nombre').value;
-  const fecha  = document.getElementById('ev-fecha').value;
-  const ciudad = document.getElementById('ev-ciudad').value;
-  const venue  = document.getElementById('ev-venue').value;
+// GUARDAR / CARGAR
+function getData(){
+  return {
+    nombre:document.getElementById('ev-nombre').value,
+    fecha:document.getElementById('ev-fecha').value,
+    ciudad:document.getElementById('ev-ciudad').value,
+    venue:document.getElementById('ev-venue').value,
+    noches:document.getElementById('ev-noches').value,
+    hotel:document.getElementById('ev-hotel').value,
+    modo,unidades:[...unidades],zonas:[...zonas],
+    kitItems:[...document.querySelectorAll('.kit-chip')].map(el=>({cost:+(el.dataset.cost||0),on:el.classList.contains('on')})),
+    staffCoordi:document.getElementById('staff-costo-coordi').value,
+    staffCreadora:document.getElementById('staff-costo-creadora').value,
+    staffHotel:document.getElementById('staff-hotel').value,
+    estac:document.getElementById('estacionamiento').value,
+    sepPlus:document.getElementById('sep-plus').value,
+    sepStay:document.getElementById('sep-stay').value,
+    sepRide:document.getElementById('sep-ride').value,
+    sepCheap:document.getElementById('sep-cheap').value,
+    savedAt:new Date().toISOString(),
+  };
+}
 
-  const msg = document.getElementById('pub-msg');
-  msg.style.color = 'var(--amarillo)';
-  msg.textContent = 'Próximamente: publicación directa a la web. Por ahora copia los precios del cotizador.';
+function guardarCotizacion(){
+  const d=getData();
+  if(!d.nombre){alert('Ponle nombre al evento antes de guardar');return;}
+  localStorage.setItem('cot_'+d.nombre.replace(/\s+/g,'_').toLowerCase(),JSON.stringify(d));
+  toast('✓ Cotización guardada');
+}
 
-  // TODO: conectar con GitHub API para actualizar array EV en index.html
+function showSaved(){
+  const keys=Object.keys(localStorage).filter(k=>k.startsWith('cot_'));
+  document.getElementById('modal-content').innerHTML=!keys.length
+    ?'<div style="color:var(--texto-sec);font-size:13px">No hay cotizaciones guardadas.</div>'
+    :keys.map(k=>{
+      const d=JSON.parse(localStorage.getItem(k));
+      return `<div class="saved-item" onclick="loadCotizacion('${k}')">
+        <div>
+          <div style="font-size:13px;font-weight:700">${d.nombre}</div>
+          <div style="font-size:11px;color:var(--texto-sec)">${d.fecha||'Sin fecha'} · ${d.ciudad} · <span class="mbadge ${d.modo==='real'?'mode-real':'mode-est'}">${d.modo||'estimado'}</span></div>
+        </div>
+        <button class="btn-x" style="font-size:11px;padding:4px 8px" onclick="event.stopPropagation();deleteCot('${k}')">🗑</button>
+      </div>`;
+    }).join('');
+  document.getElementById('modal').style.display='block';
+}
+
+function hideModal(){document.getElementById('modal').style.display='none';}
+
+function deleteCot(key){
+  if(!confirm('¿Eliminar esta cotización?'))return;
+  localStorage.removeItem(key);
+  showSaved();
+}
+
+function loadCotizacion(key){
+  const d=JSON.parse(localStorage.getItem(key));
+  if(!d)return;
+  document.getElementById('ev-nombre').value=d.nombre||'';
+  document.getElementById('ev-fecha').value=d.fecha||'';
+  document.getElementById('ev-ciudad').value=d.ciudad||'MTY';
+  document.getElementById('ev-venue').value=d.venue||'';
+  document.getElementById('ev-noches').value=d.noches||'1';
+  document.getElementById('ev-hotel').value=d.hotel||'';
+  unidades=d.unidades||[];uId=unidades.length?Math.max(...unidades.map(u=>u.id)):0;
+  zonas=d.zonas||[];zId=zonas.length?Math.max(...zonas.map(z=>z.id)):0;
+  renderUnidades();renderZonas();
+  if(d.kitItems){
+    document.querySelectorAll('.kit-chip').forEach((el,i)=>{
+      if(d.kitItems[i]){
+        el.querySelector('input').checked=d.kitItems[i].on;
+        el.classList.toggle('on',d.kitItems[i].on);
+      }
+    });
+  }
+  document.getElementById('staff-costo-coordi').value=d.staffCoordi||'';
+  document.getElementById('staff-costo-creadora').value=d.staffCreadora||'';
+  document.getElementById('staff-hotel').value=d.staffHotel||'compartida';
+  document.getElementById('estacionamiento').value=d.estac||'';
+  document.getElementById('sep-plus').value=d.sepPlus||'800';
+  document.getElementById('sep-stay').value=d.sepStay||'800';
+  document.getElementById('sep-ride').value=d.sepRide||'1000';
+  document.getElementById('sep-cheap').value=d.sepCheap||'1000';
+  setMode(d.modo||'estimado');
+  hideModal();calcular();
+}
+
+function nuevaCotizacion(){
+  if(!confirm('¿Nueva cotización? Guarda la actual primero si la necesitas.'))return;
+  document.getElementById('ev-nombre').value='';
+  document.getElementById('ev-fecha').value='';
+  document.getElementById('ev-venue').value='';
+  document.getElementById('ev-hotel').value='';
+  unidades=[];zonas=[];uId=0;zId=0;
+  agregarUnidad();agregarZona();setMode('estimado');calcular();
+}
+
+function exportarResumen(){
+  const d=getData();
+  const txt=`COTIZACIÓN: ${d.nombre}\nFecha: ${d.fecha} | ${d.ciudad} | ${d.venue}\nModo: ${d.modo}\n\nZonas:\n`+
+    d.zonas.filter(z=>z.nombre&&z.costo>0).map(z=>`  ${z.nombre}: $${z.costo.toLocaleString('es-MX')} | Pedido: ${z.pedido||0} | Vendidos: ${z.vendidos||0}`).join('\n')+
+    '\n\nTransporte:\n'+d.unidades.map(u=>`  ${TRANSPORTE[u.tipo]?.label}: $${u.costo.toLocaleString('es-MX')}`).join('\n');
+  navigator.clipboard.writeText(txt).then(()=>toast('✓ Resumen copiado'));
+}
+
+function publicar(){
+  document.getElementById('pub-msg').textContent='Próximamente: publicación directa a conectareynosa.mx';
+}
+
+function toast(msg){
+  const t=document.createElement('div');
+  t.style.cssText='position:fixed;bottom:24px;right:24px;background:var(--negro-card);border:1px solid var(--verde);color:var(--verde);padding:10px 16px;border-radius:6px;font-size:13px;font-weight:700;z-index:999';
+  t.textContent=msg;document.body.appendChild(t);setTimeout(()=>t.remove(),2500);
 }
 </script>
 </body>

@@ -1944,6 +1944,7 @@ function buildCotizacionMsg(quincenas,pagoQ){
   else if(selH) msg+='\n🏨 *Habitación:* '+selH.n+' (incluida)';
   if(selTransporte&&selTransporte.cost>0) msg+='\n🚌 *Transporte:* '+selTransporte.n+' (+'+fmt(selTransporte.cost)+'/persona)';
   msg+='\n\n💰 *Costo por persona:* '+fmt(costoXPersona);
+  if(_promoActivo) msg+='\n🏷️ *Código aplicado:* '+_promoActivo.code+' (-'+_promoActivo.pct+'%)';
   if(selViaj>1) msg+='\n💵 *Total del grupo:* '+fmt(total);
   msg+='\n💳 *Separo hoy:* '+fmt(sepActualCalc);
   msg+='\n💸 *Resto a cubrir:* '+fmt(resto);

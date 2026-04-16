@@ -923,14 +923,19 @@ function calcular(){
   const totVend=zonas.reduce((s,z)=>s+(z.vendidos||0),0);
   // Staff: coordis + creadora si viaja
   const _nCoordi = totalCoordi||0;
-  const _nCreadora = (() => { try { const sel=document.getElementById('creadora-tipo'); return sel&&sel.value!=='ninguna'?1:0; } catch(e){return 0;} })();
+  const _nCreadora = (() => { try { const sel=document.getElementById('crea-tipo'); return sel&&sel.value!=='ninguna'?1:0; } catch(e){return 0;} })();
   const totalStaff = _nCoordi + _nCreadora;
   const totPagantes = Math.max(totPed - totalStaff, 0);
   if(totPed>0){
     const ingLleno=zv.reduce((s,z)=>s+(z.precioPlus||Math.ceil((z.costo+gastosFijos+1000)/100)*100)*(z.pedido||0),0);
     const ingPagantes=totPed>0?ingLleno*(totPagantes/totPed):0;
     const costoLleno=zv.reduce((s,z)=>s+(z.costo+gastosFijos)*(z.pedido||0),0);
-    const costoFijosEv=(costoTransTotal||0)+((coordBoleto||0)+(kit||0))*_nCoordi+((estac||0)*(totalUnidades||0));
+    // Costos fijos del evento = todo menos los boletos de clientes
+    const costoFijosEv=(costoTransTotal||0)
+      +(costoHotelChoferPP||0)*(totalPax||0)
+      +((coordBoleto||0)+(kit||0))*_nCoordi
+      +(costoCreaTotal||0)
+      +((estac||0)*(totalUnidades||0));
     const precProm=totPagantes>0?ingPagantes/totPagantes:0;
     const costoVarPP=totPed>0?costoLleno/totPed:0;
     const contrib=precProm-costoVarPP;

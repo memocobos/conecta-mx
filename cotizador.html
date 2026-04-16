@@ -921,11 +921,16 @@ function calcular(){
   // PE
   const totPed=zonas.reduce((s,z)=>s+(z.pedido||0),0);
   const totVend=zonas.reduce((s,z)=>s+(z.vendidos||0),0);
+  // Staff no genera ingreso — restar coordis y creadora del conteo de pagantes
+  const totalStaff=(totalCoordi||0)+(tieneCreadora&&creadoraViaja?1:0);
+  const totPagantes=Math.max(totPed-totalStaff,0);
   if(totPed>0){
-    const ingLleno=zv.reduce((s,z)=>s+(Math.ceil((z.costo+gastosFijos+1000)/100)*100)*(z.pedido||0),0);
+    // Ingreso solo de pagantes (pedido - staff)
+    const fracPag=totPed>0?totPagantes/totPed:1;
+    const ingLleno=zv.reduce((s,z)=>s+(z.precioPlus||Math.ceil((z.costo+gastosFijos+1000)/100)*100)*Math.round((z.pedido||0)*fracPag),0);
     const costoLleno=zv.reduce((s,z)=>s+(z.costo+gastosFijos)*(z.pedido||0),0);
     const costoFijosEv=(costoTransTotal||0)+((coordBoleto||0)+(kit||0))*(totalCoordi||0)+((estac||0)*(totalUnidades||0));
-    const precProm=totPed>0?ingLleno/totPed:0;
+    const precProm=totPagantes>0?ingLleno/totPagantes:0;
     const costoVarPP=totPed>0?(costoLleno)/totPed:0;
     const contrib=precProm-costoVarPP;
     const pe=contrib>0?Math.ceil(costoFijosEv/contrib):0;
@@ -935,6 +940,8 @@ function calcular(){
     const ok=totVend>=pe;
     peDiv.innerHTML=`
       <div class="pe-r"><span style="color:var(--ts)">Boletos pedidos a matriz</span><span class="pe-n">${totPed}</span></div>
+      ${totalStaff>0?`<div class="pe-r"><span style="color:var(--ts)">Staff (coordi+creadora)</span><span class="pe-n" style="color:var(--ro)">-${totalStaff}</span></div>`:''}
+      <div class="pe-r"><span style="color:var(--ts)">Clientes pagantes</span><span class="pe-n" style="color:var(--am)">${totPagantes}</span></div>
       <div class="pe-r"><span style="color:var(--ts)">Vendidos hoy</span><span class="pe-n" style="color:var(--ve)">${totVend} <span style="font-size:10px">(${pctVend}%)</span></span></div>
       <div class="pe-r"><span style="color:var(--ts)">Punto de equilibrio</span><span class="pe-n" style="color:${ok?'var(--ve)':'var(--am)'}">${pe} <span style="font-size:10px">(${pctOcup}%)</span></span></div>
       <div class="pe-r"><span style="color:var(--ts)">${ok?'✓ Superaste el PE':'Faltan '+(pe-totVend)+' para el PE'}</span>

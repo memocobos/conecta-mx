@@ -924,7 +924,7 @@ function calcular(){
   if(totPed>0){
     const ingLleno=zv.reduce((s,z)=>s+(Math.ceil((z.costo+gastosFijos+1000)/100)*100)*(z.pedido||0),0);
     const costoLleno=zv.reduce((s,z)=>s+(z.costo+gastosFijos)*(z.pedido||0),0);
-    const costoFijosEv=costoTransTotal+(coordBoleto+kit)*totalCoordi+(costoUbersTotal=totalCoordi*coordUbers)+(coordVuelo*totalCoordi)+costoHotelChofTotal+costoHotelCoordExtra+costoHotelStaff+(estac*totalUnidades);
+    const costoFijosEv=(costoTransTotal||0)+((coordBoleto||0)+(kit||0))*(totalCoordi||0)+((estac||0)*(totalUnidades||0));
     const precProm=totPed>0?ingLleno/totPed:0;
     const costoVarPP=totPed>0?(costoLleno)/totPed:0;
     const contrib=precProm-costoVarPP;

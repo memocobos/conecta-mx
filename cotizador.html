@@ -1233,10 +1233,8 @@ Sé directo, usa números reales, habla como consultor de negocios no como asist
     // Render markdown-ish output
     const html = text
       .replace(/### (.*)/g, '<h3>$1</h3>')
-      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+      .replace(/[*][*](.*?)[*][*]/g, '<strong>$1</strong>')
       .replace(/\n/g, '<br>')
-      .replace(/
-/g, '<br>')
       .replace(/optimista/gi, '<span class="verde">optimista</span>')
       .replace(/pesimista/gi, '<span class="rojo">pesimista</span>')
       .replace(/realista/gi, '<span class="amarillo">realista</span>');

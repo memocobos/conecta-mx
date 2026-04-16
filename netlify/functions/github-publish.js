@@ -14,7 +14,7 @@ exports.handler = async (event) => {
     });
     const fileData = await fileRes.json();
     const sha = fileData.sha;
-    let content = Buffer.from(fileData.content, 'base64').toString('utf8');
+    const cleanContent = fileData.content.replace(/\n/g, ''); let content = Buffer.from(cleanContent, 'base64').toString('utf8');
 
     // 2. Find the event by id and update zonas + status
     // Replace zonas prices for this event

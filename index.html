@@ -1959,6 +1959,7 @@ function calcular(){
     var desc=Math.round(costoXPersona*_promoActivo.pct/100);
     costoXPersona=costoXPersona-desc;
     total=total-Math.round(total*_promoActivo.pct/100);
+    resto=total-sepActualCalc;
   }
   $$('r-q').textContent=fmt(costoXPersona);
   $$('r-np').textContent='por viajero';

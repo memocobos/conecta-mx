@@ -923,7 +923,7 @@ function calcular(){
   const totVend=zonas.reduce((s,z)=>s+(z.vendidos||0),0);
   // Staff: coordis + creadora si viaja
   const _nCoordi = totalCoordi||0;
-  const _nCreadora = (() => { try { const sel=document.getElementById('creadora-tipo'); return sel&&sel.value!=='ninguna'&&sel.value!=='local'?1:0; } catch(e){return 0;} })();
+  const _nCreadora = (() => { try { const sel=document.getElementById('creadora-tipo'); return sel&&sel.value!=='ninguna'?1:0; } catch(e){return 0;} })();
   const totalStaff = _nCoordi + _nCreadora;
   const totPagantes = Math.max(totPed - totalStaff, 0);
   if(totPed>0){

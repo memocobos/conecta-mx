@@ -426,8 +426,7 @@ select option{background:var(--ns)}
     <button class="btn bg" style="flex:1" onclick="guardar()">💾 Guardar</button>
     <button class="btn bg" style="flex:1" onclick="exportar()">📋 Copiar</button>
   </div>
-  <button class="b-pub" id="b-pub" onclick="publicar()" disabled>Publicar en la web →</button>
-  <div id="pub-msg" style="font-size:10px;text-align:center;margin-top:5px;color:var(--ts)"></div>
+
 </div>
 </div>
 
@@ -889,7 +888,7 @@ function calcular(){
   if(!zv.length){
     tbody.innerHTML='<tr><td colspan="5" style="color:var(--ts);font-size:11px;padding:10px 0">Agrega zonas para ver precios</td></tr>';
     peDiv.innerHTML='<div style="color:var(--ts);font-size:11px">Agrega pedido de boletos para ver el análisis</div>';
-    document.getElementById('b-pub').disabled=true;
+    if(document.getElementById('b-pub')) document.getElementById('b-pub').disabled=true;
     return;
   }
 
@@ -960,7 +959,7 @@ function calcular(){
     peDiv.innerHTML='<div style="color:var(--ts);font-size:11px">Agrega el pedido de boletos por zona para ver el análisis completo</div>';
   }
 
-  document.getElementById('b-pub').disabled=!document.getElementById('ev-nom').value;
+  if(document.getElementById('b-pub')) document.getElementById('b-pub').disabled=!document.getElementById('ev-nom').value;
 }
 
 // ── GUARDAR / CARGAR ───────────────────────────────────────────────────────
@@ -1070,11 +1069,62 @@ function nuevaCot(){
 }
 
 function exportar(){
-  const d=getData();
-  const txt=`COTIZACIÓN: ${d.nombre}\nFecha: ${d.fecha} | ${d.ciudad} | ${d.venue}\n${d.dias}d · ${d.noches}n hotel | Modo: ${d.modo}\n\nZonas:\n`+
-    d.zonas.filter(z=>z.nombre&&z.costo>0).map(z=>`  ${z.nombre}: $${(+z.costo).toLocaleString('es-MX')} | Pedido: ${z.pedido||0} | Vendidos: ${z.vendidos||0}`).join('\n')+
-    '\n\nTransporte:\n'+d.unidades.map(u=>`  ${TRP[u.tipo]?.label}: renta $${(+u.costo).toLocaleString('es-MX')} + ruta $${(+(u.gastosRuta||3500)).toLocaleString('es-MX')}`).join('\n');
-  navigator.clipboard.writeText(txt).then(()=>toast('✓ Copiado'));
+  const d = getData();
+  const ciudad = document.getElementById('ev-ciudad').value;
+  const noches = +document.getElementById('ev-noches').value||1;
+  const hotelBase = +document.getElementById('ev-hotel').value||(ciudad==='CDMX'?2900:2500);
+  const kit = getKit();
+  const totalPax = unidades.reduce((s,u)=>s+(TRP[u.tipo]?.pax||0),0);
+  const costoTrans = unidades.reduce((s,u)=>s+(u.costo||0)+(ciudad!=='CDMX'?(u.gastosRuta||3500):0),0);
+  const transPP = totalPax>0?costoTrans/totalPax:0;
+  const hotelPP = (hotelBase*noches)/4;
+  const gf = transPP + hotelPP + kit;
+  const pRide = ciudad==='CDMX'?(+document.getElementById('ride-precio-cdmx').value||2900):(+document.getElementById('ride-precio-mty').value||2700);
+  const zv = zonas.filter(z=>z.nombre&&z.costo>0);
+
+  const sep = '─'.repeat(44);
+  let txt = '';
+  txt += `COTIZACIÓN CONECTA REYNOSA\n`;
+  txt += `${sep}\n`;
+  txt += `Evento:  ${d.nombre}\n`;
+  txt += `Fecha:   ${d.fecha||'—'} | ${d.ciudad} | ${d.venue||'—'}\n`;
+  txt += `Duración: ${d.dias} día(s) · ${d.noches} noche(s)\n`;
+  txt += `${sep}\n\n`;
+
+  txt += `GASTOS FIJOS / PERSONA\n`;
+  txt += `  Transporte:  $${Math.round(transPP).toLocaleString('es-MX')}\n`;
+  txt += `  Hotel ${noches}n:    $${Math.round(hotelPP).toLocaleString('es-MX')}\n`;
+  txt += `  Kit:         $${kit}\n`;
+  txt += `  Total fijos: $${Math.round(gf).toLocaleString('es-MX')}/persona\n\n`;
+
+  txt += `PRECIOS POR ZONA\n`;
+  txt += `${'Zona'.padEnd(16)}${'PLUS'.padStart(10)}${'RIDE'.padStart(10)}${'STAY'.padStart(10)}${'CHEAP'.padStart(10)}${'Margen'.padStart(8)}\n`;
+  txt += `${sep}\n`;
+  for(const z of zv){
+    const costo = z.costo + gf;
+    const pPlus  = z.precioPlus  || Math.ceil((costo+1000)/100)*100;
+    const pStay  = z.precioStay  || Math.ceil((costo-transPP+1000)/100)*100;
+    const pCheap = z.precioCheap || Math.ceil((z.costo+500)/100)*100;
+    const mg = Math.round((pPlus-costo)/pPlus*100);
+    txt += `${z.nombre.padEnd(16)}${('$'+pPlus.toLocaleString('es-MX')).padStart(10)}${('$'+pRide.toLocaleString('es-MX')).padStart(10)}${('$'+pStay.toLocaleString('es-MX')).padStart(10)}${('$'+pCheap.toLocaleString('es-MX')).padStart(10)}${(mg+'%').padStart(8)}\n`;
+  }
+  txt += `\n`;
+
+  if(zv.some(z=>z.pedido>0)){
+    txt += `PEDIDO Y EQUILIBRIO\n`;
+    const totPed = zv.reduce((s,z)=>s+(z.pedido||0),0);
+    const totVend = zv.reduce((s,z)=>s+(z.vendidos||0),0);
+    txt += `  Boletos pedidos: ${totPed}\n`;
+    txt += `  Vendidos: ${totVend} (${totPed>0?Math.round(totVend/totPed*100):0}%)\n`;
+    txt += `  Por vender: ${totPed-totVend}\n\n`;
+  }
+
+  txt += `TRANSPORTE\n`;
+  for(const u of unidades){
+    txt += `  ${TRP[u.tipo]?.label||u.tipo}: $${(+u.costo).toLocaleString('es-MX')} renta + $${(+(u.gastosRuta||3500)).toLocaleString('es-MX')} ruta\n`;
+  }
+
+  navigator.clipboard.writeText(txt).then(()=>toast('✓ Resumen copiado al portapapeles'));
 }
 
 async function publicar(){
@@ -1085,7 +1135,7 @@ async function publicar(){
   if(!zv.length){alert('Agrega al menos una zona con precio');return;}
 
   const msg = document.getElementById('pub-msg');
-  const btn = document.getElementById('b-pub');
+  const btn = document.getElementById('b-pub') || {disabled:false};
   btn.disabled = true;
   msg.style.color = 'var(--ts)';
   msg.textContent = 'Preparando precios...';

@@ -1101,6 +1101,26 @@ function getBanco(){
   if(selPkg==='ride')return BANCO_DEFAULT;
   return(cur&&cur.banco)||BANCO_DEFAULT;
 }
+function actualizarIncluye(){
+  if(!cur||!selPkg)return;
+  var items=[];
+  if(cur.inc&&cur.inc.length>0){
+    items=cur.inc.slice();
+    if(selPkg==='ride') items=items.filter(function(i){return i.toLowerCase().indexOf('boleto')<0;});
+    else if(selPkg==='stay') items=items.filter(function(i){return i.toLowerCase().indexOf('transporte')<0&&i.toLowerCase().indexOf('traslado')<0;});
+    else if(selPkg==='cheap') items=items.filter(function(i){return i.toLowerCase().indexOf('transporte')<0&&i.toLowerCase().indexOf('traslado')<0&&i.toLowerCase().indexOf('hospedaje')<0&&i.toLowerCase().indexOf('hotel')<0;});
+  } else {
+    if(selPkg==='plus') items=[txtTransporte(cur),'Hospedaje','Boleto zona elegida','Kit Conecta'];
+    else if(selPkg==='ride') items=[txtTransporte(cur),'Hospedaje','Kit Conecta'];
+    else if(selPkg==='stay') items=['Hospedaje','Boleto zona elegida','Kit Conecta'];
+    else items=['Boleto zona elegida','Kit Conecta'];
+  }
+  if(selTransporte&&selTransporte.cost>0){
+    items.push('🚌 Autobús Reynosa-'+getCiudad(cur));
+  }
+  $$('d-inc').innerHTML='<div style="font-size:11px;color:rgba(255,255,255,.6);font-weight:700;text-transform:uppercase;line-height:2">'+items.join(' · ')+'</div>';
+  $$('w-inc-card').style.display='block';
+}
 function actualizarBankInfo(){
   var b=getBanco();
   var bH='<div class="bank-row"><span class="bank-lbl">Banco</span><span class="bank-val s">'+b.nombre+'</span></div>'+
@@ -1978,6 +1998,7 @@ function calcular(){
   $$('r-np').textContent='por viajero';
   $$('r-pkg-lbl').textContent={plus:'PLUS — Todo incluido',ride:'RIDE — Sin boleto',stay:'STAY — Sin transporte',cheap:'CHEAP — Solo boleto'}[selPkg];
   actualizarBankInfo();
+  actualizarIncluye();
   $$('r-viajeros').textContent=selViaj+(selViaj===1?' persona':' personas');
   $$('r-total').textContent=fmt(total);
   $$('r-sep').textContent=fmt(sepActualCalc);

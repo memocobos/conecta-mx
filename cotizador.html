@@ -1064,12 +1064,12 @@ async function publicar(){
 
   const zonasPayload = zv.map(z=>({
     n: z.nombre,
-    p: Math.ceil((z.costo+gf+1000)/100)*100,
+    p: z.precioPlus || Math.ceil((z.costo+gf+1000)/100)*100,
     ag: z.pedido>0&&z.vendidos>=z.pedido?1:0,
   }));
   const cheapPayload = zv.map(z=>({
     n: z.nombre,
-    p: Math.ceil((z.costo+500)/100)*100,
+    p: z.precioCheap || Math.ceil((z.costo+500)/100)*100,
   }));
 
   // Event id from nombre

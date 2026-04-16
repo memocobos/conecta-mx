@@ -356,6 +356,13 @@ select option{background:var(--ns)}
     <div class="g2">
       <div class="fg"><label>Separo PLUS ($)</label><input id="sep-plus" type="number" value="800" oninput="calcular()"></div>
       <div class="fg"><label>Separo RIDE ($)</label><input id="sep-ride" type="number" value="800" oninput="calcular()"></div>
+      <div class="fg full" style="margin-top:8px;padding-top:8px;border-top:1px solid var(--b)">
+        <label>Ganancia por cliente</label>
+        <div style="display:flex;gap:8px;margin-top:4px">
+          <div class="fg" style="flex:1"><label style="font-size:9px">PLUS ($)</label><input id="ganancia-plus" type="number" value="1000" oninput="calcular()"></div>
+          <div class="fg" style="flex:1"><label style="font-size:9px">CHEAP ($)</label><input id="ganancia-cheap" type="number" value="500" oninput="calcular()"></div>
+        </div>
+      </div>
       <div class="fg full" style="margin-top:4px">
         <label>Precio RIDE (precio fijo que cobras al cliente)</label>
         <div style="display:flex;gap:8px">
@@ -894,9 +901,11 @@ function calcular(){
 
    tbody.innerHTML=zv.map(z=>{
     const costoTot=z.costo+gastosFijos;
-    const pPlusCalc=Math.ceil((costoTot+1000)/100)*100;
-    const pStayCalc=Math.ceil((costoTot-costoTransPP+1000)/100)*100;
-    const pCheapCalc=Math.ceil((z.costo+500)/100)*100;
+    const _ganPlus  = +document.getElementById('ganancia-plus').value  || 1000;
+    const _ganCheap = +document.getElementById('ganancia-cheap').value || 500;
+    const pPlusCalc =Math.ceil((costoTot+_ganPlus)/100)*100;
+    const pStayCalc =Math.ceil((costoTot-costoTransPP+_ganPlus)/100)*100;
+    const pCheapCalc=Math.ceil((z.costo+_ganCheap)/100)*100;
     const pPlus=z.precioPlus||pPlusCalc;
     const pStay=z.precioStay||pStayCalc;
     const pCheap=z.precioCheap||pCheapCalc;
@@ -990,6 +999,8 @@ function getData(){
     sepStay:document.getElementById('sep-stay').value,
     sepCheap:document.getElementById('sep-cheap').value,
     rideMTY:document.getElementById('ride-precio-mty').value,
+    gananciaPLUS:document.getElementById('ganancia-plus').value,
+    gananciaCHEAP:document.getElementById('ganancia-cheap').value,
     rideCDMX:document.getElementById('ride-precio-cdmx').value,
     savedAt:new Date().toISOString(),
   };
@@ -1054,6 +1065,8 @@ function loadCot(k){
   document.getElementById('sep-stay').value=d.sepStay||'800';
   document.getElementById('sep-cheap').value=d.sepCheap||'1000';
   document.getElementById('ride-precio-mty').value=d.rideMTY||'2700';
+  document.getElementById('ganancia-plus').value=d.gananciaPLUS||'1000';
+  document.getElementById('ganancia-cheap').value=d.gananciaCHEAP||'500';
   document.getElementById('ride-precio-cdmx').value=d.rideCDMX||'2900';
   setMode(d.modo||'estimado');
   hideModal();calcular();
@@ -1079,6 +1092,8 @@ function exportar(){
   const transPP = totalPax>0?costoTrans/totalPax:0;
   const hotelPP = (hotelBase*noches)/4;
   const gf = transPP + hotelPP + kit;
+  const _expGanPlus  = +document.getElementById('ganancia-plus').value  || 1000;
+  const _expGanCheap = +document.getElementById('ganancia-cheap').value || 500;
   const pRide = ciudad==='CDMX'?(+document.getElementById('ride-precio-cdmx').value||2900):(+document.getElementById('ride-precio-mty').value||2700);
   const zv = zonas.filter(z=>z.nombre&&z.costo>0);
 
@@ -1102,9 +1117,9 @@ function exportar(){
   txt += `${sep}\n`;
   for(const z of zv){
     const costo = z.costo + gf;
-    const pPlus  = z.precioPlus  || Math.ceil((costo+1000)/100)*100;
+    const pPlus  = z.precioPlus  || Math.ceil((costo+_expGanPlus)/100)*100;
     const pStay  = z.precioStay  || Math.ceil((costo-transPP+1000)/100)*100;
-    const pCheap = z.precioCheap || Math.ceil((z.costo+500)/100)*100;
+    const pCheap = z.precioCheap || Math.ceil((z.costo+_expGanCheap)/100)*100;
     const mg = Math.round((pPlus-costo)/pPlus*100);
     txt += `${z.nombre.padEnd(16)}${('$'+pPlus.toLocaleString('es-MX')).padStart(10)}${('$'+pRide.toLocaleString('es-MX')).padStart(10)}${('$'+pStay.toLocaleString('es-MX')).padStart(10)}${('$'+pCheap.toLocaleString('es-MX')).padStart(10)}${(mg+'%').padStart(8)}\n`;
   }
@@ -1151,6 +1166,8 @@ async function publicar(){
   const transPP = totalPax>0?costoTrans/totalPax:0;
   const hotelPP = (hotelBase*noches)/4;
   const gf = transPP + hotelPP + kit;
+  const _expGanPlus  = +document.getElementById('ganancia-plus').value  || 1000;
+  const _expGanCheap = +document.getElementById('ganancia-cheap').value || 500;
 
   const zonasPayload = zv.map(z=>({
     n: z.nombre,
@@ -1227,6 +1244,8 @@ async function analizarConIA(){
   const transPP = totalPax>0?costoTransTotal/totalPax:0;
   const hotelPP = (hotelBase*noches)/4;
   const gf = transPP + hotelPP + kit;
+  const _expGanPlus  = +document.getElementById('ganancia-plus').value  || 1000;
+  const _expGanCheap = +document.getElementById('ganancia-cheap').value || 500;
 
   const btn = document.getElementById('ai-btn');
   const out = document.getElementById('ai-output');

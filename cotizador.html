@@ -1218,17 +1218,13 @@ Genera un análisis CONCISO y PRÁCTICO con estas secciones (usa markdown simple
 Sé directo, usa números reales, habla como consultor de negocios no como asistente genérico.`;
 
   try {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
+    const res = await fetch('/.netlify/functions/claude-analyze', {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 1000,
-        messages: [{ role: 'user', content: prompt }]
-      })
+      body: JSON.stringify({ prompt })
     });
     const data = await res.json();
-    const text = data.content?.[0]?.text || 'Error al obtener análisis';
+    const text = data.text || data.error || 'Error al obtener análisis';
 
     // Render markdown-ish output
     const html = text

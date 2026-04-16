@@ -575,7 +575,7 @@ src="https://www.facebook.com/tr?id=1685907946147007&ev=PageView&noscript=1"
     </div>
   </div>
 
-  <div class="card"><div class="card-lbl">Datos de pago</div><div id="d-bank"></div></div>
+  <div class="card" id="d-bank-card" style="display:none"><div class="card-lbl">Datos de pago</div><div id="d-bank"></div></div>
   <div class="card">
     <div class="card-lbl">Políticas</div>
     <div class="pol-row"><span class="pol-ico" style="color:#ff283b">X</span><span>Sin reembolsos por cancelación del cliente o incumplimiento de pagos</span></div>
@@ -1108,6 +1108,7 @@ function actualizarBankInfo(){
     '<div class="bank-row"><span class="bank-lbl">CLABE</span><span class="bank-val">'+b.clabe+' <span class="bank-copy" onclick="copiarDato(this,\''+b.clabe+'\')">Copiar</span></span></div>'+
     '<div class="bank-row"><span class="bank-lbl">Titular</span><span class="bank-val s">'+b.titular+'</span></div>';
   $$('d-bank').innerHTML=bH;
+  $$('d-bank-card').style.display='block';
 }
 function getCiudad(ev){
   if(!ev||!ev.v)return 'Destino';
@@ -1156,8 +1157,8 @@ function showDetail(id){
     }
   }
 
-  // Bank info (initial render, updates when package selected via actualizarBankInfo)
-  actualizarBankInfo();
+  // Bank info hidden until calcular() runs
+  $$('d-bank-card').style.display='none';
 
   // Reset wizard
   resetWizard();

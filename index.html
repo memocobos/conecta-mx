@@ -767,66 +767,18 @@ function fmt(n){var r=Math.round(n*100)/100;if(r===Math.round(r))return'$'+Math.
 function minP(ev){var _z=(ev.multifecha?ev.multifecha.reduce(function(a,mf){return a.concat(mf.zonas);},ev.zonas||[]):(ev.zonas||[]));if(ev.cheapOnly&&ev.cheapZonas)_z=ev.cheapZonas;var a=_z.filter(function(z){return !z.ag&&!z.prox&&z.p>0;});if(!a.length)return 0;return Math.min.apply(null,a.map(function(z){return z.p;}));}
 
 var _imgCache={};
-var _spotifyToken=null;
-var _spotifyExpires=0;
-var _SPOT_ID='62e53b0844094729992184f69d0ad1d6';
-var _SPOT_SEC='3aae0679ecf945eb9bf598fe9c78377b';
-
-function getSpotifyToken(){
-  if(_spotifyToken&&Date.now()<_spotifyExpires) return Promise.resolve(_spotifyToken);
-  return fetch('https://accounts.spotify.com/api/token',{
-    method:'POST',
-    headers:{'Content-Type':'application/x-www-form-urlencoded','Authorization':'Basic '+btoa(_SPOT_ID+':'+_SPOT_SEC)},
-    body:'grant_type=client_credentials'
-  }).then(function(r){return r.json();}).then(function(d){
-    _spotifyToken=d.access_token;
-    _spotifyExpires=Date.now()+(d.expires_in-60)*1000;
-    return _spotifyToken;
-  });
-}
-
-function searchSpotify(artistName,token){
-  return fetch('https://api.spotify.com/v1/search?q='+encodeURIComponent(artistName)+'&type=artist&limit=1',{
-    headers:{'Authorization':'Bearer '+token}
-  }).then(function(r){return r.json();}).then(function(d){
-    if(d&&d.artists&&d.artists.items&&d.artists.items[0]&&d.artists.items[0].images&&d.artists.items[0].images[0]){
-      return d.artists.items[0].images[0].url;
-    }
-    return null;
-  });
-}
-
-function searchAudioDB(artistName,fanart){
-  return fetch('https://www.theaudiodb.com/api/v1/json/2/search.php?s='+encodeURIComponent(artistName))
-    .then(function(r){return r.json();}).then(function(d){
-      if(d&&d.artists&&d.artists[0]){
-        var a=d.artists[0];
-        return fanart?(a.strArtistFanart||a.strArtistFanart2||a.strArtistBanner||a.strArtistThumb):(a.strArtistThumb||a.strArtistBanner||a.strArtistFanart);
-      }
-      return null;
-    });
-}
-
 function loadArtistImg(artistName,imgEl,fanart){
   var cacheKey=artistName+(fanart?'_fanart':'_thumb');
   if(_imgCache[cacheKey]){imgEl.src=_imgCache[cacheKey];return;}
-  // Spotify first, theaudiodb fallback
-  getSpotifyToken().then(function(token){
-    return searchSpotify(artistName,token);
-  }).then(function(src){
-    if(src){_imgCache[cacheKey]=src;imgEl.src=src;return;}
-    // Fallback to theaudiodb
-    return searchAudioDB(artistName,fanart).then(function(src2){
-      if(src2){_imgCache[cacheKey]=src2;imgEl.src=src2;}
+  var url='https://www.theaudiodb.com/api/v1/json/2/search.php?s='+encodeURIComponent(artistName);
+  fetch(url).then(function(r){return r.json();}).then(function(d){
+    if(d&&d.artists&&d.artists[0]){
+      var a=d.artists[0];
+      var src=fanart?(a.strArtistFanart||a.strArtistFanart2||a.strArtistBanner||a.strArtistThumb):(a.strArtistThumb||a.strArtistBanner||a.strArtistFanart);
+      if(src){_imgCache[cacheKey]=src;imgEl.src=src;}
       else showInitials(imgEl,artistName);
-    });
-  }).catch(function(){
-    // Spotify failed, try theaudiodb
-    searchAudioDB(artistName,fanart).then(function(src2){
-      if(src2){_imgCache[cacheKey]=src2;imgEl.src=src2;}
-      else showInitials(imgEl,artistName);
-    }).catch(function(){showInitials(imgEl,artistName);});
-  });
+    }else showInitials(imgEl,artistName);
+  }).catch(function(){showInitials(imgEl,artistName);});
 }
 function showInitials(imgEl,name){
   var wrap=imgEl.parentElement;

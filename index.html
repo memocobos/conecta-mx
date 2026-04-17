@@ -66,7 +66,8 @@ body{font-family:'Montserrat',sans-serif;background:#000;color:#fff;min-height:1
 .pc-row{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:#111;border:1px solid rgba(255,255,255,.07);grid-column:1/-1;cursor:default}
 .pc-name{font-size:13px;font-weight:700;color:rgba(255,255,255,.6);text-transform:uppercase;letter-spacing:.04em}
 .pc-tag{font-size:9px;font-weight:900;color:rgba(232,255,76,.4);background:rgba(232,255,76,.06);border:1px solid rgba(232,255,76,.12);padding:4px 10px;text-transform:uppercase;letter-spacing:.08em}
-.ev-card{background:#111;border:2px solid rgba(255,255,255,.08);margin-bottom:10px;cursor:pointer;overflow:hidden;position:relative}
+.ev-card{background:#111;border:1px solid rgba(255,255,255,.06);margin-bottom:8px;cursor:pointer;overflow:hidden;position:relative;opacity:0;transform:translateY(20px);transition:opacity .4s ease,transform .4s ease}
+.ev-card.visible{opacity:1;transform:translateY(0)}
 .ev-card:hover{border-color:#ff283b}
 .ev-card.agotado{cursor:default;pointer-events:none;position:relative}
 .ev-card.agotado::after{content:'AGOTADO';position:absolute;inset:0;background:rgba(190,0,0,.80);display:grid;place-items:center;font-size:26px;font-weight:900;color:#fff;letter-spacing:.15em;z-index:10;pointer-events:none;font-family:'Montserrat',sans-serif}
@@ -78,7 +79,7 @@ body{font-family:'Montserrat',sans-serif;background:#000;color:#fff;min-height:1
 .tpast{background:rgba(255,255,255,.08);color:rgba(255,255,255,.4)}
 .tpast::before{background:rgba(255,255,255,.2)}
 .ev-img{width:100%;width:100%;height:100%;object-fit:cover;object-position:center center;display:block;filter:brightness(.65)}
-.ev-img-wrap{position:relative;overflow:hidden;width:100%;aspect-ratio:1/1;background:#1a1a1a}
+.ev-img-wrap{position:relative;overflow:hidden;width:100%;aspect-ratio:4/3;background:#1a1a1a}
 .ev-img-wrap::after{content:'';position:absolute;bottom:0;left:0;right:0;height:60px;background:linear-gradient(transparent,#111)}
 .ev-img-placeholder{width:100%;aspect-ratio:1/1;background:#1a1a1a;display:flex;align-items:center;justify-content:center}
 .ev-img-initials{font-size:36px;font-weight:900;color:rgba(255,255,255,.1);text-transform:uppercase;letter-spacing:-.02em}
@@ -87,11 +88,11 @@ body{font-family:'Montserrat',sans-serif;background:#000;color:#fff;min-height:1
 .ev-fest-sub{font-size:14px;font-weight:700;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:.05em;margin-top:6px}
 .ev-stripe{height:5px}
 .s-rojo{background:#ff283b}.s-azul{background:#0000cd}.s-rosa{background:#ff4bd1}.s-amarillo{background:#e8ff4c}.s-verde{background:#88ea4e}
-.ev-body{padding:14px 14px 12px}
+.ev-body{padding:10px 12px 8px}
 .ev-top{margin-bottom:10px}
 .ev-info{flex:1}
 .ev-fecha{font-size:10px;font-weight:700;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:.05em;margin-bottom:2px}
-.ev-artist{font-size:15px;font-weight:900;color:#fff;text-transform:uppercase;line-height:1.1;margin-bottom:3px}
+.ev-artist{font-size:13px;font-weight:900;color:#fff;text-transform:uppercase;line-height:1.15;margin-bottom:2px}
 .ev-venue{font-size:10px;color:rgba(255,255,255,.35);font-weight:600;text-transform:uppercase;margin-top:3px}
 .ev-tag{font-size:9px;font-weight:900;padding:5px 10px;text-transform:uppercase;letter-spacing:.08em;white-space:nowrap;align-self:flex-start;display:flex;align-items:center;gap:5px;border:none}
 .ev-tag::before{content:'';width:7px;height:7px;border-radius:50%;flex-shrink:0}
@@ -329,7 +330,7 @@ body{font-family:'Montserrat',sans-serif;background:#000;color:#fff;min-height:1
 
 @media(min-width:768px){
   .ev-grid{grid-template-columns:repeat(3,1fr);max-width:960px;margin:0 auto;gap:14px;}
-  .ev-artist{font-size:16px;}
+  .ev-artist{font-size:14px;}
   .ev-fecha{font-size:10px;}
   .ev-venue{font-size:10px;}
   .ev-card{border-radius:4px;}
@@ -353,6 +354,17 @@ body{font-family:'Montserrat',sans-serif;background:#000;color:#fff;min-height:1
 #ev-search::placeholder{color:rgba(255,255,255,.3)}
 #ev-search:focus{border-color:rgba(232,255,76,.5)}
 .fbtn{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:rgba(255,255,255,.5);font-size:9px;font-weight:900;padding:5px 12px;cursor:pointer;font-family:Montserrat,sans-serif;text-transform:uppercase;letter-spacing:.06em;transition:all .15s}
+.month-bar{display:flex;gap:6px;overflow-x:auto;padding:8px 16px;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+.month-bar::-webkit-scrollbar{display:none}
+.mbtn{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);color:rgba(255,255,255,.4);font-size:9px;font-weight:700;padding:4px 12px;cursor:pointer;font-family:Montserrat,sans-serif;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap;transition:all .15s;border-radius:20px}
+.mbtn:hover{border-color:rgba(204,255,0,.3);color:rgba(204,255,0,.6)}
+.mbtn.active{background:rgba(204,255,0,.1);border-color:#ccff00;color:#ccff00}
+.how-section{padding:24px 16px;background:#0a0a0a}
+.how-title{font-size:12px;font-weight:900;color:#ccff00;text-transform:uppercase;letter-spacing:.1em;text-align:center;margin-bottom:16px}
+.how-steps{display:flex;flex-direction:column;gap:10px;max-width:500px;margin:0 auto}
+.how-step{display:flex;align-items:center;gap:12px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);border-radius:10px;padding:12px 14px}
+.how-num{background:#ccff00;color:#000;font-size:11px;font-weight:900;width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.how-text{color:rgba(255,255,255,.7);font-size:11px;font-weight:600;font-family:Montserrat,sans-serif}
 .fbtn.active{background:rgba(232,255,76,.12);border-color:#e8ff4c;color:#e8ff4c}
 .fbtn:hover{border-color:rgba(232,255,76,.4);color:rgba(232,255,76,.8)}
 .share-btn{width:100%;background:rgba(255,255,255,.06);border:2px solid rgba(255,255,255,.15);color:rgba(255,255,255,.7);font-size:12px;font-weight:900;text-transform:uppercase;letter-spacing:.1em;padding:13px 20px;cursor:pointer;font-family:Montserrat,sans-serif;margin-top:8px;transition:all .15s}
@@ -421,6 +433,16 @@ src="https://www.facebook.com/tr?id=1685907946147007&ev=PageView&noscript=1"
     <span class="hero-strip-title">&#161;VIAJA CON EXPERTOS!</span>
     <span class="hero-strip-sub">Transporte &nbsp;&bull;&nbsp; Traslados &nbsp;&bull;&nbsp; Vuelos &nbsp;&bull;&nbsp; Hospedaje &nbsp;&bull;&nbsp; Boletos &nbsp;&bull;&nbsp; Kit</span>
   </div>
+  <div class="how-section">
+    <div class="how-title">¿Cómo funciona?</div>
+    <div class="how-steps">
+      <div class="how-step"><span class="how-num">1</span><span class="how-text">Elige tu concierto</span></div>
+      <div class="how-step"><span class="how-num">2</span><span class="how-text">Selecciona tu paquete</span></div>
+      <div class="how-step"><span class="how-num">3</span><span class="how-text">Aparta tu lugar desde $300</span></div>
+      <div class="how-step"><span class="how-num">4</span><span class="how-text">Paga en cómodas quincenas</span></div>
+      <div class="how-step"><span class="how-num">5</span><span class="how-text">Nosotros nos encargamos de todo</span></div>
+    </div>
+  </div>
   <div class="catalog">
     <div id="search-bar" style="padding:12px 16px 4px">
   <div style="display:flex;gap:8px;margin-bottom:10px">
@@ -437,6 +459,7 @@ src="https://www.facebook.com/tr?id=1685907946147007&ev=PageView&noscript=1"
     <button class="fbtn" onclick="setFilter(this,'ult')">Últimos</button>
     <button class="fbtn" onclick="setFilter(this,'pasados')">Pasados</button>
   </div>
+  <div class="month-bar" id="month-bar"></div>
 </div>
 <div id="ev-list" class="ev-grid"></div>
   </div>
@@ -1038,7 +1061,8 @@ function filterEvents(){
       if(evPast){matchLoc=false;}
       else{matchLoc=(f==='all')||(f==='mty'&&!isCdmx)||(f==='cdmx'&&isCdmx)||(f==='disp'&&ev.st!=='agotado'&&!ev.agotado)||(f==='ult'&&ev.st==='ultimos');}
     }
-    card.style.display=(matchQ&&matchLoc)?'':'none';
+    var matchMonth=(_activeMonth==='all')||(ev.ds&&ev.ds.substring(0,7)===_activeMonth);
+    card.style.display=(matchQ&&matchLoc&&matchMonth)?'':'none';
   }
   // Hide month labels with no visible events below them
   var allEls=document.querySelectorAll('#ev-list > *');
@@ -1065,6 +1089,39 @@ function filterEvents(){
 }
 renderCatalog();
 filterEvents();
+buildMonthBar();
+
+// Scroll animations
+var _scrollObs=new IntersectionObserver(function(entries){
+  entries.forEach(function(e){if(e.isIntersecting){e.target.classList.add('visible');_scrollObs.unobserve(e.target);}});
+},{threshold:0.1});
+document.querySelectorAll('.ev-card,.how-step').forEach(function(el){_scrollObs.observe(el);});
+
+// Month filter
+var _activeMonth='all';
+function buildMonthBar(){
+  var meses={};
+  var MLBL={'01':'Ene','02':'Feb','03':'Mar','04':'Abr','05':'May','06':'Jun','07':'Jul','08':'Ago','09':'Sep','10':'Oct','11':'Nov','12':'Dic'};
+  var today=new Date();
+  EV.forEach(function(e){
+    if(e.listOnly||e._past)return;
+    var m=e.ds.substring(5,7);var y=e.ds.substring(0,4);
+    var key=y+'-'+m;
+    if(!meses[key])meses[key]=MLBL[m]+' '+y;
+  });
+  var keys=Object.keys(meses).sort();
+  var h='<button class="mbtn active" onclick="setMonth(this,\'all\')">Todos</button>';
+  keys.forEach(function(k){
+    h+='<button class="mbtn" onclick="setMonth(this,\''+k+'\')">'+meses[k]+'</button>';
+  });
+  $$('month-bar').innerHTML=h;
+}
+function setMonth(btn,m){
+  _activeMonth=m;
+  document.querySelectorAll('.mbtn').forEach(function(b){b.classList.remove('active');});
+  btn.classList.add('active');
+  filterEvents();
+}
 
 // Flash promo countdown timer
 (function(){

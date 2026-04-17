@@ -122,7 +122,15 @@
     </div>
   </div>
 
-  <div id="view-resumen" class="view"></div>
+  <div id="view-resumen" class="view">
+    <div style="padding:20px">
+      <div style="background:#111;border:1px solid rgba(204,255,0,.2);border-radius:12px;padding:24px;text-align:center;max-width:300px;margin:0 auto 20px">
+        <div style="font-size:10px;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:.1em;font-weight:700">Viajeros 2026</div>
+        <div id="viajeros-count" style="font-size:48px;font-weight:900;color:#ccff00;margin:8px 0">—</div>
+        <div id="viajeros-date" style="font-size:9px;color:rgba(255,255,255,.3)"></div>
+      </div>
+    </div>
+  </div>
   <div id="view-eventos" class="view">
     <div class="card">
       <div class="card-title">Seleccionar evento</div>
@@ -595,6 +603,39 @@ async function registrarGasto() {
     msg.textContent='Error: ' + JSON.stringify(res);
   }
 }
+
+// Viajeros 2026 counter
+function updateViajeros(){
+  var cached=localStorage.getItem('viajeros2026');
+  var cachedDate=localStorage.getItem('viajeros2026_date');
+  var today=new Date().toISOString().slice(0,10);
+  if(cached&&cachedDate===today){
+    document.getElementById('viajeros-count').textContent=cached;
+    document.getElementById('viajeros-date').textContent='Actualizado: '+cachedDate;
+    return;
+  }
+  // Count from Airtable reservations
+  var total=0;
+  var tbl=document.querySelectorAll('#view-resumen table tr');
+  if(tbl.length>0){
+    tbl.forEach(function(r){
+      var cells=r.querySelectorAll('td');
+      if(cells.length>0){
+        var n=parseInt(cells[cells.length-1]?.textContent);
+        if(!isNaN(n)) total+=n;
+      }
+    });
+  }
+  // If no table data, try localStorage previous value or show placeholder
+  if(total===0&&cached) total=parseInt(cached)||0;
+  document.getElementById('viajeros-count').textContent=total||'—';
+  document.getElementById('viajeros-date').textContent='Actualizado: '+today;
+  if(total>0){
+    localStorage.setItem('viajeros2026',total.toString());
+    localStorage.setItem('viajeros2026_date',today);
+  }
+}
+setTimeout(updateViajeros,2000);
 
 </script>
 </body>

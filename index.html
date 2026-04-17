@@ -939,7 +939,7 @@ function getPaquetes(ev) {
 
     { id:'stay', name:'Stay', badge:'STAY',
       desc: cdmx ? 'Boleto + Hospedaje + Kit Conecta · sin transporte a CDMX'
-                 : 'Boleto + Hospedaje + Kit Conecta · sin transporte Reynosa-Mty',
+                 : 'Boleto + Hospedaje + Kit Conecta · sin transporte',
       basePrice: 0, stayDiscount: cdmx ? 0 : 500, cdmx: cdmx,
       includesBoleto: true, includesHotel: true,
       priceLabel: cdmx ? 'Cotizar' : (plusMin ? 'Desde ' + fmt(Math.max(0, plusMin - 500)) : 'Cotizar') },
@@ -1150,7 +1150,13 @@ function getCiudad(ev){
   var words=v.trim().split(/\s+/);
   return words[words.length-1];
 }
-function txtTransporte(ev){return 'Transporte Reynosa-'+getCiudad(ev);}
+function txtTransporte(ev){
+  if(isCDMX(ev)){
+    if(selTransporte&&selTransporte.cost>0) return '🚌 Autobús Reynosa-CDMX';
+    return 'Traslados en CDMX';
+  }
+  return 'Transporte Reynosa-'+getCiudad(ev);
+}
 function hotelList(ev){if(ev&&ev.multifecha&&cur&&cur._fechaIdx>=0){var mf=ev.multifecha[cur._fechaIdx];if(mf&&mf.hotel)return mf.hotel;}return isCDMX(ev)?HOTEL_CDM:HOTEL_MTY;}
 
 function showDetail(id){

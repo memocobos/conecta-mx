@@ -768,7 +768,7 @@ function minP(ev){var _z=(ev.multifecha?ev.multifecha.reduce(function(a,mf){retu
 
 var _imgCache={};
 function searchDeezer(artistName){
-  return fetch('https://corsproxy.io/?'+encodeURIComponent('https://api.deezer.com/search/artist?q='+encodeURIComponent(artistName)+'&limit=1'))
+  return fetch('/.netlify/functions/deezer?q='+encodeURIComponent(artistName))
     .then(function(r){return r.json();}).then(function(d){
       if(d&&d.data&&d.data[0]&&d.data[0].picture_xl) return d.data[0].picture_xl;
       return null;

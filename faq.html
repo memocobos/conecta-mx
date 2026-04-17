@@ -5,14 +5,17 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Preguntas Frecuentes | Conecta Reynosa</title>
 <meta name="description" content="Resuelve tus dudas sobre Conecta Reynosa: boletos, transporte, hospedaje, pagos y más.">
-<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Montserrat:wght@400;500;600;700;900&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@900&family=Montserrat:wght@400;500;600;700;900&display=swap" rel="stylesheet">
 <style>
 :root{
-  --bg:#0a0a0a;
+  --bg:#000000;
   --surface:#111;
-  --accent:#CCFF00;
-  --accent-dim:rgba(204,255,0,.12);
-  --white:#fff;
+  --accent:#e8ff4c;
+  --accent-dim:rgba(232,255,76,.12);
+  --red:#ff283b;
+  --blue:#0000cd;
+  --white:#ffffff;
   --muted:rgba(255,255,255,.45);
   --border:rgba(255,255,255,.06);
   --radius:0;
@@ -27,10 +30,10 @@ a{color:var(--accent);text-decoration:none}
 
 /* ── HEADER ── */
 .hdr{position:fixed;top:0;left:0;right:0;z-index:999;display:flex;align-items:center;justify-content:space-between;padding:0 24px;height:56px;background:rgba(10,10,10,.92);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-bottom:1px solid var(--border)}
-.hdr-logo{font-family:'Bebas Neue',sans-serif;font-size:28px;letter-spacing:.06em;color:var(--white);line-height:1}
+.hdr-logo{font-family:'Barlow Condensed','Montserrat',sans-serif;font-size:28px;letter-spacing:.06em;color:var(--white);line-height:1}
 .hdr-logo span{color:var(--accent)}
-.hdr-cta{background:var(--accent);color:#000;padding:10px 20px;font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:.1em;font-family:'Montserrat',sans-serif;transition:all .25s cubic-bezier(.16,1,.3,1)}
-.hdr-cta:hover{background:#e0ff4c;transform:translateY(-1px);box-shadow:0 4px 20px rgba(204,255,0,.25)}
+.hdr-cta{background:var(--red);color:#fff;padding:10px 20px;font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:.1em;font-family:'Montserrat',sans-serif;transition:all .25s cubic-bezier(.16,1,.3,1)}
+.hdr-cta:hover{background:#e01e30;transform:translateY(-1px);box-shadow:0 4px 20px rgba(255,40,59,.35)}
 
 /* ── HERO ── */
 .hero{position:relative;height:clamp(340px,50vh,480px);display:flex;align-items:flex-end;justify-content:flex-start;overflow:hidden;margin-top:56px}
@@ -38,12 +41,12 @@ a{color:var(--accent);text-decoration:none}
 @keyframes heroZoom{from{transform:scale(1.05)}to{transform:scale(1.15)}}
 .hero-grain{position:absolute;inset:0;background:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.06'/%3E%3C/svg%3E");pointer-events:none;z-index:1}
 .hero-overlay{position:absolute;inset:0;background:linear-gradient(180deg,transparent 0%,rgba(10,10,10,.4) 50%,var(--bg) 100%);z-index:2}
-.hero-line{position:absolute;bottom:0;left:0;width:100%;height:3px;background:var(--accent);z-index:4;box-shadow:0 0 20px rgba(204,255,0,.3)}
+.hero-line{position:absolute;bottom:0;left:0;width:100%;height:3px;background:var(--accent);z-index:4;box-shadow:0 0 20px rgba(232,255,76,.3)}
 .hero-content{position:relative;z-index:3;padding:0 clamp(24px,5vw,80px) 48px;max-width:900px;animation:heroIn .8s cubic-bezier(.16,1,.3,1) both}
 @keyframes heroIn{from{opacity:0;transform:translateY(30px)}to{opacity:1;transform:translateY(0)}}
 .hero-tag{display:inline-block;font-size:10px;font-weight:900;letter-spacing:.2em;text-transform:uppercase;color:var(--accent);margin-bottom:16px;position:relative;padding-left:28px}
 .hero-tag::before{content:'';position:absolute;left:0;top:50%;width:20px;height:2px;background:var(--accent);transform:translateY(-50%)}
-.hero h1{font-family:'Bebas Neue',sans-serif;font-size:clamp(48px,10vw,96px);line-height:.9;letter-spacing:.04em;color:var(--white);margin-bottom:16px}
+.hero h1{font-family:'Barlow Condensed','Montserrat',sans-serif;font-size:clamp(48px,10vw,96px);line-height:.9;letter-spacing:.04em;color:var(--white);margin-bottom:16px}
 .hero h1 em{font-style:normal;color:var(--accent);display:block}
 .hero-sub{font-size:clamp(12px,1.5vw,14px);color:var(--muted);font-weight:500;line-height:1.6;max-width:420px}
 
@@ -64,15 +67,15 @@ a{color:var(--accent);text-decoration:none}
 .fq-section{padding:48px 0 0;opacity:0;transform:translateY(20px);transition:opacity .5s ease,transform .5s ease}
 .fq-section.visible{opacity:1;transform:translateY(0)}
 .fq-section-head{display:flex;align-items:center;gap:16px;margin-bottom:24px}
-.fq-section-num{font-family:'Bebas Neue',sans-serif;font-size:48px;line-height:1;color:rgba(204,255,0,.15);letter-spacing:.02em}
+.fq-section-num{font-family:'Barlow Condensed','Montserrat',sans-serif;font-size:48px;line-height:1;color:rgba(232,255,76,.15);letter-spacing:.02em}
 .fq-section-lbl{font-size:11px;font-weight:900;color:var(--accent);text-transform:uppercase;letter-spacing:.15em}
 
 /* ── ACCORDION ── */
 .fq{border-top:1px solid var(--border);transition:border-color .3s}
 .fq:last-child{border-bottom:1px solid var(--border)}
-.fq:hover{border-color:rgba(204,255,0,.12)}
+.fq:hover{border-color:rgba(232,255,76,.12)}
 .fq-q{display:flex;align-items:center;gap:16px;padding:20px 0;cursor:pointer;background:none;border:none;width:100%;color:var(--white);font-family:'Montserrat',sans-serif;text-align:left;transition:padding .3s}
-.fq-num{font-family:'Bebas Neue',sans-serif;font-size:22px;color:var(--accent);flex-shrink:0;width:32px;line-height:1;opacity:.6;transition:opacity .3s}
+.fq-num{font-family:'Barlow Condensed','Montserrat',sans-serif;font-size:22px;color:var(--accent);flex-shrink:0;width:32px;line-height:1;opacity:.6;transition:opacity .3s}
 .fq:hover .fq-num{opacity:1}
 .fq-text{flex:1;font-size:13px;font-weight:700;letter-spacing:.01em;line-height:1.4}
 .fq-icon{width:20px;height:20px;flex-shrink:0;position:relative;transition:transform .35s cubic-bezier(.16,1,.3,1)}
@@ -93,19 +96,19 @@ a{color:var(--accent);text-decoration:none}
 .visual:hover img{transform:scale(1.05)}
 .visual-overlay{position:absolute;inset:0;background:linear-gradient(90deg,var(--bg) 0%,transparent 30%,transparent 70%,var(--bg) 100%)}
 .visual-text{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:8px;z-index:1}
-.visual-text span{font-family:'Bebas Neue',sans-serif;font-size:clamp(28px,5vw,42px);letter-spacing:.08em;text-shadow:0 2px 20px rgba(0,0,0,.5)}
+.visual-text span{font-family:'Barlow Condensed','Montserrat',sans-serif;font-size:clamp(28px,5vw,42px);letter-spacing:.08em;text-shadow:0 2px 20px rgba(0,0,0,.5)}
 .visual-text small{font-size:10px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.2em}
 
 /* ── CTA BOTTOM ── */
 .bottom-cta{text-align:center;padding:64px 24px 48px}
-.bottom-cta a{display:inline-block;background:var(--accent);color:#000;padding:18px 48px;font-size:13px;font-weight:900;text-transform:uppercase;letter-spacing:.1em;font-family:'Montserrat',sans-serif;transition:all .3s cubic-bezier(.16,1,.3,1);position:relative;overflow:hidden}
+.bottom-cta a{display:inline-block;background:var(--red);color:#fff;padding:18px 48px;font-size:13px;font-weight:900;text-transform:uppercase;letter-spacing:.1em;font-family:'Montserrat',sans-serif;transition:all .3s cubic-bezier(.16,1,.3,1);position:relative;overflow:hidden}
 .bottom-cta a::after{content:'';position:absolute;inset:0;background:linear-gradient(135deg,transparent 40%,rgba(255,255,255,.15) 50%,transparent 60%);transform:translateX(-100%);transition:transform .6s}
-.bottom-cta a:hover{box-shadow:0 8px 32px rgba(204,255,0,.25);transform:translateY(-2px)}
+.bottom-cta a:hover{box-shadow:0 8px 32px rgba(255,40,59,.35);transform:translateY(-2px);background:#e01e30}
 .bottom-cta a:hover::after{transform:translateX(100%)}
 
 /* ── FOOTER ── */
 .ftr{border-top:1px solid var(--border);padding:48px 24px;text-align:center}
-.ftr-logo{font-family:'Bebas Neue',sans-serif;font-size:24px;letter-spacing:.06em;margin-bottom:20px}
+.ftr-logo{font-family:'Barlow Condensed','Montserrat',sans-serif;font-size:24px;letter-spacing:.06em;margin-bottom:20px}
 .ftr-logo span{color:var(--accent)}
 .ftr-links{display:flex;gap:24px;justify-content:center;margin-bottom:20px;flex-wrap:wrap}
 .ftr-links a{color:var(--muted);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;transition:color .25s}

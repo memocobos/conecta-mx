@@ -767,17 +767,22 @@ function fmt(n){var r=Math.round(n*100)/100;if(r===Math.round(r))return'$'+Math.
 function minP(ev){var _z=(ev.multifecha?ev.multifecha.reduce(function(a,mf){return a.concat(mf.zonas);},ev.zonas||[]):(ev.zonas||[]));if(ev.cheapOnly&&ev.cheapZonas)_z=ev.cheapZonas;var a=_z.filter(function(z){return !z.ag&&!z.prox&&z.p>0;});if(!a.length)return 0;return Math.min.apply(null,a.map(function(z){return z.p;}));}
 
 var _imgCache={};
-function loadArtistImg(artistName,imgEl,fanart){
-  var cacheKey=artistName+(fanart?'_fanart':'_thumb');
-  if(_imgCache[cacheKey]){imgEl.src=_imgCache[cacheKey];return;}
-  // Deezer first
-  fetch('https://api.deezer.com/search/artist?q='+encodeURIComponent(artistName)+'&limit=1')
-    .then(function(r){return r.json();}).then(function(d){
-      if(d&&d.data&&d.data[0]&&d.data[0].picture_xl){
-        var src=d.data[0].picture_xl;
-        _imgCache[cacheKey]=src;imgEl.src=src;
-      } else { return fallbackAudioDB(artistName,imgEl,fanart,cacheKey); }
-    }).catch(function(){ fallbackAudioDB(artistName,imgEl,fanart,cacheKey); });
+var _jsonpId=0;
+function deezerJsonp(artistName){
+  return new Promise(function(resolve){
+    var cbName='_dzcb'+(++_jsonpId);
+    var timeout=setTimeout(function(){delete window[cbName];resolve(null);},5000);
+    window[cbName]=function(d){
+      clearTimeout(timeout);delete window[cbName];
+      if(d&&d.data&&d.data[0]&&d.data[0].picture_xl) resolve(d.data[0].picture_xl);
+      else resolve(null);
+    };
+    var s=document.createElement('script');
+    s.src='https://api.deezer.com/search/artist?q='+encodeURIComponent(artistName)+'&limit=1&output=jsonp&callback='+cbName;
+    s.onerror=function(){clearTimeout(timeout);delete window[cbName];resolve(null);};
+    document.head.appendChild(s);
+    s.onload=function(){document.head.removeChild(s);};
+  });
 }
 function fallbackAudioDB(artistName,imgEl,fanart,cacheKey){
   return fetch('https://www.theaudiodb.com/api/v1/json/2/search.php?s='+encodeURIComponent(artistName))
@@ -789,6 +794,14 @@ function fallbackAudioDB(artistName,imgEl,fanart,cacheKey){
         else showInitials(imgEl,artistName);
       } else showInitials(imgEl,artistName);
     }).catch(function(){showInitials(imgEl,artistName);});
+}
+function loadArtistImg(artistName,imgEl,fanart){
+  var cacheKey=artistName+(fanart?'_fanart':'_thumb');
+  if(_imgCache[cacheKey]){imgEl.src=_imgCache[cacheKey];return;}
+  deezerJsonp(artistName).then(function(src){
+    if(src){_imgCache[cacheKey]=src;imgEl.src=src;}
+    else fallbackAudioDB(artistName,imgEl,fanart,cacheKey);
+  });
 }
 function showInitials(imgEl,name){
   var wrap=imgEl.parentElement;

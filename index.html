@@ -786,7 +786,7 @@ function fallbackAudioDB(artistName,imgEl,fanart,cacheKey){
     }).catch(function(){showInitials(imgEl,artistName);});
 }
 function loadArtistImg(artistName,imgEl,fanart){
-  var cacheKey=artistName+(fanart?'_fanart':'_thumb');
+  var cacheKey=artistName+(fanart?'_fanart':'_thumb')+'_v2';
   if(_imgCache[cacheKey]){imgEl.src=_imgCache[cacheKey];return;}
   searchDeezer(artistName).then(function(src){
     if(src){_imgCache[cacheKey]=src;imgEl.src=src;}

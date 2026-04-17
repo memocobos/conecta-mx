@@ -94,8 +94,8 @@ body{font-family:'Montserrat',sans-serif;font-weight:500;background:#000;color:#
 .ev-fecha{font-size:10px;font-weight:700;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:.05em;margin-bottom:2px}
 .ev-artist{font-size:13px;font-weight:900;color:#fff;text-transform:uppercase;line-height:1.15;margin-bottom:2px}
 .ev-venue{font-size:10px;color:rgba(255,255,255,.35);font-weight:600;text-transform:uppercase;margin-top:3px}
-.ev-tag{font-size:9px;font-weight:900;padding:5px 10px;text-transform:uppercase;letter-spacing:.08em;white-space:nowrap;align-self:flex-start;display:flex;align-items:center;gap:5px;border:none}
-.ev-tag::before{content:'';width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.ev-tag{position:absolute;top:8px;left:8px;z-index:5;background:rgba(0,0,0,.6);font-size:9px;font-weight:900;padding:5px 9px;text-transform:uppercase;letter-spacing:.08em;white-space:nowrap;display:inline-flex;align-items:center;gap:5px;border:none}
+.ev-tag::before{content:'';width:6px;height:6px;border-radius:50%;flex-shrink:0}
 .td{background:rgba(0,0,0,.5);color:#88ea4e}
 .td::before{background:#88ea4e;box-shadow:0 0 6px #88ea4e}
 .tu{background:rgba(0,0,0,.5);color:#e8ff4c}
@@ -130,7 +130,7 @@ body{font-family:'Montserrat',sans-serif;font-weight:500;background:#000;color:#
 .ev-price{font-size:18px;font-weight:900;color:#e8ff4c}
 .ev-price-wa{font-size:13px;font-weight:900;color:#88ea4e}
 .ev-ag-txt{font-size:12px;font-weight:900;color:rgba(255,255,255,.2);text-transform:uppercase}
-.ev-cta{background:#ff283b;color:#fff;font-size:10px;font-weight:900;padding:9px 14px;text-transform:uppercase;letter-spacing:.07em;border:none;cursor:pointer;font-family:'Montserrat',sans-serif}
+.ev-cta{display:inline-block;background:#ff283b;color:#fff;font-size:10px;font-weight:900;padding:9px 14px;text-transform:uppercase;letter-spacing:.07em;border:none;cursor:pointer;font-family:'Montserrat',sans-serif}
 .ev-cta-wa{background:#25D366}
 .detail{max-width:520px;margin:0 auto;padding-bottom:60px}
 .d-hero{background:#0000cd;padding:0;position:relative;overflow:hidden}
@@ -912,19 +912,27 @@ function renderCatalog(){
     }else{
       imgHTML='<div class="ev-img-placeholder"><span class="ev-img-initials">'+ev.a.substring(0,2).toUpperCase()+'</span></div>';
     }
+    var ctaH='';
+    if(!isPast&&!isAg&&!isProc){
+      if(isNF)ctaH='<span class="ev-cta">Notificarme</span>';
+      else if(isSV||!hasZ)ctaH='<span class="ev-cta ev-cta-wa">WhatsApp</span>';
+      else if(isPC2)ctaH='';
+      else ctaH='<span class="ev-cta">Cotizar</span>';
+    }
     var card=document.createElement('div');
     card.setAttribute('data-id',ev.id);
     card.className='ev-card'+(isPast?' pasado':'')+(isAg&&!isPast?' agotado':'')+(isProc&&!isPast?' proceso':'');
     card.innerHTML=imgHTML+
+      '<span class="ev-tag '+tagCls+'">'+tagTxt+'</span>'+
       '<div class="ev-body">'+
         '<div class="ev-top">'+
-          '<div class="ev-artist">'+ev.a+'</div>'+
           '<div class="ev-fecha">'+ev.f+'</div>'+
+          '<div class="ev-artist">'+ev.a+'</div>'+
           '<div class="ev-venue">'+ev.v+'</div>'+
         '</div>'+
         '<div class="ev-bottom">'+
-          '<span class="ev-tag '+tagCls+'">'+tagTxt+'</span>'+
           (isPast||isAg?'':priceH)+
+          ctaH+
         '</div>'+
         (ev.promo&&!isPast&&!isAg?'<div class="ev-promo-badge">🏷️ USA CÓDIGO: '+(ev.promoCode||'CONECTAREY')+'</div>':'')+
         (ev.flashPromo&&!isPast&&!isAg&&Date.now()<ev.flashPromo.expiresTs?'<div class="ev-flash-badge" data-flash-expires="'+ev.flashPromo.expiresTs+'">🔥 USA CÓDIGO: '+ev.flashPromo.code+' · <span class="flash-timer"></span></div>':'')+

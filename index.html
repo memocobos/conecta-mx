@@ -55,12 +55,12 @@ body{font-family:'Montserrat',sans-serif;font-weight:500;background:#000;color:#
 .page{display:none}.page.active{display:block}
 
 .catalog{padding:16px 16px 60px;max-width:1100px;margin:0 auto}
-.hero-strip{background:#0000cd;padding:16px 12px 14px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;text-align:center;overflow:hidden;box-sizing:border-box;width:100%;}
-.hero-strip-title{font-family:'Barlow Condensed','Montserrat',sans-serif;font-size:clamp(1.5rem,6vw,3rem);font-weight:900;color:#e8ff4c;text-transform:uppercase;letter-spacing:.04em;line-height:1;white-space:normal;overflow:visible;text-align:center;padding:0 16px;max-width:100%;display:block;}
-.hero-strip-sub{font-size:clamp(9px,2.8vw,13px);font-weight:700;color:rgba(255,255,255,.8);text-transform:uppercase;letter-spacing:.15em}
-.ev-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
-@media(max-width:700px){.ev-grid{grid-template-columns:repeat(2,1fr)}}
-@media(max-width:420px){.ev-grid{grid-template-columns:1fr}}
+.hero-strip{background:#0000cd;padding:24px 12px 22px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;text-align:center;overflow:hidden;box-sizing:border-box;width:100%;}
+.hero-strip-title{font-family:'Barlow Condensed','Montserrat',sans-serif;font-size:clamp(40px,11.5vw,64px);font-weight:900;color:#e8ff4c;text-transform:uppercase;letter-spacing:.01em;line-height:.9;white-space:normal;overflow:visible;text-align:center;padding:0 8px;max-width:100%;display:block;margin:0;}
+.hero-strip-sub{font-size:10px;font-weight:700;color:rgba(255,255,255,.75);text-transform:uppercase;letter-spacing:.12em}
+.ev-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+@media(min-width:768px){.ev-grid{grid-template-columns:repeat(3,1fr);gap:12px}}
+@media(min-width:1100px){.ev-grid{grid-template-columns:repeat(4,1fr)}}
 .mes-label{font-size:10px;font-weight:900;color:#ff283b;text-transform:uppercase;letter-spacing:.15em;padding:16px 0 8px;margin-bottom:8px;border-bottom:1px solid rgba(255,40,59,.3);grid-column:1/-1}
 .pc-section-label{font-size:10px;font-weight:900;color:rgba(255,255,255,.35);text-transform:uppercase;letter-spacing:.15em;padding:20px 0 10px;border-bottom:1px solid rgba(255,255,255,.1);grid-column:1/-1;margin-top:8px}
 .pc-row{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:#111;border:1px solid rgba(255,255,255,.07);grid-column:1/-1;cursor:default}
@@ -88,12 +88,12 @@ body{font-family:'Montserrat',sans-serif;font-weight:500;background:#000;color:#
 .ev-fest-sub{font-size:14px;font-weight:700;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:.05em;margin-top:6px}
 .ev-stripe{height:5px}
 .s-rojo{background:#ff283b}.s-azul{background:#0000cd}.s-rosa{background:#ff4bd1}.s-amarillo{background:#e8ff4c}.s-verde{background:#88ea4e}
-.ev-body{padding:10px 12px 8px}
-.ev-top{margin-bottom:10px}
+.ev-body{padding:11px 12px 9px}
+.ev-top{margin-bottom:8px}
 .ev-info{flex:1}
-.ev-fecha{font-size:10px;font-weight:700;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:.05em;margin-bottom:2px}
-.ev-artist{font-size:13px;font-weight:900;color:#fff;text-transform:uppercase;line-height:1.15;margin-bottom:2px}
-.ev-venue{font-size:10px;color:rgba(255,255,255,.35);font-weight:600;text-transform:uppercase;margin-top:3px}
+.ev-fecha{font-size:9.5px;font-weight:700;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px}
+.ev-artist{font-family:'Barlow Condensed','Montserrat',sans-serif;font-size:22px;font-weight:900;color:#fff;text-transform:uppercase;line-height:.95;letter-spacing:.01em;margin-bottom:4px}
+.ev-venue{font-size:9.5px;color:rgba(255,255,255,.35);font-weight:600;text-transform:uppercase;letter-spacing:.04em;margin-top:2px}
 .ev-tag{position:absolute;top:8px;left:8px;z-index:5;background:rgba(0,0,0,.6);font-size:9px;font-weight:900;padding:5px 9px;text-transform:uppercase;letter-spacing:.08em;white-space:nowrap;display:inline-flex;align-items:center;gap:5px;border:none}
 .ev-tag::before{content:'';width:6px;height:6px;border-radius:50%;flex-shrink:0}
 .td{background:rgba(0,0,0,.5);color:#88ea4e}
@@ -126,11 +126,11 @@ body{font-family:'Montserrat',sans-serif;font-weight:500;background:#000;color:#
 .ev-pills{display:flex;flex-wrap:wrap;gap:4px;margin:8px 0}
 .ev-pill{background:rgba(255,255,255,.05);color:rgba(255,255,255,.5);font-size:9px;font-weight:700;padding:3px 8px;text-transform:uppercase;border:1px solid rgba(255,255,255,.07)}
 .ev-bottom{display:flex;align-items:center;justify-content:space-between;padding-top:8px;border-top:1px solid rgba(255,255,255,.07);flex-wrap:wrap;gap:6px}
-.ev-price-lbl{font-size:9px;color:rgba(255,255,255,.3);font-weight:700;text-transform:uppercase;letter-spacing:.07em}
-.ev-price{font-size:18px;font-weight:900;color:#e8ff4c}
-.ev-price-wa{font-size:13px;font-weight:900;color:#88ea4e}
+.ev-price-lbl{font-size:8.5px;color:rgba(255,255,255,.3);font-weight:700;text-transform:uppercase;letter-spacing:.07em}
+.ev-price{font-size:17px;font-weight:900;color:#e8ff4c;line-height:1}
+.ev-price-wa{font-size:12px;font-weight:900;color:#88ea4e}
 .ev-ag-txt{font-size:12px;font-weight:900;color:rgba(255,255,255,.2);text-transform:uppercase}
-.ev-cta{display:inline-block;background:#ff283b;color:#fff;font-size:10px;font-weight:900;padding:9px 14px;text-transform:uppercase;letter-spacing:.07em;border:none;cursor:pointer;font-family:'Montserrat',sans-serif}
+.ev-cta{display:inline-block;background:#ff283b;color:#fff;font-size:9px;font-weight:900;padding:8px 11px;text-transform:uppercase;letter-spacing:.07em;border:none;cursor:pointer;font-family:'Montserrat',sans-serif}
 .ev-cta-wa{background:#25D366}
 .detail{max-width:520px;margin:0 auto;padding-bottom:60px}
 .d-hero{background:#0000cd;padding:0;position:relative;overflow:hidden}
@@ -330,14 +330,13 @@ body{font-family:'Montserrat',sans-serif;font-weight:500;background:#000;color:#
 
 @media(min-width:768px){
   .ev-grid{grid-template-columns:repeat(3,1fr);max-width:960px;margin:0 auto;gap:14px;}
-  .ev-artist{font-size:14px;}
+  .ev-artist{font-size:24px;}
   .ev-fecha{font-size:10px;}
   .ev-venue{font-size:10px;}
-  .ev-card{border-radius:4px;}
   .ev-img-wrap{aspect-ratio:3/4;}
-  .hero-strip{padding:20px 0 18px;}
-  
-  .hero-sub{font-size:11px;}
+  .hero-strip{padding:32px 0 28px;}
+  .hero-strip-title{font-size:clamp(56px,8vw,84px);}
+  .hero-strip-sub{font-size:12px;}
   .nav{padding:0 24px;}
   .page-catalog{max-width:1000px;margin:0 auto;}
 }

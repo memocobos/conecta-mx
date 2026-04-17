@@ -1092,6 +1092,7 @@ function filterEvents(){
     }
   }
 }
+var _activeMonth='all';
 renderCatalog();
 filterEvents();
 buildMonthBar();
@@ -1111,7 +1112,6 @@ var _scrollObs=new IntersectionObserver(function(entries){
 document.querySelectorAll('.ev-card,.how-step').forEach(function(el){_scrollObs.observe(el);});
 
 // Month filter
-var _activeMonth='all';
 function buildMonthBar(){
   var meses={};
   var MLBL={'01':'Ene','02':'Feb','03':'Mar','04':'Abr','05':'May','06':'Jun','07':'Jul','08':'Ago','09':'Sep','10':'Oct','11':'Nov','12':'Dic'};

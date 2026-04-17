@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Preguntas Frecuentes | Conecta Reynosa</title>
+<meta name="description" content="Resuelve tus dudas sobre Conecta Reynosa: boletos, transporte, hospedaje, pagos y más.">
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;900&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#0a0a1a;color:#fff;font-family:'Montserrat',sans-serif;-webkit-font-smoothing:antialiased}
+a{color:#ccff00;text-decoration:none}
+
+/* Header */
+.faq-header{display:flex;align-items:center;justify-content:space-between;padding:14px 20px;background:#000;border-bottom:1px solid rgba(255,255,255,.06);position:sticky;top:0;z-index:100}
+.faq-logo{font-size:18px;font-weight:900;color:#fff;letter-spacing:.04em}
+.faq-logo span{color:#ccff00}
+.faq-cta{background:#ccff00;color:#000;padding:8px 16px;font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:.06em;border-radius:6px;transition:background .2s}
+.faq-cta:hover{background:#e0ff4c}
+
+/* Hero */
+.faq-hero{position:relative;padding:60px 20px 50px;text-align:center;overflow:hidden}
+.faq-hero::before{content:'';position:absolute;inset:0;background:url('https://images.unsplash.com/photo-1540039155733-5bb30b53aa14?w=1200&q=80') center/cover;opacity:.15;z-index:0}
+.faq-hero::after{content:'';position:absolute;inset:0;background:linear-gradient(180deg,rgba(10,10,26,.3),rgba(10,10,26,1));z-index:1}
+.faq-hero-content{position:relative;z-index:2}
+.faq-hero h1{font-size:32px;font-weight:900;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px}
+.faq-hero h1 span{color:#ccff00}
+.faq-hero p{color:rgba(255,255,255,.5);font-size:13px;font-weight:500;max-width:500px;margin:0 auto}
+
+/* Categories */
+.faq-cats{display:flex;gap:8px;overflow-x:auto;padding:16px 20px;-webkit-overflow-scrolling:touch;scrollbar-width:none;border-bottom:1px solid rgba(255,255,255,.06)}
+.faq-cats::-webkit-scrollbar{display:none}
+.faq-cat{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);color:rgba(255,255,255,.5);font-size:9px;font-weight:700;padding:6px 14px;cursor:pointer;text-transform:uppercase;letter-spacing:.06em;white-space:nowrap;border-radius:20px;transition:all .15s}
+.faq-cat:hover{border-color:rgba(204,255,0,.3);color:rgba(204,255,0,.7)}
+.faq-cat.active{background:rgba(204,255,0,.1);border-color:#ccff00;color:#ccff00}
+
+/* Section */
+.faq-section{padding:24px 20px 0;max-width:700px;margin:0 auto;opacity:0;transform:translateY(16px);transition:opacity .4s ease,transform .4s ease}
+.faq-section.visible{opacity:1;transform:translateY(0)}
+.faq-section-title{display:flex;align-items:center;gap:10px;margin-bottom:16px}
+.faq-section-icon{font-size:20px}
+.faq-section-lbl{font-size:11px;font-weight:900;color:#ccff00;text-transform:uppercase;letter-spacing:.1em}
+
+/* Accordion */
+.faq-item{border:1px solid rgba(255,255,255,.06);margin-bottom:8px;border-radius:10px;overflow:hidden;transition:border-color .2s}
+.faq-item:hover{border-color:rgba(204,255,0,.15)}
+.faq-q{display:flex;align-items:center;gap:12px;padding:14px 16px;cursor:pointer;background:rgba(255,255,255,.02);transition:background .2s;width:100%;border:none;color:#fff;font-family:'Montserrat',sans-serif;text-align:left}
+.faq-q:hover{background:rgba(255,255,255,.04)}
+.faq-num{background:transparent;border:1.5px solid #ccff00;color:#ccff00;font-size:10px;font-weight:900;width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.faq-q-text{flex:1;font-size:12px;font-weight:700}
+.faq-arrow{color:rgba(255,255,255,.3);font-size:14px;transition:transform .3s;flex-shrink:0}
+.faq-item.open .faq-arrow{transform:rotate(180deg);color:#ccff00}
+.faq-a{max-height:0;overflow:hidden;transition:max-height .3s ease}
+.faq-item.open .faq-a{max-height:200px}
+.faq-a-text{padding:0 16px 16px 52px;font-size:11px;color:rgba(255,255,255,.55);line-height:1.7;font-weight:500}
+
+/* Visual break */
+.faq-visual{position:relative;height:140px;margin:24px 0;overflow:hidden;border-radius:10px;max-width:700px;margin-left:auto;margin-right:auto}
+.faq-visual img{width:100%;height:100%;object-fit:cover;filter:brightness(.4)}
+.faq-visual-text{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:900;text-transform:uppercase;letter-spacing:.1em;color:#ccff00}
+
+/* Footer */
+.faq-footer{text-align:center;padding:40px 20px;border-top:1px solid rgba(255,255,255,.06);margin-top:32px}
+.faq-footer-logo{font-size:16px;font-weight:900;margin-bottom:8px}
+.faq-footer-logo span{color:#ccff00}
+.faq-footer-links{display:flex;gap:16px;justify-content:center;margin-bottom:12px}
+.faq-footer-links a{color:rgba(255,255,255,.4);font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;transition:color .2s}
+.faq-footer-links a:hover{color:#ccff00}
+.faq-footer-copy{color:rgba(255,255,255,.2);font-size:9px}
+
+/* CTA bottom */
+.faq-bottom-cta{text-align:center;padding:32px 20px}
+.faq-bottom-cta a{display:inline-block;background:#ccff00;color:#000;padding:14px 32px;font-size:13px;font-weight:900;text-transform:uppercase;letter-spacing:.06em;border-radius:10px;transition:background .2s}
+.faq-bottom-cta a:hover{background:#e0ff4c}
+
+@media(max-width:500px){
+  .faq-hero h1{font-size:24px}
+  .faq-hero p{font-size:11px}
+  .faq-a-text{padding-left:16px}
+}
+</style>
+</head>
+<body>
+
+<div class="faq-header">
+  <div class="faq-logo">CONECTA<span>.</span></div>
+  <a href="/" class="faq-cta">Ver eventos &rarr;</a>
+</div>
+
+<div class="faq-hero">
+  <div class="faq-hero-content">
+    <h1>Preguntas <span>Frecuentes</span></h1>
+    <p>Todo lo que necesitas saber antes de viajar con Conecta Reynosa</p>
+  </div>
+</div>
+
+<div class="faq-cats" id="faq-cats">
+  <button class="faq-cat active" onclick="filterFaq(this,'all')">Todas</button>
+  <button class="faq-cat" onclick="filterFaq(this,'garantia')">Garantia</button>
+  <button class="faq-cat" onclick="filterFaq(this,'servicios')">Servicios</button>
+  <button class="faq-cat" onclick="filterFaq(this,'logistica')">Logistica</button>
+  <button class="faq-cat" onclick="filterFaq(this,'pagos')">Pagos</button>
+  <button class="faq-cat" onclick="filterFaq(this,'especiales')">Especiales</button>
+</div>
+
+<div class="faq-section" data-cat="garantia">
+  <div class="faq-section-title"><span class="faq-section-icon">&#x2714;</span><span class="faq-section-lbl">Nuestra Garantia</span></div>
+  <div class="faq-item" onclick="toggleFaq(this)">
+    <button class="faq-q"><span class="faq-num">1</span><span class="faq-q-text">Conecta Reynosa es confiable?</span><span class="faq-arrow">&#x25BC;</span></button>
+    <div class="faq-a"><div class="faq-a-text">Si. Contamos con mas de 13 anos de experiencia dedicados a tours de conciertos y festivales desde Reynosa, Tamaulipas.</div></div>
+  </div>
+  <div class="faq-item" onclick="toggleFaq(this)">
+    <button class="faq-q"><span class="faq-num">2</span><span class="faq-q-text">Son una agencia oficial?</span><span class="faq-arrow">&#x25BC;</span></button>
+    <div class="faq-a"><div class="faq-a-text">A lo largo de estos anos, hemos sido agencia oficial de varios eventos y festivales en Mexico.</div></div>
+  </div>
+  <div class="faq-item" onclick="toggleFaq(this)">
+    <button class="faq-q"><span class="faq-num">3</span><span class="faq-q-text">Colaboran con promotoras oficiales?</span><span class="faq-arrow">&#x25BC;</span></button>
+    <div class="faq-a"><div class="faq-a-text">Trabajamos de la mano con las promotoras mas importantes del pais: OCESA, Music Vibe, Zignia, Apodaca Group, Prime-Time, PARS, entre otras.</div></div>
+  </div>
+  <div class="faq-item" onclick="toggleFaq(this)">
+    <button class="faq-q"><span class="faq-num">4</span><span class="faq-q-text">Los boletos son originales?</span><span class="faq-arrow">&#x25BC;</span></button>
+    <div class="faq-a"><div class="faq-a-text">Si. Todos los boletos son adquiridos directamente con el promotor y canales oficiales del evento, garantizando su autenticidad.</div></div>
+  </div>
+</div>
+
+<div class="faq-visual" style="margin:24px 20px;max-width:700px;margin-left:auto;margin-right:auto">
+  <img src="https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=800&q=75" alt="Concierto">
+  <div class="faq-visual-text">+13 anos de experiencia</div>
+</div>
+
+<div class="faq-section" data-cat="servicios">
+  <div class="faq-section-title"><span class="faq-section-icon">&#x2728;</span><span class="faq-section-lbl">Servicios y Experiencias</span></div>
+  <div class="faq-item" onclick="toggleFaq(this)">
+    <button class="faq-q"><span class="faq-num">5</span><span class="faq-q-text">Que eventos manejan?</span><span class="faq-arrow">&#x25BC;</span></button>
+    <div class="faq-a"><div class="faq-a-text">Operamos conciertos y festivales masivos en todo Mexico. Consulta nuestro catalogo de eventos en <a href="/">conectareynosa.mx</a></div></div>
+  </div>
+  <div class="faq-item" onclick="toggleFaq(this)">
+    <button class="faq-q"><span class="faq-num">6</span><span class="faq-q-text">Que tipo de camiones usan?</span><span class="faq-arrow">&#x25BC;</span></button>
+    <div class="faq-a"><div class="faq-a-text">Trabajamos con empresas de transporte turistico con unidades de maximo 5 anos de antiguedad, garantizando comodidad y seguridad.</div></div>
+  </div>
+  <div class="faq-item" onclick="toggleFaq(this)">
+    <button class="faq-q"><span class="faq-num">7</span><span class="faq-q-text">Que tipo de hoteles manejan?</span><span class="faq-arrow">&#x25BC;</span></button>
+    <div class="faq-a"><div class="faq-a-text">Tenemos convenios con cadenas hoteleras nacionales de 4 y 5 estrellas. Habitaciones dobles, triples o cuadruples segun lo solicites.</div></div>
+  </div>
+</div>
+
+<div class="faq-section" data-cat="logistica">
+  <div class="faq-section-title"><span class="faq-section-icon">&#x1F68C;</span><span class="faq-section-lbl">Logistica y Transporte</span></div>
+  <div class="faq-item" onclick="toggleFaq(this)">
+    <button class="faq-q"><span class="faq-num">8</span><span class="faq-q-text">El transporte es redondo?</span><span class="faq-arrow">&#x25BC;</span></button>
+    <div class="faq-a"><div class="faq-a-text">Si, todos los tours incluyen transporte redondo desde Reynosa. En algunos paquetes tambien se incluyen traslados internos en la ciudad destino.</div></div>
+  </div>
+  <div class="faq-item" onclick="toggleFaq(this)">
+    <button class="faq-q"><span class="faq-num">9</span><span class="faq-q-text">Cuando confirman la hora de salida?</span><span class="faq-arrow">&#x25BC;</span></button>
+    <div class="faq-a"><div class="faq-a-text">La hora de salida se informa durante la semana del evento. Te recomendamos llegar 20 minutos antes del horario asignado.</div></div>
+  </div>
+  <div class="faq-item" onclick="toggleFaq(this)">
+    <button class="faq-q"><span class="faq-num">10</span><span class="faq-q-text">Puedo llevar equipaje?</span><span class="faq-arrow">&#x25BC;</span></button>
+    <div class="faq-a"><div class="faq-a-text">Si, puedes llevar una mochila o maleta pequena dependiendo del tipo de tour.</div></div>
+  </div>
+  <div class="faq-item" onclick="toggleFaq(this)">
+    <button class="faq-q"><span class="faq-num">11</span><span class="faq-q-text">Incluyen seguro de viajero?</span><span class="faq-arrow">&#x25BC;</span></button>
+    <div class="faq-a"><div class="faq-a-text">Todos los tours terrestres incluyen seguro de viajero durante el traslado.</div></div>
+  </div>
+</div>
+
+<div class="faq-visual" style="margin:24px 20px;max-width:700px;margin-left:auto;margin-right:auto">
+  <img src="https://images.unsplash.com/photo-1459749411175-04bf5292ceea?w=800&q=75" alt="Festival">
+  <div class="faq-visual-text">Viaja seguro con nosotros</div>
+</div>
+
+<div class="faq-section" data-cat="pagos">
+  <div class="faq-section-title"><span class="faq-section-icon">&#x1F4B3;</span><span class="faq-section-lbl">Boletos y Pagos</span></div>
+  <div class="faq-item" onclick="toggleFaq(this)">
+    <button class="faq-q"><span class="faq-num">12</span><span class="faq-q-text">Puedo elegir la zona de mi boleto?</span><span class="faq-arrow">&#x25BC;</span></button>
+    <div class="faq-a"><div class="faq-a-text">Si, puedes elegir tu zona segun la disponibilidad al momento de tu compra directamente en nuestra web.</div></div>
+  </div>
+  <div class="faq-item" onclick="toggleFaq(this)">
+    <button class="faq-q"><span class="faq-num">13</span><span class="faq-q-text">Que formas de pago aceptan?</span><span class="faq-arrow">&#x25BC;</span></button>
+    <div class="faq-a"><div class="faq-a-text">Aceptamos transferencias bancarias y depositos. Consulta los datos bancarios en tu cotizacion.</div></div>
+  </div>
+  <div class="faq-item" onclick="toggleFaq(this)">
+    <button class="faq-q"><span class="faq-num">14</span><span class="faq-q-text">Cuentan con facilidades de pago?</span><span class="faq-arrow">&#x25BC;</span></button>
+    <div class="faq-a"><div class="faq-a-text">Si. Aparta tu lugar con un pequeno deposito y paga el resto en comodas quincenas. Nuestra web calcula tu plan de pagos automaticamente.</div></div>
+  </div>
+  <div class="faq-item" onclick="toggleFaq(this)">
+    <button class="faq-q"><span class="faq-num">15</span><span class="faq-q-text">Que pasa si ya no puedo viajar?</span><span class="faq-arrow">&#x25BC;</span></button>
+    <div class="faq-a"><div class="faq-a-text">Las cancelaciones por parte del cliente no tienen reembolso, ya que boletos, hotel y transporte se pagan por adelantado. Los lugares pueden transferirse a otra persona sin costo hasta 5 dias antes del evento.</div></div>
+  </div>
+</div>
+
+<div class="faq-section" data-cat="especiales">
+  <div class="faq-section-title"><span class="faq-section-icon">&#x26A0;</span><span class="faq-section-lbl">Situaciones Especiales</span></div>
+  <div class="faq-item" onclick="toggleFaq(this)">
+    <button class="faq-q"><span class="faq-num">16</span><span class="faq-q-text">Pueden viajar menores de edad?</span><span class="faq-arrow">&#x25BC;</span></button>
+    <div class="faq-a"><div class="faq-a-text">Si, siempre que vayan acompanados por un adulto o se firme una carta responsiva.</div></div>
+  </div>
+</div>
+
+<div class="faq-bottom-cta">
+  <a href="/">Ver eventos y cotizar &rarr;</a>
+</div>
+
+<div class="faq-footer">
+  <div class="faq-footer-logo">CONECTA<span>.</span></div>
+  <div class="faq-footer-links">
+    <a href="https://www.instagram.com/conectareynosa" target="_blank">Instagram</a>
+    <a href="https://www.facebook.com/ConectaRey" target="_blank">Facebook</a>
+    <a href="https://www.tiktok.com/@conectareynosa" target="_blank">TikTok</a>
+    <a href="/" >Eventos</a>
+  </div>
+  <div class="faq-footer-copy">Conecta Reynosa &copy; 2026</div>
+</div>
+
+<script>
+function toggleFaq(el){
+  el.classList.toggle('open');
+}
+function filterFaq(btn,cat){
+  document.querySelectorAll('.faq-cat').forEach(function(b){b.classList.remove('active');});
+  btn.classList.add('active');
+  document.querySelectorAll('.faq-section').forEach(function(s){
+    s.style.display=(cat==='all'||s.getAttribute('data-cat')===cat)?'block':'none';
+  });
+  document.querySelectorAll('.faq-visual').forEach(function(v){
+    v.style.display=(cat==='all')?'block':'none';
+  });
+}
+// Scroll animations
+var obs=new IntersectionObserver(function(entries){
+  entries.forEach(function(e){if(e.isIntersecting){e.target.classList.add('visible');obs.unobserve(e.target);}});
+},{threshold:0.1});
+document.querySelectorAll('.faq-section').forEach(function(el){obs.observe(el);});
+</script>
+</body>
+</html>

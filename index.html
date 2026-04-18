@@ -31,6 +31,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@900&family=Montserrat:wght@400;500;600;700;900&display=swap" rel="stylesheet">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
 body{font-family:'Montserrat',sans-serif;font-weight:500;background:#000;color:#fff;min-height:100vh}
 ::-webkit-scrollbar{width:3px}::-webkit-scrollbar-thumb{background:#ff283b}
 .nav{background:#000;border-bottom:4px solid #ff283b;padding:0;display:flex;align-items:stretch;justify-content:space-between;position:sticky;top:0;z-index:200;height:56px;overflow:hidden}
@@ -482,18 +483,6 @@ body{font-family:'Montserrat',sans-serif;font-weight:500;background:#000;color:#
 .hh-btn-verde:hover{background:#1fba57;transform:translateY(-2px);box-shadow:0 12px 32px rgba(37,211,102,.4)}
 .hh-btn-full{width:100%;max-width:520px;justify-content:center;padding:18px 28px;font-size:13px}
 
-/* Stats banner (yellow) */
-.stats-v2{
-  background:var(--c-amarillo);color:#000;
-  padding:clamp(22px,3.5vw,36px) clamp(16px,5vw,80px);
-  border-top:1px solid #000;border-bottom:1px solid #000;
-  display:grid;grid-template-columns:repeat(4,1fr);gap:clamp(8px,2vw,28px);
-  text-align:left;
-}
-@media(max-width:680px){.stats-v2{grid-template-columns:repeat(2,1fr)}}
-.stat-n{font-family:var(--font-display);font-weight:900;font-size:clamp(32px,7vw,64px);line-height:.9;letter-spacing:-.01em}
-.stat-l{font-size:9px;font-weight:900;text-transform:uppercase;letter-spacing:.12em;color:rgba(0,0,0,.6);margin-top:6px}
-
 /* "Cómo funciona" v2 — big 01/02/03 numbers like FAQ */
 .how-v2{background:#000;padding:clamp(40px,6vw,80px) clamp(20px,5vw,80px) 0;max-width:1280px;margin:0 auto}
 .how-v2-head{
@@ -675,6 +664,27 @@ body{font-family:'Montserrat',sans-serif;font-weight:500;background:#000;color:#
 @keyframes spinPlay{from{transform:rotate(0)}to{transform:rotate(360deg)}}
 .ev-play.ev-play-hidden{display:none}
 
+/* Play button on wizard/detail hero — bigger variant */
+.d-play{
+  position:absolute;bottom:18px;right:18px;z-index:6;
+  width:54px;height:54px;border-radius:50%;
+  background:#000;border:3px solid var(--c-amarillo);
+  color:#fff;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  padding:0;font-family:inherit;
+  box-shadow:0 6px 20px rgba(0,0,0,.6);
+  transition:transform .2s cubic-bezier(.22,1,.36,1),background .2s ease,opacity .3s ease;
+}
+.d-play:hover{transform:scale(1.08);background:var(--c-amarillo)}
+.d-play:hover .ev-play-ico{color:#000}
+.d-play.ev-play-active{background:var(--c-amarillo);animation:playPulse 1.6s ease-in-out infinite}
+.d-play.ev-play-active .ev-play-ico{color:#000}
+.d-play .ev-play-ico{font-size:18px;margin-left:2px}
+.d-play.ev-play-active .ev-play-ico{margin-left:0}
+.d-play.ev-play-loading{opacity:.7;pointer-events:none}
+.d-play.ev-play-loading .ev-play-ico{animation:spinPlay 1s linear infinite;margin-left:0}
+.d-play.ev-play-hidden{display:none}
+
 @media(prefers-reduced-motion:reduce){
   *{animation:none !important}
   .marquee-red-track{animation:none}
@@ -765,14 +775,6 @@ src="https://www.facebook.com/tr?id=1685907946147007&ev=PageView&noscript=1"
     </div>
   </section>
 
-  <!-- Yellow stats banner -->
-  <section class="stats-v2">
-    <div><div class="stat-n">13+</div><div class="stat-l">Años operando</div></div>
-    <div><div class="stat-n">40+</div><div class="stat-l">Eventos 2026</div></div>
-    <div><div class="stat-n">150+</div><div class="stat-l">Viajeros/mes</div></div>
-    <div><div class="stat-n">100%</div><div class="stat-l">Boletos oficiales</div></div>
-  </section>
-
   <!-- Links to sub-pages, same style -->
   <a href="/funciona" class="faq-link-v2">¿Cómo funciona? <span aria-hidden="true">→</span></a>
   <a href="/faq" class="faq-link-v2">Preguntas frecuentes <span aria-hidden="true">→</span></a>
@@ -804,6 +806,7 @@ src="https://www.facebook.com/tr?id=1685907946147007&ev=PageView&noscript=1"
       <div class="d-hero-img-wrap" id="d-img-wrap">
         <img class="d-hero-bg" id="d-hero-bg" src="" alt="" />
         <img class="d-hero-img" id="d-hero-img" src="" alt="" onerror="this.style.display='none'" />
+        <button class="d-play" id="d-play" aria-label="Preview de música" onclick="previewTrack(this)"><span class="ev-play-ico">▶</span></button>
       </div>
       <div class="d-hero-content">
         <div class="d-badge" id="d-fecha"></div>
@@ -1563,7 +1566,7 @@ document.querySelectorAll('.ev-card,.how-step').forEach(function(el){_scrollObs.
 
 // Fade-in reveal for v2 sections (staggered)
 (function(){
-  var revealables=document.querySelectorAll('.how-v2-step, .stats-v2 > div');
+  var revealables=document.querySelectorAll('.how-v2-step');
   var rObs=new IntersectionObserver(function(entries){
     entries.forEach(function(entry){
       if(entry.isIntersecting){
@@ -1720,6 +1723,14 @@ function showDetail(id){
   $$('d-fecha').textContent=cur.f;
   $$('d-artist').textContent=cur.a;
   $$('d-venue').textContent=cur.v;
+  // Reset play button for the wizard hero
+  var _dPlay=document.getElementById('d-play');
+  if(_dPlay){
+    _dPlay.setAttribute('data-artist',cur.a||'');
+    _dPlay.classList.remove('ev-play-hidden','ev-play-active','ev-play-loading');
+    var _dIco=_dPlay.querySelector('.ev-play-ico');
+    if(_dIco)_dIco.textContent='▶';
+  }
   try{window.trackViewContent&&window.trackViewContent(cur.a,cur.id,minP(cur));}catch(e){}
 
   // Hero image

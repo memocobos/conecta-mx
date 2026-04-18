@@ -396,6 +396,8 @@ fbq('track', 'PageView');
 src="https://www.facebook.com/tr?id=1685907946147007&ev=PageView&noscript=1"
 /></noscript>
 <!-- End Meta Pixel Code -->
+<!-- Meta Pixel custom events -->
+<script src="/meta-events.js"></script>
 <!-- Google tag (gtag.js) -->
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-7JKGFQQQ7W"></script>
 <script>
@@ -1063,6 +1065,7 @@ function setFilter(btn,f){
   document.querySelectorAll('.fbtn').forEach(function(b){b.classList.remove('active');});
   btn.classList.add('active');
   filterEvents();
+  try{window.trackSearch&&window.trackSearch('filter:'+f);}catch(e){}
 }
 function filterEvents(){
   var q=(document.getElementById('ev-search').value||'').toLowerCase().trim();
@@ -1277,6 +1280,7 @@ function showDetail(id){
   $$('d-fecha').textContent=cur.f;
   $$('d-artist').textContent=cur.a;
   $$('d-venue').textContent=cur.v;
+  try{window.trackViewContent&&window.trackViewContent(cur.a,cur.id,minP(cur));}catch(e){}
 
   // Hero image
   var heroImg=$$('d-hero-img');
@@ -1486,6 +1490,7 @@ function updatePkgCards(){
 function selPaquete(btn,pkg){
   if(pkg==='stay'&&isCDMX(cur))return; // disabled for CDMX
   selPkg=pkg;selZ=null;selH=null;selTransporte=null;
+  try{window.trackAddToCart&&window.trackAddToCart(pkg,minP(cur));}catch(e){}
   var pb=$$('w-paquetes').querySelectorAll('.wiz-btn');
   for(var i=0;i<pb.length;i++)pb[i].classList.remove('active');
   btn.classList.add('active');
@@ -1841,6 +1846,7 @@ function cerrarMapa(){
 }
 function abrirModalPago(){
   if(!cur||!_lastCotizacion)return;
+  try{window.trackInitiateCheckout&&window.trackInitiateCheckout(cur.a,selPkg,total);}catch(e){}
   $$('pago-subtitulo').textContent='Separa tu lugar en '+cur.a+' — '+cur.f;
   $$('pago-monto').textContent='💳 '+fmt(sepActualCalc);
   var b=getBanco();

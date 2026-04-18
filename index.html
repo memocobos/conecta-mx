@@ -648,6 +648,33 @@ body{font-family:'Montserrat',sans-serif;font-weight:500;background:#000;color:#
 .wa-btn{background:#25D366;color:#fff;font-family:'Montserrat',sans-serif;font-size:14px;font-weight:900;padding:18px;letter-spacing:.1em;text-transform:uppercase}
 .wa-btn:hover{background:#1fba57}
 
+/* Preview music button on event cards */
+.ev-play{
+  position:absolute;bottom:10px;right:10px;z-index:6;
+  width:36px;height:36px;border-radius:50%;
+  background:#000;border:2px solid var(--c-amarillo);
+  color:#fff;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  padding:0;font-family:inherit;
+  box-shadow:0 4px 12px rgba(0,0,0,.5);
+  transition:transform .2s cubic-bezier(.22,1,.36,1),background .2s ease,opacity .3s ease;
+}
+.ev-play:hover{transform:scale(1.12);background:var(--c-amarillo)}
+.ev-play:hover .ev-play-ico{color:#000}
+.ev-play.ev-play-active{background:var(--c-amarillo);animation:playPulse 1.6s ease-in-out infinite}
+.ev-play.ev-play-active .ev-play-ico{color:#000}
+@keyframes playPulse{0%,100%{box-shadow:0 0 0 0 rgba(232,255,76,.6)}50%{box-shadow:0 0 0 10px rgba(232,255,76,0)}}
+.ev-play-ico{
+  font-size:12px;line-height:1;display:inline-block;
+  transition:transform .25s cubic-bezier(.22,1,.36,1),color .2s ease;
+  margin-left:1px; /* optical center for ▶ */
+}
+.ev-play-active .ev-play-ico{margin-left:0}
+.ev-play.ev-play-loading{opacity:.7;pointer-events:none}
+.ev-play.ev-play-loading .ev-play-ico{animation:spinPlay 1s linear infinite;margin-left:0}
+@keyframes spinPlay{from{transform:rotate(0)}to{transform:rotate(360deg)}}
+.ev-play.ev-play-hidden{display:none}
+
 @media(prefers-reduced-motion:reduce){
   *{animation:none !important}
   .marquee-red-track{animation:none}
@@ -1249,10 +1276,15 @@ function renderCatalog(){
     var staticSrc=STATIC_IMGS[ev.id]||STATIC_IMGS[ev.staticImg];
     if(!ev.img&&ev.img!==false&&!staticSrc&&ev.a) ev.img=ev.a.replace(/ - .*/,'').replace(/ en .*/,'').replace(/ Mexico.*/,'');
     var imgHTML='';
+    var playBtn='';
+    if(!isPast&&!isAg&&!isProc&&!isPronto&&!isPC2){
+      var qArtist=(ev.a||'').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+      playBtn='<button class="ev-play" data-artist="'+qArtist+'" aria-label="Preview de música" onclick="event.stopPropagation();previewTrack(this)"><span class="ev-play-ico">▶</span></button>';
+    }
     if(staticSrc||ev.img){
-      imgHTML='<div class="ev-img-wrap"><img class="ev-img" src="'+(staticSrc||'')+'" alt="'+ev.a+'" /></div>';
+      imgHTML='<div class="ev-img-wrap"><img class="ev-img" src="'+(staticSrc||'')+'" alt="'+ev.a+'" />'+playBtn+'</div>';
     }else{
-      imgHTML='<div class="ev-img-placeholder"><span class="ev-img-initials">'+ev.a.substring(0,2).toUpperCase()+'</span></div>';
+      imgHTML='<div class="ev-img-placeholder"><span class="ev-img-initials">'+ev.a.substring(0,2).toUpperCase()+'</span>'+playBtn+'</div>';
     }
     var ctaH='';
     if(!isPast&&!isAg&&!isProc&&!isPronto){
@@ -1476,6 +1508,45 @@ var _scrollObs=new IntersectionObserver(function(entries){
 },{threshold:0.1});
 document.querySelectorAll('.ev-card,.how-step').forEach(function(el){_scrollObs.observe(el);});
 
+// Spotify 30s preview on card play button
+(function(){
+  var _audio=null, _currentBtn=null, _cache={};
+  function setIcon(btn,ch){var i=btn&&btn.querySelector('.ev-play-ico');if(i)i.textContent=ch;}
+  function stopCurrent(){
+    if(_audio){try{_audio.pause();_audio.src='';}catch(e){}_audio=null;}
+    if(_currentBtn){_currentBtn.classList.remove('ev-play-active','ev-play-loading');setIcon(_currentBtn,'▶');_currentBtn=null;}
+  }
+  window.stopAllPreviews=stopCurrent;
+  window.previewTrack=function(btn){
+    if(!btn)return;
+    if(_currentBtn===btn){stopCurrent();return;}
+    stopCurrent();
+    var artist=btn.getAttribute('data-artist')||'';
+    if(!artist)return;
+    btn.classList.add('ev-play-loading');
+    var go=function(url){
+      btn.classList.remove('ev-play-loading');
+      if(!url){btn.classList.add('ev-play-hidden');return;}
+      _audio=new Audio(url);
+      _audio.volume=0.85;
+      _audio.addEventListener('ended',stopCurrent);
+      _audio.addEventListener('error',stopCurrent);
+      _currentBtn=btn;
+      btn.classList.add('ev-play-active');setIcon(btn,'⏸');
+      var p=_audio.play();
+      if(p&&p.catch)p.catch(function(){stopCurrent();});
+    };
+    if(_cache.hasOwnProperty(artist)){go(_cache[artist]);return;}
+    fetch('/.netlify/functions/spotify-preview?q='+encodeURIComponent(artist))
+      .then(function(r){return r.ok?r.json():{preview_url:null};})
+      .then(function(d){var u=(d&&d.preview_url)||null;_cache[artist]=u;go(u);})
+      .catch(function(){btn.classList.remove('ev-play-loading');});
+  };
+  // Pause when opening detail or navigating
+  window.addEventListener('pagehide',stopCurrent);
+  document.addEventListener('visibilitychange',function(){if(document.hidden)stopCurrent();});
+})();
+
 // Scroll progress bar (top of page)
 (function(){
   var bar=document.getElementById('progress');
@@ -1639,6 +1710,7 @@ function txtTransporte(ev){
 function hotelList(ev){if(ev&&ev.multifecha&&cur&&cur._fechaIdx>=0){var mf=ev.multifecha[cur._fechaIdx];if(mf&&mf.hotel)return mf.hotel;}return isCDMX(ev)?HOTEL_CDM:HOTEL_MTY;}
 
 function showDetail(id){
+  if(window.stopAllPreviews)window.stopAllPreviews();
   cur=null;
   for(var i=0;i<EV.length;i++){if(EV[i].id===id){cur=EV[i];break;}}
   if(!cur)return;

@@ -75,7 +75,7 @@ body{font-family:'Montserrat',sans-serif;font-weight:500;background:#000;color:#
 .ev-card.proceso{position:relative}
 .ev-card.proceso::after{content:'EN PROCESO';position:absolute;inset:0;background:rgba(0,0,205,.85);display:grid;place-items:center;font-size:22px;font-weight:900;color:#fff;letter-spacing:.15em;z-index:10;pointer-events:none;font-family:'Montserrat',sans-serif}
 .ev-card.pronto{cursor:default;pointer-events:none;position:relative}
-.ev-card.pronto::after{content:'PRÓXIMAMENTE';position:absolute;inset:0;background:rgba(232,255,76,.92);display:grid;place-items:center;font-size:19px;font-weight:900;color:#000;letter-spacing:.12em;z-index:10;pointer-events:none;font-family:'Montserrat',sans-serif}
+.ev-card.pronto::after{content:'PRÓXIMAMENTE';position:absolute;inset:0;background:rgba(232,255,76,.92);display:grid;place-items:center;font-size:clamp(12px,3.2vw,18px);font-weight:900;color:#000;letter-spacing:.04em;text-align:center;padding:0 10px;white-space:nowrap;z-index:10;pointer-events:none;font-family:'Montserrat',sans-serif}
 .ev-card.pasado{cursor:default;pointer-events:none;opacity:.55}
 .ev-card.pasado .ev-img{filter:brightness(.35) grayscale(.6)}
 .tpast{background:rgba(255,255,255,.08);color:rgba(255,255,255,.4)}

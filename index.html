@@ -739,6 +739,11 @@ body{font-family:'Montserrat',sans-serif;font-weight:500;background:#000;color:#
 body[data-ev="laura"] #d-hero-img,
 body[data-ev="laura"] #d-hero-bg{object-position:center 18% !important}
 
+/* Catálogo oculto hasta que se presiona VER EVENTOS */
+.catalog{display:none}
+.catalog.revealed{display:block;animation:fadeInCatalog .6s cubic-bezier(.22,1,.36,1) both}
+@keyframes fadeInCatalog{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+
 @media(prefers-reduced-motion:reduce){
   *{animation:none !important}
   .marquee-red-track{animation:none}
@@ -1567,6 +1572,35 @@ var _scrollObs=new IntersectionObserver(function(entries){
   entries.forEach(function(e){if(e.isIntersecting){e.target.classList.add('visible');_scrollObs.unobserve(e.target);}});
 },{threshold:0.1});
 document.querySelectorAll('.ev-card,.how-step').forEach(function(el){_scrollObs.observe(el);});
+
+// Revelar catálogo al presionar VER EVENTOS o al llegar vía #catalog-anchor
+(function(){
+  function revealCatalog(){
+    var cat=document.querySelector('.catalog');
+    if(cat&&!cat.classList.contains('revealed'))cat.classList.add('revealed');
+  }
+  window.revealCatalog=revealCatalog;
+  // Hook a todos los anchors que apunten al catálogo
+  document.querySelectorAll('a[href="#catalog-anchor"], a[href$="#catalog-anchor"]').forEach(function(a){
+    a.addEventListener('click',function(){
+      revealCatalog();
+      // Deja que el browser haga el scroll nativo al anchor (scroll-behavior:smooth ya activo)
+    });
+  });
+  // Deep link llegando con hash — revelar y scrollear
+  function handleHash(){
+    if(location.hash==='#catalog-anchor'){
+      revealCatalog();
+      setTimeout(function(){
+        var el=document.getElementById('catalog-anchor');
+        if(el)el.scrollIntoView({behavior:'smooth',block:'start'});
+      },80);
+    }
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',handleHash);
+  else handleHash();
+  window.addEventListener('hashchange',handleHash);
+})();
 
 // Spotify 30s preview on card play button
 (function(){

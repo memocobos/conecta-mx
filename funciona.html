@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<title>Cómo Funciona — Conecta Reynosa</title>
+<meta name="description" content="Cinco pasos para reservar tu próximo tour a un concierto desde Reynosa. Sin letra chica, sin estrés.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700;900&family=Montserrat:wght@500;600;700;900&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#000000;
+  --ink:#ffffff;
+  --azul:#0000cd;
+  --rojo:#ff283b;
+  --amarillo:#e8ff4c;
+  --verde:#88ea4e;
+  --rosa:#ff4bd1;
+  --muted:rgba(255,255,255,.45);
+  --dim:rgba(255,255,255,.12);
+  --line:rgba(255,255,255,.08);
+  --font-display:'Barlow Condensed','Montserrat',sans-serif;
+  --font-body:'Montserrat',sans-serif;
+  --nav-h:56px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+*::selection{background:var(--amarillo);color:#000}
+html{scroll-behavior:smooth;-webkit-text-size-adjust:100%}
+body{
+  background:var(--bg);color:var(--ink);
+  font-family:var(--font-body);font-weight:500;
+  -webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;
+  overflow-x:hidden;min-height:100vh;position:relative;
+}
+body::before{
+  content:'';position:fixed;inset:0;pointer-events:none;z-index:9999;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.06'/%3E%3C/svg%3E");
+  mix-blend-mode:overlay;
+}
+a{color:inherit;text-decoration:none}
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-track{background:#000}
+::-webkit-scrollbar-thumb{background:var(--rojo)}
+
+/* Scroll progress bar */
+.progress{position:fixed;top:0;left:0;height:3px;background:var(--amarillo);z-index:1000;width:0;transition:width .1s linear;box-shadow:0 0 12px rgba(232,255,76,.5)}
+
+/* Header */
+.hdr{
+  position:fixed;top:0;left:0;right:0;z-index:200;
+  height:var(--nav-h);
+  display:flex;align-items:stretch;justify-content:space-between;
+  background:rgba(0,0,0,.9);
+  backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+  border-bottom:4px solid var(--rojo);
+}
+.hdr-logo{display:flex;align-items:stretch}
+.hdr-logo-box{background:var(--rojo);padding:0 14px;display:flex;align-items:center}
+.hdr-logo-txt{font-weight:900;font-size:15px;color:#000;letter-spacing:.04em;text-transform:uppercase;font-family:var(--font-body)}
+.hdr-logo-mx{font-weight:900;font-style:italic;font-size:17px;color:#fff;margin-left:7px;align-self:center;padding-right:14px}
+.hdr-cta{
+  align-self:center;margin-right:14px;
+  background:var(--rojo);color:#fff;
+  padding:10px 18px;font-size:10px;font-weight:900;
+  text-transform:uppercase;letter-spacing:.1em;
+  font-family:var(--font-body);
+  transition:transform .2s ease,box-shadow .2s ease,background .2s ease;
+  display:inline-flex;align-items:center;gap:6px;
+}
+.hdr-cta:hover{background:#e01e30;transform:translateY(-1px);box-shadow:0 8px 24px rgba(255,40,59,.35)}
+
+/* Marquee */
+.marquee{
+  position:relative;z-index:20;
+  margin-top:var(--nav-h);
+  background:var(--amarillo);color:#000;
+  padding:10px 0;overflow:hidden;
+  border-bottom:1px solid #000;
+}
+.marquee-track{
+  display:flex;gap:48px;white-space:nowrap;
+  animation:scrollX 28s linear infinite;
+  font-family:var(--font-display);font-weight:900;
+  font-size:clamp(14px,3vw,20px);
+  text-transform:uppercase;letter-spacing:.08em;
+  width:max-content;
+}
+.marquee-track span{display:inline-flex;align-items:center;gap:48px}
+.marquee-track span::after{content:'●';color:var(--rojo);font-size:12px}
+@keyframes scrollX{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+
+/* Hero */
+.hero{
+  position:relative;min-height:60vh;
+  display:flex;flex-direction:column;justify-content:flex-end;
+  padding:clamp(60px,12vw,120px) clamp(20px,5vw,80px) clamp(40px,8vw,80px);
+  overflow:hidden;
+  background:radial-gradient(ellipse at top left,rgba(255,40,59,.3) 0%,transparent 50%),
+             radial-gradient(ellipse at bottom right,rgba(232,255,76,.18) 0%,transparent 55%),
+             #000;
+  border-bottom:1px solid var(--line);
+}
+.hero::after{
+  content:'';position:absolute;inset:0;pointer-events:none;
+  background:
+    linear-gradient(90deg,transparent 0,transparent calc(100% - 1px),rgba(255,255,255,.04) 100%) repeat-x,
+    linear-gradient(transparent calc(100% - 1px),rgba(255,255,255,.04) 100%) repeat-y;
+  background-size:60px 100%,100% 60px;
+  mix-blend-mode:screen;opacity:.3;
+}
+.hero-kicker{
+  display:inline-flex;align-items:center;gap:12px;
+  font-size:10px;font-weight:900;letter-spacing:.2em;text-transform:uppercase;
+  color:var(--amarillo);margin-bottom:clamp(20px,4vw,32px);
+  padding-left:40px;position:relative;
+}
+.hero-kicker::before{content:'';position:absolute;left:0;top:50%;width:28px;height:2px;background:var(--amarillo);transform:translateY(-50%)}
+.hero-title{
+  font-family:var(--font-display);font-weight:900;
+  font-size:clamp(56px,16vw,180px);
+  line-height:.85;letter-spacing:-.01em;
+  text-transform:uppercase;
+  margin-bottom:clamp(18px,3vw,28px);
+}
+.hero-title .line{display:block;position:relative;opacity:0;transform:translateY(40px);animation:lineIn .9s cubic-bezier(.22,1,.36,1) both}
+.hero-title .line:nth-child(1){animation-delay:.1s}
+.hero-title .line:nth-child(2){animation-delay:.3s}
+.hero-title .mark{position:relative;display:inline-block;padding:0 .12em;color:#000;z-index:1}
+.hero-title .mark::before{content:'';position:absolute;left:0;right:0;top:8%;bottom:8%;background:var(--amarillo);z-index:-1;transform:skewX(-6deg)}
+@keyframes lineIn{to{opacity:1;transform:translateY(0)}}
+.hero-sub{max-width:720px;font-size:clamp(14px,1.6vw,18px);font-weight:500;line-height:1.55;color:var(--muted);animation:lineIn 1s .55s both}
+.hero-stats{margin-top:clamp(32px,5vw,48px);display:grid;grid-template-columns:repeat(3,1fr);gap:clamp(12px,2vw,24px);max-width:640px;animation:lineIn 1s .7s both}
+.hero-stat{padding:14px 0;border-top:2px solid var(--ink)}
+.hero-stat-n{font-family:var(--font-display);font-weight:900;font-size:clamp(32px,6vw,52px);line-height:1;color:var(--amarillo)}
+.hero-stat-l{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-top:6px}
+@media(max-width:640px){.hero-stats{grid-template-columns:1fr 1fr}.hero-stats .hero-stat:last-child{display:none}}
+
+/* Step sections */
+main{padding:0}
+.step-section{
+  padding:clamp(60px,8vw,120px) clamp(20px,5vw,80px);
+  max-width:1280px;margin:0 auto;
+}
+.step-head{
+  display:grid;
+  grid-template-columns:auto 1fr;
+  gap:clamp(16px,3vw,40px);
+  align-items:flex-end;
+  margin-bottom:clamp(24px,4vw,36px);
+  padding-bottom:clamp(20px,3vw,28px);
+  border-bottom:2px solid var(--ink);
+}
+.step-num{
+  font-family:var(--font-display);font-weight:900;
+  font-size:clamp(88px,20vw,220px);line-height:.78;letter-spacing:-.02em;
+}
+.step-meta{padding-bottom:clamp(8px,2vw,20px)}
+.step-tag{display:inline-block;font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:.18em;padding:6px 12px;margin-bottom:14px;border:1px solid currentColor}
+.step-title{font-family:var(--font-display);font-weight:900;font-size:clamp(28px,6vw,60px);line-height:.92;text-transform:uppercase;letter-spacing:-.005em}
+.step-body{max-width:740px}
+.step-lede{font-size:clamp(15px,1.8vw,19px);line-height:1.55;color:rgba(255,255,255,.75);font-weight:500;margin-bottom:clamp(20px,3vw,28px)}
+.step-pills{display:flex;flex-wrap:wrap;gap:8px}
+.step-pill{
+  font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:.1em;
+  padding:7px 12px;border:1px solid currentColor;color:currentColor;
+  display:inline-flex;align-items:center;gap:6px;
+}
+
+/* Category accent colors */
+.step-section[data-step="01"]{--c:var(--amarillo)}
+.step-section[data-step="02"]{--c:#6b6bff}
+.step-section[data-step="03"]{--c:var(--rojo)}
+.step-section[data-step="04"]{--c:var(--verde)}
+.step-section[data-step="05"]{--c:var(--rosa)}
+.step-section .step-num{color:var(--c)}
+.step-section .step-tag{color:var(--c)}
+.step-section .step-pill{color:var(--c)}
+
+/* Reveal */
+.step-section{opacity:0;transform:translateY(30px);transition:opacity .7s ease,transform .7s ease}
+.step-section.reveal{opacity:1;transform:translateY(0)}
+
+/* Visual breaks */
+.visual{
+  position:relative;height:clamp(200px,32vw,380px);
+  overflow:hidden;margin:0;
+  display:flex;align-items:center;justify-content:center;
+}
+.visual img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;filter:brightness(.32) contrast(1.15) saturate(.75);transform:scale(1.06);transition:transform 1.2s ease}
+.visual:hover img{transform:scale(1.12)}
+.visual::after{content:'';position:absolute;inset:0;background:linear-gradient(180deg,var(--bg) 0%,transparent 25%,transparent 75%,var(--bg) 100%),linear-gradient(90deg,var(--bg) 0%,transparent 30%,transparent 70%,var(--bg) 100%);pointer-events:none}
+.visual-text{position:relative;z-index:2;text-align:center;padding:0 20px;opacity:0;transform:translateY(20px);transition:opacity .8s ease,transform .8s ease}
+.visual.reveal .visual-text{opacity:1;transform:translateY(0)}
+.visual-text .kicker{font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:.24em;color:var(--amarillo);margin-bottom:12px}
+.visual-text .big{font-family:var(--font-display);font-weight:900;font-size:clamp(32px,8vw,80px);line-height:.9;text-transform:uppercase;letter-spacing:-.005em}
+.visual-text .big em{font-style:normal;color:var(--amarillo)}
+
+/* CTA */
+.cta{padding:clamp(60px,10vw,120px) clamp(20px,5vw,80px);text-align:center;background:#000;border-top:1px solid var(--line);position:relative}
+.cta-kicker{font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:.22em;color:var(--muted);margin-bottom:18px}
+.cta-title{font-family:var(--font-display);font-weight:900;font-size:clamp(40px,10vw,104px);line-height:.9;text-transform:uppercase;letter-spacing:-.005em;margin-bottom:clamp(24px,4vw,36px)}
+.cta-title em{font-style:normal;color:var(--amarillo)}
+.cta-btn{
+  display:inline-flex;align-items:center;gap:12px;
+  background:var(--rojo);color:#fff;
+  padding:20px 40px;font-size:clamp(14px,1.6vw,18px);font-weight:900;text-transform:uppercase;letter-spacing:.1em;
+  font-family:var(--font-body);
+  transition:transform .2s ease,box-shadow .25s ease,background .2s ease;
+  position:relative;overflow:hidden;
+}
+.cta-btn::after{content:'';position:absolute;inset:0;background:linear-gradient(135deg,transparent 40%,rgba(255,255,255,.2) 50%,transparent 60%);transform:translateX(-100%);transition:transform .8s ease}
+.cta-btn:hover{background:#e01e30;transform:translateY(-3px);box-shadow:0 16px 48px rgba(255,40,59,.45)}
+.cta-btn:hover::after{transform:translateX(100%)}
+
+/* Footer */
+.ftr{background:#050505;border-top:3px solid var(--rojo);padding:clamp(40px,6vw,72px) clamp(20px,5vw,80px) clamp(28px,4vw,40px)}
+.ftr-grid{display:grid;grid-template-columns:1fr;gap:32px;max-width:1280px;margin:0 auto;align-items:start}
+@media(min-width:800px){.ftr-grid{grid-template-columns:1fr 2fr;gap:60px}}
+.ftr-brand{display:flex;align-items:center;gap:10px;margin-bottom:16px}
+.ftr-brand-box{background:var(--rojo);padding:4px 12px}
+.ftr-brand-txt{font-weight:900;color:#000;letter-spacing:.04em;text-transform:uppercase;font-size:14px}
+.ftr-brand-mx{font-weight:900;font-style:italic;font-size:16px;color:#fff}
+.ftr-tag{font-size:11px;color:var(--muted);line-height:1.6;font-weight:500;max-width:320px}
+.ftr-cols{display:grid;grid-template-columns:repeat(2,1fr);gap:32px}
+@media(min-width:560px){.ftr-cols{grid-template-columns:repeat(3,1fr)}}
+.ftr-col-lbl{font-size:9px;font-weight:900;color:var(--amarillo);text-transform:uppercase;letter-spacing:.2em;margin-bottom:14px}
+.ftr-col a{display:block;font-size:12px;font-weight:600;color:rgba(255,255,255,.6);padding:5px 0;text-transform:uppercase;letter-spacing:.04em;transition:color .2s ease,transform .2s ease}
+.ftr-col a:hover{color:var(--ink);transform:translateX(3px)}
+.ftr-bottom{max-width:1280px;margin:32px auto 0;display:flex;flex-direction:column;gap:8px;align-items:flex-start;padding-top:20px;border-top:1px solid var(--line)}
+@media(min-width:600px){.ftr-bottom{flex-direction:row;justify-content:space-between;align-items:center}}
+.ftr-copy{font-size:10px;color:rgba(255,255,255,.25);font-weight:600;text-transform:uppercase;letter-spacing:.1em}
+.ftr-mini{display:inline-flex;align-items:center;gap:8px;font-size:10px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.1em}
+.ftr-mini-dot{width:6px;height:6px;border-radius:50%;background:var(--verde);animation:pulseDot 1.6s ease-in-out infinite}
+@keyframes pulseDot{0%,100%{box-shadow:0 0 0 0 rgba(136,234,78,.6)}50%{box-shadow:0 0 0 8px rgba(136,234,78,0)}}
+
+@media(max-width:640px){
+  .step-head{grid-template-columns:1fr;gap:8px}
+  .step-num{font-size:clamp(64px,22vw,120px)}
+}
+@media(prefers-reduced-motion:reduce){
+  *{animation:none !important;transition:none !important}
+  .marquee-track{animation:none}
+  .hero-title .line,.hero-sub,.hero-stats{opacity:1;transform:none}
+}
+</style>
+</head>
+<body>
+
+<div class="progress" id="progress"></div>
+
+<!-- HEADER -->
+<header class="hdr">
+  <a href="https://conectareynosa.mx" class="hdr-logo" aria-label="Conecta Reynosa">
+    <div class="hdr-logo-box"><span class="hdr-logo-txt">CONECTA</span></div>
+    <span class="hdr-logo-mx">MX.</span>
+  </a>
+  <a href="https://conectareynosa.mx" class="hdr-cta">Ver eventos <span aria-hidden="true">→</span></a>
+</header>
+
+<!-- MARQUEE -->
+<div class="marquee" aria-hidden="true">
+  <div class="marquee-track">
+    <span>Cinco pasos · sin dolor</span><span>Transporte</span><span>Hospedaje</span><span>Boletos</span><span>Kit Conecta</span><span>Paga en quincenas</span>
+    <span>Cinco pasos · sin dolor</span><span>Transporte</span><span>Hospedaje</span><span>Boletos</span><span>Kit Conecta</span><span>Paga en quincenas</span>
+  </div>
+</div>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-kicker">Conecta Reynosa · Guía 2026</div>
+  <h1 class="hero-title">
+    <span class="line">Cómo</span>
+    <span class="line"><span class="mark">funciona</span></span>
+  </h1>
+  <p class="hero-sub">Todo el proceso en cinco pasos claros. De elegir tu evento a subirte al autobús — sin letra chica, sin enganches absurdos, sin estrés.</p>
+  <div class="hero-stats">
+    <div class="hero-stat"><div class="hero-stat-n">05</div><div class="hero-stat-l">Pasos</div></div>
+    <div class="hero-stat"><div class="hero-stat-n">0%</div><div class="hero-stat-l">Interés</div></div>
+    <div class="hero-stat"><div class="hero-stat-n">13+</div><div class="hero-stat-l">Años</div></div>
+  </div>
+</section>
+
+<!-- CONTENT -->
+<main>
+
+  <!-- 01 -->
+  <section class="step-section" data-step="01">
+    <div class="step-head">
+      <div class="step-num">01</div>
+      <div class="step-meta">
+        <span class="step-tag">Elige tu evento</span>
+        <h2 class="step-title">Catálogo completo<br>en un solo lugar</h2>
+      </div>
+    </div>
+    <div class="step-body">
+      <p class="step-lede">Más de 40 conciertos y festivales en todo México durante 2026. De pop latino a metal, de festivales masivos en CDMX a auditorios en Monterrey — hay algo para cada gusto musical. Entra al catálogo, filtra por mes o ciudad, abre la ficha del evento y revisa zonas, fechas y disponibilidad.</p>
+      <div class="step-pills">
+        <span class="step-pill">Arena MTY</span>
+        <span class="step-pill">Foro Sol CDMX</span>
+        <span class="step-pill">Estadio GNP</span>
+        <span class="step-pill">Festivales</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- VISUAL 1 -->
+  <div class="visual">
+    <img src="https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=1400&q=75" alt="" loading="lazy">
+    <div class="visual-text">
+      <div class="kicker">Desde 2013</div>
+      <div class="big">Más de <em>40</em><br>eventos</div>
+    </div>
+  </div>
+
+  <!-- 02 -->
+  <section class="step-section" data-step="02">
+    <div class="step-head">
+      <div class="step-num">02</div>
+      <div class="step-meta">
+        <span class="step-tag">Selecciona tu paquete</span>
+        <h2 class="step-title">Cuatro opciones<br>a tu medida</h2>
+      </div>
+    </div>
+    <div class="step-body">
+      <p class="step-lede">Elige el paquete que mejor encaje con tu plan. Desde el todo-incluido PLUS con transporte, hospedaje y boleto hasta el CHEAP que es solo el boleto oficial. Todos incluyen el Kit Conecta — pulsera, porta-gafete y recuerdo del tour.</p>
+      <div class="step-pills">
+        <span class="step-pill">PLUS · Todo incluido</span>
+        <span class="step-pill">RIDE · Sin boleto</span>
+        <span class="step-pill">STAY · Sin transporte</span>
+        <span class="step-pill">CHEAP · Solo boleto</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- 03 -->
+  <section class="step-section" data-step="03">
+    <div class="step-head">
+      <div class="step-num">03</div>
+      <div class="step-meta">
+        <span class="step-tag">Aparta tu lugar</span>
+        <h2 class="step-title">Un pequeño<br>separo basta</h2>
+      </div>
+    </div>
+    <div class="step-body">
+      <p class="step-lede">El separo arranca desde $300 MXN según el evento. Haces tu depósito, envías comprobante por WhatsApp o Messenger y tu lugar queda reservado. Sin tarjeta de crédito, sin buró de crédito, sin enganches ridículos.</p>
+      <div class="step-pills">
+        <span class="step-pill">Desde $300</span>
+        <span class="step-pill">Sin tarjeta</span>
+        <span class="step-pill">Sin buró</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- VISUAL 2 -->
+  <div class="visual">
+    <img src="https://images.unsplash.com/photo-1459749411175-04bf5292ceea?w=1400&q=75" alt="" loading="lazy">
+    <div class="visual-text">
+      <div class="kicker">Sin deudas</div>
+      <div class="big">Paga en <em>quincenas</em></div>
+    </div>
+  </div>
+
+  <!-- 04 -->
+  <section class="step-section" data-step="04">
+    <div class="step-head">
+      <div class="step-num">04</div>
+      <div class="step-meta">
+        <span class="step-tag">Paga en quincenas</span>
+        <h2 class="step-title">Plan automático<br>poco a poco</h2>
+      </div>
+    </div>
+    <div class="step-body">
+      <p class="step-lede">Nuestra web calcula tu plan de pagos automáticamente según los días que falten para el evento. Pagas 2-3 veces al mes cantidades pequeñas. Llegas al día del concierto sin deudas, sin sobresaltos, sin la tarjeta al tope.</p>
+      <div class="step-pills">
+        <span class="step-pill">0% interés</span>
+        <span class="step-pill">Transferencia</span>
+        <span class="step-pill">Depósito</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- 05 -->
+  <section class="step-section" data-step="05">
+    <div class="step-head">
+      <div class="step-num">05</div>
+      <div class="step-meta">
+        <span class="step-tag">¡A disfrutar!</span>
+        <h2 class="step-title">Nos encargamos<br>de todo</h2>
+      </div>
+    </div>
+    <div class="step-body">
+      <p class="step-lede">El día del evento solo preocúpate por tu mejor outfit. Transporte redondo desde Reynosa, hotel 4-5 estrellas, boleto en mano y Kit Conecta. Cero estrés, viaje acompañado con otros fans, vibra de caravana.</p>
+      <div class="step-pills">
+        <span class="step-pill">Transporte redondo</span>
+        <span class="step-pill">Hotel 4-5★</span>
+        <span class="step-pill">Boleto oficial</span>
+        <span class="step-pill">Kit Conecta</span>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<!-- CTA -->
+<section class="cta">
+  <div class="cta-kicker">Listo para ir</div>
+  <h2 class="cta-title">Elige tu<br>próximo <em>concierto</em></h2>
+  <a href="https://conectareynosa.mx" class="cta-btn">Ver eventos y cotizar <span aria-hidden="true">→</span></a>
+</section>
+
+<!-- FOOTER -->
+<footer class="ftr">
+  <div class="ftr-grid">
+    <div>
+      <div class="ftr-brand">
+        <div class="ftr-brand-box"><span class="ftr-brand-txt">CONECTA</span></div>
+        <span class="ftr-brand-mx">MX.</span>
+      </div>
+      <p class="ftr-tag">Agencia de viajes a conciertos desde Reynosa, Tamaulipas. Transporte · Hospedaje · Boletos · Kit Conecta.</p>
+    </div>
+    <div class="ftr-cols">
+      <div class="ftr-col">
+        <div class="ftr-col-lbl">Web</div>
+        <a href="https://conectareynosa.mx">Eventos</a>
+        <a href="/faq">FAQ</a>
+        <a href="/funciona">Cómo funciona</a>
+      </div>
+      <div class="ftr-col">
+        <div class="ftr-col-lbl">Redes</div>
+        <a href="https://wa.me/528119771072" target="_blank" rel="noopener">WhatsApp</a>
+        <a href="https://www.instagram.com/conectareynosa" target="_blank" rel="noopener">Instagram</a>
+        <a href="https://www.facebook.com/ConectaRey" target="_blank" rel="noopener">Facebook</a>
+        <a href="https://www.tiktok.com/@conectareynosa" target="_blank" rel="noopener">TikTok</a>
+        <a href="https://www.threads.net/@conectareynosa" target="_blank" rel="noopener">Threads</a>
+      </div>
+      <div class="ftr-col">
+        <div class="ftr-col-lbl">Contacto</div>
+        <a href="tel:+528119771072">81 1977 1072</a>
+        <a href="tel:+528132321405">81 3232 1405 (vuelos)</a>
+      </div>
+    </div>
+  </div>
+  <div class="ftr-bottom">
+    <div class="ftr-copy">Conecta Reynosa © 2026 · Todos los derechos reservados</div>
+    <div class="ftr-mini"><span class="ftr-mini-dot" aria-hidden="true"></span>Operando desde 2013</div>
+  </div>
+</footer>
+
+<script>
+'use strict';
+
+// Scroll progress bar
+(function(){
+  var bar=document.getElementById('progress');
+  function update(){
+    var h=document.documentElement;
+    var total=h.scrollHeight-h.clientHeight;
+    bar.style.width=(total>0?(h.scrollTop/total*100):0)+'%';
+  }
+  window.addEventListener('scroll',update,{passive:true});
+  window.addEventListener('resize',update);
+  update();
+})();
+
+// Fade-in reveal
+(function(){
+  var revealables=document.querySelectorAll('.step-section, .visual, .cta-title');
+  var rObs=new IntersectionObserver(function(entries){
+    entries.forEach(function(entry){
+      if(entry.isIntersecting){
+        entry.target.classList.add('reveal');
+        rObs.unobserve(entry.target);
+      }
+    });
+  },{threshold:0.12,rootMargin:'0px 0px -40px 0px'});
+  revealables.forEach(function(el){rObs.observe(el);});
+})();
+</script>
+
+</body>
+</html>

@@ -1616,6 +1616,18 @@ document.querySelectorAll('.ev-card,.how-step').forEach(function(el){_scrollObs.
 // Countdown regresivo al próximo evento disponible
 (function(){
   function pad(n){return (n<10?'0':'')+n;}
+  // Detecta hora de inicio automáticamente según el tipo (festivales 14:00 / conciertos 21:00)
+  // Permite override opcional con ev.hora si se quiere ajustar manualmente
+  function getEventHour(ev){
+    if(!ev)return '21:00';
+    if(ev.hora)return ev.hora;
+    var festivalIds=['machaca','emblema','warped','pulsoquetaro','dalemix','knotfest','edc','edc2027','coronacap','flowfest','arre','comuna','nochegrandes'];
+    var festivalKeywords=['festival','fest','machaca','warped','edc','knotfest'];
+    var id=(ev.id||'').toLowerCase();
+    var nombre=(ev.a||'').toLowerCase();
+    var esFestival=festivalIds.indexOf(id)>=0 || festivalKeywords.some(function(k){return nombre.indexOf(k)>=0||id.indexOf(k)>=0;});
+    return esFestival?'14:00':'21:00';
+  }
   function findNext(){
     if(typeof EV==='undefined')return null;
     var now=Date.now();
@@ -1625,7 +1637,7 @@ document.querySelectorAll('.ev-card,.how-step').forEach(function(el){_scrollObs.
       if(!e||e.listOnly)continue;
       if(e.st!==''&&e.st!=='ultimos')continue;
       if(!e.ds)continue;
-      var t=new Date(e.ds+'T'+(e.hora||'21:00')+':00').getTime();
+      var t=new Date(e.ds+'T'+getEventHour(e)+':00').getTime();
       if(isNaN(t)||t<=now)continue;
       candidates.push({ev:e,t:t});
     }

@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<title>Kit Conecta — Conecta Reynosa</title>
+<meta name="description" content="Vasos, tote bags, morrales, cangureras, foodcard. Te consentimos viajando con nosotros. El contenido varía por evento y sucursal.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700;900&family=Montserrat:wght@500;600;700;900&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#000000;
+  --ink:#ffffff;
+  --azul:#0000cd;
+  --rojo:#ff283b;
+  --amarillo:#e8ff4c;
+  --verde:#88ea4e;
+  --rosa:#ff4bd1;
+  --muted:rgba(255,255,255,.45);
+  --dim:rgba(255,255,255,.12);
+  --line:rgba(255,255,255,.08);
+  --font-display:'Barlow Condensed','Montserrat',sans-serif;
+  --font-body:'Montserrat',sans-serif;
+  --nav-h:56px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+*::selection{background:var(--amarillo);color:#000}
+html{scroll-behavior:smooth;-webkit-text-size-adjust:100%}
+body{background:var(--bg);color:var(--ink);font-family:var(--font-body);font-weight:500;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;overflow-x:hidden;min-height:100vh;position:relative}
+body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:9999;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.06'/%3E%3C/svg%3E");mix-blend-mode:overlay}
+a{color:inherit;text-decoration:none}
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-track{background:#000}
+::-webkit-scrollbar-thumb{background:var(--azul)}
+
+.progress{position:fixed;top:0;left:0;height:3px;background:var(--amarillo);z-index:1000;width:0;transition:width .1s linear;box-shadow:0 0 12px rgba(232,255,76,.5)}
+
+/* Header */
+.hdr{position:fixed;top:0;left:0;right:0;z-index:200;height:var(--nav-h);display:flex;align-items:stretch;justify-content:space-between;background:rgba(0,0,0,.9);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border-bottom:4px solid var(--azul)}
+.hdr-logo{display:flex;align-items:stretch}
+.hdr-logo-box{background:var(--rojo);padding:0 14px;display:flex;align-items:center}
+.hdr-logo-txt{font-weight:900;font-size:15px;color:#000;letter-spacing:.04em;text-transform:uppercase;font-family:var(--font-body)}
+.hdr-logo-mx{font-weight:900;font-style:italic;font-size:17px;color:#fff;margin-left:7px;align-self:center;padding-right:14px}
+.hdr-right{display:flex;align-items:stretch;gap:0}
+.hdr-socials{display:flex;align-items:stretch}
+.hdr-social{display:flex;align-items:center;justify-content:center;width:38px;color:rgba(255,255,255,.45);text-decoration:none;transition:color .2s ease,background .2s ease}
+.hdr-social svg{width:15px;height:15px}
+.hdr-social:hover{color:#fff}
+.hdr-social.wa:hover{color:#25D366;background:rgba(37,211,102,.1)}
+.hdr-social.ig:hover{color:#ff4bd1;background:rgba(255,75,209,.1)}
+.hdr-social.fb:hover{color:#1877F2;background:rgba(24,119,242,.1)}
+.hdr-social.tt:hover{color:#fff;background:rgba(255,255,255,.08)}
+@media(max-width:420px){.hdr-social{width:32px}.hdr-social svg{width:13px;height:13px}}
+.hdr-cta{align-self:center;margin:0 14px 0 8px;background:var(--azul);color:#fff;padding:10px 18px;font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:.1em;font-family:var(--font-body);transition:transform .2s ease,box-shadow .2s ease,background .2s ease;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.hdr-cta:hover{background:#0000a8;transform:translateY(-1px);box-shadow:0 8px 24px rgba(0,0,205,.4)}
+@media(max-width:420px){.hdr-cta{padding:9px 12px;font-size:9px}}
+
+/* Marquee */
+.marquee{position:relative;z-index:20;margin-top:var(--nav-h);background:var(--amarillo);color:#000;padding:10px 0;overflow:hidden;border-bottom:1px solid #000}
+.marquee-track{display:flex;gap:48px;white-space:nowrap;animation:scrollX 28s linear infinite;font-family:var(--font-display);font-weight:900;font-size:clamp(14px,3vw,20px);text-transform:uppercase;letter-spacing:.08em;width:max-content}
+.marquee-track span{display:inline-flex;align-items:center;gap:48px}
+.marquee-track span::after{content:'●';color:var(--rojo);font-size:12px}
+@keyframes scrollX{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+
+/* Hero */
+.hero{position:relative;min-height:60vh;display:flex;flex-direction:column;justify-content:flex-end;padding:clamp(50px,11vw,110px) clamp(20px,5vw,80px) clamp(36px,6vw,72px);overflow:hidden;background:#0000cd;border-bottom:1px solid var(--line)}
+.hero-portada{position:absolute;inset:0;z-index:0;overflow:hidden}
+.hero-portada img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;filter:brightness(.35) saturate(1.05);mix-blend-mode:luminosity;opacity:.55}
+.hero-portada::after{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(0,0,205,.85) 0%,rgba(0,0,205,.6) 60%,rgba(0,0,50,.95) 100%)}
+.hero > *{position:relative;z-index:1}
+.hero-kicker{display:inline-flex;align-items:center;gap:12px;font-size:10px;font-weight:900;letter-spacing:.2em;text-transform:uppercase;color:var(--amarillo);margin-bottom:clamp(18px,3vw,30px);padding-left:40px;position:relative}
+.hero-kicker::before{content:'';position:absolute;left:0;top:50%;width:28px;height:2px;background:var(--amarillo);transform:translateY(-50%)}
+.hero-title{font-family:var(--font-display);font-weight:900;font-size:clamp(56px,16vw,180px);line-height:.85;letter-spacing:-.01em;text-transform:uppercase;margin-bottom:clamp(16px,3vw,26px)}
+.hero-title .line{display:block;opacity:0;transform:translateY(40px);animation:lineIn .9s cubic-bezier(.22,1,.36,1) both}
+.hero-title .line:nth-child(1){animation-delay:.1s}
+.hero-title .line:nth-child(2){animation-delay:.3s}
+.hero-title .mark{position:relative;display:inline-block;padding:0 .12em;color:#000;z-index:1}
+.hero-title .mark::before{content:'';position:absolute;left:0;right:0;top:8%;bottom:8%;background:var(--amarillo);z-index:-1;transform:skewX(-6deg)}
+@keyframes lineIn{to{opacity:1;transform:translateY(0)}}
+.hero-sub{max-width:720px;font-size:clamp(14px,1.6vw,18px);font-weight:500;line-height:1.55;color:rgba(255,255,255,.85);animation:lineIn 1s .55s both;margin-bottom:clamp(10px,2vw,16px)}
+.hero-note{display:inline-block;margin-top:14px;padding:6px 12px;border:1px solid rgba(255,255,255,.25);color:rgba(255,255,255,.75);font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:.14em;animation:lineIn 1s .75s both}
+
+/* Item sections */
+main{padding:0}
+.item-section{padding:clamp(60px,8vw,110px) clamp(20px,5vw,80px);max-width:1280px;margin:0 auto;display:grid;grid-template-columns:1fr;gap:clamp(28px,5vw,48px)}
+@media(min-width:900px){.item-section{grid-template-columns:1fr 1fr;align-items:center;gap:clamp(40px,6vw,80px)}.item-section.reverse{direction:rtl}.item-section.reverse > *{direction:ltr}}
+.item-meta{display:flex;flex-direction:column}
+.item-num{font-family:var(--font-display);font-weight:900;font-size:clamp(80px,14vw,180px);line-height:.78;letter-spacing:-.02em;margin-bottom:clamp(14px,2.5vw,24px)}
+.item-tag{display:inline-block;font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:.18em;padding:6px 12px;margin-bottom:14px;border:1px solid currentColor;align-self:flex-start}
+.item-title{font-family:var(--font-display);font-weight:900;font-size:clamp(32px,6vw,64px);line-height:.92;text-transform:uppercase;letter-spacing:-.005em;color:var(--ink);margin-bottom:clamp(14px,2.5vw,22px)}
+.item-body{font-size:clamp(14px,1.6vw,17px);line-height:1.55;color:rgba(255,255,255,.75);font-weight:500;max-width:520px;margin-bottom:clamp(16px,2.5vw,22px)}
+.item-pills{display:flex;flex-wrap:wrap;gap:8px}
+.item-pill{font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:.1em;padding:7px 12px;border:1px solid currentColor;color:currentColor}
+
+.item-photo{position:relative;aspect-ratio:4/5;background:#0a0a0a;overflow:hidden;border:1px solid var(--line)}
+.item-photo img{width:100%;height:100%;object-fit:cover;display:block;transition:transform 1s ease}
+.item-photo:hover img{transform:scale(1.04)}
+.item-photo::after{content:'';position:absolute;inset:0;pointer-events:none;background:linear-gradient(180deg,transparent 60%,rgba(0,0,0,.35) 100%)}
+.item-photo-tag{position:absolute;top:14px;left:14px;z-index:2;font-family:var(--font-display);font-weight:900;font-size:clamp(18px,3vw,28px);letter-spacing:.04em;text-transform:uppercase;padding:4px 10px;background:var(--amarillo);color:#000}
+
+/* Accent per item */
+.item-section[data-item="01"]{--c:var(--amarillo)}
+.item-section[data-item="02"]{--c:#6b6bff}
+.item-section[data-item="03"]{--c:var(--rojo)}
+.item-section[data-item="04"]{--c:var(--verde)}
+.item-section[data-item="05"]{--c:var(--rosa)}
+.item-section .item-num{color:var(--c)}
+.item-section .item-tag{color:var(--c)}
+.item-section .item-pill{color:var(--c)}
+.item-section .item-photo-tag{background:var(--c)}
+
+/* Reveal */
+.item-section{opacity:0;transform:translateY(30px);transition:opacity .7s ease,transform .7s ease}
+.item-section.reveal{opacity:1;transform:translateY(0)}
+
+/* CTA */
+.cta{padding:clamp(56px,9vw,110px) clamp(20px,5vw,80px);text-align:center;background:#000;border-top:1px solid var(--line)}
+.cta-kicker{font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:.22em;color:var(--muted);margin-bottom:18px}
+.cta-title{font-family:var(--font-display);font-weight:900;font-size:clamp(36px,9vw,92px);line-height:.9;text-transform:uppercase;letter-spacing:-.005em;margin-bottom:clamp(24px,4vw,36px)}
+.cta-title em{font-style:normal;color:var(--amarillo)}
+.cta-btn{display:inline-flex;align-items:center;gap:12px;background:var(--azul);color:#fff;padding:20px 40px;font-size:clamp(14px,1.6vw,18px);font-weight:900;text-transform:uppercase;letter-spacing:.1em;font-family:var(--font-body);transition:transform .2s ease,box-shadow .25s ease,background .2s ease;position:relative;overflow:hidden}
+.cta-btn::after{content:'';position:absolute;inset:0;background:linear-gradient(135deg,transparent 40%,rgba(255,255,255,.2) 50%,transparent 60%);transform:translateX(-100%);transition:transform .8s ease}
+.cta-btn:hover{background:#0000a8;transform:translateY(-3px);box-shadow:0 16px 48px rgba(0,0,205,.5)}
+.cta-btn:hover::after{transform:translateX(100%)}
+
+/* Footer */
+.ftr{background:#050505;border-top:3px solid var(--azul);padding:clamp(40px,6vw,72px) clamp(20px,5vw,80px) clamp(28px,4vw,40px)}
+.ftr-grid{display:grid;grid-template-columns:1fr;gap:32px;max-width:1280px;margin:0 auto;align-items:start}
+@media(min-width:800px){.ftr-grid{grid-template-columns:1fr 2fr;gap:60px}}
+.ftr-brand{display:flex;align-items:center;gap:10px;margin-bottom:16px}
+.ftr-brand-box{background:var(--rojo);padding:4px 12px}
+.ftr-brand-txt{font-weight:900;color:#000;letter-spacing:.04em;text-transform:uppercase;font-size:14px}
+.ftr-brand-mx{font-weight:900;font-style:italic;font-size:16px;color:#fff}
+.ftr-tag{font-size:11px;color:var(--muted);line-height:1.6;font-weight:500;max-width:320px}
+.ftr-cols{display:grid;grid-template-columns:repeat(2,1fr);gap:32px}
+@media(min-width:560px){.ftr-cols{grid-template-columns:repeat(3,1fr)}}
+.ftr-col-lbl{font-size:9px;font-weight:900;color:var(--amarillo);text-transform:uppercase;letter-spacing:.2em;margin-bottom:14px}
+.ftr-col a{display:block;font-size:12px;font-weight:600;color:rgba(255,255,255,.6);padding:5px 0;text-transform:uppercase;letter-spacing:.04em;transition:color .2s ease,transform .2s ease}
+.ftr-col a:hover{color:var(--ink);transform:translateX(3px)}
+.ftr-bottom{max-width:1280px;margin:32px auto 0;display:flex;flex-direction:column;gap:8px;align-items:flex-start;padding-top:20px;border-top:1px solid var(--line)}
+@media(min-width:600px){.ftr-bottom{flex-direction:row;justify-content:space-between;align-items:center}}
+.ftr-copy{font-size:10px;color:rgba(255,255,255,.25);font-weight:600;text-transform:uppercase;letter-spacing:.1em}
+.ftr-mini{display:inline-flex;align-items:center;gap:8px;font-size:10px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.1em}
+.ftr-mini-dot{width:6px;height:6px;border-radius:50%;background:var(--verde);animation:pulseDot 1.6s ease-in-out infinite}
+@keyframes pulseDot{0%,100%{box-shadow:0 0 0 0 rgba(136,234,78,.6)}50%{box-shadow:0 0 0 8px rgba(136,234,78,0)}}
+
+@media(prefers-reduced-motion:reduce){*{animation:none !important;transition:none !important}.marquee-track{animation:none}.hero-title .line,.hero-sub,.hero-note{opacity:1;transform:none}}
+</style>
+</head>
+<body>
+
+<div class="progress" id="progress"></div>
+
+<!-- HEADER -->
+<header class="hdr">
+  <a href="https://conectareynosa.mx" class="hdr-logo" aria-label="Conecta Reynosa">
+    <div class="hdr-logo-box"><span class="hdr-logo-txt">CONECTA</span></div>
+    <span class="hdr-logo-mx">MX.</span>
+  </a>
+  <div class="hdr-right">
+    <div class="hdr-socials">
+      <a href="https://wa.me/528119771072" target="_blank" rel="noopener" class="hdr-social wa" aria-label="WhatsApp"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg></a>
+      <a href="https://instagram.com/conectareynosa" target="_blank" rel="noopener" class="hdr-social ig" aria-label="Instagram"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z"/></svg></a>
+      <a href="https://facebook.com/ConectaRey" target="_blank" rel="noopener" class="hdr-social fb" aria-label="Facebook"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg></a>
+      <a href="https://tiktok.com/@conectareynosa" target="_blank" rel="noopener" class="hdr-social tt" aria-label="TikTok"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z"/></svg></a>
+    </div>
+    <a href="https://conectareynosa.mx/#catalog-anchor" class="hdr-cta">Ver eventos <span aria-hidden="true">→</span></a>
+  </div>
+</header>
+
+<!-- MARQUEE -->
+<div class="marquee" aria-hidden="true">
+  <div class="marquee-track">
+    <span>Kit Conecta</span><span>Vasos</span><span>Tote bags</span><span>Morrales</span><span>Cangureras</span><span>Foodcard</span>
+    <span>Kit Conecta</span><span>Vasos</span><span>Tote bags</span><span>Morrales</span><span>Cangureras</span><span>Foodcard</span>
+  </div>
+</div>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-portada"><img data-img="kit_portada" alt="Kit Conecta"></div>
+  <div class="hero-kicker">Conecta Reynosa · Kit 2026</div>
+  <h1 class="hero-title">
+    <span class="line">Kit</span>
+    <span class="line"><span class="mark">Conecta</span></span>
+  </h1>
+  <p class="hero-sub">Te consentimos viajando con nosotros. Cada tour incluye detalles pensados para la ruta — vasos, morrales, tote bags, cangureras y foodcard.</p>
+  <span class="hero-note">El contenido varía por evento y sucursal</span>
+</section>
+
+<!-- CONTENT -->
+<main>
+
+  <section class="item-section" data-item="01">
+    <div class="item-meta">
+      <div class="item-num">01</div>
+      <span class="item-tag">Vasos</span>
+      <h2 class="item-title">Para el camino<br>y el show</h2>
+      <p class="item-body">Vasos coleccionables del tour — perfectos para el viaje en autobús, el hotel y llevar de recuerdo a casa. Diseño exclusivo por evento.</p>
+      <div class="item-pills">
+        <span class="item-pill">Incluido</span>
+        <span class="item-pill">Edición tour</span>
+      </div>
+    </div>
+    <div class="item-photo">
+      <span class="item-photo-tag">Vasos</span>
+      <img data-img="kit_vasos" alt="Vasos Kit Conecta" loading="lazy">
+    </div>
+  </section>
+
+  <section class="item-section reverse" data-item="02">
+    <div class="item-meta">
+      <div class="item-num">02</div>
+      <span class="item-tag">Tote bags</span>
+      <h2 class="item-title">Lleva todo<br>con estilo</h2>
+      <p class="item-body">Tote bags de tela reforzada con el branding del evento. Para tu merch, tus snacks, tus cosas del hotel — todo organizado.</p>
+      <div class="item-pills">
+        <span class="item-pill">Incluido</span>
+        <span class="item-pill">Tela reforzada</span>
+      </div>
+    </div>
+    <div class="item-photo">
+      <span class="item-photo-tag">Tote bag</span>
+      <img data-img="kit_totebags" alt="Tote bags Kit Conecta" loading="lazy">
+    </div>
+  </section>
+
+  <section class="item-section" data-item="03">
+    <div class="item-meta">
+      <div class="item-num">03</div>
+      <span class="item-tag">Morrales</span>
+      <h2 class="item-title">Tu equipaje<br>de mano</h2>
+      <p class="item-body">Morrales cómodos para el evento — compactos, prácticos, con espacio para celular, cartera, y lo esencial. Diseño Conecta.</p>
+      <div class="item-pills">
+        <span class="item-pill">Algunos eventos</span>
+        <span class="item-pill">Manos libres</span>
+      </div>
+    </div>
+    <div class="item-photo">
+      <span class="item-photo-tag">Morral</span>
+      <img data-img="kit_morrales" alt="Morrales Kit Conecta" loading="lazy">
+    </div>
+  </section>
+
+  <section class="item-section reverse" data-item="04">
+    <div class="item-meta">
+      <div class="item-num">04</div>
+      <span class="item-tag">Cangureras</span>
+      <h2 class="item-title">Sin manos<br>ocupadas</h2>
+      <p class="item-body">Cangureras compactas para festivales y conciertos de pie. Suficiente espacio para lo indispensable sin cargar mochila pesada.</p>
+      <div class="item-pills">
+        <span class="item-pill">Algunos eventos</span>
+        <span class="item-pill">Compacto</span>
+      </div>
+    </div>
+    <div class="item-photo">
+      <span class="item-photo-tag">Canguera</span>
+      <img data-img="kit_cangureras" alt="Cangureras Kit Conecta" loading="lazy">
+    </div>
+  </section>
+
+  <section class="item-section" data-item="05">
+    <div class="item-meta">
+      <div class="item-num">05</div>
+      <span class="item-tag">Foodcard</span>
+      <h2 class="item-title">Come en<br>la ruta</h2>
+      <p class="item-body">Foodcard con créditos para comida en el viaje — úsala en paradas seleccionadas durante el trayecto. Disponible en tours de larga distancia.</p>
+      <div class="item-pills">
+        <span class="item-pill">Tours largos</span>
+        <span class="item-pill">Incluye comida</span>
+      </div>
+    </div>
+    <div class="item-photo">
+      <span class="item-photo-tag">Foodcard</span>
+      <img data-img="kit_foodcard" alt="Foodcard Kit Conecta" loading="lazy">
+    </div>
+  </section>
+
+</main>
+
+<!-- CTA -->
+<section class="cta">
+  <div class="cta-kicker">Todo incluido</div>
+  <h2 class="cta-title">Viaja y <em>disfruta</em><br>todo el kit</h2>
+  <a href="https://conectareynosa.mx/#catalog-anchor" class="cta-btn">Ver eventos y cotizar <span aria-hidden="true">→</span></a>
+</section>
+
+<!-- FOOTER -->
+<footer class="ftr">
+  <div class="ftr-grid">
+    <div>
+      <div class="ftr-brand">
+        <div class="ftr-brand-box"><span class="ftr-brand-txt">CONECTA</span></div>
+        <span class="ftr-brand-mx">MX.</span>
+      </div>
+      <p class="ftr-tag">Agencia de viajes a conciertos desde Reynosa, Tamaulipas. Transporte · Hospedaje · Boletos · Kit Conecta.</p>
+    </div>
+    <div class="ftr-cols">
+      <div class="ftr-col">
+        <div class="ftr-col-lbl">Web</div>
+        <a href="https://conectareynosa.mx">Eventos</a>
+        <a href="/funciona">Cómo funciona</a>
+        <a href="/faq">FAQ</a>
+        <a href="/kit">Kit Conecta</a>
+      </div>
+      <div class="ftr-col">
+        <div class="ftr-col-lbl">Redes</div>
+        <a href="https://wa.me/528119771072" target="_blank" rel="noopener">WhatsApp</a>
+        <a href="https://instagram.com/conectareynosa" target="_blank" rel="noopener">Instagram</a>
+        <a href="https://facebook.com/ConectaRey" target="_blank" rel="noopener">Facebook</a>
+        <a href="https://tiktok.com/@conectareynosa" target="_blank" rel="noopener">TikTok</a>
+      </div>
+      <div class="ftr-col">
+        <div class="ftr-col-lbl">Contacto</div>
+        <a href="tel:+528119771072">81 1977 1072</a>
+        <a href="tel:+528132321405">81 3232 1405 (vuelos)</a>
+      </div>
+    </div>
+  </div>
+  <div class="ftr-bottom">
+    <div class="ftr-copy">Conecta Reynosa © 2026 · Todos los derechos reservados</div>
+    <div class="ftr-mini"><span class="ftr-mini-dot" aria-hidden="true"></span>Operando desde 2013</div>
+  </div>
+</footer>
+
+<script src="/imgs.js"></script>
+<script>
+// Populate images from STATIC_IMGS
+(function(){
+  var imgs=document.querySelectorAll('img[data-img]');
+  function apply(){
+    if(!window.STATIC_IMGS)return;
+    imgs.forEach(function(img){
+      var k=img.getAttribute('data-img');
+      if(window.STATIC_IMGS[k])img.src=window.STATIC_IMGS[k];
+    });
+  }
+  if(window.STATIC_IMGS)apply();
+  else window.addEventListener('load',apply);
+})();
+
+// Scroll progress bar
+(function(){
+  var bar=document.getElementById('progress');
+  function update(){
+    var h=document.documentElement;
+    var total=h.scrollHeight-h.clientHeight;
+    bar.style.width=(total>0?(h.scrollTop/total*100):0)+'%';
+  }
+  window.addEventListener('scroll',update,{passive:true});
+  window.addEventListener('resize',update);
+  update();
+})();
+
+// Fade-in reveal
+(function(){
+  var revealables=document.querySelectorAll('.item-section');
+  var rObs=new IntersectionObserver(function(entries){
+    entries.forEach(function(entry){
+      if(entry.isIntersecting){entry.target.classList.add('reveal');rObs.unobserve(entry.target);}
+    });
+  },{threshold:0.12,rootMargin:'0px 0px -40px 0px'});
+  revealables.forEach(function(el){rObs.observe(el);});
+})();
+</script>
+
+</body>
+</html>

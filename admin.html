@@ -618,15 +618,31 @@ function updateViajeros(force){
   }
   // Contar desde tabla de resumen (Airtable reservations)
   var total=0;
-  var tbl=document.querySelectorAll('#view-resumen table tr');
-  if(tbl.length>0){
-    tbl.forEach(function(r){
+  function sumLastCol(rows){
+    var sum=0;
+    rows.forEach(function(r){
       var cells=r.querySelectorAll('td');
       if(cells.length>0){
         var n=parseInt(cells[cells.length-1]?.textContent);
-        if(!isNaN(n)) total+=n;
+        if(!isNaN(n)) sum+=n;
       }
     });
+    return sum;
+  }
+  var primary=document.querySelectorAll('#view-resumen table tr');
+  if(primary.length>0){
+    total=sumLastCol(primary);
+  }
+  // Fallback: si view-resumen no tiene tabla o sumó 0, intentar cualquier otra tabla del dashboard
+  if(total===0){
+    var allTables=document.querySelectorAll('.view table, main table, body table');
+    for(var i=0;i<allTables.length;i++){
+      var rows=allTables[i].querySelectorAll('tr');
+      if(rows.length>0){
+        var s=sumLastCol(rows);
+        if(s>0){total=s;break;}
+      }
+    }
   }
   // Si cálculo actual es 0 pero hay cache previo, preservarlo (evita perder dato histórico)
   if(total===0&&cached) total=parseInt(cached)||0;

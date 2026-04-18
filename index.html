@@ -1175,7 +1175,9 @@ function setMonth(btn,m){
     var el=document.getElementById('home-viajeros-num');
     if(!el)return;
     var v=localStorage.getItem('viajeros2026');
-    el.textContent=v&&Number(v)>0?Number(v).toLocaleString('es-MX'):'—';
+    // null → "—" | cualquier número válido (incluyendo 0) → mostrar el número formateado
+    var n=v===null?null:Number(v);
+    el.textContent=(n!==null && !isNaN(n))?n.toLocaleString('es-MX'):'—';
   }
   render();
   window.addEventListener('storage',function(e){if(e.key==='viajeros2026')render();});

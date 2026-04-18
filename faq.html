@@ -2,355 +2,887 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Preguntas Frecuentes | Conecta Reynosa</title>
-<meta name="description" content="Resuelve tus dudas sobre Conecta Reynosa: boletos, transporte, hospedaje, pagos y más.">
-<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@900&family=Montserrat:wght@400;500;600;700;900&display=swap" rel="stylesheet">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<title>Preguntas Frecuentes — Conecta Reynosa</title>
+<meta name="description" content="Respuestas a todo sobre tours de conciertos desde Reynosa: garantía, boletos, transporte, hospedaje y pagos.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700;900&family=Montserrat:wght@500;600;700;900&display=swap" rel="stylesheet">
 <style>
 :root{
   --bg:#000000;
-  --surface:#111;
-  --accent:#e8ff4c;
-  --accent-dim:rgba(232,255,76,.12);
-  --red:#ff283b;
-  --blue:#0000cd;
-  --white:#ffffff;
+  --ink:#ffffff;
+  --azul:#0000cd;
+  --rojo:#ff283b;
+  --amarillo:#e8ff4c;
+  --verde:#88ea4e;
+  --rosa:#ff4bd1;
   --muted:rgba(255,255,255,.45);
-  --border:rgba(255,255,255,.06);
-  --radius:0;
+  --dim:rgba(255,255,255,.12);
+  --line:rgba(255,255,255,.08);
+  --font-display:'Barlow Condensed','Montserrat',sans-serif;
+  --font-body:'Montserrat',sans-serif;
+  --nav-h:56px;
+  --tabs-h:54px;
 }
 *{box-sizing:border-box;margin:0;padding:0}
-html{scroll-behavior:smooth}
-body{background:var(--bg);color:var(--white);font-family:'Montserrat',sans-serif;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;overflow-x:hidden}
-a{color:var(--accent);text-decoration:none}
-::selection{background:var(--accent);color:#000}
-::-webkit-scrollbar{width:3px}
-::-webkit-scrollbar-thumb{background:var(--accent)}
-
-/* ── HEADER ── */
-.hdr{position:fixed;top:0;left:0;right:0;z-index:999;display:flex;align-items:center;justify-content:space-between;padding:0 24px;height:56px;background:rgba(10,10,10,.92);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-bottom:1px solid var(--border)}
-.hdr-logo{font-family:'Barlow Condensed','Montserrat',sans-serif;font-size:28px;letter-spacing:.06em;color:var(--white);line-height:1}
-.hdr-logo span{color:var(--accent)}
-.hdr-cta{background:var(--red);color:#fff;padding:10px 20px;font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:.1em;font-family:'Montserrat',sans-serif;transition:all .25s cubic-bezier(.16,1,.3,1)}
-.hdr-cta:hover{background:#e01e30;transform:translateY(-1px);box-shadow:0 4px 20px rgba(255,40,59,.35)}
-
-/* ── HERO ── */
-.hero{position:relative;height:clamp(340px,50vh,480px);display:flex;align-items:flex-end;justify-content:flex-start;overflow:hidden;margin-top:56px}
-.hero-bg{position:absolute;inset:0;background:url('https://images.unsplash.com/photo-1540039155733-5bb30b53aa14?w=1400&q=80') center/cover no-repeat;filter:brightness(.3) contrast(1.1) saturate(.8);transform:scale(1.05);animation:heroZoom 20s ease-in-out infinite alternate}
-@keyframes heroZoom{from{transform:scale(1.05)}to{transform:scale(1.15)}}
-.hero-grain{position:absolute;inset:0;background:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.06'/%3E%3C/svg%3E");pointer-events:none;z-index:1}
-.hero-overlay{position:absolute;inset:0;background:linear-gradient(180deg,transparent 0%,rgba(10,10,10,.4) 50%,var(--bg) 100%);z-index:2}
-.hero-line{position:absolute;bottom:0;left:0;width:100%;height:3px;background:var(--accent);z-index:4;box-shadow:0 0 20px rgba(232,255,76,.3)}
-.hero-content{position:relative;z-index:3;padding:0 clamp(24px,5vw,80px) 48px;max-width:900px;animation:heroIn .8s cubic-bezier(.16,1,.3,1) both}
-@keyframes heroIn{from{opacity:0;transform:translateY(30px)}to{opacity:1;transform:translateY(0)}}
-.hero-tag{display:inline-block;font-size:10px;font-weight:900;letter-spacing:.2em;text-transform:uppercase;color:var(--accent);margin-bottom:16px;position:relative;padding-left:28px}
-.hero-tag::before{content:'';position:absolute;left:0;top:50%;width:20px;height:2px;background:var(--accent);transform:translateY(-50%)}
-.hero h1{font-family:'Barlow Condensed','Montserrat',sans-serif;font-size:clamp(48px,10vw,96px);line-height:.9;letter-spacing:.04em;color:var(--white);margin-bottom:16px}
-.hero h1 em{font-style:normal;color:var(--accent);display:block}
-.hero-sub{font-size:clamp(12px,1.5vw,14px);color:var(--muted);font-weight:500;line-height:1.6;max-width:420px}
-
-/* ── NAV TABS ── */
-.tabs{position:sticky;top:56px;z-index:99;background:rgba(10,10,10,.95);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-bottom:1px solid var(--border);padding:0}
-.tabs-inner{display:flex;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;max-width:900px;margin:0 auto;padding:0 24px}
-.tabs-inner::-webkit-scrollbar{display:none}
-.tab{position:relative;flex-shrink:0;padding:16px 20px;background:none;border:none;color:var(--muted);font-family:'Montserrat',sans-serif;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.12em;cursor:pointer;transition:color .25s;white-space:nowrap}
-.tab::after{content:'';position:absolute;bottom:0;left:20px;right:20px;height:2px;background:var(--accent);transform:scaleX(0);transition:transform .25s cubic-bezier(.16,1,.3,1)}
-.tab:hover{color:rgba(255,255,255,.7)}
-.tab.active{color:var(--accent)}
-.tab.active::after{transform:scaleX(1)}
-
-/* ── CONTENT ── */
-.content{max-width:900px;margin:0 auto;padding:0 clamp(20px,4vw,80px)}
-
-/* ── SECTION ── */
-.fq-section{padding:48px 0 0;opacity:0;transform:translateY(20px);transition:opacity .5s ease,transform .5s ease}
-.fq-section.visible{opacity:1;transform:translateY(0)}
-.fq-section-head{display:flex;align-items:center;gap:16px;margin-bottom:24px}
-.fq-section-num{font-family:'Barlow Condensed','Montserrat',sans-serif;font-size:48px;line-height:1;color:rgba(232,255,76,.15);letter-spacing:.02em}
-.fq-section-lbl{font-size:11px;font-weight:900;color:var(--accent);text-transform:uppercase;letter-spacing:.15em}
-
-/* ── ACCORDION ── */
-.fq{border-top:1px solid var(--border);transition:border-color .3s}
-.fq:last-child{border-bottom:1px solid var(--border)}
-.fq:hover{border-color:rgba(232,255,76,.12)}
-.fq-q{display:flex;align-items:center;gap:16px;padding:20px 0;cursor:pointer;background:none;border:none;width:100%;color:var(--white);font-family:'Montserrat',sans-serif;text-align:left;transition:padding .3s}
-.fq-num{font-family:'Barlow Condensed','Montserrat',sans-serif;font-size:22px;color:var(--accent);flex-shrink:0;width:32px;line-height:1;opacity:.6;transition:opacity .3s}
-.fq:hover .fq-num{opacity:1}
-.fq-text{flex:1;font-size:13px;font-weight:700;letter-spacing:.01em;line-height:1.4}
-.fq-icon{width:20px;height:20px;flex-shrink:0;position:relative;transition:transform .35s cubic-bezier(.16,1,.3,1)}
-.fq-icon::before,.fq-icon::after{content:'';position:absolute;background:var(--muted);transition:all .35s cubic-bezier(.16,1,.3,1)}
-.fq-icon::before{width:14px;height:1.5px;top:50%;left:50%;transform:translate(-50%,-50%)}
-.fq-icon::after{width:1.5px;height:14px;top:50%;left:50%;transform:translate(-50%,-50%)}
-.fq.open .fq-icon::after{transform:translate(-50%,-50%) rotate(90deg);opacity:0}
-.fq.open .fq-icon::before{background:var(--accent)}
-.fq-a{display:grid;grid-template-rows:0fr;transition:grid-template-rows .4s cubic-bezier(.16,1,.3,1)}
-.fq.open .fq-a{grid-template-rows:1fr}
-.fq-a-inner{overflow:hidden}
-.fq-a-body{padding:0 0 24px 48px;font-size:13px;color:var(--muted);line-height:1.8;font-weight:500}
-.fq-a-body a{color:var(--accent);text-decoration:underline;text-underline-offset:3px}
-
-/* ── VISUAL BREAKS ── */
-.visual{position:relative;height:200px;margin:48px 0;overflow:hidden}
-.visual img{width:100%;height:100%;object-fit:cover;filter:brightness(.3) saturate(.7);transition:transform 8s ease}
-.visual:hover img{transform:scale(1.05)}
-.visual-overlay{position:absolute;inset:0;background:linear-gradient(90deg,var(--bg) 0%,transparent 30%,transparent 70%,var(--bg) 100%)}
-.visual-text{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:8px;z-index:1}
-.visual-text span{font-family:'Barlow Condensed','Montserrat',sans-serif;font-size:clamp(28px,5vw,42px);letter-spacing:.08em;text-shadow:0 2px 20px rgba(0,0,0,.5)}
-.visual-text small{font-size:10px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.2em}
-
-/* ── CTA BOTTOM ── */
-.bottom-cta{text-align:center;padding:64px 24px 48px}
-.bottom-cta a{display:inline-block;background:var(--red);color:#fff;padding:18px 48px;font-size:13px;font-weight:900;text-transform:uppercase;letter-spacing:.1em;font-family:'Montserrat',sans-serif;transition:all .3s cubic-bezier(.16,1,.3,1);position:relative;overflow:hidden}
-.bottom-cta a::after{content:'';position:absolute;inset:0;background:linear-gradient(135deg,transparent 40%,rgba(255,255,255,.15) 50%,transparent 60%);transform:translateX(-100%);transition:transform .6s}
-.bottom-cta a:hover{box-shadow:0 8px 32px rgba(255,40,59,.35);transform:translateY(-2px);background:#e01e30}
-.bottom-cta a:hover::after{transform:translateX(100%)}
-
-/* ── FOOTER ── */
-.ftr{border-top:1px solid var(--border);padding:48px 24px;text-align:center}
-.ftr-logo{font-family:'Barlow Condensed','Montserrat',sans-serif;font-size:24px;letter-spacing:.06em;margin-bottom:20px}
-.ftr-logo span{color:var(--accent)}
-.ftr-links{display:flex;gap:24px;justify-content:center;margin-bottom:20px;flex-wrap:wrap}
-.ftr-links a{color:var(--muted);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;transition:color .25s}
-.ftr-links a:hover{color:var(--accent)}
-.ftr-copy{color:rgba(255,255,255,.15);font-size:9px;font-weight:600;letter-spacing:.05em}
-
-/* ── RESPONSIVE ── */
-@media(max-width:600px){
-  .hero{height:300px}
-  .hero-content{padding:0 20px 32px}
-  .fq-a-body{padding-left:0}
-  .visual{height:140px;margin:32px 0}
-  .tab{padding:14px 14px;font-size:9px;letter-spacing:.08em}
+*::selection{background:var(--amarillo);color:#000}
+html{scroll-behavior:smooth;-webkit-text-size-adjust:100%}
+body{
+  background:var(--bg);color:var(--ink);
+  font-family:var(--font-body);font-weight:500;
+  -webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;
+  overflow-x:hidden;
+  min-height:100vh;
+  position:relative;
 }
-@media(min-width:900px){
-  .content{padding:0 80px}
+/* Noise overlay for texture */
+body::before{
+  content:'';position:fixed;inset:0;pointer-events:none;z-index:9999;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.06'/%3E%3C/svg%3E");
+  mix-blend-mode:overlay;
+}
+a{color:inherit;text-decoration:none}
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-track{background:#000}
+::-webkit-scrollbar-thumb{background:var(--rojo)}
+
+/* Scroll progress bar */
+.progress{position:fixed;top:0;left:0;height:3px;background:var(--amarillo);z-index:1000;width:0;transition:width .1s linear;box-shadow:0 0 12px rgba(232,255,76,.5)}
+
+/* Header */
+.hdr{
+  position:fixed;top:0;left:0;right:0;z-index:200;
+  height:var(--nav-h);
+  display:flex;align-items:stretch;justify-content:space-between;
+  background:rgba(0,0,0,.9);
+  backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+  border-bottom:4px solid var(--rojo);
+}
+.hdr-logo{display:flex;align-items:stretch}
+.hdr-logo-box{background:var(--rojo);padding:0 14px;display:flex;align-items:center}
+.hdr-logo-txt{font-weight:900;font-size:15px;color:#000;letter-spacing:.04em;text-transform:uppercase;font-family:var(--font-body)}
+.hdr-logo-mx{font-weight:900;font-style:italic;font-size:17px;color:#fff;margin-left:7px;align-self:center;padding-right:14px}
+.hdr-cta{
+  align-self:center;margin-right:14px;
+  background:var(--rojo);color:#fff;
+  padding:10px 18px;font-size:10px;font-weight:900;
+  text-transform:uppercase;letter-spacing:.1em;
+  font-family:var(--font-body);
+  transition:transform .2s ease,box-shadow .2s ease,background .2s ease;
+  display:inline-flex;align-items:center;gap:6px;
+}
+.hdr-cta:hover{background:#e01e30;transform:translateY(-1px);box-shadow:0 8px 24px rgba(255,40,59,.35)}
+.hdr-cta:active{transform:translateY(0)}
+
+/* Marquee */
+.marquee{
+  position:relative;z-index:20;
+  margin-top:var(--nav-h);
+  background:var(--amarillo);color:#000;
+  padding:10px 0;overflow:hidden;
+  border-bottom:1px solid #000;
+}
+.marquee-track{
+  display:flex;gap:48px;white-space:nowrap;
+  animation:scrollX 28s linear infinite;
+  font-family:var(--font-display);font-weight:900;
+  font-size:clamp(14px,3vw,20px);
+  text-transform:uppercase;letter-spacing:.08em;
+  width:max-content;
+}
+.marquee-track span{display:inline-flex;align-items:center;gap:48px}
+.marquee-track span::after{content:'●';color:var(--rojo);font-size:12px}
+@keyframes scrollX{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+
+/* Hero */
+.hero{
+  position:relative;min-height:70vh;
+  display:flex;flex-direction:column;justify-content:flex-end;
+  padding:clamp(60px,12vw,120px) clamp(20px,5vw,80px) clamp(40px,8vw,80px);
+  overflow:hidden;
+  background:radial-gradient(ellipse at top right,rgba(0,0,205,.35) 0%,transparent 50%),
+             radial-gradient(ellipse at bottom left,rgba(255,40,59,.22) 0%,transparent 55%),
+             #000;
+  border-bottom:1px solid var(--line);
+}
+.hero::after{
+  content:'';position:absolute;inset:0;pointer-events:none;
+  background:
+    linear-gradient(90deg,transparent 0,transparent calc(100% - 1px),rgba(255,255,255,.04) 100%) repeat-x,
+    linear-gradient(transparent calc(100% - 1px),rgba(255,255,255,.04) 100%) repeat-y;
+  background-size:60px 100%,100% 60px;
+  mix-blend-mode:screen;
+  opacity:.3;
+}
+.hero-kicker{
+  display:inline-flex;align-items:center;gap:12px;
+  font-size:10px;font-weight:900;letter-spacing:.2em;text-transform:uppercase;
+  color:var(--amarillo);margin-bottom:clamp(20px,4vw,32px);
+  padding-left:40px;position:relative;
+}
+.hero-kicker::before{
+  content:'';position:absolute;left:0;top:50%;width:28px;height:2px;background:var(--amarillo);transform:translateY(-50%);
+}
+.hero-title{
+  font-family:var(--font-display);font-weight:900;
+  font-size:clamp(56px,16vw,180px);
+  line-height:.85;letter-spacing:-.01em;
+  text-transform:uppercase;
+  margin-bottom:clamp(18px,3vw,28px);
+  animation:heroIn .9s cubic-bezier(.22,1,.36,1) both;
+}
+.hero-title .line{display:block;position:relative;opacity:0;transform:translateY(40px);animation:lineIn .9s cubic-bezier(.22,1,.36,1) both}
+.hero-title .line:nth-child(1){animation-delay:.1s}
+.hero-title .line:nth-child(2){animation-delay:.3s}
+.hero-title .mark{
+  position:relative;display:inline-block;padding:0 .12em;color:#000;z-index:1;
+}
+.hero-title .mark::before{
+  content:'';position:absolute;left:0;right:0;top:8%;bottom:8%;
+  background:var(--rojo);z-index:-1;
+  transform:skewX(-6deg);
+}
+@keyframes lineIn{to{opacity:1;transform:translateY(0)}}
+.hero-sub{
+  max-width:720px;font-size:clamp(14px,1.6vw,18px);font-weight:500;line-height:1.55;
+  color:var(--muted);
+  animation:lineIn 1s cubic-bezier(.22,1,.36,1) .55s both;
+}
+.hero-stats{
+  margin-top:clamp(32px,5vw,48px);
+  display:grid;grid-template-columns:repeat(3,1fr);gap:clamp(12px,2vw,24px);
+  max-width:640px;
+  animation:lineIn 1s cubic-bezier(.22,1,.36,1) .7s both;
+}
+.hero-stat{padding:14px 0;border-top:2px solid var(--ink)}
+.hero-stat-n{font-family:var(--font-display);font-weight:900;font-size:clamp(32px,6vw,52px);line-height:1;color:var(--amarillo)}
+.hero-stat-l{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-top:6px}
+.hero-scroll{
+  position:absolute;bottom:clamp(12px,2vw,24px);right:clamp(20px,5vw,80px);
+  font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:.2em;color:var(--muted);
+  writing-mode:vertical-rl;transform:rotate(180deg);
+  display:flex;align-items:center;gap:10px;
+  animation:lineIn 1s 1s both;
+}
+.hero-scroll::after{content:'';width:2px;height:48px;background:var(--amarillo);animation:scrollLine 1.6s ease-in-out infinite}
+@keyframes scrollLine{0%,100%{transform:scaleY(.3);transform-origin:top}50%{transform:scaleY(1);transform-origin:top}}
+
+/* Tabs */
+.tabs{
+  position:sticky;top:var(--nav-h);z-index:150;
+  background:rgba(0,0,0,.94);
+  backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+  border-bottom:1px solid var(--line);
+}
+.tabs-inner{
+  display:flex;overflow-x:auto;-webkit-overflow-scrolling:touch;
+  scrollbar-width:none;
+  padding:0 clamp(20px,5vw,80px);
+  max-width:1280px;margin:0 auto;
+  gap:4px;
+}
+.tabs-inner::-webkit-scrollbar{display:none}
+.tab{
+  flex-shrink:0;
+  position:relative;
+  padding:18px 20px 16px;
+  background:transparent;border:none;cursor:pointer;
+  font-family:var(--font-body);
+  font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.12em;
+  color:var(--muted);
+  transition:color .25s ease;
+  white-space:nowrap;
+}
+.tab:hover{color:var(--ink)}
+.tab .tab-n{font-family:var(--font-display);font-weight:900;font-size:12px;margin-right:8px;color:inherit;opacity:.55}
+.tab::after{
+  content:'';position:absolute;left:20px;right:20px;bottom:0;height:3px;
+  background:currentColor;
+  transform:scaleX(0);transform-origin:left;
+  transition:transform .3s cubic-bezier(.22,1,.36,1);
+}
+.tab[data-cat="garantia"].active{color:var(--rojo)}
+.tab[data-cat="servicios"].active{color:var(--azul)}
+.tab[data-cat="logistica"].active{color:var(--amarillo)}
+.tab[data-cat="boletos"].active{color:var(--verde)}
+.tab[data-cat="especiales"].active{color:var(--rosa)}
+.tab.active::after{transform:scaleX(1)}
+.tab.active .tab-n{opacity:1}
+.tab[data-cat="servicios"].active{color:#6b6bff} /* azul #0000cd es muy oscuro sobre negro, usar una versión más brillante */
+
+/* Sections */
+main{padding:0}
+.fq-section{
+  padding:clamp(60px,8vw,120px) clamp(20px,5vw,80px) clamp(40px,6vw,80px);
+  max-width:1280px;margin:0 auto;
+  scroll-margin-top:calc(var(--nav-h) + var(--tabs-h) + 20px);
+}
+.fq-head{
+  display:grid;
+  grid-template-columns:auto 1fr;
+  gap:clamp(16px,3vw,40px);
+  align-items:flex-end;
+  margin-bottom:clamp(32px,5vw,56px);
+  padding-bottom:clamp(20px,3vw,28px);
+  border-bottom:2px solid var(--ink);
+}
+.fq-head-num{
+  font-family:var(--font-display);font-weight:900;
+  font-size:clamp(80px,18vw,200px);line-height:.8;letter-spacing:-.02em;
+}
+.fq-head-meta{padding-bottom:clamp(8px,2vw,20px)}
+.fq-head-tag{
+  display:inline-block;font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:.18em;
+  padding:6px 12px;margin-bottom:14px;
+  border:1px solid currentColor;
+}
+.fq-head-title{
+  font-family:var(--font-display);font-weight:900;
+  font-size:clamp(26px,5vw,52px);line-height:.95;text-transform:uppercase;letter-spacing:.005em;
+}
+.fq-head-count{
+  font-size:11px;font-weight:700;color:var(--muted);margin-top:10px;letter-spacing:.08em;text-transform:uppercase;
+}
+
+/* Category accent colors */
+.fq-section[data-cat="garantia"]{--c:var(--rojo)}
+.fq-section[data-cat="servicios"]{--c:#6b6bff} /* brightened azul for contrast */
+.fq-section[data-cat="logistica"]{--c:var(--amarillo)}
+.fq-section[data-cat="boletos"]{--c:var(--verde)}
+.fq-section[data-cat="especiales"]{--c:var(--rosa)}
+.fq-section .fq-head-num{color:var(--c)}
+.fq-section .fq-head-tag{color:var(--c)}
+
+/* Accordion */
+.fq-list{display:flex;flex-direction:column}
+.fq{
+  position:relative;
+  border-top:1px solid var(--line);
+  opacity:0;transform:translateY(20px);
+  transition:opacity .6s ease,transform .6s ease,background .2s ease;
+}
+.fq.reveal{opacity:1;transform:translateY(0)}
+.fq:last-child{border-bottom:1px solid var(--line)}
+.fq::before{
+  content:'';position:absolute;left:0;top:0;bottom:0;width:0;background:var(--c);
+  transition:width .35s cubic-bezier(.22,1,.36,1);
+}
+.fq:hover::before{width:4px}
+.fq.open::before{width:4px}
+.fq-btn{
+  display:grid;grid-template-columns:auto 1fr auto;
+  gap:clamp(14px,2.5vw,28px);align-items:center;
+  width:100%;padding:24px clamp(8px,2vw,20px) 24px 0;
+  background:none;border:none;cursor:pointer;text-align:left;
+  color:var(--ink);font-family:var(--font-body);
+  transition:padding-left .25s ease;
+}
+.fq:hover .fq-btn,.fq.open .fq-btn{padding-left:16px}
+.fq-n{
+  font-family:var(--font-display);font-weight:900;
+  font-size:clamp(28px,4vw,40px);line-height:1;
+  color:var(--c);
+  min-width:56px;
+}
+.fq-q{
+  font-size:clamp(14px,1.6vw,17px);font-weight:700;line-height:1.3;
+  letter-spacing:-.005em;
+}
+.fq-ico{
+  position:relative;width:22px;height:22px;flex-shrink:0;
+  transition:transform .35s cubic-bezier(.22,1,.36,1);
+}
+.fq-ico::before,.fq-ico::after{
+  content:'';position:absolute;left:50%;top:50%;background:var(--ink);
+  transition:all .35s cubic-bezier(.22,1,.36,1);
+}
+.fq-ico::before{width:14px;height:2px;transform:translate(-50%,-50%)}
+.fq-ico::after{width:2px;height:14px;transform:translate(-50%,-50%)}
+.fq.open .fq-ico{transform:rotate(180deg)}
+.fq.open .fq-ico::after{opacity:0;transform:translate(-50%,-50%) rotate(90deg)}
+.fq.open .fq-ico::before{background:var(--c);width:18px}
+.fq-ans{
+  display:grid;grid-template-rows:0fr;
+  transition:grid-template-rows .45s cubic-bezier(.22,1,.36,1);
+}
+.fq.open .fq-ans{grid-template-rows:1fr}
+.fq-ans-inner{overflow:hidden}
+.fq-ans-body{
+  padding:0 0 28px calc(56px + clamp(14px,2.5vw,28px) + 16px);
+  padding-right:clamp(20px,6vw,80px);
+  font-size:clamp(14px,1.45vw,16px);line-height:1.7;color:var(--muted);font-weight:500;
+}
+.fq.open .fq-ans-body{color:rgba(255,255,255,.75)}
+.fq-ans-body a{color:var(--c);text-decoration:underline;text-underline-offset:3px;text-decoration-thickness:1.5px}
+.fq-ans-body a:hover{opacity:.8}
+@media (max-width:600px){
+  .fq-ans-body{padding-left:0}
+}
+
+/* Visual breaks */
+.visual{
+  position:relative;height:clamp(240px,38vw,420px);
+  overflow:hidden;
+  margin:0;
+  display:flex;align-items:center;justify-content:center;
+}
+.visual img{
+  position:absolute;inset:0;width:100%;height:100%;object-fit:cover;
+  filter:brightness(.32) contrast(1.15) saturate(.75);
+  transform:scale(1.06);
+  transition:transform 1.2s ease;
+}
+.visual:hover img{transform:scale(1.12)}
+.visual::after{
+  content:'';position:absolute;inset:0;
+  background:linear-gradient(180deg,var(--bg) 0%,transparent 25%,transparent 75%,var(--bg) 100%),
+             linear-gradient(90deg,var(--bg) 0%,transparent 30%,transparent 70%,var(--bg) 100%);
+  pointer-events:none;
+}
+.visual-text{
+  position:relative;z-index:2;text-align:center;padding:0 20px;
+  opacity:0;transform:translateY(20px);
+  transition:opacity .8s ease,transform .8s ease;
+}
+.visual.reveal .visual-text{opacity:1;transform:translateY(0)}
+.visual-text .kicker{
+  font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:.24em;
+  color:var(--amarillo);margin-bottom:14px;
+}
+.visual-text .big{
+  font-family:var(--font-display);font-weight:900;
+  font-size:clamp(36px,9vw,96px);line-height:.9;text-transform:uppercase;letter-spacing:-.005em;
+}
+.visual-text .big em{font-style:normal;color:var(--amarillo);display:inline-block}
+
+/* Bottom CTA */
+.cta{
+  padding:clamp(60px,10vw,120px) clamp(20px,5vw,80px);
+  text-align:center;
+  background:#000;
+  border-top:1px solid var(--line);
+  position:relative;
+}
+.cta-kicker{font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:.22em;color:var(--muted);margin-bottom:18px}
+.cta-title{
+  font-family:var(--font-display);font-weight:900;
+  font-size:clamp(40px,10vw,104px);line-height:.9;text-transform:uppercase;letter-spacing:-.005em;
+  margin-bottom:clamp(24px,4vw,36px);
+}
+.cta-title em{font-style:normal;color:var(--amarillo)}
+.cta-btn{
+  display:inline-flex;align-items:center;gap:12px;
+  background:var(--rojo);color:#fff;
+  padding:20px 40px;
+  font-size:clamp(14px,1.6vw,18px);font-weight:900;text-transform:uppercase;letter-spacing:.1em;
+  font-family:var(--font-body);
+  transition:transform .2s ease,box-shadow .25s ease,background .2s ease;
+  position:relative;overflow:hidden;
+}
+.cta-btn::after{
+  content:'';position:absolute;inset:0;
+  background:linear-gradient(135deg,transparent 40%,rgba(255,255,255,.2) 50%,transparent 60%);
+  transform:translateX(-100%);transition:transform .8s ease;
+}
+.cta-btn:hover{background:#e01e30;transform:translateY(-3px);box-shadow:0 16px 48px rgba(255,40,59,.45)}
+.cta-btn:hover::after{transform:translateX(100%)}
+
+/* Footer */
+.ftr{
+  background:#050505;
+  border-top:3px solid var(--rojo);
+  padding:clamp(40px,6vw,72px) clamp(20px,5vw,80px) clamp(28px,4vw,40px);
+}
+.ftr-grid{
+  display:grid;grid-template-columns:1fr;gap:32px;
+  max-width:1280px;margin:0 auto;
+  align-items:start;
+}
+@media(min-width:800px){.ftr-grid{grid-template-columns:1fr 2fr;gap:60px}}
+.ftr-brand{display:flex;align-items:center;gap:10px;margin-bottom:16px}
+.ftr-brand-box{background:var(--rojo);padding:4px 12px}
+.ftr-brand-txt{font-weight:900;color:#000;letter-spacing:.04em;text-transform:uppercase;font-size:14px}
+.ftr-brand-mx{font-weight:900;font-style:italic;font-size:16px;color:#fff}
+.ftr-tag{font-size:11px;color:var(--muted);line-height:1.6;font-weight:500;max-width:320px}
+.ftr-sep{height:1px;background:var(--line);margin:28px 0 20px;grid-column:1/-1}
+.ftr-cols{display:grid;grid-template-columns:repeat(2,1fr);gap:32px}
+@media(min-width:560px){.ftr-cols{grid-template-columns:repeat(3,1fr)}}
+.ftr-col-lbl{font-size:9px;font-weight:900;color:var(--amarillo);text-transform:uppercase;letter-spacing:.2em;margin-bottom:14px}
+.ftr-col a{
+  display:block;
+  font-size:12px;font-weight:600;color:rgba(255,255,255,.6);
+  padding:5px 0;text-transform:uppercase;letter-spacing:.04em;
+  transition:color .2s ease,transform .2s ease;
+}
+.ftr-col a:hover{color:var(--ink);transform:translateX(3px)}
+.ftr-bottom{
+  max-width:1280px;margin:32px auto 0;
+  display:flex;flex-direction:column;gap:8px;align-items:flex-start;
+  padding-top:20px;border-top:1px solid var(--line);
+}
+@media(min-width:600px){.ftr-bottom{flex-direction:row;justify-content:space-between;align-items:center}}
+.ftr-copy{font-size:10px;color:rgba(255,255,255,.25);font-weight:600;text-transform:uppercase;letter-spacing:.1em}
+.ftr-mini{display:inline-flex;align-items:center;gap:8px;font-size:10px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.1em}
+.ftr-mini-dot{width:6px;height:6px;border-radius:50%;background:var(--verde);animation:pulseDot 1.6s ease-in-out infinite}
+@keyframes pulseDot{0%,100%{box-shadow:0 0 0 0 rgba(136,234,78,.6)}50%{box-shadow:0 0 0 8px rgba(136,234,78,0)}}
+
+/* Animations */
+@keyframes heroIn{from{opacity:0}to{opacity:1}}
+
+/* Responsive tweaks */
+@media(max-width:640px){
+  .hero-stats{grid-template-columns:1fr 1fr}
+  .hero-stats .hero-stat:last-child{display:none}
+  .fq-head{grid-template-columns:1fr;gap:8px}
+  .fq-head-num{font-size:clamp(56px,22vw,120px)}
+  .fq-btn{grid-template-columns:auto 1fr auto;padding-right:0}
+  .tab{padding:16px 14px 14px;font-size:10px;letter-spacing:.08em}
+  .tab .tab-n{font-size:11px;margin-right:5px}
+  .hero-scroll{display:none}
+}
+@media(max-width:420px){
+  .fq-n{font-size:24px;min-width:44px}
+}
+
+/* Prefers reduced motion */
+@media(prefers-reduced-motion:reduce){
+  *{animation:none !important;transition:none !important}
+  .marquee-track{animation:none}
+  .hero-title .line,.hero-sub,.hero-stats,.hero-scroll{opacity:1;transform:none}
 }
 </style>
 </head>
 <body>
 
+<div class="progress" id="progress"></div>
+
 <!-- HEADER -->
 <header class="hdr">
-  <a href="/" class="hdr-logo">CONECTA<span>.</span></a>
-  <a href="/" class="hdr-cta">Ver eventos →</a>
+  <a href="https://conectareynosa.mx" class="hdr-logo" aria-label="Conecta Reynosa">
+    <div class="hdr-logo-box"><span class="hdr-logo-txt">CONECTA</span></div>
+    <span class="hdr-logo-mx">MX.</span>
+  </a>
+  <a href="https://conectareynosa.mx" class="hdr-cta">Ver eventos <span aria-hidden="true">→</span></a>
 </header>
+
+<!-- MARQUEE -->
+<div class="marquee" aria-hidden="true">
+  <div class="marquee-track">
+    <span>Conecta Reynosa</span><span>13 años de experiencia</span><span>Tours a conciertos</span><span>Desde Reynosa · Tamaulipas</span><span>Paga en quincenas</span><span>Boletos oficiales</span>
+    <span>Conecta Reynosa</span><span>13 años de experiencia</span><span>Tours a conciertos</span><span>Desde Reynosa · Tamaulipas</span><span>Paga en quincenas</span><span>Boletos oficiales</span>
+  </div>
+</div>
 
 <!-- HERO -->
 <section class="hero">
-  <div class="hero-bg"></div>
-  <div class="hero-grain"></div>
-  <div class="hero-overlay"></div>
-  <div class="hero-line"></div>
-  <div class="hero-content">
-    <div class="hero-tag">Conecta Reynosa</div>
-    <h1>PREGUNTAS<em>FRECUENTES</em></h1>
-    <p class="hero-sub">Todo lo que necesitas saber antes de vivir la experiencia.</p>
+  <div class="hero-kicker">Conecta Reynosa · FAQ 2026</div>
+  <h1 class="hero-title">
+    <span class="line">Preguntas</span>
+    <span class="line"><span class="mark">Frecuentes</span></span>
+  </h1>
+  <p class="hero-sub">Todo lo que necesitas saber antes de sumarte al próximo tour. Respuestas claras, sin letra chica, directo al grano — como los conciertos a los que te vamos a llevar.</p>
+  <div class="hero-stats">
+    <div class="hero-stat"><div class="hero-stat-n">13+</div><div class="hero-stat-l">Años operando</div></div>
+    <div class="hero-stat"><div class="hero-stat-n">16</div><div class="hero-stat-l">Respuestas</div></div>
+    <div class="hero-stat"><div class="hero-stat-n">5</div><div class="hero-stat-l">Categorías</div></div>
   </div>
+  <div class="hero-scroll">Scroll</div>
 </section>
 
 <!-- TABS -->
-<nav class="tabs">
+<nav class="tabs" role="tablist">
   <div class="tabs-inner" id="tabs">
-    <button class="tab active" data-cat="all">Todas</button>
-    <button class="tab" data-cat="garantia">Garantía</button>
-    <button class="tab" data-cat="servicios">Servicios</button>
-    <button class="tab" data-cat="logistica">Logística</button>
-    <button class="tab" data-cat="boletos">Boletos</button>
-    <button class="tab" data-cat="especiales">Especiales</button>
+    <button class="tab active" data-cat="garantia"><span class="tab-n">01</span>Garantía</button>
+    <button class="tab" data-cat="servicios"><span class="tab-n">02</span>Servicios</button>
+    <button class="tab" data-cat="logistica"><span class="tab-n">03</span>Logística</button>
+    <button class="tab" data-cat="boletos"><span class="tab-n">04</span>Boletos</button>
+    <button class="tab" data-cat="especiales"><span class="tab-n">05</span>Especiales</button>
   </div>
 </nav>
 
-<div class="content">
+<!-- CONTENT -->
+<main>
 
-  <!-- GARANTÍA -->
+  <!-- 01 GARANTÍA -->
   <section class="fq-section" data-cat="garantia" id="sec-garantia">
-    <div class="fq-section-head">
-      <span class="fq-section-num">01</span>
-      <span class="fq-section-lbl">Nuestra Garantía</span>
+    <div class="fq-head">
+      <div class="fq-head-num">01</div>
+      <div class="fq-head-meta">
+        <span class="fq-head-tag">Garantía</span>
+        <h2 class="fq-head-title">Nuestra confianza<br>es tu respaldo</h2>
+        <div class="fq-head-count">4 respuestas · Oficial · Verificable</div>
+      </div>
     </div>
-
-    <div class="fq" onclick="toggleFaq(this)">
-      <button class="fq-q"><span class="fq-num">01</span><span class="fq-text">¿Conecta Reynosa es confiable?</span><span class="fq-icon"></span></button>
-      <div class="fq-a"><div class="fq-a-inner"><div class="fq-a-body">Sí. Contamos con más de 13 años de experiencia dedicados a tours de conciertos y festivales desde Reynosa, Tamaulipas.</div></div></div>
-    </div>
-    <div class="fq" onclick="toggleFaq(this)">
-      <button class="fq-q"><span class="fq-num">02</span><span class="fq-text">¿Son una agencia oficial?</span><span class="fq-icon"></span></button>
-      <div class="fq-a"><div class="fq-a-inner"><div class="fq-a-body">A lo largo de estos años, hemos sido agencia oficial de varios eventos y festivales en México.</div></div></div>
-    </div>
-    <div class="fq" onclick="toggleFaq(this)">
-      <button class="fq-q"><span class="fq-num">03</span><span class="fq-text">¿Colaboran con promotoras oficiales?</span><span class="fq-icon"></span></button>
-      <div class="fq-a"><div class="fq-a-inner"><div class="fq-a-body">Trabajamos de la mano con las promotoras más importantes del país: OCESA, Music Vibe, Zignia, Apodaca Group, Prime-Time, PARS, entre otras.</div></div></div>
-    </div>
-    <div class="fq" onclick="toggleFaq(this)">
-      <button class="fq-q"><span class="fq-num">04</span><span class="fq-text">¿Los boletos son originales?</span><span class="fq-icon"></span></button>
-      <div class="fq-a"><div class="fq-a-inner"><div class="fq-a-body">Sí. Todos los boletos son adquiridos directamente con el promotor y canales oficiales del evento, garantizando su autenticidad.</div></div></div>
+    <div class="fq-list">
+      <div class="fq">
+        <button class="fq-btn" aria-expanded="false">
+          <span class="fq-n">01</span>
+          <span class="fq-q">¿Conecta Reynosa es confiable?</span>
+          <span class="fq-ico" aria-hidden="true"></span>
+        </button>
+        <div class="fq-ans"><div class="fq-ans-inner"><div class="fq-ans-body">Sí. Contamos con más de 13 años de experiencia dedicados exclusivamente a tours de conciertos y festivales desde Reynosa, Tamaulipas. Somos una empresa local con trayectoria verificable.</div></div></div>
+      </div>
+      <div class="fq">
+        <button class="fq-btn" aria-expanded="false">
+          <span class="fq-n">02</span>
+          <span class="fq-q">¿Son una agencia oficial?</span>
+          <span class="fq-ico" aria-hidden="true"></span>
+        </button>
+        <div class="fq-ans"><div class="fq-ans-inner"><div class="fq-ans-body">A lo largo de estos años, hemos sido agencia oficial de varios eventos y festivales en México. Operamos con convenios directos con promotoras.</div></div></div>
+      </div>
+      <div class="fq">
+        <button class="fq-btn" aria-expanded="false">
+          <span class="fq-n">03</span>
+          <span class="fq-q">¿Colaboran con promotoras oficiales?</span>
+          <span class="fq-ico" aria-hidden="true"></span>
+        </button>
+        <div class="fq-ans"><div class="fq-ans-inner"><div class="fq-ans-body">Trabajamos de la mano con las promotoras más importantes del país: OCESA, Music Vibe, Zignia, Apodaca Group, Prime-Time, PARS, entre otras.</div></div></div>
+      </div>
+      <div class="fq">
+        <button class="fq-btn" aria-expanded="false">
+          <span class="fq-n">04</span>
+          <span class="fq-q">¿Los boletos son originales?</span>
+          <span class="fq-ico" aria-hidden="true"></span>
+        </button>
+        <div class="fq-ans"><div class="fq-ans-inner"><div class="fq-ans-body">Sí. Todos los boletos son adquiridos directamente con el promotor y canales oficiales del evento, garantizando su autenticidad.</div></div></div>
+      </div>
     </div>
   </section>
 
-  <!-- VISUAL BREAK 1 -->
+  <!-- VISUAL 1 -->
   <div class="visual">
-    <img src="https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=1000&q=75" alt="Concierto" loading="lazy">
-    <div class="visual-overlay"></div>
-    <div class="visual-text"><small>Más de</small><span>13 años de experiencia</span></div>
+    <img src="https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=1400&q=75" alt="" loading="lazy">
+    <div class="visual-text">
+      <div class="kicker">Desde 2013</div>
+      <div class="big">13 años<br><em>en la ruta</em></div>
+    </div>
   </div>
 
-  <!-- SERVICIOS -->
+  <!-- 02 SERVICIOS -->
   <section class="fq-section" data-cat="servicios" id="sec-servicios">
-    <div class="fq-section-head">
-      <span class="fq-section-num">02</span>
-      <span class="fq-section-lbl">Servicios y Experiencias</span>
+    <div class="fq-head">
+      <div class="fq-head-num">02</div>
+      <div class="fq-head-meta">
+        <span class="fq-head-tag">Servicios</span>
+        <h2 class="fq-head-title">Cómo armamos<br>tu experiencia</h2>
+        <div class="fq-head-count">3 respuestas · Transporte · Hotel</div>
+      </div>
     </div>
-
-    <div class="fq" onclick="toggleFaq(this)">
-      <button class="fq-q"><span class="fq-num">05</span><span class="fq-text">¿Qué eventos manejan?</span><span class="fq-icon"></span></button>
-      <div class="fq-a"><div class="fq-a-inner"><div class="fq-a-body">Operamos conciertos y festivales masivos en todo México. Consulta nuestro catálogo de eventos en <a href="/">conectareynosa.mx</a></div></div></div>
-    </div>
-    <div class="fq" onclick="toggleFaq(this)">
-      <button class="fq-q"><span class="fq-num">06</span><span class="fq-text">¿Qué tipo de camiones usan?</span><span class="fq-icon"></span></button>
-      <div class="fq-a"><div class="fq-a-inner"><div class="fq-a-body">Trabajamos con empresas de transporte turístico con unidades de máximo 5 años de antigüedad, garantizando comodidad y seguridad.</div></div></div>
-    </div>
-    <div class="fq" onclick="toggleFaq(this)">
-      <button class="fq-q"><span class="fq-num">07</span><span class="fq-text">¿Qué tipo de hoteles manejan?</span><span class="fq-icon"></span></button>
-      <div class="fq-a"><div class="fq-a-inner"><div class="fq-a-body">Tenemos convenios con cadenas hoteleras nacionales de 4 y 5 estrellas. Habitaciones dobles, triples o cuádruples según lo solicites.</div></div></div>
+    <div class="fq-list">
+      <div class="fq">
+        <button class="fq-btn" aria-expanded="false">
+          <span class="fq-n">05</span>
+          <span class="fq-q">¿Qué eventos manejan?</span>
+          <span class="fq-ico" aria-hidden="true"></span>
+        </button>
+        <div class="fq-ans"><div class="fq-ans-inner"><div class="fq-ans-body">Operamos conciertos y festivales masivos en todo México. Consulta nuestro catálogo completo en <a href="https://conectareynosa.mx">conectareynosa.mx</a></div></div></div>
+      </div>
+      <div class="fq">
+        <button class="fq-btn" aria-expanded="false">
+          <span class="fq-n">06</span>
+          <span class="fq-q">¿Qué tipo de camiones usan?</span>
+          <span class="fq-ico" aria-hidden="true"></span>
+        </button>
+        <div class="fq-ans"><div class="fq-ans-inner"><div class="fq-ans-body">Trabajamos con empresas de transporte turístico con unidades de máximo 5 años de antigüedad, garantizando comodidad, aire acondicionado y seguridad.</div></div></div>
+      </div>
+      <div class="fq">
+        <button class="fq-btn" aria-expanded="false">
+          <span class="fq-n">07</span>
+          <span class="fq-q">¿Qué tipo de hoteles manejan?</span>
+          <span class="fq-ico" aria-hidden="true"></span>
+        </button>
+        <div class="fq-ans"><div class="fq-ans-inner"><div class="fq-ans-body">Tenemos convenios con cadenas hoteleras nacionales de 4 y 5 estrellas. Habitaciones dobles, triples o cuádruples según lo solicites al momento de reservar.</div></div></div>
+      </div>
     </div>
   </section>
 
-  <!-- LOGÍSTICA -->
+  <!-- 03 LOGÍSTICA -->
   <section class="fq-section" data-cat="logistica" id="sec-logistica">
-    <div class="fq-section-head">
-      <span class="fq-section-num">03</span>
-      <span class="fq-section-lbl">Logística y Transporte</span>
+    <div class="fq-head">
+      <div class="fq-head-num">03</div>
+      <div class="fq-head-meta">
+        <span class="fq-head-tag">Logística</span>
+        <h2 class="fq-head-title">Ruta, salida<br>y equipaje</h2>
+        <div class="fq-head-count">4 respuestas · Redondo · Con seguro</div>
+      </div>
     </div>
-
-    <div class="fq" onclick="toggleFaq(this)">
-      <button class="fq-q"><span class="fq-num">08</span><span class="fq-text">¿El transporte es redondo?</span><span class="fq-icon"></span></button>
-      <div class="fq-a"><div class="fq-a-inner"><div class="fq-a-body">Sí, todos los tours incluyen transporte redondo desde Reynosa. En algunos paquetes también se incluyen traslados internos en la ciudad destino.</div></div></div>
-    </div>
-    <div class="fq" onclick="toggleFaq(this)">
-      <button class="fq-q"><span class="fq-num">09</span><span class="fq-text">¿Cuándo confirman la hora de salida?</span><span class="fq-icon"></span></button>
-      <div class="fq-a"><div class="fq-a-inner"><div class="fq-a-body">La hora de salida se informa durante la semana del evento. Te recomendamos llegar 20 minutos antes del horario asignado.</div></div></div>
-    </div>
-    <div class="fq" onclick="toggleFaq(this)">
-      <button class="fq-q"><span class="fq-num">10</span><span class="fq-text">¿Puedo llevar equipaje?</span><span class="fq-icon"></span></button>
-      <div class="fq-a"><div class="fq-a-inner"><div class="fq-a-body">Sí, puedes llevar una mochila o maleta pequeña dependiendo del tipo de tour.</div></div></div>
-    </div>
-    <div class="fq" onclick="toggleFaq(this)">
-      <button class="fq-q"><span class="fq-num">11</span><span class="fq-text">¿Incluyen seguro de viajero?</span><span class="fq-icon"></span></button>
-      <div class="fq-a"><div class="fq-a-inner"><div class="fq-a-body">Todos los tours terrestres incluyen seguro de viajero durante el traslado.</div></div></div>
+    <div class="fq-list">
+      <div class="fq">
+        <button class="fq-btn" aria-expanded="false">
+          <span class="fq-n">08</span>
+          <span class="fq-q">¿El transporte es redondo?</span>
+          <span class="fq-ico" aria-hidden="true"></span>
+        </button>
+        <div class="fq-ans"><div class="fq-ans-inner"><div class="fq-ans-body">Sí, todos los tours incluyen transporte redondo desde Reynosa. En algunos paquetes también se incluyen traslados internos en la ciudad destino.</div></div></div>
+      </div>
+      <div class="fq">
+        <button class="fq-btn" aria-expanded="false">
+          <span class="fq-n">09</span>
+          <span class="fq-q">¿Cuándo confirman la hora de salida?</span>
+          <span class="fq-ico" aria-hidden="true"></span>
+        </button>
+        <div class="fq-ans"><div class="fq-ans-inner"><div class="fq-ans-body">La hora de salida se informa durante la semana del evento. Te recomendamos llegar 20 minutos antes del horario asignado.</div></div></div>
+      </div>
+      <div class="fq">
+        <button class="fq-btn" aria-expanded="false">
+          <span class="fq-n">10</span>
+          <span class="fq-q">¿Puedo llevar equipaje?</span>
+          <span class="fq-ico" aria-hidden="true"></span>
+        </button>
+        <div class="fq-ans"><div class="fq-ans-inner"><div class="fq-ans-body">Sí, puedes llevar una mochila o maleta pequeña dependiendo del tipo de tour. Para festivales con acampada te damos guía específica.</div></div></div>
+      </div>
+      <div class="fq">
+        <button class="fq-btn" aria-expanded="false">
+          <span class="fq-n">11</span>
+          <span class="fq-q">¿Incluyen seguro de viajero?</span>
+          <span class="fq-ico" aria-hidden="true"></span>
+        </button>
+        <div class="fq-ans"><div class="fq-ans-inner"><div class="fq-ans-body">Todos los tours terrestres incluyen seguro de viajero durante el traslado.</div></div></div>
+      </div>
     </div>
   </section>
 
-  <!-- VISUAL BREAK 2 -->
+  <!-- VISUAL 2 -->
   <div class="visual">
-    <img src="https://images.unsplash.com/photo-1459749411175-04bf5292ceea?w=1000&q=75" alt="Festival" loading="lazy">
-    <div class="visual-overlay"></div>
-    <div class="visual-text"><small>Tu seguridad es primero</small><span>Viaja sin preocupaciones</span></div>
+    <img src="https://images.unsplash.com/photo-1459749411175-04bf5292ceea?w=1400&q=75" alt="" loading="lazy">
+    <div class="visual-text">
+      <div class="kicker">Tu seguridad es primero</div>
+      <div class="big">Viaja <em>sin</em><br>preocupaciones</div>
+    </div>
   </div>
 
-  <!-- BOLETOS Y PAGOS -->
+  <!-- 04 BOLETOS -->
   <section class="fq-section" data-cat="boletos" id="sec-boletos">
-    <div class="fq-section-head">
-      <span class="fq-section-num">04</span>
-      <span class="fq-section-lbl">Boletos y Pagos</span>
+    <div class="fq-head">
+      <div class="fq-head-num">04</div>
+      <div class="fq-head-meta">
+        <span class="fq-head-tag">Boletos y pagos</span>
+        <h2 class="fq-head-title">Zona, pago<br>y cancelaciones</h2>
+        <div class="fq-head-count">4 respuestas · Quincenas · Sin letra chica</div>
+      </div>
     </div>
-
-    <div class="fq" onclick="toggleFaq(this)">
-      <button class="fq-q"><span class="fq-num">12</span><span class="fq-text">¿Puedo elegir la zona de mi boleto?</span><span class="fq-icon"></span></button>
-      <div class="fq-a"><div class="fq-a-inner"><div class="fq-a-body">Sí, puedes elegir tu zona según la disponibilidad al momento de tu compra directamente en nuestra web.</div></div></div>
-    </div>
-    <div class="fq" onclick="toggleFaq(this)">
-      <button class="fq-q"><span class="fq-num">13</span><span class="fq-text">¿Qué formas de pago aceptan?</span><span class="fq-icon"></span></button>
-      <div class="fq-a"><div class="fq-a-inner"><div class="fq-a-body">Aceptamos transferencias bancarias y depósitos. Consulta los datos bancarios en tu cotización.</div></div></div>
-    </div>
-    <div class="fq" onclick="toggleFaq(this)">
-      <button class="fq-q"><span class="fq-num">14</span><span class="fq-text">¿Cuentan con facilidades de pago?</span><span class="fq-icon"></span></button>
-      <div class="fq-a"><div class="fq-a-inner"><div class="fq-a-body">Sí. Aparta tu lugar con un pequeño depósito y paga el resto en cómodas quincenas. Nuestra web calcula tu plan de pagos automáticamente.</div></div></div>
-    </div>
-    <div class="fq" onclick="toggleFaq(this)">
-      <button class="fq-q"><span class="fq-num">15</span><span class="fq-text">¿Qué pasa si ya no puedo viajar?</span><span class="fq-icon"></span></button>
-      <div class="fq-a"><div class="fq-a-inner"><div class="fq-a-body">Las cancelaciones por parte del cliente no tienen reembolso, ya que boletos, hotel y transporte se pagan por adelantado. Los lugares pueden transferirse a otra persona sin costo hasta 5 días antes del evento.</div></div></div>
+    <div class="fq-list">
+      <div class="fq">
+        <button class="fq-btn" aria-expanded="false">
+          <span class="fq-n">12</span>
+          <span class="fq-q">¿Puedo elegir la zona de mi boleto?</span>
+          <span class="fq-ico" aria-hidden="true"></span>
+        </button>
+        <div class="fq-ans"><div class="fq-ans-inner"><div class="fq-ans-body">Sí, puedes elegir tu zona según la disponibilidad al momento de tu compra directamente en nuestra web.</div></div></div>
+      </div>
+      <div class="fq">
+        <button class="fq-btn" aria-expanded="false">
+          <span class="fq-n">13</span>
+          <span class="fq-q">¿Qué formas de pago aceptan?</span>
+          <span class="fq-ico" aria-hidden="true"></span>
+        </button>
+        <div class="fq-ans"><div class="fq-ans-inner"><div class="fq-ans-body">Aceptamos transferencias bancarias y depósitos. Consulta los datos bancarios en tu cotización.</div></div></div>
+      </div>
+      <div class="fq">
+        <button class="fq-btn" aria-expanded="false">
+          <span class="fq-n">14</span>
+          <span class="fq-q">¿Cuentan con facilidades de pago?</span>
+          <span class="fq-ico" aria-hidden="true"></span>
+        </button>
+        <div class="fq-ans"><div class="fq-ans-inner"><div class="fq-ans-body">Sí. Aparta tu lugar con un pequeño depósito y paga el resto en cómodas quincenas. Nuestra web calcula tu plan de pagos automáticamente según el evento.</div></div></div>
+      </div>
+      <div class="fq">
+        <button class="fq-btn" aria-expanded="false">
+          <span class="fq-n">15</span>
+          <span class="fq-q">¿Qué pasa si ya no puedo viajar?</span>
+          <span class="fq-ico" aria-hidden="true"></span>
+        </button>
+        <div class="fq-ans"><div class="fq-ans-inner"><div class="fq-ans-body">Las cancelaciones por parte del cliente no tienen reembolso, ya que boletos, hotel y transporte se pagan por adelantado. Los lugares pueden transferirse a otra persona sin costo hasta 5 días antes del evento.</div></div></div>
+      </div>
     </div>
   </section>
 
-  <!-- SITUACIONES ESPECIALES -->
+  <!-- 05 ESPECIALES -->
   <section class="fq-section" data-cat="especiales" id="sec-especiales">
-    <div class="fq-section-head">
-      <span class="fq-section-num">05</span>
-      <span class="fq-section-lbl">Situaciones Especiales</span>
+    <div class="fq-head">
+      <div class="fq-head-num">05</div>
+      <div class="fq-head-meta">
+        <span class="fq-head-tag">Situaciones especiales</span>
+        <h2 class="fq-head-title">Casos fuera<br>de lo común</h2>
+        <div class="fq-head-count">1 respuesta · ¿Otra duda? Escríbenos</div>
+      </div>
     </div>
-
-    <div class="fq" onclick="toggleFaq(this)">
-      <button class="fq-q"><span class="fq-num">16</span><span class="fq-text">¿Pueden viajar menores de edad?</span><span class="fq-icon"></span></button>
-      <div class="fq-a"><div class="fq-a-inner"><div class="fq-a-body">Sí, siempre que vayan acompañados por un adulto o se firme una carta responsiva.</div></div></div>
+    <div class="fq-list">
+      <div class="fq">
+        <button class="fq-btn" aria-expanded="false">
+          <span class="fq-n">16</span>
+          <span class="fq-q">¿Pueden viajar menores de edad?</span>
+          <span class="fq-ico" aria-hidden="true"></span>
+        </button>
+        <div class="fq-ans"><div class="fq-ans-inner"><div class="fq-ans-body">Sí, siempre que vayan acompañados por un adulto o se firme una carta responsiva. Para menores de 15 años consulta condiciones específicas con nuestro equipo.</div></div></div>
+      </div>
     </div>
   </section>
 
-</div>
+</main>
 
-<!-- CTA BOTTOM -->
-<div class="bottom-cta">
-  <a href="/">Ver eventos y cotizar →</a>
-</div>
+<!-- CTA -->
+<section class="cta">
+  <div class="cta-kicker">Listo para ir</div>
+  <h2 class="cta-title">Elige tu<br>próximo <em>concierto</em></h2>
+  <a href="https://conectareynosa.mx" class="cta-btn">Ver eventos y cotizar <span aria-hidden="true">→</span></a>
+</section>
 
 <!-- FOOTER -->
 <footer class="ftr">
-  <div class="ftr-logo">CONECTA<span>.</span></div>
-  <div class="ftr-links">
-    <a href="https://wa.me/528119771072" target="_blank">WhatsApp</a>
-    <a href="https://www.instagram.com/conectareynosa" target="_blank">Instagram</a>
-    <a href="https://www.facebook.com/ConectaRey" target="_blank">Facebook</a>
-    <a href="https://www.tiktok.com/@conectareynosa" target="_blank">TikTok</a>
-    <a href="https://www.threads.net/@conectareynosa" target="_blank">Threads</a>
-    <a href="/">Eventos</a>
+  <div class="ftr-grid">
+    <div class="ftr-brandblock">
+      <div class="ftr-brand">
+        <div class="ftr-brand-box"><span class="ftr-brand-txt">CONECTA</span></div>
+        <span class="ftr-brand-mx">MX.</span>
+      </div>
+      <p class="ftr-tag">Agencia de viajes a conciertos desde Reynosa, Tamaulipas. Transporte · Hospedaje · Boletos · Kit Conecta.</p>
+    </div>
+    <div class="ftr-cols">
+      <div class="ftr-col">
+        <div class="ftr-col-lbl">Web</div>
+        <a href="https://conectareynosa.mx">Eventos</a>
+        <a href="/faq">FAQ</a>
+      </div>
+      <div class="ftr-col">
+        <div class="ftr-col-lbl">Redes</div>
+        <a href="https://wa.me/528119771072" target="_blank" rel="noopener">WhatsApp</a>
+        <a href="https://www.instagram.com/conectareynosa" target="_blank" rel="noopener">Instagram</a>
+        <a href="https://www.facebook.com/ConectaRey" target="_blank" rel="noopener">Facebook</a>
+        <a href="https://www.tiktok.com/@conectareynosa" target="_blank" rel="noopener">TikTok</a>
+        <a href="https://www.threads.net/@conectareynosa" target="_blank" rel="noopener">Threads</a>
+      </div>
+      <div class="ftr-col">
+        <div class="ftr-col-lbl">Contacto</div>
+        <a href="tel:+528119771072">81 1977 1072</a>
+        <a href="tel:+528132321405">81 3232 1405 (vuelos)</a>
+      </div>
+    </div>
   </div>
-  <div class="ftr-copy">Conecta Reynosa &copy; 2026</div>
+  <div class="ftr-bottom">
+    <div class="ftr-copy">Conecta Reynosa © 2026 · Todos los derechos reservados</div>
+    <div class="ftr-mini"><span class="ftr-mini-dot" aria-hidden="true"></span>Operando desde 2013</div>
+  </div>
 </footer>
 
 <script>
-// Accordion
-function toggleFaq(el){
-  var wasOpen=el.classList.contains('open');
-  // Close siblings in same section
-  el.parentElement.querySelectorAll('.fq.open').forEach(function(f){if(f!==el)f.classList.remove('open');});
-  if(!wasOpen) el.classList.add('open');
-  else el.classList.remove('open');
-}
+'use strict';
 
-// Tab filtering
-var tabs=document.querySelectorAll('.tab');
-var sections=document.querySelectorAll('.fq-section');
-var visuals=document.querySelectorAll('.visual');
+// Scroll progress bar
+(function(){
+  var bar=document.getElementById('progress');
+  function update(){
+    var h=document.documentElement;
+    var scrolled=h.scrollTop;
+    var total=h.scrollHeight-h.clientHeight;
+    var pct=total>0?(scrolled/total*100):0;
+    bar.style.width=pct+'%';
+  }
+  window.addEventListener('scroll',update,{passive:true});
+  window.addEventListener('resize',update);
+  update();
+})();
 
-tabs.forEach(function(tab){
-  tab.addEventListener('click',function(){
-    tabs.forEach(function(t){t.classList.remove('active');});
-    tab.classList.add('active');
-    var cat=tab.getAttribute('data-cat');
-    sections.forEach(function(s){
-      s.style.display=(cat==='all'||s.getAttribute('data-cat')===cat)?'':'none';
+// Accordion toggle — one open at a time per section
+(function(){
+  var faqs=document.querySelectorAll('.fq');
+  faqs.forEach(function(fq){
+    var btn=fq.querySelector('.fq-btn');
+    btn.addEventListener('click',function(){
+      var wasOpen=fq.classList.contains('open');
+      // Close other siblings in same section
+      var section=fq.closest('.fq-section');
+      if(section){
+        section.querySelectorAll('.fq.open').forEach(function(sib){
+          if(sib!==fq){
+            sib.classList.remove('open');
+            var b=sib.querySelector('.fq-btn');
+            if(b)b.setAttribute('aria-expanded','false');
+          }
+        });
+      }
+      if(wasOpen){fq.classList.remove('open');btn.setAttribute('aria-expanded','false');}
+      else{fq.classList.add('open');btn.setAttribute('aria-expanded','true');}
     });
-    visuals.forEach(function(v){
-      v.style.display=(cat==='all')?'':'none';
-    });
-    // Scroll to first visible section
-    if(cat!=='all'){
+  });
+})();
+
+// Tabs — smooth scroll + active state sync
+(function(){
+  var tabs=document.querySelectorAll('.tab');
+  var sections=document.querySelectorAll('.fq-section');
+  tabs.forEach(function(tab){
+    tab.addEventListener('click',function(){
+      var cat=tab.getAttribute('data-cat');
       var target=document.getElementById('sec-'+cat);
-      if(target) target.scrollIntoView({behavior:'smooth',block:'start'});
-    }
+      if(!target)return;
+      tabs.forEach(function(t){t.classList.remove('active');});
+      tab.classList.add('active');
+      var offset=56+54+12;
+      var y=target.getBoundingClientRect().top+window.pageYOffset-offset;
+      window.scrollTo({top:y,behavior:'smooth'});
+    });
   });
-});
+  // Sync active tab on scroll using IntersectionObserver
+  var tabsById={};
+  tabs.forEach(function(t){tabsById[t.getAttribute('data-cat')]=t;});
+  var obs=new IntersectionObserver(function(entries){
+    entries.forEach(function(entry){
+      if(entry.isIntersecting){
+        var cat=entry.target.getAttribute('data-cat');
+        tabs.forEach(function(t){t.classList.remove('active');});
+        if(tabsById[cat])tabsById[cat].classList.add('active');
+      }
+    });
+  },{rootMargin:'-30% 0px -55% 0px',threshold:0});
+  sections.forEach(function(s){obs.observe(s);});
+})();
 
-// Scroll reveal
-var revealObs=new IntersectionObserver(function(entries){
-  entries.forEach(function(e){
-    if(e.isIntersecting){
-      e.target.classList.add('visible');
-      revealObs.unobserve(e.target);
+// Fade-in reveal
+(function(){
+  var revealables=document.querySelectorAll('.fq, .visual, .fq-head, .cta-title');
+  var rObs=new IntersectionObserver(function(entries){
+    entries.forEach(function(entry,i){
+      if(entry.isIntersecting){
+        // Stagger sibling reveals
+        var el=entry.target;
+        var delay=0;
+        var sibs=el.parentElement?Array.prototype.slice.call(el.parentElement.querySelectorAll('.fq,.visual')):[];
+        var idx=sibs.indexOf(el);
+        if(idx>=0)delay=Math.min(idx*60,300);
+        setTimeout(function(){el.classList.add('reveal');},delay);
+        rObs.unobserve(el);
+      }
+    });
+  },{threshold:0.1,rootMargin:'0px 0px -50px 0px'});
+  revealables.forEach(function(el){rObs.observe(el);});
+})();
+
+// Deep link: open question via #q5
+(function(){
+  var hash=(location.hash||'').replace('#','');
+  if(!hash)return;
+  // Match q<number>
+  var m=hash.match(/^q(\d+)$/i);
+  if(!m)return;
+  var n=parseInt(m[1],10);
+  var numbers=document.querySelectorAll('.fq-n');
+  numbers.forEach(function(el){
+    if(parseInt(el.textContent,10)===n){
+      var fq=el.closest('.fq');
+      if(fq){
+        setTimeout(function(){
+          fq.classList.add('open');
+          fq.querySelector('.fq-btn').setAttribute('aria-expanded','true');
+          fq.scrollIntoView({behavior:'smooth',block:'center'});
+        },300);
+      }
     }
   });
-},{threshold:0.08,rootMargin:'0px 0px -40px 0px'});
-sections.forEach(function(s){revealObs.observe(s);});
+})();
 </script>
+
 </body>
 </html>

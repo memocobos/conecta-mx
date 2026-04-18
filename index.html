@@ -363,6 +363,9 @@ body{font-family:'Montserrat',sans-serif;font-weight:500;background:#000;color:#
 .mbtn{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);color:rgba(255,255,255,.4);font-size:9px;font-weight:700;padding:4px 12px;cursor:pointer;font-family:Montserrat,sans-serif;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap;transition:all .15s;border-radius:20px}
 .mbtn:hover{border-color:rgba(232,255,76,.3);color:rgba(232,255,76,.6)}
 .mbtn.active{background:rgba(232,255,76,.1);border-color:#e8ff4c;color:#e8ff4c}
+.viajeros-strip{background:#000;border-top:1px solid rgba(255,255,255,.06);border-bottom:1px solid rgba(255,255,255,.06);padding:28px 20px 26px;text-align:center}
+.viajeros-num{font-family:'Barlow Condensed','Montserrat',sans-serif;font-size:clamp(56px,14vw,96px);font-weight:900;color:#e8ff4c;line-height:.9;letter-spacing:.01em;margin-bottom:4px}
+.viajeros-lbl{font-size:11px;font-weight:900;color:#fff;text-transform:uppercase;letter-spacing:.2em;font-family:'Montserrat',sans-serif}
 .how-section{padding:0;background:#0a0a0a}
 .how-toggle{display:block;width:100%;background:none;border:none;border-top:1px solid rgba(255,255,255,.06);border-bottom:1px solid rgba(255,255,255,.06);color:#e8ff4c;font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.1em;padding:14px 16px;cursor:pointer;font-family:'Montserrat',sans-serif;text-align:center;transition:background .2s}
 .how-toggle:hover{background:rgba(232,255,76,.03)}
@@ -454,6 +457,10 @@ src="https://www.facebook.com/tr?id=1685907946147007&ev=PageView&noscript=1"
     </div>
   </div>
   <a href="/faq" class="how-toggle" style="display:block;text-decoration:none;border-top:none">Preguntas frecuentes <span>→</span></a>
+  <section class="viajeros-strip">
+    <div class="viajeros-num" id="home-viajeros-num">—</div>
+    <div class="viajeros-lbl">VIAJEROS CONECTA 2026</div>
+  </section>
   <div class="catalog">
     <div id="search-bar" style="padding:12px 16px 4px">
   <div style="display:flex;gap:8px;margin-bottom:10px">
@@ -649,7 +656,7 @@ src="https://www.facebook.com/tr?id=1685907946147007&ev=PageView&noscript=1"
 <style>
 .wa-float{position:fixed;bottom:20px;right:20px;width:56px;height:56px;background:#25D366;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;text-decoration:none;z-index:999;box-shadow:0 4px 16px rgba(37,211,102,.4);transition:transform .2s,box-shadow .2s}
 .wa-float:hover{transform:scale(1.1);box-shadow:0 6px 20px rgba(37,211,102,.6)}
-.ev-flash-badge{background:linear-gradient(90deg,#ff4500,#ff6b35);color:#fff;font-size:9px;font-weight:900;padding:5px 10px;text-align:center;font-family:'Montserrat',sans-serif;letter-spacing:.03em;animation:flashPulse 2s ease-in-out infinite}
+.ev-flash-badge{background:#ff283b;color:#fff;font-size:9px;font-weight:900;padding:5px 10px;text-align:center;font-family:'Montserrat',sans-serif;letter-spacing:.03em;animation:flashPulse 2s ease-in-out infinite}
 @keyframes flashPulse{0%,100%{opacity:1}50%{opacity:.8}}
 .ev-promo-badge{background:#e8ff4c;color:#000;font-size:9px;font-weight:900;padding:4px 10px;text-align:center;font-family:'Montserrat',sans-serif;letter-spacing:.04em}
 .bienvenida-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:9996;align-items:center;justify-content:center}
@@ -757,7 +764,7 @@ var EV=[  {id:'acdc',c:'rojo',img:'AC/DC',a:'AC/DC - Power Up Tour',f:'11 abr 20
   {id:'zayn',promo:true,mapa:'zayn',c:'azul',img:'Zayn',a:'Zayn - The First Solo Headline Arena Tour',f:'14 jun 2026',ds:'2026-06-14',v:'Estadio Borregos, Mty',sep:800,ride:2700,st:'',inc:['Boleto zona elegida','Transporte Reynosa-Mty','Hospedaje compartido','Kit Conecta'],banco:BANCO_DEFAULT,zonas:[{n:'General A',p:5900},{n:'Platino',p:6600,vip:1},{n:'Oro',p:5200},{n:'Plata',p:4000},{n:'Cancha B',p:0,ag:1}],hotel:HOTEL_STD,pagos:[{l:'Separo',d:'Hoy',s:1},{l:'Pago 1',d:'9-16 mar',s:0},{l:'Pago 2',d:'24 mar-1 abr',s:0},{l:'Pago 3',d:'9-16 abr',s:0},{l:'Pago 4',d:'24 abr-1 may',s:0},{l:'Pago 5',d:'9-16 may',s:0},{l:'Pago 6',d:'24 may-1 jun',s:0}],cheapZonas:[{n:'General A',p:4300},{n:'Platino',p:4950,vip:1},{n:'Oro',p:3600},{n:'Plata',p:2400},{n:'Cancha B',p:0,ag:1}]},
   {id:'rufus',promo:true,ride:2900,cdmx:true,mapa:'rufus',c:'verde',img:'Rufus Du Sol',a:'Rüfüs Du Sol Mexico City',f:'4 jul 2026',ds:'2026-07-04',v:'Estadio GNP, CDMX',sep:800,st:'',inc:['Boleto zona elegida','Traslados CDMX','Hospedaje compartido','Kit Conecta'],nota:'NO incluye transporte a CDMX.',banco:BANCO_DEFAULT,zonas:[{n:'General A',p:5400},{n:'General B',p:3500},{n:'Zona GNP',p:0,ag:1},{n:'Verde B',p:0,ag:1},{n:'Naranja B',p:0,ag:1},{n:'Verde C',p:0,ag:1},{n:'Naranja C',p:0,ag:1}],cheapZonas:[{n:'General A',p:4600},{n:'General B',p:2600},{n:'Zona GNP',p:0,ag:1},{n:'Verde B',p:0,ag:1},{n:'Naranja B',p:0,ag:1},{n:'Verde C',p:0,ag:1},{n:'Naranja C',p:0,ag:1}],hotel:[{n:'Compartida',e:0},{n:'Triple',e:250},{n:'Doble',e:725},{n:'Individual',e:2175}],pagos:[{l:'Separo',d:'Hoy',s:1},{l:'Pago 1',d:'9-16 mar',s:0},{l:'Pago 2',d:'24 mar-1 abr',s:0},{l:'Pago 3',d:'9-16 abr',s:0},{l:'Pago 4',d:'24 abr-1 may',s:0},{l:'Pago 5',d:'9-16 may',s:0},{l:'Pago 6',d:'24 may-1 jun',s:0},{l:'Pago 7',d:'9-16 jun',s:0},{l:'Pago 8',d:'24 jun-1 jul',s:0}]},
   {id:'harry',ride:2900,cdmx:true,mapa:'harry',c:'rosa',img:'Harry Styles',a:'Harry Styles - Together Together Tour',f:'1, 7 y 8 ago 2026',ds:'2026-08-01',v:'Estadio GNP Seguros, CDMX',sep:1000,st:'ultimos',inc:['Boleto zona elegida','Traslados CDMX','Hospedaje compartido','Kit Conecta'],nota:'NO incluye vuelos. Vuelos y autobuses disponibles como extra.',banco:BANCO_HEY,multifecha:[{lbl:'1 Agosto',zonas:[{n:'Circle',p:0,vip:1,ag:1},{n:'Disco',p:0,vip:1,ag:1},{n:'Kiss Square',p:0,vip:1,ag:1},{n:'General A',p:0,ag:1},{n:'General B',p:0,ag:1},{n:'General C',p:6500},{n:'Zona GNP',p:0,ag:1},{n:'Verde B',p:0,ag:1},{n:'Naranja B',p:0,ag:1},{n:'Verde C',p:0,ag:1},{n:'Naranja C',p:0,ag:1},{n:'Box Oro',p:16000,vip:1}],cheapZonas:[{n:'General A',p:5000},{n:'Box Oro',p:13000,vip:1},{n:'General C',p:4500},{n:'Naranja C',p:4000},{n:'Circle',p:0,ag:1},{n:'Disco',p:0,ag:1},{n:'Kiss Square',p:0,ag:1},{n:'General B',p:0,ag:1},{n:'Zona GNP',p:0,ag:1},{n:'Verde B',p:0,ag:1},{n:'Naranja B',p:0,ag:1},{n:'Verde C',p:0,ag:1}]},{lbl:'7 Agosto',zonas:[{n:'Circle',p:0,vip:1,ag:1},{n:'Disco',p:0,vip:1,ag:1},{n:'Kiss Square',p:0,vip:1,ag:1},{n:'General A',p:7500},{n:'General B',p:0,ag:1},{n:'Zona GNP',p:0,ag:1},{n:'Verde B',p:0,ag:1},{n:'Naranja B',p:0,ag:1},{n:'Verde C',p:0,ag:1},{n:'Naranja C',p:0,ag:1}],cheapZonas:[{n:'General A',p:5000},{n:'Circle',p:0,ag:1},{n:'Disco',p:0,ag:1},{n:'Kiss Square',p:0,ag:1},{n:'General B',p:0,ag:1},{n:'Zona GNP',p:0,ag:1},{n:'Verde B',p:0,ag:1},{n:'Naranja B',p:0,ag:1},{n:'Verde C',p:0,ag:1},{n:'Naranja C',p:0,ag:1}]},{lbl:'8 Agosto',zonas:[{n:'Circle',p:0,vip:1,ag:1},{n:'Disco',p:0,vip:1,ag:1},{n:'Kiss Square',p:0,vip:1,ag:1},{n:'General A',p:7500},{n:'General B',p:0,ag:1},{n:'Zona GNP',p:0,ag:1},{n:'Verde B',p:0,ag:1},{n:'Naranja B',p:0,ag:1},{n:'Verde C',p:0,ag:1},{n:'Naranja C',p:0,ag:1}],cheapZonas:[{n:'General A',p:5000},{n:'Circle',p:0,ag:1},{n:'Disco',p:0,ag:1},{n:'Kiss Square',p:0,ag:1},{n:'General B',p:0,ag:1},{n:'Zona GNP',p:0,ag:1},{n:'Verde B',p:0,ag:1},{n:'Naranja B',p:0,ag:1},{n:'Verde C',p:0,ag:1},{n:'Naranja C',p:0,ag:1}]}],zonas:[{n:'Circle',p:0,vip:1,ag:1},{n:'Disco',p:0,vip:1,ag:1},{n:'Kiss Square',p:0,vip:1,ag:1},{n:'General A',p:7500},{n:'General B',p:0,ag:1},{n:'Zona GNP',p:0,ag:1},{n:'Verde B',p:0,ag:1},{n:'Naranja B',p:0,ag:1},{n:'Verde C',p:0,ag:1},{n:'Naranja C',p:0,ag:1}],cheapZonas:[{n:'General A',p:5000},{n:'Circle',p:0,ag:1},{n:'Disco',p:0,ag:1},{n:'Kiss Square',p:0,ag:1},{n:'General B',p:0,ag:1},{n:'Zona GNP',p:0,ag:1},{n:'Verde B',p:0,ag:1},{n:'Naranja B',p:0,ag:1},{n:'Verde C',p:0,ag:1},{n:'Naranja C',p:0,ag:1}],hotel:[{n:'Compartida',e:0},{n:'Doble',e:650},{n:'Triple',e:250},{n:'Individual',e:1960}],pagos:[{l:'Separo',d:'Hoy',s:1}]},
-  {id:'melanie',mapa:'melanie',c:'rosa',img:'Melanie Martinez',a:'Melanie Martinez - Hades: The Sacrifice Tour',f:'6 ago 2026',ds:'2026-08-06',v:'Arena Monterrey, Mty',sep:500,ride:2700,stayOffset:600,st:'',inc:['Boleto zona elegida','Transporte Reynosa-Mty','Hospedaje compartido','Kit Conecta'],banco:BANCO_DEFAULT,zonas:[{n:'Early Entry VIP',p:12000,vip:1},{n:'Cancha VIP',p:5100,vip:1},{n:'Platino',p:5900},{n:'Osel',p:5900},{n:'Mc Cormick',p:5900},{n:'Coke Studio',p:5900},{n:'Oro',p:5500},{n:'Megacable',p:5500},{n:'Plus Ultra',p:5500},{n:'Banco Azteca',p:5500},{n:'Barrera',p:5100},{n:'Butaca',p:4700},{n:'Preferente',p:4300},{n:'Luneta',p:3900},{n:'Balcón',p:3500}],cheapZonas:[{n:'Early Entry VIP',p:10600,vip:1},{n:'Cancha VIP',p:3600,vip:1},{n:'Platino',p:4400},{n:'Osel',p:4400},{n:'Mc Cormick',p:4400},{n:'Coke Studio',p:4400},{n:'Oro',p:4000},{n:'Megacable',p:4000},{n:'Plus Ultra',p:4000},{n:'Banco Azteca',p:4000},{n:'Barrera',p:3600},{n:'Butaca',p:3200},{n:'Preferente',p:2800},{n:'Luneta',p:2500},{n:'Balcón',p:2100}],hotel:HOTEL_STD,pagos:[{l:'Separo',d:'Hoy',s:1},{l:'Pago 1',d:'24 abr-1 may',s:0},{l:'Pago 2',d:'9-16 may',s:0},{l:'Pago 3',d:'24 may-1 jun',s:0},{l:'Pago 4',d:'9-16 jun',s:0},{l:'Pago 5',d:'24 jun-1 jul',s:0},{l:'Pago 6',d:'9-16 jul',s:0},{l:'Pago final',d:'24 jul-1 ago',s:0}]},
+  {id:'melanie',mapa:'melanie',flashPromo:{code:'HADES',pct:5,expiresTs:1776558384253},c:'rosa',img:'Melanie Martinez',a:'Melanie Martinez - Hades: The Sacrifice Tour',f:'6 ago 2026',ds:'2026-08-06',v:'Arena Monterrey, Mty',sep:500,ride:2700,stayOffset:600,st:'',inc:['Boleto zona elegida','Transporte Reynosa-Mty','Hospedaje compartido','Kit Conecta'],banco:BANCO_DEFAULT,zonas:[{n:'Early Entry VIP',p:12000,vip:1},{n:'Cancha VIP',p:5100,vip:1},{n:'Platino',p:5900},{n:'Osel',p:5900},{n:'Mc Cormick',p:5900},{n:'Coke Studio',p:5900},{n:'Oro',p:5500},{n:'Megacable',p:5500},{n:'Plus Ultra',p:5500},{n:'Banco Azteca',p:5500},{n:'Barrera',p:5100},{n:'Butaca',p:4700},{n:'Preferente',p:4300},{n:'Luneta',p:3900},{n:'Balcón',p:3500}],cheapZonas:[{n:'Early Entry VIP',p:10600,vip:1},{n:'Cancha VIP',p:3600,vip:1},{n:'Platino',p:4400},{n:'Osel',p:4400},{n:'Mc Cormick',p:4400},{n:'Coke Studio',p:4400},{n:'Oro',p:4000},{n:'Megacable',p:4000},{n:'Plus Ultra',p:4000},{n:'Banco Azteca',p:4000},{n:'Barrera',p:3600},{n:'Butaca',p:3200},{n:'Preferente',p:2800},{n:'Luneta',p:2500},{n:'Balcón',p:2100}],hotel:HOTEL_STD,pagos:[{l:'Separo',d:'Hoy',s:1},{l:'Pago 1',d:'24 abr-1 may',s:0},{l:'Pago 2',d:'9-16 may',s:0},{l:'Pago 3',d:'24 may-1 jun',s:0},{l:'Pago 4',d:'9-16 jun',s:0},{l:'Pago 5',d:'24 jun-1 jul',s:0},{l:'Pago 6',d:'9-16 jul',s:0},{l:'Pago final',d:'24 jul-1 ago',s:0}]},
   {id:'dalemix',sepZonas:{'General':300,'Comfort':500,'VIP':500},staticImg:'dalemixx',promoModal:{emoji:'🍔',title:'¡ESTE EVENTO INCLUYE COMIDA GRATIS!',desc:'Paquete Plus — Come y disfruta dentro del evento sin gastar de más',colors:['#0a0a1a','#111']},c:'amarillo',a:'Dale Mixx',f:'15 ago 2026',ds:'2026-08-15',v:'Parque Fundidora, Mty',sep:300,ride:2700,st:'',inc:['Boleto zona elegida','Transporte Reynosa-Mty','Hospedaje compartido','Comida incluida','Kit Conecta'],banco:BANCO_DEFAULT,zonas:[{n:'General',p:3900},{n:'Comfort',p:5300},{n:'VIP',p:5950,vip:1}],cheapZonas:[{n:'General',p:2250},{n:'Comfort',p:3550},{n:'VIP',p:4200,vip:1}],hotel:HOTEL_STD,pagos:[{l:'Separo',d:'Hoy',s:1}]},
   {id:'rosalia',mapa:'rosalia',c:'rojo',img:'Rosalia',a:'Rosalía - Lux Tour',f:'19 ago 2026',ds:'2026-08-19',v:'Arena Monterrey, Mty',sep:1000,ride:2700,st:'',inc:['Boleto zona elegida','Transporte Reynosa-Mty','Hospedaje compartido','Kit Conecta'],banco:BANCO_DEFAULT,zonas:[{n:'Cancha VIP',p:7400,vip:1},{n:'Platino',p:7200},{n:'Cancha General',p:5300},{n:'Oro',p:0,ag:1},{n:'Barrera',p:0,ag:1},{n:'Butaca',p:0,ag:1},{n:'Preferente',p:0,ag:1},{n:'Luneta',p:0,ag:1},{n:'Balcón',p:0,ag:1}],cheapZonas:[{n:'Cancha VIP',p:5800,vip:1},{n:'Platino',p:5500},{n:'Cancha General',p:3700},{n:'Oro',p:0,ag:1},{n:'Barrera',p:0,ag:1},{n:'Butaca',p:0,ag:1},{n:'Preferente',p:0,ag:1},{n:'Luneta',p:0,ag:1},{n:'Balcón',p:0,ag:1}],hotel:[{n:'Compartida',e:0},{n:'Doble',e:650},{n:'Triple',e:250},{n:'Individual',e:1960}],pagos:[{l:'Separo',d:'Hoy',s:1}]},
   {id:'enjambre',cdmx:true,c:'azul',img:'Enjambre',a:'Enjambre',f:'29 ago 2026',ds:'2026-08-29',v:'Estadio GNP, CDMX',sep:0,st:'proceso',inc:[],banco:BANCO_DEFAULT,zonas:[],hotel:[],pagos:[],waChannel:'https://wa.me/528119771072'},
@@ -1025,14 +1032,14 @@ function goBack() {
 
 var PROMOS={
   'CONECTAREY': {pct:5, expires:'2026-05-30', maxUsos:9999, usos:0, desc:'5% de descuento con código CONECTAREY'},
-  'PULSOGNP': {pct:8, expiresTs:1776382739338, maxUsos:9999, usos:0, desc:'8% de descuento con código PULSOGNP', onlyEvent:'pulsoquetaro'}
+  'PULSOGNP': {pct:8, expiresTs:1776382739338, maxUsos:9999, usos:0, desc:'8% de descuento con código PULSOGNP', onlyEvent:'pulsoquetaro'},
+  'HADES': {pct:5, expiresTs:1776558384253, maxUsos:9999, usos:0, desc:'5% de descuento con código HADES', onlyEvent:'melanie', excludePkg:['ride']}
 };
 var _promoActivo=null;
 function validarPromo(code){
   var c=code.toUpperCase().trim();
   var p=PROMOS[c];
   if(!p)return {ok:false,msg:'Código no válido'};
-  // Check expiration — timestamp or date string
   if(p.expiresTs){
     if(Date.now()>p.expiresTs)return {ok:false,msg:'Código expirado'};
   } else {
@@ -1040,13 +1047,19 @@ function validarPromo(code){
     if(hoy>p.expires)return {ok:false,msg:'Código expirado'};
   }
   if(p.usos>=p.maxUsos)return {ok:false,msg:'Código agotado'};
-  // Check event-specific restriction
   if(p.onlyEvent){
-    if(!cur||cur.id!==p.onlyEvent)return {ok:false,msg:'Este código es exclusivo para Pulso GNP Querétaro'};
+    if(!cur||cur.id!==p.onlyEvent){
+      var target=EV.find(function(e){return e.id===p.onlyEvent;});
+      var name=target?target.a.replace(/ - .*/,'').replace(/ en .*/,''):p.onlyEvent;
+      return {ok:false,msg:'Este código es exclusivo para '+name};
+    }
   } else {
     if(cur&&!cur.promo)return {ok:false,msg:'Este código no aplica para este evento'};
   }
-  return {ok:true,pct:p.pct,desc:p.desc,code:c};
+  if(p.excludePkg&&selPkg&&p.excludePkg.indexOf(selPkg)>=0){
+    return {ok:false,msg:'Código no aplicable al paquete '+selPkg.toUpperCase()};
+  }
+  return {ok:true,pct:p.pct,desc:p.desc,code:c,excludePkg:p.excludePkg||null};
 }
 var PC_EVENTS=["Justin Bieber", "Bad Bunny", "Sabrina Carpenter", "U2", "Festival Trópico", "Bahidora 2027", "Coldplay", "The Rolling Stones", "Tool", "Slipknot", "Luis Miguel", "Metallica", "Feid / Ferxxo", "Evanescence", "Marilyn Manson"];
 
@@ -1155,6 +1168,19 @@ function setMonth(btn,m){
   btn.classList.add('active');
   filterEvents();
 }
+
+// Viajeros counter sync from localStorage (admin.html writes viajeros2026)
+(function(){
+  function render(){
+    var el=document.getElementById('home-viajeros-num');
+    if(!el)return;
+    var v=localStorage.getItem('viajeros2026');
+    el.textContent=v&&Number(v)>0?Number(v).toLocaleString('es-MX'):'—';
+  }
+  render();
+  window.addEventListener('storage',function(e){if(e.key==='viajeros2026')render();});
+  window.addEventListener('focus',render);
+})();
 
 // Flash promo countdown timer
 (function(){
@@ -2105,6 +2131,11 @@ function calcular(){
   $$('d-result').style.display='block';
   var promoCard=document.getElementById('w-promo-card');if(promoCard)promoCard.style.display='block';
   var shareBtn=document.getElementById('btn-share');if(shareBtn)shareBtn.style.display='block';
+  if(_promoActivo&&_promoActivo.excludePkg&&_promoActivo.excludePkg.indexOf(selPkg)>=0){
+    _promoActivo=null;
+    var pmsg=document.getElementById('promo-msg');
+    if(pmsg){pmsg.style.color='#ff283b';pmsg.textContent='✗ Código no aplicable al paquete '+selPkg.toUpperCase();}
+  }
   if(_promoActivo){
     var desc=Math.round(costoXPersona*_promoActivo.pct/100);
     costoXPersona=costoXPersona-desc;

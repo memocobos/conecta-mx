@@ -363,9 +363,6 @@ body{font-family:'Montserrat',sans-serif;font-weight:500;background:#000;color:#
 .mbtn{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);color:rgba(255,255,255,.4);font-size:9px;font-weight:700;padding:4px 12px;cursor:pointer;font-family:Montserrat,sans-serif;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap;transition:all .15s;border-radius:20px}
 .mbtn:hover{border-color:rgba(232,255,76,.3);color:rgba(232,255,76,.6)}
 .mbtn.active{background:rgba(232,255,76,.1);border-color:#e8ff4c;color:#e8ff4c}
-.viajeros-strip{padding:16px 20px;text-align:center;display:flex;align-items:baseline;justify-content:center;gap:8px;flex-wrap:wrap}
-.viajeros-num{font-family:'Barlow Condensed','Montserrat',sans-serif;font-size:clamp(30px,8vw,44px);font-weight:900;color:#e8ff4c;line-height:1;letter-spacing:.01em}
-.viajeros-lbl{font-size:12px;font-weight:500;color:rgba(255,255,255,.4);font-family:'Montserrat',sans-serif;letter-spacing:.02em}
 .how-section{padding:0;background:#0a0a0a}
 .how-toggle{display:block;width:100%;background:none;border:none;border-top:1px solid rgba(255,255,255,.06);border-bottom:1px solid rgba(255,255,255,.06);color:#e8ff4c;font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.1em;padding:14px 16px;cursor:pointer;font-family:'Montserrat',sans-serif;text-align:center;transition:background .2s}
 .how-toggle:hover{background:rgba(232,255,76,.03)}
@@ -457,10 +454,6 @@ src="https://www.facebook.com/tr?id=1685907946147007&ev=PageView&noscript=1"
     </div>
   </div>
   <a href="/faq" class="how-toggle" style="display:block;text-decoration:none;border-top:none">Preguntas frecuentes <span>→</span></a>
-  <div class="viajeros-strip">
-    <span class="viajeros-num" id="home-viajeros-num">—</span>
-    <span class="viajeros-lbl">viajeros en 2026</span>
-  </div>
   <div class="catalog">
     <div id="search-bar" style="padding:12px 16px 4px">
   <div style="display:flex;gap:8px;margin-bottom:10px">
@@ -1168,21 +1161,6 @@ function setMonth(btn,m){
   btn.classList.add('active');
   filterEvents();
 }
-
-// Viajeros counter sync from localStorage (admin.html writes viajeros2026)
-(function(){
-  function render(){
-    var el=document.getElementById('home-viajeros-num');
-    if(!el)return;
-    var v=localStorage.getItem('viajeros2026');
-    // null → "—" | cualquier número válido (incluyendo 0) → mostrar el número formateado
-    var n=v===null?null:Number(v);
-    el.textContent=(n!==null && !isNaN(n))?n.toLocaleString('es-MX'):'—';
-  }
-  render();
-  window.addEventListener('storage',function(e){if(e.key==='viajeros2026')render();});
-  window.addEventListener('focus',render);
-})();
 
 // Flash promo countdown timer
 (function(){

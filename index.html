@@ -701,6 +701,29 @@ body{font-family:'Montserrat',sans-serif;font-weight:500;background:#000;color:#
 .hh-title .mark::before{background:#e8ff4c}
 .hh-sub{color:rgba(255,255,255,.78)}
 .hh-ctas{margin-top:clamp(16px,3vw,28px);width:100%}
+
+/* Countdown al próximo evento */
+.hh-countdown{
+  margin-top:clamp(18px,3vw,28px);
+  padding:clamp(14px,2.5vw,20px) clamp(14px,3vw,22px);
+  background:rgba(0,0,0,.28);
+  border:1px solid rgba(255,255,255,.15);
+  display:flex;flex-direction:column;gap:6px;
+  animation:fadeInCountdown .6s cubic-bezier(.22,1,.36,1) both;
+}
+@keyframes fadeInCountdown{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+.cd-head{display:flex;align-items:center;gap:8px;margin-bottom:4px}
+.cd-label{font-size:10px;font-weight:900;letter-spacing:.18em;text-transform:uppercase;color:var(--c-amarillo)}
+.cd-live{width:7px;height:7px;border-radius:50%;background:var(--c-amarillo);box-shadow:0 0 10px rgba(232,255,76,.8);animation:cdPulse 1.3s ease-in-out infinite}
+@keyframes cdPulse{0%,100%{opacity:1}50%{opacity:.35}}
+.cd-artist{font-family:'Barlow Condensed','Montserrat',sans-serif;font-weight:900;font-size:clamp(22px,5vw,32px);line-height:1;letter-spacing:-.005em;color:#fff;text-transform:uppercase;margin-top:2px}
+.cd-venue{font-size:10px;font-weight:700;letter-spacing:.08em;color:rgba(255,255,255,.55);text-transform:uppercase;margin-bottom:10px}
+.cd-timer{display:flex;align-items:flex-end;gap:clamp(4px,1vw,10px)}
+.cd-cell{display:flex;flex-direction:column;align-items:center;min-width:44px}
+.cd-n{font-family:'Barlow Condensed','Montserrat',sans-serif;font-weight:900;font-size:clamp(26px,6vw,40px);line-height:1;color:var(--c-amarillo);letter-spacing:-.01em;font-variant-numeric:tabular-nums}
+.cd-l{font-size:8px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.5);margin-top:4px}
+.cd-sep{font-family:'Barlow Condensed','Montserrat',sans-serif;font-weight:900;font-size:clamp(20px,5vw,32px);color:rgba(255,255,255,.25);line-height:1;padding-bottom:14px}
+@media(max-width:380px){.cd-cell{min-width:38px}.cd-sep{display:none}.cd-timer{gap:10px}}
 .hh-btn-rojo{background:#e8ff4c;color:#000;border:none}
 .hh-btn-rojo:hover{background:#fff;color:#000;box-shadow:0 14px 36px rgba(232,255,76,.5)}
 /* CTA full width, padding vertical generoso */
@@ -829,6 +852,23 @@ src="https://www.facebook.com/tr?id=1685907946147007&ev=PageView&noscript=1"
       <span class="line"><span class="mark">expertos</span></span>
     </h1>
     <p class="hh-sub">Agencia de viajes desde Reynosa. Transporte, hospedaje, boletos y kit Conecta — todo resuelto. Escoge tu evento, elige paquete y paga en quincenas sin estrés.</p>
+    <div class="hh-countdown" id="hh-countdown" style="display:none">
+      <div class="cd-head">
+        <span class="cd-label">Próximo evento</span>
+        <span class="cd-live" aria-hidden="true"></span>
+      </div>
+      <div class="cd-artist" id="cd-artist"></div>
+      <div class="cd-venue" id="cd-venue"></div>
+      <div class="cd-timer">
+        <div class="cd-cell"><span class="cd-n" id="cd-d">00</span><span class="cd-l">días</span></div>
+        <div class="cd-sep">:</div>
+        <div class="cd-cell"><span class="cd-n" id="cd-h">00</span><span class="cd-l">hrs</span></div>
+        <div class="cd-sep">:</div>
+        <div class="cd-cell"><span class="cd-n" id="cd-m">00</span><span class="cd-l">min</span></div>
+        <div class="cd-sep">:</div>
+        <div class="cd-cell"><span class="cd-n" id="cd-s">00</span><span class="cd-l">seg</span></div>
+      </div>
+    </div>
     <div class="hh-ctas">
       <a href="#catalog-anchor" class="hh-btn hh-btn-rojo hh-btn-full">Ver eventos <span aria-hidden="true">→</span></a>
     </div>
@@ -1572,6 +1612,54 @@ var _scrollObs=new IntersectionObserver(function(entries){
   entries.forEach(function(e){if(e.isIntersecting){e.target.classList.add('visible');_scrollObs.unobserve(e.target);}});
 },{threshold:0.1});
 document.querySelectorAll('.ev-card,.how-step').forEach(function(el){_scrollObs.observe(el);});
+
+// Countdown regresivo al próximo evento disponible
+(function(){
+  function pad(n){return (n<10?'0':'')+n;}
+  function findNext(){
+    if(typeof EV==='undefined')return null;
+    var now=Date.now();
+    var candidates=[];
+    for(var i=0;i<EV.length;i++){
+      var e=EV[i];
+      if(!e||e.listOnly)continue;
+      if(e.st!==''&&e.st!=='ultimos')continue;
+      if(!e.ds)continue;
+      var t=new Date(e.ds+'T20:00:00').getTime();
+      if(isNaN(t)||t<=now)continue;
+      candidates.push({ev:e,t:t});
+    }
+    if(!candidates.length)return null;
+    candidates.sort(function(a,b){return a.t-b.t;});
+    return candidates[0];
+  }
+  var root=document.getElementById('hh-countdown');
+  if(!root)return;
+  var next=findNext();
+  if(!next){root.style.display='none';return;}
+  root.style.display='flex';
+  document.getElementById('cd-artist').textContent=(next.ev.a||'').replace(/ - .*/,'').replace(/ Tour.*/,'');
+  document.getElementById('cd-venue').textContent=next.ev.v||'';
+  var elD=document.getElementById('cd-d'),elH=document.getElementById('cd-h'),elM=document.getElementById('cd-m'),elS=document.getElementById('cd-s');
+  function tick(){
+    var diff=next.t-Date.now();
+    if(diff<=0){
+      // El evento ya pasó — reevaluar siguiente
+      next=findNext();
+      if(!next){root.style.display='none';clearInterval(_cdTimer);return;}
+      document.getElementById('cd-artist').textContent=(next.ev.a||'').replace(/ - .*/,'').replace(/ Tour.*/,'');
+      document.getElementById('cd-venue').textContent=next.ev.v||'';
+      diff=next.t-Date.now();
+    }
+    var s=Math.floor(diff/1000);
+    var d=Math.floor(s/86400);s%=86400;
+    var h=Math.floor(s/3600);s%=3600;
+    var m=Math.floor(s/60);s%=60;
+    elD.textContent=pad(d);elH.textContent=pad(h);elM.textContent=pad(m);elS.textContent=pad(s);
+  }
+  tick();
+  var _cdTimer=setInterval(tick,1000);
+})();
 
 // Revelar catálogo al presionar VER EVENTOS o al llegar vía #catalog-anchor
 (function(){

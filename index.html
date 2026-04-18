@@ -1537,9 +1537,9 @@ document.querySelectorAll('.ev-card,.how-step').forEach(function(el){_scrollObs.
       if(p&&p.catch)p.catch(function(){stopCurrent();});
     };
     if(_cache.hasOwnProperty(artist)){go(_cache[artist]);return;}
-    fetch('/.netlify/functions/spotify-preview?q='+encodeURIComponent(artist))
-      .then(function(r){return r.ok?r.json():{preview_url:null};})
-      .then(function(d){var u=(d&&d.preview_url)||null;_cache[artist]=u;go(u);})
+    fetch('/.netlify/functions/deezer?q='+encodeURIComponent(artist)+'&type=track')
+      .then(function(r){return r.ok?r.json():{preview:null};})
+      .then(function(d){var u=(d&&(d.preview||d.preview_url))||null;_cache[artist]=u;go(u);})
       .catch(function(){btn.classList.remove('ev-play-loading');});
   };
   // Pause when opening detail or navigating

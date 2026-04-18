@@ -688,21 +688,30 @@ body{font-family:'Montserrat',sans-serif;font-weight:500;background:#000;color:#
 /* ==================================================================
    Azul predominante — overrides (2026-04)
    ================================================================== */
-/* Hero bg: solid azul + extra bottom space para que los links queden justo al ras */
+/* Hero bg: solid azul, compacto para que los CTA de abajo queden al ras del viewport */
 .home-hero-v2{
   background:#0000cd !important;
   border-bottom:1px solid rgba(255,255,255,.15);
-  padding:clamp(56px,11vw,110px) clamp(20px,5vw,80px) clamp(88px,16vw,140px);
-  min-height:clamp(520px,80vh,760px);
+  padding:clamp(44px,9vw,90px) clamp(20px,5vw,80px) clamp(20px,4vw,40px);
+  min-height:0;
 }
 .home-hero-v2::after{display:none}
-.hh-kicker{color:#e8ff4c}
+.hh-kicker{color:#e8ff4c;margin-bottom:clamp(12px,2.5vw,22px)}
+.hh-title{margin-bottom:clamp(12px,2vw,20px)}
 .hh-title .mark::before{background:#e8ff4c}
 .hh-sub{color:rgba(255,255,255,.78)}
-.hh-btn-rojo{background:#0000cd;color:#fff;border:2px solid #fff}
-.hh-btn-rojo:hover{background:#fff;color:#0000cd;border-color:#fff;box-shadow:0 14px 36px rgba(255,255,255,.35)}
-.hh-btn-full{padding:22px 40px;font-size:14px;letter-spacing:.12em;font-weight:900}
-@media(max-width:520px){.hh-btn-full{padding:20px 32px}}
+.hh-ctas{margin-top:clamp(16px,3vw,28px);width:100%}
+.hh-btn-rojo{background:#e8ff4c;color:#000;border:none}
+.hh-btn-rojo:hover{background:#fff;color:#000;box-shadow:0 14px 36px rgba(232,255,76,.5)}
+/* CTA full width, padding vertical generoso */
+.hh-btn-full{
+  width:100%;max-width:none;
+  padding:26px 32px;
+  font-size:15px;letter-spacing:.14em;font-weight:900;
+  justify-content:center;
+}
+@media(min-width:600px){.hh-btn-full{max-width:560px}}
+@media(max-width:380px){.hh-btn-full{padding:24px 20px;font-size:13px;letter-spacing:.1em}}
 
 /* Marquee azul (era rojo) */
 .marquee-red{background:#0000cd !important;color:#fff}

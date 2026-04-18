@@ -8,6 +8,41 @@
     return 'ce_'+Date.now()+'_'+Math.random().toString(36).slice(2,10);
   }
 
+  function getCookie(name){
+    var m=document.cookie.match(new RegExp('(?:^|; )'+name.replace(/[.$?*|{}()[\]\\/+^]/g,'\\$&')+'=([^;]*)'));
+    return m?decodeURIComponent(m[1]):undefined;
+  }
+
+  var IS_DEV=/localhost|127\.0\.0\.1|\.netlify\.app$/i.test(location.hostname);
+
+  // Envío server-side a Meta CAPI (fire-and-forget)
+  // Se ejecuta DESPUÉS de fbq() con el mismo event_id → Meta deduplica
+  function sendToCAPI(eventName,eventID,customData){
+    try{
+      var ud={client_user_agent:navigator.userAgent};
+      var fbp=getCookie('_fbp'); if(fbp)ud.fbp=fbp;
+      var fbc=getCookie('_fbc'); if(fbc)ud.fbc=fbc;
+      var payload={
+        event_name:eventName,
+        event_id:eventID,
+        event_time:Math.floor(Date.now()/1000),
+        event_source_url:location.href,
+        user_data:ud,
+        custom_data:customData||{}
+      };
+      fetch('/.netlify/functions/meta-capi',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify(payload),
+        keepalive:true  // sobrevive a navegación (p.ej. clic a wa.me)
+      }).catch(function(err){
+        if(IS_DEV&&window.console)console.error('[capi]',err);
+      });
+    }catch(err){
+      if(IS_DEV&&window.console)console.error('[capi]',err);
+    }
+  }
+
   function trackMetaEvent(eventName,params){
     if(typeof fbq!=='function')return null;
     params=params||{};
@@ -19,6 +54,8 @@
     if(!data.currency)data.currency='MXN';
     try{fbq('track',eventName,data,{eventID:eventID});}
     catch(e){if(window.console)console.warn('[meta-events]',e);}
+    // Espejo server-side para deduplicación CAPI
+    sendToCAPI(eventName,eventID,data);
     return eventID;
   }
 

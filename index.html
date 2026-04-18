@@ -2837,7 +2837,14 @@ function buildEventSummary(){
 }
 
 function getChatSystemPrompt(){
-  var charIntro=_chatChar?'Tu personaje es '+_chatChar.name+'. Mantén su personalidad de forma sutil sin exagerar. ':'';
+  var charIntro='';
+  if(_chatChar){
+    charIntro='Tu personaje es '+_chatChar.name+'. Mantén su personalidad de forma sutil sin exagerar. ';
+    var persona=_CHAR_PERSONA&&_CHAR_PERSONA[_chatChar.name];
+    if(persona){
+      charIntro+='PERSONALIDAD ESPECÍFICA: '+persona+' Mezcla esto con el contenido comercial, no dejes que domine la respuesta. ';
+    }
+  }
   return charIntro+'Eres el asistente virtual de Conecta Reynosa, agencia de viajes y boletos para conciertos en Reynosa, Tamaulipas, México. '+
     'Respondes en español, eres amigable, cordial y comercial. Ayudas a cotizar paquetes y dar información de eventos.\n\n'+
     'PAQUETES Y PRECIOS:\n'+
@@ -2882,10 +2889,43 @@ function getChatSystemPrompt(){
     'EVENTOS ACTUALES:\n'+buildEventSummary();
 }
 
-var _CHAR_EXCLUDE=['machaca','edc','emblema','coronacap','flowfest','arre','knotfest','warped','dalemix','comuna','pulsognp','nochegrandes'];
-var _CHAR_NAMES={'weeknd':{name:'Abel Tesfaye',extra:', aunque tal vez me conozcas como The Weeknd 🌙'},'megadeth':{name:'Dave Mustaine',extra:', frontman de Megadeth 🤘'},'soad':{name:'Serj Tankian',extra:', vocalista de System of a Down 🎤'}};
+var _CHAR_EXCLUDE=['machaca','edc','edc2027','emblema','coronacap','flowfest','arre','knotfest','warped','dalemix','comuna','pulsognp','pulsoquetaro','nochegrandes'];
+// Cada key puede ser un objeto {name,extra} o un array de objetos (para eventos con 2 artistas)
+var _CHAR_NAMES={
+  'brunomars':    {name:'Bruno Mars',      extra:', el mismísimo Silk Sonic en la casa 🕺'},
+  'weeknd':       {name:'Abel Tesfaye',    extra:', aunque tal vez me conozcas como The Weeknd 🌙'},
+  'megadeth':     {name:'Dave Mustaine',   extra:', frontman de Megadeth 🤘'},
+  'soad':         {name:'Serj Tankian',    extra:', vocalista de System of a Down 🎤'},
+  'neighbourhood':{name:'Jesse Rutherford',extra:', vocalista de The Neighbourhood 🖤'},
+  'soda':         {name:'Gustavo Cerati',  extra:', frontman de Soda Stereo 🎸'},
+  'rufus':        {name:'Tom Crane',       extra:', de Rüfüs Du Sol 🌊'},
+  'ironmaiden':   {name:'Bruce Dickinson', extra:', vocalista de Iron Maiden ⚔️'},
+  'babymetal':    {name:'Suzuka Nakamoto', extra:', conocida como Su-metal de BABYMETAL 🤘🌸'},
+  'bts':          {name:'RM',              extra:', líder de BTS 💜'},
+  'romeo':[
+    {name:'Romeo Santos',extra:', el Rey de la Bachata 👑'},
+    {name:'Prince Royce',extra:', el príncipe de la bachata 🎤'}
+  ]
+};
 var _CHAR_PLURAL=['morat'];
 var _MEMO={name:'Memo Cobos',w:3,msg:'¡Hola! Soy Memo Cobos, aunque me conocen como el Tío Conecta 😎 Hoy seré tu asistente de Conecta Reynosa. ¿Con quién tengo el gusto?'};
+
+// Personalidad por personaje — inyectada al system prompt cuando está activo
+var _CHAR_PERSONA={
+  'Bruno Mars':'Usa "baby" de vez en cuando. Energía positiva, vibras de groove y funk. Menciona tu estilo elegante.',
+  'Abel Tesfaye':'Tono misterioso, algo frío y nostálgico. Referencias a la noche, Las Vegas y neón.',
+  'Dave Mustaine':'Directo, sin rodeos, referencias al thrash metal y a la vida en la carretera.',
+  'Serj Tankian':'Intenso y un poco filosófico. Referencias al rock pesado, activismo y Armenia.',
+  'Jesse Rutherford':'Cool, minimal, aesthetic dark. Referencias a Sweater Weather y Los Ángeles.',
+  'Gustavo Cerati':'Poético e intelectual, referencias al rock latinoamericano. Ocasionalmente cita letras sutiles como "gracias totales".',
+  'Tom Crane':'Relajado, vibras de electrónica minimalista y naturaleza. Referencias a atardeceres y ritmos hipnóticos.',
+  'Bruce Dickinson':'Épico y teatral. Referencias medievales, aviación y el concepto de "trooper". Usa "up the irons" de vez en cuando.',
+  'Suzuka Nakamoto':'Mezcla palabras en japonés como "konnichiwa" y "arigatou" con español. Vibra kawaii pero rockera de BABYMETAL.',
+  'RM':'Entusiasta, menciona a ARMY cariñosamente. Usa algunas palabras en coreano como "annyeong" o "saranghae". Habla del poder del fandom.',
+  'Romeo Santos':'Galante, romántico, referencias a la bachata. Llama "mi amor" o "reina/rey" al usuario de vez en cuando.',
+  'Prince Royce':'Romántico y juguetón, referencias a "Stand By Me" y la bachata moderna. Bilingüe spanglish sutil.',
+  'Memo Cobos':'Cercano, mexicano norteño, vibra de tío cool de Reynosa. Referencias a la frontera y al choro del transporte/conciertos.'
+};
 
 function buildChars(){
   var chars=[_MEMO];
@@ -2898,8 +2938,12 @@ function buildChars(){
     if(e.st==='agotado'||e.st==='proceso')continue;
     var evDate=new Date(e.ds+'T23:59:59');
     if(evDate<today)continue;
-    // Avoid duplicate names
-    var override=_CHAR_NAMES[e.id];
+    // Avoid duplicate names. Override puede ser objeto o array (eventos con 2 artistas)
+    var rawOverride=_CHAR_NAMES[e.id];
+    var override=rawOverride;
+    if(Array.isArray(rawOverride)&&rawOverride.length){
+      override=rawOverride[Math.floor(Math.random()*rawOverride.length)];
+    }
     var aName=override?override.name:e.a.replace(/ - .*/,'').replace(/ Tour.*/,'');
     if(artists.indexOf(aName)>=0)continue;
     artists.push(aName);

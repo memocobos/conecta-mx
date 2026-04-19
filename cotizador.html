@@ -44,6 +44,17 @@ if(window.self === window.top){
   --green:  #4ad99b;
   --red:    #ff4665;
   --orange: #ff8844;
+  /* Legacy aliases */
+  --ro: var(--red);
+  --am: var(--gold);
+  --ve: var(--green);
+  --t2: #a8a8b3;
+  --ts: var(--t2);
+  --nc: var(--bg3);
+  --ns: var(--bg4);
+  --n: var(--bg);
+  --b: var(--line);
+  --az: var(--blue);
 
   /* Spacing */
   --s1: 8px;  --s2: 12px;  --s3: 16px;  --s4: 20px;  --s5: 28px;
@@ -1512,10 +1523,10 @@ function calcular(){
         <div class="mb"><div class="mf" style="width:${Math.min(mgPct*2,100)}%;background:${col}"></div></div>
         <div style="font-size:9px;color:${col};margin-top:1px">${mgPct}% margen · costo $${Math.round(costoTot).toLocaleString('es-MX')}</div>
       </td>
-      <td><input type="number" value="${pPlus}" style="width:82px;font-size:12px;font-weight:700;color:var(--t);background:var(--ns);border:1px solid ${col};border-radius:4px;padding:3px 6px;text-align:right" onchange="updZonaPrecio(${z.id},'precioPlus',+this.value)"></td>
+      <td><input type="number" value="${pPlus}" style="font-weight:700;border-color:${col}" onchange="updZonaPrecio(${z.id},'precioPlus',+this.value)"></td>
       <td><span class="ride-val">${p(pRide)}</span></td>
-      <td><input type="number" value="${pStay}" style="width:82px;font-size:12px;color:var(--ts);background:var(--ns);border:1px solid var(--b);border-radius:4px;padding:3px 6px;text-align:right" onchange="updZonaPrecio(${z.id},'precioStay',+this.value)"></td>
-      <td><input type="number" value="${pCheap}" style="width:82px;font-size:12px;color:var(--am);background:var(--ns);border:1px solid var(--b);border-radius:4px;padding:3px 6px;text-align:right" onchange="updZonaPrecio(${z.id},'precioCheap',+this.value)"></td>
+      <td><input type="number" value="${pStay}" onchange="updZonaPrecio(${z.id},'precioStay',+this.value)"></td>
+      <td><input type="number" value="${pCheap}" style="color:var(--gold)" onchange="updZonaPrecio(${z.id},'precioCheap',+this.value)"></td>
     </tr>`;
   }).join('');
 

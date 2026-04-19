@@ -417,6 +417,7 @@ select option{background:var(--ns)}
 
   <div class="card">
     <div class="ct" style="margin-bottom:10px">Pedido y equilibrio</div>
+    <div id="r-alerta-riesgo" style="margin-bottom:8px"></div>
     <div id="r-pe"><div style="color:var(--ts);font-size:11px">Agrega pedido de boletos para ver el análisis</div></div>
   </div>
 
@@ -955,6 +956,27 @@ function calcular(){
     const pctVend=totPed>0?Math.round(totVend/totPed*100):0;
     const mgLleno=ingPagantes-costoLleno;
     const ok=totVend>=pe;
+
+    // Alerta de riesgo automática
+    const alertaRiesgo = document.getElementById('r-alerta-riesgo');
+    if(alertaRiesgo){
+      const alertas = [];
+      if(pe > 0 && totPed > 0 && pe/totPed > 0.6)
+        alertas.push({c:'var(--ro)', msg:'🚨 PE muy alto ('+pctOcup+'% del pedido) — necesitas vender +60% solo para no perder.'});
+      const _gp2=+document.getElementById('ganancia-plus').value||1000;
+      const zonasBajoCosto=zv.filter(z=>{const pp=z.precioPlus||Math.ceil((z.costo+gastosFijos+_gp2)/100)*100;return pp<z.costo+gastosFijos;});
+      if(zonasBajoCosto.length)
+        alertas.push({c:'var(--ro)', msg:'⛔ Vendiendo bajo costo en: '+zonasBajoCosto.map(z=>z.nombre).join(', ')});
+      const fechaVal=document.getElementById('ev-fecha').value;
+      const diasEv=fechaVal?Math.floor((new Date(fechaVal)-new Date())/(864e5)):999;
+      if(diasEv<30&&diasEv>0&&totPed>0&&totVend/totPed<0.3)
+        alertas.push({c:'var(--ro)', msg:'⏰ Faltan '+diasEv+' días y solo vendiste '+Math.round(totVend/totPed*100)+'%.'});
+      if(mgLleno<0)
+        alertas.push({c:'var(--ro)', msg:'💸 Pierdes dinero aunque vendas todo — revisa precios.'});
+      if(ok&&totVend>0)
+        alertas.push({c:'var(--ve)', msg:'✅ Superaste el PE. Lo que vendas de aquí es ganancia pura.'});
+      alertaRiesgo.innerHTML=alertas.map(a=>'<div style="border-left:3px solid '+a.c+';background:rgba(0,0,0,.2);border-radius:4px;padding:6px 10px;font-size:11px;color:'+a.c+';margin-bottom:4px">'+a.msg+'</div>').join('');
+    }
     peDiv.innerHTML=`
       <div class="pe-r"><span style="color:var(--ts)">Boletos pedidos a matriz</span><span class="pe-n">${totPed}</span></div>
       ${totalStaff>0?`<div class="pe-r"><span style="color:var(--ts)">Staff (coordi+creadora)</span><span class="pe-n" style="color:var(--ro)">-${totalStaff}</span></div>`:''}
@@ -1452,6 +1474,29 @@ async function analizarConIA(){
     return `${z.nombre}: costo boleto $${z.costo.toLocaleString('es-MX')}, precio venta $${pPlus.toLocaleString('es-MX')}, margen ${margen}%, pedido actual: ${z.pedido||0}`;
   }).join('\n');
 
+  // Cargar historial real de Airtable para contexto
+  let historialTexto = 'BTS (29 clientes, 36% margen), Morat (61 clientes, 8% margen), The Weeknd (19 clientes, 36% margen)';
+  try {
+    const hist = await fetch('/.netlify/functions/airtable-proxy', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        tabla: 'Eventos',
+        method: 'GET',
+        params: '?sort[0][field]=Fecha&sort[0][direction]=desc&maxRecords=10'
+      })
+    }).then(r=>r.json());
+    
+    if(hist.records?.length){
+      // Get reservaciones count per event
+      const evResumen = hist.records.map(e=>e.fields.Nombre).filter(Boolean).join(', ');
+      historialTexto = 'Eventos recientes: ' + evResumen;
+    }
+  } catch(e){}
+
+  // Pedido actual
+  const pedidoInfo = zv.filter(z=>z.pedido>0).map(z=>`${z.nombre}: pedido ${z.pedido}, vendidos ${z.vendidos||0}`).join(', ') || 'Sin pedido definido';
+
   const prompt = `Eres el asesor financiero de Conecta Reynosa, una agencia de tours a conciertos desde Reynosa, Tamaulipas, México. 
 
 DATOS DEL EVENTO:
@@ -1461,15 +1506,16 @@ DATOS DEL EVENTO:
 - Días: ${dias} día(s), ${noches} noche(s) de hotel
 - Transporte: ${unidades.map(u=>TRP[u.tipo]?.label).join(' + ')||'por definir'} = ${totalPax} pasajeros máximo
 - Gastos fijos por persona: $${Math.round(gf).toLocaleString('es-MX')}
+- Pedido actual: ${pedidoInfo}
 
 ZONAS Y PRECIOS:
 ${zonasInfo||'Pendiente de capturar'}
 
 CONTEXTO DE REYNOSA:
 - Ciudad fronteriza de ~700,000 habitantes
-- Mercado de tours a conciertos relativamente pequeño pero activo
-- Clientes viajan principalmente a MTY (2h) y CDMX (vuelo/bus)
-- Historial: BTS (29 clientes, 36% margen), Morat (61 clientes, 8% margen), The Weeknd (19 clientes, 36% margen)
+- Mercado de tours activo con clientes leales
+- Clientes viajan a MTY (2h) y CDMX (vuelo/bus)
+- Historial de la empresa: ${historialTexto}
 
 Genera un análisis CONCISO y PRÁCTICO con estas secciones (usa markdown simple):
 

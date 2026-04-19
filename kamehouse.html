@@ -1,0 +1,757 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kamehouse — Conecta Reynosa</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800;900&family=Barlow:wght@400;500;600&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:     #080810;
+  --bg2:    #0d0d1a;
+  --bg3:    #12121f;
+  --bg4:    #1a1a2e;
+  --border: rgba(255,255,255,.07);
+  --border2:rgba(255,255,255,.12);
+  --t:      #ffffff;
+  --ts:     rgba(255,255,255,.45);
+  --ts2:    rgba(255,255,255,.25);
+  --red:    #ff2841;
+  --red2:   #ff6b7a;
+  --blue:   #4466ff;
+  --blue2:  #6688ff;
+  --am:     #f5c542;
+  --ve:     #44e58a;
+  --ro:     #ff4455;
+  --glow-r: rgba(255,40,65,.15);
+  --glow-b: rgba(68,102,255,.15);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--t);font-family:'Barlow',sans-serif;min-height:100vh;overflow-x:hidden}
+
+/* ── NOISE OVERLAY ── */
+body::before{
+  content:'';position:fixed;inset:0;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");
+  pointer-events:none;z-index:999;opacity:.4;
+}
+
+/* ── LOGIN ── */
+#login-screen{
+  display:flex;align-items:center;justify-content:center;
+  min-height:100vh;position:relative;
+  background:radial-gradient(ellipse at 30% 50%, rgba(255,40,65,.08) 0%, transparent 60%),
+             radial-gradient(ellipse at 70% 50%, rgba(68,102,255,.08) 0%, transparent 60%),
+             var(--bg);
+}
+.login-wrap{
+  width:380px;padding:48px;
+  background:var(--bg2);
+  border:1px solid var(--border2);
+  position:relative;
+  animation:loginIn .5s ease both;
+}
+@keyframes loginIn{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+.login-wrap::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:2px;
+  background:linear-gradient(90deg,var(--red),var(--blue));
+}
+.login-logo{
+  font-family:'Barlow Condensed',sans-serif;
+  font-size:11px;font-weight:700;letter-spacing:.25em;
+  color:var(--ts);text-transform:uppercase;margin-bottom:6px;
+}
+.login-title{
+  font-family:'Barlow Condensed',sans-serif;
+  font-size:42px;font-weight:900;letter-spacing:-.01em;
+  color:var(--t);margin-bottom:4px;line-height:1;
+}
+.login-title span{color:var(--red);}
+.login-sub{font-size:12px;color:var(--ts);margin-bottom:36px;}
+.login-field{margin-bottom:12px;}
+.login-field label{display:block;font-size:11px;font-weight:600;color:var(--ts);text-transform:uppercase;letter-spacing:.1em;margin-bottom:6px;}
+.login-field input{
+  width:100%;background:var(--bg3);border:1px solid var(--border);
+  color:var(--t);padding:12px 14px;font-size:14px;
+  font-family:'Barlow',sans-serif;outline:none;transition:border .2s;
+}
+.login-field input:focus{border-color:var(--blue);}
+.login-btn{
+  width:100%;margin-top:8px;
+  background:var(--red);color:#fff;border:none;
+  padding:14px;font-size:13px;font-weight:700;
+  font-family:'Barlow Condensed',sans-serif;letter-spacing:.15em;
+  text-transform:uppercase;cursor:pointer;transition:all .2s;
+}
+.login-btn:hover{background:#e0001f;transform:translateY(-1px);}
+.login-err{color:var(--red);font-size:12px;margin-top:8px;display:none;}
+
+/* ── APP SHELL ── */
+#app{display:none;}
+
+/* ── HEADER ── */
+.kh-header{
+  height:54px;background:rgba(8,8,16,.95);
+  border-bottom:1px solid var(--border);
+  padding:0 24px;display:flex;align-items:center;gap:0;
+  position:sticky;top:0;z-index:100;backdrop-filter:blur(12px);
+}
+.kh-logo{
+  font-family:'Barlow Condensed',sans-serif;
+  font-size:20px;font-weight:900;letter-spacing:.05em;
+  color:var(--t);margin-right:32px;flex-shrink:0;
+}
+.kh-logo span{color:var(--red);}
+.kh-nav{display:flex;gap:2px;flex:1;}
+.kh-nav-btn{
+  padding:6px 14px;font-size:12px;font-weight:600;
+  font-family:'Barlow',sans-serif;border:none;
+  background:transparent;color:var(--ts);cursor:pointer;
+  text-transform:uppercase;letter-spacing:.08em;
+  border-radius:3px;transition:all .15s;white-space:nowrap;
+}
+.kh-nav-btn:hover{color:var(--t);}
+.kh-nav-btn.active{background:rgba(255,255,255,.08);color:var(--t);}
+.kh-nav-btn.active-cot{background:rgba(255,40,65,.15);color:var(--red);}
+.kh-right{display:flex;align-items:center;gap:12px;margin-left:auto;}
+.kh-role{
+  font-size:10px;font-weight:700;padding:3px 10px;
+  background:rgba(255,255,255,.06);color:var(--ts);
+  text-transform:uppercase;letter-spacing:.1em;border-radius:2px;
+}
+.kh-logout{
+  font-size:11px;color:var(--ts);background:none;border:none;
+  cursor:pointer;font-family:'Barlow',sans-serif;
+  text-transform:uppercase;letter-spacing:.08em;transition:color .15s;
+}
+.kh-logout:hover{color:var(--red);}
+
+/* ── VIEWS ── */
+.kh-view{display:none;padding:28px 24px;max-width:1400px;margin:0 auto;}
+.kh-view.active{display:block;animation:fadeUp .25s ease both;}
+@keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+
+/* ── METRIC CARDS ── */
+.metrics-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px;}
+.metric-card{
+  background:var(--bg2);border:1px solid var(--border);
+  padding:18px 20px;position:relative;overflow:hidden;
+  transition:border-color .2s;
+}
+.metric-card:hover{border-color:var(--border2);}
+.metric-card::after{
+  content:'';position:absolute;top:0;left:0;right:0;height:2px;
+  background:currentColor;opacity:.2;
+}
+.metric-card.verde{--c:var(--ve);}
+.metric-card.verde::after{background:var(--ve);}
+.metric-card.rojo{--c:var(--ro);}
+.metric-card.rojo::after{background:var(--ro);}
+.metric-card.am{--c:var(--am);}
+.metric-card.am::after{background:var(--am);}
+.metric-card.azul{--c:var(--blue2);}
+.metric-card.azul::after{background:var(--blue2);}
+.metric-label{font-size:10px;font-weight:700;color:var(--ts);text-transform:uppercase;letter-spacing:.12em;margin-bottom:8px;}
+.metric-val{font-family:'Barlow Condensed',sans-serif;font-size:34px;font-weight:800;letter-spacing:-.01em;color:var(--t);}
+.metric-card.verde .metric-val{color:var(--ve);}
+.metric-card.rojo .metric-val{color:var(--ro);}
+.metric-card.am .metric-val{color:var(--am);}
+.metric-card.azul .metric-val{color:var(--blue2);}
+.metric-sub{font-size:11px;color:var(--ts);margin-top:4px;}
+
+/* ── CARDS ── */
+.card{background:var(--bg2);border:1px solid var(--border);padding:20px;margin-bottom:14px;}
+.card-title{
+  font-size:10px;font-weight:700;color:var(--ts);
+  text-transform:uppercase;letter-spacing:.15em;margin-bottom:16px;
+}
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+
+/* ── TABLES ── */
+table{width:100%;border-collapse:collapse;font-size:13px;}
+th{font-size:10px;font-weight:700;color:var(--ts);text-transform:uppercase;letter-spacing:.1em;padding:0 8px 10px 0;border-bottom:1px solid var(--border);text-align:left;}
+td{padding:9px 8px 9px 0;border-bottom:1px solid var(--border);vertical-align:middle;}
+tr:last-child td{border-bottom:none;}
+tr:hover td{background:rgba(255,255,255,.02);}
+
+/* ── BADGES ── */
+.badge{display:inline-block;font-size:10px;font-weight:700;padding:3px 8px;text-transform:uppercase;letter-spacing:.08em;border-radius:2px;}
+.badge-ve{background:rgba(68,229,138,.12);color:var(--ve);}
+.badge-ro{background:rgba(255,68,85,.12);color:var(--ro);}
+.badge-am{background:rgba(245,197,66,.12);color:var(--am);}
+.badge-bl{background:rgba(68,102,255,.12);color:var(--blue2);}
+.badge-gr{background:rgba(255,255,255,.06);color:var(--ts);}
+
+/* ── PROGRESS BARS ── */
+.bar-wrap{height:3px;background:var(--bg4);border-radius:2px;overflow:hidden;margin:4px 0;}
+.bar-fill{height:100%;border-radius:2px;background:var(--ve);transition:width .4s ease;}
+.bar-fill.warn{background:var(--am);}
+.bar-fill.danger{background:var(--ro);}
+
+/* ── ALERTS ── */
+.alerta-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);}
+.alerta-row:last-child{border-bottom:none;}
+.alerta-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;}
+
+/* ── LOADING ── */
+.loading{text-align:center;padding:48px;color:var(--ts);font-size:13px;}
+.spinner{width:20px;height:20px;border:2px solid var(--border);border-top-color:var(--blue);border-radius:50%;animation:spin .7s linear infinite;margin:0 auto 12px;}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ── FORM ELEMENTS ── */
+.fg{margin-bottom:10px;}
+.fg label{display:block;font-size:10px;font-weight:700;color:var(--ts);text-transform:uppercase;letter-spacing:.1em;margin-bottom:5px;}
+.fg input,.fg select,.fg textarea{
+  width:100%;background:var(--bg3);border:1px solid var(--border);
+  color:var(--t);padding:9px 12px;font-size:13px;
+  font-family:'Barlow',sans-serif;outline:none;transition:border .2s;border-radius:2px;
+}
+.fg input:focus,.fg select:focus,.fg textarea:focus{border-color:var(--blue);}
+.fg select option{background:var(--bg3);}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.btn-primary{
+  background:var(--blue);color:#fff;border:none;
+  padding:11px 20px;font-size:12px;font-weight:700;
+  font-family:'Barlow',sans-serif;cursor:pointer;
+  text-transform:uppercase;letter-spacing:.1em;width:100%;
+  border-radius:2px;transition:all .2s;
+}
+.btn-primary:hover{background:var(--blue2);}
+
+/* ── EVENTO SELECT ── */
+.ev-list{display:flex;flex-direction:column;}
+.ev-row{
+  display:grid;grid-template-columns:1fr 80px 130px 100px 110px;
+  align-items:center;padding:10px 0;
+  border-bottom:1px solid var(--border);gap:12px;
+}
+.ev-row:last-child{border-bottom:none;}
+
+/* ── COTIZADOR EMBEBIDO ── */
+#view-cotizador{padding:0;}
+#cotizador-frame{
+  width:100%;height:calc(100vh - 54px);border:none;
+  background:var(--bg);
+}
+
+/* ── RESPONSIVE ── */
+@media(max-width:768px){
+  .metrics-grid{grid-template-columns:1fr 1fr;}
+  .two-col{grid-template-columns:1fr;}
+  .kh-nav-btn{padding:6px 10px;font-size:11px;}
+}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="login-screen">
+  <div class="login-wrap">
+    <div class="login-logo">Conecta Reynosa</div>
+    <div class="login-title">KAME<span>HOUSE</span></div>
+    <div class="login-sub">Panel de operaciones internas</div>
+    <div id="login-err" class="login-err">Usuario o contraseña incorrectos</div>
+    <div class="login-field">
+      <label>Usuario</label>
+      <input id="login-user" type="text" autocomplete="username" placeholder="">
+    </div>
+    <div class="login-field">
+      <label>Contraseña</label>
+      <input id="login-pass" type="password" autocomplete="current-password" placeholder="">
+    </div>
+    <button class="login-btn" onclick="doLogin()">Entrar →</button>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app">
+  <header class="kh-header">
+    <div class="kh-logo">KAME<span>HOUSE</span></div>
+    <nav class="kh-nav" id="header-nav"></nav>
+    <div class="kh-right">
+      <span class="kh-role" id="role-label">—</span>
+      <button class="kh-logout" onclick="doLogout()">Salir</button>
+    </div>
+  </header>
+
+  <!-- RESUMEN -->
+  <div class="kh-view" id="view-resumen"></div>
+
+  <!-- EVENTOS -->
+  <div class="kh-view" id="view-eventos">
+    <select id="evento-select" onchange="loadEvento(this.value)" style="background:var(--bg2);border:1px solid var(--border);color:var(--t);padding:10px 14px;font-size:13px;font-family:'Barlow',sans-serif;outline:none;margin-bottom:20px;width:100%;max-width:500px;">
+      <option value="">— Seleccionar evento —</option>
+    </select>
+    <div id="evento-content"></div>
+  </div>
+
+  <!-- PAGOS -->
+  <div class="kh-view" id="view-pagos">
+    <div class="two-col">
+      <div>
+        <div class="card">
+          <div class="card-title">Registrar pago</div>
+          <div class="form-grid">
+            <div class="fg"><label>Cliente</label><input id="pago-cliente" type="text" placeholder="Nombre"></div>
+            <div class="fg"><label>Evento</label>
+              <select id="pago-evento"><option value="">— Seleccionar —</option></select>
+            </div>
+          </div>
+          <div class="form-grid">
+            <div class="fg"><label>Monto ($)</label><input id="pago-monto" type="number"></div>
+            <div class="fg"><label>Método</label>
+              <select id="pago-metodo">
+                <option>Transferencia</option><option>Clip</option><option>Efectivo</option><option>Otro</option>
+              </select>
+            </div>
+          </div>
+          <div class="fg"><label>Referencia (opcional)</label><input id="pago-ref" type="text"></div>
+          <button class="btn-primary" onclick="registrarPago()">Registrar pago</button>
+          <div id="pago-msg" style="font-size:12px;margin-top:8px;display:none;color:var(--ts)"></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">Últimos pagos</div>
+        <div id="pagos-recientes"><div class="loading"><div class="spinner"></div></div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- GASTOS -->
+  <div class="kh-view" id="view-gastos">
+    <div class="two-col">
+      <div class="card">
+        <div class="card-title">Registrar gasto</div>
+        <div class="fg"><label>Concepto *</label><input id="g-concepto" type="text"></div>
+        <div class="form-grid">
+          <div class="fg"><label>Monto *</label><input id="g-monto" type="number"></div>
+          <div class="fg"><label>Categoría *</label>
+            <select id="g-categoria">
+              <option value="">— Seleccionar —</option>
+              <option>Boletos</option><option>Bus</option><option>Hotel</option><option>Kits</option>
+              <option>Estacionamiento</option><option>Pauta</option><option>Salarios</option>
+              <option>Contadora</option><option>Herramientas</option><option>Redes sociales</option><option>Otro</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-grid">
+          <div class="fg"><label>Fecha *</label><input id="g-fecha" type="date"></div>
+          <div class="fg"><label>Evento (opcional)</label>
+            <select id="g-evento"><option value="">Gasto general</option></select>
+          </div>
+        </div>
+        <div class="fg"><label>Notas</label><textarea id="g-notas" rows="2" style="resize:vertical"></textarea></div>
+        <button class="btn-primary" onclick="registrarGasto()">Registrar gasto</button>
+        <div id="g-msg" style="font-size:12px;margin-top:8px;color:var(--ts)"></div>
+      </div>
+      <div>
+        <div id="gastos-lista"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- VENDEDOR -->
+  <div class="kh-view" id="view-vendedor">
+    <div id="vendedor-content"></div>
+  </div>
+
+  <!-- COTIZADOR (iframe) -->
+  <div class="kh-view" id="view-cotizador">
+    <iframe id="cotizador-frame" src="/cotizador" title="Cotizador Conecta Reynosa"></iframe>
+  </div>
+</div>
+
+<script>
+const API = '/.netlify/functions/airtable-proxy';
+const USERS = {
+  memo:     { pass:'conecta2026', role:'admin',    label:'Memo — Admin' },
+  auxiliar: { pass:'admin2026',   role:'auxiliar', label:'Auxiliar Admin' },
+  coordi:   { pass:'coordi2026',  role:'coordi',   label:'Coordinador' },
+  ventas:   { pass:'ventas2026',  role:'vendedor', label:'Vendedor' },
+};
+const ROLES = {
+  admin:    { views:['resumen','eventos','pagos','gastos','cotizador'] },
+  auxiliar: { views:['pagos','eventos','gastos'] },
+  coordi:   { views:['eventos'] },
+  vendedor: { views:['vendedor'] },
+};
+const VIEW_LABELS = {
+  resumen:'Resumen', eventos:'Por evento', pagos:'Pagos',
+  gastos:'Gastos', vendedor:'Mis ventas', cotizador:'🎯 Cotizador'
+};
+
+let currentRole = null;
+let eventosCache = [], reservCache = [], clientesCache = {};
+
+// ── AUTH ──────────────────────────────────────────────────────────────────
+function doLogin(){
+  const u = document.getElementById('login-user').value.trim().toLowerCase();
+  const p = document.getElementById('login-pass').value;
+  const user = USERS[u];
+  if(!user || user.pass !== p){
+    document.getElementById('login-err').style.display='block'; return;
+  }
+  currentRole = user.role;
+  document.getElementById('login-screen').style.display='none';
+  document.getElementById('app').style.display='block';
+  document.getElementById('role-label').textContent = user.label;
+  buildNav();
+  initApp();
+}
+function doLogout(){
+  document.getElementById('login-screen').style.display='flex';
+  document.getElementById('app').style.display='none';
+  document.getElementById('login-user').value='';
+  document.getElementById('login-pass').value='';
+}
+document.getElementById('login-pass').addEventListener('keydown', e=>{ if(e.key==='Enter') doLogin(); });
+
+// ── NAV ───────────────────────────────────────────────────────────────────
+function buildNav(){
+  const nav = document.getElementById('header-nav');
+  nav.innerHTML='';
+  ROLES[currentRole].views.forEach((v,i)=>{
+    const btn = document.createElement('button');
+    const isCot = v==='cotizador';
+    btn.className = 'kh-nav-btn' + (i===0 ? (isCot?' active-cot':' active') : '');
+    btn.textContent = VIEW_LABELS[v];
+    btn.onclick = ()=>{
+      document.querySelectorAll('.kh-nav-btn').forEach(b=>b.classList.remove('active','active-cot'));
+      btn.classList.add(isCot?'active-cot':'active');
+      document.querySelectorAll('.kh-view').forEach(el=>el.classList.remove('active'));
+      document.getElementById('view-'+v).classList.add('active');
+      if(v==='eventos' && eventosCache.length>0) populateEventoSelect();
+      if(v==='gastos') initGastos();
+    };
+    nav.appendChild(btn);
+    if(i===0) document.getElementById('view-'+v).classList.add('active');
+  });
+}
+
+// ── API ───────────────────────────────────────────────────────────────────
+function wait(ms){return new Promise(r=>setTimeout(r,ms));}
+async function atFetch(tabla, params=''){
+  let records=[], offset=null;
+  do{
+    const res = await fetch(API,{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({tabla,params:`?pageSize=100${params}${offset?'&offset='+offset:''}`,method:'GET'})
+    }).then(r=>r.json());
+    records.push(...(res.records||[]));
+    offset=res.offset;
+  }while(offset);
+  return records;
+}
+async function atPost(tabla,fields){
+  return fetch(API,{
+    method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({tabla,method:'POST',body:JSON.stringify({records:[{fields}]})})
+  }).then(r=>r.json());
+}
+
+function pesos(n){ return '$'+Math.round(n||0).toLocaleString('es-MX'); }
+function fecha(f){ return f?new Date(f+'T12:00:00').toLocaleDateString('es-MX',{day:'numeric',month:'short'}):'—'; }
+
+// ── INIT ──────────────────────────────────────────────────────────────────
+async function initApp(){
+  showLoadingResumen();
+  const [eventos,reservaciones,clientes] = await Promise.all([
+    atFetch('Eventos','&sort%5B0%5D%5Bfield%5D=Fecha&sort%5B0%5D%5Bdirection%5D=asc'),
+    atFetch('Reservaciones'),
+    atFetch('Clientes'),
+  ]);
+  eventosCache = eventos;
+  reservCache = reservaciones;
+  clientes.forEach(c=>clientesCache[c.id]=c.fields);
+  populateEventoSelect();
+  if(currentRole==='admin'||currentRole==='auxiliar') loadResumen();
+  if(currentRole==='auxiliar') loadPagosRecientes();
+  if(currentRole==='vendedor') loadVendedor();
+}
+
+function showLoadingResumen(){
+  document.getElementById('view-resumen').innerHTML='<div class="loading"><div class="spinner"></div>Cargando datos...</div>';
+}
+
+function populateEventoSelect(){
+  const proximos = eventosCache.filter(e=>e.fields.Status==='Próximo');
+  ['evento-select','pago-evento'].forEach(id=>{
+    const sel=document.getElementById(id); if(!sel) return;
+    sel.innerHTML='<option value="">— Seleccionar —</option>';
+    proximos.forEach(e=>{sel.innerHTML+=`<option value="${e.id}">${e.fields.Nombre}</option>`;});
+  });
+}
+
+// ── RESUMEN ───────────────────────────────────────────────────────────────
+async function loadResumen(){
+  const pagos = await atFetch('Pagos');
+  const totalCobrado = pagos.reduce((a,p)=>a+(p.fields.Monto||0),0);
+  const totalPorCobrar = reservCache.reduce((a,r)=>a+Math.max(0,(r.fields['Total a pagar']||0)-(r.fields['Total abonado']||0)),0);
+  const proximos = eventosCache.filter(e=>e.fields.Status==='Próximo');
+
+  let html = `<div class="metrics-grid">
+    <div class="metric-card verde">
+      <div class="metric-label">Total cobrado</div>
+      <div class="metric-val">${pesos(totalCobrado)}</div>
+      <div class="metric-sub">${pagos.length} pagos registrados</div>
+    </div>
+    <div class="metric-card rojo">
+      <div class="metric-label">Por cobrar</div>
+      <div class="metric-val">${pesos(totalPorCobrar)}</div>
+      <div class="metric-sub">Saldo pendiente</div>
+    </div>
+    <div class="metric-card azul">
+      <div class="metric-label">Reservaciones</div>
+      <div class="metric-val">${reservCache.length}</div>
+      <div class="metric-sub">Clientes activos</div>
+    </div>
+    <div class="metric-card am">
+      <div class="metric-label">Próximos eventos</div>
+      <div class="metric-val">${proximos.length}</div>
+      <div class="metric-sub">En agenda</div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-title">Próximos eventos — cobranza</div>
+    <div class="ev-list">
+      <div class="ev-row" style="font-size:10px;color:var(--ts);font-weight:700;text-transform:uppercase;letter-spacing:.1em;padding-bottom:6px;border-bottom:1px solid var(--border);">
+        <span>Evento</span><span>Fecha</span><span>Cobrado</span><span>Clientes</span><span style="text-align:right">Por cobrar</span>
+      </div>`;
+
+  for(const ev of proximos.slice(0,12)){
+    const rs = reservCache.filter(r=>r.fields.Evento?.[0]===ev.id);
+    const cob = rs.reduce((a,r)=>a+(r.fields['Total abonado']||0),0);
+    const tot = rs.reduce((a,r)=>a+(r.fields['Total a pagar']||0),0);
+    const pct = tot>0?Math.round(cob/tot*100):0;
+    const falta = Math.max(0,tot-cob);
+    const bc = pct>=80?'':pct>=50?' warn':' danger';
+    const mc = pct>=80?'var(--ve)':pct>=50?'var(--am)':'var(--ro)';
+    html+=`<div class="ev-row">
+      <span style="font-size:13px;font-weight:600">${ev.fields.Nombre}</span>
+      <span style="font-size:11px;color:var(--ts)">${fecha(ev.fields.Fecha)}</span>
+      <div><div class="bar-wrap"><div class="bar-fill${bc}" style="width:${pct}%"></div></div></div>
+      <span style="font-size:11px;color:var(--ts)">${rs.length} clientes</span>
+      <span style="font-size:12px;font-weight:700;text-align:right;color:${mc}">${pesos(falta)}</span>
+    </div>`;
+  }
+
+  html+=`</div></div><div class="two-col">
+    <div class="card"><div class="card-title">Últimos pagos</div>`;
+  [...pagos].sort((a,b)=>new Date(b.createdTime)-new Date(a.createdTime)).slice(0,6).forEach(p=>{
+    html+=`<div class="alerta-row">
+      <div class="alerta-dot" style="background:var(--ve)"></div>
+      <span style="flex:1;font-size:12px">${p.fields.Referencia||'Pago'}</span>
+      <span class="badge badge-ve">${pesos(p.fields.Monto)}</span>
+    </div>`;
+  });
+  html+=`</div><div class="card"><div class="card-title">Por ciudad</div>`;
+  ['MTY','CDMX'].forEach(ciudad=>{
+    const rs=reservCache.filter(r=>eventosCache.find(e=>e.id===r.fields.Evento?.[0])?.fields.Ciudad===ciudad);
+    const cob=rs.reduce((a,r)=>a+(r.fields['Total abonado']||0),0);
+    html+=`<div class="alerta-row">
+      <div class="alerta-dot" style="background:${ciudad==='MTY'?'var(--blue2)':'var(--ro)'}"></div>
+      <span style="flex:1;font-size:13px;font-weight:600">${ciudad}</span>
+      <span style="font-size:11px;color:var(--ts);margin-right:8px">${rs.length} reserv.</span>
+      <span style="font-size:13px;font-weight:700">${pesos(cob)}</span>
+    </div>`;
+  });
+  html+=`</div></div>`;
+  document.getElementById('view-resumen').innerHTML=html;
+}
+
+// ── EVENTO ────────────────────────────────────────────────────────────────
+async function loadEvento(eventoId){
+  if(!eventoId){document.getElementById('evento-content').innerHTML='';return;}
+  document.getElementById('evento-content').innerHTML='<div class="loading"><div class="spinner"></div>Cargando...</div>';
+  const ev=eventosCache.find(e=>e.id===eventoId);
+  const rs=reservCache.filter(r=>r.fields.Evento?.[0]===eventoId);
+  const showFin=currentRole==='admin'||currentRole==='auxiliar';
+  const pagosEv=await atFetch('Pagos');
+  const reservIds=new Set(rs.map(r=>r.id));
+  const pagosPorReserv={};
+  for(const p of pagosEv){
+    const rid=p.fields['Reservación']?.[0];
+    if(rid&&reservIds.has(rid)) pagosPorReserv[rid]=(pagosPorReserv[rid]||0)+(p.fields.Monto||0);
+  }
+  const cob=rs.reduce((a,r)=>a+(pagosPorReserv[r.id]||0),0);
+  const tot=rs.reduce((a,r)=>a+(r.fields['Total a pagar']||0),0);
+  let html='';
+  if(showFin){
+    html+=`<div class="metrics-grid">
+      <div class="metric-card azul"><div class="metric-label">Clientes</div><div class="metric-val">${rs.length}</div></div>
+      <div class="metric-card verde"><div class="metric-label">Cobrado</div><div class="metric-val">${pesos(cob)}</div></div>
+      <div class="metric-card ${tot-cob>0?'rojo':'verde'}"><div class="metric-label">Por cobrar</div><div class="metric-val">${pesos(tot-cob)}</div></div>
+      <div class="metric-card am"><div class="metric-label">Total esperado</div><div class="metric-val">${pesos(tot)}</div></div>
+    </div>`;
+  }
+  html+=`<div class="card"><div class="card-title">Lista de viajeros — ${ev?.fields.Nombre||''}</div>
+    <div style="overflow-x:auto"><table><thead><tr>
+      <th>Nombre</th><th>Paquete</th><th>Zona</th><th>Habitación</th>`;
+  if(showFin) html+=`<th style="text-align:right">Total</th><th style="text-align:right">Abonado</th><th style="text-align:right">Resta</th>`;
+  html+=`</tr></thead><tbody>`;
+  for(const r of rs){
+    const cl=clientesCache[r.fields.Cliente?.[0]]||{};
+    const paq=r.fields.Paquete||'—';
+    const pc=paq==='PLUS'?'badge-ve':paq==='RIDE'?'badge-bl':paq==='CHEAP'?'badge-am':'badge-gr';
+    const t=r.fields['Total a pagar']||0;
+    const a=pagosPorReserv[r.id]||0;
+    const re=t-a;
+    const rc=re<=0?'badge-ve':re>2000?'badge-ro':'badge-am';
+    html+=`<tr>
+      <td style="font-weight:600">${cl['Nombre completo']||'—'}</td>
+      <td><span class="badge ${pc}">${paq}</span></td>
+      <td style="font-size:12px;color:var(--ts)">${r.fields['Zona / Boleto']||'—'}</td>
+      <td style="font-size:12px">${r.fields['Habitación']||'—'}</td>`;
+    if(showFin) html+=`<td style="text-align:right;font-size:12px">${pesos(t)}</td>
+      <td style="text-align:right;font-size:12px;color:var(--ve)">${pesos(a)}</td>
+      <td style="text-align:right"><span class="badge ${rc}">${pesos(re)}</span></td>`;
+    html+=`</tr>`;
+  }
+  html+=`</tbody></table></div></div>`;
+  document.getElementById('evento-content').innerHTML=html;
+}
+
+// ── PAGOS ─────────────────────────────────────────────────────────────────
+async function loadPagosRecientes(){
+  const pagos=await atFetch('Pagos','&sort%5B0%5D%5Bfield%5D=createdTime&sort%5B0%5D%5Bdirection%5D=desc&maxRecords=8');
+  let html='';
+  pagos.forEach(p=>{
+    html+=`<div class="alerta-row">
+      <div class="alerta-dot" style="background:var(--ve)"></div>
+      <span style="flex:1;font-size:13px">${p.fields.Referencia||'Pago'}</span>
+      <span style="font-size:11px;color:var(--ts);margin-right:8px">${new Date(p.createdTime).toLocaleDateString('es-MX',{day:'numeric',month:'short'})}</span>
+      <span class="badge badge-ve">${pesos(p.fields.Monto)}</span>
+    </div>`;
+  });
+  document.getElementById('pagos-recientes').innerHTML=html||'<div style="color:var(--ts);font-size:13px">Sin pagos</div>';
+}
+
+async function registrarPago(){
+  const cliente=document.getElementById('pago-cliente').value.trim();
+  const eventoId=document.getElementById('pago-evento').value;
+  const monto=parseFloat(document.getElementById('pago-monto').value);
+  const metodo=document.getElementById('pago-metodo').value;
+  const ref=document.getElementById('pago-ref').value.trim();
+  const msg=document.getElementById('pago-msg');
+  if(!cliente||!eventoId||!monto){
+    msg.style.display='block';msg.style.color='var(--ro)';
+    msg.textContent='Completa cliente, evento y monto.';return;
+  }
+  msg.style.display='block';msg.style.color='var(--ts)';msg.textContent='Registrando...';
+  const res=await atPost('Pagos',{
+    Monto:monto,Método:metodo,
+    Referencia:ref||`${cliente} — ${eventosCache.find(e=>e.id===eventoId)?.fields.Nombre||''}`,
+  });
+  if(res.records){
+    msg.style.color='var(--ve)';msg.textContent=`✓ Pago de ${pesos(monto)} registrado`;
+    document.getElementById('pago-monto').value='';
+    document.getElementById('pago-ref').value='';
+    loadPagosRecientes();
+  } else {
+    msg.style.color='var(--ro)';msg.textContent='Error al registrar.';
+  }
+}
+
+// ── GASTOS ────────────────────────────────────────────────────────────────
+function initGastos(){
+  const fd=document.getElementById('g-fecha');
+  if(fd&&!fd.value) fd.value=new Date().toISOString().split('T')[0];
+  const sel=document.getElementById('g-evento');
+  if(!sel) return;
+  while(sel.options.length>1) sel.remove(1);
+  eventosCache.forEach(e=>{
+    const opt=document.createElement('option');
+    opt.value=e.id;opt.textContent=e.fields.Nombre||e.id;sel.appendChild(opt);
+  });
+  loadGastos();
+}
+
+async function loadGastos(){
+  const gastos=await atFetch('Gastos');
+  const eventosMap={};
+  eventosCache.forEach(e=>eventosMap[e.id]=e.fields.Nombre);
+  const totales={};let totalGeneral=0;
+  gastos.forEach(g=>{
+    const cat=g.fields['Tipo']||'Otro';
+    totales[cat]=(totales[cat]||0)+(g.fields.Monto||0);
+    totalGeneral+=g.fields.Monto||0;
+  });
+  let html='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px;margin-bottom:16px">';
+  Object.entries(totales).sort((a,b)=>b[1]-a[1]).forEach(([cat,tot])=>{
+    html+=`<div style="background:var(--bg2);border:1px solid var(--border);border-radius:3px;padding:10px 12px">
+      <div style="font-size:10px;color:var(--ts)">${cat}</div>
+      <div style="font-size:16px;font-weight:700;color:var(--ro)">${pesos(tot)}</div>
+    </div>`;
+  });
+  html+=`<div style="background:var(--bg2);border:1px solid var(--am);border-radius:3px;padding:10px 12px">
+    <div style="font-size:10px;color:var(--ts)">TOTAL</div>
+    <div style="font-size:16px;font-weight:700;color:var(--am)">${pesos(totalGeneral)}</div>
+  </div></div>`;
+  if(!gastos.length){document.getElementById('gastos-lista').innerHTML=html+'<div style="color:var(--ts);font-size:13px">Sin gastos.</div>';return;}
+  html+='<div style="overflow-x:auto"><table><thead><tr><th>Fecha</th><th>Concepto</th><th>Categoría</th><th>Evento</th><th style="text-align:right">Monto</th></tr></thead><tbody>';
+  gastos.forEach(g=>{
+    const f=g.fields;
+    const ev=f.Evento?.[0]?(eventosMap[f.Evento[0]]||'—'):'General';
+    html+=`<tr>
+      <td style="font-size:12px;color:var(--ts)">${f['Fecha']||'—'}</td>
+      <td style="font-weight:600">${f.Concepto||'—'}</td>
+      <td><span class="badge badge-gr">${f['Tipo']||'—'}</span></td>
+      <td style="font-size:12px;color:var(--ts)">${ev}</td>
+      <td style="text-align:right;color:var(--ro);font-weight:600">${pesos(f.Monto||0)}</td>
+    </tr>`;
+  });
+  html+='</tbody></table></div>';
+  document.getElementById('gastos-lista').innerHTML=html;
+}
+
+async function registrarGasto(){
+  const concepto=document.getElementById('g-concepto').value.trim();
+  const monto=parseFloat(document.getElementById('g-monto').value);
+  const categoria=document.getElementById('g-categoria').value;
+  const fechaVal=document.getElementById('g-fecha').value;
+  const eventoId=document.getElementById('g-evento').value;
+  const notas=document.getElementById('g-notas').value.trim();
+  const msg=document.getElementById('g-msg');
+  if(!concepto||!monto||!categoria||!fechaVal){
+    msg.style.color='var(--ro)';msg.textContent='Llena los campos obligatorios.';return;
+  }
+  msg.style.color='var(--ts)';msg.textContent='Guardando...';
+  const fields={'Concepto':concepto,'Monto':Number(monto),'Tipo':categoria,'Fecha':fechaVal};
+  if(notas) fields['Notas']=notas;
+  if(eventoId) fields['Evento']=[eventoId];
+  const res=await atPost('Gastos',fields);
+  if(res.id||res.records?.[0]?.id){
+    msg.style.color='var(--ve)';msg.textContent='✓ Gasto registrado';
+    document.getElementById('g-concepto').value='';
+    document.getElementById('g-monto').value='';
+    document.getElementById('g-notas').value='';
+    loadGastos();
+  } else {
+    msg.style.color='var(--ro)';msg.textContent='Error: '+JSON.stringify(res);
+  }
+}
+
+// ── VENDEDOR ──────────────────────────────────────────────────────────────
+function loadVendedor(){
+  const proximos=eventosCache.filter(e=>e.fields.Status==='Próximo');
+  let html=`<div class="card"><div class="card-title">Precios — próximos eventos</div>
+    <table><thead><tr>
+      <th>Evento</th><th>Fecha</th><th>Ciudad</th>
+      <th style="text-align:right">PLUS</th><th style="text-align:right">RIDE</th><th style="text-align:right">CHEAP</th>
+    </tr></thead><tbody>`;
+  proximos.forEach(ev=>{
+    html+=`<tr>
+      <td style="font-weight:600">${ev.fields.Nombre}</td>
+      <td style="font-size:12px;color:var(--ts)">${fecha(ev.fields.Fecha)}</td>
+      <td><span class="badge ${ev.fields.Ciudad==='MTY'?'badge-bl':'badge-ro'}">${ev.fields.Ciudad||'—'}</span></td>
+      <td style="text-align:right;font-weight:600">${ev.fields['Precio PLUS']?pesos(ev.fields['Precio PLUS']):'—'}</td>
+      <td style="text-align:right">${pesos(ev.fields['Precio RIDE'])}</td>
+      <td style="text-align:right">${pesos(ev.fields['Precio CHEAP'])}</td>
+    </tr>`;
+  });
+  html+=`</tbody></table></div>`;
+  document.getElementById('vendedor-content').innerHTML=html;
+}
+</script>
+</body>
+</html>

@@ -1178,12 +1178,21 @@ async function loadCotCloud(id, nombre){
     const r = await fetch('/.netlify/functions/airtable-proxy', {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ tabla: 'Cotizaciones', method: 'GET', params: '/'+id })
+      body: JSON.stringify({ tabla: 'Cotizaciones', method: 'GET', id: id })
     }).then(r=>r.json());
     const datos = JSON.parse(r.fields?.Datos||'{}');
-    if(datos.nombre) { loadFromData(datos); toast('✓ Cotización cargada'); }
-    else toast('Error al cargar');
-  } catch(e) { toast('Error de conexión'); }
+    if(datos.nombre){
+      // Guardar en localStorage y cargar con loadCot
+      const key = 'cot_'+datos.nombre.replace(/\s+/g,'_').toLowerCase();
+      localStorage.setItem(key, JSON.stringify(datos));
+      loadCot(key);
+      toast('✓ Cotización cargada');
+    } else {
+      toast('Error: datos vacíos');
+    }
+  } catch(e) {
+    toast('Error de conexión: '+e.message);
+  }
 }
 
 async function delCotCloud(id){

@@ -184,6 +184,21 @@ select option{background:var(--ns)}
         <button class="btn by" id="b-est" onclick="setMode('estimado')">Estimado</button>
         <button class="btn bg" id="b-real" onclick="setMode('real')">Real (post-evento)</button>
       </div>
+      <!-- MODO REAL: campos adicionales -->
+      <div id="real-fields" style="display:none;margin-top:12px;padding:12px;background:rgba(255,193,7,.08);border:1px solid var(--am);border-radius:8px">
+        <div style="font-size:10px;font-weight:700;color:var(--am);text-transform:uppercase;letter-spacing:.1em;margin-bottom:10px">📋 Costos reales del evento</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          <div class="fg"><label>Costo real transporte ($)</label><input id="real-trans" type="number" placeholder="0" oninput="calcular()"></div>
+          <div class="fg"><label>Costo real hotel ($)</label><input id="real-hotel" type="number" placeholder="0" oninput="calcular()"></div>
+          <div class="fg"><label>Clientes que viajaron</label><input id="real-clientes" type="number" placeholder="0" oninput="calcular()"></div>
+          <div class="fg"><label>Ingresos reales cobrados ($)</label><input id="real-ingresos" type="number" placeholder="0" oninput="calcular()"></div>
+          <div class="fg"><label>Otros gastos reales ($)</label><input id="real-otros" type="number" placeholder="0" oninput="calcular()"></div>
+          <div class="fg"><label>Gastos imprevistos ($)</label><input id="real-imprevistos" type="number" placeholder="0" oninput="calcular()"></div>
+        </div>
+        <div id="real-resultado" style="margin-top:10px"></div>
+      </div>
+      <div style="display:none">
+      </div>
     </div>
   </div>
 
@@ -658,6 +673,7 @@ function setMode(m){
   document.getElementById('b-real').className='btn '+(m==='real'?'by':'bg');
   document.getElementById('mode-badge').className='mbadge '+(m==='real'?'m-real':'m-est');
   document.getElementById('mode-badge').textContent=m==='real'?'Real':'Estimado';
+  document.getElementById('real-fields').style.display=m==='real'?'block':'none';
   calcular();
 }
 
@@ -1038,6 +1054,49 @@ function calcular(){
     if(negat.length) html+='<div style="background:rgba(255,59,48,.1);border:1px solid var(--ro);border-radius:6px;padding:8px 10px;font-size:11px;color:var(--ro)">⚠️ <strong>Vendiendo bajo costo:</strong> '+negat.map(z=>z.nombre).join(', ')+'</div>';
     alertaDiv.innerHTML=html;
   } else if(alertaDiv){ alertaDiv.innerHTML=''; }
+  // MODO REAL: calcular resultado real vs estimado
+  if(modo==='real'){
+    const realTrans    = +document.getElementById('real-trans').value||0;
+    const realHotel    = +document.getElementById('real-hotel').value||0;
+    const realClientes = +document.getElementById('real-clientes').value||0;
+    const realIngresos = +document.getElementById('real-ingresos').value||0;
+    const realOtros    = +document.getElementById('real-otros').value||0;
+    const realImprevistos = +document.getElementById('real-imprevistos').value||0;
+    const realDiv = document.getElementById('real-resultado');
+    if(realDiv && (realIngresos>0||realClientes>0)){
+      const costoRealTotal = realTrans + realHotel + realOtros + realImprevistos;
+      const gananciReal = realIngresos - costoRealTotal;
+      const margenReal = realIngresos>0?Math.round(gananciReal/realIngresos*100):0;
+      // Comparar con estimado
+      const ingEst = zv.reduce((s,z)=>s+(z.precioPlus||Math.ceil((z.costo+gastosFijos+(+document.getElementById('ganancia-plus').value||1000))/100)*100)*(z.pedido||1),0);
+      const cosEst = zv.reduce((s,z)=>s+(z.costo+gastosFijos)*(z.pedido||1),0);
+      const ganEst = ingEst - cosEst;
+      const diff = gananciReal - ganEst;
+      const diffColor = diff>=0?'var(--ve)':'var(--ro)';
+      realDiv.innerHTML=`
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-top:8px">
+          <div style="background:rgba(0,0,0,.2);border-radius:6px;padding:8px;text-align:center">
+            <div style="font-size:9px;color:var(--ts)">Ingresos reales</div>
+            <div style="font-size:15px;font-weight:700;color:var(--ve)">$${Math.round(realIngresos).toLocaleString('es-MX')}</div>
+          </div>
+          <div style="background:rgba(0,0,0,.2);border-radius:6px;padding:8px;text-align:center">
+            <div style="font-size:9px;color:var(--ts)">Costos reales</div>
+            <div style="font-size:15px;font-weight:700;color:var(--ro)">$${Math.round(costoRealTotal).toLocaleString('es-MX')}</div>
+          </div>
+          <div style="background:rgba(0,0,0,.2);border-radius:6px;padding:8px;text-align:center">
+            <div style="font-size:9px;color:var(--ts)">Ganancia real</div>
+            <div style="font-size:15px;font-weight:700;color:${gananciReal>=0?'var(--ve)':'var(--ro)'}">$${Math.round(gananciReal).toLocaleString('es-MX')}</div>
+            <div style="font-size:10px;color:var(--ts)">${margenReal}% margen</div>
+          </div>
+        </div>
+        <div style="margin-top:8px;padding:6px 10px;background:rgba(0,0,0,.2);border-radius:6px;font-size:11px;color:${diffColor}">
+          ${diff>=0?'✅ Ganaste':'⚠️ Ganaste menos de lo esperado'} ${diff>=0?'+':''}<strong>$${Math.round(Math.abs(diff)).toLocaleString('es-MX')}</strong> vs estimado
+        </div>`;
+    } else if(realDiv){
+      realDiv.innerHTML='<div style="font-size:11px;color:var(--ts)">Captura los datos reales del evento para ver el resultado final.</div>';
+    }
+  }
+
   if(document.getElementById('b-pub')) document.getElementById('b-pub').disabled=!document.getElementById('ev-nom').value;
 }
 
@@ -1052,6 +1111,12 @@ function getData(){
     dias:document.getElementById('ev-dias').value,
     hotel:document.getElementById('ev-hotel').value,
     modo,unidades:[...unidades],zonas:[...zonas],
+    realTrans:document.getElementById('real-trans')?.value||'',
+    realHotel:document.getElementById('real-hotel')?.value||'',
+    realClientes:document.getElementById('real-clientes')?.value||'',
+    realIngresos:document.getElementById('real-ingresos')?.value||'',
+    realOtros:document.getElementById('real-otros')?.value||'',
+    realImprevistos:document.getElementById('real-imprevistos')?.value||'',
     kitItems:[...document.querySelectorAll('.kc')].map(el=>({cost:+(el.dataset.cost||0),on:el.classList.contains('on')})),
     coordTipo:document.getElementById('coord-tipo').value,
     coordBoleto:document.getElementById('coord-costo-boleto').value,
@@ -1099,10 +1164,11 @@ async function guardar(){
   let ganTotal=0, ventaTotal=0, costoTotal=0;
   zv.forEach(z=>{
     const p = z.precioPlus||Math.ceil((z.costo+gf+ganPlus)/100)*100;
-    const ped = z.pedido||0;
-    ganTotal += (p-(z.costo+gf))*ped;
-    ventaTotal += p*ped;
-    costoTotal += (z.costo+gf)*ped;
+    // Usar vendidos si hay, si no pedido, si no 1 para mostrar algo
+    const n = z.vendidos||z.pedido||1;
+    ganTotal += (p-(z.costo+gf))*n;
+    ventaTotal += p*n;
+    costoTotal += (z.costo+gf)*n;
   });
   const margen = ventaTotal>0?Math.round(ganTotal/ventaTotal*100):0;
 
@@ -1284,6 +1350,12 @@ function loadCot(k){
   document.getElementById('ganancia-cheap').value=d.gananciaCHEAP||'500';
   document.getElementById('ride-precio-cdmx').value=d.rideCDMX||'2900';
   setMode(d.modo||'estimado');
+  if(d.realTrans) document.getElementById('real-trans').value=d.realTrans;
+  if(d.realHotel) document.getElementById('real-hotel').value=d.realHotel;
+  if(d.realClientes) document.getElementById('real-clientes').value=d.realClientes;
+  if(d.realIngresos) document.getElementById('real-ingresos').value=d.realIngresos;
+  if(d.realOtros) document.getElementById('real-otros').value=d.realOtros;
+  if(d.realImprevistos) document.getElementById('real-imprevistos').value=d.realImprevistos;
   hideModal();calcular();
 }
 

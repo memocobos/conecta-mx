@@ -349,6 +349,37 @@ body {
 /* ── ANIMATIONS ── */
 @keyframes fadeUp { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
 .rcard { animation: fadeUp .2s ease both; }
+
+/* ── KIT ── */
+.kit-g { display: flex; flex-direction: column; gap: 4px; margin-top: 10px; }
+.kc {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 10px; border-radius: 5px; cursor: pointer;
+  border: 1px solid var(--line); transition: all .15s;
+  background: var(--bg3);
+}
+.kc:hover { border-color: var(--line2); }
+.kc.on { border-color: rgba(77,108,250,.3); background: rgba(77,108,250,.08); }
+.kc input[type="checkbox"] { width: 14px; height: 14px; accent-color: var(--blue); flex-shrink: 0; cursor: pointer; }
+.kn { flex: 1; font-size: 12px; color: var(--t); }
+.kp { font-size: 12px; font-weight: 700; color: var(--t2); min-width: 36px; text-align: right; }
+
+/* ── MODAL FIX ── */
+.modal-bg { display: none; }
+.modal-bg.open { display: flex !important; }
+
+/* ── AI BUTTON STATES ── */
+#ai-btn { transition: all .2s; }
+#ai-btn:disabled { opacity: .5; cursor: not-allowed; }
+.ai-loader { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--t2); padding: 12px 0; }
+.ai-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--blue); animation: aiPulse 1.2s ease infinite; }
+.ai-dot:nth-child(2) { animation-delay: .2s; }
+.ai-dot:nth-child(3) { animation-delay: .4s; }
+@keyframes aiPulse { 0%,100%{opacity:.3;transform:scale(.8)} 50%{opacity:1;transform:scale(1)} }
+
+/* ── REMOVE OLD CLASSES ── */
+.row-z-h, .row-z { display: none !important; }
+
 </style>
 </head>
 <body>
@@ -1531,7 +1562,7 @@ async function delCotCloud(id){
   showSaved();
 }
 
-function hideModal(){document.getElementById('modal').style.display='none';}
+function hideModal(){document.getElementById('modal').classList.remove('open');}
 function delCot(k){if(!confirm('¿Eliminar?'))return;localStorage.removeItem(k);showSaved();}
 
 function loadCot(k){
@@ -1789,9 +1820,13 @@ async function analizarConIA(){
   // Pedido actual
   const pedidoInfo = zv.filter(z=>z.pedido>0).map(z=>`${z.nombre}: pedido ${z.pedido}, vendidos ${z.vendidos||0}`).join(', ') || 'Sin pedido definido';
 
-  // Calcular escenarios para pasar a la IA
+  // Calcular variables para escenarios - independiente de calcular()
   const _totPed2 = zonas.reduce((s,z)=>s+(z.pedido||0),0);
   const _totVend2 = zonas.reduce((s,z)=>s+(z.vendidos||0),0);
+  const _precProm2 = zv.length>0 ? zv.reduce((s,z)=>s+(z.precioPlus||Math.ceil((z.costo+gf+_expGanPlus)/100)*100),0)/zv.length : 0;
+  const _costoVar2 = zv.length>0 ? zv.reduce((s,z)=>s+(z.costo+gf),0)/zv.length : 0;
+  const _numCoordi2 = unidades.length;
+  const _costoFijos2 = unidades.reduce((s,u)=>s+(u.costo||0)+(ciudad!=='CDMX'?(u.gastosRuta||3500):0),0);
 
   const prompt = `Eres el asesor financiero de Conecta Reynosa, una agencia de tours a conciertos desde Reynosa, Tamaulipas, México. 
 
@@ -1832,11 +1867,10 @@ Genera un análisis CONCISO y PRÁCTICO con estas secciones (usa markdown simple
 ### 📦 Recomendación de pedido
 (Cuántos boletos pedir por zona y por qué, basado en la capacidad de transporte y mercado de Reynosa)
 
-### 📊 3 Escenarios (usa EXACTAMENTE estos números calculados)
-**Optimista (90% ocupación — ${Math.round(totPed*0.9)} clientes):** ingreso $${Math.round(Math.max(totPed*0.9-totalStaff,0)*precProm).toLocaleString('es-MX')}, ganancia $${Math.round(Math.max(totPed*0.9-totalStaff,0)*precProm - Math.round(totPed*0.9)*costoVarPP - costoFijosEv).toLocaleString('es-MX')}
-**Realista (70% ocupación — ${Math.round(totPed*0.7)} clientes):** ingreso $${Math.round(Math.max(totPed*0.7-totalStaff,0)*precProm).toLocaleString('es-MX')}, ganancia $${Math.round(Math.max(totPed*0.7-totalStaff,0)*precProm - Math.round(totPed*0.7)*costoVarPP - costoFijosEv).toLocaleString('es-MX')}
-**Pesimista (50% ocupación — ${Math.round(totPed*0.5)} clientes):** ingreso $${Math.round(Math.max(totPed*0.5-totalStaff,0)*precProm).toLocaleString('es-MX')}, ganancia $${Math.round(Math.max(totPed*0.5-totalStaff,0)*precProm - Math.round(totPed*0.5)*costoVarPP - costoFijosEv).toLocaleString('es-MX')}
-**Punto de equilibrio:** ${pe} clientes (${pctOcup}% del pedido)
+### 📊 3 Escenarios${_totPed2>0 ? ' (basado en '+_totPed2+' boletos pedidos)' : ''}
+**Optimista (90% ocupación — ${Math.round(_totPed2*0.9)} clientes):** ingreso $${Math.round(Math.max(_totPed2*0.9-_numCoordi2,0)*_precProm2).toLocaleString('es-MX')}, ganancia $${Math.round(Math.max(_totPed2*0.9-_numCoordi2,0)*_precProm2 - _totPed2*0.9*_costoVar2 - _costoFijos2).toLocaleString('es-MX')}
+**Realista (70% ocupación — ${Math.round(_totPed2*0.7)} clientes):** ingreso $${Math.round(Math.max(_totPed2*0.7-_numCoordi2,0)*_precProm2).toLocaleString('es-MX')}, ganancia $${Math.round(Math.max(_totPed2*0.7-_numCoordi2,0)*_precProm2 - _totPed2*0.7*_costoVar2 - _costoFijos2).toLocaleString('es-MX')}
+**Pesimista (50% ocupación — ${Math.round(_totPed2*0.5)} clientes):** ingreso $${Math.round(Math.max(_totPed2*0.5-_numCoordi2,0)*_precProm2).toLocaleString('es-MX')}, ganancia $${Math.round(Math.max(_totPed2*0.5-_numCoordi2,0)*_precProm2 - _totPed2*0.5*_costoVar2 - _costoFijos2).toLocaleString('es-MX')}
 
 ### 🚨 Riesgos principales
 (2-3 puntos concretos que podrían afectar el evento)
@@ -1847,11 +1881,16 @@ Genera un análisis CONCISO y PRÁCTICO con estas secciones (usa markdown simple
 Sé directo, usa números reales, habla como consultor de negocios no como asistente genérico.`;
 
   try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 30000);
     const res = await fetch('/.netlify/functions/claude-analyze', {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ prompt })
+      body: JSON.stringify({ prompt }),
+      signal: controller.signal
     });
+    clearTimeout(timeout);
+    if(!res.ok) throw new Error('Error del servidor: ' + res.status);
     const data = await res.json();
     const text = data.text || data.error || 'Error al obtener análisis';
 
@@ -1873,8 +1912,11 @@ Sé directo, usa números reales, habla como consultor de negocios no como asist
 
 function toast(msg){
   const t=document.createElement('div');
-  t.style.cssText='position:fixed;bottom:20px;right:20px;background:var(--nc);border:1px solid var(--ve);color:var(--ve);padding:9px 14px;border-radius:6px;font-size:12px;font-weight:700;z-index:999';
-  t.textContent=msg;document.body.appendChild(t);setTimeout(()=>t.remove(),2500);
+  t.className='toast';
+  t.textContent=msg;
+  document.body.appendChild(t);
+  requestAnimationFrame(()=>t.classList.add('show'));
+  setTimeout(()=>{t.classList.remove('show');setTimeout(()=>t.remove(),300);},2500);
 }
 </script>
 </body>

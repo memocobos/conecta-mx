@@ -1099,13 +1099,13 @@ html, body {
 </div>
 
 <!-- MODAL -->
-<div class="modal" id="modal">
+<div class="modal-bg" id="modal">
   <div class="modal-box">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
-      <div style="font-size:14px;font-weight:900">Cotizaciones guardadas</div>
+    <div class="modal-hdr">
+      <h3>Cotizaciones guardadas</h3>
       <button class="bx" onclick="hideModal()">×</button>
     </div>
-    <div id="modal-c"></div>
+    <div class="modal-content" id="modal-c"></div>
   </div>
 </div>
 
@@ -1868,7 +1868,7 @@ async function showSaved(){
   const modal = document.getElementById('modal');
   const cont  = document.getElementById('modal-c');
   cont.innerHTML = '<div style="color:var(--ts);text-align:center;padding:20px">Cargando cotizaciones...</div>';
-  modal.style.display = 'block';
+  modal.classList.add('open');
 
   try {
     const r = await fetch('/.netlify/functions/airtable-proxy', {

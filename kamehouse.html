@@ -357,7 +357,7 @@ tr:hover td{background:rgba(255,255,255,.02);}
 
   <!-- COTIZADOR (iframe) -->
   <div class="kh-view" id="view-cotizador">
-    <iframe id="cotizador-frame" src="/cotizador" title="Cotizador Conecta Reynosa"></iframe>
+    <iframe id="cotizador-frame" src="" title="Cotizador Conecta Reynosa"></iframe>
   </div>
 </div>
 
@@ -422,6 +422,10 @@ function buildNav(){
       document.getElementById('view-'+v).classList.add('active');
       if(v==='eventos' && eventosCache.length>0) populateEventoSelect();
       if(v==='gastos') initGastos();
+      if(v==='cotizador'){
+        const fr = document.getElementById('cotizador-frame');
+        if(!fr.src || fr.src === window.location.href) fr.src = '/cotizador?v=' + Date.now();
+      }
     };
     nav.appendChild(btn);
     if(i===0) document.getElementById('view-'+v).classList.add('active');

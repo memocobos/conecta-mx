@@ -707,6 +707,64 @@ html, body {
 }
 
 /* Remove legacy classes */
+/* Zone rows (left panel form) */
+.zona-head {
+  display: grid;
+  grid-template-columns: 1fr 82px 66px 66px 32px;
+  gap: 6px;
+  padding: 0 0 8px;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 8px;
+}
+.zona-head span {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--t3);
+  text-transform: uppercase;
+  letter-spacing: .06em;
+}
+.zona-row {
+  display: grid;
+  grid-template-columns: 1fr 82px 66px 66px 32px;
+  gap: 6px;
+  margin-bottom: 6px;
+  align-items: center;
+}
+.zona-row input {
+  width: 100%;
+  background: var(--bg4);
+  border: 1px solid var(--line2);
+  color: var(--t);
+  padding: 8px 10px;
+  font-size: 13px;
+  font-family: inherit;
+  outline: none;
+  border-radius: 6px;
+  transition: border-color .15s;
+  font-variant-numeric: tabular-nums;
+}
+.zona-row input:focus {
+  border-color: var(--blue);
+  box-shadow: 0 0 0 2px rgba(90,126,255,.2);
+}
+.zona-row input[type="number"] { text-align: right; }
+.zona-row input:nth-child(4) { color: var(--gold); font-weight: 600; }
+.zona-row button {
+  width: 32px; height: 34px;
+  background: transparent;
+  color: var(--red);
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+  opacity: .6;
+  transition: all .15s;
+}
+.zona-row button:hover {
+  opacity: 1;
+  background: rgba(255,70,101,.12);
+}
 .row-z-h, .row-z { display: none !important; }
 
 /* Animations */
@@ -836,8 +894,8 @@ html, body {
   <!-- 3. ZONAS -->
   <div class="card">
     <div class="ct">3 · Zonas, boletos y pedido</div>
-    <div class="row-z-h">
-      <label>Zona</label><label>Costo boleto</label><label>Pedido</label><label>Vendidos</label><span></span>
+    <div class="zona-head">
+      <span>Zona</span><span>Costo boleto</span><span>Pedido</span><span>Vendidos</span><span></span>
     </div>
     <div id="zonas-c"></div>
     <button class="btn-add" onclick="addZona()">+ Agregar zona</button>
@@ -1318,12 +1376,12 @@ function updZona(id,f,v){const z=zonas.find(z=>z.id===id);if(z){z[f]=f==='nombre
 
 function renderZonas(){
   document.getElementById('zonas-c').innerHTML=zonas.map(z=>`
-    <div class="row-z">
+    <div class="zona-row">
       <input type="text" value="${z.nombre}" placeholder="Ej: Cancha VIP" oninput="updZona(${z.id},'nombre',this.value)">
-      <input type="number" value="${z.costo||''}" placeholder="$0" onchange="updZona(${z.id},'costo',this.value)">
+      <input type="number" value="${z.costo||''}" placeholder="0" onchange="updZona(${z.id},'costo',this.value)">
       <input type="number" value="${z.pedido||''}" placeholder="0" title="Pedido a matriz" onchange="updZona(${z.id},'pedido',this.value)">
       <input type="number" value="${z.vendidos||''}" placeholder="0" title="Vendidos hoy" onchange="updZona(${z.id},'vendidos',this.value)">
-      <button class="bx" onclick="remZona(${z.id})">×</button>
+      <button class="bx" onclick="remZona(${z.id})" title="Eliminar">×</button>
     </div>`).join('');
   updStaffSelects();
 }

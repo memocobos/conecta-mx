@@ -4,15 +4,17 @@ exports.handler = async (event) => {
 
   if (!TOKEN) return { statusCode: 500, body: JSON.stringify({ error: "Token no configurado" }) };
 
-  const { tabla, params = "", method = "GET", body } = JSON.parse(event.body || "{}");
+  const { tabla, params = "", method = "GET", body, id } = JSON.parse(event.body || "{}");
   if (!tabla) return { statusCode: 400, body: JSON.stringify({ error: "Falta tabla" }) };
 
-  const url = `https://api.airtable.com/v0/${BASE}/${encodeURIComponent(tabla)}${params}`;
+  // Si viene id, se agrega al path (para PATCH, DELETE, GET por id)
+  const path = id ? `/${encodeURIComponent(tabla)}/${id}` : `/${encodeURIComponent(tabla)}${params}`;
+  const url = `https://api.airtable.com/v0/${BASE}${path}`;
 
   const res = await fetch(url, {
     method,
     headers: { Authorization: `Bearer ${TOKEN}`, "Content-Type": "application/json" },
-    body: method !== "GET" ? body : undefined,
+    body: method !== "GET" && method !== "DELETE" ? body : undefined,
   });
 
   const data = await res.json();

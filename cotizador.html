@@ -1039,28 +1039,164 @@ function getData(){
   };
 }
 
-function guardar(){
+async function guardar(){
   const d=getData();
   if(!d.nombre){alert('Ponle nombre al evento antes de guardar');return;}
-  localStorage.setItem('cot_'+d.nombre.replace(/\s+/g,'_').toLowerCase(),JSON.stringify(d));
-  toast('✓ Guardado');
+  
+  // Guardar en localStorage (backup local)
+  const key='cot_'+d.nombre.replace(/\s+/g,'_').toLowerCase();
+  localStorage.setItem(key, JSON.stringify(d));
+  
+  // Calcular ganancia para el registro
+  const ciudad = document.getElementById('ev-ciudad').value;
+  const noches = +document.getElementById('ev-noches').value||1;
+  const hotelBase = +document.getElementById('ev-hotel').value||(ciudad==='CDMX'?2900:2500);
+  const kit = getKit();
+  const totalPax = unidades.reduce((s,u)=>s+(TRP[u.tipo]?.pax||0),0);
+  const costoTrans = unidades.reduce((s,u)=>s+(u.costo||0)+(ciudad!=='CDMX'?(u.gastosRuta||3500):0),0);
+  const transPP = totalPax>0?costoTrans/totalPax:0;
+  const hotelPP = (hotelBase*noches)/4;
+  const gf = transPP + hotelPP + kit;
+  const zv = zonas.filter(z=>z.nombre&&z.costo>0);
+  const ganPlus = +document.getElementById('ganancia-plus').value||1000;
+  let ganTotal=0, ventaTotal=0, costoTotal=0;
+  zv.forEach(z=>{
+    const p = z.precioPlus||Math.ceil((z.costo+gf+ganPlus)/100)*100;
+    const ped = z.pedido||0;
+    ganTotal += (p-(z.costo+gf))*ped;
+    ventaTotal += p*ped;
+    costoTotal += (z.costo+gf)*ped;
+  });
+  const margen = ventaTotal>0?Math.round(ganTotal/ventaTotal*100):0;
+
+  toast('Guardando...');
+  
+  try {
+    // Buscar si ya existe en Airtable
+    const buscar = await fetch('/.netlify/functions/airtable-proxy', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        tabla: 'Cotizaciones',
+        method: 'GET',
+        params: `?filterByFormula=SEARCH("${d.nombre.replace(/"/g,"'")}",{Nombre})&maxRecords=1`
+      })
+    }).then(r=>r.json());
+
+    const existing = buscar.records?.[0];
+    const fields = {
+      'Nombre': d.nombre,
+      'Evento': d.nombre,
+      'Ciudad': d.ciudad||'',
+      'Fecha': d.fecha||null,
+      'Datos': JSON.stringify(d),
+      'Actualizado': new Date().toISOString().split('T')[0],
+      'Ganancia': Math.round(ganTotal),
+      'Margen': margen,
+    };
+
+    if(existing){
+      // Actualizar
+      await fetch('/.netlify/functions/airtable-proxy', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ tabla: 'Cotizaciones', method: 'PATCH', id: existing.id, body: JSON.stringify({fields}) })
+      });
+      toast('✓ Cotización actualizada');
+    } else {
+      // Crear nueva
+      await fetch('/.netlify/functions/airtable-proxy', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ tabla: 'Cotizaciones', method: 'POST', body: JSON.stringify({records:[{fields}]}) })
+      });
+      toast('✓ Cotización guardada en la nube ☁️');
+    }
+  } catch(e) {
+    toast('✓ Guardado local (sin conexión)');
+  }
 }
 
-function showSaved(){
-  const keys=Object.keys(localStorage).filter(k=>k.startsWith('cot_'));
-  document.getElementById('modal-c').innerHTML=!keys.length
-    ?'<div style="color:var(--ts)">No hay cotizaciones guardadas.</div>'
-    :keys.map(k=>{
-      const d=JSON.parse(localStorage.getItem(k));
-      return `<div class="sv-item" onclick="loadCot('${k}')">
-        <div>
-          <div style="font-size:13px;font-weight:700">${d.nombre}</div>
-          <div style="font-size:10px;color:var(--ts)">${d.fecha||'Sin fecha'} · ${d.ciudad} · ${d.dias||1}d ${d.noches||1}n · <span class="mbadge ${d.modo==='real'?'m-real':'m-est'}">${d.modo||'estimado'}</span></div>
+async function showSaved(){
+  const modal = document.getElementById('modal');
+  const cont  = document.getElementById('modal-c');
+  cont.innerHTML = '<div style="color:var(--ts);text-align:center;padding:20px">Cargando cotizaciones...</div>';
+  modal.style.display = 'block';
+
+  try {
+    const r = await fetch('/.netlify/functions/airtable-proxy', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        tabla: 'Cotizaciones',
+        method: 'GET',
+        params: '?sort[0][field]=Actualizado&sort[0][direction]=desc'
+      })
+    }).then(r=>r.json());
+
+    const records = r.records||[];
+    
+    if(!records.length){
+      cont.innerHTML='<div style="color:var(--ts)">No hay cotizaciones guardadas.</div>';
+      return;
+    }
+
+    cont.innerHTML = records.map(rec => {
+      const f = rec.fields;
+      const gan = f.Ganancia ? '$'+Math.round(f.Ganancia).toLocaleString('es-MX') : '—';
+      const mg  = f.Margen   ? f.Margen+'%' : '—';
+      const col = f.Margen>=15?'var(--ve)':f.Margen>=8?'var(--am)':'var(--ro)';
+      return `<div class="sv-item" onclick="loadCotCloud('${rec.id}','${rec.fields.Nombre?.replace(/'/g,"\\'")}')">
+        <div style="flex:1">
+          <div style="font-size:13px;font-weight:700">${f.Nombre||'Sin nombre'}</div>
+          <div style="font-size:10px;color:var(--ts);margin-top:2px">${f.Fecha||'Sin fecha'} · ${f.Ciudad||'—'} · Ganancia: <span style="color:${col};font-weight:700">${gan}</span> (${mg})</div>
+          <div style="font-size:9px;color:var(--ts);margin-top:1px">Actualizado: ${f.Actualizado||'—'}</div>
         </div>
-        <button class="bx" style="font-size:10px;padding:3px 7px" onclick="event.stopPropagation();delCot('${k}')">🗑</button>
+        <button class="bx" style="font-size:10px;padding:3px 7px" onclick="event.stopPropagation();delCotCloud('${rec.id}')">🗑</button>
       </div>`;
     }).join('');
-  document.getElementById('modal').style.display='block';
+
+  } catch(e) {
+    // Fallback a localStorage
+    const keys=Object.keys(localStorage).filter(k=>k.startsWith('cot_'));
+    cont.innerHTML=!keys.length
+      ?'<div style="color:var(--ts)">No hay cotizaciones guardadas.</div>'
+      :keys.map(k=>{
+        const d=JSON.parse(localStorage.getItem(k));
+        return `<div class="sv-item" onclick="loadCot('${k}')">
+          <div>
+            <div style="font-size:13px;font-weight:700">${d.nombre}</div>
+            <div style="font-size:10px;color:var(--ts)">${d.fecha||'Sin fecha'} · ${d.ciudad}</div>
+          </div>
+          <button class="bx" style="font-size:10px;padding:3px 7px" onclick="event.stopPropagation();delCot('${k}')">🗑</button>
+        </div>`;
+      }).join('');
+  }
+}
+
+async function loadCotCloud(id, nombre){
+  hideModal();
+  toast('Cargando...');
+  try {
+    const r = await fetch('/.netlify/functions/airtable-proxy', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ tabla: 'Cotizaciones', method: 'GET', params: '/'+id })
+    }).then(r=>r.json());
+    const datos = JSON.parse(r.fields?.Datos||'{}');
+    if(datos.nombre) { loadFromData(datos); toast('✓ Cotización cargada'); }
+    else toast('Error al cargar');
+  } catch(e) { toast('Error de conexión'); }
+}
+
+async function delCotCloud(id){
+  if(!confirm('¿Eliminar esta cotización?')) return;
+  await fetch('/.netlify/functions/airtable-proxy', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ tabla: 'Cotizaciones', method: 'DELETE', id })
+  });
+  showSaved();
 }
 
 function hideModal(){document.getElementById('modal').style.display='none';}

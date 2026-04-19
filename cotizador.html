@@ -400,6 +400,7 @@ select option{background:var(--ns)}
 
   <div class="card">
     <div class="ct" style="margin-bottom:10px">Precios por zona</div>
+    <div id="r-zona-alerta" style="margin-bottom:8px"></div>
     <div style="overflow-x:auto">
       <table class="zt">
         <thead><tr>
@@ -968,6 +969,23 @@ function calcular(){
     peDiv.innerHTML='<div style="color:var(--ts);font-size:11px">Agrega el pedido de boletos por zona para ver el análisis completo</div>';
   }
 
+
+  // Análisis semáforo por zona
+  const _ganPlusZ = +document.getElementById('ganancia-plus').value||1000;
+  const alertaDiv = document.getElementById('r-zona-alerta');
+  if(alertaDiv && zv.length){
+    const verde = zv.filter(z=>{ const ct=z.costo+gastosFijos; const pp=z.precioPlus||Math.ceil((ct+_ganPlusZ)/100)*100; return (pp-ct)/pp*100>=15; });
+    const ambar = zv.filter(z=>{ const ct=z.costo+gastosFijos; const pp=z.precioPlus||Math.ceil((ct+_ganPlusZ)/100)*100; const m=(pp-ct)/pp*100; return m>=8&&m<15; });
+    const rojo  = zv.filter(z=>{ const ct=z.costo+gastosFijos; const pp=z.precioPlus||Math.ceil((ct+_ganPlusZ)/100)*100; return (pp-ct)/pp*100<8; });
+    const negat = zv.filter(z=>{ const ct=z.costo+gastosFijos; const pp=z.precioPlus||Math.ceil((ct+_ganPlusZ)/100)*100; return pp<ct; });
+    let html='<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px">';
+    if(verde.length) html+='<span style="font-size:10px;padding:2px 8px;background:rgba(0,255,100,.15);color:var(--ve);border-radius:10px">✅ '+verde.length+' zona'+(verde.length>1?'s':'')+' ≥15%</span>';
+    if(ambar.length) html+='<span style="font-size:10px;padding:2px 8px;background:rgba(255,193,7,.15);color:var(--am);border-radius:10px">⚠️ '+ambar.length+' zona'+(ambar.length>1?'s':'')+' 8-15%</span>';
+    if(rojo.length)  html+='<span style="font-size:10px;padding:2px 8px;background:rgba(255,59,48,.15);color:var(--ro);border-radius:10px">🔴 '+rojo.length+' zona'+(rojo.length>1?'s':'')+' <8%</span>';
+    html+='</div>';
+    if(negat.length) html+='<div style="background:rgba(255,59,48,.1);border:1px solid var(--ro);border-radius:6px;padding:8px 10px;font-size:11px;color:var(--ro)">⚠️ <strong>Vendiendo bajo costo:</strong> '+negat.map(z=>z.nombre).join(', ')+'</div>';
+    alertaDiv.innerHTML=html;
+  } else if(alertaDiv){ alertaDiv.innerHTML=''; }
   if(document.getElementById('b-pub')) document.getElementById('b-pub').disabled=!document.getElementById('ev-nom').value;
 }
 

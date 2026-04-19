@@ -104,7 +104,7 @@ html, body {
 ═══════════════════════════════════════════════ */
 .wrap {
   display: grid;
-  grid-template-columns: 340px 1fr;
+  grid-template-columns: minmax(440px, 1fr) 1fr;
   min-height: calc(100vh - 52px);
   gap: 0;
 }
@@ -710,8 +710,8 @@ html, body {
 /* Zone rows (left panel form) */
 .zona-head {
   display: grid;
-  grid-template-columns: 1fr 82px 66px 66px 32px;
-  gap: 6px;
+  grid-template-columns: 1fr 96px 76px 76px 32px;
+  gap: 8px;
   padding: 0 0 8px;
   border-bottom: 1px solid var(--line);
   margin-bottom: 8px;
@@ -725,8 +725,8 @@ html, body {
 }
 .zona-row {
   display: grid;
-  grid-template-columns: 1fr 82px 66px 66px 32px;
-  gap: 6px;
+  grid-template-columns: 1fr 96px 76px 76px 32px;
+  gap: 8px;
   margin-bottom: 6px;
   align-items: center;
 }

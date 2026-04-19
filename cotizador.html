@@ -967,34 +967,31 @@ function calcular(){
       <div class="pe-r"><span style="color:var(--ts)">Por cliente adicional</span><span style="font-size:13px;font-weight:700;color:var(--am)">~$${Math.round(contrib).toLocaleString('es-MX')}</span></div>
       <div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--b)">
         <div style="font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--ts);margin-bottom:8px">Escenarios de venta</div>
-        ${[
-          {label:'Hoy', pct: totPed>0?Math.round(totVend/totPed*100):0, n:totVend, color:'var(--ts)'},
-          {label:'Pesimista', pct:50, n:Math.round(totPed*0.5), color:'var(--ro)'},
-          {label:'Realista',  pct:70, n:Math.round(totPed*0.7), color:'var(--am)'},
-          {label:'Optimista', pct:90, n:Math.round(totPed*0.9), color:'var(--ve)'},
-          {label:'Lleno',     pct:100, n:totPagantes, color:'#00ff88'},
-        ].map(sc => {
-          const nPag = Math.max(sc.n - totalStaff, 0);
-          const ingSc = nPag * precProm;
-          const cosSc = sc.n * costoVarPP;
-          const ganSc = ingSc - cosSc - costoFijosEv + (sc.n * costoVarPP - cosSc); 
-          // Simplificado: ingreso pagantes - costo total proporcional
-          const ingPag2 = nPag * precProm;
-          const cosTot2 = sc.n * costoVarPP + costoFijosEv;
-          const gan2 = ingPag2 - cosTot2;
-          const icon = gan2>0 ? (gan2>mgLleno*0.5?'✅':'⚠️') : '🔴';
-          return \`<div style="display:flex;align-items:center;gap:6px;margin-bottom:5px">
-            <div style="width:60px;font-size:10px;font-weight:700;color:\${sc.color}">\${sc.label}</div>
-            <div style="font-size:10px;color:var(--ts);width:40px">\${sc.pct}%</div>
-            <div style="flex:1;height:4px;background:var(--b);border-radius:2px">
-              <div style="width:\${Math.min(sc.pct,100)}%;height:100%;background:\${sc.color};border-radius:2px"></div>
-            </div>
-            <div style="font-size:11px;font-weight:700;color:\${gan2>=0?sc.color:'var(--ro)'};\${gan2<0?'':''}width:90px;text-align:right">
-              \${gan2>=0?'$'+Math.round(gan2).toLocaleString('es-MX'):'-$'+Math.round(Math.abs(gan2)).toLocaleString('es-MX')}
-            </div>
-            <div style="font-size:10px;color:var(--ts);width:16px">\${icon}</div>
-          </div>\`;
-        }).join('')}
+        ${(()=>{
+          const scs=[
+            {label:'Hoy',       pct:totPed>0?Math.round(totVend/totPed*100):0, n:totVend,              color:'var(--ts)'},
+            {label:'Pesimista', pct:50, n:Math.round(totPed*0.5), color:'var(--ro)'},
+            {label:'Realista',  pct:70, n:Math.round(totPed*0.7), color:'var(--am)'},
+            {label:'Optimista', pct:90, n:Math.round(totPed*0.9), color:'var(--ve)'},
+            {label:'Lleno',     pct:100, n:totPagantes,            color:'#00ff88'},
+          ];
+          return scs.map(sc=>{
+            const nPag=Math.max(sc.n-totalStaff,0);
+            const gan2=nPag*precProm - sc.n*costoVarPP - costoFijosEv;
+            const icon=gan2>0?(gan2>mgLleno*0.5?'✅':'⚠️'):'🔴';
+            const ganStr=gan2>=0?'$'+Math.round(gan2).toLocaleString('es-MX'):'-$'+Math.round(Math.abs(gan2)).toLocaleString('es-MX');
+            const colGan=gan2>=0?sc.color:'var(--ro)';
+            return '<div style="display:flex;align-items:center;gap:6px;margin-bottom:5px">'
+              +'<div style="width:60px;font-size:10px;font-weight:700;color:'+sc.color+'">'+sc.label+'</div>'
+              +'<div style="font-size:10px;color:var(--ts);width:40px">'+sc.pct+'%</div>'
+              +'<div style="flex:1;height:4px;background:var(--b);border-radius:2px">'
+              +'<div style="width:'+Math.min(sc.pct,100)+'%;height:100%;background:'+sc.color+';border-radius:2px"></div>'
+              +'</div>'
+              +'<div style="font-size:11px;font-weight:700;color:'+colGan+';width:90px;text-align:right">'+ganStr+'</div>'
+              +'<div style="font-size:10px;color:var(--ts);width:16px">'+icon+'</div>'
+              +'</div>';
+          }).join('');
+        })()}
       </div>
     `;
   } else {

@@ -937,15 +937,17 @@ function calcular(){
   const totalStaff = _nCoordi + _nCreadora;
   const totPagantes = Math.max(totPed - totalStaff, 0);
   if(totPed>0){
-    const ingLleno=zv.reduce((s,z)=>s+(z.precioPlus||Math.ceil((z.costo+gastosFijos+1000)/100)*100)*(z.pedido||0),0);
+    const _ganPlusAct = +document.getElementById('ganancia-plus').value || 1000;
+    const ingLleno=zv.reduce((s,z)=>s+(z.precioPlus||Math.ceil((z.costo+gastosFijos+_ganPlusAct)/100)*100)*(z.pedido||0),0);
     const ingPagantes=totPed>0?ingLleno*(totPagantes/totPed):0;
     const costoLleno=zv.reduce((s,z)=>s+(z.costo+gastosFijos)*(z.pedido||0),0);
-    // Costos fijos del evento = todo menos los boletos de clientes
-    const costoFijosEv=(costoTransTotal||0)
-      +(costoHotelChoferPP||0)*(totalPax||0)
-      +((coordBoleto||0)+(kit||0))*_nCoordi
-      +(costoCreaTotal||0)
-      +((estac||0)*(totalUnidades||0));
+    // costoFijosEv = costos que NO dependen de cuántos clientes vengan
+    // = transporte + hotel choferes + coordis + creadora + estac (sin hotel clientes ni kit)
+    const costoFijosEv = costoTransTotal
+      + costoHotelChofTotal
+      + costoCoordTotal
+      + costoCreaTotal
+      + (estac * totalUnidades);
     const precProm=totPagantes>0?ingPagantes/totPagantes:0;
     const costoVarPP=totPed>0?costoLleno/totPed:0;
     const contrib=precProm-costoVarPP;
@@ -986,6 +988,34 @@ function calcular(){
       </div>
       <div class="pe-r"><span style="color:var(--ts)">Ganancia si llenas</span><span class="pe-n" style="color:var(--ve)">$${Math.round(mgLleno).toLocaleString('es-MX')}</span></div>
       <div class="pe-r"><span style="color:var(--ts)">Por cliente adicional</span><span style="font-size:13px;font-weight:700;color:var(--am)">~$${Math.round(contrib).toLocaleString('es-MX')}</span></div>
+      <div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--b)">
+        <div style="font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--ts);margin-bottom:8px">Escenarios de venta</div>
+        ${(()=>{
+          const scs=[
+            {label:'Hoy',       pct:totPed>0?Math.round(totVend/totPed*100):0, n:totVend,              color:'var(--ts)'},
+            {label:'Pesimista', pct:50, n:Math.round(totPed*0.5), color:'var(--ro)'},
+            {label:'Realista',  pct:70, n:Math.round(totPed*0.7), color:'var(--am)'},
+            {label:'Optimista', pct:90, n:Math.round(totPed*0.9), color:'var(--ve)'},
+            {label:'Lleno',     pct:100, n:totPagantes,            color:'#00ff88'},
+          ];
+          return scs.map(sc=>{
+            const nPag=Math.max(sc.n-totalStaff,0);
+            const gan2=nPag*precProm - sc.n*costoVarPP - costoFijosEv;
+            const icon=gan2>0?(gan2>mgLleno*0.5?'✅':'⚠️'):'🔴';
+            const ganStr=gan2>=0?'$'+Math.round(gan2).toLocaleString('es-MX'):'-$'+Math.round(Math.abs(gan2)).toLocaleString('es-MX');
+            const colGan=gan2>=0?sc.color:'var(--ro)';
+            return '<div style="display:flex;align-items:center;gap:6px;margin-bottom:5px">'
+              +'<div style="width:60px;font-size:10px;font-weight:700;color:'+sc.color+'">'+sc.label+'</div>'
+              +'<div style="font-size:10px;color:var(--ts);width:40px">'+sc.pct+'%</div>'
+              +'<div style="flex:1;height:4px;background:var(--b);border-radius:2px">'
+              +'<div style="width:'+Math.min(sc.pct,100)+'%;height:100%;background:'+sc.color+';border-radius:2px"></div>'
+              +'</div>'
+              +'<div style="font-size:11px;font-weight:700;color:'+colGan+';width:90px;text-align:right">'+ganStr+'</div>'
+              +'<div style="font-size:10px;color:var(--ts);width:16px">'+icon+'</div>'
+              +'</div>';
+          }).join('');
+        })()}
+      </div>
     `;
   } else {
     peDiv.innerHTML='<div style="color:var(--ts);font-size:11px">Agrega el pedido de boletos por zona para ver el análisis completo</div>';
@@ -1046,28 +1076,173 @@ function getData(){
   };
 }
 
-function guardar(){
+async function guardar(){
   const d=getData();
   if(!d.nombre){alert('Ponle nombre al evento antes de guardar');return;}
-  localStorage.setItem('cot_'+d.nombre.replace(/\s+/g,'_').toLowerCase(),JSON.stringify(d));
-  toast('✓ Guardado');
+  
+  // Guardar en localStorage (backup local)
+  const key='cot_'+d.nombre.replace(/\s+/g,'_').toLowerCase();
+  localStorage.setItem(key, JSON.stringify(d));
+  
+  // Calcular ganancia para el registro
+  const ciudad = document.getElementById('ev-ciudad').value;
+  const noches = +document.getElementById('ev-noches').value||1;
+  const hotelBase = +document.getElementById('ev-hotel').value||(ciudad==='CDMX'?2900:2500);
+  const kit = getKit();
+  const totalPax = unidades.reduce((s,u)=>s+(TRP[u.tipo]?.pax||0),0);
+  const costoTrans = unidades.reduce((s,u)=>s+(u.costo||0)+(ciudad!=='CDMX'?(u.gastosRuta||3500):0),0);
+  const transPP = totalPax>0?costoTrans/totalPax:0;
+  const hotelPP = (hotelBase*noches)/4;
+  const gf = transPP + hotelPP + kit;
+  const zv = zonas.filter(z=>z.nombre&&z.costo>0);
+  const ganPlus = +document.getElementById('ganancia-plus').value||1000;
+  let ganTotal=0, ventaTotal=0, costoTotal=0;
+  zv.forEach(z=>{
+    const p = z.precioPlus||Math.ceil((z.costo+gf+ganPlus)/100)*100;
+    const ped = z.pedido||0;
+    ganTotal += (p-(z.costo+gf))*ped;
+    ventaTotal += p*ped;
+    costoTotal += (z.costo+gf)*ped;
+  });
+  const margen = ventaTotal>0?Math.round(ganTotal/ventaTotal*100):0;
+
+  toast('Guardando...');
+  
+  try {
+    // Buscar si ya existe en Airtable
+    const buscar = await fetch('/.netlify/functions/airtable-proxy', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        tabla: 'Cotizaciones',
+        method: 'GET',
+        params: `?filterByFormula=SEARCH("${d.nombre.replace(/"/g,"'")}",{Nombre})&maxRecords=1`
+      })
+    }).then(r=>r.json());
+
+    const existing = buscar.records?.[0];
+    const fields = {
+      'Nombre': d.nombre,
+      'Evento': d.nombre,
+      'Ciudad': d.ciudad||'',
+      'Fecha': d.fecha||null,
+      'Datos': JSON.stringify(d),
+      'Actualizado': new Date().toISOString().split('T')[0],
+      'Ganancia': Math.round(ganTotal),
+      'Margen': margen,
+    };
+
+    if(existing){
+      // Actualizar
+      await fetch('/.netlify/functions/airtable-proxy', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ tabla: 'Cotizaciones', method: 'PATCH', id: existing.id, body: JSON.stringify({fields}) })
+      });
+      toast('✓ Cotización actualizada');
+    } else {
+      // Crear nueva
+      await fetch('/.netlify/functions/airtable-proxy', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ tabla: 'Cotizaciones', method: 'POST', body: JSON.stringify({records:[{fields}]}) })
+      });
+      toast('✓ Cotización guardada en la nube ☁️');
+    }
+  } catch(e) {
+    toast('✓ Guardado local (sin conexión)');
+  }
 }
 
-function showSaved(){
-  const keys=Object.keys(localStorage).filter(k=>k.startsWith('cot_'));
-  document.getElementById('modal-c').innerHTML=!keys.length
-    ?'<div style="color:var(--ts)">No hay cotizaciones guardadas.</div>'
-    :keys.map(k=>{
-      const d=JSON.parse(localStorage.getItem(k));
-      return `<div class="sv-item" onclick="loadCot('${k}')">
-        <div>
-          <div style="font-size:13px;font-weight:700">${d.nombre}</div>
-          <div style="font-size:10px;color:var(--ts)">${d.fecha||'Sin fecha'} · ${d.ciudad} · ${d.dias||1}d ${d.noches||1}n · <span class="mbadge ${d.modo==='real'?'m-real':'m-est'}">${d.modo||'estimado'}</span></div>
+async function showSaved(){
+  const modal = document.getElementById('modal');
+  const cont  = document.getElementById('modal-c');
+  cont.innerHTML = '<div style="color:var(--ts);text-align:center;padding:20px">Cargando cotizaciones...</div>';
+  modal.style.display = 'block';
+
+  try {
+    const r = await fetch('/.netlify/functions/airtable-proxy', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        tabla: 'Cotizaciones',
+        method: 'GET',
+        params: '?sort[0][field]=Actualizado&sort[0][direction]=desc'
+      })
+    }).then(r=>r.json());
+
+    const records = r.records||[];
+    
+    if(!records.length){
+      cont.innerHTML='<div style="color:var(--ts)">No hay cotizaciones guardadas.</div>';
+      return;
+    }
+
+    cont.innerHTML = records.map(rec => {
+      const f = rec.fields;
+      const gan = f.Ganancia ? '$'+Math.round(f.Ganancia).toLocaleString('es-MX') : '—';
+      const mg  = f.Margen   ? f.Margen+'%' : '—';
+      const col = f.Margen>=15?'var(--ve)':f.Margen>=8?'var(--am)':'var(--ro)';
+      return `<div class="sv-item" onclick="loadCotCloud('${rec.id}','${rec.fields.Nombre?.replace(/'/g,"\\'")}')">
+        <div style="flex:1">
+          <div style="font-size:13px;font-weight:700">${f.Nombre||'Sin nombre'}</div>
+          <div style="font-size:10px;color:var(--ts);margin-top:2px">${f.Fecha||'Sin fecha'} · ${f.Ciudad||'—'} · Ganancia: <span style="color:${col};font-weight:700">${gan}</span> (${mg})</div>
+          <div style="font-size:9px;color:var(--ts);margin-top:1px">Actualizado: ${f.Actualizado||'—'}</div>
         </div>
-        <button class="bx" style="font-size:10px;padding:3px 7px" onclick="event.stopPropagation();delCot('${k}')">🗑</button>
+        <button class="bx" style="font-size:10px;padding:3px 7px" onclick="event.stopPropagation();delCotCloud('${rec.id}')">🗑</button>
       </div>`;
     }).join('');
-  document.getElementById('modal').style.display='block';
+
+  } catch(e) {
+    // Fallback a localStorage
+    const keys=Object.keys(localStorage).filter(k=>k.startsWith('cot_'));
+    cont.innerHTML=!keys.length
+      ?'<div style="color:var(--ts)">No hay cotizaciones guardadas.</div>'
+      :keys.map(k=>{
+        const d=JSON.parse(localStorage.getItem(k));
+        return `<div class="sv-item" onclick="loadCot('${k}')">
+          <div>
+            <div style="font-size:13px;font-weight:700">${d.nombre}</div>
+            <div style="font-size:10px;color:var(--ts)">${d.fecha||'Sin fecha'} · ${d.ciudad}</div>
+          </div>
+          <button class="bx" style="font-size:10px;padding:3px 7px" onclick="event.stopPropagation();delCot('${k}')">🗑</button>
+        </div>`;
+      }).join('');
+  }
+}
+
+async function loadCotCloud(id, nombre){
+  hideModal();
+  toast('Cargando...');
+  try {
+    const r = await fetch('/.netlify/functions/airtable-proxy', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ tabla: 'Cotizaciones', method: 'GET', id: id })
+    }).then(r=>r.json());
+    const datos = JSON.parse(r.fields?.Datos||'{}');
+    if(datos.nombre){
+      // Guardar en localStorage y cargar con loadCot
+      const key = 'cot_'+datos.nombre.replace(/\s+/g,'_').toLowerCase();
+      localStorage.setItem(key, JSON.stringify(datos));
+      loadCot(key);
+      toast('✓ Cotización cargada');
+    } else {
+      toast('Error: datos vacíos');
+    }
+  } catch(e) {
+    toast('Error de conexión: '+e.message);
+  }
+}
+
+async function delCotCloud(id){
+  if(!confirm('¿Eliminar esta cotización?')) return;
+  await fetch('/.netlify/functions/airtable-proxy', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ tabla: 'Cotizaciones', method: 'DELETE', id })
+  });
+  showSaved();
 }
 
 function hideModal(){document.getElementById('modal').style.display='none';}
@@ -1322,6 +1497,10 @@ async function analizarConIA(){
   // Pedido actual
   const pedidoInfo = zv.filter(z=>z.pedido>0).map(z=>`${z.nombre}: pedido ${z.pedido}, vendidos ${z.vendidos||0}`).join(', ') || 'Sin pedido definido';
 
+  // Calcular escenarios para pasar a la IA
+  const _totPed2 = zonas.reduce((s,z)=>s+(z.pedido||0),0);
+  const _totVend2 = zonas.reduce((s,z)=>s+(z.vendidos||0),0);
+
   const prompt = `Eres el asesor financiero de Conecta Reynosa, una agencia de tours a conciertos desde Reynosa, Tamaulipas, México. 
 
 DATOS DEL EVENTO:
@@ -1350,10 +1529,11 @@ Genera un análisis CONCISO y PRÁCTICO con estas secciones (usa markdown simple
 ### 📦 Recomendación de pedido
 (Cuántos boletos pedir por zona y por qué, basado en la capacidad de transporte y mercado de Reynosa)
 
-### 📊 3 Escenarios
-**Optimista (80-100% ocupación):** ganancia estimada
-**Realista (50-70% ocupación):** ganancia estimada  
-**Pesimista (30-50% ocupación):** ganancia/pérdida estimada
+### 📊 3 Escenarios (usa EXACTAMENTE estos números calculados)
+**Optimista (90% ocupación — ${Math.round(totPed*0.9)} clientes):** ingreso $${Math.round(Math.max(totPed*0.9-totalStaff,0)*precProm).toLocaleString('es-MX')}, ganancia $${Math.round(Math.max(totPed*0.9-totalStaff,0)*precProm - Math.round(totPed*0.9)*costoVarPP - costoFijosEv).toLocaleString('es-MX')}
+**Realista (70% ocupación — ${Math.round(totPed*0.7)} clientes):** ingreso $${Math.round(Math.max(totPed*0.7-totalStaff,0)*precProm).toLocaleString('es-MX')}, ganancia $${Math.round(Math.max(totPed*0.7-totalStaff,0)*precProm - Math.round(totPed*0.7)*costoVarPP - costoFijosEv).toLocaleString('es-MX')}
+**Pesimista (50% ocupación — ${Math.round(totPed*0.5)} clientes):** ingreso $${Math.round(Math.max(totPed*0.5-totalStaff,0)*precProm).toLocaleString('es-MX')}, ganancia $${Math.round(Math.max(totPed*0.5-totalStaff,0)*precProm - Math.round(totPed*0.5)*costoVarPP - costoFijosEv).toLocaleString('es-MX')}
+**Punto de equilibrio:** ${pe} clientes (${pctOcup}% del pedido)
 
 ### 🚨 Riesgos principales
 (2-3 puntos concretos que podrían afectar el evento)

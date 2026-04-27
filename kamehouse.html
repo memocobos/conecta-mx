@@ -1,0 +1,2002 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KAMEHOUSE — Conecta Reynosa</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800;900&family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ═══════════════════════════════════════════════
+ VARIABLES Y RESET
+═══════════════════════════════════════════════ */
+:root {
+ --orange: #FF6B00;
+ --orange2: #FF8C00;
+ --gold: #FFD700;
+ --gold2: #FFC200;
+ --bg: #0a0a0f;
+ --bg2: #111118;
+ --bg3: #1a1a24;
+ --border: rgba(255,255,255,.07);
+ --border2: rgba(255,107,0,.2);
+ --text: #f0f0f5;
+ --ts: rgba(240,240,245,.45);
+ --ts2: rgba(240,240,245,.25);
+ --green: #3DDC84;
+ --red: #FF4444;
+ --blue: #5EA7FF;
+ --card: rgba(255,255,255,.03);
+ --radius: 10px;
+ --shadow: 0 8px 32px rgba(0,0,0,.5);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Montserrat',sans-serif;overflow:hidden}
+
+/* ═══════════════════════════════════════════════
+ PANTALLA DE LOGIN
+═══════════════════════════════════════════════ */
+#login-screen{
+ position:fixed;inset:0;z-index:1000;
+ display:flex;align-items:center;justify-content:center;
+ background:var(--bg);
+}
+.login-bg{
+ position:absolute;inset:0;
+ background:
+ radial-gradient(ellipse 60% 50% at 20% 50%, rgba(255,107,0,.08) 0%, transparent 70%),
+ radial-gradient(ellipse 40% 60% at 80% 30%, rgba(255,215,0,.05) 0%, transparent 70%);
+}
+.login-card{
+ position:relative;z-index:1;
+ width:100%;max-width:380px;
+ background:var(--bg2);
+ border:1px solid var(--border2);
+ border-radius:16px;
+ padding:48px 40px;
+ box-shadow:0 32px 80px rgba(0,0,0,.6),0 0 0 1px rgba(255,107,0,.1);
+}
+.login-logo{
+ font-family:'Barlow Condensed',sans-serif;
+ font-size:32px;font-weight:900;
+ letter-spacing:.12em;text-transform:uppercase;
+ color:var(--text);margin-bottom:4px;
+}
+.login-logo span{color:var(--orange)}
+.login-sub{
+ font-size:10px;font-weight:600;letter-spacing:.25em;
+ text-transform:uppercase;color:var(--ts);margin-bottom:36px;
+}
+.login-field{margin-bottom:16px}
+.login-field label{
+ display:block;font-size:10px;font-weight:700;
+ letter-spacing:.18em;text-transform:uppercase;
+ color:var(--ts);margin-bottom:8px;
+}
+.login-field input{
+ width:100%;background:rgba(255,255,255,.04);
+ border:1px solid var(--border);border-radius:8px;
+ padding:12px 16px;color:var(--text);font-family:'Montserrat',sans-serif;
+ font-size:14px;font-weight:500;outline:none;
+ transition:border-color .2s;
+}
+.login-field input:focus{border-color:var(--orange)}
+.login-btn{
+ width:100%;margin-top:8px;
+ background:linear-gradient(135deg,var(--orange),var(--orange2));
+ border:none;border-radius:8px;padding:14px;
+ color:#fff;font-family:'Barlow Condensed',sans-serif;
+ font-size:16px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;
+ cursor:pointer;transition:opacity .2s,transform .1s;
+}
+.login-btn:hover{opacity:.9}
+.login-btn:active{transform:scale(.98)}
+.login-error{
+ margin-top:12px;padding:10px 14px;
+ background:rgba(255,68,68,.1);border:1px solid rgba(255,68,68,.3);
+ border-radius:8px;font-size:12px;color:var(--red);
+ display:none;text-align:center;
+}
+
+/* ═══════════════════════════════════════════════
+ APP PRINCIPAL (oculta hasta login)
+═══════════════════════════════════════════════ */
+#app{display:none;height:100%;flex-direction:column}
+#app.visible{display:flex}
+
+/* ═══════════════════════════════════════════════
+ TOPBAR
+═══════════════════════════════════════════════ */
+.topbar{
+ display:flex;align-items:center;justify-content:space-between;
+ padding:0 20px;height:52px;
+ background:var(--bg2);
+ border-bottom:1px solid var(--border);
+ flex-shrink:0;
+}
+.topbar-logo{
+ font-family:'Barlow Condensed',sans-serif;
+ font-size:20px;font-weight:900;letter-spacing:.1em;text-transform:uppercase;
+}
+.topbar-logo span{color:var(--orange)}
+.topbar-right{display:flex;align-items:center;gap:12px}
+.topbar-user{
+ font-size:11px;font-weight:600;letter-spacing:.1em;
+ text-transform:uppercase;color:var(--ts);
+}
+.topbar-dot{
+ width:8px;height:8px;border-radius:50%;
+ background:var(--green);box-shadow:0 0 8px var(--green);
+}
+.btn-logout{
+ background:none;border:1px solid var(--border);
+ border-radius:6px;padding:6px 12px;
+ color:var(--ts);font-family:'Barlow Condensed',sans-serif;
+ font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;
+ cursor:pointer;transition:all .2s;
+}
+.btn-logout:hover{border-color:var(--red);color:var(--red)}
+
+/* ═══════════════════════════════════════════════
+ NAV PESTAÑAS (horizontal scroll en mobile)
+═══════════════════════════════════════════════ */
+.nav{
+ display:flex;align-items:stretch;
+ background:var(--bg2);border-bottom:1px solid var(--border);
+ overflow-x:auto;flex-shrink:0;
+ scrollbar-width:none;
+}
+.nav::-webkit-scrollbar{display:none}
+.nav-btn{
+ display:flex;flex-direction:column;align-items:center;justify-content:center;
+ gap:3px;padding:10px 16px;min-width:80px;
+ background:none;border:none;border-bottom:2px solid transparent;
+ color:var(--ts);cursor:pointer;transition:all .2s;
+ font-family:'Barlow Condensed',sans-serif;
+ font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
+ white-space:nowrap;
+}
+.nav-btn .nav-icon{font-size:16px}
+.nav-btn:hover{color:var(--text);background:rgba(255,255,255,.03)}
+.nav-btn.active{
+ color:var(--orange);border-bottom-color:var(--orange);
+ background:rgba(255,107,0,.05);
+}
+
+/* ═══════════════════════════════════════════════
+ ÁREA DE CONTENIDO
+═══════════════════════════════════════════════ */
+.content{
+ flex:1;overflow-y:auto;padding:20px;
+ scrollbar-width:thin;scrollbar-color:var(--border) transparent;
+}
+.content::-webkit-scrollbar{width:4px}
+.content::-webkit-scrollbar-thumb{background:var(--border)}
+
+/* ═══════════════════════════════════════════════
+ COMPONENTES GENERALES
+═══════════════════════════════════════════════ */
+.page{display:none}
+.page.active{display:block}
+
+.section-title{
+ font-family:'Barlow Condensed',sans-serif;
+ font-size:22px;font-weight:900;letter-spacing:.08em;
+ text-transform:uppercase;color:var(--text);
+ margin-bottom:4px;
+}
+.section-sub{
+ font-size:11px;color:var(--ts);font-weight:500;
+ letter-spacing:.05em;margin-bottom:20px;
+}
+
+/* Cards */
+.card{
+ background:var(--bg2);border:1px solid var(--border);
+ border-radius:var(--radius);padding:20px;
+ transition:border-color .2s;
+}
+.card:hover{border-color:rgba(255,107,0,.15)}
+
+/* Grid de métricas */
+.metrics-grid{
+ display:grid;
+ grid-template-columns:repeat(auto-fit,minmax(160px,1fr));
+ gap:12px;margin-bottom:20px;
+}
+.metric{
+ background:var(--bg2);border:1px solid var(--border);
+ border-radius:var(--radius);padding:16px;
+ position:relative;overflow:hidden;
+}
+.metric::before{
+ content:'';position:absolute;top:0;left:0;right:0;height:2px;
+ background:linear-gradient(90deg,var(--orange),var(--gold));
+}
+.metric-label{
+ font-size:9px;font-weight:700;letter-spacing:.2em;
+ text-transform:uppercase;color:var(--ts);margin-bottom:8px;
+}
+.metric-value{
+ font-family:'Barlow Condensed',sans-serif;
+ font-size:28px;font-weight:900;color:var(--gold);
+ line-height:1;
+}
+.metric-value.green{color:var(--green)}
+.metric-value.red{color:var(--red)}
+.metric-sub{font-size:10px;color:var(--ts2);margin-top:4px}
+
+/* Tabla */
+.table-wrap{overflow-x:auto;border-radius:var(--radius);border:1px solid var(--border)}
+table{width:100%;border-collapse:collapse}
+th{
+ font-family:'Barlow Condensed',sans-serif;
+ font-size:9px;font-weight:800;letter-spacing:.2em;
+ text-transform:uppercase;color:var(--ts);
+ padding:10px 14px;border-bottom:1px solid var(--border);
+ text-align:left;white-space:nowrap;background:var(--bg3);
+}
+td{
+ padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.04);
+ font-size:13px;font-weight:500;vertical-align:middle;
+}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:rgba(255,107,0,.03)}
+
+/* Badges */
+.badge{
+ display:inline-block;font-family:'Barlow Condensed',sans-serif;
+ font-size:9px;font-weight:800;padding:3px 8px;
+ text-transform:uppercase;letter-spacing:.12em;border-radius:4px;
+}
+.badge-green{background:rgba(61,220,132,.12);color:var(--green);border:1px solid rgba(61,220,132,.25)}
+.badge-red{background:rgba(255,68,68,.12);color:var(--red);border:1px solid rgba(255,68,68,.25)}
+.badge-orange{background:rgba(255,107,0,.12);color:var(--orange);border:1px solid rgba(255,107,0,.25)}
+.badge-gold{background:rgba(255,215,0,.1);color:var(--gold);border:1px solid rgba(255,215,0,.25)}
+.badge-blue{background:rgba(94,167,255,.1);color:var(--blue);border:1px solid rgba(94,167,255,.25)}
+.badge-gray{background:rgba(255,255,255,.05);color:var(--ts);border:1px solid var(--border)}
+
+/* Botones */
+.btn{
+ display:inline-flex;align-items:center;gap:6px;
+ font-family:'Barlow Condensed',sans-serif;
+ font-size:12px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;
+ padding:8px 16px;border-radius:7px;border:none;cursor:pointer;
+ transition:all .2s;text-decoration:none;
+}
+.btn-primary{background:linear-gradient(135deg,var(--orange),var(--orange2));color:#fff}
+.btn-primary:hover{opacity:.85;transform:translateY(-1px)}
+.btn-ghost{background:transparent;border:1px solid var(--border);color:var(--ts)}
+.btn-ghost:hover{border-color:var(--orange);color:var(--orange)}
+.btn-green{background:rgba(61,220,132,.15);border:1px solid rgba(61,220,132,.3);color:var(--green)}
+.btn-red{background:rgba(255,68,68,.12);border:1px solid rgba(255,68,68,.25);color:var(--red)}
+.btn-sm{padding:5px 10px;font-size:10px}
+
+/* Forms */
+.form-row{display:grid;gap:12px;margin-bottom:12px}
+.form-row.cols-2{grid-template-columns:1fr 1fr}
+.form-row.cols-3{grid-template-columns:1fr 1fr 1fr}
+.form-group label{
+ display:block;font-size:9px;font-weight:700;letter-spacing:.18em;
+ text-transform:uppercase;color:var(--ts);margin-bottom:6px;
+}
+.form-group input,
+.form-group select,
+.form-group textarea{
+ width:100%;background:rgba(255,255,255,.04);
+ border:1px solid var(--border);border-radius:7px;
+ padding:10px 12px;color:var(--text);
+ font-family:'Montserrat',sans-serif;font-size:13px;outline:none;
+ transition:border-color .2s;
+}
+.form-group input:focus,
+.form-group select:focus,
+.form-group textarea:focus{border-color:var(--orange)}
+.form-group select option{background:var(--bg2)}
+
+/* Loading */
+.loading-state{
+ text-align:center;padding:48px;
+ font-family:'Barlow Condensed',sans-serif;
+ font-size:12px;letter-spacing:.2em;text-transform:uppercase;color:var(--ts);
+}
+.spinner{
+ width:24px;height:24px;margin:0 auto 12px;
+ border:2px solid var(--border);border-top-color:var(--orange);
+ border-radius:50%;animation:spin .7s linear infinite;
+}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* Empty state */
+.empty-state{
+ text-align:center;padding:48px;color:var(--ts);
+ font-size:13px;
+}
+.empty-state .empty-icon{font-size:40px;margin-bottom:12px;opacity:.5}
+
+/* Divider */
+.divider{height:1px;background:var(--border);margin:20px 0}
+
+/* Alert */
+.alert{
+ padding:12px 16px;border-radius:8px;
+ font-size:13px;margin-bottom:16px;
+}
+.alert-success{background:rgba(61,220,132,.1);border:1px solid rgba(61,220,132,.25);color:var(--green)}
+.alert-error{background:rgba(255,68,68,.1);border:1px solid rgba(255,68,68,.25);color:var(--red)}
+.alert-info{background:rgba(94,167,255,.1);border:1px solid rgba(94,167,255,.25);color:var(--blue)}
+
+/* Modal */
+.modal-overlay{
+ position:fixed;inset:0;z-index:500;
+ background:rgba(0,0,0,.7);backdrop-filter:blur(4px);
+ display:none;align-items:center;justify-content:center;padding:20px;
+}
+.modal-overlay.open{display:flex}
+.modal{
+ background:var(--bg2);border:1px solid var(--border2);
+ border-radius:14px;width:100%;max-width:520px;
+ max-height:90vh;overflow-y:auto;
+ box-shadow:var(--shadow);
+}
+.modal-header{
+ display:flex;align-items:center;justify-content:space-between;
+ padding:20px 24px;border-bottom:1px solid var(--border);
+}
+.modal-title{
+ font-family:'Barlow Condensed',sans-serif;
+ font-size:18px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;
+}
+.modal-close{
+ background:none;border:none;color:var(--ts);
+ font-size:20px;cursor:pointer;padding:4px;
+}
+.modal-body{padding:24px}
+.modal-footer{
+ padding:16px 24px;border-top:1px solid var(--border);
+ display:flex;gap:10px;justify-content:flex-end;
+}
+
+/* ═══════════════════════════════════════════════
+ RESPONSIVE
+═══════════════════════════════════════════════ */
+@media(max-width:640px){
+ .content{padding:14px}
+ .form-row.cols-2,.form-row.cols-3{grid-template-columns:1fr}
+ .metrics-grid{grid-template-columns:1fr 1fr}
+ .metric-value{font-size:22px}
+ .nav-btn{min-width:64px;padding:8px 10px}
+}
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════
+ PANTALLA DE LOGIN
+═══════════════════════════════════════════════ -->
+<div id="login-screen">
+ <div class="login-bg"></div>
+ <div class="login-card">
+ <div class="login-logo">KAME<span>·</span>HOUSE</div>
+ <div class="login-sub">Conecta Reynosa · Sistema Interno</div>
+ <div class="login-field">
+ <label>Usuario</label>
+ <input type="text" id="login-user" placeholder="usuario" autocomplete="username">
+ </div>
+ <div class="login-field">
+ <label>Contraseña</label>
+ <input type="password" id="login-pass" placeholder="••••••••" autocomplete="current-password">
+ </div>
+ <button class="login-btn" onclick="doLogin()">Entrar</button>
+ <div class="login-error" id="login-error">Usuario o contraseña incorrectos</div>
+ </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════
+ APP PRINCIPAL
+═══════════════════════════════════════════════ -->
+<div id="app">
+
+ <!-- TOPBAR -->
+ <div class="topbar">
+ <div class="topbar-logo">KAME<span>·</span>HOUSE</div>
+ <div class="topbar-right">
+ <div class="topbar-dot"></div>
+ <div class="topbar-user">memo · admin</div>
+ <button class="btn-logout" onclick="doLogout()">Salir</button>
+ </div>
+ </div>
+
+ <!-- NAV -->
+ <nav class="nav">
+ <button class="nav-btn active" onclick="showPage('resumen')" id="nav-resumen">
+ Resumen
+ </button>
+ <button class="nav-btn" onclick="showPage('pagos')" id="nav-pagos">
+ Pagos
+ </button>
+ <button class="nav-btn" onclick="showPage('eventos')" id="nav-eventos">
+ Por Evento
+ </button>
+ <button class="nav-btn" onclick="showPage('gastos')" id="nav-gastos">
+ Gastos
+ </button>
+ <button class="nav-btn" onclick="showPage('ventas')" id="nav-ventas">
+ Mis Ventas
+ </button>
+ <button class="nav-btn" onclick="showPage('inventario')" id="nav-inventario">
+ Inventario
+ </button>
+ <button class="nav-btn" onclick="showPage('equipo')" id="nav-equipo">
+ Equipo
+ </button>
+ <button class="nav-btn" onclick="showPage('capsule')" id="nav-capsule">
+ Capsule Corp
+ </button>
+ </nav>
+
+ <!-- CONTENIDO -->
+ <div class="content">
+
+ <!-- ─── RESUMEN ─── -->
+ <div class="page active" id="page-resumen">
+ <div class="section-title">Resumen</div>
+ <div class="section-sub">Vista general del negocio en tiempo real</div>
+
+ <div class="metrics-grid" id="metrics-grid">
+ <div class="metric">
+ <div class="metric-label">Cobrado</div>
+ <div class="metric-value green" id="m-cobrado">—</div>
+ <div class="metric-sub">Total ingresado</div>
+ </div>
+ <div class="metric">
+ <div class="metric-label">Por Cobrar</div>
+ <div class="metric-value" id="m-porcobrar">—</div>
+ <div class="metric-sub">Saldo pendiente</div>
+ </div>
+ <div class="metric">
+ <div class="metric-label">Facturado</div>
+ <div class="metric-value" id="m-facturado">—</div>
+ <div class="metric-sub">Total comprometido</div>
+ </div>
+ <div class="metric">
+ <div class="metric-label">Viajeros</div>
+ <div class="metric-value gold" id="m-viajeros">—</div>
+ <div class="metric-sub">Clientes únicos</div>
+ </div>
+ <div class="metric">
+ <div class="metric-label">Eventos Activos</div>
+ <div class="metric-value" id="m-eventos">—</div>
+ <div class="metric-sub">Con reservaciones</div>
+ </div>
+ </div>
+
+ <!-- Próximos eventos -->
+ <div class="card" style="margin-bottom:16px">
+ <div style="font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--ts);margin-bottom:14px">
+ Próximos Eventos
+ </div>
+ <div id="proximos-eventos">
+ <div class="loading-state"><div class="spinner"></div>Cargando…</div>
+ </div>
+ </div>
+
+ <!-- Últimas reservaciones -->
+ <div class="card">
+ <div style="font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--ts);margin-bottom:14px">
+ Últimas Reservaciones
+ </div>
+ <div id="ultimas-reservaciones">
+ <div class="loading-state"><div class="spinner"></div>Cargando…</div>
+ </div>
+ </div>
+ </div>
+
+ <!-- ─── PAGOS ─── -->
+ <div class="page" id="page-pagos">
+ <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+ <div class="section-title">Pagos</div>
+ <button class="btn btn-primary" onclick="openModal('modal-pago')">+ Registrar Pago</button>
+ </div>
+ <div class="section-sub">Registra y administra todos los abonos de tus viajeros</div>
+
+ <!-- Filtros -->
+ <div class="card" style="margin-bottom:16px">
+ <div class="form-row cols-3">
+ <div class="form-group">
+ <label>Evento</label>
+ <select id="filtro-evento-pagos" onchange="loadPagos()">
+ <option value="">Todos los eventos</option>
+ </select>
+ </div>
+ <div class="form-group">
+ <label>Status</label>
+ <select id="filtro-status-pagos" onchange="loadPagos()">
+ <option value="">Todos</option>
+ <option value="En Proceso">En Proceso</option>
+ <option value="Liquidado">Liquidado</option>
+ <option value="Cancelado">Cancelado</option>
+ <option value="Baja">Baja</option>
+ </select>
+ </div>
+ <div class="form-group">
+ <label>Buscar viajero</label>
+ <input type="text" id="filtro-nombre-pagos" placeholder="Nombre..." oninput="loadPagos()">
+ </div>
+ </div>
+ </div>
+
+ <div class="table-wrap">
+ <table>
+ <thead>
+ <tr>
+ <th>Viajero</th>
+ <th>Evento</th>
+ <th>Paquete</th>
+ <th>Total</th>
+ <th>Abonado</th>
+ <th>Resta</th>
+ <th>Status</th>
+ <th>Acciones</th>
+ </tr>
+ </thead>
+ <tbody id="tabla-pagos">
+ <tr><td colspan="8"><div class="loading-state"><div class="spinner"></div>Cargando…</div></td></tr>
+ </tbody>
+ </table>
+ </div>
+ </div>
+
+ <!-- ─── POR EVENTO ─── -->
+ <div class="page" id="page-eventos">
+ <div class="section-title">Por Evento</div>
+ <div class="section-sub">Selecciona un evento para ver su lista de viajeros</div>
+
+ <div class="card" style="margin-bottom:16px">
+ <div class="form-row cols-3">
+ <div class="form-group">
+ <label>Evento</label>
+ <select id="selector-evento" onchange="loadViajeros()">
+ <option value="">Selecciona un evento…</option>
+ </select>
+ </div>
+ <div class="form-group">
+ <label>Paquete</label>
+ <select id="filtro-paquete" onchange="filterViajeros()">
+ <option value="">Todos</option>
+ <option>PLUS</option><option>STAY</option>
+ <option>RIDE</option><option>CHEAP</option>
+ </select>
+ </div>
+ <div class="form-group">
+ <label>Saldo</label>
+ <select id="filtro-saldo" onchange="filterViajeros()">
+ <option value="">Todos</option>
+ <option value="pendiente">Con saldo pendiente</option>
+ <option value="liquidado">Liquidados</option>
+ </select>
+ </div>
+ </div>
+ <div style="display:flex;gap:10px;flex-wrap:wrap">
+ <button class="btn btn-ghost btn-sm" onclick="exportCSV()">Exportar CSV</button>
+ <div id="evento-resumen" style="font-size:12px;color:var(--ts);align-self:center"></div>
+ </div>
+ </div>
+
+ <div class="table-wrap">
+ <table>
+ <thead>
+ <tr>
+ <th>#</th>
+ <th>Nombre</th>
+ <th>Paquete</th>
+ <th>Boleto / Zona</th>
+ <th>Habitación</th>
+ <th>Total</th>
+ <th>Abonado</th>
+ <th>Resta</th>
+ <th>Talla</th>
+ <th>Celular</th>
+ <th>WhatsApp</th>
+ </tr>
+ </thead>
+ <tbody id="tabla-viajeros">
+ <tr><td colspan="11">
+ <div class="empty-state">
+ <div class="empty-icon"></div>
+ Selecciona un evento para ver los viajeros
+ </div>
+ </td></tr>
+ </tbody>
+ </table>
+ </div>
+ </div>
+
+ <!-- ─── GASTOS ─── -->
+ <div class="page" id="page-gastos">
+ <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+ <div class="section-title">Gastos</div>
+ <button class="btn btn-primary" onclick="openModal('modal-gasto')">+ Registrar Gasto</button>
+ </div>
+ <div class="section-sub">Control de salidas del negocio</div>
+
+ <div class="metrics-grid" style="margin-bottom:16px" id="gastos-metrics">
+ <div class="metric">
+ <div class="metric-label">Total Gastos</div>
+ <div class="metric-value red" id="g-total">—</div>
+ </div>
+ <div class="metric">
+ <div class="metric-label">Este Mes</div>
+ <div class="metric-value red" id="g-mes">—</div>
+ </div>
+ </div>
+
+ <div class="card" style="margin-bottom:16px">
+ <div class="form-row cols-2">
+ <div class="form-group">
+ <label>Evento</label>
+ <select id="filtro-evento-gastos" onchange="loadGastos()">
+ <option value="">Todos</option>
+ </select>
+ </div>
+ <div class="form-group">
+ <label>Categoría</label>
+ <select id="filtro-cat-gastos" onchange="loadGastos()">
+ <option value="">Todas</option>
+ <option>Transporte</option><option>Hospedaje</option>
+ <option>Kits</option><option>Boletos</option>
+ <option>Marketing</option><option>Salarios</option>
+ <option>Renta</option><option>Otros</option>
+ </select>
+ </div>
+ </div>
+ </div>
+
+ <div class="table-wrap">
+ <table>
+ <thead>
+ <tr>
+ <th>Fecha</th><th>Concepto</th><th>Categoría</th>
+ <th>Evento</th><th>Monto</th><th>Método</th><th>Acciones</th>
+ </tr>
+ </thead>
+ <tbody id="tabla-gastos">
+ <tr><td colspan="7"><div class="loading-state"><div class="spinner"></div>Cargando…</div></td></tr>
+ </tbody>
+ </table>
+ </div>
+ </div>
+
+ <!-- ─── MIS VENTAS ─── -->
+ <div class="page" id="page-ventas">
+ <div class="section-title">Mis Ventas</div>
+ <div class="section-sub">Resumen financiero por evento</div>
+ <div id="ventas-content">
+ <div class="loading-state"><div class="spinner"></div>Cargando…</div>
+ </div>
+ </div>
+
+ <!-- ─── INVENTARIO ─── -->
+ <div class="page" id="page-inventario">
+ <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+ <div class="section-title">Inventario</div>
+ <button class="btn btn-primary" onclick="openModal('modal-kit')">+ Agregar Pieza</button>
+ </div>
+ <div class="section-sub">Control de kits y bodega</div>
+
+ <div class="metrics-grid" style="margin-bottom:16px">
+ <div class="metric">
+ <div class="metric-label">Valor Bodega</div>
+ <div class="metric-value" id="inv-valor">—</div>
+ </div>
+ <div class="metric">
+ <div class="metric-label">Piezas</div>
+ <div class="metric-value" id="inv-piezas">—</div>
+ </div>
+ </div>
+
+ <div class="table-wrap">
+ <table>
+ <thead>
+ <tr>
+ <th>Pieza</th><th>Cantidad</th><th>Costo Unit.</th>
+ <th>Valor Total</th><th>Stock Mín.</th><th>Proveedor</th><th>Acciones</th>
+ </tr>
+ </thead>
+ <tbody id="tabla-inventario">
+ <tr><td colspan="7"><div class="loading-state"><div class="spinner"></div>Cargando…</div></td></tr>
+ </tbody>
+ </table>
+ </div>
+ </div>
+
+ <!-- ─── EQUIPO ─── -->
+ <div class="page" id="page-equipo">
+ <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+ <div class="section-title">Equipo</div>
+ <button class="btn btn-primary" onclick="openModal('modal-vendedor')">+ Agregar</button>
+ </div>
+ <div class="section-sub">Guerreros Z — Tu equipo de Conecta Reynosa</div>
+ <div id="equipo-grid" class="metrics-grid">
+ <div class="loading-state"><div class="spinner"></div>Cargando…</div>
+ </div>
+ </div>
+
+ <!-- ─── CAPSULE CORP ─── -->
+ <div class="page" id="page-capsule">
+ <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+ <div class="section-title">Capsule Corp</div>
+ <button class="btn btn-primary" onclick="openModal('modal-evento')">+ Nuevo Evento</button>
+ </div>
+ <div class="section-sub">Editor de eventos — lo que publicas en tu web</div>
+
+ <div class="table-wrap">
+ <table>
+ <thead>
+ <tr>
+ <th>Evento</th><th>Fecha</th><th>Ciudad</th>
+ <th>Tipo</th><th>Status</th><th>Viajeros</th><th>Acciones</th>
+ </tr>
+ </thead>
+ <tbody id="tabla-eventos">
+ <tr><td colspan="7"><div class="loading-state"><div class="spinner"></div>Cargando…</div></td></tr>
+ </tbody>
+ </table>
+ </div>
+ </div>
+
+ </div><!-- /content -->
+</div><!-- /app -->
+
+<!-- ═══════════════════════════════════════════════
+ MODALES
+═══════════════════════════════════════════════ -->
+
+<!-- Modal: Nuevo Pago -->
+<div class="modal-overlay" id="modal-pago">
+ <div class="modal">
+ <div class="modal-header">
+ <div class="modal-title">Registrar Pago</div>
+ <button class="modal-close" onclick="closeModal('modal-pago')"></button>
+ </div>
+ <div class="modal-body">
+ <div id="pago-alert"></div>
+ <div class="form-row cols-2">
+ <div class="form-group">
+ <label>Cliente *</label>
+ <input type="text" id="pago-cliente" placeholder="Nombre del viajero" oninput="buscarCliente()">
+ <div id="pago-cliente-sugg" style="display:none;background:var(--bg3);border:1px solid var(--border);border-radius:6px;margin-top:4px;max-height:150px;overflow-y:auto"></div>
+ <input type="hidden" id="pago-cliente-id">
+ <input type="hidden" id="pago-reservacion-id">
+ </div>
+ <div class="form-group">
+ <label>Evento *</label>
+ <select id="pago-evento">
+ <option value="">Selecciona…</option>
+ </select>
+ </div>
+ </div>
+ <div class="form-row cols-2">
+ <div class="form-group">
+ <label>Monto *</label>
+ <input type="number" id="pago-monto" placeholder="0.00" min="0">
+ </div>
+ <div class="form-group">
+ <label>Método *</label>
+ <select id="pago-metodo">
+ <option>Transferencia</option>
+ <option>Efectivo</option>
+ <option>Tarjeta</option>
+ </select>
+ </div>
+ </div>
+ <div class="form-row cols-2">
+ <div class="form-group">
+ <label>Fecha</label>
+ <input type="date" id="pago-fecha">
+ </div>
+ <div class="form-group">
+ <label>Referencia / Folio</label>
+ <input type="text" id="pago-ref" placeholder="Últimos 4 dígitos, folio...">
+ </div>
+ </div>
+ <div class="form-group">
+ <label>Notas</label>
+ <input type="text" id="pago-notas" placeholder="Ej: Separo, Pago 1, etc.">
+ </div>
+ </div>
+ <div class="modal-footer">
+ <button class="btn btn-ghost" onclick="closeModal('modal-pago')">Cancelar</button>
+ <button class="btn btn-primary" onclick="guardarPago()">Guardar Pago</button>
+ </div>
+ </div>
+</div>
+
+<!-- Modal: Nuevo Gasto -->
+<div class="modal-overlay" id="modal-gasto">
+ <div class="modal">
+ <div class="modal-header">
+ <div class="modal-title">Registrar Gasto</div>
+ <button class="modal-close" onclick="closeModal('modal-gasto')"></button>
+ </div>
+ <div class="modal-body">
+ <div id="gasto-alert"></div>
+ <div class="form-row cols-2">
+ <div class="form-group">
+ <label>Concepto *</label>
+ <input type="text" id="gasto-concepto" placeholder="Ej: Renta de van">
+ </div>
+ <div class="form-group">
+ <label>Categoría *</label>
+ <select id="gasto-categoria">
+ <option>Transporte</option><option>Hospedaje</option>
+ <option>Kits</option><option>Boletos</option>
+ <option>Marketing</option><option>Salarios</option>
+ <option>Renta</option><option>Combustible</option>
+ <option>Comida Staff</option><option>Otros</option>
+ </select>
+ </div>
+ </div>
+ <div class="form-row cols-2">
+ <div class="form-group">
+ <label>Monto *</label>
+ <input type="number" id="gasto-monto" placeholder="0.00">
+ </div>
+ <div class="form-group">
+ <label>Fecha *</label>
+ <input type="date" id="gasto-fecha">
+ </div>
+ </div>
+ <div class="form-row cols-2">
+ <div class="form-group">
+ <label>Evento (si aplica)</label>
+ <select id="gasto-evento">
+ <option value="">General (no ligado a evento)</option>
+ </select>
+ </div>
+ <div class="form-group">
+ <label>Método de Pago</label>
+ <select id="gasto-metodo">
+ <option>Transferencia</option>
+ <option>Efectivo</option>
+ <option>Tarjeta</option>
+ </select>
+ </div>
+ </div>
+ <div class="form-group">
+ <label>Notas</label>
+ <input type="text" id="gasto-notas" placeholder="Detalles adicionales">
+ </div>
+ </div>
+ <div class="modal-footer">
+ <button class="btn btn-ghost" onclick="closeModal('modal-gasto')">Cancelar</button>
+ <button class="btn btn-primary" onclick="guardarGasto()">Guardar Gasto</button>
+ </div>
+ </div>
+</div>
+
+<!-- Modal: Nuevo/Editar Evento -->
+<div class="modal-overlay" id="modal-evento">
+ <div class="modal">
+ <div class="modal-header">
+ <div class="modal-title" id="modal-evento-title">Nuevo Evento</div>
+ <button class="modal-close" onclick="closeModal('modal-evento')"></button>
+ </div>
+ <div class="modal-body">
+ <div id="evento-alert"></div>
+ <input type="hidden" id="evento-id">
+ <div class="form-row cols-2">
+ <div class="form-group">
+ <label>Artista / Nombre *</label>
+ <input type="text" id="ev-artista" placeholder="Ej: Bad Bunny">
+ </div>
+ <div class="form-group">
+ <label>Tour</label>
+ <input type="text" id="ev-tour" placeholder="Ej: Most Wanted Tour">
+ </div>
+ </div>
+ <div class="form-row cols-2">
+ <div class="form-group">
+ <label>Fecha *</label>
+ <input type="date" id="ev-fecha">
+ </div>
+ <div class="form-group">
+ <label>Fecha Fin (multifecha)</label>
+ <input type="date" id="ev-fecha-fin">
+ </div>
+ </div>
+ <div class="form-row cols-2">
+ <div class="form-group">
+ <label>Ciudad *</label>
+ <input type="text" id="ev-ciudad" placeholder="Ej: CDMX">
+ </div>
+ <div class="form-group">
+ <label>Venue *</label>
+ <input type="text" id="ev-venue" placeholder="Ej: Estadio GNP">
+ </div>
+ </div>
+ <div class="form-row cols-2">
+ <div class="form-group">
+ <label>Tipo</label>
+ <select id="ev-tipo">
+ <option>Concierto</option>
+ <option>Festival</option>
+ </select>
+ </div>
+ <div class="form-group">
+ <label>Status</label>
+ <select id="ev-status">
+ <option>Disponible</option>
+ <option>Últimos Lugares</option>
+ <option>Pocos Lugares</option>
+ <option>En Proceso</option>
+ <option>Agotado</option>
+ <option>Por Confirmar</option>
+ <option>Pasado</option>
+ </select>
+ </div>
+ </div>
+ <div class="form-row cols-2">
+ <div class="form-group">
+ <label>¿Transporte desde Reynosa?</label>
+ <select id="ev-transporte">
+ <option value="false">No</option>
+ <option value="true">Sí</option>
+ </select>
+ </div>
+ <div class="form-group">
+ <label>¿Traslados internos?</label>
+ <select id="ev-traslados">
+ <option value="false">No</option>
+ <option value="true">Sí</option>
+ </select>
+ </div>
+ </div>
+ <div class="form-row cols-2">
+ <div class="form-group">
+ <label>Promotor</label>
+ <input type="text" id="ev-promotor" placeholder="Ej: Ocesa">
+ </div>
+ <div class="form-group">
+ <label>URL Imagen / Banner</label>
+ <input type="text" id="ev-imagen" placeholder="https://...">
+ </div>
+ </div>
+ <div class="form-group">
+ <label>Notas</label>
+ <input type="text" id="ev-notas" placeholder="Info adicional para el cliente">
+ </div>
+ </div>
+ <div class="modal-footer">
+ <button class="btn btn-ghost" onclick="closeModal('modal-evento')">Cancelar</button>
+ <button class="btn btn-primary" onclick="guardarEvento()">Guardar Evento</button>
+ </div>
+ </div>
+</div>
+
+<!-- Modal: Kit Inventario -->
+<div class="modal-overlay" id="modal-kit">
+ <div class="modal">
+ <div class="modal-header">
+ <div class="modal-title">Pieza de Inventario</div>
+ <button class="modal-close" onclick="closeModal('modal-kit')"></button>
+ </div>
+ <div class="modal-body">
+ <div id="kit-alert"></div>
+ <input type="hidden" id="kit-id">
+ <div class="form-row cols-2">
+ <div class="form-group">
+ <label>Pieza *</label>
+ <input type="text" id="kit-pieza" placeholder="Ej: Playera Conecta">
+ </div>
+ <div class="form-group">
+ <label>Proveedor</label>
+ <input type="text" id="kit-proveedor" placeholder="Ej: Texti Mty">
+ </div>
+ </div>
+ <div class="form-row cols-3">
+ <div class="form-group">
+ <label>Cantidad *</label>
+ <input type="number" id="kit-cantidad" placeholder="0" min="0">
+ </div>
+ <div class="form-group">
+ <label>Costo Unitario *</label>
+ <input type="number" id="kit-costo" placeholder="0.00" min="0">
+ </div>
+ <div class="form-group">
+ <label>Stock Mínimo</label>
+ <input type="number" id="kit-minimo" placeholder="0" min="0">
+ </div>
+ </div>
+ </div>
+ <div class="modal-footer">
+ <button class="btn btn-ghost" onclick="closeModal('modal-kit')">Cancelar</button>
+ <button class="btn btn-primary" onclick="guardarKit()">Guardar</button>
+ </div>
+ </div>
+</div>
+
+<!-- Modal: Vendedor/Equipo -->
+<div class="modal-overlay" id="modal-vendedor">
+ <div class="modal">
+ <div class="modal-header">
+ <div class="modal-title">Miembro del Equipo</div>
+ <button class="modal-close" onclick="closeModal('modal-vendedor')"></button>
+ </div>
+ <div class="modal-body">
+ <div id="vendedor-alert"></div>
+ <input type="hidden" id="vend-id">
+ <div class="form-row cols-2">
+ <div class="form-group">
+ <label>Nombre Completo *</label>
+ <input type="text" id="vend-nombre" placeholder="Nombre completo">
+ </div>
+ <div class="form-group">
+ <label>Rol *</label>
+ <select id="vend-rol">
+ <option>Vendedor</option>
+ <option>Coordinador</option>
+ <option>Auxiliar</option>
+ <option>Creador Contenido</option>
+ </select>
+ </div>
+ </div>
+ <div class="form-row cols-2">
+ <div class="form-group">
+ <label>Teléfono</label>
+ <input type="text" id="vend-tel" placeholder="8991234567">
+ </div>
+ <div class="form-group">
+ <label>Correo</label>
+ <input type="email" id="vend-correo" placeholder="correo@ejemplo.com">
+ </div>
+ </div>
+ <div class="form-row cols-2">
+ <div class="form-group">
+ <label>Talla Playera</label>
+ <select id="vend-talla">
+ <option>XS</option><option>S</option><option>M</option>
+ <option>L</option><option>XL</option><option>XXL</option>
+ </select>
+ </div>
+ <div class="form-group">
+ <label>Comisión por Venta CHEAP</label>
+ <input type="number" id="vend-comision" placeholder="200">
+ </div>
+ </div>
+ </div>
+ <div class="modal-footer">
+ <button class="btn btn-ghost" onclick="closeModal('modal-vendedor')">Cancelar</button>
+ <button class="btn btn-primary" onclick="guardarVendedor()">Guardar</button>
+ </div>
+ </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+// CONFIG
+// ═══════════════════════════════════════════════════════════════
+const SB_URL = 'https://npgnhsmwpcipxgvfxrho.supabase.co';
+const SB_KEY = 'sb_publishable_lKMAn9104cgguZ3qTKospw_1z16KgyV';
+
+// ═══════════════════════════════════════════════════════════════
+// AUTH — Login simple con Netlify Function
+// ═══════════════════════════════════════════════════════════════
+// Credenciales hardcodeadas aquí solo como fallback de desarrollo.
+// En producción, esto se valida en Netlify Function.
+const ADMIN_USER = 'memo';
+const ADMIN_PASS = 'conecta2026';
+const SESSION_KEY = 'kh_session';
+const SESSION_HOURS = 8;
+
+function doLogin() {
+ const user = document.getElementById('login-user').value.trim();
+ const pass = document.getElementById('login-pass').value.trim();
+ const errEl = document.getElementById('login-error');
+
+ if (user === ADMIN_USER && pass === ADMIN_PASS) {
+ const session = { user, expires: Date.now() + SESSION_HOURS * 3600000 };
+ sessionStorage.setItem(SESSION_KEY, JSON.stringify(session));
+ enterApp();
+ } else {
+ errEl.style.display = 'block';
+ setTimeout(() => errEl.style.display = 'none', 3000);
+ }
+}
+
+function doLogout() {
+ sessionStorage.removeItem(SESSION_KEY);
+ document.getElementById('app').classList.remove('visible');
+ document.getElementById('login-screen').style.display = 'flex';
+ document.getElementById('login-pass').value = '';
+}
+
+function checkSession() {
+ const raw = sessionStorage.getItem(SESSION_KEY);
+ if (!raw) return false;
+ try {
+ const s = JSON.parse(raw);
+ if (Date.now() > s.expires) { sessionStorage.removeItem(SESSION_KEY); return false; }
+ return true;
+ } catch { return false; }
+}
+
+function enterApp() {
+ document.getElementById('login-screen').style.display = 'none';
+ const app = document.getElementById('app');
+ app.classList.add('visible');
+ bootApp();
+}
+
+// Enter on password field
+document.getElementById('login-pass').addEventListener('keydown', e => {
+ if (e.key === 'Enter') doLogin();
+});
+document.getElementById('login-user').addEventListener('keydown', e => {
+ if (e.key === 'Enter') document.getElementById('login-pass').focus();
+});
+
+// ═══════════════════════════════════════════════════════════════
+// SUPABASE — Capa de datos
+// ═══════════════════════════════════════════════════════════════
+const db = {
+ headers: {
+ 'apikey': SB_KEY,
+ 'Authorization': `Bearer ${SB_KEY}`,
+ 'Content-Type': 'application/json',
+ 'Prefer': 'return=representation'
+ },
+
+ async get(table, params = '') {
+ const r = await fetch(`${SB_URL}/rest/v1/${table}${params}`, { headers: db.headers });
+ if (!r.ok) throw new Error(await r.text());
+ return r.json();
+ },
+
+ async post(table, body) {
+ const r = await fetch(`${SB_URL}/rest/v1/${table}`, {
+ method: 'POST', headers: db.headers, body: JSON.stringify(body)
+ });
+ if (!r.ok) throw new Error(await r.text());
+ return r.json();
+ },
+
+ async patch(table, id, body) {
+ const r = await fetch(`${SB_URL}/rest/v1/${table}?id=eq.${id}`, {
+ method: 'PATCH', headers: db.headers, body: JSON.stringify(body)
+ });
+ if (!r.ok) throw new Error(await r.text());
+ return r.json();
+ },
+
+ async delete(table, id) {
+ const r = await fetch(`${SB_URL}/rest/v1/${table}?id=eq.${id}`, {
+ method: 'DELETE', headers: db.headers
+ });
+ if (!r.ok) throw new Error(await r.text());
+ return true;
+ }
+};
+
+// Cache local (para no re-fetchear todo el tiempo)
+let _eventosCache = [];
+let _viajerosCache = [];
+
+// ═══════════════════════════════════════════════════════════════
+// NAVEGACIÓN
+// ═══════════════════════════════════════════════════════════════
+function showPage(name) {
+ document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+ document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+ document.getElementById(`page-${name}`).classList.add('active');
+ document.getElementById(`nav-${name}`).classList.add('active');
+ loadPage(name);
+}
+
+function loadPage(name) {
+ if (name === 'resumen') loadResumen();
+ if (name === 'pagos') loadPagos();
+ if (name === 'eventos') { /* selector manual */ }
+ if (name === 'gastos') loadGastos();
+ if (name === 'ventas') loadVentas();
+ if (name === 'inventario') loadInventario();
+ if (name === 'equipo') loadEquipo();
+ if (name === 'capsule') loadCapsule();
+}
+
+// ═══════════════════════════════════════════════════════════════
+// BOOT — Arranca todo
+// ═══════════════════════════════════════════════════════════════
+async function bootApp() {
+ // Cargar eventos en cache y poblar todos los selectores
+ try {
+ _eventosCache = await db.get('eventos', '?order=fecha.desc&limit=200');
+ populateEventoSelects();
+ } catch(e) {
+ console.error('Error cargando eventos:', e);
+ }
+ // Establecer fecha de hoy en formularios
+ const today = new Date().toISOString().split('T')[0];
+ ['pago-fecha','gasto-fecha','ev-fecha'].forEach(id => {
+ const el = document.getElementById(id);
+ if (el) el.value = today;
+ });
+ // Cargar resumen
+ loadResumen();
+}
+
+function populateEventoSelects() {
+ const selects = [
+ 'filtro-evento-pagos','filtro-evento-gastos','gasto-evento',
+ 'pago-evento','selector-evento'
+ ];
+ selects.forEach(id => {
+ const el = document.getElementById(id);
+ if (!el) return;
+ const firstOpt = el.options[0];
+ el.innerHTML = '';
+ if (firstOpt) el.appendChild(firstOpt.cloneNode(true));
+ _eventosCache.forEach(ev => {
+ const opt = document.createElement('option');
+ opt.value = ev.id;
+ opt.textContent = `${ev.artista} — ${fmtFecha(ev.fecha)}`;
+ el.appendChild(opt);
+ });
+ });
+}
+
+// ═══════════════════════════════════════════════════════════════
+// RESUMEN
+// ═══════════════════════════════════════════════════════════════
+async function loadResumen() {
+ try {
+ // Global
+ const [global] = await db.get('resumen_global', '?limit=1');
+ if (global) {
+ document.getElementById('m-cobrado').textContent = formatMXN(global.total_cobrado);
+ document.getElementById('m-porcobrar').textContent = formatMXN(global.total_por_cobrar);
+ document.getElementById('m-facturado').textContent = formatMXN(global.total_facturado);
+ document.getElementById('m-viajeros').textContent = global.viajeros_unicos ?? 0;
+ document.getElementById('m-eventos').textContent = global.eventos_activos ?? 0;
+ }
+ // Próximos eventos (solo fechas futuras, max 10)
+ const today = new Date().toISOString().split('T')[0];
+ const proximos = await db.get('resumen_eventos',
+ `?fecha=gte.${today}&order=fecha.asc&limit=10`);
+ renderProximos(proximos);
+ // Últimas reservaciones
+ const ultimas = await db.get('reservaciones',
+ '?order=created_at.desc&limit=10&select=*,clientes(nombre),eventos(artista,fecha)');
+ renderUltimas(ultimas);
+ } catch(e) {
+ console.error('Error resumen:', e);
+ }
+}
+
+function renderProximos(eventos) {
+ const el = document.getElementById('proximos-eventos');
+ if (!eventos.length) {
+ el.innerHTML = '<div class="empty-state"><div class="empty-icon"></div>Sin eventos próximos registrados</div>';
+ return;
+ }
+ el.innerHTML = eventos.map(ev => `
+ <div style="display:flex;align-items:center;justify-content:space-between;
+ padding:10px 0;border-bottom:1px solid var(--border)">
+ <div>
+ <div style="font-weight:600;font-size:14px">${ev.artista || ev.nombre}</div>
+ <div style="font-size:11px;color:var(--ts)">${fmtFecha(ev.fecha)} · ${ev.ciudad}</div>
+ </div>
+ <div style="text-align:right">
+ <div style="font-size:12px;color:var(--gold)">${formatMXN(ev.total_cobrado || 0)}</div>
+ <div style="font-size:11px;color:var(--ts)">${ev.total_viajeros || 0} viajeros</div>
+ ${badgeStatus(ev.status)}
+ </div>
+ </div>
+ `).join('');
+}
+
+function renderUltimas(reservaciones) {
+ const el = document.getElementById('ultimas-reservaciones');
+ if (!reservaciones.length) {
+ el.innerHTML = '<div class="empty-state"><div class="empty-icon"></div>Sin reservaciones aún</div>';
+ return;
+ }
+ el.innerHTML = `<div class="table-wrap"><table>
+ <thead><tr>
+ <th>Viajero</th><th>Evento</th><th>Paquete</th>
+ <th>Total</th><th>Abonado</th><th>Resta</th>
+ </tr></thead>
+ <tbody>
+ ${reservaciones.map(r => `<tr>
+ <td style="font-weight:600">${r.clientes?.nombre || '—'}</td>
+ <td style="font-size:12px;color:var(--ts)">${r.eventos?.artista || '—'}</td>
+ <td>${badgePaquete(r.paquete)}</td>
+ <td>${formatMXN(r.total_paquete)}</td>
+ <td style="color:var(--green)">${formatMXN(r.total_abonado)}</td>
+ <td style="color:${r.saldo_pendiente > 0 ? 'var(--red)' : 'var(--green)'}">
+ ${formatMXN(r.saldo_pendiente)}
+ </td>
+ </tr>`).join('')}
+ </tbody>
+ </table></div>`;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// PAGOS
+// ═══════════════════════════════════════════════════════════════
+async function loadPagos() {
+ const tbody = document.getElementById('tabla-pagos');
+ tbody.innerHTML = '<tr><td colspan="8"><div class="loading-state"><div class="spinner"></div>Cargando…</div></td></tr>';
+
+ const evId = document.getElementById('filtro-evento-pagos').value;
+ const status = document.getElementById('filtro-status-pagos').value;
+ const nombre = document.getElementById('filtro-nombre-pagos').value.trim();
+
+ let params = '?select=*,clientes(nombre,telefono),eventos(artista,fecha)&order=created_at.desc&limit=100';
+ if (evId) params += `&evento_id=eq.${evId}`;
+ if (status) params += `&status=eq.${encodeURIComponent(status)}`;
+
+ try {
+ let rows = await db.get('reservaciones', params);
+ if (nombre) rows = rows.filter(r =>
+ r.clientes?.nombre?.toLowerCase().includes(nombre.toLowerCase()));
+
+ if (!rows.length) {
+ tbody.innerHTML = '<tr><td colspan="8"><div class="empty-state"><div class="empty-icon"></div>Sin resultados</div></td></tr>';
+ return;
+ }
+ tbody.innerHTML = rows.map(r => `<tr>
+ <td>
+ <div style="font-weight:600">${r.clientes?.nombre || '—'}</div>
+ <div style="font-size:11px;color:var(--ts)">${r.clientes?.telefono || ''}</div>
+ </td>
+ <td style="font-size:12px">${r.eventos?.artista || '—'}<br>
+ <span style="color:var(--ts);font-size:11px">${fmtFecha(r.eventos?.fecha)}</span>
+ </td>
+ <td>${badgePaquete(r.paquete)}</td>
+ <td style="font-weight:600">${formatMXN(r.total_paquete)}</td>
+ <td style="color:var(--green)">${formatMXN(r.total_abonado)}</td>
+ <td style="color:${r.saldo_pendiente > 0 ? 'var(--red)' : 'var(--green)'}">
+ ${formatMXN(r.saldo_pendiente)}
+ </td>
+ <td>${badgeStatus(r.status)}</td>
+ <td>
+ <button class="btn btn-green btn-sm" onclick="editarReservacion('${r.id}')"></button>
+ <button class="btn btn-ghost btn-sm" onclick="wapp('${r.clientes?.telefono || ''}','${r.clientes?.nombre || ''}')"></button>
+ </td>
+ </tr>`).join('');
+ } catch(e) {
+ tbody.innerHTML = `<tr><td colspan="8"><div class="alert alert-error">${e.message}</div></td></tr>`;
+ }
+}
+
+async function guardarPago() {
+ const resId = document.getElementById('pago-reservacion-id').value;
+ const monto = parseFloat(document.getElementById('pago-monto').value);
+ const alerta = document.getElementById('pago-alert');
+
+ if (!resId || !monto) {
+ alerta.innerHTML = '<div class="alert alert-error">Selecciona un cliente/evento y monto</div>';
+ return;
+ }
+
+ // Buscamos la reservación y cuál slot de pago está disponible
+ try {
+ const [res] = await db.get('reservaciones', `?id=eq.${resId}`);
+ if (!res) throw new Error('Reservación no encontrada');
+
+ // Encontrar el primer pago vacío (0)
+ const campos = ['separo','pago_1','pago_2','pago_3','pago_4','pago_5',
+ 'pago_6','pago_7','pago_8','pago_9','pago_10'];
+ const campo = campos.find(c => !res[c] || res[c] == 0);
+ if (!campo) throw new Error('Ya están llenos los 11 slots de pago');
+
+ await db.patch('reservaciones', resId, { [campo]: monto });
+ alerta.innerHTML = '<div class="alert alert-success"> Pago registrado correctamente</div>';
+ setTimeout(() => { closeModal('modal-pago'); loadPagos(); loadResumen(); }, 1200);
+ } catch(e) {
+ alerta.innerHTML = `<div class="alert alert-error">${e.message}</div>`;
+ }
+}
+
+async function buscarCliente() {
+ const q = document.getElementById('pago-cliente').value.trim();
+ const sugg = document.getElementById('pago-cliente-sugg');
+ if (q.length < 2) { sugg.style.display = 'none'; return; }
+
+ try {
+ const clientes = await db.get('clientes',
+ `?nombre=ilike.*${encodeURIComponent(q)}*&limit=8&select=id,nombre,telefono`);
+ if (!clientes.length) { sugg.style.display = 'none'; return; }
+ sugg.style.display = 'block';
+ sugg.innerHTML = clientes.map(c => `
+ <div onclick="seleccionarCliente('${c.id}','${c.nombre.replace(/'/g,"\\'")}','${c.telefono||''}')"
+ style="padding:8px 12px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border)"
+ onmouseover="this.style.background='rgba(255,107,0,.1)'"
+ onmouseout="this.style.background=''">
+ ${c.nombre} <span style="color:var(--ts);font-size:11px">${c.telefono||''}</span>
+ </div>`).join('');
+ } catch(e) {}
+}
+
+async function seleccionarCliente(id, nombre, tel) {
+ document.getElementById('pago-cliente').value = nombre;
+ document.getElementById('pago-cliente-id').value = id;
+ document.getElementById('pago-cliente-sugg').style.display = 'none';
+
+ // Buscar reservaciones de este cliente
+ const evId = document.getElementById('pago-evento').value;
+ if (evId) {
+ try {
+ const [res] = await db.get('reservaciones',
+ `?cliente_id=eq.${id}&evento_id=eq.${evId}&limit=1`);
+ if (res) document.getElementById('pago-reservacion-id').value = res.id;
+ } catch(e) {}
+ }
+}
+
+document.getElementById('pago-evento').addEventListener('change', async function() {
+ const clienteId = document.getElementById('pago-cliente-id').value;
+ if (!clienteId || !this.value) return;
+ try {
+ const [res] = await db.get('reservaciones',
+ `?cliente_id=eq.${clienteId}&evento_id=eq.${this.value}&limit=1`);
+ if (res) document.getElementById('pago-reservacion-id').value = res.id;
+ } catch(e) {}
+});
+
+// ═══════════════════════════════════════════════════════════════
+// POR EVENTO — VIAJEROS
+// ═══════════════════════════════════════════════════════════════
+async function loadViajeros() {
+ const evId = document.getElementById('selector-evento').value;
+ const tbody = document.getElementById('tabla-viajeros');
+ const resumen = document.getElementById('evento-resumen');
+
+ if (!evId) return;
+
+ tbody.innerHTML = '<tr><td colspan="11"><div class="loading-state"><div class="spinner"></div>Cargando…</div></td></tr>';
+
+ try {
+ _viajerosCache = await db.get('reservaciones',
+ `?evento_id=eq.${evId}&select=*,clientes(nombre,telefono,correo,talla_playera,emergencia_tel)&order=created_at.asc`);
+ resumen.textContent = `${_viajerosCache.length} viajeros`;
+ filterViajeros();
+ } catch(e) {
+ tbody.innerHTML = `<tr><td colspan="11"><div class="alert alert-error">${e.message}</div></td></tr>`;
+ }
+}
+
+function filterViajeros() {
+ const paquete = document.getElementById('filtro-paquete').value;
+ const saldo = document.getElementById('filtro-saldo').value;
+ const tbody = document.getElementById('tabla-viajeros');
+
+ let rows = _viajerosCache;
+ if (paquete) rows = rows.filter(r => r.paquete === paquete);
+ if (saldo === 'pendiente') rows = rows.filter(r => r.saldo_pendiente > 0);
+ if (saldo === 'liquidado') rows = rows.filter(r => r.saldo_pendiente <= 0);
+
+ if (!rows.length) {
+ tbody.innerHTML = '<tr><td colspan="11"><div class="empty-state"><div class="empty-icon"></div>Sin viajeros con esos filtros</div></td></tr>';
+ return;
+ }
+
+ tbody.innerHTML = rows.map((r, i) => `<tr>
+ <td style="color:var(--ts)">${i+1}</td>
+ <td>
+ <div style="font-weight:600;font-size:13px">${r.clientes?.nombre || '—'}</div>
+ <div style="font-size:10px;color:var(--ts)">${r.clientes?.correo || ''}</div>
+ </td>
+ <td>${badgePaquete(r.paquete)}</td>
+ <td style="font-size:12px">${r.zona_boleto || '—'}</td>
+ <td style="font-size:12px">${r.tipo_habitacion || '—'}</td>
+ <td style="font-weight:600">${formatMXN(r.total_paquete)}</td>
+ <td style="color:var(--green)">${formatMXN(r.total_abonado)}</td>
+ <td style="color:${r.saldo_pendiente > 0 ? 'var(--red)' : 'var(--green)'}">
+ ${formatMXN(r.saldo_pendiente)}
+ </td>
+ <td><span class="badge badge-gray">${r.clientes?.talla_playera || '—'}</span></td>
+ <td style="font-size:12px">${r.clientes?.telefono || '—'}</td>
+ <td>
+ <button class="btn btn-green btn-sm"
+ onclick="wapp('${r.clientes?.telefono || ''}','${(r.clientes?.nombre||'').replace(/'/g,"\\'")}')">
+ 
+ </button>
+ </td>
+ </tr>`).join('');
+}
+
+function exportCSV() {
+ if (!_viajerosCache.length) return alert('No hay viajeros que exportar');
+ const headers = ['Nombre','Paquete','Zona','Habitación','Total','Abonado','Resta','Talla','Correo','Celular','Emergencia'];
+ const rows = _viajerosCache.map(r => [
+ r.clientes?.nombre || '',
+ r.paquete || '',
+ r.zona_boleto || '',
+ r.tipo_habitacion || '',
+ r.total_paquete || 0,
+ r.total_abonado || 0,
+ r.saldo_pendiente || 0,
+ r.clientes?.talla_playera || '',
+ r.clientes?.correo || '',
+ r.clientes?.telefono || '',
+ r.clientes?.emergencia_tel || ''
+ ]);
+ const csv = [headers, ...rows].map(r => r.join(',')).join('\n');
+ const a = document.createElement('a');
+ a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
+ a.download = 'viajeros.csv';
+ a.click();
+}
+
+// ═══════════════════════════════════════════════════════════════
+// GASTOS
+// ═══════════════════════════════════════════════════════════════
+async function loadGastos() {
+ const tbody = document.getElementById('tabla-gastos');
+ tbody.innerHTML = '<tr><td colspan="7"><div class="loading-state"><div class="spinner"></div>Cargando…</div></td></tr>';
+
+ const evId = document.getElementById('filtro-evento-gastos').value;
+ const cat = document.getElementById('filtro-cat-gastos').value;
+
+ let params = '?select=*,eventos(artista)&order=fecha.desc&limit=100';
+ if (evId) params += `&evento_id=eq.${evId}`;
+ if (cat) params += `&categoria=eq.${encodeURIComponent(cat)}`;
+
+ try {
+ const gastos = await db.get('gastos_generales', params);
+
+ const total = gastos.reduce((s, g) => s + (g.monto || 0), 0);
+ document.getElementById('g-total').textContent = formatMXN(total);
+
+ const mes = new Date().getMonth();
+ const totalMes = gastos.filter(g => new Date(g.fecha).getMonth() === mes)
+ .reduce((s, g) => s + (g.monto || 0), 0);
+ document.getElementById('g-mes').textContent = formatMXN(totalMes);
+
+ if (!gastos.length) {
+ tbody.innerHTML = '<tr><td colspan="7"><div class="empty-state"><div class="empty-icon"></div>Sin gastos registrados</div></td></tr>';
+ return;
+ }
+
+ tbody.innerHTML = gastos.map(g => `<tr>
+ <td style="font-size:12px">${fmtFecha(g.fecha)}</td>
+ <td style="font-weight:600">${g.concepto}</td>
+ <td><span class="badge badge-gray">${g.categoria||'—'}</span></td>
+ <td style="font-size:12px;color:var(--ts)">${g.eventos?.artista || 'General'}</td>
+ <td style="color:var(--red);font-weight:600">${formatMXN(g.monto)}</td>
+ <td style="font-size:12px">${g.metodo_pago||'—'}</td>
+ <td>
+ <button class="btn btn-red btn-sm" onclick="eliminarGasto('${g.id}')"></button>
+ </td>
+ </tr>`).join('');
+ } catch(e) {
+ tbody.innerHTML = `<tr><td colspan="7"><div class="alert alert-error">${e.message}</div></td></tr>`;
+ }
+}
+
+async function guardarGasto() {
+ const concepto = document.getElementById('gasto-concepto').value.trim();
+ const monto = parseFloat(document.getElementById('gasto-monto').value);
+ const fecha = document.getElementById('gasto-fecha').value;
+ const categoria = document.getElementById('gasto-categoria').value;
+ const evId = document.getElementById('gasto-evento').value;
+ const metodo = document.getElementById('gasto-metodo').value;
+ const notas = document.getElementById('gasto-notas').value;
+ const alerta = document.getElementById('gasto-alert');
+
+ if (!concepto || !monto || !fecha) {
+ alerta.innerHTML = '<div class="alert alert-error">Concepto, monto y fecha son obligatorios</div>';
+ return;
+ }
+
+ try {
+ await db.post('gastos_generales', {
+ concepto, monto, fecha, categoria, metodo_pago: metodo,
+ evento_id: evId || null, notas: notas || null
+ });
+ alerta.innerHTML = '<div class="alert alert-success"> Gasto registrado</div>';
+ setTimeout(() => { closeModal('modal-gasto'); loadGastos(); }, 1000);
+ } catch(e) {
+ alerta.innerHTML = `<div class="alert alert-error">${e.message}</div>`;
+ }
+}
+
+async function eliminarGasto(id) {
+ if (!confirm('¿Eliminar este gasto?')) return;
+ try {
+ await db.delete('gastos_generales', id);
+ loadGastos();
+ } catch(e) { alert(e.message); }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// MIS VENTAS
+// ═══════════════════════════════════════════════════════════════
+async function loadVentas() {
+ const el = document.getElementById('ventas-content');
+ el.innerHTML = '<div class="loading-state"><div class="spinner"></div>Cargando…</div>';
+ try {
+ const eventos = await db.get('resumen_eventos', '?order=fecha.desc&limit=50');
+ if (!eventos.length) {
+ el.innerHTML = '<div class="empty-state"><div class="empty-icon"></div>Sin datos aún</div>';
+ return;
+ }
+ el.innerHTML = eventos.map(ev => `
+ <div class="card" style="margin-bottom:12px">
+ <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px">
+ <div>
+ <div style="font-family:\'Barlow Condensed\',sans-serif;font-size:18px;font-weight:800">
+ ${ev.artista || ev.nombre}
+ </div>
+ <div style="font-size:11px;color:var(--ts)">${fmtFecha(ev.fecha)} · ${ev.ciudad}</div>
+ </div>
+ <div style="text-align:right">
+ ${badgeStatus(ev.status)}
+ <div style="font-size:11px;color:var(--ts);margin-top:4px">${ev.total_viajeros} viajeros</div>
+ </div>
+ </div>
+ <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:12px">
+ <div>
+ <div style="font-size:9px;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:var(--ts);margin-bottom:4px">Facturado</div>
+ <div style="font-family:\'Barlow Condensed\',sans-serif;font-size:20px;font-weight:900">${formatMXN(ev.total_cobrar)}</div>
+ </div>
+ <div>
+ <div style="font-size:9px;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:var(--ts);margin-bottom:4px">Cobrado</div>
+ <div style="font-family:\'Barlow Condensed\',sans-serif;font-size:20px;font-weight:900;color:var(--green)">${formatMXN(ev.total_cobrado)}</div>
+ </div>
+ <div>
+ <div style="font-size:9px;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:var(--ts);margin-bottom:4px">Pendiente</div>
+ <div style="font-family:\'Barlow Condensed\',sans-serif;font-size:20px;font-weight:900;color:var(--red)">${formatMXN(ev.total_pendiente)}</div>
+ </div>
+ <div>
+ <div style="font-size:9px;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:var(--ts);margin-bottom:4px">Costos</div>
+ <div style="font-family:\'Barlow Condensed\',sans-serif;font-size:20px;font-weight:900;color:var(--ts)">${formatMXN(ev.total_costos)}</div>
+ </div>
+ <div>
+ <div style="font-size:9px;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:var(--ts);margin-bottom:4px">Utilidad</div>
+ <div style="font-family:\'Barlow Condensed\',sans-serif;font-size:20px;font-weight:900;color:${ev.utilidad_actual >= 0 ? 'var(--green)' : 'var(--red)'}">${formatMXN(ev.utilidad_actual)}</div>
+ </div>
+ </div>
+ </div>
+ `).join('');
+ } catch(e) {
+ el.innerHTML = `<div class="alert alert-error">${e.message}</div>`;
+ }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// INVENTARIO
+// ═══════════════════════════════════════════════════════════════
+async function loadInventario() {
+ const tbody = document.getElementById('tabla-inventario');
+ try {
+ const items = await db.get('kits_inventario', '?order=pieza.asc');
+ const valorTotal = items.reduce((s, i) => s + (i.cantidad * i.costo_unitario), 0);
+ const piezasTotal = items.reduce((s, i) => s + (i.cantidad || 0), 0);
+ document.getElementById('inv-valor').textContent = formatMXN(valorTotal);
+ document.getElementById('inv-piezas').textContent = piezasTotal.toLocaleString('es-MX');
+
+ if (!items.length) {
+ tbody.innerHTML = '<tr><td colspan="7"><div class="empty-state"><div class="empty-icon"></div>Sin items en inventario</div></td></tr>';
+ return;
+ }
+ tbody.innerHTML = items.map(i => {
+ const valor = i.cantidad * i.costo_unitario;
+ const alerta = i.cantidad <= i.stock_minimo;
+ return `<tr>
+ <td style="font-weight:600">${i.pieza}${alerta ? ' <span style="color:var(--red)"></span>' : ''}</td>
+ <td style="color:${alerta ? 'var(--red)' : 'var(--text)' };font-weight:600">${i.cantidad}</td>
+ <td>${formatMXN(i.costo_unitario)}</td>
+ <td style="font-weight:600">${formatMXN(valor)}</td>
+ <td style="color:var(--ts)">${i.stock_minimo}</td>
+ <td style="font-size:12px;color:var(--ts)">${i.proveedor||'—'}</td>
+ <td>
+ <button class="btn btn-ghost btn-sm" onclick="editarKit('${i.id}')"></button>
+ <button class="btn btn-red btn-sm" onclick="eliminarKit('${i.id}')"></button>
+ </td>
+ </tr>`;
+ }).join('');
+ } catch(e) {
+ tbody.innerHTML = `<tr><td colspan="7"><div class="alert alert-error">${e.message}</div></td></tr>`;
+ }
+}
+
+async function guardarKit() {
+ const id = document.getElementById('kit-id').value;
+ const pieza = document.getElementById('kit-pieza').value.trim();
+ const cantidad = parseInt(document.getElementById('kit-cantidad').value);
+ const costo = parseFloat(document.getElementById('kit-costo').value);
+ const minimo = parseInt(document.getElementById('kit-minimo').value) || 0;
+ const proveedor= document.getElementById('kit-proveedor').value.trim();
+ const alerta = document.getElementById('kit-alert');
+
+ if (!pieza || isNaN(cantidad) || isNaN(costo)) {
+ alerta.innerHTML = '<div class="alert alert-error">Pieza, cantidad y costo son obligatorios</div>';
+ return;
+ }
+ try {
+ const body = { pieza, cantidad, costo_unitario: costo, stock_minimo: minimo, proveedor: proveedor || null };
+ if (id) await db.patch('kits_inventario', id, body);
+ else await db.post('kits_inventario', body);
+ alerta.innerHTML = '<div class="alert alert-success"> Guardado</div>';
+ setTimeout(() => { closeModal('modal-kit'); loadInventario(); }, 900);
+ } catch(e) {
+ alerta.innerHTML = `<div class="alert alert-error">${e.message}</div>`;
+ }
+}
+
+async function editarKit(id) {
+ try {
+ const [item] = await db.get('kits_inventario', `?id=eq.${id}`);
+ document.getElementById('kit-id').value = item.id;
+ document.getElementById('kit-pieza').value = item.pieza;
+ document.getElementById('kit-cantidad').value = item.cantidad;
+ document.getElementById('kit-costo').value = item.costo_unitario;
+ document.getElementById('kit-minimo').value = item.stock_minimo;
+ document.getElementById('kit-proveedor').value = item.proveedor || '';
+ openModal('modal-kit');
+ } catch(e) { alert(e.message); }
+}
+
+async function eliminarKit(id) {
+ if (!confirm('¿Eliminar esta pieza del inventario?')) return;
+ try { await db.delete('kits_inventario', id); loadInventario(); }
+ catch(e) { alert(e.message); }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// EQUIPO
+// ═══════════════════════════════════════════════════════════════
+async function loadEquipo() {
+ const el = document.getElementById('equipo-grid');
+ try {
+ const equipo = await db.get('vendedores', '?order=nombre.asc');
+ if (!equipo.length) {
+ el.innerHTML = '<div class="empty-state"><div class="empty-icon"></div>Sin miembros del equipo aún</div>';
+ return;
+ }
+ el.innerHTML = equipo.map(v => `
+ <div class="metric" style="cursor:default">
+ <div style="display:flex;justify-content:space-between;margin-bottom:8px">
+ <span class="badge ${v.status==='Activo'?'badge-green':'badge-gray'}">${v.status}</span>
+ <span class="badge badge-blue">${v.rol}</span>
+ </div>
+ <div style="font-weight:700;font-size:15px;margin-bottom:4px">${v.nombre}</div>
+ <div style="font-size:11px;color:var(--ts);margin-bottom:2px">${v.telefono||''}</div>
+ <div style="font-size:11px;color:var(--ts);margin-bottom:10px">${v.correo||''}</div>
+ <div style="display:flex;gap:8px;flex-wrap:wrap">
+ <span style="font-size:10px;color:var(--ts)">Talla: <strong>${v.talla_playera||'—'}</strong></span>
+ <span style="font-size:10px;color:var(--ts)">Errores: <strong style="color:${v.errores>2?'var(--red)':'var(--text)'}">${v.errores||0}</strong></span>
+ </div>
+ <div style="display:flex;gap:6px;margin-top:12px">
+ <button class="btn btn-ghost btn-sm" onclick="editarVendedor('${v.id}')"> Editar</button>
+ ${v.telefono ? `<button class="btn btn-green btn-sm" onclick="wapp('${v.telefono}','${v.nombre.replace(/'/g,"\\'")}')"></button>` : ''}
+ </div>
+ </div>
+ `).join('');
+ } catch(e) {
+ el.innerHTML = `<div class="alert alert-error">${e.message}</div>`;
+ }
+}
+
+async function guardarVendedor() {
+ const id = document.getElementById('vend-id').value;
+ const nombre = document.getElementById('vend-nombre').value.trim();
+ const rol = document.getElementById('vend-rol').value;
+ const tel = document.getElementById('vend-tel').value.trim();
+ const correo = document.getElementById('vend-correo').value.trim();
+ const talla = document.getElementById('vend-talla').value;
+ const comision= parseFloat(document.getElementById('vend-comision').value) || 0;
+ const alerta = document.getElementById('vendedor-alert');
+
+ if (!nombre) { alerta.innerHTML = '<div class="alert alert-error">El nombre es obligatorio</div>'; return; }
+ try {
+ const body = { nombre, rol, telefono: tel||null, correo: correo||null,
+ talla_playera: talla, comision };
+ if (id) await db.patch('vendedores', id, body);
+ else await db.post('vendedores', body);
+ alerta.innerHTML = '<div class="alert alert-success"> Guardado</div>';
+ setTimeout(() => { closeModal('modal-vendedor'); loadEquipo(); }, 900);
+ } catch(e) { alerta.innerHTML = `<div class="alert alert-error">${e.message}</div>`; }
+}
+
+async function editarVendedor(id) {
+ try {
+ const [v] = await db.get('vendedores', `?id=eq.${id}`);
+ document.getElementById('vend-id').value = v.id;
+ document.getElementById('vend-nombre').value = v.nombre;
+ document.getElementById('vend-rol').value = v.rol;
+ document.getElementById('vend-tel').value = v.telefono || '';
+ document.getElementById('vend-correo').value = v.correo || '';
+ document.getElementById('vend-talla').value = v.talla_playera || 'M';
+ document.getElementById('vend-comision').value = v.comision || 0;
+ openModal('modal-vendedor');
+ } catch(e) { alert(e.message); }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// CAPSULE CORP — EVENTOS
+// ═══════════════════════════════════════════════════════════════
+async function loadCapsule() {
+ const tbody = document.getElementById('tabla-eventos');
+ try {
+ const eventos = await db.get('resumen_eventos', '?order=fecha.desc&limit=100');
+ if (!eventos.length) {
+ tbody.innerHTML = '<tr><td colspan="7"><div class="empty-state"><div class="empty-icon"></div>Sin eventos aún. ¡Crea el primero!</div></td></tr>';
+ return;
+ }
+ tbody.innerHTML = eventos.map(ev => `<tr>
+ <td>
+ <div style="font-weight:700">${ev.artista || ev.nombre}</div>
+ <div style="font-size:11px;color:var(--ts)">${ev.ciudad}</div>
+ </td>
+ <td style="font-size:12px">${fmtFecha(ev.fecha)}</td>
+ <td style="font-size:12px">${ev.ciudad}</td>
+ <td><span class="badge badge-gray">${ev.status}</span></td>
+ <td>${badgeStatus(ev.status)}</td>
+ <td style="font-weight:600">${ev.total_viajeros}</td>
+ <td>
+ <button class="btn btn-ghost btn-sm" onclick="editarEvento('${ev.id}')"></button>
+ <button class="btn btn-red btn-sm" onclick="eliminarEvento('${ev.id}')"></button>
+ </td>
+ </tr>`).join('');
+ } catch(e) {
+ tbody.innerHTML = `<tr><td colspan="7"><div class="alert alert-error">${e.message}</div></td></tr>`;
+ }
+}
+
+async function guardarEvento() {
+ const id = document.getElementById('evento-id').value;
+ const artista = document.getElementById('ev-artista').value.trim();
+ const tour = document.getElementById('ev-tour').value.trim();
+ const fecha = document.getElementById('ev-fecha').value;
+ const fechaFin= document.getElementById('ev-fecha-fin').value;
+ const ciudad = document.getElementById('ev-ciudad').value.trim();
+ const venue = document.getElementById('ev-venue').value.trim();
+ const tipo = document.getElementById('ev-tipo').value;
+ const status = document.getElementById('ev-status').value;
+ const trans = document.getElementById('ev-transporte').value === 'true';
+ const trasl = document.getElementById('ev-traslados').value === 'true';
+ const promotor= document.getElementById('ev-promotor').value.trim();
+ const imagen = document.getElementById('ev-imagen').value.trim();
+ const notas = document.getElementById('ev-notas').value.trim();
+ const alerta = document.getElementById('evento-alert');
+
+ if (!artista || !fecha || !ciudad || !venue) {
+ alerta.innerHTML = '<div class="alert alert-error">Artista, fecha, ciudad y venue son obligatorios</div>';
+ return;
+ }
+ try {
+ const body = {
+ artista, nombre: artista, tour: tour||null, fecha, fecha_fin: fechaFin||null,
+ ciudad, venue, tipo, status,
+ tiene_transporte_largo: trans, tiene_traslados_internos: trasl,
+ promotor: promotor||null, imagen_url: imagen||null, notas: notas||null
+ };
+ if (id) await db.patch('eventos', id, body);
+ else await db.post('eventos', body);
+ alerta.innerHTML = '<div class="alert alert-success"> Evento guardado</div>';
+ // Refrescar cache
+ _eventosCache = await db.get('eventos', '?order=fecha.desc&limit=200');
+ populateEventoSelects();
+ setTimeout(() => { closeModal('modal-evento'); loadCapsule(); }, 900);
+ } catch(e) {
+ alerta.innerHTML = `<div class="alert alert-error">${e.message}</div>`;
+ }
+}
+
+async function editarEvento(id) {
+ try {
+ const [ev] = await db.get('eventos', `?id=eq.${id}`);
+ document.getElementById('evento-id').value = ev.id;
+ document.getElementById('ev-artista').value = ev.artista;
+ document.getElementById('ev-tour').value = ev.tour || '';
+ document.getElementById('ev-fecha').value = ev.fecha;
+ document.getElementById('ev-fecha-fin').value = ev.fecha_fin || '';
+ document.getElementById('ev-ciudad').value = ev.ciudad;
+ document.getElementById('ev-venue').value = ev.venue;
+ document.getElementById('ev-tipo').value = ev.tipo;
+ document.getElementById('ev-status').value = ev.status;
+ document.getElementById('ev-transporte').value = String(ev.tiene_transporte_largo);
+ document.getElementById('ev-traslados').value = String(ev.tiene_traslados_internos);
+ document.getElementById('ev-promotor').value = ev.promotor || '';
+ document.getElementById('ev-imagen').value = ev.imagen_url || '';
+ document.getElementById('ev-notas').value = ev.notas || '';
+ document.getElementById('modal-evento-title').textContent = 'Editar Evento';
+ openModal('modal-evento');
+ } catch(e) { alert(e.message); }
+}
+
+async function eliminarEvento(id) {
+ if (!confirm('¿Eliminar este evento? Se borrarán también sus reservaciones.')) return;
+ try { await db.delete('eventos', id); loadCapsule(); }
+ catch(e) { alert(e.message); }
+}
+
+async function editarReservacion(id) {
+ // Por ahora abrimos el modal de pago con la reservación seleccionada
+ document.getElementById('pago-reservacion-id').value = id;
+ openModal('modal-pago');
+}
+
+// ═══════════════════════════════════════════════════════════════
+// UTILIDADES
+// ═══════════════════════════════════════════════════════════════
+function formatMXN(n) {
+ if (n === null || n === undefined || n === '') return '—';
+ return new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN', minimumFractionDigits: 0 }).format(n);
+}
+
+function fmtFecha(d) {
+ if (!d) return '—';
+ const date = new Date(d + 'T12:00:00');
+ return date.toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+function badgePaquete(p) {
+ const map = { PLUS:'badge-orange', STAY:'badge-blue', RIDE:'badge-gold', CHEAP:'badge-gray' };
+ return `<span class="badge ${map[p]||'badge-gray'}">${p||'—'}</span>`;
+}
+
+function badgeStatus(s) {
+ const map = {
+ 'Disponible':'badge-green','Últimos Lugares':'badge-orange',
+ 'Pocos Lugares':'badge-orange','En Proceso':'badge-blue',
+ 'Agotado':'badge-red','Pasado':'badge-gray','Por Confirmar':'badge-gold'
+ };
+ return `<span class="badge ${map[s]||'badge-gray'}">${s||'—'}</span>`;
+}
+
+function wapp(tel, nombre) {
+ if (!tel) return alert('Sin número registrado');
+ const num = tel.toString().replace(/\D/g,'');
+ const msg = encodeURIComponent(`Hola ${nombre}, te contactamos de Conecta Reynosa `);
+ const num52 = num.startsWith('52') ? num : '52' + num;
+ window.open(`https://wa.me/${num52}?text=${msg}`, '_blank');
+}
+
+function openModal(id) {
+ // Limpiar alertas
+ const alerta = document.querySelector(`#${id} [id$="-alert"]`);
+ if (alerta) alerta.innerHTML = '';
+ // Reset hidden ids
+ const hiddenId = document.querySelector(`#${id} input[type=hidden]`);
+ if (hiddenId) hiddenId.value = '';
+ document.getElementById(id).classList.add('open');
+}
+
+function closeModal(id) {
+ document.getElementById(id).classList.remove('open');
+}
+
+// Cerrar modales al click en overlay
+document.querySelectorAll('.modal-overlay').forEach(overlay => {
+ overlay.addEventListener('click', function(e) {
+ if (e.target === this) this.classList.remove('open');
+ });
+});
+
+// ESC cierra modales
+document.addEventListener('keydown', e => {
+ if (e.key === 'Escape') {
+ document.querySelectorAll('.modal-overlay.open').forEach(m => m.classList.remove('open'));
+ }
+});
+
+// ═══════════════════════════════════════════════════════════════
+// PING anti-pausa Supabase (cada 6 días = 518400000 ms)
+// ═══════════════════════════════════════════════════════════════
+function pingSupabase() {
+ db.get('eventos', '?limit=1').catch(() => {});
+}
+setInterval(pingSupabase, 518400000);
+
+// ═══════════════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════════════
+if (checkSession()) enterApp();
+</script>
+</body>
+</html>

@@ -1,0 +1,666 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<meta name="robots" content="noindex,nofollow">
+<title>Información de Pago · Conecta MX</title>
+<meta name="description" content="Datos bancarios y políticas de pago Conecta MX. Acceso directo para clientes.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700;800;900&family=Montserrat:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html{scroll-behavior:smooth}
+body{
+  font-family:'Montserrat',system-ui,sans-serif;
+  font-weight:500;
+  background:#000;
+  color:#fff;
+  min-height:100vh;
+  line-height:1.4;
+  -webkit-font-smoothing:antialiased;
+  overflow-x:hidden;
+  padding-bottom:40px;
+}
+
+/* Grano sutil para profundidad */
+body::before{
+  content:'';
+  position:fixed;inset:0;pointer-events:none;z-index:1;
+  background-image:
+    radial-gradient(ellipse at top left,rgba(232,255,76,.04),transparent 50%),
+    radial-gradient(ellipse at bottom right,rgba(255,40,59,.05),transparent 55%);
+}
+
+/* ======== HEADER ======== */
+.nav{
+  position:sticky;top:0;z-index:50;
+  background:#000;
+  border-bottom:1px solid rgba(255,255,255,.08);
+  backdrop-filter:blur(12px);
+  -webkit-backdrop-filter:blur(12px);
+}
+.nav-inner{
+  display:flex;align-items:stretch;justify-content:space-between;
+  max-width:720px;margin:0 auto;
+  height:56px;
+}
+.logo{display:flex;align-items:stretch}
+.logo-box{
+  background:#ff283b;
+  padding:0 14px;
+  display:flex;align-items:center;
+  clip-path:polygon(0 0,100% 0,calc(100% - 8px) 100%,0 100%);
+}
+.logo-txt{
+  font-weight:900;font-size:15px;color:#000;
+  letter-spacing:.04em;text-transform:uppercase;
+}
+.logo-mx{
+  font-weight:900;font-style:italic;font-size:17px;color:#fff;
+  margin-left:7px;align-self:center;
+}
+.nav-link{
+  background:transparent;border:none;
+  color:rgba(255,255,255,.5);
+  font-family:'Montserrat',sans-serif;
+  font-size:10px;font-weight:800;
+  text-transform:uppercase;letter-spacing:.12em;
+  padding:0 18px;cursor:pointer;
+  text-decoration:none;
+  display:flex;align-items:center;gap:4px;
+  transition:color .15s;
+}
+.nav-link:hover{color:#e8ff4c}
+
+/* ======== HERO ======== */
+.hero{
+  position:relative;
+  padding:56px 20px 44px;
+  max-width:720px;margin:0 auto;
+  z-index:2;
+}
+.hero-eyebrow{
+  display:inline-block;
+  background:#e8ff4c;color:#000;
+  font-size:10px;font-weight:900;
+  letter-spacing:.18em;text-transform:uppercase;
+  padding:6px 12px;
+  margin-bottom:22px;
+  transform:rotate(-1deg);
+}
+.hero-title{
+  font-family:'Barlow Condensed','Montserrat',sans-serif;
+  font-size:clamp(54px,14vw,96px);
+  font-weight:900;
+  line-height:.86;
+  letter-spacing:-.01em;
+  text-transform:uppercase;
+  color:#fff;
+  margin-bottom:18px;
+}
+.hero-title .hl-pago{
+  display:inline-block;
+  color:#000;
+  background:#e8ff4c;
+  padding:0 10px 2px;
+  margin:4px 0;
+  transform:skew(-4deg);
+}
+.hero-sub{
+  font-size:13px;
+  font-weight:500;
+  color:rgba(255,255,255,.55);
+  max-width:440px;
+  letter-spacing:.01em;
+}
+.hero-sub b{color:#fff;font-weight:700}
+.hero-rule{
+  margin-top:28px;
+  height:3px;
+  background:linear-gradient(90deg,#ff283b 0%,#ff283b 30%,#e8ff4c 30%,#e8ff4c 60%,#0000cd 60%,#0000cd 100%);
+  width:140px;
+}
+
+/* ======== SECCIONES ======== */
+main{max-width:720px;margin:0 auto;padding:0 20px;position:relative;z-index:2}
+
+.sec{
+  margin-bottom:44px;
+  position:relative;
+}
+.sec-head{
+  display:flex;align-items:center;gap:12px;
+  margin-bottom:18px;
+  flex-wrap:wrap;
+}
+.badge{
+  display:inline-block;
+  font-size:10px;font-weight:900;
+  letter-spacing:.15em;text-transform:uppercase;
+  padding:7px 12px;
+  font-family:'Montserrat',sans-serif;
+}
+.badge-amarillo{background:#e8ff4c;color:#000}
+.badge-azul{background:#0000cd;color:#fff}
+.badge-rojo{background:#ff283b;color:#fff}
+
+.sec-num{
+  font-family:'Barlow Condensed',sans-serif;
+  font-size:14px;font-weight:800;
+  color:rgba(255,255,255,.3);
+  letter-spacing:.1em;
+}
+.sec-title{
+  font-family:'Barlow Condensed','Montserrat',sans-serif;
+  font-size:clamp(30px,7vw,42px);
+  font-weight:900;
+  text-transform:uppercase;
+  letter-spacing:.01em;
+  line-height:.92;
+  color:#fff;
+  margin-bottom:4px;
+}
+
+/* ======== BANK CARD ======== */
+.bank-card{
+  background:#0a0a0a;
+  border:1px solid rgba(255,255,255,.08);
+  padding:26px 22px 24px;
+  position:relative;
+  overflow:hidden;
+}
+.bank-card::before{
+  content:'';
+  position:absolute;left:0;top:0;bottom:0;
+  width:4px;
+}
+.bank-card.bbva::before{background:#0060a9}
+.bank-card.hey::before{background:#00d4aa}
+
+.bank-logo{
+  display:flex;align-items:center;gap:10px;
+  margin-bottom:22px;
+  padding-bottom:18px;
+  border-bottom:1px dashed rgba(255,255,255,.1);
+}
+.bbva-logo{
+  background:#0060a9;
+  color:#fff;
+  font-family:'Montserrat',sans-serif;
+  font-weight:900;font-size:18px;
+  padding:8px 14px;
+  letter-spacing:.08em;
+  font-style:italic;
+}
+.hey-logo{
+  background:#00d4aa;
+  color:#000;
+  font-family:'Montserrat',sans-serif;
+  font-weight:900;font-size:16px;
+  padding:8px 14px;
+  letter-spacing:-.02em;
+  text-transform:lowercase;
+}
+.hey-logo span{font-weight:500}
+.bank-tag{
+  font-size:10px;font-weight:700;
+  color:rgba(255,255,255,.4);
+  text-transform:uppercase;letter-spacing:.14em;
+}
+
+.bank-field{
+  display:flex;align-items:center;justify-content:space-between;
+  gap:10px;
+  padding:13px 0;
+  border-bottom:1px solid rgba(255,255,255,.05);
+}
+.bank-field:last-of-type{border-bottom:none}
+.bank-lbl{
+  font-size:9px;font-weight:800;
+  color:rgba(255,255,255,.4);
+  text-transform:uppercase;letter-spacing:.14em;
+  flex-shrink:0;
+  min-width:68px;
+}
+.bank-val{
+  flex:1;
+  font-family:'JetBrains Mono',ui-monospace,monospace;
+  font-size:14px;font-weight:700;
+  color:#fff;
+  letter-spacing:.02em;
+  word-break:break-all;
+}
+.bank-val.name{
+  font-family:'Montserrat',sans-serif;
+  font-size:12px;letter-spacing:.01em;
+  font-weight:600;
+}
+.copy-btn{
+  background:rgba(232,255,76,.08);
+  border:1px solid rgba(232,255,76,.2);
+  color:#e8ff4c;
+  font-family:'Montserrat',sans-serif;
+  font-size:9px;font-weight:900;
+  letter-spacing:.08em;text-transform:uppercase;
+  padding:7px 10px;
+  cursor:pointer;
+  transition:all .15s;
+  flex-shrink:0;
+  white-space:nowrap;
+}
+.copy-btn:hover{background:rgba(232,255,76,.15);border-color:#e8ff4c}
+.copy-btn:active{transform:scale(.96)}
+.copy-btn.copied{
+  background:#e8ff4c;color:#000;border-color:#e8ff4c;
+}
+
+/* Instrucciones */
+.steps{
+  margin-top:24px;
+  padding-top:22px;
+  border-top:1px dashed rgba(255,255,255,.1);
+}
+.steps-title{
+  font-size:10px;font-weight:900;
+  color:rgba(255,255,255,.4);
+  letter-spacing:.16em;text-transform:uppercase;
+  margin-bottom:14px;
+}
+.step{
+  display:flex;gap:12px;
+  padding:9px 0;
+  font-size:13px;font-weight:500;
+  color:rgba(255,255,255,.82);
+  line-height:1.4;
+}
+.step-n{
+  flex-shrink:0;
+  width:22px;height:22px;
+  background:#fff;color:#000;
+  font-weight:900;font-size:11px;
+  display:grid;place-items:center;
+  border-radius:50%;
+  margin-top:1px;
+}
+.bank-card.hey .step-n{background:#0000cd;color:#fff}
+.step b{color:#fff;font-weight:700}
+
+/* Big send button */
+.send-btn{
+  display:flex;align-items:center;justify-content:center;gap:10px;
+  width:100%;
+  padding:18px 20px;
+  margin-top:22px;
+  font-family:'Montserrat',sans-serif;
+  font-size:14px;font-weight:900;
+  letter-spacing:.08em;text-transform:uppercase;
+  border:none;cursor:pointer;
+  text-decoration:none;
+  transition:all .2s;
+  color:#fff;
+}
+.send-btn.messenger{
+  background:#0084ff;
+  box-shadow:0 0 0 0 rgba(0,132,255,.4);
+}
+.send-btn.messenger:hover{
+  background:#006ad8;
+  box-shadow:0 0 0 4px rgba(0,132,255,.2);
+}
+.send-btn.wa{
+  background:#25D366;
+  color:#000;
+  box-shadow:0 0 0 0 rgba(37,211,102,.4);
+}
+.send-btn.wa:hover{
+  background:#1fb855;
+  box-shadow:0 0 0 4px rgba(37,211,102,.2);
+}
+.send-btn .ico{font-size:17px;line-height:1}
+
+/* Warning banner */
+.warn{
+  display:flex;align-items:flex-start;gap:10px;
+  margin-top:14px;
+  background:rgba(255,40,59,.08);
+  border-left:3px solid #ff283b;
+  padding:12px 14px;
+  font-size:11px;font-weight:600;
+  color:#ff8f9a;
+  line-height:1.45;
+  letter-spacing:.01em;
+}
+.warn-ico{
+  font-size:14px;line-height:1;flex-shrink:0;
+  filter:grayscale(.1);
+}
+
+/* ======== POLÍTICAS ======== */
+.pol-sec{
+  background:#0a0a0a;
+  border:1px solid rgba(255,255,255,.08);
+  padding:28px 22px;
+  position:relative;
+}
+.pol-sec.cheap{
+  background:linear-gradient(180deg,rgba(0,0,205,.06),#0a0a0a 60%);
+  border-color:rgba(0,0,205,.2);
+}
+.pol-sec.plus{
+  background:linear-gradient(180deg,rgba(232,255,76,.04),#0a0a0a 60%);
+  border-color:rgba(232,255,76,.15);
+}
+.pol-list{list-style:none;margin-top:18px}
+.pol-item{
+  display:flex;gap:14px;
+  padding:14px 0;
+  border-bottom:1px solid rgba(255,255,255,.05);
+  font-size:13px;font-weight:500;
+  color:rgba(255,255,255,.82);
+  line-height:1.5;
+}
+.pol-item:last-child{border-bottom:none}
+.pol-ico{
+  font-size:20px;line-height:1.2;
+  flex-shrink:0;
+  width:28px;text-align:center;
+}
+.pol-item b{color:#fff;font-weight:700}
+
+/* ======== FOOTER ======== */
+footer{
+  max-width:720px;margin:52px auto 0;
+  padding:32px 20px 8px;
+  border-top:1px solid rgba(255,255,255,.08);
+  text-align:center;
+  position:relative;z-index:2;
+}
+.ft-logo{
+  display:inline-flex;align-items:stretch;
+  margin-bottom:14px;
+}
+.ft-logo .logo-box{padding:0 10px}
+.ft-logo .logo-txt{font-size:11px}
+.ft-logo .logo-mx{font-size:13px;margin-left:5px}
+.ft-meta{
+  display:flex;flex-direction:column;gap:4px;
+  font-size:10px;font-weight:700;
+  letter-spacing:.12em;text-transform:uppercase;
+  color:rgba(255,255,255,.35);
+}
+.ft-meta a{color:inherit;text-decoration:none;transition:color .15s}
+.ft-meta a:hover{color:#e8ff4c}
+
+/* Toast */
+.toast{
+  position:fixed;bottom:24px;left:50%;
+  transform:translateX(-50%) translateY(20px);
+  background:#e8ff4c;color:#000;
+  font-family:'Montserrat',sans-serif;
+  font-size:12px;font-weight:900;
+  letter-spacing:.08em;text-transform:uppercase;
+  padding:14px 22px;
+  opacity:0;pointer-events:none;
+  transition:all .25s;
+  z-index:100;
+  box-shadow:0 10px 30px rgba(232,255,76,.3);
+}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+/* Responsive */
+@media(min-width:600px){
+  .bank-card{padding:32px 28px 28px}
+  .pol-sec{padding:32px 28px}
+  .bank-lbl{min-width:80px}
+  .bank-val{font-size:15px}
+}
+
+@media(max-width:380px){
+  .bank-field{flex-wrap:wrap}
+  .copy-btn{margin-left:auto}
+  .hero{padding:40px 20px 32px}
+}
+
+/* Focus visible */
+button:focus-visible,a:focus-visible{
+  outline:2px solid #e8ff4c;
+  outline-offset:2px;
+}
+</style>
+</head>
+<body>
+
+<!-- Nav mínimo -->
+<nav class="nav">
+  <div class="nav-inner">
+    <a href="/" class="logo" aria-label="Inicio">
+      <div class="logo-box"><span class="logo-txt">CONECTA</span></div>
+      <span class="logo-mx">MX.</span>
+    </a>
+    <a href="https://wa.me/528119771072" target="_blank" rel="noopener" class="nav-link">Soporte <span aria-hidden="true">→</span></a>
+  </div>
+</nav>
+
+<!-- Hero -->
+<section class="hero">
+  <span class="hero-eyebrow">Acceso directo · clientes</span>
+  <h1 class="hero-title">
+    Información<br>
+    <span class="hl-pago">de pago</span>
+  </h1>
+  <p class="hero-sub">Elige tu método de pago según tu paquete. Los pagos <b>PLUS, STAY y RIDE</b> se hacen por BBVA; los pagos <b>CHEAP</b> por Hey Banco.</p>
+  <div class="hero-rule" aria-hidden="true"></div>
+</section>
+
+<main>
+
+  <!-- SECCIÓN 1: BBVA -->
+  <section class="sec" id="bbva">
+    <div class="sec-head">
+      <span class="sec-num">01 /</span>
+      <span class="badge badge-amarillo">PLUS · STAY · RIDE</span>
+    </div>
+    <h2 class="sec-title">Transferencia BBVA</h2>
+
+    <div class="bank-card bbva">
+      <div class="bank-logo">
+        <div class="bbva-logo">BBVA</div>
+        <span class="bank-tag">Banco destino</span>
+      </div>
+
+      <div class="bank-field">
+        <span class="bank-lbl">Titular</span>
+        <span class="bank-val name">Guillermo Alexander Cobos Vizcarra</span>
+      </div>
+
+      <div class="bank-field">
+        <span class="bank-lbl">Tarjeta</span>
+        <span class="bank-val" id="bbva-tarjeta">4152&nbsp;3139&nbsp;7573&nbsp;0487</span>
+        <button class="copy-btn" data-copy="4152313975730487" data-label="Tarjeta BBVA">📋 Copiar</button>
+      </div>
+
+      <div class="bank-field">
+        <span class="bank-lbl">CLABE</span>
+        <span class="bank-val" id="bbva-clabe">012822004639334319</span>
+        <button class="copy-btn" data-copy="012822004639334319" data-label="CLABE BBVA">📋 Copiar</button>
+      </div>
+
+      <div class="steps">
+        <div class="steps-title">Cómo pagar</div>
+        <div class="step"><span class="step-n">1</span><span>Realiza tu <b>depósito o transferencia</b> a la cuenta.</span></div>
+        <div class="step"><span class="step-n">2</span><span>Toma <b>foto o screenshot</b> del comprobante.</span></div>
+        <div class="step"><span class="step-n">3</span><span>Anota: <b>nombre del viajero</b>, <b>nombre del evento</b> y <b>concepto</b> (Separo, Pago 1, Pago 2…).</span></div>
+        <div class="step"><span class="step-n">4</span><span>Envía tu comprobante por <b>Messenger</b>.</span></div>
+      </div>
+
+      <a href="https://m.me/ConectaRey" target="_blank" rel="noopener" class="send-btn messenger">
+        <span class="ico">📲</span>
+        <span>Enviar comprobante por Messenger</span>
+      </a>
+
+      <div class="warn">
+        <span class="warn-ico">⚠️</span>
+        <span>Sin comprobante, <b>el pago no se registra ni se valida</b>.</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- SECCIÓN 2: Hey Banco -->
+  <section class="sec" id="hey">
+    <div class="sec-head">
+      <span class="sec-num">02 /</span>
+      <span class="badge badge-azul">CHEAP</span>
+    </div>
+    <h2 class="sec-title">Transferencia Hey Banco</h2>
+
+    <div class="bank-card hey">
+      <div class="bank-logo">
+        <div class="hey-logo">hey<span>,</span></div>
+        <span class="bank-tag">Banco destino</span>
+      </div>
+
+      <div class="bank-field">
+        <span class="bank-lbl">Titular</span>
+        <span class="bank-val name">Guillermo Alexander Cobos Vizcarra</span>
+      </div>
+
+      <div class="bank-field">
+        <span class="bank-lbl">Tarjeta</span>
+        <span class="bank-val" id="hey-tarjeta">4741&nbsp;7429&nbsp;2598&nbsp;0792</span>
+        <button class="copy-btn" data-copy="4741742925980792" data-label="Tarjeta Hey">📋 Copiar</button>
+      </div>
+
+      <div class="bank-field">
+        <span class="bank-lbl">CLABE</span>
+        <span class="bank-val" id="hey-clabe">058597000035732769</span>
+        <button class="copy-btn" data-copy="058597000035732769" data-label="CLABE Hey">📋 Copiar</button>
+      </div>
+
+      <div class="steps">
+        <div class="steps-title">Cómo pagar</div>
+        <div class="step"><span class="step-n">1</span><span>Realiza tu <b>depósito o transferencia</b> a la cuenta.</span></div>
+        <div class="step"><span class="step-n">2</span><span>En el <b>concepto</b> escribe: <b>Pago 1</b>, <b>Pago 2</b>, etc.</span></div>
+        <div class="step"><span class="step-n">3</span><span>Anota: <b>nombre del viajero</b>, <b>zona del boleto</b> y <b>nombre del evento</b>.</span></div>
+        <div class="step"><span class="step-n">4</span><span>Envía tu comprobante por <b>WhatsApp</b>.</span></div>
+      </div>
+
+      <a href="https://wa.me/528119771072" target="_blank" rel="noopener" class="send-btn wa">
+        <span class="ico">📲</span>
+        <span>Enviar comprobante por WhatsApp</span>
+      </a>
+
+      <div class="warn">
+        <span class="warn-ico">⚠️</span>
+        <span>Sin el envío del comprobante <b>no será posible validar ni registrar el pago</b>.</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- SECCIÓN 3: Políticas PLUS/STAY/RIDE -->
+  <section class="sec" id="pol-plus">
+    <div class="sec-head">
+      <span class="sec-num">03 /</span>
+      <span class="badge badge-amarillo">Condiciones</span>
+    </div>
+    <h2 class="sec-title">Políticas — PLUS · STAY · RIDE</h2>
+
+    <div class="pol-sec plus">
+      <ul class="pol-list">
+        <li class="pol-item"><span class="pol-ico">🚫</span><span><b>No hay reembolsos</b> por cancelación del cliente, incumplimiento de pagos o cambios de fecha.</span></li>
+        <li class="pol-item"><span class="pol-ico">🚫</span><span>No se permite <b>cambiar de tour ni de paquete</b>.</span></li>
+        <li class="pol-item"><span class="pol-ico">🔄</span><span>Lugares <b>transferibles a otra persona sin costo</b> hasta 5 días antes del evento.</span></li>
+        <li class="pol-item"><span class="pol-ico">⚠️</span><span>Errores en depósitos generan <b>cargo por servicio de $350</b>.</span></li>
+        <li class="pol-item"><span class="pol-ico">✅</span><span>Reembolsos <b>únicamente</b> en caso de cancelación oficial del evento.</span></li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- SECCIÓN 4: Políticas CHEAP -->
+  <section class="sec" id="pol-cheap">
+    <div class="sec-head">
+      <span class="sec-num">04 /</span>
+      <span class="badge badge-azul">Condiciones</span>
+    </div>
+    <h2 class="sec-title">Políticas — CHEAP</h2>
+
+    <div class="pol-sec cheap">
+      <ul class="pol-list">
+        <li class="pol-item"><span class="pol-ico">🚫</span><span><b>No hay reembolsos</b> por cancelación del cliente.</span></li>
+        <li class="pol-item"><span class="pol-ico">⚠️</span><span><b>Boleto dado de baja sin reembolso</b> si no se continúan los pagos.</span></li>
+        <li class="pol-item"><span class="pol-ico">🎟️</span><span>Boletos <b>entregados en Reynosa o Monterrey</b> previo a la semana del evento.</span></li>
+      </ul>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  <div class="ft-logo">
+    <div class="logo-box"><span class="logo-txt">CONECTA</span></div>
+    <span class="logo-mx">MX.</span>
+  </div>
+  <div class="ft-meta">
+    <a href="https://conectareynosa.mx">conectareynosa.mx</a>
+    <a href="https://www.instagram.com/conectareynosa" target="_blank" rel="noopener">@conectareynosa</a>
+  </div>
+</footer>
+
+<div class="toast" id="toast" role="status" aria-live="polite">¡Copiado! ✓</div>
+
+<script>
+(function(){
+  var toast=document.getElementById('toast');
+  var toastTimer;
+
+  function showToast(msg){
+    toast.textContent=msg||'¡Copiado! ✓';
+    toast.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer=setTimeout(function(){toast.classList.remove('show')},2000);
+  }
+
+  function fallbackCopy(text){
+    var ta=document.createElement('textarea');
+    ta.value=text;
+    ta.style.position='fixed';ta.style.opacity='0';
+    document.body.appendChild(ta);
+    ta.focus();ta.select();
+    var ok=false;
+    try{ok=document.execCommand('copy')}catch(e){}
+    document.body.removeChild(ta);
+    return ok;
+  }
+
+  document.querySelectorAll('.copy-btn').forEach(function(btn){
+    btn.addEventListener('click',function(){
+      var text=btn.getAttribute('data-copy');
+      var label=btn.getAttribute('data-label')||'Valor';
+      var original=btn.innerHTML;
+
+      var done=function(){
+        btn.classList.add('copied');
+        btn.innerHTML='¡Copiado! ✓';
+        showToast(label+' copiado ✓');
+        setTimeout(function(){
+          btn.classList.remove('copied');
+          btn.innerHTML=original;
+        },2000);
+      };
+
+      if(navigator.clipboard && navigator.clipboard.writeText){
+        navigator.clipboard.writeText(text).then(done,function(){
+          if(fallbackCopy(text)) done();
+        });
+      }else{
+        if(fallbackCopy(text)) done();
+      }
+    });
+  });
+})();
+</script>
+
+</body>
+</html>

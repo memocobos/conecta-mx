@@ -2441,12 +2441,7 @@ body[data-theme="lotr"] .qa-num{color:#C9A96E;text-shadow:0 0 12px rgba(45,80,22
   </div>
 
   <!-- CAPSULE CORP (iframe — panel CMS) -->
-  <!-- TORRE KARÍN — inventario kits -->
-  <div class="kh-view" id="view-torre">
-    <div id="torre-content"><div class="loading"><div class="spinner"></div>Cargando Torre Karín…</div></div>
-  </div>
-
-    <div class="kh-view" id="view-capsule">
+  <div class="kh-view" id="view-capsule">
     <iframe id="capsule-frame" src="" title="Capsule Corp — CMS"></iframe>
   </div>
 
@@ -2648,7 +2643,6 @@ const VIEW_LABELS = {
   gastos:    { icon:'', label:'Gastos',       short:'Gastos',  perm:'gastos'    },
   vendedor:  { icon:'', label:'Mis ventas',   short:'Ventas',  perm:'vendedor'  },
   cotizador: { icon:'', label:'Palacio de Kamisama', short:'Palacio', perm:'cotizador' },
-  torre:     { icon:'', label:'Torre Karín',  short:'Kits',    perm:'torre'     },
   capsule:   { icon:'', label:'Capsule Corp', short:'CMS',     perm:'capsule'   },
   usuarios:  { icon:'', label:'Guerreros Z',  short:'Guerreros',perm:'usuarios'  }
 };
@@ -3610,7 +3604,6 @@ function switchView(v){
     const fr = document.getElementById('cotizador-frame');
     if(!fr.src || fr.src === window.location.href) fr.src = '/cotizador.html?v=' + Date.now();
   }
-  if(v==='torre') initTorreKarin();
   if(v==='capsule'){
     const fr = document.getElementById('capsule-frame');
     if(!fr.src || fr.src === window.location.href) fr.src = '/panel.html?v=' + Date.now();
@@ -3633,7 +3626,6 @@ const PERM_MODULES = [
   // Subsecciones del Resumen (Dragon Ball)
   { k:'tesoro',    lbl:'Cámara del Tesoro' },
   { k:'semillas',  lbl:'Semillas del Hermitaño' },
-  { k:'torre',     lbl:'Torre Karín' },
   { k:'ki',        lbl:'Registro de Ki' },
   { k:'radar',     lbl:'Radar del Dragón' },
   { k:'alarmas',   lbl:'Alarma de Cell' }
@@ -4358,7 +4350,7 @@ async function inviteUser(){
 
   const defaultPerms = {
     maestro_roshi: {all:true},
-    auxiliar:      {resumen:true, pagos:true, eventos:true, gastos:true, tesoro:true, semillas:true, radar:true, alarmas:true, ki:true, torre:true},
+    auxiliar:      {resumen:true, pagos:true, eventos:true, gastos:true, tesoro:true, semillas:true, radar:true, alarmas:true, ki:true},
     coordinador:   {eventos:true},
     vendedor:      {vendedor:true}
   };
@@ -4619,8 +4611,7 @@ function showLoadingResumen(){
 }
 
 function populateEventoSelect(){
-  const _h=new Date();_h.setHours(0,0,0,0);
-  const proximos=eventosCache.filter(e=>e.fields.Status==='Próximo'&&e.fields.Fecha&&new Date(e.fields.Fecha+'T12:00:00')>=_h).sort((a,b)=>new Date(a.fields.Fecha)-new Date(b.fields.Fecha));
+  const proximos = eventosCache.filter(e=>e.fields.Status==='Próximo');
   ['evento-select','pago-evento'].forEach(id=>{
     const sel=document.getElementById(id); if(!sel) return;
     sel.innerHTML='<option value="">— Seleccionar —</option>';
@@ -4630,28 +4621,16 @@ function populateEventoSelect(){
 
 // ── RESUMEN ───────────────────────────────────────────────────────────────
 async function loadResumen(){
-  const [pagos, gastos] = await Promise.all([
-    atFetch('Pagos'), atFetch('Gastos'), ensureAllProfiles()
+  // Pre-carga paralela: pagos + profiles (necesarios para Radar del Dragón)
+  const [pagos] = await Promise.all([
+    atFetch('Pagos'),
+    ensureAllProfiles()
   ]);
-  const totalCobrado   = pagos.reduce((a,p)=>a+(p.fields.Monto||0),0);
-  const totalGastos    = gastos.reduce((a,g)=>a+(g.fields.Monto||0),0);
+  const totalCobrado = pagos.reduce((a,p)=>a+(p.fields.Monto||0),0);
   const totalPorCobrar = reservCache.reduce((a,r)=>a+Math.max(0,(r.fields['Total a pagar']||0)-(r.fields['Total abonado']||0)),0);
-  const totalEsperado  = reservCache.reduce((a,r)=>a+(r.fields['Total a pagar']||0),0);
-  const utilidad       = totalCobrado - totalGastos;
-  const _hoy = new Date(); _hoy.setHours(0,0,0,0);
-  const proximos = eventosCache
-    .filter(e=>e.fields.Status==='Próximo'&&e.fields.Fecha&&new Date(e.fields.Fecha+'T12:00:00')>=_hoy)
-    .sort((a,b)=>new Date(a.fields.Fecha)-new Date(b.fields.Fecha));
-  const _cliIds=new Set();
-  reservCache.forEach(r=>{const c=r.fields.Cliente?.[0];if(c)_cliIds.add(c);});
-  const viajerosUnicos=_cliIds.size;
+  const proximos = eventosCache.filter(e=>e.fields.Status==='Próximo');
   const currentYear = new Date().getFullYear();
   const viajerosYear = countViajerosYear(currentYear);
-  const _porEv={};
-  for(const r of reservCache){const id=r.fields.Evento?.[0];if(!id)continue;if(!_porEv[id])_porEv[id]={cobrado:0,esperado:0,gastos:0,n:0};_porEv[id].cobrado+=r.fields['Total abonado']||0;_porEv[id].esperado+=r.fields['Total a pagar']||0;_porEv[id].n++;}
-  for(const g of gastos){const id=g.fields.Evento?.[0];if(!id)continue;if(!_porEv[id])_porEv[id]={cobrado:0,esperado:0,gastos:0,n:0};_porEv[id].gastos+=g.fields.Monto||0;}
-  const topEventos=eventosCache.filter(e=>_porEv[e.id]?.n>0).map(e=>({id:e.id,nombre:e.fields.Nombre||'',fecha:e.fields.Fecha||'',cobrado:_porEv[e.id].cobrado,esperado:_porEv[e.id].esperado,gastos:_porEv[e.id].gastos,n:_porEv[e.id].n,utilidad:_porEv[e.id].cobrado-_porEv[e.id].gastos})).sort((a,b)=>b.cobrado-a.cobrado).slice(0,10);
-  const _porCat={};gastos.forEach(g=>{const c=g.fields.Tipo||'Otro';_porCat[c]=(_porCat[c]||0)+(g.fields.Monto||0);});
 
   let html = `
   <div class="kh-hero">
@@ -4703,87 +4682,40 @@ async function loadResumen(){
     </button>
   </div>`;
 
-  // ── Poder de Combate + ¿Dónde está mi dinero? ────────────────────
+  // ── Card colapsable: Poder de Combate (Balances) ─────────────────────
   html += `<div class="card collapsible" data-res-key="balances">
-    <div class="card-title" onclick="toggleCard(this)">Poder de Combate — ¿Dónde está mi dinero? <span class="chev">▼</span></div>
-    <div class="card-body">
-      <div class="metrics-grid">
-        <div class="metric-card verde">
-          <div class="metric-label">Cobrado</div>
-          <div class="metric-val">${pesos(totalCobrado)}</div>
-          <div class="metric-sub">${pagos.length} pagos · ${pesos(totalEsperado)} esperado total</div>
-        </div>
-        <div class="metric-card rojo">
-          <div class="metric-label">Por cobrar</div>
-          <div class="metric-val">${pesos(totalPorCobrar)}</div>
-          <div class="metric-sub">Saldo pendiente de viajeros</div>
-        </div>
-        <div class="metric-card am">
-          <div class="metric-label">Gastos registrados</div>
-          <div class="metric-val">${pesos(totalGastos)}</div>
-          <div class="metric-sub">${gastos.length} egresos registrados</div>
-        </div>
-        <div class="metric-card ${utilidad>=0?'verde':'rojo'}">
-          <div class="metric-label">Utilidad neta</div>
-          <div class="metric-val">${pesos(utilidad)}</div>
-          <div class="metric-sub">Cobrado − gastos registrados</div>
-        </div>
-        <div class="metric-card azul">
-          <div class="metric-label">Viajeros únicos</div>
-          <div class="metric-val">${viajerosUnicos.toLocaleString('es-MX')}</div>
-          <div class="metric-sub">${reservCache.length} reservaciones · ${proximos.length} próximos eventos</div>
-        </div>
-        <div class="metric-card naranja">
-          <div class="metric-label">Viajeros ${currentYear}</div>
-          <div class="metric-val">${viajerosYear.toLocaleString('es-MX')}</div>
-          <div class="viajeros-balls">${renderViajerosBalls(viajerosYear)}</div>
-          <div class="metric-sub" style="display:flex;align-items:center;gap:8px;margin-top:10px">
-            <button id="viajeros-btn" onclick="event.stopPropagation();saveViajerosTotal(${currentYear},${viajerosYear})" style="border:0;padding:5px 10px;font-size:10px;cursor:pointer;text-transform:uppercase">Actualizar</button>
-            <span id="viajeros-status" style="font-size:10px;color:var(--ts)"></span>
-          </div>
+    <div class="card-title" onclick="toggleCard(this)">Poder de Combate <span class="chev">▼</span></div>
+    <div class="card-body"><div class="metrics-grid">
+      <div class="metric-card verde">
+        <div class="metric-label">Total cobrado</div>
+        <div class="metric-val">${pesos(totalCobrado)}</div>
+        <div class="metric-sub">${pagos.length} pagos registrados</div>
+      </div>
+      <div class="metric-card rojo">
+        <div class="metric-label">Por cobrar</div>
+        <div class="metric-val">${pesos(totalPorCobrar)}</div>
+        <div class="metric-sub">Saldo pendiente</div>
+      </div>
+      <div class="metric-card azul">
+        <div class="metric-label">Reservaciones</div>
+        <div class="metric-val">${reservCache.length}</div>
+        <div class="metric-sub">Clientes activos</div>
+      </div>
+      <div class="metric-card am">
+        <div class="metric-label">Próximos eventos</div>
+        <div class="metric-val">${proximos.length}</div>
+        <div class="metric-sub">En agenda</div>
+      </div>
+      <div class="metric-card naranja">
+        <div class="metric-label">Viajeros ${currentYear}</div>
+        <div class="metric-val">${viajerosYear.toLocaleString('es-MX')}</div>
+        <div class="viajeros-balls">${renderViajerosBalls(viajerosYear)}</div>
+        <div class="metric-sub" style="display:flex;align-items:center;gap:8px;margin-top:10px">
+          <button id="viajeros-btn" onclick="event.stopPropagation();saveViajerosTotal(${currentYear},${viajerosYear})" style="border:0;padding:5px 10px;font-size:10px;cursor:pointer;text-transform:uppercase">Actualizar</button>
+          <span id="viajeros-status" style="font-size:10px;color:var(--ts)"></span>
         </div>
       </div>
-
-      <div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border)">
-        <div style="font-size:10px;font-weight:700;color:var(--ts);text-transform:uppercase;letter-spacing:.12em;margin-bottom:12px">Top 10 eventos — utilidad por cobranza</div>
-        <div style="overflow-x:auto">
-          <table style="width:100%;border-collapse:collapse;font-size:12px">
-            <thead><tr>
-              <th style="font-size:10px;color:var(--ts);text-transform:uppercase;letter-spacing:.08em;padding:0 8px 8px 0;border-bottom:1px solid var(--border);text-align:left">Evento</th>
-              <th style="font-size:10px;color:var(--ts);text-transform:uppercase;letter-spacing:.08em;padding:0 8px 8px;border-bottom:1px solid var(--border);text-align:right">Cobrado</th>
-              <th style="font-size:10px;color:var(--ts);text-transform:uppercase;letter-spacing:.08em;padding:0 8px 8px;border-bottom:1px solid var(--border);text-align:right">Esperado</th>
-              <th style="font-size:10px;color:var(--ts);text-transform:uppercase;letter-spacing:.08em;padding:0 8px 8px;border-bottom:1px solid var(--border);text-align:right">Gastos</th>
-              <th style="font-size:10px;color:var(--ts);text-transform:uppercase;letter-spacing:.08em;padding:0 8px 8px 0;border-bottom:1px solid var(--border);text-align:right">Utilidad</th>
-              <th style="font-size:10px;color:var(--ts);text-transform:uppercase;letter-spacing:.08em;padding:0 0 8px 8px;border-bottom:1px solid var(--border);text-align:right">Vic.</th>
-            </tr></thead>
-            <tbody>
-              ${topEventos.map(ev=>{
-                const pct=ev.esperado>0?Math.round(ev.cobrado/ev.esperado*100):0;
-                const bc=pct>=90?'var(--ve)':pct>=60?'var(--am)':'var(--ro)';
-                const uc=ev.utilidad>=0?'var(--ve)':'var(--ro)';
-                return \`<tr>
-                  <td style="padding:8px 8px 8px 0;border-bottom:1px solid var(--border);font-weight:600;max-width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">\${esc(ev.nombre)}</td>
-                  <td style="padding:8px;border-bottom:1px solid var(--border);text-align:right;color:var(--ve)">\${pesos(ev.cobrado)}</td>
-                  <td style="padding:8px;border-bottom:1px solid var(--border);text-align:right;color:var(--ts)">\${pesos(ev.esperado)}<span style="font-size:10px;margin-left:4px;color:\${bc}">\${pct}%</span></td>
-                  <td style="padding:8px;border-bottom:1px solid var(--border);text-align:right;color:var(--ro)">\${ev.gastos>0?pesos(ev.gastos):'—'}</td>
-                  <td style="padding:8px;border-bottom:1px solid var(--border);text-align:right;font-weight:700;color:\${uc}">\${pesos(ev.utilidad)}</td>
-                  <td style="padding:8px 0 8px 8px;border-bottom:1px solid var(--border);text-align:right;color:var(--ts)">\${ev.n}</td>
-                </tr>\`;
-              }).join('')}
-            </tbody>
-          </table>
-        </div>
-        ${Object.keys(_porCat).length ? `
-        <div style="margin-top:14px;display:flex;flex-wrap:wrap;gap:8px">
-          ${Object.entries(_porCat).sort((a,b)=>b[1]-a[1]).map(([cat,tot])=>`
-            <div style="background:var(--bg3);border:1px solid var(--border);padding:8px 12px;border-radius:3px">
-              <div style="font-size:10px;color:var(--ts);text-transform:uppercase;letter-spacing:.08em">${esc(cat)}</div>
-              <div style="font-size:15px;font-weight:700;color:var(--ro)">${pesos(tot)}</div>
-            </div>
-          `).join('')}
-        </div>` : ''}
-      </div>
-    </div>
+    </div></div>
   </div>`;
 
   // ── Alertas del sistema ─────────────────────────────────────────────
@@ -4835,21 +4767,9 @@ async function loadResumen(){
       <div class="card-title" onclick="toggleCard(this)">Últimos pagos <span class="chev">▼</span></div>
       <div class="card-body">`;
   [...pagos].sort((a,b)=>new Date(b.createdTime)-new Date(a.createdTime)).slice(0,6).forEach(p=>{
-    const resId=p.fields['Reservación']?.[0];
-    const reserv=resId?reservCache.find(r=>r.id===resId):null;
-    const cliId=reserv?.fields.Cliente?.[0];
-    const cli=cliId?clientesCache[cliId]:null;
-    const nombreViajero=cli?.['Nombre completo']||p.fields.Referencia||'Pago';
-    const evId=reserv?.fields.Evento?.[0];
-    const ev=evId?eventosCache.find(e=>e.id===evId):null;
-    const evNombre=ev?.fields.Nombre||'';
-    const fPago=p.fields['Fecha de pago']?new Date(p.fields['Fecha de pago']+'T12:00:00').toLocaleDateString('es-MX',{day:'numeric',month:'short'}):new Date(p.createdTime).toLocaleDateString('es-MX',{day:'numeric',month:'short'});
     html+=`<div class="alerta-row">
       <div class="alerta-dot" style="background:var(--ve)"></div>
-      <span style="flex:1;font-size:12px">
-        <span style="font-weight:600">${esc(nombreViajero)}</span>
-        ${evNombre?`<span style="color:var(--ts);font-size:10px;display:block;margin-top:1px">${esc(evNombre)} · ${esc(fPago)} · ${esc(p.fields['Método']||'')}</span>`:''}
-      </span>
+      <span style="flex:1;font-size:12px">${esc(p.fields.Referencia||'Pago')}</span>
       <span class="badge badge-ve">${pesos(p.fields.Monto)}</span>
     </div>`;
   });
@@ -4959,7 +4879,23 @@ function detectarAlertasBusiness(eventos, reservas, pagos){
     });
   });
 
-  // 2. (Alerta sin mapa desactivada — campo no existe en Airtable)
+  // 2. Eventos próximos sin mapa (señal operativa, distinta de Alarma de Cell)
+  (eventos||[]).forEach(ev => {
+    if(ev.fields?.Status !== 'Próximo') return;
+    const mapa = ev.fields?.Mapa || ev.fields?.mapa || '';
+    const f = ev.fields?.Fecha ? Date.parse(ev.fields.Fecha+'T00:00:00') : null;
+    if(!mapa && f && f > now){
+      const diasFalta = Math.round((f - now)/86400000);
+      if(diasFalta < 30){
+        out.push({
+          level: diasFalta < 7 ? 'danger' : 'warn',
+          msg: `<b>${esc(ev.fields.Nombre||'')}</b> sin mapa · faltan ${diasFalta} días`,
+          when: fechaCorta(f),
+          ts: now
+        });
+      }
+    }
+  });
 
   // 3. Pagos sin comprobante (proxy = sin Referencia porque no hay campo Comprobante aún)
   const pagosSinRef = (pagos||[]).filter(p => !(p.fields?.Referencia||p.fields?.Cliente||'').toString().trim()).length;
@@ -5077,7 +5013,16 @@ function detectarAlertas(eventos, reservas, pagos){
       detail: esc(sinZonas.slice(0,5).map(e=>e.fields.Nombre||'').join(' · ')) + (sinZonas.length>5?'…':'')});
   }
 
-  // (Alerta 'sin mapa' desactivada — campo no existe en Airtable)
+  // Eventos sin mapa
+  const sinMapa = eventos.filter(e=>{
+    const m = e.fields.Mapa||e.fields.mapa||'';
+    return !m || (typeof m==='string' && !m.trim());
+  });
+  if(sinMapa.length){
+    out.push({level:'warn',ico:'',count:sinMapa.length,
+      msg:'Eventos sin mapa',
+      detail: esc(sinMapa.slice(0,5).map(e=>e.fields.Nombre||'').join(' · ')) + (sinMapa.length>5?'…':'')});
+  }
 
   // Eventos con fecha pasada que siguen como "Próximo" o disponibles
   const pasadoActivo = eventos.filter(e=>{
@@ -5165,7 +5110,7 @@ function renderSemillasHermitano(){
   });
   const total = inv.reduce((a,b)=>a+(parseInt(b.cantidad,10)||0),0);
   return `<div class="card collapsible" data-res-key="semillas">
-    <div class="card-title" onclick="toggleCard(this)">Torre Karín — Bodega <span id="semillas-count" style="margin-left:8px;font-size:10px;color:var(--ts)">Inventario bodega · ${total.toLocaleString('es-MX')} piezas</span> <span class="chev">▼</span></div>
+    <div class="card-title" onclick="toggleCard(this)">Semillas del Hermitaño <span id="semillas-count" style="margin-left:8px;font-size:10px;color:var(--ts)">Inventario bodega · ${total.toLocaleString('es-MX')} piezas</span> <span class="chev">▼</span></div>
     <div class="card-body">
       <div class="inv-grid" id="inv-grid">${cards||'<div style="font-size:11px;color:var(--ts);padding:12px">Sin items — agrega el primero abajo.</div>'}</div>
       <div class="inv-add-row">
@@ -5202,120 +5147,6 @@ function updateSemillasHeader(){
   if(!el) return;
   const total = getInventario().reduce((a,b)=>a+(parseInt(b.cantidad,10)||0),0);
   el.textContent = `Inventario bodega · ${total.toLocaleString('es-MX')} piezas`;
-}
-
-// ── Torre Karín — Inventario kits (pestaña dedicada) ─────────────────
-function initTorreKarin(){
-  const inv = getInventario();
-  const total = inv.reduce((a,b)=>a+(parseInt(b.cantidad,10)||0),0);
-
-  // Resumen por evento (de reservCache)
-  const hoy = new Date(); hoy.setHours(0,0,0,0);
-  const proximos = eventosCache
-    .filter(e=>e.fields.Status==='Próximo'&&e.fields.Fecha&&new Date(e.fields.Fecha+'T12:00:00')>=hoy)
-    .sort((a,b)=>new Date(a.fields.Fecha)-new Date(b.fields.Fecha))
-    .slice(0,15);
-
-  const viajerosPorEv = {};
-  reservCache.forEach(r=>{
-    const id=r.fields.Evento?.[0]; if(!id) return;
-    if(!viajerosPorEv[id]) viajerosPorEv[id]={plus:0,ride:0,cheap:0,stay:0,total:0};
-    const p=(r.fields.Paquete||'PLUS').toLowerCase();
-    viajerosPorEv[id][p]=(viajerosPorEv[id][p]||0)+1;
-    viajerosPorEv[id].total++;
-  });
-
-  let html = `<div class="kh-kicker"><span class="dball" data-stars="7"></span><h2>Torre Karín</h2><span class="sub">— Inventario · Bodega · Kits por evento</span></div>`;
-
-  // ── Bodega actual ──────────────────────────────────────────────
-  html += `<div class="card">
-    <div class="card-title">Bodega actual <span style="margin-left:8px;font-size:10px;color:var(--ts)">${total.toLocaleString('es-MX')} piezas totales</span></div>
-    <div class="inv-grid" id="torre-inv-grid">${renderTorreInvCards(inv)}</div>
-    <div class="inv-add-row" style="margin-top:16px">
-      <input id="torre-new-name" placeholder="Nuevo item (ej: Gorras, Lanyards…)" onkeydown="if(event.key==='Enter')torreAddItem()">
-      <input id="torre-new-qty" type="number" placeholder="Cantidad" min="0" style="flex:0 0 110px" onkeydown="if(event.key==='Enter')torreAddItem()">
-      <button onclick="torreAddItem()" style="background:var(--orange);color:#fff;border:none;padding:8px 16px;font-size:11px;font-weight:700;font-family:'Montserrat',sans-serif;cursor:pointer;text-transform:uppercase;letter-spacing:.08em;border-radius:3px">+ Agregar</button>
-    </div>
-    <div style="margin-top:8px;font-size:10px;color:var(--ts2);letter-spacing:.05em">Los cambios se guardan automáticamente en tu dispositivo.</div>
-  </div>`;
-
-  // ── Kits por evento (próximos) ──────────────────────────────────
-  html += `<div class="card">
-    <div class="card-title">Kits necesarios por evento</div>
-    <div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px">
-      <thead><tr>
-        <th style="font-size:10px;color:var(--ts);text-transform:uppercase;letter-spacing:.08em;padding:0 8px 8px 0;border-bottom:1px solid var(--border);text-align:left">Evento</th>
-        <th style="font-size:10px;color:var(--ts);text-transform:uppercase;letter-spacing:.08em;padding:0 8px 8px;border-bottom:1px solid var(--border);text-align:center">Fecha</th>
-        <th style="font-size:10px;color:var(--ts);text-transform:uppercase;letter-spacing:.08em;padding:0 8px 8px;border-bottom:1px solid var(--border);text-align:center">Viajeros</th>
-        <th style="font-size:10px;color:var(--ts);text-transform:uppercase;letter-spacing:.08em;padding:0 8px 8px;border-bottom:1px solid var(--border);text-align:center">PLUS</th>
-        <th style="font-size:10px;color:var(--ts);text-transform:uppercase;letter-spacing:.08em;padding:0 8px 8px;border-bottom:1px solid var(--border);text-align:center">RIDE</th>
-        <th style="font-size:10px;color:var(--ts);text-transform:uppercase;letter-spacing:.08em;padding:0 0 8px 8px;border-bottom:1px solid var(--border);text-align:center">CHEAP</th>
-      </tr></thead>
-      <tbody>
-        ${proximos.map(ev=>{
-          const v=viajerosPorEv[ev.id]||{total:0};
-          const noViajeros = !v.total;
-          return `<tr style="border-bottom:1px solid var(--border)">
-            <td style="padding:8px 8px 8px 0;font-weight:600">${esc(ev.fields.Nombre||'')}</td>
-            <td style="padding:8px;text-align:center;color:var(--ts);font-size:11px">${fecha(ev.fields.Fecha)}</td>
-            <td style="padding:8px;text-align:center;font-weight:700;color:${noViajeros?'var(--ts)':'var(--t)'}">${v.total||'—'}</td>
-            <td style="padding:8px;text-align:center">${v.plus||'—'}</td>
-            <td style="padding:8px;text-align:center">${v.ride||'—'}</td>
-            <td style="padding:8px 0 8px 8px;text-align:center">${v.cheap||'—'}</td>
-          </tr>`;
-        }).join('')}
-      </tbody>
-    </table></div>
-    <div style="margin-top:10px;font-size:10px;color:var(--ts2);letter-spacing:.05em">Los números de kits son orientativos — 1 kit por viajero PLUS, RIDE y CHEAP por evento.</div>
-  </div>`;
-
-  document.getElementById('torre-content').innerHTML = html;
-}
-
-function renderTorreInvCards(inv){
-  if(!inv.length) return '<div style="font-size:11px;color:var(--ts);padding:12px">Sin items — agrega el primero abajo.</div>';
-  return inv.map((it,i)=>{
-    const n=(it.nombre||'').replace(/"/g,'&quot;');
-    const q=parseInt(it.cantidad,10)||0;
-    return `<div class="inv-card" data-inv-idx="${i}">
-      <button class="inv-del" onclick="torreRemoveItem(${i})" title="Eliminar">✕</button>
-      <div class="inv-name">${n}</div>
-      <div class="inv-num" id="torre-num-${i}">${q}</div>
-      <div class="inv-ctrls">
-        <button onclick="torreBump(${i},-1)">−</button>
-        <input type="number" value="${q}" min="0" onchange="torreSet(${i},this.value)">
-        <button onclick="torreBump(${i},1)">+</button>
-      </div>
-    </div>`;
-  }).join('');
-}
-
-function torreAddItem(){
-  const name=(document.getElementById('torre-new-name').value||'').trim();
-  const qty=parseInt(document.getElementById('torre-new-qty').value,10)||0;
-  if(!name) return;
-  const inv=getInventario(); inv.push({nombre:name,cantidad:Math.max(0,qty)});
-  saveInventario(inv);
-  document.getElementById('torre-new-name').value='';
-  document.getElementById('torre-new-qty').value='';
-  document.getElementById('torre-inv-grid').innerHTML=renderTorreInvCards(inv);
-  reRenderSemillas(); // keep resumen card in sync
-}
-function torreRemoveItem(idx){
-  const inv=getInventario(); inv.splice(idx,1); saveInventario(inv);
-  document.getElementById('torre-inv-grid').innerHTML=renderTorreInvCards(inv);
-  reRenderSemillas();
-}
-function torreSet(idx,val){
-  const inv=getInventario(); if(!inv[idx]) return;
-  inv[idx].cantidad=Math.max(0,parseInt(val,10)||0); saveInventario(inv);
-  const el=document.getElementById('torre-num-'+idx); if(el) el.textContent=inv[idx].cantidad;
-}
-function torreBump(idx,delta){
-  const inv=getInventario(); if(!inv[idx]) return;
-  inv[idx].cantidad=Math.max(0,(parseInt(inv[idx].cantidad,10)||0)+delta); saveInventario(inv);
-  const el=document.getElementById('torre-num-'+idx); if(el) el.textContent=inv[idx].cantidad;
-  const inp=document.querySelector(`.inv-card[data-inv-idx="${idx}"] input[type=number]`); if(inp) inp.value=inv[idx].cantidad;
 }
 
 // ── Cámara del Tesoro (saldos bancarios) — Supabase banco_saldos ──────
@@ -5544,8 +5375,8 @@ async function loadEvento(eventoId){
   if(!eventoId){document.getElementById('evento-content').innerHTML='';return;}
   document.getElementById('evento-content').innerHTML='<div class="loading"><div class="spinner"></div>Cargando...</div>';
   const ev=eventosCache.find(e=>e.id===eventoId);
-  let rs=reservCache.filter(r=>r.fields.Evento?.[0]===eventoId);
-  const showFin=currentProfile?.rol==='maestro_roshi'||currentProfile?.rol==='auxiliar';
+  const rs=reservCache.filter(r=>r.fields.Evento?.[0]===eventoId);
+  const showFin = currentProfile?.rol==='maestro_roshi' || currentProfile?.rol==='auxiliar';
   const pagosEv=await atFetch('Pagos');
   const reservIds=new Set(rs.map(r=>r.id));
   const pagosPorReserv={};
@@ -5555,171 +5386,41 @@ async function loadEvento(eventoId){
   }
   const cob=rs.reduce((a,r)=>a+(pagosPorReserv[r.id]||0),0);
   const tot=rs.reduce((a,r)=>a+(r.fields['Total a pagar']||0),0);
-
-  // ── Stats resumen ────────────────────────────────────────────────
   let html='';
   if(showFin){
-    // Conteos por paquete
-    const paqCount={PLUS:0,RIDE:0,CHEAP:0,STAY:0};
-    rs.forEach(r=>{const p=r.fields.Paquete||'PLUS';paqCount[p]=(paqCount[p]||0)+1;});
-    // Tallas
-    const tallas={};
-    rs.forEach(r=>{const cl=clientesCache[r.fields.Cliente?.[0]]||{};const t=cl['Talla de playera']||'Sin talla';tallas[t]=(tallas[t]||0)+1;});
-    // Habitaciones
-    const habs={};
-    rs.forEach(r=>{const h=r.fields['Habitación']||'Sin hab.';habs[h]=(habs[h]||0)+1;});
-
     html+=`<div class="metrics-grid">
-      <div class="metric-card azul"><div class="metric-label">Viajeros</div><div class="metric-val">${rs.length}</div>
-        <div class="metric-sub">${Object.entries(paqCount).filter(([,v])=>v>0).map(([k,v])=>`${k}:${v}`).join(' · ')}</div>
-      </div>
-      <div class="metric-card verde"><div class="metric-label">Cobrado</div><div class="metric-val">${pesos(cob)}</div>
-        <div class="metric-sub">${tot>0?Math.round(cob/tot*100):0}% del total esperado</div>
-      </div>
-      <div class="metric-card ${tot-cob>0?'rojo':'verde'}"><div class="metric-label">Por cobrar</div><div class="metric-val">${pesos(Math.max(0,tot-cob))}</div>
-        <div class="metric-sub">${rs.filter(r=>(r.fields['Total a pagar']||0)-(pagosPorReserv[r.id]||0)>0).length} viajeros con saldo</div>
-      </div>
-      <div class="metric-card am"><div class="metric-label">Total esperado</div><div class="metric-val">${pesos(tot)}</div>
-        <div class="metric-sub">Tallas: ${Object.entries(tallas).slice(0,4).map(([k,v])=>`${k}:${v}`).join(' · ')||'—'}</div>
-      </div>
+      <div class="metric-card azul"><div class="metric-label">Clientes</div><div class="metric-val">${rs.length}</div></div>
+      <div class="metric-card verde"><div class="metric-label">Cobrado</div><div class="metric-val">${pesos(cob)}</div></div>
+      <div class="metric-card ${tot-cob>0?'rojo':'verde'}"><div class="metric-label">Por cobrar</div><div class="metric-val">${pesos(tot-cob)}</div></div>
+      <div class="metric-card am"><div class="metric-label">Total esperado</div><div class="metric-val">${pesos(tot)}</div></div>
     </div>`;
   }
-
-  // ── Filtros + ordenamiento ───────────────────────────────────────
-  const paquetes=[...new Set(rs.map(r=>r.fields.Paquete||'').filter(Boolean))].sort();
-  const tallasUnicas=[...new Set(rs.map(r=>(clientesCache[r.fields.Cliente?.[0]]||{})['Talla de playera']||'').filter(Boolean))].sort();
-  const habsUnicas=[...new Set(rs.map(r=>r.fields['Habitación']||'').filter(Boolean))].sort();
-
-  html+=`<div class="card">
-    <div class="card-title" style="flex-wrap:wrap;gap:8px">
-      <span>Lista de viajeros — ${esc(ev?.fields.Nombre||'')} <span style="font-weight:400;color:var(--ts)">(${rs.length})</span></span>
-      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-left:auto">
-        <select id="ev-fil-paq" onchange="filtrarViajeros()" style="background:var(--bg3);border:1px solid var(--border);color:var(--t);padding:4px 8px;font-size:11px;border-radius:2px;outline:none">
-          <option value="">Paquete: todos</option>
-          ${paquetes.map(p=>`<option value="${esc(p)}">${esc(p)}</option>`).join('')}
-        </select>
-        <select id="ev-fil-talla" onchange="filtrarViajeros()" style="background:var(--bg3);border:1px solid var(--border);color:var(--t);padding:4px 8px;font-size:11px;border-radius:2px;outline:none">
-          <option value="">Talla: todas</option>
-          ${tallasUnicas.map(t=>`<option value="${esc(t)}">${esc(t)}</option>`).join('')}
-        </select>
-        <select id="ev-fil-hab" onchange="filtrarViajeros()" style="background:var(--bg3);border:1px solid var(--border);color:var(--t);padding:4px 8px;font-size:11px;border-radius:2px;outline:none">
-          <option value="">Hab: todas</option>
-          ${habsUnicas.map(h=>`<option value="${esc(h)}">${esc(h)}</option>`).join('')}
-        </select>
-        <select id="ev-fil-saldo" onchange="filtrarViajeros()" style="background:var(--bg3);border:1px solid var(--border);color:var(--t);padding:4px 8px;font-size:11px;border-radius:2px;outline:none">
-          <option value="">Saldo: todos</option>
-          <option value="pendiente">Con saldo pendiente</option>
-          <option value="pagado">Pagados</option>
-        </select>
-        <select id="ev-orden" onchange="filtrarViajeros()" style="background:var(--bg3);border:1px solid var(--border);color:var(--t);padding:4px 8px;font-size:11px;border-radius:2px;outline:none">
-          <option value="nombre">Ordenar: nombre</option>
-          <option value="saldo_desc">Mayor deuda primero</option>
-          <option value="saldo_asc">Menor deuda primero</option>
-          <option value="paquete">Por paquete</option>
-        </select>
-      </div>
-    </div>
-    <div id="ev-tabla-wrap" style="overflow-x:auto"></div>
-  </div>`;
-
+  html+=`<div class="card"><div class="card-title">Lista de viajeros — ${esc(ev?.fields.Nombre||'')}</div>
+    <div style="overflow-x:auto"><table><thead><tr>
+      <th>Nombre</th><th>Paquete</th><th>Zona</th><th>Habitación</th>`;
+  if(showFin) html+=`<th style="text-align:right">Total</th><th style="text-align:right">Abonado</th><th style="text-align:right">Resta</th>`;
+  html+=`</tr></thead><tbody>`;
+  for(const r of rs){
+    const cl=clientesCache[r.fields.Cliente?.[0]]||{};
+    const paq=r.fields.Paquete||'—';
+    const pc=paq==='PLUS'?'badge-ve':paq==='RIDE'?'badge-bl':paq==='CHEAP'?'badge-am':'badge-gr';
+    const t=r.fields['Total a pagar']||0;
+    const a=pagosPorReserv[r.id]||0;
+    const re=t-a;
+    const rc=re<=0?'badge-ve':re>2000?'badge-ro':'badge-am';
+    html+=`<tr>
+      <td style="font-weight:600">${cl['Nombre completo']||'—'}</td>
+      <td><span class="badge ${pc}">${paq}</span></td>
+      <td style="font-size:12px;color:var(--ts)">${r.fields['Zona / Boleto']||'—'}</td>
+      <td style="font-size:12px">${r.fields['Habitación']||'—'}</td>`;
+    if(showFin) html+=`<td style="text-align:right;font-size:12px">${pesos(t)}</td>
+      <td style="text-align:right;font-size:12px;color:var(--ve)">${pesos(a)}</td>
+      <td style="text-align:right"><span class="badge ${rc}">${pesos(re)}</span></td>`;
+    html+=`</tr>`;
+  }
+  html+=`</tbody></table></div></div>`;
   document.getElementById('evento-content').innerHTML=html;
-
-  // Guardamos datos en window para que filtrarViajeros() los use
-  window._evData = { rs, pagosPorReserv, showFin };
-  filtrarViajeros();
 }
-
-function filtrarViajeros(){
-  const d = window._evData; if(!d) return;
-  const {rs, pagosPorReserv, showFin} = d;
-
-  const filPaq   = document.getElementById('ev-fil-paq')?.value   || '';
-  const filTalla = document.getElementById('ev-fil-talla')?.value || '';
-  const filHab   = document.getElementById('ev-fil-hab')?.value   || '';
-  const filSaldo = document.getElementById('ev-fil-saldo')?.value || '';
-  const orden    = document.getElementById('ev-orden')?.value     || 'nombre';
-
-  let rows = rs.map(r=>{
-    const cl = clientesCache[r.fields.Cliente?.[0]]||{};
-    const t  = r.fields['Total a pagar']||0;
-    const a  = pagosPorReserv[r.id]||0;
-    const re = Math.max(0, t-a);
-    return { r, cl, t, a, re,
-      paq:   r.fields.Paquete||'',
-      zona:  r.fields['Zona / Boleto']||'',
-      hab:   r.fields['Habitación']||'',
-      trans: r.fields['Transporte']||'',
-      talla: cl['Talla de playera']||'',
-      nombre:cl['Nombre completo']||'',
-      tel:   cl['Teléfono']||'',
-      email: cl['Correo electrónico']||'',
-      emerg: cl['Contacto de emergencia']||'',
-    };
-  });
-
-  // Filtros
-  if(filPaq)   rows=rows.filter(x=>x.paq===filPaq);
-  if(filTalla) rows=rows.filter(x=>x.talla===filTalla);
-  if(filHab)   rows=rows.filter(x=>x.hab===filHab);
-  if(filSaldo==='pendiente') rows=rows.filter(x=>x.re>0);
-  if(filSaldo==='pagado')    rows=rows.filter(x=>x.re<=0);
-
-  // Orden
-  if(orden==='saldo_desc') rows.sort((a,b)=>b.re-a.re);
-  else if(orden==='saldo_asc') rows.sort((a,b)=>a.re-b.re);
-  else if(orden==='paquete') rows.sort((a,b)=>a.paq.localeCompare(b.paq));
-  else rows.sort((a,b)=>a.nombre.localeCompare(b.nombre,'es'));
-
-  const wrap = document.getElementById('ev-tabla-wrap');
-  if(!wrap) return;
-
-  if(!rows.length){
-    wrap.innerHTML='<div style="color:var(--ts);font-size:13px;padding:20px 0">Sin resultados con los filtros seleccionados.</div>';
-    return;
-  }
-
-  let t=`<table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr>
-    <th style="font-size:10px;color:var(--ts);text-transform:uppercase;letter-spacing:.08em;padding:0 8px 8px 0;border-bottom:1px solid var(--border);text-align:left">Nombre</th>
-    <th style="font-size:10px;color:var(--ts);text-transform:uppercase;letter-spacing:.08em;padding:0 8px 8px;border-bottom:1px solid var(--border)">Paquete</th>
-    <th style="font-size:10px;color:var(--ts);text-transform:uppercase;letter-spacing:.08em;padding:0 8px 8px;border-bottom:1px solid var(--border)">Zona</th>
-    <th style="font-size:10px;color:var(--ts);text-transform:uppercase;letter-spacing:.08em;padding:0 8px 8px;border-bottom:1px solid var(--border)">Hab.</th>
-    <th style="font-size:10px;color:var(--ts);text-transform:uppercase;letter-spacing:.08em;padding:0 8px 8px;border-bottom:1px solid var(--border)">Talla</th>
-    <th style="font-size:10px;color:var(--ts);text-transform:uppercase;letter-spacing:.08em;padding:0 8px 8px;border-bottom:1px solid var(--border)">Tel / Email</th>
-    <th style="font-size:10px;color:var(--ts);text-transform:uppercase;letter-spacing:.08em;padding:0 8px 8px;border-bottom:1px solid var(--border)">Emergencia</th>
-    ${showFin?`<th style="font-size:10px;color:var(--ts);text-transform:uppercase;letter-spacing:.08em;padding:0 0 8px 8px;border-bottom:1px solid var(--border);text-align:right">Total</th>
-    <th style="font-size:10px;color:var(--ts);text-transform:uppercase;letter-spacing:.08em;padding:0 0 8px 8px;border-bottom:1px solid var(--border);text-align:right">Abonado</th>
-    <th style="font-size:10px;color:var(--ts);text-transform:uppercase;letter-spacing:.08em;padding:0 0 8px 8px;border-bottom:1px solid var(--border);text-align:right">Saldo</th>`:''}
-    <th style="font-size:10px;color:var(--ts);text-transform:uppercase;letter-spacing:.08em;padding:0 0 8px 8px;border-bottom:1px solid var(--border)"></th>
-  </tr></thead><tbody>`;
-
-  for(const x of rows){
-    const pc=x.paq==='PLUS'?'badge-ve':x.paq==='RIDE'?'badge-bl':x.paq==='CHEAP'?'badge-am':'badge-gr';
-    const rc=x.re<=0?'badge-ve':x.re>2000?'badge-ro':'badge-am';
-    const waNum = x.tel.replace(/\D/g,'');
-    t+=`<tr style="border-bottom:1px solid var(--border)">
-      <td style="padding:8px 8px 8px 0;font-weight:600;white-space:nowrap">${esc(x.nombre||'—')}</td>
-      <td style="padding:8px"><span class="badge ${pc}">${esc(x.paq||'—')}</span></td>
-      <td style="padding:8px;color:var(--ts);white-space:nowrap;font-size:11px">${esc(x.zona||'—')}</td>
-      <td style="padding:8px;font-size:11px;white-space:nowrap">${esc(x.hab||'—')}</td>
-      <td style="padding:8px;font-size:11px;text-align:center">${x.talla?`<span class="badge badge-gr">${esc(x.talla)}</span>`:'—'}</td>
-      <td style="padding:8px;font-size:11px;line-height:1.5">
-        ${x.tel?`<div style="color:var(--t)">${esc(x.tel)}</div>`:''}
-        ${x.email?`<div style="color:var(--ts);font-size:10px">${esc(x.email)}</div>`:''}
-        ${!x.tel&&!x.email?'—':''}
-      </td>
-      <td style="padding:8px;font-size:11px;color:var(--ts)">${esc(x.emerg||'—')}</td>
-      ${showFin?`<td style="padding:8px 0 8px 8px;text-align:right;font-size:12px">${pesos(x.t)}</td>
-      <td style="padding:8px 0 8px 8px;text-align:right;font-size:12px;color:var(--ve)">${pesos(x.a)}</td>
-      <td style="padding:8px 0 8px 8px;text-align:right"><span class="badge ${rc}">${pesos(x.re)}</span></td>`:''}
-      <td style="padding:8px 0 8px 8px;text-align:right">
-        ${waNum?`<a href="https://wa.me/52${waNum}" target="_blank" style="display:inline-block;background:rgba(37,211,102,.15);color:#25D366;border:1px solid rgba(37,211,102,.3);padding:3px 8px;border-radius:2px;font-size:10px;font-weight:700;text-decoration:none;font-family:'Montserrat',sans-serif">WA</a>`:''}
-      </td>
-    </tr>`;
-  }
-  t+=`</tbody></table>`;
-  wrap.innerHTML = t;
-}
-
 
 // ── PAGOS ─────────────────────────────────────────────────────────────────
 async function loadPagosRecientes(){
@@ -6669,129 +6370,23 @@ async function registrarGasto(){
 
 // ── VENDEDOR ──────────────────────────────────────────────────────────────
 function loadVendedor(){
-  const isMaestro = currentProfile?.rol==='maestro_roshi';
-  const myUid = currentProfile?.id || currentProfile?.uid || '';
-  const myName = (currentProfile?.alias || currentProfile?.nombre || '').toLowerCase();
-
-  const _h=new Date();_h.setHours(0,0,0,0);
-  const proximos=eventosCache
-    .filter(e=>e.fields.Status==='Próximo'&&e.fields.Fecha&&new Date(e.fields.Fecha+'T12:00:00')>=_h)
-    .sort((a,b)=>new Date(a.fields.Fecha)-new Date(b.fields.Fecha));
-
-  // Mis reservaciones: busca por "Registrado por" o todas si es maestro
-  // Por ahora filtramos por nombre del vendedor en pagos (campo "Registrado por")
-  // Si es maestro ve todas, si es vendedor filtra las suyas
-  let misReservas = reservCache;
-  // (filtro por vendedor se agrega cuando tengamos el campo vendedor en reservaciones)
-
-  const totalCobrado = misReservas.reduce((a,r)=>a+(r.fields['Total abonado']||0),0);
-  const totalEsperado = misReservas.reduce((a,r)=>a+(r.fields['Total a pagar']||0),0);
-  const totalPorCobrar = misReservas.reduce((a,r)=>a+Math.max(0,(r.fields['Total a pagar']||0)-(r.fields['Total abonado']||0)),0);
-
-  // Mis viajeros con saldo pendiente (ordenados por saldo desc)
-  const conSaldo = misReservas
-    .filter(r=>(r.fields['Total a pagar']||0)-(r.fields['Total abonado']||0)>0)
-    .map(r=>{
-      const cl=clientesCache[r.fields.Cliente?.[0]]||{};
-      const ev=eventosCache.find(e=>e.id===r.fields.Evento?.[0]);
-      return {
-        nombre: cl['Nombre completo']||'—',
-        tel:    cl['Teléfono']||'',
-        evento: ev?.fields.Nombre||'—',
-        fecha:  ev?.fields.Fecha||'',
-        paquete:r.fields.Paquete||'',
-        total:  r.fields['Total a pagar']||0,
-        abonado:r.fields['Total abonado']||0,
-        saldo:  (r.fields['Total a pagar']||0)-(r.fields['Total abonado']||0)
-      };
-    })
-    .sort((a,b)=>b.saldo-a.saldo)
-    .slice(0,30);
-
-  let html = `<div class="kh-kicker"><h2>Mis Ventas</h2><span class="sub">— Panel del vendedor</span></div>`;
-
-  // Métricas
-  html += `<div class="metrics-grid">
-    <div class="metric-card verde">
-      <div class="metric-label">Total cobrado</div>
-      <div class="metric-val">${pesos(totalCobrado)}</div>
-      <div class="metric-sub">${misReservas.length} reservaciones</div>
-    </div>
-    <div class="metric-card rojo">
-      <div class="metric-label">Por cobrar</div>
-      <div class="metric-val">${pesos(totalPorCobrar)}</div>
-      <div class="metric-sub">${conSaldo.length} viajeros con saldo</div>
-    </div>
-    <div class="metric-card am">
-      <div class="metric-label">Total esperado</div>
-      <div class="metric-val">${pesos(totalEsperado)}</div>
-      <div class="metric-sub">${proximos.length} eventos próximos</div>
-    </div>
-    <div class="metric-card azul">
-      <div class="metric-label">% cobrado</div>
-      <div class="metric-val">${totalEsperado>0?Math.round(totalCobrado/totalEsperado*100):0}%</div>
-      <div class="metric-sub">Avance de cobranza</div>
-    </div>
-  </div>`;
-
-  // Tabla de viajeros con saldo pendiente
-  if(conSaldo.length){
-    html += `<div class="card">
-      <div class="card-title">Viajeros con saldo pendiente <span style="margin-left:8px;font-size:10px;color:var(--ro)">${conSaldo.length} pendientes</span></div>
-      <div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px">
-        <thead><tr>
-          <th style="font-size:10px;color:var(--ts);text-transform:uppercase;letter-spacing:.08em;padding:0 8px 8px 0;border-bottom:1px solid var(--border);text-align:left">Viajero</th>
-          <th style="font-size:10px;color:var(--ts);text-transform:uppercase;letter-spacing:.08em;padding:0 8px 8px;border-bottom:1px solid var(--border)">Evento</th>
-          <th style="font-size:10px;color:var(--ts);text-transform:uppercase;letter-spacing:.08em;padding:0 8px 8px;border-bottom:1px solid var(--border)">Paquete</th>
-          <th style="font-size:10px;color:var(--ts);text-transform:uppercase;letter-spacing:.08em;padding:0 8px 8px;border-bottom:1px solid var(--border);text-align:right">Abonado</th>
-          <th style="font-size:10px;color:var(--ts);text-transform:uppercase;letter-spacing:.08em;padding:0 0 8px 8px;border-bottom:1px solid var(--border);text-align:right">Saldo</th>
-          <th style="border-bottom:1px solid var(--border)"></th>
-        </tr></thead>
-        <tbody>
-          ${conSaldo.map(x=>{
-            const pc=x.paquete==='PLUS'?'badge-ve':x.paquete==='RIDE'?'badge-bl':x.paquete==='CHEAP'?'badge-am':'badge-gr';
-            const waNum=x.tel.replace(/\D/g,'');
-            return `<tr style="border-bottom:1px solid var(--border)">
-              <td style="padding:8px 8px 8px 0;font-weight:600">${esc(x.nombre)}</td>
-              <td style="padding:8px;font-size:11px;color:var(--ts);white-space:nowrap">${esc(x.evento)}<br><span style="font-size:10px">${fecha(x.fecha)}</span></td>
-              <td style="padding:8px"><span class="badge ${pc}">${esc(x.paquete||'—')}</span></td>
-              <td style="padding:8px;text-align:right;color:var(--ve)">${pesos(x.abonado)}</td>
-              <td style="padding:8px 0 8px 8px;text-align:right;font-weight:700;color:var(--ro)">${pesos(x.saldo)}</td>
-              <td style="padding:8px 0">
-                ${waNum?`<a href="https://wa.me/52${waNum}?text=Hola+${encodeURIComponent(x.nombre.split(' ')[0])}%2C+te+recordamos+que+tienes+un+saldo+pendiente+de+${encodeURIComponent(pesos(x.saldo))}+para+${encodeURIComponent(x.evento)}+%F0%9F%8E%9F" target="_blank" style="display:inline-block;background:rgba(37,211,102,.15);color:#25D366;border:1px solid rgba(37,211,102,.3);padding:3px 8px;border-radius:2px;font-size:10px;font-weight:700;text-decoration:none;font-family:'Montserrat',sans-serif;white-space:nowrap">WA 💬</a>`:''}
-              </td>
-            </tr>`;
-          }).join('')}
-        </tbody>
-      </table></div>
-    </div>`;
-  }
-
-  // Tabla de precios por evento
-  html += `<div class="card">
-    <div class="card-title">Precios — próximos eventos</div>
-    <div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px">
-      <thead><tr>
-        <th style="font-size:10px;color:var(--ts);text-transform:uppercase;letter-spacing:.08em;padding:0 8px 8px 0;border-bottom:1px solid var(--border);text-align:left">Evento</th>
-        <th style="font-size:10px;color:var(--ts);text-transform:uppercase;letter-spacing:.08em;padding:0 8px 8px;border-bottom:1px solid var(--border)">Fecha</th>
-        <th style="font-size:10px;color:var(--ts);text-transform:uppercase;letter-spacing:.08em;padding:0 8px 8px;border-bottom:1px solid var(--border)">Ciudad</th>
-        <th style="font-size:10px;color:var(--ts);text-transform:uppercase;letter-spacing:.08em;padding:0 8px 8px;border-bottom:1px solid var(--border);text-align:right">PLUS</th>
-        <th style="font-size:10px;color:var(--ts);text-transform:uppercase;letter-spacing:.08em;padding:0 8px 8px;border-bottom:1px solid var(--border);text-align:right">RIDE</th>
-        <th style="font-size:10px;color:var(--ts);text-transform:uppercase;letter-spacing:.08em;padding:0 0 8px 8px;border-bottom:1px solid var(--border);text-align:right">CHEAP</th>
-      </tr></thead>
-      <tbody>
-        ${proximos.map(ev=>`<tr style="border-bottom:1px solid var(--border)">
-          <td style="padding:8px 8px 8px 0;font-weight:600">${esc(ev.fields.Nombre||'')}</td>
-          <td style="padding:8px;font-size:11px;color:var(--ts)">${fecha(ev.fields.Fecha)}</td>
-          <td style="padding:8px"><span class="badge ${ev.fields.Ciudad==='MTY'?'badge-am':'badge-gr'}">${esc(ev.fields.Ciudad||'—')}</span></td>
-          <td style="padding:8px;text-align:right;font-weight:600">${ev.fields['Precio PLUS']?pesos(ev.fields['Precio PLUS']):'—'}</td>
-          <td style="padding:8px;text-align:right">${ev.fields['Precio RIDE']?pesos(ev.fields['Precio RIDE']):'—'}</td>
-          <td style="padding:8px 0 8px 8px;text-align:right">${ev.fields['Precio CHEAP']?pesos(ev.fields['Precio CHEAP']):'—'}</td>
-        </tr>`).join('')}
-      </tbody>
-    </table></div>
-  </div>`;
-
+  const proximos=eventosCache.filter(e=>e.fields.Status==='Próximo');
+  let html=`<div class="card"><div class="card-title">Precios — próximos eventos</div>
+    <table><thead><tr>
+      <th>Evento</th><th>Fecha</th><th>Ciudad</th>
+      <th style="text-align:right">PLUS</th><th style="text-align:right">RIDE</th><th style="text-align:right">CHEAP</th>
+    </tr></thead><tbody>`;
+  proximos.forEach(ev=>{
+    html+=`<tr>
+      <td style="font-weight:600">${esc(ev.fields.Nombre||'')}</td>
+      <td style="font-size:12px;color:var(--ts)">${esc(fecha(ev.fields.Fecha))}</td>
+      <td><span class="badge ${ev.fields.Ciudad==='MTY'?'badge-bl':'badge-ro'}">${esc(ev.fields.Ciudad||'—')}</span></td>
+      <td style="text-align:right;font-weight:600">${ev.fields['Precio PLUS']?pesos(ev.fields['Precio PLUS']):'—'}</td>
+      <td style="text-align:right">${pesos(ev.fields['Precio RIDE'])}</td>
+      <td style="text-align:right">${pesos(ev.fields['Precio CHEAP'])}</td>
+    </tr>`;
+  });
+  html+=`</tbody></table></div>`;
   document.getElementById('vendedor-content').innerHTML=html;
 }
 

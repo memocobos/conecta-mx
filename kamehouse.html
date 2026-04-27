@@ -726,20 +726,25 @@ tr:hover td{background:rgba(255,107,0,.03)}
  <div class="page" id="page-capsule">
  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
  <div class="section-title">Capsule Corp</div>
- <button class="btn btn-primary" onclick="openModal('modal-evento')">+ Nuevo Evento</button>
+ <button class="btn btn-primary" onclick="abrirNuevoEvento()">+ Nuevo Evento</button>
  </div>
- <div class="section-sub">Editor de eventos — lo que publicas en tu web</div>
-
+ <div class="section-sub">Editor de eventos — crea, edita y controla el status de cada evento</div>
+ <div style="display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap">
+ <button class="btn btn-ghost btn-sm capsule-filter active" onclick="filtrarCapsule('todos',this)">Todos</button>
+ <button class="btn btn-ghost btn-sm capsule-filter" onclick="filtrarCapsule('futuro',this)">Proximos</button>
+ <button class="btn btn-ghost btn-sm capsule-filter" onclick="filtrarCapsule('pasado',this)">Pasados</button>
+ <button class="btn btn-ghost btn-sm capsule-filter" onclick="filtrarCapsule('proceso',this)">En Proceso</button>
+ </div>
  <div class="table-wrap">
  <table>
  <thead>
  <tr>
- <th>Evento</th><th>Fecha</th><th>Ciudad</th>
- <th>Tipo</th><th>Status</th><th>Viajeros</th><th>Acciones</th>
+ <th>Evento</th><th>Fecha</th><th>Ciudad / Venue</th>
+ <th>Paquetes</th><th>Zonas</th><th>Status</th><th>Viajeros</th><th>Acciones</th>
  </tr>
  </thead>
  <tbody id="tabla-eventos">
- <tr><td colspan="7"><div class="loading-state"><div class="spinner"></div>Cargando…</div></td></tr>
+ <tr><td colspan="8"><div class="loading-state"><div class="spinner"></div>Cargando…</div></td></tr>
  </tbody>
  </table>
  </div>
@@ -876,46 +881,50 @@ tr:hover td{background:rgba(255,107,0,.03)}
 </div>
 
 <!-- Modal: Nuevo/Editar Evento -->
+<!-- Modal: Nuevo/Editar Evento COMPLETO -->
 <div class="modal-overlay" id="modal-evento">
- <div class="modal">
+ <div class="modal" style="max-width:700px">
  <div class="modal-header">
  <div class="modal-title" id="modal-evento-title">Nuevo Evento</div>
- <button class="modal-close" onclick="closeModal('modal-evento')"></button>
+ <button class="modal-close" onclick="closeModal('modal-evento')">X</button>
  </div>
  <div class="modal-body">
  <div id="evento-alert"></div>
  <input type="hidden" id="evento-id">
+
+ <!-- SECCIÓN 1: INFO BÁSICA -->
+ <div style="font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:800;letter-spacing:.2em;text-transform:uppercase;color:var(--orange);margin-bottom:10px">Info del Evento</div>
  <div class="form-row cols-2">
  <div class="form-group">
  <label>Artista / Nombre *</label>
  <input type="text" id="ev-artista" placeholder="Ej: Bad Bunny">
  </div>
  <div class="form-group">
- <label>Tour</label>
+ <label>Tour / Nombre del Show</label>
  <input type="text" id="ev-tour" placeholder="Ej: Most Wanted Tour">
  </div>
  </div>
  <div class="form-row cols-2">
  <div class="form-group">
- <label>Fecha *</label>
+ <label>Fecha Principal *</label>
  <input type="date" id="ev-fecha">
  </div>
  <div class="form-group">
- <label>Fecha Fin (multifecha)</label>
+ <label>Fecha fin (multifecha)</label>
  <input type="date" id="ev-fecha-fin">
  </div>
  </div>
  <div class="form-row cols-2">
  <div class="form-group">
  <label>Ciudad *</label>
- <input type="text" id="ev-ciudad" placeholder="Ej: CDMX">
+ <input type="text" id="ev-ciudad" placeholder="Ej: CDMX, Monterrey">
  </div>
  <div class="form-group">
  <label>Venue *</label>
- <input type="text" id="ev-venue" placeholder="Ej: Estadio GNP">
+ <input type="text" id="ev-venue" placeholder="Ej: Estadio GNP Seguros">
  </div>
  </div>
- <div class="form-row cols-2">
+ <div class="form-row cols-3">
  <div class="form-group">
  <label>Tipo</label>
  <select id="ev-tipo">
@@ -924,47 +933,146 @@ tr:hover td{background:rgba(255,107,0,.03)}
  </select>
  </div>
  <div class="form-group">
- <label>Status</label>
- <select id="ev-status">
- <option>Disponible</option>
- <option>Últimos Lugares</option>
- <option>Pocos Lugares</option>
- <option>En Proceso</option>
- <option>Agotado</option>
- <option>Por Confirmar</option>
- <option>Pasado</option>
+ <label>Color del evento</label>
+ <select id="ev-color">
+ <option value="rojo">Rojo</option>
+ <option value="azul">Azul</option>
+ <option value="rosa">Rosa</option>
+ <option value="verde">Verde</option>
+ <option value="amarillo">Amarillo</option>
  </select>
  </div>
- </div>
- <div class="form-row cols-2">
- <div class="form-group">
- <label>¿Transporte desde Reynosa?</label>
- <select id="ev-transporte">
- <option value="false">No</option>
- <option value="true">Sí</option>
- </select>
- </div>
- <div class="form-group">
- <label>¿Traslados internos?</label>
- <select id="ev-traslados">
- <option value="false">No</option>
- <option value="true">Sí</option>
- </select>
- </div>
- </div>
- <div class="form-row cols-2">
  <div class="form-group">
  <label>Promotor</label>
  <input type="text" id="ev-promotor" placeholder="Ej: Ocesa">
  </div>
+ </div>
+
+ <div class="form-group" style="margin-bottom:12px">
+ <label>Nota para el cliente</label>
+ <input type="text" id="ev-nota" placeholder='Ej: NO incluye vuelos. Vuelos disponibles como extra.'>
+ </div>
+
+ <!-- SECCIÓN 2: STATUS Y VISIBILIDAD -->
+ <div style="height:1px;background:var(--border);margin:16px 0"></div>
+ <div style="font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:800;letter-spacing:.2em;text-transform:uppercase;color:var(--orange);margin-bottom:10px">Status y Visibilidad</div>
+ <div class="form-row cols-2">
  <div class="form-group">
- <label>URL Imagen / Banner</label>
+ <label>Status en la web *</label>
+ <select id="ev-status">
+ <option value="">Disponible</option>
+ <option value="ultimos">Ultimos Lugares</option>
+ <option value="proceso">En Proceso</option>
+ <option value="agotado">Agotado</option>
+ <option value="por-confirmar">Por Confirmar</option>
+ <option value="pasado">Pasado</option>
+ </select>
+ </div>
+ <div class="form-group">
+ <label>Cuenta bancaria</label>
+ <select id="ev-banco">
+ <option value="default">BBVA (Default)</option>
+ <option value="hey">Hey Banco / Banregio</option>
+ </select>
+ </div>
+ </div>
+ <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:12px">
+ <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px">
+ <input type="checkbox" id="ev-cdmx"> Es evento CDMX (sin bus Reynosa)
+ </label>
+ <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px">
+ <input type="checkbox" id="ev-traslados"> Traslados internos hotel-venue
+ </label>
+ <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px">
+ <input type="checkbox" id="ev-transporte"> Transporte desde Reynosa
+ </label>
+ <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px">
+ <input type="checkbox" id="ev-promo"> Tiene banner de promo
+ </label>
+ <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px">
+ <input type="checkbox" id="ev-rideonly"> Solo vende RIDE
+ </label>
+ <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px">
+ <input type="checkbox" id="ev-cheaponly"> Solo vende CHEAP
+ </label>
+ <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px">
+ <input type="checkbox" id="ev-listonly"> Solo en lista (sin reservar)
+ </label>
+ </div>
+
+ <!-- SECCIÓN 3: PRECIOS BASE -->
+ <div style="height:1px;background:var(--border);margin:16px 0"></div>
+ <div style="font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:800;letter-spacing:.2em;text-transform:uppercase;color:var(--orange);margin-bottom:10px">Precios Base</div>
+ <div class="form-row cols-3">
+ <div class="form-group">
+ <label>Separo ($)</label>
+ <input type="number" id="ev-sep" placeholder="500" min="0">
+ </div>
+ <div class="form-group">
+ <label>Precio RIDE ($)</label>
+ <input type="number" id="ev-ride" placeholder="2700" min="0">
+ </div>
+ <div class="form-group">
+ <label>Imagen / Banner URL</label>
  <input type="text" id="ev-imagen" placeholder="https://...">
  </div>
  </div>
+
+ <!-- SECCIÓN 4: LO QUE INCLUYE -->
+ <div style="height:1px;background:var(--border);margin:16px 0"></div>
+ <div style="font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:800;letter-spacing:.2em;text-transform:uppercase;color:var(--orange);margin-bottom:6px">Lo que incluye el paquete</div>
+ <div style="font-size:11px;color:var(--ts);margin-bottom:10px">Estos bullets aparecen en la tarjeta del evento en tu web</div>
+ <div id="ev-incluye-lista"></div>
+ <button class="btn btn-ghost btn-sm" onclick="agregarIncluye()" style="margin-top:6px">+ Agregar linea</button>
+
+ <!-- SECCIÓN 5: ZONAS PLUS -->
+ <div style="height:1px;background:var(--border);margin:16px 0"></div>
+ <div style="font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:800;letter-spacing:.2em;text-transform:uppercase;color:var(--orange);margin-bottom:6px">Zonas PLUS</div>
+ <div style="font-size:11px;color:var(--ts);margin-bottom:10px">Nombre de la zona y precio. Marca VIP o Agotado segun corresponda.</div>
+ <div id="ev-zonas-plus"></div>
+ <button class="btn btn-ghost btn-sm" onclick="agregarZona('plus')" style="margin-top:6px">+ Agregar zona</button>
+
+ <!-- SECCIÓN 6: ZONAS CHEAP -->
+ <div style="height:1px;background:var(--border);margin:16px 0"></div>
+ <div style="font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:800;letter-spacing:.2em;text-transform:uppercase;color:var(--orange);margin-bottom:6px">Zonas CHEAP</div>
+ <div id="ev-zonas-cheap"></div>
+ <button class="btn btn-ghost btn-sm" onclick="agregarZona('cheap')" style="margin-top:6px">+ Agregar zona</button>
+
+ <!-- SECCIÓN 7: HOTEL -->
+ <div style="height:1px;background:var(--border);margin:16px 0"></div>
+ <div style="font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:800;letter-spacing:.2em;text-transform:uppercase;color:var(--orange);margin-bottom:6px">Opciones de Hotel</div>
+ <div style="font-size:11px;color:var(--ts);margin-bottom:10px">Extra = costo adicional sobre el precio base (compartida = $0)</div>
+ <div id="ev-hotel-lista"></div>
+ <button class="btn btn-ghost btn-sm" onclick="agregarHotel()" style="margin-top:6px">+ Agregar tipo</button>
+
+ <!-- SECCIÓN 8: CALENDARIO DE PAGOS -->
+ <div style="height:1px;background:var(--border);margin:16px 0"></div>
+ <div style="font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:800;letter-spacing:.2em;text-transform:uppercase;color:var(--orange);margin-bottom:6px">Calendario de Pagos</div>
+ <div id="ev-pagos-lista"></div>
+ <button class="btn btn-ghost btn-sm" onclick="agregarPago()" style="margin-top:6px">+ Agregar pago</button>
+
+ <!-- SECCIÓN 9: DESCUENTO FLASH -->
+ <div style="height:1px;background:var(--border);margin:16px 0"></div>
+ <div style="font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:800;letter-spacing:.2em;text-transform:uppercase;color:var(--orange);margin-bottom:6px">Codigo de Descuento Flash (opcional)</div>
+ <div class="form-row cols-3">
  <div class="form-group">
- <label>Notas</label>
- <input type="text" id="ev-notas" placeholder="Info adicional para el cliente">
+ <label>Codigo</label>
+ <input type="text" id="ev-dsc-codigo" placeholder="MEMO10">
+ </div>
+ <div class="form-group">
+ <label>% Descuento</label>
+ <input type="number" id="ev-dsc-pct" placeholder="10" min="0" max="100">
+ </div>
+ <div class="form-group">
+ <label>Expira</label>
+ <input type="datetime-local" id="ev-dsc-exp">
+ </div>
+ </div>
+
+ <div style="height:1px;background:var(--border);margin:16px 0"></div>
+ <div class="form-group">
+ <label>Notas internas (solo visible en Kamehouse)</label>
+ <input type="text" id="ev-notas" placeholder="Notas para ti">
  </div>
  </div>
  <div class="modal-footer">
@@ -1817,34 +1925,111 @@ async function editarVendedor(id) {
 }
 
 // ═══════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════
 // CAPSULE CORP — EVENTOS
 // ═══════════════════════════════════════════════════════════════
+let _capsuleFilter = 'todos';
+let _capsuleCache = [];
+
 async function loadCapsule() {
  const tbody = document.getElementById('tabla-eventos');
  try {
- const eventos = await db.get('resumen_eventos', '?order=fecha.desc&limit=100');
- if (!eventos.length) {
- tbody.innerHTML = '<tr><td colspan="7"><div class="empty-state"><div class="empty-icon"></div>Sin eventos aún. ¡Crea el primero!</div></td></tr>';
+ _capsuleCache = await db.get('resumen_eventos', '?order=fecha.desc&limit=200');
+ renderCapsule();
+ } catch(e) {
+ tbody.innerHTML = `<tr><td colspan="8"><div class="alert alert-error">${e.message}</div></td></tr>`;
+ }
+}
+
+function filtrarCapsule(filtro, btn) {
+ _capsuleFilter = filtro;
+ document.querySelectorAll('.capsule-filter').forEach(b => b.classList.remove('active'));
+ btn.classList.add('active');
+ renderCapsule();
+}
+
+function renderCapsule() {
+ const tbody = document.getElementById('tabla-eventos');
+ const hoy = new Date().toISOString().split('T')[0];
+ let rows = _capsuleCache;
+
+ if (_capsuleFilter === 'futuro') rows = rows.filter(e => e.fecha >= hoy);
+ if (_capsuleFilter === 'pasado') rows = rows.filter(e => e.fecha < hoy);
+ if (_capsuleFilter === 'proceso') rows = rows.filter(e => e.status === 'En Proceso' || e.status === 'proceso');
+
+ if (!rows.length) {
+ tbody.innerHTML = '<tr><td colspan="8"><div class="empty-state"><div class="empty-icon"></div>Sin eventos con ese filtro</div></td></tr>';
  return;
  }
- tbody.innerHTML = eventos.map(ev => `<tr>
+
+ tbody.innerHTML = rows.map(ev => {
+ const esPasado = ev.fecha < hoy;
+ const zonas = ev.zonas_plus ? JSON.parse(ev.zonas_plus) : [];
+ const zonasStr = zonas.length ? zonas.filter(z => !z.ag).map(z => z.n).join(', ') : '—';
+ const paquetes = [];
+ if (ev.tiene_transporte_largo || ev.tiene_traslados_internos) paquetes.push('PLUS');
+ if (ev.ride_precio > 0) paquetes.push('RIDE');
+ paquetes.push('CHEAP');
+
+ return `<tr style="${esPasado ? 'opacity:.55' : ''}">
  <td>
- <div style="font-weight:700">${ev.artista || ev.nombre}</div>
- <div style="font-size:11px;color:var(--ts)">${ev.ciudad}</div>
+ <div style="font-weight:700;font-size:13px">${ev.artista || ev.nombre}</div>
+ <div style="font-size:10px;color:var(--ts)">${ev.tour || ev.tipo || 'Concierto'}</div>
  </td>
- <td style="font-size:12px">${fmtFecha(ev.fecha)}</td>
- <td style="font-size:12px">${ev.ciudad}</td>
- <td><span class="badge badge-gray">${ev.status}</span></td>
+ <td style="font-size:12px;white-space:nowrap">${fmtFecha(ev.fecha)}</td>
+ <td>
+ <div style="font-size:12px;font-weight:600">${ev.ciudad}</div>
+ <div style="font-size:10px;color:var(--ts)">${ev.venue || ''}</div>
+ </td>
+ <td style="font-size:11px">${paquetes.map(p => `<span class="badge ${p==='PLUS'?'badge-orange':p==='RIDE'?'badge-gold':'badge-gray'}">${p}</span>`).join(' ')}</td>
+ <td style="font-size:11px;max-width:140px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${zonasStr}</td>
  <td>${badgeStatus(ev.status)}</td>
- <td style="font-weight:600">${ev.total_viajeros}</td>
- <td>
- <button class="btn btn-ghost btn-sm" onclick="editarEvento('${ev.id}')"></button>
- <button class="btn btn-red btn-sm" onclick="eliminarEvento('${ev.id}')"></button>
+ <td style="font-weight:600">${ev.total_viajeros || 0}</td>
+ <td style="white-space:nowrap">
+ <button class="btn btn-ghost btn-sm" onclick="editarEvento('${ev.id}')">Editar</button>
+ <button class="btn btn-red btn-sm" onclick="eliminarEvento('${ev.id}')">Borrar</button>
  </td>
- </tr>`).join('');
- } catch(e) {
- tbody.innerHTML = `<tr><td colspan="7"><div class="alert alert-error">${e.message}</div></td></tr>`;
- }
+ </tr>`;
+ }).join('');
+}
+
+function abrirNuevoEvento() {
+ // Reset formulario
+ document.getElementById('evento-id').value = '';
+ document.getElementById('ev-artista').value = '';
+ document.getElementById('ev-tour').value = '';
+ document.getElementById('ev-fecha').value = '';
+ document.getElementById('ev-fecha-fin').value = '';
+ document.getElementById('ev-ciudad').value = '';
+ document.getElementById('ev-venue').value = '';
+ document.getElementById('ev-tipo').value = 'Concierto';
+ document.getElementById('ev-color').value = 'azul';
+ document.getElementById('ev-promotor').value = '';
+ document.getElementById('ev-nota').value = '';
+ document.getElementById('ev-status').value = '';
+ document.getElementById('ev-banco').value = 'default';
+ document.getElementById('ev-cdmx').checked = false;
+ document.getElementById('ev-traslados').checked = false;
+ document.getElementById('ev-transporte').checked = false;
+ document.getElementById('ev-promo').checked = false;
+ document.getElementById('ev-rideonly').checked = false;
+ document.getElementById('ev-cheaponly').checked = false;
+ document.getElementById('ev-listonly').checked = false;
+ document.getElementById('ev-sep').value = '';
+ document.getElementById('ev-ride').value = '';
+ document.getElementById('ev-imagen').value = '';
+ document.getElementById('ev-dsc-codigo').value = '';
+ document.getElementById('ev-dsc-pct').value = '';
+ document.getElementById('ev-dsc-exp').value = '';
+ document.getElementById('ev-notas').value = '';
+ document.getElementById('modal-evento-title').textContent = 'Nuevo Evento';
+ // Reset listas dinámicas
+ iniciarIncluye([]);
+ iniciarZonas('plus', []);
+ iniciarZonas('cheap', []);
+ iniciarHotel([]);
+ iniciarPagos([]);
+ openModal('modal-evento');
 }
 
 async function guardarEvento() {
@@ -1852,33 +2037,77 @@ async function guardarEvento() {
  const artista = document.getElementById('ev-artista').value.trim();
  const tour = document.getElementById('ev-tour').value.trim();
  const fecha = document.getElementById('ev-fecha').value;
- const fechaFin= document.getElementById('ev-fecha-fin').value;
+ const fechaFin = document.getElementById('ev-fecha-fin').value;
  const ciudad = document.getElementById('ev-ciudad').value.trim();
  const venue = document.getElementById('ev-venue').value.trim();
  const tipo = document.getElementById('ev-tipo').value;
- const status = document.getElementById('ev-status').value;
- const trans = document.getElementById('ev-transporte').value === 'true';
- const trasl = document.getElementById('ev-traslados').value === 'true';
- const promotor= document.getElementById('ev-promotor').value.trim();
+ const color = document.getElementById('ev-color').value;
+ const promotor = document.getElementById('ev-promotor').value.trim();
+ const nota = document.getElementById('ev-nota').value.trim();
+ const status = document.getElementById('ev-status').value || 'Disponible';
+ const banco = document.getElementById('ev-banco').value;
+ const cdmx = document.getElementById('ev-cdmx').checked;
+ const traslados = document.getElementById('ev-traslados').checked;
+ const transporte = document.getElementById('ev-transporte').checked;
+ const promo = document.getElementById('ev-promo').checked;
+ const rideOnly = document.getElementById('ev-rideonly').checked;
+ const cheapOnly = document.getElementById('ev-cheaponly').checked;
+ const listOnly = document.getElementById('ev-listonly').checked;
+ const sep = parseFloat(document.getElementById('ev-sep').value) || 0;
+ const ride = parseFloat(document.getElementById('ev-ride').value) || 0;
  const imagen = document.getElementById('ev-imagen').value.trim();
  const notas = document.getElementById('ev-notas').value.trim();
+ const dscCodigo = document.getElementById('ev-dsc-codigo').value.trim();
+ const dscPct = parseFloat(document.getElementById('ev-dsc-pct').value) || 0;
+ const dscExp = document.getElementById('ev-dsc-exp').value;
  const alerta = document.getElementById('evento-alert');
 
  if (!artista || !fecha || !ciudad || !venue) {
  alerta.innerHTML = '<div class="alert alert-error">Artista, fecha, ciudad y venue son obligatorios</div>';
  return;
  }
+
+ // Leer listas dinámicas
+ const incluye = leerIncluye();
+ const zonas_plus = leerZonas('plus');
+ const zonas_cheap = leerZonas('cheap');
+ const hotel = leerHotel();
+ const pagos_cal = leerPagos();
+ const flash_promo = dscCodigo ? { code: dscCodigo, pct: dscPct, expiresTs: dscExp ? new Date(dscExp).getTime() : null } : null;
+
  try {
  const body = {
- artista, nombre: artista, tour: tour||null, fecha, fecha_fin: fechaFin||null,
- ciudad, venue, tipo, status,
- tiene_transporte_largo: trans, tiene_traslados_internos: trasl,
- promotor: promotor||null, imagen_url: imagen||null, notas: notas||null
+ artista, nombre: artista,
+ tour: tour || null,
+ fecha,
+ fecha_fin: fechaFin || null,
+ ciudad, venue, tipo,
+ color: color || 'azul',
+ promotor: promotor || null,
+ nota_cliente: nota || null,
+ status,
+ banco,
+ cdmx,
+ tiene_traslados_internos: traslados,
+ tiene_transporte_largo: transporte,
+ promo,
+ ride_only: rideOnly,
+ cheap_only: cheapOnly,
+ list_only: listOnly,
+ separo: sep,
+ ride_precio: ride,
+ imagen_url: imagen || null,
+ notas: notas || null,
+ incluye: JSON.stringify(incluye),
+ zonas_plus: JSON.stringify(zonas_plus),
+ zonas_cheap: JSON.stringify(zonas_cheap),
+ hotel_opciones: JSON.stringify(hotel),
+ pagos_calendario: JSON.stringify(pagos_cal),
+ flash_promo: flash_promo ? JSON.stringify(flash_promo) : null
  };
  if (id) await db.patch('eventos', id, body);
  else await db.post('eventos', body);
- alerta.innerHTML = '<div class="alert alert-success"> Evento guardado</div>';
- // Refrescar cache
+ alerta.innerHTML = '<div class="alert alert-success">Evento guardado</div>';
  _eventosCache = await db.get('eventos', '?order=fecha.desc&limit=200');
  populateEventoSelects();
  setTimeout(() => { closeModal('modal-evento'); loadCapsule(); }, 900);
@@ -1891,28 +2120,178 @@ async function editarEvento(id) {
  try {
  const [ev] = await db.get('eventos', `?id=eq.${id}`);
  document.getElementById('evento-id').value = ev.id;
- document.getElementById('ev-artista').value = ev.artista;
+ document.getElementById('ev-artista').value = ev.artista || '';
  document.getElementById('ev-tour').value = ev.tour || '';
- document.getElementById('ev-fecha').value = ev.fecha;
+ document.getElementById('ev-fecha').value = ev.fecha || '';
  document.getElementById('ev-fecha-fin').value = ev.fecha_fin || '';
- document.getElementById('ev-ciudad').value = ev.ciudad;
- document.getElementById('ev-venue').value = ev.venue;
- document.getElementById('ev-tipo').value = ev.tipo;
- document.getElementById('ev-status').value = ev.status;
- document.getElementById('ev-transporte').value = String(ev.tiene_transporte_largo);
- document.getElementById('ev-traslados').value = String(ev.tiene_traslados_internos);
+ document.getElementById('ev-ciudad').value = ev.ciudad || '';
+ document.getElementById('ev-venue').value = ev.venue || '';
+ document.getElementById('ev-tipo').value = ev.tipo || 'Concierto';
+ document.getElementById('ev-color').value = ev.color || 'azul';
  document.getElementById('ev-promotor').value = ev.promotor || '';
+ document.getElementById('ev-nota').value = ev.nota_cliente || '';
+ document.getElementById('ev-status').value = ev.status || '';
+ document.getElementById('ev-banco').value = ev.banco || 'default';
+ document.getElementById('ev-cdmx').checked = !!ev.cdmx;
+ document.getElementById('ev-traslados').checked = !!ev.tiene_traslados_internos;
+ document.getElementById('ev-transporte').checked = !!ev.tiene_transporte_largo;
+ document.getElementById('ev-promo').checked = !!ev.promo;
+ document.getElementById('ev-rideonly').checked = !!ev.ride_only;
+ document.getElementById('ev-cheaponly').checked = !!ev.cheap_only;
+ document.getElementById('ev-listonly').checked = !!ev.list_only;
+ document.getElementById('ev-sep').value = ev.separo || '';
+ document.getElementById('ev-ride').value = ev.ride_precio || '';
  document.getElementById('ev-imagen').value = ev.imagen_url || '';
  document.getElementById('ev-notas').value = ev.notas || '';
- document.getElementById('modal-evento-title').textContent = 'Editar Evento';
+ // Flash promo
+ const fp = ev.flash_promo ? (typeof ev.flash_promo === 'string' ? JSON.parse(ev.flash_promo) : ev.flash_promo) : null;
+ document.getElementById('ev-dsc-codigo').value = fp?.code || '';
+ document.getElementById('ev-dsc-pct').value = fp?.pct || '';
+ document.getElementById('ev-dsc-exp').value = fp?.expiresTs ? new Date(fp.expiresTs).toISOString().slice(0,16) : '';
+ // Listas dinámicas
+ iniciarIncluye(ev.incluye ? JSON.parse(ev.incluye) : []);
+ iniciarZonas('plus', ev.zonas_plus ? JSON.parse(ev.zonas_plus) : []);
+ iniciarZonas('cheap', ev.zonas_cheap ? JSON.parse(ev.zonas_cheap) : []);
+ iniciarHotel(ev.hotel_opciones ? JSON.parse(ev.hotel_opciones) : []);
+ iniciarPagos(ev.pagos_calendario ? JSON.parse(ev.pagos_calendario) : []);
+ document.getElementById('modal-evento-title').textContent = 'Editar: ' + ev.artista;
  openModal('modal-evento');
- } catch(e) { alert(e.message); }
+ } catch(e) { alert('Error al cargar evento: ' + e.message); }
 }
 
 async function eliminarEvento(id) {
  if (!confirm('¿Eliminar este evento? Se borrarán también sus reservaciones.')) return;
  try { await db.delete('eventos', id); loadCapsule(); }
  catch(e) { alert(e.message); }
+}
+
+// ─── LISTAS DINÁMICAS DEL FORMULARIO ───
+
+function iniciarIncluye(items) {
+ const c = document.getElementById('ev-incluye-lista');
+ c.innerHTML = '';
+ (items.length ? items : ['']).forEach(v => agregarIncluyeItem(v));
+}
+function agregarIncluye() { agregarIncluyeItem(''); }
+function agregarIncluyeItem(val) {
+ const c = document.getElementById('ev-incluye-lista');
+ const d = document.createElement('div');
+ d.style.cssText = 'display:flex;gap:6px;margin-bottom:6px';
+ d.innerHTML = `<input type="text" placeholder="Ej: Boleto zona elegida" value="${val}"
+ style="flex:1;background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:7px;
+ padding:8px 10px;color:var(--text);font-family:Montserrat,sans-serif;font-size:12px;outline:none">
+ <button class="btn btn-red btn-sm" onclick="this.parentElement.remove()">X</button>`;
+ c.appendChild(d);
+}
+function leerIncluye() {
+ return Array.from(document.querySelectorAll('#ev-incluye-lista input'))
+ .map(i => i.value.trim()).filter(Boolean);
+}
+
+function iniciarZonas(tipo, items) {
+ const c = document.getElementById(`ev-zonas-${tipo}`);
+ c.innerHTML = '';
+ (items.length ? items : []).forEach(z => agregarZonaItem(tipo, z));
+}
+function agregarZona(tipo) { agregarZonaItem(tipo, {}); }
+function agregarZonaItem(tipo, z) {
+ const c = document.getElementById(`ev-zonas-${tipo}`);
+ const d = document.createElement('div');
+ d.style.cssText = 'display:grid;grid-template-columns:2fr 1fr auto auto auto;gap:6px;margin-bottom:6px;align-items:center';
+ d.innerHTML = `
+ <input type="text" placeholder="Nombre zona" value="${z.n||''}"
+ style="background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:7px;
+ padding:8px 10px;color:var(--text);font-family:Montserrat,sans-serif;font-size:12px;outline:none">
+ <input type="number" placeholder="Precio" value="${z.p||''}" min="0"
+ style="background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:7px;
+ padding:8px 10px;color:var(--text);font-family:Montserrat,sans-serif;font-size:12px;outline:none">
+ <label style="display:flex;align-items:center;gap:4px;font-size:11px;cursor:pointer;white-space:nowrap">
+ <input type="checkbox" ${z.vip?'checked':''}> VIP
+ </label>
+ <label style="display:flex;align-items:center;gap:4px;font-size:11px;cursor:pointer;white-space:nowrap">
+ <input type="checkbox" ${z.ag?'checked':''}> Agotado
+ </label>
+ <button class="btn btn-red btn-sm" onclick="this.parentElement.remove()">X</button>`;
+ c.appendChild(d);
+}
+function leerZonas(tipo) {
+ return Array.from(document.querySelectorAll(`#ev-zonas-${tipo} > div`)).map(d => {
+ const inputs = d.querySelectorAll('input');
+ const checks = d.querySelectorAll('input[type=checkbox]');
+ const n = inputs[0].value.trim();
+ const p = parseFloat(inputs[1].value) || 0;
+ if (!n) return null;
+ const obj = { n, p };
+ if (checks[0].checked) obj.vip = 1;
+ if (checks[1].checked) obj.ag = 1;
+ return obj;
+ }).filter(Boolean);
+}
+
+function iniciarHotel(items) {
+ const c = document.getElementById('ev-hotel-lista');
+ c.innerHTML = '';
+ (items.length ? items : [
+ {n:'Compartida', e:0},
+ {n:'Triple', e:250},
+ {n:'Doble', e:650},
+ {n:'Individual', e:1960}
+ ]).forEach(h => agregarHotelItem(h));
+}
+function agregarHotel() { agregarHotelItem({n:'', e:0}); }
+function agregarHotelItem(h) {
+ const c = document.getElementById('ev-hotel-lista');
+ const d = document.createElement('div');
+ d.style.cssText = 'display:grid;grid-template-columns:2fr 1fr auto;gap:6px;margin-bottom:6px;align-items:center';
+ d.innerHTML = `
+ <input type="text" placeholder="Tipo habitación" value="${h.n||''}"
+ style="background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:7px;
+ padding:8px 10px;color:var(--text);font-family:Montserrat,sans-serif;font-size:12px;outline:none">
+ <input type="number" placeholder="Extra $" value="${h.e||0}" min="0"
+ style="background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:7px;
+ padding:8px 10px;color:var(--text);font-family:Montserrat,sans-serif;font-size:12px;outline:none">
+ <button class="btn btn-red btn-sm" onclick="this.parentElement.remove()">X</button>`;
+ c.appendChild(d);
+}
+function leerHotel() {
+ return Array.from(document.querySelectorAll('#ev-hotel-lista > div')).map(d => {
+ const inputs = d.querySelectorAll('input');
+ const n = inputs[0].value.trim();
+ if (!n) return null;
+ return { n, e: parseFloat(inputs[1].value) || 0 };
+ }).filter(Boolean);
+}
+
+function iniciarPagos(items) {
+ const c = document.getElementById('ev-pagos-lista');
+ c.innerHTML = '';
+ (items.length ? items : [
+ {l:'Separo', d:'Hoy'},
+ {l:'Pago 1', d:''}
+ ]).forEach(p => agregarPagoItem(p));
+}
+function agregarPago() { agregarPagoItem({l:'', d:''}); }
+function agregarPagoItem(p) {
+ const c = document.getElementById('ev-pagos-lista');
+ const d = document.createElement('div');
+ d.style.cssText = 'display:grid;grid-template-columns:1fr 2fr auto;gap:6px;margin-bottom:6px;align-items:center';
+ d.innerHTML = `
+ <input type="text" placeholder="Label (Separo, Pago 1...)" value="${p.l||''}"
+ style="background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:7px;
+ padding:8px 10px;color:var(--text);font-family:Montserrat,sans-serif;font-size:12px;outline:none">
+ <input type="text" placeholder="Fechas (ej: 9-16 abr)" value="${p.d||''}"
+ style="background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:7px;
+ padding:8px 10px;color:var(--text);font-family:Montserrat,sans-serif;font-size:12px;outline:none">
+ <button class="btn btn-red btn-sm" onclick="this.parentElement.remove()">X</button>`;
+ c.appendChild(d);
+}
+function leerPagos() {
+ return Array.from(document.querySelectorAll('#ev-pagos-lista > div')).map(d => {
+ const inputs = d.querySelectorAll('input');
+ const l = inputs[0].value.trim();
+ if (!l) return null;
+ return { l, d: inputs[1].value.trim(), s: l.toLowerCase() === 'separo' ? 1 : 0 };
+ }).filter(Boolean);
 }
 
 async function editarReservacion(id) {

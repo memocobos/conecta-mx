@@ -4611,7 +4611,11 @@ function showLoadingResumen(){
 }
 
 function populateEventoSelect(){
-  const proximos = eventosCache.filter(e=>e.fields.Status==='Próximo');
+  const _hoy = new Date(); _hoy.setHours(0,0,0,0);
+  const proximos = eventosCache
+    .filter(e=>e.fields.Status==='Próximo')
+    .filter(e=>e.fields.Fecha && new Date(e.fields.Fecha+'T12:00:00') >= _hoy)
+    .sort((a,b)=> new Date(a.fields.Fecha) - new Date(b.fields.Fecha));
   ['evento-select','pago-evento'].forEach(id=>{
     const sel=document.getElementById(id); if(!sel) return;
     sel.innerHTML='<option value="">— Seleccionar —</option>';
@@ -4628,7 +4632,16 @@ async function loadResumen(){
   ]);
   const totalCobrado = pagos.reduce((a,p)=>a+(p.fields.Monto||0),0);
   const totalPorCobrar = reservCache.reduce((a,r)=>a+Math.max(0,(r.fields['Total a pagar']||0)-(r.fields['Total abonado']||0)),0);
-  const proximos = eventosCache.filter(e=>e.fields.Status==='Próximo');
+  // FIX: filtrar por fecha futura, no solo por Status (había eventos pasados con Status "Próximo")
+  const _hoy = new Date(); _hoy.setHours(0,0,0,0);
+  const proximos = eventosCache
+    .filter(e=>e.fields.Status==='Próximo')
+    .filter(e=>e.fields.Fecha && new Date(e.fields.Fecha+'T12:00:00') >= _hoy)
+    .sort((a,b)=> new Date(a.fields.Fecha) - new Date(b.fields.Fecha));
+  // Clientes únicos con reservación (no cuenta reservaciones repetidas)
+  const _clienteIds = new Set();
+  reservCache.forEach(r=>{ const c=r.fields.Cliente?.[0]; if(c) _clienteIds.add(c); });
+  const viajerosUnicos = _clienteIds.size;
   const currentYear = new Date().getFullYear();
   const viajerosYear = countViajerosYear(currentYear);
 
@@ -4697,9 +4710,9 @@ async function loadResumen(){
         <div class="metric-sub">Saldo pendiente</div>
       </div>
       <div class="metric-card azul">
-        <div class="metric-label">Reservaciones</div>
-        <div class="metric-val">${reservCache.length}</div>
-        <div class="metric-sub">Clientes activos</div>
+        <div class="metric-label">Viajeros activos</div>
+        <div class="metric-val">${viajerosUnicos.toLocaleString('es-MX')}</div>
+        <div class="metric-sub">${reservCache.length} reservaciones</div>
       </div>
       <div class="metric-card am">
         <div class="metric-label">Próximos eventos</div>
@@ -4767,9 +4780,24 @@ async function loadResumen(){
       <div class="card-title" onclick="toggleCard(this)">Últimos pagos <span class="chev">▼</span></div>
       <div class="card-body">`;
   [...pagos].sort((a,b)=>new Date(b.createdTime)-new Date(a.createdTime)).slice(0,6).forEach(p=>{
+    // FIX: resolver nombre del viajero a través de Reservación → Cliente
+    const resId = p.fields['Reservación']?.[0];
+    const reserv = resId ? reservCache.find(r=>r.id===resId) : null;
+    const cliId = reserv?.fields.Cliente?.[0];
+    const cliente = cliId ? clientesCache[cliId] : null;
+    const nombreViajero = cliente?.['Nombre completo'] || p.fields.Referencia || 'Pago';
+    const eventoId = reserv?.fields.Evento?.[0];
+    const ev = eventoId ? eventosCache.find(e=>e.id===eventoId) : null;
+    const evNombre = ev?.fields.Nombre || '';
+    const fechaPago = p.fields['Fecha de pago']
+      ? new Date(p.fields['Fecha de pago']+'T12:00:00').toLocaleDateString('es-MX',{day:'numeric',month:'short'})
+      : new Date(p.createdTime).toLocaleDateString('es-MX',{day:'numeric',month:'short'});
     html+=`<div class="alerta-row">
       <div class="alerta-dot" style="background:var(--ve)"></div>
-      <span style="flex:1;font-size:12px">${esc(p.fields.Referencia||'Pago')}</span>
+      <span style="flex:1;font-size:12px">
+        <span style="font-weight:600">${esc(nombreViajero)}</span>
+        ${evNombre ? `<span style="color:var(--ts);font-size:10px;display:block;margin-top:2px">${esc(evNombre)} · ${esc(fechaPago)} · ${esc(p.fields['Método']||'')}</span>` : ''}
+      </span>
       <span class="badge badge-ve">${pesos(p.fields.Monto)}</span>
     </div>`;
   });
@@ -4879,23 +4907,8 @@ function detectarAlertasBusiness(eventos, reservas, pagos){
     });
   });
 
-  // 2. Eventos próximos sin mapa (señal operativa, distinta de Alarma de Cell)
-  (eventos||[]).forEach(ev => {
-    if(ev.fields?.Status !== 'Próximo') return;
-    const mapa = ev.fields?.Mapa || ev.fields?.mapa || '';
-    const f = ev.fields?.Fecha ? Date.parse(ev.fields.Fecha+'T00:00:00') : null;
-    if(!mapa && f && f > now){
-      const diasFalta = Math.round((f - now)/86400000);
-      if(diasFalta < 30){
-        out.push({
-          level: diasFalta < 7 ? 'danger' : 'warn',
-          msg: `<b>${esc(ev.fields.Nombre||'')}</b> sin mapa · faltan ${diasFalta} días`,
-          when: fechaCorta(f),
-          ts: now
-        });
-      }
-    }
-  });
+  // 2. (DESACTIVADO) Eventos próximos sin mapa — el campo no existe en Airtable.
+  //    Si en el futuro se agrega un campo "Mapa" o "Mapa URL", reactivar este bloque.
 
   // 3. Pagos sin comprobante (proxy = sin Referencia porque no hay campo Comprobante aún)
   const pagosSinRef = (pagos||[]).filter(p => !(p.fields?.Referencia||p.fields?.Cliente||'').toString().trim()).length;
@@ -5013,16 +5026,7 @@ function detectarAlertas(eventos, reservas, pagos){
       detail: esc(sinZonas.slice(0,5).map(e=>e.fields.Nombre||'').join(' · ')) + (sinZonas.length>5?'…':'')});
   }
 
-  // Eventos sin mapa
-  const sinMapa = eventos.filter(e=>{
-    const m = e.fields.Mapa||e.fields.mapa||'';
-    return !m || (typeof m==='string' && !m.trim());
-  });
-  if(sinMapa.length){
-    out.push({level:'warn',ico:'',count:sinMapa.length,
-      msg:'Eventos sin mapa',
-      detail: esc(sinMapa.slice(0,5).map(e=>e.fields.Nombre||'').join(' · ')) + (sinMapa.length>5?'…':'')});
-  }
+  // (Alerta "sin mapa" desactivada — el campo Mapa no existe en Airtable)
 
   // Eventos con fecha pasada que siguen como "Próximo" o disponibles
   const pasadoActivo = eventos.filter(e=>{
@@ -6370,7 +6374,11 @@ async function registrarGasto(){
 
 // ── VENDEDOR ──────────────────────────────────────────────────────────────
 function loadVendedor(){
-  const proximos=eventosCache.filter(e=>e.fields.Status==='Próximo');
+  const _hoy = new Date(); _hoy.setHours(0,0,0,0);
+  const proximos = eventosCache
+    .filter(e=>e.fields.Status==='Próximo')
+    .filter(e=>e.fields.Fecha && new Date(e.fields.Fecha+'T12:00:00') >= _hoy)
+    .sort((a,b)=> new Date(a.fields.Fecha) - new Date(b.fields.Fecha));
   let html=`<div class="card"><div class="card-title">Precios — próximos eventos</div>
     <table><thead><tr>
       <th>Evento</th><th>Fecha</th><th>Ciudad</th>

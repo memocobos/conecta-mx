@@ -438,6 +438,8 @@ body.chat-open,body.wizard-open{overscroll-behavior:none}
   padding:10px 0;overflow:hidden;
   border-bottom:1px solid #000;
   position:relative;z-index:20;
+  -webkit-mask-image:linear-gradient(90deg,transparent 0,#000 32px,#000 calc(100% - 32px),transparent 100%);
+          mask-image:linear-gradient(90deg,transparent 0,#000 32px,#000 calc(100% - 32px),transparent 100%);
 }
 .marquee-red-track{
   display:flex;gap:48px;white-space:nowrap;
@@ -1663,8 +1665,10 @@ function renderCatalog(){
       var qArtist=String(rawQ).replace(/"/g,'&quot;').replace(/'/g,'&#39;');
       playBtn='<button class="ev-play" data-artist="'+qArtist+'" aria-label="Preview de música" onclick="event.stopPropagation();previewTrack(this)"><span class="ev-play-ico">▶</span></button>';
     }
-    if(staticSrc||ev.img){
-      imgHTML='<div class="ev-img-wrap"><img class="ev-img" loading="lazy" decoding="async" src="'+(staticSrc||'')+'" alt="'+ev.a+'" />'+playBtn+'</div>';
+    if(staticSrc){
+      var initials=ev.a.substring(0,2).toUpperCase();
+      var fallback="this.parentElement.outerHTML='<div class=\\'ev-img-placeholder\\'><span class=\\'ev-img-initials\\'>"+initials+"</span></div>'";
+      imgHTML='<div class="ev-img-wrap"><img class="ev-img" loading="lazy" decoding="async" src="'+staticSrc+'" alt="'+ev.a+'" onerror="'+fallback+'" />'+playBtn+'</div>';
     }else{
       imgHTML='<div class="ev-img-placeholder"><span class="ev-img-initials">'+ev.a.substring(0,2).toUpperCase()+'</span>'+playBtn+'</div>';
     }
@@ -3737,7 +3741,7 @@ function cerrarBienvenida(){
 (function(){
   if(window.matchMedia('(display-mode:standalone)').matches)return;
   if(window.navigator.standalone)return;
-  if(localStorage.getItem('pwa-dismissed'))return;
+  if(localStorage.getItem('pwa-banner-dismissed')||localStorage.getItem('pwa-dismissed'))return;
   var isMobile=/Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
   if(!isMobile)return;
 
@@ -3783,11 +3787,13 @@ function cerrarBienvenida(){
       sub.textContent='Agrega la app a tu pantalla de inicio';
     }
     banner.style.display='block';
+    document.body.style.paddingBottom='96px';
   },5000);
 
   document.getElementById('pwa-close').onclick=function(){
     banner.style.display='none';
-    localStorage.setItem('pwa-dismissed','1');
+    document.body.style.paddingBottom='';
+    localStorage.setItem('pwa-banner-dismissed','1');
   };
 })();
 </script>

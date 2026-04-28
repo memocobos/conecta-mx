@@ -814,6 +814,124 @@ tr:hover td{background:rgba(255,107,0,.03)}
  </div>
  </div>
 
+ <!-- ─── COTIZADOR ─── -->
+ <div class="page" id="page-cotizador">
+ <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+ <div class="section-title">Cotizador</div>
+ <button class="btn btn-ghost btn-sm" onclick="resetCotizador()">↺ Limpiar</button>
+ </div>
+ <div class="section-sub">Calcula el costo por viajero y genera el evento en Capsule Corp</div>
+ <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+ <div style="display:flex;flex-direction:column;gap:14px">
+ <div class="card">
+ <div class="cot-section-label">📌 Evento</div>
+ <div class="form-row cols-2">
+ <div class="form-group"><label>Artista / Nombre *</label><input type="text" id="cot-artista" placeholder="Ej: Bad Bunny" oninput="recalcular()"></div>
+ <div class="form-group"><label>Tour / Show</label><input type="text" id="cot-tour" placeholder="Ej: Most Wanted Tour"></div>
+ </div>
+ <div class="form-row cols-2">
+ <div class="form-group"><label>Fecha *</label><input type="date" id="cot-fecha" oninput="recalcular()"></div>
+ <div class="form-group"><label>Ciudad *</label>
+ <select id="cot-ciudad" onchange="onCotCiudadChange()">
+ <option value="monterrey">Monterrey</option>
+ <option value="cdmx">CDMX</option>
+ <option value="otra">Otra ciudad</option>
+ </select></div>
+ </div>
+ <div class="form-row cols-2">
+ <div class="form-group"><label>Venue</label><input type="text" id="cot-venue" placeholder="Ej: Estadio GNP"></div>
+ <div class="form-group"><label>Tipo</label>
+ <select id="cot-tipo" onchange="onCotTipoChange()">
+ <option value="concierto">Concierto</option>
+ <option value="festival">Festival multidía</option>
+ </select></div>
+ </div>
+ <div id="cot-festival-row" style="display:none">
+ <div class="form-row cols-2">
+ <div class="form-group"><label>Noches de hotel</label><input type="number" id="cot-noches-festival" min="1" max="7" value="3" oninput="recalcular()"></div>
+ <div class="form-group"><label>Días de abono máximo</label><input type="number" id="cot-dias-abono" min="1" max="7" value="3" oninput="recalcular()"></div>
+ </div>
+ </div>
+ </div>
+ <div class="card">
+ <div class="cot-section-label">🚌 Transporte Reynosa → Ciudad</div>
+ <div id="cot-cdmx-nota" style="display:none;font-size:11px;color:var(--blue);margin-bottom:10px;padding:8px 10px;background:rgba(94,167,255,.08);border-radius:6px;border:1px solid rgba(94,167,255,.2)">CDMX: el transporte largo se vende aparte a cada viajero y NO entra al costo del paquete.</div>
+ <div id="cot-unidades-lista"></div>
+ <button class="btn btn-ghost btn-sm" onclick="agregarUnidad()" style="margin-top:8px">+ Agregar unidad</button>
+ </div>
+ <div class="card">
+ <div class="cot-section-label">🏨 Hotel</div>
+ <div class="form-row cols-3">
+ <div class="form-group"><label>Precio / noche / hab ($)</label><input type="number" id="cot-hotel-precio" min="0" oninput="recalcular()" placeholder="2500"></div>
+ <div class="form-group"><label>Noches</label><input type="number" id="cot-hotel-noches" min="1" value="1" oninput="recalcular()"></div>
+ <div class="form-group"><label>Personas por hab</label><input type="number" id="cot-hab-personas" min="1" value="3" oninput="recalcular()"></div>
+ </div>
+ <div style="font-size:11px;color:var(--ts)">Habitaciones viajeros (calculado): <span id="cot-hab-cantidad" style="color:var(--gold);font-weight:700">0</span></div>
+ </div>
+ <div class="card">
+ <div class="cot-section-label" style="display:flex;align-items:center;justify-content:space-between"><span>🎁 Kit del viajero</span><button class="btn btn-ghost btn-sm" onclick="agregarPiezaKit()">+ Pieza</button></div>
+ <div id="cot-kit-lista" style="margin-top:8px"></div>
+ <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border);font-size:12px;color:var(--ts)">Costo kit total: <span id="cot-kit-total" style="color:var(--gold);font-weight:700">$0</span></div>
+ </div>
+ <div class="card">
+ <div class="cot-section-label" style="display:flex;align-items:center;justify-content:space-between"><span>🎟️ Zonas / Boletos (PLUS)</span><button class="btn btn-ghost btn-sm" onclick="agregarZonaCot()">+ Zona</button></div>
+ <div style="font-size:11px;color:var(--ts);margin:6px 0 10px">El precio del boleto se suma al costo base por zona.</div>
+ <div id="cot-zonas-lista"></div>
+ </div>
+ <div class="card">
+ <div class="cot-section-label">👥 Staff</div>
+ <div style="font-size:10px;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:var(--ts);margin-bottom:8px">Coordinadores (1 por unidad)</div>
+ <div id="cot-coordis-lista"></div>
+ <div style="font-size:10px;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:var(--ts);margin:12px 0 6px">Choferes (1 por unidad · 2 por hab)</div>
+ <div id="cot-choferes-resumen" style="font-size:12px;color:var(--ts)">—</div>
+ <div style="height:1px;background:var(--border);margin:12px 0"></div>
+ <div style="font-size:10px;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:var(--ts);margin-bottom:8px">Creador de Contenido (opcional)</div>
+ <div class="form-row cols-2">
+ <div class="form-group"><label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" id="cot-cc-activo" onchange="onCCChange()"> Agregar creador de contenido</label></div>
+ <div class="form-group" id="cot-cc-origen-row" style="display:none"><label>Origen</label>
+ <select id="cot-cc-origen" onchange="recalcular()">
+ <option value="reynosa">De Reynosa (transporte + hotel + boletos)</option>
+ <option value="local">Local (solo boletos)</option>
+ </select></div>
+ </div>
+ <div id="cot-cc-boletos-row" style="display:none">
+ <div class="form-row cols-2">
+ <div class="form-group"><label>Zona boleto CC</label><select id="cot-cc-zona" onchange="recalcular()"><option value="">Selecciona zona...</option></select></div>
+ <div class="form-group"><label>Cantidad boletos</label><input type="number" id="cot-cc-cantidad" min="1" value="2" oninput="recalcular()"></div>
+ </div>
+ </div>
+ <div style="height:1px;background:var(--border);margin:12px 0"></div>
+ <div class="form-row cols-2">
+ <div class="form-group"><label>Utilidad por viajero ($)</label><input type="number" id="cot-utilidad" value="1000" min="0" oninput="recalcular()"></div>
+ <div class="form-group"><label>Viajeros (optimista)</label><input type="number" id="cot-viajeros-opt" min="1" value="30" oninput="recalcular()"></div>
+ </div>
+ </div>
+ </div>
+ <div style="display:flex;flex-direction:column;gap:14px">
+ <div class="card" style="border-color:rgba(255,107,0,.3)">
+ <div class="cot-section-label" style="color:var(--orange)">📊 Desglose de Costos</div>
+ <div id="cot-desglose"><div class="empty-state" style="padding:24px">Llena los campos para ver el cálculo</div></div>
+ </div>
+ <div class="card" style="border-color:rgba(255,215,0,.25)">
+ <div class="cot-section-label" style="color:var(--gold)">🎯 Escenarios de Precio PLUS</div>
+ <div style="font-size:11px;color:var(--ts);margin-bottom:12px">Precio base logística (sin boleto). El boleto varía por zona.</div>
+ <div id="cot-escenarios"><div class="empty-state" style="padding:24px">Esperando datos...</div></div>
+ </div>
+ <div class="card">
+ <div class="cot-section-label">🎫 Precio Final por Zona</div>
+ <div style="font-size:11px;color:var(--ts);margin-bottom:10px">Logística + boleto + utilidad (escenario realista)</div>
+ <div id="cot-precios-zonas"><div class="empty-state" style="padding:16px">Agrega zonas para ver precios</div></div>
+ </div>
+ <div class="card" style="border-color:rgba(61,220,132,.3)">
+ <div class="cot-section-label" style="color:var(--green)">🚀 Crear Evento</div>
+ <div style="font-size:12px;color:var(--ts);margin-bottom:14px">La info pasa a Capsule Corp para que termines de vestir y publicar el evento.</div>
+ <button class="btn btn-primary" style="width:100%;padding:14px" onclick="crearEventoDesdeCotizador()">✅ Crear Evento en Capsule Corp</button>
+ <div id="cot-crear-alert" style="margin-top:10px"></div>
+ </div>
+ </div>
+ </div>
+ </div>
+
  </div><!-- /content -->
 </div><!-- /app -->
 

@@ -400,7 +400,13 @@ body.chat-open,body.wizard-open{overscroll-behavior:none}
 .fbtn-exit-top10:hover{border-color:rgba(232,255,76,.5);color:#e8ff4c}
 #filter-btns.topmode .fbtn:not(.fbtn-top10):not(.fbtn-exit-top10){display:none !important}
 #filter-btns.topmode .fbtn-exit-top10{display:inline-flex}
-@media(max-width:640px){#filter-btns{flex-wrap:wrap}.fbtn-top10{flex:1 1 100%;margin-bottom:2px}#filter-btns.topmode .fbtn-exit-top10{flex:1 1 100%}}
+@media(max-width:640px){
+  #filter-btns{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+  #filter-btns::-webkit-scrollbar{display:none}
+  #filter-btns .fbtn{flex-shrink:0;white-space:nowrap}
+  .fbtn-top10{flex:0 0 auto;margin-bottom:0}
+  #filter-btns.topmode .fbtn-exit-top10{flex:0 0 auto}
+}
 .share-btn{width:100%;background:rgba(255,255,255,.06);border:2px solid rgba(255,255,255,.15);color:rgba(255,255,255,.7);font-size:12px;font-weight:900;text-transform:uppercase;letter-spacing:.1em;padding:13px 20px;cursor:pointer;font-family:Montserrat,sans-serif;margin-top:8px;transition:all .15s}
 .share-btn:hover{background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.3);color:#fff}
 
@@ -758,7 +764,7 @@ body.chat-open,body.wizard-open{overscroll-behavior:none}
 .cd-sep{font-family:'Barlow Condensed','Montserrat',sans-serif;font-weight:900;font-size:clamp(20px,5vw,32px);color:rgba(255,255,255,.25);line-height:1;padding-bottom:14px}
 @media(max-width:380px){.cd-cell{min-width:38px}.cd-sep{display:none}.cd-timer{gap:10px}}
 .hh-btn-rojo{background:#e8ff4c;color:#000;border:none}
-.hh-btn-rojo:hover{background:#fff;color:#000;box-shadow:0 14px 36px rgba(232,255,76,.5)}
+.hh-btn-rojo:hover{background:#e8ff4c;color:#000;transform:translateY(-2px);box-shadow:0 14px 36px rgba(232,255,76,.5)}
 /* CTA full width, padding vertical generoso */
 .hh-btn-full{
   width:100%;max-width:none;
@@ -1145,6 +1151,10 @@ src="https://www.facebook.com/tr?id=1685907946147007&ev=PageView&noscript=1"
 <style>
 .wa-float{position:fixed;bottom:20px;right:20px;width:56px;height:56px;background:#25D366;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;text-decoration:none;z-index:999;box-shadow:0 4px 16px rgba(37,211,102,.4);transition:transform .2s,box-shadow .2s}
 .wa-float:hover{transform:scale(1.1);box-shadow:0 6px 20px rgba(37,211,102,.6)}
+@media(max-width:768px){
+  .wa-float{bottom:90px !important}
+  .chat-fab{bottom:160px !important}
+}
 .ev-flash-badge{background:#ff283b;color:#fff;font-size:9px;font-weight:900;padding:5px 10px;text-align:center;font-family:'Montserrat',sans-serif;letter-spacing:.03em;animation:flashPulse 2s ease-in-out infinite}
 .ev-preventa-badge{background:#ff283b;color:#e8ff4c;font-size:10px;font-weight:900;padding:7px 10px;text-align:center;font-family:'Montserrat',sans-serif;letter-spacing:.06em;text-transform:uppercase;animation:preventaPulse 1.2s ease-in-out infinite;border-top:1px solid rgba(255,255,255,.08);border-bottom:1px solid rgba(255,255,255,.08)}
 .ev-preventa-badge .preventa-timer{color:#e8ff4c;font-family:'JetBrains Mono','Menlo',monospace;font-weight:900;letter-spacing:.1em;margin-left:4px;font-variant-numeric:tabular-nums;text-shadow:0 0 8px rgba(232,255,76,.45)}

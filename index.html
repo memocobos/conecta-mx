@@ -101,7 +101,7 @@ body.chat-open,body.wizard-open{overscroll-behavior:none}
 .ev-img{width:100%;height:100%;object-fit:cover;object-position:center top;display:block;filter:brightness(.65)}
 .ev-img-wrap{position:relative;overflow:hidden;width:100%;aspect-ratio:1/1;background:#1a1a1a}
 .ev-img-wrap::after{content:'';position:absolute;bottom:0;left:0;right:0;height:60px;background:linear-gradient(transparent,#111)}
-.ev-img-placeholder{width:100%;aspect-ratio:1/1;background:#1a1a1a;display:flex;align-items:center;justify-content:center}
+.ev-img-placeholder{position:relative;width:100%;aspect-ratio:1/1;background:#1a1a1a;display:flex;align-items:center;justify-content:center}
 .ev-img-initials{font-size:36px;font-weight:900;color:rgba(255,255,255,.1);text-transform:uppercase;letter-spacing:-.02em}
 .ev-img-festival{width:100%;aspect-ratio:1/1;background:#111;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:16px;text-align:center}
 .ev-fest-name{font-size:22px;font-weight:900;color:rgba(255,255,255,.8);text-transform:uppercase;letter-spacing:.02em;line-height:1.1}
@@ -665,7 +665,7 @@ body.chat-open,body.wizard-open{overscroll-behavior:none}
 
 /* Preview music button on event cards */
 .ev-play{
-  position:absolute;bottom:10px;right:10px;z-index:6;
+  position:absolute;top:10px;right:10px;z-index:6;
   width:36px;height:36px;border-radius:50%;
   background:#000;border:2px solid var(--c-amarillo);
   color:#fff;cursor:pointer;
@@ -1665,10 +1665,10 @@ function renderCatalog(){
       var qArtist=String(rawQ).replace(/"/g,'&quot;').replace(/'/g,'&#39;');
       playBtn='<button class="ev-play" data-artist="'+qArtist+'" aria-label="Preview de música" onclick="event.stopPropagation();previewTrack(this)"><span class="ev-play-ico">▶</span></button>';
     }
-    if(staticSrc){
+    if(staticSrc||ev.img){
       var initials=ev.a.substring(0,2).toUpperCase();
-      var fallback="this.parentElement.outerHTML='<div class=\\'ev-img-placeholder\\'><span class=\\'ev-img-initials\\'>"+initials+"</span></div>'";
-      imgHTML='<div class="ev-img-wrap"><img class="ev-img" loading="lazy" decoding="async" src="'+staticSrc+'" alt="'+ev.a+'" onerror="'+fallback+'" />'+playBtn+'</div>';
+      var onerr=staticSrc?(' onerror="this.parentElement.outerHTML=\'<div class=\\\'ev-img-placeholder\\\'><span class=\\\'ev-img-initials\\\'>'+initials+'</span></div>\'"'):'';
+      imgHTML='<div class="ev-img-wrap"><img class="ev-img" loading="lazy" decoding="async" src="'+(staticSrc||'')+'" alt="'+ev.a+'"'+onerr+' />'+playBtn+'</div>';
     }else{
       imgHTML='<div class="ev-img-placeholder"><span class="ev-img-initials">'+ev.a.substring(0,2).toUpperCase()+'</span>'+playBtn+'</div>';
     }

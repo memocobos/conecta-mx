@@ -369,65 +369,85 @@ tr:hover td{background:rgba(255,107,0,.03)}
 }
 
 /* ═══════════════════════════════════════════════
- COTIZADOR
+ COTIZADOR v3
 ═══════════════════════════════════════════════ */
-#page-cotizador .card { margin-bottom: 0 }
-.cot-section-label {
+#page-cotizador .card{margin-bottom:0}
+.cot-section-label{
  font-family:'Barlow Condensed',sans-serif;
  font-size:11px;font-weight:800;letter-spacing:.2em;
  text-transform:uppercase;color:var(--orange);
- margin-bottom:12px;
+ margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;
 }
-.cot-row {
- display:grid;grid-template-columns:2fr 1fr 1fr auto;
- gap:8px;align-items:center;margin-bottom:6px;
-}
-.cot-row input,
-.cot-row select {
- background:rgba(255,255,255,.04);border:1px solid var(--border);
+.cot-input{
+ width:100%;background:rgba(255,255,255,.04);border:1px solid var(--border);
  border-radius:7px;padding:8px 10px;color:var(--text);
  font-family:'Montserrat',sans-serif;font-size:12px;outline:none;
- transition:border-color .2s;width:100%;
+ transition:border-color .2s;
 }
-.cot-row input:focus,.cot-row select:focus { border-color:var(--orange) }
-.cot-desglose-row {
+.cot-input:focus{border-color:var(--orange)}
+.cot-input[readonly]{color:var(--ts);cursor:not-allowed}
+.cot-desglose-row{
  display:flex;justify-content:space-between;align-items:center;
- padding:6px 0;border-bottom:1px solid rgba(255,255,255,.04);
- font-size:12px;
+ padding:5px 0;border-bottom:1px solid rgba(255,255,255,.04);font-size:12px;
 }
-.cot-desglose-row:last-child { border-bottom:none }
-.cot-desglose-label { color:var(--ts) }
-.cot-desglose-valor { font-weight:600;color:var(--text) }
-.cot-desglose-total {
+.cot-desglose-row:last-child{border-bottom:none}
+.cot-desglose-total{
  display:flex;justify-content:space-between;align-items:center;
- padding:10px 0 0;margin-top:6px;border-top:2px solid var(--border2);
- font-family:'Barlow Condensed',sans-serif;
- font-size:16px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;
+ padding:8px 0 0;margin-top:4px;border-top:2px solid var(--border2);
+ font-family:'Barlow Condensed',sans-serif;font-size:15px;font-weight:800;
+ letter-spacing:.06em;text-transform:uppercase;
 }
-.cot-escenario {
+.cot-escenario{
  display:flex;align-items:center;justify-content:space-between;
- padding:12px 14px;border-radius:8px;border:1px solid var(--border);
- transition:all .2s;
+ padding:10px 14px;border-radius:8px;border:1px solid var(--border);margin-bottom:8px;
 }
-.cot-escenario.pesimista { border-color:rgba(255,68,68,.2);background:rgba(255,68,68,.04) }
-.cot-escenario.realista { border-color:rgba(255,215,0,.3);background:rgba(255,215,0,.05) }
-.cot-escenario.optimista { border-color:rgba(61,220,132,.25);background:rgba(61,220,132,.04) }
-.cot-esc-label { font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase }
-.cot-esc-pct { font-size:10px;color:var(--ts);margin-top:2px }
-.cot-esc-precio {
- font-family:'Barlow Condensed',sans-serif;
- font-size:24px;font-weight:900;letter-spacing:.05em;
+.cot-escenario.pesimista{border-color:rgba(255,68,68,.25);background:rgba(255,68,68,.04)}
+.cot-escenario.realista{border-color:rgba(255,215,0,.3);background:rgba(255,215,0,.04)}
+.cot-escenario.optimista{border-color:rgba(61,220,132,.25);background:rgba(61,220,132,.04)}
+.cot-esc-label{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase}
+.cot-esc-sub{font-size:10px;color:var(--ts);margin-top:2px}
+.cot-esc-precio{font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:900;letter-spacing:.04em;text-align:right}
+.cot-paquete-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:8px}
+.cot-pkg{text-align:center;border-radius:8px;padding:10px 8px;border:1px solid var(--border)}
+.cot-pkg-nombre{font-size:9px;font-weight:800;letter-spacing:.15em;text-transform:uppercase;margin-bottom:4px}
+.cot-pkg-precio{font-family:'Barlow Condensed',sans-serif;font-size:21px;font-weight:900}
+.cot-pkg-sub{font-size:9px;color:var(--ts);margin-top:2px}
+.cot-staff-card{
+ background:rgba(255,255,255,.03);border:1px solid var(--border);
+ border-radius:8px;padding:10px 12px;margin-bottom:8px;
 }
-.cot-zona-precio {
- display:flex;justify-content:space-between;align-items:center;
- padding:8px 0;border-bottom:1px solid rgba(255,255,255,.04);
+.cot-staff-costo{
+ display:inline-block;font-family:'Barlow Condensed',sans-serif;
+ font-size:13px;font-weight:800;color:var(--orange);
+ background:rgba(255,107,0,.1);border:1px solid rgba(255,107,0,.2);
+ border-radius:4px;padding:2px 8px;margin-left:8px;
 }
-.cot-zona-precio:last-child { border-bottom:none }
-@media(max-width:900px) {
- #page-cotizador > div > div:first-child + div > div { /* grid wrapper */
- grid-template-columns:1fr !important;
- }
+.cot-tabs{display:flex;gap:6px;margin-bottom:14px}
+.cot-tab{
+ font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:800;
+ letter-spacing:.1em;text-transform:uppercase;padding:6px 14px;
+ border-radius:6px;border:1px solid var(--border);
+ background:none;color:var(--ts);cursor:pointer;transition:all .2s;
 }
+.cot-tab.active{background:rgba(255,107,0,.15);border-color:var(--orange);color:var(--orange)}
+.cot-mode{display:none}
+.cot-mode.active{display:block}
+.cot-kit-item{
+ display:flex;align-items:center;gap:8px;padding:5px 0;
+ border-bottom:1px solid rgba(255,255,255,.04);font-size:12px;
+}
+.cot-kit-item:last-child{border-bottom:none}
+.cot-kit-item input[type=checkbox]{accent-color:var(--orange);width:14px;height:14px;cursor:pointer}
+.cot-event-header{
+ background:rgba(255,107,0,.06);border:1px solid rgba(255,107,0,.15);
+ border-radius:8px;padding:12px 14px;margin-bottom:14px;
+}
+.cot-event-header-titulo{
+ font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:900;
+ letter-spacing:.06em;text-transform:uppercase;color:var(--text);line-height:1.1;
+}
+.cot-event-header-sub{font-size:11px;color:var(--ts);margin-top:4px;line-height:1.6}
+
 </style>
 </head>
 <body>
@@ -818,121 +838,332 @@ tr:hover td{background:rgba(255,107,0,.03)}
  <div class="page" id="page-cotizador">
  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
  <div class="section-title">Cotizador</div>
+ <div style="display:flex;gap:8px">
+ <button class="btn btn-ghost btn-sm" onclick="guardarSesionCot()">💾 Guardar sesión</button>
  <button class="btn btn-ghost btn-sm" onclick="resetCotizador()">↺ Limpiar</button>
  </div>
- <div class="section-sub">Calcula el costo por viajero y genera el evento en Capsule Corp</div>
- <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
- <div style="display:flex;flex-direction:column;gap:14px">
- <div class="card">
- <div class="cot-section-label">📌 Evento</div>
- <div class="form-row cols-2">
- <div class="form-group"><label>Artista / Nombre *</label><input type="text" id="cot-artista" placeholder="Ej: Bad Bunny" oninput="recalcular()"></div>
- <div class="form-group"><label>Tour / Show</label><input type="text" id="cot-tour" placeholder="Ej: Most Wanted Tour"></div>
  </div>
+ <div class="section-sub">Calcula precios por paquete · guarda sesiones · compara estimado vs real post-evento</div>
+
+ <div class="cot-tabs">
+ <button class="cot-tab active" onclick="switchCotMode('preventa',this)">📋 Preventa / Cotización</button>
+ <button class="cot-tab" onclick="switchCotMode('postevento',this)">✅ Post-Evento / Real</button>
+ </div>
+
+ <!-- ══ PREVENTA ══ -->
+ <div class="cot-mode active" id="cot-mode-preventa">
+ <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+
+ <!-- COL IZQ -->
+ <div style="display:flex;flex-direction:column;gap:14px">
+
+ <!-- EVENTO -->
+ <div class="card">
+ <div class="cot-section-label"><span>📌 Evento</span></div>
  <div class="form-row cols-2">
- <div class="form-group"><label>Fecha *</label><input type="date" id="cot-fecha" oninput="recalcular()"></div>
- <div class="form-group"><label>Ciudad *</label>
- <select id="cot-ciudad" onchange="onCotCiudadChange()">
+ <div class="form-group">
+ <label>Artista / Nombre *</label>
+ <input type="text" class="cot-input" id="cot-artista" placeholder="Ej: Bad Bunny" oninput="recalcular()">
+ </div>
+ <div class="form-group">
+ <label>Tour / Show</label>
+ <input type="text" class="cot-input" id="cot-tour" placeholder="Ej: Most Wanted Tour" oninput="recalcular()">
+ </div>
+ </div>
+
+ <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+ <label style="font-size:9px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:var(--ts)">Fechas</label>
+ <button class="btn btn-ghost btn-sm" onclick="agregarFechaCot()">+ Fecha</button>
+ </div>
+ <div id="cot-fechas-lista"></div>
+
+ <div class="form-row cols-2" style="margin-top:8px">
+ <div class="form-group">
+ <label>Ciudad *</label>
+ <select class="cot-input" id="cot-ciudad" onchange="onCotCiudadChange()">
  <option value="monterrey">Monterrey</option>
  <option value="cdmx">CDMX</option>
  <option value="otra">Otra ciudad</option>
- </select></div>
+ </select>
  </div>
- <div class="form-row cols-2">
- <div class="form-group"><label>Venue</label><input type="text" id="cot-venue" placeholder="Ej: Estadio GNP"></div>
- <div class="form-group"><label>Tipo</label>
- <select id="cot-tipo" onchange="onCotTipoChange()">
+ <div class="form-group">
+ <label>Tipo</label>
+ <select class="cot-input" id="cot-tipo" onchange="onCotTipoChange()">
  <option value="concierto">Concierto</option>
  <option value="festival">Festival multidía</option>
- </select></div>
+ </select>
  </div>
- <div id="cot-festival-row" style="display:none">
+ </div>
+
+ <div class="form-group" style="margin-top:6px">
+ <label>Venue</label>
+ <div style="position:relative">
+ <input type="text" class="cot-input" id="cot-venue" placeholder="Ej: Estadio GNP" oninput="filtrarVenues(this.value);recalcular()" autocomplete="off">
+ <div id="cot-venue-sugg" style="display:none;position:absolute;z-index:50;left:0;right:0;top:100%;background:var(--bg3);border:1px solid var(--border);border-radius:6px;margin-top:2px;max-height:140px;overflow-y:auto"></div>
+ </div>
+ <div style="display:flex;gap:6px;margin-top:6px">
+ <button class="btn btn-ghost btn-sm" onclick="guardarVenueCat()">+ Guardar venue</button>
+ <button class="btn btn-ghost btn-sm" onclick="verVenuesCat()">📋 Catálogo</button>
+ </div>
+ </div>
+
+ <div id="cot-festival-row" style="display:none;margin-top:6px">
  <div class="form-row cols-2">
- <div class="form-group"><label>Noches de hotel</label><input type="number" id="cot-noches-festival" min="1" max="7" value="3" oninput="recalcular()"></div>
- <div class="form-group"><label>Días de abono máximo</label><input type="number" id="cot-dias-abono" min="1" max="7" value="3" oninput="recalcular()"></div>
+ <div class="form-group">
+ <label>Días del festival</label>
+ <input type="number" class="cot-input" id="cot-dias-festival" min="1" max="7" value="3" oninput="syncFestivalNoches();recalcular()">
  </div>
- </div>
- </div>
- <div class="card">
- <div class="cot-section-label">🚌 Transporte Reynosa → Ciudad</div>
- <div id="cot-cdmx-nota" style="display:none;font-size:11px;color:var(--blue);margin-bottom:10px;padding:8px 10px;background:rgba(94,167,255,.08);border-radius:6px;border:1px solid rgba(94,167,255,.2)">CDMX: el transporte largo se vende aparte a cada viajero y NO entra al costo del paquete.</div>
- <div id="cot-unidades-lista"></div>
- <button class="btn btn-ghost btn-sm" onclick="agregarUnidad()" style="margin-top:8px">+ Agregar unidad</button>
- </div>
- <div class="card">
- <div class="cot-section-label">🏨 Hotel</div>
- <div class="form-row cols-3">
- <div class="form-group"><label>Precio / noche / hab ($)</label><input type="number" id="cot-hotel-precio" min="0" oninput="recalcular()" placeholder="2500"></div>
- <div class="form-group"><label>Noches</label><input type="number" id="cot-hotel-noches" min="1" value="1" oninput="recalcular()"></div>
- <div class="form-group"><label>Personas por hab</label><input type="number" id="cot-hab-personas" min="1" value="3" oninput="recalcular()"></div>
- </div>
- <div style="font-size:11px;color:var(--ts)">Habitaciones viajeros (calculado): <span id="cot-hab-cantidad" style="color:var(--gold);font-weight:700">0</span></div>
- </div>
- <div class="card">
- <div class="cot-section-label" style="display:flex;align-items:center;justify-content:space-between"><span>🎁 Kit del viajero</span><button class="btn btn-ghost btn-sm" onclick="agregarPiezaKit()">+ Pieza</button></div>
- <div id="cot-kit-lista" style="margin-top:8px"></div>
- <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border);font-size:12px;color:var(--ts)">Costo kit total: <span id="cot-kit-total" style="color:var(--gold);font-weight:700">$0</span></div>
- </div>
- <div class="card">
- <div class="cot-section-label" style="display:flex;align-items:center;justify-content:space-between"><span>🎟️ Zonas / Boletos (PLUS)</span><button class="btn btn-ghost btn-sm" onclick="agregarZonaCot()">+ Zona</button></div>
- <div style="font-size:11px;color:var(--ts);margin:6px 0 10px">El precio del boleto se suma al costo base por zona.</div>
- <div id="cot-zonas-lista"></div>
- </div>
- <div class="card">
- <div class="cot-section-label">👥 Staff</div>
- <div style="font-size:10px;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:var(--ts);margin-bottom:8px">Coordinadores (1 por unidad)</div>
- <div id="cot-coordis-lista"></div>
- <div style="font-size:10px;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:var(--ts);margin:12px 0 6px">Choferes (1 por unidad · 2 por hab)</div>
- <div id="cot-choferes-resumen" style="font-size:12px;color:var(--ts)">—</div>
- <div style="height:1px;background:var(--border);margin:12px 0"></div>
- <div style="font-size:10px;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:var(--ts);margin-bottom:8px">Creador de Contenido (opcional)</div>
- <div class="form-row cols-2">
- <div class="form-group"><label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" id="cot-cc-activo" onchange="onCCChange()"> Agregar creador de contenido</label></div>
- <div class="form-group" id="cot-cc-origen-row" style="display:none"><label>Origen</label>
- <select id="cot-cc-origen" onchange="recalcular()">
- <option value="reynosa">De Reynosa (transporte + hotel + boletos)</option>
- <option value="local">Local (solo boletos)</option>
- </select></div>
- </div>
- <div id="cot-cc-boletos-row" style="display:none">
- <div class="form-row cols-2">
- <div class="form-group"><label>Zona boleto CC</label><select id="cot-cc-zona" onchange="recalcular()"><option value="">Selecciona zona...</option></select></div>
- <div class="form-group"><label>Cantidad boletos</label><input type="number" id="cot-cc-cantidad" min="1" value="2" oninput="recalcular()"></div>
- </div>
- </div>
- <div style="height:1px;background:var(--border);margin:12px 0"></div>
- <div class="form-row cols-2">
- <div class="form-group"><label>Utilidad por viajero ($)</label><input type="number" id="cot-utilidad" value="1000" min="0" oninput="recalcular()"></div>
- <div class="form-group"><label>Viajeros (optimista)</label><input type="number" id="cot-viajeros-opt" min="1" value="30" oninput="recalcular()"></div>
- </div>
- </div>
- </div>
- <div style="display:flex;flex-direction:column;gap:14px">
- <div class="card" style="border-color:rgba(255,107,0,.3)">
- <div class="cot-section-label" style="color:var(--orange)">📊 Desglose de Costos</div>
- <div id="cot-desglose"><div class="empty-state" style="padding:24px">Llena los campos para ver el cálculo</div></div>
- </div>
- <div class="card" style="border-color:rgba(255,215,0,.25)">
- <div class="cot-section-label" style="color:var(--gold)">🎯 Escenarios de Precio PLUS</div>
- <div style="font-size:11px;color:var(--ts);margin-bottom:12px">Precio base logística (sin boleto). El boleto varía por zona.</div>
- <div id="cot-escenarios"><div class="empty-state" style="padding:24px">Esperando datos...</div></div>
- </div>
- <div class="card">
- <div class="cot-section-label">🎫 Precio Final por Zona</div>
- <div style="font-size:11px;color:var(--ts);margin-bottom:10px">Logística + boleto + utilidad (escenario realista)</div>
- <div id="cot-precios-zonas"><div class="empty-state" style="padding:16px">Agrega zonas para ver precios</div></div>
- </div>
- <div class="card" style="border-color:rgba(61,220,132,.3)">
- <div class="cot-section-label" style="color:var(--green)">🚀 Crear Evento</div>
- <div style="font-size:12px;color:var(--ts);margin-bottom:14px">La info pasa a Capsule Corp para que termines de vestir y publicar el evento.</div>
- <button class="btn btn-primary" style="width:100%;padding:14px" onclick="crearEventoDesdeCotizador()">✅ Crear Evento en Capsule Corp</button>
- <div id="cot-crear-alert" style="margin-top:10px"></div>
+ <div class="form-group">
+ <label>Noches de hotel</label>
+ <input type="number" class="cot-input" id="cot-noches-festival" min="1" max="7" value="3" oninput="syncFestivalNoches();recalcular()">
  </div>
  </div>
  </div>
  </div>
 
- </div><!-- /content -->
+ <!-- TRANSPORTE -->
+ <div class="card">
+ <div class="cot-section-label"><span>🚌 Transporte</span><button class="btn btn-ghost btn-sm" onclick="agregarUnidad()">+ Unidad</button></div>
+ <div id="cot-cdmx-nota" style="display:none;font-size:11px;color:var(--blue);margin-bottom:10px;padding:8px 10px;background:rgba(94,167,255,.08);border-radius:6px;border:1px solid rgba(94,167,255,.2)">
+ CDMX: el transporte largo no aplica. Solo traslados internos (aeropuerto, hotel, venue).
+ </div>
+ <div id="cot-unidades-lista"></div>
+ <div style="margin-top:10px;display:grid;grid-template-columns:1fr 1fr;gap:8px;padding-top:8px;border-top:1px solid var(--border)">
+ <div style="font-size:11px;color:var(--ts)">Capacidad neta: <span id="cot-capacidad-neta" style="color:var(--gold);font-weight:700">0</span> pax</div>
+ <div style="font-size:11px;color:var(--ts)">Costo transporte: <span id="cot-costo-transporte-lbl" style="color:var(--gold);font-weight:700">$0</span></div>
+ </div>
+ <div style="margin-top:8px">
+ <label style="font-size:9px;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:var(--ts)">🅿️ Estacionamiento ($)</label>
+ <input type="number" class="cot-input" id="cot-estacionamiento" placeholder="0" min="0" style="margin-top:4px" oninput="recalcular()">
+ </div>
+ </div>
+
+ <!-- HOTEL -->
+ <div class="card">
+ <div class="cot-section-label"><span>🏨 Hotel</span></div>
+ <div class="form-row cols-2">
+ <div class="form-group">
+ <label>Costo por habitación ($) *</label>
+ <input type="number" class="cot-input" id="cot-hotel-precio" min="0" oninput="recalcular()" placeholder="Ej: 10000">
+ </div>
+ <div class="form-group">
+ <label>Noches</label>
+ <input type="number" class="cot-input" id="cot-hotel-noches" min="1" value="1" oninput="recalcular()">
+ </div>
+ </div>
+ <div style="font-size:11px;color:var(--ts2);margin-top:4px">Cotizador usa: precio ÷ 4 personas × noches por viajero. Extras (doble/individual) se cobran aparte en la reservación.</div>
+ </div>
+
+ <!-- KIT -->
+ <div class="card">
+ <div class="cot-section-label"><span>🎁 Kit del viajero</span></div>
+ <div id="cot-kit-lista"></div>
+ <div id="cot-kit-extras"></div>
+ <button class="btn btn-ghost btn-sm" onclick="agregarKitExtra()" style="margin-top:8px">+ Otro item</button>
+ <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border);font-size:12px;color:var(--ts)">
+ Costo kit total: <span id="cot-kit-total" style="color:var(--gold);font-weight:700">$0</span>
+ </div>
+ </div>
+
+ <!-- ZONAS -->
+ <div class="card">
+ <div class="cot-section-label"><span>🎟️ Zonas / Boletos</span><button class="btn btn-ghost btn-sm" onclick="agregarZonaCot()">+ Zona</button></div>
+ <div style="font-size:11px;color:var(--ts);margin-bottom:10px">El precio del boleto se suma al costo base logístico por zona.</div>
+ <div id="cot-zonas-lista"></div>
+ <div style="display:flex;gap:6px;margin-top:8px">
+   <button class="btn btn-ghost btn-sm" onclick="guardarZonasCatalogo()">💾 Guardar zonas en catálogo</button>
+   <button class="btn btn-ghost btn-sm" onclick="verZonasCatalogo()">📋 Catálogo de zonas</button>
+ </div>
+ </div>
+
+ <!-- STAFF -->
+ <div class="card">
+ <div class="cot-section-label"><span>👥 Staff</span></div>
+
+ <!-- Coordinadores -->
+ <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+ <div style="font-size:10px;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:var(--ts)">Coordinadores</div>
+ <button class="btn btn-ghost btn-sm" onclick="agregarCoordinator()">+ Coordinador</button>
+ </div>
+ <div id="cot-coordis-lista"></div>
+
+ <!-- Choferes -->
+ <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
+ <div style="font-size:10px;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:var(--ts);margin-bottom:8px">Choferes</div>
+ <div style="display:flex;align-items:center;gap:10px">
+ <input type="number" class="cot-input" id="cot-num-choferes" min="0" value="1" style="width:60px" oninput="recalcular()">
+ <div style="font-size:12px;color:var(--ts)">
+ <span id="cot-choferes-habs" style="color:var(--gold);font-weight:600">1 hab</span> ·
+ <span id="cot-choferes-costo" style="color:var(--gold);font-weight:600">$0</span>
+ </div>
+ </div>
+ <div style="font-size:10px;color:var(--ts2);margin-top:4px">1 cama por chofer · 2 choferes = 1 cuarto doble · 3 = doble + individual</div>
+ </div>
+
+ <!-- Creadores de contenido -->
+ <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
+ <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+ <div style="font-size:10px;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:var(--ts)">Creadores de Contenido</div>
+ <button class="btn btn-ghost btn-sm" onclick="agregarCC()">+ CC</button>
+ </div>
+ <div id="cot-cc-lista"></div>
+ </div>
+
+ <!-- Gastos extra -->
+ <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
+ <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+ <div style="font-size:10px;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:var(--ts)">Gastos Extra</div>
+ <button class="btn btn-ghost btn-sm" onclick="agregarGastoExtra()">+ Gasto</button>
+ </div>
+ <div id="cot-gastos-extra"></div>
+ </div>
+
+ <!-- Ganancia por paquete -->
+ <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
+ <div style="font-size:10px;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:var(--ts);margin-bottom:8px">Ganancia por Paquete</div>
+ <div class="form-row cols-2">
+ <div class="form-group">
+ <label>Ganancia PLUS ($)</label>
+ <input type="number" class="cot-input" id="cot-ganancia-plus" value="1000" min="0" oninput="recalcular()">
+ </div>
+ <div class="form-group">
+ <label>Ganancia CHEAP ($)</label>
+ <input type="number" class="cot-input" id="cot-ganancia-cheap" value="1000" min="0" oninput="recalcular()">
+ </div>
+ </div>
+ <div style="font-size:10px;color:var(--ts2);margin-top:4px">STAY = PLUS − $500 · RIDE = fijo $2,700 Mty / $2,900 CDMX</div>
+ </div>
+ </div>
+
+ </div><!-- /col izq -->
+
+ <!-- COL DER -->
+ <div style="display:flex;flex-direction:column;gap:14px">
+
+ <!-- HEADER EVENTO -->
+ <div class="cot-event-header" id="cot-event-header">
+ <div class="cot-event-header-titulo" id="cot-header-titulo">—</div>
+ <div class="cot-event-header-sub" id="cot-header-sub"></div>
+ </div>
+
+ <!-- DESGLOSE -->
+ <div class="card" style="border-color:rgba(255,107,0,.3)">
+ <div class="cot-section-label" style="color:var(--orange)"><span>📊 Desglose por Persona</span></div>
+ <div id="cot-desglose"><div class="empty-state" style="padding:20px">Llena los campos para ver el cálculo</div></div>
+ </div>
+
+ <!-- ESCENARIOS -->
+ <div class="card" style="border-color:rgba(255,215,0,.25)">
+ <div class="cot-section-label" style="color:var(--gold)"><span>🎯 Escenarios (base logística)</span></div>
+ <div style="font-size:11px;color:var(--ts);margin-bottom:10px">Basado en capacidad neta del transporte. El boleto se suma por zona.</div>
+ <div id="cot-escenarios"><div class="empty-state" style="padding:20px">Agrega transporte para ver escenarios</div></div>
+ </div>
+
+ <!-- PRECIOS POR PAQUETE -->
+ <div class="card">
+ <div class="cot-section-label"><span>💰 Precios por Paquete y Zona</span></div>
+ <div style="font-size:11px;color:var(--ts);margin-bottom:10px">Escenario realista (80% capacidad)</div>
+ <div id="cot-precios-paquetes"><div class="empty-state" style="padding:16px">Agrega zonas para ver precios</div></div>
+ </div>
+
+ <!-- CREAR EVENTO -->
+ <div class="card" style="border-color:rgba(61,220,132,.3)">
+ <div class="cot-section-label" style="color:var(--green)"><span>🚀 Crear Evento en Capsule Corp</span></div>
+ <div style="font-size:12px;color:var(--ts);margin-bottom:14px">La info pasa a Capsule Corp. Terminas de vestirlo y lo publicas.</div>
+ <button class="btn btn-primary" style="width:100%;padding:14px" onclick="crearEventoDesdeCotizador()">✅ Crear Evento</button>
+ <div id="cot-crear-alert" style="margin-top:10px"></div>
+ </div>
+
+ <!-- SESIONES -->
+ <div class="card">
+ <div class="cot-section-label"><span>📁 Sesiones Guardadas</span></div>
+ <div id="cot-sesiones-lista"><div style="font-size:12px;color:var(--ts)">Sin sesiones guardadas</div></div>
+ </div>
+
+ </div><!-- /col der -->
+ </div><!-- /grid preventa -->
+ </div><!-- /mode preventa -->
+
+ <!-- ══ POST-EVENTO ══ -->
+ <div class="cot-mode" id="cot-mode-postevento">
+ <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+ <div style="display:flex;flex-direction:column;gap:14px">
+ <div class="card">
+ <div class="cot-section-label"><span>📂 Selecciona evento</span></div>
+ <select class="cot-input" id="post-sesion-sel" onchange="cargarSesionPostEvento(this.value)">
+ <option value="">Selecciona...</option>
+ </select>
+ </div>
+ <div class="card" id="post-datos-card" style="display:none">
+ <div class="cot-section-label"><span>📊 Datos Reales</span></div>
+ <div class="form-row cols-2">
+ <div class="form-group"><label>Viajeros PLUS reales</label><input type="number" class="cot-input" id="post-plus" min="0" value="0" oninput="calcularPostEvento()"></div>
+ <div class="form-group"><label>Viajeros STAY reales</label><input type="number" class="cot-input" id="post-stay" min="0" value="0" oninput="calcularPostEvento()"></div>
+ </div>
+ <div class="form-row cols-2">
+ <div class="form-group"><label>Viajeros RIDE reales</label><input type="number" class="cot-input" id="post-ride" min="0" value="0" oninput="calcularPostEvento()"></div>
+ <div class="form-group"><label>Viajeros CHEAP reales</label><input type="number" class="cot-input" id="post-cheap" min="0" value="0" oninput="calcularPostEvento()"></div>
+ </div>
+ <div style="height:1px;background:var(--border);margin:10px 0"></div>
+ <div class="form-row cols-2">
+ <div class="form-group"><label>Costo transporte real ($)</label><input type="number" class="cot-input" id="post-costo-transporte" min="0" value="0" oninput="calcularPostEvento()"></div>
+ <div class="form-group"><label>Costo hotel real ($)</label><input type="number" class="cot-input" id="post-costo-hotel" min="0" value="0" oninput="calcularPostEvento()"></div>
+ </div>
+ <div class="form-row cols-2">
+ <div class="form-group"><label>Costo kits real ($)</label><input type="number" class="cot-input" id="post-costo-kits" min="0" value="0" oninput="calcularPostEvento()"></div>
+ <div class="form-group"><label>Costo boletos real ($)</label><input type="number" class="cot-input" id="post-costo-boletos" min="0" value="0" oninput="calcularPostEvento()"></div>
+ </div>
+ <div class="form-row cols-2">
+ <div class="form-group"><label>Gastos extra reales ($)</label><input type="number" class="cot-input" id="post-gastos-extra" min="0" value="0" oninput="calcularPostEvento()"></div>
+ <div class="form-group"><label>Ingresos totales ($)</label><input type="number" class="cot-input" id="post-ingresos" min="0" value="0" oninput="calcularPostEvento()"></div>
+ </div>
+ <div style="margin-top:10px">
+ <label style="font-size:11px;color:var(--ts);display:block;margin-bottom:4px">Notas post-evento (ventas en persona, reventa, etc.)</label>
+ <textarea class="cot-input" id="post-notas" rows="3" placeholder="Ej: 3 boletos vendidos en puerta, 2 reventas..."></textarea>
+ </div>
+ <button class="btn btn-primary" style="width:100%;margin-top:10px" onclick="guardarPostEvento()">💾 Guardar datos reales</button>
+ </div>
+ </div>
+ <div style="display:flex;flex-direction:column;gap:14px">
+ <div class="card" id="post-comparativa-card" style="display:none">
+ <div class="cot-section-label" style="color:var(--orange)"><span>📈 Estimado vs Real</span></div>
+ <div id="post-comparativa"></div>
+ </div>
+ <div class="card" id="post-resultado-card" style="display:none">
+ <div class="cot-section-label" style="color:var(--green)"><span>✅ Resultado Final</span></div>
+ <div id="post-resultado"></div>
+ </div>
+ </div>
+ </div>
+ </div><!-- /mode postevento -->
+
+ <!-- MODAL VENUES -->
+ <div class="modal-overlay" id="modal-venues">
+ <div class="modal" style="max-width:480px">
+ <div class="modal-header">
+ <div class="modal-title">Catálogo de Venues</div>
+ <button class="modal-close" onclick="closeModal('modal-venues')">✕</button>
+ </div>
+ <div class="modal-body"><div id="venues-lista"></div></div>
+ </div>
+ </div>
+
+ <div class="modal-overlay" id="modal-zonas-cat">
+ <div class="modal" style="max-width:520px">
+ <div class="modal-header">
+ <div class="modal-title">📋 Catálogo de Zonas</div>
+ <button class="modal-close" onclick="closeModal('modal-zonas-cat')">✕</button>
+ </div>
+ <div class="modal-body">
+   <div style="font-size:11px;color:var(--ts);margin-bottom:12px">Zonas guardadas de eventos anteriores. Haz clic en una para cargarla al cotizador actual.</div>
+   <div id="zonas-cat-lista"></div>
+ </div>
+ </div>
+ </div>
+
+ </div><!-- /page-cotizador -->
+
+</div><!-- /content -->
 </div><!-- /app -->
 
 <!-- ═══════════════════════════════════════════════
@@ -1530,7 +1761,7 @@ function populateEventoSelects() {
  _eventosCache.forEach(ev => {
  const opt = document.createElement('option');
  opt.value = ev.id;
- opt.textContent = `${ev.artista} — ${fmtFecha(ev.fecha)}`;
+ opt.textContent = `${ev.artista}${ev.tour ? ' — '+ev.tour : ''} · ${fmtFecha(ev.fecha)}`;
  el.appendChild(opt);
  });
  });
@@ -1751,7 +1982,9 @@ async function loadViajeros() {
  try {
  _viajerosCache = await db.get('reservaciones',
  `?evento_id=eq.${evId}&select=*,clientes(nombre,telefono,correo,talla_playera,emergencia_tel)&order=created_at.asc`);
- resumen.textContent = `${_viajerosCache.length} viajeros`;
+ const evData = (_eventosCache||[]).find(e=>e.id==evId);
+ const evLabel = evData ? `${evData.artista}${evData.tour?' — '+evData.tour:''} · ${fmtFecha(evData.fecha)}` : '';
+ resumen.innerHTML = `<span style="font-weight:600;color:var(--text)">${evLabel}</span><span style="color:var(--ts);margin-left:8px">${_viajerosCache.length} viajeros</span>`;
  filterViajeros();
  } catch(e) {
  tbody.innerHTML = `<tr><td colspan="11"><div class="alert alert-error">${e.message}</div></td></tr>`;
@@ -2549,524 +2782,910 @@ document.addEventListener('keydown', e => {
 
 
 // ═══════════════════════════════════════════════════════════════
-// COTIZADOR
+// COTIZADOR v3
 // ═══════════════════════════════════════════════════════════════
 
-// Estado del cotizador
-let cot = {
-  unidades: [],    // [{tipo, capacidad, costo}]
-  kit: [],         // [{nombre, costo}]
-  zonas: [],       // [{nombre, precio}]
-  coordis: [],     // [{zona, habitPropia}] — uno por unidad
-  isCDMX: false,
-  isFestival: false,
+let COT = {
+  ciudad:'monterrey', isCDMX:false, isFestival:false,
+  fechas:[], unidades:[], coordis:[], cc:[],
+  zonas:[], kitItems:[], kitExtras:[], gastosExtra:[],
+  venues:[],
 };
 
-// Precios de vehículos
-const VEHICULOS = [
-  { label: 'Bus grande (48 pax)', capacidad: 48, costo: 22000 },
-  { label: 'Bus mediano (37 pax)', capacidad: 37, costo: 37000 },
-  { label: 'Van normal (15 pax)',  capacidad: 15, costo: 11000 },
-  { label: 'Van grande (19 pax)',  capacidad: 19, costo: 14000 },
+const KIT_DEFAULT = [
+  {id:'playera',   nombre:'Playera',         precio:93,  checked:true},
+  {id:'totebag',   nombre:'Tote bag',        precio:80,  checked:true},
+  {id:'morral',    nombre:'Morral',          precio:35,  checked:true},
+  {id:'vaso',      nombre:'Vaso',            precio:22,  checked:true},
+  {id:'cangurera', nombre:'Cangurera',       precio:70,  checked:true},
+  {id:'cupon',     nombre:'Cupón de comida', precio:90,  checked:false, esCupon:true},
+  {id:'newmix',    nombre:'New mix',         precio:10,  checked:true},
 ];
-// Precios hotel por ciudad
-const HOTEL_PRECIOS = { monterrey: 2500, cdmx: 2900, otra: 0 };
 
-let _cotizadorIniciado = false;
+const VEHICULOS = [
+  {label:'Bus Lion — 48 pax',  capacidad:48},
+  {label:'Bus Tiger — 37 pax', capacidad:37},
+  {label:'Sprinter — 19 pax',  capacidad:19},
+  {label:'Van — 14 pax',       capacidad:14},
+];
 
-function initCotizador() {
-  if (_cotizadorIniciado) return;
-  _cotizadorIniciado = true;
+const HOTEL_DEFAULT = {monterrey:2500, cdmx:2900, otra:0};
+let _cotIniciado = false;
+let _vendedoresCache = [];
+
+// ── INIT ──
+async function initCotizador() {
+  if (_cotIniciado) return;
+  _cotIniciado = true;
+  COT.venues = JSON.parse(localStorage.getItem('kh_venues') || '[]');
+  // Cargar coordinadores desde Supabase
+  try {
+    const todos = await db.get('vendedores', '?select=id,nombre,cargo&order=nombre');
+    _vendedoresCache = (todos || []).filter(v => v.cargo === 'Coordinador');
+  } catch(e) { _vendedoresCache = []; }
   resetCotizador();
+  cargarListaSesiones();
 }
 
 function resetCotizador() {
-  document.getElementById('cot-artista').value = '';
-  document.getElementById('cot-tour').value = '';
-  document.getElementById('cot-fecha').value = '';
+  ['cot-artista','cot-tour','cot-venue'].forEach(id => { const el=document.getElementById(id); if(el) el.value=''; });
   document.getElementById('cot-ciudad').value = 'monterrey';
   document.getElementById('cot-tipo').value = 'concierto';
-  document.getElementById('cot-venue').value = '';
-  document.getElementById('cot-hotel-precio').value = HOTEL_PRECIOS.monterrey;
+  document.getElementById('cot-hotel-precio').value = HOTEL_DEFAULT.monterrey;
   document.getElementById('cot-hotel-noches').value = 1;
-  document.getElementById('cot-hab-personas').value = 3;
-  document.getElementById('cot-utilidad').value = 1000;
-  document.getElementById('cot-viajeros-opt').value = 30;
-  document.getElementById('cot-cc-activo').checked = false;
+  document.getElementById('cot-ganancia-plus').value = 1000;
+  document.getElementById('cot-ganancia-cheap').value = 1000;
+  document.getElementById('cot-num-choferes').value = 1;
+  document.getElementById('cot-estacionamiento').value = '';
   document.getElementById('cot-festival-row').style.display = 'none';
   document.getElementById('cot-cdmx-nota').style.display = 'none';
-  document.getElementById('cot-cc-origen-row').style.display = 'none';
-  document.getElementById('cot-cc-boletos-row').style.display = 'none';
-  cot.unidades = [];
-  cot.kit = [];
-  cot.zonas = [];
-  cot.coordis = [];
-  cot.isCDMX = false;
-  cot.isFestival = false;
-  renderUnidades();
-  renderKit();
-  renderZonasCot();
-  renderCoordisCot();
-  agregarUnidad(); // arranca con 1 bus por default
+  COT.fechas=[]; COT.unidades=[]; COT.coordis=[]; COT.cc=[];
+  COT.zonas=[]; COT.kitExtras=[]; COT.gastosExtra=[];
+  COT.kitItems = KIT_DEFAULT.map(k=>({...k}));
+  COT.isCDMX=false; COT.isFestival=false;
+  agregarFechaCot();
+  agregarUnidad();
+  renderKit(); renderFechas(); renderUnidades();
+  renderZonasCot(); renderCoordisCot(); renderCC(); renderGastosExtra();
   recalcular();
 }
 
-// ─── CIUDAD ───
+// ── TABS ──
+function switchCotMode(mode, btn) {
+  document.querySelectorAll('.cot-tab').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('.cot-mode').forEach(m=>m.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('cot-mode-'+mode).classList.add('active');
+  if (mode==='postevento') cargarSesionesSel();
+}
+
+// ── FECHAS ──
+function agregarFechaCot() {
+  const n = COT.fechas.length + 1;
+  COT.fechas.push({fecha:'', label: n===1 ? '' : 'Noche '+n});
+  renderFechas();
+}
+function renderFechas() {
+  const c = document.getElementById('cot-fechas-lista');
+  c.innerHTML = COT.fechas.map((f,i) => `
+    <div style="display:grid;grid-template-columns:140px 1fr auto;gap:6px;margin-bottom:6px;align-items:center">
+      <input type="date" class="cot-input" value="${f.fecha}" onchange="COT.fechas[${i}].fecha=this.value;recalcular()">
+      <input type="text" class="cot-input" value="${f.label}" placeholder="Label (ej: Noche 1)" onchange="COT.fechas[${i}].label=this.value">
+      <button class="btn btn-red btn-sm" onclick="COT.fechas.splice(${i},1);renderFechas()" ${COT.fechas.length===1?'disabled':''}>✕</button>
+    </div>`).join('');
+  recalcular();
+}
+
+// ── CIUDAD ──
 function onCotCiudadChange() {
-  const ciudad = document.getElementById('cot-ciudad').value;
-  cot.isCDMX = ciudad === 'cdmx';
-  const precioHotel = HOTEL_PRECIOS[ciudad] || 0;
-  document.getElementById('cot-hotel-precio').value = precioHotel || '';
-  document.getElementById('cot-cdmx-nota').style.display = cot.isCDMX ? 'block' : 'none';
+  COT.ciudad = document.getElementById('cot-ciudad').value;
+  COT.isCDMX = COT.ciudad==='cdmx';
+  if (HOTEL_DEFAULT[COT.ciudad]) document.getElementById('cot-hotel-precio').value = HOTEL_DEFAULT[COT.ciudad];
+  document.getElementById('cot-cdmx-nota').style.display = COT.isCDMX ? 'block' : 'none';
   recalcular();
 }
 
-// ─── TIPO (concierto / festival) ───
+// ── TIPO ──
 function onCotTipoChange() {
-  const tipo = document.getElementById('cot-tipo').value;
-  cot.isFestival = tipo === 'festival';
-  document.getElementById('cot-festival-row').style.display = cot.isFestival ? '' : 'none';
-  if (cot.isFestival) {
+  COT.isFestival = document.getElementById('cot-tipo').value==='festival';
+  document.getElementById('cot-festival-row').style.display = COT.isFestival ? '' : 'none';
+  if (COT.isFestival) {
     document.getElementById('cot-hotel-noches').value = document.getElementById('cot-noches-festival').value || 3;
   } else {
     document.getElementById('cot-hotel-noches').value = 1;
   }
+  renderKit(); // cupón multiplica por días
   recalcular();
 }
+function syncFestivalNoches() {
+  document.getElementById('cot-hotel-noches').value = document.getElementById('cot-noches-festival').value;
+  renderKit();
+  recalcular();
+}
+function getDiasFestival() {
+  if (!COT.isFestival) return 1;
+  return parseInt(document.getElementById('cot-dias-festival')?.value) || 1;
+}
 
-// ─── UNIDADES DE TRANSPORTE ───
+// ── VENUES ──
+function filtrarVenues(q) {
+  const s = document.getElementById('cot-venue-sugg');
+  if (!q || q.length<2) { s.style.display='none'; return; }
+  const m = COT.venues.filter(v=>v.toLowerCase().includes(q.toLowerCase()));
+  if (!m.length) { s.style.display='none'; return; }
+  s.style.display='block';
+  s.innerHTML = m.map(v=>`
+    <div onclick="document.getElementById('cot-venue').value='${v.replace(/'/g,"\\'")}';document.getElementById('cot-venue-sugg').style.display='none';recalcular()"
+      style="padding:8px 12px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border)"
+      onmouseover="this.style.background='rgba(255,107,0,.1)'" onmouseout="this.style.background=''">${v}</div>`).join('');
+}
+function guardarVenueCat() {
+  const v = document.getElementById('cot-venue').value.trim();
+  if (!v) return alert('Escribe el nombre del venue primero');
+  if (!COT.venues.includes(v)) { COT.venues.push(v); localStorage.setItem('kh_venues', JSON.stringify(COT.venues)); }
+  alert('Venue guardado ✅');
+}
+function verVenuesCat() {
+  document.getElementById('venues-lista').innerHTML = !COT.venues.length
+    ? '<div style="font-size:12px;color:var(--ts)">Sin venues guardados</div>'
+    : COT.venues.map((v,i)=>`
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)">
+          <span style="font-size:13px">${v}</span>
+          <button class="btn btn-red btn-sm" onclick="COT.venues.splice(${i},1);localStorage.setItem('kh_venues',JSON.stringify(COT.venues));verVenuesCat()">Borrar</button>
+        </div>`).join('');
+  openModal('modal-venues');
+}
+
+// ── CATÁLOGO DE ZONAS ──
+function guardarZonasCatalogo() {
+  const zonasActivas = COT.zonas.filter(z => z.nombre && z.nombre.trim());
+  if (!zonasActivas.length) return alert('No hay zonas con nombre para guardar');
+  const cat = JSON.parse(localStorage.getItem('kh_zonas_cat') || '[]');
+  let nuevas = 0;
+  zonasActivas.forEach(z => {
+    const key = z.nombre.trim().toLowerCase();
+    if (!cat.find(c => c.nombre.toLowerCase() === key)) {
+      cat.push({nombre: z.nombre.trim(), precio: z.precio || 0});
+      nuevas++;
+    }
+  });
+  localStorage.setItem('kh_zonas_cat', JSON.stringify(cat));
+  alert(nuevas > 0 ? `✅ ${nuevas} zona(s) nueva(s) guardada(s)` : 'Esas zonas ya estaban en el catálogo');
+}
+function verZonasCatalogo() {
+  const cat = JSON.parse(localStorage.getItem('kh_zonas_cat') || '[]');
+  document.getElementById('zonas-cat-lista').innerHTML = !cat.length
+    ? '<div style="font-size:12px;color:var(--ts)">Sin zonas guardadas. Agrega zonas en el cotizador y presiona "Guardar zonas en catálogo".</div>'
+    : cat.map((z,i)=>`
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)">
+          <div>
+            <span style="font-size:13px;font-weight:600">${z.nombre}</span>
+            <span style="font-size:11px;color:var(--ts);margin-left:8px">${formatMXN(z.precio)}</span>
+          </div>
+          <div style="display:flex;gap:6px">
+            <button class="btn btn-ghost btn-sm" onclick="cargarZonaCatalogo(${i})">+ Agregar</button>
+            <button class="btn btn-red btn-sm" onclick="borrarZonaCatalogo(${i})">✕</button>
+          </div>
+        </div>`).join('');
+  openModal('modal-zonas-cat');
+}
+function cargarZonaCatalogo(idx) {
+  const cat = JSON.parse(localStorage.getItem('kh_zonas_cat') || '[]');
+  const z = cat[idx];
+  if (!z) return;
+  COT.zonas.push({nombre: z.nombre, precio: z.precio});
+  renderZonasCot(); syncZonaSelects(); recalcular();
+  closeModal('modal-zonas-cat');
+}
+function borrarZonaCatalogo(idx) {
+  const cat = JSON.parse(localStorage.getItem('kh_zonas_cat') || '[]');
+  cat.splice(idx, 1);
+  localStorage.setItem('kh_zonas_cat', JSON.stringify(cat));
+  verZonasCatalogo();
+}
+
+// ── UNIDADES ──
 function agregarUnidad() {
-  cot.unidades.push({ tipo: 0, capacidad: 48, costo: 22000 });
-  cot.coordis.push({ zonaIdx: -1, habitPropia: false });
-  renderUnidades();
-  renderCoordisCot();
-  recalcular();
+  COT.unidades.push({vIdx:0, nombre:VEHICULOS[0].label, capacidad:VEHICULOS[0].capacidad, costo:0});
+  renderUnidades(); recalcular();
 }
-
 function renderUnidades() {
   const c = document.getElementById('cot-unidades-lista');
-  if (!cot.unidades.length) {
-    c.innerHTML = '<div style="font-size:12px;color:var(--ts);padding:8px 0">Sin unidades agregadas</div>';
-    return;
-  }
-  c.innerHTML = cot.unidades.map((u, i) => `
-    <div class="cot-row" style="grid-template-columns:2fr 1fr auto">
-      <select onchange="onUnidadChange(${i},this.value)">
-        ${VEHICULOS.map((v,vi) => `<option value="${vi}" ${u.tipo===vi?'selected':''}>${v.label}</option>`).join('')}
-        <option value="custom" ${u.tipo==='custom'?'selected':''}>Otro (costo manual)</option>
+  if (!COT.unidades.length) { c.innerHTML='<div style="font-size:12px;color:var(--ts)">Sin unidades</div>'; return; }
+  c.innerHTML = COT.unidades.map((u,i)=>`
+    <div style="display:grid;grid-template-columns:2fr 1fr 1fr auto;gap:6px;margin-bottom:8px;align-items:center">
+      <select class="cot-input" onchange="onUnidadSelect(${i},this.value)">
+        ${VEHICULOS.map((v,vi)=>`<option value="${vi}" ${u.vIdx===vi?'selected':''}>${v.label}</option>`).join('')}
       </select>
-      <input type="number" value="${u.costo}" placeholder="Costo $" 
-        onchange="onCostoUnidadChange(${i},this.value)"
-        style="background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:7px;padding:8px 10px;color:var(--text);font-family:Montserrat,sans-serif;font-size:12px;outline:none">
-      <button class="btn btn-red btn-sm" onclick="eliminarUnidad(${i})">✕</button>
-    </div>
-  `).join('');
+      <input type="number" class="cot-input" placeholder="Cap." value="${u.capacidad}" min="1"
+        onchange="COT.unidades[${i}].capacidad=parseInt(this.value)||0;recalcular()">
+      <input type="number" class="cot-input" placeholder="Costo $" value="${u.costo||''}" min="0"
+        oninput="COT.unidades[${i}].costo=parseFloat(this.value)||0;recalcular()">
+      <button class="btn btn-red btn-sm" onclick="COT.unidades.splice(${i},1);renderUnidades();recalcular()">✕</button>
+    </div>`).join('');
+}
+function onUnidadSelect(i, vi) {
+  vi = parseInt(vi);
+  COT.unidades[i].vIdx = vi;
+  COT.unidades[i].nombre = VEHICULOS[vi].label;
+  COT.unidades[i].capacidad = VEHICULOS[vi].capacidad;
+  renderUnidades(); recalcular();
 }
 
-function onUnidadChange(i, val) {
-  if (val === 'custom') {
-    cot.unidades[i].tipo = 'custom';
-  } else {
-    const v = VEHICULOS[parseInt(val)];
-    cot.unidades[i].tipo = parseInt(val);
-    cot.unidades[i].capacidad = v.capacidad;
-    cot.unidades[i].costo = v.costo;
-    renderUnidades();
-  }
-  recalcular();
-}
-
-function onCostoUnidadChange(i, val) {
-  cot.unidades[i].costo = parseFloat(val) || 0;
-  recalcular();
-}
-
-function eliminarUnidad(i) {
-  cot.unidades.splice(i, 1);
-  cot.coordis.splice(i, 1);
-  renderUnidades();
-  renderCoordisCot();
-  recalcular();
-}
-
-// ─── KIT ───
-function agregarPiezaKit() {
-  cot.kit.push({ nombre: '', costo: 0 });
-  renderKit();
-}
-
+// ── KIT ──
 function renderKit() {
+  const dias = getDiasFestival();
   const c = document.getElementById('cot-kit-lista');
-  if (!cot.kit.length) {
-    c.innerHTML = '<div style="font-size:12px;color:var(--ts)">Sin piezas. Agrega playera, pulsera, etc.</div>';
-    document.getElementById('cot-kit-total').textContent = '$0';
-    return;
-  }
-  c.innerHTML = cot.kit.map((k, i) => `
-    <div class="cot-row" style="grid-template-columns:2fr 1fr auto;margin-bottom:6px">
-      <input type="text" placeholder="Nombre pieza" value="${k.nombre}"
-        onchange="cot.kit[${i}].nombre=this.value"
-        style="background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:7px;padding:8px 10px;color:var(--text);font-family:Montserrat,sans-serif;font-size:12px;outline:none">
-      <input type="number" placeholder="$ costo" value="${k.costo||''}" min="0"
-        oninput="cot.kit[${i}].costo=parseFloat(this.value)||0;recalcular()"
-        style="background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:7px;padding:8px 10px;color:var(--text);font-family:Montserrat,sans-serif;font-size:12px;outline:none">
-      <button class="btn btn-red btn-sm" onclick="cot.kit.splice(${i},1);renderKit();recalcular()">✕</button>
-    </div>
-  `).join('');
-  const total = cot.kit.reduce((s,k) => s+k.costo, 0);
-  document.getElementById('cot-kit-total').textContent = formatMXN(total);
+  c.innerHTML = COT.kitItems.map((k,i)=>`
+    <div class="cot-kit-item">
+      <input type="checkbox" ${k.checked?'checked':''} onchange="COT.kitItems[${i}].checked=this.checked;renderKitTotal();recalcular()">
+      <span style="flex:1">${k.nombre}${k.esCupon && COT.isFestival ? ' × '+dias+' días' : ''}</span>
+      <input type="number" class="cot-input" value="${k.esCupon && COT.isFestival ? k.precio*dias : k.precio}" min="0" style="width:70px"
+        ${k.esCupon && COT.isFestival ? 'readonly' : `oninput="COT.kitItems[${i}].precio=parseFloat(this.value)||0;renderKitTotal();recalcular()"`}>
+    </div>`).join('');
+  renderKitExtras(); renderKitTotal();
+}
+function renderKitExtras() {
+  const c = document.getElementById('cot-kit-extras');
+  c.innerHTML = COT.kitExtras.map((k,i)=>`
+    <div class="cot-kit-item">
+      <input type="checkbox" ${k.checked!==false?'checked':''} onchange="COT.kitExtras[${i}].checked=this.checked;renderKitTotal();recalcular()">
+      <input type="text" class="cot-input" value="${k.nombre}" placeholder="Nombre" style="flex:1" onchange="COT.kitExtras[${i}].nombre=this.value">
+      <input type="number" class="cot-input" value="${k.costo||''}" placeholder="$" min="0" style="width:70px"
+        oninput="COT.kitExtras[${i}].costo=parseFloat(this.value)||0;renderKitTotal();recalcular()">
+      <button class="btn btn-red btn-sm" onclick="COT.kitExtras.splice(${i},1);renderKit()">✕</button>
+    </div>`).join('');
+}
+function agregarKitExtra() { COT.kitExtras.push({nombre:'',costo:0,checked:true}); renderKit(); }
+function getKitTotal() {
+  const dias = getDiasFestival();
+  const base = COT.kitItems.reduce((s,k)=>{
+    if (!k.checked) return s;
+    return s + (k.esCupon && COT.isFestival ? k.precio*dias : k.precio);
+  }, 0);
+  return base + COT.kitExtras.filter(k=>k.checked!==false).reduce((s,k)=>s+k.costo,0);
+}
+function renderKitTotal() {
+  document.getElementById('cot-kit-total').textContent = formatMXN(getKitTotal());
 }
 
-// ─── ZONAS ───
-function agregarZonaCot() {
-  cot.zonas.push({ nombre: '', precio: 0 });
-  renderZonasCot();
-  sincronizarZonasCC();
-}
-
+// ── ZONAS ──
+function agregarZonaCot() { COT.zonas.push({nombre:'',precio:0}); renderZonasCot(); }
 function renderZonasCot() {
   const c = document.getElementById('cot-zonas-lista');
-  if (!cot.zonas.length) {
-    c.innerHTML = '<div style="font-size:12px;color:var(--ts)">Sin zonas agregadas</div>';
-    return;
-  }
-  c.innerHTML = cot.zonas.map((z, i) => `
-    <div class="cot-row" style="grid-template-columns:2fr 1fr auto;margin-bottom:6px">
-      <input type="text" placeholder="Nombre zona (ej: Floor)" value="${z.nombre}"
-        oninput="cot.zonas[${i}].nombre=this.value;sincronizarZonasCC();recalcular()"
-        style="background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:7px;padding:8px 10px;color:var(--text);font-family:Montserrat,sans-serif;font-size:12px;outline:none">
-      <input type="number" placeholder="Precio boleto $" value="${z.precio||''}" min="0"
-        oninput="cot.zonas[${i}].precio=parseFloat(this.value)||0;recalcular()"
-        style="background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:7px;padding:8px 10px;color:var(--text);font-family:Montserrat,sans-serif;font-size:12px;outline:none">
-      <button class="btn btn-red btn-sm" onclick="cot.zonas.splice(${i},1);renderZonasCot();sincronizarZonasCC();recalcular()">✕</button>
-    </div>
-  `).join('');
+  if (!COT.zonas.length) { c.innerHTML='<div style="font-size:12px;color:var(--ts)">Sin zonas</div>'; return; }
+  c.innerHTML = COT.zonas.map((z,i)=>`
+    <div style="display:grid;grid-template-columns:2fr 1fr auto;gap:6px;margin-bottom:6px;align-items:center">
+      <input type="text" class="cot-input" placeholder="Zona (ej: Floor)" value="${z.nombre}"
+        oninput="COT.zonas[${i}].nombre=this.value;syncZonaSelects();recalcular()">
+      <input type="number" class="cot-input" placeholder="Precio boleto $" value="${z.precio||''}" min="0"
+        oninput="COT.zonas[${i}].precio=parseFloat(this.value)||0;recalcular()">
+      <button class="btn btn-red btn-sm" onclick="COT.zonas.splice(${i},1);renderZonasCot();syncZonaSelects();recalcular()">✕</button>
+    </div>`).join('');
+}
+function syncZonaSelects() {
+  document.querySelectorAll('.cot-zona-sel').forEach(sel=>{
+    const prev=sel.value;
+    sel.innerHTML='<option value="-1">Sin boleto</option>'+
+      COT.zonas.map((z,i)=>`<option value="${i}" ${prev==i?'selected':''}>${z.nombre||'Zona '+(i+1)} — ${formatMXN(z.precio)}</option>`).join('');
+  });
 }
 
-function sincronizarZonasCC() {
-  const sel = document.getElementById('cot-cc-zona');
-  const prev = sel.value;
-  sel.innerHTML = '<option value="">Selecciona zona...</option>' +
-    cot.zonas.filter(z=>z.nombre).map((z,i) =>
-      `<option value="${i}" ${prev==i?'selected':''}>${z.nombre} — ${formatMXN(z.precio)}</option>`
-    ).join('');
-}
+// ── HELPER: render tarjeta staff (coordi y CC comparten estructura) ──
+function renderStaffCard(persona, i, tipo) {
+  const isCoord = tipo==='coordi';
+  const color = isCoord ? 'var(--orange)' : 'var(--blue)';
+  const label = isCoord ? 'Coordinador' : 'Creador de Contenido';
+  // calcularCostoStaff also populates persona._desglose used by renderStaffDesglose
+  const _isCDMX = document.getElementById('cot-ciudad')?.value === 'cdmx';
+  const _cTrans = _isCDMX ? 0 : (window.COT?.unidades||[]).reduce((s,u)=>s+(u.costo||0),0);
+  const _staffBus = [...(window.COT?.coordis||[]),...(window.COT?.cc||[])].filter(s=>s.transporte==='bus').length;
+  const _capBruta = (window.COT?.unidades||[]).reduce((s,u)=>s+(u.capacidad||0),0);
+  const _divTrans = Math.max(1, _capBruta - _staffBus);
+  const costo = calcularCostoStaff(persona, isCoord, _cTrans, _divTrans);
 
-// ─── COORDINADORES ───
-function renderCoordisCot() {
-  const c = document.getElementById('cot-coordis-lista');
-  if (!cot.unidades.length) {
-    c.innerHTML = '<div style="font-size:12px;color:var(--ts)">Agrega unidades de transporte primero</div>';
-    return;
-  }
-  c.innerHTML = cot.unidades.map((u, i) => {
-    const vLabel = u.tipo === 'custom' ? 'Unidad manual' : (VEHICULOS[u.tipo]?.label || 'Unidad');
-    const coordi = cot.coordis[i] || { zonaIdx: -1, habitPropia: false };
-    return `
-      <div style="background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:8px">
-        <div style="font-size:11px;font-weight:600;color:var(--orange);margin-bottom:8px">Coordi Unidad ${i+1} · ${vLabel}</div>
-        <div style="display:grid;grid-template-columns:2fr 1fr;gap:8px;align-items:center">
-          <div>
-            <div style="font-size:9px;letter-spacing:.15em;text-transform:uppercase;color:var(--ts);margin-bottom:4px">Zona / Boleto (costo a repartir)</div>
-            <select onchange="cot.coordis[${i}].zonaIdx=parseInt(this.value);recalcular()"
-              style="width:100%;background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:7px;padding:8px 10px;color:var(--text);font-family:Montserrat,sans-serif;font-size:12px;outline:none">
-              <option value="-1">Sin boleto</option>
-              ${cot.zonas.map((z,zi) => `<option value="${zi}" ${coordi.zonaIdx===zi?'selected':''}>${z.nombre||'Zona '+(zi+1)} — ${formatMXN(z.precio)}</option>`).join('')}
-            </select>
-          </div>
-          <div>
-            <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer">
-              <input type="checkbox" ${coordi.habitPropia?'checked':''} onchange="cot.coordis[${i}].habitPropia=this.checked;recalcular()">
-              Cuarto propio
-            </label>
-          </div>
+  // Dropdown nombre: coordis desde Supabase, CC texto libre
+  const nombreField = isCoord && _vendedoresCache.length
+    ? `<select class="cot-input" onchange="COT.${tipo}s[${i}].nombre=this.options[this.selectedIndex].text;COT.${tipo}s[${i}].vendedor_id=this.value;recalcular()">
+        <option value="">Sin asignar</option>
+        ${_vendedoresCache.map(v=>`<option value="${v.id}" ${persona.vendedor_id===v.id?'selected':''}>${v.nombre}</option>`).join('')}
+       </select>`
+    : `<input type="text" class="cot-input" placeholder="Nombre" value="${persona.nombre||''}"
+        onchange="COT.${tipo}s[${i}].nombre=this.value">`;
+
+  return `
+    <div class="cot-staff-card">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+        <div style="display:flex;align-items:center;gap:6px">
+          <span style="font-size:11px;font-weight:700;color:${color}">${label} ${i+1}</span>
+          <span class="cot-staff-costo" id="cot-${tipo}-costo-${i}">${formatMXN(costo)}</span>
+        </div>
+        <button class="btn btn-red btn-sm" onclick="COT.${tipo}s.splice(${i},1);${isCoord?'renderCoordisCot()':'renderCC()'};recalcular()">✕</button>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px">
+        <div class="form-group"><label>Nombre</label>${nombreField}</div>
+        <div class="form-group">
+          <label>Viaja desde</label>
+          <select class="cot-input" onchange="COT.${tipo}s[${i}].desde=this.value;recalcular()">
+            <option value="reynosa"   ${persona.desde==='reynosa'?'selected':''}>Reynosa</option>
+            <option value="monterrey" ${persona.desde==='monterrey'?'selected':''}>Monterrey</option>
+            <option value="cdmx"      ${persona.desde==='cdmx'?'selected':''}>CDMX (soporte local)</option>
+          </select>
         </div>
       </div>
-    `;
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px">
+        <div class="form-group">
+          <label>Boleto / Zona</label>
+          <select class="cot-input cot-zona-sel" onchange="COT.${tipo}s[${i}].zona_idx=parseInt(this.value);recalcular()">
+            <option value="-1">Sin boleto</option>
+            ${COT.zonas.map((z,zi)=>`<option value="${zi}" ${persona.zona_idx===zi?'selected':''}>${z.nombre||'Zona '+(zi+1)} — ${formatMXN(z.precio)}</option>`).join('')}
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Habitación</label>
+          <select class="cot-input" onchange="COT.${tipo}s[${i}].hab_tipo=this.value;recalcular()">
+            <option value="compartida3" ${persona.hab_tipo==='compartida3'?'selected':''}>Compartida con 3 (÷4)</option>
+            <option value="compartida2" ${persona.hab_tipo==='compartida2'?'selected':''}>Compartida con 2 (÷3)</option>
+            <option value="compartida1" ${persona.hab_tipo==='compartida1'?'selected':''}>Compartida con 1 (÷2)</option>
+            <option value="individual"  ${persona.hab_tipo==='individual'?'selected':''}>Individual (cuarto propio)</option>
+          </select>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;align-items:center">
+        <div class="form-group">
+          <label>Transporte</label>
+          <select class="cot-input" onchange="COT.${tipo}s[${i}].transporte=this.value;recalcular()">
+            <option value="bus"   ${persona.transporte==='bus'?'selected':''}>Bus (ocupa asiento)</option>
+            <option value="van"   ${persona.transporte==='van'?'selected':''}>Van (CDMX)</option>
+            <option value="vuelo" ${persona.transporte==='vuelo'?'selected':''}>Vuelo (no ocupa bus)</option>
+            <option value="local" ${persona.transporte==='local'?'selected':''}>Local (no viaja)</option>
+          </select>
+        </div>
+        ${!isCoord ? `<div class="form-group">
+          <label>Cantidad boletos</label>
+          <input type="number" class="cot-input" value="${persona.cantidad||1}" min="1"
+            oninput="COT.${tipo}s[${i}].cantidad=parseInt(this.value)||1;recalcular()">
+        </div>` : '<div></div>'}
+        <div class="form-group" style="display:flex;align-items:center;gap:6px;padding-top:18px">
+          <input type="checkbox" ${persona.incluye_kit?'checked':''} onchange="COT.${tipo}s[${i}].incluye_kit=this.checked;recalcular()">
+          <label style="cursor:pointer;font-size:12px">Kit</label>
+        </div>
+      </div>
+      ${COT.isCDMX && persona.desde!=='cdmx' ? `
+      <div style="margin-top:8px;padding:6px 8px;background:rgba(94,167,255,.06);border:1px solid rgba(94,167,255,.15);border-radius:6px">
+        <div style="font-size:9px;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:var(--blue);margin-bottom:4px">CDMX — Gastos traslado</div>
+        <div style="display:flex;gap:6px;align-items:center">
+          <input type="number" class="cot-input" placeholder="$ Uber/traslado" value="${persona.gasto_traslado||''}" min="0" style="width:120px"
+            oninput="COT.${tipo}s[${i}].gasto_traslado=parseFloat(this.value)||0;recalcular()">
+          <span style="font-size:11px;color:var(--ts)">aeropuerto + regreso</span>
+        </div>
+      </div>` : ''}
+      ${renderStaffDesglose(persona)}
+    </div>`;
+}
+
+function calcularCostoStaff(persona, isCoord, costoTransporteTotal, divisorTransporte) {
+  const kit = getKitTotal();
+  const hotelPrecio = parseFloat(document.getElementById('cot-hotel-precio')?.value) || 0;
+  const hotelNoches = parseInt(document.getElementById('cot-hotel-noches')?.value) || 1;
+  const isCDMX = document.getElementById('cot-ciudad')?.value === 'cdmx';
+  const fracHab = {compartida3:1/4,compartida2:1/3,compartida1:1/2,individual:1}[persona.hab_tipo||'compartida3'];
+  // cant = cantidad de boletos (CC puede llevar varios, coordi siempre 1)
+  const cant = isCoord ? 1 : (persona.cantidad||1);
+  const nombreZona = (persona.zona_idx >= 0 && COT.zonas[persona.zona_idx]) ? COT.zonas[persona.zona_idx].nombre : null;
+  const precioBoleto = (persona.zona_idx >= 0 && COT.zonas[persona.zona_idx]) ? COT.zonas[persona.zona_idx].precio : 0;
+  const costoBoletos = precioBoleto * cant;
+  const costoKit = persona.incluye_kit ? kit * cant : 0;
+  // Hotel: 1 hab siempre (fracHab = su parte según tipo de cuarto)
+  const costoHotel = persona.desde !== 'cdmx' ? hotelPrecio * fracHab * hotelNoches : 0;
+  const costoTraslado = persona.gasto_traslado || 0;
+  // Transporte: si ocupa asiento en bus, absorbe su parte proporcional del costo del bus
+  const _cTrans = (costoTransporteTotal !== undefined) ? costoTransporteTotal : 0;
+  const _divTrans = (divisorTransporte !== undefined && divisorTransporte > 0) ? divisorTransporte : 1;
+  const costoTransporteStaff = (!isCDMX && persona.transporte === 'bus' && _cTrans > 0)
+    ? _cTrans / _divTrans
+    : 0;
+  const total = costoBoletos + costoKit + costoHotel + costoTraslado + costoTransporteStaff;
+  // Guardar desglose para mostrar en tarjeta
+  persona._desglose = {
+    boletos: costoBoletos, boletoLabel: nombreZona ? cant+'x '+nombreZona+' ('+formatMXN(precioBoleto)+')' : null,
+    kit: costoKit, hotel: costoHotel, traslado: costoTraslado,
+    transporte: costoTransporteStaff,
+    total,
+    fracHabLabel: {compartida3:'÷4',compartida2:'÷3',compartida1:'÷2',individual:'cuarto propio'}[persona.hab_tipo||'compartida3'],
+  };
+  return total;
+}
+
+// Renderiza el mini-desglose dentro de la tarjeta del staff
+function renderStaffDesglose(persona) {
+  const d = persona._desglose;
+  if (!d) return '';
+  const filas = [
+    d.transporte > 0 ? ['🚌 Transporte (asiento bus)', d.transporte] : null,
+    d.boletoLabel ? ['🎟 Boleto'+( (persona.cantidad||1)>1 ? 's' : '')+': '+d.boletoLabel, d.boletos] : null,
+    d.kit > 0 ? ['🎁 Kit'+(( persona.cantidad||1)>1 ? ' ×'+(persona.cantidad||1) : ''), d.kit] : null,
+    d.hotel > 0 ? ['🏨 Hotel ('+d.fracHabLabel+')', d.hotel] : null,
+    d.traslado > 0 ? ['🚕 Traslado CDMX', d.traslado] : null,
+  ].filter(Boolean);
+  if (!filas.length) return '<div style="font-size:11px;color:var(--ts2);margin-top:6px">Sin costos asignados</div>';
+  return '<div style="margin-top:8px;padding:8px;background:rgba(0,0,0,.2);border-radius:6px;border:1px solid rgba(255,255,255,.06)">' +
+    filas.map(([l,v]) =>
+      '<div style="display:flex;justify-content:space-between;font-size:11px;padding:2px 0">' +
+      '<span style="color:var(--ts)">'+l+'</span>' +
+      '<span style="font-weight:600">'+formatMXN(v)+'</span></div>'
+    ).join('') +
+    '<div style="display:flex;justify-content:space-between;font-size:12px;padding:4px 0 0;margin-top:4px;border-top:1px solid rgba(255,255,255,.08)">' +
+    '<span style="font-weight:700">Total</span>' +
+    '<span style="font-weight:800;color:var(--orange)">'+formatMXN(d.total)+'</span></div>' +
+    '</div>';
+}
+
+function agregarCoordinator() {
+  COT.coordis.push({nombre:'',vendedor_id:'',desde:'reynosa',zona_idx:-1,hab_tipo:'compartida3',incluye_kit:true,transporte:'bus',gasto_traslado:0});
+  renderCoordisCot(); recalcular();
+}
+function renderCoordisCot() {
+  const c = document.getElementById('cot-coordis-lista');
+  if (!COT.coordis.length) { c.innerHTML='<div style="font-size:12px;color:var(--ts)">Sin coordinadores</div>'; return; }
+  c.innerHTML = COT.coordis.map((co,i) => renderStaffCard(co, i, 'coordi')).join('');
+}
+
+function agregarCC() {
+  COT.cc.push({nombre:'',desde:'reynosa',zona_idx:-1,cantidad:1,hab_tipo:'compartida3',incluye_kit:true,transporte:'bus',gasto_traslado:0});
+  renderCC(); recalcular();
+}
+function renderCC() {
+  const c = document.getElementById('cot-cc-lista');
+  if (!COT.cc.length) { c.innerHTML='<div style="font-size:12px;color:var(--ts);margin-bottom:8px">Sin creadores</div>'; return; }
+  c.innerHTML = COT.cc.map((cc,i) => renderStaffCard(cc, i, 'cc')).join('');
+}
+
+// ── GASTOS EXTRA ──
+function agregarGastoExtra() { COT.gastosExtra.push({nombre:'',costo:0}); renderGastosExtra(); }
+function renderGastosExtra() {
+  const c = document.getElementById('cot-gastos-extra');
+  if (!COT.gastosExtra.length) { c.innerHTML=''; return; }
+  c.innerHTML = COT.gastosExtra.map((g,i)=>`
+    <div style="display:grid;grid-template-columns:2fr 1fr auto;gap:6px;margin-bottom:6px;align-items:center">
+      <input type="text" class="cot-input" placeholder="Nombre" value="${g.nombre}" onchange="COT.gastosExtra[${i}].nombre=this.value">
+      <input type="number" class="cot-input" placeholder="$" value="${g.costo||''}" min="0"
+        oninput="COT.gastosExtra[${i}].costo=parseFloat(this.value)||0;recalcular()">
+      <button class="btn btn-red btn-sm" onclick="COT.gastosExtra.splice(${i},1);renderGastosExtra();recalcular()">✕</button>
+    </div>`).join('');
+}
+
+// ── HEADER EVENT ──
+function actualizarHeaderEvento() {
+  const artista = document.getElementById('cot-artista').value.trim();
+  const tour = document.getElementById('cot-tour').value.trim();
+  const venue = document.getElementById('cot-venue').value.trim();
+  const ciudad = document.getElementById('cot-ciudad').value;
+  const fechasStr = COT.fechas.filter(f=>f.fecha).map(f=>f.fecha+(f.label?' ('+f.label+')':'')).join(' · ');
+
+  document.getElementById('cot-header-titulo').textContent = artista || '—';
+  const partes = [tour, venue, ciudad!=='monterrey'?ciudad.toUpperCase():null, fechasStr].filter(Boolean);
+  document.getElementById('cot-header-sub').textContent = partes.join(' · ');
+}
+
+// ── CÁLCULO PRINCIPAL ──
+function recalcular() {
+  actualizarHeaderEvento();
+  renderKitTotal();
+
+  const isCDMX = document.getElementById('cot-ciudad').value==='cdmx';
+  const hotelPrecioHab = parseFloat(document.getElementById('cot-hotel-precio').value) || 0;
+  const hotelNoches = parseInt(document.getElementById('cot-hotel-noches').value) || 1;
+  const gananciaPlus = parseFloat(document.getElementById('cot-ganancia-plus').value) || 1000;
+  const gananciaCheap = parseFloat(document.getElementById('cot-ganancia-cheap').value) || 1000;
+  const numChoferes = parseInt(document.getElementById('cot-num-choferes').value) || 0;
+  const estacionamiento = parseFloat(document.getElementById('cot-estacionamiento').value) || 0;
+  const kitTotal = getKitTotal();
+  const gastosExtraTotal = COT.gastosExtra.reduce((s,g)=>s+g.costo,0);
+  const RIDE = isCDMX ? 2900 : 2700;
+
+  // Capacidad
+  const staffEnBus = [...COT.coordis,...COT.cc].filter(s=>s.transporte==='bus').length;
+  const capacidadBruta = COT.unidades.reduce((s,u)=>s+(u.capacidad||0),0);
+  const capacidadNeta = Math.max(1, capacidadBruta - staffEnBus);
+  // Transporte siempre ÷ capacidad fija del bus menos staff en bus (no varía por escenario)
+  const divisorTransporte = Math.max(1, capacidadBruta - staffEnBus);
+  const costoTransporte = isCDMX ? 0 : COT.unidades.reduce((s,u)=>s+(u.costo||0),0);
+  const costoTransportePorPax = costoTransporte > 0 ? costoTransporte / divisorTransporte : 0;
+
+  document.getElementById('cot-capacidad-neta').textContent = capacidadNeta + ' (' + capacidadBruta + ' − ' + staffEnBus + ' staff)';
+  document.getElementById('cot-costo-transporte-lbl').textContent = formatMXN(costoTransporte);
+
+  // Choferes
+  const habsChoferes = numChoferes > 0 ? Math.ceil(numChoferes/2) : 0;
+  const costoChoferes = habsChoferes * hotelPrecioHab * hotelNoches;
+  document.getElementById('cot-choferes-habs').textContent = habsChoferes + ' hab' + (habsChoferes!==1?'s':'');
+  document.getElementById('cot-choferes-costo').textContent = formatMXN(costoChoferes);
+
+  // Staff costos individuales
+  let costoCoordisTotal = 0;
+  COT.coordis.forEach((co,i) => {
+    const c = calcularCostoStaff(co, true, costoTransporte, divisorTransporte);
+    costoCoordisTotal += c;
+    const el = document.getElementById('cot-coordi-costo-'+i);
+    if (el) el.textContent = formatMXN(c);
+  });
+  let costoCCTotal = 0;
+  COT.cc.forEach((cc,i) => {
+    const c = calcularCostoStaff(cc, false, costoTransporte, divisorTransporte);
+    costoCCTotal += c;
+    const el = document.getElementById('cot-cc-costo-'+i);
+    if (el) el.textContent = formatMXN(c);
+  });
+  // Re-renderizar tarjetas para reflejar cambios en kit, habitación, boleto, transporte
+  renderCoordisCot();
+  renderCC();
+
+  // Costos fijos absolutos (bus + hotel÷4 + kit — no cambian por escenario)
+  const costoHotelPorPax = (hotelPrecioHab / 4) * hotelNoches;
+  const costoTransportePorPaxFijo = costoTransportePorPax; // ya calculado: costo÷capacidad_bus
+
+  // Escenarios basados en capacidad neta
+  const escenarios = [
+    {label:'Pesimista', key:'pesimista', pct:0.70, color:'var(--red)'},
+    {label:'Realista',  key:'realista',  pct:0.80, color:'var(--gold)'},
+    {label:'Optimista', key:'optimista', pct:1.00, color:'var(--green)'},
+  ];
+
+  const results = escenarios.map(esc => {
+    const viajeros = Math.max(1, Math.round(capacidadNeta * esc.pct));
+    const habs = Math.ceil(viajeros / 4);
+    // TODOS los costos compartidos ÷ capacidad neta del bus (divisorTransporte)
+    // El divisor es FIJO — no varía por escenario
+    const costoFijosRepartidos = (costoChoferes + costoCoordisTotal + costoCCTotal + estacionamiento + gastosExtraTotal) / divisorTransporte;
+    const costoPorViajero = costoTransportePorPaxFijo + costoHotelPorPax + kitTotal + costoFijosRepartidos;
+    const total = costoPorViajero * viajeros;
+    return {...esc, viajeros, habs, costoHotelPorPax, total, costoPorViajero};
+  });
+
+  const real = results.find(r=>r.key==='realista');
+
+  // Desglose (realista)
+  const D = divisorTransporte; // capacidad neta del bus — divisor único para TODOS los costos
+  const filas = [
+    !isCDMX && costoTransporte>0 ? ['🚌 Transporte ('+formatMXN(costoTransporte)+' ÷ '+D+' lugares netos)', costoTransportePorPax] : null,
+    isCDMX ? ['🚌 Transporte','No aplica (CDMX)'] : null,
+    ['🏨 Hotel ('+formatMXN(hotelPrecioHab)+' ÷ 4 × '+hotelNoches+' noche'+(hotelNoches>1?'s':'')+')', real.costoHotelPorPax],
+    ['🎁 Kit', kitTotal],
+    costoChoferes>0      ? ['🚗 Choferes ('+habsChoferes+' hab ÷ '+D+' lugares)', costoChoferes/D]      : null,
+    costoCoordisTotal>0  ? ['👤 Coordinadores (÷ '+D+' lugares)',                  costoCoordisTotal/D]  : null,
+    costoCCTotal>0       ? ['📸 Creadores contenido (÷ '+D+' lugares)',             costoCCTotal/D]       : null,
+    estacionamiento>0    ? ['🅿️ Estacionamiento (÷ '+D+' lugares)',                estacionamiento/D]    : null,
+    gastosExtraTotal>0   ? ['➕ Gastos extra (÷ '+D+' lugares)',                    gastosExtraTotal/D]   : null,
+  ].filter(Boolean);
+
+  document.getElementById('cot-desglose').innerHTML =
+    filas.map(([l,v])=>`
+      <div class="cot-desglose-row">
+        <span style="color:var(--ts)">${l}</span>
+        <span style="font-weight:600">${typeof v==='number'?formatMXN(v):v}</span>
+      </div>`).join('') +
+    `<div class="cot-desglose-total">
+      <span>Costo logística / pax</span>
+      <span style="color:var(--orange)">${formatMXN(real.costoPorViajero)}</span>
+    </div>
+    <div style="display:flex;justify-content:space-between;font-size:12px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.04)">
+      <span style="color:var(--ts)">+ Ganancia PLUS</span>
+      <span style="color:var(--green);font-weight:600">${formatMXN(gananciaPlus)}</span>
+    </div>
+    <div style="display:flex;justify-content:space-between;font-size:12px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.04)">
+      <span style="color:var(--ts)">+ Ganancia CHEAP</span>
+      <span style="color:var(--green);font-weight:600">${formatMXN(gananciaCheap)}</span>
+    </div>
+    <div style="display:flex;justify-content:space-between;padding:8px 0 0;font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:800;letter-spacing:.06em;text-transform:uppercase">
+      <span>Precio PLUS base (realista)</span>
+      <span style="color:var(--gold)">${formatMXN(real.costoPorViajero + gananciaPlus)}</span>
+    </div>`;
+
+  // Escenarios
+  document.getElementById('cot-escenarios').innerHTML = !capacidadBruta
+    ? '<div class="empty-state" style="padding:20px">Agrega unidades de transporte</div>'
+    : results.map(r=>`
+      <div class="cot-escenario ${r.key}">
+        <div>
+          <div class="cot-esc-label" style="color:${r.color}">${r.label}</div>
+          <div class="cot-esc-sub">${Math.round(r.pct*100)}% · ${r.viajeros} viajeros · ${r.habs} habs</div>
+        </div>
+        <div>
+          <div class="cot-esc-precio" style="color:${r.color}">${formatMXN(r.costoPorViajero)}</div>
+          <div style="font-size:10px;color:var(--ts);text-align:right">logística / pax</div>
+        </div>
+      </div>`).join('');
+
+  // Precios por paquete
+  renderPreciosPaquetes(real.costoPorViajero, gananciaPlus, gananciaCheap, RIDE);
+}
+
+function renderPreciosPaquetes(base, gananciaPlus, gananciaCheap, RIDE) {
+  const c = document.getElementById('cot-precios-paquetes');
+  const zonasFiltradas = COT.zonas.filter(z=>z.nombre);
+  if (!zonasFiltradas.length) {
+    c.innerHTML='<div class="empty-state" style="padding:16px">Agrega zonas para ver precios</div>'; return;
+  }
+  c.innerHTML = zonasFiltradas.map(z=>{
+    const plus  = base + z.precio + gananciaPlus;
+    const stay  = plus - 500;
+    const cheap = z.precio + gananciaCheap;
+    return `
+      <div style="margin-bottom:14px">
+        <div style="font-size:11px;font-weight:700;color:var(--ts);letter-spacing:.1em;text-transform:uppercase;margin-bottom:6px">Zona: ${z.nombre} — boleto ${formatMXN(z.precio)}</div>
+        <div class="cot-paquete-grid">
+          <div class="cot-pkg" style="border-color:rgba(255,107,0,.3);background:rgba(255,107,0,.05)">
+            <div class="cot-pkg-nombre" style="color:var(--orange)">PLUS</div>
+            <div class="cot-pkg-precio" style="color:var(--orange)">${formatMXN(plus)}</div>
+            <div class="cot-pkg-sub">logística+boleto+ganancia</div>
+          </div>
+          <div class="cot-pkg" style="border-color:rgba(94,167,255,.3);background:rgba(94,167,255,.05)">
+            <div class="cot-pkg-nombre" style="color:var(--blue)">STAY</div>
+            <div class="cot-pkg-precio" style="color:var(--blue)">${formatMXN(stay)}</div>
+            <div class="cot-pkg-sub">PLUS − $500</div>
+          </div>
+          <div class="cot-pkg" style="border-color:rgba(255,215,0,.3);background:rgba(255,215,0,.05)">
+            <div class="cot-pkg-nombre" style="color:var(--gold)">RIDE</div>
+            <div class="cot-pkg-precio" style="color:var(--gold)">${formatMXN(RIDE)}</div>
+            <div class="cot-pkg-sub">precio fijo</div>
+          </div>
+          <div class="cot-pkg" style="border-color:rgba(255,255,255,.1)">
+            <div class="cot-pkg-nombre" style="color:var(--ts)">CHEAP</div>
+            <div class="cot-pkg-precio">${formatMXN(cheap)}</div>
+            <div class="cot-pkg-sub">boleto+ganancia</div>
+          </div>
+        </div>
+      </div>`;
+  }).join('') + `<div style="font-size:10px;color:var(--ts2)">Ganancia PLUS: ${formatMXN(gananciaPlus)} · CHEAP: ${formatMXN(gananciaCheap)} · Escenario realista (80%)</div>`;
+}
+
+// ── SESIONES ──
+function guardarSesionCot() {
+  const artista = document.getElementById('cot-artista').value.trim() || 'Sin nombre';
+  const primeraFecha = COT.fechas[0]?.fecha || new Date().toISOString().split('T')[0];
+  const key = ('kh_cot_' + artista + '_' + primeraFecha).replace(/[\s\/]/g,'_');
+  const data = {
+    artista, key, savedAt: new Date().toISOString(),
+    ciudad: document.getElementById('cot-ciudad').value,
+    tipo: document.getElementById('cot-tipo').value,
+    venue: document.getElementById('cot-venue').value,
+    tour: document.getElementById('cot-tour').value,
+    hotel_precio: document.getElementById('cot-hotel-precio').value,
+    hotel_noches: document.getElementById('cot-hotel-noches').value,
+    ganancia_plus: document.getElementById('cot-ganancia-plus').value,
+    ganancia_cheap: document.getElementById('cot-ganancia-cheap').value,
+    num_choferes: document.getElementById('cot-num-choferes').value,
+    estacionamiento: document.getElementById('cot-estacionamiento').value,
+    fechas:COT.fechas, unidades:COT.unidades, coordis:COT.coordis, cc:COT.cc,
+    zonas:COT.zonas, kitItems:COT.kitItems, kitExtras:COT.kitExtras, gastosExtra:COT.gastosExtra,
+  };
+  localStorage.setItem(key, JSON.stringify(data));
+  let idx = JSON.parse(localStorage.getItem('kh_cot_index')||'[]');
+  if (!idx.includes(key)) idx.push(key);
+  localStorage.setItem('kh_cot_index', JSON.stringify(idx));
+  cargarListaSesiones();
+  const a = document.getElementById('cot-crear-alert');
+  a.innerHTML='<div class="alert alert-success">💾 Sesión guardada: '+artista+'</div>';
+  setTimeout(()=>a.innerHTML='', 2500);
+}
+
+function cargarListaSesiones() {
+  const idx = JSON.parse(localStorage.getItem('kh_cot_index')||'[]');
+  const c = document.getElementById('cot-sesiones-lista');
+  if (!idx.length) { c.innerHTML='<div style="font-size:12px;color:var(--ts)">Sin sesiones guardadas</div>'; return; }
+  c.innerHTML = idx.map(key=>{
+    const raw=localStorage.getItem(key); if(!raw) return '';
+    const d=JSON.parse(raw);
+    return `<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border)">
+      <div>
+        <div style="font-size:12px;font-weight:600">${d.artista}</div>
+        <div style="font-size:10px;color:var(--ts)">${d.fechas?.[0]?.fecha||''} · ${d.ciudad||''}</div>
+      </div>
+      <div style="display:flex;gap:6px">
+        <button class="btn btn-ghost btn-sm" onclick="cargarSesionCotKey('${key}')">Cargar</button>
+        <button class="btn btn-red btn-sm" onclick="eliminarSesion('${key}')">✕</button>
+      </div>
+    </div>`;
   }).join('');
 }
 
-// ─── CREADOR DE CONTENIDO ───
-function onCCChange() {
-  const activo = document.getElementById('cot-cc-activo').checked;
-  document.getElementById('cot-cc-origen-row').style.display = activo ? '' : 'none';
-  document.getElementById('cot-cc-boletos-row').style.display = activo ? '' : 'none';
+function cargarSesionCotKey(key) {
+  const raw=localStorage.getItem(key); if(!raw) return alert('Sesión no encontrada');
+  const d=JSON.parse(raw);
+  document.getElementById('cot-artista').value=d.artista||'';
+  document.getElementById('cot-tour').value=d.tour||'';
+  document.getElementById('cot-venue').value=d.venue||'';
+  document.getElementById('cot-ciudad').value=d.ciudad||'monterrey';
+  document.getElementById('cot-tipo').value=d.tipo||'concierto';
+  document.getElementById('cot-hotel-precio').value=d.hotel_precio||'';
+  document.getElementById('cot-hotel-noches').value=d.hotel_noches||1;
+  document.getElementById('cot-ganancia-plus').value=d.ganancia_plus||1000;
+  document.getElementById('cot-ganancia-cheap').value=d.ganancia_cheap||1000;
+  document.getElementById('cot-num-choferes').value=d.num_choferes||1;
+  document.getElementById('cot-estacionamiento').value=d.estacionamiento||'';
+  COT.fechas=d.fechas||[]; COT.unidades=d.unidades||[]; COT.coordis=d.coordis||[]; COT.cc=d.cc||[];
+  COT.zonas=d.zonas||[]; COT.kitItems=d.kitItems||KIT_DEFAULT.map(k=>({...k}));
+  COT.kitExtras=d.kitExtras||[]; COT.gastosExtra=d.gastosExtra||[];
+  onCotCiudadChange(); onCotTipoChange();
+  renderFechas(); renderUnidades(); renderKit(); renderZonasCot();
+  renderCoordisCot(); renderCC(); renderGastosExtra(); syncZonaSelects();
   recalcular();
 }
 
-// ─── CÁLCULO PRINCIPAL ───
-function recalcular() {
-  const ciudad = document.getElementById('cot-ciudad').value;
-  const isCDMX = ciudad === 'cdmx';
-  const isFestival = document.getElementById('cot-tipo').value === 'festival';
+function eliminarSesion(key) {
+  if(!confirm('¿Eliminar esta sesión?')) return;
+  localStorage.removeItem(key);
+  let idx=JSON.parse(localStorage.getItem('kh_cot_index')||'[]');
+  localStorage.setItem('kh_cot_index',JSON.stringify(idx.filter(k=>k!==key)));
+  cargarListaSesiones();
+}
 
-  const hotelPrecioNoche = parseFloat(document.getElementById('cot-hotel-precio').value) || 0;
-  const hotelNoches = parseInt(isFestival
-    ? (document.getElementById('cot-noches-festival')?.value || 1)
-    : document.getElementById('cot-hotel-noches').value) || 1;
-  const personasPorHab = parseInt(document.getElementById('cot-hab-personas').value) || 3;
-  const utilidad = parseFloat(document.getElementById('cot-utilidad').value) || 1000;
-  const viajerosOpt = parseInt(document.getElementById('cot-viajeros-opt').value) || 30;
+function cargarSesionesSel() {
+  const idx=JSON.parse(localStorage.getItem('kh_cot_index')||'[]');
+  const sel=document.getElementById('post-sesion-sel');
+  sel.innerHTML='<option value="">Selecciona...</option>'+idx.map(key=>{
+    const raw=localStorage.getItem(key); if(!raw) return '';
+    const d=JSON.parse(raw);
+    return `<option value="${key}">${d.artista} — ${d.fechas?.[0]?.fecha||''}</option>`;
+  }).join('');
+}
 
-  const kitTotal = cot.kit.reduce((s,k) => s+k.costo, 0);
-  const numUnidades = cot.unidades.length;
-  const capacidadTotal = cot.unidades.reduce((s,u) => s+(u.capacidad||0), 0);
-  const costoTransporte = isCDMX ? 0 : cot.unidades.reduce((s,u) => s+(u.costo||0), 0);
-
-  // ─ Staff: Coordinadores ─
-  let costoCoordiBoletos = 0;
-  let costoCordiHoteles = 0;
-  cot.coordis.forEach((co, i) => {
-    if (co.zonaIdx >= 0 && cot.zonas[co.zonaIdx]) {
-      costoCoordiBoletos += cot.zonas[co.zonaIdx].precio || 0;
-    }
-    // Kit del coordi
-    costoCoordiBoletos += kitTotal;
-    // Hotel coordi
-    if (co.habitPropia) {
-      costoCordiHoteles += hotelPrecioNoche * hotelNoches;
-    }
-  });
-  // Coordis que comparten cuarto con viajeros: se suman a habsViajeros
-  const coordisCompartidos = cot.coordis.filter(co => !co.habitPropia).length;
-
-  // ─ Staff: Choferes ─
-  const numChoferes = numUnidades;
-  const habsChoferes = Math.ceil(numChoferes / 2);
-  const costoChoferes = habsChoferes * hotelPrecioNoche * hotelNoches;
-  const resumenChoferes = numUnidades
-    ? `${numChoferes} chofer${numChoferes > 1 ? 'es' : ''} · ${habsChoferes} hab${habsChoferes > 1 ? 's' : ''} · ${formatMXN(costoChoferes)}`
-    : '—';
-  document.getElementById('cot-choferes-resumen').textContent = resumenChoferes;
-
-  // ─ Creador de contenido ─
-  let costoCC = 0;
-  const ccActivo = document.getElementById('cot-cc-activo').checked;
-  if (ccActivo) {
-    const ccOrigen = document.getElementById('cot-cc-origen').value;
-    const ccZonaIdx = parseInt(document.getElementById('cot-cc-zona').value);
-    const ccCantidad = parseInt(document.getElementById('cot-cc-cantidad').value) || 1;
-    const precioBoletoCC = (!isNaN(ccZonaIdx) && cot.zonas[ccZonaIdx]) ? cot.zonas[ccZonaIdx].precio : 0;
-    costoCC += precioBoletoCC * ccCantidad; // boletos
-    costoCC += kitTotal * ccCantidad;       // kits
-    if (ccOrigen === 'reynosa') {
-      // transporte: proporcional a 1 asiento (si no isCDMX)
-      if (!isCDMX && capacidadTotal > 0) {
-        costoCC += costoTransporte / capacidadTotal;
-      }
-      // hotel: 1 habitación
-      costoCC += hotelPrecioNoche * hotelNoches;
-    }
-  }
-
-  // ─ Escenarios de viajeros ─
-  const scenarios = [
-    { label: 'Pesimista', key: 'pesimista', pct: 0.70, color: 'var(--red)' },
-    { label: 'Realista',  key: 'realista',  pct: 0.80, color: 'var(--gold)' },
-    { label: 'Optimista', key: 'optimista', pct: 1.00, color: 'var(--green)' },
-  ];
-
-  // Calculamos para cada escenario
-  const results = scenarios.map(sc => {
-    const viajeros = Math.max(1, Math.round(viajerosOpt * sc.pct));
-    // Habitaciones para viajeros (incluyendo coordis que comparten)
-    const personasConHabitacion = viajeros + coordisCompartidos;
-    const habs = Math.ceil(personasConHabitacion / personasPorHab);
-    document.getElementById('cot-hab-cantidad').textContent = habs; // solo se muestra para optimista
-    const costoHotelViajeros = habs * hotelPrecioNoche * hotelNoches;
-    // Costo hotel coordis con cuarto propio
-    const totalHotel = costoHotelViajeros + costoCordiHoteles + costoChoferes;
-    // Total costos compartidos (sin boleto — ese varía por zona)
-    const costoBase = costoTransporte + totalHotel + kitTotal + costoCoordiBoletos + costoCC;
-    const costoPorViajero = viajeros > 0 ? costoBase / viajeros : 0;
-    const precioPLUS = costoPorViajero + utilidad;
-    return { ...sc, viajeros, habs, costoBase, costoPorViajero, precioPLUS };
-  });
-
-  // Usar escenario realista para el desglose
-  const reali = results.find(r => r.key === 'realista');
-
-  // ─ Renderizar desglose ─
-  const desglose = document.getElementById('cot-desglose');
-  const filas = [
-    ['Transporte', isCDMX ? '(CDMX — no aplica)' : formatMXN(costoTransporte), isCDMX],
-    ['Hotel viajeros (' + reali.habs + ' hab × ' + hotelNoches + ' noche' + (hotelNoches>1?'s':'') + ')', formatMXN(reali.habs * hotelPrecioNoche * hotelNoches), false],
-    costoCordiHoteles > 0 ? ['Hotel coordis (cuarto propio)', formatMXN(costoCordiHoteles), false] : null,
-    costoChoferes > 0 ? ['Hotel choferes (' + habsChoferes + ' hab)', formatMXN(costoChoferes), false] : null,
-    ['Kit por viajero × ' + reali.viajeros, formatMXN(kitTotal * reali.viajeros), false],
-    costoCoordiBoletos > 0 ? ['Boletos + kit staff (coordis)', formatMXN(costoCoordiBoletos), false] : null,
-    ccActivo && costoCC > 0 ? ['Creador de contenido', formatMXN(costoCC), false] : null,
-  ].filter(Boolean);
-
-  desglose.innerHTML = filas.map(([label, val, gris]) =>
-    `<div class="cot-desglose-row">
-      <span class="cot-desglose-label" style="${gris?'color:var(--ts2)':''}">${label}</span>
-      <span class="cot-desglose-valor" style="${gris?'color:var(--ts2)':''}">${val}</span>
-    </div>`
-  ).join('') +
-  `<div class="cot-desglose-row" style="margin-top:6px;padding-top:8px;border-top:1px solid var(--border)">
-    <span class="cot-desglose-label">Viajeros (escenario realista)</span>
-    <span class="cot-desglose-valor">${reali.viajeros}</span>
-  </div>
-  <div class="cot-desglose-total">
-    <span>Costo total</span>
-    <span style="color:var(--orange)">${formatMXN(reali.costoBase)}</span>
-  </div>
-  <div style="display:flex;justify-content:space-between;font-size:12px;margin-top:6px;color:var(--ts)">
-    <span>Costo logística / viajero</span>
-    <span style="color:var(--text);font-weight:600">${formatMXN(reali.costoPorViajero)}</span>
-  </div>`;
-
-  // ─ Renderizar escenarios ─
-  document.getElementById('cot-escenarios').innerHTML = results.map(r =>
-    `<div class="cot-escenario ${r.key}">
-      <div>
-        <div class="cot-esc-label" style="color:${r.color}">${r.label}</div>
-        <div class="cot-esc-pct">${Math.round(r.pct*100)}% llenado · ${r.viajeros} viajeros</div>
-      </div>
-      <div>
-        <div class="cot-esc-precio" style="color:${r.color}">${formatMXN(r.precioPLUS)}</div>
-        <div style="font-size:10px;color:var(--ts);text-align:right">base logística + utilidad</div>
-      </div>
-    </div>`
-  ).join('');
-
-  // ─ Renderizar precios por zona ─
-  const preciosZonas = document.getElementById('cot-precios-zonas');
-  if (!cot.zonas.length) {
-    preciosZonas.innerHTML = '<div class="empty-state" style="padding:16px">Agrega zonas para ver precios finales</div>';
-  } else {
-    const realiBase = reali.costoPorViajero;
-    preciosZonas.innerHTML = `
-      <div style="display:grid;grid-template-columns:repeat(3,auto);gap:8px;font-size:10px;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:var(--ts);padding-bottom:6px;border-bottom:1px solid var(--border);margin-bottom:8px">
-        <span>Zona</span><span style="text-align:right">Boleto</span><span style="text-align:right">Precio PLUS</span>
-      </div>
-      ${cot.zonas.filter(z=>z.nombre).map(z => {
-        const precioFinal = realiBase + z.precio + utilidad;
-        return `<div style="display:grid;grid-template-columns:repeat(3,auto);gap:8px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.04)">
-          <span style="font-weight:600">${z.nombre}</span>
-          <span style="text-align:right;color:var(--ts)">${formatMXN(z.precio)}</span>
-          <span style="text-align:right;color:var(--gold);font-weight:700;font-family:'Barlow Condensed',sans-serif;font-size:16px">${formatMXN(precioFinal)}</span>
-        </div>`;
-      }).join('')}
-      <div style="font-size:10px;color:var(--ts2);margin-top:8px">Calculado con escenario realista (${reali.viajeros} viajeros)</div>
-    `;
+// ── POST EVENTO ──
+function cargarSesionPostEvento(key) {
+  document.getElementById('post-datos-card').style.display = key ? '' : 'none';
+  document.getElementById('post-comparativa-card').style.display = 'none';
+  document.getElementById('post-resultado-card').style.display = 'none';
+  if (!key) return;
+  // Si tiene datos post guardados, cargarlos
+  const raw=localStorage.getItem(key); if(!raw) return;
+  const d=JSON.parse(raw);
+  if (d.post_evento) {
+    const p=d.post_evento;
+    ['plus','stay','ride','cheap'].forEach(k=>{const el=document.getElementById('post-'+k);if(el)el.value=p[k]||0;});
+    ['costo_transporte','costo_hotel','costo_kits','costo_boletos','gastos_extra','ingresos'].forEach(k=>{
+      const el=document.getElementById('post-'+k.replace('_','-'));if(el)el.value=p[k]||0;
+    });
+    const notasEl=document.getElementById('post-notas');if(notasEl)notasEl.value=p.notas||'';
+    calcularPostEvento();
   }
 }
 
-// ─── CREAR EVENTO DESDE COTIZADOR ───
-async function crearEventoDesdeCotizador() {
-  const alertEl = document.getElementById('cot-crear-alert');
-  const artista = document.getElementById('cot-artista').value.trim();
-  const fecha = document.getElementById('cot-fecha').value;
-  const ciudad = document.getElementById('cot-ciudad').value;
-  const venue = document.getElementById('cot-venue').value.trim();
+function calcularPostEvento() {
+  const key=document.getElementById('post-sesion-sel').value; if(!key) return;
+  const raw=localStorage.getItem(key);
+  const sesion=raw?JSON.parse(raw):null;
+  const plus=parseInt(document.getElementById('post-plus').value)||0;
+  const stay=parseInt(document.getElementById('post-stay').value)||0;
+  const ride=parseInt(document.getElementById('post-ride').value)||0;
+  const cheap=parseInt(document.getElementById('post-cheap').value)||0;
+  const totalViajeros=plus+stay+ride+cheap;
+  const cTrans=parseFloat(document.getElementById('post-costo-transporte').value)||0;
+  const cHotel=parseFloat(document.getElementById('post-costo-hotel').value)||0;
+  const cKits=parseFloat(document.getElementById('post-costo-kits').value)||0;
+  const cBoletos=parseFloat(document.getElementById('post-costo-boletos').value)||0;
+  const cExtra=parseFloat(document.getElementById('post-gastos-extra').value)||0;
+  const ingresos=parseFloat(document.getElementById('post-ingresos').value)||0;
+  const totalCostos=cTrans+cHotel+cKits+cBoletos+cExtra;
+  const utilidad=ingresos-totalCostos;
+  const margen=ingresos>0?(utilidad/ingresos*100):0;
 
-  if (!artista || !fecha) {
-    alertEl.innerHTML = '<div class="alert alert-error">Artista y fecha son obligatorios</div>';
-    return;
+  document.getElementById('post-comparativa-card').style.display='';
+  document.getElementById('post-resultado-card').style.display='';
+
+  let compHtml='';
+  if(sesion){
+    const capNeta=Math.max(1,(sesion.unidades||[]).reduce((s,u)=>s+(u.capacidad||0),0));
+    const estReal=Math.round(capNeta*0.8);
+    const diffV=totalViajeros-estReal;
+    compHtml+=`
+      <div class="cot-desglose-row"><span style="color:var(--ts)">Viajeros estimados (80% cap.)</span><span>${estReal}</span></div>
+      <div class="cot-desglose-row"><span style="color:var(--ts)">Viajeros reales</span>
+        <span style="color:${diffV>=0?'var(--green)':'var(--red)'};font-weight:600">${totalViajeros} (${diffV>=0?'+':''}${diffV})</span></div>
+      <div class="cot-desglose-row"><span style="color:var(--ts)">Mix</span><span style="font-size:11px;color:var(--ts)">PLUS:${plus} STAY:${stay} RIDE:${ride} CHEAP:${cheap}</span></div>`;
   }
+  document.getElementById('post-comparativa').innerHTML=compHtml+
+    `<div class="cot-desglose-row"><span style="color:var(--ts)">Total costos reales</span><span style="color:var(--red)">${formatMXN(totalCostos)}</span></div>
+    <div class="cot-desglose-row"><span style="color:var(--ts)">Ingresos</span><span style="color:var(--green)">${formatMXN(ingresos)}</span></div>`;
 
-  const tour = document.getElementById('cot-tour').value.trim();
-  const tipo = document.getElementById('cot-tipo').value;
-  const isCDMX = ciudad === 'cdmx';
-  const isFestival = tipo === 'festival';
-  const hotelPrecioNoche = parseFloat(document.getElementById('cot-hotel-precio').value) || 0;
-  const hotelNoches = parseInt(isFestival
-    ? (document.getElementById('cot-noches-festival')?.value || 1)
-    : document.getElementById('cot-hotel-noches').value) || 1;
-  const utilidad = parseFloat(document.getElementById('cot-utilidad').value) || 1000;
-  const viajerosOpt = parseInt(document.getElementById('cot-viajeros-opt').value) || 30;
-  const viajerosRealista = Math.round(viajerosOpt * 0.8);
+  const col=utilidad>=0?'var(--green)':'var(--red)';
+  document.getElementById('post-resultado').innerHTML=`
+    <div class="cot-desglose-row"><span style="color:var(--ts)">Utilidad neta</span>
+      <span style="font-family:'Barlow Condensed',sans-serif;font-size:24px;font-weight:900;color:${col}">${formatMXN(utilidad)}</span></div>
+    <div class="cot-desglose-row"><span style="color:var(--ts)">Margen</span><span style="color:${col}">${margen.toFixed(1)}%</span></div>
+    <div class="cot-desglose-row"><span style="color:var(--ts)">Por viajero promedio</span><span>${totalViajeros>0?formatMXN(utilidad/totalViajeros):'—'}</span></div>
+    <div style="margin-top:10px;padding:10px;border-radius:6px;background:${utilidad>=0?'rgba(61,220,132,.08)':'rgba(255,68,68,.08)'};border:1px solid ${utilidad>=0?'rgba(61,220,132,.2)':'rgba(255,68,68,.2)'};font-size:12px">
+      ${utilidad>=0?'✅ Evento rentable. Ganaste '+formatMXN(utilidad/Math.max(1,totalViajeros))+' por viajero en promedio.':'⚠️ El evento perdió dinero. Revisa qué costos subieron vs el estimado.'}
+    </div>`;
+}
 
-  // Zonas PLUS para Supabase
-  const zonas_plus = cot.zonas.filter(z => z.nombre).map(z => ({ n: z.nombre, p: z.precio }));
+function guardarPostEvento() {
+  const key=document.getElementById('post-sesion-sel').value; if(!key) return;
+  const raw=localStorage.getItem(key); if(!raw) return;
+  const sesion=JSON.parse(raw);
+  sesion.post_evento={
+    plus:document.getElementById('post-plus').value,
+    stay:document.getElementById('post-stay').value,
+    ride:document.getElementById('post-ride').value,
+    cheap:document.getElementById('post-cheap').value,
+    costo_transporte:document.getElementById('post-costo-transporte').value,
+    costo_hotel:document.getElementById('post-costo-hotel').value,
+    costo_kits:document.getElementById('post-costo-kits').value,
+    costo_boletos:document.getElementById('post-costo-boletos').value,
+    gastos_extra:document.getElementById('post-gastos-extra').value,
+    ingresos:document.getElementById('post-ingresos').value,
+    notas:document.getElementById('post-notas').value,
+    savedAt:new Date().toISOString(),
+  };
+  localStorage.setItem(key,JSON.stringify(sesion));
+  alert('✅ Datos post-evento guardados');
+}
 
-  // Calcular precio base realista
-  const personasPorHab = parseInt(document.getElementById('cot-hab-personas').value) || 3;
-  const costoTransporte = isCDMX ? 0 : cot.unidades.reduce((s,u) => s+(u.costo||0), 0);
-  const kitTotal = cot.kit.reduce((s,k) => s+k.costo, 0);
-  const coordisCompartidos = cot.coordis.filter(co => !co.habitPropia).length;
-  const habs = Math.ceil((viajerosRealista + coordisCompartidos) / personasPorHab);
-  const costoHotelViajeros = habs * hotelPrecioNoche * hotelNoches;
-  const costoCordiHoteles = cot.coordis.filter(co=>co.habitPropia).length * hotelPrecioNoche * hotelNoches;
-  const numChoferes = cot.unidades.length;
-  const habsChoferes = Math.ceil(numChoferes / 2);
-  const costoChoferes = habsChoferes * hotelPrecioNoche * hotelNoches;
-  let costoCoordiBoletos = 0;
-  cot.coordis.forEach(co => {
-    if (co.zonaIdx >= 0 && cot.zonas[co.zonaIdx]) costoCoordiBoletos += cot.zonas[co.zonaIdx].precio || 0;
-    costoCoordiBoletos += kitTotal;
-  });
-  const costoBase = costoTransporte + costoHotelViajeros + costoCordiHoteles + costoChoferes + kitTotal + costoCoordiBoletos;
-  const costoPorViajeroRealista = viajerosRealista > 0 ? costoBase / viajerosRealista : 0;
-  const precioBaseRealista = costoPorViajeroRealista + utilidad;
+// ── CREAR EVENTO ──
+async function crearEventoDesdeCotizador() {
+  const alertEl=document.getElementById('cot-crear-alert');
+  const artista=document.getElementById('cot-artista').value.trim();
+  const primeraFecha=COT.fechas[0]?.fecha||'';
+  if(!artista||!primeraFecha){alertEl.innerHTML='<div class="alert alert-error">Artista y fecha son obligatorios</div>';return;}
+  const isCDMX=document.getElementById('cot-ciudad').value==='cdmx';
+  const isFestival=document.getElementById('cot-tipo').value==='festival';
+  const hotelPrecioHab=parseFloat(document.getElementById('cot-hotel-precio').value)||0;
+  const hotelNoches=parseInt(document.getElementById('cot-hotel-noches').value)||1;
+  const gananciaPlus=parseFloat(document.getElementById('cot-ganancia-plus').value)||1000;
+  const RIDE=isCDMX?2900:2700;
+  const kitTotal=getKitTotal();
+  const costoTransporte=isCDMX?0:COT.unidades.reduce((s,u)=>s+(u.costo||0),0);
+  const capNeta=Math.max(1,COT.unidades.reduce((s,u)=>s+(u.capacidad||0),0)-[...COT.coordis,...COT.cc].filter(s=>s.transporte==='bus').length);
+  const viajerosReal=Math.round(capNeta*0.8);
+  const habs=Math.ceil(viajerosReal/4);
+  const costoHotel=habs*hotelPrecioHab*hotelNoches;
+  const costoChoferes=Math.ceil((parseInt(document.getElementById('cot-num-choferes').value)||0)/2)*hotelPrecioHab*hotelNoches;
+  const _divisorTrans=Math.max(1,COT.unidades.reduce((s,u)=>s+(u.capacidad||0),0)-[...COT.coordis,...COT.cc].filter(s=>s.transporte==='bus').length);
+  let costoStaff=0; [...COT.coordis,...COT.cc].forEach(p=>costoStaff+=calcularCostoStaff(p,false,costoTransporte,_divisorTrans));
+  const gastosExtra=COT.gastosExtra.reduce((s,g)=>s+g.costo,0);
+  const estacionamiento=parseFloat(document.getElementById('cot-estacionamiento').value)||0;
+  const totalCostos=costoTransporte+costoHotel+kitTotal*viajerosReal+costoChoferes+costoStaff+gastosExtra+estacionamiento;
+  const costoPorViajero=totalCostos/viajerosReal;
 
-  // Nota interna con resumen del cotizador
-  const notasInternas = `[COTIZADOR] Unidades: ${cot.unidades.length} · Costo transporte: ${formatMXN(costoTransporte)} · Hotel: ${formatMXN(hotelPrecioNoche)}/noche · Noches: ${hotelNoches} · Kit: ${formatMXN(kitTotal)} · Costo/viajero realista: ${formatMXN(costoPorViajeroRealista)} · Precio PLUS base: ${formatMXN(precioBaseRealista)}`;
-
-  // Incluye (bullets para web)
-  const incluye = [
-    !isCDMX ? 'Transporte Reynosa ↔ ' + (venue || ciudad.charAt(0).toUpperCase() + ciudad.slice(1)) : null,
-    'Hotel ' + hotelNoches + ' noche' + (hotelNoches > 1 ? 's' : ''),
-    'Kit Conecta Reynosa',
-    'Boleto zona elegida',
-    !isCDMX ? 'Traslados internos hotel ↔ venue' : null,
+  const zonas_plus=COT.zonas.filter(z=>z.nombre).map(z=>({n:z.nombre,p:z.precio}));
+  const incluye=[
+    !isCDMX?'Transporte Reynosa ↔ '+(document.getElementById('cot-venue').value||'destino'):null,
+    'Hotel '+hotelNoches+' noche'+(hotelNoches>1?'s':''),
+    'Kit Conecta Reynosa','Boleto zona elegida','Traslados hotel ↔ venue',
   ].filter(Boolean);
+
+  const nota='[COT v3] Costo/pax: '+formatMXN(costoPorViajero)+' | Trans: '+formatMXN(costoTransporte)+' | Hotel: '+formatMXN(hotelPrecioHab)+'/hab×'+hotelNoches+'n | Kit: '+formatMXN(kitTotal)+' | Unidades: '+COT.unidades.map(u=>u.nombre).join(', ');
 
   try {
-    alertEl.innerHTML = '<div class="alert alert-info">Creando evento...</div>';
-    const body = {
-      artista,
-      nombre: artista,
-      tour: tour || null,
-      fecha,
-      ciudad: ciudad === 'monterrey' ? 'Monterrey' : ciudad === 'cdmx' ? 'CDMX' : ciudad,
-      venue: venue || null,
-      tipo: isFestival ? 'Festival' : 'Concierto',
-      color: 'azul',
-      status: 'Por Confirmar',
-      banco: 'default',
-      cdmx: isCDMX,
-      tiene_traslados_internos: true,
-      tiene_transporte_largo: !isCDMX,
-      promo: false,
-      ride_only: false,
-      cheap_only: false,
-      list_only: false,
-      separo: 500,
-      incluye: JSON.stringify(incluye),
-      zonas_plus: JSON.stringify(zonas_plus),
-      zonas_cheap: JSON.stringify([]),
-      hotel_opciones: JSON.stringify([
-        {n:'Compartida', e:0},
-        {n:'Doble', e:650},
-        {n:'Individual', e:1960}
-      ]),
-      pagos_calendario: JSON.stringify([
-        {l:'Separo', d:'Hoy', s:1},
-        {l:'Pago 1', d:''},
-        {l:'Pago 2', d:''},
-        {l:'Pago 3', d:''},
-      ]),
-      notas: notasInternas,
+    alertEl.innerHTML='<div class="alert alert-info">Creando evento...</div>';
+    const body={
+      artista,nombre:artista,
+      tour:document.getElementById('cot-tour').value.trim()||null,
+      fecha:primeraFecha,
+      fecha_fin:COT.fechas.length>1?COT.fechas[COT.fechas.length-1].fecha:null,
+      ciudad:document.getElementById('cot-ciudad').value==='monterrey'?'Monterrey':document.getElementById('cot-ciudad').value==='cdmx'?'CDMX':document.getElementById('cot-ciudad').value,
+      venue:document.getElementById('cot-venue').value.trim()||null,
+      tipo:isFestival?'Festival':'Concierto',
+      color:'azul',status:'Por Confirmar',banco:'default',
+      cdmx:isCDMX,tiene_traslados_internos:true,tiene_transporte_largo:!isCDMX,
+      promo:false,ride_only:false,cheap_only:false,list_only:false,
+      separo:500,ride_precio:RIDE,
+      incluye:JSON.stringify(incluye),
+      zonas_plus:JSON.stringify(zonas_plus),
+      zonas_cheap:JSON.stringify([]),
+      hotel_opciones:JSON.stringify([{n:'Compartida',e:0},{n:'Triple',e:250},{n:'Doble',e:650},{n:'Individual',e:1960}]),
+      pagos_calendario:JSON.stringify([{l:'Separo',d:'Hoy',s:1},{l:'Pago 1',d:''},{l:'Pago 2',d:''},{l:'Pago 3',d:''}]),
+      notas:nota,
     };
-
-    const [ev] = await db.post('eventos', body);
-    alertEl.innerHTML = '<div class="alert alert-success">✅ Evento creado en Capsule Corp</div>';
-    _eventosCache = await db.get('eventos', '?order=fecha.desc&limit=200');
+    const [ev]=await db.post('eventos',body);
+    alertEl.innerHTML='<div class="alert alert-success">✅ Evento creado. Redirigiendo...</div>';
+    _eventosCache=await db.get('eventos','?order=fecha.desc&limit=200');
     populateEventoSelects();
-
-    // Redirigir a Capsule Corp y abrir el evento a editar
-    setTimeout(() => {
-      showPage('capsule');
-      if (ev?.id) editarEvento(ev.id);
-    }, 1200);
-
-  } catch(e) {
-    alertEl.innerHTML = `<div class="alert alert-error">${e.message}</div>`;
-  }
+    guardarSesionCot();
+    setTimeout(()=>{showPage('capsule');if(ev?.id)editarEvento(ev.id);},1200);
+  } catch(e){alertEl.innerHTML=`<div class="alert alert-error">${e.message}</div>`;}
 }
+
 
 // ═══════════════════════════════════════════════════════════════
 // PING anti-pausa Supabase (cada 6 días = 518400000 ms)

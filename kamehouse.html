@@ -3076,13 +3076,19 @@ function renderStaffCard(persona, i, tipo) {
   const isCoord = tipo==='coordi';
   const color = isCoord ? 'var(--orange)' : 'var(--blue)';
   const label = isCoord ? 'Coordinador' : 'Creador de Contenido';
-  // calcularCostoStaff also populates persona._desglose used by renderStaffDesglose
-  const _isCDMX = document.getElementById('cot-ciudad')?.value === 'cdmx';
-  const _cTrans = _isCDMX ? 0 : (window.COT?.unidades||[]).reduce((s,u)=>s+(u.costo||0),0);
-  const _staffBus = [...(window.COT?.coordis||[]),...(window.COT?.cc||[])].filter(s=>s.transporte==='bus').length;
-  const _capBruta = (window.COT?.unidades||[]).reduce((s,u)=>s+(u.capacidad||0),0);
-  const _divTrans = Math.max(1, _capBruta - _staffBus);
-  const costo = calcularCostoStaff(persona, isCoord, _cTrans, _divTrans);
+  // Si recalcular() ya populó _desglose con los params correctos, usar ese total.
+  // Si no (primer render), calcular con valores leídos del DOM.
+  let costo;
+  if (persona._desglose && typeof persona._desglose.total === 'number') {
+    costo = persona._desglose.total;
+  } else {
+    const _isCDMX = document.getElementById('cot-ciudad')?.value === 'cdmx';
+    const _cTrans = _isCDMX ? 0 : (COT.unidades||[]).reduce((s,u)=>s+(u.costo||0),0);
+    const _staffBus = [...(COT.coordis||[]),...(COT.cc||[])].filter(s=>s.transporte==='bus').length;
+    const _capBruta = (COT.unidades||[]).reduce((s,u)=>s+(u.capacidad||0),0);
+    const _divTrans = Math.max(1, _capBruta - _staffBus);
+    costo = calcularCostoStaff(persona, isCoord, _cTrans, _divTrans);
+  }
 
   // Dropdown nombre: coordis desde Supabase, CC texto libre
   const nombreField = isCoord && _vendedoresCache.length

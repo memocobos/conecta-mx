@@ -1627,6 +1627,7 @@ function renderCatalog(){
   var list=$$('ev-list');
   list.innerHTML='';
   var mesActual='';
+  var _priorityCount=0;  // primeras 3 cards upcoming reciben fetchpriority="high"
   var normalEvs=EV.filter(function(e){return!e.listOnly;}).sort(function(a,b){return(a.ds||'').localeCompare(b.ds||'');});
   var listOnlyEvs=EV.filter(function(e){return e.listOnly;});
   var allEvs=normalEvs.concat(listOnlyEvs);
@@ -1695,7 +1696,11 @@ function renderCatalog(){
     if(staticSrc||ev.img){
       var initials=ev.a.substring(0,2).toUpperCase();
       var onerr=staticSrc?(' onerror="this.parentElement.outerHTML=\'<div class=\\\'ev-img-placeholder\\\'><span class=\\\'ev-img-initials\\\'>'+initials+'</span></div>\'"'):'';
-      imgHTML='<div class="ev-img-wrap"><img class="ev-img" loading="lazy" decoding="async" src="'+(staticSrc||'')+'" alt="'+ev.a+'"'+onerr+' />'+playBtn+'</div>';
+      // Primeras 3 cards no-pasadas no-agotadas: priority hint para LCP
+      var isPriority=!isPast&&!isAg&&_priorityCount<3;
+      var loadAttr=isPriority?'eager" fetchpriority="high':'lazy';
+      if(isPriority)_priorityCount++;
+      imgHTML='<div class="ev-img-wrap"><img class="ev-img" loading="'+loadAttr+'" decoding="async" src="'+(staticSrc||'')+'" alt="'+ev.a+'"'+onerr+' />'+playBtn+'</div>';
     }else{
       imgHTML='<div class="ev-img-placeholder"><span class="ev-img-initials">'+ev.a.substring(0,2).toUpperCase()+'</span>'+playBtn+'</div>';
     }
@@ -1978,6 +1983,96 @@ filterEvents();
 buildMonthBar();
 refreshTop10();
 loadViajerosCounter();
+injectEventStructuredData();
+
+// SEO: structured data JSON-LD para todos los eventos upcoming (excluye pasados, agotados, listOnly).
+// Google usa MusicEvent schema para mostrar rich snippets en búsquedas.
+function injectEventStructuredData(){
+  if(typeof EV==='undefined'||!Array.isArray(EV))return;
+  var today=new Date().toISOString().slice(0,10);
+  var BASE='https://conectareynosa.mx';
+  var events=EV.filter(function(e){
+    if(e.listOnly)return false;
+    if(!e.ds)return false;
+    if(e.ds<today)return false;
+    if(e.st==='agotado'||e.agotado)return false;
+    return true;
+  });
+  function minPrice(ev){
+    var pools=[];
+    if(ev.cheapZonas&&ev.cheapZonas.length)pools.push(ev.cheapZonas);
+    if(ev.zonas&&ev.zonas.length)pools.push(ev.zonas);
+    if(ev.multifecha)ev.multifecha.forEach(function(mf){
+      if(mf.cheapZonas)pools.push(Array.isArray(mf.cheapZonas)?mf.cheapZonas:Object.values(mf.cheapZonas));
+      if(mf.zonas)pools.push(Array.isArray(mf.zonas)?mf.zonas:Object.values(mf.zonas));
+    });
+    var min=Infinity;
+    pools.forEach(function(z){z.forEach(function(zz){if(!zz.ag&&zz.p>0&&zz.p<min)min=zz.p;});});
+    return min===Infinity?null:min;
+  }
+  function imgUrl(ev){
+    var s=(typeof STATIC_IMGS!=='undefined'&&STATIC_IMGS)?
+      (STATIC_IMGS[ev.id]||STATIC_IMGS[ev.staticImg]):null;
+    if(!s)return BASE+'/icon-512.png';
+    if(s.indexOf('http')===0||s.indexOf('data:')===0)return s;
+    return BASE+'/'+s.replace(/^\//,'');
+  }
+  function cityFromVenue(v){
+    var u=(v||'').toUpperCase();
+    if(u.indexOf('CDMX')>=0||u.indexOf('CIUDAD DE MEXICO')>=0)return 'Ciudad de México';
+    if(u.indexOf('NL')>=0||u.indexOf('MTY')>=0||u.indexOf('MONTERREY')>=0||u.indexOf('FUNDIDORA')>=0)return 'Monterrey';
+    if(u.indexOf('QUERÉTARO')>=0||u.indexOf('QUERETARO')>=0)return 'Querétaro';
+    return 'Monterrey';
+  }
+  function performerName(ev){
+    return (ev.a||'').split(' - ')[0].split(' en ')[0].split(' & ')[0].trim();
+  }
+  var docs=events.map(function(ev){
+    var p=minPrice(ev);
+    var doc={
+      '@context':'https://schema.org',
+      '@type':'MusicEvent',
+      'name':ev.a,
+      'startDate':ev.ds,
+      'location':{
+        '@type':'Place',
+        'name':ev.v,
+        'address':{
+          '@type':'PostalAddress',
+          'addressLocality':cityFromVenue(ev.v),
+          'addressCountry':'MX'
+        }
+      },
+      'image':imgUrl(ev),
+      'performer':{
+        '@type':'MusicGroup',
+        'name':performerName(ev)
+      },
+      'organizer':{
+        '@type':'Organization',
+        'name':'Conecta Reynosa',
+        'url':BASE
+      },
+      'eventAttendanceMode':'https://schema.org/OfflineEventAttendanceMode',
+      'eventStatus':'https://schema.org/EventScheduled'
+    };
+    if(p){
+      doc.offers={
+        '@type':'Offer',
+        'price':String(p),
+        'priceCurrency':'MXN',
+        'availability':'https://schema.org/InStock',
+        'url':BASE
+      };
+    }
+    return doc;
+  });
+  if(!docs.length)return;
+  var s=document.createElement('script');
+  s.type='application/ld+json';
+  s.textContent=JSON.stringify(docs);
+  document.head.appendChild(s);
+}
 
 function loadViajerosCounter(){
   var SB_URL='https://lcffgrrwbbbgorooawyd.supabase.co';

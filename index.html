@@ -516,72 +516,6 @@ body.chat-open,body.wizard-open{overscroll-behavior:none}
 .hh-btn-verde:hover{background:#1fba57;transform:translateY(-2px);box-shadow:0 12px 32px rgba(37,211,102,.4)}
 .hh-btn-full{width:100%;max-width:520px;justify-content:center;padding:18px 28px;font-size:13px}
 
-/* Hero trust badges */
-.hh-trust{
-  display:flex;flex-wrap:wrap;justify-content:center;align-items:center;
-  gap:8px 14px;margin-top:clamp(18px,2.5vw,24px);
-  padding:12px 18px;max-width:760px;
-  background:rgba(0,0,0,.55);border:1px solid rgba(255,255,255,.1);
-  backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
-  animation:lineInMain 1s .8s both;
-}
-.hh-trust-item{
-  display:inline-flex;align-items:center;gap:6px;
-  font-family:'Montserrat',sans-serif;font-size:11px;font-weight:700;
-  color:#fff;text-transform:uppercase;letter-spacing:.06em;
-}
-.hh-trust-item strong{color:var(--c-amarillo);font-weight:900}
-.hh-trust-ico{font-size:14px;line-height:1}
-.hh-trust-sep{color:rgba(255,255,255,.25);font-size:9px}
-.hh-trust-bank{font-size:10px;color:rgba(255,255,255,.6);font-weight:600;letter-spacing:.04em;text-transform:none}
-@media(max-width:520px){
-  .hh-trust{padding:10px 12px;gap:6px 10px}
-  .hh-trust-item{font-size:10px}
-  .hh-trust-sep{display:none}
-}
-
-/* Cómo funciona — 4 pasos visuales horizontales (home) */
-.como-pasos{
-  background:#0a0a0a;padding:clamp(40px,6vw,72px) clamp(20px,5vw,80px);
-  max-width:1280px;margin:0 auto;
-  border-top:1px solid var(--c-line);border-bottom:1px solid var(--c-line);
-}
-.como-pasos-head{text-align:center;margin-bottom:clamp(28px,4vw,44px)}
-.como-pasos-kicker{display:inline-block;font-size:10px;font-weight:900;letter-spacing:.2em;text-transform:uppercase;color:var(--c-amarillo);margin-bottom:10px;font-family:'Montserrat',sans-serif}
-.como-pasos-title{font-family:var(--font-display);font-weight:900;font-size:clamp(28px,5vw,48px);line-height:.95;text-transform:uppercase;color:#fff;letter-spacing:-.005em;margin:0}
-.como-pasos-grid{display:grid;grid-template-columns:1fr;gap:14px}
-@media(min-width:640px){.como-pasos-grid{grid-template-columns:repeat(2,1fr);gap:16px}}
-@media(min-width:1024px){.como-pasos-grid{grid-template-columns:repeat(4,1fr);gap:18px}}
-.como-paso{
-  position:relative;background:#000;border:1px solid rgba(255,255,255,.08);
-  padding:clamp(22px,3vw,28px) clamp(18px,2.5vw,24px);
-  display:flex;flex-direction:column;gap:10px;
-  transition:border-color .25s ease,transform .25s ease;
-}
-.como-paso:hover{border-color:var(--c-amarillo);transform:translateY(-3px)}
-.como-paso-num{
-  width:36px;height:36px;border-radius:50%;
-  background:var(--c-amarillo);color:#000;
-  display:flex;align-items:center;justify-content:center;
-  font-family:'Montserrat',sans-serif;font-weight:900;font-size:14px;
-}
-.como-paso-ico{font-size:36px;line-height:1;margin:6px 0 4px}
-.como-paso-titulo{
-  font-family:'Montserrat',sans-serif;font-weight:900;font-size:13px;
-  text-transform:uppercase;letter-spacing:.06em;color:#fff;margin:0;
-}
-.como-paso-desc{font-size:12.5px;line-height:1.5;color:rgba(255,255,255,.6);font-weight:500;margin:0}
-.como-pasos-cta{text-align:center;margin-top:clamp(22px,3vw,30px)}
-.como-pasos-cta a{
-  display:inline-flex;align-items:center;gap:8px;
-  font-family:'Montserrat',sans-serif;font-size:11px;font-weight:900;
-  text-transform:uppercase;letter-spacing:.12em;
-  color:var(--c-amarillo);text-decoration:none;
-  border-bottom:1px solid rgba(232,255,76,.3);padding-bottom:4px;
-  transition:border-color .2s ease;
-}
-.como-pasos-cta a:hover{border-color:var(--c-amarillo)}
-
 /* "Cómo funciona" v2 — big 01/02/03 numbers like FAQ */
 .how-v2{background:#000;padding:clamp(40px,6vw,80px) clamp(20px,5vw,80px) 0;max-width:1280px;margin:0 auto}
 .how-v2-head{
@@ -958,15 +892,6 @@ src="https://www.facebook.com/tr?id=1685907946147007&ev=PageView&noscript=1"
       <span class="line"><span class="mark">expertos</span></span>
     </h1>
     <p class="hh-sub">Agencia de viajes desde Reynosa. Transporte, hospedaje, boletos y kit Conecta — todo resuelto. Escoge tu evento, elige paquete y paga en quincenas sin estrés.</p>
-    <div class="hh-trust" aria-label="Indicadores de confianza">
-      <span class="hh-trust-item"><span class="hh-trust-ico" aria-hidden="true">👥</span><strong>+1,200</strong>&nbsp;viajeros felices</span>
-      <span class="hh-trust-sep" aria-hidden="true">●</span>
-      <span class="hh-trust-item"><span class="hh-trust-ico" aria-hidden="true">🏆</span><strong>13 años</strong>&nbsp;de experiencia</span>
-      <span class="hh-trust-sep" aria-hidden="true">●</span>
-      <span class="hh-trust-item"><span class="hh-trust-ico" aria-hidden="true">🔒</span>Reservas seguras</span>
-      <span class="hh-trust-sep" aria-hidden="true">●</span>
-      <span class="hh-trust-item hh-trust-bank">BBVA + Hey Banco</span>
-    </div>
     <div class="hh-countdown" id="hh-countdown" style="display:none">
       <div class="cd-head">
         <span class="cd-label" id="cd-label">Próximo evento</span>
@@ -975,48 +900,12 @@ src="https://www.facebook.com/tr?id=1685907946147007&ev=PageView&noscript=1"
       <div class="cd-cards" id="cd-cards"></div>
     </div>
     <div class="hh-ctas">
-      <a href="#catalog-anchor" class="hh-btn hh-btn-rojo hh-btn-full">Ver próximos conciertos <span aria-hidden="true">→</span></a>
-    </div>
-  </section>
-
-  <!-- Cómo funciona — 4 pasos visuales -->
-  <section class="como-pasos" aria-labelledby="como-pasos-title">
-    <div class="como-pasos-head">
-      <div class="como-pasos-kicker">Reservar es fácil</div>
-      <h2 class="como-pasos-title" id="como-pasos-title">¿Cómo funciona?</h2>
-    </div>
-    <div class="como-pasos-grid">
-      <article class="como-paso">
-        <div class="como-paso-num">1</div>
-        <div class="como-paso-ico" aria-hidden="true">🎫</div>
-        <h3 class="como-paso-titulo">Elige tu evento</h3>
-        <p class="como-paso-desc">Explora nuestro catálogo de conciertos.</p>
-      </article>
-      <article class="como-paso">
-        <div class="como-paso-num">2</div>
-        <div class="como-paso-ico" aria-hidden="true">📦</div>
-        <h3 class="como-paso-titulo">Selecciona tu paquete</h3>
-        <p class="como-paso-desc">PLUS, RIDE, STAY o CHEAP — elige el que mejor se adapte.</p>
-      </article>
-      <article class="como-paso">
-        <div class="como-paso-num">3</div>
-        <div class="como-paso-ico" aria-hidden="true">💳</div>
-        <h3 class="como-paso-titulo">Reserva con $500</h3>
-        <p class="como-paso-desc">Separa tu lugar y paga el resto en cómodas mensualidades.</p>
-      </article>
-      <article class="como-paso">
-        <div class="como-paso-num">4</div>
-        <div class="como-paso-ico" aria-hidden="true">🎉</div>
-        <h3 class="como-paso-titulo">Vive el concierto</h3>
-        <p class="como-paso-desc">Te llevamos, hospedamos y disfrutas.</p>
-      </article>
-    </div>
-    <div class="como-pasos-cta">
-      <a href="/funciona">Ver guía completa <span aria-hidden="true">→</span></a>
+      <a href="#catalog-anchor" class="hh-btn hh-btn-rojo hh-btn-full">Ver eventos <span aria-hidden="true">→</span></a>
     </div>
   </section>
 
   <!-- Links to sub-pages, same style -->
+  <a href="/funciona" class="faq-link-v2">¿Cómo funciona? <span aria-hidden="true">→</span></a>
   <a href="/faq" class="faq-link-v2">Preguntas frecuentes <span aria-hidden="true">→</span></a>
   <a href="/kit" class="faq-link-v2">Kit Conecta <span aria-hidden="true">→</span></a>
   <div id="viajeros-counter" style="display:none;text-align:center;padding:28px 16px 20px;font-family:'Montserrat',sans-serif">

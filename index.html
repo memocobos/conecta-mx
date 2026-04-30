@@ -3550,7 +3550,10 @@ function buildEventSummary(){
       var hParts=hl.map(function(h){return h.n+': '+(h.e===0?'incluida sin costo extra':'+$'+h.e+' por persona');});
       hTxt=' | Hotel: '+hParts.join(', ');
     }
-    lines.push('- '+e.a+' | '+e.f+' | '+e.v+' | '+stTxt+' | Zonas: '+zTxt+' | Separo: $'+(e.sep||0)+hTxt);
+    var sepTxt='Separo PLUS/STAY/RIDE: $'+(e.sep||0);
+    if(e.sepCheap)sepTxt+=' | Separo CHEAP: $'+e.sepCheap;
+    else sepTxt+=' | Separo CHEAP: $'+(e.sep||0);
+    lines.push('- '+e.a+' | '+e.f+' | '+e.v+' | '+stTxt+' | Zonas: '+zTxt+' | '+sepTxt+hTxt);
   }
   return lines.join('\n');
 }
@@ -3607,12 +3610,21 @@ function getChatSystemPrompt(){
     'Ambos incluyen hospedaje compartido. Cual prefieres?"\n\n'+
     'CIERRE OBLIGATORIO AL TERMINAR DE COTIZAR:\n'+
     'Cuando el cliente ya eligio paquete y zona y le diste el precio total, SIEMPRE cierra con un mensaje guiando al pago. NUNCA termines la cotizacion sin invitar al separo.\n'+
-    'Formato del cierre (sigue exactamente esta estructura, separando con lineas en blanco):\n\n'+
+    'IMPORTANTE: el monto del separo NO es fijo. Depende del evento Y del paquete:\n'+
+    'Para PLUS, STAY o RIDE → usa el monto "Separo PLUS/STAY/RIDE" del evento (campo sep).\n'+
+    'Para CHEAP → usa el monto "Separo CHEAP" del evento (campo sepCheap, o sep si no hay sepCheap).\n'+
+    'NUNCA digas $500 fijo. Lee el separo real del evento que el cliente eligio.\n'+
+    'Cuenta segun paquete:\n'+
+    'PLUS, STAY, RIDE → BBVA, comprobante por Messenger.\n'+
+    'CHEAP → Hey Banco, comprobante por WhatsApp.\n\n'+
+    'Formato del cierre (sigue exactamente esta estructura, separando con lineas en blanco. Reemplaza [SEPARO], [BANCO] y [CANAL] con los valores correctos del evento y paquete):\n\n'+
     '"Listo! Tu paquete cuesta $X.\n\n'+
     'Para reservar:\n\n'+
-    '1. Transfiere $500 de separo (BBVA si elegiste PLUS, RIDE o STAY. Hey Banco si elegiste CHEAP).\n\n'+
-    '2. Envia tu comprobante por Messenger o WhatsApp.\n\n'+
+    '1. Transfiere el separo de $[SEPARO] a [BANCO].\n\n'+
+    '2. Envia tu comprobante por [CANAL].\n\n'+
     'Quieres que te muestre los datos bancarios?"\n\n'+
+    'Ejemplo PLUS (evento con sep=800): "...el separo de $800 a BBVA. Envia tu comprobante por Messenger."\n'+
+    'Ejemplo CHEAP (evento con sepCheap=1000): "...el separo de $1,000 a Hey Banco. Envia tu comprobante por WhatsApp."\n\n'+
     'Cuando el cliente diga si, sí, claro, dale, ok, va, perfecto o similar como respuesta a esa pregunta, responde algo corto como "Perfecto, aqui tienes los datos" — el sistema mostrara automaticamente botones para ver datos BBVA, Hey Banco, Messenger y WhatsApp. NO escribas tu las cuentas, CLABE ni nombre del titular: el frontend los muestra.\n\n'+
     'EVENTOS ACTUALES:\n'+buildEventSummary();
 }

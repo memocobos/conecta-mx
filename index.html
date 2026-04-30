@@ -31,6 +31,8 @@
 <link rel="preload" as="font" type="font/woff2" crossorigin href="https://fonts.gstatic.com/s/barlowcondensed/v13/HTxwL3I-JCGChYJ8VI-L6OO_au7B45L0z3bWuYMBYro.woff2">
 <link rel="preload" as="font" type="font/woff2" crossorigin href="https://fonts.gstatic.com/s/montserrat/v31/JTUSjIg1_i6t8kCHKm459WlhyyTh89Y.woff2">
 <link rel="preload" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@900&family=Montserrat:wght@400;500;600;700;900&display=swap" as="style">
+<!-- Preload primer evento upcoming visible (LCP candidate). Otros se cargan via lazy / Deezer. -->
+<link rel="preload" as="image" href="imgs/laura.jpg" fetchpriority="high">
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@900&family=Montserrat:wght@400;500;600;700;900&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
 <noscript><link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@900&family=Montserrat:wght@400;500;600;700;900&display=swap" rel="stylesheet"></noscript>
 <style>
@@ -78,7 +80,7 @@ body.chat-open,body.wizard-open{overscroll-behavior:none}
 .ev-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
 @media(min-width:768px){.ev-grid{grid-template-columns:repeat(3,1fr);gap:12px}}
 @media(min-width:1100px){.ev-grid{grid-template-columns:repeat(4,1fr)}}
-.ev-top-badge{position:absolute;top:8px;right:8px;background:#ff283b;color:#fff;font-size:10px;font-weight:900;letter-spacing:.08em;padding:4px 8px;border-radius:4px;z-index:9;font-family:'Montserrat',sans-serif;box-shadow:0 2px 6px rgba(0,0,0,.4)}
+.ev-top-badge{position:absolute;top:8px;right:8px;background:#ff283b;color:#000;font-size:10px;font-weight:900;letter-spacing:.08em;padding:4px 8px;border-radius:4px;z-index:9;font-family:'Montserrat',sans-serif;box-shadow:0 2px 6px rgba(0,0,0,.5)}
 .mes-label{font-size:10px;font-weight:900;color:#ff283b;text-transform:uppercase;letter-spacing:.15em;padding:16px 0 8px;margin-bottom:8px;border-bottom:1px solid rgba(255,40,59,.3);grid-column:1/-1}
 .pc-section-label{font-size:10px;font-weight:900;color:rgba(255,255,255,.35);text-transform:uppercase;letter-spacing:.15em;padding:20px 0 10px;border-bottom:1px solid rgba(255,255,255,.1);grid-column:1/-1;margin-top:8px}
 .pc-row{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:#111;border:1px solid rgba(255,255,255,.07);grid-column:1/-1;cursor:default}
@@ -3795,6 +3797,9 @@ function cerrarBienvenida(){
   });
 
   setTimeout(function(){
+    // Suprimir si el welcome modal sigue abierto — evitar dos overlays simultáneos
+    var wb=document.getElementById('bienvenida-bg');
+    if(wb&&wb.style.display==='flex')return;
     if(isAndroid&&deferredPrompt){
       sub.textContent='Acceso rápido desde tu pantalla de inicio';
       action.innerHTML='<button id="pwa-install" style="width:100%;background:#e8ff4c;color:#000;border:none;padding:10px;font-size:12px;font-weight:900;font-family:Montserrat,sans-serif;border-radius:8px;cursor:pointer;text-transform:uppercase;letter-spacing:.06em">📱 Instalar app</button>';

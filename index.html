@@ -1212,7 +1212,28 @@ src="https://www.facebook.com/tr?id=1685907946147007&ev=PageView&noscript=1"
 .chat-fab{position:fixed;bottom:84px;right:20px;width:56px;height:56px;background:#e8ff4c;border-radius:50%;display:flex;align-items:center;justify-content:center;border:none;cursor:pointer;z-index:999;box-shadow:0 4px 16px rgba(232,255,76,.35);transition:transform .2s;font-size:26px}
 .chat-fab:hover{transform:scale(1.1)}
 .chat-panel{position:fixed;bottom:20px;right:20px;width:360px;height:520px;background:#1a1a1a;border:1px solid rgba(255,255,255,.1);border-radius:14px;z-index:1000;display:none;flex-direction:column;overflow:hidden;box-shadow:0 12px 40px rgba(0,0,0,.6);font-family:'Montserrat',sans-serif}
-@media(max-width:420px){.chat-panel{width:calc(100vw - 16px);height:calc(100vh - 80px);right:8px;bottom:8px;border-radius:10px}}
+@media(max-width:768px){
+  .chat-panel{
+    inset:0;width:100vw;width:100dvw;height:100vh;height:100dvh;
+    right:auto;bottom:auto;top:0;left:0;border-radius:0;border:none;
+  }
+  .chat-head{padding-top:max(14px,env(safe-area-inset-top))}
+  .chat-input-wrap{padding-bottom:max(10px,env(safe-area-inset-bottom))}
+}
+.chat-quick{display:flex;flex-wrap:wrap;gap:6px;margin:-4px 0 4px;align-self:flex-start;max-width:100%}
+.chat-quick-btn{
+  background:rgba(232,255,76,.1);color:#e8ff4c;
+  border:1px solid rgba(232,255,76,.3);
+  padding:8px 12px;border-radius:18px;
+  font-size:12px;font-weight:700;font-family:'Montserrat',sans-serif;
+  cursor:pointer;transition:background .15s ease,transform .15s ease;
+  text-decoration:none;display:inline-flex;align-items:center;gap:4px;
+  -webkit-tap-highlight-color:rgba(232,255,76,.2);
+}
+.chat-quick-btn:hover{background:rgba(232,255,76,.22);transform:translateY(-1px)}
+.chat-quick-btn:active{transform:translateY(0)}
+.chat-quick-btn.pay{background:rgba(37,211,102,.12);color:#88ea4e;border-color:rgba(136,234,78,.35)}
+.chat-quick-btn.pay:hover{background:rgba(37,211,102,.22)}
 .chat-head{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;background:#111;border-bottom:1px solid rgba(255,255,255,.08)}
 .chat-head-title{font-size:13px;font-weight:900;color:#e8ff4c;text-transform:uppercase;letter-spacing:.06em}
 .chat-close{background:none;border:none;color:rgba(255,255,255,.5);font-size:22px;cursor:pointer;padding:0 4px}
@@ -3508,7 +3529,8 @@ function getQuincenas(from, until, max){
   }
 
 // ── Chatbot IA ──────────────────────────────────────────────────────────
-var _chatOpen=false,_chatReady=false,_chatHistory=[],_chatChar=null;
+var _chatOpen=false,_chatReady=false,_chatHistory=[],_chatChar=null,_chatScrollY=0;
+function _chatIsMobile(){return window.matchMedia('(max-width:768px)').matches;}
 
 function buildEventSummary(){
   var lines=[];
@@ -3583,6 +3605,15 @@ function getChatSystemPrompt(){
     '"Se presenta el [fecha] en [venue].\n\n'+
     'PLUS por $5,000 (con transporte). STAY por $4,500 (sin transporte).\n\n'+
     'Ambos incluyen hospedaje compartido. Cual prefieres?"\n\n'+
+    'CIERRE OBLIGATORIO AL TERMINAR DE COTIZAR:\n'+
+    'Cuando el cliente ya eligio paquete y zona y le diste el precio total, SIEMPRE cierra con un mensaje guiando al pago. NUNCA termines la cotizacion sin invitar al separo.\n'+
+    'Formato del cierre (sigue exactamente esta estructura, separando con lineas en blanco):\n\n'+
+    '"Listo! Tu paquete cuesta $X.\n\n'+
+    'Para reservar:\n\n'+
+    '1. Transfiere $500 de separo (BBVA si elegiste PLUS, RIDE o STAY. Hey Banco si elegiste CHEAP).\n\n'+
+    '2. Envia tu comprobante por Messenger o WhatsApp.\n\n'+
+    'Quieres que te muestre los datos bancarios?"\n\n'+
+    'Cuando el cliente diga si, sí, claro, dale, ok, va, perfecto o similar como respuesta a esa pregunta, responde algo corto como "Perfecto, aqui tienes los datos" — el sistema mostrara automaticamente botones para ver datos BBVA, Hey Banco, Messenger y WhatsApp. NO escribas tu las cuentas, CLABE ni nombre del titular: el frontend los muestra.\n\n'+
     'EVENTOS ACTUALES:\n'+buildEventSummary();
 }
 
@@ -3687,26 +3718,171 @@ function addChatMsg(txt,role){
   return div;
 }
 
+function _clearChatQuick(){
+  var msgs=document.getElementById('chat-msgs');
+  if(!msgs)return;
+  var olds=msgs.querySelectorAll('.chat-quick');
+  for(var i=0;i<olds.length;i++)olds[i].remove();
+}
+
+function renderChatQuick(buttons){
+  if(!buttons||!buttons.length)return;
+  _clearChatQuick();
+  var msgs=document.getElementById('chat-msgs');
+  var wrap=document.createElement('div');
+  wrap.className='chat-quick';
+  buttons.forEach(function(b){
+    var el;
+    if(b.url){
+      el=document.createElement('a');
+      el.href=b.url;
+      el.target='_blank';
+      el.rel='noopener';
+    } else {
+      el=document.createElement('button');
+      el.type='button';
+    }
+    el.className='chat-quick-btn'+(b.pay?' pay':'');
+    el.textContent=b.label;
+    if(!b.url){
+      el.addEventListener('click',function(){
+        if(b.action==='showBank'){
+          _showBankInChat(b.bank);
+          _clearChatQuick();
+          return;
+        }
+        var send=b.send||b.label;
+        var input=document.getElementById('chat-input');
+        input.value=send;
+        _clearChatQuick();
+        enviarChat();
+      });
+    } else {
+      el.addEventListener('click',function(){_clearChatQuick();});
+    }
+    wrap.appendChild(el);
+  });
+  msgs.appendChild(wrap);
+  msgs.scrollTop=msgs.scrollHeight;
+}
+
+function _showBankInChat(which){
+  var b=which==='hey'?BANCO_HEY:BANCO_DEFAULT;
+  var lines=[
+    '📋 '+b.nombre,
+    '',
+    'Titular: '+b.titular,
+    'Tarjeta: '+b.tarjeta,
+    'CLABE: '+b.clabe,
+    '',
+    'Manda tu comprobante por Messenger o WhatsApp para confirmar tu lugar.'
+  ].join('\n');
+  addChatMsg(lines,'bot');
+  _chatHistory.push({role:'assistant',content:lines});
+  // Re-render the messenger/wa shortcut buttons after showing bank info.
+  renderChatQuick([
+    {label:'📲 Messenger',url:'https://m.me/ConectaRey',pay:true},
+    {label:'📲 WhatsApp',url:'https://wa.me/528119771072',pay:true}
+  ]);
+}
+
+function _chatUpcomingEvents(n){
+  n=n||5;
+  var today=new Date();
+  var list=[];
+  if(typeof EV==='undefined'||!EV)return list;
+  for(var i=0;i<EV.length&&list.length<n;i++){
+    var e=EV[i];
+    if(!e||e.listOnly)continue;
+    if(e.st==='agotado'||e.st==='proceso')continue;
+    var evDate=new Date(e.ds+'T23:59:59');
+    if(evDate<today)continue;
+    var clean=(e.a||'').replace(/ - .*$/,'').replace(/ -.*$/,'');
+    if(clean.length>26)clean=clean.slice(0,26)+'…';
+    list.push({label:clean,send:e.a});
+  }
+  return list;
+}
+
+function detectChatButtons(reply){
+  if(!reply)return null;
+  var t=reply.toLowerCase();
+  // Datos bancarios / pago
+  var asksBank=t.indexOf('datos bancarios')>=0||t.indexOf('te paso los datos')>=0||t.indexOf('te muestro los datos')>=0||t.indexOf('te comparto los datos')>=0;
+  var hasBankInfo=t.indexOf('bbva')>=0&&(t.indexOf('clabe')>=0||t.indexOf('tarjeta')>=0);
+  if(asksBank||hasBankInfo){
+    return [
+      {label:'📋 Datos BBVA',action:'showBank',bank:'bbva',pay:true},
+      {label:'📋 Datos Hey Banco',action:'showBank',bank:'hey',pay:true},
+      {label:'📲 Messenger',url:'https://m.me/ConectaRey',pay:true},
+      {label:'📲 WhatsApp',url:'https://wa.me/528119771072',pay:true}
+    ];
+  }
+  // Paquete
+  if(/qu[eé]\s+paquete|cu[aá]l\s+paquete|paquete\s+prefieres|paquete\s+te\s+interesa/.test(t)){
+    return [
+      {label:'PLUS',send:'PLUS'},
+      {label:'RIDE',send:'RIDE'},
+      {label:'STAY',send:'STAY'},
+      {label:'CHEAP',send:'CHEAP'}
+    ];
+  }
+  // Ciudad
+  if(/desde\s+qu[eé]\s+ciudad|desde\s+d[oó]nde|de\s+qu[eé]\s+ciudad|desde\s+que\s+ciudad/.test(t)){
+    return [
+      {label:'Reynosa',send:'Reynosa'},
+      {label:'Otra ciudad',send:'Otra ciudad'}
+    ];
+  }
+  // Personas
+  if(/cu[aá]nt[oa]s?\s+(personas|viajeros|viajan|son|van)/.test(t)){
+    return [
+      {label:'1',send:'1 persona'},
+      {label:'2',send:'2 personas'},
+      {label:'3',send:'3 personas'},
+      {label:'4',send:'4 personas'}
+    ];
+  }
+  // Evento
+  if(/qu[eé]\s+evento|cu[aá]l\s+evento|evento\s+te\s+interesa|qu[eé]\s+concierto|cu[aá]l\s+concierto|concierto\s+te\s+interesa/.test(t)){
+    var evs=_chatUpcomingEvents(5);
+    if(evs.length){
+      return evs.map(function(e){return {label:e.label,send:e.send};});
+    }
+  }
+  return null;
+}
+
 function toggleChat(){
   _chatOpen=!_chatOpen;
   var panel=document.getElementById('chat-panel');
   var fab=document.getElementById('chat-fab');
   if(_chatOpen){
+    if(_chatIsMobile()){
+      _chatScrollY=window.scrollY||window.pageYOffset||0;
+      document.body.style.top='-'+_chatScrollY+'px';
+      document.body.classList.add('chat-open');
+    }
     panel.style.display='flex';
     fab.style.display='none';
-    if(window.matchMedia('(max-width:420px)').matches){document.body.classList.add('chat-open');}
     if(!_chatReady){
       _chatReady=true;
       _chatChar=pickChar();
       document.getElementById('chat-char-name').textContent=_chatChar.name;
       _chatHistory=[{role:'assistant',content:_chatChar.msg}];
       addChatMsg(_chatChar.msg,'bot');
+      var initBtns=detectChatButtons(_chatChar.msg);
+      if(initBtns)renderChatQuick(initBtns);
     }
-    document.getElementById('chat-input').focus();
+    if(!_chatIsMobile())document.getElementById('chat-input').focus();
   } else {
     panel.style.display='none';
     fab.style.display='flex';
-    document.body.classList.remove('chat-open');
+    if(document.body.classList.contains('chat-open')){
+      document.body.classList.remove('chat-open');
+      document.body.style.top='';
+      window.scrollTo(0,_chatScrollY);
+    }
   }
 }
 
@@ -3715,6 +3891,7 @@ function enviarChat(){
   var txt=input.value.trim();
   if(!txt)return;
   input.value='';
+  _clearChatQuick();
   addChatMsg(txt,'user');
   _chatHistory.push({role:'user',content:txt});
   var typing=addChatMsg('Escribiendo...','bot typing');
@@ -3750,8 +3927,11 @@ function enviarChat(){
     // Check if bot suggests human contact
     var hasHuman=reply.toLowerCase().indexOf('whatsapp')>=0||reply.toLowerCase().indexOf('humano')>=0||reply.toLowerCase().indexOf('persona real')>=0;
     if(hasHuman)reply+='HUMANO_BTN';
-    _chatHistory.push({role:'assistant',content:reply.replace('HUMANO_BTN','')});
+    var cleanReply=reply.replace('HUMANO_BTN','');
+    _chatHistory.push({role:'assistant',content:cleanReply});
     addChatMsg(reply,'bot');
+    var btns=detectChatButtons(cleanReply);
+    if(btns)renderChatQuick(btns);else _clearChatQuick();
   }).catch(function(err){
     typing.remove();
     addChatMsg('Ups, hubo un error de conexión. Intenta de nuevo o contáctanos por WhatsApp.HUMANO_BTN','bot');

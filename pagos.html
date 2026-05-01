@@ -474,6 +474,59 @@ button:focus-visible,a:focus-visible{
   .alert-cuenta-title{font-size:14px}
   .alert-cuenta-row{font-size:14px}
 }
+
+/* ======== Botones de selección rápida ======== */
+.choose-cta{
+  margin:18px auto 28px;max-width:920px;
+  display:grid;grid-template-columns:1fr;gap:12px;
+  font-family:'Montserrat',sans-serif;
+}
+@media(min-width:780px){.choose-cta{grid-template-columns:repeat(3,1fr);gap:14px}}
+.choose-btn{
+  display:flex;flex-direction:column;align-items:flex-start;justify-content:center;
+  gap:6px;text-align:left;
+  padding:20px 22px;min-height:104px;
+  text-decoration:none;
+  border:2px solid;
+  background:#000;
+  transition:transform .18s ease,box-shadow .18s ease,background .18s ease,border-color .18s ease;
+  cursor:pointer;
+}
+.choose-btn:hover{transform:translateY(-3px)}
+.choose-btn:active{transform:translateY(-1px)}
+.choose-btn-title{
+  font-size:13px;font-weight:900;line-height:1.2;
+  text-transform:uppercase;letter-spacing:.06em;
+}
+.choose-btn-sub{
+  font-size:11px;font-weight:700;line-height:1.3;
+  text-transform:uppercase;letter-spacing:.1em;
+  opacity:.7;
+}
+.choose-btn.bbva,
+.choose-btn.hey{
+  background:#0000cd;color:#fff;border-color:#e8ff4c;
+  box-shadow:0 0 0 0 rgba(232,255,76,0);
+}
+.choose-btn.bbva:hover,
+.choose-btn.hey:hover{
+  background:#0000a8;box-shadow:0 12px 28px rgba(0,0,205,.4),0 0 0 1px rgba(232,255,76,.4) inset;
+}
+.choose-btn.bbva .choose-btn-title,
+.choose-btn.hey .choose-btn-title{color:#e8ff4c}
+.choose-btn.bbva .choose-btn-sub,
+.choose-btn.hey .choose-btn-sub{color:rgba(255,255,255,.85)}
+.choose-btn.help{
+  background:#25D366;color:#fff;border-color:#1fba57;
+}
+.choose-btn.help:hover{
+  background:#1fba57;box-shadow:0 12px 28px rgba(37,211,102,.4);
+}
+.choose-btn.help .choose-btn-title{color:#fff}
+.choose-btn.help .choose-btn-sub{color:rgba(255,255,255,.85)}
+
+/* Scroll margin para que el sticky nav no tape el destino */
+.sec{scroll-margin-top:80px}
 </style>
 </head>
 <body>
@@ -522,6 +575,22 @@ button:focus-visible,a:focus-visible{
       Depositar en la cuenta equivocada tiene un <b>costo por servicio de $350</b>.
     </div>
   </aside>
+
+  <!-- Selector rápido de cuenta según paquete -->
+  <div class="choose-cta" role="group" aria-label="Elige cuenta según tu paquete">
+    <a href="#bbva" class="choose-btn bbva">
+      <span class="choose-btn-title">💳 Tengo paquete PLUS, STAY o RIDE</span>
+      <span class="choose-btn-sub">Ver cuenta BBVA</span>
+    </a>
+    <a href="#heybanco" class="choose-btn hey">
+      <span class="choose-btn-title">💳 Tengo paquete CHEAP</span>
+      <span class="choose-btn-sub">Ver cuenta Hey Banco</span>
+    </a>
+    <a href="https://wa.me/528119771072?text=Hola%2C%20quiero%20realizar%20mi%20pago%20pero%20no%20s%C3%A9%20cu%C3%A1l%20cuenta%20me%20corresponde.%20Me%20pueden%20orientar%3F%0A%0AMi%20nombre%20es%3A%20%0AMi%20evento%20es%3A" target="_blank" rel="noopener" class="choose-btn help">
+      <span class="choose-btn-title">❓ No sé qué cuenta me corresponde</span>
+      <span class="choose-btn-sub">Pregunta por WhatsApp</span>
+    </a>
+  </div>
 
   <!-- SECCIÓN 1: BBVA -->
   <section class="sec" id="bbva">
@@ -576,7 +645,7 @@ button:focus-visible,a:focus-visible{
   </section>
 
   <!-- SECCIÓN 2: Hey Banco -->
-  <section class="sec" id="hey">
+  <section class="sec" id="heybanco">
     <div class="sec-head">
       <span class="sec-num">02 /</span>
       <span class="badge badge-azul">CHEAP</span>

@@ -429,6 +429,42 @@ button:focus-visible,a:focus-visible{
   outline:2px solid #e8ff4c;
   outline-offset:2px;
 }
+
+/* ======== ALERT cuenta correcta ======== */
+.alert-cuenta{
+  margin:24px auto 8px;max-width:920px;
+  background:rgba(0,0,0,.72);
+  border:2px solid #e8ff4c;
+  padding:22px 22px 20px;
+  position:relative;
+  box-shadow:0 0 28px rgba(232,255,76,.18);
+  font-family:'Montserrat',sans-serif;
+}
+.alert-cuenta-title{
+  display:flex;align-items:center;gap:10px;
+  font-size:13px;font-weight:900;color:#e8ff4c;
+  text-transform:uppercase;letter-spacing:.1em;
+  line-height:1.3;margin-bottom:14px;
+}
+.alert-cuenta-title .ico{font-size:18px;line-height:1}
+.alert-cuenta-list{list-style:none;display:flex;flex-direction:column;gap:10px;margin:0;padding:0}
+.alert-cuenta-row{
+  display:flex;gap:10px;align-items:flex-start;
+  font-size:13px;font-weight:600;color:rgba(255,255,255,.9);line-height:1.5;
+}
+.alert-cuenta-row .ico{font-size:16px;line-height:1.4;flex-shrink:0}
+.alert-cuenta-row b{color:#e8ff4c;font-weight:900;letter-spacing:.02em}
+.alert-cuenta-foot{
+  margin-top:14px;padding-top:12px;
+  border-top:1px solid rgba(232,255,76,.18);
+  font-size:12px;font-weight:700;color:rgba(255,255,255,.78);line-height:1.5;
+}
+.alert-cuenta-foot b{color:#ff283b;font-weight:900}
+@media(min-width:600px){
+  .alert-cuenta{padding:26px 28px 24px}
+  .alert-cuenta-title{font-size:14px}
+  .alert-cuenta-row{font-size:14px}
+}
 </style>
 </head>
 <body>
@@ -456,6 +492,27 @@ button:focus-visible,a:focus-visible{
 </section>
 
 <main>
+
+  <!-- ALERTA: cuenta correcta según paquete -->
+  <aside class="alert-cuenta" role="note" aria-label="Importante: elige la cuenta correcta">
+    <div class="alert-cuenta-title">
+      <span class="ico" aria-hidden="true">⚠️</span>
+      <span>Importante — elige la cuenta correcta según tu paquete</span>
+    </div>
+    <ul class="alert-cuenta-list">
+      <li class="alert-cuenta-row">
+        <span class="ico" aria-hidden="true">🏦</span>
+        <span><b>BBVA</b> → Para paquetes <b>PLUS</b>, <b>STAY</b> y <b>RIDE</b>.</span>
+      </li>
+      <li class="alert-cuenta-row">
+        <span class="ico" aria-hidden="true">🏧</span>
+        <span><b>HEY BANCO (BANREGIO)</b> → Para paquete <b>CHEAP</b> únicamente.</span>
+      </li>
+    </ul>
+    <div class="alert-cuenta-foot">
+      Depositar en la cuenta equivocada tiene un <b>costo por servicio de $350</b>.
+    </div>
+  </aside>
 
   <!-- SECCIÓN 1: BBVA -->
   <section class="sec" id="bbva">
@@ -588,6 +645,7 @@ button:focus-visible,a:focus-visible{
 
     <div class="pol-sec cheap">
       <ul class="pol-list">
+        <li class="pol-item"><span class="pol-ico">⚠️</span><span>Errores en depósitos a cuenta equivocada generan un <b>cargo por servicio de $350</b>. Verifica bien que estás depositando en <b>HEY BANCO</b> antes de transferir.</span></li>
         <li class="pol-item"><span class="pol-ico">🚫</span><span><b>No hay reembolsos</b> por cancelación del cliente.</span></li>
         <li class="pol-item"><span class="pol-ico">⚠️</span><span><b>Boleto dado de baja sin reembolso</b> si no se continúan los pagos.</span></li>
         <li class="pol-item"><span class="pol-ico">🎟️</span><span>Boletos <b>entregados en Reynosa o Monterrey</b> previo a la semana del evento.</span></li>

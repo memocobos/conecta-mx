@@ -764,19 +764,15 @@ body.chat-open,body.wizard-open{overscroll-behavior:none}
 .cd-l{font-size:8px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.5);margin-top:4px}
 .cd-sep{font-family:'Barlow Condensed','Montserrat',sans-serif;font-weight:900;font-size:clamp(20px,5vw,32px);color:rgba(255,255,255,.25);line-height:1;padding-bottom:14px}
 @media(max-width:380px){.cd-cell{min-width:38px}.cd-sep{display:none}.cd-timer{gap:10px}}
-.cd-agotado{
-  display:inline-flex;align-items:center;justify-content:center;
-  align-self:flex-start;
+.cd-pill-agotado{
+  display:inline-block;align-self:flex-start;
   background:#ff283b;color:#fff;
-  font-family:'Barlow Condensed','Montserrat',sans-serif;
-  font-weight:900;font-size:clamp(28px,7vw,48px);
-  line-height:1;letter-spacing:.05em;
-  padding:14px 24px;margin-top:4px;
+  font-family:'Montserrat',sans-serif;
+  font-size:10px;font-weight:900;letter-spacing:.14em;
   text-transform:uppercase;
-  box-shadow:0 0 24px rgba(255,40,59,.45);
-  animation:cdAgotadoPulse 2s ease-in-out infinite;
+  padding:4px 10px;border-radius:999px;
+  margin:-4px 0 8px;
 }
-@keyframes cdAgotadoPulse{0%,100%{box-shadow:0 0 24px rgba(255,40,59,.45)}50%{box-shadow:0 0 36px rgba(255,40,59,.75)}}
 .hh-btn-rojo{background:#e8ff4c;color:#000;border:none}
 .hh-btn-rojo:hover{background:#e8ff4c;color:#000;transform:translateY(-2px);box-shadow:0 14px 36px rgba(232,255,76,.5)}
 /* CTA full width, padding vertical generoso */
@@ -2204,21 +2200,20 @@ var _countdownInterval = null;
       var ev=group[i].ev;
       var venueStr=ev.v||'';
       if(ev.dsList&&ev.dsList.length>1&&group[i].ds) venueStr=(venueStr?venueStr+' · ':'')+dsShort(group[i].ds);
-      var body=ev.st==='agotado'
-        ? '<div class="cd-agotado">Agotado</div>'
-        : '<div class="cd-timer">'+
-            '<div class="cd-cell"><span class="cd-n" data-i="'+i+'" data-u="d">00</span><span class="cd-l">días</span></div>'+
-            '<div class="cd-sep">:</div>'+
-            '<div class="cd-cell"><span class="cd-n" data-i="'+i+'" data-u="h">00</span><span class="cd-l">hrs</span></div>'+
-            '<div class="cd-sep">:</div>'+
-            '<div class="cd-cell"><span class="cd-n" data-i="'+i+'" data-u="m">00</span><span class="cd-l">min</span></div>'+
-            '<div class="cd-sep">:</div>'+
-            '<div class="cd-cell"><span class="cd-n" data-i="'+i+'" data-u="s">00</span><span class="cd-l">seg</span></div>'+
-          '</div>';
+      var pill=ev.st==='agotado'?'<span class="cd-pill-agotado">Agotado</span>':'';
       h+='<div class="cd-card">'+
            '<div class="cd-artist">'+esc(cleanName(ev.a))+'</div>'+
+           pill+
            '<div class="cd-venue">'+esc(venueStr)+'</div>'+
-           body+
+           '<div class="cd-timer">'+
+             '<div class="cd-cell"><span class="cd-n" data-i="'+i+'" data-u="d">00</span><span class="cd-l">días</span></div>'+
+             '<div class="cd-sep">:</div>'+
+             '<div class="cd-cell"><span class="cd-n" data-i="'+i+'" data-u="h">00</span><span class="cd-l">hrs</span></div>'+
+             '<div class="cd-sep">:</div>'+
+             '<div class="cd-cell"><span class="cd-n" data-i="'+i+'" data-u="m">00</span><span class="cd-l">min</span></div>'+
+             '<div class="cd-sep">:</div>'+
+             '<div class="cd-cell"><span class="cd-n" data-i="'+i+'" data-u="s">00</span><span class="cd-l">seg</span></div>'+
+           '</div>'+
          '</div>';
     }
     cardsEl.innerHTML=h;
@@ -2238,7 +2233,6 @@ var _countdownInterval = null;
       var diff=group[i].t-now;
       if(diff<=0)continue;
       anyActive=true;
-      if(group[i].ev.st==='agotado')continue;
       var s=Math.floor(diff/1000);
       var d=Math.floor(s/86400);s%=86400;
       var h=Math.floor(s/3600);s%=3600;

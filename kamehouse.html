@@ -179,33 +179,13 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Montse
 .page{display:none}
 .page.active{display:block}
 
-/* ─── Pestaña Diseño (iframes aislados, switch interno) ─── */
-#page-diseno{padding:0;margin:-20px;height:calc(100vh - 20px);display:none;flex-direction:column}
-#page-diseno.active{display:flex}
-.diseno-switch{
- display:flex;gap:6px;padding:10px 12px;
- background:var(--bg2);border-bottom:1px solid var(--border);flex-shrink:0;
+/* ─── Pestaña Diseño (iframe aislado) ─── */
+#page-diseno{padding:0;margin:-20px;height:calc(100vh - 20px)}
+.diseno-section{
+ position:relative;width:100%;height:100%;
+ background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);
+ overflow:hidden;
 }
-.diseno-switch-btn{
- background:transparent;color:var(--muted);
- border:1px solid var(--border);
- padding:8px 16px;border-radius:6px;
- font-family:'Montserrat',sans-serif;font-size:11px;font-weight:800;
- text-transform:uppercase;letter-spacing:.08em;cursor:pointer;
- transition:background .15s,color .15s,border-color .15s;
- display:inline-flex;align-items:center;gap:6px;
-}
-.diseno-switch-btn:hover{color:var(--text);background:rgba(255,255,255,.04)}
-.diseno-switch-btn.active{
- background:rgba(255,107,0,.15);border-color:var(--orange);color:var(--orange);
-}
-.diseno-stage{position:relative;flex:1;background:var(--bg2);overflow:hidden}
-.diseno-pane{
- position:absolute;inset:0;display:none;
- background:var(--bg2);
- border:1px solid var(--border);border-top:0;
-}
-.diseno-pane.active{display:block}
 .diseno-frame{
  width:100%;height:100%;border:0;display:block;background:#000;
 }
@@ -213,9 +193,9 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Montse
  position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
  color:var(--muted);font-family:'Montserrat',sans-serif;font-size:13px;font-weight:600;
  letter-spacing:.08em;text-transform:uppercase;pointer-events:none;
- background:var(--bg2);transition:opacity .3s ease;z-index:1;
+ background:var(--bg2);transition:opacity .3s ease;
 }
-.diseno-pane.loaded .diseno-loading{opacity:0}
+.diseno-section.loaded .diseno-loading{opacity:0}
 
 .section-title{
  font-family:'Barlow Condensed',sans-serif;
@@ -1204,27 +1184,13 @@ tr:hover td{background:rgba(255,107,0,.03)}
 
  </div><!-- /page-cotizador -->
 
- <!-- ─── DISEÑO (con submenu: Diseño / Recibo) ─── -->
+ <!-- ─── DISEÑO ─── -->
  <div class="page" id="page-diseno" data-view="diseno">
-  <div class="diseno-switch" role="tablist" aria-label="Herramientas de diseño">
-   <button class="diseno-switch-btn active" role="tab" aria-selected="true"
-           data-tool="diseno" onclick="switchDisenoTool('diseno', this)">🎨 Diseño</button>
-   <button class="diseno-switch-btn" role="tab" aria-selected="false"
-           data-tool="recibo" onclick="switchDisenoTool('recibo', this)">🧾 Recibo</button>
-  </div>
-  <div class="diseno-stage">
-   <div class="diseno-pane active" id="pane-diseno" role="tabpanel">
-    <div class="diseno-loading">Cargando diseño…</div>
-    <iframe class="diseno-frame" id="frame-diseno" title="Conecta Diseño"
-            referrerpolicy="no-referrer"
-            sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-downloads"></iframe>
-   </div>
-   <div class="diseno-pane" id="pane-recibo" role="tabpanel">
-    <div class="diseno-loading">Cargando recibo…</div>
-    <iframe class="diseno-frame" id="frame-recibo" title="Recibos"
-            referrerpolicy="no-referrer"
-            sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-downloads"></iframe>
-   </div>
+  <div class="diseno-section" id="diseno-section">
+   <div class="diseno-loading">Cargando diseño…</div>
+   <iframe class="diseno-frame" id="diseno-frame" title="Conecta Diseño"
+     loading="lazy" referrerpolicy="no-referrer"
+     sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-downloads"></iframe>
   </div>
  </div><!-- /page-diseno -->
 
@@ -1792,43 +1758,13 @@ function loadPage(name) {
  if (name === 'diseno') loadDiseno();
 }
 
-// Pestaña Diseño: submenu con dos herramientas
-const DISENO_TOOLS = {
- diseno: { src: 'diseno.html', frame: 'frame-diseno', pane: 'pane-diseno' },
- recibo: { src: 'recibos.html', frame: 'frame-recibo', pane: 'pane-recibo' }
-};
-let _disenoActiveTool = 'diseno';
-
-function ensureDisenoLoaded(tool) {
- const cfg = DISENO_TOOLS[tool];
- if (!cfg) return;
- const frame = document.getElementById(cfg.frame);
- const pane = document.getElementById(cfg.pane);
- if (!frame || frame.dataset.loaded === '1') return;
- frame.addEventListener('load', () => pane.classList.add('loaded'), { once: true });
- frame.src = cfg.src;
- frame.dataset.loaded = '1';
-}
-
-function switchDisenoTool(tool, btn) {
- _disenoActiveTool = tool;
- // Toggle switch buttons
- document.querySelectorAll('.diseno-switch-btn').forEach(b => {
-  const isActive = b.dataset.tool === tool;
-  b.classList.toggle('active', isActive);
-  b.setAttribute('aria-selected', isActive ? 'true' : 'false');
- });
- // Toggle panes
- Object.keys(DISENO_TOOLS).forEach(k => {
-  const cfg = DISENO_TOOLS[k];
-  document.getElementById(cfg.pane).classList.toggle('active', k === tool);
- });
- ensureDisenoLoaded(tool);
-}
-
 function loadDiseno() {
- // Carga el iframe activo la primera vez (y cualquier siguiente clic en el submenu)
- ensureDisenoLoaded(_disenoActiveTool);
+ const frame = document.getElementById('diseno-frame');
+ const section = document.getElementById('diseno-section');
+ if (!frame || frame.dataset.loaded === '1') return;
+ frame.addEventListener('load', () => section.classList.add('loaded'), { once: true });
+ frame.src = 'diseno.html';
+ frame.dataset.loaded = '1';
 }
 
 // ═══════════════════════════════════════════════════════════════

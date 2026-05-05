@@ -38,5 +38,6 @@ window.MAPAS={
   'miloj':'mapas/miloj.jpg',
   'melanie':'mapas/melanie.jpg',
   'edsheeran':'mapas/edsheeran.jpg',
-  'karolg':'mapas/karolg.webp'
+  'karolg':'mapas/karolg.webp',
+  'edenmunoz':'mapas/edenmunoz.webp'
 };

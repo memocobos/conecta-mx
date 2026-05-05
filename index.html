@@ -44,7 +44,8 @@ body.scroll-lock,body.chat-open,body.wizard-open{overflow:hidden;position:fixed;
 body.chat-open,body.wizard-open{overscroll-behavior:none}
 /* Safety net: prevent children from spilling out horizontally on mobile */
 @media(max-width:640px){
-  .catalog,.hero-strip,.ev-grid,.detail,.d-hero,.wiz{max-width:100vw;overflow-x:hidden}
+  .catalog,.hero-strip,.ev-grid,.d-hero,.wiz{max-width:100vw;overflow-x:hidden}
+  .detail{max-width:100vw}
   img,video,iframe{max-width:100%;height:auto}
 }
 ::-webkit-scrollbar{width:3px}::-webkit-scrollbar-thumb{background:#ff283b}
@@ -1200,21 +1201,21 @@ src="https://www.facebook.com/tr?id=1685907946147007&ev=PageView&noscript=1"
 .bienvenida-skip{color:rgba(255,255,255,.35);font-size:11px;cursor:pointer;border:none;background:none;font-family:'Montserrat',sans-serif}
 .bienvenida-skip:hover{color:rgba(255,255,255,.6)}
 /* WIZ PROGRESS BAR */
-.wiz-progress{display:flex;align-items:center;gap:6px;padding:12px 18px;background:#000;border-bottom:1px solid rgba(255,255,255,.08);position:sticky;top:0;z-index:50;font-family:'Montserrat',sans-serif}
-.wiz-progress-step{display:flex;align-items:center;gap:8px;min-width:0}
-.wiz-progress-num{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:rgba(255,255,255,.08);color:rgba(255,255,255,.45);font-size:11px;font-weight:900;flex-shrink:0;transition:background .18s,color .18s;line-height:1}
-.wiz-progress-lbl{font-size:11px;font-weight:800;color:rgba(255,255,255,.45);text-transform:uppercase;letter-spacing:.04em;white-space:nowrap;transition:color .18s;font-family:'Barlow Condensed','Montserrat',sans-serif}
-.wiz-progress-sep{flex:1;height:2px;background:rgba(255,255,255,.08);min-width:8px;border-radius:1px;transition:background .18s}
-.wiz-progress-step.active .wiz-progress-num{background:#e8ff4c;color:#000}
+.wiz-progress{display:flex;align-items:center;gap:8px;padding:12px 16px;background:#000;border-bottom:2px solid rgba(232,255,76,.22);position:sticky;top:0;z-index:80;font-family:'Montserrat',sans-serif;box-shadow:0 6px 18px rgba(0,0,0,.55)}
+.wiz-progress-step{display:flex;align-items:center;gap:8px;min-width:0;transition:opacity .18s}
+.wiz-progress-num{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:50%;background:rgba(255,255,255,.1);color:rgba(255,255,255,.55);font-size:11px;font-weight:900;flex-shrink:0;transition:background .18s,color .18s,box-shadow .18s,width .18s,height .18s,font-size .18s;line-height:1;font-family:'Montserrat',sans-serif}
+.wiz-progress-lbl{font-size:11px;font-weight:800;color:rgba(255,255,255,.55);text-transform:uppercase;letter-spacing:.04em;white-space:nowrap;transition:color .18s;font-family:'Barlow Condensed','Montserrat',sans-serif}
+.wiz-progress-sep{flex:1;height:2px;background:rgba(255,255,255,.1);min-width:6px;border-radius:1px;transition:background .18s}
+.wiz-progress-step.active .wiz-progress-num{background:#e8ff4c;color:#000;box-shadow:0 0 0 4px rgba(232,255,76,.22)}
 .wiz-progress-step.active .wiz-progress-lbl{color:#e8ff4c}
 .wiz-progress-step.done .wiz-progress-num{background:#e8ff4c;color:#000}
-.wiz-progress-step.done .wiz-progress-lbl{color:rgba(232,255,76,.7)}
+.wiz-progress-step.done .wiz-progress-lbl{color:rgba(232,255,76,.6)}
 .wiz-progress-step.done + .wiz-progress-sep{background:#e8ff4c}
 @media (max-width:640px){
-  .wiz-progress{padding:10px 14px;gap:5px}
+  .wiz-progress{padding:10px 12px;gap:6px}
   .wiz-progress-step .wiz-progress-lbl{display:none}
-  .wiz-progress-step.active .wiz-progress-lbl,
-  .wiz-progress-step.next .wiz-progress-lbl{display:inline}
+  .wiz-progress-step.active .wiz-progress-lbl{display:inline;font-size:12px}
+  .wiz-progress-step.active .wiz-progress-num{width:30px;height:30px;font-size:13px}
   .wiz-progress-sep{min-width:6px}
 }
 /* ONBOARDING MODAL */

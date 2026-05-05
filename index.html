@@ -1212,11 +1212,16 @@ src="https://www.facebook.com/tr?id=1685907946147007&ev=PageView&noscript=1"
 .wiz-progress-step.done .wiz-progress-lbl{color:rgba(232,255,76,.6)}
 .wiz-progress-step.done + .wiz-progress-sep{background:#e8ff4c}
 @media (max-width:640px){
-  .wiz-progress{padding:10px 12px;gap:6px}
+  /* Move the bar out of the .detail flow on mobile so it can't be width-constrained
+     by the parent. Pinned to viewport with fixed; sits right below the 56px nav. */
+  .wiz-progress{position:fixed !important;top:56px !important;left:0 !important;right:0 !important;width:100% !important;padding:10px 12px;gap:6px}
   .wiz-progress-step .wiz-progress-lbl{display:none}
   .wiz-progress-step.active .wiz-progress-lbl{display:inline;font-size:12px}
   .wiz-progress-step.active .wiz-progress-num{width:30px;height:30px;font-size:13px}
   .wiz-progress-sep{min-width:6px}
+  /* Compensate for the now out-of-flow bar so wizard content isn't shoved
+     under it once the user scrolls past the hero. */
+  .d-body{padding-top:54px}
 }
 /* ONBOARDING MODAL */
 .onboard-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);z-index:9999;align-items:center;justify-content:center;padding:20px;overflow-y:auto}

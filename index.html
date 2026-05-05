@@ -961,6 +961,15 @@ src="https://www.facebook.com/tr?id=1685907946147007&ev=PageView&noscript=1"
         <div class="d-venue" id="d-venue"></div>
       </div>
     </div>
+    <div class="wiz-progress" id="wiz-progress" aria-label="Progreso de la cotización">
+      <div class="wiz-progress-step" data-step="1"><span class="wiz-progress-num">1</span><span class="wiz-progress-lbl">Paquete</span></div>
+      <div class="wiz-progress-sep"></div>
+      <div class="wiz-progress-step" data-step="2"><span class="wiz-progress-num">2</span><span class="wiz-progress-lbl">Zona</span></div>
+      <div class="wiz-progress-sep"></div>
+      <div class="wiz-progress-step" data-step="3"><span class="wiz-progress-num">3</span><span class="wiz-progress-lbl">Cotización</span></div>
+      <div class="wiz-progress-sep"></div>
+      <div class="wiz-progress-step" data-step="4"><span class="wiz-progress-num">4</span><span class="wiz-progress-lbl">Reservar</span></div>
+    </div>
     <div class="d-body">
 
   <!-- PASO 1: VIAJEROS -->
@@ -1190,6 +1199,44 @@ src="https://www.facebook.com/tr?id=1685907946147007&ev=PageView&noscript=1"
 .bienvenida-btn:hover{background:#e0ff4c}
 .bienvenida-skip{color:rgba(255,255,255,.35);font-size:11px;cursor:pointer;border:none;background:none;font-family:'Montserrat',sans-serif}
 .bienvenida-skip:hover{color:rgba(255,255,255,.6)}
+/* WIZ PROGRESS BAR */
+.wiz-progress{display:flex;align-items:center;gap:6px;padding:12px 18px;background:#000;border-bottom:1px solid rgba(255,255,255,.08);position:sticky;top:0;z-index:50;font-family:'Montserrat',sans-serif}
+.wiz-progress-step{display:flex;align-items:center;gap:8px;min-width:0}
+.wiz-progress-num{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:rgba(255,255,255,.08);color:rgba(255,255,255,.45);font-size:11px;font-weight:900;flex-shrink:0;transition:background .18s,color .18s;line-height:1}
+.wiz-progress-lbl{font-size:11px;font-weight:800;color:rgba(255,255,255,.45);text-transform:uppercase;letter-spacing:.04em;white-space:nowrap;transition:color .18s;font-family:'Barlow Condensed','Montserrat',sans-serif}
+.wiz-progress-sep{flex:1;height:2px;background:rgba(255,255,255,.08);min-width:8px;border-radius:1px;transition:background .18s}
+.wiz-progress-step.active .wiz-progress-num{background:#e8ff4c;color:#000}
+.wiz-progress-step.active .wiz-progress-lbl{color:#e8ff4c}
+.wiz-progress-step.done .wiz-progress-num{background:#e8ff4c;color:#000}
+.wiz-progress-step.done .wiz-progress-lbl{color:rgba(232,255,76,.7)}
+.wiz-progress-step.done + .wiz-progress-sep{background:#e8ff4c}
+@media (max-width:640px){
+  .wiz-progress{padding:10px 14px;gap:5px}
+  .wiz-progress-step .wiz-progress-lbl{display:none}
+  .wiz-progress-step.active .wiz-progress-lbl,
+  .wiz-progress-step.next .wiz-progress-lbl{display:inline}
+  .wiz-progress-sep{min-width:6px}
+}
+/* ONBOARDING MODAL */
+.onboard-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);z-index:9999;align-items:center;justify-content:center;padding:20px;overflow-y:auto}
+.onboard-box{background:#0a0a0a;border:2px solid rgba(232,255,76,.25);max-width:500px;width:100%;padding:28px 24px;color:#fff;font-family:'Montserrat',sans-serif;max-height:92vh;overflow-y:auto;border-radius:4px;position:relative}
+.onboard-head{margin-bottom:18px;padding-bottom:14px;border-bottom:1px solid rgba(255,255,255,.08)}
+.onboard-ev{font-family:'Barlow Condensed','Montserrat',sans-serif;font-size:24px;font-weight:900;text-transform:uppercase;letter-spacing:-.005em;line-height:1;color:#fff}
+.onboard-fecha{font-size:11px;font-weight:800;color:#e8ff4c;text-transform:uppercase;letter-spacing:.08em;margin-top:6px;font-family:'Montserrat',sans-serif}
+.onboard-title{font-family:'Barlow Condensed','Montserrat',sans-serif;font-size:30px;font-weight:900;text-transform:uppercase;letter-spacing:-.005em;line-height:1;color:#e8ff4c;margin:0 0 22px}
+.onboard-steps{display:flex;flex-direction:column;gap:14px;margin-bottom:18px}
+.onboard-step{display:flex;gap:14px;align-items:flex-start}
+.onboard-step-num{flex-shrink:0;width:32px;height:32px;border-radius:50%;background:#e8ff4c;color:#000;font-weight:900;font-size:13px;display:flex;align-items:center;justify-content:center;font-family:'Montserrat',sans-serif;line-height:1}
+.onboard-step-body{flex:1;min-width:0}
+.onboard-step-title{font-family:'Barlow Condensed','Montserrat',sans-serif;font-size:15px;font-weight:900;text-transform:uppercase;letter-spacing:.01em;color:#fff;margin-bottom:3px;line-height:1.05}
+.onboard-step-desc{font-size:12px;color:rgba(255,255,255,.65);line-height:1.45;font-weight:500;font-family:'Montserrat',sans-serif}
+.onboard-promo{background:rgba(232,255,76,.1);border:1.5px solid #e8ff4c;padding:12px 14px;margin-bottom:18px;font-size:12px;color:#e8ff4c;font-weight:700;line-height:1.45;border-radius:3px;font-family:'Montserrat',sans-serif}
+.onboard-promo b{color:#fff;font-weight:900;letter-spacing:.05em}
+.onboard-actions{display:flex;gap:10px;align-items:center}
+.onboard-skip{background:transparent;color:rgba(255,255,255,.55);border:none;padding:14px 16px;font-size:12px;font-weight:700;font-family:'Montserrat',sans-serif;cursor:pointer;text-transform:uppercase;letter-spacing:.05em}
+.onboard-skip:hover{color:#fff}
+.onboard-go{flex:1;background:#e8ff4c;color:#000;border:none;padding:14px 18px;font-size:13px;font-weight:900;font-family:'Montserrat',sans-serif;cursor:pointer;text-transform:uppercase;letter-spacing:.06em;border-radius:3px}
+.onboard-go:hover{filter:brightness(1.05)}
 .promo-modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:9997;align-items:center;justify-content:center}
 .promo-modal-box{border-radius:16px;padding:36px 28px;text-align:center;max-width:400px;width:90%;position:relative;box-shadow:0 20px 60px rgba(0,0,0,.5);max-height:85vh;overflow-y:auto;border:1.5px solid rgba(232,255,76,.2)}
 .promo-modal-emoji{font-size:56px;line-height:1;margin-bottom:12px}
@@ -2566,6 +2613,8 @@ function showDetail(id){
   $$('nav-back').style.display='flex';
   if(window.matchMedia('(max-width:640px)').matches){document.body.classList.add('wizard-open');window.scrollTo(0,0);}
   window.scrollTo(0,0);
+  // First-visit onboarding tutorial (global once)
+  setTimeout(function(){showOnboarding(cur);},250);
   // Promo modal per event (once per session)
   if(cur.promoModal&&!sessionStorage.getItem('promo_'+cur.id)){
     setTimeout(function(){
@@ -2616,6 +2665,50 @@ function resetWizard(){
   $$('d-result').style.display='none';
   selZ=null;selH=null;selPkg=null;selFechaIdx=0;selBoleto=null;selTransporte=null;
   $$('w-fecha-lbl').textContent='Elige tu fecha';
+  setWizProgress(1);
+}
+
+function setWizProgress(step){
+  var bar=document.getElementById('wiz-progress');if(!bar)return;
+  var steps=bar.querySelectorAll('.wiz-progress-step');
+  for(var i=0;i<steps.length;i++){
+    var n=parseInt(steps[i].getAttribute('data-step'),10);
+    var numEl=steps[i].querySelector('.wiz-progress-num');
+    steps[i].classList.remove('active','done','next');
+    if(n<step){
+      steps[i].classList.add('done');
+      if(numEl)numEl.textContent='✓';
+    } else {
+      if(numEl)numEl.textContent=String(n);
+      if(n===step)steps[i].classList.add('active');
+      else if(n===step+1)steps[i].classList.add('next');
+    }
+  }
+}
+
+function showOnboarding(ev){
+  try{if(localStorage.getItem('tutorial-visto')==='true')return;}catch(e){return;}
+  var bg=document.getElementById('onboard-bg');if(!bg||!ev)return;
+  document.getElementById('onboard-ev').textContent=ev.a||'';
+  document.getElementById('onboard-fecha').textContent=ev.f||'';
+  var pr=document.getElementById('onboard-promo');
+  var fp=ev.flashPromo;
+  var active=fp&&fp.code&&(!fp.expiresTs||fp.expiresTs>Date.now());
+  if(active){
+    var pct=fp.pct||0;
+    pr.innerHTML='Tienes un código de descuento disponible: <b>'+fp.code+'</b> — aplícalo antes de cotizar para obtener '+pct+'% de descuento.';
+    pr.style.display='block';
+  } else {
+    pr.style.display='none';
+  }
+  bg.style.display='flex';
+}
+function finishOnboarding(){
+  try{localStorage.setItem('tutorial-visto','true');}catch(e){}
+  var bg=document.getElementById('onboard-bg');if(bg)bg.style.display='none';
+}
+function skipOnboarding(){
+  var bg=document.getElementById('onboard-bg');if(bg)bg.style.display='none';
 }
 
 function selViajeros(btn,n){
@@ -2744,6 +2837,7 @@ function updatePkgCards(){
 function selPaquete(btn,pkg){
   if(pkg==='stay'&&isCDMX(cur))return; // disabled for CDMX
   selPkg=pkg;selZ=null;selH=null;selTransporte=null;
+  setWizProgress(2);
   try{window.trackAddToCart&&window.trackAddToCart(pkg,minP(cur));}catch(e){}
   var pb=$$('w-paquetes').querySelectorAll('.wiz-btn');
   for(var i=0;i<pb.length;i++)pb[i].classList.remove('active');
@@ -3027,6 +3121,7 @@ function selZona(btn,p,n){
   for(var i=0;i<btns.length;i++)btns[i].classList.remove('active');
   btn.classList.add('active');
   selZ={n:n,p:p};
+  setWizProgress(3);
   calcular();
 }
 
@@ -3384,6 +3479,7 @@ function calcular(){
 
   $$('d-placeholder').style.display='none';
   $$('d-result').style.display='block';
+  setWizProgress(4);
   var promoCard=document.getElementById('w-promo-card');if(promoCard)promoCard.style.display='block';
   var shareBtn=document.getElementById('btn-share');if(shareBtn)shareBtn.style.display='block';
   if(_promoActivo&&_promoActivo.excludePkg&&_promoActivo.excludePkg.indexOf(selPkg)>=0){
@@ -3994,6 +4090,50 @@ function enviarChat(){
     </div>
     <button class="bienvenida-btn" onclick="cerrarBienvenida();document.getElementById('ev-list').scrollIntoView({behavior:'smooth'})">Ver eventos y cotizar →</button>
     <button class="bienvenida-skip" onclick="cerrarBienvenida()">Continuar sin descuento</button>
+  </div>
+</div>
+<div class="onboard-bg" id="onboard-bg" onclick="if(event.target===this)skipOnboarding()">
+  <div class="onboard-box" role="dialog" aria-modal="true" aria-labelledby="onboard-title-h">
+    <div class="onboard-head">
+      <div class="onboard-ev" id="onboard-ev"></div>
+      <div class="onboard-fecha" id="onboard-fecha"></div>
+    </div>
+    <h2 class="onboard-title" id="onboard-title-h">¿Cómo reservar tu lugar?</h2>
+    <div class="onboard-steps">
+      <div class="onboard-step">
+        <div class="onboard-step-num">1</div>
+        <div class="onboard-step-body">
+          <div class="onboard-step-title">Elige tu paquete</div>
+          <div class="onboard-step-desc">PLUS (todo incluido), RIDE (sin boleto), STAY (sin transporte) o CHEAP (solo boleto).</div>
+        </div>
+      </div>
+      <div class="onboard-step">
+        <div class="onboard-step-num">2</div>
+        <div class="onboard-step-body">
+          <div class="onboard-step-title">Selecciona tu zona</div>
+          <div class="onboard-step-desc">Cada zona muestra el precio. Las tachadas ya están agotadas.</div>
+        </div>
+      </div>
+      <div class="onboard-step">
+        <div class="onboard-step-num">3</div>
+        <div class="onboard-step-body">
+          <div class="onboard-step-title">Revisa tu cotización</div>
+          <div class="onboard-step-desc">Ve el costo total y el plan de pagos.</div>
+        </div>
+      </div>
+      <div class="onboard-step">
+        <div class="onboard-step-num">4</div>
+        <div class="onboard-step-body">
+          <div class="onboard-step-title">Reserva con el separo</div>
+          <div class="onboard-step-desc">Transfiere el separo y envía tu comprobante por Messenger o WhatsApp.</div>
+        </div>
+      </div>
+    </div>
+    <div class="onboard-promo" id="onboard-promo" style="display:none"></div>
+    <div class="onboard-actions">
+      <button class="onboard-skip" type="button" onclick="skipOnboarding()">Saltar</button>
+      <button class="onboard-go" type="button" onclick="finishOnboarding()">Entendido, vamos</button>
+    </div>
   </div>
 </div>
 <div class="promo-modal-bg" id="promo-modal-bg" onclick="cerrarPromoModal()">

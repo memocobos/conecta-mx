@@ -203,7 +203,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Montse
 .nav-dropdown.open .drop-arrow{transform:rotate(180deg);}
 .nav-dropdown.open .nav-dropdown-menu{display:block;}
 .nav-dropdown-menu{
-  display:none;position:absolute;top:100%;left:0;z-index:200;
+  display:none;position:fixed;top:106px;z-index:9999;
   background:var(--bg2);border:1px solid var(--border2);
   border-radius:8px;min-width:140px;
   box-shadow:0 8px 24px rgba(0,0,0,.6);
@@ -966,6 +966,333 @@ tr:hover td{background:rgba(255,107,0,.03)}
        <div style="font-size:13px">Gestion de viajeros, rooming list interactivo y asignacion de eventos.<br>Proxima actualizacion.</div>
       </div>
      </div>
+
+      <!-- ─── COTIZADOR ─── -->
+ <div class="page" id="page-cotizador">
+ <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+ <div class="section-title">Palacio de Kamisama</div>
+ <div style="display:flex;gap:8px">
+ <button class="btn btn-ghost btn-sm" onclick="guardarSesionCot()">💾 Guardar sesión</button>
+ <button class="btn btn-ghost btn-sm" onclick="resetCotizador()">↺ Limpiar</button>
+ </div>
+ </div>
+ <div class="section-sub">Calcula precios por paquete · guarda sesiones · compara estimado vs real post-evento</div>
+
+ <div class="cot-tabs">
+ <button class="cot-tab active" onclick="switchCotMode('preventa',this)">📋 Preventa / Cotización</button>
+ <button class="cot-tab" onclick="switchCotMode('postevento',this)">✅ Post-Evento / Real</button>
+ </div>
+
+ <!-- ══ PREVENTA ══ -->
+ <div class="cot-mode active" id="cot-mode-preventa">
+ <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+
+ <!-- COL IZQ -->
+ <div style="display:flex;flex-direction:column;gap:14px">
+
+ <!-- EVENTO -->
+ <div class="card">
+ <div class="cot-section-label"><span>📌 Evento</span></div>
+ <div class="form-row cols-2">
+ <div class="form-group">
+ <label>Artista / Nombre *</label>
+ <input type="text" class="cot-input" id="cot-artista" placeholder="Ej: Bad Bunny" oninput="recalcular()">
+ </div>
+ <div class="form-group">
+ <label>Tour / Show</label>
+ <input type="text" class="cot-input" id="cot-tour" placeholder="Ej: Most Wanted Tour" oninput="recalcular()">
+ </div>
+ </div>
+
+ <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+ <label style="font-size:9px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:var(--ts)">Fechas</label>
+ <button class="btn btn-ghost btn-sm" onclick="agregarFechaCot()">+ Fecha</button>
+ </div>
+ <div id="cot-fechas-lista"></div>
+
+ <div class="form-row cols-2" style="margin-top:8px">
+ <div class="form-group">
+ <label>Ciudad *</label>
+ <select class="cot-input" id="cot-ciudad" onchange="onCotCiudadChange()">
+ <option value="monterrey">Monterrey</option>
+ <option value="cdmx">CDMX</option>
+ <option value="otra">Otra ciudad</option>
+ </select>
+ </div>
+ <div class="form-group">
+ <label>Tipo</label>
+ <select class="cot-input" id="cot-tipo" onchange="onCotTipoChange()">
+ <option value="concierto">Concierto</option>
+ <option value="festival">Festival multidía</option>
+ </select>
+ </div>
+ </div>
+
+ <div class="form-group" style="margin-top:6px">
+ <label>Venue</label>
+ <div style="position:relative">
+ <input type="text" class="cot-input" id="cot-venue" placeholder="Ej: Estadio GNP" oninput="filtrarVenues(this.value);recalcular()" autocomplete="off">
+ <div id="cot-venue-sugg" style="display:none;position:absolute;z-index:50;left:0;right:0;top:100%;background:var(--bg3);border:1px solid var(--border);border-radius:6px;margin-top:2px;max-height:140px;overflow-y:auto"></div>
+ </div>
+ <div style="display:flex;gap:6px;margin-top:6px">
+ <button class="btn btn-ghost btn-sm" onclick="guardarVenueCat()">+ Guardar venue</button>
+ <button class="btn btn-ghost btn-sm" onclick="verVenuesCat()">📋 Catálogo</button>
+ </div>
+ </div>
+
+ <div id="cot-festival-row" style="display:none;margin-top:6px">
+ <div class="form-row cols-2">
+ <div class="form-group">
+ <label>Días del festival</label>
+ <input type="number" class="cot-input" id="cot-dias-festival" min="1" max="7" value="3" oninput="syncFestivalNoches();recalcular()">
+ </div>
+ <div class="form-group">
+ <label>Noches de hotel</label>
+ <input type="number" class="cot-input" id="cot-noches-festival" min="1" max="7" value="3" oninput="syncFestivalNoches();recalcular()">
+ </div>
+ </div>
+ </div>
+ </div>
+
+ <!-- TRANSPORTE -->
+ <div class="card">
+ <div class="cot-section-label"><span>🚌 Transporte</span><button class="btn btn-ghost btn-sm" onclick="agregarUnidad()">+ Unidad</button></div>
+ <div id="cot-cdmx-nota" style="display:none;font-size:11px;color:var(--blue);margin-bottom:10px;padding:8px 10px;background:rgba(94,167,255,.08);border-radius:6px;border:1px solid rgba(94,167,255,.2)">
+ CDMX: el transporte largo no aplica. Solo traslados internos (aeropuerto, hotel, venue).
+ </div>
+ <div id="cot-unidades-lista"></div>
+ <div style="margin-top:10px;display:grid;grid-template-columns:1fr 1fr;gap:8px;padding-top:8px;border-top:1px solid var(--border)">
+ <div style="font-size:11px;color:var(--ts)">Capacidad neta: <span id="cot-capacidad-neta" style="color:var(--gold);font-weight:700">0</span> pax</div>
+ <div style="font-size:11px;color:var(--ts)">Costo transporte: <span id="cot-costo-transporte-lbl" style="color:var(--gold);font-weight:700">$0</span></div>
+ </div>
+ <div style="margin-top:8px">
+ <label style="font-size:9px;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:var(--ts)">🅿️ Estacionamiento ($)</label>
+ <input type="number" class="cot-input" id="cot-estacionamiento" placeholder="0" min="0" style="margin-top:4px" oninput="recalcular()">
+ </div>
+ </div>
+
+ <!-- HOTEL -->
+ <div class="card">
+ <div class="cot-section-label"><span>🏨 Hotel</span></div>
+ <div class="form-row cols-2">
+ <div class="form-group">
+ <label>Costo por habitación ($) *</label>
+ <input type="number" class="cot-input" id="cot-hotel-precio" min="0" oninput="recalcular()" placeholder="Ej: 10000">
+ </div>
+ <div class="form-group">
+ <label>Noches</label>
+ <input type="number" class="cot-input" id="cot-hotel-noches" min="1" value="1" oninput="recalcular()">
+ </div>
+ </div>
+ <div style="font-size:11px;color:var(--ts2);margin-top:4px">Cotizador usa: precio ÷ 4 personas × noches por viajero. Extras (doble/individual) se cobran aparte en la reservación.</div>
+ </div>
+
+ <!-- KIT -->
+ <div class="card">
+ <div class="cot-section-label"><span>🎁 Kit del viajero</span></div>
+ <div id="cot-kit-lista"></div>
+ <div id="cot-kit-extras"></div>
+ <button class="btn btn-ghost btn-sm" onclick="agregarKitExtra()" style="margin-top:8px">+ Otro item</button>
+ <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border);font-size:12px;color:var(--ts)">
+ Costo kit total: <span id="cot-kit-total" style="color:var(--gold);font-weight:700">$0</span>
+ </div>
+ </div>
+
+ <!-- ZONAS -->
+ <div class="card">
+ <div class="cot-section-label"><span>🎟️ Zonas / Boletos</span><button class="btn btn-ghost btn-sm" onclick="agregarZonaCot()">+ Zona</button></div>
+ <div style="font-size:11px;color:var(--ts);margin-bottom:10px">El precio del boleto se suma al costo base logístico por zona.</div>
+ <div id="cot-zonas-lista"></div>
+ <div style="display:flex;gap:6px;margin-top:8px">
+   <button class="btn btn-ghost btn-sm" onclick="guardarZonasCatalogo()">💾 Guardar zonas en catálogo</button>
+   <button class="btn btn-ghost btn-sm" onclick="verZonasCatalogo()">📋 Catálogo de zonas</button>
+ </div>
+ </div>
+
+ <!-- STAFF -->
+ <div class="card">
+ <div class="cot-section-label"><span>👥 Staff</span></div>
+
+ <!-- Coordinadores -->
+ <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+ <div style="font-size:10px;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:var(--ts)">Coordinadores</div>
+ <button class="btn btn-ghost btn-sm" onclick="agregarCoordinator()">+ Coordinador</button>
+ </div>
+ <div id="cot-coordis-lista"></div>
+
+ <!-- Choferes -->
+ <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
+ <div style="font-size:10px;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:var(--ts);margin-bottom:8px">Choferes</div>
+ <div style="display:flex;align-items:center;gap:10px">
+ <input type="number" class="cot-input" id="cot-num-choferes" min="0" value="1" style="width:60px" oninput="recalcular()">
+ <div style="font-size:12px;color:var(--ts)">
+ <span id="cot-choferes-habs" style="color:var(--gold);font-weight:600">1 hab</span> ·
+ <span id="cot-choferes-costo" style="color:var(--gold);font-weight:600">$0</span>
+ </div>
+ </div>
+ <div style="font-size:10px;color:var(--ts2);margin-top:4px">1 cama por chofer · 2 choferes = 1 cuarto doble · 3 = doble + individual</div>
+ </div>
+
+ <!-- Creadores de contenido -->
+ <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
+ <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+ <div style="font-size:10px;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:var(--ts)">Creadores de Contenido</div>
+ <button class="btn btn-ghost btn-sm" onclick="agregarCC()">+ CC</button>
+ </div>
+ <div id="cot-cc-lista"></div>
+ </div>
+
+ <!-- Gastos extra -->
+ <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
+ <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+ <div style="font-size:10px;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:var(--ts)">Gastos Extra</div>
+ <button class="btn btn-ghost btn-sm" onclick="agregarGastoExtra()">+ Gasto</button>
+ </div>
+ <div id="cot-gastos-extra"></div>
+ </div>
+
+ <!-- Ganancia por paquete -->
+ <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
+ <div style="font-size:10px;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:var(--ts);margin-bottom:8px">Ganancia por Paquete</div>
+ <div class="form-row cols-2">
+ <div class="form-group">
+ <label>Ganancia PLUS ($)</label>
+ <input type="number" class="cot-input" id="cot-ganancia-plus" value="1000" min="0" oninput="recalcular()">
+ </div>
+ <div class="form-group">
+ <label>Ganancia CHEAP ($)</label>
+ <input type="number" class="cot-input" id="cot-ganancia-cheap" value="1000" min="0" oninput="recalcular()">
+ </div>
+ </div>
+ <div style="font-size:10px;color:var(--ts2);margin-top:4px">STAY = PLUS − $500 · RIDE = fijo $2,700 Mty / $2,900 CDMX</div>
+ </div>
+ </div>
+
+ </div><!-- /col izq -->
+
+ <!-- COL DER -->
+ <div style="display:flex;flex-direction:column;gap:14px">
+
+ <!-- HEADER EVENTO -->
+ <div class="cot-event-header" id="cot-event-header">
+ <div class="cot-event-header-titulo" id="cot-header-titulo">—</div>
+ <div class="cot-event-header-sub" id="cot-header-sub"></div>
+ </div>
+
+ <!-- DESGLOSE -->
+ <div class="card" style="border-color:rgba(255,107,0,.3)">
+ <div class="cot-section-label" style="color:var(--orange)"><span>📊 Desglose por Persona</span></div>
+ <div id="cot-desglose"><div class="empty-state" style="padding:20px">Llena los campos para ver el cálculo</div></div>
+ </div>
+
+ <!-- ESCENARIOS -->
+ <div class="card" style="border-color:rgba(255,215,0,.25)">
+ <div class="cot-section-label" style="color:var(--gold)"><span>🎯 Escenarios (base logística)</span></div>
+ <div style="font-size:11px;color:var(--ts);margin-bottom:10px">Basado en capacidad neta del transporte. El boleto se suma por zona.</div>
+ <div id="cot-escenarios"><div class="empty-state" style="padding:20px">Agrega transporte para ver escenarios</div></div>
+ </div>
+
+ <!-- PRECIOS POR PAQUETE -->
+ <div class="card">
+ <div class="cot-section-label"><span>💰 Precios por Paquete y Zona</span></div>
+ <div style="font-size:11px;color:var(--ts);margin-bottom:10px">Escenario realista (80% capacidad)</div>
+ <div id="cot-precios-paquetes"><div class="empty-state" style="padding:16px">Agrega zonas para ver precios</div></div>
+ </div>
+
+ <!-- CREAR EVENTO -->
+ <div class="card" style="border-color:rgba(61,220,132,.3)">
+ <div class="cot-section-label" style="color:var(--green)"><span>🚀 Crear Evento en Capsule Corp</span></div>
+ <div style="font-size:12px;color:var(--ts);margin-bottom:14px">La info pasa a Capsule Corp. Terminas de vestirlo y lo publicas.</div>
+ <button class="btn btn-primary" style="width:100%;padding:14px" onclick="crearEventoDesdeCotizador()">✅ Crear Evento</button>
+ <div id="cot-crear-alert" style="margin-top:10px"></div>
+ </div>
+
+ <!-- SESIONES -->
+ <div class="card">
+ <div class="cot-section-label"><span>📁 Sesiones Guardadas</span></div>
+ <div id="cot-sesiones-lista"><div style="font-size:12px;color:var(--ts)">Sin sesiones guardadas</div></div>
+ </div>
+
+ </div><!-- /col der -->
+ </div><!-- /grid preventa -->
+ </div><!-- /mode preventa -->
+
+ <!-- ══ POST-EVENTO ══ -->
+ <div class="cot-mode" id="cot-mode-postevento">
+ <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+ <div style="display:flex;flex-direction:column;gap:14px">
+ <div class="card">
+ <div class="cot-section-label"><span>📂 Selecciona evento</span></div>
+ <select class="cot-input" id="post-sesion-sel" onchange="cargarSesionPostEvento(this.value)">
+ <option value="">Selecciona...</option>
+ </select>
+ </div>
+ <div class="card" id="post-datos-card" style="display:none">
+ <div class="cot-section-label"><span>📊 Datos Reales</span></div>
+ <div class="form-row cols-2">
+ <div class="form-group"><label>Viajeros PLUS reales</label><input type="number" class="cot-input" id="post-plus" min="0" value="0" oninput="calcularPostEvento()"></div>
+ <div class="form-group"><label>Viajeros STAY reales</label><input type="number" class="cot-input" id="post-stay" min="0" value="0" oninput="calcularPostEvento()"></div>
+ </div>
+ <div class="form-row cols-2">
+ <div class="form-group"><label>Viajeros RIDE reales</label><input type="number" class="cot-input" id="post-ride" min="0" value="0" oninput="calcularPostEvento()"></div>
+ <div class="form-group"><label>Viajeros CHEAP reales</label><input type="number" class="cot-input" id="post-cheap" min="0" value="0" oninput="calcularPostEvento()"></div>
+ </div>
+ <div style="height:1px;background:var(--border);margin:10px 0"></div>
+ <div class="form-row cols-2">
+ <div class="form-group"><label>Costo transporte real ($)</label><input type="number" class="cot-input" id="post-costo-transporte" min="0" value="0" oninput="calcularPostEvento()"></div>
+ <div class="form-group"><label>Costo hotel real ($)</label><input type="number" class="cot-input" id="post-costo-hotel" min="0" value="0" oninput="calcularPostEvento()"></div>
+ </div>
+ <div class="form-row cols-2">
+ <div class="form-group"><label>Costo kits real ($)</label><input type="number" class="cot-input" id="post-costo-kits" min="0" value="0" oninput="calcularPostEvento()"></div>
+ <div class="form-group"><label>Costo boletos real ($)</label><input type="number" class="cot-input" id="post-costo-boletos" min="0" value="0" oninput="calcularPostEvento()"></div>
+ </div>
+ <div class="form-row cols-2">
+ <div class="form-group"><label>Gastos extra reales ($)</label><input type="number" class="cot-input" id="post-gastos-extra" min="0" value="0" oninput="calcularPostEvento()"></div>
+ <div class="form-group"><label>Ingresos totales ($)</label><input type="number" class="cot-input" id="post-ingresos" min="0" value="0" oninput="calcularPostEvento()"></div>
+ </div>
+ <div style="margin-top:10px">
+ <label style="font-size:11px;color:var(--ts);display:block;margin-bottom:4px">Notas post-evento (ventas en persona, reventa, etc.)</label>
+ <textarea class="cot-input" id="post-notas" rows="3" placeholder="Ej: 3 boletos vendidos en puerta, 2 reventas..."></textarea>
+ </div>
+ <button class="btn btn-primary" style="width:100%;margin-top:10px" onclick="guardarPostEvento()">💾 Guardar datos reales</button>
+ </div>
+ </div>
+ <div style="display:flex;flex-direction:column;gap:14px">
+ <div class="card" id="post-comparativa-card" style="display:none">
+ <div class="cot-section-label" style="color:var(--orange)"><span>📈 Estimado vs Real</span></div>
+ <div id="post-comparativa"></div>
+ </div>
+ <div class="card" id="post-resultado-card" style="display:none">
+ <div class="cot-section-label" style="color:var(--green)"><span>✅ Resultado Final</span></div>
+ <div id="post-resultado"></div>
+ </div>
+ </div>
+ </div>
+ </div><!-- /mode postevento -->
+
+ <!-- MODAL VENUES -->
+ <div class="modal-overlay" id="modal-venues">
+ <div class="modal" style="max-width:480px">
+ <div class="modal-header">
+ <div class="modal-title">Catálogo de Venues</div>
+ <button class="modal-close" onclick="closeModal('modal-venues')">✕</button>
+ </div>
+ <div class="modal-body"><div id="venues-lista"></div></div>
+ </div>
+ </div>
+
+ <div class="modal-overlay" id="modal-zonas-cat">
+ <div class="modal" style="max-width:520px">
+ <div class="modal-header">
+ <div class="modal-title">📋 Catálogo de Zonas</div>
+ <button class="modal-close" onclick="closeModal('modal-zonas-cat')">✕</button>
+ </div>
+ <div class="modal-body">
+   <div style="font-size:11px;color:var(--ts);margin-bottom:12px">Zonas guardadas de eventos anteriores. Haz clic en una para cargarla al cotizador actual.</div>
+   <div id="zonas-cat-lista"></div>
+ </div>
+ </div>
+ </div>
 
      <!-- ─── HERRAMIENTAS: RECIBOS ─── -->
      <div class="page" id="page-recibos" style="padding:0">
@@ -4078,7 +4405,15 @@ if (checkSession()) {
 function toggleDropdown(e) {
   if (e) e.stopPropagation();
   const dd = document.getElementById('nav-dropdown-herramientas');
-  dd.classList.toggle('open');
+  const isOpen = dd.classList.toggle('open');
+  if (isOpen) {
+    // Posicionar el menu debajo del botón usando coordenadas absolutas
+    const btn = document.getElementById('nav-herramientas');
+    const menu = dd.querySelector('.nav-dropdown-menu');
+    const rect = btn.getBoundingClientRect();
+    menu.style.top = (rect.bottom + 2) + 'px';
+    menu.style.left = rect.left + 'px';
+  }
 }
 // Cerrar dropdown al hacer click fuera
 document.addEventListener('click', function(e) {

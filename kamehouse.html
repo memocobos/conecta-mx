@@ -1880,6 +1880,9 @@ const SESSION_HOURS = 8;
 let currentUser = null;
 let _karinCatFilter = 'all';
 let _karinPiezasCache = [];
+let recibosLoaded = false;
+let disenoLoaded = false;
+let _cotIniciado = false;
 
 // Roles con acceso al kamehouse.html (admin panel)
 const ROLES_ADMIN = ['maestro_roshi', 'bulma', 'mister_popo', 'coordinador', 'cc', 'vendedor'];
@@ -2051,7 +2054,8 @@ function aplicarPermisosUI() {
 document.getElementById('login-pass').addEventListener('keydown', e => {
   if (e.key === 'Enter') doLogin();
 });
-document.getElementById('login-user').addEventListener('keydown', e => {
+const loginUserEl = document.getElementById('login-user');
+if (loginUserEl) loginUserEl.addEventListener('keydown', e => {
   if (e.key === 'Enter') document.getElementById('login-pass').focus();
 });
 
@@ -3204,7 +3208,6 @@ const VEHICULOS = [
 ];
 
 const HOTEL_DEFAULT = {monterrey:2500, cdmx:2900, otra:0};
-let _cotIniciado = false;
 let _vendedoresCache = [];
 
 // ── INIT ──
@@ -4417,9 +4420,6 @@ document.addEventListener('click', function(e) {
 
 // HTML del recibos embebido
 const RECIBOS_HTML = document.getElementById('recibos-tpl').innerHTML;
-
-let recibosLoaded = false;
-let disenoLoaded = false;
 
 function showHerramienta(name) {
   console.log('[Herramientas] click:', name);

@@ -1309,7 +1309,7 @@ tr:hover td{background:rgba(255,107,0,.03)}
     </div>
    </div>
 
-<template id="recibos-tpl">
+<script type="text/plain" id="recibos-tpl">
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -1857,7 +1857,7 @@ document.addEventListener("DOMContentLoaded",()=>{
 </script>
 </body>
 </html>
-</template>
+</script>
 <script>
 // ═══════════════════════════════════════════════════════════════
 // CONFIG
@@ -3219,8 +3219,8 @@ async function initCotizador() {
   COT.venues = JSON.parse(localStorage.getItem('kh_venues') || '[]');
   // Cargar coordinadores desde Supabase
   try {
-    const todos = await db.get('vendedores', '?select=id,nombre,cargo&order=nombre');
-    _vendedoresCache = (todos || []).filter(v => v.cargo === 'Coordinador');
+    const todos = await db.get('vendedores', '?select=id,nombre,rol&order=nombre');
+    _vendedoresCache = (todos || []).filter(v => v.rol === 'Coordinador');
   } catch(e) { _vendedoresCache = []; }
   resetCotizador();
   cargarListaSesiones();
@@ -4456,7 +4456,10 @@ function showHerramienta(name) {
     if (frame && !recibosLoaded) {
       const tpl = document.getElementById('recibos-tpl');
       if (tpl) {
-        frame.srcdoc = tpl.innerHTML;
+        const html = tpl.textContent;
+        const blob = new Blob([html], {type: 'text/html'});
+        const url = URL.createObjectURL(blob);
+        frame.src = url;
         recibosLoaded = true;
       }
     }

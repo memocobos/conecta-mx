@@ -971,6 +971,7 @@ src="https://www.facebook.com/tr?id=1685907946147007&ev=PageView&noscript=1"
       <div class="wiz-progress-sep"></div>
       <div class="wiz-progress-step" data-step="4"><span class="wiz-progress-num">4</span><span class="wiz-progress-lbl">Reservar</span></div>
     </div>
+    <div class="wiz-hint" id="wiz-hint" aria-live="polite"></div>
     <div class="d-body">
 
   <!-- PASO 1: VIAJEROS -->
@@ -1211,6 +1212,8 @@ src="https://www.facebook.com/tr?id=1685907946147007&ev=PageView&noscript=1"
 .wiz-progress-step.done .wiz-progress-num{background:#e8ff4c;color:#000}
 .wiz-progress-step.done .wiz-progress-lbl{color:rgba(232,255,76,.6)}
 .wiz-progress-step.done + .wiz-progress-sep{background:#e8ff4c}
+.wiz-hint{display:none;background:#e8ff4c;color:#000;padding:9px 16px;font-size:12px;font-weight:700;font-family:'Montserrat',sans-serif;line-height:1.4;text-align:center;position:sticky;top:104px;z-index:179;border-bottom:1px solid rgba(0,0,0,.18);box-shadow:0 4px 14px rgba(0,0,0,.45)}
+.wiz-hint.show{display:block}
 @media (max-width:640px){
   /* Move the bar out of the .detail flow on mobile so it can't be width-constrained
      by the parent. Pinned to viewport with fixed; sits right below the 56px nav. */
@@ -1222,6 +1225,8 @@ src="https://www.facebook.com/tr?id=1685907946147007&ev=PageView&noscript=1"
   /* Compensate for the now out-of-flow bar so wizard content isn't shoved
      under it once the user scrolls past the hero. */
   .d-body{padding-top:54px}
+  .wiz-hint{position:fixed;top:106px;left:0;right:0;width:100%;padding:7px 14px;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;letter-spacing:0}
+  body.wiz-hint-on .d-body{padding-top:84px}
 }
 /* ONBOARDING MODAL */
 .onboard-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);z-index:9999;align-items:center;justify-content:center;padding:20px;overflow-y:auto}
@@ -1896,6 +1901,7 @@ function goBack() {
   $$('page-catalog').classList.add('active');
   $$('nav-back').style.display = 'none';
   document.body.classList.remove('wizard-open');
+  if(typeof setWizHint==='function')setWizHint('');
   window.scrollTo(0,0);
 }
 
@@ -2672,6 +2678,7 @@ function resetWizard(){
   selZ=null;selH=null;selPkg=null;selFechaIdx=0;selBoleto=null;selTransporte=null;
   $$('w-fecha-lbl').textContent='Elige tu fecha';
   setWizProgress(1);
+  setWizHint('');
 }
 
 function setWizProgress(step){
@@ -2690,6 +2697,12 @@ function setWizProgress(step){
       else if(n===step+1)steps[i].classList.add('next');
     }
   }
+}
+
+function setWizHint(text){
+  var el=document.getElementById('wiz-hint');if(!el)return;
+  if(!text){el.classList.remove('show');el.textContent='';document.body.classList.remove('wiz-hint-on');return;}
+  el.textContent=text;el.classList.add('show');document.body.classList.add('wiz-hint-on');
 }
 
 function showOnboarding(ev){
@@ -2844,6 +2857,16 @@ function selPaquete(btn,pkg){
   if(pkg==='stay'&&isCDMX(cur))return; // disabled for CDMX
   selPkg=pkg;selZ=null;selH=null;selTransporte=null;
   setWizProgress(2);
+  var _hintBase='';
+  if(pkg==='plus')_hintBase='Incluye boleto, transporte, hospedaje y kit. ';
+  else if(pkg==='ride')_hintBase='Incluye transporte, hospedaje y kit (sin boleto). ';
+  else if(pkg==='stay')_hintBase='Incluye hospedaje, boleto y kit (sin transporte). ';
+  else if(pkg==='cheap')_hintBase='Solo boleto y kit. ';
+  var _hintNext;
+  if(cur&&cur.diaFirst) _hintNext=(pkg==='ride'||pkg==='plus'||pkg==='stay')?'Ahora elige tu hotel.':'Desplázate hacia abajo para ver tu cotización.';
+  else if(pkg==='ride') _hintNext='Ahora elige tu hotel.';
+  else _hintNext='Ahora elige tu zona.';
+  setWizHint(_hintBase+_hintNext);
   try{window.trackAddToCart&&window.trackAddToCart(pkg,minP(cur));}catch(e){}
   var pb=$$('w-paquetes').querySelectorAll('.wiz-btn');
   for(var i=0;i<pb.length;i++)pb[i].classList.remove('active');
@@ -2980,6 +3003,7 @@ function selBoletoBtn(btn,id){
   var btns=$$('d-boletos').querySelectorAll('.f-btn');
   for(var i=0;i<btns.length;i++)btns[i].classList.remove('active');
   btn.classList.add('active');
+  setWizHint('Boleto seleccionado. Ahora elige tu paquete.');
   // Auto-set zona from selected boleto + day
   var mf=cur.multifecha[selFechaIdx];
   if(mf&&mf.zonas[id]){
@@ -3128,6 +3152,7 @@ function selZona(btn,p,n){
   btn.classList.add('active');
   selZ={n:n,p:p};
   setWizProgress(3);
+  setWizHint('Zona seleccionada. Desplázate hacia abajo para ver tu cotización completa.');
   calcular();
 }
 
@@ -3206,6 +3231,7 @@ function cerrarMapa(){
 function abrirModalPago(){
   if(!cur||!_lastCotizacion)return;
   try{window.trackInitiateCheckout&&window.trackInitiateCheckout(cur.a,selPkg,total);}catch(e){}
+  setWizHint('Realiza tu transferencia por el monto del separo. Toma foto del comprobante y presiona el botón de abajo.');
   $$('pago-subtitulo').textContent='Separa tu lugar en '+cur.a+' — '+cur.f;
   $$('pago-monto').textContent='💳 '+fmt(sepActualCalc);
   var b=getBanco();
@@ -3486,6 +3512,7 @@ function calcular(){
   $$('d-placeholder').style.display='none';
   $$('d-result').style.display='block';
   setWizProgress(4);
+  setWizHint('Tu cotización está lista. Revisa el plan de pagos y presiona el botón para reservar.');
   var promoCard=document.getElementById('w-promo-card');if(promoCard)promoCard.style.display='block';
   var shareBtn=document.getElementById('btn-share');if(shareBtn)shareBtn.style.display='block';
   if(_promoActivo&&_promoActivo.excludePkg&&_promoActivo.excludePkg.indexOf(selPkg)>=0){

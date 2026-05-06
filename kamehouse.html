@@ -959,16 +959,28 @@ tr:hover td{background:rgba(255,107,0,.03)}
  
      <!-- ─── CAPSULE CORP ─── -->
  <div class="page" id="page-capsule">
- <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
- <div class="section-title">Capsule Corp</div>
- <button class="btn btn-primary" onclick="abrirNuevoEvento()">+ Nuevo Evento</button>
- </div>
- <div class="section-sub">Área de trabajo de Bulma — En construcción</div>
- <div style="margin-top:48px;text-align:center;color:var(--ts)">
-       <div style="font-size:48px;margin-bottom:16px"></div>
+      <div class="section-title">Capsule Corp</div>
+      <div class="section-sub">Area de trabajo de Bulma — En construccion</div>
+      <div style="margin-top:48px;text-align:center;color:var(--ts)">
        <div style="font-size:16px;font-weight:700;color:var(--text);margin-bottom:8px">Capsule Corp v2 en camino</div>
-       <div style="font-size:13px">Gestión de viajeros, rooming list interactivo y asignación de eventos.<br>Próxima actualización.</div>
-      </div><template id="recibos-tpl">
+       <div style="font-size:13px">Gestion de viajeros, rooming list interactivo y asignacion de eventos.<br>Proxima actualizacion.</div>
+      </div>
+     </div>
+
+     <!-- ─── HERRAMIENTAS: RECIBOS ─── -->
+     <div class="page" id="page-recibos" style="padding:0">
+      <iframe id="frame-recibos" src="about:blank" style="width:100%;height:calc(100vh - 110px);border:none;background:transparent"></iframe>
+     </div>
+
+     <!-- ─── HERRAMIENTAS: DISENO ─── -->
+     <div class="page" id="page-diseno" style="padding:0">
+      <iframe id="frame-diseno" src="about:blank" srcdoc="" style="width:100%;height:calc(100vh - 110px);border:none;background:transparent"></iframe>
+     </div>
+
+    </div>
+   </div>
+
+<template id="recibos-tpl">
 <!DOCTYPE html>
 <html lang="es">
 <head>

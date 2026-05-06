@@ -850,10 +850,11 @@ tr:hover td{background:rgba(255,107,0,.03)}
         <div class="section-title">Guerreros Z</div>
         <div class="section-sub">Tu equipo de Conecta Reynosa</div>
        </div>
-       <div style="display:flex;gap:8px">
-        <button class="btn btn-ghost btn-sm" onclick="showGZTab('lista',this)">Equipo</button>
-        <button class="btn btn-ghost btn-sm" onclick="showGZTab('invitar',this)">+ Invitar</button>
-        <button class="btn btn-ghost btn-sm" onclick="showGZTab('miperfil',this)">Mi Perfil</button>
+       <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-ghost btn-sm gz-tab-btn active" onclick="showGZTab('lista',this)">Equipo</button>
+        <button class="btn btn-ghost btn-sm gz-tab-btn" onclick="showGZTab('invitar',this)">+ Invitar</button>
+        <button class="btn btn-ghost btn-sm gz-tab-btn" onclick="showGZTab('miperfil',this)">Mi Perfil</button>
+        <button class="btn btn-ghost btn-sm" onclick="abrirRanking()" style="border-color:rgba(255,183,3,.4);color:var(--gold)">🏆 Ranking</button>
        </div>
       </div>
 
@@ -868,7 +869,7 @@ tr:hover td{background:rgba(255,107,0,.03)}
         <button class="btn btn-ghost btn-sm gz-filter" onclick="filtrarGZ('vendedor',this)">Vendedores</button>
         <button class="btn btn-ghost btn-sm gz-filter" onclick="filtrarGZ('cc',this)">CC</button>
        </div>
-       <div id="gz-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px">
+       <div id="gz-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px">
         <div class="loading-state"><div class="spinner"></div>Cargando equipo…</div>
        </div>
       </div>
@@ -3909,34 +3910,21 @@ function renderGZ() {
   grid.innerHTML = lista.map(u => {
     const iniciales = u.nombre.split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase();
     const strikes = u.strikes || 0;
-    const strikeClass = strikes >= 3 ? 'danger' : strikes >= 2 ? 'warn' : 'ok';
-    const strikeEmoji = strikes >= 3 ? '💀' : '⚡';
-    const edad = u.fecha_nacimiento ? calcularEdad(u.fecha_nacimiento) : null;
+    const strikeColor = strikes >= 3 ? 'var(--red)' : strikes >= 2 ? 'var(--gold)' : 'var(--green)';
     const cumple = u.fecha_nacimiento ? esCumple(u.fecha_nacimiento) : false;
     const esYo = currentUser && u.id === currentUser.id;
-    return `<div class="gz-card">
-      ${cumple ? '<div style="position:absolute;top:10px;right:10px;font-size:18px">🎂</div>' : ''}
-      <div style="display:flex;gap:14px;align-items:flex-start;margin-bottom:14px">
-        <div class="gz-avatar" onclick="abrirPerfil('${u.id}')">
-          ${u.foto_url ? `<img src="${u.foto_url}" alt="${u.nombre}">` : iniciales}
-        </div>
-        <div style="flex:1;min-width:0">
-          <div class="gz-rol">${ROL_LABELS[u.rol] || u.rol}</div>
-          <div style="font-weight:700;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${u.nombre}${esYo ? ' <span style="font-size:10px;color:var(--ts)">(tú)</span>' : ''}</div>
-          ${edad ? `<div style="font-size:11px;color:var(--ts)">${edad} años</div>` : ''}
-        </div>
+    const nombreCorto = u.nombre.split(' ')[0];
+    return `<div class="gz-card" onclick="abrirPerfil('${u.id}')" style="cursor:pointer;text-align:center;padding:20px 14px;position:relative">
+      ${cumple ? '<div style="position:absolute;top:8px;right:8px;font-size:14px">🎂</div>' : ''}
+      ${esYo ? '<div style="position:absolute;top:8px;left:8px;font-size:10px;color:var(--gold);font-weight:700;font-family:Rajdhani">TÚ</div>' : ''}
+      <div class="gz-avatar" style="margin:0 auto 10px;width:64px;height:64px;font-size:24px">
+        ${u.foto_url ? `<img src="${u.foto_url}" alt="${u.nombre}">` : iniciales}
       </div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
-        <span class="gz-strike ${strikeClass}">${strikeEmoji} ${strikes}/3 strikes</span>
-        <span class="badge badge-gray">${u.talla_playera || 'Sin talla'}</span>
-        ${u.perfil_completo ? '<span class="badge badge-green">Perfil completo</span>' : '<span class="badge badge-gray">Perfil incompleto</span>'}
-      </div>
-      <div style="display:flex;gap:6px;flex-wrap:wrap">
-        <button class="btn btn-ghost btn-sm" onclick="abrirPerfil('${u.id}')">Ver perfil</button>
-        ${currentUser?.rol === 'maestro_roshi' ? `
-          <button class="btn btn-ghost btn-sm" onclick="gestionarStrikes('${u.id}','${u.nombre.replace(/'/g,"\\'")}',${strikes})">Strikes</button>
-          <button class="btn btn-ghost btn-sm" style="color:var(--red);border-color:rgba(230,57,70,.3)" onclick="confirmarEliminar('${u.id}','${u.nombre.replace(/'/g,"\\'")}')">Dar de baja</button>
-        ` : ''}
+      <div style="font-weight:700;font-size:13px;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${nombreCorto}</div>
+      <div class="gz-rol" style="font-size:9px;margin-bottom:8px">${ROL_LABELS[u.rol] || u.rol}</div>
+      <div style="display:flex;justify-content:center;gap:6px;flex-wrap:wrap">
+        <span style="font-size:9px;font-weight:700;color:${strikeColor}">⚡${strikes}/3</span>
+        ${!u.perfil_completo ? '<span style="font-size:9px;color:var(--ts)">⚠️ Incompleto</span>' : ''}
       </div>
     </div>`;
   }).join('');
@@ -3954,7 +3942,8 @@ function showGZTab(tab, btn) {
     const el = document.getElementById('gz-tab-' + t);
     if (el) el.style.display = t === tab ? '' : 'none';
   });
-  // Cargar mi perfil si es necesario
+  document.querySelectorAll('.gz-tab-btn').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
   if (tab === 'miperfil') renderMiPerfil();
   if (tab === 'lista') renderGZ();
 }
@@ -4204,6 +4193,7 @@ async function abrirPerfil(userId) {
           <span class="gz-strike ${(usuario.strikes||0) >= 3 ? 'danger' : (usuario.strikes||0) >= 2 ? 'warn' : 'ok'}">⚡ ${usuario.strikes||0}/3 strikes</span>
           ${edad ? `<span class="badge badge-gray">${edad} años</span>` : ''}
           ${usuario.talla_playera ? `<span class="badge badge-gray">Talla ${usuario.talla_playera}</span>` : ''}
+          <span style="font-family:'Rajdhani',sans-serif;font-size:13px;font-weight:700;color:var(--gold);background:rgba(255,183,3,.1);padding:3px 8px;border-radius:4px">🏆 ${calcularPuntos(toursPasados)} pts</span>
         </div>
       </div>
     </div>
@@ -4249,8 +4239,11 @@ async function abrirPerfil(userId) {
         ${toursPasados.length ? toursPasados.map(t => `
           <div style="background:var(--bg3);border-radius:8px;padding:12px;margin-bottom:8px;display:flex;align-items:flex-start;justify-content:space-between">
             <div>
-              <div style="font-weight:700">${t.artista}</div>
-              <div style="font-size:11px;color:var(--ts)">${t.ciudad || ''} ${t.fecha_aprox ? '· ' + fmtFecha(t.fecha_aprox) : ''} · <em>${t.rol_en_tour || 'Coordinador'}</em></div>
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+                <div style="font-weight:700">${t.artista}</div>
+                ${t.tipo_tour && new Date(t.fecha_aprox||'2025').getFullYear() >= 2026 ? `<span style="font-size:9px;font-weight:700;color:var(--gold);background:rgba(255,183,3,.1);padding:2px 6px;border-radius:4px">+${PUNTOS_TOUR[t.tipo_tour]||0} pts</span>` : ''}
+              </div>
+              <div style="font-size:11px;color:var(--ts)">${TIPO_TOUR_LABEL[t.tipo_tour]||'Tour'} · ${t.ciudad || ''} ${t.fecha_aprox ? '· ' + fmtFecha(t.fecha_aprox) : ''} · <em>${t.rol_en_tour || 'Coordinador'}</em></div>
               ${t.notas ? `<div style="font-size:11px;color:var(--ts);margin-top:4px">${t.notas}</div>` : ''}
             </div>
             ${puedeEditar ? `<button onclick="eliminarTourPasado('${t.id}','${userId}')" style="background:none;border:none;color:var(--ts);cursor:pointer;font-size:16px;padding:0 0 0 8px">×</button>` : ''}
@@ -4294,6 +4287,13 @@ function abrirAgregarTour(userId) {
         <input class="cot-input" id="tp-ciudad" placeholder="ej. Monterrey, CDMX"></div>
       <div><label class="cot-label">Fecha aproximada</label>
         <input class="cot-input" type="date" id="tp-fecha"></div>
+      <div><label class="cot-label">Tipo de tour</label>
+        <select class="cot-input" id="tp-tipo">
+          <option value="concierto">Concierto (3 pts)</option>
+          <option value="festival_1d">Festival 1 día (5 pts)</option>
+          <option value="festival_2d">Festival 2 días (7 pts)</option>
+          <option value="festival_3d">Festival 3 días (10 pts)</option>
+        </select></div>
       <div><label class="cot-label">Tu rol</label>
         <select class="cot-input" id="tp-rol">
           <option value="Coordinador">Coordinador</option>
@@ -4321,6 +4321,7 @@ async function guardarTourPasado(userId) {
       artista,
       ciudad: document.getElementById('tp-ciudad').value.trim() || null,
       fecha_aprox: document.getElementById('tp-fecha').value || null,
+      tipo_tour: document.getElementById('tp-tipo').value,
       rol_en_tour: document.getElementById('tp-rol').value,
       notas: document.getElementById('tp-notas').value.trim() || null
     });
@@ -4571,6 +4572,118 @@ async function subirFoto(userId) {
     } catch(e) { alert('Error subiendo foto: ' + e.message); }
   };
   input.click();
+}
+
+
+
+// ═══════════════════════════════════════════════════════════════
+// RANKING DE PUNTOS — Sistema de tours
+// ═══════════════════════════════════════════════════════════════
+const PUNTOS_TOUR = {
+  concierto: 3,
+  festival_1d: 5,
+  festival_2d: 7,
+  festival_3d: 10
+};
+
+const TIPO_TOUR_LABEL = {
+  concierto: 'Concierto',
+  festival_1d: 'Festival 1 día',
+  festival_2d: 'Festival 2 días',
+  festival_3d: 'Festival 3 días'
+};
+
+function calcularPuntos(tours) {
+  // Solo tours de 2026 en adelante suman puntos
+  return tours.reduce((total, t) => {
+    if (!t.fecha_aprox) return total;
+    const año = new Date(t.fecha_aprox).getFullYear();
+    if (año < 2026) return total;
+    return total + (PUNTOS_TOUR[t.tipo_tour] || 0);
+  }, 0);
+}
+
+function calcularPuntosAnio(tours, anio) {
+  return tours.reduce((total, t) => {
+    if (!t.fecha_aprox) return total;
+    const año = new Date(t.fecha_aprox).getFullYear();
+    if (año !== anio) return total;
+    return total + (PUNTOS_TOUR[t.tipo_tour] || 0);
+  }, 0);
+}
+
+async function abrirRanking() {
+  const modal = crearModal('ranking', '🏆 Ranking de Tours', '<div class="loading-state"><div class="spinner"></div>Calculando ranking…</div>');
+
+  try {
+    // Traer todos los tours pasados de 2026 en adelante
+    const tours = await db.get('tours_pasados', '?fecha_aprox=gte.2026-01-01&order=fecha_aprox.desc');
+    const usuarios = await db.get('usuarios', '?activo=eq.true&order=nombre.asc');
+
+    // Calcular puntos por usuario
+    const rankingData = usuarios.map(u => {
+      const misToures = tours.filter(t => t.usuario_id === u.id);
+      const anioActual = new Date().getFullYear();
+      const ptsAnio = calcularPuntosAnio(misToures, anioActual);
+      const ptsTotal = calcularPuntos(misToures);
+      const iniciales = u.nombre.split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase();
+      return { ...u, tours: misToures, ptsAnio, ptsTotal, iniciales };
+    });
+
+    // Ordenar por puntos del año actual
+    rankingData.sort((a, b) => b.ptsAnio - a.ptsAnio);
+
+    const anioActual = new Date().getFullYear();
+    const medallaEmoji = ['🥇','🥈','🥉'];
+
+    const rankingHTML = `
+      <div style="margin-bottom:16px;text-align:center">
+        <div style="font-size:11px;color:var(--ts);letter-spacing:.1em;text-transform:uppercase">Temporada ${anioActual}</div>
+        <div style="font-size:11px;color:var(--gold);margin-top:4px">El líder al final del año gana un tour gratis 🎉</div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        ${rankingData.map((u, i) => {
+          const esTop = i < 3;
+          const esPrimero = i === 0;
+          const esYo = currentUser && u.id === currentUser.id;
+          return `<div style="
+            background:${esPrimero ? 'linear-gradient(135deg,rgba(232,93,4,.15),rgba(255,183,3,.1))' : 'var(--bg3)'};
+            border:1px solid ${esPrimero ? 'rgba(255,183,3,.3)' : 'var(--border)'};
+            border-radius:10px;padding:14px 16px;
+            display:flex;align-items:center;gap:14px;
+            ${esYo ? 'box-shadow:0 0 0 1px var(--orange);' : ''}
+          ">
+            <div style="font-size:${esTop ? '24px' : '14px'};font-weight:700;width:28px;text-align:center;color:var(--ts);flex-shrink:0">
+              ${esTop ? medallaEmoji[i] : (i + 1)}
+            </div>
+            <div style="width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,var(--orange),var(--gold));display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;color:#fff;flex-shrink:0;overflow:hidden">
+              ${u.foto_url ? `<img src="${u.foto_url}" style="width:100%;height:100%;object-fit:cover">` : u.iniciales}
+            </div>
+            <div style="flex:1;min-width:0">
+              <div style="font-weight:700;font-size:14px">${u.nombre} ${esYo ? '<span style="font-size:10px;color:var(--ts)">(tú)</span>' : ''}</div>
+              <div style="font-size:10px;color:var(--ts)">${ROL_LABELS[u.rol] || u.rol} · ${u.tours.length} tours</div>
+            </div>
+            <div style="text-align:right;flex-shrink:0">
+              <div style="font-family:'Rajdhani',sans-serif;font-size:22px;font-weight:700;color:${esPrimero ? 'var(--gold)' : 'var(--text)'};line-height:1">${u.ptsAnio}</div>
+              <div style="font-size:9px;color:var(--ts);letter-spacing:.08em;text-transform:uppercase">pts ${anioActual}</div>
+            </div>
+          </div>`;
+        }).join('')}
+      </div>
+      ${rankingData.every(u => u.ptsAnio === 0) ? `
+        <div style="text-align:center;padding:24px;color:var(--ts);font-size:13px">
+          Sin tours registrados en ${anioActual} aún.<br>
+          <span style="font-size:11px">Agrega tus tours pasados en tu perfil para empezar a sumar puntos.</span>
+        </div>` : ''}
+    `;
+
+    const modalContent = modal.querySelector('[style*="background:var(--bg2)"]') || modal.querySelector('div > div');
+    const lastDiv = modal.querySelector('.loading-state');
+    if (lastDiv) lastDiv.outerHTML = rankingHTML;
+
+  } catch(e) {
+    console.error('Error ranking:', e);
+  }
 }
 
 

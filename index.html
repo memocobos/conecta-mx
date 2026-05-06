@@ -1248,6 +1248,27 @@ src="https://www.facebook.com/tr?id=1685907946147007&ev=PageView&noscript=1"
 .onboard-skip:hover{color:#fff}
 .onboard-go{flex:1;background:#e8ff4c;color:#000;border:none;padding:14px 18px;font-size:13px;font-weight:900;font-family:'Montserrat',sans-serif;cursor:pointer;text-transform:uppercase;letter-spacing:.06em;border-radius:3px}
 .onboard-go:hover{filter:brightness(1.05)}
+/* Wizard tour — spotlight tooltips */
+.tour-highlight{display:none;position:fixed;border-radius:10px;box-shadow:0 0 0 9999px rgba(0,0,0,.65),0 0 0 4px #e8ff4c,0 0 26px rgba(232,255,76,.35);pointer-events:none;z-index:10000;transition:top .25s ease,left .25s ease,width .25s ease,height .25s ease}
+.tour-highlight.active{display:block}
+.tour-tooltip{display:none;position:fixed;background:#0a0a0a;border:2px solid #e8ff4c;border-radius:10px;padding:18px 20px;width:340px;max-width:calc(100% - 32px);z-index:10001;box-shadow:0 18px 50px rgba(0,0,0,.6);font-family:'Montserrat',sans-serif;animation:tourFadeIn .28s ease both}
+.tour-tooltip.active{display:block}
+@keyframes tourFadeIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+.tour-arrow{position:absolute;width:0;height:0;border:9px solid transparent;left:30px}
+.tour-arrow.up{bottom:100%;border-bottom-color:#e8ff4c;border-top:0}
+.tour-arrow.down{top:100%;border-top-color:#e8ff4c;border-bottom:0}
+.tour-title{font-family:'Barlow Condensed','Montserrat',sans-serif;font-size:18px;font-weight:900;color:#e8ff4c;text-transform:uppercase;letter-spacing:.02em;margin:0 0 8px;line-height:1.1}
+.tour-text{font-size:12.5px;color:rgba(255,255,255,.78);line-height:1.5;margin:0 0 16px;font-weight:500}
+.tour-actions{display:flex;justify-content:space-between;align-items:center;gap:12px}
+.tour-skip{background:none;border:none;color:rgba(255,255,255,.42);font-size:11px;font-weight:600;font-family:'Montserrat',sans-serif;cursor:pointer;padding:6px 0;text-decoration:underline;letter-spacing:0;text-transform:none}
+.tour-skip:hover{color:rgba(255,255,255,.75)}
+.tour-next{background:#e8ff4c;color:#000;border:none;padding:11px 18px;font-size:12px;font-weight:900;font-family:'Montserrat',sans-serif;cursor:pointer;text-transform:uppercase;letter-spacing:.06em;border-radius:4px}
+.tour-next:hover{filter:brightness(1.05)}
+@media(max-width:640px){
+  .tour-tooltip{position:fixed!important;left:0!important;right:0!important;bottom:0!important;top:auto!important;width:100%!important;max-width:100%!important;border-radius:14px 14px 0 0;border-bottom:none;padding:18px 18px 24px;animation:tourSlideUp .3s cubic-bezier(.22,1,.36,1) both}
+  .tour-arrow{display:none}
+  @keyframes tourSlideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
+}
 .promo-modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:9997;align-items:center;justify-content:center}
 .promo-modal-box{border-radius:16px;padding:36px 28px;text-align:center;max-width:400px;width:90%;position:relative;box-shadow:0 20px 60px rgba(0,0,0,.5);max-height:85vh;overflow-y:auto;border:1.5px solid rgba(232,255,76,.2)}
 .promo-modal-emoji{font-size:56px;line-height:1;margin-bottom:12px}
@@ -1902,6 +1923,7 @@ function goBack() {
   $$('nav-back').style.display = 'none';
   document.body.classList.remove('wizard-open');
   if(typeof setWizHint==='function')setWizHint('');
+  if(typeof _tourHide==='function')_tourHide();
   window.scrollTo(0,0);
 }
 
@@ -2706,7 +2728,12 @@ function setWizHint(text){
 }
 
 function showOnboarding(ev){
-  try{if(localStorage.getItem('tutorial-visto')==='true')return;}catch(e){return;}
+  try{
+    if(localStorage.getItem('tutorial-visto')==='true'){
+      setTimeout(function(){startWizardTour();},200);
+      return;
+    }
+  }catch(e){return;}
   var bg=document.getElementById('onboard-bg');if(!bg||!ev)return;
   document.getElementById('onboard-ev').textContent=ev.a||'';
   document.getElementById('onboard-fecha').textContent=ev.f||'';
@@ -2725,10 +2752,122 @@ function showOnboarding(ev){
 function finishOnboarding(){
   try{localStorage.setItem('tutorial-visto','true');}catch(e){}
   var bg=document.getElementById('onboard-bg');if(bg)bg.style.display='none';
+  setTimeout(function(){startWizardTour();},250);
 }
 function skipOnboarding(){
   var bg=document.getElementById('onboard-bg');if(bg)bg.style.display='none';
+  setTimeout(function(){startWizardTour();},250);
 }
+
+/* ================== Wizard tour (spotlight tooltips) ================== */
+var TOUR_STEPS=[
+  {id:'viajeros',target:'#w-viajeros',title:'¿Cuántos van?',text:'Selecciona cuántas personas viajan contigo. El precio se calcula por persona.',cta:'Entendido →'},
+  {id:'paquetes',target:'#w-paquetes',title:'Elige tu paquete',text:'PLUS incluye todo. CHEAP es solo boleto. RIDE si ya tienes hotel. STAY si vas por tu cuenta.',cta:'Entendido →'},
+  {id:'zonas',target:'#d-zonas',title:'Elige tu zona',text:'Cada precio es por persona. Las zonas tachadas están agotadas. Presiona "Ver mapa del venue" para ubicarte.',cta:'Entendido →'},
+  {id:'hotel',target:'#d-hotel',title:'Tipo de habitación',text:'Elige según cuántos van. Compartida es la más económica. Individual es cuarto solo para ti.',cta:'Entendido →'},
+  {id:'cotizacion',target:'#d-result',title:'Tu cotización',text:'Aquí ves el precio total, el separo para reservar y tu plan de pagos mensual.',cta:'Entendido →'},
+  {id:'pago',target:'#pago-btn-comprobante',title:'Último paso',text:'Transfiere el separo a la cuenta indicada. Toma foto y presiona el botón para enviarlo por Messenger o WhatsApp.',cta:'Listo, voy a reservar'}
+];
+var _tourActive=false,_tourStep=-1,_tourPending=null;
+
+function _tourDone(){try{return localStorage.getItem('wizard-tour-done')==='true';}catch(e){return true;}}
+function _tourElVisible(el){if(!el)return false;if(el.offsetParent===null&&getComputedStyle(el).position!=='fixed')return false;var r=el.getBoundingClientRect();return r.width>4&&r.height>4;}
+function _tourFindStep(id){for(var i=0;i<TOUR_STEPS.length;i++){if(TOUR_STEPS[i].id===id)return i;}return -1;}
+
+function startWizardTour(){
+  if(_tourDone())return;
+  _tourActive=true;_tourStep=-1;
+  _tourTry('viajeros');
+}
+
+function _tourTry(stepId){
+  if(!_tourActive)return;
+  var idx=_tourFindStep(stepId);
+  if(idx===-1||idx<=_tourStep)return;
+  for(var j=idx;j<TOUR_STEPS.length;j++){
+    var t=document.querySelector(TOUR_STEPS[j].target);
+    if(_tourElVisible(t)){
+      _tourStep=j;
+      _tourRender(t,TOUR_STEPS[j]);
+      return;
+    }
+  }
+  _tourStep=idx;
+  _tourHide();
+}
+
+function _tourRender(target,step){
+  var hl=document.getElementById('tour-highlight');
+  var tip=document.getElementById('tour-tooltip');
+  var arrow=document.getElementById('tour-arrow');
+  document.getElementById('tour-title').textContent=step.title;
+  document.getElementById('tour-text').textContent=step.text;
+  document.getElementById('tour-next').textContent=step.cta||'Entendido →';
+  var inModal=step.id==='pago';
+  // Scroll into view if needed (skip for modal targets)
+  if(!inModal){
+    var r0=target.getBoundingClientRect();
+    if(r0.top<80||r0.bottom>window.innerHeight-160){
+      try{target.scrollIntoView({behavior:'smooth',block:'center'});}catch(e){target.scrollIntoView();}
+    }
+  }
+  setTimeout(function(){
+    var r=target.getBoundingClientRect();
+    hl.style.top=Math.max(r.top-6,4)+'px';
+    hl.style.left=Math.max(r.left-6,4)+'px';
+    hl.style.width=(r.width+12)+'px';
+    hl.style.height=(r.height+12)+'px';
+    hl.classList.add('active');
+    var isMobile=window.matchMedia('(max-width:640px)').matches;
+    if(isMobile){
+      tip.style.top='';tip.style.left='';tip.style.right='';
+    } else {
+      var tipH=tip.offsetHeight||190;
+      var tipW=340;
+      var spaceBelow=window.innerHeight-r.bottom;
+      if(spaceBelow>tipH+30){
+        tip.style.top=(r.bottom+14)+'px';
+        arrow.className='tour-arrow up';
+      } else {
+        tip.style.top=Math.max(20,r.top-tipH-14)+'px';
+        arrow.className='tour-arrow down';
+      }
+      var left=r.left+r.width/2-tipW/2;
+      if(left<10)left=10;
+      if(left+tipW>window.innerWidth-10)left=window.innerWidth-tipW-10;
+      tip.style.left=left+'px';
+      tip.style.right='';
+    }
+    tip.classList.add('active');
+  },inModal?0:280);
+}
+
+function _tourHide(){
+  var hl=document.getElementById('tour-highlight');if(hl)hl.classList.remove('active');
+  var tip=document.getElementById('tour-tooltip');if(tip)tip.classList.remove('active');
+}
+
+function tourNext(){
+  if(!_tourActive)return;
+  var s=TOUR_STEPS[_tourStep];if(!s){_tourHide();return;}
+  if(s.id==='pago'){endWizardTour(true);return;}
+  _tourHide();
+}
+
+function tourSkip(){endWizardTour(true);}
+
+function endWizardTour(persist){
+  _tourActive=false;_tourStep=TOUR_STEPS.length;
+  if(persist){try{localStorage.setItem('wizard-tour-done','true');}catch(e){}}
+  _tourHide();
+}
+
+window.addEventListener('resize',function(){
+  if(!_tourActive)return;
+  var s=TOUR_STEPS[_tourStep];if(!s)return;
+  var t=document.querySelector(s.target);if(!_tourElVisible(t))return;
+  _tourRender(t,s);
+});
 
 function selViajeros(btn,n){
   selViaj=n;selZ=null;selH=null;selPkg=null;selFechaIdx=0;selBoleto=null;selTransporte=null;
@@ -2761,6 +2900,7 @@ function selViajeros(btn,n){
     updatePkgCards();
     $$('w-pkg-card').style.display='block';
   }
+  setTimeout(function(){_tourTry('paquetes');},300);
 }
 
 function updatePkgCards(){
@@ -2867,6 +3007,7 @@ function selPaquete(btn,pkg){
   else if(pkg==='ride') _hintNext='Ahora elige tu hotel.';
   else _hintNext='Ahora elige tu zona.';
   setWizHint(_hintBase+_hintNext);
+  setTimeout(function(){_tourTry(pkg==='ride'?'hotel':'zonas');},300);
   try{window.trackAddToCart&&window.trackAddToCart(pkg,minP(cur));}catch(e){}
   var pb=$$('w-paquetes').querySelectorAll('.wiz-btn');
   for(var i=0;i<pb.length;i++)pb[i].classList.remove('active');
@@ -3004,6 +3145,7 @@ function selBoletoBtn(btn,id){
   for(var i=0;i<btns.length;i++)btns[i].classList.remove('active');
   btn.classList.add('active');
   setWizHint('Boleto seleccionado. Ahora elige tu paquete.');
+  setTimeout(function(){_tourTry('paquetes');},300);
   // Auto-set zona from selected boleto + day
   var mf=cur.multifecha[selFechaIdx];
   if(mf&&mf.zonas[id]){
@@ -3154,6 +3296,7 @@ function selZona(btn,p,n){
   setWizProgress(3);
   setWizHint('Zona seleccionada. Desplázate hacia abajo para ver tu cotización completa.');
   calcular();
+  setTimeout(function(){_tourTry((selPkg==='cheap')?'cotizacion':'hotel');},300);
 }
 
 function selHotel(btn,e,n){
@@ -3232,6 +3375,7 @@ function abrirModalPago(){
   if(!cur||!_lastCotizacion)return;
   try{window.trackInitiateCheckout&&window.trackInitiateCheckout(cur.a,selPkg,total);}catch(e){}
   setWizHint('Realiza tu transferencia por el monto del separo. Toma foto del comprobante y presiona el botón de abajo.');
+  setTimeout(function(){_tourTry('pago');},450);
   $$('pago-subtitulo').textContent='Separa tu lugar en '+cur.a+' — '+cur.f;
   $$('pago-monto').textContent='💳 '+fmt(sepActualCalc);
   var b=getBanco();
@@ -3263,6 +3407,7 @@ function cerrarPromoModal(){
 }
 function cerrarModalPago(){
   document.getElementById('pago-modal-bg').style.display='none';
+  if(_tourActive&&TOUR_STEPS[_tourStep]&&TOUR_STEPS[_tourStep].id==='pago')_tourHide();
 }
 
 function abrirLineup(id,nombre){
@@ -3513,6 +3658,7 @@ function calcular(){
   $$('d-result').style.display='block';
   setWizProgress(4);
   setWizHint('Tu cotización está lista. Revisa el plan de pagos y presiona el botón para reservar.');
+  setTimeout(function(){_tourTry('cotizacion');},300);
   var promoCard=document.getElementById('w-promo-card');if(promoCard)promoCard.style.display='block';
   var shareBtn=document.getElementById('btn-share');if(shareBtn)shareBtn.style.display='block';
   if(_promoActivo&&_promoActivo.excludePkg&&_promoActivo.excludePkg.indexOf(selPkg)>=0){
@@ -4136,28 +4282,28 @@ function enviarChat(){
       <div class="onboard-step">
         <div class="onboard-step-num">1</div>
         <div class="onboard-step-body">
-          <div class="onboard-step-title">Elige tu paquete</div>
-          <div class="onboard-step-desc">PLUS (todo incluido), RIDE (sin boleto), STAY (sin transporte) o CHEAP (solo boleto).</div>
+          <div class="onboard-step-title">Elige cuántos viajeros van</div>
+          <div class="onboard-step-desc">1, 2, 3 o 4 personas. El precio se calcula por persona.</div>
         </div>
       </div>
       <div class="onboard-step">
         <div class="onboard-step-num">2</div>
         <div class="onboard-step-body">
-          <div class="onboard-step-title">Selecciona tu zona</div>
-          <div class="onboard-step-desc">Cada zona muestra el precio. Las tachadas ya están agotadas.</div>
+          <div class="onboard-step-title">Selecciona tu paquete</div>
+          <div class="onboard-step-desc">PLUS (todo incluido), RIDE (sin boleto), STAY (sin transporte) o CHEAP (solo boleto + kit).</div>
         </div>
       </div>
       <div class="onboard-step">
         <div class="onboard-step-num">3</div>
         <div class="onboard-step-body">
-          <div class="onboard-step-title">Revisa tu cotización</div>
-          <div class="onboard-step-desc">Ve el costo total y el plan de pagos.</div>
+          <div class="onboard-step-title">Elige tu zona y revisa precios</div>
+          <div class="onboard-step-desc">Las zonas tachadas están agotadas. Presiona "Ver mapa del venue" para ubicarte.</div>
         </div>
       </div>
       <div class="onboard-step">
         <div class="onboard-step-num">4</div>
         <div class="onboard-step-body">
-          <div class="onboard-step-title">Reserva con el separo</div>
+          <div class="onboard-step-title">Separa tu lugar</div>
           <div class="onboard-step-desc">Transfiere el separo y envía tu comprobante por Messenger o WhatsApp.</div>
         </div>
       </div>
@@ -4167,6 +4313,16 @@ function enviarChat(){
       <button class="onboard-skip" type="button" onclick="skipOnboarding()">Saltar</button>
       <button class="onboard-go" type="button" onclick="finishOnboarding()">Entendido, vamos</button>
     </div>
+  </div>
+</div>
+<div class="tour-highlight" id="tour-highlight" aria-hidden="true"></div>
+<div class="tour-tooltip" id="tour-tooltip" role="dialog" aria-live="polite">
+  <span class="tour-arrow up" id="tour-arrow"></span>
+  <h3 class="tour-title" id="tour-title"></h3>
+  <p class="tour-text" id="tour-text"></p>
+  <div class="tour-actions">
+    <button type="button" class="tour-skip" onclick="tourSkip()">Saltar tour</button>
+    <button type="button" class="tour-next" id="tour-next" onclick="tourNext()">Entendido →</button>
   </div>
 </div>
 <div class="promo-modal-bg" id="promo-modal-bg" onclick="cerrarPromoModal()">

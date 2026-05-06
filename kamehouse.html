@@ -1883,6 +1883,12 @@ let _karinPiezasCache = [];
 let recibosLoaded = false;
 let disenoLoaded = false;
 let _cotIniciado = false;
+let COT = {
+  ciudad:'monterrey', isCDMX:false, isFestival:false,
+  fechas:[], unidades:[], coordis:[], cc:[],
+  zonas:[], kitItems:[], kitExtras:[], gastosExtra:[],
+  venues:[],
+};
 
 // Roles con acceso al kamehouse.html (admin panel)
 const ROLES_ADMIN = ['maestro_roshi', 'bulma', 'mister_popo', 'coordinador', 'cc', 'vendedor'];
@@ -2051,7 +2057,8 @@ function aplicarPermisosUI() {
 }
 
 // Enter en campos
-document.getElementById('login-pass').addEventListener('keydown', e => {
+const _loginPassEl = document.getElementById('login-pass');
+if (_loginPassEl) _loginPassEl.addEventListener('keydown', e => {
   if (e.key === 'Enter') doLogin();
 });
 const loginUserEl = document.getElementById('login-user');
@@ -2360,13 +2367,14 @@ async function seleccionarCliente(id, nombre, tel) {
  }
 }
 
-document.getElementById('pago-evento').addEventListener('change', async function() {
+const _pagoEvEl = document.getElementById('pago-evento');
+if (_pagoEvEl) _pagoEvEl.addEventListener('change', async function() {
  const clienteId = document.getElementById('pago-cliente-id').value;
  if (!clienteId || !this.value) return;
  try {
- const [res] = await db.get('reservaciones',
- `?cliente_id=eq.${clienteId}&evento_id=eq.${this.value}&limit=1`);
- if (res) document.getElementById('pago-reservacion-id').value = res.id;
+  const [res] = await db.get('reservaciones',
+  `?cliente_id=eq.${clienteId}&evento_id=eq.${this.value}&limit=1`);
+  if (res) document.getElementById('pago-reservacion-id').value = res.id;
  } catch(e) {}
 });
 
@@ -3183,12 +3191,6 @@ document.addEventListener('keydown', e => {
 // COTIZADOR v3
 // ═══════════════════════════════════════════════════════════════
 
-let COT = {
-  ciudad:'monterrey', isCDMX:false, isFestival:false,
-  fechas:[], unidades:[], coordis:[], cc:[],
-  zonas:[], kitItems:[], kitExtras:[], gastosExtra:[],
-  venues:[],
-};
 
 const KIT_DEFAULT = [
   {id:'playera',   nombre:'Playera',         precio:93,  checked:true},
@@ -4419,7 +4421,6 @@ document.addEventListener('click', function(e) {
 });
 
 // HTML del recibos embebido
-const RECIBOS_HTML = document.getElementById('recibos-tpl').innerHTML;
 
 function showHerramienta(name) {
   console.log('[Herramientas] click:', name);
@@ -4452,9 +4453,12 @@ function showHerramienta(name) {
   if (name === 'recibos') {
     const frame = document.getElementById('frame-recibos');
     console.log('[Recibos] frame:', !!frame, 'loaded:', recibosLoaded, 'RECIBOS_HTML len:', typeof RECIBOS_HTML !== 'undefined' ? RECIBOS_HTML.length : 'undefined');
-    if (frame && !recibosLoaded && typeof RECIBOS_HTML !== 'undefined') {
-      frame.srcdoc = RECIBOS_HTML;
-      recibosLoaded = true;
+    if (frame && !recibosLoaded) {
+      const tpl = document.getElementById('recibos-tpl');
+      if (tpl) {
+        frame.srcdoc = tpl.innerHTML;
+        recibosLoaded = true;
+      }
     }
   }
   if (name === 'diseno') {

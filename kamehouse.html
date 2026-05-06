@@ -161,10 +161,12 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Montse
  display:flex;align-items:stretch;
  background:linear-gradient(180deg,var(--bg2),rgba(13,13,20,.95));
  border-bottom:1px solid var(--border);
- overflow-x:auto;flex-shrink:0;
+ flex-shrink:0;
  scrollbar-width:none;
  position:relative;
+ overflow:visible;
 }
+.nav-scroll-container{overflow-x:auto;overflow-y:visible;}
 .nav::-webkit-scrollbar{display:none}
 .nav-btn{
  display:flex;flex-direction:column;align-items:center;justify-content:center;
@@ -203,7 +205,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Montse
 .nav-dropdown.open .drop-arrow{transform:rotate(180deg);}
 .nav-dropdown.open .nav-dropdown-menu{display:block;}
 .nav-dropdown-menu{
-  display:none;position:fixed;top:106px;z-index:9999;
+  display:none;position:absolute;top:100%;right:0;z-index:9999;
   background:var(--bg2);border:1px solid var(--border2);
   border-radius:8px;min-width:140px;
   box-shadow:0 8px 24px rgba(0,0,0,.6);
@@ -4403,17 +4405,9 @@ if (checkSession()) {
 
 // ── DROPDOWN HERRAMIENTAS ──
 function toggleDropdown(e) {
-  if (e) e.stopPropagation();
+  if (e) { e.stopPropagation(); e.preventDefault(); }
   const dd = document.getElementById('nav-dropdown-herramientas');
-  const isOpen = dd.classList.toggle('open');
-  if (isOpen) {
-    // Posicionar el menu debajo del botón usando coordenadas absolutas
-    const btn = document.getElementById('nav-herramientas');
-    const menu = dd.querySelector('.nav-dropdown-menu');
-    const rect = btn.getBoundingClientRect();
-    menu.style.top = (rect.bottom + 2) + 'px';
-    menu.style.left = rect.left + 'px';
-  }
+  dd.classList.toggle('open');
 }
 // Cerrar dropdown al hacer click fuera
 document.addEventListener('click', function(e) {
@@ -4425,10 +4419,14 @@ document.addEventListener('click', function(e) {
 const RECIBOS_HTML = document.getElementById('recibos-tpl').innerHTML;
 
 let recibosLoaded = false;
+let disenoLoaded = false;
 
 function showHerramienta(name) {
+  console.log('[Herramientas] click:', name);
+  
   // Cerrar dropdown
-  document.getElementById('nav-dropdown-herramientas').classList.remove('open');
+  const dd = document.getElementById('nav-dropdown-herramientas');
+  if (dd) dd.classList.remove('open');
 
   // Deactivate all pages and nav buttons
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
@@ -4437,25 +4435,33 @@ function showHerramienta(name) {
 
   // Activate page
   const page = document.getElementById('page-' + name);
-  if (page) page.classList.add('active');
+  console.log('[Herramientas] page encontrada:', !!page, 'id=page-' + name);
+  if (page) {
+    page.classList.add('active');
+  } else {
+    console.error('[Herramientas] No existe page-' + name);
+    return;
+  }
 
   // Mark dropdown btn active
-  document.getElementById('nav-herramientas').classList.add('active');
+  const btnHerr = document.getElementById('nav-herramientas');
+  if (btnHerr) btnHerr.classList.add('active');
   const item = document.getElementById('nav-' + name);
   if (item) item.classList.add('active');
 
   if (name === 'recibos') {
-    if (!recibosLoaded) {
-      const frame = document.getElementById('frame-recibos');
+    const frame = document.getElementById('frame-recibos');
+    console.log('[Recibos] frame:', !!frame, 'loaded:', recibosLoaded, 'RECIBOS_HTML len:', typeof RECIBOS_HTML !== 'undefined' ? RECIBOS_HTML.length : 'undefined');
+    if (frame && !recibosLoaded && typeof RECIBOS_HTML !== 'undefined') {
       frame.srcdoc = RECIBOS_HTML;
       recibosLoaded = true;
     }
   }
   if (name === 'diseno') {
-    // placeholder - puedes cargar el Diseno HTML aqui
     const frame = document.getElementById('frame-diseno');
-    if (frame.src === 'about:blank' && frame.srcdoc === '') {
-      frame.srcdoc = '<div style="display:flex;align-items:center;justify-content:center;height:100vh;background:#0a0a0f;color:#888;font-family:Montserrat,sans-serif;font-size:14px;">Sube el archivo Conecta-Diseno.html para cargar esta seccion</div>';
+    if (frame && !disenoLoaded) {
+      frame.srcdoc = '<div style="display:flex;align-items:center;justify-content:center;height:100vh;background:#0a0a0f;color:#888;font-family:Montserrat,sans-serif;font-size:14px;text-align:center;padding:20px">Sube el archivo Conecta-Diseno.html<br>para cargar esta seccion</div>';
+      disenoLoaded = true;
     }
   }
 }

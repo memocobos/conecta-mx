@@ -3,32 +3,41 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>KAMEHOUSE — Conecta Reynosa</title>
+<title>KAME · HOUSE — Conecta Reynosa</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800;900&family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800;900&family=Montserrat:wght@400;500;600;700&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 /* ═══════════════════════════════════════════════
  VARIABLES Y RESET
 ═══════════════════════════════════════════════ */
 :root {
- --orange: #FF6B00;
- --orange2: #FF8C00;
- --gold: #FFD700;
- --gold2: #FFC200;
- --bg: #0a0a0f;
- --bg2: #111118;
- --bg3: #1a1a24;
- --border: rgba(255,255,255,.07);
- --border2: rgba(255,107,0,.2);
- --text: #f0f0f5;
- --ts: rgba(240,240,245,.45);
- --ts2: rgba(240,240,245,.25);
- --green: #3DDC84;
- --red: #FF4444;
- --blue: #5EA7FF;
- --card: rgba(255,255,255,.03);
- --radius: 10px;
- --shadow: 0 8px 32px rgba(0,0,0,.5);
+ /* Paleta Dragon Ball — oscuro con acento naranja-fuego y dorado */
+ --orange: #E85D04;
+ --orange2: #F48C06;
+ --gold: #FFB703;
+ --gold2: #FB8500;
+ --bg: #06060A;
+ --bg2: #0D0D14;
+ --bg3: #14141E;
+ --bg4: #1A1A28;
+ --border: rgba(255,255,255,.06);
+ --border2: rgba(232,93,4,.25);
+ --border3: rgba(255,183,3,.15);
+ --text: #EEEEF5;
+ --ts: rgba(238,238,245,.4);
+ --ts2: rgba(238,238,245,.2);
+ --green: #2DC653;
+ --red: #E63946;
+ --blue: #4CC9F0;
+ --card: rgba(255,255,255,.025);
+ --card2: rgba(232,93,4,.04);
+ --radius: 8px;
+ --radius2: 12px;
+ --shadow: 0 12px 40px rgba(0,0,0,.7);
+ --shadow2: 0 4px 16px rgba(0,0,0,.5);
+ /* Glow effects */
+ --glow-orange: 0 0 20px rgba(232,93,4,.3);
+ --glow-gold: 0 0 20px rgba(255,183,3,.2);
 }
 *{margin:0;padding:0;box-sizing:border-box}
 html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Montserrat',sans-serif;overflow:hidden}
@@ -44,23 +53,25 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Montse
 .login-bg{
  position:absolute;inset:0;
  background:
- radial-gradient(ellipse 60% 50% at 20% 50%, rgba(255,107,0,.08) 0%, transparent 70%),
- radial-gradient(ellipse 40% 60% at 80% 30%, rgba(255,215,0,.05) 0%, transparent 70%);
+ radial-gradient(ellipse 70% 60% at 15% 50%, rgba(232,93,4,.1) 0%, transparent 65%),
+ radial-gradient(ellipse 50% 70% at 85% 20%, rgba(255,183,3,.07) 0%, transparent 65%),
+ radial-gradient(ellipse 30% 40% at 50% 90%, rgba(232,93,4,.05) 0%, transparent 60%);
 }
 .login-card{
  position:relative;z-index:1;
  width:100%;max-width:380px;
  background:var(--bg2);
- border:1px solid var(--border2);
+ border:1px solid rgba(232,93,4,.2);
+ border-top:1px solid rgba(255,183,3,.2);
  border-radius:16px;
  padding:48px 40px;
- box-shadow:0 32px 80px rgba(0,0,0,.6),0 0 0 1px rgba(255,107,0,.1);
+ box-shadow:0 32px 80px rgba(0,0,0,.8),var(--glow-orange);
 }
 .login-logo{
- font-family:'Barlow Condensed',sans-serif;
- font-size:32px;font-weight:900;
- letter-spacing:.12em;text-transform:uppercase;
- color:var(--text);margin-bottom:4px;
+ font-family:'Rajdhani',sans-serif;
+ font-size:36px;font-weight:700;
+ letter-spacing:.16em;text-transform:uppercase;
+ background:linear-gradient(90deg,var(--text),var(--gold));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;margin-bottom:4px;
 }
 .login-logo span{color:var(--orange)}
 .login-sub{
@@ -113,9 +124,15 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Montse
  background:var(--bg2);
  border-bottom:1px solid var(--border);
  flex-shrink:0;
+ position:relative;
+}
+.topbar::after{
+ content:'';position:absolute;bottom:0;left:0;right:0;height:1px;
+ background:linear-gradient(90deg,transparent,var(--orange),var(--gold),var(--orange),transparent);
+ opacity:.4;
 }
 .topbar-logo{
- font-family:'Barlow Condensed',sans-serif;
+ font-family:'Rajdhani',sans-serif;
  font-size:20px;font-weight:900;letter-spacing:.1em;text-transform:uppercase;
 }
 .topbar-logo span{color:var(--orange)}
@@ -142,25 +159,32 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Montse
 ═══════════════════════════════════════════════ */
 .nav{
  display:flex;align-items:stretch;
- background:var(--bg2);border-bottom:1px solid var(--border);
+ background:linear-gradient(180deg,var(--bg2),rgba(13,13,20,.95));
+ border-bottom:1px solid var(--border);
  overflow-x:auto;flex-shrink:0;
  scrollbar-width:none;
+ position:relative;
 }
 .nav::-webkit-scrollbar{display:none}
 .nav-btn{
  display:flex;flex-direction:column;align-items:center;justify-content:center;
- gap:3px;padding:10px 16px;min-width:80px;
+ gap:3px;padding:10px 18px;min-width:80px;
  background:none;border:none;border-bottom:2px solid transparent;
  color:var(--ts);cursor:pointer;transition:all .2s;
- font-family:'Barlow Condensed',sans-serif;
- font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
- white-space:nowrap;
+ font-family:'Rajdhani',sans-serif;
+ font-size:11px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;
+ white-space:nowrap;position:relative;
 }
 .nav-btn .nav-icon{font-size:16px}
 .nav-btn:hover{color:var(--text);background:rgba(255,255,255,.03)}
 .nav-btn.active{
- color:var(--orange);border-bottom-color:var(--orange);
- background:rgba(255,107,0,.05);
+ color:var(--gold);border-bottom-color:var(--orange);
+ background:linear-gradient(180deg,transparent,rgba(232,93,4,.06));
+}
+.nav-btn.active::after{
+ content:'';position:absolute;bottom:-2px;left:20%;right:20%;height:2px;
+ background:linear-gradient(90deg,transparent,var(--gold),transparent);
+ border-radius:2px;
 }
 /* ── NAV DROPDOWN HERRAMIENTAS ── */
 .nav-dropdown{position:relative;display:inline-flex;}
@@ -215,23 +239,36 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Montse
 .page.active{display:block}
 
 .section-title{
- font-family:'Barlow Condensed',sans-serif;
- font-size:22px;font-weight:900;letter-spacing:.08em;
- text-transform:uppercase;color:var(--text);
+ font-family:'Rajdhani',sans-serif;
+ font-size:22px;font-weight:700;letter-spacing:.14em;
+ text-transform:uppercase;
  margin-bottom:4px;
+ background:linear-gradient(90deg,var(--text) 60%,var(--gold));
+ -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+ background-clip:text;display:inline-block;
 }
 .section-sub{
  font-size:11px;color:var(--ts);font-weight:500;
- letter-spacing:.05em;margin-bottom:20px;
+ letter-spacing:.06em;margin-bottom:20px;
 }
 
 /* Cards */
 .card{
- background:var(--bg2);border:1px solid var(--border);
- border-radius:var(--radius);padding:20px;
- transition:border-color .2s;
+ background:var(--bg2);
+ border:1px solid var(--border);
+ border-top:1px solid rgba(255,183,3,.08);
+ border-radius:var(--radius2);padding:20px;
+ transition:all .25s;
+ position:relative;overflow:hidden;
 }
-.card:hover{border-color:rgba(255,107,0,.15)}
+.card::before{
+ content:'';position:absolute;top:0;left:0;right:0;height:1px;
+ background:linear-gradient(90deg,transparent,rgba(255,183,3,.2),transparent);
+}
+.card:hover{
+ border-color:rgba(232,93,4,.2);
+ box-shadow:0 4px 24px rgba(232,93,4,.08);
+}
 
 /* Grid de métricas */
 .metrics-grid{
@@ -240,13 +277,18 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Montse
  gap:12px;margin-bottom:20px;
 }
 .metric{
- background:var(--bg2);border:1px solid var(--border);
- border-radius:var(--radius);padding:16px;
+ background:var(--bg3);
+ border:1px solid var(--border);
+ border-bottom:1px solid rgba(255,183,3,.1);
+ border-radius:var(--radius2);padding:16px;
  position:relative;overflow:hidden;
+ transition:all .2s;
 }
+.metric:hover{background:var(--bg4);border-color:rgba(232,93,4,.2);}
 .metric::before{
  content:'';position:absolute;top:0;left:0;right:0;height:2px;
- background:linear-gradient(90deg,var(--orange),var(--gold));
+ background:linear-gradient(90deg,var(--orange),var(--gold),var(--orange2));
+ opacity:.8;
 }
 .metric-label{
  font-size:9px;font-weight:700;letter-spacing:.2em;
@@ -265,10 +307,10 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Montse
 .table-wrap{overflow-x:auto;border-radius:var(--radius);border:1px solid var(--border)}
 table{width:100%;border-collapse:collapse}
 th{
- font-family:'Barlow Condensed',sans-serif;
+ font-family:'Rajdhani',sans-serif;
  font-size:9px;font-weight:800;letter-spacing:.2em;
- text-transform:uppercase;color:var(--ts);
- padding:10px 14px;border-bottom:1px solid var(--border);
+ text-transform:uppercase;color:var(--gold);
+ padding:10px 14px;border-bottom:1px solid rgba(255,183,3,.15);
  text-align:left;white-space:nowrap;background:var(--bg3);
 }
 td{
@@ -280,7 +322,7 @@ tr:hover td{background:rgba(255,107,0,.03)}
 
 /* Badges */
 .badge{
- display:inline-block;font-family:'Barlow Condensed',sans-serif;
+ display:inline-block;font-family:'Rajdhani',sans-serif;
  font-size:9px;font-weight:800;padding:3px 8px;
  text-transform:uppercase;letter-spacing:.12em;border-radius:4px;
 }
@@ -299,10 +341,10 @@ tr:hover td{background:rgba(255,107,0,.03)}
  padding:8px 16px;border-radius:7px;border:none;cursor:pointer;
  transition:all .2s;text-decoration:none;
 }
-.btn-primary{background:linear-gradient(135deg,var(--orange),var(--orange2));color:#fff}
-.btn-primary:hover{opacity:.85;transform:translateY(-1px)}
+.btn-primary{background:linear-gradient(135deg,var(--orange),var(--gold2));color:#fff;box-shadow:0 2px 14px rgba(232,93,4,.3);}
+.btn-primary:hover{opacity:.9;transform:translateY(-1px);box-shadow:0 4px 20px rgba(232,93,4,.4);}
 .btn-ghost{background:transparent;border:1px solid var(--border);color:var(--ts)}
-.btn-ghost:hover{border-color:var(--orange);color:var(--orange)}
+.btn-ghost:hover{border-color:var(--gold);color:var(--gold);background:rgba(255,183,3,.04)}
 .btn-green{background:rgba(61,220,132,.15);border:1px solid rgba(61,220,132,.3);color:var(--green)}
 .btn-red{background:rgba(255,68,68,.12);border:1px solid rgba(255,68,68,.25);color:var(--red)}
 .btn-sm{padding:5px 10px;font-size:10px}
@@ -541,19 +583,19 @@ tr:hover td{background:rgba(255,107,0,.03)}
  Mis Ventas
  </button>
  <button class="nav-btn" onclick="showPage('inventario')" id="nav-inventario">
- Inventario
+ Torre de Karin
  </button>
  <button class="nav-btn" onclick="showPage('equipo')" id="nav-equipo">
- Equipo
+ Guerreros Z
  </button>
  <button class="nav-btn" onclick="showPage('karin')" id="nav-karin">
- 🏯 Torre de Karin
+ Torre de Karin
  </button>
  <button class="nav-btn" onclick="showPage('capsule')" id="nav-capsule">
  Capsule Corp
  </button>
  <button class="nav-btn" onclick="showPage('cotizador')" id="nav-cotizador">
- Cotizador
+ Palacio de Kamisama
  </button>
  <div class="nav-dropdown" id="nav-dropdown-herramientas">
  <button class="nav-dropdown-btn" onclick="toggleDropdown()" id="nav-herramientas">
@@ -811,7 +853,7 @@ tr:hover td{background:rgba(255,107,0,.03)}
  <!-- ─── INVENTARIO ─── -->
  <div class="page" id="page-inventario">
  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
- <div class="section-title">Inventario</div>
+ <div class="section-title">Torre de Karin</div>
  <button class="btn btn-primary" onclick="openModal('modal-kit')">+ Agregar Pieza</button>
  </div>
  <div class="section-sub">Control de kits y bodega</div>
@@ -845,7 +887,7 @@ tr:hover td{background:rgba(255,107,0,.03)}
  <!-- ─── EQUIPO ─── -->
  <div class="page" id="page-equipo">
  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
- <div class="section-title">Equipo</div>
+ <div class="section-title">Guerreros Z</div>
  <button class="btn btn-primary" onclick="openModal('modal-vendedor')">+ Agregar</button>
  </div>
  <div class="section-sub">Guerreros Z — Tu equipo de Conecta Reynosa</div>
@@ -859,7 +901,7 @@ tr:hover td{background:rgba(255,107,0,.03)}
      <div class="page" id="page-karin">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
        <div>
-        <div class="section-title">🏯 Torre de Karin</div>
+        <div class="section-title">Torre de Karin</div>
         <div class="section-sub">Control de inventario de bodega · Solo Maestro Roshi y Mister Popo</div>
        </div>
        <div style="display:flex;gap:8px" id="karin-admin-btns">
@@ -873,18 +915,18 @@ tr:hover td{background:rgba(255,107,0,.03)}
 
       <!-- Tabs -->
       <div class="cot-tabs" style="margin-bottom:16px">
-       <button class="cot-tab active" onclick="switchKarinTab('inventario',this)" id="ktab-inventario">📦 Inventario</button>
-       <button class="cot-tab" onclick="switchKarinTab('movimientos',this)" id="ktab-movimientos">📋 Historial</button>
+       <button class="cot-tab active" onclick="switchKarinTab('inventario',this)" id="ktab-inventario"> Inventario</button>
+       <button class="cot-tab" onclick="switchKarinTab('movimientos',this)" id="ktab-movimientos"> Historial</button>
       </div>
 
       <!-- TAB INVENTARIO -->
       <div id="karin-tab-inventario">
        <div style="display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap">
         <button class="btn btn-ghost btn-sm karin-cat active" onclick="filtrarKarin('all',this)">Todos</button>
-        <button class="btn btn-ghost btn-sm karin-cat" onclick="filtrarKarin('ropa',this)">👕 Ropa</button>
-        <button class="btn btn-ghost btn-sm karin-cat" onclick="filtrarKarin('accesorio',this)">🎒 Accesorios</button>
-        <button class="btn btn-ghost btn-sm karin-cat" onclick="filtrarKarin('comida',this)">🍕 Comida</button>
-        <button class="btn btn-ghost btn-sm karin-cat" onclick="filtrarKarin('otro',this)">📦 Otro</button>
+        <button class="btn btn-ghost btn-sm karin-cat" onclick="filtrarKarin('ropa',this)"> Ropa</button>
+        <button class="btn btn-ghost btn-sm karin-cat" onclick="filtrarKarin('accesorio',this)"> Accesorios</button>
+        <button class="btn btn-ghost btn-sm karin-cat" onclick="filtrarKarin('comida',this)"> Comida</button>
+        <button class="btn btn-ghost btn-sm karin-cat" onclick="filtrarKarin('otro',this)"> Otro</button>
        </div>
        <div class="table-wrap">
         <table>
@@ -941,39 +983,48 @@ tr:hover td{background:rgba(255,107,0,.03)}
  </div>
  <div class="section-sub">Área de trabajo de Bulma — En construcción</div>
  <div style="margin-top:48px;text-align:center;color:var(--ts)">
-       <div style="font-size:48px;margin-bottom:16px">🚀</div>
+       <div style="font-size:48px;margin-bottom:16px"></div>
        <div style="font-size:16px;font-weight:700;color:var(--text);margin-bottom:8px">Capsule Corp v2 en camino</div>
        <div style="font-size:13px">Gestión de viajeros, rooming list interactivo y asignación de eventos.<br>Próxima actualización.</div>
       </div>l lang="es">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>KAMEHOUSE — Conecta Reynosa</title>
+<title>KAME · HOUSE — Conecta Reynosa</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800;900&family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800;900&family=Montserrat:wght@400;500;600;700&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 /* ═══════════════════════════════════════════════
  VARIABLES Y RESET
 ═══════════════════════════════════════════════ */
 :root {
- --orange: #FF6B00;
- --orange2: #FF8C00;
- --gold: #FFD700;
- --gold2: #FFC200;
- --bg: #0a0a0f;
- --bg2: #111118;
- --bg3: #1a1a24;
- --border: rgba(255,255,255,.07);
- --border2: rgba(255,107,0,.2);
- --text: #f0f0f5;
- --ts: rgba(240,240,245,.45);
- --ts2: rgba(240,240,245,.25);
- --green: #3DDC84;
- --red: #FF4444;
- --blue: #5EA7FF;
- --card: rgba(255,255,255,.03);
- --radius: 10px;
- --shadow: 0 8px 32px rgba(0,0,0,.5);
+ /* Paleta Dragon Ball — oscuro con acento naranja-fuego y dorado */
+ --orange: #E85D04;
+ --orange2: #F48C06;
+ --gold: #FFB703;
+ --gold2: #FB8500;
+ --bg: #06060A;
+ --bg2: #0D0D14;
+ --bg3: #14141E;
+ --bg4: #1A1A28;
+ --border: rgba(255,255,255,.06);
+ --border2: rgba(232,93,4,.25);
+ --border3: rgba(255,183,3,.15);
+ --text: #EEEEF5;
+ --ts: rgba(238,238,245,.4);
+ --ts2: rgba(238,238,245,.2);
+ --green: #2DC653;
+ --red: #E63946;
+ --blue: #4CC9F0;
+ --card: rgba(255,255,255,.025);
+ --card2: rgba(232,93,4,.04);
+ --radius: 8px;
+ --radius2: 12px;
+ --shadow: 0 12px 40px rgba(0,0,0,.7);
+ --shadow2: 0 4px 16px rgba(0,0,0,.5);
+ /* Glow effects */
+ --glow-orange: 0 0 20px rgba(232,93,4,.3);
+ --glow-gold: 0 0 20px rgba(255,183,3,.2);
 }
 *{margin:0;padding:0;box-sizing:border-box}
 html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Montserrat',sans-serif;overflow:hidden}
@@ -989,23 +1040,25 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Montse
 .login-bg{
  position:absolute;inset:0;
  background:
- radial-gradient(ellipse 60% 50% at 20% 50%, rgba(255,107,0,.08) 0%, transparent 70%),
- radial-gradient(ellipse 40% 60% at 80% 30%, rgba(255,215,0,.05) 0%, transparent 70%);
+ radial-gradient(ellipse 70% 60% at 15% 50%, rgba(232,93,4,.1) 0%, transparent 65%),
+ radial-gradient(ellipse 50% 70% at 85% 20%, rgba(255,183,3,.07) 0%, transparent 65%),
+ radial-gradient(ellipse 30% 40% at 50% 90%, rgba(232,93,4,.05) 0%, transparent 60%);
 }
 .login-card{
  position:relative;z-index:1;
  width:100%;max-width:380px;
  background:var(--bg2);
- border:1px solid var(--border2);
+ border:1px solid rgba(232,93,4,.2);
+ border-top:1px solid rgba(255,183,3,.2);
  border-radius:16px;
  padding:48px 40px;
- box-shadow:0 32px 80px rgba(0,0,0,.6),0 0 0 1px rgba(255,107,0,.1);
+ box-shadow:0 32px 80px rgba(0,0,0,.8),var(--glow-orange);
 }
 .login-logo{
- font-family:'Barlow Condensed',sans-serif;
- font-size:32px;font-weight:900;
- letter-spacing:.12em;text-transform:uppercase;
- color:var(--text);margin-bottom:4px;
+ font-family:'Rajdhani',sans-serif;
+ font-size:36px;font-weight:700;
+ letter-spacing:.16em;text-transform:uppercase;
+ background:linear-gradient(90deg,var(--text),var(--gold));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;margin-bottom:4px;
 }
 .login-logo span{color:var(--orange)}
 .login-sub{
@@ -1058,6 +1111,12 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Montse
  background:var(--bg2);
  border-bottom:1px solid var(--border);
  flex-shrink:0;
+ position:relative;
+}
+.topbar::after{
+ content:'';position:absolute;bottom:0;left:0;right:0;height:1px;
+ background:linear-gradient(90deg,transparent,var(--orange),var(--gold),var(--orange),transparent);
+ opacity:.4;
 }
 .topbar-logo{
  font-family:'Barlow Condensed',sans-serif;
@@ -1087,25 +1146,32 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Montse
 ═══════════════════════════════════════════════ */
 .nav{
  display:flex;align-items:stretch;
- background:var(--bg2);border-bottom:1px solid var(--border);
+ background:linear-gradient(180deg,var(--bg2),rgba(13,13,20,.95));
+ border-bottom:1px solid var(--border);
  overflow-x:auto;flex-shrink:0;
  scrollbar-width:none;
+ position:relative;
 }
 .nav::-webkit-scrollbar{display:none}
 .nav-btn{
  display:flex;flex-direction:column;align-items:center;justify-content:center;
- gap:3px;padding:10px 16px;min-width:80px;
+ gap:3px;padding:10px 18px;min-width:80px;
  background:none;border:none;border-bottom:2px solid transparent;
  color:var(--ts);cursor:pointer;transition:all .2s;
- font-family:'Barlow Condensed',sans-serif;
- font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
- white-space:nowrap;
+ font-family:'Rajdhani',sans-serif;
+ font-size:11px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;
+ white-space:nowrap;position:relative;
 }
 .nav-btn .nav-icon{font-size:16px}
 .nav-btn:hover{color:var(--text);background:rgba(255,255,255,.03)}
 .nav-btn.active{
- color:var(--orange);border-bottom-color:var(--orange);
- background:rgba(255,107,0,.05);
+ color:var(--gold);border-bottom-color:var(--orange);
+ background:linear-gradient(180deg,transparent,rgba(232,93,4,.06));
+}
+.nav-btn.active::after{
+ content:'';position:absolute;bottom:-2px;left:20%;right:20%;height:2px;
+ background:linear-gradient(90deg,transparent,var(--gold),transparent);
+ border-radius:2px;
 }
 /* ── NAV DROPDOWN HERRAMIENTAS ── */
 .nav-dropdown{position:relative;display:inline-flex;}
@@ -1160,23 +1226,36 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Montse
 .page.active{display:block}
 
 .section-title{
- font-family:'Barlow Condensed',sans-serif;
- font-size:22px;font-weight:900;letter-spacing:.08em;
- text-transform:uppercase;color:var(--text);
+ font-family:'Rajdhani',sans-serif;
+ font-size:22px;font-weight:700;letter-spacing:.14em;
+ text-transform:uppercase;
  margin-bottom:4px;
+ background:linear-gradient(90deg,var(--text) 60%,var(--gold));
+ -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+ background-clip:text;display:inline-block;
 }
 .section-sub{
  font-size:11px;color:var(--ts);font-weight:500;
- letter-spacing:.05em;margin-bottom:20px;
+ letter-spacing:.06em;margin-bottom:20px;
 }
 
 /* Cards */
 .card{
- background:var(--bg2);border:1px solid var(--border);
- border-radius:var(--radius);padding:20px;
- transition:border-color .2s;
+ background:var(--bg2);
+ border:1px solid var(--border);
+ border-top:1px solid rgba(255,183,3,.08);
+ border-radius:var(--radius2);padding:20px;
+ transition:all .25s;
+ position:relative;overflow:hidden;
 }
-.card:hover{border-color:rgba(255,107,0,.15)}
+.card::before{
+ content:'';position:absolute;top:0;left:0;right:0;height:1px;
+ background:linear-gradient(90deg,transparent,rgba(255,183,3,.2),transparent);
+}
+.card:hover{
+ border-color:rgba(232,93,4,.2);
+ box-shadow:0 4px 24px rgba(232,93,4,.08);
+}
 
 /* Grid de métricas */
 .metrics-grid{
@@ -1185,13 +1264,18 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Montse
  gap:12px;margin-bottom:20px;
 }
 .metric{
- background:var(--bg2);border:1px solid var(--border);
- border-radius:var(--radius);padding:16px;
+ background:var(--bg3);
+ border:1px solid var(--border);
+ border-bottom:1px solid rgba(255,183,3,.1);
+ border-radius:var(--radius2);padding:16px;
  position:relative;overflow:hidden;
+ transition:all .2s;
 }
+.metric:hover{background:var(--bg4);border-color:rgba(232,93,4,.2);}
 .metric::before{
  content:'';position:absolute;top:0;left:0;right:0;height:2px;
- background:linear-gradient(90deg,var(--orange),var(--gold));
+ background:linear-gradient(90deg,var(--orange),var(--gold),var(--orange2));
+ opacity:.8;
 }
 .metric-label{
  font-size:9px;font-weight:700;letter-spacing:.2em;
@@ -1210,10 +1294,10 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Montse
 .table-wrap{overflow-x:auto;border-radius:var(--radius);border:1px solid var(--border)}
 table{width:100%;border-collapse:collapse}
 th{
- font-family:'Barlow Condensed',sans-serif;
+ font-family:'Rajdhani',sans-serif;
  font-size:9px;font-weight:800;letter-spacing:.2em;
- text-transform:uppercase;color:var(--ts);
- padding:10px 14px;border-bottom:1px solid var(--border);
+ text-transform:uppercase;color:var(--gold);
+ padding:10px 14px;border-bottom:1px solid rgba(255,183,3,.15);
  text-align:left;white-space:nowrap;background:var(--bg3);
 }
 td{
@@ -1244,10 +1328,10 @@ tr:hover td{background:rgba(255,107,0,.03)}
  padding:8px 16px;border-radius:7px;border:none;cursor:pointer;
  transition:all .2s;text-decoration:none;
 }
-.btn-primary{background:linear-gradient(135deg,var(--orange),var(--orange2));color:#fff}
-.btn-primary:hover{opacity:.85;transform:translateY(-1px)}
+.btn-primary{background:linear-gradient(135deg,var(--orange),var(--gold2));color:#fff;box-shadow:0 2px 14px rgba(232,93,4,.3);}
+.btn-primary:hover{opacity:.9;transform:translateY(-1px);box-shadow:0 4px 20px rgba(232,93,4,.4);}
 .btn-ghost{background:transparent;border:1px solid var(--border);color:var(--ts)}
-.btn-ghost:hover{border-color:var(--orange);color:var(--orange)}
+.btn-ghost:hover{border-color:var(--gold);color:var(--gold);background:rgba(255,183,3,.04)}
 .btn-green{background:rgba(61,220,132,.15);border:1px solid rgba(61,220,132,.3);color:var(--green)}
 .btn-red{background:rgba(255,68,68,.12);border:1px solid rgba(255,68,68,.25);color:var(--red)}
 .btn-sm{padding:5px 10px;font-size:10px}
@@ -1486,19 +1570,19 @@ tr:hover td{background:rgba(255,107,0,.03)}
  Mis Ventas
  </button>
  <button class="nav-btn" onclick="showPage('inventario')" id="nav-inventario">
- Inventario
+ Torre de Karin
  </button>
  <button class="nav-btn" onclick="showPage('equipo')" id="nav-equipo">
- Equipo
+ Guerreros Z
  </button>
  <button class="nav-btn" onclick="showPage('karin')" id="nav-karin">
- 🏯 Torre de Karin
+ Torre de Karin
  </button>
  <button class="nav-btn" onclick="showPage('capsule')" id="nav-capsule">
  Capsule Corp
  </button>
  <button class="nav-btn" onclick="showPage('cotizador')" id="nav-cotizador">
- Cotizador
+ Palacio de Kamisama
  </button>
  <div class="nav-dropdown" id="nav-dropdown-herramientas">
  <button class="nav-dropdown-btn" onclick="toggleDropdown()" id="nav-herramientas">
@@ -1756,7 +1840,7 @@ tr:hover td{background:rgba(255,107,0,.03)}
  <!-- ─── INVENTARIO ─── -->
  <div class="page" id="page-inventario">
  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
- <div class="section-title">Inventario</div>
+ <div class="section-title">Torre de Karin</div>
  <button class="btn btn-primary" onclick="openModal('modal-kit')">+ Agregar Pieza</button>
  </div>
  <div class="section-sub">Control de kits y bodega</div>
@@ -1790,7 +1874,7 @@ tr:hover td{background:rgba(255,107,0,.03)}
  <!-- ─── EQUIPO ─── -->
  <div class="page" id="page-equipo">
  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
- <div class="section-title">Equipo</div>
+ <div class="section-title">Guerreros Z</div>
  <button class="btn btn-primary" onclick="openModal('modal-vendedor')">+ Agregar</button>
  </div>
  <div class="section-sub">Guerreros Z — Tu equipo de Conecta Reynosa</div>
@@ -1804,7 +1888,7 @@ tr:hover td{background:rgba(255,107,0,.03)}
      <div class="page" id="page-karin">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
        <div>
-        <div class="section-title">🏯 Torre de Karin</div>
+        <div class="section-title">Torre de Karin</div>
         <div class="section-sub">Control de inventario de bodega · Solo Maestro Roshi y Mister Popo</div>
        </div>
        <div style="display:flex;gap:8px" id="karin-admin-btns">
@@ -1818,18 +1902,18 @@ tr:hover td{background:rgba(255,107,0,.03)}
 
       <!-- Tabs -->
       <div class="cot-tabs" style="margin-bottom:16px">
-       <button class="cot-tab active" onclick="switchKarinTab('inventario',this)" id="ktab-inventario">📦 Inventario</button>
-       <button class="cot-tab" onclick="switchKarinTab('movimientos',this)" id="ktab-movimientos">📋 Historial</button>
+       <button class="cot-tab active" onclick="switchKarinTab('inventario',this)" id="ktab-inventario"> Inventario</button>
+       <button class="cot-tab" onclick="switchKarinTab('movimientos',this)" id="ktab-movimientos"> Historial</button>
       </div>
 
       <!-- TAB INVENTARIO -->
       <div id="karin-tab-inventario">
        <div style="display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap">
         <button class="btn btn-ghost btn-sm karin-cat active" onclick="filtrarKarin('all',this)">Todos</button>
-        <button class="btn btn-ghost btn-sm karin-cat" onclick="filtrarKarin('ropa',this)">👕 Ropa</button>
-        <button class="btn btn-ghost btn-sm karin-cat" onclick="filtrarKarin('accesorio',this)">🎒 Accesorios</button>
-        <button class="btn btn-ghost btn-sm karin-cat" onclick="filtrarKarin('comida',this)">🍕 Comida</button>
-        <button class="btn btn-ghost btn-sm karin-cat" onclick="filtrarKarin('otro',this)">📦 Otro</button>
+        <button class="btn btn-ghost btn-sm karin-cat" onclick="filtrarKarin('ropa',this)"> Ropa</button>
+        <button class="btn btn-ghost btn-sm karin-cat" onclick="filtrarKarin('accesorio',this)"> Accesorios</button>
+        <button class="btn btn-ghost btn-sm karin-cat" onclick="filtrarKarin('comida',this)"> Comida</button>
+        <button class="btn btn-ghost btn-sm karin-cat" onclick="filtrarKarin('otro',this)"> Otro</button>
        </div>
        <div class="table-wrap">
         <table>
@@ -1886,7 +1970,7 @@ tr:hover td{background:rgba(255,107,0,.03)}
  </div>
  <div class="section-sub">Área de trabajo de Bulma — En construcción</div>
  <div style="margin-top:48px;text-align:center;color:var(--ts)">
-       <div style="font-size:48px;margin-bottom:16px">🚀</div>
+       <div style="font-size:48px;margin-bottom:16px"></div>
        <div style="font-size:16px;font-weight:700;color:var(--text);margin-bottom:8px">Capsule Corp v2 en camino</div>
        <div style="font-size:13px">Gestión de viajeros, rooming list interactivo y asignación de eventos.<br>Próxima actualización.</div>
       </div>
@@ -1895,17 +1979,17 @@ tr:hover td{background:rgba(255,107,0,.03)}
  <!-- ─── COTIZADOR ─── -->
  <div class="page" id="page-cotizador">
  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
- <div class="section-title">Cotizador</div>
+ <div class="section-title">Palacio de Kamisama</div>
  <div style="display:flex;gap:8px">
- <button class="btn btn-ghost btn-sm" onclick="guardarSesionCot()">💾 Guardar sesión</button>
+ <button class="btn btn-ghost btn-sm" onclick="guardarSesionCot()"> Guardar sesión</button>
  <button class="btn btn-ghost btn-sm" onclick="resetCotizador()">↺ Limpiar</button>
  </div>
  </div>
  <div class="section-sub">Calcula precios por paquete · guarda sesiones · compara estimado vs real post-evento</div>
 
  <div class="cot-tabs">
- <button class="cot-tab active" onclick="switchCotMode('preventa',this)">📋 Preventa / Cotización</button>
- <button class="cot-tab" onclick="switchCotMode('postevento',this)">✅ Post-Evento / Real</button>
+ <button class="cot-tab active" onclick="switchCotMode('preventa',this)"> Preventa / Cotización</button>
+ <button class="cot-tab" onclick="switchCotMode('postevento',this)"> Post-Evento / Real</button>
  </div>
 
  <!-- ══ PREVENTA ══ -->
@@ -1917,7 +2001,7 @@ tr:hover td{background:rgba(255,107,0,.03)}
 
  <!-- EVENTO -->
  <div class="card">
- <div class="cot-section-label"><span>📌 Evento</span></div>
+ <div class="cot-section-label"><span> Evento</span></div>
  <div class="form-row cols-2">
  <div class="form-group">
  <label>Artista / Nombre *</label>
@@ -1961,7 +2045,7 @@ tr:hover td{background:rgba(255,107,0,.03)}
  </div>
  <div style="display:flex;gap:6px;margin-top:6px">
  <button class="btn btn-ghost btn-sm" onclick="guardarVenueCat()">+ Guardar venue</button>
- <button class="btn btn-ghost btn-sm" onclick="verVenuesCat()">📋 Catálogo</button>
+ <button class="btn btn-ghost btn-sm" onclick="verVenuesCat()"> Catálogo</button>
  </div>
  </div>
 
@@ -1981,7 +2065,7 @@ tr:hover td{background:rgba(255,107,0,.03)}
 
  <!-- TRANSPORTE -->
  <div class="card">
- <div class="cot-section-label"><span>🚌 Transporte</span><button class="btn btn-ghost btn-sm" onclick="agregarUnidad()">+ Unidad</button></div>
+ <div class="cot-section-label"><span> Transporte</span><button class="btn btn-ghost btn-sm" onclick="agregarUnidad()">+ Unidad</button></div>
  <div id="cot-cdmx-nota" style="display:none;font-size:11px;color:var(--blue);margin-bottom:10px;padding:8px 10px;background:rgba(94,167,255,.08);border-radius:6px;border:1px solid rgba(94,167,255,.2)">
  CDMX: el transporte largo no aplica. Solo traslados internos (aeropuerto, hotel, venue).
  </div>
@@ -1998,7 +2082,7 @@ tr:hover td{background:rgba(255,107,0,.03)}
 
  <!-- HOTEL -->
  <div class="card">
- <div class="cot-section-label"><span>🏨 Hotel</span></div>
+ <div class="cot-section-label"><span> Hotel</span></div>
  <div class="form-row cols-2">
  <div class="form-group">
  <label>Costo por habitación ($) *</label>
@@ -2014,7 +2098,7 @@ tr:hover td{background:rgba(255,107,0,.03)}
 
  <!-- KIT -->
  <div class="card">
- <div class="cot-section-label"><span>🎁 Kit del viajero</span></div>
+ <div class="cot-section-label"><span> Kit del viajero</span></div>
  <div id="cot-kit-lista"></div>
  <div id="cot-kit-extras"></div>
  <button class="btn btn-ghost btn-sm" onclick="agregarKitExtra()" style="margin-top:8px">+ Otro item</button>
@@ -2025,18 +2109,18 @@ tr:hover td{background:rgba(255,107,0,.03)}
 
  <!-- ZONAS -->
  <div class="card">
- <div class="cot-section-label"><span>🎟️ Zonas / Boletos</span><button class="btn btn-ghost btn-sm" onclick="agregarZonaCot()">+ Zona</button></div>
+ <div class="cot-section-label"><span>️ Zonas / Boletos</span><button class="btn btn-ghost btn-sm" onclick="agregarZonaCot()">+ Zona</button></div>
  <div style="font-size:11px;color:var(--ts);margin-bottom:10px">El precio del boleto se suma al costo base logístico por zona.</div>
  <div id="cot-zonas-lista"></div>
  <div style="display:flex;gap:6px;margin-top:8px">
-   <button class="btn btn-ghost btn-sm" onclick="guardarZonasCatalogo()">💾 Guardar zonas en catálogo</button>
-   <button class="btn btn-ghost btn-sm" onclick="verZonasCatalogo()">📋 Catálogo de zonas</button>
+   <button class="btn btn-ghost btn-sm" onclick="guardarZonasCatalogo()"> Guardar zonas en catálogo</button>
+   <button class="btn btn-ghost btn-sm" onclick="verZonasCatalogo()"> Catálogo de zonas</button>
  </div>
  </div>
 
  <!-- STAFF -->
  <div class="card">
- <div class="cot-section-label"><span>👥 Staff</span></div>
+ <div class="cot-section-label"><span> Staff</span></div>
 
  <!-- Coordinadores -->
  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
@@ -2106,35 +2190,35 @@ tr:hover td{background:rgba(255,107,0,.03)}
 
  <!-- DESGLOSE -->
  <div class="card" style="border-color:rgba(255,107,0,.3)">
- <div class="cot-section-label" style="color:var(--orange)"><span>📊 Desglose por Persona</span></div>
+ <div class="cot-section-label" style="color:var(--orange)"><span> Desglose por Persona</span></div>
  <div id="cot-desglose"><div class="empty-state" style="padding:20px">Llena los campos para ver el cálculo</div></div>
  </div>
 
  <!-- ESCENARIOS -->
  <div class="card" style="border-color:rgba(255,215,0,.25)">
- <div class="cot-section-label" style="color:var(--gold)"><span>🎯 Escenarios (base logística)</span></div>
+ <div class="cot-section-label" style="color:var(--gold)"><span> Escenarios (base logística)</span></div>
  <div style="font-size:11px;color:var(--ts);margin-bottom:10px">Basado en capacidad neta del transporte. El boleto se suma por zona.</div>
  <div id="cot-escenarios"><div class="empty-state" style="padding:20px">Agrega transporte para ver escenarios</div></div>
  </div>
 
  <!-- PRECIOS POR PAQUETE -->
  <div class="card">
- <div class="cot-section-label"><span>💰 Precios por Paquete y Zona</span></div>
+ <div class="cot-section-label"><span> Precios por Paquete y Zona</span></div>
  <div style="font-size:11px;color:var(--ts);margin-bottom:10px">Escenario realista (80% capacidad)</div>
  <div id="cot-precios-paquetes"><div class="empty-state" style="padding:16px">Agrega zonas para ver precios</div></div>
  </div>
 
  <!-- CREAR EVENTO -->
  <div class="card" style="border-color:rgba(61,220,132,.3)">
- <div class="cot-section-label" style="color:var(--green)"><span>🚀 Crear Evento en Capsule Corp</span></div>
+ <div class="cot-section-label" style="color:var(--green)"><span> Crear Evento en Capsule Corp</span></div>
  <div style="font-size:12px;color:var(--ts);margin-bottom:14px">La info pasa a Capsule Corp. Terminas de vestirlo y lo publicas.</div>
- <button class="btn btn-primary" style="width:100%;padding:14px" onclick="crearEventoDesdeCotizador()">✅ Crear Evento</button>
+ <button class="btn btn-primary" style="width:100%;padding:14px" onclick="crearEventoDesdeCotizador()"> Crear Evento</button>
  <div id="cot-crear-alert" style="margin-top:10px"></div>
  </div>
 
  <!-- SESIONES -->
  <div class="card">
- <div class="cot-section-label"><span>📁 Sesiones Guardadas</span></div>
+ <div class="cot-section-label"><span> Sesiones Guardadas</span></div>
  <div id="cot-sesiones-lista"><div style="font-size:12px;color:var(--ts)">Sin sesiones guardadas</div></div>
  </div>
 
@@ -2147,13 +2231,13 @@ tr:hover td{background:rgba(255,107,0,.03)}
  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
  <div style="display:flex;flex-direction:column;gap:14px">
  <div class="card">
- <div class="cot-section-label"><span>📂 Selecciona evento</span></div>
+ <div class="cot-section-label"><span> Selecciona evento</span></div>
  <select class="cot-input" id="post-sesion-sel" onchange="cargarSesionPostEvento(this.value)">
  <option value="">Selecciona...</option>
  </select>
  </div>
  <div class="card" id="post-datos-card" style="display:none">
- <div class="cot-section-label"><span>📊 Datos Reales</span></div>
+ <div class="cot-section-label"><span> Datos Reales</span></div>
  <div class="form-row cols-2">
  <div class="form-group"><label>Viajeros PLUS reales</label><input type="number" class="cot-input" id="post-plus" min="0" value="0" oninput="calcularPostEvento()"></div>
  <div class="form-group"><label>Viajeros STAY reales</label><input type="number" class="cot-input" id="post-stay" min="0" value="0" oninput="calcularPostEvento()"></div>
@@ -2179,16 +2263,16 @@ tr:hover td{background:rgba(255,107,0,.03)}
  <label style="font-size:11px;color:var(--ts);display:block;margin-bottom:4px">Notas post-evento (ventas en persona, reventa, etc.)</label>
  <textarea class="cot-input" id="post-notas" rows="3" placeholder="Ej: 3 boletos vendidos en puerta, 2 reventas..."></textarea>
  </div>
- <button class="btn btn-primary" style="width:100%;margin-top:10px" onclick="guardarPostEvento()">💾 Guardar datos reales</button>
+ <button class="btn btn-primary" style="width:100%;margin-top:10px" onclick="guardarPostEvento()"> Guardar datos reales</button>
  </div>
  </div>
  <div style="display:flex;flex-direction:column;gap:14px">
  <div class="card" id="post-comparativa-card" style="display:none">
- <div class="cot-section-label" style="color:var(--orange)"><span>📈 Estimado vs Real</span></div>
+ <div class="cot-section-label" style="color:var(--orange)"><span> Estimado vs Real</span></div>
  <div id="post-comparativa"></div>
  </div>
  <div class="card" id="post-resultado-card" style="display:none">
- <div class="cot-section-label" style="color:var(--green)"><span>✅ Resultado Final</span></div>
+ <div class="cot-section-label" style="color:var(--green)"><span> Resultado Final</span></div>
  <div id="post-resultado"></div>
  </div>
  </div>
@@ -2200,7 +2284,7 @@ tr:hover td{background:rgba(255,107,0,.03)}
  <div class="modal" style="max-width:480px">
  <div class="modal-header">
  <div class="modal-title">Catálogo de Venues</div>
- <button class="modal-close" onclick="closeModal('modal-venues')">✕</button>
+ <button class="modal-close" onclick="closeModal('modal-venues')"></button>
  </div>
  <div class="modal-body"><div id="venues-lista"></div></div>
  </div>
@@ -2209,8 +2293,8 @@ tr:hover td{background:rgba(255,107,0,.03)}
  <div class="modal-overlay" id="modal-zonas-cat">
  <div class="modal" style="max-width:520px">
  <div class="modal-header">
- <div class="modal-title">📋 Catálogo de Zonas</div>
- <button class="modal-close" onclick="closeModal('modal-zonas-cat')">✕</button>
+ <div class="modal-title"> Catálogo de Zonas</div>
+ <button class="modal-close" onclick="closeModal('modal-zonas-cat')"></button>
  </div>
  <div class="modal-body">
    <div style="font-size:11px;color:var(--ts);margin-bottom:12px">Zonas guardadas de eventos anteriores. Haz clic en una para cargarla al cotizador actual.</div>
@@ -5106,7 +5190,7 @@ function recalcular() {
     ['🏨 Hotel ('+formatMXN(hotelPrecioHab)+' ÷ 4 × '+hotelNoches+' noche'+(hotelNoches>1?'s':'')+')', real.costoHotelPorPax],
     ['🎁 Kit', kitTotal],
     costoChoferes>0      ? ['🚗 Choferes ('+habsChoferes+' hab ÷ '+D+' lugares)', costoChoferes/D]      : null,
-    costoCoordisTotal>0  ? ['👤 Coordinadores (÷ '+D+' lugares)',                  costoCoordisTotal/D]  : null,
+    costoCoordisTotal>0  ? ['Coordinadores (÷ '+D+' lugares)',                  costoCoordisTotal/D]  : null,
     costoCCTotal>0       ? ['📸 Creadores contenido (÷ '+D+' lugares)',             costoCCTotal/D]       : null,
     estacionamiento>0    ? ['🅿️ Estacionamiento (÷ '+D+' lugares)',                estacionamiento/D]    : null,
     gastosExtraTotal>0   ? ['➕ Gastos extra (÷ '+D+' lugares)',                    gastosExtraTotal/D]   : null,
@@ -5464,7 +5548,7 @@ async function loadKarinAlerts() {
     }
     alertEl.innerHTML = `
       <div class="alert alert-error" style="margin-bottom:14px">
-        ⚠️ <strong>${bajas.length} pieza${bajas.length>1?'s':''} con stock bajo:</strong>
+        <strong>${bajas.length} pieza${bajas.length>1?'s':''} con stock bajo:</strong>
         ${bajas.map(p => `<span style="margin-left:8px">${p.nombre} (${p.stock_actual})</span>`).join('')}
       </div>`;
   } catch(e) { alertEl.innerHTML = ''; }
@@ -5501,7 +5585,7 @@ function renderKarinInventario() {
     return;
   }
 
-  const catEmoji = { ropa:'👕', accesorio:'🎒', comida:'🍕', otro:'📦' };
+  const catEmoji = { ropa:'', accesorio:'', comida:'', otro:'' };
   tbody.innerHTML = piezas.map(p => {
     const bajo = p.stock_actual <= p.stock_minimo;
     const statusBadge = bajo
@@ -5566,8 +5650,8 @@ async function loadKarinHistorial() {
         <td>${piezaMap[m.pieza_id] || '—'}</td>
         <td><span class="badge ${tipoColor[m.tipo]||'badge-gray'}">${m.tipo}</span></td>
         <td style="font-weight:700">${m.tipo==='salida'||m.tipo==='ajuste'?'-':'+'} ${m.cantidad}</td>
-        <td style="font-size:11px;color:var(--ts)">${m.evento_id ? '📅 Evento' : '—'}</td>
-        <td style="font-size:11px;color:var(--ts)">${m.coordi_id ? '👤 Coordi' : 'Karin'}</td>
+        <td style="font-size:11px;color:var(--ts)">${m.evento_id ? 'Evento' : '—'}</td>
+        <td style="font-size:11px;color:var(--ts)">${m.coordi_id ? 'Coordi' : 'Karin'}</td>
         <td style="font-size:11px;color:var(--ts)">${m.nota || '—'}</td>
       </tr>`).join('');
   } catch(e) {

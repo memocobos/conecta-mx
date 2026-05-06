@@ -841,19 +841,78 @@ tr:hover td{background:rgba(255,107,0,.03)}
  </div>
  </div>
 
- <!-- ─── EQUIPO ─── -->
- <div class="page" id="page-equipo">
- <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
- <div class="section-title">Guerreros Z</div>
- <button class="btn btn-primary" onclick="openModal('modal-vendedor')">+ Agregar</button>
- </div>
- <div class="section-sub">Guerreros Z — Tu equipo de Conecta Reynosa</div>
- <div id="equipo-grid" class="metrics-grid">
- <div class="loading-state"><div class="spinner"></div>Cargando…</div>
- </div>
- </div>
+ <!-- ─── GUERREROS Z ─── -->
+     <div class="page" id="page-equipo">
 
- <!-- ─── CAPSULE CORP ─── -->
+      <!-- Header -->
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px">
+       <div>
+        <div class="section-title">Guerreros Z</div>
+        <div class="section-sub">Tu equipo de Conecta Reynosa</div>
+       </div>
+       <div style="display:flex;gap:8px">
+        <button class="btn btn-ghost btn-sm" onclick="showGZTab('lista',this)">Equipo</button>
+        <button class="btn btn-ghost btn-sm" onclick="showGZTab('invitar',this)">+ Invitar</button>
+        <button class="btn btn-ghost btn-sm" onclick="showGZTab('miperfil',this)">Mi Perfil</button>
+       </div>
+      </div>
+
+      <!-- TAB: Lista del equipo -->
+      <div id="gz-tab-lista">
+       <!-- Filtros -->
+       <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap">
+        <button class="btn btn-ghost btn-sm gz-filter active" onclick="filtrarGZ('todos',this)">Todos</button>
+        <button class="btn btn-ghost btn-sm gz-filter" onclick="filtrarGZ('coordinador',this)">Coordinadores</button>
+        <button class="btn btn-ghost btn-sm gz-filter" onclick="filtrarGZ('mister_popo',this)">Mister Popo</button>
+        <button class="btn btn-ghost btn-sm gz-filter" onclick="filtrarGZ('bulma',this)">Bulma</button>
+        <button class="btn btn-ghost btn-sm gz-filter" onclick="filtrarGZ('vendedor',this)">Vendedores</button>
+        <button class="btn btn-ghost btn-sm gz-filter" onclick="filtrarGZ('cc',this)">CC</button>
+       </div>
+       <div id="gz-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px">
+        <div class="loading-state"><div class="spinner"></div>Cargando equipo…</div>
+       </div>
+      </div>
+
+      <!-- TAB: Invitar -->
+      <div id="gz-tab-invitar" style="display:none;max-width:520px">
+       <div class="card" style="padding:28px">
+        <div style="font-family:'Rajdhani',sans-serif;font-size:16px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;margin-bottom:4px">Invitar al equipo</div>
+        <div style="font-size:12px;color:var(--ts);margin-bottom:24px">Le llega un email con un link para crear su perfil. El link expira en 48 horas.</div>
+        <div id="gz-invite-alert"></div>
+        <div style="display:flex;flex-direction:column;gap:14px">
+         <div>
+          <label class="cot-label">Correo electrónico *</label>
+          <input class="cot-input" type="email" id="inv-correo" placeholder="correo@ejemplo.com">
+         </div>
+         <div>
+          <label class="cot-label">Nombre *</label>
+          <input class="cot-input" type="text" id="inv-nombre" placeholder="Nombre completo">
+         </div>
+         <div>
+          <label class="cot-label">Rol *</label>
+          <select class="cot-input" id="inv-rol">
+           <option value="coordinador">Coordinador</option>
+           <option value="mister_popo">Mister Popo (Bodega)</option>
+           <option value="bulma">Bulma (Admin)</option>
+           <option value="cc">Creador de Contenido</option>
+           <option value="vendedor">Vendedor</option>
+          </select>
+         </div>
+         <button class="btn btn-primary" onclick="enviarInvitacion()" style="margin-top:8px">Enviar invitación</button>
+        </div>
+       </div>
+      </div>
+
+      <!-- TAB: Mi Perfil -->
+      <div id="gz-tab-miperfil" style="display:none">
+       <div id="gz-miperfil-content">
+        <div class="loading-state"><div class="spinner"></div>Cargando perfil…</div>
+       </div>
+      </div>
+
+     </div>
+
+     <!-- ─── CAPSULE CORP ─── -->
  <div class="page" id="page-capsule">
       <div class="section-title">Capsule Corp</div>
       <div class="section-sub">Area de trabajo de Bulma — En construccion</div>
@@ -3805,6 +3864,713 @@ async function crearEventoDesdeCotizador() {
     guardarSesionCot();
     setTimeout(()=>{showPage('capsule');if(ev?.id)editarEvento(ev.id);},1200);
   } catch(e){alertEl.innerHTML=`<div class="alert alert-error">${e.message}</div>`;}
+}
+
+
+
+// ═══════════════════════════════════════════════════════════════
+// GUERREROS Z — Sistema de perfiles e invitaciones
+// ═══════════════════════════════════════════════════════════════
+const RESEND_KEY = 're_htK2Yc2M_D6XiAZyXmk3a4hRKQk4BpFHi';
+const APP_URL = 'https://conectareynosa.mx/kamehouse';
+
+let _gzCache = [];
+let _gzFilter = 'todos';
+
+const ROL_LABELS = {
+  maestro_roshi: 'Maestro Roshi',
+  bulma: 'Bulma',
+  mister_popo: 'Mister Popo',
+  coordinador: 'Coordinador',
+  cc: 'Creador de Contenido',
+  vendedor: 'Vendedor'
+};
+
+async function loadEquipo() {
+  const grid = document.getElementById('gz-grid');
+  if (!grid) return;
+  try {
+    _gzCache = await db.get('usuarios', '?activo=eq.true&order=nombre.asc');
+    renderGZ();
+  } catch(e) {
+    grid.innerHTML = `<div class="alert alert-error">${e.message}</div>`;
+  }
+}
+
+function renderGZ() {
+  const grid = document.getElementById('gz-grid');
+  if (!grid) return;
+  let lista = _gzCache;
+  if (_gzFilter !== 'todos') lista = lista.filter(u => u.rol === _gzFilter);
+  if (!lista.length) {
+    grid.innerHTML = '<div class="empty-state">Sin miembros en esta categoría</div>';
+    return;
+  }
+  grid.innerHTML = lista.map(u => {
+    const iniciales = u.nombre.split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase();
+    const strikes = u.strikes || 0;
+    const strikeClass = strikes >= 3 ? 'danger' : strikes >= 2 ? 'warn' : 'ok';
+    const strikeEmoji = strikes >= 3 ? '💀' : '⚡';
+    const edad = u.fecha_nacimiento ? calcularEdad(u.fecha_nacimiento) : null;
+    const cumple = u.fecha_nacimiento ? esCumple(u.fecha_nacimiento) : false;
+    const esYo = currentUser && u.id === currentUser.id;
+    return `<div class="gz-card">
+      ${cumple ? '<div style="position:absolute;top:10px;right:10px;font-size:18px">🎂</div>' : ''}
+      <div style="display:flex;gap:14px;align-items:flex-start;margin-bottom:14px">
+        <div class="gz-avatar" onclick="abrirPerfil('${u.id}')">
+          ${u.foto_url ? `<img src="${u.foto_url}" alt="${u.nombre}">` : iniciales}
+        </div>
+        <div style="flex:1;min-width:0">
+          <div class="gz-rol">${ROL_LABELS[u.rol] || u.rol}</div>
+          <div style="font-weight:700;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${u.nombre}${esYo ? ' <span style="font-size:10px;color:var(--ts)">(tú)</span>' : ''}</div>
+          ${edad ? `<div style="font-size:11px;color:var(--ts)">${edad} años</div>` : ''}
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+        <span class="gz-strike ${strikeClass}">${strikeEmoji} ${strikes}/3 strikes</span>
+        <span class="badge badge-gray">${u.talla_playera || 'Sin talla'}</span>
+        ${u.perfil_completo ? '<span class="badge badge-green">Perfil completo</span>' : '<span class="badge badge-gray">Perfil incompleto</span>'}
+      </div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        <button class="btn btn-ghost btn-sm" onclick="abrirPerfil('${u.id}')">Ver perfil</button>
+        ${currentUser?.rol === 'maestro_roshi' ? `
+          <button class="btn btn-ghost btn-sm" onclick="gestionarStrikes('${u.id}','${u.nombre.replace(/'/g,"\\'")}',${strikes})">Strikes</button>
+          <button class="btn btn-ghost btn-sm" style="color:var(--red);border-color:rgba(230,57,70,.3)" onclick="confirmarEliminar('${u.id}','${u.nombre.replace(/'/g,"\\'")}')">Dar de baja</button>
+        ` : ''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function filtrarGZ(filtro, btn) {
+  _gzFilter = filtro;
+  document.querySelectorAll('.gz-filter').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderGZ();
+}
+
+function showGZTab(tab, btn) {
+  ['lista','invitar','miperfil'].forEach(t => {
+    const el = document.getElementById('gz-tab-' + t);
+    if (el) el.style.display = t === tab ? '' : 'none';
+  });
+  // Cargar mi perfil si es necesario
+  if (tab === 'miperfil') renderMiPerfil();
+  if (tab === 'lista') renderGZ();
+}
+
+function calcularEdad(fechaNac) {
+  const hoy = new Date();
+  const nac = new Date(fechaNac);
+  let edad = hoy.getFullYear() - nac.getFullYear();
+  const m = hoy.getMonth() - nac.getMonth();
+  if (m < 0 || (m === 0 && hoy.getDate() < nac.getDate())) edad--;
+  return edad;
+}
+
+function esCumple(fechaNac) {
+  const hoy = new Date();
+  const nac = new Date(fechaNac);
+  return hoy.getMonth() === nac.getMonth() && hoy.getDate() === nac.getDate();
+}
+
+// ─── INVITACIONES ───
+async function enviarInvitacion() {
+  const correo = document.getElementById('inv-correo').value.trim();
+  const nombre = document.getElementById('inv-nombre').value.trim();
+  const rol = document.getElementById('inv-rol').value;
+  const alertEl = document.getElementById('gz-invite-alert');
+
+  if (!correo || !nombre) {
+    alertEl.innerHTML = '<div class="alert alert-error">Completa correo y nombre</div>';
+    setTimeout(() => alertEl.innerHTML = '', 3000);
+    return;
+  }
+
+  // Generar token único
+  const token = crypto.randomUUID();
+  const expires = new Date(Date.now() + 48 * 3600000).toISOString();
+  const link = `${APP_URL}/registro?token=${token}`;
+
+  try {
+    alertEl.innerHTML = '<div class="alert" style="background:rgba(255,183,3,.1);color:var(--gold)">Enviando invitación…</div>';
+
+    // Crear usuario pendiente en Supabase
+    await db.post('usuarios', {
+      correo,
+      nombre,
+      rol,
+      activo: false,
+      invite_token: token,
+      invite_usado: false,
+      invite_expires_at: expires,
+      password_hash: null
+    });
+
+    // Enviar email con Resend
+    const emailResp = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${RESEND_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        from: 'Kamehouse <noreply@conectareynosa.mx>',
+        to: [correo],
+        subject: 'Bienvenido al equipo de Conecta Reynosa',
+        html: buildInviteEmail(nombre, rol, link)
+      })
+    });
+
+    if (!emailResp.ok) {
+      const err = await emailResp.json();
+      throw new Error(err.message || 'Error enviando email');
+    }
+
+    alertEl.innerHTML = '<div class="alert alert-green" style="background:rgba(45,198,83,.1);color:var(--green)">Invitación enviada a ' + correo + '</div>';
+    document.getElementById('inv-correo').value = '';
+    document.getElementById('inv-nombre').value = '';
+    setTimeout(() => alertEl.innerHTML = '', 4000);
+    loadEquipo();
+
+  } catch(e) {
+    alertEl.innerHTML = `<div class="alert alert-error">${e.message}</div>`;
+  }
+}
+
+function buildInviteEmail(nombre, rol, link) {
+  return `<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#06060A;font-family:Arial,sans-serif">
+  <div style="max-width:520px;margin:40px auto;background:#0D0D14;border:1px solid rgba(232,93,4,.25);border-radius:12px;overflow:hidden">
+    <div style="background:linear-gradient(135deg,#E85D04,#FFB703);padding:28px 32px">
+      <div style="font-size:24px;font-weight:900;letter-spacing:.1em;color:#fff">KAME·HOUSE</div>
+      <div style="font-size:12px;color:rgba(255,255,255,.8);margin-top:4px">Conecta Reynosa · Sistema Interno</div>
+    </div>
+    <div style="padding:32px">
+      <div style="font-size:20px;font-weight:700;color:#EEEEF5;margin-bottom:8px">Hola ${nombre} 👋</div>
+      <div style="color:rgba(238,238,245,.6);font-size:14px;line-height:1.7;margin-bottom:24px">
+        Memo Cobos te ha invitado a unirte al equipo de <strong style="color:#EEEEF5">Conecta Reynosa</strong> como <strong style="color:#FFB703">${ROL_LABELS[rol] || rol}</strong>.<br><br>
+        Haz click en el botón para crear tu perfil y acceder al Kamehouse. El link expira en <strong>48 horas</strong>.
+      </div>
+      <a href="${link}" style="display:inline-block;background:linear-gradient(135deg,#E85D04,#FB8500);color:#fff;text-decoration:none;padding:14px 28px;border-radius:8px;font-weight:700;font-size:14px;letter-spacing:.08em">
+        Crear mi perfil →
+      </a>
+      <div style="margin-top:28px;padding-top:20px;border-top:1px solid rgba(255,255,255,.08);font-size:11px;color:rgba(238,238,245,.3)">
+        Si no esperabas este correo, ignóralo.<br>
+        Link: <span style="color:rgba(238,238,245,.5)">${link}</span>
+      </div>
+    </div>
+  </div>
+</body>
+</html>`;
+}
+
+// ─── STRIKES ───
+async function gestionarStrikes(userId, nombre, strikesActuales) {
+  const accion = await mostrarDialogoStrikes(nombre, strikesActuales);
+  if (!accion) return;
+
+  const nuevo = accion === 'agregar'
+    ? Math.min(strikesActuales + 1, 3)
+    : Math.max(strikesActuales - 1, 0);
+
+  const motivo = prompt(`Motivo del ${accion === 'agregar' ? 'strike' : 'perdón'}:`);
+  if (motivo === null) return;
+
+  try {
+    // Actualizar strikes en usuarios
+    await fetch(`${SB_URL}/rest/v1/usuarios?id=eq.${userId}`, {
+      method: 'PATCH',
+      headers: { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ strikes: nuevo })
+    });
+
+    // Registrar en strikes_log
+    await db.post('strikes_log', {
+      coordi_id: userId,
+      accion: accion === 'agregar' ? 'asignado' : 'quitado',
+      motivo: motivo || null,
+      por_quien: currentUser.id
+    });
+
+    // Si llegó a 3, enviar email de advertencia
+    if (nuevo >= 3) {
+      const usuario = _gzCache.find(u => u.id === userId);
+      if (usuario?.correo_notif || usuario?.correo) {
+        await fetch('https://api.resend.com/emails', {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${RESEND_KEY}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            from: 'Kamehouse <noreply@conectareynosa.mx>',
+            to: [usuario.correo_notif || usuario.correo],
+            subject: '⚠️ Has acumulado 3 strikes en Kamehouse',
+            html: `<div style="font-family:Arial;padding:32px;background:#06060A;color:#EEEEF5">
+              <h2 style="color:#E63946">Aviso importante</h2>
+              <p>Has acumulado 3 strikes en el sistema de Conecta Reynosa.</p>
+              <p>Motivo del último strike: <strong>${motivo}</strong></p>
+              <p>Memo Cobos revisará tu situación próximamente.</p>
+            </div>`
+          })
+        });
+      }
+    }
+
+    await loadEquipo();
+  } catch(e) {
+    alert('Error: ' + e.message);
+  }
+}
+
+function mostrarDialogoStrikes(nombre, actual) {
+  return new Promise(resolve => {
+    const modal = crearModal('strikes-dlg', `Strikes — ${nombre}`, `
+      <div style="text-align:center;padding:8px 0">
+        <div style="font-size:48px;margin-bottom:8px">${actual >= 3 ? '💀' : actual >= 2 ? '⚠️' : '⚡'}</div>
+        <div style="font-size:28px;font-weight:900;font-family:'Rajdhani',sans-serif;color:${actual >= 3 ? 'var(--red)' : actual >= 2 ? 'var(--gold)' : 'var(--text)'}">${actual} / 3 strikes</div>
+        <div style="font-size:12px;color:var(--ts);margin-bottom:24px">${actual >= 3 ? 'Dado de baja al llegar a 3' : actual >= 2 ? 'Un strike más y es dado de baja' : 'Sin problemas'}</div>
+      </div>
+      <div style="display:flex;gap:10px;justify-content:center">
+        ${actual < 3 ? `<button class="btn btn-primary" onclick="document.getElementById('modal-strikes-dlg').dataset.result='agregar';cerrarModal('strikes-dlg')">+ Agregar strike</button>` : ''}
+        ${actual > 0 ? `<button class="btn btn-ghost" onclick="document.getElementById('modal-strikes-dlg').dataset.result='quitar';cerrarModal('strikes-dlg')">- Quitar strike</button>` : ''}
+        <button class="btn btn-ghost" onclick="document.getElementById('modal-strikes-dlg').dataset.result='';cerrarModal('strikes-dlg')">Cancelar</button>
+      </div>
+    `);
+    modal.id = 'modal-strikes-dlg';
+    modal.addEventListener('click', e => {
+      if (!e.target.closest('[style*="background"]')) return;
+      resolve(modal.dataset.result || null);
+    });
+    // Observer para cuando se cierre
+    const obs = new MutationObserver(() => {
+      if (!document.getElementById('modal-strikes-dlg')) {
+        obs.disconnect();
+        resolve(document.getElementById('modal-strikes-dlg')?.dataset.result || null);
+      }
+    });
+    obs.observe(document.body, { childList: true });
+  });
+}
+
+// ─── DAR DE BAJA ───
+async function confirmarEliminar(userId, nombre) {
+  if (!confirm(`¿Dar de baja a ${nombre}? Esto desactiva su acceso pero conserva su historial.`)) return;
+  try {
+    await fetch(`${SB_URL}/rest/v1/usuarios?id=eq.${userId}`, {
+      method: 'PATCH',
+      headers: { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ activo: false })
+    });
+    await loadEquipo();
+  } catch(e) { alert('Error: ' + e.message); }
+}
+
+// ─── VER PERFIL ───
+async function abrirPerfil(userId) {
+  const usuario = _gzCache.find(u => u.id === userId);
+  if (!usuario) return;
+
+  const esYo = currentUser && usuario.id === currentUser.id;
+  const puedeEditar = esYo || currentUser?.rol === 'maestro_roshi';
+  const iniciales = usuario.nombre.split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase();
+  const edad = usuario.fecha_nacimiento ? calcularEdad(usuario.fecha_nacimiento) : null;
+  const cumple = usuario.fecha_nacimiento ? esCumple(usuario.fecha_nacimiento) : false;
+
+  // Cargar tours pasados
+  let toursPasados = [];
+  try {
+    toursPasados = await db.get('tours_pasados', `?usuario_id=eq.${userId}&order=fecha_aprox.desc`);
+  } catch(e) {}
+
+  // Cargar eventos asignados
+  let evAsignados = [];
+  try {
+    evAsignados = await db.get('eventos_coordi', `?coordi_id=eq.${userId}&select=evento_id,indicaciones,eventos(artista,fecha,ciudad)`);
+  } catch(e) {}
+
+  const modal = crearModal('ver-perfil', '', `
+    <!-- Header del perfil -->
+    <div style="display:flex;gap:20px;align-items:flex-start;margin-bottom:24px;flex-wrap:wrap">
+      <div class="perfil-avatar-large" onclick="${puedeEditar ? `subirFoto('${userId}')` : ''}">
+        ${usuario.foto_url ? `<img src="${usuario.foto_url}" alt="${usuario.nombre}">` : iniciales}
+      </div>
+      <div style="flex:1;min-width:0">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px">
+          <div style="font-size:22px;font-weight:700">${usuario.nombre} ${cumple ? '🎂' : ''}</div>
+        </div>
+        <div class="gz-rol" style="margin-bottom:6px">${ROL_LABELS[usuario.rol] || usuario.rol}</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <span class="gz-strike ${(usuario.strikes||0) >= 3 ? 'danger' : (usuario.strikes||0) >= 2 ? 'warn' : 'ok'}">⚡ ${usuario.strikes||0}/3 strikes</span>
+          ${edad ? `<span class="badge badge-gray">${edad} años</span>` : ''}
+          ${usuario.talla_playera ? `<span class="badge badge-gray">Talla ${usuario.talla_playera}</span>` : ''}
+        </div>
+      </div>
+    </div>
+
+    <!-- Info personal -->
+    <div class="perfil-section">
+      <div class="perfil-section-title">Información personal</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        ${campo('Correo', usuario.correo)}
+        ${campo('Celular', usuario.celular)}
+        ${campo('Correo notificaciones', usuario.correo_notif)}
+        ${campo('Emergencia', usuario.nombre_emergencia ? `${usuario.nombre_emergencia} · ${usuario.num_emergencia}` : usuario.num_emergencia)}
+        ${campo('Fecha de nacimiento', usuario.fecha_nacimiento ? fmtFecha(usuario.fecha_nacimiento) : null)}
+        ${campo('Último acceso', usuario.ultimo_acceso ? fmtFecha(usuario.ultimo_acceso?.split('T')[0]) : null)}
+      </div>
+    </div>
+
+    <!-- Template sugerido -->
+    ${usuario.template_sugerido ? `
+    <div class="perfil-section">
+      <div class="perfil-section-title">Template sugerido</div>
+      <div style="background:var(--bg3);border-radius:8px;padding:14px;font-size:13px;color:var(--ts);font-style:italic">"${usuario.template_sugerido}"</div>
+    </div>` : ''}
+
+    <!-- Tours asignados -->
+    <div class="perfil-section">
+      <div class="perfil-section-title">Tours asignados (${evAsignados.length})</div>
+      ${evAsignados.length ? evAsignados.map(e => `
+        <div style="background:var(--bg3);border-radius:8px;padding:12px;margin-bottom:8px">
+          <div style="font-weight:700">${e.eventos?.artista || '—'}</div>
+          <div style="font-size:11px;color:var(--ts)">${e.eventos?.ciudad || ''} · ${e.eventos?.fecha ? fmtFecha(e.eventos.fecha) : ''}</div>
+          ${e.indicaciones ? `<div style="font-size:11px;color:var(--ts);margin-top:4px">📋 ${e.indicaciones}</div>` : ''}
+        </div>`).join('') : '<div style="color:var(--ts);font-size:12px">Sin tours asignados aún</div>'}
+    </div>
+
+    <!-- Tours pasados -->
+    <div class="perfil-section">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <div class="perfil-section-title" style="margin-bottom:0">Tours pasados (${toursPasados.length})</div>
+        ${puedeEditar ? `<button class="btn btn-ghost btn-sm" onclick="abrirAgregarTour('${userId}')">+ Agregar</button>` : ''}
+      </div>
+      <div id="lista-tours-pasados">
+        ${toursPasados.length ? toursPasados.map(t => `
+          <div style="background:var(--bg3);border-radius:8px;padding:12px;margin-bottom:8px;display:flex;align-items:flex-start;justify-content:space-between">
+            <div>
+              <div style="font-weight:700">${t.artista}</div>
+              <div style="font-size:11px;color:var(--ts)">${t.ciudad || ''} ${t.fecha_aprox ? '· ' + fmtFecha(t.fecha_aprox) : ''} · <em>${t.rol_en_tour || 'Coordinador'}</em></div>
+              ${t.notas ? `<div style="font-size:11px;color:var(--ts);margin-top:4px">${t.notas}</div>` : ''}
+            </div>
+            ${puedeEditar ? `<button onclick="eliminarTourPasado('${t.id}','${userId}')" style="background:none;border:none;color:var(--ts);cursor:pointer;font-size:16px;padding:0 0 0 8px">×</button>` : ''}
+          </div>`).join('') : '<div style="color:var(--ts);font-size:12px">Sin historial de tours. Agrega los tours que hiciste antes del sistema.</div>'}
+      </div>
+    </div>
+
+    <!-- Acciones de Roshi -->
+    ${currentUser?.rol === 'maestro_roshi' && !esYo ? `
+    <div class="perfil-section">
+      <div class="perfil-section-title">Administración</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-ghost btn-sm" onclick="resetearPassword('${userId}','${usuario.nombre.replace(/'/g,"\\'")}')">Resetear contraseña</button>
+        <button class="btn btn-ghost btn-sm" onclick="cambiarRol('${userId}','${usuario.rol}')">Cambiar rol</button>
+        <button class="btn btn-ghost btn-sm" style="color:var(--red)" onclick="cerrarModal('ver-perfil');confirmarEliminar('${userId}','${usuario.nombre.replace(/'/g,"\\'")}')">Dar de baja</button>
+      </div>
+    </div>` : ''}
+
+    <!-- Botón editar si es mi perfil -->
+    ${esYo ? `
+    <div style="margin-top:16px">
+      <button class="btn btn-primary" onclick="cerrarModal('ver-perfil');renderMiPerfil(true)">Editar mi perfil</button>
+    </div>` : ''}
+  `);
+}
+
+function campo(label, valor) {
+  return `<div>
+    <div style="font-size:10px;color:var(--ts);letter-spacing:.08em;text-transform:uppercase;margin-bottom:2px">${label}</div>
+    <div style="font-size:13px;font-weight:600">${valor || '<span style="color:var(--ts)">—</span>'}</div>
+  </div>`;
+}
+
+// ─── TOURS PASADOS ───
+function abrirAgregarTour(userId) {
+  crearModal('add-tour', 'Agregar Tour Pasado', `
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div><label class="cot-label">Artista / Evento *</label>
+        <input class="cot-input" id="tp-artista" placeholder="ej. Bad Bunny, Feid, Arre Tour"></div>
+      <div><label class="cot-label">Ciudad</label>
+        <input class="cot-input" id="tp-ciudad" placeholder="ej. Monterrey, CDMX"></div>
+      <div><label class="cot-label">Fecha aproximada</label>
+        <input class="cot-input" type="date" id="tp-fecha"></div>
+      <div><label class="cot-label">Tu rol</label>
+        <select class="cot-input" id="tp-rol">
+          <option value="Coordinador">Coordinador</option>
+          <option value="Auxiliar">Auxiliar</option>
+          <option value="Vendedor">Vendedor</option>
+          <option value="Creador de Contenido">Creador de Contenido</option>
+          <option value="Otro">Otro</option>
+        </select></div>
+      <div><label class="cot-label">Notas (opcional)</label>
+        <input class="cot-input" id="tp-notas" placeholder="Algo que aprendiste, algo especial..."></div>
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
+      <button class="btn btn-ghost" onclick="cerrarModal('add-tour')">Cancelar</button>
+      <button class="btn btn-primary" onclick="guardarTourPasado('${userId}')">Guardar</button>
+    </div>
+  `);
+}
+
+async function guardarTourPasado(userId) {
+  const artista = document.getElementById('tp-artista').value.trim();
+  if (!artista) { alert('El artista es obligatorio'); return; }
+  try {
+    await db.post('tours_pasados', {
+      usuario_id: userId,
+      artista,
+      ciudad: document.getElementById('tp-ciudad').value.trim() || null,
+      fecha_aprox: document.getElementById('tp-fecha').value || null,
+      rol_en_tour: document.getElementById('tp-rol').value,
+      notas: document.getElementById('tp-notas').value.trim() || null
+    });
+    cerrarModal('add-tour');
+    cerrarModal('ver-perfil');
+    await abrirPerfil(userId);
+  } catch(e) { alert(e.message); }
+}
+
+async function eliminarTourPasado(tourId, userId) {
+  if (!confirm('¿Eliminar este tour del historial?')) return;
+  try {
+    await fetch(`${SB_URL}/rest/v1/tours_pasados?id=eq.${tourId}`, {
+      method: 'DELETE',
+      headers: { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}` }
+    });
+    cerrarModal('ver-perfil');
+    await abrirPerfil(userId);
+  } catch(e) { alert(e.message); }
+}
+
+// ─── RESETEAR CONTRASEÑA ───
+async function resetearPassword(userId, nombre) {
+  const nueva = prompt(`Nueva contraseña para ${nombre}:`);
+  if (!nueva || nueva.length < 4) { alert('Contraseña muy corta'); return; }
+  try {
+    await fetch(`${SB_URL}/rest/v1/usuarios?id=eq.${userId}`, {
+      method: 'PATCH',
+      headers: { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password_hash: nueva })
+    });
+    alert(`Contraseña de ${nombre} actualizada.`);
+  } catch(e) { alert('Error: ' + e.message); }
+}
+
+// ─── CAMBIAR ROL ───
+async function cambiarRol(userId, rolActual) {
+  const roles = ['coordinador','mister_popo','bulma','cc','vendedor'];
+  const opts = roles.map(r => `<option value="${r}" ${r === rolActual ? 'selected' : ''}>${ROL_LABELS[r]}</option>`).join('');
+  crearModal('cambiar-rol', 'Cambiar Rol', `
+    <select class="cot-input" id="nuevo-rol">${opts}</select>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
+      <button class="btn btn-ghost" onclick="cerrarModal('cambiar-rol')">Cancelar</button>
+      <button class="btn btn-primary" onclick="guardarRol('${userId}')">Guardar</button>
+    </div>
+  `);
+}
+
+async function guardarRol(userId) {
+  const nuevoRol = document.getElementById('nuevo-rol').value;
+  try {
+    await fetch(`${SB_URL}/rest/v1/usuarios?id=eq.${userId}`, {
+      method: 'PATCH',
+      headers: { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ rol: nuevoRol })
+    });
+    cerrarModal('cambiar-rol');
+    cerrarModal('ver-perfil');
+    await loadEquipo();
+  } catch(e) { alert('Error: ' + e.message); }
+}
+
+// ─── MI PERFIL ───
+async function renderMiPerfil(modoEdicion = false) {
+  if (!currentUser) return;
+  const el = document.getElementById('gz-miperfil-content');
+  if (!el) return;
+
+  if (modoEdicion) {
+    el.innerHTML = renderFormPerfil();
+    // Rellenar datos actuales
+    const u = _gzCache.find(u => u.id === currentUser.id) || currentUser;
+    ['nombre','correo','correo_notif','celular','num_emergencia','nombre_emergencia','talla_playera','fecha_nacimiento','template_sugerido'].forEach(campo => {
+      const inp = document.getElementById('mp-' + campo);
+      if (inp && u[campo]) inp.value = u[campo];
+    });
+    return;
+  }
+
+  el.innerHTML = '<div class="loading-state"><div class="spinner"></div>Cargando…</div>';
+  try {
+    const [u] = await db.get('usuarios', `?id=eq.${currentUser.id}&limit=1`);
+    if (!u) { el.innerHTML = '<div class="alert alert-error">No se encontró el perfil</div>'; return; }
+    currentUser = { ...currentUser, ...u };
+
+    const iniciales = u.nombre.split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase();
+    const edad = u.fecha_nacimiento ? calcularEdad(u.fecha_nacimiento) : null;
+
+    el.innerHTML = `
+      <div style="display:flex;gap:20px;align-items:flex-start;margin-bottom:28px;flex-wrap:wrap">
+        <div class="perfil-avatar-large" onclick="subirFoto('${u.id}')">
+          ${u.foto_url ? `<img src="${u.foto_url}" alt="${u.nombre}">` : iniciales}
+          <div style="position:absolute;bottom:0;right:0;background:var(--orange);border-radius:50%;width:22px;height:22px;display:flex;align-items:center;justify-content:center;font-size:12px">✏️</div>
+        </div>
+        <div>
+          <div style="font-size:22px;font-weight:700;margin-bottom:4px">${u.nombre}</div>
+          <div class="gz-rol">${ROL_LABELS[u.rol] || u.rol}</div>
+          ${edad ? `<div style="font-size:12px;color:var(--ts);margin-top:4px">${edad} años</div>` : ''}
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:24px">
+        ${campo('Correo', u.correo)}
+        ${campo('Celular', u.celular)}
+        ${campo('Correo notificaciones', u.correo_notif)}
+        ${campo('Emergencia', u.nombre_emergencia ? `${u.nombre_emergencia} · ${u.num_emergencia}` : u.num_emergencia)}
+        ${campo('Talla playera', u.talla_playera)}
+        ${campo('Fecha de nacimiento', u.fecha_nacimiento ? fmtFecha(u.fecha_nacimiento) : null)}
+      </div>
+      ${u.template_sugerido ? `<div style="background:var(--bg3);border-radius:8px;padding:14px;margin-bottom:20px;font-size:12px;color:var(--ts)">Template sugerido: "${u.template_sugerido}"</div>` : ''}
+      <button class="btn btn-primary" onclick="renderMiPerfil(true)">Editar mi perfil</button>
+    `;
+  } catch(e) {
+    el.innerHTML = `<div class="alert alert-error">${e.message}</div>`;
+  }
+}
+
+function renderFormPerfil() {
+  return `
+    <div style="max-width:560px">
+      <div class="perfil-section">
+        <div class="perfil-section-title">Información básica</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <div style="grid-column:1/-1"><label class="cot-label">Nombre completo</label>
+            <input class="cot-input" id="mp-nombre" placeholder="Tu nombre completo"></div>
+          <div><label class="cot-label">Celular</label>
+            <input class="cot-input" id="mp-celular" placeholder="8991234567" type="tel"></div>
+          <div><label class="cot-label">Talla playera</label>
+            <select class="cot-input" id="mp-talla_playera">
+              <option value="">Seleccionar</option>
+              ${['XS','S','M','L','XL','XXL'].map(t => `<option value="${t}">${t}</option>`).join('')}
+            </select></div>
+          <div><label class="cot-label">Fecha de nacimiento</label>
+            <input class="cot-input" id="mp-fecha_nacimiento" type="date"></div>
+          <div><label class="cot-label">Correo notificaciones</label>
+            <input class="cot-input" id="mp-correo_notif" placeholder="tu@correo.com" type="email"></div>
+        </div>
+      </div>
+      <div class="perfil-section">
+        <div class="perfil-section-title">Emergencia</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <div><label class="cot-label">Nombre de emergencia</label>
+            <input class="cot-input" id="mp-nombre_emergencia" placeholder="Nombre completo"></div>
+          <div><label class="cot-label">Número de emergencia</label>
+            <input class="cot-input" id="mp-num_emergencia" placeholder="8991234567" type="tel"></div>
+        </div>
+      </div>
+      <div class="perfil-section">
+        <div class="perfil-section-title">Mi template</div>
+        <div style="font-size:12px;color:var(--ts);margin-bottom:10px">Describe el tema visual que te gustaría para tu perfil. Puede ser un color, un personaje, un estilo... Memo lo revisará y lo iremos armando juntos.</div>
+        <textarea class="cot-input" id="mp-template_sugerido" rows="3" placeholder="ej. Me gustaría un tema azul oscuro con detalles dorados, tipo Vegeta. O algo minimalista en negro y rojo."></textarea>
+      </div>
+      <div class="perfil-section">
+        <div class="perfil-section-title">Cambiar contraseña</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <div><label class="cot-label">Nueva contraseña</label>
+            <input class="cot-input" id="mp-pass-nueva" type="password" placeholder="Nueva contraseña"></div>
+          <div><label class="cot-label">Confirmar contraseña</label>
+            <input class="cot-input" id="mp-pass-confirm" type="password" placeholder="Repetir contraseña"></div>
+        </div>
+      </div>
+      <div style="display:flex;gap:10px;margin-top:8px">
+        <button class="btn btn-primary" onclick="guardarMiPerfil()">Guardar cambios</button>
+        <button class="btn btn-ghost" onclick="renderMiPerfil(false)">Cancelar</button>
+      </div>
+      <div id="mp-alert" style="margin-top:12px"></div>
+    </div>
+  `;
+}
+
+async function guardarMiPerfil() {
+  const alertEl = document.getElementById('mp-alert');
+  const passNueva = document.getElementById('mp-pass-nueva')?.value;
+  const passConfirm = document.getElementById('mp-pass-confirm')?.value;
+
+  if (passNueva && passNueva !== passConfirm) {
+    alertEl.innerHTML = '<div class="alert alert-error">Las contraseñas no coinciden</div>';
+    return;
+  }
+
+  const body = {
+    nombre: document.getElementById('mp-nombre')?.value.trim(),
+    celular: document.getElementById('mp-celular')?.value.trim() || null,
+    talla_playera: document.getElementById('mp-talla_playera')?.value || null,
+    fecha_nacimiento: document.getElementById('mp-fecha_nacimiento')?.value || null,
+    correo_notif: document.getElementById('mp-correo_notif')?.value.trim() || null,
+    nombre_emergencia: document.getElementById('mp-nombre_emergencia')?.value.trim() || null,
+    num_emergencia: document.getElementById('mp-num_emergencia')?.value.trim() || null,
+    template_sugerido: document.getElementById('mp-template_sugerido')?.value.trim() || null,
+    perfil_completo: true,
+  };
+
+  if (passNueva) body.password_hash = passNueva;
+
+  try {
+    await fetch(`${SB_URL}/rest/v1/usuarios?id=eq.${currentUser.id}`, {
+      method: 'PATCH',
+      headers: { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    alertEl.innerHTML = '<div class="alert" style="background:rgba(45,198,83,.1);color:var(--green)">Perfil guardado</div>';
+    currentUser = { ...currentUser, ...body };
+    setTimeout(() => renderMiPerfil(false), 1500);
+    loadEquipo();
+  } catch(e) {
+    alertEl.innerHTML = `<div class="alert alert-error">${e.message}</div>`;
+  }
+}
+
+// ─── SUBIR FOTO ───
+async function subirFoto(userId) {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'image/jpeg,image/png,image/webp';
+  input.onchange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) { alert('La foto no puede pesar más de 2MB'); return; }
+
+    const ext = file.name.split('.').pop();
+    const path = `${userId}/avatar.${ext}`;
+
+    try {
+      // Subir a Supabase Storage bucket 'perfiles'
+      const uploadResp = await fetch(`${SB_URL}/storage/v1/object/perfiles/${path}`, {
+        method: 'POST',
+        headers: {
+          'apikey': SB_KEY,
+          'Authorization': `Bearer ${SB_KEY}`,
+          'Content-Type': file.type,
+          'x-upsert': 'true'
+        },
+        body: file
+      });
+
+      if (!uploadResp.ok) throw new Error('Error subiendo foto');
+
+      const fotoUrl = `${SB_URL}/storage/v1/object/public/perfiles/${path}`;
+
+      await fetch(`${SB_URL}/rest/v1/usuarios?id=eq.${userId}`, {
+        method: 'PATCH',
+        headers: { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ foto_url: fotoUrl })
+      });
+
+      await loadEquipo();
+      cerrarModal('ver-perfil');
+      abrirPerfil(userId);
+    } catch(e) { alert('Error subiendo foto: ' + e.message); }
+  };
+  input.click();
 }
 
 

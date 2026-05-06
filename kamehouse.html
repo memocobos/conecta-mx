@@ -596,7 +596,7 @@ tr:hover td{background:rgba(255,107,0,.03)}
  Palacio de Kamisama
  </button>
  <div class="nav-dropdown" id="nav-dropdown-herramientas">
- <button class="nav-dropdown-btn" onclick="toggleDropdown()" id="nav-herramientas">
+ <button class="nav-dropdown-btn" onclick="toggleDropdown(event)" id="nav-herramientas">
  Herramientas
  <span class="drop-arrow">▼</span>
  </button>
@@ -1537,14 +1537,16 @@ const SESSION_HOURS = 8;
 
 // Usuario actual en sesión
 let currentUser = null;
+let _karinCatFilter = 'all';
+let _karinPiezasCache = [];
 
 // Roles con acceso al kamehouse.html (admin panel)
 const ROLES_ADMIN = ['maestro_roshi', 'bulma', 'mister_popo', 'coordinador', 'cc', 'vendedor'];
 
 // Pestañas visibles por rol
 const PERMISOS_TABS = {
-  maestro_roshi: ['resumen','pagos','eventos','gastos','ventas','inventario','equipo','capsule','cotizador'],
-  bulma:         ['resumen','pagos','eventos','gastos','ventas','inventario','equipo','capsule','cotizador'],
+  maestro_roshi: ['resumen','pagos','eventos','gastos','ventas','inventario','equipo','capsule','cotizador','herramientas'],
+  bulma:         ['resumen','pagos','eventos','gastos','ventas','inventario','equipo','capsule','cotizador','herramientas'],
   mister_popo:   ['inventario'],
   coordinador:   ['inventario'],
   cc:            ['inventario'],
@@ -1684,6 +1686,13 @@ function aplicarPermisosUI() {
       btn.style.display = 'none';
     }
   });
+
+  // Mostrar dropdown Herramientas solo para roles administrativos
+  const dropdownHerr = document.getElementById('nav-dropdown-herramientas');
+  if (dropdownHerr) {
+    const verHerr = ['maestro_roshi','bulma'].includes(currentUser.rol);
+    dropdownHerr.style.display = verHerr ? '' : 'none';
+  }
 
   // Ocultar botones de admin en Torre de Karin si no es roshi/mister_popo
   const karinAdminBtns = document.getElementById('karin-admin-btns');
@@ -3745,9 +3754,6 @@ async function crearEventoDesdeCotizador() {
 // ═══════════════════════════════════════════════════════════════
 // TORRE DE KARIN — Lógica de bodega
 // ═══════════════════════════════════════════════════════════════
-let _karinCatFilter = 'all';
-let _karinPiezasCache = [];
-
 async function loadKarin() {
   await loadKarinInventario();
   await loadKarinAlerts();
@@ -4057,7 +4063,8 @@ if (checkSession()) {
 }
 
 // ── DROPDOWN HERRAMIENTAS ──
-function toggleDropdown() {
+function toggleDropdown(e) {
+  if (e) e.stopPropagation();
   const dd = document.getElementById('nav-dropdown-herramientas');
   dd.classList.toggle('open');
 }

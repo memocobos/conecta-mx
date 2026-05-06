@@ -201,6 +201,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Montse
 .nav-dropdown-btn.active{color:var(--orange);border-bottom-color:var(--orange);background:rgba(255,107,0,.05);}
 .nav-dropdown-btn .drop-arrow{font-size:8px;margin-top:1px;transition:transform .2s;}
 .nav-dropdown.open .drop-arrow{transform:rotate(180deg);}
+.nav-dropdown.open .nav-dropdown-menu{display:block;}
 .nav-dropdown-menu{
   display:none;position:absolute;top:100%;left:0;z-index:200;
   background:var(--bg2);border:1px solid var(--border2);
@@ -588,9 +589,6 @@ tr:hover td{background:rgba(255,107,0,.03)}
  <button class="nav-btn" onclick="showPage('equipo')" id="nav-equipo">
  Guerreros Z
  </button>
- <button class="nav-btn" onclick="showPage('karin')" id="nav-karin">
- Torre de Karin
- </button>
  <button class="nav-btn" onclick="showPage('capsule')" id="nav-capsule">
  Capsule Corp
  </button>
@@ -850,63 +848,32 @@ tr:hover td{background:rgba(255,107,0,.03)}
  </div>
  </div>
 
- <!-- ─── INVENTARIO ─── -->
- <div class="page" id="page-inventario">
- <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
- <div class="section-title">Torre de Karin</div>
- <button class="btn btn-primary" onclick="openModal('modal-kit')">+ Agregar Pieza</button>
- </div>
- <div class="section-sub">Control de kits y bodega</div>
-
- <div class="metrics-grid" style="margin-bottom:16px">
- <div class="metric">
- <div class="metric-label">Valor Bodega</div>
- <div class="metric-value" id="inv-valor">—</div>
- </div>
- <div class="metric">
- <div class="metric-label">Piezas</div>
- <div class="metric-value" id="inv-piezas">—</div>
- </div>
- </div>
-
- <div class="table-wrap">
- <table>
- <thead>
- <tr>
- <th>Pieza</th><th>Cantidad</th><th>Costo Unit.</th>
- <th>Valor Total</th><th>Stock Mín.</th><th>Proveedor</th><th>Acciones</th>
- </tr>
- </thead>
- <tbody id="tabla-inventario">
- <tr><td colspan="7"><div class="loading-state"><div class="spinner"></div>Cargando…</div></td></tr>
- </tbody>
- </table>
- </div>
- </div>
-
- <!-- ─── EQUIPO ─── -->
- <div class="page" id="page-equipo">
- <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
- <div class="section-title">Guerreros Z</div>
- <button class="btn btn-primary" onclick="openModal('modal-vendedor')">+ Agregar</button>
- </div>
- <div class="section-sub">Guerreros Z — Tu equipo de Conecta Reynosa</div>
- <div id="equipo-grid" class="metrics-grid">
- <div class="loading-state"><div class="spinner"></div>Cargando…</div>
- </div>
- </div>
-
- 
-     <!-- ─── TORRE DE KARIN ─── -->
-     <div class="page" id="page-karin">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+ <!-- ─── TORRE DE KARIN (Inventario / Bodega) ─── -->
+     <div class="page" id="page-inventario">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;flex-wrap:wrap;gap:8px">
        <div>
         <div class="section-title">Torre de Karin</div>
-        <div class="section-sub">Control de inventario de bodega · Solo Maestro Roshi y Mister Popo</div>
+        <div class="section-sub">Bodega de kits — control de piezas, stock, movimientos y proveedores</div>
        </div>
        <div style="display:flex;gap:8px" id="karin-admin-btns">
         <button class="btn btn-ghost btn-sm" onclick="abrirModalPieza()">+ Nueva pieza</button>
         <button class="btn btn-primary btn-sm" onclick="abrirModalMovimiento()">+ Movimiento</button>
+       </div>
+      </div>
+
+      <!-- Métricas -->
+      <div class="metrics-grid" style="margin-bottom:16px">
+       <div class="metric">
+        <div class="metric-label">Valor Bodega</div>
+        <div class="metric-value" id="inv-valor">—</div>
+       </div>
+       <div class="metric">
+        <div class="metric-label">Piezas Totales</div>
+        <div class="metric-value" id="inv-piezas">—</div>
+       </div>
+       <div class="metric">
+        <div class="metric-label">Stock Bajo</div>
+        <div class="metric-value" id="inv-bajo" style="color:var(--red)">—</div>
        </div>
       </div>
 
@@ -915,33 +882,36 @@ tr:hover td{background:rgba(255,107,0,.03)}
 
       <!-- Tabs -->
       <div class="cot-tabs" style="margin-bottom:16px">
-       <button class="cot-tab active" onclick="switchKarinTab('inventario',this)" id="ktab-inventario"> Inventario</button>
-       <button class="cot-tab" onclick="switchKarinTab('movimientos',this)" id="ktab-movimientos"> Historial</button>
+       <button class="cot-tab active" onclick="switchKarinTab('inventario',this)" id="ktab-inventario">Inventario</button>
+       <button class="cot-tab" onclick="switchKarinTab('movimientos',this)" id="ktab-movimientos">Historial</button>
       </div>
 
       <!-- TAB INVENTARIO -->
       <div id="karin-tab-inventario">
        <div style="display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap">
-        <button class="btn btn-ghost btn-sm karin-cat active" onclick="filtrarKarin('all',this)">Todos</button>
-        <button class="btn btn-ghost btn-sm karin-cat" onclick="filtrarKarin('ropa',this)"> Ropa</button>
-        <button class="btn btn-ghost btn-sm karin-cat" onclick="filtrarKarin('accesorio',this)"> Accesorios</button>
-        <button class="btn btn-ghost btn-sm karin-cat" onclick="filtrarKarin('comida',this)"> Comida</button>
-        <button class="btn btn-ghost btn-sm karin-cat" onclick="filtrarKarin('otro',this)"> Otro</button>
+        <button class="btn btn-ghost btn-sm karin-cat active" onclick="filtrarKarin('all',this)">Todas</button>
+        <button class="btn btn-ghost btn-sm karin-cat" onclick="filtrarKarin('ropa',this)">Ropa</button>
+        <button class="btn btn-ghost btn-sm karin-cat" onclick="filtrarKarin('accesorio',this)">Accesorios</button>
+        <button class="btn btn-ghost btn-sm karin-cat" onclick="filtrarKarin('comida',this)">Comida</button>
+        <button class="btn btn-ghost btn-sm karin-cat" onclick="filtrarKarin('otro',this)">Otro</button>
        </div>
        <div class="table-wrap">
         <table>
          <thead>
           <tr>
            <th>Pieza</th>
-           <th>Categoría</th>
+           <th>Categoria</th>
            <th>Stock actual</th>
-           <th>Stock mínimo</th>
+           <th>Stock min.</th>
+           <th>Costo unit.</th>
+           <th>Valor total</th>
+           <th>Proveedor</th>
            <th>Estado</th>
            <th id="karin-col-acciones">Acciones</th>
           </tr>
          </thead>
          <tbody id="karin-tabla-piezas">
-          <tr><td colspan="6"><div class="loading-state"><div class="spinner"></div>Cargando…</div></td></tr>
+          <tr><td colspan="9"><div class="loading-state"><div class="spinner"></div>Cargando…</div></td></tr>
          </tbody>
         </table>
        </div>
@@ -974,904 +944,7 @@ tr:hover td{background:rgba(255,107,0,.03)}
       </div>
      </div>
 
-
-     <!-- ─── CAPSULE CORP ─── -->
- <div class="page" id="page-capsule">
- <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
- <div class="section-title">Capsule Corp</div>
- <button class="btn btn-primary" onclick="abrirNuevoEvento()">+ Nuevo Evento</button>
- </div>
- <div class="section-sub">Área de trabajo de Bulma — En construcción</div>
- <div style="margin-top:48px;text-align:center;color:var(--ts)">
-       <div style="font-size:48px;margin-bottom:16px"></div>
-       <div style="font-size:16px;font-weight:700;color:var(--text);margin-bottom:8px">Capsule Corp v2 en camino</div>
-       <div style="font-size:13px">Gestión de viajeros, rooming list interactivo y asignación de eventos.<br>Próxima actualización.</div>
-      </div>l lang="es">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>KAME · HOUSE — Conecta Reynosa</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800;900&family=Montserrat:wght@400;500;600;700&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
-<style>
-/* ═══════════════════════════════════════════════
- VARIABLES Y RESET
-═══════════════════════════════════════════════ */
-:root {
- /* Paleta Dragon Ball — oscuro con acento naranja-fuego y dorado */
- --orange: #E85D04;
- --orange2: #F48C06;
- --gold: #FFB703;
- --gold2: #FB8500;
- --bg: #06060A;
- --bg2: #0D0D14;
- --bg3: #14141E;
- --bg4: #1A1A28;
- --border: rgba(255,255,255,.06);
- --border2: rgba(232,93,4,.25);
- --border3: rgba(255,183,3,.15);
- --text: #EEEEF5;
- --ts: rgba(238,238,245,.4);
- --ts2: rgba(238,238,245,.2);
- --green: #2DC653;
- --red: #E63946;
- --blue: #4CC9F0;
- --card: rgba(255,255,255,.025);
- --card2: rgba(232,93,4,.04);
- --radius: 8px;
- --radius2: 12px;
- --shadow: 0 12px 40px rgba(0,0,0,.7);
- --shadow2: 0 4px 16px rgba(0,0,0,.5);
- /* Glow effects */
- --glow-orange: 0 0 20px rgba(232,93,4,.3);
- --glow-gold: 0 0 20px rgba(255,183,3,.2);
-}
-*{margin:0;padding:0;box-sizing:border-box}
-html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Montserrat',sans-serif;overflow:hidden}
-
-/* ═══════════════════════════════════════════════
- PANTALLA DE LOGIN
-═══════════════════════════════════════════════ */
-#login-screen{
- position:fixed;inset:0;z-index:1000;
- display:flex;align-items:center;justify-content:center;
- background:var(--bg);
-}
-.login-bg{
- position:absolute;inset:0;
- background:
- radial-gradient(ellipse 70% 60% at 15% 50%, rgba(232,93,4,.1) 0%, transparent 65%),
- radial-gradient(ellipse 50% 70% at 85% 20%, rgba(255,183,3,.07) 0%, transparent 65%),
- radial-gradient(ellipse 30% 40% at 50% 90%, rgba(232,93,4,.05) 0%, transparent 60%);
-}
-.login-card{
- position:relative;z-index:1;
- width:100%;max-width:380px;
- background:var(--bg2);
- border:1px solid rgba(232,93,4,.2);
- border-top:1px solid rgba(255,183,3,.2);
- border-radius:16px;
- padding:48px 40px;
- box-shadow:0 32px 80px rgba(0,0,0,.8),var(--glow-orange);
-}
-.login-logo{
- font-family:'Rajdhani',sans-serif;
- font-size:36px;font-weight:700;
- letter-spacing:.16em;text-transform:uppercase;
- background:linear-gradient(90deg,var(--text),var(--gold));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;margin-bottom:4px;
-}
-.login-logo span{color:var(--orange)}
-.login-sub{
- font-size:10px;font-weight:600;letter-spacing:.25em;
- text-transform:uppercase;color:var(--ts);margin-bottom:36px;
-}
-.login-field{margin-bottom:16px}
-.login-field label{
- display:block;font-size:10px;font-weight:700;
- letter-spacing:.18em;text-transform:uppercase;
- color:var(--ts);margin-bottom:8px;
-}
-.login-field input{
- width:100%;background:rgba(255,255,255,.04);
- border:1px solid var(--border);border-radius:8px;
- padding:12px 16px;color:var(--text);font-family:'Montserrat',sans-serif;
- font-size:14px;font-weight:500;outline:none;
- transition:border-color .2s;
-}
-.login-field input:focus{border-color:var(--orange)}
-.login-btn{
- width:100%;margin-top:8px;
- background:linear-gradient(135deg,var(--orange),var(--orange2));
- border:none;border-radius:8px;padding:14px;
- color:#fff;font-family:'Barlow Condensed',sans-serif;
- font-size:16px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;
- cursor:pointer;transition:opacity .2s,transform .1s;
-}
-.login-btn:hover{opacity:.9}
-.login-btn:active{transform:scale(.98)}
-.login-error{
- margin-top:12px;padding:10px 14px;
- background:rgba(255,68,68,.1);border:1px solid rgba(255,68,68,.3);
- border-radius:8px;font-size:12px;color:var(--red);
- display:none;text-align:center;
-}
-
-/* ═══════════════════════════════════════════════
- APP PRINCIPAL (oculta hasta login)
-═══════════════════════════════════════════════ */
-#app{display:none;height:100%;flex-direction:column}
-#app.visible{display:flex}
-
-/* ═══════════════════════════════════════════════
- TOPBAR
-═══════════════════════════════════════════════ */
-.topbar{
- display:flex;align-items:center;justify-content:space-between;
- padding:0 20px;height:52px;
- background:var(--bg2);
- border-bottom:1px solid var(--border);
- flex-shrink:0;
- position:relative;
-}
-.topbar::after{
- content:'';position:absolute;bottom:0;left:0;right:0;height:1px;
- background:linear-gradient(90deg,transparent,var(--orange),var(--gold),var(--orange),transparent);
- opacity:.4;
-}
-.topbar-logo{
- font-family:'Barlow Condensed',sans-serif;
- font-size:20px;font-weight:900;letter-spacing:.1em;text-transform:uppercase;
-}
-.topbar-logo span{color:var(--orange)}
-.topbar-right{display:flex;align-items:center;gap:12px}
-.topbar-user{
- font-size:11px;font-weight:600;letter-spacing:.1em;
- text-transform:uppercase;color:var(--ts);
-}
-.topbar-dot{
- width:8px;height:8px;border-radius:50%;
- background:var(--green);box-shadow:0 0 8px var(--green);
-}
-.btn-logout{
- background:none;border:1px solid var(--border);
- border-radius:6px;padding:6px 12px;
- color:var(--ts);font-family:'Barlow Condensed',sans-serif;
- font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;
- cursor:pointer;transition:all .2s;
-}
-.btn-logout:hover{border-color:var(--red);color:var(--red)}
-
-/* ═══════════════════════════════════════════════
- NAV PESTAÑAS (horizontal scroll en mobile)
-═══════════════════════════════════════════════ */
-.nav{
- display:flex;align-items:stretch;
- background:linear-gradient(180deg,var(--bg2),rgba(13,13,20,.95));
- border-bottom:1px solid var(--border);
- overflow-x:auto;flex-shrink:0;
- scrollbar-width:none;
- position:relative;
-}
-.nav::-webkit-scrollbar{display:none}
-.nav-btn{
- display:flex;flex-direction:column;align-items:center;justify-content:center;
- gap:3px;padding:10px 18px;min-width:80px;
- background:none;border:none;border-bottom:2px solid transparent;
- color:var(--ts);cursor:pointer;transition:all .2s;
- font-family:'Rajdhani',sans-serif;
- font-size:11px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;
- white-space:nowrap;position:relative;
-}
-.nav-btn .nav-icon{font-size:16px}
-.nav-btn:hover{color:var(--text);background:rgba(255,255,255,.03)}
-.nav-btn.active{
- color:var(--gold);border-bottom-color:var(--orange);
- background:linear-gradient(180deg,transparent,rgba(232,93,4,.06));
-}
-.nav-btn.active::after{
- content:'';position:absolute;bottom:-2px;left:20%;right:20%;height:2px;
- background:linear-gradient(90deg,transparent,var(--gold),transparent);
- border-radius:2px;
-}
-/* ── NAV DROPDOWN HERRAMIENTAS ── */
-.nav-dropdown{position:relative;display:inline-flex;}
-.nav-dropdown-btn{
-  display:flex;flex-direction:column;align-items:center;justify-content:center;
-  gap:3px;padding:10px 16px;min-width:80px;
-  background:none;border:none;border-bottom:2px solid transparent;
-  color:var(--ts);cursor:pointer;transition:all .2s;
-  font-family:'Barlow Condensed',sans-serif;
-  font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
-  white-space:nowrap;
-}
-.nav-dropdown-btn:hover{color:var(--text);background:rgba(255,255,255,.03);}
-.nav-dropdown-btn.active{color:var(--orange);border-bottom-color:var(--orange);background:rgba(255,107,0,.05);}
-.nav-dropdown-btn .drop-arrow{font-size:8px;margin-top:1px;transition:transform .2s;}
-.nav-dropdown.open .drop-arrow{transform:rotate(180deg);}
-.nav-dropdown-menu{
-  display:none;position:absolute;top:100%;left:0;z-index:200;
-  background:var(--bg2);border:1px solid var(--border2);
-  border-radius:8px;min-width:140px;
-  box-shadow:0 8px 24px rgba(0,0,0,.6);
-  overflow:hidden;
-}
-.nav-dropdown.open .nav-dropdown-menu{display:block;}
-.nav-dropdown-item{
-  display:block;width:100%;padding:11px 16px;
-  background:none;border:none;text-align:left;
-  font-family:'Barlow Condensed',sans-serif;
-  font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
-  color:var(--ts);cursor:pointer;transition:all .15s;
-  border-bottom:1px solid var(--border);
-}
-.nav-dropdown-item:last-child{border-bottom:none;}
-.nav-dropdown-item:hover{background:rgba(255,107,0,.08);color:var(--orange);}
-.nav-dropdown-item.active{color:var(--orange);}
-
-
-/* ═══════════════════════════════════════════════
- ÁREA DE CONTENIDO
-═══════════════════════════════════════════════ */
-.content{
- flex:1;overflow-y:auto;padding:20px;
- scrollbar-width:thin;scrollbar-color:var(--border) transparent;
-}
-.content::-webkit-scrollbar{width:4px}
-.content::-webkit-scrollbar-thumb{background:var(--border)}
-
-/* ═══════════════════════════════════════════════
- COMPONENTES GENERALES
-═══════════════════════════════════════════════ */
-.page{display:none}
-.page.active{display:block}
-
-.section-title{
- font-family:'Rajdhani',sans-serif;
- font-size:22px;font-weight:700;letter-spacing:.14em;
- text-transform:uppercase;
- margin-bottom:4px;
- background:linear-gradient(90deg,var(--text) 60%,var(--gold));
- -webkit-background-clip:text;-webkit-text-fill-color:transparent;
- background-clip:text;display:inline-block;
-}
-.section-sub{
- font-size:11px;color:var(--ts);font-weight:500;
- letter-spacing:.06em;margin-bottom:20px;
-}
-
-/* Cards */
-.card{
- background:var(--bg2);
- border:1px solid var(--border);
- border-top:1px solid rgba(255,183,3,.08);
- border-radius:var(--radius2);padding:20px;
- transition:all .25s;
- position:relative;overflow:hidden;
-}
-.card::before{
- content:'';position:absolute;top:0;left:0;right:0;height:1px;
- background:linear-gradient(90deg,transparent,rgba(255,183,3,.2),transparent);
-}
-.card:hover{
- border-color:rgba(232,93,4,.2);
- box-shadow:0 4px 24px rgba(232,93,4,.08);
-}
-
-/* Grid de métricas */
-.metrics-grid{
- display:grid;
- grid-template-columns:repeat(auto-fit,minmax(160px,1fr));
- gap:12px;margin-bottom:20px;
-}
-.metric{
- background:var(--bg3);
- border:1px solid var(--border);
- border-bottom:1px solid rgba(255,183,3,.1);
- border-radius:var(--radius2);padding:16px;
- position:relative;overflow:hidden;
- transition:all .2s;
-}
-.metric:hover{background:var(--bg4);border-color:rgba(232,93,4,.2);}
-.metric::before{
- content:'';position:absolute;top:0;left:0;right:0;height:2px;
- background:linear-gradient(90deg,var(--orange),var(--gold),var(--orange2));
- opacity:.8;
-}
-.metric-label{
- font-size:9px;font-weight:700;letter-spacing:.2em;
- text-transform:uppercase;color:var(--ts);margin-bottom:8px;
-}
-.metric-value{
- font-family:'Barlow Condensed',sans-serif;
- font-size:28px;font-weight:900;color:var(--gold);
- line-height:1;
-}
-.metric-value.green{color:var(--green)}
-.metric-value.red{color:var(--red)}
-.metric-sub{font-size:10px;color:var(--ts2);margin-top:4px}
-
-/* Tabla */
-.table-wrap{overflow-x:auto;border-radius:var(--radius);border:1px solid var(--border)}
-table{width:100%;border-collapse:collapse}
-th{
- font-family:'Rajdhani',sans-serif;
- font-size:9px;font-weight:800;letter-spacing:.2em;
- text-transform:uppercase;color:var(--gold);
- padding:10px 14px;border-bottom:1px solid rgba(255,183,3,.15);
- text-align:left;white-space:nowrap;background:var(--bg3);
-}
-td{
- padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.04);
- font-size:13px;font-weight:500;vertical-align:middle;
-}
-tr:last-child td{border-bottom:none}
-tr:hover td{background:rgba(255,107,0,.03)}
-
-/* Badges */
-.badge{
- display:inline-block;font-family:'Barlow Condensed',sans-serif;
- font-size:9px;font-weight:800;padding:3px 8px;
- text-transform:uppercase;letter-spacing:.12em;border-radius:4px;
-}
-.badge-green{background:rgba(61,220,132,.12);color:var(--green);border:1px solid rgba(61,220,132,.25)}
-.badge-red{background:rgba(255,68,68,.12);color:var(--red);border:1px solid rgba(255,68,68,.25)}
-.badge-orange{background:rgba(255,107,0,.12);color:var(--orange);border:1px solid rgba(255,107,0,.25)}
-.badge-gold{background:rgba(255,215,0,.1);color:var(--gold);border:1px solid rgba(255,215,0,.25)}
-.badge-blue{background:rgba(94,167,255,.1);color:var(--blue);border:1px solid rgba(94,167,255,.25)}
-.badge-gray{background:rgba(255,255,255,.05);color:var(--ts);border:1px solid var(--border)}
-
-/* Botones */
-.btn{
- display:inline-flex;align-items:center;gap:6px;
- font-family:'Barlow Condensed',sans-serif;
- font-size:12px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;
- padding:8px 16px;border-radius:7px;border:none;cursor:pointer;
- transition:all .2s;text-decoration:none;
-}
-.btn-primary{background:linear-gradient(135deg,var(--orange),var(--gold2));color:#fff;box-shadow:0 2px 14px rgba(232,93,4,.3);}
-.btn-primary:hover{opacity:.9;transform:translateY(-1px);box-shadow:0 4px 20px rgba(232,93,4,.4);}
-.btn-ghost{background:transparent;border:1px solid var(--border);color:var(--ts)}
-.btn-ghost:hover{border-color:var(--gold);color:var(--gold);background:rgba(255,183,3,.04)}
-.btn-green{background:rgba(61,220,132,.15);border:1px solid rgba(61,220,132,.3);color:var(--green)}
-.btn-red{background:rgba(255,68,68,.12);border:1px solid rgba(255,68,68,.25);color:var(--red)}
-.btn-sm{padding:5px 10px;font-size:10px}
-
-/* Forms */
-.form-row{display:grid;gap:12px;margin-bottom:12px}
-.form-row.cols-2{grid-template-columns:1fr 1fr}
-.form-row.cols-3{grid-template-columns:1fr 1fr 1fr}
-.form-group label{
- display:block;font-size:9px;font-weight:700;letter-spacing:.18em;
- text-transform:uppercase;color:var(--ts);margin-bottom:6px;
-}
-.form-group input,
-.form-group select,
-.form-group textarea{
- width:100%;background:rgba(255,255,255,.04);
- border:1px solid var(--border);border-radius:7px;
- padding:10px 12px;color:var(--text);
- font-family:'Montserrat',sans-serif;font-size:13px;outline:none;
- transition:border-color .2s;
-}
-.form-group input:focus,
-.form-group select:focus,
-.form-group textarea:focus{border-color:var(--orange)}
-.form-group select option{background:var(--bg2)}
-
-/* Loading */
-.loading-state{
- text-align:center;padding:48px;
- font-family:'Barlow Condensed',sans-serif;
- font-size:12px;letter-spacing:.2em;text-transform:uppercase;color:var(--ts);
-}
-.spinner{
- width:24px;height:24px;margin:0 auto 12px;
- border:2px solid var(--border);border-top-color:var(--orange);
- border-radius:50%;animation:spin .7s linear infinite;
-}
-@keyframes spin{to{transform:rotate(360deg)}}
-
-/* Empty state */
-.empty-state{
- text-align:center;padding:48px;color:var(--ts);
- font-size:13px;
-}
-.empty-state .empty-icon{font-size:40px;margin-bottom:12px;opacity:.5}
-
-/* Divider */
-.divider{height:1px;background:var(--border);margin:20px 0}
-
-/* Alert */
-.alert{
- padding:12px 16px;border-radius:8px;
- font-size:13px;margin-bottom:16px;
-}
-.alert-success{background:rgba(61,220,132,.1);border:1px solid rgba(61,220,132,.25);color:var(--green)}
-.alert-error{background:rgba(255,68,68,.1);border:1px solid rgba(255,68,68,.25);color:var(--red)}
-.alert-info{background:rgba(94,167,255,.1);border:1px solid rgba(94,167,255,.25);color:var(--blue)}
-
-/* Modal */
-.modal-overlay{
- position:fixed;inset:0;z-index:500;
- background:rgba(0,0,0,.7);backdrop-filter:blur(4px);
- display:none;align-items:center;justify-content:center;padding:20px;
-}
-.modal-overlay.open{display:flex}
-.modal{
- background:var(--bg2);border:1px solid var(--border2);
- border-radius:14px;width:100%;max-width:520px;
- max-height:90vh;overflow-y:auto;
- box-shadow:var(--shadow);
-}
-.modal-header{
- display:flex;align-items:center;justify-content:space-between;
- padding:20px 24px;border-bottom:1px solid var(--border);
-}
-.modal-title{
- font-family:'Barlow Condensed',sans-serif;
- font-size:18px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;
-}
-.modal-close{
- background:none;border:none;color:var(--ts);
- font-size:20px;cursor:pointer;padding:4px;
-}
-.modal-body{padding:24px}
-.modal-footer{
- padding:16px 24px;border-top:1px solid var(--border);
- display:flex;gap:10px;justify-content:flex-end;
-}
-
-/* ═══════════════════════════════════════════════
- RESPONSIVE
-═══════════════════════════════════════════════ */
-@media(max-width:640px){
- .content{padding:14px}
- .form-row.cols-2,.form-row.cols-3{grid-template-columns:1fr}
- .metrics-grid{grid-template-columns:1fr 1fr}
- .metric-value{font-size:22px}
- .nav-btn{min-width:64px;padding:8px 10px}
-}
-
-/* ═══════════════════════════════════════════════
- COTIZADOR v3
-═══════════════════════════════════════════════ */
-#page-cotizador .card{margin-bottom:0}
-.cot-section-label{
- font-family:'Barlow Condensed',sans-serif;
- font-size:11px;font-weight:800;letter-spacing:.2em;
- text-transform:uppercase;color:var(--orange);
- margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;
-}
-.cot-input{
- width:100%;background:rgba(255,255,255,.04);border:1px solid var(--border);
- border-radius:7px;padding:8px 10px;color:var(--text);
- font-family:'Montserrat',sans-serif;font-size:12px;outline:none;
- transition:border-color .2s;
-}
-.cot-input:focus{border-color:var(--orange)}
-.cot-input[readonly]{color:var(--ts);cursor:not-allowed}
-.cot-desglose-row{
- display:flex;justify-content:space-between;align-items:center;
- padding:5px 0;border-bottom:1px solid rgba(255,255,255,.04);font-size:12px;
-}
-.cot-desglose-row:last-child{border-bottom:none}
-.cot-desglose-total{
- display:flex;justify-content:space-between;align-items:center;
- padding:8px 0 0;margin-top:4px;border-top:2px solid var(--border2);
- font-family:'Barlow Condensed',sans-serif;font-size:15px;font-weight:800;
- letter-spacing:.06em;text-transform:uppercase;
-}
-.cot-escenario{
- display:flex;align-items:center;justify-content:space-between;
- padding:10px 14px;border-radius:8px;border:1px solid var(--border);margin-bottom:8px;
-}
-.cot-escenario.pesimista{border-color:rgba(255,68,68,.25);background:rgba(255,68,68,.04)}
-.cot-escenario.realista{border-color:rgba(255,215,0,.3);background:rgba(255,215,0,.04)}
-.cot-escenario.optimista{border-color:rgba(61,220,132,.25);background:rgba(61,220,132,.04)}
-.cot-esc-label{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase}
-.cot-esc-sub{font-size:10px;color:var(--ts);margin-top:2px}
-.cot-esc-precio{font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:900;letter-spacing:.04em;text-align:right}
-.cot-paquete-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:8px}
-.cot-pkg{text-align:center;border-radius:8px;padding:10px 8px;border:1px solid var(--border)}
-.cot-pkg-nombre{font-size:9px;font-weight:800;letter-spacing:.15em;text-transform:uppercase;margin-bottom:4px}
-.cot-pkg-precio{font-family:'Barlow Condensed',sans-serif;font-size:21px;font-weight:900}
-.cot-pkg-sub{font-size:9px;color:var(--ts);margin-top:2px}
-.cot-staff-card{
- background:rgba(255,255,255,.03);border:1px solid var(--border);
- border-radius:8px;padding:10px 12px;margin-bottom:8px;
-}
-.cot-staff-costo{
- display:inline-block;font-family:'Barlow Condensed',sans-serif;
- font-size:13px;font-weight:800;color:var(--orange);
- background:rgba(255,107,0,.1);border:1px solid rgba(255,107,0,.2);
- border-radius:4px;padding:2px 8px;margin-left:8px;
-}
-.cot-tabs{display:flex;gap:6px;margin-bottom:14px}
-.cot-tab{
- font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:800;
- letter-spacing:.1em;text-transform:uppercase;padding:6px 14px;
- border-radius:6px;border:1px solid var(--border);
- background:none;color:var(--ts);cursor:pointer;transition:all .2s;
-}
-.cot-tab.active{background:rgba(255,107,0,.15);border-color:var(--orange);color:var(--orange)}
-.cot-mode{display:none}
-.cot-mode.active{display:block}
-.cot-kit-item{
- display:flex;align-items:center;gap:8px;padding:5px 0;
- border-bottom:1px solid rgba(255,255,255,.04);font-size:12px;
-}
-.cot-kit-item:last-child{border-bottom:none}
-.cot-kit-item input[type=checkbox]{accent-color:var(--orange);width:14px;height:14px;cursor:pointer}
-.cot-event-header{
- background:rgba(255,107,0,.06);border:1px solid rgba(255,107,0,.15);
- border-radius:8px;padding:12px 14px;margin-bottom:14px;
-}
-.cot-event-header-titulo{
- font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:900;
- letter-spacing:.06em;text-transform:uppercase;color:var(--text);line-height:1.1;
-}
-.cot-event-header-sub{font-size:11px;color:var(--ts);margin-top:4px;line-height:1.6}
-
-</style>
-</head>
-<body>
-
-<!-- ═══════════════════════════════════════════════
- PANTALLA DE LOGIN
-═══════════════════════════════════════════════ -->
-<div id="login-screen">
- <div class="login-bg"></div>
- <div class="login-card">
- <div class="login-logo">KAME<span>·</span>HOUSE</div>
- <div class="login-sub">Conecta Reynosa · Sistema Interno</div>
- <div class="login-field">
- <label>Usuario</label>
- <input type="text" id="login-user" placeholder="usuario" autocomplete="username">
- </div>
- <div class="login-field">
- <label>Contraseña</label>
- <input type="password" id="login-pass" placeholder="••••••••" autocomplete="current-password">
- </div>
- <button class="login-btn" id="login-btn" onclick="doLogin()">Entrar</button>
- <div class="login-error" id="login-error">Correo o contraseña incorrectos</div>
- </div>
-</div>
-
-<!-- ═══════════════════════════════════════════════
- APP PRINCIPAL
-═══════════════════════════════════════════════ -->
-<div id="app">
-
- <!-- TOPBAR -->
- <div class="topbar">
- <div class="topbar-logo">KAME<span>·</span>HOUSE</div>
- <div class="topbar-right">
- <div class="topbar-dot"></div>
- <div class="topbar-user" id="topbar-user-info">—</div>
- <button class="btn-logout" onclick="doLogout()">Salir</button>
- </div>
- </div>
-
- <!-- NAV -->
- <nav class="nav">
- <button class="nav-btn active" onclick="showPage('resumen')" id="nav-resumen">
- Resumen
- </button>
- <button class="nav-btn" onclick="showPage('pagos')" id="nav-pagos">
- Pagos
- </button>
- <button class="nav-btn" onclick="showPage('eventos')" id="nav-eventos">
- Por Evento
- </button>
- <button class="nav-btn" onclick="showPage('gastos')" id="nav-gastos">
- Gastos
- </button>
- <button class="nav-btn" onclick="showPage('ventas')" id="nav-ventas">
- Mis Ventas
- </button>
- <button class="nav-btn" onclick="showPage('inventario')" id="nav-inventario">
- Torre de Karin
- </button>
- <button class="nav-btn" onclick="showPage('equipo')" id="nav-equipo">
- Guerreros Z
- </button>
- <button class="nav-btn" onclick="showPage('karin')" id="nav-karin">
- Torre de Karin
- </button>
- <button class="nav-btn" onclick="showPage('capsule')" id="nav-capsule">
- Capsule Corp
- </button>
- <button class="nav-btn" onclick="showPage('cotizador')" id="nav-cotizador">
- Palacio de Kamisama
- </button>
- <div class="nav-dropdown" id="nav-dropdown-herramientas">
- <button class="nav-dropdown-btn" onclick="toggleDropdown()" id="nav-herramientas">
- Herramientas
- <span class="drop-arrow">▼</span>
- </button>
- <div class="nav-dropdown-menu">
- <button class="nav-dropdown-item" id="nav-recibos" onclick="showHerramienta('recibos')">Recibos</button>
- <button class="nav-dropdown-item" id="nav-diseno" onclick="showHerramienta('diseno')">Diseno</button>
- </div>
- </div>
- </nav>
-
- <!-- CONTENIDO -->
- <div class="content">
-
- <!-- ─── RESUMEN ─── -->
- <div class="page active" id="page-resumen">
- <div class="section-title">Resumen</div>
- <div class="section-sub">Vista general del negocio en tiempo real</div>
-
- <div class="metrics-grid" id="metrics-grid">
- <div class="metric">
- <div class="metric-label">Cobrado</div>
- <div class="metric-value green" id="m-cobrado">—</div>
- <div class="metric-sub">Total ingresado</div>
- </div>
- <div class="metric">
- <div class="metric-label">Por Cobrar</div>
- <div class="metric-value" id="m-porcobrar">—</div>
- <div class="metric-sub">Saldo pendiente</div>
- </div>
- <div class="metric">
- <div class="metric-label">Facturado</div>
- <div class="metric-value" id="m-facturado">—</div>
- <div class="metric-sub">Total comprometido</div>
- </div>
- <div class="metric">
- <div class="metric-label">Viajeros</div>
- <div class="metric-value gold" id="m-viajeros">—</div>
- <div class="metric-sub">Clientes únicos</div>
- </div>
- <div class="metric">
- <div class="metric-label">Eventos Activos</div>
- <div class="metric-value" id="m-eventos">—</div>
- <div class="metric-sub">Con reservaciones</div>
- </div>
- </div>
-
- <!-- Próximos eventos -->
- <div class="card" style="margin-bottom:16px">
- <div style="font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--ts);margin-bottom:14px">
- Próximos Eventos
- </div>
- <div id="proximos-eventos">
- <div class="loading-state"><div class="spinner"></div>Cargando…</div>
- </div>
- </div>
-
- <!-- Últimas reservaciones -->
- <div class="card">
- <div style="font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--ts);margin-bottom:14px">
- Últimas Reservaciones
- </div>
- <div id="ultimas-reservaciones">
- <div class="loading-state"><div class="spinner"></div>Cargando…</div>
- </div>
- </div>
- </div>
-
- <!-- ─── PAGOS ─── -->
- <div class="page" id="page-pagos">
- <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
- <div class="section-title">Pagos</div>
- <button class="btn btn-primary" onclick="openModal('modal-pago')">+ Registrar Pago</button>
- </div>
- <div class="section-sub">Registra y administra todos los abonos de tus viajeros</div>
-
- <!-- Filtros -->
- <div class="card" style="margin-bottom:16px">
- <div class="form-row cols-3">
- <div class="form-group">
- <label>Evento</label>
- <select id="filtro-evento-pagos" onchange="loadPagos()">
- <option value="">Todos los eventos</option>
- </select>
- </div>
- <div class="form-group">
- <label>Status</label>
- <select id="filtro-status-pagos" onchange="loadPagos()">
- <option value="">Todos</option>
- <option value="En Proceso">En Proceso</option>
- <option value="Liquidado">Liquidado</option>
- <option value="Cancelado">Cancelado</option>
- <option value="Baja">Baja</option>
- </select>
- </div>
- <div class="form-group">
- <label>Buscar viajero</label>
- <input type="text" id="filtro-nombre-pagos" placeholder="Nombre..." oninput="loadPagos()">
- </div>
- </div>
- </div>
-
- <div class="table-wrap">
- <table>
- <thead>
- <tr>
- <th>Viajero</th>
- <th>Evento</th>
- <th>Paquete</th>
- <th>Total</th>
- <th>Abonado</th>
- <th>Resta</th>
- <th>Status</th>
- <th>Acciones</th>
- </tr>
- </thead>
- <tbody id="tabla-pagos">
- <tr><td colspan="8"><div class="loading-state"><div class="spinner"></div>Cargando…</div></td></tr>
- </tbody>
- </table>
- </div>
- </div>
-
- <!-- ─── POR EVENTO ─── -->
- <div class="page" id="page-eventos">
- <div class="section-title">Por Evento</div>
- <div class="section-sub">Selecciona un evento para ver su lista de viajeros</div>
-
- <div class="card" style="margin-bottom:16px">
- <div class="form-row cols-3">
- <div class="form-group">
- <label>Evento</label>
- <select id="selector-evento" onchange="loadViajeros()">
- <option value="">Selecciona un evento…</option>
- </select>
- </div>
- <div class="form-group">
- <label>Paquete</label>
- <select id="filtro-paquete" onchange="filterViajeros()">
- <option value="">Todos</option>
- <option>PLUS</option><option>STAY</option>
- <option>RIDE</option><option>CHEAP</option>
- </select>
- </div>
- <div class="form-group">
- <label>Saldo</label>
- <select id="filtro-saldo" onchange="filterViajeros()">
- <option value="">Todos</option>
- <option value="pendiente">Con saldo pendiente</option>
- <option value="liquidado">Liquidados</option>
- </select>
- </div>
- </div>
- <div style="display:flex;gap:10px;flex-wrap:wrap">
- <button class="btn btn-ghost btn-sm" onclick="exportCSV()">Exportar CSV</button>
- <div id="evento-resumen" style="font-size:12px;color:var(--ts);align-self:center"></div>
- </div>
- </div>
-
- <div class="table-wrap">
- <table>
- <thead>
- <tr>
- <th>#</th>
- <th>Nombre</th>
- <th>Paquete</th>
- <th>Boleto / Zona</th>
- <th>Habitación</th>
- <th>Total</th>
- <th>Abonado</th>
- <th>Resta</th>
- <th>Talla</th>
- <th>Celular</th>
- <th>WhatsApp</th>
- </tr>
- </thead>
- <tbody id="tabla-viajeros">
- <tr><td colspan="11">
- <div class="empty-state">
- <div class="empty-icon"></div>
- Selecciona un evento para ver los viajeros
- </div>
- </td></tr>
- </tbody>
- </table>
- </div>
- </div>
-
- <!-- ─── GASTOS ─── -->
- <div class="page" id="page-gastos">
- <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
- <div class="section-title">Gastos</div>
- <button class="btn btn-primary" onclick="openModal('modal-gasto')">+ Registrar Gasto</button>
- </div>
- <div class="section-sub">Control de salidas del negocio</div>
-
- <div class="metrics-grid" style="margin-bottom:16px" id="gastos-metrics">
- <div class="metric">
- <div class="metric-label">Total Gastos</div>
- <div class="metric-value red" id="g-total">—</div>
- </div>
- <div class="metric">
- <div class="metric-label">Este Mes</div>
- <div class="metric-value red" id="g-mes">—</div>
- </div>
- </div>
-
- <div class="card" style="margin-bottom:16px">
- <div class="form-row cols-2">
- <div class="form-group">
- <label>Evento</label>
- <select id="filtro-evento-gastos" onchange="loadGastos()">
- <option value="">Todos</option>
- </select>
- </div>
- <div class="form-group">
- <label>Categoría</label>
- <select id="filtro-cat-gastos" onchange="loadGastos()">
- <option value="">Todas</option>
- <option>Transporte</option><option>Hospedaje</option>
- <option>Kits</option><option>Boletos</option>
- <option>Marketing</option><option>Salarios</option>
- <option>Renta</option><option>Otros</option>
- </select>
- </div>
- </div>
- </div>
-
- <div class="table-wrap">
- <table>
- <thead>
- <tr>
- <th>Fecha</th><th>Concepto</th><th>Categoría</th>
- <th>Evento</th><th>Monto</th><th>Método</th><th>Acciones</th>
- </tr>
- </thead>
- <tbody id="tabla-gastos">
- <tr><td colspan="7"><div class="loading-state"><div class="spinner"></div>Cargando…</div></td></tr>
- </tbody>
- </table>
- </div>
- </div>
-
- <!-- ─── MIS VENTAS ─── -->
- <div class="page" id="page-ventas">
- <div class="section-title">Mis Ventas</div>
- <div class="section-sub">Resumen financiero por evento</div>
- <div id="ventas-content">
- <div class="loading-state"><div class="spinner"></div>Cargando…</div>
- </div>
- </div>
-
- <!-- ─── INVENTARIO ─── -->
- <div class="page" id="page-inventario">
- <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
- <div class="section-title">Torre de Karin</div>
- <button class="btn btn-primary" onclick="openModal('modal-kit')">+ Agregar Pieza</button>
- </div>
- <div class="section-sub">Control de kits y bodega</div>
-
- <div class="metrics-grid" style="margin-bottom:16px">
- <div class="metric">
- <div class="metric-label">Valor Bodega</div>
- <div class="metric-value" id="inv-valor">—</div>
- </div>
- <div class="metric">
- <div class="metric-label">Piezas</div>
- <div class="metric-value" id="inv-piezas">—</div>
- </div>
- </div>
-
- <div class="table-wrap">
- <table>
- <thead>
- <tr>
- <th>Pieza</th><th>Cantidad</th><th>Costo Unit.</th>
- <th>Valor Total</th><th>Stock Mín.</th><th>Proveedor</th><th>Acciones</th>
- </tr>
- </thead>
- <tbody id="tabla-inventario">
- <tr><td colspan="7"><div class="loading-state"><div class="spinner"></div>Cargando…</div></td></tr>
- </tbody>
- </table>
- </div>
- </div>
-
- <!-- ─── EQUIPO ─── -->
+     <!-- ─── EQUIPO ─── -->
  <div class="page" id="page-equipo">
  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
  <div class="section-title">Guerreros Z</div>
@@ -1884,84 +957,6 @@ tr:hover td{background:rgba(255,107,0,.03)}
  </div>
 
  
-     <!-- ─── TORRE DE KARIN ─── -->
-     <div class="page" id="page-karin">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
-       <div>
-        <div class="section-title">Torre de Karin</div>
-        <div class="section-sub">Control de inventario de bodega · Solo Maestro Roshi y Mister Popo</div>
-       </div>
-       <div style="display:flex;gap:8px" id="karin-admin-btns">
-        <button class="btn btn-ghost btn-sm" onclick="abrirModalPieza()">+ Nueva pieza</button>
-        <button class="btn btn-primary btn-sm" onclick="abrirModalMovimiento()">+ Movimiento</button>
-       </div>
-      </div>
-
-      <!-- Alertas de stock bajo -->
-      <div id="karin-alertas"></div>
-
-      <!-- Tabs -->
-      <div class="cot-tabs" style="margin-bottom:16px">
-       <button class="cot-tab active" onclick="switchKarinTab('inventario',this)" id="ktab-inventario"> Inventario</button>
-       <button class="cot-tab" onclick="switchKarinTab('movimientos',this)" id="ktab-movimientos"> Historial</button>
-      </div>
-
-      <!-- TAB INVENTARIO -->
-      <div id="karin-tab-inventario">
-       <div style="display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap">
-        <button class="btn btn-ghost btn-sm karin-cat active" onclick="filtrarKarin('all',this)">Todos</button>
-        <button class="btn btn-ghost btn-sm karin-cat" onclick="filtrarKarin('ropa',this)"> Ropa</button>
-        <button class="btn btn-ghost btn-sm karin-cat" onclick="filtrarKarin('accesorio',this)"> Accesorios</button>
-        <button class="btn btn-ghost btn-sm karin-cat" onclick="filtrarKarin('comida',this)"> Comida</button>
-        <button class="btn btn-ghost btn-sm karin-cat" onclick="filtrarKarin('otro',this)"> Otro</button>
-       </div>
-       <div class="table-wrap">
-        <table>
-         <thead>
-          <tr>
-           <th>Pieza</th>
-           <th>Categoría</th>
-           <th>Stock actual</th>
-           <th>Stock mínimo</th>
-           <th>Estado</th>
-           <th id="karin-col-acciones">Acciones</th>
-          </tr>
-         </thead>
-         <tbody id="karin-tabla-piezas">
-          <tr><td colspan="6"><div class="loading-state"><div class="spinner"></div>Cargando…</div></td></tr>
-         </tbody>
-        </table>
-       </div>
-      </div>
-
-      <!-- TAB HISTORIAL -->
-      <div id="karin-tab-movimientos" style="display:none">
-       <div style="display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap;align-items:center">
-        <select class="cot-input" id="karin-hist-tipo" onchange="loadKarinHistorial()" style="max-width:160px">
-         <option value="">Todos los tipos</option>
-         <option value="entrada">Entradas</option>
-         <option value="salida">Salidas</option>
-         <option value="devolucion">Devoluciones</option>
-         <option value="ajuste">Ajustes</option>
-        </select>
-        <select class="cot-input" id="karin-hist-pieza" onchange="loadKarinHistorial()" style="max-width:180px">
-         <option value="">Todas las piezas</option>
-        </select>
-       </div>
-       <div class="table-wrap">
-        <table>
-         <thead>
-          <tr><th>Fecha</th><th>Pieza</th><th>Tipo</th><th>Cantidad</th><th>Evento</th><th>Responsable</th><th>Nota</th></tr>
-         </thead>
-         <tbody id="karin-tabla-historial">
-          <tr><td colspan="7"><div class="loading-state"><div class="spinner"></div>Cargando…</div></td></tr>
-         </tbody>
-        </table>
-       </div>
-      </div>
-     </div>
-
-
      <!-- ─── CAPSULE CORP ─── -->
  <div class="page" id="page-capsule">
  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
@@ -1973,780 +968,7 @@ tr:hover td{background:rgba(255,107,0,.03)}
        <div style="font-size:48px;margin-bottom:16px"></div>
        <div style="font-size:16px;font-weight:700;color:var(--text);margin-bottom:8px">Capsule Corp v2 en camino</div>
        <div style="font-size:13px">Gestión de viajeros, rooming list interactivo y asignación de eventos.<br>Próxima actualización.</div>
-      </div>
- </div>
-
- <!-- ─── COTIZADOR ─── -->
- <div class="page" id="page-cotizador">
- <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
- <div class="section-title">Palacio de Kamisama</div>
- <div style="display:flex;gap:8px">
- <button class="btn btn-ghost btn-sm" onclick="guardarSesionCot()"> Guardar sesión</button>
- <button class="btn btn-ghost btn-sm" onclick="resetCotizador()">↺ Limpiar</button>
- </div>
- </div>
- <div class="section-sub">Calcula precios por paquete · guarda sesiones · compara estimado vs real post-evento</div>
-
- <div class="cot-tabs">
- <button class="cot-tab active" onclick="switchCotMode('preventa',this)"> Preventa / Cotización</button>
- <button class="cot-tab" onclick="switchCotMode('postevento',this)"> Post-Evento / Real</button>
- </div>
-
- <!-- ══ PREVENTA ══ -->
- <div class="cot-mode active" id="cot-mode-preventa">
- <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
-
- <!-- COL IZQ -->
- <div style="display:flex;flex-direction:column;gap:14px">
-
- <!-- EVENTO -->
- <div class="card">
- <div class="cot-section-label"><span> Evento</span></div>
- <div class="form-row cols-2">
- <div class="form-group">
- <label>Artista / Nombre *</label>
- <input type="text" class="cot-input" id="cot-artista" placeholder="Ej: Bad Bunny" oninput="recalcular()">
- </div>
- <div class="form-group">
- <label>Tour / Show</label>
- <input type="text" class="cot-input" id="cot-tour" placeholder="Ej: Most Wanted Tour" oninput="recalcular()">
- </div>
- </div>
-
- <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
- <label style="font-size:9px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:var(--ts)">Fechas</label>
- <button class="btn btn-ghost btn-sm" onclick="agregarFechaCot()">+ Fecha</button>
- </div>
- <div id="cot-fechas-lista"></div>
-
- <div class="form-row cols-2" style="margin-top:8px">
- <div class="form-group">
- <label>Ciudad *</label>
- <select class="cot-input" id="cot-ciudad" onchange="onCotCiudadChange()">
- <option value="monterrey">Monterrey</option>
- <option value="cdmx">CDMX</option>
- <option value="otra">Otra ciudad</option>
- </select>
- </div>
- <div class="form-group">
- <label>Tipo</label>
- <select class="cot-input" id="cot-tipo" onchange="onCotTipoChange()">
- <option value="concierto">Concierto</option>
- <option value="festival">Festival multidía</option>
- </select>
- </div>
- </div>
-
- <div class="form-group" style="margin-top:6px">
- <label>Venue</label>
- <div style="position:relative">
- <input type="text" class="cot-input" id="cot-venue" placeholder="Ej: Estadio GNP" oninput="filtrarVenues(this.value);recalcular()" autocomplete="off">
- <div id="cot-venue-sugg" style="display:none;position:absolute;z-index:50;left:0;right:0;top:100%;background:var(--bg3);border:1px solid var(--border);border-radius:6px;margin-top:2px;max-height:140px;overflow-y:auto"></div>
- </div>
- <div style="display:flex;gap:6px;margin-top:6px">
- <button class="btn btn-ghost btn-sm" onclick="guardarVenueCat()">+ Guardar venue</button>
- <button class="btn btn-ghost btn-sm" onclick="verVenuesCat()"> Catálogo</button>
- </div>
- </div>
-
- <div id="cot-festival-row" style="display:none;margin-top:6px">
- <div class="form-row cols-2">
- <div class="form-group">
- <label>Días del festival</label>
- <input type="number" class="cot-input" id="cot-dias-festival" min="1" max="7" value="3" oninput="syncFestivalNoches();recalcular()">
- </div>
- <div class="form-group">
- <label>Noches de hotel</label>
- <input type="number" class="cot-input" id="cot-noches-festival" min="1" max="7" value="3" oninput="syncFestivalNoches();recalcular()">
- </div>
- </div>
- </div>
- </div>
-
- <!-- TRANSPORTE -->
- <div class="card">
- <div class="cot-section-label"><span> Transporte</span><button class="btn btn-ghost btn-sm" onclick="agregarUnidad()">+ Unidad</button></div>
- <div id="cot-cdmx-nota" style="display:none;font-size:11px;color:var(--blue);margin-bottom:10px;padding:8px 10px;background:rgba(94,167,255,.08);border-radius:6px;border:1px solid rgba(94,167,255,.2)">
- CDMX: el transporte largo no aplica. Solo traslados internos (aeropuerto, hotel, venue).
- </div>
- <div id="cot-unidades-lista"></div>
- <div style="margin-top:10px;display:grid;grid-template-columns:1fr 1fr;gap:8px;padding-top:8px;border-top:1px solid var(--border)">
- <div style="font-size:11px;color:var(--ts)">Capacidad neta: <span id="cot-capacidad-neta" style="color:var(--gold);font-weight:700">0</span> pax</div>
- <div style="font-size:11px;color:var(--ts)">Costo transporte: <span id="cot-costo-transporte-lbl" style="color:var(--gold);font-weight:700">$0</span></div>
- </div>
- <div style="margin-top:8px">
- <label style="font-size:9px;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:var(--ts)">🅿️ Estacionamiento ($)</label>
- <input type="number" class="cot-input" id="cot-estacionamiento" placeholder="0" min="0" style="margin-top:4px" oninput="recalcular()">
- </div>
- </div>
-
- <!-- HOTEL -->
- <div class="card">
- <div class="cot-section-label"><span> Hotel</span></div>
- <div class="form-row cols-2">
- <div class="form-group">
- <label>Costo por habitación ($) *</label>
- <input type="number" class="cot-input" id="cot-hotel-precio" min="0" oninput="recalcular()" placeholder="Ej: 10000">
- </div>
- <div class="form-group">
- <label>Noches</label>
- <input type="number" class="cot-input" id="cot-hotel-noches" min="1" value="1" oninput="recalcular()">
- </div>
- </div>
- <div style="font-size:11px;color:var(--ts2);margin-top:4px">Cotizador usa: precio ÷ 4 personas × noches por viajero. Extras (doble/individual) se cobran aparte en la reservación.</div>
- </div>
-
- <!-- KIT -->
- <div class="card">
- <div class="cot-section-label"><span> Kit del viajero</span></div>
- <div id="cot-kit-lista"></div>
- <div id="cot-kit-extras"></div>
- <button class="btn btn-ghost btn-sm" onclick="agregarKitExtra()" style="margin-top:8px">+ Otro item</button>
- <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border);font-size:12px;color:var(--ts)">
- Costo kit total: <span id="cot-kit-total" style="color:var(--gold);font-weight:700">$0</span>
- </div>
- </div>
-
- <!-- ZONAS -->
- <div class="card">
- <div class="cot-section-label"><span>️ Zonas / Boletos</span><button class="btn btn-ghost btn-sm" onclick="agregarZonaCot()">+ Zona</button></div>
- <div style="font-size:11px;color:var(--ts);margin-bottom:10px">El precio del boleto se suma al costo base logístico por zona.</div>
- <div id="cot-zonas-lista"></div>
- <div style="display:flex;gap:6px;margin-top:8px">
-   <button class="btn btn-ghost btn-sm" onclick="guardarZonasCatalogo()"> Guardar zonas en catálogo</button>
-   <button class="btn btn-ghost btn-sm" onclick="verZonasCatalogo()"> Catálogo de zonas</button>
- </div>
- </div>
-
- <!-- STAFF -->
- <div class="card">
- <div class="cot-section-label"><span> Staff</span></div>
-
- <!-- Coordinadores -->
- <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
- <div style="font-size:10px;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:var(--ts)">Coordinadores</div>
- <button class="btn btn-ghost btn-sm" onclick="agregarCoordinator()">+ Coordinador</button>
- </div>
- <div id="cot-coordis-lista"></div>
-
- <!-- Choferes -->
- <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
- <div style="font-size:10px;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:var(--ts);margin-bottom:8px">Choferes</div>
- <div style="display:flex;align-items:center;gap:10px">
- <input type="number" class="cot-input" id="cot-num-choferes" min="0" value="1" style="width:60px" oninput="recalcular()">
- <div style="font-size:12px;color:var(--ts)">
- <span id="cot-choferes-habs" style="color:var(--gold);font-weight:600">1 hab</span> ·
- <span id="cot-choferes-costo" style="color:var(--gold);font-weight:600">$0</span>
- </div>
- </div>
- <div style="font-size:10px;color:var(--ts2);margin-top:4px">1 cama por chofer · 2 choferes = 1 cuarto doble · 3 = doble + individual</div>
- </div>
-
- <!-- Creadores de contenido -->
- <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
- <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
- <div style="font-size:10px;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:var(--ts)">Creadores de Contenido</div>
- <button class="btn btn-ghost btn-sm" onclick="agregarCC()">+ CC</button>
- </div>
- <div id="cot-cc-lista"></div>
- </div>
-
- <!-- Gastos extra -->
- <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
- <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
- <div style="font-size:10px;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:var(--ts)">Gastos Extra</div>
- <button class="btn btn-ghost btn-sm" onclick="agregarGastoExtra()">+ Gasto</button>
- </div>
- <div id="cot-gastos-extra"></div>
- </div>
-
- <!-- Ganancia por paquete -->
- <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
- <div style="font-size:10px;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:var(--ts);margin-bottom:8px">Ganancia por Paquete</div>
- <div class="form-row cols-2">
- <div class="form-group">
- <label>Ganancia PLUS ($)</label>
- <input type="number" class="cot-input" id="cot-ganancia-plus" value="1000" min="0" oninput="recalcular()">
- </div>
- <div class="form-group">
- <label>Ganancia CHEAP ($)</label>
- <input type="number" class="cot-input" id="cot-ganancia-cheap" value="1000" min="0" oninput="recalcular()">
- </div>
- </div>
- <div style="font-size:10px;color:var(--ts2);margin-top:4px">STAY = PLUS − $500 · RIDE = fijo $2,700 Mty / $2,900 CDMX</div>
- </div>
- </div>
-
- </div><!-- /col izq -->
-
- <!-- COL DER -->
- <div style="display:flex;flex-direction:column;gap:14px">
-
- <!-- HEADER EVENTO -->
- <div class="cot-event-header" id="cot-event-header">
- <div class="cot-event-header-titulo" id="cot-header-titulo">—</div>
- <div class="cot-event-header-sub" id="cot-header-sub"></div>
- </div>
-
- <!-- DESGLOSE -->
- <div class="card" style="border-color:rgba(255,107,0,.3)">
- <div class="cot-section-label" style="color:var(--orange)"><span> Desglose por Persona</span></div>
- <div id="cot-desglose"><div class="empty-state" style="padding:20px">Llena los campos para ver el cálculo</div></div>
- </div>
-
- <!-- ESCENARIOS -->
- <div class="card" style="border-color:rgba(255,215,0,.25)">
- <div class="cot-section-label" style="color:var(--gold)"><span> Escenarios (base logística)</span></div>
- <div style="font-size:11px;color:var(--ts);margin-bottom:10px">Basado en capacidad neta del transporte. El boleto se suma por zona.</div>
- <div id="cot-escenarios"><div class="empty-state" style="padding:20px">Agrega transporte para ver escenarios</div></div>
- </div>
-
- <!-- PRECIOS POR PAQUETE -->
- <div class="card">
- <div class="cot-section-label"><span> Precios por Paquete y Zona</span></div>
- <div style="font-size:11px;color:var(--ts);margin-bottom:10px">Escenario realista (80% capacidad)</div>
- <div id="cot-precios-paquetes"><div class="empty-state" style="padding:16px">Agrega zonas para ver precios</div></div>
- </div>
-
- <!-- CREAR EVENTO -->
- <div class="card" style="border-color:rgba(61,220,132,.3)">
- <div class="cot-section-label" style="color:var(--green)"><span> Crear Evento en Capsule Corp</span></div>
- <div style="font-size:12px;color:var(--ts);margin-bottom:14px">La info pasa a Capsule Corp. Terminas de vestirlo y lo publicas.</div>
- <button class="btn btn-primary" style="width:100%;padding:14px" onclick="crearEventoDesdeCotizador()"> Crear Evento</button>
- <div id="cot-crear-alert" style="margin-top:10px"></div>
- </div>
-
- <!-- SESIONES -->
- <div class="card">
- <div class="cot-section-label"><span> Sesiones Guardadas</span></div>
- <div id="cot-sesiones-lista"><div style="font-size:12px;color:var(--ts)">Sin sesiones guardadas</div></div>
- </div>
-
- </div><!-- /col der -->
- </div><!-- /grid preventa -->
- </div><!-- /mode preventa -->
-
- <!-- ══ POST-EVENTO ══ -->
- <div class="cot-mode" id="cot-mode-postevento">
- <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
- <div style="display:flex;flex-direction:column;gap:14px">
- <div class="card">
- <div class="cot-section-label"><span> Selecciona evento</span></div>
- <select class="cot-input" id="post-sesion-sel" onchange="cargarSesionPostEvento(this.value)">
- <option value="">Selecciona...</option>
- </select>
- </div>
- <div class="card" id="post-datos-card" style="display:none">
- <div class="cot-section-label"><span> Datos Reales</span></div>
- <div class="form-row cols-2">
- <div class="form-group"><label>Viajeros PLUS reales</label><input type="number" class="cot-input" id="post-plus" min="0" value="0" oninput="calcularPostEvento()"></div>
- <div class="form-group"><label>Viajeros STAY reales</label><input type="number" class="cot-input" id="post-stay" min="0" value="0" oninput="calcularPostEvento()"></div>
- </div>
- <div class="form-row cols-2">
- <div class="form-group"><label>Viajeros RIDE reales</label><input type="number" class="cot-input" id="post-ride" min="0" value="0" oninput="calcularPostEvento()"></div>
- <div class="form-group"><label>Viajeros CHEAP reales</label><input type="number" class="cot-input" id="post-cheap" min="0" value="0" oninput="calcularPostEvento()"></div>
- </div>
- <div style="height:1px;background:var(--border);margin:10px 0"></div>
- <div class="form-row cols-2">
- <div class="form-group"><label>Costo transporte real ($)</label><input type="number" class="cot-input" id="post-costo-transporte" min="0" value="0" oninput="calcularPostEvento()"></div>
- <div class="form-group"><label>Costo hotel real ($)</label><input type="number" class="cot-input" id="post-costo-hotel" min="0" value="0" oninput="calcularPostEvento()"></div>
- </div>
- <div class="form-row cols-2">
- <div class="form-group"><label>Costo kits real ($)</label><input type="number" class="cot-input" id="post-costo-kits" min="0" value="0" oninput="calcularPostEvento()"></div>
- <div class="form-group"><label>Costo boletos real ($)</label><input type="number" class="cot-input" id="post-costo-boletos" min="0" value="0" oninput="calcularPostEvento()"></div>
- </div>
- <div class="form-row cols-2">
- <div class="form-group"><label>Gastos extra reales ($)</label><input type="number" class="cot-input" id="post-gastos-extra" min="0" value="0" oninput="calcularPostEvento()"></div>
- <div class="form-group"><label>Ingresos totales ($)</label><input type="number" class="cot-input" id="post-ingresos" min="0" value="0" oninput="calcularPostEvento()"></div>
- </div>
- <div style="margin-top:10px">
- <label style="font-size:11px;color:var(--ts);display:block;margin-bottom:4px">Notas post-evento (ventas en persona, reventa, etc.)</label>
- <textarea class="cot-input" id="post-notas" rows="3" placeholder="Ej: 3 boletos vendidos en puerta, 2 reventas..."></textarea>
- </div>
- <button class="btn btn-primary" style="width:100%;margin-top:10px" onclick="guardarPostEvento()"> Guardar datos reales</button>
- </div>
- </div>
- <div style="display:flex;flex-direction:column;gap:14px">
- <div class="card" id="post-comparativa-card" style="display:none">
- <div class="cot-section-label" style="color:var(--orange)"><span> Estimado vs Real</span></div>
- <div id="post-comparativa"></div>
- </div>
- <div class="card" id="post-resultado-card" style="display:none">
- <div class="cot-section-label" style="color:var(--green)"><span> Resultado Final</span></div>
- <div id="post-resultado"></div>
- </div>
- </div>
- </div>
- </div><!-- /mode postevento -->
-
- <!-- MODAL VENUES -->
- <div class="modal-overlay" id="modal-venues">
- <div class="modal" style="max-width:480px">
- <div class="modal-header">
- <div class="modal-title">Catálogo de Venues</div>
- <button class="modal-close" onclick="closeModal('modal-venues')"></button>
- </div>
- <div class="modal-body"><div id="venues-lista"></div></div>
- </div>
- </div>
-
- <div class="modal-overlay" id="modal-zonas-cat">
- <div class="modal" style="max-width:520px">
- <div class="modal-header">
- <div class="modal-title"> Catálogo de Zonas</div>
- <button class="modal-close" onclick="closeModal('modal-zonas-cat')"></button>
- </div>
- <div class="modal-body">
-   <div style="font-size:11px;color:var(--ts);margin-bottom:12px">Zonas guardadas de eventos anteriores. Haz clic en una para cargarla al cotizador actual.</div>
-   <div id="zonas-cat-lista"></div>
- </div>
- </div>
- </div>
-
- </div><!-- /page-cotizador -->
-
-
- <!-- ─── RECIBOS ─── -->
- <div class="page" id="page-recibos" style="height:100%;margin:-20px;padding:0;">
- <iframe id="frame-recibos" style="width:100%;height:calc(100vh - 96px);border:none;display:block;" src="about:blank"></iframe>
- </div>
-
- <!-- ─── DISENO ─── -->
- <div class="page" id="page-diseno" style="height:100%;margin:-20px;padding:0;">
- <iframe id="frame-diseno" style="width:100%;height:calc(100vh - 96px);border:none;display:block;" src="about:blank"></iframe>
- </div>
-</div><!-- /content -->
-</div><!-- /app -->
-
-<!-- ═══════════════════════════════════════════════
- MODALES
-═══════════════════════════════════════════════ -->
-
-<!-- Modal: Nuevo Pago -->
-<div class="modal-overlay" id="modal-pago">
- <div class="modal">
- <div class="modal-header">
- <div class="modal-title">Registrar Pago</div>
- <button class="modal-close" onclick="closeModal('modal-pago')"></button>
- </div>
- <div class="modal-body">
- <div id="pago-alert"></div>
- <div class="form-row cols-2">
- <div class="form-group">
- <label>Cliente *</label>
- <input type="text" id="pago-cliente" placeholder="Nombre del viajero" oninput="buscarCliente()">
- <div id="pago-cliente-sugg" style="display:none;background:var(--bg3);border:1px solid var(--border);border-radius:6px;margin-top:4px;max-height:150px;overflow-y:auto"></div>
- <input type="hidden" id="pago-cliente-id">
- <input type="hidden" id="pago-reservacion-id">
- </div>
- <div class="form-group">
- <label>Evento *</label>
- <select id="pago-evento">
- <option value="">Selecciona…</option>
- </select>
- </div>
- </div>
- <div class="form-row cols-2">
- <div class="form-group">
- <label>Monto *</label>
- <input type="number" id="pago-monto" placeholder="0.00" min="0">
- </div>
- <div class="form-group">
- <label>Método *</label>
- <select id="pago-metodo">
- <option>Transferencia</option>
- <option>Efectivo</option>
- <option>Tarjeta</option>
- </select>
- </div>
- </div>
- <div class="form-row cols-2">
- <div class="form-group">
- <label>Fecha</label>
- <input type="date" id="pago-fecha">
- </div>
- <div class="form-group">
- <label>Referencia / Folio</label>
- <input type="text" id="pago-ref" placeholder="Últimos 4 dígitos, folio...">
- </div>
- </div>
- <div class="form-group">
- <label>Notas</label>
- <input type="text" id="pago-notas" placeholder="Ej: Separo, Pago 1, etc.">
- </div>
- </div>
- <div class="modal-footer">
- <button class="btn btn-ghost" onclick="closeModal('modal-pago')">Cancelar</button>
- <button class="btn btn-primary" onclick="guardarPago()">Guardar Pago</button>
- </div>
- </div>
-</div>
-
-<!-- Modal: Nuevo Gasto -->
-<div class="modal-overlay" id="modal-gasto">
- <div class="modal">
- <div class="modal-header">
- <div class="modal-title">Registrar Gasto</div>
- <button class="modal-close" onclick="closeModal('modal-gasto')"></button>
- </div>
- <div class="modal-body">
- <div id="gasto-alert"></div>
- <div class="form-row cols-2">
- <div class="form-group">
- <label>Concepto *</label>
- <input type="text" id="gasto-concepto" placeholder="Ej: Renta de van">
- </div>
- <div class="form-group">
- <label>Categoría *</label>
- <select id="gasto-categoria">
- <option>Transporte</option><option>Hospedaje</option>
- <option>Kits</option><option>Boletos</option>
- <option>Marketing</option><option>Salarios</option>
- <option>Renta</option><option>Combustible</option>
- <option>Comida Staff</option><option>Otros</option>
- </select>
- </div>
- </div>
- <div class="form-row cols-2">
- <div class="form-group">
- <label>Monto *</label>
- <input type="number" id="gasto-monto" placeholder="0.00">
- </div>
- <div class="form-group">
- <label>Fecha *</label>
- <input type="date" id="gasto-fecha">
- </div>
- </div>
- <div class="form-row cols-2">
- <div class="form-group">
- <label>Evento (si aplica)</label>
- <select id="gasto-evento">
- <option value="">General (no ligado a evento)</option>
- </select>
- </div>
- <div class="form-group">
- <label>Método de Pago</label>
- <select id="gasto-metodo">
- <option>Transferencia</option>
- <option>Efectivo</option>
- <option>Tarjeta</option>
- </select>
- </div>
- </div>
- <div class="form-group">
- <label>Notas</label>
- <input type="text" id="gasto-notas" placeholder="Detalles adicionales">
- </div>
- </div>
- <div class="modal-footer">
- <button class="btn btn-ghost" onclick="closeModal('modal-gasto')">Cancelar</button>
- <button class="btn btn-primary" onclick="guardarGasto()">Guardar Gasto</button>
- </div>
- </div>
-</div>
-
-<!-- Modal: Nuevo/Editar Evento -->
-<!-- Modal: Nuevo/Editar Evento COMPLETO -->
-<div class="modal-overlay" id="modal-evento">
- <div class="modal" style="max-width:700px">
- <div class="modal-header">
- <div class="modal-title" id="modal-evento-title">Nuevo Evento</div>
- <button class="modal-close" onclick="closeModal('modal-evento')">X</button>
- </div>
- <div class="modal-body">
- <div id="evento-alert"></div>
- <input type="hidden" id="evento-id">
-
- <!-- SECCIÓN 1: INFO BÁSICA -->
- <div style="font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:800;letter-spacing:.2em;text-transform:uppercase;color:var(--orange);margin-bottom:10px">Info del Evento</div>
- <div class="form-row cols-2">
- <div class="form-group">
- <label>Artista / Nombre *</label>
- <input type="text" id="ev-artista" placeholder="Ej: Bad Bunny">
- </div>
- <div class="form-group">
- <label>Tour / Nombre del Show</label>
- <input type="text" id="ev-tour" placeholder="Ej: Most Wanted Tour">
- </div>
- </div>
- <div class="form-row cols-2">
- <div class="form-group">
- <label>Fecha Principal *</label>
- <input type="date" id="ev-fecha">
- </div>
- <div class="form-group">
- <label>Fecha fin (multifecha)</label>
- <input type="date" id="ev-fecha-fin">
- </div>
- </div>
- <div class="form-row cols-2">
- <div class="form-group">
- <label>Ciudad *</label>
- <input type="text" id="ev-ciudad" placeholder="Ej: CDMX, Monterrey">
- </div>
- <div class="form-group">
- <label>Venue *</label>
- <input type="text" id="ev-venue" placeholder="Ej: Estadio GNP Seguros">
- </div>
- </div>
- <div class="form-row cols-3">
- <div class="form-group">
- <label>Tipo</label>
- <select id="ev-tipo">
- <option>Concierto</option>
- <option>Festival</option>
- </select>
- </div>
- <div class="form-group">
- <label>Color del evento</label>
- <select id="ev-color">
- <option value="rojo">Rojo</option>
- <option value="azul">Azul</option>
- <option value="rosa">Rosa</option>
- <option value="verde">Verde</option>
- <option value="amarillo">Amarillo</option>
- </select>
- </div>
- <div class="form-group">
- <label>Promotor</label>
- <input type="text" id="ev-promotor" placeholder="Ej: Ocesa">
- </div>
- </div>
-
- <div class="form-group" style="margin-bottom:12px">
- <label>Nota para el cliente</label>
- <input type="text" id="ev-nota" placeholder='Ej: NO incluye vuelos. Vuelos disponibles como extra.'>
- </div>
-
- <!-- SECCIÓN 2: STATUS Y VISIBILIDAD -->
- <div style="height:1px;background:var(--border);margin:16px 0"></div>
- <div style="font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:800;letter-spacing:.2em;text-transform:uppercase;color:var(--orange);margin-bottom:10px">Status y Visibilidad</div>
- <div class="form-row cols-2">
- <div class="form-group">
- <label>Status en la web *</label>
- <select id="ev-status">
- <option value="">Disponible</option>
- <option value="ultimos">Ultimos Lugares</option>
- <option value="proceso">En Proceso</option>
- <option value="agotado">Agotado</option>
- <option value="por-confirmar">Por Confirmar</option>
- <option value="pasado">Pasado</option>
- </select>
- </div>
- <div class="form-group">
- <label>Cuenta bancaria</label>
- <select id="ev-banco">
- <option value="default">BBVA (Default)</option>
- <option value="hey">Hey Banco / Banregio</option>
- </select>
- </div>
- </div>
- <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:12px">
- <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px">
- <input type="checkbox" id="ev-cdmx"> Es evento CDMX (sin bus Reynosa)
- </label>
- <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px">
- <input type="checkbox" id="ev-traslados"> Traslados internos hotel-venue
- </label>
- <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px">
- <input type="checkbox" id="ev-transporte"> Transporte desde Reynosa
- </label>
- <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px">
- <input type="checkbox" id="ev-promo"> Tiene banner de promo
- </label>
- <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px">
- <input type="checkbox" id="ev-rideonly"> Solo vende RIDE
- </label>
- <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px">
- <input type="checkbox" id="ev-cheaponly"> Solo vende CHEAP
- </label>
- <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px">
- <input type="checkbox" id="ev-listonly"> Solo en lista (sin reservar)
- </label>
- </div>
-
- <!-- SECCIÓN 3: PRECIOS BASE -->
- <div style="height:1px;background:var(--border);margin:16px 0"></div>
- <div style="font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:800;letter-spacing:.2em;text-transform:uppercase;color:var(--orange);margin-bottom:10px">Precios Base</div>
- <div class="form-row cols-3">
- <div class="form-group">
- <label>Separo ($)</label>
- <input type="number" id="ev-sep" placeholder="500" min="0">
- </div>
- <div class="form-group">
- <label>Precio RIDE ($)</label>
- <input type="number" id="ev-ride" placeholder="2700" min="0">
- </div>
- <div class="form-group">
- <label>Imagen / Banner URL</label>
- <input type="text" id="ev-imagen" placeholder="https://...">
- </div>
- </div>
-
- <!-- SECCIÓN 4: LO QUE INCLUYE -->
- <div style="height:1px;background:var(--border);margin:16px 0"></div>
- <div style="font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:800;letter-spacing:.2em;text-transform:uppercase;color:var(--orange);margin-bottom:6px">Lo que incluye el paquete</div>
- <div style="font-size:11px;color:var(--ts);margin-bottom:10px">Estos bullets aparecen en la tarjeta del evento en tu web</div>
- <div id="ev-incluye-lista"></div>
- <button class="btn btn-ghost btn-sm" onclick="agregarIncluye()" style="margin-top:6px">+ Agregar linea</button>
-
- <!-- SECCIÓN 5: ZONAS PLUS -->
- <div style="height:1px;background:var(--border);margin:16px 0"></div>
- <div style="font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:800;letter-spacing:.2em;text-transform:uppercase;color:var(--orange);margin-bottom:6px">Zonas PLUS</div>
- <div style="font-size:11px;color:var(--ts);margin-bottom:10px">Nombre de la zona y precio. Marca VIP o Agotado segun corresponda.</div>
- <div id="ev-zonas-plus"></div>
- <button class="btn btn-ghost btn-sm" onclick="agregarZona('plus')" style="margin-top:6px">+ Agregar zona</button>
-
- <!-- SECCIÓN 6: ZONAS CHEAP -->
- <div style="height:1px;background:var(--border);margin:16px 0"></div>
- <div style="font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:800;letter-spacing:.2em;text-transform:uppercase;color:var(--orange);margin-bottom:6px">Zonas CHEAP</div>
- <div id="ev-zonas-cheap"></div>
- <button class="btn btn-ghost btn-sm" onclick="agregarZona('cheap')" style="margin-top:6px">+ Agregar zona</button>
-
- <!-- SECCIÓN 7: HOTEL -->
- <div style="height:1px;background:var(--border);margin:16px 0"></div>
- <div style="font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:800;letter-spacing:.2em;text-transform:uppercase;color:var(--orange);margin-bottom:6px">Opciones de Hotel</div>
- <div style="font-size:11px;color:var(--ts);margin-bottom:10px">Extra = costo adicional sobre el precio base (compartida = $0)</div>
- <div id="ev-hotel-lista"></div>
- <button class="btn btn-ghost btn-sm" onclick="agregarHotel()" style="margin-top:6px">+ Agregar tipo</button>
-
- <!-- SECCIÓN 8: CALENDARIO DE PAGOS -->
- <div style="height:1px;background:var(--border);margin:16px 0"></div>
- <div style="font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:800;letter-spacing:.2em;text-transform:uppercase;color:var(--orange);margin-bottom:6px">Calendario de Pagos</div>
- <div id="ev-pagos-lista"></div>
- <button class="btn btn-ghost btn-sm" onclick="agregarPago()" style="margin-top:6px">+ Agregar pago</button>
-
- <!-- SECCIÓN 9: DESCUENTO FLASH -->
- <div style="height:1px;background:var(--border);margin:16px 0"></div>
- <div style="font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:800;letter-spacing:.2em;text-transform:uppercase;color:var(--orange);margin-bottom:6px">Codigo de Descuento Flash (opcional)</div>
- <div class="form-row cols-3">
- <div class="form-group">
- <label>Codigo</label>
- <input type="text" id="ev-dsc-codigo" placeholder="MEMO10">
- </div>
- <div class="form-group">
- <label>% Descuento</label>
- <input type="number" id="ev-dsc-pct" placeholder="10" min="0" max="100">
- </div>
- <div class="form-group">
- <label>Expira</label>
- <input type="datetime-local" id="ev-dsc-exp">
- </div>
- </div>
-
- <div style="height:1px;background:var(--border);margin:16px 0"></div>
- <div class="form-group">
- <label>Notas internas (solo visible en Kamehouse)</label>
- <input type="text" id="ev-notas" placeholder="Notas para ti">
- </div>
- </div>
- <div class="modal-footer">
- <button class="btn btn-ghost" onclick="closeModal('modal-evento')">Cancelar</button>
- <button class="btn btn-primary" onclick="guardarEvento()">Guardar Evento</button>
- </div>
- </div>
-</div>
-
-<!-- Modal: Kit Inventario -->
-<div class="modal-overlay" id="modal-kit">
- <div class="modal">
- <div class="modal-header">
- <div class="modal-title">Pieza de Inventario</div>
- <button class="modal-close" onclick="closeModal('modal-kit')"></button>
- </div>
- <div class="modal-body">
- <div id="kit-alert"></div>
- <input type="hidden" id="kit-id">
- <div class="form-row cols-2">
- <div class="form-group">
- <label>Pieza *</label>
- <input type="text" id="kit-pieza" placeholder="Ej: Playera Conecta">
- </div>
- <div class="form-group">
- <label>Proveedor</label>
- <input type="text" id="kit-proveedor" placeholder="Ej: Texti Mty">
- </div>
- </div>
- <div class="form-row cols-3">
- <div class="form-group">
- <label>Cantidad *</label>
- <input type="number" id="kit-cantidad" placeholder="0" min="0">
- </div>
- <div class="form-group">
- <label>Costo Unitario *</label>
- <input type="number" id="kit-costo" placeholder="0.00" min="0">
- </div>
- <div class="form-group">
- <label>Stock Mínimo</label>
- <input type="number" id="kit-minimo" placeholder="0" min="0">
- </div>
- </div>
- </div>
- <div class="modal-footer">
- <button class="btn btn-ghost" onclick="closeModal('modal-kit')">Cancelar</button>
- <button class="btn btn-primary" onclick="guardarKit()">Guardar</button>
- </div>
- </div>
-</div>
-
-<!-- Modal: Vendedor/Equipo -->
-<div class="modal-overlay" id="modal-vendedor">
- <div class="modal">
- <div class="modal-header">
- <div class="modal-title">Miembro del Equipo</div>
- <button class="modal-close" onclick="closeModal('modal-vendedor')"></button>
- </div>
- <div class="modal-body">
- <div id="vendedor-alert"></div>
- <input type="hidden" id="vend-id">
- <div class="form-row cols-2">
- <div class="form-group">
- <label>Nombre Completo *</label>
- <input type="text" id="vend-nombre" placeholder="Nombre completo">
- </div>
- <div class="form-group">
- <label>Rol *</label>
- <select id="vend-rol">
- <option>Vendedor</option>
- <option>Coordinador</option>
- <option>Auxiliar</option>
- <option>Creador Contenido</option>
- </select>
- </div>
- </div>
- <div class="form-row cols-2">
- <div class="form-group">
- <label>Teléfono</label>
- <input type="text" id="vend-tel" placeholder="8991234567">
- </div>
- <div class="form-group">
- <label>Correo</label>
- <input type="email" id="vend-correo" placeholder="correo@ejemplo.com">
- </div>
- </div>
- <div class="form-row cols-2">
- <div class="form-group">
- <label>Talla Playera</label>
- <select id="vend-talla">
- <option>XS</option><option>S</option><option>M</option>
- <option>L</option><option>XL</option><option>XXL</option>
- </select>
- </div>
- <div class="form-group">
- <label>Comisión por Venta CHEAP</label>
- <input type="number" id="vend-comision" placeholder="200">
- </div>
- </div>
- </div>
- <div class="modal-footer">
- <button class="btn btn-ghost" onclick="closeModal('modal-vendedor')">Cancelar</button>
- <button class="btn btn-primary" onclick="guardarVendedor()">Guardar</button>
- </div>
- </div>
-</div>
-
-
-<template id="recibos-tpl">
+      </div><template id="recibos-tpl">
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -3321,11 +1543,11 @@ const ROLES_ADMIN = ['maestro_roshi', 'bulma', 'mister_popo', 'coordinador', 'cc
 
 // Pestañas visibles por rol
 const PERMISOS_TABS = {
-  maestro_roshi: ['resumen','pagos','eventos','gastos','ventas','inventario','equipo','karin','capsule','cotizador'],
-  bulma:         ['resumen','pagos','eventos','gastos','ventas','inventario','equipo','karin','capsule','cotizador'],
-  mister_popo:   ['karin'],
-  coordinador:   ['karin'],
-  cc:            ['karin'],
+  maestro_roshi: ['resumen','pagos','eventos','gastos','ventas','inventario','equipo','capsule','cotizador'],
+  bulma:         ['resumen','pagos','eventos','gastos','ventas','inventario','equipo','capsule','cotizador'],
+  mister_popo:   ['inventario'],
+  coordinador:   ['inventario'],
+  cc:            ['inventario'],
   vendedor:      ['ventas']
 };
 
@@ -3452,7 +1674,7 @@ function aplicarPermisosUI() {
   const tabsPermitidos = [...new Set([...base, ...extras])].filter(t => !bloqueados.includes(t));
 
   // Todos los nav-btn
-  const allTabs = ['resumen','pagos','eventos','gastos','ventas','inventario','equipo','karin','capsule','cotizador'];
+  const allTabs = ['resumen','pagos','eventos','gastos','ventas','inventario','equipo','capsule','cotizador'];
   allTabs.forEach(tab => {
     const btn = document.getElementById(`nav-${tab}`);
     if (!btn) return;
@@ -3546,10 +1768,10 @@ function loadPage(name) {
  if (name === 'eventos') { /* selector manual */ }
  if (name === 'gastos') loadGastos();
  if (name === 'ventas') loadVentas();
- if (name === 'inventario') loadInventario();
+ if (name === 'inventario') loadKarin();
  if (name === 'equipo') loadEquipo();
  if (name === 'capsule') loadCapsule();
-  if (name === 'karin') loadKarin();
+  
  if (name === 'cotizador') initCotizador();
 }
 
@@ -4175,13 +2397,8 @@ let _capsuleFilter = 'todos';
 let _capsuleCache = [];
 
 async function loadCapsule() {
- const tbody = document.getElementById('tabla-eventos');
- try {
- _capsuleCache = await db.get('resumen_eventos', '?order=fecha.desc&limit=200');
- renderCapsule();
- } catch(e) {
- tbody.innerHTML = `<tr><td colspan="8"><div class="alert alert-error">${e.message}</div></td></tr>`;
- }
+ // Capsule Corp v2 en construccion — placeholder por ahora
+ return;
 }
 
 function filtrarCapsule(filtro, btn) {
@@ -5575,30 +3792,50 @@ async function loadKarinInventario() {
 function renderKarinInventario() {
   const tbody = document.getElementById('karin-tabla-piezas');
   if (!tbody) return;
-  const esAdmin = currentUser && ['maestro_roshi','mister_popo'].includes(currentUser.rol);
+  const esAdmin = currentUser && ['maestro_roshi','mister_popo','bulma'].includes(currentUser.rol);
 
   let piezas = _karinPiezasCache;
   if (_karinCatFilter !== 'all') piezas = piezas.filter(p => p.categoria === _karinCatFilter);
 
+  // Calcular metricas globales
+  let valorTotal = 0, piezasTotales = 0, stockBajoCount = 0;
+  _karinPiezasCache.forEach(p => {
+    const costo = parseFloat(p.costo_unitario || 0);
+    valorTotal += costo * (p.stock_actual || 0);
+    piezasTotales += (p.stock_actual || 0);
+    if (p.stock_actual <= p.stock_minimo) stockBajoCount++;
+  });
+  const fmt = n => '$' + Math.round(n).toLocaleString('es-MX');
+  const elValor = document.getElementById('inv-valor');
+  const elPiezas = document.getElementById('inv-piezas');
+  const elBajo = document.getElementById('inv-bajo');
+  if (elValor) elValor.textContent = fmt(valorTotal);
+  if (elPiezas) elPiezas.textContent = piezasTotales.toLocaleString('es-MX');
+  if (elBajo) elBajo.textContent = stockBajoCount;
+
   if (!piezas.length) {
-    tbody.innerHTML = '<tr><td colspan="6"><div class="empty-state"><div class="empty-icon">📦</div>Sin piezas en esta categoría</div></td></tr>';
+    tbody.innerHTML = '<tr><td colspan="9"><div class="empty-state">Sin piezas en esta categoria</div></td></tr>';
     return;
   }
 
-  const catEmoji = { ropa:'', accesorio:'', comida:'', otro:'' };
   tbody.innerHTML = piezas.map(p => {
     const bajo = p.stock_actual <= p.stock_minimo;
+    const costo = parseFloat(p.costo_unitario || 0);
+    const valor = costo * (p.stock_actual || 0);
     const statusBadge = bajo
-      ? `<span class="badge badge-red">⚠️ Stock bajo</span>`
-      : `<span class="badge badge-green">✓ OK</span>`;
+      ? `<span class="badge badge-red">Stock bajo</span>`
+      : `<span class="badge badge-green">OK</span>`;
     const acciones = esAdmin ? `
-      <button class="btn btn-ghost btn-sm" onclick="abrirModalMovimiento('${p.id}')">+ Movimiento</button>
+      <button class="btn btn-ghost btn-sm" onclick="abrirModalMovimiento('${p.id}')">Mov</button>
       <button class="btn btn-ghost btn-sm" onclick="editarPieza('${p.id}')">Editar</button>` : '—';
     return `<tr>
       <td><div style="font-weight:700">${p.nombre}</div><div style="font-size:10px;color:var(--ts)">${p.unidad}</div></td>
-      <td><span class="badge badge-gray">${catEmoji[p.categoria]||'📦'} ${p.categoria}</span></td>
+      <td><span class="badge badge-gray">${p.categoria}</span></td>
       <td><span style="font-size:18px;font-weight:800;color:${bajo?'var(--red)':'var(--green)'}">${p.stock_actual}</span></td>
       <td style="color:var(--ts)">${p.stock_minimo}</td>
+      <td style="color:var(--ts)">${costo > 0 ? fmt(costo) : '—'}</td>
+      <td style="font-weight:700">${valor > 0 ? fmt(valor) : '—'}</td>
+      <td style="color:var(--ts);font-size:11px">${p.proveedor || '—'}</td>
       <td>${statusBadge}</td>
       <td style="white-space:nowrap">${acciones}</td>
     </tr>`;
@@ -5666,19 +3903,23 @@ function abrirModalPieza(id = null) {
     <div class="cot-grid-2" style="gap:12px">
       <div><label class="cot-label">Nombre</label>
         <input class="cot-input" id="mp-nombre" value="${pieza?.nombre||''}" placeholder="ej. Playera M"></div>
-      <div><label class="cot-label">Categoría</label>
+      <div><label class="cot-label">Categoria</label>
         <select class="cot-input" id="mp-cat">
-          <option value="ropa" ${pieza?.categoria==='ropa'?'selected':''}>👕 Ropa</option>
-          <option value="accesorio" ${pieza?.categoria==='accesorio'?'selected':''}>🎒 Accesorio</option>
-          <option value="comida" ${pieza?.categoria==='comida'?'selected':''}>🍕 Comida</option>
-          <option value="otro" ${pieza?.categoria==='otro'?'selected':''}>📦 Otro</option>
+          <option value="ropa" ${pieza?.categoria==='ropa'?'selected':''}>Ropa</option>
+          <option value="accesorio" ${pieza?.categoria==='accesorio'?'selected':''}>Accesorio</option>
+          <option value="comida" ${pieza?.categoria==='comida'?'selected':''}>Comida</option>
+          <option value="otro" ${pieza?.categoria==='otro'?'selected':''}>Otro</option>
         </select></div>
       <div><label class="cot-label">Stock actual</label>
         <input class="cot-input" id="mp-stock" type="number" min="0" value="${pieza?.stock_actual||0}"></div>
-      <div><label class="cot-label">Stock mínimo (alerta)</label>
+      <div><label class="cot-label">Stock minimo (alerta)</label>
         <input class="cot-input" id="mp-minimo" type="number" min="0" value="${pieza?.stock_minimo||5}"></div>
+      <div><label class="cot-label">Costo unitario ($)</label>
+        <input class="cot-input" id="mp-costo" type="number" min="0" step="0.01" value="${pieza?.costo_unitario||0}"></div>
       <div><label class="cot-label">Unidad</label>
-        <input class="cot-input" id="mp-unidad" value="${pieza?.unidad||'pieza'}" placeholder="pieza, caja…"></div>
+        <input class="cot-input" id="mp-unidad" value="${pieza?.unidad||'pieza'}" placeholder="pieza, caja..."></div>
+      <div style="grid-column:1/-1"><label class="cot-label">Proveedor</label>
+        <input class="cot-input" id="mp-proveedor" value="${pieza?.proveedor||''}" placeholder="nombre del proveedor"></div>
     </div>
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
       <button class="btn btn-ghost" onclick="cerrarModal('nueva-pieza')">Cancelar</button>
@@ -5696,6 +3937,8 @@ async function guardarPieza(id) {
     stock_actual: parseInt(document.getElementById('mp-stock').value) || 0,
     stock_minimo: parseInt(document.getElementById('mp-minimo').value) || 5,
     unidad: document.getElementById('mp-unidad').value.trim() || 'pieza',
+    costo_unitario: parseFloat(document.getElementById('mp-costo').value) || 0,
+    proveedor: document.getElementById('mp-proveedor').value.trim() || null,
   };
   if (!body.nombre) { alert('El nombre es obligatorio'); return; }
   try {

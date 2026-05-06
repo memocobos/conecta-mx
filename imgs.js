@@ -38,5 +38,6 @@ window.STATIC_IMGS={
   'edsheeran':'imgs/edsheeran.jpg',
   'babymetal':'imgs/babymetal.jpg',
   'aperfectcircle':'imgs/aperfectcircle.webp',
-  'edenmunoz':'imgs/edenmunoz.webp'
+  'edenmunoz':'imgs/edenmunoz.webp',
+  'beele':'imgs/beele.webp'
 };

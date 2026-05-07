@@ -1089,14 +1089,97 @@ tr:hover td{background:rgba(255,107,0,.03)}
      </div>
 
      <!-- ─── CAPSULE CORP ─── -->
- <div class="page" id="page-capsule">
-      <div class="section-title">Capsule Corp</div>
-      <div class="section-sub">Area de trabajo de Bulma — En construccion</div>
-      <div style="margin-top:48px;text-align:center;color:var(--ts)">
-       <div style="font-size:16px;font-weight:700;color:var(--text);margin-bottom:8px">Capsule Corp v2 en camino</div>
-       <div style="font-size:13px">Gestion de viajeros, rooming list interactivo y asignacion de eventos.</div>
+     <div class="page" id="page-capsule">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;flex-wrap:wrap;gap:10px">
+       <div>
+        <div style="font-family:'Zen Dots',sans-serif;font-size:28px;letter-spacing:.04em;background:linear-gradient(135deg,var(--text) 0%,var(--gold) 50%,var(--orange) 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">CAPSULE CORP</div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.1em;color:var(--ts)">// viajeros · rooming · coordis</div>
+       </div>
+      </div>
+
+      <!-- Tabs principales -->
+      <div style="display:flex;gap:6px;margin-bottom:20px;flex-wrap:wrap;border-bottom:1px solid var(--border);padding-bottom:12px">
+       <button class="gz-filter active" id="cc-tab-btn-eventos" onclick="showCCTab('eventos',this)">// Eventos</button>
+       <button class="gz-filter" id="cc-tab-btn-coordis" onclick="showCCTab('coordis',this)">// Asignar Coordis</button>
+      </div>
+
+      <!-- TAB: Eventos (viajeros + rooming) -->
+      <div id="cc-tab-eventos">
+       <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;align-items:center;justify-content:space-between">
+        <select class="cot-input" id="cc-evento-select" onchange="loadCCEvento()" style="max-width:340px;font-size:13px">
+         <option value="">— Selecciona un evento —</option>
+        </select>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--ts)" id="cc-evento-info"></div>
+       </div>
+
+       <!-- Sub-tabs viajeros / rooming -->
+       <div id="cc-evento-tabs" style="display:none">
+        <div style="display:flex;gap:6px;margin-bottom:16px">
+         <button class="gz-filter active" id="cc-sub-btn-viajeros" onclick="showCCSubTab('viajeros',this)">👥 Viajeros</button>
+         <button class="gz-filter" id="cc-sub-btn-rooming" onclick="showCCSubTab('rooming',this)">🛏 Rooming List</button>
+        </div>
+
+        <!-- VIAJEROS -->
+        <div id="cc-sub-viajeros">
+         <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;align-items:center;justify-content:space-between">
+          <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.12em;color:var(--ts)" id="cc-viajeros-count">0 viajeros</div>
+          <div style="display:flex;gap:8px">
+           <button class="btn btn-ghost btn-sm" onclick="exportarViajeros('excel')" style="font-size:10px">↓ Excel</button>
+           <button class="btn btn-ghost btn-sm" onclick="exportarViajeros('pdf')" style="font-size:10px">↓ PDF</button>
+           <button class="btn btn-primary btn-sm" onclick="abrirModalViajero(null)">+ Viajero</button>
+          </div>
+         </div>
+         <div id="cc-viajeros-list">
+          <div class="empty-state"><div class="empty-icon">👥</div>Selecciona un evento para ver viajeros</div>
+         </div>
+        </div>
+
+        <!-- ROOMING -->
+        <div id="cc-sub-rooming" style="display:none">
+         <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;align-items:center;justify-content:space-between">
+          <div>
+           <input class="cot-input" id="cc-hotel-nombre" placeholder="Nombre del hotel…" style="font-size:12px;padding:7px 12px;min-width:220px" oninput="autoGuardarHotel()">
+          </div>
+          <div style="display:flex;gap:8px">
+           <button class="btn btn-ghost btn-sm" onclick="exportarRooming('excel')" style="font-size:10px">↓ Excel</button>
+           <button class="btn btn-ghost btn-sm" onclick="exportarRooming('pdf')" style="font-size:10px">↓ PDF</button>
+           <button class="btn btn-primary btn-sm" onclick="abrirModalHabitacion(null)">+ Habitación</button>
+          </div>
+         </div>
+         <div id="cc-rooming-resumen" style="display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap"></div>
+         <div id="cc-rooming-list">
+          <div class="empty-state"><div class="empty-icon">🛏</div>Sin habitaciones registradas</div>
+         </div>
+         <!-- Botón notificar coordi -->
+         <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border);display:flex;justify-content:flex-end">
+          <button class="btn btn-primary" onclick="notificarCoordiListas()" id="cc-btn-notificar">
+           📧 Notificar coordi — listas actualizadas
+          </button>
+         </div>
+        </div>
+       </div>
+      </div>
+
+      <!-- TAB: Asignar Coordis -->
+      <div id="cc-tab-coordis" style="display:none">
+       <div style="display:flex;gap:8px;margin-bottom:16px;align-items:center;justify-content:space-between;flex-wrap:wrap">
+        <select class="cot-input" id="cc-coordi-evento-select" onchange="loadCCCoordiEvento()" style="max-width:340px;font-size:13px">
+         <option value="">— Selecciona un evento —</option>
+        </select>
+        <button class="btn btn-primary btn-sm" id="cc-btn-asignar" onclick="abrirModalAsignarCoordi()" style="display:none">+ Asignar coordi</button>
+       </div>
+       <div id="cc-coordis-asignados">
+        <div class="empty-state"><div class="empty-icon">🎯</div>Selecciona un evento</div>
+       </div>
       </div>
      </div>
+
+     <!-- Modal: Viajero -->
+     <div class="modal-overlay" id="modal-viajero"></div>
+     <!-- Modal: Habitación -->
+     <div class="modal-overlay" id="modal-habitacion"></div>
+     <!-- Modal: Asignar Coordi -->
+     <div class="modal-overlay" id="modal-asignar-coordi"></div>
 
      <!-- HERRAMIENTAS: RECIBOS -->
      <div class="page" id="page-recibos" style="padding:0;height:calc(100vh - 102px)">
@@ -1909,8 +1992,8 @@ let disenoLoaded = false;
 let _cotIniciado = false;
 
 const PERMISOS_TABS = {
-  maestro_roshi: ['resumen','pagos','eventos','gastos','ventas','inventario','reportes','equipo','capsule','cotizador','herramientas'],
-  bulma:         ['resumen','pagos','eventos','gastos','ventas','inventario','reportes','equipo','capsule','cotizador','herramientas'],
+  maestro_roshi: ['resumen','pagos','eventos','gastos','ventas','inventario','reportes','capsule','equipo','cotizador','herramientas'],
+  bulma:         ['resumen','pagos','eventos','gastos','ventas','inventario','reportes','capsule','equipo','cotizador','herramientas'],
   mister_popo:   ['inventario','reportes','equipo'],
   coordinador:   ['inventario','reportes','equipo'],
   cc:            ['equipo'],
@@ -2111,6 +2194,7 @@ function loadPage(name) {
  if (name === 'ventas') loadVentas();
  if (name === 'inventario') loadInventario();
  if (name === 'reportes') loadReportes();
+ if (name === 'capsule') loadCapsule();
  if (name === 'equipo') loadEquipo();
  if (name === 'capsule') loadCapsule();
  if (name === 'cotizador') initCotizador();
@@ -5117,7 +5201,536 @@ function actualizarLabelNavMobile(nombre) {
 
 
 // ═══════════════════════════════════════════════════════════════
-// SISTEMA DE REPORTES POST-EVENTO
+// CAPSULE CORPS
+// ═══════════════════════════════════════════════════════════════
+let _ccEventoActual = null;
+let _ccViajeros = [];
+let _ccHabitaciones = [];
+let _ccCoordiEventoActual = null;
+let _ccEventosCache = [];
+
+// ── Carga inicial ────────────────────────────────────────────
+async function loadCapsule() {
+  // Cargar eventos en ambos selects
+  try {
+    _ccEventosCache = await db.get('eventos', '?order=fecha.desc&limit=100');
+    const opts = _ccEventosCache.map(e =>
+      `<option value="${e.id}">${e.nombre} · ${new Date(e.fecha+'T12:00:00').toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric'})}</option>`
+    ).join('');
+    const placeholder = '<option value="">— Selecciona un evento —</option>';
+    const sel1 = document.getElementById('cc-evento-select');
+    const sel2 = document.getElementById('cc-coordi-evento-select');
+    if (sel1) sel1.innerHTML = placeholder + opts;
+    if (sel2) sel2.innerHTML = placeholder + opts;
+  } catch(e) {
+    console.warn('loadCapsule:', e.message);
+  }
+}
+
+function showCCTab(tab, btn) {
+  document.querySelectorAll('#page-capsule .gz-filter[id^="cc-tab-btn"]').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  document.getElementById('cc-tab-eventos').style.display  = tab === 'eventos'  ? '' : 'none';
+  document.getElementById('cc-tab-coordis').style.display  = tab === 'coordis'  ? '' : 'none';
+}
+
+function showCCSubTab(sub, btn) {
+  document.querySelectorAll('#page-capsule .gz-filter[id^="cc-sub-btn"]').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  document.getElementById('cc-sub-viajeros').style.display = sub === 'viajeros' ? '' : 'none';
+  document.getElementById('cc-sub-rooming').style.display  = sub === 'rooming'  ? '' : 'none';
+}
+
+// ── Cargar evento seleccionado (viajeros + rooming) ──────────
+async function loadCCEvento() {
+  const eventoId = document.getElementById('cc-evento-select')?.value;
+  const tabsEl   = document.getElementById('cc-evento-tabs');
+  const infoEl   = document.getElementById('cc-evento-info');
+  if (!eventoId) { if (tabsEl) tabsEl.style.display = 'none'; return; }
+  _ccEventoActual = eventoId;
+  if (tabsEl) tabsEl.style.display = '';
+  const ev = _ccEventosCache.find(e => e.id === eventoId);
+  if (infoEl && ev) infoEl.textContent = ev.ciudad || '';
+  await Promise.all([loadViajeros(), loadRooming()]);
+}
+
+// ════════════════════════════════
+// VIAJEROS
+// ════════════════════════════════
+async function loadViajeros() {
+  if (!_ccEventoActual) return;
+  const list = document.getElementById('cc-viajeros-list');
+  list.innerHTML = '<div class="loading-state"><div class="spinner"></div>Cargando…</div>';
+  try {
+    _ccViajeros = await db.get('viajeros_evento', `?evento_id=eq.${_ccEventoActual}&order=nombre.asc`);
+    const countEl = document.getElementById('cc-viajeros-count');
+    if (countEl) countEl.textContent = `${_ccViajeros.length} viajero${_ccViajeros.length !== 1 ? 's' : ''}`;
+    if (!_ccViajeros.length) {
+      list.innerHTML = '<div class="empty-state"><div class="empty-icon">👥</div>Sin viajeros registrados — agrega el primero</div>';
+      return;
+    }
+    list.innerHTML = `
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th>Nombre</th><th>Celular</th><th>Correo</th>
+            <th>Talla</th><th>Emergencia</th><th>Notas</th><th></th>
+          </tr></thead>
+          <tbody>
+            ${_ccViajeros.map(v => `<tr>
+              <td style="font-weight:600">${v.nombre}</td>
+              <td style="font-family:'JetBrains Mono',monospace;font-size:12px">${v.celular||'—'}</td>
+              <td style="font-size:12px;color:var(--ts)">${v.correo||'—'}</td>
+              <td style="text-align:center">${v.talla_playera||'—'}</td>
+              <td style="font-size:11px;color:var(--ts)">${v.num_emergencia||'—'}</td>
+              <td style="font-size:11px;color:var(--ts);max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${v.notas||'—'}</td>
+              <td style="white-space:nowrap">
+                <button class="btn btn-ghost btn-sm" onclick="abrirModalViajero('${v.id}')">✏️</button>
+                <button class="btn btn-red btn-sm" onclick="eliminarViajero('${v.id}')">✕</button>
+              </td>
+            </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>`;
+  } catch(e) {
+    list.innerHTML = `<div class="alert alert-error">${e.message}</div>`;
+  }
+}
+
+function abrirModalViajero(id) {
+  const v = id ? _ccViajeros.find(x => x.id === id) : {};
+  document.getElementById('modal-viajero').innerHTML = `
+    <div class="modal" style="max-width:540px">
+      <div class="modal-header">
+        <div class="modal-title" style="font-family:'Zen Dots',sans-serif;font-size:15px">${id ? 'Editar Viajero' : 'Nuevo Viajero'}</div>
+        <button class="modal-close" onclick="closeModal('modal-viajero')">×</button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="vj-id" value="${v?.id||''}">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <div class="form-group" style="grid-column:1/-1">
+            <label>Nombre completo *</label>
+            <input class="cot-input" id="vj-nombre" value="${v?.nombre||''}" placeholder="Nombre…" style="width:100%">
+          </div>
+          <div class="form-group">
+            <label>Celular</label>
+            <input class="cot-input" id="vj-celular" value="${v?.celular||''}" placeholder="811…">
+          </div>
+          <div class="form-group">
+            <label>Correo</label>
+            <input class="cot-input" id="vj-correo" value="${v?.correo||''}" placeholder="correo@…">
+          </div>
+          <div class="form-group">
+            <label>Talla playera</label>
+            <select class="cot-input" id="vj-talla">
+              ${['XS','S','M','L','XL','XXL','XXXL'].map(t => `<option ${v?.talla_playera===t?'selected':''}>${t}</option>`).join('')}
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Número de emergencia</label>
+            <input class="cot-input" id="vj-emergencia" value="${v?.num_emergencia||''}" placeholder="811…">
+          </div>
+          <div class="form-group" style="grid-column:1/-1">
+            <label>Notas especiales</label>
+            <textarea class="cot-input" id="vj-notas" rows="2" placeholder="Alergias, requerimientos…" style="width:100%;resize:vertical">${v?.notas||''}</textarea>
+          </div>
+        </div>
+        <div id="vj-alert"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" onclick="closeModal('modal-viajero')">Cancelar</button>
+        <button class="btn btn-primary" onclick="guardarViajero()">Guardar</button>
+      </div>
+    </div>`;
+  openModal('modal-viajero');
+}
+
+async function guardarViajero() {
+  const id     = document.getElementById('vj-id')?.value;
+  const nombre = document.getElementById('vj-nombre')?.value.trim();
+  if (!nombre) { document.getElementById('vj-alert').innerHTML='<div class="alert alert-error">El nombre es obligatorio</div>'; return; }
+  const body = {
+    evento_id: _ccEventoActual,
+    nombre,
+    celular:       document.getElementById('vj-celular')?.value.trim()||null,
+    correo:        document.getElementById('vj-correo')?.value.trim()||null,
+    talla_playera: document.getElementById('vj-talla')?.value||null,
+    num_emergencia:document.getElementById('vj-emergencia')?.value.trim()||null,
+    notas:         document.getElementById('vj-notas')?.value.trim()||null,
+  };
+  try {
+    if (id) await db.patch('viajeros_evento', id, body);
+    else    await db.post('viajeros_evento', body);
+    closeModal('modal-viajero');
+    await loadViajeros();
+  } catch(e) { document.getElementById('vj-alert').innerHTML=`<div class="alert alert-error">${e.message}</div>`; }
+}
+
+async function eliminarViajero(id) {
+  if (!confirm('¿Eliminar este viajero?')) return;
+  try { await db.delete('viajeros_evento', id); await loadViajeros(); }
+  catch(e) { alert(e.message); }
+}
+
+// Exportar viajeros
+async function exportarViajeros(formato) {
+  if (!_ccViajeros.length) { alert('No hay viajeros para exportar'); return; }
+  const ev = _ccEventosCache.find(e => e.id === _ccEventoActual);
+  const titulo = `Viajeros — ${ev?.nombre || 'Evento'}`;
+  if (formato === 'pdf') {
+    const win = window.open('','_blank');
+    win.document.write(`<html><head><title>${titulo}</title>
+    <style>body{font-family:Arial,sans-serif;padding:24px}h2{margin-bottom:16px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ccc;padding:8px 12px;font-size:13px}th{background:#f5f5f5}</style></head><body>
+    <h2>${titulo}</h2>
+    <table><thead><tr><th>#</th><th>Nombre</th><th>Celular</th><th>Correo</th><th>Talla</th><th>Emergencia</th><th>Notas</th></tr></thead>
+    <tbody>${_ccViajeros.map((v,i)=>`<tr><td>${i+1}</td><td>${v.nombre}</td><td>${v.celular||''}</td><td>${v.correo||''}</td><td>${v.talla_playera||''}</td><td>${v.num_emergencia||''}</td><td>${v.notas||''}</td></tr>`).join('')}</tbody>
+    </table></body></html>`);
+    win.document.close(); win.print();
+  } else {
+    // CSV descargable
+    const headers = ['#','Nombre','Celular','Correo','Talla','Emergencia','Notas'];
+    const rows = _ccViajeros.map((v,i) => [i+1,v.nombre,v.celular||'',v.correo||'',v.talla_playera||'',v.num_emergencia||'',v.notas||''].map(c=>`"${String(c).replace(/"/g,'""')}"`).join(','));
+    const csv = [headers.join(','), ...rows].join('\n');
+    const a = document.createElement('a');
+    a.href = 'data:text/csv;charset=utf-8,\uFEFF' + encodeURIComponent(csv);
+    a.download = `viajeros-${ev?.nombre||'evento'}.csv`;
+    a.click();
+  }
+}
+
+// ════════════════════════════════
+// ROOMING LIST
+// ════════════════════════════════
+async function loadRooming() {
+  if (!_ccEventoActual) return;
+  const list = document.getElementById('cc-rooming-list');
+  const resumen = document.getElementById('cc-rooming-resumen');
+  if (list) list.innerHTML = '<div class="loading-state"><div class="spinner"></div>Cargando…</div>';
+  try {
+    // Cargar hotel info
+    const [roomInfo] = await db.get('rooming_habitaciones', `?evento_id=eq.${_ccEventoActual}&limit=1`).catch(()=>[]);
+    const hotelInput = document.getElementById('cc-hotel-nombre');
+    if (hotelInput && roomInfo?.hotel_nombre) hotelInput.value = roomInfo.hotel_nombre;
+
+    _ccHabitaciones = await db.get('rooming_habitaciones', `?evento_id=eq.${_ccEventoActual}&order=tipo.asc,numero.asc`);
+
+    // Resumen por tipo
+    const tipos = {individual:0,doble:0,triple:0,cuadruple:0};
+    _ccHabitaciones.forEach(h => { if (tipos[h.tipo]!==undefined) tipos[h.tipo]++; });
+    const tipoLabels = {individual:'Individual',doble:'Doble',triple:'Triple',cuadruple:'Cuádruple'};
+    if (resumen) resumen.innerHTML = Object.entries(tipos).filter(([,v])=>v>0).map(([k,v])=>
+      `<div style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:10px 16px;text-align:center">
+        <div style="font-family:'Zen Dots',sans-serif;font-size:20px;color:var(--orange)">${v}</div>
+        <div style="font-size:10px;color:var(--ts)">${tipoLabels[k]}</div>
+      </div>`
+    ).join('');
+
+    if (!_ccHabitaciones.length) {
+      if (list) list.innerHTML = '<div class="empty-state"><div class="empty-icon">🛏</div>Sin habitaciones — agrega la primera</div>';
+      return;
+    }
+
+    if (list) list.innerHTML = _ccHabitaciones.map(h => {
+      const ocupantes = h.ocupantes ? (typeof h.ocupantes==='string'?JSON.parse(h.ocupantes):h.ocupantes) : [];
+      const tipoCol = {individual:'var(--ts)',doble:'var(--blue)',triple:'var(--gold)',cuadruple:'var(--orange)'};
+      return `<div style="background:var(--bg2);border:1px solid var(--border);border-left:3px solid ${tipoCol[h.tipo]||'var(--border)'};border-radius:var(--radius);padding:14px 18px;margin-bottom:10px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:8px">
+          <div>
+            <span style="font-family:'Rajdhani',sans-serif;font-weight:700;font-size:16px">Hab. ${h.numero||'—'}</span>
+            <span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:${tipoCol[h.tipo]||'var(--ts)'};margin-left:10px;letter-spacing:.1em">${(h.tipo||'').toUpperCase()}</span>
+          </div>
+          <div style="display:flex;gap:6px">
+            <button class="btn btn-ghost btn-sm" onclick="abrirModalHabitacion('${h.id}')">✏️</button>
+            <button class="btn btn-red btn-sm" onclick="eliminarHabitacion('${h.id}')">✕</button>
+          </div>
+        </div>
+        <div style="font-size:12px;color:var(--ts)">
+          ${ocupantes.length ? ocupantes.map(o=>`<span style="background:rgba(255,255,255,.06);border-radius:4px;padding:2px 8px;margin-right:4px;margin-bottom:4px;display:inline-block">${o}</span>`).join('') : '<span style="color:var(--ts)">Sin ocupantes asignados</span>'}
+        </div>
+      </div>`;
+    }).join('');
+  } catch(e) {
+    if (list) list.innerHTML = `<div class="alert alert-error">${e.message}</div>`;
+  }
+}
+
+let _hotelSaveTimer = null;
+function autoGuardarHotel() {
+  clearTimeout(_hotelSaveTimer);
+  _hotelSaveTimer = setTimeout(async () => {
+    const nombre = document.getElementById('cc-hotel-nombre')?.value.trim();
+    if (!nombre || !_ccEventoActual) return;
+    // Actualizar todas las habitaciones del evento con el nuevo nombre de hotel
+    for (const h of _ccHabitaciones) {
+      await db.patch('rooming_habitaciones', h.id, { hotel_nombre: nombre }).catch(()=>{});
+    }
+  }, 1200);
+}
+
+function abrirModalHabitacion(id) {
+  const h = id ? _ccHabitaciones.find(x => x.id === id) : {};
+  const ocupantesStr = h?.ocupantes ? (typeof h.ocupantes==='string'?JSON.parse(h.ocupantes):h.ocupantes).join('\n') : '';
+  // Opciones de viajeros para autocompletar
+  const viajerosSugg = _ccViajeros.map(v=>v.nombre).join(',');
+  document.getElementById('modal-habitacion').innerHTML = `
+    <div class="modal" style="max-width:460px">
+      <div class="modal-header">
+        <div class="modal-title" style="font-family:'Zen Dots',sans-serif;font-size:15px">${id ? 'Editar Habitación' : 'Nueva Habitación'}</div>
+        <button class="modal-close" onclick="closeModal('modal-habitacion')">×</button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="hab-id" value="${h?.id||''}">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <div class="form-group">
+            <label>Número / nombre</label>
+            <input class="cot-input" id="hab-numero" value="${h?.numero||''}" placeholder="101, Suite A…">
+          </div>
+          <div class="form-group">
+            <label>Tipo *</label>
+            <select class="cot-input" id="hab-tipo">
+              ${['individual','doble','triple','cuadruple'].map(t=>`<option value="${t}" ${h?.tipo===t?'selected':''}>${{individual:'Individual',doble:'Doble',triple:'Triple',cuadruple:'Cuádruple'}[t]}</option>`).join('')}
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Ocupantes (uno por línea)</label>
+          <textarea class="cot-input" id="hab-ocupantes" rows="4" placeholder="Juan Pérez&#10;María García&#10;…" style="width:100%;resize:vertical">${ocupantesStr}</textarea>
+          <div style="font-size:10px;color:var(--ts);margin-top:4px">Viajeros del evento: ${_ccViajeros.map(v=>v.nombre).join(', ')||'ninguno aún'}</div>
+        </div>
+        <div id="hab-alert"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" onclick="closeModal('modal-habitacion')">Cancelar</button>
+        <button class="btn btn-primary" onclick="guardarHabitacion()">Guardar</button>
+      </div>
+    </div>`;
+  openModal('modal-habitacion');
+}
+
+async function guardarHabitacion() {
+  const id      = document.getElementById('hab-id')?.value;
+  const tipo    = document.getElementById('hab-tipo')?.value;
+  const numero  = document.getElementById('hab-numero')?.value.trim()||null;
+  const hotel   = document.getElementById('cc-hotel-nombre')?.value.trim()||null;
+  const rawOcup = document.getElementById('hab-ocupantes')?.value||'';
+  const ocupantes = rawOcup.split('\n').map(s=>s.trim()).filter(Boolean);
+  const body = {
+    evento_id: _ccEventoActual,
+    tipo, numero,
+    hotel_nombre: hotel,
+    ocupantes: JSON.stringify(ocupantes),
+  };
+  try {
+    if (id) await db.patch('rooming_habitaciones', id, body);
+    else    await db.post('rooming_habitaciones', body);
+    closeModal('modal-habitacion');
+    await loadRooming();
+  } catch(e) { document.getElementById('hab-alert').innerHTML=`<div class="alert alert-error">${e.message}</div>`; }
+}
+
+async function eliminarHabitacion(id) {
+  if (!confirm('¿Eliminar esta habitación?')) return;
+  try { await db.delete('rooming_habitaciones', id); await loadRooming(); }
+  catch(e) { alert(e.message); }
+}
+
+async function exportarRooming(formato) {
+  if (!_ccHabitaciones.length) { alert('No hay habitaciones para exportar'); return; }
+  const ev    = _ccEventosCache.find(e => e.id === _ccEventoActual);
+  const hotel = document.getElementById('cc-hotel-nombre')?.value || 'Hotel';
+  const titulo = `Rooming List — ${ev?.nombre||'Evento'} · ${hotel}`;
+  const tipoLabel = {individual:'Individual',doble:'Doble',triple:'Triple',cuadruple:'Cuádruple'};
+  if (formato === 'pdf') {
+    const win = window.open('','_blank');
+    win.document.write(`<html><head><title>${titulo}</title>
+    <style>body{font-family:Arial,sans-serif;padding:24px}h2{margin-bottom:4px}h3{color:#555;margin-bottom:16px;font-weight:400}table{width:100%;border-collapse:collapse;margin-bottom:24px}th,td{border:1px solid #ccc;padding:8px 12px;font-size:13px;vertical-align:top}th{background:#f5f5f5}</style></head><body>
+    <h2>${titulo}</h2>
+    <table><thead><tr><th>Habitación</th><th>Tipo</th><th>Ocupantes</th></tr></thead>
+    <tbody>${_ccHabitaciones.map(h=>{
+      const ocp = h.ocupantes?(typeof h.ocupantes==='string'?JSON.parse(h.ocupantes):h.ocupantes):[];
+      return `<tr><td>${h.numero||'—'}</td><td>${tipoLabel[h.tipo]||h.tipo}</td><td>${ocp.join('<br>')}</td></tr>`;
+    }).join('')}</tbody></table></body></html>`);
+    win.document.close(); win.print();
+  } else {
+    const headers = ['Habitación','Tipo','Ocupantes'];
+    const rows = _ccHabitaciones.map(h => {
+      const ocp = h.ocupantes?(typeof h.ocupantes==='string'?JSON.parse(h.ocupantes):h.ocupantes):[];
+      return [h.numero||'',tipoLabel[h.tipo]||h.tipo,ocp.join(' | ')].map(c=>`"${String(c).replace(/"/g,'""')}"`).join(',');
+    });
+    const csv = [headers.join(','),...rows].join('\n');
+    const a = document.createElement('a');
+    a.href = 'data:text/csv;charset=utf-8,\uFEFF'+encodeURIComponent(csv);
+    a.download = `rooming-${ev?.nombre||'evento'}.csv`;
+    a.click();
+  }
+}
+
+// ════════════════════════════════
+// ASIGNACIÓN DE COORDIS
+// ════════════════════════════════
+async function loadCCCoordiEvento() {
+  const eventoId = document.getElementById('cc-coordi-evento-select')?.value;
+  const container = document.getElementById('cc-coordis-asignados');
+  const btnAsignar = document.getElementById('cc-btn-asignar');
+  _ccCoordiEventoActual = eventoId || null;
+  if (btnAsignar) btnAsignar.style.display = eventoId ? '' : 'none';
+  if (!eventoId) { container.innerHTML='<div class="empty-state"><div class="empty-icon">🎯</div>Selecciona un evento</div>'; return; }
+  container.innerHTML = '<div class="loading-state"><div class="spinner"></div>Cargando…</div>';
+  try {
+    const asigs = await db.get('eventos_coordi', `?evento_id=eq.${eventoId}`);
+    if (!asigs.length) {
+      container.innerHTML = '<div class="empty-state"><div class="empty-icon">🎯</div>Sin coordis asignados — agrega el primero</div>';
+      return;
+    }
+    const uIds = asigs.map(a=>a.coordi_id).join(',');
+    const usuarios = await db.get('usuarios', `?id=in.(${uIds})`);
+    const uMap = Object.fromEntries(usuarios.map(u=>[u.id,u]));
+    container.innerHTML = asigs.map(a => {
+      const u = uMap[a.coordi_id]||{};
+      return `<div style="background:var(--bg2);border:1px solid var(--border);border-left:3px solid var(--orange);border-radius:var(--radius);padding:14px 18px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+        <div style="display:flex;align-items:center;gap:12px">
+          <div style="width:40px;height:40px;border-radius:50%;background:var(--bg3);overflow:hidden;flex-shrink:0">
+            ${u.foto_url?`<img src="${u.foto_url}" style="width:100%;height:100%;object-fit:cover">`:
+            `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-family:'Zen Dots',sans-serif;font-size:14px;color:var(--orange)">${(u.nombre||'?')[0]}</div>`}
+          </div>
+          <div>
+            <div style="font-family:'Rajdhani',sans-serif;font-weight:700;font-size:16px">${u.nombre||'—'}</div>
+            <div style="font-size:10px;font-family:'JetBrains Mono',monospace;color:var(--ts)">${u.correo||''}</div>
+            ${a.indicaciones?`<div style="font-size:11px;color:var(--ts);margin-top:4px;font-style:italic">${a.indicaciones}</div>`:''}
+          </div>
+        </div>
+        <button class="btn btn-red btn-sm" onclick="desasignarCoordi('${a.id}')">Desasignar</button>
+      </div>`;
+    }).join('');
+  } catch(e) { container.innerHTML=`<div class="alert alert-error">${e.message}</div>`; }
+}
+
+async function abrirModalAsignarCoordi() {
+  // Cargar coordis disponibles
+  let coordis = [];
+  try { coordis = await db.get('usuarios', `?rol=in.(coordinador)&activo=eq.true&order=nombre.asc`); }
+  catch(e) {}
+  const opts = coordis.map(u=>`<option value="${u.id}">${u.nombre} (${u.correo||u.username})</option>`).join('');
+  document.getElementById('modal-asignar-coordi').innerHTML = `
+    <div class="modal" style="max-width:480px">
+      <div class="modal-header">
+        <div class="modal-title" style="font-family:'Zen Dots',sans-serif;font-size:15px">Asignar Coordi</div>
+        <button class="modal-close" onclick="closeModal('modal-asignar-coordi')">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label>Coordinador *</label>
+          <select class="cot-input" id="ac-coordi-sel" style="width:100%">
+            <option value="">— Selecciona —</option>${opts}
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Indicaciones especiales</label>
+          <textarea class="cot-input" id="ac-indicaciones" rows="3" placeholder="Instrucciones, puntos de encuentro, responsabilidades…" style="width:100%;resize:vertical"></textarea>
+        </div>
+        <div style="background:rgba(255,183,3,.06);border:1px solid rgba(255,183,3,.15);border-radius:8px;padding:12px;font-size:11px;color:var(--gold);font-family:'JetBrains Mono',monospace">
+          📧 Se enviará un correo al coordi notificándole su asignación
+        </div>
+        <div id="ac-alert" style="margin-top:8px"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" onclick="closeModal('modal-asignar-coordi')">Cancelar</button>
+        <button class="btn btn-primary" onclick="guardarAsignacionCoordi()">Asignar y notificar →</button>
+      </div>
+    </div>`;
+  openModal('modal-asignar-coordi');
+}
+
+async function guardarAsignacionCoordi() {
+  const coordiId     = document.getElementById('ac-coordi-sel')?.value;
+  const indicaciones = document.getElementById('ac-indicaciones')?.value.trim()||null;
+  const alertEl      = document.getElementById('ac-alert');
+  if (!coordiId) { alertEl.innerHTML='<div class="alert alert-error">Selecciona un coordi</div>'; return; }
+  if (!_ccCoordiEventoActual) { alertEl.innerHTML='<div class="alert alert-error">Sin evento seleccionado</div>'; return; }
+  alertEl.innerHTML='<div class="alert" style="border-color:var(--border)">Guardando…</div>';
+  try {
+    await db.post('eventos_coordi', {
+      evento_id: _ccCoordiEventoActual,
+      coordi_id: coordiId,
+      indicaciones,
+    });
+    // Enviar correo de notificación vía Netlify Function
+    const ev = _ccEventosCache.find(e=>e.id===_ccCoordiEventoActual);
+    const coordis = await db.get('usuarios', `?id=eq.${coordiId}`);
+    const coordi = coordis[0];
+    if (coordi?.correo_notif || coordi?.correo) {
+      await fetch('/.netlify/functions/send-invite', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({
+          to: coordi.correo_notif || coordi.correo,
+          subject: `🎯 Tour asignado: ${ev?.nombre||'Evento'}`,
+          html: `
+            <div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;background:#0a0a0f;color:#f0f0f5;padding:32px;border-radius:12px">
+              <h2 style="color:#FF6B00;font-size:22px;margin-bottom:8px">Tour Asignado</h2>
+              <p style="color:#888899;font-size:13px;margin-bottom:24px">Kamehouse · Conecta Reynosa</p>
+              <p>Hola <strong>${coordi.nombre}</strong>,</p>
+              <p>Se te ha asignado el siguiente tour:</p>
+              <div style="background:#1a1a24;border-left:3px solid #FF6B00;padding:16px 20px;border-radius:8px;margin:20px 0">
+                <div style="font-size:20px;font-weight:700;margin-bottom:4px">${ev?.nombre||'Evento'}</div>
+                <div style="color:#888899;font-size:13px">${ev?.fecha?new Date(ev.fecha+'T12:00:00').toLocaleDateString('es-MX',{weekday:'long',day:'numeric',month:'long',year:'numeric'}):''}</div>
+                ${ev?.ciudad?`<div style="color:#888899;font-size:13px">${ev.ciudad}</div>`:''}
+              </div>
+              ${indicaciones?`<div style="margin-top:16px"><strong>Indicaciones especiales:</strong><p style="color:#888899">${indicaciones}</p></div>`:''}
+              <p style="margin-top:24px">Puedes ver los detalles de tu tour en tu perfil del Kamehouse.</p>
+              <p style="color:#888899;font-size:12px;margin-top:32px">Conecta Reynosa · conectareynosa.mx</p>
+            </div>`,
+        }),
+      });
+    }
+    alertEl.innerHTML='<div class="alert alert-success">✅ Coordi asignado y notificado</div>';
+    setTimeout(()=>{ closeModal('modal-asignar-coordi'); loadCCCoordiEvento(); }, 900);
+  } catch(e) { alertEl.innerHTML=`<div class="alert alert-error">${e.message}</div>`; }
+}
+
+async function desasignarCoordi(asigId) {
+  if (!confirm('¿Desasignar este coordi del evento?')) return;
+  try { await db.delete('eventos_coordi', asigId); loadCCCoordiEvento(); }
+  catch(e) { alert(e.message); }
+}
+
+// Notificar al coordi que las listas fueron actualizadas
+async function notificarCoordiListas() {
+  if (!_ccEventoActual) return;
+  const ev = _ccEventosCache.find(e=>e.id===_ccEventoActual);
+  try {
+    const asigs = await db.get('eventos_coordi', `?evento_id=eq.${_ccEventoActual}`);
+    if (!asigs.length) { alert('No hay coordis asignados a este evento'); return; }
+    const uIds = asigs.map(a=>a.coordi_id).join(',');
+    const usuarios = await db.get('usuarios', `?id=in.(${uIds})`);
+    let enviados = 0;
+    for (const u of usuarios) {
+      const email = u.correo_notif || u.correo;
+      if (!email) continue;
+      await fetch('/.netlify/functions/send-invite', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({
+          to: email,
+          subject: `📋 Listas actualizadas: ${ev?.nombre||'Evento'}`,
+          html: `
+            <div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;background:#0a0a0f;color:#f0f0f5;padding:32px;border-radius:12px">
+              <h2 style="color:#FF6B00">Listas actualizadas</h2>
+              <p>Hola <strong>${u.nombre}</strong>,</p>
+              <p>Las listas del evento <strong>${ev?.nombre||''}</strong> han sido actualizadas.</p>
+              <p>Entra al Kamehouse para ver la lista de viajeros y el rooming list actualizado.</p>
+              <p style="margin-top:20px">Recuerda pasar a <strong>Torre de Karin</strong> a recoger los kits antes del evento.</p>
+              <p style="color:#888899;font-size:12px;margin-top:32px">Conecta Reynosa · conectareynosa.mx</p>
+            </div>`,
+        }),
+      });
+      enviados++;
+    }
+    alert(`✅ Notificación enviada a ${enviados} coordi${enviados!==1?'s':''}`);
+  } catch(e) { alert('Error enviando notificación: '+e.message); }
+}
+
+
 // ═══════════════════════════════════════════════════════════════
 let _reportesFiltroActual = 'todos';
 let _reportesCache = [];
@@ -5271,9 +5884,12 @@ async function abrirModalReporte(reporteId) {
       const eIds = asigs.map(a => a.evento_id).join(',');
       evAsig = await db.get('eventos', `?id=in.(${eIds})&order=fecha.desc`);
     }
+    // Si es admin puede ver todos los eventos
+    if (!evAsig.length && ['maestro_roshi','bulma'].includes(currentUser.rol)) {
+      evAsig = await db.get('eventos', '?order=fecha.desc&limit=100');
+    }
   } catch(e) {
-    // fallback: mostrar todos los eventos
-    evAsig = _eventosCache || [];
+    evAsig = [];
   }
   _eventosAsignadosCache = evAsig;
 

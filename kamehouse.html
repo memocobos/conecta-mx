@@ -716,6 +716,7 @@ tr:hover td{background:rgba(255,107,0,.03)}
    <button class="nav-btn" onclick="showPage('equipo')" id="nav-equipo">Guerreros Z</button>
    <button class="nav-btn" onclick="showPage('capsule')" id="nav-capsule">Capsule Corp</button>
    <button class="nav-btn" onclick="showPage('cotizador')" id="nav-cotizador">Palacio de Kamisama</button>
+   <button class="nav-btn" onclick="showPage('montana')" id="nav-montana">🏔 Montaña Pai</button>
    <div class="nav-dropdown" id="nav-dropdown-herramientas">
     <button class="nav-dropdown-btn" onclick="toggleDropdown(event)" id="nav-herramientas">
      Herramientas <span class="drop-arrow">▼</span>
@@ -1211,6 +1212,96 @@ tr:hover td{background:rgba(255,107,0,.03)}
      </div>
 
  <!-- ─── COTIZADOR ─── -->
+     <!-- ─── MONTAÑA PAI ─── -->
+     <div class="page" id="page-montana">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;flex-wrap:wrap;gap:10px">
+       <div>
+        <div style="font-family:'Zen Dots',sans-serif;font-size:28px;letter-spacing:.04em;background:linear-gradient(135deg,var(--text) 0%,var(--gold) 50%,var(--orange) 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">MONTAÑA PAI</div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.1em;color:var(--ts)">// panel maestro roshi · control total</div>
+       </div>
+       <button class="btn btn-ghost btn-sm" onclick="loadMontana()" style="font-family:'JetBrains Mono',monospace;font-size:10px">↺ ACTUALIZAR</button>
+      </div>
+
+      <!-- Tabs -->
+      <div style="display:flex;gap:6px;margin:16px 0;flex-wrap:wrap;border-bottom:1px solid var(--border);padding-bottom:12px">
+       <button class="gz-filter active" id="mt-tab-btn-resumen" onclick="showMTTab('resumen',this)">// Resumen</button>
+       <button class="gz-filter" id="mt-tab-btn-usuarios" onclick="showMTTab('usuarios',this)">// Usuarios</button>
+       <button class="gz-filter" id="mt-tab-btn-strikes" onclick="showMTTab('strikes',this)">// Strikes</button>
+       <button class="gz-filter" id="mt-tab-btn-alertas" onclick="showMTTab('alertas',this)">// Alertas</button>
+       <button class="gz-filter" id="mt-tab-btn-config" onclick="showMTTab('config',this)">// Config</button>
+      </div>
+
+      <!-- TAB: Resumen del sistema -->
+      <div id="mt-tab-resumen">
+       <div id="mt-resumen-content"><div class="loading-state"><div class="spinner"></div>Cargando…</div></div>
+      </div>
+
+      <!-- TAB: Usuarios -->
+      <div id="mt-tab-usuarios" style="display:none">
+       <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;align-items:center;justify-content:space-between">
+        <input class="cot-input" id="mt-user-search" placeholder="Buscar usuario…" oninput="filtrarMTUsuarios()" style="max-width:280px;font-size:12px">
+        <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--ts)" id="mt-user-count"></div>
+       </div>
+       <div id="mt-usuarios-list"><div class="loading-state"><div class="spinner"></div></div></div>
+      </div>
+
+      <!-- TAB: Strikes -->
+      <div id="mt-tab-strikes" style="display:none">
+       <div id="mt-strikes-list"><div class="loading-state"><div class="spinner"></div>Cargando…</div></div>
+      </div>
+
+      <!-- TAB: Alertas -->
+      <div id="mt-tab-alertas" style="display:none">
+       <div style="display:flex;gap:8px;margin-bottom:16px;align-items:center;justify-content:space-between;flex-wrap:wrap">
+        <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.12em;color:var(--ts)">// alertas recientes del sistema</div>
+        <button class="btn btn-ghost btn-sm" onclick="marcarTodasLeidas()" style="font-size:10px">✓ Marcar todas leídas</button>
+       </div>
+       <div id="mt-alertas-list"><div class="loading-state"><div class="spinner"></div>Cargando…</div></div>
+      </div>
+
+      <!-- TAB: Config -->
+      <div id="mt-tab-config" style="display:none">
+       <div style="max-width:560px;display:flex;flex-direction:column;gap:20px">
+        <!-- Cuenta bancaria -->
+        <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:20px">
+         <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.15em;color:var(--ts);margin-bottom:16px">// CUENTA BANCARIA MEMO (para reembolsos)</div>
+         <div class="form-group">
+          <label>CLABE / Cuenta</label>
+          <input class="cot-input" id="cfg-clabe" placeholder="18 dígitos CLABE…" style="width:100%">
+         </div>
+         <div class="form-group">
+          <label>Banco</label>
+          <input class="cot-input" id="cfg-banco" placeholder="BBVA, Banorte…" style="width:100%">
+         </div>
+         <div class="form-group">
+          <label>Nombre titular</label>
+          <input class="cot-input" id="cfg-titular" placeholder="Nombre completo…" style="width:100%">
+         </div>
+         <button class="btn btn-primary" onclick="guardarConfigCuenta()">Guardar cuenta</button>
+         <div id="cfg-cuenta-alert" style="margin-top:10px"></div>
+        </div>
+        <!-- Mensaje del día -->
+        <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:20px">
+         <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.15em;color:var(--ts);margin-bottom:16px">// MENSAJE DEL DÍA (aparece al entrar)</div>
+         <div class="form-group">
+          <textarea class="cot-input" id="cfg-mensaje" rows="3" placeholder="Aviso para todo el equipo al iniciar sesión…" style="width:100%;resize:vertical"></textarea>
+         </div>
+         <label style="display:flex;align-items:center;gap:8px;margin-bottom:14px;cursor:pointer">
+          <input type="checkbox" id="cfg-mensaje-activo" style="accent-color:var(--orange)">
+          <span style="font-size:13px">Mostrar mensaje actualmente</span>
+         </label>
+         <button class="btn btn-primary" onclick="guardarConfigMensaje()">Guardar mensaje</button>
+         <div id="cfg-mensaje-alert" style="margin-top:10px"></div>
+        </div>
+       </div>
+      </div>
+     </div>
+
+     <!-- Modal: editar usuario desde Montana -->
+     <div class="modal-overlay" id="modal-mt-usuario"></div>
+     <!-- Modal: ver como rol -->
+     <div class="modal-overlay" id="modal-mt-vercomo"></div>
+
  <div class="page" id="page-cotizador">
  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
  <div class="section-title">Palacio de Kamisama</div>
@@ -2011,7 +2102,7 @@ let disenoLoaded = false;
 let _cotIniciado = false;
 
 const PERMISOS_TABS = {
-  maestro_roshi: ['resumen','pagos','eventos','gastos','ventas','inventario','reportes','capsule','equipo','cotizador','herramientas'],
+  maestro_roshi: ['resumen','pagos','eventos','gastos','ventas','inventario','reportes','capsule','equipo','cotizador','herramientas','montana'],
   bulma:         ['resumen','pagos','eventos','gastos','ventas','inventario','reportes','capsule','equipo','cotizador','herramientas'],
   mister_popo:   ['inventario','reportes','equipo'],
   coordinador:   ['inventario','reportes','equipo'],
@@ -2109,7 +2200,7 @@ function aplicarPermisosUI() {
   const extras = currentUser.permisos_extra?.tabs_extra || [];
   const bloqueados = currentUser.permisos_extra?.tabs_bloqueados || [];
   const tabsPermitidos = [...new Set([...base, ...extras])].filter(t => !bloqueados.includes(t));
-  const allTabs = ['resumen','pagos','eventos','gastos','ventas','inventario','reportes','equipo','capsule','cotizador'];
+  const allTabs = ['resumen','pagos','eventos','gastos','ventas','inventario','reportes','equipo','capsule','cotizador','montana'];
   allTabs.forEach(tab => {
     const btn = document.getElementById('nav-' + tab);
     if (btn) btn.style.display = tabsPermitidos.includes(tab) ? '' : 'none';
@@ -2217,6 +2308,7 @@ function loadPage(name) {
  if (name === 'equipo') loadEquipo();
  if (name === 'capsule') loadCapsule();
  if (name === 'cotizador') initCotizador();
+ if (name === 'montana') loadMontana();
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -2240,6 +2332,8 @@ async function bootApp() {
  loadResumen();
  // Manejar links de aceptar/declinar tour desde correo
  manejarAccionAsignacion();
+ // Mensaje del día
+ checkMensajeDia();
 }
 
 function populateEventoSelects() {
@@ -5160,6 +5254,8 @@ if (_inviteToken) {
   mostrarRegistroInvitado(_inviteToken);
 } else if (checkSession()) {
   enterApp();
+  // Alerta primer login
+  if (currentUser && !currentUser.perfil_completo) { enviarAlertaMemo('nuevo_usuario', { nombre: currentUser.nombre, rol: currentUser.rol }); }
 }
 
 // ── DROPDOWN HERRAMIENTAS ──
@@ -5659,6 +5755,11 @@ async function manejarAccionAsignacion() {
     try {
       await db.patch('eventos_coordi', asigId, { status: 'declinado', motivo_declinacion: motivo });
       window.history.replaceState({}, '', window.location.pathname);
+      // Notificar a Memo
+      const _asigD = await db.get('eventos_coordi', `?id=eq.${asigId}`).then(r=>r[0]).catch(()=>({}));
+      const _evD = _asigD?.evento_id ? await db.get('eventos',`?id=eq.${_asigD.evento_id}`).then(r=>r[0]?.nombre||'').catch(()=>'') : '';
+      const _uD  = _asigD?.coordi_id ? await db.get('usuarios',`?id=eq.${_asigD.coordi_id}`).then(r=>r[0]?.nombre||'').catch(()=>'') : '';
+      await enviarAlertaMemo('tour_declinado', { nombre: _uD, evento: _evD, motivo });
       setTimeout(() => alert('Respuesta registrada. Memo será notificado.'), 500);
     } catch(e) { console.warn(e); }
   }
@@ -6195,7 +6296,583 @@ async function descargarRoomingList(eventoId) {
 
 
 let _reportesFiltroActual = 'todos';
-let _reportesCache = [];
+// ═══════════════════════════════════════════════════════════════
+// MONTAÑA PAI — Panel Maestro Roshi
+// ═══════════════════════════════════════════════════════════════
+const MEMO_EMAIL = 'reynosa@conectamexico.mx';
+let _mtUsuariosCache = [];
+let _mtConfig = {};
+
+// ── Tabs ────────────────────────────────────────────────────
+function showMTTab(tab, btn) {
+  document.querySelectorAll('#page-montana .gz-filter[id^="mt-tab-btn"]').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  ['resumen','usuarios','strikes','alertas','config'].forEach(t => {
+    const el = document.getElementById(`mt-tab-${t}`);
+    if (el) el.style.display = t === tab ? '' : 'none';
+  });
+}
+
+async function loadMontana() {
+  await Promise.all([loadMTResumen(), loadMTUsuarios(), loadMTStrikes(), loadMTAlertas(), loadMTConfig()]);
+}
+
+// ── RESUMEN ──────────────────────────────────────────────────
+async function loadMTResumen() {
+  const el = document.getElementById('mt-resumen-content');
+  if (!el) return;
+  try {
+    const [usuarios, eventos, reportes, asigs] = await Promise.all([
+      db.get('usuarios', '?activo=eq.true&select=id,rol'),
+      db.get('eventos', '?order=fecha.desc&limit=5&select=id,nombre,fecha'),
+      db.get('reportes_evento', '?status=in.(enviado,aprobado_popo)&select=id,status'),
+      db.get('eventos_coordi', '?status=eq.pendiente&select=id'),
+    ]);
+    const porRol = {};
+    usuarios.forEach(u => { porRol[u.rol] = (porRol[u.rol]||0)+1; });
+    const rolLabels = { maestro_roshi:'Maestro Roshi', bulma:'Bulma', mister_popo:'Mister Popo', coordinador:'Coordi', cc:'CC', vendedor:'Vendedor' };
+
+    el.innerHTML = `
+      <!-- Métricas rápidas -->
+      <div class="metrics-grid" style="margin-bottom:24px">
+        <div class="metric"><div class="metric-label">Usuarios activos</div><div class="metric-value">${usuarios.length}</div></div>
+        <div class="metric"><div class="metric-label">Reportes pendientes</div><div class="metric-value" style="color:${reportes.length?'var(--gold)':'var(--green)'}">${reportes.length}</div></div>
+        <div class="metric"><div class="metric-label">Asignaciones sin respuesta</div><div class="metric-value" style="color:${asigs.length?'var(--gold)':'var(--green)'}">${asigs.length}</div></div>
+      </div>
+
+      <!-- Usuarios por rol -->
+      <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:16px 20px;margin-bottom:16px">
+        <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.12em;color:var(--ts);margin-bottom:14px">// EQUIPO POR ROL</div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          ${Object.entries(porRol).map(([rol,count]) =>
+            `<div style="text-align:center;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:10px 16px;min-width:90px">
+              <div style="font-family:'Zen Dots',sans-serif;font-size:22px;color:var(--orange)">${count}</div>
+              <div style="font-size:10px;color:var(--ts)">${rolLabels[rol]||rol}</div>
+            </div>`
+          ).join('')}
+        </div>
+      </div>
+
+      <!-- Próximos eventos -->
+      <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:16px 20px">
+        <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.12em;color:var(--ts);margin-bottom:14px">// PRÓXIMOS EVENTOS</div>
+        ${eventos.length ? eventos.map(e => {
+          const f = new Date(e.fecha+'T12:00:00');
+          const hoy = new Date(); hoy.setHours(0,0,0,0);
+          const dias = Math.ceil((f-hoy)/(1000*60*60*24));
+          return `<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)">
+            <div style="font-weight:600;font-size:14px">${e.nombre}</div>
+            <div style="font-size:11px;font-family:'JetBrains Mono',monospace;color:${dias<=7?'var(--orange)':'var(--ts)'}">
+              ${dias > 0 ? `en ${dias} día${dias!==1?'s':''}` : dias===0 ? '¡HOY!' : 'pasado'}
+            </div>
+          </div>`;
+        }).join('') : '<div style="color:var(--ts);font-size:12px">Sin eventos próximos</div>'}
+      </div>`;
+  } catch(e) { el.innerHTML = `<div class="alert alert-error">${e.message}</div>`; }
+}
+
+// ── USUARIOS ─────────────────────────────────────────────────
+async function loadMTUsuarios() {
+  const list = document.getElementById('mt-usuarios-list');
+  const countEl = document.getElementById('mt-user-count');
+  if (!list) return;
+  list.innerHTML = '<div class="loading-state"><div class="spinner"></div></div>';
+  try {
+    _mtUsuariosCache = await db.get('usuarios', '?order=nombre.asc');
+    if (countEl) countEl.textContent = `${_mtUsuariosCache.length} usuarios`;
+    renderMTUsuarios(_mtUsuariosCache);
+  } catch(e) { list.innerHTML = `<div class="alert alert-error">${e.message}</div>`; }
+}
+
+function filtrarMTUsuarios() {
+  const q = document.getElementById('mt-user-search')?.value.toLowerCase() || '';
+  const filtrado = _mtUsuariosCache.filter(u =>
+    u.nombre?.toLowerCase().includes(q) || u.correo?.toLowerCase().includes(q) || u.rol?.includes(q)
+  );
+  renderMTUsuarios(filtrado);
+}
+
+function renderMTUsuarios(lista) {
+  const list = document.getElementById('mt-usuarios-list');
+  if (!lista.length) { list.innerHTML='<div class="empty-state">Sin resultados</div>'; return; }
+  const rolLabels = { maestro_roshi:'Maestro Roshi', bulma:'Bulma', mister_popo:'Mister Popo', coordinador:'Coordinador', cc:'CC', vendedor:'Vendedor' };
+  list.innerHTML = lista.map(u => `
+    <div style="background:var(--bg2);border:1px solid ${u.activo?'var(--border)':'rgba(255,68,68,.2)'};border-radius:var(--radius);padding:14px 18px;margin-bottom:8px;display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+      <div style="width:36px;height:36px;border-radius:50%;background:var(--bg3);overflow:hidden;flex-shrink:0;display:flex;align-items:center;justify-content:center">
+        ${u.foto_url ? `<img src="${u.foto_url}" style="width:100%;height:100%;object-fit:cover">` :
+        `<span style="font-family:'Zen Dots',sans-serif;font-size:13px;color:var(--orange)">${(u.nombre||'?')[0]}</span>`}
+      </div>
+      <div style="flex:1;min-width:140px">
+        <div style="font-family:'Rajdhani',sans-serif;font-weight:700;font-size:15px">${u.nombre||'—'} ${u.activo?'':'<span style="font-size:10px;color:var(--red)">[INACTIVO]</span>'}</div>
+        <div style="font-size:10px;font-family:'JetBrains Mono',monospace;color:var(--ts)">${rolLabels[u.rol]||u.rol} · ${u.correo||u.username||''}</div>
+        ${u.strikes ? `<div style="font-size:10px;color:var(--red);margin-top:2px">⚠ ${u.strikes} strike${u.strikes!==1?'s':''}</div>` : ''}
+      </div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        <button class="btn btn-ghost btn-sm" onclick="abrirVerComo('${u.id}','${u.rol}')" style="font-size:10px;font-family:'JetBrains Mono',monospace">👁 Ver como</button>
+        <button class="btn btn-ghost btn-sm" onclick="abrirEditarUsuarioMT('${u.id}')" style="font-size:10px">✏️ Editar</button>
+        <button class="btn ${u.activo?'btn-red':'btn-green'} btn-sm" onclick="toggleActivoUsuario('${u.id}',${u.activo})" style="font-size:10px">${u.activo?'Desactivar':'Activar'}</button>
+      </div>
+    </div>`).join('');
+}
+
+async function toggleActivoUsuario(id, activo) {
+  const accion = activo ? 'desactivar' : 'activar';
+  if (!confirm(`¿${accion.charAt(0).toUpperCase()+accion.slice(1)} este usuario?`)) return;
+  try {
+    await db.patch('usuarios', id, { activo: !activo });
+    await loadMTUsuarios();
+    // Alerta si se desactiva
+    if (activo) await enviarAlertaMemo('usuario_desactivado', { id });
+  } catch(e) { alert(e.message); }
+}
+
+function abrirEditarUsuarioMT(id) {
+  const u = _mtUsuariosCache.find(x => x.id === id) || {};
+  const rolOpts = ['maestro_roshi','bulma','mister_popo','coordinador','cc','vendedor'];
+  const rolLabels = { maestro_roshi:'Maestro Roshi', bulma:'Bulma', mister_popo:'Mister Popo', coordinador:'Coordinador', cc:'CC', vendedor:'Vendedor' };
+  // Tabs extra / bloqueadas actuales
+  const permisos = u.permisos_extra || {};
+  const tabsExtra = permisos.tabs_extra || [];
+  const tabsBloq  = permisos.tabs_bloqueados || [];
+  const todasTabs = ['resumen','pagos','eventos','gastos','ventas','inventario','reportes','capsule','equipo','cotizador'];
+
+  document.getElementById('modal-mt-usuario').innerHTML = `
+    <div class="modal" style="max-width:520px">
+      <div class="modal-header">
+        <div class="modal-title" style="font-family:'Zen Dots',sans-serif;font-size:15px">Editar usuario</div>
+        <button class="modal-close" onclick="closeModal('modal-mt-usuario')">×</button>
+      </div>
+      <div class="modal-body" style="max-height:70vh;overflow-y:auto">
+        <input type="hidden" id="mtu-id" value="${u.id||''}">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <div class="form-group">
+            <label>Nombre</label>
+            <input class="cot-input" id="mtu-nombre" value="${u.nombre||''}" style="width:100%">
+          </div>
+          <div class="form-group">
+            <label>Rol</label>
+            <select class="cot-input" id="mtu-rol" style="width:100%">
+              ${rolOpts.map(r=>`<option value="${r}" ${u.rol===r?'selected':''}>${rolLabels[r]}</option>`).join('')}
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Username</label>
+            <input class="cot-input" id="mtu-username" value="${u.username||''}" style="width:100%">
+          </div>
+          <div class="form-group">
+            <label>Nueva contraseña</label>
+            <input class="cot-input" id="mtu-pass" placeholder="Dejar vacío para no cambiar" style="width:100%">
+          </div>
+        </div>
+        <!-- Tabs extra -->
+        <div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border)">
+          <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.12em;color:var(--ts);margin-bottom:10px">// PERMISOS EXTRA DE TABS</div>
+          <div style="font-size:11px;color:var(--ts);margin-bottom:8px">Tabs adicionales que puede ver (además de las de su rol):</div>
+          <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px">
+            ${todasTabs.map(t=>`<label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:12px;padding:5px 10px;border:1px solid var(--border);border-radius:5px;background:${tabsExtra.includes(t)?'rgba(255,107,0,.1)':'transparent'}">
+              <input type="checkbox" class="mt-tab-extra" value="${t}" ${tabsExtra.includes(t)?'checked':''} style="accent-color:var(--orange)"> ${t}
+            </label>`).join('')}
+          </div>
+          <div style="font-size:11px;color:var(--ts);margin-bottom:8px">Tabs bloqueadas (aunque su rol las tenga):</div>
+          <div style="display:flex;flex-wrap:wrap;gap:6px">
+            ${todasTabs.map(t=>`<label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:12px;padding:5px 10px;border:1px solid var(--border);border-radius:5px;background:${tabsBloq.includes(t)?'rgba(255,68,68,.1)':'transparent'}">
+              <input type="checkbox" class="mt-tab-bloq" value="${t}" ${tabsBloq.includes(t)?'checked':''} style="accent-color:var(--red)"> ${t}
+            </label>`).join('')}
+          </div>
+        </div>
+        <div id="mtu-alert" style="margin-top:12px"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" onclick="closeModal('modal-mt-usuario')">Cancelar</button>
+        <button class="btn btn-primary" onclick="guardarUsuarioMT()">Guardar</button>
+      </div>
+    </div>`;
+  openModal('modal-mt-usuario');
+}
+
+async function guardarUsuarioMT() {
+  const id       = document.getElementById('mtu-id')?.value;
+  const nombre   = document.getElementById('mtu-nombre')?.value.trim();
+  const rol      = document.getElementById('mtu-rol')?.value;
+  const username = document.getElementById('mtu-username')?.value.trim();
+  const pass     = document.getElementById('mtu-pass')?.value.trim();
+  const tabsExtra = Array.from(document.querySelectorAll('.mt-tab-extra:checked')).map(c=>c.value);
+  const tabsBloq  = Array.from(document.querySelectorAll('.mt-tab-bloq:checked')).map(c=>c.value);
+  const body = {
+    nombre, rol, username: username||null,
+    permisos_extra: { tabs_extra: tabsExtra, tabs_bloqueados: tabsBloq },
+  };
+  if (pass) body.password_hash = pass;
+  try {
+    await db.patch('usuarios', id, body);
+    document.getElementById('mtu-alert').innerHTML='<div class="alert alert-success">✅ Guardado</div>';
+    setTimeout(()=>{ closeModal('modal-mt-usuario'); loadMTUsuarios(); }, 800);
+  } catch(e) { document.getElementById('mtu-alert').innerHTML=`<div class="alert alert-error">${e.message}</div>`; }
+}
+
+// ── VER COMO ROL ─────────────────────────────────────────────
+function abrirVerComo(userId, rol) {
+  const u = _mtUsuariosCache.find(x=>x.id===userId);
+  if (!u) return;
+  document.getElementById('modal-mt-vercomo').innerHTML = `
+    <div class="modal" style="max-width:400px">
+      <div class="modal-header">
+        <div class="modal-title" style="font-family:'Zen Dots',sans-serif;font-size:15px">Ver como: ${u.nombre}</div>
+        <button class="modal-close" onclick="closeModal('modal-mt-vercomo')">×</button>
+      </div>
+      <div class="modal-body">
+        <p style="font-size:13px;color:var(--ts);margin-bottom:16px">Vas a simular la vista del sistema como si fueras <strong style="color:var(--text)">${u.nombre}</strong> (${u.rol}). Tu sesión de Maestro Roshi se restaura al salir.</p>
+        <div style="background:rgba(255,183,3,.06);border:1px solid rgba(255,183,3,.2);border-radius:8px;padding:12px;font-size:11px;color:var(--gold)">
+          ⚠️ Solo es una vista — no puedes hacer cambios que afecten a ${u.nombre}
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" onclick="closeModal('modal-mt-vercomo')">Cancelar</button>
+        <button class="btn btn-primary" onclick="activarVerComo('${userId}')">Entrar como ${u.nombre} →</button>
+      </div>
+    </div>`;
+  openModal('modal-mt-vercomo');
+}
+
+function activarVerComo(userId) {
+  const u = _mtUsuariosCache.find(x=>x.id===userId);
+  if (!u) return;
+  // Guardar sesión original
+  sessionStorage.setItem('_roshi_session_backup', sessionStorage.getItem(SESSION_KEY));
+  // Simular usuario
+  const fakeSession = { user: { ...u }, expires: Date.now() + 3600000 };
+  sessionStorage.setItem(SESSION_KEY, JSON.stringify(fakeSession));
+  currentUser = u;
+  closeModal('modal-mt-vercomo');
+  // Mostrar banner de aviso y aplicar permisos
+  mostrarBannerVerComo(u.nombre);
+  aplicarPermisosUI();
+}
+
+function mostrarBannerVerComo(nombre) {
+  let banner = document.getElementById('ver-como-banner');
+  if (!banner) {
+    banner = document.createElement('div');
+    banner.id = 'ver-como-banner';
+    banner.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:9999;background:rgba(255,183,3,.95);color:#0a0a0f;padding:10px 20px;font-family:JetBrains Mono,monospace;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:space-between;letter-spacing:.05em';
+    document.body.appendChild(banner);
+  }
+  banner.innerHTML = `<span>👁 MODO VISTA — viendo como: ${nombre.toUpperCase()}</span>
+    <button onclick="salirVerComo()" style="background:var(--bg);border:none;padding:6px 14px;border-radius:6px;cursor:pointer;font-family:JetBrains Mono,monospace;font-size:11px;font-weight:700">✕ Salir y volver a Roshi</button>`;
+}
+
+function salirVerComo() {
+  const backup = sessionStorage.getItem('_roshi_session_backup');
+  if (backup) {
+    sessionStorage.setItem(SESSION_KEY, backup);
+    sessionStorage.removeItem('_roshi_session_backup');
+    const s = JSON.parse(backup);
+    currentUser = s.user;
+  }
+  const banner = document.getElementById('ver-como-banner');
+  if (banner) banner.remove();
+  aplicarPermisosUI();
+  showPage('montana');
+}
+
+// ── STRIKES ──────────────────────────────────────────────────
+async function loadMTStrikes() {
+  const list = document.getElementById('mt-strikes-list');
+  if (!list) return;
+  list.innerHTML = '<div class="loading-state"><div class="spinner"></div></div>';
+  try {
+    const usuarios = await db.get('usuarios', '?order=strikes.desc&select=id,nombre,rol,strikes,activo');
+    const conStrikes = usuarios.filter(u => (u.strikes||0) > 0);
+    const sinStrikes = usuarios.filter(u => (u.strikes||0) === 0);
+    const rolLabels = { maestro_roshi:'Maestro Roshi', bulma:'Bulma', mister_popo:'Mister Popo', coordinador:'Coordinador', cc:'CC', vendedor:'Vendedor' };
+
+    list.innerHTML = `
+      <div style="margin-bottom:20px">
+        <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.12em;color:var(--ts);margin-bottom:12px">// USUARIOS CON STRIKES</div>
+        ${conStrikes.length ? conStrikes.map(u => {
+          const col = u.strikes >= 3 ? 'var(--red)' : u.strikes >= 2 ? 'var(--orange)' : 'var(--gold)';
+          return `<div style="background:var(--bg2);border:1px solid var(--border);border-left:3px solid ${col};border-radius:var(--radius);padding:14px 18px;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
+            <div>
+              <div style="font-family:'Rajdhani',sans-serif;font-weight:700;font-size:16px">${u.nombre}</div>
+              <div style="font-size:10px;font-family:'JetBrains Mono',monospace;color:var(--ts)">${rolLabels[u.rol]||u.rol}</div>
+            </div>
+            <div style="display:flex;align-items:center;gap:12px">
+              <div style="font-family:'Zen Dots',sans-serif;font-size:28px;color:${col}">${u.strikes}</div>
+              <div style="display:flex;gap:6px">
+                <button class="btn btn-primary btn-sm" onclick="ponerStrikeManual('${u.id}','${u.nombre.replace(/'/g,"\\'")}',${u.strikes})" style="font-size:10px">+ Strike</button>
+                <button class="btn btn-ghost btn-sm" onclick="quitarStrike('${u.id}','${u.nombre.replace(/'/g,"\\'")}',${u.strikes})" style="font-size:10px">− Quitar</button>
+              </div>
+            </div>
+          </div>`;
+        }).join('') : '<div style="font-size:12px;color:var(--green);padding:12px">✅ Nadie tiene strikes</div>'}
+      </div>
+      <div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.12em;color:var(--ts);margin-bottom:12px">// PONER STRIKE A CUALQUIER USUARIO</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
+          <div class="form-group" style="margin:0">
+            <label>Usuario</label>
+            <select class="cot-input" id="mt-strike-user" style="min-width:200px">
+              <option value="">— Selecciona —</option>
+              ${usuarios.filter(u=>u.activo).map(u=>`<option value="${u.id}">${u.nombre} (${u.strikes||0} strikes)</option>`).join('')}
+            </select>
+          </div>
+          <div class="form-group" style="margin:0;flex:1;min-width:160px">
+            <label>Motivo</label>
+            <input class="cot-input" id="mt-strike-motivo" placeholder="Motivo del strike…">
+          </div>
+          <button class="btn btn-primary" onclick="ponerStrikeDesdePanel()">Aplicar strike</button>
+        </div>
+        <div id="mt-strike-alert" style="margin-top:8px"></div>
+      </div>`;
+  } catch(e) { list.innerHTML = `<div class="alert alert-error">${e.message}</div>`; }
+}
+
+async function ponerStrikeManual(userId, nombre, strikesActuales) {
+  const motivo = prompt(`Motivo del strike para ${nombre}:`);
+  if (!motivo) return;
+  await aplicarStrike(userId, nombre, strikesActuales, motivo);
+}
+
+async function ponerStrikeDesdePanel() {
+  const userId = document.getElementById('mt-strike-user')?.value;
+  const motivo = document.getElementById('mt-strike-motivo')?.value.trim();
+  const alertEl = document.getElementById('mt-strike-alert');
+  if (!userId) { alertEl.innerHTML='<div class="alert alert-error">Selecciona un usuario</div>'; return; }
+  if (!motivo) { alertEl.innerHTML='<div class="alert alert-error">Ingresa el motivo</div>'; return; }
+  const u = _mtUsuariosCache.find(x=>x.id===userId) || {};
+  await aplicarStrike(userId, u.nombre||'Usuario', u.strikes||0, motivo);
+  alertEl.innerHTML='<div class="alert alert-success">✅ Strike aplicado</div>';
+  setTimeout(()=>{ alertEl.innerHTML=''; loadMTStrikes(); }, 1500);
+}
+
+async function aplicarStrike(userId, nombre, strikesActuales, motivo) {
+  const nuevos = strikesActuales + 1;
+  try {
+    await db.patch('usuarios', userId, { strikes: nuevos });
+    // Log del strike
+    await db.post('strikes_log', {
+      coordi_id: userId,
+      accion: 'strike_manual',
+      motivo,
+      por_quien: currentUser?.id,
+      created_at: new Date().toISOString(),
+    }).catch(()=>{});
+    // Email al usuario
+    const [u] = await db.get('usuarios', `?id=eq.${userId}`);
+    const email = u?.correo_notif || u?.correo;
+    if (email) {
+      await enviarEmailSistema(email, `⚠️ Strike registrado — Kamehouse`,
+        `<p>Hola <strong>${nombre}</strong>,</p>
+         <p>Se ha registrado un strike en tu cuenta.</p>
+         <p><strong>Motivo:</strong> ${motivo}</p>
+         <p><strong>Strikes acumulados:</strong> ${nuevos}/3</p>
+         ${nuevos >= 2 ? `<p style="color:#FF4444"><strong>⚠️ Advertencia:</strong> Al llegar a 3 strikes tu cuenta será suspendida.</p>` : ''}
+         ${nuevos >= 3 ? `<p style="color:#FF4444"><strong>🚫 Tu cuenta ha sido suspendida.</strong></p>` : ''}`
+      );
+    }
+    // Alerta a Memo si llegó a 2 o 3
+    if (nuevos >= 2) await enviarAlertaMemo('strikes', { nombre, strikes: nuevos, motivo });
+    // Suspender si llegó a 3
+    if (nuevos >= 3) {
+      await db.patch('usuarios', userId, { activo: false });
+    }
+    await loadMTStrikes();
+  } catch(e) { alert(e.message); }
+}
+
+async function quitarStrike(userId, nombre, strikesActuales) {
+  if (!confirm(`¿Quitar 1 strike a ${nombre}?`)) return;
+  const nuevos = Math.max(0, strikesActuales - 1);
+  try {
+    await db.patch('usuarios', userId, { strikes: nuevos });
+    await loadMTStrikes();
+  } catch(e) { alert(e.message); }
+}
+
+// ── ALERTAS ──────────────────────────────────────────────────
+async function loadMTAlertas() {
+  const list = document.getElementById('mt-alertas-list');
+  if (!list) return;
+  list.innerHTML = '<div class="loading-state"><div class="spinner"></div></div>';
+  try {
+    const alertas = await db.get('sistema_alertas', '?order=created_at.desc&limit=50').catch(()=>[]);
+    if (!alertas.length) {
+      list.innerHTML = '<div class="empty-state"><div class="empty-icon">🔔</div>Sin alertas recientes</div>';
+      return;
+    }
+    const tipoInfo = {
+      strike_auto:        { icon:'⚠️', color:'var(--orange)', label:'Strike automático' },
+      strike_manual:      { icon:'🎯', color:'var(--orange)', label:'Strike manual' },
+      strikes:            { icon:'⚠️', color:'var(--orange)', label:'Strike' },
+      tour_declinado:     { icon:'❌', color:'var(--red)',    label:'Tour declinado' },
+      reporte_rechazado:  { icon:'📋', color:'var(--red)',    label:'Reporte rechazado' },
+      nuevo_usuario:      { icon:'👤', color:'var(--green)',  label:'Nuevo usuario' },
+      advertencia:        { icon:'⚠️', color:'var(--gold)',   label:'Advertencia' },
+      suspension:         { icon:'🚫', color:'var(--red)',    label:'Suspensión' },
+      usuario_desactivado:{ icon:'🔒', color:'var(--red)',    label:'Usuario desactivado' },
+    };
+    list.innerHTML = alertas.map(a => {
+      const ti = tipoInfo[a.tipo] || { icon:'🔔', color:'var(--ts)', label: a.tipo };
+      const fecha = new Date(a.created_at);
+      return `<div style="background:var(--bg2);border:1px solid var(--border);border-left:3px solid ${ti.color};border-radius:var(--radius);padding:12px 18px;margin-bottom:8px;${a.leida?'opacity:.5':''}">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;flex-wrap:wrap">
+          <div>
+            <div style="font-size:13px;font-weight:600">${ti.icon} ${a.mensaje||ti.label}</div>
+            <div style="font-size:10px;font-family:'JetBrains Mono',monospace;color:var(--ts);margin-top:3px">
+              ${fecha.toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric'})} ${fecha.toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'})}
+            </div>
+          </div>
+          ${!a.leida ? `<button class="btn btn-ghost btn-sm" onclick="marcarAlertaLeida('${a.id}')" style="font-size:10px">✓ Leída</button>` : ''}
+        </div>
+      </div>`;
+    }).join('');
+  } catch(e) { list.innerHTML = `<div class="alert alert-error">${e.message}</div>`; }
+}
+
+async function marcarAlertaLeida(id) {
+  try { await db.patch('sistema_alertas', id, { leida: true }); await loadMTAlertas(); }
+  catch(e) { alert(e.message); }
+}
+
+async function marcarTodasLeidas() {
+  try {
+    const alertas = await db.get('sistema_alertas', '?leida=eq.false&select=id');
+    for (const a of alertas) {
+      await db.patch('sistema_alertas', a.id, { leida: true }).catch(()=>{});
+    }
+    await loadMTAlertas();
+  } catch(e) {}
+}
+
+// ── CONFIG ───────────────────────────────────────────────────
+async function loadMTConfig() {
+  try {
+    const [cfg] = await db.get('sistema_config', '?id=eq.1').catch(()=>[{}]);
+    _mtConfig = cfg || {};
+    document.getElementById('cfg-clabe')?.setAttribute('value', cfg?.cuenta_clabe||'');
+    document.getElementById('cfg-banco')?.setAttribute('value', cfg?.cuenta_banco||'');
+    document.getElementById('cfg-titular')?.setAttribute('value', cfg?.cuenta_titular||'');
+    if (document.getElementById('cfg-clabe')) document.getElementById('cfg-clabe').value = cfg?.cuenta_clabe||'';
+    if (document.getElementById('cfg-banco')) document.getElementById('cfg-banco').value = cfg?.cuenta_banco||'';
+    if (document.getElementById('cfg-titular')) document.getElementById('cfg-titular').value = cfg?.cuenta_titular||'';
+    if (document.getElementById('cfg-mensaje')) document.getElementById('cfg-mensaje').value = cfg?.mensaje_dia||'';
+    if (document.getElementById('cfg-mensaje-activo')) document.getElementById('cfg-mensaje-activo').checked = cfg?.mensaje_activo||false;
+  } catch(e) {}
+}
+
+async function guardarConfigCuenta() {
+  const body = {
+    cuenta_clabe:   document.getElementById('cfg-clabe')?.value.trim()||null,
+    cuenta_banco:   document.getElementById('cfg-banco')?.value.trim()||null,
+    cuenta_titular: document.getElementById('cfg-titular')?.value.trim()||null,
+  };
+  const alertEl = document.getElementById('cfg-cuenta-alert');
+  try {
+    if (_mtConfig?.id) await db.patch('sistema_config', _mtConfig.id, body);
+    else await db.post('sistema_config', { id: 1, ...body });
+    alertEl.innerHTML='<div class="alert alert-success">✅ Cuenta guardada</div>';
+    setTimeout(()=>alertEl.innerHTML='', 2000);
+  } catch(e) { alertEl.innerHTML=`<div class="alert alert-error">${e.message}</div>`; }
+}
+
+async function guardarConfigMensaje() {
+  const body = {
+    mensaje_dia:    document.getElementById('cfg-mensaje')?.value.trim()||null,
+    mensaje_activo: document.getElementById('cfg-mensaje-activo')?.checked||false,
+  };
+  const alertEl = document.getElementById('cfg-mensaje-alert');
+  try {
+    if (_mtConfig?.id) await db.patch('sistema_config', _mtConfig.id, body);
+    else await db.post('sistema_config', { id: 1, ...body });
+    alertEl.innerHTML='<div class="alert alert-success">✅ Mensaje guardado</div>';
+    setTimeout(()=>alertEl.innerHTML='', 2000);
+  } catch(e) { alertEl.innerHTML=`<div class="alert alert-error">${e.message}</div>`; }
+}
+
+// ── SISTEMA DE ALERTAS Y CORREOS ─────────────────────────────
+async function enviarEmailSistema(to, subject, bodyHtml) {
+  try {
+    await fetch('/.netlify/functions/send-invite', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        to, subject,
+        html: `<div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;background:#0a0a0f;color:#f0f0f5;padding:32px;border-radius:12px">
+          ${bodyHtml}
+          <p style="color:#888899;font-size:12px;margin-top:32px">Kamehouse · Conecta Reynosa</p>
+        </div>`,
+      }),
+    });
+  } catch(e) { console.warn('Email error:', e.message); }
+}
+
+async function enviarAlertaMemo(tipo, datos = {}) {
+  // Guardar en DB
+  try {
+    let mensaje = '';
+    let emailSubject = '';
+    let emailBody = '';
+    switch(tipo) {
+      case 'tour_declinado':
+        mensaje = `${datos.nombre||'Un coordi'} declinó el tour: ${datos.evento||''}${datos.motivo?' — Motivo: '+datos.motivo:''}`;
+        emailSubject = `❌ Tour declinado — ${datos.evento||''}`;
+        emailBody = `<p>${datos.nombre} declinó el tour <strong>${datos.evento}</strong>.</p>${datos.motivo?`<p><strong>Motivo:</strong> ${datos.motivo}</p>`:''}`;
+        break;
+      case 'reporte_rechazado':
+        mensaje = `Mister Popo rechazó el reporte de ${datos.coordi||'un coordi'}${datos.motivo?': '+datos.motivo:''}`;
+        emailSubject = `📋 Reporte rechazado por Mister Popo`;
+        emailBody = `<p>Mister Popo rechazó el reporte post-evento de <strong>${datos.coordi}</strong>.</p>${datos.motivo?`<p><strong>Motivo:</strong> ${datos.motivo}</p>`:''}`;
+        break;
+      case 'nuevo_usuario':
+        mensaje = `Nuevo usuario registrado: ${datos.nombre||''}`;
+        emailSubject = `👤 Nuevo guerrero Z: ${datos.nombre||''}`;
+        emailBody = `<p>Se registró un nuevo usuario: <strong>${datos.nombre}</strong> (${datos.rol||''}).</p>`;
+        break;
+      case 'strikes':
+        mensaje = `${datos.nombre} acumuló ${datos.strikes} strike${datos.strikes!==1?'s':''}${datos.motivo?' — '+datos.motivo:''}`;
+        emailSubject = `⚠️ ${datos.strikes >= 3 ? 'SUSPENSIÓN' : 'Advertencia'} — ${datos.nombre}`;
+        emailBody = `<p><strong>${datos.nombre}</strong> tiene ahora ${datos.strikes} strike${datos.strikes!==1?'s':''}.</p>${datos.motivo?`<p>Motivo: ${datos.motivo}</p>`:''}${datos.strikes>=3?'<p style="color:#FF4444"><strong>Cuenta suspendida automáticamente.</strong></p>':''}`;
+        break;
+      case 'usuario_desactivado':
+        mensaje = `Usuario desactivado desde el panel`;
+        emailSubject = `🔒 Usuario desactivado`;
+        emailBody = `<p>Un usuario fue desactivado desde Montaña Pai.</p>`;
+        break;
+      default:
+        mensaje = JSON.stringify(datos);
+        emailSubject = `🔔 Alerta Kamehouse: ${tipo}`;
+        emailBody = `<p>${mensaje}</p>`;
+    }
+    await db.post('sistema_alertas', {
+      tipo, mensaje,
+      leida: false,
+      created_at: new Date().toISOString(),
+    }).catch(()=>{});
+    // Email a Memo
+    await enviarEmailSistema(MEMO_EMAIL, emailSubject, emailBody);
+  } catch(e) { console.warn('Alerta error:', e.message); }
+}
+
+// Mostrar mensaje del día al entrar
+async function checkMensajeDia() {
+  try {
+    const [cfg] = await db.get('sistema_config', '?id=eq.1').catch(()=>[]);
+    if (cfg?.mensaje_activo && cfg?.mensaje_dia) {
+      let banner = document.getElementById('msg-dia-banner');
+      if (!banner) {
+        banner = document.createElement('div');
+        banner.id = 'msg-dia-banner';
+        banner.style.cssText = 'position:fixed;bottom:20px;right:20px;z-index:9998;background:var(--bg2);border:1px solid var(--border2);border-radius:10px;padding:16px 20px;max-width:320px;box-shadow:0 8px 32px rgba(0,0,0,.5)';
+        document.body.appendChild(banner);
+      }
+      banner.innerHTML = `
+        <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--orange);margin-bottom:8px;letter-spacing:.1em">// MENSAJE DEL DÍA</div>
+        <div style="font-size:13px;color:var(--text);line-height:1.5">${cfg.mensaje_dia}</div>
+        <button onclick="document.getElementById('msg-dia-banner').remove()" style="margin-top:12px;background:none;border:1px solid var(--border);border-radius:6px;padding:4px 12px;color:var(--ts);cursor:pointer;font-size:11px;width:100%">Cerrar</button>`;
+    }
+  } catch(e) {}
+}
+
+
 let _bodegaPiezasCache = [];
 let _eventosAsignadosCache = [];
 
@@ -6658,8 +7335,10 @@ async function rechazarReporte(id) {
     await db.patch('reportes_evento', id, {
       status: 'rechazado',
       rechazo_motivo: motivo,
-      updated_at: new Date().toISOString()
     });
+    // Alerta a Memo
+    const r = _reportesCache.find(x=>x.id===id);
+    await enviarAlertaMemo('reporte_rechazado', { coordi: r?._coordi?.nombre||'Coordi', motivo });
     loadReportes();
   } catch(e) { alert(e.message); }
 }

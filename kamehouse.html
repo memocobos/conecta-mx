@@ -4360,7 +4360,7 @@ async function renderMiPerfil(modoEdicion = false) {
   if (modoEdicion) {
     el.innerHTML = renderFormPerfil();
     const u = _gzCache.find(u => u.id === currentUser.id) || currentUser;
-    ['nombre','correo_notif','celular','num_emergencia','nombre_emergencia','talla_playera','fecha_nacimiento','template_sugerido'].forEach(campo => {
+    ['nombre','correo_notif','celular','num_emergencia','nombre_emergencia','talla_playera','fecha_nacimiento','template_sugerido','username'].forEach(campo => {
       const inp = document.getElementById('mp-' + campo);
       if (inp && u[campo]) inp.value = u[campo];
     });
@@ -4529,11 +4529,24 @@ function renderFormPerfil() {
         <textarea class="cot-input" id="mp-template_sugerido" rows="3" placeholder="ej. Tema azul oscuro con detalles dorados estilo Vegeta"></textarea>
       </div>
       <div class="perfil-section">
-        <div class="perfil-section-title">Cambiar contraseña</div>
-        <div style="font-family:JetBrains Mono;font-size:10px;color:var(--ts);margin-bottom:10px;letter-spacing:.04em">// dejar vacío para no cambiarla</div>
+        <div class="perfil-section-title">Acceso al sistema</div>
+        <div style="font-family:JetBrains Mono;font-size:10px;color:var(--ts);margin-bottom:14px;letter-spacing:.04em">// puedes entrar con tu correo o con tu nombre de usuario</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
-          <div><div class="perfil-field-label" style="margin-bottom:6px">Nueva contraseña</div><input class="cot-input" id="mp-pass-nueva" type="password"></div>
-          <div><div class="perfil-field-label" style="margin-bottom:6px">Confirmar</div><input class="cot-input" id="mp-pass-confirm" type="password"></div>
+          <div style="grid-column:1/-1">
+            <div class="perfil-field-label" style="margin-bottom:4px">Nombre de usuario</div>
+            <div style="font-family:JetBrains Mono;font-size:10px;color:var(--ts);margin-bottom:6px;letter-spacing:.04em">// elige un alias corto para iniciar sesión más rápido</div>
+            <input class="cot-input" id="mp-username" placeholder="ej. memo · mipopo · juanpz" autocomplete="username" style="text-transform:lowercase">
+          </div>
+          <div>
+            <div class="perfil-field-label" style="margin-bottom:4px">Nueva contraseña</div>
+            <div style="font-family:JetBrains Mono;font-size:10px;color:var(--ts);margin-bottom:6px;letter-spacing:.04em">// dejar vacío para no cambiarla</div>
+            <input class="cot-input" id="mp-pass-nueva" type="password" placeholder="Mínimo 6 caracteres" autocomplete="new-password">
+          </div>
+          <div>
+            <div class="perfil-field-label" style="margin-bottom:4px">Confirmar contraseña</div>
+            <div style="font-family:JetBrains Mono;font-size:10px;color:var(--ts);margin-bottom:6px;letter-spacing:.04em">&nbsp;</div>
+            <input class="cot-input" id="mp-pass-confirm" type="password" placeholder="Repite la contraseña" autocomplete="new-password">
+          </div>
         </div>
       </div>
       <div class="perfil-section">
@@ -4555,6 +4568,21 @@ async function guardarMiPerfil() {
     alertEl.innerHTML = '<div class="alert alert-error">Las contraseñas no coinciden</div>';
     return;
   }
+  // Validar username si lo cambió
+  const usernameNuevo = document.getElementById('mp-username')?.value.trim().toLowerCase().replace(/\s+/g,'') || null;
+  if (usernameNuevo) {
+    // Verificar que no esté tomado por otro usuario
+    const chkResp = await fetch(
+      `${SB_URL}/rest/v1/usuarios?username=eq.${encodeURIComponent(usernameNuevo)}&id=neq.${currentUser.id}&limit=1`,
+      { headers: { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}` } }
+    );
+    const chk = await chkResp.json();
+    if (chk && chk.length > 0) {
+      alertEl.innerHTML = '<div class="alert alert-error">Ese nombre de usuario ya está tomado, elige otro</div>';
+      return;
+    }
+  }
+
   const body = {
     nombre: document.getElementById('mp-nombre')?.value.trim(),
     celular: document.getElementById('mp-celular')?.value.trim() || null,
@@ -4566,6 +4594,7 @@ async function guardarMiPerfil() {
     template_sugerido: document.getElementById('mp-template_sugerido')?.value.trim() || null,
     perfil_completo: true,
   };
+  if (usernameNuevo) body.username = usernameNuevo;
   if (passNueva) body.password_hash = passNueva;
   try {
     await fetch(`${SB_URL}/rest/v1/usuarios?id=eq.${currentUser.id}`, {

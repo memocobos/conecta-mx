@@ -5286,6 +5286,7 @@ function renderCCEventos(lista, filtro) {
         </div>
         <div style="display:flex;gap:6px">
           <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();abrirModalEditarEvento('${e.id}')" style="font-size:11px">✏️</button>
+          <button class="btn btn-red btn-sm" onclick="event.stopPropagation();eliminarEventoCC('${e.id}')" style="font-size:11px">✕</button>
           <button class="btn btn-primary btn-sm" onclick="event.stopPropagation();abrirDetalleEvento('${e.id}')" style="font-size:11px">Ver →</button>
         </div>
       </div>
@@ -5353,6 +5354,16 @@ function abrirModalEvento(id) {
       </div>
     </div>`;
   openModal('modal-cc-evento');
+}
+
+async function eliminarEventoCC(id) {
+  const ev = _ccEventosCache.find(e => e.id === id);
+  const nombre = ev?.nombre || 'este evento';
+  if (!confirm(`¿Eliminar "${nombre}"?\n\nEsto también eliminará viajeros y rooming list. No se puede deshacer.`)) return;
+  try {
+    await db.delete('eventos', id);
+    await loadCapsule();
+  } catch(e) { alert('Error al eliminar: ' + e.message); }
 }
 
 async function guardarEventoCC() {

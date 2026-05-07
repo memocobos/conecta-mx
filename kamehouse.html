@@ -5458,6 +5458,8 @@ async function loadCCEquipo() {
     const uIds = asigs.map(a=>a.coordi_id).join(',');
     const usuarios = await db.get('usuarios', `?id=in.(${uIds})`);
     const uMap = Object.fromEntries(usuarios.map(u=>[u.id,u]));
+    // Guardar referencia de usuario en cada asignación (para rooming)
+    _ccAsignados = asigs.map(a => ({ ...a, _usuario: uMap[a.coordi_id]||{} }));
     const statusCol = { pendiente:'var(--gold)', aceptado:'var(--green)', declinado:'var(--red)' };
     const statusLabel = { pendiente:'⏳ Pendiente', aceptado:'✅ Aceptó', declinado:'❌ Declinó' };
     container.innerHTML = asigs.map(a => {
@@ -5978,6 +5980,13 @@ function abrirModalHabitacion(id) {
   const tipoActual = h.tipo || 'doble';
   const nombresViajeros = _ccViajeros.map(v => v.nombre);
 
+  // Combinar viajeros + equipo asignado + chofer
+  const nombresEquipo = _ccAsignados.map(a => {
+    const u = a._usuario || {};
+    return u.nombre || '';
+  }).filter(Boolean);
+  const todosLosNombres = [...new Set([...nombresViajeros, ...nombresEquipo])].sort();
+
   function selects(tipo, ocsActuales) {
     const c = CAPACIDAD_HAB[tipo] || 1;
     return Array.from({length: c}).map((_, i) => `
@@ -5985,7 +5994,9 @@ function abrirModalHabitacion(id) {
         <div style="font-size:10px;color:var(--ts);margin-bottom:4px">Lugar ${i+1}</div>
         <select class="cot-input ocp-select" style="width:100%">
           <option value="">— Lugar libre —</option>
-          ${nombresViajeros.map(n=>`<option value="${n}" ${ocsActuales[i]===n?'selected':''}>${n}</option>`).join('')}
+          <optgroup label="Viajeros">${nombresViajeros.map(n=>`<option value="${n}" ${ocsActuales[i]===n?'selected':''}>${n}</option>`).join('')}</optgroup>
+          ${nombresEquipo.length ? `<optgroup label="Equipo (coordis / CC)">${nombresEquipo.map(n=>`<option value="${n}" ${ocsActuales[i]===n?'selected':''}>${n}</option>`).join('')}</optgroup>` : ''}
+          <optgroup label="Otros"><option value="Chofer" ${ocsActuales[i]==='Chofer'?'selected':''}>🚗 Chofer</option></optgroup>
         </select>
       </div>`).join('');
   }
@@ -6024,12 +6035,15 @@ function actualizarOcupantesHab(tipo) {
   if (!container) return;
   const cap = CAPACIDAD_HAB[tipo] || 1;
   const nombresViajeros = _ccViajeros.map(v => v.nombre);
+  const nombresEquipo = _ccAsignados.map(a => a._usuario?.nombre||'').filter(Boolean);
   container.innerHTML = Array.from({length: cap}).map((_, i) => `
     <div style="margin-bottom:8px">
       <div style="font-size:10px;color:var(--ts);margin-bottom:4px">Lugar ${i+1}</div>
       <select class="cot-input ocp-select" style="width:100%">
         <option value="">— Lugar libre —</option>
-        ${nombresViajeros.map(n=>`<option value="${n}">${n}</option>`).join('')}
+        <optgroup label="Viajeros">${nombresViajeros.map(n=>`<option value="${n}">${n}</option>`).join('')}</optgroup>
+        ${nombresEquipo.length ? `<optgroup label="Equipo">${nombresEquipo.map(n=>`<option value="${n}">${n}</option>`).join('')}</optgroup>` : ''}
+        <optgroup label="Otros"><option value="Chofer">🚗 Chofer</option></optgroup>
       </select>
     </div>`).join('');
 }
@@ -6047,6 +6061,7 @@ async function guardarHabitacion() {
   const body = {
     evento_id:       _ccEventoActual,
     tipo, orden,
+    numero_hab:      String(id ? (_ccHabitaciones.find(h=>h.id===id)?.orden||orden) : orden),
     ocupantes:       JSON.stringify(ocupantes),
     hotel_nombre:    _ccHotelInfo?.nombre||null,
     hotel_direccion: _ccHotelInfo?.direccion||null,

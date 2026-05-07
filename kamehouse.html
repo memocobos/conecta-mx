@@ -1054,12 +1054,14 @@ tr:hover td{background:rgba(255,107,0,.03)}
          <span style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.1em;color:var(--gold)">SOLO LECTURA — puedes ver los perfiles de tu equipo, no editarlos</span>
        </div>
        <div style="display:flex;gap:8px;margin-bottom:18px;flex-wrap:wrap">
-        <button class="gz-filter active" onclick="filtrarGZ('todos',this)">// todos</button>
-        <button class="gz-filter" onclick="filtrarGZ('coordinador',this)">// coordinadores</button>
-        <button class="gz-filter" onclick="filtrarGZ('mister_popo',this)">// mister popo</button>
-        <button class="gz-filter" onclick="filtrarGZ('bulma',this)">// bulma</button>
-        <button class="gz-filter" onclick="filtrarGZ('vendedor',this)">// vendedores</button>
-        <button class="gz-filter" onclick="filtrarGZ('cc',this)">// cc</button>
+        <div id="gz-filtros-admin" style="display:none;gap:6px;flex-wrap:wrap">
+         <button class="gz-filter active" onclick="filtrarGZ('todos',this)">// todos</button>
+         <button class="gz-filter" onclick="filtrarGZ('coordinador',this)">// coordinadores</button>
+         <button class="gz-filter" onclick="filtrarGZ('mister_popo',this)">// mister popo</button>
+         <button class="gz-filter" onclick="filtrarGZ('bulma',this)">// bulma</button>
+         <button class="gz-filter" onclick="filtrarGZ('vendedor',this)">// vendedores</button>
+         <button class="gz-filter" onclick="filtrarGZ('cc',this)">// cc</button>
+        </div>
        </div>
        <div id="gz-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px">
         <div class="loading-state"><div class="spinner"></div>Cargando equipo…</div>
@@ -2221,6 +2223,9 @@ function aplicarPermisosUI() {
   // Ranking: todos los que llegan a GZ lo pueden ver
   const btnRanking = document.querySelector('[onclick*=\'abrirRanking\']');
   if (btnRanking) btnRanking.style.display = '';
+  // Filtros de Guerreros Z: solo admins
+  const gzFiltros = document.getElementById('gz-filtros-admin');
+  if (gzFiltros) gzFiltros.style.display = ['maestro_roshi','bulma'].includes(rol) ? 'flex' : 'none';
   // Etiqueta de solo lectura para roles no-admin en la lista
   const soloLecturaLabel = document.getElementById('gz-solo-lectura-label');
   const esAdmin = ['maestro_roshi','bulma'].includes(rol);

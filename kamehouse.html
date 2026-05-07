@@ -5336,6 +5336,11 @@ function abrirModalEvento(id) {
             </div>
           </div>
           <div class="form-group" style="grid-column:1/-1">
+            <label>Zonas / tipos de boleto</label>
+            <input class="cot-input" id="ccev-zonas" value="${(e?.zonas_boleto||[]).join(', ')}" placeholder="Floor, GA, VIP, Diamante, Palco… (separadas por coma)" style="width:100%">
+            <div style="font-size:10px;color:var(--ts);margin-top:4px">Escribe las zonas separadas por coma — aparecerán como opciones al agregar viajeros</div>
+          </div>
+          <div class="form-group" style="grid-column:1/-1">
             <label>Notas internas para el equipo</label>
             <textarea class="cot-input" id="ccev-notas" rows="3" placeholder="Punto de encuentro, indicaciones generales, dress code…" style="width:100%;resize:vertical">${e?.notas_internas||''}</textarea>
           </div>
@@ -5366,6 +5371,7 @@ async function guardarEventoCC() {
     fecha,
     tipo_evento:     tipo,
     notas_internas:  document.getElementById('ccev-notas')?.value.trim()||null,
+    zonas_boleto:    (document.getElementById('ccev-zonas')?.value||'').split(',').map(s=>s.trim()).filter(Boolean),
   };
   alert.innerHTML='<div class="alert" style="border-color:var(--border)">Guardando…</div>';
   try {
@@ -5709,7 +5715,7 @@ function abrirModalViajero(id) {
           <div class="form-group">
             <label>Talla playera</label>
             <select class="cot-input" id="vj-talla">
-              ${['XS','S','M','L','XL','XXL','XXXL'].map(t=>`<option ${v?.talla_playera===t?'selected':''}>${t}</option>`).join('')}
+              ${['XS','S','M','L','XL','XXL'].map(t=>`<option ${v?.talla_playera===t?'selected':''}>${t}</option>`).join('')}
             </select>
           </div>
           <div class="form-group">
@@ -5718,7 +5724,14 @@ function abrirModalViajero(id) {
           </div>
           <div class="form-group">
             <label>Zona / tipo de boleto</label>
-            <input class="cot-input" id="vj-zona" value="${v?.zona_boleto||''}" placeholder="Floor, GA, VIP, Diamante…">
+            <select class="cot-input" id="vj-zona">
+              <option value="">— Sin zona —</option>
+              ${(_ccEventoActual ? (_ccEventosCache.find(e=>e.id===_ccEventoActual)?.zonas_boleto||[]) : []).map(z =>
+                `<option value="${z}" ${v?.zona_boleto===z?'selected':''}>${z}</option>`
+              ).join('')}
+              ${v?.zona_boleto && !(_ccEventosCache.find(e=>e.id===_ccEventoActual)?.zonas_boleto||[]).includes(v.zona_boleto) ?
+                `<option value="${v.zona_boleto}" selected>${v.zona_boleto}</option>` : ''}
+            </select>
           </div>
           <div class="form-group" style="grid-column:1/-1">
             <label>Notas especiales</label>

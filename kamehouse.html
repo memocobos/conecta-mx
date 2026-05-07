@@ -3011,6 +3011,39 @@ function closeModal(id) {
  document.getElementById(id).classList.remove('open');
 }
 
+// ─── Modal dinámico (creado en JS, no en HTML) ───
+function crearModal(nombre, titulo, contenidoHTML) {
+  const modalId = 'modal-' + nombre;
+  // Si ya existe, actualiza contenido
+  let el = document.getElementById(modalId);
+  if (!el) {
+    el = document.createElement('div');
+    el.className = 'modal-overlay';
+    el.id = modalId;
+    el.innerHTML = `<div class="modal" style="max-width:640px;width:95%">
+      <div class="modal-header" id="${modalId}-header">
+        <span id="${modalId}-title"></span>
+        <button class="modal-close" onclick="cerrarModal('${nombre}')">✕</button>
+      </div>
+      <div class="modal-body" id="${modalId}-body"></div>
+    </div>`;
+    el.addEventListener('click', function(e) {
+      if (e.target === this) cerrarModal(nombre);
+    });
+    document.body.appendChild(el);
+  }
+  const titleEl = document.getElementById(modalId + '-title');
+  const bodyEl  = document.getElementById(modalId + '-body');
+  if (titleEl) titleEl.textContent = titulo;
+  if (bodyEl)  bodyEl.innerHTML = contenidoHTML;
+  el.classList.add('open');
+}
+
+function cerrarModal(nombre) {
+  const el = document.getElementById('modal-' + nombre);
+  if (el) el.classList.remove('open');
+}
+
 // Cerrar modales al click en overlay
 document.querySelectorAll('.modal-overlay').forEach(overlay => {
  overlay.addEventListener('click', function(e) {

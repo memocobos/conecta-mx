@@ -3974,26 +3974,17 @@ const RESEND_KEY = 're_SyHtnp2a_AWsc89GVABY3JLcAgxFnKC7H';
 const EMAIL_ENDPOINT = '/.netlify/functions/send-invite';
 
 async function sendEmail(to, subject, html) {
-  // Intenta Netlify Function primero (seguro, sin CORS)
-  try {
-    const resp = await fetch(EMAIL_ENDPOINT, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ to, subject, html })
-    });
-    if (resp.ok) return true;
-    const err = await resp.json();
-    throw new Error(err.error || err.message || 'Error en servidor de email');
-  } catch(e) {
-    // Fallback: llamar a Resend directo (puede fallar por CORS)
-    const resp = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${RESEND_KEY}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ from: 'Kamehouse <noreply@conectareynosa.mx>', to: Array.isArray(to) ? to : [to], subject, html })
-    });
-    if (!resp.ok) { const err = await resp.json(); throw new Error(err.message || 'Error enviando email'); }
-    return true;
+  const resp = await fetch(EMAIL_ENDPOINT, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ to, subject, html })
+  });
+  if (!resp.ok) {
+    let msg = 'Error enviando email';
+    try { const err = await resp.json(); msg = err.error || err.message || msg; } catch(e) {}
+    throw new Error(msg);
   }
+  return true;
 }
 const APP_URL = 'https://conectareynosa.mx/kamehouse';
 

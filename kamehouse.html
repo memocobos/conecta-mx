@@ -6414,9 +6414,87 @@ function renderMTReportes(lista, filtro) {
           <div><div style="font-size:10px;color:var(--ts)">DIFERENCIA</div><div style="font-family:'Zen Dots',sans-serif;font-size:16px;color:${difColor}">${difLabel}</div></div>
         </div>
       </div>
-      ${btns ? `<div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap">${btns}</div>` : ''}
+      <div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;margin-top:${btns?'8px':'0'}">
+        <button class="btn btn-ghost btn-sm" onclick="mtVerDetalleReporte('${r.id}')" style="font-family:'JetBrains Mono',monospace;font-size:10px">VER DETALLE ↓</button>
+        ${btns}
+      </div>
+      <!-- Detalle expandible -->
+      <div id="mt-rep-det-${r.id}" style="display:none;margin-top:14px;padding-top:14px;border-top:1px solid var(--border)"></div>
     </div>`;
   }).join('');
+}
+
+function mtVerDetalleReporte(id) {
+  const el = document.getElementById(`mt-rep-det-${id}`);
+  if (!el) return;
+  if (el.style.display !== 'none') { el.style.display='none'; return; }
+  const r = _mtReportesCache.find(x=>x.id===id);
+  if (!r) return;
+  const kits   = r.kits_detalle   ? (typeof r.kits_detalle==='string'   ? JSON.parse(r.kits_detalle)   : r.kits_detalle)   : [];
+  const gastos = r.gastos_detalle ? (typeof r.gastos_detalle==='string' ? JSON.parse(r.gastos_detalle) : r.gastos_detalle) : [];
+  const coo = r._coordi || {};
+  const ev  = r._evento || {};
+
+  el.innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;flex-wrap:wrap">
+      <!-- Info coordi -->
+      <div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.12em;color:var(--ts);margin-bottom:10px">// COORDINADOR</div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <div style="width:36px;height:36px;border-radius:50%;background:var(--bg3);overflow:hidden;flex-shrink:0;display:flex;align-items:center;justify-content:center">
+            ${coo.foto_url?`<img src="${coo.foto_url}" style="width:100%;height:100%;object-fit:cover">`:`<span style="font-family:'Zen Dots',sans-serif;font-size:13px;color:var(--orange)">${(coo.nombre||'?')[0]}</span>`}
+          </div>
+          <div>
+            <div style="font-weight:700;font-size:15px">${coo.nombre||'—'}</div>
+            <div style="font-size:11px;color:var(--ts)">${coo.correo||coo.username||''}</div>
+            <div style="font-size:11px;color:var(--ts)">${coo.celular||''}</div>
+          </div>
+        </div>
+        ${r.cuenta_bancaria_coordi?`<div style="margin-top:10px;font-size:11px;padding:6px 10px;background:rgba(255,68,68,.06);border-left:2px solid var(--red);border-radius:4px">Cuenta: <strong>${r.cuenta_bancaria_coordi}</strong></div>`:''}
+      </div>
+      <!-- Info evento -->
+      <div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.12em;color:var(--ts);margin-bottom:10px">// EVENTO</div>
+        <div style="font-weight:700;font-size:15px">${ev.nombre||'—'}</div>
+        <div style="font-size:12px;color:var(--ts)">${ev.artista?ev.artista+' · ':''}${ev.ciudad||''}</div>
+        <div style="font-size:12px;color:var(--ts)">${ev.fecha?new Date(ev.fecha+'T12:00:00').toLocaleDateString('es-MX',{weekday:'long',day:'numeric',month:'long',year:'numeric'}):''}</div>
+      </div>
+    </div>
+
+    <!-- Kits -->
+    ${kits.length ? `
+    <div style="margin-top:16px">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.12em;color:var(--ts);margin-bottom:10px">// KITS</div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Pieza</th><th>Sacados</th><th>Sobran</th><th>Recibido</th></tr></thead>
+          <tbody>${kits.map(k=>`<tr>
+            <td style="font-weight:600">${k.pieza_nombre||k.pieza_id||'—'}</td>
+            <td>${k.cantidad_sacada||0}</td>
+            <td>${k.cantidad_sobrante||0}</td>
+            <td style="color:${k.recibido?'var(--green)':'var(--ts)'}">${k.recibido?'✓ Recibido':'Pendiente'}</td>
+          </tr>`).join('')}</tbody>
+        </table>
+      </div>
+    </div>` : '<div style="margin-top:12px;font-size:11px;color:var(--ts);font-family:JetBrains Mono,monospace">// sin kits registrados</div>'}
+
+    <!-- Gastos -->
+    ${gastos.length ? `
+    <div style="margin-top:16px">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.12em;color:var(--ts);margin-bottom:10px">// GASTOS</div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Concepto</th><th style="text-align:right">Monto</th></tr></thead>
+          <tbody>${gastos.map(g=>`<tr><td>${g.concepto||'—'}</td><td style="text-align:right;font-weight:600">${formatMXN(g.monto||0)}</td></tr>`).join('')}
+          <tr style="border-top:2px solid var(--border)"><td style="font-weight:700">TOTAL</td><td style="text-align:right;font-weight:700;font-family:'Zen Dots',sans-serif">${formatMXN(r.total_gastado||0)}</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>` : '<div style="margin-top:12px;font-size:11px;color:var(--ts);font-family:JetBrains Mono,monospace">// sin gastos registrados</div>'}
+
+    ${r.notas?`<div style="margin-top:12px;padding:10px 14px;background:var(--bg3);border-left:2px solid var(--border2);font-size:12px;color:var(--ts)">📝 ${r.notas}</div>`:''}
+  `;
+  el.style.display = 'block';
 }
 
 async function mtAprobarReporte(id, desdeStatus) {

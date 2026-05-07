@@ -4,7 +4,7 @@ exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return { statusCode: 200, headers, body: '' };
   if (event.httpMethod !== 'POST') return { statusCode: 405, headers, body: '{"error":"Method not allowed"}' };
 
-  const RESEND_KEY = process.env.RESEND_KEY;
+  const RESEND_KEY = process.env.RESEND_KEY || process.env.RESEND_API_KEY;
   if (!RESEND_KEY) return { statusCode: 500, headers, body: '{"error":"RESEND_KEY not configured in Netlify"}' };
 
   try {

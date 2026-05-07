@@ -601,7 +601,7 @@ tr:hover td{background:rgba(255,107,0,.03)}
  <div class="login-sub">Conecta Reynosa · Sistema Interno</div>
  <div class="login-field">
  <label>Usuario</label>
- <input type="text" id="login-user" placeholder="usuario" autocomplete="username">
+ <input type="text" id="login-user" placeholder="usuario o correo" autocomplete="username">
  </div>
  <div class="login-field">
  <label>Contraseña</label>
@@ -976,38 +976,29 @@ tr:hover td{background:rgba(255,107,0,.03)}
       </div>
 
       <!-- TAB: Invitar -->
-      <div id="gz-tab-invitar" style="display:none;max-width:560px">
-       <div class="perfil-card">
-        <div class="perfil-card-header" style="padding:24px 28px">
-         <div style="font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.2em;color:var(--ts);margin-bottom:4px">// SEND_INVITE</div>
-         <div style="font-family:'Zen Dots',cursive;font-size:20px;background:linear-gradient(90deg,var(--text),var(--gold));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">Invitar al equipo</div>
-         <div style="font-family:JetBrains Mono;font-size:10px;color:var(--ts);margin-top:8px;letter-spacing:.04em">// le llega un email con un link para crear su perfil. expira en 48h</div>
+      <div id="gz-tab-invitar" style="display:none;max-width:520px">
+        <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.15em;color:var(--ts);margin-bottom:20px;text-transform:uppercase">// nueva invitación — el usuario recibirá un link para registrarse</div>
+        <div style="display:flex;flex-direction:column;gap:14px">
+          <div>
+            <div class="perfil-field-label" style="margin-bottom:6px">Rol *</div>
+            <select class="cot-input" id="inv-rol">
+              <option value="bulma">Bulma</option>
+              <option value="mister_popo">Mister Popo</option>
+              <option value="coordinador">Coordinador</option>
+              <option value="cc">Creador de Contenido</option>
+              <option value="vendedor">Vendedor</option>
+            </select>
+          </div>
+          <div>
+            <div class="perfil-field-label" style="margin-bottom:6px">Correo *</div>
+            <input class="cot-input" id="inv-correo" placeholder="correo@ejemplo.com" type="email">
+          </div>
+          <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--ts);padding:10px 14px;background:var(--bg3);border-left:2px solid rgba(255,183,3,.3)">
+            El nombre de usuario y contraseña los elige la persona al abrir el link.<br>El link expira en 48 horas.
+          </div>
+          <button class="btn btn-primary" onclick="enviarInvitacion()" style="align-self:flex-start">Enviar invitación →</button>
+          <div id="gz-invite-alert"></div>
         </div>
-        <div class="perfil-section">
-         <div id="gz-invite-alert"></div>
-         <div style="display:flex;flex-direction:column;gap:14px">
-          <div>
-           <div class="perfil-field-label" style="margin-bottom:6px">Correo electrónico *</div>
-           <input class="cot-input" type="email" id="inv-correo" placeholder="correo@ejemplo.com">
-          </div>
-          <div>
-           <div class="perfil-field-label" style="margin-bottom:6px">Nombre *</div>
-           <input class="cot-input" type="text" id="inv-nombre" placeholder="Nombre completo">
-          </div>
-          <div>
-           <div class="perfil-field-label" style="margin-bottom:6px">Rol *</div>
-           <select class="cot-input" id="inv-rol">
-            <option value="coordinador">Coordinador</option>
-            <option value="mister_popo">Mister Popo (Bodega)</option>
-            <option value="bulma">Bulma (Admin)</option>
-            <option value="cc">Creador de Contenido</option>
-            <option value="vendedor">Vendedor</option>
-           </select>
-          </div>
-          <button class="btn btn-primary" onclick="enviarInvitacion()" style="margin-top:8px">Enviar invitación</button>
-         </div>
-        </div>
-       </div>
       </div>
 
       <!-- TAB: Mi Perfil -->
@@ -1857,12 +1848,14 @@ async function doLogin() {
   }
   btn.textContent = 'Entrando…'; btn.disabled = true;
   try {
+    // Buscar por username primero, luego por correo
+    const campo = correo.includes('@') ? `correo=eq.${encodeURIComponent(correo)}` : `username=eq.${encodeURIComponent(correo)}`;
     const resp = await fetch(
-      `${SB_URL}/rest/v1/usuarios?correo=eq.${encodeURIComponent(correo)}&activo=eq.true&select=id,correo,nombre,rol,strikes,permisos_extra&limit=1`,
+      `${SB_URL}/rest/v1/usuarios?${campo}&activo=eq.true&select=id,correo,nombre,rol,strikes,username,permisos_extra&limit=1`,
       { headers: { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}` } }
     );
     const usuarios = await resp.json();
-    if (!usuarios || usuarios.length === 0) throw new Error('Usuario no encontrado o inactivo');
+    if (!usuarios || usuarios.length === 0) throw new Error('Usuario no encontrado');
     const u = usuarios[0];
     const respPass = await fetch(
       `${SB_URL}/rest/v1/usuarios?id=eq.${u.id}&password_hash=eq.${encodeURIComponent(pass)}&select=id&limit=1`,
@@ -4119,22 +4112,21 @@ function showGZTab(tab, btn) {
 
 // ─── INVITACIONES ───
 async function enviarInvitacion() {
-  const correo = document.getElementById('inv-correo').value.trim();
-  const nombre = document.getElementById('inv-nombre').value.trim();
+  const correo = document.getElementById('inv-correo').value.trim().toLowerCase();
   const rol = document.getElementById('inv-rol').value;
   const alertEl = document.getElementById('gz-invite-alert');
-  if (!correo || !nombre) {
-    alertEl.innerHTML = '<div class="alert alert-error">Completa correo y nombre</div>';
+  if (!correo) {
+    alertEl.innerHTML = '<div class="alert alert-error">Ingresa el correo</div>';
     setTimeout(() => alertEl.innerHTML = '', 3000);
     return;
   }
   const token = crypto.randomUUID();
   const expires = new Date(Date.now() + 48 * 3600000).toISOString();
-  const link = `${APP_URL}/registro?token=${token}`;
+  const link = `${APP_URL}?token=${token}`;
   try {
     alertEl.innerHTML = '<div class="alert" style="background:rgba(255,183,3,.1);color:var(--gold)">Enviando invitación…</div>';
     await db.post('usuarios', {
-      correo, nombre, rol, activo: false,
+      correo, nombre: correo.split('@')[0], rol, activo: false,
       invite_token: token, invite_usado: false,
       invite_expires_at: expires, password_hash: null
     });
@@ -4688,9 +4680,160 @@ function pingSupabase() {
 setInterval(pingSupabase, 518400000);
 
 // ═══════════════════════════════════════════════════════════════
+// REGISTRO POR INVITACIÓN
+// ═══════════════════════════════════════════════════════════════
+async function mostrarRegistroInvitado(token) {
+  const screen = document.getElementById('login-screen');
+  screen.style.display = 'flex';
+
+  // Verificar token
+  let usuario = null;
+  try {
+    const resp = await fetch(
+      `${SB_URL}/rest/v1/usuarios?invite_token=eq.${token}&invite_usado=eq.false&limit=1`,
+      { headers: { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}` } }
+    );
+    const data = await resp.json();
+    usuario = data && data[0];
+  } catch(e) {}
+
+  if (!usuario) {
+    screen.innerHTML = `
+      <div class="login-bg"></div>
+      <div class="login-card">
+        <div class="login-logo">KAME<span>·</span>HOUSE</div>
+        <div class="login-sub" style="color:var(--red)">Link inválido o ya usado</div>
+        <p style="color:var(--ts);font-size:13px;text-align:center;margin-top:12px">
+          Este link de invitación ya fue usado o no existe.<br>Pídele a Memo que te mande uno nuevo.
+        </p>
+      </div>`;
+    return;
+  }
+
+  if (usuario.invite_expires_at && new Date(usuario.invite_expires_at) < new Date()) {
+    screen.innerHTML = `
+      <div class="login-bg"></div>
+      <div class="login-card">
+        <div class="login-logo">KAME<span>·</span>HOUSE</div>
+        <div class="login-sub" style="color:var(--red)">Link expirado</div>
+        <p style="color:var(--ts);font-size:13px;text-align:center;margin-top:12px">
+          Este link expiró (48 horas). Pídele a Memo que te mande uno nuevo.
+        </p>
+      </div>`;
+    return;
+  }
+
+  // Mostrar formulario completo
+  screen.innerHTML = `
+    <div class="login-bg"></div>
+    <div class="login-card" style="max-width:420px">
+      <div class="login-logo">KAME<span>·</span>HOUSE</div>
+      <div class="login-sub">Bienvenido al equipo</div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.12em;color:var(--gold);text-align:center;margin-bottom:20px;text-transform:uppercase">
+        ${ROL_LABELS[usuario.rol] || usuario.rol} · Conecta Reynosa
+      </div>
+      <div class="login-field">
+        <label>Tu nombre completo *</label>
+        <input type="text" id="reg-nombre" placeholder="Juan Pérez" autocomplete="name">
+      </div>
+      <div class="login-field">
+        <label>Usuario (para iniciar sesión) *</label>
+        <input type="text" id="reg-username" placeholder="juanpz · mipopo · lo que quieras" autocomplete="username">
+      </div>
+      <div class="login-field">
+        <label>Contraseña *</label>
+        <input type="password" id="reg-pass" placeholder="Mínimo 6 caracteres" autocomplete="new-password">
+      </div>
+      <div class="login-field">
+        <label>Confirmar contraseña *</label>
+        <input type="password" id="reg-pass2" placeholder="Repite tu contraseña" autocomplete="new-password">
+      </div>
+      <div class="login-field">
+        <label>Celular</label>
+        <input type="tel" id="reg-cel" placeholder="81 1234 5678">
+      </div>
+      <div class="login-field">
+        <label>Talla playera</label>
+        <select id="reg-talla" style="background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:10px 12px;font-size:14px;width:100%">
+          <option value="">— Selecciona —</option>
+          <option>XS</option><option>S</option><option>M</option><option>L</option><option>XL</option><option>XXL</option>
+        </select>
+      </div>
+      <button class="login-btn" id="reg-btn" onclick="completarRegistro('${usuario.id}','${token}')">Crear mi cuenta →</button>
+      <div id="reg-error" style="color:var(--red);font-size:13px;text-align:center;min-height:20px;margin-top:8px"></div>
+    </div>`;
+}
+
+async function completarRegistro(userId, token) {
+  const nombre   = (document.getElementById('reg-nombre').value || '').trim();
+  const username = (document.getElementById('reg-username').value || '').trim().toLowerCase().replace(/\s+/g,'');
+  const pass     = document.getElementById('reg-pass').value;
+  const pass2    = document.getElementById('reg-pass2').value;
+  const errEl    = document.getElementById('reg-error');
+  const btn      = document.getElementById('reg-btn');
+
+  if (!nombre)    { errEl.textContent = 'El nombre es obligatorio'; return; }
+  if (!username)  { errEl.textContent = 'Elige un nombre de usuario'; return; }
+  if (pass.length < 6) { errEl.textContent = 'La contraseña debe tener mínimo 6 caracteres'; return; }
+  if (pass !== pass2)  { errEl.textContent = 'Las contraseñas no coinciden'; return; }
+
+  btn.textContent = 'Creando cuenta…'; btn.disabled = true;
+
+  try {
+    // Verificar que el username no esté tomado
+    const resp = await fetch(
+      `${SB_URL}/rest/v1/usuarios?username=eq.${encodeURIComponent(username)}&limit=1`,
+      { headers: { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}` } }
+    );
+    const existing = await resp.json();
+    if (existing && existing.length > 0 && existing[0].id !== userId) {
+      errEl.textContent = 'Ese usuario ya está tomado, elige otro';
+      btn.textContent = 'Crear mi cuenta →'; btn.disabled = false;
+      return;
+    }
+
+    const body = {
+      nombre, username, password_hash: pass,
+      activo: true, invite_usado: true, invite_token: null
+    };
+    const cel   = document.getElementById('reg-cel').value.trim();
+    const talla = document.getElementById('reg-talla').value;
+    if (cel)   body.celular = cel;
+    if (talla) body.talla_playera = talla;
+
+    await fetch(`${SB_URL}/rest/v1/usuarios?id=eq.${userId}`, {
+      method: 'PATCH',
+      headers: { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+
+    // Cargar el usuario actualizado y entrar
+    const userResp = await fetch(
+      `${SB_URL}/rest/v1/usuarios?id=eq.${userId}&limit=1`,
+      { headers: { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}` } }
+    );
+    const users = await userResp.json();
+    currentUser = users[0];
+    sessionStorage.setItem(SESSION_KEY, JSON.stringify({ user: currentUser, expires: Date.now() + SESSION_HOURS * 3600000 }));
+    window.history.replaceState({}, '', window.location.pathname);
+    enterApp();
+  } catch(e) {
+    errEl.textContent = e.message || 'Error al crear la cuenta';
+    btn.textContent = 'Crear mi cuenta →'; btn.disabled = false;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
 // INIT
 // ═══════════════════════════════════════════════════════════════
-if (checkSession()) { enterApp(); }
+// Detectar si viene de invitación
+const _urlParams = new URLSearchParams(window.location.search);
+const _inviteToken = _urlParams.get('token');
+if (_inviteToken) {
+  mostrarRegistroInvitado(_inviteToken);
+} else if (checkSession()) {
+  enterApp();
+}
 
 // ── DROPDOWN HERRAMIENTAS ──
 function toggleDropdown(e) {

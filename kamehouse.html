@@ -7104,7 +7104,7 @@ async function abrirModalReporte(reporteId) {
         <div style="background:rgba(255,183,3,.06);border:1px solid rgba(255,183,3,.2);border-radius:8px;padding:16px;margin-bottom:20px">
           <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.15em;color:var(--gold);margin-bottom:10px">// DINERO RECIBIDO DE MEMO</div>
           <div class="form-group" style="margin:0">
-            <label>Memo me entregó *</label>
+            <label>Memo me entregó <span style="color:var(--ts);font-weight:400">(0 si no recibió efectivo)</span></label>
             <input type="number" class="cot-input" id="rep-dinero" placeholder="0.00" min="0" value="${reporte?.dinero_recibido||''}" oninput="recalcReporte()" style="width:220px">
           </div>
         </div>
@@ -7255,16 +7255,14 @@ async function guardarReporte(nuevoStatus) {
   if (nuevoStatus === 'enviado' && !eventoId) {
     alert.innerHTML = '<div class="alert alert-error">Selecciona un evento</div>'; return;
   }
-  if (nuevoStatus === 'enviado' && !dinero) {
-    alert.innerHTML = '<div class="alert alert-error">Ingresa el monto que Memo te entregó</div>'; return;
-  }
+  // dinero puede ser 0 (tours donde Memo no entrega efectivo)
 
   const kits   = leerKitsForm();
   const gastos = leerGastosForm();
   const totalGastado = gastos.reduce((a,b) => a + b.monto, 0);
   const diferencia = dinero - totalGastado;
 
-  if (nuevoStatus === 'enviado' && diferencia < 0 && !clabe) {
+  if (nuevoStatus === 'enviado' && dinero > 0 && diferencia < 0 && !clabe) {
     alert.innerHTML = '<div class="alert alert-error">Ingresa tu CLABE: gastaste más de lo recibido</div>'; return;
   }
 

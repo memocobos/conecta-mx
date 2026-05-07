@@ -647,6 +647,9 @@ tr:hover td{background:rgba(255,107,0,.03)}
  <button class="nav-btn" onclick="showPage('inventario')" id="nav-inventario">
  Torre de Karin
  </button>
+ <button class="nav-btn" onclick="showPage('reportes')" id="nav-reportes">
+ Reportes
+ </button>
  <button class="nav-btn" onclick="showPage('equipo')" id="nav-equipo">
  Guerreros Z
  </button>
@@ -941,6 +944,31 @@ tr:hover td{background:rgba(255,107,0,.03)}
  </tbody>
  </table>
  </div>
+ </div>
+
+ <!-- ─── REPORTES POST-EVENTO ─── -->
+ <div class="page" id="page-reportes">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;flex-wrap:wrap;gap:10px">
+   <div>
+    <div style="font-family:'Zen Dots',sans-serif;font-size:28px;letter-spacing:.04em;background:linear-gradient(135deg,var(--text) 0%,var(--gold) 50%,var(--orange) 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">REPORTES</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.1em;color:var(--ts)">// post-evento · flujo de aprobación</div>
+   </div>
+   <!-- Coordi: btn crear reporte; Popo/Roshi: filtros -->
+   <div id="reportes-header-btns" style="display:flex;gap:8px;flex-wrap:wrap"></div>
+  </div>
+
+  <!-- Tabs de estado (Memo/Popo ven todos; coordi ve los suyos) -->
+  <div style="display:flex;gap:6px;margin-bottom:18px;flex-wrap:wrap;border-bottom:1px solid var(--border);padding-bottom:12px">
+   <button class="gz-filter active" id="rfil-todos" onclick="filtrarReportes('todos',this)">// todos</button>
+   <button class="gz-filter" id="rfil-pendiente" onclick="filtrarReportes('enviado',this)">// pendientes</button>
+   <button class="gz-filter" id="rfil-rechazado" onclick="filtrarReportes('rechazado',this)">// rechazados</button>
+   <button class="gz-filter" id="rfil-popo" onclick="filtrarReportes('aprobado_popo',this)">// en revisión Roshi</button>
+   <button class="gz-filter" id="rfil-aprobado" onclick="filtrarReportes('aprobado_memo',this)">// aprobados</button>
+  </div>
+
+  <div id="reportes-list">
+   <div class="loading-state"><div class="spinner"></div>Cargando reportes…</div>
+  </div>
  </div>
 
  <!-- ─── GUERREROS Z ─── -->
@@ -1375,6 +1403,10 @@ tr:hover td{background:rgba(255,107,0,.03)}
 <!-- ═══════════════════════════════════════════════
  MODALES
 ═══════════════════════════════════════════════ -->
+
+<!-- Modal: Reporte Post-Evento (contenido dinámico) -->
+<div class="modal-overlay" id="modal-reporte">
+</div>
 
 <!-- Modal: Nuevo Pago -->
 <div class="modal-overlay" id="modal-pago">
@@ -1827,10 +1859,10 @@ let disenoLoaded = false;
 let _cotIniciado = false;
 
 const PERMISOS_TABS = {
-  maestro_roshi: ['resumen','pagos','eventos','gastos','ventas','inventario','equipo','capsule','cotizador','herramientas'],
-  bulma:         ['resumen','pagos','eventos','gastos','ventas','inventario','equipo','capsule','cotizador','herramientas'],
-  mister_popo:   ['inventario'],
-  coordinador:   ['inventario'],
+  maestro_roshi: ['resumen','pagos','eventos','gastos','ventas','inventario','reportes','equipo','capsule','cotizador','herramientas'],
+  bulma:         ['resumen','pagos','eventos','gastos','ventas','inventario','reportes','equipo','capsule','cotizador','herramientas'],
+  mister_popo:   ['inventario','reportes'],
+  coordinador:   ['inventario','reportes'],
   cc:            ['inventario'],
   vendedor:      ['ventas']
 };
@@ -1914,7 +1946,7 @@ function aplicarPermisosUI() {
   const extras = currentUser.permisos_extra?.tabs_extra || [];
   const bloqueados = currentUser.permisos_extra?.tabs_bloqueados || [];
   const tabsPermitidos = [...new Set([...base, ...extras])].filter(t => !bloqueados.includes(t));
-  const allTabs = ['resumen','pagos','eventos','gastos','ventas','inventario','equipo','capsule','cotizador'];
+  const allTabs = ['resumen','pagos','eventos','gastos','ventas','inventario','reportes','equipo','capsule','cotizador'];
   allTabs.forEach(tab => {
     const btn = document.getElementById(`nav-${tab}`);
     if (btn) btn.style.display = tabsPermitidos.includes(tab) ? '' : 'none';
@@ -1995,6 +2027,7 @@ function loadPage(name) {
  if (name === 'gastos') loadGastos();
  if (name === 'ventas') loadVentas();
  if (name === 'inventario') loadInventario();
+ if (name === 'reportes') loadReportes();
  if (name === 'equipo') loadEquipo();
  if (name === 'capsule') loadCapsule();
  if (name === 'cotizador') initCotizador();
@@ -4931,6 +4964,577 @@ function showHerramienta(name) {
   }
 }
 
+// ═══════════════════════════════════════════════════════════════
+// SISTEMA DE REPORTES POST-EVENTO
+// ═══════════════════════════════════════════════════════════════
+let _reportesFiltroActual = 'todos';
+let _reportesCache = [];
+let _bodegaPiezasCache = [];
+let _eventosAsignadosCache = [];
+
+// ── Carga principal ──────────────────────────────────────────
+async function loadReportes() {
+  const container = document.getElementById('reportes-list');
+  const headerBtns = document.getElementById('reportes-header-btns');
+  const rol = currentUser?.rol;
+
+  // Mostrar botón según rol
+  if (headerBtns) {
+    if (rol === 'coordinador') {
+      headerBtns.innerHTML = `<button class="btn btn-primary" onclick="abrirModalReporte(null)">+ Nuevo Reporte</button>`;
+    } else if (['maestro_roshi','bulma'].includes(rol)) {
+      headerBtns.innerHTML = `<button class="btn btn-ghost btn-sm" onclick="loadReportes()" style="font-family:'JetBrains Mono',monospace;font-size:10px">↺ ACTUALIZAR</button>`;
+    } else {
+      headerBtns.innerHTML = '';
+    }
+  }
+
+  container.innerHTML = '<div class="loading-state"><div class="spinner"></div>Cargando…</div>';
+  try {
+    // Cargar piezas de bodega (para el formulario)
+    _bodegaPiezasCache = await db.get('bodega_piezas', '?order=nombre.asc&activo=eq.true').catch(() => db.get('kits_inventario', '?order=pieza.asc').then(r => r.map(x => ({...x, nombre: x.pieza}))));
+
+    let query = '?order=created_at.desc&limit=100';
+    if (rol === 'coordinador') {
+      query += `&coordi_id=eq.${currentUser.id}`;
+    }
+    _reportesCache = await db.get('reportes_evento', query);
+
+    // Join manual con eventos y coordis
+    if (_reportesCache.length) {
+      const eIds = [...new Set(_reportesCache.map(r => r.evento_id).filter(Boolean))];
+      const uIds = [...new Set(_reportesCache.map(r => r.coordi_id).filter(Boolean))];
+      const [evs, users] = await Promise.all([
+        eIds.length ? db.get('eventos', `?id=in.(${eIds.join(',')})`) : [],
+        uIds.length ? db.get('usuarios', `?id=in.(${uIds.join(',')})`) : [],
+      ]);
+      const evMap = Object.fromEntries(evs.map(e => [e.id, e]));
+      const uMap  = Object.fromEntries(users.map(u => [u.id, u]));
+      _reportesCache = _reportesCache.map(r => ({
+        ...r,
+        _evento: evMap[r.evento_id] || null,
+        _coordi: uMap[r.coordi_id] || null,
+      }));
+    }
+
+    renderReportes(_reportesCache, _reportesFiltroActual);
+  } catch(e) {
+    container.innerHTML = `<div class="alert alert-error" style="margin-top:20px">Error: ${e.message}</div>`;
+  }
+}
+
+function filtrarReportes(status, btn) {
+  _reportesFiltroActual = status;
+  document.querySelectorAll('#page-reportes .gz-filter').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  renderReportes(_reportesCache, status);
+}
+
+function renderReportes(lista, filtro) {
+  const container = document.getElementById('reportes-list');
+  const filtrada = filtro === 'todos' ? lista : lista.filter(r => r.status === filtro);
+
+  if (!filtrada.length) {
+    container.innerHTML = `<div class="empty-state" style="margin-top:40px"><div class="empty-icon">📋</div>Sin reportes${filtro === 'todos' ? '' : ' con este estado'}</div>`;
+    return;
+  }
+
+  const statusInfo = {
+    borrador:       { label:'Borrador',          color:'var(--ts)',    icon:'✏️' },
+    enviado:        { label:'Pendiente revisión', color:'var(--gold)',  icon:'⏳' },
+    rechazado:      { label:'Rechazado',          color:'var(--red)',   icon:'❌' },
+    aprobado_popo:  { label:'En revisión Roshi',  color:'var(--blue)',  icon:'🔍' },
+    aprobado_memo:  { label:'Aprobado',           color:'var(--green)', icon:'✅' },
+  };
+
+  container.innerHTML = filtrada.map(r => {
+    const s = statusInfo[r.status] || { label: r.status, color:'var(--ts)', icon:'📄' };
+    const ev = r._evento;
+    const coo = r._coordi;
+    const dif = r.diferencia ?? 0;
+    const difColor = dif >= 0 ? 'var(--green)' : 'var(--red)';
+    const difLabel = dif >= 0 ? `Sobró ${formatMXN(Math.abs(dif))}` : `Debe ${formatMXN(Math.abs(dif))}`;
+    const gastos = r.gastos_detalle ? JSON.parse(typeof r.gastos_detalle === 'string' ? r.gastos_detalle : JSON.stringify(r.gastos_detalle)) : [];
+    const kits   = r.kits_detalle   ? JSON.parse(typeof r.kits_detalle   === 'string' ? r.kits_detalle   : JSON.stringify(r.kits_detalle))   : [];
+
+    // Botones según rol y status
+    const rol = currentUser?.rol;
+    let btns = '';
+    if (rol === 'coordinador' && (r.status === 'borrador' || r.status === 'rechazado')) {
+      btns = `<button class="btn btn-primary btn-sm" onclick="abrirModalReporte('${r.id}')">Editar</button>
+              <button class="btn btn-ghost btn-sm" onclick="enviarReporte('${r.id}')">Enviar →</button>`;
+    }
+    if (rol === 'mister_popo' && r.status === 'enviado') {
+      btns = `<button class="btn btn-primary btn-sm" onclick="aprobarReportePopo('${r.id}')">✓ Aprobar</button>
+              <button class="btn btn-red btn-sm" onclick="rechazarReporte('${r.id}')">✗ Rechazar</button>`;
+    }
+    if (['maestro_roshi','bulma'].includes(rol) && r.status === 'aprobado_popo') {
+      btns = `<button class="btn btn-primary btn-sm" onclick="aprobarReporteMemo('${r.id}')">✓ Aprobar Definitivo</button>
+              <button class="btn btn-red btn-sm" onclick="rechazarReporte('${r.id}')">✗ Rechazar</button>`;
+    }
+    // Popo: marcar kits recibidos cuando aprobado_memo
+    if (rol === 'mister_popo' && r.status === 'aprobado_memo' && kits.some(k => (k.cantidad_sobrante||0) > 0 && !k.recibido)) {
+      btns += `<button class="btn btn-ghost btn-sm" onclick="marcarKitsRecibidos('${r.id}')" style="border-color:rgba(62,220,132,.4);color:var(--green)">📦 Marcar Recibido</button>`;
+    }
+    if (btns) btns = `<div class="modal-footer" style="padding:0;margin-top:12px;justify-content:flex-end;gap:8px;flex-wrap:wrap">${btns}</div>`;
+
+    // Kits sobrantes resumen
+    const kitsSob = kits.filter(k => (k.cantidad_sobrante||0) > 0);
+    const kitsHtml = kitsSob.length ? `<div style="margin-top:8px;font-size:11px;color:var(--ts);font-family:'JetBrains Mono',monospace">
+      SOBRANTES: ${kitsSob.map(k => `${k.nombre||k.pieza_nombre||k.pieza_id} ×${k.cantidad_sobrante}`).join(' · ')}
+    </div>` : '';
+
+    return `<div style="background:var(--bg2);border:1px solid var(--border);border-left:3px solid ${s.color};border-radius:var(--radius);padding:16px 20px;margin-bottom:12px">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap">
+        <div>
+          <div style="font-family:'Rajdhani',sans-serif;font-size:18px;font-weight:700;margin-bottom:2px">${ev ? ev.nombre : (r.evento_id || '—')}</div>
+          <div style="font-size:11px;font-family:'JetBrains Mono',monospace;color:var(--ts);margin-bottom:8px">
+            ${ev ? new Date(ev.fecha+'T12:00:00').toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric'}) : ''}
+            ${coo ? ` · ${coo.nombre}` : ''} · <span style="color:${s.color}">${s.icon} ${s.label}</span>
+          </div>
+          <div style="display:flex;gap:20px;flex-wrap:wrap">
+            <div><div style="font-size:10px;letter-spacing:.12em;color:var(--ts)">ENTREGADO</div><div style="font-family:'Zen Dots',sans-serif;font-size:16px">${formatMXN(r.dinero_recibido||0)}</div></div>
+            <div><div style="font-size:10px;letter-spacing:.12em;color:var(--ts)">GASTADO</div><div style="font-family:'Zen Dots',sans-serif;font-size:16px">${formatMXN(r.total_gastado||0)}</div></div>
+            <div><div style="font-size:10px;letter-spacing:.12em;color:var(--ts)">DIFERENCIA</div><div style="font-family:'Zen Dots',sans-serif;font-size:16px;color:${difColor}">${difLabel}</div></div>
+          </div>
+          ${kitsHtml}
+          ${r.rechazo_motivo ? `<div style="margin-top:8px;font-size:11px;padding:6px 10px;background:rgba(255,68,68,.08);border-left:2px solid var(--red);color:var(--red)">Motivo rechazo: ${r.rechazo_motivo}</div>` : ''}
+        </div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <button class="btn btn-ghost btn-sm" onclick="verDetalleReporte('${r.id}')" style="font-family:'JetBrains Mono',monospace;font-size:10px">VER DETALLE</button>
+        </div>
+      </div>
+      ${btns}
+    </div>`;
+  }).join('');
+}
+
+// ── Abrir modal crear/editar reporte ────────────────────────
+async function abrirModalReporte(reporteId) {
+  // Cargar eventos asignados al coordi
+  let evAsig = [];
+  try {
+    const asigs = await db.get('eventos_coordi', `?coordi_id=eq.${currentUser.id}`);
+    if (asigs.length) {
+      const eIds = asigs.map(a => a.evento_id).join(',');
+      evAsig = await db.get('eventos', `?id=in.(${eIds})&order=fecha.desc`);
+    }
+  } catch(e) {
+    // fallback: mostrar todos los eventos
+    evAsig = _eventosCache || [];
+  }
+  _eventosAsignadosCache = evAsig;
+
+  // Piezas bodega
+  const piezas = _bodegaPiezasCache;
+
+  let reporte = null;
+  if (reporteId) {
+    [reporte] = _reportesCache.filter(r => r.id === reporteId);
+  }
+
+  // Construir kits existentes
+  const kitsActuales = reporte?.kits_detalle
+    ? (typeof reporte.kits_detalle === 'string' ? JSON.parse(reporte.kits_detalle) : reporte.kits_detalle)
+    : [];
+  const gastosActuales = reporte?.gastos_detalle
+    ? (typeof reporte.gastos_detalle === 'string' ? JSON.parse(reporte.gastos_detalle) : reporte.gastos_detalle)
+    : [];
+
+  // Opciones select piezas
+  const piezasOptions = piezas.map(p =>
+    `<option value="${p.id}">${p.nombre || p.pieza}</option>`
+  ).join('');
+
+  // Render kits rows
+  function kitRow(k, idx) {
+    const sel = piezas.map(p => `<option value="${p.id}" ${p.id===k.pieza_id?'selected':''}>${p.nombre||p.pieza}</option>`).join('');
+    return `<div class="kit-row" data-idx="${idx}" style="display:grid;grid-template-columns:1fr 100px 100px 28px;gap:8px;align-items:center;margin-bottom:8px">
+      <select class="cot-input kit-pieza-sel" style="font-size:12px;padding:7px 10px"><option value="">— Pieza —</option>${sel}</select>
+      <input type="number" class="cot-input kit-sacada" placeholder="Sacada" min="0" value="${k.cantidad_sacada||''}" style="font-size:12px;padding:7px 10px">
+      <input type="number" class="cot-input kit-sobrante" placeholder="Sobra" min="0" value="${k.cantidad_sobrante||''}" style="font-size:12px;padding:7px 10px">
+      <button onclick="this.closest('.kit-row').remove()" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:16px;padding:0">×</button>
+    </div>`;
+  }
+  function gastoRow(g, idx) {
+    return `<div class="gasto-row" style="display:grid;grid-template-columns:1fr 130px 28px;gap:8px;align-items:center;margin-bottom:8px">
+      <input type="text" class="cot-input gasto-concepto" placeholder="Concepto" value="${g.concepto||''}" style="font-size:12px;padding:7px 10px">
+      <input type="number" class="cot-input gasto-monto" placeholder="Monto" min="0" value="${g.monto||''}" style="font-size:12px;padding:7px 10px" oninput="recalcReporte()">
+      <button onclick="this.closest('.gasto-row').remove();recalcReporte()" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:16px;padding:0">×</button>
+    </div>`;
+  }
+
+  const kitsHtml   = kitsActuales.map(kitRow).join('') || kitRow({},0);
+  const gastosHtml = gastosActuales.map(gastoRow).join('') || gastoRow({},0);
+
+  const evOptions = evAsig.map(e =>
+    `<option value="${e.id}" ${e.id===reporte?.evento_id?'selected':''}>${e.nombre} · ${new Date(e.fecha+'T12:00:00').toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric'})}</option>`
+  ).join('');
+
+  document.getElementById('modal-reporte').innerHTML = `
+    <div class="modal" style="max-width:680px">
+      <div class="modal-header">
+        <div class="modal-title" style="font-family:'Zen Dots',sans-serif;font-size:16px">${reporteId ? 'Editar Reporte' : 'Nuevo Reporte Post-Evento'}</div>
+        <button class="modal-close" onclick="closeModal('modal-reporte')">×</button>
+      </div>
+      <div class="modal-body" style="max-height:75vh;overflow-y:auto">
+        <input type="hidden" id="rep-id" value="${reporte?.id||''}">
+
+        <div class="form-group" style="margin-bottom:16px">
+          <label>Evento *</label>
+          <select class="cot-input" id="rep-evento" style="width:100%">
+            <option value="">Selecciona un evento…</option>
+            ${evOptions}
+          </select>
+        </div>
+
+        <!-- Dinero recibido -->
+        <div style="background:rgba(255,183,3,.06);border:1px solid rgba(255,183,3,.2);border-radius:8px;padding:16px;margin-bottom:20px">
+          <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.15em;color:var(--gold);margin-bottom:10px">// DINERO RECIBIDO DE MEMO</div>
+          <div class="form-group" style="margin:0">
+            <label>Memo me entregó *</label>
+            <input type="number" class="cot-input" id="rep-dinero" placeholder="0.00" min="0" value="${reporte?.dinero_recibido||''}" oninput="recalcReporte()" style="width:220px">
+          </div>
+        </div>
+
+        <!-- Kits -->
+        <div style="margin-bottom:20px">
+          <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.15em;color:var(--ts);margin-bottom:12px;display:flex;align-items:center;justify-content:space-between">
+            <span>// CONTROL DE KITS</span>
+            <button class="btn btn-ghost btn-sm" onclick="agregarKitRow()" style="font-size:10px">+ Agregar item</button>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 100px 100px 28px;gap:8px;margin-bottom:6px">
+            <div style="font-size:10px;color:var(--ts)">PIEZA</div>
+            <div style="font-size:10px;color:var(--ts)">SACADOS</div>
+            <div style="font-size:10px;color:var(--ts)">SOBRAN</div>
+            <div></div>
+          </div>
+          <div id="kits-rows">${kitsHtml}</div>
+        </div>
+
+        <!-- Gastos -->
+        <div style="margin-bottom:20px">
+          <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.15em;color:var(--ts);margin-bottom:12px;display:flex;align-items:center;justify-content:space-between">
+            <span>// GASTOS DEL EVENTO</span>
+            <button class="btn btn-ghost btn-sm" onclick="agregarGastoRow()" style="font-size:10px">+ Agregar gasto</button>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 130px 28px;gap:8px;margin-bottom:6px">
+            <div style="font-size:10px;color:var(--ts)">CONCEPTO</div>
+            <div style="font-size:10px;color:var(--ts)">MONTO</div>
+            <div></div>
+          </div>
+          <div id="gastos-rows">${gastosHtml}</div>
+        </div>
+
+        <!-- Resumen financiero -->
+        <div style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:16px;margin-bottom:16px">
+          <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.15em;color:var(--ts);margin-bottom:12px">// RESUMEN</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;text-align:center">
+            <div><div style="font-size:10px;color:var(--ts)">ENTREGADO</div><div style="font-family:'Zen Dots',sans-serif;font-size:18px;color:var(--gold)" id="rep-total-entregado">$0</div></div>
+            <div><div style="font-size:10px;color:var(--ts)">GASTADO</div><div style="font-family:'Zen Dots',sans-serif;font-size:18px" id="rep-total-gastado">$0</div></div>
+            <div><div style="font-size:10px;color:var(--ts)">DIFERENCIA</div><div style="font-family:'Zen Dots',sans-serif;font-size:18px" id="rep-diferencia">$0</div></div>
+          </div>
+          <!-- CLABE si gastó de más -->
+          <div id="rep-clabe-section" style="display:none;margin-top:16px;padding-top:12px;border-top:1px solid var(--border)">
+            <div style="font-size:11px;color:var(--red);margin-bottom:8px">⚠️ Gastaste más de lo recibido. Ingresa tu cuenta para que Memo te reembolse.</div>
+            <div class="form-group" style="margin:0">
+              <label>CLABE / Cuenta bancaria</label>
+              <input type="text" class="cot-input" id="rep-clabe" placeholder="18 dígitos o datos bancarios" value="${reporte?.cuenta_bancaria_coordi||''}" style="width:100%">
+            </div>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Notas adicionales</label>
+          <textarea class="cot-input" id="rep-notas" rows="3" placeholder="Algo importante que Memo deba saber…" style="width:100%;resize:vertical">${reporte?.notas||''}</textarea>
+        </div>
+
+        <div id="rep-alert"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" onclick="closeModal('modal-reporte')">Cancelar</button>
+        <button class="btn btn-ghost" onclick="guardarReporte('borrador')">Guardar borrador</button>
+        <button class="btn btn-primary" onclick="guardarReporte('enviado')">Enviar reporte →</button>
+      </div>
+    </div>`;
+
+  openModal('modal-reporte');
+  recalcReporte();
+}
+
+function agregarKitRow() {
+  const container = document.getElementById('kits-rows');
+  const piezas = _bodegaPiezasCache;
+  const sel = piezas.map(p => `<option value="${p.id}">${p.nombre||p.pieza}</option>`).join('');
+  const div = document.createElement('div');
+  div.className = 'kit-row';
+  div.style.cssText = 'display:grid;grid-template-columns:1fr 100px 100px 28px;gap:8px;align-items:center;margin-bottom:8px';
+  div.innerHTML = `
+    <select class="cot-input kit-pieza-sel" style="font-size:12px;padding:7px 10px"><option value="">— Pieza —</option>${sel}</select>
+    <input type="number" class="cot-input kit-sacada" placeholder="Sacada" min="0" style="font-size:12px;padding:7px 10px">
+    <input type="number" class="cot-input kit-sobrante" placeholder="Sobra" min="0" style="font-size:12px;padding:7px 10px">
+    <button onclick="this.closest('.kit-row').remove()" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:16px;padding:0">×</button>`;
+  container.appendChild(div);
+}
+
+function agregarGastoRow() {
+  const container = document.getElementById('gastos-rows');
+  const div = document.createElement('div');
+  div.className = 'gasto-row';
+  div.style.cssText = 'display:grid;grid-template-columns:1fr 130px 28px;gap:8px;align-items:center;margin-bottom:8px';
+  div.innerHTML = `
+    <input type="text" class="cot-input gasto-concepto" placeholder="Concepto" style="font-size:12px;padding:7px 10px">
+    <input type="number" class="cot-input gasto-monto" placeholder="Monto" min="0" style="font-size:12px;padding:7px 10px" oninput="recalcReporte()">
+    <button onclick="this.closest('.gasto-row').remove();recalcReporte()" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:16px;padding:0">×</button>`;
+  container.appendChild(div);
+}
+
+function recalcReporte() {
+  const entregado = parseFloat(document.getElementById('rep-dinero')?.value) || 0;
+  const montos = Array.from(document.querySelectorAll('.gasto-monto')).map(i => parseFloat(i.value)||0);
+  const gastado = montos.reduce((a,b) => a+b, 0);
+  const dif = entregado - gastado;
+
+  document.getElementById('rep-total-entregado').textContent = formatMXN(entregado);
+  document.getElementById('rep-total-gastado').textContent   = formatMXN(gastado);
+  const difEl = document.getElementById('rep-diferencia');
+  if (difEl) {
+    difEl.textContent = formatMXN(Math.abs(dif));
+    difEl.style.color = dif >= 0 ? 'var(--green)' : 'var(--red)';
+  }
+  const clabeSection = document.getElementById('rep-clabe-section');
+  if (clabeSection) clabeSection.style.display = dif < 0 ? 'block' : 'none';
+}
+
+function leerKitsForm() {
+  const rows = document.querySelectorAll('.kit-row');
+  const result = [];
+  rows.forEach(row => {
+    const piezaId   = row.querySelector('.kit-pieza-sel')?.value;
+    const sacada    = parseInt(row.querySelector('.kit-sacada')?.value) || 0;
+    const sobrante  = parseInt(row.querySelector('.kit-sobrante')?.value) || 0;
+    if (piezaId) {
+      const pieza = _bodegaPiezasCache.find(p => p.id === piezaId);
+      result.push({ pieza_id: piezaId, pieza_nombre: pieza?.nombre || pieza?.pieza || '', cantidad_sacada: sacada, cantidad_sobrante: sobrante, recibido: false });
+    }
+  });
+  return result;
+}
+
+function leerGastosForm() {
+  const rows = document.querySelectorAll('.gasto-row');
+  const result = [];
+  rows.forEach(row => {
+    const concepto = row.querySelector('.gasto-concepto')?.value.trim();
+    const monto    = parseFloat(row.querySelector('.gasto-monto')?.value) || 0;
+    if (concepto || monto) result.push({ concepto: concepto || '—', monto });
+  });
+  return result;
+}
+
+async function guardarReporte(nuevoStatus) {
+  const alert = document.getElementById('rep-alert');
+  const id = document.getElementById('rep-id')?.value;
+  const eventoId = document.getElementById('rep-evento')?.value;
+  const dinero = parseFloat(document.getElementById('rep-dinero')?.value) || 0;
+  const notas = document.getElementById('rep-notas')?.value.trim() || '';
+  const clabe = document.getElementById('rep-clabe')?.value.trim() || null;
+
+  if (nuevoStatus === 'enviado' && !eventoId) {
+    alert.innerHTML = '<div class="alert alert-error">Selecciona un evento</div>'; return;
+  }
+  if (nuevoStatus === 'enviado' && !dinero) {
+    alert.innerHTML = '<div class="alert alert-error">Ingresa el monto que Memo te entregó</div>'; return;
+  }
+
+  const kits   = leerKitsForm();
+  const gastos = leerGastosForm();
+  const totalGastado = gastos.reduce((a,b) => a + b.monto, 0);
+  const diferencia = dinero - totalGastado;
+
+  if (nuevoStatus === 'enviado' && diferencia < 0 && !clabe) {
+    alert.innerHTML = '<div class="alert alert-error">Ingresa tu CLABE: gastaste más de lo recibido</div>'; return;
+  }
+
+  const body = {
+    evento_id: eventoId || null,
+    coordi_id: currentUser.id,
+    status: nuevoStatus,
+    kits_detalle: JSON.stringify(kits),
+    gastos_detalle: JSON.stringify(gastos),
+    dinero_recibido: dinero,
+    total_gastado: totalGastado,
+    diferencia,
+    cuenta_bancaria_coordi: clabe,
+    notas: notas || null,
+    updated_at: new Date().toISOString(),
+  };
+
+  try {
+    alert.innerHTML = '<div class="alert" style="border-color:var(--border)">Guardando…</div>';
+    if (id) {
+      await db.patch('reportes_evento', id, body);
+    } else {
+      body.created_at = new Date().toISOString();
+      await db.post('reportes_evento', body);
+    }
+    alert.innerHTML = `<div class="alert alert-success">${nuevoStatus === 'enviado' ? '✅ Reporte enviado' : '✅ Borrador guardado'}</div>`;
+    setTimeout(() => { closeModal('modal-reporte'); loadReportes(); }, 900);
+  } catch(e) {
+    alert.innerHTML = `<div class="alert alert-error">${e.message}</div>`;
+  }
+}
+
+async function enviarReporte(id) {
+  // Enviar directamente desde la lista (shortcut)
+  const r = _reportesCache.find(x => x.id === id);
+  if (!r) return;
+  if (!confirm('¿Confirmas enviar este reporte para revisión?')) return;
+  try {
+    await db.patch('reportes_evento', id, { status: 'enviado', updated_at: new Date().toISOString() });
+    loadReportes();
+  } catch(e) { alert(e.message); }
+}
+
+async function aprobarReportePopo(id) {
+  if (!confirm('¿Aprobar este reporte y enviarlo a Memo para revisión final?')) return;
+  try {
+    await db.patch('reportes_evento', id, { status: 'aprobado_popo', updated_at: new Date().toISOString() });
+    loadReportes();
+  } catch(e) { alert(e.message); }
+}
+
+async function aprobarReporteMemo(id) {
+  const r = _reportesCache.find(x => x.id === id);
+  if (!r) return;
+  if (!confirm('¿Aprobar definitivamente este reporte? Se liberarán los pagos y se registrará el sobrante de kits.')) return;
+  try {
+    await db.patch('reportes_evento', id, { status: 'aprobado_memo', updated_at: new Date().toISOString() });
+    // Notificación financiera
+    const dif = r.diferencia || 0;
+    const coordi = r._coordi;
+    if (dif > 0) {
+      alert(`✅ Aprobado.\n\n💰 Sobró ${formatMXN(dif)}.\nEl coordi debe regresar ese dinero a la cuenta de Memo.`);
+    } else if (dif < 0) {
+      const clabe = r.cuenta_bancaria_coordi || 'no registrada';
+      alert(`✅ Aprobado.\n\n⚠️ El coordi gastó ${formatMXN(Math.abs(dif))} de más.\nDepositar a: ${clabe}`);
+    }
+    loadReportes();
+  } catch(e) { alert(e.message); }
+}
+
+async function rechazarReporte(id) {
+  const motivo = prompt('Motivo del rechazo (el coordi lo verá):');
+  if (!motivo) return;
+  try {
+    await db.patch('reportes_evento', id, {
+      status: 'rechazado',
+      rechazo_motivo: motivo,
+      updated_at: new Date().toISOString()
+    });
+    loadReportes();
+  } catch(e) { alert(e.message); }
+}
+
+async function marcarKitsRecibidos(id) {
+  const r = _reportesCache.find(x => x.id === id);
+  if (!r) return;
+  if (!confirm('¿Confirmar que recibiste los kits sobrantes? Se agregarán al inventario de bodega.')) return;
+  try {
+    // Marcar kits como recibidos en el reporte
+    const kits = typeof r.kits_detalle === 'string' ? JSON.parse(r.kits_detalle) : (r.kits_detalle || []);
+    const kitsActualizados = kits.map(k => ({ ...k, recibido: true }));
+    await db.patch('reportes_evento', id, {
+      kits_detalle: JSON.stringify(kitsActualizados),
+      updated_at: new Date().toISOString()
+    });
+
+    // Actualizar stock en bodega_piezas
+    for (const k of kits.filter(k => (k.cantidad_sobrante||0) > 0 && !k.recibido)) {
+      try {
+        const [pieza] = await db.get('bodega_piezas', `?id=eq.${k.pieza_id}`).catch(() => [null]);
+        if (pieza) {
+          await db.patch('bodega_piezas', k.pieza_id, {
+            cantidad: (pieza.cantidad || 0) + k.cantidad_sobrante
+          });
+          // Registrar movimiento en bodega_movimientos
+          await db.post('bodega_movimientos', {
+            pieza_id: k.pieza_id,
+            tipo: 'entrada',
+            cantidad: k.cantidad_sobrante,
+            motivo: `Sobrante reporte evento ${r.evento_id}`,
+            usuario_id: currentUser.id,
+            created_at: new Date().toISOString()
+          });
+        }
+      } catch(e2) { console.warn('No se pudo actualizar pieza', k.pieza_id, e2.message); }
+    }
+
+    alert('✅ Kits marcados como recibidos y actualizados en bodega.');
+    loadReportes();
+    // Refrescar inventario si está activo
+    if (document.getElementById('page-inventario').classList.contains('active')) loadInventario();
+  } catch(e) { alert(e.message); }
+}
+
+// ── Ver detalle completo ──────────────────────────────────────
+function verDetalleReporte(id) {
+  const r = _reportesCache.find(x => x.id === id);
+  if (!r) return;
+  const kits   = typeof r.kits_detalle   === 'string' ? JSON.parse(r.kits_detalle)   : (r.kits_detalle   || []);
+  const gastos = typeof r.gastos_detalle === 'string' ? JSON.parse(r.gastos_detalle) : (r.gastos_detalle || []);
+  const dif    = r.diferencia || 0;
+  const difColor = dif >= 0 ? 'var(--green)' : 'var(--red)';
+
+  const kitsHtml = kits.length ? kits.map(k =>
+    `<tr>
+      <td style="font-weight:600">${k.pieza_nombre || k.pieza_id}</td>
+      <td>${k.cantidad_sacada || 0}</td>
+      <td>${k.cantidad_sobrante || 0}</td>
+      <td style="color:${k.recibido ? 'var(--green)' : 'var(--ts)'}">${k.recibido ? '✓ Recibido' : '—'}</td>
+    </tr>`
+  ).join('') : '<tr><td colspan="4" style="color:var(--ts)">Sin kits registrados</td></tr>';
+
+  const gastosHtml = gastos.length ? gastos.map(g =>
+    `<tr><td>${g.concepto}</td><td style="text-align:right;font-weight:600">${formatMXN(g.monto)}</td></tr>`
+  ).join('') : '<tr><td colspan="2" style="color:var(--ts)">Sin gastos</td></tr>';
+
+  document.getElementById('modal-reporte').innerHTML = `
+    <div class="modal" style="max-width:620px">
+      <div class="modal-header">
+        <div>
+          <div class="modal-title" style="font-family:'Zen Dots',sans-serif;font-size:15px">DETALLE REPORTE</div>
+          <div style="font-size:11px;font-family:'JetBrains Mono',monospace;color:var(--ts)">${r._evento?.nombre || r.evento_id} · ${r._coordi?.nombre || ''}</div>
+        </div>
+        <button class="modal-close" onclick="closeModal('modal-reporte')">×</button>
+      </div>
+      <div class="modal-body" style="max-height:75vh;overflow-y:auto">
+        <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.15em;color:var(--ts);margin-bottom:10px">// KITS</div>
+        <div class="table-wrap" style="margin-bottom:20px">
+          <table>
+            <thead><tr><th>Pieza</th><th>Sacados</th><th>Sobran</th><th>Status</th></tr></thead>
+            <tbody>${kitsHtml}</tbody>
+          </table>
+        </div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.15em;color:var(--ts);margin-bottom:10px">// GASTOS</div>
+        <div class="table-wrap" style="margin-bottom:20px">
+          <table>
+            <thead><tr><th>Concepto</th><th style="text-align:right">Monto</th></tr></thead>
+            <tbody>${gastosHtml}</tbody>
+          </table>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;text-align:center;background:var(--bg3);padding:16px;border-radius:8px;margin-bottom:16px">
+          <div><div style="font-size:10px;color:var(--ts)">ENTREGADO</div><div style="font-family:'Zen Dots',sans-serif;font-size:18px;color:var(--gold)">${formatMXN(r.dinero_recibido||0)}</div></div>
+          <div><div style="font-size:10px;color:var(--ts)">GASTADO</div><div style="font-family:'Zen Dots',sans-serif;font-size:18px">${formatMXN(r.total_gastado||0)}</div></div>
+          <div><div style="font-size:10px;color:var(--ts)">DIFERENCIA</div><div style="font-family:'Zen Dots',sans-serif;font-size:18px;color:${difColor}">${formatMXN(Math.abs(dif))}</div></div>
+        </div>
+        ${r.cuenta_bancaria_coordi ? `<div style="padding:10px 14px;background:rgba(255,68,68,.06);border-left:2px solid var(--red);margin-bottom:12px;font-size:12px">Cuenta coordi: <strong>${r.cuenta_bancaria_coordi}</strong></div>` : ''}
+        ${r.notas ? `<div style="padding:10px 14px;background:var(--bg3);border-left:2px solid var(--border2);font-size:12px;color:var(--ts)">Notas: ${r.notas}</div>` : ''}
+      </div>
+      <div class="modal-footer"><button class="btn btn-ghost" onclick="closeModal('modal-reporte')">Cerrar</button></div>
+    </div>`;
+  openModal('modal-reporte');
+}
+
 </script>
-</body>
 </html>

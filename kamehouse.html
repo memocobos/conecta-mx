@@ -4509,7 +4509,7 @@ async function abrirPerfil(userId) {
     toursPasados = await db.get('tours_pasados', `?usuario_id=eq.${userId}&order=fecha_aprox.desc`);
   } catch(e) {}
   try {
-    evAsignados = await db.get('eventos_coordi', `?coordi_id=eq.${userId}&select=evento_id,indicaciones,eventos(artista,fecha,ciudad)`);
+    evAsignados = await db.get('eventos_coordi', `?coordi_id=eq.${userId}&select=evento_id,indicaciones,status,eventos(id,nombre,artista,fecha,ciudad,notas_internas)`);
   } catch(e) {}
 
   const ptsTotal = calcularPuntos(toursPasados);
@@ -4626,7 +4626,7 @@ async function renderMiPerfil(modoEdicion = false) {
     currentUser = { ...currentUser, ...u };
 
     const toursPasados = await db.get('tours_pasados', `?usuario_id=eq.${u.id}&order=fecha_aprox.desc`);
-    const evAsignados = await db.get('eventos_coordi', `?coordi_id=eq.${u.id}&select=evento_id,indicaciones,eventos(artista,fecha,ciudad)`).catch(() => []);
+    const evAsignados = await db.get('eventos_coordi', `?coordi_id=eq.${u.id}&select=evento_id,indicaciones,status,eventos(id,nombre,artista,fecha,ciudad,notas_internas)`).catch(() => []);
 
     const iniciales = u.nombre.split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase();
     const edad = u.fecha_nacimiento ? calcularEdad(u.fecha_nacimiento) : null;
@@ -4704,16 +4704,35 @@ function renderPerfilCompleto(u, toursPasados, evAsignados, iniciales, edad, cum
       ` : ''}
 
       <div class="perfil-section">
-        <div class="perfil-section-title">Tours asignados <span style="color:var(--ts);font-weight:400">[${evAsignados.length}]</span></div>
-        ${evAsignados.length ? evAsignados.map(e => `
-          <div class="tour-item">
-            <div class="tour-item-head">
-              <div class="tour-item-name">${e.eventos?.artista || '—'}</div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px">
+          <div class="perfil-section-title" style="margin-bottom:0">Tours asignados <span style="color:var(--ts);font-weight:400">[${evAsignados.length}]</span></div>
+        </div>
+        ${evAsignados.length ? evAsignados.map(e => {
+          const ev = e.eventos || {};
+          const hoy = new Date(); hoy.setHours(0,0,0,0);
+          const fechaEv = ev.fecha ? new Date(ev.fecha + 'T12:00:00') : null;
+          const esPasado = fechaEv && fechaEv < hoy;
+          const stColor = { pendiente:'var(--gold)', aceptado:'var(--green)', declinado:'var(--red)' };
+          const stLabel = { pendiente:'⏳ Pendiente', aceptado:'✅ Aceptado', declinado:'❌ Declinado' };
+          return `<div class="tour-item" style="border-left-color:${esPasado?'var(--ts)':'var(--orange)'}">
+            <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;flex-wrap:wrap">
+              <div>
+                <div class="tour-item-name" style="font-size:16px">${ev.nombre || ev.artista || '—'}</div>
+                <div class="tour-item-meta">${ev.artista?ev.artista+' · ':''}${ev.ciudad||''} ${fechaEv?'· '+fechaEv.toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric'}):''}</div>
+                ${e.indicaciones ? `<div style="font-size:11px;color:var(--ts);margin-top:5px;font-style:italic">📌 ${e.indicaciones}</div>` : ''}
+                ${ev.notas_internas ? `<div style="font-size:11px;color:var(--ts);margin-top:4px">📋 ${ev.notas_internas}</div>` : ''}
+              </div>
+              <span style="font-size:10px;white-space:nowrap;color:${stColor[e.status]||'var(--ts)'}">
+                ${stLabel[e.status]||e.status||''}
+              </span>
             </div>
-            <div class="tour-item-meta">${e.eventos?.ciudad || ''} ${e.eventos?.fecha ? '· ' + fmtFecha(e.eventos.fecha) : ''}</div>
-            ${e.indicaciones ? `<div style="font-size:11px;color:var(--ts);margin-top:6px">${e.indicaciones}</div>` : ''}
-          </div>
-        `).join('') : '<div style="font-family:JetBrains Mono,monospace;font-size:11px;color:var(--ts);letter-spacing:.05em">// sin tours asignados</div>'}
+            ${esMiPerfil && ev.id ? `
+            <div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap">
+              <button class="btn btn-ghost btn-sm" onclick="descargarListaViajeros('${ev.id}')" style="font-size:10px;font-family:'JetBrains Mono',monospace">↓ Lista viajeros</button>
+              <button class="btn btn-ghost btn-sm" onclick="descargarRoomingList('${ev.id}')" style="font-size:10px;font-family:'JetBrains Mono',monospace">↓ Rooming list</button>
+            </div>` : ''}
+          </div>`;
+        }).join('') : '<div style="font-family:JetBrains Mono,monospace;font-size:11px;color:var(--ts);letter-spacing:.05em">// sin tours asignados</div>'}
       </div>
 
       <div class="perfil-section">
@@ -5980,22 +5999,35 @@ function abrirModalHabitacion(id) {
   const tipoActual = h.tipo || 'doble';
   const nombresViajeros = _ccViajeros.map(v => v.nombre);
 
-  // Combinar viajeros + equipo asignado + chofer
-  const nombresEquipo = _ccAsignados.map(a => {
-    const u = a._usuario || {};
-    return u.nombre || '';
-  }).filter(Boolean);
-  const todosLosNombres = [...new Set([...nombresViajeros, ...nombresEquipo])].sort();
+  // Combinar viajeros + equipo asignado
+  const nombresEquipo = _ccAsignados.map(a => a._usuario?.nombre||'').filter(Boolean);
+
+  // Personas ya asignadas en OTRAS habitaciones (excluir de disponibles)
+  const yaAsignados = new Set(
+    _ccHabitaciones
+      .filter(h => h.id !== (id||'__none__'))
+      .flatMap(h => h.ocupantes ? (typeof h.ocupantes==='string'?JSON.parse(h.ocupantes):h.ocupantes) : [])
+      .filter(n => n && n !== 'Chofer')
+  );
+
+  function disponibles(lista) {
+    return lista.filter(n => !yaAsignados.has(n));
+  }
 
   function selects(tipo, ocsActuales) {
     const c = CAPACIDAD_HAB[tipo] || 1;
+    const dispViajeros = disponibles(nombresViajeros);
+    const dispEquipo   = disponibles(nombresEquipo);
     return Array.from({length: c}).map((_, i) => `
       <div style="margin-bottom:8px">
         <div style="font-size:10px;color:var(--ts);margin-bottom:4px">Lugar ${i+1}</div>
         <select class="cot-input ocp-select" style="width:100%">
           <option value="">— Lugar libre —</option>
-          <optgroup label="Viajeros">${nombresViajeros.map(n=>`<option value="${n}" ${ocsActuales[i]===n?'selected':''}>${n}</option>`).join('')}</optgroup>
-          ${nombresEquipo.length ? `<optgroup label="Equipo (coordis / CC)">${nombresEquipo.map(n=>`<option value="${n}" ${ocsActuales[i]===n?'selected':''}>${n}</option>`).join('')}</optgroup>` : ''}
+          <optgroup label="Viajeros disponibles">
+            ${dispViajeros.map(n=>`<option value="${n}" ${ocsActuales[i]===n?'selected':''}>${n}</option>`).join('')}
+            ${ocsActuales[i] && !dispViajeros.includes(ocsActuales[i]) && nombresViajeros.includes(ocsActuales[i]) ? `<option value="${ocsActuales[i]}" selected>${ocsActuales[i]} ✓</option>` : ''}
+          </optgroup>
+          ${dispEquipo.length ? `<optgroup label="Equipo disponible">${dispEquipo.map(n=>`<option value="${n}" ${ocsActuales[i]===n?'selected':''}>${n}</option>`).join('')}</optgroup>` : ''}
           <optgroup label="Otros"><option value="Chofer" ${ocsActuales[i]==='Chofer'?'selected':''}>🚗 Chofer</option></optgroup>
         </select>
       </div>`).join('');
@@ -6034,15 +6066,21 @@ function actualizarOcupantesHab(tipo) {
   const container = document.getElementById('hab-ocupantes-container');
   if (!container) return;
   const cap = CAPACIDAD_HAB[tipo] || 1;
-  const nombresViajeros = _ccViajeros.map(v => v.nombre);
-  const nombresEquipo = _ccAsignados.map(a => a._usuario?.nombre||'').filter(Boolean);
+  const habId = document.getElementById('hab-id')?.value || '__none__';
+  const yaAsig = new Set(
+    _ccHabitaciones.filter(h=>h.id!==habId)
+      .flatMap(h=>h.ocupantes?(typeof h.ocupantes==='string'?JSON.parse(h.ocupantes):h.ocupantes):[])
+      .filter(n=>n&&n!=='Chofer')
+  );
+  const dispViajeros = _ccViajeros.map(v=>v.nombre).filter(n=>!yaAsig.has(n));
+  const dispEquipo   = _ccAsignados.map(a=>a._usuario?.nombre||'').filter(n=>n&&!yaAsig.has(n));
   container.innerHTML = Array.from({length: cap}).map((_, i) => `
     <div style="margin-bottom:8px">
       <div style="font-size:10px;color:var(--ts);margin-bottom:4px">Lugar ${i+1}</div>
       <select class="cot-input ocp-select" style="width:100%">
         <option value="">— Lugar libre —</option>
-        <optgroup label="Viajeros">${nombresViajeros.map(n=>`<option value="${n}">${n}</option>`).join('')}</optgroup>
-        ${nombresEquipo.length ? `<optgroup label="Equipo">${nombresEquipo.map(n=>`<option value="${n}">${n}</option>`).join('')}</optgroup>` : ''}
+        <optgroup label="Viajeros disponibles">${dispViajeros.map(n=>`<option value="${n}">${n}</option>`).join('')}</optgroup>
+        ${dispEquipo.length ? `<optgroup label="Equipo disponible">${dispEquipo.map(n=>`<option value="${n}">${n}</option>`).join('')}</optgroup>` : ''}
         <optgroup label="Otros"><option value="Chofer">🚗 Chofer</option></optgroup>
       </select>
     </div>`).join('');
@@ -6109,6 +6147,50 @@ async function exportarRooming(formato) {
     a.download = `rooming-${ev?.nombre||'evento'}.csv`;
     a.click();
   }
+}
+
+
+// ── Descargar listas desde perfil del coordi ─────────────────
+async function descargarListaViajeros(eventoId) {
+  try {
+    const [ev, viajeros] = await Promise.all([
+      db.get('eventos', `?id=eq.${eventoId}`).then(r=>r[0]||{}),
+      db.get('viajeros_evento', `?evento_id=eq.${eventoId}&order=nombre.asc`),
+    ]);
+    if (!viajeros.length) { alert('No hay viajeros registrados para este evento'); return; }
+    const titulo = `Viajeros — ${ev.nombre||'Evento'}`;
+    const win = window.open('','_blank');
+    win.document.write(`<html><head><title>${titulo}</title>
+    <style>body{font-family:Arial,sans-serif;padding:24px}h2{margin-bottom:4px}p{color:#666;margin-bottom:20px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ccc;padding:8px 12px;font-size:13px}th{background:#f5f5f5}</style></head><body>
+    <h2>${titulo}</h2><p>${ev.artista?ev.artista+' · ':''}${ev.ciudad||''} ${ev.fecha?'· '+new Date(ev.fecha+'T12:00:00').toLocaleDateString('es-MX',{day:'numeric',month:'long',year:'numeric'}):''}</p>
+    <table><thead><tr><th>#</th><th>Nombre</th><th>Paquete</th><th>Zona</th><th>Talla</th><th>Celular</th><th>Emergencia</th><th>Notas</th></tr></thead>
+    <tbody>${viajeros.map((v,i)=>`<tr><td>${i+1}</td><td><strong>${v.nombre}</strong></td><td>${v.tipo_paquete||'—'}</td><td>${v.zona_boleto||'—'}</td><td>${v.talla_playera||'—'}</td><td>${v.celular||'—'}</td><td>${v.num_emergencia||'—'}</td><td>${v.notas||'—'}</td></tr>`).join('')}</tbody>
+    </table></body></html>`);
+    win.document.close(); win.print();
+  } catch(e) { alert('Error: ' + e.message); }
+}
+
+async function descargarRoomingList(eventoId) {
+  try {
+    const [ev, habs] = await Promise.all([
+      db.get('eventos', `?id=eq.${eventoId}`).then(r=>r[0]||{}),
+      db.get('rooming_habitaciones', `?evento_id=eq.${eventoId}&order=orden.asc`),
+    ]);
+    if (!habs.length) { alert('No hay rooming list para este evento'); return; }
+    const tipoLabels = {individual:'Individual',doble:'Doble',triple:'Triple',cuadruple:'Cuádruple'};
+    const titulo = `Rooming List — ${ev.nombre||'Evento'}`;
+    const win = window.open('','_blank');
+    win.document.write(`<html><head><title>${titulo}</title>
+    <style>body{font-family:Arial,sans-serif;padding:24px}h2{margin-bottom:4px}p{color:#666;margin-bottom:20px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ccc;padding:8px 12px;font-size:13px;vertical-align:top}th{background:#f5f5f5}</style></head><body>
+    <h2>${titulo}</h2>
+    <p>${habs[0]?.hotel_nombre||''}${habs[0]?.hotel_direccion?' · '+habs[0].hotel_direccion:''}${habs[0]?.incluye_desayuno?' · ✓ Incluye desayuno':''}</p>
+    <table><thead><tr><th>Habitación</th><th>Tipo</th><th>Ocupantes</th></tr></thead>
+    <tbody>${habs.map((h,i)=>{
+      const ocp = h.ocupantes?(typeof h.ocupantes==='string'?JSON.parse(h.ocupantes):h.ocupantes):[];
+      return `<tr><td>Habitación ${i+1}</td><td>${tipoLabels[h.tipo]||h.tipo}</td><td>${ocp.join('<br>')||'—'}</td></tr>`;
+    }).join('')}</tbody></table></body></html>`);
+    win.document.close(); win.print();
+  } catch(e) { alert('Error: ' + e.message); }
 }
 
 

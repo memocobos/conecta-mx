@@ -6498,17 +6498,12 @@ function mtVerDetalleReporte(id) {
 }
 
 async function mtAprobarReporte(id, desdeStatus) {
-  if (!confirm('¿Aprobar este reporte?')) return;
+  if (!confirm('¿Aprobar este reporte? Se descontará el stock de Torre de Karin.')) return;
   try {
-    await db.patch('reportes_evento', id, { status: 'aprobado_memo' });
     const r = _mtReportesCache.find(x=>x.id===id);
-    const dif = r?.diferencia||0;
-    if (dif > 0) alert(`✅ Aprobado.
-💰 Sobró ${formatMXN(dif)} — el coordi debe regresarlo a tu cuenta.`);
-    else if (dif < 0) alert(`✅ Aprobado.
-⚠️ El coordi gastó ${formatMXN(Math.abs(dif))} de más.
-Cuenta: ${r?.cuenta_bancaria_coordi||'no registrada'}`);
+    await ejecutarAprobacionFinal(id, r);
     await loadMTReportes();
+    if (document.getElementById('page-inventario')?.classList.contains('active')) loadInventario();
   } catch(e) { alert(e.message); }
 }
 
@@ -7526,22 +7521,52 @@ async function aprobarReportePopo(id) {
   } catch(e) { alert(e.message); }
 }
 
+// Función compartida — aprueba reporte y descuenta stock
+async function ejecutarAprobacionFinal(id, reporte) {
+  await db.patch('reportes_evento', id, { status: 'aprobado_memo' });
+  // Descontar kits del inventario
+  const kits = reporte?.kits_detalle
+    ? (typeof reporte.kits_detalle==='string' ? JSON.parse(reporte.kits_detalle) : reporte.kits_detalle)
+    : [];
+  for (const k of kits.filter(k => (k.cantidad_sacada||0) > 0)) {
+    try {
+      const [pieza] = await db.get('kits_inventario', `?id=eq.${k.pieza_id}`).catch(()=>[null]);
+      if (pieza) {
+        const nuevaCantidad = Math.max(0, (pieza.cantidad||0) - (k.cantidad_sacada||0) + (k.cantidad_sobrante||0));
+        await db.patch('kits_inventario', k.pieza_id, { cantidad: nuevaCantidad });
+        // Registrar movimiento si la tabla existe
+        await db.post('bodega_movimientos', {
+          pieza_id: k.pieza_id,
+          tipo: 'salida',
+          cantidad: k.cantidad_sacada - (k.cantidad_sobrante||0),
+          motivo: `Reporte aprobado — evento ${reporte.evento_id}`,
+          usuario_id: reporte.coordi_id,
+          created_at: new Date().toISOString(),
+        }).catch(()=>{});
+      }
+    } catch(e) { console.warn('Stock update error:', k.pieza_id, e.message); }
+  }
+  // Notificación financiera
+  const dif = reporte?.diferencia || 0;
+  const clabe = reporte?.cuenta_bancaria_coordi || 'no registrada';
+  if (dif > 0) {
+    alert(`✅ Aprobado y stock actualizado.\n\n💰 Sobró ${formatMXN(dif)}.\nEl coordi debe regresar ese dinero a tu cuenta.`);
+  } else if (dif < 0) {
+    alert(`✅ Aprobado y stock actualizado.\n\n⚠️ El coordi gastó ${formatMXN(Math.abs(dif))} de más.\nDepositar a: ${clabe}`);
+  } else {
+    alert('✅ Reporte aprobado y stock actualizado.');
+  }
+}
+
 async function aprobarReporteMemo(id) {
   const r = _reportesCache.find(x => x.id === id);
   if (!r) return;
-  if (!confirm('¿Aprobar definitivamente este reporte? Se liberarán los pagos y se registrará el sobrante de kits.')) return;
+  if (!confirm('¿Aprobar definitivamente este reporte? Se descontará el stock de Torre de Karin.')) return;
   try {
-    await db.patch('reportes_evento', id, { status: 'aprobado_memo' });
-    // Notificación financiera
-    const dif = r.diferencia || 0;
-    const coordi = r._coordi;
-    if (dif > 0) {
-      alert(`✅ Aprobado.\n\n💰 Sobró ${formatMXN(dif)}.\nEl coordi debe regresar ese dinero a la cuenta de Memo.`);
-    } else if (dif < 0) {
-      const clabe = r.cuenta_bancaria_coordi || 'no registrada';
-      alert(`✅ Aprobado.\n\n⚠️ El coordi gastó ${formatMXN(Math.abs(dif))} de más.\nDepositar a: ${clabe}`);
-    }
+    await ejecutarAprobacionFinal(id, r);
     loadReportes();
+    // Refrescar inventario si está visible
+    if (document.getElementById('page-inventario')?.classList.contains('active')) loadInventario();
   } catch(e) { alert(e.message); }
 }
 

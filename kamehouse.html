@@ -6194,6 +6194,7 @@ async function descargarRoomingList(eventoId) {
 }
 
 
+let _reportesFiltroActual = 'todos';
 let _reportesCache = [];
 let _bodegaPiezasCache = [];
 let _eventosAsignadosCache = [];
@@ -6218,7 +6219,7 @@ async function loadReportes() {
   container.innerHTML = '<div class="loading-state"><div class="spinner"></div>Cargando…</div>';
   try {
     // Cargar piezas de bodega (para el formulario)
-    _bodegaPiezasCache = await db.get('bodega_piezas', '?order=nombre.asc&activo=eq.true').catch(() => db.get('kits_inventario', '?order=pieza.asc').then(r => r.map(x => ({...x, nombre: x.pieza}))));
+    _bodegaPiezasCache = await db.get('kits_inventario', '?order=pieza.asc').then(r => r.map(x => ({...x, nombre: x.nombre||x.pieza}))).catch(() => []);
 
     let query = '?order=created_at.desc&limit=100';
     if (rol === 'coordinador') {

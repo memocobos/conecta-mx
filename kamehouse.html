@@ -4702,27 +4702,55 @@ async function subirFoto(userId) {
   input.onchange = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
-    if (file.size > 2 * 1024 * 1024) { alert('La foto no puede pesar más de 2MB'); return; }
-    const ext = file.name.split('.').pop();
-    const path = `${userId}/avatar.${ext}`;
+    if (file.size > 3 * 1024 * 1024) { alert('La foto no puede pesar más de 3MB'); return; }
+
+    // Redimensionar y convertir a base64 (funciona sin Storage bucket)
     try {
-      const uploadResp = await fetch(`${SB_URL}/storage/v1/object/perfiles/${path}`, {
-        method: 'POST',
-        headers: { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}`, 'Content-Type': file.type, 'x-upsert': 'true' },
-        body: file
+      const base64url = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          const img = new Image();
+          img.onload = () => {
+            const canvas = document.createElement('canvas');
+            const MAX = 400;
+            let w = img.width, h = img.height;
+            if (w > h) { if (w > MAX) { h = h * MAX / w; w = MAX; } }
+            else { if (h > MAX) { w = w * MAX / h; h = MAX; } }
+            canvas.width = w; canvas.height = h;
+            canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+            resolve(canvas.toDataURL('image/jpeg', 0.82));
+          };
+          img.onerror = reject;
+          img.src = ev.target.result;
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
       });
-      if (!uploadResp.ok) throw new Error('Error subiendo foto');
-      const fotoUrl = `${SB_URL}/storage/v1/object/public/perfiles/${path}?t=${Date.now()}`;
+
+      // Guardar base64 directo en foto_url (sin depender de Storage)
       await fetch(`${SB_URL}/rest/v1/usuarios?id=eq.${userId}`, {
         method: 'PATCH',
-        headers: { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ foto_url: fotoUrl })
+        headers: { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}`, 'Content-Type': 'application/json', 'Prefer': 'return=representation' },
+        body: JSON.stringify({ foto_url: base64url })
       });
+
+      // Actualizar sesión si es el usuario actual
+      if (userId === currentUser.id) {
+        currentUser.foto_url = base64url;
+        const raw = sessionStorage.getItem(SESSION_KEY);
+        if (raw) {
+          const s = JSON.parse(raw);
+          s.user.foto_url = base64url;
+          sessionStorage.setItem(SESSION_KEY, JSON.stringify(s));
+        }
+      }
+
       await loadEquipo();
-      cerrarModal('ver-perfil');
       if (userId === currentUser.id) renderMiPerfil(false);
-      else abrirPerfil(userId);
-    } catch(e) { alert('Error subiendo foto: ' + e.message); }
+
+    } catch(e) {
+      alert('Error al procesar la foto: ' + e.message);
+    }
   };
   input.click();
 }
@@ -5403,7 +5431,6 @@ async function guardarReporte(nuevoStatus) {
     diferencia,
     cuenta_bancaria_coordi: clabe,
     notas: notas || null,
-    updated_at: new Date().toISOString(),
   };
 
   try {
@@ -5411,7 +5438,6 @@ async function guardarReporte(nuevoStatus) {
     if (id) {
       await db.patch('reportes_evento', id, body);
     } else {
-      body.created_at = new Date().toISOString();
       await db.post('reportes_evento', body);
     }
     alert.innerHTML = `<div class="alert alert-success">${nuevoStatus === 'enviado' ? '✅ Reporte enviado' : '✅ Borrador guardado'}</div>`;
@@ -5427,7 +5453,7 @@ async function enviarReporte(id) {
   if (!r) return;
   if (!confirm('¿Confirmas enviar este reporte para revisión?')) return;
   try {
-    await db.patch('reportes_evento', id, { status: 'enviado', updated_at: new Date().toISOString() });
+    await db.patch('reportes_evento', id, { status: 'enviado' });
     loadReportes();
   } catch(e) { alert(e.message); }
 }
@@ -5435,7 +5461,7 @@ async function enviarReporte(id) {
 async function aprobarReportePopo(id) {
   if (!confirm('¿Aprobar este reporte y enviarlo a Memo para revisión final?')) return;
   try {
-    await db.patch('reportes_evento', id, { status: 'aprobado_popo', updated_at: new Date().toISOString() });
+    await db.patch('reportes_evento', id, { status: 'aprobado_popo' });
     loadReportes();
   } catch(e) { alert(e.message); }
 }
@@ -5445,7 +5471,7 @@ async function aprobarReporteMemo(id) {
   if (!r) return;
   if (!confirm('¿Aprobar definitivamente este reporte? Se liberarán los pagos y se registrará el sobrante de kits.')) return;
   try {
-    await db.patch('reportes_evento', id, { status: 'aprobado_memo', updated_at: new Date().toISOString() });
+    await db.patch('reportes_evento', id, { status: 'aprobado_memo' });
     // Notificación financiera
     const dif = r.diferencia || 0;
     const coordi = r._coordi;

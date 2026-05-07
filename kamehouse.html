@@ -1227,6 +1227,7 @@ tr:hover td{background:rgba(255,107,0,.03)}
       <!-- Tabs -->
       <div style="display:flex;gap:6px;margin:16px 0;flex-wrap:wrap;border-bottom:1px solid var(--border);padding-bottom:12px">
        <button class="gz-filter active" id="mt-tab-btn-resumen" onclick="showMTTab('resumen',this)">// Resumen</button>
+       <button class="gz-filter" id="mt-tab-btn-reportes" onclick="showMTTab('reportes',this)">// Reportes</button>
        <button class="gz-filter" id="mt-tab-btn-usuarios" onclick="showMTTab('usuarios',this)">// Usuarios</button>
        <button class="gz-filter" id="mt-tab-btn-strikes" onclick="showMTTab('strikes',this)">// Strikes</button>
        <button class="gz-filter" id="mt-tab-btn-alertas" onclick="showMTTab('alertas',this)">// Alertas</button>
@@ -1236,6 +1237,18 @@ tr:hover td{background:rgba(255,107,0,.03)}
       <!-- TAB: Resumen del sistema -->
       <div id="mt-tab-resumen">
        <div id="mt-resumen-content"><div class="loading-state"><div class="spinner"></div>Cargando…</div></div>
+      </div>
+
+      <!-- TAB: Reportes -->
+      <div id="mt-tab-reportes" style="display:none">
+       <div style="display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap;border-bottom:1px solid var(--border);padding-bottom:12px">
+        <button class="gz-filter active" id="mtr-fil-todos" onclick="filtrarMTReportes('todos',this)">// todos</button>
+        <button class="gz-filter" id="mtr-fil-enviado" onclick="filtrarMTReportes('enviado',this)">// pendientes</button>
+        <button class="gz-filter" id="mtr-fil-popo" onclick="filtrarMTReportes('aprobado_popo',this)">// en revisión Popo</button>
+        <button class="gz-filter" id="mtr-fil-rechazado" onclick="filtrarMTReportes('rechazado',this)">// rechazados</button>
+        <button class="gz-filter" id="mtr-fil-aprobado" onclick="filtrarMTReportes('aprobado_memo',this)">// aprobados</button>
+       </div>
+       <div id="mt-reportes-list"><div class="loading-state"><div class="spinner"></div>Cargando…</div></div>
       </div>
 
       <!-- TAB: Usuarios -->
@@ -6309,17 +6322,127 @@ let _mtUsuariosCache = [];
 let _mtConfig = {};
 
 // ── Tabs ────────────────────────────────────────────────────
+let _mtReportesCache = [];
+let _mtReportesFiltro = 'todos';
+
 function showMTTab(tab, btn) {
   document.querySelectorAll('#page-montana .gz-filter[id^="mt-tab-btn"]').forEach(b => b.classList.remove('active'));
   if (btn) btn.classList.add('active');
-  ['resumen','usuarios','strikes','alertas','config'].forEach(t => {
+  ['resumen','reportes','usuarios','strikes','alertas','config'].forEach(t => {
     const el = document.getElementById(`mt-tab-${t}`);
     if (el) el.style.display = t === tab ? '' : 'none';
   });
+  if (tab === 'reportes') loadMTReportes();
 }
 
 async function loadMontana() {
   await Promise.all([loadMTResumen(), loadMTUsuarios(), loadMTStrikes(), loadMTAlertas(), loadMTConfig()]);
+}
+
+async function loadMTReportes() {
+  const list = document.getElementById('mt-reportes-list');
+  if (!list) return;
+  list.innerHTML = '<div class="loading-state"><div class="spinner"></div>Cargando reportes…</div>';
+  try {
+    _mtReportesCache = await db.get('reportes_evento', '?order=created_at.desc&limit=100');
+    // Join eventos y coordis
+    const eIds = [...new Set(_mtReportesCache.map(r=>r.evento_id).filter(Boolean))];
+    const uIds = [...new Set(_mtReportesCache.map(r=>r.coordi_id).filter(Boolean))];
+    const [evs, users] = await Promise.all([
+      eIds.length ? db.get('eventos', `?id=in.(${eIds.join(',')})`) : [],
+      uIds.length ? db.get('usuarios', `?id=in.(${uIds.join(',')})`) : [],
+    ]);
+    const evMap = Object.fromEntries(evs.map(e=>[e.id,e]));
+    const uMap  = Object.fromEntries(users.map(u=>[u.id,u]));
+    _mtReportesCache = _mtReportesCache.map(r=>({...r, _evento:evMap[r.evento_id]||null, _coordi:uMap[r.coordi_id]||null}));
+    renderMTReportes(_mtReportesCache, _mtReportesFiltro);
+  } catch(e) { list.innerHTML=`<div class="alert alert-error">${e.message}</div>`; }
+}
+
+function filtrarMTReportes(status, btn) {
+  _mtReportesFiltro = status;
+  document.querySelectorAll('#mt-tab-reportes .gz-filter[id^="mtr-fil"]').forEach(b=>b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  renderMTReportes(_mtReportesCache, status);
+}
+
+function renderMTReportes(lista, filtro) {
+  const list = document.getElementById('mt-reportes-list');
+  const filtrada = filtro==='todos' ? lista : lista.filter(r=>r.status===filtro);
+  if (!filtrada.length) {
+    list.innerHTML='<div class="empty-state"><div class="empty-icon">📋</div>Sin reportes'+( filtro==='todos'?'':' con este estado')+'</div>';
+    return;
+  }
+  const statusInfo = {
+    borrador:      { label:'Borrador',           color:'var(--ts)',    icon:'✏️' },
+    enviado:       { label:'⏳ Pendiente revisión',color:'var(--gold)', icon:'⏳' },
+    rechazado:     { label:'❌ Rechazado',         color:'var(--red)',  icon:'❌' },
+    aprobado_popo: { label:'🔍 En revisión Roshi', color:'var(--blue)', icon:'🔍' },
+    aprobado_memo: { label:'✅ Aprobado',           color:'var(--green)',icon:'✅' },
+  };
+  list.innerHTML = filtrada.map(r => {
+    const s = statusInfo[r.status]||{label:r.status,color:'var(--ts)',icon:'📄'};
+    const ev = r._evento;
+    const coo = r._coordi;
+    const dif = r.diferencia||0;
+    const difColor = dif>=0?'var(--green)':'var(--red)';
+    const difLabel = dif>=0?`Sobró ${formatMXN(Math.abs(dif))}`:`Debe ${formatMXN(Math.abs(dif))}`;
+    const rol = currentUser?.rol;
+    let btns = '';
+    if (['maestro_roshi','bulma'].includes(rol)) {
+      if (r.status==='enviado') {
+        btns = `<button class="btn btn-primary btn-sm" onclick="mtAprobarReporte('${r.id}','enviado')">✓ Aprobar directo</button>
+                <button class="btn btn-red btn-sm" onclick="mtRechazarReporte('${r.id}')">✗ Rechazar</button>`;
+      } else if (r.status==='aprobado_popo') {
+        btns = `<button class="btn btn-primary btn-sm" onclick="mtAprobarReporte('${r.id}','aprobado_popo')">✓ Aprobar definitivo</button>
+                <button class="btn btn-red btn-sm" onclick="mtRechazarReporte('${r.id}')">✗ Rechazar</button>`;
+      }
+    }
+    return `<div style="background:var(--bg2);border:1px solid var(--border);border-left:3px solid ${s.color};border-radius:var(--radius);padding:16px 20px;margin-bottom:10px">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:10px">
+        <div>
+          <div style="font-family:'Rajdhani',sans-serif;font-size:18px;font-weight:700">${ev?ev.nombre:(r.evento_id||'—')}</div>
+          <div style="font-size:11px;font-family:'JetBrains Mono',monospace;color:var(--ts);margin-top:2px">
+            ${coo?coo.nombre+' · ':''}<span style="color:${s.color}">${s.icon} ${s.label}</span>
+            ${ev?' · '+new Date(ev.fecha+'T12:00:00').toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric'}):''}
+          </div>
+          ${r.rechazo_motivo?`<div style="margin-top:6px;font-size:11px;padding:5px 10px;background:rgba(255,68,68,.08);border-left:2px solid var(--red);color:var(--red)">Motivo rechazo: ${r.rechazo_motivo}</div>`:''}
+        </div>
+        <div style="display:flex;gap:12px;text-align:right">
+          <div><div style="font-size:10px;color:var(--ts)">ENTREGADO</div><div style="font-family:'Zen Dots',sans-serif;font-size:16px;color:var(--gold)">${formatMXN(r.dinero_recibido||0)}</div></div>
+          <div><div style="font-size:10px;color:var(--ts)">GASTADO</div><div style="font-family:'Zen Dots',sans-serif;font-size:16px">${formatMXN(r.total_gastado||0)}</div></div>
+          <div><div style="font-size:10px;color:var(--ts)">DIFERENCIA</div><div style="font-family:'Zen Dots',sans-serif;font-size:16px;color:${difColor}">${difLabel}</div></div>
+        </div>
+      </div>
+      ${btns ? `<div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap">${btns}</div>` : ''}
+    </div>`;
+  }).join('');
+}
+
+async function mtAprobarReporte(id, desdeStatus) {
+  if (!confirm('¿Aprobar este reporte?')) return;
+  try {
+    await db.patch('reportes_evento', id, { status: 'aprobado_memo' });
+    const r = _mtReportesCache.find(x=>x.id===id);
+    const dif = r?.diferencia||0;
+    if (dif > 0) alert(`✅ Aprobado.
+💰 Sobró ${formatMXN(dif)} — el coordi debe regresarlo a tu cuenta.`);
+    else if (dif < 0) alert(`✅ Aprobado.
+⚠️ El coordi gastó ${formatMXN(Math.abs(dif))} de más.
+Cuenta: ${r?.cuenta_bancaria_coordi||'no registrada'}`);
+    await loadMTReportes();
+  } catch(e) { alert(e.message); }
+}
+
+async function mtRechazarReporte(id) {
+  const motivo = prompt('Motivo del rechazo:');
+  if (!motivo) return;
+  try {
+    await db.patch('reportes_evento', id, { status: 'rechazado', rechazo_motivo: motivo });
+    const r = _mtReportesCache.find(x=>x.id===id);
+    await enviarAlertaMemo('reporte_rechazado', { coordi: r?._coordi?.nombre||'Coordi', motivo });
+    await loadMTReportes();
+  } catch(e) { alert(e.message); }
 }
 
 // ── RESUMEN ──────────────────────────────────────────────────

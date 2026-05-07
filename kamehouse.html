@@ -4137,7 +4137,7 @@ async function enviarInvitacion() {
         from: 'Kamehouse <noreply@conectareynosa.mx>',
         to: [correo],
         subject: 'Bienvenido al equipo de Conecta Reynosa',
-        html: buildInviteEmail(nombre, rol, link)
+        html: buildInviteEmail(correo.split('@')[0], rol, link)
       })
     });
     if (!emailResp.ok) {

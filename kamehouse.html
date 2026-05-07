@@ -3971,6 +3971,30 @@ async function crearEventoDesdeCotizador() {
 // GUERREROS Z — Sistema de perfiles, invitaciones, ranking
 // ═══════════════════════════════════════════════════════════════
 const RESEND_KEY = 're_SyHtnp2a_AWsc89GVABY3JLcAgxFnKC7H';
+const EMAIL_ENDPOINT = '/.netlify/functions/send-invite';
+
+async function sendEmail(to, subject, html) {
+  // Intenta Netlify Function primero (seguro, sin CORS)
+  try {
+    const resp = await fetch(EMAIL_ENDPOINT, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ to, subject, html })
+    });
+    if (resp.ok) return true;
+    const err = await resp.json();
+    throw new Error(err.error || err.message || 'Error en servidor de email');
+  } catch(e) {
+    // Fallback: llamar a Resend directo (puede fallar por CORS)
+    const resp = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${RESEND_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ from: 'Kamehouse <noreply@conectareynosa.mx>', to: Array.isArray(to) ? to : [to], subject, html })
+    });
+    if (!resp.ok) { const err = await resp.json(); throw new Error(err.message || 'Error enviando email'); }
+    return true;
+  }
+}
 const APP_URL = 'https://conectareynosa.mx/kamehouse';
 
 let _gzCache = [];
@@ -4130,27 +4154,21 @@ async function enviarInvitacion() {
       invite_token: token, invite_usado: false,
       invite_expires_at: expires, password_hash: null
     });
-    const emailResp = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${RESEND_KEY}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        from: 'Kamehouse <noreply@conectareynosa.mx>',
-        to: [correo],
-        subject: 'Bienvenido al equipo de Conecta Reynosa',
-        html: buildInviteEmail(correo.split('@')[0], rol, link)
-      })
-    });
-    if (!emailResp.ok) {
-      const err = await emailResp.json();
-      throw new Error(err.message || 'Error enviando email');
-    }
-    alertEl.innerHTML = '<div class="alert" style="background:rgba(45,198,83,.1);color:var(--green)">Invitación enviada a ' + correo + '</div>';
+    await sendEmail(correo, 'Bienvenido al equipo de Conecta Reynosa', buildInviteEmail(correo.split('@')[0], rol, link));
+    alertEl.innerHTML = '<div class="alert" style="background:rgba(45,198,83,.1);color:var(--green)">✅ Invitación enviada a ' + correo + '</div>';
     document.getElementById('inv-correo').value = '';
-    document.getElementById('inv-nombre').value = '';
-    setTimeout(() => alertEl.innerHTML = '', 4000);
+    setTimeout(() => alertEl.innerHTML = '', 5000);
     loadEquipo();
-  } catch(e) {
-    alertEl.innerHTML = `<div class="alert alert-error">${e.message}</div>`;
+  } catch(emailErr) {
+    // Si el email falla, el usuario YA se creó en Supabase — mostrar el link para copiar
+    alertEl.innerHTML = `<div class="alert" style="background:rgba(255,183,3,.08);color:var(--gold);font-size:13px;line-height:1.6">
+      <div style="margin-bottom:8px">⚠️ El usuario se creó pero el email no se pudo enviar.</div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:10px;margin-bottom:8px">Manda este link por WhatsApp:</div>
+      <input readonly value="${link}" style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:8px 10px;font-family:'JetBrains Mono',monospace;font-size:11px;cursor:text" onclick="this.select();document.execCommand('copy')">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--ts);margin-top:6px">// click en el link para copiarlo · expira en 48h</div>
+    </div>`;
+    document.getElementById('inv-correo').value = '';
+    loadEquipo();
   }
 }
 
@@ -4191,16 +4209,11 @@ async function gestionarStrikes(userId, nombre, strikesActuales) {
     if (nuevo >= 3) {
       const usuario = _gzCache.find(u => u.id === userId);
       if (usuario?.correo_notif || usuario?.correo) {
-        await fetch('https://api.resend.com/emails', {
-          method: 'POST',
-          headers: { 'Authorization': `Bearer ${RESEND_KEY}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            from: 'Kamehouse <noreply@conectareynosa.mx>',
-            to: [usuario.correo_notif || usuario.correo],
-            subject: '⚠️ Has acumulado 3 strikes',
-            html: `<div style="font-family:Arial;padding:32px;background:#06060A;color:#EEEEF5"><h2 style="color:#E63946">Aviso importante</h2><p>Has acumulado 3 strikes en el sistema.</p><p>Motivo: <strong>${motivo}</strong></p></div>`
-          })
-        });
+        await sendEmail(
+          usuario.correo_notif || usuario.correo,
+          '⚠️ Has acumulado 3 strikes',
+          `<div style="font-family:Arial;padding:32px;background:#06060A;color:#EEEEF5"><h2 style="color:#E63946">Aviso importante</h2><p>Has acumulado 3 strikes en el sistema.</p><p>Motivo: <strong>${motivo}</strong></p></div>`
+        ).catch(() => {});
       }
     }
     await loadEquipo();

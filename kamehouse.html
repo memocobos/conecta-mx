@@ -4359,11 +4359,21 @@ async function renderMiPerfil(modoEdicion = false) {
 
   if (modoEdicion) {
     el.innerHTML = renderFormPerfil();
-    const u = _gzCache.find(u => u.id === currentUser.id) || currentUser;
-    ['nombre','correo_notif','celular','num_emergencia','nombre_emergencia','talla_playera','fecha_nacimiento','template_sugerido','username'].forEach(campo => {
-      const inp = document.getElementById('mp-' + campo);
-      if (inp && u[campo]) inp.value = u[campo];
-    });
+    // Fetch fresco para tener todos los campos (incluyendo username)
+    try {
+      const [uFresh] = await db.get('usuarios', `?id=eq.${currentUser.id}&limit=1`);
+      const u = uFresh || currentUser;
+      ['nombre','correo_notif','celular','num_emergencia','nombre_emergencia','talla_playera','fecha_nacimiento','template_sugerido','username'].forEach(campo => {
+        const inp = document.getElementById('mp-' + campo);
+        if (inp && u[campo]) inp.value = u[campo];
+      });
+    } catch(e) {
+      const u = currentUser;
+      ['nombre','correo_notif','celular','num_emergencia','nombre_emergencia','talla_playera','fecha_nacimiento','template_sugerido','username'].forEach(campo => {
+        const inp = document.getElementById('mp-' + campo);
+        if (inp && u[campo]) inp.value = u[campo];
+      });
+    }
     return;
   }
 

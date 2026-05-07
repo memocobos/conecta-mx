@@ -1035,6 +1035,11 @@ tr:hover td{background:rgba(255,107,0,.03)}
 
       <!-- TAB: Lista -->
       <div id="gz-tab-lista">
+       <!-- Label solo lectura para roles no-admin -->
+       <div id="gz-solo-lectura-label" style="display:none;align-items:center;gap:8px;margin-bottom:14px;padding:8px 14px;background:rgba(255,183,3,.06);border:1px solid rgba(255,183,3,.15);border-radius:8px">
+         <span style="font-size:14px">👁</span>
+         <span style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.1em;color:var(--gold)">SOLO LECTURA — puedes ver los perfiles de tu equipo, no editarlos</span>
+       </div>
        <div style="display:flex;gap:8px;margin-bottom:18px;flex-wrap:wrap">
         <button class="gz-filter active" onclick="filtrarGZ('todos',this)">// todos</button>
         <button class="gz-filter" onclick="filtrarGZ('coordinador',this)">// coordinadores</button>
@@ -1916,10 +1921,10 @@ const PERMISOS_TABS = {
 const GZ_TABS_PERMITIDAS = {
   maestro_roshi: ['lista','invitar','miperfil'],
   bulma:         ['lista','invitar','miperfil'],
-  mister_popo:   ['miperfil'],
-  coordinador:   ['miperfil'],
-  cc:            ['miperfil'],
-  vendedor:      ['miperfil'],
+  mister_popo:   ['lista','miperfil'],
+  coordinador:   ['lista','miperfil'],
+  cc:            ['lista','miperfil'],
+  vendedor:      ['lista','miperfil'],
 };
 
 async function doLogin() {
@@ -2013,7 +2018,7 @@ function aplicarPermisosUI() {
   if (karinAdminBtns) karinAdminBtns.style.display = ['maestro_roshi','mister_popo'].includes(rol) ? 'flex' : 'none';
 
   // Ocultar botones de tabs de Guerreros Z segun rol
-  const gzPermitidas = GZ_TABS_PERMITIDAS[rol] || ['miperfil'];
+  const gzPermitidas = GZ_TABS_PERMITIDAS[rol] || ['lista','miperfil'];
   const btnLista   = document.querySelector('.gz-tab-btn[onclick*=\'lista\']');
   const btnInvitar = document.querySelector('.gz-tab-btn[onclick*=\'invitar\']');
   const btnPerfil  = document.querySelector('.gz-tab-btn[onclick*=\'miperfil\']');
@@ -2023,6 +2028,10 @@ function aplicarPermisosUI() {
   // Ranking: todos los que llegan a GZ lo pueden ver
   const btnRanking = document.querySelector('[onclick*=\'abrirRanking\']');
   if (btnRanking) btnRanking.style.display = '';
+  // Etiqueta de solo lectura para roles no-admin en la lista
+  const soloLecturaLabel = document.getElementById('gz-solo-lectura-label');
+  const esAdmin = ['maestro_roshi','bulma'].includes(rol);
+  if (soloLecturaLabel) soloLecturaLabel.style.display = esAdmin ? 'none' : 'flex';
 
   showPage(tabsPermitidos[0] || 'resumen');
 }
@@ -4175,7 +4184,8 @@ async function loadEquipo() {
     grid.innerHTML = `<div class="alert alert-error">${e.message}</div>`;
   }
   // Mostrar la tab correcta según rol al entrar a Guerreros Z
-  const gzPermitidas = GZ_TABS_PERMITIDAS[currentUser?.rol] || ['miperfil'];
+  // Todos los roles ahora pueden ver la lista del equipo (solo lectura)
+  const gzPermitidas = GZ_TABS_PERMITIDAS[currentUser?.rol] || ['lista','miperfil'];
   const tabInicial = gzPermitidas.includes('lista') ? 'lista' : 'miperfil';
   const btnInicial = document.querySelector(`.gz-tab-btn[onclick*="${tabInicial}"]`);
   showGZTab(tabInicial, btnInicial);

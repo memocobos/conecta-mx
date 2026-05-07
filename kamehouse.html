@@ -6416,8 +6416,21 @@ function renderMTUsuarios(lista) {
         <button class="btn btn-ghost btn-sm" onclick="abrirVerComo('${u.id}','${u.rol}')" style="font-size:10px;font-family:'JetBrains Mono',monospace">👁 Ver como</button>
         <button class="btn btn-ghost btn-sm" onclick="abrirEditarUsuarioMT('${u.id}')" style="font-size:10px">✏️ Editar</button>
         <button class="btn ${u.activo?'btn-red':'btn-green'} btn-sm" onclick="toggleActivoUsuario('${u.id}',${u.activo})" style="font-size:10px">${u.activo?'Desactivar':'Activar'}</button>
+        <button class="btn btn-red btn-sm" onclick="eliminarUsuarioMT('${u.id}','${u.nombre.replace(/'/g,"\\'")}','${u.rol}')" style="font-size:10px;opacity:.7" title="Eliminar permanentemente">🗑</button>
       </div>
     </div>`).join('');
+}
+
+async function eliminarUsuarioMT(id, nombre, rol) {
+  if (['maestro_roshi','bulma'].includes(rol)) {
+    alert('No puedes eliminar a Maestro Roshi ni a Bulma desde aquí.');
+    return;
+  }
+  if (!confirm(`¿Eliminar permanentemente a "${nombre}"?\n\nEsta acción no se puede deshacer.`)) return;
+  try {
+    await db.delete('usuarios', id);
+    await loadMTUsuarios();
+  } catch(e) { alert('Error al eliminar: ' + e.message); }
 }
 
 async function toggleActivoUsuario(id, activo) {
@@ -6977,8 +6990,8 @@ function renderReportes(lista, filtro) {
       btns = `<button class="btn btn-primary btn-sm" onclick="aprobarReportePopo('${r.id}')">✓ Aprobar</button>
               <button class="btn btn-red btn-sm" onclick="rechazarReporte('${r.id}')">✗ Rechazar</button>`;
     }
-    if (['maestro_roshi','bulma'].includes(rol) && r.status === 'aprobado_popo') {
-      btns = `<button class="btn btn-primary btn-sm" onclick="aprobarReporteMemo('${r.id}')">✓ Aprobar Definitivo</button>
+    if (['maestro_roshi','bulma'].includes(rol) && ['aprobado_popo','enviado'].includes(r.status)) {
+      btns = `<button class="btn btn-primary btn-sm" onclick="aprobarReporteMemo('${r.id}')">✓ Aprobar${r.status==='enviado'?' directo':' Definitivo'}</button>
               <button class="btn btn-red btn-sm" onclick="rechazarReporte('${r.id}')">✗ Rechazar</button>`;
     }
     // Popo: marcar kits recibidos cuando aprobado_memo

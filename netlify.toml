@@ -21,6 +21,8 @@
   [headers.values]
     Access-Control-Allow-Methods = "POST, OPTIONS"
     Access-Control-Allow-Headers = "Content-Type"
-[[functions]]
+[functions]
+  directory = "netlify/functions"
+
+[functions."check-strikes-diario"]
   schedule = "0 0 * * *"
-  name = "check-strikes-diario"

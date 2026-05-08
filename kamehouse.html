@@ -5504,10 +5504,13 @@ function showHerramienta(name) {
     }
   }
   if (name === 'diseno') {
-    // placeholder - puedes cargar el Diseno HTML aqui
-    const frame = document.getElementById('frame-diseno');
-    if (frame.src === 'about:blank' && frame.srcdoc === '') {
-      frame.srcdoc = '<div style="display:flex;align-items:center;justify-content:center;height:100vh;background:#0a0a0f;color:#888;font-family:Montserrat,sans-serif;font-size:14px;">Sube el archivo Conecta-Diseno.html para cargar esta seccion</div>';
+    if (!disenoLoaded) {
+      const frame = document.getElementById('frame-diseno');
+      if (frame) {
+        frame.removeAttribute('srcdoc');
+        frame.src = './Conecta-Diseno.html';
+        disenoLoaded = true;
+      }
     }
   }
 }

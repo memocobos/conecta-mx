@@ -1,7 +1,6 @@
 // netlify/functions/check-strikes-diario.js
-// Scheduled: todos los días a las 00:00 UTC (6 PM hora CDMX)
-
-const { schedule } = require("@netlify/functions");
+// Esta función es disparada por el schedule en netlify.toml
+// Corre todos los días a las 00:00 UTC (6 PM hora CDMX)
 
 const SB_URL = "https://npgnhsmwpcipxgvfxrho.supabase.co";
 const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5wZ25oc213cGNpcHhndmZ4cmhvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczMDEwNTMsImV4cCI6MjA5Mjg3NzA1M30.08Fp0YaIkD1okEWB8ao3HoPpdaq6rFi2kzAYGZ72jQg";
@@ -49,7 +48,7 @@ async function aplicarStrike(usuarioId, motivo, tipo) {
         <p>Hola <strong>${u.nombre}</strong>,</p>
         <p><strong>Motivo:</strong> ${motivo}</p>
         <p><strong>Strikes:</strong> ${nuevos}/3</p>
-        ${nuevos >= 2 ? '<p style="color:#FFB703">⚠️ Advertencia: al llegar a 3 tu cuenta será suspendida.</p>' : ""}
+        ${nuevos >= 2 ? '<p style="color:#FFB703">⚠️ Al llegar a 3 tu cuenta será suspendida.</p>' : ""}
         ${nuevos >= 3 ? '<p style="color:#FF4444">🚫 Cuenta suspendida.</p>' : ""}
         <p style="color:#888;font-size:12px">Conecta Reynosa</p>
       </div>`
@@ -66,55 +65,57 @@ async function aplicarStrike(usuarioId, motivo, tipo) {
   );
 }
 
-const handler = schedule("0 0 * * *", async () => {
+exports.handler = async function(event) {
   console.log("[check-strikes] Iniciando:", new Date().toISOString());
   const ahora = new Date();
   let sr = 0, sd = 0;
 
-  // 1) STRIKE POR REPORTE NO LLENADO EN 48 HRS
-  const hace48h = new Date(ahora.getTime() - 48 * 60 * 60 * 1000);
-  const fechaLimite = hace48h.toISOString().split("T")[0];
-  const eventosVencidos = await sb(`eventos?fecha=lte.${fechaLimite}&select=id,nombre,fecha`).catch(() => []);
+  try {
+    // 1) STRIKE POR REPORTE NO LLENADO EN 48 HRS
+    const hace48h = new Date(ahora.getTime() - 48 * 60 * 60 * 1000);
+    const fechaLimite = hace48h.toISOString().split("T")[0];
+    const eventosVencidos = await sb(`eventos?fecha=lte.${fechaLimite}&select=id,nombre,fecha`).catch(() => []);
 
-  for (const ev of eventosVencidos) {
-    const asigs = await sb(`eventos_coordi?evento_id=eq.${ev.id}&status=eq.aceptado&select=coordi_id`).catch(() => []);
-    for (const a of asigs) {
-      const rep = await sb(`reportes_evento?evento_id=eq.${ev.id}&coordi_id=eq.${a.coordi_id}&status=in.(enviado,aprobado_popo,aprobado_memo)&select=id&limit=1`).catch(() => []);
-      if (!rep || rep.length === 0) {
-        const prev = await sb(`strikes_log?coordi_id=eq.${a.coordi_id}&accion=eq.strike_reporte_no_enviado&motivo=ilike.*${ev.id}*&select=id&limit=1`).catch(() => []);
-        if (!prev || prev.length === 0) {
-          await aplicarStrike(a.coordi_id, `Reporte no enviado en 48hrs — ${ev.nombre} (${ev.id})`, "strike_reporte_no_enviado");
-          sr++;
+    for (const ev of eventosVencidos) {
+      const asigs = await sb(`eventos_coordi?evento_id=eq.${ev.id}&status=eq.aceptado&select=coordi_id`).catch(() => []);
+      for (const a of asigs) {
+        const rep = await sb(`reportes_evento?evento_id=eq.${ev.id}&coordi_id=eq.${a.coordi_id}&status=in.(enviado,aprobado_popo,aprobado_memo)&select=id&limit=1`).catch(() => []);
+        if (!rep || rep.length === 0) {
+          const prev = await sb(`strikes_log?coordi_id=eq.${a.coordi_id}&accion=eq.strike_reporte_no_enviado&motivo=ilike.*${ev.id}*&select=id&limit=1`).catch(() => []);
+          if (!prev || prev.length === 0) {
+            await aplicarStrike(a.coordi_id, `Reporte no enviado en 48hrs — ${ev.nombre}`, "strike_reporte_no_enviado");
+            sr++;
+          }
         }
       }
     }
-  }
 
-  // 2) STRIKE Y DEUDA POR SOBRANTE NO DEVUELTO EN 5 DÍAS
-  const hace5d = new Date(ahora.getTime() - 5 * 24 * 60 * 60 * 1000).toISOString();
-  const aprobados = await sb(`reportes_evento?status=eq.aprobado_memo&strike_devolucion_aplicado=eq.false&fecha_aprobado=lte.${hace5d}&select=id,coordi_id,evento_id,kits_detalle,fecha_aprobado`).catch(() => []);
+    // 2) STRIKE Y DEUDA POR SOBRANTE NO DEVUELTO EN 5 DÍAS
+    const hace5d = new Date(ahora.getTime() - 5 * 24 * 60 * 60 * 1000).toISOString();
+    const aprobados = await sb(`reportes_evento?status=eq.aprobado_memo&strike_devolucion_aplicado=eq.false&fecha_aprobado=lte.${hace5d}&select=id,coordi_id,evento_id,kits_detalle,fecha_aprobado`).catch(() => []);
 
-  for (const r of aprobados) {
-    const kits = typeof r.kits_detalle === "string" ? JSON.parse(r.kits_detalle) : (r.kits_detalle || []);
-    const sobrantes = kits.filter((k) => (k.cantidad_sobrante || 0) > 0 && !k.recibido);
-    if (!sobrantes.length) continue;
+    for (const r of aprobados) {
+      const kits = typeof r.kits_detalle === "string" ? JSON.parse(r.kits_detalle) : (r.kits_detalle || []);
+      const sobrantes = kits.filter((k) => (k.cantidad_sobrante || 0) > 0 && !k.recibido);
+      if (!sobrantes.length) continue;
 
-    await aplicarStrike(r.coordi_id, "Kits sobrantes no regresados a bodega en 5 días", "strike_devolucion_pendiente");
+      await aplicarStrike(r.coordi_id, "Kits sobrantes no regresados en 5 días", "strike_devolucion_pendiente");
 
-    for (const k of sobrantes) {
-      const piezas = await sb(`kits_inventario?id=eq.${k.pieza_id}&select=pieza,costo_unitario`).catch(() => []);
-      const pieza = piezas && piezas[0];
-      if (!pieza) continue;
-      const monto = (k.cantidad_sobrante || 0) * (pieza.costo_unitario || 0);
-      await sb("deudas_coordi", { method: "POST", body: JSON.stringify({ coordi_id: r.coordi_id, evento_id: r.evento_id, reporte_id: r.id, tipo: "kit_perdido", concepto: `${k.cantidad_sobrante} ${pieza.pieza} no regresados`, monto, notas: "Plazo 5 días vencido", created_at: new Date().toISOString() }) }).catch(() => {});
+      for (const k of sobrantes) {
+        const piezas = await sb(`kits_inventario?id=eq.${k.pieza_id}&select=pieza,costo_unitario`).catch(() => []);
+        const pieza = piezas && piezas[0];
+        if (!pieza) continue;
+        const monto = (k.cantidad_sobrante || 0) * (pieza.costo_unitario || 0);
+        await sb("deudas_coordi", { method: "POST", body: JSON.stringify({ coordi_id: r.coordi_id, evento_id: r.evento_id, reporte_id: r.id, tipo: "kit_perdido", concepto: `${k.cantidad_sobrante} ${pieza.pieza} no regresados`, monto, notas: "Plazo 5 días vencido", created_at: new Date().toISOString() }) }).catch(() => {});
+      }
+
+      await sb(`reportes_evento?id=eq.${r.id}`, { method: "PATCH", body: JSON.stringify({ strike_devolucion_aplicado: true }) });
+      sd++;
     }
-
-    await sb(`reportes_evento?id=eq.${r.id}`, { method: "PATCH", body: JSON.stringify({ strike_devolucion_aplicado: true }) });
-    sd++;
+  } catch (e) {
+    console.error("[check-strikes] Error:", e.message);
   }
 
-  console.log(`[check-strikes] Fin. sr:${sr} sd:${sd}`);
+  console.log(`[check-strikes] Fin. Strikes reporte:${sr} devolución:${sd}`);
   return { statusCode: 200, body: JSON.stringify({ ok: true, sr, sd }) };
-});
-
-module.exports = { handler };
+};

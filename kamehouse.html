@@ -5496,9 +5496,9 @@ function showHerramienta(name) {
   if (name === 'recibos') {
     if (!recibosLoaded) {
       const frame = document.getElementById('frame-recibos');
-      if (frame && typeof _RECIBOS_B64 !== 'undefined') {
-        const html = decodeURIComponent(escape(atob(_RECIBOS_B64)));
-        frame.srcdoc = html;
+      if (frame) {
+        frame.removeAttribute('srcdoc');
+        frame.src = './recibos_v6.html';
         recibosLoaded = true;
       }
     }
@@ -5508,7 +5508,7 @@ function showHerramienta(name) {
       const frame = document.getElementById('frame-diseno');
       if (frame) {
         frame.removeAttribute('srcdoc');
-        frame.src = './Conecta-Diseno.html';
+        frame.src = './diseno.html';
         disenoLoaded = true;
       }
     }

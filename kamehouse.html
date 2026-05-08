@@ -5643,7 +5643,7 @@ function filtrarCCEventos(filtro, btn) {
   renderCCEventos(_ccEventosCache, filtro);
 }
 
-f catch(e) { console.warn('renderCCEventos:', e); }unction renderCCEventos(lista, filtro) {
+function renderCCEventos(lista, filtro) {
   try {
   const grid = document.getElementById('cc-eventos-grid');
   const hoy = new Date(); hoy.setHours(0,0,0,0);

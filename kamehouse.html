@@ -37,6 +37,160 @@
  --radius: 10px;
  --shadow: 0 8px 32px rgba(0,0,0,.5);
  --bg4: #20202d;}
+
+/* ═══════════════════════════════════════════════
+   SISTEMA DE DISEÑO UNIFICADO — KAMEHOUSE v2
+═══════════════════════════════════════════════ */
+
+/* Headers de página potentes — estilo manga editorial */
+.page-hero{
+ display:flex;align-items:center;justify-content:space-between;
+ margin-bottom:20px;flex-wrap:wrap;gap:12px;
+ padding-bottom:18px;border-bottom:1px solid var(--border);position:relative;
+}
+.page-hero::before{
+ content:'';position:absolute;left:0;bottom:-1px;height:2px;width:80px;
+ background:linear-gradient(90deg,var(--orange),var(--gold),transparent);
+}
+.page-title{
+ font-family:'Zen Dots',sans-serif;font-size:28px;letter-spacing:.04em;line-height:1;
+ background:linear-gradient(135deg,var(--text) 0%,var(--gold) 50%,var(--orange) 100%);
+ -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+}
+.page-sub{
+ font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.12em;
+ color:var(--ts);margin-top:6px;text-transform:lowercase;
+}
+.page-eyebrow{
+ font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.15em;
+ color:var(--orange);margin-bottom:14px;text-transform:uppercase;
+ display:flex;align-items:center;gap:8px;
+}
+.page-eyebrow::before{
+ content:'';width:24px;height:1px;background:var(--orange);
+}
+
+/* Cards potentes con clip-path */
+.k-card{
+ background:var(--bg2);border:1px solid var(--border);
+ border-radius:var(--radius);padding:20px;position:relative;
+ transition:border-color .2s;
+}
+.k-card:hover{border-color:var(--border2)}
+.k-card-clip{
+ background:var(--bg2);border:1px solid var(--border);position:relative;
+ padding:20px 24px;
+ clip-path:polygon(12px 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%,0 12px);
+}
+.k-card-clip::before{
+ content:'';position:absolute;left:0;top:0;width:3px;height:40%;
+ background:linear-gradient(180deg,var(--orange),transparent);
+}
+.k-card-glow{
+ background:var(--bg2);border:1px solid var(--border);
+ border-radius:var(--radius);padding:18px 20px;position:relative;overflow:hidden;
+}
+.k-card-glow::before{
+ content:'';position:absolute;top:0;left:0;right:0;height:1px;
+ background:linear-gradient(90deg,transparent,var(--orange),var(--gold),transparent);
+}
+
+/* Métricas potentes con número grande */
+.k-metric{
+ background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);
+ padding:18px 20px;position:relative;overflow:hidden;
+}
+.k-metric::before{
+ content:'';position:absolute;top:0;left:0;right:0;height:2px;
+ background:linear-gradient(90deg,var(--orange),var(--gold));
+}
+.k-metric-label{
+ font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.18em;
+ color:var(--ts);text-transform:uppercase;margin-bottom:6px;
+}
+.k-metric-value{
+ font-family:'Zen Dots',sans-serif;font-size:26px;color:var(--text);line-height:1;
+}
+.k-metric-value.gold{color:var(--gold)}
+.k-metric-value.orange{color:var(--orange)}
+.k-metric-value.green{color:var(--green)}
+.k-metric-value.red{color:var(--red)}
+.k-metric-sub{font-size:10px;color:var(--ts2);margin-top:6px;font-family:'JetBrains Mono',monospace}
+
+/* Tags / pills minimalistas */
+.k-tag{
+ display:inline-block;font-family:'JetBrains Mono',monospace;
+ font-size:10px;letter-spacing:.1em;padding:3px 10px;border-radius:4px;
+ border:1px solid var(--border);color:var(--ts);text-transform:uppercase;
+}
+.k-tag.orange{border-color:rgba(255,107,0,.3);color:var(--orange);background:rgba(255,107,0,.06)}
+.k-tag.gold{border-color:rgba(255,215,0,.3);color:var(--gold);background:rgba(255,215,0,.06)}
+.k-tag.green{border-color:rgba(61,220,132,.3);color:var(--green);background:rgba(61,220,132,.06)}
+.k-tag.red{border-color:rgba(255,68,68,.3);color:var(--red);background:rgba(255,68,68,.06)}
+.k-tag.blue{border-color:rgba(94,167,255,.3);color:var(--blue);background:rgba(94,167,255,.06)}
+
+/* Item con border-left de color (tipo tour-item de GZ) */
+.k-item{
+ background:var(--bg2);border:1px solid var(--border);border-left:3px solid var(--border2);
+ border-radius:var(--radius);padding:14px 18px;margin-bottom:10px;
+ transition:all .2s;
+}
+.k-item:hover{border-left-color:var(--orange)}
+.k-item.green{border-left-color:var(--green)}
+.k-item.gold{border-left-color:var(--gold)}
+.k-item.red{border-left-color:var(--red)}
+.k-item.blue{border-left-color:var(--blue)}
+.k-item.muted{border-left-color:var(--ts2);opacity:.7}
+
+/* Divisor estético */
+.k-divider{
+ height:1px;background:linear-gradient(90deg,transparent,var(--border),transparent);
+ margin:20px 0;
+}
+
+/* Mono labels */
+.k-mono{font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.12em;color:var(--ts);text-transform:uppercase}
+.k-mono-sm{font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.15em;color:var(--ts);text-transform:uppercase}
+
+/* ═══════════════════════════════════════════════
+   OPTIMIZACIÓN MOBILE
+═══════════════════════════════════════════════ */
+@media(max-width:768px){
+ .page-title{font-size:22px}
+ .page-hero{padding-bottom:14px;margin-bottom:16px}
+ .k-card,.k-card-clip,.k-card-glow{padding:14px 16px}
+ .k-metric{padding:14px 16px}
+ .k-metric-value{font-size:22px}
+ .k-item{padding:12px 14px}
+ .btn{padding:10px 14px;font-size:11px;min-height:40px}
+ .btn-sm{padding:7px 12px;font-size:10px;min-height:34px}
+
+ /* Tablas → scroll horizontal limpio en mobile */
+ .table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+ .table-wrap table{min-width:560px}
+
+ /* Modales fullscreen en mobile */
+ .modal-overlay.open{padding:0}
+ .modal{
+  max-width:100%!important;width:100%;max-height:100vh;height:100%;
+  border-radius:0;display:flex;flex-direction:column;
+ }
+ .modal-body{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch}
+
+ /* Grids 2col → 1col */
+ .grid-2{grid-template-columns:1fr!important}
+
+ /* Reducir padding del contenido principal */
+ .content{padding:16px 12px}
+ .topbar{padding:10px 14px}
+}
+@media(max-width:480px){
+ .page-title{font-size:18px}
+ .page-sub{font-size:10px}
+ .k-metric-value{font-size:20px}
+ .topbar-brand{font-size:13px}
+ .topbar-user{font-size:10px}
+}
 *{margin:0;padding:0;box-sizing:border-box}
 html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Montserrat',sans-serif;overflow:hidden}
 
@@ -716,7 +870,7 @@ tr:hover td{background:rgba(255,107,0,.03)}
    <button class="nav-btn" onclick="showPage('equipo')" id="nav-equipo">Guerreros Z</button>
    <button class="nav-btn" onclick="showPage('capsule')" id="nav-capsule">Capsule Corp</button>
    <button class="nav-btn" onclick="showPage('cotizador')" id="nav-cotizador">Palacio de Kamisama</button>
-   <button class="nav-btn" onclick="showPage('montana')" id="nav-montana">🏔 Montaña Pai</button>
+   <button class="nav-btn" onclick="showPage('montana')" id="nav-montana">Montaña Pai</button>
    <div class="nav-dropdown" id="nav-dropdown-herramientas">
     <button class="nav-dropdown-btn" onclick="toggleDropdown(event)" id="nav-herramientas">
      Herramientas <span class="drop-arrow">▼</span>
@@ -734,8 +888,12 @@ tr:hover td{background:rgba(255,107,0,.03)}
 
  <!-- ─── RESUMEN ─── -->
  <div class="page active" id="page-resumen">
- <div class="section-title">Resumen</div>
- <div class="section-sub">Vista general del negocio en tiempo real</div>
+  <div class="page-hero">
+   <div>
+    <div class="page-title">RESUMEN</div>
+    <div class="page-sub">// vista general · tiempo real</div>
+   </div>
+  </div>
 
  <div class="metrics-grid" id="metrics-grid">
  <div class="metric">
@@ -788,11 +946,13 @@ tr:hover td{background:rgba(255,107,0,.03)}
 
  <!-- ─── PAGOS ─── -->
  <div class="page" id="page-pagos">
- <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
- <div class="section-title">Pagos</div>
- <button class="btn btn-primary" onclick="openModal('modal-pago')">+ Registrar Pago</button>
- </div>
- <div class="section-sub">Registra y administra todos los abonos de tus viajeros</div>
+  <div class="page-hero">
+   <div>
+    <div class="page-title">PAGOS</div>
+    <div class="page-sub">// ingresos · saldos por cliente</div>
+   </div>
+   <button class="btn btn-primary" onclick="openModal('modal-pago')">+ Registrar Pago</button>
+  </div>
 
  <!-- Filtros -->
  <div class="card" style="margin-bottom:16px">
@@ -843,8 +1003,12 @@ tr:hover td{background:rgba(255,107,0,.03)}
 
  <!-- ─── POR EVENTO ─── -->
  <div class="page" id="page-eventos">
- <div class="section-title">Por Evento</div>
- <div class="section-sub">Selecciona un evento para ver su lista de viajeros</div>
+ <div class="page-hero">
+   <div>
+    <div class="page-title">POR EVENTO</div>
+    <div class="page-sub">// análisis financiero por concierto</div>
+   </div>
+  </div>
 
  <div class="card" style="margin-bottom:16px">
  <div class="form-row cols-3">
@@ -908,11 +1072,14 @@ tr:hover td{background:rgba(255,107,0,.03)}
 
  <!-- ─── GASTOS ─── -->
  <div class="page" id="page-gastos">
- <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
- <div class="section-title">Gastos</div>
- <button class="btn btn-primary" onclick="openModal('modal-gasto')">+ Registrar Gasto</button>
- </div>
- <div class="section-sub">Control de salidas del negocio</div>
+ <div class="page-hero">
+   <div>
+    <div class="page-title">GASTOS</div>
+    <div class="page-sub">// egresos · costos operativos</div>
+   </div>
+   <button class="btn btn-primary" onclick="openModal('modal-gasto')">+ Registrar Gasto</button>
+ 
+  </div>
 
  <div class="metrics-grid" style="margin-bottom:16px" id="gastos-metrics">
  <div class="metric">
@@ -963,8 +1130,12 @@ tr:hover td{background:rgba(255,107,0,.03)}
 
  <!-- ─── MIS VENTAS ─── -->
  <div class="page" id="page-ventas">
- <div class="section-title">Mis Ventas</div>
- <div class="section-sub">Resumen financiero por evento</div>
+ <div class="page-hero">
+   <div>
+    <div class="page-title">MIS VENTAS</div>
+    <div class="page-sub">// comisiones · ventas registradas</div>
+   </div>
+  </div>
  <div id="ventas-content">
  <div class="loading-state"><div class="spinner"></div>Cargando…</div>
  </div>
@@ -972,11 +1143,14 @@ tr:hover td{background:rgba(255,107,0,.03)}
 
  <!-- ─── INVENTARIO ─── -->
  <div class="page" id="page-inventario">
- <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
- <div class="section-title">Torre de Karin</div>
- <button class="btn btn-primary" onclick="openModal('modal-kit')">+ Agregar Pieza</button>
- </div>
- <div class="section-sub">Control de kits y bodega</div>
+ <div class="page-hero">
+   <div>
+    <div class="page-title">TORRE DE KARIN</div>
+    <div class="page-sub">// control de kits · bodega</div>
+   </div>
+   <button class="btn btn-primary" onclick="openModal('modal-kit')">+ Agregar Pieza</button>
+ 
+  </div>
 
  <div class="metrics-grid" style="margin-bottom:16px">
  <div class="metric" id="inv-valor-wrap">
@@ -1006,10 +1180,10 @@ tr:hover td{background:rgba(255,107,0,.03)}
 
  <!-- ─── REPORTES POST-EVENTO ─── -->
  <div class="page" id="page-reportes">
-  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;flex-wrap:wrap;gap:10px">
+  <div class="page-hero">
    <div>
-    <div style="font-family:'Zen Dots',sans-serif;font-size:28px;letter-spacing:.04em;background:linear-gradient(135deg,var(--text) 0%,var(--gold) 50%,var(--orange) 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">REPORTES</div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.1em;color:var(--ts)">// post-evento · flujo de aprobación</div>
+    <div class="page-title">REPORTES</div>
+    <div class="page-sub">// post-evento · flujo de aprobación</div>
    </div>
    <!-- Coordi: btn crear reporte; Popo/Roshi: filtros -->
    <div id="reportes-header-btns" style="display:flex;gap:8px;flex-wrap:wrap"></div>
@@ -1042,7 +1216,7 @@ tr:hover td{background:rgba(255,107,0,.03)}
         <button class="btn btn-ghost btn-sm gz-tab-btn active" onclick="showGZTab('lista',this)" style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.08em">EQUIPO</button>
         <button class="btn btn-ghost btn-sm gz-tab-btn" onclick="showGZTab('invitar',this)" style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.08em">+ INVITAR</button>
         <button class="btn btn-ghost btn-sm gz-tab-btn" onclick="showGZTab('miperfil',this)" style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.08em">MI PERFIL</button>
-        <button class="btn btn-ghost btn-sm" onclick="abrirRanking()" style="border-color:rgba(255,183,3,.4);color:var(--gold);font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.08em">🏆 RANKING</button>
+        <button class="btn btn-ghost btn-sm" onclick="abrirRanking()" style="border-color:rgba(255,183,3,.4);color:var(--gold);font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.08em">RANKING</button>
        </div>
       </div>
 
@@ -1105,10 +1279,10 @@ tr:hover td{background:rgba(255,107,0,.03)}
 
      <!-- ─── CAPSULE CORP ─── -->
      <div class="page" id="page-capsule">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;flex-wrap:wrap;gap:10px">
+      <div class="page-hero">
        <div>
-        <div style="font-family:'Zen Dots',sans-serif;font-size:28px;letter-spacing:.04em;background:linear-gradient(135deg,var(--text) 0%,var(--gold) 50%,var(--orange) 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">CAPSULE CORP</div>
-        <div style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.1em;color:var(--ts)">// eventos · viajeros · rooming · equipo</div>
+        <div class="page-title">CAPSULE CORP</div>
+        <div class="page-sub">// eventos · viajeros · rooming · equipo</div>
        </div>
        <button class="btn btn-primary" onclick="abrirModalCrearEvento()">+ Nuevo Evento</button>
       </div>
@@ -1136,9 +1310,9 @@ tr:hover td{background:rgba(255,107,0,.03)}
 
        <!-- Sub-tabs -->
        <div style="display:flex;gap:6px;margin-bottom:20px;flex-wrap:wrap">
-        <button class="gz-filter active" id="cc-sub-btn-equipo" onclick="showCCSubTab('equipo',this)">🎯 Equipo</button>
-        <button class="gz-filter" id="cc-sub-btn-viajeros" onclick="showCCSubTab('viajeros',this)">👥 Viajeros</button>
-        <button class="gz-filter" id="cc-sub-btn-rooming" onclick="showCCSubTab('rooming',this)">🛏 Rooming</button>
+        <button class="gz-filter active" id="cc-sub-btn-equipo" onclick="showCCSubTab('equipo',this)">Equipo</button>
+        <button class="gz-filter" id="cc-sub-btn-viajeros" onclick="showCCSubTab('viajeros',this)">Viajeros</button>
+        <button class="gz-filter" id="cc-sub-btn-rooming" onclick="showCCSubTab('rooming',this)">Rooming</button>
        </div>
 
        <!-- SUB: EQUIPO ASIGNADO -->
@@ -1147,9 +1321,9 @@ tr:hover td{background:rgba(255,107,0,.03)}
          <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.12em;color:var(--ts)" id="cc-equipo-count">0 asignados</div>
          <button class="btn btn-primary btn-sm" onclick="abrirModalAsignarCoordi()">+ Asignar persona</button>
         </div>
-        <div id="cc-coordis-asignados"><div class="empty-state"><div class="empty-icon">🎯</div>Sin equipo asignado</div></div>
+        <div id="cc-coordis-asignados"><div class="empty-state"><div class="empty-icon">·</div>Sin equipo asignado</div></div>
         <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:8px">
-         <button class="btn btn-ghost" onclick="notificarEquipoListas()" style="font-size:12px">📧 Notificar equipo — listas listas</button>
+         <button class="btn btn-ghost" onclick="notificarEquipoListas()" style="font-size:12px">Notificar equipo — listas listas</button>
         </div>
        </div>
 
@@ -1163,7 +1337,7 @@ tr:hover td{background:rgba(255,107,0,.03)}
           <button class="btn btn-primary btn-sm" onclick="abrirModalViajero(null)">+ Viajero</button>
          </div>
         </div>
-        <div id="cc-viajeros-list"><div class="empty-state"><div class="empty-icon">👥</div>Sin viajeros registrados</div></div>
+        <div id="cc-viajeros-list"><div class="empty-state"><div class="empty-icon">·</div>Sin viajeros registrados</div></div>
        </div>
 
        <!-- SUB: ROOMING -->
@@ -1172,7 +1346,7 @@ tr:hover td{background:rgba(255,107,0,.03)}
         <div style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);padding:16px 20px;margin-bottom:16px">
          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px">
           <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.12em;color:var(--ts)">// HOTEL</div>
-          <button class="btn btn-ghost btn-sm" onclick="abrirModalHotel()" style="font-size:10px">✏️ Editar hotel</button>
+          <button class="btn btn-ghost btn-sm" onclick="abrirModalHotel()" style="font-size:10px">⎘ Editar hotel</button>
          </div>
          <div id="cc-hotel-info">
           <div style="color:var(--ts);font-size:12px">Sin hotel configurado — <button class="btn btn-ghost btn-sm" onclick="abrirModalHotel()" style="font-size:11px">+ Agregar hotel</button></div>
@@ -1187,11 +1361,11 @@ tr:hover td{background:rgba(255,107,0,.03)}
           <button class="btn btn-primary btn-sm" onclick="abrirModalHabitacion(null)">+ Habitación</button>
          </div>
         </div>
-        <div id="cc-rooming-list"><div class="empty-state"><div class="empty-icon">🛏</div>Sin habitaciones registradas</div></div>
+        <div id="cc-rooming-list"><div class="empty-state"><div class="empty-icon">·</div>Sin habitaciones registradas</div></div>
         <!-- Notificar -->
         <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:8px">
          <button class="btn btn-ghost btn-sm" onclick="exportarRooming('pdf')" style="font-size:11px">↓ PDF completo</button>
-         <button class="btn btn-primary" onclick="notificarEquipoListas()">📧 Enviar listas al equipo</button>
+         <button class="btn btn-primary" onclick="notificarEquipoListas()">Enviar listas al equipo</button>
         </div>
        </div>
       </div>
@@ -1216,12 +1390,12 @@ tr:hover td{background:rgba(255,107,0,.03)}
  <!-- ─── COTIZADOR ─── -->
      <!-- ─── MONTAÑA PAI ─── -->
      <div class="page" id="page-montana">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;flex-wrap:wrap;gap:10px">
+      <div class="page-hero">
        <div>
-        <div style="font-family:'Zen Dots',sans-serif;font-size:28px;letter-spacing:.04em;background:linear-gradient(135deg,var(--text) 0%,var(--gold) 50%,var(--orange) 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">MONTAÑA PAI</div>
-        <div style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.1em;color:var(--ts)">// panel maestro roshi · control total</div>
+        <div class="page-title">MONTAÑA PAI</div>
+        <div class="page-sub">// panel maestro roshi · control total</div>
        </div>
-       <button class="btn btn-ghost btn-sm" onclick="loadMontana()" style="font-family:'JetBrains Mono',monospace;font-size:10px">↺ ACTUALIZAR</button>
+       <button class="btn btn-ghost btn-sm" onclick="loadMontana()" class="k-mono">ACTUALIZAR</button>
       </div>
 
       <!-- Tabs -->
@@ -1335,18 +1509,20 @@ tr:hover td{background:rgba(255,107,0,.03)}
      <div class="modal-overlay" id="modal-mt-vercomo"></div>
 
  <div class="page" id="page-cotizador">
- <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
- <div class="section-title">Palacio de Kamisama</div>
- <div style="display:flex;gap:8px">
- <button class="btn btn-ghost btn-sm" onclick="guardarSesionCot()">💾 Guardar sesión</button>
- <button class="btn btn-ghost btn-sm" onclick="resetCotizador()">↺ Limpiar</button>
- </div>
- </div>
- <div class="section-sub">Calcula precios por paquete · guarda sesiones · compara estimado vs real post-evento</div>
+  <div class="page-hero">
+   <div>
+    <div class="page-title">PALACIO DE KAMISAMA</div>
+    <div class="page-sub">// cotizador · estimado vs real</div>
+   </div>
+   <div style="display:flex;gap:8px">
+    <button class="btn btn-ghost btn-sm" onclick="guardarSesionCot()">Guardar sesión</button>
+    <button class="btn btn-ghost btn-sm" onclick="resetCotizador()">↺ Limpiar</button>
+   </div>
+  </div>
 
  <div class="cot-tabs">
- <button class="cot-tab active" onclick="switchCotMode('preventa',this)">📋 Preventa / Cotización</button>
- <button class="cot-tab" onclick="switchCotMode('postevento',this)">✅ Post-Evento / Real</button>
+ <button class="cot-tab active" onclick="switchCotMode('preventa',this)">Preventa / Cotización</button>
+ <button class="cot-tab" onclick="switchCotMode('postevento',this)">Post-Evento / Real</button>
  </div>
 
  <!-- ══ PREVENTA ══ -->
@@ -1402,7 +1578,7 @@ tr:hover td{background:rgba(255,107,0,.03)}
  </div>
  <div style="display:flex;gap:6px;margin-top:6px">
  <button class="btn btn-ghost btn-sm" onclick="guardarVenueCat()">+ Guardar venue</button>
- <button class="btn btn-ghost btn-sm" onclick="verVenuesCat()">📋 Catálogo</button>
+ <button class="btn btn-ghost btn-sm" onclick="verVenuesCat()">Catálogo</button>
  </div>
  </div>
 
@@ -1471,13 +1647,13 @@ tr:hover td{background:rgba(255,107,0,.03)}
  <div id="cot-zonas-lista"></div>
  <div style="display:flex;gap:6px;margin-top:8px">
    <button class="btn btn-ghost btn-sm" onclick="guardarZonasCatalogo()">💾 Guardar zonas en catálogo</button>
-   <button class="btn btn-ghost btn-sm" onclick="verZonasCatalogo()">📋 Catálogo de zonas</button>
+   <button class="btn btn-ghost btn-sm" onclick="verZonasCatalogo()">Catálogo de zonas</button>
  </div>
  </div>
 
  <!-- STAFF -->
  <div class="card">
- <div class="cot-section-label"><span>👥 Staff</span></div>
+ <div class="cot-section-label"><span>Staff</span></div>
 
  <!-- Coordinadores -->
  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
@@ -1547,20 +1723,20 @@ tr:hover td{background:rgba(255,107,0,.03)}
 
  <!-- DESGLOSE -->
  <div class="card" style="border-color:rgba(255,107,0,.3)">
- <div class="cot-section-label" style="color:var(--orange)"><span>📊 Desglose por Persona</span></div>
+ <div class="cot-section-label" style="color:var(--orange)"><span> Desglose por Persona</span></div>
  <div id="cot-desglose"><div class="empty-state" style="padding:20px">Llena los campos para ver el cálculo</div></div>
  </div>
 
  <!-- ESCENARIOS -->
  <div class="card" style="border-color:rgba(255,215,0,.25)">
- <div class="cot-section-label" style="color:var(--gold)"><span>🎯 Escenarios (base logística)</span></div>
+ <div class="cot-section-label" style="color:var(--gold)"><span>Escenarios (base logística)</span></div>
  <div style="font-size:11px;color:var(--ts);margin-bottom:10px">Basado en capacidad neta del transporte. El boleto se suma por zona.</div>
  <div id="cot-escenarios"><div class="empty-state" style="padding:20px">Agrega transporte para ver escenarios</div></div>
  </div>
 
  <!-- PRECIOS POR PAQUETE -->
  <div class="card">
- <div class="cot-section-label"><span>💰 Precios por Paquete y Zona</span></div>
+ <div class="cot-section-label"><span>Precios por Paquete y Zona</span></div>
  <div style="font-size:11px;color:var(--ts);margin-bottom:10px">Escenario realista (80% capacidad)</div>
  <div id="cot-precios-paquetes"><div class="empty-state" style="padding:16px">Agrega zonas para ver precios</div></div>
  </div>
@@ -1594,7 +1770,7 @@ tr:hover td{background:rgba(255,107,0,.03)}
  </select>
  </div>
  <div class="card" id="post-datos-card" style="display:none">
- <div class="cot-section-label"><span>📊 Datos Reales</span></div>
+ <div class="cot-section-label"><span> Datos Reales</span></div>
  <div class="form-row cols-2">
  <div class="form-group"><label>Viajeros PLUS reales</label><input type="number" class="cot-input" id="post-plus" min="0" value="0" oninput="calcularPostEvento()"></div>
  <div class="form-group"><label>Viajeros STAY reales</label><input type="number" class="cot-input" id="post-stay" min="0" value="0" oninput="calcularPostEvento()"></div>
@@ -1650,7 +1826,7 @@ tr:hover td{background:rgba(255,107,0,.03)}
  <div class="modal-overlay" id="modal-zonas-cat">
  <div class="modal" style="max-width:520px">
  <div class="modal-header">
- <div class="modal-title">📋 Catálogo de Zonas</div>
+ <div class="modal-title">Catálogo de Zonas</div>
  <button class="modal-close" onclick="closeModal('modal-zonas-cat')">✕</button>
  </div>
  <div class="modal-body">
@@ -2855,7 +3031,7 @@ async function loadInventario() {
  <td style="color:var(--ts)">${i.stock_minimo}</td>
  <td style="font-size:12px;color:var(--ts)">${i.proveedor||'—'}</td>
  <td>${puedeEditarKarin ? `
- <button class="btn btn-ghost btn-sm" onclick="editarKit('${i.id}')">✏️</button>
+ <button class="btn btn-ghost btn-sm" onclick="editarKit('${i.id}')">⎘</button>
  <button class="btn btn-red btn-sm" onclick="eliminarKit('${i.id}')">✕</button>
  ` : '—'}</td>
  </tr>`;
@@ -3992,7 +4168,7 @@ function recalcular() {
     isCDMX ? ['🚌 Transporte','No aplica (CDMX)'] : null,
     ['🏨 Hotel ('+formatMXN(hotelPrecioHab)+' ÷ 4 × '+hotelNoches+' noche'+(hotelNoches>1?'s':'')+')', real.costoHotelPorPax],
     ['🎁 Kit', kitTotal],
-    costoChoferes>0      ? ['🚗 Choferes ('+habsChoferes+' hab ÷ '+D+' lugares)', costoChoferes/D]      : null,
+    costoChoferes>0      ? ['Choferes ('+habsChoferes+' hab ÷ '+D+' lugares)', costoChoferes/D]      : null,
     costoCoordisTotal>0  ? ['👤 Coordinadores (÷ '+D+' lugares)',                  costoCoordisTotal/D]  : null,
     costoCCTotal>0       ? ['📸 Creadores contenido (÷ '+D+' lugares)',             costoCCTotal/D]       : null,
     estacionamiento>0    ? ['🅿️ Estacionamiento (÷ '+D+' lugares)',                estacionamiento/D]    : null,
@@ -4842,14 +5018,14 @@ function renderPerfilCompleto(u, toursPasados, evAsignados, iniciales, edad, cum
           const fechaEv = ev.fecha ? new Date(ev.fecha + 'T12:00:00') : null;
           const esPasado = fechaEv && fechaEv < hoy;
           const stColor = { pendiente:'var(--gold)', aceptado:'var(--green)', declinado:'var(--red)' };
-          const stLabel = { pendiente:'⏳ Pendiente', aceptado:'✅ Aceptado', declinado:'❌ Declinado' };
+          const stLabel = { pendiente:'Pendiente', aceptado:'Aceptado', declinado:'Declinado' };
           return `<div class="tour-item" style="border-left-color:${esPasado?'var(--ts)':'var(--orange)'}">
             <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;flex-wrap:wrap">
               <div>
                 <div class="tour-item-name" style="font-size:16px">${ev.nombre || ev.artista || '—'}</div>
                 <div class="tour-item-meta">${ev.artista?ev.artista+' · ':''}${ev.ciudad||''} ${fechaEv?'· '+fechaEv.toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric'}):''}</div>
                 ${e.indicaciones ? `<div style="font-size:11px;color:var(--ts);margin-top:5px;font-style:italic">📌 ${e.indicaciones}</div>` : ''}
-                ${ev.notas_internas ? `<div style="font-size:11px;color:var(--ts);margin-top:4px">📋 ${ev.notas_internas}</div>` : ''}
+                ${ev.notas_internas ? `<div style="font-size:11px;color:var(--ts);margin-top:4px"><span class="k-mono-sm" style="margin-right:6px">EQUIPO</span>${ev.notas_internas}</div>` : ''}
               </div>
               <span style="font-size:10px;white-space:nowrap;color:${stColor[e.status]||'var(--ts)'}">
                 ${stLabel[e.status]||e.status||''}
@@ -5100,7 +5276,7 @@ async function abrirRanking() {
           <div style="font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.2em;color:var(--ts);margin-bottom:4px">// LEADERBOARD_${anioActual}</div>
           <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
             <div style="font-family:'Zen Dots',cursive;font-size:22px;background:linear-gradient(90deg,var(--orange),var(--gold));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">RANKING ${anioActual}</div>
-            <span style="font-size:24px">🏆</span>
+            <span style="font-size:24px"></span>
           </div>
           <div style="font-family:Rajdhani;font-size:13px;color:var(--gold);margin-top:8px;font-weight:600">El líder al final del año gana un tour gratis 🎉</div>
           <div style="font-family:JetBrains Mono;font-size:10px;color:var(--ts);margin-top:4px;letter-spacing:.04em">// concierto: 3pts · festival 1d: 5pts · 2d: 7pts · 3d: 10pts</div>
@@ -5430,7 +5606,7 @@ function renderCCEventos(lista, filtro) {
   if (filtro === 'pasado')  filtrada = lista.filter(e => new Date(e.fecha+'T12:00:00') < hoy);
 
   if (!filtrada.length) {
-    grid.innerHTML = '<div class="empty-state"><div class="empty-icon">📅</div>Sin eventos — crea el primero con "+ Nuevo Evento"</div>';
+    grid.innerHTML = '<div class="empty-state"><div class="empty-icon">·</div>Sin eventos — crea el primero con "+ Nuevo Evento"</div>';
     return;
   }
   grid.innerHTML = filtrada.map(e => {
@@ -5450,7 +5626,7 @@ function renderCCEventos(lista, filtro) {
           </div>
         </div>
         <div style="display:flex;gap:6px">
-          <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();abrirModalEditarEvento('${e.id}')" style="font-size:11px">✏️</button>
+          <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();abrirModalEditarEvento('${e.id}')" style="font-size:11px">⎘</button>
           <button class="btn btn-red btn-sm" onclick="event.stopPropagation();eliminarEventoCC('${e.id}')" style="font-size:11px">✕</button>
           <button class="btn btn-primary btn-sm" onclick="event.stopPropagation();abrirDetalleEvento('${e.id}')" style="font-size:11px">Ver →</button>
         </div>
@@ -5580,7 +5756,7 @@ async function abrirDetalleEvento(id) {
           <div style="font-size:11px;font-family:'JetBrains Mono',monospace;color:var(--ts);margin-top:2px">
             ${ev.artista?ev.artista+' · ':''}${ev.ciudad||''} · ${fecha.toLocaleDateString('es-MX',{weekday:'long',day:'numeric',month:'long',year:'numeric'})} · ${TIPOS_EVENTO[ev.tipo_evento]||'Concierto'}
           </div>
-          ${ev.notas_internas?`<div style="margin-top:8px;font-size:11px;color:var(--ts);padding:6px 10px;background:rgba(255,255,255,.03);border-left:2px solid var(--border)">📌 ${ev.notas_internas}</div>`:''}
+          ${ev.notas_internas?`<div style="margin-top:8px;font-size:11px;color:var(--ts);padding:6px 10px;background:rgba(255,255,255,.03);border-left:2px solid var(--border)">${ev.notas_internas}</div>`:''}
         </div>
         <button class="btn btn-ghost btn-sm" onclick="showCCTab('lista', document.getElementById('cc-tab-btn-lista'))" style="font-size:10px">← Todos los eventos</button>
       </div>`;
@@ -5602,7 +5778,7 @@ async function loadCCEquipo() {
     _ccAsignados = asigs;
     if (countEl) countEl.textContent = `${asigs.length} asignado${asigs.length!==1?'s':''}`;
     if (!asigs.length) {
-      container.innerHTML = '<div class="empty-state"><div class="empty-icon">🎯</div>Sin equipo asignado</div>';
+      container.innerHTML = '<div class="empty-state"><div class="empty-icon">·</div>Sin equipo asignado</div>';
       return;
     }
     const uIds = asigs.map(a=>a.coordi_id).join(',');
@@ -5611,7 +5787,7 @@ async function loadCCEquipo() {
     // Guardar referencia de usuario en cada asignación (para rooming)
     _ccAsignados = asigs.map(a => ({ ...a, _usuario: uMap[a.coordi_id]||{} }));
     const statusCol = { pendiente:'var(--gold)', aceptado:'var(--green)', declinado:'var(--red)' };
-    const statusLabel = { pendiente:'⏳ Pendiente', aceptado:'✅ Aceptó', declinado:'❌ Declinó' };
+    const statusLabel = { pendiente:'Pendiente', aceptado:'Aceptó', declinado:'Declinó' };
     container.innerHTML = asigs.map(a => {
       const u = uMap[a.coordi_id]||{};
       const st = a.status||'pendiente';
@@ -5679,7 +5855,7 @@ async function abrirModalAsignarCoordi() {
           <textarea class="cot-input" id="ac-indicaciones" rows="3" placeholder="Punto de encuentro, responsabilidades, horario…" style="width:100%;resize:vertical"></textarea>
         </div>
         <div style="background:rgba(255,183,3,.06);border:1px solid rgba(255,183,3,.15);border-radius:8px;padding:12px;font-size:11px;color:var(--gold);font-family:'JetBrains Mono',monospace">
-          📧 Se enviará un correo con link para aceptar o declinar
+          Se enviará un correo con link para aceptar o declinar
         </div>
         <div id="ac-alert" style="margin-top:8px"></div>
       </div>
@@ -5716,7 +5892,7 @@ async function guardarAsignacionCoordi() {
         method:'POST', headers:{'Content-Type':'application/json'},
         body: JSON.stringify({
           to: usuario.correo_notif || usuario.correo,
-          subject: `🎯 Tour asignado: ${ev?.nombre||'Evento'}`,
+          subject: `Tour asignado: ${ev?.nombre||'Evento'}`,
           html: `<div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;background:#0a0a0f;color:#f0f0f5;padding:32px;border-radius:12px">
             <h2 style="color:#FF6B00;margin-bottom:8px">Tour Asignado</h2>
             <p>Hola <strong>${usuario.nombre}</strong>,</p>
@@ -5762,7 +5938,7 @@ async function reenviarNotificacion(asigId) {
         method:'POST', headers:{'Content-Type':'application/json'},
         body: JSON.stringify({
           to: usuario.correo_notif || usuario.correo,
-          subject: `🔔 Recordatorio — Tour asignado: ${ev?.nombre||''}`,
+          subject: `Recordatorio — Tour asignado: ${ev?.nombre||''}`,
           html: `<div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;background:#0a0a0f;color:#f0f0f5;padding:32px;border-radius:12px">
             <h2 style="color:#FFB703">Recordatorio de asignación</h2>
             <p>Hola <strong>${usuario.nombre}</strong>, aún no has respondido a tu asignación:</p>
@@ -5829,14 +6005,14 @@ async function notificarEquipoListas() {
       method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({
         to: email,
-        subject: `📋 Listas listas: ${ev?.nombre||'Evento'}`,
+        subject: `Listas listas: ${ev?.nombre||'Evento'}`,
         html: `<div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;background:#0a0a0f;color:#f0f0f5;padding:32px;border-radius:12px">
           <h2 style="color:#FF6B00">Listas actualizadas</h2>
           <p>Hola <strong>${u.nombre}</strong>,</p>
           <p>Las listas del evento <strong>${ev?.nombre||''}</strong> ya están listas.</p>
           <ul style="color:#888899;line-height:2">
-            <li>📋 Lista de viajeros</li>
-            <li>🛏 Rooming list</li>
+            <li>Lista de viajeros</li>
+            <li>Rooming list</li>
           </ul>
           <p>Entra al Kamehouse y revisa tu perfil para descargarlas.</p>
           <p style="margin-top:16px">No olvides pasar a <strong>Torre de Karin</strong> a recoger los kits antes del evento.</p>
@@ -5863,7 +6039,7 @@ async function loadViajeros() {
     const countEl = document.getElementById('cc-viajeros-count');
     if (countEl) countEl.textContent = `${_ccViajeros.length} viajero${_ccViajeros.length!==1?'s':''}`;
     if (!_ccViajeros.length) {
-      list.innerHTML = '<div class="empty-state"><div class="empty-icon">👥</div>Sin viajeros — agrega el primero</div>';
+      list.innerHTML = '<div class="empty-state"><div class="empty-icon">·</div>Sin viajeros — agrega el primero</div>';
       return;
     }
     list.innerHTML = `<div class="table-wrap"><table>
@@ -5878,7 +6054,7 @@ async function loadViajeros() {
         <td style="font-size:11px;color:var(--ts)">${v.num_emergencia||'—'}</td>
         <td style="font-size:11px;color:var(--ts);max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${v.notas||'—'}</td>
         <td style="white-space:nowrap">
-          <button class="btn btn-ghost btn-sm" onclick="abrirModalViajero('${v.id}')">✏️</button>
+          <button class="btn btn-ghost btn-sm" onclick="abrirModalViajero('${v.id}')">⎘</button>
           <button class="btn btn-red btn-sm" onclick="eliminarViajero('${v.id}')">✕</button>
         </td>
       </tr>`).join('')}</tbody>
@@ -6042,7 +6218,7 @@ async function loadRooming() {
         <div style="font-size:10px;color:var(--ts)">${TIPO_LABELS[k]}</div>
       </div>`).join('');
     if (!_ccHabitaciones.length) {
-      list.innerHTML = '<div class="empty-state"><div class="empty-icon">🛏</div>Sin habitaciones — agrega la primera</div>';
+      list.innerHTML = '<div class="empty-state"><div class="empty-icon">·</div>Sin habitaciones — agrega la primera</div>';
       return;
     }
     list.innerHTML = _ccHabitaciones.map((h, idx) => {
@@ -6057,7 +6233,7 @@ async function loadRooming() {
             <span style="font-size:10px;color:${llena?'var(--green)':'var(--ts)'};margin-left:8px">${ocupantes.length}/${cap}${llena?' ✓':''}</span>
           </div>
           <div style="display:flex;gap:6px">
-            <button class="btn btn-ghost btn-sm" onclick="abrirModalHabitacion('${h.id}')">✏️</button>
+            <button class="btn btn-ghost btn-sm" onclick="abrirModalHabitacion('${h.id}')">⎘</button>
             <button class="btn btn-red btn-sm" onclick="eliminarHabitacion('${h.id}')">✕</button>
           </div>
         </div>
@@ -6084,7 +6260,7 @@ function renderHotelInfo() {
   el.innerHTML = `<div style="display:flex;gap:20px;flex-wrap:wrap;align-items:center">
     <div>
       <div style="font-family:'Rajdhani',sans-serif;font-weight:700;font-size:18px">${_ccHotelInfo.nombre}</div>
-      ${_ccHotelInfo.direccion?`<div style="font-size:12px;color:var(--ts);margin-top:2px">📍 ${_ccHotelInfo.direccion}</div>`:''}
+      ${_ccHotelInfo.direccion?`<div style="font-size:12px;color:var(--ts);margin-top:2px">${_ccHotelInfo.direccion}</div>`:''}
     </div>
     <div style="font-size:11px;padding:4px 12px;border-radius:20px;border:1px solid ${_ccHotelInfo.incluye_desayuno?'rgba(61,220,132,.3)':'var(--border)'};color:${_ccHotelInfo.incluye_desayuno?'var(--green)':'var(--ts)'}">
       ${_ccHotelInfo.incluye_desayuno?'✓ Con desayuno':'✗ Sin desayuno'}
@@ -6177,7 +6353,7 @@ function abrirModalHabitacion(id) {
             ${ocsActuales[i] && !dispViajeros.includes(ocsActuales[i]) && nombresViajeros.includes(ocsActuales[i]) ? `<option value="${ocsActuales[i]}" selected>${ocsActuales[i]} ✓</option>` : ''}
           </optgroup>
           ${dispEquipo.length ? `<optgroup label="Equipo disponible">${dispEquipo.map(n=>`<option value="${n}" ${ocsActuales[i]===n?'selected':''}>${n}</option>`).join('')}</optgroup>` : ''}
-          <optgroup label="Otros"><option value="Chofer" ${ocsActuales[i]==='Chofer'?'selected':''}>🚗 Chofer</option></optgroup>
+          <optgroup label="Otros"><option value="Chofer" ${ocsActuales[i]==='Chofer'?'selected':''}>Chofer</option></optgroup>
         </select>
       </div>`).join('');
   }
@@ -6230,7 +6406,7 @@ function actualizarOcupantesHab(tipo) {
         <option value="">— Lugar libre —</option>
         <optgroup label="Viajeros disponibles">${dispViajeros.map(n=>`<option value="${n}">${n}</option>`).join('')}</optgroup>
         ${dispEquipo.length ? `<optgroup label="Equipo disponible">${dispEquipo.map(n=>`<option value="${n}">${n}</option>`).join('')}</optgroup>` : ''}
-        <optgroup label="Otros"><option value="Chofer">🚗 Chofer</option></optgroup>
+        <optgroup label="Otros"><option value="Chofer">Chofer</option></optgroup>
       </select>
     </div>`).join('');
 }
@@ -6404,15 +6580,15 @@ function renderMTReportes(lista, filtro) {
   const list = document.getElementById('mt-reportes-list');
   const filtrada = filtro==='todos' ? lista : lista.filter(r=>r.status===filtro);
   if (!filtrada.length) {
-    list.innerHTML='<div class="empty-state"><div class="empty-icon">📋</div>Sin reportes'+( filtro==='todos'?'':' con este estado')+'</div>';
+    list.innerHTML='<div class="empty-state"><div class="empty-icon">·</div>Sin reportes'+( filtro==='todos'?'':' con este estado')+'</div>';
     return;
   }
   const statusInfo = {
-    borrador:      { label:'Borrador',           color:'var(--ts)',    icon:'✏️' },
-    enviado:       { label:'⏳ Pendiente revisión',color:'var(--gold)', icon:'⏳' },
-    rechazado:     { label:'❌ Rechazado',         color:'var(--red)',  icon:'❌' },
-    aprobado_popo: { label:'🔍 En revisión Roshi', color:'var(--blue)', icon:'🔍' },
-    aprobado_memo: { label:'✅ Aprobado',           color:'var(--green)',icon:'✅' },
+    borrador:      { label:'Borrador',           color:'var(--ts)',    icon:'⎘' },
+    enviado:       { label:'Pendiente revisión',color:'var(--gold)', icon:'⏳' },
+    rechazado:     { label:'Rechazado',         color:'var(--red)',  icon:'❌' },
+    aprobado_popo: { label:'En revisión Roshi', color:'var(--blue)', icon:'🔍' },
+    aprobado_memo: { label:'Aprobado',           color:'var(--green)',icon:'✅' },
   };
   list.innerHTML = filtrada.map(r => {
     const s = statusInfo[r.status]||{label:r.status,color:'var(--ts)',icon:'📄'};
@@ -6451,7 +6627,7 @@ function renderMTReportes(lista, filtro) {
       <div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;margin-top:8px">
         <button class="btn btn-ghost btn-sm" onclick="mtVerDetalleReporte('${r.id}')" style="font-family:'JetBrains Mono',monospace;font-size:10px">VER DETALLE ↓</button>
         ${btns}
-        <button class="btn btn-red btn-sm" onclick="mtEliminarReporte('${r.id}')" style="font-size:10px;opacity:.6" title="Eliminar reporte">🗑</button>
+        <button class="btn btn-red btn-sm" onclick="mtEliminarReporte('${r.id}')" style="font-size:10px;opacity:.6" title="Eliminar reporte">✕</button>
       </div>
       <!-- Detalle expandible -->
       <div id="mt-rep-det-${r.id}" style="display:none;margin-top:14px;padding-top:14px;border-top:1px solid var(--border)"></div>
@@ -6474,7 +6650,7 @@ function mtVerDetalleReporte(id) {
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;flex-wrap:wrap">
       <!-- Info coordi -->
       <div>
-        <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.12em;color:var(--ts);margin-bottom:10px">// COORDINADOR</div>
+        <div class="k-mono" style="margin-bottom:10px">// COORDINADOR</div>
         <div style="display:flex;align-items:center;gap:10px">
           <div style="width:36px;height:36px;border-radius:50%;background:var(--bg3);overflow:hidden;flex-shrink:0;display:flex;align-items:center;justify-content:center">
             ${coo.foto_url?`<img src="${coo.foto_url}" style="width:100%;height:100%;object-fit:cover">`:`<span style="font-family:'Zen Dots',sans-serif;font-size:13px;color:var(--orange)">${(coo.nombre||'?')[0]}</span>`}
@@ -6489,7 +6665,7 @@ function mtVerDetalleReporte(id) {
       </div>
       <!-- Info evento -->
       <div>
-        <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.12em;color:var(--ts);margin-bottom:10px">// EVENTO</div>
+        <div class="k-mono" style="margin-bottom:10px">// EVENTO</div>
         <div style="font-weight:700;font-size:15px">${ev.nombre||'—'}</div>
         <div style="font-size:12px;color:var(--ts)">${ev.artista?ev.artista+' · ':''}${ev.ciudad||''}</div>
         <div style="font-size:12px;color:var(--ts)">${ev.fecha?new Date(ev.fecha+'T12:00:00').toLocaleDateString('es-MX',{weekday:'long',day:'numeric',month:'long',year:'numeric'}):''}</div>
@@ -6499,7 +6675,7 @@ function mtVerDetalleReporte(id) {
     <!-- Kits -->
     ${kits.length ? `
     <div style="margin-top:16px">
-      <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.12em;color:var(--ts);margin-bottom:10px">// KITS</div>
+      <div class="k-mono" style="margin-bottom:10px">// KITS</div>
       <div class="table-wrap">
         <table>
           <thead><tr><th>Pieza</th><th>Sacados</th><th>Sobran</th><th>Recibido</th></tr></thead>
@@ -6516,7 +6692,7 @@ function mtVerDetalleReporte(id) {
     <!-- Gastos -->
     ${gastos.length ? `
     <div style="margin-top:16px">
-      <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.12em;color:var(--ts);margin-bottom:10px">// GASTOS</div>
+      <div class="k-mono" style="margin-bottom:10px">// GASTOS</div>
       <div class="table-wrap">
         <table>
           <thead><tr><th>Concepto</th><th style="text-align:right">Monto</th></tr></thead>
@@ -6527,7 +6703,7 @@ function mtVerDetalleReporte(id) {
       </div>
     </div>` : '<div style="margin-top:12px;font-size:11px;color:var(--ts);font-family:JetBrains Mono,monospace">// sin gastos registrados</div>'}
 
-    ${r.notas?`<div style="margin-top:12px;padding:10px 14px;background:var(--bg3);border-left:2px solid var(--border2);font-size:12px;color:var(--ts)">📝 ${r.notas}</div>`:''}
+    ${r.notas?`<div style="margin-top:12px;padding:10px 14px;background:var(--bg3);border-left:2px solid var(--border2);font-size:12px;color:var(--ts)">${r.notas}</div>`:''}
   `;
   el.style.display = 'block';
 }
@@ -6668,7 +6844,7 @@ function renderMTDeudas(lista, filtro) {
   const totalPend = lista.filter(d=>!d.pagado).reduce((s,d)=>s+(d.monto||0), 0);
 
   if (!filtrada.length) {
-    list.innerHTML = `<div class="empty-state"><div class="empty-icon">💰</div>Sin deudas ${filtro==='pendientes'?'pendientes':filtro}</div>`;
+    list.innerHTML = `<div class="empty-state"><div class="empty-icon">·</div>Sin deudas ${filtro==='pendientes'?'pendientes':filtro}</div>`;
     return;
   }
 
@@ -6698,13 +6874,13 @@ function renderMTDeudas(lista, filtro) {
         ${g.deudas.map(d => `
           <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-top:1px solid var(--border);flex-wrap:wrap;gap:8px">
             <div style="flex:1;min-width:200px">
-              <div style="font-size:13px">${d.concepto}${d.tipo==='kit_perdido'?' 🎒':''}</div>
+              <div style="font-size:13px">${d.concepto}</div>
               <div style="font-size:10px;color:var(--ts);font-family:'JetBrains Mono',monospace">${d._evento?.nombre||''} · ${new Date(d.created_at).toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric'})}</div>
             </div>
             <div style="font-family:'Zen Dots',sans-serif;font-size:14px;color:${d.pagado?'var(--green)':'var(--red)'}">${formatMXN(d.monto)}</div>
             <div style="display:flex;gap:6px">
               ${!d.pagado ? `<button class="btn btn-primary btn-sm" onclick="marcarDeudaPagada('${d.id}')" style="font-size:10px">✓ Pagada</button>` : '<span style="font-size:11px;color:var(--green)">✓ Pagada</span>'}
-              <button class="btn btn-red btn-sm" onclick="eliminarDeuda('${d.id}')" style="font-size:10px;opacity:.5">🗑</button>
+              <button class="btn btn-red btn-sm" onclick="eliminarDeuda('${d.id}')" style="font-size:10px;opacity:.5">✕</button>
             </div>
           </div>
         `).join('')}
@@ -6782,7 +6958,7 @@ async function loadMTResumen() {
 
       <!-- Usuarios por rol -->
       <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:16px 20px;margin-bottom:16px">
-        <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.12em;color:var(--ts);margin-bottom:14px">// EQUIPO POR ROL</div>
+        <div class="k-mono" style="margin-bottom:14px">// EQUIPO POR ROL</div>
         <div style="display:flex;gap:10px;flex-wrap:wrap">
           ${Object.entries(porRol).map(([rol,count]) =>
             `<div style="text-align:center;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:10px 16px;min-width:90px">
@@ -6795,7 +6971,7 @@ async function loadMTResumen() {
 
       <!-- Próximos eventos -->
       <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:16px 20px">
-        <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.12em;color:var(--ts);margin-bottom:14px">// PRÓXIMOS EVENTOS</div>
+        <div class="k-mono" style="margin-bottom:14px">// PRÓXIMOS EVENTOS</div>
         ${eventos.length ? eventos.map(e => {
           const f = new Date(e.fecha+'T12:00:00');
           const hoy = new Date(); hoy.setHours(0,0,0,0);
@@ -6849,9 +7025,9 @@ function renderMTUsuarios(lista) {
       </div>
       <div style="display:flex;gap:6px;flex-wrap:wrap">
         <button class="btn btn-ghost btn-sm" onclick="abrirVerComo('${u.id}','${u.rol}')" style="font-size:10px;font-family:'JetBrains Mono',monospace">👁 Ver como</button>
-        <button class="btn btn-ghost btn-sm" onclick="abrirEditarUsuarioMT('${u.id}')" style="font-size:10px">✏️ Editar</button>
+        <button class="btn btn-ghost btn-sm" onclick="abrirEditarUsuarioMT('${u.id}')" style="font-size:10px">⎘ Editar</button>
         <button class="btn ${u.activo?'btn-red':'btn-green'} btn-sm" onclick="toggleActivoUsuario('${u.id}',${u.activo})" style="font-size:10px">${u.activo?'Desactivar':'Activar'}</button>
-        <button class="btn btn-red btn-sm" onclick="eliminarUsuarioMT('${u.id}','${u.nombre.replace(/'/g,"\\'")}','${u.rol}')" style="font-size:10px;opacity:.7" title="Eliminar permanentemente">🗑</button>
+        <button class="btn btn-red btn-sm" onclick="eliminarUsuarioMT('${u.id}','${u.nombre.replace(/'/g,"\\'")}','${u.rol}')" style="font-size:10px;opacity:.7" title="Eliminar permanentemente">✕</button>
       </div>
     </div>`).join('');
 }
@@ -6919,7 +7095,7 @@ function abrirEditarUsuarioMT(id) {
         </div>
         <!-- Tabs extra -->
         <div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border)">
-          <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.12em;color:var(--ts);margin-bottom:10px">// PERMISOS EXTRA DE TABS</div>
+          <div class="k-mono" style="margin-bottom:10px">// PERMISOS EXTRA DE TABS</div>
           <div style="font-size:11px;color:var(--ts);margin-bottom:8px">Tabs adicionales que puede ver (además de las de su rol):</div>
           <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px">
             ${todasTabs.map(t=>`<label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:12px;padding:5px 10px;border:1px solid var(--border);border-radius:5px;background:${tabsExtra.includes(t)?'rgba(255,107,0,.1)':'transparent'}">
@@ -7041,7 +7217,7 @@ async function loadMTStrikes() {
 
     list.innerHTML = `
       <div style="margin-bottom:20px">
-        <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.12em;color:var(--ts);margin-bottom:12px">// USUARIOS CON STRIKES</div>
+        <div class="k-mono" style="margin-bottom:12px">// USUARIOS CON STRIKES</div>
         ${conStrikes.length ? conStrikes.map(u => {
           const col = u.strikes >= 3 ? 'var(--red)' : u.strikes >= 2 ? 'var(--orange)' : 'var(--gold)';
           return `<div style="background:var(--bg2);border:1px solid var(--border);border-left:3px solid ${col};border-radius:var(--radius);padding:14px 18px;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
@@ -7060,7 +7236,7 @@ async function loadMTStrikes() {
         }).join('') : '<div style="font-size:12px;color:var(--green);padding:12px">✅ Nadie tiene strikes</div>'}
       </div>
       <div>
-        <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.12em;color:var(--ts);margin-bottom:12px">// PONER STRIKE A CUALQUIER USUARIO</div>
+        <div class="k-mono" style="margin-bottom:12px">// PONER STRIKE A CUALQUIER USUARIO</div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
           <div class="form-group" style="margin:0">
             <label>Usuario</label>
@@ -7120,7 +7296,7 @@ async function aplicarStrike(userId, nombre, strikesActuales, motivo) {
          <p><strong>Motivo:</strong> ${motivo}</p>
          <p><strong>Strikes acumulados:</strong> ${nuevos}/3</p>
          ${nuevos >= 2 ? `<p style="color:#FF4444"><strong>⚠️ Advertencia:</strong> Al llegar a 3 strikes tu cuenta será suspendida.</p>` : ''}
-         ${nuevos >= 3 ? `<p style="color:#FF4444"><strong>🚫 Tu cuenta ha sido suspendida.</strong></p>` : ''}`
+         ${nuevos >= 3 ? `<p style="color:#FF4444"><strong>Tu cuenta ha sido suspendida.</strong></p>` : ''}`
       );
     }
     // Alerta a Memo si llegó a 2 o 3
@@ -7150,7 +7326,7 @@ async function loadMTAlertas() {
   try {
     const alertas = await db.get('sistema_alertas', '?order=created_at.desc&limit=50').catch(()=>[]);
     if (!alertas.length) {
-      list.innerHTML = '<div class="empty-state"><div class="empty-icon">🔔</div>Sin alertas recientes</div>';
+      list.innerHTML = '<div class="empty-state"><div class="empty-icon">·</div>Sin alertas recientes</div>';
       return;
     }
     const tipoInfo = {
@@ -7272,7 +7448,7 @@ async function enviarAlertaMemo(tipo, datos = {}) {
         break;
       case 'reporte_rechazado':
         mensaje = `Mister Popo rechazó el reporte de ${datos.coordi||'un coordi'}${datos.motivo?': '+datos.motivo:''}`;
-        emailSubject = `📋 Reporte rechazado por Mister Popo`;
+        emailSubject = `Reporte rechazado por Mister Popo`;
         emailBody = `<p>Mister Popo rechazó el reporte post-evento de <strong>${datos.coordi}</strong>.</p>${datos.motivo?`<p><strong>Motivo:</strong> ${datos.motivo}</p>`:''}`;
         break;
       case 'nuevo_usuario':
@@ -7292,7 +7468,7 @@ async function enviarAlertaMemo(tipo, datos = {}) {
         break;
       default:
         mensaje = JSON.stringify(datos);
-        emailSubject = `🔔 Alerta Kamehouse: ${tipo}`;
+        emailSubject = `Alerta Kamehouse: ${tipo}`;
         emailBody = `<p>${mensaje}</p>`;
     }
     await db.post('sistema_alertas', {
@@ -7392,12 +7568,12 @@ function renderReportes(lista, filtro) {
   const filtrada = filtro === 'todos' ? lista : lista.filter(r => r.status === filtro);
 
   if (!filtrada.length) {
-    container.innerHTML = `<div class="empty-state" style="margin-top:40px"><div class="empty-icon">📋</div>Sin reportes${filtro === 'todos' ? '' : ' con este estado'}</div>`;
+    container.innerHTML = `<div class="empty-state" style="margin-top:40px"><div class="empty-icon">·</div>Sin reportes${filtro === 'todos' ? '' : ' con este estado'}</div>`;
     return;
   }
 
   const statusInfo = {
-    borrador:       { label:'Borrador',          color:'var(--ts)',    icon:'✏️' },
+    borrador:       { label:'Borrador',          color:'var(--ts)',    icon:'⎘' },
     enviado:        { label:'Pendiente revisión', color:'var(--gold)',  icon:'⏳' },
     rechazado:      { label:'Rechazado',          color:'var(--red)',   icon:'❌' },
     aprobado_popo:  { label:'En revisión Roshi',  color:'var(--blue)',  icon:'🔍' },
@@ -7792,7 +7968,7 @@ async function ejecutarAprobacionFinal(id, reporte) {
   const dif = reporte?.diferencia || 0;
   const clabe = reporte?.cuenta_bancaria_coordi || 'no registrada';
   if (dif > 0) {
-    alert(`✅ Aprobado y stock actualizado.\n\n💰 Sobró ${formatMXN(dif)}.\nEl coordi debe regresar ese dinero a tu cuenta.`);
+    alert(`✅ Aprobado y stock actualizado.\n\nSobró ${formatMXN(dif)}.\nEl coordi debe regresar ese dinero a tu cuenta.`);
   } else if (dif < 0) {
     alert(`✅ Aprobado y stock actualizado.\n\n⚠️ El coordi gastó ${formatMXN(Math.abs(dif))} de más.\nDepositar a: ${clabe}`);
   } else {

@@ -1,0 +1,9 @@
+# netlify.toml — agregar esta sección a tu netlify.toml existente
+# Si NO tienes netlify.toml en tu repo, sube este archivo completo a la raíz
+
+[functions]
+  node_bundler = "esbuild"
+
+[[functions]]
+  schedule = "0 0 * * *"
+  name = "check-strikes-diario"

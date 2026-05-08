@@ -1227,7 +1227,9 @@ tr:hover td{background:rgba(255,107,0,.03)}
       <!-- Tabs -->
       <div style="display:flex;gap:6px;margin:16px 0;flex-wrap:wrap;border-bottom:1px solid var(--border);padding-bottom:12px">
        <button class="gz-filter active" id="mt-tab-btn-resumen" onclick="showMTTab('resumen',this)">// Resumen</button>
+       <button class="gz-filter" id="mt-tab-btn-pendientes" onclick="showMTTab('pendientes',this)">// Pendientes</button>
        <button class="gz-filter" id="mt-tab-btn-reportes" onclick="showMTTab('reportes',this)">// Reportes</button>
+       <button class="gz-filter" id="mt-tab-btn-deudas" onclick="showMTTab('deudas',this)">// Deudas</button>
        <button class="gz-filter" id="mt-tab-btn-usuarios" onclick="showMTTab('usuarios',this)">// Usuarios</button>
        <button class="gz-filter" id="mt-tab-btn-strikes" onclick="showMTTab('strikes',this)">// Strikes</button>
        <button class="gz-filter" id="mt-tab-btn-alertas" onclick="showMTTab('alertas',this)">// Alertas</button>
@@ -1237,6 +1239,21 @@ tr:hover td{background:rgba(255,107,0,.03)}
       <!-- TAB: Resumen del sistema -->
       <div id="mt-tab-resumen">
        <div id="mt-resumen-content"><div class="loading-state"><div class="spinner"></div>Cargando…</div></div>
+      </div>
+
+      <!-- TAB: Pendientes (cuenta regresiva) -->
+      <div id="mt-tab-pendientes" style="display:none">
+       <div id="mt-pendientes-content"><div class="loading-state"><div class="spinner"></div>Calculando…</div></div>
+      </div>
+
+      <!-- TAB: Deudas -->
+      <div id="mt-tab-deudas" style="display:none">
+       <div style="display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap;border-bottom:1px solid var(--border);padding-bottom:12px">
+        <button class="gz-filter active" id="mtd-fil-pendientes" onclick="filtrarMTDeudas('pendientes',this)">// pendientes</button>
+        <button class="gz-filter" id="mtd-fil-pagadas" onclick="filtrarMTDeudas('pagadas',this)">// pagadas</button>
+        <button class="gz-filter" id="mtd-fil-todas" onclick="filtrarMTDeudas('todas',this)">// todas</button>
+       </div>
+       <div id="mt-deudas-list"><div class="loading-state"><div class="spinner"></div>Cargando…</div></div>
       </div>
 
       <!-- TAB: Reportes -->
@@ -5630,7 +5647,20 @@ async function abrirModalAsignarCoordi() {
   // Excluir ya asignados
   const asignadosIds = _ccAsignados.map(a=>a.coordi_id);
   usuarios = usuarios.filter(u => rolesAsignables.includes(u.rol) && !asignadosIds.includes(u.id));
-  const opts = usuarios.map(u=>`<option value="${u.id}">${u.nombre} · ${u.rol}</option>`).join('');
+  // Cargar deudas pendientes de cada usuario para advertir
+  const deudasPend = await db.get('deudas_coordi', '?pagado=eq.false&select=coordi_id,monto').catch(()=>[]);
+  const deudasPorUser = {};
+  deudasPend.forEach(d => {
+    if (!deudasPorUser[d.coordi_id]) deudasPorUser[d.coordi_id] = 0;
+    deudasPorUser[d.coordi_id] += (d.monto||0);
+  });
+
+  const opts = usuarios.map(u => {
+    const deuda = deudasPorUser[u.id]||0;
+    const warn = deuda > 0 ? ` ⚠ debe ${formatMXN(deuda)}` : '';
+    const strike = u.strikes >= 2 ? ` ⚠ ${u.strikes} strikes` : '';
+    return `<option value="${u.id}">${u.nombre} · ${u.rol}${warn}${strike}</option>`;
+  }).join('');
   document.getElementById('modal-asignar-coordi').innerHTML = `
     <div class="modal" style="max-width:480px">
       <div class="modal-header">
@@ -6324,15 +6354,19 @@ let _mtConfig = {};
 // ── Tabs ────────────────────────────────────────────────────
 let _mtReportesCache = [];
 let _mtReportesFiltro = 'todos';
+let _mtDeudasCache = [];
+let _mtDeudasFiltro = 'pendientes';
 
 function showMTTab(tab, btn) {
   document.querySelectorAll('#page-montana .gz-filter[id^="mt-tab-btn"]').forEach(b => b.classList.remove('active'));
   if (btn) btn.classList.add('active');
-  ['resumen','reportes','usuarios','strikes','alertas','config'].forEach(t => {
+  ['resumen','pendientes','reportes','deudas','usuarios','strikes','alertas','config'].forEach(t => {
     const el = document.getElementById(`mt-tab-${t}`);
     if (el) el.style.display = t === tab ? '' : 'none';
   });
-  if (tab === 'reportes') loadMTReportes();
+  if (tab === 'reportes')   loadMTReportes();
+  if (tab === 'pendientes') loadMTPendientes();
+  if (tab === 'deudas')     loadMTDeudas();
 }
 
 async function loadMontana() {
@@ -6496,6 +6530,202 @@ function mtVerDetalleReporte(id) {
     ${r.notas?`<div style="margin-top:12px;padding:10px 14px;background:var(--bg3);border-left:2px solid var(--border2);font-size:12px;color:var(--ts)">📝 ${r.notas}</div>`:''}
   `;
   el.style.display = 'block';
+}
+
+// ── PENDIENTES (cuenta regresiva) ────────────────────────────
+async function loadMTPendientes() {
+  const el = document.getElementById('mt-pendientes-content');
+  if (!el) return;
+  el.innerHTML = '<div class="loading-state"><div class="spinner"></div></div>';
+  try {
+    const ahora = new Date();
+    const [reportes, eventosCoordi] = await Promise.all([
+      db.get('reportes_evento', '?status=eq.aprobado_memo&select=*'),
+      db.get('eventos_coordi', '?status=eq.aceptado&select=*'),
+    ]);
+
+    // Cargar eventos y usuarios
+    const eIds = [...new Set([...reportes.map(r=>r.evento_id), ...eventosCoordi.map(e=>e.evento_id)].filter(Boolean))];
+    const uIds = [...new Set([...reportes.map(r=>r.coordi_id), ...eventosCoordi.map(e=>e.coordi_id)].filter(Boolean))];
+    const [evs, usuarios] = await Promise.all([
+      eIds.length ? db.get('eventos', `?id=in.(${eIds.join(',')})`) : [],
+      uIds.length ? db.get('usuarios', `?id=in.(${uIds.join(',')})`) : [],
+    ]);
+    const evMap = Object.fromEntries(evs.map(e=>[e.id,e]));
+    const uMap  = Object.fromEntries(usuarios.map(u=>[u.id,u]));
+
+    // ── 1) Reportes pendientes de levantar (evento ya pasó) ──
+    const reportesPendientes = [];
+    for (const ec of eventosCoordi) {
+      const ev = evMap[ec.evento_id];
+      if (!ev || !ev.fecha) continue;
+      const fechaEv = new Date(ev.fecha+'T12:00:00');
+      if (fechaEv > ahora) continue; // evento futuro
+      // ¿ya hay reporte enviado?
+      const yaTieneReporte = reportes.some(r => r.evento_id===ec.evento_id && r.coordi_id===ec.coordi_id) ||
+        await db.get('reportes_evento', `?evento_id=eq.${ec.evento_id}&coordi_id=eq.${ec.coordi_id}&status=in.(enviado,aprobado_popo,aprobado_memo)`).then(r=>r.length>0).catch(()=>false);
+      if (yaTieneReporte) continue;
+      const horasDesde = (ahora - fechaEv) / (1000*60*60);
+      const horasRestantes = 48 - horasDesde;
+      reportesPendientes.push({
+        coordi: uMap[ec.coordi_id],
+        evento: ev,
+        horasRestantes,
+        vencido: horasRestantes < 0,
+      });
+    }
+
+    // ── 2) Devoluciones pendientes ──
+    const devolPendientes = [];
+    for (const r of reportes) {
+      if (!r.fecha_aprobado) continue;
+      const kits = r.kits_detalle ? (typeof r.kits_detalle==='string'?JSON.parse(r.kits_detalle):r.kits_detalle) : [];
+      const sobrantes = kits.filter(k => (k.cantidad_sobrante||0) > 0 && !k.recibido);
+      if (!sobrantes.length) continue;
+      const fechaApr = new Date(r.fecha_aprobado);
+      const diasDesde = (ahora - fechaApr) / (1000*60*60*24);
+      const diasRestantes = 5 - diasDesde;
+      devolPendientes.push({
+        coordi: uMap[r.coordi_id],
+        evento: evMap[r.evento_id],
+        sobrantes,
+        diasRestantes,
+        vencido: diasRestantes < 0,
+        reporteId: r.id,
+      });
+    }
+
+    el.innerHTML = `
+      <div style="margin-bottom:24px">
+        <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.12em;color:var(--ts);margin-bottom:12px">// REPORTES PENDIENTES (límite 48 hrs)</div>
+        ${reportesPendientes.length ? reportesPendientes.map(p => {
+          const col = p.vencido ? 'var(--red)' : p.horasRestantes < 12 ? 'var(--orange)' : 'var(--gold)';
+          const lbl = p.vencido ? `⚠ VENCIDO HACE ${Math.floor(Math.abs(p.horasRestantes))}h` : `${Math.floor(p.horasRestantes)}h restantes`;
+          return `<div style="background:var(--bg2);border:1px solid var(--border);border-left:3px solid ${col};border-radius:var(--radius);padding:12px 18px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
+            <div>
+              <div style="font-weight:700;font-size:14px">${p.coordi?.nombre||'—'}</div>
+              <div style="font-size:11px;color:var(--ts);font-family:'JetBrains Mono',monospace">${p.evento?.nombre||''} · ${p.evento?.fecha?new Date(p.evento.fecha+'T12:00:00').toLocaleDateString('es-MX',{day:'2-digit',month:'short'}):''}</div>
+            </div>
+            <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:${col};font-weight:700">${lbl}</div>
+          </div>`;
+        }).join('') : '<div style="font-size:12px;color:var(--green)">✅ Sin reportes pendientes</div>'}
+      </div>
+
+      <div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.12em;color:var(--ts);margin-bottom:12px">// SOBRANTES POR DEVOLVER (límite 5 días)</div>
+        ${devolPendientes.length ? devolPendientes.map(d => {
+          const col = d.vencido ? 'var(--red)' : d.diasRestantes < 1 ? 'var(--orange)' : 'var(--gold)';
+          const lbl = d.vencido ? `⚠ VENCIDO HACE ${Math.floor(Math.abs(d.diasRestantes))}d` : `${Math.ceil(d.diasRestantes)}d restantes`;
+          return `<div style="background:var(--bg2);border:1px solid var(--border);border-left:3px solid ${col};border-radius:var(--radius);padding:12px 18px;margin-bottom:8px">
+            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
+              <div>
+                <div style="font-weight:700;font-size:14px">${d.coordi?.nombre||'—'}</div>
+                <div style="font-size:11px;color:var(--ts);font-family:'JetBrains Mono',monospace">${d.evento?.nombre||''}</div>
+              </div>
+              <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:${col};font-weight:700">${lbl}</div>
+            </div>
+            <div style="margin-top:8px;font-size:11px;color:var(--ts)">Pendiente: ${d.sobrantes.map(s=>`${s.pieza_nombre||'kit'} ×${s.cantidad_sobrante}`).join(', ')}</div>
+          </div>`;
+        }).join('') : '<div style="font-size:12px;color:var(--green)">✅ Sin devoluciones pendientes</div>'}
+      </div>`;
+  } catch(e) { el.innerHTML = `<div class="alert alert-error">${e.message}</div>`; }
+}
+
+// ── DEUDAS ───────────────────────────────────────────────────
+async function loadMTDeudas() {
+  const list = document.getElementById('mt-deudas-list');
+  if (!list) return;
+  list.innerHTML = '<div class="loading-state"><div class="spinner"></div></div>';
+  try {
+    _mtDeudasCache = await db.get('deudas_coordi', '?order=created_at.desc&limit=200').catch(()=>[]);
+    const uIds = [...new Set(_mtDeudasCache.map(d=>d.coordi_id).filter(Boolean))];
+    const eIds = [...new Set(_mtDeudasCache.map(d=>d.evento_id).filter(Boolean))];
+    const [usuarios, eventos] = await Promise.all([
+      uIds.length ? db.get('usuarios', `?id=in.(${uIds.join(',')})`) : [],
+      eIds.length ? db.get('eventos', `?id=in.(${eIds.join(',')})`) : [],
+    ]);
+    const uMap = Object.fromEntries(usuarios.map(u=>[u.id,u]));
+    const evMap = Object.fromEntries(eventos.map(e=>[e.id,e]));
+    _mtDeudasCache = _mtDeudasCache.map(d=>({...d, _coordi:uMap[d.coordi_id], _evento:evMap[d.evento_id]}));
+    renderMTDeudas(_mtDeudasCache, _mtDeudasFiltro);
+  } catch(e) { list.innerHTML = `<div class="alert alert-error">${e.message}</div>`; }
+}
+
+function filtrarMTDeudas(filtro, btn) {
+  _mtDeudasFiltro = filtro;
+  document.querySelectorAll('#mt-tab-deudas .gz-filter[id^="mtd-fil"]').forEach(b=>b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  renderMTDeudas(_mtDeudasCache, filtro);
+}
+
+function renderMTDeudas(lista, filtro) {
+  const list = document.getElementById('mt-deudas-list');
+  let filtrada = lista;
+  if (filtro === 'pendientes') filtrada = lista.filter(d=>!d.pagado);
+  if (filtro === 'pagadas')    filtrada = lista.filter(d=>d.pagado);
+
+  // Total pendiente
+  const totalPend = lista.filter(d=>!d.pagado).reduce((s,d)=>s+(d.monto||0), 0);
+
+  if (!filtrada.length) {
+    list.innerHTML = `<div class="empty-state"><div class="empty-icon">💰</div>Sin deudas ${filtro==='pendientes'?'pendientes':filtro}</div>`;
+    return;
+  }
+
+  // Agrupar por coordi
+  const porCoordi = {};
+  filtrada.forEach(d => {
+    const k = d.coordi_id;
+    if (!porCoordi[k]) porCoordi[k] = { coordi: d._coordi, deudas: [], total: 0 };
+    porCoordi[k].deudas.push(d);
+    if (!d.pagado) porCoordi[k].total += (d.monto||0);
+  });
+
+  list.innerHTML = `
+    <div style="background:rgba(255,68,68,.06);border:1px solid rgba(255,68,68,.2);border-radius:8px;padding:14px 18px;margin-bottom:16px">
+      <div style="font-size:11px;color:var(--ts);font-family:'JetBrains Mono',monospace;letter-spacing:.1em">// TOTAL PENDIENTE DE COBRO</div>
+      <div style="font-family:'Zen Dots',sans-serif;font-size:24px;color:var(--red);margin-top:4px">${formatMXN(totalPend)}</div>
+    </div>
+    ${Object.values(porCoordi).map(g => `
+      <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:14px 18px;margin-bottom:10px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:10px">
+          <div>
+            <div style="font-family:'Rajdhani',sans-serif;font-weight:700;font-size:16px">${g.coordi?.nombre||'—'}</div>
+            <div style="font-size:11px;color:var(--ts);font-family:'JetBrains Mono',monospace">${g.coordi?.correo||''}</div>
+          </div>
+          <div style="font-family:'Zen Dots',sans-serif;font-size:18px;color:var(--red)">${formatMXN(g.total)}</div>
+        </div>
+        ${g.deudas.map(d => `
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-top:1px solid var(--border);flex-wrap:wrap;gap:8px">
+            <div style="flex:1;min-width:200px">
+              <div style="font-size:13px">${d.concepto}${d.tipo==='kit_perdido'?' 🎒':''}</div>
+              <div style="font-size:10px;color:var(--ts);font-family:'JetBrains Mono',monospace">${d._evento?.nombre||''} · ${new Date(d.created_at).toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric'})}</div>
+            </div>
+            <div style="font-family:'Zen Dots',sans-serif;font-size:14px;color:${d.pagado?'var(--green)':'var(--red)'}">${formatMXN(d.monto)}</div>
+            <div style="display:flex;gap:6px">
+              ${!d.pagado ? `<button class="btn btn-primary btn-sm" onclick="marcarDeudaPagada('${d.id}')" style="font-size:10px">✓ Pagada</button>` : '<span style="font-size:11px;color:var(--green)">✓ Pagada</span>'}
+              <button class="btn btn-red btn-sm" onclick="eliminarDeuda('${d.id}')" style="font-size:10px;opacity:.5">🗑</button>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    `).join('')}`;
+}
+
+async function marcarDeudaPagada(id) {
+  if (!confirm('¿Marcar esta deuda como pagada?')) return;
+  try {
+    await db.patch('deudas_coordi', id, { pagado: true, fecha_pago: new Date().toISOString() });
+    await loadMTDeudas();
+  } catch(e) { alert(e.message); }
+}
+
+async function eliminarDeuda(id) {
+  if (!confirm('¿Eliminar esta deuda?')) return;
+  try {
+    await db.delete('deudas_coordi', id);
+    await loadMTDeudas();
+  } catch(e) { alert(e.message); }
 }
 
 async function mtAprobarReporte(id, desdeStatus) {
@@ -7532,7 +7762,10 @@ async function aprobarReportePopo(id) {
 
 // Función compartida — aprueba reporte y descuenta stock
 async function ejecutarAprobacionFinal(id, reporte) {
-  await db.patch('reportes_evento', id, { status: 'aprobado_memo' });
+  await db.patch('reportes_evento', id, {
+    status: 'aprobado_memo',
+    fecha_aprobado: new Date().toISOString()
+  });
   // Descontar kits del inventario
   const kits = reporte?.kits_detalle
     ? (typeof reporte.kits_detalle==='string' ? JSON.parse(reporte.kits_detalle) : reporte.kits_detalle)

@@ -629,6 +629,11 @@ tr:hover td{background:rgba(255,107,0,.03)}
  .metrics-grid{grid-template-columns:1fr 1fr}
  .metric-value{font-size:22px}
  .nav-btn{min-width:64px;padding:8px 10px}
+ .cot-paquete-grid{grid-template-columns:1fr 1fr!important}
+}
+@media(max-width:860px){
+ #cot-mode-preventa>div,#cot-mode-postevento>div{grid-template-columns:1fr!important}
+ .cot-staff-card>div[style*="grid-template-columns:1fr 1fr"]{grid-template-columns:1fr!important}
 }
 
 /* ═══════════════════════════════════════════════
@@ -2298,6 +2303,7 @@ let _karinPiezasCache = [];
 let recibosLoaded = false;
 let disenoLoaded = false;
 let _cotIniciado = false;
+let _recalcTimer = null;
 
 const PERMISOS_TABS = {
   maestro_roshi: ['resumen','pagos','eventos','gastos','ventas','inventario','reportes','capsule','equipo','cotizador','herramientas','montana'],
@@ -2491,7 +2497,9 @@ function showPage(name) {
  const navBtn = document.getElementById(`nav-${name}`);
  if (navBtn) {
    navBtn.classList.add('active');
-   actualizarLabelNavMobile(navBtn.textContent.trim());
+   const _ic = navBtn.querySelector('.nav-icon');
+   const _lb = _ic ? navBtn.textContent.replace(_ic.textContent,'').trim() : navBtn.textContent.trim();
+   actualizarLabelNavMobile(_lb || name.toUpperCase());
  }
  cerrarNavMobile();
  loadPage(name);
@@ -4076,6 +4084,10 @@ function actualizarHeaderEvento() {
 
 // ── CÁLCULO PRINCIPAL ──
 function recalcular() {
+  clearTimeout(_recalcTimer);
+  _recalcTimer = setTimeout(() => _recalcularCore(), 120);
+}
+function _recalcularCore() {
   actualizarHeaderEvento();
   renderKitTotal();
 
@@ -5558,12 +5570,13 @@ const TIPOS_EVENTO = {
 };
 
 async function loadCapsule() {
+  const _ccGrid = document.getElementById('cc-eventos-grid');
+  if (_ccGrid) _ccGrid.innerHTML = '<div class="loading-state"><div class="spinner"></div>Cargando eventos…</div>';
   try {
     _ccEventosCache = await db.get('eventos', '?order=fecha.desc&limit=200');
     renderCCEventos(_ccEventosCache, 'todos');
   } catch(e) {
-    const g = document.getElementById('cc-eventos-grid');
-    if (g) g.innerHTML = `<div class="alert alert-error">${e.message}</div>`;
+    if (_ccGrid) _ccGrid.innerHTML = `<div class="alert alert-error">${e.message}</div>`;
   }
 }
 
@@ -6153,6 +6166,30 @@ async function eliminarViajero(id) {
   catch(e) { alert(e.message); }
 }
 
+function _descargarBlob(contenido, nombreArchivo) {
+  const blob = new Blob([contenido], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = nombreArchivo;
+  document.body.appendChild(a); a.click();
+  setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 200);
+}
+function _abrirHTMLImprimible(htmlStr) {
+  try {
+    const win = window.open('','_blank');
+    if (!win || win.closed) throw new Error('blocked');
+    win.document.write(htmlStr);
+    win.document.close();
+    setTimeout(() => win.print(), 400);
+  } catch(e) {
+    const fr = document.createElement('iframe');
+    fr.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:1px;height:1px';
+    document.body.appendChild(fr);
+    fr.contentDocument.write(htmlStr);
+    fr.contentDocument.close();
+    setTimeout(() => { fr.contentWindow.print(); setTimeout(() => document.body.removeChild(fr), 2000); }, 400);
+  }
+}
 async function exportarViajeros(formato) {
   if (!_ccViajeros.length) { alert('No hay viajeros para exportar'); return; }
   const ev = _ccEventosCache.find(e => e.id === _ccEventoActual);
@@ -6384,7 +6421,7 @@ function actualizarOcupantesHab(tipo) {
   const container = document.getElementById('hab-ocupantes-container');
   if (!container) return;
   const cap = CAPACIDAD_HAB[tipo] || 1;
-  const habId = document.getElementById('hab-id')?.value || '__none__';
+  const habId = document.getElementById('hab-id')?.value || '';
   const yaAsig = new Set(
     _ccHabitaciones.filter(h=>h.id!==habId)
       .flatMap(h=>h.ocupantes?(typeof h.ocupantes==='string'?JSON.parse(h.ocupantes):h.ocupantes):[])
@@ -6539,6 +6576,8 @@ function showMTTab(tab, btn) {
 }
 
 async function loadMontana() {
+  const btnResumen = document.getElementById('mt-tab-btn-resumen');
+  showMTTab('resumen', btnResumen);
   await Promise.all([loadMTResumen(), loadMTUsuarios(), loadMTStrikes(), loadMTAlertas(), loadMTConfig()]);
 }
 

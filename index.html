@@ -930,10 +930,6 @@ src="https://www.facebook.com/tr?id=1685907946147007&ev=PageView&noscript=1"
   <a href="/funciona" class="faq-link-v2">¿Cómo funciona? <span aria-hidden="true">→</span></a>
   <a href="/faq" class="faq-link-v2">Preguntas frecuentes <span aria-hidden="true">→</span></a>
   <a href="/kit" class="faq-link-v2">Kit Conecta <span aria-hidden="true">→</span></a>
-  <div id="viajeros-counter" style="display:none;text-align:center;padding:28px 16px 20px;font-family:'Montserrat',sans-serif">
-    <div id="viajeros-num" style="font-size:56px;font-weight:900;color:#e8ff4c;line-height:1;letter-spacing:-.02em"></div>
-    <div id="viajeros-lbl" style="font-size:11px;font-weight:600;color:rgba(255,255,255,.45);text-transform:uppercase;letter-spacing:.15em;margin-top:8px"></div>
-  </div>
   <div class="catalog" id="catalog-anchor">
     <div id="search-bar" style="padding:12px 16px 4px">
   <div style="display:flex;gap:8px;margin-bottom:10px">
@@ -1073,7 +1069,7 @@ src="https://www.facebook.com/tr?id=1685907946147007&ev=PageView&noscript=1"
 
   <!-- PASO: TRANSPORTE (solo CDMX) -->
   <div class="wiz-card" id="w-transport-card" style="display:none">
-    <div class="wiz-lbl"><span class="wiz-num-badge" id="w-transport-n">5</span>¿Cómo llegarás al evento?</div>
+    <div class="wiz-lbl"><span class="wiz-num-badge" id="w-transport-n">5</span>¿Te gustaría agregar transporte a CDMX?</div>
     <div class="zona-grid" id="d-transport"></div>
   </div>
 
@@ -2127,7 +2123,6 @@ renderCatalog();
 filterEvents();
 buildMonthBar();
 refreshTop10();
-loadViajerosCounter();
 injectEventStructuredData();
 
 // SEO: structured data JSON-LD para todos los eventos upcoming (excluye pasados, agotados, listOnly).
@@ -2217,22 +2212,6 @@ function injectEventStructuredData(){
   s.type='application/ld+json';
   s.textContent=JSON.stringify(docs);
   document.head.appendChild(s);
-}
-
-function loadViajerosCounter(){
-  var SB_URL='https://lcffgrrwbbbgorooawyd.supabase.co';
-  var SB_KEY='sb_publishable_n5Hn_1CPKJSC2kLymO2BRw_0WnMXe3S';
-  var year=new Date().getFullYear();
-  fetch(SB_URL+'/rest/v1/viajeros_stats?year=eq.'+year+'&select=total',{
-    headers:{apikey:SB_KEY,Authorization:'Bearer '+SB_KEY}
-  }).then(function(r){return r.ok?r.json():null;}).then(function(rows){
-    if(!rows||!rows.length||!rows[0].total)return;
-    var total=rows[0].total;
-    var box=document.getElementById('viajeros-counter');
-    document.getElementById('viajeros-num').textContent=total.toLocaleString('es-MX');
-    document.getElementById('viajeros-lbl').textContent='viajeros en '+year;
-    box.style.display='block';
-  }).catch(function(){});
 }
 
 // How section toggle

@@ -39,5 +39,6 @@ window.STATIC_IMGS={
   'babymetal':'imgs/babymetal.jpg',
   'aperfectcircle':'imgs/aperfectcircle.webp',
   'edenmunoz':'imgs/edenmunoz.webp',
-  'beele':'imgs/beele.webp'
+  'beele':'imgs/beele.webp',
+  'arre':'imgs/arre.webp'
 };

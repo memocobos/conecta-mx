@@ -5,5 +5,6 @@
 window.LINEUPS={
   'machaca':'lineups/machaca.png',
   'emblema':'lineups/emblema.jpg',
-  'pulsolineup':'lineups/pulsolineup.jpg'
+  'pulsolineup':'lineups/pulsolineup.jpg',
+  'arre':'lineups/arre.webp'
 };

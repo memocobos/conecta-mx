@@ -815,6 +815,49 @@ tr:hover td{background:rgba(255,107,0,.03)}
 .rank-pts{font-family:'Zen Dots',cursive;font-size:20px;color:var(--text);line-height:1;text-align:right}
 .rank-row.top1 .rank-pts{color:var(--gold)}
 
+
+/* ═══════════════════════════════════════════════
+   TEMA XIMENA — Pink Cyber Kawaii Sanrio 🌸
+═══════════════════════════════════════════════ */
+body.tema-ximena {
+  --orange: #FF6BCB;
+  --orange2: #FFA8DC;
+  --gold: #FFB6E1;
+  --gold2: #FFD4EB;
+  --green: #FF85C8;
+  background:
+    radial-gradient(circle at 10% 20%, rgba(255,107,203,0.08) 0%, transparent 50%),
+    radial-gradient(circle at 90% 80%, rgba(255,184,225,0.06) 0%, transparent 50%),
+    #1a0f1c !important;
+}
+body.tema-ximena::before {
+  content: '✨ 💖 ⭐ 💕 🌸 ✨ 💖 ⭐ 💕 🌸 ✨ 💖 ⭐ 💕 🌸 ✨ 💖 ⭐ 💕 🌸';
+  position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+  font-size: 24px; opacity: 0.04; pointer-events: none; z-index: 0;
+  letter-spacing: 80px; line-height: 90px; word-spacing: 40px;
+  white-space: pre-wrap; overflow: hidden;
+}
+body.tema-ximena .topbar { background: linear-gradient(135deg, #2a1530 0%, #1a0f1c 100%) !important; border-bottom: 2px solid #FF6BCB !important; }
+body.tema-ximena .topbar-brand { color: #FFB6E1 !important; text-shadow: 0 0 10px rgba(255,107,203,0.5); }
+body.tema-ximena .nav-btn:hover, body.tema-ximena .nav-btn.active { background: linear-gradient(135deg, #FF6BCB, #FFA8DC) !important; color: #fff !important; box-shadow: 0 0 16px rgba(255,107,203,0.5); border-radius: 14px !important; }
+body.tema-ximena .k-card, body.tema-ximena .perfil-card, body.tema-ximena .gz-card { background: linear-gradient(135deg, rgba(42,21,48,0.95), rgba(26,15,28,0.95)) !important; border: 1px solid rgba(255,107,203,0.3) !important; border-radius: 20px !important; }
+body.tema-ximena .k-card:hover, body.tema-ximena .gz-card:hover { border-color: #FF6BCB !important; box-shadow: 0 8px 24px rgba(255,107,203,0.25); transform: translateY(-2px); transition: all 0.3s; }
+body.tema-ximena .btn-primary, body.tema-ximena .login-btn { background: linear-gradient(135deg, #FF6BCB 0%, #FFA8DC 100%) !important; border-radius: 16px !important; box-shadow: 0 4px 14px rgba(255,107,203,0.4); border: none !important; font-weight: 600; color: #fff !important; }
+body.tema-ximena .btn-primary:hover, body.tema-ximena .login-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(255,107,203,0.6); }
+body.tema-ximena .btn-ghost { border-radius: 14px !important; border-color: rgba(255,182,225,0.4) !important; color: #FFB6E1 !important; }
+body.tema-ximena .btn-ghost:hover { background: rgba(255,107,203,0.15) !important; border-color: #FF6BCB !important; }
+body.tema-ximena h1, body.tema-ximena h2, body.tema-ximena h3, body.tema-ximena .page-title { color: #FFB6E1 !important; text-shadow: 0 0 12px rgba(255,107,203,0.4); }
+body.tema-ximena .stat-number, body.tema-ximena .gz-stat-num { color: #FF6BCB !important; text-shadow: 0 0 10px rgba(255,107,203,0.5); }
+body.tema-ximena input, body.tema-ximena select, body.tema-ximena textarea, body.tema-ximena .cot-input { border-radius: 12px !important; border-color: rgba(255,182,225,0.3) !important; background: rgba(42,21,48,0.5) !important; }
+body.tema-ximena input:focus, body.tema-ximena select:focus, body.tema-ximena textarea:focus, body.tema-ximena .cot-input:focus { border-color: #FF6BCB !important; box-shadow: 0 0 0 3px rgba(255,107,203,0.2) !important; }
+body.tema-ximena table th { color: #FFB6E1 !important; border-bottom: 2px solid rgba(255,107,203,0.3) !important; }
+body.tema-ximena .modal-content { border-radius: 24px !important; border: 1px solid rgba(255,107,203,0.4) !important; }
+body.tema-ximena ::selection { background: #FF6BCB !important; color: #fff !important; }
+body.tema-ximena .perfil-card-header { background: linear-gradient(135deg, rgba(255,107,203,0.15), rgba(255,168,220,0.05)) !important; }
+body.tema-ximena .gz-stat-bar { background: linear-gradient(90deg, #FF6BCB, #FFB6E1) !important; }
+body.tema-ximena .tour-item { border-left-color: #FF6BCB !important; border-radius: 14px !important; }
+body.tema-ximena .alert-success { background: linear-gradient(135deg, rgba(255,133,200,0.15), rgba(255,182,225,0.1)) !important; border-color: #FF85C8 !important; color: #FFB6E1 !important; border-radius: 14px !important; }
+
 </style>
 </head>
 <body>
@@ -2407,7 +2450,25 @@ function enterApp() {
   const roleLabels = { maestro_roshi:'Maestro Roshi', bulma:'Bulma', mister_popo:'Mister Popo', coordinador:'Coordinador', cc:'CC', vendedor:'Vendedor' };
   document.getElementById('topbar-user-info').textContent = `${currentUser.nombre} · ${roleLabels[currentUser.rol] || currentUser.rol}`;
   aplicarPermisosUI();
+  aplicarTemaCoordi();
   bootApp();
+}
+
+
+// ── SISTEMA DE TEMAS POR COORDI ──
+function aplicarTemaCoordi() {
+  if (!currentUser) return;
+  const nombre = (currentUser.nombre || '').toLowerCase().trim();
+  // Mapa: nombre del coordi → clase CSS del tema
+  const temas = {
+    'ximena payán': 'tema-ximena',
+    'ximena payan': 'tema-ximena',
+  };
+  // Limpiar temas previos
+  document.body.className = document.body.className.replace(/\btema-\w+/g, '').trim();
+  // Aplicar tema si existe
+  const clase = temas[nombre];
+  if (clase) document.body.classList.add(clase);
 }
 
 function aplicarPermisosUI() {

@@ -3446,16 +3446,25 @@ async function guardarKit() {
 }
 
 async function editarKit(id) {
- try {
- const [item] = await db.get('kits_inventario', `?id=eq.${id}`);
- document.getElementById('kit-id').value = item.id;
- document.getElementById('kit-pieza').value = item.pieza;
- document.getElementById('kit-cantidad').value = item.cantidad;
- document.getElementById('kit-costo').value = item.costo_unitario;
- document.getElementById('kit-minimo').value = item.stock_minimo;
- document.getElementById('kit-proveedor').value = item.proveedor || '';
- openModal('modal-kit');
- } catch(e) { alert(e.message); }
+  // Limpiar form y abrir modal primero
+  document.getElementById('kit-id').value = '';
+  document.getElementById('kit-pieza').value = '';
+  document.getElementById('kit-cantidad').value = '';
+  document.getElementById('kit-costo').value = '';
+  document.getElementById('kit-minimo').value = '';
+  document.getElementById('kit-proveedor').value = '';
+  openModal('modal-kit');
+  try {
+    const [item] = await db.get('kits_inventario', `?id=eq.${id}`);
+    if (!item) { closeModal('modal-kit'); showToast('Kit no encontrado'); return; }
+    // Llenar con datos reales
+    document.getElementById('kit-id').value = item.id;
+    document.getElementById('kit-pieza').value = item.pieza;
+    document.getElementById('kit-cantidad').value = item.cantidad;
+    document.getElementById('kit-costo').value = item.costo_unitario;
+    document.getElementById('kit-minimo').value = item.stock_minimo || 0;
+    document.getElementById('kit-proveedor').value = item.proveedor || '';
+  } catch(e) { closeModal('modal-kit'); showToast(e.message); }
 }
 
 async function eliminarKit(id) {

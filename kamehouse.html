@@ -2698,14 +2698,14 @@ async function doLogin() {
     const campo = correo.includes('@') ? `correo=eq.${encodeURIComponent(correo)}` : `username=eq.${encodeURIComponent(correo)}`;
     const resp = await fetch(
       `${SB_URL}/rest/v1/usuarios?${campo}&activo=eq.true&select=id,correo,nombre,rol,strikes,username,permisos_extra&limit=1`,
-      { headers: { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}` } }
+      { headers: { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY } }
     );
     const usuarios = await resp.json();
     if (!usuarios || usuarios.length === 0) throw new Error('Usuario no encontrado');
     const u = usuarios[0];
     const respPass = await fetch(
       `${SB_URL}/rest/v1/usuarios?id=eq.${u.id}&password_hash=eq.${encodeURIComponent(pass)}&select=id&limit=1`,
-      { headers: { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}` } }
+      { headers: { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY } }
     );
     const check = await respPass.json();
     if (!check || check.length === 0) throw new Error('Contraseña incorrecta');
@@ -2713,7 +2713,7 @@ async function doLogin() {
     sessionStorage.setItem(SESSION_KEY, JSON.stringify({ user: u, expires: Date.now() + SESSION_HOURS * 3600000 }));
     fetch(`${SB_URL}/rest/v1/usuarios?id=eq.${u.id}`, {
       method: 'PATCH',
-      headers: { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}`, 'Content-Type': 'application/json' },
+      headers: { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY, 'Content-Type': 'application/json' },
       body: JSON.stringify({ ultimo_acceso: new Date().toISOString() })
     }).catch(() => {});
     enterApp();
@@ -2831,7 +2831,7 @@ if (loginUserEl) loginUserEl.addEventListener('keydown', e => { if (e.key === 'E
 const db = {
  headers: {
  'apikey': SB_KEY,
- 'Authorization': `Bearer ${SB_KEY}`,
+ 'Authorization': 'Bearer ' + SB_KEY,
  'Content-Type': 'application/json',
  'Prefer': 'return=representation'
  },
@@ -5117,7 +5117,7 @@ async function gestionarStrikes(userId, nombre, strikesActuales) {
   try {
     await fetch(`${SB_URL}/rest/v1/usuarios?id=eq.${userId}`, {
       method: 'PATCH',
-      headers: { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}`, 'Content-Type': 'application/json' },
+      headers: { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY, 'Content-Type': 'application/json' },
       body: JSON.stringify({ strikes: nuevo })
     });
     try {
@@ -5146,7 +5146,7 @@ async function confirmarEliminar(userId, nombre) {
   try {
     await fetch(`${SB_URL}/rest/v1/usuarios?id=eq.${userId}`, {
       method: 'PATCH',
-      headers: { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}`, 'Content-Type': 'application/json' },
+      headers: { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY, 'Content-Type': 'application/json' },
       body: JSON.stringify({ activo: false })
     });
     await loadEquipo();
@@ -5159,7 +5159,7 @@ async function resetearPassword(userId, nombre) {
   try {
     await fetch(`${SB_URL}/rest/v1/usuarios?id=eq.${userId}`, {
       method: 'PATCH',
-      headers: { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}`, 'Content-Type': 'application/json' },
+      headers: { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY, 'Content-Type': 'application/json' },
       body: JSON.stringify({ password_hash: nueva })
     });
     alert(`Contraseña actualizada.`);
@@ -5173,7 +5173,7 @@ async function cambiarRol(userId, rolActual) {
   try {
     await fetch(`${SB_URL}/rest/v1/usuarios?id=eq.${userId}`, {
       method: 'PATCH',
-      headers: { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}`, 'Content-Type': 'application/json' },
+      headers: { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY, 'Content-Type': 'application/json' },
       body: JSON.stringify({ rol: nuevoRol })
     });
     cerrarModal('ver-perfil');
@@ -5273,7 +5273,7 @@ async function eliminarTourPasado(tourId, userId) {
   try {
     await fetch(`${SB_URL}/rest/v1/tours_pasados?id=eq.${tourId}`, {
       method: 'DELETE',
-      headers: { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}` }
+      headers: { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY }
     });
     cerrarModal('ver-perfil');
     if (currentUser && userId === currentUser.id) renderMiPerfil(false);
@@ -5533,7 +5533,7 @@ async function guardarMiPerfil() {
     // Verificar que no esté tomado por otro usuario
     const chkResp = await fetch(
       `${SB_URL}/rest/v1/usuarios?username=eq.${encodeURIComponent(usernameNuevo)}&id=neq.${currentUser.id}&limit=1`,
-      { headers: { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}` } }
+      { headers: { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY } }
     );
     const chk = await chkResp.json();
     if (chk && chk.length > 0) {
@@ -5558,7 +5558,7 @@ async function guardarMiPerfil() {
   try {
     await fetch(`${SB_URL}/rest/v1/usuarios?id=eq.${currentUser.id}`, {
       method: 'PATCH',
-      headers: { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}`, 'Content-Type': 'application/json' },
+      headers: { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY, 'Content-Type': 'application/json' },
       body: JSON.stringify(body)
     });
     alertEl.innerHTML = '<div class="alert" style="background:rgba(45,198,83,.1);color:var(--green)">Perfil guardado</div>';
@@ -5606,7 +5606,7 @@ async function subirFoto(userId) {
       // Guardar base64 directo en foto_url (sin depender de Storage)
       await fetch(`${SB_URL}/rest/v1/usuarios?id=eq.${userId}`, {
         method: 'PATCH',
-        headers: { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}`, 'Content-Type': 'application/json', 'Prefer': 'return=representation' },
+        headers: { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY, 'Content-Type': 'application/json', 'Prefer': 'return=representation' },
         body: JSON.stringify({ foto_url: base64url })
       });
 
@@ -5707,7 +5707,7 @@ async function mostrarRegistroInvitado(token) {
   try {
     const resp = await fetch(
       `${SB_URL}/rest/v1/usuarios?invite_token=eq.${token}&invite_usado=eq.false&limit=1`,
-      { headers: { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}` } }
+      { headers: { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY } }
     );
     const data = await resp.json();
     usuario = data && data[0];
@@ -5799,7 +5799,7 @@ async function completarRegistro(userId, token) {
     // Verificar que el username no esté tomado
     const resp = await fetch(
       `${SB_URL}/rest/v1/usuarios?username=eq.${encodeURIComponent(username)}&limit=1`,
-      { headers: { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}` } }
+      { headers: { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY } }
     );
     const existing = await resp.json();
     if (existing && existing.length > 0 && existing[0].id !== userId) {
@@ -5819,14 +5819,14 @@ async function completarRegistro(userId, token) {
 
     await fetch(`${SB_URL}/rest/v1/usuarios?id=eq.${userId}`, {
       method: 'PATCH',
-      headers: { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}`, 'Content-Type': 'application/json' },
+      headers: { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY, 'Content-Type': 'application/json' },
       body: JSON.stringify(body)
     });
 
     // Cargar el usuario actualizado y entrar
     const userResp = await fetch(
       `${SB_URL}/rest/v1/usuarios?id=eq.${userId}&limit=1`,
-      { headers: { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}` } }
+      { headers: { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY } }
     );
     const users = await userResp.json();
     currentUser = users[0];

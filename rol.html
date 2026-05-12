@@ -510,6 +510,20 @@ button{cursor:pointer;border:none;background:none}
   display:flex;flex-wrap:wrap;gap:8px;
 }
 .tour-card .tc-meta b{color:var(--yel);font-weight:700}
+.tc-status{
+  display:inline-flex;align-items:center;gap:6px;
+  margin-top:10px;padding:5px 10px;
+  font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;
+  border:1px solid var(--line);
+}
+.tc-status::before{content:'';width:8px;height:8px;border-radius:50%;background:var(--ink-mute)}
+.tc-status.ok{background:rgba(136,234,78,.12);border-color:var(--green);color:var(--green)}
+.tc-status.ok::before{background:var(--green)}
+.tc-status.late{background:rgba(255,40,59,.14);border-color:var(--red);color:var(--red)}
+.tc-status.late::before{background:var(--red)}
+.tc-status.next{background:rgba(232,255,76,.12);border-color:var(--yel);color:var(--yel)}
+.tc-status.next::before{background:var(--yel)}
+.tc-status.mute{color:var(--ink-mute)}
 .tour-card .tc-actions{display:flex;gap:6px;align-items:center}
 .tc-btn{
   background:#000;border:1px solid var(--line);
@@ -593,13 +607,214 @@ button{cursor:pointer;border:none;background:none}
 .actions.extra{margin-top:12px;margin-bottom:0}
 .actions.extra .cta{font-size:13px;padding:13px 14px}
 
-@media(max-width:520px){
-  .shell{padding:20px 14px 60px}
-  .step{padding:18px 16px 22px}
+/* ── MOBILE OPTIMIZATIONS ───────────────────── */
+@media(max-width:600px){
+  /* ── Shell + padding ── */
+  .shell{padding:20px 16px 80px;max-width:100%}
+  .hero{padding:16px 0 22px;margin-bottom:24px}
+  .hero h1{font-size:clamp(46px,12.5vw,72px)}
+  .hero .sub{font-size:13px;margin-top:14px}
+  .hero .blot{font-size:10px}
+  .hero .blot b{font-size:11px}
+
+  /* ── Step containers (hide locked/done on mobile) ── */
+  #wizard-shell .step.locked{display:none !important}
+  #wizard-shell .step.done{display:none !important}
+  .step{padding:20px 16px 22px}
+  .step-hd{flex-wrap:wrap;gap:8px}
   .step-hd .n{font-size:36px}
-  .step-hd .t{font-size:19px}
-  .track-cell{padding:9px 6px 11px}
-  .track-lbl{font-size:11px}
+  .step-hd .t{font-size:20px}
+  .step-hd .hint{font-size:10px;margin-left:0;flex-basis:100%;order:3}
+
+  /* ── Track ── */
+  .track{gap:3px;margin-bottom:22px}
+  .track-cell{padding:9px 4px 10px}
+  .track-lbl{font-size:10px;letter-spacing:.02em}
+  .track-num{font-size:9px}
+
+  /* ── Onboarding ── */
+  .onboarding{padding:26px 18px 22px}
+  .onboarding .obh{font-size:clamp(34px,9.5vw,52px)}
+  .onboarding .obs{font-size:13px}
+
+  /* ── Home ── */
+  .home-greet{font-size:clamp(36px,10vw,64px)}
+  .home-sub{font-size:13px;margin-bottom:22px}
+  .home-section-title{font-size:9px;margin-bottom:8px}
+  .tours-list{gap:10px;margin-bottom:14px}
+  .tour-card{
+    grid-template-columns:1fr;gap:14px;padding:16px 16px;
+  }
+  .tour-card .tc-title{font-size:24px}
+  .tour-card .tc-meta{font-size:11px;gap:6px}
+  .tc-actions{
+    display:grid !important;grid-template-columns:1fr auto;gap:8px;
+    width:100%;margin-top:2px;
+  }
+  .tc-btn{padding:14px 16px;min-height:44px;font-size:12px;letter-spacing:.08em}
+  .tc-btn.open{width:100%;background:var(--card);border-color:var(--yel);color:var(--yel)}
+  .tc-btn.del{min-width:44px}
+  .home-foot-actions{flex-direction:column;gap:6px}
+  .home-foot-actions button{width:100%;min-height:44px;text-align:center;padding:12px 14px;font-size:11px}
+
+  /* ── Search list ── */
+  .search-in{padding:14px 44px 14px 44px;font-size:15px;min-height:52px}
+  .ev-list{max-height:340px}
+  .ev-item{padding:14px 14px;grid-template-columns:42px 1fr auto;gap:12px}
+  .ev-day{padding:5px 0}
+  .ev-day .d{font-size:17px}
+  .ev-day .m{font-size:9px}
+  .ev-meta b{font-size:13px;line-height:1.2}
+  .ev-meta span{font-size:10px}
+  .ev-tag{font-size:9px}
+
+  /* ── Multifecha pills ── */
+  .multif-grid{grid-template-columns:1fr 1fr;gap:6px}
+  .mf{padding:14px 12px;font-size:13px;min-height:48px}
+
+  /* ── Paquetes: 2 columnas en móvil ── */
+  .pkg-grid{grid-template-columns:1fr 1fr;gap:8px}
+  .pkg{padding:14px 12px 16px;min-height:80px}
+  .pkg .pn{font-size:24px}
+  .pkg .pd{font-size:10px}
+
+  /* ── Habitación: 1 columna apilada ── */
+  .hab-grid{grid-template-columns:1fr;gap:6px}
+  .hab{padding:14px 14px 14px;min-height:50px}
+  .hab .hn{font-size:14px}
+  .hab .he{font-size:11px}
+
+  /* ── Buy-type pills: 1 columna apilada ── */
+  .bt-pills{flex-direction:column;gap:6px}
+  .pill{
+    width:100%;text-align:center;padding:14px 16px;
+    border-radius:6px;font-size:13px;min-height:48px;
+    display:flex;align-items:center;justify-content:center;
+  }
+
+  /* ── Inputs numéricos ── */
+  .fld input,.fld select{padding:8px 38px 14px 14px;font-size:16px;min-height:48px}
+  .fld.num input{padding-left:36px;font-size:16px}
+  .fld.num .pfx{font-size:17px;bottom:13px}
+  .fld input[type="date"]{font-size:16px;min-height:48px}
+  .fld label{font-size:9px;padding:10px 14px 0}
+  .fld-help{font-size:12px;line-height:1.5}
+
+  /* ── CTA / botones grandes ── */
+  .cta{
+    min-height:52px;padding:14px 18px;font-size:16px;
+    width:100%;justify-content:flex-start;text-align:left;
+  }
+  .cta:hover{transform:none;box-shadow:none}
+  #btn-name{justify-content:center;text-align:center}
+
+  /* ── Resumen ejecutivo: 1 columna apilada ── */
+  .summary{grid-template-columns:1fr;gap:6px;margin-bottom:18px}
+  .sm{padding:18px 18px;display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center}
+  .sm .k{margin-bottom:0;align-self:center;font-size:10px}
+  .sm .v{font-size:36px;text-align:right;line-height:1}
+
+  /* ── Status badge ── */
+  .status-badge{padding:18px 20px;margin-bottom:14px}
+  .status-badge .sk{font-size:9px}
+  .status-badge .sv{font-size:22px}
+
+  /* ── Progress bar ── */
+  .progress-wrap{margin-bottom:20px}
+  .progress-hd{flex-wrap:wrap;gap:6px}
+  .progress-lbl{font-size:12px}
+  .progress-pct{font-size:28px}
+  .progress-bar{height:12px}
+
+  /* ── Next-payment banner: STICKY arriba en plan view ── */
+  #step5 .next{
+    position:sticky;top:56px;z-index:40;
+    margin-left:-16px;margin-right:-16px;
+    padding:16px 22px;
+    box-shadow:0 4px 12px rgba(0,0,0,.4);
+  }
+  #step5 .next .nv{font-size:20px;line-height:1.1}
+  #step5 .next .nk{font-size:10px}
+  #step5 .next .nx{font-size:11px;margin-top:4px}
+
+  /* ── Tabla → cards verticales ── */
+  .tabla-wrap{background:transparent;border:none;margin-bottom:18px}
+  .tabla-head{display:none !important}
+  .tabla-row{
+    display:grid !important;
+    grid-template-columns:1fr auto;
+    grid-template-areas:"lab status" "monto status";
+    grid-template-rows:auto auto;
+    gap:6px 14px;
+    padding:18px 18px;
+    background:var(--card);
+    border:1px solid var(--line);
+    margin-bottom:6px;
+    align-items:center;
+    min-height:72px;
+  }
+  .tabla-row .idx,.tabla-row .fecha{display:none !important}
+  .tabla-row .lab{grid-area:lab;min-width:0}
+  .tabla-row .lab b{font-size:17px;display:block;margin-bottom:2px}
+  .tabla-row .lab span{font-size:12px;color:var(--ink-soft)}
+  .tabla-row .lab span::before{content:'';margin:0}
+  .tabla-row .monto{
+    grid-area:monto;font-size:22px;font-weight:800;
+    color:var(--ink);letter-spacing:-.01em;justify-self:start;
+  }
+  .tabla-row .status{
+    grid-area:status;align-self:center;
+    font-size:11px;flex-direction:column;gap:4px;
+    justify-self:end;text-align:right;
+  }
+  .tabla-row .status::before{width:14px;height:14px}
+  .tabla-row.pagado .monto{color:var(--ink-mute);text-decoration:line-through}
+  .tabla-row.estemes{border-color:var(--yel);box-shadow:0 0 0 1px var(--yel) inset}
+
+  /* ── Botones de acción: stack vertical, izquierda ── */
+  .actions{grid-template-columns:1fr;gap:8px;margin-bottom:10px}
+  .actions.extra{grid-template-columns:1fr;gap:8px}
+  .actions .cta,.actions.extra .cta,#btn-pagos{
+    width:100%;justify-content:flex-start;text-align:left;
+    min-height:52px;padding:14px 18px;font-size:14px;
+    box-shadow:none;
+  }
+  .actions .cta:hover,.actions.extra .cta:hover{transform:none;box-shadow:none}
+  #btn-pagos{font-size:15px;margin-bottom:10px}
+
+  /* ── Toast más grande en móvil ── */
+  .toast{font-size:14px;padding:14px 22px;left:16px;right:16px;width:auto;transform:translateY(80px)}
+  .toast.show{transform:translateY(0)}
+
+  /* ── Nav ── */
+  .nav .tag{padding:0 14px;font-size:15px}
+  .nav .tag::before{width:6px;height:6px;margin-right:8px}
+
+  /* ── Note ── */
+  .note{font-size:11px;padding:12px 14px}
+
+  /* ── Footer ── */
+  .foot{flex-direction:column;align-items:flex-start;gap:6px;font-size:10px}
+}
+
+/* Extra-small: 380px and below */
+@media(max-width:380px){
+  .shell{padding:18px 14px 70px}
+  .step{padding:18px 14px 20px}
+  .step-hd .n{font-size:32px}
+  .step-hd .t{font-size:18px}
+  .home-greet{font-size:clamp(30px,8.5vw,48px)}
+  .pkg .pn{font-size:21px}
+  .pkg .pd{font-size:9px}
+  .tabla-row{padding:16px 14px}
+  .tabla-row .lab b{font-size:16px}
+  .tabla-row .monto{font-size:20px}
+  .summary .sm .v{font-size:30px}
+  .cta{font-size:14px;padding:13px 16px}
+  .progress-pct{font-size:24px}
+  .sm{padding:16px 16px}
+  #step5 .next{margin-left:-14px;margin-right:-14px;padding:14px 18px}
+  #step5 .next .nv{font-size:18px}
 }
 </style>
 </head>
@@ -1727,6 +1942,82 @@ document.getElementById('name-in').addEventListener('keydown', function(e){
   if(e.key==='Enter'){ e.preventDefault(); submitName(); }
 });
 
+// ── Per-tour status (reuses calc logic) ──────
+function tourStorageKey(t){
+  var habK = t.hab || 'na';
+  return 'rol-paid::'+t.ev+'::'+t.pkg+'::'+slug(t.zonaName||t.zona)+'::'+habK+'::'+t.sep;
+}
+function buildPlanForTour(t){
+  var ev = EV.find(function(x){return x.id===t.ev;});
+  if(!ev) return null;
+  var pkg=t.pkg;
+  var habE=(pkg==='cheap')?0:(t.habE||0);
+  var zonaP=t.precio||0;
+  var rideBase=ev.ride||(isCDMX(ev)?2900:2700);
+  var stayDiscount=ev.sep||500;
+  var perP=0;
+  if(pkg==='plus')      perP=zonaP+habE;
+  else if(pkg==='ride') perP=rideBase+habE;
+  else if(pkg==='stay'){perP=zonaP-stayDiscount+habE; if(perP<0)perP=zonaP+habE;}
+  else if(pkg==='cheap')perP=zonaP;
+  var sepD=new Date(t.sep+'T12:00:00');
+  var sepActual;
+  if(t.sepMonto!=null) sepActual=t.sepMonto;
+  else if(pkg==='cheap') sepActual=(ev.sepCheap!==undefined?ev.sepCheap:1000);
+  else{
+    var eventDate0=new Date(ev.ds+'T12:00:00');
+    var days=Math.ceil((eventDate0-sepD)/(1000*60*60*24));
+    if(days<=15) sepActual=Math.ceil(perP*0.5);
+    else{
+      sepActual=ev.sep||0;
+      if(pkg==='ride' && ev.sepRide!==undefined) sepActual=ev.sepRide;
+    }
+  }
+  if(sepActual>perP) sepActual=perP;
+  var resto=perP-sepActual;
+  var eventDate=new Date(ev.ds+'T12:00:00');
+  var maxPagos=(pkg==='cheap')?4:10;
+  var quincenas=getQuincenas(sepD,eventDate,maxPagos);
+  var pagoQ=quincenas.length>0?Math.ceil(resto/quincenas.length):resto;
+  var rows=[];
+  rows.push({k:'sep',label:'Separo',sub:'Al apartar',date:sepD,amount:sepActual});
+  var acc=sepActual;
+  for(var i=0;i<quincenas.length;i++){
+    var m=(i===quincenas.length-1)?(perP-acc):pagoQ;
+    acc+=m;
+    rows.push({k:'pq'+i,label:'Pago '+(i+1),sub:quincenas[i].lbl,date:quincenas[i].d,amount:m});
+  }
+  if(quincenas.length===0 && resto>0){
+    rows.push({k:'liq',label:'Liquidación',sub:'Próximamente',date:eventDate,amount:resto});
+  }
+  var paid=[]; try{paid=JSON.parse(localStorage.getItem(tourStorageKey(t))||'[]');}catch(e){}
+  // First-time default: separo marked as paid
+  if(!localStorage.getItem(tourStorageKey(t))) paid=['sep'];
+  return {ev:ev,perP:perP,sepActual:sepActual,rows:rows,paid:paid,eventDate:eventDate};
+}
+function computeTourStatus(t){
+  var plan=buildPlanForTour(t);
+  if(!plan) return {kind:'mute',label:'Evento no disponible',pct:0};
+  var today=new Date(); today.setHours(0,0,0,0);
+  var overdue=false, nextDate=null, totalPaid=0;
+  plan.rows.forEach(function(r){
+    if(plan.paid.indexOf(r.k)>=0){ totalPaid+=r.amount; return; }
+    if(!r.date) return;
+    var d=new Date(r.date); d.setHours(0,0,0,0);
+    if(d<today) overdue=true;
+    else if(!nextDate || d<nextDate) nextDate=d;
+  });
+  var pct=plan.perP>0?Math.round(totalPaid/plan.perP*100):0;
+  if(pct>=100) return {kind:'ok',label:'Completado',pct:pct};
+  if(overdue) return {kind:'late',label:'Pago pendiente',pct:pct};
+  if(nextDate){
+    var days=Math.ceil((nextDate-today)/86400000);
+    var lbl=days===0?'Pago hoy':days===1?'Pago mañana':'Próximo en '+days+' d';
+    return {kind:'next',label:lbl,pct:pct};
+  }
+  return {kind:'ok',label:'Al día',pct:pct};
+}
+
 // ── HOME ─────────────────────────────────────
 function renderHome(){
   document.getElementById('hg-name').textContent = state.user || 'Tú';
@@ -1747,10 +2038,13 @@ function renderHome(){
     var pkgLabel = (t.pkg||'').toUpperCase();
     var zonaLabel = t.zonaName || (t.zona ? t.zona.replace(/-/g,' ').toUpperCase() : '—');
     var sepLabel = t.sep ? fmtFecha(new Date(t.sep+'T12:00:00')) : '';
+    var status = computeTourStatus(t);
+    var statusIcon = status.kind==='ok'?'✓':status.kind==='late'?'⚠':status.kind==='next'?'⏰':'·';
     card.innerHTML =
       '<div class="tc-main">'+
         '<div class="tc-title">'+title+'</div>'+
         '<div class="tc-meta"><span><b>'+pkgLabel+'</b></span><span>·</span><span>'+zonaLabel+'</span>'+(sepLabel?'<span>·</span><span>Sep: '+sepLabel+'</span>':'')+'</div>'+
+        '<div class="tc-status '+status.kind+'">'+statusIcon+' '+status.label+(status.pct?' · '+status.pct+'%':'')+'</div>'+
       '</div>'+
       '<div class="tc-actions">'+
         '<button class="tc-btn open" data-idx="'+idx+'" type="button">Abrir</button>'+

@@ -259,6 +259,30 @@ button{cursor:pointer;border:none;background:none}
   line-height:1.4;font-weight:500;
 }
 .fld-help b{color:var(--yel);font-weight:700}
+
+/* Buy-type pills */
+.bt-wrap{margin-top:14px}
+.bt-title{
+  font-size:10px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--ink-mute);margin-bottom:8px;
+}
+.bt-pills{display:flex;flex-wrap:wrap;gap:6px}
+.pill{
+  background:#000;border:1px solid var(--line);
+  padding:9px 14px;border-radius:999px;
+  font-weight:700;font-size:12px;letter-spacing:.04em;
+  color:var(--ink);transition:all .15s;
+  text-transform:uppercase;
+}
+.pill:hover{border-color:var(--yel)}
+.pill.sel{background:var(--yel);border-color:var(--yel);color:#000}
+.pill.sel:hover{background:var(--yel)}
+
+/* Plain text field (no $ prefix) */
+.fld.txt::after{display:none}
+.fld.txt{margin-top:10px}
+.fld.txt input{font-family:'JetBrains Mono',monospace;font-weight:700;font-size:14px;letter-spacing:.04em;text-transform:uppercase;cursor:text}
+.fld.txt input::placeholder{color:var(--ink-mute);text-transform:uppercase;letter-spacing:.04em}
 .hab-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:6px}
 .hab{
   background:#000;border:1px solid var(--line);padding:11px 12px 13px;
@@ -502,12 +526,24 @@ button{cursor:pointer;border:none;background:none}
       <select id="zona-select"><option value="">— Elige una zona —</option></select>
     </div>
     <div id="precio-wrap" style="display:none">
+      <div class="bt-wrap">
+        <div class="bt-title">¿Cómo compraste tu boleto?</div>
+        <div class="bt-pills" id="bt-pills">
+          <button class="pill sel" data-bt="normal" type="button">Precio normal</button>
+          <button class="pill" data-bt="preventa" type="button">Preventa</button>
+          <button class="pill" data-bt="codigo" type="button">Con código de descuento</button>
+        </div>
+      </div>
+      <div class="fld txt" id="codigo-wrap" style="display:none">
+        <label for="codigo-input">¿Qué código usaste?</label>
+        <input type="text" id="codigo-input" autocomplete="off" placeholder="Ej. KAROLG">
+      </div>
       <div class="fld num">
         <label for="zona-precio">Precio de tu zona</label>
         <span class="pfx">$</span>
         <input type="text" inputmode="decimal" id="zona-precio" autocomplete="off">
       </div>
-      <div class="fld-help">¿Tuviste preventa o código de descuento? <b>Ajusta el precio al monto que tú pagaste.</b></div>
+      <div class="fld-help" id="precio-help">El precio del sitio. Si compraste al precio actual, deja el monto como está.</div>
     </div>
     <div class="hab-wrap" id="hab-wrap">
       <div class="hab-title">Habitación (suma al total)</div>
@@ -755,6 +791,8 @@ function selectEvent(id){
   state.ev = EV.find(function(e){return e.id===id;}) || null;
   state.fi=null; state.pkg=null; state.zona=null; state.hab=null;
   state.precio=null; state.sepMonto=null; state.sepTouched=false;
+  state.codigo='';
+  applyBuyType('normal');
   document.querySelectorAll('.pkg').forEach(function(b){b.classList.remove('sel');});
   document.getElementById('zona-select').innerHTML='<option value="">— Elige una zona —</option>';
   document.getElementById('hab-grid').innerHTML='';
@@ -762,6 +800,7 @@ function selectEvent(id){
   document.getElementById('sep-monto-wrap').style.display='none';
   document.getElementById('zona-precio').value='';
   document.getElementById('sep-monto').value='';
+  document.getElementById('codigo-input').value='';
   document.getElementById('btn-calc').disabled=true;
   renderEvList(document.getElementById('q').value);
   if(state.ev){
@@ -910,6 +949,29 @@ document.getElementById('zona-precio').addEventListener('input', function(){
   state.precio = parseNum(this.value);
   recomputeDefaultSepMonto();
   checkReady();
+});
+
+// Buy-type pills (purely UX guidance — no impact on calculation)
+var BT_HELP = {
+  normal:   'El precio del sitio. Si compraste al precio actual, deja el monto como está.',
+  preventa: 'Pon el precio que pagaste en preventa (generalmente fue más bajo que el actual).',
+  codigo:   'Pon el precio final después del descuento aplicado.'
+};
+state.buyType = 'normal';
+state.codigo = '';
+function applyBuyType(bt){
+  state.buyType = bt;
+  document.querySelectorAll('#bt-pills .pill').forEach(function(p){
+    p.classList.toggle('sel', p.dataset.bt===bt);
+  });
+  document.getElementById('precio-help').textContent = BT_HELP[bt] || BT_HELP.normal;
+  document.getElementById('codigo-wrap').style.display = (bt==='codigo') ? 'block' : 'none';
+}
+document.querySelectorAll('#bt-pills .pill').forEach(function(btn){
+  btn.addEventListener('click', function(){applyBuyType(btn.dataset.bt);});
+});
+document.getElementById('codigo-input').addEventListener('input', function(){
+  state.codigo = String(this.value||'').trim();
 });
 
 // ── Habs ─────────────────────────────────────

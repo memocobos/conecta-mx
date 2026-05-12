@@ -289,7 +289,9 @@ button{cursor:pointer;border:none;background:none}
   text-align:left;transition:all .15s;
 }
 .hab .hn{font-weight:800;font-size:14px;letter-spacing:.02em;text-transform:uppercase}
-.hab .he{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--ink-soft);margin-top:3px;font-weight:700}
+.hab .h-desc{font-size:11px;color:var(--ink-mute);margin-top:3px;font-weight:500;line-height:1.3}
+.hab .he{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--ink-soft);margin-top:6px;font-weight:700}
+.hab.sel .h-desc{color:rgba(255,255,255,.75)}
 .hab:hover{border-color:var(--yel)}
 .hab.sel{background:var(--blue);border-color:var(--blue);color:#fff}
 .hab.sel .he{color:rgba(255,255,255,.85)}
@@ -1335,6 +1337,12 @@ function showMultifecha(){
       document.querySelectorAll('.mf').forEach(function(x){x.classList.remove('sel');});
       b.classList.add('sel');
       populateZonas();
+      // Si el evento es multifecha con hotel distinto por fecha (EDC),
+      // re-poblar habs cuando el usuario ya había avanzado al paso 3.
+      if(state.pkg && state.pkg!=='cheap'){
+        populateHabs();
+        recomputeDefaultSepMonto();
+      }
       setStep(2);
     });
     grid.appendChild(b);
@@ -1531,19 +1539,64 @@ document.getElementById('codigo-input').addEventListener('input', function(){
 });
 
 // ── Habs ─────────────────────────────────────
+// Cadena de precedencia (espejo de hotelList() + buildHotelButtons() de index.html):
+//   1. ev.hotelOverride === true && ev.hotel.length → usa ev.hotel
+//   2. ev.multifecha[fi].hotel                       → usa ese array
+//   3. fallback                                      → HOTEL_CDM / HOTEL_MTY según isCDMX(ev)
+function resolveHotelArray(ev, fi){
+  if(!ev) return [];
+  if(ev.hotelOverride && Array.isArray(ev.hotel) && ev.hotel.length) return ev.hotel;
+  if(ev.multifecha && fi!=null && ev.multifecha[fi] && Array.isArray(ev.multifecha[fi].hotel) && ev.multifecha[fi].hotel.length){
+    return ev.multifecha[fi].hotel;
+  }
+  var fallback = isCDMX(ev) ? HOTEL_CDM : HOTEL_MTY;
+  if(Array.isArray(fallback) && fallback.length) return fallback;
+  return HABS_STD; // último recurso si EV no cargó los globales
+}
+
+// Costo por persona para 1 viajero (rol.html siempre calcula por una persona):
+//   - hotelPP:true  → e ya es por persona, súmalo directo
+//   - hotelPP falsy → e es costo total del cuarto; divide entre la capacidad (max de h.viaj)
+function habPP(h, ev){
+  if(!h || !h.e) return 0;
+  if(ev && ev.hotelPP) return h.e;
+  var cap = (h.viaj && h.viaj.length) ? Math.max.apply(null, h.viaj) : 1;
+  return Math.ceil(h.e / cap);
+}
+
+// Texto descriptivo por tipo (matcheo por prefijo del slug)
+function habDescription(name){
+  var k = slug(name);
+  if(k.indexOf('compartida')===0) return 'Compartes cuarto con otros viajeros';
+  if(k.indexOf('triple')===0)     return 'Tu parte del cuarto triple';
+  if(k.indexOf('doble')===0)      return 'Tu parte del cuarto doble';
+  if(k.indexOf('individual')===0) return 'Cuarto solo para ti';
+  return '';
+}
+
 function getHabs(){
   if(!state.ev || state.pkg==='cheap') return [];
-  var arr = state.ev.hotel;
-  if(!arr || !arr.length) return HABS_STD;
-  return arr.map(function(h){return {k:slug(h.n), n:h.n, e:h.e||0};});
+  var arr = resolveHotelArray(state.ev, state.fi);
+  if(!arr || !arr.length) return [];
+  return arr.map(function(h){
+    return {
+      k:    slug(h.n),
+      n:    h.n,
+      e:    h.e || 0,                   // costo bruto del array (puede ser total o por persona)
+      pp:   habPP(h, state.ev),         // costo por persona ya resuelto para 1 viajero
+      viaj: h.viaj || null,             // capacidad de la habitación
+      desc: habDescription(h.n),
+    };
+  });
 }
+
 function populateHabs(){
   var wrap=document.getElementById('hab-wrap');
   var grid=document.getElementById('hab-grid');
   grid.innerHTML='';
   if(state.pkg==='cheap'){
     wrap.style.display='none';
-    state.hab={k:'na',n:'No aplica',e:0};
+    state.hab={k:'na',n:'No aplica',e:0,pp:0};
     return;
   }
   wrap.style.display='block';
@@ -1551,7 +1604,9 @@ function populateHabs(){
   habs.forEach(function(h){
     var b=document.createElement('button');
     b.className='hab'; b.dataset.k=h.k;
-    b.innerHTML='<div class="hn">'+h.n+'</div><div class="he">'+(h.e===0?'Sin costo extra':'+'+fmt(h.e)+(state.ev.hotelPP?' / persona':''))+'</div>';
+    var priceLbl = h.pp===0 ? 'Sin costo extra' : '+'+fmt(h.pp)+' / persona';
+    var desc = h.desc ? '<div class="h-desc">'+h.desc+'</div>' : '';
+    b.innerHTML='<div class="hn">'+h.n+'</div>'+desc+'<div class="he">'+priceLbl+'</div>';
     b.addEventListener('click', function(){
       document.querySelectorAll('.hab').forEach(function(x){x.classList.remove('sel');});
       b.classList.add('sel');
@@ -1585,7 +1640,7 @@ document.getElementById('sep-monto').addEventListener('input', function(){
 function computeDefaultSep(){
   if(!state.ev||!state.pkg||state.precio==null||!state.sepDate) return null;
   var ev=state.ev, pkg=state.pkg;
-  var habE = (pkg==='cheap')?0:(state.hab?state.hab.e:0);
+  var habE = (pkg==='cheap')?0:(state.hab?(state.hab.pp!=null?state.hab.pp:state.hab.e):0);
   var rideBase = ev.ride || (isCDMX(ev)?2900:2700);
   var stayDiscount = ev.sep||500;
   var perP=0;
@@ -1700,7 +1755,7 @@ function calculate(skipSave){
   var ev=state.ev, pkg=state.pkg, z=state.zona, hab=state.hab, sepD=state.sepDate;
   if(!ev||!pkg||!z||!sepD) return;
   var cdmx=isCDMX(ev);
-  var habE = (pkg==='cheap')?0:(hab?hab.e:0);
+  var habE = (pkg==='cheap')?0:(hab?(hab.pp!=null?hab.pp:hab.e):0);
   // Editable zone price (user may have applied a discount/preventa)
   var zonaP = (state.precio!=null && state.precio>0) ? state.precio : (z.p||0);
   var rideBase=ev.ride||(cdmx?2900:2700);
@@ -1916,7 +1971,7 @@ document.getElementById('btn-wa').addEventListener('click', function(){
           '📍 '+ev.v+'\n'+
           '📦 '+pkgNames[state.pkg]+'\n'+
           '🎫 '+state.zona.n+(state.zona.fecha?' ('+state.zona.fecha+')':'')+' — '+fmt(state.zona.p)+'\n'+
-          (state.pkg!=='cheap'?'🛏️ '+state.hab.n+(state.hab.e?' (+'+fmt(state.hab.e)+')':'')+'\n':'')+
+          (state.pkg!=='cheap'?'🛏️ '+state.hab.n+(state.hab.pp?' (+'+fmt(state.hab.pp)+'/persona)':'')+'\n':'')+
           '\n💰 *Total p.persona:* '+fmt(p.perP)+
           '\n💳 *Separo:* '+fmt(p.sepActual)+' ('+fmtFecha(state.sepDate)+')'+
           '\n💸 *Falta:* '+fmt(p.resto)+
@@ -1956,7 +2011,7 @@ function buildExportCard(){
   document.getElementById('exp-pkg').textContent=pkgNames[state.pkg];
   var zl=(state.zona.fecha?state.zona.fecha+' · ':'')+state.zona.n+' — '+fmt(state.zona.p);
   document.getElementById('exp-zona').textContent=zl;
-  document.getElementById('exp-hab').textContent = state.pkg==='cheap' ? 'No aplica' : state.hab.n+(state.hab.e?' (+'+fmt(state.hab.e)+')':' (sin costo)');
+  document.getElementById('exp-hab').textContent = state.pkg==='cheap' ? 'No aplica' : state.hab.n+(state.hab.pp?' (+'+fmt(state.hab.pp)+'/persona)':' (sin costo)');
   document.getElementById('exp-total').textContent=fmt(p.perP);
   var bk=p.bank;
   document.getElementById('exp-bank').innerHTML=bk.nombre+'<br>Tarjeta: '+bk.tarjeta+'<br>CLABE: '+bk.clabe+'<br>A: '+bk.titular;
@@ -2190,7 +2245,9 @@ function populateHabs_silent(){
   getHabs().forEach(function(h){
     var b=document.createElement('button');
     b.className='hab'; b.dataset.k=h.k;
-    b.innerHTML='<div class="hn">'+h.n+'</div><div class="he">'+(h.e===0?'Sin costo extra':'+'+fmt(h.e)+(state.ev.hotelPP?' / persona':''))+'</div>';
+    var priceLbl = h.pp===0 ? 'Sin costo extra' : '+'+fmt(h.pp)+' / persona';
+    var desc = h.desc ? '<div class="h-desc">'+h.desc+'</div>' : '';
+    b.innerHTML='<div class="hn">'+h.n+'</div>'+desc+'<div class="he">'+priceLbl+'</div>';
     grid.appendChild(b);
   });
 }
@@ -2302,7 +2359,7 @@ function saveCurrentTour(){
     fi: state.zona.fi!=null ? state.zona.fi : (state.fi!=null?state.fi:null),
     precio: state.precio,
     hab: state.hab ? state.hab.k : null,
-    habE: state.hab ? state.hab.e : 0,
+    habE: state.hab ? (state.hab.pp!=null?state.hab.pp:state.hab.e) : 0,
     sep: ymd(state.sepDate),
     sepMonto: state.sepTouched ? state.sepMonto : null,
     buyType: state.buyType||'normal',

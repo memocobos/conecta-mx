@@ -443,6 +443,40 @@ button{cursor:pointer;border:none;background:none}
 }
 .note b{color:var(--yel);text-transform:uppercase;font-size:11px;letter-spacing:.1em;display:block;margin-bottom:3px;font-family:'Barlow Condensed',sans-serif;font-weight:900}
 
+/* ── Email subscribe ────────────────────────── */
+.email-box{
+  background:var(--card);border:1px solid var(--line);
+  padding:24px 22px 22px;margin-top:18px;position:relative;
+  border-left:6px solid var(--yel);
+}
+.email-box .eb-eyebrow{
+  font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;
+  letter-spacing:.2em;text-transform:uppercase;color:var(--yel);
+  margin-bottom:8px;display:flex;align-items:center;gap:8px;
+}
+.email-box .eb-title{
+  font-family:'Barlow Condensed',sans-serif;font-weight:900;
+  font-size:clamp(22px,5.5vw,28px);line-height:1;letter-spacing:-.005em;
+  text-transform:uppercase;margin-bottom:6px;
+}
+.email-box .eb-sub{
+  font-size:13px;color:var(--ink-soft);line-height:1.5;margin-bottom:18px;
+}
+.email-box .fld{margin-bottom:8px}
+.email-box .fld:last-of-type{margin-bottom:14px}
+.email-box .cta{width:100%;justify-content:center;text-align:center;margin-top:0}
+.email-box .eb-ok{
+  background:rgba(136,234,78,.1);border:1px solid var(--green);
+  padding:18px 16px;color:var(--green);
+  font-weight:700;font-size:14px;letter-spacing:.04em;
+  display:flex;align-items:center;gap:10px;line-height:1.4;
+}
+.email-box .eb-err{
+  margin-top:8px;color:var(--red);font-size:12px;font-weight:600;letter-spacing:.04em;
+  display:none;
+}
+.email-box .eb-err.on{display:block}
+
 .loading{padding:50px 20px;text-align:center;color:var(--ink-mute);font-size:13px;letter-spacing:.1em;text-transform:uppercase}
 .loading::before{content:'';display:block;width:30px;height:30px;border:3px solid var(--ink-mute);border-top-color:var(--yel);border-radius:50%;margin:0 auto 18px;animation:spin 1s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
@@ -993,6 +1027,27 @@ button{cursor:pointer;border:none;background:none}
       <button class="cta ghost" id="btn-remind">⏰ Programar recordatorios</button>
       <button class="cta ghost" id="btn-ics">📅 Agregar a mi calendario</button>
       <button class="cta ghost" id="btn-save-tour">⭐ Guardar este tour</button>
+    </div>
+
+    <div class="email-box" id="email-box">
+      <div id="eb-form">
+        <div class="eb-eyebrow">📧 Recordatorios automáticos</div>
+        <div class="eb-title">Recibe un email el día de cada pago</div>
+        <div class="eb-sub">Te llega un correo a las 8am con el monto del día, link a tu plan y datos bancarios. Sin spam, sin costo.</div>
+        <div class="fld">
+          <label for="eb-nombre">Tu nombre</label>
+          <input type="text" id="eb-nombre" autocomplete="given-name" maxlength="60">
+        </div>
+        <div class="fld">
+          <label for="eb-email">Tu email</label>
+          <input type="email" id="eb-email" autocomplete="email" placeholder="tucorreo@gmail.com" maxlength="120">
+        </div>
+        <button class="cta" id="btn-sub" type="button">Activar recordatorios automáticos</button>
+        <div class="eb-err" id="eb-err">—</div>
+      </div>
+      <div id="eb-ok" class="eb-ok" style="display:none">
+        ✓ Listo, recibirás un email el día de cada pago con tu link.
+      </div>
     </div>
 
     <div class="note">
@@ -2368,6 +2423,101 @@ document.getElementById('btn-save-tour').addEventListener('click', function(){
   saveCurrentTour();
   toast('Tour guardado ✓');
 });
+
+// ── Email subscribe ──────────────────────────
+function emailSubKey(){
+  if(!state.ev||!state.zona||!state.sepDate) return null;
+  return 'rol-emailsub::'+state.ev.id+'::'+state.pkg+'::'+slug(state.zona.n)+'::'+ymd(state.sepDate);
+}
+function refreshSubscribeUI(){
+  var box=document.getElementById('email-box');
+  if(!box) return;
+  var nombreIn=document.getElementById('eb-nombre');
+  if(nombreIn && state.user && !nombreIn.value) nombreIn.value=state.user;
+  var k=emailSubKey();
+  var already = k ? localStorage.getItem(k) : null;
+  if(already){
+    document.getElementById('eb-form').style.display='none';
+    var ok=document.getElementById('eb-ok');
+    ok.style.display='flex';
+    ok.textContent = '✓ Ya activaste recordatorios para este plan (' + already + ').';
+  } else {
+    document.getElementById('eb-form').style.display='block';
+    document.getElementById('eb-ok').style.display='none';
+    var err=document.getElementById('eb-err'); if(err){err.classList.remove('on');err.textContent='';}
+  }
+}
+
+function buildSubscribePayload(){
+  if(!state.ev||!state.plan||!state.zona||!state.sepDate) return null;
+  var rows = buildRows();
+  // Excluir el separo: ya se pagó al apartar; los recordatorios son para pagos futuros.
+  var pagos = rows
+    .filter(function(r){ return r.k && r.date && r.k !== 'sep'; })
+    .map(function(r,i){
+      return {
+        k:      r.k,
+        label:  r.label,
+        date:   ymd(r.date),
+        amount: Math.round(r.amount),
+        num:    i + 1, // 1-based (Pago 1, 2, ...)
+      };
+    });
+  return {
+    nombre:        String(document.getElementById('eb-nombre').value||'').trim(),
+    email:         String(document.getElementById('eb-email').value||'').trim().toLowerCase(),
+    evento_id:     state.ev.id,
+    evento_nombre: state.ev.a,
+    paquete:       state.pkg,
+    zona:          state.zona.n,
+    precio:        Math.round(state.plan.perP),
+    separo_fecha:  ymd(state.sepDate),
+    separo_monto:  Math.round(state.plan.sepActual),
+    pagos:         pagos,
+  };
+}
+
+document.getElementById('btn-sub').addEventListener('click', async function(){
+  var err = document.getElementById('eb-err');
+  err.classList.remove('on'); err.textContent='';
+  var payload = buildSubscribePayload();
+  if(!payload){ err.textContent='Genera primero tu plan.'; err.classList.add('on'); return; }
+  if(!payload.nombre || payload.nombre.length<2){ err.textContent='Pon tu nombre.'; err.classList.add('on'); return; }
+  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(payload.email)){ err.textContent='Email inválido.'; err.classList.add('on'); return; }
+  if(!payload.pagos.length){ err.textContent='No hay pagos pendientes que recordar.'; err.classList.add('on'); return; }
+  var btn=this; var orig=btn.textContent;
+  btn.disabled=true; btn.textContent='Activando…';
+  try{
+    var res = await fetch('/.netlify/functions/rol-subscribe', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(payload),
+    });
+    var j = await res.json().catch(function(){return {ok:false,error:'Respuesta inválida'};});
+    if(!res.ok || !j.ok){
+      err.textContent = (j && j.error) ? j.error : 'No pude activar los recordatorios. Intenta más tarde.';
+      err.classList.add('on');
+      btn.disabled=false; btn.textContent=orig;
+      return;
+    }
+    var k=emailSubKey();
+    if(k){ try{localStorage.setItem(k, payload.email);}catch(e){} }
+    document.getElementById('eb-form').style.display='none';
+    var ok = document.getElementById('eb-ok');
+    ok.style.display='flex';
+    ok.textContent = '✓ Listo, '+payload.nombre.split(' ')[0]+'. Recibirás un email a '+payload.email+' el día de cada pago.';
+    toast('Recordatorios activados ✓');
+  }catch(e){
+    console.error(e);
+    err.textContent='Error de red. Intenta de nuevo.';
+    err.classList.add('on');
+    btn.disabled=false; btn.textContent=orig;
+  }
+});
+
+// Llamamos a refreshSubscribeUI() después de renderPlan
+var _origRenderPlan = renderPlan;
+renderPlan = function(){ _origRenderPlan.apply(this, arguments); refreshSubscribeUI(); };
 
 // ── Boot ─────────────────────────────────────
 loadEV();

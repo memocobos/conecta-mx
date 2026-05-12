@@ -26,3 +26,7 @@
 
 [functions."check-strikes-diario"]
   schedule = "0 0 * * *"
+
+# Recordatorios de pago de /rol — 14:00 UTC = 8:00 AM CDMX
+[functions."rol-recordatorios"]
+  schedule = "0 14 * * *"

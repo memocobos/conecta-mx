@@ -6,7 +6,7 @@
 const SB_URL      = process.env.SUPABASE_URL;
 const SB_KEY      = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
 const RESEND_KEY  = process.env.RESEND_API_KEY || process.env.RESEND_KEY;
-const RESEND_FROM = process.env.RESEND_FROM || "Conecta MX <kamehouse@conectareynosa.mx>";
+const RESEND_FROM = process.env.RESEND_FROM || "Conecta Reynosa <admin@conectareynosa.mx>";
 const SITE        = process.env.URL || "https://conectareynosa.mx";
 
 const MX_TZ = "America/Monterrey";
@@ -130,11 +130,17 @@ function emailTemplate({ sub, pago, totalPagos }) {
       </td></tr>
 
       <!-- HELP TEXT -->
-      <tr><td style="padding:18px 26px 26px 26px">
+      <tr><td style="padding:18px 26px 14px 26px">
         <div style="border-top:1px solid rgba(255,255,255,.1);padding-top:16px;font-size:12px;color:rgba(255,255,255,.55);line-height:1.6">
           ¿Dudas? Manda WhatsApp al <a href="${dudasUrl}" style="color:#e8ff4c;text-decoration:none;font-weight:700">81 1977 1072</a>.<br>
-          Si ya pagaste, ignora este correo — el cargo puede tardar unos minutos en reflejar.<br>
-          ¿No quieres más recordatorios? Responde STOP a este correo.
+          Si ya pagaste, ignora este correo — el cargo puede tardar unos minutos en reflejar.
+        </div>
+      </td></tr>
+
+      <!-- NO-REPLY NOTICE -->
+      <tr><td style="padding:0 26px 18px 26px">
+        <div style="border-top:1px solid rgba(255,255,255,.08);padding-top:14px;font-size:11px;color:rgba(255,255,255,.42);text-align:center;line-height:1.55;font-family:Arial,sans-serif">
+          ⚠ Este correo no puede ser contestado.<br>Si necesitas ayuda, contáctanos por <a href="${dudasUrl}" style="color:#e8ff4c;text-decoration:none;font-weight:700">WhatsApp</a> o <a href="https://m.me/conectareynosa" style="color:#e8ff4c;text-decoration:none;font-weight:700">Messenger</a>.
         </div>
       </td></tr>
 

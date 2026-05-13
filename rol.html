@@ -283,6 +283,34 @@ button{cursor:pointer;border:none;background:none}
 .fld.txt{margin-top:10px}
 .fld.txt input{font-family:'JetBrains Mono',monospace;font-weight:700;font-size:14px;letter-spacing:.04em;text-transform:uppercase;cursor:text}
 .fld.txt input::placeholder{color:var(--ink-mute);text-transform:uppercase;letter-spacing:.04em}
+
+/* Mensaje de validación del código */
+.codigo-msg{
+  margin-top:8px;font-size:12px;font-weight:700;
+  letter-spacing:.04em;line-height:1.4;
+  padding:0 14px 12px;
+}
+.codigo-msg.ok{color:var(--green)}
+.codigo-msg.err{color:var(--red)}
+
+/* Display read-only del precio (modos 'normal' y 'codigo') */
+.precio-display{
+  margin-top:10px;padding:14px 16px;
+  background:#000;border:1px solid var(--line);border-left:4px solid var(--yel);
+}
+.precio-display .pd-k{
+  font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;
+  letter-spacing:.16em;text-transform:uppercase;color:var(--ink-mute);
+  margin-bottom:4px;
+}
+.precio-display .pd-v{
+  font-family:'Barlow Condensed',sans-serif;font-weight:900;
+  font-size:28px;line-height:1;letter-spacing:-.01em;color:var(--yel);
+}
+.precio-display .pd-note{
+  margin-top:4px;font-size:11px;color:var(--ink-soft);
+  letter-spacing:.04em;font-weight:600;
+}
 .hab-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:6px}
 .hab{
   background:#000;border:1px solid var(--line);padding:11px 12px 13px;
@@ -948,15 +976,28 @@ button{cursor:pointer;border:none;background:none}
           <button class="pill" data-bt="codigo" type="button">Con código de descuento</button>
         </div>
       </div>
+
+      <!-- Modo 'codigo': input de código + validación en vivo -->
       <div class="fld txt" id="codigo-wrap" style="display:none">
-        <label for="codigo-input">¿Qué código usaste?</label>
+        <label for="codigo-input">Escribe el código que usaste</label>
         <input type="text" id="codigo-input" autocomplete="off" placeholder="Ej. KAROLG">
+        <div class="codigo-msg" id="codigo-msg"></div>
       </div>
-      <div class="fld num">
-        <label for="zona-precio">Precio de tu zona</label>
+
+      <!-- Modo 'preventa': precio editable -->
+      <div class="fld num" id="precio-edit-wrap" style="display:none">
+        <label for="zona-precio">Precio que pagaste</label>
         <span class="pfx">$</span>
         <input type="text" inputmode="decimal" id="zona-precio" autocomplete="off">
       </div>
+
+      <!-- Modo 'normal' y 'codigo': display read-only del precio efectivo -->
+      <div class="precio-display" id="precio-display" style="display:none">
+        <div class="pd-k">Tu precio del boleto</div>
+        <div class="pd-v" id="pd-v">—</div>
+        <div class="pd-note" id="pd-note"></div>
+      </div>
+
       <div class="fld-help" id="precio-help">El precio del sitio. Si compraste al precio actual, deja el monto como está.</div>
     </div>
     <div class="hab-wrap" id="hab-wrap">
@@ -1097,7 +1138,7 @@ button{cursor:pointer;border:none;background:none}
 window.STATIC_IMGS = window.STATIC_IMGS || {};
 window.MAPAS = window.MAPAS || {};
 window.LINEUPS = window.LINEUPS || {};
-var EV=[], BANCO_DEFAULT={}, BANCO_HEY={}, HOTEL_STD=[], HOTEL_CDM=[], HOTEL_MTY=[], MESES={}, WA='528119771072';
+var EV=[], BANCO_DEFAULT={}, BANCO_HEY={}, HOTEL_STD=[], HOTEL_CDM=[], HOTEL_MTY=[], MESES={}, WA='528119771072', PROMOS={};
 
 // Standard hotel options (fallback)
 var HABS_STD = [
@@ -1173,9 +1214,11 @@ async function loadEV(){
     var res = await fetch('/index.html',{cache:'no-store'});
     if(!res.ok) throw new Error('HTTP '+res.status);
     var html = await res.text();
-    // Find boundaries
+    // El bloque debe llegar hasta DESPUÉS de PROMOS (línea ~1976). El marcador `var _promoActivo=null;`
+    // está justo después de PROMOS, así que ahí cortamos.
     var startIdx = html.indexOf("var WA='");
-    var endIdx   = html.indexOf('function $$(');
+    var endIdx   = html.indexOf('var _promoActivo');
+    if(endIdx < 0) endIdx = html.indexOf('function $$('); // fallback al boundary viejo
     if(startIdx<0 || endIdx<0) throw new Error('Bloque EV no localizado en index.html');
     var block = html.slice(startIdx, endIdx);
     // Eval inside a function. Pass stub window for STATIC_IMGS / MAPAS / LINEUPS fallbacks.
@@ -1185,11 +1228,13 @@ async function loadEV(){
       'HOTEL_STD:HOTEL_STD,'+
       'HOTEL_CDM:(typeof HOTEL_CDM!=="undefined"?HOTEL_CDM:[]),'+
       'HOTEL_MTY:(typeof HOTEL_MTY!=="undefined"?HOTEL_MTY:[]),'+
+      'PROMOS:(typeof PROMOS!=="undefined"?PROMOS:{}),'+
       'MESES:MESES,WA:WA};'
     );
     var out = fn({STATIC_IMGS:{},MAPAS:{},LINEUPS:{}});
     EV=out.EV; BANCO_DEFAULT=out.BANCO_DEFAULT; BANCO_HEY=out.BANCO_HEY;
     HOTEL_STD=out.HOTEL_STD; HOTEL_CDM=out.HOTEL_CDM; HOTEL_MTY=out.HOTEL_MTY;
+    PROMOS=out.PROMOS||{};
     MESES=out.MESES; WA=out.WA;
     document.getElementById('ev-loading').style.display='none';
     document.getElementById('ev-search').style.display='block';
@@ -1421,6 +1466,8 @@ document.querySelectorAll('.pkg').forEach(function(btn){
     state.precio=null; state.sepMonto=null; state.sepTouched=false;
     document.getElementById('precio-wrap').style.display='none';
     document.getElementById('sep-monto-wrap').style.display='none';
+    // Reset modo de compra al cambiar paquete (un código podría no aplicar al nuevo pkg)
+    applyBuyType('normal');
     populateZonas();
     populateHabs();
     document.getElementById('btn-calc').disabled=true;
@@ -1487,21 +1534,28 @@ document.getElementById('zona-select').addEventListener('change', function(){
   } else if(v!==''){
     state.zona = getZonaList()[parseInt(v,10)];
   } else state.zona=null;
-  // Sync editable price field
+
   var pwrap=document.getElementById('precio-wrap');
   var pin=document.getElementById('zona-precio');
   if(state.zona){
-    state.precio = state.zona.p;
-    pin.value = state.zona.p;
+    pin.value = state.zona.p; // preset del input editable (visible solo en 'preventa')
     pwrap.style.display='block';
+    // Re-aplicar el modo activo (para mostrar/ocultar elementos correctos)
+    applyBuyType(state.buyType || 'normal');
+    // Re-validar código por si tiene restricción onlyZones
+    revalidateCodigo();
+    refreshPrecioFromBuyType();
   } else {
     state.precio=null;
     pin.value='';
     pwrap.style.display='none';
+    recomputeDefaultSepMonto();
+    checkReady();
   }
-  recomputeDefaultSepMonto();
-  checkReady();
-  if(state.zona) setStep(4);
+
+  // Avanzar al paso 4 solo si CHEAP (no requiere habitación). Para PLUS/RIDE/STAY
+  // dejar al usuario en paso 3 hasta que elija habitación.
+  if(state.zona && state.pkg === 'cheap') setStep(4);
 });
 
 // Editable price input
@@ -1510,33 +1564,163 @@ function parseNum(v){
   return isFinite(n)?n:0;
 }
 document.getElementById('zona-precio').addEventListener('input', function(){
-  state.precio = parseNum(this.value);
-  recomputeDefaultSepMonto();
-  checkReady();
+  // El campo solo está visible en modo 'preventa'; en otros modos no toca state.precio
+  if(state.buyType === 'preventa'){
+    state.precio = parseNum(this.value);
+    updatePrecioDisplay();
+    recomputeDefaultSepMonto();
+    checkReady();
+  }
 });
 
-// Buy-type pills (purely UX guidance — no impact on calculation)
+// ── Buy-type pills + validación de código contra PROMOS ──
 var BT_HELP = {
-  normal:   'El precio del sitio. Si compraste al precio actual, deja el monto como está.',
-  preventa: 'Pon el precio que pagaste en preventa (generalmente fue más bajo que el actual).',
-  codigo:   'Pon el precio final después del descuento aplicado.'
+  normal:   'Usaremos el precio del sitio. No tienes que escribirlo.',
+  preventa: 'Pon el precio exacto que pagaste en preventa.',
+  codigo:   'Escribe tu código y aplicamos el descuento automáticamente.'
 };
-state.buyType = 'normal';
-state.codigo = '';
+state.buyType    = 'normal';
+state.codigo     = '';
+state.codigoPromo = null; // resultado de validateCodigoLocal: {ok, pct, amount, code, ...} o null
+
 function applyBuyType(bt){
   state.buyType = bt;
   document.querySelectorAll('#bt-pills .pill').forEach(function(p){
     p.classList.toggle('sel', p.dataset.bt===bt);
   });
   document.getElementById('precio-help').textContent = BT_HELP[bt] || BT_HELP.normal;
-  document.getElementById('codigo-wrap').style.display = (bt==='codigo') ? 'block' : 'none';
+  document.getElementById('codigo-wrap').style.display     = (bt==='codigo')   ? 'block' : 'none';
+  document.getElementById('precio-edit-wrap').style.display= (bt==='preventa') ? 'block' : 'none';
+  document.getElementById('precio-display').style.display  = (bt==='normal'||bt==='codigo') ? 'block' : 'none';
+  // Limpiar estado de código si salimos de ese modo
+  if(bt !== 'codigo'){
+    state.codigoPromo = null;
+    state.codigo = '';
+    document.getElementById('codigo-input').value = '';
+    var msg = document.getElementById('codigo-msg');
+    msg.textContent = ''; msg.className = 'codigo-msg';
+  }
+  refreshPrecioFromBuyType();
 }
+
 document.querySelectorAll('#bt-pills .pill').forEach(function(btn){
   btn.addEventListener('click', function(){applyBuyType(btn.dataset.bt);});
 });
+
+// Validador local de códigos contra PROMOS (espejo de validarPromo() de index.html
+// pero usando state.* en lugar de cur/selZ/selPkg globales).
+function validateCodigoLocal(rawCode){
+  if(!rawCode) return {ok:false,msg:'Escribe un código'};
+  var c = String(rawCode).toUpperCase().trim();
+  var p = PROMOS && PROMOS[c];
+  if(!p) return {ok:false,msg:'Código no válido'};
+  if(p.singleUse){
+    try{ if(localStorage.getItem('promo_used_'+c)==='true') return {ok:false,msg:'Este código ya fue utilizado'}; }catch(e){}
+  }
+  if(p.expiresTs && Date.now()>p.expiresTs) return {ok:false,msg:'Código expirado'};
+  if(p.expires){
+    var hoy=new Date().toISOString().slice(0,10);
+    if(hoy>p.expires) return {ok:false,msg:'Código expirado'};
+  }
+  if(p.maxUsos && p.usos>=p.maxUsos) return {ok:false,msg:'Código agotado'};
+  // Restricciones por evento
+  if(p.onlyEvent || p.onlyEvents){
+    var allowed = p.onlyEvents || [p.onlyEvent];
+    if(!state.ev || allowed.indexOf(state.ev.id)<0){
+      return {ok:false,msg:'Este código no aplica a este evento'};
+    }
+  } else {
+    // Código general (sin onlyEvent): el evento debe tener flag promo:true
+    if(state.ev && !state.ev.promo) return {ok:false,msg:'Este código no aplica a este evento'};
+  }
+  // Restricción por paquete
+  if(p.excludePkg && state.pkg && p.excludePkg.indexOf(state.pkg)>=0){
+    return {ok:false,msg:'Código no aplicable al paquete '+state.pkg.toUpperCase()};
+  }
+  // Restricción por zona
+  if(p.onlyZones && p.onlyZones.length){
+    if(!state.zona || p.onlyZones.indexOf(state.zona.n)<0){
+      return {ok:false,msg:'Código exclusivo para zona: '+p.onlyZones.join(' / ')};
+    }
+  }
+  return {ok:true, pct:p.pct||0, amount:p.amount||0, desc:p.desc, customMsg:p.customMsg||null, code:c};
+}
+
+function revalidateCodigo(){
+  if(state.buyType !== 'codigo') return;
+  var raw = document.getElementById('codigo-input').value.trim();
+  state.codigo = raw.toUpperCase();
+  var msg = document.getElementById('codigo-msg');
+  if(!raw){
+    msg.textContent=''; msg.className='codigo-msg';
+    state.codigoPromo=null;
+    return;
+  }
+  var result = validateCodigoLocal(raw);
+  state.codigoPromo = result;
+  if(result.ok){
+    msg.textContent = '✓ '+(result.customMsg || result.desc || 'Código aplicado');
+    msg.className = 'codigo-msg ok';
+  } else {
+    msg.textContent = '✗ '+result.msg;
+    msg.className = 'codigo-msg err';
+  }
+}
+
 document.getElementById('codigo-input').addEventListener('input', function(){
-  state.codigo = String(this.value||'').trim();
+  // Forzar mayúsculas en el input
+  var pos = this.selectionStart;
+  this.value = this.value.toUpperCase();
+  if(pos!=null) this.setSelectionRange(pos,pos);
+  revalidateCodigo();
+  refreshPrecioFromBuyType();
 });
+
+// Recomputa state.precio según el modo activo (llamado en cualquier cambio relevante)
+function refreshPrecioFromBuyType(){
+  if(!state.zona){
+    state.precio = null;
+    updatePrecioDisplay();
+    recomputeDefaultSepMonto();
+    checkReady();
+    return;
+  }
+  var base = state.zona.p || 0;
+  if(state.buyType === 'preventa'){
+    var v = parseNum(document.getElementById('zona-precio').value);
+    state.precio = v > 0 ? v : base;
+  } else if(state.buyType === 'codigo' && state.codigoPromo && state.codigoPromo.ok){
+    var disc = state.codigoPromo.amount || 0;
+    if(state.codigoPromo.pct) disc = Math.round(base * state.codigoPromo.pct / 100);
+    state.precio = Math.max(0, base - disc);
+  } else {
+    state.precio = base; // 'normal' o 'codigo' sin código válido
+  }
+  updatePrecioDisplay();
+  recomputeDefaultSepMonto();
+  checkReady();
+}
+
+function updatePrecioDisplay(){
+  var v = document.getElementById('pd-v');
+  var note = document.getElementById('pd-note');
+  if(state.precio == null){ v.textContent='—'; note.textContent=''; return; }
+  v.textContent = fmt(state.precio);
+  if(state.buyType === 'codigo'){
+    if(state.codigoPromo && state.codigoPromo.ok){
+      var base = state.zona ? (state.zona.p||0) : 0;
+      var saved = Math.max(0, base - state.precio);
+      note.innerHTML = '<span style="color:var(--green)">−'+fmt(saved)+'</span> con '+state.codigoPromo.code +
+                       (state.codigoPromo.pct?' ('+state.codigoPromo.pct+'%)':'');
+    } else {
+      note.textContent = 'Escribe tu código arriba para aplicar el descuento';
+    }
+  } else if(state.buyType === 'normal'){
+    note.textContent = '';
+  } else {
+    note.textContent = '';
+  }
+}
 
 // ── Habs ─────────────────────────────────────
 // Cadena de precedencia (espejo de hotelList() + buildHotelButtons() de index.html):
@@ -1613,6 +1797,8 @@ function populateHabs(){
       state.hab=h;
       recomputeDefaultSepMonto();
       checkReady();
+      // Avanzar al paso 4 ahora que tenemos zona + hab
+      if(state.zona && state.pkg !== 'cheap') setStep(4);
     });
     grid.appendChild(b);
   });

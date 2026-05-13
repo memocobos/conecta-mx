@@ -1298,11 +1298,13 @@ window.LINEUPS = window.LINEUPS || {};
 var EV=[], BANCO_DEFAULT={}, BANCO_HEY={}, HOTEL_STD=[], HOTEL_CDM=[], HOTEL_MTY=[], MESES={}, WA='528119771072', PROMOS={};
 
 // Standard hotel options (fallback)
+// Fallback de último recurso — valores legacy ya per-persona. Incluye pp para evitar fallback a hab.e
+// (que para HOTEL_MTY/CDM sería el costo TOTAL del cuarto y daría números inflados).
 var HABS_STD = [
-  {k:'compartida', n:'Compartida', e:0},
-  {k:'triple',     n:'Triple',     e:250},
-  {k:'doble',      n:'Doble',      e:650},
-  {k:'individual', n:'Individual', e:1960}
+  {k:'compartida', n:'Compartida', e:0,    pp:0,    desc:'Compartes cuarto con otros viajeros'},
+  {k:'triple',     n:'Triple',     e:250,  pp:250,  desc:'Tu parte del cuarto triple'},
+  {k:'doble',      n:'Doble',      e:650,  pp:650,  desc:'Tu parte del cuarto doble'},
+  {k:'individual', n:'Individual', e:1960, pp:1960, desc:'Cuarto solo para ti'}
 ];
 
 // ── Helpers ──────────────────────────────────

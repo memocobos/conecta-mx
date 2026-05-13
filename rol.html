@@ -629,6 +629,115 @@ button{cursor:pointer;border:none;background:none}
 }
 .btn-back:hover{border-color:var(--yel);color:var(--yel)}
 
+/* ── ESTADO DE CUENTA (cabecera del plan) ──── */
+.account-status{
+  margin-bottom:22px;background:var(--card);
+  border:1px solid var(--line);overflow:hidden;
+}
+.as-head{
+  padding:12px 20px;font-family:'JetBrains Mono',monospace;
+  font-size:10px;font-weight:700;letter-spacing:.22em;
+  text-transform:uppercase;color:var(--ink-mute);
+  border-bottom:1px solid var(--line);
+}
+.as-body{padding:22px 22px 20px}
+.as-badge{
+  display:flex;align-items:center;gap:14px;margin-bottom:18px;
+  padding:14px 16px;border:2px solid var(--green);
+}
+.as-badge.ok{background:rgba(136,234,78,.08);border-color:var(--green);color:var(--green)}
+.as-badge.next{background:rgba(232,255,76,.08);border-color:var(--yel);color:var(--yel)}
+.as-badge.late{background:rgba(255,40,59,.10);border-color:var(--red);color:var(--red)}
+.as-badge .ic{
+  font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:34px;line-height:1;
+  flex:0 0 auto;
+}
+.as-badge .txt{
+  font-family:'Barlow Condensed',sans-serif;font-weight:900;
+  font-size:clamp(20px,5vw,28px);line-height:1;letter-spacing:.02em;text-transform:uppercase;
+}
+.as-stats{display:grid;grid-template-columns:1fr;gap:12px;margin-bottom:16px}
+.as-row{
+  display:flex;justify-content:space-between;align-items:baseline;gap:14px;
+  padding:11px 0;border-bottom:1px solid var(--line);
+}
+.as-row:last-of-type{border-bottom:none}
+.as-row .as-key{
+  font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;
+  letter-spacing:.16em;text-transform:uppercase;color:var(--ink-mute);
+}
+.as-row .as-val{
+  font-family:'Barlow Condensed',sans-serif;font-weight:900;
+  font-size:18px;line-height:1.1;color:var(--ink);text-align:right;
+}
+.as-row .as-val em{font-style:normal;color:var(--ink-soft);font-size:13px;font-weight:600;font-family:'Montserrat',sans-serif;display:block;margin-top:2px}
+
+.btn-acabo{
+  width:100%;display:flex;align-items:center;justify-content:center;gap:10px;
+  background:var(--green);color:#000;
+  padding:18px 20px;border:none;
+  font-family:'Barlow Condensed',sans-serif;font-weight:900;
+  font-size:18px;letter-spacing:.1em;text-transform:uppercase;
+  transition:transform .12s, box-shadow .12s;cursor:pointer;
+}
+.btn-acabo:hover{transform:translate(-2px,-2px);box-shadow:6px 6px 0 #000}
+.btn-acabo:disabled{opacity:.4;cursor:not-allowed;transform:none;box-shadow:none;background:var(--card);color:var(--ink-mute)}
+.btn-acabo:disabled:hover{transform:none;box-shadow:none}
+
+/* ── Comprobante por fila ──────────────────── */
+.comp-btn{
+  background:transparent;border:1px solid var(--line);
+  padding:6px 10px;font-size:10px;font-weight:700;
+  letter-spacing:.08em;text-transform:uppercase;color:var(--ink-mute);
+  cursor:pointer;transition:all .12s;
+  display:inline-flex;align-items:center;gap:5px;
+}
+.comp-btn:hover{border-color:var(--yel);color:var(--yel)}
+.comp-btn.attached{border-color:var(--green);color:var(--green);background:rgba(136,234,78,.06)}
+
+/* ── Modal genérico ────────────────────────── */
+.modal-overlay{
+  position:fixed;inset:0;background:rgba(0,0,0,.85);
+  display:none;align-items:center;justify-content:center;
+  z-index:1000;padding:16px;
+}
+.modal-overlay.show{display:flex;animation:fadeIn .2s ease}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+.modal-card{
+  background:var(--card);border:1px solid var(--line);
+  width:100%;max-width:520px;max-height:90vh;overflow-y:auto;
+  padding:24px 22px 22px;position:relative;
+}
+.modal-close{
+  position:absolute;top:10px;right:10px;
+  width:36px;height:36px;display:flex;align-items:center;justify-content:center;
+  background:transparent;border:1px solid var(--line);font-size:18px;
+  color:var(--ink);cursor:pointer;
+}
+.modal-close:hover{border-color:var(--red);color:var(--red)}
+.modal-title{
+  font-family:'Barlow Condensed',sans-serif;font-weight:900;
+  font-size:28px;line-height:.95;letter-spacing:-.005em;
+  text-transform:uppercase;margin-bottom:8px;color:var(--ink);padding-right:40px;
+}
+.modal-sub{
+  font-size:13px;color:var(--ink-soft);line-height:1.5;margin-bottom:18px;
+}
+.modal-actions{display:grid;grid-template-columns:1fr;gap:8px}
+.modal-actions .cta{margin:0;width:100%;justify-content:center;text-align:center;font-size:14px;padding:14px 16px;min-height:50px}
+
+/* Modal comprobante: preview de imagen */
+.comp-preview{
+  width:100%;max-height:60vh;background:#000;
+  display:flex;align-items:center;justify-content:center;
+  margin:14px 0;border:1px solid var(--line);overflow:hidden;
+}
+.comp-preview img{max-width:100%;max-height:60vh;display:block}
+.comp-preview .pdf-fallback{
+  padding:40px 20px;text-align:center;color:var(--ink-soft);font-size:13px;
+}
+.comp-preview .pdf-fallback a{color:var(--yel);font-weight:700;text-decoration:none}
+
 /* ── STATUS BADGE + PROGRESS ────────────────── */
 .status-badge{
   padding:18px 20px;margin-bottom:14px;
@@ -1026,7 +1135,29 @@ button{cursor:pointer;border:none;background:none}
   <section class="step locked" id="step5">
     <div class="step-hd"><span class="n">05</span><span class="t">Tu plan</span><span class="hint" id="plan-id">—</span></div>
 
-    <div class="status-badge" id="status-badge">
+    <!-- Estado de cuenta — primer elemento visible -->
+    <div class="account-status" id="account-status">
+      <div class="as-head">Estado de cuenta</div>
+      <div class="as-body">
+        <div class="as-badge ok" id="as-badge">
+          <div class="ic" id="as-ic">✓</div>
+          <div class="txt" id="as-txt">Al día</div>
+        </div>
+        <div class="as-stats">
+          <div class="as-row">
+            <span class="as-key">Has pagado</span>
+            <span class="as-val" id="as-pagado">$0<em>0 de 0 pagos</em></span>
+          </div>
+          <div class="as-row">
+            <span class="as-key">Próximo pago</span>
+            <span class="as-val" id="as-next">—</span>
+          </div>
+        </div>
+        <button class="btn-acabo" id="btn-acabo" type="button">✓ Acabo de pagar</button>
+      </div>
+    </div>
+
+    <div class="status-badge" id="status-badge" style="display:none">
       <div class="sk" id="sb-key">Estado</div>
       <div class="sv" id="sb-val">—</div>
     </div>
@@ -1063,11 +1194,10 @@ button{cursor:pointer;border:none;background:none}
     <div class="actions">
       <button class="cta" id="btn-png">↓ Descargar PNG</button>
       <button class="cta alt" id="btn-wa">Compartir WhatsApp</button>
-      <button class="cta ghost" id="btn-link">Copiar link</button>
+      <button class="cta ghost" id="btn-share-fam">👨‍👩‍👧 Compartir con familiar</button>
     </div>
 
     <div class="actions extra">
-      <button class="cta ghost" id="btn-remind">⏰ Programar recordatorios</button>
       <button class="cta ghost" id="btn-ics">📅 Agregar a mi calendario</button>
       <button class="cta ghost" id="btn-save-tour">⭐ Guardar este tour</button>
     </div>
@@ -1105,6 +1235,33 @@ button{cursor:pointer;border:none;background:none}
     <div>v4.0 · plan-pagos</div>
   </footer>
 </main>
+
+<!-- Modal: compartir con familiar -->
+<div class="modal-overlay" id="share-modal">
+  <div class="modal-card">
+    <button class="modal-close" id="share-close" type="button" aria-label="Cerrar">✕</button>
+    <div class="modal-title">Compartir mi plan con familiar</div>
+    <div class="modal-sub">Comparte este link con tu acompañante para que también vea cuándo son los pagos. Si te suscribiste a recordatorios, los emails llegan a tu correo nada más.</div>
+    <div class="modal-actions">
+      <button class="cta" id="share-copy" type="button">📋 Copiar link</button>
+      <button class="cta alt" id="share-wa" type="button">💬 Compartir por WhatsApp</button>
+      <button class="cta ghost" id="share-email" type="button">✉️ Enviar por Email</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: ver / eliminar comprobante -->
+<div class="modal-overlay" id="comp-modal">
+  <div class="modal-card">
+    <button class="modal-close" id="comp-close" type="button" aria-label="Cerrar">✕</button>
+    <div class="modal-title" id="comp-title">Comprobante</div>
+    <div class="modal-sub" id="comp-sub">Pago marcado el —</div>
+    <div class="comp-preview" id="comp-preview"></div>
+    <div class="modal-actions">
+      <button class="cta alt" id="comp-delete" type="button">🗑 Eliminar comprobante</button>
+    </div>
+  </div>
+</div>
 
 <div class="toast" id="toast">—</div>
 
@@ -2020,6 +2177,7 @@ function renderPlan(){
   }
 
   var esteMes=findEsteMes(rows, paid);
+  var comps=loadComps();
   var body=document.getElementById('tabla-body');
   body.innerHTML='';
   rows.forEach(function(r,i){
@@ -2030,17 +2188,35 @@ function renderPlan(){
     div.dataset.k=r.k;
     var statusLabel = paidNow?'Pagado':(i===esteMes?'Este mes':'Pendiente');
     var fechaStr = r.date ? fmtFecha(r.date) : '';
+    var hasComp = !!comps[r.k];
+    var compBtn = hasComp
+      ? '<button class="comp-btn attached" data-k="'+r.k+'" data-act="view" type="button">✓ Comprobante</button>'
+      : '<button class="comp-btn" data-k="'+r.k+'" data-act="upload" type="button">📎 Subir</button>';
     div.innerHTML =
       '<div class="idx">'+String(i+1).padStart(2,'0')+'</div>'+
-      '<div class="lab"><b>'+r.label+'</b><span data-fecha="'+fechaStr+'">'+r.sub+'</span></div>'+
+      '<div class="lab"><b>'+r.label+'</b><span data-fecha="'+fechaStr+'">'+r.sub+' · '+compBtn+'</span></div>'+
       '<div class="fecha">'+fechaStr+'</div>'+
       '<div class="monto">'+fmt(r.amount)+'</div>'+
       '<div class="status">'+statusLabel+'</div>';
-    div.addEventListener('click', function(){togglePaid(r.k);});
+    // Click en la fila (excepto el botón de comprobante) togglea pagado
+    div.addEventListener('click', function(ev){
+      if(ev.target.closest('.comp-btn')) return; // dejar pasar al handler del botón
+      togglePaid(r.k);
+    });
     body.appendChild(div);
+  });
+  // Delegación para botones de comprobante
+  body.querySelectorAll('.comp-btn').forEach(function(b){
+    b.addEventListener('click', function(ev){
+      ev.stopPropagation();
+      var k=b.dataset.k, act=b.dataset.act;
+      if(act==='upload') openCompUpload(k);
+      else openCompModal(k);
+    });
   });
   updateNextBanner(rows, paid);
   updateStatusAndProgress(rows, paid, state.plan.perP);
+  updateAccountStatus(rows, paid, state.plan.perP);
 }
 
 function updateNextBanner(rows, paid){
@@ -2062,12 +2238,91 @@ function updateNextBanner(rows, paid){
   }
 }
 
+// ── paidAt: timestamp del día que se marcó cada pago ──
+function paidAtKey(){
+  if(!state.ev||!state.pkg||!state.zona||!state.sepDate) return null;
+  return 'rol-paidAt::'+state.ev.id+'::'+state.pkg+'::'+slug(state.zona.n)+'::'+ymd(state.sepDate);
+}
+function loadPaidAt(){
+  var k=paidAtKey(); if(!k) return {};
+  try{return JSON.parse(localStorage.getItem(k)||'{}');}catch(e){return {};}
+}
+function savePaidAt(obj){
+  var k=paidAtKey(); if(!k) return;
+  try{localStorage.setItem(k, JSON.stringify(obj||{}));}catch(e){}
+}
+
 function togglePaid(k){
   var paid=loadPaid();
-  var i=paid.indexOf(k);
-  if(i>=0) paid.splice(i,1); else paid.push(k);
+  var paidAt=loadPaidAt();
+  var idx=paid.indexOf(k);
+  if(idx>=0){
+    // Desmarcar
+    paid.splice(idx,1);
+    delete paidAt[k];
+  } else {
+    // Marcar — detectar duplicado mismo día
+    var today=ymd(new Date());
+    var dupKey=null;
+    for(var key in paidAt){
+      if(paidAt.hasOwnProperty(key) && paidAt[key]===today && key!==k){dupKey=key;break;}
+    }
+    if(dupKey){
+      if(!confirm('¿Ya marcaste un pago hoy? ¿Estás seguro de marcar este también?')) return;
+    }
+    paid.push(k);
+    paidAt[k]=today;
+  }
   savePaid(paid);
+  savePaidAt(paidAt);
   renderPlan();
+}
+
+// ── Comprobantes (archivos adjuntos por pago) ──
+function compsKey(){
+  if(!state.ev||!state.pkg||!state.zona||!state.sepDate) return null;
+  return 'rol-comp::'+state.ev.id+'::'+state.pkg+'::'+slug(state.zona.n)+'::'+ymd(state.sepDate);
+}
+function loadComps(){
+  var k=compsKey(); if(!k) return {};
+  try{return JSON.parse(localStorage.getItem(k)||'{}');}catch(e){return {};}
+}
+function saveComps(obj){
+  var k=compsKey(); if(!k) return;
+  try{localStorage.setItem(k, JSON.stringify(obj||{}));}catch(e){
+    toast('Espacio insuficiente — borra alguno');
+  }
+}
+// Comprime imagen a JPEG ~75% antes de guardar (max 1200px lado largo)
+function compressImageFile(file, maxWidth, quality){
+  maxWidth = maxWidth || 1200; quality = quality || 0.75;
+  return new Promise(function(resolve, reject){
+    var reader=new FileReader();
+    reader.onload=function(e){
+      var img=new Image();
+      img.onload=function(){
+        var ratio = img.width>maxWidth ? maxWidth/img.width : 1;
+        var w=Math.round(img.width*ratio), h=Math.round(img.height*ratio);
+        var c=document.createElement('canvas');
+        c.width=w; c.height=h;
+        c.getContext('2d').drawImage(img,0,0,w,h);
+        try{ resolve(c.toDataURL('image/jpeg', quality)); }
+        catch(err){ reject(err); }
+      };
+      img.onerror=reject;
+      img.src=e.target.result;
+    };
+    reader.onerror=reject;
+    reader.readAsDataURL(file);
+  });
+}
+function readFileAsDataUrl(file){
+  return new Promise(function(resolve, reject){
+    var reader=new FileReader();
+    reader.onload=function(e){resolve(e.target.result);};
+    reader.onerror=reject;
+    reader.readAsDataURL(file);
+  });
 }
 
 // ── URL params ───────────────────────────────
@@ -2130,18 +2385,7 @@ function applyUrlParams(){
   }
 }
 
-// ── Actions ──────────────────────────────────
-document.getElementById('btn-link').addEventListener('click', function(){
-  pushUrlParams();
-  var url=location.origin+location.pathname+location.search;
-  if(navigator.clipboard){
-    navigator.clipboard.writeText(url).then(function(){toast('Link copiado ✓');});
-  } else {
-    var t=document.createElement('textarea'); t.value=url; document.body.appendChild(t); t.select();
-    try{document.execCommand('copy');toast('Link copiado ✓');}catch(e){prompt('Copia el link:',url);}
-    document.body.removeChild(t);
-  }
-});
+// (Antiguo btn-link "Copiar link" reemplazado por btn-share-fam más abajo, que abre modal con 3 opciones)
 
 document.getElementById('btn-wa').addEventListener('click', function(){
   if(!state.ev||!state.plan) return;
@@ -2600,19 +2844,214 @@ function updateStatusAndProgress(rows, paid, perP){
   }
 }
 
-// ── Reminders via WhatsApp self-message ──────
-document.getElementById('btn-remind').addEventListener('click', function(){
-  if(!state.plan) return;
-  var rows = buildRows();
-  var paid = loadPaid();
-  var pending = rows.filter(function(r){return paid.indexOf(r.k)<0 && r.date;});
-  if(!pending.length){ toast('No tienes pagos pendientes'); return; }
-  var ev = state.ev;
-  var lines = pending.map(function(r,i){
-    return (i+1)+'. '+r.label+' - '+fmt(r.amount)+' - '+fmtFecha(r.date);
-  }).join('\n');
-  var msg = 'Mis pagos Conecta Reynosa - '+ev.a+':\n\n'+lines+'\n\nLink de mi plan: '+location.origin+location.pathname+'?u='+encodeURIComponent(slug(state.user||'tu'))+'&tours='+encodeURIComponent([ev.id, state.pkg, slug(state.zona.n), ymd(state.sepDate)].join('-'));
+// (Recordatorios por WhatsApp eliminados — los recordatorios ahora son por email vía rol-subscribe)
+
+// ── Estado de cuenta + Acabo de pagar + Notif Push ──
+function updateAccountStatus(rows, paid, perP){
+  // Estadísticas
+  var totalPaid = rows.reduce(function(s,r){return s + (paid.indexOf(r.k)>=0?r.amount:0);}, 0);
+  var paidCount = rows.filter(function(r){return paid.indexOf(r.k)>=0;}).length;
+  document.getElementById('as-pagado').innerHTML = fmt(totalPaid)+'<em>'+paidCount+' de '+rows.length+' pago'+(rows.length===1?'':'s')+'</em>';
+
+  // Estado y próximo pago
+  var today=new Date(); today.setHours(0,0,0,0);
+  var overdue=null, next=null;
+  rows.forEach(function(r){
+    if(paid.indexOf(r.k)>=0) return;
+    if(!r.date) return;
+    var d=new Date(r.date); d.setHours(0,0,0,0);
+    if(d<today){ if(!overdue) overdue=r; }
+    else if(!next || d<new Date(next.date)) next=r;
+  });
+
+  var badge=document.getElementById('as-badge');
+  var ic=document.getElementById('as-ic');
+  var txt=document.getElementById('as-txt');
+  var nextEl=document.getElementById('as-next');
+  badge.classList.remove('ok','next','late');
+
+  if(overdue){
+    badge.classList.add('late');
+    ic.textContent='⚠'; txt.textContent='Tienes un pago vencido';
+    nextEl.innerHTML = '<strong style="color:var(--red)">'+fmt(overdue.amount)+'</strong><em>'+overdue.label+' venció el '+fmtFecha(overdue.date)+'</em>';
+  } else if(next){
+    var days = Math.ceil((new Date(next.date)-today)/86400000);
+    var soon = days <= 15;
+    badge.classList.add(soon?'next':'ok');
+    ic.textContent = soon?'⏰':'✓';
+    txt.textContent = soon?'Pago próximo':'Al día';
+    var dayLbl = days===0?'vence hoy':days===1?'vence mañana':'vence en '+days+' días';
+    nextEl.innerHTML = '<strong>'+fmt(next.amount)+'</strong><em>'+next.label+' — '+dayLbl+'</em>';
+  } else {
+    badge.classList.add('ok');
+    ic.textContent='✓';
+    txt.textContent = paidCount===rows.length && rows.length>0 ? 'Plan completado 🎉' : 'Al día';
+    nextEl.innerHTML = '<strong>—</strong><em>No hay pagos pendientes</em>';
+  }
+
+  // Habilita "Acabo de pagar" solo si hay un pago pendiente
+  var btn=document.getElementById('btn-acabo');
+  btn.disabled = !(overdue || next);
+  btn._next = overdue || next; // referencia rápida al pago candidato
+
+  // Notif push si hay vencido (una sola vez por sesión)
+  if(overdue && !window._rolNotified){
+    window._rolNotified = true;
+    notifyOverdue(overdue);
+  }
+}
+
+document.getElementById('btn-acabo').addEventListener('click', function(){
+  var target = this._next;
+  if(!target) return;
+  togglePaid(target.k);
+  toast('Pago marcado ✓');
+});
+
+// Notificación push del navegador
+function notifyOverdue(pago){
+  if(!('Notification' in window)) return;
+  var doNotify = function(){
+    try{
+      var n = new Notification('Tienes un pago vencido', {
+        body: fmt(pago.amount)+' — '+pago.label+' del '+fmtFecha(pago.date),
+        icon: '/icon-192.png',
+        tag: 'rol-overdue-'+(state.ev?state.ev.id:''),
+      });
+      n.onclick = function(){window.focus(); n.close();};
+    }catch(e){console.warn('Notification error:',e);}
+  };
+  if(Notification.permission === 'granted'){ doNotify(); }
+  else if(Notification.permission === 'default'){
+    Notification.requestPermission().then(function(perm){
+      if(perm==='granted') doNotify();
+    });
+  }
+}
+
+// ── Comprobantes UI ──────────────────────────
+var _compCurrentKey = null;
+function openCompUpload(k){
+  // Crea input file efímero
+  var input=document.createElement('input');
+  input.type='file';
+  input.accept='image/*,application/pdf';
+  input.style.display='none';
+  input.addEventListener('change', async function(){
+    var file=input.files && input.files[0];
+    if(!file) return;
+    try{
+      var dataUrl;
+      if(file.type.indexOf('image/')===0){
+        dataUrl = await compressImageFile(file);
+      } else if(file.type==='application/pdf'){
+        if(file.size > 1.5*1024*1024){
+          toast('PDF demasiado grande (max 1.5MB)');
+          return;
+        }
+        dataUrl = await readFileAsDataUrl(file);
+      } else {
+        toast('Solo imágenes o PDF');
+        return;
+      }
+      var comps=loadComps();
+      comps[k] = {data:dataUrl, type:file.type, name:file.name, at:new Date().toISOString()};
+      saveComps(comps);
+      toast('Comprobante guardado ✓');
+      renderPlan();
+    }catch(e){
+      console.error(e);
+      toast('No pude guardar el archivo');
+    }
+    document.body.removeChild(input);
+  });
+  document.body.appendChild(input);
+  input.click();
+}
+
+function openCompModal(k){
+  var comps=loadComps();
+  var c=comps[k];
+  if(!c) return;
+  _compCurrentKey = k;
+  document.getElementById('comp-title').textContent = 'Comprobante · '+labelForKey(k);
+  document.getElementById('comp-sub').textContent = c.at ? 'Subido el '+fmtFecha(new Date(c.at)) : '';
+  var preview=document.getElementById('comp-preview');
+  preview.innerHTML='';
+  if(c.type && c.type.indexOf('image/')===0){
+    var img=document.createElement('img');
+    img.src=c.data; img.alt='Comprobante';
+    preview.appendChild(img);
+  } else {
+    var div=document.createElement('div');
+    div.className='pdf-fallback';
+    div.innerHTML='📄 '+(c.name||'documento.pdf')+'<br><br><a href="'+c.data+'" target="_blank" rel="noopener">Abrir / descargar</a>';
+    preview.appendChild(div);
+  }
+  document.getElementById('comp-modal').classList.add('show');
+}
+function labelForKey(k){
+  if(k==='sep') return 'Separo';
+  if(k==='liq') return 'Liquidación';
+  var m=String(k).match(/^pq(\d+)$/);
+  if(m) return 'Pago '+(parseInt(m[1],10)+1);
+  return k;
+}
+document.getElementById('comp-close').addEventListener('click', function(){
+  document.getElementById('comp-modal').classList.remove('show');
+});
+document.getElementById('comp-modal').addEventListener('click', function(e){
+  if(e.target===this) this.classList.remove('show');
+});
+document.getElementById('comp-delete').addEventListener('click', function(){
+  if(!_compCurrentKey) return;
+  if(!confirm('¿Eliminar este comprobante?')) return;
+  var comps=loadComps();
+  delete comps[_compCurrentKey];
+  saveComps(comps);
+  document.getElementById('comp-modal').classList.remove('show');
+  toast('Comprobante eliminado');
+  renderPlan();
+});
+
+// ── Modal: compartir con familiar ────────────
+document.getElementById('btn-share-fam').addEventListener('click', function(){
+  pushUrlParams();
+  document.getElementById('share-modal').classList.add('show');
+});
+document.getElementById('share-close').addEventListener('click', function(){
+  document.getElementById('share-modal').classList.remove('show');
+});
+document.getElementById('share-modal').addEventListener('click', function(e){
+  if(e.target===this) this.classList.remove('show');
+});
+function shareUrlCurrent(){
+  // URL del usuario con TODOS sus tours (igual que home > Compartir mis tours)
+  return state.tours.length ? buildShareUrl() : (location.origin+location.pathname+location.search);
+}
+document.getElementById('share-copy').addEventListener('click', function(){
+  var url = shareUrlCurrent();
+  if(navigator.clipboard){
+    navigator.clipboard.writeText(url).then(function(){
+      toast('Link copiado ✓');
+      document.getElementById('share-modal').classList.remove('show');
+    });
+  } else {
+    prompt('Copia tu link:', url);
+  }
+});
+document.getElementById('share-wa').addEventListener('click', function(){
+  var url = shareUrlCurrent();
+  var msg = 'Hola! Te comparto el plan de pagos del viaje Conecta. Aquí puedes ver cuándo son los pagos:\n\n'+url;
   window.open('https://wa.me/?text='+encodeURIComponent(msg), '_blank');
+  document.getElementById('share-modal').classList.remove('show');
+});
+document.getElementById('share-email').addEventListener('click', function(){
+  var url = shareUrlCurrent();
+  var subj = 'Plan de pagos Conecta — '+(state.ev?state.ev.a:'');
+  var body = 'Hola!\n\nTe comparto el plan de pagos del viaje. Aquí puedes ver cuándo son los pagos:\n\n'+url+'\n\n— '+(state.user||'');
+  window.location.href = 'mailto:?subject='+encodeURIComponent(subj)+'&body='+encodeURIComponent(body);
+  document.getElementById('share-modal').classList.remove('show');
 });
 
 // ── ICS calendar ─────────────────────────────

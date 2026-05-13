@@ -320,6 +320,34 @@ button{cursor:pointer;border:none;background:none}
 .hab .h-desc{font-size:11px;color:var(--ink-mute);margin-top:3px;font-weight:500;line-height:1.3}
 .hab .he{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--ink-soft);margin-top:6px;font-weight:700}
 .hab.sel .h-desc{color:rgba(255,255,255,.75)}
+
+/* ── Transporte CDMX ──────────────────────── */
+.transp-wrap{margin-top:18px;display:none}
+.transp-wrap.on{display:block}
+.transp-title{
+  font-size:10px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--ink-mute);margin-bottom:8px;
+}
+.transp-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:6px}
+.transp-btn{
+  background:#000;border:1px solid var(--line);padding:12px 14px;
+  text-align:left;display:flex;align-items:center;gap:10px;
+  transition:all .15s;
+}
+.transp-btn .ti{font-size:20px;flex:0 0 auto}
+.transp-btn .tmid{flex:1;min-width:0}
+.transp-btn .tn{font-weight:800;font-size:13px;letter-spacing:.02em;text-transform:uppercase;line-height:1.1;display:block}
+.transp-btn .tnote{font-size:10px;color:var(--ink-mute);font-weight:600;margin-top:2px;display:block}
+.transp-btn .tp{font-family:'JetBrains Mono',monospace;font-weight:700;font-size:12px;color:var(--ink-soft);flex:0 0 auto}
+.transp-btn:hover{border-color:var(--yel)}
+.transp-btn.sel{background:var(--blue);border-color:var(--blue);color:#fff}
+.transp-btn.sel .tnote{color:rgba(255,255,255,.7)}
+.transp-btn.sel .tp{color:rgba(255,255,255,.9)}
+@media(max-width:600px){
+  .transp-grid{grid-template-columns:1fr;gap:6px}
+  .transp-btn{padding:14px 14px;min-height:54px}
+  .transp-btn .tn{font-size:14px}
+}
 .hab:hover{border-color:var(--yel)}
 .hab.sel{background:var(--blue);border-color:var(--blue);color:#fff}
 .hab.sel .he{color:rgba(255,255,255,.85)}
@@ -1113,6 +1141,18 @@ button{cursor:pointer;border:none;background:none}
       <div class="hab-title">Habitación (suma al total)</div>
       <div class="hab-grid" id="hab-grid"></div>
     </div>
+
+    <!-- Paso de transporte CDMX — visible solo cuando isCDMX(ev) && pkg !== 'cheap' -->
+    <div class="transp-wrap" id="transp-wrap">
+      <div class="transp-title">¿Agregaste transporte a CDMX?</div>
+      <div class="transp-grid" id="transp-grid"></div>
+      <div class="fld num" id="transp-edit-wrap" style="display:none;margin-top:10px">
+        <label for="transp-monto">Monto que pagaste</label>
+        <span class="pfx">$</span>
+        <input type="text" inputmode="decimal" id="transp-monto" autocomplete="off">
+      </div>
+      <div class="fld-help" style="margin-top:6px">Si el cliente pagó vuelo o autobús a CDMX, suma al total y se distribuye en los pagos mensuales.</div>
+    </div>
   </section>
 
   <section class="step locked" id="step4">
@@ -1193,7 +1233,6 @@ button{cursor:pointer;border:none;background:none}
 
     <div class="actions">
       <button class="cta" id="btn-png">↓ Descargar PNG</button>
-      <button class="cta alt" id="btn-wa">Compartir WhatsApp</button>
       <button class="cta ghost" id="btn-share-fam">👨‍👩‍👧 Compartir con familiar</button>
     </div>
 
@@ -1232,7 +1271,7 @@ button{cursor:pointer;border:none;background:none}
 
   <footer class="foot">
     <div>Conecta Reynosa · <b>conectareynosa.mx</b></div>
-    <div>v4.1 · plan-pagos · hab-fix</div>
+    <div>v4.2 · plan-pagos · transp-cdmx</div>
   </footer>
 </main>
 
@@ -1333,7 +1372,7 @@ function toast(msg){
 }
 
 // ── State ────────────────────────────────────
-var state = { ev:null, fi:null, pkg:null, zona:null, hab:null, sepDate:null, precio:null, sepMonto:null, sepTouched:false, plan:null, user:null, tours:[], view:'onboarding' };
+var state = { ev:null, fi:null, pkg:null, zona:null, hab:null, transporte:null, sepDate:null, precio:null, sepMonto:null, sepTouched:false, plan:null, user:null, tours:[], view:'onboarding' };
 
 // ── User & tours (multi-tour persistence) ────
 function loadUser(){
@@ -1557,7 +1596,7 @@ function showMultifecha(){
 // ── Select event ─────────────────────────────
 function selectEvent(id){
   state.ev = EV.find(function(e){return e.id===id;}) || null;
-  state.fi=null; state.pkg=null; state.zona=null; state.hab=null;
+  state.fi=null; state.pkg=null; state.zona=null; state.hab=null; state.transporte=null;
   state.precio=null; state.sepMonto=null; state.sepTouched=false;
   state.codigo='';
   applyBuyType('normal');
@@ -1569,6 +1608,10 @@ function selectEvent(id){
   document.getElementById('zona-precio').value='';
   document.getElementById('sep-monto').value='';
   document.getElementById('codigo-input').value='';
+  document.getElementById('transp-wrap').classList.remove('on');
+  document.getElementById('transp-grid').innerHTML='';
+  document.getElementById('transp-edit-wrap').style.display='none';
+  document.getElementById('transp-monto').value='';
   document.getElementById('btn-calc').disabled=true;
   renderEvList(document.getElementById('q').value);
   if(state.ev){
@@ -1621,7 +1664,7 @@ document.querySelectorAll('.pkg').forEach(function(btn){
   btn.addEventListener('click', function(){
     document.querySelectorAll('.pkg').forEach(function(b){b.classList.remove('sel');});
     btn.classList.add('sel');
-    state.pkg=btn.dataset.p; state.zona=null; state.hab=null;
+    state.pkg=btn.dataset.p; state.zona=null; state.hab=null; state.transporte=null;
     state.precio=null; state.sepMonto=null; state.sepTouched=false;
     document.getElementById('precio-wrap').style.display='none';
     document.getElementById('sep-monto-wrap').style.display='none';
@@ -1629,6 +1672,7 @@ document.querySelectorAll('.pkg').forEach(function(btn){
     applyBuyType('normal');
     populateZonas();
     populateHabs();
+    populateTransporte();
     document.getElementById('btn-calc').disabled=true;
     setStep(3);
   });
@@ -1773,15 +1817,9 @@ function validateCodigoLocal(rawCode){
   var c = String(rawCode).toUpperCase().trim();
   var p = PROMOS && PROMOS[c];
   if(!p) return {ok:false,msg:'Código no válido'};
-  if(p.singleUse){
-    try{ if(localStorage.getItem('promo_used_'+c)==='true') return {ok:false,msg:'Este código ya fue utilizado'}; }catch(e){}
-  }
-  if(p.expiresTs && Date.now()>p.expiresTs) return {ok:false,msg:'Código expirado'};
-  if(p.expires){
-    var hoy=new Date().toISOString().slice(0,10);
-    if(hoy>p.expires) return {ok:false,msg:'Código expirado'};
-  }
-  if(p.maxUsos && p.usos>=p.maxUsos) return {ok:false,msg:'Código agotado'};
+  // NO validamos expiresTs / expires / singleUse / maxUsos:
+  // este flujo reconstruye el rol histórico — si el cliente usó el código cuando estaba vigente,
+  // debe poder ver su precio real aunque el código ya haya expirado o se haya agotado.
   // Restricciones por evento
   if(p.onlyEvent || p.onlyEvents){
     var allowed = p.onlyEvents || [p.onlyEvent];
@@ -1960,8 +1998,14 @@ function populateHabs(){
       checkReady();
       // Si ya existe un plan generado, refrescar total/progreso/estado en vivo
       refreshPlanIfActive();
-      // Avanzar al paso 4 ahora que tenemos zona + hab
-      if(state.zona && state.pkg !== 'cheap') setStep(4);
+      // Avanzar al paso 4 (separo). En CDMX no-cheap, dejar visible el paso de transporte:
+      // si el usuario quiere ajustarlo se queda en step 3, sino el botón Generar funciona en step 4.
+      if(state.zona){
+        if(state.pkg === 'cheap') setStep(4);
+        else if(!transporteNeeded()) setStep(4);
+        // Para CDMX no-cheap: NO avanzar — el paso de transporte queda visible debajo.
+        // El click en una opción de transporte avanzará al paso 4.
+      }
     });
     grid.appendChild(b);
   });
@@ -1972,6 +2016,82 @@ function populateHabs(){
     if(btn) btn.classList.add('sel');
   }
 }
+
+// ── Transporte CDMX ──────────────────────────
+// Espejo de buildTransporteButtons() de index.html. Solo aplica para isCDMX(ev) && pkg!=='cheap'.
+// Opciones: Sin transporte ($0) · Autobús Reynosa-CDMX ($2,500 default editable) · Avión (editable)
+// Festival Arre tiene caso especial: oculta el autobús (idéntico al wizard).
+function transporteOptions(ev){
+  if(!ev || !isCDMX(ev)) return [];
+  var opts = [{k:'sin', n:'Sin transporte', cost:0, icon:'🚶', note:'No agregué traslado'}];
+  if(ev.id !== 'arre'){
+    opts.push({k:'bus', n:'Autobús Rey↔CDMX', cost:2500, editable:true, icon:'🚌', note:'$2,500 estándar — editable'});
+  }
+  opts.push({k:'avion', n:'Avión Rey↔CDMX', cost:0, editable:true, icon:'✈️', note:'Pon el monto que pagaste'});
+  return opts;
+}
+
+function transporteNeeded(){
+  return !!(state.ev && isCDMX(state.ev) && state.pkg && state.pkg !== 'cheap');
+}
+
+function populateTransporte(){
+  var wrap = document.getElementById('transp-wrap');
+  var grid = document.getElementById('transp-grid');
+  var edit = document.getElementById('transp-edit-wrap');
+  var editIn = document.getElementById('transp-monto');
+  grid.innerHTML = '';
+  edit.style.display = 'none';
+  editIn.value = '';
+  if(!transporteNeeded()){
+    wrap.classList.remove('on');
+    state.transporte = null; // no aplica
+    return;
+  }
+  wrap.classList.add('on');
+  var opts = transporteOptions(state.ev);
+  opts.forEach(function(o){
+    var b = document.createElement('button');
+    b.className = 'transp-btn';
+    b.type = 'button';
+    b.dataset.k = o.k;
+    var priceLbl = (o.cost > 0) ? fmt(o.cost) : (o.k==='sin' ? '$0' : 'Variable');
+    b.innerHTML = '<span class="ti">'+o.icon+'</span>'+
+      '<span class="tmid"><span class="tn">'+o.n+'</span><span class="tnote">'+o.note+'</span></span>'+
+      '<span class="tp">'+priceLbl+'</span>';
+    b.addEventListener('click', function(){
+      document.querySelectorAll('.transp-btn').forEach(function(x){x.classList.remove('sel');});
+      b.classList.add('sel');
+      state.transporte = {k:o.k, n:o.n, cost: o.cost||0};
+      if(o.editable){
+        edit.style.display = 'block';
+        editIn.value = o.cost || '';
+        // Foco en input para que el cliente pueda escribir el monto custom
+        setTimeout(function(){editIn.focus();}, 50);
+      } else {
+        edit.style.display = 'none';
+        editIn.value = '';
+      }
+      recomputeDefaultSepMonto();
+      checkReady();
+      refreshPlanIfActive();
+      // Avanzar al separo cuando se elige transporte (zona + hab + transporte completos)
+      if(state.zona && state.hab) setStep(4);
+    });
+    grid.appendChild(b);
+  });
+  // Default: Sin transporte
+  state.transporte = {k:'sin', n:'Sin transporte', cost:0};
+  var defBtn = grid.querySelector('[data-k="sin"]');
+  if(defBtn) defBtn.classList.add('sel');
+}
+
+document.getElementById('transp-monto').addEventListener('input', function(){
+  if(!state.transporte) return;
+  state.transporte.cost = parseNum(this.value);
+  recomputeDefaultSepMonto();
+  refreshPlanIfActive();
+});
 
 // ── Date + Separo ────────────────────────────
 document.getElementById('sep-date').addEventListener('change', function(){
@@ -1994,10 +2114,11 @@ function computeDefaultSep(){
   var habE = (pkg==='cheap')?0:(state.hab?(state.hab.pp!=null?state.hab.pp:state.hab.e):0);
   var rideBase = ev.ride || (isCDMX(ev)?2900:2700);
   var stayDiscount = ev.sep||500;
+  var transpCost = (pkg !== 'cheap' && state.transporte && state.transporte.cost > 0) ? state.transporte.cost : 0;
   var perP=0;
-  if(pkg==='plus')      perP = state.precio + habE;
-  else if(pkg==='ride') perP = rideBase + habE;
-  else if(pkg==='stay'){perP = state.precio - stayDiscount + habE; if(perP<0) perP = state.precio + habE;}
+  if(pkg==='plus')      perP = state.precio + habE + transpCost;
+  else if(pkg==='ride') perP = rideBase + habE + transpCost;
+  else if(pkg==='stay'){perP = state.precio - stayDiscount + habE + transpCost; if(perP<0) perP = state.precio + habE + transpCost;}
   else if(pkg==='cheap')perP = state.precio;
   var sep;
   if(pkg==='cheap'){
@@ -2112,11 +2233,14 @@ function computeStatePlan(){
   var zonaP = (state.precio!=null && state.precio>0) ? state.precio : (z.p||0);
   var rideBase=ev.ride||(cdmx?2900:2700);
   var stayDiscount=ev.sep||500;
+  // Transporte CDMX: solo cuenta para paquetes no-cheap; el wizard de index.html
+  // fuerza Sin transporte $0 para cheap, mismo aquí.
+  var transpCost = (pkg !== 'cheap' && state.transporte && state.transporte.cost > 0) ? state.transporte.cost : 0;
 
   var perP=0;
-  if(pkg==='plus')      perP=zonaP+habE;
-  else if(pkg==='ride') perP=rideBase+habE;
-  else if(pkg==='stay'){perP=zonaP-stayDiscount+habE; if(perP<0)perP=zonaP+habE;}
+  if(pkg==='plus')      perP=zonaP+habE+transpCost;
+  else if(pkg==='ride') perP=rideBase+habE+transpCost;
+  else if(pkg==='stay'){perP=zonaP-stayDiscount+habE+transpCost; if(perP<0)perP=zonaP+habE+transpCost;}
   else if(pkg==='cheap')perP=zonaP;
 
   var sepActual = (state.sepMonto!=null) ? state.sepMonto : 0;
@@ -2405,34 +2529,7 @@ function applyUrlParams(){
   }
 }
 
-// (Antiguo btn-link "Copiar link" reemplazado por btn-share-fam más abajo, que abre modal con 3 opciones)
-
-document.getElementById('btn-wa').addEventListener('click', function(){
-  if(!state.ev||!state.plan) return;
-  pushUrlParams();
-  var ev=state.ev, p=state.plan;
-  var pkgNames={plus:'PLUS · Todo incluido', ride:'RIDE · Sin boleto', stay:'STAY · Sin transporte', cheap:'CHEAP · Solo boleto'};
-  var rows=buildRows();
-  var paid=loadPaid();
-  var firstPendIdx=rows.findIndex(function(x){return paid.indexOf(x.k)<0;});
-  var msg='Hola! Este es mi plan de pagos 📋\n\n'+
-          '🎤 *'+ev.a+'*\n'+
-          '📅 '+ev.f+'\n'+
-          '📍 '+ev.v+'\n'+
-          '📦 '+pkgNames[state.pkg]+'\n'+
-          '🎫 '+state.zona.n+(state.zona.fecha?' ('+state.zona.fecha+')':'')+' — '+fmt(state.zona.p)+'\n'+
-          (state.pkg!=='cheap'?'🛏️ '+state.hab.n+(state.hab.pp?' (+'+fmt(state.hab.pp)+'/persona)':'')+'\n':'')+
-          '\n💰 *Total p.persona:* '+fmt(p.perP)+
-          '\n💳 *Separo:* '+fmt(p.sepActual)+' ('+fmtFecha(state.sepDate)+')'+
-          '\n💸 *Falta:* '+fmt(p.resto)+
-          '\n\n📆 *Calendario:*\n';
-  rows.forEach(function(r,i){
-    var mark = paid.indexOf(r.k)>=0?'✅':(i===firstPendIdx?'⏰':'⬜');
-    msg+='  '+mark+' '+r.label+' — '+fmt(r.amount)+(r.date?' · '+fmtFecha(r.date):'')+'\n';
-  });
-  msg+='\n🔗 '+location.origin+location.pathname+location.search;
-  window.open('https://wa.me/'+WA+'?text='+encodeURIComponent(msg),'_blank');
-});
+// (Antiguo btn-link / btn-wa reemplazados por btn-share-fam que abre modal con 3 opciones de compartir)
 
 document.getElementById('btn-png').addEventListener('click', async function(){
   if(typeof html2canvas==='undefined'){alert('Espera unos segundos a que cargue la librería de imágenes.');return;}
@@ -2515,10 +2612,11 @@ function buildPlanForTour(t){
   var zonaP=t.precio||0;
   var rideBase=ev.ride||(isCDMX(ev)?2900:2700);
   var stayDiscount=ev.sep||500;
+  var transpCost = (pkg !== 'cheap' && t.transp && t.transp.cost > 0) ? t.transp.cost : 0;
   var perP=0;
-  if(pkg==='plus')      perP=zonaP+habE;
-  else if(pkg==='ride') perP=rideBase+habE;
-  else if(pkg==='stay'){perP=zonaP-stayDiscount+habE; if(perP<0)perP=zonaP+habE;}
+  if(pkg==='plus')      perP=zonaP+habE+transpCost;
+  else if(pkg==='ride') perP=rideBase+habE+transpCost;
+  else if(pkg==='stay'){perP=zonaP-stayDiscount+habE+transpCost; if(perP<0)perP=zonaP+habE+transpCost;}
   else if(pkg==='cheap')perP=zonaP;
   var sepD=new Date(t.sep+'T12:00:00');
   var sepActual;
@@ -2665,6 +2763,12 @@ function openTour(idx){
   }
   state.buyType = t.buyType || 'normal';
   state.codigo  = t.codigo  || '';
+  // Restaurar transporte si el evento es CDMX no-cheap; sino, ignorar
+  if(transporteNeeded() && t.transp){
+    state.transporte = {k:t.transp.k||'sin', n:t.transp.n||'Sin transporte', cost:t.transp.cost||0};
+  } else {
+    state.transporte = transporteNeeded() ? {k:'sin', n:'Sin transporte', cost:0} : null;
+  }
   calculate(true);  // skip-save flag to avoid duplicating
 }
 
@@ -2731,7 +2835,7 @@ function findHabByKey(k){
 // ── Home actions ─────────────────────────────
 document.getElementById('btn-add-tour').addEventListener('click', function(){
   // Reset wizard state but keep user/tours
-  state.ev=null; state.fi=null; state.pkg=null; state.zona=null; state.hab=null;
+  state.ev=null; state.fi=null; state.pkg=null; state.zona=null; state.hab=null; state.transporte=null;
   state.precio=null; state.sepMonto=null; state.sepTouched=false;
   state.codigo=''; state.buyType='normal';
   document.getElementById('q').value='';
@@ -2744,6 +2848,10 @@ document.getElementById('btn-add-tour').addEventListener('click', function(){
   document.getElementById('zona-precio').value='';
   document.getElementById('sep-monto').value='';
   document.getElementById('codigo-input').value='';
+  document.getElementById('transp-wrap').classList.remove('on');
+  document.getElementById('transp-grid').innerHTML='';
+  document.getElementById('transp-edit-wrap').style.display='none';
+  document.getElementById('transp-monto').value='';
   applyBuyType('normal');
   document.getElementById('multif').classList.remove('on');
   // Re-render event list (clears any selection style)
@@ -2814,6 +2922,7 @@ function saveCurrentTour(){
     sepMonto: state.sepTouched ? state.sepMonto : null,
     buyType: state.buyType||'normal',
     codigo: state.codigo||'',
+    transp: state.transporte ? {k:state.transporte.k, n:state.transporte.n, cost:state.transporte.cost||0} : null,
     savedAt: new Date().toISOString()
   };
   var key = tourKey(t);

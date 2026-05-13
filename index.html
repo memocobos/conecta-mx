@@ -2064,17 +2064,9 @@ function goBack(_skipHistory) {
   }
 }
 
-// Navegación con botón "atrás" del navegador
-window.addEventListener('popstate', function(e){
-  var s = e && e.state;
-  if(s && s.event){
-    if(typeof showDetail==='function') showDetail(s.event, true);
-  } else {
-    if(typeof goBack==='function' && $$('page-detail').classList.contains('active')) goBack(true);
-  }
-});
-
-
+// (Listener `popstate` reubicado más abajo, fuera del rango que rol.html extrae para parsear EV/PROMOS.
+//  Si vive aquí, el `new Function('window', ...)` de rol.html ejecuta el addEventListener sobre un stub
+//  vacío y crashea — dejando la página en "header vacío".)
 
 var PROMOS={
   'CONECTAREY': {pct:5, expires:'2026-05-30', maxUsos:9999, usos:0, desc:'5% de descuento con código CONECTAREY'},
@@ -2095,6 +2087,18 @@ var PROMOS={
   'COMPA': {pct:5, expiresTs:1778427681035, maxUsos:9999, usos:0, desc:'5% de descuento con código COMPA', onlyEvent:'arre', excludePkg:['ride','stay','cheap']}
 };
 var _promoActivo=null;
+
+// Navegación con botón "atrás" del navegador (fuera del rango que rol.html extrae a propósito).
+window.addEventListener('popstate', function(e){
+  var s = e && e.state;
+  if(s && s.event){
+    if(typeof showDetail==='function') showDetail(s.event, true);
+  } else {
+    var pd = document.getElementById('page-detail');
+    if(typeof goBack==='function' && pd && pd.classList.contains('active')) goBack(true);
+  }
+});
+
 function validarPromo(code){
   var c=code.toUpperCase().trim();
   var p=PROMOS[c];

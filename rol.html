@@ -1429,7 +1429,16 @@ async function loadEV(){
       'PROMOS:(typeof PROMOS!=="undefined"?PROMOS:{}),'+
       'MESES:MESES,WA:WA};'
     );
-    var out = fn({STATIC_IMGS:{},MAPAS:{},LINEUPS:{}});
+    // Stub defensivo: si el bloque que extraemos contiene side-effects del DOM/window
+    // (p. ej. addEventListener), ofrecemos un no-op para evitar crashear el eval.
+    var _noop = function(){};
+    var winStub = {
+      STATIC_IMGS:{}, MAPAS:{}, LINEUPS:{},
+      addEventListener:_noop, removeEventListener:_noop,
+      matchMedia: function(){return {matches:false, addEventListener:_noop, removeEventListener:_noop};},
+      location: {pathname:'/', search:'', hash:''}, history: {state:null, pushState:_noop, replaceState:_noop},
+    };
+    var out = fn(winStub);
     EV=out.EV; BANCO_DEFAULT=out.BANCO_DEFAULT; BANCO_HEY=out.BANCO_HEY;
     HOTEL_STD=out.HOTEL_STD; HOTEL_CDM=out.HOTEL_CDM; HOTEL_MTY=out.HOTEL_MTY;
     PROMOS=out.PROMOS||{};

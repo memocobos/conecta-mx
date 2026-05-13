@@ -69,6 +69,19 @@ body.chat-open,body.wizard-open{overscroll-behavior:none}
 .logo-txt{font-weight:900;font-size:15px;color:#000;letter-spacing:.04em;text-transform:uppercase}
 .logo-mx{font-weight:900;font-style:italic;font-size:17px;color:#fff;margin-left:7px;align-self:center}
 .nav-back{display:none;background:#e8ff4c;border:none;color:#000;font-size:20px;font-weight:900;cursor:pointer;padding:0 14px;align-items:center;justify-content:center;font-family:'Montserrat',sans-serif;align-self:stretch;flex-shrink:0;min-width:44px;min-height:44px}
+/* Links de cliente en el header (entre socials y back) */
+.nav-cli-links{display:flex;align-items:center;border-right:1px solid rgba(255,255,255,.1);padding:0 4px}
+.nav-cli-link{display:flex;align-items:center;padding:0 10px;color:#fff;text-decoration:none;font-weight:900;font-size:11px;letter-spacing:.06em;text-transform:uppercase;font-family:'Montserrat',sans-serif;transition:color .12s, background .12s;height:100%}
+.nav-cli-link:hover{color:#e8ff4c;background:rgba(232,255,76,.06)}
+.nav-cli-link .nlt{display:inline}
+.nav-cli-link .nli{display:none;font-size:18px;line-height:1}
+.nav-cli-sep{color:rgba(255,255,255,.25);font-weight:700;align-self:center}
+@media(max-width:720px){
+  .nav-cli-link{padding:0 8px}
+  .nav-cli-link .nlt{display:none}
+  .nav-cli-link .nli{display:inline-block}
+  .nav-cli-sep{display:none}
+}
 .page{display:none}.page.active{display:block}
 @media(max-width:640px){
   #page-detail.active{position:fixed;inset:0;z-index:150;overflow-y:auto;overflow-x:hidden;background:#000;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
@@ -576,11 +589,64 @@ body.chat-open,body.wizard-open{overscroll-behavior:none}
 .faq-link-v2 span:last-child{font-family:var(--font-display);font-size:18px;transition:transform .25s ease}
 .faq-link-v2:hover span:last-child{transform:translateX(6px)}
 
+/* Sección "PARA CLIENTES" — banner antes del footer */
+.cli-banner{
+  background:#0a0a0a;border-top:2px solid rgba(232,255,76,.15);border-bottom:2px solid rgba(232,255,76,.15);
+  padding:clamp(36px,5vw,56px) clamp(20px,5vw,80px);
+  max-width:100%;
+}
+.cli-banner-wrap{max-width:1100px;margin:0 auto}
+.cli-banner-eyebrow{
+  display:inline-flex;align-items:center;gap:10px;font-family:'Montserrat',sans-serif;
+  font-size:11px;font-weight:700;letter-spacing:.22em;text-transform:uppercase;
+  color:rgba(255,255,255,.55);margin-bottom:8px;
+}
+.cli-banner-eyebrow::before{content:'';width:24px;height:2px;background:#ff283b;display:inline-block}
+.cli-banner-title{
+  font-family:'Barlow Condensed',sans-serif;font-weight:900;
+  font-size:clamp(36px,7vw,58px);line-height:.9;letter-spacing:-.005em;text-transform:uppercase;
+  color:#fff;margin-bottom:6px;
+}
+.cli-banner-title .y{color:#e8ff4c}
+.cli-banner-sub{
+  color:rgba(255,255,255,.55);font-size:14px;font-weight:500;margin-bottom:24px;
+}
+.cli-banner-grid{display:grid;grid-template-columns:1fr;gap:12px}
+@media(min-width:720px){.cli-banner-grid{grid-template-columns:1fr 1fr;gap:14px}}
+.cli-card{
+  display:flex;align-items:center;gap:16px;
+  background:#000;border:1px solid rgba(255,255,255,.12);
+  padding:22px 22px;text-decoration:none;color:#fff;
+  transition:transform .15s, border-color .15s, background .15s;
+}
+.cli-card:hover{transform:translate(-2px,-2px);border-color:#e8ff4c;background:rgba(232,255,76,.04)}
+.cli-card .cci{
+  font-size:32px;line-height:1;flex:0 0 auto;
+  width:54px;height:54px;display:flex;align-items:center;justify-content:center;
+  background:#e8ff4c;color:#000;border-radius:0;
+}
+.cli-card.alt .cci{background:#0000cd;color:#fff}
+.cli-card .ccm{flex:1;min-width:0}
+.cli-card .cct{
+  font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:22px;
+  line-height:1;letter-spacing:.02em;text-transform:uppercase;margin-bottom:4px;
+}
+.cli-card .ccs{
+  font-size:12px;color:rgba(255,255,255,.55);font-weight:600;letter-spacing:.04em;
+}
+.cli-card .cca{
+  font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:24px;
+  color:#e8ff4c;flex:0 0 auto;transition:transform .15s;
+}
+.cli-card:hover .cca{transform:translateX(4px)}
+.cli-card.alt .cca{color:#0000cd}
+.cli-card:hover.alt .cca{color:#e8ff4c}
+
 /* Footer v2 (FAQ-style) */
 .ftr-v2{
   background:#050505;border-top:3px solid var(--c-rojo);
   padding:clamp(40px,6vw,72px) clamp(20px,5vw,80px) clamp(28px,4vw,40px);
-  margin-top:clamp(40px,6vw,80px);
+  margin-top:0;
 }
 .ftr-v2-grid{display:grid;grid-template-columns:1fr;gap:32px;max-width:1280px;margin:0 auto;align-items:start}
 @media(min-width:800px){.ftr-v2-grid{grid-template-columns:1fr 2fr;gap:60px}}
@@ -875,6 +941,15 @@ src="https://www.facebook.com/tr?id=1685907946147007&ev=PageView&noscript=1"
     </div>
   </div>
   <div class="nav-right" id="nav-right">
+    <div class="nav-cli-links">
+      <a href="/rol" class="nav-cli-link" title="Mi plan de pagos">
+        <span class="nli">📋</span><span class="nlt">Mi Plan de Pagos</span>
+      </a>
+      <span class="nav-cli-sep">•</span>
+      <a href="/pagos" class="nav-cli-link" title="Datos bancarios">
+        <span class="nli">💳</span><span class="nlt">Datos Bancarios</span>
+      </a>
+    </div>
     <div class="nav-socials">
       <a href="https://wa.me/528119771072" target="_blank" class="nav-social wa" title="WhatsApp">
         <svg viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
@@ -1131,6 +1206,32 @@ src="https://www.facebook.com/tr?id=1685907946147007&ev=PageView&noscript=1"
 </div>
   </div>
 </div>
+
+<section class="cli-banner" aria-label="Para clientes Conecta">
+  <div class="cli-banner-wrap">
+    <div class="cli-banner-eyebrow">Para clientes Conecta</div>
+    <div class="cli-banner-title">¿Ya eres <span class="y">cliente</span>?</div>
+    <div class="cli-banner-sub">Consulta tu plan de pagos o pásate por los datos bancarios para hacer tu siguiente depósito.</div>
+    <div class="cli-banner-grid">
+      <a href="/rol" class="cli-card">
+        <div class="cci">📋</div>
+        <div class="ccm">
+          <div class="cct">Ver mi plan de pagos</div>
+          <div class="ccs">Consulta cuándo te toca cada pago</div>
+        </div>
+        <span class="cca" aria-hidden="true">→</span>
+      </a>
+      <a href="/pagos" class="cli-card alt">
+        <div class="cci">💳</div>
+        <div class="ccm">
+          <div class="cct">Datos bancarios</div>
+          <div class="ccs">BBVA · Hey Banco · Banregio</div>
+        </div>
+        <span class="cca" aria-hidden="true">→</span>
+      </a>
+    </div>
+  </div>
+</section>
 
 <footer class="ftr-v2">
   <div class="ftr-v2-grid">
@@ -1944,15 +2045,34 @@ function getPaquetes(ev) {
 
 
 
-function goBack() {
+function goBack(_skipHistory) {
   $$('page-detail').classList.remove('active');
   $$('page-catalog').classList.add('active');
   $$('nav-back').style.display = 'none';
   document.body.classList.remove('wizard-open');
+  document.body.removeAttribute('data-ev');
   if(typeof setWizHint==='function')setWizHint('');
   if(typeof _tourHide==='function')_tourHide();
   window.scrollTo(0,0);
+  // Deep link: actualizar URL a / (excepto si venimos de popstate)
+  if(!_skipHistory && typeof history!=='undefined' && history.pushState){
+    try{
+      if(history.state && history.state.event){
+        history.pushState({}, '', '/');
+      }
+    }catch(e){}
+  }
 }
+
+// Navegación con botón "atrás" del navegador
+window.addEventListener('popstate', function(e){
+  var s = e && e.state;
+  if(s && s.event){
+    if(typeof showDetail==='function') showDetail(s.event, true);
+  } else {
+    if(typeof goBack==='function' && $$('page-detail').classList.contains('active')) goBack(true);
+  }
+});
 
 
 
@@ -2545,7 +2665,13 @@ function setMonth(btn,m){
   }
   if(!found||found.listOnly)return;
   if(found.st==='proceso'&&found.waChannel){window.location.href=found.waChannel;return;}
-  showDetail(found.id);
+  // Deep link: usar replaceState para evitar entrada duplicada en history
+  try{
+    if(typeof history!=='undefined' && history.replaceState){
+      history.replaceState({event:found.id}, '', '/'+found.id);
+    }
+  }catch(e){}
+  showDetail(found.id, true); // _skipHistory: ya hicimos replaceState
 })();
 
 function isCDMX(ev){ return ev.v && (ev.v.toUpperCase().includes('CDMX') || ev.v.toUpperCase().includes('CIUDAD DE MEXICO')); }
@@ -2612,7 +2738,7 @@ function txtTransporte(ev){
 }
 function hotelList(ev){if(ev&&ev.multifecha&&cur&&cur._fechaIdx>=0){var mf=ev.multifecha[cur._fechaIdx];if(mf&&mf.hotel)return mf.hotel;}return isCDMX(ev)?HOTEL_CDM:HOTEL_MTY;}
 
-function showDetail(id){
+function showDetail(id, _skipHistory){
   if(window.stopAllPreviews)window.stopAllPreviews();
   cur=null;
   for(var i=0;i<EV.length;i++){if(EV[i].id===id){cur=EV[i];break;}}
@@ -2669,6 +2795,14 @@ function showDetail(id){
   $$('nav-back').style.display='flex';
   if(window.matchMedia('(max-width:640px)').matches){document.body.classList.add('wizard-open');window.scrollTo(0,0);}
   window.scrollTo(0,0);
+  // Deep link: actualizar URL del navegador a /<id> sin recargar (skip si venimos de popstate)
+  if(!_skipHistory && typeof history!=='undefined' && history.pushState){
+    try{
+      if(!history.state || history.state.event !== id){
+        history.pushState({event:id}, '', '/'+id);
+      }
+    }catch(e){}
+  }
   // First-visit onboarding tutorial (global once)
   setTimeout(function(){showOnboarding(cur);},250);
   // Promo modal per event (once per session)

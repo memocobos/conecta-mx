@@ -1,87 +1,26 @@
-/acdc /index.html?evento=acdc 200
-/ac-dc-power-up-tour /index.html?evento=ac-dc-power-up-tour 200
-/machaca /index.html?evento=machaca 200
-/machaca-icons-edition /index.html?evento=machaca-icons-edition 200
-/weeknd /index.html?evento=weeknd 200
-/the-weeknd /index.html?evento=the-weeknd 200
-/soda /index.html?evento=soda 200
-/soda-estereo /index.html?evento=soda-estereo 200
-/lorde /index.html?evento=lorde 200
-/laura /index.html?evento=laura 200
-/laura-pausini /index.html?evento=laura-pausini 200
-/bts /index.html?evento=bts 200
-/solomun /index.html?evento=solomun 200
-/emblema /index.html?evento=emblema 200
-/tecate-emblema /index.html?evento=tecate-emblema 200
-/megadeth /index.html?evento=megadeth 200
-/jbalvin /index.html?evento=jbalvin 200
-/j-balvin /index.html?evento=j-balvin 200
-/mendivil /index.html?evento=mendivil 200
-/victor-mendivil /index.html?evento=victor-mendivil 200
-/t3r /index.html?evento=t3r 200
-/t3r-elemento-cornelio-vega /index.html?evento=t3r-elemento-cornelio-vega 200
-/monlaferte /index.html?evento=monlaferte 200
-/mon-laferte /index.html?evento=mon-laferte 200
-/soad /index.html?evento=soad 200
-/system-of-a-down /index.html?evento=system-of-a-down 200
-/marcos /index.html?evento=marcos 200
-/marco-antonio-solis /index.html?evento=marco-antonio-solis 200
-/keniaos /index.html?evento=keniaos 200
-/kenia-os /index.html?evento=kenia-os 200
-/nochegrandes /index.html?evento=nochegrandes 200
-/wwe-aaa-noche-de-los-grandes /index.html?evento=wwe-aaa-noche-de-los-grandes 200
-/miloj /index.html?evento=miloj 200
-/milo-j /index.html?evento=milo-j 200
-/zayn /index.html?evento=zayn 200
-/rufus /index.html?evento=rufus 200
-/rufus-du-sol /index.html?evento=rufus-du-sol 200
-/harry /index.html?evento=harry 200
-/harry-styles /index.html?evento=harry-styles 200
-/warped /index.html?evento=warped 200
-/vans-warped-tour-mexico /index.html?evento=vans-warped-tour-mexico 200
-/rosalia /index.html?evento=rosalia 200
-/rosalia-lux-tour /index.html?evento=rosalia-lux-tour 200
-/neighbourhood /index.html?evento=neighbourhood 200
-/the-neighbourhood /index.html?evento=the-neighbourhood 200
-/ironmaiden /index.html?evento=ironmaiden 200
-/iron-maiden-the-future-past-tour /index.html?evento=iron-maiden-the-future-past-tour 200
-/dimitri /index.html?evento=dimitri 200
-/dimitri-vegas-like-mike /index.html?evento=dimitri-vegas-like-mike 200
-/romeo /index.html?evento=romeo 200
-/romeo-santos-prince-royce /index.html?evento=romeo-santos-prince-royce 200
-/brunomars /index.html?evento=brunomars 200
-/bruno-mars-the-romantic-tour /index.html?evento=bruno-mars-the-romantic-tour 200
-/knotfest /index.html?evento=knotfest 200
-/knotfest-mexico-2026 /index.html?evento=knotfest-mexico-2026 200
-/arjona /index.html?evento=arjona 200
-/ricardo-arjona-tour-lo-que-el-seco-no-dijo /index.html?evento=ricardo-arjona-tour-lo-que-el-seco-no-dijo 200
-/youngmiko /index.html?evento=youngmiko 200
-/young-miko /index.html?evento=young-miko 200
-/siddharta /index.html?evento=siddharta 200
-/morat /index.html?evento=morat 200
-/hilary /index.html?evento=hilary 200
-/hilary-duff /index.html?evento=hilary-duff 200
-/edc2027 /index.html?evento=edc2027 200
-/electric-daisy-carnival-edc-2027 /index.html?evento=electric-daisy-carnival-edc-2027 200
-/dalemix /index.html?evento=dalemix 200
-/dale-mixx /index.html?evento=dale-mixx 200
-/coronacap /index.html?evento=coronacap 200
-/corona-capital /index.html?evento=corona-capital 200
-/flowfest /index.html?evento=flowfest 200
-/coca-cola-flow-fest /index.html?evento=coca-cola-flow-fest 200
-/arre /index.html?evento=arre 200
-/festival-arre /index.html?evento=festival-arre 200
-/comuna /index.html?evento=comuna 200
-/festival-comuna /index.html?evento=festival-comuna 200
-/pulsognp /index.html?evento=pulsognp 200
-/pulso-gnp /index.html?evento=pulso-gnp 200
-/babymetal /index.html?evento=babymetal 200
-/edsheeran /index.html?evento=edsheeran 200
-/ed-sheeran /index.html?evento=ed-sheeran 200
-/enjambre /index.html?evento=enjambre 200
-/pulsoquetaro /index.html?evento=pulsoquetaro 200
-/pulso-gnp /index.html?evento=pulso-gnp 200
-/faq /faq.html 200
-/funciona /funciona.html 200
-/kit /kit.html 200
-/*  /index.html  200
+# Conecta Reynosa — Routing
+# Las URLs limpias (/rol, /pagos, etc.) sirven el HTML correspondiente.
+# Cualquier otra URL cae al catchall `/* → /index.html` y el JS de index.html
+# detecta el ID del evento desde window.location.pathname (ver IIFE "Deep link").
+
+# Páginas dedicadas (URL limpia → .html). Sin estas reglas, /rol daría 404.
+/rol         /rol.html         200
+/pagos       /pagos.html       200
+/kamehouse   /kamehouse.html   200
+/faq         /faq.html         200
+/funciona    /funciona.html    200
+/kit         /kit.html         200
+/diseno      /diseno.html      200
+/recibos     /recibos_v6.html  200
+/demo        /demo.html        200
+/demo-full   /demo-full.html   200
+
+# Archivos especiales (Netlify los sirve directo si existen — protección extra)
+/robots.txt  /robots.txt       200
+/sitemap.xml /sitemap.xml      200
+/manifest.json /manifest.json  200
+/sw.js       /sw.js            200
+
+# Catchall: cualquier otra URL (eventos como /karolg, /brunomars, etc.)
+# carga index.html y el JS detecta el evento por pathname.
+/*           /index.html       200

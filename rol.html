@@ -1858,6 +1858,8 @@ function refreshPrecioFromBuyType(){
   updatePrecioDisplay();
   recomputeDefaultSepMonto();
   checkReady();
+  // Si ya existe un plan, refrescar el total con el nuevo precio
+  refreshPlanIfActive();
 }
 
 function updatePrecioDisplay(){
@@ -1956,6 +1958,8 @@ function populateHabs(){
       state.hab=h;
       recomputeDefaultSepMonto();
       checkReady();
+      // Si ya existe un plan generado, refrescar total/progreso/estado en vivo
+      refreshPlanIfActive();
       // Avanzar al paso 4 ahora que tenemos zona + hab
       if(state.zona && state.pkg !== 'cheap') setStep(4);
     });
@@ -1974,11 +1978,13 @@ document.getElementById('sep-date').addEventListener('change', function(){
   state.sepDate = this.value ? new Date(this.value+'T12:00:00') : null;
   recomputeDefaultSepMonto();
   checkReady();
+  refreshPlanIfActive();
 });
 document.getElementById('sep-monto').addEventListener('input', function(){
   state.sepMonto = parseNum(this.value);
   state.sepTouched = true;
   checkReady();
+  refreshPlanIfActive();
 });
 
 // Compute the "default" separo amount based on current selections
@@ -2096,12 +2102,13 @@ function savePaid(arr){
 
 // ── Calculate ────────────────────────────────
 document.getElementById('btn-calc').addEventListener('click', function(){calculate(false);});
-function calculate(skipSave){
+// Cómputo puro de state.plan — sin tocar vista ni guardar. Reutilizado por calculate() y por
+// recompute "silencioso" cuando hab/precio cambia después de haber generado el plan inicial.
+function computeStatePlan(){
   var ev=state.ev, pkg=state.pkg, z=state.zona, hab=state.hab, sepD=state.sepDate;
-  if(!ev||!pkg||!z||!sepD) return;
+  if(!ev||!pkg||!z||!sepD) return false;
   var cdmx=isCDMX(ev);
   var habE = (pkg==='cheap')?0:(hab?(hab.pp!=null?hab.pp:hab.e):0);
-  // Editable zone price (user may have applied a discount/preventa)
   var zonaP = (state.precio!=null && state.precio>0) ? state.precio : (z.p||0);
   var rideBase=ev.ride||(cdmx?2900:2700);
   var stayDiscount=ev.sep||500;
@@ -2112,7 +2119,6 @@ function calculate(skipSave){
   else if(pkg==='stay'){perP=zonaP-stayDiscount+habE; if(perP<0)perP=zonaP+habE;}
   else if(pkg==='cheap')perP=zonaP;
 
-  // Editable separo: use user-entered value, capped at perP
   var sepActual = (state.sepMonto!=null) ? state.sepMonto : 0;
   if(sepActual>perP) sepActual=perP;
   if(sepActual<0)    sepActual=0;
@@ -2124,12 +2130,24 @@ function calculate(skipSave){
   var pagoQ=quincenas.length>0 ? Math.ceil(resto/quincenas.length) : resto;
   var bank=ev.banco||BANCO_DEFAULT;
 
-  state.plan={perP, sepActual, resto, quincenas, pagoQ, eventDate, bank};
+  state.plan={perP:perP, sepActual:sepActual, resto:resto, quincenas:quincenas, pagoQ:pagoQ, eventDate:eventDate, bank:bank};
+  return true;
+}
+
+function calculate(skipSave){
+  if(!computeStatePlan()) return;
   renderPlan();
   setStep(5);
-  // Auto-save tour unless explicitly skipping (avoids duplicate when re-opening)
   if(!skipSave) saveCurrentTour();
   showView('plan');
+}
+
+// Si ya existe un plan generado, re-cómputo silencioso ante cambios de hab/precio/buyType.
+// Garantiza que sum-total, progreso, estado de cuenta y demás reflejen la nueva habitación
+// (no solo el separo) cuando el usuario vuelve a tocar inputs del wizard.
+function refreshPlanIfActive(){
+  if(!state.plan) return;
+  if(computeStatePlan()) renderPlan();
 }
 
 // ── Build rows ───────────────────────────────

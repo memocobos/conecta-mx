@@ -21,6 +21,18 @@
   [headers.values]
     Access-Control-Allow-Methods = "POST, OPTIONS"
     Access-Control-Allow-Headers = "Content-Type"
+
+# Forzar revalidación del HTML del rol — evita que el navegador sirva versiones
+# viejas mientras seguimos iterando en el cálculo del plan de pagos.
+[[headers]]
+  for = "/rol"
+  [headers.values]
+    Cache-Control = "no-cache, no-store, must-revalidate"
+
+[[headers]]
+  for = "/rol.html"
+  [headers.values]
+    Cache-Control = "no-cache, no-store, must-revalidate"
 [functions]
   directory = "netlify/functions"
 

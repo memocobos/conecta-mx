@@ -6,7 +6,7 @@
 const SB_URL      = process.env.SUPABASE_URL;
 const SB_KEY      = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
 const RESEND_KEY  = process.env.RESEND_API_KEY || process.env.RESEND_KEY;
-const RESEND_FROM = process.env.RESEND_FROM || "Conecta Reynosa <admin@conectareynosa.mx>";
+const FROM = process.env.RESEND_FROM_ROL || "Conecta Reynosa <admin@conectareynosa.mx>";
 const SITE        = process.env.URL || "https://conectareynosa.mx";
 
 const MX_TZ = "America/Monterrey";
@@ -54,7 +54,7 @@ async function sendEmail(to, subject, html) {
   const res = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: { Authorization: `Bearer ${RESEND_KEY}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ from: RESEND_FROM, to, subject, html }),
+    body: JSON.stringify({ from: FROM, to, subject, html }),
   });
   if (!res.ok) {
     console.error("[rol-recordatorios] Resend error:", res.status, await res.text());

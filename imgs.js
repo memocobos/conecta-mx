@@ -40,5 +40,6 @@ window.STATIC_IMGS={
   'aperfectcircle':'imgs/aperfectcircle.webp',
   'edenmunoz':'imgs/edenmunoz.webp',
   'beele':'imgs/beele.webp',
-  'arre':'imgs/arre.webp'
+  'arre':'imgs/arre.webp',
+  'anuelaa':'imgs/anuelaa.webp'
 };

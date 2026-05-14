@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow">
+<title>Contrato de colaboración · Conecta Reynosa</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800;900&family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="icon" type="image/png" href="/icon-192.png">
+<style>
+  *,*::before,*::after{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    font-family:'Montserrat',-apple-system,BlinkMacSystemFont,sans-serif;
+    color:#1a1a1a;
+    background:#f4f4f4;
+    line-height:1.5;
+    -webkit-font-smoothing:antialiased;
+    -webkit-text-size-adjust:100%;
+  }
+  :root{
+    --negro:#000;
+    --blanco:#fff;
+    --amarillo:#e8ff4c;
+    --rojo:#ff283b;
+    --azul:#0000cd;
+    --gris:#9a9a9a;
+    --gris-claro:#e6e6e6;
+    --border:#d8d8d8;
+  }
+  .display{font-family:'Barlow Condensed','Montserrat',sans-serif;text-transform:uppercase;letter-spacing:.02em;line-height:.95}
+
+  /* ── Pantallas de estado ── */
+  .state-screen{
+    min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    padding:32px 24px;text-align:center;background:#000;color:#fff;
+  }
+  .state-screen h1{font-family:'Barlow Condensed',sans-serif;font-size:48px;line-height:.9;text-transform:uppercase;margin:24px 0 12px;color:var(--amarillo)}
+  .state-screen p{max-width:380px;color:rgba(255,255,255,.7);font-size:15px;margin:0 0 24px}
+  .state-screen .badge-tag{font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:rgba(255,255,255,.5);font-weight:700}
+  .state-screen a.btn-link{display:inline-block;background:var(--amarillo);color:#000;padding:14px 28px;font-weight:900;letter-spacing:.06em;text-transform:uppercase;text-decoration:none;font-size:14px}
+
+  /* ── Header marca ── */
+  header.brand{
+    background:#000;color:#fff;border-bottom:5px solid var(--rojo);padding:18px 22px;
+    display:flex;align-items:center;justify-content:space-between;gap:14px;
+    position:sticky;top:0;z-index:5;
+  }
+  header.brand .logo-wrap{display:flex;align-items:center;gap:10px}
+  header.brand .logo-wrap .pill{background:var(--rojo);color:#000;padding:7px 11px;font-weight:900;letter-spacing:.04em;text-transform:uppercase;font-size:13px}
+  header.brand .logo-wrap .mx{color:#fff;font-style:italic;font-weight:900;font-size:18px}
+  header.brand .tagline{color:var(--amarillo);font-weight:900;letter-spacing:.16em;text-transform:uppercase;font-size:11px}
+
+  /* ── Documento ── */
+  .container{max-width:780px;margin:0 auto;padding:0}
+  .doc{background:#fff;padding:32px 24px 24px;min-height:60vh}
+  @media (min-width:720px){
+    .doc{padding:48px 56px 40px;margin:24px auto;box-shadow:0 6px 40px rgba(0,0,0,.08);border:1px solid var(--border)}
+  }
+
+  .doc-meta{display:flex;flex-wrap:wrap;gap:18px 28px;font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:#666;margin-bottom:18px;font-weight:700}
+  .doc-meta span b{color:var(--negro);font-weight:800}
+
+  h2.doc-title{font-family:'Barlow Condensed',sans-serif;font-size:42px;line-height:.92;text-transform:uppercase;margin:6px 0 4px;color:var(--negro);letter-spacing:-.01em}
+  h2.doc-title small{display:block;font-size:14px;color:var(--rojo);font-weight:800;letter-spacing:.18em;margin-top:8px}
+
+  .partes{margin:26px 0 18px;border-top:3px solid var(--negro);border-bottom:1px solid var(--border);padding:18px 0}
+  .partes p{margin:0 0 8px;font-size:14px}
+  .partes p strong{color:var(--negro);font-weight:800}
+  .partes .vs{color:var(--rojo);font-weight:900;letter-spacing:.2em;font-size:11px;text-transform:uppercase;margin:8px 0}
+
+  /* ── Cláusulas ── */
+  .clausula{margin:28px 0 0}
+  .clausula h3{
+    font-family:'Barlow Condensed',sans-serif;
+    text-transform:uppercase;
+    font-size:22px;letter-spacing:.04em;
+    margin:0 0 10px;display:flex;align-items:baseline;gap:12px;
+    border-left:6px solid var(--amarillo);padding:6px 0 6px 12px;
+    background:linear-gradient(90deg,rgba(232,255,76,.18),transparent 60%);
+  }
+  .clausula h3 .num{font-family:'Barlow Condensed',sans-serif;color:var(--rojo);font-weight:900;font-size:30px;letter-spacing:0;min-width:38px;text-align:left}
+  .clausula p, .clausula li{font-size:14px;line-height:1.65;margin:0 0 10px}
+  .clausula ul{padding-left:22px;margin:6px 0 12px}
+  .clausula li{margin-bottom:6px}
+  .subclausula{font-weight:700;color:var(--negro)}
+
+  .item-list{margin:0;padding:0;list-style:none;border:1px solid var(--border);border-radius:4px;overflow:hidden;background:#fafafa}
+  .item-list li{display:flex;align-items:flex-start;gap:10px;padding:11px 14px;border-bottom:1px solid var(--border);font-size:14px}
+  .item-list li:last-child{border-bottom:0}
+  .item-list li::before{content:'';width:8px;height:8px;background:var(--rojo);margin-top:8px;flex:0 0 8px}
+
+  /* ── Firma section (solo en pendiente) ── */
+  .firma-section{margin-top:34px;padding:24px;background:var(--negro);color:#fff;border-radius:4px}
+  .firma-section h3{font-family:'Barlow Condensed',sans-serif;text-transform:uppercase;font-size:24px;margin:0 0 16px;letter-spacing:.04em;color:var(--amarillo);border:none;padding:0;background:none}
+  .firma-section .hint{font-size:12px;color:rgba(255,255,255,.65);margin:0 0 14px}
+  .canvas-wrap{background:#fff;border-radius:4px;position:relative;border:2px dashed rgba(255,255,255,.15);overflow:hidden}
+  #firmaCanvas{display:block;width:100%;height:200px;touch-action:none;cursor:crosshair}
+  .canvas-actions{display:flex;justify-content:space-between;align-items:center;margin-top:10px;font-size:12px}
+  .canvas-actions button{background:transparent;border:1px solid rgba(255,255,255,.3);color:#fff;padding:8px 16px;font-size:11px;text-transform:uppercase;letter-spacing:.1em;font-weight:700;cursor:pointer;font-family:'Montserrat',sans-serif;border-radius:3px}
+  .canvas-actions button:hover{background:rgba(255,255,255,.05)}
+
+  .ine-section{margin-top:24px}
+  .ine-section h3{font-family:'Barlow Condensed',sans-serif;text-transform:uppercase;font-size:22px;margin:0 0 14px;letter-spacing:.04em;color:var(--amarillo);border:none;padding:0;background:none}
+  .ine-uploads{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .ine-uploads label{display:block;border:2px dashed rgba(255,255,255,.25);border-radius:4px;padding:24px 12px;text-align:center;font-size:12px;cursor:pointer;background:rgba(255,255,255,.03);position:relative;overflow:hidden;min-height:130px;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:6px;transition:border-color .2s,background .2s}
+  .ine-uploads label:hover{border-color:var(--amarillo);background:rgba(232,255,76,.08)}
+  .ine-uploads label.has-file{border-style:solid;border-color:var(--amarillo);padding:0}
+  .ine-uploads label .lbl-title{font-weight:900;letter-spacing:.14em;text-transform:uppercase;font-size:11px;color:rgba(255,255,255,.85)}
+  .ine-uploads label .lbl-hint{font-size:10px;color:rgba(255,255,255,.45);letter-spacing:.06em}
+  .ine-uploads label .preview-img{width:100%;height:130px;object-fit:cover;display:block}
+  .ine-uploads input[type=file]{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
+
+  .check-section{margin-top:22px;display:flex;gap:12px;align-items:flex-start;font-size:13px;line-height:1.5}
+  .check-section input{margin-top:3px;width:18px;height:18px;flex:0 0 18px;accent-color:var(--amarillo)}
+
+  .submit-area{margin-top:26px}
+  .btn-submit{width:100%;background:var(--amarillo);color:#000;border:0;padding:18px;font-weight:900;font-size:16px;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;font-family:'Montserrat',sans-serif;border-radius:3px}
+  .btn-submit:disabled{opacity:.5;cursor:not-allowed}
+  .btn-submit:active:not(:disabled){transform:translateY(1px)}
+
+  .form-err{display:none;margin-top:14px;padding:12px 14px;background:rgba(255,40,59,.15);border:1px solid var(--rojo);border-radius:3px;color:#ffb3ba;font-size:13px}
+  .form-err.show{display:block}
+
+  /* ── Firma renderizada (vista firmada) ── */
+  .firma-rendered{margin-top:34px;border-top:3px solid var(--negro);padding-top:24px;display:grid;grid-template-columns:1fr;gap:24px}
+  @media (min-width:640px){.firma-rendered{grid-template-columns:1fr 1fr}}
+  .firma-rendered .col h4{font-family:'Barlow Condensed',sans-serif;text-transform:uppercase;font-size:14px;letter-spacing:.18em;margin:0 0 10px;color:#666;font-weight:700}
+  .firma-rendered .firma-img{background:#fafafa;border:1px solid var(--border);padding:14px;min-height:130px;display:flex;align-items:center;justify-content:center}
+  .firma-rendered .firma-img img{max-width:100%;max-height:200px}
+  .firma-rendered .firma-name{font-weight:800;text-transform:uppercase;letter-spacing:.04em;margin-top:8px;font-size:14px}
+  .firma-rendered .firma-meta{font-size:11px;color:#888;letter-spacing:.1em;text-transform:uppercase;margin-top:4px}
+  .firma-rendered .ine-thumbs{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .firma-rendered .ine-thumbs a{display:block;border:1px solid var(--border);overflow:hidden;background:#fafafa}
+  .firma-rendered .ine-thumbs img{width:100%;height:90px;object-fit:cover;display:block}
+
+  /* ── Footer ── */
+  footer.doc-footer{padding:24px 24px 40px;text-align:center;font-size:11px;color:#888;letter-spacing:.14em;text-transform:uppercase}
+  footer.doc-footer a{color:var(--rojo);text-decoration:none;font-weight:800}
+
+  /* Loading */
+  .loading{min-height:60vh;display:flex;align-items:center;justify-content:center;color:#666;font-size:13px;letter-spacing:.16em;text-transform:uppercase}
+
+  /* Print */
+  @media print{
+    body{background:#fff}
+    header.brand{position:static;border-bottom-width:4px}
+    .doc{box-shadow:none;border:none;padding:0 8px}
+    .firma-section,.ine-section,.check-section,.submit-area,footer.doc-footer{display:none !important}
+  }
+</style>
+</head>
+<body>
+
+<div id="root">
+  <div class="loading">Cargando contrato…</div>
+</div>
+
+<script>
+const API_OBTENER = "/.netlify/functions/contrato-obtener";
+const API_FIRMAR  = "/.netlify/functions/contrato-firmar";
+
+function $q(sel, el) { return (el || document).querySelector(sel); }
+function escapeHtml(s) {
+  return String(s == null ? "" : s).replace(/[&<>"']/g, c =>
+    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+function fmtFechaLarga(iso) {
+  if (!iso) return "—";
+  const [y, m, d] = String(iso).split("-");
+  if (!y || !m || !d) return iso;
+  const meses = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
+  return `${parseInt(d,10)} de ${meses[parseInt(m,10)-1] || ""} de ${y}`;
+}
+function getToken() {
+  const u = new URLSearchParams(location.search);
+  return (u.get("t") || u.get("token") || "").trim();
+}
+
+const BRAND_HEADER = `
+  <header class="brand">
+    <div class="logo-wrap">
+      <span class="pill">Conecta</span>
+      <span class="mx">MX</span>
+    </div>
+    <span class="tagline">Reynosa · Contrato</span>
+  </header>`;
+
+const FOOTER = `
+  <footer class="doc-footer">
+    Conecta Reynosa · <a href="https://conectareynosa.mx">conectareynosa.mx</a><br>
+    RFC: COVG850924BB6 · Guillermo Alexander Cobos Vizcarra
+  </footer>`;
+
+// ── Cláusulas del contrato (texto legal) ───────────────────────────────
+const CLAUSULAS = [
+  {
+    num: 1, titulo: "Objeto",
+    cuerpo: `<p>El presente contrato tiene por objeto establecer los términos del intercambio comercial entre <strong>Conecta MX (la Agencia)</strong> y <strong class="creador-strong"></strong> (en adelante, el "Creador"), para la promoción del evento mediante la generación de contenido digital.</p>`
+  },
+  {
+    num: 2, titulo: "Intercambio",
+    cuerpo: `<p><strong>La Agencia se compromete a entregar al Creador:</strong></p><div class="item-list-ofrecimiento"></div><p style="margin-top:14px"><strong>El Creador se compromete a entregar a la Agencia:</strong></p><div class="item-list-expectativas"></div>`
+  },
+  {
+    num: 3, titulo: "Propiedad del contenido",
+    cuerpo: `<p>El contenido generado por el Creador será de su propiedad intelectual. Sin embargo, la Agencia podrá hacer uso del mismo con fines de difusión, repost y archivo, citando siempre al autor.</p><p>El Creador conserva el derecho a publicar el contenido en sus propios canales sin restricción adicional.</p>`
+  },
+  {
+    num: 4, titulo: "Requisitos del contenido",
+    cuerpo: `<p><span class="subclausula">4.1</span> El contenido debe publicarse durante el evento o dentro de las 48 horas posteriores al mismo, salvo acuerdo distinto por escrito.</p>
+<p><span class="subclausula">4.2</span> Las menciones deberán etiquetar oficialmente a Conecta Reynosa en todas las publicaciones realizadas.</p>
+<p><span class="subclausula">4.3</span> El contenido debe respetar los lineamientos de imagen y narrativa acordados con la Agencia.</p>
+<p><span class="subclausula">4.4</span> El Creador es responsable de la calidad técnica del contenido entregado (audio, video, edición).</p>
+<p><span class="subclausula">4.5</span> Cualquier modificación al contenido propuesto deberá comunicarse con un mínimo de 24 horas de anticipación.</p>
+<p><span class="subclausula">4.6</span> <strong>Exclusividad durante el evento:</strong> Durante el evento, el Creador no podrá promocionar a otras agencias competidoras o servicios similares.</p>
+<p><span class="subclausula">4.7</span> <strong>Veto de contenido:</strong> La Agencia se reserva el derecho de solicitar la eliminación de contenido publicado que no cumpla con los estándares acordados, en un plazo máximo de 24 horas.</p>`
+  },
+  {
+    num: 5, titulo: "Cancelación e incumplimiento",
+    cuerpo: `<p><span class="subclausula">5.1</span> En caso de que el Creador no pueda asistir al evento, deberá notificar a la Agencia con al menos 72 horas de anticipación.</p>
+<p><span class="subclausula">5.2</span> El Creador podrá designar un suplente sujeto a aprobación previa por parte de la Agencia.</p>
+<p><span class="subclausula">5.3</span> En caso de cancelación tardía sin justificación válida, la Agencia podrá excluir al Creador de futuras colaboraciones.</p>
+<p><span class="subclausula">5.4</span> Si el evento se cancela por causas ajenas a la Agencia (fuerza mayor), el presente contrato quedará sin efecto sin penalización para ninguna de las partes.</p>
+<p><span class="subclausula">5.5</span> <strong>Reembolso del costo del intercambio:</strong> En caso de incumplimiento total del Creador (no asistencia, no entrega de contenido), el Creador deberá reembolsar el valor comercial del intercambio dentro de 15 días naturales.</p>`
+  },
+  {
+    num: 6, titulo: "Beneficios adicionales",
+    cuerpo: `<p>El Creador tendrá acceso prioritario a futuras invitaciones de eventos organizados por la Agencia, en función de su desempeño y cumplimiento.</p><p>La Agencia podrá ofrecer beneficios adicionales (acceso a zonas VIP, kits exclusivos, contenido detrás de cámaras) sujetos a disponibilidad y mérito.</p>`
+  },
+  {
+    num: 7, titulo: "Compromiso de profesionalismo",
+    cuerpo: `<p>Ambas partes se comprometen a mantener una conducta respetuosa, profesional y conforme a los valores de imagen pública de la marca Conecta MX. El Creador se obliga a evitar conductas que puedan dañar la reputación de la Agencia o del evento.</p>`
+  },
+  {
+    num: 8, titulo: "Cláusulas finales",
+    cuerpo: `<p><span class="subclausula">8.1</span> Cualquier modificación a este contrato deberá ser por escrito y aceptada por ambas partes.</p>
+<p><span class="subclausula">8.2</span> Este acuerdo tiene una validez correspondiente al evento mencionado y se considera concluido tras la publicación del contenido pactado.</p>
+<p><span class="subclausula">8.3</span> <strong>Datos personales:</strong> El Creador autoriza el uso de su imagen, nombre y contenido generado para fines promocionales de la Agencia por un periodo indefinido.</p>
+<p><span class="subclausula">8.4</span> <strong>Jurisdicción:</strong> Cualquier controversia derivada del presente contrato será resuelta en los tribunales de Reynosa, Tamaulipas, México.</p>`
+  }
+];
+
+// ── Render del documento base ──────────────────────────────────────────
+function renderDoc(c, opts) {
+  opts = opts || {};
+  const fechaContrato = fmtFechaLarga(c.contrato_fecha);
+  const fechaEvento = fmtFechaLarga(c.evento_fecha);
+  const docMeta = `
+    <div class="doc-meta">
+      <span><b>Fecha del contrato:</b> ${escapeHtml(fechaContrato)}</span>
+      <span><b>Evento:</b> ${escapeHtml(c.evento_nombre)}</span>
+      <span><b>Fecha del evento:</b> ${escapeHtml(fechaEvento)}</span>
+    </div>`;
+
+  const partes = `
+    <div class="partes">
+      <p><strong>Conecta MX</strong> · Agencia organizadora de viajes a conciertos y festivales · representada por Guillermo Alexander Cobos Vizcarra (Reynosa, Tamaulipas).</p>
+      <p class="vs">—— y ——</p>
+      <p><strong>${escapeHtml(c.creador_nombre)}</strong> · Creador(a) de contenido · ${escapeHtml(c.creador_email)}.</p>
+    </div>`;
+
+  const clausulasHtml = CLAUSULAS.map(cl => `
+    <div class="clausula">
+      <h3><span class="num">${cl.num}.</span>${escapeHtml(cl.titulo)}</h3>
+      ${cl.cuerpo}
+    </div>`).join("");
+
+  let firmaSection = "";
+  if (opts.estado === "pendiente") {
+    firmaSection = `
+      <section class="firma-section">
+        <h3>Firma del Creador</h3>
+        <p class="hint">Dibuja tu firma con el dedo (móvil) o el mouse. Si te sale mal, presiona "Limpiar firma".</p>
+        <div class="canvas-wrap">
+          <canvas id="firmaCanvas"></canvas>
+        </div>
+        <div class="canvas-actions">
+          <span style="color:rgba(255,255,255,.45)">Tu firma se guarda como imagen.</span>
+          <button type="button" id="btnLimpiarFirma">Limpiar firma</button>
+        </div>
+
+        <div class="ine-section">
+          <h3>Credencial INE</h3>
+          <p class="hint">Sube foto del frente y reverso. Se guarda privada en nuestros servidores.</p>
+          <div class="ine-uploads">
+            <label data-side="frente" id="lblFrente">
+              <span class="lbl-title">📸 Frente del INE</span>
+              <span class="lbl-hint">Toca para tomar/subir foto</span>
+              <input type="file" id="fileFrente" accept="image/jpeg,image/png,image/webp" capture="environment">
+            </label>
+            <label data-side="reverso" id="lblReverso">
+              <span class="lbl-title">📸 Reverso del INE</span>
+              <span class="lbl-hint">Toca para tomar/subir foto</span>
+              <input type="file" id="fileReverso" accept="image/jpeg,image/png,image/webp" capture="environment">
+            </label>
+          </div>
+        </div>
+
+        <label class="check-section">
+          <input type="checkbox" id="acepto">
+          <span>He leído y acepto los términos del contrato.</span>
+        </label>
+
+        <div class="submit-area">
+          <button class="btn-submit" id="btnFirmar" disabled>Enviar contrato firmado</button>
+          <div class="form-err" id="formErr"></div>
+        </div>
+      </section>`;
+  } else if (opts.estado === "firmado") {
+    const ine = c.ine_urls || {};
+    firmaSection = `
+      <section class="firma-rendered">
+        <div class="col">
+          <h4>Firma del creador</h4>
+          <div class="firma-img">
+            ${c.firma_data ? `<img src="${escapeHtml(c.firma_data)}" alt="Firma">` : `<span style="color:#aaa">Firma no disponible</span>`}
+          </div>
+          <div class="firma-name">${escapeHtml(c.creador_nombre)}</div>
+          <div class="firma-meta">Firmado: ${fmtFechaLarga((c.firmado_at || "").slice(0,10))}</div>
+        </div>
+        <div class="col">
+          <h4>INE entregada</h4>
+          <div class="ine-thumbs">
+            ${ine.frente ? `<a href="${escapeHtml(ine.frente)}" target="_blank" rel="noopener"><img src="${escapeHtml(ine.frente)}" alt="INE frente"></a>` : '<div style="border:1px solid var(--border);padding:20px;font-size:11px;color:#aaa;text-align:center">FRENTE no disponible</div>'}
+            ${ine.reverso ? `<a href="${escapeHtml(ine.reverso)}" target="_blank" rel="noopener"><img src="${escapeHtml(ine.reverso)}" alt="INE reverso"></a>` : '<div style="border:1px solid var(--border);padding:20px;font-size:11px;color:#aaa;text-align:center">REVERSO no disponible</div>'}
+          </div>
+        </div>
+      </section>`;
+  }
+
+  return `
+    ${BRAND_HEADER}
+    <div class="container">
+      <article class="doc">
+        ${docMeta}
+        <h2 class="doc-title">Contrato de colaboración<small>Creadores de contenido · ${escapeHtml(c.evento_nombre)}</small></h2>
+        ${partes}
+        ${clausulasHtml}
+        ${firmaSection}
+      </article>
+    </div>
+    ${FOOTER}
+  `;
+}
+
+function renderItemList(container, items) {
+  if (!container || !Array.isArray(items)) return;
+  container.innerHTML = `<ul class="item-list">${items.map(it => `<li>${escapeHtml(it)}</li>`).join("")}</ul>`;
+}
+
+// ── Estado: pendiente (firma activa) ──────────────────────────────────
+function setupFirmaCanvas() {
+  const canvas = document.getElementById("firmaCanvas");
+  if (!canvas) return null;
+  const dpr = window.devicePixelRatio || 1;
+  function fit() {
+    const rect = canvas.getBoundingClientRect();
+    canvas.width = rect.width * dpr;
+    canvas.height = 200 * dpr;
+    const ctx = canvas.getContext("2d");
+    ctx.scale(dpr, dpr);
+    ctx.lineWidth = 2.2;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    ctx.strokeStyle = "#111";
+    ctx.fillStyle = "#fff";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+  }
+  fit();
+  window.addEventListener("resize", fit);
+  const ctx = canvas.getContext("2d");
+  let drawing = false, hasInk = false;
+  function pos(e) {
+    const r = canvas.getBoundingClientRect();
+    const t = e.touches ? e.touches[0] : e;
+    return { x: t.clientX - r.left, y: t.clientY - r.top };
+  }
+  function start(e) {
+    e.preventDefault();
+    drawing = true;
+    const p = pos(e);
+    ctx.beginPath();
+    ctx.moveTo(p.x, p.y);
+  }
+  function move(e) {
+    if (!drawing) return;
+    e.preventDefault();
+    const p = pos(e);
+    ctx.lineTo(p.x, p.y);
+    ctx.stroke();
+    hasInk = true;
+  }
+  function end() { drawing = false; }
+  canvas.addEventListener("mousedown", start);
+  canvas.addEventListener("mousemove", move);
+  canvas.addEventListener("mouseup", end);
+  canvas.addEventListener("mouseleave", end);
+  canvas.addEventListener("touchstart", start, { passive: false });
+  canvas.addEventListener("touchmove", move, { passive: false });
+  canvas.addEventListener("touchend", end);
+
+  return {
+    clear: fit,
+    hasInk: () => hasInk,
+    setHasInk: v => { hasInk = v; },
+    dataURL: () => canvas.toDataURL("image/png"),
+  };
+}
+
+function setupFileInput(side) {
+  const input = document.getElementById(side === "frente" ? "fileFrente" : "fileReverso");
+  const label = document.getElementById(side === "frente" ? "lblFrente" : "lblReverso");
+  const state = { dataUrl: null };
+  input.addEventListener("change", () => {
+    const f = input.files && input.files[0];
+    if (!f) return;
+    if (!/^image\/(jpeg|png|webp)$/.test(f.type)) {
+      alert("Solo se aceptan imágenes JPG, PNG o WEBP."); input.value = ""; return;
+    }
+    if (f.size > 6 * 1024 * 1024) {
+      alert("La foto supera 6 MB. Tómala con menos resolución o recórtala."); input.value = ""; return;
+    }
+    const r = new FileReader();
+    r.onload = () => {
+      state.dataUrl = r.result;
+      label.classList.add("has-file");
+      label.innerHTML = `<img class="preview-img" src="${state.dataUrl}" alt="${side}"><input type="file" id="${input.id}" accept="image/jpeg,image/png,image/webp" capture="environment">`;
+      // Re-bind: porque reemplazamos el contenido
+      const newInput = document.getElementById(input.id);
+      newInput.addEventListener("change", input.onchange);
+      newInput.onchange = input.onchange;
+      checkSubmit();
+    };
+    r.readAsDataURL(f);
+  });
+  return state;
+}
+
+let firma, ineFrenteState, ineReversoState;
+
+function checkSubmit() {
+  const accept = document.getElementById("acepto");
+  const btn = document.getElementById("btnFirmar");
+  if (!btn) return;
+  const ok = firma && firma.hasInk() && ineFrenteState.dataUrl && ineReversoState.dataUrl && accept.checked;
+  btn.disabled = !ok;
+}
+
+async function enviarFirma(token, btn, errBox) {
+  if (btn.disabled) return;
+  btn.disabled = true;
+  const original = btn.textContent;
+  btn.textContent = "Enviando…";
+  errBox.classList.remove("show");
+
+  try {
+    const resp = await fetch(API_FIRMAR, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        token,
+        firma_data: firma.dataURL(),
+        ine_frente: ineFrenteState.dataUrl,
+        ine_reverso: ineReversoState.dataUrl,
+      }),
+    });
+    const j = await resp.json();
+    if (!resp.ok || !j.ok) {
+      errBox.textContent = j.error || "No pudimos guardar tu firma. Intenta de nuevo.";
+      errBox.classList.add("show");
+      btn.disabled = false;
+      btn.textContent = original;
+      return;
+    }
+    // Re-render como firmado.
+    loadContrato();
+  } catch (e) {
+    errBox.textContent = "Error de red: " + e.message;
+    errBox.classList.add("show");
+    btn.disabled = false;
+    btn.textContent = original;
+  }
+}
+
+// ── Loader principal ──────────────────────────────────────────────────
+async function loadContrato() {
+  const root = document.getElementById("root");
+  const token = getToken();
+  if (!token) {
+    root.innerHTML = `
+      <div class="state-screen">
+        <span class="badge-tag">⚠ Link inválido</span>
+        <h1>Falta el token</h1>
+        <p>Este link no incluye un token. Pídele a Conecta Reynosa que te reenvíe tu invitación.</p>
+        <a class="btn-link" href="https://conectareynosa.mx">Ir al sitio</a>
+      </div>`;
+    return;
+  }
+
+  root.innerHTML = `<div class="loading">Cargando contrato…</div>`;
+
+  let data;
+  try {
+    const r = await fetch(`${API_OBTENER}?t=${encodeURIComponent(token)}`);
+    data = await r.json();
+    if (!r.ok || !data.ok) {
+      const msg = data && data.error ? data.error : "Contrato no encontrado";
+      root.innerHTML = `
+        <div class="state-screen">
+          <span class="badge-tag">❌ ${escapeHtml(msg)}</span>
+          <h1>No encontramos tu contrato</h1>
+          <p>El token expiró o no es válido. Contáctanos por WhatsApp si crees que es un error.</p>
+          <a class="btn-link" href="https://wa.me/528119771072">WhatsApp 81 1977 1072</a>
+        </div>`;
+      return;
+    }
+  } catch (e) {
+    root.innerHTML = `
+      <div class="state-screen">
+        <span class="badge-tag">⚠ Error de red</span>
+        <h1>Inténtalo de nuevo</h1>
+        <p>${escapeHtml(e.message)}</p>
+        <a class="btn-link" href="javascript:location.reload()">Reintentar</a>
+      </div>`;
+    return;
+  }
+
+  const c = data.contrato;
+  root.innerHTML = renderDoc(c, { estado: c.estado });
+
+  // Rellenar listas (después de inyectar el HTML).
+  const creadorEl = root.querySelector(".creador-strong");
+  if (creadorEl) creadorEl.textContent = c.creador_nombre;
+  renderItemList(root.querySelector(".item-list-ofrecimiento"), c.ofrecimiento);
+  renderItemList(root.querySelector(".item-list-expectativas"), c.expectativas);
+
+  if (c.estado === "pendiente") {
+    firma = setupFirmaCanvas();
+    ineFrenteState = setupFileInput("frente");
+    ineReversoState = setupFileInput("reverso");
+    document.getElementById("btnLimpiarFirma").addEventListener("click", () => {
+      firma.clear();
+      firma.setHasInk(false);
+      checkSubmit();
+    });
+    document.getElementById("firmaCanvas").addEventListener("mouseup", checkSubmit);
+    document.getElementById("firmaCanvas").addEventListener("touchend", checkSubmit);
+    document.getElementById("acepto").addEventListener("change", checkSubmit);
+    document.getElementById("btnFirmar").addEventListener("click", () => {
+      const errBox = document.getElementById("formErr");
+      enviarFirma(getToken(), document.getElementById("btnFirmar"), errBox);
+    });
+  }
+}
+
+loadContrato();
+</script>
+
+</body>
+</html>

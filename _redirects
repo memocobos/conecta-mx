@@ -14,6 +14,7 @@
 /recibos     /recibos_v6.html  200
 /demo        /demo.html        200
 /demo-full   /demo-full.html   200
+/contrato    /contrato.html    200
 
 # Archivos especiales (Netlify los sirve directo si existen — protección extra)
 /robots.txt  /robots.txt       200

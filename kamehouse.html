@@ -2214,11 +2214,13 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
        <div class="form-row cols-2">
          <div class="form-group">
            <label>Nombre de la creadora *</label>
-           <input type="text" id="ctr-nombre" placeholder="Ej: Dayanna Pérez" autocomplete="off">
+           <input type="text" id="ctr-nombre" placeholder="Ej: Dayanna Pérez" autocomplete="off" list="ctr-datalist-nombres" oninput="onCtrNombreInput()">
+           <datalist id="ctr-datalist-nombres"></datalist>
          </div>
          <div class="form-group">
            <label>Email *</label>
-           <input type="email" id="ctr-email" placeholder="creadora@ejemplo.com" autocomplete="off">
+           <input type="email" id="ctr-email" placeholder="creadora@ejemplo.com" autocomplete="off" list="ctr-datalist-emails" oninput="onCtrEmailInput()">
+           <datalist id="ctr-datalist-emails"></datalist>
          </div>
        </div>
 
@@ -8640,64 +8642,89 @@ let _contratosEVPobladoEnSelect = false;
 
 // — Cláusulas legales (idéntico texto que contrato.html) ——————
 const _CTR_CLAUSULAS = [
-  { num:1, t:'Objeto del contrato', body: c => `El presente contrato tiene por objeto establecer los términos del intercambio comercial entre <b>Conecta MX (la Agencia)</b>, representada por Guillermo Alexander Cobos Vizcarra, y <b>${_escCtr(c.creador_nombre)}</b> (en adelante, el "Creador"), para la promoción del evento <b>${_escCtr(c.evento_nombre)}</b> mediante la generación de contenido digital, en los términos y condiciones que aquí se detallan.` },
-  { num:2, t:'Detalle del intercambio', body: c => `<b>2.1 Lo que ofrece la Agencia:</b>${_ulCtr(c.ofrecimiento)}<b style="display:block;margin-top:10px">2.2 Lo que se espera del Creador:</b>${_ulCtr(c.expectativas)}` },
+  { num:1, t:'Objeto del contrato', body: c => `El presente Contrato regula la colaboración entre <b>CONECTA REYNOSA</b> (en adelante, "la Agencia") y <b>${_escCtr(c.creador_nombre)}</b> (en adelante, "el Creador de Contenido"), mediante un intercambio que incluye beneficios detallados en la cláusula 5, a cambio de la generación y entrega de contenido audiovisual bajo las condiciones descritas en este documento.` },
+  { num:2, t:'Detalle del intercambio', body: c => `<b>2.1 Lo que ofrece la Agencia:</b>${_ulCtr(c.ofrecimiento)}<b style="display:block;margin-top:10px">2.2 Lo que se espera del Creador de Contenido:</b>${_ulCtr(c.expectativas)}` },
   { num:3, t:'Propiedad del contenido', body: () => `
-<b>3.1</b> Todo el contenido generado por el Creador durante el evento será de propiedad exclusiva de la Agencia.<br>
-<b>3.2</b> Únicamente la Agencia podrá distribuir, publicar y/o utilizar el contenido en sus canales oficiales de comunicación, sin requerir autorización adicional del Creador.<br>
-<b>3.3</b> Cualquier publicación realizada por el Creador en sus propias redes deberá ser etiquetada como una colaboración oficial con la Agencia (@conectareynosa).` },
+<ul style="margin:6px 0 0;padding-left:20px">
+<li>Todo el contenido generado será de propiedad exclusiva de la Agencia.</li>
+<li>Solo la Agencia podrá distribuir, publicar y usar el contenido en sus plataformas.</li>
+<li>Cualquier publicación por parte del Creador de Contenido deberá ser etiquetada como colaboración oficial con la Agencia.</li>
+</ul>` },
   { num:4, t:'Requisitos del contenido', body: () => `
-<b>4.1 Calidad y formato:</b>
-<ul style="margin:6px 0 12px;padding-left:20px">
-<li>Calidad técnica HD o 4K.</li>
-<li>Formato Reel / vertical 1080 × 1920 px.</li>
-<li>Iluminación y presentación que reflejen una experiencia increíble.</li>
-</ul>
-<b>4.2 Requisitos de la voz:</b>
-<ul style="margin:6px 0 12px;padding-left:20px">
-<li>Audición clara, sin ruidos de fondo.</li>
-<li>Buena dicción.</li>
-<li>Tono respetuoso.</li>
-<li>Adecuación al propósito del contenido.</li>
-</ul>
-<b>4.3 Historias y publicaciones:</b>
-<ul style="margin:6px 0 12px;padding-left:20px">
-<li>Menciones publicadas como historias en Instagram y/o TikTok.</li>
-<li>Las redes del Creador deberán permanecer públicas durante el evento y los 10–15 días posteriores.</li>
-<li>Multas por incumplimiento: <b>25%</b> en la primera infracción, <b>50%</b> si persiste.</li>
-</ul>
-<b>4.4 Plazo de entrega:</b>
-<ul style="margin:6px 0 12px;padding-left:20px">
-<li>Contenido entregado dentro de los <b>2–3 días</b> posteriores al evento.</li>
-<li>Multas por retraso: <b>25%</b> (1–7 días), <b>50%</b> (7–10 días), <b>75%</b> (10–15 días), <b>100%</b> (más de 15 días).</li>
-</ul>
-<b>4.5 Correcciones:</b>
-<ul style="margin:6px 0 12px;padding-left:20px">
-<li>El Creador tendrá <b>24 horas</b> para realizar los ajustes solicitados por la Agencia.</li>
-<li>Multa del <b>50%</b> si no cumple el plazo de corrección.</li>
-<li>Multa del <b>100%</b> si ningún video entregado cumple con las expectativas pactadas.</li>
-</ul>
-<b>4.6 Exclusividad durante el evento:</b> Durante el evento, el Creador no podrá promocionar a otras agencias competidoras o servicios similares de viajes a conciertos.<br>
-<b>4.7 Veto de contenido:</b> La Agencia se reserva el derecho de solicitar la eliminación de contenido publicado que no cumpla con los estándares acordados, en un plazo máximo de <b>24 horas</b> a partir de la notificación.` },
+<b>4.1 Calidad y formato del contenido</b>
+<ol style="margin:6px 0 12px;padding-left:22px">
+<li><b>Calidad técnica:</b> Material en HD o 4K. Cualquier material de calidad inferior será rechazado.</li>
+<li><b>Formato:</b> Videos en formato Reel o video vertical para redes sociales (1080 × 1920 píxeles).</li>
+<li><b>Iluminación y presentación:</b> Todo contenido, incluidas las menciones durante el evento, deberá tener buena iluminación, claridad y demostrar que el Creador está disfrutando una experiencia increíble.</li>
+</ol>
+
+<b>4.2 Requisitos de la voz</b>
+<ol style="margin:6px 0 12px;padding-left:22px">
+<li><b>Audición clara:</b> sin ruidos de fondo que interfieran con el mensaje.</li>
+<li><b>Buena dicción:</b> hablar de manera clara y entendible.</li>
+<li><b>Tono respetuoso:</b> acorde al profesionalismo de la Agencia.</li>
+<li><b>Adecuación:</b> ajustarse al propósito del video (experiencia, comercial o contenido extra).</li>
+</ol>
+
+<b>4.3 Historias y publicaciones</b>
+<ol style="margin:6px 0 12px;padding-left:22px">
+<li>Las menciones en el evento deberán publicarse como historias en <b>Instagram y/o TikTok</b>.</li>
+<li>Las redes sociales del Creador deberán estar en modo <b>público</b> durante: la duración del evento + un lapso de <b>10 a 15 días</b> posteriores a la publicación del contenido.</li>
+<li>Sanciones por incumplimiento: <span style="color:#ff283b;font-weight:800">25%</span> primera infracción · <span style="color:#ff283b;font-weight:800">50%</span> si persiste.</li>
+</ol>
+
+<b>4.4 Plazo de entrega</b>
+<ol style="margin:6px 0 12px;padding-left:22px">
+<li>El contenido debe ser entregado de <b>2 a 3 días</b> después del evento.</li>
+<li>Multas por retraso: <span style="color:#ff283b;font-weight:800">25%</span> (1–7 días) · <span style="color:#ff283b;font-weight:800">50%</span> (7–10) · <span style="color:#ff283b;font-weight:800">75%</span> (10–15) · <span style="color:#ff283b;font-weight:800">100%</span> (más de 15 días).</li>
+</ol>
+
+<b>4.5 Correcciones</b>
+<ol style="margin:6px 0 12px;padding-left:22px">
+<li>El Creador tiene <b>24 horas</b> para hacer los ajustes solicitados.</li>
+<li>Si no cumple el plazo: <span style="color:#ff283b;font-weight:800">50%</span> del costo del intercambio. Si ningún video cumple con las expectativas: <span style="color:#ff283b;font-weight:800">100%</span>.</li>
+</ol>
+
+<b>4.6 Exclusividad durante el evento:</b> Durante el evento, el Creador no podrá promocionar a otras agencias competidoras o servicios similares de viajes a conciertos. El incumplimiento resultará en cancelación inmediata del contrato y cobro del <span style="color:#ff283b;font-weight:800">100%</span> del intercambio.<br>
+
+<b>4.7 Veto de contenido:</b> La Agencia se reserva el derecho de solicitar la eliminación de contenido publicado que no cumpla con los estándares acordados, en un plazo máximo de <b>24 horas</b>. El no cumplimiento resultará en multa del <span style="color:#ff283b;font-weight:800">50%</span> del valor del intercambio.` },
   { num:5, t:'Políticas de cancelación', body: () => `
-<b>5.1</b> En caso de que el Creador no pueda asistir al evento, deberá notificar a la Agencia con al menos <b>72 horas</b> de anticipación.<br>
-<b>5.2</b> El Creador podrá proponer un suplente, sujeto a aprobación previa por escrito de la Agencia.<br>
-<b>5.3</b> En caso de cancelación tardía sin justificación válida, la Agencia podrá excluir al Creador de futuras colaboraciones.<br>
-<b>5.4</b> Si el evento se cancela por causas ajenas a la Agencia (fuerza mayor), el presente contrato quedará sin efecto, sin penalización para ninguna de las partes.<br>
-<b>5.5 Reembolso del intercambio:</b> En caso de incumplimiento total del Creador (no asistencia, no entrega de contenido), el Creador deberá reembolsar el valor comercial del intercambio dentro de <b>15 días naturales</b> contados a partir de la fecha del evento.` },
-  { num:6, t:'Beneficios para el Creador', body: () => `El Creador tendrá acceso prioritario a futuras invitaciones de eventos organizados por la Agencia, en función de su desempeño y cumplimiento. La Agencia podrá ofrecer beneficios adicionales (acceso a zonas VIP, kits exclusivos, contenido detrás de cámaras, atención preferencial) sujetos a disponibilidad y mérito.` },
-  { num:7, t:'Compromiso del Creador', body: () => `El Creador se compromete a mantener una conducta respetuosa y profesional durante todo el evento y en toda comunicación pública relacionada. Se obliga a no realizar declaraciones, actos o publicaciones que puedan dañar la reputación de la Agencia, del evento o de cualquier marca patrocinadora involucrada.` },
+El contrato podrá cancelarse por las siguientes razones:
+<ol style="margin:8px 0 0;padding-left:22px">
+<li><b>Incumplimiento de calidad</b> (técnica, iluminación, formato, menciones).</li>
+<li><b>Imagen pública:</b> polémicas, problemas legales o comportamientos que afecten la imagen de la Agencia.</li>
+<li><b>Redes sociales privadas</b> durante el plazo estipulado.</li>
+<li><b>Entregas incumplidas:</b> no entrega en tiempo y forma o no realizar las correcciones solicitadas.</li>
+<li><b>Reembolso del intercambio:</b> en caso de incumplimiento total del Creador (no asistencia, no entrega), el Creador deberá reembolsar el valor comercial del intercambio dentro de <b>15 días naturales</b> contados a partir de la fecha del evento.</li>
+</ol>` },
+  { num:6, t:'Beneficios para el Creador de Contenido', body: () => `
+<ol style="margin:6px 0 0;padding-left:22px">
+<li><b>Entradas:</b> acceso al evento o festival en zonas de buena ubicación.</li>
+<li><b>Viaje y alojamiento</b> (si aplica): transporte, traslados, kit Conecta, hospedaje y otros servicios según la logística del evento.</li>
+<li><b>Extras:</b> otros beneficios serán detallados dependiendo del intercambio acordado.</li>
+</ol>` },
+  { num:7, t:'Compromiso del Creador de Contenido', body: () => `
+El Creador de Contenido se compromete a:
+<ol style="margin:8px 0 0;padding-left:22px">
+<li>Generar contenido que represente positivamente la experiencia del evento.</li>
+<li>Aceptar las solicitudes de colaboración etiquetada en redes sociales.</li>
+<li>Publicar historias y menciones durante el evento con buena calidad y en redes públicas.</li>
+<li>Cumplir con las fechas y plazos establecidos para entrega y correcciones.</li>
+</ol>` },
   { num:8, t:'Cláusulas finales', body: () => `
-<b>8.1 Hashtags obligatorios:</b> Todas las publicaciones derivadas de esta colaboración deberán incluir los siguientes hashtags:
-<ul style="margin:6px 0 12px;padding-left:20px">
+<b>8.1 Hashtags</b>
+<ul style="margin:6px 0 12px;padding-left:22px">
 <li><b>#Viajaconexpertos</b></li>
 <li><b>#Seguimosconectando</b></li>
 <li><b>#CMX10</b></li>
 </ul>
-<b>8.2 Confidencialidad:</b> El Creador se obliga a mantener en estricta reserva cualquier información, condición económica o detalle del presente contrato y de la operación interna de la Agencia que conozca con motivo de esta colaboración. Esta obligación subsiste incluso después de concluido el contrato.<br>
-<b>8.3 Datos personales:</b> El Creador autoriza expresamente el uso de su imagen, nombre y contenido generado para fines promocionales de la Agencia, por un periodo indefinido.<br>
-<b>8.4 Jurisdicción:</b> Cualquier controversia derivada del presente contrato será resuelta en los tribunales competentes de la ciudad de <b>Reynosa, Tamaulipas, México</b>, renunciando expresamente las partes a cualquier otro fuero que pudiera corresponderles.` },
-  { num:9, t:'Firmas', body: () => `Las partes firman el presente contrato de conformidad con los términos arriba expresados. La firma digital y el envío de la identificación oficial (INE) por parte del Creador constituyen la aceptación plena de este contrato.` },
+
+<b>8.2 Confidencialidad:</b> Toda la información y beneficios otorgados al Creador son confidenciales y no podrán divulgarse sin autorización de la Agencia.<br>
+
+<b>8.3 Datos personales y uso de imagen:</b> El Creador autoriza el uso de su imagen, nombre y contenido generado para fines promocionales de la Agencia por un periodo indefinido, en todas sus plataformas digitales, redes sociales, campañas publicitarias y materiales promocionales presentes y futuros.<br>
+
+<b>8.4 Jurisdicción:</b> Cualquier controversia derivada del presente contrato será resuelta en los tribunales competentes de <b>Reynosa, Tamaulipas, México</b>, renunciando ambas partes a cualquier otro fuero que pudiera corresponderles.` },
+  { num:9, t:'Firmas', body: () => `Yo, <b>el Creador de Contenido</b>, he leído, entendido y aceptado los términos y condiciones de este contrato. Por parte de la Agencia firma <b>Guillermo Alexander Cobos Vizcarra</b>, Representante de Conecta Reynosa. La firma digital del Creador y el envío de su INE constituyen la aceptación plena del presente contrato.` },
 ];
 
 function _escCtr(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c])); }
@@ -8757,20 +8784,72 @@ async function _poblarSelectEventos() {
   if (!sel) return;
   const ev = await _fetchEVFromIndex();
   if (!ev.length) return;
-  // Orden cronológico ascendente por ds (eventos sin ds van al final).
-  const sorted = ev.slice().sort((a, b) => (a.ds || '9999').localeCompare(b.ds || '9999'));
+  const today = new Date().toISOString().slice(0, 10);
+  // Filtrar: sin agotados, sin "en proceso", solo fechas futuras o sin fecha.
+  const filtered = ev.filter(e =>
+    e && e.id && e.a &&
+    e.st !== 'agotado' &&
+    e.st !== 'proceso' &&
+    (!e.ds || e.ds >= today)
+  );
+  // Orden cronológico ascendente.
+  const sorted = filtered.slice().sort((a, b) => (a.ds || '9999').localeCompare(b.ds || '9999'));
   // Limpiar opciones existentes salvo la primera ("— Selecciona —").
   while (sel.options.length > 1) sel.remove(1);
   sorted.forEach(e => {
-    if (!e || !e.id || !e.a) return;
     const opt = document.createElement('option');
     opt.value = e.id;
     opt.dataset.nombre = e.a;
     opt.dataset.fecha = (e.ds || '').slice(0, 10);
-    opt.textContent = `${e.a}${e.f ? ' · ' + e.f : ''}`;
+    opt.textContent = e.a;
     sel.appendChild(opt);
   });
   _contratosEVPobladoEnSelect = true;
+}
+
+// — Autocomplete de creadoras previas ————————————————
+// Mapa nombre→email y email→nombre, construido desde _contratosCache (cargado
+// por loadContratosList). Dedupe por email (case-insensitive).
+let _contratosCreadorasNombre2Email = {};
+let _contratosCreadorasEmail2Nombre = {};
+function _rebuildCreadorasDatalists() {
+  const listN = document.getElementById('ctr-datalist-nombres');
+  const listE = document.getElementById('ctr-datalist-emails');
+  if (!listN || !listE) return;
+  _contratosCreadorasNombre2Email = {};
+  _contratosCreadorasEmail2Nombre = {};
+  const seen = new Set();
+  for (const c of (_contratosCache || [])) {
+    const email = (c.creador_email || '').trim().toLowerCase();
+    const nombre = (c.creador_nombre || '').trim();
+    if (!email || !nombre) continue;
+    if (seen.has(email)) continue;
+    seen.add(email);
+    _contratosCreadorasNombre2Email[nombre.toLowerCase()] = { nombre, email };
+    _contratosCreadorasEmail2Nombre[email] = { nombre, email };
+  }
+  // Ordenar alfabéticamente por nombre.
+  const entries = Object.values(_contratosCreadorasEmail2Nombre)
+    .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es', { sensitivity: 'base' }));
+  listN.innerHTML = entries.map(e => `<option value="${_escCtr(e.nombre)}">${_escCtr(e.email)}</option>`).join('');
+  listE.innerHTML = entries.map(e => `<option value="${_escCtr(e.email)}">${_escCtr(e.nombre)}</option>`).join('');
+}
+
+function onCtrNombreInput() {
+  const v = (document.getElementById('ctr-nombre').value || '').trim().toLowerCase();
+  const match = _contratosCreadorasNombre2Email[v];
+  if (match) {
+    const emailEl = document.getElementById('ctr-email');
+    if (emailEl && !emailEl.value) emailEl.value = match.email;
+  }
+}
+function onCtrEmailInput() {
+  const v = (document.getElementById('ctr-email').value || '').trim().toLowerCase();
+  const match = _contratosCreadorasEmail2Nombre[v];
+  if (match) {
+    const nombreEl = document.getElementById('ctr-nombre');
+    if (nombreEl && !nombreEl.value) nombreEl.value = match.nombre;
+  }
 }
 
 // — Boot principal de la pestaña ——————————————————————
@@ -8782,6 +8861,7 @@ async function loadContratos() {
   const fc = document.getElementById('ctr-contrato-fecha');
   if (fc && !fc.value) fc.value = new Date().toISOString().slice(0, 10);
   await loadContratosList();
+  _rebuildCreadorasDatalists();
 }
 
 function switchContratoView(name) {

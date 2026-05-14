@@ -14,9 +14,9 @@
   html,body{margin:0;padding:0}
   body{
     font-family:'Montserrat',-apple-system,BlinkMacSystemFont,sans-serif;
-    color:#1a1a1a;
-    background:#f4f4f4;
-    line-height:1.5;
+    color:#222;
+    background:#e9eaee;
+    line-height:1.55;
     -webkit-font-smoothing:antialiased;
     -webkit-text-size-adjust:100%;
   }
@@ -30,7 +30,6 @@
     --gris-claro:#e6e6e6;
     --border:#d8d8d8;
   }
-  .display{font-family:'Barlow Condensed','Montserrat',sans-serif;text-transform:uppercase;letter-spacing:.02em;line-height:.95}
 
   /* ── Pantallas de estado ── */
   .state-screen{
@@ -42,113 +41,185 @@
   .state-screen .badge-tag{font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:rgba(255,255,255,.5);font-weight:700}
   .state-screen a.btn-link{display:inline-block;background:var(--amarillo);color:#000;padding:14px 28px;font-weight:900;letter-spacing:.06em;text-transform:uppercase;text-decoration:none;font-size:14px}
 
-  /* ── Header marca ── */
-  header.brand{
-    background:#000;color:#fff;border-bottom:5px solid var(--rojo);padding:18px 22px;
-    display:flex;align-items:center;justify-content:space-between;gap:14px;
-    position:sticky;top:0;z-index:5;
-  }
-  header.brand .logo-wrap{display:flex;align-items:center;gap:10px}
-  header.brand .logo-wrap .pill{background:var(--rojo);color:#000;padding:7px 11px;font-weight:900;letter-spacing:.04em;text-transform:uppercase;font-size:13px}
-  header.brand .logo-wrap .mx{color:#fff;font-style:italic;font-weight:900;font-size:18px}
-  header.brand .tagline{color:var(--amarillo);font-weight:900;letter-spacing:.16em;text-transform:uppercase;font-size:11px}
-
   /* ── Documento ── */
-  .container{max-width:780px;margin:0 auto;padding:0}
-  .doc{background:#fff;padding:32px 24px 24px;min-height:60vh}
-  @media (min-width:720px){
-    .doc{padding:48px 56px 40px;margin:24px auto;box-shadow:0 6px 40px rgba(0,0,0,.08);border:1px solid var(--border)}
+  .container{max-width:820px;margin:0 auto;padding:0}
+  .doc{background:#fff;padding:34px 22px 28px;min-height:60vh}
+  @media (min-width:760px){
+    .doc{padding:60px 72px 56px;margin:32px auto;box-shadow:0 8px 60px rgba(0,0,0,.12);border:1px solid var(--border)}
   }
 
-  .doc-meta{display:flex;flex-wrap:wrap;gap:18px 28px;font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:#666;margin-bottom:18px;font-weight:700}
-  .doc-meta span b{color:var(--negro);font-weight:800}
+  /* ── Header del documento ── */
+  .doc-header{
+    text-align:center;
+    border-bottom:3px solid #000;
+    padding-bottom:24px;
+    margin-bottom:30px;
+  }
+  .doc-header .logo{
+    display:block;
+    margin:0 auto 22px;
+    width:240px;
+    max-width:75%;
+    height:auto;
+  }
+  .doc-header h1{
+    font-family:'Barlow Condensed','Montserrat',sans-serif;
+    text-transform:uppercase;
+    font-size:24px;
+    line-height:1.15;
+    letter-spacing:.02em;
+    color:#000;
+    margin:0 0 6px;
+    font-weight:800;
+  }
+  .doc-header .subtitle{
+    font-family:'Barlow Condensed','Montserrat',sans-serif;
+    text-transform:uppercase;
+    font-size:14px;
+    color:var(--rojo);
+    font-weight:800;
+    letter-spacing:.14em;
+    margin:0;
+  }
+  @media (min-width:760px){
+    .doc-header h1{font-size:30px}
+  }
 
-  h2.doc-title{font-family:'Barlow Condensed',sans-serif;font-size:42px;line-height:.92;text-transform:uppercase;margin:6px 0 4px;color:var(--negro);letter-spacing:-.01em}
-  h2.doc-title small{display:block;font-size:14px;color:var(--rojo);font-weight:800;letter-spacing:.18em;margin-top:8px}
-
-  .partes{margin:26px 0 18px;border-top:3px solid var(--negro);border-bottom:1px solid var(--border);padding:18px 0}
-  .partes p{margin:0 0 8px;font-size:14px}
-  .partes p strong{color:var(--negro);font-weight:800}
-  .partes .vs{color:var(--rojo);font-weight:900;letter-spacing:.2em;font-size:11px;text-transform:uppercase;margin:8px 0}
-
-  /* ── Cláusulas ── */
-  .clausula{margin:28px 0 0}
-  .clausula h3{
+  /* ── Bloque meta ── */
+  .doc-meta{
+    background:#fafafa;
+    border-left:6px solid var(--amarillo);
+    border-radius:0;
+    padding:18px 22px;
+    margin-bottom:30px;
+    display:flex;
+    flex-direction:column;
+    gap:8px;
+  }
+  .doc-meta .meta-row{
+    display:flex;flex-wrap:wrap;align-items:baseline;gap:8px;
+    font-size:13.5px;
+  }
+  .doc-meta .meta-row .lbl{
     font-family:'Barlow Condensed',sans-serif;
     text-transform:uppercase;
-    font-size:22px;letter-spacing:.04em;
-    margin:0 0 10px;display:flex;align-items:baseline;gap:12px;
-    border-left:6px solid var(--amarillo);padding:6px 0 6px 12px;
-    background:linear-gradient(90deg,rgba(232,255,76,.18),transparent 60%);
+    color:var(--rojo);
+    font-weight:800;
+    letter-spacing:.1em;
+    font-size:11px;
+    min-width:165px;
   }
-  .clausula h3 .num{font-family:'Barlow Condensed',sans-serif;color:var(--rojo);font-weight:900;font-size:30px;letter-spacing:0;min-width:38px;text-align:left}
-  .clausula p, .clausula li{font-size:14px;line-height:1.65;margin:0 0 10px}
-  .clausula ul{padding-left:22px;margin:6px 0 12px}
-  .clausula li{margin-bottom:6px}
-  .subclausula{font-weight:700;color:var(--negro)}
+  .doc-meta .meta-row .val{color:#000;font-weight:700}
 
-  .item-list{margin:0;padding:0;list-style:none;border:1px solid var(--border);border-radius:4px;overflow:hidden;background:#fafafa}
-  .item-list li{display:flex;align-items:flex-start;gap:10px;padding:11px 14px;border-bottom:1px solid var(--border);font-size:14px}
+  /* ── Cláusulas ── */
+  .clausula{margin-top:30px}
+  .clausula h2{
+    font-family:'Barlow Condensed','Montserrat',sans-serif;
+    text-transform:uppercase;
+    font-size:22px;
+    letter-spacing:.04em;
+    margin:0 0 12px;
+    color:#000;
+    border-bottom:2px solid #000;
+    padding-bottom:6px;
+    line-height:1.15;
+  }
+  .clausula h2 .num{color:var(--rojo);font-weight:900;margin-right:10px}
+  .clausula p{font-size:14px;line-height:1.7;margin:0 0 10px;color:#1a1a1a}
+  .clausula ul, .clausula ol{padding-left:22px;margin:8px 0 14px}
+  .clausula li{font-size:14px;line-height:1.7;margin-bottom:6px}
+  .clausula .subseccion{
+    font-family:'Barlow Condensed','Montserrat',sans-serif;
+    text-transform:uppercase;
+    font-size:14px;
+    letter-spacing:.05em;
+    color:#000;
+    font-weight:800;
+    margin:18px 0 8px;
+  }
+  .clausula .subseccion .num{color:var(--rojo);margin-right:6px;font-weight:900}
+  .clausula .multa{font-weight:800;color:var(--rojo)}
+
+  .item-list{margin:8px 0 14px;padding:0;list-style:none;border:1px solid var(--border);background:#fafafa}
+  .item-list li{display:flex;align-items:flex-start;gap:10px;padding:11px 16px;border-bottom:1px solid var(--border);font-size:14px}
   .item-list li:last-child{border-bottom:0}
-  .item-list li::before{content:'';width:8px;height:8px;background:var(--rojo);margin-top:8px;flex:0 0 8px}
+  .item-list li::before{content:'';width:8px;height:8px;background:var(--rojo);margin-top:8px;flex:0 0 8px;border-radius:0}
 
-  /* ── Firma section (solo en pendiente) ── */
-  .firma-section{margin-top:34px;padding:24px;background:var(--negro);color:#fff;border-radius:4px}
-  .firma-section h3{font-family:'Barlow Condensed',sans-serif;text-transform:uppercase;font-size:24px;margin:0 0 16px;letter-spacing:.04em;color:var(--amarillo);border:none;padding:0;background:none}
-  .firma-section .hint{font-size:12px;color:rgba(255,255,255,.65);margin:0 0 14px}
-  .canvas-wrap{background:#fff;border-radius:4px;position:relative;border:2px dashed rgba(255,255,255,.15);overflow:hidden}
-  #firmaCanvas{display:block;width:100%;height:200px;touch-action:none;cursor:crosshair}
-  .canvas-actions{display:flex;justify-content:space-between;align-items:center;margin-top:10px;font-size:12px}
-  .canvas-actions button{background:transparent;border:1px solid rgba(255,255,255,.3);color:#fff;padding:8px 16px;font-size:11px;text-transform:uppercase;letter-spacing:.1em;font-weight:700;cursor:pointer;font-family:'Montserrat',sans-serif;border-radius:3px}
+  /* ── Sección de firma (estado pendiente) ── */
+  .firma-section{margin-top:40px;padding:24px 22px;background:#000;color:#fff;border-radius:0}
+  .firma-section .panel-title{font-family:'Barlow Condensed',sans-serif;text-transform:uppercase;font-size:22px;letter-spacing:.05em;color:var(--amarillo);margin:0 0 14px;font-weight:800}
+  .firma-section .panel-sub{font-size:12px;color:rgba(255,255,255,.65);margin:0 0 14px;line-height:1.5}
+  .firma-acept{background:#fafafa;color:#000;padding:18px 20px;margin-bottom:20px;border-left:4px solid var(--amarillo);font-size:13px;line-height:1.6}
+  .firma-acept b{font-weight:800}
+
+  .canvas-wrap{background:#fff;border-radius:0;position:relative;border:2px dashed rgba(255,255,255,.18);overflow:hidden}
+  #firmaCanvas{display:block;width:100%;height:200px;touch-action:none;cursor:crosshair;background:#fff}
+  .canvas-actions{display:flex;justify-content:space-between;align-items:center;margin-top:10px;font-size:12px;color:rgba(255,255,255,.5)}
+  .canvas-actions button{background:transparent;border:1px solid rgba(255,255,255,.3);color:#fff;padding:8px 16px;font-size:11px;text-transform:uppercase;letter-spacing:.1em;font-weight:700;cursor:pointer;font-family:'Montserrat',sans-serif;border-radius:0}
   .canvas-actions button:hover{background:rgba(255,255,255,.05)}
 
-  .ine-section{margin-top:24px}
-  .ine-section h3{font-family:'Barlow Condensed',sans-serif;text-transform:uppercase;font-size:22px;margin:0 0 14px;letter-spacing:.04em;color:var(--amarillo);border:none;padding:0;background:none}
+  .ine-section{margin-top:28px}
   .ine-uploads{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-  .ine-uploads label{display:block;border:2px dashed rgba(255,255,255,.25);border-radius:4px;padding:24px 12px;text-align:center;font-size:12px;cursor:pointer;background:rgba(255,255,255,.03);position:relative;overflow:hidden;min-height:130px;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:6px;transition:border-color .2s,background .2s}
+  .ine-uploads label{display:flex;flex-direction:column;justify-content:center;align-items:center;gap:6px;border:2px dashed rgba(255,255,255,.25);padding:24px 12px;text-align:center;font-size:12px;cursor:pointer;background:rgba(255,255,255,.03);position:relative;overflow:hidden;min-height:130px;transition:border-color .2s,background .2s}
   .ine-uploads label:hover{border-color:var(--amarillo);background:rgba(232,255,76,.08)}
   .ine-uploads label.has-file{border-style:solid;border-color:var(--amarillo);padding:0}
-  .ine-uploads label .lbl-title{font-weight:900;letter-spacing:.14em;text-transform:uppercase;font-size:11px;color:rgba(255,255,255,.85)}
+  .ine-uploads label .lbl-title{font-weight:900;letter-spacing:.12em;text-transform:uppercase;font-size:11px;color:rgba(255,255,255,.85)}
   .ine-uploads label .lbl-hint{font-size:10px;color:rgba(255,255,255,.45);letter-spacing:.06em}
   .ine-uploads label .preview-img{width:100%;height:130px;object-fit:cover;display:block}
   .ine-uploads input[type=file]{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
 
-  .check-section{margin-top:22px;display:flex;gap:12px;align-items:flex-start;font-size:13px;line-height:1.5}
+  .check-section{margin-top:22px;display:flex;gap:12px;align-items:flex-start;font-size:13px;line-height:1.5;color:rgba(255,255,255,.85)}
   .check-section input{margin-top:3px;width:18px;height:18px;flex:0 0 18px;accent-color:var(--amarillo)}
 
   .submit-area{margin-top:26px}
-  .btn-submit{width:100%;background:var(--amarillo);color:#000;border:0;padding:18px;font-weight:900;font-size:16px;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;font-family:'Montserrat',sans-serif;border-radius:3px}
+  .btn-submit{width:100%;background:var(--amarillo);color:#000;border:0;padding:18px;font-weight:900;font-size:16px;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;font-family:'Montserrat',sans-serif;border-radius:0}
   .btn-submit:disabled{opacity:.5;cursor:not-allowed}
   .btn-submit:active:not(:disabled){transform:translateY(1px)}
-
-  .form-err{display:none;margin-top:14px;padding:12px 14px;background:rgba(255,40,59,.15);border:1px solid var(--rojo);border-radius:3px;color:#ffb3ba;font-size:13px}
+  .form-err{display:none;margin-top:14px;padding:12px 14px;background:rgba(255,40,59,.15);border:1px solid var(--rojo);color:#ffb3ba;font-size:13px}
   .form-err.show{display:block}
 
-  /* ── Firma renderizada (vista firmada) ── */
-  .firma-rendered{margin-top:34px;border-top:3px solid var(--negro);padding-top:24px;display:grid;grid-template-columns:1fr;gap:24px}
-  @media (min-width:640px){.firma-rendered{grid-template-columns:1fr 1fr}}
-  .firma-rendered .col h4{font-family:'Barlow Condensed',sans-serif;text-transform:uppercase;font-size:14px;letter-spacing:.18em;margin:0 0 10px;color:#666;font-weight:700}
-  .firma-rendered .firma-img{background:#fafafa;border:1px solid var(--border);padding:14px;min-height:130px;display:flex;align-items:center;justify-content:center}
-  .firma-rendered .firma-img img{max-width:100%;max-height:200px}
-  .firma-rendered .firma-name{font-weight:800;text-transform:uppercase;letter-spacing:.04em;margin-top:8px;font-size:14px}
-  .firma-rendered .firma-meta{font-size:11px;color:#888;letter-spacing:.1em;text-transform:uppercase;margin-top:4px}
-  .firma-rendered .ine-thumbs{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-  .firma-rendered .ine-thumbs a{display:block;border:1px solid var(--border);overflow:hidden;background:#fafafa}
-  .firma-rendered .ine-thumbs img{width:100%;height:90px;object-fit:cover;display:block}
+  /* ── Firmas RENDERIZADAS (vista firmada) ── */
+  .firmas-rendered{margin-top:46px;border-top:3px solid #000;padding-top:26px}
+  .firmas-rendered .firmas-title{font-family:'Barlow Condensed',sans-serif;text-transform:uppercase;font-size:22px;letter-spacing:.04em;color:#000;margin:0 0 18px;font-weight:800}
+  .firmas-rendered .firmas-title .num{color:var(--rojo);margin-right:10px;font-weight:900}
+  .firmas-rendered .grid{display:grid;grid-template-columns:1fr;gap:34px}
+  @media (min-width:640px){.firmas-rendered .grid{grid-template-columns:1fr 1fr}}
+  .firma-block{display:flex;flex-direction:column;gap:8px}
+  .firma-block .label-mini{font-family:'Barlow Condensed',sans-serif;text-transform:uppercase;font-size:11px;letter-spacing:.18em;color:#666;font-weight:700}
+  .firma-block .firma-box{background:#fafafa;border:1px solid var(--border);padding:14px;min-height:130px;display:flex;align-items:center;justify-content:center}
+  .firma-block .firma-box img{max-width:100%;max-height:140px}
+  .firma-block .firma-nombre{font-weight:800;text-transform:uppercase;letter-spacing:.04em;margin-top:6px;font-size:14px;color:#000}
+  .firma-block .firma-rol{font-size:11px;color:#666;letter-spacing:.1em;text-transform:uppercase;font-weight:700}
 
-  /* ── Footer ── */
-  footer.doc-footer{padding:24px 24px 40px;text-align:center;font-size:11px;color:#888;letter-spacing:.14em;text-transform:uppercase}
+  .ine-rendered{margin-top:30px;padding-top:22px;border-top:1px dashed var(--border)}
+  .ine-rendered .label-mini{font-family:'Barlow Condensed',sans-serif;text-transform:uppercase;font-size:11px;letter-spacing:.18em;color:#666;font-weight:700;margin-bottom:10px;display:block}
+  .ine-rendered .ine-thumbs{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .ine-rendered .ine-thumbs a{display:block;border:1px solid var(--border);overflow:hidden;background:#fafafa}
+  .ine-rendered .ine-thumbs img{width:100%;height:130px;object-fit:cover;display:block}
+
+  /* Footer */
+  footer.doc-footer{padding:24px 24px 40px;text-align:center;font-size:11px;color:#666;letter-spacing:.14em;text-transform:uppercase;font-family:'Montserrat',sans-serif}
   footer.doc-footer a{color:var(--rojo);text-decoration:none;font-weight:800}
 
-  /* Loading */
   .loading{min-height:60vh;display:flex;align-items:center;justify-content:center;color:#666;font-size:13px;letter-spacing:.16em;text-transform:uppercase}
+
+  /* Sección "Aceptación del Creador" */
+  .firma-creador-intro{
+    background:rgba(232,255,76,.18);
+    border-left:5px solid var(--amarillo);
+    padding:16px 20px;
+    margin-bottom:18px;
+    color:#000;
+    font-size:13.5px;
+    line-height:1.65;
+  }
+  .firma-creador-intro b{font-weight:800}
 
   /* Print */
   @media print{
     body{background:#fff}
-    header.brand{position:static;border-bottom-width:4px}
-    .doc{box-shadow:none;border:none;padding:0 8px}
-    .firma-section,.ine-section,.check-section,.submit-area,footer.doc-footer{display:none !important}
+    .doc{box-shadow:none;border:none;padding:0 8px;margin:0}
+    .firma-section,footer.doc-footer{display:none !important}
   }
 </style>
 </head>
@@ -161,6 +232,8 @@
 <script>
 const API_OBTENER = "/.netlify/functions/contrato-obtener";
 const API_FIRMAR  = "/.netlify/functions/contrato-firmar";
+const FIRMA_GUILLERMO_SRC = "/imgs/firma-guillermo.png";
+const LOGO_SRC = "/imgs/logo-conecta-mx.png";
 
 function $q(sel, el) { return (el || document).querySelector(sel); }
 function escapeHtml(s) {
@@ -174,161 +247,217 @@ function fmtFechaLarga(iso) {
   const meses = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
   return `${parseInt(d,10)} de ${meses[parseInt(m,10)-1] || ""} de ${y}`;
 }
+function fmtFechaCorta(iso) {
+  // Formato DD/MM/AA
+  if (!iso) return "—";
+  const [y, m, d] = String(iso).split("-");
+  if (!y || !m || !d) return iso;
+  return `${d}/${m}/${y.slice(-2)}`;
+}
 function getToken() {
   const u = new URLSearchParams(location.search);
   return (u.get("t") || u.get("token") || "").trim();
 }
 
-const BRAND_HEADER = `
-  <header class="brand">
-    <div class="logo-wrap">
-      <span class="pill">Conecta</span>
-      <span class="mx">MX</span>
-    </div>
-    <span class="tagline">Reynosa · Contrato</span>
-  </header>`;
-
 const FOOTER = `
   <footer class="doc-footer">
-    Conecta Reynosa · <a href="https://conectareynosa.mx">conectareynosa.mx</a><br>
-    RFC: COVG850924BB6 · Guillermo Alexander Cobos Vizcarra
+    Conecta Reynosa · <a href="https://conectareynosa.mx">conectareynosa.mx</a> · RFC: COVG850924BB6<br>
+    Guillermo Alexander Cobos Vizcarra · Viaja con Expertos
   </footer>`;
 
-// ── Cláusulas del contrato (texto legal) ───────────────────────────────
+// ── Cláusulas legales — replica exacta del PDF + agregados ─────────────
 const CLAUSULAS = [
   {
     num: 1, titulo: "Objeto del contrato",
-    cuerpo: `<p>El presente contrato tiene por objeto establecer los términos del intercambio comercial entre <strong>Conecta MX (la Agencia)</strong>, representada por Guillermo Alexander Cobos Vizcarra, y <strong class="creador-strong"></strong> (en adelante, el "Creador"), para la promoción del evento mediante la generación de contenido digital, en los términos y condiciones que aquí se detallan.</p>`
+    cuerpo: c => `<p>El presente Contrato regula la colaboración entre <b>CONECTA REYNOSA</b> (en adelante, "la Agencia") y <b class="creador-strong">${escapeHtml(c.creador_nombre)}</b> (en adelante, "el Creador de Contenido"), mediante un intercambio que incluye beneficios detallados en la cláusula 5, a cambio de la generación y entrega de contenido audiovisual bajo las condiciones descritas en este documento.</p>`
   },
   {
     num: 2, titulo: "Detalle del intercambio",
-    cuerpo: `<p><strong>2.1 Lo que ofrece la Agencia:</strong></p><div class="item-list-ofrecimiento"></div><p style="margin-top:14px"><strong>2.2 Lo que se espera del Creador:</strong></p><div class="item-list-expectativas"></div>`
+    cuerpo: c => `
+<div class="subseccion">2.1 Lo que ofrece la Agencia:</div>
+<div class="item-list-ofrecimiento"></div>
+<div class="subseccion">2.2 Lo que se espera del Creador de Contenido:</div>
+<div class="item-list-expectativas"></div>`
   },
   {
     num: 3, titulo: "Propiedad del contenido",
-    cuerpo: `<p><span class="subclausula">3.1</span> Todo el contenido generado por el Creador durante el evento será de propiedad exclusiva de la Agencia.</p>
-<p><span class="subclausula">3.2</span> Únicamente la Agencia podrá distribuir, publicar y/o utilizar el contenido en sus canales oficiales de comunicación, sin requerir autorización adicional del Creador.</p>
-<p><span class="subclausula">3.3</span> Cualquier publicación realizada por el Creador en sus propias redes deberá ser etiquetada como una colaboración oficial con la Agencia (@conectareynosa).</p>`
+    cuerpo: () => `
+<ul>
+  <li>Todo el contenido generado será de propiedad exclusiva de la Agencia.</li>
+  <li>Solo la Agencia podrá distribuir, publicar y usar el contenido en sus plataformas.</li>
+  <li>Cualquier publicación por parte del Creador de Contenido deberá ser etiquetada como colaboración oficial con la Agencia.</li>
+</ul>`
   },
   {
     num: 4, titulo: "Requisitos del contenido",
-    cuerpo: `<p><span class="subclausula">4.1</span> <strong>Calidad y formato:</strong></p>
-<ul>
-  <li>Calidad técnica HD o 4K.</li>
-  <li>Formato Reel / vertical 1080 × 1920 px.</li>
-  <li>Iluminación y presentación que reflejen una experiencia increíble.</li>
-</ul>
-<p><span class="subclausula">4.2</span> <strong>Requisitos de la voz:</strong></p>
-<ul>
-  <li>Audición clara, sin ruidos de fondo.</li>
-  <li>Buena dicción.</li>
-  <li>Tono respetuoso.</li>
-  <li>Adecuación al propósito del contenido.</li>
-</ul>
-<p><span class="subclausula">4.3</span> <strong>Historias y publicaciones:</strong></p>
-<ul>
-  <li>Menciones publicadas como historias en Instagram y/o TikTok.</li>
-  <li>Las redes del Creador deberán permanecer públicas durante el evento y los 10–15 días posteriores.</li>
-  <li>Multas por incumplimiento: <strong>25%</strong> en la primera infracción, <strong>50%</strong> si persiste.</li>
-</ul>
-<p><span class="subclausula">4.4</span> <strong>Plazo de entrega:</strong></p>
-<ul>
-  <li>Contenido entregado dentro de los <strong>2–3 días</strong> posteriores al evento.</li>
-  <li>Multas por retraso: <strong>25%</strong> (1–7 días), <strong>50%</strong> (7–10 días), <strong>75%</strong> (10–15 días), <strong>100%</strong> (más de 15 días).</li>
-</ul>
-<p><span class="subclausula">4.5</span> <strong>Correcciones:</strong></p>
-<ul>
-  <li>El Creador tendrá <strong>24 horas</strong> para realizar los ajustes solicitados por la Agencia.</li>
-  <li>Multa del <strong>50%</strong> si no cumple el plazo de corrección.</li>
-  <li>Multa del <strong>100%</strong> si ningún video entregado cumple con las expectativas pactadas.</li>
-</ul>
-<p><span class="subclausula">4.6</span> <strong>Exclusividad durante el evento:</strong> Durante el evento, el Creador no podrá promocionar a otras agencias competidoras o servicios similares de viajes a conciertos.</p>
-<p><span class="subclausula">4.7</span> <strong>Veto de contenido:</strong> La Agencia se reserva el derecho de solicitar la eliminación de contenido publicado que no cumpla con los estándares acordados, en un plazo máximo de <strong>24 horas</strong> a partir de la notificación.</p>`
+    cuerpo: () => `
+<div class="subseccion"><span class="num">4.1</span> Calidad y formato del contenido</div>
+<ol>
+  <li><b>Calidad técnica:</b> Material en HD o 4K. Cualquier material de calidad inferior será rechazado.</li>
+  <li><b>Formato:</b> Videos en formato Reel o video vertical para redes sociales (1080 × 1920 píxeles).</li>
+  <li><b>Iluminación y presentación:</b> Todo contenido, incluidas las menciones durante el evento, deberá tener buena iluminación, claridad y demostrar que el Creador está disfrutando una experiencia increíble.</li>
+</ol>
+
+<div class="subseccion"><span class="num">4.2</span> Requisitos de la voz</div>
+<ol>
+  <li><b>Audición clara:</b> La voz en los videos debe ser claramente audible, sin ruidos de fondo que interfieran con el mensaje.</li>
+  <li><b>Buena dicción:</b> El Creador deberá hablar de manera clara y entendible, sin errores que dificulten la comprensión del mensaje.</li>
+  <li><b>Tono respetuoso:</b> El lenguaje y tono utilizados deben ser respetuosos y acordes al profesionalismo de la Agencia.</li>
+  <li><b>Adecuación:</b> La voz deberá ajustarse al propósito del video (ya sea experiencia, comercial o contenido extra) y ser funcional para nuestras plataformas y campañas.</li>
+</ol>
+
+<div class="subseccion"><span class="num">4.3</span> Historias y publicaciones</div>
+<ol>
+  <li>Las menciones en el evento deberán publicarse como historias en <b>Instagram y/o TikTok</b>.</li>
+  <li>Las redes sociales del Creador deberán estar en modo <b>público</b> durante:
+    <ul>
+      <li>La duración del evento.</li>
+      <li>Un lapso de <b>10 a 15 días</b> posteriores a la publicación del contenido.</li>
+    </ul>
+  </li>
+  <li>En caso de incumplir estas indicaciones, se aplicarán las siguientes sanciones:
+    <ul>
+      <li>Multa del <span class="multa">25%</span> del costo del intercambio si la infracción ocurre por primera vez.</li>
+      <li>Multa del <span class="multa">50%</span> del costo del intercambio si la infracción persiste.</li>
+    </ul>
+  </li>
+</ol>
+
+<div class="subseccion"><span class="num">4.4</span> Plazo de entrega</div>
+<ol>
+  <li>El contenido debe ser entregado de <b>2 a 3 días</b> después del evento.</li>
+  <li>En caso de retraso después de los días de margen en la entrega:
+    <ul>
+      <li>Retraso de <b>1 a 7 días:</b> Multa del <span class="multa">25%</span>.</li>
+      <li>Retraso de <b>7 a 10 días:</b> Multa del <span class="multa">50%</span>.</li>
+      <li>Retraso de <b>10 a 15 días:</b> Multa del <span class="multa">75%</span>.</li>
+      <li>Retraso mayor a <b>15 días:</b> Multa del <span class="multa">100%</span>.</li>
+    </ul>
+  </li>
+</ol>
+
+<div class="subseccion"><span class="num">4.5</span> Correcciones</div>
+<ol>
+  <li>Si el material es devuelto para correcciones, el Creador tiene <b>24 horas</b> para hacer los ajustes solicitados.</li>
+  <li>Si no cumple con el plazo:
+    <ul>
+      <li><span class="multa">50%</span> del costo del intercambio será cobrado.</li>
+      <li>Si ninguno de los videos cumple con las expectativas, la Agencia podrá cobrar el <span class="multa">100%</span> del costo del intercambio.</li>
+    </ul>
+  </li>
+</ol>
+
+<div class="subseccion"><span class="num">4.6</span> Exclusividad durante el evento</div>
+<p>Durante el evento, el Creador no podrá promocionar a otras agencias competidoras o servicios similares de viajes a conciertos. El incumplimiento de esta cláusula resultará en la <b>cancelación inmediata del contrato</b> y el cobro del <span class="multa">100%</span> del valor comercial del intercambio.</p>
+
+<div class="subseccion"><span class="num">4.7</span> Veto de contenido</div>
+<p>La Agencia se reserva el derecho de solicitar la eliminación de contenido publicado que no cumpla con los estándares acordados, en un plazo máximo de <b>24 horas</b>. El no cumplimiento de esta solicitud resultará en multa del <span class="multa">50%</span> del valor del intercambio.</p>`
   },
   {
     num: 5, titulo: "Políticas de cancelación",
-    cuerpo: `<p><span class="subclausula">5.1</span> En caso de que el Creador no pueda asistir al evento, deberá notificar a la Agencia con al menos <strong>72 horas</strong> de anticipación.</p>
-<p><span class="subclausula">5.2</span> El Creador podrá proponer un suplente, sujeto a aprobación previa por escrito de la Agencia.</p>
-<p><span class="subclausula">5.3</span> En caso de cancelación tardía sin justificación válida, la Agencia podrá excluir al Creador de futuras colaboraciones.</p>
-<p><span class="subclausula">5.4</span> Si el evento se cancela por causas ajenas a la Agencia (fuerza mayor), el presente contrato quedará sin efecto, sin penalización para ninguna de las partes.</p>
-<p><span class="subclausula">5.5</span> <strong>Reembolso del intercambio:</strong> En caso de incumplimiento total del Creador (no asistencia, no entrega de contenido), el Creador deberá reembolsar el valor comercial del intercambio dentro de <strong>15 días naturales</strong> contados a partir de la fecha del evento.</p>`
+    cuerpo: () => `
+<p>El contrato podrá cancelarse por las siguientes razones:</p>
+<ol>
+  <li><b>Incumplimiento de calidad:</b> Si el contenido no cumple con los requisitos establecidos (calidad técnica, iluminación, formato, menciones claras y positivas).</li>
+  <li><b>Imagen pública:</b> Si el Creador está involucrado en polémicas, problemas legales o comportamientos que afecten la imagen de la Agencia.</li>
+  <li><b>Redes sociales privadas:</b> Si el Creador no mantiene sus redes públicas durante el plazo estipulado.</li>
+  <li><b>Entregas incumplidas:</b> Si el contenido no se entrega en tiempo y forma o no se realizan las correcciones solicitadas.</li>
+  <li><b>Reembolso del intercambio:</b> En caso de incumplimiento total del Creador (no asistencia, no entrega de contenido), el Creador deberá reembolsar el valor comercial del intercambio dentro de <b>15 días naturales</b> contados a partir de la fecha del evento.</li>
+</ol>`
   },
   {
-    num: 6, titulo: "Beneficios para el Creador",
-    cuerpo: `<p>El Creador tendrá acceso prioritario a futuras invitaciones de eventos organizados por la Agencia, en función de su desempeño y cumplimiento. La Agencia podrá ofrecer beneficios adicionales (acceso a zonas VIP, kits exclusivos, contenido detrás de cámaras, atención preferencial) sujetos a disponibilidad y mérito.</p>`
+    num: 6, titulo: "Beneficios para el Creador de Contenido",
+    cuerpo: () => `
+<ol>
+  <li><b>Entradas:</b> Acceso al evento o festival en zonas de buena ubicación.</li>
+  <li><b>Viaje y alojamiento</b> (si aplica): Transporte, traslados, kit Conecta, hospedaje y otros servicios según la logística del evento.</li>
+  <li><b>Extras:</b> Otros beneficios serán detallados dependiendo del intercambio acordado.</li>
+</ol>`
   },
   {
-    num: 7, titulo: "Compromiso del Creador",
-    cuerpo: `<p>El Creador se compromete a mantener una conducta respetuosa y profesional durante todo el evento y en toda comunicación pública relacionada. Se obliga a no realizar declaraciones, actos o publicaciones que puedan dañar la reputación de la Agencia, del evento o de cualquier marca patrocinadora involucrada.</p>`
+    num: 7, titulo: "Compromiso del Creador de Contenido",
+    cuerpo: () => `
+<p>El Creador de Contenido se compromete a:</p>
+<ol>
+  <li>Generar contenido que represente positivamente la experiencia del evento.</li>
+  <li>Aceptar las solicitudes de colaboración etiquetada en redes sociales.</li>
+  <li>Publicar historias y menciones durante el evento con buena calidad y en redes públicas.</li>
+  <li>Cumplir con las fechas y plazos establecidos para entrega y correcciones.</li>
+</ol>`
   },
   {
     num: 8, titulo: "Cláusulas finales",
-    cuerpo: `<p><span class="subclausula">8.1</span> <strong>Hashtags obligatorios:</strong> Todas las publicaciones derivadas de esta colaboración deberán incluir los siguientes hashtags:</p>
+    cuerpo: () => `
+<div class="subseccion"><span class="num">8.1</span> Hashtags</div>
 <ul>
-  <li><strong>#Viajaconexpertos</strong></li>
-  <li><strong>#Seguimosconectando</strong></li>
-  <li><strong>#CMX10</strong></li>
+  <li><b>#Viajaconexpertos</b></li>
+  <li><b>#Seguimosconectando</b></li>
+  <li><b>#CMX10</b></li>
 </ul>
-<p><span class="subclausula">8.2</span> <strong>Confidencialidad:</strong> El Creador se obliga a mantener en estricta reserva cualquier información, condición económica o detalle del presente contrato y de la operación interna de la Agencia que conozca con motivo de esta colaboración. Esta obligación subsiste incluso después de concluido el contrato.</p>
-<p><span class="subclausula">8.3</span> <strong>Datos personales:</strong> El Creador autoriza expresamente el uso de su imagen, nombre y contenido generado para fines promocionales de la Agencia, por un periodo indefinido.</p>
-<p><span class="subclausula">8.4</span> <strong>Jurisdicción:</strong> Cualquier controversia derivada del presente contrato será resuelta en los tribunales competentes de la ciudad de <strong>Reynosa, Tamaulipas, México</strong>, renunciando expresamente las partes a cualquier otro fuero que pudiera corresponderles.</p>`
-  },
-  {
-    num: 9, titulo: "Firmas",
-    cuerpo: `<p>Las partes firman el presente contrato de conformidad con los términos arriba expresados. La firma digital y el envío de la identificación oficial (INE) por parte del Creador constituyen la aceptación plena de este contrato.</p>`
+
+<div class="subseccion"><span class="num">8.2</span> Confidencialidad</div>
+<p>Toda la información y beneficios otorgados al Creador son confidenciales y no podrán divulgarse sin autorización de la Agencia.</p>
+
+<div class="subseccion"><span class="num">8.3</span> Datos personales y uso de imagen</div>
+<p>El Creador autoriza el uso de su imagen, nombre y contenido generado para fines promocionales de la Agencia por un periodo indefinido, en todas sus plataformas digitales, redes sociales, campañas publicitarias y materiales promocionales presentes y futuros.</p>
+
+<div class="subseccion"><span class="num">8.4</span> Jurisdicción</div>
+<p>Cualquier controversia derivada del presente contrato será resuelta en los tribunales competentes de <b>Reynosa, Tamaulipas, México</b>, renunciando ambas partes a cualquier otro fuero que pudiera corresponderles.</p>`
   }
 ];
 
-// ── Render del documento base ──────────────────────────────────────────
+// ── Render principal ──────────────────────────────────────────────────
 function renderDoc(c, opts) {
   opts = opts || {};
-  const fechaContrato = fmtFechaLarga(c.contrato_fecha);
-  const fechaEvento = fmtFechaLarga(c.evento_fecha);
   const docMeta = `
     <div class="doc-meta">
-      <span><b>Fecha del contrato:</b> ${escapeHtml(fechaContrato)}</span>
-      <span><b>Evento:</b> ${escapeHtml(c.evento_nombre)}</span>
-      <span><b>Fecha del evento:</b> ${escapeHtml(fechaEvento)}</span>
+      <div class="meta-row"><span class="lbl">Fecha del contrato:</span><span class="val">${escapeHtml(fmtFechaLarga(c.contrato_fecha))}</span></div>
+      <div class="meta-row"><span class="lbl">Concierto / Festival / Evento:</span><span class="val">${escapeHtml(c.evento_nombre)}</span></div>
+      <div class="meta-row"><span class="lbl">Fecha del evento:</span><span class="val">${escapeHtml(fmtFechaCorta(c.evento_fecha))}</span></div>
     </div>`;
 
-  const partes = `
-    <div class="partes">
-      <p><strong>Conecta MX</strong> · Agencia organizadora de viajes a conciertos y festivales · representada por Guillermo Alexander Cobos Vizcarra (Reynosa, Tamaulipas).</p>
-      <p class="vs">—— y ——</p>
-      <p><strong>${escapeHtml(c.creador_nombre)}</strong> · Creador(a) de contenido · ${escapeHtml(c.creador_email)}.</p>
+  const header = `
+    <div class="doc-header">
+      <img class="logo" src="${LOGO_SRC}" alt="Conecta MX Reynosa">
+      <h1>Contrato de prestación de servicios por intercambio<br>entre "Conecta Reynosa" y el Creador de Contenido</h1>
+      <p class="subtitle">Reynosa, Tamaulipas · México</p>
     </div>`;
 
   const clausulasHtml = CLAUSULAS.map(cl => `
-    <div class="clausula">
-      <h3><span class="num">${cl.num}.</span>${escapeHtml(cl.titulo)}</h3>
-      ${cl.cuerpo}
-    </div>`).join("");
+    <section class="clausula">
+      <h2><span class="num">${cl.num}.</span>${escapeHtml(cl.titulo)}</h2>
+      ${cl.cuerpo(c)}
+    </section>`).join("");
 
-  let firmaSection = "";
+  // Sección 9 — depende del estado.
+  let seccion9;
   if (opts.estado === "pendiente") {
-    firmaSection = `
+    seccion9 = `
       <section class="firma-section">
-        <h3>Firma del Creador</h3>
-        <p class="hint">Dibuja tu firma con el dedo (móvil) o el mouse. Si te sale mal, presiona "Limpiar firma".</p>
+        <div class="panel-title">9. Firmas</div>
+        <div class="firma-acept">
+          Yo, <b>${escapeHtml(c.creador_nombre)}</b>, he leído, entendido y aceptado los términos y condiciones de este contrato. Firmo abajo para constancia.
+        </div>
+        <p class="panel-sub">Dibuja tu firma con el dedo (móvil) o el mouse. Si te sale mal, presiona "Limpiar firma".</p>
         <div class="canvas-wrap">
           <canvas id="firmaCanvas"></canvas>
         </div>
         <div class="canvas-actions">
-          <span style="color:rgba(255,255,255,.45)">Tu firma se guarda como imagen.</span>
+          <span>Tu firma se guarda como imagen.</span>
           <button type="button" id="btnLimpiarFirma">Limpiar firma</button>
         </div>
 
         <div class="ine-section">
-          <h3>Credencial INE</h3>
-          <p class="hint">Sube foto del frente y reverso. Se guarda privada en nuestros servidores.</p>
+          <div class="panel-title" style="font-size:18px;margin-top:24px">📸 Credencial INE</div>
+          <p class="panel-sub">Sube foto del frente y reverso. Se guarda privada en nuestros servidores.</p>
           <div class="ine-uploads">
             <label data-side="frente" id="lblFrente">
-              <span class="lbl-title">📸 Frente del INE</span>
+              <span class="lbl-title">Frente del INE</span>
               <span class="lbl-hint">Toca para tomar/subir foto</span>
               <input type="file" id="fileFrente" accept="image/jpeg,image/png,image/webp" capture="environment">
             </label>
             <label data-side="reverso" id="lblReverso">
-              <span class="lbl-title">📸 Reverso del INE</span>
+              <span class="lbl-title">Reverso del INE</span>
               <span class="lbl-hint">Toca para tomar/subir foto</span>
               <input type="file" id="fileReverso" accept="image/jpeg,image/png,image/webp" capture="environment">
             </label>
@@ -344,38 +473,54 @@ function renderDoc(c, opts) {
           <button class="btn-submit" id="btnFirmar" disabled>Enviar contrato firmado</button>
           <div class="form-err" id="formErr"></div>
         </div>
+
+        <div style="margin-top:24px;padding-top:18px;border-top:1px solid rgba(255,255,255,.1);font-size:11px;color:rgba(255,255,255,.45);letter-spacing:.04em">
+          Por parte de la Agencia firma <b style="color:rgba(255,255,255,.7)">Guillermo Alexander Cobos Vizcarra</b> — Representante legal de Conecta Reynosa.
+        </div>
       </section>`;
   } else if (opts.estado === "firmado") {
     const ine = c.ine_urls || {};
-    firmaSection = `
-      <section class="firma-rendered">
-        <div class="col">
-          <h4>Firma del creador</h4>
-          <div class="firma-img">
-            ${c.firma_data ? `<img src="${escapeHtml(c.firma_data)}" alt="Firma">` : `<span style="color:#aaa">Firma no disponible</span>`}
+    seccion9 = `
+      <section class="firmas-rendered">
+        <div class="firmas-title"><span class="num">9.</span>Firmas</div>
+        <div class="grid">
+          <div class="firma-block">
+            <span class="label-mini">Firma del Creador de Contenido</span>
+            <div class="firma-box">
+              ${c.firma_data ? `<img src="${escapeHtml(c.firma_data)}" alt="Firma del creador">` : `<span style="color:#999;font-size:12px">Firma no disponible</span>`}
+            </div>
+            <div class="firma-nombre">${escapeHtml(c.creador_nombre)}</div>
+            <div class="firma-rol">Firmado: ${escapeHtml(fmtFechaLarga((c.firmado_at || "").slice(0,10)))}</div>
           </div>
-          <div class="firma-name">${escapeHtml(c.creador_nombre)}</div>
-          <div class="firma-meta">Firmado: ${fmtFechaLarga((c.firmado_at || "").slice(0,10))}</div>
+          <div class="firma-block">
+            <span class="label-mini">Firma del Representante de Conecta Reynosa</span>
+            <div class="firma-box">
+              <img src="${FIRMA_GUILLERMO_SRC}" alt="Firma de Guillermo Cobos">
+            </div>
+            <div class="firma-nombre">Guillermo Alexander Cobos Vizcarra</div>
+            <div class="firma-rol">Representante · Conecta Reynosa</div>
+          </div>
         </div>
-        <div class="col">
-          <h4>INE entregada</h4>
+
+        <div class="ine-rendered">
+          <span class="label-mini">📸 Credencial INE entregada por el Creador</span>
           <div class="ine-thumbs">
             ${ine.frente ? `<a href="${escapeHtml(ine.frente)}" target="_blank" rel="noopener"><img src="${escapeHtml(ine.frente)}" alt="INE frente"></a>` : '<div style="border:1px solid var(--border);padding:20px;font-size:11px;color:#aaa;text-align:center">FRENTE no disponible</div>'}
             ${ine.reverso ? `<a href="${escapeHtml(ine.reverso)}" target="_blank" rel="noopener"><img src="${escapeHtml(ine.reverso)}" alt="INE reverso"></a>` : '<div style="border:1px solid var(--border);padding:20px;font-size:11px;color:#aaa;text-align:center">REVERSO no disponible</div>'}
           </div>
         </div>
       </section>`;
+  } else {
+    seccion9 = "";
   }
 
   return `
-    ${BRAND_HEADER}
     <div class="container">
       <article class="doc">
+        ${header}
         ${docMeta}
-        <h2 class="doc-title">Contrato de colaboración<small>Creadores de contenido · ${escapeHtml(c.evento_nombre)}</small></h2>
-        ${partes}
         ${clausulasHtml}
-        ${firmaSection}
+        ${seccion9}
       </article>
     </div>
     ${FOOTER}
@@ -387,7 +532,7 @@ function renderItemList(container, items) {
   container.innerHTML = `<ul class="item-list">${items.map(it => `<li>${escapeHtml(it)}</li>`).join("")}</ul>`;
 }
 
-// ── Estado: pendiente (firma activa) ──────────────────────────────────
+// ── Canvas de firma ────────────────────────────────────────────────────
 function setupFirmaCanvas() {
   const canvas = document.getElementById("firmaCanvas");
   if (!canvas) return null;
@@ -398,7 +543,7 @@ function setupFirmaCanvas() {
     canvas.height = 200 * dpr;
     const ctx = canvas.getContext("2d");
     ctx.scale(dpr, dpr);
-    ctx.lineWidth = 2.2;
+    ctx.lineWidth = 2.4;
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
     ctx.strokeStyle = "#111";
@@ -414,21 +559,8 @@ function setupFirmaCanvas() {
     const t = e.touches ? e.touches[0] : e;
     return { x: t.clientX - r.left, y: t.clientY - r.top };
   }
-  function start(e) {
-    e.preventDefault();
-    drawing = true;
-    const p = pos(e);
-    ctx.beginPath();
-    ctx.moveTo(p.x, p.y);
-  }
-  function move(e) {
-    if (!drawing) return;
-    e.preventDefault();
-    const p = pos(e);
-    ctx.lineTo(p.x, p.y);
-    ctx.stroke();
-    hasInk = true;
-  }
+  function start(e) { e.preventDefault(); drawing = true; const p = pos(e); ctx.beginPath(); ctx.moveTo(p.x, p.y); }
+  function move(e) { if (!drawing) return; e.preventDefault(); const p = pos(e); ctx.lineTo(p.x, p.y); ctx.stroke(); hasInk = true; }
   function end() { drawing = false; }
   canvas.addEventListener("mousedown", start);
   canvas.addEventListener("mousemove", move);
@@ -437,7 +569,6 @@ function setupFirmaCanvas() {
   canvas.addEventListener("touchstart", start, { passive: false });
   canvas.addEventListener("touchmove", move, { passive: false });
   canvas.addEventListener("touchend", end);
-
   return {
     clear: fit,
     hasInk: () => hasInk,
@@ -453,20 +584,14 @@ function setupFileInput(side) {
   input.addEventListener("change", () => {
     const f = input.files && input.files[0];
     if (!f) return;
-    if (!/^image\/(jpeg|png|webp)$/.test(f.type)) {
-      alert("Solo se aceptan imágenes JPG, PNG o WEBP."); input.value = ""; return;
-    }
-    if (f.size > 6 * 1024 * 1024) {
-      alert("La foto supera 6 MB. Tómala con menos resolución o recórtala."); input.value = ""; return;
-    }
+    if (!/^image\/(jpeg|png|webp)$/.test(f.type)) { alert("Solo JPG, PNG o WEBP."); input.value = ""; return; }
+    if (f.size > 6 * 1024 * 1024) { alert("La foto supera 6 MB."); input.value = ""; return; }
     const r = new FileReader();
     r.onload = () => {
       state.dataUrl = r.result;
       label.classList.add("has-file");
       label.innerHTML = `<img class="preview-img" src="${state.dataUrl}" alt="${side}"><input type="file" id="${input.id}" accept="image/jpeg,image/png,image/webp" capture="environment">`;
-      // Re-bind: porque reemplazamos el contenido
       const newInput = document.getElementById(input.id);
-      newInput.addEventListener("change", input.onchange);
       newInput.onchange = input.onchange;
       checkSubmit();
     };
@@ -476,13 +601,11 @@ function setupFileInput(side) {
 }
 
 let firma, ineFrenteState, ineReversoState;
-
 function checkSubmit() {
   const accept = document.getElementById("acepto");
   const btn = document.getElementById("btnFirmar");
   if (!btn) return;
-  const ok = firma && firma.hasInk() && ineFrenteState.dataUrl && ineReversoState.dataUrl && accept.checked;
-  btn.disabled = !ok;
+  btn.disabled = !(firma && firma.hasInk() && ineFrenteState.dataUrl && ineReversoState.dataUrl && accept.checked);
 }
 
 async function enviarFirma(token, btn, errBox) {
@@ -491,7 +614,6 @@ async function enviarFirma(token, btn, errBox) {
   const original = btn.textContent;
   btn.textContent = "Enviando…";
   errBox.classList.remove("show");
-
   try {
     const resp = await fetch(API_FIRMAR, {
       method: "POST",
@@ -511,7 +633,6 @@ async function enviarFirma(token, btn, errBox) {
       btn.textContent = original;
       return;
     }
-    // Re-render como firmado.
     loadContrato();
   } catch (e) {
     errBox.textContent = "Error de red: " + e.message;
@@ -521,7 +642,6 @@ async function enviarFirma(token, btn, errBox) {
   }
 }
 
-// ── Loader principal ──────────────────────────────────────────────────
 async function loadContrato() {
   const root = document.getElementById("root");
   const token = getToken();
@@ -535,9 +655,7 @@ async function loadContrato() {
       </div>`;
     return;
   }
-
   root.innerHTML = `<div class="loading">Cargando contrato…</div>`;
-
   let data;
   try {
     const r = await fetch(`${API_OBTENER}?t=${encodeURIComponent(token)}`);
@@ -567,7 +685,7 @@ async function loadContrato() {
   const c = data.contrato;
   root.innerHTML = renderDoc(c, { estado: c.estado });
 
-  // Rellenar listas (después de inyectar el HTML).
+  // Inyectar listas y nombre en cláusula 1.
   const creadorEl = root.querySelector(".creador-strong");
   if (creadorEl) creadorEl.textContent = c.creador_nombre;
   renderItemList(root.querySelector(".item-list-ofrecimiento"), c.ofrecimiento);
@@ -578,9 +696,7 @@ async function loadContrato() {
     ineFrenteState = setupFileInput("frente");
     ineReversoState = setupFileInput("reverso");
     document.getElementById("btnLimpiarFirma").addEventListener("click", () => {
-      firma.clear();
-      firma.setHasInk(false);
-      checkSubmit();
+      firma.clear(); firma.setHasInk(false); checkSubmit();
     });
     document.getElementById("firmaCanvas").addEventListener("mouseup", checkSubmit);
     document.getElementById("firmaCanvas").addEventListener("touchend", checkSubmit);

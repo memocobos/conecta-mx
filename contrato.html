@@ -202,6 +202,7 @@
   footer.doc-footer a{color:var(--rojo);text-decoration:none;font-weight:800}
 
   .loading{min-height:60vh;display:flex;align-items:center;justify-content:center;color:#666;font-size:13px;letter-spacing:.16em;text-transform:uppercase}
+  @keyframes ctr-spin { to { transform: rotate(360deg) } }
 
   /* Sección "Aceptación del Creador" */
   .firma-creador-intro{
@@ -587,41 +588,75 @@ function setupFirmaCanvas() {
   };
 }
 
-// Convierte cualquier imagen (HEIC, PNG, GIF, JPEG…) a un data URL JPEG. Esto:
-//  • normaliza el formato → el servidor siempre recibe data:image/jpeg;base64,…
-//  • resuelve HEIC de iPhone (Safari sí renderiza HEIC en <img>; canvas lo
-//    re-encoda)
-//  • redimensiona a 2400px máx → evita los 6 MB de Netlify
-//  • aplica calidad 0.85 → ~80% menos pesado que la foto original
+// Logger con prefijo para que se vea claro en consola del móvil.
+const _log = (...args) => { try { console.log("[contrato]", ...args); } catch (_) {} };
+const _logErr = (...args) => { try { console.warn("[contrato:ERROR]", ...args); } catch (_) {} };
+
+// Intenta convertir un File a data URL JPEG vía canvas. Si falla (HEIC con
+// bugs en iOS Safari, canvas vacío, dimensiones inválidas), tira para que
+// el caller use el fallback de FileReader.
 async function _toJpegDataUrl(file, maxDim = 2400, quality = 0.85) {
+  _log("convertir a JPEG vía canvas: type=" + file.type + " size=" + file.size);
   const objUrl = URL.createObjectURL(file);
   try {
     const img = await new Promise((resolve, reject) => {
       const i = new Image();
-      i.onload = () => resolve(i);
-      i.onerror = () => reject(new Error("No se pudo leer la imagen (formato no soportado)"));
+      const t = setTimeout(() => reject(new Error("timeout cargando imagen (>15s)")), 15000);
+      i.onload = () => { clearTimeout(t); resolve(i); };
+      i.onerror = () => { clearTimeout(t); reject(new Error("Image.onerror")); };
       i.src = objUrl;
     });
     let w = img.naturalWidth || img.width;
     let h = img.naturalHeight || img.height;
-    if (!w || !h) throw new Error("La imagen no tiene dimensiones válidas");
+    _log("imagen cargada, dimensiones nativas:", w, "x", h);
+    if (!w || !h) throw new Error("dimensiones 0");
     const longest = Math.max(w, h);
     if (longest > maxDim) {
       const r = maxDim / longest;
       w = Math.round(w * r);
       h = Math.round(h * r);
+      _log("redimensionando a:", w, "x", h);
     }
     const cnv = document.createElement("canvas");
     cnv.width = w;
     cnv.height = h;
     const ctx = cnv.getContext("2d");
+    if (!ctx) throw new Error("getContext null");
     ctx.fillStyle = "#fff";
     ctx.fillRect(0, 0, w, h);
     ctx.drawImage(img, 0, 0, w, h);
-    return cnv.toDataURL("image/jpeg", quality);
+    const dataUrl = cnv.toDataURL("image/jpeg", quality);
+    // Sanity: data URL muy corto suele significar canvas tainted o drawImage
+    // que no copió nada (común con HEIC en iOS Safari).
+    if (!dataUrl || dataUrl.length < 1000) {
+      throw new Error("canvas produjo dataURL vacío (HEIC quirk en Safari?)");
+    }
+    _log("canvas → JPEG ok, size:", dataUrl.length, "chars (~" + Math.round(dataUrl.length/1024) + " KB)");
+    return dataUrl;
   } finally {
     URL.revokeObjectURL(objUrl);
   }
+}
+
+// Fallback: leer el archivo crudo y devolverlo como data URL en su formato
+// original. Esto siempre funciona porque no toca canvas. El servidor acepta
+// cualquier image/* mime después del fix de regex.
+function _readAsDataUrl(file) {
+  _log("fallback FileReader.readAsDataURL: type=" + file.type + " size=" + file.size);
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    const t = setTimeout(() => reject(new Error("timeout leyendo archivo (>30s)")), 30000);
+    r.onload = () => { clearTimeout(t); resolve(r.result); };
+    r.onerror = () => { clearTimeout(t); reject(new Error("FileReader.onerror")); };
+    r.readAsDataURL(file);
+  });
+}
+
+function _spinnerHtml(texto) {
+  return `<div style="display:flex;flex-direction:column;align-items:center;gap:10px;padding:18px 8px;font-size:11px;color:rgba(255,255,255,.7);letter-spacing:.1em;text-transform:uppercase">
+    <div style="width:24px;height:24px;border:2px solid rgba(232,255,76,.25);border-top-color:#e8ff4c;border-radius:50%;animation:ctr-spin 0.8s linear infinite"></div>
+    <span>${texto}</span>
+  </div>`;
 }
 
 function setupFileInput(side) {
@@ -633,31 +668,78 @@ function setupFileInput(side) {
   async function onPick(ev) {
     const inp = ev.target;
     const f = inp.files && inp.files[0];
+    _log(side + ": change disparado, file?:", !!f);
     if (!f) return;
-    if (f.size > 30 * 1024 * 1024) { alert("La foto supera 30 MB."); inp.value = ""; return; }
-    label.classList.add("has-file");
-    label.innerHTML = `<div style="padding:14px;font-size:11px;color:rgba(255,255,255,.6);letter-spacing:.1em;text-transform:uppercase">Procesando…</div>` + _fileInputHtml(inputId);
-    bindNewInput();
-    try {
-      const jpegUrl = await _toJpegDataUrl(f);
-      state.dataUrl = jpegUrl;
-      label.innerHTML = `<img class="preview-img" src="${jpegUrl}" alt="${side}">` + _fileInputHtml(inputId);
-    } catch (e) {
-      state.dataUrl = null;
-      label.classList.remove("has-file");
-      label.innerHTML = `<span class="lbl-title">📸 ${side === "frente" ? "Frente" : "Reverso"} del INE</span><span class="lbl-hint" style="color:#ff8888">${e.message || "Error al procesar"}. Intenta con otra foto.</span>` + _fileInputHtml(inputId);
+    _log(side + ": archivo recibido —", f.name, "/", f.type || "(tipo vacío)", "/", f.size, "bytes");
+    if (f.size > 30 * 1024 * 1024) {
+      alert("La foto supera 30 MB.");
+      inp.value = "";
+      return;
     }
+
+    // Render loader mientras procesa.
+    label.classList.add("has-file");
+    label.innerHTML = _spinnerHtml("Procesando foto…") + _fileInputHtml(inputId);
+    bindNewInput();
+
+    let finalDataUrl = null;
+    let usedFallback = false;
+
+    // Intento 1: convertir a JPEG via canvas (preferido — reduce peso).
+    try {
+      finalDataUrl = await _toJpegDataUrl(f);
+    } catch (e) {
+      _logErr(side + ": canvas fail —", e.message, "—> intentando fallback");
+      // Intento 2: leer crudo como data URL (formato original).
+      try {
+        finalDataUrl = await _readAsDataUrl(f);
+        usedFallback = true;
+        // Tope de seguridad: si el archivo original es >5 MB, no lo mandamos
+        // (Netlify rechaza payloads >6 MB y necesitamos espacio para los otros).
+        const approxKB = Math.round(finalDataUrl.length * 0.75 / 1024);
+        if (approxKB > 5000) {
+          finalDataUrl = null;
+          _logErr(side + ": fallback OK pero archivo muy pesado (" + approxKB + " KB)");
+          state.dataUrl = null;
+          label.classList.remove("has-file");
+          label.innerHTML = `<span class="lbl-title">📸 ${side === "frente" ? "Frente" : "Reverso"} del INE</span><span class="lbl-hint" style="color:#ff8888">Foto muy pesada (${(approxKB/1024).toFixed(1)} MB). Toma una nueva con menos resolución o intenta otra vez.</span>` + _fileInputHtml(inputId);
+          bindNewInput();
+          checkSubmit();
+          return;
+        }
+      } catch (e2) {
+        _logErr(side + ": fallback también falló —", e2.message);
+        state.dataUrl = null;
+        label.classList.remove("has-file");
+        label.innerHTML = `<span class="lbl-title">📸 ${side === "frente" ? "Frente" : "Reverso"} del INE</span><span class="lbl-hint" style="color:#ff8888">No se pudo procesar la foto. Intenta tomar una nueva.</span>` + _fileInputHtml(inputId);
+        bindNewInput();
+        checkSubmit();
+        return;
+      }
+    }
+
+    state.dataUrl = finalDataUrl;
+    _log(side + ": listo —", usedFallback ? "(fallback crudo)" : "(canvas JPEG)", "tamaño final:", finalDataUrl.length, "chars");
+
+    // Mostrar preview. Si el browser no puede renderizar el formato original
+    // (e.g. HEIC en algún Android viejo), la preview puede salir rota pero
+    // el upload sigue funcionando.
+    label.innerHTML = `<img class="preview-img" src="${finalDataUrl}" alt="${side}" onerror="this.style.display='none';this.insertAdjacentHTML('afterend','<div style=\\'padding:14px;font-size:11px;color:rgba(255,255,255,.6)\\'>✓ Foto cargada (sin preview disponible)</div>')">` + _fileInputHtml(inputId);
     bindNewInput();
     checkSubmit();
   }
+
   function bindNewInput() {
     const inp = document.getElementById(inputId);
-    if (inp) inp.addEventListener("change", onPick);
+    if (inp) {
+      // Si el input ya tiene listener, remove first para evitar duplicar.
+      inp.removeEventListener("change", onPick);
+      inp.addEventListener("change", onPick);
+    }
   }
 
   // Bind inicial.
-  const initialInput = document.getElementById(inputId);
-  if (initialInput) initialInput.addEventListener("change", onPick);
+  bindNewInput();
   return state;
 }
 
@@ -679,9 +761,13 @@ async function enviarFirma(token, btn, errBox) {
   const original = btn.textContent;
   btn.textContent = "Enviando…";
   errBox.classList.remove("show");
+  _log("enviarFirma: inicio, token=" + token.slice(0,8) + "…");
   try {
-    // Pre-flight validation con mensajes claros (antes de gastar el round-trip)
     const firmaData = firma && firma.dataURL ? firma.dataURL() : "";
+    _log("firma_data:", firmaData ? (firmaData.length + " chars, prefix " + firmaData.slice(0,30)) : "VACÍA");
+    _log("ine_frente:", ineFrenteState.dataUrl ? (ineFrenteState.dataUrl.length + " chars, prefix " + ineFrenteState.dataUrl.slice(0,30)) : "VACÍA");
+    _log("ine_reverso:", ineReversoState.dataUrl ? (ineReversoState.dataUrl.length + " chars, prefix " + ineReversoState.dataUrl.slice(0,30)) : "VACÍA");
+
     if (!firmaData.startsWith("data:image/")) throw new Error("La firma se borró. Vuelve a firmar antes de enviar.");
     if (!ineFrenteState.dataUrl) throw new Error("Falta foto del frente del INE.");
     if (!ineReversoState.dataUrl) throw new Error("Falta foto del reverso del INE.");
@@ -692,25 +778,30 @@ async function enviarFirma(token, btn, errBox) {
       ine_frente: ineFrenteState.dataUrl,
       ine_reverso: ineReversoState.dataUrl,
     };
-    // Aviso si el payload total supera ~5.5 MB (margen vs el límite Netlify 6 MB).
     const bodySize = JSON.stringify(payload).length;
+    _log("payload total:", (bodySize/1024/1024).toFixed(2), "MB");
     if (bodySize > 5.5 * 1024 * 1024) {
       throw new Error(`El payload pesa ${(bodySize/1024/1024).toFixed(1)} MB. Toma las fotos del INE de nuevo más chicas.`);
     }
 
+    _log("POST /.netlify/functions/contrato-firmar…");
     const resp = await fetch(API_FIRMAR, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
+    _log("respuesta HTTP:", resp.status, resp.statusText);
     let j;
     try { j = await resp.json(); }
     catch (e2) { throw new Error("Respuesta del servidor no es JSON (status " + resp.status + ")"); }
+    _log("respuesta body:", JSON.stringify(j).slice(0,200));
     if (!resp.ok || !j.ok) {
       throw new Error(j.error || ("Error " + resp.status));
     }
+    _log("✓ firma exitosa, recargando vista");
     loadContrato();
   } catch (e) {
+    _logErr("enviarFirma falló:", e.message, "|", e.stack ? e.stack.split('\n')[0] : "");
     errBox.textContent = e.message || "No pudimos guardar tu firma. Intenta de nuevo.";
     errBox.classList.add("show");
     btn.disabled = false;

@@ -30,18 +30,29 @@ function escapeHtml(s) {
     ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 }
 
-// Acepta "data:image/jpeg;base64,XYZ..." o solo "XYZ..."; devuelve {bytes, mime, ext}.
+// Acepta data URL `data:image/<sub>;base64,XYZ` con cualquier subtipo image/*
+// (jpeg, png, webp, heic, heif, gif, etc.). Devuelve {bytes, mime, ext} o null.
 function parseImageData(dataStr) {
-  if (!dataStr || typeof dataStr !== "string") return null;
-  let mime = "image/jpeg";
-  let b64 = dataStr;
-  const m = dataStr.match(/^data:(image\/(jpeg|png|webp));base64,(.+)$/);
-  if (m) { mime = m[1]; b64 = m[3]; }
+  if (!dataStr || typeof dataStr !== "string") return { error: "empty" };
+  const m = dataStr.match(/^data:(image\/[a-z0-9.+-]+);base64,([A-Za-z0-9+/=\s]+)$/i);
+  if (!m) {
+    // Diagnóstico útil sin volcar el data URL completo al log.
+    const head = dataStr.slice(0, 50);
+    return { error: `data URL inválido (prefijo: "${head}…")` };
+  }
+  const mime = m[1].toLowerCase();
+  const b64 = m[2].replace(/\s+/g, "");
   let bytes;
-  try { bytes = Buffer.from(b64, "base64"); } catch { return null; }
-  if (!bytes.length) return null;
+  try { bytes = Buffer.from(b64, "base64"); } catch (e) { return { error: "base64 corrupta" }; }
+  if (!bytes.length) return { error: "bytes vacíos tras decodificar" };
   if (bytes.length > MAX_BYTES) return { tooBig: true, size: bytes.length };
-  const ext = mime === "image/png" ? "png" : (mime === "image/webp" ? "webp" : "jpg");
+  const ext =
+    mime === "image/png"  ? "png"  :
+    mime === "image/webp" ? "webp" :
+    mime === "image/gif"  ? "gif"  :
+    mime === "image/heic" ? "heic" :
+    mime === "image/heif" ? "heif" :
+    "jpg";
   return { bytes, mime, ext };
 }
 
@@ -129,16 +140,20 @@ exports.handler = async function (event) {
   try { data = JSON.parse(event.body || "{}"); }
   catch { return bad(400, "JSON inválido"); }
 
-  const token = String(data.token || "").trim();
-  if (!/^[a-f0-9]{20,80}$/.test(token)) return bad(400, "Token inválido");
+  const token = String(data.token || "").trim().toLowerCase();
+  if (!/^[a-f0-9]{20,80}$/.test(token)) {
+    return bad(400, `Token inválido (recibido ${token.length} chars: "${token.slice(0,16)}…")`);
+  }
 
   const firma = String(data.firma_data || "").trim();
-  if (!firma.startsWith("data:image/")) return bad(400, "Firma inválida");
+  if (!firma.startsWith("data:image/")) {
+    return bad(400, `Firma inválida (prefijo: "${firma.slice(0,30)}…")`);
+  }
 
   const frente = parseImageData(data.ine_frente);
   const reverso = parseImageData(data.ine_reverso);
-  if (!frente) return bad(400, "INE frente inválido");
-  if (!reverso) return bad(400, "INE reverso inválido");
+  if (frente.error) return bad(400, `INE frente: ${frente.error}`);
+  if (reverso.error) return bad(400, `INE reverso: ${reverso.error}`);
   if (frente.tooBig) return bad(413, `INE frente excede 6 MB (${Math.round(frente.size/1024/1024*10)/10} MB)`);
   if (reverso.tooBig) return bad(413, `INE reverso excede 6 MB (${Math.round(reverso.size/1024/1024*10)/10} MB)`);
 

@@ -454,12 +454,12 @@ function renderDoc(c, opts) {
             <label data-side="frente" id="lblFrente">
               <span class="lbl-title">Frente del INE</span>
               <span class="lbl-hint">Toca para tomar/subir foto</span>
-              <input type="file" id="fileFrente" accept="image/jpeg,image/png,image/webp" capture="environment">
+              <input type="file" id="fileFrente" accept="image/*" capture="environment">
             </label>
             <label data-side="reverso" id="lblReverso">
               <span class="lbl-title">Reverso del INE</span>
               <span class="lbl-hint">Toca para tomar/subir foto</span>
-              <input type="file" id="fileReverso" accept="image/jpeg,image/png,image/webp" capture="environment">
+              <input type="file" id="fileReverso" accept="image/*" capture="environment">
             </label>
           </div>
         </div>
@@ -587,27 +587,82 @@ function setupFirmaCanvas() {
   };
 }
 
+// Convierte cualquier imagen (HEIC, PNG, GIF, JPEG…) a un data URL JPEG. Esto:
+//  • normaliza el formato → el servidor siempre recibe data:image/jpeg;base64,…
+//  • resuelve HEIC de iPhone (Safari sí renderiza HEIC en <img>; canvas lo
+//    re-encoda)
+//  • redimensiona a 2400px máx → evita los 6 MB de Netlify
+//  • aplica calidad 0.85 → ~80% menos pesado que la foto original
+async function _toJpegDataUrl(file, maxDim = 2400, quality = 0.85) {
+  const objUrl = URL.createObjectURL(file);
+  try {
+    const img = await new Promise((resolve, reject) => {
+      const i = new Image();
+      i.onload = () => resolve(i);
+      i.onerror = () => reject(new Error("No se pudo leer la imagen (formato no soportado)"));
+      i.src = objUrl;
+    });
+    let w = img.naturalWidth || img.width;
+    let h = img.naturalHeight || img.height;
+    if (!w || !h) throw new Error("La imagen no tiene dimensiones válidas");
+    const longest = Math.max(w, h);
+    if (longest > maxDim) {
+      const r = maxDim / longest;
+      w = Math.round(w * r);
+      h = Math.round(h * r);
+    }
+    const cnv = document.createElement("canvas");
+    cnv.width = w;
+    cnv.height = h;
+    const ctx = cnv.getContext("2d");
+    ctx.fillStyle = "#fff";
+    ctx.fillRect(0, 0, w, h);
+    ctx.drawImage(img, 0, 0, w, h);
+    return cnv.toDataURL("image/jpeg", quality);
+  } finally {
+    URL.revokeObjectURL(objUrl);
+  }
+}
+
 function setupFileInput(side) {
-  const input = document.getElementById(side === "frente" ? "fileFrente" : "fileReverso");
-  const label = document.getElementById(side === "frente" ? "lblFrente" : "lblReverso");
+  const inputId = side === "frente" ? "fileFrente" : "fileReverso";
+  const labelId = side === "frente" ? "lblFrente" : "lblReverso";
+  const label = document.getElementById(labelId);
   const state = { dataUrl: null };
-  input.addEventListener("change", () => {
-    const f = input.files && input.files[0];
+
+  async function onPick(ev) {
+    const inp = ev.target;
+    const f = inp.files && inp.files[0];
     if (!f) return;
-    if (!/^image\/(jpeg|png|webp)$/.test(f.type)) { alert("Solo JPG, PNG o WEBP."); input.value = ""; return; }
-    if (f.size > 6 * 1024 * 1024) { alert("La foto supera 6 MB."); input.value = ""; return; }
-    const r = new FileReader();
-    r.onload = () => {
-      state.dataUrl = r.result;
-      label.classList.add("has-file");
-      label.innerHTML = `<img class="preview-img" src="${state.dataUrl}" alt="${side}"><input type="file" id="${input.id}" accept="image/jpeg,image/png,image/webp" capture="environment">`;
-      const newInput = document.getElementById(input.id);
-      newInput.onchange = input.onchange;
-      checkSubmit();
-    };
-    r.readAsDataURL(f);
-  });
+    if (f.size > 30 * 1024 * 1024) { alert("La foto supera 30 MB."); inp.value = ""; return; }
+    label.classList.add("has-file");
+    label.innerHTML = `<div style="padding:14px;font-size:11px;color:rgba(255,255,255,.6);letter-spacing:.1em;text-transform:uppercase">Procesando…</div>` + _fileInputHtml(inputId);
+    bindNewInput();
+    try {
+      const jpegUrl = await _toJpegDataUrl(f);
+      state.dataUrl = jpegUrl;
+      label.innerHTML = `<img class="preview-img" src="${jpegUrl}" alt="${side}">` + _fileInputHtml(inputId);
+    } catch (e) {
+      state.dataUrl = null;
+      label.classList.remove("has-file");
+      label.innerHTML = `<span class="lbl-title">📸 ${side === "frente" ? "Frente" : "Reverso"} del INE</span><span class="lbl-hint" style="color:#ff8888">${e.message || "Error al procesar"}. Intenta con otra foto.</span>` + _fileInputHtml(inputId);
+    }
+    bindNewInput();
+    checkSubmit();
+  }
+  function bindNewInput() {
+    const inp = document.getElementById(inputId);
+    if (inp) inp.addEventListener("change", onPick);
+  }
+
+  // Bind inicial.
+  const initialInput = document.getElementById(inputId);
+  if (initialInput) initialInput.addEventListener("change", onPick);
   return state;
+}
+
+function _fileInputHtml(id) {
+  return `<input type="file" id="${id}" accept="image/*" capture="environment">`;
 }
 
 let firma, ineFrenteState, ineReversoState;
@@ -625,27 +680,38 @@ async function enviarFirma(token, btn, errBox) {
   btn.textContent = "Enviando…";
   errBox.classList.remove("show");
   try {
+    // Pre-flight validation con mensajes claros (antes de gastar el round-trip)
+    const firmaData = firma && firma.dataURL ? firma.dataURL() : "";
+    if (!firmaData.startsWith("data:image/")) throw new Error("La firma se borró. Vuelve a firmar antes de enviar.");
+    if (!ineFrenteState.dataUrl) throw new Error("Falta foto del frente del INE.");
+    if (!ineReversoState.dataUrl) throw new Error("Falta foto del reverso del INE.");
+
+    const payload = {
+      token,
+      firma_data: firmaData,
+      ine_frente: ineFrenteState.dataUrl,
+      ine_reverso: ineReversoState.dataUrl,
+    };
+    // Aviso si el payload total supera ~5.5 MB (margen vs el límite Netlify 6 MB).
+    const bodySize = JSON.stringify(payload).length;
+    if (bodySize > 5.5 * 1024 * 1024) {
+      throw new Error(`El payload pesa ${(bodySize/1024/1024).toFixed(1)} MB. Toma las fotos del INE de nuevo más chicas.`);
+    }
+
     const resp = await fetch(API_FIRMAR, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        token,
-        firma_data: firma.dataURL(),
-        ine_frente: ineFrenteState.dataUrl,
-        ine_reverso: ineReversoState.dataUrl,
-      }),
+      body: JSON.stringify(payload),
     });
-    const j = await resp.json();
+    let j;
+    try { j = await resp.json(); }
+    catch (e2) { throw new Error("Respuesta del servidor no es JSON (status " + resp.status + ")"); }
     if (!resp.ok || !j.ok) {
-      errBox.textContent = j.error || "No pudimos guardar tu firma. Intenta de nuevo.";
-      errBox.classList.add("show");
-      btn.disabled = false;
-      btn.textContent = original;
-      return;
+      throw new Error(j.error || ("Error " + resp.status));
     }
     loadContrato();
   } catch (e) {
-    errBox.textContent = "Error de red: " + e.message;
+    errBox.textContent = e.message || "No pudimos guardar tu firma. Intenta de nuevo.";
     errBox.classList.add("show");
     btn.disabled = false;
     btn.textContent = original;

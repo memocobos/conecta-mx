@@ -320,9 +320,11 @@ function setPago(p){
 
 // ── LÍNEAS ──
 let lineas=[],lineasCount=0;
-function addLinea(cant="",desc="",pu=""){
+function addLinea(cant="1",desc="",pu=""){
   const id=lineasCount++;
-  lineas.push({id,cant,desc,pu,importe:0});
+  const c=parseFloat(cant)||0;
+  const p=parseFloat((pu+"").replace(/[$,\s]/g,""))||0;
+  lineas.push({id,cant,desc,pu,importe:c*p});
   renderLineas(); renderRecibo();
 }
 function removeLinea(id){

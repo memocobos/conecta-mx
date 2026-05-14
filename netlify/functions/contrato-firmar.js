@@ -217,6 +217,17 @@ exports.handler = async function (event) {
     return bad(500, "Error interno");
   }
 
+  // Auto-asignación: si existe un usuario con rol='cc' y correo igual al del
+  // contrato, intentar crear la fila en eventos_coordi (mismo flujo que la
+  // asignación manual desde Capsule Corp). Si falla en cualquier paso, se
+  // loguea pero no rompe la firma — la asignación es opcional.
+  let asignacion = null;
+  try {
+    asignacion = await _autoAsignarEvento(contrato);
+  } catch (e) {
+    console.error("[contrato-firmar] Auto-asign falló:", e.message);
+  }
+
   // Emails best-effort (no rompen el endpoint si fallan).
   const link = `${SITE}/contrato?t=${token}`;
   try {
@@ -237,6 +248,96 @@ exports.handler = async function (event) {
   return {
     statusCode: 200,
     headers: HEADERS,
-    body: JSON.stringify({ ok: true }),
+    body: JSON.stringify({ ok: true, asignacion }),
   };
 };
+
+// ─── Auto-asignación de evento ────────────────────────────────────────
+// Busca el usuario rol='cc' por correo y, si encuentra evento por fecha/nombre,
+// inserta la asignación en eventos_coordi con status='aceptado'. Idempotente:
+// si ya existe (coordi_id, evento_id) lo devuelve sin duplicar.
+async function _autoAsignarEvento(contrato) {
+  // 1. Buscar usuario rol='cc' con el correo del contrato.
+  const userResp = await fetch(
+    `${SB_URL}/rest/v1/usuarios?correo=eq.${encodeURIComponent(contrato.creador_email)}&rol=eq.cc&select=id,nombre&limit=1`,
+    { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` } }
+  );
+  if (!userResp.ok) {
+    console.warn("[auto-asign] lookup usuario falló:", userResp.status);
+    return { skipped: true, reason: "lookup_user_error" };
+  }
+  const users = await userResp.json();
+  const user = users[0];
+  if (!user) {
+    console.log("[auto-asign] no hay usuario rol='cc' con correo", contrato.creador_email);
+    return { skipped: true, reason: "no_cc_profile" };
+  }
+
+  // 2. Buscar evento_id. Prioridad: misma fecha; si hay varios, matchear por
+  //    similitud de nombre con contrato.evento_nombre.
+  const evResp = await fetch(
+    `${SB_URL}/rest/v1/eventos?fecha=eq.${encodeURIComponent(contrato.evento_fecha)}&select=id,nombre,artista&limit=20`,
+    { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` } }
+  );
+  if (!evResp.ok) {
+    console.warn("[auto-asign] lookup eventos falló:", evResp.status);
+    return { skipped: true, reason: "lookup_evento_error" };
+  }
+  const candidatos = await evResp.json();
+  if (!candidatos.length) {
+    console.log("[auto-asign] sin eventos en fecha", contrato.evento_fecha);
+    return { skipped: true, reason: "no_evento_en_fecha" };
+  }
+
+  const target = String(contrato.evento_nombre || "").toLowerCase();
+  let evento = null;
+  if (candidatos.length === 1) {
+    evento = candidatos[0];
+  } else {
+    // Match por substring nombre o artista.
+    evento = candidatos.find(e => {
+      const n = (e.nombre || "").toLowerCase();
+      const a = (e.artista || "").toLowerCase();
+      return target.includes(n) || n.includes(target) || (a && target.includes(a));
+    }) || candidatos[0]; // fallback: el primero en esa fecha
+  }
+
+  // 3. Idempotencia: ¿ya existe la asignación?
+  const dupResp = await fetch(
+    `${SB_URL}/rest/v1/eventos_coordi?coordi_id=eq.${user.id}&evento_id=eq.${evento.id}&select=id,status&limit=1`,
+    { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` } }
+  );
+  const dupes = dupResp.ok ? await dupResp.json() : [];
+  if (dupes.length) {
+    console.log("[auto-asign] ya existe asignación id=", dupes[0].id);
+    return { id: dupes[0].id, evento_id: evento.id, coordi_id: user.id, existing: true };
+  }
+
+  // 4. Insertar. `asignado_en` y created defaults los pone PostgreSQL.
+  const indicaciones = Array.isArray(contrato.expectativas)
+    ? contrato.expectativas.join("\n")
+    : String(contrato.expectativas || "");
+  const insResp = await fetch(`${SB_URL}/rest/v1/eventos_coordi`, {
+    method: "POST",
+    headers: {
+      apikey: SB_KEY,
+      Authorization: `Bearer ${SB_KEY}`,
+      "Content-Type": "application/json",
+      Prefer: "return=representation",
+    },
+    body: JSON.stringify({
+      coordi_id: user.id,
+      evento_id: evento.id,
+      indicaciones,
+      status: "aceptado", // ya firmó el contrato, asume aceptación
+    }),
+  });
+  if (!insResp.ok) {
+    const err = await insResp.text();
+    console.error("[auto-asign] insert falló:", insResp.status, err);
+    return { skipped: true, reason: "insert_error" };
+  }
+  const [created] = await insResp.json();
+  console.log("[auto-asign] asignación creada id=", created.id, "para user", user.nombre, "evento", evento.nombre);
+  return { id: created.id, evento_id: evento.id, coordi_id: user.id, created: true };
+}

@@ -5339,8 +5339,16 @@ async function abrirPerfil(userId) {
     toursPasados = await db.get('tours_pasados', `?usuario_id=eq.${userId}&order=fecha_aprox.desc`);
   } catch(e) {}
   try {
-    evAsignados = await db.get('eventos_coordi', `?coordi_id=eq.${userId}&select=evento_id,indicaciones,status,eventos(id,nombre,artista,fecha,ciudad,notas_internas)`);
+    // Trae el id de la asignación (necesario para FK de deliverables)
+    evAsignados = await db.get('eventos_coordi', `?coordi_id=eq.${userId}&select=id,evento_id,indicaciones,status,eventos(id,nombre,artista,fecha,ciudad,notas_internas)`);
   } catch(e) {}
+
+  // Si la usuaria es Creador de Contenido, cargar y/o auto-popular deliverables
+  // de cada evento asignado. Sin esto, los .deliverables quedan vacíos y el
+  // panel renderiza el botón de "iniciar tracking".
+  if (usuario.rol === 'cc' && evAsignados.length) {
+    await _ensureDeliverables(evAsignados);
+  }
 
   const ptsTotal = calcularPuntos(toursPasados);
   const ptsAnio = calcularPuntosAnio(toursPasados, new Date().getFullYear());
@@ -5456,7 +5464,10 @@ async function renderMiPerfil(modoEdicion = false) {
     currentUser = { ...currentUser, ...u };
 
     const toursPasados = await db.get('tours_pasados', `?usuario_id=eq.${u.id}&order=fecha_aprox.desc`);
-    const evAsignados = await db.get('eventos_coordi', `?coordi_id=eq.${u.id}&select=evento_id,indicaciones,status,eventos(id,nombre,artista,fecha,ciudad,notas_internas)`).catch(() => []);
+    const evAsignados = await db.get('eventos_coordi', `?coordi_id=eq.${u.id}&select=id,evento_id,indicaciones,status,eventos(id,nombre,artista,fecha,ciudad,notas_internas)`).catch(() => []);
+    if (u.rol === 'cc' && evAsignados.length) {
+      await _ensureDeliverables(evAsignados);
+    }
 
     const iniciales = u.nombre.split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase();
     const edad = u.fecha_nacimiento ? calcularEdad(u.fecha_nacimiento) : null;
@@ -5489,18 +5500,38 @@ function renderPerfilCompleto(u, toursPasados, evAsignados, iniciales, edad, cum
             ${edad ? `<div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--ts);margin-top:4px">${edad} años</div>` : ''}
           </div>
           <div style="display:flex;gap:24px;flex-wrap:wrap">
-            <div style="text-align:center">
-              <div class="pts-display">${ptsAnio}</div>
-              <div class="pts-label">PTS ${anioActual}</div>
-            </div>
-            <div style="text-align:center">
-              <div style="font-family:'Zen Dots',cursive;font-size:24px;line-height:1;color:var(--text)">${toursPasados.length}</div>
-              <div class="pts-label">Tours</div>
-            </div>
-            <div style="text-align:center">
-              <div style="font-family:'Zen Dots',cursive;font-size:24px;line-height:1;color:${strikes >= 3 ? 'var(--red)' : strikes >= 2 ? 'var(--gold)' : 'var(--green)'}">${strikes}/3</div>
-              <div class="pts-label">Strikes</div>
-            </div>
+            ${u.rol === 'cc' ? (() => {
+              const totalDeliv = evAsignados.reduce((s, e) => s + (e.deliverables ? e.deliverables.length : 0), 0);
+              const okDeliv = evAsignados.reduce((s, e) => s + (e.deliverables ? e.deliverables.filter(d => d.estado === 'completado').length : 0), 0);
+              const ratioColor = totalDeliv === 0 ? 'var(--ts)' : okDeliv === totalDeliv ? 'var(--green)' : okDeliv > 0 ? 'var(--gold)' : 'var(--red)';
+              return `
+                <div style="text-align:center">
+                  <div style="font-family:'Zen Dots',cursive;font-size:24px;line-height:1;color:var(--text)">${evAsignados.length}</div>
+                  <div class="pts-label">Tours asig</div>
+                </div>
+                <div style="text-align:center">
+                  <div style="font-family:'Zen Dots',cursive;font-size:24px;line-height:1;color:${ratioColor}">${okDeliv}/${totalDeliv}</div>
+                  <div class="pts-label">Material</div>
+                </div>
+                <div style="text-align:center">
+                  <div style="font-family:'Zen Dots',cursive;font-size:24px;line-height:1;color:${strikes >= 3 ? 'var(--red)' : strikes >= 2 ? 'var(--gold)' : 'var(--green)'}">${strikes}/3</div>
+                  <div class="pts-label">Strikes</div>
+                </div>
+              `;
+            })() : `
+              <div style="text-align:center">
+                <div class="pts-display">${ptsAnio}</div>
+                <div class="pts-label">PTS ${anioActual}</div>
+              </div>
+              <div style="text-align:center">
+                <div style="font-family:'Zen Dots',cursive;font-size:24px;line-height:1;color:var(--text)">${toursPasados.length}</div>
+                <div class="pts-label">Tours</div>
+              </div>
+              <div style="text-align:center">
+                <div style="font-family:'Zen Dots',cursive;font-size:24px;line-height:1;color:${strikes >= 3 ? 'var(--red)' : strikes >= 2 ? 'var(--gold)' : 'var(--green)'}">${strikes}/3</div>
+                <div class="pts-label">Strikes</div>
+              </div>
+            `}
           </div>
         </div>
       </div>
@@ -5561,6 +5592,7 @@ function renderPerfilCompleto(u, toursPasados, evAsignados, iniciales, edad, cum
               <button class="btn btn-ghost btn-sm" onclick="descargarListaViajeros('${ev.id}')" style="font-size:10px;font-family:'JetBrains Mono',monospace">↓ Lista viajeros</button>
               <button class="btn btn-ghost btn-sm" onclick="descargarRoomingList('${ev.id}')" style="font-size:10px;font-family:'JetBrains Mono',monospace">↓ Rooming list</button>
             </div>` : ''}
+            ${u.rol === 'cc' && Array.isArray(e.deliverables) ? _renderDeliverablesPanel(e, u) : ''}
           </div>`;
         }).join('') : '<div style="font-family:JetBrains Mono,monospace;font-size:11px;color:var(--ts);letter-spacing:.05em">// sin tours asignados</div>'}
       </div>
@@ -8632,6 +8664,169 @@ function verDetalleReporte(id) {
       <div class="modal-footer"><button class="btn btn-ghost" onclick="closeModal('modal-reporte')">Cerrar</button></div>
     </div>`;
   openModal('modal-reporte');
+}
+
+// ═══════════════════════════════════════════════════════════════
+// DELIVERABLES · material entregable por evento asignado a creadora
+// ═══════════════════════════════════════════════════════════════
+const _DELIVERABLES_DEFAULT = [
+  "Video Reel (1080x1920)",
+  "3-4 menciones en historias",
+  "Post collab con fotos",
+];
+
+// Anota cada item de evAsignados con su array .deliverables. Si una asignación
+// no tiene ninguno, crea los 3 defaults para evento del flujo de contratos.
+async function _ensureDeliverables(evAsignados) {
+  if (!evAsignados.length) return;
+  const ids = evAsignados.map(e => e.id).filter(Boolean);
+  if (!ids.length) return;
+  let rows = [];
+  try {
+    const inList = ids.map(id => '"' + id + '"').join(',');
+    rows = await db.get('deliverables_creadoras', `?evento_coordi_id=in.(${inList})&order=created_at.asc`);
+  } catch (e) {
+    console.warn('[deliverables] read falló:', e.message);
+    return;
+  }
+  // Group by evento_coordi_id
+  const byId = {};
+  rows.forEach(r => { (byId[r.evento_coordi_id] = byId[r.evento_coordi_id] || []).push(r); });
+
+  // Para cada asignación, auto-popular si está vacía.
+  for (const e of evAsignados) {
+    let list = byId[e.id] || [];
+    if (!list.length) {
+      try {
+        const inserted = [];
+        for (const desc of _DELIVERABLES_DEFAULT) {
+          const [row] = await db.post('deliverables_creadoras', {
+            evento_coordi_id: e.id,
+            descripcion: desc,
+            estado: 'pendiente',
+          });
+          if (row) inserted.push(row);
+        }
+        list = inserted;
+      } catch (err) {
+        console.warn('[deliverables] auto-popular falló para', e.id, err.message);
+      }
+    }
+    e.deliverables = list;
+  }
+}
+
+function _renderDeliverablesPanel(e, u) {
+  const dels = e.deliverables || [];
+  const ok = dels.filter(d => d.estado === 'completado').length;
+  const total = dels.length;
+  return `
+    <div style="margin-top:14px;background:rgba(0,0,0,.18);border:1px solid rgba(255,255,255,.05);border-radius:6px;padding:12px 14px">
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:8px">
+        <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--gold)">▸ Material entregado <span style="color:var(--ts);margin-left:4px">[${ok}/${total}]</span></div>
+        <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();_delivAdd('${e.id}','${u.id}')" style="font-size:10px;font-family:'JetBrains Mono',monospace">+ deliverable</button>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:6px">
+        ${dels.map(d => _renderDeliverableItem(d, u)).join('') || '<div style="font-family:JetBrains Mono,monospace;font-size:10px;color:var(--ts);letter-spacing:.05em">// sin items</div>'}
+      </div>
+    </div>
+  `;
+}
+
+function _renderDeliverableItem(d, u) {
+  const done = d.estado === 'completado';
+  const color = done ? 'var(--green)' : 'var(--gold)';
+  const bg = done ? 'rgba(61,220,132,.08)' : 'rgba(255,183,3,.05)';
+  const fechaTxt = done && d.completado_at
+    ? ' · ' + new Date(d.completado_at).toLocaleDateString('es-MX', { day: '2-digit', month: 'short' })
+    : '';
+  return `
+    <div style="background:${bg};border-left:2px solid ${color};padding:8px 10px;font-size:12px">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;flex-wrap:wrap">
+        <div style="flex:1;min-width:0">
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-family:'JetBrains Mono',monospace;font-size:13px;color:${color}">${done ? '☑' : '☐'}</span>
+            <span style="color:var(--text);font-weight:600">${_escDeliv(d.descripcion)}</span>
+            <span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:${color};letter-spacing:.1em;text-transform:uppercase">${done ? 'Entregado'+fechaTxt : 'Pendiente'}</span>
+          </div>
+          ${d.link_contenido ? `<div style="margin-top:4px;font-size:10px;font-family:'JetBrains Mono',monospace;color:var(--ts)">↗ <a href="${_escDeliv(d.link_contenido)}" target="_blank" rel="noopener" style="color:var(--gold)">${_escDeliv(d.link_contenido).slice(0,60)}${d.link_contenido.length>60?'…':''}</a></div>` : ''}
+          ${d.notas ? `<div style="margin-top:4px;font-size:10px;color:var(--ts);font-style:italic">${_escDeliv(d.notas)}</div>` : ''}
+        </div>
+        <div style="display:flex;gap:4px;flex-wrap:wrap">
+          <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();_delivToggle('${d.id}','${u.id}')" style="font-size:9px;font-family:'JetBrains Mono',monospace;padding:3px 7px">${done ? '↻ marcar pendiente' : '✓ marcar entregado'}</button>
+          <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();_delivEditarLink('${d.id}','${u.id}')" style="font-size:9px;font-family:'JetBrains Mono',monospace;padding:3px 7px" title="Link del contenido">🔗</button>
+          <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();_delivEditarNotas('${d.id}','${u.id}')" style="font-size:9px;font-family:'JetBrains Mono',monospace;padding:3px 7px" title="Notas">✎</button>
+          <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();_delivBorrar('${d.id}','${u.id}')" style="font-size:9px;font-family:'JetBrains Mono',monospace;padding:3px 7px;color:var(--red);border-color:rgba(230,57,70,.3)" title="Eliminar">×</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function _escDeliv(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c])); }
+
+async function _delivToggle(id, userId) {
+  try {
+    const [actual] = await db.get('deliverables_creadoras', `?id=eq.${id}&limit=1`);
+    if (!actual) return;
+    const nuevo = actual.estado === 'completado' ? 'pendiente' : 'completado';
+    const patch = { estado: nuevo, completado_at: nuevo === 'completado' ? new Date().toISOString() : null };
+    await db.patch('deliverables_creadoras', id, patch);
+    _delivRefreshProfile(userId);
+  } catch (e) { alert('Error: ' + e.message); }
+}
+
+async function _delivEditarLink(id, userId) {
+  try {
+    const [actual] = await db.get('deliverables_creadoras', `?id=eq.${id}&limit=1`);
+    if (!actual) return;
+    const nuevo = prompt('Link del contenido entregado (URL)\n— deja vacío para quitar el link:', actual.link_contenido || '');
+    if (nuevo === null) return;
+    await db.patch('deliverables_creadoras', id, { link_contenido: nuevo.trim() || null });
+    _delivRefreshProfile(userId);
+  } catch (e) { alert('Error: ' + e.message); }
+}
+
+async function _delivEditarNotas(id, userId) {
+  try {
+    const [actual] = await db.get('deliverables_creadoras', `?id=eq.${id}&limit=1`);
+    if (!actual) return;
+    const nuevo = prompt('Notas para este deliverable:', actual.notas || '');
+    if (nuevo === null) return;
+    await db.patch('deliverables_creadoras', id, { notas: nuevo.trim() || null });
+    _delivRefreshProfile(userId);
+  } catch (e) { alert('Error: ' + e.message); }
+}
+
+async function _delivBorrar(id, userId) {
+  if (!confirm('¿Eliminar este deliverable?')) return;
+  try {
+    await db.delete('deliverables_creadoras', id);
+    _delivRefreshProfile(userId);
+  } catch (e) { alert('Error: ' + e.message); }
+}
+
+async function _delivAdd(eventoCoordiId, userId) {
+  const desc = prompt('Descripción del deliverable extra:\n(ej. "Video backstage", "Story con marca patrocinadora")');
+  if (!desc || !desc.trim()) return;
+  try {
+    await db.post('deliverables_creadoras', {
+      evento_coordi_id: eventoCoordiId,
+      descripcion: desc.trim(),
+      estado: 'pendiente',
+    });
+    _delivRefreshProfile(userId);
+  } catch (e) { alert('Error: ' + e.message); }
+}
+
+function _delivRefreshProfile(userId) {
+  // Re-abre el mismo modal de perfil. Si es el propio user, renderMiPerfil.
+  if (currentUser && userId === currentUser.id && typeof renderMiPerfil === 'function') {
+    renderMiPerfil(false);
+  } else {
+    cerrarModal('ver-perfil');
+    abrirPerfil(userId);
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════

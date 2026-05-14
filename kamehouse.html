@@ -2260,9 +2260,11 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
        <div class="form-row">
          <div class="form-group">
            <label>Lo que se espera del creador *</label>
-           <textarea id="ctr-expectativas" rows="4" placeholder="Una línea por ítem">1 Video formato Reel (1080x1920)
-3-4 menciones en historias el día del evento
-1 Post dentro del evento</textarea>
+           <textarea id="ctr-expectativas" rows="14" placeholder="Una línea por ítem">1 Video en formato Reel o video vertical para redes sociales (1080 x 1920 píxeles) sobre el evento al que ha sido invitado y de la experiencia del concierto / festival con Conecta Reynosa (modo collab).
+
+3 o 4 menciones en historias de ig el día del evento a Conecta Reynosa, disfrutando del concierto o festival asignado y la experiencia de Conecta utilizando el hashtag #viajaconexpertos o #Seguimosconectando (SÉ CREATIV@ no grabes solo el artista, graba el ambiente, como te la estas pasando, haznos sentir la experiencia desde tu perspectiva)
+
+1 Post dentro del evento (Fotos donde aparezcas) en las redes del creador agradeciendo a Conecta Reynosa por la experiencia y la invitación al evento (Modo Collab)</textarea>
          </div>
        </div>
 
@@ -9017,7 +9019,7 @@ function _resetFormUI() {
   const ofr = document.getElementById('ctr-ofrecimiento');
   const exp = document.getElementById('ctr-expectativas');
   if (ofr && !_contratosEditingToken) ofr.value = '1 boleto en zona general\n1 Kit Conecta\n1 comida gratis dentro del festival';
-  if (exp && !_contratosEditingToken) exp.value = '1 Video formato Reel (1080x1920)\n3-4 menciones en historias el día del evento\n1 Post dentro del evento';
+  if (exp && !_contratosEditingToken) exp.value = '1 Video en formato Reel o video vertical para redes sociales (1080 x 1920 píxeles) sobre el evento al que ha sido invitado y de la experiencia del concierto / festival con Conecta Reynosa (modo collab).\n\n3 o 4 menciones en historias de ig el día del evento a Conecta Reynosa, disfrutando del concierto o festival asignado y la experiencia de Conecta utilizando el hashtag #viajaconexpertos o #Seguimosconectando (SÉ CREATIV@ no grabes solo el artista, graba el ambiente, como te la estas pasando, haznos sentir la experiencia desde tu perspectiva)\n\n1 Post dentro del evento (Fotos donde aparezcas) en las redes del creador agradeciendo a Conecta Reynosa por la experiencia y la invitación al evento (Modo Collab)';
   const fc = document.getElementById('ctr-contrato-fecha');
   if (fc) fc.value = new Date().toISOString().slice(0,10);
   // Botón principal

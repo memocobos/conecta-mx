@@ -486,18 +486,18 @@ function renderDoc(c, opts) {
         <div class="grid">
           <div class="firma-block">
             <span class="label-mini">Firma del Creador de Contenido</span>
+            <div class="firma-nombre">${escapeHtml(c.creador_nombre)}</div>
             <div class="firma-box">
               ${c.firma_data ? `<img src="${escapeHtml(c.firma_data)}" alt="Firma del creador">` : `<span style="color:#999;font-size:12px">Firma no disponible</span>`}
             </div>
-            <div class="firma-nombre">${escapeHtml(c.creador_nombre)}</div>
             <div class="firma-rol">Firmado: ${escapeHtml(fmtFechaLarga((c.firmado_at || "").slice(0,10)))}</div>
           </div>
           <div class="firma-block">
             <span class="label-mini">Firma del Representante de Conecta Reynosa</span>
+            <div class="firma-nombre">Guillermo Alexander Cobos Vizcarra</div>
             <div class="firma-box">
               <img src="${FIRMA_GUILLERMO_SRC}" alt="Firma de Guillermo Cobos">
             </div>
-            <div class="firma-nombre">Guillermo Alexander Cobos Vizcarra</div>
             <div class="firma-rol">Representante · Conecta Reynosa</div>
           </div>
         </div>
@@ -537,7 +537,16 @@ function setupFirmaCanvas() {
   const canvas = document.getElementById("firmaCanvas");
   if (!canvas) return null;
   const dpr = window.devicePixelRatio || 1;
+  // Estado del canvas — declarado antes de fit() para evitar TDZ y para que
+  // fit() pueda consultar hasInk al disparar el resize handler.
+  let drawing = false, hasInk = false;
+
   function fit() {
+    // CRÍTICO: si el usuario ya empezó a firmar, NO redimensionar — asignar
+    // canvas.width borra todos los píxeles. En móvil, resize se dispara con
+    // scroll (address bar), teclado y rotación. Sin este guard la firma
+    // capturada termina siendo un PNG en blanco.
+    if (hasInk) return;
     const rect = canvas.getBoundingClientRect();
     canvas.width = rect.width * dpr;
     canvas.height = 200 * dpr;
@@ -553,7 +562,6 @@ function setupFirmaCanvas() {
   fit();
   window.addEventListener("resize", fit);
   const ctx = canvas.getContext("2d");
-  let drawing = false, hasInk = false;
   function pos(e) {
     const r = canvas.getBoundingClientRect();
     const t = e.touches ? e.touches[0] : e;
@@ -569,8 +577,10 @@ function setupFirmaCanvas() {
   canvas.addEventListener("touchstart", start, { passive: false });
   canvas.addEventListener("touchmove", move, { passive: false });
   canvas.addEventListener("touchend", end);
+  // clear() debe forzar el reset, así que reseteamos hasInk ANTES de fit().
+  function doClear() { hasInk = false; fit(); }
   return {
-    clear: fit,
+    clear: doClear,
     hasInk: () => hasInk,
     setHasInk: v => { hasInk = v; },
     dataURL: () => canvas.toDataURL("image/png"),

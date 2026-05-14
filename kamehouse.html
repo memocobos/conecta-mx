@@ -1217,13 +1217,13 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
    <button class="nav-btn" onclick="showPage('capsule')" id="nav-capsule">Capsule Corp</button>
    <button class="nav-btn" onclick="showPage('cotizador')" id="nav-cotizador">Palacio de Kamisama</button>
    <button class="nav-btn" onclick="showPage('montana')" id="nav-montana">Montaña Pai</button>
-   <button class="nav-btn" onclick="showPage('contratos')" id="nav-contratos">📝 Contratos</button>
    <div class="nav-dropdown" id="nav-dropdown-herramientas">
     <button class="nav-dropdown-btn" onclick="toggleDropdown(event)" id="nav-herramientas">
      Herramientas <span class="drop-arrow">▼</span>
     </button>
     <div class="nav-dropdown-menu">
      <button class="nav-dropdown-item" id="nav-recibos" onclick="showHerramienta('recibos')">Recibos</button>
+     <button class="nav-dropdown-item" id="nav-contratos" onclick="showHerramienta('contratos')">Contratos</button>
      <button class="nav-dropdown-item" id="nav-diseno" onclick="showHerramienta('diseno')">Diseño</button>
     </div>
    </div>
@@ -2209,6 +2209,7 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
    <!-- ── Vista A: Formulario ── -->
    <div id="ctr-view-nuevo" class="contratos-view" style="display:none">
      <div style="max-width:760px">
+       <div id="ctr-banner-edit" style="display:none;padding:10px 14px;background:rgba(255,107,0,.12);border:1px solid rgba(255,107,0,.4);color:#ffb47a;border-radius:6px;margin-bottom:14px;font-size:12px;letter-spacing:.04em"></div>
        <div id="ctr-alert"></div>
        <div class="form-row cols-2">
          <div class="form-group">
@@ -2266,6 +2267,7 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
        <div style="display:flex;gap:10px;margin-top:18px;flex-wrap:wrap">
          <button class="btn btn-ghost" onclick="previewContrato()">👁 Vista previa</button>
          <button class="btn btn-primary" id="ctr-btn-enviar" onclick="enviarContrato()">📨 Enviar por correo</button>
+         <button class="btn btn-ghost" id="ctr-btn-cancelar-edit" onclick="cancelarEdicionContrato()" style="display:none;color:#ff6666;border-color:rgba(255,68,68,.3)">Cancelar edición</button>
        </div>
      </div>
    </div>
@@ -3026,7 +3028,6 @@ function loadPage(name) {
  if (name === 'capsule') loadCapsule();
  if (name === 'cotizador') initCotizador();
  if (name === 'montana') loadMontana();
- if (name === 'contratos') loadContratos();
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -6043,6 +6044,9 @@ function showHerramienta(name) {
       }
     }
   }
+  if (name === 'contratos') {
+    loadContratos();
+  }
 }
 
 // ── NAV MOBILE HAMBURGUESA ──────────────────────────────────
@@ -8630,33 +8634,70 @@ function verDetalleReporte(id) {
 // CONTRATOS · creadores de contenido
 // ═══════════════════════════════════════════════════════════════
 let _contratosCache = [];
-let _contratosEventoSelectPoblado = false;
+let _contratosEditingToken = null;        // null = creando, "abc..." = editando
+let _contratosEVCache = null;             // EV array fetched from /index.html
+let _contratosEVPobladoEnSelect = false;
 
+// — Cláusulas legales (idéntico texto que contrato.html) ——————
 const _CTR_CLAUSULAS = [
-  { num:1, t:'Objeto', body: c => `El presente contrato tiene por objeto establecer los términos del intercambio comercial entre <b>Conecta MX (la Agencia)</b> y <b>${_escCtr(c.creador_nombre)}</b> (en adelante, el "Creador"), para la promoción del evento mediante la generación de contenido digital.` },
-  { num:2, t:'Intercambio', body: c => `<b>La Agencia se compromete a entregar al Creador:</b>${_ulCtr(c.ofrecimiento)}<b style="display:block;margin-top:8px">El Creador se compromete a entregar a la Agencia:</b>${_ulCtr(c.expectativas)}` },
-  { num:3, t:'Propiedad del contenido', body: () => `El contenido generado por el Creador será de su propiedad intelectual. Sin embargo, la Agencia podrá hacer uso del mismo con fines de difusión, repost y archivo, citando siempre al autor. El Creador conserva el derecho a publicar el contenido en sus propios canales sin restricción adicional.` },
+  { num:1, t:'Objeto del contrato', body: c => `El presente contrato tiene por objeto establecer los términos del intercambio comercial entre <b>Conecta MX (la Agencia)</b>, representada por Guillermo Alexander Cobos Vizcarra, y <b>${_escCtr(c.creador_nombre)}</b> (en adelante, el "Creador"), para la promoción del evento <b>${_escCtr(c.evento_nombre)}</b> mediante la generación de contenido digital, en los términos y condiciones que aquí se detallan.` },
+  { num:2, t:'Detalle del intercambio', body: c => `<b>2.1 Lo que ofrece la Agencia:</b>${_ulCtr(c.ofrecimiento)}<b style="display:block;margin-top:10px">2.2 Lo que se espera del Creador:</b>${_ulCtr(c.expectativas)}` },
+  { num:3, t:'Propiedad del contenido', body: () => `
+<b>3.1</b> Todo el contenido generado por el Creador durante el evento será de propiedad exclusiva de la Agencia.<br>
+<b>3.2</b> Únicamente la Agencia podrá distribuir, publicar y/o utilizar el contenido en sus canales oficiales de comunicación, sin requerir autorización adicional del Creador.<br>
+<b>3.3</b> Cualquier publicación realizada por el Creador en sus propias redes deberá ser etiquetada como una colaboración oficial con la Agencia (@conectareynosa).` },
   { num:4, t:'Requisitos del contenido', body: () => `
-<b>4.1</b> El contenido debe publicarse durante el evento o dentro de las 48 horas posteriores al mismo, salvo acuerdo distinto por escrito.<br>
-<b>4.2</b> Las menciones deberán etiquetar oficialmente a Conecta Reynosa en todas las publicaciones realizadas.<br>
-<b>4.3</b> El contenido debe respetar los lineamientos de imagen y narrativa acordados con la Agencia.<br>
-<b>4.4</b> El Creador es responsable de la calidad técnica del contenido entregado (audio, video, edición).<br>
-<b>4.5</b> Cualquier modificación al contenido propuesto deberá comunicarse con un mínimo de 24 horas de anticipación.<br>
-<b>4.6 Exclusividad durante el evento:</b> Durante el evento, el Creador no podrá promocionar a otras agencias competidoras o servicios similares.<br>
-<b>4.7 Veto de contenido:</b> La Agencia se reserva el derecho de solicitar la eliminación de contenido publicado que no cumpla con los estándares acordados, en un plazo máximo de 24 horas.` },
-  { num:5, t:'Cancelación e incumplimiento', body: () => `
-<b>5.1</b> En caso de que el Creador no pueda asistir al evento, deberá notificar a la Agencia con al menos 72 horas de anticipación.<br>
-<b>5.2</b> El Creador podrá designar un suplente sujeto a aprobación previa por parte de la Agencia.<br>
+<b>4.1 Calidad y formato:</b>
+<ul style="margin:6px 0 12px;padding-left:20px">
+<li>Calidad técnica HD o 4K.</li>
+<li>Formato Reel / vertical 1080 × 1920 px.</li>
+<li>Iluminación y presentación que reflejen una experiencia increíble.</li>
+</ul>
+<b>4.2 Requisitos de la voz:</b>
+<ul style="margin:6px 0 12px;padding-left:20px">
+<li>Audición clara, sin ruidos de fondo.</li>
+<li>Buena dicción.</li>
+<li>Tono respetuoso.</li>
+<li>Adecuación al propósito del contenido.</li>
+</ul>
+<b>4.3 Historias y publicaciones:</b>
+<ul style="margin:6px 0 12px;padding-left:20px">
+<li>Menciones publicadas como historias en Instagram y/o TikTok.</li>
+<li>Las redes del Creador deberán permanecer públicas durante el evento y los 10–15 días posteriores.</li>
+<li>Multas por incumplimiento: <b>25%</b> en la primera infracción, <b>50%</b> si persiste.</li>
+</ul>
+<b>4.4 Plazo de entrega:</b>
+<ul style="margin:6px 0 12px;padding-left:20px">
+<li>Contenido entregado dentro de los <b>2–3 días</b> posteriores al evento.</li>
+<li>Multas por retraso: <b>25%</b> (1–7 días), <b>50%</b> (7–10 días), <b>75%</b> (10–15 días), <b>100%</b> (más de 15 días).</li>
+</ul>
+<b>4.5 Correcciones:</b>
+<ul style="margin:6px 0 12px;padding-left:20px">
+<li>El Creador tendrá <b>24 horas</b> para realizar los ajustes solicitados por la Agencia.</li>
+<li>Multa del <b>50%</b> si no cumple el plazo de corrección.</li>
+<li>Multa del <b>100%</b> si ningún video entregado cumple con las expectativas pactadas.</li>
+</ul>
+<b>4.6 Exclusividad durante el evento:</b> Durante el evento, el Creador no podrá promocionar a otras agencias competidoras o servicios similares de viajes a conciertos.<br>
+<b>4.7 Veto de contenido:</b> La Agencia se reserva el derecho de solicitar la eliminación de contenido publicado que no cumpla con los estándares acordados, en un plazo máximo de <b>24 horas</b> a partir de la notificación.` },
+  { num:5, t:'Políticas de cancelación', body: () => `
+<b>5.1</b> En caso de que el Creador no pueda asistir al evento, deberá notificar a la Agencia con al menos <b>72 horas</b> de anticipación.<br>
+<b>5.2</b> El Creador podrá proponer un suplente, sujeto a aprobación previa por escrito de la Agencia.<br>
 <b>5.3</b> En caso de cancelación tardía sin justificación válida, la Agencia podrá excluir al Creador de futuras colaboraciones.<br>
-<b>5.4</b> Si el evento se cancela por causas ajenas a la Agencia (fuerza mayor), el presente contrato quedará sin efecto sin penalización.<br>
-<b>5.5 Reembolso del costo del intercambio:</b> En caso de incumplimiento total del Creador (no asistencia, no entrega de contenido), el Creador deberá reembolsar el valor comercial del intercambio dentro de 15 días naturales.` },
-  { num:6, t:'Beneficios adicionales', body: () => `El Creador tendrá acceso prioritario a futuras invitaciones de eventos organizados por la Agencia, en función de su desempeño y cumplimiento. La Agencia podrá ofrecer beneficios adicionales (acceso VIP, kits exclusivos, contenido detrás de cámaras) sujetos a disponibilidad y mérito.` },
-  { num:7, t:'Compromiso de profesionalismo', body: () => `Ambas partes se comprometen a mantener una conducta respetuosa, profesional y conforme a los valores de imagen pública de la marca Conecta MX. El Creador se obliga a evitar conductas que puedan dañar la reputación de la Agencia o del evento.` },
+<b>5.4</b> Si el evento se cancela por causas ajenas a la Agencia (fuerza mayor), el presente contrato quedará sin efecto, sin penalización para ninguna de las partes.<br>
+<b>5.5 Reembolso del intercambio:</b> En caso de incumplimiento total del Creador (no asistencia, no entrega de contenido), el Creador deberá reembolsar el valor comercial del intercambio dentro de <b>15 días naturales</b> contados a partir de la fecha del evento.` },
+  { num:6, t:'Beneficios para el Creador', body: () => `El Creador tendrá acceso prioritario a futuras invitaciones de eventos organizados por la Agencia, en función de su desempeño y cumplimiento. La Agencia podrá ofrecer beneficios adicionales (acceso a zonas VIP, kits exclusivos, contenido detrás de cámaras, atención preferencial) sujetos a disponibilidad y mérito.` },
+  { num:7, t:'Compromiso del Creador', body: () => `El Creador se compromete a mantener una conducta respetuosa y profesional durante todo el evento y en toda comunicación pública relacionada. Se obliga a no realizar declaraciones, actos o publicaciones que puedan dañar la reputación de la Agencia, del evento o de cualquier marca patrocinadora involucrada.` },
   { num:8, t:'Cláusulas finales', body: () => `
-<b>8.1</b> Cualquier modificación a este contrato deberá ser por escrito y aceptada por ambas partes.<br>
-<b>8.2</b> Este acuerdo tiene una validez correspondiente al evento mencionado y se considera concluido tras la publicación del contenido pactado.<br>
-<b>8.3 Datos personales:</b> El Creador autoriza el uso de su imagen, nombre y contenido generado para fines promocionales de la Agencia por un periodo indefinido.<br>
-<b>8.4 Jurisdicción:</b> Cualquier controversia derivada del presente contrato será resuelta en los tribunales de Reynosa, Tamaulipas, México.` },
+<b>8.1 Hashtags obligatorios:</b> Todas las publicaciones derivadas de esta colaboración deberán incluir los siguientes hashtags:
+<ul style="margin:6px 0 12px;padding-left:20px">
+<li><b>#Viajaconexpertos</b></li>
+<li><b>#Seguimosconectando</b></li>
+<li><b>#CMX10</b></li>
+</ul>
+<b>8.2 Confidencialidad:</b> El Creador se obliga a mantener en estricta reserva cualquier información, condición económica o detalle del presente contrato y de la operación interna de la Agencia que conozca con motivo de esta colaboración. Esta obligación subsiste incluso después de concluido el contrato.<br>
+<b>8.3 Datos personales:</b> El Creador autoriza expresamente el uso de su imagen, nombre y contenido generado para fines promocionales de la Agencia, por un periodo indefinido.<br>
+<b>8.4 Jurisdicción:</b> Cualquier controversia derivada del presente contrato será resuelta en los tribunales competentes de la ciudad de <b>Reynosa, Tamaulipas, México</b>, renunciando expresamente las partes a cualquier otro fuero que pudiera corresponderles.` },
+  { num:9, t:'Firmas', body: () => `Las partes firman el presente contrato de conformidad con los términos arriba expresados. La firma digital y el envío de la identificación oficial (INE) por parte del Creador constituyen la aceptación plena de este contrato.` },
 ];
 
 function _escCtr(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c])); }
@@ -8677,28 +8718,69 @@ function _splitLineas(s) {
   return String(s || '').split(/\r?\n/).map(l => l.trim()).filter(Boolean);
 }
 
-async function loadContratos() {
-  // Vista por default: listado
-  switchContratoView('listado');
-  // Poblar select de eventos una sola vez (eventos del kamehouse cache)
-  if (!_contratosEventoSelectPoblado) {
-    const sel = document.getElementById('ctr-evento-select');
-    if (sel && Array.isArray(_eventosCache)) {
-      _eventosCache.forEach(ev => {
-        const opt = document.createElement('option');
-        opt.value = ev.id;
-        opt.dataset.nombre = `${ev.artista || ''}${ev.tour ? ' — '+ev.tour : ''}`.trim();
-        opt.dataset.fecha = ev.fecha || '';
-        opt.textContent = `${opt.dataset.nombre}${ev.fecha ? ' · '+_fmtFechaCortaCtr(ev.fecha) : ''}`;
-        sel.appendChild(opt);
-      });
-      _contratosEventoSelectPoblado = true;
+// — Cargar EV array desde /index.html (single source of truth) ———————
+async function _fetchEVFromIndex() {
+  if (_contratosEVCache) return _contratosEVCache;
+  try {
+    const r = await fetch('/index.html', { cache: 'no-cache' });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const html = await r.text();
+    const m = html.match(/var\s+EV\s*=\s*\[/);
+    if (!m) throw new Error('var EV no encontrado en index.html');
+    const start = m.index + m[0].length - 1;
+    let depth = 0, inStr = false, sc = '', esc = false, end = -1;
+    for (let i = start; i < html.length; i++) {
+      const ch = html[i];
+      if (esc) { esc = false; continue; }
+      if (inStr) { if (ch === '\\') { esc = true; continue; } if (ch === sc) inStr = false; continue; }
+      if (ch === '"' || ch === "'") { inStr = true; sc = ch; continue; }
+      if (ch === '[') depth++;
+      else if (ch === ']') { depth--; if (!depth) { end = i + 1; break; } }
     }
+    if (end < 0) throw new Error('Array EV sin cerrar');
+    const arrText = html.slice(start, end);
+    // Stubs para los globals que el array referencia (BANCO_*, HOTEL_*).
+    const stubs = 'var BANCO_DEFAULT={},BANCO_HEY={},HOTEL_CDM=[],HOTEL_STD=[];';
+    const ev = new Function(stubs + 'return ' + arrText + ';')();
+    if (!Array.isArray(ev)) throw new Error('EV no es array');
+    _contratosEVCache = ev;
+    return ev;
+  } catch (e) {
+    console.warn('[Contratos] No se pudo cargar EV de index.html:', e.message);
+    return [];
   }
-  // Defaults del form
-  const today = new Date().toISOString().slice(0,10);
+}
+
+async function _poblarSelectEventos() {
+  if (_contratosEVPobladoEnSelect) return;
+  const sel = document.getElementById('ctr-evento-select');
+  if (!sel) return;
+  const ev = await _fetchEVFromIndex();
+  if (!ev.length) return;
+  // Orden cronológico ascendente por ds (eventos sin ds van al final).
+  const sorted = ev.slice().sort((a, b) => (a.ds || '9999').localeCompare(b.ds || '9999'));
+  // Limpiar opciones existentes salvo la primera ("— Selecciona —").
+  while (sel.options.length > 1) sel.remove(1);
+  sorted.forEach(e => {
+    if (!e || !e.id || !e.a) return;
+    const opt = document.createElement('option');
+    opt.value = e.id;
+    opt.dataset.nombre = e.a;
+    opt.dataset.fecha = (e.ds || '').slice(0, 10);
+    opt.textContent = `${e.a}${e.f ? ' · ' + e.f : ''}`;
+    sel.appendChild(opt);
+  });
+  _contratosEVPobladoEnSelect = true;
+}
+
+// — Boot principal de la pestaña ——————————————————————
+async function loadContratos() {
+  switchContratoView('listado');
+  _contratosEditingToken = null;
+  _resetFormUI();
+  await _poblarSelectEventos();
   const fc = document.getElementById('ctr-contrato-fecha');
-  if (fc && !fc.value) fc.value = today;
+  if (fc && !fc.value) fc.value = new Date().toISOString().slice(0, 10);
   await loadContratosList();
 }
 
@@ -8719,6 +8801,9 @@ function switchContratoView(name) {
       view.style.display = 'none';
     }
   });
+  // Cuando el usuario manualmente entra a "Nuevo" desde el tab, asegurar que
+  // no estamos en modo edición (a menos que loadContratoEdit ya lo haya seteado).
+  if (name === 'nuevo' && !_contratosEditingToken) _resetFormUI();
 }
 
 function onContratoEventoChange() {
@@ -8728,7 +8813,7 @@ function onContratoEventoChange() {
   const nombreInput = document.getElementById('ctr-evento-nombre');
   const fechaInput = document.getElementById('ctr-evento-fecha');
   if (nombreInput && opt.dataset.nombre) nombreInput.value = opt.dataset.nombre;
-  if (fechaInput && opt.dataset.fecha) fechaInput.value = opt.dataset.fecha.slice(0,10);
+  if (fechaInput && opt.dataset.fecha) fechaInput.value = opt.dataset.fecha;
 }
 
 function _ctrFormData() {
@@ -8760,7 +8845,7 @@ function _validateCtrForm(d) {
 function _renderContratoHTML(c) {
   const partes = `
     <div style="border-top:3px solid #000;border-bottom:1px solid #ddd;padding:18px 0;margin:20px 0">
-      <p style="margin:0 0 8px;font-size:14px"><b>Conecta MX</b> · Agencia organizadora · representada por Guillermo Alexander Cobos Vizcarra (Reynosa, Tamaulipas).</p>
+      <p style="margin:0 0 8px;font-size:14px"><b>Conecta MX</b> · Agencia organizadora de viajes a conciertos y festivales · representada por Guillermo Alexander Cobos Vizcarra (Reynosa, Tamaulipas).</p>
       <p style="color:#ff283b;font-weight:900;letter-spacing:.2em;font-size:11px;text-transform:uppercase;margin:8px 0">—— y ——</p>
       <p style="margin:0;font-size:14px"><b>${_escCtr(c.creador_nombre)}</b> · Creador(a) de contenido · ${_escCtr(c.creador_email)}.</p>
     </div>`;
@@ -8799,6 +8884,7 @@ function previewContrato() {
   openModal('modal-contrato-preview');
 }
 
+// — Form submit: crea o actualiza según el estado ——————————————
 async function enviarContrato() {
   const d = _ctrFormData();
   const err = _validateCtrForm(d);
@@ -8811,23 +8897,30 @@ async function enviarContrato() {
   alert.innerHTML = '';
   const original = btn.textContent;
   btn.disabled = true;
-  btn.textContent = 'Enviando…';
+  btn.textContent = _contratosEditingToken ? 'Guardando…' : 'Enviando…';
   try {
-    const r = await fetch('/.netlify/functions/contrato-crear', {
+    let body, endpoint;
+    if (_contratosEditingToken) {
+      endpoint = '/.netlify/functions/contrato-actualizar';
+      body = { token: _contratosEditingToken, ...d };
+    } else {
+      endpoint = '/.netlify/functions/contrato-crear';
+      body = d;
+    }
+    const r = await fetch(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(d),
+      body: JSON.stringify(body),
     });
     const j = await r.json();
-    if (!r.ok || !j.ok) throw new Error(j.error || 'Error al enviar');
-    alert.innerHTML = `<div style="padding:10px 14px;background:rgba(61,220,132,.12);border:1px solid rgba(61,220,132,.4);color:#7ee9b3;border-radius:6px;margin-bottom:14px;font-size:13px">✓ Contrato enviado a <b>${_escCtr(d.creador_email)}</b>${j.emailSent === false ? ' (guardado, pero no se pudo mandar email — revisa RESEND_API_KEY)' : ''}</div>`;
-    // Reset y switch a listado
-    document.getElementById('ctr-nombre').value = '';
-    document.getElementById('ctr-email').value = '';
-    document.getElementById('ctr-evento-nombre').value = '';
-    document.getElementById('ctr-evento-select').value = '';
-    document.getElementById('ctr-evento-fecha').value = '';
-    setTimeout(() => { switchContratoView('listado'); loadContratosList(); }, 900);
+    if (!r.ok || !j.ok) throw new Error(j.error || 'Error');
+
+    const okMsg = _contratosEditingToken
+      ? `<div style="padding:10px 14px;background:rgba(61,220,132,.12);border:1px solid rgba(61,220,132,.4);color:#7ee9b3;border-radius:6px;margin-bottom:14px;font-size:13px">✓ Contrato actualizado. El link enviado a la creadora ya muestra los datos nuevos.</div>`
+      : `<div style="padding:10px 14px;background:rgba(61,220,132,.12);border:1px solid rgba(61,220,132,.4);color:#7ee9b3;border-radius:6px;margin-bottom:14px;font-size:13px">✓ Contrato enviado a <b>${_escCtr(d.creador_email)}</b>${j.emailSent === false ? ' (guardado, pero no se pudo mandar email — revisa RESEND_API_KEY)' : ''}</div>`;
+    alert.innerHTML = okMsg;
+    _contratosEditingToken = null;
+    setTimeout(() => { switchContratoView('listado'); loadContratosList(); _resetFormUI(); }, 1100);
   } catch (e) {
     alert.innerHTML = `<div style="padding:10px 14px;background:rgba(255,68,68,.12);border:1px solid rgba(255,68,68,.4);color:#ffb3b3;border-radius:6px;margin-bottom:14px;font-size:13px">⚠ ${_escCtr(e.message)}</div>`;
   } finally {
@@ -8836,11 +8929,58 @@ async function enviarContrato() {
   }
 }
 
+function _resetFormUI() {
+  // Limpia el form + restaura el botón a "Enviar por correo".
+  const ids = ['ctr-nombre','ctr-email','ctr-evento-nombre','ctr-evento-select','ctr-evento-fecha','ctr-ofrecimiento','ctr-expectativas'];
+  ids.forEach(id => { const el = document.getElementById(id); if (el) { if (el.tagName === 'SELECT') el.value = ''; else el.value = ''; } });
+  // Restaurar defaults de textareas
+  const ofr = document.getElementById('ctr-ofrecimiento');
+  const exp = document.getElementById('ctr-expectativas');
+  if (ofr && !_contratosEditingToken) ofr.value = '1 boleto en zona general\n1 Kit Conecta\n1 comida gratis dentro del festival';
+  if (exp && !_contratosEditingToken) exp.value = '1 Video formato Reel (1080x1920)\n3-4 menciones en historias el día del evento\n1 Post dentro del evento';
+  const fc = document.getElementById('ctr-contrato-fecha');
+  if (fc) fc.value = new Date().toISOString().slice(0,10);
+  // Botón principal
+  const btn = document.getElementById('ctr-btn-enviar');
+  if (btn) btn.textContent = '📨 Enviar por correo';
+  // Toggle cancelar / titulo edición
+  const cancelBtn = document.getElementById('ctr-btn-cancelar-edit');
+  if (cancelBtn) cancelBtn.style.display = 'none';
+  const banner = document.getElementById('ctr-banner-edit');
+  if (banner) banner.style.display = 'none';
+}
+
+function _loadContratoEnForm(c) {
+  document.getElementById('ctr-nombre').value = c.creador_nombre || '';
+  document.getElementById('ctr-email').value = c.creador_email || '';
+  document.getElementById('ctr-evento-nombre').value = c.evento_nombre || '';
+  document.getElementById('ctr-evento-select').value = '';
+  document.getElementById('ctr-evento-fecha').value = (c.evento_fecha || '').slice(0,10);
+  document.getElementById('ctr-contrato-fecha').value = (c.contrato_fecha || '').slice(0,10);
+  document.getElementById('ctr-ofrecimiento').value = (Array.isArray(c.ofrecimiento) ? c.ofrecimiento : []).join('\n');
+  document.getElementById('ctr-expectativas').value = (Array.isArray(c.expectativas) ? c.expectativas : []).join('\n');
+  document.getElementById('ctr-btn-enviar').textContent = '💾 Guardar cambios';
+  const cancelBtn = document.getElementById('ctr-btn-cancelar-edit');
+  if (cancelBtn) cancelBtn.style.display = '';
+  const banner = document.getElementById('ctr-banner-edit');
+  if (banner) {
+    banner.style.display = '';
+    banner.innerHTML = `Editando contrato de <b>${_escCtr(c.creador_nombre)}</b> · token <code style="font-size:11px;background:rgba(255,255,255,.1);padding:2px 6px;border-radius:3px">${_escCtr((c.token || '').slice(0,8))}…</code>`;
+  }
+}
+
+function cancelarEdicionContrato() {
+  _contratosEditingToken = null;
+  _resetFormUI();
+  switchContratoView('listado');
+}
+
+// — Tabla listado + acciones ——————————————————————————
 async function loadContratosList() {
   const tbody = document.getElementById('ctr-tbody');
   if (!tbody) return;
   try {
-    const rows = await db.get('contratos_creadores', '?select=id,token,creador_nombre,creador_email,evento_nombre,evento_fecha,estado,enviado_at,firmado_at&order=enviado_at.desc&limit=200');
+    const rows = await db.get('contratos_creadores', '?select=id,token,creador_nombre,creador_email,evento_nombre,evento_fecha,contrato_fecha,ofrecimiento,expectativas,estado,enviado_at,firmado_at&order=enviado_at.desc&limit=200');
     _contratosCache = rows || [];
     if (!_contratosCache.length) {
       tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--ts);padding:30px;font-size:12px;letter-spacing:.1em;text-transform:uppercase">Sin contratos todavía. Crea el primero en "+ Nuevo".</td></tr>`;
@@ -8852,15 +8992,23 @@ async function loadContratosList() {
         ? `<span style="background:rgba(61,220,132,.18);color:#3ddc84;border:1px solid rgba(61,220,132,.35);padding:3px 9px;border-radius:4px;font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;font-weight:700">✓ Firmado</span>`
         : `<span style="background:rgba(255,176,32,.15);color:#ffb020;border:1px solid rgba(255,176,32,.35);padding:3px 9px;border-radius:4px;font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;font-weight:700">⏳ Pendiente</span>`;
       const fechaEnviado = _fmtFechaCortaCtr((c.enviado_at || '').slice(0,10));
-      const accion = firmado
-        ? `<button class="btn btn-ghost" style="padding:5px 10px;font-size:11px" onclick="verContratoFirmado('${_escCtr(c.token)}','${_escCtr(c.creador_nombre)}')">Ver</button>`
-        : `<button class="btn btn-ghost" style="padding:5px 10px;font-size:11px" onclick="reenviarContratoEmail('${_escCtr(c.token)}',this)">Reenviar</button> <button class="btn btn-ghost" style="padding:5px 10px;font-size:11px" onclick="copiarLinkContrato('${_escCtr(c.token)}',this)">Copiar link</button>`;
+      const tokenSafe = _escCtr(c.token);
+      const nombreSafe = _escCtr(c.creador_nombre);
+      const acciones = firmado
+        ? `
+          <button class="btn btn-ghost" style="padding:5px 10px;font-size:11px" onclick="verContratoFirmado('${tokenSafe}','${nombreSafe}')">Ver</button>
+          <button class="btn btn-ghost" style="padding:5px 10px;font-size:11px;color:#ff6666;border-color:rgba(255,68,68,.3)" onclick="eliminarContrato('${tokenSafe}','${nombreSafe}',this)">Eliminar</button>`
+        : `
+          <button class="btn btn-ghost" style="padding:5px 10px;font-size:11px" onclick="editarContrato('${tokenSafe}')">Editar</button>
+          <button class="btn btn-ghost" style="padding:5px 10px;font-size:11px" onclick="reenviarContratoEmail('${tokenSafe}',this)">Reenviar</button>
+          <button class="btn btn-ghost" style="padding:5px 10px;font-size:11px" onclick="copiarLinkContrato('${tokenSafe}',this)">Copiar link</button>
+          <button class="btn btn-ghost" style="padding:5px 10px;font-size:11px;color:#ff6666;border-color:rgba(255,68,68,.3)" onclick="eliminarContrato('${tokenSafe}','${nombreSafe}',this)">Eliminar</button>`;
       return `<tr>
-        <td><b>${_escCtr(c.creador_nombre)}</b><br><span style="color:var(--ts);font-size:11px">${_escCtr(c.creador_email)}</span></td>
+        <td><b>${nombreSafe}</b><br><span style="color:var(--ts);font-size:11px">${_escCtr(c.creador_email)}</span></td>
         <td>${_escCtr(c.evento_nombre)}<br><span style="color:var(--ts);font-size:11px">${_fmtFechaCortaCtr(c.evento_fecha)}</span></td>
         <td>${fechaEnviado}</td>
         <td>${badge}</td>
-        <td style="text-align:right">${accion}</td>
+        <td style="text-align:right;white-space:nowrap">${acciones}</td>
       </tr>`;
     }).join('');
   } catch (e) {
@@ -8908,5 +9056,37 @@ async function copiarLinkContrato(token, btn) {
   }
 }
 
+function editarContrato(token) {
+  const c = _contratosCache.find(x => x.token === token);
+  if (!c) { alert('Contrato no encontrado en cache'); return; }
+  if (c.estado === 'firmado') { alert('No se puede editar un contrato firmado'); return; }
+  _contratosEditingToken = token;
+  switchContratoView('nuevo');
+  _loadContratoEnForm(c);
+  document.getElementById('ctr-alert').innerHTML = '';
+}
+
+async function eliminarContrato(token, nombre, btn) {
+  if (!confirm(`¿Eliminar este contrato${nombre ? ' de ' + nombre : ''}? Esta acción no se puede deshacer.`)) return;
+  const original = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = '…';
+  try {
+    const r = await fetch('/.netlify/functions/contrato-eliminar', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token }),
+    });
+    const j = await r.json();
+    if (!r.ok || !j.ok) throw new Error(j.error || 'Error al eliminar');
+    loadContratosList();
+  } catch (e) {
+    alert('No se pudo eliminar: ' + e.message);
+    btn.textContent = original;
+    btn.disabled = false;
+  }
+}
+
 </script>
+
 </html>

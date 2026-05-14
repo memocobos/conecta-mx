@@ -197,49 +197,85 @@ const FOOTER = `
 // ── Cláusulas del contrato (texto legal) ───────────────────────────────
 const CLAUSULAS = [
   {
-    num: 1, titulo: "Objeto",
-    cuerpo: `<p>El presente contrato tiene por objeto establecer los términos del intercambio comercial entre <strong>Conecta MX (la Agencia)</strong> y <strong class="creador-strong"></strong> (en adelante, el "Creador"), para la promoción del evento mediante la generación de contenido digital.</p>`
+    num: 1, titulo: "Objeto del contrato",
+    cuerpo: `<p>El presente contrato tiene por objeto establecer los términos del intercambio comercial entre <strong>Conecta MX (la Agencia)</strong>, representada por Guillermo Alexander Cobos Vizcarra, y <strong class="creador-strong"></strong> (en adelante, el "Creador"), para la promoción del evento mediante la generación de contenido digital, en los términos y condiciones que aquí se detallan.</p>`
   },
   {
-    num: 2, titulo: "Intercambio",
-    cuerpo: `<p><strong>La Agencia se compromete a entregar al Creador:</strong></p><div class="item-list-ofrecimiento"></div><p style="margin-top:14px"><strong>El Creador se compromete a entregar a la Agencia:</strong></p><div class="item-list-expectativas"></div>`
+    num: 2, titulo: "Detalle del intercambio",
+    cuerpo: `<p><strong>2.1 Lo que ofrece la Agencia:</strong></p><div class="item-list-ofrecimiento"></div><p style="margin-top:14px"><strong>2.2 Lo que se espera del Creador:</strong></p><div class="item-list-expectativas"></div>`
   },
   {
     num: 3, titulo: "Propiedad del contenido",
-    cuerpo: `<p>El contenido generado por el Creador será de su propiedad intelectual. Sin embargo, la Agencia podrá hacer uso del mismo con fines de difusión, repost y archivo, citando siempre al autor.</p><p>El Creador conserva el derecho a publicar el contenido en sus propios canales sin restricción adicional.</p>`
+    cuerpo: `<p><span class="subclausula">3.1</span> Todo el contenido generado por el Creador durante el evento será de propiedad exclusiva de la Agencia.</p>
+<p><span class="subclausula">3.2</span> Únicamente la Agencia podrá distribuir, publicar y/o utilizar el contenido en sus canales oficiales de comunicación, sin requerir autorización adicional del Creador.</p>
+<p><span class="subclausula">3.3</span> Cualquier publicación realizada por el Creador en sus propias redes deberá ser etiquetada como una colaboración oficial con la Agencia (@conectareynosa).</p>`
   },
   {
     num: 4, titulo: "Requisitos del contenido",
-    cuerpo: `<p><span class="subclausula">4.1</span> El contenido debe publicarse durante el evento o dentro de las 48 horas posteriores al mismo, salvo acuerdo distinto por escrito.</p>
-<p><span class="subclausula">4.2</span> Las menciones deberán etiquetar oficialmente a Conecta Reynosa en todas las publicaciones realizadas.</p>
-<p><span class="subclausula">4.3</span> El contenido debe respetar los lineamientos de imagen y narrativa acordados con la Agencia.</p>
-<p><span class="subclausula">4.4</span> El Creador es responsable de la calidad técnica del contenido entregado (audio, video, edición).</p>
-<p><span class="subclausula">4.5</span> Cualquier modificación al contenido propuesto deberá comunicarse con un mínimo de 24 horas de anticipación.</p>
-<p><span class="subclausula">4.6</span> <strong>Exclusividad durante el evento:</strong> Durante el evento, el Creador no podrá promocionar a otras agencias competidoras o servicios similares.</p>
-<p><span class="subclausula">4.7</span> <strong>Veto de contenido:</strong> La Agencia se reserva el derecho de solicitar la eliminación de contenido publicado que no cumpla con los estándares acordados, en un plazo máximo de 24 horas.</p>`
+    cuerpo: `<p><span class="subclausula">4.1</span> <strong>Calidad y formato:</strong></p>
+<ul>
+  <li>Calidad técnica HD o 4K.</li>
+  <li>Formato Reel / vertical 1080 × 1920 px.</li>
+  <li>Iluminación y presentación que reflejen una experiencia increíble.</li>
+</ul>
+<p><span class="subclausula">4.2</span> <strong>Requisitos de la voz:</strong></p>
+<ul>
+  <li>Audición clara, sin ruidos de fondo.</li>
+  <li>Buena dicción.</li>
+  <li>Tono respetuoso.</li>
+  <li>Adecuación al propósito del contenido.</li>
+</ul>
+<p><span class="subclausula">4.3</span> <strong>Historias y publicaciones:</strong></p>
+<ul>
+  <li>Menciones publicadas como historias en Instagram y/o TikTok.</li>
+  <li>Las redes del Creador deberán permanecer públicas durante el evento y los 10–15 días posteriores.</li>
+  <li>Multas por incumplimiento: <strong>25%</strong> en la primera infracción, <strong>50%</strong> si persiste.</li>
+</ul>
+<p><span class="subclausula">4.4</span> <strong>Plazo de entrega:</strong></p>
+<ul>
+  <li>Contenido entregado dentro de los <strong>2–3 días</strong> posteriores al evento.</li>
+  <li>Multas por retraso: <strong>25%</strong> (1–7 días), <strong>50%</strong> (7–10 días), <strong>75%</strong> (10–15 días), <strong>100%</strong> (más de 15 días).</li>
+</ul>
+<p><span class="subclausula">4.5</span> <strong>Correcciones:</strong></p>
+<ul>
+  <li>El Creador tendrá <strong>24 horas</strong> para realizar los ajustes solicitados por la Agencia.</li>
+  <li>Multa del <strong>50%</strong> si no cumple el plazo de corrección.</li>
+  <li>Multa del <strong>100%</strong> si ningún video entregado cumple con las expectativas pactadas.</li>
+</ul>
+<p><span class="subclausula">4.6</span> <strong>Exclusividad durante el evento:</strong> Durante el evento, el Creador no podrá promocionar a otras agencias competidoras o servicios similares de viajes a conciertos.</p>
+<p><span class="subclausula">4.7</span> <strong>Veto de contenido:</strong> La Agencia se reserva el derecho de solicitar la eliminación de contenido publicado que no cumpla con los estándares acordados, en un plazo máximo de <strong>24 horas</strong> a partir de la notificación.</p>`
   },
   {
-    num: 5, titulo: "Cancelación e incumplimiento",
-    cuerpo: `<p><span class="subclausula">5.1</span> En caso de que el Creador no pueda asistir al evento, deberá notificar a la Agencia con al menos 72 horas de anticipación.</p>
-<p><span class="subclausula">5.2</span> El Creador podrá designar un suplente sujeto a aprobación previa por parte de la Agencia.</p>
+    num: 5, titulo: "Políticas de cancelación",
+    cuerpo: `<p><span class="subclausula">5.1</span> En caso de que el Creador no pueda asistir al evento, deberá notificar a la Agencia con al menos <strong>72 horas</strong> de anticipación.</p>
+<p><span class="subclausula">5.2</span> El Creador podrá proponer un suplente, sujeto a aprobación previa por escrito de la Agencia.</p>
 <p><span class="subclausula">5.3</span> En caso de cancelación tardía sin justificación válida, la Agencia podrá excluir al Creador de futuras colaboraciones.</p>
-<p><span class="subclausula">5.4</span> Si el evento se cancela por causas ajenas a la Agencia (fuerza mayor), el presente contrato quedará sin efecto sin penalización para ninguna de las partes.</p>
-<p><span class="subclausula">5.5</span> <strong>Reembolso del costo del intercambio:</strong> En caso de incumplimiento total del Creador (no asistencia, no entrega de contenido), el Creador deberá reembolsar el valor comercial del intercambio dentro de 15 días naturales.</p>`
+<p><span class="subclausula">5.4</span> Si el evento se cancela por causas ajenas a la Agencia (fuerza mayor), el presente contrato quedará sin efecto, sin penalización para ninguna de las partes.</p>
+<p><span class="subclausula">5.5</span> <strong>Reembolso del intercambio:</strong> En caso de incumplimiento total del Creador (no asistencia, no entrega de contenido), el Creador deberá reembolsar el valor comercial del intercambio dentro de <strong>15 días naturales</strong> contados a partir de la fecha del evento.</p>`
   },
   {
-    num: 6, titulo: "Beneficios adicionales",
-    cuerpo: `<p>El Creador tendrá acceso prioritario a futuras invitaciones de eventos organizados por la Agencia, en función de su desempeño y cumplimiento.</p><p>La Agencia podrá ofrecer beneficios adicionales (acceso a zonas VIP, kits exclusivos, contenido detrás de cámaras) sujetos a disponibilidad y mérito.</p>`
+    num: 6, titulo: "Beneficios para el Creador",
+    cuerpo: `<p>El Creador tendrá acceso prioritario a futuras invitaciones de eventos organizados por la Agencia, en función de su desempeño y cumplimiento. La Agencia podrá ofrecer beneficios adicionales (acceso a zonas VIP, kits exclusivos, contenido detrás de cámaras, atención preferencial) sujetos a disponibilidad y mérito.</p>`
   },
   {
-    num: 7, titulo: "Compromiso de profesionalismo",
-    cuerpo: `<p>Ambas partes se comprometen a mantener una conducta respetuosa, profesional y conforme a los valores de imagen pública de la marca Conecta MX. El Creador se obliga a evitar conductas que puedan dañar la reputación de la Agencia o del evento.</p>`
+    num: 7, titulo: "Compromiso del Creador",
+    cuerpo: `<p>El Creador se compromete a mantener una conducta respetuosa y profesional durante todo el evento y en toda comunicación pública relacionada. Se obliga a no realizar declaraciones, actos o publicaciones que puedan dañar la reputación de la Agencia, del evento o de cualquier marca patrocinadora involucrada.</p>`
   },
   {
     num: 8, titulo: "Cláusulas finales",
-    cuerpo: `<p><span class="subclausula">8.1</span> Cualquier modificación a este contrato deberá ser por escrito y aceptada por ambas partes.</p>
-<p><span class="subclausula">8.2</span> Este acuerdo tiene una validez correspondiente al evento mencionado y se considera concluido tras la publicación del contenido pactado.</p>
-<p><span class="subclausula">8.3</span> <strong>Datos personales:</strong> El Creador autoriza el uso de su imagen, nombre y contenido generado para fines promocionales de la Agencia por un periodo indefinido.</p>
-<p><span class="subclausula">8.4</span> <strong>Jurisdicción:</strong> Cualquier controversia derivada del presente contrato será resuelta en los tribunales de Reynosa, Tamaulipas, México.</p>`
+    cuerpo: `<p><span class="subclausula">8.1</span> <strong>Hashtags obligatorios:</strong> Todas las publicaciones derivadas de esta colaboración deberán incluir los siguientes hashtags:</p>
+<ul>
+  <li><strong>#Viajaconexpertos</strong></li>
+  <li><strong>#Seguimosconectando</strong></li>
+  <li><strong>#CMX10</strong></li>
+</ul>
+<p><span class="subclausula">8.2</span> <strong>Confidencialidad:</strong> El Creador se obliga a mantener en estricta reserva cualquier información, condición económica o detalle del presente contrato y de la operación interna de la Agencia que conozca con motivo de esta colaboración. Esta obligación subsiste incluso después de concluido el contrato.</p>
+<p><span class="subclausula">8.3</span> <strong>Datos personales:</strong> El Creador autoriza expresamente el uso de su imagen, nombre y contenido generado para fines promocionales de la Agencia, por un periodo indefinido.</p>
+<p><span class="subclausula">8.4</span> <strong>Jurisdicción:</strong> Cualquier controversia derivada del presente contrato será resuelta en los tribunales competentes de la ciudad de <strong>Reynosa, Tamaulipas, México</strong>, renunciando expresamente las partes a cualquier otro fuero que pudiera corresponderles.</p>`
+  },
+  {
+    num: 9, titulo: "Firmas",
+    cuerpo: `<p>Las partes firman el presente contrato de conformidad con los términos arriba expresados. La firma digital y el envío de la identificación oficial (INE) por parte del Creador constituyen la aceptación plena de este contrato.</p>`
   }
 ];
 

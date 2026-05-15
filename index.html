@@ -1108,7 +1108,7 @@ src="https://www.facebook.com/tr?id=1685907946147007&ev=PageView&noscript=1"
         <div class="pkg-desde">Desde <span class="pkg-precio" id="pp-plus">—</span></div>
       </button>
       <button class="wiz-btn wiz-pkg-btn" onclick="selPaquete(this,'ride')">
-        <div class="pkg-top"><span class="pkg-name">RIDE</span><span class="pkg-tag pkg-tag-ride">Sin boleto</span></div>
+        <div class="pkg-top"><span class="pkg-name">RIDE</span><span class="pkg-tag pkg-tag-ride" id="pkg-tag-ride">Sin boleto</span></div>
         <div class="pkg-inc" id="pi-ride"></div>
         <div class="pkg-desde">Desde <span class="pkg-precio" id="pp-ride">—</span></div>
       </button>
@@ -3114,6 +3114,8 @@ function updatePkgCards(){
   var rideCost=rideBase+(mh>0?mh:0);
   $$('pi-ride').textContent=txtTransporte(cur)+(cur.noHotel?' · Boleto · Kit Conecta':' · Hospedaje · Kit');
   $$('pp-ride').textContent=fmt(rideCost);
+  var _rideTag=document.getElementById('pkg-tag-ride');
+  if(_rideTag) _rideTag.textContent=cur.noHotel?'Sin hotel':'Sin boleto';
 
   // STAY: disable for CDMX events
   var stayBtn=document.getElementById('btn-stay');

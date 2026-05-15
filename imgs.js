@@ -27,6 +27,7 @@ window.STATIC_IMGS={
   'dalemixx':'imgs/dalemixx.jpg',
   'edc2027':'imgs/edc2027.jpg',
   'knotfest':'imgs/knotfest.jpg',
+  'fanfest':'imgs/fanfest.webp',
   'kit_portada':'imgs/kit_portada.png',
   'kit_vasos':'imgs/kit_vasos.png',
   'kit_totebags':'imgs/kit_totebags.png',

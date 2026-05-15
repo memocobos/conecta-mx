@@ -2693,7 +2693,7 @@ function actualizarIncluye(){
   var items=[];
   if(cur.inc&&cur.inc.length>0){
     items=cur.inc.slice();
-    if(selPkg==='ride') items=items.filter(function(i){return i.toLowerCase().indexOf('boleto')<0;});
+    if(selPkg==='ride') items=cur.noHotel?items.filter(function(i){return i.toLowerCase().indexOf('hospedaje')<0&&i.toLowerCase().indexOf('hotel')<0;}):items.filter(function(i){return i.toLowerCase().indexOf('boleto')<0;});
     else if(selPkg==='stay') items=items.filter(function(i){return i.toLowerCase().indexOf('transporte')<0&&i.toLowerCase().indexOf('traslado')<0;});
     else if(selPkg==='cheap') items=items.filter(function(i){return i.toLowerCase().indexOf('transporte')<0&&i.toLowerCase().indexOf('traslado')<0&&i.toLowerCase().indexOf('hospedaje')<0&&i.toLowerCase().indexOf('hotel')<0;});
     // CDMX: normalize transport text
@@ -3182,7 +3182,7 @@ function selPaquete(btn,pkg){
   setWizProgress(2);
   var _hintBase='';
   if(pkg==='plus')_hintBase='Incluye boleto, transporte, hospedaje y kit. ';
-  else if(pkg==='ride')_hintBase='Incluye transporte, hospedaje y kit (sin boleto). ';
+  else if(pkg==='ride')_hintBase=cur.noHotel?'Incluye transporte, boleto y kit (sin hotel). ':'Incluye transporte, hospedaje y kit (sin boleto). ';
   else if(pkg==='stay')_hintBase='Incluye hospedaje, boleto y kit (sin transporte). ';
   else if(pkg==='cheap')_hintBase='Solo boleto y kit. ';
   var _hintNext;
@@ -3205,7 +3205,7 @@ function selPaquete(btn,pkg){
   var incTxt='';
   if(cur.inc&&cur.inc.length>0){
     var incItems=cur.inc.slice();
-    if(pkg==='ride') incItems=incItems.filter(function(i){return i.toLowerCase().indexOf('boleto')<0;});
+    if(pkg==='ride') incItems=cur.noHotel?incItems.filter(function(i){return i.toLowerCase().indexOf('hospedaje')<0&&i.toLowerCase().indexOf('hotel')<0;}):incItems.filter(function(i){return i.toLowerCase().indexOf('boleto')<0;});
     else if(pkg==='stay') incItems=incItems.filter(function(i){return i.toLowerCase().indexOf('transporte')<0&&i.toLowerCase().indexOf('traslado')<0;});
     else if(pkg==='cheap') incItems=incItems.filter(function(i){return i.toLowerCase().indexOf('transporte')<0&&i.toLowerCase().indexOf('traslado')<0&&i.toLowerCase().indexOf('hospedaje')<0&&i.toLowerCase().indexOf('hotel')<0;});
     incTxt=incItems.join(' · ');
@@ -3621,7 +3621,7 @@ var _lastQuincenas=[],_lastPagoQ=0;
 function generarImagenCotizacion(){
   if(!cur)return;
   var W=420,sc=Math.max(window.devicePixelRatio||1,2);
-  var pkgNames={plus:'PLUS — Todo incluido',ride:'RIDE — Sin boleto',stay:'STAY — Sin transporte',cheap:'CHEAP — Solo boleto'};
+  var pkgNames={plus:'PLUS — Todo incluido',ride:cur.noHotel?'RIDE — Sin hotel':'RIDE — Sin boleto',stay:'STAY — Sin transporte',cheap:'CHEAP — Solo boleto'};
 
   // Collect rows
   var rows=[];
@@ -3876,7 +3876,7 @@ function calcular(){
   }
   $$('r-q').textContent=fmt(costoXPersona);
   $$('r-np').textContent='por viajero';
-  $$('r-pkg-lbl').textContent={plus:'PLUS — Todo incluido',ride:'RIDE — Sin boleto',stay:'STAY — Sin transporte',cheap:'CHEAP — Solo boleto'}[selPkg];
+  $$('r-pkg-lbl').textContent={plus:'PLUS — Todo incluido',ride:cur.noHotel?'RIDE — Sin hotel':'RIDE — Sin boleto',stay:'STAY — Sin transporte',cheap:'CHEAP — Solo boleto'}[selPkg];
   actualizarBankInfo();
   actualizarIncluye();
   $$('r-viajeros').textContent=selViaj+(selViaj===1?' persona':' personas');
@@ -3951,7 +3951,7 @@ function calcular(){
 
 var _lastCotizacion='';
 function buildCotizacionMsg(quincenas,pagoQ){
-  var pkgNames={plus:'PLUS — Todo incluido',ride:'RIDE — Sin boleto',stay:'STAY — Sin transporte',cheap:'CHEAP — Solo boleto'};
+  var pkgNames={plus:'PLUS — Todo incluido',ride:cur.noHotel?'RIDE — Sin hotel':'RIDE — Sin boleto',stay:'STAY — Sin transporte',cheap:'CHEAP — Solo boleto'};
   var hoy=new Date();
   var fechaHoy=hoy.getDate()+'/'+(hoy.getMonth()+1)+'/'+hoy.getFullYear();
   var fechaMsg=cur.f;

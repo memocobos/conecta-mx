@@ -41,5 +41,6 @@ window.MAPAS={
   'karolg':'mapas/karolg.webp',
   'edenmunoz':'mapas/edenmunoz.webp',
   'beele':'mapas/beele.webp',
-  'anuelaa':'mapas/anuelaa.webp'
+  'anuelaa':'mapas/anuelaa.webp',
+  'fanfest':'mapas/fanfest.webp'
 };

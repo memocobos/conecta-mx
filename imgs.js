@@ -42,5 +42,6 @@ window.STATIC_IMGS={
   'edenmunoz':'imgs/edenmunoz.webp',
   'beele':'imgs/beele.webp',
   'arre':'imgs/arre.webp',
-  'anuelaa':'imgs/anuelaa.webp'
+  'anuelaa':'imgs/anuelaa.webp',
+  'vaiven':'imgs/vaiven.webp'
 };

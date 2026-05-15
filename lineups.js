@@ -6,5 +6,6 @@ window.LINEUPS={
   'machaca':'lineups/machaca.png',
   'emblema':'lineups/emblema.jpg',
   'pulsolineup':'lineups/pulsolineup.jpg',
-  'arre':'lineups/arre.webp'
+  'arre':'lineups/arre.webp',
+  'vaiven':'lineups/vaiven.webp'
 };

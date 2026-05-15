@@ -3808,8 +3808,9 @@ function calcular(){
       costoXPersona=zonaP+hotelPP;
     }
   } else if(selPkg==='ride'){
-    total=rideBase*selViaj+hotelTotal;
-    costoXPersona=rideBase+hotelPP;
+    var rideCXP=(cur.rideOnly&&zonaP>0)?zonaP:rideBase;
+    total=rideCXP*selViaj+hotelTotal;
+    costoXPersona=rideCXP+hotelPP;
   } else if(selPkg==='stay'){
     costoXPersona=zonaP-stayDiscount+hotelPP;
     if(costoXPersona<0)costoXPersona=zonaP+hotelPP;

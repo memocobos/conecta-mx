@@ -257,9 +257,10 @@ exports.handler = async function (event) {
 // inserta la asignación en eventos_coordi con status='aceptado'. Idempotente:
 // si ya existe (coordi_id, evento_id) lo devuelve sin duplicar.
 async function _autoAsignarEvento(contrato) {
-  // 1. Buscar usuario rol='cc' con el correo del contrato.
+  // 1. Buscar usuario rol='cc' con el correo del contrato (con todos los
+  //    campos que vamos a necesitar para auto-poblar viajeros_evento).
   const userResp = await fetch(
-    `${SB_URL}/rest/v1/usuarios?correo=eq.${encodeURIComponent(contrato.creador_email)}&rol=eq.cc&select=id,nombre&limit=1`,
+    `${SB_URL}/rest/v1/usuarios?correo=eq.${encodeURIComponent(contrato.creador_email)}&rol=eq.cc&select=id,nombre,correo,celular,talla_playera,num_emergencia,nombre_emergencia,rol&limit=1`,
     { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` } }
   );
   if (!userResp.ok) {
@@ -294,12 +295,11 @@ async function _autoAsignarEvento(contrato) {
   if (candidatos.length === 1) {
     evento = candidatos[0];
   } else {
-    // Match por substring nombre o artista.
     evento = candidatos.find(e => {
       const n = (e.nombre || "").toLowerCase();
       const a = (e.artista || "").toLowerCase();
       return target.includes(n) || n.includes(target) || (a && target.includes(a));
-    }) || candidatos[0]; // fallback: el primero en esa fecha
+    }) || candidatos[0];
   }
 
   // 3. Idempotencia: ¿ya existe la asignación?
@@ -308,16 +308,94 @@ async function _autoAsignarEvento(contrato) {
     { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` } }
   );
   const dupes = dupResp.ok ? await dupResp.json() : [];
+
+  let asigId, asigCreated = false;
   if (dupes.length) {
-    console.log("[auto-asign] ya existe asignación id=", dupes[0].id);
-    return { id: dupes[0].id, evento_id: evento.id, coordi_id: user.id, existing: true };
+    asigId = dupes[0].id;
+    console.log("[auto-asign] ya existe asignación id=", asigId);
+  } else {
+    // 4. Insertar asignación.
+    const indicaciones = Array.isArray(contrato.expectativas)
+      ? contrato.expectativas.join("\n")
+      : String(contrato.expectativas || "");
+    const insResp = await fetch(`${SB_URL}/rest/v1/eventos_coordi`, {
+      method: "POST",
+      headers: {
+        apikey: SB_KEY,
+        Authorization: `Bearer ${SB_KEY}`,
+        "Content-Type": "application/json",
+        Prefer: "return=representation",
+      },
+      body: JSON.stringify({
+        coordi_id: user.id,
+        evento_id: evento.id,
+        indicaciones,
+        status: "aceptado",
+      }),
+    });
+    if (!insResp.ok) {
+      const err = await insResp.text();
+      console.error("[auto-asign] insert asignación falló:", insResp.status, err);
+      return { skipped: true, reason: "insert_error" };
+    }
+    const [created] = await insResp.json();
+    asigId = created.id;
+    asigCreated = true;
+    console.log("[auto-asign] asignación creada id=", asigId, "user=", user.nombre, "evento=", evento.nombre);
   }
 
-  // 4. Insertar. `asignado_en` y created defaults los pone PostgreSQL.
-  const indicaciones = Array.isArray(contrato.expectativas)
-    ? contrato.expectativas.join("\n")
-    : String(contrato.expectativas || "");
-  const insResp = await fetch(`${SB_URL}/rest/v1/eventos_coordi`, {
+  // 5. Auto-agregar como viajero del evento (idempotente). Best-effort: si
+  //    falla no rompe la asignación.
+  let viajero = null;
+  try {
+    viajero = await _upsertViajeroStaffServer(evento.id, user);
+  } catch (e) {
+    console.warn("[auto-asign] upsert viajero falló:", e.message);
+  }
+
+  return {
+    id: asigId,
+    evento_id: evento.id,
+    coordi_id: user.id,
+    [asigCreated ? "created" : "existing"]: true,
+    viajero,
+  };
+}
+
+// Inserta o devuelve viajero staff existente para (evento_id, correo).
+// Idempotente. Llamado tras crear la asignación en eventos_coordi.
+// Si la migración tipo_viajero/usuario_id no se ha aplicado en prod, reintenta
+// el INSERT sin esos campos y deja un marker [STAFF:<rol>] en `notas` para que
+// el cliente detecte la fila como staff vía _esStaff().
+async function _upsertViajeroStaffServer(eventoId, user) {
+  // Idempotencia por correo (siempre existe en viajeros_evento).
+  if (user.correo) {
+    const dupResp = await fetch(
+      `${SB_URL}/rest/v1/viajeros_evento?evento_id=eq.${eventoId}&correo=eq.${encodeURIComponent(user.correo)}&select=id&limit=1`,
+      { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` } }
+    );
+    if (dupResp.ok) {
+      const dupes = await dupResp.json();
+      if (dupes.length) {
+        console.log("[viajero-staff] ya existe id=", dupes[0].id);
+        return { id: dupes[0].id, existing: true };
+      }
+    }
+  }
+
+  const baseBody = {
+    evento_id: eventoId,
+    nombre: user.nombre,
+    celular: user.celular || null,
+    correo: user.correo || null,
+    talla_playera: user.talla_playera || null,
+    num_emergencia: user.num_emergencia || null,
+    emergencia_nombre: user.nombre_emergencia || null,
+    tipo_paquete: "PLUS",
+    notas: `[STAFF:${user.rol || "cc"}] Asignación automática por firmar contrato`,
+  };
+
+  const _post = async (body) => fetch(`${SB_URL}/rest/v1/viajeros_evento`, {
     method: "POST",
     headers: {
       apikey: SB_KEY,
@@ -325,19 +403,23 @@ async function _autoAsignarEvento(contrato) {
       "Content-Type": "application/json",
       Prefer: "return=representation",
     },
-    body: JSON.stringify({
-      coordi_id: user.id,
-      evento_id: evento.id,
-      indicaciones,
-      status: "aceptado", // ya firmó el contrato, asume aceptación
-    }),
+    body: JSON.stringify(body),
   });
+
+  let insResp = await _post({ ...baseBody, tipo_viajero: user.rol || "cc", usuario_id: user.id });
   if (!insResp.ok) {
     const err = await insResp.text();
-    console.error("[auto-asign] insert falló:", insResp.status, err);
-    return { skipped: true, reason: "insert_error" };
+    if (/tipo_viajero|usuario_id|schema cache/i.test(err)) {
+      console.warn("[viajero-staff] migración pendiente, reintento sin tipo_viajero/usuario_id");
+      insResp = await _post(baseBody);
+    }
+    if (!insResp.ok) {
+      const err2 = await insResp.text();
+      console.error("[viajero-staff] insert falló:", insResp.status, err2);
+      return { skipped: true };
+    }
   }
   const [created] = await insResp.json();
-  console.log("[auto-asign] asignación creada id=", created.id, "para user", user.nombre, "evento", evento.nombre);
-  return { id: created.id, evento_id: evento.id, coordi_id: user.id, created: true };
+  console.log("[viajero-staff] viajero creado id=", created.id);
+  return { id: created.id, created: true };
 }

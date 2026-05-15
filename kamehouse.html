@@ -1361,7 +1361,7 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
  <div class="form-row cols-3">
  <div class="form-group">
  <label>Evento</label>
- <select id="selector-evento" onchange="loadViajeros()">
+ <select id="selector-evento" onchange="loadReservaciones()">
  <option value="">Selecciona un evento…</option>
  </select>
  </div>
@@ -1676,13 +1676,22 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
 
        <!-- SUB: VIAJEROS -->
        <div id="cc-sub-viajeros" style="display:none">
-        <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;align-items:center;justify-content:space-between">
+        <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center;justify-content:space-between">
          <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.12em;color:var(--ts)" id="cc-viajeros-count">0 viajeros</div>
-         <div style="display:flex;gap:8px">
+         <div style="display:flex;gap:8px;align-items:center">
+          <label style="display:inline-flex;align-items:center;gap:6px;font-size:11px;font-family:'JetBrains Mono',monospace;color:var(--ts);cursor:pointer">
+            <input type="checkbox" id="cc-export-excluir-staff" style="accent-color:var(--orange)">
+            <span>excluir staff al exportar</span>
+          </label>
           <button class="btn btn-ghost btn-sm" onclick="exportarViajeros('excel')" style="font-size:10px">↓ CSV</button>
           <button class="btn btn-ghost btn-sm" onclick="exportarViajeros('pdf')" style="font-size:10px">↓ PDF</button>
           <button class="btn btn-primary btn-sm" onclick="abrirModalViajero(null)">+ Viajero</button>
          </div>
+        </div>
+        <div style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap">
+         <button class="gz-filter active" id="cc-fil-viaj-todos" onclick="filtrarViajerosCC('todos',this)">// todos <span id="cc-cnt-todos" style="color:var(--ts);margin-left:4px"></span></button>
+         <button class="gz-filter" id="cc-fil-viaj-cliente" onclick="filtrarViajerosCC('cliente',this)">// clientes <span id="cc-cnt-cliente" style="color:var(--ts);margin-left:4px"></span></button>
+         <button class="gz-filter" id="cc-fil-viaj-staff" onclick="filtrarViajerosCC('staff',this)">// staff <span id="cc-cnt-staff" style="color:var(--ts);margin-left:4px"></span></button>
         </div>
         <div id="cc-viajeros-list"><div class="empty-state"><div class="empty-icon">·</div>Sin viajeros registrados</div></div>
        </div>
@@ -1702,7 +1711,11 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
         <!-- Habitaciones -->
         <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;align-items:center;justify-content:space-between">
          <div id="cc-rooming-resumen" style="display:flex;gap:10px;flex-wrap:wrap"></div>
-         <div style="display:flex;gap:8px">
+         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <label style="display:inline-flex;align-items:center;gap:6px;font-size:11px;font-family:'JetBrains Mono',monospace;color:var(--ts);cursor:pointer">
+            <input type="checkbox" id="cc-rooming-excluir-staff" style="accent-color:var(--orange)">
+            <span>excluir staff</span>
+          </label>
           <button class="btn btn-ghost btn-sm" onclick="exportarRooming('excel')" style="font-size:10px">↓ CSV</button>
           <button class="btn btn-ghost btn-sm" onclick="exportarRooming('pdf')" style="font-size:10px">↓ PDF</button>
           <button class="btn btn-primary btn-sm" onclick="abrirModalHabitacion(null)">+ Habitación</button>
@@ -3281,9 +3294,14 @@ if (_pagoEvEl) _pagoEvEl.addEventListener('change', async function() {
 });
 
 // ═══════════════════════════════════════════════════════════════
-// POR EVENTO — VIAJEROS
+// POR EVENTO — RESERVACIONES (legacy)
 // ═══════════════════════════════════════════════════════════════
-async function loadViajeros() {
+// TODO: deprecated, migrar a viajeros_evento si se reactiva esta vista.
+// Renombrado de loadViajeros para evitar colisión con la función canónica
+// de Capsule Corp (line ~6595). La tabla `reservaciones` está vacía hoy;
+// esta función queda como stub funcional hasta decidir si la pestaña
+// "Por Evento" debe migrarse a viajeros_evento o eliminarse.
+async function loadReservaciones() {
  const evId = document.getElementById('selector-evento').value;
  const tbody = document.getElementById('tabla-viajeros');
  const resumen = document.getElementById('evento-resumen');
@@ -5580,7 +5598,7 @@ function renderPerfilCompleto(u, toursPasados, evAsignados, iniciales, edad, cum
               <div>
                 <div class="tour-item-name" style="font-size:16px">${ev.nombre || ev.artista || '—'}</div>
                 <div class="tour-item-meta">${ev.artista?ev.artista+' · ':''}${ev.ciudad||''} ${fechaEv?'· '+fechaEv.toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric'}):''}</div>
-                ${e.indicaciones ? `<div style="font-size:11px;color:var(--ts);margin-top:5px;font-style:italic">📌 ${e.indicaciones}</div>` : ''}
+                ${u.rol !== 'cc' && e.indicaciones ? `<div style="font-size:11px;color:var(--ts);margin-top:5px;font-style:italic">📌 ${e.indicaciones}</div>` : ''}
                 ${ev.notas_internas ? `<div style="font-size:11px;color:var(--ts);margin-top:4px"><span class="k-mono-sm" style="margin-right:6px">EQUIPO</span>${ev.notas_internas}</div>` : ''}
               </div>
               <span style="font-size:10px;white-space:nowrap;color:${stColor[e.status]||'var(--ts)'}">
@@ -6349,11 +6367,20 @@ async function loadCCEquipo() {
     const uMap = Object.fromEntries(usuarios.map(u=>[u.id,u]));
     // Guardar referencia de usuario en cada asignación (para rooming)
     _ccAsignados = asigs.map(a => ({ ...a, _usuario: uMap[a.coordi_id]||{} }));
+    // Backfill: auto-agregar a viajeros_evento a quienes ya están aceptados
+    // pero no aparecen en la lista (idempotente, best-effort).
+    _backfillStaffViajeros().then(() => { if (document.getElementById('cc-viajeros-list')) loadViajeros(); });
     const statusCol = { pendiente:'var(--gold)', aceptado:'var(--green)', declinado:'var(--red)' };
     const statusLabel = { pendiente:'Pendiente', aceptado:'Aceptó', declinado:'Declinó' };
     container.innerHTML = asigs.map(a => {
       const u = uMap[a.coordi_id]||{};
       const st = a.status||'pendiente';
+      const esCC = u.rol === 'cc';
+      // CC: no mostrar el bloque de expectativas (la descripción larga del
+      // contrato vive en su perfil → panel "Material Entregado").
+      const indicacionesHtml = (!esCC && a.indicaciones)
+        ? `<div style="font-size:11px;color:var(--ts);margin-top:3px;font-style:italic">${a.indicaciones}</div>`
+        : '';
       return `<div style="background:var(--bg2);border:1px solid var(--border);border-left:3px solid ${statusCol[st]||'var(--ts)'};border-radius:var(--radius);padding:14px 18px;margin-bottom:10px">
         <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
           <div style="display:flex;align-items:center;gap:12px">
@@ -6364,11 +6391,11 @@ async function loadCCEquipo() {
             <div>
               <div style="font-family:'Rajdhani',sans-serif;font-weight:700;font-size:16px">${u.nombre||'—'}</div>
               <div style="font-size:10px;font-family:'JetBrains Mono',monospace;color:var(--ts)">${u.rol||''} · <span style="color:${statusCol[st]||'var(--ts)'}">${statusLabel[st]||st}</span></div>
-              ${a.indicaciones ? `<div style="font-size:11px;color:var(--ts);margin-top:3px;font-style:italic">${a.indicaciones}</div>` : ''}
+              ${indicacionesHtml}
               ${a.motivo_declinacion ? `<div style="font-size:11px;color:var(--red);margin-top:3px">Motivo: ${a.motivo_declinacion}</div>` : ''}
             </div>
           </div>
-          <div style="display:flex;gap:6px">
+          <div style="display:flex;gap:6px;flex-wrap:wrap">
             ${st==='pendiente' ? `<button class="btn btn-ghost btn-sm" onclick="reenviarNotificacion('${a.id}')" style="font-size:10px">↺ Reenviar</button>` : ''}
             <button class="btn btn-red btn-sm" onclick="desasignarCoordi('${a.id}')">✕</button>
           </div>
@@ -6531,6 +6558,10 @@ async function manejarAccionAsignacion() {
   if (accion === 'aceptar') {
     try {
       await db.patch('eventos_coordi', asigId, { status: 'aceptado' });
+      // Auto-agregar al usuario aceptante como viajero del evento (best-effort).
+      // Si falla, la aceptación del tour se completa igual.
+      try { await _upsertViajeroStaff(asigId); }
+      catch(e) { console.warn('[viajero-staff] upsert falló:', e.message); }
       // Limpiar URL
       window.history.replaceState({}, '', window.location.pathname);
       setTimeout(() => alert('✅ ¡Tour aceptado! Aparecerá en tu perfil.'), 500);
@@ -6549,6 +6580,65 @@ async function manejarAccionAsignacion() {
       await enviarAlertaMemo('tour_declinado', { nombre: _uD, evento: _evD, motivo });
       setTimeout(() => alert('Respuesta registrada. Memo será notificado.'), 500);
     } catch(e) { console.warn(e); }
+  }
+}
+
+// Inserta al usuario aceptante como viajero del evento (staff). Idempotente:
+// si ya existe (evento_id, correo) o (evento_id, usuario_id) no duplica.
+// Best-effort — el caller envuelve en try/catch para que la aceptación nunca falle.
+// La columna `tipo_viajero`/`usuario_id` puede no existir aún en prod (migración
+// supabase-viajeros-tipo.sql pendiente): si Postgres rechaza el INSERT por
+// columna desconocida, reintenta sin esos campos y usa el marker en `notas`
+// para que _esStaff() siga reconociendo la fila.
+async function _upsertViajeroStaff(asigId) {
+  const [asig] = await db.get('eventos_coordi', `?id=eq.${asigId}&select=id,evento_id,coordi_id&limit=1`);
+  if (!asig || !asig.evento_id || !asig.coordi_id) return null;
+
+  const [u] = await db.get('usuarios', `?id=eq.${asig.coordi_id}&select=id,nombre,correo,celular,talla_playera,num_emergencia,nombre_emergencia,rol&limit=1`);
+  if (!u) return null;
+
+  // Idempotencia: chequear por correo (siempre presente en viajeros_evento).
+  if (u.correo) {
+    const existing = await db.get(
+      'viajeros_evento',
+      `?evento_id=eq.${asig.evento_id}&correo=eq.${encodeURIComponent(u.correo)}&select=id&limit=1`
+    );
+    if (existing.length) return existing[0];
+  }
+
+  const baseBody = {
+    evento_id: asig.evento_id,
+    nombre: u.nombre,
+    celular: u.celular || null,
+    correo: u.correo || null,
+    talla_playera: u.talla_playera || null,
+    num_emergencia: u.num_emergencia || null,
+    emergencia_nombre: u.nombre_emergencia || null,
+    tipo_paquete: 'PLUS',
+    notas: `[STAFF:${u.rol || 'staff'}] Asignación automática por aceptar tour`,
+  };
+
+  try {
+    return await db.post('viajeros_evento', { ...baseBody, tipo_viajero: u.rol || 'staff', usuario_id: u.id });
+  } catch(e) {
+    if (/tipo_viajero|usuario_id|schema cache/i.test(e.message)) {
+      console.warn('[viajero-staff] migración pendiente, insert sin tipo_viajero/usuario_id');
+      return await db.post('viajeros_evento', baseBody);
+    }
+    throw e;
+  }
+}
+
+// Backfill: asegura que todo CC con status='aceptado' tenga su fila en
+// viajeros_evento. Se llama al cargar el detalle del evento en Capsule Corp
+// para auto-curar a quienes aceptaron antes de que existiera _upsertViajeroStaff.
+async function _backfillStaffViajeros() {
+  if (!_ccEventoActual || !Array.isArray(_ccAsignados)) return;
+  const aceptados = _ccAsignados.filter(a => a.status === 'aceptado');
+  if (!aceptados.length) return;
+  for (const a of aceptados) {
+    try { await _upsertViajeroStaff(a.id); }
+    catch(e) { console.warn('[backfill] viajero-staff falló:', e.message); }
   }
 }
 
@@ -6592,6 +6682,71 @@ async function notificarEquipoListas() {
 // ════════════════════════════════
 // VIAJEROS
 // ════════════════════════════════
+let _ccViajerosFiltro = 'todos';   // todos | cliente | staff
+
+function _esStaff(v) {
+  if (!v) return false;
+  if (v.tipo_viajero && v.tipo_viajero !== 'cliente') return true;
+  // Fallback: marker en notas (cuando la columna tipo_viajero no existe aún).
+  if (typeof v.notas === 'string' && /\[STAFF:/i.test(v.notas)) return true;
+  return false;
+}
+
+// Extrae el rol de staff a partir de tipo_viajero o del marker en notas.
+function _staffRol(v) {
+  if (!v) return '';
+  if (v.tipo_viajero && v.tipo_viajero !== 'cliente') return v.tipo_viajero;
+  const m = typeof v.notas === 'string' ? v.notas.match(/\[STAFF:([^\]]+)\]/i) : null;
+  return m ? m[1] : '';
+}
+
+function filtrarViajerosCC(filtro, btn) {
+  _ccViajerosFiltro = filtro;
+  document.querySelectorAll('#cc-sub-viajeros .gz-filter').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  _renderViajerosTabla();
+}
+
+function _renderViajerosTabla() {
+  const list = document.getElementById('cc-viajeros-list');
+  if (!list) return;
+  const todos   = _ccViajeros;
+  const staff   = todos.filter(_esStaff);
+  const clientes = todos.filter(v => !_esStaff(v));
+  // Actualizar contadores en las pestañas
+  const cT = document.getElementById('cc-cnt-todos');   if (cT) cT.textContent = `(${todos.length})`;
+  const cC = document.getElementById('cc-cnt-cliente'); if (cC) cC.textContent = `(${clientes.length})`;
+  const cS = document.getElementById('cc-cnt-staff');   if (cS) cS.textContent = `(${staff.length})`;
+  // Aplicar filtro
+  const filas = _ccViajerosFiltro === 'staff' ? staff
+              : _ccViajerosFiltro === 'cliente' ? clientes
+              : todos;
+  if (!filas.length) {
+    list.innerHTML = `<div class="empty-state"><div class="empty-icon">·</div>${_ccViajerosFiltro==='todos'?'Sin viajeros — agrega el primero':'Sin viajeros con ese filtro'}</div>`;
+    return;
+  }
+  list.innerHTML = `<div class="table-wrap"><table>
+    <thead><tr><th>Nombre</th><th>Paquete</th><th>Zona</th><th>Celular</th><th>Correo</th><th>Talla</th><th>Emergencia</th><th>Notas</th><th></th></tr></thead>
+    <tbody>${filas.map(v => `<tr>
+      <td style="font-weight:600">
+        ${v.nombre}
+        ${_esStaff(v) ? `<span style="margin-left:6px;font-size:9px;font-weight:800;padding:1px 7px;border-radius:3px;background:rgba(255,183,3,.18);color:var(--gold);border:1px solid rgba(255,183,3,.4);letter-spacing:.1em;text-transform:uppercase;font-family:'JetBrains Mono',monospace">STAFF</span>` : ''}
+      </td>
+      <td>${v.tipo_paquete ? `<span style="font-size:10px;font-weight:700;padding:2px 10px;border-radius:4px;background:${{'PLUS':'rgba(255,183,3,.15)','STAY':'rgba(94,167,255,.15)','RIDE':'rgba(61,220,132,.15)'}[v.tipo_paquete]||'rgba(255,255,255,.06)'};color:${{'PLUS':'var(--gold)','STAY':'var(--blue)','RIDE':'var(--green)'}[v.tipo_paquete]||'var(--ts)'}">${v.tipo_paquete}</span>` : '—'}</td>
+      <td style="font-size:11px;padding:2px 8px;background:rgba(255,107,0,.1);border-radius:4px;color:var(--orange);white-space:nowrap">${v.zona_boleto||'—'}</td>
+      <td style="font-family:'JetBrains Mono',monospace;font-size:12px">${v.celular||'—'}</td>
+      <td style="font-size:12px;color:var(--ts)">${v.correo||'—'}</td>
+      <td style="text-align:center">${v.talla_playera||'—'}</td>
+      <td style="font-size:11px;color:var(--ts)">${v.num_emergencia||'—'}</td>
+      <td style="font-size:11px;color:var(--ts);max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${v.notas||'—'}</td>
+      <td style="white-space:nowrap">
+        <button class="btn btn-ghost btn-sm" onclick="abrirModalViajero('${v.id}')">⎘</button>
+        <button class="btn btn-red btn-sm" onclick="eliminarViajero('${v.id}')">✕</button>
+      </td>
+    </tr>`).join('')}</tbody>
+  </table></div>`;
+}
+
 async function loadViajeros() {
   if (!_ccEventoActual) return;
   const list = document.getElementById('cc-viajeros-list');
@@ -6601,27 +6756,7 @@ async function loadViajeros() {
     _ccViajeros = await db.get('viajeros_evento', `?evento_id=eq.${_ccEventoActual}&order=nombre.asc`);
     const countEl = document.getElementById('cc-viajeros-count');
     if (countEl) countEl.textContent = `${_ccViajeros.length} viajero${_ccViajeros.length!==1?'s':''}`;
-    if (!_ccViajeros.length) {
-      list.innerHTML = '<div class="empty-state"><div class="empty-icon">·</div>Sin viajeros — agrega el primero</div>';
-      return;
-    }
-    list.innerHTML = `<div class="table-wrap"><table>
-      <thead><tr><th>Nombre</th><th>Paquete</th><th>Zona</th><th>Celular</th><th>Correo</th><th>Talla</th><th>Emergencia</th><th>Notas</th><th></th></tr></thead>
-      <tbody>${_ccViajeros.map(v => `<tr>
-        <td style="font-weight:600">${v.nombre}</td>
-        <td>${v.tipo_paquete ? `<span style="font-size:10px;font-weight:700;padding:2px 10px;border-radius:4px;background:${{'PLUS':'rgba(255,183,3,.15)','STAY':'rgba(94,167,255,.15)','RIDE':'rgba(61,220,132,.15)'}[v.tipo_paquete]||'rgba(255,255,255,.06)'};color:${{'PLUS':'var(--gold)','STAY':'var(--blue)','RIDE':'var(--green)'}[v.tipo_paquete]||'var(--ts)'}">${v.tipo_paquete}</span>` : '—'}</td>
-        <td style="font-size:11px;padding:2px 8px;background:rgba(255,107,0,.1);border-radius:4px;color:var(--orange);white-space:nowrap">${v.zona_boleto||'—'}</td>
-        <td style="font-family:'JetBrains Mono',monospace;font-size:12px">${v.celular||'—'}</td>
-        <td style="font-size:12px;color:var(--ts)">${v.correo||'—'}</td>
-        <td style="text-align:center">${v.talla_playera||'—'}</td>
-        <td style="font-size:11px;color:var(--ts)">${v.num_emergencia||'—'}</td>
-        <td style="font-size:11px;color:var(--ts);max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${v.notas||'—'}</td>
-        <td style="white-space:nowrap">
-          <button class="btn btn-ghost btn-sm" onclick="abrirModalViajero('${v.id}')">⎘</button>
-          <button class="btn btn-red btn-sm" onclick="eliminarViajero('${v.id}')">✕</button>
-        </td>
-      </tr>`).join('')}</tbody>
-    </table></div>`;
+    _renderViajerosTabla();
   } catch(e) { list.innerHTML = `<div class="alert alert-error">${e.message}</div>`; }
 }
 
@@ -6725,24 +6860,29 @@ async function eliminarViajero(id) {
 
 async function exportarViajeros(formato) {
   if (!_ccViajeros.length) { alert('No hay viajeros para exportar'); return; }
+  const excluirStaff = !!document.getElementById('cc-export-excluir-staff')?.checked;
+  const lista = excluirStaff ? _ccViajeros.filter(v => !_esStaff(v)) : _ccViajeros;
+  if (!lista.length) { alert('No hay clientes para exportar (todos son staff)'); return; }
   const ev = _ccEventosCache.find(e => e.id === _ccEventoActual);
-  const titulo = `Viajeros — ${ev?.nombre||'Evento'}`;
+  const sufijoTitulo = excluirStaff ? ' (sin staff)' : '';
+  const titulo = `Viajeros — ${ev?.nombre||'Evento'}${sufijoTitulo}`;
   if (formato === 'pdf') {
     const win = window.open('','_blank');
     win.document.write(`<html><head><title>${titulo}</title>
-    <style>body{font-family:Arial,sans-serif;padding:24px}h2{margin-bottom:16px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ccc;padding:8px 12px;font-size:13px}th{background:#f5f5f5}</style></head><body>
+    <style>body{font-family:Arial,sans-serif;padding:24px}h2{margin-bottom:16px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ccc;padding:8px 12px;font-size:13px}th{background:#f5f5f5}.staff{background:#fff4d6}</style></head><body>
     <h2>${titulo}</h2>
-    <table><thead><tr><th>#</th><th>Nombre</th><th>Celular</th><th>Correo</th><th>Talla</th><th>Emergencia</th><th>Notas</th></tr></thead>
-    <tbody>${_ccViajeros.map((v,i)=>`<tr><td>${i+1}</td><td>${v.nombre}</td><td>${v.celular||''}</td><td>${v.correo||''}</td><td>${v.talla_playera||''}</td><td>${v.num_emergencia||''}</td><td>${v.notas||''}</td></tr>`).join('')}</tbody>
+    <table><thead><tr><th>#</th><th>Nombre</th><th>Tipo</th><th>Celular</th><th>Correo</th><th>Talla</th><th>Emergencia</th><th>Notas</th></tr></thead>
+    <tbody>${lista.map((v,i)=>`<tr${_esStaff(v)?' class="staff"':''}><td>${i+1}</td><td>${v.nombre}</td><td>${(_esStaff(v) ? (_staffRol(v)||'staff') : 'cliente')}</td><td>${v.celular||''}</td><td>${v.correo||''}</td><td>${v.talla_playera||''}</td><td>${v.num_emergencia||''}</td><td>${v.notas||''}</td></tr>`).join('')}</tbody>
     </table></body></html>`);
     win.document.close(); win.print();
   } else {
-    const headers = ['#','Nombre','Celular','Correo','Talla','Emergencia','Notas'];
-    const rows = _ccViajeros.map((v,i) => [i+1,v.nombre,v.celular||'',v.correo||'',v.talla_playera||'',v.num_emergencia||'',v.notas||''].map(c=>`"${String(c).replace(/"/g,'""')}"`).join(','));
+    const headers = ['#','Nombre','Tipo','Celular','Correo','Talla','Emergencia','Notas'];
+    const rows = lista.map((v,i) => [i+1,v.nombre,(_esStaff(v) ? (_staffRol(v)||'staff') : 'cliente'),v.celular||'',v.correo||'',v.talla_playera||'',v.num_emergencia||'',v.notas||''].map(c=>`"${String(c).replace(/"/g,'""')}"`).join(','));
     const csv = [headers.join(','), ...rows].join('\n');
     const a = document.createElement('a');
     a.href = 'data:text/csv;charset=utf-8,\uFEFF' + encodeURIComponent(csv);
-    a.download = `viajeros-${ev?.nombre||'evento'}.csv`;
+    const sufijoFile = excluirStaff ? '-sin-staff' : '';
+    a.download = `viajeros-${ev?.nombre||'evento'}${sufijoFile}.csv`;
     a.click();
   }
 }
@@ -7008,9 +7148,20 @@ async function eliminarHabitacion(id) {
 }
 async function exportarRooming(formato) {
   if (!_ccHabitaciones.length) { alert('No hay habitaciones para exportar'); return; }
+  const excluirStaff = !!document.getElementById('cc-rooming-excluir-staff')?.checked;
+  // Set de nombres staff del evento — solo necesario cuando se quiere filtrar.
+  let staffNames = new Set();
+  if (excluirStaff) {
+    const staffVj = (_ccViajeros || []).filter(_esStaff);
+    staffNames = new Set(staffVj.map(v => (v.nombre || '').trim().toLowerCase()));
+  }
+  const filtrarOcp = ocp => excluirStaff
+    ? ocp.filter(n => !staffNames.has(String(n || '').trim().toLowerCase()))
+    : ocp;
   const ev = _ccEventosCache.find(e => e.id === _ccEventoActual);
   const hotel = document.getElementById('cc-hotel-nombre')?.value || '';
-  const titulo = `Rooming List — ${ev?.nombre||'Evento'}${hotel?' · '+hotel:''}`;
+  const sufijoTitulo = excluirStaff ? ' (sin staff)' : '';
+  const titulo = `Rooming List — ${ev?.nombre||'Evento'}${hotel?' · '+hotel:''}${sufijoTitulo}`;
   const tipoLabel = {individual:'Individual',doble:'Doble',triple:'Triple',cuadruple:'Cuádruple'};
   if (formato === 'pdf') {
     const win = window.open('','_blank');
@@ -7019,20 +7170,21 @@ async function exportarRooming(formato) {
     <h2>${titulo}</h2>
     <table><thead><tr><th>Habitación</th><th>Tipo</th><th>Ocupantes</th></tr></thead>
     <tbody>${_ccHabitaciones.map(h=>{
-      const ocp = h.ocupantes?(typeof h.ocupantes==='string'?JSON.parse(h.ocupantes):h.ocupantes):[];
-      return `<tr><td>${h.numero||'—'}</td><td>${tipoLabel[h.tipo]||h.tipo}</td><td>${ocp.join('<br>')}</td></tr>`;
+      const ocp = filtrarOcp(h.ocupantes?(typeof h.ocupantes==='string'?JSON.parse(h.ocupantes):h.ocupantes):[]);
+      return `<tr><td>${h.numero||'—'}</td><td>${tipoLabel[h.tipo]||h.tipo}</td><td>${ocp.join('<br>')||'—'}</td></tr>`;
     }).join('')}</tbody></table></body></html>`);
     win.document.close(); win.print();
   } else {
     const headers = ['Habitación','Tipo','Ocupantes'];
     const rows = _ccHabitaciones.map(h => {
-      const ocp = h.ocupantes?(typeof h.ocupantes==='string'?JSON.parse(h.ocupantes):h.ocupantes):[];
+      const ocp = filtrarOcp(h.ocupantes?(typeof h.ocupantes==='string'?JSON.parse(h.ocupantes):h.ocupantes):[]);
       return [h.numero||'',tipoLabel[h.tipo]||h.tipo,ocp.join(' | ')].map(c=>`"${String(c).replace(/"/g,'""')}"`).join(',');
     });
     const csv = [headers.join(','),...rows].join('\n');
     const a = document.createElement('a');
     a.href = 'data:text/csv;charset=utf-8,\uFEFF'+encodeURIComponent(csv);
-    a.download = `rooming-${ev?.nombre||'evento'}.csv`;
+    const sufijoFile = excluirStaff ? '-sin-staff' : '';
+    a.download = `rooming-${ev?.nombre||'evento'}${sufijoFile}.csv`;
     a.click();
   }
 }

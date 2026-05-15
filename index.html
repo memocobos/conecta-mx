@@ -3112,7 +3112,7 @@ function updatePkgCards(){
   // RIDE: fixed cost (no boleto)
   var rideBase=cur.ride||(cdmx?2900:2700);
   var rideCost=rideBase+(mh>0?mh:0);
-  $$('pi-ride').textContent=txtTransporte(cur)+' · Hospedaje · Kit';
+  $$('pi-ride').textContent=txtTransporte(cur)+(cur.noHotel?' · Boleto · Kit Conecta':' · Hospedaje · Kit');
   $$('pp-ride').textContent=fmt(rideCost);
 
   // STAY: disable for CDMX events
@@ -3209,7 +3209,7 @@ function selPaquete(btn,pkg){
     incTxt=incItems.join(' · ');
   } else {
     if(pkg==='plus')incTxt=txtTransporte(cur)+' · Hospedaje · Boleto zona elegida · Kit Conecta';
-    else if(pkg==='ride')incTxt=txtTransporte(cur)+' · Hospedaje · Kit Conecta (sin boleto)';
+    else if(pkg==='ride')incTxt=cur.noHotel?txtTransporte(cur)+' · Boleto · Kit Conecta':txtTransporte(cur)+' · Hospedaje · Kit Conecta (sin boleto)';
     else if(pkg==='stay')incTxt='Hospedaje · Boleto zona elegida · Kit Conecta';
     else incTxt='Boleto zona elegida · Kit Conecta';
   }

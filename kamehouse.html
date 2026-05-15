@@ -6692,6 +6692,21 @@ function _esStaff(v) {
   return false;
 }
 
+// Descarga un blob HTML como archivo. Reemplaza window.open()+win.print(),
+// que es bloqueado por Safari iOS y popup-blockers cuando la invocación
+// ocurre tras un await async. El archivo descargado se abre en el navegador
+// del usuario y desde ahí pueden imprimir/guardar como PDF.
+function _descargarHTML(filename, html) {
+  const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 100);
+}
+
 // Extrae el rol de staff a partir de tipo_viajero o del marker en notas.
 function _staffRol(v) {
   if (!v) return '';
@@ -6867,14 +6882,14 @@ async function exportarViajeros(formato) {
   const sufijoTitulo = excluirStaff ? ' (sin staff)' : '';
   const titulo = `Viajeros — ${ev?.nombre||'Evento'}${sufijoTitulo}`;
   if (formato === 'pdf') {
-    const win = window.open('','_blank');
-    win.document.write(`<html><head><title>${titulo}</title>
+    const sufijoFile = excluirStaff ? '-sin-staff' : '';
+    const html = `<html><head><meta charset="utf-8"><title>${titulo}</title>
     <style>body{font-family:Arial,sans-serif;padding:24px}h2{margin-bottom:16px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ccc;padding:8px 12px;font-size:13px}th{background:#f5f5f5}.staff{background:#fff4d6}</style></head><body>
     <h2>${titulo}</h2>
     <table><thead><tr><th>#</th><th>Nombre</th><th>Tipo</th><th>Celular</th><th>Correo</th><th>Talla</th><th>Emergencia</th><th>Notas</th></tr></thead>
     <tbody>${lista.map((v,i)=>`<tr${_esStaff(v)?' class="staff"':''}><td>${i+1}</td><td>${v.nombre}</td><td>${(_esStaff(v) ? (_staffRol(v)||'staff') : 'cliente')}</td><td>${v.celular||''}</td><td>${v.correo||''}</td><td>${v.talla_playera||''}</td><td>${v.num_emergencia||''}</td><td>${v.notas||''}</td></tr>`).join('')}</tbody>
-    </table></body></html>`);
-    win.document.close(); win.print();
+    </table></body></html>`;
+    _descargarHTML(`viajeros-${ev?.nombre||'evento'}${sufijoFile}.html`, html);
   } else {
     const headers = ['#','Nombre','Tipo','Celular','Correo','Talla','Emergencia','Notas'];
     const rows = lista.map((v,i) => [i+1,v.nombre,(_esStaff(v) ? (_staffRol(v)||'staff') : 'cliente'),v.celular||'',v.correo||'',v.talla_playera||'',v.num_emergencia||'',v.notas||''].map(c=>`"${String(c).replace(/"/g,'""')}"`).join(','));
@@ -7164,16 +7179,16 @@ async function exportarRooming(formato) {
   const titulo = `Rooming List — ${ev?.nombre||'Evento'}${hotel?' · '+hotel:''}${sufijoTitulo}`;
   const tipoLabel = {individual:'Individual',doble:'Doble',triple:'Triple',cuadruple:'Cuádruple'};
   if (formato === 'pdf') {
-    const win = window.open('','_blank');
-    win.document.write(`<html><head><title>${titulo}</title>
+    const sufijoFile = excluirStaff ? '-sin-staff' : '';
+    const html = `<html><head><meta charset="utf-8"><title>${titulo}</title>
     <style>body{font-family:Arial,sans-serif;padding:24px}h2{margin-bottom:16px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ccc;padding:8px 12px;font-size:13px;vertical-align:top}th{background:#f5f5f5}</style></head><body>
     <h2>${titulo}</h2>
     <table><thead><tr><th>Habitación</th><th>Tipo</th><th>Ocupantes</th></tr></thead>
     <tbody>${_ccHabitaciones.map(h=>{
       const ocp = filtrarOcp(h.ocupantes?(typeof h.ocupantes==='string'?JSON.parse(h.ocupantes):h.ocupantes):[]);
       return `<tr><td>${h.numero||'—'}</td><td>${tipoLabel[h.tipo]||h.tipo}</td><td>${ocp.join('<br>')||'—'}</td></tr>`;
-    }).join('')}</tbody></table></body></html>`);
-    win.document.close(); win.print();
+    }).join('')}</tbody></table></body></html>`;
+    _descargarHTML(`rooming-${ev?.nombre||'evento'}${sufijoFile}.html`, html);
   } else {
     const headers = ['Habitación','Tipo','Ocupantes'];
     const rows = _ccHabitaciones.map(h => {
@@ -7199,14 +7214,13 @@ async function descargarListaViajeros(eventoId) {
     ]);
     if (!viajeros.length) { alert('No hay viajeros registrados para este evento'); return; }
     const titulo = `Viajeros — ${ev.nombre||'Evento'}`;
-    const win = window.open('','_blank');
-    win.document.write(`<html><head><title>${titulo}</title>
+    const html = `<html><head><meta charset="utf-8"><title>${titulo}</title>
     <style>body{font-family:Arial,sans-serif;padding:24px}h2{margin-bottom:4px}p{color:#666;margin-bottom:20px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ccc;padding:8px 12px;font-size:13px}th{background:#f5f5f5}</style></head><body>
     <h2>${titulo}</h2><p>${ev.artista?ev.artista+' · ':''}${ev.ciudad||''} ${ev.fecha?'· '+new Date(ev.fecha+'T12:00:00').toLocaleDateString('es-MX',{day:'numeric',month:'long',year:'numeric'}):''}</p>
     <table><thead><tr><th>#</th><th>Nombre</th><th>Paquete</th><th>Zona</th><th>Talla</th><th>Celular</th><th>Emergencia</th><th>Notas</th></tr></thead>
     <tbody>${viajeros.map((v,i)=>`<tr><td>${i+1}</td><td><strong>${v.nombre}</strong></td><td>${v.tipo_paquete||'—'}</td><td>${v.zona_boleto||'—'}</td><td>${v.talla_playera||'—'}</td><td>${v.celular||'—'}</td><td>${v.num_emergencia||'—'}</td><td>${v.notas||'—'}</td></tr>`).join('')}</tbody>
-    </table></body></html>`);
-    win.document.close(); win.print();
+    </table></body></html>`;
+    _descargarHTML(`viajeros-${(ev.nombre||'evento').replace(/[^a-zA-Z0-9-_]+/g,'_')}.html`, html);
   } catch(e) { alert('Error: ' + e.message); }
 }
 
@@ -7219,8 +7233,7 @@ async function descargarRoomingList(eventoId) {
     if (!habs.length) { alert('No hay rooming list para este evento'); return; }
     const tipoLabels = {individual:'Individual',doble:'Doble',triple:'Triple',cuadruple:'Cuádruple'};
     const titulo = `Rooming List — ${ev.nombre||'Evento'}`;
-    const win = window.open('','_blank');
-    win.document.write(`<html><head><title>${titulo}</title>
+    const html = `<html><head><meta charset="utf-8"><title>${titulo}</title>
     <style>body{font-family:Arial,sans-serif;padding:24px}h2{margin-bottom:4px}p{color:#666;margin-bottom:20px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ccc;padding:8px 12px;font-size:13px;vertical-align:top}th{background:#f5f5f5}</style></head><body>
     <h2>${titulo}</h2>
     <p>${habs[0]?.hotel_nombre||''}${habs[0]?.hotel_direccion?' · '+habs[0].hotel_direccion:''}${habs[0]?.incluye_desayuno?' · ✓ Incluye desayuno':''}</p>
@@ -7228,8 +7241,8 @@ async function descargarRoomingList(eventoId) {
     <tbody>${habs.map((h,i)=>{
       const ocp = h.ocupantes?(typeof h.ocupantes==='string'?JSON.parse(h.ocupantes):h.ocupantes):[];
       return `<tr><td>Habitación ${i+1}</td><td>${tipoLabels[h.tipo]||h.tipo}</td><td>${ocp.join('<br>')||'—'}</td></tr>`;
-    }).join('')}</tbody></table></body></html>`);
-    win.document.close(); win.print();
+    }).join('')}</tbody></table></body></html>`;
+    _descargarHTML(`rooming-${(ev.nombre||'evento').replace(/[^a-zA-Z0-9-_]+/g,'_')}.html`, html);
   } catch(e) { alert('Error: ' + e.message); }
 }
 

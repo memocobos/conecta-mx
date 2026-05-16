@@ -1224,6 +1224,7 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
     <div class="nav-dropdown-menu">
      <button class="nav-dropdown-item" id="nav-recibos" onclick="showHerramienta('recibos')">Recibos</button>
      <button class="nav-dropdown-item" id="nav-contratos" onclick="showHerramienta('contratos')">Contratos</button>
+     <button class="nav-dropdown-item" id="nav-waitlist" onclick="showHerramienta('waitlist')">Lista de espera</button>
      <button class="nav-dropdown-item" id="nav-diseno" onclick="showHerramienta('diseno')">Diseño</button>
     </div>
    </div>
@@ -2288,6 +2289,16 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
        </div>
      </div>
    </div>
+ </div>
+
+ <!-- ─── LISTA DE ESPERA ─── -->
+ <div class="page" id="page-waitlist">
+   <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px;flex-wrap:wrap">
+     <h2 style="margin:0;font-family:'Zen Dots',sans-serif;font-size:22px;letter-spacing:.02em">🔔 Lista de espera</h2>
+     <button class="btn btn-ghost btn-sm" onclick="loadWaitlist()">↻ Refrescar</button>
+   </div>
+   <div id="wl-summary" style="font-size:12px;color:var(--ts);letter-spacing:.06em;text-transform:uppercase;margin-bottom:14px">Cargando…</div>
+   <div id="wl-groups" style="display:grid;gap:12px"></div>
  </div>
 
  <!-- ─── RECIBOS ─── -->
@@ -6101,6 +6112,9 @@ function showHerramienta(name) {
   if (name === 'contratos') {
     loadContratos();
   }
+  if (name === 'waitlist') {
+    loadWaitlist();
+  }
 }
 
 // ── NAV MOBILE HAMBURGUESA ──────────────────────────────────
@@ -9526,6 +9540,181 @@ async function eliminarContrato(token, nombre, btn) {
     alert('No se pudo eliminar: ' + e.message);
     btn.textContent = original;
     btn.disabled = false;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// LISTA DE ESPERA (eventos_waitlist + eventos_estado_snapshot)
+// ═══════════════════════════════════════════════════════════════
+let _waitlistCache = [];
+let _snapshotCache = {};
+
+async function _wlSb(path) {
+  const res = await fetch(`${SB_URL}/rest/v1/${path}`, {
+    headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` },
+  });
+  if (!res.ok) throw new Error(`SB ${res.status}`);
+  return res.json();
+}
+
+async function loadWaitlist() {
+  const summary = document.getElementById('wl-summary');
+  const groups = document.getElementById('wl-groups');
+  if (summary) summary.textContent = 'Cargando…';
+  if (groups) groups.innerHTML = '';
+
+  let rows = [], snap = [];
+  try {
+    [rows, snap] = await Promise.all([
+      _wlSb('eventos_waitlist?select=id,evento_id,evento_nombre,nombre,email,notificado,notificado_at,created_at&order=created_at.desc'),
+      _wlSb('eventos_estado_snapshot?select=evento_id,estado'),
+    ]);
+  } catch (e) {
+    if (summary) summary.textContent = 'Error cargando: ' + e.message;
+    return;
+  }
+  _waitlistCache = rows || [];
+  _snapshotCache = {};
+  for (const s of (snap || [])) _snapshotCache[s.evento_id] = s.estado;
+
+  // Agrupar por evento_id, usar el evento_nombre más reciente por evento
+  const byEv = {};
+  for (const r of _waitlistCache) {
+    if (!byEv[r.evento_id]) byEv[r.evento_id] = { evento_id: r.evento_id, evento_nombre: r.evento_nombre, rows: [] };
+    byEv[r.evento_id].rows.push(r);
+  }
+  const eventos = Object.values(byEv).sort((a,b) => b.rows.length - a.rows.length);
+  const total = _waitlistCache.length;
+
+  if (summary) summary.textContent = `Total: ${total} ${total === 1 ? 'persona' : 'personas'} en ${eventos.length} ${eventos.length === 1 ? 'evento' : 'eventos'}`;
+
+  if (!eventos.length) {
+    groups.innerHTML = '<div class="empty-state" style="padding:40px;text-align:center;color:var(--ts);border:1px dashed var(--border);border-radius:10px"><div style="font-size:36px;margin-bottom:8px">🔔</div><div style="font-size:13px;letter-spacing:.06em">No hay registros todavía. Cuando alguien se registre en un evento &laquo;Próximamente&raquo;, aparecerá aquí.</div></div>';
+    return;
+  }
+
+  groups.innerHTML = eventos.map(g => {
+    const estadoSnap = _snapshotCache[g.evento_id];
+    const isActivo = estadoSnap === '' || estadoSnap == null;
+    const pendientes = g.rows.filter(r => !r.notificado).length;
+    const tagBg = estadoSnap === 'proximamente' ? 'rgba(232,255,76,.15)' : 'rgba(136,234,78,.15)';
+    const tagBorder = estadoSnap === 'proximamente' ? 'rgba(232,255,76,.5)' : 'rgba(136,234,78,.5)';
+    const tagColor = estadoSnap === 'proximamente' ? '#e8ff4c' : '#88ea4e';
+    const tagText = estadoSnap === 'proximamente' ? 'PRÓXIMAMENTE' : (isActivo ? 'ACTIVO ✓' : (estadoSnap || '—').toUpperCase());
+    const notifLabel = (pendientes > 0) ? `Notificar a ${pendientes} ahora` : 'Reenviar notificación';
+    return `<div style="background:var(--bg2,#0a0a0a);border:1px solid var(--border);border-left:4px solid #e8ff4c;border-radius:10px;padding:18px 20px">
+      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:6px">
+        <div style="font-size:15px;font-weight:800;color:#fff;flex:1 1 auto">📅 ${_wlEsc(g.evento_nombre)}</div>
+        <span style="font-size:10px;letter-spacing:.14em;padding:4px 10px;border-radius:4px;background:${tagBg};border:1px solid ${tagBorder};color:${tagColor};font-weight:800">${tagText}</span>
+      </div>
+      <div style="font-size:12px;color:var(--ts);margin-bottom:12px;letter-spacing:.04em">
+        ${g.rows.length} ${g.rows.length === 1 ? 'persona registrada' : 'personas registradas'}
+        ${pendientes > 0 ? ` · <span style="color:#e8ff4c;font-weight:700">${pendientes} sin notificar</span>` : ' · <span style="color:#88ea4e">todos notificados</span>'}
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-ghost btn-sm" onclick="wlVerRegistrados('${_wlEsc(g.evento_id)}')">Ver registrados</button>
+        <button class="btn btn-primary btn-sm" onclick="wlNotificar('${_wlEsc(g.evento_id)}', ${g.rows.length}, ${pendientes})">${notifLabel}</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function _wlEsc(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function _wlFmtDate(iso) {
+  if (!iso) return '—';
+  try {
+    const d = new Date(iso);
+    return d.toLocaleDateString('es-MX', { day:'2-digit', month:'short', year:'2-digit' }) + ' ' + d.toLocaleTimeString('es-MX', { hour:'2-digit', minute:'2-digit' });
+  } catch { return iso; }
+}
+
+function wlVerRegistrados(eventoId) {
+  const rows = _waitlistCache.filter(r => r.evento_id === eventoId);
+  const nombreEv = rows[0] ? rows[0].evento_nombre : eventoId;
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(6px)';
+  overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+  overlay.innerHTML = `<div style="background:#0a0a1a;border:1px solid var(--border);border-radius:14px;max-width:800px;width:100%;max-height:88vh;overflow:auto;padding:0">
+    <div style="position:sticky;top:0;background:#0a0a1a;padding:18px 22px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px">
+      <div style="flex:1 1 auto">
+        <div style="font-size:10px;letter-spacing:.16em;color:var(--ts);text-transform:uppercase;margin-bottom:4px">Lista de espera</div>
+        <div style="font-size:16px;font-weight:800;color:#fff">${_wlEsc(nombreEv)}</div>
+        <div style="font-size:11px;color:var(--ts);margin-top:4px">${rows.length} registro${rows.length===1?'':'s'}</div>
+      </div>
+      <button class="btn btn-ghost btn-sm" onclick="wlExportarCSV('${_wlEsc(eventoId)}')">Exportar CSV</button>
+      <button onclick="this.closest('[data-wl-overlay]').remove()" style="background:rgba(255,255,255,.1);border:none;color:#fff;font-size:18px;width:32px;height:32px;border-radius:50%;cursor:pointer">✕</button>
+    </div>
+    <div style="padding:0">
+      <table style="width:100%;border-collapse:collapse;font-size:13px">
+        <thead><tr style="background:rgba(255,255,255,.04);border-bottom:1px solid var(--border)">
+          <th style="text-align:left;padding:10px 16px;font-size:10px;color:var(--ts);letter-spacing:.12em;text-transform:uppercase">Nombre</th>
+          <th style="text-align:left;padding:10px 16px;font-size:10px;color:var(--ts);letter-spacing:.12em;text-transform:uppercase">Email</th>
+          <th style="text-align:left;padding:10px 16px;font-size:10px;color:var(--ts);letter-spacing:.12em;text-transform:uppercase">Registro</th>
+          <th style="text-align:center;padding:10px 16px;font-size:10px;color:var(--ts);letter-spacing:.12em;text-transform:uppercase">Notificado</th>
+        </tr></thead>
+        <tbody>
+          ${rows.map(r => `<tr style="border-bottom:1px solid rgba(255,255,255,.06)">
+            <td style="padding:10px 16px;color:#fff;font-weight:600">${_wlEsc(r.nombre)}</td>
+            <td style="padding:10px 16px;color:rgba(255,255,255,.75)"><a href="mailto:${_wlEsc(r.email)}" style="color:inherit;text-decoration:none">${_wlEsc(r.email)}</a></td>
+            <td style="padding:10px 16px;color:rgba(255,255,255,.6);font-size:11px">${_wlFmtDate(r.created_at)}</td>
+            <td style="padding:10px 16px;text-align:center">${r.notificado ? '<span style="color:#88ea4e">✓</span>' : '<span style="color:rgba(255,255,255,.3)">✗</span>'}</td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>
+  </div>`;
+  overlay.setAttribute('data-wl-overlay', '1');
+  document.body.appendChild(overlay);
+}
+
+function wlExportarCSV(eventoId) {
+  const rows = _waitlistCache.filter(r => r.evento_id === eventoId);
+  if (!rows.length) return;
+  const header = ['Nombre','Email','Fecha registro','Notificado','Notificado at'];
+  const lines = [header.join(',')].concat(rows.map(r => [
+    JSON.stringify(r.nombre || ''),
+    JSON.stringify(r.email || ''),
+    JSON.stringify(r.created_at || ''),
+    r.notificado ? '1' : '0',
+    JSON.stringify(r.notificado_at || ''),
+  ].join(',')));
+  const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `waitlist-${eventoId}.csv`;
+  document.body.appendChild(a); a.click();
+  setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 100);
+}
+
+async function wlNotificar(eventoId, totalRegs, pendientes) {
+  const targetCount = pendientes > 0 ? pendientes : totalRegs;
+  const verbo = pendientes > 0 ? 'mandar email' : 'REENVIAR (todos ya fueron notificados)';
+  if (!confirm(`¿${verbo} a las ${targetCount} personas registradas? Esta acción no se puede deshacer.`)) return;
+
+  // Si es reenvío, primero reset notificado=false para los que ya fueron notificados.
+  if (pendientes === 0 && totalRegs > 0) {
+    try {
+      await fetch(`${SB_URL}/rest/v1/eventos_waitlist?evento_id=eq.${encodeURIComponent(eventoId)}`, {
+        method: 'PATCH',
+        headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ notificado: false, notificado_at: null }),
+      });
+    } catch (e) { alert('No se pudo resetear el flag: ' + e.message); return; }
+  }
+
+  // Disparar la función
+  try {
+    const r = await fetch(`/.netlify/functions/waitlist-notify?force=true&evento_id=${encodeURIComponent(eventoId)}`);
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok || !d.ok) { alert('Error: ' + (d.error || r.status)); return; }
+    alert(`Enviados ${d.sent || 0} de ${d.total || 0} emails.`);
+    loadWaitlist();
+  } catch (e) {
+    alert('Error de red: ' + e.message);
   }
 }
 

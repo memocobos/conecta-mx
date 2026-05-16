@@ -110,6 +110,13 @@ body.chat-open,body.wizard-open{overscroll-behavior:none}
 .ev-card.proceso::after{content:'EN PROCESO';position:absolute;inset:0;background:rgba(0,0,205,.85);display:grid;place-items:center;font-size:22px;font-weight:900;color:#fff;letter-spacing:.15em;z-index:10;pointer-events:none;font-family:'Montserrat',sans-serif}
 .ev-card.pronto{cursor:default;pointer-events:none;position:relative}
 .ev-card.pronto::after{content:'PRÓXIMAMENTE';position:absolute;inset:0;background:rgba(232,255,76,.92);display:grid;place-items:center;font-size:clamp(12px,3.2vw,18px);font-weight:900;color:#000;letter-spacing:.04em;text-align:center;padding:0 10px;white-space:nowrap;z-index:10;pointer-events:none;font-family:'Montserrat',sans-serif}
+/* PROXIMAMENTE clickeable: igual estilo amarillo pero card abre modal de lista de espera */
+.ev-card.proxi{cursor:pointer;position:relative;transition:transform .15s ease}
+.ev-card.proxi:hover{transform:translateY(-2px)}
+.ev-card.proxi .ev-bottom{justify-content:center}
+.ev-prox-badge{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;background:#e8ff4c;color:#000;padding:14px 12px;font-size:13px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;font-family:'Montserrat',sans-serif;border-radius:8px;text-align:center;line-height:1.1}
+.ev-prox-badge::before{content:'🔔'}
+.ev-prox-sub{display:block;font-size:9px;letter-spacing:.18em;color:rgba(0,0,0,.55);margin-top:3px;font-weight:800}
 .ev-card.pasado{cursor:default;pointer-events:none;opacity:.55}
 .ev-card.pasado .ev-img{filter:brightness(.35) grayscale(.6)}
 .tpast{background:rgba(255,255,255,.08);color:rgba(255,255,255,.4)}
@@ -152,6 +159,32 @@ body.chat-open,body.wizard-open{overscroll-behavior:none}
 .nf-modal-btn:hover{background:#e01e30}
 .nf-modal-skip{color:rgba(255,255,255,.35);font-size:11px;cursor:pointer;border:none;background:none;font-family:'Montserrat',sans-serif}
 .nf-modal-skip:hover{color:rgba(255,255,255,.6)}
+/* ── WAITLIST MODAL ─────────────────────────────────────── */
+.wl-modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:9998;align-items:center;justify-content:center;padding:16px;backdrop-filter:blur(6px)}
+.wl-modal{background:#0a0a1a;border:1.5px solid rgba(232,255,76,.25);border-radius:18px;max-width:420px;width:100%;padding:32px 28px 26px;position:relative;box-shadow:0 24px 70px rgba(0,0,0,.7);font-family:'Montserrat',sans-serif}
+.wl-modal-close{position:absolute;top:12px;right:14px;background:rgba(255,255,255,.08);border:none;color:#fff;font-size:18px;width:32px;height:32px;border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.wl-modal-close:hover{background:rgba(255,255,255,.2)}
+.wl-brand{display:flex;align-items:center;gap:8px;margin-bottom:18px}
+.wl-brand-conecta{background:#ff283b;color:#000;font-weight:900;font-size:11px;letter-spacing:.06em;padding:5px 10px;text-transform:uppercase}
+.wl-brand-mx{color:#fff;font-style:italic;font-weight:900;font-size:14px}
+.wl-eyebrow{font-size:10px;letter-spacing:.22em;text-transform:uppercase;color:#e8ff4c;font-weight:900;margin-bottom:8px}
+.wl-title{color:#fff;font-size:22px;font-weight:900;line-height:1.15;margin-bottom:12px;letter-spacing:-.01em}
+.wl-title em{color:#e8ff4c;font-style:normal}
+.wl-lead{color:rgba(255,255,255,.7);font-size:13px;line-height:1.55;margin-bottom:22px}
+.wl-field{margin-bottom:12px}
+.wl-field label{display:block;font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:rgba(255,255,255,.5);font-weight:800;margin-bottom:6px}
+.wl-field input{width:100%;background:#000;border:1.5px solid rgba(255,255,255,.15);color:#fff;padding:13px 14px;font-size:14px;font-family:inherit;font-weight:600;border-radius:10px;box-sizing:border-box;transition:border-color .15s}
+.wl-field input:focus{outline:none;border-color:#e8ff4c}
+.wl-field input::placeholder{color:rgba(255,255,255,.3)}
+.wl-cta{display:block;width:100%;background:#e8ff4c;color:#000;border:none;padding:16px;font-size:13px;font-weight:900;font-family:inherit;text-transform:uppercase;letter-spacing:.08em;border-radius:10px;cursor:pointer;margin-top:8px;transition:transform .15s,filter .15s}
+.wl-cta:hover{filter:brightness(1.08)}
+.wl-cta:active{transform:translateY(1px)}
+.wl-cta:disabled{opacity:.5;cursor:wait}
+.wl-fine{margin-top:14px;font-size:10px;color:rgba(255,255,255,.4);text-align:center;line-height:1.5}
+.wl-msg{margin:12px 0 0;padding:12px 14px;border-radius:8px;font-size:12px;line-height:1.5;font-weight:600;display:none}
+.wl-msg.ok{background:rgba(136,234,78,.12);border:1px solid rgba(136,234,78,.4);color:#88ea4e;display:block}
+.wl-msg.warn{background:rgba(232,255,76,.1);border:1px solid rgba(232,255,76,.35);color:#e8ff4c;display:block}
+.wl-msg.err{background:rgba(255,40,59,.12);border:1px solid rgba(255,40,59,.45);color:#ff6b7a;display:block}
 .tnf::before{background:#FFD700;box-shadow:0 0 6px #FFD700}
 .tpc{background:rgba(0,0,0,.5);color:#e8ff4c}
 .tpc::before{background:#e8ff4c;animation:pulse-yellow 1.5s ease-in-out infinite}
@@ -1920,17 +1953,18 @@ function renderCatalog(){
     isPC2=st==='por-confirmar';
     var isNF=st==='nueva-fecha';
     var isPronto=st==='pronto';
+    var isProxi=st==='proximamente';
     // Auto-semáforo: calcula % de zonas disponibles
     var _zonas=(ev.multifecha?ev.multifecha.reduce(function(a,mf){return a.concat(mf.zonas);},ev.zonas||[]):(ev.zonas||[]));
     var _total=_zonas.length;
     var _avail=_zonas.filter(function(z){return !z.ag;}).length;
     var _pct=_total>0?(_avail/_total*100):100;
-    if(!isAg&&!isNF&&!isPronto&&_total>0&&_avail===0)isAg=true;
-    var isUlt=st==='ultimos'||(!isAg&&!isSV&&!isPC2&&!isProc&&!isNF&&!isPronto&&_pct<40&&_pct>0);
-    var isPoca=!isAg&&!isUlt&&!isSV&&!isPC2&&!isProc&&!isNF&&!isPronto&&_pct>=40&&_pct<60;
+    if(!isAg&&!isNF&&!isPronto&&!isProxi&&_total>0&&_avail===0)isAg=true;
+    var isUlt=st==='ultimos'||(!isAg&&!isSV&&!isPC2&&!isProc&&!isNF&&!isPronto&&!isProxi&&_pct<40&&_pct>0);
+    var isPoca=!isAg&&!isUlt&&!isSV&&!isPC2&&!isProc&&!isNF&&!isPronto&&!isProxi&&_pct>=40&&_pct<60;
     hasZ=ev.zonas.length>0;
-    var tagTxt=isAg?'Agotado':isPronto?'Próximamente':isNF?'🔄 Próximamente nueva fecha':isProc?'En Proceso':isUlt?'Últimos lugares':isPoca?'Poca disponibilidad':isSV?'Solo viaje':isPC2?'Por confirmar':'Disponible';
-    var tagCls=isAg?'tag':isPronto?'tpronto':isNF?'tnf':isProc?'tproc':isUlt?'tu':isPoca?'tpoca':isSV?'tsv':isPC2?'tpc':'td';
+    var tagTxt=isAg?'Agotado':isProxi?'Próximamente':isPronto?'Próximamente':isNF?'🔄 Próximamente nueva fecha':isProc?'En Proceso':isUlt?'Últimos lugares':isPoca?'Poca disponibilidad':isSV?'Solo viaje':isPC2?'Por confirmar':'Disponible';
+    var tagCls=isAg?'tag':isProxi?'tpronto':isPronto?'tpronto':isNF?'tnf':isProc?'tproc':isUlt?'tu':isPoca?'tpoca':isSV?'tsv':isPC2?'tpc':'td';
     }
     var priceH='';
     if(isPast){priceH='<div style="height:4px"></div>';}
@@ -1942,7 +1976,7 @@ function renderCatalog(){
     if(!ev.img&&ev.img!==false&&!staticSrc&&ev.a) ev.img=ev.a.replace(/ - .*/,'').replace(/ en .*/,'').replace(/ Mexico.*/,'');
     var imgHTML='';
     var playBtn='';
-    if(!isPast&&!isAg&&!isProc&&!isPronto&&!isPC2){
+    if(!isPast&&!isAg&&!isProc&&!isPronto&&!isPC2&&!isProxi){
       // Preview query: music id > musicSearch/previewQuery override > ev.img (ya limpio) > ev.a
       var rawQ=evMusicQuery(ev,0);
       var qArtist=String(rawQ).replace(/"/g,'&quot;').replace(/'/g,'&#39;');
@@ -1960,7 +1994,7 @@ function renderCatalog(){
       imgHTML='<div class="ev-img-placeholder"><span class="ev-img-initials">'+ev.a.substring(0,2).toUpperCase()+'</span>'+playBtn+'</div>';
     }
     var ctaH='';
-    if(!isPast&&!isAg&&!isProc&&!isPronto){
+    if(!isPast&&!isAg&&!isProc&&!isPronto&&!isProxi){
       if(isNF)ctaH='<span class="ev-cta">Notificarme</span>';
       else if(isSV||!hasZ)ctaH='<span class="ev-cta ev-cta-wa">WhatsApp</span>';
       else if(isPC2)ctaH='';
@@ -1968,7 +2002,8 @@ function renderCatalog(){
     }
     var card=document.createElement('div');
     card.setAttribute('data-id',ev.id);
-    card.className='ev-card'+(isPast?' pasado':'')+(isAg&&!isPast?' agotado':'')+(isProc&&!isPast?' proceso':'')+(isPronto&&!isPast?' pronto':'');
+    card.className='ev-card'+(isPast?' pasado':'')+(isAg&&!isPast?' agotado':'')+(isProc&&!isPast?' proceso':'')+(isPronto&&!isPast?' pronto':'')+(isProxi&&!isPast?' proxi':'');
+    var proxBadge=isProxi?'<div class="ev-prox-badge">AVÍSAME<span class="ev-prox-sub">Lista de espera</span></div>':'';
     card.innerHTML=imgHTML+
       '<span class="ev-tag '+tagCls+'">'+tagTxt+'</span>'+
       '<div class="ev-body">'+
@@ -1978,8 +2013,7 @@ function renderCatalog(){
           '<div class="ev-venue">'+ev.v+'</div>'+
         '</div>'+
         '<div class="ev-bottom">'+
-          (isPast||isAg||isPronto?'':priceH)+
-          ctaH+
+          (isProxi?proxBadge:(isPast||isAg||isPronto?'':priceH)+ctaH)+
         '</div>'+
         (ev.preventa&&!isPast&&!isAg&&Date.now()<ev.preventa.expiresTs?'<div class="ev-preventa-badge" data-preventa-expires="'+ev.preventa.expiresTs+'">Preventa termina en: <span class="preventa-timer">--:--:--</span></div>':'')+
         (ev.promo&&!isPast&&!isAg?'<div class="ev-promo-badge">🏷️ USA CÓDIGO: '+(ev.promoCode||'CONECTAREY')+'</div>':'')+
@@ -1987,14 +2021,15 @@ function renderCatalog(){
         (ev.lineup&&LINEUPS[ev.lineup]?'<button class="ev-lineup-btn" data-lineup="'+ev.lineup+'" onclick="event.stopPropagation();abrirLineup(\''+ev.lineup+'\',\''+ev.a.replace(/'/g,"\\'")+'\')">🎵 Ver Line Up</button>':'')+
       '</div>';
     if(!isPast&&!isAg){
-      (function(evv,sv,proc,nf){
+      (function(evv,sv,proc,nf,proxi){
         card.onclick=function(e){
+          if(proxi){abrirWaitlistModal(evv);return;}
           if(nf){abrirNuevaFechaModal();return;}
           if(proc&&evv.waChannel){window.open(evv.waChannel,'_blank');}
           else if(proc||sv){var msg='Hola! Me interesa el tour de '+evv.a+' ('+evv.f+'). Me dan informes?';window.open('https://wa.me/'+WA+'?text='+encodeURIComponent(msg),'_blank');}
           else{showDetail(evv.id);}
         };
-      })(ev,isSV,isProc,isNF);
+      })(ev,isSV,isProc,isNF,isProxi);
     }
     list.appendChild(card);
     // Load image via API if no static image
@@ -3623,6 +3658,54 @@ function cerrarNfModal(){
   document.getElementById('nf-modal-bg').style.display='none';
 }
 
+// ── WAITLIST (st:'proximamente') ──────────────────────────
+var _wlEvento=null;
+function abrirWaitlistModal(ev){
+  _wlEvento=ev;
+  document.getElementById('wl-ev-name').textContent=ev.a;
+  // Reset
+  var f=document.getElementById('wl-form');
+  if(f){f.style.display='block';f.reset();}
+  var msg=document.getElementById('wl-msg');
+  if(msg){msg.className='wl-msg';msg.textContent='';}
+  var btn=document.getElementById('wl-submit');
+  if(btn){btn.disabled=false;btn.textContent='Avísame cuando esté listo';}
+  document.getElementById('wl-modal-bg').style.display='flex';
+  try{window.stopAllPreviews&&window.stopAllPreviews();}catch(e){}
+  setTimeout(function(){var n=document.getElementById('wl-nombre');if(n)n.focus();},120);
+}
+function cerrarWaitlistModal(){
+  document.getElementById('wl-modal-bg').style.display='none';
+  _wlEvento=null;
+}
+function enviarWaitlist(e){
+  if(e&&e.preventDefault)e.preventDefault();
+  if(!_wlEvento)return false;
+  var nombre=(document.getElementById('wl-nombre').value||'').trim();
+  var email=(document.getElementById('wl-email').value||'').trim().toLowerCase();
+  var msg=document.getElementById('wl-msg');
+  var btn=document.getElementById('wl-submit');
+  var setMsg=function(cls,txt){msg.className='wl-msg '+cls;msg.textContent=txt;};
+  if(!nombre){setMsg('err','Pon tu nombre.');return false;}
+  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){setMsg('err','Email inválido.');return false;}
+  btn.disabled=true;btn.textContent='Enviando…';
+  fetch('/.netlify/functions/waitlist-subscribe',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({evento_id:_wlEvento.id,evento_nombre:_wlEvento.a,nombre:nombre,email:email})
+  })
+  .then(function(r){return r.json().catch(function(){return{ok:false};});})
+  .then(function(d){
+    if(!d||!d.ok){setMsg('err','No pudimos registrarte. Intenta de nuevo o escríbenos por WhatsApp.');btn.disabled=false;btn.textContent='Avísame cuando esté listo';return;}
+    document.getElementById('wl-form').style.display='none';
+    if(d.already){setMsg('warn','Ya estás en la lista. Te avisaremos cuando esté listo.');}
+    else{setMsg('ok','✓ Listo '+nombre.split(' ')[0]+', te avisaremos en cuanto publiquemos los precios.');}
+    try{window.trackEventClick&&window.trackEventClick(_wlEvento.id+':waitlist',_wlEvento.a);}catch(e){}
+  })
+  .catch(function(){setMsg('err','Error de conexión. Intenta de nuevo.');btn.disabled=false;btn.textContent='Avísame cuando esté listo';});
+  return false;
+}
+
 function cerrarPromoModal(){
   document.getElementById('promo-modal-bg').style.display='none';
   if(cur)sessionStorage.setItem('promo_'+cur.id,'1');
@@ -3645,7 +3728,7 @@ function abrirLineup(id,nombre){
 function cerrarLineup(){
   document.getElementById('lineup-modal').style.display='none';
 }
-document.addEventListener('keydown',function(e){if(e.key==='Escape'){cerrarMapa();cerrarLineup();cerrarModalPago();cerrarPromoModal();cerrarNfModal();}});
+document.addEventListener('keydown',function(e){if(e.key==='Escape'){cerrarMapa();cerrarLineup();cerrarModalPago();cerrarPromoModal();cerrarNfModal();cerrarWaitlistModal();}});
 
 var _lastQuincenas=[],_lastPagoQ=0;
 
@@ -4567,6 +4650,22 @@ function enviarChat(){
     <div class="nf-modal-text">Esta fecha está agotada pero viene una nueva. Únete a nuestro canal de WhatsApp — ahí anunciamos las ventas antes que en cualquier otro lugar.</div>
     <a class="nf-modal-btn" href="https://whatsapp.com/channel/0029Vb7JuO1IN9ipDaGVV92f" target="_blank" onclick="cerrarNfModal()">📲 Unirme al canal de WhatsApp</a>
     <button class="nf-modal-skip" onclick="cerrarNfModal();document.getElementById('ev-list').scrollIntoView({behavior:'smooth'})">Ver otros eventos</button>
+  </div>
+</div>
+<div class="wl-modal-bg" id="wl-modal-bg" onclick="cerrarWaitlistModal()">
+  <div class="wl-modal" onclick="event.stopPropagation()">
+    <button class="wl-modal-close" onclick="cerrarWaitlistModal()" aria-label="Cerrar">✕</button>
+    <div class="wl-brand"><span class="wl-brand-conecta">Conecta</span><span class="wl-brand-mx">MX</span></div>
+    <div class="wl-eyebrow">Próximamente</div>
+    <div class="wl-title"><em id="wl-ev-name">—</em></div>
+    <div class="wl-lead">Sé de los primeros en enterarte cuando publiquemos precios y zonas.</div>
+    <form id="wl-form" onsubmit="enviarWaitlist(event)" autocomplete="on" novalidate>
+      <div class="wl-field"><label for="wl-nombre">Nombre completo</label><input id="wl-nombre" type="text" required autocomplete="name" placeholder="Tu nombre"></div>
+      <div class="wl-field"><label for="wl-email">Email</label><input id="wl-email" type="email" required autocomplete="email" placeholder="tu@email.com"></div>
+      <button class="wl-cta" type="submit" id="wl-submit">Avísame cuando esté listo</button>
+      <div class="wl-msg" id="wl-msg"></div>
+    </form>
+    <div class="wl-fine">Solo te enviaremos un correo cuando este evento esté disponible. Sin spam.</div>
   </div>
 </div>
 <div class="pago-modal-bg" id="pago-modal-bg" onclick="cerrarModalPago()">

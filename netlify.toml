@@ -42,3 +42,8 @@
 # Recordatorios de pago de /rol — 14:00 UTC = 8:00 AM CDMX
 [functions."rol-recordatorios"]
   schedule = "0 14 * * *"
+
+# Notificaciones de lista de espera — detecta transición 'proximamente' → activo
+# y manda emails a los registrados. 14:00 UTC = 8:00 AM CDMX, mismo slot diario.
+[functions."waitlist-notify"]
+  schedule = "0 14 * * *"

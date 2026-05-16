@@ -16,6 +16,10 @@
 /demo-full   /demo-full.html   200
 /contrato    /contrato.html    200
 
+# Portal de clientes (Fase 2.1 — Supabase Auth)
+/portal      /portal.html      200
+/portal/*    /portal.html      200
+
 # Archivos especiales (Netlify los sirve directo si existen — protección extra)
 /robots.txt  /robots.txt       200
 /sitemap.xml /sitemap.xml      200

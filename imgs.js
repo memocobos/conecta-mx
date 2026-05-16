@@ -44,5 +44,12 @@ window.STATIC_IMGS={
   'arre':'imgs/arre.webp',
   'anuelaa':'imgs/anuelaa.webp',
   'vaiven':'imgs/vaiven.webp',
-  'monlaferte':'imgs/monlaferte.webp'
+  'monlaferte':'imgs/monlaferte.webp',
+  'juniorh':'imgs/juniorh.webp',
+  'badbunny':'imgs/badbunny.webp',
+  'coronacapital':'imgs/coronacapital.webp',
+  'tecatecomuna':'imgs/tecatecomuna.webp',
+  'louist':'imgs/louist.webp',
+  'flowfest':'imgs/flowfest.webp',
+  'bahidora2027':'imgs/bahidora2027.webp'
 };

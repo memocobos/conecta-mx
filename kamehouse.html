@@ -9614,6 +9614,7 @@ async function loadWaitlist() {
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         <button class="btn btn-ghost btn-sm" onclick="wlVerRegistrados('${_wlEsc(g.evento_id)}')">Ver registrados</button>
         <button class="btn btn-primary btn-sm" onclick="wlNotificar('${_wlEsc(g.evento_id)}', ${g.rows.length}, ${pendientes})">${notifLabel}</button>
+        ${['maestro_roshi','bulma'].includes(currentUser?.rol) ? `<button class="btn btn-ghost btn-sm" style="color:#ff6666;border-color:rgba(255,68,68,.3)" onclick="wlEliminarEvento('${_wlEsc(g.evento_id)}', ${g.rows.length})">🗑 Eliminar evento de la lista</button>` : ''}
       </div>
     </div>`;
   }).join('');
@@ -9688,6 +9689,34 @@ function wlExportarCSV(eventoId) {
   a.download = `waitlist-${eventoId}.csv`;
   document.body.appendChild(a); a.click();
   setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 100);
+}
+
+async function wlEliminarEvento(eventoId, total) {
+  // Defensa en profundidad: el botón ya está gated, pero un usuario podría
+  // invocar la función desde la consola — re-chequeamos el rol.
+  if (!['maestro_roshi','bulma'].includes(currentUser?.rol)) {
+    alert('No tienes permisos para eliminar eventos de la lista de espera.');
+    return;
+  }
+  const grupo = _waitlistCache.find(r => r.evento_id === eventoId);
+  const nombreEv = grupo ? grupo.evento_nombre : eventoId;
+  if (!confirm(`¿Eliminar a las ${total} personas registradas para "${nombreEv}"? Esta acción no se puede deshacer.`)) return;
+
+  try {
+    // RLS de eventos_waitlist no expone DELETE al anon key — pasamos por la
+    // Netlify Function que tiene service key.
+    const r = await fetch('/.netlify/functions/waitlist-delete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ evento_id: eventoId }),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok || !d.ok) throw new Error(d.error || ('HTTP ' + r.status));
+    alert(`Eliminados ${d.deleted ?? total} registros de "${nombreEv}".`);
+    loadWaitlist();
+  } catch (e) {
+    alert('No se pudo eliminar: ' + e.message);
+  }
 }
 
 async function wlNotificar(eventoId, totalRegs, pendientes) {

@@ -1303,6 +1303,75 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
   color:var(--ts);text-align:right;
 }
 
+/* ═══════════════════════════════════════════════
+   TOOLS BOTTOM-SHEET (móvil) — reemplaza el dropdown
+   de Herramientas que daba problemas con taps.
+═══════════════════════════════════════════════ */
+.tools-sheet{
+  position:fixed;inset:0;z-index:9998;
+  display:none;
+  background:rgba(0,0,0,.6);
+  align-items:flex-end;justify-content:center;
+  animation:tsFade .15s ease;
+}
+.tools-sheet.open{display:flex}
+@keyframes tsFade{from{opacity:0}to{opacity:1}}
+.tools-sheet-panel{
+  background:var(--bg2);
+  width:100%;max-width:560px;
+  border-top:3px solid var(--orange);
+  border-top-left-radius:14px;border-top-right-radius:14px;
+  padding:10px 0 calc(14px + env(safe-area-inset-bottom));
+  max-height:80vh;overflow-y:auto;
+  animation:tsSlide .22s cubic-bezier(.2,.85,.3,1);
+  box-shadow:0 -12px 36px rgba(0,0,0,.55);
+}
+@keyframes tsSlide{from{transform:translateY(100%)}to{transform:translateY(0)}}
+.tools-sheet-handle{
+  width:42px;height:4px;background:rgba(255,255,255,.18);
+  border-radius:2px;margin:6px auto 14px;
+}
+.tools-sheet-head{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:0 20px 12px;border-bottom:1px solid var(--border);
+}
+.tools-sheet-title{
+  font-family:'Barlow Condensed',sans-serif;font-weight:900;
+  font-size:18px;letter-spacing:.08em;text-transform:uppercase;
+  color:var(--orange);
+}
+.tools-sheet-close{
+  background:none;border:none;color:var(--text);
+  width:40px;height:40px;font-size:22px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  border-radius:8px;
+}
+.tools-sheet-close:active{background:rgba(255,255,255,.06)}
+.tools-sheet-list{display:flex;flex-direction:column;padding:6px 8px 0}
+.tools-sheet-item{
+  display:flex;align-items:center;justify-content:space-between;
+  width:100%;min-height:56px;padding:14px 16px;
+  background:none;border:none;color:var(--text);
+  font-family:'Barlow Condensed',sans-serif;
+  font-size:15px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;
+  text-align:left;cursor:pointer;border-radius:8px;
+  transition:background .12s;
+}
+.tools-sheet-item:active{background:rgba(255,107,0,.12)}
+.tools-sheet-item .ts-chevron{color:var(--ts);font-size:18px;font-weight:400}
+.tools-sheet-item.active{color:var(--orange)}
+.tools-sheet-item.active .ts-chevron{color:var(--orange)}
+
+/* En móvil ocultamos el dropdown menu nativo (lo reemplaza el sheet) */
+@media(max-width:768px){
+  .nav-dropdown-menu{display:none!important}
+  .nav-dropdown.open .nav-dropdown-menu{display:none!important}
+  /* El botón Herramientas se queda visible en el nav-items-wrapper —
+     solo cambiamos la flecha por un indicador de "abre algo más" */
+  .nav-dropdown-btn .drop-arrow{transform:rotate(-90deg)}
+  .nav-dropdown.open .drop-arrow{transform:rotate(-90deg)}
+}
+
 </style>
 </head>
 <body>
@@ -2968,6 +3037,21 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
     </div>
     <div class="modal-body" style="flex:1;padding:0;overflow:hidden">
       <iframe id="ctr-ver-iframe" src="about:blank" style="width:100%;height:100%;border:0;display:block"></iframe>
+    </div>
+  </div>
+</div>
+
+<!-- Tools bottom-sheet (móvil) — reemplaza al dropdown que no se abre por touch.
+     Vive a nivel raíz para evitar overflow:hidden del nav-items-wrapper. -->
+<div class="tools-sheet" id="tools-sheet" role="dialog" aria-modal="true" aria-labelledby="tools-sheet-title">
+  <div class="tools-sheet-panel" id="tools-sheet-panel">
+    <div class="tools-sheet-handle" aria-hidden="true"></div>
+    <div class="tools-sheet-head">
+      <span class="tools-sheet-title" id="tools-sheet-title">Herramientas</span>
+      <button type="button" class="tools-sheet-close" id="tools-sheet-close" aria-label="Cerrar">✕</button>
+    </div>
+    <div class="tools-sheet-list" id="tools-sheet-list">
+      <!-- items inyectados por openToolsSheet() a partir de los nav-dropdown-item existentes -->
     </div>
   </div>
 </div>
@@ -6255,14 +6339,86 @@ if (_inviteToken) {
 // ── DROPDOWN HERRAMIENTAS ──
 function toggleDropdown(e) {
   if (e) { e.stopPropagation(); e.preventDefault(); }
+  // En móvil (≤768px) abrimos un bottom-sheet en lugar del dropdown inline,
+  // que tenía race conditions con el outside-click handler y items muy pequeños.
+  if (window.matchMedia('(max-width: 768px)').matches) {
+    openToolsSheet();
+    return;
+  }
   const dd = document.getElementById('nav-dropdown-herramientas');
   dd.classList.toggle('open');
 }
-// Cerrar dropdown al hacer click fuera
+// Cerrar dropdown desktop al hacer click fuera (no aplica al bottom-sheet)
 document.addEventListener('click', function(e) {
   const dd = document.getElementById('nav-dropdown-herramientas');
   if (dd && !dd.contains(e.target)) dd.classList.remove('open');
 });
+
+// ── Tools bottom-sheet (móvil) ───────────────────────────────────
+// Construido al vuelo a partir de los items reales del dropdown, así
+// agregar/quitar items en un solo lugar (el HTML del dropdown) se refleja
+// automáticamente en el sheet sin duplicar markup.
+function openToolsSheet() {
+  const sheet = document.getElementById('tools-sheet');
+  const list  = document.getElementById('tools-sheet-list');
+  if (!sheet || !list) return;
+  // Repoblar cada vez por si el rol del usuario filtró visibilidad de items
+  const src = document.querySelectorAll('#nav-dropdown-herramientas .nav-dropdown-item');
+  list.innerHTML = '';
+  src.forEach(srcBtn => {
+    if (srcBtn.offsetParent === null && getComputedStyle(srcBtn).display === 'none') return;
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'tools-sheet-item' + (srcBtn.classList.contains('active') ? ' active' : '');
+    b.dataset.itemId = srcBtn.id;
+    b.innerHTML = `<span>${srcBtn.textContent.trim()}</span><span class="ts-chevron" aria-hidden="true">›</span>`;
+    b.addEventListener('click', () => {
+      closeToolsSheet();
+      // Pequeño delay para que la animación de cierre se vea y el sheet no
+      // tape la transición a la nueva página
+      setTimeout(() => srcBtn.click(), 80);
+    });
+    list.appendChild(b);
+  });
+  sheet.classList.add('open');
+  document.body.style.overflow = 'hidden';
+  cerrarNavMobile(); // por si el wrapper hamburguesa estaba abierto detrás
+}
+
+function closeToolsSheet() {
+  const sheet = document.getElementById('tools-sheet');
+  if (!sheet) return;
+  sheet.classList.remove('open');
+  document.body.style.overflow = '';
+}
+
+// Wire de los triggers del sheet (idempotente — corre solo una vez)
+(function wireToolsSheet() {
+  const sheet = document.getElementById('tools-sheet');
+  if (!sheet || sheet.dataset.wired) return;
+  sheet.dataset.wired = '1';
+  sheet.addEventListener('click', (e) => {
+    // Backdrop click (no panel interno)
+    if (e.target === sheet) closeToolsSheet();
+  });
+  const closeBtn = document.getElementById('tools-sheet-close');
+  if (closeBtn) closeBtn.addEventListener('click', closeToolsSheet);
+  // ESC cierra (útil para usuarios con teclado / orientación landscape con teclado)
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && sheet.classList.contains('open')) closeToolsSheet();
+  });
+  // Si el usuario rota a desktop con el sheet abierto, lo cerramos para
+  // evitar que quede un overlay raro encima del dropdown desktop.
+  let _toolsResizeT = null;
+  window.addEventListener('resize', () => {
+    clearTimeout(_toolsResizeT);
+    _toolsResizeT = setTimeout(() => {
+      if (!window.matchMedia('(max-width: 768px)').matches && sheet.classList.contains('open')) {
+        closeToolsSheet();
+      }
+    }, 150);
+  });
+})();
 
 // HTML del recibos embebido
 // RECIBOS_HTML → base64

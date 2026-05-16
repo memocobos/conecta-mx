@@ -1006,6 +1006,10 @@ src="https://www.facebook.com/tr?id=1685907946147007&ev=PageView&noscript=1"
     <button class="nav-back" id="nav-back" onclick="goBack()">←</button>
   </div>
 </nav>
+<button type="button" class="wiz-volver" id="wiz-volver" onclick="goBack()" aria-label="Volver al catálogo de eventos">
+  <span class="wiz-volver-arrow" aria-hidden="true">←</span>
+  <span class="wiz-volver-txt">Volver a eventos</span>
+</button>
 
 <div class="page active" id="page-catalog">
 
@@ -1388,19 +1392,27 @@ src="https://www.facebook.com/tr?id=1685907946147007&ev=PageView&noscript=1"
 .wiz-progress-step.done + .wiz-progress-sep{background:#e8ff4c}
 .wiz-hint{display:none;background:#e8ff4c;color:#000;padding:9px 16px;font-size:12px;font-weight:700;font-family:'Montserrat',sans-serif;line-height:1.4;text-align:center;position:sticky;top:104px;z-index:179;border-bottom:1px solid rgba(0,0,0,.18);box-shadow:0 4px 14px rgba(0,0,0,.45)}
 .wiz-hint.show{display:block}
+/* Botón "Volver a eventos" sticky en el detalle de evento (mobile-first) */
+.wiz-volver{display:none;position:fixed;top:0;left:0;right:0;height:48px;width:100%;background:rgba(0,0,0,.7);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border:0;border-bottom:2px solid #e8ff4c;color:#fff;font-family:'Montserrat',sans-serif;font-size:12px;font-weight:900;letter-spacing:.1em;text-transform:uppercase;align-items:center;justify-content:flex-start;gap:10px;padding:0 16px;cursor:pointer;z-index:210}
+.wiz-volver:hover{background:rgba(0,0,0,.85)}
+.wiz-volver-arrow{font-size:18px;font-weight:900;line-height:1}
 @media (max-width:640px){
+  /* Ocultar nav completo (logo + socials + cli-links) cuando el wizard está abierto */
+  body.wizard-open .nav{display:none !important}
+  /* Mostrar el botón Volver solo cuando el wizard está abierto en móvil */
+  body.wizard-open .wiz-volver{display:flex}
   /* Move the bar out of the .detail flow on mobile so it can't be width-constrained
-     by the parent. Pinned to viewport with fixed; sits right below the 56px nav. */
-  .wiz-progress{position:fixed !important;top:56px !important;left:0 !important;right:0 !important;width:100% !important;padding:10px 12px;gap:6px}
+     by the parent. Pinned to viewport con fixed; ahora va justo debajo del Volver (48px). */
+  .wiz-progress{position:fixed !important;top:48px !important;left:0 !important;right:0 !important;width:100% !important;padding:10px 12px;gap:6px}
   .wiz-progress-step .wiz-progress-lbl{display:none}
   .wiz-progress-step.active .wiz-progress-lbl{display:inline;font-size:12px}
   .wiz-progress-step.active .wiz-progress-num{width:30px;height:30px;font-size:13px}
   .wiz-progress-sep{min-width:6px}
   /* Compensate for the now out-of-flow bar so wizard content isn't shoved
-     under it once the user scrolls past the hero. */
-  .d-body{padding-top:54px}
-  .wiz-hint{position:fixed;top:106px;left:0;right:0;width:100%;padding:7px 14px;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;letter-spacing:0}
-  body.wiz-hint-on .d-body{padding-top:84px}
+     under it once the user scrolls past the hero. +48px extra por el botón Volver. */
+  .d-body{padding-top:102px}
+  .wiz-hint{position:fixed;top:98px;left:0;right:0;width:100%;padding:7px 14px;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;letter-spacing:0}
+  body.wiz-hint-on .d-body{padding-top:132px}
 }
 /* ONBOARDING MODAL */
 .onboard-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);z-index:9999;align-items:center;justify-content:center;padding:20px;overflow-y:auto}
@@ -2116,6 +2128,7 @@ function getPaquetes(ev) {
 
 
 
+var _catalogScrollY=0;
 function goBack(_skipHistory) {
   $$('page-detail').classList.remove('active');
   $$('page-catalog').classList.add('active');
@@ -2124,7 +2137,8 @@ function goBack(_skipHistory) {
   document.body.removeAttribute('data-ev');
   if(typeof setWizHint==='function')setWizHint('');
   if(typeof _tourHide==='function')_tourHide();
-  window.scrollTo(0,0);
+  // Restaurar la posición de scroll del catálogo donde estaba el evento abierto
+  window.scrollTo(0,_catalogScrollY||0);
   // Deep link: actualizar URL a / (excepto si venimos de popstate)
   if(!_skipHistory && typeof history!=='undefined' && history.pushState){
     try{
@@ -2918,6 +2932,8 @@ function showDetail(id, _skipHistory){
   // Reset wizard
   resetWizard();
 
+  // Guardar scroll del catálogo antes de abrir el detalle (skip si venimos de popstate)
+  if(!_skipHistory){_catalogScrollY=window.scrollY||window.pageYOffset||0;}
   $$('page-catalog').classList.remove('active');
   $$('page-detail').classList.add('active');
   $$('nav-back').style.display='flex';

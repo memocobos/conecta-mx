@@ -456,6 +456,9 @@ body.chat-open,body.wizard-open{overscroll-behavior:none}
 .fbtn-top10{background:rgba(255,40,59,.15);border-color:#ff283b;color:#ff283b;order:-1}
 .fbtn-top10.active{background:rgba(255,40,59,.22);border-color:#ff283b;color:#fff}
 .fbtn-top10:hover{border-color:#ff283b;color:#fff;background:rgba(255,40,59,.22)}
+.fbtn-proximos{border-color:rgba(232,255,76,.35);color:rgba(232,255,76,.85)}
+.fbtn-proximos:hover{border-color:#e8ff4c;color:#e8ff4c}
+.fbtn-proximos.active{background:#e8ff4c;border-color:#e8ff4c;color:#000}
 .fbtn-exit-top10{display:none;background:transparent;border-color:rgba(255,255,255,.2);color:rgba(255,255,255,.7);order:99}
 .fbtn-exit-top10:hover{border-color:rgba(232,255,76,.5);color:#e8ff4c}
 #filter-btns.topmode .fbtn:not(.fbtn-top10):not(.fbtn-exit-top10){display:none !important}
@@ -1039,6 +1042,16 @@ src="https://www.facebook.com/tr?id=1685907946147007&ev=PageView&noscript=1"
   <a href="/faq" class="faq-link-v2">Preguntas frecuentes <span aria-hidden="true">→</span></a>
   <a href="/kit" class="faq-link-v2">Kit Conecta <span aria-hidden="true">→</span></a>
   <div class="catalog" id="catalog-anchor">
+    <div id="proximos-banner" style="display:none;margin:12px 16px 8px;background:#e8ff4c;color:#000;border:1px solid #d4e642;padding:14px 44px 14px 16px;position:relative;font-family:Montserrat,sans-serif">
+      <div style="display:flex;align-items:flex-start;gap:10px">
+        <span style="font-size:20px;line-height:1;flex-shrink:0">🔔</span>
+        <div style="font-size:13px;line-height:1.4;font-weight:700">
+          <strong style="display:block;font-size:11px;letter-spacing:.14em;text-transform:uppercase;margin-bottom:4px;font-weight:900">Próximos Tours</strong>
+          Regístrate en la lista de espera y te avisaremos en cuanto publiquemos precios y zonas.
+        </div>
+      </div>
+      <button type="button" aria-label="Cerrar" onclick="cerrarProximosBanner()" style="position:absolute;top:8px;right:8px;background:transparent;border:0;color:#000;font-size:18px;font-weight:900;line-height:1;cursor:pointer;padding:4px 8px">✗</button>
+    </div>
     <div id="search-bar" style="padding:12px 16px 4px">
   <div style="display:flex;gap:8px;margin-bottom:10px">
     <input id="ev-search" type="text" placeholder="🔍  Buscar evento..." 
@@ -1055,6 +1068,7 @@ src="https://www.facebook.com/tr?id=1685907946147007&ev=PageView&noscript=1"
     <button class="fbtn" onclick="setFilter(this,'otras')">Otras ciudades</button>
     <button class="fbtn" onclick="setFilter(this,'disp')">Disponibles</button>
     <button class="fbtn" onclick="setFilter(this,'ult')">Últimos</button>
+    <button class="fbtn fbtn-proximos" onclick="setFilter(this,'proximos')">📅 Próximos</button>
     <button class="fbtn" onclick="setFilter(this,'pasados')">Pasados</button>
     <button class="fbtn fbtn-exit-top10" onclick="setFilter(this.parentNode.querySelector('.fbtn:nth-child(2)'),'all')">← Ver todo</button>
   </div>
@@ -2239,8 +2253,20 @@ function setFilter(btn,f){
   if(f==='top10'){_activeMonth='all';document.querySelectorAll('.mbtn').forEach(function(b){b.classList.remove('active');});var tb=document.querySelector('.mbtn:first-child');if(tb)tb.classList.add('active');}
   var fb=document.getElementById('filter-btns');
   if(fb)fb.classList.toggle('topmode', f==='top10');
+  // Si veníamos de /proximos y el usuario eligió otro filtro, restauramos URL a /
+  try{
+    var onProximos=window.location.pathname.replace(/\/$/,'')==='/proximos';
+    if(onProximos && f!=='proximos' && history.replaceState){
+      history.replaceState({},'','/');
+      cerrarProximosBanner();
+    }
+  }catch(e){}
   filterEvents();
   try{window.trackSearch&&window.trackSearch('filter:'+f);}catch(e){}
+}
+function cerrarProximosBanner(){
+  var b=document.getElementById('proximos-banner');
+  if(b)b.style.display='none';
 }
 function filterEvents(){
   var q=(document.getElementById('ev-search').value||'').toLowerCase().trim();
@@ -2283,7 +2309,7 @@ function filterEvents(){
         // Nuevos: agregado en los últimos 30 días (campo ev.added 'YYYY-MM-DD').
         var addedTs=ev.added?Date.parse(ev.added+'T00:00:00'):0;
         var isNew=!!addedTs&&(Date.now()-addedTs)<30*24*60*60*1000;
-        matchLoc=(f==='all')||(f==='mty'&&isMty)||(f==='cdmx'&&isCdmx)||(f==='otras'&&isOtras)||(f==='nuevos'&&isNew)||(f==='disp'&&ev.st!=='agotado'&&!ev.agotado)||(f==='ult'&&ev.st==='ultimos');
+        matchLoc=(f==='all')||(f==='mty'&&isMty)||(f==='cdmx'&&isCdmx)||(f==='otras'&&isOtras)||(f==='nuevos'&&isNew)||(f==='disp'&&ev.st!=='agotado'&&!ev.agotado)||(f==='ult'&&ev.st==='ultimos')||(f==='proximos'&&ev.st==='proximamente');
       }
     }
     var matchMonth=(f==='top10')||(_activeMonth==='all')||(ev.ds&&ev.ds.substring(0,7)===_activeMonth);
@@ -2737,6 +2763,36 @@ function setMonth(btn,m){
     }
   }catch(e){}
   showDetail(found.id, true); // _skipHistory: ya hicimos replaceState
+})();
+
+// Deep link: /proximos → activar filtro "Próximos", scroll al catálogo, SEO + banner
+(function(){
+  var path=window.location.pathname.replace(/\/$/,'');
+  if(path!=='/proximos')return;
+  // SEO: title + meta description dinámicos
+  try{
+    document.title='Próximos Tours · Conecta Reynosa';
+    var md=document.querySelector('meta[name="description"]');
+    if(md)md.setAttribute('content','Sé el primero en enterarte. Regístrate en la lista de espera para nuestros próximos tours a conciertos y festivales.');
+  }catch(e){}
+  function activar(){
+    var btn=document.querySelector('.fbtn-proximos');
+    if(!btn){setTimeout(activar,60);return;}
+    setFilter(btn,'proximos');
+    // setFilter podría haber borrado el banner si la URL ya cambió — re-aseguramos
+    try{
+      if(history.replaceState)history.replaceState({},'','/proximos');
+    }catch(e){}
+    var banner=document.getElementById('proximos-banner');
+    if(banner)banner.style.display='';
+    var anchor=document.getElementById('catalog-anchor');
+    if(anchor)anchor.scrollIntoView({behavior:'smooth',block:'start'});
+  }
+  if(document.readyState==='loading'){
+    document.addEventListener('DOMContentLoaded',activar);
+  } else {
+    activar();
+  }
 })();
 
 function isCDMX(ev){ return ev.v && (ev.v.toUpperCase().includes('CDMX') || ev.v.toUpperCase().includes('CIUDAD DE MEXICO')); }

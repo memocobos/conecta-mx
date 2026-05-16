@@ -2295,7 +2295,10 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
  <div class="page" id="page-waitlist">
    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px;flex-wrap:wrap">
      <h2 style="margin:0;font-family:'Zen Dots',sans-serif;font-size:22px;letter-spacing:.02em">🔔 Lista de espera</h2>
-     <button class="btn btn-ghost btn-sm" onclick="loadWaitlist()">↻ Refrescar</button>
+     <div style="display:flex;gap:8px;flex-wrap:wrap">
+       <button class="btn btn-sm" id="btn-copiar-proximos" onclick="copiarLinkProximos(this)" style="background:#e8ff4c;color:#000;font-weight:900">📋 Copiar link de próximos tours</button>
+       <button class="btn btn-ghost btn-sm" onclick="loadWaitlist()">↻ Refrescar</button>
+     </div>
    </div>
    <div id="wl-summary" style="font-size:12px;color:var(--ts);letter-spacing:.06em;text-transform:uppercase;margin-bottom:14px">Cargando…</div>
    <div id="wl-groups" style="display:grid;gap:12px"></div>
@@ -9555,6 +9558,28 @@ async function _wlSb(path) {
   });
   if (!res.ok) throw new Error(`SB ${res.status}`);
   return res.json();
+}
+
+function copiarLinkProximos(btn) {
+  const url = 'https://conectareynosa.mx/proximos';
+  const restore = () => { if (btn) { btn.textContent = '📋 Copiar link de próximos tours'; btn.disabled = false; } };
+  const ok = () => { if (btn) { btn.textContent = '✅ Copiado'; btn.disabled = true; setTimeout(restore, 2000); } };
+  const fallback = () => {
+    try {
+      const ta = document.createElement('textarea');
+      ta.value = url; ta.style.position = 'fixed'; ta.style.opacity = '0';
+      document.body.appendChild(ta); ta.select();
+      document.execCommand('copy'); document.body.removeChild(ta);
+      ok();
+    } catch (e) {
+      if (btn) { btn.textContent = '⚠️ Copia manual: ' + url; setTimeout(restore, 3500); }
+    }
+  };
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(url).then(ok).catch(fallback);
+  } else {
+    fallback();
+  }
 }
 
 async function loadWaitlist() {

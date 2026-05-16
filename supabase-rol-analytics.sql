@@ -36,6 +36,13 @@ CREATE INDEX IF NOT EXISTS idx_uso_created ON rol_eventos_uso(created_at);
 
 ALTER TABLE rol_eventos_uso ENABLE ROW LEVEL SECURITY;
 
+-- GRANTS: PostgREST chequea el grant ANTES de evaluar RLS. Sin estos,
+-- una query con anon key devuelve 401 (permission denied) aunque la
+-- policy permita acceso. Supabase no los agrega automáticamente a tablas
+-- creadas con SQL puro.
+GRANT SELECT, INSERT ON rol_eventos_uso TO anon, authenticated;
+GRANT ALL          ON rol_eventos_uso TO service_role;
+
 -- INSERT abierto: el frontend puede registrar eventos sin auth (el rate-limit
 -- vive en la Netlify Function que llamamos, no en RLS).
 DROP POLICY IF EXISTS "Public insert uso" ON rol_eventos_uso;

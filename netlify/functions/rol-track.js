@@ -10,9 +10,11 @@
 // Privacidad: NO persiste IP, email, ni nombres. Solo lo que el cliente manda
 // + user_agent + pathname.
 //
-// Variables de entorno requeridas (proyecto Kamehouse):
-//   - SUPABASE_URL_KAMEHOUSE
-//   - SUPABASE_SERVICE_KEY_KAMEHOUSE
+// Variables de entorno requeridas (proyecto Kamehouse).
+// Aceptamos varias convenciones porque el repo tiene un mosaico:
+//   URL: SUPABASE_URL_KAMEHOUSE → SUPABASE_URL
+//   KEY: SUPABASE_SERVICE_KEY_KAMEHOUSE → SUPABASE_SERVICE_KEY → SUPABASE_SERVICE_ROLE_KEY
+// Mismo patrón que chat.js, rol-recordatorios.js y otras Functions del repo.
 // =============================================================================
 
 exports.handler = async (event) => {
@@ -28,10 +30,16 @@ exports.handler = async (event) => {
     return { statusCode: 405, headers, body: JSON.stringify({ error: 'Method not allowed' }) };
   }
 
-  const SB_URL = process.env.SUPABASE_URL_KAMEHOUSE;
-  const SB_KEY = process.env.SUPABASE_SERVICE_KEY_KAMEHOUSE;
+  const SB_URL = process.env.SUPABASE_URL_KAMEHOUSE
+              || process.env.SUPABASE_URL;
+  const SB_KEY = process.env.SUPABASE_SERVICE_KEY_KAMEHOUSE
+              || process.env.SUPABASE_SERVICE_KEY
+              || process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!SB_URL || !SB_KEY) {
-    return { statusCode: 500, headers, body: JSON.stringify({ error: 'env vars no configuradas' }) };
+    return { statusCode: 500, headers, body: JSON.stringify({
+      error: 'env vars no configuradas',
+      hint: 'Define SUPABASE_URL (o SUPABASE_URL_KAMEHOUSE) y SUPABASE_SERVICE_KEY (o variantes) en Netlify.'
+    }) };
   }
 
   // ---- Parse y validación mínima ----

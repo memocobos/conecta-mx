@@ -12,8 +12,8 @@ CREATE TABLE IF NOT EXISTS eventos_waitlist (
   nombre text NOT NULL,
   email text NOT NULL,
   notificado boolean DEFAULT false,
-  notificado_at timestamp,
-  created_at timestamp DEFAULT now()
+  notificado_at timestamptz,
+  created_at timestamptz DEFAULT now()
 );
 
 CREATE INDEX IF NOT EXISTS idx_wl_evento ON eventos_waitlist(evento_id);
@@ -34,7 +34,7 @@ CREATE POLICY "Public read waitlist"   ON eventos_waitlist FOR SELECT USING (tru
 CREATE TABLE IF NOT EXISTS eventos_estado_snapshot (
   evento_id  text PRIMARY KEY,
   estado     text NOT NULL,
-  updated_at timestamp DEFAULT now()
+  updated_at timestamptz DEFAULT now()
 );
 
 ALTER TABLE eventos_estado_snapshot ENABLE ROW LEVEL SECURITY;

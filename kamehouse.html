@@ -7620,7 +7620,7 @@ function renderMTDeudas(lista, filtro) {
           <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-top:1px solid var(--border);flex-wrap:wrap;gap:8px">
             <div style="flex:1;min-width:200px">
               <div style="font-size:13px">${d.concepto}</div>
-              <div style="font-size:10px;color:var(--ts);font-family:'JetBrains Mono',monospace">${d._evento?.nombre||''} · ${new Date(d.created_at).toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric',timeZone:'America/Monterrey'})}</div>
+              <div style="font-size:10px;color:var(--ts);font-family:'JetBrains Mono',monospace">${d._evento?.nombre||''} · ${_tsToDate(d.created_at)?.toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric',timeZone:'America/Monterrey'})||'—'}</div>
             </div>
             <div style="font-family:'Zen Dots',sans-serif;font-size:14px;color:${d.pagado?'var(--green)':'var(--red)'}">${formatMXN(d.monto)}</div>
             <div style="display:flex;gap:6px">
@@ -8087,7 +8087,7 @@ async function loadMTAlertas() {
     };
     list.innerHTML = alertas.map(a => {
       const ti = tipoInfo[a.tipo] || { icon:'🔔', color:'var(--ts)', label: a.tipo };
-      const fecha = new Date(a.created_at);
+      const fecha = _tsToDate(a.created_at) || new Date();
       return `<div style="background:var(--bg2);border:1px solid var(--border);border-left:3px solid ${ti.color};border-radius:var(--radius);padding:12px 18px;margin-bottom:8px;${a.leida?'opacity:.5':''}">
         <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;flex-wrap:wrap">
           <div>
@@ -9451,7 +9451,7 @@ async function loadContratosList() {
         ? `<span style="background:rgba(61,220,132,.18);color:#3ddc84;border:1px solid rgba(61,220,132,.35);padding:3px 9px;border-radius:4px;font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;font-weight:700">✓ Firmado</span>`
         : `<span style="background:rgba(255,176,32,.15);color:#ffb020;border:1px solid rgba(255,176,32,.35);padding:3px 9px;border-radius:4px;font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;font-weight:700">⏳ Pendiente</span>`;
       const fechaEnviado = c.enviado_at
-        ? new Date(c.enviado_at).toLocaleDateString('es-MX',{day:'2-digit',month:'short',timeZone:'America/Monterrey'})
+        ? _tsToDate(c.enviado_at).toLocaleDateString('es-MX',{day:'2-digit',month:'short',timeZone:'America/Monterrey'})
         : '—';
       const tokenSafe = _escCtr(c.token);
       const nombreSafe = _escCtr(c.creador_nombre);
@@ -9651,6 +9651,19 @@ function _wlEsc(s) {
   return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 
+// Construye un Date a prueba de timestamps sin información de zona.
+// Si el ISO no termina en 'Z' ni en offset +HH:MM, se asume UTC y se sufija 'Z'
+// para que JS no lo interprete como hora local del navegador. Esto neutraliza el
+// bug clásico de columnas Postgres `timestamp` (sin time zone) que serializan
+// "2026-05-16T14:58:48.099127" sin sufijo. Si la columna está bien tipada como
+// `timestamptz`, el regex detecta el offset y no se modifica el string.
+function _tsToDate(iso) {
+  if (!iso) return null;
+  const s = String(iso);
+  const fixed = /[Zz]$|[+\-]\d{2}:?\d{2}$/.test(s) ? s : (s + 'Z');
+  return new Date(fixed);
+}
+
 function _wlFmtDate(iso) {
   if (!iso) return '—';
   try {
@@ -9658,7 +9671,7 @@ function _wlFmtDate(iso) {
       day:'2-digit', month:'short', year:'2-digit',
       hour:'2-digit', minute:'2-digit', hour12:true,
       timeZone:'America/Monterrey'
-    }).format(new Date(iso));
+    }).format(_tsToDate(iso));
   } catch { return iso; }
 }
 

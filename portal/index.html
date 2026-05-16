@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Portal · Conecta Reynosa</title>
+<meta name="robots" content="noindex, nofollow">
+<!--
+  Redirect-only file para desarrollo local con `python3 -m http.server`,
+  que no entiende la regla `/portal → /portal.html` del _redirects de Netlify.
+  En producción esta ruta nunca se sirve: Netlify procesa _redirects antes
+  que el filesystem, así que /portal y /portal/* sirven /portal.html directo.
+
+  Preservamos search + hash porque el callback de Google OAuth llega con
+  el access_token en el fragment (#access_token=...) o el código PKCE en
+  el query (?code=...). Si no se preservan, supabase-js no detecta la sesión.
+-->
+<script>
+  (function(){
+    var target = '/portal.html' + (window.location.search || '') + (window.location.hash || '');
+    window.location.replace(target);
+  })();
+</script>
+<meta http-equiv="refresh" content="0; url=/portal.html">
+<style>body{background:#000;color:#e8ff4c;font-family:monospace;padding:24px;font-size:13px}</style>
+</head>
+<body>Redirigiendo a <a href="/portal.html" style="color:#e8ff4c">/portal.html</a>…</body>
+</html>

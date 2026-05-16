@@ -1,0 +1,861 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-title" content="Portal Conecta">
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" href="/icon-192.png">
+<link rel="apple-touch-icon" href="/icon-192.png">
+<title>Portal · Conecta Reynosa</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@900&family=Montserrat:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{overflow-x:hidden;max-width:100vw}
+body{
+  font-family:'Montserrat',sans-serif;font-weight:500;
+  background:#000;color:#fff;min-height:100vh;
+  -webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;
+}
+
+:root{
+  --bg:#000;
+  --card:#0a0a0a;
+  --ink:#fff;
+  --ink-soft:rgba(255,255,255,.62);
+  --ink-mute:rgba(255,255,255,.32);
+  --yel:#e8ff4c;
+  --red:#ff283b;
+  --blue:#0000cd;
+  --green:#88ea4e;
+  --line:rgba(255,255,255,.1);
+  --line-strong:rgba(255,255,255,.18);
+  --field-bg:rgba(255,255,255,.04);
+  --shell-pad:18px;
+  --shell-max:480px;
+}
+
+/* ============================ Layout shell ============================ */
+.nav{
+  background:#000;border-bottom:4px solid var(--red);
+  display:flex;align-items:center;justify-content:space-between;
+  padding:0 16px;height:56px;position:sticky;top:0;z-index:100;
+}
+.nav .logo-box{background:var(--red);padding:6px 12px;display:flex;align-items:center}
+.nav .logo-txt{font-weight:900;font-size:14px;color:#000;letter-spacing:.04em;text-transform:uppercase}
+.nav .logo-mx{font-weight:900;font-style:italic;font-size:16px;color:#fff;margin-left:6px}
+.nav .nav-tag{
+  font-family:'Barlow Condensed',sans-serif;font-weight:900;
+  font-size:22px;letter-spacing:.04em;color:var(--yel);text-transform:uppercase;
+}
+
+main{
+  max-width:var(--shell-max);margin:0 auto;
+  padding:32px var(--shell-pad) 80px;
+  min-height:calc(100vh - 56px);
+}
+
+/* ============================ Tipografía ============================ */
+.h-display{
+  font-family:'Barlow Condensed',sans-serif;font-weight:900;
+  text-transform:uppercase;letter-spacing:.01em;line-height:.95;
+  font-size:clamp(34px,9vw,46px);color:#fff;
+}
+.h-display .accent{color:var(--yel)}
+.subtitle{
+  color:var(--ink-soft);font-size:14px;font-weight:500;margin-top:10px;line-height:1.45;
+}
+.eyebrow{
+  font-family:'JetBrains Mono',monospace;font-weight:700;font-size:10px;
+  letter-spacing:.18em;text-transform:uppercase;color:var(--yel);margin-bottom:10px;
+}
+.mono{font-family:'JetBrains Mono',monospace;font-weight:700;letter-spacing:.02em}
+
+/* ============================ Card ============================ */
+.card{
+  background:var(--card);border:1px solid var(--line);
+  border-radius:14px;padding:22px 20px;margin-top:22px;
+}
+
+/* ============================ Tabs ============================ */
+.tabs{
+  display:grid;grid-template-columns:1fr 1fr;gap:0;
+  background:var(--field-bg);border:1px solid var(--line);border-radius:10px;
+  padding:4px;margin-bottom:20px;
+}
+.tab-btn{
+  background:transparent;color:var(--ink-soft);
+  border:none;padding:12px 8px;font-family:'Montserrat',sans-serif;
+  font-weight:700;font-size:12px;letter-spacing:.08em;text-transform:uppercase;
+  cursor:pointer;border-radius:8px;transition:background .15s,color .15s;
+  min-height:44px;
+}
+.tab-btn.is-active{background:var(--yel);color:#000;font-weight:900}
+
+/* ============================ Botón Google ============================ */
+.btn-google{
+  display:flex;align-items:center;justify-content:center;gap:12px;
+  width:100%;background:#fff;color:#1f1f1f;border:none;
+  padding:0 16px;min-height:50px;border-radius:10px;
+  font-family:'Montserrat',sans-serif;font-weight:700;font-size:14px;
+  cursor:pointer;transition:transform .12s,box-shadow .12s,filter .12s;
+}
+.btn-google:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 8px 22px rgba(255,255,255,.08)}
+.btn-google:disabled{filter:grayscale(.4) brightness(.85);cursor:wait}
+.btn-google svg{width:18px;height:18px;flex-shrink:0}
+
+/* ============================ Divider ============================ */
+.divider{
+  display:flex;align-items:center;gap:12px;margin:20px 0;
+  color:var(--ink-mute);font-size:11px;letter-spacing:.12em;text-transform:uppercase;font-weight:700;
+}
+.divider::before,.divider::after{content:'';flex:1;height:1px;background:var(--line)}
+
+/* ============================ Forms ============================ */
+.form{display:flex;flex-direction:column;gap:14px}
+.field{display:flex;flex-direction:column;gap:7px}
+.field label{
+  font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--ink-soft);
+}
+.field .hint{font-size:11px;color:var(--ink-mute);font-weight:500;margin-top:-2px;line-height:1.35}
+.field input,.field select{
+  width:100%;min-height:50px;
+  background:var(--field-bg);color:#fff;
+  border:1.5px solid var(--line-strong);border-radius:10px;
+  padding:12px 14px;font-size:15px;font-family:'Montserrat',sans-serif;font-weight:600;
+  transition:border-color .15s,background .15s;
+}
+.field input::placeholder{color:var(--ink-mute);font-weight:500}
+.field input:focus,.field select:focus{outline:none;border-color:var(--yel);background:rgba(232,255,76,.04)}
+.field.is-error input,.field.is-error select{border-color:var(--red);background:rgba(255,40,59,.06)}
+.field .err{color:var(--red);font-size:11px;font-weight:700;margin-top:2px;display:none}
+.field.is-error .err{display:block}
+.field select{appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'><path fill='%23e8ff4c' d='M1 1l5 5 5-5'/></svg>");background-repeat:no-repeat;background-position:right 16px center;padding-right:38px}
+
+/* Input numérico con look mono (cliente, celular, código) */
+.field input.mono{font-family:'JetBrains Mono',monospace;font-weight:700;letter-spacing:.06em}
+
+/* ============================ Buttons ============================ */
+.btn{
+  display:flex;align-items:center;justify-content:center;gap:8px;
+  width:100%;min-height:52px;
+  border:none;border-radius:10px;cursor:pointer;
+  font-family:'Montserrat',sans-serif;font-weight:900;font-size:13px;
+  letter-spacing:.1em;text-transform:uppercase;
+  padding:0 16px;transition:transform .12s,filter .12s,background .15s,color .15s;
+}
+.btn-primary{background:var(--yel);color:#000}
+.btn-primary:hover:not(:disabled){transform:translateY(-1px);filter:brightness(1.05)}
+.btn-secondary{background:var(--field-bg);color:#fff;border:1.5px solid var(--line-strong)}
+.btn-secondary:hover:not(:disabled){background:rgba(255,255,255,.08);border-color:var(--yel);color:var(--yel)}
+.btn-danger{background:transparent;color:var(--red);border:1.5px solid var(--red)}
+.btn-danger:hover:not(:disabled){background:var(--red);color:#fff}
+.btn:disabled{opacity:.55;cursor:wait;transform:none!important}
+.btn .spinner{width:16px;height:16px;border:2px solid currentColor;border-top-color:transparent;border-radius:50%;animation:spin .8s linear infinite;display:none}
+.btn.is-loading .spinner{display:inline-block}
+.btn.is-loading .label{opacity:.6}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+.link-btn{
+  background:none;border:none;color:var(--yel);cursor:pointer;
+  font-family:'Montserrat',sans-serif;font-weight:700;font-size:12px;
+  text-decoration:underline;padding:8px 0;align-self:center;
+}
+.link-btn:hover{color:#fff}
+
+/* ============================ Alerts ============================ */
+.alert{
+  border-radius:10px;padding:12px 14px;font-size:13px;font-weight:600;line-height:1.4;
+  margin-bottom:14px;display:none;
+}
+.alert.is-visible{display:block}
+.alert-error{background:rgba(255,40,59,.12);border:1.5px solid var(--red);color:#ffd2d7}
+.alert-success{background:rgba(136,234,78,.12);border:1.5px solid var(--green);color:#d4f7c1}
+.alert-info{background:rgba(0,0,205,.18);border:1.5px solid rgba(0,0,205,.6);color:#cfd4ff}
+.alert-warn{background:rgba(232,255,76,.1);border:1.5px solid var(--yel);color:var(--yel)}
+
+/* ============================ Dashboard ============================ */
+.dash-header{
+  display:flex;flex-direction:column;gap:6px;margin-bottom:6px;
+}
+.dash-hola{
+  font-family:'Barlow Condensed',sans-serif;font-weight:900;
+  font-size:clamp(28px,7vw,38px);text-transform:uppercase;letter-spacing:.01em;line-height:1;
+}
+.dash-cliente{
+  display:inline-flex;align-items:center;gap:8px;
+  font-family:'JetBrains Mono',monospace;font-weight:700;font-size:12px;
+  color:var(--yel);letter-spacing:.1em;
+}
+.dash-cliente::before{content:'';width:6px;height:6px;border-radius:50%;background:var(--yel);box-shadow:0 0 8px var(--yel)}
+
+.dash-tiles{display:flex;flex-direction:column;gap:12px;margin-top:6px}
+.tile{
+  display:flex;align-items:center;gap:16px;
+  background:var(--field-bg);border:1px solid var(--line);
+  border-radius:12px;padding:18px 16px;
+}
+.tile-icon{
+  width:48px;height:48px;flex-shrink:0;border-radius:10px;
+  background:rgba(232,255,76,.08);border:1.5px solid rgba(232,255,76,.25);
+  display:flex;align-items:center;justify-content:center;color:var(--yel);
+}
+.tile-icon svg{width:22px;height:22px}
+.tile-body{flex:1;min-width:0}
+.tile-title{
+  font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:20px;
+  text-transform:uppercase;letter-spacing:.02em;color:#fff;line-height:1;
+}
+.tile-meta{font-size:11px;font-weight:700;letter-spacing:.14em;color:var(--ink-mute);text-transform:uppercase;margin-top:6px}
+
+.dash-actions{display:flex;flex-direction:column;gap:10px;margin-top:18px}
+
+.dash-footer{
+  margin-top:30px;text-align:center;font-size:12px;color:var(--ink-mute);line-height:1.5;
+}
+.dash-footer a{color:var(--yel);font-weight:700;text-decoration:none}
+.dash-footer a:hover{text-decoration:underline}
+
+/* ============================ Loader pantalla completa ============================ */
+.boot{
+  position:fixed;inset:0;background:#000;display:flex;align-items:center;justify-content:center;
+  flex-direction:column;gap:14px;z-index:999;
+}
+.boot .b-spin{width:42px;height:42px;border:3px solid rgba(232,255,76,.2);border-top-color:var(--yel);border-radius:50%;animation:spin .9s linear infinite}
+.boot .b-txt{font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;color:var(--ink-mute);letter-spacing:.2em;text-transform:uppercase}
+
+/* Mostrar/ocultar vistas */
+.view{display:none}
+.view.is-active{display:block}
+
+@media(max-width:380px){
+  main{padding:24px 14px 60px}
+  .card{padding:18px 16px}
+}
+</style>
+</head>
+<body>
+
+<!-- Bootstrap loader -->
+<div class="boot" id="boot">
+  <div class="b-spin"></div>
+  <div class="b-txt">Cargando portal…</div>
+</div>
+
+<nav class="nav">
+  <a href="/" style="display:flex;align-items:center;text-decoration:none">
+    <span class="logo-box">
+      <span class="logo-txt">Conecta</span>
+      <span class="logo-mx">MX</span>
+    </span>
+  </a>
+  <span class="nav-tag">Portal</span>
+</nav>
+
+<main>
+
+  <!-- ============================================================ -->
+  <!-- VISTA A — LOGIN / REGISTRO                                    -->
+  <!-- ============================================================ -->
+  <section class="view" id="view-auth" aria-labelledby="auth-title">
+    <div class="eyebrow">Acceso de clientes</div>
+    <h1 class="h-display" id="auth-title">Tu portal <span class="accent">Conecta</span></h1>
+    <p class="subtitle">Entra para ver tus tours, pagos y recibos. Si ya hiciste tu separo, usa el correo con el que te contactamos.</p>
+
+    <div class="card">
+      <button type="button" class="btn-google" id="btn-google" data-action="google">
+        <svg viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+          <path fill="#FFC107" d="M43.611 20.083H42V20H24v8h11.303c-1.649 4.657-6.08 8-11.303 8-6.627 0-12-5.373-12-12s5.373-12 12-12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 12.955 4 4 12.955 4 24s8.955 20 20 20 20-8.955 20-20c0-1.341-.138-2.65-.389-3.917z"/>
+          <path fill="#FF3D00" d="M6.306 14.691l6.571 4.819C14.655 15.108 18.961 12 24 12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 16.318 4 9.656 8.337 6.306 14.691z"/>
+          <path fill="#4CAF50" d="M24 44c5.166 0 9.86-1.977 13.409-5.192l-6.19-5.238C29.211 35.091 26.715 36 24 36c-5.202 0-9.619-3.317-11.283-7.946l-6.522 5.025C9.505 39.556 16.227 44 24 44z"/>
+          <path fill="#1976D2" d="M43.611 20.083H42V20H24v8h11.303c-.792 2.237-2.231 4.166-4.087 5.571.001-.001.002-.001.003-.002l6.19 5.238C36.971 39.205 44 34 44 24c0-1.341-.138-2.65-.389-3.917z"/>
+        </svg>
+        <span>Continuar con Google</span>
+      </button>
+
+      <div class="divider">o con tu correo</div>
+
+      <div class="tabs" role="tablist">
+        <button type="button" class="tab-btn is-active" role="tab" data-tab="login" aria-selected="true">Iniciar sesión</button>
+        <button type="button" class="tab-btn" role="tab" data-tab="signup" aria-selected="false">Crear cuenta</button>
+      </div>
+
+      <div class="alert" id="auth-alert" role="status"></div>
+
+      <!-- Login form -->
+      <form class="form" id="form-login" autocomplete="on">
+        <div class="field">
+          <label for="login-email">Correo</label>
+          <input id="login-email" name="email" type="email" inputmode="email" autocomplete="email" required placeholder="tucorreo@ejemplo.com">
+          <div class="err">Correo inválido</div>
+        </div>
+        <div class="field">
+          <label for="login-pass">Contraseña</label>
+          <input id="login-pass" name="password" type="password" autocomplete="current-password" required placeholder="••••••••" minlength="8">
+          <div class="err">La contraseña debe tener al menos 8 caracteres</div>
+        </div>
+        <button type="submit" class="btn btn-primary" data-action="login">
+          <span class="spinner"></span><span class="label">Entrar</span>
+        </button>
+        <button type="button" class="link-btn" data-action="forgot">¿Olvidaste tu contraseña?</button>
+      </form>
+
+      <!-- Signup form -->
+      <form class="form" id="form-signup" autocomplete="on" style="display:none">
+        <div class="field">
+          <label for="signup-email">Correo</label>
+          <input id="signup-email" name="email" type="email" inputmode="email" autocomplete="email" required placeholder="tucorreo@ejemplo.com">
+          <div class="err">Correo inválido</div>
+        </div>
+        <div class="field">
+          <label for="signup-pass">Contraseña</label>
+          <input id="signup-pass" name="password" type="password" autocomplete="new-password" required minlength="8" placeholder="Mínimo 8 caracteres">
+          <div class="err">La contraseña debe tener al menos 8 caracteres</div>
+        </div>
+        <div class="field">
+          <label for="signup-pass2">Confirma tu contraseña</label>
+          <input id="signup-pass2" name="password_confirm" type="password" autocomplete="new-password" required minlength="8" placeholder="Repítela">
+          <div class="err">Las contraseñas no coinciden</div>
+        </div>
+        <button type="submit" class="btn btn-primary" data-action="signup">
+          <span class="spinner"></span><span class="label">Crear cuenta</span>
+        </button>
+      </form>
+    </div>
+  </section>
+
+  <!-- ============================================================ -->
+  <!-- VISTA B — COMPLETAR PERFIL                                    -->
+  <!-- ============================================================ -->
+  <section class="view" id="view-profile" aria-labelledby="profile-title">
+    <div class="eyebrow">Paso final</div>
+    <h1 class="h-display" id="profile-title">Completa tu <span class="accent">perfil</span></h1>
+    <p class="subtitle">Solo te lo pedimos una vez. Esto nos ayuda a organizar tu viaje y mantener tu información a la mano.</p>
+
+    <div class="card">
+      <div class="alert" id="profile-alert" role="status"></div>
+
+      <form class="form" id="form-profile" autocomplete="on" novalidate>
+        <div class="field">
+          <label for="p-nombre">Nombre completo</label>
+          <input id="p-nombre" name="nombre_completo" type="text" autocomplete="name" required minlength="5" placeholder="Como aparece en tu INE">
+          <div class="err">Escribe tu nombre completo (mínimo 5 caracteres)</div>
+        </div>
+
+        <div class="field">
+          <label for="p-nacimiento">Fecha de nacimiento</label>
+          <input id="p-nacimiento" name="fecha_nacimiento" type="date" autocomplete="bday" required>
+          <div class="err">Fecha inválida</div>
+          <div class="hint" id="p-edad-aviso" style="display:none;color:var(--yel)"></div>
+        </div>
+
+        <div class="field">
+          <label for="p-celular">Celular (10 dígitos)</label>
+          <input id="p-celular" class="mono" name="celular" type="tel" inputmode="tel" autocomplete="tel-national" required placeholder="867 123 4567">
+          <div class="err">Necesito 10 dígitos</div>
+        </div>
+
+        <div class="field">
+          <label for="p-tm">Correo Ticketmaster <span style="color:var(--ink-mute);font-weight:500">(opcional)</span></label>
+          <input id="p-tm" name="correo_ticketmaster" type="email" inputmode="email" placeholder="Si es diferente a tu correo de registro">
+          <div class="err">Correo inválido</div>
+        </div>
+
+        <div class="field">
+          <label for="p-talla">Talla de playera</label>
+          <select id="p-talla" name="talla_playera" required>
+            <option value="">Elige tu talla</option>
+            <option value="XS">XS</option>
+            <option value="S">S</option>
+            <option value="M">M</option>
+            <option value="L">L</option>
+            <option value="XL">XL</option>
+            <option value="XXL">XXL</option>
+          </select>
+          <div class="err">Elige una talla</div>
+        </div>
+
+        <div class="field">
+          <label for="p-emerg-nombre">Contacto de emergencia — Nombre</label>
+          <input id="p-emerg-nombre" name="contacto_emergencia_nombre" type="text" required minlength="3" placeholder="Nombre completo">
+          <div class="err">Necesito el nombre del contacto</div>
+        </div>
+
+        <div class="field">
+          <label for="p-emerg-tel">Contacto de emergencia — Teléfono</label>
+          <input id="p-emerg-tel" class="mono" name="contacto_emergencia_telefono" type="tel" inputmode="tel" required placeholder="867 123 4567">
+          <div class="err">Necesito 10 dígitos</div>
+        </div>
+
+        <div class="field">
+          <label for="p-emerg-rel">Relación contigo <span style="color:var(--ink-mute);font-weight:500">(opcional)</span></label>
+          <input id="p-emerg-rel" name="contacto_emergencia_relacion" type="text" placeholder="mamá, pareja, hermano…">
+        </div>
+
+        <button type="submit" class="btn btn-primary" data-action="save-profile">
+          <span class="spinner"></span><span class="label">Guardar y continuar</span>
+        </button>
+        <button type="button" class="link-btn" data-action="cancel-profile" id="btn-cancel-profile" style="display:none">Cancelar</button>
+      </form>
+    </div>
+  </section>
+
+  <!-- ============================================================ -->
+  <!-- VISTA C — DASHBOARD                                           -->
+  <!-- ============================================================ -->
+  <section class="view" id="view-dashboard" aria-labelledby="dash-title">
+    <div class="dash-header">
+      <h1 class="dash-hola" id="dash-title">Hola, <span id="dash-nombre" class="accent" style="color:var(--yel)">Cliente</span></h1>
+      <span class="dash-cliente">CLIENTE <span id="dash-numero" class="mono">#0000</span></span>
+    </div>
+
+    <div class="card">
+      <div class="eyebrow" style="margin:0 0 14px">Tu cuenta</div>
+      <div class="dash-tiles">
+
+        <div class="tile">
+          <div class="tile-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v4"/><path d="M16 2v4"/><rect x="3" y="6" width="18" height="15" rx="2"/><path d="M3 11h18"/></svg>
+          </div>
+          <div class="tile-body">
+            <div class="tile-title">Tus tours</div>
+            <div class="tile-meta">Próximamente</div>
+          </div>
+        </div>
+
+        <div class="tile">
+          <div class="tile-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M2 10h20"/><path d="M6 14h4"/></svg>
+          </div>
+          <div class="tile-body">
+            <div class="tile-title">Plan de pagos</div>
+            <div class="tile-meta">Próximamente</div>
+          </div>
+        </div>
+
+        <div class="tile">
+          <div class="tile-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M8 13h8"/><path d="M8 17h5"/></svg>
+          </div>
+          <div class="tile-body">
+            <div class="tile-title">Recibos</div>
+            <div class="tile-meta">Próximamente</div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <div class="dash-actions">
+      <button type="button" class="btn btn-secondary" data-action="edit-profile">Editar mi perfil</button>
+      <button type="button" class="btn btn-danger" data-action="logout">Cerrar sesión</button>
+    </div>
+
+    <div class="dash-footer">
+      ¿Tienes un plan de pagos anterior?<br>
+      <a href="/rol">Ver mi rol →</a>
+    </div>
+  </section>
+
+</main>
+
+<!-- Credenciales del proyecto Supabase del portal (anon key es segura por RLS) -->
+<script>
+  window.PORTAL_SUPABASE_URL = 'https://muvvrstnkxsxfpkhbntq.supabase.co';
+  window.PORTAL_SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im11dnZyc3Rua3hzeGZwa2hibnRxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg5NDc1MzQsImV4cCI6MjA5NDUyMzUzNH0.vtnJzC9zipujgZhbGEwttFpOv9kL03enf4ZIRkXB6zE';
+</script>
+
+<script type="module">
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+
+const SB_URL = window.PORTAL_SUPABASE_URL;
+const SB_ANON = window.PORTAL_SUPABASE_ANON_KEY;
+
+if (!SB_URL || SB_ANON === 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im11dnZyc3Rua3hzeGZwa2hibnRxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg5NDc1MzQsImV4cCI6MjA5NDUyMzUzNH0.vtnJzC9zipujgZhbGEwttFpOv9kL03enf4ZIRkXB6zE') {
+  console.warn('[portal] Falta pegar la anon key de Supabase en portal.html');
+}
+
+const supabase = createClient(SB_URL, SB_ANON, {
+  auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
+});
+
+// =====================================================================
+// Helpers DOM
+// =====================================================================
+const $  = (sel, root=document) => root.querySelector(sel);
+const $$ = (sel, root=document) => Array.from(root.querySelectorAll(sel));
+
+function showView(name){
+  $$('.view').forEach(v => v.classList.remove('is-active'));
+  const v = document.getElementById('view-' + name);
+  if (v) v.classList.add('is-active');
+  $('#boot').style.display = 'none';
+  window.scrollTo({ top: 0, behavior: 'instant' });
+}
+
+function setLoading(btn, on){
+  if (!btn) return;
+  btn.classList.toggle('is-loading', !!on);
+  btn.disabled = !!on;
+}
+
+function showAlert(el, type, msg){
+  if (!el) return;
+  el.className = 'alert alert-' + type + ' is-visible';
+  el.textContent = msg;
+}
+function hideAlert(el){
+  if (!el) return;
+  el.classList.remove('is-visible');
+  el.textContent = '';
+}
+
+// Mapeo de errores de Supabase → español amable
+function traducirError(err){
+  if (!err) return 'Algo salió mal. Intenta de nuevo.';
+  const m = (err.message || err.toString() || '').toLowerCase();
+  if (m.includes('invalid login credentials')) return 'Correo o contraseña incorrectos';
+  if (m.includes('email not confirmed'))       return 'Confirma tu correo antes de entrar';
+  if (m.includes('password should be at least')) return 'La contraseña debe tener al menos 8 caracteres';
+  if (m.includes('user already registered'))   return 'Ese correo ya tiene cuenta. Inicia sesión.';
+  if (m.includes('over_email_send_rate_limit') || m.includes('email rate limit')) return 'Demasiados correos enviados. Espera unos minutos.';
+  if (m.includes('failed to fetch') || m.includes('network')) return 'Sin conexión. Revisa tu internet.';
+  if (m.includes('unable to validate email address')) return 'El correo no es válido';
+  return err.message || 'Algo salió mal. Intenta de nuevo.';
+}
+
+// =====================================================================
+// Vista A — Tabs login / signup
+// =====================================================================
+$$('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const tab = btn.dataset.tab;
+    $$('.tab-btn').forEach(b => {
+      b.classList.toggle('is-active', b === btn);
+      b.setAttribute('aria-selected', b === btn ? 'true' : 'false');
+    });
+    $('#form-login').style.display  = tab === 'login'  ? 'flex' : 'none';
+    $('#form-signup').style.display = tab === 'signup' ? 'flex' : 'none';
+    hideAlert($('#auth-alert'));
+  });
+});
+
+// Login email/password
+$('#form-login').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  hideAlert($('#auth-alert'));
+  const email = $('#login-email').value.trim().toLowerCase();
+  const password = $('#login-pass').value;
+  const btn = e.target.querySelector('[data-action="login"]');
+  setLoading(btn, true);
+  const { error } = await supabase.auth.signInWithPassword({ email, password });
+  setLoading(btn, false);
+  if (error){
+    showAlert($('#auth-alert'), 'error', traducirError(error));
+    return;
+  }
+  // onAuthStateChange se encarga de cambiar vista
+});
+
+// Signup
+$('#form-signup').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  hideAlert($('#auth-alert'));
+  const email = $('#signup-email').value.trim().toLowerCase();
+  const pass1 = $('#signup-pass').value;
+  const pass2 = $('#signup-pass2').value;
+  if (pass1.length < 8){
+    showAlert($('#auth-alert'), 'error', 'La contraseña debe tener al menos 8 caracteres');
+    return;
+  }
+  if (pass1 !== pass2){
+    showAlert($('#auth-alert'), 'error', 'Las contraseñas no coinciden');
+    return;
+  }
+  const btn = e.target.querySelector('[data-action="signup"]');
+  setLoading(btn, true);
+  const { data, error } = await supabase.auth.signUp({
+    email, password: pass1,
+    options: { emailRedirectTo: window.location.origin + '/portal' }
+  });
+  setLoading(btn, false);
+  if (error){
+    showAlert($('#auth-alert'), 'error', traducirError(error));
+    return;
+  }
+  // Si la confirmación de email está activada, no hay sesión activa todavía.
+  if (!data.session){
+    showAlert($('#auth-alert'), 'info', 'Te mandamos un correo a ' + email + '. Confirma tu cuenta para entrar.');
+    $('#form-signup').reset();
+  }
+  // Si Supabase tiene "Auto Confirm" activado, onAuthStateChange dispara la transición.
+});
+
+// Login con Google
+$('#btn-google').addEventListener('click', async () => {
+  hideAlert($('#auth-alert'));
+  const btn = $('#btn-google');
+  btn.disabled = true;
+  const { error } = await supabase.auth.signInWithOAuth({
+    provider: 'google',
+    options: { redirectTo: window.location.origin + '/portal' }
+  });
+  if (error){
+    btn.disabled = false;
+    showAlert($('#auth-alert'), 'error', traducirError(error));
+  }
+});
+
+// Olvidé mi contraseña
+document.querySelector('[data-action="forgot"]').addEventListener('click', async () => {
+  const email = $('#login-email').value.trim().toLowerCase();
+  hideAlert($('#auth-alert'));
+  if (!email){
+    showAlert($('#auth-alert'), 'warn', 'Escribe tu correo arriba y vuelve a darle clic.');
+    $('#login-email').focus();
+    return;
+  }
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: window.location.origin + '/portal'
+  });
+  if (error){
+    showAlert($('#auth-alert'), 'error', traducirError(error));
+  } else {
+    showAlert($('#auth-alert'), 'success', 'Listo. Te mandamos un correo a ' + email + ' con el link para crear una nueva contraseña.');
+  }
+});
+
+// =====================================================================
+// Vista B — Perfil
+// =====================================================================
+let perfilExistente = null;
+
+function calcularEdad(fechaIsoStr){
+  if (!fechaIsoStr) return null;
+  const fn = new Date(fechaIsoStr);
+  if (isNaN(fn)) return null;
+  const hoy = new Date();
+  let edad = hoy.getFullYear() - fn.getFullYear();
+  const m = hoy.getMonth() - fn.getMonth();
+  if (m < 0 || (m === 0 && hoy.getDate() < fn.getDate())) edad--;
+  return edad;
+}
+
+$('#p-nacimiento').addEventListener('change', (e) => {
+  const edad = calcularEdad(e.target.value);
+  const aviso = $('#p-edad-aviso');
+  if (edad !== null && edad < 18){
+    aviso.style.display = 'block';
+    aviso.textContent = 'Si la persona que viaja es menor de edad, asegúrate de que un adulto responsable también esté registrado.';
+  } else {
+    aviso.style.display = 'none';
+    aviso.textContent = '';
+  }
+});
+
+function setFieldError(fieldEl, msg){
+  fieldEl.classList.add('is-error');
+  if (msg){
+    const err = fieldEl.querySelector('.err');
+    if (err) err.textContent = msg;
+  }
+}
+function clearFieldErrors(form){
+  $$('.field.is-error', form).forEach(f => f.classList.remove('is-error'));
+}
+
+function soloDigitos(str){ return (str || '').replace(/\D+/g, ''); }
+
+function validarPerfil(){
+  const form = $('#form-profile');
+  clearFieldErrors(form);
+  let ok = true;
+
+  const nombre = $('#p-nombre').value.trim();
+  if (nombre.length < 5){ setFieldError($('#p-nombre').closest('.field')); ok = false; }
+
+  const fn = $('#p-nacimiento').value;
+  if (!fn){ setFieldError($('#p-nacimiento').closest('.field')); ok = false; }
+
+  const cel = soloDigitos($('#p-celular').value);
+  if (cel.length !== 10){ setFieldError($('#p-celular').closest('.field')); ok = false; }
+
+  const tm = $('#p-tm').value.trim();
+  if (tm && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(tm)){
+    setFieldError($('#p-tm').closest('.field')); ok = false;
+  }
+
+  const talla = $('#p-talla').value;
+  if (!talla){ setFieldError($('#p-talla').closest('.field')); ok = false; }
+
+  const en = $('#p-emerg-nombre').value.trim();
+  if (en.length < 3){ setFieldError($('#p-emerg-nombre').closest('.field')); ok = false; }
+
+  const et = soloDigitos($('#p-emerg-tel').value);
+  if (et.length !== 10){ setFieldError($('#p-emerg-tel').closest('.field')); ok = false; }
+
+  return ok;
+}
+
+function recolectarPerfil(user){
+  return {
+    auth_user_id: user.id,
+    correo: (user.email || '').toLowerCase(),
+    nombre_completo: $('#p-nombre').value.trim(),
+    fecha_nacimiento: $('#p-nacimiento').value,
+    celular: soloDigitos($('#p-celular').value),
+    correo_ticketmaster: $('#p-tm').value.trim().toLowerCase() || null,
+    talla_playera: $('#p-talla').value,
+    contacto_emergencia_nombre: $('#p-emerg-nombre').value.trim(),
+    contacto_emergencia_telefono: soloDigitos($('#p-emerg-tel').value),
+    contacto_emergencia_relacion: $('#p-emerg-rel').value.trim() || null,
+    ultima_actividad: new Date().toISOString()
+  };
+}
+
+function prellenarPerfil(c){
+  if (!c) return;
+  $('#p-nombre').value       = c.nombre_completo || '';
+  $('#p-nacimiento').value   = c.fecha_nacimiento || '';
+  $('#p-celular').value      = c.celular || '';
+  $('#p-tm').value           = c.correo_ticketmaster || '';
+  $('#p-talla').value        = c.talla_playera || '';
+  $('#p-emerg-nombre').value = c.contacto_emergencia_nombre || '';
+  $('#p-emerg-tel').value    = c.contacto_emergencia_telefono || '';
+  $('#p-emerg-rel').value    = c.contacto_emergencia_relacion || '';
+  // Disparar aviso de edad si corresponde
+  $('#p-nacimiento').dispatchEvent(new Event('change'));
+}
+
+$('#form-profile').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  hideAlert($('#profile-alert'));
+  if (!validarPerfil()){
+    showAlert($('#profile-alert'), 'error', 'Revisa los campos marcados en rojo.');
+    return;
+  }
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user){
+    showAlert($('#profile-alert'), 'error', 'Tu sesión expiró. Vuelve a iniciar sesión.');
+    return;
+  }
+  const btn = e.target.querySelector('[data-action="save-profile"]');
+  setLoading(btn, true);
+  const payload = recolectarPerfil(user);
+
+  let resp;
+  if (perfilExistente){
+    // No mando campos inmutables — los protege el trigger pero por higiene
+    const { correo, auth_user_id, ...patch } = payload; // eslint-disable-line no-unused-vars
+    resp = await supabase.from('clientes')
+      .update(patch)
+      .eq('auth_user_id', user.id)
+      .select()
+      .single();
+  } else {
+    resp = await supabase.from('clientes')
+      .insert(payload)
+      .select()
+      .single();
+  }
+  setLoading(btn, false);
+
+  if (resp.error){
+    showAlert($('#profile-alert'), 'error', traducirError(resp.error));
+    return;
+  }
+  perfilExistente = resp.data;
+  renderDashboard(perfilExistente);
+  showView('dashboard');
+});
+
+$('#btn-cancel-profile').addEventListener('click', () => {
+  if (!perfilExistente) return;
+  prellenarPerfil(perfilExistente);
+  hideAlert($('#profile-alert'));
+  renderDashboard(perfilExistente);
+  showView('dashboard');
+});
+
+// =====================================================================
+// Vista C — Dashboard
+// =====================================================================
+function renderDashboard(c){
+  const primerNombre = (c.nombre_completo || 'Cliente').split(' ')[0];
+  $('#dash-nombre').textContent = primerNombre;
+  $('#dash-numero').textContent = '#' + (c.numero_cliente || '0000');
+}
+
+document.querySelector('[data-action="edit-profile"]').addEventListener('click', () => {
+  if (perfilExistente) prellenarPerfil(perfilExistente);
+  $('#btn-cancel-profile').style.display = perfilExistente ? 'inline-flex' : 'none';
+  hideAlert($('#profile-alert'));
+  showView('profile');
+});
+
+document.querySelector('[data-action="logout"]').addEventListener('click', async () => {
+  await supabase.auth.signOut();
+  perfilExistente = null;
+  // onAuthStateChange dispara la vista A
+});
+
+// =====================================================================
+// Routing inicial + onAuthStateChange
+// =====================================================================
+async function cargarClienteYRutear(session){
+  if (!session){
+    showView('auth');
+    return;
+  }
+  const { data, error } = await supabase
+    .from('clientes')
+    .select('*')
+    .eq('auth_user_id', session.user.id)
+    .maybeSingle();
+
+  if (error){
+    // PGRST116 = no rows — manejado por maybeSingle()
+    console.error('[portal] error cargando perfil', error);
+    showAlert($('#auth-alert'), 'error', traducirError(error));
+    showView('auth');
+    return;
+  }
+
+  if (!data){
+    perfilExistente = null;
+    $('#btn-cancel-profile').style.display = 'none';
+    showView('profile');
+    return;
+  }
+
+  perfilExistente = data;
+  renderDashboard(data);
+  // Tocar ultima_actividad sin bloquear UI
+  supabase.from('clientes')
+    .update({ ultima_actividad: new Date().toISOString() })
+    .eq('auth_user_id', session.user.id)
+    .then(() => {}, () => {});
+  showView('dashboard');
+}
+
+(async function init(){
+  const { data: { session } } = await supabase.auth.getSession();
+  await cargarClienteYRutear(session);
+})();
+
+supabase.auth.onAuthStateChange((event, session) => {
+  // SIGNED_IN, SIGNED_OUT, TOKEN_REFRESHED, USER_UPDATED, PASSWORD_RECOVERY
+  cargarClienteYRutear(session);
+});
+</script>
+
+</body>
+</html>

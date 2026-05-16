@@ -7620,7 +7620,7 @@ function renderMTDeudas(lista, filtro) {
           <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-top:1px solid var(--border);flex-wrap:wrap;gap:8px">
             <div style="flex:1;min-width:200px">
               <div style="font-size:13px">${d.concepto}</div>
-              <div style="font-size:10px;color:var(--ts);font-family:'JetBrains Mono',monospace">${d._evento?.nombre||''} · ${new Date(d.created_at).toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric'})}</div>
+              <div style="font-size:10px;color:var(--ts);font-family:'JetBrains Mono',monospace">${d._evento?.nombre||''} · ${new Date(d.created_at).toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric',timeZone:'America/Monterrey'})}</div>
             </div>
             <div style="font-family:'Zen Dots',sans-serif;font-size:14px;color:${d.pagado?'var(--green)':'var(--red)'}">${formatMXN(d.monto)}</div>
             <div style="display:flex;gap:6px">
@@ -8093,7 +8093,7 @@ async function loadMTAlertas() {
           <div>
             <div style="font-size:13px;font-weight:600">${ti.icon} ${a.mensaje||ti.label}</div>
             <div style="font-size:10px;font-family:'JetBrains Mono',monospace;color:var(--ts);margin-top:3px">
-              ${fecha.toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric'})} ${fecha.toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'})}
+              ${fecha.toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric',timeZone:'America/Monterrey'})} ${fecha.toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit',hour12:true,timeZone:'America/Monterrey'})}
             </div>
           </div>
           ${!a.leida ? `<button class="btn btn-ghost btn-sm" onclick="marcarAlertaLeida('${a.id}')" style="font-size:10px">✓ Leída</button>` : ''}
@@ -9450,7 +9450,9 @@ async function loadContratosList() {
       const badge = firmado
         ? `<span style="background:rgba(61,220,132,.18);color:#3ddc84;border:1px solid rgba(61,220,132,.35);padding:3px 9px;border-radius:4px;font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;font-weight:700">✓ Firmado</span>`
         : `<span style="background:rgba(255,176,32,.15);color:#ffb020;border:1px solid rgba(255,176,32,.35);padding:3px 9px;border-radius:4px;font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;font-weight:700">⏳ Pendiente</span>`;
-      const fechaEnviado = _fmtFechaCortaCtr((c.enviado_at || '').slice(0,10));
+      const fechaEnviado = c.enviado_at
+        ? new Date(c.enviado_at).toLocaleDateString('es-MX',{day:'2-digit',month:'short',timeZone:'America/Monterrey'})
+        : '—';
       const tokenSafe = _escCtr(c.token);
       const nombreSafe = _escCtr(c.creador_nombre);
       const acciones = firmado
@@ -9652,8 +9654,11 @@ function _wlEsc(s) {
 function _wlFmtDate(iso) {
   if (!iso) return '—';
   try {
-    const d = new Date(iso);
-    return d.toLocaleDateString('es-MX', { day:'2-digit', month:'short', year:'2-digit' }) + ' ' + d.toLocaleTimeString('es-MX', { hour:'2-digit', minute:'2-digit' });
+    return new Intl.DateTimeFormat('es-MX', {
+      day:'2-digit', month:'short', year:'2-digit',
+      hour:'2-digit', minute:'2-digit', hour12:true,
+      timeZone:'America/Monterrey'
+    }).format(new Date(iso));
   } catch { return iso; }
 }
 

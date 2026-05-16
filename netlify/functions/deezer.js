@@ -1,6 +1,7 @@
 // Deezer proxy.
 // Default:        /.netlify/functions/deezer?q=<artista>              → search artist (fotos)
 // Track preview:  /.netlify/functions/deezer?q=<artista>&type=track   → {preview, title, artist}
+// Track by id:    /.netlify/functions/deezer?id=<track_id>            → {preview, title, artist}
 
 function cleanQuery(raw) {
   return String(raw || '')
@@ -15,8 +16,34 @@ function cleanQuery(raw) {
 exports.handler = async function(event) {
   const qs = event.queryStringParameters || {};
   const q = qs.q;
+  const trackId = qs.id;
+
+  // === Track by id mode (exact track, no search) ===
+  if (trackId && /^\d+$/.test(trackId)) {
+    try {
+      const url = `https://api.deezer.com/track/${trackId}`;
+      const res = await fetch(url);
+      if (!res.ok) {
+        return { statusCode: res.status, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ error: 'Deezer track fetch failed' }) };
+      }
+      const t = await res.json();
+      return {
+        statusCode: 200,
+        headers: { 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=86400' },
+        body: JSON.stringify({
+          preview: t.preview || null,
+          preview_url: t.preview || null,
+          title: t.title,
+          artist: t.artist && t.artist.name
+        })
+      };
+    } catch (err) {
+      return { statusCode: 502, body: JSON.stringify({ error: 'Failed to reach Deezer API', details: err.message }) };
+    }
+  }
+
   if (!q) {
-    return { statusCode: 400, body: JSON.stringify({ error: 'Missing q parameter' }) };
+    return { statusCode: 400, body: JSON.stringify({ error: 'Missing q or id parameter' }) };
   }
 
   const type = (qs.type || '').toLowerCase();

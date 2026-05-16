@@ -13,6 +13,16 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700;800;900&family=Montserrat:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" defer></script>
+
+<!-- Google Analytics 4 (mismo property que index.html) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-7JKGFQQQ7W"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', 'G-7JKGFQQQ7W', { send_page_view: true });
+</script>
+
 <style>
 :root{
   --bg:#000; --ink:#fff;
@@ -1485,6 +1495,77 @@ window.MAPAS = window.MAPAS || {};
 window.LINEUPS = window.LINEUPS || {};
 var EV=[], BANCO_DEFAULT={}, BANCO_HEY={}, HOTEL_STD=[], HOTEL_CDM=[], HOTEL_MTY=[], MESES={}, WA='528119771072', PROMOS={};
 
+// ── Analytics anónimo de uso de /rol ─────────
+// session_id vive en sessionStorage (se borra al cerrar el navegador).
+// NUNCA enviamos email, nombre, comprobante ni IP — solo el flujo del wizard.
+// Si el endpoint o GA fallan, NO bloqueamos al usuario (try/catch silencioso).
+function _rolSessionId(){
+  try {
+    var k = 'rol-session-id';
+    var s = sessionStorage.getItem(k);
+    if(!s){
+      s = 'sx-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2,10);
+      sessionStorage.setItem(k, s);
+    }
+    return s;
+  } catch(e){
+    // Safari incognito → sessionStorage tira. Fallback a sesión en memoria.
+    window._rolSidMem = window._rolSidMem || ('sx-mem-' + Date.now().toString(36));
+    return window._rolSidMem;
+  }
+}
+function trackRolEvent(accion, datos){
+  datos = datos || {};
+  // 1) Backend (Supabase via Netlify Function)
+  try {
+    var payload = {
+      session_id:    _rolSessionId(),
+      accion:        accion,
+      pathname:      location.pathname,
+      evento_id:     datos.evento_id || (state && state.ev && state.ev.id) || null,
+      evento_nombre: datos.evento_nombre || (state && state.ev && state.ev.a) || null,
+      paquete:       datos.paquete || (state && state.pkg) || null,
+      zona:          datos.zona || (state && state.zona && state.zona.n) || null,
+      precio_zona:   datos.precio_zona != null ? datos.precio_zona : (state && state.zona && state.zona.p) || null,
+      habitacion:    datos.habitacion || (state && state.hab && state.hab.n) || null,
+      transporte:    datos.transporte || (state && state.transporte && state.transporte.n) || null,
+      precio_total:  datos.precio_total != null ? datos.precio_total : (state && state.plan && state.plan.perP) || null,
+      tipo_compra:   datos.tipo_compra || (state && state.buyType) || null
+    };
+    if(navigator.sendBeacon){
+      var blob = new Blob([JSON.stringify(payload)], {type:'application/json'});
+      navigator.sendBeacon('/.netlify/functions/rol-track', blob);
+    } else {
+      fetch('/.netlify/functions/rol-track', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify(payload),
+        keepalive: true
+      }).catch(function(){});
+    }
+  } catch(e){ /* tracking nunca rompe el flujo */ }
+
+  // 2) GA4 (defensivo — funciona aunque el script no cargó)
+  try {
+    if(typeof gtag !== 'undefined'){
+      gtag('event', accion, {
+        event_category: 'rol',
+        event_label: datos.evento_nombre || (state && state.ev && state.ev.a) || '',
+        value: Math.round(datos.precio_total || (state && state.plan && state.plan.perP) || 0)
+      });
+    }
+  } catch(e){}
+}
+
+// Dispara la primera visita lo antes posible. Si la página viene de un
+// link compartido (?u=memo&tours=...) lo distinguimos por el query.
+(function(){
+  try {
+    var src = (location.search && location.search.indexOf('u=') >= 0) ? 'shared' : 'direct';
+    trackRolEvent('rol_visita', { tipo_compra: src });
+  } catch(e){}
+})();
+
 // Standard hotel options (fallback)
 // Fallback de último recurso — valores legacy ya per-persona. Incluye pp para evitar fallback a hab.e
 // (que para HOTEL_MTY/CDM sería el costo TOTAL del cuarto y daría números inflados).
@@ -1754,6 +1835,7 @@ function showMultifecha(){
 // ── Select event ─────────────────────────────
 function selectEvent(id){
   state.ev = EV.find(function(e){return e.id===id;}) || null;
+  if(state.ev) trackRolEvent('rol_evento_seleccionado', { evento_id: state.ev.id, evento_nombre: state.ev.a });
   state.fi=null; state.pkg=null; state.zona=null; state.hab=null; state.transporte=null;
   state.precio=null; state.sepMonto=null; state.sepTouched=false;
   state.codigo='';
@@ -1783,9 +1865,19 @@ function selectEvent(id){
 }
 
 // ── Search input ─────────────────────────────
+var _searchTrackTimer = null;
 document.getElementById('q').addEventListener('input', function(){
   renderEvList(this.value);
   document.getElementById('q-clear').classList.toggle('on', !!this.value);
+  // Track con debounce de 800ms: solo cuando el cliente termina de escribir,
+  // para no mandar un evento por cada tecla.
+  var val = this.value.trim();
+  clearTimeout(_searchTrackTimer);
+  if(val.length >= 2){
+    _searchTrackTimer = setTimeout(function(){
+      trackRolEvent('rol_evento_buscado', { evento_nombre: val });
+    }, 800);
+  }
 });
 document.getElementById('q-clear').addEventListener('click', function(){
   var q = document.getElementById('q'); q.value=''; q.focus();
@@ -1823,6 +1915,7 @@ document.querySelectorAll('.pkg').forEach(function(btn){
     document.querySelectorAll('.pkg').forEach(function(b){b.classList.remove('sel');});
     btn.classList.add('sel');
     state.pkg=btn.dataset.p; state.zona=null; state.hab=null; state.transporte=null;
+    trackRolEvent('rol_paquete_elegido', { paquete: state.pkg });
     state.precio=null; state.sepMonto=null; state.sepTouched=false;
     document.getElementById('precio-wrap').style.display='none';
     document.getElementById('sep-monto-wrap').style.display='none';
@@ -1895,6 +1988,7 @@ document.getElementById('zona-select').addEventListener('change', function(){
   } else if(v!==''){
     state.zona = getZonaList()[parseInt(v,10)];
   } else state.zona=null;
+  if(state.zona) trackRolEvent('rol_zona_elegida', { zona: state.zona.n, precio_zona: state.zona.p });
 
   var pwrap=document.getElementById('precio-wrap');
   var pin=document.getElementById('zona-precio');
@@ -2152,6 +2246,7 @@ function populateHabs(){
       document.querySelectorAll('.hab').forEach(function(x){x.classList.remove('sel');});
       b.classList.add('sel');
       state.hab=h;
+      trackRolEvent('rol_habitacion_elegida', { habitacion: h.n });
       recomputeDefaultSepMonto();
       checkReady();
       // Si ya existe un plan generado, refrescar total/progreso/estado en vivo
@@ -2221,6 +2316,7 @@ function populateTransporte(){
       document.querySelectorAll('.transp-btn').forEach(function(x){x.classList.remove('sel');});
       b.classList.add('sel');
       state.transporte = {k:o.k, n:o.n, cost: o.cost||0};
+      trackRolEvent('rol_transporte_elegido', { transporte: o.n });
       if(o.editable){
         edit.style.display = 'block';
         editIn.value = o.cost || '';
@@ -2421,6 +2517,8 @@ function calculate(skipSave){
   renderPlan();
   setStep(5);
   if(!skipSave) saveCurrentTour();
+  // Acción más importante del funnel: el cliente terminó el wizard y vio su plan.
+  trackRolEvent('rol_plan_generado', { precio_total: state.plan && state.plan.perP });
   showView('plan');
 }
 
@@ -2558,7 +2656,8 @@ function togglePaid(k){
   var paid=loadPaid();
   var paidAt=loadPaidAt();
   var idx=paid.indexOf(k);
-  if(idx>=0){
+  var wasMarcado = idx>=0;
+  if(wasMarcado){
     // Desmarcar
     paid.splice(idx,1);
     delete paidAt[k];
@@ -2577,6 +2676,8 @@ function togglePaid(k){
   }
   savePaid(paid);
   savePaidAt(paidAt);
+  // Solo trackear cuando se MARCA (no cuando se desmarca, eso es corrección)
+  if(!wasMarcado) trackRolEvent('rol_pago_marcado', { tipo_compra: k });
   renderPlan();
 }
 
@@ -2691,6 +2792,7 @@ function applyUrlParams(){
 
 document.getElementById('btn-png').addEventListener('click', async function(){
   if(typeof html2canvas==='undefined'){alert('Espera unos segundos a que cargue la librería de imágenes.');return;}
+  trackRolEvent('rol_png_descargado', {});
   var btn=this; var orig=btn.textContent;
   btn.textContent='Generando…'; btn.disabled=true;
   try{
@@ -3256,6 +3358,8 @@ function abrirPickerArchivo(k){
       comps[k] = {data:dataUrl, type:file.type, name:file.name, at:new Date().toISOString()};
       saveComps(comps);
       toast('Comprobante guardado ✓');
+      // NUNCA mandamos el archivo, solo el hecho de que se subió uno.
+      trackRolEvent('rol_comprobante_subido', { tipo_compra: k });
       renderPlan();
     }catch(e){
       console.error(e);
@@ -3361,6 +3465,7 @@ function shareUrlCurrent(){
 }
 document.getElementById('share-copy').addEventListener('click', function(){
   var url = shareUrlCurrent();
+  trackRolEvent('rol_compartido', { tipo_compra: 'copy' });
   if(navigator.clipboard){
     navigator.clipboard.writeText(url).then(function(){
       toast('Link copiado ✓');
@@ -3372,12 +3477,14 @@ document.getElementById('share-copy').addEventListener('click', function(){
 });
 document.getElementById('share-wa').addEventListener('click', function(){
   var url = shareUrlCurrent();
+  trackRolEvent('rol_compartido', { tipo_compra: 'whatsapp' });
   var msg = 'Hola! Te comparto el plan de pagos del viaje Conecta. Aquí puedes ver cuándo son los pagos:\n\n'+url;
   window.open('https://wa.me/?text='+encodeURIComponent(msg), '_blank');
   document.getElementById('share-modal').classList.remove('show');
 });
 document.getElementById('share-email').addEventListener('click', function(){
   var url = shareUrlCurrent();
+  trackRolEvent('rol_compartido', { tipo_compra: 'email' });
   var subj = 'Plan de pagos Conecta — '+(state.ev?state.ev.a:'');
   var body = 'Hola!\n\nTe comparto el plan de pagos del viaje. Aquí puedes ver cuándo son los pagos:\n\n'+url+'\n\n— '+(state.user||'');
   window.location.href = 'mailto:?subject='+encodeURIComponent(subj)+'&body='+encodeURIComponent(body);
@@ -3395,6 +3502,7 @@ function icsLine(s){
 }
 document.getElementById('btn-ics').addEventListener('click', function(){
   if(!state.plan) return;
+  trackRolEvent('rol_calendario_descargado', {});
   var rows = buildRows();
   var ev = state.ev;
   var stamp = icsDate(new Date()) + 'T' + pad(new Date().getHours()) + pad(new Date().getMinutes()) + '00';
@@ -3433,6 +3541,7 @@ document.getElementById('btn-ics').addEventListener('click', function(){
 // Explicit "Save this tour"
 document.getElementById('btn-save-tour').addEventListener('click', function(){
   saveCurrentTour();
+  trackRolEvent('rol_tour_guardado', {});
   toast('Tour guardado ✓');
 });
 
@@ -3518,6 +3627,8 @@ document.getElementById('btn-sub').addEventListener('click', async function(){
     var ok = document.getElementById('eb-ok');
     ok.style.display='flex';
     ok.textContent = '✓ Listo, '+payload.nombre.split(' ')[0]+'. Recibirás un email a '+payload.email+' el día de cada pago.';
+    // NUNCA mandamos el email/nombre al tracker, solo el hecho de la activación.
+    trackRolEvent('rol_recordatorios_activados', {});
     toast('Recordatorios activados ✓');
   }catch(e){
     console.error(e);

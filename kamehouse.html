@@ -1159,6 +1159,150 @@ body.tema-axel table th { color: #E8F0FF !important; border-bottom: 1px solid rg
 body.tema-axel .perfil-card-header { background: linear-gradient(135deg, rgba(148,163,200,0.1), rgba(125,211,252,0.05)) !important; }
 body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !important; }
 
+/* ═══════════════════════════════════════════════
+   ROL · ANALYTICS DASHBOARD
+═══════════════════════════════════════════════ */
+#page-rol-analytics .rolan-range{
+  display:flex;gap:6px;flex-wrap:wrap;margin-bottom:18px;
+  background:var(--card);padding:6px;border-radius:var(--radius);
+  border:1px solid var(--border);width:fit-content;
+}
+#page-rol-analytics .rolan-range button{
+  background:transparent;border:none;color:var(--ts);
+  padding:8px 14px;font-family:'JetBrains Mono',monospace;font-size:11px;
+  font-weight:700;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;
+  border-radius:6px;transition:all .15s;
+}
+#page-rol-analytics .rolan-range button:hover{color:var(--text)}
+#page-rol-analytics .rolan-range button.active{background:var(--gold);color:#000}
+
+#page-rol-analytics .rolan-kpis{
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));
+  gap:10px;margin-bottom:24px;
+}
+#page-rol-analytics .rolan-kpi{
+  background:var(--card);border:1px solid var(--border);border-radius:var(--radius);
+  padding:14px 16px;display:flex;flex-direction:column;gap:6px;
+  border-left:3px solid var(--gold);
+}
+#page-rol-analytics .rolan-kpi .lbl{
+  font-size:10px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--ts);
+}
+#page-rol-analytics .rolan-kpi .val{
+  font-family:'JetBrains Mono',monospace;font-weight:700;font-size:24px;
+  color:var(--text);letter-spacing:-.02em;line-height:1;
+}
+
+#page-rol-analytics .rolan-grid{
+  display:grid;grid-template-columns:1fr 1fr;gap:16px;
+}
+@media(max-width:900px){
+  #page-rol-analytics .rolan-grid{grid-template-columns:1fr}
+}
+
+#page-rol-analytics .rolan-section{
+  background:var(--card);border:1px solid var(--border);border-radius:var(--radius);
+  padding:18px 18px 16px;
+}
+#page-rol-analytics .rolan-section h3{
+  font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700;
+  letter-spacing:.12em;text-transform:uppercase;color:var(--ts);
+  margin:0 0 14px;display:flex;align-items:center;gap:8px;
+}
+#page-rol-analytics .rolan-section h3::before{
+  content:'';width:6px;height:6px;background:var(--gold);border-radius:50%;
+}
+
+#page-rol-analytics .rolan-empty{
+  color:var(--ts);font-size:13px;padding:14px 0;text-align:center;font-style:italic;
+}
+
+/* Ranked list (top eventos) */
+#page-rol-analytics .rolan-ranked{
+  list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:6px;
+  counter-reset:rolr;
+}
+#page-rol-analytics .rolan-ranked li{
+  display:grid;grid-template-columns:28px 1fr auto;align-items:center;gap:10px;
+  padding:8px 10px;background:rgba(255,255,255,.02);border-radius:6px;
+  font-size:13px;counter-increment:rolr;
+}
+#page-rol-analytics .rolan-ranked li::before{
+  content:counter(rolr);font-family:'JetBrains Mono',monospace;font-weight:700;
+  font-size:11px;color:var(--gold);letter-spacing:.04em;
+}
+#page-rol-analytics .rolan-ranked .name{color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#page-rol-analytics .rolan-ranked .count{
+  font-family:'JetBrains Mono',monospace;font-weight:700;font-size:12px;color:var(--ts);
+}
+
+/* Bars de paquetes */
+#page-rol-analytics .rolan-bar-row{
+  display:grid;grid-template-columns:60px 1fr 56px;gap:10px;align-items:center;
+  margin-bottom:8px;font-size:13px;
+}
+#page-rol-analytics .rolan-bar-row:last-child{margin-bottom:0}
+#page-rol-analytics .rolan-bar-row .key{
+  font-family:'JetBrains Mono',monospace;font-weight:700;font-size:12px;color:var(--text);
+  letter-spacing:.05em;
+}
+#page-rol-analytics .rolan-bar-row .track{
+  background:rgba(255,255,255,.04);border-radius:4px;height:18px;position:relative;overflow:hidden;
+}
+#page-rol-analytics .rolan-bar-row .fill{
+  position:absolute;left:0;top:0;bottom:0;background:var(--gold);
+  transition:width .4s ease;border-radius:4px;
+}
+#page-rol-analytics .rolan-bar-row .pct{
+  font-family:'JetBrains Mono',monospace;font-weight:700;font-size:12px;
+  color:var(--gold);text-align:right;
+}
+
+/* Embudo */
+#page-rol-analytics .rolan-funnel{
+  list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:6px;
+}
+#page-rol-analytics .rolan-funnel li{
+  display:grid;grid-template-columns:1fr auto 56px;gap:10px;align-items:center;
+  font-size:13px;position:relative;background:rgba(255,255,255,.02);
+  padding:9px 12px;border-radius:6px;overflow:hidden;
+}
+#page-rol-analytics .rolan-funnel li::before{
+  content:'';position:absolute;left:0;top:0;bottom:0;background:rgba(94,167,255,.16);
+  border-right:2px solid var(--blue);transition:width .4s ease;
+}
+#page-rol-analytics .rolan-funnel li > *{position:relative;z-index:1}
+#page-rol-analytics .rolan-funnel .step{color:var(--text)}
+#page-rol-analytics .rolan-funnel .count{
+  font-family:'JetBrains Mono',monospace;font-weight:700;color:var(--text);
+}
+#page-rol-analytics .rolan-funnel .pct{
+  font-family:'JetBrains Mono',monospace;font-weight:700;font-size:12px;
+  color:var(--blue);text-align:right;
+}
+
+/* Actividad por hora */
+#page-rol-analytics .rolan-hours{display:flex;flex-direction:column;gap:3px}
+#page-rol-analytics .rolan-hours .hr{
+  display:grid;grid-template-columns:46px 1fr 38px;align-items:center;gap:10px;
+  font-size:12px;
+}
+#page-rol-analytics .rolan-hours .hr .h{
+  font-family:'JetBrains Mono',monospace;font-weight:700;color:var(--ts);
+}
+#page-rol-analytics .rolan-hours .hr .track{
+  background:rgba(255,255,255,.03);height:14px;border-radius:3px;position:relative;
+}
+#page-rol-analytics .rolan-hours .hr .fill{
+  position:absolute;left:0;top:0;bottom:0;background:var(--orange);
+  border-radius:3px;transition:width .3s ease;
+}
+#page-rol-analytics .rolan-hours .hr .n{
+  font-family:'JetBrains Mono',monospace;font-weight:700;font-size:11px;
+  color:var(--ts);text-align:right;
+}
+
 </style>
 </head>
 <body>
@@ -1225,6 +1369,7 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
      <button class="nav-dropdown-item" id="nav-recibos" onclick="showHerramienta('recibos')">Recibos</button>
      <button class="nav-dropdown-item" id="nav-contratos" onclick="showHerramienta('contratos')">Contratos</button>
      <button class="nav-dropdown-item" id="nav-waitlist" onclick="showHerramienta('waitlist')">Lista de espera</button>
+     <button class="nav-dropdown-item" id="nav-rol-analytics" onclick="showHerramienta('rol-analytics')">📊 ROL · Analytics</button>
      <button class="nav-dropdown-item" id="nav-diseno" onclick="showHerramienta('diseno')">Diseño</button>
     </div>
    </div>
@@ -2302,6 +2447,55 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
    </div>
    <div id="wl-summary" style="font-size:12px;color:var(--ts);letter-spacing:.06em;text-transform:uppercase;margin-bottom:14px">Cargando…</div>
    <div id="wl-groups" style="display:grid;gap:12px"></div>
+ </div>
+
+ <!-- ─── ROL · ANALYTICS ─── -->
+ <div class="page" id="page-rol-analytics">
+   <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px;flex-wrap:wrap">
+     <h2 style="margin:0;font-family:'Zen Dots',sans-serif;font-size:22px;letter-spacing:.02em">📊 ROL · Analytics</h2>
+     <div style="display:flex;gap:8px;flex-wrap:wrap">
+       <span id="rolan-status" style="font-size:11px;letter-spacing:.1em;color:var(--ts);text-transform:uppercase;align-self:center">—</span>
+       <button class="btn btn-ghost btn-sm" onclick="loadRolAnalytics()">↻ Refrescar</button>
+       <button class="btn btn-sm" onclick="exportRolAnalyticsCSV()" style="background:var(--gold);color:#000;font-weight:900">📥 Export CSV</button>
+     </div>
+   </div>
+
+   <div class="rolan-range" id="rolan-range">
+     <button data-r="today" type="button">Hoy</button>
+     <button data-r="week" type="button">Esta semana</button>
+     <button data-r="month" type="button" class="active">Este mes</button>
+     <button data-r="all" type="button">Todo</button>
+   </div>
+
+   <div class="rolan-kpis" id="rolan-kpis">
+     <div class="rolan-kpi"><span class="lbl">Sesiones únicas</span><span class="val" id="rolan-kpi-sesiones">—</span></div>
+     <div class="rolan-kpi"><span class="lbl">Planes generados</span><span class="val" id="rolan-kpi-planes">—</span></div>
+     <div class="rolan-kpi"><span class="lbl">Conversión</span><span class="val" id="rolan-kpi-conversion">—</span></div>
+     <div class="rolan-kpi"><span class="lbl">Recordatorios</span><span class="val" id="rolan-kpi-recordatorios">—</span></div>
+     <div class="rolan-kpi"><span class="lbl">Comprobantes</span><span class="val" id="rolan-kpi-comprobantes">—</span></div>
+   </div>
+
+   <div class="rolan-grid">
+     <section class="rolan-section">
+       <h3>Eventos más consultados</h3>
+       <ol id="rolan-eventos-top" class="rolan-ranked"><li class="rolan-empty">Cargando…</li></ol>
+     </section>
+
+     <section class="rolan-section">
+       <h3>Paquetes más elegidos</h3>
+       <div id="rolan-paquetes"><div class="rolan-empty">Cargando…</div></div>
+     </section>
+
+     <section class="rolan-section">
+       <h3>Embudo de conversión</h3>
+       <ol id="rolan-embudo" class="rolan-funnel"><li class="rolan-empty">Cargando…</li></ol>
+     </section>
+
+     <section class="rolan-section">
+       <h3>Actividad por hora · últimas 24h</h3>
+       <div id="rolan-actividad" class="rolan-hours"><div class="rolan-empty">Cargando…</div></div>
+     </section>
+   </div>
  </div>
 
  <!-- ─── RECIBOS ─── -->
@@ -6118,6 +6312,12 @@ function showHerramienta(name) {
   if (name === 'waitlist') {
     loadWaitlist();
   }
+  if (name === 'rol-analytics') {
+    initRolAnalyticsTab();
+  } else {
+    // Si nos vamos de la pestaña, paramos el auto-refresh
+    stopRolAnalyticsAutoRefresh();
+  }
 }
 
 // ── NAV MOBILE HAMBURGUESA ──────────────────────────────────
@@ -9788,6 +9988,235 @@ async function wlNotificar(eventoId, totalRegs, pendientes) {
   } catch (e) {
     alert('Error de red: ' + e.message);
   }
+}
+
+// ═══════════════════════════════════════════════
+// ROL · ANALYTICS — dashboard de uso anónimo de /rol
+// ═══════════════════════════════════════════════
+var _rolanRange = 'month';
+var _rolanRefreshId = null;
+var _rolanLastRows = [];
+
+function initRolAnalyticsTab(){
+  // Gate de seguridad: solo maestro_roshi/bulma. El dropdown ya está oculto
+  // para otros roles, pero protegemos por si entran por URL/devtools.
+  if (!['maestro_roshi','bulma'].includes(currentUser?.rol)) {
+    const page = document.getElementById('page-rol-analytics');
+    if (page) page.innerHTML = '<div style="padding:40px;text-align:center;color:var(--ts)">Acceso restringido</div>';
+    return;
+  }
+  // Wire range selector (idempotente)
+  const rangeWrap = document.getElementById('rolan-range');
+  if (rangeWrap && !rangeWrap.dataset.wired) {
+    rangeWrap.dataset.wired = '1';
+    rangeWrap.querySelectorAll('button[data-r]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        rangeWrap.querySelectorAll('button').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        _rolanRange = btn.dataset.r;
+        loadRolAnalytics();
+      });
+    });
+  }
+  loadRolAnalytics();
+  startRolAnalyticsAutoRefresh();
+}
+
+function startRolAnalyticsAutoRefresh(){
+  stopRolAnalyticsAutoRefresh();
+  _rolanRefreshId = setInterval(() => {
+    // Solo refrescar si la pestaña sigue activa
+    const page = document.getElementById('page-rol-analytics');
+    if (page && page.classList.contains('active')) loadRolAnalytics(true);
+  }, 60000);
+}
+function stopRolAnalyticsAutoRefresh(){
+  if (_rolanRefreshId) { clearInterval(_rolanRefreshId); _rolanRefreshId = null; }
+}
+
+function _rolanSinceISO(){
+  const now = new Date();
+  if (_rolanRange === 'today'){
+    const d = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    return d.toISOString();
+  }
+  if (_rolanRange === 'week'){
+    const d = new Date(now); d.setDate(d.getDate() - 7); return d.toISOString();
+  }
+  if (_rolanRange === 'month'){
+    const d = new Date(now); d.setDate(d.getDate() - 30); return d.toISOString();
+  }
+  return '1970-01-01T00:00:00Z'; // 'all'
+}
+
+async function loadRolAnalytics(silent){
+  const status = document.getElementById('rolan-status');
+  if (status && !silent) status.textContent = 'Cargando…';
+  try {
+    const since = _rolanSinceISO();
+    // Hasta 10k filas en el rango — suficiente para volúmenes esperados de /rol.
+    const url = `${SB_URL}/rest/v1/rol_eventos_uso?created_at=gte.${encodeURIComponent(since)}` +
+                `&select=session_id,accion,evento_id,evento_nombre,paquete,zona,precio_total,created_at` +
+                `&order=created_at.desc&limit=10000`;
+    const r = await fetch(url, { headers: { apikey: SB_KEY, Authorization: 'Bearer ' + SB_KEY } });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const rows = await r.json();
+    _rolanLastRows = rows || [];
+    renderRolAnalytics(_rolanLastRows);
+    if (status) {
+      const hora = new Date().toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' });
+      status.textContent = `Última act: ${hora}`;
+    }
+  } catch (e) {
+    console.error('[rolan]', e);
+    if (status) status.textContent = 'Error: ' + e.message;
+  }
+}
+
+function renderRolAnalytics(rows){
+  // ── KPIs ──
+  const sesiones = new Set(rows.map(r => r.session_id));
+  const planes = rows.filter(r => r.accion === 'rol_plan_generado');
+  const sesionesConPlan = new Set(planes.map(r => r.session_id));
+  const sesionesQueVisitan = new Set(
+    rows.filter(r => r.accion === 'rol_visita').map(r => r.session_id)
+  );
+  const baseConv = sesionesQueVisitan.size || sesiones.size;
+  const conv = baseConv > 0 ? (sesionesConPlan.size / baseConv * 100) : 0;
+  const recordatorios = rows.filter(r => r.accion === 'rol_recordatorios_activados').length;
+  const comprobantes  = rows.filter(r => r.accion === 'rol_comprobante_subido').length;
+
+  document.getElementById('rolan-kpi-sesiones').textContent      = sesiones.size.toLocaleString('es-MX');
+  document.getElementById('rolan-kpi-planes').textContent        = planes.length.toLocaleString('es-MX');
+  document.getElementById('rolan-kpi-conversion').textContent    = conv.toFixed(1) + '%';
+  document.getElementById('rolan-kpi-recordatorios').textContent = recordatorios.toLocaleString('es-MX');
+  document.getElementById('rolan-kpi-comprobantes').textContent  = comprobantes.toLocaleString('es-MX');
+
+  // ── Eventos más consultados (por planes generados) ──
+  const evCount = {};
+  const evName = {};
+  planes.forEach(r => {
+    if (!r.evento_id) return;
+    evCount[r.evento_id] = (evCount[r.evento_id] || 0) + 1;
+    if (r.evento_nombre) evName[r.evento_id] = r.evento_nombre;
+  });
+  const evTop = Object.entries(evCount).sort((a,b) => b[1]-a[1]).slice(0, 10);
+  const olEv = document.getElementById('rolan-eventos-top');
+  if (evTop.length === 0){
+    olEv.innerHTML = '<li class="rolan-empty">Aún no hay planes generados en este rango</li>';
+  } else {
+    olEv.innerHTML = evTop.map(([id, n]) => {
+      const nm = (evName[id] || id).replace(/</g,'&lt;');
+      return `<li><span class="name">${nm}</span><span class="count">${n} ${n===1?'plan':'planes'}</span></li>`;
+    }).join('');
+  }
+
+  // ── Paquetes más elegidos (sobre rol_paquete_elegido — última elección por sesión) ──
+  // Agrupamos por sesión y tomamos el último paquete elegido para evitar contar
+  // 2 paquetes si el cliente cambió de opinión en la misma sesión.
+  const lastPkgBySession = {};
+  rows.forEach(r => {
+    if (r.accion !== 'rol_paquete_elegido' || !r.paquete) return;
+    const prev = lastPkgBySession[r.session_id];
+    if (!prev || r.created_at > prev.at) {
+      lastPkgBySession[r.session_id] = { pkg: r.paquete.toUpperCase(), at: r.created_at };
+    }
+  });
+  const pkgCount = { PLUS:0, RIDE:0, STAY:0, CHEAP:0 };
+  Object.values(lastPkgBySession).forEach(p => { if (pkgCount[p.pkg] != null) pkgCount[p.pkg]++; });
+  const pkgTotal = Object.values(pkgCount).reduce((a,b) => a+b, 0);
+  const pkgWrap = document.getElementById('rolan-paquetes');
+  if (pkgTotal === 0){
+    pkgWrap.innerHTML = '<div class="rolan-empty">Aún no hay paquetes elegidos en este rango</div>';
+  } else {
+    pkgWrap.innerHTML = Object.entries(pkgCount)
+      .sort((a,b) => b[1]-a[1])
+      .map(([k, n]) => {
+        const pct = (n / pkgTotal * 100);
+        return `<div class="rolan-bar-row">
+          <span class="key">${k}</span>
+          <div class="track"><div class="fill" style="width:${pct.toFixed(1)}%"></div></div>
+          <span class="pct">${pct.toFixed(1)}%</span>
+        </div>`;
+      }).join('');
+  }
+
+  // ── Embudo de conversión (sesiones únicas por cada paso) ──
+  const setBy = (accion) => new Set(rows.filter(r => r.accion === accion).map(r => r.session_id));
+  const visitas      = setBy('rol_visita').size || sesiones.size;
+  const ev           = setBy('rol_evento_seleccionado').size;
+  const pkg          = setBy('rol_paquete_elegido').size;
+  const zona         = setBy('rol_zona_elegida').size;
+  const planGen      = setBy('rol_plan_generado').size;
+  const recordOk     = setBy('rol_recordatorios_activados').size;
+  const pasos = [
+    ['Visitas', visitas],
+    ['Eligen evento', ev],
+    ['Eligen paquete', pkg],
+    ['Eligen zona', zona],
+    ['Generan plan', planGen],
+    ['Activan recordatorios', recordOk]
+  ];
+  const olEmb = document.getElementById('rolan-embudo');
+  if (visitas === 0){
+    olEmb.innerHTML = '<li class="rolan-empty">Sin actividad en este rango</li>';
+  } else {
+    olEmb.innerHTML = pasos.map(([k, n]) => {
+      const pct = (n / visitas * 100);
+      // Aplicamos el "fill" del embudo como linear-gradient directo en el style.background
+      // del <li>, evitando el ::before que requeriría CSS dinámico.
+      const fillStyle = `background:linear-gradient(90deg, rgba(94,167,255,.18) ${pct.toFixed(1)}%, rgba(255,255,255,.02) ${pct.toFixed(1)}%)`;
+      return `<li style="${fillStyle}">
+        <span class="step">${k}</span>
+        <span class="count">${n.toLocaleString('es-MX')}</span>
+        <span class="pct">${pct.toFixed(0)}%</span>
+      </li>`;
+    }).join('');
+  }
+
+  // ── Actividad por hora (últimas 24h) ──
+  const now = Date.now();
+  const dayAgo = now - 24*60*60*1000;
+  const buckets = new Array(24).fill(0);
+  rows.forEach(r => {
+    const t = new Date(r.created_at).getTime();
+    if (t < dayAgo || t > now) return;
+    const hoursAgo = Math.floor((now - t) / (60*60*1000));
+    if (hoursAgo >= 0 && hoursAgo < 24) buckets[23 - hoursAgo]++;
+  });
+  const maxBucket = Math.max(1, ...buckets);
+  const wrapH = document.getElementById('rolan-actividad');
+  const baseHour = new Date(now - 23*60*60*1000);
+  const fmtH = (i) => {
+    const d = new Date(baseHour.getTime() + i*60*60*1000);
+    return d.toLocaleTimeString('es-MX', { hour: '2-digit', minute:'2-digit', hour12: false });
+  };
+  if (buckets.every(b => b === 0)){
+    wrapH.innerHTML = '<div class="rolan-empty">Sin actividad en las últimas 24h</div>';
+  } else {
+    wrapH.innerHTML = buckets.map((n, i) => {
+      const pct = (n / maxBucket * 100);
+      return `<div class="hr">
+        <span class="h">${fmtH(i)}</span>
+        <div class="track"><div class="fill" style="width:${pct.toFixed(1)}%"></div></div>
+        <span class="n">${n}</span>
+      </div>`;
+    }).join('');
+  }
+}
+
+function exportRolAnalyticsCSV(){
+  const rows = _rolanLastRows;
+  if (!rows || rows.length === 0){ alert('No hay datos en el rango actual.'); return; }
+  const cols = ['created_at','session_id','accion','evento_id','evento_nombre','paquete','zona','precio_total'];
+  const esc = v => v == null ? '' : '"' + String(v).replace(/"/g,'""') + '"';
+  const csv = [cols.join(',')].concat(rows.map(r => cols.map(c => esc(r[c])).join(','))).join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `rol-analytics-${_rolanRange}-${new Date().toISOString().slice(0,10)}.csv`;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 }
 
 </script>

@@ -1017,6 +1017,111 @@ button{cursor:pointer;border:none;background:none}
   #step5 .next{margin-left:-14px;margin-right:-14px;padding:14px 18px}
   #step5 .next .nv{font-size:18px}
 }
+
+/* ── Disclaimers (uso personal vs registro oficial) ────────────────── */
+.disclaimer-banner{
+  background:var(--yel);color:#000;border:3px solid #000;
+  padding:20px 22px;margin:0 0 22px;
+  font-family:'Montserrat',sans-serif;
+}
+.disclaimer-banner .db-head{
+  display:flex;align-items:center;gap:10px;
+  font-family:'Barlow Condensed',sans-serif;font-weight:900;
+  font-size:22px;line-height:1;letter-spacing:.02em;text-transform:uppercase;
+  margin-bottom:10px;
+}
+.disclaimer-banner .db-head .db-icon{
+  font-size:24px;line-height:1;
+}
+.disclaimer-banner .db-body{
+  font-size:14px;font-weight:600;line-height:1.5;color:#000;
+}
+.disclaimer-banner .db-body b{font-weight:900}
+.disclaimer-banner .db-body p{margin:0 0 8px}
+.disclaimer-banner .db-body p:last-child{margin-bottom:0}
+@media(max-width:520px){
+  .disclaimer-banner{padding:16px 16px}
+  .disclaimer-banner .db-head{font-size:18px}
+  .disclaimer-banner .db-body{font-size:13px}
+}
+
+.onboarding-disclaimer{
+  margin-top:18px;padding:14px 16px;
+  border:1.5px solid var(--yel);background:rgba(232,255,76,.08);
+  font-size:13px;color:#fff;line-height:1.5;font-weight:500;
+  max-width:520px;
+}
+.onboarding-disclaimer b{color:var(--yel);font-weight:700}
+
+.legal-foot{
+  max-width:720px;margin:24px auto 0;padding:0 18px;
+  font-size:12px;line-height:1.55;color:var(--ink-mute);text-align:center;
+  font-weight:500;
+}
+
+/* ── Modal de advertencia sobre comprobante ─────────────────────────── */
+.warn-modal-overlay{
+  position:fixed;inset:0;background:rgba(0,0,0,.82);
+  display:none;align-items:flex-end;justify-content:center;z-index:200;
+  padding:0;
+}
+.warn-modal-overlay.on{display:flex}
+.warn-modal{
+  background:#0a0a0a;border:1px solid var(--line);
+  width:100%;max-width:520px;
+  padding:26px 22px 22px;
+  border-top:4px solid var(--yel);
+  max-height:90vh;overflow-y:auto;
+  font-family:'Montserrat',sans-serif;
+}
+@media(min-width:560px){
+  .warn-modal-overlay{align-items:center}
+  .warn-modal{border-radius:0;border:1px solid var(--line);border-top:4px solid var(--yel)}
+}
+.warn-modal .wm-head{
+  font-family:'Barlow Condensed',sans-serif;font-weight:900;
+  font-size:30px;line-height:1;letter-spacing:.02em;text-transform:uppercase;
+  color:var(--yel);margin-bottom:14px;display:flex;align-items:center;gap:10px;
+}
+.warn-modal .wm-head .wm-icon{font-size:28px}
+.warn-modal .wm-lead{
+  font-size:15px;line-height:1.5;color:#fff;font-weight:700;margin-bottom:10px;
+}
+.warn-modal .wm-lead b{color:var(--yel)}
+.warn-modal .wm-body{
+  font-size:13px;line-height:1.55;color:var(--ink-soft);font-weight:500;margin-bottom:18px;
+}
+.warn-modal .wm-cta-title{
+  font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--ink-mute);margin:14px 0 10px;
+}
+.warn-modal .wm-channels{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:18px}
+.warn-modal .wm-ch{
+  display:flex;align-items:center;justify-content:center;gap:8px;
+  padding:14px 12px;border:none;cursor:pointer;
+  font-family:'Montserrat',sans-serif;font-weight:900;font-size:13px;
+  letter-spacing:.04em;text-decoration:none;text-align:center;
+  transition:transform .12s,filter .12s;
+}
+.warn-modal .wm-ch:hover{transform:translateY(-1px);filter:brightness(1.08)}
+.warn-modal .wm-ch.wa{background:#25D366;color:#000}
+.warn-modal .wm-ch.fb{background:#0084FF;color:#fff}
+.warn-modal .wm-actions{display:flex;flex-direction:column;gap:8px}
+.warn-modal .wm-continue{
+  width:100%;background:transparent;color:var(--ink-soft);
+  border:1px solid var(--line);padding:12px 14px;cursor:pointer;
+  font-family:'Montserrat',sans-serif;font-weight:700;font-size:12px;
+  letter-spacing:.06em;text-transform:uppercase;transition:all .15s;
+}
+.warn-modal .wm-continue:hover{border-color:var(--yel);color:var(--yel)}
+.warn-modal .wm-cancel{
+  background:none;border:none;color:var(--ink-mute);cursor:pointer;
+  font-size:12px;font-weight:600;padding:8px;text-decoration:underline;
+}
+.warn-modal .wm-cancel:hover{color:#fff}
+@media(max-width:380px){
+  .warn-modal .wm-channels{grid-template-columns:1fr}
+}
 </style>
 </head>
 <body>
@@ -1042,6 +1147,9 @@ button{cursor:pointer;border:none;background:none}
     <input class="name-in" id="name-in" type="text" placeholder="Tu nombre" autocomplete="given-name" maxlength="40">
     <div style="display:flex;gap:10px;align-items:center;margin-top:14px;flex-wrap:wrap">
       <button class="cta" id="btn-name" style="margin-top:0">Empezar →</button>
+    </div>
+    <div class="onboarding-disclaimer">
+      Esta herramienta te ayuda a llevar el <b>control de tus pagos</b>. Recuerda que TODO lo que marques aquí es solo para tu seguimiento personal — <b>no modifica tu reserva oficial</b>.
     </div>
   </section>
 
@@ -1175,6 +1283,15 @@ button{cursor:pointer;border:none;background:none}
   <section class="step locked" id="step5">
     <div class="step-hd"><span class="n">05</span><span class="t">Tu plan</span><span class="hint" id="plan-id">—</span></div>
 
+    <!-- Disclaimer permanente: aclarar que esta vista es solo de control personal -->
+    <div class="disclaimer-banner" role="note" aria-label="Aviso importante">
+      <div class="db-head"><span class="db-icon" aria-hidden="true">⚠</span><span>Herramienta de control personal</span></div>
+      <div class="db-body">
+        <p>Esta es una herramienta para que <b>lleves tu control</b>. Lo que marques aquí <b>NO modifica tu reserva</b> ni actualiza tus pagos en nuestro sistema.</p>
+        <p>Para que tus pagos queden registrados <b>oficialmente</b>, envía tu comprobante a nuestras redes sociales.</p>
+      </div>
+    </div>
+
     <!-- Estado de cuenta — primer elemento visible -->
     <div class="account-status" id="account-status">
       <div class="as-head">Estado de cuenta</div>
@@ -1269,6 +1386,10 @@ button{cursor:pointer;border:none;background:none}
   </section>
   </div><!-- /wizard-shell -->
 
+  <div class="legal-foot">
+    Aviso: Conecta Reynosa Mi Plan de Pagos es una <b>herramienta personal de seguimiento</b>. No reemplaza la comunicación oficial con nuestro equipo. Para registrar pagos, modificar reservas o resolver dudas, contáctanos por WhatsApp o Messenger.
+  </div>
+
   <footer class="foot">
     <div>Conecta Reynosa · <b>conectareynosa.mx</b></div>
     <div>v4.2 · plan-pagos · transp-cdmx</div>
@@ -1285,6 +1406,34 @@ button{cursor:pointer;border:none;background:none}
       <button class="cta" id="share-copy" type="button">📋 Copiar link</button>
       <button class="cta alt" id="share-wa" type="button">💬 Compartir por WhatsApp</button>
       <button class="cta ghost" id="share-email" type="button">✉️ Enviar por Email</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: advertencia antes de subir comprobante (solo personal, no oficial) -->
+<div class="warn-modal-overlay" id="warn-comp-modal" role="dialog" aria-modal="true" aria-labelledby="warn-comp-title">
+  <div class="warn-modal">
+    <div class="wm-head" id="warn-comp-title">
+      <span class="wm-icon" aria-hidden="true">⚠</span><span>Importante</span>
+    </div>
+    <div class="wm-lead">
+      Subir tu comprobante <b>AQUÍ NO ES UN REGISTRO OFICIAL DE PAGO</b>.
+    </div>
+    <div class="wm-body">
+      Esta foto se guarda solo en tu dispositivo como recordatorio personal.
+    </div>
+    <div class="wm-cta-title">Para que tu pago quede registrado, envíalo a:</div>
+    <div class="wm-channels">
+      <a class="wm-ch wa" href="https://wa.me/528119771072" target="_blank" rel="noopener">
+        📲 WhatsApp
+      </a>
+      <a class="wm-ch fb" href="https://m.me/ConectaRey" target="_blank" rel="noopener">
+        💬 Messenger
+      </a>
+    </div>
+    <div class="wm-actions">
+      <button class="wm-continue" id="warn-comp-continue" type="button">Entiendo, continuar de todos modos</button>
+      <button class="wm-cancel" id="warn-comp-cancel" type="button">Cancelar</button>
     </div>
   </div>
 </div>
@@ -3069,15 +3218,26 @@ function notifyOverdue(pago){
 
 // ── Comprobantes UI ──────────────────────────
 var _compCurrentKey = null;
-function openCompUpload(k){
-  // Crea input file efímero
+
+// Disclaimer pre-upload: aclarar que esta foto es solo recordatorio personal.
+// localStorage key 'rol-disclaimer-visto' = true después de la primera vez que
+// el cliente cierra el modal, así no repetimos cada vez.
+function disclaimerYaVisto(){
+  try { return localStorage.getItem('rol-disclaimer-visto') === 'true'; }
+  catch(e){ return false; }
+}
+function marcarDisclaimerVisto(){
+  try { localStorage.setItem('rol-disclaimer-visto', 'true'); } catch(e){}
+}
+
+function abrirPickerArchivo(k){
   var input=document.createElement('input');
   input.type='file';
   input.accept='image/*,application/pdf';
   input.style.display='none';
   input.addEventListener('change', async function(){
     var file=input.files && input.files[0];
-    if(!file) return;
+    if(!file){ document.body.removeChild(input); return; }
     try{
       var dataUrl;
       if(file.type.indexOf('image/')===0){
@@ -3105,6 +3265,38 @@ function openCompUpload(k){
   });
   document.body.appendChild(input);
   input.click();
+}
+
+(function setupWarnComprobanteModal(){
+  var overlay = document.getElementById('warn-comp-modal');
+  if(!overlay) return;
+  var pending = null;
+  function close(){ overlay.classList.remove('on'); pending = null; }
+  overlay.addEventListener('click', function(e){
+    if(e.target === overlay) close();
+  });
+  document.getElementById('warn-comp-cancel').addEventListener('click', close);
+  document.getElementById('warn-comp-continue').addEventListener('click', function(){
+    marcarDisclaimerVisto();
+    var k = pending;
+    close();
+    if(k) abrirPickerArchivo(k);
+  });
+  // Expose opener
+  window._abrirWarnComp = function(k){
+    pending = k;
+    overlay.classList.add('on');
+  };
+})();
+
+function openCompUpload(k){
+  // Si el cliente ya vio el disclaimer una vez, abrimos el picker directo;
+  // si no, el modal le explica primero.
+  if(disclaimerYaVisto()){
+    abrirPickerArchivo(k);
+  } else {
+    window._abrirWarnComp(k);
+  }
 }
 
 function openCompModal(k){

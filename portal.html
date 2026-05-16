@@ -236,9 +236,228 @@ main{
 .view{display:none}
 .view.is-active{display:block}
 
+/* ============================ Tours list (Vista C) ============================ */
+.tours-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}
+.btn-pill{
+  background:var(--yel);color:#000;border:none;border-radius:999px;
+  padding:8px 14px;font-family:'Montserrat',sans-serif;font-weight:900;font-size:11px;
+  letter-spacing:.1em;text-transform:uppercase;cursor:pointer;transition:transform .12s,filter .12s;
+  min-height:36px;
+}
+.btn-pill:hover{transform:translateY(-1px);filter:brightness(1.05)}
+.tours-list{display:flex;flex-direction:column;gap:10px}
+.tours-loading{display:flex;justify-content:center;padding:18px}
+.tour-empty{
+  text-align:center;padding:18px 8px;color:var(--ink-soft);font-size:13px;line-height:1.5;
+}
+.tour-empty b{display:block;font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:20px;color:#fff;text-transform:uppercase;margin-bottom:6px}
+.tour-card{
+  background:#000;border:1px solid var(--line);border-radius:12px;padding:14px 14px 13px;
+  display:flex;flex-direction:column;gap:8px;position:relative;
+}
+.tour-card .tc-top{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+.tour-card .tc-name{
+  font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:18px;
+  text-transform:uppercase;line-height:1.05;letter-spacing:.01em;
+}
+.tour-card .tc-meta{font-size:11px;color:var(--ink-mute);font-weight:700;letter-spacing:.12em;text-transform:uppercase;margin-top:3px}
+.tour-card .tc-row{
+  display:flex;align-items:center;justify-content:space-between;gap:10px;
+  padding-top:8px;border-top:1px solid var(--line);
+}
+.tour-card .tc-money{display:flex;flex-direction:column;gap:1px}
+.tour-card .tc-money .lbl{font-size:9px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-mute)}
+.tour-card .tc-money .val{font-family:'JetBrains Mono',monospace;font-weight:700;font-size:14px;color:#fff}
+.tour-card .tc-money .val.total{color:var(--yel)}
+.tour-card .tc-date{
+  font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;
+  letter-spacing:.1em;color:var(--ink-mute);text-align:right;
+}
+.badge{
+  display:inline-flex;align-items:center;gap:6px;
+  padding:5px 10px;border-radius:999px;
+  font-size:10px;font-weight:900;letter-spacing:.12em;text-transform:uppercase;
+  white-space:nowrap;flex-shrink:0;font-family:'Montserrat',sans-serif;
+}
+.badge::before{content:'';width:6px;height:6px;border-radius:50%;background:currentColor}
+.badge-pendiente{background:rgba(232,255,76,.14);color:var(--yel);border:1px solid rgba(232,255,76,.4)}
+.badge-en_pagos {background:rgba(0,0,205,.22);color:#9aa5ff;border:1px solid rgba(0,0,205,.6)}
+.badge-pagado   {background:rgba(136,234,78,.14);color:var(--green);border:1px solid rgba(136,234,78,.4)}
+.badge-cancelado{background:rgba(255,40,59,.12);color:#ffb0b8;border:1px solid rgba(255,40,59,.5)}
+
+/* ============================ FAB (Floating Action Button) ============================ */
+.fab{
+  position:fixed;bottom:20px;right:20px;z-index:50;
+  display:none;align-items:center;justify-content:center;gap:8px;
+  background:var(--yel);color:#000;border:none;border-radius:999px;
+  padding:14px 20px;font-family:'Montserrat',sans-serif;font-weight:900;font-size:13px;
+  letter-spacing:.08em;text-transform:uppercase;cursor:pointer;
+  box-shadow:0 8px 28px rgba(232,255,76,.35),0 2px 6px rgba(0,0,0,.4);
+  transition:transform .15s,box-shadow .15s;
+}
+.fab.is-visible{display:inline-flex}
+.fab:hover{transform:translateY(-2px);box-shadow:0 12px 32px rgba(232,255,76,.45),0 3px 8px rgba(0,0,0,.4)}
+.fab .plus{font-size:18px;line-height:1;font-weight:900}
+
+/* ============================ Wizard (Vista D) ============================ */
+.wiz-header{
+  display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:16px;
+}
+.wiz-back{
+  background:transparent;border:1.5px solid var(--line-strong);color:#fff;
+  border-radius:999px;width:40px;height:40px;font-size:18px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;flex-shrink:0;
+  transition:border-color .15s,background .15s;
+}
+.wiz-back:hover:not(:disabled){border-color:var(--yel);color:var(--yel)}
+.wiz-back:disabled{opacity:.3;cursor:not-allowed}
+.wiz-cancel{
+  background:none;border:none;color:var(--ink-mute);cursor:pointer;
+  font-family:'Montserrat',sans-serif;font-weight:700;font-size:12px;
+  letter-spacing:.08em;text-transform:uppercase;padding:8px 4px;
+}
+.wiz-cancel:hover{color:var(--red)}
+.wiz-progress{display:flex;align-items:center;gap:10px;margin-bottom:22px}
+.wiz-bar{flex:1;height:4px;background:var(--field-bg);border-radius:2px;overflow:hidden}
+.wiz-bar-fill{height:100%;background:var(--yel);transition:width .35s ease;width:20%}
+.wiz-step-num{
+  font-family:'JetBrains Mono',monospace;font-weight:700;font-size:11px;
+  letter-spacing:.1em;color:var(--ink-soft);white-space:nowrap;
+}
+
+.wiz-step{display:none}
+.wiz-step.is-active{display:block}
+
+.wiz-step h2.h-display{font-size:clamp(28px,7vw,36px);margin-bottom:6px}
+
+/* Búsqueda y lista de eventos */
+.wiz-search{
+  width:100%;background:var(--field-bg);color:#fff;border:1.5px solid var(--line-strong);
+  border-radius:10px;padding:14px 16px;font-size:15px;font-family:'Montserrat',sans-serif;
+  font-weight:600;outline:none;transition:border-color .15s;min-height:50px;
+}
+.wiz-search:focus{border-color:var(--yel)}
+.wiz-event-list{
+  margin-top:12px;max-height:48vh;overflow-y:auto;
+  border:1px solid var(--line);border-radius:10px;background:#000;
+}
+.wiz-event-list:empty::before{
+  content:'No hay eventos que coincidan';
+  display:block;padding:24px 16px;text-align:center;color:var(--ink-mute);
+  font-size:12px;letter-spacing:.06em;text-transform:uppercase;
+}
+.wiz-event{
+  display:grid;grid-template-columns:46px 1fr;gap:12px;align-items:center;
+  padding:13px 14px;cursor:pointer;border-bottom:1px solid var(--line);
+  transition:background .12s;
+}
+.wiz-event:last-child{border-bottom:none}
+.wiz-event:hover{background:rgba(232,255,76,.06)}
+.wiz-event .ev-day{
+  background:#000;border:1px solid var(--ink-mute);
+  text-align:center;padding:4px 0;
+}
+.wiz-event .ev-day .d{font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:18px;line-height:1;color:var(--yel);display:block}
+.wiz-event .ev-day .m{font-size:9px;font-weight:700;letter-spacing:.1em;color:var(--ink-mute);margin-top:2px;display:block;text-transform:uppercase}
+.wiz-event .ev-name{font-weight:800;font-size:14px;line-height:1.2}
+.wiz-event .ev-venue{display:block;font-size:11px;color:var(--ink-mute);margin-top:2px;font-weight:600}
+
+/* Paquetes */
+.wiz-pkgs{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.wiz-pkg{
+  background:#000;border:1.5px solid var(--line-strong);border-radius:10px;
+  padding:16px 14px;cursor:pointer;text-align:left;
+  font-family:inherit;color:#fff;transition:all .15s;
+}
+.wiz-pkg:hover{border-color:var(--yel);transform:translateY(-2px)}
+.wiz-pkg .pn{font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:24px;line-height:.9;color:var(--yel)}
+.wiz-pkg .pd{margin-top:8px;font-size:11px;color:var(--ink-soft);line-height:1.35;font-weight:500}
+.wiz-pkg.sel{background:var(--yel);border-color:var(--yel)}
+.wiz-pkg.sel .pn{color:#000}
+.wiz-pkg.sel .pd{color:rgba(0,0,0,.65)}
+
+/* Detalles — vuelo toggle */
+.wiz-toggle{
+  display:flex;align-items:center;justify-content:space-between;gap:12px;
+  padding:12px 14px;background:var(--field-bg);border:1.5px solid var(--line-strong);
+  border-radius:10px;cursor:pointer;
+}
+.wiz-toggle.on{border-color:var(--yel);background:rgba(232,255,76,.06)}
+.wiz-toggle .tg-label{font-size:13px;font-weight:700}
+.wiz-toggle .tg-switch{
+  width:42px;height:24px;background:var(--field-bg);border:1.5px solid var(--line-strong);
+  border-radius:12px;position:relative;flex-shrink:0;transition:background .15s,border-color .15s;
+}
+.wiz-toggle .tg-switch::after{
+  content:'';position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;
+  background:var(--ink-soft);transition:transform .15s,background .15s;
+}
+.wiz-toggle.on .tg-switch{background:var(--yel);border-color:var(--yel)}
+.wiz-toggle.on .tg-switch::after{transform:translateX(18px);background:#000}
+
+.wiz-textarea{
+  width:100%;min-height:80px;
+  background:var(--field-bg);color:#fff;border:1.5px solid var(--line-strong);
+  border-radius:10px;padding:12px 14px;font-size:14px;font-family:'Montserrat',sans-serif;
+  font-weight:500;resize:vertical;outline:none;transition:border-color .15s;
+}
+.wiz-textarea:focus{border-color:var(--yel)}
+.wiz-textarea::placeholder{color:var(--ink-mute)}
+
+/* Resumen */
+.wiz-summary-rows{display:flex;flex-direction:column;gap:0}
+.wiz-summary-rows .sr{
+  display:flex;justify-content:space-between;gap:12px;
+  padding:11px 0;border-bottom:1px solid var(--line);
+}
+.wiz-summary-rows .sr:last-child{border-bottom:none}
+.wiz-summary-rows .sr-k{
+  font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-soft);
+}
+.wiz-summary-rows .sr-v{
+  font-family:'JetBrains Mono',monospace;font-weight:700;font-size:13px;
+  color:#fff;text-align:right;letter-spacing:.02em;
+}
+.wiz-summary-rows .sr.total{padding-top:14px;border-top:2px solid var(--yel);margin-top:6px}
+.wiz-summary-rows .sr.total .sr-k{color:var(--yel);font-size:12px}
+.wiz-summary-rows .sr.total .sr-v{
+  font-family:'Barlow Condensed',sans-serif;font-size:26px;color:var(--yel);font-weight:900;
+}
+.wiz-summary-rows .sr.sep .sr-v{color:var(--yel)}
+
+/* Comprobante / upload */
+.wiz-upload{
+  border:2px dashed var(--line-strong);border-radius:12px;
+  padding:24px 18px;text-align:center;cursor:pointer;
+  transition:border-color .15s,background .15s;
+}
+.wiz-upload:hover{border-color:var(--yel);background:rgba(232,255,76,.04)}
+.wiz-upload .up-icon{
+  width:42px;height:42px;margin:0 auto 10px;border-radius:50%;
+  background:rgba(232,255,76,.08);display:flex;align-items:center;justify-content:center;color:var(--yel);
+}
+.wiz-upload .up-text{font-size:13px;color:var(--ink-soft);line-height:1.4}
+.wiz-upload .up-hint{font-size:11px;color:var(--ink-mute);margin-top:6px;letter-spacing:.06em;text-transform:uppercase}
+.wiz-upload.has-file{border-style:solid;border-color:var(--green);background:rgba(136,234,78,.04)}
+.wiz-upload .up-preview{max-width:100%;max-height:220px;margin-top:12px;border-radius:8px;display:none}
+.wiz-upload.has-file .up-preview{display:inline-block}
+.wiz-upload .up-name{display:none;margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--green);font-weight:700;word-break:break-all}
+.wiz-upload.has-file .up-name{display:block}
+.wiz-upload input[type=file]{display:none}
+
+/* Success */
+.wiz-success-icon{
+  width:80px;height:80px;border-radius:50%;background:rgba(136,234,78,.12);
+  border:2px solid var(--green);display:flex;align-items:center;justify-content:center;
+  margin:0 auto 18px;color:var(--green);
+}
+.wiz-success-icon svg{width:36px;height:36px}
+
 @media(max-width:380px){
   main{padding:24px 14px 60px}
   .card{padding:18px 16px}
+  .fab{bottom:14px;right:14px;padding:12px 16px;font-size:12px}
+  .wiz-pkgs{grid-template-columns:1fr}
 }
 </style>
 </head>
@@ -418,18 +637,18 @@ main{
     </div>
 
     <div class="card">
-      <div class="eyebrow" style="margin:0 0 14px">Tu cuenta</div>
-      <div class="dash-tiles">
+      <div class="tours-head">
+        <div class="eyebrow" style="margin:0">Tus tours</div>
+        <button type="button" class="btn-pill" data-action="new-tour">+ Nuevo</button>
+      </div>
+      <div id="tours-list" class="tours-list" aria-live="polite">
+        <div class="tours-loading"><div class="b-spin" style="width:24px;height:24px"></div></div>
+      </div>
+    </div>
 
-        <div class="tile">
-          <div class="tile-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v4"/><path d="M16 2v4"/><rect x="3" y="6" width="18" height="15" rx="2"/><path d="M3 11h18"/></svg>
-          </div>
-          <div class="tile-body">
-            <div class="tile-title">Tus tours</div>
-            <div class="tile-meta">Próximamente</div>
-          </div>
-        </div>
+    <div class="card">
+      <div class="eyebrow" style="margin:0 0 14px">Próximas funciones</div>
+      <div class="dash-tiles">
 
         <div class="tile">
           <div class="tile-icon">
@@ -465,7 +684,170 @@ main{
     </div>
   </section>
 
+  <!-- ============================================================ -->
+  <!-- VISTA D — WIZARD NUEVA SOLICITUD                              -->
+  <!-- ============================================================ -->
+  <section class="view" id="view-wizard" aria-labelledby="wiz-title">
+    <div class="wiz-header">
+      <button type="button" class="wiz-back" id="wiz-back" aria-label="Atrás">←</button>
+      <div class="wiz-step-num"><span id="wiz-step-cur">1</span> / 5</div>
+      <button type="button" class="wiz-cancel" data-action="wiz-cancel">Cancelar</button>
+    </div>
+    <div class="wiz-progress" aria-hidden="true">
+      <div class="wiz-bar"><div class="wiz-bar-fill" id="wiz-bar-fill"></div></div>
+    </div>
+
+    <div class="alert" id="wiz-alert" role="status"></div>
+
+    <!-- Paso 1: Evento -->
+    <div class="wiz-step is-active" data-step="1" id="wiz-step-1">
+      <div class="eyebrow">Paso 1</div>
+      <h2 class="h-display" id="wiz-title">Elige tu <span class="accent">evento</span></h2>
+      <p class="subtitle">Solo aparecen eventos con boletos y fechas disponibles.</p>
+      <div class="card">
+        <input type="search" id="wiz-event-search" class="wiz-search" placeholder="Busca artista, ciudad o venue…" autocomplete="off">
+        <div id="wiz-event-list" class="wiz-event-list" role="listbox">
+          <div class="tours-loading"><div class="b-spin" style="width:24px;height:24px"></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Paso 2: Paquete -->
+    <div class="wiz-step" data-step="2" id="wiz-step-2">
+      <div class="eyebrow">Paso 2</div>
+      <h2 class="h-display">Elige tu <span class="accent">paquete</span></h2>
+      <p class="subtitle" id="wiz-pkg-evname"></p>
+      <div class="card">
+        <div id="wiz-pkg-grid" class="wiz-pkgs"></div>
+      </div>
+    </div>
+
+    <!-- Paso 3: Detalles -->
+    <div class="wiz-step" data-step="3" id="wiz-step-3">
+      <div class="eyebrow">Paso 3</div>
+      <h2 class="h-display">Detalles</h2>
+      <p class="subtitle">Llena la información de tu viaje.</p>
+      <div class="card">
+        <div class="form">
+          <div class="field" id="wiz-multifecha-field" style="display:none">
+            <label for="wiz-multifecha">Elige la fecha</label>
+            <select id="wiz-multifecha"></select>
+          </div>
+
+          <div class="field" id="wiz-zona-field">
+            <label for="wiz-zona">Zona del boleto</label>
+            <select id="wiz-zona"></select>
+            <div class="err">Elige una zona</div>
+          </div>
+
+          <div class="field">
+            <label for="wiz-personas">Número de personas</label>
+            <select id="wiz-personas">
+              <option value="1">1 persona</option>
+              <option value="2">2 personas</option>
+              <option value="3">3 personas</option>
+              <option value="4">4 personas</option>
+              <option value="5">5 personas</option>
+              <option value="6">6 personas</option>
+            </select>
+          </div>
+
+          <div class="field" id="wiz-hab-field" style="display:none">
+            <label for="wiz-hab">Tipo de habitación</label>
+            <select id="wiz-hab"></select>
+            <div class="err">Elige una habitación</div>
+          </div>
+
+          <div class="field">
+            <div class="wiz-toggle" id="wiz-vuelo-toggle" tabindex="0" role="switch" aria-checked="false">
+              <span class="tg-label">¿Llevas vuelo propio?</span>
+              <span class="tg-switch"></span>
+            </div>
+          </div>
+
+          <div class="field" id="wiz-vuelo-field" style="display:none">
+            <label for="wiz-vuelo-codigo">Código de vuelo</label>
+            <input id="wiz-vuelo-codigo" type="text" placeholder="AM 123 / VB 456" autocomplete="off">
+          </div>
+
+          <div class="field">
+            <label for="wiz-codigo">Código de descuento <span style="color:var(--ink-mute);font-weight:500">(opcional)</span></label>
+            <input id="wiz-codigo" type="text" placeholder="Si te dimos un código" autocomplete="off">
+          </div>
+
+          <div class="field">
+            <label for="wiz-notas">Notas adicionales <span style="color:var(--ink-mute);font-weight:500">(opcional)</span></label>
+            <textarea id="wiz-notas" class="wiz-textarea" placeholder="Algo que debamos saber…"></textarea>
+          </div>
+
+          <button type="button" class="btn btn-primary" data-action="wiz-to-summary">
+            <span class="spinner"></span><span class="label">Ver resumen</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Paso 4: Resumen -->
+    <div class="wiz-step" data-step="4" id="wiz-step-4">
+      <div class="eyebrow">Paso 4</div>
+      <h2 class="h-display">Resumen y <span class="accent">precio</span></h2>
+      <p class="subtitle">Revisa antes de confirmar. Te confirmamos por WhatsApp.</p>
+      <div class="card">
+        <div class="wiz-summary-rows" id="wiz-summary"></div>
+      </div>
+      <div class="dash-actions">
+        <button type="button" class="btn btn-primary" data-action="wiz-confirm">
+          <span class="spinner"></span><span class="label">Confirmar solicitud</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Paso 5: Comprobante -->
+    <div class="wiz-step" data-step="5" id="wiz-step-5">
+      <div class="eyebrow">Paso 5</div>
+      <h2 class="h-display">Sube tu <span class="accent">comprobante</span></h2>
+      <p class="subtitle">Opcional pero acelera tu aprobación.</p>
+      <div class="card">
+        <label class="wiz-upload" id="wiz-upload">
+          <input type="file" id="wiz-file" accept="image/jpeg,image/png,image/webp,application/pdf">
+          <div class="up-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          </div>
+          <div class="up-text">Toca para elegir archivo<br><span class="up-hint">JPG, PNG, WEBP o PDF · máx 5 MB</span></div>
+          <img class="up-preview" id="wiz-file-preview" alt="">
+          <div class="up-name" id="wiz-file-name"></div>
+        </label>
+        <div class="dash-actions">
+          <button type="button" class="btn btn-primary" data-action="wiz-upload-finish">
+            <span class="spinner"></span><span class="label">Subir y finalizar</span>
+          </button>
+          <button type="button" class="link-btn" data-action="wiz-skip-upload">Saltar por ahora</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Pantalla de éxito -->
+    <div class="wiz-step" data-step="6" id="wiz-step-6">
+      <div class="card" style="text-align:center;padding:34px 22px">
+        <div class="wiz-success-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+        </div>
+        <h2 class="h-display" style="margin-bottom:8px">¡Solicitud <span class="accent">enviada</span>!</h2>
+        <p class="subtitle">Nos pondremos en contacto contigo pronto para confirmar tu lugar.</p>
+        <div class="dash-actions" style="margin-top:22px">
+          <button type="button" class="btn btn-primary" data-action="wiz-done">Ver mis tours</button>
+          <button type="button" class="btn btn-secondary" data-action="wiz-another">Agregar otro tour</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
 </main>
+
+<!-- FAB visible solo en dashboard -->
+<button type="button" class="fab" id="fab-new-tour" data-action="new-tour" aria-label="Nuevo tour">
+  <span class="plus">+</span><span>Agregar tour</span>
+</button>
 
 <!-- Credenciales del proyecto Supabase del portal (anon key es segura por RLS) -->
 <script>
@@ -479,7 +861,9 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 const SB_URL = window.PORTAL_SUPABASE_URL;
 const SB_ANON = window.PORTAL_SUPABASE_ANON_KEY;
 
-if (!SB_URL || SB_ANON === 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im11dnZyc3Rua3hzeGZwa2hibnRxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg5NDc1MzQsImV4cCI6MjA5NDUyMzUzNH0.vtnJzC9zipujgZhbGEwttFpOv9kL03enf4ZIRkXB6zE') {
+// Heurística: toda anon key de Supabase es un JWT que empieza con "eyJ".
+// Cualquier otro valor (placeholder, vacío, accidente) dispara el warning.
+if (!SB_URL || typeof SB_ANON !== 'string' || !SB_ANON.startsWith('eyJ')) {
   console.warn('[portal] Falta pegar la anon key de Supabase en portal.html');
 }
 
@@ -498,6 +882,8 @@ function showView(name){
   const v = document.getElementById('view-' + name);
   if (v) v.classList.add('is-active');
   $('#boot').style.display = 'none';
+  // FAB solo visible en dashboard
+  $('#fab-new-tour').classList.toggle('is-visible', name === 'dashboard');
   window.scrollTo({ top: 0, behavior: 'instant' });
 }
 
@@ -844,6 +1230,7 @@ async function cargarClienteYRutear(session){
     .eq('auth_user_id', session.user.id)
     .then(() => {}, () => {});
   showView('dashboard');
+  renderToursList(); // dispara fetch async, render cuando llegue
 }
 
 (async function init(){
@@ -854,6 +1241,786 @@ async function cargarClienteYRutear(session){
 supabase.auth.onAuthStateChange((event, session) => {
   // SIGNED_IN, SIGNED_OUT, TOKEN_REFRESHED, USER_UPDATED, PASSWORD_RECOVERY
   cargarClienteYRutear(session);
+});
+
+// =====================================================================
+// Helpers de formato
+// =====================================================================
+const MESES_CORTO = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+function fmtMxn(n){ return '$' + Math.round(n||0).toLocaleString('es-MX'); }
+function fmtFechaCorta(dsStr){
+  // dsStr "2026-08-15" → "15 ago"
+  if (!dsStr) return '';
+  const [y, m, d] = dsStr.split('-');
+  return (parseInt(d,10)) + ' ' + (MESES_CORTO[parseInt(m,10)-1] || '');
+}
+function fmtFechaLarga(iso){
+  if (!iso) return '';
+  try {
+    return new Date(iso).toLocaleDateString('es-MX', { day:'2-digit', month:'short', year:'numeric' });
+  } catch (e){ return iso; }
+}
+function isCDMX(ev){
+  return ev.v && (ev.v.toUpperCase().includes('CDMX') || ev.v.toUpperCase().includes('CIUDAD DE MEXICO')) || !!ev.cdmx;
+}
+function escapeHtml(s){
+  return String(s == null ? '' : s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+// =====================================================================
+// Lista de tours del cliente (Vista C)
+// =====================================================================
+const ESTADOS_LBL = {
+  pendiente:  'Pendiente',
+  en_pagos:   'En pagos',
+  pagado:     'Pagado',
+  cancelado:  'Cancelado'
+};
+
+async function renderToursList(){
+  const cont = $('#tours-list');
+  if (!perfilExistente) return;
+  cont.innerHTML = '<div class="tours-loading"><div class="b-spin" style="width:24px;height:24px"></div></div>';
+
+  const { data, error } = await supabase
+    .from('solicitudes_tour')
+    .select('id,evento_nombre,paquete,zona,num_personas,precio_total,monto_separo,estado,created_at')
+    .eq('auth_user_id', perfilExistente.auth_user_id)
+    .order('created_at', { ascending: false })
+    .limit(20);
+
+  if (error){
+    console.error('[portal] tours', error);
+    cont.innerHTML = '<div class="tour-empty"><b>No se pudieron cargar tus tours</b>' + escapeHtml(traducirError(error)) + '</div>';
+    return;
+  }
+
+  if (!data || data.length === 0){
+    cont.innerHTML = `
+      <div class="tour-empty">
+        <b>Sin solicitudes todavía</b>
+        Crea tu primer tour para empezar el viaje.
+        <div style="margin-top:14px">
+          <button type="button" class="btn btn-primary" data-action="new-tour" style="max-width:240px;margin:0 auto">
+            <span class="label">+ Crear mi primer tour</span>
+          </button>
+        </div>
+      </div>`;
+    return;
+  }
+
+  cont.innerHTML = data.map(t => `
+    <article class="tour-card">
+      <div class="tc-top">
+        <div>
+          <div class="tc-name">${escapeHtml(t.evento_nombre)}</div>
+          <div class="tc-meta">${escapeHtml(t.paquete)} · ${escapeHtml(t.zona)}${t.num_personas > 1 ? ' · ' + t.num_personas + ' pers.' : ''}</div>
+        </div>
+        <span class="badge badge-${t.estado}">${ESTADOS_LBL[t.estado] || t.estado}</span>
+      </div>
+      <div class="tc-row">
+        <div class="tc-money">
+          <span class="lbl">Separo</span>
+          <span class="val">${fmtMxn(t.monto_separo)}</span>
+        </div>
+        <div class="tc-money" style="text-align:right">
+          <span class="lbl">Total</span>
+          <span class="val total">${fmtMxn(t.precio_total)}</span>
+        </div>
+      </div>
+      <div class="tc-date">${fmtFechaLarga(t.created_at)}</div>
+    </article>
+  `).join('');
+}
+
+// =====================================================================
+// Carga del array EV desde /index.html (mismo truco que rol.html)
+// =====================================================================
+let EV = null;
+let HOTEL_STD_FALLBACK = [
+  { n:'Compartida', e:0,    pp:0 },
+  { n:'Triple',     e:250,  pp:250 },
+  { n:'Doble',      e:650,  pp:650 },
+  { n:'Individual', e:1960, pp:1960 }
+];
+let loadEVPromise = null;
+
+function loadEV(){
+  if (loadEVPromise) return loadEVPromise;
+  loadEVPromise = (async () => {
+    try {
+      const res = await fetch('/index.html', { cache: 'no-store' });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const html = await res.text();
+      const startIdx = html.indexOf("var WA='");
+      let endIdx = html.indexOf('var _promoActivo');
+      if (endIdx < 0) endIdx = html.indexOf('function $$(');
+      if (startIdx < 0 || endIdx < 0) throw new Error('Bloque EV no localizado en index.html');
+      const block = html.slice(startIdx, endIdx);
+      const fn = new Function('window',
+        block +
+        '\nreturn {EV:EV,HOTEL_STD:HOTEL_STD,HOTEL_CDM:(typeof HOTEL_CDM!=="undefined"?HOTEL_CDM:[]),HOTEL_MTY:(typeof HOTEL_MTY!=="undefined"?HOTEL_MTY:[]),MESES:MESES};'
+      );
+      const noop = () => {};
+      const winStub = {
+        STATIC_IMGS: {}, MAPAS: {}, LINEUPS: {},
+        addEventListener: noop, removeEventListener: noop,
+        matchMedia: () => ({ matches: false, addEventListener: noop, removeEventListener: noop }),
+        location: { pathname:'/', search:'', hash:'' },
+        history: { state: null, pushState: noop, replaceState: noop }
+      };
+      const out = fn(winStub);
+      EV = out.EV || [];
+      if (out.HOTEL_STD && out.HOTEL_STD.length) HOTEL_STD_FALLBACK = out.HOTEL_STD.map(h => ({ ...h, pp: h.pp != null ? h.pp : h.e }));
+      return EV;
+    } catch (e) {
+      console.error('[portal] loadEV', e);
+      throw e;
+    }
+  })();
+  return loadEVPromise;
+}
+
+// =====================================================================
+// Lógica de paquetes (portada de rol.html con simplificaciones)
+// =====================================================================
+function pkgAvailable(pkg, ev){
+  if (!ev) return false;
+  const hasZ = (ev.zonas || []).some(z => z.p > 0) ||
+               (ev.multifecha || []).some(f => (f.zonas || []).some(z => z && z.p > 0));
+  const hasCheap = (ev.cheapZonas || []).some(z => z.p > 0) ||
+                   (ev.multifecha || []).some(f => (f.cheapZonas || []).some(z => z && z.p > 0)) ||
+                   !!ev.sepCheap;
+  if (ev.rideOnly)  return pkg === 'RIDE';
+  if (ev.cheapOnly) return pkg === 'CHEAP';
+  switch (pkg){
+    case 'PLUS':  return hasZ;
+    case 'RIDE':  return !!ev.ride && ev.ride > 0;
+    case 'STAY':  return hasZ && !isCDMX(ev) && !ev.noHotel && (ev.hotel || []).length > 0;
+    case 'CHEAP': return hasCheap;
+  }
+  return false;
+}
+
+function getZonas(ev, pkg, multifechaIdx){
+  if (!ev) return [];
+  const useCheap = (pkg === 'CHEAP');
+  if (ev.multifecha && ev.multifecha.length){
+    if (multifechaIdx == null) return [];
+    const f = ev.multifecha[multifechaIdx];
+    if (!f) return [];
+    const zs = useCheap ? (f.cheapZonas || f.zonas || []) : (f.zonas || []);
+    return Array.isArray(zs) ? zs : [];
+  }
+  return useCheap ? (ev.cheapZonas || ev.zonas || []) : (ev.zonas || []);
+}
+
+function getHabs(ev){
+  return (ev && ev.hotel && ev.hotel.length) ? ev.hotel : HOTEL_STD_FALLBACK;
+}
+
+// Hotel.e en MXN por persona (HOTEL_STD ya es per-person; hotelPP fuerza per-person en hoteles custom)
+function habCostPP(hab, ev){
+  if (!hab) return 0;
+  if (ev && ev.hotelPP) return hab.e || 0;
+  return hab.pp != null ? hab.pp : (hab.e || 0);
+}
+
+function fechaUltima(ev){
+  // Para multifecha tomamos la última fecha disponible para decidir si el evento todavía sirve.
+  if (ev.dsList && ev.dsList.length) return ev.dsList[ev.dsList.length - 1];
+  if (ev.multifecha && ev.multifecha.length){
+    const fs = ev.multifecha.map(f => f.ds).filter(Boolean);
+    if (fs.length) return fs.sort().pop();
+  }
+  return ev.ds;
+}
+
+function eventoAgendable(ev){
+  if (!ev) return false;
+  if (ev.st === 'agotado' || ev.st === 'por-confirmar' || ev.st === 'proximamente') return false;
+  const last = fechaUltima(ev);
+  if (!last) return false;
+  const lastD = new Date(last + 'T23:59:00');
+  return lastD >= new Date();
+}
+
+// =====================================================================
+// Cálculo de precio y separo (mismo modelo que rol.html)
+// =====================================================================
+function calcularPrecio(){
+  const { ev, pkg, multifechaIdx, zona, hab, personas } = wizState;
+  if (!ev || !pkg) return null;
+  const cdmx = isCDMX(ev);
+  const rideBase = ev.ride || (cdmx ? 2900 : 2700);
+  const stayDiscount = ev.sep || 500;
+  const habE = (pkg === 'CHEAP') ? 0 : habCostPP(hab, ev);
+  const zonaP = (zona && zona.p > 0) ? zona.p : 0;
+
+  let perP = 0;
+  if (pkg === 'PLUS')  perP = zonaP + habE + rideBase;
+  if (pkg === 'RIDE')  perP = rideBase + habE;
+  if (pkg === 'STAY'){
+    perP = zonaP - stayDiscount + habE;
+    if (perP < 0) perP = zonaP + habE;
+  }
+  if (pkg === 'CHEAP') perP = zonaP;
+
+  // Separo por defecto
+  let sep;
+  if (pkg === 'CHEAP'){
+    sep = (ev.sepCheap != null) ? ev.sepCheap : 1000;
+  } else if (pkg === 'RIDE' && ev.sepRide != null){
+    sep = ev.sepRide;
+  } else {
+    sep = ev.sep || 500;
+  }
+  if (sep > perP) sep = perP;
+
+  const total = perP * personas;
+  const separoTotal = sep * personas;
+
+  return {
+    perP, total, sep, separoTotal,
+    desglose: {
+      boleto:  (pkg === 'PLUS' || pkg === 'STAY' || pkg === 'CHEAP') ? zonaP : 0,
+      hotel:   (pkg !== 'CHEAP') ? habE : 0,
+      transporte: (pkg === 'PLUS' || pkg === 'RIDE') ? rideBase : 0,
+      stayDiscount: (pkg === 'STAY') ? stayDiscount : 0
+    }
+  };
+}
+
+// =====================================================================
+// Wizard — state machine
+// =====================================================================
+const wizState = {
+  step: 1,
+  ev: null,
+  pkg: null,
+  multifechaIdx: null,
+  zona: null,
+  hab: null,
+  personas: 1,
+  llevaVuelo: false,
+  codigoVuelo: '',
+  codigoDescuento: '',
+  notas: '',
+  solicitudId: null,
+  file: null
+};
+
+function resetWizard(){
+  wizState.step = 1;
+  wizState.ev = null;
+  wizState.pkg = null;
+  wizState.multifechaIdx = null;
+  wizState.zona = null;
+  wizState.hab = null;
+  wizState.personas = 1;
+  wizState.llevaVuelo = false;
+  wizState.codigoVuelo = '';
+  wizState.codigoDescuento = '';
+  wizState.notas = '';
+  wizState.solicitudId = null;
+  wizState.file = null;
+  $('#wiz-event-search').value = '';
+  $('#wiz-personas').value = '1';
+  $('#wiz-codigo').value = '';
+  $('#wiz-notas').value = '';
+  $('#wiz-vuelo-codigo').value = '';
+  $('#wiz-vuelo-toggle').classList.remove('on');
+  $('#wiz-vuelo-toggle').setAttribute('aria-checked','false');
+  $('#wiz-vuelo-field').style.display = 'none';
+  $('#wiz-upload').classList.remove('has-file');
+  $('#wiz-file').value = '';
+  $('#wiz-file-preview').src = '';
+  $('#wiz-file-name').textContent = '';
+  hideAlert($('#wiz-alert'));
+}
+
+function setWizStep(n){
+  wizState.step = n;
+  $$('.wiz-step').forEach(s => s.classList.toggle('is-active', parseInt(s.dataset.step,10) === n));
+  const total = 5; // pasos visibles en progreso (el 6 es éxito)
+  const display = Math.min(n, total);
+  $('#wiz-step-cur').textContent = display;
+  $('#wiz-bar-fill').style.width = ((display / total) * 100) + '%';
+  $('#wiz-back').disabled = (n <= 1 || n >= 6);
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function openWizard(){
+  resetWizard();
+  setWizStep(1);
+  showView('wizard');
+  poblarEventList();
+}
+
+$('#fab-new-tour').addEventListener('click', openWizard);
+document.body.addEventListener('click', (e) => {
+  const t = e.target.closest('[data-action="new-tour"]');
+  if (t) openWizard();
+});
+
+// Cancelar wizard
+document.body.addEventListener('click', (e) => {
+  const t = e.target.closest('[data-action="wiz-cancel"]');
+  if (!t) return;
+  if (wizState.step === 6 || confirm('¿Seguro? Perderás los datos ingresados.')){
+    resetWizard();
+    showView('dashboard');
+  }
+});
+
+// Atrás
+$('#wiz-back').addEventListener('click', () => {
+  if (wizState.step <= 1 || wizState.step >= 6) return;
+  // Si vamos de 3 → 2 y solo había 1 paquete válido, saltar a 1 directo
+  if (wizState.step === 3 && wizState.ev){
+    const dispon = ['PLUS','RIDE','STAY','CHEAP'].filter(p => pkgAvailable(p, wizState.ev));
+    if (dispon.length === 1){ setWizStep(1); return; }
+  }
+  setWizStep(wizState.step - 1);
+});
+
+// ---------- Paso 1: Evento ----------
+async function poblarEventList(){
+  const list = $('#wiz-event-list');
+  try {
+    if (!EV) await loadEV();
+  } catch (e) {
+    list.innerHTML = '<div class="tour-empty" style="padding:24px"><b>No se pudo cargar la lista</b>Recarga la página.</div>';
+    return;
+  }
+  pintarEventos($('#wiz-event-search').value || '');
+}
+
+function pintarEventos(filtro){
+  const list = $('#wiz-event-list');
+  const q = filtro.trim().toLowerCase()
+    .normalize('NFD').replace(/[̀-ͯ]/g, '');
+  const elegibles = (EV || []).filter(eventoAgendable);
+  const filt = q
+    ? elegibles.filter(ev => {
+        const hay = (ev.a + ' ' + (ev.v||'')).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
+        return hay.includes(q);
+      })
+    : elegibles;
+
+  if (filt.length === 0){
+    list.innerHTML = '';
+    return;
+  }
+  list.innerHTML = filt.slice(0, 60).map(ev => {
+    const [y,m,d] = (ev.ds || '').split('-');
+    return `
+      <div class="wiz-event" data-ev-id="${escapeHtml(ev.id)}" role="option">
+        <div class="ev-day">
+          <span class="d">${parseInt(d||'0',10) || '?'}</span>
+          <span class="m">${MESES_CORTO[(parseInt(m||'1',10) || 1) - 1] || ''}</span>
+        </div>
+        <div>
+          <div class="ev-name">${escapeHtml(ev.a)}</div>
+          <span class="ev-venue">${escapeHtml(ev.v || '')} · ${escapeHtml(ev.f || '')}</span>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+$('#wiz-event-search').addEventListener('input', (e) => pintarEventos(e.target.value));
+
+$('#wiz-event-list').addEventListener('click', (e) => {
+  const t = e.target.closest('[data-ev-id]');
+  if (!t) return;
+  const ev = (EV || []).find(x => x.id === t.dataset.evId);
+  if (!ev) return;
+  wizState.ev = ev;
+  wizState.pkg = null;
+  wizState.multifechaIdx = null;
+  wizState.zona = null;
+  wizState.hab = null;
+  poblarPaquetes();
+});
+
+// ---------- Paso 2: Paquete ----------
+const PKG_DESC = {
+  PLUS:  'Boleto + Hotel + Transporte',
+  RIDE:  'Solo Transporte (sin hotel)',
+  STAY:  'Solo Hotel (sin transporte)',
+  CHEAP: 'Solo Boleto'
+};
+
+function poblarPaquetes(){
+  const ev = wizState.ev;
+  $('#wiz-pkg-evname').textContent = ev.a + ' · ' + (ev.f || '');
+  const dispon = ['PLUS','RIDE','STAY','CHEAP'].filter(p => pkgAvailable(p, ev));
+  if (dispon.length === 0){
+    showAlert($('#wiz-alert'), 'error', 'Este evento no tiene paquetes disponibles. Contacta por WhatsApp.');
+    return;
+  }
+  // Si solo hay 1, saltar paso 2
+  if (dispon.length === 1){
+    wizState.pkg = dispon[0];
+    poblarDetalles();
+    return;
+  }
+  const grid = $('#wiz-pkg-grid');
+  grid.innerHTML = dispon.map(p => `
+    <button type="button" class="wiz-pkg" data-pkg="${p}">
+      <div class="pn">${p}</div>
+      <div class="pd">${PKG_DESC[p]}</div>
+    </button>
+  `).join('');
+  setWizStep(2);
+}
+
+$('#wiz-pkg-grid').addEventListener('click', (e) => {
+  const t = e.target.closest('[data-pkg]');
+  if (!t) return;
+  $$('.wiz-pkg').forEach(b => b.classList.remove('sel'));
+  t.classList.add('sel');
+  wizState.pkg = t.dataset.pkg;
+  setTimeout(poblarDetalles, 180); // pequeño respiro para que el usuario vea la selección
+});
+
+// ---------- Paso 3: Detalles ----------
+function poblarDetalles(){
+  const ev = wizState.ev;
+  const pkg = wizState.pkg;
+
+  // Multifecha
+  const mfField = $('#wiz-multifecha-field');
+  const mfSel = $('#wiz-multifecha');
+  if (ev.multifecha && ev.multifecha.length){
+    mfField.style.display = '';
+    mfSel.innerHTML = '<option value="">— Elige fecha —</option>' +
+      ev.multifecha.map((f, i) => `<option value="${i}">${escapeHtml(f.lbl || f.ds || ('Fecha ' + (i+1)))}</option>`).join('');
+    if (wizState.multifechaIdx != null) mfSel.value = String(wizState.multifechaIdx);
+  } else {
+    mfField.style.display = 'none';
+    wizState.multifechaIdx = null;
+  }
+
+  poblarZonas();
+  poblarHabitaciones();
+  // Si paquete no requiere zona (RIDE), ocultamos field
+  $('#wiz-zona-field').style.display = (pkg === 'RIDE') ? 'none' : '';
+  // Hab: solo PLUS/RIDE/STAY (CHEAP no incluye hotel; pero permitimos comprar hotel? — no, mantener como /rol)
+  $('#wiz-hab-field').style.display = (pkg === 'CHEAP' || !(ev.hotel || HOTEL_STD_FALLBACK).length || ev.noHotel) ? 'none' : '';
+
+  setWizStep(3);
+}
+
+$('#wiz-multifecha').addEventListener('change', (e) => {
+  const v = e.target.value;
+  wizState.multifechaIdx = (v === '') ? null : parseInt(v, 10);
+  wizState.zona = null;
+  poblarZonas();
+});
+
+function poblarZonas(){
+  const sel = $('#wiz-zona');
+  const ev = wizState.ev;
+  const pkg = wizState.pkg;
+
+  if (pkg === 'RIDE'){
+    const rb = ev.ride || (isCDMX(ev) ? 2900 : 2700);
+    sel.innerHTML = `<option value="__ride__" selected>Paquete RIDE — ${fmtMxn(rb)} (sin boleto)</option>`;
+    wizState.zona = { n: 'Paquete RIDE', p: 0 }; // p=0 porque el ride ya va en transporte del cálculo
+    return;
+  }
+
+  // Necesitamos multifecha definida para listar zonas
+  if (ev.multifecha && ev.multifecha.length && wizState.multifechaIdx == null){
+    sel.innerHTML = '<option value="">Primero elige una fecha</option>';
+    return;
+  }
+
+  const zonas = getZonas(ev, pkg, wizState.multifechaIdx);
+  if (!zonas.length){
+    sel.innerHTML = '<option value="">— Sin zonas disponibles —</option>';
+    return;
+  }
+  sel.innerHTML = '<option value="">— Elige una zona —</option>' +
+    zonas.map((z, i) => {
+      const agotada = !!z.ag || !(z.p > 0);
+      const lbl = z.n + (z.p > 0 ? ' — ' + fmtMxn(z.p) : ' (agotada)');
+      return `<option value="${i}" ${agotada ? 'disabled' : ''}>${escapeHtml(lbl)}</option>`;
+    }).join('');
+}
+
+$('#wiz-zona').addEventListener('change', (e) => {
+  const v = e.target.value;
+  if (v === '' || v === '__ride__') return;
+  const zonas = getZonas(wizState.ev, wizState.pkg, wizState.multifechaIdx);
+  wizState.zona = zonas[parseInt(v,10)] || null;
+});
+
+function poblarHabitaciones(){
+  const sel = $('#wiz-hab');
+  const habs = getHabs(wizState.ev);
+  sel.innerHTML = '<option value="">— Elige habitación —</option>' +
+    habs.map((h, i) => {
+      const cost = habCostPP(h, wizState.ev);
+      const lbl = h.n + (cost > 0 ? ' (+' + fmtMxn(cost) + '/persona)' : ' (sin costo extra)');
+      return `<option value="${i}">${escapeHtml(lbl)}</option>`;
+    }).join('');
+}
+
+$('#wiz-hab').addEventListener('change', (e) => {
+  const v = e.target.value;
+  if (v === ''){ wizState.hab = null; return; }
+  const habs = getHabs(wizState.ev);
+  wizState.hab = habs[parseInt(v,10)] || null;
+});
+
+$('#wiz-personas').addEventListener('change', (e) => {
+  wizState.personas = parseInt(e.target.value, 10) || 1;
+});
+
+// Vuelo toggle
+$('#wiz-vuelo-toggle').addEventListener('click', () => {
+  const t = $('#wiz-vuelo-toggle');
+  const on = !t.classList.contains('on');
+  t.classList.toggle('on', on);
+  t.setAttribute('aria-checked', on ? 'true' : 'false');
+  $('#wiz-vuelo-field').style.display = on ? '' : 'none';
+  wizState.llevaVuelo = on;
+});
+
+// Ir a resumen
+document.body.addEventListener('click', (e) => {
+  const t = e.target.closest('[data-action="wiz-to-summary"]');
+  if (!t) return;
+  hideAlert($('#wiz-alert'));
+  // Validar
+  const ev = wizState.ev, pkg = wizState.pkg;
+  if (ev.multifecha && wizState.multifechaIdx == null){
+    showAlert($('#wiz-alert'), 'error', 'Elige la fecha del evento.');
+    return;
+  }
+  if (pkg !== 'RIDE' && !wizState.zona){
+    showAlert($('#wiz-alert'), 'error', 'Elige una zona.');
+    return;
+  }
+  const habRequerida = (pkg === 'PLUS' || pkg === 'RIDE' || pkg === 'STAY') && (ev.hotel || HOTEL_STD_FALLBACK).length && !ev.noHotel;
+  if (habRequerida && !wizState.hab){
+    showAlert($('#wiz-alert'), 'error', 'Elige una habitación.');
+    return;
+  }
+  wizState.codigoVuelo = $('#wiz-vuelo-codigo').value.trim();
+  wizState.codigoDescuento = $('#wiz-codigo').value.trim();
+  wizState.notas = $('#wiz-notas').value.trim();
+  poblarResumen();
+  setWizStep(4);
+});
+
+// ---------- Paso 4: Resumen ----------
+function poblarResumen(){
+  const ev = wizState.ev;
+  const pkg = wizState.pkg;
+  const calc = calcularPrecio();
+  if (!calc) return;
+  const fechaLbl = (ev.multifecha && wizState.multifechaIdx != null)
+    ? ev.multifecha[wizState.multifechaIdx].lbl
+    : (ev.f || ev.ds || '');
+
+  const rows = [
+    ['Evento',  escapeHtml(ev.a)],
+    ['Fecha',   escapeHtml(fechaLbl)],
+    ['Venue',   escapeHtml(ev.v || '')],
+    ['Paquete', escapeHtml(pkg)],
+    pkg !== 'RIDE' ? ['Zona', escapeHtml(wizState.zona.n)] : null,
+    ['Personas', String(wizState.personas)],
+    wizState.hab ? ['Habitación', escapeHtml(wizState.hab.n)] : null,
+    wizState.llevaVuelo ? ['Vuelo propio', wizState.codigoVuelo ? escapeHtml(wizState.codigoVuelo) : 'Sí'] : null,
+    wizState.codigoDescuento ? ['Código', escapeHtml(wizState.codigoDescuento)] : null
+  ].filter(Boolean);
+
+  const dsg = calc.desglose;
+  if (dsg.boleto > 0)     rows.push(['Boleto (por persona)',    fmtMxn(dsg.boleto)]);
+  if (dsg.hotel > 0)      rows.push(['Hotel (por persona)',     '+' + fmtMxn(dsg.hotel)]);
+  if (dsg.transporte > 0) rows.push(['Transporte (por persona)','+' + fmtMxn(dsg.transporte)]);
+  if (dsg.stayDiscount > 0) rows.push(['Descuento STAY',         '-' + fmtMxn(dsg.stayDiscount)]);
+  if (wizState.personas > 1) rows.push(['× ' + wizState.personas + ' personas', '']);
+
+  let html = rows.map(([k,v]) => `<div class="sr"><span class="sr-k">${k}</span><span class="sr-v">${v}</span></div>`).join('');
+  html += `<div class="sr sep"><span class="sr-k">Separo (primer pago)</span><span class="sr-v">${fmtMxn(calc.separoTotal)}</span></div>`;
+  html += `<div class="sr total"><span class="sr-k">Precio total</span><span class="sr-v">${fmtMxn(calc.total)}</span></div>`;
+  $('#wiz-summary').innerHTML = html;
+}
+
+// Confirmar — INSERT en solicitudes_tour, luego paso 5 (comprobante opcional)
+document.body.addEventListener('click', async (e) => {
+  const t = e.target.closest('[data-action="wiz-confirm"]');
+  if (!t) return;
+  hideAlert($('#wiz-alert'));
+  if (!perfilExistente){
+    showAlert($('#wiz-alert'), 'error', 'Tu sesión expiró. Vuelve a iniciar sesión.');
+    return;
+  }
+  const calc = calcularPrecio();
+  if (!calc){ showAlert($('#wiz-alert'), 'error', 'No se pudo calcular el precio.'); return; }
+  setLoading(t, true);
+
+  const ev = wizState.ev;
+  const fechaEv = (ev.multifecha && wizState.multifechaIdx != null) ? ev.multifecha[wizState.multifechaIdx].lbl : (ev.f || ev.ds);
+  const nombreEvento = ev.a + ' · ' + (fechaEv || '');
+
+  const payload = {
+    cliente_id: perfilExistente.id,
+    auth_user_id: perfilExistente.auth_user_id,
+    evento_id: ev.id + (wizState.multifechaIdx != null ? ('#' + wizState.multifechaIdx) : ''),
+    evento_nombre: nombreEvento,
+    paquete: wizState.pkg,
+    zona: wizState.zona ? wizState.zona.n : 'N/A',
+    num_personas: wizState.personas,
+    tipo_habitacion: wizState.hab ? wizState.hab.n.toLowerCase() : null,
+    lleva_vuelo: !!wizState.llevaVuelo,
+    codigo_vuelo: wizState.codigoVuelo || null,
+    codigo_descuento: wizState.codigoDescuento || null,
+    precio_total: calc.total,
+    monto_separo: calc.separoTotal,
+    notas_cliente: wizState.notas || null,
+    estado: 'pendiente'
+  };
+
+  const { data, error } = await supabase
+    .from('solicitudes_tour')
+    .insert(payload)
+    .select()
+    .single();
+
+  setLoading(t, false);
+
+  if (error){
+    console.error('[portal] insert solicitud', error);
+    showAlert($('#wiz-alert'), 'error', traducirError(error));
+    return;
+  }
+  wizState.solicitudId = data.id;
+
+  // Notificar al admin (async, sin bloquear el flow del cliente)
+  notificarAdminNuevaSolicitud(data.id);
+
+  setWizStep(5);
+});
+
+async function notificarAdminNuevaSolicitud(solicitudId){
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    const jwt = session && session.access_token;
+    if (!jwt) return;
+    await fetch('/.netlify/functions/portal-nueva-solicitud', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + jwt },
+      body: JSON.stringify({ solicitud_id: solicitudId })
+    });
+  } catch (e) {
+    console.warn('[portal] notif admin falló', e);
+  }
+}
+
+// ---------- Paso 5: Comprobante ----------
+$('#wiz-file').addEventListener('change', (e) => {
+  const f = e.target.files && e.target.files[0];
+  if (!f) return;
+  // Validar tamaño y tipo
+  const MAX = 5 * 1024 * 1024;
+  if (f.size > MAX){
+    showAlert($('#wiz-alert'), 'error', 'El archivo pesa más de 5 MB. Comprime o elige otro.');
+    e.target.value = '';
+    return;
+  }
+  const okTypes = ['image/jpeg','image/png','image/webp','application/pdf'];
+  if (!okTypes.includes(f.type)){
+    showAlert($('#wiz-alert'), 'error', 'Solo aceptamos JPG, PNG, WEBP o PDF.');
+    e.target.value = '';
+    return;
+  }
+  wizState.file = f;
+  $('#wiz-upload').classList.add('has-file');
+  $('#wiz-file-name').textContent = f.name + ' · ' + Math.round(f.size / 1024) + ' KB';
+  // Preview si es imagen
+  if (f.type.startsWith('image/')){
+    const url = URL.createObjectURL(f);
+    $('#wiz-file-preview').src = url;
+    $('#wiz-file-preview').style.display = 'block';
+  } else {
+    $('#wiz-file-preview').style.display = 'none';
+  }
+});
+
+document.body.addEventListener('click', async (e) => {
+  const skip = e.target.closest('[data-action="wiz-skip-upload"]');
+  const upload = e.target.closest('[data-action="wiz-upload-finish"]');
+  if (!skip && !upload) return;
+
+  if (skip){
+    setWizStep(6);
+    return;
+  }
+
+  // upload
+  if (!wizState.file){
+    showAlert($('#wiz-alert'), 'warn', 'Elige un archivo o salta este paso.');
+    return;
+  }
+  if (!wizState.solicitudId){
+    showAlert($('#wiz-alert'), 'error', 'Falta el ID de la solicitud. Vuelve al paso anterior.');
+    return;
+  }
+  hideAlert($('#wiz-alert'));
+  setLoading(upload, true);
+
+  const ext = (wizState.file.name.split('.').pop() || 'bin').toLowerCase().replace(/[^a-z0-9]/g,'');
+  const ts = Date.now();
+  const path = perfilExistente.auth_user_id + '/' + wizState.solicitudId + '_' + ts + '.' + ext;
+
+  const { error: upErr } = await supabase.storage
+    .from('comprobantes')
+    .upload(path, wizState.file, {
+      contentType: wizState.file.type,
+      upsert: false
+    });
+
+  if (upErr){
+    setLoading(upload, false);
+    showAlert($('#wiz-alert'), 'error', 'No se pudo subir: ' + (upErr.message || ''));
+    return;
+  }
+
+  // Guardar referencia del path en la solicitud
+  const { error: updErr } = await supabase
+    .from('solicitudes_tour')
+    .update({ comprobante_separo_url: path })
+    .eq('id', wizState.solicitudId);
+
+  setLoading(upload, false);
+
+  if (updErr){
+    console.warn('[portal] no se pudo guardar el path del comprobante', updErr);
+    // No bloqueamos el flow — el archivo ya está subido, el admin puede asociarlo manualmente
+  }
+  setWizStep(6);
+});
+
+// ---------- Paso 6: Éxito ----------
+document.body.addEventListener('click', (e) => {
+  if (e.target.closest('[data-action="wiz-done"]')){
+    resetWizard();
+    showView('dashboard');
+    renderToursList();
+    return;
+  }
+  if (e.target.closest('[data-action="wiz-another"]')){
+    openWizard();
+    return;
+  }
 });
 </script>
 

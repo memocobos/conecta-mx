@@ -3055,9 +3055,15 @@ function setWizHint(text){
   el.textContent=text;el.classList.add('show');document.body.classList.add('wiz-hint-on');
 }
 
+// Onboarding e ID del evento actual viven como vars de módulo para que
+// finishOnboarding/skipOnboarding marquen la clave correcta sin tener
+// que pasar el evento como argumento.
+var _onboardingEvId=null;
+function _tutorialKey(id){return 'tutorial-visto-'+(id||'_global');}
 function showOnboarding(ev){
+  _onboardingEvId=ev&&ev.id||null;
   try{
-    if(localStorage.getItem('tutorial-visto')==='true'){
+    if(localStorage.getItem(_tutorialKey(_onboardingEvId))==='true'){
       setTimeout(function(){startWizardTour();},200);
       return;
     }
@@ -3078,11 +3084,13 @@ function showOnboarding(ev){
   bg.style.display='flex';
 }
 function finishOnboarding(){
-  try{localStorage.setItem('tutorial-visto','true');}catch(e){}
+  try{localStorage.setItem(_tutorialKey(_onboardingEvId),'true');}catch(e){}
   var bg=document.getElementById('onboard-bg');if(bg)bg.style.display='none';
   setTimeout(function(){startWizardTour();},250);
 }
 function skipOnboarding(){
+  // Antes no marcaba como visto → el modal volvía a salir al refrescar.
+  try{localStorage.setItem(_tutorialKey(_onboardingEvId),'true');}catch(e){}
   var bg=document.getElementById('onboard-bg');if(bg)bg.style.display='none';
   setTimeout(function(){startWizardTour();},250);
 }
@@ -3098,7 +3106,8 @@ var TOUR_STEPS=[
 ];
 var _tourActive=false,_tourStep=-1,_tourPending=null;
 
-function _tourDone(){try{return localStorage.getItem('wizard-tour-done')==='true';}catch(e){return true;}}
+function _tourDoneKey(){return 'wizard-tour-done-'+(_onboardingEvId||'_global');}
+function _tourDone(){try{return localStorage.getItem(_tourDoneKey())==='true';}catch(e){return true;}}
 function _tourElVisible(el){if(!el)return false;if(el.offsetParent===null&&getComputedStyle(el).position!=='fixed')return false;var r=el.getBoundingClientRect();return r.width>4&&r.height>4;}
 function _tourFindStep(id){for(var i=0;i<TOUR_STEPS.length;i++){if(TOUR_STEPS[i].id===id)return i;}return -1;}
 
@@ -3186,7 +3195,7 @@ function tourSkip(){endWizardTour(true);}
 
 function endWizardTour(persist){
   _tourActive=false;_tourStep=TOUR_STEPS.length;
-  if(persist){try{localStorage.setItem('wizard-tour-done','true');}catch(e){}}
+  if(persist){try{localStorage.setItem(_tourDoneKey(),'true');}catch(e){}}
   _tourHide();
 }
 
@@ -3436,6 +3445,20 @@ function selPaquete(btn,pkg){
 
   $$('d-placeholder').style.display='block';
   $$('d-result').style.display='none';
+  // Scroll automático al siguiente paso visible (consistente independientemente
+  // del tour de tooltips, que solo dispara la primera vez por evento).
+  setTimeout(function(){
+    var ids=['w-fecha-card','w-zona-card','w-hotel-card','w-transport-card'];
+    for(var i=0;i<ids.length;i++){
+      var el=document.getElementById(ids[i]);
+      if(el&&getComputedStyle(el).display!=='none'){
+        try{el.scrollIntoView({behavior:'smooth',block:'start'});}catch(e){el.scrollIntoView();}
+        return;
+      }
+    }
+    // Sin más pasos (ej. diaFirst CDMX cheap llama calcular() directo);
+    // calcular() hace su propio scroll al #d-result.
+  },150);
 }
 
 function buildFechaButtons(){
@@ -4059,7 +4082,14 @@ function calcular(){
   $$('d-result').style.display='block';
   setWizProgress(4);
   setWizHint('Tu cotización está lista. Revisa el plan de pagos y presiona el botón para reservar.');
-  setTimeout(function(){_tourTry('cotizacion');},300);
+  // Scroll al cuadro azul del total. block:'start' deja el `.big-pago` arriba
+  // del viewport en lugar de centrar el #d-result entero (que dejaría al
+  // calendario de pagos en el medio en pantallas grandes).
+  setTimeout(function(){
+    var r=document.getElementById('d-result');
+    if(r){try{r.scrollIntoView({behavior:'smooth',block:'start'});}catch(e){r.scrollIntoView();}}
+  },150);
+  setTimeout(function(){_tourTry('cotizacion');},600);
   var promoCard=document.getElementById('w-promo-card');if(promoCard)promoCard.style.display='block';
   var shareBtn=document.getElementById('btn-share');if(shareBtn)shareBtn.style.display='block';
   if(_promoActivo&&_promoActivo.excludePkg&&_promoActivo.excludePkg.indexOf(selPkg)>=0){
@@ -4793,17 +4823,6 @@ function enviarChat(){
   <button onclick="cerrarMapa()" style="position:absolute;top:12px;right:16px;background:none;border:none;color:#fff;font-size:32px;cursor:pointer;z-index:10000;font-weight:900">✕</button>
   <img id="mapa-img" src="" style="max-width:94vw;max-height:90vh;object-fit:contain;border-radius:6px" onclick="event.stopPropagation()">
 </div>
-<div id="pwa-banner" style="display:none;position:fixed;bottom:80px;left:50%;transform:translateX(-50%);width:calc(100% - 32px);max-width:400px;background:#111;border:1.5px solid #e8ff4c;border-radius:12px;padding:14px 16px;z-index:9998;font-family:'Montserrat',sans-serif">
-  <button id="pwa-close" style="position:absolute;top:8px;right:10px;background:none;border:none;color:rgba(255,255,255,.4);font-size:18px;cursor:pointer">✕</button>
-  <div style="display:flex;align-items:center;gap:12px">
-    <img src="/icon-192.png" style="width:44px;height:44px;border-radius:10px;flex-shrink:0">
-    <div style="flex:1">
-      <div style="color:#fff;font-size:14px;font-weight:900">Instala Conecta Reynosa</div>
-      <div id="pwa-sub" style="color:rgba(255,255,255,.5);font-size:11px;margin-top:4px;line-height:1.4"></div>
-    </div>
-  </div>
-  <div id="pwa-action" style="margin-top:10px"></div>
-</div>
 <script>
 // Bienvenida pop-up
 (function(){
@@ -4820,66 +4839,13 @@ function cerrarBienvenida(){
 }
 </script>
 <script>
+// Service Worker para cache offline (independiente del banner PWA, que se removió).
+// Solo se registra en navegadores móviles que lo soporten — no agrega UI ni banner.
 (function(){
-  if(window.matchMedia('(display-mode:standalone)').matches)return;
-  if(window.navigator.standalone)return;
-  if(localStorage.getItem('pwa-banner-dismissed')||localStorage.getItem('pwa-dismissed'))return;
+  if(!('serviceWorker' in navigator))return;
   var isMobile=/Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
   if(!isMobile)return;
-
-  if('serviceWorker' in navigator){navigator.serviceWorker.register('/sw.js');}
-
-  var banner=document.getElementById('pwa-banner');
-  var sub=document.getElementById('pwa-sub');
-  var action=document.getElementById('pwa-action');
-  var ua=navigator.userAgent;
-  var isIOS=/iPhone|iPad|iPod/i.test(ua);
-  var isSafari=isIOS&&/Safari/i.test(ua)&&!/CriOS|FxiOS|OPiOS/i.test(ua);
-  var isAndroid=/Android/i.test(ua);
-  var isChrome=/Chrome/i.test(ua)&&!/Edge|OPR|Samsung/i.test(ua);
-  var isSamsung=/Samsung/i.test(ua);
-  var isHuawei=/Huawei|HMSCore/i.test(ua);
-  var deferredPrompt=null;
-
-  window.addEventListener('beforeinstallprompt',function(e){
-    e.preventDefault();
-    deferredPrompt=e;
-  });
-
-  setTimeout(function(){
-    // Suprimir si el welcome modal sigue abierto — evitar dos overlays simultáneos
-    var wb=document.getElementById('bienvenida-bg');
-    if(wb&&wb.style.display==='flex')return;
-    if(isAndroid&&deferredPrompt){
-      sub.textContent='Acceso rápido desde tu pantalla de inicio';
-      action.innerHTML='<button id="pwa-install" style="width:100%;background:#e8ff4c;color:#000;border:none;padding:10px;font-size:12px;font-weight:900;font-family:Montserrat,sans-serif;border-radius:8px;cursor:pointer;text-transform:uppercase;letter-spacing:.06em">📱 Instalar app</button>';
-      document.getElementById('pwa-install').onclick=function(){
-        deferredPrompt.prompt();
-        deferredPrompt.userChoice.then(function(){deferredPrompt=null;banner.style.display='none';});
-      };
-    } else if(isAndroid&&isSamsung){
-      sub.textContent='Abre ⋮ menú → Agregar a pantalla de inicio';
-    } else if(isAndroid&&isHuawei){
-      sub.textContent='Menú → Agregar a pantalla de inicio';
-    } else if(isAndroid){
-      sub.textContent='Abre ⋮ menú → Agregar a pantalla de inicio';
-    } else if(isIOS&&isSafari){
-      sub.textContent='Toca compartir ↑ → Agregar a pantalla de inicio';
-      action.innerHTML='<div style="background:rgba(232,255,76,.1);border:1px solid rgba(232,255,76,.2);border-radius:8px;padding:8px 12px;font-size:10px;color:#e8ff4c;text-align:center;margin-top:6px">Toca el botón <b>↑</b> de Safari → <b>Agregar a inicio</b></div>';
-    } else if(isIOS){
-      sub.textContent='Abre este link en Safari para instalar';
-    } else {
-      sub.textContent='Agrega la app a tu pantalla de inicio';
-    }
-    banner.style.display='block';
-    document.body.style.paddingBottom='96px';
-  },5000);
-
-  document.getElementById('pwa-close').onclick=function(){
-    banner.style.display='none';
-    document.body.style.paddingBottom='';
-    localStorage.setItem('pwa-banner-dismissed','1');
-  };
+  navigator.serviceWorker.register('/sw.js').catch(function(){});
 })();
 </script>
 </body>

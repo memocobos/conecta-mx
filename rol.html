@@ -2437,6 +2437,27 @@ function setStep(n){
   }
 }
 
+// ── Pagos manuales (override por subfecha de multifecha) ─────
+// Algunos eventos definen fechas de pago explícitas en `multifecha[i].pagos`
+// (array de strings 'YYYY-MM-DD'). Cuando existe, IGNORAMOS la lógica de
+// quincenas y construimos los "pagos" directos a partir de esas fechas.
+// Usado actualmente solo por Fan Fest MTY para alinear cobros con cada función.
+function getPagosManuales(ev, fi, fromDate){
+  if(!ev || !ev.multifecha || fi==null) return null;
+  var mf = ev.multifecha[fi];
+  if(!mf || !Array.isArray(mf.pagos) || mf.pagos.length===0) return null;
+  var sepD = fromDate || new Date();
+  var list = mf.pagos.map(function(ds){
+    var d = new Date(ds+'T12:00:00');
+    var mm = String(d.getMonth()+1).padStart(2,'0');
+    return { lbl: d.getDate() + ' de ' + (MESES[mm]||''), d: d, e: d };
+  });
+  // Mismo criterio que getQuincenas: excluir pagos que caen antes del separo.
+  // Sin esto, un cliente entrando después de una fecha hardcodeada vería un
+  // "pago pendiente" con fecha en el pasado.
+  return list.filter(function(p){ return p.d >= sepD; });
+}
+
 // ── Quincenas ────────────────────────────────
 // `diasAntes` (opcional): cuántos días antes del evento se corta el último pago.
 // Default 14 (regla general de Conecta). Algunos eventos lo overridean — ej.
@@ -2513,7 +2534,12 @@ function computeStatePlan(){
     : ev.ds;
   var eventDate=new Date(dsEffective+'T12:00:00');
   var maxPagos=(pkg==='cheap')?4:10;
-  var quincenas=getQuincenas(sepD, eventDate, maxPagos, ev.diasAntes);
+  // Override por subfecha: si la multifecha define `pagos:['YYYY-MM-DD',...]`
+  // usamos esas fechas directamente. Si no, caemos al cálculo de quincenas.
+  var manualPagos=getPagosManuales(ev, state.fi, sepD);
+  var quincenas = manualPagos
+    ? manualPagos.slice(0, maxPagos)
+    : getQuincenas(sepD, eventDate, maxPagos, ev.diasAntes);
   var pagoQ=quincenas.length>0 ? Math.ceil(resto/quincenas.length) : resto;
   var bank=ev.banco||BANCO_DEFAULT;
 
@@ -2908,7 +2934,11 @@ function buildPlanForTour(t){
     : ev.ds;
   var eventDate=new Date(dsEffective+'T12:00:00');
   var maxPagos=(pkg==='cheap')?4:10;
-  var quincenas=getQuincenas(sepD,eventDate,maxPagos,ev.diasAntes);
+  // Override por subfecha (mismo patrón que computeStatePlan)
+  var manualPagos=getPagosManuales(ev, t.fi, sepD);
+  var quincenas = manualPagos
+    ? manualPagos.slice(0, maxPagos)
+    : getQuincenas(sepD,eventDate,maxPagos,ev.diasAntes);
   var pagoQ=quincenas.length>0?Math.ceil(resto/quincenas.length):resto;
   var rows=[];
   rows.push({k:'sep',label:'Separo',sub:'Al apartar',date:sepD,amount:sepActual});

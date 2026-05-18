@@ -95,9 +95,23 @@ function extractEventos(html) {
   return out;
 }
 
-function emailTemplate({ nombre, evento_nombre, fecha, venue, link }) {
+function emailTemplate({ nombre, evento_nombre, fecha, venue, link, promo }) {
   const dudasUrl = "https://wa.me/528119771072";
   const firstName = (nombre || "").split(" ")[0] || nombre;
+  // Bloque amarillo de código de descuento (opcional).
+  // Se inserta entre la "EVENT CARD" y el botón CTA cuando el admin lo activó
+  // en el modal de Kamehouse antes de mandar el correo.
+  const promoBlock = promo && promo.codigo ? `
+      <tr><td style="padding:18px 26px 0 26px">
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#e8ff4c;border-radius:8px">
+          <tr><td style="padding:20px;text-align:center">
+            <p style="color:#000;font-size:13px;margin:0 0 8px 0;font-weight:700;letter-spacing:.16em;text-transform:uppercase;font-family:Arial,sans-serif">🎁 Código de descuento exclusivo</p>
+            <p style="color:#000;font-size:28px;font-weight:900;letter-spacing:4px;margin:0 0 8px 0;font-family:Arial Black,Arial,sans-serif">${escapeHtml(promo.codigo)}</p>
+            <p style="color:#000;font-size:13px;margin:0;font-weight:600">${promo.descuento}% de descuento · Aplícalo al cotizar en el sitio</p>
+            <p style="color:rgba(0,0,0,.65);font-size:11px;margin:8px 0 0 0;font-weight:700;letter-spacing:.08em;text-transform:uppercase">⏱ Válido por ${promo.horas} ${promo.horas === 1 ? 'hora' : 'horas'}</p>
+          </td></tr>
+        </table>
+      </td></tr>` : '';
   return `<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>¡Ya está disponible!</title></head>
 <body style="margin:0;padding:0;background:#000;font-family:Helvetica,Arial,sans-serif;color:#ffffff;-webkit-font-smoothing:antialiased">
 <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#000">
@@ -132,6 +146,8 @@ function emailTemplate({ nombre, evento_nombre, fecha, venue, link }) {
         </table>
       </td></tr>
 
+      ${promoBlock}
+
       <!-- BUTTON -->
       <tr><td style="padding:24px 26px 8px 26px">
         <a href="${link}" style="display:block;width:100%;background:#e8ff4c;color:#000;padding:18px 20px;text-align:center;font-weight:900;font-size:15px;letter-spacing:.08em;text-transform:uppercase;text-decoration:none;font-family:Arial,sans-serif;box-sizing:border-box">→ Ver precios y reservar</a>
@@ -165,7 +181,7 @@ function emailTemplate({ nombre, evento_nombre, fecha, venue, link }) {
 </body></html>`;
 }
 
-async function notifyEvento({ id, a, f, v }) {
+async function notifyEvento({ id, a, f, v, promo }) {
   const link = `${SITE}/${encodeURIComponent(id)}`;
   // Pide solo registros pendientes.
   const rows = await sb(`eventos_waitlist?evento_id=eq.${encodeURIComponent(id)}&notificado=eq.false&select=id,nombre,email`);
@@ -174,7 +190,7 @@ async function notifyEvento({ id, a, f, v }) {
   let sent = 0;
   for (const r of rows) {
     const subject = `¡Ya está disponible ${a}!`;
-    const html = emailTemplate({ nombre: r.nombre, evento_nombre: a, fecha: f, venue: v, link });
+    const html = emailTemplate({ nombre: r.nombre, evento_nombre: a, fecha: f, venue: v, link, promo });
     const okSend = await sendEmail(r.email, subject, html);
     if (!okSend) continue;
     sent++;
@@ -204,6 +220,17 @@ exports.handler = async function (event) {
   const force = qs.force === "true";
   const forceId = qs.evento_id;
 
+  // Código de descuento opcional (force mode). El admin lo configura desde el
+  // modal de Kamehouse → Lista de espera → Notificar. Si llegan los 3 campos,
+  // el email incluye el bloque amarillo destacado; si no, va el correo normal.
+  const codigo = (qs.codigo || "").trim().toUpperCase().slice(0, 24);
+  const descuento = parseInt(qs.descuento, 10);
+  const horas = parseInt(qs.horas, 10);
+  const promo = (codigo && /^[A-Z0-9_-]{2,24}$/.test(codigo)
+                 && Number.isFinite(descuento) && descuento > 0 && descuento < 100
+                 && Number.isFinite(horas) && horas > 0 && horas <= 168)
+    ? { codigo, descuento, horas } : null;
+
   // ── FORCE MODE: notificar a una lista específica desde kamehouse ──
   if (force && forceId) {
     // Necesitamos el nombre/fecha/venue. Los traemos del primer registro
@@ -215,7 +242,7 @@ exports.handler = async function (event) {
     } catch (e) { return bad(500, "SB error: " + e.message); }
     if (!row) return ok({ ok: true, sent: 0, total: 0, note: "Lista vacía" });
 
-    const summary = await notifyEvento({ id: forceId, a: row.evento_nombre, f: "", v: "" });
+    const summary = await notifyEvento({ id: forceId, a: row.evento_nombre, f: "", v: "", promo });
     // Marca el evento como activo en snapshot para que el cron no vuelva a disparar.
     try {
       await sb(`eventos_estado_snapshot`, {

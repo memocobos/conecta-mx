@@ -3041,6 +3041,54 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
   </div>
 </div>
 
+<!-- Modal: Notificar lista de espera con código opcional -->
+<div class="modal-overlay" id="modal-wl-notif" role="dialog" aria-modal="true">
+  <div class="modal" style="max-width:480px">
+    <div class="modal-header">
+      <span class="modal-title">🔔 Notificar lista de espera</span>
+      <button type="button" class="modal-close" id="wl-notif-close" aria-label="Cerrar">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="font-size:11px;letter-spacing:.14em;color:var(--ts);text-transform:uppercase;margin-bottom:4px">Evento</div>
+      <div id="wl-notif-evento" style="font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:18px;color:#fff;margin-bottom:6px">—</div>
+      <div id="wl-notif-target" style="font-size:12px;color:var(--ts);margin-bottom:22px">—</div>
+
+      <label style="display:flex;align-items:flex-start;gap:10px;padding:14px;background:rgba(232,255,76,.06);border:1px solid rgba(232,255,76,.2);border-radius:8px;cursor:pointer">
+        <input type="checkbox" id="wl-notif-usar-codigo" style="width:18px;height:18px;margin-top:2px;accent-color:#e8ff4c;cursor:pointer">
+        <div>
+          <div style="font-size:13px;font-weight:700;color:#e8ff4c;line-height:1.3">Incluir código de descuento exclusivo en el correo</div>
+          <div style="font-size:11px;color:var(--ts);margin-top:4px;line-height:1.4">Aparece como bloque amarillo destacado dentro del email, con el código en grande.</div>
+        </div>
+      </label>
+
+      <div id="wl-notif-codigo-fields" style="display:none;margin-top:14px;padding:14px;border:1px dashed var(--border2);border-radius:8px">
+        <div style="margin-bottom:12px">
+          <label style="display:block;font-size:10px;letter-spacing:.14em;color:var(--ts);text-transform:uppercase;font-weight:700;margin-bottom:6px">Código (ej. KENIA24)</label>
+          <input type="text" id="wl-notif-codigo" maxlength="24" placeholder="LETRAS Y NÚMEROS"
+            style="width:100%;padding:11px 13px;background:#000;border:1.5px solid var(--border2);border-radius:6px;color:#fff;font-family:'JetBrains Mono',monospace;font-weight:700;font-size:14px;letter-spacing:.1em;text-transform:uppercase;outline:none">
+        </div>
+        <div style="display:flex;gap:10px">
+          <div style="flex:1">
+            <label style="display:block;font-size:10px;letter-spacing:.14em;color:var(--ts);text-transform:uppercase;font-weight:700;margin-bottom:6px">% de descuento</label>
+            <input type="number" id="wl-notif-descuento" min="1" max="99" step="1" placeholder="10"
+              style="width:100%;padding:11px 13px;background:#000;border:1.5px solid var(--border2);border-radius:6px;color:#fff;font-family:'JetBrains Mono',monospace;font-weight:700;font-size:14px;outline:none">
+          </div>
+          <div style="flex:1">
+            <label style="display:block;font-size:10px;letter-spacing:.14em;color:var(--ts);text-transform:uppercase;font-weight:700;margin-bottom:6px">Válido por (horas)</label>
+            <input type="number" id="wl-notif-horas" min="1" max="168" step="1" value="24"
+              style="width:100%;padding:11px 13px;background:#000;border:1.5px solid var(--border2);border-radius:6px;color:#fff;font-family:'JetBrains Mono',monospace;font-weight:700;font-size:14px;outline:none">
+          </div>
+        </div>
+        <div id="wl-notif-error" style="display:none;margin-top:10px;font-size:12px;color:#ff6666;font-weight:600">—</div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-ghost" id="wl-notif-cancel">Cancelar</button>
+      <button type="button" class="btn btn-primary" id="wl-notif-submit" style="background:#e8ff4c;color:#000;font-weight:900">Enviar correos</button>
+    </div>
+  </div>
+</div>
+
 <!-- Tools bottom-sheet (móvil) — reemplaza al dropdown que no se abre por touch.
      Vive a nivel raíz para evitar overflow:hidden del nav-items-wrapper. -->
 <div class="tools-sheet" id="tools-sheet" role="dialog" aria-modal="true" aria-labelledby="tools-sheet-title">
@@ -10119,9 +10167,10 @@ async function wlEliminarEvento(eventoId, total) {
 }
 
 async function wlNotificar(eventoId, totalRegs, pendientes) {
-  const targetCount = pendientes > 0 ? pendientes : totalRegs;
-  const verbo = pendientes > 0 ? 'mandar email' : 'REENVIAR (todos ya fueron notificados)';
-  if (!confirm(`¿${verbo} a las ${targetCount} personas registradas? Esta acción no se puede deshacer.`)) return;
+  // Abre el modal de configuración. El admin puede elegir mandar correo normal
+  // o incluir un código de descuento exclusivo (bloque amarillo en el email).
+  const params = await wlAbrirModalNotif(eventoId, totalRegs, pendientes);
+  if (!params) return; // cancelado
 
   // Si es reenvío, primero reset notificado=false para los que ya fueron notificados.
   if (pendientes === 0 && totalRegs > 0) {
@@ -10134,16 +10183,114 @@ async function wlNotificar(eventoId, totalRegs, pendientes) {
     } catch (e) { alert('No se pudo resetear el flag: ' + e.message); return; }
   }
 
-  // Disparar la función
+  // Disparar la función. Si hay código, lo pasamos por query string.
+  const qs = new URLSearchParams({ force: 'true', evento_id: eventoId });
+  if (params.codigo) {
+    qs.set('codigo', params.codigo);
+    qs.set('descuento', String(params.descuento));
+    qs.set('horas', String(params.horas));
+  }
   try {
-    const r = await fetch(`/.netlify/functions/waitlist-notify?force=true&evento_id=${encodeURIComponent(eventoId)}`);
+    const r = await fetch(`/.netlify/functions/waitlist-notify?${qs.toString()}`);
     const d = await r.json().catch(() => ({}));
     if (!r.ok || !d.ok) { alert('Error: ' + (d.error || r.status)); return; }
-    alert(`Enviados ${d.sent || 0} de ${d.total || 0} emails.`);
+    const suffix = params.codigo ? ` (con código ${params.codigo} · ${params.descuento}% · ${params.horas}h)` : '';
+    alert(`Enviados ${d.sent || 0} de ${d.total || 0} emails${suffix}.`);
     loadWaitlist();
   } catch (e) {
     alert('Error de red: ' + e.message);
   }
+}
+
+// ── Modal de configuración de notificación ──────────────────
+// Resuelve a `{codigo, descuento, horas}` o `null` si el admin cancela.
+// Si el checkbox NO está marcado, los 3 campos llegan vacíos y se manda
+// el email sin la sección de código.
+function wlAbrirModalNotif(eventoId, totalRegs, pendientes) {
+  return new Promise(resolve => {
+    const modal = document.getElementById('modal-wl-notif');
+    const $cb   = document.getElementById('wl-notif-usar-codigo');
+    const $box  = document.getElementById('wl-notif-codigo-fields');
+    const $cod  = document.getElementById('wl-notif-codigo');
+    const $desc = document.getElementById('wl-notif-descuento');
+    const $hrs  = document.getElementById('wl-notif-horas');
+    const $err  = document.getElementById('wl-notif-error');
+    const $okBtn   = document.getElementById('wl-notif-submit');
+    const $cancel  = document.getElementById('wl-notif-cancel');
+    const $closeX  = document.getElementById('wl-notif-close');
+    const $evName  = document.getElementById('wl-notif-evento');
+    const $target  = document.getElementById('wl-notif-target');
+
+    // Resolver nombre del evento desde el cache de waitlist (_waitlistCache lo
+    // tiene poblado por loadWaitlist; cada row trae evento_nombre).
+    let evNombre = eventoId;
+    try {
+      if (typeof _waitlistCache !== 'undefined') {
+        const row = (_waitlistCache || []).find(r => r.evento_id === eventoId);
+        if (row && row.evento_nombre) evNombre = row.evento_nombre;
+      }
+    } catch {}
+    $evName.textContent = evNombre;
+    const target = pendientes > 0 ? pendientes : totalRegs;
+    const verbo  = pendientes > 0 ? 'mandar email a' : 'reenviar email a';
+    $target.textContent = `Vas a ${verbo} ${target} ${target === 1 ? 'persona' : 'personas'} registradas.`;
+
+    // Reset estado
+    $cb.checked = false;
+    $box.style.display = 'none';
+    $cod.value = '';
+    $desc.value = '';
+    $hrs.value = '24';
+    $err.style.display = 'none';
+    $err.textContent = '';
+
+    // Wire (idempotente: reemplazamos handlers cada vez para evitar leaks)
+    function cleanup() {
+      modal.classList.remove('open');
+      $cb.removeEventListener('change', onToggle);
+      $okBtn.removeEventListener('click', onOk);
+      $cancel.removeEventListener('click', onCancel);
+      $closeX.removeEventListener('click', onCancel);
+      modal.removeEventListener('click', onBackdrop);
+      document.removeEventListener('keydown', onKey);
+    }
+    function onToggle() {
+      $box.style.display = $cb.checked ? 'block' : 'none';
+      $err.style.display = 'none';
+      if ($cb.checked) setTimeout(() => $cod.focus(), 50);
+    }
+    function onCancel() { cleanup(); resolve(null); }
+    function onBackdrop(e) { if (e.target === modal) onCancel(); }
+    function onKey(e) { if (e.key === 'Escape') onCancel(); }
+    function onOk() {
+      if (!$cb.checked) { cleanup(); resolve({ codigo: '', descuento: 0, horas: 0 }); return; }
+      const cod = ($cod.value || '').trim().toUpperCase();
+      const desc = parseInt($desc.value, 10);
+      const hrs  = parseInt($hrs.value, 10) || 24;
+      if (!cod || !/^[A-Z0-9_-]{2,24}$/.test(cod)) {
+        $err.textContent = 'Código inválido: solo letras, números, _ o − (2-24 chars).';
+        $err.style.display = 'block'; $cod.focus(); return;
+      }
+      if (!Number.isFinite(desc) || desc < 1 || desc > 99) {
+        $err.textContent = 'Descuento debe ser entre 1 y 99.';
+        $err.style.display = 'block'; $desc.focus(); return;
+      }
+      if (!Number.isFinite(hrs) || hrs < 1 || hrs > 168) {
+        $err.textContent = 'Horas debe ser entre 1 y 168.';
+        $err.style.display = 'block'; $hrs.focus(); return;
+      }
+      cleanup();
+      resolve({ codigo: cod, descuento: desc, horas: hrs });
+    }
+    $cb.addEventListener('change', onToggle);
+    $okBtn.addEventListener('click', onOk);
+    $cancel.addEventListener('click', onCancel);
+    $closeX.addEventListener('click', onCancel);
+    modal.addEventListener('click', onBackdrop);
+    document.addEventListener('keydown', onKey);
+
+    modal.classList.add('open');
+  });
 }
 
 // ═══════════════════════════════════════════════

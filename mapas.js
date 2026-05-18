@@ -42,5 +42,6 @@ window.MAPAS={
   'edenmunoz':'mapas/edenmunoz.webp',
   'beele':'mapas/beele.webp',
   'anuelaa':'mapas/anuelaa.webp',
-  'fanfest':'mapas/fanfest.webp'
+  'fanfest':'mapas/fanfest.webp',
+  'monlaferte':'mapas/monlaferte.webp'
 };

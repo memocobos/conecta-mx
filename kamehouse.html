@@ -1808,45 +1808,6 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
   text-align:center;padding:24px 12px;font-style:italic;
 }
 
-/* Compatibilidad con render functions viejas (rolan-kpi-* IDs siguen ahí pero
-   los envolvemos en cards rdr-kpi). Algunas funciones aún escriben en .rolan-*
-   placeholders viejos del bloque /Rol — los re-estilizamos con menor prominencia. */
-#page-radar .radar-sub[data-sub="rol"] .rolan-kpis{
-  display:grid;grid-template-columns:repeat(3, minmax(0, 1fr));gap:14px;margin-bottom:22px;
-}
-@media(max-width:1023px){#page-radar .radar-sub[data-sub="rol"] .rolan-kpis{grid-template-columns:repeat(2, minmax(0, 1fr))}}
-@media(max-width:640px){#page-radar .radar-sub[data-sub="rol"] .rolan-kpis{grid-template-columns:1fr}}
-#page-radar .radar-sub[data-sub="rol"] .rolan-kpi{
-  position:relative;
-  background:linear-gradient(165deg, var(--rdr-card-hi) 0%, var(--rdr-card) 100%);
-  border:1px solid var(--rdr-border);border-radius:12px;padding:18px;
-  box-shadow:var(--rdr-shadow);
-}
-#page-radar .radar-sub[data-sub="rol"] .rolan-kpi::before{
-  content:'';position:absolute;top:0;left:0;right:0;height:1px;
-  background:linear-gradient(90deg, transparent 0%, rgba(232,255,76,.18) 50%, transparent 100%);
-}
-#page-radar .radar-sub[data-sub="rol"] .rolan-kpi .lbl{
-  display:block;font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;
-  letter-spacing:.18em;text-transform:uppercase;color:var(--ts);margin-bottom:8px;
-}
-#page-radar .radar-sub[data-sub="rol"] .rolan-kpi .val{
-  display:block;font-family:'Barlow Condensed',sans-serif;font-weight:900;
-  font-size:clamp(34px, 5vw, 44px);line-height:.9;letter-spacing:-.02em;color:var(--text);
-}
-#page-radar .radar-sub[data-sub="rol"] .rolan-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
-@media(max-width:900px){#page-radar .radar-sub[data-sub="rol"] .rolan-grid{grid-template-columns:1fr}}
-#page-radar .radar-sub[data-sub="rol"] .rolan-section{
-  background:linear-gradient(180deg, var(--rdr-card-hi) 0%, var(--rdr-card) 100%);
-  border:1px solid var(--rdr-border);border-radius:14px;padding:20px;
-  box-shadow:var(--rdr-shadow);
-}
-#page-radar .radar-sub[data-sub="rol"] .rolan-section h3{
-  font-family:'Zen Dots',sans-serif;font-size:12px;letter-spacing:.06em;
-  color:var(--text);margin:0 0 14px;padding-bottom:12px;
-  border-bottom:1px solid var(--rdr-border);text-transform:none;
-}
-
 </style>
 </head>
 <body>
@@ -3219,44 +3180,132 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
      </div>
    </section>
 
-   <!-- SUB-PESTAÑA: /Rol (contenido viejo de ROL Analytics, intacto) -->
+   <!-- ═══════════ SUB-PESTAÑA: /Rol ═══════════ -->
    <section class="radar-sub" data-sub="rol" style="display:none">
-     <div style="display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;margin-bottom:14px">
-       <span id="rolan-status" style="font-size:11px;letter-spacing:.1em;color:var(--ts);text-transform:uppercase;align-self:center">—</span>
-       <button class="btn btn-ghost btn-sm" onclick="loadRolAnalytics()">↻ Refrescar</button>
-       <button class="btn btn-sm" onclick="exportRolAnalyticsCSV()" style="background:var(--gold);color:#000;font-weight:900">📥 Export CSV</button>
+     <!-- KPI cards con sparklines y trends -->
+     <div class="rdr-kpis">
+       <div class="rdr-kpi">
+         <div class="rdr-kpi-lbl">Sesiones únicas</div>
+         <div class="rdr-kpi-num">
+           <span class="rdr-kpi-val" id="rro-sesiones">—</span>
+           <span class="rdr-kpi-trend" id="rro-sesiones-tr"></span>
+         </div>
+         <svg class="rdr-kpi-spark" id="rro-sesiones-spark" viewBox="0 0 240 32" preserveAspectRatio="none"></svg>
+       </div>
+       <div class="rdr-kpi">
+         <div class="rdr-kpi-lbl">Planes generados</div>
+         <div class="rdr-kpi-num">
+           <span class="rdr-kpi-val" id="rro-planes">—</span>
+           <span class="rdr-kpi-trend" id="rro-planes-tr"></span>
+         </div>
+         <svg class="rdr-kpi-spark" id="rro-planes-spark" viewBox="0 0 240 32" preserveAspectRatio="none"></svg>
+       </div>
+       <div class="rdr-kpi">
+         <div class="rdr-kpi-lbl">Conversión</div>
+         <div class="rdr-kpi-num">
+           <span class="rdr-kpi-val" id="rro-conv">—</span>
+           <span class="rdr-kpi-trend" id="rro-conv-tr"></span>
+         </div>
+         <svg class="rdr-kpi-spark" id="rro-conv-spark" viewBox="0 0 240 32" preserveAspectRatio="none"></svg>
+       </div>
+       <div class="rdr-kpi">
+         <div class="rdr-kpi-lbl">Recordatorios</div>
+         <div class="rdr-kpi-num">
+           <span class="rdr-kpi-val" id="rro-recordatorios">—</span>
+           <span class="rdr-kpi-trend" id="rro-recordatorios-tr"></span>
+         </div>
+         <svg class="rdr-kpi-spark" id="rro-recordatorios-spark" viewBox="0 0 240 32" preserveAspectRatio="none"></svg>
+       </div>
+       <div class="rdr-kpi">
+         <div class="rdr-kpi-lbl">Comprobantes</div>
+         <div class="rdr-kpi-num">
+           <span class="rdr-kpi-val" id="rro-comprobantes">—</span>
+           <span class="rdr-kpi-trend" id="rro-comprobantes-tr"></span>
+         </div>
+         <svg class="rdr-kpi-spark" id="rro-comprobantes-spark" viewBox="0 0 240 32" preserveAspectRatio="none"></svg>
+       </div>
+       <div class="rdr-kpi">
+         <div class="rdr-kpi-lbl">Tours guardados</div>
+         <div class="rdr-kpi-num">
+           <span class="rdr-kpi-val" id="rro-tours">—</span>
+           <span class="rdr-kpi-trend" id="rro-tours-tr"></span>
+         </div>
+         <svg class="rdr-kpi-spark" id="rro-tours-spark" viewBox="0 0 240 32" preserveAspectRatio="none"></svg>
+       </div>
      </div>
-     <div class="rolan-kpis" id="rolan-kpis">
-       <div class="rolan-kpi"><span class="lbl">Sesiones únicas</span><span class="val" id="rolan-kpi-sesiones">—</span></div>
-       <div class="rolan-kpi"><span class="lbl">Planes generados</span><span class="val" id="rolan-kpi-planes">—</span></div>
-       <div class="rolan-kpi"><span class="lbl">Conversión</span><span class="val" id="rolan-kpi-conversion">—</span></div>
-       <div class="rolan-kpi"><span class="lbl">Recordatorios</span><span class="val" id="rolan-kpi-recordatorios">—</span></div>
-       <div class="rolan-kpi"><span class="lbl">Comprobantes</span><span class="val" id="rolan-kpi-comprobantes">—</span></div>
-       <div class="rolan-kpi"><span class="lbl">Tours guardados</span><span class="val" id="rolan-kpi-tours">—</span></div>
-       <div class="rolan-kpi"><span class="lbl">Calendarios .ics</span><span class="val" id="rolan-kpi-ics">—</span></div>
-       <div class="rolan-kpi"><span class="lbl">PNG descargados</span><span class="val" id="rolan-kpi-png">—</span></div>
+
+     <!-- Acciones extras (cards horizontales pequeñas) + export -->
+     <div class="rdr-kpis" style="grid-template-columns:repeat(auto-fit, minmax(220px, 1fr));margin-top:14px">
+       <div class="rdr-kpi">
+         <div class="rdr-kpi-lbl"><span style="color:var(--rdr-yel)">⌖</span> Calendarios .ics</div>
+         <div class="rdr-kpi-num"><span class="rdr-kpi-val" id="rro-ics" style="font-size:34px">—</span></div>
+       </div>
+       <div class="rdr-kpi">
+         <div class="rdr-kpi-lbl"><span style="color:var(--rdr-yel)">⌬</span> PNG descargados</div>
+         <div class="rdr-kpi-num"><span class="rdr-kpi-val" id="rro-png" style="font-size:34px">—</span></div>
+       </div>
+       <div class="rdr-kpi">
+         <div class="rdr-kpi-lbl"><span style="color:var(--rdr-yel)">⌗</span> Tours compartidos</div>
+         <div class="rdr-kpi-num"><span class="rdr-kpi-val" id="rro-shared" style="font-size:34px">—</span></div>
+       </div>
      </div>
-     <div class="rolan-grid">
-       <section class="rolan-section">
-         <h3>Eventos más consultados</h3>
-         <ol id="rolan-eventos-top" class="rolan-ranked"><li class="rolan-empty">Cargando…</li></ol>
-       </section>
-       <section class="rolan-section">
-         <h3>Paquetes más elegidos</h3>
-         <div id="rolan-paquetes"><div class="rolan-empty">Cargando…</div></div>
-       </section>
-       <section class="rolan-section">
-         <h3>Embudo de conversión</h3>
-         <ol id="rolan-embudo" class="rolan-funnel"><li class="rolan-empty">Cargando…</li></ol>
-       </section>
-       <section class="rolan-section">
-         <h3>Métodos de compartir</h3>
-         <div id="rolan-share"><div class="rolan-empty">Cargando…</div></div>
-       </section>
-       <section class="rolan-section">
-         <h3>Actividad por hora · últimas 24h</h3>
-         <div id="rolan-actividad" class="rolan-hours"><div class="rolan-empty">Cargando…</div></div>
-       </section>
+
+     <!-- Export CSV bar -->
+     <div style="margin:18px 0;text-align:right">
+       <button style="border:1px solid var(--rdr-border);background:transparent;color:var(--rdr-yel);padding:8px 16px;border-radius:6px;cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:900;letter-spacing:.14em;text-transform:uppercase" onclick="exportRolAnalyticsCSV()">📥 Export CSV</button>
+     </div>
+
+     <!-- Top eventos + Donut paquetes -->
+     <div class="rdr-grid-2">
+       <div class="rdr-card">
+         <div class="rdr-card-head">
+           <div class="rdr-card-title"><span class="ico">🎯</span>Eventos más consultados en /Rol</div>
+           <div class="rdr-card-meta" id="rro-eventos-meta">—</div>
+         </div>
+         <ol id="rro-eventos-top" class="rdr-rank"><li class="rdr-empty">Cargando…</li></ol>
+       </div>
+       <div class="rdr-card">
+         <div class="rdr-card-head">
+           <div class="rdr-card-title"><span class="ico">◐</span>Paquetes más elegidos</div>
+           <div class="rdr-card-meta" id="rro-paquetes-meta">—</div>
+         </div>
+         <div class="rdr-donut-wrap">
+           <div class="rdr-donut" id="rro-donut">
+             <svg viewBox="0 0 120 120" width="140" height="140">
+               <circle cx="60" cy="60" r="46" fill="none" stroke="rgba(255,255,255,.04)" stroke-width="14"/>
+               <g id="rro-donut-segs" transform="rotate(-90 60 60)"></g>
+               <text id="rro-donut-center" x="60" y="60" text-anchor="middle" dominant-baseline="central"
+                     fill="#e8ff4c" font-family="Barlow Condensed" font-weight="900" font-size="24">—</text>
+             </svg>
+           </div>
+           <div class="rdr-donut-legend" id="rro-donut-legend"></div>
+         </div>
+       </div>
+     </div>
+
+     <!-- Embudo + Métodos de compartir -->
+     <div class="rdr-grid-2" style="margin-top:14px">
+       <div class="rdr-card">
+         <div class="rdr-card-head">
+           <div class="rdr-card-title"><span class="ico">⇥</span>Embudo de conversión</div>
+         </div>
+         <ol id="rro-embudo" class="rdr-funnel"><li class="rdr-empty">Cargando…</li></ol>
+       </div>
+       <div class="rdr-card">
+         <div class="rdr-card-head">
+           <div class="rdr-card-title"><span class="ico">🔗</span>Métodos de compartir</div>
+         </div>
+         <div id="rro-share" class="rdr-bars"><div class="rdr-empty">Cargando…</div></div>
+       </div>
+     </div>
+
+     <!-- Actividad por hora (full width) -->
+     <div class="rdr-card" style="margin-top:14px">
+       <div class="rdr-card-head">
+         <div class="rdr-card-title"><span class="ico">⌁</span>Actividad · últimas 24h</div>
+         <div class="rdr-card-meta">Sesiones por hora · MX time</div>
+       </div>
+       <div id="rro-actividad" class="rdr-hours"><div class="rdr-empty">Cargando…</div></div>
      </div>
    </section>
 
@@ -11089,115 +11138,148 @@ function stopRolAnalyticsAutoRefresh(){
 }
 
 function _rolanSinceISO(){
-  const now = new Date();
-  if (_rolanRange === 'today'){
-    const d = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    return d.toISOString();
-  }
-  if (_rolanRange === 'week'){
-    const d = new Date(now); d.setDate(d.getDate() - 7); return d.toISOString();
-  }
-  if (_rolanRange === 'month'){
-    const d = new Date(now); d.setDate(d.getDate() - 30); return d.toISOString();
-  }
-  return '1970-01-01T00:00:00Z'; // 'all'
+  // Legacy helper — ahora /Rol usa el rango global del Radar (_radarRange) para
+  // que las pills compartidas filtren todas las sub-pestañas por igual.
+  return _radarSinceISO();
 }
 
 async function loadRolAnalytics(silent){
-  const status = document.getElementById('rolan-status');
-  if (status && !silent) status.textContent = 'Cargando…';
   try {
-    const since = _rolanSinceISO();
-    // Hasta 10k filas en el rango — suficiente para volúmenes esperados de /rol.
-    const url = `${SB_URL}/rest/v1/rol_eventos_uso?created_at=gte.${encodeURIComponent(since)}` +
-                `&select=session_id,accion,evento_id,evento_nombre,paquete,zona,precio_total,created_at` +
-                `&order=created_at.desc&limit=10000`;
-    const r = await fetch(url, { headers: { apikey: SB_KEY, Authorization: 'Bearer ' + SB_KEY } });
-    if (!r.ok) throw new Error('HTTP ' + r.status);
-    const rows = await r.json();
+    const since     = _radarSinceISO();
+    const prevSince = _radarPrevSinceISO();
+    // Sparklines siempre últimos 7 días, independiente del rango global.
+    const since7d = new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString();
+    const select = 'select=session_id,accion,evento_id,evento_nombre,paquete,zona,precio_total,tipo_compra,created_at';
+    const [rows, rowsPrev, rows7] = await Promise.all([
+      _radarFetch('rol_eventos_uso?' + select, since),
+      _radarFetch('rol_eventos_uso?' + select, prevSince, since),
+      _radarFetch('rol_eventos_uso?' + select, since7d)
+    ]);
     _rolanLastRows = rows || [];
-    renderRolAnalytics(_rolanLastRows);
-    if (status) {
-      const hora = new Date().toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' });
-      status.textContent = `Última act: ${hora}`;
-    }
+    renderRolAnalytics(rows || [], rowsPrev || [], rows7 || []);
   } catch (e) {
     console.error('[rolan]', e);
-    if (status) status.textContent = 'Error: ' + e.message;
   }
 }
 
-function renderRolAnalytics(rows){
-  // ── KPIs ──
-  const sesiones = new Set(rows.map(r => r.session_id));
-  const planes = rows.filter(r => r.accion === 'rol_plan_generado');
-  const sesionesConPlan = new Set(planes.map(r => r.session_id));
-  const sesionesQueVisitan = new Set(
-    rows.filter(r => r.accion === 'rol_visita').map(r => r.session_id)
-  );
-  const baseConv = sesionesQueVisitan.size || sesiones.size;
-  const conv = baseConv > 0 ? (sesionesConPlan.size / baseConv * 100) : 0;
-  const recordatorios = rows.filter(r => r.accion === 'rol_recordatorios_activados').length;
-  const comprobantes  = rows.filter(r => r.accion === 'rol_comprobante_subido').length;
-  // KPIs adicionales del Radar del Dragón
-  const toursGuardados = rows.filter(r => r.accion === 'rol_tour_guardado').length;
-  const icsDescargas   = rows.filter(r => r.accion === 'rol_calendario_descargado').length;
-  const pngDescargas   = rows.filter(r => r.accion === 'rol_png_descargado').length;
+function renderRolAnalytics(rows, rowsPrev, rows7){
+  rowsPrev = rowsPrev || [];
+  rows7    = rows7 || [];
 
-  const setKpi = (id, val) => { const el=document.getElementById(id); if(el) el.textContent = val; };
-  setKpi('rolan-kpi-sesiones',      sesiones.size.toLocaleString('es-MX'));
-  setKpi('rolan-kpi-planes',        planes.length.toLocaleString('es-MX'));
-  setKpi('rolan-kpi-conversion',    conv.toFixed(1) + '%');
-  setKpi('rolan-kpi-recordatorios', recordatorios.toLocaleString('es-MX'));
-  setKpi('rolan-kpi-comprobantes',  comprobantes.toLocaleString('es-MX'));
-  setKpi('rolan-kpi-tours',         toursGuardados.toLocaleString('es-MX'));
-  setKpi('rolan-kpi-ics',           icsDescargas.toLocaleString('es-MX'));
-  setKpi('rolan-kpi-png',           pngDescargas.toLocaleString('es-MX'));
+  // ── KPI counters ──
+  const filt = (arr, pred) => (arr||[]).filter(pred);
+  const uniqSessions = (arr, pred) => new Set(filt(arr, pred).map(r=>r.session_id)).size;
 
-  // ── Métodos de compartir más usados ──
-  // El hook rol_compartido envía `tipo_compra: 'copy' | 'whatsapp' | 'email'`
-  const shareCount = { copy:0, whatsapp:0, email:0, otro:0 };
-  for (const r of rows) {
-    if (r.accion !== 'rol_compartido') continue;
-    const k = (r.tipo_compra || '').toLowerCase();
-    if (shareCount[k] != null) shareCount[k]++; else shareCount.otro++;
-  }
-  const shareTotal = Object.values(shareCount).reduce((a,b) => a+b, 0);
-  const shareWrap = document.getElementById('rolan-share');
-  if (shareWrap) {
-    shareWrap.innerHTML = shareTotal === 0
-      ? '<div class="rolan-empty">Sin compartidos en el rango</div>'
-      : Object.entries(shareCount).filter(([,n]) => n > 0)
-          .sort((a,b) => b[1]-a[1])
-          .map(([k,n]) => {
-            const pct = (n/shareTotal*100).toFixed(1);
-            const lbl = { copy:'Link copiado', whatsapp:'WhatsApp', email:'Email', otro:'Otro' }[k] || k;
-            return `<div class="rolan-bar-row"><span class="key">${lbl}</span><div class="track"><div class="fill" style="width:${pct}%"></div></div><span class="pct">${pct}%</span></div>`;
-          }).join('');
-  }
+  const sesiones       = new Set(rows.map(r => r.session_id)).size;
+  const sesionesP      = new Set(rowsPrev.map(r => r.session_id)).size;
+  const planes         = filt(rows,     r => r.accion === 'rol_plan_generado').length;
+  const planesP        = filt(rowsPrev, r => r.accion === 'rol_plan_generado').length;
+  const sesionesConPlan = uniqSessions(rows, r => r.accion === 'rol_plan_generado');
+  const sesionesQueVisitan = uniqSessions(rows, r => r.accion === 'rol_visita');
+  const baseConv  = sesionesQueVisitan || sesiones;
+  const conv      = baseConv > 0 ? (sesionesConPlan / baseConv * 100) : 0;
+  const sesConPlanP = uniqSessions(rowsPrev, r => r.accion === 'rol_plan_generado');
+  const sesVisitanP = uniqSessions(rowsPrev, r => r.accion === 'rol_visita');
+  const baseConvP = sesVisitanP || sesionesP;
+  const convP     = baseConvP > 0 ? (sesConPlanP / baseConvP * 100) : 0;
+  const recordatorios  = filt(rows,     r => r.accion === 'rol_recordatorios_activados').length;
+  const recordatoriosP = filt(rowsPrev, r => r.accion === 'rol_recordatorios_activados').length;
+  const comprobantes   = filt(rows,     r => r.accion === 'rol_comprobante_subido').length;
+  const comprobantesP  = filt(rowsPrev, r => r.accion === 'rol_comprobante_subido').length;
+  const toursGuardados  = filt(rows,     r => r.accion === 'rol_tour_guardado').length;
+  const toursGuardadosP = filt(rowsPrev, r => r.accion === 'rol_tour_guardado').length;
+  const icsDescargas = filt(rows, r => r.accion === 'rol_calendario_descargado').length;
+  const pngDescargas = filt(rows, r => r.accion === 'rol_png_descargado').length;
+  const sharedCount  = filt(rows, r => r.accion === 'rol_compartido').length;
+
+  // ── Set KPI helper con trend ──
+  const setKpi = (id, val, prev, isPercent) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = isPercent ? (typeof val === 'number' ? val.toFixed(1) + '%' : String(val))
+                                        : (typeof val === 'number' ? val.toLocaleString('es-MX') : String(val));
+    const tr = document.getElementById(id + '-tr');
+    if (tr) {
+      const t = _trendArrow(typeof val === 'number' ? val : parseFloat(val) || 0, prev || 0);
+      tr.textContent = t.html;
+      tr.className = 'rdr-kpi-trend ' + t.cls;
+    }
+  };
+  setKpi('rro-sesiones',      sesiones,       sesionesP);
+  setKpi('rro-planes',        planes,         planesP);
+  setKpi('rro-conv',          conv,           convP, true);
+  setKpi('rro-recordatorios', recordatorios,  recordatoriosP);
+  setKpi('rro-comprobantes',  comprobantes,   comprobantesP);
+  setKpi('rro-tours',         toursGuardados, toursGuardadosP);
+
+  // Extras (sin trend)
+  const extras = [['rro-ics', icsDescargas], ['rro-png', pngDescargas], ['rro-shared', sharedCount]];
+  extras.forEach(([id, n]) => { const e = document.getElementById(id); if (e) e.textContent = n.toLocaleString('es-MX'); });
+
+  // ── Sparklines (últimos 7 días) ──
+  _rdrPaintSpark(document.getElementById('rro-sesiones-spark'),
+    _rdrSeries7d(rows7, () => true).map((_, i, arr) => {
+      // sesiones únicas por día
+      const today0 = new Date(new Date().setHours(0,0,0,0));
+      const dayStart = new Date(today0); dayStart.setDate(dayStart.getDate() - (arr.length - 1 - i));
+      const dayEnd = new Date(dayStart); dayEnd.setDate(dayEnd.getDate() + 1);
+      return new Set(rows7.filter(r => {
+        const t = new Date(r.created_at);
+        return t >= dayStart && t < dayEnd;
+      }).map(r => r.session_id)).size;
+    }));
+  _rdrPaintSpark(document.getElementById('rro-planes-spark'),
+    _rdrSeries7d(rows7, r => r.accion === 'rol_plan_generado'));
+  // Conv: planes únicos / visitas únicas por día
+  const sparkConv = (() => {
+    const today0 = new Date(new Date().setHours(0,0,0,0));
+    const days = 7;
+    const out = [];
+    for (let i = 0; i < days; i++) {
+      const dayStart = new Date(today0); dayStart.setDate(dayStart.getDate() - (days - 1 - i));
+      const dayEnd   = new Date(dayStart); dayEnd.setDate(dayEnd.getDate() + 1);
+      const inDay = rows7.filter(r => { const t = new Date(r.created_at); return t >= dayStart && t < dayEnd; });
+      const v = new Set(inDay.filter(r => r.accion === 'rol_visita').map(r => r.session_id)).size;
+      const p = new Set(inDay.filter(r => r.accion === 'rol_plan_generado').map(r => r.session_id)).size;
+      out.push(v > 0 ? (p / v * 100) : 0);
+    }
+    return out;
+  })();
+  _rdrPaintSpark(document.getElementById('rro-conv-spark'), sparkConv);
+  _rdrPaintSpark(document.getElementById('rro-recordatorios-spark'),
+    _rdrSeries7d(rows7, r => r.accion === 'rol_recordatorios_activados'));
+  _rdrPaintSpark(document.getElementById('rro-comprobantes-spark'),
+    _rdrSeries7d(rows7, r => r.accion === 'rol_comprobante_subido'));
+  _rdrPaintSpark(document.getElementById('rro-tours-spark'),
+    _rdrSeries7d(rows7, r => r.accion === 'rol_tour_guardado'));
 
   // ── Eventos más consultados (por planes generados) ──
   const evCount = {};
   const evName = {};
-  planes.forEach(r => {
+  filt(rows, r => r.accion === 'rol_plan_generado').forEach(r => {
     if (!r.evento_id) return;
     evCount[r.evento_id] = (evCount[r.evento_id] || 0) + 1;
     if (r.evento_nombre) evName[r.evento_id] = r.evento_nombre;
   });
   const evTop = Object.entries(evCount).sort((a,b) => b[1]-a[1]).slice(0, 10);
-  const olEv = document.getElementById('rolan-eventos-top');
-  if (evTop.length === 0){
-    olEv.innerHTML = '<li class="rolan-empty">Aún no hay planes generados en este rango</li>';
-  } else {
-    olEv.innerHTML = evTop.map(([id, n]) => {
-      const nm = (evName[id] || id).replace(/</g,'&lt;');
-      return `<li><span class="name">${nm}</span><span class="count">${n} ${n===1?'plan':'planes'}</span></li>`;
-    }).join('');
+  const olEv = document.getElementById('rro-eventos-top');
+  const metaEv = document.getElementById('rro-eventos-meta');
+  if (metaEv) metaEv.textContent = `${evTop.length} ${evTop.length===1?'evento':'eventos'}`;
+  const maxEv = Math.max(1, ...evTop.map(([,n]) => n));
+  if (olEv) {
+    olEv.innerHTML = evTop.length === 0
+      ? '<li class="rdr-empty">Aún no hay planes generados en este rango</li>'
+      : evTop.map(([id, n], i) => {
+          const nm = _radarEsc(evName[id] || id);
+          const pct = (n / maxEv * 100).toFixed(0);
+          return `<li>
+            <span class="rk-pos">#${i+1}</span>
+            <span class="rk-name">${nm}<span class="rk-bar" style="width:${pct}%;animation-delay:${(0.04*i).toFixed(2)}s"></span></span>
+            <span class="rk-val">${n}<span class="unit">${n===1?'plan':'planes'}</span></span>
+          </li>`;
+        }).join('');
   }
 
-  // ── Paquetes más elegidos (sobre rol_paquete_elegido — última elección por sesión) ──
-  // Agrupamos por sesión y tomamos el último paquete elegido para evitar contar
-  // 2 paquetes si el cliente cambió de opinión en la misma sesión.
+  // ── Paquetes más elegidos (última elección por sesión) → donut ──
   const lastPkgBySession = {};
   rows.forEach(r => {
     if (r.accion !== 'rol_paquete_elegido' || !r.paquete) return;
@@ -11209,25 +11291,36 @@ function renderRolAnalytics(rows){
   const pkgCount = { PLUS:0, RIDE:0, STAY:0, CHEAP:0 };
   Object.values(lastPkgBySession).forEach(p => { if (pkgCount[p.pkg] != null) pkgCount[p.pkg]++; });
   const pkgTotal = Object.values(pkgCount).reduce((a,b) => a+b, 0);
-  const pkgWrap = document.getElementById('rolan-paquetes');
-  if (pkgTotal === 0){
-    pkgWrap.innerHTML = '<div class="rolan-empty">Aún no hay paquetes elegidos en este rango</div>';
+  const pkgItems = Object.entries(pkgCount)
+    .filter(([,n]) => n > 0)
+    .sort((a,b) => b[1]-a[1])
+    .map(([k,n]) => ({ label:k, value:n }));
+  const pkgPalette = ['#e8ff4c', '#0000cd', '#88ea4e', '#ff283b'];
+  const metaPk = document.getElementById('rro-paquetes-meta');
+  if (metaPk) metaPk.textContent = pkgTotal === 0 ? 'Sin datos' : `${pkgTotal} ${pkgTotal===1?'elección':'elecciones'}`;
+  const donutCenter = document.getElementById('rro-donut-center');
+  const donutLegend = document.getElementById('rro-donut-legend');
+  if (pkgTotal === 0) {
+    const segs = document.getElementById('rro-donut-segs');
+    if (segs) segs.innerHTML = '';
+    if (donutCenter) donutCenter.textContent = '—';
+    if (donutLegend) donutLegend.innerHTML = '<div class="rdr-empty">Aún no hay paquetes elegidos</div>';
   } else {
-    pkgWrap.innerHTML = Object.entries(pkgCount)
-      .sort((a,b) => b[1]-a[1])
-      .map(([k, n]) => {
-        const pct = (n / pkgTotal * 100);
-        return `<div class="rolan-bar-row">
-          <span class="key">${k}</span>
-          <div class="track"><div class="fill" style="width:${pct.toFixed(1)}%"></div></div>
-          <span class="pct">${pct.toFixed(1)}%</span>
-        </div>`;
-      }).join('');
+    _rdrPaintDonut('rro-donut-segs', pkgItems, pkgPalette);
+    if (donutCenter) donutCenter.textContent = pkgTotal.toLocaleString('es-MX');
+    if (donutLegend) donutLegend.innerHTML = pkgItems.map((it, i) => {
+      const pct = (it.value / pkgTotal * 100).toFixed(1);
+      return `<div class="lg">
+        <span class="dot" style="background:${pkgPalette[i % pkgPalette.length]}"></span>
+        <span class="lbl">${it.label}</span>
+        <span class="pct">${pct}%</span>
+      </div>`;
+    }).join('');
   }
 
   // ── Embudo de conversión (sesiones únicas por cada paso) ──
   const setBy = (accion) => new Set(rows.filter(r => r.accion === accion).map(r => r.session_id));
-  const visitas      = setBy('rol_visita').size || sesiones.size;
+  const visitas      = setBy('rol_visita').size || sesiones;
   const ev           = setBy('rol_evento_seleccionado').size;
   const pkg          = setBy('rol_paquete_elegido').size;
   const zona         = setBy('rol_zona_elegida').size;
@@ -11241,21 +11334,46 @@ function renderRolAnalytics(rows){
     ['Generan plan', planGen],
     ['Activan recordatorios', recordOk]
   ];
-  const olEmb = document.getElementById('rolan-embudo');
-  if (visitas === 0){
-    olEmb.innerHTML = '<li class="rolan-empty">Sin actividad en este rango</li>';
-  } else {
-    olEmb.innerHTML = pasos.map(([k, n]) => {
-      const pct = (n / visitas * 100);
-      // Aplicamos el "fill" del embudo como linear-gradient directo en el style.background
-      // del <li>, evitando el ::before que requeriría CSS dinámico.
-      const fillStyle = `background:linear-gradient(90deg, rgba(94,167,255,.18) ${pct.toFixed(1)}%, rgba(255,255,255,.02) ${pct.toFixed(1)}%)`;
-      return `<li style="${fillStyle}">
-        <span class="step">${k}</span>
-        <span class="count">${n.toLocaleString('es-MX')}</span>
-        <span class="pct">${pct.toFixed(0)}%</span>
-      </li>`;
-    }).join('');
+  const olEmb = document.getElementById('rro-embudo');
+  if (olEmb) {
+    if (visitas === 0) {
+      olEmb.innerHTML = '<li class="rdr-empty">Sin actividad en este rango</li>';
+    } else {
+      olEmb.innerHTML = pasos.map(([k, n]) => {
+        const pct = (n / visitas * 100);
+        const fillStyle = `background:linear-gradient(90deg, rgba(232,255,76,.16) ${pct.toFixed(1)}%, rgba(255,255,255,.02) ${pct.toFixed(1)}%)`;
+        return `<li style="${fillStyle}">
+          <span class="step">${k}</span>
+          <span class="count">${n.toLocaleString('es-MX')}</span>
+          <span class="pct">${pct.toFixed(0)}%</span>
+        </li>`;
+      }).join('');
+    }
+  }
+
+  // ── Métodos de compartir ──
+  const shareCount = { copy:0, whatsapp:0, email:0, otro:0 };
+  for (const r of rows) {
+    if (r.accion !== 'rol_compartido') continue;
+    const k = (r.tipo_compra || '').toLowerCase();
+    if (shareCount[k] != null) shareCount[k]++; else shareCount.otro++;
+  }
+  const shareTotal = Object.values(shareCount).reduce((a,b) => a+b, 0);
+  const shareWrap = document.getElementById('rro-share');
+  if (shareWrap) {
+    shareWrap.innerHTML = shareTotal === 0
+      ? '<div class="rdr-empty">Sin compartidos en el rango</div>'
+      : Object.entries(shareCount).filter(([,n]) => n > 0)
+          .sort((a,b) => b[1]-a[1])
+          .map(([k,n]) => {
+            const pct = (n / shareTotal * 100).toFixed(1);
+            const lbl = { copy:'Link copiado', whatsapp:'WhatsApp', email:'Email', otro:'Otro' }[k] || k;
+            return `<div class="row">
+              <span class="k">${lbl}</span>
+              <div class="t"><div class="f" style="width:${pct}%"></div></div>
+              <span class="p">${pct}%</span>
+            </div>`;
+          }).join('');
   }
 
   // ── Actividad por hora (últimas 24h) ──
@@ -11269,23 +11387,25 @@ function renderRolAnalytics(rows){
     if (hoursAgo >= 0 && hoursAgo < 24) buckets[23 - hoursAgo]++;
   });
   const maxBucket = Math.max(1, ...buckets);
-  const wrapH = document.getElementById('rolan-actividad');
+  const wrapH = document.getElementById('rro-actividad');
   const baseHour = new Date(now - 23*60*60*1000);
   const fmtH = (i) => {
     const d = new Date(baseHour.getTime() + i*60*60*1000);
     return d.toLocaleTimeString('es-MX', { hour: '2-digit', minute:'2-digit', hour12: false });
   };
-  if (buckets.every(b => b === 0)){
-    wrapH.innerHTML = '<div class="rolan-empty">Sin actividad en las últimas 24h</div>';
-  } else {
-    wrapH.innerHTML = buckets.map((n, i) => {
-      const pct = (n / maxBucket * 100);
-      return `<div class="hr">
-        <span class="h">${fmtH(i)}</span>
-        <div class="track"><div class="fill" style="width:${pct.toFixed(1)}%"></div></div>
-        <span class="n">${n}</span>
-      </div>`;
-    }).join('');
+  if (wrapH) {
+    if (buckets.every(b => b === 0)) {
+      wrapH.innerHTML = '<div class="rdr-empty">Sin actividad en las últimas 24h</div>';
+    } else {
+      wrapH.innerHTML = buckets.map((n, i) => {
+        const pct = (n / maxBucket * 100);
+        return `<div class="hr">
+          <span class="h">${fmtH(i)}</span>
+          <div class="track"><div class="fill" style="width:${pct.toFixed(1)}%"></div></div>
+          <span class="n">${n}</span>
+        </div>`;
+      }).join('');
+    }
   }
 }
 

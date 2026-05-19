@@ -10957,7 +10957,11 @@ async function loadRadar(silent){
 }
 
 async function _radarFetch(table, sinceISO, untilISO){
-  let url = `${SB_URL}/rest/v1/${table}?created_at=gte.${encodeURIComponent(sinceISO)}`;
+  // Si el path ya viene con querystring (ej. 'tabla?select=...'), concatenamos
+  // con '&'. Antes asumíamos siempre '?', lo que producía URLs con dos signos
+  // de interrogación y PostgREST devolvía 400 PGRST100.
+  const sep = table.indexOf('?') >= 0 ? '&' : '?';
+  let url = `${SB_URL}/rest/v1/${table}${sep}created_at=gte.${encodeURIComponent(sinceISO)}`;
   if (untilISO) url += `&created_at=lt.${encodeURIComponent(untilISO)}`;
   url += '&order=created_at.desc&limit=10000';
   const r = await fetch(url, { headers: { apikey: SB_KEY, Authorization: 'Bearer ' + SB_KEY } });

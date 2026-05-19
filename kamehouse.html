@@ -1372,68 +1372,480 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
   .nav-dropdown.open .drop-arrow{transform:rotate(-90deg)}
 }
 
-/* ═══════════════════════════════════════════════
-   RADAR DEL DRAGÓN — sub-tabs, range, trends, alertas
-═══════════════════════════════════════════════ */
-#page-radar .radar-subs{
-  display:flex;gap:4px;flex-wrap:wrap;margin-bottom:14px;
-  border-bottom:1px solid var(--border);padding-bottom:0;
+/* ═══════════════════════════════════════════════════════════════
+   RADAR DEL DRAGÓN — Mission Control / Ops Dashboard
+   Aesthetic: military radar + Stripe/Linear precision.
+   Tipografía: Barlow Condensed 900 (numbers) · Zen Dots (titles)
+               Montserrat (body) · JetBrains Mono (data tech)
+═══════════════════════════════════════════════════════════════ */
+#page-radar{
+  --rdr-yel: #e8ff4c;
+  --rdr-red: #ff283b;
+  --rdr-blu: #0000cd;
+  --rdr-grn: #88ea4e;
+  --rdr-bg: #06060a;
+  --rdr-card: #0a0a14;
+  --rdr-card-hi: #0f0f1d;
+  --rdr-border: rgba(232,255,76,.10);
+  --rdr-border-hi: rgba(232,255,76,.28);
+  --rdr-shadow: 0 8px 32px rgba(0,0,0,.55), 0 1px 0 rgba(232,255,76,.04) inset;
+  position:relative;
+  background:
+    radial-gradient(ellipse 80% 50% at 50% -10%, rgba(0,0,205,.10) 0%, transparent 60%),
+    radial-gradient(ellipse 60% 40% at 100% 110%, rgba(232,255,76,.04) 0%, transparent 60%),
+    linear-gradient(180deg, #06060a 0%, #0a0a14 100%);
+  margin:-20px;padding:24px 28px 60px;min-height:100vh;
 }
-#page-radar .radar-subs button{
-  background:transparent;border:none;color:var(--ts);
-  padding:10px 14px;font-family:'JetBrains Mono',monospace;font-size:11px;
-  font-weight:700;letter-spacing:.06em;text-transform:uppercase;cursor:pointer;
-  border-bottom:2px solid transparent;transition:all .15s;position:relative;
+@media(max-width:640px){
+  #page-radar{padding:18px 14px 40px}
 }
-#page-radar .radar-subs button:hover{color:var(--text)}
-#page-radar .radar-subs button.active{color:var(--gold);border-bottom-color:var(--gold)}
-#page-radar .radar-badge{
-  display:inline-flex;align-items:center;justify-content:center;
-  background:var(--red);color:#fff;font-size:9px;font-weight:900;
-  min-width:18px;height:18px;border-radius:9px;padding:0 5px;margin-left:6px;
-  letter-spacing:0;
+
+/* Subtle radar-grid backdrop */
+#page-radar::before{
+  content:'';position:absolute;inset:0;pointer-events:none;
+  background-image:
+    linear-gradient(rgba(232,255,76,.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(232,255,76,.025) 1px, transparent 1px);
+  background-size:40px 40px;
+  mask-image:radial-gradient(ellipse 80% 60% at 50% 30%, #000 0%, transparent 70%);
+  z-index:0;
 }
-#page-radar .radar-range{
+#page-radar > *{position:relative;z-index:1}
+
+/* ── HEADER ÉPICO ─────────────────────────────────────── */
+.rdr-header{
+  display:grid;grid-template-columns:auto 1fr auto;gap:18px;align-items:center;
+  padding:8px 0 22px;margin-bottom:18px;
+  border-bottom:1px solid var(--rdr-border);
+}
+.rdr-header-icon{
+  width:64px;height:64px;flex-shrink:0;
+  position:relative;display:flex;align-items:center;justify-content:center;
+}
+.rdr-header-icon svg{width:64px;height:64px;display:block}
+.rdr-radar-sweep{transform-origin:50% 50%;animation:rdrSweep 4s linear infinite}
+.rdr-radar-pulse{transform-origin:50% 50%;animation:rdrPulse 3s ease-in-out infinite}
+@keyframes rdrSweep{from{transform:rotate(0)} to{transform:rotate(360deg)}}
+@keyframes rdrPulse{
+  0%,100%{opacity:.25;transform:scale(.85)}
+  50%{opacity:.6;transform:scale(1)}
+}
+.rdr-header-title{
+  font-family:'Zen Dots',sans-serif;font-size:26px;letter-spacing:.04em;line-height:1;
+  color:var(--text);
+  text-shadow:0 0 24px rgba(232,255,76,.15);
+}
+.rdr-header-title .y{color:var(--rdr-yel)}
+.rdr-header-sub{
+  font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;
+  letter-spacing:.22em;text-transform:uppercase;color:var(--ts);margin-top:6px;
+}
+.rdr-header-status{
+  display:flex;flex-direction:column;gap:8px;align-items:flex-end;
+  font-family:'JetBrains Mono',monospace;
+}
+.rdr-status-pill{
+  display:inline-flex;align-items:center;gap:8px;
+  background:rgba(136,234,78,.08);border:1px solid rgba(136,234,78,.35);
+  padding:6px 12px;border-radius:99px;
+  font-size:10px;font-weight:900;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--rdr-grn);
+}
+.rdr-status-pill::before{
+  content:'';width:6px;height:6px;border-radius:50%;background:var(--rdr-grn);
+  box-shadow:0 0 0 0 rgba(136,234,78,.7);animation:rdrDot 1.6s ease-out infinite;
+}
+@keyframes rdrDot{
+  0%{box-shadow:0 0 0 0 rgba(136,234,78,.7)}
+  70%{box-shadow:0 0 0 8px rgba(136,234,78,0)}
+  100%{box-shadow:0 0 0 0 rgba(136,234,78,0)}
+}
+.rdr-status-line{
+  font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;
+  color:var(--ts);display:flex;gap:14px;align-items:center;
+}
+.rdr-status-line button{
+  background:transparent;border:1px solid var(--rdr-border);color:var(--rdr-yel);
+  padding:6px 12px;border-radius:6px;cursor:pointer;
+  font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:900;
+  letter-spacing:.12em;text-transform:uppercase;transition:all .15s;
+}
+.rdr-status-line button:hover{background:rgba(232,255,76,.08);border-color:var(--rdr-border-hi)}
+@media(max-width:640px){
+  .rdr-header{grid-template-columns:auto 1fr;gap:12px}
+  .rdr-header-icon{width:48px;height:48px}.rdr-header-icon svg{width:48px;height:48px}
+  .rdr-header-title{font-size:18px;letter-spacing:.02em}
+  .rdr-header-status{grid-column:1/-1;align-items:flex-start;flex-direction:row;flex-wrap:wrap}
+}
+
+/* ── SUB-PESTAÑAS rediseñadas ──────────────────────────── */
+.rdr-tabs{
   display:flex;gap:6px;flex-wrap:wrap;margin-bottom:18px;
-  background:var(--card);padding:6px;border-radius:var(--radius);
-  border:1px solid var(--border);width:fit-content;
+  padding:0;background:transparent;border:none;
 }
-#page-radar .radar-range button{
+.rdr-tabs button{
+  background:transparent;border:1px solid var(--rdr-border);
+  padding:10px 18px;border-radius:8px;cursor:pointer;
+  font-family:'Barlow Condensed',sans-serif;font-weight:900;
+  font-size:14px;letter-spacing:.08em;text-transform:uppercase;color:var(--text);
+  display:inline-flex;align-items:center;gap:8px;transition:all .15s;
+  position:relative;
+}
+.rdr-tabs button:hover{border-color:var(--rdr-border-hi);color:var(--rdr-yel)}
+.rdr-tabs button.active{
+  background:var(--rdr-yel);color:#000;border-color:var(--rdr-yel);
+  box-shadow:0 0 24px rgba(232,255,76,.25),0 4px 14px rgba(232,255,76,.15);
+}
+.rdr-tab-ico{font-size:14px;line-height:1}
+.rdr-badge{
+  display:inline-flex;align-items:center;justify-content:center;
+  background:var(--rdr-red);color:#fff;font-family:'JetBrains Mono',monospace;
+  font-size:10px;font-weight:900;min-width:18px;height:18px;border-radius:9px;
+  padding:0 5px;letter-spacing:0;
+  box-shadow:0 0 0 0 rgba(255,40,59,.6);animation:rdrDot 1.6s ease-out infinite;
+}
+@media(max-width:640px){
+  .rdr-tabs{overflow-x:auto;flex-wrap:nowrap;-webkit-overflow-scrolling:touch;
+            margin-left:-14px;margin-right:-14px;padding:0 14px 4px;scrollbar-width:none}
+  .rdr-tabs::-webkit-scrollbar{display:none}
+  .rdr-tabs button{flex-shrink:0;font-size:12px;padding:8px 14px}
+}
+
+/* ── PILLS de rango ──────────────────────────────────── */
+.rdr-range{
+  display:flex;gap:0;flex-wrap:wrap;margin-bottom:22px;
+  background:var(--rdr-card);padding:5px;border-radius:99px;
+  border:1px solid var(--rdr-border);width:fit-content;
+  box-shadow:0 4px 16px rgba(0,0,0,.4);
+}
+.rdr-range button{
   background:transparent;border:none;color:var(--ts);
-  padding:8px 14px;font-family:'JetBrains Mono',monospace;font-size:11px;
-  font-weight:700;letter-spacing:.06em;text-transform:uppercase;cursor:pointer;
-  border-radius:6px;transition:all .15s;
+  padding:9px 18px;font-family:'JetBrains Mono',monospace;font-size:10px;
+  font-weight:700;letter-spacing:.14em;text-transform:uppercase;cursor:pointer;
+  border-radius:99px;transition:all .2s;
 }
-#page-radar .radar-range button:hover{color:var(--text)}
-#page-radar .radar-range button.active{background:var(--gold);color:#000}
-#page-radar .rolan-kpi{position:relative}
-#page-radar .rolan-kpi .trend{
-  display:block;font-size:10px;font-weight:700;letter-spacing:.04em;
-  margin-top:4px;font-family:'JetBrains Mono',monospace;
+.rdr-range button:hover{color:var(--text)}
+.rdr-range button.active{
+  background:var(--rdr-yel);color:#000;
+  box-shadow:0 0 18px rgba(232,255,76,.25);
 }
-#page-radar .rolan-kpi .trend.up{color:var(--green)}
-#page-radar .rolan-kpi .trend.down{color:var(--red)}
-#page-radar .rolan-kpi .trend.flat{color:var(--ts)}
-#page-radar .rolan-select{
-  background:var(--card);border:1px solid var(--border);color:var(--text);
-  padding:10px 14px;border-radius:var(--radius);
-  font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700;
-  letter-spacing:.06em;text-transform:uppercase;cursor:pointer;outline:none;
+
+/* ── KPI grid ────────────────────────────────────────── */
+.rdr-kpis{
+  display:grid;grid-template-columns:repeat(3, minmax(0, 1fr));
+  gap:14px;margin-bottom:22px;
 }
-#page-radar .ral-item{
-  display:grid;grid-template-columns:18px 1fr auto;gap:12px;align-items:start;
-  background:var(--card);border:1px solid var(--border);border-radius:var(--radius);
-  padding:14px 16px;border-left:3px solid var(--ts);
+@media(max-width:1023px){.rdr-kpis{grid-template-columns:repeat(2, minmax(0, 1fr))}}
+@media(max-width:640px) {.rdr-kpis{grid-template-columns:1fr}}
+
+.rdr-kpi{
+  position:relative;
+  background:linear-gradient(165deg, var(--rdr-card-hi) 0%, var(--rdr-card) 100%);
+  border:1px solid var(--rdr-border);border-radius:12px;
+  padding:18px 18px 14px;
+  box-shadow:var(--rdr-shadow);
+  overflow:hidden;
+  transition:transform .2s, border-color .2s, box-shadow .2s;
+  animation:rdrFadeUp .55s cubic-bezier(.2,.85,.3,1) backwards;
 }
-#page-radar .ral-item.severidad-alta{border-left-color:var(--red)}
-#page-radar .ral-item.severidad-media{border-left-color:var(--orange)}
-#page-radar .ral-item.severidad-info{border-left-color:var(--blue)}
-#page-radar .ral-item.no-vista{background:rgba(255,255,255,.04)}
-#page-radar .ral-dot{width:10px;height:10px;border-radius:50%;background:var(--gold);margin-top:4px}
-#page-radar .ral-item.vista .ral-dot{background:transparent;border:1.5px solid var(--ts)}
-#page-radar .ral-titulo{font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:16px;text-transform:uppercase;letter-spacing:.02em;color:var(--text)}
-#page-radar .ral-mensaje{font-size:13px;color:var(--ts);margin-top:4px;line-height:1.4}
-#page-radar .ral-meta{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--ts2);letter-spacing:.06em;text-align:right;white-space:nowrap}
+.rdr-kpi:hover{
+  transform:translateY(-2px);
+  border-color:var(--rdr-border-hi);
+  box-shadow:0 12px 36px rgba(0,0,0,.6),0 0 24px rgba(232,255,76,.06),0 1px 0 rgba(232,255,76,.08) inset;
+}
+.rdr-kpi::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:1px;
+  background:linear-gradient(90deg, transparent 0%, rgba(232,255,76,.18) 50%, transparent 100%);
+}
+.rdr-kpi-lbl{
+  font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;
+  letter-spacing:.18em;text-transform:uppercase;color:var(--ts);
+  margin-bottom:8px;
+}
+.rdr-kpi-num{
+  display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;
+}
+.rdr-kpi-val{
+  font-family:'Barlow Condensed',sans-serif;font-weight:900;
+  font-size:clamp(36px, 5vw, 48px);line-height:.9;letter-spacing:-.02em;
+  color:var(--text);
+}
+.rdr-kpi-trend{
+  font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;
+  letter-spacing:.04em;white-space:nowrap;
+}
+.rdr-kpi-trend.up{color:var(--rdr-grn)}
+.rdr-kpi-trend.down{color:var(--rdr-red)}
+.rdr-kpi-trend.flat{color:var(--ts)}
+.rdr-kpi-spark{
+  margin-top:10px;height:32px;display:block;
+}
+.rdr-kpi-spark .spark-path{
+  stroke:var(--rdr-yel);stroke-width:1.5;fill:none;
+  stroke-linecap:round;stroke-linejoin:round;
+  filter:drop-shadow(0 1px 2px rgba(232,255,76,.3));
+  stroke-dasharray:1000;stroke-dashoffset:1000;
+  animation:rdrDraw 1.4s ease-out .15s forwards;
+}
+.rdr-kpi-spark .spark-area{
+  fill:url(#rdrSparkGrad);opacity:0;
+  animation:rdrFadeIn .8s ease-out .9s forwards;
+}
+.rdr-kpi-spark .spark-dot{
+  fill:var(--rdr-yel);
+  filter:drop-shadow(0 0 6px var(--rdr-yel));
+  opacity:0;animation:rdrFadeIn .4s ease-out 1.5s forwards;
+}
+@keyframes rdrFadeUp{
+  from{opacity:0;transform:translateY(16px)}
+  to{opacity:1;transform:translateY(0)}
+}
+@keyframes rdrDraw{to{stroke-dashoffset:0}}
+@keyframes rdrFadeIn{to{opacity:1}}
+.rdr-kpi:nth-child(1){animation-delay:.02s}.rdr-kpi:nth-child(2){animation-delay:.06s}
+.rdr-kpi:nth-child(3){animation-delay:.10s}.rdr-kpi:nth-child(4){animation-delay:.14s}
+.rdr-kpi:nth-child(5){animation-delay:.18s}.rdr-kpi:nth-child(6){animation-delay:.22s}
+.rdr-kpi:nth-child(7){animation-delay:.26s}.rdr-kpi:nth-child(8){animation-delay:.30s}
+.rdr-kpi:nth-child(9){animation-delay:.34s}
+
+/* ── Card grande (top eventos, donut, actividad) ─────── */
+.rdr-grid-2{
+  display:grid;grid-template-columns:1fr 1fr;gap:14px;
+}
+@media(max-width:900px){.rdr-grid-2{grid-template-columns:1fr}}
+.rdr-card{
+  background:linear-gradient(180deg, var(--rdr-card-hi) 0%, var(--rdr-card) 100%);
+  border:1px solid var(--rdr-border);border-radius:14px;
+  padding:20px 20px 18px;box-shadow:var(--rdr-shadow);
+  animation:rdrFadeUp .6s cubic-bezier(.2,.85,.3,1) backwards;
+  position:relative;overflow:hidden;
+}
+.rdr-card::before{
+  content:'';position:absolute;top:0;left:20px;right:20px;height:1px;
+  background:linear-gradient(90deg, transparent 0%, rgba(232,255,76,.3) 50%, transparent 100%);
+}
+.rdr-card-head{
+  display:flex;align-items:center;justify-content:space-between;
+  margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid var(--rdr-border);
+}
+.rdr-card-title{
+  font-family:'Zen Dots',sans-serif;font-size:13px;letter-spacing:.06em;
+  color:var(--text);display:flex;align-items:center;gap:10px;
+}
+.rdr-card-title .ico{color:var(--rdr-yel);font-size:14px;line-height:1}
+.rdr-card-meta{
+  font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--ts);
+  letter-spacing:.1em;text-transform:uppercase;
+}
+
+/* ── Top eventos (ranked) ────────────────────────────── */
+.rdr-rank{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:8px}
+.rdr-rank li{
+  display:grid;grid-template-columns:24px 1fr auto;gap:12px;align-items:center;
+  padding:8px 0;animation:rdrFadeUp .35s ease-out backwards;
+}
+.rdr-rank li:nth-child(1){animation-delay:.05s}.rdr-rank li:nth-child(2){animation-delay:.08s}
+.rdr-rank li:nth-child(3){animation-delay:.11s}.rdr-rank li:nth-child(4){animation-delay:.14s}
+.rdr-rank li:nth-child(5){animation-delay:.17s}.rdr-rank li:nth-child(6){animation-delay:.20s}
+.rdr-rank li:nth-child(n+7){animation-delay:.23s}
+.rdr-rank .rk-pos{
+  font-family:'JetBrains Mono',monospace;font-weight:700;font-size:11px;
+  color:var(--ts);letter-spacing:.04em;
+}
+.rdr-rank .rk-name{
+  font-family:'Montserrat',sans-serif;font-weight:600;font-size:13px;
+  color:var(--text);position:relative;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.rdr-rank .rk-bar{
+  position:absolute;left:0;bottom:-4px;height:2px;background:var(--rdr-yel);
+  opacity:.4;border-radius:1px;
+  animation:rdrBar .9s cubic-bezier(.2,.85,.3,1) backwards;
+}
+@keyframes rdrBar{from{width:0!important}}
+.rdr-rank .rk-val{
+  font-family:'JetBrains Mono',monospace;font-weight:700;font-size:12px;
+  color:var(--rdr-yel);letter-spacing:.02em;
+}
+.rdr-rank .rk-val .unit{color:var(--ts);font-weight:500;font-size:10px;margin-left:4px}
+.rdr-rank .rdr-empty{
+  color:var(--ts);font-style:italic;text-align:center;padding:14px 0;font-size:12px;
+}
+
+/* ── Donut chart ─────────────────────────────────────── */
+.rdr-donut-wrap{
+  display:grid;grid-template-columns:140px 1fr;gap:18px;align-items:center;
+}
+@media(max-width:520px){.rdr-donut-wrap{grid-template-columns:1fr;justify-items:center;text-align:center}}
+.rdr-donut svg{display:block}
+.rdr-donut-legend{display:flex;flex-direction:column;gap:8px;font-family:'Montserrat',sans-serif}
+.rdr-donut-legend .lg{
+  display:grid;grid-template-columns:10px 1fr auto;gap:10px;align-items:center;
+  font-size:12px;
+}
+.rdr-donut-legend .lg .dot{width:10px;height:10px;border-radius:50%}
+.rdr-donut-legend .lg .lbl{color:var(--text);text-transform:capitalize}
+.rdr-donut-legend .lg .pct{
+  font-family:'JetBrains Mono',monospace;font-weight:700;font-size:11px;
+  color:var(--ts);letter-spacing:.04em;
+}
+
+/* ── Actividad por hora ──────────────────────────────── */
+.rdr-hours{display:flex;flex-direction:column;gap:3px}
+.rdr-hours .hr{
+  display:grid;grid-template-columns:46px 1fr 32px;gap:10px;align-items:center;font-size:11px;
+}
+.rdr-hours .hr .h{font-family:'JetBrains Mono',monospace;font-weight:700;color:var(--ts);letter-spacing:.02em}
+.rdr-hours .hr .track{background:rgba(232,255,76,.04);height:12px;border-radius:2px;position:relative;overflow:hidden}
+.rdr-hours .hr .fill{
+  position:absolute;left:0;top:0;bottom:0;
+  background:linear-gradient(90deg, rgba(232,255,76,.5) 0%, var(--rdr-yel) 100%);
+  border-radius:2px;
+  animation:rdrBar 1s cubic-bezier(.2,.85,.3,1) backwards;
+}
+.rdr-hours .hr .n{font-family:'JetBrains Mono',monospace;font-weight:700;font-size:10px;color:var(--ts);text-align:right}
+
+/* ── Embudo wizard ──────────────────────────────────── */
+.rdr-funnel{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:6px}
+.rdr-funnel li{
+  display:grid;grid-template-columns:1fr auto auto;gap:12px;align-items:center;
+  padding:11px 14px;border-radius:8px;position:relative;overflow:hidden;
+  background:rgba(255,255,255,.02);
+  font-size:13px;
+}
+.rdr-funnel .step{color:var(--text);font-weight:600;z-index:1}
+.rdr-funnel .count{font-family:'JetBrains Mono',monospace;font-weight:700;color:var(--text);z-index:1}
+.rdr-funnel .pct{font-family:'JetBrains Mono',monospace;font-weight:700;font-size:11px;color:var(--rdr-blu);z-index:1;min-width:42px;text-align:right}
+
+/* ── Bar rows (paquetes, orígenes) ──────────────────── */
+.rdr-bars{display:flex;flex-direction:column;gap:8px}
+.rdr-bars .row{
+  display:grid;grid-template-columns:80px 1fr 56px;gap:12px;align-items:center;font-size:13px;
+}
+.rdr-bars .row .k{font-family:'JetBrains Mono',monospace;font-weight:700;font-size:11px;color:var(--text);letter-spacing:.04em}
+.rdr-bars .row .t{background:rgba(232,255,76,.05);height:18px;border-radius:4px;position:relative;overflow:hidden}
+.rdr-bars .row .f{
+  position:absolute;left:0;top:0;bottom:0;
+  background:linear-gradient(90deg, rgba(232,255,76,.7) 0%, var(--rdr-yel) 100%);
+  border-radius:4px;
+  animation:rdrBar 1s cubic-bezier(.2,.85,.3,1) backwards;
+}
+.rdr-bars .row .f.alt{background:linear-gradient(90deg, rgba(255,40,59,.6) 0%, var(--rdr-red) 100%)}
+.rdr-bars .row .p{font-family:'JetBrains Mono',monospace;font-weight:700;font-size:11px;color:var(--rdr-yel);text-align:right}
+
+/* ── Select (comparativas) ──────────────────────────── */
+.rdr-select{
+  background:var(--rdr-card-hi);border:1px solid var(--rdr-border);color:var(--text);
+  padding:10px 14px;border-radius:8px;
+  font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;
+  letter-spacing:.08em;text-transform:uppercase;cursor:pointer;outline:none;
+  transition:border-color .15s;
+}
+.rdr-select:focus{border-color:var(--rdr-border-hi)}
+
+/* ── Alertas (lista log) ────────────────────────────── */
+.rdr-alerts{display:flex;flex-direction:column;gap:0;
+  background:linear-gradient(180deg, var(--rdr-card-hi) 0%, var(--rdr-card) 100%);
+  border:1px solid var(--rdr-border);border-radius:12px;overflow:hidden;
+}
+.rdr-alert{
+  display:grid;grid-template-columns:14px 1fr auto;gap:14px;align-items:start;
+  padding:16px 20px;border-bottom:1px solid var(--rdr-border);
+  position:relative;animation:rdrFadeUp .4s ease-out backwards;cursor:pointer;
+  transition:background .15s;
+}
+.rdr-alert:last-child{border-bottom:none}
+.rdr-alert:hover{background:rgba(255,255,255,.02)}
+.rdr-alert::before{
+  content:'';position:absolute;left:0;top:0;bottom:0;width:3px;
+}
+.rdr-alert.sev-alta::before{background:var(--rdr-red)}
+.rdr-alert.sev-media::before{background:var(--rdr-yel)}
+.rdr-alert.sev-info::before{background:var(--rdr-blu)}
+.rdr-alert .dot{
+  width:10px;height:10px;border-radius:50%;margin-top:5px;
+  background:var(--rdr-yel);
+  box-shadow:0 0 8px rgba(232,255,76,.5);
+}
+.rdr-alert.vista .dot{background:transparent;border:1.5px solid var(--ts);box-shadow:none}
+.rdr-alert .body{min-width:0}
+.rdr-alert .titulo{
+  font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:16px;
+  text-transform:uppercase;letter-spacing:.03em;color:var(--text);line-height:1.1;
+}
+.rdr-alert .mensaje{font-size:12px;color:var(--ts);margin-top:6px;line-height:1.5}
+.rdr-alert .meta{
+  font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--ts2);
+  letter-spacing:.08em;text-align:right;white-space:nowrap;line-height:1.6;
+}
+
+/* ── Comparativas (split) ───────────────────────────── */
+.rdr-cmp-grid{display:grid;grid-template-columns:repeat(auto-fit, minmax(280px, 1fr));gap:14px}
+.rdr-cmp-row{
+  display:grid;grid-template-columns:1fr 80px 1fr;gap:14px;align-items:center;
+  background:linear-gradient(180deg, var(--rdr-card-hi) 0%, var(--rdr-card) 100%);
+  border:1px solid var(--rdr-border);border-radius:12px;
+  padding:18px;animation:rdrFadeUp .4s ease-out backwards;
+}
+.rdr-cmp-side{display:flex;flex-direction:column;gap:4px}
+.rdr-cmp-side .lbl{font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:var(--ts)}
+.rdr-cmp-side .val{font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:34px;line-height:.9;color:var(--text)}
+.rdr-cmp-side.right{text-align:right;align-items:flex-end}
+.rdr-cmp-side.right .val{opacity:.55}
+.rdr-cmp-arrow{
+  font-family:'JetBrains Mono',monospace;font-weight:900;font-size:13px;letter-spacing:.04em;
+  text-align:center;padding:10px;border-radius:8px;
+}
+.rdr-cmp-arrow.up{color:var(--rdr-grn);background:rgba(136,234,78,.08)}
+.rdr-cmp-arrow.down{color:var(--rdr-red);background:rgba(255,40,59,.08)}
+.rdr-cmp-arrow.flat{color:var(--ts);background:rgba(255,255,255,.03)}
+@media(max-width:520px){
+  .rdr-cmp-row{grid-template-columns:1fr;text-align:center}
+  .rdr-cmp-side.right{text-align:center;align-items:center}
+}
+
+.rdr-empty{
+  color:var(--ts);font-family:'Montserrat',sans-serif;font-size:13px;
+  text-align:center;padding:24px 12px;font-style:italic;
+}
+
+/* Compatibilidad con render functions viejas (rolan-kpi-* IDs siguen ahí pero
+   los envolvemos en cards rdr-kpi). Algunas funciones aún escriben en .rolan-*
+   placeholders viejos del bloque /Rol — los re-estilizamos con menor prominencia. */
+#page-radar .radar-sub[data-sub="rol"] .rolan-kpis{
+  display:grid;grid-template-columns:repeat(3, minmax(0, 1fr));gap:14px;margin-bottom:22px;
+}
+@media(max-width:1023px){#page-radar .radar-sub[data-sub="rol"] .rolan-kpis{grid-template-columns:repeat(2, minmax(0, 1fr))}}
+@media(max-width:640px){#page-radar .radar-sub[data-sub="rol"] .rolan-kpis{grid-template-columns:1fr}}
+#page-radar .radar-sub[data-sub="rol"] .rolan-kpi{
+  position:relative;
+  background:linear-gradient(165deg, var(--rdr-card-hi) 0%, var(--rdr-card) 100%);
+  border:1px solid var(--rdr-border);border-radius:12px;padding:18px;
+  box-shadow:var(--rdr-shadow);
+}
+#page-radar .radar-sub[data-sub="rol"] .rolan-kpi::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:1px;
+  background:linear-gradient(90deg, transparent 0%, rgba(232,255,76,.18) 50%, transparent 100%);
+}
+#page-radar .radar-sub[data-sub="rol"] .rolan-kpi .lbl{
+  display:block;font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;
+  letter-spacing:.18em;text-transform:uppercase;color:var(--ts);margin-bottom:8px;
+}
+#page-radar .radar-sub[data-sub="rol"] .rolan-kpi .val{
+  display:block;font-family:'Barlow Condensed',sans-serif;font-weight:900;
+  font-size:clamp(34px, 5vw, 44px);line-height:.9;letter-spacing:-.02em;color:var(--text);
+}
+#page-radar .radar-sub[data-sub="rol"] .rolan-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media(max-width:900px){#page-radar .radar-sub[data-sub="rol"] .rolan-grid{grid-template-columns:1fr}}
+#page-radar .radar-sub[data-sub="rol"] .rolan-section{
+  background:linear-gradient(180deg, var(--rdr-card-hi) 0%, var(--rdr-card) 100%);
+  border:1px solid var(--rdr-border);border-radius:14px;padding:20px;
+  box-shadow:var(--rdr-shadow);
+}
+#page-radar .radar-sub[data-sub="rol"] .rolan-section h3{
+  font-family:'Zen Dots',sans-serif;font-size:12px;letter-spacing:.06em;
+  color:var(--text);margin:0 0 14px;padding-bottom:12px;
+  border-bottom:1px solid var(--rdr-border);text-transform:none;
+}
 
 </style>
 </head>
@@ -2583,96 +2995,227 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
 
  <!-- ─── RADAR DEL DRAGÓN ─── -->
  <div class="page" id="page-radar">
-   <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px;flex-wrap:wrap">
+   <!-- Gradient defs reusables para sparklines / donut -->
+   <svg width="0" height="0" style="position:absolute;pointer-events:none" aria-hidden="true">
+     <defs>
+       <linearGradient id="rdrSparkGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+         <stop offset="0%" stop-color="#e8ff4c" stop-opacity="0.3"/>
+         <stop offset="100%" stop-color="#e8ff4c" stop-opacity="0"/>
+       </linearGradient>
+     </defs>
+   </svg>
+
+   <!-- HEADER ÉPICO -->
+   <div class="rdr-header">
+     <div class="rdr-header-icon" aria-hidden="true">
+       <svg viewBox="0 0 64 64">
+         <!-- Pulsing concentric rings -->
+         <circle class="rdr-radar-pulse" cx="32" cy="32" r="28" fill="none" stroke="#e8ff4c" stroke-width="1" opacity=".15"/>
+         <circle cx="32" cy="32" r="22" fill="none" stroke="#e8ff4c" stroke-width="1" opacity=".25"/>
+         <circle cx="32" cy="32" r="14" fill="none" stroke="#e8ff4c" stroke-width="1" opacity=".4"/>
+         <circle cx="32" cy="32" r="6" fill="none" stroke="#e8ff4c" stroke-width="1" opacity=".6"/>
+         <!-- Cross hairs -->
+         <line x1="32" y1="4" x2="32" y2="60" stroke="#e8ff4c" stroke-width=".5" opacity=".25"/>
+         <line x1="4" y1="32" x2="60" y2="32" stroke="#e8ff4c" stroke-width=".5" opacity=".25"/>
+         <!-- Sweep -->
+         <g class="rdr-radar-sweep">
+           <path d="M32 32 L32 4 A28 28 0 0 1 56 18 Z" fill="url(#rdrSweepGrad)" opacity=".5"/>
+         </g>
+         <defs>
+           <radialGradient id="rdrSweepGrad" cx="0%" cy="100%" r="100%">
+             <stop offset="0%" stop-color="#e8ff4c" stop-opacity="0"/>
+             <stop offset="100%" stop-color="#e8ff4c" stop-opacity=".7"/>
+           </radialGradient>
+         </defs>
+         <!-- Center dot -->
+         <circle cx="32" cy="32" r="2" fill="#e8ff4c"/>
+       </svg>
+     </div>
      <div>
-       <h2 style="margin:0;font-family:'Zen Dots',sans-serif;font-size:22px;letter-spacing:.02em">📡 RADAR DEL DRAGÓN</h2>
-       <div style="font-size:11px;letter-spacing:.1em;color:var(--ts);text-transform:uppercase;margin-top:4px">Analytics de todo el ecosistema · Conecta Reynosa</div>
+       <h2 class="rdr-header-title">RADAR DEL <span class="y">DRAGÓN</span></h2>
+       <div class="rdr-header-sub">Analytics de todo el ecosistema · Conecta Reynosa</div>
      </div>
-     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-       <span id="radar-status" style="font-size:11px;letter-spacing:.1em;color:var(--ts);text-transform:uppercase">—</span>
-       <button class="btn btn-ghost btn-sm" onclick="loadRadar()">↻ Refrescar</button>
+     <div class="rdr-header-status">
+       <span class="rdr-status-pill">Operativo</span>
+       <div class="rdr-status-line">
+         <span id="radar-status">—</span>
+         <button onclick="loadRadar()" type="button">↻ Refrescar</button>
+       </div>
      </div>
    </div>
 
-   <!-- Sub-pestañas -->
-   <div class="radar-subs" id="radar-subs">
-     <button data-sub="resumen" type="button" class="active">🏠 Resumen general</button>
-     <button data-sub="sitio"   type="button">🌐 Sitio principal</button>
-     <button data-sub="rol"     type="button">📋 /Rol</button>
-     <button data-sub="pagos"   type="button">💳 /Pagos</button>
-     <button data-sub="alertas" type="button">🔔 Alertas <span class="radar-badge" id="radar-alertas-badge" style="display:none">0</span></button>
-     <button data-sub="comparativas" type="button">📊 Comparativas</button>
+   <!-- SUB-PESTAÑAS -->
+   <div class="rdr-tabs" id="radar-subs">
+     <button data-sub="resumen" type="button" class="active"><span class="rdr-tab-ico">⌖</span> Resumen</button>
+     <button data-sub="sitio"   type="button"><span class="rdr-tab-ico">⊕</span> Sitio</button>
+     <button data-sub="rol"     type="button"><span class="rdr-tab-ico">≡</span> /Rol</button>
+     <button data-sub="pagos"   type="button"><span class="rdr-tab-ico">$</span> /Pagos</button>
+     <button data-sub="alertas" type="button"><span class="rdr-tab-ico">⚠</span> Alertas<span class="rdr-badge" id="radar-alertas-badge" style="display:none">0</span></button>
+     <button data-sub="comparativas" type="button"><span class="rdr-tab-ico">↔</span> Comparativas</button>
    </div>
 
-   <!-- Selector global de rango -->
-   <div class="radar-range" id="radar-range">
+   <!-- SELECTOR DE RANGO -->
+   <div class="rdr-range" id="radar-range">
      <button data-r="today"   type="button">Hoy</button>
      <button data-r="week"    type="button">Esta semana</button>
      <button data-r="month"   type="button" class="active">Este mes</button>
-     <button data-r="3months" type="button">Últimos 3 meses</button>
+     <button data-r="3months" type="button">Últimos 3M</button>
      <button data-r="all"     type="button">Todo</button>
    </div>
 
-   <!-- SUB-PESTAÑA: Resumen general -->
+   <!-- ═══════════ SUB-PESTAÑA: Resumen general ═══════════ -->
    <section class="radar-sub" data-sub="resumen" style="display:block">
-     <div class="rolan-kpis" id="rgr-kpis">
-       <div class="rolan-kpi"><span class="lbl">Visitas totales</span><span class="val" id="rgr-visitas">—</span><span class="trend" id="rgr-visitas-tr"></span></div>
-       <div class="rolan-kpi"><span class="lbl">Cotizaciones</span><span class="val" id="rgr-cotizaciones">—</span><span class="trend" id="rgr-cotizaciones-tr"></span></div>
-       <div class="rolan-kpi"><span class="lbl">Modal pago abierto</span><span class="val" id="rgr-modal">—</span><span class="trend" id="rgr-modal-tr"></span></div>
-       <div class="rolan-kpi"><span class="lbl">Comprobantes enviados</span><span class="val" id="rgr-comprobante">—</span><span class="trend" id="rgr-comprobante-tr"></span></div>
-       <div class="rolan-kpi"><span class="lbl">Conversión global</span><span class="val" id="rgr-conv">—</span><span class="trend" id="rgr-conv-tr"></span></div>
-       <div class="rolan-kpi"><span class="lbl">Eventos activos</span><span class="val" id="rgr-eventos-act">—</span></div>
-       <div class="rolan-kpi"><span class="lbl">Lista de espera</span><span class="val" id="rgr-waitlist">—</span></div>
-       <div class="rolan-kpi"><span class="lbl">Planes /rol creados</span><span class="val" id="rgr-planes">—</span><span class="trend" id="rgr-planes-tr"></span></div>
+     <!-- KPI cards con sparklines individuales -->
+     <div class="rdr-kpis">
+       <div class="rdr-kpi">
+         <div class="rdr-kpi-lbl">Visitas totales</div>
+         <div class="rdr-kpi-num">
+           <span class="rdr-kpi-val" id="rgr-visitas">—</span>
+           <span class="rdr-kpi-trend" id="rgr-visitas-tr"></span>
+         </div>
+         <svg class="rdr-kpi-spark" id="rgr-visitas-spark" viewBox="0 0 240 32" preserveAspectRatio="none"></svg>
+       </div>
+       <div class="rdr-kpi">
+         <div class="rdr-kpi-lbl">Cotizaciones</div>
+         <div class="rdr-kpi-num">
+           <span class="rdr-kpi-val" id="rgr-cotizaciones">—</span>
+           <span class="rdr-kpi-trend" id="rgr-cotizaciones-tr"></span>
+         </div>
+         <svg class="rdr-kpi-spark" id="rgr-cotizaciones-spark" viewBox="0 0 240 32" preserveAspectRatio="none"></svg>
+       </div>
+       <div class="rdr-kpi">
+         <div class="rdr-kpi-lbl">Modal pago abierto</div>
+         <div class="rdr-kpi-num">
+           <span class="rdr-kpi-val" id="rgr-modal">—</span>
+           <span class="rdr-kpi-trend" id="rgr-modal-tr"></span>
+         </div>
+         <svg class="rdr-kpi-spark" id="rgr-modal-spark" viewBox="0 0 240 32" preserveAspectRatio="none"></svg>
+       </div>
+       <div class="rdr-kpi">
+         <div class="rdr-kpi-lbl">Comprobantes enviados</div>
+         <div class="rdr-kpi-num">
+           <span class="rdr-kpi-val" id="rgr-comprobante">—</span>
+           <span class="rdr-kpi-trend" id="rgr-comprobante-tr"></span>
+         </div>
+         <svg class="rdr-kpi-spark" id="rgr-comprobante-spark" viewBox="0 0 240 32" preserveAspectRatio="none"></svg>
+       </div>
+       <div class="rdr-kpi">
+         <div class="rdr-kpi-lbl">Conversión global</div>
+         <div class="rdr-kpi-num">
+           <span class="rdr-kpi-val" id="rgr-conv">—</span>
+           <span class="rdr-kpi-trend" id="rgr-conv-tr"></span>
+         </div>
+         <svg class="rdr-kpi-spark" id="rgr-conv-spark" viewBox="0 0 240 32" preserveAspectRatio="none"></svg>
+       </div>
+       <div class="rdr-kpi">
+         <div class="rdr-kpi-lbl">Eventos activos</div>
+         <div class="rdr-kpi-num">
+           <span class="rdr-kpi-val" id="rgr-eventos-act">—</span>
+           <span class="rdr-kpi-trend"></span>
+         </div>
+         <svg class="rdr-kpi-spark" viewBox="0 0 240 32" preserveAspectRatio="none"></svg>
+       </div>
+       <div class="rdr-kpi">
+         <div class="rdr-kpi-lbl">Lista de espera</div>
+         <div class="rdr-kpi-num">
+           <span class="rdr-kpi-val" id="rgr-waitlist">—</span>
+         </div>
+         <svg class="rdr-kpi-spark" id="rgr-waitlist-spark" viewBox="0 0 240 32" preserveAspectRatio="none"></svg>
+       </div>
+       <div class="rdr-kpi">
+         <div class="rdr-kpi-lbl">Planes /rol creados</div>
+         <div class="rdr-kpi-num">
+           <span class="rdr-kpi-val" id="rgr-planes">—</span>
+           <span class="rdr-kpi-trend" id="rgr-planes-tr"></span>
+         </div>
+         <svg class="rdr-kpi-spark" id="rgr-planes-spark" viewBox="0 0 240 32" preserveAspectRatio="none"></svg>
+       </div>
+       <div class="rdr-kpi">
+         <div class="rdr-kpi-lbl">Códigos aplicados</div>
+         <div class="rdr-kpi-num">
+           <span class="rdr-kpi-val" id="rgr-codigos">—</span>
+           <span class="rdr-kpi-trend" id="rgr-codigos-tr"></span>
+         </div>
+         <svg class="rdr-kpi-spark" id="rgr-codigos-spark" viewBox="0 0 240 32" preserveAspectRatio="none"></svg>
+       </div>
      </div>
-     <div class="rolan-grid">
-       <section class="rolan-section">
-         <h3>Top eventos cotizados</h3>
-         <ol id="rgr-top-cot" class="rolan-ranked"><li class="rolan-empty">Cargando…</li></ol>
-       </section>
-       <section class="rolan-section">
-         <h3>Origen de tráfico</h3>
-         <div id="rgr-origenes"><div class="rolan-empty">Cargando…</div></div>
-       </section>
+
+     <!-- Top eventos cotizados + donut origen -->
+     <div class="rdr-grid-2">
+       <div class="rdr-card">
+         <div class="rdr-card-head">
+           <div class="rdr-card-title"><span class="ico">⌖</span>Top eventos cotizados</div>
+           <div class="rdr-card-meta" id="rgr-top-cot-meta">—</div>
+         </div>
+         <ol id="rgr-top-cot" class="rdr-rank"><li class="rdr-empty">Cargando…</li></ol>
+       </div>
+       <div class="rdr-card">
+         <div class="rdr-card-head">
+           <div class="rdr-card-title"><span class="ico">◐</span>Origen de tráfico</div>
+           <div class="rdr-card-meta" id="rgr-origenes-meta">—</div>
+         </div>
+         <div class="rdr-donut-wrap">
+           <div class="rdr-donut" id="rgr-donut">
+             <svg viewBox="0 0 120 120" width="140" height="140">
+               <circle cx="60" cy="60" r="46" fill="none" stroke="rgba(255,255,255,.04)" stroke-width="14"/>
+               <g id="rgr-donut-segs" transform="rotate(-90 60 60)"></g>
+               <text id="rgr-donut-center" x="60" y="60" text-anchor="middle" dominant-baseline="central"
+                     fill="#e8ff4c" font-family="Barlow Condensed" font-weight="900" font-size="24">—</text>
+             </svg>
+           </div>
+           <div class="rdr-donut-legend" id="rgr-donut-legend"></div>
+         </div>
+       </div>
+     </div>
+
+     <!-- Actividad por hora (full width) -->
+     <div class="rdr-card" style="margin-top:14px">
+       <div class="rdr-card-head">
+         <div class="rdr-card-title"><span class="ico">⌁</span>Actividad · últimas 24h</div>
+         <div class="rdr-card-meta">Sesiones por hora · MX time</div>
+       </div>
+       <div id="rgr-actividad" class="rdr-hours"><div class="rdr-empty">Cargando…</div></div>
      </div>
    </section>
 
-   <!-- SUB-PESTAÑA: Sitio principal -->
+   <!-- ═══════════ SUB-PESTAÑA: Sitio principal ═══════════ -->
    <section class="radar-sub" data-sub="sitio" style="display:none">
-     <div class="rolan-kpis">
-       <div class="rolan-kpi"><span class="lbl">Sesiones únicas</span><span class="val" id="rsi-sesiones">—</span></div>
-       <div class="rolan-kpi"><span class="lbl">Eventos vistos</span><span class="val" id="rsi-eventos-vistos">—</span></div>
-       <div class="rolan-kpi"><span class="lbl">Cotizaciones</span><span class="val" id="rsi-cotizaciones">—</span></div>
-       <div class="rolan-kpi"><span class="lbl">Códigos intentados</span><span class="val" id="rsi-codigos">—</span></div>
-       <div class="rolan-kpi"><span class="lbl">Mobile / Desktop</span><span class="val" id="rsi-devices">—</span></div>
-       <div class="rolan-kpi"><span class="lbl">Música reproducida</span><span class="val" id="rsi-musica">—</span></div>
-       <button class="btn btn-sm" onclick="exportRadarCSV('main')" style="background:var(--gold);color:#000;font-weight:900">📥 Export CSV</button>
+     <div class="rdr-kpis">
+       <div class="rdr-kpi"><div class="rdr-kpi-lbl">Sesiones únicas</div><div class="rdr-kpi-num"><span class="rdr-kpi-val" id="rsi-sesiones">—</span></div></div>
+       <div class="rdr-kpi"><div class="rdr-kpi-lbl">Eventos vistos</div><div class="rdr-kpi-num"><span class="rdr-kpi-val" id="rsi-eventos-vistos">—</span></div></div>
+       <div class="rdr-kpi"><div class="rdr-kpi-lbl">Cotizaciones</div><div class="rdr-kpi-num"><span class="rdr-kpi-val" id="rsi-cotizaciones">—</span></div></div>
+       <div class="rdr-kpi"><div class="rdr-kpi-lbl">Códigos intentados</div><div class="rdr-kpi-num"><span class="rdr-kpi-val" id="rsi-codigos">—</span></div></div>
+       <div class="rdr-kpi"><div class="rdr-kpi-lbl">Mobile / Desktop</div><div class="rdr-kpi-num"><span class="rdr-kpi-val" id="rsi-devices" style="font-size:18px;letter-spacing:0">—</span></div></div>
+       <div class="rdr-kpi"><div class="rdr-kpi-lbl">Música reproducida</div><div class="rdr-kpi-num"><span class="rdr-kpi-val" id="rsi-musica">—</span></div></div>
      </div>
-     <div class="rolan-grid">
-       <section class="rolan-section">
-         <h3>Top 10 eventos más vistos</h3>
-         <ol id="rsi-eventos-top" class="rolan-ranked"><li class="rolan-empty">Cargando…</li></ol>
-       </section>
-       <section class="rolan-section">
-         <h3>Paquetes más elegidos</h3>
-         <div id="rsi-paquetes"><div class="rolan-empty">Cargando…</div></div>
-       </section>
-       <section class="rolan-section">
-         <h3>Embudo del wizard</h3>
-         <ol id="rsi-embudo" class="rolan-funnel"><li class="rolan-empty">Cargando…</li></ol>
-       </section>
-       <section class="rolan-section">
-         <h3>Filtros más usados</h3>
-         <ol id="rsi-filtros" class="rolan-ranked"><li class="rolan-empty">Cargando…</li></ol>
-       </section>
-       <section class="rolan-section">
-         <h3>Códigos: válidos vs no válidos</h3>
-         <div id="rsi-codigos-detalle"><div class="rolan-empty">Cargando…</div></div>
-       </section>
-       <section class="rolan-section">
-         <h3>Origen de tráfico</h3>
-         <div id="rsi-origenes"><div class="rolan-empty">Cargando…</div></div>
-       </section>
+     <div style="margin-bottom:18px;text-align:right">
+       <button class="rdr-status-line" style="border:1px solid var(--rdr-border);background:transparent;color:var(--rdr-yel);padding:8px 16px;border-radius:6px;cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:900;letter-spacing:.14em;text-transform:uppercase" onclick="exportRadarCSV('main')">📥 Export CSV</button>
+     </div>
+     <div class="rdr-grid-2">
+       <div class="rdr-card">
+         <div class="rdr-card-head"><div class="rdr-card-title"><span class="ico">★</span>Top 10 eventos más vistos</div></div>
+         <ol id="rsi-eventos-top" class="rdr-rank"><li class="rdr-empty">Cargando…</li></ol>
+       </div>
+       <div class="rdr-card">
+         <div class="rdr-card-head"><div class="rdr-card-title"><span class="ico">▦</span>Paquetes más elegidos</div></div>
+         <div id="rsi-paquetes" class="rdr-bars"><div class="rdr-empty">Cargando…</div></div>
+       </div>
+       <div class="rdr-card">
+         <div class="rdr-card-head"><div class="rdr-card-title"><span class="ico">⇥</span>Embudo del wizard</div></div>
+         <ol id="rsi-embudo" class="rdr-funnel"><li class="rdr-empty">Cargando…</li></ol>
+       </div>
+       <div class="rdr-card">
+         <div class="rdr-card-head"><div class="rdr-card-title"><span class="ico">⌕</span>Filtros más usados</div></div>
+         <ol id="rsi-filtros" class="rdr-rank"><li class="rdr-empty">Cargando…</li></ol>
+       </div>
+       <div class="rdr-card">
+         <div class="rdr-card-head"><div class="rdr-card-title"><span class="ico">⚑</span>Códigos: válidos vs no válidos</div></div>
+         <div id="rsi-codigos-detalle" class="rdr-bars"><div class="rdr-empty">Cargando…</div></div>
+       </div>
+       <div class="rdr-card">
+         <div class="rdr-card-head"><div class="rdr-card-title"><span class="ico">↗</span>Origen de tráfico</div></div>
+         <div id="rsi-origenes" class="rdr-bars"><div class="rdr-empty">Cargando…</div></div>
+       </div>
      </div>
    </section>
 
@@ -2717,68 +3260,62 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
      </div>
    </section>
 
-   <!-- SUB-PESTAÑA: /Pagos -->
+   <!-- ═══════════ SUB-PESTAÑA: /Pagos ═══════════ -->
    <section class="radar-sub" data-sub="pagos" style="display:none">
-     <div class="rolan-kpis">
-       <div class="rolan-kpi"><span class="lbl">Sesiones únicas</span><span class="val" id="rpa-sesiones">—</span></div>
-       <div class="rolan-kpi"><span class="lbl">Cuentas copiadas</span><span class="val" id="rpa-copias">—</span></div>
-       <div class="rolan-kpi"><span class="lbl">Clicks a WhatsApp</span><span class="val" id="rpa-wa">—</span></div>
-       <button class="btn btn-sm" onclick="exportRadarCSV('pagos')" style="background:var(--gold);color:#000;font-weight:900">📥 Export CSV</button>
+     <div class="rdr-kpis">
+       <div class="rdr-kpi"><div class="rdr-kpi-lbl">Sesiones únicas</div><div class="rdr-kpi-num"><span class="rdr-kpi-val" id="rpa-sesiones">—</span></div></div>
+       <div class="rdr-kpi"><div class="rdr-kpi-lbl">Cuentas copiadas</div><div class="rdr-kpi-num"><span class="rdr-kpi-val" id="rpa-copias">—</span></div></div>
+       <div class="rdr-kpi"><div class="rdr-kpi-lbl">Clicks a WhatsApp</div><div class="rdr-kpi-num"><span class="rdr-kpi-val" id="rpa-wa">—</span></div></div>
      </div>
-     <div class="rolan-grid">
-       <section class="rolan-section">
-         <h3>Cuentas más copiadas</h3>
-         <ol id="rpa-cuentas" class="rolan-ranked"><li class="rolan-empty">Cargando…</li></ol>
-       </section>
-       <section class="rolan-section">
-         <h3>De dónde llegan</h3>
-         <div id="rpa-origenes"><div class="rolan-empty">Cargando…</div></div>
-       </section>
+     <div style="margin-bottom:18px;text-align:right">
+       <button style="border:1px solid var(--rdr-border);background:transparent;color:var(--rdr-yel);padding:8px 16px;border-radius:6px;cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:900;letter-spacing:.14em;text-transform:uppercase" onclick="exportRadarCSV('pagos')">📥 Export CSV</button>
+     </div>
+     <div class="rdr-grid-2">
+       <div class="rdr-card">
+         <div class="rdr-card-head"><div class="rdr-card-title"><span class="ico">▦</span>Cuentas más copiadas</div></div>
+         <ol id="rpa-cuentas" class="rdr-rank"><li class="rdr-empty">Cargando…</li></ol>
+       </div>
+       <div class="rdr-card">
+         <div class="rdr-card-head"><div class="rdr-card-title"><span class="ico">↗</span>De dónde llegan</div></div>
+         <div id="rpa-origenes" class="rdr-bars"><div class="rdr-empty">Cargando…</div></div>
+       </div>
      </div>
    </section>
 
-   <!-- SUB-PESTAÑA: Alertas -->
+   <!-- ═══════════ SUB-PESTAÑA: Alertas ═══════════ -->
    <section class="radar-sub" data-sub="alertas" style="display:none">
-     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px">
-       <div class="radar-range" style="margin:0">
+     <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:center;margin-bottom:18px;justify-content:space-between">
+       <div class="rdr-range" style="margin:0">
          <button data-af="all" type="button" class="active">Todas</button>
          <button data-af="unread" type="button">Sin leer</button>
          <button data-af="critical" type="button">Críticas</button>
        </div>
-       <button class="btn btn-ghost btn-sm" onclick="markAllAlertsRead()">✓ Marcar todas como leídas</button>
+       <button onclick="markAllAlertsRead()" style="border:1px solid var(--rdr-border);background:transparent;color:var(--rdr-yel);padding:8px 16px;border-radius:6px;cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:900;letter-spacing:.14em;text-transform:uppercase">✓ Marcar todas como leídas</button>
      </div>
-     <div id="ral-list" style="display:flex;flex-direction:column;gap:10px">
-       <div class="rolan-empty">Cargando alertas…</div>
+     <div class="rdr-alerts" id="ral-list">
+       <div class="rdr-empty">Cargando alertas…</div>
      </div>
    </section>
 
-   <!-- SUB-PESTAÑA: Comparativas -->
+   <!-- ═══════════ SUB-PESTAÑA: Comparativas ═══════════ -->
    <section class="radar-sub" data-sub="comparativas" style="display:none">
-     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;align-items:center">
-       <select id="rcm-modo" class="rolan-select">
+     <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px;align-items:center">
+       <select id="rcm-modo" class="rdr-select">
          <option value="week">Esta semana vs la pasada</option>
          <option value="month" selected>Este mes vs el pasado</option>
          <option value="year">Este año vs el pasado</option>
          <option value="month_yoy">Mes específico vs mismo mes año anterior</option>
        </select>
-       <select id="rcm-mes-yoy" class="rolan-select" style="display:none">
-         <option value="0">Enero</option>
-         <option value="1">Febrero</option>
-         <option value="2">Marzo</option>
-         <option value="3">Abril</option>
-         <option value="4">Mayo</option>
-         <option value="5">Junio</option>
-         <option value="6">Julio</option>
-         <option value="7">Agosto</option>
-         <option value="8">Septiembre</option>
-         <option value="9">Octubre</option>
-         <option value="10">Noviembre</option>
-         <option value="11">Diciembre</option>
+       <select id="rcm-mes-yoy" class="rdr-select" style="display:none">
+         <option value="0">Enero</option><option value="1">Febrero</option><option value="2">Marzo</option>
+         <option value="3">Abril</option><option value="4">Mayo</option><option value="5">Junio</option>
+         <option value="6">Julio</option><option value="7">Agosto</option><option value="8">Septiembre</option>
+         <option value="9">Octubre</option><option value="10">Noviembre</option><option value="11">Diciembre</option>
        </select>
      </div>
-     <div id="rcm-leyenda" style="font-size:11px;letter-spacing:.06em;color:var(--ts);text-transform:uppercase;margin-bottom:10px"></div>
-     <div class="rolan-kpis" id="rcm-kpis">
-       <div class="rolan-empty" style="grid-column:1/-1">Selecciona un modo para ver la comparativa.</div>
+     <div id="rcm-leyenda" style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.18em;color:var(--ts);text-transform:uppercase;margin-bottom:14px"></div>
+     <div class="rdr-cmp-grid" id="rcm-kpis">
+       <div class="rdr-empty" style="grid-column:1/-1">Selecciona un modo para ver la comparativa.</div>
      </div>
    </section>
  </div>
@@ -10969,54 +11506,157 @@ async function _radarFetch(table, sinceISO, untilISO){
   return r.json();
 }
 
+// ── Helpers visuales del Radar ────────────────────────────
+// Bucketing por día: devuelve array de N valores (uno por día) terminando en HOY.
+function _rdrSeries7d(rows, predicate, days){
+  days = days || 7;
+  const now = new Date();
+  const today0 = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const buckets = new Array(days).fill(0);
+  for (const r of rows || []) {
+    if (predicate && !predicate(r)) continue;
+    const t = new Date(r.created_at);
+    const d = new Date(t.getFullYear(), t.getMonth(), t.getDate());
+    const diff = Math.round((today0 - d) / (24 * 3600 * 1000));
+    if (diff >= 0 && diff < days) buckets[days - 1 - diff]++;
+  }
+  return buckets;
+}
+// Genera el path SVG de un sparkline + área debajo, dado un array de valores.
+// viewBox fijo 240x32 (matchea el HTML).
+function _rdrSparkPath(values, w, h){
+  w = w || 240; h = h || 32;
+  if (!values || values.length < 2) {
+    return { line: `M0 ${h-2} L${w} ${h-2}`, area: '', dot: { cx:w, cy:h-2 } };
+  }
+  const max = Math.max(1, ...values);
+  const min = Math.min(...values);
+  const range = Math.max(1, max - min);
+  const stepX = w / (values.length - 1);
+  const points = values.map((v, i) => {
+    const x = i * stepX;
+    const y = h - 4 - ((v - min) / range) * (h - 8);
+    return [x, y];
+  });
+  const line = 'M ' + points.map(p => p[0].toFixed(1) + ' ' + p[1].toFixed(1)).join(' L ');
+  const last = points[points.length - 1];
+  const area = line + ` L ${w} ${h} L 0 ${h} Z`;
+  return { line, area, dot: { cx: last[0], cy: last[1] } };
+}
+function _rdrPaintSpark(svgEl, values){
+  if (!svgEl) return;
+  const { line, area, dot } = _rdrSparkPath(values);
+  // Limpiar y dibujar de nuevo
+  svgEl.innerHTML =
+    `<path class="spark-area" d="${area}"/>` +
+    `<path class="spark-path" d="${line}"/>` +
+    `<circle class="spark-dot" cx="${dot.cx.toFixed(1)}" cy="${dot.cy.toFixed(1)}" r="2.5"/>`;
+}
+// Donut: genera segmentos <path> con stroke-dasharray (animados).
+function _rdrPaintDonut(svgGroupId, items, palette){
+  const g = document.getElementById(svgGroupId);
+  if (!g) return;
+  const total = items.reduce((a, it) => a + it.value, 0);
+  if (total === 0) { g.innerHTML = ''; return; }
+  const r = 46, c = 2 * Math.PI * r;
+  let acc = 0;
+  g.innerHTML = items.map((it, i) => {
+    const portion = it.value / total;
+    const dash = (portion * c).toFixed(2);
+    const gap  = (c - portion * c).toFixed(2);
+    const offset = (-acc * c).toFixed(2);
+    acc += portion;
+    const color = palette[i % palette.length];
+    return `<circle cx="60" cy="60" r="${r}" fill="none"
+      stroke="${color}" stroke-width="14"
+      stroke-dasharray="${dash} ${gap}"
+      stroke-dashoffset="${offset}"
+      style="transition:stroke-dasharray .9s cubic-bezier(.2,.85,.3,1)"/>`;
+  }).join('');
+  // Texto central: muestra el total
+  const t = document.getElementById('rgr-donut-center');
+  if (t) t.textContent = total.toLocaleString('es-MX');
+}
+
 // ── RESUMEN GENERAL ────────────────────────────────────────
 async function loadRadarResumen(){
   const since = _radarSinceISO();
   const prevSince = _radarPrevSinceISO();
-  const [main, mainPrev, rol, waitlist] = await Promise.all([
+  // Para sparklines siempre traemos los últimos 7 días (independiente del rango).
+  const since7d = new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString();
+  const [main, mainPrev, rol, waitlist, main7, rol7] = await Promise.all([
     _radarFetch('main_eventos_uso', since),
     _radarFetch('main_eventos_uso', prevSince, since),
     _radarFetch('rol_eventos_uso', since),
-    _radarFetch('eventos_waitlist?select=evento_id,evento_nombre,created_at', '1970-01-01T00:00:00Z').catch(() => [])
+    _radarFetch('eventos_waitlist?select=evento_id,evento_nombre,created_at', '1970-01-01T00:00:00Z').catch(() => []),
+    _radarFetch('main_eventos_uso', since7d),
+    _radarFetch('rol_eventos_uso',  since7d).catch(() => [])
   ]);
   _radarCache.main = main || [];
   _radarCache.rol  = rol || [];
 
-  const visitas    = new Set((main||[]).filter(r=>r.accion==='main_visita').map(r=>r.session_id)).size;
-  const visitasP   = new Set((mainPrev||[]).filter(r=>r.accion==='main_visita').map(r=>r.session_id)).size;
-  const cot        = (main||[]).filter(r=>r.accion==='main_cotizacion_generada').length;
-  const cotP       = (mainPrev||[]).filter(r=>r.accion==='main_cotizacion_generada').length;
-  const modal      = (main||[]).filter(r=>r.accion==='main_modal_pago_abierto').length;
-  const modalP     = (mainPrev||[]).filter(r=>r.accion==='main_modal_pago_abierto').length;
-  const compro     = (main||[]).filter(r=>r.accion==='main_comprobante_enviado').length;
-  const comproP    = (mainPrev||[]).filter(r=>r.accion==='main_comprobante_enviado').length;
+  const filt = (arr, pred) => (arr||[]).filter(pred);
+  const uniqSessions = (arr, pred) => new Set(filt(arr, pred).map(r=>r.session_id)).size;
+
+  const visitas    = uniqSessions(main, r => r.accion==='main_visita');
+  const visitasP   = uniqSessions(mainPrev, r => r.accion==='main_visita');
+  const cot        = filt(main, r=>r.accion==='main_cotizacion_generada').length;
+  const cotP       = filt(mainPrev, r=>r.accion==='main_cotizacion_generada').length;
+  const modal      = filt(main, r=>r.accion==='main_modal_pago_abierto').length;
+  const modalP     = filt(mainPrev, r=>r.accion==='main_modal_pago_abierto').length;
+  const compro     = filt(main, r=>r.accion==='main_comprobante_enviado').length;
+  const comproP    = filt(mainPrev, r=>r.accion==='main_comprobante_enviado').length;
   const conv       = visitas ? (modal / visitas * 100) : 0;
   const convP      = visitasP ? (modalP / visitasP * 100) : 0;
-  const planes     = (rol||[]).filter(r=>r.accion==='rol_plan_generado').length;
-  const planesP    = 0; // rolPrev no fetched — opcional
+  const planes     = filt(rol, r=>r.accion==='rol_plan_generado').length;
+  const codigosOk  = filt(main, r=>r.accion==='main_codigo_intentado' && r.codigo_valido).length;
+  const codigosOkP = filt(mainPrev, r=>r.accion==='main_codigo_intentado' && r.codigo_valido).length;
   const wlTotal    = (waitlist||[]).length;
-  const eventosAct = 0; // requeriría leer EV de index.html — lo dejamos en cero o fetch dinámico
 
-  const setKpi = (id, val, prev) => {
-    const el = document.getElementById(id); if (el) el.textContent = String(val).toLocaleString('es-MX');
+  // Set KPI val + trend pill
+  const setKpi = (id, val, prev, isPercent) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = isPercent ? (typeof val === 'number' ? val.toFixed(1)+'%' : String(val))
+                                       : (typeof val === 'number' ? val.toLocaleString('es-MX') : String(val));
     const tr = document.getElementById(id+'-tr');
-    if (tr) { const t = _trendArrow(val, prev); tr.textContent = t.html; tr.className = 'trend ' + t.cls; }
+    if (tr) {
+      const t = _trendArrow(typeof val === 'number' ? val : parseFloat(val) || 0, prev || 0);
+      tr.textContent = t.html;
+      tr.className = 'rdr-kpi-trend ' + t.cls;
+    }
   };
-  setKpi('rgr-visitas', visitas, visitasP);
-  setKpi('rgr-cotizaciones', cot, cotP);
-  setKpi('rgr-modal', modal, modalP);
-  setKpi('rgr-comprobante', compro, comproP);
-  setKpi('rgr-conv', conv.toFixed(1) + '%', convP);
-  // Eventos activos: fetch index.html y contar los que no estén agotados ni
-  // próximamente. Cache de 5 min en memoria para no penalizar refreshes.
+  setKpi('rgr-visitas',     visitas, visitasP);
+  setKpi('rgr-cotizaciones', cot,    cotP);
+  setKpi('rgr-modal',       modal,   modalP);
+  setKpi('rgr-comprobante', compro,  comproP);
+  setKpi('rgr-conv',        conv,    convP, true);
+  setKpi('rgr-planes',      planes,  0);
+  setKpi('rgr-codigos',     codigosOk, codigosOkP);
+  // Eventos activos: fetch async desde /index.html (cache 5 min interno)
   _radarContarEventosActivos().then(n => {
     const el = document.getElementById('rgr-eventos-act');
     if (el) el.textContent = (n == null ? '—' : n.toLocaleString('es-MX'));
   });
   document.getElementById('rgr-waitlist').textContent = wlTotal.toLocaleString('es-MX');
-  setKpi('rgr-planes', planes, planesP);
 
-  // Top eventos cotizados
+  // ── Sparklines (7 días móviles) ──
+  _rdrPaintSpark(document.getElementById('rgr-visitas-spark'),     _rdrSeries7d(main7, r => r.accion==='main_visita'));
+  _rdrPaintSpark(document.getElementById('rgr-cotizaciones-spark'),_rdrSeries7d(main7, r => r.accion==='main_cotizacion_generada'));
+  _rdrPaintSpark(document.getElementById('rgr-modal-spark'),       _rdrSeries7d(main7, r => r.accion==='main_modal_pago_abierto'));
+  _rdrPaintSpark(document.getElementById('rgr-comprobante-spark'), _rdrSeries7d(main7, r => r.accion==='main_comprobante_enviado'));
+  _rdrPaintSpark(document.getElementById('rgr-codigos-spark'),     _rdrSeries7d(main7, r => r.accion==='main_codigo_intentado' && r.codigo_valido));
+  _rdrPaintSpark(document.getElementById('rgr-planes-spark'),      _rdrSeries7d(rol7, r => r.accion==='rol_plan_generado'));
+  // Conv como % por día — eviata división por cero si no hay visitas ese día.
+  const sparkConv = (() => {
+    const v = _rdrSeries7d(main7, r => r.accion==='main_visita');
+    const m = _rdrSeries7d(main7, r => r.accion==='main_modal_pago_abierto');
+    return v.map((vi, i) => vi > 0 ? (m[i] / vi * 100) : 0);
+  })();
+  _rdrPaintSpark(document.getElementById('rgr-conv-spark'), sparkConv);
+  _rdrPaintSpark(document.getElementById('rgr-waitlist-spark'),
+    _rdrSeries7d(waitlist, () => true));
+
+  // ── Top eventos cotizados (con barras inline) ──
   const topCot = {};
   for (const r of main) {
     if (r.accion === 'main_cotizacion_generada' && r.evento_id) {
@@ -11025,26 +11665,76 @@ async function loadRadarResumen(){
     }
   }
   const olTop = document.getElementById('rgr-top-cot');
-  const arr = Object.values(topCot).sort((a,b) => b.count - a.count).slice(0, 10);
+  const arr = Object.values(topCot).sort((a,b) => b.count - a.count).slice(0, 6);
+  const metaTop = document.getElementById('rgr-top-cot-meta');
+  if (metaTop) metaTop.textContent = `${arr.length} ${arr.length===1?'evento':'eventos'}`;
+  const maxCot = Math.max(1, ...arr.map(x => x.count));
   olTop.innerHTML = arr.length === 0
-    ? '<li class="rolan-empty">Sin cotizaciones en el rango</li>'
-    : arr.map(x => `<li><span class="name">${_radarEsc(x.nombre)}</span><span class="count">${x.count} ${x.count===1?'cotización':'cotizaciones'}</span></li>`).join('');
+    ? '<li class="rdr-empty">Sin cotizaciones en el rango</li>'
+    : arr.map((x, i) => {
+        const pct = (x.count / maxCot * 100).toFixed(0);
+        const delay = (0.05 + i*0.04).toFixed(2);
+        return `<li>
+          <span class="rk-pos">#${i+1}</span>
+          <span class="rk-name">${_radarEsc(x.nombre)}<span class="rk-bar" style="width:${pct}%;animation-delay:${delay}s"></span></span>
+          <span class="rk-val">${x.count}<span class="unit">${x.count===1?'cotización':'cotizaciones'}</span></span>
+        </li>`;
+      }).join('');
 
-  // Orígenes de tráfico
+  // ── Donut: orígenes de tráfico ──
   const orig = {};
   for (const r of main) {
     if (r.accion !== 'main_visita') continue;
     const k = (r.origen_trafico || 'direct').toLowerCase();
     orig[k] = (orig[k] || 0) + 1;
   }
-  const total = Object.values(orig).reduce((a,b) => a+b, 0);
-  const wrap = document.getElementById('rgr-origenes');
-  wrap.innerHTML = total === 0
-    ? '<div class="rolan-empty">Sin sesiones registradas</div>'
-    : Object.entries(orig).sort((a,b) => b[1]-a[1]).map(([k,n]) => {
-        const pct = (n/total*100).toFixed(1);
-        return `<div class="rolan-bar-row"><span class="key">${k}</span><div class="track"><div class="fill" style="width:${pct}%"></div></div><span class="pct">${pct}%</span></div>`;
+  const origArr = Object.entries(orig).sort((a,b) => b[1]-a[1]).map(([k,n]) => ({ label:k, value:n }));
+  const origTotal = origArr.reduce((a,b) => a+b.value, 0);
+  const palette = ['#e8ff4c', '#ff283b', '#0000cd', '#88ea4e', '#ff4bd1', '#7be0ff', '#a4ff7b'];
+  _rdrPaintDonut('rgr-donut-segs', origArr, palette);
+  const metaOrig = document.getElementById('rgr-origenes-meta');
+  if (metaOrig) metaOrig.textContent = origTotal === 0 ? '—' : `${origTotal} sesiones`;
+  const legend = document.getElementById('rgr-donut-legend');
+  legend.innerHTML = origTotal === 0
+    ? '<div class="rdr-empty">Sin sesiones</div>'
+    : origArr.map((it, i) => {
+        const pct = (it.value / origTotal * 100).toFixed(1);
+        return `<div class="lg">
+          <span class="dot" style="background:${palette[i % palette.length]}"></span>
+          <span class="lbl">${_radarEsc(it.label)}</span>
+          <span class="pct">${pct}%</span>
+        </div>`;
       }).join('');
+
+  // ── Actividad por hora (últimas 24h sobre main7) ──
+  const nowMs = Date.now(), dayAgoMs = nowMs - 24 * 3600 * 1000;
+  const buckets = new Array(24).fill(0);
+  for (const r of (main7 || [])) {
+    const t = new Date(r.created_at).getTime();
+    if (t < dayAgoMs || t > nowMs) continue;
+    const hoursAgo = Math.floor((nowMs - t) / (3600 * 1000));
+    if (hoursAgo >= 0 && hoursAgo < 24) buckets[23 - hoursAgo]++;
+  }
+  const maxBucket = Math.max(1, ...buckets);
+  const baseHour = new Date(nowMs - 23 * 3600 * 1000);
+  const fmtH = (i) => {
+    const d = new Date(baseHour.getTime() + i * 3600 * 1000);
+    return d.toLocaleTimeString('es-MX', { hour: '2-digit', minute:'2-digit', hour12: false });
+  };
+  const actWrap = document.getElementById('rgr-actividad');
+  if (buckets.every(b => b === 0)) {
+    actWrap.innerHTML = '<div class="rdr-empty">Sin actividad en las últimas 24h</div>';
+  } else {
+    actWrap.innerHTML = buckets.map((n, i) => {
+      const pct = (n / maxBucket * 100).toFixed(1);
+      const delay = (i * 0.015).toFixed(2);
+      return `<div class="hr">
+        <span class="h">${fmtH(i)}</span>
+        <div class="track"><div class="fill" style="width:${pct}%;animation-delay:${delay}s"></div></div>
+        <span class="n">${n}</span>
+      </div>`;
+    }).join('');
+  }
 }
 
 // ── SITIO PRINCIPAL ────────────────────────────────────────
@@ -11076,9 +11766,17 @@ async function loadRadarSitio(){
     }
   }
   const arr = Object.values(top).sort((a,b) => b.count - a.count).slice(0, 10);
+  const maxClicks = Math.max(1, ...arr.map(x => x.count));
   document.getElementById('rsi-eventos-top').innerHTML = arr.length === 0
-    ? '<li class="rolan-empty">Sin eventos vistos en el rango</li>'
-    : arr.map(x => `<li><span class="name">${_radarEsc(x.nombre)}</span><span class="count">${x.count} clicks</span></li>`).join('');
+    ? '<li class="rdr-empty">Sin eventos vistos en el rango</li>'
+    : arr.map((x, i) => {
+        const pct = (x.count / maxClicks * 100).toFixed(0);
+        return `<li>
+          <span class="rk-pos">#${i+1}</span>
+          <span class="rk-name">${_radarEsc(x.nombre)}<span class="rk-bar" style="width:${pct}%;animation-delay:${(0.04*i).toFixed(2)}s"></span></span>
+          <span class="rk-val">${x.count}<span class="unit">clicks</span></span>
+        </li>`;
+      }).join('');
 
   // Paquetes (última elección por sesión)
   const lastPkg = {};
@@ -11091,10 +11789,10 @@ async function loadRadarSitio(){
   Object.values(lastPkg).forEach(p => { if (pkgCount[p.pkg] != null) pkgCount[p.pkg]++; });
   const pkgTotal = Object.values(pkgCount).reduce((a,b) => a+b, 0);
   document.getElementById('rsi-paquetes').innerHTML = pkgTotal === 0
-    ? '<div class="rolan-empty">Sin paquetes elegidos</div>'
+    ? '<div class="rdr-empty">Sin paquetes elegidos</div>'
     : Object.entries(pkgCount).sort((a,b)=>b[1]-a[1]).map(([k,n]) => {
         const pct = n/pkgTotal*100;
-        return `<div class="rolan-bar-row"><span class="key">${k}</span><div class="track"><div class="fill" style="width:${pct.toFixed(1)}%"></div></div><span class="pct">${pct.toFixed(1)}%</span></div>`;
+        return `<div class="row"><span class="k">${k}</span><div class="t"><div class="f" style="width:${pct.toFixed(1)}%"></div></div><span class="p">${pct.toFixed(1)}%</span></div>`;
       }).join('');
 
   // Embudo
@@ -11111,7 +11809,7 @@ async function loadRadarSitio(){
   const base = pasos[0][1] || 1;
   document.getElementById('rsi-embudo').innerHTML = pasos.map(([k,n]) => {
     const pct = n/base*100;
-    const fill = `background:linear-gradient(90deg, rgba(94,167,255,.18) ${pct.toFixed(1)}%, rgba(255,255,255,.02) ${pct.toFixed(1)}%)`;
+    const fill = `background:linear-gradient(90deg, rgba(232,255,76,.16) ${pct.toFixed(1)}%, rgba(255,255,255,.02) ${pct.toFixed(1)}%)`;
     return `<li style="${fill}"><span class="step">${k}</span><span class="count">${n.toLocaleString('es-MX')}</span><span class="pct">${pct.toFixed(0)}%</span></li>`;
   }).join('');
 
@@ -11119,9 +11817,17 @@ async function loadRadarSitio(){
   const filt = {};
   for (const r of rows) { if (r.accion==='main_filtro_aplicado' && r.filtro_usado) filt[r.filtro_usado]=(filt[r.filtro_usado]||0)+1; }
   const farr = Object.entries(filt).sort((a,b)=>b[1]-a[1]).slice(0,10);
+  const maxFiltro = Math.max(1, ...farr.map(([,n]) => n));
   document.getElementById('rsi-filtros').innerHTML = farr.length === 0
-    ? '<li class="rolan-empty">Sin filtros usados</li>'
-    : farr.map(([k,n]) => `<li><span class="name">${_radarEsc(k)}</span><span class="count">${n}</span></li>`).join('');
+    ? '<li class="rdr-empty">Sin filtros usados</li>'
+    : farr.map(([k,n], i) => {
+        const pct = (n / maxFiltro * 100).toFixed(0);
+        return `<li>
+          <span class="rk-pos">#${i+1}</span>
+          <span class="rk-name">${_radarEsc(k)}<span class="rk-bar" style="width:${pct}%;animation-delay:${(0.04*i).toFixed(2)}s"></span></span>
+          <span class="rk-val">${n}</span>
+        </li>`;
+      }).join('');
 
   // Códigos validos vs no
   const cod = { validos:0, invalidos:0 };
@@ -11131,9 +11837,9 @@ async function loadRadarSitio(){
   }
   const codTotal = cod.validos + cod.invalidos;
   document.getElementById('rsi-codigos-detalle').innerHTML = codTotal === 0
-    ? '<div class="rolan-empty">Sin intentos de código</div>'
-    : `<div class="rolan-bar-row"><span class="key">Válidos</span><div class="track"><div class="fill" style="width:${(cod.validos/codTotal*100).toFixed(1)}%"></div></div><span class="pct">${cod.validos}</span></div>
-       <div class="rolan-bar-row"><span class="key">No vál.</span><div class="track"><div class="fill" style="width:${(cod.invalidos/codTotal*100).toFixed(1)}%;background:var(--red)"></div></div><span class="pct">${cod.invalidos}</span></div>`;
+    ? '<div class="rdr-empty">Sin intentos de código</div>'
+    : `<div class="row"><span class="k">Válidos</span><div class="t"><div class="f" style="width:${(cod.validos/codTotal*100).toFixed(1)}%"></div></div><span class="p">${cod.validos}</span></div>
+       <div class="row"><span class="k">No vál.</span><div class="t"><div class="f alt" style="width:${(cod.invalidos/codTotal*100).toFixed(1)}%"></div></div><span class="p" style="color:var(--rdr-red)">${cod.invalidos}</span></div>`;
 
   // Origen tráfico
   const orig = {};
@@ -11144,10 +11850,10 @@ async function loadRadarSitio(){
   }
   const oTotal = Object.values(orig).reduce((a,b)=>a+b,0);
   document.getElementById('rsi-origenes').innerHTML = oTotal === 0
-    ? '<div class="rolan-empty">Sin sesiones</div>'
+    ? '<div class="rdr-empty">Sin sesiones</div>'
     : Object.entries(orig).sort((a,b)=>b[1]-a[1]).map(([k,n]) => {
         const pct = n/oTotal*100;
-        return `<div class="rolan-bar-row"><span class="key">${k}</span><div class="track"><div class="fill" style="width:${pct.toFixed(1)}%"></div></div><span class="pct">${pct.toFixed(1)}%</span></div>`;
+        return `<div class="row"><span class="k">${_radarEsc(k)}</span><div class="t"><div class="f" style="width:${pct.toFixed(1)}%"></div></div><span class="p">${pct.toFixed(1)}%</span></div>`;
       }).join('');
 }
 
@@ -11165,9 +11871,17 @@ async function loadRadarPagos(){
   const cuentas = {};
   for (const r of rows) { if (r.cuenta_copiada) cuentas[r.cuenta_copiada]=(cuentas[r.cuenta_copiada]||0)+1; }
   const carr = Object.entries(cuentas).sort((a,b)=>b[1]-a[1]).slice(0,10);
+  const maxCuenta = Math.max(1, ...carr.map(([,n]) => n));
   document.getElementById('rpa-cuentas').innerHTML = carr.length === 0
-    ? '<li class="rolan-empty">Sin copias registradas</li>'
-    : carr.map(([k,n]) => `<li><span class="name">${_radarEsc(k)}</span><span class="count">${n}</span></li>`).join('');
+    ? '<li class="rdr-empty">Sin copias registradas</li>'
+    : carr.map(([k,n], i) => {
+        const pct = (n / maxCuenta * 100).toFixed(0);
+        return `<li>
+          <span class="rk-pos">#${i+1}</span>
+          <span class="rk-name">${_radarEsc(k)}<span class="rk-bar" style="width:${pct}%;animation-delay:${(0.04*i).toFixed(2)}s"></span></span>
+          <span class="rk-val">${n}</span>
+        </li>`;
+      }).join('');
   const orig = {};
   for (const r of rows) {
     if (r.accion !== 'pagos_visita') continue;
@@ -11181,10 +11895,10 @@ async function loadRadarPagos(){
   }
   const oTotal = Object.values(orig).reduce((a,b)=>a+b,0);
   document.getElementById('rpa-origenes').innerHTML = oTotal === 0
-    ? '<div class="rolan-empty">Sin sesiones</div>'
+    ? '<div class="rdr-empty">Sin sesiones</div>'
     : Object.entries(orig).sort((a,b)=>b[1]-a[1]).map(([k,n]) => {
         const pct = n/oTotal*100;
-        return `<div class="rolan-bar-row"><span class="key">${k}</span><div class="track"><div class="fill" style="width:${pct.toFixed(1)}%"></div></div><span class="pct">${pct.toFixed(1)}%</span></div>`;
+        return `<div class="row"><span class="k">${_radarEsc(k)}</span><div class="t"><div class="f" style="width:${pct.toFixed(1)}%"></div></div><span class="p">${pct.toFixed(1)}%</span></div>`;
       }).join('');
 }
 
@@ -11206,20 +11920,20 @@ function renderAlertasFiltered(filtro){
   });
   const list = document.getElementById('ral-list');
   if (!list) return;
-  if (arr.length === 0) { list.innerHTML = '<div class="rolan-empty">Sin alertas en este filtro</div>'; return; }
+  if (arr.length === 0) { list.innerHTML = '<div class="rdr-empty">Sin alertas en este filtro</div>'; return; }
   list.innerHTML = arr.map(a => {
     const fecha = new Date(a.created_at).toLocaleString('es-MX', { dateStyle:'medium', timeStyle:'short' });
-    return `<div class="ral-item severidad-${a.severidad} ${a.vista?'vista':'no-vista'}" data-id="${a.id}">
-      <div class="ral-dot"></div>
-      <div>
-        <div class="ral-titulo">${_radarEsc(a.titulo)}</div>
-        <div class="ral-mensaje">${_radarEsc(a.mensaje)}</div>
+    return `<div class="rdr-alert sev-${a.severidad} ${a.vista?'vista':'no-vista'}" data-id="${a.id}">
+      <div class="dot"></div>
+      <div class="body">
+        <div class="titulo">${_radarEsc(a.titulo)}</div>
+        <div class="mensaje">${_radarEsc(a.mensaje)}</div>
       </div>
-      <div class="ral-meta">${fecha}<br>${a.tipo}</div>
+      <div class="meta">${fecha}<br><span class="tipo">${_radarEsc(a.tipo)}</span></div>
     </div>`;
   }).join('');
   // Marcar como vista al click
-  list.querySelectorAll('.ral-item.no-vista').forEach(item => {
+  list.querySelectorAll('.rdr-alert.no-vista').forEach(item => {
     item.addEventListener('click', async () => {
       const id = item.dataset.id;
       await fetch(`${SB_URL}/rest/v1/radar_alertas?id=eq.${id}`, {
@@ -11324,12 +12038,21 @@ async function loadRadarComparativas(){
                               p:prev.filter(r=>r.accion==='main_codigo_intentado'&&r.codigo_valido).length },
   ];
   const wrap = document.getElementById('rcm-kpis');
-  wrap.innerHTML = items.map(it => {
-    const t = _trendArrow(it.a, it.p);
-    return `<div class="rolan-kpi">
-      <span class="lbl">${it.lbl}</span>
-      <span class="val">${it.a.toLocaleString('es-MX')}</span>
-      <span class="trend ${t.cls}">vs ${it.p.toLocaleString('es-MX')} · ${t.html}</span>
+  wrap.innerHTML = items.map((it, i) => {
+    const dir = it.a > it.p ? 'up' : it.a < it.p ? 'down' : 'flat';
+    const arrow = dir === 'up' ? '↑' : dir === 'down' ? '↓' : '→';
+    const delta = it.p === 0 ? (it.a === 0 ? '0%' : '+∞') :
+                  ((it.a - it.p) / it.p * 100).toFixed(0) + '%';
+    return `<div class="rdr-cmp-row" style="animation-delay:${(0.05*i).toFixed(2)}s">
+      <div class="rdr-cmp-side">
+        <span class="lbl">${it.lbl} · Actual</span>
+        <span class="val">${it.a.toLocaleString('es-MX')}</span>
+      </div>
+      <div class="rdr-cmp-arrow ${dir}">${arrow}<br>${delta}</div>
+      <div class="rdr-cmp-side right">
+        <span class="lbl">Anterior</span>
+        <span class="val">${it.p.toLocaleString('es-MX')}</span>
+      </div>
     </div>`;
   }).join('');
 }

@@ -1372,6 +1372,69 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
   .nav-dropdown.open .drop-arrow{transform:rotate(-90deg)}
 }
 
+/* ═══════════════════════════════════════════════
+   RADAR DEL DRAGÓN — sub-tabs, range, trends, alertas
+═══════════════════════════════════════════════ */
+#page-radar .radar-subs{
+  display:flex;gap:4px;flex-wrap:wrap;margin-bottom:14px;
+  border-bottom:1px solid var(--border);padding-bottom:0;
+}
+#page-radar .radar-subs button{
+  background:transparent;border:none;color:var(--ts);
+  padding:10px 14px;font-family:'JetBrains Mono',monospace;font-size:11px;
+  font-weight:700;letter-spacing:.06em;text-transform:uppercase;cursor:pointer;
+  border-bottom:2px solid transparent;transition:all .15s;position:relative;
+}
+#page-radar .radar-subs button:hover{color:var(--text)}
+#page-radar .radar-subs button.active{color:var(--gold);border-bottom-color:var(--gold)}
+#page-radar .radar-badge{
+  display:inline-flex;align-items:center;justify-content:center;
+  background:var(--red);color:#fff;font-size:9px;font-weight:900;
+  min-width:18px;height:18px;border-radius:9px;padding:0 5px;margin-left:6px;
+  letter-spacing:0;
+}
+#page-radar .radar-range{
+  display:flex;gap:6px;flex-wrap:wrap;margin-bottom:18px;
+  background:var(--card);padding:6px;border-radius:var(--radius);
+  border:1px solid var(--border);width:fit-content;
+}
+#page-radar .radar-range button{
+  background:transparent;border:none;color:var(--ts);
+  padding:8px 14px;font-family:'JetBrains Mono',monospace;font-size:11px;
+  font-weight:700;letter-spacing:.06em;text-transform:uppercase;cursor:pointer;
+  border-radius:6px;transition:all .15s;
+}
+#page-radar .radar-range button:hover{color:var(--text)}
+#page-radar .radar-range button.active{background:var(--gold);color:#000}
+#page-radar .rolan-kpi{position:relative}
+#page-radar .rolan-kpi .trend{
+  display:block;font-size:10px;font-weight:700;letter-spacing:.04em;
+  margin-top:4px;font-family:'JetBrains Mono',monospace;
+}
+#page-radar .rolan-kpi .trend.up{color:var(--green)}
+#page-radar .rolan-kpi .trend.down{color:var(--red)}
+#page-radar .rolan-kpi .trend.flat{color:var(--ts)}
+#page-radar .rolan-select{
+  background:var(--card);border:1px solid var(--border);color:var(--text);
+  padding:10px 14px;border-radius:var(--radius);
+  font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700;
+  letter-spacing:.06em;text-transform:uppercase;cursor:pointer;outline:none;
+}
+#page-radar .ral-item{
+  display:grid;grid-template-columns:18px 1fr auto;gap:12px;align-items:start;
+  background:var(--card);border:1px solid var(--border);border-radius:var(--radius);
+  padding:14px 16px;border-left:3px solid var(--ts);
+}
+#page-radar .ral-item.severidad-alta{border-left-color:var(--red)}
+#page-radar .ral-item.severidad-media{border-left-color:var(--orange)}
+#page-radar .ral-item.severidad-info{border-left-color:var(--blue)}
+#page-radar .ral-item.no-vista{background:rgba(255,255,255,.04)}
+#page-radar .ral-dot{width:10px;height:10px;border-radius:50%;background:var(--gold);margin-top:4px}
+#page-radar .ral-item.vista .ral-dot{background:transparent;border:1.5px solid var(--ts)}
+#page-radar .ral-titulo{font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:16px;text-transform:uppercase;letter-spacing:.02em;color:var(--text)}
+#page-radar .ral-mensaje{font-size:13px;color:var(--ts);margin-top:4px;line-height:1.4}
+#page-radar .ral-meta{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--ts2);letter-spacing:.06em;text-align:right;white-space:nowrap}
+
 </style>
 </head>
 <body>
@@ -1429,6 +1492,7 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
    <button class="nav-btn" onclick="showPage('equipo')" id="nav-equipo">Guerreros Z</button>
    <button class="nav-btn" onclick="showPage('capsule')" id="nav-capsule">Capsule Corp</button>
    <button class="nav-btn" onclick="showPage('cotizador')" id="nav-cotizador">Palacio de Kamisama</button>
+   <button class="nav-btn" onclick="showPage('radar')" id="nav-radar">RADAR DEL DRAGÓN</button>
    <button class="nav-btn" onclick="showPage('montana')" id="nav-montana">Montaña Pai</button>
    <div class="nav-dropdown" id="nav-dropdown-herramientas">
     <button class="nav-dropdown-btn" onclick="toggleDropdown(event)" id="nav-herramientas">
@@ -1438,7 +1502,6 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
      <button class="nav-dropdown-item" id="nav-recibos" onclick="showHerramienta('recibos')">Recibos</button>
      <button class="nav-dropdown-item" id="nav-contratos" onclick="showHerramienta('contratos')">Contratos</button>
      <button class="nav-dropdown-item" id="nav-waitlist" onclick="showHerramienta('waitlist')">Lista de espera</button>
-     <button class="nav-dropdown-item" id="nav-rol-analytics" onclick="showHerramienta('rol-analytics')">📊 ROL · Analytics</button>
      <button class="nav-dropdown-item" id="nav-diseno" onclick="showHerramienta('diseno')">Diseño</button>
     </div>
    </div>
@@ -2518,53 +2581,190 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
    <div id="wl-groups" style="display:grid;gap:12px"></div>
  </div>
 
- <!-- ─── ROL · ANALYTICS ─── -->
- <div class="page" id="page-rol-analytics">
+ <!-- ─── RADAR DEL DRAGÓN ─── -->
+ <div class="page" id="page-radar">
    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px;flex-wrap:wrap">
-     <h2 style="margin:0;font-family:'Zen Dots',sans-serif;font-size:22px;letter-spacing:.02em">📊 ROL · Analytics</h2>
-     <div style="display:flex;gap:8px;flex-wrap:wrap">
+     <div>
+       <h2 style="margin:0;font-family:'Zen Dots',sans-serif;font-size:22px;letter-spacing:.02em">📡 RADAR DEL DRAGÓN</h2>
+       <div style="font-size:11px;letter-spacing:.1em;color:var(--ts);text-transform:uppercase;margin-top:4px">Analytics de todo el ecosistema · Conecta Reynosa</div>
+     </div>
+     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+       <span id="radar-status" style="font-size:11px;letter-spacing:.1em;color:var(--ts);text-transform:uppercase">—</span>
+       <button class="btn btn-ghost btn-sm" onclick="loadRadar()">↻ Refrescar</button>
+     </div>
+   </div>
+
+   <!-- Sub-pestañas -->
+   <div class="radar-subs" id="radar-subs">
+     <button data-sub="resumen" type="button" class="active">🏠 Resumen general</button>
+     <button data-sub="sitio"   type="button">🌐 Sitio principal</button>
+     <button data-sub="rol"     type="button">📋 /Rol</button>
+     <button data-sub="pagos"   type="button">💳 /Pagos</button>
+     <button data-sub="alertas" type="button">🔔 Alertas <span class="radar-badge" id="radar-alertas-badge" style="display:none">0</span></button>
+     <button data-sub="comparativas" type="button">📊 Comparativas</button>
+   </div>
+
+   <!-- Selector global de rango -->
+   <div class="radar-range" id="radar-range">
+     <button data-r="today"   type="button">Hoy</button>
+     <button data-r="week"    type="button">Esta semana</button>
+     <button data-r="month"   type="button" class="active">Este mes</button>
+     <button data-r="3months" type="button">Últimos 3 meses</button>
+     <button data-r="all"     type="button">Todo</button>
+   </div>
+
+   <!-- SUB-PESTAÑA: Resumen general -->
+   <section class="radar-sub" data-sub="resumen" style="display:block">
+     <div class="rolan-kpis" id="rgr-kpis">
+       <div class="rolan-kpi"><span class="lbl">Visitas totales</span><span class="val" id="rgr-visitas">—</span><span class="trend" id="rgr-visitas-tr"></span></div>
+       <div class="rolan-kpi"><span class="lbl">Cotizaciones</span><span class="val" id="rgr-cotizaciones">—</span><span class="trend" id="rgr-cotizaciones-tr"></span></div>
+       <div class="rolan-kpi"><span class="lbl">Modal pago abierto</span><span class="val" id="rgr-modal">—</span><span class="trend" id="rgr-modal-tr"></span></div>
+       <div class="rolan-kpi"><span class="lbl">Comprobantes enviados</span><span class="val" id="rgr-comprobante">—</span><span class="trend" id="rgr-comprobante-tr"></span></div>
+       <div class="rolan-kpi"><span class="lbl">Conversión global</span><span class="val" id="rgr-conv">—</span><span class="trend" id="rgr-conv-tr"></span></div>
+       <div class="rolan-kpi"><span class="lbl">Eventos activos</span><span class="val" id="rgr-eventos-act">—</span></div>
+       <div class="rolan-kpi"><span class="lbl">Lista de espera</span><span class="val" id="rgr-waitlist">—</span></div>
+       <div class="rolan-kpi"><span class="lbl">Planes /rol creados</span><span class="val" id="rgr-planes">—</span><span class="trend" id="rgr-planes-tr"></span></div>
+     </div>
+     <div class="rolan-grid">
+       <section class="rolan-section">
+         <h3>Top eventos cotizados</h3>
+         <ol id="rgr-top-cot" class="rolan-ranked"><li class="rolan-empty">Cargando…</li></ol>
+       </section>
+       <section class="rolan-section">
+         <h3>Origen de tráfico</h3>
+         <div id="rgr-origenes"><div class="rolan-empty">Cargando…</div></div>
+       </section>
+     </div>
+   </section>
+
+   <!-- SUB-PESTAÑA: Sitio principal -->
+   <section class="radar-sub" data-sub="sitio" style="display:none">
+     <div class="rolan-kpis">
+       <div class="rolan-kpi"><span class="lbl">Sesiones únicas</span><span class="val" id="rsi-sesiones">—</span></div>
+       <div class="rolan-kpi"><span class="lbl">Eventos vistos</span><span class="val" id="rsi-eventos-vistos">—</span></div>
+       <div class="rolan-kpi"><span class="lbl">Cotizaciones</span><span class="val" id="rsi-cotizaciones">—</span></div>
+       <div class="rolan-kpi"><span class="lbl">Códigos intentados</span><span class="val" id="rsi-codigos">—</span></div>
+       <div class="rolan-kpi"><span class="lbl">Mobile / Desktop</span><span class="val" id="rsi-devices">—</span></div>
+       <div class="rolan-kpi"><span class="lbl">Música reproducida</span><span class="val" id="rsi-musica">—</span></div>
+       <button class="btn btn-sm" onclick="exportRadarCSV('main')" style="background:var(--gold);color:#000;font-weight:900">📥 Export CSV</button>
+     </div>
+     <div class="rolan-grid">
+       <section class="rolan-section">
+         <h3>Top 10 eventos más vistos</h3>
+         <ol id="rsi-eventos-top" class="rolan-ranked"><li class="rolan-empty">Cargando…</li></ol>
+       </section>
+       <section class="rolan-section">
+         <h3>Paquetes más elegidos</h3>
+         <div id="rsi-paquetes"><div class="rolan-empty">Cargando…</div></div>
+       </section>
+       <section class="rolan-section">
+         <h3>Embudo del wizard</h3>
+         <ol id="rsi-embudo" class="rolan-funnel"><li class="rolan-empty">Cargando…</li></ol>
+       </section>
+       <section class="rolan-section">
+         <h3>Filtros más usados</h3>
+         <ol id="rsi-filtros" class="rolan-ranked"><li class="rolan-empty">Cargando…</li></ol>
+       </section>
+       <section class="rolan-section">
+         <h3>Códigos: válidos vs no válidos</h3>
+         <div id="rsi-codigos-detalle"><div class="rolan-empty">Cargando…</div></div>
+       </section>
+       <section class="rolan-section">
+         <h3>Origen de tráfico</h3>
+         <div id="rsi-origenes"><div class="rolan-empty">Cargando…</div></div>
+       </section>
+     </div>
+   </section>
+
+   <!-- SUB-PESTAÑA: /Rol (contenido viejo de ROL Analytics, intacto) -->
+   <section class="radar-sub" data-sub="rol" style="display:none">
+     <div style="display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;margin-bottom:14px">
        <span id="rolan-status" style="font-size:11px;letter-spacing:.1em;color:var(--ts);text-transform:uppercase;align-self:center">—</span>
        <button class="btn btn-ghost btn-sm" onclick="loadRolAnalytics()">↻ Refrescar</button>
        <button class="btn btn-sm" onclick="exportRolAnalyticsCSV()" style="background:var(--gold);color:#000;font-weight:900">📥 Export CSV</button>
      </div>
-   </div>
+     <div class="rolan-kpis" id="rolan-kpis">
+       <div class="rolan-kpi"><span class="lbl">Sesiones únicas</span><span class="val" id="rolan-kpi-sesiones">—</span></div>
+       <div class="rolan-kpi"><span class="lbl">Planes generados</span><span class="val" id="rolan-kpi-planes">—</span></div>
+       <div class="rolan-kpi"><span class="lbl">Conversión</span><span class="val" id="rolan-kpi-conversion">—</span></div>
+       <div class="rolan-kpi"><span class="lbl">Recordatorios</span><span class="val" id="rolan-kpi-recordatorios">—</span></div>
+       <div class="rolan-kpi"><span class="lbl">Comprobantes</span><span class="val" id="rolan-kpi-comprobantes">—</span></div>
+       <div class="rolan-kpi"><span class="lbl">Tours guardados</span><span class="val" id="rolan-kpi-tours">—</span></div>
+       <div class="rolan-kpi"><span class="lbl">Calendarios .ics</span><span class="val" id="rolan-kpi-ics">—</span></div>
+       <div class="rolan-kpi"><span class="lbl">PNG descargados</span><span class="val" id="rolan-kpi-png">—</span></div>
+     </div>
+     <div class="rolan-grid">
+       <section class="rolan-section">
+         <h3>Eventos más consultados</h3>
+         <ol id="rolan-eventos-top" class="rolan-ranked"><li class="rolan-empty">Cargando…</li></ol>
+       </section>
+       <section class="rolan-section">
+         <h3>Paquetes más elegidos</h3>
+         <div id="rolan-paquetes"><div class="rolan-empty">Cargando…</div></div>
+       </section>
+       <section class="rolan-section">
+         <h3>Embudo de conversión</h3>
+         <ol id="rolan-embudo" class="rolan-funnel"><li class="rolan-empty">Cargando…</li></ol>
+       </section>
+       <section class="rolan-section">
+         <h3>Métodos de compartir</h3>
+         <div id="rolan-share"><div class="rolan-empty">Cargando…</div></div>
+       </section>
+       <section class="rolan-section">
+         <h3>Actividad por hora · últimas 24h</h3>
+         <div id="rolan-actividad" class="rolan-hours"><div class="rolan-empty">Cargando…</div></div>
+       </section>
+     </div>
+   </section>
 
-   <div class="rolan-range" id="rolan-range">
-     <button data-r="today" type="button">Hoy</button>
-     <button data-r="week" type="button">Esta semana</button>
-     <button data-r="month" type="button" class="active">Este mes</button>
-     <button data-r="all" type="button">Todo</button>
-   </div>
+   <!-- SUB-PESTAÑA: /Pagos -->
+   <section class="radar-sub" data-sub="pagos" style="display:none">
+     <div class="rolan-kpis">
+       <div class="rolan-kpi"><span class="lbl">Sesiones únicas</span><span class="val" id="rpa-sesiones">—</span></div>
+       <div class="rolan-kpi"><span class="lbl">Cuentas copiadas</span><span class="val" id="rpa-copias">—</span></div>
+       <div class="rolan-kpi"><span class="lbl">Clicks a WhatsApp</span><span class="val" id="rpa-wa">—</span></div>
+       <button class="btn btn-sm" onclick="exportRadarCSV('pagos')" style="background:var(--gold);color:#000;font-weight:900">📥 Export CSV</button>
+     </div>
+     <div class="rolan-grid">
+       <section class="rolan-section">
+         <h3>Cuentas más copiadas</h3>
+         <ol id="rpa-cuentas" class="rolan-ranked"><li class="rolan-empty">Cargando…</li></ol>
+       </section>
+       <section class="rolan-section">
+         <h3>De dónde llegan</h3>
+         <div id="rpa-origenes"><div class="rolan-empty">Cargando…</div></div>
+       </section>
+     </div>
+   </section>
 
-   <div class="rolan-kpis" id="rolan-kpis">
-     <div class="rolan-kpi"><span class="lbl">Sesiones únicas</span><span class="val" id="rolan-kpi-sesiones">—</span></div>
-     <div class="rolan-kpi"><span class="lbl">Planes generados</span><span class="val" id="rolan-kpi-planes">—</span></div>
-     <div class="rolan-kpi"><span class="lbl">Conversión</span><span class="val" id="rolan-kpi-conversion">—</span></div>
-     <div class="rolan-kpi"><span class="lbl">Recordatorios</span><span class="val" id="rolan-kpi-recordatorios">—</span></div>
-     <div class="rolan-kpi"><span class="lbl">Comprobantes</span><span class="val" id="rolan-kpi-comprobantes">—</span></div>
-   </div>
+   <!-- SUB-PESTAÑA: Alertas -->
+   <section class="radar-sub" data-sub="alertas" style="display:none">
+     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px">
+       <div class="radar-range" style="margin:0">
+         <button data-af="all" type="button" class="active">Todas</button>
+         <button data-af="unread" type="button">Sin leer</button>
+         <button data-af="critical" type="button">Críticas</button>
+       </div>
+       <button class="btn btn-ghost btn-sm" onclick="markAllAlertsRead()">✓ Marcar todas como leídas</button>
+     </div>
+     <div id="ral-list" style="display:flex;flex-direction:column;gap:10px">
+       <div class="rolan-empty">Cargando alertas…</div>
+     </div>
+   </section>
 
-   <div class="rolan-grid">
-     <section class="rolan-section">
-       <h3>Eventos más consultados</h3>
-       <ol id="rolan-eventos-top" class="rolan-ranked"><li class="rolan-empty">Cargando…</li></ol>
-     </section>
-
-     <section class="rolan-section">
-       <h3>Paquetes más elegidos</h3>
-       <div id="rolan-paquetes"><div class="rolan-empty">Cargando…</div></div>
-     </section>
-
-     <section class="rolan-section">
-       <h3>Embudo de conversión</h3>
-       <ol id="rolan-embudo" class="rolan-funnel"><li class="rolan-empty">Cargando…</li></ol>
-     </section>
-
-     <section class="rolan-section">
-       <h3>Actividad por hora · últimas 24h</h3>
-       <div id="rolan-actividad" class="rolan-hours"><div class="rolan-empty">Cargando…</div></div>
-     </section>
-   </div>
+   <!-- SUB-PESTAÑA: Comparativas -->
+   <section class="radar-sub" data-sub="comparativas" style="display:none">
+     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">
+       <select id="rcm-modo" class="rolan-select">
+         <option value="week">Esta semana vs la pasada</option>
+         <option value="month" selected>Este mes vs el pasado</option>
+         <option value="year">Este año vs el pasado</option>
+       </select>
+     </div>
+     <div class="rolan-kpis" id="rcm-kpis">
+       <div class="rolan-empty" style="grid-column:1/-1">Selecciona un modo para ver la comparativa.</div>
+     </div>
+   </section>
  </div>
 
  <!-- ─── RECIBOS ─── -->
@@ -3131,7 +3331,7 @@ let disenoLoaded = false;
 let _cotIniciado = false;
 
 const PERMISOS_TABS = {
-  maestro_roshi: ['resumen','pagos','eventos','gastos','ventas','inventario','reportes','capsule','equipo','cotizador','herramientas','montana'],
+  maestro_roshi: ['resumen','pagos','eventos','gastos','ventas','inventario','reportes','capsule','equipo','cotizador','herramientas','radar','montana'],
   bulma:         ['resumen','pagos','eventos','gastos','ventas','inventario','reportes','capsule','equipo','cotizador','herramientas'],
   mister_popo:   ['inventario','reportes','equipo'],
   coordinador:   ['inventario','reportes','equipo'],
@@ -3273,7 +3473,7 @@ function aplicarPermisosUI() {
   const extras = currentUser.permisos_extra?.tabs_extra || [];
   const bloqueados = currentUser.permisos_extra?.tabs_bloqueados || [];
   const tabsPermitidos = [...new Set([...base, ...extras])].filter(t => !bloqueados.includes(t));
-  const allTabs = ['resumen','pagos','eventos','gastos','ventas','inventario','reportes','equipo','capsule','cotizador','montana'];
+  const allTabs = ['resumen','pagos','eventos','gastos','ventas','inventario','reportes','equipo','capsule','cotizador','radar','montana'];
   allTabs.forEach(tab => {
     const btn = document.getElementById('nav-' + tab);
     if (btn) btn.style.display = tabsPermitidos.includes(tab) ? '' : 'none';
@@ -3385,6 +3585,7 @@ function loadPage(name) {
  if (name === 'capsule') loadCapsule();
  if (name === 'cotizador') initCotizador();
  if (name === 'montana') loadMontana();
+ if (name === 'radar') initRadarTab();
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -6516,12 +6717,9 @@ function showHerramienta(name) {
   if (name === 'waitlist') {
     loadWaitlist();
   }
-  if (name === 'rol-analytics') {
-    initRolAnalyticsTab();
-  } else {
-    // Si nos vamos de la pestaña, paramos el auto-refresh
-    stopRolAnalyticsAutoRefresh();
-  }
+  // ROL Analytics se mudó a la pestaña RADAR DEL DRAGÓN como sub-pestaña.
+  // Si el admin sale de cualquier herramienta, paramos los timers del Radar.
+  stopRolAnalyticsAutoRefresh();
 }
 
 // ── NAV MOBILE HAMBURGUESA ──────────────────────────────────
@@ -10518,6 +10716,486 @@ function exportRolAnalyticsCSV(){
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
   a.download = `rol-analytics-${_rolanRange}-${new Date().toISOString().slice(0,10)}.csv`;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+
+// ═══════════════════════════════════════════════
+// RADAR DEL DRAGÓN — analytics cross-source
+// ═══════════════════════════════════════════════
+var _radarRange = 'month';     // 'today' | 'week' | 'month' | '3months' | 'all'
+var _radarSub   = 'resumen';
+var _radarRefreshId = null;
+var _radarCache = { main: [], pagos: [], rol: [], waitlist: [], alertas: [] };
+
+function _radarSinceISO(r){
+  r = r || _radarRange;
+  const now = new Date();
+  if (r === 'today')   { const d=new Date(now.getFullYear(),now.getMonth(),now.getDate()); return d.toISOString(); }
+  if (r === 'week')    { const d=new Date(now); d.setDate(d.getDate()-7);   return d.toISOString(); }
+  if (r === 'month')   { const d=new Date(now); d.setDate(d.getDate()-30);  return d.toISOString(); }
+  if (r === '3months') { const d=new Date(now); d.setDate(d.getDate()-90);  return d.toISOString(); }
+  return '1970-01-01T00:00:00Z';
+}
+function _radarPrevSinceISO(r){
+  // El periodo anterior del mismo tamaño, para calcular tendencias.
+  r = r || _radarRange;
+  const now = new Date();
+  if (r === 'today')   { const d=new Date(now); d.setDate(d.getDate()-1); d.setHours(0,0,0,0); return d.toISOString(); }
+  if (r === 'week')    { const d=new Date(now); d.setDate(d.getDate()-14); return d.toISOString(); }
+  if (r === 'month')   { const d=new Date(now); d.setDate(d.getDate()-60); return d.toISOString(); }
+  if (r === '3months') { const d=new Date(now); d.setDate(d.getDate()-180); return d.toISOString(); }
+  return '1970-01-01T00:00:00Z';
+}
+function _trendArrow(actual, anterior){
+  if (!anterior || anterior === 0) return { html: '', cls: 'flat' };
+  const diff = ((actual - anterior) / anterior) * 100;
+  if (Math.abs(diff) < 1) return { html: '→ 0%', cls: 'flat' };
+  const arrow = diff > 0 ? '↑' : '↓';
+  const cls = diff > 0 ? 'up' : 'down';
+  return { html: `${arrow} ${Math.abs(diff).toFixed(0)}%`, cls };
+}
+
+function initRadarTab(){
+  // Gate por rol (también está protegido por allTabs)
+  if (!['maestro_roshi'].includes(currentUser?.rol)) {
+    const page = document.getElementById('page-radar');
+    if (page) page.innerHTML = '<div style="padding:40px;text-align:center;color:var(--ts)">Acceso restringido</div>';
+    return;
+  }
+  // Wire sub-tabs (idempotente)
+  const subs = document.getElementById('radar-subs');
+  if (subs && !subs.dataset.wired) {
+    subs.dataset.wired = '1';
+    subs.querySelectorAll('button[data-sub]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        subs.querySelectorAll('button').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        _radarSub = btn.dataset.sub;
+        document.querySelectorAll('#page-radar .radar-sub').forEach(s => {
+          s.style.display = (s.dataset.sub === _radarSub) ? 'block' : 'none';
+        });
+        loadRadar();
+      });
+    });
+  }
+  const range = document.getElementById('radar-range');
+  if (range && !range.dataset.wired) {
+    range.dataset.wired = '1';
+    range.querySelectorAll('button[data-r]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        range.querySelectorAll('button').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        _radarRange = btn.dataset.r;
+        loadRadar();
+      });
+    });
+  }
+  // Filtros de alertas
+  const af = document.querySelector('#page-radar .radar-sub[data-sub="alertas"] .radar-range');
+  if (af && !af.dataset.wired) {
+    af.dataset.wired = '1';
+    af.querySelectorAll('button[data-af]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        af.querySelectorAll('button').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        renderAlertasFiltered(btn.dataset.af);
+      });
+    });
+  }
+  // Selector de comparativas
+  const sel = document.getElementById('rcm-modo');
+  if (sel && !sel.dataset.wired) {
+    sel.dataset.wired = '1';
+    sel.addEventListener('change', loadRadarComparativas);
+  }
+  loadRadar();
+  // Auto-refresh cada 60s mientras estemos en la pestaña
+  if (_radarRefreshId) clearInterval(_radarRefreshId);
+  _radarRefreshId = setInterval(() => {
+    const p = document.getElementById('page-radar');
+    if (p && p.classList.contains('active')) loadRadar(true);
+    else { clearInterval(_radarRefreshId); _radarRefreshId = null; }
+  }, 60000);
+  // El conteo de alertas no leídas se actualiza siempre (no depende de la sub-tab)
+  refreshAlertasBadge();
+}
+
+async function loadRadar(silent){
+  const status = document.getElementById('radar-status');
+  if (status && !silent) status.textContent = 'Cargando…';
+  try {
+    if (_radarSub === 'resumen')      await loadRadarResumen();
+    if (_radarSub === 'sitio')        await loadRadarSitio();
+    if (_radarSub === 'rol')          { loadRolAnalytics(); }
+    if (_radarSub === 'pagos')        await loadRadarPagos();
+    if (_radarSub === 'alertas')      await loadRadarAlertas();
+    if (_radarSub === 'comparativas') await loadRadarComparativas();
+    if (status) {
+      const hora = new Date().toLocaleTimeString('es-MX', { hour:'2-digit', minute:'2-digit' });
+      status.textContent = `Última act: ${hora}`;
+    }
+  } catch (e) {
+    console.error('[radar]', e);
+    if (status) status.textContent = 'Error: ' + e.message;
+  }
+}
+
+async function _radarFetch(table, sinceISO, untilISO){
+  let url = `${SB_URL}/rest/v1/${table}?created_at=gte.${encodeURIComponent(sinceISO)}`;
+  if (untilISO) url += `&created_at=lt.${encodeURIComponent(untilISO)}`;
+  url += '&order=created_at.desc&limit=10000';
+  const r = await fetch(url, { headers: { apikey: SB_KEY, Authorization: 'Bearer ' + SB_KEY } });
+  if (!r.ok) throw new Error('HTTP ' + r.status + ' ' + table);
+  return r.json();
+}
+
+// ── RESUMEN GENERAL ────────────────────────────────────────
+async function loadRadarResumen(){
+  const since = _radarSinceISO();
+  const prevSince = _radarPrevSinceISO();
+  const [main, mainPrev, rol, waitlist] = await Promise.all([
+    _radarFetch('main_eventos_uso', since),
+    _radarFetch('main_eventos_uso', prevSince, since),
+    _radarFetch('rol_eventos_uso', since),
+    _radarFetch('eventos_waitlist?select=evento_id,evento_nombre,created_at', '1970-01-01T00:00:00Z').catch(() => [])
+  ]);
+  _radarCache.main = main || [];
+  _radarCache.rol  = rol || [];
+
+  const visitas    = new Set((main||[]).filter(r=>r.accion==='main_visita').map(r=>r.session_id)).size;
+  const visitasP   = new Set((mainPrev||[]).filter(r=>r.accion==='main_visita').map(r=>r.session_id)).size;
+  const cot        = (main||[]).filter(r=>r.accion==='main_cotizacion_generada').length;
+  const cotP       = (mainPrev||[]).filter(r=>r.accion==='main_cotizacion_generada').length;
+  const modal      = (main||[]).filter(r=>r.accion==='main_modal_pago_abierto').length;
+  const modalP     = (mainPrev||[]).filter(r=>r.accion==='main_modal_pago_abierto').length;
+  const compro     = (main||[]).filter(r=>r.accion==='main_comprobante_enviado').length;
+  const comproP    = (mainPrev||[]).filter(r=>r.accion==='main_comprobante_enviado').length;
+  const conv       = visitas ? (modal / visitas * 100) : 0;
+  const convP      = visitasP ? (modalP / visitasP * 100) : 0;
+  const planes     = (rol||[]).filter(r=>r.accion==='rol_plan_generado').length;
+  const planesP    = 0; // rolPrev no fetched — opcional
+  const wlTotal    = (waitlist||[]).length;
+  const eventosAct = 0; // requeriría leer EV de index.html — lo dejamos en cero o fetch dinámico
+
+  const setKpi = (id, val, prev) => {
+    const el = document.getElementById(id); if (el) el.textContent = String(val).toLocaleString('es-MX');
+    const tr = document.getElementById(id+'-tr');
+    if (tr) { const t = _trendArrow(val, prev); tr.textContent = t.html; tr.className = 'trend ' + t.cls; }
+  };
+  setKpi('rgr-visitas', visitas, visitasP);
+  setKpi('rgr-cotizaciones', cot, cotP);
+  setKpi('rgr-modal', modal, modalP);
+  setKpi('rgr-comprobante', compro, comproP);
+  setKpi('rgr-conv', conv.toFixed(1) + '%', convP);
+  document.getElementById('rgr-eventos-act').textContent = '—';
+  document.getElementById('rgr-waitlist').textContent = wlTotal.toLocaleString('es-MX');
+  setKpi('rgr-planes', planes, planesP);
+
+  // Top eventos cotizados
+  const topCot = {};
+  for (const r of main) {
+    if (r.accion === 'main_cotizacion_generada' && r.evento_id) {
+      topCot[r.evento_id] = topCot[r.evento_id] || { count:0, nombre:r.evento_nombre || r.evento_id };
+      topCot[r.evento_id].count++;
+    }
+  }
+  const olTop = document.getElementById('rgr-top-cot');
+  const arr = Object.values(topCot).sort((a,b) => b.count - a.count).slice(0, 10);
+  olTop.innerHTML = arr.length === 0
+    ? '<li class="rolan-empty">Sin cotizaciones en el rango</li>'
+    : arr.map(x => `<li><span class="name">${_radarEsc(x.nombre)}</span><span class="count">${x.count} ${x.count===1?'cotización':'cotizaciones'}</span></li>`).join('');
+
+  // Orígenes de tráfico
+  const orig = {};
+  for (const r of main) {
+    if (r.accion !== 'main_visita') continue;
+    const k = (r.origen_trafico || 'direct').toLowerCase();
+    orig[k] = (orig[k] || 0) + 1;
+  }
+  const total = Object.values(orig).reduce((a,b) => a+b, 0);
+  const wrap = document.getElementById('rgr-origenes');
+  wrap.innerHTML = total === 0
+    ? '<div class="rolan-empty">Sin sesiones registradas</div>'
+    : Object.entries(orig).sort((a,b) => b[1]-a[1]).map(([k,n]) => {
+        const pct = (n/total*100).toFixed(1);
+        return `<div class="rolan-bar-row"><span class="key">${k}</span><div class="track"><div class="fill" style="width:${pct}%"></div></div><span class="pct">${pct}%</span></div>`;
+      }).join('');
+}
+
+// ── SITIO PRINCIPAL ────────────────────────────────────────
+async function loadRadarSitio(){
+  const since = _radarSinceISO();
+  const rows = await _radarFetch('main_eventos_uso', since);
+  _radarCache.main = rows;
+  const visitas = new Set(rows.filter(r=>r.accion==='main_visita').map(r=>r.session_id)).size;
+  const eventosVistos = rows.filter(r=>r.accion==='main_evento_visto').length;
+  const cot = rows.filter(r=>r.accion==='main_cotizacion_generada').length;
+  const codigos = rows.filter(r=>r.accion==='main_codigo_intentado').length;
+  const musica = rows.filter(r=>r.accion==='main_musica_reproducida').length;
+  const devs = {};
+  for (const r of rows) { if (r.device) devs[r.device] = (devs[r.device]||0)+1; }
+  const devStr = Object.entries(devs).map(([k,n])=>`${k.charAt(0).toUpperCase()+k.slice(1)} ${Math.round(n/(rows.length||1)*100)}%`).join(' · ') || '—';
+  document.getElementById('rsi-sesiones').textContent = visitas.toLocaleString('es-MX');
+  document.getElementById('rsi-eventos-vistos').textContent = eventosVistos.toLocaleString('es-MX');
+  document.getElementById('rsi-cotizaciones').textContent = cot.toLocaleString('es-MX');
+  document.getElementById('rsi-codigos').textContent = codigos.toLocaleString('es-MX');
+  document.getElementById('rsi-devices').textContent = devStr;
+  document.getElementById('rsi-musica').textContent = musica.toLocaleString('es-MX');
+
+  // Top eventos vistos
+  const top = {};
+  for (const r of rows) {
+    if (r.accion === 'main_evento_visto' && r.evento_id) {
+      top[r.evento_id] = top[r.evento_id] || { count:0, nombre:r.evento_nombre || r.evento_id };
+      top[r.evento_id].count++;
+    }
+  }
+  const arr = Object.values(top).sort((a,b) => b.count - a.count).slice(0, 10);
+  document.getElementById('rsi-eventos-top').innerHTML = arr.length === 0
+    ? '<li class="rolan-empty">Sin eventos vistos en el rango</li>'
+    : arr.map(x => `<li><span class="name">${_radarEsc(x.nombre)}</span><span class="count">${x.count} clicks</span></li>`).join('');
+
+  // Paquetes (última elección por sesión)
+  const lastPkg = {};
+  for (const r of rows) {
+    if (r.accion !== 'main_paquete_elegido' || !r.paquete) continue;
+    const prev = lastPkg[r.session_id];
+    if (!prev || r.created_at > prev.at) lastPkg[r.session_id] = { pkg: r.paquete.toUpperCase(), at: r.created_at };
+  }
+  const pkgCount = { PLUS:0, RIDE:0, STAY:0, CHEAP:0 };
+  Object.values(lastPkg).forEach(p => { if (pkgCount[p.pkg] != null) pkgCount[p.pkg]++; });
+  const pkgTotal = Object.values(pkgCount).reduce((a,b) => a+b, 0);
+  document.getElementById('rsi-paquetes').innerHTML = pkgTotal === 0
+    ? '<div class="rolan-empty">Sin paquetes elegidos</div>'
+    : Object.entries(pkgCount).sort((a,b)=>b[1]-a[1]).map(([k,n]) => {
+        const pct = n/pkgTotal*100;
+        return `<div class="rolan-bar-row"><span class="key">${k}</span><div class="track"><div class="fill" style="width:${pct.toFixed(1)}%"></div></div><span class="pct">${pct.toFixed(1)}%</span></div>`;
+      }).join('');
+
+  // Embudo
+  const setBy = (a) => new Set(rows.filter(r => r.accion === a).map(r => r.session_id));
+  const pasos = [
+    ['Visitas',          setBy('main_visita').size || visitas],
+    ['Vieron evento',    setBy('main_evento_visto').size],
+    ['Eligen paquete',   setBy('main_paquete_elegido').size],
+    ['Eligen zona',      setBy('main_zona_elegida').size],
+    ['Generan cotización', setBy('main_cotizacion_generada').size],
+    ['Abren modal pago', setBy('main_modal_pago_abierto').size],
+    ['Envían comprobante', setBy('main_comprobante_enviado').size]
+  ];
+  const base = pasos[0][1] || 1;
+  document.getElementById('rsi-embudo').innerHTML = pasos.map(([k,n]) => {
+    const pct = n/base*100;
+    const fill = `background:linear-gradient(90deg, rgba(94,167,255,.18) ${pct.toFixed(1)}%, rgba(255,255,255,.02) ${pct.toFixed(1)}%)`;
+    return `<li style="${fill}"><span class="step">${k}</span><span class="count">${n.toLocaleString('es-MX')}</span><span class="pct">${pct.toFixed(0)}%</span></li>`;
+  }).join('');
+
+  // Filtros
+  const filt = {};
+  for (const r of rows) { if (r.accion==='main_filtro_aplicado' && r.filtro_usado) filt[r.filtro_usado]=(filt[r.filtro_usado]||0)+1; }
+  const farr = Object.entries(filt).sort((a,b)=>b[1]-a[1]).slice(0,10);
+  document.getElementById('rsi-filtros').innerHTML = farr.length === 0
+    ? '<li class="rolan-empty">Sin filtros usados</li>'
+    : farr.map(([k,n]) => `<li><span class="name">${_radarEsc(k)}</span><span class="count">${n}</span></li>`).join('');
+
+  // Códigos validos vs no
+  const cod = { validos:0, invalidos:0 };
+  for (const r of rows) {
+    if (r.accion !== 'main_codigo_intentado') continue;
+    if (r.codigo_valido === true) cod.validos++; else cod.invalidos++;
+  }
+  const codTotal = cod.validos + cod.invalidos;
+  document.getElementById('rsi-codigos-detalle').innerHTML = codTotal === 0
+    ? '<div class="rolan-empty">Sin intentos de código</div>'
+    : `<div class="rolan-bar-row"><span class="key">Válidos</span><div class="track"><div class="fill" style="width:${(cod.validos/codTotal*100).toFixed(1)}%"></div></div><span class="pct">${cod.validos}</span></div>
+       <div class="rolan-bar-row"><span class="key">No vál.</span><div class="track"><div class="fill" style="width:${(cod.invalidos/codTotal*100).toFixed(1)}%;background:var(--red)"></div></div><span class="pct">${cod.invalidos}</span></div>`;
+
+  // Origen tráfico
+  const orig = {};
+  for (const r of rows) {
+    if (r.accion !== 'main_visita') continue;
+    const k = (r.origen_trafico||'direct').toLowerCase();
+    orig[k] = (orig[k]||0) + 1;
+  }
+  const oTotal = Object.values(orig).reduce((a,b)=>a+b,0);
+  document.getElementById('rsi-origenes').innerHTML = oTotal === 0
+    ? '<div class="rolan-empty">Sin sesiones</div>'
+    : Object.entries(orig).sort((a,b)=>b[1]-a[1]).map(([k,n]) => {
+        const pct = n/oTotal*100;
+        return `<div class="rolan-bar-row"><span class="key">${k}</span><div class="track"><div class="fill" style="width:${pct.toFixed(1)}%"></div></div><span class="pct">${pct.toFixed(1)}%</span></div>`;
+      }).join('');
+}
+
+// ── /PAGOS ─────────────────────────────────────────────────
+async function loadRadarPagos(){
+  const since = _radarSinceISO();
+  const rows = await _radarFetch('pagos_eventos_uso', since);
+  _radarCache.pagos = rows;
+  const visitas = new Set(rows.filter(r=>r.accion==='pagos_visita').map(r=>r.session_id)).size;
+  const copias = rows.filter(r=>r.accion==='pagos_cuenta_copiada').length;
+  const wa = rows.filter(r=>r.accion==='pagos_whatsapp_clic').length;
+  document.getElementById('rpa-sesiones').textContent = visitas.toLocaleString('es-MX');
+  document.getElementById('rpa-copias').textContent = copias.toLocaleString('es-MX');
+  document.getElementById('rpa-wa').textContent = wa.toLocaleString('es-MX');
+  const cuentas = {};
+  for (const r of rows) { if (r.cuenta_copiada) cuentas[r.cuenta_copiada]=(cuentas[r.cuenta_copiada]||0)+1; }
+  const carr = Object.entries(cuentas).sort((a,b)=>b[1]-a[1]).slice(0,10);
+  document.getElementById('rpa-cuentas').innerHTML = carr.length === 0
+    ? '<li class="rolan-empty">Sin copias registradas</li>'
+    : carr.map(([k,n]) => `<li><span class="name">${_radarEsc(k)}</span><span class="count">${n}</span></li>`).join('');
+  const orig = {};
+  for (const r of rows) {
+    if (r.accion !== 'pagos_visita') continue;
+    let k = (r.referrer || '').toLowerCase();
+    if (!k) k = 'direct';
+    else if (k.includes('rol')) k = '/rol';
+    else if (k.includes('conectareynosa')) k = 'interno';
+    else if (k.includes('whatsapp') || k.includes('wa.me')) k = 'whatsapp';
+    else k = 'externo';
+    orig[k] = (orig[k]||0) + 1;
+  }
+  const oTotal = Object.values(orig).reduce((a,b)=>a+b,0);
+  document.getElementById('rpa-origenes').innerHTML = oTotal === 0
+    ? '<div class="rolan-empty">Sin sesiones</div>'
+    : Object.entries(orig).sort((a,b)=>b[1]-a[1]).map(([k,n]) => {
+        const pct = n/oTotal*100;
+        return `<div class="rolan-bar-row"><span class="key">${k}</span><div class="track"><div class="fill" style="width:${pct.toFixed(1)}%"></div></div><span class="pct">${pct.toFixed(1)}%</span></div>`;
+      }).join('');
+}
+
+// ── ALERTAS ────────────────────────────────────────────────
+async function loadRadarAlertas(){
+  const r = await fetch(`${SB_URL}/rest/v1/radar_alertas?select=*&order=created_at.desc&limit=200`,
+    { headers: { apikey: SB_KEY, Authorization: 'Bearer ' + SB_KEY } });
+  if (!r.ok) throw new Error('HTTP ' + r.status + ' alertas');
+  _radarCache.alertas = await r.json();
+  renderAlertasFiltered('all');
+  refreshAlertasBadge();
+}
+
+function renderAlertasFiltered(filtro){
+  const arr = (_radarCache.alertas || []).filter(a => {
+    if (filtro === 'unread') return !a.vista;
+    if (filtro === 'critical') return a.severidad === 'alta';
+    return true;
+  });
+  const list = document.getElementById('ral-list');
+  if (!list) return;
+  if (arr.length === 0) { list.innerHTML = '<div class="rolan-empty">Sin alertas en este filtro</div>'; return; }
+  list.innerHTML = arr.map(a => {
+    const fecha = new Date(a.created_at).toLocaleString('es-MX', { dateStyle:'medium', timeStyle:'short' });
+    return `<div class="ral-item severidad-${a.severidad} ${a.vista?'vista':'no-vista'}" data-id="${a.id}">
+      <div class="ral-dot"></div>
+      <div>
+        <div class="ral-titulo">${_radarEsc(a.titulo)}</div>
+        <div class="ral-mensaje">${_radarEsc(a.mensaje)}</div>
+      </div>
+      <div class="ral-meta">${fecha}<br>${a.tipo}</div>
+    </div>`;
+  }).join('');
+  // Marcar como vista al click
+  list.querySelectorAll('.ral-item.no-vista').forEach(item => {
+    item.addEventListener('click', async () => {
+      const id = item.dataset.id;
+      await fetch(`${SB_URL}/rest/v1/radar_alertas?id=eq.${id}`, {
+        method:'PATCH',
+        headers:{ apikey:SB_KEY, Authorization:'Bearer '+SB_KEY, 'Content-Type':'application/json', Prefer:'return=minimal' },
+        body: JSON.stringify({ vista:true })
+      }).catch(() => {});
+      const a = _radarCache.alertas.find(x => x.id === id); if (a) a.vista = true;
+      item.classList.remove('no-vista'); item.classList.add('vista');
+      refreshAlertasBadge();
+    });
+  });
+}
+
+async function refreshAlertasBadge(){
+  try {
+    const r = await fetch(`${SB_URL}/rest/v1/radar_alertas?vista=eq.false&select=id&limit=200`,
+      { headers: { apikey: SB_KEY, Authorization: 'Bearer ' + SB_KEY } });
+    if (!r.ok) return;
+    const rows = await r.json();
+    const badge = document.getElementById('radar-alertas-badge');
+    if (!badge) return;
+    if (rows.length > 0) { badge.style.display = 'inline-flex'; badge.textContent = rows.length; }
+    else badge.style.display = 'none';
+  } catch (e) {}
+}
+
+async function markAllAlertsRead(){
+  if (!confirm('¿Marcar TODAS las alertas como leídas?')) return;
+  try {
+    await fetch(`${SB_URL}/rest/v1/radar_alertas?vista=eq.false`, {
+      method:'PATCH',
+      headers:{ apikey:SB_KEY, Authorization:'Bearer '+SB_KEY, 'Content-Type':'application/json', Prefer:'return=minimal' },
+      body: JSON.stringify({ vista:true })
+    });
+    (_radarCache.alertas || []).forEach(a => a.vista = true);
+    renderAlertasFiltered('all');
+    refreshAlertasBadge();
+  } catch (e) { alert('Error: ' + e.message); }
+}
+
+// ── COMPARATIVAS ───────────────────────────────────────────
+async function loadRadarComparativas(){
+  const modo = document.getElementById('rcm-modo')?.value || 'month';
+  const now = new Date();
+  let actualSince, prevSince, prevUntil;
+  if (modo === 'week') {
+    actualSince = new Date(now); actualSince.setDate(now.getDate()-7);
+    prevUntil = actualSince;
+    prevSince = new Date(prevUntil); prevSince.setDate(prevUntil.getDate()-7);
+  } else if (modo === 'year') {
+    actualSince = new Date(now); actualSince.setFullYear(now.getFullYear()-1);
+    prevUntil = actualSince;
+    prevSince = new Date(prevUntil); prevSince.setFullYear(prevUntil.getFullYear()-1);
+  } else {
+    actualSince = new Date(now); actualSince.setDate(now.getDate()-30);
+    prevUntil = actualSince;
+    prevSince = new Date(prevUntil); prevSince.setDate(prevUntil.getDate()-30);
+  }
+  const [act, prev] = await Promise.all([
+    _radarFetch('main_eventos_uso', actualSince.toISOString()),
+    _radarFetch('main_eventos_uso', prevSince.toISOString(), prevUntil.toISOString())
+  ]);
+  const metric = (rows, accion, uniq) => uniq
+    ? new Set(rows.filter(r=>r.accion===accion).map(r=>r.session_id)).size
+    : rows.filter(r=>r.accion===accion).length;
+  const items = [
+    { lbl:'Visitas', a:metric(act,'main_visita',true), p:metric(prev,'main_visita',true) },
+    { lbl:'Cotizaciones', a:metric(act,'main_cotizacion_generada'), p:metric(prev,'main_cotizacion_generada') },
+    { lbl:'Modal pago', a:metric(act,'main_modal_pago_abierto'), p:metric(prev,'main_modal_pago_abierto') },
+    { lbl:'Comprobante', a:metric(act,'main_comprobante_enviado'), p:metric(prev,'main_comprobante_enviado') },
+    { lbl:'Códigos válidos', a:act.filter(r=>r.accion==='main_codigo_intentado'&&r.codigo_valido).length, p:prev.filter(r=>r.accion==='main_codigo_intentado'&&r.codigo_valido).length },
+  ];
+  const wrap = document.getElementById('rcm-kpis');
+  wrap.innerHTML = items.map(it => {
+    const t = _trendArrow(it.a, it.p);
+    return `<div class="rolan-kpi">
+      <span class="lbl">${it.lbl}</span>
+      <span class="val">${it.a.toLocaleString('es-MX')}</span>
+      <span class="trend ${t.cls}">vs ${it.p.toLocaleString('es-MX')} · ${t.html}</span>
+    </div>`;
+  }).join('');
+}
+
+function _radarEsc(s){
+  return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+async function exportRadarCSV(tipo){
+  const since = _radarSinceISO();
+  const table = tipo === 'main' ? 'main_eventos_uso' : 'pagos_eventos_uso';
+  const rows = await _radarFetch(table, since);
+  if (!rows || rows.length === 0) { alert('Sin datos en el rango'); return; }
+  const cols = Object.keys(rows[0]);
+  const esc = v => v == null ? '' : '"' + String(v).replace(/"/g,'""') + '"';
+  const csv = [cols.join(',')].concat(rows.map(r => cols.map(c => esc(r[c])).join(','))).join('\n');
+  const blob = new Blob([csv], { type:'text/csv;charset=utf-8;' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `radar-${tipo}-${_radarRange}-${new Date().toISOString().slice(0,10)}.csv`;
   document.body.appendChild(a); a.click(); document.body.removeChild(a);
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 }

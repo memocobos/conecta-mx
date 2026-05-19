@@ -2225,6 +2225,125 @@ var PC_EVENTS=["Justin Bieber", "Bad Bunny", "Sabrina Carpenter", "U2", "Festiva
 var _activeFilter='all';
 var _top10Ids=[];
 var _top10Rank={};
+
+// ── Analytics anónimo del sitio principal (Radar del Dragón) ──────────────
+// Mismo patrón que rol.html: session_id en sessionStorage, sendBeacon como
+// canal primario y fetch keepalive como fallback. Nunca rompe el flujo.
+function _mainSessionId(){
+  try {
+    var k='main-session-id';
+    var s=sessionStorage.getItem(k);
+    if(!s){ s='mx-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,10); sessionStorage.setItem(k,s); }
+    return s;
+  } catch(e){
+    window._mainSidMem = window._mainSidMem || ('mx-mem-'+Date.now().toString(36));
+    return window._mainSidMem;
+  }
+}
+function _mainDevice(){
+  var w=window.innerWidth||screen.width||0;
+  if(w<640)return 'mobile';
+  if(w<1024)return 'tablet';
+  return 'desktop';
+}
+function _mainOrigen(){
+  var r=document.referrer||'';
+  if(!r)return 'direct';
+  var h=''; try{ h=new URL(r).hostname.toLowerCase(); }catch(e){ h=r.toLowerCase(); }
+  if(/whatsapp|wa\.me/.test(h))return 'whatsapp';
+  if(/instagram/.test(h))return 'instagram';
+  if(/facebook|fb\.com|m\.me|messenger/.test(h))return 'facebook';
+  if(/tiktok/.test(h))return 'tiktok';
+  if(/google/.test(h))return 'google';
+  if(/conectareynosa/.test(h))return 'interno';
+  return h.split('.').slice(-2,-1)[0] || 'otro';
+}
+function trackMainEvent(accion, datos){
+  datos = datos || {};
+  try {
+    var payload = {
+      session_id: _mainSessionId(),
+      accion: accion,
+      pathname: location.pathname,
+      referrer: (document.referrer||'').slice(0,300),
+      origen_trafico: _mainOrigen(),
+      device: _mainDevice(),
+      evento_id:      datos.evento_id || (typeof cur!=='undefined' && cur && cur.id) || null,
+      evento_nombre:  datos.evento_nombre || (typeof cur!=='undefined' && cur && cur.a) || null,
+      paquete:        datos.paquete || (typeof selPkg!=='undefined' ? selPkg : null) || null,
+      zona:           datos.zona || (typeof selZ!=='undefined' && selZ && selZ.n) || null,
+      precio_zona:    datos.precio_zona != null ? datos.precio_zona : (typeof selZ!=='undefined' && selZ && selZ.p) || null,
+      habitacion:     datos.habitacion || (typeof selH!=='undefined' && selH && selH.n) || null,
+      transporte:     datos.transporte || (typeof selTransporte!=='undefined' && selTransporte && selTransporte.n) || null,
+      precio_total:   datos.precio_total != null ? datos.precio_total : (typeof total!=='undefined' ? total : null),
+      paso_wizard:    datos.paso_wizard || null,
+      codigo_aplicado: datos.codigo_aplicado || null,
+      codigo_valido:  datos.codigo_valido != null ? datos.codigo_valido : null,
+      filtro_usado:   datos.filtro_usado || null
+    };
+    if(navigator.sendBeacon){
+      navigator.sendBeacon('/.netlify/functions/main-track', new Blob([JSON.stringify(payload)],{type:'application/json'}));
+    } else {
+      fetch('/.netlify/functions/main-track', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify(payload), keepalive: true
+      }).catch(function(){});
+    }
+  } catch(e){}
+  try {
+    if(typeof gtag !== 'undefined'){
+      gtag('event', accion, {
+        event_category: 'main',
+        event_label: datos.evento_nombre || (typeof cur!=='undefined' && cur && cur.a) || '',
+        value: Math.round(datos.precio_total || (typeof total!=='undefined' ? total : 0) || 0)
+      });
+    }
+  } catch(e){}
+}
+
+// Visita inicial — disparada lo antes posible
+(function(){ try { trackMainEvent('main_visita', {}); } catch(e){} })();
+
+// Delegate global para hooks que se aplican sobre elementos creados dinámicamente
+// o muy distribuidos. Click filtrado por intent — no estamos haciendo overload.
+document.addEventListener('click', function(e){
+  try {
+    var t = e.target.closest('a, button');
+    if (!t) return;
+    // Música preview (Deezer) — el play está sobre .ev-music-btn o iframes deezer
+    if (t.matches('.ev-music-btn, .music-btn, [data-music-play]')) {
+      trackMainEvent('main_musica_reproducida', { evento_id: t.dataset.eventId || null });
+      return;
+    }
+    // Comprobante: botón en el modal de pago que abre WA/Messenger
+    if (t.matches('#pago-btn-comprobante, [data-comprobante], .send-comprobante-btn')
+        || (t.tagName === 'A' && /comprobante/i.test(t.textContent))) {
+      trackMainEvent('main_comprobante_enviado', {});
+      return;
+    }
+    // Lista de espera: botones que confirman registro en waitlist
+    if (t.matches('#wl-confirm, .wl-submit, [data-wl-submit]')) {
+      trackMainEvent('main_lista_espera_registro', { evento_id: (typeof _wlEvento !== 'undefined' && _wlEvento && _wlEvento.id) || null });
+      return;
+    }
+    // Redes sociales en el footer
+    if (t.tagName === 'A' && t.href) {
+      var h = t.href.toLowerCase();
+      var red = /instagram/.test(h) ? 'instagram'
+              : /tiktok/.test(h) ? 'tiktok'
+              : /facebook|fb\.com/.test(h) ? 'facebook'
+              : /threads/.test(h) ? 'threads'
+              : /youtube|youtu\.be/.test(h) ? 'youtube'
+              : /wa\.me|whatsapp/.test(h) ? 'whatsapp'
+              : null;
+      if (red && t.closest('footer, .ftr-v2, .nav, .nav-socials')) {
+        trackMainEvent('main_redes_clic', { transporte: red });
+      }
+    }
+  } catch(e){}
+}, true);
+
+
 window.trackEventClick=function(eventId,eventName){
   if(!eventId)return;
   try{
@@ -2234,6 +2353,8 @@ window.trackEventClick=function(eventId,eventName){
       body:JSON.stringify({eventId:eventId,eventName:eventName||eventId})
     }).catch(function(){});
   }catch(e){}
+  // Analytics: registrar click en card de evento (para Radar del Dragón)
+  try{ trackMainEvent('main_evento_visto', { evento_id: eventId, evento_nombre: eventName || eventId }); }catch(e){}
 };
 function refreshTop10(){
   fetch('/.netlify/functions/event-clicks').then(function(r){return r.ok?r.json():null;}).then(function(d){
@@ -2262,6 +2383,7 @@ function applyTop10Badges(){
 }
 function setFilter(btn,f){
   _activeFilter=f;
+  try{ trackMainEvent('main_filtro_aplicado', { filtro_usado: f }); }catch(e){}
   document.querySelectorAll('.fbtn').forEach(function(b){b.classList.remove('active');});
   if(btn)btn.classList.add('active');
   var mb=document.getElementById('month-bar');
@@ -3335,6 +3457,7 @@ function updatePkgCards(){
 function selPaquete(btn,pkg){
   if(pkg==='stay'&&isCDMX(cur))return; // disabled for CDMX
   selPkg=pkg;selZ=null;selH=null;selTransporte=null;
+  try{ trackMainEvent('main_paquete_elegido', { paquete: pkg, paso_wizard: 'paquete' }); }catch(e){}
   setWizProgress(2);
   var _hintBase='';
   if(pkg==='plus')_hintBase='Incluye boleto, transporte, hospedaje y kit. ';
@@ -3664,6 +3787,7 @@ function selZona(btn,p,n){
   for(var i=0;i<btns.length;i++)btns[i].classList.remove('active');
   btn.classList.add('active');
   selZ={n:n,p:p};
+  try{ trackMainEvent('main_zona_elegida', { zona: n, precio_zona: p, paso_wizard: 'zona' }); }catch(e){}
   setWizProgress(3);
   setWizHint('Zona seleccionada. Desplázate hacia abajo para ver tu cotización completa.');
   calcular();
@@ -3676,6 +3800,7 @@ function selHotel(btn,e,n){
   btn.classList.add('active');
   selH={n:n,e:e};
   selTransporte=null;
+  try{ trackMainEvent('main_habitacion_elegida', { habitacion: n, paso_wizard: 'hotel' }); }catch(e2){}
   if(isCDMX(cur)){
     buildTransporteButtons();
     $$('w-transport-card').style.display='block';
@@ -3711,6 +3836,7 @@ function selTransporteBtn(btn,cost,name){
   for(var i=0;i<btns.length;i++)btns[i].classList.remove('active');
   btn.classList.add('active');
   selTransporte={n:name,cost:cost};
+  try{ trackMainEvent('main_transporte_elegido', { transporte: name, paso_wizard: 'transporte' }); }catch(e){}
   calcular();
 }
 
@@ -3749,6 +3875,7 @@ function cerrarMapa(){
 function abrirModalPago(){
   if(!cur||!_lastCotizacion)return;
   try{window.trackInitiateCheckout&&window.trackInitiateCheckout(cur.a,selPkg,total);}catch(e){}
+  try{ trackMainEvent('main_modal_pago_abierto', {}); }catch(e){}
   setWizHint('Realiza tu transferencia por el monto del separo. Toma foto del comprobante y presiona el botón de abajo.');
   setTimeout(function(){_tourTry('pago');},450);
   $$('pago-subtitulo').textContent='Separa tu lugar en '+cur.a+' — '+cur.f;
@@ -3998,6 +4125,11 @@ function aplicarPromo(){
   var code=document.getElementById('promo-input').value;
   var msg=document.getElementById('promo-msg');
   var r=validarPromo(code);
+  // Tracking: registramos el intento con el código en MAYÚSCULAS y el resultado
+  try{ trackMainEvent('main_codigo_intentado', {
+    codigo_aplicado: (code||'').toUpperCase().trim().slice(0,24),
+    codigo_valido: !!r.ok
+  }); }catch(e){}
   if(r.ok){
     _promoActivo=r;
     PROMOS[r.code].usos++;
@@ -4169,6 +4301,7 @@ function calcular(){
   _lastQuincenas=quincenas;_lastPagoQ=pagoQ;
   // Build full message (shared by WA, copy, vuelo)
   _lastCotizacion=buildCotizacionMsg(quincenas,pagoQ);
+  try{ trackMainEvent('main_cotizacion_generada', { precio_total: total, paso_wizard: 'cotizacion' }); }catch(e){}
   $$('r-wa').href='https://wa.me/'+WA+'?text='+encodeURIComponent(_lastCotizacion);
 
   // Vuelo CTA

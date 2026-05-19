@@ -47,3 +47,9 @@
 # y manda emails a los registrados. 14:00 UTC = 8:00 AM CDMX, mismo slot diario.
 [functions."waitlist-notify"]
   schedule = "0 14 * * *"
+
+# Radar del Dragón — detector de anomalías. Corre 2x día:
+#   14:00 UTC = 8:00 AM hora México
+#   02:00 UTC = 8:00 PM hora México (del día anterior)
+[functions."radar-alertas"]
+  schedule = "0 14,2 * * *"

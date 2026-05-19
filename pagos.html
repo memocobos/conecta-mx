@@ -777,6 +777,8 @@ button:focus-visible,a:focus-visible{
       var text=btn.getAttribute('data-copy');
       var label=btn.getAttribute('data-label')||'Valor';
       var original=btn.innerHTML;
+      // Analytics: registrar qué cuenta se copió (BBVA vs Hey, Tarjeta vs CLABE)
+      try { trackPagosEvent('pagos_cuenta_copiada', { cuenta_copiada: label }); } catch(e) {}
 
       var done=function(){
         btn.classList.add('copied');
@@ -795,6 +797,62 @@ button:focus-visible,a:focus-visible{
       }else{
         if(fallbackCopy(text)) done();
       }
+    });
+  });
+
+  // ── Analytics anónimo de /pagos ──────────────────────────────────────────
+  function _pagosSessionId(){
+    try {
+      var k='pagos-session-id';
+      var s=sessionStorage.getItem(k);
+      if(!s){ s='px-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,10); sessionStorage.setItem(k,s); }
+      return s;
+    } catch(e){
+      window._pagosSidMem = window._pagosSidMem || ('px-mem-' + Date.now().toString(36));
+      return window._pagosSidMem;
+    }
+  }
+  function _device(){
+    var w = window.innerWidth || screen.width || 0;
+    if (w < 640) return 'mobile';
+    if (w < 1024) return 'tablet';
+    return 'desktop';
+  }
+  function trackPagosEvent(accion, datos){
+    datos = datos || {};
+    try {
+      var payload = {
+        session_id: _pagosSessionId(),
+        accion: accion,
+        cuenta_copiada: datos.cuenta_copiada || null,
+        origen: (document.referrer || '').slice(0, 200) || 'direct',
+        device: _device(),
+        referrer: (document.referrer || '').slice(0, 300)
+      };
+      if (navigator.sendBeacon) {
+        var blob = new Blob([JSON.stringify(payload)], { type: 'application/json' });
+        navigator.sendBeacon('/.netlify/functions/pagos-track', blob);
+      } else {
+        fetch('/.netlify/functions/pagos-track', {
+          method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify(payload), keepalive: true
+        }).catch(function(){});
+      }
+    } catch(e){}
+    try {
+      if (typeof gtag !== 'undefined') {
+        gtag('event', accion, { event_category: 'pagos', event_label: datos.cuenta_copiada || '' });
+      }
+    } catch(e){}
+  }
+  // Exponemos en window para que el handler de .copy-btn (closure interno) la vea.
+  window.trackPagosEvent = trackPagosEvent;
+  // 1) Visita
+  trackPagosEvent('pagos_visita', {});
+  // 2) Cualquier click en links de WhatsApp
+  document.querySelectorAll('a[href*="wa.me"]').forEach(function(a){
+    a.addEventListener('click', function(){
+      trackPagosEvent('pagos_whatsapp_clic', { cuenta_copiada: a.textContent.trim().slice(0, 40) });
     });
   });
 })();

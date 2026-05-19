@@ -9402,8 +9402,11 @@ async function enviarAlertaMemo(tipo, datos = {}) {
         break;
       case 'nuevo_usuario':
         mensaje = `Nuevo usuario registrado: ${datos.nombre||''}`;
-        emailSubject = `👤 Nuevo guerrero Z: ${datos.nombre||''}`;
-        emailBody = `<p>Se registró un nuevo usuario: <strong>${datos.nombre}</strong> (${datos.rol||''}).</p>`;
+        // [2026-05-18] Email "Nuevo guerrero Z" desactivado — genera demasiado ruido
+        // en admin@conectareynosa.mx. La alerta in-app (sistema_alertas) sigue activa.
+        // Si se necesita reactivar, descomentar estas 2 líneas.
+        // emailSubject = `👤 Nuevo guerrero Z: ${datos.nombre||''}`;
+        // emailBody = `<p>Se registró un nuevo usuario: <strong>${datos.nombre}</strong> (${datos.rol||''}).</p>`;
         break;
       case 'strikes':
         mensaje = `${datos.nombre} acumuló ${datos.strikes} strike${datos.strikes!==1?'s':''}${datos.motivo?' — '+datos.motivo:''}`;
@@ -9425,8 +9428,8 @@ async function enviarAlertaMemo(tipo, datos = {}) {
       leida: false,
       created_at: new Date().toISOString(),
     }).catch(()=>{});
-    // Email a Memo
-    await enviarEmailSistema(MEMO_EMAIL, emailSubject, emailBody);
+    // Email a Memo — guard: tipos sin emailSubject (ej. nuevo_usuario desactivado el 2026-05-18) no mandan correo.
+    if (emailSubject) await enviarEmailSistema(MEMO_EMAIL, emailSubject, emailBody);
   } catch(e) { console.warn('Alerta error:', e.message); }
 }
 

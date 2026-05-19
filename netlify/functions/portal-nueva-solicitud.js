@@ -154,7 +154,7 @@ exports.handler = async (event) => {
       headers: { Authorization: `Bearer ${RESEND_KEY}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
         from: 'Portal Conecta <admin@conectareynosa.mx>',
-        to: ['hcgcobos@gmail.com'],
+        to: ['admin@conectareynosa.mx'],
         reply_to: cliente.correo,
         subject,
         html,

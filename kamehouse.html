@@ -1864,6 +1864,7 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
    <button class="nav-btn" onclick="showPage('reportes')" id="nav-reportes">Reportes</button>
    <button class="nav-btn" onclick="showPage('equipo')" id="nav-equipo">Guerreros Z</button>
    <button class="nav-btn" onclick="showPage('capsule')" id="nav-capsule">Capsule Corp</button>
+   <button class="nav-btn" onclick="showPage('solicitudes_portal')" id="nav-solicitudes_portal">📥 Solicitudes Portal</button>
    <button class="nav-btn" onclick="showPage('cotizador')" id="nav-cotizador">Palacio de Kamisama</button>
    <button class="nav-btn" onclick="showPage('radar')" id="nav-radar">RADAR DEL DRAGÓN</button>
    <button class="nav-btn" onclick="showPage('montana')" id="nav-montana">Montaña Pai</button>
@@ -2387,6 +2388,63 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
      <div class="modal-overlay" id="modal-viajero"></div>
      <div class="modal-overlay" id="modal-habitacion"></div>
      <div class="modal-overlay" id="modal-asignar-coordi"></div>
+
+     <!-- ─── SOLICITUDES PORTAL (Fase 2.2b) ─── -->
+     <div class="page" id="page-solicitudes_portal">
+      <div class="page-hero">
+       <div>
+        <div class="page-title">📥 SOLICITUDES PORTAL</div>
+        <div class="page-sub">// clientes pidiendo separar tour desde el portal</div>
+       </div>
+       <button class="btn btn-ghost" onclick="loadSolicitudesPortal()" id="sp-btn-refresh">↻ Refrescar</button>
+      </div>
+
+      <!-- Contadores -->
+      <div id="sp-contadores" style="display:flex;gap:10px;flex-wrap:wrap;margin:16px 0;font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.08em;color:var(--ts)">
+       <span>Cargando…</span>
+      </div>
+
+      <!-- Filtros -->
+      <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;margin-bottom:16px;display:grid;grid-template-columns:1fr 200px 200px 160px 160px;gap:10px;align-items:end">
+       <div>
+        <label style="display:block;font-size:10px;letter-spacing:.12em;color:var(--ts);text-transform:uppercase;margin-bottom:4px">Buscar</label>
+        <input type="text" id="sp-q" placeholder="Nombre, correo, evento o # cliente" oninput="renderSolicitudesPortal()" style="width:100%;padding:8px 10px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;color:var(--ink);font-size:13px">
+       </div>
+       <div>
+        <label style="display:block;font-size:10px;letter-spacing:.12em;color:var(--ts);text-transform:uppercase;margin-bottom:4px">Estado</label>
+        <select id="sp-filtro-estado" onchange="loadSolicitudesPortal()" style="width:100%;padding:8px 10px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;color:var(--ink);font-size:13px">
+         <option value="">Todos</option>
+         <option value="pendiente">Pendiente</option>
+         <option value="en_pagos">En pagos</option>
+         <option value="pagado">Pagado</option>
+         <option value="cancelado">Cancelado</option>
+        </select>
+       </div>
+       <div>
+        <label style="display:block;font-size:10px;letter-spacing:.12em;color:var(--ts);text-transform:uppercase;margin-bottom:4px">Evento</label>
+        <select id="sp-filtro-evento" onchange="loadSolicitudesPortal()" style="width:100%;padding:8px 10px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;color:var(--ink);font-size:13px">
+         <option value="">Todos</option>
+        </select>
+       </div>
+       <div>
+        <label style="display:block;font-size:10px;letter-spacing:.12em;color:var(--ts);text-transform:uppercase;margin-bottom:4px">Desde</label>
+        <input type="date" id="sp-filtro-desde" onchange="loadSolicitudesPortal()" style="width:100%;padding:8px 10px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;color:var(--ink);font-size:13px">
+       </div>
+       <div>
+        <label style="display:block;font-size:10px;letter-spacing:.12em;color:var(--ts);text-transform:uppercase;margin-bottom:4px">Hasta</label>
+        <input type="date" id="sp-filtro-hasta" onchange="loadSolicitudesPortal()" style="width:100%;padding:8px 10px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;color:var(--ink);font-size:13px">
+       </div>
+      </div>
+
+      <!-- Tabla -->
+      <div id="sp-table-wrap" style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);overflow:auto">
+       <div id="sp-table" style="min-height:120px"></div>
+      </div>
+     </div>
+
+     <!-- Modales Solicitudes Portal -->
+     <div class="modal-overlay" id="modal-sp-detalle"></div>
+     <div class="modal-overlay" id="modal-sp-cambiar-estado"></div>
 
  <!-- ─── COTIZADOR ─── -->
      <!-- ─── MONTAÑA PAI ─── -->
@@ -3933,8 +3991,8 @@ let disenoLoaded = false;
 let _cotIniciado = false;
 
 const PERMISOS_TABS = {
-  maestro_roshi: ['resumen','pagos','eventos','gastos','ventas','inventario','reportes','capsule','equipo','cotizador','herramientas','radar','montana'],
-  bulma:         ['resumen','pagos','eventos','gastos','ventas','inventario','reportes','capsule','equipo','cotizador','herramientas'],
+  maestro_roshi: ['resumen','pagos','eventos','gastos','ventas','inventario','reportes','capsule','solicitudes_portal','equipo','cotizador','herramientas','radar','montana'],
+  bulma:         ['resumen','pagos','eventos','gastos','ventas','inventario','reportes','capsule','solicitudes_portal','equipo','cotizador','herramientas'],
   mister_popo:   ['inventario','reportes','equipo'],
   coordinador:   ['inventario','reportes','equipo'],
   cc:            ['equipo'],
@@ -4075,7 +4133,7 @@ function aplicarPermisosUI() {
   const extras = currentUser.permisos_extra?.tabs_extra || [];
   const bloqueados = currentUser.permisos_extra?.tabs_bloqueados || [];
   const tabsPermitidos = [...new Set([...base, ...extras])].filter(t => !bloqueados.includes(t));
-  const allTabs = ['resumen','pagos','eventos','gastos','ventas','inventario','reportes','equipo','capsule','cotizador','radar','montana'];
+  const allTabs = ['resumen','pagos','eventos','gastos','ventas','inventario','reportes','equipo','capsule','solicitudes_portal','cotizador','radar','montana'];
   allTabs.forEach(tab => {
     const btn = document.getElementById('nav-' + tab);
     if (btn) btn.style.display = tabsPermitidos.includes(tab) ? '' : 'none';
@@ -4185,6 +4243,7 @@ function loadPage(name) {
  if (name === 'capsule') loadCapsule();
  if (name === 'equipo') loadEquipo();
  if (name === 'capsule') loadCapsule();
+ if (name === 'solicitudes_portal') loadSolicitudesPortal();
  if (name === 'cotizador') initCotizador();
  if (name === 'montana') loadMontana();
  if (name === 'radar') initRadarTab();
@@ -8469,6 +8528,353 @@ async function descargarRoomingList(eventoId) {
 
 
 let _reportesFiltroActual = 'todos';
+
+// ═══════════════════════════════════════════════════════════════
+// SOLICITUDES PORTAL (Fase 2.2b)
+// Vista admin de solicitudes_tour del Supabase NUEVO (conecta-portal).
+// Las queries pasan por Netlify Functions con service_role — el frontend
+// nunca ve la service key. Auth se valida lookup-de-usuario en cada call.
+// ═══════════════════════════════════════════════════════════════
+let _spCache = [];
+let _spLoading = false;
+// Acumulador de eventos vistos en cualquier carga (no se reduce al filtrar) —
+// alimenta el dropdown de filtro de evento. Clave: evento_id, valor: evento_nombre.
+let _spEventosVistos = new Map();
+
+function _spAdminHeaders() {
+  return {
+    'Content-Type': 'application/json',
+    'x-kh-user-id': (currentUser && currentUser.id) || '',
+    'x-kh-correo': ((currentUser && currentUser.correo) || '').toLowerCase(),
+  };
+}
+
+function _spFmtMxn(n) {
+  return '$' + Number(n || 0).toLocaleString('es-MX', { maximumFractionDigits: 2 });
+}
+
+function _spFmtFechaRel(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  const diffMs = Date.now() - d.getTime();
+  const min = Math.round(diffMs / 60000);
+  if (min < 1)  return 'Hace unos segundos';
+  if (min < 60) return `Hace ${min} min`;
+  const h = Math.round(min / 60);
+  if (h < 24)   return `Hace ${h} h`;
+  const dd = Math.round(h / 24);
+  if (dd < 30)  return `Hace ${dd} d`;
+  return d.toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+
+function _spFmtFechaAbs(iso) {
+  if (!iso) return '';
+  return new Date(iso).toLocaleString('es-MX', { timeZone: 'America/Monterrey', dateStyle: 'medium', timeStyle: 'short' });
+}
+
+function _spEscape(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+function _spBadgeEstado(estado) {
+  const map = {
+    pendiente:  { bg: '#fff3cd', fg: '#856404', label: 'Pendiente' },
+    en_pagos:   { bg: '#d1ecf1', fg: '#0c5460', label: 'En pagos' },
+    pagado:     { bg: '#d4edda', fg: '#155724', label: 'Pagado' },
+    cancelado:  { bg: '#f8d7da', fg: '#721c24', label: 'Cancelado' },
+  };
+  const e = map[estado] || { bg: '#eee', fg: '#333', label: estado || '—' };
+  return `<span style="display:inline-block;padding:3px 9px;border-radius:12px;background:${e.bg};color:${e.fg};font-size:11px;font-weight:700;letter-spacing:.04em">${e.label}</span>`;
+}
+
+function _spPoblarDropdownEventos() {
+  // El portal guarda evento_id con el slug del sitio público (ev. "morat-dic-3#0"),
+  // que NO coincide con los UUIDs de la tabla eventos de Kamehouse. Por eso el
+  // dropdown se arma a partir de los evento_id/evento_nombre acumulados en
+  // _spEventosVistos. Importante: el acumulador NUNCA se reduce — si la
+  // armáramos solo desde _spCache, al filtrar por un evento desaparecerían los
+  // demás del dropdown.
+  const sel = document.getElementById('sp-filtro-evento');
+  if (!sel) return;
+  (_spCache || []).forEach(s => {
+    if (s.evento_id && !_spEventosVistos.has(s.evento_id)) {
+      _spEventosVistos.set(s.evento_id, s.evento_nombre || s.evento_id);
+    }
+  });
+  const valorActual = sel.value;
+  const opciones = Array.from(_spEventosVistos.entries())
+    .sort((a, b) => String(a[1]).localeCompare(String(b[1])))
+    .map(([id, nombre]) => `<option value="${_spEscape(id)}">${_spEscape(nombre)}</option>`)
+    .join('');
+  sel.innerHTML = `<option value="">Todos</option>${opciones}`;
+  // Conservar la selección actual aunque el filtro haya escondido el resto.
+  if (valorActual && _spEventosVistos.has(valorActual)) sel.value = valorActual;
+}
+
+async function loadSolicitudesPortal() {
+  if (_spLoading) return;
+  _spLoading = true;
+
+  const tableEl = document.getElementById('sp-table');
+  const contadoresEl = document.getElementById('sp-contadores');
+  const btn = document.getElementById('sp-btn-refresh');
+  if (btn) { btn.disabled = true; btn.textContent = '↻ Cargando…'; }
+  if (tableEl) tableEl.innerHTML = '<div style="padding:24px;text-align:center;color:var(--ts);font-family:\'JetBrains Mono\',monospace;font-size:11px">// cargando solicitudes…</div>';
+
+  const payload = {
+    estado: document.getElementById('sp-filtro-estado').value || undefined,
+    evento_id: document.getElementById('sp-filtro-evento').value || undefined,
+    desde: _spDateToIso(document.getElementById('sp-filtro-desde').value, false),
+    hasta: _spDateToIso(document.getElementById('sp-filtro-hasta').value, true),
+  };
+
+  try {
+    const r = await fetch('/.netlify/functions/admin-solicitudes-list', {
+      method: 'POST',
+      headers: _spAdminHeaders(),
+      body: JSON.stringify(payload),
+    });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || 'Error cargando solicitudes');
+    _spCache = data.solicitudes || [];
+    _spPoblarDropdownEventos();
+    if (contadoresEl) {
+      const c = data.contadores || {};
+      contadoresEl.innerHTML = [
+        `<span style="color:#e8a800">⏳ ${c.pendiente || 0} pendiente${(c.pendiente||0)===1?'':'s'}</span>`,
+        `<span style="color:#3aa1c4">▸ ${c.en_pagos || 0} en pagos</span>`,
+        `<span style="color:#3DDC84">✓ ${c.pagado || 0} pagado${(c.pagado||0)===1?'':'s'}</span>`,
+        `<span style="color:#FF6B6B">✕ ${c.cancelado || 0} cancelado${(c.cancelado||0)===1?'':'s'}</span>`,
+        `<span style="margin-left:auto">// ${data.count} mostradas</span>`,
+      ].join('');
+    }
+    renderSolicitudesPortal();
+  } catch (e) {
+    if (tableEl) tableEl.innerHTML = `<div style="padding:24px;text-align:center;color:#FF6B6B">Error: ${_spEscape(e.message)}</div>`;
+    showToast('No se pudieron cargar las solicitudes: ' + e.message, 'error');
+  } finally {
+    _spLoading = false;
+    if (btn) { btn.disabled = false; btn.textContent = '↻ Refrescar'; }
+  }
+}
+
+function _spDateToIso(yyyyMmDd, endOfDay) {
+  if (!yyyyMmDd) return undefined;
+  // El input <input type="date"> ya viene en formato YYYY-MM-DD. Lo
+  // convertimos a ISO en UTC con offset de México para evitar que un día
+  // se pierda en el borde de medianoche.
+  const t = endOfDay ? 'T23:59:59' : 'T00:00:00';
+  return `${yyyyMmDd}${t}-06:00`;
+}
+
+function renderSolicitudesPortal() {
+  const tableEl = document.getElementById('sp-table');
+  if (!tableEl) return;
+  const q = (document.getElementById('sp-q').value || '').trim().toLowerCase();
+  let rows = _spCache;
+  if (q.length >= 2) {
+    rows = rows.filter(s => {
+      const c = s.clientes || {};
+      return (c.nombre_completo || '').toLowerCase().includes(q)
+          || (c.correo || '').toLowerCase().includes(q)
+          || (s.evento_nombre || '').toLowerCase().includes(q)
+          || String(c.numero_cliente || '').includes(q);
+    });
+  }
+
+  if (!rows.length) {
+    tableEl.innerHTML = '<div class="empty-state"><div class="empty-icon">·</div>Sin solicitudes que coincidan con los filtros</div>';
+    return;
+  }
+
+  const head = `
+    <thead>
+      <tr style="background:var(--bg3);text-align:left">
+        <th style="padding:10px 8px;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ts);white-space:nowrap">Fecha</th>
+        <th style="padding:10px 8px;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ts);white-space:nowrap">#Cliente</th>
+        <th style="padding:10px 8px;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ts)">Cliente</th>
+        <th style="padding:10px 8px;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ts)">Evento</th>
+        <th style="padding:10px 8px;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ts)">Paquete</th>
+        <th style="padding:10px 8px;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ts)">Zona</th>
+        <th style="padding:10px 8px;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ts);text-align:right">Separo</th>
+        <th style="padding:10px 8px;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ts);text-align:right">Total</th>
+        <th style="padding:10px 8px;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ts)">Estado</th>
+        <th style="padding:10px 8px;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ts);text-align:center">📎</th>
+        <th style="padding:10px 8px;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ts)"></th>
+      </tr>
+    </thead>`;
+
+  const body = rows.map(s => {
+    const c = s.clientes || {};
+    const tieneComprob = !!s.comprobante_separo_url;
+    return `
+      <tr style="border-top:1px solid var(--border)">
+        <td style="padding:10px 8px;font-size:12px;color:var(--ts);white-space:nowrap" title="${_spEscape(_spFmtFechaAbs(s.created_at))}">${_spEscape(_spFmtFechaRel(s.created_at))}</td>
+        <td style="padding:10px 8px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--orange);white-space:nowrap">#${_spEscape(c.numero_cliente || '—')}</td>
+        <td style="padding:10px 8px;font-size:13px">${_spEscape(c.nombre_completo || '—')}<br><span style="color:var(--ts);font-size:11px">${_spEscape(c.correo || '')}</span></td>
+        <td style="padding:10px 8px;font-size:13px">${_spEscape(s.evento_nombre || '')}</td>
+        <td style="padding:10px 8px;font-size:13px"><b>${_spEscape(s.paquete || '')}</b></td>
+        <td style="padding:10px 8px;font-size:12px">${_spEscape(s.zona || '')}</td>
+        <td style="padding:10px 8px;font-size:12px;text-align:right;white-space:nowrap">${_spFmtMxn(s.monto_separo)}</td>
+        <td style="padding:10px 8px;font-size:12px;text-align:right;white-space:nowrap"><b>${_spFmtMxn(s.precio_total)}</b></td>
+        <td style="padding:10px 8px">${_spBadgeEstado(s.estado)}</td>
+        <td style="padding:10px 8px;text-align:center;font-size:14px">${tieneComprob ? '📎' : '<span style="color:var(--ts)">—</span>'}</td>
+        <td style="padding:10px 8px;text-align:right;white-space:nowrap"><button class="btn btn-ghost btn-sm" onclick="verSolicitudPortal('${_spEscape(s.id)}')" style="font-size:11px">Ver detalles</button></td>
+      </tr>`;
+  }).join('');
+
+  tableEl.innerHTML = `<table style="width:100%;border-collapse:collapse">${head}<tbody>${body}</tbody></table>`;
+}
+
+async function verSolicitudPortal(id) {
+  const s = _spCache.find(x => x.id === id);
+  if (!s) { showToast('Solicitud no encontrada en cache, refresca la lista', 'error'); return; }
+  const c = s.clientes || {};
+
+  const seccion = (titulo, html) => `
+    <div style="margin-top:18px;padding-top:14px;border-top:1px solid var(--border)">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.14em;color:var(--orange);text-transform:uppercase;margin-bottom:10px">// ${titulo}</div>
+      ${html}
+    </div>`;
+
+  const row = (k, v) => `<div style="display:grid;grid-template-columns:140px 1fr;gap:10px;padding:4px 0;font-size:13px"><div style="color:var(--ts);font-size:11px;text-transform:uppercase;letter-spacing:.08em">${_spEscape(k)}</div><div>${v == null || v === '' ? '<span style="color:var(--ts)">—</span>' : v}</div></div>`;
+
+  const contenido = `
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px">
+      ${_spBadgeEstado(s.estado)}
+      <button class="btn btn-primary btn-sm" onclick="abrirCambiarEstadoSP('${_spEscape(s.id)}')" style="font-size:11px">Cambiar estado</button>
+      <span style="margin-left:auto;color:var(--ts);font-size:11px;font-family:'JetBrains Mono',monospace">${_spEscape(_spFmtFechaAbs(s.created_at))}</span>
+    </div>
+
+    ${seccion('Cliente', `
+      ${row('Nombre', _spEscape(c.nombre_completo))}
+      ${row('# Cliente', `<span style="font-family:'JetBrains Mono',monospace;color:var(--orange)">#${_spEscape(c.numero_cliente || '—')}</span>`)}
+      ${row('Correo', _spEscape(c.correo))}
+      ${row('Celular', _spEscape(c.celular))}
+      ${row('Talla playera', _spEscape(c.talla_playera))}
+      ${row('Contacto emergencia', `${_spEscape(c.contacto_emergencia_nombre || '')} · ${_spEscape(c.contacto_emergencia_telefono || '')}${c.contacto_emergencia_relacion ? ' · ' + _spEscape(c.contacto_emergencia_relacion) : ''}`)}
+    `)}
+
+    ${seccion('Tour', `
+      ${row('Evento', _spEscape(s.evento_nombre))}
+      ${row('Evento ID', `<span style="font-family:'JetBrains Mono',monospace;color:var(--ts);font-size:11px">${_spEscape(s.evento_id)}</span>`)}
+      ${row('Paquete', `<b>${_spEscape(s.paquete)}</b>`)}
+      ${row('Zona', _spEscape(s.zona))}
+      ${row('Personas', String(s.num_personas))}
+      ${s.tipo_habitacion ? row('Habitación', _spEscape(s.tipo_habitacion)) : ''}
+      ${s.lleva_vuelo ? row('Vuelo propio', s.codigo_vuelo ? _spEscape(s.codigo_vuelo) : 'Sí (sin código)') : ''}
+      ${s.codigo_descuento ? row('Código descuento', _spEscape(s.codigo_descuento)) : ''}
+      ${s.notas_cliente ? row('Notas del cliente', `<i>${_spEscape(s.notas_cliente)}</i>`) : ''}
+    `)}
+
+    ${seccion('Dinero', `
+      ${row('Precio total', `<b>${_spFmtMxn(s.precio_total)}</b>`)}
+      ${row('Monto separo', `<b style="color:var(--orange)">${_spFmtMxn(s.monto_separo)}</b>`)}
+      ${row('Estado actual', _spBadgeEstado(s.estado))}
+      ${s.notas_admin ? row('Notas admin', `<i style="color:var(--ts)">${_spEscape(s.notas_admin)}</i>`) : ''}
+    `)}
+
+    ${seccion('Comprobante de separo', `
+      <div id="sp-comprobante-${_spEscape(s.id)}" style="font-size:13px;color:var(--ts)">
+        ${s.comprobante_separo_url ? 'Cargando vista previa…' : '<span style="color:var(--ts)">Sin comprobante subido por el cliente</span>'}
+      </div>
+    `)}
+  `;
+
+  crearModal('sp-detalle', `Solicitud · ${s.evento_nombre || ''}`, contenido);
+  document.getElementById('modal-sp-detalle').querySelector('.modal').style.maxWidth = '720px';
+
+  if (s.comprobante_separo_url) {
+    cargarComprobanteSP(s.id);
+  }
+}
+
+async function cargarComprobanteSP(solicitudId) {
+  const target = document.getElementById(`sp-comprobante-${solicitudId}`);
+  if (!target) return;
+  try {
+    const r = await fetch('/.netlify/functions/admin-solicitud-comprobante', {
+      method: 'POST',
+      headers: _spAdminHeaders(),
+      body: JSON.stringify({ solicitud_id: solicitudId }),
+    });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || 'No se pudo obtener el comprobante');
+    const isPdf = data.content_type === 'application/pdf';
+    const safeUrl = data.signed_url;
+    target.innerHTML = `
+      <div style="margin-bottom:8px;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--ts);letter-spacing:.08em">// firma válida 1 hora — ${_spEscape(data.path)}</div>
+      ${isPdf
+        ? `<iframe src="${_spEscape(safeUrl)}" style="width:100%;height:480px;border:1px solid var(--border);border-radius:8px"></iframe>`
+        : `<a href="${_spEscape(safeUrl)}" target="_blank" rel="noopener"><img src="${_spEscape(safeUrl)}" style="max-width:100%;max-height:480px;border:1px solid var(--border);border-radius:8px" alt="Comprobante"></a>`}
+      <div style="margin-top:10px;display:flex;gap:8px">
+        <a href="${_spEscape(safeUrl)}" target="_blank" rel="noopener" class="btn btn-ghost btn-sm" style="font-size:11px">↗ Abrir en pestaña nueva</a>
+        <a href="${_spEscape(safeUrl)}" download class="btn btn-primary btn-sm" style="font-size:11px">↓ Descargar</a>
+      </div>
+    `;
+  } catch (e) {
+    target.innerHTML = `<span style="color:#FF6B6B">Error: ${_spEscape(e.message)}</span>`;
+  }
+}
+
+function abrirCambiarEstadoSP(solicitudId) {
+  const s = _spCache.find(x => x.id === solicitudId);
+  if (!s) { showToast('Solicitud no encontrada', 'error'); return; }
+  const contenido = `
+    <div style="font-size:12px;color:var(--ts);margin-bottom:14px">Cliente <b style="color:var(--ink)">${_spEscape((s.clientes||{}).nombre_completo || '—')}</b> · ${_spEscape(s.evento_nombre || '')}</div>
+
+    <label style="display:block;font-size:10px;letter-spacing:.12em;color:var(--ts);text-transform:uppercase;margin-bottom:4px">Nuevo estado</label>
+    <select id="sp-nuevo-estado" style="width:100%;padding:10px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;color:var(--ink);font-size:14px;margin-bottom:14px">
+      <option value="pendiente" ${s.estado==='pendiente'?'selected':''}>Pendiente</option>
+      <option value="en_pagos" ${s.estado==='en_pagos'?'selected':''}>En pagos</option>
+      <option value="pagado" ${s.estado==='pagado'?'selected':''}>Pagado</option>
+      <option value="cancelado" ${s.estado==='cancelado'?'selected':''}>Cancelado</option>
+    </select>
+
+    <label style="display:block;font-size:10px;letter-spacing:.12em;color:var(--ts);text-transform:uppercase;margin-bottom:4px">Notas internas (admin)</label>
+    <textarea id="sp-nuevas-notas" rows="3" placeholder="Opcional — solo lo ve el admin" style="width:100%;padding:10px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;color:var(--ink);font-size:13px;resize:vertical;margin-bottom:6px">${_spEscape(s.notas_admin || '')}</textarea>
+    <div style="font-size:11px;color:var(--ts);margin-bottom:14px">El cliente nunca ve estas notas. Dejándolas vacías se conservan las anteriores.</div>
+
+    <div style="display:flex;justify-content:flex-end;gap:8px">
+      <button class="btn btn-ghost" onclick="cerrarModal('sp-cambiar-estado')">Cancelar</button>
+      <button class="btn btn-primary" id="sp-btn-guardar-estado" onclick="guardarCambioEstadoSP('${_spEscape(solicitudId)}')">Guardar</button>
+    </div>
+  `;
+  crearModal('sp-cambiar-estado', 'Cambiar estado de la solicitud', contenido);
+  document.getElementById('modal-sp-cambiar-estado').querySelector('.modal').style.maxWidth = '480px';
+}
+
+async function guardarCambioEstadoSP(solicitudId) {
+  const btn = document.getElementById('sp-btn-guardar-estado');
+  const estado = document.getElementById('sp-nuevo-estado').value;
+  const notasInput = document.getElementById('sp-nuevas-notas').value.trim();
+  // Si el textarea quedó igual a las notas previas (autorrellenado), no las re-enviamos
+  // para no spamear el campo con su mismo valor. Solo enviamos cuando cambiaron.
+  const s = _spCache.find(x => x.id === solicitudId) || {};
+  const notasParaEnviar = notasInput && notasInput !== (s.notas_admin || '') ? notasInput : '';
+
+  if (btn) { btn.disabled = true; btn.textContent = 'Guardando…'; }
+  try {
+    const r = await fetch('/.netlify/functions/admin-solicitud-update-estado', {
+      method: 'POST',
+      headers: _spAdminHeaders(),
+      body: JSON.stringify({ solicitud_id: solicitudId, nuevo_estado: estado, notas_admin: notasParaEnviar }),
+    });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || 'Error guardando');
+    showToast('Solicitud actualizada', 'success');
+    cerrarModal('sp-cambiar-estado');
+    cerrarModal('sp-detalle');
+    loadSolicitudesPortal();
+  } catch (e) {
+    showToast('No se pudo guardar: ' + e.message, 'error');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Guardar'; }
+  }
+}
+
 // ═══════════════════════════════════════════════════════════════
 // MONTAÑA PAI — Panel Maestro Roshi
 // ═══════════════════════════════════════════════════════════════

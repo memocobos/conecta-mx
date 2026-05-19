@@ -24,7 +24,7 @@ const SB_KEY = process.env.SUPABASE_SERVICE_KEY_KAMEHOUSE
             || process.env.SUPABASE_SERVICE_ROLE_KEY;
 const RESEND_KEY = process.env.RESEND_KEY || process.env.RESEND_API_KEY;
 const ADMIN_EMAIL = 'admin@conectareynosa.mx';
-const ADMIN_TO = 'hcgcobos@gmail.com';
+const ADMIN_TO = 'admin@conectareynosa.mx';
 
 async function sb(path, init = {}) {
   const r = await fetch(`${SB_URL}/rest/v1/${path}`, {

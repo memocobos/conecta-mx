@@ -2754,13 +2754,29 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
 
    <!-- SUB-PESTAÑA: Comparativas -->
    <section class="radar-sub" data-sub="comparativas" style="display:none">
-     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">
+     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;align-items:center">
        <select id="rcm-modo" class="rolan-select">
          <option value="week">Esta semana vs la pasada</option>
          <option value="month" selected>Este mes vs el pasado</option>
          <option value="year">Este año vs el pasado</option>
+         <option value="month_yoy">Mes específico vs mismo mes año anterior</option>
+       </select>
+       <select id="rcm-mes-yoy" class="rolan-select" style="display:none">
+         <option value="0">Enero</option>
+         <option value="1">Febrero</option>
+         <option value="2">Marzo</option>
+         <option value="3">Abril</option>
+         <option value="4">Mayo</option>
+         <option value="5">Junio</option>
+         <option value="6">Julio</option>
+         <option value="7">Agosto</option>
+         <option value="8">Septiembre</option>
+         <option value="9">Octubre</option>
+         <option value="10">Noviembre</option>
+         <option value="11">Diciembre</option>
        </select>
      </div>
+     <div id="rcm-leyenda" style="font-size:11px;letter-spacing:.06em;color:var(--ts);text-transform:uppercase;margin-bottom:10px"></div>
      <div class="rolan-kpis" id="rcm-kpis">
        <div class="rolan-empty" style="grid-column:1/-1">Selecciona un modo para ver la comparativa.</div>
      </div>
@@ -10586,12 +10602,42 @@ function renderRolAnalytics(rows){
   const conv = baseConv > 0 ? (sesionesConPlan.size / baseConv * 100) : 0;
   const recordatorios = rows.filter(r => r.accion === 'rol_recordatorios_activados').length;
   const comprobantes  = rows.filter(r => r.accion === 'rol_comprobante_subido').length;
+  // KPIs adicionales del Radar del Dragón
+  const toursGuardados = rows.filter(r => r.accion === 'rol_tour_guardado').length;
+  const icsDescargas   = rows.filter(r => r.accion === 'rol_calendario_descargado').length;
+  const pngDescargas   = rows.filter(r => r.accion === 'rol_png_descargado').length;
 
-  document.getElementById('rolan-kpi-sesiones').textContent      = sesiones.size.toLocaleString('es-MX');
-  document.getElementById('rolan-kpi-planes').textContent        = planes.length.toLocaleString('es-MX');
-  document.getElementById('rolan-kpi-conversion').textContent    = conv.toFixed(1) + '%';
-  document.getElementById('rolan-kpi-recordatorios').textContent = recordatorios.toLocaleString('es-MX');
-  document.getElementById('rolan-kpi-comprobantes').textContent  = comprobantes.toLocaleString('es-MX');
+  const setKpi = (id, val) => { const el=document.getElementById(id); if(el) el.textContent = val; };
+  setKpi('rolan-kpi-sesiones',      sesiones.size.toLocaleString('es-MX'));
+  setKpi('rolan-kpi-planes',        planes.length.toLocaleString('es-MX'));
+  setKpi('rolan-kpi-conversion',    conv.toFixed(1) + '%');
+  setKpi('rolan-kpi-recordatorios', recordatorios.toLocaleString('es-MX'));
+  setKpi('rolan-kpi-comprobantes',  comprobantes.toLocaleString('es-MX'));
+  setKpi('rolan-kpi-tours',         toursGuardados.toLocaleString('es-MX'));
+  setKpi('rolan-kpi-ics',           icsDescargas.toLocaleString('es-MX'));
+  setKpi('rolan-kpi-png',           pngDescargas.toLocaleString('es-MX'));
+
+  // ── Métodos de compartir más usados ──
+  // El hook rol_compartido envía `tipo_compra: 'copy' | 'whatsapp' | 'email'`
+  const shareCount = { copy:0, whatsapp:0, email:0, otro:0 };
+  for (const r of rows) {
+    if (r.accion !== 'rol_compartido') continue;
+    const k = (r.tipo_compra || '').toLowerCase();
+    if (shareCount[k] != null) shareCount[k]++; else shareCount.otro++;
+  }
+  const shareTotal = Object.values(shareCount).reduce((a,b) => a+b, 0);
+  const shareWrap = document.getElementById('rolan-share');
+  if (shareWrap) {
+    shareWrap.innerHTML = shareTotal === 0
+      ? '<div class="rolan-empty">Sin compartidos en el rango</div>'
+      : Object.entries(shareCount).filter(([,n]) => n > 0)
+          .sort((a,b) => b[1]-a[1])
+          .map(([k,n]) => {
+            const pct = (n/shareTotal*100).toFixed(1);
+            const lbl = { copy:'Link copiado', whatsapp:'WhatsApp', email:'Email', otro:'Otro' }[k] || k;
+            return `<div class="rolan-bar-row"><span class="key">${lbl}</span><div class="track"><div class="fill" style="width:${pct}%"></div></div><span class="pct">${pct}%</span></div>`;
+          }).join('');
+  }
 
   // ── Eventos más consultados (por planes generados) ──
   const evCount = {};
@@ -10727,6 +10773,67 @@ var _radarRange = 'month';     // 'today' | 'week' | 'month' | '3months' | 'all'
 var _radarSub   = 'resumen';
 var _radarRefreshId = null;
 var _radarCache = { main: [], pagos: [], rol: [], waitlist: [], alertas: [] };
+var _radarEvCache = { count: null, ts: 0 }; // eventos activos: 5 min TTL
+
+// Cuenta cuántos eventos del array EV en producción están "activos"
+// (no agotados, no próximamente). Hace fetch a /index.html y extrae el array
+// con el mismo truco que rol.html (regex + balanceo de llaves).
+async function _radarContarEventosActivos(){
+  const TTL_MS = 5 * 60 * 1000;
+  if (_radarEvCache.count != null && (Date.now() - _radarEvCache.ts) < TTL_MS) {
+    return _radarEvCache.count;
+  }
+  try {
+    const r = await fetch('https://conectareynosa.mx/index.html?nc=' + Date.now(), { cache: 'no-store' });
+    if (!r.ok) return null;
+    const html = await r.text();
+    const start = html.indexOf("var EV=[");
+    if (start < 0) return null;
+    // Balanceo de [ ] empezando en el '[' que sigue al '=' (ignorando strings).
+    let i = html.indexOf('[', start);
+    let depth = 0, end = -1, inStr = false, strCh = '';
+    for (; i < html.length; i++) {
+      const c = html[i], prev = html[i-1];
+      if (inStr) { if (c === strCh && prev !== '\\') inStr = false; continue; }
+      if (c === "'" || c === '"') { inStr = true; strCh = c; continue; }
+      if (c === '[' || c === '{') depth++;
+      else if (c === ']' || c === '}') { depth--; if (depth === 0 && c === ']') { end = i; break; } }
+    }
+    if (end < 0) return null;
+    // Para cada objeto top-level, mira su campo st:
+    const arr = html.slice(html.indexOf('[', start), end + 1);
+    const objRe = /\{[^{}]*?id:\s*'[^']+'[^{}]*?\}/g;
+    // El regex anterior NO permite llaves anidadas (eventos con zonas:[{...}]
+    // no caben). Solo capta objetos planos — esos son los placeholders agotado
+    // o proximamente. Para los demás, recurrimos a parser balanceado:
+    let count = 0;
+    let depth2 = 0, oStart = -1, ins = false, sc = '';
+    for (let j = 0; j < arr.length; j++) {
+      const c = arr[j], prev = arr[j-1];
+      if (ins) { if (c === sc && prev !== '\\') ins = false; continue; }
+      if (c === "'" || c === '"') { ins = true; sc = c; continue; }
+      if (c === '{') { if (depth2 === 0) oStart = j; depth2++; }
+      else if (c === '}') {
+        depth2--;
+        if (depth2 === 0 && oStart >= 0) {
+          const blob = arr.slice(oStart, j + 1);
+          const stM = blob.match(/(?:^|[,{])\s*st\s*:\s*'([^']*)'/);
+          const st = stM ? stM[1] : '';
+          // Activo = no agotado y no próximamente. Eventos con st:'' o
+          // st:'ultimos' / st:'proceso' cuentan como activos.
+          if (st !== 'agotado' && st !== 'proximamente' && st !== 'por-confirmar') count++;
+          oStart = -1;
+        }
+      }
+    }
+    _radarEvCache.count = count;
+    _radarEvCache.ts = Date.now();
+    return count;
+  } catch (e) {
+    console.warn('[radar] contarEventos falló', e.message);
+    return null;
+  }
+}
 
 function _radarSinceISO(r){
   r = r || _radarRange;
@@ -10803,11 +10910,19 @@ function initRadarTab(){
       });
     });
   }
-  // Selector de comparativas
+  // Selector de comparativas (modo + mes para 'month_yoy')
   const sel = document.getElementById('rcm-modo');
   if (sel && !sel.dataset.wired) {
     sel.dataset.wired = '1';
     sel.addEventListener('change', loadRadarComparativas);
+  }
+  const selMes = document.getElementById('rcm-mes-yoy');
+  if (selMes && !selMes.dataset.wired) {
+    selMes.dataset.wired = '1';
+    selMes.addEventListener('change', loadRadarComparativas);
+    // Preset al mes anterior (más útil que el actual incompleto)
+    const m = new Date().getMonth();
+    selMes.value = String(((m - 1) + 12) % 12);
   }
   loadRadar();
   // Auto-refresh cada 60s mientras estemos en la pestaña
@@ -10888,7 +11003,12 @@ async function loadRadarResumen(){
   setKpi('rgr-modal', modal, modalP);
   setKpi('rgr-comprobante', compro, comproP);
   setKpi('rgr-conv', conv.toFixed(1) + '%', convP);
-  document.getElementById('rgr-eventos-act').textContent = '—';
+  // Eventos activos: fetch index.html y contar los que no estén agotados ni
+  // próximamente. Cache de 5 min en memoria para no penalizar refreshes.
+  _radarContarEventosActivos().then(n => {
+    const el = document.getElementById('rgr-eventos-act');
+    if (el) el.textContent = (n == null ? '—' : n.toLocaleString('es-MX'));
+  });
   document.getElementById('rgr-waitlist').textContent = wlTotal.toLocaleString('es-MX');
   setKpi('rgr-planes', planes, planesP);
 
@@ -11138,36 +11258,66 @@ async function markAllAlertsRead(){
 }
 
 // ── COMPARATIVAS ───────────────────────────────────────────
+const _RCM_MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+
+function _rcmRangosPara(modo, opts){
+  // Devuelve { actSince, actUntil, prevSince, prevUntil, leyenda }
+  // actUntil/prevUntil pueden ser null (= ahora / abierto al final).
+  const now = new Date();
+  if (modo === 'week') {
+    const actSince = new Date(now); actSince.setDate(now.getDate()-7);
+    const prevSince = new Date(actSince); prevSince.setDate(actSince.getDate()-7);
+    return { actSince, actUntil: now, prevSince, prevUntil: actSince,
+             leyenda: 'Últimos 7 días vs los 7 anteriores' };
+  }
+  if (modo === 'year') {
+    const actSince = new Date(now.getFullYear(), 0, 1);
+    const prevSince = new Date(now.getFullYear()-1, 0, 1);
+    const prevUntil = new Date(now.getFullYear()-1, now.getMonth(), now.getDate(), now.getHours(), now.getMinutes());
+    return { actSince, actUntil: now, prevSince, prevUntil,
+             leyenda: `${now.getFullYear()} (a la fecha) vs ${now.getFullYear()-1} (mismo periodo)` };
+  }
+  if (modo === 'month_yoy') {
+    const mes = opts?.mesIdx != null ? opts.mesIdx : now.getMonth();
+    const actSince  = new Date(now.getFullYear(),     mes, 1);
+    const actUntil  = new Date(now.getFullYear(),     mes + 1, 1);
+    const prevSince = new Date(now.getFullYear() - 1, mes, 1);
+    const prevUntil = new Date(now.getFullYear() - 1, mes + 1, 1);
+    return { actSince, actUntil, prevSince, prevUntil,
+             leyenda: `${_RCM_MESES[mes]} ${now.getFullYear()} vs ${_RCM_MESES[mes]} ${now.getFullYear()-1}` };
+  }
+  // Default: 'month' — últimos 30 días vs los 30 anteriores
+  const actSince  = new Date(now); actSince.setDate(now.getDate()-30);
+  const prevSince = new Date(actSince); prevSince.setDate(actSince.getDate()-30);
+  return { actSince, actUntil: now, prevSince, prevUntil: actSince,
+           leyenda: 'Últimos 30 días vs los 30 anteriores' };
+}
+
 async function loadRadarComparativas(){
   const modo = document.getElementById('rcm-modo')?.value || 'month';
-  const now = new Date();
-  let actualSince, prevSince, prevUntil;
-  if (modo === 'week') {
-    actualSince = new Date(now); actualSince.setDate(now.getDate()-7);
-    prevUntil = actualSince;
-    prevSince = new Date(prevUntil); prevSince.setDate(prevUntil.getDate()-7);
-  } else if (modo === 'year') {
-    actualSince = new Date(now); actualSince.setFullYear(now.getFullYear()-1);
-    prevUntil = actualSince;
-    prevSince = new Date(prevUntil); prevSince.setFullYear(prevUntil.getFullYear()-1);
-  } else {
-    actualSince = new Date(now); actualSince.setDate(now.getDate()-30);
-    prevUntil = actualSince;
-    prevSince = new Date(prevUntil); prevSince.setDate(prevUntil.getDate()-30);
-  }
+  const mesIdx = parseInt(document.getElementById('rcm-mes-yoy')?.value, 10);
+  // Mostrar/ocultar el dropdown de mes según el modo
+  const mesSel = document.getElementById('rcm-mes-yoy');
+  if (mesSel) mesSel.style.display = (modo === 'month_yoy') ? '' : 'none';
+
+  const r = _rcmRangosPara(modo, { mesIdx: Number.isFinite(mesIdx) ? mesIdx : (new Date()).getMonth() });
+  const ley = document.getElementById('rcm-leyenda');
+  if (ley) ley.textContent = r.leyenda;
+
   const [act, prev] = await Promise.all([
-    _radarFetch('main_eventos_uso', actualSince.toISOString()),
-    _radarFetch('main_eventos_uso', prevSince.toISOString(), prevUntil.toISOString())
+    _radarFetch('main_eventos_uso', r.actSince.toISOString(),  r.actUntil  ? r.actUntil.toISOString()  : null),
+    _radarFetch('main_eventos_uso', r.prevSince.toISOString(), r.prevUntil ? r.prevUntil.toISOString() : null)
   ]);
   const metric = (rows, accion, uniq) => uniq
     ? new Set(rows.filter(r=>r.accion===accion).map(r=>r.session_id)).size
     : rows.filter(r=>r.accion===accion).length;
   const items = [
-    { lbl:'Visitas', a:metric(act,'main_visita',true), p:metric(prev,'main_visita',true) },
-    { lbl:'Cotizaciones', a:metric(act,'main_cotizacion_generada'), p:metric(prev,'main_cotizacion_generada') },
-    { lbl:'Modal pago', a:metric(act,'main_modal_pago_abierto'), p:metric(prev,'main_modal_pago_abierto') },
-    { lbl:'Comprobante', a:metric(act,'main_comprobante_enviado'), p:metric(prev,'main_comprobante_enviado') },
-    { lbl:'Códigos válidos', a:act.filter(r=>r.accion==='main_codigo_intentado'&&r.codigo_valido).length, p:prev.filter(r=>r.accion==='main_codigo_intentado'&&r.codigo_valido).length },
+    { lbl:'Visitas',         a:metric(act,'main_visita',true),                p:metric(prev,'main_visita',true) },
+    { lbl:'Cotizaciones',    a:metric(act,'main_cotizacion_generada'),        p:metric(prev,'main_cotizacion_generada') },
+    { lbl:'Modal pago',      a:metric(act,'main_modal_pago_abierto'),         p:metric(prev,'main_modal_pago_abierto') },
+    { lbl:'Comprobante',     a:metric(act,'main_comprobante_enviado'),        p:metric(prev,'main_comprobante_enviado') },
+    { lbl:'Códigos válidos', a:act.filter(r=>r.accion==='main_codigo_intentado'&&r.codigo_valido).length,
+                              p:prev.filter(r=>r.accion==='main_codigo_intentado'&&r.codigo_valido).length },
   ];
   const wrap = document.getElementById('rcm-kpis');
   wrap.innerHTML = items.map(it => {

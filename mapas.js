@@ -4,6 +4,7 @@
 
 window.MAPAS={
   'intocable':'mapas/intocable.webp',
+  'caifanes':'mapas/caifanes.webp',
   'badgyal':'mapas/badgyal.webp',
   'machaca':'mapas/machaca.jpg',
   'arjona':'mapas/arjona.jpg',

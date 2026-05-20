@@ -332,11 +332,25 @@ button{cursor:pointer;border:none;background:none}
 .hab.sel .h-desc{color:rgba(255,255,255,.75)}
 
 /* ── Transporte CDMX ──────────────────────── */
-.transp-wrap{margin-top:18px;display:none}
+.transp-wrap{
+  margin-top:22px;display:none;
+  /* Visualmente separado de la habitación para que se sienta como otro paso */
+  padding-top:18px;border-top:1px dashed var(--line);
+  position:relative;
+}
 .transp-wrap.on{display:block}
+.transp-wrap::before{
+  /* Badge "PASO ADICIONAL" arriba a la derecha — el usuario móvil ve esto y
+     entiende que falta algo después de habitación. */
+  content:'PASO ADICIONAL';
+  position:absolute;top:-9px;right:0;
+  background:var(--yel);color:#000;
+  font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:900;
+  letter-spacing:.16em;padding:3px 8px;
+}
 .transp-title{
-  font-size:10px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;
-  color:var(--ink-mute);margin-bottom:8px;
+  font-size:13px;font-weight:900;letter-spacing:.02em;text-transform:none;
+  color:var(--ink);margin-bottom:10px;
 }
 .transp-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:6px}
 .transp-btn{
@@ -2256,8 +2270,18 @@ function populateHabs(){
       if(state.zona){
         if(state.pkg === 'cheap') setStep(4);
         else if(!transporteNeeded()) setStep(4);
-        // Para CDMX no-cheap: NO avanzar — el paso de transporte queda visible debajo.
-        // El click en una opción de transporte avanzará al paso 4.
+        else {
+          // CDMX no-cheap: NO avanzar. El transp-wrap está abajo de la habitación dentro
+          // del mismo step 3 — en móvil queda fuera del viewport y el usuario asume que
+          // se brincó. Scroll automático lo hace visible. Solo la PRIMERA vez (cuando el
+          // transporte sigue en el default 'sin') para no pelearse con la elección del user.
+          if(!state.transporte || state.transporte.k === 'sin'){
+            var transp = document.getElementById('transp-wrap');
+            if(transp) setTimeout(function(){
+              transp.scrollIntoView({behavior:'smooth', block:'start'});
+            }, 120);
+          }
+        }
       }
     });
     grid.appendChild(b);
@@ -2277,7 +2301,10 @@ function populateHabs(){
 function transporteOptions(ev){
   if(!ev || !isCDMX(ev)) return [];
   var opts = [{k:'sin', n:'Sin transporte', cost:0, icon:'🚶', note:'No agregué traslado'}];
-  if(ev.id !== 'arre'){
+  // Ocultar autobús cuando el evento lo declara con noBus:true (Festival Vaiven,
+  // Corona Capital, etc.) o cuando es Festival Arre (legacy). El resto de CDMX
+  // sí muestra el autobús con precio default editable.
+  if(!ev.noBus && ev.id !== 'arre'){
     opts.push({k:'bus', n:'Autobús Rey↔CDMX', cost:2500, editable:true, icon:'🚌', note:'$2,500 estándar — editable'});
   }
   opts.push({k:'avion', n:'Avión Rey↔CDMX', cost:0, editable:true, icon:'✈️', note:'Pon el monto que pagaste'});

@@ -11992,7 +11992,7 @@ const RADAR_HELP_KPIS = {
   'rgr-conv':        'Porcentaje calculado como (comprobantes enviados / visitas totales) × 100. Indica qué tan eficiente es el sitio para convertir visitas en intenciones de reserva.',
   'rgr-eventos-act': 'Total de eventos con st: "" o st: "ultimos". Excluye agotados, próximamente y placeholders.',
   'rgr-waitlist':    'Total de personas registradas en eventos con st: "proximamente". Esto es histórico — incluye registros de todos los eventos.',
-  'rgr-planes':      'Cuántos planes de pago se generaron exitosamente en /rol. NO incluye visitas que solo navegaron sin completar.',
+  'rgr-planes':      'Cuántos planes de pago se generaron en total — un mismo usuario puede crear varios planes diferentes.',
   // /Rol
   'rro-sesiones':    'Visitas únicas a la página /rol. Cada sesión cuenta una vez, sin importar cuántos planes haga el mismo usuario.',
   'rro-planes':      'Cuántos planes de pago completos se crearon. Un usuario puede generar varios planes diferentes.',
@@ -12008,7 +12008,7 @@ const RADAR_HELP_CARDS = {
   'Origen de tráfico':     'De dónde llegan los visitantes — Direct (escribieron la URL directo o vienen de WhatsApp/SMS), Facebook, Instagram, Google, etc.',
   'Embudo del wizard':     'Indica en qué paso del wizard el usuario abandona más. Si muchos se caen en "Hotel", revisar si las opciones son confusas o caras.',
   'Embudo de conversión':  'Cada paso muestra cuántos llegaron hasta ahí. Las pérdidas grandes entre pasos indican fricción en la UX.',
-  'Paquetes más elegidos': 'Distribución porcentual de qué paquetes (PLUS/RIDE/STAY/CHEAP) eligen los usuarios. PLUS suele dominar.',
+  'Paquetes más elegidos': 'Distribución porcentual de la última elección de paquete por sesión. Si un usuario cambia de PLUS a RIDE, cuenta solo como RIDE.',
   'Códigos: válidos vs no válidos': 'Códigos intentados con qué frecuencia y cuántos fueron válidos. Si un código tiene muchos intentos fallidos, revisar el flashPromo.',
   'Cuentas más copiadas':  'Cuáles cuentas bancarias se copiaron al portapapeles más veces. Indica qué paquete está vendiendo más.',
   'De dónde llegan':       'De dónde llegan los visitantes a /pagos — útil para entender qué canales mandan tráfico cerca del cierre.',
@@ -12309,10 +12309,11 @@ async function loadRadarResumen(){
   const prevSince = _radarPrevSinceISO();
   // Para sparklines siempre traemos los últimos 7 días (independiente del rango).
   const since7d = new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString();
-  const [main, mainPrev, rol, waitlist, main7, rol7] = await Promise.all([
+  const [main, mainPrev, rol, rolPrev, waitlist, main7, rol7] = await Promise.all([
     _radarFetch('main_eventos_uso', since),
     _radarFetch('main_eventos_uso', prevSince, since),
     _radarFetch('rol_eventos_uso', since),
+    _radarFetch('rol_eventos_uso', prevSince, since).catch(() => []),
     _radarFetch('eventos_waitlist?select=evento_id,evento_nombre,created_at', '1970-01-01T00:00:00Z').catch(() => []),
     _radarFetch('main_eventos_uso', since7d),
     _radarFetch('rol_eventos_uso',  since7d).catch(() => [])
@@ -12323,19 +12324,25 @@ async function loadRadarResumen(){
   const filt = (arr, pred) => (arr||[]).filter(pred);
   const uniqSessions = (arr, pred) => new Set(filt(arr, pred).map(r=>r.session_id)).size;
 
+  // KPIs por sesión única — un usuario que dispara la misma acción N veces cuenta 1.
+  // Excepción: `planes` (rol_plan_generado) sí cuenta cada plan individual, porque un
+  // mismo usuario puede crear varios planes legítimos.
   const visitas    = uniqSessions(main, r => r.accion==='main_visita');
   const visitasP   = uniqSessions(mainPrev, r => r.accion==='main_visita');
-  const cot        = filt(main, r=>r.accion==='main_cotizacion_generada').length;
-  const cotP       = filt(mainPrev, r=>r.accion==='main_cotizacion_generada').length;
-  const modal      = filt(main, r=>r.accion==='main_modal_pago_abierto').length;
-  const modalP     = filt(mainPrev, r=>r.accion==='main_modal_pago_abierto').length;
-  const compro     = filt(main, r=>r.accion==='main_comprobante_enviado').length;
-  const comproP    = filt(mainPrev, r=>r.accion==='main_comprobante_enviado').length;
-  const conv       = visitas ? (modal / visitas * 100) : 0;
-  const convP      = visitasP ? (modalP / visitasP * 100) : 0;
-  const planes     = filt(rol, r=>r.accion==='rol_plan_generado').length;
-  const codigosOk  = filt(main, r=>r.accion==='main_codigo_intentado' && r.codigo_valido).length;
-  const codigosOkP = filt(mainPrev, r=>r.accion==='main_codigo_intentado' && r.codigo_valido).length;
+  const cot        = uniqSessions(main,     r => r.accion==='main_cotizacion_generada');
+  const cotP       = uniqSessions(mainPrev, r => r.accion==='main_cotizacion_generada');
+  const modal      = uniqSessions(main,     r => r.accion==='main_modal_pago_abierto');
+  const modalP     = uniqSessions(mainPrev, r => r.accion==='main_modal_pago_abierto');
+  const compro     = uniqSessions(main,     r => r.accion==='main_comprobante_enviado');
+  const comproP    = uniqSessions(mainPrev, r => r.accion==='main_comprobante_enviado');
+  // Conversión global = (sesiones que enviaron comprobante / sesiones que visitaron) × 100.
+  // Antes usaba `modal` que sobrestimaba porque modal_pago_abierto es una etapa anterior.
+  const conv       = visitas  ? (compro  / visitas  * 100) : 0;
+  const convP      = visitasP ? (comproP / visitasP * 100) : 0;
+  const planes     = filt(rol,     r=>r.accion==='rol_plan_generado').length;
+  const planesP    = filt(rolPrev, r=>r.accion==='rol_plan_generado').length;
+  const codigosOk  = uniqSessions(main,     r => r.accion==='main_codigo_intentado' && r.codigo_valido);
+  const codigosOkP = uniqSessions(mainPrev, r => r.accion==='main_codigo_intentado' && r.codigo_valido);
   const wlTotal    = (waitlist||[]).length;
 
   // Set KPI val + trend pill
@@ -12355,7 +12362,7 @@ async function loadRadarResumen(){
   setKpi('rgr-modal',       modal,   modalP);
   setKpi('rgr-comprobante', compro,  comproP);
   setKpi('rgr-conv',        conv,    convP, true);
-  setKpi('rgr-planes',      planes,  0);
+  setKpi('rgr-planes',      planes,  planesP);
   setKpi('rgr-codigos',     codigosOk, codigosOkP);
   // Eventos activos: fetch async desde /index.html (cache 5 min interno)
   _radarContarEventosActivos().then(n => {
@@ -12372,37 +12379,43 @@ async function loadRadarResumen(){
   _rdrPaintSpark(document.getElementById('rgr-codigos-spark'),     _rdrSeries7d(main7, r => r.accion==='main_codigo_intentado' && r.codigo_valido));
   _rdrPaintSpark(document.getElementById('rgr-planes-spark'),      _rdrSeries7d(rol7, r => r.accion==='rol_plan_generado'));
   // Conv como % por día — eviata división por cero si no hay visitas ese día.
+  // Misma fórmula que el KPI: comprobantes / visitas, NO modal_pago_abierto.
   const sparkConv = (() => {
     const v = _rdrSeries7d(main7, r => r.accion==='main_visita');
-    const m = _rdrSeries7d(main7, r => r.accion==='main_modal_pago_abierto');
-    return v.map((vi, i) => vi > 0 ? (m[i] / vi * 100) : 0);
+    const c = _rdrSeries7d(main7, r => r.accion==='main_comprobante_enviado');
+    return v.map((vi, i) => vi > 0 ? (c[i] / vi * 100) : 0);
   })();
   _rdrPaintSpark(document.getElementById('rgr-conv-spark'), sparkConv);
   _rdrPaintSpark(document.getElementById('rgr-waitlist-spark'),
     _rdrSeries7d(waitlist, () => true));
 
-  // ── Top eventos cotizados (con barras inline) ──
+  // ── Top eventos cotizados (con barras inline) — por sesiones únicas ──
+  // Antes contaba cada cotización individual: un usuario que ajustaba paquete/zona 5 veces
+  // sumaba 5 al evento. Ahora cuenta sesiones únicas que cotizaron ese evento.
   const topCot = {};
   for (const r of main) {
     if (r.accion === 'main_cotizacion_generada' && r.evento_id) {
-      topCot[r.evento_id] = topCot[r.evento_id] || { count:0, nombre:r.evento_nombre || r.evento_id };
-      topCot[r.evento_id].count++;
+      if (!topCot[r.evento_id]) {
+        topCot[r.evento_id] = { nombre: r.evento_nombre || r.evento_id, sessions: new Set() };
+      }
+      topCot[r.evento_id].sessions.add(r.session_id);
     }
   }
   const olTop = document.getElementById('rgr-top-cot');
-  const arr = Object.values(topCot).sort((a,b) => b.count - a.count).slice(0, 6);
+  const arr = Object.values(topCot).sort((a,b) => b.sessions.size - a.sessions.size).slice(0, 6);
   const metaTop = document.getElementById('rgr-top-cot-meta');
   if (metaTop) metaTop.textContent = `${arr.length} ${arr.length===1?'evento':'eventos'}`;
-  const maxCot = Math.max(1, ...arr.map(x => x.count));
+  const maxCot = Math.max(1, ...arr.map(x => x.sessions.size));
   olTop.innerHTML = arr.length === 0
     ? '<li class="rdr-empty">Sin cotizaciones en el rango</li>'
     : arr.map((x, i) => {
-        const pct = (x.count / maxCot * 100).toFixed(0);
+        const n = x.sessions.size;
+        const pct = (n / maxCot * 100).toFixed(0);
         const delay = (0.05 + i*0.04).toFixed(2);
         return `<li>
           <span class="rk-pos">#${i+1}</span>
           <span class="rk-name">${_radarEsc(x.nombre)}<span class="rk-bar" style="width:${pct}%;animation-delay:${delay}s"></span></span>
-          <span class="rk-val">${x.count}<span class="unit">${x.count===1?'cotización':'cotizaciones'}</span></span>
+          <span class="rk-val">${n}<span class="unit">${n===1?'sesión':'sesiones'}</span></span>
         </li>`;
       }).join('');
 
@@ -12467,11 +12480,13 @@ async function loadRadarSitio(){
   const since = _radarSinceISO();
   const rows = await _radarFetch('main_eventos_uso', since);
   _radarCache.main = rows;
-  const visitas = new Set(rows.filter(r=>r.accion==='main_visita').map(r=>r.session_id)).size;
-  const eventosVistos = rows.filter(r=>r.accion==='main_evento_visto').length;
-  const cot = rows.filter(r=>r.accion==='main_cotizacion_generada').length;
-  const codigos = rows.filter(r=>r.accion==='main_codigo_intentado').length;
-  const musica = rows.filter(r=>r.accion==='main_musica_reproducida').length;
+  // KPIs por sesión única (mismo criterio que loadRadarResumen).
+  const _uniq = (pred) => new Set(rows.filter(pred).map(r=>r.session_id)).size;
+  const visitas       = _uniq(r=>r.accion==='main_visita');
+  const eventosVistos = _uniq(r=>r.accion==='main_evento_visto');
+  const cot           = _uniq(r=>r.accion==='main_cotizacion_generada');
+  const codigos       = _uniq(r=>r.accion==='main_codigo_intentado');
+  const musica        = _uniq(r=>r.accion==='main_musica_reproducida');
   const devs = {};
   for (const r of rows) { if (r.device) devs[r.device] = (devs[r.device]||0)+1; }
   const devStr = Object.entries(devs).map(([k,n])=>`${k.charAt(0).toUpperCase()+k.slice(1)} ${Math.round(n/(rows.length||1)*100)}%`).join(' · ') || '—';
@@ -12482,24 +12497,27 @@ async function loadRadarSitio(){
   document.getElementById('rsi-devices').textContent = devStr;
   document.getElementById('rsi-musica').textContent = musica.toLocaleString('es-MX');
 
-  // Top eventos vistos
+  // Top eventos vistos — por sesiones únicas (evita inflar por visitas repetidas).
   const top = {};
   for (const r of rows) {
     if (r.accion === 'main_evento_visto' && r.evento_id) {
-      top[r.evento_id] = top[r.evento_id] || { count:0, nombre:r.evento_nombre || r.evento_id };
-      top[r.evento_id].count++;
+      if (!top[r.evento_id]) {
+        top[r.evento_id] = { nombre: r.evento_nombre || r.evento_id, sessions: new Set() };
+      }
+      top[r.evento_id].sessions.add(r.session_id);
     }
   }
-  const arr = Object.values(top).sort((a,b) => b.count - a.count).slice(0, 10);
-  const maxClicks = Math.max(1, ...arr.map(x => x.count));
+  const arr = Object.values(top).sort((a,b) => b.sessions.size - a.sessions.size).slice(0, 10);
+  const maxClicks = Math.max(1, ...arr.map(x => x.sessions.size));
   document.getElementById('rsi-eventos-top').innerHTML = arr.length === 0
     ? '<li class="rdr-empty">Sin eventos vistos en el rango</li>'
     : arr.map((x, i) => {
-        const pct = (x.count / maxClicks * 100).toFixed(0);
+        const n = x.sessions.size;
+        const pct = (n / maxClicks * 100).toFixed(0);
         return `<li>
           <span class="rk-pos">#${i+1}</span>
           <span class="rk-name">${_radarEsc(x.nombre)}<span class="rk-bar" style="width:${pct}%;animation-delay:${(0.04*i).toFixed(2)}s"></span></span>
-          <span class="rk-val">${x.count}<span class="unit">clicks</span></span>
+          <span class="rk-val">${n}<span class="unit">${n===1?'sesión':'sesiones'}</span></span>
         </li>`;
       }).join('');
 
@@ -12587,9 +12605,12 @@ async function loadRadarPagos(){
   const since = _radarSinceISO();
   const rows = await _radarFetch('pagos_eventos_uso', since);
   _radarCache.pagos = rows;
-  const visitas = new Set(rows.filter(r=>r.accion==='pagos_visita').map(r=>r.session_id)).size;
-  const copias = rows.filter(r=>r.accion==='pagos_cuenta_copiada').length;
-  const wa = rows.filter(r=>r.accion==='pagos_whatsapp_clic').length;
+  // KPIs por sesión única — un usuario que copia la misma cuenta varias veces o que
+  // clica WhatsApp varias veces cuenta 1.
+  const _uniq = (pred) => new Set(rows.filter(pred).map(r=>r.session_id)).size;
+  const visitas = _uniq(r=>r.accion==='pagos_visita');
+  const copias  = _uniq(r=>r.accion==='pagos_cuenta_copiada');
+  const wa      = _uniq(r=>r.accion==='pagos_whatsapp_clic');
   document.getElementById('rpa-sesiones').textContent = visitas.toLocaleString('es-MX');
   document.getElementById('rpa-copias').textContent = copias.toLocaleString('es-MX');
   document.getElementById('rpa-wa').textContent = wa.toLocaleString('es-MX');

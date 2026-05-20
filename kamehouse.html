@@ -1608,6 +1608,59 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
 .rdr-kpi:nth-child(7){animation-delay:.26s}.rdr-kpi:nth-child(8){animation-delay:.30s}
 .rdr-kpi:nth-child(9){animation-delay:.34s}
 
+/* ── Botón de ayuda "?" y tooltip ─────────────────────── */
+.rdr-help-btn{
+  position:absolute;top:8px;right:8px;
+  width:20px;height:20px;border-radius:50%;
+  background:#000;border:1px solid rgba(232,255,76,.45);
+  color:#e8ff4c;
+  font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:900;
+  cursor:pointer;display:flex;align-items:center;justify-content:center;
+  padding:0;line-height:1;
+  transition:background .15s, border-color .15s, box-shadow .15s, transform .15s;
+  z-index:5;
+}
+.rdr-help-btn:hover, .rdr-help-btn:focus, .rdr-help-btn.active{
+  background:rgba(232,255,76,.14);
+  border-color:#e8ff4c;
+  box-shadow:0 0 14px rgba(232,255,76,.4);
+  outline:none;transform:scale(1.08);
+}
+.rdr-tooltip{
+  position:absolute;
+  display:none;
+  max-width:280px;min-width:200px;
+  background:#0a0a0e;
+  border:1px solid rgba(232,255,76,.55);
+  border-radius:8px;
+  padding:12px 14px;
+  font-family:'Inter','Montserrat',sans-serif;
+  font-size:12px;font-weight:400;line-height:1.55;
+  color:rgba(255,255,255,.86);
+  z-index:1000;
+  box-shadow:0 10px 28px rgba(0,0,0,.55), 0 0 18px rgba(232,255,76,.16);
+  pointer-events:auto;white-space:normal;
+  /* default position: just below the help btn (top:30px) anchored to right edge */
+  top:32px;right:6px;
+  animation:rdrTipIn .14s ease-out;
+}
+.rdr-tooltip.visible{display:block}
+.rdr-tooltip::before{
+  content:'';position:absolute;
+  width:8px;height:8px;background:#0a0a0e;
+  border-top:1px solid rgba(232,255,76,.55);
+  border-left:1px solid rgba(232,255,76,.55);
+  transform:rotate(45deg);
+  top:-5px;right:14px;
+}
+/* Cuando el tooltip se voltea arriba (sin espacio abajo) */
+.rdr-tooltip.tip-above{top:auto;bottom:32px}
+.rdr-tooltip.tip-above::before{top:auto;bottom:-5px;transform:rotate(225deg)}
+@keyframes rdrTipIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:translateY(0)}}
+@media(max-width:640px){
+  .rdr-tooltip{max-width:calc(100vw - 40px);font-size:12.5px}
+}
+
 /* ── Card grande (top eventos, donut, actividad) ─────── */
 .rdr-grid-2{
   display:grid;grid-template-columns:1fr 1fr;gap:14px;
@@ -11925,6 +11978,152 @@ function _trendArrow(actual, anterior){
   return { html: `${arrow} ${Math.abs(diff).toFixed(0)}%`, cls };
 }
 
+// ═══════════════════════════════════════════════════════════════
+// Textos de ayuda para botones "?" del Radar del Dragón
+// Clave: ID del elemento `.rdr-kpi-val` (para KPIs) o texto exacto del
+// `.rdr-card-title` (para cards). Sin entrada = sin botón.
+// ═══════════════════════════════════════════════════════════════
+const RADAR_HELP_KPIS = {
+  // Resumen general
+  'rgr-visitas':     'Número de sesiones únicas que entraron al sitio en el rango seleccionado. Una sesión es una visita continua hasta que el usuario cierra el navegador o pasa 30 minutos sin actividad.',
+  'rgr-cotizaciones':'Cuántas veces los usuarios llegaron al paso final del wizard y generaron una cotización completa. Incluye paquete + zona + (hotel si aplica) + (transporte si aplica).',
+  'rgr-modal':       'Cuántos usuarios llegaron a ver el modal con datos bancarios. Es un indicador fuerte de intención de compra real.',
+  'rgr-comprobante': 'Cuántos clicaron el botón "Enviar comprobante por Messenger/WhatsApp". NO confirma que efectivamente reservaron — solo que dieron clic.',
+  'rgr-conv':        'Porcentaje calculado como (comprobantes enviados / visitas totales) × 100. Indica qué tan eficiente es el sitio para convertir visitas en intenciones de reserva.',
+  'rgr-eventos-act': 'Total de eventos con st: "" o st: "ultimos". Excluye agotados, próximamente y placeholders.',
+  'rgr-waitlist':    'Total de personas registradas en eventos con st: "proximamente". Esto es histórico — incluye registros de todos los eventos.',
+  'rgr-planes':      'Cuántos planes de pago se generaron exitosamente en /rol. NO incluye visitas que solo navegaron sin completar.',
+  // /Rol
+  'rro-sesiones':    'Visitas únicas a la página /rol. Cada sesión cuenta una vez, sin importar cuántos planes haga el mismo usuario.',
+  'rro-planes':      'Cuántos planes de pago completos se crearon. Un usuario puede generar varios planes diferentes.',
+  'rro-recordatorios':'Cuántos clientes activaron los recordatorios automáticos por email (un correo el día de cada pago).',
+  // /Pagos
+  'rpa-sesiones':    'Visitas a la página /pagos donde están los datos bancarios.',
+  'rpa-copias':      'Cuáles cuentas bancarias se copiaron al portapapeles más veces. Indica qué paquete está vendiendo más.',
+  'rpa-wa':          'Cuántos clicaron el botón de dudas por WhatsApp. Si es alto, podría haber confusión en la información.',
+};
+const RADAR_HELP_CARDS = {
+  // Match por substring del title (case-insensitive). Primer match gana.
+  'Top eventos cotizados': 'Lista de los eventos con más cotizaciones completas. Útil para saber dónde está la demanda real.',
+  'Origen de tráfico':     'De dónde llegan los visitantes — Direct (escribieron la URL directo o vienen de WhatsApp/SMS), Facebook, Instagram, Google, etc.',
+  'Embudo del wizard':     'Indica en qué paso del wizard el usuario abandona más. Si muchos se caen en "Hotel", revisar si las opciones son confusas o caras.',
+  'Embudo de conversión':  'Cada paso muestra cuántos llegaron hasta ahí. Las pérdidas grandes entre pasos indican fricción en la UX.',
+  'Paquetes más elegidos': 'Distribución porcentual de qué paquetes (PLUS/RIDE/STAY/CHEAP) eligen los usuarios. PLUS suele dominar.',
+  'Códigos: válidos vs no válidos': 'Códigos intentados con qué frecuencia y cuántos fueron válidos. Si un código tiene muchos intentos fallidos, revisar el flashPromo.',
+  'Cuentas más copiadas':  'Cuáles cuentas bancarias se copiaron al portapapeles más veces. Indica qué paquete está vendiendo más.',
+  'De dónde llegan':       'De dónde llegan los visitantes a /pagos — útil para entender qué canales mandan tráfico cerca del cierre.',
+  'Métodos de compartir':  'Cómo comparten los clientes su plan — WhatsApp, copy link, email. WhatsApp suele dominar.',
+};
+// Cada sub-pestaña sin cards/kpis puede tener un tooltip "de sección".
+const RADAR_HELP_SECTIONS = {
+  alertas:      'Tipos de alertas: pico de tráfico (visitas +50% vs ayer), caídas (-30%), hitos de lista de espera (50/100/250 personas), records históricos, anomalías en códigos.',
+  comparativas: 'Compara dos rangos de tiempo. Útil para ver tendencias: ¿este mes vendimos más que el pasado?',
+};
+
+function _radarInjectHelpBtn(host, text){
+  if (!host || !text || host.querySelector(':scope > .rdr-help-btn')) return;
+  // Asegurar contenedor relativo
+  const cs = getComputedStyle(host);
+  if (cs.position === 'static') host.style.position = 'relative';
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'rdr-help-btn';
+  btn.setAttribute('aria-label', 'Explicar esta métrica');
+  btn.setAttribute('aria-expanded', 'false');
+  btn.textContent = '?';
+  const tip = document.createElement('div');
+  tip.className = 'rdr-tooltip';
+  tip.setAttribute('role', 'tooltip');
+  tip.textContent = text;
+  host.appendChild(btn);
+  host.appendChild(tip);
+
+  function close(){
+    tip.classList.remove('visible','tip-above');
+    btn.classList.remove('active');
+    btn.setAttribute('aria-expanded','false');
+  }
+  function open(){
+    // Cerrar otros tooltips abiertos
+    document.querySelectorAll('.rdr-tooltip.visible').forEach(t => {
+      if (t !== tip) {
+        t.classList.remove('visible','tip-above');
+        const pb = t.parentElement && t.parentElement.querySelector('.rdr-help-btn');
+        if (pb) { pb.classList.remove('active'); pb.setAttribute('aria-expanded','false'); }
+      }
+    });
+    tip.classList.add('visible');
+    btn.classList.add('active');
+    btn.setAttribute('aria-expanded','true');
+    // Voltear arriba si no hay espacio abajo
+    const rect = tip.getBoundingClientRect();
+    if (rect.bottom > window.innerHeight - 8) tip.classList.add('tip-above');
+  }
+
+  // Desktop: hover
+  btn.addEventListener('mouseenter', open);
+  host.addEventListener('mouseleave', e => {
+    if (!host.contains(e.relatedTarget)) close();
+  });
+  // Mobile/keyboard: toggle on click + tap-outside-to-close
+  btn.addEventListener('click', e => {
+    e.stopPropagation();
+    if (tip.classList.contains('visible')) close(); else open();
+  });
+  btn.addEventListener('focus', open);
+  btn.addEventListener('blur', () => setTimeout(close, 150));
+}
+
+function initRadarHelpButtons(){
+  const page = document.getElementById('page-radar');
+  if (!page) return;
+  // KPIs — clave por id de .rdr-kpi-val
+  page.querySelectorAll('.rdr-kpi').forEach(kpi => {
+    const val = kpi.querySelector('.rdr-kpi-val');
+    const id = val && val.id;
+    const text = id && RADAR_HELP_KPIS[id];
+    if (text) _radarInjectHelpBtn(kpi, text);
+  });
+  // Cards — clave por texto del title
+  page.querySelectorAll('.rdr-card').forEach(card => {
+    const titleEl = card.querySelector('.rdr-card-title');
+    if (!titleEl) return;
+    const titleText = (titleEl.textContent || '').trim();
+    for (const key in RADAR_HELP_CARDS) {
+      if (titleText.toLowerCase().includes(key.toLowerCase())) {
+        _radarInjectHelpBtn(card, RADAR_HELP_CARDS[key]);
+        break;
+      }
+    }
+  });
+  // Sub-pestañas sin KPIs/cards visibles (Alertas, Comparativas) — botón a nivel sección
+  for (const sub in RADAR_HELP_SECTIONS) {
+    const sec = page.querySelector('.radar-sub[data-sub="' + sub + '"]');
+    if (sec) _radarInjectHelpBtn(sec, RADAR_HELP_SECTIONS[sub]);
+  }
+  // Cerrar tooltips al tap fuera (idempotente — solo registrar una vez)
+  if (!page.dataset.helpClickBound) {
+    page.dataset.helpClickBound = '1';
+    document.addEventListener('click', e => {
+      if (e.target.closest('.rdr-help-btn, .rdr-tooltip')) return;
+      document.querySelectorAll('#page-radar .rdr-tooltip.visible').forEach(t => {
+        t.classList.remove('visible','tip-above');
+        const pb = t.parentElement && t.parentElement.querySelector('.rdr-help-btn');
+        if (pb) { pb.classList.remove('active'); pb.setAttribute('aria-expanded','false'); }
+      });
+    });
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape') {
+        document.querySelectorAll('#page-radar .rdr-tooltip.visible').forEach(t => {
+          t.classList.remove('visible','tip-above');
+          const pb = t.parentElement && t.parentElement.querySelector('.rdr-help-btn');
+          if (pb) { pb.classList.remove('active'); pb.setAttribute('aria-expanded','false'); }
+        });
+      }
+    });
+  }
+}
+
 function initRadarTab(){
   // Gate por rol (también está protegido por allTabs)
   if (!['maestro_roshi'].includes(currentUser?.rol)) {
@@ -11986,6 +12185,7 @@ function initRadarTab(){
     const m = new Date().getMonth();
     selMes.value = String(((m - 1) + 12) % 12);
   }
+  initRadarHelpButtons();
   loadRadar();
   // Auto-refresh cada 60s mientras estemos en la pestaña
   if (_radarRefreshId) clearInterval(_radarRefreshId);

@@ -12219,16 +12219,62 @@ async function loadRadar(silent){
 }
 
 async function _radarFetch(table, sinceISO, untilISO){
-  // Si el path ya viene con querystring (ej. 'tabla?select=...'), concatenamos
-  // con '&'. Antes asumíamos siempre '?', lo que producía URLs con dos signos
-  // de interrogación y PostgREST devolvía 400 PGRST100.
+  // Paginación con Range headers — Supabase/PostgREST tiene db-max-rows = 1000
+  // server-side. Pedir &limit=10000 NO funciona: el server cappea a 1000
+  // independientemente. Combinado con order=created_at.desc, las queries
+  // devolvían siempre las 1000 más recientes, así que cambiar el `gte` del
+  // rango (Hoy/Semana/Mes/Todo) no afectaba el resultado.
+  //
+  // Si el path ya trae querystring (ej. 'tabla?select=...'), concatenamos
+  // con '&'. Antes asumíamos siempre '?', lo que producía URLs con dos
+  // signos de interrogación y PostgREST devolvía 400 PGRST100.
   const sep = table.indexOf('?') >= 0 ? '&' : '?';
-  let url = `${SB_URL}/rest/v1/${table}${sep}created_at=gte.${encodeURIComponent(sinceISO)}`;
-  if (untilISO) url += `&created_at=lt.${encodeURIComponent(untilISO)}`;
-  url += '&order=created_at.desc&limit=10000';
-  const r = await fetch(url, { headers: { apikey: SB_KEY, Authorization: 'Bearer ' + SB_KEY } });
-  if (!r.ok) throw new Error('HTTP ' + r.status + ' ' + table);
-  return r.json();
+  let filters = `${sep}created_at=gte.${encodeURIComponent(sinceISO)}`;
+  if (untilISO) filters += `&created_at=lt.${encodeURIComponent(untilISO)}`;
+  filters += '&order=created_at.desc';
+  const url = `${SB_URL}/rest/v1/${table}${filters}`;
+
+  const PAGE_SIZE = 1000;     // matchea db-max-rows del server
+  const MAX_ROWS  = 20000;    // cap defensivo — UI se vuelve pesada más allá
+  const all = [];
+  let off = 0;
+  while (off < MAX_ROWS) {
+    let resp;
+    try {
+      resp = await fetch(url, {
+        headers: {
+          apikey: SB_KEY,
+          Authorization: 'Bearer ' + SB_KEY,
+          'Range-Unit': 'items',
+          'Range': off + '-' + (off + PAGE_SIZE - 1),
+        },
+      });
+    } catch (e) {
+      // Falla de red en una página: aborta paginación pero devuelve lo
+      // acumulado hasta ahora. Render parcial > render vacío.
+      console.warn('[_radarFetch] network error at offset', off, table, e);
+      break;
+    }
+    if (!resp.ok) {
+      // 416 Range Not Satisfiable: el offset quedó fuera del total. Señal
+      // limpia de "no hay más filas", no es error.
+      if (resp.status === 416) break;
+      // Otros errores: log y abort, devolver acumulado. Si pasa en la primera
+      // página (off=0) y no hay filas todavía, propagamos para no enmascarar
+      // problemas de auth/CSP/RLS.
+      if (off === 0 && all.length === 0) {
+        throw new Error('HTTP ' + resp.status + ' ' + table);
+      }
+      console.warn('[_radarFetch] HTTP', resp.status, 'at offset', off, table);
+      break;
+    }
+    const rows = await resp.json();
+    if (!Array.isArray(rows) || rows.length === 0) break;
+    all.push(...rows);
+    if (rows.length < PAGE_SIZE) break; // última página (parcial)
+    off += PAGE_SIZE;
+  }
+  return all;
 }
 
 // ── Helpers visuales del Radar ────────────────────────────

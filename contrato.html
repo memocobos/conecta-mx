@@ -595,8 +595,8 @@ const _logErr = (...args) => { try { console.warn("[contrato:ERROR]", ...args); 
 // Intenta convertir un File a data URL JPEG vía canvas. Si falla (HEIC con
 // bugs en iOS Safari, canvas vacío, dimensiones inválidas), tira para que
 // el caller use el fallback de FileReader.
-async function _toJpegDataUrl(file, maxDim = 2400, quality = 0.85) {
-  _log("convertir a JPEG vía canvas: type=" + file.type + " size=" + file.size);
+async function _toJpegDataUrl(file, maxDim = 1800, quality = 0.78) {
+  _log("convertir a JPEG vía canvas: type=" + file.type + " size=" + file.size + " bytes (" + (file.size/1024/1024).toFixed(2) + " MB) | params maxDim=" + maxDim + " q=" + quality);
   const objUrl = URL.createObjectURL(file);
   try {
     const img = await new Promise((resolve, reject) => {
@@ -631,7 +631,9 @@ async function _toJpegDataUrl(file, maxDim = 2400, quality = 0.85) {
     if (!dataUrl || dataUrl.length < 1000) {
       throw new Error("canvas produjo dataURL vacío (HEIC quirk en Safari?)");
     }
-    _log("canvas → JPEG ok, size:", dataUrl.length, "chars (~" + Math.round(dataUrl.length/1024) + " KB)");
+    const finalKB = Math.round(dataUrl.length * 0.75 / 1024);
+    const ratio = file.size > 0 ? ((dataUrl.length * 0.75) / file.size).toFixed(2) : "?";
+    _log("✓ PATH=canvas | JPEG ok | dataUrl.length=" + dataUrl.length + " | bytes≈" + finalKB + " KB | ratio vs original=" + ratio);
     return dataUrl;
   } finally {
     URL.revokeObjectURL(objUrl);
@@ -642,7 +644,7 @@ async function _toJpegDataUrl(file, maxDim = 2400, quality = 0.85) {
 // original. Esto siempre funciona porque no toca canvas. El servidor acepta
 // cualquier image/* mime después del fix de regex.
 function _readAsDataUrl(file) {
-  _log("fallback FileReader.readAsDataURL: type=" + file.type + " size=" + file.size);
+  _logErr("⚠ PATH=fallback (FileReader crudo, SIN compresión) — esto produce payload grande. type=" + file.type + " size=" + file.size + " bytes (" + (file.size/1024/1024).toFixed(2) + " MB)");
   return new Promise((resolve, reject) => {
     const r = new FileReader();
     const t = setTimeout(() => reject(new Error("timeout leyendo archivo (>30s)")), 30000);
@@ -659,18 +661,51 @@ function _spinnerHtml(texto) {
   </div>`;
 }
 
+// Devuelve el peso aproximado en bytes que pesará un data URL ya en JSON.
+// Un data URL base64 pesa ~length chars; la decodificación a bytes es ~length*0.75
+// pero lo que viaja al servidor es el string base64 dentro del JSON, así que
+// para estimar el payload usamos length directamente.
+function _dataUrlBytes(d) { return d ? d.length : 0; }
+
+// HTML del badge de tamaño que va debajo del preview. Verde <2MB, amarillo
+// 2-3MB, rojo >3MB. La creadora ve el resultado real ANTES de enviar.
+function _sizeBadgeHtml(side, dataUrl, usedFallback) {
+  const bytes = _dataUrlBytes(dataUrl);
+  const mb = bytes / 1024 / 1024;
+  let color, icon, hint = "";
+  if (mb < 2) { color = "#88ea4e"; icon = "✓"; }
+  else if (mb < 3) { color = "#e8ff4c"; icon = "⚠"; hint = " · pesada"; }
+  else { color = "#ff8888"; icon = "✗"; hint = " · se va a recomprimir"; }
+  const fallbackTag = usedFallback ? ' <span style="color:#ff8888">(sin compresión)</span>' : "";
+  const sideLbl = side === "frente" ? "Frente" : "Reverso";
+  return `<div data-badge="1" style="position:absolute;bottom:6px;left:6px;right:6px;background:rgba(0,0,0,.78);color:${color};padding:6px 10px;font-size:11px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;text-align:center;pointer-events:none">${sideLbl}: ${mb.toFixed(2)} MB ${icon}${hint}${fallbackTag}</div>`;
+}
+
+// HTML para mostrar el error cuando ni canvas ni FileReader pudieron procesar
+// la foto (raro: formato exótico, archivo corrupto, navegador muy viejo).
+function _renderErrorState(label, side, inputId, msg) {
+  label.classList.remove("has-file");
+  label.innerHTML = `
+    <span class="lbl-title">📸 ${side === "frente" ? "Frente" : "Reverso"} del INE</span>
+    <span class="lbl-hint" style="color:#ff8888;line-height:1.5;padding:0 4px">${msg}</span>
+  ` + _fileInputHtml(inputId);
+}
+
 function setupFileInput(side) {
   const inputId = side === "frente" ? "fileFrente" : "fileReverso";
   const labelId = side === "frente" ? "lblFrente" : "lblReverso";
   const label = document.getElementById(labelId);
-  const state = { dataUrl: null };
+  // state guarda dataUrl (lo que se manda) + file (original) + usedFallback.
+  // Guardar el File original es clave para poder recomprimir desde cero en
+  // enviarFirma() si el payload total queda muy pesado.
+  const state = { dataUrl: null, file: null, usedFallback: false };
 
   async function onPick(ev) {
     const inp = ev.target;
     const f = inp.files && inp.files[0];
     _log(side + ": change disparado, file?:", !!f);
     if (!f) return;
-    _log(side + ": archivo recibido —", f.name, "/", f.type || "(tipo vacío)", "/", f.size, "bytes");
+    _log(side + ": archivo recibido —", f.name, "/", f.type || "(tipo vacío)", "/", f.size, "bytes (" + (f.size/1024/1024).toFixed(2) + " MB)");
     if (f.size > 30 * 1024 * 1024) {
       alert("La foto supera 30 MB.");
       inp.value = "";
@@ -689,20 +724,26 @@ function setupFileInput(side) {
     try {
       finalDataUrl = await _toJpegDataUrl(f);
     } catch (e) {
-      _logErr(side + ": canvas fail —", e.message, "—> intentando fallback");
+      _logErr(side + ": canvas fail —", e.message, "—> intentando fallback crudo");
       // Intento 2: leer crudo como data URL (formato original).
       try {
         finalDataUrl = await _readAsDataUrl(f);
         usedFallback = true;
-        // Tope de seguridad: si el archivo original es >5 MB, no lo mandamos
-        // (Netlify rechaza payloads >6 MB y necesitamos espacio para los otros).
-        const approxKB = Math.round(finalDataUrl.length * 0.75 / 1024);
-        if (approxKB > 5000) {
-          finalDataUrl = null;
-          _logErr(side + ": fallback OK pero archivo muy pesado (" + approxKB + " KB)");
+        // Tope de seguridad: si el fallback crudo es >5 MB ni siquiera vale la
+        // pena intentar enviarlo. La compresión adaptativa del enviarFirma sólo
+        // puede recomprimir si el canvas funciona — si llegamos al fallback es
+        // porque canvas falló, así que no podemos hacer mucho más.
+        const approxMB = (finalDataUrl.length * 0.75 / 1024 / 1024);
+        if (approxMB > 5) {
+          _logErr(side + ": fallback crudo demasiado pesado (" + approxMB.toFixed(2) + " MB)");
           state.dataUrl = null;
-          label.classList.remove("has-file");
-          label.innerHTML = `<span class="lbl-title">📸 ${side === "frente" ? "Frente" : "Reverso"} del INE</span><span class="lbl-hint" style="color:#ff8888">Foto muy pesada (${(approxKB/1024).toFixed(1)} MB). Toma una nueva con menos resolución o intenta otra vez.</span>` + _fileInputHtml(inputId);
+          state.file = null;
+          state.usedFallback = false;
+          // Mensaje accionable: el problema típico es HEIC de iPhone que Safari
+          // no procesa via canvas. Le decimos qué hacer.
+          _renderErrorState(label, side, inputId,
+            "Tu navegador no puede procesar este formato de foto. Si tienes iPhone, abre la foto en la app Fotos y compártela con \"Copiar foto\" antes de subirla aquí — eso la convierte a un formato compatible."
+          );
           bindNewInput();
           checkSubmit();
           return;
@@ -710,8 +751,11 @@ function setupFileInput(side) {
       } catch (e2) {
         _logErr(side + ": fallback también falló —", e2.message);
         state.dataUrl = null;
-        label.classList.remove("has-file");
-        label.innerHTML = `<span class="lbl-title">📸 ${side === "frente" ? "Frente" : "Reverso"} del INE</span><span class="lbl-hint" style="color:#ff8888">No se pudo procesar la foto. Intenta tomar una nueva.</span>` + _fileInputHtml(inputId);
+        state.file = null;
+        state.usedFallback = false;
+        _renderErrorState(label, side, inputId,
+          "No pudimos abrir la foto. Si tienes iPhone, en Ajustes → Cámara → Formatos elige \"Más compatible\". Si tienes Android, abre la foto en Galería y compártela aquí."
+        );
         bindNewInput();
         checkSubmit();
         return;
@@ -719,15 +763,30 @@ function setupFileInput(side) {
     }
 
     state.dataUrl = finalDataUrl;
-    _log(side + ": listo —", usedFallback ? "(fallback crudo)" : "(canvas JPEG)", "tamaño final:", finalDataUrl.length, "chars");
+    state.file = f;
+    state.usedFallback = usedFallback;
+    const finalMB = (finalDataUrl.length * 0.75 / 1024 / 1024);
+    _log(side + ": ✓ listo — path=" + (usedFallback ? "fallback-crudo" : "canvas-jpeg") + " | final≈" + finalMB.toFixed(2) + " MB");
 
-    // Mostrar preview. Si el browser no puede renderizar el formato original
-    // (e.g. HEIC en algún Android viejo), la preview puede salir rota pero
-    // el upload sigue funcionando.
-    label.innerHTML = `<img class="preview-img" src="${finalDataUrl}" alt="${side}" onerror="this.style.display='none';this.insertAdjacentHTML('afterend','<div style=\\'padding:14px;font-size:11px;color:rgba(255,255,255,.6)\\'>✓ Foto cargada (sin preview disponible)</div>')">` + _fileInputHtml(inputId);
+    // Preview + badge de tamaño con color (verde/amarillo/rojo) para que la
+    // creadora sepa de entrada si la foto va a dar problemas.
+    label.innerHTML = `
+      <img class="preview-img" src="${finalDataUrl}" alt="${side}" onerror="this.style.display='none';this.insertAdjacentHTML('afterend','<div style=\\'padding:14px;font-size:11px;color:rgba(255,255,255,.6)\\'>✓ Foto cargada (sin preview disponible)</div>')">
+      ${_sizeBadgeHtml(side, finalDataUrl, usedFallback)}
+    ` + _fileInputHtml(inputId);
     bindNewInput();
     checkSubmit();
   }
+
+  // Actualiza solo el badge cuando recomprimimos desde enviarFirma. No re-renderiza
+  // todo el preview porque la imagen ya está mostrada y solo cambió el tamaño.
+  function refreshBadge() {
+    if (!state.dataUrl) return;
+    const old = label.querySelector("div[data-badge]");
+    if (old) old.remove();
+    label.insertAdjacentHTML("beforeend", _sizeBadgeHtml(side, state.dataUrl, state.usedFallback));
+  }
+  state.refreshBadge = refreshBadge;
 
   function bindNewInput() {
     const inp = document.getElementById(inputId);
@@ -755,6 +814,24 @@ function checkSubmit() {
   btn.disabled = !(firma && firma.hasInk() && ineFrenteState.dataUrl && ineReversoState.dataUrl && accept.checked);
 }
 
+// Mensaje accionable que mostramos cuando ni la cascada de compresión logra
+// bajar el payload del límite (raro). Le decimos a la creadora exactamente
+// qué hacer con su teléfono — no le pedimos "achícalas" sin explicar cómo.
+const MSG_FOTOS_NO_BAJAN =
+  "Tus fotos tienen tanto detalle que no podemos enviarlas a nuestros servidores. " +
+  "Si usas iPhone: abre Ajustes → Cámara → Formatos y elige \"Más compatible\". " +
+  "Si usas Android: baja la resolución de la cámara antes de tomar la foto del INE. " +
+  "Después, toma de nuevo las fotos del frente y reverso.";
+
+// Cascada de re-compresión cuando el payload total queda muy pesado. Solo se
+// aplica a fotos que vinieron por el camino canvas (las del fallback crudo no
+// se pueden recomprimir porque canvas ya falló con ese archivo).
+const COMPRESS_STEPS = [
+  { maxDim: 1400, quality: 0.72 },
+  { maxDim: 1200, quality: 0.65 },
+  { maxDim: 1000, quality: 0.60 },
+];
+
 async function enviarFirma(token, btn, errBox) {
   if (btn.disabled) return;
   btn.disabled = true;
@@ -772,18 +849,61 @@ async function enviarFirma(token, btn, errBox) {
     if (!ineFrenteState.dataUrl) throw new Error("Falta foto del frente del INE.");
     if (!ineReversoState.dataUrl) throw new Error("Falta foto del reverso del INE.");
 
-    const payload = {
+    const buildPayload = () => ({
       token,
       firma_data: firmaData,
       ine_frente: ineFrenteState.dataUrl,
       ine_reverso: ineReversoState.dataUrl,
-    };
-    const bodySize = JSON.stringify(payload).length;
-    _log("payload total:", (bodySize/1024/1024).toFixed(2), "MB");
-    if (bodySize > 5.5 * 1024 * 1024) {
-      throw new Error(`El payload pesa ${(bodySize/1024/1024).toFixed(1)} MB. Toma las fotos del INE de nuevo más chicas.`);
+    });
+    const sizeMB = (p) => JSON.stringify(p).length / 1024 / 1024;
+
+    let payload = buildPayload();
+    let curMB = sizeMB(payload);
+    _log("payload inicial: " + curMB.toFixed(2) + " MB " +
+      "| frente=" + (ineFrenteState.dataUrl.length/1024/1024*0.75).toFixed(2) + " MB" +
+      (ineFrenteState.usedFallback ? " (fallback)" : "") +
+      " | reverso=" + (ineReversoState.dataUrl.length/1024/1024*0.75).toFixed(2) + " MB" +
+      (ineReversoState.usedFallback ? " (fallback)" : ""));
+
+    // Compresión adaptativa: si excede 4 MB intentamos recomprimir en cascada.
+    // No tocamos fotos que vinieron por fallback (canvas falló — recomprimir
+    // tampoco va a funcionar). Hay 3 etapas cada vez más agresivas.
+    if (curMB > 4) {
+      const states = [ineFrenteState, ineReversoState];
+      const compresibles = states.filter(s => s.file && !s.usedFallback);
+      if (!compresibles.length) {
+        _logErr("payload " + curMB.toFixed(2) + " MB pero ninguna foto es recomprimible (todas vienen de fallback)");
+        throw new Error(MSG_FOTOS_NO_BAJAN);
+      }
+      btn.textContent = "Optimizando fotos…";
+      for (let i = 0; i < COMPRESS_STEPS.length; i++) {
+        const step = COMPRESS_STEPS[i];
+        _log("recompresión paso " + (i+1) + "/" + COMPRESS_STEPS.length +
+          " (maxDim=" + step.maxDim + ", q=" + step.quality + ")");
+        for (const s of compresibles) {
+          try {
+            const nuevo = await _toJpegDataUrl(s.file, step.maxDim, step.quality);
+            s.dataUrl = nuevo;
+            if (s.refreshBadge) s.refreshBadge();
+          } catch (e) {
+            _logErr("recompresión falló en paso " + (i+1) + ":", e.message);
+            // No abortamos — seguimos con la dataUrl actual y el siguiente paso.
+          }
+        }
+        payload = buildPayload();
+        curMB = sizeMB(payload);
+        _log("payload tras paso " + (i+1) + ": " + curMB.toFixed(2) + " MB");
+        if (curMB <= 5) break;  // suficiente margen, salir de la cascada
+      }
+      btn.textContent = "Enviando…";
     }
 
+    if (curMB > 5.5) {
+      _logErr("payload final " + curMB.toFixed(2) + " MB tras agotar cascada — no podemos enviar");
+      throw new Error(MSG_FOTOS_NO_BAJAN);
+    }
+
+    _log("payload final: " + curMB.toFixed(2) + " MB ✓");
     _log("POST /.netlify/functions/contrato-firmar…");
     const resp = await fetch(API_FIRMAR, {
       method: "POST",

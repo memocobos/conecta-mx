@@ -118,29 +118,6 @@ exports.handler = async (event) => {
     return badRequest(event, 502, 'Error de red consultando usuarios');
   }
 
-  // ── DEBUG temporal — quitar tras diagnosticar el 401 en local ──
-  // Solo loguea metadatos NO expone el password ni el hash.
-  const _phash = (user && user.password_hash) || '';
-  console.log('[auth-login DEBUG]', JSON.stringify({
-    isEmail,
-    filterField,
-    credentials_len: credentials.length,
-    credentials_first2: credentials.slice(0, 2),
-    user_found: !!user,
-    user_correo: user ? user.correo : null,
-    user_rol: user ? user.rol : null,
-    user_activo: user ? true : false, // ya filtramos por activo=true
-    pass_received_len: password.length,
-    pass_received_first1: password.slice(0, 1),
-    pass_received_last1: password.slice(-1),
-    pass_received_has_trailing_space: password !== password.trimEnd(),
-    db_hash_len: _phash.length,
-    db_hash_first1: _phash.slice(0, 1),
-    db_hash_last1: _phash.slice(-1),
-    db_hash_has_trailing_space: _phash !== _phash.trimEnd(),
-    lengths_match: password.length === _phash.length,
-  }));
-
   // ── Compare password ──
   // ⚠️ TEXTO PLANO temporal — migrar a bcrypt en próxima PR.
   // Comparación timing-safe para no leak por timing si pasa a bcrypt.

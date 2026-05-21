@@ -3,6 +3,9 @@
 // Ejemplo: { nombreEvento: 'imgs/nombreEvento.webp' }
 
 window.STATIC_IMGS={
+  // caifanes: foto de ProtoplasmaKid (Wikimedia Commons), CC BY-SA 4.0
+  // https://commons.wikimedia.org/wiki/File:Concierto_de_Caifanes_en_la_Alcaldía_Venustiano_Carranza_02.jpg
+  'caifanes':'imgs/caifanes.webp',
   'palnorte':'imgs/palnorte.webp',
   'avengedsevenfold':'imgs/avengedsevenfold.webp',
   'kanyewest':'imgs/kanyewest.webp',

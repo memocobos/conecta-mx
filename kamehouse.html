@@ -8282,7 +8282,7 @@ async function loadRooming() {
   if (!list) return;
   list.innerHTML = '<div class="loading-state"><div class="spinner"></div>Cargando…</div>';
   try {
-    _ccHabitaciones = await db.get('rooming_habitaciones', `?evento_id=eq.${_ccEventoActual}&order=orden.asc,created_at.asc`).catch(()=>
+    _ccHabitaciones = await db.get('rooming_habitaciones', `?evento_id=eq.${_ccEventoActual}&order=orden.asc`).catch(()=>
       db.get('rooming_habitaciones', `?evento_id=eq.${_ccEventoActual}`)
     );
     _ccHotelInfo = _ccHabitaciones[0] ? {
@@ -8624,11 +8624,16 @@ let _spLoading = false;
 // alimenta el dropdown de filtro de evento. Clave: evento_id, valor: evento_nombre.
 let _spEventosVistos = new Map();
 
+// Headers para las 3 admin-* functions. Antes mandaba x-kh-user-id +
+// x-kh-correo (validados con anon key contra usuarios). Tras Security Phase 2
+// usa Authorization: Bearer <JWT> como las otras admin functions.
+// Se conserva esta función porque hay 3 call sites con fetch + headers
+// explícitos. (khAdminFetch sería más limpio pero requeriría refactor de
+// los 3 sites.)
 function _spAdminHeaders() {
   return {
     'Content-Type': 'application/json',
-    'x-kh-user-id': (currentUser && currentUser.id) || '',
-    'x-kh-correo': ((currentUser && currentUser.correo) || '').toLowerCase(),
+    'Authorization': 'Bearer ' + (khGetJwt() || ''),
   };
 }
 

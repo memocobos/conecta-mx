@@ -44,5 +44,6 @@ window.MAPAS={
   'beele':'mapas/beele.webp',
   'anuelaa':'mapas/anuelaa.webp',
   'fanfest':'mapas/fanfest.webp',
-  'monlaferte':'mapas/monlaferte.webp'
+  'monlaferte':'mapas/monlaferte.webp',
+  'trueno':'mapas/trueno.jpg'
 };

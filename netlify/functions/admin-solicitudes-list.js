@@ -7,38 +7,42 @@
 //
 // Fase 2.2b — usado por la pestaña "Solicitudes Portal" de Kamehouse.
 //
-// Seguridad:
-//   - El frontend de kamehouse manda x-kh-user-id + x-kh-correo en headers.
-//   - Validamos contra la tabla usuarios del Supabase VIEJO con anon key,
-//     exigiendo activo=true y rol ∈ {maestro_roshi, bulma}.
+// Seguridad (Security Phase 2 — migrado a JWT):
+//   - El frontend de kamehouse manda Authorization: Bearer <JWT> firmado por
+//     auth-login.js (HS256). verifyAdminAuth() en _lib/verify-admin.js valida
+//     firma + expiración + rol permitido.
 //   - Si pasa, se consulta el Supabase NUEVO con service_role (bypass RLS).
 //   - service_role nunca sale al cliente.
 //
 // Variables de entorno requeridas:
 //   - PORTAL_SUPABASE_URL          (proyecto NUEVO conecta-portal)
 //   - PORTAL_SUPABASE_SERVICE_KEY  (proyecto NUEVO conecta-portal)
-//   - KH_SUPABASE_URL              (proyecto VIEJO de kamehouse — para validar admin)
-//   - KH_SUPABASE_ANON_KEY         (proyecto VIEJO de kamehouse — anon basta)
+//   - JWT_SECRET                   (compartido con auth-login.js)
 // =============================================================================
 
+const { verifyAdminAuth, corsCheck } = require('./_lib/verify-admin');
+
 exports.handler = async (event) => {
+  const __origin = corsCheck(event);
   const headers = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'Content-Type, x-kh-user-id, x-kh-correo',
+    'Access-Control-Allow-Origin': __origin || 'null',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Vary': 'Origin',
     'Content-Type': 'application/json',
   };
 
-  if (event.httpMethod === 'OPTIONS') return { statusCode: 200, headers, body: '' };
+  if (event.httpMethod === 'OPTIONS') return { statusCode: 204, headers, body: '' };
   if (event.httpMethod !== 'POST') {
     return { statusCode: 405, headers, body: JSON.stringify({ error: 'Method not allowed' }) };
   }
+  if (!__origin) return { statusCode: 403, headers, body: JSON.stringify({ error: 'Origen no permitido' }) };
+
+  const auth = verifyAdminAuth(event, ['maestro_roshi','bulma']);
+  if (!auth.valid) return { statusCode: auth.status, headers, body: JSON.stringify({ error: auth.error }) };
 
   const env = readEnv();
   if (env.error) return { statusCode: 500, headers, body: JSON.stringify({ error: env.error }) };
-
-  const admin = await verificarAdminKh(event.headers, env);
-  if (admin.error) return { statusCode: admin.status, headers, body: JSON.stringify({ error: admin.error }) };
 
   let body = {};
   try { body = JSON.parse(event.body || '{}'); }
@@ -111,40 +115,8 @@ exports.handler = async (event) => {
 function readEnv() {
   const PORTAL_SB_URL     = process.env.PORTAL_SUPABASE_URL;
   const PORTAL_SB_SERVICE = process.env.PORTAL_SUPABASE_SERVICE_KEY;
-  const KH_SB_URL         = process.env.KH_SUPABASE_URL;
-  const KH_SB_ANON        = process.env.KH_SUPABASE_ANON_KEY;
-  if (!PORTAL_SB_URL || !PORTAL_SB_SERVICE || !KH_SB_URL || !KH_SB_ANON) {
-    return { error: 'Faltan env vars (PORTAL_SUPABASE_URL/SERVICE_KEY, KH_SUPABASE_URL/ANON_KEY)' };
+  if (!PORTAL_SB_URL || !PORTAL_SB_SERVICE) {
+    return { error: 'Faltan env vars (PORTAL_SUPABASE_URL/SERVICE_KEY)' };
   }
-  return { PORTAL_SB_URL, PORTAL_SB_SERVICE, KH_SB_URL, KH_SB_ANON };
-}
-
-async function verificarAdminKh(reqHeaders, env) {
-  const h = lower(reqHeaders);
-  const userId = h['x-kh-user-id'];
-  const correo = (h['x-kh-correo'] || '').toLowerCase();
-  if (!userId || !/^[0-9a-f-]{36}$/i.test(userId) || !correo) {
-    return { error: 'Faltan headers x-kh-user-id / x-kh-correo', status: 401 };
-  }
-  const url = `${env.KH_SB_URL}/rest/v1/usuarios?id=eq.${userId}&correo=eq.${encodeURIComponent(correo)}&activo=eq.true&select=id,correo,rol&limit=1`;
-  let arr;
-  try {
-    const r = await fetch(url, { headers: { apikey: env.KH_SB_ANON, Authorization: `Bearer ${env.KH_SB_ANON}` } });
-    if (!r.ok) return { error: 'No se pudo validar admin contra Kamehouse', status: 502 };
-    arr = await r.json();
-  } catch (e) {
-    return { error: 'Error de red validando admin', status: 502 };
-  }
-  const u = Array.isArray(arr) ? arr[0] : null;
-  if (!u) return { error: 'Usuario no encontrado o inactivo', status: 401 };
-  if (!['maestro_roshi','bulma'].includes(u.rol)) {
-    return { error: 'Rol sin permiso para Solicitudes Portal', status: 403 };
-  }
-  return { admin: u };
-}
-
-function lower(obj) {
-  const out = {};
-  for (const k in obj || {}) out[k.toLowerCase()] = obj[k];
-  return out;
+  return { PORTAL_SB_URL, PORTAL_SB_SERVICE };
 }

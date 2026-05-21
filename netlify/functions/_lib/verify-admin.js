@@ -18,9 +18,17 @@ const crypto = require('crypto');
 
 const JWT_SECRET = process.env.JWT_SECRET;
 
+// Producción. En dev local, NETLIFY_DEV=true se setea automáticamente por
+// `netlify dev` y agregamos los orígenes localhost en corsCheck().
 const ALLOWED_ORIGINS = [
   'https://conectareynosa.mx',
   'https://www.conectareynosa.mx',
+];
+
+const ALLOWED_ORIGINS_DEV = [
+  'http://localhost:8888',
+  'http://localhost:3999',
+  'http://127.0.0.1:8888',
 ];
 
 // ───────────────────────────────────────────────────────────────────────
@@ -73,9 +81,11 @@ function jwtVerify(token, secret) {
 // ───────────────────────────────────────────────────────────────────────
 
 // Origen permitido. Devuelve el origin para usar en CORS, o null si bloquea.
+// En dev (NETLIFY_DEV=true seteado por `netlify dev`) acepta localhost.
 function corsCheck(event) {
   const origin = (event.headers && (event.headers.origin || event.headers.Origin)) || '';
   if (ALLOWED_ORIGINS.includes(origin)) return origin;
+  if (process.env.NETLIFY_DEV === 'true' && ALLOWED_ORIGINS_DEV.includes(origin)) return origin;
   return null;
 }
 

@@ -53,5 +53,6 @@ window.STATIC_IMGS={
   'louist':'imgs/louist.webp',
   'flowfest':'imgs/flowfest.webp',
   'bahidora2027':'imgs/bahidora2027.webp',
-  'scorpions':'imgs/scorpions.webp'
+  'scorpions':'imgs/scorpions.webp',
+  'trueno':'imgs/trueno.webp'
 };

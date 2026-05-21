@@ -1,5 +1,27 @@
+const { verifyAdminAuth, corsCheck } = require('./_lib/verify-admin');
+
 exports.handler = async (event) => {
+  // ─── Origin + Admin auth (Stop the Bleed) ───
+  // CRÍTICO: este endpoint escribe directamente al repo de GitHub con
+  // GITHUB_TOKEN. Sin gate, cualquiera con curl podía modificar precios
+  // o status de eventos. Solo maestro_roshi por restricción máxima.
+  const __origin = corsCheck(event);
+  if (event.httpMethod === 'OPTIONS') {
+    return {
+      statusCode: 204,
+      headers: {
+        'Access-Control-Allow-Origin': __origin || 'null',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+        'Access-Control-Allow-Methods': 'POST, OPTIONS',
+        'Vary': 'Origin',
+      },
+      body: '',
+    };
+  }
   if (event.httpMethod !== 'POST') return { statusCode: 405, body: 'Method not allowed' };
+  if (!__origin) return { statusCode: 403, body: JSON.stringify({ ok: false, error: 'Origen no permitido' }) };
+  const __auth = verifyAdminAuth(event, ['maestro_roshi']);
+  if (!__auth.valid) return { statusCode: __auth.status, body: JSON.stringify({ ok: false, error: __auth.error }) };
 
   const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
   const REPO = 'memocobos/conecta-mx';

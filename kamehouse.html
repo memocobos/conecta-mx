@@ -4075,12 +4075,36 @@ function showToast(msg, tipo) {
   t._timer = setTimeout(function(){ t.style.opacity = '0'; }, 3500);
 }
 
+// JWT del backend tras login exitoso. Se manda como Authorization Bearer en
+// requests a admin functions (contrato-*, send-invite, github-publish, etc.).
+// Se preserva en localStorage para sobrevivir reloads.
+const KH_JWT_KEY = 'kh_jwt_v1';
+function khGetJwt() { try { return localStorage.getItem(KH_JWT_KEY) || ''; } catch (e) { return ''; } }
+function khSetJwt(t) { try { if (t) localStorage.setItem(KH_JWT_KEY, t); else localStorage.removeItem(KH_JWT_KEY); } catch (e) {} }
+
+// Wrapper de fetch que agrega Authorization Bearer automáticamente.
+// Usar para endpoints admin (contrato-*, send-invite, github-publish, etc.)
+// que ahora requieren JWT. Si el JWT expiró/es inválido, el endpoint devolverá
+// 401 y el caller debe manejar el re-login.
+async function khAdminFetch(url, options) {
+  options = options || {};
+  const jwt = khGetJwt();
+  const baseHeaders = { 'Content-Type': 'application/json' };
+  options.headers = Object.assign(
+    {},
+    baseHeaders,
+    options.headers || {},
+    jwt ? { 'Authorization': 'Bearer ' + jwt } : {}
+  );
+  return fetch(url, options);
+}
+
 async function doLogin() {
-  const correo = document.getElementById('login-user').value.trim().toLowerCase();
-  const pass   = document.getElementById('login-pass').value.trim();
-  const errEl  = document.getElementById('login-error');
-  const btn    = document.getElementById('login-btn');
-  if (!correo || !pass) {
+  const credentials = document.getElementById('login-user').value.trim().toLowerCase();
+  const pass        = document.getElementById('login-pass').value.trim();
+  const errEl       = document.getElementById('login-error');
+  const btn         = document.getElementById('login-btn');
+  if (!credentials || !pass) {
     errEl.textContent = 'Ingresa correo y contraseña';
     errEl.style.display = 'block';
     setTimeout(() => errEl.style.display = 'none', 3000);
@@ -4088,28 +4112,27 @@ async function doLogin() {
   }
   btn.textContent = 'Entrando…'; btn.disabled = true;
   try {
-    // Buscar por username primero, luego por correo
-    const campo = correo.includes('@') ? `correo=eq.${encodeURIComponent(correo)}` : `username=eq.${encodeURIComponent(correo)}`;
-    const resp = await fetch(
-      `${SB_URL}/rest/v1/usuarios?${campo}&activo=eq.true&select=id,correo,nombre,rol,strikes,username,permisos_extra&limit=1`,
-      { headers: { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY } }
-    );
-    const usuarios = await resp.json();
-    if (!usuarios || usuarios.length === 0) throw new Error('Usuario no encontrado');
-    const u = usuarios[0];
-    const respPass = await fetch(
-      `${SB_URL}/rest/v1/usuarios?id=eq.${u.id}&password_hash=eq.${encodeURIComponent(pass)}&select=id&limit=1`,
-      { headers: { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY } }
-    );
-    const check = await respPass.json();
-    if (!check || check.length === 0) throw new Error('Contraseña incorrecta');
-    currentUser = u;
-    sessionStorage.setItem(SESSION_KEY, JSON.stringify({ user: u, expires: Date.now() + SESSION_HOURS * 3600000 }));
-    fetch(`${SB_URL}/rest/v1/usuarios?id=eq.${u.id}`, {
-      method: 'PATCH',
-      headers: { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ultimo_acceso: new Date().toISOString() })
-    }).catch(() => {});
+    // Login pasa por Netlify Function que usa service_role — el cliente
+    // ya NO consulta usuarios directamente con anon key. Service Stop the Bleed.
+    const resp = await fetch('/.netlify/functions/auth-login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ credentials, password: pass }),
+    });
+    let data;
+    try { data = await resp.json(); } catch (e) { data = {}; }
+    if (resp.status === 429) {
+      throw new Error(data.error || 'Demasiados intentos. Intenta más tarde.');
+    }
+    if (!resp.ok || !data.ok) {
+      throw new Error(data.error || 'Credenciales inválidas');
+    }
+    currentUser = data.user;
+    khSetJwt(data.token);
+    sessionStorage.setItem(SESSION_KEY, JSON.stringify({
+      user: data.user,
+      expires: Date.now() + (data.ttl ? data.ttl * 1000 : SESSION_HOURS * 3600000),
+    }));
     enterApp();
   } catch(e) {
     errEl.textContent = e.message || 'Error al iniciar sesión';
@@ -4123,6 +4146,7 @@ async function doLogin() {
 function doLogout() {
   currentUser = null;
   sessionStorage.removeItem(SESSION_KEY);
+  khSetJwt(null);
   document.getElementById('app').classList.remove('visible');
   document.getElementById('login-screen').style.display = 'flex';
   document.getElementById('login-pass').value = '';
@@ -4133,7 +4157,17 @@ function checkSession() {
   if (!raw) return false;
   try {
     const s = JSON.parse(raw);
-    if (Date.now() > s.expires) { sessionStorage.removeItem(SESSION_KEY); return false; }
+    if (Date.now() > s.expires) {
+      sessionStorage.removeItem(SESSION_KEY);
+      khSetJwt(null);
+      return false;
+    }
+    // Si la sesión vive pero perdimos el JWT (ej. localStorage clearado),
+    // forzamos re-login. Sin JWT no podemos invocar admin functions.
+    if (!khGetJwt()) {
+      sessionStorage.removeItem(SESSION_KEY);
+      return false;
+    }
     currentUser = s.user;
     return true;
   } catch { return false; }
@@ -7807,7 +7841,7 @@ async function guardarAsignacionCoordi() {
     const linkAceptar = `${baseUrl}?accion=aceptar&asig=${asigId}`;
     const linkDeclinar = `${baseUrl}?accion=declinar&asig=${asigId}`;
     if (usuario?.correo_notif || usuario?.correo) {
-      await fetch('/.netlify/functions/send-invite', {
+      await khAdminFetch('/.netlify/functions/send-invite', {
         method:'POST', headers:{'Content-Type':'application/json'},
         body: JSON.stringify({
           to: usuario.correo_notif || usuario.correo,
@@ -7853,7 +7887,7 @@ async function reenviarNotificacion(asigId) {
     const linkAceptar = `${baseUrl}?accion=aceptar&asig=${asigId}`;
     const linkDeclinar = `${baseUrl}?accion=declinar&asig=${asigId}`;
     if (usuario?.correo_notif || usuario?.correo) {
-      await fetch('/.netlify/functions/send-invite', {
+      await khAdminFetch('/.netlify/functions/send-invite', {
         method:'POST', headers:{'Content-Type':'application/json'},
         body: JSON.stringify({
           to: usuario.correo_notif || usuario.correo,
@@ -7983,7 +8017,7 @@ async function notificarEquipoListas() {
   for (const u of usuarios) {
     const email = u.correo_notif || u.correo;
     if (!email) continue;
-    await fetch('/.netlify/functions/send-invite', {
+    await khAdminFetch('/.netlify/functions/send-invite', {
       method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({
         to: email,
@@ -9825,7 +9859,7 @@ async function guardarConfigMensaje() {
 // ── SISTEMA DE ALERTAS Y CORREOS ─────────────────────────────
 async function enviarEmailSistema(to, subject, bodyHtml) {
   try {
-    await fetch('/.netlify/functions/send-invite', {
+    await khAdminFetch('/.netlify/functions/send-invite', {
       method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({
         to, subject,
@@ -11028,9 +11062,8 @@ async function enviarContrato() {
       endpoint = '/.netlify/functions/contrato-crear';
       body = d;
     }
-    const r = await fetch(endpoint, {
+    const r = await khAdminFetch(endpoint, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     });
     const j = await r.json();
@@ -11151,7 +11184,7 @@ async function reenviarContratoEmail(token, btn) {
   btn.disabled = true;
   btn.textContent = '…';
   try {
-    const r = await fetch('/.netlify/functions/contrato-reenviar', {
+    const r = await khAdminFetch('/.netlify/functions/contrato-reenviar', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ token }),
@@ -11195,7 +11228,7 @@ async function eliminarContrato(token, nombre, btn) {
   btn.disabled = true;
   btn.textContent = '…';
   try {
-    const r = await fetch('/.netlify/functions/contrato-eliminar', {
+    const r = await khAdminFetch('/.netlify/functions/contrato-eliminar', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ token }),

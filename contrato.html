@@ -231,8 +231,9 @@
 </div>
 
 <script>
-const API_OBTENER = "/.netlify/functions/contrato-obtener";
-const API_FIRMAR  = "/.netlify/functions/contrato-firmar";
+const API_OBTENER  = "/.netlify/functions/contrato-obtener";
+const API_FIRMAR   = "/.netlify/functions/contrato-firmar";
+const API_DEBUG_LOG = "/.netlify/functions/contrato-debug-log";
 const FIRMA_GUILLERMO_SRC = "/imgs/firma-guillermo.png";
 const LOGO_SRC = "/imgs/logo-conecta-mx.png";
 
@@ -592,51 +593,111 @@ function setupFirmaCanvas() {
 const _log = (...args) => { try { console.log("[contrato]", ...args); } catch (_) {} };
 const _logErr = (...args) => { try { console.warn("[contrato:ERROR]", ...args); } catch (_) {} };
 
-// Intenta convertir un File a data URL JPEG vía canvas. Si falla (HEIC con
-// bugs en iOS Safari, canvas vacío, dimensiones inválidas), tira para que
-// el caller use el fallback de FileReader.
-async function _toJpegDataUrl(file, maxDim = 1800, quality = 0.78) {
-  _log("convertir a JPEG vía canvas: type=" + file.type + " size=" + file.size + " bytes (" + (file.size/1024/1024).toFixed(2) + " MB) | params maxDim=" + maxDim + " q=" + quality);
+// Dibuja una fuente decodificada (ImageBitmap o HTMLImageElement) en canvas y
+// devuelve un data URL JPEG. Tira si las dimensiones son 0 o el canvas no copió.
+function _drawToJpeg(source, maxDim, quality) {
+  let w = source.width || source.naturalWidth;
+  let h = source.height || source.naturalHeight;
+  if (!w || !h) throw new Error("dimensiones 0");
+  const longest = Math.max(w, h);
+  if (longest > maxDim) {
+    const r = maxDim / longest;
+    w = Math.round(w * r);
+    h = Math.round(h * r);
+  }
+  const cnv = document.createElement("canvas");
+  cnv.width = w;
+  cnv.height = h;
+  const ctx = cnv.getContext("2d");
+  if (!ctx) throw new Error("getContext null");
+  ctx.fillStyle = "#fff";
+  ctx.fillRect(0, 0, w, h);
+  ctx.drawImage(source, 0, 0, w, h);
+  const dataUrl = cnv.toDataURL("image/jpeg", quality);
+  if (!dataUrl || dataUrl.length < 1000) {
+    throw new Error("canvas produjo dataURL vacío (drawImage falló silenciosamente)");
+  }
+  return { dataUrl, w, h };
+}
+
+// Decodificador clásico: URL.createObjectURL + new Image. Funciona para JPEG/PNG
+// en todos los navegadores; NO funciona para HEIC en iOS Safari (Image.onerror).
+async function _decodeViaImage(file, maxDim, quality) {
   const objUrl = URL.createObjectURL(file);
   try {
     const img = await new Promise((resolve, reject) => {
       const i = new Image();
-      const t = setTimeout(() => reject(new Error("timeout cargando imagen (>15s)")), 15000);
+      const t = setTimeout(() => reject(new Error("timeout >15s")), 15000);
       i.onload = () => { clearTimeout(t); resolve(i); };
       i.onerror = () => { clearTimeout(t); reject(new Error("Image.onerror")); };
       i.src = objUrl;
     });
-    let w = img.naturalWidth || img.width;
-    let h = img.naturalHeight || img.height;
-    _log("imagen cargada, dimensiones nativas:", w, "x", h);
-    if (!w || !h) throw new Error("dimensiones 0");
-    const longest = Math.max(w, h);
-    if (longest > maxDim) {
-      const r = maxDim / longest;
-      w = Math.round(w * r);
-      h = Math.round(h * r);
-      _log("redimensionando a:", w, "x", h);
-    }
-    const cnv = document.createElement("canvas");
-    cnv.width = w;
-    cnv.height = h;
-    const ctx = cnv.getContext("2d");
-    if (!ctx) throw new Error("getContext null");
-    ctx.fillStyle = "#fff";
-    ctx.fillRect(0, 0, w, h);
-    ctx.drawImage(img, 0, 0, w, h);
-    const dataUrl = cnv.toDataURL("image/jpeg", quality);
-    // Sanity: data URL muy corto suele significar canvas tainted o drawImage
-    // que no copió nada (común con HEIC en iOS Safari).
-    if (!dataUrl || dataUrl.length < 1000) {
-      throw new Error("canvas produjo dataURL vacío (HEIC quirk en Safari?)");
-    }
-    const finalKB = Math.round(dataUrl.length * 0.75 / 1024);
-    const ratio = file.size > 0 ? ((dataUrl.length * 0.75) / file.size).toFixed(2) : "?";
-    _log("✓ PATH=canvas | JPEG ok | dataUrl.length=" + dataUrl.length + " | bytes≈" + finalKB + " KB | ratio vs original=" + ratio);
-    return dataUrl;
+    return _drawToJpeg(img, maxDim, quality);
   } finally {
     URL.revokeObjectURL(objUrl);
+  }
+}
+
+// Cadena de decodificación con 3 intentos:
+//   1. createImageBitmap(file) — decodifica HEIC en iOS 15+ vía ImageIO de Apple.
+//   2. URL.createObjectURL + new Image() — fallback para navegadores sin ImageBitmap.
+//   3. _readAsDataUrl(file) crudo — SOLO si NO es HEIC y file.size < 2 MB.
+// Devuelve { dataUrl, method, attempts }. Tira con e.attempts y e.isHeic en error.
+async function _decodeToJpeg(file, maxDim = 1800, quality = 0.78) {
+  const attempts = [];
+  const isHeic = /^image\/(heic|heif)$/i.test(file.type || "");
+  _log("decode start: type=" + (file.type || "(empty)") + " size=" + file.size +
+    " (" + (file.size/1024/1024).toFixed(2) + " MB) | isHEIC=" + isHeic +
+    " | maxDim=" + maxDim + " q=" + quality);
+
+  // Intento 1: createImageBitmap.
+  if (typeof createImageBitmap === "function") {
+    let bmp = null;
+    try {
+      bmp = await createImageBitmap(file);
+      const { dataUrl, w, h } = _drawToJpeg(bmp, maxDim, quality);
+      attempts.push("createImageBitmap:ok");
+      _log("✓ PATH=createImageBitmap | " + w + "x" + h + " | dataUrl=" + dataUrl.length);
+      return { dataUrl, method: "createImageBitmap", attempts };
+    } catch (e) {
+      attempts.push("createImageBitmap:fail(" + (e.message || "?").slice(0,80) + ")");
+      _logErr("createImageBitmap fail:", e.message);
+    } finally {
+      if (bmp && bmp.close) try { bmp.close(); } catch (_) {}
+    }
+  } else {
+    attempts.push("createImageBitmap:unsupported");
+  }
+
+  // Intento 2: <img> + objectURL.
+  try {
+    const { dataUrl, w, h } = await _decodeViaImage(file, maxDim, quality);
+    attempts.push("image:ok");
+    _log("✓ PATH=image | " + w + "x" + h + " | dataUrl=" + dataUrl.length);
+    return { dataUrl, method: "image", attempts };
+  } catch (e) {
+    attempts.push("image:fail(" + (e.message || "?").slice(0,80) + ")");
+    _logErr("image decoder fail:", e.message);
+  }
+
+  // Intento 3: fallback crudo. Solo para no-HEIC pequeños — HEIC crudo no lo
+  // puede mostrar el navegador después, y archivos grandes saturan el payload.
+  if (isHeic) {
+    attempts.push("fallback-raw:skipped(heic)");
+    throw Object.assign(new Error("HEIC sin decoder disponible"), { attempts, isHeic: true });
+  }
+  if (file.size > 2 * 1024 * 1024) {
+    attempts.push("fallback-raw:skipped(too-big)");
+    throw Object.assign(new Error("decoder fail y file.size >2MB"), { attempts, isHeic: false });
+  }
+  try {
+    const dataUrl = await _readAsDataUrl(file);
+    attempts.push("fallback-raw:ok");
+    _log("✓ PATH=fallback-raw (sin compresión) | dataUrl=" + dataUrl.length);
+    return { dataUrl, method: "fallback-raw", attempts };
+  } catch (e) {
+    attempts.push("fallback-raw:fail(" + (e.message || "?").slice(0,80) + ")");
+    throw Object.assign(new Error("Todos los decoders fallaron"), { attempts, isHeic: false });
   }
 }
 
@@ -654,6 +715,29 @@ function _readAsDataUrl(file) {
   });
 }
 
+// Manda los errores de decodificación/cascada al backend para que podamos ver
+// MAÑANA cuántas creadoras tropiezan y de qué tipo. Best-effort, jamás bloquea.
+async function _postTelemetry(errorType, fileInfo, decoderPath) {
+  const token = getToken();
+  if (!token) return;
+  try {
+    await fetch(API_DEBUG_LOG, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        token,
+        error_type: errorType,
+        user_agent: navigator.userAgent || "",
+        file_info: fileInfo || {},
+        decoder_path: Array.isArray(decoderPath) ? decoderPath : [],
+      }),
+      keepalive: true,
+    });
+  } catch (e) {
+    _logErr("telemetría falló (no crítico):", e.message);
+  }
+}
+
 function _spinnerHtml(texto) {
   return `<div style="display:flex;flex-direction:column;align-items:center;gap:10px;padding:18px 8px;font-size:11px;color:rgba(255,255,255,.7);letter-spacing:.1em;text-transform:uppercase">
     <div style="width:24px;height:24px;border:2px solid rgba(232,255,76,.25);border-top-color:#e8ff4c;border-radius:50%;animation:ctr-spin 0.8s linear infinite"></div>
@@ -668,26 +752,28 @@ function _spinnerHtml(texto) {
 function _dataUrlBytes(d) { return d ? d.length : 0; }
 
 // HTML del badge de tamaño que va debajo del preview. Verde <2MB, amarillo
-// 2-3MB, rojo >3MB. La creadora ve el resultado real ANTES de enviar.
+// 2-3MB, rojo >3MB. La creadora ve el resultado real ANTES de enviar. Si la
+// foto cayó al fallback crudo, lo marcamos con "(sin comprimir)" — la cascada
+// del envío intentará re-decodificar de todos modos antes de POSTear.
 function _sizeBadgeHtml(side, dataUrl, usedFallback) {
   const bytes = _dataUrlBytes(dataUrl);
   const mb = bytes / 1024 / 1024;
-  let color, icon, hint = "";
+  let color, icon;
   if (mb < 2) { color = "#88ea4e"; icon = "✓"; }
-  else if (mb < 3) { color = "#e8ff4c"; icon = "⚠"; hint = " · pesada"; }
-  else { color = "#ff8888"; icon = "✗"; hint = " · se va a recomprimir"; }
-  const fallbackTag = usedFallback ? ' <span style="color:#ff8888">(sin compresión)</span>' : "";
+  else if (mb < 3) { color = "#e8ff4c"; icon = "⚠"; }
+  else { color = "#ff8888"; icon = "✗"; }
+  const fallbackTag = usedFallback ? ' <span style="color:rgba(255,255,255,.7)">(sin comprimir)</span>' : "";
   const sideLbl = side === "frente" ? "Frente" : "Reverso";
-  return `<div data-badge="1" style="position:absolute;bottom:6px;left:6px;right:6px;background:rgba(0,0,0,.78);color:${color};padding:6px 10px;font-size:11px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;text-align:center;pointer-events:none">${sideLbl}: ${mb.toFixed(2)} MB ${icon}${hint}${fallbackTag}</div>`;
+  return `<div data-badge="1" style="position:absolute;bottom:6px;left:6px;right:6px;background:rgba(0,0,0,.78);color:${color};padding:6px 10px;font-size:11px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;text-align:center;pointer-events:none">${sideLbl}: ${mb.toFixed(2)} MB ${icon}${fallbackTag}</div>`;
 }
 
 // HTML para mostrar el error cuando ni canvas ni FileReader pudieron procesar
-// la foto (raro: formato exótico, archivo corrupto, navegador muy viejo).
+// la foto. Preserva saltos de línea del mensaje (algunos son listas con \n).
 function _renderErrorState(label, side, inputId, msg) {
   label.classList.remove("has-file");
   label.innerHTML = `
     <span class="lbl-title">📸 ${side === "frente" ? "Frente" : "Reverso"} del INE</span>
-    <span class="lbl-hint" style="color:#ff8888;line-height:1.5;padding:0 4px">${msg}</span>
+    <span class="lbl-hint" style="color:#ff8888;line-height:1.5;padding:0 4px;white-space:pre-line;text-align:left">${escapeHtml(msg)}</span>
   ` + _fileInputHtml(inputId);
 }
 
@@ -695,10 +781,10 @@ function setupFileInput(side) {
   const inputId = side === "frente" ? "fileFrente" : "fileReverso";
   const labelId = side === "frente" ? "lblFrente" : "lblReverso";
   const label = document.getElementById(labelId);
-  // state guarda dataUrl (lo que se manda) + file (original) + usedFallback.
-  // Guardar el File original es clave para poder recomprimir desde cero en
-  // enviarFirma() si el payload total queda muy pesado.
-  const state = { dataUrl: null, file: null, usedFallback: false };
+  // state guarda dataUrl (lo que se manda) + file (original) + usedFallback +
+  // needsManualConversion (HEIC sin decoder). El File original se conserva
+  // para que la cascada de enviarFirma re-decodifique con params agresivos.
+  const state = { dataUrl: null, file: null, usedFallback: false, needsManualConversion: false, method: null };
 
   async function onPick(ev) {
     const inp = ev.target;
@@ -717,62 +803,44 @@ function setupFileInput(side) {
     label.innerHTML = _spinnerHtml("Procesando foto…") + _fileInputHtml(inputId);
     bindNewInput();
 
-    let finalDataUrl = null;
-    let usedFallback = false;
+    let finalDataUrl, method, attempts;
 
-    // Intento 1: convertir a JPEG via canvas (preferido — reduce peso).
     try {
-      finalDataUrl = await _toJpegDataUrl(f);
+      const r = await _decodeToJpeg(f);
+      finalDataUrl = r.dataUrl;
+      method = r.method;
+      attempts = r.attempts;
     } catch (e) {
-      _logErr(side + ": canvas fail —", e.message, "—> intentando fallback crudo");
-      // Intento 2: leer crudo como data URL (formato original).
-      try {
-        finalDataUrl = await _readAsDataUrl(f);
-        usedFallback = true;
-        // Tope de seguridad: si el fallback crudo es >5 MB ni siquiera vale la
-        // pena intentar enviarlo. La compresión adaptativa del enviarFirma sólo
-        // puede recomprimir si el canvas funciona — si llegamos al fallback es
-        // porque canvas falló, así que no podemos hacer mucho más.
-        const approxMB = (finalDataUrl.length * 0.75 / 1024 / 1024);
-        if (approxMB > 5) {
-          _logErr(side + ": fallback crudo demasiado pesado (" + approxMB.toFixed(2) + " MB)");
-          state.dataUrl = null;
-          state.file = null;
-          state.usedFallback = false;
-          // Mensaje accionable: el problema típico es HEIC de iPhone que Safari
-          // no procesa via canvas. Le decimos qué hacer.
-          _renderErrorState(label, side, inputId,
-            "Tu navegador no puede procesar este formato de foto. Si tienes iPhone, abre la foto en la app Fotos y compártela con \"Copiar foto\" antes de subirla aquí — eso la convierte a un formato compatible."
-          );
-          bindNewInput();
-          checkSubmit();
-          return;
-        }
-      } catch (e2) {
-        _logErr(side + ": fallback también falló —", e2.message);
-        state.dataUrl = null;
-        state.file = null;
-        state.usedFallback = false;
-        _renderErrorState(label, side, inputId,
-          "No pudimos abrir la foto. Si tienes iPhone, en Ajustes → Cámara → Formatos elige \"Más compatible\". Si tienes Android, abre la foto en Galería y compártela aquí."
-        );
-        bindNewInput();
-        checkSubmit();
-        return;
-      }
+      const isHeic = e.isHeic === true;
+      attempts = e.attempts || [];
+      _logErr(side + ": decoder chain agotado | isHEIC=" + isHeic + " | attempts=" + JSON.stringify(attempts));
+      state.dataUrl = null;
+      state.file = f;  // conservamos el File por si el usuario reintenta
+      state.usedFallback = false;
+      state.needsManualConversion = isHeic;
+      state.method = null;
+      _postTelemetry(isHeic ? "heic_decode_failed" : "decoder_chain_failed", {
+        side, file_type: f.type || "", file_size: f.size, file_name: f.name || "",
+      }, attempts);
+      _renderErrorState(label, side, inputId, isHeic ? MSG_FOTOS_HEIC : MSG_FOTOS_NO_BAJAN);
+      bindNewInput();
+      checkSubmit();
+      return;
     }
 
     state.dataUrl = finalDataUrl;
     state.file = f;
-    state.usedFallback = usedFallback;
+    state.usedFallback = (method === "fallback-raw");
+    state.needsManualConversion = false;
+    state.method = method;
     const finalMB = (finalDataUrl.length * 0.75 / 1024 / 1024);
-    _log(side + ": ✓ listo — path=" + (usedFallback ? "fallback-crudo" : "canvas-jpeg") + " | final≈" + finalMB.toFixed(2) + " MB");
+    _log(side + ": ✓ listo — method=" + method + " | final≈" + finalMB.toFixed(2) + " MB");
 
     // Preview + badge de tamaño con color (verde/amarillo/rojo) para que la
     // creadora sepa de entrada si la foto va a dar problemas.
     label.innerHTML = `
       <img class="preview-img" src="${finalDataUrl}" alt="${side}" onerror="this.style.display='none';this.insertAdjacentHTML('afterend','<div style=\\'padding:14px;font-size:11px;color:rgba(255,255,255,.6)\\'>✓ Foto cargada (sin preview disponible)</div>')">
-      ${_sizeBadgeHtml(side, finalDataUrl, usedFallback)}
+      ${_sizeBadgeHtml(side, finalDataUrl, state.usedFallback)}
     ` + _fileInputHtml(inputId);
     bindNewInput();
     checkSubmit();
@@ -823,9 +891,25 @@ const MSG_FOTOS_NO_BAJAN =
   "Si usas Android: baja la resolución de la cámara antes de tomar la foto del INE. " +
   "Después, toma de nuevo las fotos del frente y reverso.";
 
-// Cascada de re-compresión cuando el payload total queda muy pesado. Solo se
-// aplica a fotos que vinieron por el camino canvas (las del fallback crudo no
-// se pueden recomprimir porque canvas ya falló con ese archivo).
+// Mensaje específico para HEIC sin decoder disponible (iPhone con iOS <15 o
+// alguna combinación rara de Safari). Damos 2 caminos: convertir la foto
+// antes de subir, o cambiar el formato de cámara del iPhone.
+const MSG_FOTOS_HEIC =
+  "Tu foto está en formato HEIC (típico de iPhone). Hay 2 formas de arreglarlo:\n\n" +
+  "OPCIÓN A — Convertir antes de subir:\n" +
+  "1. Abre la foto en la app Fotos del iPhone\n" +
+  "2. Toca el ícono de compartir (cuadrado con flecha)\n" +
+  "3. Elige \"Copiar foto\" → cierra\n" +
+  "4. Regresa aquí y pega la foto\n\n" +
+  "OPCIÓN B — Cambiar formato del iPhone:\n" +
+  "1. Ajustes → Cámara → Formatos → \"Más compatible\"\n" +
+  "2. Toma de nuevo la foto del INE\n\n" +
+  "Lo sentimos por el inconveniente — estamos trabajando en arreglar esto pronto.";
+
+// Cascada de re-compresión cuando el payload total queda muy pesado. Re-corre
+// _decodeToJpeg con params más agresivos sobre el File original. Incluye fotos
+// que vinieron por fallback-raw — el decoder primario (createImageBitmap) puede
+// haber fallado por params, no por incapacidad fundamental.
 const COMPRESS_STEPS = [
   { maxDim: 1400, quality: 0.72 },
   { maxDim: 1200, quality: 0.65 },
@@ -849,6 +933,14 @@ async function enviarFirma(token, btn, errBox) {
     if (!ineFrenteState.dataUrl) throw new Error("Falta foto del frente del INE.");
     if (!ineReversoState.dataUrl) throw new Error("Falta foto del reverso del INE.");
 
+    // Gate: si alguna foto quedó marcada como HEIC sin decoder, no tiene sentido
+    // intentar la cascada porque _decodeToJpeg va a fallar otra vez. Mostramos
+    // el mensaje accionable y paramos.
+    const allStates = [ineFrenteState, ineReversoState];
+    if (allStates.some(s => s.needsManualConversion)) {
+      throw new Error(MSG_FOTOS_HEIC);
+    }
+
     const buildPayload = () => ({
       token,
       firma_data: firmaData,
@@ -861,18 +953,18 @@ async function enviarFirma(token, btn, errBox) {
     let curMB = sizeMB(payload);
     _log("payload inicial: " + curMB.toFixed(2) + " MB " +
       "| frente=" + (ineFrenteState.dataUrl.length/1024/1024*0.75).toFixed(2) + " MB" +
-      (ineFrenteState.usedFallback ? " (fallback)" : "") +
+      " method=" + (ineFrenteState.method || "?") +
       " | reverso=" + (ineReversoState.dataUrl.length/1024/1024*0.75).toFixed(2) + " MB" +
-      (ineReversoState.usedFallback ? " (fallback)" : ""));
+      " method=" + (ineReversoState.method || "?"));
 
     // Compresión adaptativa: si excede 4 MB intentamos recomprimir en cascada.
-    // No tocamos fotos que vinieron por fallback (canvas falló — recomprimir
-    // tampoco va a funcionar). Hay 3 etapas cada vez más agresivas.
+    // Re-corremos _decodeToJpeg con params más agresivos sobre TODAS las fotos
+    // (incluyendo fallback-raw — el decoder primario puede haber fallado por
+    // params, ahora con maxDim menor podría funcionar y bajar el peso).
     if (curMB > 4) {
-      const states = [ineFrenteState, ineReversoState];
-      const compresibles = states.filter(s => s.file && !s.usedFallback);
+      const compresibles = allStates.filter(s => s.file);
       if (!compresibles.length) {
-        _logErr("payload " + curMB.toFixed(2) + " MB pero ninguna foto es recomprimible (todas vienen de fallback)");
+        _logErr("payload " + curMB.toFixed(2) + " MB pero ninguna foto tiene File para recomprimir");
         throw new Error(MSG_FOTOS_NO_BAJAN);
       }
       btn.textContent = "Optimizando fotos…";
@@ -882,8 +974,10 @@ async function enviarFirma(token, btn, errBox) {
           " (maxDim=" + step.maxDim + ", q=" + step.quality + ")");
         for (const s of compresibles) {
           try {
-            const nuevo = await _toJpegDataUrl(s.file, step.maxDim, step.quality);
-            s.dataUrl = nuevo;
+            const r = await _decodeToJpeg(s.file, step.maxDim, step.quality);
+            s.dataUrl = r.dataUrl;
+            s.usedFallback = (r.method === "fallback-raw");
+            s.method = r.method;
             if (s.refreshBadge) s.refreshBadge();
           } catch (e) {
             _logErr("recompresión falló en paso " + (i+1) + ":", e.message);
@@ -900,6 +994,17 @@ async function enviarFirma(token, btn, errBox) {
 
     if (curMB > 5.5) {
       _logErr("payload final " + curMB.toFixed(2) + " MB tras agotar cascada — no podemos enviar");
+      _postTelemetry("cascade_exhausted", {
+        final_payload_mb: Number(curMB.toFixed(2)),
+        sides: allStates.map((s, idx) => ({
+          side: idx === 0 ? "frente" : "reverso",
+          file_type: (s.file && s.file.type) || "",
+          file_size: (s.file && s.file.size) || 0,
+          data_url_mb: Number(((s.dataUrl ? s.dataUrl.length : 0) * 0.75 / 1024 / 1024).toFixed(2)),
+          method: s.method || "?",
+          usedFallback: !!s.usedFallback,
+        })),
+      }, []);
       throw new Error(MSG_FOTOS_NO_BAJAN);
     }
 

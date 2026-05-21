@@ -1,8 +1,23 @@
+const { verifyAdminAuth, corsCheck } = require('./_lib/verify-admin');
+
 exports.handler = async (event) => {
-  const headers = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'Content-Type', 'Access-Control-Allow-Methods': 'POST', 'Content-Type': 'application/json' };
-  
-  if (event.httpMethod === 'OPTIONS') return { statusCode: 200, headers, body: '' };
+  // ─── Origin + Admin auth (Stop the Bleed) ───
+  // CRÍTICO: este endpoint envía emails desde noreply@conectareynosa.mx.
+  // Sin gate, cualquiera podía hacer phishing usando el dominio oficial.
+  const __origin = corsCheck(event);
+  const headers = {
+    'Access-Control-Allow-Origin': __origin || 'null',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Vary': 'Origin',
+    'Content-Type': 'application/json',
+  };
+
+  if (event.httpMethod === 'OPTIONS') return { statusCode: 204, headers, body: '' };
   if (event.httpMethod !== 'POST') return { statusCode: 405, headers, body: '{"error":"Method not allowed"}' };
+  if (!__origin) return { statusCode: 403, headers, body: '{"error":"Origen no permitido"}' };
+  const __auth = verifyAdminAuth(event, ['maestro_roshi','bulma']);
+  if (!__auth.valid) return { statusCode: __auth.status, headers, body: JSON.stringify({ error: __auth.error }) };
 
   const RESEND_KEY = process.env.RESEND_KEY || process.env.RESEND_API_KEY;
   if (!RESEND_KEY) return { statusCode: 500, headers, body: '{"error":"RESEND_KEY not configured in Netlify"}' };

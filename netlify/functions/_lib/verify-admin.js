@@ -31,6 +31,11 @@ const ALLOWED_ORIGINS_DEV = [
   'http://127.0.0.1:8888',
 ];
 
+// Subdominios `<branch-o-pr>--conectareynosa.netlify.app` que Netlify genera
+// para deploy previews y branch deploys. Regex anclado a inicio/fin para
+// rechazar sufijos maliciosos (p.ej. https://evil--conectareynosa.netlify.app.attacker.com).
+const NETLIFY_PREVIEW_RE = /^https:\/\/[a-z0-9-]+--conectareynosa\.netlify\.app$/;
+
 // ───────────────────────────────────────────────────────────────────────
 // JWT helpers (HS256 manual — sin dependencias externas)
 // ───────────────────────────────────────────────────────────────────────
@@ -82,9 +87,11 @@ function jwtVerify(token, secret) {
 
 // Origen permitido. Devuelve el origin para usar en CORS, o null si bloquea.
 // En dev (NETLIFY_DEV=true seteado por `netlify dev`) acepta localhost.
+// También acepta deploy previews y branch deploys del site Netlify (regex).
 function corsCheck(event) {
   const origin = (event.headers && (event.headers.origin || event.headers.Origin)) || '';
   if (ALLOWED_ORIGINS.includes(origin)) return origin;
+  if (NETLIFY_PREVIEW_RE.test(origin)) return origin;
   if (process.env.NETLIFY_DEV === 'true' && ALLOWED_ORIGINS_DEV.includes(origin)) return origin;
   return null;
 }

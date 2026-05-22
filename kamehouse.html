@@ -9817,9 +9817,13 @@ async function marcarTodasLeidas() {
 }
 
 // ── CONFIG ───────────────────────────────────────────────────
+// sistema_config tiene RLS deny-all desde anon. Todo pasa por Netlify Functions
+// con JWT propio: GET filtra columnas por rol, SAVE exige maestro_roshi.
 async function loadMTConfig() {
   try {
-    const [cfg] = await db.get('sistema_config', '?id=eq.1').catch(()=>[{}]);
+    const r = await khAdminFetch('/.netlify/functions/sistema-config-get', { method:'POST' });
+    if (!r.ok) return;
+    const { config: cfg } = await r.json();
     _mtConfig = cfg || {};
     document.getElementById('cfg-clabe')?.setAttribute('value', cfg?.cuenta_clabe||'');
     document.getElementById('cfg-banco')?.setAttribute('value', cfg?.cuenta_banco||'');
@@ -9840,8 +9844,15 @@ async function guardarConfigCuenta() {
   };
   const alertEl = document.getElementById('cfg-cuenta-alert');
   try {
-    if (_mtConfig?.id) await db.patch('sistema_config', _mtConfig.id, body);
-    else await db.post('sistema_config', { id: 1, ...body });
+    const r = await khAdminFetch('/.netlify/functions/sistema-config-save', {
+      method:'POST', body: JSON.stringify(body),
+    });
+    if (!r.ok) {
+      const detail = await r.json().catch(()=>({ error: r.statusText }));
+      throw new Error(detail.error || 'Error guardando');
+    }
+    const { config } = await r.json();
+    if (config) _mtConfig = config;
     alertEl.innerHTML='<div class="alert alert-success">✅ Cuenta guardada</div>';
     setTimeout(()=>alertEl.innerHTML='', 2000);
   } catch(e) { alertEl.innerHTML=`<div class="alert alert-error">${e.message}</div>`; }
@@ -9854,8 +9865,15 @@ async function guardarConfigMensaje() {
   };
   const alertEl = document.getElementById('cfg-mensaje-alert');
   try {
-    if (_mtConfig?.id) await db.patch('sistema_config', _mtConfig.id, body);
-    else await db.post('sistema_config', { id: 1, ...body });
+    const r = await khAdminFetch('/.netlify/functions/sistema-config-save', {
+      method:'POST', body: JSON.stringify(body),
+    });
+    if (!r.ok) {
+      const detail = await r.json().catch(()=>({ error: r.statusText }));
+      throw new Error(detail.error || 'Error guardando');
+    }
+    const { config } = await r.json();
+    if (config) _mtConfig = config;
     alertEl.innerHTML='<div class="alert alert-success">✅ Mensaje guardado</div>';
     setTimeout(()=>alertEl.innerHTML='', 2000);
   } catch(e) { alertEl.innerHTML=`<div class="alert alert-error">${e.message}</div>`; }
@@ -9927,10 +9945,14 @@ async function enviarAlertaMemo(tipo, datos = {}) {
   } catch(e) { console.warn('Alerta error:', e.message); }
 }
 
-// Mostrar mensaje del día al entrar
+// Mostrar mensaje del día al entrar — corre post-login para todos los roles.
+// Usa la Function sistema-config-get que para roles non-maestro devuelve solo
+// mensaje_dia y mensaje_activo (los campos cuenta_* nunca llegan al cliente).
 async function checkMensajeDia() {
   try {
-    const [cfg] = await db.get('sistema_config', '?id=eq.1').catch(()=>[]);
+    const r = await khAdminFetch('/.netlify/functions/sistema-config-get', { method:'POST' });
+    if (!r.ok) return;
+    const { config: cfg } = await r.json();
     if (cfg?.mensaje_activo && cfg?.mensaje_dia) {
       let banner = document.getElementById('msg-dia-banner');
       if (!banner) {

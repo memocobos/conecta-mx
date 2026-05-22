@@ -1909,6 +1909,7 @@ function pkgAvailable(p, ev){
     var zs=f.cheapZonas||[]; if(Array.isArray(zs)) return zs.some(function(z){return z.p>0;});
     return zs && Object.values(zs||{}).some(function(z){return z && z.p>0;});
   }) || !!ev.sepCheap;
+  if(ev.rideOnly && ev.cheapAlsoOk) return p==='ride' || p==='cheap';
   if(ev.rideOnly) return p==='ride';
   if(ev.cheapOnly) return p==='cheap';
   switch(p){

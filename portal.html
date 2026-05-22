@@ -1393,6 +1393,7 @@ function pkgAvailable(pkg, ev){
   const hasCheap = (ev.cheapZonas || []).some(z => z.p > 0) ||
                    (ev.multifecha || []).some(f => (f.cheapZonas || []).some(z => z && z.p > 0)) ||
                    !!ev.sepCheap;
+  if (ev.rideOnly && ev.cheapAlsoOk) return pkg === 'RIDE' || pkg === 'CHEAP';
   if (ev.rideOnly)  return pkg === 'RIDE';
   if (ev.cheapOnly) return pkg === 'CHEAP';
   switch (pkg){

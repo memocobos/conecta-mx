@@ -10887,11 +10887,10 @@ async function _poblarSelectEventos() {
   const ev = await _fetchEVFromIndex();
   if (!ev.length) return;
   const today = new Date().toISOString().slice(0, 10);
-  // Filtrar: sin agotados, sin "en proceso", solo fechas futuras o sin fecha.
+  // Filtrar: solo fechas futuras o sin fecha. Incluye agotados y por-confirmar:
+  // las creadoras son staff y deben poder asociarse a cualquier tour vigente.
   const filtered = ev.filter(e =>
     e && e.id && e.a &&
-    e.st !== 'agotado' &&
-    e.st !== 'proceso' &&
     (!e.ds || e.ds >= today)
   );
   // Orden cronológico ascendente.

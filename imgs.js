@@ -51,6 +51,7 @@ window.STATIC_IMGS={
   'coronacapital':'imgs/coronacapital.webp',
   'tecatecomuna':'imgs/tecatecomuna.webp',
   'louist':'imgs/louist.webp',
+  'straykids':'imgs/straykids.webp',
   'flowfest':'imgs/flowfest.webp',
   'bahidora2027':'imgs/bahidora2027.webp',
   'scorpions':'imgs/scorpions.webp',

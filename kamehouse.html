@@ -7718,24 +7718,89 @@ async function loadCCEquipo() {
   const countEl   = document.getElementById('cc-equipo-count');
   container.innerHTML = '<div class="loading-state"><div class="spinner"></div></div>';
   try {
+    const ev = _ccEventosCache.find(e => e.id === _ccEventoActual) || {};
     const asigs = await db.get('eventos_coordi', `?evento_id=eq.${_ccEventoActual}`);
     _ccAsignados = asigs;
-    if (countEl) countEl.textContent = `${asigs.length} asignado${asigs.length!==1?'s':''}`;
-    if (!asigs.length) {
+
+    let usuarios = [];
+    let uMap = {};
+    if (asigs.length) {
+      const uIds = asigs.map(a=>a.coordi_id).join(',');
+      usuarios = await db.get('usuarios', `?id=in.(${uIds})`);
+      uMap = Object.fromEntries(usuarios.map(u=>[u.id,u]));
+      // Guardar referencia de usuario en cada asignación (para rooming)
+      _ccAsignados = asigs.map(a => ({ ...a, _usuario: uMap[a.coordi_id]||{} }));
+      // Backfill: auto-agregar a viajeros_evento a quienes ya están aceptados
+      // pero no aparecen en la lista (idempotente, best-effort).
+      _backfillStaffViajeros().then(() => { if (document.getElementById('cc-viajeros-list')) loadViajeros(); });
+    }
+
+    // ── Contratos pendientes de firma ────────────────────────────
+    // Match: fecha exacta + nombre fuzzy (mismo criterio que
+    // _autoAsignarEvento en contrato-firmar.js:277-303). Solo se listan
+    // creadoras que ya tienen perfil rol='cc' en usuarios — las que no,
+    // se omiten silenciosamente (caso Tipo B, otra sesión).
+    let pendientesFirma = [];
+    try {
+      if (ev.fecha) {
+        const ctos = await db.get('contratos_creadores',
+          `?estado=eq.pendiente&evento_fecha=eq.${ev.fecha}&order=enviado_at.desc&select=id,token,creador_nombre,creador_email,evento_nombre,evento_fecha,enviado_at`);
+        const evNombre  = (ev.nombre||'').toLowerCase().trim();
+        const evArtista = (ev.artista||'').toLowerCase().trim();
+        const matched = ctos.filter(c => {
+          const target = (c.evento_nombre||'').toLowerCase().trim();
+          if (!target || !evNombre) return false;
+          return target.includes(evNombre) || evNombre.includes(target) || (evArtista && target.includes(evArtista));
+        });
+        if (matched.length) {
+          // Dedupe contra eventos_coordi por correo: si ya firmó y se creó
+          // la asignación, la versión confirmada gana.
+          const correosAsignados = new Set(
+            usuarios.map(u => (u.correo||'').toLowerCase()).filter(Boolean)
+          );
+          const sinAsignacion = matched.filter(c =>
+            !correosAsignados.has((c.creador_email||'').toLowerCase())
+          );
+          // Lookup de perfiles rol='cc' por correo. Sin perfil → skip.
+          const correosUnicos = [...new Set(
+            sinAsignacion.map(c => (c.creador_email||'').toLowerCase()).filter(Boolean)
+          )];
+          const lookups = await Promise.all(correosUnicos.map(c =>
+            db.get('usuarios',
+              `?correo=eq.${encodeURIComponent(c)}&rol=eq.cc&select=id,nombre,correo,foto_url,rol&limit=1`
+            ).catch(()=>[])
+          ));
+          const ccMap = {};
+          lookups.forEach((arr, i) => { if (arr[0]) ccMap[correosUnicos[i]] = arr[0]; });
+          // Dedupe interno: si la misma creadora tiene varios contratos
+          // pendientes al mismo evento, gana el más reciente (orden desc).
+          const seen = new Set();
+          pendientesFirma = sinAsignacion.filter(c => {
+            const em = (c.creador_email||'').toLowerCase();
+            if (!ccMap[em] || seen.has(em)) return false;
+            seen.add(em);
+            return true;
+          }).map(c => ({
+            _contrato: c,
+            _usuario:  ccMap[(c.creador_email||'').toLowerCase()],
+          }));
+        }
+      }
+    } catch(e) { console.warn('[Capsule] contratos pendientes:', e.message); }
+
+    const total = asigs.length + pendientesFirma.length;
+    if (countEl) countEl.textContent = `${total} asignado${total!==1?'s':''}`;
+
+    if (!total) {
       container.innerHTML = '<div class="empty-state"><div class="empty-icon">·</div>Sin equipo asignado</div>';
       return;
     }
-    const uIds = asigs.map(a=>a.coordi_id).join(',');
-    const usuarios = await db.get('usuarios', `?id=in.(${uIds})`);
-    const uMap = Object.fromEntries(usuarios.map(u=>[u.id,u]));
-    // Guardar referencia de usuario en cada asignación (para rooming)
-    _ccAsignados = asigs.map(a => ({ ...a, _usuario: uMap[a.coordi_id]||{} }));
-    // Backfill: auto-agregar a viajeros_evento a quienes ya están aceptados
-    // pero no aparecen en la lista (idempotente, best-effort).
-    _backfillStaffViajeros().then(() => { if (document.getElementById('cc-viajeros-list')) loadViajeros(); });
+
     const statusCol = { pendiente:'var(--gold)', aceptado:'var(--green)', declinado:'var(--red)' };
     const statusLabel = { pendiente:'Pendiente', aceptado:'Aceptó', declinado:'Declinó' };
-    container.innerHTML = asigs.map(a => {
+    const COLOR_PEND_FIRMA = '#e8ff4c';
+
+    const htmlAsigs = asigs.map(a => {
       const u = uMap[a.coordi_id]||{};
       const st = a.status||'pendiente';
       const esCC = u.rol === 'cc';
@@ -7765,6 +7830,28 @@ async function loadCCEquipo() {
         </div>
       </div>`;
     }).join('');
+
+    const htmlPend = pendientesFirma.map(p => {
+      const u = p._usuario;
+      const c = p._contrato;
+      const nombre = u.nombre || c.creador_nombre || '—';
+      return `<div style="background:var(--bg2);border:1px solid var(--border);border-left:3px solid ${COLOR_PEND_FIRMA};border-radius:var(--radius);padding:14px 18px;margin-bottom:10px">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+          <div style="display:flex;align-items:center;gap:12px">
+            <div style="width:40px;height:40px;border-radius:50%;background:var(--bg3);overflow:hidden;flex-shrink:0;display:flex;align-items:center;justify-content:center">
+              ${u.foto_url ? `<img src="${u.foto_url}" style="width:100%;height:100%;object-fit:cover">` :
+              `<span style="font-family:'Zen Dots',sans-serif;font-size:15px;color:${COLOR_PEND_FIRMA}">${(nombre||'?')[0]}</span>`}
+            </div>
+            <div>
+              <div style="font-family:'Rajdhani',sans-serif;font-weight:700;font-size:16px">${nombre}</div>
+              <div style="font-size:10px;font-family:'JetBrains Mono',monospace;color:var(--ts)">cc · <span style="color:${COLOR_PEND_FIRMA};font-weight:700">✍️ PENDIENTE DE FIRMA</span></div>
+            </div>
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+
+    container.innerHTML = htmlAsigs + htmlPend;
   } catch(e) { container.innerHTML=`<div class="alert alert-error">${e.message}</div>`; }
 }
 

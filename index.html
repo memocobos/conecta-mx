@@ -2751,7 +2751,10 @@ var _countdownInterval = null;
 
 // Spotify 30s preview on card play button
 (function(){
-  var _audio=null, _currentBtn=null, _cache={};
+  // Cache entries: {artist → {url, ts}}. Deezer firma las preview URLs con
+  // `hdnea=exp=` y expiran en ~15-30 min — re-fetcheamos pasados 5 min para
+  // no servir MP3 muerto desde una sesión larga.
+  var _audio=null, _currentBtn=null, _cache={}, CACHE_TTL=5*60*1000;
   function setIcon(btn,ch){var i=btn&&btn.querySelector('.ev-play-ico');if(i)i.textContent=ch;}
   function stopCurrent(){
     if(_audio){try{_audio.pause();_audio.src='';}catch(e){}_audio=null;}
@@ -2777,14 +2780,15 @@ var _countdownInterval = null;
       var p=_audio.play();
       if(p&&p.catch)p.catch(function(){stopCurrent();});
     };
-    if(_cache.hasOwnProperty(artist)){go(_cache[artist]);return;}
+    var cached=_cache[artist];
+    if(cached&&(Date.now()-cached.ts)<CACHE_TTL){go(cached.url);return;}
     // "id:NNN" → exact Deezer track id; otherwise free-text search
     var url=/^id:\d+$/.test(artist)
       ? '/.netlify/functions/deezer?id='+artist.slice(3)
       : '/.netlify/functions/deezer?q='+encodeURIComponent(artist)+'&type=track';
     fetch(url)
       .then(function(r){return r.ok?r.json():{preview:null};})
-      .then(function(d){var u=(d&&(d.preview||d.preview_url))||null;_cache[artist]=u;go(u);})
+      .then(function(d){var u=(d&&(d.preview||d.preview_url))||null;_cache[artist]={url:u,ts:Date.now()};go(u);})
       .catch(function(){btn.classList.remove('ev-play-loading');});
   };
   // Pause when opening detail or navigating

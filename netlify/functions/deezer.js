@@ -27,9 +27,11 @@ exports.handler = async function(event) {
         return { statusCode: res.status, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ error: 'Deezer track fetch failed' }) };
       }
       const t = await res.json();
+      // No shared/CDN cache: Deezer signed `preview` URLs expire in ~15-30 min,
+      // pero el JSON queda guardado 24h en Netlify Edge → MP3 muerto al reproducir.
       return {
         statusCode: 200,
-        headers: { 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=86400' },
+        headers: { 'Content-Type': 'application/json', 'Cache-Control': 'private, max-age=300' },
         body: JSON.stringify({
           preview: t.preview || null,
           preview_url: t.preview || null,
@@ -70,13 +72,13 @@ exports.handler = async function(event) {
       if (!hit) {
         return {
           statusCode: 200,
-          headers: { 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=3600' },
+          headers: { 'Content-Type': 'application/json', 'Cache-Control': 'private, max-age=300' },
           body: JSON.stringify({ preview: null })
         };
       }
       return {
         statusCode: 200,
-        headers: { 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=3600' },
+        headers: { 'Content-Type': 'application/json', 'Cache-Control': 'private, max-age=300' },
         body: JSON.stringify({
           preview: hit.preview,
           preview_url: hit.preview,   // alias for client convenience

@@ -1397,6 +1397,11 @@ src="https://www.facebook.com/tr?id=1685907946147007&ev=PageView&noscript=1"
 .wiz-progress-step.done + .wiz-progress-sep{background:#e8ff4c}
 .wiz-hint{display:none;background:#e8ff4c;color:#000;padding:9px 16px;font-size:12px;font-weight:700;font-family:'Montserrat',sans-serif;line-height:1.4;text-align:center;position:sticky;top:104px;z-index:179;border-bottom:1px solid rgba(0,0,0,.18);box-shadow:0 4px 14px rgba(0,0,0,.45)}
 .wiz-hint.show{display:block}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(20px);background:#111;border:1px solid rgba(255,255,255,.14);border-left:4px solid #0000cd;color:#fff;padding:14px 18px;border-radius:10px;font-size:13px;font-weight:600;font-family:'Montserrat',sans-serif;line-height:1.45;max-width:90%;width:360px;box-sizing:border-box;text-align:center;z-index:9999;opacity:0;pointer-events:none;transition:opacity .25s ease,transform .25s ease;box-shadow:0 10px 30px rgba(0,0,0,.5)}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.toast.warning{border-left-color:#e8ff4c}
+.toast.info{border-left-color:#0000cd}
+.z-nota{margin-top:6px;font-size:10px;font-weight:800;color:#e8ff4c;text-transform:uppercase;letter-spacing:.04em;line-height:1.3}
 /* Botón "Volver a eventos" sticky en el detalle de evento (mobile-first) */
 .wiz-volver{display:none;position:fixed;top:0;left:0;right:0;height:48px;width:100%;background:rgba(0,0,0,.7);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border:0;border-bottom:2px solid #e8ff4c;color:#fff;font-family:'Montserrat',sans-serif;font-size:12px;font-weight:900;letter-spacing:.1em;text-transform:uppercase;align-items:center;justify-content:flex-start;gap:10px;padding:0 16px;cursor:pointer;z-index:210}
 .wiz-volver:hover{background:rgba(0,0,0,.85)}
@@ -1815,7 +1820,7 @@ var EV=[  {id:'avengedsevenfold',c:'gris',img:'Avenged Sevenfold',a:'Avenged Sev
   {id:'tecatecomuna',added:'2026-05-15',music:'2250256',c:'rojo',img:'Tecate Comuna',a:'Tecate Comuna',f:'28 nov 2026',ds:'2026-11-28',v:'Foro Cholula, Puebla',st:'proximamente',inc:[],banco:BANCO_DEFAULT,zonas:[],hotel:[],pagos:[]},
   {id:'badbunny',added:'2026-05-15',music:'1741494317',c:'azul',img:'Bad Bunny',a:'Bad Bunny',f:'dic 2026',ds:'2026-12-01',v:'Estadio BBVA, Mty',st:'proximamente',inc:[],banco:BANCO_DEFAULT,zonas:[],hotel:[],pagos:[]},
   {id:'bahidora2027',added:'2026-05-15',music:'103052662',c:'azul',img:'Bahidora',a:'Bahidora 2027',f:'feb 2027',ds:'2027-02-01',v:'Las Estacas, Morelos',st:'proximamente',inc:[],banco:BANCO_DEFAULT,zonas:[],hotel:[],pagos:[]},
-  {id:'juniorh',added:'2026-05-25',music:'2473525031',c:'rojo',img:'Junior H',a:'Junior H',f:'13 feb 2027',ds:'2027-02-13',v:'Estadio Walmart Park, MTY',sep:500,sepCheap:800,ride:2700,stayOffset:500,st:'',banco:BANCO_DEFAULT,bancoCheap:BANCO_HEY,zonas:[{n:'Mesas Rockstar',p:7600,vip:1},{n:'1er Nivel 1ra Base',p:5500},{n:'1er Nivel 3ra Base',p:5500},{n:'Sad Boyz Zone',p:5300,vip:1},{n:'1er Nivel Central',p:4900},{n:'2do Nivel Central',p:4900},{n:'2do Nivel 1ra Base',p:4600},{n:'2do Nivel 3ra Base',p:4600},{n:'General',p:4200},{n:'3er Nivel 1ra Base',p:4100},{n:'3er Nivel 3ra Base',p:4100},{n:'Jardín Derecho',p:3900},{n:'Jardín Izquierdo',p:3900},{n:'3er Nivel Central',p:3800}],cheapZonas:[{n:'Mesas Rockstar',p:5900,vip:1},{n:'1er Nivel 1ra Base',p:3800},{n:'1er Nivel 3ra Base',p:3800},{n:'Sad Boyz Zone',p:3600,vip:1},{n:'1er Nivel Central',p:3300},{n:'2do Nivel Central',p:3300},{n:'2do Nivel 1ra Base',p:2900},{n:'2do Nivel 3ra Base',p:2900},{n:'General',p:2500},{n:'3er Nivel 1ra Base',p:2400},{n:'3er Nivel 3ra Base',p:2400},{n:'Jardín Derecho',p:2200},{n:'Jardín Izquierdo',p:2200},{n:'3er Nivel Central',p:2100}],hotel:[{k:'compartida',n:'Compartida (4)',e:0,pp:0,viaj:[4],desc:'Compartes cuarto con otros viajeros'},{k:'triple',n:'Triple',e:250,pp:250,viaj:[3],desc:'Tu parte del cuarto triple'},{k:'doble',n:'Doble',e:650,pp:650,viaj:[2],desc:'Tu parte del cuarto doble'},{k:'individual',n:'Individual',e:1960,pp:1960,viaj:[1],desc:'Cuarto solo para ti'}],pagos:[{l:'Separo',d:'Hoy',s:1}]},
+  {id:'juniorh',added:'2026-05-25',music:'2473525031',c:'rojo',img:'Junior H',a:'Junior H',f:'13 feb 2027',ds:'2027-02-13',v:'Estadio Walmart Park, MTY',sep:500,sepCheap:800,ride:2700,stayOffset:500,st:'',banco:BANCO_DEFAULT,bancoCheap:BANCO_HEY,zonas:[{n:'Mesas Rockstar',p:7600,vip:1,requiereViajeros:4},{n:'1er Nivel 1ra Base',p:5500},{n:'1er Nivel 3ra Base',p:5500},{n:'Sad Boyz Zone',p:5300,vip:1},{n:'1er Nivel Central',p:4900},{n:'2do Nivel Central',p:4900},{n:'2do Nivel 1ra Base',p:4600},{n:'2do Nivel 3ra Base',p:4600},{n:'General',p:4200},{n:'3er Nivel 1ra Base',p:4100},{n:'3er Nivel 3ra Base',p:4100},{n:'Jardín Derecho',p:3900},{n:'Jardín Izquierdo',p:3900},{n:'3er Nivel Central',p:3800}],cheapZonas:[{n:'Mesas Rockstar',p:5900,vip:1,requiereViajeros:4},{n:'1er Nivel 1ra Base',p:3800},{n:'1er Nivel 3ra Base',p:3800},{n:'Sad Boyz Zone',p:3600,vip:1},{n:'1er Nivel Central',p:3300},{n:'2do Nivel Central',p:3300},{n:'2do Nivel 1ra Base',p:2900},{n:'2do Nivel 3ra Base',p:2900},{n:'General',p:2500},{n:'3er Nivel 1ra Base',p:2400},{n:'3er Nivel 3ra Base',p:2400},{n:'Jardín Derecho',p:2200},{n:'Jardín Izquierdo',p:2200},{n:'3er Nivel Central',p:2100}],hotel:[{k:'compartida',n:'Compartida (4)',e:0,pp:0,viaj:[4],desc:'Compartes cuarto con otros viajeros'},{k:'triple',n:'Triple',e:250,pp:250,viaj:[3],desc:'Tu parte del cuarto triple'},{k:'doble',n:'Doble',e:650,pp:650,viaj:[2],desc:'Tu parte del cuarto doble'},{k:'individual',n:'Individual',e:1960,pp:1960,viaj:[1],desc:'Cuarto solo para ti'}],pagos:[{l:'Separo',d:'Hoy',s:1}]},
   {id:'louist',added:'2026-05-25',music:'3806386932',mapa:'louistomlinson',cdmx:true,c:'azul',img:'Louis Tomlinson',a:'Louis Tomlinson - How Did We Get Here? Tour',f:'10 abr 2027',ds:'2027-04-10',v:'Estadio GNP, CDMX',sep:1000,sepCheap:1000,ride:2900,noStay:true,st:'',banco:BANCO_DEFAULT,bancoCheap:BANCO_HEY,zonas:[{n:'Platino',p:0,prox:1,vip:1},{n:'Diamante',p:9000,vip:1},{n:'Gold',p:8400,vip:1},{n:'Zona GNP',p:7600},{n:'Silver',p:7600},{n:'Bronce',p:6900},{n:'Verde B',p:6500},{n:'Naranja B',p:5800},{n:'Verde C',p:5100},{n:'General B',p:4600},{n:'Naranja C',p:4500}],cheapZonas:[{n:'Platino',p:0,prox:1,vip:1},{n:'Diamante',p:7100,vip:1},{n:'Gold',p:6500,vip:1},{n:'Zona GNP',p:5700},{n:'Silver',p:5700},{n:'Bronce',p:5000},{n:'Verde B',p:4600},{n:'Naranja B',p:3900},{n:'Verde C',p:3200},{n:'General B',p:2700},{n:'Naranja C',p:2600}],hotel:[{k:'compartida',n:'Compartida (4)',e:0,pp:0,viaj:[4],desc:'Compartes cuarto con otros viajeros'},{k:'triple',n:'Triple',e:300,pp:300,viaj:[3],desc:'Tu parte del cuarto triple'},{k:'doble',n:'Doble',e:800,pp:800,viaj:[2],desc:'Tu parte del cuarto doble'},{k:'individual',n:'Individual',e:2400,pp:2400,viaj:[1],desc:'Cuarto solo para ti'}],pagos:[{l:'Separo',d:'Hoy',s:1}]},
   {id:'trueno',mapa:'trueno',c:'azul',img:'Trueno',a:'Trueno',f:'26 nov 2026',ds:'2026-11-26',v:'Auditorio Banamex, MTY',sep:300,ride:2700,stayOffset:500,st:'',inc:['Boleto zona elegida','Transporte Reynosa-Mty','Hospedaje compartido','Kit Conecta'],banco:BANCO_DEFAULT,flashPromo:{code:'TRUENO',pct:5,expiresHours:24,expiresTs:Date.parse('2026-05-22T20:00:00-06:00'),excludePkg:['ride','stay','cheap'],onlyEvent:'trueno'},zonas:[{n:'Beyond General',p:4450},{n:'Platino',p:5250,vip:1},{n:'Platino B',p:4700},{n:'Platino C',p:4150},{n:'Perfil A',p:4050},{n:'Perfil B',p:3900},{n:'Perfil C',p:3650},{n:'Perfil D',p:3800}],cheapZonas:[{n:'Beyond General',p:2650},{n:'Platino',p:3450,vip:1},{n:'Platino B',p:2900},{n:'Platino C',p:2350},{n:'Perfil A',p:2250},{n:'Perfil B',p:2100},{n:'Perfil C',p:1850},{n:'Perfil D',p:2000}],hotel:[{n:'Compartida',e:0},{n:'Doble',e:650},{n:'Triple',e:250},{n:'Individual',e:1960}],pagos:[{l:'Separo',d:'Hoy',s:1}]}];
 
@@ -3194,6 +3199,16 @@ function setWizHint(text){
   el.textContent=text;el.classList.add('show');document.body.classList.add('wiz-hint-on');
 }
 
+// Toast genérico (info/warning). Auto-oculta a los ~4.5s.
+var _toastTimer=null;
+function showToast(msg,type){
+  var el=document.getElementById('toast');if(!el)return;
+  el.textContent=msg;
+  el.className='toast '+(type||'info')+' show';
+  if(_toastTimer)clearTimeout(_toastTimer);
+  _toastTimer=setTimeout(function(){el.classList.remove('show');},4500);
+}
+
 // Onboarding e ID del evento actual viven como vars de módulo para que
 // finishOnboarding/skipOnboarding marquen la clave correcta sin tener
 // que pasar el evento como argumento.
@@ -3735,7 +3750,10 @@ function buildZonaButtons(zonas){
     } else {
       var showP=z.p;
       if(selPkg==='stay'&&cur){showP=z.p-(cur.sep||500);if(showP<0)showP=z.p;}
-      h+='<button class="z-btn'+(z.vip?' vip':'')+'" data-p="'+z.p+'" data-n="'+z.n+'"><div class="z-name">'+z.n+'</div><div class="z-price">'+fmt(showP)+'</div></button>';
+      var reqV=z.requiereViajeros||0;
+      var reqAttr=reqV?' data-reqviaj="'+reqV+'"':'';
+      var notaH=reqV?'<div class="z-nota">Solo grupos de '+reqV+' · '+fmt(z.p*reqV)+' total</div>':'';
+      h+='<button class="z-btn'+(z.vip?' vip':'')+'"'+reqAttr+' data-p="'+z.p+'" data-n="'+z.n+'"><div class="z-name">'+z.n+'</div><div class="z-price">'+fmt(showP)+'</div>'+notaH+'</button>';
     }
   }
   $$('d-zonas').innerHTML=h;
@@ -3836,6 +3854,18 @@ function selFecha(btn,idx){
 }
 
 function selZona(btn,p,n){
+  // Zonas con requiereViajeros (ej. Mesas Rockstar = grupos de 4): si el nº de
+  // viajeros actual no coincide, lo forzamos al requerido, reconstruimos el
+  // hotel para ese nº y avisamos. Genérico: aplica a cualquier zona/evento.
+  var reqViaj=parseInt(btn.getAttribute('data-reqviaj'),10)||0;
+  if(reqViaj&&selViaj!==reqViaj){
+    selViaj=reqViaj;
+    var vbtns=$$('w-viajeros').querySelectorAll('.wiz-btn');
+    for(var vi=0;vi<vbtns.length;vi++)vbtns[vi].classList.toggle('active',(vi+1)===reqViaj);
+    var hasHotel=(selPkg==='plus'||selPkg==='ride'||selPkg==='stay')&&cur&&!cur.noHotel;
+    if(hasHotel)buildHotelButtons();
+    showToast('Las '+n+' solo se venden por grupos de '+reqViaj+' personas. Ajustamos tu reserva a '+reqViaj+' viajeros.','info');
+  }
   var btns=document.querySelectorAll('.z-btn');
   for(var i=0;i<btns.length;i++)btns[i].classList.remove('active');
   btn.classList.add('active');
@@ -4886,6 +4916,7 @@ function enviarChat(){
     <button class="chat-send" id="chat-send" onclick="enviarChat()">Enviar</button>
   </div>
 </div>
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
 <div class="bienvenida-bg" id="bienvenida-bg" onclick="cerrarBienvenida()">
   <div class="bienvenida-box" onclick="event.stopPropagation()">
     <button class="bienvenida-close" onclick="cerrarBienvenida()">✕</button>

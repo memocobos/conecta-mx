@@ -251,9 +251,43 @@ async function detectarCotizacionesCaida(resumen) {
   }
 }
 
+// Extrae los códigos que existen actualmente en el objeto PROMOS del index.html
+// en producción. Devuelve un Set de códigos en MAYÚSCULAS, o null si no se pudo
+// leer (en ese caso no filtramos, para no suprimir alertas legítimas).
+async function fetchPromoCodes() {
+  try {
+    const SITE = process.env.URL || 'https://conectareynosa.mx';
+    const r = await fetch(`${SITE}/index.html`, { headers: { 'Cache-Control': 'no-cache' } });
+    if (!r.ok) return null;
+    const html = await r.text();
+    const m = html.match(/var\s+PROMOS\s*=\s*\{/);
+    if (!m) return null;
+    const start = m.index + m[0].length - 1; // posición del '{'
+    let depth = 0, end = -1, inStr = false, strCh = '';
+    for (let i = start; i < html.length; i++) {
+      const c = html[i], prev = html[i - 1];
+      if (inStr) { if (c === strCh && prev !== '\\') inStr = false; continue; }
+      if (c === "'" || c === '"') { inStr = true; strCh = c; continue; }
+      if (c === '{') depth++;
+      else if (c === '}') { depth--; if (depth === 0) { end = i; break; } }
+    }
+    if (end < 0) return null;
+    const block = html.slice(start, end + 1);
+    const codes = new Set();
+    const re = /['"]([A-Z0-9_]{2,})['"]\s*:/g; // claves de código: 'XXX': {...}
+    let k;
+    while ((k = re.exec(block))) codes.add(k[1].toUpperCase());
+    return codes.size ? codes : null;
+  } catch (e) { return null; }
+}
+
 async function detectarCodigoFalla(resumen) {
   // Códigos intentados 20+ veces en los últimos 7 días con tasa de éxito < 20%.
   const hace7 = new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString();
+  // Solo alertamos sobre códigos que SIGUEN existiendo en PROMOS. Un código
+  // eliminado (p.ej. CONECTAREY) ya no debe generar alertas aunque queden
+  // intentos fallidos en la ventana de 7 días.
+  const promoCodes = await fetchPromoCodes();
   let rows = [];
   try {
     rows = await sb(
@@ -272,6 +306,8 @@ async function detectarCodigoFalla(resumen) {
   }
   for (const [cod, s] of Object.entries(stats)) {
     if (s.total < 20) continue;
+    // Si pudimos leer PROMOS y el código ya no existe ahí, no alertar.
+    if (promoCodes && !promoCodes.has(cod)) continue;
     const tasaExito = s.validos / s.total;
     if (tasaExito >= 0.2) continue;
     const ctx = `codigo_intentos_falla-${cod}-${new Date().toISOString().slice(0, 10)}`;

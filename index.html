@@ -2058,7 +2058,7 @@ function renderCatalog(){
           (isProxi?proxBadge:(isPast||isAg||isPronto?'':priceH)+ctaH)+
         '</div>'+
         (ev.preventa&&!isPast&&!isAg&&Date.now()<ev.preventa.expiresTs?'<div class="ev-preventa-badge" data-preventa-expires="'+ev.preventa.expiresTs+'">Preventa termina en: <span class="preventa-timer">--:--:--</span></div>':'')+
-        (ev.promo&&!isPast&&!isAg?'<div class="ev-promo-badge">🏷️ USA CÓDIGO: '+(ev.promoCode||'CONECTAREY')+'</div>':'')+
+        (ev.promo&&ev.promoCode&&!isPast&&!isAg?'<div class="ev-promo-badge">🏷️ USA CÓDIGO: '+ev.promoCode+'</div>':'')+
         (ev.flashPromo&&!isPast&&!isAg&&Date.now()<ev.flashPromo.expiresTs?'<div class="ev-flash-badge" data-flash-expires="'+ev.flashPromo.expiresTs+'">🔥 USA CÓDIGO: '+ev.flashPromo.code+' · <span class="flash-timer"></span></div>':'')+
         (ev.lineup&&LINEUPS[ev.lineup]?'<button class="ev-lineup-btn" data-lineup="'+ev.lineup+'" onclick="event.stopPropagation();abrirLineup(\''+ev.lineup+'\',\''+ev.a.replace(/'/g,"\\'")+'\')">🎵 Ver Line Up</button>':'')+
       '</div>';
@@ -2163,7 +2163,6 @@ function goBack(_skipHistory) {
 //  vacío y crashea — dejando la página en "header vacío".)
 
 var PROMOS={
-  'CONECTAREY': {pct:5, expires:'2026-05-30', maxUsos:9999, usos:0, desc:'5% de descuento con código CONECTAREY'},
   'PULSOGNP': {pct:8, expiresTs:1776382739338, maxUsos:9999, usos:0, desc:'8% de descuento con código PULSOGNP', onlyEvent:'pulsoquetaro'},
   'HADES': {pct:5, expiresTs:1776558384253, maxUsos:9999, usos:0, desc:'5% de descuento con código HADES', onlyEvent:'melanie', excludePkg:['ride']},
   'LOOP': {pct:5, expiresTs:1776617509451, maxUsos:9999, usos:0, desc:'5% de descuento con código LOOP', onlyEvent:'edsheeran', excludePkg:['ride']},
@@ -4892,13 +4891,8 @@ function enviarChat(){
     <button class="bienvenida-close" onclick="cerrarBienvenida()">✕</button>
     <div class="bienvenida-title">¡Bienvenido a Conecta Reynosa! 🎉</div>
     <div class="bienvenida-text">Cotiza tu viaje a tus conciertos favoritos en menos de 60 segundos.</div>
-    <div class="bienvenida-gift">
-      <div class="bienvenida-gift-lbl">🎁 Regalo de bienvenida:</div>
-      <div class="bienvenida-gift-code">Usa el código <b style="color:#e8ff4c">CONECTAREY</b> y recibe 5% de descuento en tu primera compra.</div>
-      <div class="bienvenida-gift-small">Válido en eventos participantes.</div>
-    </div>
     <button class="bienvenida-btn" onclick="cerrarBienvenida();document.getElementById('ev-list').scrollIntoView({behavior:'smooth'})">Ver eventos y cotizar →</button>
-    <button class="bienvenida-skip" onclick="cerrarBienvenida()">Continuar sin descuento</button>
+    <button class="bienvenida-skip" onclick="cerrarBienvenida()">Continuar</button>
   </div>
 </div>
 <div class="onboard-bg" id="onboard-bg" onclick="if(event.target===this)skipOnboarding()">

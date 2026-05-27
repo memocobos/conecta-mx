@@ -2220,7 +2220,7 @@ var PROMOS={
   'HURRICANE': {pct:5, expiresTs:Date.parse('2026-05-21T20:00:00-06:00'), maxUsos:9999, usos:0, desc:'5% de descuento con código HURRICANE', onlyEvent:'scorpions', excludePkg:['ride','stay','cheap']},
   'TRUENO': {pct:5, expiresTs:Date.parse('2026-05-22T20:00:00-06:00'), maxUsos:9999, usos:0, desc:'5% de descuento con código TRUENO', onlyEvent:'trueno', excludePkg:['ride','stay','cheap']},
   'ULTRA': {pct:5, expiresTs:Date.parse('2026-05-26T20:00:00-06:00'), maxUsos:9999, usos:0, desc:'5% de descuento con código ULTRA', onlyEvent:'ultramexico', excludePkg:['ride','stay','cheap']},
-  'HOTSALE': {pct:8, pctCheap:5, startTs:Date.parse('2026-05-27T00:00:00-05:00'), expiresTs:Date.parse('2026-05-28T00:00:00-05:00'), maxUsos:9999, usos:0, desc:'HOT SALE 24h — 8% PLUS / 5% CHEAP', excludePkg:['ride','stay'], onlyEvents:['keniaos','fanfest','zayn','rufus','harry','melanie','rosalia','arre','tini','warped','scorpions','anuelaa','youngmiko','neighbourhood','ironmaiden','beele','pulsoquetaro','enjambre','alejandrosanz','vaiven','badgyal','aitana','romeo','intocable','siddharta','monlaferte','aperfectcircle','trueno','morat','brunomars','knotfest','arjona','edenmunoz','edsheeran','babymetal','caifanes','edc2027']}
+  'HOTSALE': {pct:8, pctCheap:5, startTs:Date.parse('2026-05-27T00:00:00-05:00'), expiresTs:Date.parse('2026-05-28T00:00:00-05:00'), maxUsos:9999, usos:0, desc:'HOT SALE 24h — 8% PLUS / 5% CHEAP', excludePkg:['ride','stay'], onlyEvents:['keniaos','fanfest','zayn','rufus','harry','melanie','rosalia','arre','tini','warped','scorpions','anuelaa','youngmiko','neighbourhood','ironmaiden','beele','pulsoquetaro','enjambre','alejandrosanz','vaiven','badgyal','aitana','romeo','intocable','siddharta','monlaferte','aperfectcircle','trueno','morat','brunomars','knotfest','arjona','edenmunoz','edsheeran','babymetal','caifanes','edc2027'], excludeZones:{'harry':['Box Oro'],'melanie':['Early Entry VIP'],'edsheeran':['Palcos'],'brunomars':['Platino']}}
 };
 var _promoActivo=null;
 
@@ -2268,7 +2268,14 @@ function validarPromo(code){
       return {ok:false,msg:'Código exclusivo para zona '+p.onlyZones.join(' / ')};
     }
   }
-  return {ok:true,pct:p.pct||0,pctCheap:p.pctCheap||0,amount:p.amount||0,desc:p.desc,customMsg:p.customMsg||null,code:c,excludePkg:p.excludePkg||null,onlyZones:p.onlyZones||null};
+  if(p.excludeZones&&selZ&&cur){
+    var _exz=p.excludeZones[cur.id];
+    if(_exz&&_exz.indexOf(selZ.n)>=0){
+      var _evn=cur.a.replace(/ - .*| en .*/,'');
+      return {ok:false,msg:'El código '+c+' no aplica en la zona '+selZ.n+'. Disponible en otras zonas de '+_evn+'.'};
+    }
+  }
+  return {ok:true,pct:p.pct||0,pctCheap:p.pctCheap||0,amount:p.amount||0,desc:p.desc,customMsg:p.customMsg||null,code:c,excludePkg:p.excludePkg||null,onlyZones:p.onlyZones||null,excludeZones:p.excludeZones||null};
 }
 var PC_EVENTS=["Justin Bieber", "Bad Bunny", "Sabrina Carpenter", "U2", "Festival Trópico", "Bahidora 2027", "Coldplay", "The Rolling Stones", "Tool", "Slipknot", "Luis Miguel", "Metallica", "Feid / Ferxxo", "Evanescence", "Marilyn Manson"];
 
@@ -4391,6 +4398,14 @@ function calcular(){
     _promoActivo=null;
     var pmsg2=document.getElementById('promo-msg');
     if(pmsg2){pmsg2.style.color='#ff283b';pmsg2.textContent='✗ Código no aplicable a esta zona';}
+  }
+  if(_promoActivo&&_promoActivo.excludeZones&&selZ&&cur){
+    var _xz=_promoActivo.excludeZones[cur.id];
+    if(_xz&&_xz.indexOf(selZ.n)>=0){
+      _promoActivo=null;
+      var pmsg3=document.getElementById('promo-msg');
+      if(pmsg3){pmsg3.style.color='#ff283b';pmsg3.textContent='✗ El código no aplica en la zona '+selZ.n;}
+    }
   }
   if(_promoActivo){
     if(_promoActivo.amount){

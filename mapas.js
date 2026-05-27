@@ -47,5 +47,6 @@ window.MAPAS={
   'monlaferte':'mapas/monlaferte.webp',
   'trueno':'mapas/trueno.webp',
   'straykids':'mapas/straykids.webp',
-  'louistomlinson':'mapas/louistomlinson.webp'
+  'louistomlinson':'mapas/louistomlinson.webp',
+  'juniorh':'mapas/juniorh.webp'
 };

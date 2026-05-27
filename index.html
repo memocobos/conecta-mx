@@ -2078,7 +2078,9 @@ function renderCatalog(){
     card.setAttribute('data-id',ev.id);
     card.className='ev-card'+(isPast?' pasado':'')+(isAg&&!isPast?' agotado':'')+(isProc&&!isPast?' proceso':'')+(isPronto&&!isPast?' pronto':'')+(isProxi&&!isPast?' proxi':'');
     var proxBadge=isProxi?'<div class="ev-prox-badge">AVÍSAME<span class="ev-prox-sub">Lista de espera</span></div>':'';
-    var hotSaleBadge=(typeof hotSaleActive==='function'&&hotSaleActive()&&PROMOS['HOTSALE']&&PROMOS['HOTSALE'].onlyEvents&&PROMOS['HOTSALE'].onlyEvents.indexOf(ev.id)>=0&&!isPast&&!isAg)?'<div class="ev-badge-hotsale">🔥 HOT SALE 8%</div>':'';
+    var hotSaleBadge='';
+    var _hsP=(typeof PROMOS!=='undefined')&&PROMOS['HOTSALE'];
+    if(_hsP&&Date.now()>=_hsP.startTs&&Date.now()<_hsP.expiresTs&&_hsP.onlyEvents&&_hsP.onlyEvents.indexOf(ev.id)>=0&&!isPast&&!isAg)hotSaleBadge='<div class="ev-badge-hotsale">🔥 HOT SALE 8%</div>';
     card.innerHTML=imgHTML+hotSaleBadge+
       '<span class="ev-tag '+tagCls+'">'+tagTxt+'</span>'+
       '<div class="ev-body">'+

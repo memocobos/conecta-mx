@@ -40,8 +40,8 @@
 html{scroll-behavior:smooth}
 html,body{overflow-x:hidden;max-width:100vw}
 body{font-family:'Montserrat',sans-serif;font-weight:500;background:#000;color:#fff;min-height:100vh}
-body.scroll-lock,body.chat-open,body.wizard-open{overflow:hidden;position:fixed;width:100%;top:0;left:0}
-body.chat-open,body.wizard-open{overscroll-behavior:none}
+body.scroll-lock,body.wizard-open{overflow:hidden;position:fixed;width:100%;top:0;left:0}
+body.wizard-open{overscroll-behavior:none}
 /* Safety net: prevent children from spilling out horizontally on mobile */
 @media(max-width:640px){
   .catalog,.hero-strip,.ev-grid,.d-hero,.wiz{max-width:100vw;overflow-x:hidden}
@@ -1121,7 +1121,6 @@ src="https://www.facebook.com/tr?id=1685907946147007&ev=PageView&noscript=1"
       <div class="wiz-progress-sep"></div>
       <div class="wiz-progress-step" data-step="4"><span class="wiz-progress-num">4</span><span class="wiz-progress-lbl">Reservar</span></div>
     </div>
-    <div class="wiz-hint" id="wiz-hint" aria-live="polite"></div>
     <div class="d-body">
 
   <!-- PASO 0 (solo arre): MODALIDAD DE VIAJE -->
@@ -1370,7 +1369,7 @@ src="https://www.facebook.com/tr?id=1685907946147007&ev=PageView&noscript=1"
 .wa-float:hover{transform:scale(1.1);box-shadow:0 6px 20px rgba(37,211,102,.6)}
 @media(max-width:768px){
   .wa-float{bottom:90px !important}
-  .chat-fab{bottom:160px !important}
+  .help-fab{bottom:160px !important}
 }
 .ev-flash-badge{background:#ff283b;color:#fff;font-size:9px;font-weight:900;padding:5px 10px;text-align:center;font-family:'Montserrat',sans-serif;letter-spacing:.03em;animation:flashPulse 2s ease-in-out infinite}
 .ev-preventa-badge{background:#ff283b;color:#e8ff4c;font-size:10px;font-weight:900;padding:7px 10px;text-align:center;font-family:'Montserrat',sans-serif;letter-spacing:.06em;text-transform:uppercase;animation:preventaPulse 1.2s ease-in-out infinite;border-top:1px solid rgba(255,255,255,.08);border-bottom:1px solid rgba(255,255,255,.08)}
@@ -1406,8 +1405,6 @@ src="https://www.facebook.com/tr?id=1685907946147007&ev=PageView&noscript=1"
 .wiz-progress-step.done .wiz-progress-num{background:#e8ff4c;color:#000}
 .wiz-progress-step.done .wiz-progress-lbl{color:rgba(232,255,76,.6)}
 .wiz-progress-step.done + .wiz-progress-sep{background:#e8ff4c}
-.wiz-hint{display:none;background:#e8ff4c;color:#000;padding:9px 16px;font-size:12px;font-weight:700;font-family:'Montserrat',sans-serif;line-height:1.4;text-align:center;position:sticky;top:104px;z-index:179;border-bottom:1px solid rgba(0,0,0,.18);box-shadow:0 4px 14px rgba(0,0,0,.45)}
-.wiz-hint.show{display:block}
 .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(20px);background:#111;border:1px solid rgba(255,255,255,.14);border-left:4px solid #0000cd;color:#fff;padding:14px 18px;border-radius:10px;font-size:13px;font-weight:600;font-family:'Montserrat',sans-serif;line-height:1.45;max-width:90%;width:360px;box-sizing:border-box;text-align:center;z-index:9999;opacity:0;pointer-events:none;transition:opacity .25s ease,transform .25s ease;box-shadow:0 10px 30px rgba(0,0,0,.5)}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 .toast.warning{border-left-color:#e8ff4c}
@@ -1448,49 +1445,6 @@ body:has(#page-detail.active) .hot-sale-banner{display:none !important}
   /* Compensate for the now out-of-flow bar so wizard content isn't shoved
      under it once the user scrolls past the hero. +48px extra por el botón Volver. */
   .d-body{padding-top:102px}
-  .wiz-hint{position:fixed;top:98px;left:0;right:0;width:100%;padding:7px 14px;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;letter-spacing:0}
-  body.wiz-hint-on .d-body{padding-top:132px}
-}
-/* ONBOARDING MODAL */
-.onboard-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);z-index:9999;align-items:center;justify-content:center;padding:20px;overflow-y:auto}
-.onboard-box{background:#0a0a0a;border:2px solid rgba(232,255,76,.25);max-width:500px;width:100%;padding:28px 24px;color:#fff;font-family:'Montserrat',sans-serif;max-height:92vh;overflow-y:auto;border-radius:4px;position:relative}
-.onboard-head{margin-bottom:18px;padding-bottom:14px;border-bottom:1px solid rgba(255,255,255,.08)}
-.onboard-ev{font-family:'Barlow Condensed','Montserrat',sans-serif;font-size:24px;font-weight:900;text-transform:uppercase;letter-spacing:-.005em;line-height:1;color:#fff}
-.onboard-fecha{font-size:11px;font-weight:800;color:#e8ff4c;text-transform:uppercase;letter-spacing:.08em;margin-top:6px;font-family:'Montserrat',sans-serif}
-.onboard-title{font-family:'Barlow Condensed','Montserrat',sans-serif;font-size:30px;font-weight:900;text-transform:uppercase;letter-spacing:-.005em;line-height:1;color:#e8ff4c;margin:0 0 22px}
-.onboard-steps{display:flex;flex-direction:column;gap:14px;margin-bottom:18px}
-.onboard-step{display:flex;gap:14px;align-items:flex-start}
-.onboard-step-num{flex-shrink:0;width:32px;height:32px;border-radius:50%;background:#e8ff4c;color:#000;font-weight:900;font-size:13px;display:flex;align-items:center;justify-content:center;font-family:'Montserrat',sans-serif;line-height:1}
-.onboard-step-body{flex:1;min-width:0}
-.onboard-step-title{font-family:'Barlow Condensed','Montserrat',sans-serif;font-size:15px;font-weight:900;text-transform:uppercase;letter-spacing:.01em;color:#fff;margin-bottom:3px;line-height:1.05}
-.onboard-step-desc{font-size:12px;color:rgba(255,255,255,.65);line-height:1.45;font-weight:500;font-family:'Montserrat',sans-serif}
-.onboard-promo{background:rgba(232,255,76,.1);border:1.5px solid #e8ff4c;padding:12px 14px;margin-bottom:18px;font-size:12px;color:#e8ff4c;font-weight:700;line-height:1.45;border-radius:3px;font-family:'Montserrat',sans-serif}
-.onboard-promo b{color:#fff;font-weight:900;letter-spacing:.05em}
-.onboard-actions{display:flex;gap:10px;align-items:center}
-.onboard-skip{background:transparent;color:rgba(255,255,255,.55);border:none;padding:14px 16px;font-size:12px;font-weight:700;font-family:'Montserrat',sans-serif;cursor:pointer;text-transform:uppercase;letter-spacing:.05em}
-.onboard-skip:hover{color:#fff}
-.onboard-go{flex:1;background:#e8ff4c;color:#000;border:none;padding:14px 18px;font-size:13px;font-weight:900;font-family:'Montserrat',sans-serif;cursor:pointer;text-transform:uppercase;letter-spacing:.06em;border-radius:3px}
-.onboard-go:hover{filter:brightness(1.05)}
-/* Wizard tour — spotlight tooltips */
-.tour-highlight{display:none;position:fixed;border-radius:10px;box-shadow:0 0 0 9999px rgba(0,0,0,.65),0 0 0 4px #e8ff4c,0 0 26px rgba(232,255,76,.35);pointer-events:none;z-index:10000;transition:top .25s ease,left .25s ease,width .25s ease,height .25s ease}
-.tour-highlight.active{display:block}
-.tour-tooltip{display:none;position:fixed;background:#0a0a0a;border:2px solid #e8ff4c;border-radius:10px;padding:18px 20px;width:340px;max-width:calc(100% - 32px);z-index:10001;box-shadow:0 18px 50px rgba(0,0,0,.6);font-family:'Montserrat',sans-serif;animation:tourFadeIn .28s ease both}
-.tour-tooltip.active{display:block}
-@keyframes tourFadeIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
-.tour-arrow{position:absolute;width:0;height:0;border:9px solid transparent;left:30px}
-.tour-arrow.up{bottom:100%;border-bottom-color:#e8ff4c;border-top:0}
-.tour-arrow.down{top:100%;border-top-color:#e8ff4c;border-bottom:0}
-.tour-title{font-family:'Barlow Condensed','Montserrat',sans-serif;font-size:18px;font-weight:900;color:#e8ff4c;text-transform:uppercase;letter-spacing:.02em;margin:0 0 8px;line-height:1.1}
-.tour-text{font-size:12.5px;color:rgba(255,255,255,.78);line-height:1.5;margin:0 0 16px;font-weight:500}
-.tour-actions{display:flex;justify-content:space-between;align-items:center;gap:12px}
-.tour-skip{background:none;border:none;color:rgba(255,255,255,.42);font-size:11px;font-weight:600;font-family:'Montserrat',sans-serif;cursor:pointer;padding:6px 0;text-decoration:underline;letter-spacing:0;text-transform:none}
-.tour-skip:hover{color:rgba(255,255,255,.75)}
-.tour-next{background:#e8ff4c;color:#000;border:none;padding:11px 18px;font-size:12px;font-weight:900;font-family:'Montserrat',sans-serif;cursor:pointer;text-transform:uppercase;letter-spacing:.06em;border-radius:4px}
-.tour-next:hover{filter:brightness(1.05)}
-@media(max-width:640px){
-  .tour-tooltip{position:fixed!important;left:0!important;right:0!important;bottom:0!important;top:auto!important;width:100%!important;max-width:100%!important;border-radius:14px 14px 0 0;border-bottom:none;padding:18px 18px 24px;animation:tourSlideUp .3s cubic-bezier(.22,1,.36,1) both}
-  .tour-arrow{display:none}
-  @keyframes tourSlideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
 }
 .promo-modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:9997;align-items:center;justify-content:center}
 .promo-modal-box{border-radius:16px;padding:36px 28px;text-align:center;max-width:400px;width:90%;position:relative;box-shadow:0 20px 60px rgba(0,0,0,.5);max-height:85vh;overflow-y:auto;border:1.5px solid rgba(232,255,76,.2)}
@@ -1522,49 +1476,33 @@ body:has(#page-detail.active) .hot-sale-banner{display:none !important}
 .pago-btn-secondary:hover{background:rgba(37,211,102,.2)}
 .pago-close{position:absolute;top:12px;right:14px;background:none;border:none;color:rgba(255,255,255,.4);font-size:22px;cursor:pointer;z-index:1}
 .pago-close:hover{color:#fff}
-.chat-fab{position:fixed;bottom:84px;right:20px;width:56px;height:56px;background:#e8ff4c;border-radius:50%;display:flex;align-items:center;justify-content:center;border:none;cursor:pointer;z-index:999;box-shadow:0 4px 16px rgba(232,255,76,.35);transition:transform .2s;font-size:26px}
-.chat-fab:hover{transform:scale(1.1)}
-.chat-panel{position:fixed;bottom:20px;right:20px;width:360px;height:520px;background:#1a1a1a;border:1px solid rgba(255,255,255,.1);border-radius:14px;z-index:1000;display:none;flex-direction:column;overflow:hidden;box-shadow:0 12px 40px rgba(0,0,0,.6);font-family:'Montserrat',sans-serif}
-@media(max-width:768px){
-  .chat-panel{
-    inset:0;width:100vw;width:100dvw;height:100vh;height:100dvh;
-    right:auto;bottom:auto;top:0;left:0;border-radius:0;border:none;
-  }
-  .chat-head{padding-top:max(14px,env(safe-area-inset-top))}
-  .chat-input-wrap{padding-bottom:max(10px,env(safe-area-inset-bottom))}
-}
-.chat-quick{display:flex;flex-wrap:wrap;gap:6px;margin:-4px 0 4px;align-self:flex-start;max-width:100%}
-.chat-quick-btn{
-  background:rgba(232,255,76,.1);color:#e8ff4c;
-  border:1px solid rgba(232,255,76,.3);
-  padding:8px 12px;border-radius:18px;
-  font-size:12px;font-weight:700;font-family:'Montserrat',sans-serif;
-  cursor:pointer;transition:background .15s ease,transform .15s ease;
-  text-decoration:none;display:inline-flex;align-items:center;gap:4px;
-  -webkit-tap-highlight-color:rgba(232,255,76,.2);
-}
-.chat-quick-btn:hover{background:rgba(232,255,76,.22);transform:translateY(-1px)}
-.chat-quick-btn:active{transform:translateY(0)}
-.chat-quick-btn.pay{background:rgba(37,211,102,.12);color:#88ea4e;border-color:rgba(136,234,78,.35)}
-.chat-quick-btn.pay:hover{background:rgba(37,211,102,.22)}
-.chat-head{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;background:#111;border-bottom:1px solid rgba(255,255,255,.08)}
-.chat-head-title{font-size:13px;font-weight:900;color:#e8ff4c;text-transform:uppercase;letter-spacing:.06em}
-.chat-close{background:none;border:none;color:rgba(255,255,255,.5);font-size:22px;cursor:pointer;padding:0 4px}
-.chat-close:hover{color:#fff}
-.chat-msgs{flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:10px}
-.chat-msg{max-width:85%;padding:10px 14px;border-radius:12px;font-size:12px;line-height:1.5;word-wrap:break-word}
-.chat-msg.bot{background:rgba(255,255,255,.07);color:rgba(255,255,255,.85);align-self:flex-start;border-bottom-left-radius:4px}
-.chat-msg.user{background:rgba(232,255,76,.15);color:#e8ff4c;align-self:flex-end;border-bottom-right-radius:4px;font-weight:600}
-.chat-msg.typing{color:rgba(255,255,255,.3);font-style:italic}
-.chat-input-wrap{display:flex;gap:8px;padding:10px 14px;border-top:1px solid rgba(255,255,255,.08);background:#111}
-.chat-input{flex:1;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);color:#fff;padding:10px 12px;font-size:12px;font-family:'Montserrat',sans-serif;border-radius:8px;outline:none}
-.chat-input:focus{border-color:rgba(232,255,76,.4)}
-.chat-input::placeholder{color:rgba(255,255,255,.25)}
-.chat-send{background:#e8ff4c;color:#000;border:none;padding:10px 16px;font-size:11px;font-weight:900;font-family:'Montserrat',sans-serif;text-transform:uppercase;letter-spacing:.06em;cursor:pointer;border-radius:8px}
-.chat-send:hover{background:#e0ff4c}
-.chat-send:disabled{opacity:.3;cursor:not-allowed}
-.chat-wa-btn{display:inline-block;background:rgba(37,211,102,.15);color:#25D366;border:1px solid rgba(37,211,102,.3);padding:8px 14px;border-radius:8px;font-size:11px;font-weight:700;text-decoration:none;margin-top:6px;text-align:center}
-.chat-wa-btn:hover{background:rgba(37,211,102,.25)}
+/* ===== Ayuda contextual: FAB flotante + modal mínimo + hints sutiles ===== */
+.help-fab{position:fixed;bottom:84px;right:20px;width:52px;height:52px;border-radius:50%;background:#e8ff4c;color:#000;border:2px solid #000;font-family:'Barlow Condensed','Montserrat',sans-serif;font-size:30px;font-weight:900;cursor:pointer;z-index:999;box-shadow:0 4px 12px rgba(0,0,0,.3);transition:transform .2s,box-shadow .2s;display:flex;align-items:center;justify-content:center;padding:0;line-height:1}
+.help-fab .help-fab-icon{display:block;transform:translateY(-1px)}
+.help-fab:hover{transform:scale(1.1);box-shadow:0 6px 16px rgba(0,0,0,.4)}
+.help-fab:active{transform:scale(.95)}
+.help-fab.pulse-once{animation:helpFabPulse 2s ease-in-out 2}
+@keyframes helpFabPulse{0%,100%{box-shadow:0 4px 12px rgba(232,255,76,.3)}50%{box-shadow:0 4px 24px rgba(232,255,76,.8)}}
+@media(max-width:640px){.help-fab{width:48px;height:48px;font-size:26px}}
+
+.help-modal{position:fixed;inset:0;background:rgba(0,0,0,.85);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);z-index:9995;display:flex;align-items:center;justify-content:center;padding:20px}
+.help-modal[hidden]{display:none}
+.help-modal-content{background:#0a0a0a;border-left:4px solid #e8ff4c;border-radius:2px;max-width:420px;width:92%;padding:34px 28px 28px;position:relative;box-shadow:0 24px 64px rgba(0,0,0,.75),0 0 0 1px rgba(255,255,255,.05);font-family:'Montserrat',sans-serif;animation:modalSlideUp .3s cubic-bezier(.22,1,.36,1) both}
+.help-close{position:absolute;top:10px;right:12px;width:36px;height:36px;background:transparent;border:none;color:rgba(255,255,255,.45);font-size:24px;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1;transition:color .2s,background .2s}
+.help-close:hover{color:#e8ff4c;background:rgba(255,255,255,.06)}
+.help-modal-content h3{font-family:'Barlow Condensed','Montserrat',sans-serif;font-weight:900;font-size:clamp(24px,5vw,30px);text-transform:uppercase;letter-spacing:.01em;color:#e8ff4c;margin:0 0 22px;line-height:1}
+.help-steps{list-style:none;margin:0 0 22px;padding:0;display:flex;flex-direction:column;gap:14px}
+.help-steps li{display:flex;gap:12px;align-items:flex-start;color:rgba(255,255,255,.82);font-size:15px;line-height:1.4;font-weight:500}
+.help-steps li strong{flex-shrink:0;width:26px;height:26px;border-radius:50%;background:#e8ff4c;color:#000;font-size:13px;font-weight:900;display:flex;align-items:center;justify-content:center;font-family:'Montserrat',sans-serif}
+.help-note{color:rgba(255,255,255,.55);font-size:13px;margin:0 0 14px;text-align:center}
+.help-wa-btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;box-sizing:border-box;background:#25D366;color:#fff;border:none;padding:14px;font-size:15px;font-weight:800;font-family:'Montserrat',sans-serif;border-radius:10px;text-decoration:none;transition:background .2s,transform .15s}
+.help-wa-btn:hover{background:#1fb855;transform:translateY(-1px)}
+
+/* Hints contextuales sutiles — una sola vez por usuario, debajo del paso actual */
+.hint-contextual{background:rgba(232,255,76,.1);border-left:3px solid #e8ff4c;padding:8px 12px;margin:8px 0;border-radius:4px;font-size:13px;color:#e8ff4c;font-weight:500;line-height:1.4;animation:hintFadeIn .4s ease-out;position:relative;cursor:pointer}
+.hint-contextual.dismissed{animation:hintFadeOut .3s forwards;overflow:hidden}
+@keyframes hintFadeIn{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}
+@keyframes hintFadeOut{to{opacity:0;height:0;padding-top:0;padding-bottom:0;margin-top:0;margin-bottom:0}}
 @media(max-width:520px){.nav-sede{display:none}.nav-social{width:36px}.footer-contact{align-items:flex-start}}
 
 /* ==================================================================
@@ -2179,8 +2117,6 @@ function goBack(_skipHistory) {
   $$('nav-back').style.display = 'none';
   document.body.classList.remove('wizard-open');
   document.body.removeAttribute('data-ev');
-  if(typeof setWizHint==='function')setWizHint('');
-  if(typeof _tourHide==='function')_tourHide();
   // Restaurar la posición de scroll del catálogo donde estaba el evento abierto
   window.scrollTo(0,_catalogScrollY||0);
   // Deep link: actualizar URL a / (excepto si venimos de popstate)
@@ -3140,8 +3076,6 @@ function showDetail(id, _skipHistory){
       }
     }catch(e){}
   }
-  // First-visit onboarding tutorial (global once)
-  setTimeout(function(){showOnboarding(cur);},250);
   // Promo modal per event (once per session)
   if(cur.promoModal&&!sessionStorage.getItem('promo_'+cur.id)){
     setTimeout(function(){
@@ -3203,7 +3137,6 @@ function resetWizard(){
     if(vc)vc.style.display='block';
   }
   setWizProgress(1);
-  setWizHint('');
 }
 
 function selTransModo(modo){
@@ -3230,12 +3163,6 @@ function setWizProgress(step){
       else if(n===step+1)steps[i].classList.add('next');
     }
   }
-}
-
-function setWizHint(text){
-  var el=document.getElementById('wiz-hint');if(!el)return;
-  if(!text){el.classList.remove('show');el.textContent='';document.body.classList.remove('wiz-hint-on');return;}
-  el.textContent=text;el.classList.add('show');document.body.classList.add('wiz-hint-on');
 }
 
 // Toast genérico (info/warning). Auto-oculta a los ~4.5s.
@@ -3279,156 +3206,47 @@ function updateHotSaleBanner(){
   setInterval(updateHotSaleBanner,1000);
 })();
 
-// Onboarding e ID del evento actual viven como vars de módulo para que
-// finishOnboarding/skipOnboarding marquen la clave correcta sin tener
-// que pasar el evento como argumento.
-var _onboardingEvId=null;
-function _tutorialKey(id){return 'tutorial-visto-'+(id||'_global');}
-function showOnboarding(ev){
-  _onboardingEvId=ev&&ev.id||null;
-  try{
-    if(localStorage.getItem(_tutorialKey(_onboardingEvId))==='true'){
-      setTimeout(function(){startWizardTour();},200);
-      return;
-    }
-  }catch(e){return;}
-  var bg=document.getElementById('onboard-bg');if(!bg||!ev)return;
-  document.getElementById('onboard-ev').textContent=ev.a||'';
-  document.getElementById('onboard-fecha').textContent=ev.f||'';
-  var pr=document.getElementById('onboard-promo');
-  var fp=ev.flashPromo;
-  var active=fp&&fp.code&&(!fp.expiresTs||fp.expiresTs>Date.now());
-  if(active){
-    var pct=fp.pct||0;
-    pr.innerHTML='Tienes un código de descuento disponible: <b>'+fp.code+'</b> — aplícalo antes de cotizar para obtener '+pct+'% de descuento.';
-    pr.style.display='block';
-  } else {
-    pr.style.display='none';
-  }
-  bg.style.display='flex';
-}
-function finishOnboarding(){
-  try{localStorage.setItem(_tutorialKey(_onboardingEvId),'true');}catch(e){}
-  var bg=document.getElementById('onboard-bg');if(bg)bg.style.display='none';
-  setTimeout(function(){startWizardTour();},250);
-}
-function skipOnboarding(){
-  // Antes no marcaba como visto → el modal volvía a salir al refrescar.
-  try{localStorage.setItem(_tutorialKey(_onboardingEvId),'true');}catch(e){}
-  var bg=document.getElementById('onboard-bg');if(bg)bg.style.display='none';
-  setTimeout(function(){startWizardTour();},250);
+/* ================== Ayuda contextual (hints sutiles por paso) ==================
+   Reemplaza el modal de bienvenida, la barra wiz-hint y el tour spotlight.
+   Cada hint aparece UNA sola vez por usuario (localStorage 'hints-vistos'),
+   se auto-oculta a los 4s y se cierra al tocarlo. */
+var _HINTS={
+  paquete:'👇 Toca cada paquete para ver qué incluye',
+  zona:'👇 Selecciona dónde quieres sentarte',
+  hotel:'👇 Elige cómo dormirás (compartido = más barato)',
+  transporte:'👇 ¿Bus, avión o por tu cuenta?'
+};
+var _HINT_CARD={paquete:'w-pkg-card',zona:'w-zona-card',hotel:'w-hotel-card',transporte:'w-transport-card'};
+
+function dismissHint(el){
+  if(!el)return;
+  el.classList.add('dismissed');
+  setTimeout(function(){if(el.parentNode)el.parentNode.removeChild(el);},300);
 }
 
-/* ================== Wizard tour (spotlight tooltips) ================== */
-var TOUR_STEPS=[
-  {id:'viajeros',target:'#w-viajeros',title:'¿Cuántos van?',text:'Selecciona cuántas personas viajan contigo. El precio se calcula por persona.',cta:'Entendido →'},
-  {id:'paquetes',target:'#w-paquetes',title:'Elige tu paquete',text:'PLUS incluye todo. CHEAP es solo boleto. RIDE si ya tienes hotel. STAY si vas por tu cuenta.',cta:'Entendido →'},
-  {id:'zonas',target:'#d-zonas',title:'Elige tu zona',text:'Cada precio es por persona. Las zonas tachadas están agotadas. Presiona "Ver mapa del venue" para ubicarte.',cta:'Entendido →'},
-  {id:'hotel',target:'#d-hotel',title:'Tipo de habitación',text:'Elige según cuántos van. Compartida es la más económica. Individual es cuarto solo para ti.',cta:'Entendido →'},
-  {id:'cotizacion',target:'#d-result',title:'Tu cotización',text:'Aquí ves el precio total, el separo para reservar y tu plan de pagos mensual.',cta:'Entendido →'},
-  {id:'pago',target:'#pago-btn-comprobante',title:'Último paso',text:'Transfiere el separo a la cuenta indicada. Toma foto y presiona el botón para enviarlo por Messenger o WhatsApp.',cta:'Listo, voy a reservar'}
-];
-var _tourActive=false,_tourStep=-1,_tourPending=null;
-
-function _tourDoneKey(){return 'wizard-tour-done-'+(_onboardingEvId||'_global');}
-function _tourDone(){try{return localStorage.getItem(_tourDoneKey())==='true';}catch(e){return true;}}
-function _tourElVisible(el){if(!el)return false;if(el.offsetParent===null&&getComputedStyle(el).position!=='fixed')return false;var r=el.getBoundingClientRect();return r.width>4&&r.height>4;}
-function _tourFindStep(id){for(var i=0;i<TOUR_STEPS.length;i++){if(TOUR_STEPS[i].id===id)return i;}return -1;}
-
-function startWizardTour(){
-  if(_tourDone())return;
-  _tourActive=true;_tourStep=-1;
-  _tourTry('viajeros');
+function showContextualHint(key,cardId,text){
+  var vistos;
+  try{vistos=JSON.parse(localStorage.getItem('hints-vistos')||'{}');}catch(e){vistos={};}
+  if(vistos[key])return;
+  var card=document.getElementById(cardId);
+  if(!card||card.querySelector('.hint-contextual'))return;
+  var hint=document.createElement('div');
+  hint.className='hint-contextual';
+  hint.textContent=text;
+  hint.addEventListener('click',function(){dismissHint(hint);});
+  // Insertar justo debajo del título del paso (.wiz-lbl)
+  var lbl=card.querySelector('.wiz-lbl');
+  if(lbl&&lbl.nextSibling)card.insertBefore(hint,lbl.nextSibling);
+  else if(lbl)card.appendChild(hint);
+  else card.insertBefore(hint,card.firstChild);
+  setTimeout(function(){if(hint.parentNode)dismissHint(hint);},4000);
+  vistos[key]=true;
+  try{localStorage.setItem('hints-vistos',JSON.stringify(vistos));}catch(e){}
 }
 
-function _tourTry(stepId){
-  if(!_tourActive)return;
-  var idx=_tourFindStep(stepId);
-  if(idx===-1||idx<=_tourStep)return;
-  for(var j=idx;j<TOUR_STEPS.length;j++){
-    var t=document.querySelector(TOUR_STEPS[j].target);
-    if(_tourElVisible(t)){
-      _tourStep=j;
-      _tourRender(t,TOUR_STEPS[j]);
-      return;
-    }
-  }
-  _tourStep=idx;
-  _tourHide();
+function fireStepHint(step){
+  if(_HINT_CARD[step])showContextualHint(step,_HINT_CARD[step],_HINTS[step]);
 }
-
-function _tourRender(target,step){
-  var hl=document.getElementById('tour-highlight');
-  var tip=document.getElementById('tour-tooltip');
-  var arrow=document.getElementById('tour-arrow');
-  document.getElementById('tour-title').textContent=step.title;
-  document.getElementById('tour-text').textContent=step.text;
-  document.getElementById('tour-next').textContent=step.cta||'Entendido →';
-  var inModal=step.id==='pago';
-  // Scroll into view if needed (skip for modal targets)
-  if(!inModal){
-    var r0=target.getBoundingClientRect();
-    if(r0.top<80||r0.bottom>window.innerHeight-160){
-      try{target.scrollIntoView({behavior:'smooth',block:'center'});}catch(e){target.scrollIntoView();}
-    }
-  }
-  setTimeout(function(){
-    var r=target.getBoundingClientRect();
-    hl.style.top=Math.max(r.top-6,4)+'px';
-    hl.style.left=Math.max(r.left-6,4)+'px';
-    hl.style.width=(r.width+12)+'px';
-    hl.style.height=(r.height+12)+'px';
-    hl.classList.add('active');
-    var isMobile=window.matchMedia('(max-width:640px)').matches;
-    if(isMobile){
-      tip.style.top='';tip.style.left='';tip.style.right='';
-    } else {
-      var tipH=tip.offsetHeight||190;
-      var tipW=340;
-      var spaceBelow=window.innerHeight-r.bottom;
-      if(spaceBelow>tipH+30){
-        tip.style.top=(r.bottom+14)+'px';
-        arrow.className='tour-arrow up';
-      } else {
-        tip.style.top=Math.max(20,r.top-tipH-14)+'px';
-        arrow.className='tour-arrow down';
-      }
-      var left=r.left+r.width/2-tipW/2;
-      if(left<10)left=10;
-      if(left+tipW>window.innerWidth-10)left=window.innerWidth-tipW-10;
-      tip.style.left=left+'px';
-      tip.style.right='';
-    }
-    tip.classList.add('active');
-  },inModal?0:280);
-}
-
-function _tourHide(){
-  var hl=document.getElementById('tour-highlight');if(hl)hl.classList.remove('active');
-  var tip=document.getElementById('tour-tooltip');if(tip)tip.classList.remove('active');
-}
-
-function tourNext(){
-  if(!_tourActive)return;
-  var s=TOUR_STEPS[_tourStep];if(!s){_tourHide();return;}
-  if(s.id==='pago'){endWizardTour(true);return;}
-  _tourHide();
-}
-
-function tourSkip(){endWizardTour(true);}
-
-function endWizardTour(persist){
-  _tourActive=false;_tourStep=TOUR_STEPS.length;
-  if(persist){try{localStorage.setItem(_tourDoneKey(),'true');}catch(e){}}
-  _tourHide();
-}
-
-window.addEventListener('resize',function(){
-  if(!_tourActive)return;
-  var s=TOUR_STEPS[_tourStep];if(!s)return;
-  var t=document.querySelector(s.target);if(!_tourElVisible(t))return;
-  _tourRender(t,s);
-});
 
 function selViajeros(btn,n){
   selViaj=n;selZ=null;selH=null;selPkg=null;selFechaIdx=0;selBoleto=null;selTransporte=null;
@@ -3461,7 +3279,7 @@ function selViajeros(btn,n){
     updatePkgCards();
     $$('w-pkg-card').style.display='block';
   }
-  setTimeout(function(){_tourTry('paquetes');},300);
+  setTimeout(function(){fireStepHint('paquete');},350);
 }
 
 function updatePkgCards(){
@@ -3583,18 +3401,7 @@ function selPaquete(btn,pkg){
   selPkg=pkg;selZ=null;selH=null;selTransporte=null;
   try{ trackMainEvent('main_paquete_elegido', { paquete: pkg, paso_wizard: 'paquete' }); }catch(e){}
   setWizProgress(2);
-  var _hintBase='';
-  if(pkg==='plus')_hintBase='Incluye boleto, transporte, hospedaje y kit. ';
-  else if(pkg==='ride')_hintBase=cur.noHotel?'Incluye transporte, boleto y kit (sin hotel). ':'Incluye transporte, hospedaje y kit (sin boleto). ';
-  else if(pkg==='stay')_hintBase='Incluye hospedaje, boleto y kit (sin transporte). ';
-  else if(pkg==='cheap')_hintBase='Solo boleto y kit. ';
-  var _hintNext;
-  if(cur&&cur.diaFirst) _hintNext=(pkg==='ride'||pkg==='plus'||pkg==='stay')?'Ahora elige tu hotel.':'Desplázate hacia abajo para ver tu cotización.';
-  else if(pkg==='ride'&&cur.noHotel) _hintNext=cur.forceZona?'Ahora elige tu zona.':'Desplázate hacia abajo para ver tu cotización.';
-  else if(pkg==='ride') _hintNext='Ahora elige tu hotel.';
-  else _hintNext='Ahora elige tu zona.';
-  setWizHint(_hintBase+_hintNext);
-  setTimeout(function(){_tourTry((pkg==='ride'&&!cur.noHotel)?'hotel':'zonas');},300);
+  setTimeout(function(){fireStepHint((pkg==='ride'&&!cur.noHotel)?'hotel':'zona');},350);
   try{window.trackAddToCart&&window.trackAddToCart(pkg,minP(cur));}catch(e){}
   var pb=$$('w-paquetes').querySelectorAll('.wiz-btn');
   for(var i=0;i<pb.length;i++)pb[i].classList.remove('active');
@@ -3639,6 +3446,7 @@ function selPaquete(btn,pkg){
       $$('w-hotel-n').textContent='5';
       buildHotelButtons();
       $$('w-hotel-card').style.display='block';
+      setTimeout(function(){fireStepHint('hotel');},350);
     } else {
       $$('w-hotel-card').style.display='none';
       selH={n:'Sin hospedaje',e:0};
@@ -3646,6 +3454,7 @@ function selPaquete(btn,pkg){
       if(isCDMX(cur)){
         buildTransporteButtons();
         $$('w-transport-card').style.display='block';
+        setTimeout(function(){fireStepHint('transporte');},350);
       } else {
         calcular();
       }
@@ -3750,8 +3559,7 @@ function selBoletoBtn(btn,id){
   var btns=$$('d-boletos').querySelectorAll('.f-btn');
   for(var i=0;i<btns.length;i++)btns[i].classList.remove('active');
   btn.classList.add('active');
-  setWizHint('Boleto seleccionado. Ahora elige tu paquete.');
-  setTimeout(function(){_tourTry('paquetes');},300);
+  setTimeout(function(){fireStepHint('paquete');},350);
   // Auto-set zona from selected boleto + day
   var mf=cur.multifecha[selFechaIdx];
   if(mf&&mf.zonas[id]){
@@ -3947,9 +3755,8 @@ function selZona(btn,p,n){
   selZ={n:n,p:p};
   try{ trackMainEvent('main_zona_elegida', { zona: n, precio_zona: p, paso_wizard: 'zona' }); }catch(e){}
   setWizProgress(3);
-  setWizHint('Zona seleccionada. Desplázate hacia abajo para ver tu cotización completa.');
   calcular();
-  setTimeout(function(){_tourTry((selPkg==='cheap')?'cotizacion':'hotel');},300);
+  setTimeout(function(){if(selPkg!=='cheap')fireStepHint('hotel');},350);
 }
 
 function selHotel(btn,e,n){
@@ -3962,6 +3769,7 @@ function selHotel(btn,e,n){
   if(isCDMX(cur)){
     buildTransporteButtons();
     $$('w-transport-card').style.display='block';
+    setTimeout(function(){fireStepHint('transporte');},350);
   } else {
     $$('w-transport-card').style.display='none';
     calcular();
@@ -4034,8 +3842,6 @@ function abrirModalPago(){
   if(!cur||!_lastCotizacion)return;
   try{window.trackInitiateCheckout&&window.trackInitiateCheckout(cur.a,selPkg,total);}catch(e){}
   try{ trackMainEvent('main_modal_pago_abierto', {}); }catch(e){}
-  setWizHint('Realiza tu transferencia por el monto del separo. Toma foto del comprobante y presiona el botón de abajo.');
-  setTimeout(function(){_tourTry('pago');},450);
   $$('pago-subtitulo').textContent='Separa tu lugar en '+cur.a+' — '+cur.f;
   $$('pago-monto').textContent='💳 '+fmt(sepActualCalc);
   var b=getBanco();
@@ -4115,7 +3921,6 @@ function cerrarPromoModal(){
 }
 function cerrarModalPago(){
   document.getElementById('pago-modal-bg').style.display='none';
-  if(_tourActive&&TOUR_STEPS[_tourStep]&&TOUR_STEPS[_tourStep].id==='pago')_tourHide();
 }
 
 function abrirLineup(id,nombre){
@@ -4383,7 +4188,6 @@ function calcular(){
   $$('d-placeholder').style.display='none';
   $$('d-result').style.display='block';
   setWizProgress(4);
-  setWizHint('Tu cotización está lista. Revisa el plan de pagos y presiona el botón para reservar.');
   // Scroll al cuadro azul del total. block:'start' deja el `.big-pago` arriba
   // del viewport en lugar de centrar el #d-result entero (que dejaría al
   // calendario de pagos en el medio en pantallas grandes).
@@ -4391,7 +4195,6 @@ function calcular(){
     var r=document.getElementById('d-result');
     if(r){try{r.scrollIntoView({behavior:'smooth',block:'start'});}catch(e){r.scrollIntoView();}}
   },150);
-  setTimeout(function(){_tourTry('cotizacion');},600);
   var promoCard=document.getElementById('w-promo-card');if(promoCard)promoCard.style.display='block';
   var shareBtn=document.getElementById('btn-share');if(shareBtn)shareBtn.style.display='block';
   if(_promoActivo&&_promoActivo.excludePkg&&_promoActivo.excludePkg.indexOf(selPkg)>=0){
@@ -4563,441 +4366,22 @@ function getQuincenas(from, until, max){
     return result.slice(0,max);
   }
 
-// ── Chatbot IA ──────────────────────────────────────────────────────────
-var _chatOpen=false,_chatReady=false,_chatHistory=[],_chatChar=null,_chatScrollY=0;
-function _chatIsMobile(){return window.matchMedia('(max-width:768px)').matches;}
-
-function buildEventSummary(){
-  var lines=[];
-  var today=new Date();
-  for(var i=0;i<EV.length;i++){
-    var e=EV[i];
-    if(e.listOnly)continue;
-    var evDate=new Date(e.ds+'T23:59:59');
-    if(evDate<today)continue;
-    var availZ=(e.zonas||[]).filter(function(z){return !z.ag&&!z.prox&&z.p>0;});
-    var zTxt=availZ.map(function(z){return z.n+' $'+z.p;}).join(', ');
-    if(!zTxt)zTxt='Zonas por confirmar';
-    var stTxt=e.st==='agotado'?'AGOTADO':e.st==='proceso'?'EN PROCESO':'Disponible';
-    var hTxt='';
-    var hl=e.hotel;
-    if(hl&&hl.length){
-      var hParts=hl.map(function(h){return h.n+': '+(h.e===0?'incluida sin costo extra':'+$'+h.e+' por persona');});
-      hTxt=' | Hotel: '+hParts.join(', ');
-    }
-    var sepTxt='Separo PLUS/STAY/RIDE: $'+(e.sep||0);
-    if(e.sepCheap)sepTxt+=' | Separo CHEAP: $'+e.sepCheap;
-    else sepTxt+=' | Separo CHEAP: $'+(e.sep||0);
-    lines.push('- '+e.a+' | '+e.f+' | '+e.v+' | '+stTxt+' | Zonas: '+zTxt+' | '+sepTxt+hTxt);
-  }
-  return lines.join('\n');
-}
-
-function getChatSystemPrompt(){
-  var charIntro='';
-  if(_chatChar){
-    charIntro='Tu personaje es '+_chatChar.name+'. Mantén su personalidad de forma sutil sin exagerar. ';
-    var persona=_CHAR_PERSONA&&_CHAR_PERSONA[_chatChar.name];
-    if(persona){
-      charIntro+='PERSONALIDAD ESPECÍFICA: '+persona+' Mezcla esto con el contenido comercial, no dejes que domine la respuesta. ';
-    }
-  }
-  return charIntro+'Eres el asistente virtual de Conecta Reynosa, agencia de viajes y boletos para conciertos en Reynosa, Tamaulipas, México. '+
-    'Respondes en español, eres amigable, cordial y comercial. Ayudas a cotizar paquetes y dar información de eventos.\n\n'+
-    'PAQUETES Y PRECIOS:\n'+
-    'PLUS: todo incluido (transporte + hotel compartido + boleto + kit). Precio = precio de la zona elegida.\n'+
-    'RIDE: sin boleto (transporte + hotel compartido + kit). El cliente ya tiene su boleto. RIDE MTY = $2,700. RIDE CDMX = $2,900.\n'+
-    'STAY: sin transporte (hotel compartido + boleto + kit). Precio = precio zona MENOS $500. Ejemplo: zona $5,000, STAY = $4,500. NUNCA digas que STAY cuesta lo mismo que PLUS. STAY solo disponible en MTY, NO existe en CDMX.\n'+
-    'CHEAP: solo boleto + kit. Sin transporte ni hotel.\n\n'+
-    'TRANSPORTE CDMX:\n'+
-    'Eventos en CDMX ofrecen 3 opciones de transporte: Autobus desde Reynosa ($2,500), Avion (cotizar al 81 3232 1405), o Sin transporte.\n'+
-    'El transporte se suma al costo del paquete.\n\n'+
-    'REGLAS ESTRICTAS:\n'+
-    'El hotel compartido (4 personas) SIEMPRE esta INCLUIDO sin costo extra en PLUS, RIDE y STAY.\n'+
-    'Solo se cobra extra si el cliente quiere habitacion Individual, Doble o Triple.\n'+
-    'NUNCA preguntes cuantas noches ni donde quiere el hotel. El hotel es siempre cerca del venue del evento.\n'+
-    'NUNCA inventes precios. Solo usa los datos proporcionados. Si no tienes el dato exacto, di "te puedo dar mas info por WhatsApp".\n'+
-    'NUNCA ofrezcas servicios que no existen (seleccion de hotel, noches adicionales, upgrades, etc.).\n'+
-    'Adapta tu lenguaje al genero del cliente: terminaciones femeninas con nombres femeninos, masculinas con masculinos. Si no estas seguro, usa neutro.\n'+
-    'Si el usuario quiere hablar con una persona real, dile que puede contactar por WhatsApp.\n\n'+
-    'CONTACTO:\n'+
-    'Reservas y dudas generales: WhatsApp 81 1977 1072\n'+
-    'Vuelos: WhatsApp 81 3232 1405\n'+
-    'Conecta Reynosa SI cotiza vuelos. NUNCA le digas al cliente que cotice directo con la aerolinea.\n'+
-    'Cuando pregunten por vuelos: "Si cotizamos vuelos! Te paso el contacto de nuestro equipo de vuelos al 81 3232 1405 para que te coticen."\n\n'+
-    'FORMATO OBLIGATORIO - SIGUE ESTO AL PIE DE LA LETRA:\n'+
-    'NUNCA uses markdown: nada de **negrita**, *cursiva*, ## headers, ni listas con guion (-).\n'+
-    'Para enfasis usa MAYUSCULAS en palabras clave como PLUS, STAY, RIDE, CHEAP.\n'+
-    'Maximo 2 oraciones por mensaje, luego salto de linea vacio.\n'+
-    'Cada idea va en su propio parrafo separado por linea vacia.\n'+
-    'Si vas a listar eventos, pon MAXIMO 3, no todos.\n'+
-    'Nunca escribas mas de 4 lineas seguidas sin un espacio.\n\n'+
-    'EJEMPLO CORRECTO de como listar eventos:\n'+
-    '"Tenemos varios eventos en CDMX:\n\n'+
-    'The Weeknd — 20, 21 y 22 de abril\n\n'+
-    'BTS — 7, 9 y 10 de mayo\n\n'+
-    'Te interesa alguno en especial?"\n\n'+
-    'EJEMPLO INCORRECTO (NUNCA hagas esto):\n'+
-    '"Tenemos varios eventos en CDMX: AC/DC | 11 de abril | Estadio GNP | AGOTADO The Weeknd | 20, 21 y 22 de abril..."\n\n'+
-    'EJEMPLO DE COTIZACION CORRECTA:\n'+
-    '"Se presenta el [fecha] en [venue].\n\n'+
-    'PLUS por $5,000 (con transporte). STAY por $4,500 (sin transporte).\n\n'+
-    'Ambos incluyen hospedaje compartido. Cual prefieres?"\n\n'+
-    'CIERRE OBLIGATORIO AL TERMINAR DE COTIZAR:\n'+
-    'Cuando el cliente ya eligio paquete y zona y le diste el precio total, SIEMPRE cierra con un mensaje guiando al pago. NUNCA termines la cotizacion sin invitar al separo.\n'+
-    'IMPORTANTE: el monto del separo NO es fijo. Depende del evento Y del paquete:\n'+
-    'Para PLUS, STAY o RIDE → usa el monto "Separo PLUS/STAY/RIDE" del evento (campo sep).\n'+
-    'Para CHEAP → usa el monto "Separo CHEAP" del evento (campo sepCheap, o sep si no hay sepCheap).\n'+
-    'NUNCA digas $500 fijo. Lee el separo real del evento que el cliente eligio.\n'+
-    'Cuenta segun paquete:\n'+
-    'PLUS, STAY, RIDE → BBVA, comprobante por Messenger.\n'+
-    'CHEAP → Hey Banco, comprobante por WhatsApp.\n\n'+
-    'Formato del cierre (sigue exactamente esta estructura, separando con lineas en blanco. Reemplaza [SEPARO], [BANCO] y [CANAL] con los valores correctos del evento y paquete):\n\n'+
-    '"Listo! Tu paquete cuesta $X.\n\n'+
-    'Para reservar:\n\n'+
-    '1. Transfiere el separo de $[SEPARO] a [BANCO].\n\n'+
-    '2. Envia tu comprobante por [CANAL].\n\n'+
-    'Quieres que te muestre los datos bancarios?"\n\n'+
-    'Ejemplo PLUS (evento con sep=800): "...el separo de $800 a BBVA. Envia tu comprobante por Messenger."\n'+
-    'Ejemplo CHEAP (evento con sepCheap=1000): "...el separo de $1,000 a Hey Banco. Envia tu comprobante por WhatsApp."\n\n'+
-    'Cuando el cliente diga si, sí, claro, dale, ok, va, perfecto o similar como respuesta a esa pregunta, responde algo corto como "Perfecto, aqui tienes los datos" — el sistema mostrara automaticamente botones para ver datos BBVA, Hey Banco, Messenger y WhatsApp. NO escribas tu las cuentas, CLABE ni nombre del titular: el frontend los muestra.\n\n'+
-    'EVENTOS ACTUALES:\n'+buildEventSummary();
-}
-
-var _CHAR_EXCLUDE=['machaca','edc','edc2027','emblema','coronacap','flowfest','arre','knotfest','warped','dalemix','comuna','pulsognp','pulsoquetaro','nochegrandes'];
-// Cada key puede ser un objeto {name,extra} o un array de objetos (para eventos con 2 artistas)
-var _CHAR_NAMES={
-  'brunomars':    {name:'Bruno Mars',      extra:', el mismísimo Silk Sonic en la casa 🕺'},
-  'weeknd':       {name:'Abel Tesfaye',    extra:', aunque tal vez me conozcas como The Weeknd 🌙'},
-  'megadeth':     {name:'Dave Mustaine',   extra:', frontman de Megadeth 🤘'},
-  'soad':         {name:'Serj Tankian',    extra:', vocalista de System of a Down 🎤'},
-  'neighbourhood':{name:'Jesse Rutherford',extra:', vocalista de The Neighbourhood 🖤'},
-  'soda':         {name:'Gustavo Cerati',  extra:', frontman de Soda Stereo 🎸'},
-  'rufus':        {name:'Tom Crane',       extra:', de Rüfüs Du Sol 🌊'},
-  'ironmaiden':   {name:'Bruce Dickinson', extra:', vocalista de Iron Maiden ⚔️'},
-  'babymetal':    {name:'Suzuka Nakamoto', extra:', conocida como Su-metal de BABYMETAL 🤘🌸'},
-  'bts':          {name:'RM',              extra:', líder de BTS 💜'},
-  'romeo':[
-    {name:'Romeo Santos',extra:', el Rey de la Bachata 👑'},
-    {name:'Prince Royce',extra:', el príncipe de la bachata 🎤'}
-  ]
-};
-var _CHAR_PLURAL=['morat'];
-var _MEMO={name:'Memo Cobos',w:3,msg:'¡Hola! Soy Memo Cobos, aunque me conocen como el Tío Conecta 😎 Hoy seré tu asistente de Conecta Reynosa. ¿Con quién tengo el gusto?'};
-
-// Personalidad por personaje — inyectada al system prompt cuando está activo
-var _CHAR_PERSONA={
-  'Bruno Mars':'Usa "baby" de vez en cuando. Energía positiva, vibras de groove y funk. Menciona tu estilo elegante.',
-  'Abel Tesfaye':'Tono misterioso, algo frío y nostálgico. Referencias a la noche, Las Vegas y neón.',
-  'Dave Mustaine':'Directo, sin rodeos, referencias al thrash metal y a la vida en la carretera.',
-  'Serj Tankian':'Intenso y un poco filosófico. Referencias al rock pesado, activismo y Armenia.',
-  'Jesse Rutherford':'Cool, minimal, aesthetic dark. Referencias a Sweater Weather y Los Ángeles.',
-  'Gustavo Cerati':'Poético e intelectual, referencias al rock latinoamericano. Ocasionalmente cita letras sutiles como "gracias totales".',
-  'Tom Crane':'Relajado, vibras de electrónica minimalista y naturaleza. Referencias a atardeceres y ritmos hipnóticos.',
-  'Bruce Dickinson':'Épico y teatral. Referencias medievales, aviación y el concepto de "trooper". Usa "up the irons" de vez en cuando.',
-  'Suzuka Nakamoto':'Mezcla palabras en japonés como "konnichiwa" y "arigatou" con español. Vibra kawaii pero rockera de BABYMETAL.',
-  'RM':'Entusiasta, menciona a ARMY cariñosamente. Usa algunas palabras en coreano como "annyeong" o "saranghae". Habla del poder del fandom.',
-  'Romeo Santos':'Galante, romántico, referencias a la bachata. Llama "mi amor" o "reina/rey" al usuario de vez en cuando.',
-  'Prince Royce':'Romántico y juguetón, referencias a "Stand By Me" y la bachata moderna. Bilingüe spanglish sutil.',
-  'Memo Cobos':'Cercano, mexicano norteño, vibra de tío cool de Reynosa. Referencias a la frontera y al choro del transporte/conciertos.'
-};
-
-function buildChars(){
-  var chars=[_MEMO];
-  var today=new Date();
-  var artists=[];
-  for(var i=0;i<EV.length;i++){
-    var e=EV[i];
-    if(e.listOnly)continue;
-    if(_CHAR_EXCLUDE.indexOf(e.id)>=0)continue;
-    if(e.st==='agotado'||e.st==='proceso')continue;
-    var evDate=new Date(e.ds+'T23:59:59');
-    if(evDate<today)continue;
-    // Avoid duplicate names. Override puede ser objeto o array (eventos con 2 artistas)
-    var rawOverride=_CHAR_NAMES[e.id];
-    var override=rawOverride;
-    if(Array.isArray(rawOverride)&&rawOverride.length){
-      override=rawOverride[Math.floor(Math.random()*rawOverride.length)];
-    }
-    var aName=override?override.name:e.a.replace(/ - .*/,'').replace(/ Tour.*/,'');
-    if(artists.indexOf(aName)>=0)continue;
-    artists.push(aName);
-    var isPlural=_CHAR_PLURAL.indexOf(e.id)>=0;
-    var extra=override?override.extra:'';
-    var msg=isPlural
-      ?'¡Hola! Somos '+aName+extra+' y hoy seremos tus asistentes de Conecta Reynosa 🎵 ¿Con quién tenemos el gusto?'
-      :'¡Hola! Soy '+aName+extra+' y hoy seré tu asistente de Conecta Reynosa 🎵 ¿Con quién tengo el gusto?';
-    chars.push({name:aName,w:1,msg:msg});
-  }
-  // Distribute 97% among artists equally
-  if(chars.length>1){
-    var artistW=97/(chars.length-1);
-    for(var j=1;j<chars.length;j++) chars[j].w=artistW;
-  }
-  return chars;
-}
-
-function pickChar(){
-  var chars=buildChars();
-  if(chars.length<=1)return _MEMO;
-  var totalW=chars.reduce(function(a,c){return a+c.w;},0);
-  var r=Math.random()*totalW;
-  var acc=0;
-  for(var i=0;i<chars.length;i++){
-    acc+=chars[i].w;
-    if(r<=acc)return chars[i];
-  }
-  return _MEMO;
-}
-
-function addChatMsg(txt,role){
-  var msgs=document.getElementById('chat-msgs');
-  var div=document.createElement('div');
-  div.className='chat-msg '+role;
-  if(role==='bot'&&txt.indexOf('HUMANO_BTN')>=0){
-    txt=txt.replace('HUMANO_BTN','');
-    div.innerHTML=txt+'<br><a class="chat-wa-btn" href="https://wa.me/528119771072" target="_blank">Hablar con un humano 💬</a>';
-  } else {
-    div.textContent=txt;
-  }
-  msgs.appendChild(div);
-  msgs.scrollTop=msgs.scrollHeight;
-  return div;
-}
-
-function _clearChatQuick(){
-  var msgs=document.getElementById('chat-msgs');
-  if(!msgs)return;
-  var olds=msgs.querySelectorAll('.chat-quick');
-  for(var i=0;i<olds.length;i++)olds[i].remove();
-}
-
-function renderChatQuick(buttons){
-  if(!buttons||!buttons.length)return;
-  _clearChatQuick();
-  var msgs=document.getElementById('chat-msgs');
-  var wrap=document.createElement('div');
-  wrap.className='chat-quick';
-  buttons.forEach(function(b){
-    var el;
-    if(b.url){
-      el=document.createElement('a');
-      el.href=b.url;
-      el.target='_blank';
-      el.rel='noopener';
-    } else {
-      el=document.createElement('button');
-      el.type='button';
-    }
-    el.className='chat-quick-btn'+(b.pay?' pay':'');
-    el.textContent=b.label;
-    if(!b.url){
-      el.addEventListener('click',function(){
-        if(b.action==='showBank'){
-          _showBankInChat(b.bank);
-          _clearChatQuick();
-          return;
-        }
-        var send=b.send||b.label;
-        var input=document.getElementById('chat-input');
-        input.value=send;
-        _clearChatQuick();
-        enviarChat();
-      });
-    } else {
-      el.addEventListener('click',function(){_clearChatQuick();});
-    }
-    wrap.appendChild(el);
-  });
-  msgs.appendChild(wrap);
-  msgs.scrollTop=msgs.scrollHeight;
-}
-
-function _showBankInChat(which){
-  var b=which==='hey'?BANCO_HEY:BANCO_DEFAULT;
-  var lines=[
-    '📋 '+b.nombre,
-    '',
-    'Titular: '+b.titular,
-    'Tarjeta: '+b.tarjeta,
-    'CLABE: '+b.clabe,
-    '',
-    'Manda tu comprobante por Messenger o WhatsApp para confirmar tu lugar.'
-  ].join('\n');
-  addChatMsg(lines,'bot');
-  _chatHistory.push({role:'assistant',content:lines});
-  // Re-render the messenger/wa shortcut buttons after showing bank info.
-  renderChatQuick([
-    {label:'📲 Messenger',url:'https://m.me/ConectaRey',pay:true},
-    {label:'📲 WhatsApp',url:'https://wa.me/528119771072',pay:true}
-  ]);
-}
-
-function _chatUpcomingEvents(n){
-  n=n||5;
-  var today=new Date();
-  var list=[];
-  if(typeof EV==='undefined'||!EV)return list;
-  for(var i=0;i<EV.length&&list.length<n;i++){
-    var e=EV[i];
-    if(!e||e.listOnly)continue;
-    if(e.st==='agotado'||e.st==='proceso')continue;
-    var evDate=new Date(e.ds+'T23:59:59');
-    if(evDate<today)continue;
-    var clean=(e.a||'').replace(/ - .*$/,'').replace(/ -.*$/,'');
-    if(clean.length>26)clean=clean.slice(0,26)+'…';
-    list.push({label:clean,send:e.a});
-  }
-  return list;
-}
-
-function detectChatButtons(reply){
-  if(!reply)return null;
-  var t=reply.toLowerCase();
-  // Datos bancarios / pago
-  var asksBank=t.indexOf('datos bancarios')>=0||t.indexOf('te paso los datos')>=0||t.indexOf('te muestro los datos')>=0||t.indexOf('te comparto los datos')>=0;
-  var hasBankInfo=t.indexOf('bbva')>=0&&(t.indexOf('clabe')>=0||t.indexOf('tarjeta')>=0);
-  if(asksBank||hasBankInfo){
-    return [
-      {label:'📋 Datos BBVA',action:'showBank',bank:'bbva',pay:true},
-      {label:'📋 Datos Hey Banco',action:'showBank',bank:'hey',pay:true},
-      {label:'📲 Messenger',url:'https://m.me/ConectaRey',pay:true},
-      {label:'📲 WhatsApp',url:'https://wa.me/528119771072',pay:true}
-    ];
-  }
-  // Paquete
-  if(/qu[eé]\s+paquete|cu[aá]l\s+paquete|paquete\s+prefieres|paquete\s+te\s+interesa/.test(t)){
-    return [
-      {label:'PLUS',send:'PLUS'},
-      {label:'RIDE',send:'RIDE'},
-      {label:'STAY',send:'STAY'},
-      {label:'CHEAP',send:'CHEAP'}
-    ];
-  }
-  // Ciudad
-  if(/desde\s+qu[eé]\s+ciudad|desde\s+d[oó]nde|de\s+qu[eé]\s+ciudad|desde\s+que\s+ciudad/.test(t)){
-    return [
-      {label:'Reynosa',send:'Reynosa'},
-      {label:'Otra ciudad',send:'Otra ciudad'}
-    ];
-  }
-  // Personas
-  if(/cu[aá]nt[oa]s?\s+(personas|viajeros|viajan|son|van)/.test(t)){
-    return [
-      {label:'1',send:'1 persona'},
-      {label:'2',send:'2 personas'},
-      {label:'3',send:'3 personas'},
-      {label:'4',send:'4 personas'}
-    ];
-  }
-  // Evento
-  if(/qu[eé]\s+evento|cu[aá]l\s+evento|evento\s+te\s+interesa|qu[eé]\s+concierto|cu[aá]l\s+concierto|concierto\s+te\s+interesa/.test(t)){
-    var evs=_chatUpcomingEvents(5);
-    if(evs.length){
-      return evs.map(function(e){return {label:e.label,send:e.send};});
-    }
-  }
-  return null;
-}
-
-function toggleChat(){
-  _chatOpen=!_chatOpen;
-  var panel=document.getElementById('chat-panel');
-  var fab=document.getElementById('chat-fab');
-  if(_chatOpen){
-    if(_chatIsMobile()){
-      _chatScrollY=window.scrollY||window.pageYOffset||0;
-      document.body.style.top='-'+_chatScrollY+'px';
-      document.body.classList.add('chat-open');
-    }
-    panel.style.display='flex';
-    fab.style.display='none';
-    if(!_chatReady){
-      _chatReady=true;
-      _chatChar=pickChar();
-      document.getElementById('chat-char-name').textContent=_chatChar.name;
-      _chatHistory=[{role:'assistant',content:_chatChar.msg}];
-      addChatMsg(_chatChar.msg,'bot');
-      var initBtns=detectChatButtons(_chatChar.msg);
-      if(initBtns)renderChatQuick(initBtns);
-    }
-    if(!_chatIsMobile())document.getElementById('chat-input').focus();
-  } else {
-    panel.style.display='none';
-    fab.style.display='flex';
-    if(document.body.classList.contains('chat-open')){
-      document.body.classList.remove('chat-open');
-      document.body.style.top='';
-      window.scrollTo(0,_chatScrollY);
-    }
-  }
-}
-
-function enviarChat(){
-  var input=document.getElementById('chat-input');
-  var txt=input.value.trim();
-  if(!txt)return;
-  input.value='';
-  _clearChatQuick();
-  addChatMsg(txt,'user');
-  _chatHistory.push({role:'user',content:txt});
-  var typing=addChatMsg('Escribiendo...','bot typing');
-  document.getElementById('chat-send').disabled=true;
-
-  // Construye el system prompt y valida que sea una cadena no vacía.
-  var sysPrompt = getChatSystemPrompt();
-  if(typeof sysPrompt !== 'string' || !sysPrompt.trim()){
-    console.warn('[chat] system prompt vacío — usando fallback mínimo');
-    sysPrompt = 'Eres el asistente de Conecta Reynosa. Responde en español, amigable, y sugiere WhatsApp 81 1977 1072 para reservas.';
-  }
-  // Historial últimos 16 turnos (Anthropic recomienda limitar para caching).
-  // Nota: antes se armaba un array `msgs` inyectando sysPrompt como user[0],
-  // pero el request usa `system:` (campo dedicado de Anthropic) así que ese
-  // array era dead code. Se eliminó.
-  var hist = _chatHistory.slice(-16);
-
-  fetch('/.netlify/functions/chat',{
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({
-      model:'claude-haiku-4-5-20251001',
-      max_tokens:180,
-      system:sysPrompt,
-      messages:hist
-    })
-  }).then(function(r){
-    if(!r.ok)throw new Error('HTTP '+r.status);
-    return r.json();
-  }).then(function(data){
-    typing.remove();
-    var reply=data.content&&data.content[0]?data.content[0].text:'Lo siento, no pude procesar tu mensaje. ¿Intentas de nuevo?';
-    // Check if bot suggests human contact
-    var hasHuman=reply.toLowerCase().indexOf('whatsapp')>=0||reply.toLowerCase().indexOf('humano')>=0||reply.toLowerCase().indexOf('persona real')>=0;
-    if(hasHuman)reply+='HUMANO_BTN';
-    var cleanReply=reply.replace('HUMANO_BTN','');
-    _chatHistory.push({role:'assistant',content:cleanReply});
-    addChatMsg(reply,'bot');
-    var btns=detectChatButtons(cleanReply);
-    if(btns)renderChatQuick(btns);else _clearChatQuick();
-  }).catch(function(err){
-    typing.remove();
-    addChatMsg('Ups, hubo un error de conexión. Intenta de nuevo o contáctanos por WhatsApp.HUMANO_BTN','bot');
-  }).finally(function(){
-    document.getElementById('chat-send').disabled=false;
-  });
-}
 
 </script>
-<button class="chat-fab" id="chat-fab" onclick="toggleChat()" title="Asistente virtual">💬</button>
-<div class="chat-panel" id="chat-panel">
-  <div class="chat-head">
-    <span class="chat-head-title" id="chat-char-name">Conecta Reynosa</span>
-    <button class="chat-close" onclick="toggleChat()">✕</button>
-  </div>
-  <div class="chat-msgs" id="chat-msgs"></div>
-  <div class="chat-input-wrap">
-    <input class="chat-input" id="chat-input" placeholder="Escribe tu mensaje..." onkeydown="if(event.key==='Enter')enviarChat()">
-    <button class="chat-send" id="chat-send" onclick="enviarChat()">Enviar</button>
+<!-- Ayuda contextual: FAB flotante persistente -->
+<button id="help-fab" class="help-fab" aria-label="Ayuda — ¿Cómo cotizar?" title="¿Cómo cotizar?"><span class="help-fab-icon">?</span></button>
+<div id="help-modal" class="help-modal" role="dialog" aria-modal="true" aria-labelledby="help-modal-title" hidden>
+  <div class="help-modal-content">
+    <button class="help-close" type="button" aria-label="Cerrar">×</button>
+    <h3 id="help-modal-title">¿Cómo cotizar?</h3>
+    <ol class="help-steps">
+      <li><strong>1</strong> Elige a cuántos van</li>
+      <li><strong>2</strong> Selecciona el paquete que más te conviene</li>
+      <li><strong>3</strong> Escoge tu zona, hotel y transporte</li>
+      <li><strong>4</strong> Listo, mira tu cotización</li>
+    </ol>
+    <p class="help-note">¿Dudas? Escríbenos por WhatsApp</p>
+    <a href="https://wa.me/528119771072?text=Hola!%20Tengo%20una%20duda%20sobre%20mi%20cotización" class="help-wa-btn" target="_blank" rel="noopener">💬 Abrir WhatsApp</a>
   </div>
 </div>
 <div id="toast" class="toast" role="status" aria-live="polite"></div>
@@ -5013,60 +4397,6 @@ function enviarChat(){
     </div>
     <button class="bienvenida-btn" onclick="cerrarBienvenida();document.getElementById('ev-list').scrollIntoView({behavior:'smooth'})">Ver eventos y cotizar →</button>
     <button class="bienvenida-skip" onclick="cerrarBienvenida()">Continuar</button>
-  </div>
-</div>
-<div class="onboard-bg" id="onboard-bg" onclick="if(event.target===this)skipOnboarding()">
-  <div class="onboard-box" role="dialog" aria-modal="true" aria-labelledby="onboard-title-h">
-    <div class="onboard-head">
-      <div class="onboard-ev" id="onboard-ev"></div>
-      <div class="onboard-fecha" id="onboard-fecha"></div>
-    </div>
-    <h2 class="onboard-title" id="onboard-title-h">¿Cómo reservar tu lugar?</h2>
-    <div class="onboard-steps">
-      <div class="onboard-step">
-        <div class="onboard-step-num">1</div>
-        <div class="onboard-step-body">
-          <div class="onboard-step-title">Elige cuántos viajeros van</div>
-          <div class="onboard-step-desc">1, 2, 3 o 4 personas. El precio se calcula por persona.</div>
-        </div>
-      </div>
-      <div class="onboard-step">
-        <div class="onboard-step-num">2</div>
-        <div class="onboard-step-body">
-          <div class="onboard-step-title">Selecciona tu paquete</div>
-          <div class="onboard-step-desc">PLUS (todo incluido), RIDE (sin boleto), STAY (sin transporte) o CHEAP (solo boleto + kit).</div>
-        </div>
-      </div>
-      <div class="onboard-step">
-        <div class="onboard-step-num">3</div>
-        <div class="onboard-step-body">
-          <div class="onboard-step-title">Elige tu zona y revisa precios</div>
-          <div class="onboard-step-desc">Las zonas tachadas están agotadas. Presiona "Ver mapa del venue" para ubicarte.</div>
-        </div>
-      </div>
-      <div class="onboard-step">
-        <div class="onboard-step-num">4</div>
-        <div class="onboard-step-body">
-          <div class="onboard-step-title">Separa tu lugar</div>
-          <div class="onboard-step-desc">Transfiere el separo y envía tu comprobante por Messenger o WhatsApp.</div>
-        </div>
-      </div>
-    </div>
-    <div class="onboard-promo" id="onboard-promo" style="display:none"></div>
-    <div class="onboard-actions">
-      <button class="onboard-skip" type="button" onclick="skipOnboarding()">Saltar</button>
-      <button class="onboard-go" type="button" onclick="finishOnboarding()">Entendido, vamos</button>
-    </div>
-  </div>
-</div>
-<div class="tour-highlight" id="tour-highlight" aria-hidden="true"></div>
-<div class="tour-tooltip" id="tour-tooltip" role="dialog" aria-live="polite">
-  <span class="tour-arrow up" id="tour-arrow"></span>
-  <h3 class="tour-title" id="tour-title"></h3>
-  <p class="tour-text" id="tour-text"></p>
-  <div class="tour-actions">
-    <button type="button" class="tour-skip" onclick="tourSkip()">Saltar tour</button>
-    <button type="button" class="tour-next" id="tour-next" onclick="tourNext()">Entendido →</button>
   </div>
 </div>
 <div class="promo-modal-bg" id="promo-modal-bg" onclick="cerrarPromoModal()">
@@ -5165,6 +4495,39 @@ function cerrarBienvenida(){
   var isMobile=/Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
   if(!isMobile)return;
   navigator.serviceWorker.register('/sw.js').catch(function(){});
+})();
+</script>
+<script>
+// Ayuda contextual: FAB flotante "?" + modal mínimo.
+(function(){
+  // Limpieza de keys de versiones anteriores del sistema de ayuda (modal de
+  // bienvenida del wizard, barra wiz-hint y tour spotlight, ya eliminados).
+  try{
+    ['tutorial-visto','onboarding-visto','wiz-hint-visto','wizard-tour-done'].forEach(function(prefix){
+      Object.keys(localStorage).forEach(function(key){
+        if(key.indexOf(prefix)===0)localStorage.removeItem(key);
+      });
+    });
+  }catch(e){}
+
+  var fab=document.getElementById('help-fab');
+  var modal=document.getElementById('help-modal');
+  if(!fab||!modal)return;
+  function abrir(){modal.hidden=false;}
+  function cerrar(){modal.hidden=true;}
+  fab.addEventListener('click',abrir);
+  var close=modal.querySelector('.help-close');
+  if(close)close.addEventListener('click',cerrar);
+  modal.addEventListener('click',function(e){if(e.target===modal)cerrar();});
+  document.addEventListener('keydown',function(e){if(e.key==='Escape'&&!modal.hidden)cerrar();});
+
+  // Pulse suave solo en la PRIMERA visita al sitio, para invitar a descubrirlo.
+  try{
+    if(!localStorage.getItem('help-fab-shown')){
+      fab.classList.add('pulse-once');
+      localStorage.setItem('help-fab-shown','1');
+    }
+  }catch(e){}
 })();
 </script>
 </body>

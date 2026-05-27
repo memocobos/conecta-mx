@@ -972,6 +972,17 @@ src="https://www.facebook.com/tr?id=1685907946147007&ev=PageView&noscript=1"
 </head>
 <body>
 
+<div id="hot-sale-banner" class="hot-sale-banner" title="Copiar código HOTSALE">
+  <div class="hsb-content">
+    <span class="hsb-icon">🔥</span>
+    <div class="hsb-text">
+      <strong>HOT SALE 24H</strong>
+      <span>Código <code>HOTSALE</code> · 8% PLUS · 5% CHEAP</span>
+    </div>
+    <div class="hsb-countdown" id="hsb-countdown">--:--:--</div>
+  </div>
+</div>
+
 <div class="progress" id="progress"></div>
 
 <nav class="nav">
@@ -1401,7 +1412,23 @@ src="https://www.facebook.com/tr?id=1685907946147007&ev=PageView&noscript=1"
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 .toast.warning{border-left-color:#e8ff4c}
 .toast.info{border-left-color:#0000cd}
+.toast.success{border-left-color:#88ea4e}
 .z-nota{margin-top:6px;font-size:10px;font-weight:800;color:#e8ff4c;text-transform:uppercase;letter-spacing:.04em;line-height:1.3}
+/* HOT SALE banner */
+.hot-sale-banner{display:none;position:sticky;top:0;z-index:9999;background:linear-gradient(90deg,#ff283b 0%,#e8ff4c 50%,#ff283b 100%);background-size:200% 100%;animation:hsbShimmer 3s linear infinite;padding:10px 16px;text-align:center;color:#000;font-weight:700;border-bottom:3px solid #000;cursor:pointer;font-family:'Montserrat',sans-serif}
+@keyframes hsbShimmer{0%{background-position:0% 50%}100%{background-position:200% 50%}}
+.hsb-content{max-width:1200px;margin:0 auto;display:flex;align-items:center;justify-content:center;gap:14px;flex-wrap:wrap}
+.hsb-icon{font-size:22px;animation:hsbPulse 1s ease-in-out infinite}
+@keyframes hsbPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.2)}}
+.hsb-text{display:flex;flex-direction:column;text-align:left;line-height:1.25}
+.hsb-text strong{font-size:15px;letter-spacing:.5px}
+.hsb-text code{background:#000;color:#e8ff4c;padding:1px 7px;border-radius:4px;font-family:'Barlow Condensed',monospace;font-weight:900;letter-spacing:2px}
+.hsb-countdown{background:#000;color:#e8ff4c;padding:7px 14px;border-radius:8px;font-family:'Barlow Condensed',monospace;font-size:22px;font-weight:900;min-width:120px;letter-spacing:1px}
+@media(max-width:640px){.hsb-text{font-size:11px}.hsb-text strong{font-size:13px}.hsb-countdown{font-size:17px;padding:5px 11px;min-width:96px}}
+body.hsale-on .nav{top:var(--hsb-h,0px)}
+body:has(#page-detail.active) .hot-sale-banner{display:none !important}
+/* HOT SALE badge en card */
+.ev-badge-hotsale{background:linear-gradient(135deg,#ff283b 0%,#ff8800 100%);color:#fff;font-weight:900;padding:5px 11px;border-radius:20px;font-size:11px;letter-spacing:.5px;animation:hsbPulse 1.5s ease-in-out infinite;position:absolute;top:12px;right:12px;z-index:6;font-family:'Montserrat',sans-serif;box-shadow:0 4px 12px rgba(0,0,0,.4)}
 /* Botón "Volver a eventos" sticky en el detalle de evento (mobile-first) */
 .wiz-volver{display:none;position:fixed;top:0;left:0;right:0;height:48px;width:100%;background:rgba(0,0,0,.7);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border:0;border-bottom:2px solid #e8ff4c;color:#fff;font-family:'Montserrat',sans-serif;font-size:12px;font-weight:900;letter-spacing:.1em;text-transform:uppercase;align-items:center;justify-content:flex-start;gap:10px;padding:0 16px;cursor:pointer;z-index:210}
 .wiz-volver:hover{background:rgba(0,0,0,.85)}
@@ -2051,7 +2078,8 @@ function renderCatalog(){
     card.setAttribute('data-id',ev.id);
     card.className='ev-card'+(isPast?' pasado':'')+(isAg&&!isPast?' agotado':'')+(isProc&&!isPast?' proceso':'')+(isPronto&&!isPast?' pronto':'')+(isProxi&&!isPast?' proxi':'');
     var proxBadge=isProxi?'<div class="ev-prox-badge">AVÍSAME<span class="ev-prox-sub">Lista de espera</span></div>':'';
-    card.innerHTML=imgHTML+
+    var hotSaleBadge=(typeof hotSaleActive==='function'&&hotSaleActive()&&PROMOS['HOTSALE']&&PROMOS['HOTSALE'].onlyEvents&&PROMOS['HOTSALE'].onlyEvents.indexOf(ev.id)>=0&&!isPast&&!isAg)?'<div class="ev-badge-hotsale">🔥 HOT SALE 8%</div>':'';
+    card.innerHTML=imgHTML+hotSaleBadge+
       '<span class="ev-tag '+tagCls+'">'+tagTxt+'</span>'+
       '<div class="ev-body">'+
         '<div class="ev-top">'+
@@ -2189,7 +2217,8 @@ var PROMOS={
   'CAIFAN': {pct:5, expiresTs:Date.parse('2026-05-20T20:00:00-06:00'), maxUsos:9999, usos:0, desc:'5% de descuento con código CAIFAN', onlyEvent:'caifanes', excludePkg:['ride','stay','cheap']},
   'HURRICANE': {pct:5, expiresTs:Date.parse('2026-05-21T20:00:00-06:00'), maxUsos:9999, usos:0, desc:'5% de descuento con código HURRICANE', onlyEvent:'scorpions', excludePkg:['ride','stay','cheap']},
   'TRUENO': {pct:5, expiresTs:Date.parse('2026-05-22T20:00:00-06:00'), maxUsos:9999, usos:0, desc:'5% de descuento con código TRUENO', onlyEvent:'trueno', excludePkg:['ride','stay','cheap']},
-  'ULTRA': {pct:5, expiresTs:Date.parse('2026-05-26T20:00:00-06:00'), maxUsos:9999, usos:0, desc:'5% de descuento con código ULTRA', onlyEvent:'ultramexico', excludePkg:['ride','stay','cheap']}
+  'ULTRA': {pct:5, expiresTs:Date.parse('2026-05-26T20:00:00-06:00'), maxUsos:9999, usos:0, desc:'5% de descuento con código ULTRA', onlyEvent:'ultramexico', excludePkg:['ride','stay','cheap']},
+  'HOTSALE': {pct:8, pctCheap:5, startTs:Date.parse('2026-05-27T00:00:00-05:00'), expiresTs:Date.parse('2026-05-28T00:00:00-05:00'), maxUsos:9999, usos:0, desc:'HOT SALE 24h — 8% PLUS / 5% CHEAP', excludePkg:['ride','stay'], onlyEvents:['keniaos','fanfest','zayn','rufus','harry','melanie','rosalia','arre','tini','warped','scorpions','anuelaa','youngmiko','neighbourhood','ironmaiden','beele','pulsoquetaro','enjambre','alejandrosanz','vaiven','badgyal','aitana','romeo','intocable','siddharta','monlaferte','aperfectcircle','trueno','morat','brunomars','knotfest','arjona','edenmunoz','edsheeran','babymetal','caifanes','edc2027']}
 };
 var _promoActivo=null;
 
@@ -2211,6 +2240,7 @@ function validarPromo(code){
   if(p.singleUse){
     try{ if(localStorage.getItem('promo_used_'+c)==='true') return {ok:false,msg:'Este código ya fue utilizado'}; }catch(e){}
   }
+  if(p.startTs&&Date.now()<p.startTs)return {ok:false,msg:'Este código aún no está activo'};
   if(p.expiresTs){
     if(Date.now()>p.expiresTs)return {ok:false,msg:'Código expirado'};
   } else if(p.expires){
@@ -2236,7 +2266,7 @@ function validarPromo(code){
       return {ok:false,msg:'Código exclusivo para zona '+p.onlyZones.join(' / ')};
     }
   }
-  return {ok:true,pct:p.pct||0,amount:p.amount||0,desc:p.desc,customMsg:p.customMsg||null,code:c,excludePkg:p.excludePkg||null,onlyZones:p.onlyZones||null};
+  return {ok:true,pct:p.pct||0,pctCheap:p.pctCheap||0,amount:p.amount||0,desc:p.desc,customMsg:p.customMsg||null,code:c,excludePkg:p.excludePkg||null,onlyZones:p.onlyZones||null};
 }
 var PC_EVENTS=["Justin Bieber", "Bad Bunny", "Sabrina Carpenter", "U2", "Festival Trópico", "Bahidora 2027", "Coldplay", "The Rolling Stones", "Tool", "Slipknot", "Luis Miguel", "Metallica", "Feid / Ferxxo", "Evanescence", "Marilyn Manson"];
 
@@ -3208,6 +3238,37 @@ function showToast(msg,type){
   if(_toastTimer)clearTimeout(_toastTimer);
   _toastTimer=setTimeout(function(){el.classList.remove('show');},4500);
 }
+
+// ── HOT SALE 24h (banner sticky + countdown) ───────────────────
+// Fuente de verdad: PROMOS['HOTSALE'].startTs/expiresTs (con literal de respaldo).
+var _hs=(typeof PROMOS!=='undefined'&&PROMOS['HOTSALE'])?PROMOS['HOTSALE']:null;
+var HOTSALE_START=_hs?_hs.startTs:Date.parse('2026-05-27T00:00:00-05:00');
+var HOTSALE_END=_hs?_hs.expiresTs:Date.parse('2026-05-28T00:00:00-05:00');
+function hotSaleActive(){var n=Date.now();return n>=HOTSALE_START&&n<HOTSALE_END;}
+function updateHotSaleBanner(){
+  var banner=document.getElementById('hot-sale-banner');if(!banner)return;
+  if(!hotSaleActive()){
+    if(banner.style.display!=='none'){banner.style.display='none';document.body.classList.remove('hsale-on');}
+    return;
+  }
+  banner.style.display='block';
+  document.body.classList.add('hsale-on');
+  try{document.documentElement.style.setProperty('--hsb-h',banner.offsetHeight+'px');}catch(e){}
+  var rem=HOTSALE_END-Date.now();
+  if(rem<=0){banner.style.display='none';document.body.classList.remove('hsale-on');return;}
+  var h=Math.floor(rem/3600000),m=Math.floor((rem%3600000)/60000),s=Math.floor((rem%60000)/1000);
+  var cd=document.getElementById('hsb-countdown');
+  if(cd)cd.textContent=String(h).padStart(2,'0')+':'+String(m).padStart(2,'0')+':'+String(s).padStart(2,'0');
+}
+(function(){
+  var banner=document.getElementById('hot-sale-banner');
+  if(banner)banner.addEventListener('click',function(){
+    try{navigator.clipboard.writeText('HOTSALE');showToast('Código HOTSALE copiado al portapapeles','success');}
+    catch(e){showToast('Código: HOTSALE','info');}
+  });
+  updateHotSaleBanner();
+  setInterval(updateHotSaleBanner,1000);
+})();
 
 // Onboarding e ID del evento actual viven como vars de módulo para que
 // finishOnboarding/skipOnboarding marquen la clave correcta sin tener
@@ -4333,10 +4394,11 @@ function calcular(){
     if(_promoActivo.amount){
       costoXPersona=Math.max(0,costoXPersona-_promoActivo.amount);
       total=Math.max(0,total-_promoActivo.amount*selViaj);
-    } else if(_promoActivo.pct){
-      var desc=Math.round(costoXPersona*_promoActivo.pct/100);
+    } else if(_promoActivo.pct||_promoActivo.pctCheap){
+      var _epct=(selPkg==='cheap'&&_promoActivo.pctCheap)?_promoActivo.pctCheap:_promoActivo.pct;
+      var desc=Math.round(costoXPersona*_epct/100);
       costoXPersona=costoXPersona-desc;
-      total=total-Math.round(total*_promoActivo.pct/100);
+      total=total-Math.round(total*_epct/100);
     }
     resto=total-sepActualCalc;
   }
@@ -4920,8 +4982,13 @@ function enviarChat(){
 <div class="bienvenida-bg" id="bienvenida-bg" onclick="cerrarBienvenida()">
   <div class="bienvenida-box" onclick="event.stopPropagation()">
     <button class="bienvenida-close" onclick="cerrarBienvenida()">✕</button>
-    <div class="bienvenida-title">¡Bienvenido a Conecta Reynosa! 🎉</div>
-    <div class="bienvenida-text">Cotiza tu viaje a tus conciertos favoritos en menos de 60 segundos.</div>
+    <div class="bienvenida-title" id="bvn-title">¡Bienvenido a Conecta Reynosa! 🎉</div>
+    <div class="bienvenida-text" id="bvn-text">Cotiza tu viaje a tus conciertos favoritos en menos de 60 segundos.</div>
+    <div class="bienvenida-gift" id="bvn-hotsale" style="display:none">
+      <div class="bienvenida-gift-lbl">🔥 HOT SALE 24H</div>
+      <div class="bienvenida-gift-code">Código <b style="color:#e8ff4c">HOTSALE</b><br>8% en PLUS · 5% en CHEAP</div>
+      <div class="bienvenida-gift-small">Válido en 37 eventos seleccionados</div>
+    </div>
     <button class="bienvenida-btn" onclick="cerrarBienvenida();document.getElementById('ev-list').scrollIntoView({behavior:'smooth'})">Ver eventos y cotizar →</button>
     <button class="bienvenida-skip" onclick="cerrarBienvenida()">Continuar</button>
   </div>
@@ -5055,6 +5122,12 @@ function enviarChat(){
   var h=window.location.hash;
   var p=window.location.pathname.replace(/^\//,'');
   if(q.indexOf('evento=')>=0||h.length>1||p.length>0)return;
+  // Durante el HOT SALE el modal de bienvenida muestra el código de la promo.
+  if(typeof hotSaleActive==='function'&&hotSaleActive()){
+    var hsBlk=document.getElementById('bvn-hotsale');if(hsBlk)hsBlk.style.display='block';
+    var tEl=document.getElementById('bvn-title');if(tEl)tEl.textContent='🔥 HOT SALE 24H';
+    var txEl=document.getElementById('bvn-text');if(txEl)txEl.textContent='Solo por hoy: descuento exclusivo en 37 eventos seleccionados.';
+  }
   setTimeout(function(){document.getElementById('bienvenida-bg').style.display='flex';},800);
 })();
 function cerrarBienvenida(){

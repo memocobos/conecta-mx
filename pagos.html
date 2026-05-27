@@ -531,6 +531,47 @@ button:focus-visible,a:focus-visible{
 </head>
 <body>
 
+<!-- HOT SALE 24h banner (self-contained, sin dependencias) -->
+<style>
+#hot-sale-banner{display:none;position:sticky;top:0;z-index:9999;background:linear-gradient(90deg,#ff283b 0%,#e8ff4c 50%,#ff283b 100%);background-size:200% 100%;animation:hsbShimmer 3s linear infinite;padding:10px 16px;text-align:center;color:#000;font-weight:700;border-bottom:3px solid #000;cursor:pointer;font-family:'Montserrat',sans-serif}
+@keyframes hsbShimmer{0%{background-position:0% 50%}100%{background-position:200% 50%}}
+#hot-sale-banner .hsb-content{max-width:1200px;margin:0 auto;display:flex;align-items:center;justify-content:center;gap:14px;flex-wrap:wrap}
+#hot-sale-banner .hsb-icon{font-size:22px;animation:hsbPulse 1s ease-in-out infinite}
+@keyframes hsbPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.2)}}
+#hot-sale-banner .hsb-text{display:flex;flex-direction:column;text-align:left;line-height:1.25}
+#hot-sale-banner .hsb-text strong{font-size:15px;letter-spacing:.5px}
+#hot-sale-banner .hsb-text code{background:#000;color:#e8ff4c;padding:1px 7px;border-radius:4px;font-family:'Barlow Condensed',monospace;font-weight:900;letter-spacing:2px}
+#hot-sale-banner .hsb-countdown{background:#000;color:#e8ff4c;padding:7px 14px;border-radius:8px;font-family:'Barlow Condensed',monospace;font-size:22px;font-weight:900;min-width:120px;letter-spacing:1px}
+@media(max-width:640px){#hot-sale-banner .hsb-text{font-size:11px}#hot-sale-banner .hsb-text strong{font-size:13px}#hot-sale-banner .hsb-countdown{font-size:17px;padding:5px 11px;min-width:96px}}
+body.hsale-on .nav{top:var(--hsb-h,0px)}
+</style>
+<div id="hot-sale-banner" title="Copiar código HOTSALE">
+  <div class="hsb-content">
+    <span class="hsb-icon">🔥</span>
+    <div class="hsb-text"><strong>HOT SALE 24H</strong><span>Código <code id="hsb-code">HOTSALE</code> · 8% PLUS · 5% CHEAP</span></div>
+    <div class="hsb-countdown" id="hsb-countdown">--:--:--</div>
+  </div>
+</div>
+<script>
+(function(){
+  var START=Date.parse('2026-05-27T00:00:00-05:00'),END=Date.parse('2026-05-28T00:00:00-05:00');
+  var banner=document.getElementById('hot-sale-banner');if(!banner)return;
+  function pad(n){return String(n).padStart(2,'0');}
+  function tick(){
+    var n=Date.now();
+    if(n<START||n>=END){if(banner.style.display!=='none'){banner.style.display='none';document.body.classList.remove('hsale-on');}return;}
+    banner.style.display='block';document.body.classList.add('hsale-on');
+    try{document.documentElement.style.setProperty('--hsb-h',banner.offsetHeight+'px');}catch(e){}
+    var rem=END-n,h=Math.floor(rem/3600000),m=Math.floor((rem%3600000)/60000),s=Math.floor((rem%60000)/1000);
+    var cd=document.getElementById('hsb-countdown');if(cd)cd.textContent=pad(h)+':'+pad(m)+':'+pad(s);
+  }
+  banner.addEventListener('click',function(){
+    try{navigator.clipboard.writeText('HOTSALE');}catch(e){}
+    var code=document.getElementById('hsb-code');if(code){var o=code.textContent;code.textContent='¡COPIADO!';setTimeout(function(){code.textContent=o;},1500);}
+  });
+  tick();setInterval(tick,1000);
+})();
+</script>
 <!-- Nav mínimo -->
 <nav class="nav">
   <div class="nav-inner">

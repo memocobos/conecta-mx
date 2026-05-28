@@ -1475,17 +1475,26 @@ body:has(#page-detail.active) .hot-sale-banner{display:none !important}
 .pago-btn-secondary:hover{background:rgba(37,211,102,.2)}
 .pago-close{position:absolute;top:12px;right:14px;background:none;border:none;color:rgba(255,255,255,.4);font-size:22px;cursor:pointer;z-index:1}
 .pago-close:hover{color:#fff}
-/* ===== Tutorial "¿Cómo cotizar?" — popup primera vez por evento ===== */
-.tut-modal{position:fixed;inset:0;background:rgba(0,0,0,.85);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);z-index:9996;display:flex;align-items:center;justify-content:center;padding:20px}
-.tut-modal[hidden]{display:none}
-.tut-modal-content{background:#0a0a0a;border-left:4px solid #e8ff4c;border-radius:2px;max-width:420px;width:90%;padding:34px 28px 28px;position:relative;box-shadow:0 24px 64px rgba(0,0,0,.75),0 0 0 1px rgba(255,255,255,.05);font-family:'Montserrat',sans-serif;animation:modalSlideUp .3s cubic-bezier(.22,1,.36,1) both}
-.tut-modal-content h3{font-family:'Barlow Condensed','Montserrat',sans-serif;font-weight:900;font-size:clamp(26px,6vw,34px);text-transform:uppercase;letter-spacing:.01em;color:#e8ff4c;margin:0 0 22px;line-height:1}
-.tut-steps{list-style:none;margin:0 0 24px;padding:0;display:flex;flex-direction:column;gap:14px}
-.tut-steps li{display:flex;gap:12px;align-items:flex-start;color:rgba(255,255,255,.85);font-size:15px;line-height:1.4;font-weight:500}
-.tut-steps li strong{flex-shrink:0;width:26px;height:26px;border-radius:50%;background:#e8ff4c;color:#000;font-size:13px;font-weight:900;display:flex;align-items:center;justify-content:center;font-family:'Montserrat',sans-serif}
-.tut-btn{width:100%;background:#e8ff4c;color:#000;border:none;padding:15px;font-family:'Barlow Condensed','Montserrat',sans-serif;font-size:18px;font-weight:900;text-transform:uppercase;letter-spacing:.06em;border-radius:0;cursor:pointer;transition:background .2s,transform .15s}
-.tut-btn:hover{background:#fff;transform:translateY(-1px)}
-@media(max-width:420px){.tut-modal-content{padding:28px 22px}}
+/* ===== ONBOARDING MODAL — popup "¿Cómo reservar tu lugar?" (1ra vez por evento) ===== */
+.onboard-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);z-index:9999;align-items:center;justify-content:center;padding:20px;overflow-y:auto}
+.onboard-box{background:#0a0a0a;border:2px solid rgba(232,255,76,.25);max-width:500px;width:100%;padding:28px 24px;color:#fff;font-family:'Montserrat',sans-serif;max-height:92vh;overflow-y:auto;border-radius:4px;position:relative}
+.onboard-head{margin-bottom:18px;padding-bottom:14px;border-bottom:1px solid rgba(255,255,255,.08)}
+.onboard-ev{font-family:'Barlow Condensed','Montserrat',sans-serif;font-size:24px;font-weight:900;text-transform:uppercase;letter-spacing:-.005em;line-height:1;color:#fff}
+.onboard-fecha{font-size:11px;font-weight:800;color:#e8ff4c;text-transform:uppercase;letter-spacing:.08em;margin-top:6px;font-family:'Montserrat',sans-serif}
+.onboard-title{font-family:'Barlow Condensed','Montserrat',sans-serif;font-size:30px;font-weight:900;text-transform:uppercase;letter-spacing:-.005em;line-height:1;color:#e8ff4c;margin:0 0 22px}
+.onboard-steps{display:flex;flex-direction:column;gap:14px;margin-bottom:18px}
+.onboard-step{display:flex;gap:14px;align-items:flex-start}
+.onboard-step-num{flex-shrink:0;width:32px;height:32px;border-radius:50%;background:#e8ff4c;color:#000;font-weight:900;font-size:13px;display:flex;align-items:center;justify-content:center;font-family:'Montserrat',sans-serif;line-height:1}
+.onboard-step-body{flex:1;min-width:0}
+.onboard-step-title{font-family:'Barlow Condensed','Montserrat',sans-serif;font-size:15px;font-weight:900;text-transform:uppercase;letter-spacing:.01em;color:#fff;margin-bottom:3px;line-height:1.05}
+.onboard-step-desc{font-size:12px;color:rgba(255,255,255,.65);line-height:1.45;font-weight:500;font-family:'Montserrat',sans-serif}
+.onboard-promo{background:rgba(232,255,76,.1);border:1.5px solid #e8ff4c;padding:12px 14px;margin-bottom:18px;font-size:12px;color:#e8ff4c;font-weight:700;line-height:1.45;border-radius:3px;font-family:'Montserrat',sans-serif}
+.onboard-promo b{color:#fff;font-weight:900;letter-spacing:.05em}
+.onboard-actions{display:flex;gap:10px;align-items:center}
+.onboard-skip{background:transparent;color:rgba(255,255,255,.55);border:none;padding:14px 16px;font-size:12px;font-weight:700;font-family:'Montserrat',sans-serif;cursor:pointer;text-transform:uppercase;letter-spacing:.05em}
+.onboard-skip:hover{color:#fff}
+.onboard-go{flex:1;background:#e8ff4c;color:#000;border:none;padding:14px 18px;font-size:13px;font-weight:900;font-family:'Montserrat',sans-serif;cursor:pointer;text-transform:uppercase;letter-spacing:.06em;border-radius:3px}
+.onboard-go:hover{filter:brightness(1.05)}
 @media(max-width:520px){.nav-sede{display:none}.nav-social{width:36px}.footer-contact{align-items:flex-start}}
 
 /* ==================================================================
@@ -3059,13 +3068,11 @@ function showDetail(id, _skipHistory){
       }
     }catch(e){}
   }
-  // Fix 1: popup "¿Cómo cotizar?" — PRIMERA vez por evento (por dispositivo).
+  // Popup "¿Cómo reservar tu lugar?" — PRIMERA vez por evento (por dispositivo).
   // No se muestra si este evento dispara su propio promoModal (evita modales apilados).
   try{
     var _promoVa=(cur.promoModal&&!sessionStorage.getItem('promo_'+cur.id));
-    if(!_promoVa && !localStorage.getItem('tutorial-visto-'+cur.id)){
-      setTimeout(function(){var tm=document.getElementById('tutorial-modal');if(tm)tm.hidden=false;},350);
-    }
+    if(!_promoVa){ setTimeout(function(){showOnboarding(cur);},300); }
   }catch(e){}
   // Promo modal per event (once per session)
   if(cur.promoModal&&!sessionStorage.getItem('promo_'+cur.id)){
@@ -4334,17 +4341,49 @@ function getQuincenas(from, until, max){
 
 
 </script>
-<!-- Fix 1: popup "¿Cómo cotizar?" — primera vez por evento (lo dispara showDetail) -->
-<div id="tutorial-modal" class="tut-modal" role="dialog" aria-modal="true" aria-labelledby="tut-modal-title" hidden>
-  <div class="tut-modal-content">
-    <h3 id="tut-modal-title">¿Cómo cotizar?</h3>
-    <ol class="tut-steps">
-      <li><strong>1</strong> Elige cuántos van</li>
-      <li><strong>2</strong> Selecciona el paquete que más te conviene</li>
-      <li><strong>3</strong> Escoge zona, hotel y transporte</li>
-      <li><strong>4</strong> Listo, mira tu cotización</li>
-    </ol>
-    <button class="tut-btn" type="button" id="tut-entendido">Entendido</button>
+<!-- Popup "¿Cómo reservar tu lugar?" — primera vez por evento (lo dispara showDetail; sin tour) -->
+<div class="onboard-bg" id="onboard-bg" onclick="if(event.target===this)skipOnboarding()">
+  <div class="onboard-box" role="dialog" aria-modal="true" aria-labelledby="onboard-title-h">
+    <div class="onboard-head">
+      <div class="onboard-ev" id="onboard-ev"></div>
+      <div class="onboard-fecha" id="onboard-fecha"></div>
+    </div>
+    <h2 class="onboard-title" id="onboard-title-h">¿Cómo reservar tu lugar?</h2>
+    <div class="onboard-steps">
+      <div class="onboard-step">
+        <div class="onboard-step-num">1</div>
+        <div class="onboard-step-body">
+          <div class="onboard-step-title">Elige cuántos viajeros van</div>
+          <div class="onboard-step-desc">1, 2, 3 o 4 personas. El precio se calcula por persona.</div>
+        </div>
+      </div>
+      <div class="onboard-step">
+        <div class="onboard-step-num">2</div>
+        <div class="onboard-step-body">
+          <div class="onboard-step-title">Selecciona tu paquete</div>
+          <div class="onboard-step-desc">PLUS (todo incluido), RIDE (sin boleto), STAY (sin transporte) o CHEAP (solo boleto + kit).</div>
+        </div>
+      </div>
+      <div class="onboard-step">
+        <div class="onboard-step-num">3</div>
+        <div class="onboard-step-body">
+          <div class="onboard-step-title">Elige tu zona y revisa precios</div>
+          <div class="onboard-step-desc">Las zonas tachadas están agotadas. Presiona "Ver mapa del venue" para ubicarte.</div>
+        </div>
+      </div>
+      <div class="onboard-step">
+        <div class="onboard-step-num">4</div>
+        <div class="onboard-step-body">
+          <div class="onboard-step-title">Separa tu lugar</div>
+          <div class="onboard-step-desc">Transfiere el separo y envía tu comprobante por Messenger o WhatsApp.</div>
+        </div>
+      </div>
+    </div>
+    <div class="onboard-promo" id="onboard-promo" style="display:none"></div>
+    <div class="onboard-actions">
+      <button class="onboard-skip" type="button" onclick="skipOnboarding()">Saltar</button>
+      <button class="onboard-go" type="button" onclick="finishOnboarding()">Entendido, vamos</button>
+    </div>
   </div>
 </div>
 <div id="toast" class="toast" role="status" aria-live="polite"></div>
@@ -4461,11 +4500,9 @@ function cerrarBienvenida(){
 })();
 </script>
 <script>
-// Fix 1: popup "¿Cómo cotizar?" — listeners de cierre. Marca visto AL CERRAR,
-// una sola vez por evento por dispositivo (localStorage 'tutorial-visto-<id>').
+// Limpieza de keys de versiones anteriores del sistema de ayuda ya eliminado
+// (NO toca 'tutorial-visto', que usa el popup onboarding por evento).
 (function(){
-  // Limpieza de keys de versiones anteriores del sistema de ayuda ya eliminado
-  // (NO incluye 'tutorial-visto', que ahora usa el popup por evento).
   try{
     ['onboarding-visto','wiz-hint-visto','wizard-tour-done','hints-vistos','help-fab-shown'].forEach(function(prefix){
       Object.keys(localStorage).forEach(function(key){
@@ -4473,18 +4510,38 @@ function cerrarBienvenida(){
       });
     });
   }catch(e){}
-
-  var tm=document.getElementById('tutorial-modal');
-  if(!tm)return;
-  function cerrarTut(){
-    tm.hidden=true;
-    try{ if(typeof cur!=='undefined'&&cur&&cur.id)localStorage.setItem('tutorial-visto-'+cur.id,'1'); }catch(e){}
-  }
-  var btn=document.getElementById('tut-entendido');
-  if(btn)btn.addEventListener('click',cerrarTut);
-  tm.addEventListener('click',function(e){if(e.target===tm)cerrarTut();});
-  document.addEventListener('keydown',function(e){if(e.key==='Escape'&&!tm.hidden)cerrarTut();});
 })();
+
+// Popup "¿Cómo reservar tu lugar?" — PRIMERA vez por evento (por dispositivo).
+// Versión B restaurada SIN el tour spotlight: al cerrar solo oculta el modal.
+var _onboardingEvId=null;
+function _tutorialKey(id){return 'tutorial-visto-'+(id||'_global');}
+function showOnboarding(ev){
+  _onboardingEvId=ev&&ev.id||null;
+  try{ if(localStorage.getItem(_tutorialKey(_onboardingEvId)))return; }catch(e){return;}
+  var bg=document.getElementById('onboard-bg');if(!bg||!ev)return;
+  document.getElementById('onboard-ev').textContent=ev.a||'';
+  document.getElementById('onboard-fecha').textContent=ev.f||'';
+  var pr=document.getElementById('onboard-promo');
+  var fp=ev.flashPromo;
+  var active=fp&&fp.code&&(!fp.expiresTs||fp.expiresTs>Date.now());
+  if(active){
+    var pct=fp.pct||0;
+    pr.innerHTML='Tienes un código de descuento disponible: <b>'+fp.code+'</b> — aplícalo antes de cotizar para obtener '+pct+'% de descuento.';
+    pr.style.display='block';
+  } else {
+    pr.style.display='none';
+  }
+  bg.style.display='flex';
+}
+function finishOnboarding(){
+  try{localStorage.setItem(_tutorialKey(_onboardingEvId),'1');}catch(e){}
+  var bg=document.getElementById('onboard-bg');if(bg)bg.style.display='none';
+}
+function skipOnboarding(){
+  try{localStorage.setItem(_tutorialKey(_onboardingEvId),'1');}catch(e){}
+  var bg=document.getElementById('onboard-bg');if(bg)bg.style.display='none';
+}
 </script>
 </body>
 </html>

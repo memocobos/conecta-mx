@@ -1369,7 +1369,6 @@ src="https://www.facebook.com/tr?id=1685907946147007&ev=PageView&noscript=1"
 .wa-float:hover{transform:scale(1.1);box-shadow:0 6px 20px rgba(37,211,102,.6)}
 @media(max-width:768px){
   .wa-float{bottom:90px !important}
-  .help-fab{bottom:160px !important}
 }
 .ev-flash-badge{background:#ff283b;color:#fff;font-size:9px;font-weight:900;padding:5px 10px;text-align:center;font-family:'Montserrat',sans-serif;letter-spacing:.03em;animation:flashPulse 2s ease-in-out infinite}
 .ev-preventa-badge{background:#ff283b;color:#e8ff4c;font-size:10px;font-weight:900;padding:7px 10px;text-align:center;font-family:'Montserrat',sans-serif;letter-spacing:.06em;text-transform:uppercase;animation:preventaPulse 1.2s ease-in-out infinite;border-top:1px solid rgba(255,255,255,.08);border-bottom:1px solid rgba(255,255,255,.08)}
@@ -1476,33 +1475,17 @@ body:has(#page-detail.active) .hot-sale-banner{display:none !important}
 .pago-btn-secondary:hover{background:rgba(37,211,102,.2)}
 .pago-close{position:absolute;top:12px;right:14px;background:none;border:none;color:rgba(255,255,255,.4);font-size:22px;cursor:pointer;z-index:1}
 .pago-close:hover{color:#fff}
-/* ===== Ayuda contextual: FAB flotante + modal mínimo + hints sutiles ===== */
-.help-fab{position:fixed;bottom:84px;right:20px;width:52px;height:52px;border-radius:50%;background:#e8ff4c;color:#000;border:2px solid #000;font-family:'Barlow Condensed','Montserrat',sans-serif;font-size:30px;font-weight:900;cursor:pointer;z-index:999;box-shadow:0 4px 12px rgba(0,0,0,.3);transition:transform .2s,box-shadow .2s;display:flex;align-items:center;justify-content:center;padding:0;line-height:1}
-.help-fab .help-fab-icon{display:block;transform:translateY(-1px)}
-.help-fab:hover{transform:scale(1.1);box-shadow:0 6px 16px rgba(0,0,0,.4)}
-.help-fab:active{transform:scale(.95)}
-.help-fab.pulse-once{animation:helpFabPulse 2s ease-in-out 2}
-@keyframes helpFabPulse{0%,100%{box-shadow:0 4px 12px rgba(232,255,76,.3)}50%{box-shadow:0 4px 24px rgba(232,255,76,.8)}}
-@media(max-width:640px){.help-fab{width:48px;height:48px;font-size:26px}}
-
-.help-modal{position:fixed;inset:0;background:rgba(0,0,0,.85);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);z-index:9995;display:flex;align-items:center;justify-content:center;padding:20px}
-.help-modal[hidden]{display:none}
-.help-modal-content{background:#0a0a0a;border-left:4px solid #e8ff4c;border-radius:2px;max-width:420px;width:92%;padding:34px 28px 28px;position:relative;box-shadow:0 24px 64px rgba(0,0,0,.75),0 0 0 1px rgba(255,255,255,.05);font-family:'Montserrat',sans-serif;animation:modalSlideUp .3s cubic-bezier(.22,1,.36,1) both}
-.help-close{position:absolute;top:10px;right:12px;width:36px;height:36px;background:transparent;border:none;color:rgba(255,255,255,.45);font-size:24px;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1;transition:color .2s,background .2s}
-.help-close:hover{color:#e8ff4c;background:rgba(255,255,255,.06)}
-.help-modal-content h3{font-family:'Barlow Condensed','Montserrat',sans-serif;font-weight:900;font-size:clamp(24px,5vw,30px);text-transform:uppercase;letter-spacing:.01em;color:#e8ff4c;margin:0 0 22px;line-height:1}
-.help-steps{list-style:none;margin:0 0 22px;padding:0;display:flex;flex-direction:column;gap:14px}
-.help-steps li{display:flex;gap:12px;align-items:flex-start;color:rgba(255,255,255,.82);font-size:15px;line-height:1.4;font-weight:500}
-.help-steps li strong{flex-shrink:0;width:26px;height:26px;border-radius:50%;background:#e8ff4c;color:#000;font-size:13px;font-weight:900;display:flex;align-items:center;justify-content:center;font-family:'Montserrat',sans-serif}
-.help-note{color:rgba(255,255,255,.55);font-size:13px;margin:0 0 14px;text-align:center}
-.help-wa-btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;box-sizing:border-box;background:#25D366;color:#fff;border:none;padding:14px;font-size:15px;font-weight:800;font-family:'Montserrat',sans-serif;border-radius:10px;text-decoration:none;transition:background .2s,transform .15s}
-.help-wa-btn:hover{background:#1fb855;transform:translateY(-1px)}
-
-/* Hints contextuales sutiles — una sola vez por usuario, debajo del paso actual */
-.hint-contextual{background:rgba(232,255,76,.1);border-left:3px solid #e8ff4c;padding:8px 12px;margin:8px 0;border-radius:4px;font-size:13px;color:#e8ff4c;font-weight:500;line-height:1.4;animation:hintFadeIn .4s ease-out;position:relative;cursor:pointer}
-.hint-contextual.dismissed{animation:hintFadeOut .3s forwards;overflow:hidden}
-@keyframes hintFadeIn{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}
-@keyframes hintFadeOut{to{opacity:0;height:0;padding-top:0;padding-bottom:0;margin-top:0;margin-bottom:0}}
+/* ===== Tutorial "¿Cómo cotizar?" — popup primera vez por evento ===== */
+.tut-modal{position:fixed;inset:0;background:rgba(0,0,0,.85);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);z-index:9996;display:flex;align-items:center;justify-content:center;padding:20px}
+.tut-modal[hidden]{display:none}
+.tut-modal-content{background:#0a0a0a;border-left:4px solid #e8ff4c;border-radius:2px;max-width:420px;width:90%;padding:34px 28px 28px;position:relative;box-shadow:0 24px 64px rgba(0,0,0,.75),0 0 0 1px rgba(255,255,255,.05);font-family:'Montserrat',sans-serif;animation:modalSlideUp .3s cubic-bezier(.22,1,.36,1) both}
+.tut-modal-content h3{font-family:'Barlow Condensed','Montserrat',sans-serif;font-weight:900;font-size:clamp(26px,6vw,34px);text-transform:uppercase;letter-spacing:.01em;color:#e8ff4c;margin:0 0 22px;line-height:1}
+.tut-steps{list-style:none;margin:0 0 24px;padding:0;display:flex;flex-direction:column;gap:14px}
+.tut-steps li{display:flex;gap:12px;align-items:flex-start;color:rgba(255,255,255,.85);font-size:15px;line-height:1.4;font-weight:500}
+.tut-steps li strong{flex-shrink:0;width:26px;height:26px;border-radius:50%;background:#e8ff4c;color:#000;font-size:13px;font-weight:900;display:flex;align-items:center;justify-content:center;font-family:'Montserrat',sans-serif}
+.tut-btn{width:100%;background:#e8ff4c;color:#000;border:none;padding:15px;font-family:'Barlow Condensed','Montserrat',sans-serif;font-size:18px;font-weight:900;text-transform:uppercase;letter-spacing:.06em;border-radius:0;cursor:pointer;transition:background .2s,transform .15s}
+.tut-btn:hover{background:#fff;transform:translateY(-1px)}
+@media(max-width:420px){.tut-modal-content{padding:28px 22px}}
 @media(max-width:520px){.nav-sede{display:none}.nav-social{width:36px}.footer-contact{align-items:flex-start}}
 
 /* ==================================================================
@@ -3066,8 +3049,8 @@ function showDetail(id, _skipHistory){
   $$('page-catalog').classList.remove('active');
   $$('page-detail').classList.add('active');
   $$('nav-back').style.display='flex';
-  if(window.matchMedia('(max-width:640px)').matches){document.body.classList.add('wizard-open');window.scrollTo(0,0);}
-  window.scrollTo(0,0);
+  if(window.matchMedia('(max-width:640px)').matches){document.body.classList.add('wizard-open');}
+  window.scrollTo(0,0);  // Fix: scrollTo(0,0) una sola vez (antes se llamaba 2x en móvil)
   // Deep link: actualizar URL del navegador a /<id> sin recargar (skip si venimos de popstate)
   if(!_skipHistory && typeof history!=='undefined' && history.pushState){
     try{
@@ -3076,6 +3059,14 @@ function showDetail(id, _skipHistory){
       }
     }catch(e){}
   }
+  // Fix 1: popup "¿Cómo cotizar?" — PRIMERA vez por evento (por dispositivo).
+  // No se muestra si este evento dispara su propio promoModal (evita modales apilados).
+  try{
+    var _promoVa=(cur.promoModal&&!sessionStorage.getItem('promo_'+cur.id));
+    if(!_promoVa && !localStorage.getItem('tutorial-visto-'+cur.id)){
+      setTimeout(function(){var tm=document.getElementById('tutorial-modal');if(tm)tm.hidden=false;},350);
+    }
+  }catch(e){}
   // Promo modal per event (once per session)
   if(cur.promoModal&&!sessionStorage.getItem('promo_'+cur.id)){
     setTimeout(function(){
@@ -3206,46 +3197,23 @@ function updateHotSaleBanner(){
   setInterval(updateHotSaleBanner,1000);
 })();
 
-/* ================== Ayuda contextual (hints sutiles por paso) ==================
-   Reemplaza el modal de bienvenida, la barra wiz-hint y el tour spotlight.
-   Cada hint aparece UNA sola vez por usuario (localStorage 'hints-vistos'),
-   se auto-oculta a los 4s y se cierra al tocarlo. */
-var _HINTS={
-  paquete:'👇 Toca cada paquete para ver qué incluye',
-  zona:'👇 Selecciona dónde quieres sentarte',
-  hotel:'👇 Elige cómo dormirás (compartido = más barato)',
-  transporte:'👇 ¿Bus, avión o por tu cuenta?'
-};
-var _HINT_CARD={paquete:'w-pkg-card',zona:'w-zona-card',hotel:'w-hotel-card',transporte:'w-transport-card'};
-
-function dismissHint(el){
-  if(!el)return;
-  el.classList.add('dismissed');
-  setTimeout(function(){if(el.parentNode)el.parentNode.removeChild(el);},300);
+/* ================== Auto-scroll preciso del wizard (Fix 3/4) ==================
+   Cada selección lleva al cliente al SIGUIENTE paso, y el flujo termina en el
+   cuadro azul del total — NUNCA en el rol/plan de pagos que va debajo. */
+// CUADRO AZUL DEL TOTAL — destino final del auto-scroll
+var TOTAL_SELECTOR = '#d-result .big-pago';
+function scrollToStep(id){
+  setTimeout(function(){
+    var el=document.getElementById(id);
+    if(!el||getComputedStyle(el).display==='none')return;
+    try{el.scrollIntoView({behavior:'smooth',block:'center'});}catch(e){el.scrollIntoView();}
+  },150);
 }
-
-function showContextualHint(key,cardId,text){
-  var vistos;
-  try{vistos=JSON.parse(localStorage.getItem('hints-vistos')||'{}');}catch(e){vistos={};}
-  if(vistos[key])return;
-  var card=document.getElementById(cardId);
-  if(!card||card.querySelector('.hint-contextual'))return;
-  var hint=document.createElement('div');
-  hint.className='hint-contextual';
-  hint.textContent=text;
-  hint.addEventListener('click',function(){dismissHint(hint);});
-  // Insertar justo debajo del título del paso (.wiz-lbl)
-  var lbl=card.querySelector('.wiz-lbl');
-  if(lbl&&lbl.nextSibling)card.insertBefore(hint,lbl.nextSibling);
-  else if(lbl)card.appendChild(hint);
-  else card.insertBefore(hint,card.firstChild);
-  setTimeout(function(){if(hint.parentNode)dismissHint(hint);},4000);
-  vistos[key]=true;
-  try{localStorage.setItem('hints-vistos',JSON.stringify(vistos));}catch(e){}
-}
-
-function fireStepHint(step){
-  if(_HINT_CARD[step])showContextualHint(step,_HINT_CARD[step],_HINTS[step]);
+function scrollToTotal(){
+  setTimeout(function(){
+    var el=document.querySelector(TOTAL_SELECTOR);
+    if(el){try{el.scrollIntoView({behavior:'smooth',block:'center'});}catch(e){el.scrollIntoView();}}
+  },150);
 }
 
 function selViajeros(btn,n){
@@ -3279,7 +3247,7 @@ function selViajeros(btn,n){
     updatePkgCards();
     $$('w-pkg-card').style.display='block';
   }
-  setTimeout(function(){fireStepHint('paquete');},350);
+  scrollToStep(cur&&cur.diaFirst?'w-dia-card':'w-pkg-card');
 }
 
 function updatePkgCards(){
@@ -3401,7 +3369,6 @@ function selPaquete(btn,pkg){
   selPkg=pkg;selZ=null;selH=null;selTransporte=null;
   try{ trackMainEvent('main_paquete_elegido', { paquete: pkg, paso_wizard: 'paquete' }); }catch(e){}
   setWizProgress(2);
-  setTimeout(function(){fireStepHint((pkg==='ride'&&!cur.noHotel)?'hotel':'zona');},350);
   try{window.trackAddToCart&&window.trackAddToCart(pkg,minP(cur));}catch(e){}
   var pb=$$('w-paquetes').querySelectorAll('.wiz-btn');
   for(var i=0;i<pb.length;i++)pb[i].classList.remove('active');
@@ -3446,7 +3413,6 @@ function selPaquete(btn,pkg){
       $$('w-hotel-n').textContent='5';
       buildHotelButtons();
       $$('w-hotel-card').style.display='block';
-      setTimeout(function(){fireStepHint('hotel');},350);
     } else {
       $$('w-hotel-card').style.display='none';
       selH={n:'Sin hospedaje',e:0};
@@ -3454,9 +3420,9 @@ function selPaquete(btn,pkg){
       if(isCDMX(cur)){
         buildTransporteButtons();
         $$('w-transport-card').style.display='block';
-        setTimeout(function(){fireStepHint('transporte');},350);
       } else {
         calcular();
+        scrollToTotal();
       }
     }
   } else {
@@ -3501,19 +3467,18 @@ function selPaquete(btn,pkg){
 
   $$('d-placeholder').style.display='block';
   $$('d-result').style.display='none';
-  // Scroll automático al siguiente paso visible (consistente independientemente
-  // del tour de tooltips, que solo dispara la primera vez por evento).
+  // Fix 3: tras elegir paquete, scroll al PRIMER paso visible (normalmente ZONAS,
+  // o FECHA si el evento la pide). block:'center' consistente con el resto.
   setTimeout(function(){
     var ids=['w-fecha-card','w-zona-card','w-hotel-card','w-transport-card'];
     for(var i=0;i<ids.length;i++){
       var el=document.getElementById(ids[i]);
       if(el&&getComputedStyle(el).display!=='none'){
-        try{el.scrollIntoView({behavior:'smooth',block:'start'});}catch(e){el.scrollIntoView();}
+        try{el.scrollIntoView({behavior:'smooth',block:'center'});}catch(e){el.scrollIntoView();}
         return;
       }
     }
-    // Sin más pasos (ej. diaFirst CDMX cheap llama calcular() directo);
-    // calcular() hace su propio scroll al #d-result.
+    // Sin más pasos (ej. diaFirst CDMX cheap): el scrollToTotal() del caller cubre.
   },150);
 }
 
@@ -3559,7 +3524,7 @@ function selBoletoBtn(btn,id){
   var btns=$$('d-boletos').querySelectorAll('.f-btn');
   for(var i=0;i<btns.length;i++)btns[i].classList.remove('active');
   btn.classList.add('active');
-  setTimeout(function(){fireStepHint('paquete');},350);
+  scrollToStep('w-pkg-card');
   // Auto-set zona from selected boleto + day
   var mf=cur.multifecha[selFechaIdx];
   if(mf&&mf.zonas[id]){
@@ -3756,7 +3721,10 @@ function selZona(btn,p,n){
   try{ trackMainEvent('main_zona_elegida', { zona: n, precio_zona: p, paso_wizard: 'zona' }); }catch(e){}
   setWizProgress(3);
   calcular();
-  setTimeout(function(){if(selPkg!=='cheap')fireStepHint('hotel');},350);
+  // Fix 3: ZONA → si falta habitación, ir a ella; si no (CHEAP/sin hotel), al total.
+  var _hotelPend=(selPkg==='plus'||selPkg==='ride'||selPkg==='stay')&&cur&&!cur.noHotel;
+  if(_hotelPend)scrollToStep('w-hotel-card');
+  else scrollToTotal();
 }
 
 function selHotel(btn,e,n){
@@ -3769,10 +3737,11 @@ function selHotel(btn,e,n){
   if(isCDMX(cur)){
     buildTransporteButtons();
     $$('w-transport-card').style.display='block';
-    setTimeout(function(){fireStepHint('transporte');},350);
+    scrollToStep('w-transport-card');  // Fix 3: HABITACIÓN → TRANSPORTE (CDMX)
   } else {
     $$('w-transport-card').style.display='none';
     calcular();
+    scrollToTotal();  // Fix 3: HABITACIÓN → cuadro azul (no CDMX)
   }
 }
 
@@ -3804,6 +3773,7 @@ function selTransporteBtn(btn,cost,name){
   selTransporte={n:name,cost:cost};
   try{ trackMainEvent('main_transporte_elegido', { transporte: name, paso_wizard: 'transporte' }); }catch(e){}
   calcular();
+  scrollToTotal();  // Fix 3: TRANSPORTE → cuadro azul del total
 }
 
 
@@ -4099,6 +4069,7 @@ function aplicarPromo(){
     if(PROMOS[r.code].singleUse){ try{ localStorage.setItem('promo_used_'+r.code,'true'); }catch(e){} }
     if(msg){msg.style.color='#88ea4e';msg.textContent='✓ '+(r.customMsg||(r.desc+' aplicado'));}
     calcular();
+    scrollToTotal();
   } else {
     _promoActivo=null;
     if(msg){msg.style.color='#ff283b';msg.textContent='✗ '+r.msg;}
@@ -4188,13 +4159,9 @@ function calcular(){
   $$('d-placeholder').style.display='none';
   $$('d-result').style.display='block';
   setWizProgress(4);
-  // Scroll al cuadro azul del total. block:'start' deja el `.big-pago` arriba
-  // del viewport en lugar de centrar el #d-result entero (que dejaría al
-  // calendario de pagos en el medio en pantallas grandes).
-  setTimeout(function(){
-    var r=document.getElementById('d-result');
-    if(r){try{r.scrollIntoView({behavior:'smooth',block:'start'});}catch(e){r.scrollIntoView();}}
-  },150);
+  // Fix 3/4: calcular() YA NO hace scroll aquí. El scroll lo dispara cada caller
+  // (selZona/selHotel/selTransporteBtn → scrollToTotal) apuntando al cuadro azul
+  // (.big-pago), nunca al #d-result completo que arrastra el plan de pagos.
   var promoCard=document.getElementById('w-promo-card');if(promoCard)promoCard.style.display='block';
   var shareBtn=document.getElementById('btn-share');if(shareBtn)shareBtn.style.display='block';
   if(_promoActivo&&_promoActivo.excludePkg&&_promoActivo.excludePkg.indexOf(selPkg)>=0){
@@ -4300,7 +4267,6 @@ function calcular(){
     }
   }
 
-  setTimeout(function(){var el=$$('d-result');if(el&&el.scrollIntoView)el.scrollIntoView({behavior:'smooth',block:'start'});},100);
 }
 
 var _lastCotizacion='';
@@ -4368,20 +4334,17 @@ function getQuincenas(from, until, max){
 
 
 </script>
-<!-- Ayuda contextual: FAB flotante persistente -->
-<button id="help-fab" class="help-fab" aria-label="Ayuda — ¿Cómo cotizar?" title="¿Cómo cotizar?"><span class="help-fab-icon">?</span></button>
-<div id="help-modal" class="help-modal" role="dialog" aria-modal="true" aria-labelledby="help-modal-title" hidden>
-  <div class="help-modal-content">
-    <button class="help-close" type="button" aria-label="Cerrar">×</button>
-    <h3 id="help-modal-title">¿Cómo cotizar?</h3>
-    <ol class="help-steps">
-      <li><strong>1</strong> Elige a cuántos van</li>
+<!-- Fix 1: popup "¿Cómo cotizar?" — primera vez por evento (lo dispara showDetail) -->
+<div id="tutorial-modal" class="tut-modal" role="dialog" aria-modal="true" aria-labelledby="tut-modal-title" hidden>
+  <div class="tut-modal-content">
+    <h3 id="tut-modal-title">¿Cómo cotizar?</h3>
+    <ol class="tut-steps">
+      <li><strong>1</strong> Elige cuántos van</li>
       <li><strong>2</strong> Selecciona el paquete que más te conviene</li>
-      <li><strong>3</strong> Escoge tu zona, hotel y transporte</li>
+      <li><strong>3</strong> Escoge zona, hotel y transporte</li>
       <li><strong>4</strong> Listo, mira tu cotización</li>
     </ol>
-    <p class="help-note">¿Dudas? Escríbenos por WhatsApp</p>
-    <a href="https://wa.me/528119771072?text=Hola!%20Tengo%20una%20duda%20sobre%20mi%20cotización" class="help-wa-btn" target="_blank" rel="noopener">💬 Abrir WhatsApp</a>
+    <button class="tut-btn" type="button" id="tut-entendido">Entendido</button>
   </div>
 </div>
 <div id="toast" class="toast" role="status" aria-live="polite"></div>
@@ -4498,36 +4461,29 @@ function cerrarBienvenida(){
 })();
 </script>
 <script>
-// Ayuda contextual: FAB flotante "?" + modal mínimo.
+// Fix 1: popup "¿Cómo cotizar?" — listeners de cierre. Marca visto AL CERRAR,
+// una sola vez por evento por dispositivo (localStorage 'tutorial-visto-<id>').
 (function(){
-  // Limpieza de keys de versiones anteriores del sistema de ayuda (modal de
-  // bienvenida del wizard, barra wiz-hint y tour spotlight, ya eliminados).
+  // Limpieza de keys de versiones anteriores del sistema de ayuda ya eliminado
+  // (NO incluye 'tutorial-visto', que ahora usa el popup por evento).
   try{
-    ['tutorial-visto','onboarding-visto','wiz-hint-visto','wizard-tour-done'].forEach(function(prefix){
+    ['onboarding-visto','wiz-hint-visto','wizard-tour-done','hints-vistos','help-fab-shown'].forEach(function(prefix){
       Object.keys(localStorage).forEach(function(key){
         if(key.indexOf(prefix)===0)localStorage.removeItem(key);
       });
     });
   }catch(e){}
 
-  var fab=document.getElementById('help-fab');
-  var modal=document.getElementById('help-modal');
-  if(!fab||!modal)return;
-  function abrir(){modal.hidden=false;}
-  function cerrar(){modal.hidden=true;}
-  fab.addEventListener('click',abrir);
-  var close=modal.querySelector('.help-close');
-  if(close)close.addEventListener('click',cerrar);
-  modal.addEventListener('click',function(e){if(e.target===modal)cerrar();});
-  document.addEventListener('keydown',function(e){if(e.key==='Escape'&&!modal.hidden)cerrar();});
-
-  // Pulse suave solo en la PRIMERA visita al sitio, para invitar a descubrirlo.
-  try{
-    if(!localStorage.getItem('help-fab-shown')){
-      fab.classList.add('pulse-once');
-      localStorage.setItem('help-fab-shown','1');
-    }
-  }catch(e){}
+  var tm=document.getElementById('tutorial-modal');
+  if(!tm)return;
+  function cerrarTut(){
+    tm.hidden=true;
+    try{ if(typeof cur!=='undefined'&&cur&&cur.id)localStorage.setItem('tutorial-visto-'+cur.id,'1'); }catch(e){}
+  }
+  var btn=document.getElementById('tut-entendido');
+  if(btn)btn.addEventListener('click',cerrarTut);
+  tm.addEventListener('click',function(e){if(e.target===tm)cerrarTut();});
+  document.addEventListener('keydown',function(e){if(e.key==='Escape'&&!tm.hidden)cerrarTut();});
 })();
 </script>
 </body>

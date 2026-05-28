@@ -10,10 +10,12 @@
 // Body JSON: { credentials: <correo o username>, password: <string> }
 // Devuelve : { ok: true, token: '<JWT>', user: { id, correo, nombre, rol, ... } }
 //
-// IMPORTANTE — passwords en texto plano:
-//   La columna `usuarios.password_hash` hoy guarda texto plano (ver auditoría).
-//   Este endpoint compara texto plano para mantener compatibilidad con la base
-//   actual. La migración a bcrypt va en una segunda PR (NO está en este commit).
+// Passwords: bcrypt con fallback texto plano (transición):
+//   La columna `usuarios.password_hash` se migró a bcrypt cost 10.
+//   Si el valor empieza con '$2' → bcrypt.compare. Si no → secureCompare
+//   (texto plano timing-safe) como fallback temporal hasta que todos los
+//   registros estén migrados. Eliminar el fallback cuando los 18 estén en
+//   bcrypt (idempotente: `migrate-bcrypt.js` ya cubre los pendientes).
 //
 // Env vars requeridas:
 //   - SUPABASE_URL_KAMEHOUSE  (fallback SUPABASE_URL)
@@ -22,6 +24,7 @@
 // =============================================================================
 
 const { jwtSign, corsCheck, corsHeaders, jsonError, ALLOWED_ORIGINS } = require('./_lib/verify-admin');
+const bcrypt = require('bcryptjs');
 
 const SB_URL = process.env.SUPABASE_URL_KAMEHOUSE || process.env.SUPABASE_URL;
 const SB_KEY = process.env.SUPABASE_SERVICE_KEY_KAMEHOUSE
@@ -119,9 +122,9 @@ exports.handler = async (event) => {
   }
 
   // ── Compare password ──
-  // ⚠️ TEXTO PLANO temporal — migrar a bcrypt en próxima PR.
-  // Comparación timing-safe para no leak por timing si pasa a bcrypt.
-  if (!user || !secureCompare(user.password_hash || '', password)) {
+  // Si password_hash empieza con '$2' → bcrypt. Si no → fallback texto plano
+  // timing-safe (transición). Eliminar el fallback cuando todos estén migrados.
+  if (!user || !(await passwordMatches(password, user.password_hash || ''))) {
     return badRequest(event, 401, 'Credenciales inválidas');
   }
 
@@ -171,6 +174,18 @@ exports.handler = async (event) => {
 // ───────────────────────────────────────────────────────────────────────
 // Rate limiting helpers
 // ───────────────────────────────────────────────────────────────────────
+
+// Compara password contra hash bcrypt o, como fallback, contra texto plano
+// timing-safe. Centralizado para que remover el fallback sea cambiar una sola
+// función cuando todos los registros estén migrados.
+async function passwordMatches(plain, stored) {
+  if (!stored) return false;
+  if (stored.startsWith('$2')) {
+    try { return await bcrypt.compare(plain, stored); }
+    catch (_) { return false; }
+  }
+  return secureCompare(stored, plain);
+}
 
 // Comparison timing-safe (string vs string)
 function secureCompare(a, b) {

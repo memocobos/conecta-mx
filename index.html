@@ -1680,6 +1680,120 @@ body:has(#page-detail.active) .hot-sale-banner{display:none !important}
   .nf-modal-title,
   .modal-conecta-title{font-size:24px !important}
 }
+
+/* ===================================================================
+   CONECTA MX · REFINAMIENTO v2 (presentación home)
+   Pegar al FINAL del <style> existente. Solo override visual.
+   NO toca: wizard (.wiz-*), lógica de eventos, ni JavaScript.
+   Para revertir: borrar este bloque o restaurar index_backup.html
+   =================================================================== */
+
+/* ---- NAV: glass-blur + borde rojo con línea animada + hover dorado ---- */
+.nav{
+  background:rgba(6,6,6,.82) !important;
+  -webkit-backdrop-filter:blur(14px) saturate(150%);
+  backdrop-filter:blur(14px) saturate(150%);
+  border-bottom:3px solid var(--c-rojo) !important;
+  box-shadow:0 0 24px rgba(255,40,59,.30),0 10px 30px rgba(0,0,0,.55);
+  height:60px;
+}
+.nav::after{
+  content:'';position:absolute;bottom:-3px;left:0;right:0;height:3px;
+  background:linear-gradient(90deg,var(--c-rojo),var(--c-rosa),var(--c-rojo));
+  background-size:200% 100%;animation:cmxSlide 3s linear infinite;
+}
+@keyframes cmxSlide{to{background-position:200% 0}}
+.nav .logo-box{
+  background:linear-gradient(135deg,#f4ff6b,#dcff2e) !important;
+  clip-path:polygon(0 0,100% 0,92% 100%,0 100%);
+}
+.nav-cli-link{border-radius:10px;transition:color .15s,background .15s}
+.nav-cli-link:hover{color:#000 !important;background:var(--c-amarillo) !important}
+
+/* ---- HERO: sombra triple apilada + glow en botón + grano más visible ---- */
+.home-hero-v2{
+  background:
+    radial-gradient(ellipse at 80% 6%,rgba(0,0,205,.45) 0,transparent 50%),
+    radial-gradient(ellipse at 10% 94%,rgba(255,40,59,.30) 0,transparent 54%),
+    #050505 !important;
+}
+.hh-kicker{
+  color:#000 !important;background:var(--c-amarillo);
+  padding:6px 14px 6px 12px;
+  clip-path:polygon(0 0,100% 0,93% 100%,0 100%);
+}
+.hh-kicker::before{display:none}
+.hh-title .mark::before{
+  background:linear-gradient(135deg,#f4ff6b,#dcff2e) !important;
+  box-shadow:8px 8px 0 var(--c-azul),16px 16px 0 rgba(255,40,59,.4);
+}
+.hh-btn-rojo{
+  border-radius:16px;
+  box-shadow:0 0 0 0 rgba(255,40,59,.5),0 10px 30px rgba(255,40,59,.4);
+}
+.hh-btn-rojo:hover{
+  transform:translateY(-3px) scale(1.02);
+  box-shadow:0 0 0 4px rgba(255,40,59,.25),0 18px 44px rgba(255,40,59,.55);
+}
+
+/* ---- TARJETAS DE EVENTO: redondez + elevación + halo rojo neón ---- */
+.ev-card{
+  background:linear-gradient(180deg,#161616,#0d0d0d) !important;
+  border:1px solid rgba(255,255,255,.08) !important;
+  border-radius:16px;
+  transition:opacity .4s ease,transform .22s cubic-bezier(.22,1,.36,1),border-color .2s,box-shadow .2s !important;
+}
+.ev-card:hover{
+  transform:translateY(-6px);
+  border-color:var(--c-rojo) !important;
+  box-shadow:0 22px 44px rgba(0,0,0,.6),0 0 26px rgba(255,40,59,.32);
+}
+/* La animación de entrada (.visible) sigue funcionando: solo afina el hover */
+.ev-card.visible:hover{transform:translateY(-6px)}
+.ev-img-wrap{border-radius:16px 16px 0 0;overflow:hidden}
+.ev-card .ev-price-val,.ev-card .ev-precio,.cpr{text-shadow:0 0 22px rgba(232,255,76,.30)}
+/* El precio: glow tenue sin cambiar tu markup */
+.ev-bottom [class*="price"],.ev-bottom [class*="precio"]{text-shadow:0 0 18px rgba(232,255,76,.28)}
+
+/* tag de estado: pastilla redonda con punto "live" */
+.ev-tag{border-radius:999px;border:1px solid rgba(255,255,255,.12);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+.ev-tag::before{box-shadow:0 0 8px currentColor}
+
+/* IMPORTANTE: respetar estados especiales — mantener esquinas del overlay */
+.ev-card.agotado::after,
+.ev-card.proceso::after,
+.ev-card.pronto::after{border-radius:16px}
+
+/* ---- BANNER CLIENTES: redondez + íconos en chip + hover ---- */
+.cli-banner{border-radius:16px;overflow:hidden}
+.cli-card{
+  border-radius:13px;
+  transition:transform .18s,border-color .18s,box-shadow .18s;
+}
+.cli-card:hover{
+  transform:translateY(-3px);
+  border-color:var(--c-amarillo);
+  box-shadow:0 14px 32px rgba(0,0,0,.5);
+}
+.cli-card .cci{
+  width:46px;height:46px;border-radius:12px;
+  background:rgba(232,255,76,.1);
+  display:flex;align-items:center;justify-content:center;flex-shrink:0;
+}
+.cli-card.alt .cci{background:rgba(0,0,205,.25)}
+.cli-card .cca{transition:transform .18s}
+.cli-card:hover .cca{transform:translateX(5px);color:var(--c-amarillo)}
+
+/* ---- FOOTER: acento superior ---- */
+.ftr-v2{border-top:3px solid var(--c-rojo) !important;position:relative}
+.ftr-v2-cta-rojo{border-radius:12px;box-shadow:0 8px 24px rgba(255,40,59,.3);transition:transform .2s,box-shadow .2s}
+.ftr-v2-cta-rojo:hover{transform:translateY(-2px);box-shadow:0 14px 32px rgba(255,40,59,.45)}
+.ftr-v2-cta-verde{border-radius:12px;transition:transform .2s}
+.ftr-v2-cta-verde:hover{transform:translateY(-2px)}
+
+/* ===================================================================
+   FIN REFINAMIENTO v2
+   =================================================================== */
 </style>
 
 <script src="imgs.js"></script>
@@ -1772,7 +1886,7 @@ var EV=[  {id:'avengedsevenfold',c:'gris',img:'Avenged Sevenfold',a:'Avenged Sev
   {id:'hilary',cdmx:true,mapa:'hilary',c:'rosa',img:'Hilary Duff',a:'Hilary Duff - The Lucky Me Tour',f:'13 feb 2027',ds:'2027-02-13',v:'Palacio de los Deportes, CDMX',sep:1000,ride:2900,st:'',inc:['Boleto zona elegida','Traslados CDMX','Hospedaje compartido','Kit Conecta'],nota:'NO incluye vuelos.',banco:BANCO_HEY,zonas:[{n:'Sección D',p:0,ag:1},{n:'Sección E',p:4800},{n:'Nivel A',p:0,ag:1},{n:'Nivel B',p:0,ag:1},{n:'Nivel C',p:0,ag:1}],cheapZonas:[{n:'Sección D',p:0,ag:1},{n:'Sección E',p:3000},{n:'Nivel A',p:0,ag:1},{n:'Nivel B',p:0,ag:1},{n:'Nivel C',p:0,ag:1}],hotel:[{n:'Compartida',e:0},{n:'Doble',e:725},{n:'Triple',e:250},{n:'Individual',e:2175}],pagos:[{l:'Separo',d:'Hoy',s:1}]},
   {id:'edc2027',music:'99374314',staticImg:'edc2027',cdmx:true,c:'azul',img:false,a:'Electric Daisy Carnival EDC 2027',f:'19, 20 y 21 feb 2027',ds:'2027-02-19',v:'Autódromo Hermanos Rodríguez, CDMX',sep:800,st:'',inc:['Boleto zona elegida','Traslados CDMX Hotel-Evento','Hospedaje compartido','Kit Conecta'],nota:'NO incluye vuelos.',banco:BANCO_DEFAULT,diaFirst:true,hotelPP:true,boletos:[{n:'General',id:'general'},{n:'VIP',id:'vip',prox:true}],multifecha:[{lbl:'3 Días (19-21 Feb)',zonas:{general:{n:'General 3 días',p:9100},vip:{n:'VIP 3 días',p:0,prox:true}},cheapZonas:{general:{n:'General 3 días',p:5300},vip:{n:'VIP 3 días',p:0,prox:true}},hotel:[{n:'Compartida 4 personas',e:0,viaj:[1,2,3,4]},{n:'Individual (1p)',e:6525,viaj:[1]},{n:'Doble (2p)',e:2175,viaj:[2]},{n:'Triple (3p)',e:725,viaj:[3]}]},{lbl:'1 Día',zonas:{general:{n:'General 1 día',p:4100},vip:{n:'VIP 1 día',p:0,prox:true}},cheapZonas:{general:{n:'General 1 día',p:2500},vip:{n:'VIP 1 día',p:0,prox:true}},hotel:[{n:'Compartida 4 personas',e:0,viaj:[1,2,3,4]},{n:'Individual (1p)',e:2175,viaj:[1]},{n:'Doble (2p)',e:725,viaj:[2]},{n:'Triple (3p)',e:250,viaj:[3]}]},{lbl:'2 Días',zonas:{},prox:true}],zonas:[{n:'General 3 días',p:9100},{n:'General 1 día',p:4100}],cheapZonas:[{n:'General 3 días',p:5300},{n:'General 1 día',p:2500}],hotel:HOTEL_CDM,pagos:[{l:'Separo',d:'Hoy',s:1},{l:'Pago 1',d:'24 abr-1 may',s:0},{l:'Pago 2',d:'9-16 may',s:0},{l:'Pago 3',d:'24 may-1 jun',s:0},{l:'Pago 4',d:'9-16 jun',s:0},{l:'Pago 5',d:'24 jun-1 jul',s:0},{l:'Pago 6',d:'24 jul-1 ago',s:0},{l:'Pago 7',d:'24 ago-1 sep',s:0},{l:'Pago 8',d:'9-16 sep',s:0},{l:'Pago 9',d:'24 sep-1 oct',s:0},{l:'Pago 10',d:'9-16 oct',s:0}]},
   {id:'coronacapital',added:'2026-05-19',cdmx:true,noBus:true,hotelOverride:true,hotelPP:true,noStay:true,noCheap:true,cheapSoon:true,c:'azul',img:'Corona Capital',mapa:null,a:'Corona Capital',f:'20, 21 y 22 nov 2026',ds:'2026-11-20',v:'Autódromo Hermanos Rodríguez, CDMX',sep:800,st:'',inc:['Boleto zona elegida','Traslados Hotel-Evento CDMX','Hospedaje compartido','Kit Conecta'],nota:'NO incluye transporte a CDMX. Cotiza vuelo o llega por tu cuenta.',banco:BANCO_DEFAULT,flashPromo:{code:'CC2026',pct:5,expiresHours:24,expiresTs:Date.parse('2026-05-20T20:00:00-06:00'),excludePkg:['ride','stay','cheap'],onlyEvent:'coronacapital'},multifecha:[{lbl:'Vie 20 nov · 1 día',ds:'2026-11-20',noches:1,music:'958109',zonas:[{n:'General',p:3900}],cheapZonas:[{n:'General',p:0,prox:1}],ride:2900,hotel:[{k:'compartida',n:'Compartida (4)',e:0,pp:0,viaj:[1,2,3,4],desc:'Compartes cuarto con otros viajeros'},{k:'triple',n:'Triple',e:300,pp:300,viaj:[3],desc:'Tu parte del cuarto triple'},{k:'doble',n:'Doble',e:800,pp:800,viaj:[2],desc:'Tu parte del cuarto doble'},{k:'individual',n:'Individual',e:2400,pp:2400,viaj:[1],desc:'Cuarto solo para ti'}]},{lbl:'Sáb 21 nov · 1 día',ds:'2026-11-21',noches:1,music:'3129407',zonas:[{n:'General',p:3900}],cheapZonas:[{n:'General',p:0,prox:1}],ride:2900,hotel:[{k:'compartida',n:'Compartida (4)',e:0,pp:0,viaj:[1,2,3,4],desc:'Compartes cuarto con otros viajeros'},{k:'triple',n:'Triple',e:300,pp:300,viaj:[3],desc:'Tu parte del cuarto triple'},{k:'doble',n:'Doble',e:800,pp:800,viaj:[2],desc:'Tu parte del cuarto doble'},{k:'individual',n:'Individual',e:2400,pp:2400,viaj:[1],desc:'Cuarto solo para ti'}]},{lbl:'Dom 22 nov · 1 día',ds:'2026-11-22',noches:1,music:'99976952',zonas:[{n:'General',p:3900}],cheapZonas:[{n:'General',p:0,prox:1}],ride:2900,hotel:[{k:'compartida',n:'Compartida (4)',e:0,pp:0,viaj:[1,2,3,4],desc:'Compartes cuarto con otros viajeros'},{k:'triple',n:'Triple',e:300,pp:300,viaj:[3],desc:'Tu parte del cuarto triple'},{k:'doble',n:'Doble',e:800,pp:800,viaj:[2],desc:'Tu parte del cuarto doble'},{k:'individual',n:'Individual',e:2400,pp:2400,viaj:[1],desc:'Cuarto solo para ti'}]},{lbl:'Vie + Sáb · 2 días',ds:'2026-11-20',noches:2,music:'958109',zonas:[{n:'General',p:6300}],cheapZonas:[{n:'General',p:0,prox:1}],ride:4800,hotel:[{k:'compartida',n:'Compartida (4)',e:0,pp:0,viaj:[1,2,3,4],desc:'Compartes cuarto con otros viajeros · 2 noches'},{k:'triple',n:'Triple',e:600,pp:600,viaj:[3],desc:'Tu parte del cuarto triple · 2 noches'},{k:'doble',n:'Doble',e:1600,pp:1600,viaj:[2],desc:'Tu parte del cuarto doble · 2 noches'},{k:'individual',n:'Individual',e:4800,pp:4800,viaj:[1],desc:'Cuarto solo para ti · 2 noches'}]},{lbl:'Sáb + Dom · 2 días',ds:'2026-11-21',noches:2,music:'3129407',zonas:[{n:'General',p:6300}],cheapZonas:[{n:'General',p:0,prox:1}],ride:4800,hotel:[{k:'compartida',n:'Compartida (4)',e:0,pp:0,viaj:[1,2,3,4],desc:'Compartes cuarto con otros viajeros · 2 noches'},{k:'triple',n:'Triple',e:600,pp:600,viaj:[3],desc:'Tu parte del cuarto triple · 2 noches'},{k:'doble',n:'Doble',e:1600,pp:1600,viaj:[2],desc:'Tu parte del cuarto doble · 2 noches'},{k:'individual',n:'Individual',e:4800,pp:4800,viaj:[1],desc:'Cuarto solo para ti · 2 noches'}]},{lbl:'Vie a Dom · 3 días',ds:'2026-11-20',noches:3,music:'958109',zonas:[{n:'General',p:8700}],cheapZonas:[{n:'General',p:0,prox:1}],ride:6700,hotel:[{k:'compartida',n:'Compartida (4)',e:0,pp:0,viaj:[1,2,3,4],desc:'Compartes cuarto con otros viajeros · 3 noches'},{k:'triple',n:'Triple',e:900,pp:900,viaj:[3],desc:'Tu parte del cuarto triple · 3 noches'},{k:'doble',n:'Doble',e:2400,pp:2400,viaj:[2],desc:'Tu parte del cuarto doble · 3 noches'},{k:'individual',n:'Individual',e:7200,pp:7200,viaj:[1],desc:'Cuarto solo para ti · 3 noches'}]}],zonas:[{n:'General',p:3900}],cheapZonas:[{n:'General',p:0,prox:1}],pagos:[{l:'Separo',d:'Hoy',s:1},{l:'Pago 1',d:'24 jul-1 ago',s:0},{l:'Pago 2',d:'24 ago-1 sep',s:0},{l:'Pago 3',d:'9-16 sep',s:0},{l:'Pago 4',d:'24 sep-1 oct',s:0},{l:'Pago final',d:'24 oct-1 nov',s:0}]},
-  {id:'straykids',added:'2026-05-21',music:'2893837431',mapa:'straykids',cdmx:true,c:'azul',img:'Stray Kids',a:'Stray Kids',f:'25 sep 2026',ds:'2026-09-25',v:'Estadio GNP, CDMX',sep:1000,sepCheap:1000,ride:2900,stayOffset:500,st:'',banco:BANCO_DEFAULT,bancoCheap:BANCO_HEY,zonas:[{n:'Box Oro',p:13900,vip:1},{n:'General B',p:4900}],cheapZonas:[{n:'Box Oro',p:12000,vip:1,sepEspecial:4000},{n:'General B',p:2800}],hotel:[{k:'compartida',n:'Compartida (4)',e:0,pp:0,viaj:[4],desc:'Compartes cuarto con otros viajeros'},{k:'triple',n:'Triple',e:300,pp:300,viaj:[3],desc:'Tu parte del cuarto triple'},{k:'doble',n:'Doble',e:800,pp:800,viaj:[2],desc:'Tu parte del cuarto doble'},{k:'individual',n:'Individual',e:2400,pp:2400,viaj:[1],desc:'Cuarto solo para ti'}],pagos:[{l:'Separo',d:'Hoy',s:1}]},
+  {id:'straykids',added:'2026-05-21',music:'2893837431',mapa:'straykids',cdmx:true,c:'azul',img:'Stray Kids',a:'Stray Kids',f:'25 sep 2026',ds:'2026-09-25',v:'Estadio GNP, CDMX',sep:1000,sepCheap:1000,ride:2900,stayOffset:500,st:'',banco:BANCO_DEFAULT,bancoCheap:BANCO_HEY,zonas:[{n:'Box Oro',p:13900,vip:1},{n:'Platino A',p:15000,vip:1},{n:'Platino B',p:11400,vip:1},{n:'Platino C',p:10500,vip:1},{n:'Platino D',p:9400,vip:1},{n:'Zona GNP',p:9700},{n:'Platino E',p:8000},{n:'Verde',p:8100},{n:'Naranja B',p:7600},{n:'Verde C',p:6000},{n:'General B',p:4900},{n:'Naranja C',p:4800}],cheapZonas:[{n:'Box Oro',p:12000,vip:1,sepEspecial:4000},{n:'Platino A',p:13200,vip:1},{n:'Platino B',p:9600,vip:1},{n:'Platino C',p:8700,vip:1},{n:'Platino D',p:7600,vip:1},{n:'Zona GNP',p:7900},{n:'Platino E',p:6200},{n:'Verde',p:6300},{n:'Naranja B',p:5800},{n:'Verde C',p:4200},{n:'General B',p:3300},{n:'Naranja C',p:3000}],hotel:[{k:'compartida',n:'Compartida (4)',e:0,pp:0,viaj:[4],desc:'Compartes cuarto con otros viajeros'},{k:'triple',n:'Triple',e:300,pp:300,viaj:[3],desc:'Tu parte del cuarto triple'},{k:'doble',n:'Doble',e:800,pp:800,viaj:[2],desc:'Tu parte del cuarto doble'},{k:'individual',n:'Individual',e:2400,pp:2400,viaj:[1],desc:'Cuarto solo para ti'}],pagos:[{l:'Separo',d:'Hoy',s:1}]},
   {id:'flowfest',added:'2026-05-15',music:'1415334812',cdmx:true,c:'azul',img:'Coca Cola Flow Fest',a:'Coca Cola Flow Fest',f:'28 y 29 nov 2026',ds:'2026-11-28',v:'Autódromo Hermanos Rodríguez, CDMX',st:'proximamente',inc:[],banco:BANCO_DEFAULT,zonas:[],hotel:[],pagos:[]},
   {id:'tecatecomuna',added:'2026-05-15',music:'2250256',c:'rojo',img:'Tecate Comuna',a:'Tecate Comuna',f:'28 nov 2026',ds:'2026-11-28',v:'Foro Cholula, Puebla',st:'proximamente',inc:[],banco:BANCO_DEFAULT,zonas:[],hotel:[],pagos:[]},
   {id:'badbunny',added:'2026-05-15',music:'1741494317',c:'azul',img:'Bad Bunny',a:'Bad Bunny',f:'dic 2026',ds:'2026-12-01',v:'Estadio BBVA, Mty',st:'proximamente',inc:[],banco:BANCO_DEFAULT,zonas:[],hotel:[],pagos:[]},

@@ -14,7 +14,7 @@
 - Mapas de venues: mapas.js (MAPAS)
 - Lineups: lineups.js (LINEUPS)
 - Deploy: GitHub → Netlify automático
-- Chatbot IA: netlify/functions/chat.js (API Anthropic)
+- Ayuda contextual: FAB "?" flotante + modal mínimo + hints sutiles por paso (sin chatbot)
 - Analytics: Google Analytics G-7JKGFQQQ7W
 - Dominio: conectareynosa.mx (GoDaddy → Netlify DNS)
 

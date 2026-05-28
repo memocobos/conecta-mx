@@ -14,7 +14,7 @@
 // Aceptamos varias convenciones porque el repo tiene un mosaico:
 //   URL: SUPABASE_URL_KAMEHOUSE → SUPABASE_URL
 //   KEY: SUPABASE_SERVICE_KEY_KAMEHOUSE → SUPABASE_SERVICE_KEY → SUPABASE_SERVICE_ROLE_KEY
-// Mismo patrón que chat.js, rol-recordatorios.js y otras Functions del repo.
+// Mismo patrón que rol-recordatorios.js y otras Functions del repo.
 // =============================================================================
 
 exports.handler = async (event) => {

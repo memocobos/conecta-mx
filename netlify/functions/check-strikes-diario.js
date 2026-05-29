@@ -63,13 +63,73 @@ function _debeAplicarStrike(usuario) {
   return true;
 }
 
-async function aplicarStrike(usuarioId, motivo, tipo) {
+// ── Dedup helpers ───────────────────────────────────────────────────
+// strikes_log.evento_id se agregó en migración 2026-05-28 para hacer el
+// dedup robusto. Antes el dedup buscaba ev.id en el texto del motivo
+// y nunca matcheaba.
+//
+// _insertStrikeLog: intenta INSERT con evento_id, si la columna no
+// existe todavía (migración no corrida), retry sin evento_id.
+//
+// _yaExisteStrikeReporte: busca strike previo por evento_id (exacto) +
+// fallback por motivo.ilike.*nombre*. Si la columna no existe, hace
+// fallback total a solo-nombre.
+async function _insertStrikeLog(coordiId, accion, motivo, eventoId) {
+  const baseRow = {
+    coordi_id: coordiId,
+    accion,
+    motivo,
+    por_quien: null,
+    created_at: new Date().toISOString(),
+  };
+  const tryRow = eventoId ? { ...baseRow, evento_id: eventoId } : baseRow;
+  let r = await fetch(`${SB_URL}/rest/v1/strikes_log`, {
+    method: "POST",
+    headers: { ...HEADERS, Prefer: "return=minimal" },
+    body: JSON.stringify(tryRow),
+  }).catch(() => null);
+  if (r && r.ok) return;
+  if (!eventoId) return; // no había evento_id, ya falló por otra razón
+  // Retry sin evento_id por si la columna no existe todavía
+  await fetch(`${SB_URL}/rest/v1/strikes_log`, {
+    method: "POST",
+    headers: { ...HEADERS, Prefer: "return=minimal" },
+    body: JSON.stringify(baseRow),
+  }).catch(() => {});
+}
+
+async function _yaExisteStrikeReporte(coordiId, ev) {
+  // 1) Intento OR (evento_id exacto OR motivo por nombre)
+  const orFilter = `or=(evento_id.eq.${encodeURIComponent(ev.id)},motivo.ilike.*${encodeURIComponent(ev.nombre)}*)`;
+  let r = await fetch(
+    `${SB_URL}/rest/v1/strikes_log?coordi_id=eq.${coordiId}&accion=eq.strike_reporte_no_enviado&${orFilter}&select=id&limit=1`,
+    { headers: HEADERS }
+  ).catch(() => null);
+  if (r && r.ok) {
+    const rows = await r.json().catch(() => []);
+    return Array.isArray(rows) && rows.length > 0;
+  }
+  // 2) Fallback solo-por-nombre (cuando la columna evento_id aún no existe)
+  r = await fetch(
+    `${SB_URL}/rest/v1/strikes_log?coordi_id=eq.${coordiId}&accion=eq.strike_reporte_no_enviado&motivo=ilike.*${encodeURIComponent(ev.nombre)}*&select=id&limit=1`,
+    { headers: HEADERS }
+  ).catch(() => null);
+  if (r && r.ok) {
+    const rows = await r.json().catch(() => []);
+    return Array.isArray(rows) && rows.length > 0;
+  }
+  // Ambos fallaron: por seguridad asumimos que NO existe previo (mejor
+  // duplicar 1 strike que perderlo si el coordi realmente no entregó).
+  return false;
+}
+
+async function aplicarStrike(usuarioId, motivo, tipo, eventoId = null) {
   const rows = await sb(`usuarios?id=eq.${usuarioId}&select=nombre,strikes,correo,correo_notif`).catch(() => []);
   const u = rows && rows[0];
   if (!u) return;
   const nuevos = (u.strikes || 0) + 1;
   await sb(`usuarios?id=eq.${usuarioId}`, { method: "PATCH", body: JSON.stringify({ strikes: nuevos }) });
-  await sb("strikes_log", { method: "POST", body: JSON.stringify({ coordi_id: usuarioId, accion: tipo, motivo, por_quien: null, created_at: new Date().toISOString() }) }).catch(() => {});
+  await _insertStrikeLog(usuarioId, tipo, motivo, eventoId);
   if (nuevos >= 3) {
     await sb(`usuarios?id=eq.${usuarioId}`, { method: "PATCH", body: JSON.stringify({ activo: false }) });
   }
@@ -137,14 +197,13 @@ exports.handler = async function(event) {
           `reportes_evento?evento_id=eq.${ev.id}&coordi_id=eq.${a.coordi_id}&status=in.(enviado,aprobado_popo,aprobado_memo)&select=id&limit=1`
         ).catch(() => []);
         if (rep && rep.length > 0) continue;
-        const prev = await sb(
-          `strikes_log?coordi_id=eq.${a.coordi_id}&accion=eq.strike_reporte_no_enviado&motivo=ilike.*${ev.id}*&select=id&limit=1`
-        ).catch(() => []);
-        if (prev && prev.length > 0) continue;
+        // Dedup robusto por evento_id (con fallback por nombre)
+        if (await _yaExisteStrikeReporte(a.coordi_id, ev)) continue;
         await aplicarStrike(
           a.coordi_id,
           `Reporte no enviado en 48hrs — ${ev.nombre}`,
-          "strike_reporte_no_enviado"
+          "strike_reporte_no_enviado",
+          ev.id
         );
         sr++;
       }
@@ -173,7 +232,10 @@ exports.handler = async function(event) {
       const deadline = _deadlineDevolucion(ev);
       if (!deadline || ahora < deadline) continue; // todavía no vence
 
-      await aplicarStrike(r.coordi_id, "Kits sobrantes no regresados en 5 días", "strike_devolucion_pendiente");
+      // Dedup de devolución funciona vía strike_devolucion_aplicado flag
+      // en reportes_evento (PATCH al final del bloque). evento_id se pasa
+      // por higiene de datos.
+      await aplicarStrike(r.coordi_id, "Kits sobrantes no regresados en 5 días", "strike_devolucion_pendiente", r.evento_id);
 
       for (const k of sobrantes) {
         const piezas = await sb(`kits_inventario?id=eq.${k.pieza_id}&select=pieza,costo_unitario`).catch(() => []);

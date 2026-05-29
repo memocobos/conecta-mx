@@ -48,5 +48,6 @@ window.MAPAS={
   'trueno':'mapas/trueno.webp',
   'straykids':'mapas/straykids.webp',
   'louistomlinson':'mapas/louistomlinson.webp',
-  'juniorh':'mapas/juniorh.webp'
+  'juniorh':'mapas/juniorh.webp',
+  'armado':'mapas/armado.png'
 };

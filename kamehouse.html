@@ -12365,11 +12365,11 @@ async function loadRadar(silent){
 }
 
 async function _radarFetch(table, sinceISO, untilISO){
-  // Paginación con Range headers — Supabase/PostgREST tiene db-max-rows = 1000
-  // server-side. Pedir &limit=10000 NO funciona: el server cappea a 1000
-  // independientemente. Combinado con order=created_at.desc, las queries
-  // devolvían siempre las 1000 más recientes, así que cambiar el `gte` del
-  // rango (Hoy/Semana/Mes/Todo) no afectaba el resultado.
+  // Paginación con Range headers — Supabase/PostgREST tiene db-max-rows
+  // server-side. El cap real puede ser distinto al esperado (medido: 5000),
+  // por eso NO confiamos en `rows.length < PAGE_SIZE` como señal de fin
+  // (rompía si el server cappeaba silenciosamente). Avanzamos por
+  // rows.length REAL y usamos Content-Range para detectar fin de datos.
   //
   // Si el path ya trae querystring (ej. 'tabla?select=...'), concatenamos
   // con '&'. Antes asumíamos siempre '?', lo que producía URLs con dos
@@ -12380,7 +12380,7 @@ async function _radarFetch(table, sinceISO, untilISO){
   filters += '&order=created_at.desc';
   const url = `${SB_URL}/rest/v1/${table}${filters}`;
 
-  const PAGE_SIZE = 10000;    // matchea db-max-rows del server
+  const PAGE_SIZE = 5000;     // matchea db-max-rows actual del server (medido)
   const MAX_ROWS  = 100000;   // cap defensivo — UI se vuelve pesada más allá
   const all = [];
   let off = 0;
@@ -12393,6 +12393,7 @@ async function _radarFetch(table, sinceISO, untilISO){
           Authorization: 'Bearer ' + SB_KEY,
           'Range-Unit': 'items',
           'Range': off + '-' + (off + PAGE_SIZE - 1),
+          Prefer: 'count=exact',
         },
       });
     } catch (e) {
@@ -12417,8 +12418,14 @@ async function _radarFetch(table, sinceISO, untilISO){
     const rows = await resp.json();
     if (!Array.isArray(rows) || rows.length === 0) break;
     all.push(...rows);
-    if (rows.length < PAGE_SIZE) break; // última página (parcial)
-    off += PAGE_SIZE;
+    // Content-Range nos dice el total real (ej. "0-4999/34865"). Si ya
+    // acumulamos >= total, terminamos sin un round-trip extra.
+    const cr = resp.headers.get('content-range') || '';
+    const total = parseInt((cr.split('/')[1] || '0'), 10);
+    if (Number.isFinite(total) && total > 0 && all.length >= total) break;
+    // Avanzar por lo que REALMENTE recibimos (no por PAGE_SIZE asumido).
+    // Esto es robusto si el server cappea silenciosamente bajo el PAGE_SIZE pedido.
+    off += rows.length;
   }
   if (all.length >= MAX_ROWS) {
     console.warn('[Radar] Cap alcanzado:', MAX_ROWS, 'filas para', table, '— datos pueden estar truncados.');

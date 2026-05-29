@@ -9613,8 +9613,21 @@ async function toggleActivoUsuario(id, activo) {
   } catch(e) { alert(e.message); }
 }
 
-function abrirEditarUsuarioMT(id) {
-  const u = _mtUsuariosCache.find(x => x.id === id) || {};
+async function abrirEditarUsuarioMT(id) {
+  if (!id) { alert('ID de usuario inválido.'); return; }
+  let u = _mtUsuariosCache.find(x => x.id === id);
+  // Fallback: si la cache no lo tiene (stale, no cargada), traer de DB.
+  // Sin esto, el modal abría con u = {} → hidden mtu-id="" → PATCH con UUID vacío → error 22P02.
+  if (!u) {
+    try {
+      const rows = await db.get('usuarios', `?id=eq.${encodeURIComponent(id)}&limit=1`);
+      u = rows && rows[0];
+    } catch(e) { /* u sigue undefined */ }
+  }
+  if (!u || !u.id) {
+    alert('No se pudo cargar el usuario. Refresca la lista y vuelve a intentar.');
+    return;
+  }
   const rolOpts = ['maestro_roshi','bulma','mister_popo','coordinador','cc','vendedor'];
   const rolLabels = { maestro_roshi:'Maestro Roshi', bulma:'Bulma', mister_popo:'Mister Popo', coordinador:'Coordinador', cc:'CC', vendedor:'Vendedor' };
   // Tabs extra / bloqueadas actuales
@@ -9678,9 +9691,19 @@ function abrirEditarUsuarioMT(id) {
 }
 
 async function guardarUsuarioMT() {
+  const alertEl = document.getElementById('mtu-alert');
+  const showErr = (msg) => { if (alertEl) alertEl.innerHTML = `<div class="alert alert-error">${msg}</div>`; };
+
   const id       = document.getElementById('mtu-id')?.value;
+  // Guard: id vacío rompe el PATCH (URL ?id=eq.) → PG falla con UUID syntax.
+  // Si el modal se abrió con cache stale, el hidden quedó "". Aborta limpio.
+  if (!id) { showErr('Error interno: no se identificó el usuario. Cierra el modal y vuelve a abrirlo.'); return; }
+
   const nombre   = document.getElementById('mtu-nombre')?.value.trim();
   const rol      = document.getElementById('mtu-rol')?.value;
+  if (!nombre) { showErr('El nombre es obligatorio.'); return; }
+  if (!rol)    { showErr('El rol es obligatorio.'); return; }
+
   const username = document.getElementById('mtu-username')?.value.trim();
   const pass     = document.getElementById('mtu-pass')?.value.trim();
   const tabsExtra = Array.from(document.querySelectorAll('.mt-tab-extra:checked')).map(c=>c.value);
@@ -9692,9 +9715,9 @@ async function guardarUsuarioMT() {
   if (pass) body.password_hash = pass;
   try {
     await db.patch('usuarios', id, body);
-    document.getElementById('mtu-alert').innerHTML='<div class="alert alert-success">✅ Guardado</div>';
+    if (alertEl) alertEl.innerHTML='<div class="alert alert-success">✅ Guardado</div>';
     setTimeout(()=>{ closeModal('modal-mt-usuario'); loadMTUsuarios(); }, 800);
-  } catch(e) { document.getElementById('mtu-alert').innerHTML=`<div class="alert alert-error">${e.message}</div>`; }
+  } catch(e) { showErr(e.message); }
 }
 
 // ── VER COMO ROL ─────────────────────────────────────────────

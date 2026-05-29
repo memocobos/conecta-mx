@@ -9260,21 +9260,46 @@ async function loadMTPendientes() {
     const evMap = Object.fromEntries(evs.map(e=>[e.id,e]));
     const uMap  = Object.fromEntries(usuarios.map(u=>[u.id,u]));
 
+    // Helpers — misma lógica que el cron check-strikes-diario.js
+    // último día del evento = fecha_fin || fecha; contador empieza 00:00 MX día siguiente
+    const _ultimoDia = (ev) => ev && (ev.fecha_fin || ev.fecha);
+    const _inicioContador = (ev) => {
+      const u = _ultimoDia(ev);
+      if (!u) return null;
+      const d = new Date(u + 'T00:00:00-06:00'); // MX = UTC-6 sin DST
+      d.setUTCDate(d.getUTCDate() + 1);
+      return d;
+    };
+    const _deadlineReporte = (ev) => {
+      const s = _inicioContador(ev);
+      return s ? new Date(s.getTime() + 48*60*60*1000) : null;
+    };
+    const _deadlineDevol = (ev) => {
+      const s = _inicioContador(ev);
+      return s ? new Date(s.getTime() + 5*24*60*60*1000) : null;
+    };
+    // Solo Guerreros Z reciben strikes automáticos — excluir creadoras y admins.
+    const _aplicaStrike = (u) => !!u && u.rol !== 'cc' && !['maestro_roshi','bulma'].includes(u.rol);
+
     // ── 1) Reportes pendientes de levantar (evento ya pasó) ──
     const reportesPendientes = [];
     for (const ec of eventosCoordi) {
       const ev = evMap[ec.evento_id];
       if (!ev || !ev.fecha) continue;
-      const fechaEv = new Date(ev.fecha+'T12:00:00');
-      if (fechaEv > ahora) continue; // evento futuro
+      const u = uMap[ec.coordi_id];
+      if (!_aplicaStrike(u)) continue;
+      const deadline = _deadlineReporte(ev);
+      if (!deadline) continue;
+      // Solo eventos ya iniciados (no futuros)
+      const fechaIni = new Date(ev.fecha + 'T12:00:00');
+      if (fechaIni > ahora) continue;
       // ¿ya hay reporte enviado?
       const yaTieneReporte = reportes.some(r => r.evento_id===ec.evento_id && r.coordi_id===ec.coordi_id) ||
         await db.get('reportes_evento', `?evento_id=eq.${ec.evento_id}&coordi_id=eq.${ec.coordi_id}&status=in.(enviado,aprobado_popo,aprobado_memo)`).then(r=>r.length>0).catch(()=>false);
       if (yaTieneReporte) continue;
-      const horasDesde = (ahora - fechaEv) / (1000*60*60);
-      const horasRestantes = 48 - horasDesde;
+      const horasRestantes = (deadline - ahora) / (1000*60*60);
       reportesPendientes.push({
-        coordi: uMap[ec.coordi_id],
+        coordi: u,
         evento: ev,
         horasRestantes,
         vencido: horasRestantes < 0,
@@ -9288,12 +9313,15 @@ async function loadMTPendientes() {
       const kits = r.kits_detalle ? (typeof r.kits_detalle==='string'?JSON.parse(r.kits_detalle):r.kits_detalle) : [];
       const sobrantes = kits.filter(k => (k.cantidad_sobrante||0) > 0 && !k.recibido);
       if (!sobrantes.length) continue;
-      const fechaApr = new Date(r.fecha_aprobado);
-      const diasDesde = (ahora - fechaApr) / (1000*60*60*24);
-      const diasRestantes = 5 - diasDesde;
+      const u = uMap[r.coordi_id];
+      if (!_aplicaStrike(u)) continue;
+      const ev = evMap[r.evento_id];
+      const deadline = _deadlineDevol(ev);
+      if (!deadline) continue;
+      const diasRestantes = (deadline - ahora) / (1000*60*60*24);
       devolPendientes.push({
-        coordi: uMap[r.coordi_id],
-        evento: evMap[r.evento_id],
+        coordi: u,
+        evento: ev,
         sobrantes,
         diasRestantes,
         vencido: diasRestantes < 0,

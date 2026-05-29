@@ -30,6 +30,39 @@ async function enviarCorreo(to, subject, html) {
   }).catch((e) => console.error("Email:", e.message));
 }
 
+// ── Helpers de cálculo de deadline ─────────────────────────────────────
+// Reglas (2026-05-28):
+//   - "Último día del evento" = ev.fecha_fin || ev.fecha
+//   - Contador empieza 00:00 MX del día SIGUIENTE al último día (1 día de gracia)
+//   - Strike reporte    = inicio_contador + 48h
+//   - Strike devolución = inicio_contador + 5 días
+//   - México = UTC-6 sin DST desde 2022, por eso el offset literal.
+function _ultimoDiaEvento(ev) {
+  return ev && (ev.fecha_fin || ev.fecha);
+}
+function _inicioContadorMX(ev) {
+  const ultimo = _ultimoDiaEvento(ev);
+  if (!ultimo) return null;
+  const d = new Date(ultimo + 'T00:00:00-06:00');
+  d.setUTCDate(d.getUTCDate() + 1);
+  return d;
+}
+function _deadlineReporte(ev) {
+  const start = _inicioContadorMX(ev);
+  return start ? new Date(start.getTime() + 48 * 60 * 60 * 1000) : null;
+}
+function _deadlineDevolucion(ev) {
+  const start = _inicioContadorMX(ev);
+  return start ? new Date(start.getTime() + 5 * 24 * 60 * 60 * 1000) : null;
+}
+// Excluir creadoras (cc) y admins — solo Guerreros Z reciben strikes automáticos.
+function _debeAplicarStrike(usuario) {
+  if (!usuario || !usuario.rol) return false;
+  if (usuario.rol === 'cc') return false;
+  if (['maestro_roshi', 'bulma'].includes(usuario.rol)) return false;
+  return true;
+}
+
 async function aplicarStrike(usuarioId, motivo, tipo) {
   const rows = await sb(`usuarios?id=eq.${usuarioId}&select=nombre,strikes,correo,correo_notif`).catch(() => []);
   const u = rows && rows[0];
@@ -71,33 +104,74 @@ exports.handler = async function(event) {
   let sr = 0, sd = 0;
 
   try {
-    // 1) STRIKE POR REPORTE NO LLENADO EN 48 HRS
-    const hace48h = new Date(ahora.getTime() - 48 * 60 * 60 * 1000);
-    const fechaLimite = hace48h.toISOString().split("T")[0];
-    const eventosVencidos = await sb(`eventos?fecha=lte.${fechaLimite}&select=id,nombre,fecha`).catch(() => []);
+    // 1) STRIKE POR REPORTE NO LLENADO — deadline = fin_evento + 1día + 48h
+    // Traemos eventos cuya fecha de inicio (`fecha`) ya pasó hace ≥2 días.
+    // Cubre tanto eventos de 1 día (deadline = fecha + 3 días) como
+    // multifecha más largos. El filtro fino se hace en JS con _deadlineReporte.
+    const margenISO = new Date(ahora.getTime() - 2 * 24 * 60 * 60 * 1000)
+      .toISOString().split("T")[0];
+    const eventosVencidos = await sb(
+      `eventos?fecha=lte.${margenISO}&select=id,nombre,fecha,fecha_fin`
+    ).catch(() => []);
 
     for (const ev of eventosVencidos) {
-      const asigs = await sb(`eventos_coordi?evento_id=eq.${ev.id}&status=eq.aceptado&select=coordi_id`).catch(() => []);
+      const deadline = _deadlineReporte(ev);
+      if (!deadline || ahora < deadline) continue; // todavía no vence
+
+      const asigs = await sb(
+        `eventos_coordi?evento_id=eq.${ev.id}&status=eq.aceptado&select=coordi_id`
+      ).catch(() => []);
+      if (!asigs.length) continue;
+
+      const coordiIds = asigs.map(a => a.coordi_id).filter(Boolean);
+      if (!coordiIds.length) continue;
+      const usuarios = await sb(
+        `usuarios?id=in.(${coordiIds.join(",")})&select=id,nombre,rol`
+      ).catch(() => []);
+      const uMap = Object.fromEntries(usuarios.map(u => [u.id, u]));
+
       for (const a of asigs) {
-        const rep = await sb(`reportes_evento?evento_id=eq.${ev.id}&coordi_id=eq.${a.coordi_id}&status=in.(enviado,aprobado_popo,aprobado_memo)&select=id&limit=1`).catch(() => []);
-        if (!rep || rep.length === 0) {
-          const prev = await sb(`strikes_log?coordi_id=eq.${a.coordi_id}&accion=eq.strike_reporte_no_enviado&motivo=ilike.*${ev.id}*&select=id&limit=1`).catch(() => []);
-          if (!prev || prev.length === 0) {
-            await aplicarStrike(a.coordi_id, `Reporte no enviado en 48hrs — ${ev.nombre}`, "strike_reporte_no_enviado");
-            sr++;
-          }
-        }
+        const u = uMap[a.coordi_id];
+        if (!_debeAplicarStrike(u)) continue;
+        const rep = await sb(
+          `reportes_evento?evento_id=eq.${ev.id}&coordi_id=eq.${a.coordi_id}&status=in.(enviado,aprobado_popo,aprobado_memo)&select=id&limit=1`
+        ).catch(() => []);
+        if (rep && rep.length > 0) continue;
+        const prev = await sb(
+          `strikes_log?coordi_id=eq.${a.coordi_id}&accion=eq.strike_reporte_no_enviado&motivo=ilike.*${ev.id}*&select=id&limit=1`
+        ).catch(() => []);
+        if (prev && prev.length > 0) continue;
+        await aplicarStrike(
+          a.coordi_id,
+          `Reporte no enviado en 48hrs — ${ev.nombre}`,
+          "strike_reporte_no_enviado"
+        );
+        sr++;
       }
     }
 
-    // 2) STRIKE Y DEUDA POR SOBRANTE NO DEVUELTO EN 5 DÍAS
-    const hace5d = new Date(ahora.getTime() - 5 * 24 * 60 * 60 * 1000).toISOString();
-    const aprobados = await sb(`reportes_evento?status=eq.aprobado_memo&strike_devolucion_aplicado=eq.false&fecha_aprobado=lte.${hace5d}&select=id,coordi_id,evento_id,kits_detalle,fecha_aprobado`).catch(() => []);
+    // 2) STRIKE Y DEUDA POR SOBRANTE NO DEVUELTO — deadline = fin_evento + 6 días
+    // (1 día de gracia + 5 días para devolver). Solo aplica si el reporte ya
+    // fue aprobado_memo (necesitamos kits_detalle con sobrantes).
+    const aprobados = await sb(
+      `reportes_evento?status=eq.aprobado_memo&strike_devolucion_aplicado=eq.false&select=id,coordi_id,evento_id,kits_detalle,fecha_aprobado`
+    ).catch(() => []);
 
     for (const r of aprobados) {
-      const kits = typeof r.kits_detalle === "string" ? JSON.parse(r.kits_detalle) : (r.kits_detalle || []);
-      const sobrantes = kits.filter((k) => (k.cantidad_sobrante || 0) > 0 && !k.recibido);
+      const kits = typeof r.kits_detalle === "string"
+        ? JSON.parse(r.kits_detalle) : (r.kits_detalle || []);
+      const sobrantes = kits.filter(k => (k.cantidad_sobrante || 0) > 0 && !k.recibido);
       if (!sobrantes.length) continue;
+
+      const usuariosRow = await sb(`usuarios?id=eq.${r.coordi_id}&select=id,nombre,rol`).catch(() => []);
+      const u = usuariosRow && usuariosRow[0];
+      if (!_debeAplicarStrike(u)) continue;
+
+      const evRows = await sb(`eventos?id=eq.${r.evento_id}&select=id,fecha,fecha_fin`).catch(() => []);
+      const ev = evRows && evRows[0];
+      if (!ev) continue;
+      const deadline = _deadlineDevolucion(ev);
+      if (!deadline || ahora < deadline) continue; // todavía no vence
 
       await aplicarStrike(r.coordi_id, "Kits sobrantes no regresados en 5 días", "strike_devolucion_pendiente");
 

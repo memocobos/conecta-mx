@@ -9622,10 +9622,17 @@ async function toggleActivoUsuario(id, activo) {
 }
 
 async function abrirEditarUsuarioMT(id) {
-  console.log('[abrirEditarUsuarioMT] ID recibido:', id, 'tipo:', typeof id, 'cache size:', (_mtUsuariosCache||[]).length);
+  // ─── DEBUG temporal — investigando bug "Error interno: no se identificó" ───
+  console.log('[DEBUG abrirEditarUsuarioMT] id recibido:', id, 'tipo:', typeof id, 'length:', id?.length);
+  console.log('[DEBUG] _mtUsuariosCache (window) existe:', !!window._mtUsuariosCache);
+  console.log('[DEBUG] _mtUsuariosCache (scope) typeof:', typeof _mtUsuariosCache);
+  const _cacheDbg = (typeof _mtUsuariosCache !== 'undefined' ? _mtUsuariosCache : window._mtUsuariosCache) || [];
+  console.log('[DEBUG] cache size:', _cacheDbg.length);
+  console.log('[DEBUG] usuario encontrado en cache:', _cacheDbg.find(x => x.id === id));
+  // ─── fin DEBUG ────────────────────────────────────────────────────────────
   if (!id) { alert('ID de usuario inválido.'); return; }
   let u = _mtUsuariosCache.find(x => x.id === id);
-  console.log('[abrirEditarUsuarioMT] match en cache:', !!u, u ? `(nombre=${u.nombre})` : '');
+  console.log('[DEBUG] u después de cache lookup:', u ? `OK (nombre=${u.nombre}, id=${u.id})` : 'no encontrado');
   // Fallback: si la cache no lo tiene (stale, no cargada), traer de DB.
   // Sin esto, el modal abría con u = {} → hidden mtu-id="" → PATCH con UUID vacío → error 22P02.
   if (!u) {
@@ -9704,9 +9711,16 @@ async function guardarUsuarioMT() {
   const alertEl = document.getElementById('mtu-alert');
   const showErr = (msg) => { if (alertEl) alertEl.innerHTML = `<div class="alert alert-error">${msg}</div>`; };
 
+  // ─── DEBUG temporal ─────────────────────────────────────────────────────
   const mtuIdEl  = document.getElementById('mtu-id');
   const id       = mtuIdEl?.value;
-  console.log('[guardarUsuarioMT] mtu-id element existe:', !!mtuIdEl, '| value:', JSON.stringify(id), '| #elementos con id mtu-id:', document.querySelectorAll('#mtu-id').length);
+  console.log('[DEBUG guardarUsuarioMT] mtu-id input element existe:', !!mtuIdEl);
+  console.log('[DEBUG] mtu-id value:', JSON.stringify(id), 'tipo:', typeof id, 'length:', id?.length);
+  console.log('[DEBUG] #elementos con id mtu-id en DOM:', document.querySelectorAll('#mtu-id').length);
+  const _modalEl = document.getElementById('modal-mt-usuario');
+  console.log('[DEBUG] modal-mt-usuario existe:', !!_modalEl, '| display:', _modalEl ? getComputedStyle(_modalEl).display : 'n/a');
+  console.log('[DEBUG] modal HTML (primeros 300 chars):', _modalEl?.innerHTML?.substring(0, 300));
+  // ─── fin DEBUG ──────────────────────────────────────────────────────────
   // Guard: id vacío rompe el PATCH (URL ?id=eq.) → PG falla con UUID syntax.
   // Si el modal se abrió con cache stale, el hidden quedó "". Aborta limpio.
   if (!id) { showErr('Error interno: no se identificó el usuario. Cierra el modal y vuelve a abrirlo.'); return; }

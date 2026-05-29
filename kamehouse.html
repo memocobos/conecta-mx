@@ -12380,7 +12380,7 @@ async function _radarFetch(table, sinceISO, untilISO){
   filters += '&order=created_at.desc';
   const url = `${SB_URL}/rest/v1/${table}${filters}`;
 
-  const PAGE_SIZE = 1000;     // matchea db-max-rows del server
+  const PAGE_SIZE = 10000;    // matchea db-max-rows del server
   const MAX_ROWS  = 100000;   // cap defensivo — UI se vuelve pesada más allá
   const all = [];
   let off = 0;

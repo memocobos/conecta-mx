@@ -9597,7 +9597,15 @@ async function eliminarUsuarioMT(id, nombre, rol) {
   }
   if (!confirm(`¿Eliminar permanentemente a "${nombre}"?\n\nEsta acción no se puede deshacer.`)) return;
   try {
-    await db.delete('usuarios', id);
+    // DELETE via Netlify Function — anon ya no tiene permiso DELETE sobre usuarios.
+    const r = await khAdminFetch('/.netlify/functions/admin-eliminar-usuario', {
+      method: 'POST',
+      body: JSON.stringify({ userId: id }),
+    });
+    if (!r.ok) {
+      const j = await r.json().catch(() => ({ error: 'Error ' + r.status }));
+      throw new Error(j.error || 'Error desconocido');
+    }
     await loadMTUsuarios();
   } catch(e) { alert('Error al eliminar: ' + e.message); }
 }
@@ -9614,8 +9622,10 @@ async function toggleActivoUsuario(id, activo) {
 }
 
 async function abrirEditarUsuarioMT(id) {
+  console.log('[abrirEditarUsuarioMT] ID recibido:', id, 'tipo:', typeof id, 'cache size:', (_mtUsuariosCache||[]).length);
   if (!id) { alert('ID de usuario inválido.'); return; }
   let u = _mtUsuariosCache.find(x => x.id === id);
+  console.log('[abrirEditarUsuarioMT] match en cache:', !!u, u ? `(nombre=${u.nombre})` : '');
   // Fallback: si la cache no lo tiene (stale, no cargada), traer de DB.
   // Sin esto, el modal abría con u = {} → hidden mtu-id="" → PATCH con UUID vacío → error 22P02.
   if (!u) {
@@ -9694,7 +9704,9 @@ async function guardarUsuarioMT() {
   const alertEl = document.getElementById('mtu-alert');
   const showErr = (msg) => { if (alertEl) alertEl.innerHTML = `<div class="alert alert-error">${msg}</div>`; };
 
-  const id       = document.getElementById('mtu-id')?.value;
+  const mtuIdEl  = document.getElementById('mtu-id');
+  const id       = mtuIdEl?.value;
+  console.log('[guardarUsuarioMT] mtu-id element existe:', !!mtuIdEl, '| value:', JSON.stringify(id), '| #elementos con id mtu-id:', document.querySelectorAll('#mtu-id').length);
   // Guard: id vacío rompe el PATCH (URL ?id=eq.) → PG falla con UUID syntax.
   // Si el modal se abrió con cache stale, el hidden quedó "". Aborta limpio.
   if (!id) { showErr('Error interno: no se identificó el usuario. Cierra el modal y vuelve a abrirlo.'); return; }

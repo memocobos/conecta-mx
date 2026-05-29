@@ -9055,6 +9055,11 @@ async function guardarCambioEstadoSP(solicitudId) {
 // ═══════════════════════════════════════════════════════════════
 const MEMO_EMAIL = 'reynosa@conectamexico.mx';
 let _mtUsuariosCache = [];
+// ID del usuario que estamos editando — fuente de verdad para guardarUsuarioMT.
+// Antes usábamos un input hidden value="${u.id}" pero el template literal
+// dentro de innerHTML a veces no popula el .value del input. Variable de
+// scope = a prueba de eso.
+let _mtEditandoUserId = null;
 let _mtConfig = {};
 
 // ── Tabs ────────────────────────────────────────────────────
@@ -9622,19 +9627,9 @@ async function toggleActivoUsuario(id, activo) {
 }
 
 async function abrirEditarUsuarioMT(id) {
-  // ─── DEBUG temporal — investigando bug "Error interno: no se identificó" ───
-  console.log('[DEBUG abrirEditarUsuarioMT] id recibido:', id, 'tipo:', typeof id, 'length:', id?.length);
-  console.log('[DEBUG] _mtUsuariosCache (window) existe:', !!window._mtUsuariosCache);
-  console.log('[DEBUG] _mtUsuariosCache (scope) typeof:', typeof _mtUsuariosCache);
-  const _cacheDbg = (typeof _mtUsuariosCache !== 'undefined' ? _mtUsuariosCache : window._mtUsuariosCache) || [];
-  console.log('[DEBUG] cache size:', _cacheDbg.length);
-  console.log('[DEBUG] usuario encontrado en cache:', _cacheDbg.find(x => x.id === id));
-  // ─── fin DEBUG ────────────────────────────────────────────────────────────
   if (!id) { alert('ID de usuario inválido.'); return; }
   let u = _mtUsuariosCache.find(x => x.id === id);
-  console.log('[DEBUG] u después de cache lookup:', u ? `OK (nombre=${u.nombre}, id=${u.id})` : 'no encontrado');
   // Fallback: si la cache no lo tiene (stale, no cargada), traer de DB.
-  // Sin esto, el modal abría con u = {} → hidden mtu-id="" → PATCH con UUID vacío → error 22P02.
   if (!u) {
     try {
       const rows = await db.get('usuarios', `?id=eq.${encodeURIComponent(id)}&limit=1`);
@@ -9645,6 +9640,8 @@ async function abrirEditarUsuarioMT(id) {
     alert('No se pudo cargar el usuario. Refresca la lista y vuelve a intentar.');
     return;
   }
+  // Source of truth para guardarUsuarioMT — no dependemos de un input hidden.
+  _mtEditandoUserId = u.id;
   const rolOpts = ['maestro_roshi','bulma','mister_popo','coordinador','cc','vendedor'];
   const rolLabels = { maestro_roshi:'Maestro Roshi', bulma:'Bulma', mister_popo:'Mister Popo', coordinador:'Coordinador', cc:'CC', vendedor:'Vendedor' };
   // Tabs extra / bloqueadas actuales
@@ -9660,7 +9657,6 @@ async function abrirEditarUsuarioMT(id) {
         <button class="modal-close" onclick="closeModal('modal-mt-usuario')">×</button>
       </div>
       <div class="modal-body" style="max-height:70vh;overflow-y:auto">
-        <input type="hidden" id="mtu-id" value="${u.id||''}">
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
           <div class="form-group">
             <label>Nombre</label>
@@ -9711,18 +9707,8 @@ async function guardarUsuarioMT() {
   const alertEl = document.getElementById('mtu-alert');
   const showErr = (msg) => { if (alertEl) alertEl.innerHTML = `<div class="alert alert-error">${msg}</div>`; };
 
-  // ─── DEBUG temporal ─────────────────────────────────────────────────────
-  const mtuIdEl  = document.getElementById('mtu-id');
-  const id       = mtuIdEl?.value;
-  console.log('[DEBUG guardarUsuarioMT] mtu-id input element existe:', !!mtuIdEl);
-  console.log('[DEBUG] mtu-id value:', JSON.stringify(id), 'tipo:', typeof id, 'length:', id?.length);
-  console.log('[DEBUG] #elementos con id mtu-id en DOM:', document.querySelectorAll('#mtu-id').length);
-  const _modalEl = document.getElementById('modal-mt-usuario');
-  console.log('[DEBUG] modal-mt-usuario existe:', !!_modalEl, '| display:', _modalEl ? getComputedStyle(_modalEl).display : 'n/a');
-  console.log('[DEBUG] modal HTML (primeros 300 chars):', _modalEl?.innerHTML?.substring(0, 300));
-  // ─── fin DEBUG ──────────────────────────────────────────────────────────
-  // Guard: id vacío rompe el PATCH (URL ?id=eq.) → PG falla con UUID syntax.
-  // Si el modal se abrió con cache stale, el hidden quedó "". Aborta limpio.
+  // Source of truth: variable de scope (no input hidden — innerHTML no setea value confiable)
+  const id = _mtEditandoUserId;
   if (!id) { showErr('Error interno: no se identificó el usuario. Cierra el modal y vuelve a abrirlo.'); return; }
 
   const nombre   = document.getElementById('mtu-nombre')?.value.trim();

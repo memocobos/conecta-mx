@@ -977,7 +977,7 @@ src="https://www.facebook.com/tr?id=1685907946147007&ev=PageView&noscript=1"
     <span class="hsb-icon">🔥</span>
     <div class="hsb-text">
       <strong>HOT SALE 24H</strong>
-      <span>Código <code>HOTSALE</code> · 8% PLUS · 5% CHEAP</span>
+      <span>Usa el código <code>HOTSALE</code> en tu paquete PLUS</span>
     </div>
     <div class="hsb-countdown" id="hsb-countdown">--:--:--</div>
   </div>
@@ -2126,7 +2126,7 @@ function renderCatalog(){
     var proxBadge=isProxi?'<div class="ev-prox-badge">AVÍSAME<span class="ev-prox-sub">Lista de espera</span></div>':'';
     var hotSaleBadge='';
     var _hsP=(typeof PROMOS!=='undefined')&&PROMOS['HOTSALE'];
-    if(_hsP&&Date.now()>=_hsP.startTs&&Date.now()<_hsP.expiresTs&&_hsP.onlyEvents&&_hsP.onlyEvents.indexOf(ev.id)>=0&&!isPast&&!isAg)hotSaleBadge='<div class="ev-badge-hotsale">🔥 HOT SALE 8%</div>';
+    if(_hsP&&Date.now()>=_hsP.startTs&&Date.now()<_hsP.expiresTs&&_hsP.onlyEvents&&_hsP.onlyEvents.indexOf(ev.id)>=0&&!isPast&&!isAg)hotSaleBadge='<div class="ev-badge-hotsale">🔥 HOT SALE</div>';
     card.innerHTML=imgHTML+hotSaleBadge+
       '<span class="ev-tag '+tagCls+'">'+tagTxt+'</span>'+
       '<div class="ev-body">'+
@@ -2265,7 +2265,7 @@ var PROMOS={
   'HURRICANE': {pct:5, expiresTs:Date.parse('2026-05-21T20:00:00-06:00'), maxUsos:9999, usos:0, desc:'5% de descuento con código HURRICANE', onlyEvent:'scorpions', excludePkg:['ride','stay','cheap']},
   'TRUENO': {pct:5, expiresTs:Date.parse('2026-05-22T20:00:00-06:00'), maxUsos:9999, usos:0, desc:'5% de descuento con código TRUENO', onlyEvent:'trueno', excludePkg:['ride','stay','cheap']},
   'ULTRA': {pct:5, expiresTs:Date.parse('2026-05-26T20:00:00-06:00'), maxUsos:9999, usos:0, desc:'5% de descuento con código ULTRA', onlyEvent:'ultramexico', excludePkg:['ride','stay','cheap']},
-  'HOTSALE': {pct:8, pctCheap:5, startTs:Date.parse('2026-05-27T00:00:00-05:00'), expiresTs:Date.parse('2026-05-28T00:00:00-05:00'), maxUsos:9999, usos:0, desc:'HOT SALE 24h — 8% PLUS / 5% CHEAP', excludePkg:['ride','stay'], onlyEvents:['keniaos','fanfest','zayn','rufus','harry','melanie','rosalia','arre','tini','warped','scorpions','anuelaa','youngmiko','neighbourhood','ironmaiden','beele','pulsoquetaro','enjambre','alejandrosanz','vaiven','badgyal','aitana','romeo','intocable','siddharta','monlaferte','aperfectcircle','trueno','morat','brunomars','knotfest','arjona','edenmunoz','edsheeran','babymetal','caifanes','edc2027'], excludeZones:{'harry':['Box Oro'],'melanie':['Early Entry VIP'],'edsheeran':['Palcos'],'brunomars':['Platino']}}
+  'HOTSALE': {amount:500, startTs:1780323876000, expiresTs:1780410276000, maxUsos:9999, usos:0, desc:'HOT SALE — descuento aplicado', excludePkg:['ride','stay','cheap'], onlyEvents:['machaca','weeknd','soda','lorde','laura','t3r','miloj','fanfest','zayn','rufus','pacoamoroso','harry','melanie','dalemix','rosalia','enjambre','tini','arre','warped','scorpions','anuelaa','youngmiko','neighbourhood','eslabon','ironmaiden','beele','pulsoquetaro','alejandrosanz','vaiven','badgyal','aitana','romeo','ultramexico','siddharta','karolg','intocable','monlaferte','aperfectcircle','morat','brunomars','knotfest','arjona','edenmunoz','edsheeran','babymetal','caifanes','hilary','edc2027','coronacapital','straykids','juniorh','louist','trueno'], customMsg:'Código aplicado', hideAmount:true}
 };
 var _promoActivo=null;
 
@@ -2320,7 +2320,7 @@ function validarPromo(code){
       return {ok:false,msg:'El código '+c+' no aplica en la zona '+selZ.n+'. Disponible en otras zonas de '+_evn+'.'};
     }
   }
-  return {ok:true,pct:p.pct||0,pctCheap:p.pctCheap||0,amount:p.amount||0,desc:p.desc,customMsg:p.customMsg||null,code:c,excludePkg:p.excludePkg||null,onlyZones:p.onlyZones||null,excludeZones:p.excludeZones||null};
+  return {ok:true,pct:p.pct||0,pctCheap:p.pctCheap||0,amount:p.amount||0,desc:p.desc,customMsg:p.customMsg||null,code:c,excludePkg:p.excludePkg||null,onlyZones:p.onlyZones||null,excludeZones:p.excludeZones||null,hideAmount:p.hideAmount||false};
 }
 var PC_EVENTS=["Justin Bieber", "Bad Bunny", "Sabrina Carpenter", "U2", "Festival Trópico", "Bahidora 2027", "Coldplay", "The Rolling Stones", "Tool", "Slipknot", "Luis Miguel", "Metallica", "Feid / Ferxxo", "Evanescence", "Marilyn Manson"];
 
@@ -4411,7 +4411,7 @@ function buildCotizacionMsg(quincenas,pagoQ){
   else if(selH) msg+='\n🏨 *Habitación:* '+selH.n+' (incluida)';
   if(selTransporte&&selTransporte.cost>0) msg+='\n🚌 *Transporte:* '+selTransporte.n+' (+'+fmt(selTransporte.cost)+'/persona)';
   msg+='\n\n💰 *Costo por persona:* '+fmt(costoXPersona);
-  if(_promoActivo) msg+='\n🏷️ *Código aplicado:* '+_promoActivo.code+(_promoActivo.amount?' (-'+fmt(_promoActivo.amount)+'/persona)':' (-'+_promoActivo.pct+'%)');
+  if(_promoActivo) msg+='\n🏷️ *Código aplicado:* '+_promoActivo.code+(_promoActivo.hideAmount?'':(_promoActivo.amount?' (-'+fmt(_promoActivo.amount)+'/persona)':' (-'+_promoActivo.pct+'%)'));
   if(selViaj>1) msg+='\n💵 *Total del grupo:* '+fmt(total);
   msg+='\n💳 *Separo hoy:* '+fmt(sepActualCalc);
   msg+='\n💸 *Resto a cubrir:* '+fmt(resto);
@@ -4511,8 +4511,8 @@ function getQuincenas(from, until, max){
     <div class="bienvenida-text" id="bvn-text">Cotiza tu viaje a tus conciertos favoritos en menos de 60 segundos.</div>
     <div class="bienvenida-gift" id="bvn-hotsale" style="display:none">
       <div class="bienvenida-gift-lbl">🔥 HOT SALE 24H</div>
-      <div class="bienvenida-gift-code">Código <b style="color:#e8ff4c">HOTSALE</b><br>8% en PLUS · 5% en CHEAP</div>
-      <div class="bienvenida-gift-small">Válido en 37 eventos seleccionados</div>
+      <div class="bienvenida-gift-code">Código <b style="color:#e8ff4c">HOTSALE</b><br>Oferta especial en paquete PLUS</div>
+      <div class="bienvenida-gift-small">Válido por 24 horas en todos los eventos</div>
     </div>
     <button class="bienvenida-btn" onclick="cerrarBienvenida();document.getElementById('ev-list').scrollIntoView({behavior:'smooth'})">Ver eventos y cotizar →</button>
     <button class="bienvenida-skip" onclick="cerrarBienvenida()">Continuar</button>

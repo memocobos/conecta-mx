@@ -56,5 +56,6 @@ window.STATIC_IMGS={
   'bahidora2027':'imgs/bahidora2027.webp',
   'scorpions':'imgs/scorpions.webp',
   'trueno':'imgs/trueno.webp',
-  'ultramexico':'imgs/ultramexico.webp'
+  'ultramexico':'imgs/ultramexico.webp',
+  'wwemexico':'imgs/wwemexico.jpg'
 };

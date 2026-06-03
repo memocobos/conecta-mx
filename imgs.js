@@ -57,5 +57,6 @@ window.STATIC_IMGS={
   'scorpions':'imgs/scorpions.webp',
   'trueno':'imgs/trueno.webp',
   'ultramexico':'imgs/ultramexico.webp',
-  'wwemexico':'imgs/wwemexico.jpg'
+  'wwemexico':'imgs/wwemexico.jpg',
+  'wweraw':'imgs/wweraw.jpg'
 };

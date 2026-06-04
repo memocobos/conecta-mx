@@ -4278,6 +4278,16 @@ const db = {
  return r.json();
  },
 
+ async upsert(table, body, onConflict) {
+ const r = await fetch(`${SB_URL}/rest/v1/${table}?on_conflict=${onConflict}`, {
+ method: 'POST',
+ headers: Object.assign({}, db.headers, { 'Prefer': 'resolution=merge-duplicates,return=representation' }),
+ body: JSON.stringify(body)
+ });
+ if (!r.ok) throw new Error(await r.text());
+ return r.json();
+ },
+
  async patch(table, id, body) {
  const r = await fetch(`${SB_URL}/rest/v1/${table}?id=eq.${id}`, {
  method: 'PATCH', headers: db.headers, body: JSON.stringify(body)
@@ -10239,6 +10249,7 @@ function renderReportes(lista, filtro) {
       <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap">
         <div>
           <div style="font-family:'Rajdhani',sans-serif;font-size:18px;font-weight:700;margin-bottom:2px">${ev ? ev.nombre : (r.evento_id || '—')}</div>
+          ${r.status === 'rechazado' ? '<span style="display:inline-block;background:var(--red);color:#fff;font-size:9px;font-weight:900;letter-spacing:.05em;padding:2px 8px;border-radius:4px;margin-bottom:6px;font-family:\'JetBrains Mono\',monospace">RECHAZADO · CORREGIR</span>' : ''}
           <div style="font-size:11px;font-family:'JetBrains Mono',monospace;color:var(--ts);margin-bottom:8px">
             ${ev ? new Date(ev.fecha+'T12:00:00').toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric'}) : ''}
             ${coo ? ` · ${coo.nombre}` : ''} · <span style="color:${s.color}">${s.icon} ${s.label}</span>
@@ -10325,6 +10336,11 @@ async function abrirModalReporte(reporteId) {
     `<option value="${e.id}" ${e.id===reporte?.evento_id?'selected':''}>${e.nombre} · ${new Date(e.fecha+'T12:00:00').toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric'})}</option>`
   ).join('');
 
+  // CAMBIO 4: aviso de rechazo visible al reabrir un reporte rechazado
+  const rechazoBanner = (reporte && reporte.status === 'rechazado')
+    ? '<div class="alert alert-error" style="margin-bottom:16px">⚠️ Reporte rechazado. ' + (reporte.rechazo_motivo ? 'Motivo: ' + reporte.rechazo_motivo : 'Corrígelo y reenvíalo.') + '</div>'
+    : '';
+
   document.getElementById('modal-reporte').innerHTML = `
     <div class="modal" style="max-width:680px">
       <div class="modal-header">
@@ -10333,10 +10349,11 @@ async function abrirModalReporte(reporteId) {
       </div>
       <div class="modal-body" style="max-height:75vh;overflow-y:auto">
         <input type="hidden" id="rep-id" value="${reporte?.id||''}">
+        ${rechazoBanner}
 
         <div class="form-group" style="margin-bottom:16px">
           <label>Evento *</label>
-          <select class="cot-input" id="rep-evento" style="width:100%">
+          <select class="cot-input" id="rep-evento" style="width:100%" onchange="repEventoCheck(this.value)">
             <option value="">Selecciona un evento…</option>
             ${evOptions}
           </select>
@@ -10407,8 +10424,8 @@ async function abrirModalReporte(reporteId) {
       </div>
       <div class="modal-footer">
         <button class="btn btn-ghost" onclick="closeModal('modal-reporte')">Cancelar</button>
-        <button class="btn btn-ghost" onclick="guardarReporte('borrador')">Guardar borrador</button>
-        <button class="btn btn-primary" onclick="guardarReporte('enviado')">Enviar reporte →</button>
+        <button class="btn btn-ghost" id="rep-btn-borrador" onclick="guardarReporte('borrador')">Guardar borrador</button>
+        <button class="btn btn-primary" id="rep-btn-enviar" onclick="guardarReporte('enviado')">Enviar reporte →</button>
       </div>
     </div>`;
 
@@ -10486,6 +10503,23 @@ function leerGastosForm() {
   return result;
 }
 
+function repEventoCheck(eventoId) {
+  // CAMBIO 1: si el coordi ya tiene fila para este evento, reusarla en vez de crear (evita 23505).
+  if (!eventoId) return;
+  const mine = (_reportesCache || []).filter(r =>
+    String(r.evento_id) === String(eventoId) && String(r.coordi_id) === String(currentUser.id));
+  if (!mine.length) return;
+  const existing = mine[0];
+  const repIdEl = document.getElementById('rep-id');
+  const curId = repIdEl ? repIdEl.value : '';
+  if (curId && String(curId) === String(existing.id)) return;  // ya lo estamos editando
+  const locked = { enviado:'Pendiente revisión', aprobado_popo:'En revisión Roshi', aprobado_memo:'Aprobado' };
+  if (locked[existing.status]) {
+    alert('Ya tienes un reporte de este evento (estado: ' + locked[existing.status] + '). Lo abriré para editarlo.');
+  }
+  abrirModalReporte(existing.id);
+}
+
 async function guardarReporte(nuevoStatus) {
   const alert = document.getElementById('rep-alert');
   const id = document.getElementById('rep-id')?.value;
@@ -10520,18 +10554,32 @@ async function guardarReporte(nuevoStatus) {
     cuenta_bancaria_coordi: clabe,
     notas: notas || null,
   };
+  // CAMBIO 5: al reenviar, limpiar el motivo de rechazo viejo
+  if (nuevoStatus === 'enviado') body.rechazo_motivo = null;
+
+  // CAMBIO 3: anti doble-submit
+  const btnB = document.getElementById('rep-btn-borrador');
+  const btnE = document.getElementById('rep-btn-enviar');
+  if (btnB) btnB.disabled = true;
+  if (btnE) btnE.disabled = true;
 
   try {
     alert.innerHTML = '<div class="alert" style="border-color:var(--border)">Guardando…</div>';
     if (id) {
       await db.patch('reportes_evento', id, body);
     } else {
-      await db.post('reportes_evento', body);
+      // CAMBIO 2: upsert por (evento_id,coordi_id) para no chocar con la constraint;
+      // captura el id devuelto y lo escribe en #rep-id (2do guardado = PATCH).
+      const rows = await db.upsert('reportes_evento', body, 'evento_id,coordi_id');
+      const newId = Array.isArray(rows) ? (rows[0] && rows[0].id) : (rows && rows.id);
+      if (newId) { const rf = document.getElementById('rep-id'); if (rf) rf.value = newId; }
     }
     alert.innerHTML = `<div class="alert alert-success">${nuevoStatus === 'enviado' ? '✅ Reporte enviado' : '✅ Borrador guardado'}</div>`;
     setTimeout(() => { closeModal('modal-reporte'); loadReportes(); }, 900);
   } catch(e) {
     alert.innerHTML = `<div class="alert alert-error">${e.message}</div>`;
+    if (btnB) btnB.disabled = false;
+    if (btnE) btnE.disabled = false;
   }
 }
 

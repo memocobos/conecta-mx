@@ -590,7 +590,7 @@ body.hsale-on .nav{top:var(--hsb-h,0px)}
     Información<br>
     <span class="hl-pago">de pago</span>
   </h1>
-  <p class="hero-sub">Elige tu método de pago según tu paquete. Los pagos <b>PLUS, STAY y RIDE</b> se hacen por BBVA; los pagos <b>CHEAP</b> por Hey Banco.</p>
+  <p class="hero-sub">Elige tu método de pago según tu paquete. Los pagos <b>PLUS, STAY y RIDE</b> se hacen por BBVA; los pagos <b>CHEAP</b> por Banamex.</p>
   <div class="hero-rule" aria-hidden="true"></div>
 </section>
 
@@ -609,7 +609,7 @@ body.hsale-on .nav{top:var(--hsb-h,0px)}
       </li>
       <li class="alert-cuenta-row">
         <span class="ico" aria-hidden="true">🏧</span>
-        <span><b>HEY BANCO (BANREGIO)</b> → Para paquete <b>CHEAP</b> únicamente.</span>
+        <span><b>BANAMEX</b> → Para paquete <b>CHEAP</b> únicamente.</span>
       </li>
     </ul>
     <div class="alert-cuenta-foot">
@@ -625,7 +625,7 @@ body.hsale-on .nav{top:var(--hsb-h,0px)}
     </a>
     <a href="#heybanco" class="choose-btn hey">
       <span class="choose-btn-title">💳 Tengo paquete CHEAP</span>
-      <span class="choose-btn-sub">Ver cuenta Hey Banco</span>
+      <span class="choose-btn-sub">Ver cuenta Banamex</span>
     </a>
     <a href="https://wa.me/528119771072?text=Hola%2C%20quiero%20realizar%20mi%20pago%20pero%20no%20s%C3%A9%20cu%C3%A1l%20cuenta%20me%20corresponde.%20Me%20pueden%20orientar%3F%0A%0AMi%20nombre%20es%3A%20%0AMi%20evento%20es%3A" target="_blank" rel="noopener" class="choose-btn help">
       <span class="choose-btn-title">❓ No sé qué cuenta me corresponde</span>
@@ -685,35 +685,35 @@ body.hsale-on .nav{top:var(--hsb-h,0px)}
     </div>
   </section>
 
-  <!-- SECCIÓN 2: Hey Banco -->
+  <!-- SECCIÓN 2: Banamex (CHEAP) -->
   <section class="sec" id="heybanco">
     <div class="sec-head">
       <span class="sec-num">02 /</span>
       <span class="badge badge-azul">CHEAP</span>
     </div>
-    <h2 class="sec-title">Transferencia Hey Banco</h2>
+    <h2 class="sec-title">Transferencia Banamex</h2>
 
     <div class="bank-card hey">
       <div class="bank-logo">
-        <div class="hey-logo">hey<span>,</span></div>
+        <div class="hey-logo">Banamex</div>
         <span class="bank-tag">Banco destino</span>
       </div>
 
       <div class="bank-field">
         <span class="bank-lbl">Titular</span>
-        <span class="bank-val name">Guillermo Alexander Cobos Vizcarra</span>
+        <span class="bank-val name">Guillermo Cobos Vizcarra</span>
       </div>
 
       <div class="bank-field">
         <span class="bank-lbl">Tarjeta</span>
-        <span class="bank-val" id="hey-tarjeta">4741&nbsp;7429&nbsp;2598&nbsp;0792</span>
-        <button class="copy-btn" data-copy="4741742925980792" data-label="Tarjeta Hey">📋 Copiar</button>
+        <span class="bank-val" id="hey-tarjeta">5206&nbsp;9403&nbsp;0472&nbsp;6407</span>
+        <button class="copy-btn" data-copy="5206940304726407" data-label="Tarjeta Banamex">📋 Copiar</button>
       </div>
 
       <div class="bank-field">
         <span class="bank-lbl">CLABE</span>
-        <span class="bank-val" id="hey-clabe">058597000035732769</span>
-        <button class="copy-btn" data-copy="058597000035732769" data-label="CLABE Hey">📋 Copiar</button>
+        <span class="bank-val" id="hey-clabe">002580702305539377</span>
+        <button class="copy-btn" data-copy="002580702305539377" data-label="CLABE Banamex">📋 Copiar</button>
       </div>
 
       <div class="steps">
@@ -766,7 +766,7 @@ body.hsale-on .nav{top:var(--hsb-h,0px)}
 
     <div class="pol-sec cheap">
       <ul class="pol-list">
-        <li class="pol-item"><span class="pol-ico">⚠️</span><span>Errores en depósitos a cuenta equivocada generan un <b>cargo por servicio de $350</b>. Verifica bien que estás depositando en <b>HEY BANCO</b> antes de transferir.</span></li>
+        <li class="pol-item"><span class="pol-ico">⚠️</span><span>Errores en depósitos a cuenta equivocada generan un <b>cargo por servicio de $350</b>. Verifica bien que estás depositando en <b>BANAMEX</b> antes de transferir.</span></li>
         <li class="pol-item"><span class="pol-ico">🚫</span><span><b>No hay reembolsos</b> por cancelación del cliente.</span></li>
         <li class="pol-item"><span class="pol-ico">⚠️</span><span><b>Boleto dado de baja sin reembolso</b> si no se continúan los pagos.</span></li>
         <li class="pol-item"><span class="pol-ico">🎟️</span><span>Boletos <b>entregados en Reynosa o Monterrey</b> previo a la semana del evento.</span></li>
@@ -818,7 +818,7 @@ body.hsale-on .nav{top:var(--hsb-h,0px)}
       var text=btn.getAttribute('data-copy');
       var label=btn.getAttribute('data-label')||'Valor';
       var original=btn.innerHTML;
-      // Analytics: registrar qué cuenta se copió (BBVA vs Hey, Tarjeta vs CLABE)
+      // Analytics: registrar qué cuenta se copió (BBVA vs Banamex, Tarjeta vs CLABE)
       try { trackPagosEvent('pagos_cuenta_copiada', { cuenta_copiada: label }); } catch(e) {}
 
       var done=function(){

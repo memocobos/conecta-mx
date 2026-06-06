@@ -12871,21 +12871,18 @@ async function loadRadarSitio(){
 
 // ── /PAGOS ─────────────────────────────────────────────────
 async function loadRadarPagos(){
-  const since = _radarSinceISO();
-  const rows = await _radarFetch('pagos_eventos_uso', since);
-  _radarCache.pagos = rows;
-  // KPIs por sesión única — un usuario que copia la misma cuenta varias veces o que
-  // clica WhatsApp varias veces cuenta 1.
-  const _uniq = (pred) => new Set(rows.filter(pred).map(r=>r.session_id)).size;
-  const visitas = _uniq(r=>r.accion==='pagos_visita');
-  const copias  = _uniq(r=>r.accion==='pagos_cuenta_copiada');
-  const wa      = _uniq(r=>r.accion==='pagos_whatsapp_clic');
+  // Todo el panel sale del RPC agregado (cacheado por rango). Sin tendencias aquí.
+  const data = await _radarGetMetricas(_radarRange);
+  const p = (data.pagos || {}).act || {};
+  const num = v => Number(v) || 0;
+  const visitas = num(p.visitas);
+  const copias  = num(p.copias);
+  const wa      = num(p.wa);
   document.getElementById('rpa-sesiones').textContent = visitas.toLocaleString('es-MX');
   document.getElementById('rpa-copias').textContent = copias.toLocaleString('es-MX');
   document.getElementById('rpa-wa').textContent = wa.toLocaleString('es-MX');
-  const cuentas = {};
-  for (const r of rows) { if (r.cuenta_copiada) cuentas[r.cuenta_copiada]=(cuentas[r.cuenta_copiada]||0)+1; }
-  const carr = Object.entries(cuentas).sort((a,b)=>b[1]-a[1]).slice(0,10);
+  // Cuentas más copiadas (top 10, del RPC): [{cuenta, n}]
+  const carr = (p.cuentas || []).map(e => [e.cuenta, num(e.n)]);
   const maxCuenta = Math.max(1, ...carr.map(([,n]) => n));
   document.getElementById('rpa-cuentas').innerHTML = carr.length === 0
     ? '<li class="rdr-empty">Sin copias registradas</li>'
@@ -12897,18 +12894,9 @@ async function loadRadarPagos(){
           <span class="rk-val">${n}</span>
         </li>`;
       }).join('');
-  const orig = {};
-  for (const r of rows) {
-    if (r.accion !== 'pagos_visita') continue;
-    let k = (r.referrer || '').toLowerCase();
-    if (!k) k = 'direct';
-    else if (k.includes('rol')) k = '/rol';
-    else if (k.includes('conectareynosa')) k = 'interno';
-    else if (k.includes('whatsapp') || k.includes('wa.me')) k = 'whatsapp';
-    else k = 'externo';
-    orig[k] = (orig[k]||0) + 1;
-  }
-  const oTotal = Object.values(orig).reduce((a,b)=>a+b,0);
+  // Orígenes (bucket por referrer, del RPC): {bucket: n}
+  const orig = p.origenes || {};
+  const oTotal = Object.values(orig).reduce((a,b)=>a+Number(b),0);
   document.getElementById('rpa-origenes').innerHTML = oTotal === 0
     ? '<div class="rdr-empty">Sin sesiones</div>'
     : Object.entries(orig).sort((a,b)=>b[1]-a[1]).map(([k,n]) => {
@@ -13037,20 +13025,20 @@ async function loadRadarComparativas(){
   const ley = document.getElementById('rcm-leyenda');
   if (ley) ley.textContent = r.leyenda;
 
+  // Comparativas usa ventanas propias (no los 5 rangos fijos), así que llama al
+  // helper radar_main_metrics con fechas explícitas — sin pasar por _radarRpcCache.
+  // OJO: usa los campos _n (COUNT de filas), NO los DISTINCT, para igualar el histórico.
   const [act, prev] = await Promise.all([
-    _radarFetch('main_eventos_uso', r.actSince.toISOString(),  r.actUntil  ? r.actUntil.toISOString()  : null),
-    _radarFetch('main_eventos_uso', r.prevSince.toISOString(), r.prevUntil ? r.prevUntil.toISOString() : null)
+    db.rpc('radar_main_metrics', { p_since: r.actSince.toISOString(),  p_until: r.actUntil  ? r.actUntil.toISOString()  : null }),
+    db.rpc('radar_main_metrics', { p_since: r.prevSince.toISOString(), p_until: r.prevUntil ? r.prevUntil.toISOString() : null })
   ]);
-  const metric = (rows, accion, uniq) => uniq
-    ? new Set(rows.filter(r=>r.accion===accion).map(r=>r.session_id)).size
-    : rows.filter(r=>r.accion===accion).length;
+  const num = v => Number(v) || 0;
   const items = [
-    { lbl:'Visitas',         a:metric(act,'main_visita',true),                p:metric(prev,'main_visita',true) },
-    { lbl:'Cotizaciones',    a:metric(act,'main_cotizacion_generada'),        p:metric(prev,'main_cotizacion_generada') },
-    { lbl:'Modal pago',      a:metric(act,'main_modal_pago_abierto'),         p:metric(prev,'main_modal_pago_abierto') },
-    { lbl:'Comprobante',     a:metric(act,'main_comprobante_enviado'),        p:metric(prev,'main_comprobante_enviado') },
-    { lbl:'Códigos válidos', a:act.filter(r=>r.accion==='main_codigo_intentado'&&r.codigo_valido).length,
-                              p:prev.filter(r=>r.accion==='main_codigo_intentado'&&r.codigo_valido).length },
+    { lbl:'Visitas',         a:num(act.visitas),        p:num(prev.visitas) },
+    { lbl:'Cotizaciones',    a:num(act.cotizaciones_n), p:num(prev.cotizaciones_n) },
+    { lbl:'Modal pago',      a:num(act.modal_n),        p:num(prev.modal_n) },
+    { lbl:'Comprobante',     a:num(act.comprobante_n),  p:num(prev.comprobante_n) },
+    { lbl:'Códigos válidos', a:num(act.codigos_ok_n),   p:num(prev.codigos_ok_n) },
   ];
   const wrap = document.getElementById('rcm-kpis');
   wrap.innerHTML = items.map((it, i) => {

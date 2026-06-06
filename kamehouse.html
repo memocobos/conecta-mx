@@ -11874,52 +11874,46 @@ function _rolanSinceISO(){
 
 async function loadRolAnalytics(silent){
   try {
-    const since     = _radarSinceISO();
-    const prevSince = _radarPrevSinceISO();
-    // Sparklines siempre últimos 7 días, independiente del rango global.
+    // KPIs, tops, paquetes, embudo y métodos de compartir salen del RPC (cacheado por rango).
+    const data = await _radarGetMetricas(_radarRange);
+    // Sparklines (7d) y actividad por hora (24h) siguen de un fetch liviano de 7 días.
     const since7d = new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString();
-    const select = 'select=session_id,accion,evento_id,evento_nombre,paquete,zona,precio_total,tipo_compra,created_at';
-    const [rows, rowsPrev, rows7] = await Promise.all([
-      _radarFetch('rol_eventos_uso?' + select, since),
-      _radarFetch('rol_eventos_uso?' + select, prevSince, since),
-      _radarFetch('rol_eventos_uso?' + select, since7d)
-    ]);
-    _rolanLastRows = rows || [];
-    renderRolAnalytics(rows || [], rowsPrev || [], rows7 || []);
+    const select = 'select=session_id,accion,created_at';
+    const rows7 = await _radarFetch('rol_eventos_uso?' + select, since7d).catch(() => []);
+    renderRolAnalytics(data, rows7 || []);
   } catch (e) {
     console.error('[rolan]', e);
   }
 }
 
-function renderRolAnalytics(rows, rowsPrev, rows7){
-  rowsPrev = rowsPrev || [];
-  rows7    = rows7 || [];
+function renderRolAnalytics(data, rows7){
+  rows7 = rows7 || [];
+  const rAct  = (data && data.rol && data.rol.act)  || {};
+  const rPrev = (data && data.rol && data.rol.prev) || {};
+  const num = v => Number(v) || 0;
 
-  // ── KPI counters ──
-  const filt = (arr, pred) => (arr||[]).filter(pred);
-  const uniqSessions = (arr, pred) => new Set(filt(arr, pred).map(r=>r.session_id)).size;
-
-  const sesiones       = new Set(rows.map(r => r.session_id)).size;
-  const sesionesP      = new Set(rowsPrev.map(r => r.session_id)).size;
-  const planes         = filt(rows,     r => r.accion === 'rol_plan_generado').length;
-  const planesP        = filt(rowsPrev, r => r.accion === 'rol_plan_generado').length;
-  const sesionesConPlan = uniqSessions(rows, r => r.accion === 'rol_plan_generado');
-  const sesionesQueVisitan = uniqSessions(rows, r => r.accion === 'rol_visita');
+  // ── KPI counters (desde el RPC) ──
+  const sesiones       = num(rAct.sesiones);
+  const sesionesP      = num(rPrev.sesiones);
+  const planes         = num(rAct.planes);
+  const planesP        = num(rPrev.planes);
+  const sesionesConPlan = num(rAct.sesiones_con_plan);
+  const sesionesQueVisitan = num(rAct.sesiones_visitan);
   const baseConv  = sesionesQueVisitan || sesiones;
   const conv      = baseConv > 0 ? (sesionesConPlan / baseConv * 100) : 0;
-  const sesConPlanP = uniqSessions(rowsPrev, r => r.accion === 'rol_plan_generado');
-  const sesVisitanP = uniqSessions(rowsPrev, r => r.accion === 'rol_visita');
+  const sesConPlanP = num(rPrev.sesiones_con_plan);
+  const sesVisitanP = num(rPrev.sesiones_visitan);
   const baseConvP = sesVisitanP || sesionesP;
   const convP     = baseConvP > 0 ? (sesConPlanP / baseConvP * 100) : 0;
-  const recordatorios  = filt(rows,     r => r.accion === 'rol_recordatorios_activados').length;
-  const recordatoriosP = filt(rowsPrev, r => r.accion === 'rol_recordatorios_activados').length;
-  const comprobantes   = filt(rows,     r => r.accion === 'rol_comprobante_subido').length;
-  const comprobantesP  = filt(rowsPrev, r => r.accion === 'rol_comprobante_subido').length;
-  const toursGuardados  = filt(rows,     r => r.accion === 'rol_tour_guardado').length;
-  const toursGuardadosP = filt(rowsPrev, r => r.accion === 'rol_tour_guardado').length;
-  const icsDescargas = filt(rows, r => r.accion === 'rol_calendario_descargado').length;
-  const pngDescargas = filt(rows, r => r.accion === 'rol_png_descargado').length;
-  const sharedCount  = filt(rows, r => r.accion === 'rol_compartido').length;
+  const recordatorios  = num(rAct.recordatorios);
+  const recordatoriosP = num(rPrev.recordatorios);
+  const comprobantes   = num(rAct.comprobantes);
+  const comprobantesP  = num(rPrev.comprobantes);
+  const toursGuardados  = num(rAct.tours);
+  const toursGuardadosP = num(rPrev.tours);
+  const icsDescargas = num(rAct.ics);
+  const pngDescargas = num(rAct.png);
+  const sharedCount  = num(rAct.shared);
 
   // ── Set KPI helper con trend ──
   const setKpi = (id, val, prev, isPercent) => {
@@ -11981,24 +11975,18 @@ function renderRolAnalytics(rows, rowsPrev, rows7){
   _rdrPaintSpark(document.getElementById('rro-tours-spark'),
     _rdrSeries7d(rows7, r => r.accion === 'rol_tour_guardado'));
 
-  // ── Eventos más consultados (por planes generados) ──
-  const evCount = {};
-  const evName = {};
-  filt(rows, r => r.accion === 'rol_plan_generado').forEach(r => {
-    if (!r.evento_id) return;
-    evCount[r.evento_id] = (evCount[r.evento_id] || 0) + 1;
-    if (r.evento_nombre) evName[r.evento_id] = r.evento_nombre;
-  });
-  const evTop = Object.entries(evCount).sort((a,b) => b[1]-a[1]).slice(0, 10);
+  // ── Eventos más consultados (por planes generados) — del RPC ──
+  const evTop = (rAct.top_eventos || []).map(e => ({ nombre: e.nombre || e.evento_id, n: num(e.planes) }));
   const olEv = document.getElementById('rro-eventos-top');
   const metaEv = document.getElementById('rro-eventos-meta');
   if (metaEv) metaEv.textContent = `${evTop.length} ${evTop.length===1?'evento':'eventos'}`;
-  const maxEv = Math.max(1, ...evTop.map(([,n]) => n));
+  const maxEv = Math.max(1, ...evTop.map(x => x.n));
   if (olEv) {
     olEv.innerHTML = evTop.length === 0
       ? '<li class="rdr-empty">Aún no hay planes generados en este rango</li>'
-      : evTop.map(([id, n], i) => {
-          const nm = _radarEsc(evName[id] || id);
+      : evTop.map((x, i) => {
+          const nm = _radarEsc(x.nombre);
+          const n = x.n;
           const pct = (n / maxEv * 100).toFixed(0);
           return `<li>
             <span class="rk-pos">#${i+1}</span>
@@ -12008,17 +11996,9 @@ function renderRolAnalytics(rows, rowsPrev, rows7){
         }).join('');
   }
 
-  // ── Paquetes más elegidos (última elección por sesión) → donut ──
-  const lastPkgBySession = {};
-  rows.forEach(r => {
-    if (r.accion !== 'rol_paquete_elegido' || !r.paquete) return;
-    const prev = lastPkgBySession[r.session_id];
-    if (!prev || r.created_at > prev.at) {
-      lastPkgBySession[r.session_id] = { pkg: r.paquete.toUpperCase(), at: r.created_at };
-    }
-  });
-  const pkgCount = { PLUS:0, RIDE:0, STAY:0, CHEAP:0 };
-  Object.values(lastPkgBySession).forEach(p => { if (pkgCount[p.pkg] != null) pkgCount[p.pkg]++; });
+  // ── Paquetes más elegidos (última elección por sesión) → donut (del RPC) ──
+  const pkgSrc = rAct.paquetes || {};
+  const pkgCount = { PLUS:num(pkgSrc.PLUS), RIDE:num(pkgSrc.RIDE), STAY:num(pkgSrc.STAY), CHEAP:num(pkgSrc.CHEAP) };
   const pkgTotal = Object.values(pkgCount).reduce((a,b) => a+b, 0);
   const pkgItems = Object.entries(pkgCount)
     .filter(([,n]) => n > 0)
@@ -12047,14 +12027,14 @@ function renderRolAnalytics(rows, rowsPrev, rows7){
     }).join('');
   }
 
-  // ── Embudo de conversión (sesiones únicas por cada paso) ──
-  const setBy = (accion) => new Set(rows.filter(r => r.accion === accion).map(r => r.session_id));
-  const visitas      = setBy('rol_visita').size || sesiones;
-  const ev           = setBy('rol_evento_seleccionado').size;
-  const pkg          = setBy('rol_paquete_elegido').size;
-  const zona         = setBy('rol_zona_elegida').size;
-  const planGen      = setBy('rol_plan_generado').size;
-  const recordOk     = setBy('rol_recordatorios_activados').size;
+  // ── Embudo de conversión (sesiones únicas por cada paso) — del RPC ──
+  const emb = rAct.embudo || {};
+  const visitas      = num(emb.visitas) || sesiones;
+  const ev           = num(emb.evento);
+  const pkg          = num(emb.paquete);
+  const zona         = num(emb.zona);
+  const planGen      = num(emb.plan);
+  const recordOk     = num(emb.recordatorios);
   const pasos = [
     ['Visitas', visitas],
     ['Eligen evento', ev],
@@ -12080,13 +12060,9 @@ function renderRolAnalytics(rows, rowsPrev, rows7){
     }
   }
 
-  // ── Métodos de compartir ──
-  const shareCount = { copy:0, whatsapp:0, email:0, otro:0 };
-  for (const r of rows) {
-    if (r.accion !== 'rol_compartido') continue;
-    const k = (r.tipo_compra || '').toLowerCase();
-    if (shareCount[k] != null) shareCount[k]++; else shareCount.otro++;
-  }
+  // ── Métodos de compartir (del RPC: share_metodos) ──
+  const shareSrc = rAct.share_metodos || {};
+  const shareCount = { copy:num(shareSrc.copy), whatsapp:num(shareSrc.whatsapp), email:num(shareSrc.email), otro:num(shareSrc.otro) };
   const shareTotal = Object.values(shareCount).reduce((a,b) => a+b, 0);
   const shareWrap = document.getElementById('rro-share');
   if (shareWrap) {
@@ -12109,7 +12085,7 @@ function renderRolAnalytics(rows, rowsPrev, rows7){
   const now = Date.now();
   const dayAgo = now - 24*60*60*1000;
   const buckets = new Array(24).fill(0);
-  rows.forEach(r => {
+  rows7.forEach(r => {
     const t = new Date(r.created_at).getTime();
     if (t < dayAgo || t > now) return;
     const hoursAgo = Math.floor((now - t) / (60*60*1000));
@@ -12138,9 +12114,13 @@ function renderRolAnalytics(rows, rowsPrev, rows7){
   }
 }
 
-function exportRolAnalyticsCSV(){
-  const rows = _rolanLastRows;
-  if (!rows || rows.length === 0){ alert('No hay datos en el rango actual.'); return; }
+async function exportRolAnalyticsCSV(){
+  // On-demand: trae las filas crudas del rango solo al exportar (ya no se cachean).
+  const select = 'select=session_id,accion,evento_id,evento_nombre,paquete,zona,precio_total,created_at';
+  let rows = [];
+  try { rows = await _radarFetch('rol_eventos_uso?' + select, _radarSinceISO()) || []; }
+  catch (e){ alert('Error al exportar: ' + e.message); return; }
+  if (!rows.length){ alert('No hay datos en el rango actual.'); return; }
   const cols = ['created_at','session_id','accion','evento_id','evento_nombre','paquete','zona','precio_total'];
   const esc = v => v == null ? '' : '"' + String(v).replace(/"/g,'""') + '"';
   const csv = [cols.join(',')].concat(rows.map(r => cols.map(c => esc(r[c])).join(','))).join('\n');
@@ -12792,19 +12772,19 @@ async function loadRadarResumen(){
 
 // ── SITIO PRINCIPAL ────────────────────────────────────────
 async function loadRadarSitio(){
-  const since = _radarSinceISO();
-  const rows = await _radarFetch('main_eventos_uso', since);
-  _radarCache.main = rows;
-  // KPIs por sesión única (mismo criterio que loadRadarResumen).
-  const _uniq = (pred) => new Set(rows.filter(pred).map(r=>r.session_id)).size;
-  const visitas       = _uniq(r=>r.accion==='main_visita');
-  const eventosVistos = _uniq(r=>r.accion==='main_evento_visto');
-  const cot           = _uniq(r=>r.accion==='main_cotizacion_generada');
-  const codigos       = _uniq(r=>r.accion==='main_codigo_intentado');
-  const musica        = _uniq(r=>r.accion==='main_musica_reproducida');
-  const devs = {};
-  for (const r of rows) { if (r.device) devs[r.device] = (devs[r.device]||0)+1; }
-  const devStr = Object.entries(devs).map(([k,n])=>`${k.charAt(0).toUpperCase()+k.slice(1)} ${Math.round(n/(rows.length||1)*100)}%`).join(' · ') || '—';
+  // Todo el panel sale del RPC agregado (cacheado por rango). Sin tendencias aquí.
+  const data = await _radarGetMetricas(_radarRange);
+  const mAct = (data.main || {}).act || {};
+  const num = v => Number(v) || 0;
+  // KPIs por sesión única (del RPC).
+  const visitas       = num(mAct.visitas);
+  const eventosVistos = num(mAct.eventos_vistos);
+  const cot           = num(mAct.cotizaciones);
+  const codigos       = num(mAct.codigos);
+  const musica        = num(mAct.musica);
+  const devs = mAct.devices || {};
+  const devTotal = num(mAct.total_rows) || 1;
+  const devStr = Object.entries(devs).map(([k,n])=>`${k.charAt(0).toUpperCase()+k.slice(1)} ${Math.round(num(n)/devTotal*100)}%`).join(' · ') || '—';
   document.getElementById('rsi-sesiones').textContent = visitas.toLocaleString('es-MX');
   document.getElementById('rsi-eventos-vistos').textContent = eventosVistos.toLocaleString('es-MX');
   document.getElementById('rsi-cotizaciones').textContent = cot.toLocaleString('es-MX');
@@ -12812,22 +12792,13 @@ async function loadRadarSitio(){
   document.getElementById('rsi-devices').textContent = devStr;
   document.getElementById('rsi-musica').textContent = musica.toLocaleString('es-MX');
 
-  // Top eventos vistos — por sesiones únicas (evita inflar por visitas repetidas).
-  const top = {};
-  for (const r of rows) {
-    if (r.accion === 'main_evento_visto' && r.evento_id) {
-      if (!top[r.evento_id]) {
-        top[r.evento_id] = { nombre: r.evento_nombre || r.evento_id, sessions: new Set() };
-      }
-      top[r.evento_id].sessions.add(r.session_id);
-    }
-  }
-  const arr = Object.values(top).sort((a,b) => b.sessions.size - a.sessions.size).slice(0, 10);
-  const maxClicks = Math.max(1, ...arr.map(x => x.sessions.size));
+  // Top eventos vistos — por sesiones únicas (del RPC).
+  const arr = (mAct.top_vistos || []).map(e => ({ nombre: e.nombre || e.evento_id, n: num(e.sesiones) }));
+  const maxClicks = Math.max(1, ...arr.map(x => x.n));
   document.getElementById('rsi-eventos-top').innerHTML = arr.length === 0
     ? '<li class="rdr-empty">Sin eventos vistos en el rango</li>'
     : arr.map((x, i) => {
-        const n = x.sessions.size;
+        const n = x.n;
         const pct = (n / maxClicks * 100).toFixed(0);
         return `<li>
           <span class="rk-pos">#${i+1}</span>
@@ -12836,15 +12807,9 @@ async function loadRadarSitio(){
         </li>`;
       }).join('');
 
-  // Paquetes (última elección por sesión)
-  const lastPkg = {};
-  for (const r of rows) {
-    if (r.accion !== 'main_paquete_elegido' || !r.paquete) continue;
-    const prev = lastPkg[r.session_id];
-    if (!prev || r.created_at > prev.at) lastPkg[r.session_id] = { pkg: r.paquete.toUpperCase(), at: r.created_at };
-  }
-  const pkgCount = { PLUS:0, RIDE:0, STAY:0, CHEAP:0 };
-  Object.values(lastPkg).forEach(p => { if (pkgCount[p.pkg] != null) pkgCount[p.pkg]++; });
+  // Paquetes (última elección por sesión) — del RPC.
+  const pkgSrc = mAct.paquetes || {};
+  const pkgCount = { PLUS:num(pkgSrc.PLUS), RIDE:num(pkgSrc.RIDE), STAY:num(pkgSrc.STAY), CHEAP:num(pkgSrc.CHEAP) };
   const pkgTotal = Object.values(pkgCount).reduce((a,b) => a+b, 0);
   document.getElementById('rsi-paquetes').innerHTML = pkgTotal === 0
     ? '<div class="rdr-empty">Sin paquetes elegidos</div>'
@@ -12853,16 +12818,16 @@ async function loadRadarSitio(){
         return `<div class="row"><span class="k">${k}</span><div class="t"><div class="f" style="width:${pct.toFixed(1)}%"></div></div><span class="p">${pct.toFixed(1)}%</span></div>`;
       }).join('');
 
-  // Embudo
-  const setBy = (a) => new Set(rows.filter(r => r.accion === a).map(r => r.session_id));
+  // Embudo (del RPC).
+  const emb = mAct.embudo || {};
   const pasos = [
-    ['Visitas',          setBy('main_visita').size || visitas],
-    ['Vieron evento',    setBy('main_evento_visto').size],
-    ['Eligen paquete',   setBy('main_paquete_elegido').size],
-    ['Eligen zona',      setBy('main_zona_elegida').size],
-    ['Generan cotización', setBy('main_cotizacion_generada').size],
-    ['Abren modal pago', setBy('main_modal_pago_abierto').size],
-    ['Envían comprobante', setBy('main_comprobante_enviado').size]
+    ['Visitas',          num(emb.visitas) || visitas],
+    ['Vieron evento',    num(emb.evento_visto)],
+    ['Eligen paquete',   num(emb.paquete)],
+    ['Eligen zona',      num(emb.zona)],
+    ['Generan cotización', num(emb.cotizacion)],
+    ['Abren modal pago', num(emb.modal)],
+    ['Envían comprobante', num(emb.comprobante)]
   ];
   const base = pasos[0][1] || 1;
   document.getElementById('rsi-embudo').innerHTML = pasos.map(([k,n]) => {
@@ -12871,10 +12836,8 @@ async function loadRadarSitio(){
     return `<li style="${fill}"><span class="step">${k}</span><span class="count">${n.toLocaleString('es-MX')}</span><span class="pct">${pct.toFixed(0)}%</span></li>`;
   }).join('');
 
-  // Filtros
-  const filt = {};
-  for (const r of rows) { if (r.accion==='main_filtro_aplicado' && r.filtro_usado) filt[r.filtro_usado]=(filt[r.filtro_usado]||0)+1; }
-  const farr = Object.entries(filt).sort((a,b)=>b[1]-a[1]).slice(0,10);
+  // Filtros (del RPC, top 10).
+  const farr = (mAct.filtros || []).map(e => [e.filtro, num(e.n)]);
   const maxFiltro = Math.max(1, ...farr.map(([,n]) => n));
   document.getElementById('rsi-filtros').innerHTML = farr.length === 0
     ? '<li class="rdr-empty">Sin filtros usados</li>'
@@ -12887,26 +12850,17 @@ async function loadRadarSitio(){
         </li>`;
       }).join('');
 
-  // Códigos validos vs no
-  const cod = { validos:0, invalidos:0 };
-  for (const r of rows) {
-    if (r.accion !== 'main_codigo_intentado') continue;
-    if (r.codigo_valido === true) cod.validos++; else cod.invalidos++;
-  }
+  // Códigos validos vs no (del RPC).
+  const cod = { validos: num(mAct.codigos_ok_n), invalidos: num(mAct.codigos_no_n) };
   const codTotal = cod.validos + cod.invalidos;
   document.getElementById('rsi-codigos-detalle').innerHTML = codTotal === 0
     ? '<div class="rdr-empty">Sin intentos de código</div>'
     : `<div class="row"><span class="k">Válidos</span><div class="t"><div class="f" style="width:${(cod.validos/codTotal*100).toFixed(1)}%"></div></div><span class="p">${cod.validos}</span></div>
        <div class="row"><span class="k">No vál.</span><div class="t"><div class="f alt" style="width:${(cod.invalidos/codTotal*100).toFixed(1)}%"></div></div><span class="p" style="color:var(--rdr-red)">${cod.invalidos}</span></div>`;
 
-  // Origen tráfico
-  const orig = {};
-  for (const r of rows) {
-    if (r.accion !== 'main_visita') continue;
-    const k = (r.origen_trafico||'direct').toLowerCase();
-    orig[k] = (orig[k]||0) + 1;
-  }
-  const oTotal = Object.values(orig).reduce((a,b)=>a+b,0);
+  // Origen tráfico (del RPC).
+  const orig = mAct.origenes || {};
+  const oTotal = Object.values(orig).reduce((a,b)=>a+Number(b),0);
   document.getElementById('rsi-origenes').innerHTML = oTotal === 0
     ? '<div class="rdr-empty">Sin sesiones</div>'
     : Object.entries(orig).sort((a,b)=>b[1]-a[1]).map(([k,n]) => {

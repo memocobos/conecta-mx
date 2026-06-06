@@ -285,6 +285,59 @@ main{
 .badge-pagado   {background:rgba(136,234,78,.14);color:var(--green);border:1px solid rgba(136,234,78,.4)}
 .badge-cancelado{background:rgba(255,40,59,.12);color:#ffb0b8;border:1px solid rgba(255,40,59,.5)}
 
+/* ============================ Vista Tour — Plan de pagos (Vista E) ============================ */
+.tour-card{cursor:pointer;transition:border-color .15s,transform .12s}
+.tour-card:hover{border-color:var(--line-strong);transform:translateY(-1px)}
+.tour-card .tc-cta{font-size:10px;font-weight:900;letter-spacing:.12em;text-transform:uppercase;color:var(--yel);text-align:right}
+
+.tour-hero{margin-bottom:2px}
+.tour-hero .h-display{font-size:clamp(28px,8vw,40px)}
+.tour-sub{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-top:10px}
+.tour-sub .tour-sub-meta{font-size:11px;color:var(--ink-mute);font-weight:700;letter-spacing:.12em;text-transform:uppercase}
+
+.resumen-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;text-align:center}
+.res-item{display:flex;flex-direction:column;gap:4px}
+.res-lbl{font-size:9px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-mute)}
+.res-val{font-family:'JetBrains Mono',monospace;font-weight:700;font-size:16px;color:#fff}
+.res-val.ok{color:var(--green)}
+.res-val.yel{color:var(--yel)}
+.prog-bar{height:8px;border-radius:999px;background:var(--field-bg);border:1px solid var(--line);overflow:hidden;margin-top:16px}
+.prog-fill{height:100%;background:var(--green);border-radius:999px;transition:width .4s ease}
+.prog-cap{font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-mute);text-align:right;margin-top:6px}
+
+.prox-pago{text-align:center;padding:4px 0}
+.prox-lbl{font-size:10px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-mute);margin-bottom:6px}
+.prox-monto{font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:38px;line-height:1;color:var(--yel)}
+.prox-fecha{font-size:13px;font-weight:700;color:#fff;margin-top:6px}
+.prox-concepto{font-size:11px;color:var(--ink-mute);font-weight:700;letter-spacing:.08em;text-transform:uppercase;margin-top:4px}
+.prox-pago.is-vencido .prox-monto{color:var(--red)}
+.prox-pago.is-vencido .prox-fecha{color:#ffb0b8}
+.prox-pago.is-ok .prox-monto{color:var(--green)}
+
+.pago-list{display:flex;flex-direction:column;gap:0}
+.pago-row{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--line)}
+.pago-row:last-child{border-bottom:none}
+.pago-ico{width:26px;height:26px;flex-shrink:0;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:13px;border:1.5px solid var(--line-strong);color:var(--ink-mute)}
+.pago-row.is-pagado .pago-ico{background:rgba(136,234,78,.14);border-color:rgba(136,234,78,.5);color:var(--green)}
+.pago-row.is-vencido .pago-ico{background:rgba(255,40,59,.12);border-color:rgba(255,40,59,.5);color:#ffb0b8}
+.pago-info{flex:1;min-width:0}
+.pago-concepto{font-size:13px;font-weight:700;color:#fff}
+.pago-fecha{font-size:11px;color:var(--ink-mute);font-weight:600;margin-top:2px}
+.pago-row.is-vencido .pago-fecha{color:#ffb0b8}
+.pago-monto{font-family:'JetBrains Mono',monospace;font-weight:700;font-size:14px;color:#fff;flex-shrink:0}
+.pago-row.is-pagado .pago-monto{color:var(--green)}
+
+.como-pagar p{font-size:13px;color:var(--ink-soft);line-height:1.5;margin:0}
+.como-pagar a{color:var(--yel);font-weight:700;text-decoration:none}
+.como-pagar a:hover{text-decoration:underline}
+
+.tour-msg{text-align:center;padding:10px 4px}
+.tour-msg b{display:block;font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:22px;text-transform:uppercase;color:#fff;margin-bottom:8px}
+.tour-msg p{font-size:13px;color:var(--ink-soft);line-height:1.5;margin:0}
+.tour-msg-info b{color:#cfd4ff}
+.tour-msg-warn b{color:var(--yel)}
+.tour-msg-error b{color:#ffd2d7}
+
 /* ============================ FAB (Floating Action Button) ============================ */
 .fab{
   position:fixed;bottom:20px;right:20px;z-index:50;
@@ -652,16 +705,6 @@ main{
 
         <div class="tile">
           <div class="tile-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M2 10h20"/><path d="M6 14h4"/></svg>
-          </div>
-          <div class="tile-body">
-            <div class="tile-title">Plan de pagos</div>
-            <div class="tile-meta">Próximamente</div>
-          </div>
-        </div>
-
-        <div class="tile">
-          <div class="tile-icon">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M8 13h8"/><path d="M8 17h5"/></svg>
           </div>
           <div class="tile-body">
@@ -840,6 +883,18 @@ main{
         </div>
       </div>
     </div>
+  </section>
+
+  <!-- ============================================================ -->
+  <!-- VISTA E — PLAN DE PAGOS DEL CLIENTE (solo lectura)           -->
+  <!-- ============================================================ -->
+  <section class="view" id="view-tour" aria-labelledby="tour-title">
+    <div class="wiz-header">
+      <button type="button" class="wiz-back" data-action="tour-back" aria-label="Volver">←</button>
+      <div class="wiz-step-num">Plan de pagos</div>
+      <span style="width:40px"></span>
+    </div>
+    <div id="tour-content" aria-live="polite"></div>
   </section>
 
 </main>
@@ -1279,6 +1334,9 @@ const ESTADOS_LBL = {
   cancelado:  'Cancelado'
 };
 
+let _toursCache = [];   // últimas solicitudes cargadas (para abrir su plan)
+let _tourActual = null; // tour cuyo plan se está mostrando
+
 async function renderToursList(){
   const cont = $('#tours-list');
   if (!perfilExistente) return;
@@ -1311,8 +1369,9 @@ async function renderToursList(){
     return;
   }
 
+  _toursCache = data;
   cont.innerHTML = data.map(t => `
-    <article class="tour-card">
+    <article class="tour-card" data-tour-id="${escapeHtml(t.id)}" role="button" tabindex="0">
       <div class="tc-top">
         <div>
           <div class="tc-name">${escapeHtml(t.evento_nombre)}</div>
@@ -1331,9 +1390,167 @@ async function renderToursList(){
         </div>
       </div>
       <div class="tc-date">${fmtFechaLarga(t.created_at)}</div>
+      <div class="tc-cta">Ver plan de pagos →</div>
     </article>
   `).join('');
 }
+
+// =====================================================================
+// Vista E — Plan de pagos del cliente (SOLO LECTURA)
+// =====================================================================
+function tourSubMeta(t){
+  return escapeHtml(t.paquete) + ' · ' + escapeHtml(t.zona) +
+    (t.num_personas > 1 ? ' · ' + t.num_personas + ' pers.' : '');
+}
+
+function tourHeadHtml(t){
+  return `
+    <div class="tour-hero">
+      <div class="eyebrow" style="margin-bottom:6px">Tu tour</div>
+      <h1 class="h-display" id="tour-title">${escapeHtml(t.evento_nombre)}</h1>
+      <div class="tour-sub">
+        <span class="tour-sub-meta">${tourSubMeta(t)}</span>
+        <span class="badge badge-${t.estado}">${ESTADOS_LBL[t.estado] || t.estado}</span>
+      </div>
+    </div>`;
+}
+
+function tourMsgCard(type, title, msg){
+  return `<div class="card"><div class="tour-msg tour-msg-${type}"><b>${escapeHtml(title)}</b><p>${escapeHtml(msg)}</p></div></div>`;
+}
+
+function abrirTour(t){
+  _tourActual = t;
+  const cont = $('#tour-content');
+  const head = tourHeadHtml(t);
+  showView('tour');
+
+  if (t.estado === 'pendiente'){
+    cont.innerHTML = head + tourMsgCard('info', 'En revisión',
+      'Tu solicitud está en revisión. En cuanto la aprobemos verás aquí tu plan de pagos.');
+    return;
+  }
+  if (t.estado === 'cancelado'){
+    cont.innerHTML = head + tourMsgCard('warn', 'Tour cancelado',
+      'Este tour fue cancelado. Si crees que es un error, escríbenos por WhatsApp.');
+    return;
+  }
+  // en_pagos | pagado → cargar plan
+  cont.innerHTML = head + '<div class="card"><div class="tours-loading"><div class="b-spin" style="width:24px;height:24px"></div></div></div>';
+  renderPlanPagos(t, head);
+}
+
+async function renderPlanPagos(t, head){
+  const cont = $('#tour-content');
+
+  const { data, error } = await supabase
+    .from('pagos')
+    .select('*')
+    .eq('solicitud_id', t.id)
+    .order('numero_pago', { ascending: true });
+
+  // Si el usuario ya navegó a otro tour mientras cargaba, no pisamos la vista.
+  if (_tourActual !== t) return;
+
+  if (error){
+    console.error('[portal] pagos', error);
+    cont.innerHTML = head + tourMsgCard('error', 'No se pudo cargar tu plan', traducirError(error));
+    return;
+  }
+  if (!data || data.length === 0){
+    cont.innerHTML = head + tourMsgCard('info', 'Plan en preparación',
+      'Tu plan de pagos se está generando. Vuelve en un momento; si tarda, escríbenos.');
+    return;
+  }
+
+  const total   = Number(t.precio_total) || 0;
+  const abonado = data.filter(p => p.estado === 'pagado').reduce((s, p) => s + (Number(p.monto) || 0), 0);
+  const restante = Math.max(0, total - abonado);
+  const pct = total > 0 ? Math.min(100, Math.round(abonado / total * 100)) : 0;
+
+  // Próximo pago: pendiente/vencido con fecha_esperada más próxima
+  const porPagar = data
+    .filter(p => p.estado === 'pendiente' || p.estado === 'vencido')
+    .sort((a, b) => String(a.fecha_esperada || '').localeCompare(String(b.fecha_esperada || '')));
+  const prox = porPagar[0] || null;
+
+  let proxHtml;
+  if (prox){
+    const venc = prox.estado === 'vencido';
+    proxHtml = `
+      <div class="prox-pago ${venc ? 'is-vencido' : ''}">
+        <div class="prox-lbl">${venc ? 'Pago vencido' : 'Tu próximo pago'}</div>
+        <div class="prox-monto">${fmtMxn(prox.monto)}</div>
+        <div class="prox-fecha">${venc ? 'venció el' : 'antes del'} ${fmtFechaCorta(prox.fecha_esperada)}</div>
+        <div class="prox-concepto">${escapeHtml(prox.concepto)}</div>
+      </div>`;
+  } else {
+    const txt = t.estado === 'pagado' ? '¡Tour pagado! 🎉' : '¡Estás al corriente!';
+    proxHtml = `<div class="prox-pago is-ok"><div class="prox-monto" style="font-size:24px">${txt}</div></div>`;
+  }
+
+  const filas = data.map(p => {
+    const cls  = p.estado === 'pagado' ? 'is-pagado' : (p.estado === 'vencido' ? 'is-vencido' : 'is-pend');
+    const ico  = p.estado === 'pagado' ? '✓' : (p.estado === 'vencido' ? '!' : '');
+    const sub  = p.estado === 'pagado' && p.fecha_pagada
+      ? 'Pagado el ' + fmtFechaCorta(p.fecha_pagada)
+      : (p.estado === 'vencido' ? 'Venció el ' + fmtFechaCorta(p.fecha_esperada)
+                                : 'Para el ' + fmtFechaCorta(p.fecha_esperada));
+    return `
+      <div class="pago-row ${cls}">
+        <div class="pago-ico">${ico}</div>
+        <div class="pago-info">
+          <div class="pago-concepto">${escapeHtml(p.concepto)}</div>
+          <div class="pago-fecha">${sub}</div>
+        </div>
+        <div class="pago-monto">${fmtMxn(p.monto)}</div>
+      </div>`;
+  }).join('');
+
+  cont.innerHTML = head + `
+    <div class="card">
+      <div class="resumen-grid">
+        <div class="res-item"><span class="res-lbl">Total</span><span class="res-val">${fmtMxn(total)}</span></div>
+        <div class="res-item"><span class="res-lbl">Abonado</span><span class="res-val ok">${fmtMxn(abonado)}</span></div>
+        <div class="res-item"><span class="res-lbl">Restante</span><span class="res-val yel">${fmtMxn(restante)}</span></div>
+      </div>
+      <div class="prog-bar"><div class="prog-fill" style="width:${pct}%"></div></div>
+      <div class="prog-cap">${pct}% pagado</div>
+    </div>
+
+    <div class="card">${proxHtml}</div>
+
+    <div class="card">
+      <div class="eyebrow" style="margin-bottom:14px">Tu plan de pagos</div>
+      <div class="pago-list">${filas}</div>
+    </div>
+
+    <div class="card como-pagar">
+      <div class="eyebrow" style="margin-bottom:8px">¿Cómo pago?</div>
+      <p>Haz tu pago y manda el comprobante por WhatsApp. Consulta los datos bancarios en <a href="/pagos">la página de pagos →</a></p>
+    </div>`;
+}
+
+// Abrir tour al tocar su tarjeta (click o Enter/Espacio)
+document.body.addEventListener('click', (e) => {
+  const card = e.target.closest('.tour-card[data-tour-id]');
+  if (!card) return;
+  const tour = _toursCache.find(x => x.id === card.dataset.tourId);
+  if (tour) abrirTour(tour);
+});
+document.body.addEventListener('keydown', (e) => {
+  if (e.key !== 'Enter' && e.key !== ' ') return;
+  const card = e.target.closest('.tour-card[data-tour-id]');
+  if (!card) return;
+  e.preventDefault();
+  const tour = _toursCache.find(x => x.id === card.dataset.tourId);
+  if (tour) abrirTour(tour);
+});
+
+// Volver al dashboard desde la vista del tour
+document.body.addEventListener('click', (e) => {
+  if (e.target.closest('[data-action="tour-back"]')) showView('dashboard');
+});
 
 // =====================================================================
 // Carga del array EV desde /index.html (mismo truco que rol.html)

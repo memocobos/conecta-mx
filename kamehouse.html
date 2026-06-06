@@ -6608,14 +6608,19 @@ async function confirmarEliminar(userId, nombre) {
 }
 
 async function resetearPassword(userId, nombre) {
-  const nueva = prompt(`Nueva contraseña para ${nombre}:`);
-  if (!nueva || nueva.length < 4) { alert('Contraseña muy corta'); return; }
+  const nueva = prompt(`Nueva contraseña para ${nombre}:\n\nMínimo 8 caracteres`);
+  if (!nueva || nueva.length < 8) { alert('Mínimo 8 caracteres'); return; }
   try {
-    await fetch(`${SB_URL}/rest/v1/usuarios?id=eq.${userId}`, {
-      method: 'PATCH',
-      headers: { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ password_hash: nueva })
+    // La password viaja por HTTPS a la Netlify Function, que la hashea con bcrypt
+    // (service_role). NUNCA se guarda en texto plano ni se toca Supabase directo.
+    const r = await khAdminFetch('/.netlify/functions/reset-password', {
+      method: 'POST',
+      body: JSON.stringify({ userId, nuevaPassword: nueva }),
     });
+    if (!r.ok) {
+      const j = await r.json().catch(() => ({ error: 'Error ' + r.status }));
+      throw new Error(j.error || 'Error desconocido');
+    }
     alert(`Contraseña actualizada.`);
   } catch(e) { alert('Error: ' + e.message); }
 }

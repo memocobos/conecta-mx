@@ -4302,6 +4302,15 @@ const db = {
  });
  if (!r.ok) throw new Error(await r.text());
  return true;
+ },
+
+ // Llama una función Postgres vía PostgREST: POST /rest/v1/rpc/<fn> con body {args}.
+ async rpc(fn, body) {
+ const r = await fetch(`${SB_URL}/rest/v1/rpc/${fn}`, {
+ method: 'POST', headers: db.headers, body: JSON.stringify(body || {})
+ });
+ if (!r.ok) throw new Error(await r.text());
+ return r.json();
  }
 };
 
@@ -12152,6 +12161,17 @@ var _radarRefreshId = null;
 var _radarCache = { main: [], pagos: [], rol: [], waitlist: [], alertas: [] };
 var _radarEvCache = { count: null, ts: 0 }; // eventos activos: 5 min TTL
 
+// Cache del RPC radar_metricas, indexado por rango ('today'|'week'|...). Evita
+// re-pedir el agregado al cambiar de sub-pestaña con el mismo rango. Se invalida
+// al cambiar de rango y en cada auto-refresh (ver loadRadar / handler de rango).
+var _radarRpcCache = {};
+async function _radarGetMetricas(rango){
+  if (_radarRpcCache[rango]) return _radarRpcCache[rango];
+  const data = await db.rpc('radar_metricas', { p_rango: rango });
+  _radarRpcCache[rango] = data;
+  return data;
+}
+
 // Cuenta cuántos eventos del array EV en producción están "activos"
 // (no agotados, no próximamente). Hace fetch a /index.html y extrae el array
 // con el mismo truco que rol.html (regex + balanceo de llaves).
@@ -12417,6 +12437,7 @@ function initRadarTab(){
         range.querySelectorAll('button').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
         _radarRange = btn.dataset.r;
+        _radarRpcCache = {};   // rango nuevo → datos frescos
         loadRadar();
       });
     });
@@ -12461,6 +12482,8 @@ function initRadarTab(){
 }
 
 async function loadRadar(silent){
+  // El auto-refresh (silent=true) invalida el cache del RPC para traer datos frescos.
+  if (silent) _radarRpcCache = {};
   const status = document.getElementById('radar-status');
   if (status && !silent) status.textContent = 'Cargando…';
   try {
@@ -12623,45 +12646,35 @@ function _rdrPaintDonut(svgGroupId, items, palette){
 
 // ── RESUMEN GENERAL ────────────────────────────────────────
 async function loadRadarResumen(){
-  const since = _radarSinceISO();
-  const prevSince = _radarPrevSinceISO();
-  // Para sparklines siempre traemos los últimos 7 días (independiente del rango).
+  // KPIs, top de eventos y donut de orígenes salen del RPC agregado (cacheado por rango).
+  // Esto reemplaza la descarga de ~52k filas + conteo client-side que hacía timeout.
+  const data  = await _radarGetMetricas(_radarRange);
+  const mAct  = (data.main || {}).act  || {};
+  const mPrev = (data.main || {}).prev || {};
+  const rAct  = (data.rol  || {}).act  || {};
+  const rPrev = (data.rol  || {}).prev || {};
+
+  // Sparklines (7 días) y actividad por hora (24h) son series temporales: siguen
+  // saliendo de un fetch liviano de los últimos 7 días (nunca fue el cuello de botella).
   const since7d = new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString();
-  const [main, mainPrev, rol, rolPrev, waitlist, main7, rol7] = await Promise.all([
-    _radarFetch('main_eventos_uso', since),
-    _radarFetch('main_eventos_uso', prevSince, since),
-    _radarFetch('rol_eventos_uso', since),
-    _radarFetch('rol_eventos_uso', prevSince, since).catch(() => []),
+  const [waitlist, main7, rol7] = await Promise.all([
     _radarFetch('eventos_waitlist?select=evento_id,evento_nombre,created_at', '1970-01-01T00:00:00Z').catch(() => []),
-    _radarFetch('main_eventos_uso', since7d),
+    _radarFetch('main_eventos_uso', since7d).catch(() => []),
     _radarFetch('rol_eventos_uso',  since7d).catch(() => [])
   ]);
-  _radarCache.main = main || [];
-  _radarCache.rol  = rol || [];
 
-  const filt = (arr, pred) => (arr||[]).filter(pred);
-  const uniqSessions = (arr, pred) => new Set(filt(arr, pred).map(r=>r.session_id)).size;
-
-  // KPIs por sesión única — un usuario que dispara la misma acción N veces cuenta 1.
-  // Excepción: `planes` (rol_plan_generado) sí cuenta cada plan individual, porque un
-  // mismo usuario puede crear varios planes legítimos.
-  const visitas    = uniqSessions(main, r => r.accion==='main_visita');
-  const visitasP   = uniqSessions(mainPrev, r => r.accion==='main_visita');
-  const cot        = uniqSessions(main,     r => r.accion==='main_cotizacion_generada');
-  const cotP       = uniqSessions(mainPrev, r => r.accion==='main_cotizacion_generada');
-  const modal      = uniqSessions(main,     r => r.accion==='main_modal_pago_abierto');
-  const modalP     = uniqSessions(mainPrev, r => r.accion==='main_modal_pago_abierto');
-  const compro     = uniqSessions(main,     r => r.accion==='main_comprobante_enviado');
-  const comproP    = uniqSessions(mainPrev, r => r.accion==='main_comprobante_enviado');
-  // Conversión global = (sesiones que enviaron comprobante / sesiones que visitaron) × 100.
-  // Antes usaba `modal` que sobrestimaba porque modal_pago_abierto es una etapa anterior.
+  // ── KPIs (desde el RPC) ──
+  const num = v => Number(v) || 0;
+  const visitas    = num(mAct.visitas),      visitasP   = num(mPrev.visitas);
+  const cot        = num(mAct.cotizaciones), cotP       = num(mPrev.cotizaciones);
+  const modal      = num(mAct.modal),        modalP     = num(mPrev.modal);
+  const compro     = num(mAct.comprobante),  comproP    = num(mPrev.comprobante);
+  // Conversión global = comprobantes / visitas × 100 (misma fórmula que antes).
   const conv       = visitas  ? (compro  / visitas  * 100) : 0;
   const convP      = visitasP ? (comproP / visitasP * 100) : 0;
-  const planes     = filt(rol,     r=>r.accion==='rol_plan_generado').length;
-  const planesP    = filt(rolPrev, r=>r.accion==='rol_plan_generado').length;
-  const codigosOk  = uniqSessions(main,     r => r.accion==='main_codigo_intentado' && r.codigo_valido);
-  const codigosOkP = uniqSessions(mainPrev, r => r.accion==='main_codigo_intentado' && r.codigo_valido);
-  const wlTotal    = (waitlist||[]).length;
+  const planes     = num(rAct.planes),       planesP    = num(rPrev.planes);
+  const codigosOk  = num(mAct.codigos_ok),   codigosOkP = num(mPrev.codigos_ok);
+  const wlTotal    = num(data.waitlist_total);
 
   // Set KPI val + trend pill
   const setKpi = (id, val, prev, isPercent) => {
@@ -12707,27 +12720,16 @@ async function loadRadarResumen(){
   _rdrPaintSpark(document.getElementById('rgr-waitlist-spark'),
     _rdrSeries7d(waitlist, () => true));
 
-  // ── Top eventos cotizados (con barras inline) — por sesiones únicas ──
-  // Antes contaba cada cotización individual: un usuario que ajustaba paquete/zona 5 veces
-  // sumaba 5 al evento. Ahora cuenta sesiones únicas que cotizaron ese evento.
-  const topCot = {};
-  for (const r of main) {
-    if (r.accion === 'main_cotizacion_generada' && r.evento_id) {
-      if (!topCot[r.evento_id]) {
-        topCot[r.evento_id] = { nombre: r.evento_nombre || r.evento_id, sessions: new Set() };
-      }
-      topCot[r.evento_id].sessions.add(r.session_id);
-    }
-  }
+  // ── Top eventos cotizados (con barras inline) — por sesiones únicas (del RPC) ──
   const olTop = document.getElementById('rgr-top-cot');
-  const arr = Object.values(topCot).sort((a,b) => b.sessions.size - a.sessions.size).slice(0, 6);
+  const arr = (mAct.top_cotizados || []).map(e => ({ nombre: e.nombre || e.evento_id, n: num(e.sesiones) }));
   const metaTop = document.getElementById('rgr-top-cot-meta');
   if (metaTop) metaTop.textContent = `${arr.length} ${arr.length===1?'evento':'eventos'}`;
-  const maxCot = Math.max(1, ...arr.map(x => x.sessions.size));
+  const maxCot = Math.max(1, ...arr.map(x => x.n));
   olTop.innerHTML = arr.length === 0
     ? '<li class="rdr-empty">Sin cotizaciones en el rango</li>'
     : arr.map((x, i) => {
-        const n = x.sessions.size;
+        const n = x.n;
         const pct = (n / maxCot * 100).toFixed(0);
         const delay = (0.05 + i*0.04).toFixed(2);
         return `<li>
@@ -12737,14 +12739,9 @@ async function loadRadarResumen(){
         </li>`;
       }).join('');
 
-  // ── Donut: orígenes de tráfico ──
-  const orig = {};
-  for (const r of main) {
-    if (r.accion !== 'main_visita') continue;
-    const k = (r.origen_trafico || 'direct').toLowerCase();
-    orig[k] = (orig[k] || 0) + 1;
-  }
-  const origArr = Object.entries(orig).sort((a,b) => b[1]-a[1]).map(([k,n]) => ({ label:k, value:n }));
+  // ── Donut: orígenes de tráfico (del RPC) ──
+  const orig = mAct.origenes || {};
+  const origArr = Object.entries(orig).sort((a,b) => b[1]-a[1]).map(([k,n]) => ({ label:k, value:num(n) }));
   const origTotal = origArr.reduce((a,b) => a+b.value, 0);
   const palette = ['#e8ff4c', '#ff283b', '#0000cd', '#88ea4e', '#ff4bd1', '#7be0ff', '#a4ff7b'];
   _rdrPaintDonut('rgr-donut-segs', origArr, palette);

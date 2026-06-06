@@ -9018,6 +9018,140 @@ async function cargarComprobanteSP(solicitudId) {
   }
 }
 
+// ═══════════════════════════════════════════════════════════════
+// PLAN DE PAGOS (Fase 2.3a) — generación automática al aprobar
+//
+// Bloque AUTOCONTENIDO. getQuincenas / getPagosManuales son COPIAS fieles de
+// rol.html (NO se modificó rol.html). Cuando el admin cambia el estado de una
+// solicitud a 'en_pagos', _spCalcularPlanPagos arma el plan (separo + quincenas)
+// a partir de precio_total / monto_separo de la solicitud + el evento en
+// _contratosEVCache (ds, diasAntes, multifecha). El plan se persiste vía
+// admin-generar-plan-pagos ANTES de flipear el estado (generar-primero).
+// ═══════════════════════════════════════════════════════════════
+
+const _SP_MESES = {'01':'Enero','02':'Febrero','03':'Marzo','04':'Abril','05':'Mayo','06':'Junio','07':'Julio','08':'Agosto','09':'Septiembre','10':'Octubre','11':'Noviembre','12':'Diciembre'};
+
+// YYYY-MM-DD en hora local (sin desfase de zona horaria de toISOString).
+function _spYmd(d) {
+  return d.getFullYear() + '-' +
+    String(d.getMonth() + 1).padStart(2, '0') + '-' +
+    String(d.getDate()).padStart(2, '0');
+}
+
+// ── COPIA fiel de rol.html: getPagosManuales (override por subfecha) ──────
+function _spGetPagosManuales(ev, fi, fromDate) {
+  if (!ev || !ev.multifecha || fi == null) return null;
+  var mf = ev.multifecha[fi];
+  if (!mf || !Array.isArray(mf.pagos) || mf.pagos.length === 0) return null;
+  var sepD = fromDate || new Date();
+  var list = mf.pagos.map(function(ds) {
+    var d = new Date(ds + 'T12:00:00');
+    var mm = String(d.getMonth() + 1).padStart(2, '0');
+    return { lbl: d.getDate() + ' de ' + (_SP_MESES[mm] || ''), d: d, e: d };
+  });
+  return list.filter(function(p) { return p.d >= sepD; });
+}
+
+// ── COPIA fiel de rol.html: getQuincenas (quincenas 9-16 y 24-1) ─────────
+function _spGetQuincenas(from, until, max, diasAntes) {
+  var dias = (diasAntes != null && isFinite(diasAntes)) ? diasAntes : 14;
+  var result = [];
+  var capped = new Date(until.getTime() - dias * 24 * 3600 * 1000);
+  var d = new Date(from); d.setDate(1);
+  while (d <= capped && result.length < max) {
+    var mm = String(d.getMonth() + 1).padStart(2, '0');
+    var q1s = new Date(d.getFullYear(), d.getMonth(), 9);
+    var q1e = new Date(d.getFullYear(), d.getMonth(), 16);
+    if (q1s >= from && q1e <= capped) {
+      result.push({ lbl: '9 al 16 de ' + (_SP_MESES[mm] || ''), d: q1s, e: q1e });
+    }
+    var q2s = new Date(d.getFullYear(), d.getMonth(), 24);
+    var q2e = new Date(d.getFullYear(), d.getMonth() + 1, 1);
+    if (q2s >= from && q2e <= capped) {
+      var mn = String((d.getMonth() + 2 > 12 ? 1 : d.getMonth() + 2)).padStart(2, '0');
+      result.push({ lbl: '24 ' + (_SP_MESES[mm] || '') + ' al 1 de ' + (_SP_MESES[mn] || ''), d: q2s, e: q2e });
+    }
+    d.setMonth(d.getMonth() + 1);
+  }
+  return result.slice(0, max);
+}
+
+// Arma el plan de pagos para una solicitud. Devuelve:
+//   { ok:true, pagos:[{numero_pago, concepto, monto, fecha_esperada}], evento_nombre }
+//   { ok:false, error:'...' }   (p.ej. evento no encontrado en index.html)
+//
+// Reglas (mismo modelo que rol.html buildPlanState/buildRows):
+//   - pago #1 = Separo: monto = monto_separo, fecha = hoy.
+//   - resto = precio_total - monto_separo, repartido en quincenas (pagoQ por
+//     quincena, la última absorbe el redondeo para cuadrar con precio_total).
+//   - si no caben quincenas (evento muy cercano) y resto > 0 → un solo pago
+//     'Liquidación' por el resto con fecha = fecha del evento.
+async function _spCalcularPlanPagos(s) {
+  const evArr = await _fetchEVFromIndex();
+  // evento_id del portal = ev.id + ('#' + multifechaIdx) si es multifecha.
+  const raw = String(s.evento_id || '');
+  const hashIdx = raw.indexOf('#');
+  const baseId = hashIdx >= 0 ? raw.slice(0, hashIdx) : raw;
+  const fi = hashIdx >= 0 ? parseInt(raw.slice(hashIdx + 1), 10) : null;
+  const ev = (evArr || []).find(e => e && e.id === baseId);
+  if (!ev) {
+    return { ok: false, error: 'Evento "' + baseId + '" no está en index.html (no se pudo calcular el plan). Verifica que el evento siga publicado e intenta de nuevo.' };
+  }
+
+  const precioTotal = Number(s.precio_total) || 0;
+  let montoSeparo = Number(s.monto_separo) || 0;
+  if (montoSeparo > precioTotal) montoSeparo = precioTotal;
+  if (montoSeparo < 0) montoSeparo = 0;
+  const resto = precioTotal - montoSeparo;
+
+  // Fecha del evento: para multifecha, la subfecha elegida; si no, ev.ds.
+  const dsEffective = (ev.multifecha && fi != null && ev.multifecha[fi] && ev.multifecha[fi].ds)
+    ? ev.multifecha[fi].ds
+    : ev.ds;
+  if (!dsEffective) {
+    return { ok: false, error: 'El evento no tiene fecha (ds) — no se puede calcular el plan.' };
+  }
+  const eventDate = new Date(dsEffective + 'T12:00:00');
+
+  // Separo = hoy (primer pago). Las quincenas se cuentan desde hoy.
+  const hoy = new Date();
+  const sepD = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate(), 12, 0, 0);
+
+  const esCheap = String(s.paquete || '').toUpperCase() === 'CHEAP';
+  const maxPagos = esCheap ? 4 : 10;
+
+  const manualPagos = _spGetPagosManuales(ev, fi, sepD);
+  const quincenas = manualPagos
+    ? manualPagos.slice(0, maxPagos)
+    : _spGetQuincenas(sepD, eventDate, maxPagos, ev.diasAntes);
+
+  const pagos = [];
+  // Pago #1 — Separo.
+  pagos.push({ numero_pago: 1, concepto: 'Separo', monto: Math.round(montoSeparo), fecha_esperada: _spYmd(sepD) });
+
+  if (resto > 0) {
+    if (quincenas.length > 0) {
+      const pagoQ = Math.ceil(resto / quincenas.length);
+      let acc = montoSeparo;
+      for (let i = 0; i < quincenas.length; i++) {
+        const m = (i === quincenas.length - 1) ? (precioTotal - acc) : pagoQ;
+        acc += m;
+        pagos.push({
+          numero_pago: i + 2,
+          concepto: quincenas[i].lbl,
+          monto: Math.round(m),
+          fecha_esperada: _spYmd(quincenas[i].d),
+        });
+      }
+    } else {
+      // Evento demasiado cercano para quincenas: una sola liquidación.
+      pagos.push({ numero_pago: 2, concepto: 'Liquidación', monto: Math.round(resto), fecha_esperada: _spYmd(eventDate) });
+    }
+  }
+
+  return { ok: true, pagos, evento_nombre: s.evento_nombre || ev.a || baseId };
+}
+
 function abrirCambiarEstadoSP(solicitudId) {
   const s = _spCache.find(x => x.id === solicitudId);
   if (!s) { showToast('Solicitud no encontrada', 'error'); return; }
@@ -9056,6 +9190,28 @@ async function guardarCambioEstadoSP(solicitudId) {
 
   if (btn) { btn.disabled = true; btn.textContent = 'Guardando…'; }
   try {
+    // GENERAR-PRIMERO: si pasamos a 'en_pagos', creamos el plan de pagos ANTES
+    // de flipear el estado. Así nunca queda un tour en_pagos sin plan. La
+    // función backend es idempotente, así que re-aprobar NO duplica.
+    if (estado === 'en_pagos') {
+      if (btn) btn.textContent = 'Generando plan…';
+      const plan = await _spCalcularPlanPagos(s);
+      if (!plan.ok) throw new Error(plan.error || 'No se pudo calcular el plan de pagos');
+      const rp = await fetch('/.netlify/functions/admin-generar-plan-pagos', {
+        method: 'POST',
+        headers: _spAdminHeaders(),
+        body: JSON.stringify({ solicitud_id: solicitudId, pagos: plan.pagos }),
+      });
+      const dataP = await rp.json();
+      if (!rp.ok) throw new Error(dataP.error || 'Error generando el plan de pagos');
+      if (dataP.ya_existia) {
+        showToast('El plan de pagos ya existía — no se duplicó', 'success');
+      } else {
+        showToast('Plan de pagos generado (' + (dataP.pagos || []).length + ' pagos)', 'success');
+      }
+      if (btn) btn.textContent = 'Guardando…';
+    }
+
     const r = await fetch('/.netlify/functions/admin-solicitud-update-estado', {
       method: 'POST',
       headers: _spAdminHeaders(),

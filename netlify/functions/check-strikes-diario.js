@@ -2,8 +2,10 @@
 // Esta función es disparada por el schedule en netlify.toml
 // Corre todos los días a las 00:00 UTC (6 PM hora CDMX)
 
-const SB_URL = "https://npgnhsmwpcipxgvfxrho.supabase.co";
-const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5wZ25oc213cGNpcHhndmZ4cmhvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczMDEwNTMsImV4cCI6MjA5Mjg3NzA1M30.08Fp0YaIkD1okEWB8ao3HoPpdaq6rFi2kzAYGZ72jQg";
+const SB_URL = process.env.SUPABASE_URL_KAMEHOUSE || process.env.SUPABASE_URL;
+const SB_KEY = process.env.SUPABASE_SERVICE_KEY_KAMEHOUSE
+            || process.env.SUPABASE_SERVICE_KEY
+            || process.env.SUPABASE_SERVICE_ROLE_KEY;
 const MEMO_EMAIL = "reynosa@conectamexico.mx";
 const HEADERS = {
   apikey: SB_KEY,
@@ -160,6 +162,10 @@ async function aplicarStrike(usuarioId, motivo, tipo, eventoId = null) {
 
 exports.handler = async function(event) {
   console.log("[check-strikes] Iniciando:", new Date().toISOString());
+  if (!SB_KEY || !SB_URL) {
+    console.error('[check-strikes] Falta SUPABASE_SERVICE_KEY_KAMEHOUSE o URL');
+    return { statusCode: 500, body: 'Config faltante' };
+  }
   const ahora = new Date();
   let sr = 0, sd = 0;
 

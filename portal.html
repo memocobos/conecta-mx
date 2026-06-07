@@ -1730,7 +1730,7 @@ function calcularPrecio(){
   const zonaP = (zona && zona.p > 0) ? zona.p : 0;
 
   let perP = 0;
-  if (pkg === 'PLUS')  perP = zonaP + habE + rideBase;
+  if (pkg === 'PLUS')  perP = zonaP + habE;   // sin rideBase, igual que el main (MTY ya viene en la zona; CDMX es tarjeta aparte)
   if (pkg === 'RIDE')  perP = rideBase + habE;
   if (pkg === 'STAY'){
     perP = zonaP - stayDiscount + habE;
@@ -1757,7 +1757,7 @@ function calcularPrecio(){
     desglose: {
       boleto:  (pkg === 'PLUS' || pkg === 'STAY' || pkg === 'CHEAP') ? zonaP : 0,
       hotel:   (pkg !== 'CHEAP') ? habE : 0,
-      transporte: (pkg === 'PLUS' || pkg === 'RIDE') ? rideBase : 0,
+      transporte: (pkg === 'RIDE') ? rideBase : 0,
       stayDiscount: (pkg === 'STAY') ? stayDiscount : 0
     }
   };

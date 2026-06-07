@@ -2201,7 +2201,7 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
     <div class="page-title">GASTOS</div>
     <div class="page-sub">// egresos · costos operativos</div>
    </div>
-   <button class="btn btn-primary" onclick="openModal('modal-gasto')">+ Registrar Gasto</button>
+   <button class="btn btn-primary" onclick="nuevoGasto()">+ Registrar Gasto</button>
  
   </div>
 
@@ -3572,7 +3572,7 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
 <div class="modal-overlay" id="modal-gasto">
  <div class="modal">
  <div class="modal-header">
- <div class="modal-title">Registrar Gasto</div>
+ <div class="modal-title" id="gasto-modal-title">Registrar Gasto</div>
  <button class="modal-close" onclick="closeModal('modal-gasto')"></button>
  </div>
  <div class="modal-body">
@@ -3637,7 +3637,7 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
  </div>
  <div class="modal-footer">
  <button class="btn btn-ghost" onclick="closeModal('modal-gasto')">Cancelar</button>
- <button class="btn btn-primary" onclick="guardarGasto()">Guardar Gasto</button>
+ <button class="btn btn-primary" id="gasto-save-btn" onclick="guardarGasto()">Guardar Gasto</button>
  </div>
  </div>
 </div>
@@ -5170,6 +5170,8 @@ function _evtExportCSV() {
 // ═══════════════════════════════════════════════════════════════
 let _gastosSelectsPoblado = false;
 let _gastosEVMap = {};   // evento_id (base o base#idx) -> { nombre, fecha }
+let _gastosListCache = [];   // últimos gastos pintados (para editarGasto)
+let _gastoEditId = null;     // id del gasto en edición; null = modo crear
 
 // Puebla filtro-evento-gastos y gasto-evento desde EV (con multifecha), igual que
 // Pagos/Por Evento. Conserva la primera opción de cada select (Todos / General) y
@@ -5233,6 +5235,7 @@ async function loadGastos() {
  const d = await r.json();
  if (!r.ok) throw new Error(d.error || 'No se pudieron cargar los gastos');
  const gastos = Array.isArray(d.gastos) ? d.gastos : [];
+ _gastosListCache = gastos;   // para que editarGasto pre-llene desde memoria
 
  document.getElementById('g-total').textContent = _spFmtMxn(d.total || 0);
  document.getElementById('g-mes').textContent = _spFmtMxn(d.total_mes || 0);
@@ -5250,13 +5253,51 @@ async function loadGastos() {
  <td style="color:var(--red);font-weight:600">${_spFmtMxn(g.monto)}</td>
  <td>${g.cuenta ? `<span class="badge badge-gray">${_spEscape(g.cuenta)}</span>` : '<span style="font-size:12px;color:var(--ts)">—</span>'}</td>
  <td style="font-size:12px">${_spEscape(g.metodo_pago||'—')}</td>
- <td>
+ <td style="white-space:nowrap">
+ <button class="btn btn-ghost btn-sm" onclick="editarGasto('${g.id}')">✏️ Editar</button>
  <button class="btn btn-red btn-sm" onclick="eliminarGasto('${g.id}')"></button>
  </td>
  </tr>`).join('');
  } catch(e) {
  tbody.innerHTML = `<tr><td colspan="8"><div class="alert alert-error">${_spEscape(e.message)}</div></td></tr>`;
  }
+}
+
+// Abre el modal en modo CREAR: limpia el id de edición, vacía el form y restablece
+// los textos del modal. Lo dispara el botón "+ Registrar Gasto".
+function nuevoGasto() {
+ _gastoEditId = null;
+ ['gasto-concepto', 'gasto-monto', 'gasto-fecha', 'gasto-notas'].forEach(id => {
+   const el = document.getElementById(id); if (el) el.value = '';
+ });
+ ['gasto-categoria', 'gasto-metodo', 'gasto-cuenta'].forEach(id => {
+   const el = document.getElementById(id); if (el) el.selectedIndex = 0;
+ });
+ const ev = document.getElementById('gasto-evento'); if (ev) ev.value = '';
+ const tit = document.getElementById('gasto-modal-title'); if (tit) tit.textContent = 'Registrar Gasto';
+ const btn = document.getElementById('gasto-save-btn');   if (btn) btn.textContent = 'Guardar Gasto';
+ openModal('modal-gasto');
+}
+
+// Abre el modal en modo EDICIÓN, pre-llenado con el gasto (desde _gastosListCache).
+// Guarda el id en _gastoEditId para que guardarGasto haga UPDATE en vez de INSERT.
+async function editarGasto(id) {
+ await _poblarSelectsGastos();   // garantiza que gasto-evento tenga las opciones
+ const g = (_gastosListCache || []).find(x => String(x.id) === String(id));
+ if (!g) { alert('No se encontró el gasto a editar'); return; }
+ _gastoEditId = id;
+ const set = (elId, v) => { const el = document.getElementById(elId); if (el) el.value = (v == null ? '' : v); };
+ set('gasto-concepto', g.concepto);
+ set('gasto-monto',    g.monto);
+ set('gasto-fecha',    g.fecha);
+ set('gasto-categoria', g.categoria);
+ set('gasto-metodo',   g.metodo_pago);
+ set('gasto-cuenta',   g.cuenta);
+ set('gasto-evento',   g.evento_id || '');
+ set('gasto-notas',    g.notas);
+ const tit = document.getElementById('gasto-modal-title'); if (tit) tit.textContent = 'Editar Gasto';
+ const btn = document.getElementById('gasto-save-btn');   if (btn) btn.textContent = 'Guardar Cambios';
+ openModal('modal-gasto');
 }
 
 async function guardarGasto() {
@@ -5275,19 +5316,25 @@ async function guardarGasto() {
  return;
  }
 
- try {
- const r = await fetch('/.netlify/functions/admin-gasto-crear', {
- method: 'POST',
- headers: _spAdminHeaders(),
- body: JSON.stringify({
+ const editando = !!_gastoEditId;
+ const url = editando ? '/.netlify/functions/admin-gasto-editar' : '/.netlify/functions/admin-gasto-crear';
+ const payload = {
  concepto, monto, fecha, categoria, metodo_pago: metodo,
  cuenta: cuenta || undefined,
  evento_id: evId || undefined, notas: notas || undefined
- }),
+ };
+ if (editando) payload.id = _gastoEditId;
+
+ try {
+ const r = await fetch(url, {
+ method: 'POST',
+ headers: _spAdminHeaders(),
+ body: JSON.stringify(payload),
  });
  const d = await r.json();
- if (!r.ok) throw new Error(d.error || 'No se pudo registrar el gasto');
- alerta.innerHTML = '<div class="alert alert-success">Gasto registrado</div>';
+ if (!r.ok) throw new Error(d.error || (editando ? 'No se pudo actualizar el gasto' : 'No se pudo registrar el gasto'));
+ alerta.innerHTML = `<div class="alert alert-success">${editando ? 'Gasto actualizado' : 'Gasto registrado'}</div>`;
+ _gastoEditId = null;
  setTimeout(() => { closeModal('modal-gasto'); loadGastos(); }, 1000);
  } catch(e) {
  alerta.innerHTML = `<div class="alert alert-error">${_spEscape(e.message)}</div>`;
@@ -5908,6 +5955,7 @@ function openModal(id) {
 
 function closeModal(id) {
  document.getElementById(id).classList.remove('open');
+ if (id === 'modal-gasto') _gastoEditId = null;   // sal de modo edición al cerrar
 }
 
 // ─── Modal dinámico (creado en JS, no en HTML) ───

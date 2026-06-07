@@ -81,6 +81,12 @@ exports.handler = async (event) => {
     if (cliente.auth_user_id) {
       return { statusCode: 400, headers, body: JSON.stringify({ error: 'Este cliente ya tiene cuenta del portal — no hace falta invitarlo' }) };
     }
+    // Backstop: aunque un correo malo ya esté guardado, NO mandamos al vacío.
+    // Si el formato es inválido o el TLD es claramente erróneo (.con/.cm/...),
+    // cortamos antes de Resend (que aceptaría el envío y rebotaría en silencio).
+    if (!correoFormatoValido(cliente.correo) || tldClaramenteMalo(cliente.correo)) {
+      return { statusCode: 400, headers, body: JSON.stringify({ error: 'El correo del cliente parece inválido (¿quisiste .com?). Corrígelo antes de invitar.' }) };
+    }
 
     // 2. Armar y enviar el correo (Resend, desde admin@conectareynosa.mx).
     const primerNombre = String(cliente.nombre_completo || '').trim().split(/\s+/)[0] || 'Hola';
@@ -123,6 +129,22 @@ exports.handler = async (event) => {
 };
 
 // ----- helpers -----
+
+// Formato básico: algo@algo.tld con TLD de 2+ letras, sin espacios.
+function correoFormatoValido(correo) {
+  return /^[^\s@]+@[^\s@]+\.[A-Za-z]{2,}$/.test(String(correo == null ? '' : correo).trim());
+}
+
+// TLD claramente mal escrito (típico de ".com" mal tecleado). Atrapa el caso que
+// pasó: "gmail.con" tiene formato válido pero el correo no existe.
+const _TLD_MALOS = ['con', 'cm', 'comm', 'ocm'];
+function tldClaramenteMalo(correo) {
+  const c = String(correo == null ? '' : correo).trim().toLowerCase();
+  const dot = c.lastIndexOf('.');
+  if (dot < 0) return false;
+  return _TLD_MALOS.includes(c.slice(dot + 1));
+}
+
 function escapeHtml(s) {
   return String(s == null ? '' : s)
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')

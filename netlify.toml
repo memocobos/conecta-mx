@@ -39,6 +39,11 @@
 [functions."check-strikes-diario"]
   schedule = "0 0 * * *"
 
+# Marca pagos pendientes vencidos en la BD del portal (excluye tours cancelados).
+# 08:00 UTC = 2:00 AM hora México, antes del día laboral.
+[functions."marcar-vencidos-diario"]
+  schedule = "0 8 * * *"
+
 # Recordatorios de pago de /rol — 14:00 UTC = 8:00 AM CDMX
 [functions."rol-recordatorios"]
   schedule = "0 14 * * *"

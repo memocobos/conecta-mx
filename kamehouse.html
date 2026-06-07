@@ -525,6 +525,20 @@ tr:hover td{background:var(--bg3)}
 .btn-red{background:rgba(255,90,77,.13);border:1px solid rgba(255,90,77,.28);color:var(--red)}
 .btn-sm{padding:5px 10px;font-size:10px}
 
+/* Selector de color de tema (DC1) */
+.tema-dots{display:flex;gap:12px;flex-wrap:wrap}
+.tema-dot{
+ width:34px;height:34px;border-radius:50%;border:2px solid var(--border);
+ background:var(--c);cursor:pointer;padding:0;position:relative;
+ transition:transform .12s,border-color .12s;
+}
+.tema-dot:hover{transform:scale(1.08)}
+.tema-dot.sel{border-color:var(--text)}
+.tema-dot.sel::after{
+ content:'✓';position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+ color:#0a0a0a;font-size:16px;font-weight:900;
+}
+
 /* Forms */
 .form-row{display:grid;gap:12px;margin-bottom:12px}
 .form-row.cols-2{grid-template-columns:1fr 1fr}
@@ -4237,6 +4251,7 @@ function enterApp() {
   document.getElementById('topbar-user-info').textContent = `${currentUser.nombre} · ${roleLabels[currentUser.rol] || currentUser.rol}`;
   aplicarPermisosUI();
   aplicarTemaCoordi();
+  applyTema(currentUser.tema_acento);
   bootApp();
 }
 
@@ -4264,6 +4279,51 @@ function aplicarTemaCoordi() {
   // Aplicar tema si existe
   const clase = temas[nombre];
   if (clase) document.body.classList.add(clase);
+}
+
+// ── TEMA DE ACENTO PERSONALIZADO (DC1) ──
+// Cada usuario elige su color de acento; se guarda en usuarios.tema_acento.
+// Solo presets brillantes (texto oscuro legible encima). null = lima por defecto.
+const TEMA_PRESETS = [
+  { hex: '#e8ff4c', nombre: 'Lima' },
+  { hex: '#ff3ea5', nombre: 'Magenta' },
+  { hex: '#3ee0ff', nombre: 'Cyan' },
+  { hex: '#ffa033', nombre: 'Ámbar' },
+  { hex: '#ff6b4c', nombre: 'Coral' },
+];
+
+// Oscurece un hex por un factor (0.12 = 12% más oscuro).
+function _hexOscurecer(hex, factor) {
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex || '');
+  if (!m) return hex;
+  const n = parseInt(m[1], 16);
+  const ajusta = v => Math.round(v * (1 - factor)).toString(16).padStart(2, '0');
+  return '#' + ajusta((n >> 16) & 255) + ajusta((n >> 8) & 255) + ajusta(n & 255);
+}
+// Convierte un hex a rgba(...) con el alpha dado.
+function _hexAlpha(hex, alpha) {
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex || '');
+  if (!m) return hex;
+  const n = parseInt(m[1], 16);
+  return 'rgba(' + ((n >> 16) & 255) + ',' + ((n >> 8) & 255) + ',' + (n & 255) + ',' + alpha + ')';
+}
+// Sobrescribe los tokens de acento en :root. Si no hay hex, deja el lima por defecto.
+function applyTema(hex) {
+  if (!hex) return;
+  const root = document.documentElement.style;
+  root.setProperty('--gold', hex);
+  root.setProperty('--gold2', _hexOscurecer(hex, 0.12));
+  root.setProperty('--orange', hex);
+  root.setProperty('--orange2', hex);
+  root.setProperty('--border2', _hexAlpha(hex, 0.28));
+}
+
+// Marca el preset elegido en el formulario de perfil (no guarda hasta "Guardar").
+function seleccionarTema(hex, el) {
+  const inp = document.getElementById('mp-tema_acento');
+  if (inp) inp.value = hex;
+  document.querySelectorAll('.tema-dot').forEach(d => d.classList.remove('sel'));
+  if (el) el.classList.add('sel');
 }
 
 function aplicarPermisosUI() {
@@ -7244,6 +7304,11 @@ async function renderMiPerfil(modoEdicion = false) {
         const inp = document.getElementById('mp-' + campo);
         if (inp && u[campo]) inp.value = u[campo];
       });
+      // Marca el punto de tema según el valor fresco (por si la sesión venía sin él)
+      if (u.tema_acento) {
+        const dot = document.querySelector(`.tema-dot[data-hex="${u.tema_acento.toLowerCase()}"]`);
+        if (dot) seleccionarTema(u.tema_acento, dot);
+      }
     } catch(e) {
       const u = currentUser;
       ['nombre','correo_notif','celular','num_emergencia','nombre_emergencia','talla_playera','fecha_nacimiento','template_sugerido','username'].forEach(campo => {
@@ -7430,6 +7495,10 @@ function perfilCampo(label, valor) {
 }
 
 function renderFormPerfil() {
+  const temaActual = (currentUser.tema_acento || '#e8ff4c').toLowerCase();
+  const temaDots = TEMA_PRESETS.map(t =>
+    `<button type="button" class="tema-dot${t.hex.toLowerCase() === temaActual ? ' sel' : ''}" style="--c:${t.hex}" data-hex="${t.hex.toLowerCase()}" title="${t.nombre}" aria-label="${t.nombre}" onclick="seleccionarTema('${t.hex}', this)"></button>`
+  ).join('');
   return `
     <div class="perfil-card" style="max-width:920px">
       <div class="perfil-card-header" style="padding:24px 28px">
@@ -7445,6 +7514,12 @@ function renderFormPerfil() {
           <div><div class="perfil-field-label" style="margin-bottom:6px">Fecha de nacimiento</div><input class="cot-input" id="mp-fecha_nacimiento" type="date"></div>
           <div><div class="perfil-field-label" style="margin-bottom:6px">Correo notificaciones</div><input class="cot-input" id="mp-correo_notif" type="email" placeholder="tu@correo.com"></div>
         </div>
+      </div>
+      <div class="perfil-section">
+        <div class="perfil-section-title">Color de tema</div>
+        <div style="font-family:JetBrains Mono;font-size:10px;color:var(--ts);margin-bottom:12px;letter-spacing:.04em">// elige el acento de tu Kamehouse</div>
+        <input type="hidden" id="mp-tema_acento" value="${temaActual}">
+        <div class="tema-dots">${temaDots}</div>
       </div>
       <div class="perfil-section">
         <div class="perfil-section-title">Contacto de emergencia</div>
@@ -7522,6 +7597,7 @@ async function guardarMiPerfil() {
     nombre_emergencia: document.getElementById('mp-nombre_emergencia')?.value.trim() || null,
     num_emergencia: document.getElementById('mp-num_emergencia')?.value.trim() || null,
     template_sugerido: document.getElementById('mp-template_sugerido')?.value.trim() || null,
+    tema_acento: document.getElementById('mp-tema_acento')?.value || null,
     perfil_completo: true,
   };
   if (usernameNuevo) body.username = usernameNuevo;
@@ -7534,6 +7610,14 @@ async function guardarMiPerfil() {
     });
     alertEl.innerHTML = '<div class="alert" style="background:rgba(45,198,83,.1);color:var(--green)">Perfil guardado</div>';
     currentUser = { ...currentUser, ...body };
+    // Refrescar la sesión guardada para que el tema persista al recargar
+    const _sesRaw = sessionStorage.getItem(SESSION_KEY);
+    if (_sesRaw) {
+      const _ses = JSON.parse(_sesRaw);
+      _ses.user = { ..._ses.user, ...body };
+      sessionStorage.setItem(SESSION_KEY, JSON.stringify(_ses));
+    }
+    applyTema(body.tema_acento);
     setTimeout(() => renderMiPerfil(false), 1200);
     loadEquipo();
   } catch(e) {

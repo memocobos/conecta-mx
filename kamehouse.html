@@ -8734,6 +8734,10 @@ let _spLoading = false;
 // Acumulador de eventos vistos en cualquier carga (no se reduce al filtrar) —
 // alimenta el dropdown de filtro de evento. Clave: evento_id, valor: evento_nombre.
 let _spEventosVistos = new Map();
+// Cache del plan de pagos por solicitud abierta en el modal de detalle.
+// Clave: solicitud_id, valor: array de pagos. Lo llena cargarPlanPagosSP y lo
+// re-renderiza renderPlanPagosSP tras marcar/revertir (Fase 2.3c).
+let _spPlanCache = {};
 
 // Headers para las 3 admin-* functions. Antes mandaba x-kh-user-id +
 // x-kh-correo (validados con anon key contra usuarios). Tras Security Phase 2
@@ -8975,6 +8979,10 @@ async function verSolicitudPortal(id) {
       ${s.notas_admin ? row('Notas admin', `<i style="color:var(--ts)">${_spEscape(s.notas_admin)}</i>`) : ''}
     `)}
 
+    ${seccion('Plan de pagos', `
+      <div id="sp-plan-${_spEscape(s.id)}" style="font-size:13px;color:var(--ts)">Cargando plan…</div>
+    `)}
+
     ${seccion('Comprobante de separo', `
       <div id="sp-comprobante-${_spEscape(s.id)}" style="font-size:13px;color:var(--ts)">
         ${s.comprobante_separo_url ? 'Cargando vista previa…' : '<span style="color:var(--ts)">Sin comprobante subido por el cliente</span>'}
@@ -8984,6 +8992,8 @@ async function verSolicitudPortal(id) {
 
   crearModal('sp-detalle', `Solicitud · ${s.evento_nombre || ''}`, contenido);
   document.getElementById('modal-sp-detalle').querySelector('.modal').style.maxWidth = '720px';
+
+  cargarPlanPagosSP(s.id, s.estado);
 
   if (s.comprobante_separo_url) {
     cargarComprobanteSP(s.id);
@@ -9016,6 +9026,207 @@ async function cargarComprobanteSP(solicitudId) {
   } catch (e) {
     target.innerHTML = `<span style="color:#FF6B6B">Error: ${_spEscape(e.message)}</span>`;
   }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// PLAN DE PAGOS (Fase 2.3c) — marcar / revertir pagos desde Kamehouse
+//
+// Carga diferida del plan dentro del modal de detalle (mismo patrón que
+// cargarComprobanteSP, vía admin-pagos-list). Por cada pago: "Marcar pagado"
+// (mini-form con fecha/método/referencia → admin-marcar-pago accion 'pagar') o
+// "Revertir" (accion 'revertir'). El backend reconcilia el estado de la
+// solicitud (todos pagados → 'pagado'; revertir uno → 'en_pagos'). El cliente
+// ve el abono en portal.html en cuanto un pago pasa a 'pagado'.
+// ═══════════════════════════════════════════════════════════════
+
+const _SP_METODO_LBL = { bbva:'BBVA', hey:'Hey Banco', efectivo:'Efectivo', transferencia:'Transferencia', otro:'Otro' };
+
+// Badge de estado de un pago. Reusa _spBadgeEstado, agregando 'vencido' (que la
+// tabla pagos permite pero la solicitud no).
+function _spBadgePago(estado) {
+  if (estado === 'vencido') {
+    return `<span style="display:inline-block;padding:3px 9px;border-radius:12px;background:#f8d7da;color:#721c24;font-size:11px;font-weight:700;letter-spacing:.04em">Vencido</span>`;
+  }
+  return _spBadgeEstado(estado);
+}
+
+// Carga diferida del plan (lazy load, igual que cargarComprobanteSP).
+async function cargarPlanPagosSP(solicitudId, estadoSolicitud) {
+  const target = document.getElementById('sp-plan-' + solicitudId);
+  if (!target) return;
+  try {
+    const r = await fetch('/.netlify/functions/admin-pagos-list', {
+      method: 'POST',
+      headers: _spAdminHeaders(),
+      body: JSON.stringify({ solicitud_id: solicitudId }),
+    });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || 'No se pudo obtener el plan de pagos');
+    _spPlanCache[solicitudId] = Array.isArray(data.pagos) ? data.pagos : [];
+    renderPlanPagosSP(solicitudId, estadoSolicitud);
+  } catch (e) {
+    target.innerHTML = `<span style="color:#FF6B6B">Error: ${_spEscape(e.message)}</span>`;
+  }
+}
+
+function renderPlanPagosSP(solicitudId, estadoSolicitud) {
+  const target = document.getElementById('sp-plan-' + solicitudId);
+  if (!target) return;
+  const pagos = _spPlanCache[solicitudId] || [];
+  if (!pagos.length) {
+    const msg = estadoSolicitud === 'pendiente'
+      ? 'Aún sin plan — aprueba la solicitud (cambia el estado a “En pagos”) para generarlo.'
+      : 'Sin plan de pagos para esta solicitud.';
+    target.innerHTML = `<span style="color:var(--ts)">${msg}</span>`;
+    return;
+  }
+
+  const total   = pagos.reduce((a, p) => a + Number(p.monto || 0), 0);
+  const abonado = pagos.filter(p => p.estado === 'pagado').reduce((a, p) => a + Number(p.monto || 0), 0);
+  const restante = total - abonado;
+
+  const resumen = `
+    <div style="display:flex;gap:22px;flex-wrap:wrap;padding:10px 12px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;margin-bottom:12px">
+      <div><div style="color:var(--ts);text-transform:uppercase;letter-spacing:.08em;font-size:10px">Total</div><b style="font-size:14px">${_spFmtMxn(total)}</b></div>
+      <div><div style="color:var(--ts);text-transform:uppercase;letter-spacing:.08em;font-size:10px">Abonado</div><b style="font-size:14px;color:#3DDC84">${_spFmtMxn(abonado)}</b></div>
+      <div><div style="color:var(--ts);text-transform:uppercase;letter-spacing:.08em;font-size:10px">Restante</div><b style="font-size:14px;color:var(--orange)">${_spFmtMxn(restante)}</b></div>
+    </div>`;
+
+  const filas = pagos.map(p => _spRenderFilaPago(solicitudId, p)).join('');
+  target.innerHTML = resumen + `<div style="display:flex;flex-direction:column;gap:8px">${filas}</div>`;
+}
+
+function _spRenderFilaPago(solicitudId, p) {
+  const idSafe   = _spEscape(p.id);
+  const solSafe  = _spEscape(solicitudId);
+  const esPagado = p.estado === 'pagado';
+
+  let accionHtml;
+  if (esPagado) {
+    const detalle = [
+      p.metodo ? (_SP_METODO_LBL[p.metodo] || p.metodo) : null,
+      p.referencia ? 'Ref: ' + _spEscape(p.referencia) : null,
+      p.fecha_pagada ? 'Pagado ' + _spEscape(p.fecha_pagada) : null,
+    ].filter(Boolean).join(' · ');
+    accionHtml = `
+      <div style="margin-top:8px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <span style="font-size:11px;color:#3DDC84">${detalle || 'Pagado'}</span>
+        <button class="btn btn-ghost btn-sm" style="font-size:11px" onclick="revertirPagoSP('${solSafe}','${idSafe}')">Revertir</button>
+      </div>`;
+  } else {
+    const hoy = _spYmd(new Date());
+    const opciones = Object.keys(_SP_METODO_LBL)
+      .map(k => `<option value="${k}">${_SP_METODO_LBL[k]}</option>`).join('');
+    accionHtml = `
+      <div style="margin-top:8px">
+        <button class="btn btn-primary btn-sm" style="font-size:11px" onclick="abrirFormPagarSP('${idSafe}')">Marcar pagado</button>
+      </div>
+      <div id="sp-form-pago-${idSafe}" style="display:none;margin-top:10px;padding:10px 12px;background:var(--bg3);border:1px solid var(--border);border-radius:8px">
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
+          <div>
+            <label style="display:block;font-size:9px;letter-spacing:.1em;color:var(--ts);text-transform:uppercase;margin-bottom:3px">Fecha</label>
+            <input type="date" id="sp-pago-fecha-${idSafe}" value="${_spEscape(hoy)}" style="padding:7px 8px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;color:var(--ink);font-size:12px">
+          </div>
+          <div>
+            <label style="display:block;font-size:9px;letter-spacing:.1em;color:var(--ts);text-transform:uppercase;margin-bottom:3px">Método</label>
+            <select id="sp-pago-metodo-${idSafe}" style="padding:7px 8px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;color:var(--ink);font-size:12px">${opciones}</select>
+          </div>
+          <div style="flex:1;min-width:150px">
+            <label style="display:block;font-size:9px;letter-spacing:.1em;color:var(--ts);text-transform:uppercase;margin-bottom:3px">Referencia (opcional)</label>
+            <input type="text" id="sp-pago-ref-${idSafe}" maxlength="120" placeholder="folio, últimos 4 dígitos, etc." style="width:100%;padding:7px 8px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;color:var(--ink);font-size:12px">
+          </div>
+        </div>
+        <div style="margin-top:10px;display:flex;gap:8px;justify-content:flex-end">
+          <button class="btn btn-ghost btn-sm" style="font-size:11px" onclick="cerrarFormPagarSP('${idSafe}')">Cancelar</button>
+          <button class="btn btn-primary btn-sm" id="sp-pago-btn-${idSafe}" style="font-size:11px" onclick="marcarPagoSP('${solSafe}','${idSafe}')">Confirmar pago</button>
+        </div>
+      </div>`;
+  }
+
+  return `
+    <div style="border:1px solid var(--border);border-radius:8px;padding:10px 12px">
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--orange)">#${_spEscape(p.numero_pago)}</span>
+        <span style="flex:1;font-size:13px">${_spEscape(p.concepto)}</span>
+        <span style="font-size:13px;white-space:nowrap"><b>${_spFmtMxn(p.monto)}</b></span>
+        ${_spBadgePago(p.estado)}
+      </div>
+      <div style="margin-top:3px;font-size:11px;color:var(--ts)">Vence: ${_spEscape(p.fecha_esperada)}${Number(p.numero_pago) === 1 ? ' · Separo (comprobante en la sección de abajo)' : ''}</div>
+      ${accionHtml}
+    </div>`;
+}
+
+function abrirFormPagarSP(pagoId) {
+  const f = document.getElementById('sp-form-pago-' + pagoId);
+  if (f) f.style.display = '';
+}
+
+function cerrarFormPagarSP(pagoId) {
+  const f = document.getElementById('sp-form-pago-' + pagoId);
+  if (f) f.style.display = 'none';
+}
+
+async function marcarPagoSP(solicitudId, pagoId) {
+  const btn = document.getElementById('sp-pago-btn-' + pagoId);
+  const fecha  = (document.getElementById('sp-pago-fecha-' + pagoId) || {}).value || '';
+  const metodo = (document.getElementById('sp-pago-metodo-' + pagoId) || {}).value || '';
+  const ref    = ((document.getElementById('sp-pago-ref-' + pagoId) || {}).value || '').trim();
+  if (!metodo) { showToast('Elige un método de pago', 'error'); return; }
+
+  if (btn) { btn.disabled = true; btn.textContent = 'Guardando…'; }
+  try {
+    const r = await fetch('/.netlify/functions/admin-marcar-pago', {
+      method: 'POST',
+      headers: _spAdminHeaders(),
+      body: JSON.stringify({
+        pago_id: pagoId,
+        accion: 'pagar',
+        fecha_pagada: fecha || undefined,
+        metodo,
+        referencia: ref || undefined,
+      }),
+    });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || 'No se pudo marcar el pago');
+    if (data.solicitud_estado_cambio === 'pagado') {
+      showToast('Pago registrado — la solicitud quedó totalmente pagada', 'success');
+    } else {
+      showToast('Pago registrado', 'success');
+    }
+    await _spRefrescarPlanYLista(solicitudId, data.solicitud_estado);
+  } catch (e) {
+    showToast('Error: ' + e.message, 'error');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Confirmar pago'; }
+  }
+}
+
+async function revertirPagoSP(solicitudId, pagoId) {
+  if (!confirm('¿Revertir este pago? Volverá a "pendiente" y se borrarán método, referencia y fecha de pago.')) return;
+  try {
+    const r = await fetch('/.netlify/functions/admin-marcar-pago', {
+      method: 'POST',
+      headers: _spAdminHeaders(),
+      body: JSON.stringify({ pago_id: pagoId, accion: 'revertir' }),
+    });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || 'No se pudo revertir el pago');
+    if (data.solicitud_estado_cambio === 'en_pagos') {
+      showToast('Pago revertido — la solicitud volvió a "En pagos"', 'success');
+    } else {
+      showToast('Pago revertido', 'success');
+    }
+    await _spRefrescarPlanYLista(solicitudId, data.solicitud_estado);
+  } catch (e) {
+    showToast('Error: ' + e.message, 'error');
+  }
+}
+
+// Refresca la sección del plan (re-fetch) y la lista de fondo. estadoSolicitud
+// es el estado ya reconciliado por el backend, para la lógica de "sin plan".
+async function _spRefrescarPlanYLista(solicitudId, estadoSolicitud) {
+  await cargarPlanPagosSP(solicitudId, estadoSolicitud);
+  loadSolicitudesPortal();
 }
 
 // ═══════════════════════════════════════════════════════════════

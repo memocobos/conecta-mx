@@ -4826,7 +4826,7 @@ function _renderCobranza() {
       : '<span style="color:var(--ts)">—</span>';
     const rowCls = atr ? 'cob-atrasado' : (t.estado === 'pagado' ? 'cob-pagado' : '');
     return `<tr class="${rowCls}">
-      <td><div style="font-weight:600">${_spEscape(c.nombre_completo || '—')}</div></td>
+      <td><div style="font-weight:600">${_spEscape(c.nombre_completo || '—')}</div><div style="margin-top:3px">${_badgeCliente(c)}</div></td>
       <td style="font-size:12px">${telCell}</td>
       <td style="font-size:12px">${_spEscape(evL.nombre)}${evL.fecha?`<br><span style="color:var(--ts);font-size:11px">${_spEscape(evL.fecha)}</span>`:''}</td>
       <td style="font-size:12px">${_spEscape(t.zona || '—')}</td>
@@ -8698,6 +8698,18 @@ function filtrarViajerosCC(filtro, btn) {
   _renderViajerosTabla();
 }
 
+// Badges de ESTADO DE CUENTA del cliente (adicionales a los de pago). Reusa la
+// paleta de .badge del CSS. Combina: walk-in sin cuenta → "Walk-in" + "Sin cuenta";
+// walk-in que ya reclamó → "Walk-in" + "En portal"; cliente del portal → "En portal".
+function _badgeCliente(c) {
+  c = c || {};
+  const badges = [];
+  if (c.creado_por_admin) badges.push('<span class="badge badge-gray">Walk-in</span>');
+  if (c.auth_user_id)     badges.push('<span class="badge badge-green">En portal</span>');
+  else                    badges.push('<span class="badge badge-gray" style="opacity:.7">Sin cuenta</span>');
+  return badges.join(' ');
+}
+
 function _renderViajerosTabla() {
   const list = document.getElementById('cc-viajeros-list');
   if (!list) return;
@@ -8729,7 +8741,7 @@ function _renderViajerosTabla() {
         ? `<br><button class="btn btn-ghost btn-sm" style="font-size:10px;margin-top:5px" onclick="invitarWalkin('${_spEscape(c.id)}', this)">✉ Invitar al portal</button>`
         : '';
       return `<tr>
-      <td style="font-weight:600">${c.nombre_completo || '—'}${c.correo ? `<br><span style="color:var(--ts);font-size:11px;font-weight:400">${c.correo}</span>` : ''}${botonInvitar}</td>
+      <td style="font-weight:600">${c.nombre_completo || '—'} ${_badgeCliente(c)}${c.correo ? `<br><span style="color:var(--ts);font-size:11px;font-weight:400">${c.correo}</span>` : ''}${botonInvitar}</td>
       <td style="font-family:'JetBrains Mono',monospace;font-size:12px">${c.celular || '—'}</td>
       <td>${paq ? `<span style="font-size:10px;font-weight:700;padding:2px 10px;border-radius:4px;background:${paqCol[paq]||'rgba(255,255,255,.06)'};color:${paqFg[paq]||'var(--ts)'}">${paq}</span>` : '—'}</td>
       <td style="font-size:11px;color:var(--orange);white-space:nowrap">${v.zona || '—'}</td>

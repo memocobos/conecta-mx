@@ -67,7 +67,7 @@ exports.handler = async (event) => {
   try {
     // 1. Solicitudes activas (o el estado filtrado).
     const sp = new URLSearchParams();
-    sp.set('select', 'id,evento_id,evento_nombre,paquete,zona,num_personas,estado,precio_total,created_at,clientes(nombre_completo,celular)');
+    sp.set('select', 'id,evento_id,evento_nombre,paquete,zona,num_personas,estado,precio_total,created_at,clientes(nombre_completo,celular,creado_por_admin,auth_user_id)');
     if (estadoFiltro) sp.append('estado', `eq.${estadoFiltro}`);
     else              sp.append('estado', `in.(${ESTADOS_DEFAULT.join(',')})`);
     if (base) sp.append('evento_id', `like.${base}*`);  // acota; el match exacto va en JS

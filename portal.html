@@ -612,6 +612,8 @@ main{
     <h1 class="h-display" id="profile-title">Completa tu <span class="accent">perfil</span></h1>
     <p class="subtitle">Solo te lo pedimos una vez. Esto nos ayuda a organizar tu viaje y mantener tu información a la mano.</p>
 
+    <div class="alert alert-warn" id="profile-obligatorio" role="alert">Completa tu perfil para continuar. Es necesario para poder usar tu portal.</div>
+
     <div class="card">
       <div class="alert" id="profile-alert" role="status"></div>
 
@@ -933,12 +935,23 @@ const $  = (sel, root=document) => root.querySelector(sel);
 const $$ = (sel, root=document) => Array.from(root.querySelectorAll(sel));
 
 function showView(name){
+  // Candado: con el perfil incompleto el ÚNICO destino permitido es 'profile'
+  // (ni dashboard, ni wizard, ni tour). 'auth' se respeta para poder cerrar sesión.
+  if (name !== 'profile' && name !== 'auth' && _perfilIncompleto(perfilExistente)){
+    name = 'profile';
+  }
   $$('.view').forEach(v => v.classList.remove('is-active'));
   const v = document.getElementById('view-' + name);
   if (v) v.classList.add('is-active');
   $('#boot').style.display = 'none';
   // FAB solo visible en dashboard
   $('#fab-new-tour').classList.toggle('is-visible', name === 'dashboard');
+  // Modo obligatorio de perfil: aviso visible y sin botón de salida hasta completar.
+  if (name === 'profile'){
+    const obligatorio = _perfilIncompleto(perfilExistente);
+    $('#profile-obligatorio').classList.toggle('is-visible', obligatorio);
+    if (obligatorio) $('#btn-cancel-profile').style.display = 'none';
+  }
   window.scrollTo({ top: 0, behavior: 'instant' });
 }
 
@@ -1328,6 +1341,13 @@ async function cargarClienteYRutear(session){
   }
 
   perfilExistente = data;
+  if (_perfilIncompleto(data)){
+    // Perfil incompleto (típico walk-in reclamado que no terminó): forzar a completar
+    // antes de dejarlo entrar. El candado de showView impide brincarse el formulario.
+    prellenarPerfil(data);
+    showView('profile');
+    return;
+  }
   renderDashboard(data);
   // Tocar ultima_actividad sin bloquear UI
   supabase.from('clientes')

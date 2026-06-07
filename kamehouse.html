@@ -7774,6 +7774,13 @@ async function abrirPerfil(userId) {
     await _ensureDeliverables(evAsignados);
   }
 
+  // Cockpit del coordi (DC2b): precarga los viajeros reales del portal para SU
+  // propio perfil. No bloquea el render; los botones esperan la promesa si hace
+  // falta. Refresca al abrir el perfil.
+  if (esYo && (usuario.rol === 'coordinador' || usuario.rol === 'cc')) {
+    _coordiCargarGrupos(true);
+  }
+
   const ptsTotal = calcularPuntos(toursPasados);
   const ptsAnio = calcularPuntosAnio(toursPasados, new Date().getFullYear());
 
@@ -7898,6 +7905,12 @@ async function renderMiPerfil(modoEdicion = false) {
       await _ensureDeliverables(evAsignados);
     }
 
+    // Cockpit del coordi (DC2b): precarga los viajeros reales del portal (perfil
+    // propio). No bloquea; los botones esperan la promesa si hace falta.
+    if (u.rol === 'coordinador' || u.rol === 'cc') {
+      _coordiCargarGrupos(true);
+    }
+
     const iniciales = u.nombre.split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase();
     const edad = u.fecha_nacimiento ? calcularEdad(u.fecha_nacimiento) : null;
     const cumple = u.fecha_nacimiento ? esCumple(u.fecha_nacimiento) : false;
@@ -8018,9 +8031,11 @@ function renderPerfilCompleto(u, toursPasados, evAsignados, iniciales, edad, cum
             </div>
             ${esMiPerfil && ev.id ? `
             <div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap">
+              <button class="btn btn-ghost btn-sm" onclick="_coordiVerViajeros('${ev.id}', this)" style="font-size:10px;font-family:'JetBrains Mono',monospace">👁 Ver viajeros</button>
               <button class="btn btn-ghost btn-sm" onclick="descargarListaViajeros('${ev.id}')" style="font-size:10px;font-family:'JetBrains Mono',monospace">↓ Lista viajeros</button>
               <button class="btn btn-ghost btn-sm" onclick="descargarRoomingList('${ev.id}')" style="font-size:10px;font-family:'JetBrains Mono',monospace">↓ Rooming list</button>
-            </div>` : ''}
+            </div>
+            <div id="coordi-viajeros-${ev.id}" style="display:none;margin-top:10px"></div>` : ''}
             ${u.rol === 'cc' && Array.isArray(e.deliverables) ? _renderDeliverablesPanel(e, u) : ''}
           </div>`;
         }).join('') : '<div style="font-family:JetBrains Mono,monospace;font-size:11px;color:var(--ts);letter-spacing:.05em">// sin tours asignados</div>'}
@@ -10131,45 +10146,161 @@ async function exportarRooming(formato) {
 }
 
 
-// ── Descargar listas desde perfil del coordi ─────────────────
-async function descargarListaViajeros(eventoId) {
-  try {
-    const [ev, viajeros] = await Promise.all([
-      db.get('eventos', `?id=eq.${eventoId}`).then(r=>r[0]||{}),
-      db.get('viajeros_evento', `?evento_id=eq.${eventoId}&order=nombre.asc`),
-    ]);
-    if (!viajeros.length) { alert('No hay viajeros registrados para este evento'); return; }
-    const titulo = `Viajeros — ${ev.nombre||'Evento'}`;
-    const html = `<html><head><meta charset="utf-8"><title>${titulo}</title>
-    <style>body{font-family:Arial,sans-serif;padding:24px}h2{margin-bottom:4px}p{color:#666;margin-bottom:20px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ccc;padding:8px 12px;font-size:13px}th{background:#f5f5f5}</style></head><body>
-    <h2>${titulo}</h2><p>${ev.artista?ev.artista+' · ':''}${ev.ciudad||''} ${ev.fecha?'· '+new Date(ev.fecha+'T12:00:00').toLocaleDateString('es-MX',{day:'numeric',month:'long',year:'numeric'}):''}</p>
-    <table><thead><tr><th>#</th><th>Nombre</th><th>Paquete</th><th>Zona</th><th>Talla</th><th>Celular</th><th>Emergencia</th><th>Notas</th></tr></thead>
-    <tbody>${viajeros.map((v,i)=>`<tr><td>${i+1}</td><td><strong>${v.nombre}</strong></td><td>${v.tipo_paquete||'—'}</td><td>${v.zona_boleto||'—'}</td><td>${v.talla_playera||'—'}</td><td>${v.celular||'—'}</td><td>${v.num_emergencia||'—'}</td><td>${v.notas||'—'}</td></tr>`).join('')}</tbody>
-    </table></body></html>`;
-    _descargarHTML(`viajeros-${(ev.nombre||'evento').replace(/[^a-zA-Z0-9-_]+/g,'_')}.html`, html);
-  } catch(e) { alert('Error: ' + e.message); }
+// ═══════════════════════════════════════════════════════════════
+// COCKPIT DEL COORDI (DC2b) — viajeros REALES del portal
+// Los viajeros viven en el PORTAL (solicitudes_tour), no en las tablas
+// muertas de KH (viajeros_evento / rooming_habitaciones). coordi-mis-grupos
+// (DC2a) los devuelve scoped por el JWT del coordi: SOLO eventos aceptados,
+// CERO dinero. Cacheamos la respuesta una vez por sesión de perfil.
+// ═══════════════════════════════════════════════════════════════
+let _coordiGruposCache = null;    // { eventos:[...] } una vez cargado
+let _coordiGruposLoading = null;  // promesa en vuelo (evita fetch duplicado)
+
+function _coordiEsc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c])); }
+
+// Carga (una vez) los grupos del coordi. Nunca truena: ante fallo deja
+// { eventos:[], error:true } para que el perfil siga vivo.
+async function _coordiCargarGrupos(forzar) {
+  if (_coordiGruposCache && !forzar) return _coordiGruposCache;
+  if (forzar) _coordiGruposCache = null;  // refresca: callers no-forzados esperan la carga fresca
+  if (_coordiGruposLoading) return _coordiGruposLoading;
+  _coordiGruposLoading = (async () => {
+    const resp = await khAdminFetch('/.netlify/functions/coordi-mis-grupos', {
+      method: 'POST', body: '{}',
+    }).catch(() => null);
+    let data = { eventos: [], error: true };
+    if (resp && resp.ok) {
+      const j = await resp.json().catch(() => null);
+      if (j && j.ok && Array.isArray(j.eventos)) data = { eventos: j.eventos };
+    }
+    _coordiGruposCache = data;
+    return data;
+  })();
+  const out = await _coordiGruposLoading;
+  _coordiGruposLoading = null;
+  return out;
 }
 
+// Busca el grupo (evento) en el cache por evento_id (eventos_coordi.evento_id,
+// que coincide con eventos.id por FK).
+function _coordiGrupo(eventoId) {
+  const c = _coordiGruposCache;
+  if (!c || !Array.isArray(c.eventos)) return null;
+  return c.eventos.find(g => g.evento_id === eventoId) || null;
+}
+
+// Tabla read-only de viajeros para pantalla. SOLO logística, CERO dinero.
+function _coordiRenderTablaViajeros(viajeros) {
+  const tdBase = 'padding:6px 10px;border-bottom:1px solid var(--border)';
+  const td = (val, extra) => `<td style="${tdBase}${extra?';'+extra:''}">${val}</td>`;
+  const dash = `<span style="color:var(--ts)">—</span>`;
+  const cel = v => (v != null && v !== '') ? _coordiEsc(v) : dash;
+  const filas = viajeros.map((v, i) => {
+    const emerg = [v.contacto_emergencia_nombre, v.contacto_emergencia_telefono].filter(Boolean).map(_coordiEsc).join(' · ');
+    return `<tr>
+      ${td(i+1, 'color:var(--ts)')}
+      ${td('<strong>'+cel(v.nombre_completo)+'</strong>')}
+      ${td(cel(v.talla_playera))}
+      ${td(cel(v.celular))}
+      ${td(emerg || dash)}
+      ${td(cel(v.zona))}
+      ${td(cel(v.paquete))}
+      ${td(cel(v.tipo_habitacion))}
+      ${td(cel(v.comentarios), 'white-space:normal;min-width:120px')}
+    </tr>`;
+  }).join('');
+  const ths = ['#','Nombre','Talla','Celular','Emergencia','Zona','Paquete','Habitación','Comentarios']
+    .map(h=>`<th style="padding:6px 10px;color:var(--ts);font-family:'JetBrains Mono',monospace;font-weight:400;font-size:10px;letter-spacing:.04em;border-bottom:1px solid var(--border);text-align:left">${h}</th>`).join('');
+  return `<div style="overflow-x:auto;border:1px solid var(--border);border-radius:8px">
+    <table style="width:100%;border-collapse:collapse;font-size:11px;white-space:nowrap">
+      <thead><tr style="background:rgba(255,255,255,.03)">${ths}</tr></thead>
+      <tbody>${filas}</tbody>
+    </table></div>`;
+}
+
+// Ver viajeros EN PANTALLA (expand). Solo aparece en el perfil propio.
+async function _coordiVerViajeros(eventoId, btn) {
+  const cont = document.getElementById('coordi-viajeros-' + eventoId);
+  if (!cont) return;
+  if (cont.style.display !== 'none') {
+    cont.style.display = 'none';
+    if (btn) btn.textContent = '👁 Ver viajeros';
+    return;
+  }
+  cont.style.display = 'block';
+  if (btn) btn.textContent = '✕ Ocultar';
+  cont.innerHTML = '<div style="font-family:JetBrains Mono,monospace;font-size:11px;color:var(--ts);letter-spacing:.05em">// cargando viajeros…</div>';
+  const data = await _coordiCargarGrupos();
+  const grupo = _coordiGrupo(eventoId);
+  const viajeros = grupo ? (grupo.viajeros || []) : [];
+  if (!viajeros.length) {
+    const msg = data.error
+      ? 'No se pudieron cargar los viajeros ahora. Intenta de nuevo en un momento.'
+      : 'Sin viajeros registrados para este evento todavía.';
+    cont.innerHTML = `<div style="font-size:12px;color:var(--ts);padding:4px 0">${msg}</div>`;
+    return;
+  }
+  cont.innerHTML = `<div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--ts);margin-bottom:6px;letter-spacing:.05em">${viajeros.length} VIAJERO${viajeros.length===1?'':'S'} · solo logística</div>` + _coordiRenderTablaViajeros(viajeros);
+}
+
+// ── Descargar listas desde perfil del coordi (datos REALES del portal) ──
+async function descargarListaViajeros(eventoId) {
+  const data = await _coordiCargarGrupos();
+  const grupo = _coordiGrupo(eventoId);
+  const viajeros = grupo ? (grupo.viajeros || []) : [];
+  if (!viajeros.length) {
+    alert(data.error ? 'No se pudieron cargar los viajeros ahora. Intenta de nuevo.' : 'No hay viajeros registrados para este evento.');
+    return;
+  }
+  const nombreEv = grupo.nombre || 'Evento';
+  const titulo = `Viajeros — ${nombreEv}`;
+  const html = `<html><head><meta charset="utf-8"><title>${_coordiEsc(titulo)}</title>
+  <style>body{font-family:Arial,sans-serif;padding:24px}h2{margin-bottom:4px}p{color:#666;margin-bottom:20px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ccc;padding:8px 12px;font-size:13px}th{background:#f5f5f5;text-align:left}</style></head><body>
+  <h2>${_coordiEsc(titulo)}</h2><p>${viajeros.length} viajero${viajeros.length===1?'':'s'} · solo logística</p>
+  <table><thead><tr><th>#</th><th>Nombre</th><th>Paquete</th><th>Zona</th><th>Talla</th><th>Celular</th><th>Emergencia</th><th>Habitación</th><th>Comentarios</th></tr></thead>
+  <tbody>${viajeros.map((v,i)=>{
+    const emerg = [v.contacto_emergencia_nombre, v.contacto_emergencia_telefono].filter(Boolean).map(_coordiEsc).join(' · ');
+    return `<tr><td>${i+1}</td><td><strong>${_coordiEsc(v.nombre_completo)||'—'}</strong></td><td>${_coordiEsc(v.paquete)||'—'}</td><td>${_coordiEsc(v.zona)||'—'}</td><td>${_coordiEsc(v.talla_playera)||'—'}</td><td>${_coordiEsc(v.celular)||'—'}</td><td>${emerg||'—'}</td><td>${_coordiEsc(v.tipo_habitacion)||'—'}</td><td>${_coordiEsc(v.comentarios)||'—'}</td></tr>`;
+  }).join('')}</tbody>
+  </table></body></html>`;
+  _descargarHTML(`viajeros-${nombreEv.replace(/[^a-zA-Z0-9-_]+/g,'_')}.html`, html);
+}
+
+// Rooming POR TIPO de habitación (compartida/triple/doble/individual) — agrupa
+// quién cae en cada tipo. NO es asignación cuarto-por-cuarto (eso no existe hoy).
 async function descargarRoomingList(eventoId) {
-  try {
-    const [ev, habs] = await Promise.all([
-      db.get('eventos', `?id=eq.${eventoId}`).then(r=>r[0]||{}),
-      db.get('rooming_habitaciones', `?evento_id=eq.${eventoId}&order=orden.asc`),
-    ]);
-    if (!habs.length) { alert('No hay rooming list para este evento'); return; }
-    const tipoLabels = {individual:'Individual',doble:'Doble',triple:'Triple',cuadruple:'Cuádruple'};
-    const titulo = `Rooming List — ${ev.nombre||'Evento'}`;
-    const html = `<html><head><meta charset="utf-8"><title>${titulo}</title>
-    <style>body{font-family:Arial,sans-serif;padding:24px}h2{margin-bottom:4px}p{color:#666;margin-bottom:20px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ccc;padding:8px 12px;font-size:13px;vertical-align:top}th{background:#f5f5f5}</style></head><body>
-    <h2>${titulo}</h2>
-    <p>${habs[0]?.hotel_nombre||''}${habs[0]?.hotel_direccion?' · '+habs[0].hotel_direccion:''}${habs[0]?.incluye_desayuno?' · ✓ Incluye desayuno':''}</p>
-    <table><thead><tr><th>Habitación</th><th>Tipo</th><th>Ocupantes</th></tr></thead>
-    <tbody>${habs.map((h,i)=>{
-      const ocp = h.ocupantes?(typeof h.ocupantes==='string'?JSON.parse(h.ocupantes):h.ocupantes):[];
-      return `<tr><td>Habitación ${i+1}</td><td>${tipoLabels[h.tipo]||h.tipo}</td><td>${ocp.join('<br>')||'—'}</td></tr>`;
-    }).join('')}</tbody></table></body></html>`;
-    _descargarHTML(`rooming-${(ev.nombre||'evento').replace(/[^a-zA-Z0-9-_]+/g,'_')}.html`, html);
-  } catch(e) { alert('Error: ' + e.message); }
+  const data = await _coordiCargarGrupos();
+  const grupo = _coordiGrupo(eventoId);
+  const viajeros = grupo ? (grupo.viajeros || []) : [];
+  if (!viajeros.length) {
+    alert(data.error ? 'No se pudieron cargar los viajeros ahora. Intenta de nuevo.' : 'No hay viajeros registrados para este evento.');
+    return;
+  }
+  const nombreEv = grupo.nombre || 'Evento';
+  const ordenTipo = ['compartida','triple','doble','individual'];
+  const tipoLabels = { compartida:'Compartida', triple:'Triple', doble:'Doble', individual:'Individual', sin_asignar:'Sin asignar' };
+  const buckets = {};
+  viajeros.forEach(v => {
+    const t = (v.tipo_habitacion || '').toLowerCase().trim() || 'sin_asignar';
+    (buckets[t] = buckets[t] || []).push(v);
+  });
+  const tipos = Object.keys(buckets).sort((a,b) => {
+    const ia = ordenTipo.indexOf(a), ib = ordenTipo.indexOf(b);
+    return (ia<0?99:ia) - (ib<0?99:ib);
+  });
+  const secciones = tipos.map(t => {
+    const label = tipoLabels[t] || (t.charAt(0).toUpperCase()+t.slice(1));
+    const filas = buckets[t].map((v,i)=>`<tr><td>${i+1}</td><td><strong>${_coordiEsc(v.nombre_completo)||'—'}</strong></td><td>${_coordiEsc(v.celular)||'—'}</td><td>${_coordiEsc(v.paquete)||'—'}</td></tr>`).join('');
+    return `<h3 style="margin:22px 0 6px">${_coordiEsc(label)} <span style="color:#888;font-weight:normal">(${buckets[t].length})</span></h3>
+    <table><thead><tr><th>#</th><th>Nombre</th><th>Celular</th><th>Paquete</th></tr></thead><tbody>${filas}</tbody></table>`;
+  }).join('');
+  const titulo = `Rooming List — ${nombreEv}`;
+  const html = `<html><head><meta charset="utf-8"><title>${_coordiEsc(titulo)}</title>
+  <style>body{font-family:Arial,sans-serif;padding:24px}h2{margin-bottom:4px}h3{margin-bottom:4px}p{color:#666;margin-bottom:20px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ccc;padding:8px 12px;font-size:13px;vertical-align:top}th{background:#f5f5f5;text-align:left}</style></head><body>
+  <h2>${_coordiEsc(titulo)}</h2>
+  <p>Rooming por tipo de habitación · ${viajeros.length} viajero${viajeros.length===1?'':'s'}</p>
+  ${secciones}</body></html>`;
+  _descargarHTML(`rooming-${nombreEv.replace(/[^a-zA-Z0-9-_]+/g,'_')}.html`, html);
 }
 
 

@@ -9969,11 +9969,16 @@ async function cargarComprobanteSP(solicitudId) {
 // ve el abono en portal.html en cuanto un pago pasa a 'pagado'.
 // ═══════════════════════════════════════════════════════════════
 
-const _SP_METODO_LBL = { bbva:'BBVA', hey:'Banamex', efectivo:'Efectivo', transferencia:'Transferencia', otro:'Otro' };
+// `metodo` = CÓMO pagó (forma de pago). Ya no mezcla bancos. Los valores viejos
+// (bbva/hey/otro) siguen mapeados para mostrar pagos antiguos, pero el <select>
+// solo ofrece los 3 nuevos (ver _SP_METODOS_UI).
+const _SP_METODO_LBL = { transferencia:'Transferencia', deposito:'Depósito', efectivo:'Efectivo', bbva:'BBVA', hey:'Banamex', otro:'Otro' };
+const _SP_METODOS_UI = ['transferencia','deposito','efectivo'];
 
-// `cuenta` = a qué cuenta ENTRÓ el dinero (visor de saldos), DISTINTO de método.
-// Va por pago; default según el paquete pero editable a mano.
-const _SP_CUENTAS = ['BBVA','Banamex','Efectivo','Otro'];
+// `cuenta`/banco = a qué cuenta ENTRÓ el dinero (visor de saldos), DISTINTO de
+// método. El selector de BANCO solo ofrece BBVA/Banamex y solo aparece cuando el
+// método es Transferencia o Depósito; con Efectivo la cuenta es 'Efectivo'.
+const _SP_BANCOS = ['BBVA','Banamex'];
 // Paquete de cada solicitud, para el default de cuenta. Lo llena cargarPlanPagosSP
 // (el refresh tras marcar/revertir no trae el paquete, así que lo lee de aquí).
 let _spPaqueteCache = {};
@@ -10067,12 +10072,14 @@ function _spRenderFilaPago(solicitudId, p) {
       </div>`;
   } else {
     const hoy = _spYmd(new Date());
-    const opciones = Object.keys(_SP_METODO_LBL)
+    // Método: solo las 3 formas de pago nuevas.
+    const opciones = _SP_METODOS_UI
       .map(k => `<option value="${k}">${_SP_METODO_LBL[k]}</option>`).join('');
-    // Cuenta: default según el paquete de la solicitud (editable a mano).
-    const cuentaDefault = _spCuentaDefault(_spPaqueteCache[solicitudId]);
-    const opcionesCuenta = _SP_CUENTAS
-      .map(c => `<option value="${c}"${c === cuentaDefault ? ' selected' : ''}>${c}</option>`).join('');
+    // Banco: default según el paquete de la solicitud (editable). Solo aplica si
+    // el método es Transferencia o Depósito; con Efectivo se oculta.
+    const bancoDefault = _spCuentaDefault(_spPaqueteCache[solicitudId]);
+    const opcionesBanco = _SP_BANCOS
+      .map(c => `<option value="${c}"${c === bancoDefault ? ' selected' : ''}>${c}</option>`).join('');
     accionHtml = `
       <div style="margin-top:8px">
         <button class="btn btn-primary btn-sm" style="font-size:11px" onclick="abrirFormPagarSP('${idSafe}')">Marcar pagado</button>
@@ -10089,11 +10096,11 @@ function _spRenderFilaPago(solicitudId, p) {
           </div>
           <div>
             <label style="display:block;font-size:9px;letter-spacing:.1em;color:var(--ts);text-transform:uppercase;margin-bottom:3px">Método</label>
-            <select id="sp-pago-metodo-${idSafe}" style="padding:7px 8px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;color:var(--ink);font-size:12px">${opciones}</select>
+            <select id="sp-pago-metodo-${idSafe}" onchange="_spOnMetodoChange('${idSafe}')" style="padding:7px 8px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;color:var(--ink);font-size:12px">${opciones}</select>
           </div>
-          <div>
-            <label style="display:block;font-size:9px;letter-spacing:.1em;color:var(--ts);text-transform:uppercase;margin-bottom:3px">Cuenta</label>
-            <select id="sp-pago-cuenta-${idSafe}" style="padding:7px 8px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;color:var(--ink);font-size:12px">${opcionesCuenta}</select>
+          <div id="sp-pago-banco-wrap-${idSafe}">
+            <label style="display:block;font-size:9px;letter-spacing:.1em;color:var(--ts);text-transform:uppercase;margin-bottom:3px">Banco</label>
+            <select id="sp-pago-banco-${idSafe}" style="padding:7px 8px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;color:var(--ink);font-size:12px">${opcionesBanco}</select>
           </div>
           <div style="flex:1;min-width:150px">
             <label style="display:block;font-size:9px;letter-spacing:.1em;color:var(--ts);text-transform:uppercase;margin-bottom:3px">Referencia (opcional)</label>
@@ -10136,6 +10143,15 @@ function _spRenderFilaPago(solicitudId, p) {
 function abrirFormPagarSP(pagoId) {
   const f = document.getElementById('sp-form-pago-' + pagoId);
   if (f) f.style.display = '';
+  _spOnMetodoChange(pagoId);  // sincroniza la visibilidad del banco con el método
+}
+
+// Muestra/oculta el selector de banco según el método: Transferencia/Depósito lo
+// muestran (el dinero entra a un banco); Efectivo lo oculta (cuenta = 'Efectivo').
+function _spOnMetodoChange(pagoId) {
+  const metodo = (document.getElementById('sp-pago-metodo-' + pagoId) || {}).value || '';
+  const wrap = document.getElementById('sp-pago-banco-wrap-' + pagoId);
+  if (wrap) wrap.style.display = (metodo === 'efectivo') ? 'none' : '';
 }
 
 function cerrarFormPagarSP(pagoId) {
@@ -10147,7 +10163,10 @@ async function marcarPagoSP(solicitudId, pagoId) {
   const btn = document.getElementById('sp-pago-btn-' + pagoId);
   const fecha  = (document.getElementById('sp-pago-fecha-' + pagoId) || {}).value || '';
   const metodo = (document.getElementById('sp-pago-metodo-' + pagoId) || {}).value || '';
-  const cuenta = (document.getElementById('sp-pago-cuenta-' + pagoId) || {}).value || '';
+  // Cuenta = a qué cuenta entró el dinero: Efectivo → 'Efectivo'; si no, el banco.
+  const cuenta = (metodo === 'efectivo')
+    ? 'Efectivo'
+    : ((document.getElementById('sp-pago-banco-' + pagoId) || {}).value || '');
   const ref    = ((document.getElementById('sp-pago-ref-' + pagoId) || {}).value || '').trim();
   const montoRaw = ((document.getElementById('sp-pago-monto-' + pagoId) || {}).value || '').trim();
   if (!metodo) { showToast('Elige un método de pago', 'error'); return; }

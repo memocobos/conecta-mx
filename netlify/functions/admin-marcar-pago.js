@@ -89,6 +89,17 @@ exports.handler = async (event) => {
     if (referencia.length > MAX_REFERENCIA) {
       return { statusCode: 400, headers, body: JSON.stringify({ error: `referencia demasiado larga (máx ${MAX_REFERENCIA})` }) };
     }
+    // monto_pagado opcional: monto REAL pagado. Si no viene, queda NULL y el
+    // cálculo de abonado usa el monto del plan (COALESCE) — compatibilidad.
+    let montoPagado = body.monto_pagado;
+    if (montoPagado == null || montoPagado === '') {
+      montoPagado = null;
+    } else {
+      montoPagado = Number(montoPagado);
+      if (!Number.isFinite(montoPagado) || montoPagado < 0) {
+        return { statusCode: 400, headers, body: JSON.stringify({ error: 'monto_pagado debe ser un número >= 0' }) };
+      }
+    }
     const registradoPor = (auth.user && (auth.user.correo || auth.user.rol)) || 'admin';
     patch = {
       estado:         'pagado',
@@ -97,9 +108,10 @@ exports.handler = async (event) => {
       referencia:     referencia || null,
       registrado_por: registradoPor,
     };
+    if (montoPagado !== null) patch.monto_pagado = montoPagado;
   } else {
     // revertir: deja el pago como estaba (pendiente, sin datos de pago).
-    patch = { estado: 'pendiente', fecha_pagada: null, metodo: null, referencia: null };
+    patch = { estado: 'pendiente', fecha_pagada: null, metodo: null, referencia: null, monto_pagado: null };
   }
 
   const sbHeaders = {

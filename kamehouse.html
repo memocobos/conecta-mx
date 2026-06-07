@@ -9517,7 +9517,10 @@ function renderPlanPagosSP(solicitudId, estadoSolicitud) {
   }
 
   const total   = pagos.reduce((a, p) => a + Number(p.monto || 0), 0);
-  const abonado = pagos.filter(p => p.estado === 'pagado').reduce((a, p) => a + Number(p.monto || 0), 0);
+  // Abonado = monto REAL pagado: COALESCE(monto_pagado, monto), igual que en
+  // admin-cobranza-list y el portal del cliente (Fase 3.2). El plan ya trae
+  // monto_pagado (admin-pagos-list usa select=*); NULL = monto del plan.
+  const abonado = pagos.filter(p => p.estado === 'pagado').reduce((a, p) => a + (Number(p.monto_pagado ?? p.monto) || 0), 0);
   const restante = total - abonado;
 
   const resumen = `
@@ -9538,7 +9541,12 @@ function _spRenderFilaPago(solicitudId, p) {
 
   let accionHtml;
   if (esPagado) {
+    // Si se capturó un monto real distinto al del plan, mostrarlo (transparencia).
+    const difMonto = (p.monto_pagado != null && Number(p.monto_pagado) !== Number(p.monto))
+      ? 'Pagado: ' + _spFmtMxn(p.monto_pagado) + ' (esperado: ' + _spFmtMxn(p.monto) + ')'
+      : null;
     const detalle = [
+      difMonto,
       p.metodo ? (_SP_METODO_LBL[p.metodo] || p.metodo) : null,
       p.referencia ? 'Ref: ' + _spEscape(p.referencia) : null,
       p.fecha_pagada ? 'Pagado ' + _spEscape(p.fecha_pagada) : null,
@@ -9559,6 +9567,10 @@ function _spRenderFilaPago(solicitudId, p) {
       <div id="sp-form-pago-${idSafe}" style="display:none;margin-top:10px;padding:10px 12px;background:var(--bg3);border:1px solid var(--border);border-radius:8px">
         <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
           <div>
+            <label style="display:block;font-size:9px;letter-spacing:.1em;color:var(--ts);text-transform:uppercase;margin-bottom:3px">Monto pagado</label>
+            <input type="number" id="sp-pago-monto-${idSafe}" min="0" step="0.01" value="${_spEscape(Number(p.monto || 0))}" style="width:120px;padding:7px 8px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;color:var(--ink);font-size:12px">
+          </div>
+          <div>
             <label style="display:block;font-size:9px;letter-spacing:.1em;color:var(--ts);text-transform:uppercase;margin-bottom:3px">Fecha</label>
             <input type="date" id="sp-pago-fecha-${idSafe}" value="${_spEscape(hoy)}" style="padding:7px 8px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;color:var(--ink);font-size:12px">
           </div>
@@ -9571,6 +9583,7 @@ function _spRenderFilaPago(solicitudId, p) {
             <input type="text" id="sp-pago-ref-${idSafe}" maxlength="120" placeholder="folio, últimos 4 dígitos, etc." style="width:100%;padding:7px 8px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;color:var(--ink);font-size:12px">
           </div>
         </div>
+        <div style="margin-top:6px;font-size:10px;color:var(--ts)">Por defecto el monto del plan — cámbialo si pagó distinto.</div>
         <div style="margin-top:10px;display:flex;gap:8px;justify-content:flex-end">
           <button class="btn btn-ghost btn-sm" style="font-size:11px" onclick="cerrarFormPagarSP('${idSafe}')">Cancelar</button>
           <button class="btn btn-primary btn-sm" id="sp-pago-btn-${idSafe}" style="font-size:11px" onclick="marcarPagoSP('${solSafe}','${idSafe}')">Confirmar pago</button>
@@ -9606,7 +9619,19 @@ async function marcarPagoSP(solicitudId, pagoId) {
   const fecha  = (document.getElementById('sp-pago-fecha-' + pagoId) || {}).value || '';
   const metodo = (document.getElementById('sp-pago-metodo-' + pagoId) || {}).value || '';
   const ref    = ((document.getElementById('sp-pago-ref-' + pagoId) || {}).value || '').trim();
+  const montoRaw = ((document.getElementById('sp-pago-monto-' + pagoId) || {}).value || '').trim();
   if (!metodo) { showToast('Elige un método de pago', 'error'); return; }
+
+  // Monto real pagado: prellenado con el del plan, editable. Si queda vacío se
+  // manda undefined (el backend deja NULL = monto del plan, compatibilidad).
+  let montoPagado;
+  if (montoRaw !== '') {
+    montoPagado = Number(montoRaw);
+    if (!Number.isFinite(montoPagado) || montoPagado < 0) {
+      showToast('El monto pagado debe ser un número válido (>= 0)', 'error');
+      return;
+    }
+  }
 
   if (btn) { btn.disabled = true; btn.textContent = 'Guardando…'; }
   try {
@@ -9619,6 +9644,7 @@ async function marcarPagoSP(solicitudId, pagoId) {
         fecha_pagada: fecha || undefined,
         metodo,
         referencia: ref || undefined,
+        monto_pagado: montoPagado,
       }),
     });
     const data = await r.json();

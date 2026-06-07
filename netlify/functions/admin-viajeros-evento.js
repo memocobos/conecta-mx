@@ -72,7 +72,7 @@ exports.handler = async (event) => {
     //    base+'#...'), para no traer eventos que solo comparten prefijo
     //    (p.ej. 'karolg2') ni que el '_' de LIKE actúe como comodín.
     const sp = new URLSearchParams();
-    sp.set('select', 'id,evento_id,evento_nombre,paquete,zona,num_personas,tipo_habitacion,estado,precio_total,monto_separo,clientes(nombre_completo,correo,celular)');
+    sp.set('select', 'id,evento_id,evento_nombre,paquete,zona,num_personas,tipo_habitacion,estado,precio_total,monto_separo,clientes(id,nombre_completo,correo,celular,creado_por_admin,auth_user_id)');
     sp.append('evento_id', `like.${base}*`);
     sp.append('estado', `in.(${ESTADOS_VIAJERO.join(',')})`);
     sp.set('order', 'created_at.desc');

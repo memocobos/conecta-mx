@@ -1997,6 +1997,16 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
  <div class="metric-value" id="m-eventos">—</div>
  <div class="metric-sub">Con tours activos</div>
  </div>
+ <div class="metric">
+ <div class="metric-label">Gastos</div>
+ <div class="metric-value red" id="m-gastos">—</div>
+ <div class="metric-sub">Total de egresos</div>
+ </div>
+ <div class="metric">
+ <div class="metric-label">Utilidad</div>
+ <div class="metric-value green" id="m-utilidad">—</div>
+ <div class="metric-sub">Facturado − gastos</div>
+ </div>
  </div>
 
  <div id="resumen-cap-aviso" style="display:none;margin-bottom:16px;padding:10px 14px;border:1px solid var(--border2);border-radius:8px;background:rgba(255,107,0,.06);color:var(--orange);font-size:12px"></div>
@@ -2140,6 +2150,8 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
    <div class="cob-stat"><div class="cob-stat-lbl">Por cobrar</div><div class="cob-stat-val orange" id="evt-porcobrar">—</div></div>
    <div class="cob-stat"><div class="cob-stat-lbl">Viajeros</div><div class="cob-stat-val" id="evt-viajeros">—</div></div>
    <div class="cob-stat"><div class="cob-stat-lbl">Atrasados</div><div class="cob-stat-val red" id="evt-atrasados">—</div></div>
+   <div class="cob-stat"><div class="cob-stat-lbl">Gastos</div><div class="cob-stat-val red" id="evt-gastos">—</div></div>
+   <div class="cob-stat"><div class="cob-stat-lbl">Utilidad</div><div class="cob-stat-val green" id="evt-utilidad">—</div></div>
  </div>
 
  <!-- Desglose por paquete / zona -->
@@ -4481,6 +4493,7 @@ function populateEventoSelects() {
 // Los TOTALES de dinero EXCLUYEN cancelados; estos se cuentan aparte.
 // ═══════════════════════════════════════════════════════════════
 let _cobTodoCache = null;   // { activos:[], cancelados:[], capHit:bool } | null
+let _gastosG2Cache = null;  // { lista:[], total:Number } | null — gastos para Resumen/Por Evento
 let _evtTours = [];         // tours ACTIVOS del evento seleccionado en Por Evento
 let _evtFiltrados = [];     // subconjunto filtrado de la tabla (para CSV)
 
@@ -4513,6 +4526,29 @@ function _cobTourMatchEvento(t, evId) {
   return t.evento_id === evId || (typeof t.evento_id === 'string' && t.evento_id.startsWith(evId + '#'));
 }
 
+// Trae TODOS los gastos una sola vez (cache en memoria, estilo _cobTodoCache) para
+// sumarlos en Resumen y Por Evento. admin-gastos-list con body {} = todos (incluye los
+// "General"). Si la función falla, devolvemos 0 y NO cacheamos (reintenta a la próxima)
+// para no tronar el Resumen: los demás números deben seguir saliendo.
+async function _cobCargarGastos(force) {
+  if (_gastosG2Cache && !force) return _gastosG2Cache;
+  try {
+    const r = await fetch('/.netlify/functions/admin-gastos-list', {
+      method: 'POST',
+      headers: _spAdminHeaders(),
+      body: JSON.stringify({}),
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || 'No se pudieron cargar los gastos');
+    const lista = Array.isArray(d.gastos) ? d.gastos : [];
+    const total = Number(d.total || 0) || lista.reduce((a, g) => a + Number(g.monto || 0), 0);
+    _gastosG2Cache = { lista, total };
+    return _gastosG2Cache;
+  } catch (e) {
+    return { lista: [], total: 0 };
+  }
+}
+
 async function loadResumen() {
   const proxEl = document.getElementById('proximos-eventos');
   const atrEl  = document.getElementById('atrasados-lista');
@@ -4533,6 +4569,15 @@ async function loadResumen() {
     setTxt('m-facturado', _spFmtMxn(facturado));
     setTxt('m-viajeros',  String(activos.length));
     setTxt('m-eventos',   String(eventosActivos));
+
+    // Gastos + Utilidad (G2). Suma de TODOS los gastos (incluye los "General").
+    // _cobCargarGastos devuelve 0 si la función falla, sin tronar el Resumen.
+    const { total: totalGastos } = await _cobCargarGastos(true);
+    setTxt('m-gastos', _spFmtMxn(totalGastos));
+    const utilidad = facturado - totalGastos;
+    setTxt('m-utilidad', _spFmtMxn(utilidad));
+    const elUtil = document.getElementById('m-utilidad');
+    if (elUtil) elUtil.className = 'metric-value ' + (utilidad >= 0 ? 'green' : 'red');
 
     const aviso = document.getElementById('resumen-cap-aviso');
     if (aviso) {
@@ -4985,6 +5030,7 @@ async function loadPorEvento() {
   tbody.innerHTML = '<tr><td colspan="8"><div class="loading-state"><div class="spinner"></div>Cargando…</div></td></tr>';
   try {
     const { activos } = await _cobCargarTodo();
+    await _cobCargarGastos();   // cachea gastos para que _renderPorEvento sume en memoria
     _evtTours = (activos || []).filter(t => _cobTourMatchEvento(t, evId));
     _renderPorEvento();
   } catch (e) {
@@ -5014,6 +5060,25 @@ function _renderPorEvento() {
   setTxt('evt-porcobrar', _spFmtMxn(porCobrar));
   setTxt('evt-viajeros',  String(tours.length));
   setTxt('evt-atrasados', String(atrasados));
+
+  // Gastos + Utilidad del evento (G2). Match por BASE del evento_id (cuenta aunque el
+  // evento sea multifecha). Los "General" (evento_id null) NO se incluyen aquí. Usa la
+  // lista ya cacheada por _cobCargarGastos — sin llamada extra por evento.
+  const evIdSel = (document.getElementById('selector-evento') || {}).value || '';
+  const evBase  = evIdSel.split('#')[0];
+  const gastosLista = (_gastosG2Cache && _gastosG2Cache.lista) || [];
+  const gastosEvt = evBase
+    ? gastosLista.reduce((a, g) => {
+        const gBase = String(g.evento_id || '').split('#')[0];
+        return (g.evento_id && gBase === evBase) ? a + Number(g.monto || 0) : a;
+      }, 0)
+    : 0;
+  setTxt('evt-gastos', _spFmtMxn(gastosEvt));
+  const evtUtil = vendido - gastosEvt;
+  setTxt('evt-utilidad', _spFmtMxn(evtUtil));
+  const elEvtUtil = document.getElementById('evt-utilidad');
+  if (elEvtUtil) elEvtUtil.className = 'cob-stat-val ' + (evtUtil >= 0 ? 'green' : 'red');
+
   if (stats) stats.style.display = tours.length ? '' : 'none';
   if (desg)  desg.style.display  = tours.length ? '' : 'none';
 

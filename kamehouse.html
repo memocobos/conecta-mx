@@ -519,8 +519,8 @@ tr:hover td{background:rgba(255,107,0,.03)}
 .cob-sort{cursor:pointer;user-select:none}
 .cob-sort:hover{color:var(--orange)}
 .cob-arrow{font-size:9px;color:var(--orange)}
-#page-pagos tr.cob-atrasado td{background:rgba(255,68,68,.07)}
-#page-pagos tr.cob-pagado td{background:rgba(61,220,132,.06)}
+.cob-table tr.cob-atrasado td{background:rgba(255,68,68,.07)}
+.cob-table tr.cob-pagado td{background:rgba(61,220,132,.06)}
 .cob-badge-atraso{display:inline-block;margin-left:6px;padding:2px 7px;border-radius:10px;background:rgba(255,68,68,.18);color:var(--red);font-size:9px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;vertical-align:middle}
 
 /* Badges */
@@ -1983,14 +1983,16 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
  <div class="metric">
  <div class="metric-label">Viajeros</div>
  <div class="metric-value gold" id="m-viajeros">—</div>
- <div class="metric-sub">Clientes únicos</div>
+ <div class="metric-sub">Tours activos</div>
  </div>
  <div class="metric">
  <div class="metric-label">Eventos Activos</div>
  <div class="metric-value" id="m-eventos">—</div>
- <div class="metric-sub">Con reservaciones</div>
+ <div class="metric-sub">Con tours activos</div>
  </div>
  </div>
+
+ <div id="resumen-cap-aviso" style="display:none;margin-bottom:16px;padding:10px 14px;border:1px solid var(--border2);border-radius:8px;background:rgba(255,107,0,.06);color:var(--orange);font-size:12px"></div>
 
  <!-- Próximos eventos -->
  <div class="card" style="margin-bottom:16px">
@@ -2002,12 +2004,12 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
  </div>
  </div>
 
- <!-- Últimas reservaciones -->
+ <!-- Atrasados (accionable) -->
  <div class="card">
  <div style="font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--ts);margin-bottom:14px">
- Últimas Reservaciones
+ Atrasados
  </div>
- <div id="ultimas-reservaciones">
+ <div id="atrasados-lista">
  <div class="loading-state"><div class="spinner"></div>Cargando…</div>
  </div>
  </div>
@@ -2098,13 +2100,13 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
  <div class="form-row cols-3">
  <div class="form-group">
  <label>Evento</label>
- <select id="selector-evento" onchange="loadReservaciones()">
+ <select id="selector-evento" onchange="loadPorEvento()">
  <option value="">Selecciona un evento…</option>
  </select>
  </div>
  <div class="form-group">
  <label>Paquete</label>
- <select id="filtro-paquete" onchange="filterViajeros()">
+ <select id="filtro-paquete" onchange="_renderPorEvento()">
  <option value="">Todos</option>
  <option>PLUS</option><option>STAY</option>
  <option>RIDE</option><option>CHEAP</option>
@@ -2112,38 +2114,57 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
  </div>
  <div class="form-group">
  <label>Saldo</label>
- <select id="filtro-saldo" onchange="filterViajeros()">
+ <select id="filtro-saldo" onchange="_renderPorEvento()">
  <option value="">Todos</option>
  <option value="pendiente">Con saldo pendiente</option>
  <option value="liquidado">Liquidados</option>
  </select>
  </div>
  </div>
- <div style="display:flex;gap:10px;flex-wrap:wrap">
- <button class="btn btn-ghost btn-sm" onclick="exportCSV()">Exportar CSV</button>
- <div id="evento-resumen" style="font-size:12px;color:var(--ts);align-self:center"></div>
+ <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:8px">
+ <button class="btn btn-ghost btn-sm" onclick="_evtExportCSV()">Exportar CSV</button>
  </div>
  </div>
 
- <div class="table-wrap">
- <table>
+ <!-- Resumen financiero del evento -->
+ <div class="cob-stats" id="evt-stats" style="display:none">
+   <div class="cob-stat"><div class="cob-stat-lbl">Vendido</div><div class="cob-stat-val" id="evt-vendido">—</div></div>
+   <div class="cob-stat"><div class="cob-stat-lbl">Cobrado</div><div class="cob-stat-val green" id="evt-cobrado">—</div></div>
+   <div class="cob-stat"><div class="cob-stat-lbl">Por cobrar</div><div class="cob-stat-val orange" id="evt-porcobrar">—</div></div>
+   <div class="cob-stat"><div class="cob-stat-lbl">Viajeros</div><div class="cob-stat-val" id="evt-viajeros">—</div></div>
+   <div class="cob-stat"><div class="cob-stat-lbl">Atrasados</div><div class="cob-stat-val red" id="evt-atrasados">—</div></div>
+ </div>
+
+ <!-- Desglose por paquete / zona -->
+ <div class="card" id="evt-desglose" style="display:none;margin-bottom:16px">
+   <div class="form-row cols-2">
+     <div>
+       <div style="font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--ts);margin-bottom:10px">Por paquete</div>
+       <div id="evt-por-paquete"></div>
+     </div>
+     <div>
+       <div style="font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--ts);margin-bottom:10px">Por zona</div>
+       <div id="evt-por-zona"></div>
+     </div>
+   </div>
+ </div>
+
+ <div class="table-wrap cob-wrap">
+ <table class="cob-table">
  <thead>
  <tr>
- <th>#</th>
  <th>Nombre</th>
  <th>Paquete</th>
- <th>Boleto / Zona</th>
- <th>Habitación</th>
+ <th>Zona</th>
  <th>Total</th>
  <th>Abonado</th>
  <th>Resta</th>
- <th>Talla</th>
- <th>Celular</th>
+ <th>Estado</th>
  <th>WhatsApp</th>
  </tr>
  </thead>
  <tbody id="tabla-viajeros">
- <tr><td colspan="11">
+ <tr><td colspan="8">
  <div class="empty-state">
  <div class="empty-icon"></div>
  Selecciona un evento para ver los viajeros
@@ -4369,7 +4390,7 @@ function showPage(name) {
 function loadPage(name) {
  if (name === 'resumen') loadResumen();
  if (name === 'pagos') loadPagos();
- if (name === 'eventos') { /* selector manual */ }
+ if (name === 'eventos') _evtPoblarSelector();
  if (name === 'gastos') loadGastos();
  if (name === 'ventas') loadVentas();
  if (name === 'inventario') loadInventario();
@@ -4411,8 +4432,9 @@ async function bootApp() {
 function populateEventoSelects() {
  const selects = [
  // 'filtro-evento-pagos' lo puebla _poblarFiltroEventoPagos() desde EV (Fase 3 cobranza).
+ // 'selector-evento' lo puebla _evtPoblarSelector() desde EV (Fase 4 Por Evento).
  'filtro-evento-gastos','gasto-evento',
- 'pago-evento','selector-evento'
+ 'pago-evento'
  ];
  selects.forEach(id => {
  const el = document.getElementById(id);
@@ -4432,77 +4454,163 @@ function populateEventoSelects() {
 // ═══════════════════════════════════════════════════════════════
 // RESUMEN
 // ═══════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════
+// FASE 4 — Resumen y Por Evento sobre el MODELO DEL PORTAL
+// Reusan admin-cobranza-list (mismos helpers que la Fase 3.1). Solo LEEN y suman.
+// Los TOTALES de dinero EXCLUYEN cancelados; estos se cuentan aparte.
+// ═══════════════════════════════════════════════════════════════
+let _cobTodoCache = null;   // { activos:[], cancelados:[], capHit:bool } | null
+let _evtTours = [];         // tours ACTIVOS del evento seleccionado en Por Evento
+let _evtFiltrados = [];     // subconjunto filtrado de la tabla (para CSV)
+
+// Trae TODA la cobranza (activos por default + cancelados) una sola vez. La pestaña
+// Pagos mantiene su propia _cobranzaCache; esta cache es para Resumen/Por Evento.
+async function _cobCargarTodo(force) {
+  if (_cobTodoCache && !force) return _cobTodoCache;
+  await _poblarFiltroEventoPagos();   // garantiza _cobEVMap (multifecha) poblado
+  const hdrs = _spAdminHeaders();
+  const pedir = (estado) => fetch('/.netlify/functions/admin-cobranza-list', {
+    method: 'POST',
+    headers: hdrs,
+    body: JSON.stringify(estado ? { estado } : {}),
+  }).then(r => r.json().then(d => ({ ok: r.ok, d })));
+  const [act, can] = await Promise.all([pedir(null), pedir('cancelado')]);
+  if (!act.ok) throw new Error((act.d && act.d.error) || 'No se pudo cargar la cobranza');
+  const activos    = Array.isArray(act.d.tours) ? act.d.tours : [];
+  const cancelados = (can.ok && Array.isArray(can.d.tours)) ? can.d.tours : [];
+  // admin-cobranza-list topa en 300; si llegamos al tope, los totales podrían estar
+  // incompletos (avisamos en Resumen en vez de mostrar números silenciosamente cortos).
+  _cobTodoCache = { activos, cancelados, capHit: activos.length >= 300 };
+  return _cobTodoCache;
+}
+
+// ¿El tour pertenece al evento del filtro? Mismo criterio que la Fase 3.1:
+// valor con '#': match exacto (fecha de multifecha); valor base: base o base#idx.
+function _cobTourMatchEvento(t, evId) {
+  if (!evId) return true;
+  if (evId.indexOf('#') >= 0) return t.evento_id === evId;
+  return t.evento_id === evId || (typeof t.evento_id === 'string' && t.evento_id.startsWith(evId + '#'));
+}
+
 async function loadResumen() {
- try {
- // Global
- const [global] = await db.get('resumen_global', '?limit=1');
- if (global) {
- document.getElementById('m-cobrado').textContent = formatMXN(global.total_cobrado);
- document.getElementById('m-porcobrar').textContent = formatMXN(global.total_por_cobrar);
- document.getElementById('m-facturado').textContent = formatMXN(global.total_facturado);
- document.getElementById('m-viajeros').textContent = global.viajeros_unicos ?? 0;
- document.getElementById('m-eventos').textContent = global.eventos_activos ?? 0;
- }
- // Próximos eventos (solo fechas futuras, max 10)
- const today = new Date().toISOString().split('T')[0];
- const proximos = await db.get('resumen_eventos',
- `?fecha=gte.${today}&order=fecha.asc&limit=10`);
- renderProximos(proximos);
- // Últimas reservaciones
- const ultimas = await db.get('reservaciones',
- '?order=created_at.desc&limit=10&select=*,clientes(nombre),eventos(artista,fecha)');
- renderUltimas(ultimas);
- } catch(e) {
- console.error('Error resumen:', e);
- }
+  const proxEl = document.getElementById('proximos-eventos');
+  const atrEl  = document.getElementById('atrasados-lista');
+  if (proxEl) proxEl.innerHTML = '<div class="loading-state"><div class="spinner"></div>Cargando…</div>';
+  if (atrEl)  atrEl.innerHTML  = '<div class="loading-state"><div class="spinner"></div>Cargando…</div>';
+
+  try {
+    const { activos, cancelados, capHit } = await _cobCargarTodo(true);  // siempre fresco al entrar
+
+    // 5 métricas — solo ACTIVOS (en_pagos, pagado). Cancelados no son ingreso ni venta.
+    const cobrado   = activos.reduce((a, t) => a + Number((t.pago || {}).abonado  || 0), 0);
+    const porCobrar = activos.reduce((a, t) => a + Number((t.pago || {}).restante || 0), 0);
+    const facturado = activos.reduce((a, t) => a + Number((t.pago || {}).total    || 0), 0);
+    const eventosActivos = new Set(activos.map(t => t.evento_id)).size;
+    const setTxt = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+    setTxt('m-cobrado',   _spFmtMxn(cobrado));
+    setTxt('m-porcobrar', _spFmtMxn(porCobrar));
+    setTxt('m-facturado', _spFmtMxn(facturado));
+    setTxt('m-viajeros',  String(activos.length));
+    setTxt('m-eventos',   String(eventosActivos));
+
+    const aviso = document.getElementById('resumen-cap-aviso');
+    if (aviso) {
+      if (capHit) {
+        aviso.textContent = 'Mostrando los primeros 300 tours activos — los totales podrían estar incompletos. (Pendiente: paginación cuando se superen 300.)';
+        aviso.style.display = '';
+      } else {
+        aviso.style.display = 'none';
+      }
+    }
+
+    const ev = await _fetchEVFromIndex();
+    _renderResumenProximos(ev, activos);
+    _renderResumenAtrasados(activos, cancelados);
+  } catch (e) {
+    if (proxEl) proxEl.innerHTML = `<div class="alert alert-error">${_spEscape(e.message)}</div>`;
+    if (atrEl)  atrEl.innerHTML  = '';
+  }
 }
 
-function renderProximos(eventos) {
- const el = document.getElementById('proximos-eventos');
- if (!eventos.length) {
- el.innerHTML = '<div class="empty-state"><div class="empty-icon"></div>Sin eventos próximos registrados</div>';
- return;
- }
- el.innerHTML = eventos.map(ev => `
- <div style="display:flex;align-items:center;justify-content:space-between;
- padding:10px 0;border-bottom:1px solid var(--border)">
- <div>
- <div style="font-weight:600;font-size:14px">${ev.artista || ev.nombre}</div>
- <div style="font-size:11px;color:var(--ts)">${fmtFecha(ev.fecha)} · ${ev.ciudad}</div>
- </div>
- <div style="text-align:right">
- <div style="font-size:12px;color:var(--gold)">${formatMXN(ev.total_cobrado || 0)}</div>
- <div style="font-size:11px;color:var(--ts)">${ev.total_viajeros || 0} viajeros</div>
- ${badgeStatus(ev.status)}
- </div>
- </div>
- `).join('');
+// Próximos eventos: desde EV (index.html), fechas futuras, máx 10, con su dinero
+// agregado de la cobranza ACTIVA (cobrado + # viajeros, casando base y base#idx).
+function _renderResumenProximos(ev, activos) {
+  const el = document.getElementById('proximos-eventos');
+  if (!el) return;
+  const today = _cobHoyISO();
+  const futuros = (ev || [])
+    .filter(e => e && e.id && e.a && (!e.ds || e.ds >= today))
+    .slice()
+    .sort((a, b) => String(a.ds || '9999').localeCompare(String(b.ds || '9999')))
+    .slice(0, 10);
+
+  if (!futuros.length) {
+    el.innerHTML = '<div class="empty-state"><div class="empty-icon">·</div>Sin eventos próximos</div>';
+    return;
+  }
+
+  el.innerHTML = futuros.map(e => {
+    const tours   = (activos || []).filter(t => _cobTourMatchEvento(t, e.id));
+    const cobrado = tours.reduce((a, t) => a + Number((t.pago || {}).abonado || 0), 0);
+    const fecha   = e.f || e.ds || '';
+    const lugar   = e.v ? (' · ' + _spEscape(e.v)) : '';
+    return `
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px solid var(--border)">
+      <div>
+        <div style="font-weight:600;font-size:14px">${_spEscape(e.a)}</div>
+        <div style="font-size:11px;color:var(--ts)">${_spEscape(fecha)}${lugar}</div>
+      </div>
+      <div style="text-align:right;white-space:nowrap">
+        <div style="font-size:13px;color:var(--green)">${_spFmtMxn(cobrado)}</div>
+        <div style="font-size:11px;color:var(--ts)">${tours.length} viajero${tours.length === 1 ? '' : 's'}</div>
+      </div>
+    </div>`;
+  }).join('');
 }
 
-function renderUltimas(reservaciones) {
- const el = document.getElementById('ultimas-reservaciones');
- if (!reservaciones.length) {
- el.innerHTML = '<div class="empty-state"><div class="empty-icon"></div>Sin reservaciones aún</div>';
- return;
- }
- el.innerHTML = `<div class="table-wrap"><table>
- <thead><tr>
- <th>Viajero</th><th>Evento</th><th>Paquete</th>
- <th>Total</th><th>Abonado</th><th>Resta</th>
- </tr></thead>
- <tbody>
- ${reservaciones.map(r => `<tr>
- <td style="font-weight:600">${r.clientes?.nombre || '—'}</td>
- <td style="font-size:12px;color:var(--ts)">${r.eventos?.artista || '—'}</td>
- <td>${badgePaquete(r.paquete)}</td>
- <td>${formatMXN(r.total_paquete)}</td>
- <td style="color:var(--green)">${formatMXN(r.total_abonado)}</td>
- <td style="color:${r.saldo_pendiente > 0 ? 'var(--red)' : 'var(--green)'}">
- ${formatMXN(r.saldo_pendiente)}
- </td>
- </tr>`).join('')}
- </tbody>
- </table></div>`;
+// Atrasados: tours activos con pago vencido (_cobEsAtrasado). Vista accionable
+// con botón de WhatsApp al cliente. Si no hay, estado vacío amable.
+function _renderResumenAtrasados(activos, cancelados) {
+  const el = document.getElementById('atrasados-lista');
+  if (!el) return;
+  const atr = (activos || []).filter(_cobEsAtrasado).sort((a, b) => {
+    const fa = (a.pago.proximo && a.pago.proximo.fecha_esperada) || '9999-12-31';
+    const fb = (b.pago.proximo && b.pago.proximo.fecha_esperada) || '9999-12-31';
+    return fa < fb ? -1 : (fa > fb ? 1 : 0);
+  });
+  const nCanc = (cancelados || []).length;
+  const pie = nCanc ? `<div style="margin-top:12px;font-size:11px;color:var(--ts)">${nCanc} tour${nCanc === 1 ? '' : 's'} cancelado${nCanc === 1 ? '' : 's'} (no cuentan en los totales).</div>` : '';
+
+  if (!atr.length) {
+    el.innerHTML = '<div class="empty-state"><div class="empty-icon">✓</div>Nadie atrasado — todos al corriente.</div>' + pie;
+    return;
+  }
+
+  el.innerHTML = atr.map(t => {
+    const c = t.clientes || {};
+    const pago = t.pago || {};
+    const evL = _cobEventoLabel(t);
+    const prox = pago.proximo;
+    const wa = _cobWaHref(t);
+    const waBtn = wa
+      ? `<a class="btn btn-green btn-sm" href="${wa}" target="_blank" rel="noopener" style="font-size:11px;text-decoration:none">WhatsApp</a>`
+      : `<span style="font-size:11px;color:var(--ts)">${_spEscape(c.celular || 's/tel')}</span>`;
+    const venceTxt = prox ? ('Venció ' + _spEscape(prox.fecha_esperada)) : '';
+    return `
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px solid var(--border)">
+      <div>
+        <div style="font-weight:600;font-size:14px">${_spEscape(c.nombre_completo || '—')}</div>
+        <div style="font-size:11px;color:var(--ts)">${_spEscape(evL.nombre)}${evL.fecha ? ' · ' + _spEscape(evL.fecha) : ''}${venceTxt ? ' · ' + venceTxt : ''}</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:12px;white-space:nowrap">
+        <div style="text-align:right">
+          <div style="font-size:13px;color:var(--orange)">${_spFmtMxn(pago.restante)}</div>
+          <div style="font-size:10px;color:var(--ts)">saldo</div>
+        </div>
+        ${waBtn}
+      </div>
+    </div>`;
+  }).join('') + pie;
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -4880,95 +4988,169 @@ if (_pagoEvEl) _pagoEvEl.addEventListener('change', async function() {
 });
 
 // ═══════════════════════════════════════════════════════════════
-// POR EVENTO — RESERVACIONES (legacy)
+// POR EVENTO — Análisis financiero por evento (Fase 4, sobre el portal)
 // ═══════════════════════════════════════════════════════════════
-// TODO: deprecated, migrar a viajeros_evento si se reactiva esta vista.
-// Renombrado de loadViajeros para evitar colisión con la función canónica
-// de Capsule Corp (line ~6595). La tabla `reservaciones` está vacía hoy;
-// esta función queda como stub funcional hasta decidir si la pestaña
-// "Por Evento" debe migrarse a viajeros_evento o eliminarse.
-async function loadReservaciones() {
- const evId = document.getElementById('selector-evento').value;
- const tbody = document.getElementById('tabla-viajeros');
- const resumen = document.getElementById('evento-resumen');
+let _evtSelectorPoblado = false;
 
- if (!evId) return;
-
- tbody.innerHTML = '<tr><td colspan="11"><div class="loading-state"><div class="spinner"></div>Cargando…</div></td></tr>';
-
- try {
- _viajerosCache = await db.get('reservaciones',
- `?evento_id=eq.${evId}&select=*,clientes(nombre,telefono,correo,talla_playera,emergencia_tel)&order=created_at.asc`);
- const evData = (_eventosCache||[]).find(e=>e.id==evId);
- const evLabel = evData ? `${evData.artista}${evData.tour?' — '+evData.tour:''} · ${fmtFecha(evData.fecha)}` : '';
- resumen.innerHTML = `<span style="font-weight:600;color:var(--text)">${evLabel}</span><span style="color:var(--ts);margin-left:8px">${_viajerosCache.length} viajeros</span>`;
- filterViajeros();
- } catch(e) {
- tbody.innerHTML = `<tr><td colspan="11"><div class="alert alert-error">${e.message}</div></td></tr>`;
- }
+// Puebla #selector-evento desde EV (index.html), con multifecha por separado
+// (base#idx), igual que el filtro de la Fase 3.1. Corre una sola vez.
+async function _evtPoblarSelector() {
+  if (_evtSelectorPoblado) return;
+  const sel = document.getElementById('selector-evento');
+  if (!sel) return;
+  const ev = await _fetchEVFromIndex();
+  const eventos = (ev || []).filter(e => e && e.id && e.a)
+    .slice().sort((a, b) => String(b.ds || '').localeCompare(String(a.ds || '')));
+  while (sel.options.length > 1) sel.remove(1);
+  eventos.forEach(e => {
+    if (Array.isArray(e.multifecha) && e.multifecha.length) {
+      e.multifecha.forEach((mf, i) => {
+        const lbl = (mf && mf.lbl) ? mf.lbl : ('Fecha ' + (i + 1));
+        const opt = document.createElement('option');
+        opt.value = e.id + '#' + i;
+        opt.textContent = e.a + ' · ' + lbl;
+        sel.appendChild(opt);
+      });
+    } else {
+      const opt = document.createElement('option');
+      opt.value = e.id;
+      opt.textContent = e.a;
+      sel.appendChild(opt);
+    }
+  });
+  _evtSelectorPoblado = true;
 }
 
-function filterViajeros() {
- const paquete = document.getElementById('filtro-paquete').value;
- const saldo = document.getElementById('filtro-saldo').value;
- const tbody = document.getElementById('tabla-viajeros');
+// Carga los tours ACTIVOS del evento elegido (filtra la cache de cobranza) y pinta.
+async function loadPorEvento() {
+  const evId = document.getElementById('selector-evento').value;
+  const tbody = document.getElementById('tabla-viajeros');
+  const stats = document.getElementById('evt-stats');
+  const desg  = document.getElementById('evt-desglose');
+  if (!tbody) return;
 
- let rows = _viajerosCache;
- if (paquete) rows = rows.filter(r => r.paquete === paquete);
- if (saldo === 'pendiente') rows = rows.filter(r => r.saldo_pendiente > 0);
- if (saldo === 'liquidado') rows = rows.filter(r => r.saldo_pendiente <= 0);
+  if (!evId) {
+    _evtTours = []; _evtFiltrados = [];
+    if (stats) stats.style.display = 'none';
+    if (desg)  desg.style.display = 'none';
+    tbody.innerHTML = '<tr><td colspan="8"><div class="empty-state"><div class="empty-icon">·</div>Selecciona un evento para ver los viajeros</div></td></tr>';
+    return;
+  }
 
- if (!rows.length) {
- tbody.innerHTML = '<tr><td colspan="11"><div class="empty-state"><div class="empty-icon"></div>Sin viajeros con esos filtros</div></td></tr>';
- return;
- }
-
- tbody.innerHTML = rows.map((r, i) => `<tr>
- <td style="color:var(--ts)">${i+1}</td>
- <td>
- <div style="font-weight:600;font-size:13px">${r.clientes?.nombre || '—'}</div>
- <div style="font-size:10px;color:var(--ts)">${r.clientes?.correo || ''}</div>
- </td>
- <td>${badgePaquete(r.paquete)}</td>
- <td style="font-size:12px">${r.zona_boleto || '—'}</td>
- <td style="font-size:12px">${r.tipo_habitacion || '—'}</td>
- <td style="font-weight:600">${formatMXN(r.total_paquete)}</td>
- <td style="color:var(--green)">${formatMXN(r.total_abonado)}</td>
- <td style="color:${r.saldo_pendiente > 0 ? 'var(--red)' : 'var(--green)'}">
- ${formatMXN(r.saldo_pendiente)}
- </td>
- <td><span class="badge badge-gray">${r.clientes?.talla_playera || '—'}</span></td>
- <td style="font-size:12px">${r.clientes?.telefono || '—'}</td>
- <td>
- <button class="btn btn-green btn-sm"
- onclick="wapp('${r.clientes?.telefono || ''}','${(r.clientes?.nombre||'').replace(/'/g,"\\'")}')">
- 
- </button>
- </td>
- </tr>`).join('');
+  tbody.innerHTML = '<tr><td colspan="8"><div class="loading-state"><div class="spinner"></div>Cargando…</div></td></tr>';
+  try {
+    const { activos } = await _cobCargarTodo();
+    _evtTours = (activos || []).filter(t => _cobTourMatchEvento(t, evId));
+    _renderPorEvento();
+  } catch (e) {
+    if (stats) stats.style.display = 'none';
+    if (desg)  desg.style.display = 'none';
+    tbody.innerHTML = `<tr><td colspan="8"><div class="alert alert-error">${_spEscape(e.message)}</div></td></tr>`;
+  }
 }
 
-function exportCSV() {
- if (!_viajerosCache.length) return alert('No hay viajeros que exportar');
- const headers = ['Nombre','Paquete','Zona','Habitación','Total','Abonado','Resta','Talla','Correo','Celular','Emergencia'];
- const rows = _viajerosCache.map(r => [
- r.clientes?.nombre || '',
- r.paquete || '',
- r.zona_boleto || '',
- r.tipo_habitacion || '',
- r.total_paquete || 0,
- r.total_abonado || 0,
- r.saldo_pendiente || 0,
- r.clientes?.talla_playera || '',
- r.clientes?.correo || '',
- r.clientes?.telefono || '',
- r.clientes?.emergencia_tel || ''
- ]);
- const csv = [headers, ...rows].map(r => r.join(',')).join('\n');
- const a = document.createElement('a');
- a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
- a.download = 'viajeros.csv';
- a.click();
+// Pinta resumen financiero (sobre TODO el evento), desglose por paquete/zona y la
+// tabla (sujeta a los filtros de paquete y saldo). _evtTours = tours del evento.
+function _renderPorEvento() {
+  const tbody = document.getElementById('tabla-viajeros');
+  const stats = document.getElementById('evt-stats');
+  const desg  = document.getElementById('evt-desglose');
+  if (!tbody) return;
+  const tours = _evtTours || [];
+
+  // Resumen financiero del evento (no depende de los filtros de la tabla).
+  const vendido   = tours.reduce((a, t) => a + Number((t.pago || {}).total    || 0), 0);
+  const cobrado   = tours.reduce((a, t) => a + Number((t.pago || {}).abonado  || 0), 0);
+  const porCobrar = tours.reduce((a, t) => a + Number((t.pago || {}).restante || 0), 0);
+  const atrasados = tours.filter(_cobEsAtrasado).length;
+  const setTxt = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+  setTxt('evt-vendido',   _spFmtMxn(vendido));
+  setTxt('evt-cobrado',   _spFmtMxn(cobrado));
+  setTxt('evt-porcobrar', _spFmtMxn(porCobrar));
+  setTxt('evt-viajeros',  String(tours.length));
+  setTxt('evt-atrasados', String(atrasados));
+  if (stats) stats.style.display = tours.length ? '' : 'none';
+  if (desg)  desg.style.display  = tours.length ? '' : 'none';
+
+  // Desglose por paquete (# viajeros + cobrado) y por zona (# viajeros).
+  const porPaq = {};
+  const porZona = {};
+  tours.forEach(t => {
+    const paq = t.paquete || '—';
+    porPaq[paq] = porPaq[paq] || { n: 0, cobrado: 0 };
+    porPaq[paq].n++;
+    porPaq[paq].cobrado += Number((t.pago || {}).abonado || 0);
+    const z = t.zona || '—';
+    porZona[z] = (porZona[z] || 0) + 1;
+  });
+  const elPaq = document.getElementById('evt-por-paquete');
+  if (elPaq) {
+    const orden = ['PLUS', 'STAY', 'RIDE', 'CHEAP'];
+    const claves = Object.keys(porPaq).sort((a, b) => {
+      const ia = orden.indexOf(a), ib = orden.indexOf(b);
+      return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib);
+    });
+    elPaq.innerHTML = claves.map(k => {
+      const bg = _COB_PAQ_BG[k] || 'rgba(255,255,255,.06)';
+      const fg = _COB_PAQ_FG[k] || 'var(--ts)';
+      return `<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:6px 0;border-bottom:1px solid var(--border)">
+        <span style="font-size:11px;font-weight:700;padding:2px 10px;border-radius:4px;background:${bg};color:${fg}">${_spEscape(k)}</span>
+        <span style="font-size:12px;color:var(--ts)">${porPaq[k].n} viaj. · <span style="color:var(--green)">${_spFmtMxn(porPaq[k].cobrado)}</span></span>
+      </div>`;
+    }).join('') || '<div style="font-size:12px;color:var(--ts)">—</div>';
+  }
+  const elZona = document.getElementById('evt-por-zona');
+  if (elZona) {
+    const claves = Object.keys(porZona).sort((a, b) => porZona[b] - porZona[a]);
+    elZona.innerHTML = claves.map(z =>
+      `<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:6px 0;border-bottom:1px solid var(--border)">
+        <span style="font-size:12px">${_spEscape(z)}</span>
+        <span style="font-size:12px;color:var(--ts)">${porZona[z]} viaj.</span>
+      </div>`
+    ).join('') || '<div style="font-size:12px;color:var(--ts)">—</div>';
+  }
+
+  // Tabla (con filtros de paquete y saldo).
+  const paquete = document.getElementById('filtro-paquete').value;
+  const saldo   = document.getElementById('filtro-saldo').value;
+  let rows = tours.slice();
+  if (paquete) rows = rows.filter(t => t.paquete === paquete);
+  if (saldo === 'pendiente') rows = rows.filter(t => Number((t.pago || {}).restante || 0) > 0);
+  if (saldo === 'liquidado') rows = rows.filter(t => Number((t.pago || {}).restante || 0) <= 0);
+  _evtFiltrados = rows;
+
+  if (!rows.length) {
+    tbody.innerHTML = '<tr><td colspan="8"><div class="empty-state"><div class="empty-icon">·</div>Sin viajeros con esos filtros</div></td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = rows.map(t => {
+    const c = t.clientes || {};
+    const pago = t.pago || {};
+    const paq = t.paquete || '';
+    const atr = _cobEsAtrasado(t);
+    const wa = _cobWaHref(t);
+    const waCell = wa
+      ? `<a class="btn btn-green btn-sm" href="${wa}" target="_blank" rel="noopener" style="font-size:11px;text-decoration:none">WhatsApp</a>`
+      : `<span style="font-size:11px;color:var(--ts)">${_spEscape(c.celular || '—')}</span>`;
+    const rowCls = atr ? 'cob-atrasado' : (t.estado === 'pagado' ? 'cob-pagado' : '');
+    return `<tr class="${rowCls}">
+      <td><div style="font-weight:600;font-size:13px">${_spEscape(c.nombre_completo || '—')}</div><div style="font-size:10px;color:var(--ts)">${_spEscape(c.correo || '')}</div></td>
+      <td>${paq ? `<span style="font-size:10px;font-weight:700;padding:2px 10px;border-radius:4px;background:${_COB_PAQ_BG[paq]||'rgba(255,255,255,.06)'};color:${_COB_PAQ_FG[paq]||'var(--ts)'}">${_spEscape(paq)}</span>` : '—'}</td>
+      <td style="font-size:12px">${_spEscape(t.zona || '—')}</td>
+      <td style="font-weight:600">${_spFmtMxn(pago.total)}</td>
+      <td style="color:var(--green)">${_spFmtMxn(pago.abonado)}</td>
+      <td style="color:${(pago.restante||0) > 0 ? 'var(--orange)' : 'var(--green)'}">${_spFmtMxn(pago.restante)}</td>
+      <td style="white-space:nowrap">${_spBadgeEstado(t.estado)}${atr ? '<span class="cob-badge-atraso">Atrasado</span>' : ''}</td>
+      <td>${waCell}</td>
+    </tr>`;
+  }).join('');
+}
+
+// Exporta la tabla filtrada del evento reusando _cobExportCSV (mismo shape de tour).
+function _evtExportCSV() {
+  _cobFiltrados = _evtFiltrados || [];
+  _cobExportCSV();
 }
 
 // ═══════════════════════════════════════════════════════════════

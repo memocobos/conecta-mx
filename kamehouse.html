@@ -3612,21 +3612,19 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
  </div>
  <div class="form-group">
  <label>Método de Pago</label>
- <select id="gasto-metodo">
+ <select id="gasto-metodo" onchange="_gastoOnMetodoChange()">
  <option>Transferencia</option>
+ <option>Depósito</option>
  <option>Efectivo</option>
- <option>Tarjeta</option>
  </select>
  </div>
  </div>
  <div class="form-row cols-2">
- <div class="form-group">
- <label>Cuenta</label>
+ <div class="form-group" id="gasto-banco-wrap">
+ <label>Banco</label>
  <select id="gasto-cuenta">
  <option>BBVA</option>
  <option>Banamex</option>
- <option>Efectivo</option>
- <option>Otro</option>
  </select>
  </div>
  <div class="form-group">
@@ -5273,10 +5271,20 @@ function nuevoGasto() {
  ['gasto-categoria', 'gasto-metodo', 'gasto-cuenta'].forEach(id => {
    const el = document.getElementById(id); if (el) el.selectedIndex = 0;
  });
+ // Método por default (Transferencia) con Banco (BBVA) visible.
+ _gastoOnMetodoChange();
  const ev = document.getElementById('gasto-evento'); if (ev) ev.value = '';
  const tit = document.getElementById('gasto-modal-title'); if (tit) tit.textContent = 'Registrar Gasto';
  const btn = document.getElementById('gasto-save-btn');   if (btn) btn.textContent = 'Guardar Gasto';
  openModal('modal-gasto');
+}
+
+// Muestra/oculta el selector de Banco según el método (igual que pagos): Transferencia
+// y Depósito lo muestran (el dinero entra a un banco); Efectivo lo oculta (cuenta = 'Efectivo').
+function _gastoOnMetodoChange() {
+ const metodo = (document.getElementById('gasto-metodo') || {}).value || '';
+ const wrap = document.getElementById('gasto-banco-wrap');
+ if (wrap) wrap.style.display = (metodo === 'Efectivo') ? 'none' : '';
 }
 
 // Abre el modal en modo EDICIÓN, pre-llenado con el gasto (desde _gastosListCache).
@@ -5291,8 +5299,15 @@ async function editarGasto(id) {
  set('gasto-monto',    g.monto);
  set('gasto-fecha',    g.fecha);
  set('gasto-categoria', g.categoria);
- set('gasto-metodo',   g.metodo_pago);
- set('gasto-cuenta',   g.cuenta);
+ // Método: solo los 3 válidos; si la cuenta fue 'Efectivo', el método queda en Efectivo.
+ const _metodosGasto = ['Transferencia', 'Depósito', 'Efectivo'];
+ let _metodoSel = _metodosGasto.includes(g.metodo_pago) ? g.metodo_pago : 'Transferencia';
+ if (g.cuenta === 'Efectivo') _metodoSel = 'Efectivo';
+ set('gasto-metodo', _metodoSel);
+ // Banco: pre-selecciona BBVA/Banamex si así estaba; si no, default (BBVA).
+ if (g.cuenta === 'BBVA' || g.cuenta === 'Banamex') set('gasto-cuenta', g.cuenta);
+ else document.getElementById('gasto-cuenta').selectedIndex = 0;
+ _gastoOnMetodoChange();  // muestra/oculta el Banco según el método elegido
  set('gasto-evento',   g.evento_id || '');
  set('gasto-notas',    g.notas);
  const tit = document.getElementById('gasto-modal-title'); if (tit) tit.textContent = 'Editar Gasto';
@@ -5307,7 +5322,9 @@ async function guardarGasto() {
  const categoria = document.getElementById('gasto-categoria').value;
  const evId = document.getElementById('gasto-evento').value;
  const metodo = document.getElementById('gasto-metodo').value;
- const cuenta = document.getElementById('gasto-cuenta').value;
+ // Cuenta = a dónde entró el dinero: Efectivo → 'Efectivo'; si no, el Banco elegido.
+ const banco = document.getElementById('gasto-cuenta').value;
+ const cuenta = (metodo === 'Efectivo') ? 'Efectivo' : banco;
  const notas = document.getElementById('gasto-notas').value;
  const alerta = document.getElementById('gasto-alert');
 

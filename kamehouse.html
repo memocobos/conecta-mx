@@ -9884,12 +9884,23 @@ function _spRenderFilaPago(solicitudId, p) {
           </div>
         </div>
         <div style="margin-top:6px;font-size:10px;color:var(--ts)">Por defecto el monto del plan — cámbialo si pagó distinto.</div>
+        <div style="margin-top:10px">
+          <label style="display:block;font-size:9px;letter-spacing:.1em;color:var(--ts);text-transform:uppercase;margin-bottom:3px">Comprobante (opcional)</label>
+          <input type="file" id="sp-pago-comprob-${idSafe}" accept="image/jpeg,image/png,image/webp,application/pdf" style="font-size:11px;color:var(--ts);max-width:100%">
+          <div style="margin-top:3px;font-size:10px;color:var(--ts)">JPG, PNG, WEBP o PDF · máx 4 MB</div>
+        </div>
         <div style="margin-top:10px;display:flex;gap:8px;justify-content:flex-end">
           <button class="btn btn-ghost btn-sm" style="font-size:11px" onclick="cerrarFormPagarSP('${idSafe}')">Cancelar</button>
           <button class="btn btn-primary btn-sm" id="sp-pago-btn-${idSafe}" style="font-size:11px" onclick="marcarPagoSP('${solSafe}','${idSafe}')">Confirmar pago</button>
         </div>
       </div>`;
   }
+
+  // Enlace para ver el comprobante del pago si ya tiene uno (firma on-demand,
+  // igual que el del separo). El separo (pago #1) se ve en su propia sección.
+  const comprobHtml = (p.comprobante_url && Number(p.numero_pago) !== 1)
+    ? `<div style="margin-top:6px"><button class="btn btn-ghost btn-sm" style="font-size:11px" onclick="verComprobantePagoSP('${idSafe}')">📎 Ver comprobante</button></div>`
+    : '';
 
   return `
     <div style="border:1px solid var(--border);border-radius:8px;padding:10px 12px">
@@ -9901,6 +9912,7 @@ function _spRenderFilaPago(solicitudId, p) {
       </div>
       <div style="margin-top:3px;font-size:11px;color:var(--ts)">Vence: ${_spEscape(p.fecha_esperada)}${Number(p.numero_pago) === 1 ? ' · Separo (comprobante en la sección de abajo)' : ''}</div>
       ${accionHtml}
+      ${comprobHtml}
     </div>`;
 }
 
@@ -9954,11 +9966,73 @@ async function marcarPagoSP(solicitudId, pagoId) {
     } else {
       showToast('Pago registrado', 'success');
     }
+    // Comprobante OPCIONAL: si se eligió archivo, súbelo después de marcar el pago.
+    // Si la subida falla, avisa pero NO se revierte el pago (ya quedó registrado).
+    const fileInput = document.getElementById('sp-pago-comprob-' + pagoId);
+    const file = fileInput && fileInput.files && fileInput.files[0];
+    if (file) {
+      try {
+        await _spSubirComprobantePago(pagoId, file);
+        showToast('Comprobante adjuntado', 'success');
+      } catch (e) {
+        showToast('Pago registrado, pero el comprobante no se subió: ' + e.message, 'error');
+      }
+    }
     await _spRefrescarPlanYLista(solicitudId, data.solicitud_estado);
   } catch (e) {
     showToast('Error: ' + e.message, 'error');
   } finally {
     if (btn) { btn.disabled = false; btn.textContent = 'Confirmar pago'; }
+  }
+}
+
+// Lee un File a base64 (sin el prefijo data:...;base64,).
+function _spLeerArchivoBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = String(reader.result || '');
+      const comma = result.indexOf(',');
+      resolve(comma >= 0 ? result.slice(comma + 1) : result);
+    };
+    reader.onerror = () => reject(new Error('No se pudo leer el archivo'));
+    reader.readAsDataURL(file);
+  });
+}
+
+// Sube el comprobante de un pago vía la función con service_role (el admin no
+// tiene sesión de Supabase). Valida tipo/tamaño en cliente antes de mandar.
+async function _spSubirComprobantePago(pagoId, file) {
+  const MAX = 4 * 1024 * 1024;
+  const OK_MIME = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
+  if (!OK_MIME.includes(file.type)) throw new Error('Tipo no permitido (usa JPG, PNG, WEBP o PDF)');
+  if (file.size > MAX) throw new Error('El archivo es muy grande, súbelo más liviano (máx 4 MB)');
+  const file_base64 = await _spLeerArchivoBase64(file);
+  const ext = (file.name.split('.').pop() || '').toLowerCase();
+  const r = await fetch('/.netlify/functions/admin-subir-comprobante-pago', {
+    method: 'POST',
+    headers: _spAdminHeaders(),
+    body: JSON.stringify({ pago_id: pagoId, file_base64, mime: file.type, ext }),
+  });
+  const data = await r.json();
+  if (!r.ok) throw new Error(data.error || 'No se pudo subir el comprobante');
+  return data;
+}
+
+// Abre el comprobante de un pago en pestaña nueva (signed url on-demand, igual
+// que el del separo). El bucket es privado: pedimos la firma cada vez.
+async function verComprobantePagoSP(pagoId) {
+  try {
+    const r = await fetch('/.netlify/functions/admin-pago-comprobante', {
+      method: 'POST',
+      headers: _spAdminHeaders(),
+      body: JSON.stringify({ pago_id: pagoId }),
+    });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || 'No se pudo obtener el comprobante');
+    window.open(data.signed_url, '_blank', 'noopener');
+  } catch (e) {
+    showToast('Error: ' + e.message, 'error');
   }
 }
 

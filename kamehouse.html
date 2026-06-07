@@ -7770,7 +7770,15 @@ async function loadCCEquipo() {
   if (!_ccEventoActual) return;
   const container = document.getElementById('cc-coordis-asignados');
   const countEl   = document.getElementById('cc-equipo-count');
-  container.innerHTML = '<div class="loading-state"><div class="spinner"></div></div>';
+  // [Capsule-sobre-portal] La sub-pestaña Equipo aún NO está migrada al modelo
+  // del portal. No consultamos el sistema viejo: con eventos de index.html el
+  // evento_id es un slug (ej. 'karolg') y la query vieja tronaba con
+  // 22P02 (invalid input syntax for type uuid). Mostramos un empty-state amable.
+  // El código viejo de abajo queda intacto e inalcanzable, listo para reusar
+  // cuando se reconstruya Equipo sobre el portal.
+  if (countEl) countEl.textContent = '0 asignados';
+  if (container) container.innerHTML = '<div class="empty-state"><div class="empty-icon">·</div>Equipo del evento — próximamente</div>';
+  return;
   try {
     const ev = _ccEventosCache.find(e => e.id === _ccEventoActual) || {};
     const asigs = await db.get('eventos_coordi', `?evento_id=eq.${_ccEventoActual}`);

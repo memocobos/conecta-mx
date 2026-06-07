@@ -8260,8 +8260,12 @@ function _renderViajerosTabla() {
       const c = v.clientes || {};
       const pago = v.pago || {};
       const paq = v.paquete || '';
+      const esWalkinSinCuenta = c.creado_por_admin && !c.auth_user_id;
+      const botonInvitar = (esWalkinSinCuenta && c.correo)
+        ? `<br><button class="btn btn-ghost btn-sm" style="font-size:10px;margin-top:5px" onclick="invitarWalkin('${_spEscape(c.id)}', this)">✉ Invitar al portal</button>`
+        : '';
       return `<tr>
-      <td style="font-weight:600">${c.nombre_completo || '—'}${c.correo ? `<br><span style="color:var(--ts);font-size:11px;font-weight:400">${c.correo}</span>` : ''}</td>
+      <td style="font-weight:600">${c.nombre_completo || '—'}${c.correo ? `<br><span style="color:var(--ts);font-size:11px;font-weight:400">${c.correo}</span>` : ''}${botonInvitar}</td>
       <td style="font-family:'JetBrains Mono',monospace;font-size:12px">${c.celular || '—'}</td>
       <td>${paq ? `<span style="font-size:10px;font-weight:700;padding:2px 10px;border-radius:4px;background:${paqCol[paq]||'rgba(255,255,255,.06)'};color:${paqFg[paq]||'var(--ts)'}">${paq}</span>` : '—'}</td>
       <td style="font-size:11px;color:var(--orange);white-space:nowrap">${v.zona || '—'}</td>
@@ -8272,6 +8276,28 @@ function _renderViajerosTabla() {
       <td>${_spBadgeEstado(v.estado)}</td>
     </tr>`; }).join('')}</tbody>
   </table></div>`;
+}
+
+// Invita por correo a un walk-in (cliente sin cuenta de portal) para que reclame
+// su cuenta. El enlace real lo hace portal-reclamar-cuenta cuando el cliente se
+// registra con correo verificado. Solo aparece para walk-ins con correo.
+async function invitarWalkin(clienteId, btn) {
+  if (!clienteId) return;
+  if (btn) { btn.disabled = true; btn.textContent = 'Enviando…'; }
+  try {
+    const r = await fetch('/.netlify/functions/admin-invitar-walkin', {
+      method: 'POST',
+      headers: _spAdminHeaders(),
+      body: JSON.stringify({ cliente_id: clienteId }),
+    });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || 'No se pudo invitar');
+    showToast('Invitación enviada a ' + (data.to || 'su correo'), 'success');
+    if (btn) btn.textContent = '✓ Invitado';
+  } catch(e) {
+    showToast('Error: ' + e.message, 'error');
+    if (btn) { btn.disabled = false; btn.textContent = '✉ Invitar al portal'; }
+  }
 }
 
 async function loadViajeros() {

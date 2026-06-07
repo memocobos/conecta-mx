@@ -1251,6 +1251,30 @@ document.querySelector('[data-action="logout"]').addEventListener('click', async
 // =====================================================================
 // Routing inicial + onAuthStateChange
 // =====================================================================
+// ¿Le falta algún dato obligatorio del perfil? (Los walk-ins nacen con estos NULL.)
+function _perfilIncompleto(c){
+  return !c || !c.fecha_nacimiento || !c.talla_playera
+    || !c.contacto_emergencia_nombre || !c.contacto_emergencia_telefono;
+}
+
+// Intenta reclamar un walk-in con el correo VERIFICADO del propio JWT. El candado
+// de seguridad (email verificado, match exacto de correo) vive en el backend.
+async function intentarReclamarWalkin(session){
+  try {
+    const jwt = session && session.access_token;
+    if (!jwt) return null;
+    const r = await fetch('/.netlify/functions/portal-reclamar-cuenta', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + jwt },
+    });
+    if (!r.ok) return null;
+    return await r.json();
+  } catch (e) {
+    console.warn('[portal] reclamar walk-in falló', e);
+    return null;
+  }
+}
+
 async function cargarClienteYRutear(session){
   if (!session){
     showView('auth');
@@ -1271,6 +1295,32 @@ async function cargarClienteYRutear(session){
   }
 
   if (!data){
+    // Antes de crear perfil nuevo: ¿es un walk-in que un admin dio de alta con
+    // este MISMO correo verificado? Si sí, reclamamos su cuenta y mostramos su plan.
+    const reclamo = await intentarReclamarWalkin(session);
+    if (reclamo && reclamo.linked){
+      const { data: dataReclamada } = await supabase
+        .from('clientes')
+        .select('*')
+        .eq('auth_user_id', session.user.id)
+        .maybeSingle();
+      if (dataReclamada){
+        perfilExistente = dataReclamada;
+        if (_perfilIncompleto(dataReclamada)){
+          // Walk-in: ya tenemos nombre/celular/correo; pedimos completar lo que falta.
+          prellenarPerfil(dataReclamada);
+          $('#btn-cancel-profile').style.display = 'none';
+          showAlert($('#profile-alert'), 'success', 'Ya encontramos tu información. Completa estos últimos datos para terminar tu registro.');
+          showView('profile');
+        } else {
+          renderDashboard(dataReclamada);
+          showView('dashboard');
+          renderToursList();
+        }
+        return;
+      }
+    }
+    // Flujo normal: crear perfil nuevo.
     perfilExistente = null;
     $('#btn-cancel-profile').style.display = 'none';
     showView('profile');

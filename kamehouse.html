@@ -4443,7 +4443,7 @@ function populateEventoSelects() {
  const selects = [
  // 'filtro-evento-pagos' lo puebla _poblarFiltroEventoPagos() desde EV (Fase 3 cobranza).
  // 'selector-evento' lo puebla _evtPoblarSelector() desde EV (Fase 4 Por Evento).
- 'filtro-evento-gastos','gasto-evento',
+ // 'filtro-evento-gastos'/'gasto-evento' los puebla _poblarSelectsGastos() desde EV (G1).
  'pago-evento'
  ];
  selects.forEach(id => {
@@ -5088,29 +5088,78 @@ function _evtExportCSV() {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// GASTOS
+// GASTOS — reconstruido sobre el PORTAL (G1)
+// Tabla public.gastos del portal, ligada a eventos del EV (igual que ingresos).
+// Todo pasa por funciones admin con service_role; el cliente NO accede.
 // ═══════════════════════════════════════════════════════════════
+let _gastosSelectsPoblado = false;
+let _gastosEVMap = {};   // evento_id (base o base#idx) -> { nombre, fecha }
+
+// Puebla filtro-evento-gastos y gasto-evento desde EV (con multifecha), igual que
+// Pagos/Por Evento. Conserva la primera opción de cada select (Todos / General) y
+// llena _gastosEVMap para resolver el nombre del evento en la tabla.
+async function _poblarSelectsGastos() {
+  if (_gastosSelectsPoblado) return;
+  const ev = await _fetchEVFromIndex();
+  const eventos = (ev || []).filter(e => e && e.id && e.a)
+    .slice().sort((a, b) => String(b.ds || '').localeCompare(String(a.ds || '')));
+  const opciones = [];
+  eventos.forEach(e => {
+    if (Array.isArray(e.multifecha) && e.multifecha.length) {
+      e.multifecha.forEach((mf, i) => {
+        const lbl = (mf && mf.lbl) ? mf.lbl : ('Fecha ' + (i + 1));
+        const id = e.id + '#' + i;
+        _gastosEVMap[id] = { nombre: e.a, fecha: lbl };
+        opciones.push({ value: id, label: e.a + ' · ' + lbl });
+      });
+    } else {
+      _gastosEVMap[e.id] = { nombre: e.a, fecha: '' };
+      opciones.push({ value: e.id, label: e.a });
+    }
+  });
+  ['filtro-evento-gastos', 'gasto-evento'].forEach(selId => {
+    const sel = document.getElementById(selId);
+    if (!sel) return;
+    while (sel.options.length > 1) sel.remove(1);   // conserva la 1ª opción (Todos / General)
+    opciones.forEach(o => {
+      const opt = document.createElement('option');
+      opt.value = o.value;
+      opt.textContent = o.label;
+      sel.appendChild(opt);
+    });
+  });
+  _gastosSelectsPoblado = true;
+}
+
+// Nombre del evento para la tabla, resuelto desde EV. evento_id vacío = General.
+function _gastoEventoLabel(eventoId) {
+  if (!eventoId) return 'General';
+  const map = _gastosEVMap[eventoId];
+  if (!map) return eventoId;
+  return map.fecha ? (map.nombre + ' · ' + map.fecha) : map.nombre;
+}
+
 async function loadGastos() {
  const tbody = document.getElementById('tabla-gastos');
+ if (!tbody) return;
+ await _poblarSelectsGastos();
  tbody.innerHTML = '<tr><td colspan="7"><div class="loading-state"><div class="spinner"></div>Cargando…</div></td></tr>';
 
  const evId = document.getElementById('filtro-evento-gastos').value;
  const cat = document.getElementById('filtro-cat-gastos').value;
 
- let params = '?select=*,eventos(artista)&order=fecha.desc&limit=100';
- if (evId) params += `&evento_id=eq.${evId}`;
- if (cat) params += `&categoria=eq.${encodeURIComponent(cat)}`;
-
  try {
- const gastos = await db.get('gastos_generales', params);
+ const r = await fetch('/.netlify/functions/admin-gastos-list', {
+ method: 'POST',
+ headers: _spAdminHeaders(),
+ body: JSON.stringify({ evento_id: evId || undefined, categoria: cat || undefined }),
+ });
+ const d = await r.json();
+ if (!r.ok) throw new Error(d.error || 'No se pudieron cargar los gastos');
+ const gastos = Array.isArray(d.gastos) ? d.gastos : [];
 
- const total = gastos.reduce((s, g) => s + (g.monto || 0), 0);
- document.getElementById('g-total').textContent = formatMXN(total);
-
- const mes = new Date().getMonth();
- const totalMes = gastos.filter(g => new Date(g.fecha).getMonth() === mes)
- .reduce((s, g) => s + (g.monto || 0), 0);
- document.getElementById('g-mes').textContent = formatMXN(totalMes);
+ document.getElementById('g-total').textContent = _spFmtMxn(d.total || 0);
+ document.getElementById('g-mes').textContent = _spFmtMxn(d.total_mes || 0);
 
  if (!gastos.length) {
  tbody.innerHTML = '<tr><td colspan="7"><div class="empty-state"><div class="empty-icon"></div>Sin gastos registrados</div></td></tr>';
@@ -5119,17 +5168,17 @@ async function loadGastos() {
 
  tbody.innerHTML = gastos.map(g => `<tr>
  <td style="font-size:12px">${fmtFecha(g.fecha)}</td>
- <td style="font-weight:600">${g.concepto}</td>
- <td><span class="badge badge-gray">${g.categoria||'—'}</span></td>
- <td style="font-size:12px;color:var(--ts)">${g.eventos?.artista || 'General'}</td>
- <td style="color:var(--red);font-weight:600">${formatMXN(g.monto)}</td>
- <td style="font-size:12px">${g.metodo_pago||'—'}</td>
+ <td style="font-weight:600">${_spEscape(g.concepto)}</td>
+ <td><span class="badge badge-gray">${_spEscape(g.categoria||'—')}</span></td>
+ <td style="font-size:12px;color:var(--ts)">${_spEscape(_gastoEventoLabel(g.evento_id))}</td>
+ <td style="color:var(--red);font-weight:600">${_spFmtMxn(g.monto)}</td>
+ <td style="font-size:12px">${_spEscape(g.metodo_pago||'—')}</td>
  <td>
  <button class="btn btn-red btn-sm" onclick="eliminarGasto('${g.id}')"></button>
  </td>
  </tr>`).join('');
  } catch(e) {
- tbody.innerHTML = `<tr><td colspan="7"><div class="alert alert-error">${e.message}</div></td></tr>`;
+ tbody.innerHTML = `<tr><td colspan="7"><div class="alert alert-error">${_spEscape(e.message)}</div></td></tr>`;
  }
 }
 
@@ -5143,27 +5192,39 @@ async function guardarGasto() {
  const notas = document.getElementById('gasto-notas').value;
  const alerta = document.getElementById('gasto-alert');
 
- if (!concepto || !monto || !fecha) {
+ if (!concepto || !(monto >= 0) || !fecha) {
  alerta.innerHTML = '<div class="alert alert-error">Concepto, monto y fecha son obligatorios</div>';
  return;
  }
 
  try {
- await db.post('gastos_generales', {
+ const r = await fetch('/.netlify/functions/admin-gasto-crear', {
+ method: 'POST',
+ headers: _spAdminHeaders(),
+ body: JSON.stringify({
  concepto, monto, fecha, categoria, metodo_pago: metodo,
- evento_id: evId || null, notas: notas || null
+ evento_id: evId || undefined, notas: notas || undefined
+ }),
  });
- alerta.innerHTML = '<div class="alert alert-success"> Gasto registrado</div>';
+ const d = await r.json();
+ if (!r.ok) throw new Error(d.error || 'No se pudo registrar el gasto');
+ alerta.innerHTML = '<div class="alert alert-success">Gasto registrado</div>';
  setTimeout(() => { closeModal('modal-gasto'); loadGastos(); }, 1000);
  } catch(e) {
- alerta.innerHTML = `<div class="alert alert-error">${e.message}</div>`;
+ alerta.innerHTML = `<div class="alert alert-error">${_spEscape(e.message)}</div>`;
  }
 }
 
 async function eliminarGasto(id) {
  if (!confirm('¿Eliminar este gasto?')) return;
  try {
- await db.delete('gastos_generales', id);
+ const r = await fetch('/.netlify/functions/admin-gasto-eliminar', {
+ method: 'POST',
+ headers: _spAdminHeaders(),
+ body: JSON.stringify({ id }),
+ });
+ const d = await r.json();
+ if (!r.ok) throw new Error(d.error || 'No se pudo eliminar el gasto');
  loadGastos();
  } catch(e) { alert(e.message); }
 }

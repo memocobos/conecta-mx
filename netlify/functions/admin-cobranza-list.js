@@ -100,7 +100,7 @@ exports.handler = async (event) => {
     // 2. Todos los pagos de esas solicitudes en UNA query.
     const ids = solicitudes.map(s => s.id);
     const pp = new URLSearchParams();
-    pp.set('select', 'solicitud_id,numero_pago,concepto,monto,estado,fecha_esperada');
+    pp.set('select', 'solicitud_id,numero_pago,concepto,monto,monto_pagado,estado,fecha_esperada');
     pp.append('solicitud_id', `in.(${ids.join(',')})`);
     pp.set('limit', '5000');
 
@@ -117,7 +117,10 @@ exports.handler = async (event) => {
     const proximoPor = {};
     for (const p of (Array.isArray(pagos) ? pagos : [])) {
       if (p.estado === 'pagado') {
-        abonadoPor[p.solicitud_id] = (abonadoPor[p.solicitud_id] || 0) + Number(p.monto || 0);
+        // monto REAL pagado: COALESCE(monto_pagado, monto) — los pagos previos
+        // a la Fase 3.2 tienen monto_pagado NULL y suman su monto del plan.
+        const real = (p.monto_pagado == null) ? p.monto : p.monto_pagado;
+        abonadoPor[p.solicitud_id] = (abonadoPor[p.solicitud_id] || 0) + Number(real || 0);
       } else if (p.estado === 'pendiente' || p.estado === 'vencido') {
         const prev = proximoPor[p.solicitud_id];
         if (!prev || String(p.fecha_esperada || '') < String(prev.fecha_esperada || '')) {

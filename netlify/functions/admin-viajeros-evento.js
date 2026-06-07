@@ -97,7 +97,7 @@ exports.handler = async (event) => {
     const ids = solicitudes.map(s => s.id);
     const abonadoPorSolicitud = {};
     const pp = new URLSearchParams();
-    pp.set('select', 'solicitud_id,monto,estado');
+    pp.set('select', 'solicitud_id,monto,monto_pagado,estado');
     pp.append('solicitud_id', `in.(${ids.join(',')})`);
     pp.append('estado', 'eq.pagado');
     pp.set('limit', '5000');
@@ -110,7 +110,10 @@ exports.handler = async (event) => {
     }
     const pagos = await pagosR.json();
     for (const p of (Array.isArray(pagos) ? pagos : [])) {
-      abonadoPorSolicitud[p.solicitud_id] = (abonadoPorSolicitud[p.solicitud_id] || 0) + Number(p.monto || 0);
+      // monto REAL pagado: COALESCE(monto_pagado, monto) — pagos previos a la
+      // Fase 3.2 tienen monto_pagado NULL y suman su monto del plan.
+      const real = (p.monto_pagado == null) ? p.monto : p.monto_pagado;
+      abonadoPorSolicitud[p.solicitud_id] = (abonadoPorSolicitud[p.solicitud_id] || 0) + Number(real || 0);
     }
 
     // 3. Armar los viajeros con su resumen de pago.

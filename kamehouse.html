@@ -4216,6 +4216,10 @@ function aplicarTemaCoordi() {
   };
   // Limpiar temas previos
   document.body.className = document.body.className.replace(/\btema-\w+/g, '').trim();
+  // Precedencia DC1: si el usuario eligió acento personal (tema_acento), ESE manda.
+  // No aplicamos el tema-coordi viejo (sus colores con !important pisarían el
+  // acento que va por variables CSS). El body queda sin clase tema-XXX.
+  if (currentUser.tema_acento) return;
   // Aplicar tema si existe
   const clase = temas[nombre];
   if (clase) document.body.classList.add(clase);
@@ -7469,6 +7473,9 @@ async function guardarMiPerfil() {
       _ses.user = { ..._ses.user, ...body };
       sessionStorage.setItem(SESSION_KEY, JSON.stringify(_ses));
     }
+    // Re-aplica la precedencia (mismo orden que enterApp): al elegir un acento
+    // personal se quita la clase tema-XXX para que el acento se vea al instante.
+    aplicarTemaCoordi();
     applyTema(body.tema_acento);
     setTimeout(() => renderMiPerfil(false), 1200);
     loadEquipo();

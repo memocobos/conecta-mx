@@ -2390,7 +2390,7 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
           </label>
           <button class="btn btn-ghost btn-sm" onclick="exportarViajeros('excel')" style="font-size:10px">↓ CSV</button>
           <button class="btn btn-ghost btn-sm" onclick="exportarViajeros('pdf')" style="font-size:10px">↓ PDF</button>
-          <button class="btn btn-primary btn-sm" onclick="abrirModalViajero(null)">+ Viajero</button>
+          <button class="btn btn-primary btn-sm" disabled title="Próximamente — el alta manual de walk-ins llega en la Fase 2" style="opacity:.5;cursor:not-allowed">+ Viajero</button>
          </div>
         </div>
         <div style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap">
@@ -2423,7 +2423,7 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
           </label>
           <button class="btn btn-ghost btn-sm" onclick="exportarRooming('excel')" style="font-size:10px">↓ CSV</button>
           <button class="btn btn-ghost btn-sm" onclick="exportarRooming('pdf')" style="font-size:10px">↓ PDF</button>
-          <button class="btn btn-primary btn-sm" onclick="abrirModalHabitacion(null)">+ Habitación</button>
+          <button class="btn btn-primary btn-sm" disabled title="Próximamente — la asignación fina de cuartos llega en una fase posterior" style="opacity:.5;cursor:not-allowed">+ Habitación</button>
          </div>
         </div>
         <div id="cc-rooming-list"><div class="empty-state"><div class="empty-icon">·</div>Sin habitaciones registradas</div></div>
@@ -7532,12 +7532,37 @@ const TIPOS_EVENTO = {
   festival_3d: 'Festival 3 días',
 };
 
+// Capsule sobre el portal (Fase feat/capsule-sobre-portal): la lista de eventos
+// sale del array EV de index.html (misma fuente que el sitio), NO de la tabla
+// vieja `eventos`. _ccEvFromEV mapea cada EV a la forma que espera
+// renderCCEventos / abrirDetalleEvento (id base = el evento_id del portal).
+function _ccEvFromEV(e) {
+  const fecha = e.ds
+    || (Array.isArray(e.multifecha) && e.multifecha[0] && e.multifecha[0].ds)
+    || '';
+  return {
+    id:             e.id,
+    nombre:         e.a || e.id,
+    artista:        '',                       // e.a ya es el nombre; no duplicar
+    ciudad:         e.cdmx ? 'CDMX' : 'MTY',
+    fecha,
+    tipo_evento:    null,                      // → 'Concierto' (fallback de TIPOS_EVENTO)
+    notas_internas: null,
+    zonas_boleto:   [],
+    _ev:            e,
+  };
+}
+
 async function loadCapsule() {
+  const g = document.getElementById('cc-eventos-grid');
   try {
-    _ccEventosCache = await db.get('eventos', '?order=fecha.desc&limit=200');
+    const ev = await _fetchEVFromIndex();
+    _ccEventosCache = (ev || [])
+      .filter(e => e && e.id && e.a)
+      .map(_ccEvFromEV)
+      .sort((a, b) => String(b.fecha || '').localeCompare(String(a.fecha || '')));
     renderCCEventos(_ccEventosCache, 'todos');
   } catch(e) {
-    const g = document.getElementById('cc-eventos-grid');
     if (g) g.innerHTML = `<div class="alert alert-error">${e.message}</div>`;
   }
 }
@@ -7594,8 +7619,12 @@ function renderCCEventos(lista, filtro) {
           </div>
         </div>
         <div style="display:flex;gap:6px">
+          <!-- Editar/eliminar OCULTOS: los eventos vienen de index.html (no de la tabla
+               vieja 'eventos'), estos botones apuntan al sistema viejo. Editar eventos =
+               Palacio de Kamisama. Código conservado por si se reusa.
           <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();abrirModalEditarEvento('${e.id}')" style="font-size:11px">⎘</button>
           <button class="btn btn-red btn-sm" onclick="event.stopPropagation();eliminarEventoCC('${e.id}')" style="font-size:11px">✕</button>
+          -->
           <button class="btn btn-primary btn-sm" onclick="event.stopPropagation();abrirDetalleEvento('${e.id}')" style="font-size:11px">Ver →</button>
         </div>
       </div>
@@ -7730,9 +7759,10 @@ async function abrirDetalleEvento(id) {
       </div>`;
   }
 
-  // Cargar datos
+  // Cargar datos. Rooming agrupa _ccViajeros, así que corre DESPUÉS de loadViajeros.
   showCCSubTab('equipo', document.getElementById('cc-sub-btn-equipo'));
-  await Promise.all([loadCCEquipo(), loadViajeros(), loadRooming()]);
+  await Promise.all([loadCCEquipo(), loadViajeros()]);
+  await loadRooming();
 }
 
 // ── EQUIPO ASIGNADO ──────────────────────────────────────────
@@ -8211,28 +8241,28 @@ function _renderViajerosTabla() {
               : _ccViajerosFiltro === 'cliente' ? clientes
               : todos;
   if (!filas.length) {
-    list.innerHTML = `<div class="empty-state"><div class="empty-icon">·</div>${_ccViajerosFiltro==='todos'?'Sin viajeros — agrega el primero':'Sin viajeros con ese filtro'}</div>`;
+    list.innerHTML = `<div class="empty-state"><div class="empty-icon">·</div>${_ccViajerosFiltro==='todos'?'Sin viajeros aprobados para este evento':'Sin viajeros con ese filtro'}</div>`;
     return;
   }
+  const paqCol = { 'PLUS':'rgba(255,183,3,.15)','STAY':'rgba(94,167,255,.15)','RIDE':'rgba(61,220,132,.15)','CHEAP':'rgba(255,107,0,.12)' };
+  const paqFg  = { 'PLUS':'var(--gold)','STAY':'var(--blue)','RIDE':'var(--green)','CHEAP':'var(--orange)' };
   list.innerHTML = `<div class="table-wrap"><table>
-    <thead><tr><th>Nombre</th><th>Paquete</th><th>Zona</th><th>Celular</th><th>Correo</th><th>Talla</th><th>Emergencia</th><th>Notas</th><th></th></tr></thead>
-    <tbody>${filas.map(v => `<tr>
-      <td style="font-weight:600">
-        ${v.nombre}
-        ${_esStaff(v) ? `<span style="margin-left:6px;font-size:9px;font-weight:800;padding:1px 7px;border-radius:3px;background:rgba(255,183,3,.18);color:var(--gold);border:1px solid rgba(255,183,3,.4);letter-spacing:.1em;text-transform:uppercase;font-family:'JetBrains Mono',monospace">STAFF</span>` : ''}
-      </td>
-      <td>${v.tipo_paquete ? `<span style="font-size:10px;font-weight:700;padding:2px 10px;border-radius:4px;background:${{'PLUS':'rgba(255,183,3,.15)','STAY':'rgba(94,167,255,.15)','RIDE':'rgba(61,220,132,.15)'}[v.tipo_paquete]||'rgba(255,255,255,.06)'};color:${{'PLUS':'var(--gold)','STAY':'var(--blue)','RIDE':'var(--green)'}[v.tipo_paquete]||'var(--ts)'}">${v.tipo_paquete}</span>` : '—'}</td>
-      <td style="font-size:11px;padding:2px 8px;background:rgba(255,107,0,.1);border-radius:4px;color:var(--orange);white-space:nowrap">${v.zona_boleto||'—'}</td>
-      <td style="font-family:'JetBrains Mono',monospace;font-size:12px">${v.celular||'—'}</td>
-      <td style="font-size:12px;color:var(--ts)">${v.correo||'—'}</td>
-      <td style="text-align:center">${v.talla_playera||'—'}</td>
-      <td style="font-size:11px;color:var(--ts)">${v.num_emergencia||'—'}</td>
-      <td style="font-size:11px;color:var(--ts);max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${v.notas||'—'}</td>
-      <td style="white-space:nowrap">
-        <button class="btn btn-ghost btn-sm" onclick="abrirModalViajero('${v.id}')">⎘</button>
-        <button class="btn btn-red btn-sm" onclick="eliminarViajero('${v.id}')">✕</button>
-      </td>
-    </tr>`).join('')}</tbody>
+    <thead><tr><th>Nombre</th><th>Celular</th><th>Paquete</th><th>Zona</th><th style="text-align:center">Pers.</th><th style="text-align:right">Total</th><th style="text-align:right">Abonado</th><th style="text-align:right">Restante</th><th>Estado</th></tr></thead>
+    <tbody>${filas.map(v => {
+      const c = v.clientes || {};
+      const pago = v.pago || {};
+      const paq = v.paquete || '';
+      return `<tr>
+      <td style="font-weight:600">${c.nombre_completo || '—'}${c.correo ? `<br><span style="color:var(--ts);font-size:11px;font-weight:400">${c.correo}</span>` : ''}</td>
+      <td style="font-family:'JetBrains Mono',monospace;font-size:12px">${c.celular || '—'}</td>
+      <td>${paq ? `<span style="font-size:10px;font-weight:700;padding:2px 10px;border-radius:4px;background:${paqCol[paq]||'rgba(255,255,255,.06)'};color:${paqFg[paq]||'var(--ts)'}">${paq}</span>` : '—'}</td>
+      <td style="font-size:11px;color:var(--orange);white-space:nowrap">${v.zona || '—'}</td>
+      <td style="text-align:center">${v.num_personas || 1}</td>
+      <td style="text-align:right;font-family:'JetBrains Mono',monospace;font-size:12px">${_spFmtMxn(pago.total)}</td>
+      <td style="text-align:right;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--green)">${_spFmtMxn(pago.abonado)}</td>
+      <td style="text-align:right;font-family:'JetBrains Mono',monospace;font-size:12px;color:${(pago.restante||0) > 0 ? 'var(--orange)' : 'var(--ts)'}">${_spFmtMxn(pago.restante)}</td>
+      <td>${_spBadgeEstado(v.estado)}</td>
+    </tr>`; }).join('')}</tbody>
   </table></div>`;
 }
 
@@ -8242,7 +8272,16 @@ async function loadViajeros() {
   if (!list) return;
   list.innerHTML = '<div class="loading-state"><div class="spinner"></div>Cargando…</div>';
   try {
-    _ccViajeros = await db.get('viajeros_evento', `?evento_id=eq.${_ccEventoActual}&order=nombre.asc`);
+    // Viajeros = solicitudes del portal (en_pagos/pagado) de este evento, con
+    // su resumen de pago. service_role vive en la función; aquí va el JWT admin.
+    const r = await fetch('/.netlify/functions/admin-viajeros-evento', {
+      method: 'POST',
+      headers: _spAdminHeaders(),
+      body: JSON.stringify({ evento_id: _ccEventoActual }),
+    });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || 'No se pudieron cargar los viajeros');
+    _ccViajeros = Array.isArray(data.viajeros) ? data.viajeros : [];
     const countEl = document.getElementById('cc-viajeros-count');
     if (countEl) countEl.textContent = `${_ccViajeros.length} viajero${_ccViajeros.length!==1?'s':''}`;
     _renderViajerosTabla();
@@ -8355,18 +8394,22 @@ async function exportarViajeros(formato) {
   const ev = _ccEventosCache.find(e => e.id === _ccEventoActual);
   const sufijoTitulo = excluirStaff ? ' (sin staff)' : '';
   const titulo = `Viajeros — ${ev?.nombre||'Evento'}${sufijoTitulo}`;
+  const _vNombre = v => (v.clientes || {}).nombre_completo || '';
+  const _vCel    = v => (v.clientes || {}).celular || '';
+  const _vCorreo = v => (v.clientes || {}).correo || '';
+  const _vPago   = v => v.pago || {};
   if (formato === 'pdf') {
     const sufijoFile = excluirStaff ? '-sin-staff' : '';
     const html = `<html><head><meta charset="utf-8"><title>${titulo}</title>
-    <style>body{font-family:Arial,sans-serif;padding:24px}h2{margin-bottom:16px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ccc;padding:8px 12px;font-size:13px}th{background:#f5f5f5}.staff{background:#fff4d6}</style></head><body>
+    <style>body{font-family:Arial,sans-serif;padding:24px}h2{margin-bottom:16px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ccc;padding:8px 12px;font-size:13px}th{background:#f5f5f5}td.num{text-align:right}</style></head><body>
     <h2>${titulo}</h2>
-    <table><thead><tr><th>#</th><th>Nombre</th><th>Tipo</th><th>Celular</th><th>Correo</th><th>Talla</th><th>Emergencia</th><th>Notas</th></tr></thead>
-    <tbody>${lista.map((v,i)=>`<tr${_esStaff(v)?' class="staff"':''}><td>${i+1}</td><td>${v.nombre}</td><td>${(_esStaff(v) ? (_staffRol(v)||'staff') : 'cliente')}</td><td>${v.celular||''}</td><td>${v.correo||''}</td><td>${v.talla_playera||''}</td><td>${v.num_emergencia||''}</td><td>${v.notas||''}</td></tr>`).join('')}</tbody>
+    <table><thead><tr><th>#</th><th>Nombre</th><th>Celular</th><th>Correo</th><th>Paquete</th><th>Zona</th><th>Pers.</th><th>Total</th><th>Abonado</th><th>Restante</th><th>Estado</th></tr></thead>
+    <tbody>${lista.map((v,i)=>`<tr><td>${i+1}</td><td>${_vNombre(v)}</td><td>${_vCel(v)}</td><td>${_vCorreo(v)}</td><td>${v.paquete||''}</td><td>${v.zona||''}</td><td>${v.num_personas||1}</td><td class="num">${_spFmtMxn(_vPago(v).total)}</td><td class="num">${_spFmtMxn(_vPago(v).abonado)}</td><td class="num">${_spFmtMxn(_vPago(v).restante)}</td><td>${v.estado||''}</td></tr>`).join('')}</tbody>
     </table></body></html>`;
     _descargarHTML(`viajeros-${ev?.nombre||'evento'}${sufijoFile}.html`, html);
   } else {
-    const headers = ['#','Nombre','Tipo','Celular','Correo','Talla','Emergencia','Notas'];
-    const rows = lista.map((v,i) => [i+1,v.nombre,(_esStaff(v) ? (_staffRol(v)||'staff') : 'cliente'),v.celular||'',v.correo||'',v.talla_playera||'',v.num_emergencia||'',v.notas||''].map(c=>`"${String(c).replace(/"/g,'""')}"`).join(','));
+    const headers = ['#','Nombre','Celular','Correo','Paquete','Zona','Personas','Total','Abonado','Restante','Estado'];
+    const rows = lista.map((v,i) => [i+1,_vNombre(v),_vCel(v),_vCorreo(v),v.paquete||'',v.zona||'',v.num_personas||1,_vPago(v).total||0,_vPago(v).abonado||0,_vPago(v).restante||0,v.estado||''].map(c=>`"${String(c).replace(/"/g,'""')}"`).join(','));
     const csv = [headers.join(','), ...rows].join('\n');
     const a = document.createElement('a');
     a.href = 'data:text/csv;charset=utf-8,\uFEFF' + encodeURIComponent(csv);
@@ -8386,60 +8429,67 @@ const CAPACIDAD_HAB = { individual: 1, doble: 2, triple: 3, cuadruple: 4 };
 const TIPO_LABELS   = { individual: 'Individual', doble: 'Doble', triple: 'Triple', cuadruple: 'Cuádruple' };
 const TIPO_COL      = { individual: 'var(--ts)', doble: 'var(--blue)', triple: 'var(--gold)', cuadruple: 'var(--orange)' };
 
+// Rooming básico (lectura): agrupa los viajeros del portal (_ccViajeros) por
+// tipo_habitacion. La asignación fina cuarto-por-cuarto es fase futura. Los
+// tipos válidos del portal son compartida|doble|triple|individual; los viajeros
+// sin habitación (paquetes sin hotel, p.ej. RIDE/CHEAP) caen en "Sin habitación".
 async function loadRooming() {
   if (!_ccEventoActual) return;
   const list    = document.getElementById('cc-rooming-list');
   const resumen = document.getElementById('cc-rooming-resumen');
   if (!list) return;
-  list.innerHTML = '<div class="loading-state"><div class="spinner"></div>Cargando…</div>';
-  try {
-    _ccHabitaciones = await db.get('rooming_habitaciones', `?evento_id=eq.${_ccEventoActual}&order=orden.asc`).catch(()=>
-      db.get('rooming_habitaciones', `?evento_id=eq.${_ccEventoActual}`)
-    );
-    _ccHotelInfo = _ccHabitaciones[0] ? {
-      nombre:           _ccHabitaciones[0].hotel_nombre,
-      direccion:        _ccHabitaciones[0].hotel_direccion,
-      incluye_desayuno: _ccHabitaciones[0].incluye_desayuno,
-    } : null;
-    renderHotelInfo();
-    const conteo = { individual:0, doble:0, triple:0, cuadruple:0 };
-    _ccHabitaciones.forEach(h => { if (conteo[h.tipo]!==undefined) conteo[h.tipo]++; });
-    if (resumen) resumen.innerHTML = Object.entries(conteo).filter(([,v])=>v>0).map(([k,v])=>
+
+  // Hotel queda como fase futura — mostramos el bloque vacío sin tocar datos viejos.
+  _ccHotelInfo = null;
+  renderHotelInfo();
+
+  const GRUPOS = [
+    { key: 'compartida', label: 'Compartida', col: 'var(--green)' },
+    { key: 'doble',      label: 'Doble',      col: 'var(--blue)' },
+    { key: 'triple',     label: 'Triple',     col: 'var(--gold)' },
+    { key: 'individual', label: 'Individual', col: 'var(--orange)' },
+    { key: '_sin',       label: 'Sin habitación', col: 'var(--ts)' },
+  ];
+  const VALIDOS = ['compartida','doble','triple','individual'];
+  const porTipo = {};
+  GRUPOS.forEach(g => { porTipo[g.key] = []; });
+  (_ccViajeros || []).forEach(v => {
+    const t = VALIDOS.includes(v.tipo_habitacion) ? v.tipo_habitacion : '_sin';
+    porTipo[t].push(v);
+  });
+
+  if (resumen) {
+    resumen.innerHTML = GRUPOS.filter(g => porTipo[g.key].length).map(g =>
       `<div style="background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:8px 14px;text-align:center;min-width:80px">
-        <div style="font-family:'Zen Dots',sans-serif;font-size:22px;color:${TIPO_COL[k]}">${v}</div>
-        <div style="font-size:10px;color:var(--ts)">${TIPO_LABELS[k]}</div>
+        <div style="font-family:'Zen Dots',sans-serif;font-size:22px;color:${g.col}">${porTipo[g.key].length}</div>
+        <div style="font-size:10px;color:var(--ts)">${g.label}</div>
       </div>`).join('');
-    if (!_ccHabitaciones.length) {
-      list.innerHTML = '<div class="empty-state"><div class="empty-icon">·</div>Sin habitaciones — agrega la primera</div>';
-      return;
-    }
-    list.innerHTML = _ccHabitaciones.map((h, idx) => {
-      const ocupantes = h.ocupantes ? (typeof h.ocupantes==='string'?JSON.parse(h.ocupantes):h.ocupantes) : [];
-      const cap = CAPACIDAD_HAB[h.tipo] || 1;
-      const llena = ocupantes.length >= cap;
-      return `<div style="background:var(--bg2);border:1px solid ${llena?'rgba(61,220,132,.25)':'var(--border)'};border-left:3px solid ${TIPO_COL[h.tipo]||'var(--border)'};border-radius:var(--radius);padding:14px 18px;margin-bottom:10px">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px">
-          <div>
-            <span style="font-family:'Rajdhani',sans-serif;font-weight:700;font-size:18px">Habitación ${idx+1}</span>
-            <span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:${TIPO_COL[h.tipo]||'var(--ts)'};margin-left:10px;letter-spacing:.1em">${TIPO_LABELS[h.tipo]||''}</span>
-            <span style="font-size:10px;color:${llena?'var(--green)':'var(--ts)'};margin-left:8px">${ocupantes.length}/${cap}${llena?' ✓':''}</span>
-          </div>
-          <div style="display:flex;gap:6px">
-            <button class="btn btn-ghost btn-sm" onclick="abrirModalHabitacion('${h.id}')">⎘</button>
-            <button class="btn btn-red btn-sm" onclick="eliminarHabitacion('${h.id}')">✕</button>
-          </div>
-        </div>
-        <div style="display:flex;flex-wrap:wrap;gap:6px">
-          ${Array.from({length: cap}).map((_, i) => {
-            const n = ocupantes[i];
-            return n
-              ? `<div style="background:rgba(255,255,255,.07);border:1px solid var(--border);border-radius:6px;padding:6px 14px;font-size:13px;font-weight:500">${n}</div>`
-              : `<div style="border:1px dashed rgba(255,255,255,.1);border-radius:6px;padding:6px 14px;font-size:12px;color:var(--ts)">Lugar libre</div>`;
-          }).join('')}
-        </div>
+  }
+
+  const conData = GRUPOS.filter(g => porTipo[g.key].length);
+  if (!conData.length) {
+    list.innerHTML = '<div class="empty-state"><div class="empty-icon">·</div>Sin viajeros aprobados para armar rooming</div>';
+    return;
+  }
+
+  list.innerHTML = conData.map(g => {
+    const miembros = porTipo[g.key];
+    const chips = miembros.map(v => {
+      const c = v.clientes || {};
+      const meta = [v.paquete, v.zona, (v.num_personas && v.num_personas > 1) ? (v.num_personas + ' pers.') : null].filter(Boolean).join(' · ');
+      return `<div style="background:rgba(255,255,255,.07);border:1px solid var(--border);border-radius:6px;padding:6px 14px;font-size:13px">
+        <span style="font-weight:600">${c.nombre_completo || '—'}</span>
+        ${meta ? `<span style="font-size:10px;color:var(--ts);margin-left:8px;font-family:'JetBrains Mono',monospace">${meta}</span>` : ''}
       </div>`;
     }).join('');
-  } catch(e) { list.innerHTML = `<div class="alert alert-error">${e.message}</div>`; }
+    return `<div style="background:var(--bg2);border:1px solid var(--border);border-left:3px solid ${g.col};border-radius:var(--radius);padding:14px 18px;margin-bottom:10px">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap">
+        <span style="font-family:'Rajdhani',sans-serif;font-weight:700;font-size:18px">${g.label}</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:${g.col};letter-spacing:.1em">${miembros.length} ${miembros.length===1?'viajero':'viajeros'}</span>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px">${chips}</div>
+    </div>`;
+  }).join('');
 }
 
 function renderHotelInfo() {

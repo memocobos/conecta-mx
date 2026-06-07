@@ -11108,16 +11108,24 @@ async function loadMTAlertas() {
 }
 
 async function marcarAlertaLeida(id) {
-  try { await db.patch('sistema_alertas', id, { leida: true }); await loadMTAlertas(); }
+  // UPDATE vía Netlify Function con service_role (RLS bloquea UPDATE anon).
+  try {
+    await khAdminFetch('/.netlify/functions/sistema-alertas-write', {
+      method: 'POST',
+      body: JSON.stringify({ accion: 'marcar_leida', id }),
+    });
+    await loadMTAlertas();
+  }
   catch(e) { alert(e.message); }
 }
 
 async function marcarTodasLeidas() {
+  // UPDATE de todas las no leídas en una sola llamada (service_role).
   try {
-    const alertas = await db.get('sistema_alertas', '?leida=eq.false&select=id');
-    for (const a of alertas) {
-      await db.patch('sistema_alertas', a.id, { leida: true }).catch(()=>{});
-    }
+    await khAdminFetch('/.netlify/functions/sistema-alertas-write', {
+      method: 'POST',
+      body: JSON.stringify({ accion: 'marcar_todas_leidas' }),
+    });
     await loadMTAlertas();
   } catch(e) {}
 }
@@ -11241,10 +11249,12 @@ async function enviarAlertaMemo(tipo, datos = {}) {
         emailSubject = `Alerta Kamehouse: ${tipo}`;
         emailBody = `<p>${mensaje}</p>`;
     }
-    await db.post('sistema_alertas', {
-      tipo, mensaje,
-      leida: false,
-      created_at: new Date().toISOString(),
+    // INSERT vía Netlify Function con service_role: la tabla tiene RLS que
+    // bloquea INSERT desde el cliente anon (daba 401). Mantiene .catch para
+    // degradar elegante si la función falla.
+    await khAdminFetch('/.netlify/functions/sistema-alertas-write', {
+      method: 'POST',
+      body: JSON.stringify({ accion: 'crear', tipo, mensaje }),
     }).catch(()=>{});
     // Email a Memo — guard: tipos sin emailSubject (ej. nuevo_usuario desactivado el 2026-05-18) no mandan correo.
     if (emailSubject) await enviarEmailSistema(MEMO_EMAIL, emailSubject, emailBody);

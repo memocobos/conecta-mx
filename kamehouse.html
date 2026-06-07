@@ -2001,9 +2001,12 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
   <div class="page-hero">
    <div>
     <div class="page-title">PAGOS</div>
-    <div class="page-sub">// ingresos · saldos por cliente</div>
+    <div class="page-sub">// centro de cobranza · tours activos del portal</div>
    </div>
-   <button class="btn btn-primary" onclick="openModal('modal-pago')">+ Registrar Pago</button>
+   <div style="text-align:right">
+    <div style="font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--ts);font-family:'JetBrains Mono',monospace">Ingresado (lista)</div>
+    <div id="pagos-ingresado" style="font-family:'Zen Dots',sans-serif;font-size:22px;color:var(--green)">—</div>
+   </div>
   </div>
 
  <!-- Filtros -->
@@ -2019,10 +2022,9 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
  <label>Status</label>
  <select id="filtro-status-pagos" onchange="loadPagos()">
  <option value="">Todos</option>
- <option value="En Proceso">En Proceso</option>
- <option value="Liquidado">Liquidado</option>
- <option value="Cancelado">Cancelado</option>
- <option value="Baja">Baja</option>
+ <option value="en_pagos">En pagos</option>
+ <option value="pagado">Pagado</option>
+ <option value="cancelado">Cancelado</option>
  </select>
  </div>
  <div class="form-group">
@@ -4378,7 +4380,8 @@ async function bootApp() {
 
 function populateEventoSelects() {
  const selects = [
- 'filtro-evento-pagos','filtro-evento-gastos','gasto-evento',
+ // 'filtro-evento-pagos' lo puebla _poblarFiltroEventoPagos() desde EV (Fase 3 cobranza).
+ 'filtro-evento-gastos','gasto-evento',
  'pago-evento','selector-evento'
  ];
  selects.forEach(id => {
@@ -4475,50 +4478,104 @@ function renderUltimas(reservaciones) {
 // ═══════════════════════════════════════════════════════════════
 // PAGOS
 // ═══════════════════════════════════════════════════════════════
+// ── PAGOS = CENTRO DE COBRANZA sobre el portal (Fase 3) ───────────────────
+// loadPagos lista los tours activos (solicitudes_tour en_pagos/pagado) vía
+// admin-cobranza-list, con su avance de cobranza. "Registrar pago" reusa el
+// flujo de la 2.3c (cargarPlanPagosSP/marcarPagoSP/revertirPagoSP) en un modal.
+let _cobranzaCache = [];
+let _cobranzaEventoSelectPoblado = false;
+
+// Puebla el filtro de Evento desde EV (index.html), una sola vez (no resetea la
+// selección en cada filtro). Conserva la primera opción ("Todos los eventos").
+async function _poblarFiltroEventoPagos() {
+  if (_cobranzaEventoSelectPoblado) return;
+  const sel = document.getElementById('filtro-evento-pagos');
+  if (!sel) return;
+  const ev = await _fetchEVFromIndex();
+  const eventos = (ev || []).filter(e => e && e.id && e.a)
+    .slice().sort((a, b) => String(b.ds || '').localeCompare(String(a.ds || '')));
+  while (sel.options.length > 1) sel.remove(1);
+  eventos.forEach(e => {
+    const opt = document.createElement('option');
+    opt.value = e.id;
+    opt.textContent = e.a;
+    sel.appendChild(opt);
+  });
+  _cobranzaEventoSelectPoblado = true;
+}
+
 async function loadPagos() {
- const tbody = document.getElementById('tabla-pagos');
- tbody.innerHTML = '<tr><td colspan="8"><div class="loading-state"><div class="spinner"></div>Cargando…</div></td></tr>';
+  const tbody = document.getElementById('tabla-pagos');
+  if (!tbody) return;
+  await _poblarFiltroEventoPagos();
 
- const evId = document.getElementById('filtro-evento-pagos').value;
- const status = document.getElementById('filtro-status-pagos').value;
- const nombre = document.getElementById('filtro-nombre-pagos').value.trim();
+  const evId   = document.getElementById('filtro-evento-pagos').value;
+  const estado = document.getElementById('filtro-status-pagos').value;
+  const nombre = document.getElementById('filtro-nombre-pagos').value.trim();
+  const ingEl  = document.getElementById('pagos-ingresado');
 
- let params = '?select=*,clientes(nombre,telefono),eventos(artista,fecha)&order=created_at.desc&limit=100';
- if (evId) params += `&evento_id=eq.${evId}`;
- if (status) params += `&status=eq.${encodeURIComponent(status)}`;
+  tbody.innerHTML = '<tr><td colspan="8"><div class="loading-state"><div class="spinner"></div>Cargando…</div></td></tr>';
 
- try {
- let rows = await db.get('reservaciones', params);
- if (nombre) rows = rows.filter(r =>
- r.clientes?.nombre?.toLowerCase().includes(nombre.toLowerCase()));
+  try {
+    const r = await fetch('/.netlify/functions/admin-cobranza-list', {
+      method: 'POST',
+      headers: _spAdminHeaders(),
+      body: JSON.stringify({ evento_id: evId || undefined, estado: estado || undefined, nombre: nombre || undefined }),
+    });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || 'No se pudo cargar la cobranza');
+    _cobranzaCache = Array.isArray(data.tours) ? data.tours : [];
 
- if (!rows.length) {
- tbody.innerHTML = '<tr><td colspan="8"><div class="empty-state"><div class="empty-icon"></div>Sin resultados</div></td></tr>';
- return;
- }
- tbody.innerHTML = rows.map(r => `<tr>
- <td>
- <div style="font-weight:600">${r.clientes?.nombre || '—'}</div>
- <div style="font-size:11px;color:var(--ts)">${r.clientes?.telefono || ''}</div>
- </td>
- <td style="font-size:12px">${r.eventos?.artista || '—'}<br>
- <span style="color:var(--ts);font-size:11px">${fmtFecha(r.eventos?.fecha)}</span>
- </td>
- <td>${badgePaquete(r.paquete)}</td>
- <td style="font-weight:600">${formatMXN(r.total_paquete)}</td>
- <td style="color:var(--green)">${formatMXN(r.total_abonado)}</td>
- <td style="color:${r.saldo_pendiente > 0 ? 'var(--red)' : 'var(--green)'}">
- ${formatMXN(r.saldo_pendiente)}
- </td>
- <td>${badgeStatus(r.status)}</td>
- <td>
- <button class="btn btn-green btn-sm" onclick="editarReservacion('${r.id}')"></button>
- <button class="btn btn-ghost btn-sm" onclick="wapp('${r.clientes?.telefono || ''}','${r.clientes?.nombre || ''}')"></button>
- </td>
- </tr>`).join('');
- } catch(e) {
- tbody.innerHTML = `<tr><td colspan="8"><div class="alert alert-error">${e.message}</div></td></tr>`;
- }
+    const ingresado = _cobranzaCache.reduce((a, t) => a + Number((t.pago || {}).abonado || 0), 0);
+    if (ingEl) ingEl.textContent = _spFmtMxn(ingresado);
+
+    if (!_cobranzaCache.length) {
+      tbody.innerHTML = '<tr><td colspan="8"><div class="empty-state"><div class="empty-icon">·</div>Sin tours que coincidan con los filtros</div></td></tr>';
+      return;
+    }
+
+    const paqCol = { 'PLUS':'rgba(255,183,3,.15)','STAY':'rgba(94,167,255,.15)','RIDE':'rgba(61,220,132,.15)','CHEAP':'rgba(255,107,0,.12)' };
+    const paqFg  = { 'PLUS':'var(--gold)','STAY':'var(--blue)','RIDE':'var(--green)','CHEAP':'var(--orange)' };
+
+    tbody.innerHTML = _cobranzaCache.map(t => {
+      const c = t.clientes || {};
+      const pago = t.pago || {};
+      const paq = t.paquete || '';
+      const prox = pago.proximo;
+      return `<tr>
+        <td>
+          <div style="font-weight:600">${_spEscape(c.nombre_completo || '—')}</div>
+          <div style="font-size:11px;color:var(--ts)">${_spEscape(c.celular || '')}</div>
+        </td>
+        <td style="font-size:12px">${_spEscape(t.evento_nombre || '—')}${prox ? `<br><span style="color:var(--ts);font-size:11px">próx: ${_spEscape(prox.fecha_esperada)} · ${_spFmtMxn(prox.monto)}</span>` : ''}</td>
+        <td>${paq ? `<span style="font-size:10px;font-weight:700;padding:2px 10px;border-radius:4px;background:${paqCol[paq]||'rgba(255,255,255,.06)'};color:${paqFg[paq]||'var(--ts)'}">${paq}</span>` : '—'}</td>
+        <td style="font-weight:600">${_spFmtMxn(pago.total)}</td>
+        <td style="color:var(--green)">${_spFmtMxn(pago.abonado)}</td>
+        <td style="color:${(pago.restante||0) > 0 ? 'var(--orange)' : 'var(--green)'}">${_spFmtMxn(pago.restante)}</td>
+        <td>${_spBadgeEstado(t.estado)}</td>
+        <td><button class="btn btn-primary btn-sm" style="font-size:11px" onclick="abrirPlanCobranza('${_spEscape(t.id)}')">Registrar pago</button></td>
+      </tr>`;
+    }).join('');
+  } catch(e) {
+    if (ingEl) ingEl.textContent = '—';
+    tbody.innerHTML = `<tr><td colspan="8"><div class="alert alert-error">${_spEscape(e.message)}</div></td></tr>`;
+  }
+}
+
+// Abre el plan de una solicitud en un modal, reusando el render de la 2.3c.
+// El render apunta a #sp-plan-<id>; marcarPagoSP/revertirPagoSP refrescan ese
+// div y, al detectar este modal abierto, también loadPagos() (ver _spRefrescarPlanYLista).
+function abrirPlanCobranza(solicitudId) {
+  const t = (_cobranzaCache || []).find(x => x.id === solicitudId);
+  const c = (t && t.clientes) || {};
+  const eventoNombre = (t && t.evento_nombre) || '';
+  const contenido = `
+    <div style="font-size:12px;color:var(--ts);margin-bottom:12px">Viajero <b style="color:var(--ink)">${_spEscape(c.nombre_completo || '—')}</b> · ${_spEscape(eventoNombre)}</div>
+    <div id="sp-plan-${_spEscape(solicitudId)}" style="font-size:13px;color:var(--ts)">Cargando plan…</div>`;
+  crearModal('cobranza-plan', 'Plan de pagos · ' + eventoNombre, contenido);
+  const m = document.getElementById('modal-cobranza-plan');
+  if (m) { const inner = m.querySelector('.modal'); if (inner) inner.style.maxWidth = '640px'; }
+  cargarPlanPagosSP(solicitudId, t ? t.estado : 'en_pagos');
 }
 
 async function guardarPago() {
@@ -9380,6 +9437,10 @@ async function revertirPagoSP(solicitudId, pagoId) {
 async function _spRefrescarPlanYLista(solicitudId, estadoSolicitud) {
   await cargarPlanPagosSP(solicitudId, estadoSolicitud);
   loadSolicitudesPortal();
+  // Si el plan se está viendo desde el modal de la pestaña Pagos (Fase 3),
+  // refresca también su tabla para que Total/Abonado/Resta queden al día.
+  const cob = document.getElementById('modal-cobranza-plan');
+  if (cob && cob.classList.contains('open')) loadPagos();
 }
 
 // ═══════════════════════════════════════════════════════════════

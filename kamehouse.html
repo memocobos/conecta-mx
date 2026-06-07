@@ -1906,6 +1906,7 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
   <symbol id="ic-inventario" viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="5" rx="1"/><rect x="4" y="10" width="16" height="5" rx="1"/><rect x="4" y="17" width="16" height="4" rx="1"/></symbol>
   <symbol id="ic-gastos" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v9M8 12l4 4 4-4"/></symbol>
   <symbol id="ic-ingresos" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 17V8M8 12l4-4 4 4"/></symbol>
+  <symbol id="ic-saldos" viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18"/><path d="M16 3l3 3"/></symbol>
   <symbol id="ic-ventas" viewBox="0 0 24 24"><path d="M3 3h7l11 11-7 7L3 10z"/><circle cx="7.5" cy="7.5" r="1.5"/></symbol>
   <symbol id="ic-reportes" viewBox="0 0 24 24"><path d="M4 20V11M10 20V4M16 20v-6M2 20h20"/></symbol>
   <symbol id="ic-equipo" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><path d="M3 20c0-3.3 2.7-5 6-5s6 1.7 6 5"/><path d="M16 6a3 3 0 0 1 0 6"/></symbol>
@@ -1936,6 +1937,7 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
    <button class="nav-btn" onclick="showPage('inventario')" id="nav-inventario"><svg class="nav-ic"><use href="#ic-inventario"/></svg><span>Torre de Karin</span></button>
    <button class="nav-btn" onclick="showPage('gastos')" id="nav-gastos"><svg class="nav-ic"><use href="#ic-gastos"/></svg><span>Gastos</span></button>
    <button class="nav-btn" onclick="showPage('ingresos')" id="nav-ingresos"><svg class="nav-ic"><use href="#ic-ingresos"/></svg><span>Ingresos</span></button>
+   <button class="nav-btn" onclick="showPage('saldos')" id="nav-saldos"><svg class="nav-ic"><use href="#ic-saldos"/></svg><span>Saldos</span></button>
    <button class="nav-btn" onclick="showPage('ventas')" id="nav-ventas"><svg class="nav-ic"><use href="#ic-ventas"/></svg><span>Mis Ventas</span></button>
    <button class="nav-btn" onclick="showPage('reportes')" id="nav-reportes"><svg class="nav-ic"><use href="#ic-reportes"/></svg><span>Reportes</span></button>
   </div>
@@ -2309,6 +2311,21 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
  </tbody>
  </table>
  </div>
+ </div>
+
+ <!-- ─── SALDOS ─── -->
+ <div class="page" id="page-saldos">
+ <div class="page-hero">
+   <div>
+    <div class="page-title">SALDOS</div>
+    <div class="page-sub">// saldo que debería haber por cuenta</div>
+   </div>
+   <button class="btn btn-ghost" onclick="loadSaldos()">↻ Actualizar</button>
+  </div>
+ <div id="saldos-content">
+ <div class="loading-state"><div class="spinner"></div>Cargando…</div>
+ </div>
+ <div id="saldo-detalle-panel" class="card" style="display:none;margin-top:16px"></div>
  </div>
 
  <!-- ─── MIS VENTAS ─── -->
@@ -4209,8 +4226,8 @@ let disenoLoaded = false;
 let _cotIniciado = false;
 
 const PERMISOS_TABS = {
-  maestro_roshi: ['resumen','pagos','eventos','gastos','ingresos','ventas','inventario','reportes','capsule','solicitudes_portal','equipo','cotizador','herramientas','radar','montana'],
-  bulma:         ['resumen','pagos','eventos','gastos','ingresos','ventas','inventario','reportes','capsule','solicitudes_portal','equipo','cotizador','herramientas'],
+  maestro_roshi: ['resumen','pagos','eventos','gastos','ingresos','saldos','ventas','inventario','reportes','capsule','solicitudes_portal','equipo','cotizador','herramientas','radar','montana'],
+  bulma:         ['resumen','pagos','eventos','gastos','ingresos','saldos','ventas','inventario','reportes','capsule','solicitudes_portal','equipo','cotizador','herramientas'],
   mister_popo:   ['inventario','reportes','equipo'],
   coordinador:   ['inventario','reportes','equipo'],
   cc:            ['equipo'],
@@ -4435,7 +4452,7 @@ function aplicarPermisosUI() {
   const extras = currentUser.permisos_extra?.tabs_extra || [];
   const bloqueados = currentUser.permisos_extra?.tabs_bloqueados || [];
   const tabsPermitidos = [...new Set([...base, ...extras])].filter(t => !bloqueados.includes(t));
-  const allTabs = ['resumen','pagos','eventos','gastos','ingresos','ventas','inventario','reportes','equipo','capsule','solicitudes_portal','cotizador','radar','montana'];
+  const allTabs = ['resumen','pagos','eventos','gastos','ingresos','saldos','ventas','inventario','reportes','equipo','capsule','solicitudes_portal','cotizador','radar','montana'];
   allTabs.forEach(tab => {
     const btn = document.getElementById('nav-' + tab);
     if (btn) btn.style.display = tabsPermitidos.includes(tab) ? '' : 'none';
@@ -4561,6 +4578,7 @@ function loadPage(name) {
  if (name === 'eventos') _evtPoblarSelector();
  if (name === 'gastos') loadGastos();
  if (name === 'ingresos') loadIngresos();
+ if (name === 'saldos') loadSaldos();
  if (name === 'ventas') loadVentas();
  if (name === 'inventario') loadInventario();
  if (name === 'reportes') loadReportes();
@@ -5754,6 +5772,108 @@ async function eliminarIngreso(id) {
  if (!r.ok) throw new Error(d.error || 'No se pudo eliminar el ingreso');
  loadIngresos();
  } catch(e) { alert(e.message); }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// SALDOS (S3 — visor de saldos por cuenta; solo LECTURA vía admin-saldos)
+// ═══════════════════════════════════════════════════════════════
+let _saldosData = null;
+let _saldoDetalleActivo = null;   // nombre de la cuenta con detalle abierto, o null
+
+async function loadSaldos() {
+ const el = document.getElementById('saldos-content');
+ if (!el) return;
+ _saldoDetalleActivo = null;
+ const panel = document.getElementById('saldo-detalle-panel');
+ if (panel) { panel.style.display = 'none'; panel.innerHTML = ''; }
+ el.innerHTML = '<div class="loading-state"><div class="spinner"></div>Cargando…</div>';
+ try {
+ const r = await fetch('/.netlify/functions/admin-saldos', {
+ method: 'POST',
+ headers: _spAdminHeaders(),
+ body: JSON.stringify({}),
+ });
+ const d = await r.json();
+ if (!r.ok) throw new Error(d.error || 'No se pudieron cargar los saldos');
+ _saldosData = d;
+ _renderSaldos(d);
+ } catch(e) {
+ el.innerHTML = `<div class="alert alert-error">${_spEscape(e.message)}</div>`;
+ }
+}
+
+function _renderSaldos(d) {
+ const el = document.getElementById('saldos-content');
+ if (!el) return;
+ const cuentas = d.cuentas || {};
+ const orden = ['BBVA', 'Banamex', 'Efectivo'];
+ const cards = orden.map(nombre => {
+   const c = cuentas[nombre] || { entradas: 0, salidas: 0, saldo: 0 };
+   const saldoColor = (Number(c.saldo) >= 0) ? 'var(--green)' : 'var(--red)';
+   return `<div class="card saldo-card" style="cursor:pointer" onclick="_toggleSaldoDetalle('${nombre}')">
+     <div style="display:flex;justify-content:space-between;align-items:center">
+       <div style="font-weight:700;letter-spacing:.04em">${nombre}</div>
+       <span style="font-size:11px;color:var(--ts)">ver detalle ▾</span>
+     </div>
+     <div style="font-size:28px;font-weight:800;color:${saldoColor};margin:10px 0 6px">${_spFmtMxn(c.saldo)}</div>
+     <div style="font-size:12px;color:var(--ts)">Entradas ${_spFmtMxn(c.entradas)} · Salidas ${_spFmtMxn(c.salidas)}</div>
+   </div>`;
+ }).join('');
+ const grid = `<div class="metrics-grid">${cards}</div>`;
+
+ let pie = '';
+ if (Number(d.otros_total || 0) !== 0) {
+   pie = `<div style="font-size:12px;color:var(--ts);margin-top:12px">${_spFmtMxn(d.otros_total)} en Otro/sin cuenta (no mostrado en las tarjetas).</div>`;
+ }
+ const stamp = d.generado_at ? `<div style="font-size:11px;color:var(--ts);margin-top:6px">Actualizado: ${_spFmtFechaAbs(d.generado_at)}</div>` : '';
+ el.innerHTML = grid + pie + stamp;
+}
+
+// Abre/cierra el panel de detalle (compartido, debajo de las tarjetas) para una cuenta.
+function _toggleSaldoDetalle(nombre) {
+ const panel = document.getElementById('saldo-detalle-panel');
+ if (!panel || !_saldosData) return;
+ if (_saldoDetalleActivo === nombre) {   // clic en la misma → cerrar
+   panel.style.display = 'none';
+   panel.innerHTML = '';
+   _saldoDetalleActivo = null;
+   return;
+ }
+ const c = (_saldosData.cuentas || {})[nombre];
+ if (!c) return;
+ _saldoDetalleActivo = nombre;
+ panel.innerHTML = `<div style="font-weight:700;margin-bottom:12px">Detalle · ${nombre}</div>` + _renderSaldoDetalle(c);
+ panel.style.display = '';
+}
+
+function _renderSaldoDetalle(c) {
+ const linea = (izq, monto, color) =>
+   `<div style="display:flex;justify-content:space-between;gap:12px;font-size:12px;padding:3px 0">
+      <span>${izq}</span><span style="color:${color};white-space:nowrap">${monto}</span>
+    </div>`;
+ const seccion = (titulo, subtotal, color, filas) =>
+   `<div style="margin-bottom:14px">
+      <div style="display:flex;justify-content:space-between;font-weight:600;font-size:13px;margin-bottom:4px">
+        <span>${titulo}</span><span style="color:${color}">${subtotal}</span>
+      </div>${filas}
+    </div>`;
+
+ const pagosFilas = (c.pagos || []).length
+   ? c.pagos.map(p => linea(`${fmtFecha(p.fecha)} · ${_spEscape(p.cliente || '—')}${p.evento ? (' · ' + _spEscape(p.evento)) : ''}`, _spFmtMxn(p.monto), 'var(--green)')).join('')
+   : '<div style="font-size:12px;color:var(--ts)">Sin pagos cobrados</div>';
+ const ingFilas = (c.ingresos || []).length
+   ? c.ingresos.map(i => linea(`${fmtFecha(i.fecha)} · ${_spEscape(i.concepto || '—')}`, _spFmtMxn(i.monto), 'var(--green)')).join('')
+   : '<div style="font-size:12px;color:var(--ts)">Sin ingresos sueltos</div>';
+ const gasFilas = (c.gastos || []).length
+   ? c.gastos.map(g => linea(`${fmtFecha(g.fecha)} · ${_spEscape(g.concepto || '—')}`, '−' + _spFmtMxn(g.monto), 'var(--red)')).join('')
+   : '<div style="font-size:12px;color:var(--ts)">Sin gastos</div>';
+
+ return seccion('+ Pagos cobrados', _spFmtMxn(c.entradas_pagos), 'var(--green)', pagosFilas)
+   + seccion('+ Ingresos sueltos', _spFmtMxn(c.entradas_ingresos), 'var(--green)', ingFilas)
+   + seccion('− Gastos', '−' + _spFmtMxn(c.salidas_gastos), 'var(--red)', gasFilas)
+   + `<div style="display:flex;justify-content:space-between;font-weight:800;font-size:15px;border-top:1px solid var(--border);padding-top:10px;margin-top:4px">
+        <span>= Saldo</span><span style="color:${Number(c.saldo) >= 0 ? 'var(--green)' : 'var(--red)'}">${_spFmtMxn(c.saldo)}</span>
+      </div>`;
 }
 
 // ═══════════════════════════════════════════════════════════════

@@ -506,6 +506,23 @@ td{
 tr:last-child td{border-bottom:none}
 tr:hover td{background:rgba(255,107,0,.03)}
 
+/* Pagos — centro de cobranza */
+.cob-stats{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px}
+.cob-stat{flex:1 1 140px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:12px 16px}
+.cob-stat-lbl{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--ts);font-family:'JetBrains Mono',monospace;margin-bottom:4px}
+.cob-stat-val{font-family:'Zen Dots',sans-serif;font-size:20px;color:var(--text)}
+.cob-stat-val.green{color:var(--green)}
+.cob-stat-val.orange{color:var(--orange)}
+.cob-stat-val.red{color:var(--red)}
+.cob-wrap{max-height:calc(100vh - 300px);overflow:auto}
+.cob-table thead th{position:sticky;top:0;z-index:5;background:var(--bg3)}
+.cob-sort{cursor:pointer;user-select:none}
+.cob-sort:hover{color:var(--orange)}
+.cob-arrow{font-size:9px;color:var(--orange)}
+#page-pagos tr.cob-atrasado td{background:rgba(255,68,68,.07)}
+#page-pagos tr.cob-pagado td{background:rgba(61,220,132,.06)}
+.cob-badge-atraso{display:inline-block;margin-left:6px;padding:2px 7px;border-radius:10px;background:rgba(255,68,68,.18);color:var(--red);font-size:9px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;vertical-align:middle}
+
 /* Badges */
 .badge{
  display:inline-block;font-family:'Barlow Condensed',sans-serif;
@@ -2003,24 +2020,28 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
     <div class="page-title">PAGOS</div>
     <div class="page-sub">// centro de cobranza · tours activos del portal</div>
    </div>
-   <div style="text-align:right">
-    <div style="font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--ts);font-family:'JetBrains Mono',monospace">Ingresado (lista)</div>
-    <div id="pagos-ingresado" style="font-family:'Zen Dots',sans-serif;font-size:22px;color:var(--green)">—</div>
-   </div>
   </div>
+
+ <!-- Contadores de la lista filtrada -->
+ <div class="cob-stats">
+   <div class="cob-stat"><div class="cob-stat-lbl">Viajeros</div><div class="cob-stat-val" id="pagos-cnt-viajeros">—</div></div>
+   <div class="cob-stat"><div class="cob-stat-lbl">Atrasados</div><div class="cob-stat-val red" id="pagos-cnt-atrasados">—</div></div>
+   <div class="cob-stat"><div class="cob-stat-lbl">Ingresado</div><div class="cob-stat-val green" id="pagos-ingresado">—</div></div>
+   <div class="cob-stat"><div class="cob-stat-lbl">Por cobrar</div><div class="cob-stat-val orange" id="pagos-porcobrar">—</div></div>
+ </div>
 
  <!-- Filtros -->
  <div class="card" style="margin-bottom:16px">
  <div class="form-row cols-3">
  <div class="form-group">
  <label>Evento</label>
- <select id="filtro-evento-pagos" onchange="loadPagos()">
+ <select id="filtro-evento-pagos" onchange="_renderCobranza()">
  <option value="">Todos los eventos</option>
  </select>
  </div>
  <div class="form-group">
- <label>Status</label>
- <select id="filtro-status-pagos" onchange="loadPagos()">
+ <label>Estado</label>
+ <select id="filtro-status-pagos" onchange="_renderCobranza()">
  <option value="">Todos</option>
  <option value="en_pagos">En pagos</option>
  <option value="pagado">Pagado</option>
@@ -2028,28 +2049,37 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
  </select>
  </div>
  <div class="form-group">
- <label>Buscar viajero</label>
- <input type="text" id="filtro-nombre-pagos" placeholder="Nombre..." oninput="loadPagos()">
+ <label>Buscar (nombre, evento, zona, teléfono)</label>
+ <input type="text" id="filtro-nombre-pagos" placeholder="Escribe para filtrar…" oninput="_renderCobranza()">
  </div>
+ </div>
+ <div style="display:flex;align-items:center;gap:16px;margin-top:12px;flex-wrap:wrap">
+   <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;color:var(--text)">
+     <input type="checkbox" id="filtro-atrasados-pagos" onchange="_renderCobranza()" style="width:16px;height:16px;cursor:pointer">
+     Solo atrasados
+   </label>
+   <button class="btn btn-ghost btn-sm" style="font-size:11px;margin-left:auto" onclick="_cobExportCSV()">Exportar CSV</button>
  </div>
  </div>
 
- <div class="table-wrap">
- <table>
+ <div class="table-wrap cob-wrap">
+ <table class="cob-table">
  <thead>
  <tr>
- <th>Viajero</th>
- <th>Evento</th>
+ <th class="cob-sort" onclick="_cobSort('nombre')">Viajero <span class="cob-arrow" data-k="nombre"></span></th>
+ <th>Teléfono</th>
+ <th class="cob-sort" onclick="_cobSort('evento')">Evento <span class="cob-arrow" data-k="evento"></span></th>
+ <th>Zona</th>
  <th>Paquete</th>
- <th>Total</th>
+ <th class="cob-sort" onclick="_cobSort('proximo')">Próximo pago <span class="cob-arrow" data-k="proximo"></span></th>
  <th>Abonado</th>
- <th>Resta</th>
- <th>Status</th>
+ <th class="cob-sort" onclick="_cobSort('resta')">Resta <span class="cob-arrow" data-k="resta"></span></th>
+ <th>Estado</th>
  <th>Acciones</th>
  </tr>
  </thead>
  <tbody id="tabla-pagos">
- <tr><td colspan="8"><div class="loading-state"><div class="spinner"></div>Cargando…</div></td></tr>
+ <tr><td colspan="10"><div class="loading-state"><div class="spinner"></div>Cargando…</div></td></tr>
  </tbody>
  </table>
  </div>
@@ -4482,84 +4512,279 @@ function renderUltimas(reservaciones) {
 // loadPagos lista los tours activos (solicitudes_tour en_pagos/pagado) vía
 // admin-cobranza-list, con su avance de cobranza. "Registrar pago" reusa el
 // flujo de la 2.3c (cargarPlanPagosSP/marcarPagoSP/revertirPagoSP) en un modal.
-let _cobranzaCache = [];
+let _cobranzaCache = [];          // todos los tours cargados (activos + cancelados)
+let _cobFiltrados = [];           // última lista filtrada (para CSV)
 let _cobranzaEventoSelectPoblado = false;
+let _cobEVMap = {};               // evento_id (base o base#idx) -> { nombre, fecha }
+let _cobSortKey = 'proximo';      // nombre | evento | resta | proximo
+let _cobSortDir = 'asc';
 
-// Puebla el filtro de Evento desde EV (index.html), una sola vez (no resetea la
-// selección en cada filtro). Conserva la primera opción ("Todos los eventos").
+const _COB_PAQ_BG = { 'PLUS':'rgba(255,183,3,.15)','STAY':'rgba(94,167,255,.15)','RIDE':'rgba(61,220,132,.15)','CHEAP':'rgba(255,107,0,.12)' };
+const _COB_PAQ_FG = { 'PLUS':'var(--gold)','STAY':'var(--blue)','RIDE':'var(--green)','CHEAP':'var(--orange)' };
+
+// Puebla el filtro de Evento desde EV (index.html) y arma _cobEVMap para resolver
+// nombre/fecha por evento_id. Multifecha: una opción por fecha (valor base#idx,
+// ej. "Karol G · 6 Noviembre"); evento normal usa el id base. Corre una sola vez.
 async function _poblarFiltroEventoPagos() {
   if (_cobranzaEventoSelectPoblado) return;
   const sel = document.getElementById('filtro-evento-pagos');
-  if (!sel) return;
   const ev = await _fetchEVFromIndex();
   const eventos = (ev || []).filter(e => e && e.id && e.a)
     .slice().sort((a, b) => String(b.ds || '').localeCompare(String(a.ds || '')));
-  while (sel.options.length > 1) sel.remove(1);
+  const opciones = [];
   eventos.forEach(e => {
-    const opt = document.createElement('option');
-    opt.value = e.id;
-    opt.textContent = e.a;
-    sel.appendChild(opt);
+    if (Array.isArray(e.multifecha) && e.multifecha.length) {
+      e.multifecha.forEach((mf, i) => {
+        const lbl = (mf && mf.lbl) ? mf.lbl : ('Fecha ' + (i + 1));
+        const id = e.id + '#' + i;
+        _cobEVMap[id] = { nombre: e.a, fecha: lbl };
+        opciones.push({ value: id, label: e.a + ' · ' + lbl });
+      });
+    } else {
+      _cobEVMap[e.id] = { nombre: e.a, fecha: '' };
+      opciones.push({ value: e.id, label: e.a });
+    }
   });
+  if (sel) {
+    while (sel.options.length > 1) sel.remove(1);
+    opciones.forEach(o => {
+      const opt = document.createElement('option');
+      opt.value = o.value;
+      opt.textContent = o.label;
+      sel.appendChild(opt);
+    });
+  }
   _cobranzaEventoSelectPoblado = true;
 }
 
+// Carga UNA vez la lista completa (activos por defecto + cancelados) en
+// _cobranzaCache y delega todo el filtrado/orden a _renderCobranza (client-side,
+// instantáneo). El refresh tras marcar un pago vuelve a llamar a loadPagos.
 async function loadPagos() {
   const tbody = document.getElementById('tabla-pagos');
   if (!tbody) return;
   await _poblarFiltroEventoPagos();
-
-  const evId   = document.getElementById('filtro-evento-pagos').value;
-  const estado = document.getElementById('filtro-status-pagos').value;
-  const nombre = document.getElementById('filtro-nombre-pagos').value.trim();
-  const ingEl  = document.getElementById('pagos-ingresado');
-
-  tbody.innerHTML = '<tr><td colspan="8"><div class="loading-state"><div class="spinner"></div>Cargando…</div></td></tr>';
+  tbody.innerHTML = '<tr><td colspan="10"><div class="loading-state"><div class="spinner"></div>Cargando…</div></td></tr>';
 
   try {
-    const r = await fetch('/.netlify/functions/admin-cobranza-list', {
+    const hdrs = _spAdminHeaders();
+    const pedir = (estado) => fetch('/.netlify/functions/admin-cobranza-list', {
       method: 'POST',
-      headers: _spAdminHeaders(),
-      body: JSON.stringify({ evento_id: evId || undefined, estado: estado || undefined, nombre: nombre || undefined }),
-    });
-    const data = await r.json();
-    if (!r.ok) throw new Error(data.error || 'No se pudo cargar la cobranza');
-    _cobranzaCache = Array.isArray(data.tours) ? data.tours : [];
-
-    const ingresado = _cobranzaCache.reduce((a, t) => a + Number((t.pago || {}).abonado || 0), 0);
-    if (ingEl) ingEl.textContent = _spFmtMxn(ingresado);
-
-    if (!_cobranzaCache.length) {
-      tbody.innerHTML = '<tr><td colspan="8"><div class="empty-state"><div class="empty-icon">·</div>Sin tours que coincidan con los filtros</div></td></tr>';
-      return;
-    }
-
-    const paqCol = { 'PLUS':'rgba(255,183,3,.15)','STAY':'rgba(94,167,255,.15)','RIDE':'rgba(61,220,132,.15)','CHEAP':'rgba(255,107,0,.12)' };
-    const paqFg  = { 'PLUS':'var(--gold)','STAY':'var(--blue)','RIDE':'var(--green)','CHEAP':'var(--orange)' };
-
-    tbody.innerHTML = _cobranzaCache.map(t => {
-      const c = t.clientes || {};
-      const pago = t.pago || {};
-      const paq = t.paquete || '';
-      const prox = pago.proximo;
-      return `<tr>
-        <td>
-          <div style="font-weight:600">${_spEscape(c.nombre_completo || '—')}</div>
-          <div style="font-size:11px;color:var(--ts)">${_spEscape(c.celular || '')}</div>
-        </td>
-        <td style="font-size:12px">${_spEscape(t.evento_nombre || '—')}${prox ? `<br><span style="color:var(--ts);font-size:11px">próx: ${_spEscape(prox.fecha_esperada)} · ${_spFmtMxn(prox.monto)}</span>` : ''}</td>
-        <td>${paq ? `<span style="font-size:10px;font-weight:700;padding:2px 10px;border-radius:4px;background:${paqCol[paq]||'rgba(255,255,255,.06)'};color:${paqFg[paq]||'var(--ts)'}">${paq}</span>` : '—'}</td>
-        <td style="font-weight:600">${_spFmtMxn(pago.total)}</td>
-        <td style="color:var(--green)">${_spFmtMxn(pago.abonado)}</td>
-        <td style="color:${(pago.restante||0) > 0 ? 'var(--orange)' : 'var(--green)'}">${_spFmtMxn(pago.restante)}</td>
-        <td>${_spBadgeEstado(t.estado)}</td>
-        <td><button class="btn btn-primary btn-sm" style="font-size:11px" onclick="abrirPlanCobranza('${_spEscape(t.id)}')">Registrar pago</button></td>
-      </tr>`;
-    }).join('');
-  } catch(e) {
-    if (ingEl) ingEl.textContent = '—';
-    tbody.innerHTML = `<tr><td colspan="8"><div class="alert alert-error">${_spEscape(e.message)}</div></td></tr>`;
+      headers: hdrs,
+      body: JSON.stringify(estado ? { estado } : {}),
+    }).then(r => r.json().then(d => ({ ok: r.ok, d })));
+    const [act, can] = await Promise.all([pedir(null), pedir('cancelado')]);
+    if (!act.ok) throw new Error((act.d && act.d.error) || 'No se pudo cargar la cobranza');
+    const activos    = Array.isArray(act.d.tours) ? act.d.tours : [];
+    const cancelados = (can.ok && Array.isArray(can.d.tours)) ? can.d.tours : [];
+    _cobranzaCache = activos.concat(cancelados);
+    _renderCobranza();
+  } catch (e) {
+    _cobranzaCache = [];
+    _cobFiltrados = [];
+    ['pagos-cnt-viajeros','pagos-cnt-atrasados','pagos-ingresado','pagos-porcobrar']
+      .forEach(id => { const el = document.getElementById(id); if (el) el.textContent = '—'; });
+    tbody.innerHTML = `<tr><td colspan="10"><div class="alert alert-error">${_spEscape(e.message)}</div></td></tr>`;
   }
+}
+
+function _cobHoyISO() { return new Date().toISOString().slice(0, 10); }
+
+// Atrasado: tiene un próximo pago pendiente con fecha_esperada anterior a hoy.
+// Cancelado/liquidado nunca cuenta como atrasado.
+function _cobEsAtrasado(t) {
+  if (!t || t.estado === 'cancelado') return false;
+  const p = (t.pago || {}).proximo;
+  return !!(p && p.fecha_esperada && String(p.fecha_esperada) < _cobHoyISO());
+}
+
+// Nombre del evento + fecha (solo si es multifecha y la fecha no está ya en el nombre).
+function _cobEventoLabel(t) {
+  const nombre = t.evento_nombre || t.evento_id || '—';
+  const map = _cobEVMap[t.evento_id];
+  if (map && map.fecha && !String(nombre).toLowerCase().includes(String(map.fecha).toLowerCase())) {
+    return { nombre, fecha: map.fecha };
+  }
+  return { nombre, fecha: '' };
+}
+
+function _cobDigits(s) { return String(s || '').replace(/\D/g, ''); }
+
+// Enlace WhatsApp al cliente con recordatorio prellenado. Devuelve null si el
+// celular no resuelve a 10 dígitos (entonces se muestra sin enlace).
+function _cobWaHref(t) {
+  const c = t.clientes || {};
+  let d = _cobDigits(c.celular);
+  if (d.length === 13 && d.startsWith('521')) d = d.slice(3);
+  else if (d.length === 12 && d.startsWith('52')) d = d.slice(2);
+  if (d.length !== 10) return null;
+  const primer = (String(c.nombre_completo || '').trim().split(/\s+/)[0]) || 'viajero';
+  const prox = (t.pago || {}).proximo;
+  const evN = t.evento_nombre || 'tu tour';
+  let msg;
+  if (prox) {
+    msg = 'Hola ' + primer + ', te recordamos tu pago de Conecta Reynosa para ' + evN +
+          '. Tu próximo pago es de ' + _spFmtMxn(prox.monto) + ' antes del ' + prox.fecha_esperada +
+          '. Cuando lo realices, mándanos tu comprobante. ¡Gracias!';
+  } else {
+    msg = 'Hola ' + primer + ', te saludamos de Conecta Reynosa. ¡Gracias por viajar con nosotros!';
+  }
+  return 'https://wa.me/52' + d + '?text=' + encodeURIComponent(msg);
+}
+
+// Aplica búsqueda/filtros/orden sobre _cobranzaCache (sin re-fetch) y pinta tabla,
+// contadores y flechas de orden.
+function _renderCobranza() {
+  const tbody = document.getElementById('tabla-pagos');
+  if (!tbody) return;
+  const evId   = (document.getElementById('filtro-evento-pagos') || {}).value || '';
+  const estado = (document.getElementById('filtro-status-pagos') || {}).value || '';
+  const q      = ((document.getElementById('filtro-nombre-pagos') || {}).value || '').trim().toLowerCase();
+  const soloAtr = !!(document.getElementById('filtro-atrasados-pagos') || {}).checked;
+
+  let lista = (_cobranzaCache || []).slice();
+
+  if (estado) lista = lista.filter(t => t.estado === estado);
+
+  if (evId) {
+    if (evId.indexOf('#') >= 0) lista = lista.filter(t => t.evento_id === evId);
+    else lista = lista.filter(t => t.evento_id === evId || (typeof t.evento_id === 'string' && t.evento_id.startsWith(evId + '#')));
+  }
+
+  if (q) {
+    lista = lista.filter(t => {
+      const c = t.clientes || {};
+      const hay = [c.nombre_completo, t.evento_nombre, t.zona, c.celular]
+        .map(x => String(x || '').toLowerCase()).join(' ');
+      return hay.indexOf(q) >= 0;
+    });
+  }
+
+  if (soloAtr) lista = lista.filter(_cobEsAtrasado);
+
+  const dir = _cobSortDir === 'desc' ? -1 : 1;
+  lista.sort((a, b) => {
+    if (_cobSortKey === 'nombre') {
+      return String((a.clientes||{}).nombre_completo||'').localeCompare(String((b.clientes||{}).nombre_completo||''), 'es', { sensitivity:'base' }) * dir;
+    }
+    if (_cobSortKey === 'evento') {
+      return String(a.evento_nombre||'').localeCompare(String(b.evento_nombre||''), 'es', { sensitivity:'base' }) * dir;
+    }
+    if (_cobSortKey === 'resta') {
+      return (Number((a.pago||{}).restante||0) - Number((b.pago||{}).restante||0)) * dir;
+    }
+    const fa = ((a.pago||{}).proximo && a.pago.proximo.fecha_esperada) || '9999-12-31';
+    const fb = ((b.pago||{}).proximo && b.pago.proximo.fecha_esperada) || '9999-12-31';
+    if (fa === fb) return 0;
+    return (fa < fb ? -1 : 1) * dir;
+  });
+
+  _cobFiltrados = lista;
+
+  // Contadores de la lista filtrada.
+  const nAtr = lista.filter(_cobEsAtrasado).length;
+  const ingresado = lista.reduce((a, t) => a + Number((t.pago||{}).abonado||0), 0);
+  const porCobrar = lista.reduce((a, t) => a + Number((t.pago||{}).restante||0), 0);
+  const setTxt = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+  setTxt('pagos-cnt-viajeros', String(lista.length));
+  setTxt('pagos-cnt-atrasados', String(nAtr));
+  setTxt('pagos-ingresado', _spFmtMxn(ingresado));
+  setTxt('pagos-porcobrar', _spFmtMxn(porCobrar));
+
+  // Flechas de orden.
+  document.querySelectorAll('.cob-arrow').forEach(s => { s.textContent = ''; });
+  const arr = document.querySelector('.cob-arrow[data-k="' + _cobSortKey + '"]');
+  if (arr) arr.textContent = _cobSortDir === 'asc' ? '▲' : '▼';
+
+  if (!lista.length) {
+    tbody.innerHTML = '<tr><td colspan="10"><div class="empty-state"><div class="empty-icon">·</div>Sin tours que coincidan con los filtros</div></td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = lista.map(t => {
+    const c = t.clientes || {};
+    const pago = t.pago || {};
+    const paq = t.paquete || '';
+    const prox = pago.proximo;
+    const atr = _cobEsAtrasado(t);
+    const evL = _cobEventoLabel(t);
+    const wa = _cobWaHref(t);
+    const telTxt = _spEscape(c.celular || '—');
+    const telCell = wa
+      ? `<a href="${wa}" target="_blank" rel="noopener" style="color:var(--green);text-decoration:none;white-space:nowrap" title="Enviar recordatorio por WhatsApp">${telTxt} ↗</a>`
+      : `<span style="color:var(--ts)">${telTxt}</span>`;
+    const proxCell = prox
+      ? `<div style="white-space:nowrap"><b>${_spFmtMxn(prox.monto)}</b></div><div style="font-size:11px;color:${atr?'var(--red)':'var(--ts)'}">${_spEscape(prox.fecha_esperada)}</div>`
+      : '<span style="color:var(--ts)">—</span>';
+    const rowCls = atr ? 'cob-atrasado' : (t.estado === 'pagado' ? 'cob-pagado' : '');
+    return `<tr class="${rowCls}">
+      <td><div style="font-weight:600">${_spEscape(c.nombre_completo || '—')}</div></td>
+      <td style="font-size:12px">${telCell}</td>
+      <td style="font-size:12px">${_spEscape(evL.nombre)}${evL.fecha?`<br><span style="color:var(--ts);font-size:11px">${_spEscape(evL.fecha)}</span>`:''}</td>
+      <td style="font-size:12px">${_spEscape(t.zona || '—')}</td>
+      <td>${paq ? `<span style="font-size:10px;font-weight:700;padding:2px 10px;border-radius:4px;background:${_COB_PAQ_BG[paq]||'rgba(255,255,255,.06)'};color:${_COB_PAQ_FG[paq]||'var(--ts)'}">${_spEscape(paq)}</span>` : '—'}</td>
+      <td>${proxCell}</td>
+      <td style="color:var(--green)">${_spFmtMxn(pago.abonado)}</td>
+      <td style="color:${(pago.restante||0) > 0 ? 'var(--orange)' : 'var(--green)'}">${_spFmtMxn(pago.restante)}</td>
+      <td style="white-space:nowrap">${_spBadgeEstado(t.estado)}${atr?'<span class="cob-badge-atraso">Atrasado</span>':''}</td>
+      <td><button class="btn btn-primary btn-sm" style="font-size:11px" onclick="abrirPlanCobranza('${_spEscape(t.id)}')">Registrar pago</button></td>
+    </tr>`;
+  }).join('');
+}
+
+// Cambia la columna/dirección de orden y re-pinta. Texto asc por defecto;
+// montos/saldo arrancan desc (lo más grande primero); próximo pago asc (lo más cercano).
+function _cobSort(key) {
+  if (_cobSortKey === key) {
+    _cobSortDir = (_cobSortDir === 'asc') ? 'desc' : 'asc';
+  } else {
+    _cobSortKey = key;
+    _cobSortDir = (key === 'resta') ? 'desc' : 'asc';
+  }
+  _renderCobranza();
+}
+
+function _cobCsvCell(v) {
+  const s = String(v == null ? '' : v);
+  return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+}
+
+// Exporta la lista FILTRADA actual a CSV (mismas columnas que la tabla).
+function _cobExportCSV() {
+  const rows = _cobFiltrados || [];
+  if (!rows.length) { showToast('No hay filas que exportar', 'error'); return; }
+  const head = ['Viajero','Telefono','Evento','Fecha','Zona','Paquete','Proximo_monto','Proximo_fecha','Abonado','Resta','Estado','Atrasado'];
+  const lines = [head.join(',')];
+  rows.forEach(t => {
+    const c = t.clientes || {};
+    const pago = t.pago || {};
+    const prox = pago.proximo;
+    const evL = _cobEventoLabel(t);
+    lines.push([
+      _cobCsvCell(c.nombre_completo || ''),
+      _cobCsvCell(c.celular || ''),
+      _cobCsvCell(evL.nombre),
+      _cobCsvCell(evL.fecha),
+      _cobCsvCell(t.zona || ''),
+      _cobCsvCell(t.paquete || ''),
+      _cobCsvCell(prox ? prox.monto : ''),
+      _cobCsvCell(prox ? prox.fecha_esperada : ''),
+      _cobCsvCell(pago.abonado || 0),
+      _cobCsvCell(pago.restante || 0),
+      _cobCsvCell(t.estado || ''),
+      _cobCsvCell(_cobEsAtrasado(t) ? 'Si' : 'No'),
+    ].join(','));
+  });
+  const csv = '﻿' + lines.join('\r\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'cobranza.csv';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 }
 
 // Abre el plan de una solicitud en un modal, reusando el render de la 2.3c.

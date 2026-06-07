@@ -8789,7 +8789,100 @@ async function loadViajeros() {
 // Alta de walk-in (Fase 2a): captura un cliente de WhatsApp (sin cuenta de
 // portal) y lo da de alta en el MODELO DEL PORTAL (cliente + solicitud en_pagos
 // + plan de pagos). No es edición — el id se ignora; sirve solo para "nuevo".
+// ═══════════════════════════════════════════════════════════════
+// VALIDACIÓN DE CORREO (walk-in) — mismo criterio que el backend
+// (admin-crear-viajero / admin-invitar-walkin). Tapa el hueco de correos mal
+// escritos (ej. "gmail.con") que Resend acepta pero rebotan en silencio.
+// ═══════════════════════════════════════════════════════════════
+let _vjCorreoConfirmado = false;   // el humano eligió "usarlo de todos modos"
+let _vjSugActual = '';             // sugerencia mostrada actualmente
+
+// Formato básico: algo@algo.tld con TLD de 2+ letras, sin espacios.
+function correoFormatoValido(correo) {
+  return /^[^\s@]+@[^\s@]+\.[A-Za-z]{2,}$/.test(String(correo == null ? '' : correo).trim());
+}
+
+// TLD mal escrito → se asume .com.
+const _VJ_TLD_MALOS = { con:1, cm:1, comm:1, ocm:1, cmo:1, vom:1, xom:1, col:1, om:1 };
+// Dominios populares mal escritos → su forma correcta.
+const _VJ_DOMINIOS_MALOS = {
+  'gmial.com':'gmail.com', 'gmai.com':'gmail.com', 'gmail.co':'gmail.com', 'gmaill.com':'gmail.com', 'gnail.com':'gmail.com',
+  'hotmial.com':'hotmail.com', 'hotmal.com':'hotmail.com', 'hotmil.com':'hotmail.com', 'hotmai.com':'hotmail.com',
+  'yaho.com':'yahoo.com', 'yahooo.com':'yahoo.com', 'yhaoo.com':'yahoo.com',
+  'outlok.com':'outlook.com', 'outloo.com':'outlook.com', 'outlock.com':'outlook.com',
+};
+
+// Devuelve una corrección sugerida (string) o null. Conserva la parte local tal
+// como se escribió; solo corrige el dominio/TLD.
+function sugerenciaCorreo(correo) {
+  const raw = String(correo == null ? '' : correo).trim();
+  const at = raw.lastIndexOf('@');
+  if (at < 1 || at === raw.length - 1) return null;
+  const local = raw.slice(0, at);
+  const dominio = raw.slice(at + 1).toLowerCase();
+  if (_VJ_DOMINIOS_MALOS[dominio]) return local + '@' + _VJ_DOMINIOS_MALOS[dominio];
+  const dot = dominio.lastIndexOf('.');
+  if (dot > 0 && _VJ_TLD_MALOS[dominio.slice(dot + 1)]) {
+    return local + '@' + dominio.slice(0, dot) + '.com';
+  }
+  return null;
+}
+
+function _vjLimpiarCorreoHint() {
+  const el = document.getElementById('vj-correo-hint');
+  if (el) el.innerHTML = '';
+}
+
+// Cualquier edición invalida una confirmación previa y limpia el aviso.
+function _vjOnCorreoInput() {
+  _vjCorreoConfirmado = false;
+  _vjLimpiarCorreoHint();
+}
+
+// Feedback temprano al salir del campo (no bloquea; solo informa).
+function _vjChequeoCorreoBlur() {
+  const correo = (document.getElementById('vj-correo')?.value || '').trim();
+  if (!correo) { _vjLimpiarCorreoHint(); return; }
+  if (!correoFormatoValido(correo)) { _vjMostrarCorreoError('El correo no parece válido. Revísalo.'); return; }
+  const sug = sugerenciaCorreo(correo);
+  if (sug && !_vjCorreoConfirmado) { _vjMostrarCorreoSugerencia(sug); }
+  else { _vjLimpiarCorreoHint(); }
+}
+
+function _vjMostrarCorreoError(msg) {
+  const el = document.getElementById('vj-correo-hint');
+  if (el) el.innerHTML = `<div style="font-size:12px;color:var(--red);padding:6px 8px;border:1px solid rgba(255,68,68,.3);border-radius:6px;background:rgba(255,68,68,.08)">${_spEscape(msg)}</div>`;
+}
+
+// Aviso amable con la sugerencia y dos opciones: corregir / usarlo igual.
+function _vjMostrarCorreoSugerencia(sug) {
+  _vjSugActual = sug;
+  const el = document.getElementById('vj-correo-hint');
+  if (!el) return;
+  el.innerHTML = `<div style="font-size:12px;color:var(--text);padding:8px 10px;border:1px solid var(--border2);border-radius:6px;background:rgba(255,107,0,.06)">
+    ¿Quisiste decir <b style="color:var(--orange)">${_spEscape(sug)}</b>?
+    <div style="display:flex;gap:8px;margin-top:8px">
+      <button type="button" class="btn btn-primary btn-sm" style="font-size:11px" onclick="_vjAceptarSugerencia()">Sí, corregir</button>
+      <button type="button" class="btn btn-ghost btn-sm" style="font-size:11px" onclick="_vjUsarDeTodosModos()">Usarlo de todos modos</button>
+    </div>
+  </div>`;
+}
+
+function _vjAceptarSugerencia() {
+  const inp = document.getElementById('vj-correo');
+  if (inp && _vjSugActual) inp.value = _vjSugActual;
+  _vjCorreoConfirmado = false;   // el corregido ya no tendrá sugerencia
+  _vjLimpiarCorreoHint();
+}
+
+function _vjUsarDeTodosModos() {
+  _vjCorreoConfirmado = true;
+  const el = document.getElementById('vj-correo-hint');
+  if (el) el.innerHTML = `<div style="font-size:11px;color:var(--ts)">Se usará el correo tal como lo escribiste — presiona “Guardar viajero”.</div>`;
+}
+
 function abrirModalViajero(id) {
+  _vjCorreoConfirmado = false;
   const eventos = _ccEventosCache || [];
   const opcionesEvento = eventos
     .map(e => `<option value="${_spEscape(e.id)}" ${e.id===_ccEventoActual?'selected':''}>${_spEscape(e.nombre || e.id)}</option>`)
@@ -8814,8 +8907,9 @@ function abrirModalViajero(id) {
           </div>
           <div class="form-group">
             <label>Correo</label>
-            <input class="cot-input" id="vj-correo" type="email" placeholder="correo@…">
+            <input class="cot-input" id="vj-correo" type="email" placeholder="correo@…" oninput="_vjOnCorreoInput()" onblur="_vjChequeoCorreoBlur()">
             <div style="font-size:10px;color:var(--ts);margin-top:4px">Opcional — necesario para invitarlo al portal después</div>
+            <div id="vj-correo-hint" style="margin-top:6px"></div>
           </div>
           <div class="form-group" style="grid-column:1/-1">
             <label>Evento *</label>
@@ -8890,6 +8984,20 @@ async function guardarViajero() {
   if (!isFinite(precioTotal) || precioTotal < 0) return err('Precio total inválido');
   if (!isFinite(montoSeparo) || montoSeparo < 0) return err('Separo inválido');
   if (montoSeparo > precioTotal) return err('El separo no puede ser mayor que el total');
+
+  // Validación del correo (opcional). Formato malo → bloquea. Formato bueno pero
+  // con typo probable → sugiere y espera que el humano acepte o lo use igual.
+  if (correo) {
+    if (!correoFormatoValido(correo)) {
+      _vjMostrarCorreoError('El correo no parece válido. Revísalo.');
+      return err('El correo no parece válido. Revísalo.');
+    }
+    const sug = sugerenciaCorreo(correo);
+    if (sug && !_vjCorreoConfirmado) {
+      _vjMostrarCorreoSugerencia(sug);
+      return;  // espera la decisión del humano (aceptar / usar de todos modos)
+    }
+  }
 
   const ev = (_ccEventosCache || []).find(e => e.id === eventoId) || {};
   const eventoNombre = ev.nombre || eventoId;

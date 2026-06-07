@@ -69,8 +69,8 @@ exports.handler = async (event) => {
   let correo = null;
   if (cli.correo != null && String(cli.correo).trim() !== '') {
     correo = String(cli.correo).trim().toLowerCase();
-    if (correo.length > 200 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(correo)) {
-      return { statusCode: 400, headers, body: JSON.stringify({ error: 'correo inválido' }) };
+    if (correo.length > 200 || !correoFormatoValido(correo)) {
+      return { statusCode: 400, headers, body: JSON.stringify({ error: 'Correo con formato inválido' }) };
     }
   }
 
@@ -186,6 +186,13 @@ exports.handler = async (event) => {
 };
 
 // ----- helpers -----
+
+// Formato básico: algo@algo.tld con TLD de 2+ letras y sin espacios. Bloquea
+// basura como "juanperez", "juan@", "juan@gmail" o "juan@gmail.c". NOTA: ".con"
+// pasa este filtro (es formato válido); el front lo atrapa con una sugerencia.
+function correoFormatoValido(correo) {
+  return /^[^\s@]+@[^\s@]+\.[A-Za-z]{2,}$/.test(String(correo == null ? '' : correo).trim());
+}
 
 function readEnv() {
   const PORTAL_SB_URL     = process.env.PORTAL_SUPABASE_URL;

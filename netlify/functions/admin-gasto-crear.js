@@ -16,6 +16,8 @@
 
 const { verifyAdminAuth, corsCheck } = require('./_lib/verify-admin');
 
+const CUENTAS = ['BBVA', 'Banamex', 'Efectivo', 'Otro'];
+
 exports.handler = async (event) => {
   const __origin = corsCheck(event);
   const headers = {
@@ -57,6 +59,13 @@ exports.handler = async (event) => {
   }
   const categoria  = (typeof body.categoria === 'string' && body.categoria.trim()) ? body.categoria.trim().slice(0, 60) : null;
   const metodoPago = (typeof body.metodo_pago === 'string' && body.metodo_pago.trim()) ? body.metodo_pago.trim().slice(0, 60) : null;
+
+  // Cuenta de la que salió el gasto (para el futuro visor de saldos). Opcional,
+  // pero si viene debe ser uno de los 4 valores permitidos.
+  const cuenta = (typeof body.cuenta === 'string' && body.cuenta.trim()) ? body.cuenta.trim() : null;
+  if (cuenta && !CUENTAS.includes(cuenta)) {
+    return { statusCode: 400, headers, body: JSON.stringify({ error: 'cuenta inválida' }) };
+  }
   const notas      = (typeof body.notas === 'string' && body.notas.trim()) ? body.notas.trim().slice(0, 1000) : null;
 
   const registradoPor = (auth.user && (auth.user.correo || auth.user.rol)) || null;
@@ -77,6 +86,7 @@ exports.handler = async (event) => {
         concepto,
         monto,
         categoria,
+        cuenta,
         metodo_pago: metodoPago,
         fecha,
         notas,

@@ -19,6 +19,7 @@ create table if not exists public.gastos (
   concepto       text not null,
   monto          numeric(10,2) not null check (monto >= 0),
   categoria      text,                         -- Transporte, Hospedaje, Kits, etc.
+  cuenta         text,                         -- 'BBVA' | 'Banamex' | 'Efectivo' | 'Otro' (visor de saldos)
   metodo_pago    text,
   fecha          date not null,
   notas          text,

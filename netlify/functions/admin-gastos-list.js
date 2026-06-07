@@ -67,7 +67,7 @@ exports.handler = async (event) => {
 
   try {
     const sp = new URLSearchParams();
-    sp.set('select', 'id,evento_id,concepto,monto,categoria,metodo_pago,fecha,notas,registrado_por,created_at');
+    sp.set('select', 'id,evento_id,concepto,monto,categoria,cuenta,metodo_pago,fecha,notas,registrado_por,created_at');
     if (eventoId)  sp.append('evento_id', `eq.${eventoId}`);
     if (categoria) sp.append('categoria', `eq.${categoria}`);
     sp.set('order', 'fecha.desc');

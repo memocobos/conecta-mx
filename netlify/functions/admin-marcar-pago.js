@@ -30,7 +30,10 @@
 
 const { verifyAdminAuth, corsCheck } = require('./_lib/verify-admin');
 
-const METODOS_VALIDOS = ['bbva','hey','efectivo','transferencia','otro'];
+// `metodo` = CÓMO pagó (solo formas de pago; ya no incluye bancos). La BD aún
+// acepta los viejos (bbva/hey/otro) para no violar filas existentes, pero la UI
+// y esta validación solo permiten los 3 nuevos.
+const METODOS_VALIDOS = ['transferencia','deposito','efectivo'];
 // `cuenta` = a qué cuenta ENTRÓ el dinero (distinto de `metodo`). Opcional.
 const CUENTAS_VALIDAS = ['BBVA','Banamex','Efectivo','Otro'];
 const MAX_REFERENCIA = 120;
@@ -75,7 +78,7 @@ exports.handler = async (event) => {
   if (accion === 'pagar') {
     const metodo = body.metodo;
     if (!METODOS_VALIDOS.includes(metodo)) {
-      return { statusCode: 400, headers, body: JSON.stringify({ error: 'metodo inválido (bbva|hey|efectivo|transferencia|otro)' }) };
+      return { statusCode: 400, headers, body: JSON.stringify({ error: 'metodo inválido (transferencia|deposito|efectivo)' }) };
     }
     let fechaPagada = body.fecha_pagada;
     if (fechaPagada == null || fechaPagada === '') {

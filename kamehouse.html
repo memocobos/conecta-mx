@@ -1905,6 +1905,7 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
   <symbol id="ic-solicitudes" viewBox="0 0 24 24"><path d="M5 5h14l3 7v6a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1v-6z"/><path d="M2 12h6l2 3h4l2-3h6"/></symbol>
   <symbol id="ic-inventario" viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="5" rx="1"/><rect x="4" y="10" width="16" height="5" rx="1"/><rect x="4" y="17" width="16" height="4" rx="1"/></symbol>
   <symbol id="ic-gastos" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v9M8 12l4 4 4-4"/></symbol>
+  <symbol id="ic-ingresos" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 17V8M8 12l4-4 4 4"/></symbol>
   <symbol id="ic-ventas" viewBox="0 0 24 24"><path d="M3 3h7l11 11-7 7L3 10z"/><circle cx="7.5" cy="7.5" r="1.5"/></symbol>
   <symbol id="ic-reportes" viewBox="0 0 24 24"><path d="M4 20V11M10 20V4M16 20v-6M2 20h20"/></symbol>
   <symbol id="ic-equipo" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><path d="M3 20c0-3.3 2.7-5 6-5s6 1.7 6 5"/><path d="M16 6a3 3 0 0 1 0 6"/></symbol>
@@ -1934,6 +1935,7 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
    <div class="nav-group-title">Inventario &amp; Ventas</div>
    <button class="nav-btn" onclick="showPage('inventario')" id="nav-inventario"><svg class="nav-ic"><use href="#ic-inventario"/></svg><span>Torre de Karin</span></button>
    <button class="nav-btn" onclick="showPage('gastos')" id="nav-gastos"><svg class="nav-ic"><use href="#ic-gastos"/></svg><span>Gastos</span></button>
+   <button class="nav-btn" onclick="showPage('ingresos')" id="nav-ingresos"><svg class="nav-ic"><use href="#ic-ingresos"/></svg><span>Ingresos</span></button>
    <button class="nav-btn" onclick="showPage('ventas')" id="nav-ventas"><svg class="nav-ic"><use href="#ic-ventas"/></svg><span>Mis Ventas</span></button>
    <button class="nav-btn" onclick="showPage('reportes')" id="nav-reportes"><svg class="nav-ic"><use href="#ic-reportes"/></svg><span>Reportes</span></button>
   </div>
@@ -2247,6 +2249,63 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
  </thead>
  <tbody id="tabla-gastos">
  <tr><td colspan="8"><div class="loading-state"><div class="spinner"></div>Cargando…</div></td></tr>
+ </tbody>
+ </table>
+ </div>
+ </div>
+
+ <!-- ─── INGRESOS ─── -->
+ <div class="page" id="page-ingresos">
+ <div class="page-hero">
+   <div>
+    <div class="page-title">INGRESOS</div>
+    <div class="page-sub">// entradas sueltas · vuelos · autobuses · cargos</div>
+   </div>
+   <button class="btn btn-primary" onclick="nuevoIngreso()">+ Registrar Ingreso</button>
+
+  </div>
+
+ <div class="metrics-grid" style="margin-bottom:16px" id="ingresos-metrics">
+ <div class="metric">
+ <div class="metric-label">Total Ingresos</div>
+ <div class="metric-value green" id="i-total">—</div>
+ </div>
+ <div class="metric">
+ <div class="metric-label">Este Mes</div>
+ <div class="metric-value green" id="i-mes">—</div>
+ </div>
+ </div>
+
+ <div class="card" style="margin-bottom:16px">
+ <div class="form-row cols-2">
+ <div class="form-group">
+ <label>Evento</label>
+ <select id="filtro-evento-ingresos" onchange="loadIngresos()">
+ <option value="">Todos</option>
+ </select>
+ </div>
+ <div class="form-group">
+ <label>Categoría</label>
+ <select id="filtro-cat-ingresos" onchange="loadIngresos()">
+ <option value="">Todas</option>
+ <option>Vuelo</option><option>Autobús</option>
+ <option>Cargo administrativo</option><option>Boleto extra</option>
+ <option>Otro</option>
+ </select>
+ </div>
+ </div>
+ </div>
+
+ <div class="table-wrap">
+ <table>
+ <thead>
+ <tr>
+ <th>Fecha</th><th>Concepto</th><th>Categoría</th>
+ <th>Cliente</th><th>Evento</th><th>Monto</th><th>Cuenta</th><th>Método</th><th>Acciones</th>
+ </tr>
+ </thead>
+ <tbody id="tabla-ingresos">
+ <tr><td colspan="9"><div class="loading-state"><div class="spinner"></div>Cargando…</div></td></tr>
  </tbody>
  </table>
  </div>
@@ -3640,6 +3699,84 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
  </div>
 </div>
 
+<!-- Modal: Nuevo Ingreso -->
+<div class="modal-overlay" id="modal-ingreso">
+ <div class="modal">
+ <div class="modal-header">
+ <div class="modal-title" id="ingreso-modal-title">Registrar Ingreso</div>
+ <button class="modal-close" onclick="closeModal('modal-ingreso')"></button>
+ </div>
+ <div class="modal-body">
+ <div id="ingreso-alert"></div>
+ <div class="form-row cols-2">
+ <div class="form-group">
+ <label>Concepto *</label>
+ <input type="text" id="ingreso-concepto" placeholder="Ej: Vuelo CDMX">
+ </div>
+ <div class="form-group">
+ <label>Categoría *</label>
+ <select id="ingreso-categoria">
+ <option>Vuelo</option><option>Autobús</option>
+ <option>Cargo administrativo</option><option>Boleto extra</option>
+ <option>Otro</option>
+ </select>
+ </div>
+ </div>
+ <div class="form-row cols-2">
+ <div class="form-group">
+ <label>Monto *</label>
+ <input type="number" id="ingreso-monto" placeholder="0.00">
+ </div>
+ <div class="form-group">
+ <label>Fecha *</label>
+ <input type="date" id="ingreso-fecha">
+ </div>
+ </div>
+ <div class="form-row cols-2">
+ <div class="form-group">
+ <label>Cliente (si aplica)</label>
+ <select id="ingreso-cliente">
+ <option value="">— (ninguno) —</option>
+ </select>
+ </div>
+ <div class="form-group">
+ <label>Evento (si aplica)</label>
+ <select id="ingreso-evento">
+ <option value="">Sin evento</option>
+ </select>
+ </div>
+ </div>
+ <div class="form-row cols-2">
+ <div class="form-group">
+ <label>Método de Pago</label>
+ <select id="ingreso-metodo" onchange="_ingresoOnMetodoChange()">
+ <option>Transferencia</option>
+ <option>Depósito</option>
+ <option>Efectivo</option>
+ </select>
+ </div>
+ <div class="form-group" id="ingreso-banco-wrap">
+ <label>Banco</label>
+ <select id="ingreso-cuenta">
+ <option>BBVA</option>
+ <option>Banamex</option>
+ </select>
+ </div>
+ </div>
+ <div class="form-row">
+ <div class="form-group">
+ <label>Notas</label>
+ <input type="text" id="ingreso-notas" placeholder="Detalles adicionales">
+ </div>
+ </div>
+ </div>
+ <div class="modal-footer">
+ <button class="btn btn-ghost" onclick="closeModal('modal-ingreso')">Cancelar</button>
+ <button class="btn btn-primary" id="ingreso-save-btn" onclick="guardarIngreso()">Guardar Ingreso</button>
+ </div>
+ </div>
+</div>
+
 <!-- Modal: Nuevo/Editar Evento -->
 <!-- Modal: Nuevo/Editar Evento COMPLETO -->
 <div class="modal-overlay" id="modal-evento">
@@ -4072,8 +4209,8 @@ let disenoLoaded = false;
 let _cotIniciado = false;
 
 const PERMISOS_TABS = {
-  maestro_roshi: ['resumen','pagos','eventos','gastos','ventas','inventario','reportes','capsule','solicitudes_portal','equipo','cotizador','herramientas','radar','montana'],
-  bulma:         ['resumen','pagos','eventos','gastos','ventas','inventario','reportes','capsule','solicitudes_portal','equipo','cotizador','herramientas'],
+  maestro_roshi: ['resumen','pagos','eventos','gastos','ingresos','ventas','inventario','reportes','capsule','solicitudes_portal','equipo','cotizador','herramientas','radar','montana'],
+  bulma:         ['resumen','pagos','eventos','gastos','ingresos','ventas','inventario','reportes','capsule','solicitudes_portal','equipo','cotizador','herramientas'],
   mister_popo:   ['inventario','reportes','equipo'],
   coordinador:   ['inventario','reportes','equipo'],
   cc:            ['equipo'],
@@ -4298,7 +4435,7 @@ function aplicarPermisosUI() {
   const extras = currentUser.permisos_extra?.tabs_extra || [];
   const bloqueados = currentUser.permisos_extra?.tabs_bloqueados || [];
   const tabsPermitidos = [...new Set([...base, ...extras])].filter(t => !bloqueados.includes(t));
-  const allTabs = ['resumen','pagos','eventos','gastos','ventas','inventario','reportes','equipo','capsule','solicitudes_portal','cotizador','radar','montana'];
+  const allTabs = ['resumen','pagos','eventos','gastos','ingresos','ventas','inventario','reportes','equipo','capsule','solicitudes_portal','cotizador','radar','montana'];
   allTabs.forEach(tab => {
     const btn = document.getElementById('nav-' + tab);
     if (btn) btn.style.display = tabsPermitidos.includes(tab) ? '' : 'none';
@@ -4423,6 +4560,7 @@ function loadPage(name) {
  if (name === 'pagos') loadPagos();
  if (name === 'eventos') _evtPoblarSelector();
  if (name === 'gastos') loadGastos();
+ if (name === 'ingresos') loadIngresos();
  if (name === 'ventas') loadVentas();
  if (name === 'inventario') loadInventario();
  if (name === 'reportes') loadReportes();
@@ -5373,6 +5511,252 @@ async function eliminarGasto(id) {
 }
 
 // ═══════════════════════════════════════════════════════════════
+// INGRESOS (S2 — entradas sueltas; clon del módulo Gastos)
+// ═══════════════════════════════════════════════════════════════
+let _ingresosSelectsPoblado = false;
+let _ingresosEVMap = {};       // evento_id (base o base#idx) -> { nombre, fecha }
+let _ingresosClientesMap = {}; // cliente_id (uuid) -> { nombre, celular }
+let _ingresosListCache = [];   // últimos ingresos pintados (para editarIngreso)
+let _ingresoEditId = null;     // id del ingreso en edición; null = modo crear
+
+// Puebla los selects de evento (filtro + modal) desde EV y el select de cliente
+// desde admin-clientes-min; llena los mapas para resolver nombres en la tabla.
+async function _poblarSelectsIngresos() {
+  if (_ingresosSelectsPoblado) return;
+
+  // ── Eventos desde EV (igual que gastos) ──
+  const ev = await _fetchEVFromIndex();
+  const eventos = (ev || []).filter(e => e && e.id && e.a)
+    .slice().sort((a, b) => String(b.ds || '').localeCompare(String(a.ds || '')));
+  const opciones = [];
+  eventos.forEach(e => {
+    if (Array.isArray(e.multifecha) && e.multifecha.length) {
+      e.multifecha.forEach((mf, i) => {
+        const lbl = (mf && mf.lbl) ? mf.lbl : ('Fecha ' + (i + 1));
+        const id = e.id + '#' + i;
+        _ingresosEVMap[id] = { nombre: e.a, fecha: lbl };
+        opciones.push({ value: id, label: e.a + ' · ' + lbl });
+      });
+    } else {
+      _ingresosEVMap[e.id] = { nombre: e.a, fecha: '' };
+      opciones.push({ value: e.id, label: e.a });
+    }
+  });
+  ['filtro-evento-ingresos', 'ingreso-evento'].forEach(selId => {
+    const sel = document.getElementById(selId);
+    if (!sel) return;
+    while (sel.options.length > 1) sel.remove(1);   // conserva la 1ª opción (Todos / Sin evento)
+    opciones.forEach(o => {
+      const opt = document.createElement('option');
+      opt.value = o.value;
+      opt.textContent = o.label;
+      sel.appendChild(opt);
+    });
+  });
+
+  // ── Clientes desde admin-clientes-min (solo para el select del modal) ──
+  try {
+    const r = await fetch('/.netlify/functions/admin-clientes-min', {
+      method: 'POST',
+      headers: _spAdminHeaders(),
+      body: JSON.stringify({}),
+    });
+    const d = await r.json();
+    if (r.ok) {
+      const clientes = Array.isArray(d.clientes) ? d.clientes : [];
+      const selCli = document.getElementById('ingreso-cliente');
+      clientes.forEach(c => {
+        _ingresosClientesMap[c.id] = { nombre: c.nombre_completo, celular: c.celular };
+        if (selCli) {
+          const opt = document.createElement('option');
+          opt.value = c.id;
+          opt.textContent = (c.nombre_completo || 'Cliente') + (c.celular ? (' — ' + c.celular) : '');
+          selCli.appendChild(opt);
+        }
+      });
+    }
+  } catch (e) { /* el select de cliente queda solo con "— (ninguno) —" */ }
+
+  _ingresosSelectsPoblado = true;
+}
+
+// Nombre del evento para la tabla, resuelto desde EV. evento_id vacío = sin evento.
+function _ingresoEventoLabel(eventoId) {
+  if (!eventoId) return '—';
+  const map = _ingresosEVMap[eventoId];
+  if (!map) return eventoId;
+  return map.fecha ? (map.nombre + ' · ' + map.fecha) : map.nombre;
+}
+
+// Nombre del cliente para la tabla, resuelto desde la lista de clientes.
+function _ingresoClienteLabel(clienteId) {
+  if (!clienteId) return '—';
+  const c = _ingresosClientesMap[clienteId];
+  return c ? c.nombre : '—';
+}
+
+async function loadIngresos() {
+ const tbody = document.getElementById('tabla-ingresos');
+ if (!tbody) return;
+ await _poblarSelectsIngresos();
+ tbody.innerHTML = '<tr><td colspan="9"><div class="loading-state"><div class="spinner"></div>Cargando…</div></td></tr>';
+
+ const evId = document.getElementById('filtro-evento-ingresos').value;
+ const cat = document.getElementById('filtro-cat-ingresos').value;
+
+ try {
+ const r = await fetch('/.netlify/functions/admin-ingresos-list', {
+ method: 'POST',
+ headers: _spAdminHeaders(),
+ body: JSON.stringify({ evento_id: evId || undefined, categoria: cat || undefined }),
+ });
+ const d = await r.json();
+ if (!r.ok) throw new Error(d.error || 'No se pudieron cargar los ingresos');
+ const ingresos = Array.isArray(d.ingresos) ? d.ingresos : [];
+ _ingresosListCache = ingresos;   // para que editarIngreso pre-llene desde memoria
+
+ document.getElementById('i-total').textContent = _spFmtMxn(d.total || 0);
+ document.getElementById('i-mes').textContent = _spFmtMxn(d.total_mes || 0);
+
+ if (!ingresos.length) {
+ tbody.innerHTML = '<tr><td colspan="9"><div class="empty-state"><div class="empty-icon"></div>Sin ingresos registrados</div></td></tr>';
+ return;
+ }
+
+ tbody.innerHTML = ingresos.map(g => `<tr>
+ <td style="font-size:12px">${fmtFecha(g.fecha)}</td>
+ <td style="font-weight:600">${_spEscape(g.concepto)}</td>
+ <td><span class="badge badge-gray">${_spEscape(g.categoria||'—')}</span></td>
+ <td style="font-size:12px;color:var(--ts)">${_spEscape(_ingresoClienteLabel(g.cliente_id))}</td>
+ <td style="font-size:12px;color:var(--ts)">${_spEscape(_ingresoEventoLabel(g.evento_id))}</td>
+ <td style="color:var(--green);font-weight:600">${_spFmtMxn(g.monto)}</td>
+ <td>${g.cuenta ? `<span class="badge badge-gray">${_spEscape(g.cuenta)}</span>` : '<span style="font-size:12px;color:var(--ts)">—</span>'}</td>
+ <td style="font-size:12px">${_spEscape(g.metodo_pago||'—')}</td>
+ <td style="white-space:nowrap">
+ <button class="btn btn-ghost btn-sm" onclick="editarIngreso('${g.id}')">✏️ Editar</button>
+ <button class="btn btn-red btn-sm" onclick="eliminarIngreso('${g.id}')"></button>
+ </td>
+ </tr>`).join('');
+ } catch(e) {
+ tbody.innerHTML = `<tr><td colspan="9"><div class="alert alert-error">${_spEscape(e.message)}</div></td></tr>`;
+ }
+}
+
+// Abre el modal en modo CREAR: limpia el id de edición, vacía el form y restablece
+// los textos del modal. Lo dispara el botón "+ Registrar Ingreso".
+function nuevoIngreso() {
+ _ingresoEditId = null;
+ ['ingreso-concepto', 'ingreso-monto', 'ingreso-fecha', 'ingreso-notas'].forEach(id => {
+   const el = document.getElementById(id); if (el) el.value = '';
+ });
+ ['ingreso-categoria', 'ingreso-metodo', 'ingreso-cuenta'].forEach(id => {
+   const el = document.getElementById(id); if (el) el.selectedIndex = 0;
+ });
+ // Método por default (Transferencia) con Banco (BBVA) visible.
+ _ingresoOnMetodoChange();
+ const ev = document.getElementById('ingreso-evento'); if (ev) ev.value = '';
+ const cli = document.getElementById('ingreso-cliente'); if (cli) cli.value = '';
+ const tit = document.getElementById('ingreso-modal-title'); if (tit) tit.textContent = 'Registrar Ingreso';
+ const btn = document.getElementById('ingreso-save-btn');   if (btn) btn.textContent = 'Guardar Ingreso';
+ _poblarSelectsIngresos().then(() => openModal('modal-ingreso'));
+}
+
+// Muestra/oculta el selector de Banco según el método (igual que gastos): Transferencia
+// y Depósito lo muestran; Efectivo lo oculta (cuenta = 'Efectivo').
+function _ingresoOnMetodoChange() {
+ const metodo = (document.getElementById('ingreso-metodo') || {}).value || '';
+ const wrap = document.getElementById('ingreso-banco-wrap');
+ if (wrap) wrap.style.display = (metodo === 'Efectivo') ? 'none' : '';
+}
+
+// Abre el modal en modo EDICIÓN, pre-llenado con el ingreso (desde _ingresosListCache).
+// Guarda el id en _ingresoEditId para que guardarIngreso haga UPDATE en vez de INSERT.
+async function editarIngreso(id) {
+ await _poblarSelectsIngresos();   // garantiza que evento/cliente tengan opciones
+ const g = (_ingresosListCache || []).find(x => String(x.id) === String(id));
+ if (!g) { alert('No se encontró el ingreso a editar'); return; }
+ _ingresoEditId = id;
+ const set = (elId, v) => { const el = document.getElementById(elId); if (el) el.value = (v == null ? '' : v); };
+ set('ingreso-concepto', g.concepto);
+ set('ingreso-monto',    g.monto);
+ set('ingreso-fecha',    g.fecha);
+ set('ingreso-categoria', g.categoria);
+ // Método: solo los 3 válidos; si la cuenta fue 'Efectivo', el método queda en Efectivo.
+ const _metodosIngreso = ['Transferencia', 'Depósito', 'Efectivo'];
+ let _metodoSel = _metodosIngreso.includes(g.metodo_pago) ? g.metodo_pago : 'Transferencia';
+ if (g.cuenta === 'Efectivo') _metodoSel = 'Efectivo';
+ set('ingreso-metodo', _metodoSel);
+ // Banco: pre-selecciona BBVA/Banamex si así estaba; si no, default (BBVA).
+ if (g.cuenta === 'BBVA' || g.cuenta === 'Banamex') set('ingreso-cuenta', g.cuenta);
+ else document.getElementById('ingreso-cuenta').selectedIndex = 0;
+ _ingresoOnMetodoChange();  // muestra/oculta el Banco según el método elegido
+ set('ingreso-evento',  g.evento_id || '');
+ set('ingreso-cliente', g.cliente_id || '');
+ set('ingreso-notas',   g.notas);
+ const tit = document.getElementById('ingreso-modal-title'); if (tit) tit.textContent = 'Editar Ingreso';
+ const btn = document.getElementById('ingreso-save-btn');   if (btn) btn.textContent = 'Guardar Cambios';
+ openModal('modal-ingreso');
+}
+
+async function guardarIngreso() {
+ const concepto = document.getElementById('ingreso-concepto').value.trim();
+ const monto = parseFloat(document.getElementById('ingreso-monto').value);
+ const fecha = document.getElementById('ingreso-fecha').value;
+ const categoria = document.getElementById('ingreso-categoria').value;
+ const evId = document.getElementById('ingreso-evento').value;
+ const clienteId = document.getElementById('ingreso-cliente').value;
+ const metodo = document.getElementById('ingreso-metodo').value;
+ // Cuenta = a dónde entró el dinero: Efectivo → 'Efectivo'; si no, el Banco elegido.
+ const banco = document.getElementById('ingreso-cuenta').value;
+ const cuenta = (metodo === 'Efectivo') ? 'Efectivo' : banco;
+ const notas = document.getElementById('ingreso-notas').value;
+ const alerta = document.getElementById('ingreso-alert');
+
+ if (!concepto || !(monto >= 0) || !fecha) {
+ alerta.innerHTML = '<div class="alert alert-error">Concepto, monto y fecha son obligatorios</div>';
+ return;
+ }
+
+ const editando = !!_ingresoEditId;
+ const url = editando ? '/.netlify/functions/admin-ingreso-editar' : '/.netlify/functions/admin-ingreso-crear';
+ const payload = {
+ concepto, monto, fecha, categoria, metodo_pago: metodo,
+ cuenta: cuenta || undefined,
+ evento_id: evId || undefined, cliente_id: clienteId || undefined, notas: notas || undefined
+ };
+ if (editando) payload.id = _ingresoEditId;
+
+ try {
+ const r = await fetch(url, {
+ method: 'POST',
+ headers: _spAdminHeaders(),
+ body: JSON.stringify(payload),
+ });
+ const d = await r.json();
+ if (!r.ok) throw new Error(d.error || (editando ? 'No se pudo actualizar el ingreso' : 'No se pudo registrar el ingreso'));
+ alerta.innerHTML = `<div class="alert alert-success">${editando ? 'Ingreso actualizado' : 'Ingreso registrado'}</div>`;
+ _ingresoEditId = null;
+ setTimeout(() => { closeModal('modal-ingreso'); loadIngresos(); }, 1000);
+ } catch(e) {
+ alerta.innerHTML = `<div class="alert alert-error">${_spEscape(e.message)}</div>`;
+ }
+}
+
+async function eliminarIngreso(id) {
+ if (!confirm('¿Eliminar este ingreso?')) return;
+ try {
+ const r = await fetch('/.netlify/functions/admin-ingreso-eliminar', {
+ method: 'POST',
+ headers: _spAdminHeaders(),
+ body: JSON.stringify({ id }),
+ });
+ const d = await r.json();
+ if (!r.ok) throw new Error(d.error || 'No se pudo eliminar el ingreso');
+ loadIngresos();
+ } catch(e) { alert(e.message); }
+}
+
+// ═══════════════════════════════════════════════════════════════
 // MIS VENTAS
 // ═══════════════════════════════════════════════════════════════
 async function loadVentas() {
@@ -5973,6 +6357,7 @@ function openModal(id) {
 function closeModal(id) {
  document.getElementById(id).classList.remove('open');
  if (id === 'modal-gasto') _gastoEditId = null;   // sal de modo edición al cerrar
+ if (id === 'modal-ingreso') _ingresoEditId = null;   // sal de modo edición al cerrar
 }
 
 // ─── Modal dinámico (creado en JS, no en HTML) ───

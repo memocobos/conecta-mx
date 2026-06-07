@@ -299,131 +299,101 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Montse
 .btn-logout:hover{border-color:var(--red);color:var(--red)}
 
 /* ═══════════════════════════════════════════════
- NAV PESTAÑAS (horizontal scroll en mobile)
+ NAV — SIDEBAR agrupado (desktop) + BARRA INFERIOR (móvil)  · D2
 ═══════════════════════════════════════════════ */
 .nav{
- display:flex;align-items:stretch;
- background:var(--bg2);border-bottom:1px solid var(--border);
- flex-shrink:0;
- scrollbar-width:none;
- overflow:visible;
+ position:fixed;top:52px;left:0;bottom:0;width:232px;z-index:60;
+ display:flex;flex-direction:column;align-items:stretch;gap:1px;
+ padding:14px 10px 28px;
+ background:var(--bg2);border-right:1px solid var(--border);
+ overflow-y:auto;overflow-x:hidden;
+ scrollbar-width:thin;scrollbar-color:var(--border) transparent;
 }
-.nav::-webkit-scrollbar{display:none}
-.nav-btn{
- display:flex;flex-direction:column;align-items:center;justify-content:center;
- gap:3px;padding:10px 16px;min-width:80px;
- background:none;border:none;border-bottom:2px solid transparent;
- color:var(--ts);cursor:pointer;transition:all .2s;
+.nav::-webkit-scrollbar{width:4px}
+.nav::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px}
+.kh-svg-sprite{position:absolute;width:0;height:0;overflow:hidden}
+
+/* Marca arriba del sidebar */
+.nav-brand{
+ display:flex;align-items:center;gap:8px;
+ padding:2px 12px 14px;margin-bottom:4px;
  font-family:'Barlow Condensed',sans-serif;
- font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
- white-space:nowrap;
+ font-size:17px;font-weight:900;letter-spacing:.12em;text-transform:uppercase;
+ color:var(--text);border-bottom:1px solid var(--border);
 }
-.nav-btn .nav-icon{font-size:16px}
-.nav-btn:hover{color:var(--text);background:rgba(255,255,255,.03)}
-.nav-btn.active{
- color:var(--orange);border-bottom-color:var(--orange);
- background:rgba(255,107,0,.05);
+.nav-brand-dot{width:7px;height:7px;border-radius:50%;background:var(--gold);box-shadow:0 0 8px var(--gold);flex-shrink:0}
+
+/* Grupos */
+.nav-group{display:flex;flex-direction:column;gap:1px;margin-top:9px}
+.nav-group-title{
+ font-family:'JetBrains Mono',monospace;
+ font-size:9px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;
+ color:var(--ts2);padding:6px 12px 5px;
 }
 
-/* ── HAMBURGUESA MOBILE ── */
-.nav-hamburger{display:none;}
-.nav-mobile-label{display:none;}
-/* Desktop: wrapper siempre visible como fila horizontal */
-.nav-items-wrapper{display:contents;}
+/* Items: pestañas (.nav-btn) + herramientas (.nav-dropdown-item) */
+.nav-btn,.nav-dropdown-item{
+ display:flex;flex-direction:row;align-items:center;gap:11px;
+ width:100%;min-width:0;text-align:left;
+ padding:9px 12px;border-radius:8px;
+ background:none;border:none;border-left:2px solid transparent;
+ color:var(--ts);cursor:pointer;transition:background .15s,color .15s;
+ font-family:'Barlow Condensed',sans-serif;
+ font-size:13px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;
+ white-space:nowrap;
+}
+.nav-btn .nav-ic,.nav-dropdown-item .nav-ic{
+ width:18px;height:18px;flex-shrink:0;stroke:currentColor;fill:none;
+ stroke-width:2;stroke-linecap:round;stroke-linejoin:round;
+}
+.nav-btn>span,.nav-dropdown-item>span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.nav-btn:hover,.nav-dropdown-item:hover{color:var(--text);background:rgba(255,255,255,.04)}
+.nav-btn.active,.nav-dropdown-item.active{
+ color:var(--gold);background:rgba(232,255,76,.08);border-left-color:var(--gold);
+}
+/* Encabezado del grupo Herramientas (conserva id #nav-herramientas para showHerramienta) */
+#nav-herramientas{cursor:default}
+#nav-herramientas.active{color:var(--ts2)}
+
+/* ── BARRA INFERIOR + SCRIM (solo móvil; ocultos en desktop) ── */
+.kh-bottombar{display:none}
+.kh-scrim{display:none}
+
 @media(max-width:860px){
+ /* El sidebar se convierte en drawer off-canvas (lo abre el botón "Más") */
  .nav{
-  flex-direction:column;overflow:visible;
-  height:auto;border-bottom:none;
-  position:relative;background:var(--bg2);
-  border-bottom:1px solid var(--border);
+  top:0;width:82%;max-width:300px;z-index:1200;
+  transform:translateX(-100%);transition:transform .25s ease;
+  box-shadow:0 0 40px rgba(0,0,0,.6);padding-top:18px;
  }
- .nav-hamburger{
-  display:flex;align-items:center;gap:10px;
-  background:none;border:none;
-  color:var(--text);cursor:pointer;
-  padding:12px 16px;width:100%;
+ .nav.drawer-open{transform:translateX(0)}
+ .kh-scrim{
+  display:block;position:fixed;inset:0;z-index:1100;
+  background:rgba(0,0,0,.5);opacity:0;pointer-events:none;transition:opacity .25s;
+ }
+ .kh-scrim.show{opacity:1;pointer-events:auto}
+
+ /* Barra inferior fija con 4 destinos + "Más" */
+ .kh-bottombar{
+  display:flex;position:fixed;left:0;right:0;bottom:0;z-index:900;
+  background:var(--bg2);border-top:1px solid var(--border);
+  padding:6px 4px;padding-bottom:max(6px,env(safe-area-inset-bottom));
+ }
+ .kh-bb-item{
+  flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
+  background:none;border:none;cursor:pointer;color:var(--ts);min-width:0;padding:4px 2px;
   font-family:'Barlow Condensed',sans-serif;
-  font-size:12px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;
+  font-size:9px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;
  }
- .nav-hamburger-icon{font-size:18px;transition:transform .2s}
- .nav-hamburger.open .nav-hamburger-icon{transform:rotate(90deg)}
- .nav-mobile-label{
-  display:block;flex:1;text-align:left;
-  color:var(--orange);
- }
- .nav-items-wrapper{
-  display:none;flex-direction:column;
-  border-top:1px solid var(--border);
-  background:var(--bg2);
-  overflow:hidden;
-  position:absolute;top:100%;left:0;right:0;
-  z-index:999;
-  box-shadow:0 8px 32px rgba(0,0,0,.7);
- }
- .nav-items-wrapper.open{display:flex}
- .nav-btn{
-  flex-direction:row;justify-content:flex-start;
-  min-width:unset;width:100%;
-  padding:13px 20px;border-bottom:1px solid var(--border);
-  border-bottom-width:1px!important;
-  border-left:3px solid transparent;
-  font-size:12px;
- }
- .nav-btn.active{
-  border-bottom-color:var(--border)!important;
-  border-left-color:var(--orange);
-  background:rgba(255,107,0,.06);
- }
- .nav-dropdown{width:100%;display:flex;flex-direction:column}
- .nav-dropdown-btn{
-  flex-direction:row;justify-content:space-between;
-  min-width:unset;width:100%;
-  padding:13px 20px;border-bottom:1px solid var(--border);
-  font-size:12px;
- }
- .nav-dropdown-menu{
-  position:static;border:none;border-radius:0;
-  box-shadow:none;background:rgba(255,255,255,.03);
- }
- .nav-dropdown-item{padding:11px 32px;font-size:11px}
- .app{flex-direction:column}
+ .kh-bb-item .nav-ic{width:21px;height:21px;flex-shrink:0;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+ .kh-bb-item>span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%}
+ .kh-bb-item.active{color:var(--gold)}
+
  .topbar{padding:10px 14px}
 }
-/* ── NAV DROPDOWN HERRAMIENTAS ── */
-.nav-dropdown{position:relative;display:inline-flex;}
-.nav-dropdown-btn{
-  display:flex;flex-direction:column;align-items:center;justify-content:center;
-  gap:3px;padding:10px 16px;min-width:80px;
-  background:none;border:none;border-bottom:2px solid transparent;
-  color:var(--ts);cursor:pointer;transition:all .2s;
-  font-family:'Barlow Condensed',sans-serif;
-  font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
-  white-space:nowrap;
-}
-.nav-dropdown-btn:hover{color:var(--text);background:rgba(255,255,255,.03);}
-.nav-dropdown-btn.active{color:var(--orange);border-bottom-color:var(--orange);background:rgba(255,107,0,.05);}
-.nav-dropdown-btn .drop-arrow{font-size:8px;margin-top:1px;transition:transform .2s;}
-.nav-dropdown.open .drop-arrow{transform:rotate(180deg);}
-.nav-dropdown.open .nav-dropdown-menu{display:block;}
-.nav-dropdown-menu{
-  display:none;position:absolute;top:100%;right:0;z-index:9999;
-  background:var(--bg2);border:1px solid var(--border2);
-  border-radius:8px;min-width:140px;
-  box-shadow:0 8px 24px rgba(0,0,0,.6);
-  overflow:hidden;
-}
-.nav-dropdown.open .nav-dropdown-menu{display:block;}
-.nav-dropdown-item{
-  display:block;width:100%;padding:11px 16px;
-  background:none;border:none;text-align:left;
-  font-family:'Barlow Condensed',sans-serif;
-  font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
-  color:var(--ts);cursor:pointer;transition:all .15s;
-  border-bottom:1px solid var(--border);
-}
-.nav-dropdown-item:last-child{border-bottom:none;}
-.nav-dropdown-item:hover{background:rgba(255,107,0,.08);color:var(--orange);}
-.nav-dropdown-item.active{color:var(--orange);}
+/* Dropdown "Herramientas" desktop reemplazado por items del grupo en el sidebar (D2).
+   Se conservan los ids #nav-dropdown-herramientas y #nav-herramientas y la clase
+   .nav-dropdown-item porque el JS de permisos y showHerramienta los referencian. */
 
 
 /* ═══════════════════════════════════════════════
@@ -431,10 +401,14 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Montse
 ═══════════════════════════════════════════════ */
 .content{
  flex:1;overflow-y:auto;padding:20px;
+ margin-left:232px;
  scrollbar-width:thin;scrollbar-color:var(--border) transparent;
 }
 .content::-webkit-scrollbar{width:4px}
 .content::-webkit-scrollbar-thumb{background:var(--border)}
+@media(max-width:860px){
+ .content{margin-left:0;padding-bottom:84px}
+}
 
 /* ═══════════════════════════════════════════════
  COMPONENTES GENERALES
@@ -1379,16 +1353,6 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
 .tools-sheet-item.active{color:var(--orange)}
 .tools-sheet-item.active .ts-chevron{color:var(--orange)}
 
-/* En móvil ocultamos el dropdown menu nativo (lo reemplaza el sheet) */
-@media(max-width:768px){
-  .nav-dropdown-menu{display:none!important}
-  .nav-dropdown.open .nav-dropdown-menu{display:none!important}
-  /* El botón Herramientas se queda visible en el nav-items-wrapper —
-     solo cambiamos la flecha por un indicador de "abre algo más" */
-  .nav-dropdown-btn .drop-arrow{transform:rotate(-90deg)}
-  .nav-dropdown.open .drop-arrow{transform:rotate(-90deg)}
-}
-
 /* ═══════════════════════════════════════════════════════════════
    RADAR DEL DRAGÓN — Mission Control / Ops Dashboard
    Aesthetic: military radar + Stripe/Linear precision.
@@ -1919,36 +1883,66 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
  </div>
 
  <!-- NAV -->
- <nav class="nav">
-  <button class="nav-hamburger" id="nav-hamburger-btn" onclick="toggleNavMobile()" aria-label="Menú">
-   <span class="nav-hamburger-icon">☰</span>
-   <span class="nav-mobile-label" id="nav-mobile-section-label">SECCIÓN</span>
-  </button>
-  <div class="nav-items-wrapper" id="nav-items-wrapper">
-   <button class="nav-btn active" onclick="showPage('resumen')" id="nav-resumen">Resumen</button>
-   <button class="nav-btn" onclick="showPage('pagos')" id="nav-pagos">Pagos</button>
-   <button class="nav-btn" onclick="showPage('eventos')" id="nav-eventos">Por Evento</button>
-   <button class="nav-btn" onclick="showPage('gastos')" id="nav-gastos">Gastos</button>
-   <button class="nav-btn" onclick="showPage('ventas')" id="nav-ventas">Mis Ventas</button>
-   <button class="nav-btn" onclick="showPage('inventario')" id="nav-inventario">Torre de Karin</button>
-   <button class="nav-btn" onclick="showPage('reportes')" id="nav-reportes">Reportes</button>
-   <button class="nav-btn" onclick="showPage('equipo')" id="nav-equipo">Guerreros Z</button>
-   <button class="nav-btn" onclick="showPage('capsule')" id="nav-capsule">Capsule Corp</button>
-   <button class="nav-btn" onclick="showPage('solicitudes_portal')" id="nav-solicitudes_portal">📥 Solicitudes Portal</button>
-   <button class="nav-btn" onclick="showPage('cotizador')" id="nav-cotizador">Palacio de Kamisama</button>
-   <button class="nav-btn" onclick="showPage('radar')" id="nav-radar">RADAR DEL DRAGÓN</button>
-   <button class="nav-btn" onclick="showPage('montana')" id="nav-montana">Montaña Pai</button>
-   <div class="nav-dropdown" id="nav-dropdown-herramientas">
-    <button class="nav-dropdown-btn" onclick="toggleDropdown(event)" id="nav-herramientas">
-     Herramientas <span class="drop-arrow">▼</span>
-    </button>
-    <div class="nav-dropdown-menu">
-     <button class="nav-dropdown-item" id="nav-recibos" onclick="showHerramienta('recibos')">Recibos</button>
-     <button class="nav-dropdown-item" id="nav-contratos" onclick="showHerramienta('contratos')">Contratos</button>
-     <button class="nav-dropdown-item" id="nav-waitlist" onclick="showHerramienta('waitlist')">Lista de espera</button>
-     <button class="nav-dropdown-item" id="nav-diseno" onclick="showHerramienta('diseno')">Diseño</button>
-    </div>
-   </div>
+ <!-- Sprite de íconos del sidebar (D2) -->
+ <svg class="kh-svg-sprite" aria-hidden="true" focusable="false"><defs>
+  <symbol id="ic-resumen" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></symbol>
+  <symbol id="ic-pagos" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></symbol>
+  <symbol id="ic-eventos" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/></symbol>
+  <symbol id="ic-capsule" viewBox="0 0 24 24"><path d="M21 8l-9-5-9 5v8l9 5 9-5z"/><path d="M3 8l9 5 9-5"/></symbol>
+  <symbol id="ic-solicitudes" viewBox="0 0 24 24"><path d="M5 5h14l3 7v6a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1v-6z"/><path d="M2 12h6l2 3h4l2-3h6"/></symbol>
+  <symbol id="ic-inventario" viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="5" rx="1"/><rect x="4" y="10" width="16" height="5" rx="1"/><rect x="4" y="17" width="16" height="4" rx="1"/></symbol>
+  <symbol id="ic-gastos" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v9M8 12l4 4 4-4"/></symbol>
+  <symbol id="ic-ventas" viewBox="0 0 24 24"><path d="M3 3h7l11 11-7 7L3 10z"/><circle cx="7.5" cy="7.5" r="1.5"/></symbol>
+  <symbol id="ic-reportes" viewBox="0 0 24 24"><path d="M4 20V11M10 20V4M16 20v-6M2 20h20"/></symbol>
+  <symbol id="ic-equipo" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><path d="M3 20c0-3.3 2.7-5 6-5s6 1.7 6 5"/><path d="M16 6a3 3 0 0 1 0 6"/></symbol>
+  <symbol id="ic-montana" viewBox="0 0 24 24"><path d="M3 20h18L14 7l-3 5-2-3z"/></symbol>
+  <symbol id="ic-cotizador" viewBox="0 0 24 24"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M8 7h8M8 11h2M12 11h2M8 15h2M12 15h2"/></symbol>
+  <symbol id="ic-radar" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/><path d="M12 12l6-4"/></symbol>
+  <symbol id="ic-recibos" viewBox="0 0 24 24"><path d="M6 2h12v20l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6"/></symbol>
+  <symbol id="ic-contratos" viewBox="0 0 24 24"><path d="M6 2h8l4 4v16H6z"/><path d="M14 2v4h4"/><path d="M9 14l2 2 4-4"/></symbol>
+  <symbol id="ic-waitlist" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+  <symbol id="ic-diseno" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="8" cy="10" r="1.1"/><circle cx="12" cy="8" r="1.1"/><circle cx="16" cy="10" r="1.1"/></symbol>
+  <symbol id="ic-mas" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></symbol>
+ </defs></svg>
+
+ <nav class="nav" id="kh-sidebar" aria-label="Navegación principal">
+  <div class="nav-brand">KAMEHOUSE<span class="nav-brand-dot"></span></div>
+
+  <div class="nav-group">
+   <div class="nav-group-title">Operación</div>
+   <button class="nav-btn active" onclick="showPage('resumen')" id="nav-resumen"><svg class="nav-ic"><use href="#ic-resumen"/></svg><span>Resumen</span></button>
+   <button class="nav-btn" onclick="showPage('pagos')" id="nav-pagos"><svg class="nav-ic"><use href="#ic-pagos"/></svg><span>Pagos</span></button>
+   <button class="nav-btn" onclick="showPage('eventos')" id="nav-eventos"><svg class="nav-ic"><use href="#ic-eventos"/></svg><span>Por Evento</span></button>
+   <button class="nav-btn" onclick="showPage('capsule')" id="nav-capsule"><svg class="nav-ic"><use href="#ic-capsule"/></svg><span>Capsule Corp</span></button>
+   <button class="nav-btn" onclick="showPage('solicitudes_portal')" id="nav-solicitudes_portal"><svg class="nav-ic"><use href="#ic-solicitudes"/></svg><span>Solicitudes Portal</span></button>
+  </div>
+
+  <div class="nav-group">
+   <div class="nav-group-title">Inventario &amp; Ventas</div>
+   <button class="nav-btn" onclick="showPage('inventario')" id="nav-inventario"><svg class="nav-ic"><use href="#ic-inventario"/></svg><span>Torre de Karin</span></button>
+   <button class="nav-btn" onclick="showPage('gastos')" id="nav-gastos"><svg class="nav-ic"><use href="#ic-gastos"/></svg><span>Gastos</span></button>
+   <button class="nav-btn" onclick="showPage('ventas')" id="nav-ventas"><svg class="nav-ic"><use href="#ic-ventas"/></svg><span>Mis Ventas</span></button>
+   <button class="nav-btn" onclick="showPage('reportes')" id="nav-reportes"><svg class="nav-ic"><use href="#ic-reportes"/></svg><span>Reportes</span></button>
+  </div>
+
+  <div class="nav-group">
+   <div class="nav-group-title">Equipo</div>
+   <button class="nav-btn" onclick="showPage('equipo')" id="nav-equipo"><svg class="nav-ic"><use href="#ic-equipo"/></svg><span>Guerreros Z</span></button>
+   <button class="nav-btn" onclick="showPage('montana')" id="nav-montana"><svg class="nav-ic"><use href="#ic-montana"/></svg><span>Montaña Pai</span></button>
+  </div>
+
+  <div class="nav-group">
+   <div class="nav-group-title">Eventos</div>
+   <button class="nav-btn" onclick="showPage('cotizador')" id="nav-cotizador"><svg class="nav-ic"><use href="#ic-cotizador"/></svg><span>Palacio de Kamisama</span></button>
+   <button class="nav-btn" onclick="showPage('radar')" id="nav-radar"><svg class="nav-ic"><use href="#ic-radar"/></svg><span>Radar del Dragón</span></button>
+  </div>
+
+  <div class="nav-group" id="nav-dropdown-herramientas">
+   <div class="nav-group-title" id="nav-herramientas">Herramientas</div>
+   <button class="nav-dropdown-item" id="nav-recibos" onclick="showHerramienta('recibos')"><svg class="nav-ic"><use href="#ic-recibos"/></svg><span>Recibos</span></button>
+   <button class="nav-dropdown-item" id="nav-contratos" onclick="showHerramienta('contratos')"><svg class="nav-ic"><use href="#ic-contratos"/></svg><span>Contratos</span></button>
+   <button class="nav-dropdown-item" id="nav-waitlist" onclick="showHerramienta('waitlist')"><svg class="nav-ic"><use href="#ic-waitlist"/></svg><span>Lista de espera</span></button>
+   <button class="nav-dropdown-item" id="nav-diseno" onclick="showHerramienta('diseno')"><svg class="nav-ic"><use href="#ic-diseno"/></svg><span>Diseño</span></button>
   </div>
  </nav>
 
@@ -4051,6 +4045,17 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
   </div>
 </div>
 
+<!-- D2: barra inferior (móvil) + scrim del drawer. A nivel raíz para no verse
+     afectados por el transform del sidebar. Usan showPage() (mismo ruteo). -->
+<nav class="kh-bottombar" id="kh-bottombar" aria-label="Navegación rápida">
+ <button class="kh-bb-item active" data-tab="resumen" onclick="showPage('resumen')"><svg class="nav-ic"><use href="#ic-resumen"/></svg><span>Resumen</span></button>
+ <button class="kh-bb-item" data-tab="pagos" onclick="showPage('pagos')"><svg class="nav-ic"><use href="#ic-pagos"/></svg><span>Pagos</span></button>
+ <button class="kh-bb-item" data-tab="capsule" onclick="showPage('capsule')"><svg class="nav-ic"><use href="#ic-capsule"/></svg><span>Capsule</span></button>
+ <button class="kh-bb-item" data-tab="solicitudes_portal" onclick="showPage('solicitudes_portal')"><svg class="nav-ic"><use href="#ic-solicitudes"/></svg><span>Portal</span></button>
+ <button class="kh-bb-item kh-bb-more" onclick="khAbrirMenu()"><svg class="nav-ic"><use href="#ic-mas"/></svg><span>Más</span></button>
+</nav>
+<div class="kh-scrim" id="kh-scrim" onclick="khCerrarMenu()" aria-hidden="true"></div>
+
 <!-- Tools bottom-sheet (móvil) — reemplaza al dropdown que no se abre por touch.
      Vive a nivel raíz para evitar overflow:hidden del nav-items-wrapper. -->
 <div class="tools-sheet" id="tools-sheet" role="dialog" aria-modal="true" aria-labelledby="tools-sheet-title">
@@ -4385,6 +4390,9 @@ function showPage(name) {
  }
  cerrarNavMobile();
  loadPage(name);
+ // D2: sincroniza la barra inferior móvil (estado activo + visibilidad por rol)
+ // y oculta grupos del sidebar que quedaron vacíos. Única adición a showPage.
+ if (typeof _khNavSync === 'function') _khNavSync(name);
 }
 
 function loadPage(name) {
@@ -7975,6 +7983,61 @@ function actualizarLabelNavMobile(nombre) {
   const label = document.getElementById('nav-mobile-section-label');
   if (label) label.textContent = nombre.toUpperCase();
 }
+
+// ── D2: SIDEBAR (drawer móvil) + BARRA INFERIOR ─────────────
+// Abrir/cerrar el sidebar como drawer off-canvas en móvil.
+function khAbrirMenu() {
+  const sb = document.getElementById('kh-sidebar');
+  const sc = document.getElementById('kh-scrim');
+  if (sb) sb.classList.add('drawer-open');
+  if (sc) sc.classList.add('show');
+  document.body.style.overflow = 'hidden';
+}
+function khCerrarMenu() {
+  const sb = document.getElementById('kh-sidebar');
+  const sc = document.getElementById('kh-scrim');
+  if (sb) sb.classList.remove('drawer-open');
+  if (sc) sc.classList.remove('show');
+  document.body.style.overflow = '';
+}
+
+// Sincroniza la barra inferior y limpia grupos vacíos del sidebar.
+// NO toca permisos: solo refleja el estado de display que ya aplicó
+// aplicarPermisosUI sobre cada #nav-<tab>.
+function _khNavSync(name) {
+  // Al navegar a una pestaña normal, limpiar el resaltado de items de Herramientas
+  // (showHerramienta lo vuelve a poner cuando se abre una herramienta).
+  document.querySelectorAll('.nav-dropdown-item.active, #nav-herramientas.active')
+    .forEach(b => b.classList.remove('active'));
+  // Barra inferior: marcar destino activo + ocultar los que el rol no permite.
+  document.querySelectorAll('.kh-bb-item[data-tab]').forEach(b => {
+    const tab = b.dataset.tab;
+    b.classList.toggle('active', tab === name);
+    const src = document.getElementById('nav-' + tab);
+    b.style.display = (src && src.style.display !== 'none') ? '' : 'none';
+  });
+  // Ocultar encabezado de grupos del sidebar que quedaron sin items visibles.
+  // El grupo Herramientas se omite: su visibilidad la maneja aplicarPermisosUI.
+  document.querySelectorAll('#kh-sidebar .nav-group').forEach(g => {
+    if (g.id === 'nav-dropdown-herramientas') return;
+    const items = g.querySelectorAll('.nav-btn');
+    const algunoVisible = Array.from(items).some(b => b.style.display !== 'none');
+    g.style.display = algunoVisible ? '' : 'none';
+  });
+}
+
+// En móvil, cualquier click dentro del sidebar (pestaña o herramienta) cierra el drawer.
+(function wireSidebarDrawer() {
+  const sb = document.getElementById('kh-sidebar');
+  if (!sb || sb.dataset.wiredDrawer) return;
+  sb.dataset.wiredDrawer = '1';
+  sb.addEventListener('click', e => {
+    if (e.target.closest('.nav-btn, .nav-dropdown-item')) khCerrarMenu();
+  });
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') khCerrarMenu();
+  });
+})();
 
 
 // CAPSULE CORPS — reemplazado abajo

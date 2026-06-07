@@ -31,6 +31,8 @@
 const { verifyAdminAuth, corsCheck } = require('./_lib/verify-admin');
 
 const METODOS_VALIDOS = ['bbva','hey','efectivo','transferencia','otro'];
+// `cuenta` = a qué cuenta ENTRÓ el dinero (distinto de `metodo`). Opcional.
+const CUENTAS_VALIDAS = ['BBVA','Banamex','Efectivo','Otro'];
 const MAX_REFERENCIA = 120;
 
 exports.handler = async (event) => {
@@ -100,18 +102,26 @@ exports.handler = async (event) => {
         return { statusCode: 400, headers, body: JSON.stringify({ error: 'monto_pagado debe ser un número >= 0' }) };
       }
     }
+    // cuenta opcional: a qué cuenta entró el dinero. Si viene, debe ser válida.
+    let cuenta = body.cuenta;
+    if (cuenta == null || cuenta === '') {
+      cuenta = null;
+    } else if (!CUENTAS_VALIDAS.includes(cuenta)) {
+      return { statusCode: 400, headers, body: JSON.stringify({ error: 'cuenta inválida (BBVA|Banamex|Efectivo|Otro)' }) };
+    }
     const registradoPor = (auth.user && (auth.user.correo || auth.user.rol)) || 'admin';
     patch = {
       estado:         'pagado',
       fecha_pagada:   fechaPagada,
       metodo:         metodo,
+      cuenta:         cuenta,
       referencia:     referencia || null,
       registrado_por: registradoPor,
     };
     if (montoPagado !== null) patch.monto_pagado = montoPagado;
   } else {
     // revertir: deja el pago como estaba (pendiente, sin datos de pago).
-    patch = { estado: 'pendiente', fecha_pagada: null, metodo: null, referencia: null, monto_pagado: null };
+    patch = { estado: 'pendiente', fecha_pagada: null, metodo: null, cuenta: null, referencia: null, monto_pagado: null };
   }
 
   const sbHeaders = {

@@ -4974,7 +4974,7 @@ function abrirPlanCobranza(solicitudId) {
   crearModal('cobranza-plan', 'Plan de pagos · ' + eventoNombre, contenido);
   const m = document.getElementById('modal-cobranza-plan');
   if (m) { const inner = m.querySelector('.modal'); if (inner) inner.style.maxWidth = '640px'; }
-  cargarPlanPagosSP(solicitudId, t ? t.estado : 'en_pagos');
+  cargarPlanPagosSP(solicitudId, t ? t.estado : 'en_pagos', t ? t.paquete : undefined);
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -9923,7 +9923,7 @@ async function verSolicitudPortal(id) {
   crearModal('sp-detalle', `Solicitud · ${s.evento_nombre || ''}`, contenido);
   document.getElementById('modal-sp-detalle').querySelector('.modal').style.maxWidth = '720px';
 
-  cargarPlanPagosSP(s.id, s.estado);
+  cargarPlanPagosSP(s.id, s.estado, s.paquete);
 
   if (s.comprobante_separo_url) {
     cargarComprobanteSP(s.id);
@@ -9971,6 +9971,16 @@ async function cargarComprobanteSP(solicitudId) {
 
 const _SP_METODO_LBL = { bbva:'BBVA', hey:'Banamex', efectivo:'Efectivo', transferencia:'Transferencia', otro:'Otro' };
 
+// `cuenta` = a qué cuenta ENTRÓ el dinero (visor de saldos), DISTINTO de método.
+// Va por pago; default según el paquete pero editable a mano.
+const _SP_CUENTAS = ['BBVA','Banamex','Efectivo','Otro'];
+// Paquete de cada solicitud, para el default de cuenta. Lo llena cargarPlanPagosSP
+// (el refresh tras marcar/revertir no trae el paquete, así que lo lee de aquí).
+let _spPaqueteCache = {};
+function _spCuentaDefault(paquete) {
+  return String(paquete || '').toUpperCase() === 'CHEAP' ? 'Banamex' : 'BBVA';
+}
+
 // Badge de estado de un pago. Reusa _spBadgeEstado, agregando 'vencido' (que la
 // tabla pagos permite pero la solicitud no).
 function _spBadgePago(estado) {
@@ -9981,9 +9991,12 @@ function _spBadgePago(estado) {
 }
 
 // Carga diferida del plan (lazy load, igual que cargarComprobanteSP).
-async function cargarPlanPagosSP(solicitudId, estadoSolicitud) {
+async function cargarPlanPagosSP(solicitudId, estadoSolicitud, paquete) {
   const target = document.getElementById('sp-plan-' + solicitudId);
   if (!target) return;
+  // El paquete solo llega al abrir el modal; el refresh tras marcar/revertir no
+  // lo pasa, así que lo cacheamos para el default de cuenta.
+  if (paquete != null) _spPaqueteCache[solicitudId] = paquete;
   try {
     const r = await fetch('/.netlify/functions/admin-pagos-list', {
       method: 'POST',
@@ -10043,6 +10056,7 @@ function _spRenderFilaPago(solicitudId, p) {
     const detalle = [
       difMonto,
       p.metodo ? (_SP_METODO_LBL[p.metodo] || p.metodo) : null,
+      p.cuenta ? 'Cuenta: ' + _spEscape(p.cuenta) : null,
       p.referencia ? 'Ref: ' + _spEscape(p.referencia) : null,
       p.fecha_pagada ? 'Pagado ' + _spEscape(p.fecha_pagada) : null,
     ].filter(Boolean).join(' · ');
@@ -10055,6 +10069,10 @@ function _spRenderFilaPago(solicitudId, p) {
     const hoy = _spYmd(new Date());
     const opciones = Object.keys(_SP_METODO_LBL)
       .map(k => `<option value="${k}">${_SP_METODO_LBL[k]}</option>`).join('');
+    // Cuenta: default según el paquete de la solicitud (editable a mano).
+    const cuentaDefault = _spCuentaDefault(_spPaqueteCache[solicitudId]);
+    const opcionesCuenta = _SP_CUENTAS
+      .map(c => `<option value="${c}"${c === cuentaDefault ? ' selected' : ''}>${c}</option>`).join('');
     accionHtml = `
       <div style="margin-top:8px">
         <button class="btn btn-primary btn-sm" style="font-size:11px" onclick="abrirFormPagarSP('${idSafe}')">Marcar pagado</button>
@@ -10072,6 +10090,10 @@ function _spRenderFilaPago(solicitudId, p) {
           <div>
             <label style="display:block;font-size:9px;letter-spacing:.1em;color:var(--ts);text-transform:uppercase;margin-bottom:3px">Método</label>
             <select id="sp-pago-metodo-${idSafe}" style="padding:7px 8px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;color:var(--ink);font-size:12px">${opciones}</select>
+          </div>
+          <div>
+            <label style="display:block;font-size:9px;letter-spacing:.1em;color:var(--ts);text-transform:uppercase;margin-bottom:3px">Cuenta</label>
+            <select id="sp-pago-cuenta-${idSafe}" style="padding:7px 8px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;color:var(--ink);font-size:12px">${opcionesCuenta}</select>
           </div>
           <div style="flex:1;min-width:150px">
             <label style="display:block;font-size:9px;letter-spacing:.1em;color:var(--ts);text-transform:uppercase;margin-bottom:3px">Referencia (opcional)</label>
@@ -10125,6 +10147,7 @@ async function marcarPagoSP(solicitudId, pagoId) {
   const btn = document.getElementById('sp-pago-btn-' + pagoId);
   const fecha  = (document.getElementById('sp-pago-fecha-' + pagoId) || {}).value || '';
   const metodo = (document.getElementById('sp-pago-metodo-' + pagoId) || {}).value || '';
+  const cuenta = (document.getElementById('sp-pago-cuenta-' + pagoId) || {}).value || '';
   const ref    = ((document.getElementById('sp-pago-ref-' + pagoId) || {}).value || '').trim();
   const montoRaw = ((document.getElementById('sp-pago-monto-' + pagoId) || {}).value || '').trim();
   if (!metodo) { showToast('Elige un método de pago', 'error'); return; }
@@ -10150,6 +10173,7 @@ async function marcarPagoSP(solicitudId, pagoId) {
         accion: 'pagar',
         fecha_pagada: fecha || undefined,
         metodo,
+        cuenta: cuenta || undefined,
         referencia: ref || undefined,
         monto_pagado: montoPagado,
       }),

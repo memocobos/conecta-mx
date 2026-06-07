@@ -3556,66 +3556,6 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
 <div class="modal-overlay" id="modal-reporte">
 </div>
 
-<!-- Modal: Nuevo Pago -->
-<div class="modal-overlay" id="modal-pago">
- <div class="modal">
- <div class="modal-header">
- <div class="modal-title">Registrar Pago</div>
- <button class="modal-close" onclick="closeModal('modal-pago')"></button>
- </div>
- <div class="modal-body">
- <div id="pago-alert"></div>
- <div class="form-row cols-2">
- <div class="form-group">
- <label>Cliente *</label>
- <input type="text" id="pago-cliente" placeholder="Nombre del viajero" oninput="buscarCliente()">
- <div id="pago-cliente-sugg" style="display:none;background:var(--bg3);border:1px solid var(--border);border-radius:6px;margin-top:4px;max-height:150px;overflow-y:auto"></div>
- <input type="hidden" id="pago-cliente-id">
- <input type="hidden" id="pago-reservacion-id">
- </div>
- <div class="form-group">
- <label>Evento *</label>
- <select id="pago-evento">
- <option value="">Selecciona…</option>
- </select>
- </div>
- </div>
- <div class="form-row cols-2">
- <div class="form-group">
- <label>Monto *</label>
- <input type="number" id="pago-monto" placeholder="0.00" min="0">
- </div>
- <div class="form-group">
- <label>Método *</label>
- <select id="pago-metodo">
- <option>Transferencia</option>
- <option>Efectivo</option>
- <option>Tarjeta</option>
- </select>
- </div>
- </div>
- <div class="form-row cols-2">
- <div class="form-group">
- <label>Fecha</label>
- <input type="date" id="pago-fecha">
- </div>
- <div class="form-group">
- <label>Referencia / Folio</label>
- <input type="text" id="pago-ref" placeholder="Últimos 4 dígitos, folio...">
- </div>
- </div>
- <div class="form-group">
- <label>Notas</label>
- <input type="text" id="pago-notas" placeholder="Ej: Separo, Pago 1, etc.">
- </div>
- </div>
- <div class="modal-footer">
- <button class="btn btn-ghost" onclick="closeModal('modal-pago')">Cancelar</button>
- <button class="btn btn-primary" onclick="guardarPago()">Guardar Pago</button>
- </div>
- </div>
-</div>
-
 <!-- Modal: Nuevo Gasto -->
 <div class="modal-overlay" id="modal-gasto">
  <div class="modal">
@@ -4433,7 +4373,6 @@ const db = {
 
 // Cache local (para no re-fetchear todo el tiempo)
 let _eventosCache = [];
-let _viajerosCache = [];
 
 // ═══════════════════════════════════════════════════════════════
 // NAVEGACIÓN
@@ -4977,82 +4916,6 @@ function abrirPlanCobranza(solicitudId) {
   if (m) { const inner = m.querySelector('.modal'); if (inner) inner.style.maxWidth = '640px'; }
   cargarPlanPagosSP(solicitudId, t ? t.estado : 'en_pagos');
 }
-
-async function guardarPago() {
- const resId = document.getElementById('pago-reservacion-id').value;
- const monto = parseFloat(document.getElementById('pago-monto').value);
- const alerta = document.getElementById('pago-alert');
-
- if (!resId || !monto) {
- alerta.innerHTML = '<div class="alert alert-error">Selecciona un cliente/evento y monto</div>';
- return;
- }
-
- // Buscamos la reservación y cuál slot de pago está disponible
- try {
- const [res] = await db.get('reservaciones', `?id=eq.${resId}`);
- if (!res) throw new Error('Reservación no encontrada');
-
- // Encontrar el primer pago vacío (0)
- const campos = ['separo','pago_1','pago_2','pago_3','pago_4','pago_5',
- 'pago_6','pago_7','pago_8','pago_9','pago_10'];
- const campo = campos.find(c => !res[c] || res[c] == 0);
- if (!campo) throw new Error('Ya están llenos los 11 slots de pago');
-
- await db.patch('reservaciones', resId, { [campo]: monto });
- alerta.innerHTML = '<div class="alert alert-success"> Pago registrado correctamente</div>';
- setTimeout(() => { closeModal('modal-pago'); loadPagos(); loadResumen(); }, 1200);
- } catch(e) {
- alerta.innerHTML = `<div class="alert alert-error">${e.message}</div>`;
- }
-}
-
-async function buscarCliente() {
- const q = document.getElementById('pago-cliente').value.trim();
- const sugg = document.getElementById('pago-cliente-sugg');
- if (q.length < 2) { sugg.style.display = 'none'; return; }
-
- try {
- const clientes = await db.get('clientes',
- `?nombre=ilike.*${encodeURIComponent(q)}*&limit=8&select=id,nombre,telefono`);
- if (!clientes.length) { sugg.style.display = 'none'; return; }
- sugg.style.display = 'block';
- sugg.innerHTML = clientes.map(c => `
- <div onclick="seleccionarCliente('${c.id}','${c.nombre.replace(/'/g,"\\'")}','${c.telefono||''}')"
- style="padding:8px 12px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border)"
- onmouseover="this.style.background='rgba(255,107,0,.1)'"
- onmouseout="this.style.background=''">
- ${c.nombre} <span style="color:var(--ts);font-size:11px">${c.telefono||''}</span>
- </div>`).join('');
- } catch(e) {}
-}
-
-async function seleccionarCliente(id, nombre, tel) {
- document.getElementById('pago-cliente').value = nombre;
- document.getElementById('pago-cliente-id').value = id;
- document.getElementById('pago-cliente-sugg').style.display = 'none';
-
- // Buscar reservaciones de este cliente
- const evId = document.getElementById('pago-evento').value;
- if (evId) {
- try {
- const [res] = await db.get('reservaciones',
- `?cliente_id=eq.${id}&evento_id=eq.${evId}&limit=1`);
- if (res) document.getElementById('pago-reservacion-id').value = res.id;
- } catch(e) {}
- }
-}
-
-const _pagoEvEl = document.getElementById('pago-evento');
-if (_pagoEvEl) _pagoEvEl.addEventListener('change', async function() {
- const clienteId = document.getElementById('pago-cliente-id').value;
- if (!clienteId || !this.value) return;
- try {
- const [res] = await db.get('reservaciones',
- `?cliente_id=eq.${clienteId}&evento_id=eq.${this.value}&limit=1`);
- if (res) document.getElementById('pago-reservacion-id').value = res.id;
- } catch(e) {}
-});
 
 // ═══════════════════════════════════════════════════════════════
 // POR EVENTO — Análisis financiero por evento (Fase 4, sobre el portal)
@@ -5858,12 +5721,6 @@ function leerPagos() {
  }).filter(Boolean);
 }
 
-async function editarReservacion(id) {
- // Por ahora abrimos el modal de pago con la reservación seleccionada
- document.getElementById('pago-reservacion-id').value = id;
- openModal('modal-pago');
-}
-
 // ═══════════════════════════════════════════════════════════════
 // UTILIDADES
 // ═══════════════════════════════════════════════════════════════
@@ -5876,11 +5733,6 @@ function fmtFecha(d) {
  if (!d) return '—';
  const date = new Date(d + 'T12:00:00');
  return date.toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: 'numeric' });
-}
-
-function badgePaquete(p) {
- const map = { PLUS:'badge-orange', STAY:'badge-blue', RIDE:'badge-gold', CHEAP:'badge-gray' };
- return `<span class="badge ${map[p]||'badge-gray'}">${p||'—'}</span>`;
 }
 
 function badgeStatus(s) {

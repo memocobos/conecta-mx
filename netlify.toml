@@ -58,3 +58,9 @@
 #   02:00 UTC = 8:00 PM hora México (del día anterior)
 [functions."radar-alertas"]
   schedule = "0 14,2 * * *"
+
+# Recordatorio "tu evento es pronto" para coordis (U3 / DC2c-B). Lee eventos_meta
+# por slug y avisa (campanita + correo) a quien aceptó eventos en los próximos
+# DIAS_ANTES días. 15:00 UTC = 9:00 AM hora México.
+[functions."recordatorio-eventos-diario"]
+  schedule = "0 15 * * *"

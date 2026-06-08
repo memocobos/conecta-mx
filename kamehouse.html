@@ -4299,6 +4299,8 @@ function showToast(msg, tipo) {
 const KH_JWT_KEY = 'kh_jwt_v1';
 function khGetJwt() { try { return localStorage.getItem(KH_JWT_KEY) || ''; } catch (e) { return ''; } }
 function khSetJwt(t) { try { if (t) localStorage.setItem(KH_JWT_KEY, t); else localStorage.removeItem(KH_JWT_KEY); } catch (e) {} }
+// [sec-401] guarda para no disparar logout-storm cuando varios fetch caen 401 a la vez
+let _khSessionExpired = false;
 
 // Wrapper de fetch que agrega Authorization Bearer automáticamente.
 // Usar para endpoints admin (contrato-*, send-invite, github-publish, etc.)
@@ -4314,7 +4316,16 @@ async function khAdminFetch(url, options) {
     options.headers || {},
     jwt ? { 'Authorization': 'Bearer ' + jwt } : {}
   );
-  return fetch(url, options);
+  const resp = await fetch(url, options);
+  // [sec-401] Sesión zombie: si el JWT expiró/inválido, ningún admin fetch sirve. En vez de
+  // fallar en silencio (todo 401), forzamos re-login UNA vez con aviso. Igual devolvemos resp
+  // para no romper al caller en vuelo.
+  if (resp.status === 401 && !_khSessionExpired) {
+    _khSessionExpired = true;
+    showToast('Tu sesión expiró. Vuelve a iniciar sesión.', 'error');
+    doLogout();
+  }
+  return resp;
 }
 
 // ── NOTIFICACIONES IN-APP (DC2c-A) ──────────────────────────────────────────
@@ -4466,6 +4477,7 @@ async function doLogin() {
     }
     currentUser = data.user;
     khSetJwt(data.token);
+    _khSessionExpired = false; // [sec-401] sesión fresca, rearma el manejador
     sessionStorage.setItem(SESSION_KEY, JSON.stringify({
       user: data.user,
       expires: Date.now() + (data.ttl ? data.ttl * 1000 : SESSION_HOURS * 3600000),

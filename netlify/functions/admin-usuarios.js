@@ -45,7 +45,7 @@ const COLS = [
   'id', 'nombre', 'username', 'correo', 'correo_notif', 'celular', 'rol',
   'activo', 'strikes', 'foto_url', 'talla_playera', 'fecha_nacimiento',
   'num_emergencia', 'nombre_emergencia', 'template_sugerido', 'tema_acento',
-  'perfil_completo', 'permisos_extra', 'created_at', 'ultimo_acceso',
+  'perfil_completo', 'permisos_extra', 'creado_en', 'ultimo_acceso',
 ].join(',');
 
 // Campos que un usuario puede editar de SU PROPIO perfil.

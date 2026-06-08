@@ -2767,6 +2767,13 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
          <button class="btn btn-primary" onclick="guardarConfigCuenta()">Guardar cuenta</button>
          <div id="cfg-cuenta-alert" style="margin-top:10px"></div>
         </div>
+        <!-- Sincronizar eventos (U1: tabla espejo eventos_meta por slug) -->
+        <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:20px">
+         <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.15em;color:var(--ts);margin-bottom:8px">// SINCRONIZAR EVENTOS (espejo por slug para crons)</div>
+         <div style="font-size:12px;color:var(--ts);margin-bottom:14px;line-height:1.5">Lee el EV de index.html y actualiza la tabla <code>eventos_meta</code> (slug, fecha, fecha_fin, tipo). No toca el sitio público ni el portal. Córrelo cuando agregues o cambies fechas de eventos.</div>
+         <button class="btn btn-primary" onclick="_sincronizarEventosMeta(this)">Sincronizar eventos</button>
+         <div id="cfg-eventos-meta-alert" style="margin-top:10px"></div>
+        </div>
         <!-- Mensaje del día -->
         <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:20px">
          <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.15em;color:var(--ts);margin-bottom:16px">// MENSAJE DEL DÍA (aparece al entrar)</div>
@@ -12276,6 +12283,76 @@ async function guardarConfigCuenta() {
     alertEl.innerHTML='<div class="alert alert-success">✅ Cuenta guardada</div>';
     setTimeout(()=>alertEl.innerHTML='', 2000);
   } catch(e) { alertEl.innerHTML=`<div class="alert alert-error">${e.message}</div>`; }
+}
+
+// ── U1: sincronizar tabla espejo eventos_meta desde el EV (index.html) ──────
+// Lee el EV (client-side, ya lo parsea bien), deriva slug/fecha/fecha_fin/tipo/
+// dias por evento y los manda a la función eventos-meta-sync (upsert por slug).
+// fecha_fin: festival → fecha + (min(dias,3)-1) días; concierto → la ÚLTIMA
+// fecha disponible (max de dsList[]/multifecha[].ds; si no hay, = fecha).
+function _fechaMetaToISO(d) {
+  // d = 'YYYY-MM-DD' (o más). Devuelve 'YYYY-MM-DD' o null.
+  if (typeof d !== 'string' || !d.trim()) return null;
+  const s = d.trim().slice(0, 10);
+  return /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : null;
+}
+
+function _eventoMetaFila(e) {
+  const slug = e.id;
+  if (!slug) return null;
+  const esFest = !!FESTIVALES[slug];
+  const dias = FESTIVALES[slug] || 1;
+  const tipo = esFest ? 'festival' : 'concierto';
+
+  // Todas las fechas candidatas del evento ('YYYY-MM-DD').
+  const cand = [];
+  const push = (x) => { const f = _fechaMetaToISO(x); if (f) cand.push(f); };
+  push(e.ds);
+  if (Array.isArray(e.dsList)) e.dsList.forEach(push);
+  if (Array.isArray(e.multifecha)) e.multifecha.forEach(mf => mf && push(mf.ds));
+
+  const fecha = _fechaMetaToISO(e.ds)
+    || (Array.isArray(e.multifecha) && e.multifecha[0] ? _fechaMetaToISO(e.multifecha[0].ds) : null)
+    || (Array.isArray(e.dsList) ? _fechaMetaToISO(e.dsList[0]) : null)
+    || (cand.length ? cand.slice().sort()[0] : null);
+
+  let fecha_fin;
+  if (esFest && fecha) {
+    const d = new Date(fecha + 'T12:00:00');
+    d.setDate(d.getDate() + (Math.min(dias, 3) - 1));
+    fecha_fin = d.toISOString().slice(0, 10);
+  } else {
+    // Concierto: la última fecha disponible (max), o = fecha si no hay más.
+    fecha_fin = cand.length ? cand.slice().sort().slice(-1)[0] : fecha;
+  }
+
+  return { slug, nombre: e.a || slug, fecha, fecha_fin, tipo, dias };
+}
+
+async function _sincronizarEventosMeta(btn) {
+  const alertEl = document.getElementById('cfg-eventos-meta-alert');
+  if (btn) btn.disabled = true;
+  if (alertEl) alertEl.innerHTML = '<div class="alert" style="border-color:var(--border)">Leyendo eventos…</div>';
+  try {
+    const ev = await _fetchEVFromIndex();
+    const eventos = (ev || [])
+      .filter(e => e && e.id)
+      .map(_eventoMetaFila)
+      .filter(Boolean);
+    if (!eventos.length) throw new Error('No se encontraron eventos en el EV');
+
+    const r = await khAdminFetch('/.netlify/functions/eventos-meta-sync', {
+      method: 'POST', body: JSON.stringify({ eventos }),
+    });
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok || !data.ok) throw new Error(data.error || 'Error sincronizando');
+    if (alertEl) alertEl.innerHTML = `<div class="alert alert-success">✅ ${data.upserted} evento${data.upserted !== 1 ? 's' : ''} sincronizado${data.upserted !== 1 ? 's' : ''}</div>`;
+    setTimeout(() => { if (alertEl) alertEl.innerHTML = ''; }, 3000);
+  } catch (e) {
+    if (alertEl) alertEl.innerHTML = `<div class="alert alert-error">${e.message}</div>`;
+  } finally {
+    if (btn) btn.disabled = false;
+  }
 }
 
 async function guardarConfigMensaje() {

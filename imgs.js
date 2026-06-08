@@ -3,6 +3,7 @@
 // Ejemplo: { nombreEvento: 'imgs/nombreEvento.webp' }
 
 window.STATIC_IMGS={
+  'alvarodiaz':'mapas/alvaro.jpg',
   'caifanes':'imgs/caifanes.webp',
   'palnorte':'imgs/palnorte.webp',
   'avengedsevenfold':'imgs/avengedsevenfold.webp',

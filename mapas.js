@@ -8,6 +8,7 @@ window.MAPAS={
   'badgyal':'mapas/badgyal.webp',
   'machaca':'mapas/machaca.jpg',
   'arjona':'mapas/arjona.jpg',
+  'alvarodiaz':'mapas/alvaro.jpg',
   'brunomars':'mapas/brunomars.jpg',
   'dimitri':'mapas/dimitri.jpg',
   'hilary':'mapas/hilary.png',

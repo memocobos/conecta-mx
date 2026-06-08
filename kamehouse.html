@@ -4805,6 +4805,30 @@ const khTours = {
   eliminar(id) { return this._call({ accion: 'eliminar', id }); },
 };
 
+// [sec-kits] Acceso a kits_inventario vía Netlify Function con service_role
+// (cerramos lectura/escritura anon). Lectura: popo/coordi/admins (costo oculto a
+// no-admins). Crear/editar/eliminar: mister_popo + admins (verifyAdminAuth lo exige).
+const khKits = {
+  async _call(payload) {
+    const r = await khAdminFetch('/.netlify/functions/admin-kits', {
+      method: 'POST', body: JSON.stringify(payload),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || j.ok === false) throw new Error(j.error || ('admin-kits ' + r.status));
+    return j;
+  },
+  // listar() → array de piezas (order pieza.asc)
+  listar() { return this._call({ accion: 'listar' }).then(j => j.kits || []); },
+  // obtener(id) → una pieza (con costo) o null
+  obtener(id) { return this._call({ accion: 'obtener', id }).then(j => j.kit || null); },
+  // crear(body) → { ok, kit }
+  crear(body) { return this._call(Object.assign({ accion: 'crear' }, body || {})); },
+  // actualizar(id, patch) → { ok }
+  actualizar(id, patch) { return this._call({ accion: 'actualizar', id, patch }); },
+  // eliminar(id) → { ok }
+  eliminar(id) { return this._call({ accion: 'eliminar', id }); },
+};
+
 // [sec-usuarios] Registro por invitación (flujo PRE-JWT): el invite_token es la
 // credencial. fetch directo (no khAdminFetch) porque el invitado aún no tiene JWT.
 async function khRegistroInvitado(payload) {
@@ -6202,7 +6226,7 @@ async function loadInventario() {
  const tbody = document.getElementById('tabla-inventario');
  const verCostos = !['mister_popo','coordinador','cc'].includes(currentUser?.rol);
  try {
- const items = await db.get('kits_inventario', '?order=pieza.asc');
+ const items = await khKits.listar(); // [sec-kits]
  const valorTotal = items.reduce((s, i) => s + (i.cantidad * i.costo_unitario), 0);
  const piezasTotal = items.reduce((s, i) => s + (i.cantidad || 0), 0);
  const invValorEl = document.getElementById('inv-valor');
@@ -6260,8 +6284,8 @@ async function guardarKit() {
  }
  try {
  const body = { pieza, cantidad, costo_unitario: costo, stock_minimo: minimo, proveedor: proveedor || null };
- if (id) await db.patch('kits_inventario', id, body);
- else await db.post('kits_inventario', body);
+ if (id) await khKits.actualizar(id, body); // [sec-kits]
+ else await khKits.crear(body); // [sec-kits]
  alerta.innerHTML = '<div class="alert alert-success"> Guardado</div>';
  setTimeout(() => { closeModal('modal-kit'); loadInventario(); }, 900);
  } catch(e) {
@@ -6279,7 +6303,7 @@ async function editarKit(id) {
   document.getElementById('kit-proveedor').value = '';
   openModal('modal-kit');
   try {
-    const [item] = await db.get('kits_inventario', `?id=eq.${id}`);
+    const item = await khKits.obtener(id); // [sec-kits]
     if (!item) { closeModal('modal-kit'); showToast('Kit no encontrado'); return; }
     // Llenar con datos reales
     document.getElementById('kit-id').value = item.id;
@@ -6293,7 +6317,7 @@ async function editarKit(id) {
 
 async function eliminarKit(id) {
  if (!confirm('¿Eliminar esta pieza del inventario?')) return;
- try { await db.delete('kits_inventario', id); loadInventario(); }
+ try { await khKits.eliminar(id); loadInventario(); } // [sec-kits]
  catch(e) { alert(e.message); }
 }
 
@@ -12562,7 +12586,7 @@ async function loadReportes() {
   container.innerHTML = '<div class="loading-state"><div class="spinner"></div>Cargando…</div>';
   try {
     // Cargar piezas de bodega (para el formulario)
-    _bodegaPiezasCache = await db.get('kits_inventario', '?order=pieza.asc').then(r => r.map(x => ({...x, nombre: x.nombre||x.pieza}))).catch(() => []);
+    _bodegaPiezasCache = await khKits.listar().then(r => r.map(x => ({...x, nombre: x.nombre||x.pieza}))).catch(() => []); // [sec-kits]
 
     // [sec-reportes] El backend acota por rol: si es coordinador, fuerza
     // coordi_id = su id (ve SOLO sus reportes). No mandamos coordi_id desde aquí.
@@ -13028,10 +13052,10 @@ async function ejecutarAprobacionFinal(id, reporte) {
     : [];
   for (const k of kits.filter(k => (k.cantidad_sacada||0) > 0)) {
     try {
-      const [pieza] = await db.get('kits_inventario', `?id=eq.${k.pieza_id}`).catch(()=>[null]);
+      const pieza = await khKits.obtener(k.pieza_id).catch(()=>null); // [sec-kits]
       if (pieza) {
         const nuevaCantidad = Math.max(0, (pieza.cantidad||0) - (k.cantidad_sacada||0) + (k.cantidad_sobrante||0));
-        await db.patch('kits_inventario', k.pieza_id, { cantidad: nuevaCantidad });
+        await khKits.actualizar(k.pieza_id, { cantidad: nuevaCantidad }); // [sec-kits]
         // Registrar movimiento si la tabla existe
         await db.post('bodega_movimientos', {
           pieza_id: k.pieza_id,

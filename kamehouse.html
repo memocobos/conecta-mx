@@ -7995,8 +7995,10 @@ async function abrirPerfil(userId) {
     toursPasados = await db.get('tours_pasados', `?usuario_id=eq.${userId}&order=fecha_aprox.desc`);
   } catch(e) {}
   try {
-    // Trae el id de la asignación (necesario para FK de deliverables)
-    evAsignados = await db.get('eventos_coordi', `?coordi_id=eq.${userId}&select=id,evento_id,indicaciones,status,eventos(id,nombre,artista,fecha,ciudad,notas_internas)`);
+    // Trae el id de la asignación (necesario para FK de deliverables). El
+    // evento_id es slug (Fase A); los datos del evento los adjuntamos desde el
+    // EV más abajo (ya no usamos el embed eventos(...), sin FK).
+    evAsignados = await db.get('eventos_coordi', `?coordi_id=eq.${userId}&select=id,evento_id,indicaciones,status`);
   } catch(e) {}
 
   // Si la usuaria es Creador de Contenido, cargar y/o auto-popular deliverables
@@ -8011,6 +8013,7 @@ async function abrirPerfil(userId) {
   const _evArrPerfil = await _fetchEVFromIndex();
   const _evMapPerfil = {};
   _evArrPerfil.forEach(e => { if (e && e.id) _evMapPerfil[e.id] = e; });
+  _attachEventoDesdeEV(evAsignados, _evMapPerfil);
   const _combPerfil = calcularPuntosCombinados(toursPasados, evAsignados, _evMapPerfil, _anioPerfil);
   const ptsTotal = _combPerfil.total;
   const ptsAnio = _combPerfil.total;
@@ -8132,7 +8135,7 @@ async function renderMiPerfil(modoEdicion = false) {
     currentUser = { ...currentUser, ...u };
 
     const toursPasados = await db.get('tours_pasados', `?usuario_id=eq.${u.id}&order=fecha_aprox.desc`);
-    const evAsignados = await db.get('eventos_coordi', `?coordi_id=eq.${u.id}&select=id,evento_id,indicaciones,status,eventos(id,nombre,artista,fecha,ciudad,notas_internas)`).catch(() => []);
+    const evAsignados = await db.get('eventos_coordi', `?coordi_id=eq.${u.id}&select=id,evento_id,indicaciones,status`).catch(() => []);
     if (u.rol === 'cc' && evAsignados.length) {
       await _ensureDeliverables(evAsignados);
     }
@@ -8144,6 +8147,7 @@ async function renderMiPerfil(modoEdicion = false) {
     const _evArrMP = await _fetchEVFromIndex();
     const _evMapMP = {};
     _evArrMP.forEach(e => { if (e && e.id) _evMapMP[e.id] = e; });
+    _attachEventoDesdeEV(evAsignados, _evMapMP);
     const _combMP = calcularPuntosCombinados(toursPasados, evAsignados, _evMapMP, new Date().getFullYear());
     const ptsTotal = _combMP.total;
     const ptsAnio = _combMP.total;
@@ -8996,6 +9000,18 @@ function _ccEvFromEV(e) {
   };
 }
 
+// Adjunta a cada asignación (eventos_coordi, por slug) los datos del evento
+// tomados del EV ya cargado en cliente (mapa slug→item). Sustituye el viejo
+// embed PostgREST eventos(...), que dependía de una FK eventos_coordi→eventos
+// que ya NO existe (Fase A). Si el slug no está en el EV, deja un fallback con
+// el slug crudo como nombre para no romper el render.
+function _attachEventoDesdeEV(evAsignados, evMap) {
+  (evAsignados || []).forEach(e => {
+    const evItem = e && e.evento_id ? evMap[e.evento_id] : null;
+    e.eventos = evItem ? _ccEvFromEV(evItem) : { id: e.evento_id, nombre: e.evento_id };
+  });
+}
+
 async function loadCapsule() {
   const g = document.getElementById('cc-eventos-grid');
   try {
@@ -9535,7 +9551,7 @@ async function manejarAccionAsignacion() {
       window.history.replaceState({}, '', window.location.pathname);
       // Notificar a Memo
       const _asigD = await db.get('eventos_coordi', `?id=eq.${asigId}`).then(r=>r[0]).catch(()=>({}));
-      const _evD = _asigD?.evento_id ? await db.get('eventos',`?id=eq.${_asigD.evento_id}`).then(r=>r[0]?.nombre||'').catch(()=>'') : '';
+      const _evD = _asigD?.evento_id ? await db.get('eventos_meta',`?slug=eq.${_asigD.evento_id}&select=nombre`).then(r=>r[0]?.nombre||'').catch(()=>'') : '';
       const _uD  = _asigD?.coordi_id ? await db.get('usuarios',`?id=eq.${_asigD.coordi_id}`).then(r=>r[0]?.nombre||'').catch(()=>'') : '';
       await enviarAlertaMemo('tour_declinado', { nombre: _uD, evento: _evD, motivo });
       setTimeout(() => alert('Respuesta registrada. Memo será notificado.'), 500);
@@ -10409,7 +10425,7 @@ async function exportarRooming(formato) {
 async function descargarListaViajeros(eventoId) {
   try {
     const [ev, viajeros] = await Promise.all([
-      db.get('eventos', `?id=eq.${eventoId}`).then(r=>r[0]||{}),
+      db.get('eventos_meta', `?slug=eq.${eventoId}&select=nombre`).then(r=>r[0]||{}),
       db.get('viajeros_evento', `?evento_id=eq.${eventoId}&order=nombre.asc`),
     ]);
     if (!viajeros.length) { alert('No hay viajeros registrados para este evento'); return; }
@@ -10427,7 +10443,7 @@ async function descargarListaViajeros(eventoId) {
 async function descargarRoomingList(eventoId) {
   try {
     const [ev, habs] = await Promise.all([
-      db.get('eventos', `?id=eq.${eventoId}`).then(r=>r[0]||{}),
+      db.get('eventos_meta', `?slug=eq.${eventoId}&select=nombre`).then(r=>r[0]||{}),
       db.get('rooming_habitaciones', `?evento_id=eq.${eventoId}&order=orden.asc`),
     ]);
     if (!habs.length) { alert('No hay rooming list para este evento'); return; }
@@ -11358,10 +11374,10 @@ async function loadMTReportes() {
     const eIds = [...new Set(_mtReportesCache.map(r=>r.evento_id).filter(Boolean))];
     const uIds = [...new Set(_mtReportesCache.map(r=>r.coordi_id).filter(Boolean))];
     const [evs, users] = await Promise.all([
-      eIds.length ? db.get('eventos', `?id=in.(${eIds.join(',')})`) : [],
+      eIds.length ? db.get('eventos_meta', `?slug=in.(${eIds.join(',')})&select=slug,nombre,fecha,fecha_fin`) : [],
       uIds.length ? db.get('usuarios', `?id=in.(${uIds.join(',')})`) : [],
     ]);
-    const evMap = Object.fromEntries(evs.map(e=>[e.id,e]));
+    const evMap = Object.fromEntries(evs.map(e=>[e.slug,e]));
     const uMap  = Object.fromEntries(users.map(u=>[u.id,u]));
     _mtReportesCache = _mtReportesCache.map(r=>({...r, _evento:evMap[r.evento_id]||null, _coordi:uMap[r.coordi_id]||null}));
     renderMTReportes(_mtReportesCache, _mtReportesFiltro);
@@ -11523,10 +11539,10 @@ async function loadMTPendientes() {
     const eIds = [...new Set([...reportes.map(r=>r.evento_id), ...eventosCoordi.map(e=>e.evento_id)].filter(Boolean))];
     const uIds = [...new Set([...reportes.map(r=>r.coordi_id), ...eventosCoordi.map(e=>e.coordi_id)].filter(Boolean))];
     const [evs, usuarios] = await Promise.all([
-      eIds.length ? db.get('eventos', `?id=in.(${eIds.join(',')})`) : [],
+      eIds.length ? db.get('eventos_meta', `?slug=in.(${eIds.join(',')})&select=slug,nombre,fecha,fecha_fin`) : [],
       uIds.length ? db.get('usuarios', `?id=in.(${uIds.join(',')})`) : [],
     ]);
-    const evMap = Object.fromEntries(evs.map(e=>[e.id,e]));
+    const evMap = Object.fromEntries(evs.map(e=>[e.slug,e]));
     const uMap  = Object.fromEntries(usuarios.map(u=>[u.id,u]));
 
     // Helpers — misma lógica que el cron check-strikes-diario.js
@@ -11645,10 +11661,10 @@ async function loadMTDeudas() {
     const eIds = [...new Set(_mtDeudasCache.map(d=>d.evento_id).filter(Boolean))];
     const [usuarios, eventos] = await Promise.all([
       uIds.length ? db.get('usuarios', `?id=in.(${uIds.join(',')})`) : [],
-      eIds.length ? db.get('eventos', `?id=in.(${eIds.join(',')})`) : [],
+      eIds.length ? db.get('eventos_meta', `?slug=in.(${eIds.join(',')})&select=slug,nombre,fecha,fecha_fin`) : [],
     ]);
     const uMap = Object.fromEntries(usuarios.map(u=>[u.id,u]));
-    const evMap = Object.fromEntries(eventos.map(e=>[e.id,e]));
+    const evMap = Object.fromEntries(eventos.map(e=>[e.slug,e]));
     _mtDeudasCache = _mtDeudasCache.map(d=>({...d, _coordi:uMap[d.coordi_id], _evento:evMap[d.evento_id]}));
     renderMTDeudas(_mtDeudasCache, _mtDeudasFiltro);
   } catch(e) { list.innerHTML = `<div class="alert alert-error">${e.message}</div>`; }
@@ -12505,10 +12521,10 @@ async function loadReportes() {
       const eIds = [...new Set(_reportesCache.map(r => r.evento_id).filter(Boolean))];
       const uIds = [...new Set(_reportesCache.map(r => r.coordi_id).filter(Boolean))];
       const [evs, users] = await Promise.all([
-        eIds.length ? db.get('eventos', `?id=in.(${eIds.join(',')})`) : [],
+        eIds.length ? db.get('eventos_meta', `?slug=in.(${eIds.join(',')})&select=slug,nombre,fecha,fecha_fin`) : [],
         uIds.length ? db.get('usuarios', `?id=in.(${uIds.join(',')})`) : [],
       ]);
-      const evMap = Object.fromEntries(evs.map(e => [e.id, e]));
+      const evMap = Object.fromEntries(evs.map(e => [e.slug, e]));
       const uMap  = Object.fromEntries(users.map(u => [u.id, u]));
       _reportesCache = _reportesCache.map(r => ({
         ...r,
@@ -12612,17 +12628,26 @@ function renderReportes(lista, filtro) {
 
 // ── Abrir modal crear/editar reporte ────────────────────────
 async function abrirModalReporte(reporteId) {
-  // Cargar eventos asignados al coordi
+  // El coordi SOLO puede reportar eventos a los que está asignado (decisión de
+  // Memo). Leemos sus asignaciones (evento_id = slug, Fase A) y resolvemos el
+  // nombre/fecha bonita desde el EV ya cargado en cliente. value del option =
+  // slug. Si un slug no está en el EV, mostramos el slug crudo (fallback). Ya
+  // NO consultamos la tabla `eventos` (UUID).
   let evAsig = [];
   try {
-    const asigs = await db.get('eventos_coordi', `?coordi_id=eq.${currentUser.id}`);
-    if (asigs.length) {
-      const eIds = asigs.map(a => a.evento_id).join(',');
-      evAsig = await db.get('eventos', `?id=in.(${eIds})&order=fecha.desc`);
-    }
-    // Si es admin puede ver todos los eventos
-    if (!evAsig.length && ['maestro_roshi','bulma'].includes(currentUser.rol)) {
-      evAsig = await db.get('eventos', '?order=fecha.desc&limit=100');
+    const asigs = await db.get('eventos_coordi', `?coordi_id=eq.${currentUser.id}&select=evento_id`);
+    const slugs = [...new Set((asigs || []).map(a => a.evento_id).filter(Boolean))];
+    if (slugs.length) {
+      const evArr = await _fetchEVFromIndex().catch(() => []);
+      const evMap = {};
+      (evArr || []).forEach(e => { if (e && e.id) evMap[e.id] = e; });
+      evAsig = slugs.map(slug => {
+        const ev = evMap[slug];
+        const fecha = ev
+          ? (ev.ds || (Array.isArray(ev.multifecha) && ev.multifecha[0] && ev.multifecha[0].ds) || '')
+          : '';
+        return { id: slug, nombre: ev ? (ev.a || slug) : slug, fecha };
+      });
     }
   } catch(e) {
     evAsig = [];
@@ -12671,9 +12696,11 @@ async function abrirModalReporte(reporteId) {
   const kitsHtml   = kitsActuales.map(kitRow).join('') || kitRow({},0);
   const gastosHtml = gastosActuales.map(gastoRow).join('') || gastoRow({},0);
 
-  const evOptions = evAsig.map(e =>
-    `<option value="${e.id}" ${e.id===reporte?.evento_id?'selected':''}>${e.nombre} · ${new Date(e.fecha+'T12:00:00').toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric'})}</option>`
-  ).join('');
+  const evOptions = evAsig.map(e => {
+    const f = e.fecha ? new Date(e.fecha + 'T12:00:00') : null;
+    const fTxt = (f && !isNaN(f)) ? ' · ' + f.toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric'}) : '';
+    return `<option value="${e.id}" ${e.id===reporte?.evento_id?'selected':''}>${e.nombre}${fTxt}</option>`;
+  }).join('');
 
   // CAMBIO 4: aviso de rechazo visible al reabrir un reporte rechazado
   const rechazoBanner = (reporte && reporte.status === 'rechazado')

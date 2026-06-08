@@ -274,37 +274,35 @@ async function _autoAsignarEvento(contrato) {
     return { skipped: true, reason: "no_cc_profile" };
   }
 
-  // 2. Buscar evento_id. Prioridad: misma fecha; si hay varios, matchear por
-  //    similitud de nombre con contrato.evento_nombre.
+  // 2. Resolver el SLUG del evento vía eventos_meta (proyección por slug),
+  //    matcheando por fecha. ANTES usaba la tabla `eventos` (UUID) e insertaba
+  //    ese UUID en eventos_coordi; ahora todo opera por slug (EV/portal).
+  //    Si hay varias filas en la misma fecha NO adivinamos: no asignamos y
+  //    logueamos un warn (fails-soft) — la firma del contrato no se rompe.
   const evResp = await fetch(
-    `${SB_URL}/rest/v1/eventos?fecha=eq.${encodeURIComponent(contrato.evento_fecha)}&select=id,nombre,artista&limit=20`,
+    `${SB_URL}/rest/v1/eventos_meta?fecha=eq.${encodeURIComponent(contrato.evento_fecha)}&select=slug,nombre`,
     { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` } }
   );
   if (!evResp.ok) {
-    console.warn("[auto-asign] lookup eventos falló:", evResp.status);
+    console.warn("[auto-asign] lookup eventos_meta falló:", evResp.status);
     return { skipped: true, reason: "lookup_evento_error" };
   }
   const candidatos = await evResp.json();
   if (!candidatos.length) {
-    console.log("[auto-asign] sin eventos en fecha", contrato.evento_fecha);
+    console.log("[auto-asign] sin eventos_meta en fecha", contrato.evento_fecha);
     return { skipped: true, reason: "no_evento_en_fecha" };
   }
-
-  const target = String(contrato.evento_nombre || "").toLowerCase();
-  let evento = null;
-  if (candidatos.length === 1) {
-    evento = candidatos[0];
-  } else {
-    evento = candidatos.find(e => {
-      const n = (e.nombre || "").toLowerCase();
-      const a = (e.artista || "").toLowerCase();
-      return target.includes(n) || n.includes(target) || (a && target.includes(a));
-    }) || candidatos[0];
+  if (candidatos.length > 1) {
+    console.warn("[auto-asign] varias filas en eventos_meta para fecha", contrato.evento_fecha, "→ no autoasigno (ambiguo)");
+    return { skipped: true, reason: "evento_ambiguo" };
   }
 
-  // 3. Idempotencia: ¿ya existe la asignación?
+  const slug = candidatos[0].slug;
+  const eventoNombre = candidatos[0].nombre || slug;
+
+  // 3. Idempotencia: ¿ya existe la asignación? (por slug)
   const dupResp = await fetch(
-    `${SB_URL}/rest/v1/eventos_coordi?coordi_id=eq.${user.id}&evento_id=eq.${evento.id}&select=id,status&limit=1`,
+    `${SB_URL}/rest/v1/eventos_coordi?coordi_id=eq.${user.id}&evento_id=eq.${encodeURIComponent(slug)}&select=id,status&limit=1`,
     { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` } }
   );
   const dupes = dupResp.ok ? await dupResp.json() : [];
@@ -314,7 +312,7 @@ async function _autoAsignarEvento(contrato) {
     asigId = dupes[0].id;
     console.log("[auto-asign] ya existe asignación id=", asigId);
   } else {
-    // 4. Insertar asignación.
+    // 4. Insertar asignación (evento_id = slug).
     const indicaciones = Array.isArray(contrato.expectativas)
       ? contrato.expectativas.join("\n")
       : String(contrato.expectativas || "");
@@ -328,7 +326,7 @@ async function _autoAsignarEvento(contrato) {
       },
       body: JSON.stringify({
         coordi_id: user.id,
-        evento_id: evento.id,
+        evento_id: slug,
         indicaciones,
         status: "aceptado",
       }),
@@ -341,21 +339,21 @@ async function _autoAsignarEvento(contrato) {
     const [created] = await insResp.json();
     asigId = created.id;
     asigCreated = true;
-    console.log("[auto-asign] asignación creada id=", asigId, "user=", user.nombre, "evento=", evento.nombre);
+    console.log("[auto-asign] asignación creada id=", asigId, "user=", user.nombre, "evento=", eventoNombre, "slug=", slug);
   }
 
   // 5. Auto-agregar como viajero del evento (idempotente). Best-effort: si
-  //    falla no rompe la asignación.
+  //    falla no rompe la asignación. viajeros_evento.evento_id también es slug.
   let viajero = null;
   try {
-    viajero = await _upsertViajeroStaffServer(evento.id, user);
+    viajero = await _upsertViajeroStaffServer(slug, user);
   } catch (e) {
     console.warn("[auto-asign] upsert viajero falló:", e.message);
   }
 
   return {
     id: asigId,
-    evento_id: evento.id,
+    evento_id: slug,
     coordi_id: user.id,
     [asigCreated ? "created" : "existing"]: true,
     viajero,

@@ -65,6 +65,18 @@ function _debeAplicarStrike(usuario) {
   return true;
 }
 
+// ── Guardia retroactiva ────────────────────────────────────────────────
+// Apenas estamos configurando el sistema por slug y NO hay datos reales.
+// Para que el cron NO dispare strikes retroactivos de eventos viejos, solo
+// evaluamos eventos cuyo último día (fecha_fin || fecha) sea POSTERIOR a esta
+// fecha de corte. Ajusta FECHA_CORTE_STRIKES (YYYY-MM-DD) cuando el sistema ya
+// esté en operación real. Comparación lexicográfica (fechas ISO ordenan bien).
+const FECHA_CORTE_STRIKES = '2026-06-07'; // ← Memo: muévela cuando arranque en serio
+function _antesDelCorte(ev) {
+  const ult = _ultimoDiaEvento(ev);
+  return !ult || ult < FECHA_CORTE_STRIKES;
+}
+
 // ── Dedup helpers ───────────────────────────────────────────────────
 // strikes_log.evento_id se agregó en migración 2026-05-28 para hacer el
 // dedup robusto. Antes el dedup buscaba ev.id en el texto del motivo
@@ -166,52 +178,70 @@ exports.handler = async function(event) {
     console.error('[check-strikes] Falta SUPABASE_SERVICE_KEY_KAMEHOUSE o URL');
     return { statusCode: 500, body: 'Config faltante' };
   }
+
+  // dry_run (?dry_run=1 o body {dry_run:true}): NO escribe (ni strikes, ni
+  // deudas, ni flags); solo cuenta lo que HARÍA. Para probar sin efectos.
+  let dryRun = (event && event.queryStringParameters && event.queryStringParameters.dry_run === '1');
+  if (!dryRun && event && event.body) {
+    try { dryRun = JSON.parse(event.body).dry_run === true; } catch { /* body no-JSON */ }
+  }
+
   const ahora = new Date();
   let sr = 0, sd = 0;
 
   try {
     // 1) STRIKE POR REPORTE NO LLENADO — deadline = fin_evento + 1día + 48h
-    // Traemos eventos cuya fecha de inicio (`fecha`) ya pasó hace ≥2 días.
-    // Cubre tanto eventos de 1 día (deadline = fecha + 3 días) como
-    // multifecha más largos. El filtro fino se hace en JS con _deadlineReporte.
+    // Fechas e identidad del evento desde eventos_meta (por SLUG). Antes leía la
+    // tabla `eventos` (UUID); tras la unificación TODO casa por slug. Traemos
+    // eventos cuya fecha de inicio (`fecha`) ya pasó hace ≥2 días; el filtro
+    // fino se hace en JS con _deadlineReporte.
     const margenISO = new Date(ahora.getTime() - 2 * 24 * 60 * 60 * 1000)
       .toISOString().split("T")[0];
-    const eventosVencidos = await sb(
-      `eventos?fecha=lte.${margenISO}&select=id,nombre,fecha,fecha_fin`
+    const eventosRaw = await sb(
+      `eventos_meta?fecha=lte.${margenISO}&select=slug,nombre,fecha,fecha_fin`
     ).catch(() => []);
+    // Normaliza: el resto del cron usa ev.id como identidad del evento (= slug).
+    const eventosVencidos = (eventosRaw || []).map(e => ({ ...e, id: e.slug }));
 
     for (const ev of eventosVencidos) {
-      const deadline = _deadlineReporte(ev);
-      if (!deadline || ahora < deadline) continue; // todavía no vence
+      try {
+        if (_antesDelCorte(ev)) continue;          // guardia retroactiva
+        const deadline = _deadlineReporte(ev);
+        if (!deadline || ahora < deadline) continue; // todavía no vence
 
-      const asigs = await sb(
-        `eventos_coordi?evento_id=eq.${ev.id}&status=eq.aceptado&select=coordi_id`
-      ).catch(() => []);
-      if (!asigs.length) continue;
-
-      const coordiIds = asigs.map(a => a.coordi_id).filter(Boolean);
-      if (!coordiIds.length) continue;
-      const usuarios = await sb(
-        `usuarios?id=in.(${coordiIds.join(",")})&select=id,nombre,rol`
-      ).catch(() => []);
-      const uMap = Object.fromEntries(usuarios.map(u => [u.id, u]));
-
-      for (const a of asigs) {
-        const u = uMap[a.coordi_id];
-        if (!_debeAplicarStrike(u)) continue;
-        const rep = await sb(
-          `reportes_evento?evento_id=eq.${ev.id}&coordi_id=eq.${a.coordi_id}&status=in.(enviado,aprobado_popo,aprobado_memo)&select=id&limit=1`
+        const asigs = await sb(
+          `eventos_coordi?evento_id=eq.${encodeURIComponent(ev.id)}&status=eq.aceptado&select=coordi_id`
         ).catch(() => []);
-        if (rep && rep.length > 0) continue;
-        // Dedup robusto por evento_id (con fallback por nombre)
-        if (await _yaExisteStrikeReporte(a.coordi_id, ev)) continue;
-        await aplicarStrike(
-          a.coordi_id,
-          `Reporte no enviado en 48hrs — ${ev.nombre}`,
-          "strike_reporte_no_enviado",
-          ev.id
-        );
-        sr++;
+        if (!asigs.length) continue;
+
+        const coordiIds = asigs.map(a => a.coordi_id).filter(Boolean);
+        if (!coordiIds.length) continue;
+        const usuarios = await sb(
+          `usuarios?id=in.(${coordiIds.join(",")})&select=id,nombre,rol`
+        ).catch(() => []);
+        const uMap = Object.fromEntries(usuarios.map(u => [u.id, u]));
+
+        for (const a of asigs) {
+          const u = uMap[a.coordi_id];
+          if (!_debeAplicarStrike(u)) continue;
+          const rep = await sb(
+            `reportes_evento?evento_id=eq.${encodeURIComponent(ev.id)}&coordi_id=eq.${a.coordi_id}&status=in.(enviado,aprobado_popo,aprobado_memo)&select=id&limit=1`
+          ).catch(() => []);
+          if (rep && rep.length > 0) continue;
+          // Dedup robusto por evento_id (slug) con fallback por nombre
+          if (await _yaExisteStrikeReporte(a.coordi_id, ev)) continue;
+          if (!dryRun) {
+            await aplicarStrike(
+              a.coordi_id,
+              `Reporte no enviado en 48hrs — ${ev.nombre}`,
+              "strike_reporte_no_enviado",
+              ev.id
+            );
+          }
+          sr++;
+        }
+      } catch (e) {
+        console.error(`[check-strikes] evento ${ev && ev.id}:`, e.message);
       }
     }
 
@@ -223,41 +253,50 @@ exports.handler = async function(event) {
     ).catch(() => []);
 
     for (const r of aprobados) {
-      const kits = typeof r.kits_detalle === "string"
-        ? JSON.parse(r.kits_detalle) : (r.kits_detalle || []);
-      const sobrantes = kits.filter(k => (k.cantidad_sobrante || 0) > 0 && !k.recibido);
-      if (!sobrantes.length) continue;
+      try {
+        const kits = typeof r.kits_detalle === "string"
+          ? JSON.parse(r.kits_detalle) : (r.kits_detalle || []);
+        const sobrantes = kits.filter(k => (k.cantidad_sobrante || 0) > 0 && !k.recibido);
+        if (!sobrantes.length) continue;
 
-      const usuariosRow = await sb(`usuarios?id=eq.${r.coordi_id}&select=id,nombre,rol`).catch(() => []);
-      const u = usuariosRow && usuariosRow[0];
-      if (!_debeAplicarStrike(u)) continue;
+        const usuariosRow = await sb(`usuarios?id=eq.${r.coordi_id}&select=id,nombre,rol`).catch(() => []);
+        const u = usuariosRow && usuariosRow[0];
+        if (!_debeAplicarStrike(u)) continue;
 
-      const evRows = await sb(`eventos?id=eq.${r.evento_id}&select=id,fecha,fecha_fin`).catch(() => []);
-      const ev = evRows && evRows[0];
-      if (!ev) continue;
-      const deadline = _deadlineDevolucion(ev);
-      if (!deadline || ahora < deadline) continue; // todavía no vence
+        // Fechas del evento desde eventos_meta, por slug (= reportes_evento.evento_id).
+        const evRows = await sb(`eventos_meta?slug=eq.${encodeURIComponent(r.evento_id)}&select=slug,fecha,fecha_fin`).catch(() => []);
+        const evRow = evRows && evRows[0];
+        if (!evRow) continue;
+        const ev = { ...evRow, id: evRow.slug };
+        if (_antesDelCorte(ev)) continue;          // guardia retroactiva
+        const deadline = _deadlineDevolucion(ev);
+        if (!deadline || ahora < deadline) continue; // todavía no vence
 
-      // Dedup de devolución funciona vía strike_devolucion_aplicado flag
-      // en reportes_evento (PATCH al final del bloque). evento_id se pasa
-      // por higiene de datos.
-      await aplicarStrike(r.coordi_id, "Kits sobrantes no regresados en 5 días", "strike_devolucion_pendiente", r.evento_id);
+        if (!dryRun) {
+          // Dedup de devolución funciona vía strike_devolucion_aplicado flag
+          // en reportes_evento (PATCH al final del bloque). evento_id (slug) se
+          // pasa por higiene de datos.
+          await aplicarStrike(r.coordi_id, "Kits sobrantes no regresados en 5 días", "strike_devolucion_pendiente", r.evento_id);
 
-      for (const k of sobrantes) {
-        const piezas = await sb(`kits_inventario?id=eq.${k.pieza_id}&select=pieza,costo_unitario`).catch(() => []);
-        const pieza = piezas && piezas[0];
-        if (!pieza) continue;
-        const monto = (k.cantidad_sobrante || 0) * (pieza.costo_unitario || 0);
-        await sb("deudas_coordi", { method: "POST", body: JSON.stringify({ coordi_id: r.coordi_id, evento_id: r.evento_id, reporte_id: r.id, tipo: "kit_perdido", concepto: `${k.cantidad_sobrante} ${pieza.pieza} no regresados`, monto, notas: "Plazo 5 días vencido", created_at: new Date().toISOString() }) }).catch(() => {});
+          for (const k of sobrantes) {
+            const piezas = await sb(`kits_inventario?id=eq.${k.pieza_id}&select=pieza,costo_unitario`).catch(() => []);
+            const pieza = piezas && piezas[0];
+            if (!pieza) continue;
+            const monto = (k.cantidad_sobrante || 0) * (pieza.costo_unitario || 0);
+            await sb("deudas_coordi", { method: "POST", body: JSON.stringify({ coordi_id: r.coordi_id, evento_id: r.evento_id, reporte_id: r.id, tipo: "kit_perdido", concepto: `${k.cantidad_sobrante} ${pieza.pieza} no regresados`, monto, notas: "Plazo 5 días vencido", created_at: new Date().toISOString() }) }).catch(() => {});
+          }
+
+          await sb(`reportes_evento?id=eq.${r.id}`, { method: "PATCH", body: JSON.stringify({ strike_devolucion_aplicado: true }) });
+        }
+        sd++;
+      } catch (e) {
+        console.error(`[check-strikes] reporte ${r && r.id}:`, e.message);
       }
-
-      await sb(`reportes_evento?id=eq.${r.id}`, { method: "PATCH", body: JSON.stringify({ strike_devolucion_aplicado: true }) });
-      sd++;
     }
   } catch (e) {
     console.error("[check-strikes] Error:", e.message);
   }
 
-  console.log(`[check-strikes] Fin. Strikes reporte:${sr} devolución:${sd}`);
-  return { statusCode: 200, body: JSON.stringify({ ok: true, sr, sd }) };
+  console.log(`[check-strikes] Fin${dryRun ? ' (DRY RUN)' : ''}. Strikes reporte:${sr} devolución:${sd}`);
+  return { statusCode: 200, body: JSON.stringify({ ok: true, dry_run: dryRun, sr, sd }) };
 };

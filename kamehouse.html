@@ -7526,6 +7526,80 @@ function calcularPuntosAnio(tours, anio) {
   }, 0);
 }
 
+// ═══════════════════════════════════════════════════════════════
+// DC2d — Puntos AUTO desde tours asignados (eventos_coordi → eventos)
+// Los tours_pasados (manuales) son para tours FUERA del sistema. Los tours
+// ASIGNADOS + ACEPTADOS cuyo evento YA pasó suman solos, derivando el tipo/días
+// del evento de KH. NO se deduplican manual vs auto (no comparten llave): se
+// confía en esa regla de uso.
+// ═══════════════════════════════════════════════════════════════
+
+// Parse robusto de una fecha 'YYYY-MM-DD' (o ISO) a Date al mediodía local.
+function _fechaDiaKH(s) {
+  if (!s) return null;
+  const d = new Date(String(s).slice(0, 10) + 'T12:00:00');
+  return isNaN(d.getTime()) ? null : d;
+}
+
+// (A) Deriva la clave de PUNTOS_TOUR del tipo/días de un evento de KH.
+function tipoTourDeEvento(ev) {
+  if (!ev) return 'concierto';
+  if (String(ev.tipo || '').toLowerCase() !== 'festival') return 'concierto';  // Concierto o sin tipo
+  const ini = _fechaDiaKH(ev.fecha);
+  if (!ini) return 'concierto';  // fecha inválida → degrada
+  const fin = _fechaDiaKH(ev.fecha_fin);
+  const dias = fin ? Math.round((fin - ini) / 86400000) + 1 : 1;
+  if (dias <= 1) return 'festival_1d';
+  if (dias === 2) return 'festival_2d';
+  return 'festival_3d';
+}
+
+// (B) ¿El evento asignado YA pasó? (fecha_fin || fecha) < hoy@00:00. Sin fecha → false.
+function eventoYaPaso(ev) {
+  if (!ev) return false;
+  const ref = _fechaDiaKH(ev.fecha_fin) || _fechaDiaKH(ev.fecha);
+  if (!ref) return false;
+  const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
+  return ref < hoy;
+}
+
+// Lista los tours AUTO de un usuario: asignaciones aceptadas cuyo evento existe
+// en eventosById y YA pasó. Dedup por evento_id (un tour = un set de puntos).
+// Sin filtro de año aquí; el filtro de año lo aplica quien suma.
+function toursAutoDeUsuario(asignaciones, eventosById) {
+  const out = [];
+  const vistos = new Set();
+  (asignaciones || []).forEach(a => {
+    if (!a || a.status !== 'aceptado') return;
+    const eid = a.evento_id;
+    if (!eid || vistos.has(eid)) return;
+    const ev = eventosById[eid];
+    if (!ev || !eventoYaPaso(ev)) return;  // sin fila en eventos KH o futuro → no cuenta auto
+    vistos.add(eid);
+    const tipo = tipoTourDeEvento(ev);
+    out.push({
+      nombre: ev.nombre || ev.artista || 'Evento',
+      artista: ev.artista || ev.nombre || 'Evento',
+      tipo_tour: tipo,
+      pts: PUNTOS_TOUR[tipo] || 0,
+      fecha: ev.fecha_fin || ev.fecha || null,
+    });
+  });
+  return out;
+}
+
+// (C) Puntos combinados manual + auto para un usuario en un año. Reusa
+// calcularPuntosAnio para lo manual (no lo duplica).
+function calcularPuntosCombinados(toursPasados, asignaciones, eventosById, anio) {
+  const manuales = calcularPuntosAnio(toursPasados || [], anio);
+  const autosAnio = toursAutoDeUsuario(asignaciones, eventosById).filter(t => {
+    const d = _fechaDiaKH(t.fecha);
+    return d && d.getFullYear() === anio;
+  });
+  const auto = autosAnio.reduce((s, t) => s + t.pts, 0);
+  return { total: manuales + auto, manuales, auto, toursAutoDetalle: autosAnio };
+}
+
 async function loadEquipo() {
   const grid = document.getElementById('gz-grid');
   if (!grid) return;
@@ -7764,7 +7838,7 @@ async function abrirPerfil(userId) {
   } catch(e) {}
   try {
     // Trae el id de la asignación (necesario para FK de deliverables)
-    evAsignados = await db.get('eventos_coordi', `?coordi_id=eq.${userId}&select=id,evento_id,indicaciones,status,eventos(id,nombre,artista,fecha,ciudad,notas_internas)`);
+    evAsignados = await db.get('eventos_coordi', `?coordi_id=eq.${userId}&select=id,evento_id,indicaciones,status,eventos(id,nombre,artista,fecha,fecha_fin,tipo,ciudad,notas_internas)`);
   } catch(e) {}
 
   // Si la usuaria es Creador de Contenido, cargar y/o auto-popular deliverables
@@ -7893,7 +7967,7 @@ async function renderMiPerfil(modoEdicion = false) {
     currentUser = { ...currentUser, ...u };
 
     const toursPasados = await db.get('tours_pasados', `?usuario_id=eq.${u.id}&order=fecha_aprox.desc`);
-    const evAsignados = await db.get('eventos_coordi', `?coordi_id=eq.${u.id}&select=id,evento_id,indicaciones,status,eventos(id,nombre,artista,fecha,ciudad,notas_internas)`).catch(() => []);
+    const evAsignados = await db.get('eventos_coordi', `?coordi_id=eq.${u.id}&select=id,evento_id,indicaciones,status,eventos(id,nombre,artista,fecha,fecha_fin,tipo,ciudad,notas_internas)`).catch(() => []);
     if (u.rol === 'cc' && evAsignados.length) {
       await _ensureDeliverables(evAsignados);
     }
@@ -7913,6 +7987,15 @@ async function renderMiPerfil(modoEdicion = false) {
 function renderPerfilCompleto(u, toursPasados, evAsignados, iniciales, edad, cumple, ptsTotal, ptsAnio, esMiPerfil) {
   const strikes = u.strikes || 0;
   const anioActual = new Date().getFullYear();
+
+  // DC2d: puntos combinados (manuales + tours asignados ya pasados). El mapa
+  // eventosById sale de los embeds de evAsignados (tipo/fecha/fecha_fin).
+  const _evById = {};
+  (evAsignados || []).forEach(e => { if (e && e.evento_id && e.eventos) _evById[e.evento_id] = e.eventos; });
+  const _comb = calcularPuntosCombinados(toursPasados, evAsignados, _evById, anioActual);
+  const _toursAuto = toursAutoDeUsuario(evAsignados, _evById);  // todos los pasados (cualquier año), para el historial
+  const ptsAnioComb = _comb.total;
+  const toursCount = (toursPasados ? toursPasados.length : 0) + _toursAuto.length;
 
   return `
     <div class="perfil-card">
@@ -7949,11 +8032,11 @@ function renderPerfilCompleto(u, toursPasados, evAsignados, iniciales, edad, cum
               `;
             })() : `
               <div style="text-align:center">
-                <div class="pts-display">${ptsAnio}</div>
+                <div class="pts-display">${ptsAnioComb}</div>
                 <div class="pts-label">PTS ${anioActual}</div>
               </div>
               <div style="text-align:center">
-                <div style="font-family:'Zen Dots',cursive;font-size:24px;line-height:1;color:var(--text)">${toursPasados.length}</div>
+                <div style="font-family:'Zen Dots',cursive;font-size:24px;line-height:1;color:var(--text)">${toursCount}</div>
                 <div class="pts-label">Tours</div>
               </div>
               <div style="text-align:center">
@@ -8028,10 +8111,11 @@ function renderPerfilCompleto(u, toursPasados, evAsignados, iniciales, edad, cum
 
       <div class="perfil-section">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px">
-          <div class="perfil-section-title" style="margin-bottom:0">Historial de tours <span style="color:var(--ts);font-weight:400">[${toursPasados.length}]</span></div>
+          <div class="perfil-section-title" style="margin-bottom:0">Historial de tours <span style="color:var(--ts);font-weight:400">[${toursCount}]</span></div>
           <button class="btn btn-ghost btn-sm" onclick="abrirAgregarTour('${u.id}')" style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.08em">+ Agregar</button>
         </div>
-        ${toursPasados.length ? toursPasados.map(t => {
+        ${(toursPasados.length || _toursAuto.length) ? (
+          toursPasados.map(t => {
           const año = t.fecha_aprox ? new Date(t.fecha_aprox).getFullYear() : null;
           const sumaPuntos = año && año >= 2026;
           const ptsTour = PUNTOS_TOUR[t.tipo_tour] || 0;
@@ -8047,7 +8131,21 @@ function renderPerfilCompleto(u, toursPasados, evAsignados, iniciales, edad, cum
             <div class="tour-item-meta">${TIPO_TOUR_LABEL[t.tipo_tour]||'Tour'} · ${t.ciudad || ''} ${t.fecha_aprox ? '· ' + fmtFecha(t.fecha_aprox) : ''}</div>
             ${t.notas ? `<div style="font-size:11px;color:var(--ts);margin-top:6px;font-style:italic">${t.notas}</div>` : ''}
           </div>`;
-        }).join('') : '<div style="font-family:JetBrains Mono,monospace;font-size:11px;color:var(--ts);letter-spacing:.05em">// sin historial. Agrega tus tours pre-sistema para construir tu perfil.</div>'}
+        }).join('') + _toursAuto.map(t => {
+          const año = _fechaDiaKH(t.fecha) ? _fechaDiaKH(t.fecha).getFullYear() : null;
+          const sumaPuntos = año && año >= 2026;
+          return `
+          <div class="tour-item" style="border-left-color:var(--orange)">
+            <div class="tour-item-head">
+              <div class="tour-item-name">${t.artista} <span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--orange);letter-spacing:.1em">(asignado)</span></div>
+              <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
+                ${sumaPuntos ? `<span class="tour-item-pts">+${t.pts}</span>` : '<span style="font-family:JetBrains Mono,monospace;font-size:9px;color:var(--ts);letter-spacing:.1em">PRE-2026</span>'}
+              </div>
+            </div>
+            <div class="tour-item-meta">${TIPO_TOUR_LABEL[t.tipo_tour]||'Tour'} ${t.fecha ? '· ' + fmtFecha(t.fecha) : ''} · <span style="color:var(--orange)">tour asignado (auto)</span></div>
+          </div>`;
+        }).join('')
+        ) : '<div style="font-family:JetBrains Mono,monospace;font-size:11px;color:var(--ts);letter-spacing:.05em">// sin historial. Agrega tus tours pre-sistema para construir tu perfil.</div>'}
       </div>
     </div>
   `;
@@ -8262,11 +8360,24 @@ async function abrirRanking() {
     const tours = await db.get('tours_pasados', '?fecha_aprox=gte.2026-01-01&order=fecha_aprox.desc');
     const usuarios = await db.get('usuarios', '?activo=eq.true&order=nombre.asc');
     const anioActual = new Date().getFullYear();
+
+    // DC2d: tours asignados+aceptados de TODOS + sus eventos KH (para puntos auto).
+    const asigsAceptadas = await db.get('eventos_coordi', '?status=eq.aceptado&select=coordi_id,evento_id,status');
+    const _eventoIds = [...new Set(asigsAceptadas.map(a => a.evento_id).filter(Boolean))];
+    const eventosById = {};
+    if (_eventoIds.length) {
+      const evs = await db.get('eventos', `?id=in.(${_eventoIds.join(',')})&select=id,tipo,fecha,fecha_fin,nombre,artista`);
+      evs.forEach(ev => { eventosById[ev.id] = ev; });
+    }
+    const asigsPorUsuario = {};
+    asigsAceptadas.forEach(a => { (asigsPorUsuario[a.coordi_id] = asigsPorUsuario[a.coordi_id] || []).push(a); });
+
     const rankingData = usuarios.map(u => {
       const misToures = tours.filter(t => t.usuario_id === u.id);
-      const ptsAnio = calcularPuntosAnio(misToures, anioActual);
+      const comb = calcularPuntosCombinados(misToures, asigsPorUsuario[u.id] || [], eventosById, anioActual);
       const iniciales = u.nombre.split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase();
-      return { ...u, tours: misToures, ptsAnio, iniciales };
+      // "X tours" = manuales (del año, ya filtrados a 2026+) + autos contados en pts.
+      return { ...u, tours: misToures, ptsAnio: comb.total, toursCount: misToures.length + comb.toursAutoDetalle.length, iniciales };
     });
     rankingData.sort((a, b) => b.ptsAnio - a.ptsAnio);
     const medallaEmoji = ['🥇','🥈','🥉'];
@@ -8288,6 +8399,7 @@ async function abrirRanking() {
           </div>
           <div style="font-family:Rajdhani;font-size:13px;color:var(--gold);margin-top:8px;font-weight:600">El líder al final del año gana un tour gratis 🎉</div>
           <div style="font-family:JetBrains Mono;font-size:10px;color:var(--ts);margin-top:4px;letter-spacing:.04em">// concierto: 3pts · festival 1d: 5pts · 2d: 7pts · 3d: 10pts</div>
+          <div style="font-family:JetBrains Mono;font-size:10px;color:var(--ts);margin-top:2px;letter-spacing:.04em">// tus tours asignados ya realizados suman automático</div>
         </div>
         <div style="padding:20px 28px 28px">
           ${rankingData.map((u, i) => {
@@ -8297,7 +8409,7 @@ async function abrirRanking() {
             return `<div class="rank-row ${top} ${esYo}">
               <div class="rank-pos">${posDisplay}</div>
               <div class="gz-avatar" style="width:44px;height:44px;font-size:14px;flex-shrink:0">${u.foto_url ? `<img src="${u.foto_url}">` : u.iniciales}</div>
-              <div style="flex:1;min-width:0"><div style="font-family:Rajdhani;font-weight:700;font-size:14px">${u.nombre}${esYo ? ' <span style="font-family:JetBrains Mono;font-size:9px;color:var(--orange);letter-spacing:.1em">// TÚ</span>' : ''}</div><div class="gz-rol" style="font-size:9px;margin-bottom:0">${ROL_LABELS[u.rol] || u.rol} · ${u.tours.length} tours</div></div>
+              <div style="flex:1;min-width:0"><div style="font-family:Rajdhani;font-weight:700;font-size:14px">${u.nombre}${esYo ? ' <span style="font-family:JetBrains Mono;font-size:9px;color:var(--orange);letter-spacing:.1em">// TÚ</span>' : ''}</div><div class="gz-rol" style="font-size:9px;margin-bottom:0">${ROL_LABELS[u.rol] || u.rol} · ${u.toursCount} tours</div></div>
               <div style="text-align:right"><div class="rank-pts">${u.ptsAnio}</div><div style="font-family:'JetBrains Mono',monospace;font-size:8px;letter-spacing:.18em;color:var(--ts);text-transform:uppercase">PTS</div></div>
             </div>`;
           }).join('')}

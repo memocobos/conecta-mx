@@ -4785,6 +4785,26 @@ const khReportes = {
   eliminar(id) { return this._call({ accion: 'eliminar', id }); },
 };
 
+// [sec-tours] Acceso a tours_pasados vía Netlify Function con service_role
+// (cerramos lectura/escritura anon). Lectura: cualquier logueado. Crear/eliminar:
+// el backend exige que el tour sea del propio usuario salvo admin (maestro_roshi/bulma).
+const khTours = {
+  async _call(payload) {
+    const r = await khAdminFetch('/.netlify/functions/admin-tours', {
+      method: 'POST', body: JSON.stringify(payload),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || j.ok === false) throw new Error(j.error || ('admin-tours ' + r.status));
+    return j;
+  },
+  // listar({ usuario_id?, desde?, limit? }) → array de tours
+  listar(opts) { return this._call(Object.assign({ accion: 'listar' }, opts || {})).then(j => j.tours || []); },
+  // crear(tour) → { ok, tour }
+  crear(tour) { return this._call(Object.assign({ accion: 'crear' }, tour || {})); },
+  // eliminar(id) → { ok }
+  eliminar(id) { return this._call({ accion: 'eliminar', id }); },
+};
+
 // [sec-usuarios] Registro por invitación (flujo PRE-JWT): el invite_token es la
 // credencial. fetch directo (no khAdminFetch) porque el invitado aún no tiene JWT.
 async function khRegistroInvitado(payload) {
@@ -7870,7 +7890,7 @@ async function renderGZ() {
   // Cargar puntos para todos: manuales (tours_pasados) + auto (tours asignados por
   // slug, DC2d). Fails-soft: si fallan asignaciones o EV, cae a solo manuales.
   let allTours = [];
-  try { allTours = await db.get('tours_pasados', '?fecha_aprox=gte.2026-01-01'); } catch(e){}
+  try { allTours = await khTours.listar({ desde: '2026-01-01' }); } catch(e){} // [sec-tours]
   let asignacionesDe = {};
   let evMap = {};
   try {
@@ -8067,7 +8087,7 @@ async function abrirPerfil(userId) {
   let toursPasados = [];
   let evAsignados = [];
   try {
-    toursPasados = await db.get('tours_pasados', `?usuario_id=eq.${userId}&order=fecha_aprox.desc`);
+    toursPasados = await khTours.listar({ usuario_id: userId }); // [sec-tours]
   } catch(e) {}
   try {
     // Trae el id de la asignación (necesario para FK de deliverables). El
@@ -8143,7 +8163,7 @@ async function guardarTourPasado(userId) {
   const artista = document.getElementById('tp-artista').value.trim();
   if (!artista) { alert('El artista es obligatorio'); return; }
   try {
-    await db.post('tours_pasados', {
+    await khTours.crear({ // [sec-tours]
       usuario_id: userId, artista,
       ciudad: document.getElementById('tp-ciudad').value.trim() || null,
       fecha_aprox: document.getElementById('tp-fecha').value || null,
@@ -8161,10 +8181,7 @@ async function guardarTourPasado(userId) {
 async function eliminarTourPasado(tourId, userId) {
   if (!confirm('¿Eliminar este tour del historial?')) return;
   try {
-    await fetch(`${SB_URL}/rest/v1/tours_pasados?id=eq.${tourId}`, {
-      method: 'DELETE',
-      headers: { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY }
-    });
+    await khTours.eliminar(tourId); // [sec-tours]
     cerrarModal('ver-perfil');
     if (currentUser && userId === currentUser.id) renderMiPerfil(false);
     else abrirPerfil(userId);
@@ -8209,7 +8226,7 @@ async function renderMiPerfil(modoEdicion = false) {
     if (!u) { el.innerHTML = '<div class="alert alert-error">No se encontró el perfil</div>'; return; }
     currentUser = { ...currentUser, ...u };
 
-    const toursPasados = await db.get('tours_pasados', `?usuario_id=eq.${u.id}&order=fecha_aprox.desc`);
+    const toursPasados = await khTours.listar({ usuario_id: u.id }); // [sec-tours]
     const evAsignados = await db.get('eventos_coordi', `?coordi_id=eq.${u.id}&select=id,evento_id,indicaciones,status`).catch(() => []);
     if (u.rol === 'cc' && evAsignados.length) {
       await _ensureDeliverables(evAsignados);
@@ -8583,7 +8600,7 @@ async function subirFoto(userId) {
 async function abrirRanking() {
   crearModal('ranking', '', '<div class="loading-state"><div class="spinner"></div>Calculando ranking…</div>');
   try {
-    const tours = await db.get('tours_pasados', '?fecha_aprox=gte.2026-01-01&order=fecha_aprox.desc');
+    const tours = await khTours.listar({ desde: '2026-01-01' }); // [sec-tours]
     const usuarios = await khUsuarios.listar({ activos: true, orden: 'nombre' }); // [sec-usuarios]
     // Tours asignados aceptados (de TODOS) → puntos AUTO derivados del EV por slug (DC2d).
     const asignaciones = await db.get('eventos_coordi', '?status=eq.aceptado&select=coordi_id,evento_id,status');

@@ -4702,6 +4702,40 @@ const db = {
  }
 };
 
+// [sec-usuarios] Acceso a la tabla `usuarios` vía Netlify Function (service_role).
+// Reemplaza db.get/post/patch('usuarios', ...). El RLS de `usuarios` ya NO expone
+// PII (nombre/correo/rol/password_hash) a la anon key. La función whitelistea
+// columnas (nunca devuelve password_hash) y hashea cualquier password con bcrypt.
+const khUsuarios = {
+  async _call(payload) {
+    const r = await khAdminFetch('/.netlify/functions/admin-usuarios', {
+      method: 'POST', body: JSON.stringify(payload),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || j.ok === false) throw new Error(j.error || ('admin-usuarios ' + r.status));
+    return j;
+  },
+  // listar({ activos?, ids?, rol?, correo?, orden? }) → array de usuarios (sin password)
+  listar(opts) { return this._call(Object.assign({ accion: 'listar' }, opts || {})).then(j => j.usuarios || []); },
+  // obtener(id) → un usuario (objeto) o null
+  obtener(id) { return this._call({ accion: 'obtener', id }).then(j => j.usuario || null); },
+  // verificarUsername(username, excludeId?) → bool disponible
+  verificarUsername(username, excludeId) { return this._call({ accion: 'verificar_username', username, excludeId }).then(j => j.disponible); },
+  // crear(correo, rol) → { id, correo, nombre, rol, invite_token }
+  crear(correo, rol) { return this._call({ accion: 'crear', correo, rol }).then(j => j.usuario); },
+  // actualizar(id, patch) → ok (password en patch.password se hashea server-side)
+  actualizar(id, patch) { return this._call({ accion: 'actualizar', id, patch }); },
+};
+
+// [sec-usuarios] Registro por invitación (flujo PRE-JWT): el invite_token es la
+// credencial. fetch directo (no khAdminFetch) porque el invitado aún no tiene JWT.
+async function khRegistroInvitado(payload) {
+  const r = await fetch('/.netlify/functions/registro-invitado', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
+  });
+  return r.json().catch(() => ({ ok: false, error: 'Respuesta inválida del servidor' }));
+}
+
 // Cache local (para no re-fetchear todo el tiempo)
 let _eventosCache = [];
 
@@ -7753,7 +7787,7 @@ async function loadEquipo() {
   const grid = document.getElementById('gz-grid');
   if (!grid) return;
   try {
-    _gzCache = await db.get('usuarios', '?activo=eq.true&order=nombre.asc');
+    _gzCache = await khUsuarios.listar({ activos: true, orden: 'nombre' }); // [sec-usuarios]
     renderGZ();
   } catch(e) {
     grid.innerHTML = `<div class="alert alert-error">${e.message}</div>`;
@@ -7853,16 +7887,11 @@ async function enviarInvitacion() {
     setTimeout(() => alertEl.innerHTML = '', 3000);
     return;
   }
-  const token = crypto.randomUUID();
-  const expires = new Date(Date.now() + 48 * 3600000).toISOString();
-  const link = `${APP_URL}?token=${token}`;
+  let link = ''; // [sec-usuarios] el server genera el invite_token y lo devuelve
   try {
     alertEl.innerHTML = '<div class="alert" style="background:rgba(255,183,3,.1);color:var(--gold)">Enviando invitación…</div>';
-    await db.post('usuarios', {
-      correo, nombre: correo.split('@')[0], rol, activo: false,
-      invite_token: token, invite_usado: false,
-      invite_expires_at: expires, password_hash: null
-    });
+    const nuevo = await khUsuarios.crear(correo, rol); // [sec-usuarios]
+    link = `${APP_URL}?token=${nuevo.invite_token}`;
     await sendEmail(correo, 'Bienvenido al equipo de Conecta Reynosa', buildInviteEmail(correo.split('@')[0], rol, link));
     alertEl.innerHTML = '<div class="alert" style="background:rgba(45,198,83,.1);color:var(--green)">✅ Invitación enviada a ' + correo + '</div>';
     document.getElementById('inv-correo').value = '';
@@ -7907,11 +7936,7 @@ async function gestionarStrikes(userId, nombre, strikesActuales) {
   const motivo = prompt(`Motivo:`);
   if (motivo === null) return;
   try {
-    await fetch(`${SB_URL}/rest/v1/usuarios?id=eq.${userId}`, {
-      method: 'PATCH',
-      headers: { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ strikes: nuevo })
-    });
+    await khUsuarios.actualizar(userId, { strikes: nuevo }); // [sec-usuarios]
     try {
       await db.post('strikes_log', { coordi_id: userId, accion: accion === '+' ? 'asignado' : 'quitado', motivo: motivo || null, por_quien: currentUser.id });
     } catch(e) {}
@@ -7936,11 +7961,7 @@ async function gestionarStrikes(userId, nombre, strikesActuales) {
 async function confirmarEliminar(userId, nombre) {
   if (!confirm(`¿Dar de baja a ${nombre}? Esto desactiva su acceso pero conserva su historial.`)) return;
   try {
-    await fetch(`${SB_URL}/rest/v1/usuarios?id=eq.${userId}`, {
-      method: 'PATCH',
-      headers: { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ activo: false })
-    });
+    await khUsuarios.actualizar(userId, { activo: false }); // [sec-usuarios]
     await loadEquipo();
   } catch(e) { alert('Error: ' + e.message); }
 }
@@ -7968,11 +7989,7 @@ async function cambiarRol(userId, rolActual) {
   const nuevoRol = prompt(`Rol actual: ${rolActual}\n\nEscribe el nuevo rol:\n${roles.join(', ')}`);
   if (!nuevoRol || !roles.includes(nuevoRol)) return;
   try {
-    await fetch(`${SB_URL}/rest/v1/usuarios?id=eq.${userId}`, {
-      method: 'PATCH',
-      headers: { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ rol: nuevoRol })
-    });
+    await khUsuarios.actualizar(userId, { rol: nuevoRol }); // [sec-usuarios]
     cerrarModal('ver-perfil');
     await loadEquipo();
   } catch(e) { alert('Error: ' + e.message); }
@@ -8106,7 +8123,7 @@ async function renderMiPerfil(modoEdicion = false) {
     el.innerHTML = renderFormPerfil();
     // Fetch fresco para tener todos los campos (incluyendo username)
     try {
-      const [uFresh] = await db.get('usuarios', `?id=eq.${currentUser.id}&limit=1`);
+      const uFresh = await khUsuarios.obtener(currentUser.id); // [sec-usuarios]
       const u = uFresh || currentUser;
       ['nombre','correo_notif','celular','num_emergencia','nombre_emergencia','talla_playera','fecha_nacimiento','template_sugerido','username'].forEach(campo => {
         const inp = document.getElementById('mp-' + campo);
@@ -8130,7 +8147,7 @@ async function renderMiPerfil(modoEdicion = false) {
   el.innerHTML = '<div class="loading-state"><div class="spinner"></div>Cargando perfil…</div>';
 
   try {
-    const [u] = await db.get('usuarios', `?id=eq.${currentUser.id}&limit=1`);
+    const u = await khUsuarios.obtener(currentUser.id); // [sec-usuarios]
     if (!u) { el.innerHTML = '<div class="alert alert-error">No se encontró el perfil</div>'; return; }
     currentUser = { ...currentUser, ...u };
 
@@ -8403,12 +8420,8 @@ async function guardarMiPerfil() {
   const usernameNuevo = document.getElementById('mp-username')?.value.trim().toLowerCase().replace(/\s+/g,'') || null;
   if (usernameNuevo) {
     // Verificar que no esté tomado por otro usuario
-    const chkResp = await fetch(
-      `${SB_URL}/rest/v1/usuarios?username=eq.${encodeURIComponent(usernameNuevo)}&id=neq.${currentUser.id}&limit=1`,
-      { headers: { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY } }
-    );
-    const chk = await chkResp.json();
-    if (chk && chk.length > 0) {
+    const disponible = await khUsuarios.verificarUsername(usernameNuevo, currentUser.id); // [sec-usuarios]
+    if (!disponible) {
       alertEl.innerHTML = '<div class="alert alert-error">Ese nombre de usuario ya está tomado, elige otro</div>';
       return;
     }
@@ -8427,13 +8440,10 @@ async function guardarMiPerfil() {
     perfil_completo: true,
   };
   if (usernameNuevo) body.username = usernameNuevo;
-  if (passNueva) body.password_hash = passNueva;
+  if (passNueva) body.password = passNueva; // [sec-usuarios] texto plano; el server lo hashea (bcrypt)
   try {
-    await fetch(`${SB_URL}/rest/v1/usuarios?id=eq.${currentUser.id}`, {
-      method: 'PATCH',
-      headers: { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY, 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
-    });
+    await khUsuarios.actualizar(currentUser.id, body); // [sec-usuarios]
+    delete body.password; // [sec-usuarios] no propagar la password en claro a currentUser/sessionStorage
     alertEl.innerHTML = '<div class="alert" style="background:rgba(45,198,83,.1);color:var(--green)">Perfil guardado</div>';
     currentUser = { ...currentUser, ...body };
     // Refrescar la sesión guardada para que el tema persista al recargar
@@ -8488,11 +8498,7 @@ async function subirFoto(userId) {
       });
 
       // Guardar base64 directo en foto_url (sin depender de Storage)
-      await fetch(`${SB_URL}/rest/v1/usuarios?id=eq.${userId}`, {
-        method: 'PATCH',
-        headers: { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY, 'Content-Type': 'application/json', 'Prefer': 'return=representation' },
-        body: JSON.stringify({ foto_url: base64url })
-      });
+      await khUsuarios.actualizar(userId, { foto_url: base64url }); // [sec-usuarios]
 
       // Actualizar sesión si es el usuario actual
       if (userId === currentUser.id) {
@@ -8520,7 +8526,7 @@ async function abrirRanking() {
   crearModal('ranking', '', '<div class="loading-state"><div class="spinner"></div>Calculando ranking…</div>');
   try {
     const tours = await db.get('tours_pasados', '?fecha_aprox=gte.2026-01-01&order=fecha_aprox.desc');
-    const usuarios = await db.get('usuarios', '?activo=eq.true&order=nombre.asc');
+    const usuarios = await khUsuarios.listar({ activos: true, orden: 'nombre' }); // [sec-usuarios]
     // Tours asignados aceptados (de TODOS) → puntos AUTO derivados del EV por slug (DC2d).
     const asignaciones = await db.get('eventos_coordi', '?status=eq.aceptado&select=coordi_id,evento_id,status');
     const evArr = await _fetchEVFromIndex();
@@ -8594,16 +8600,26 @@ async function mostrarRegistroInvitado(token) {
   const screen = document.getElementById('login-screen');
   screen.style.display = 'flex';
 
-  // Verificar token
+  // Verificar token vía Netlify Function (pre-JWT; el invite_token es la credencial).
   let usuario = null;
+  let _regReason = '';
   try {
-    const resp = await fetch(
-      `${SB_URL}/rest/v1/usuarios?invite_token=eq.${token}&invite_usado=eq.false&limit=1`,
-      { headers: { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY } }
-    );
-    const data = await resp.json();
-    usuario = data && data[0];
-  } catch(e) {}
+    const vr = await khRegistroInvitado({ accion: 'validar', token }); // [sec-usuarios]
+    if (vr.ok) usuario = vr.usuario; else _regReason = vr.reason || 'invalido';
+  } catch(e) { _regReason = 'invalido'; }
+
+  if (!usuario && _regReason === 'expirado') {
+    screen.innerHTML = `
+      <div class="login-bg"></div>
+      <div class="login-card">
+        <div class="login-logo">KAME<span>·</span>HOUSE</div>
+        <div class="login-sub" style="color:var(--red)">Link expirado</div>
+        <p style="color:var(--ts);font-size:13px;text-align:center;margin-top:12px">
+          Este link expiró (48 horas). Pídele a Memo que te mande uno nuevo.
+        </p>
+      </div>`;
+    return;
+  }
 
   if (!usuario) {
     screen.innerHTML = `
@@ -8613,19 +8629,6 @@ async function mostrarRegistroInvitado(token) {
         <div class="login-sub" style="color:var(--red)">Link inválido o ya usado</div>
         <p style="color:var(--ts);font-size:13px;text-align:center;margin-top:12px">
           Este link de invitación ya fue usado o no existe.<br>Pídele a Memo que te mande uno nuevo.
-        </p>
-      </div>`;
-    return;
-  }
-
-  if (usuario.invite_expires_at && new Date(usuario.invite_expires_at) < new Date()) {
-    screen.innerHTML = `
-      <div class="login-bg"></div>
-      <div class="login-card">
-        <div class="login-logo">KAME<span>·</span>HOUSE</div>
-        <div class="login-sub" style="color:var(--red)">Link expirado</div>
-        <p style="color:var(--ts);font-size:13px;text-align:center;margin-top:12px">
-          Este link expiró (48 horas). Pídele a Memo que te mande uno nuevo.
         </p>
       </div>`;
     return;
@@ -8688,40 +8691,20 @@ async function completarRegistro(userId, token) {
   btn.textContent = 'Creando cuenta…'; btn.disabled = true;
 
   try {
-    // Verificar que el username no esté tomado
-    const resp = await fetch(
-      `${SB_URL}/rest/v1/usuarios?username=eq.${encodeURIComponent(username)}&limit=1`,
-      { headers: { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY } }
-    );
-    const existing = await resp.json();
-    if (existing && existing.length > 0 && existing[0].id !== userId) {
-      errEl.textContent = 'Ese usuario ya está tomado, elige otro';
+    const cel   = document.getElementById('reg-cel').value.trim();
+    const talla = document.getElementById('reg-talla').value;
+    // [sec-usuarios] El alta (re-valida token + username, hashea con bcrypt y activa
+    // la cuenta) ocurre server-side. El id se deriva del token, no del cliente.
+    const res = await khRegistroInvitado({
+      accion: 'completar', token, nombre, username, password: pass,
+      celular: cel || undefined, talla_playera: talla || undefined,
+    });
+    if (!res.ok) {
+      errEl.textContent = res.error || 'Error al crear la cuenta';
       btn.textContent = 'Crear mi cuenta →'; btn.disabled = false;
       return;
     }
-
-    const body = {
-      nombre, username, password_hash: pass,
-      activo: true, invite_usado: true, invite_token: null
-    };
-    const cel   = document.getElementById('reg-cel').value.trim();
-    const talla = document.getElementById('reg-talla').value;
-    if (cel)   body.celular = cel;
-    if (talla) body.talla_playera = talla;
-
-    await fetch(`${SB_URL}/rest/v1/usuarios?id=eq.${userId}`, {
-      method: 'PATCH',
-      headers: { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY, 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
-    });
-
-    // Cargar el usuario actualizado y entrar
-    const userResp = await fetch(
-      `${SB_URL}/rest/v1/usuarios?id=eq.${userId}&limit=1`,
-      { headers: { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY } }
-    );
-    const users = await userResp.json();
-    currentUser = users[0];
+    currentUser = res.user;
     sessionStorage.setItem(SESSION_KEY, JSON.stringify({ user: currentUser, expires: Date.now() + SESSION_HOURS * 3600000 }));
     window.history.replaceState({}, '', window.location.pathname);
     enterApp();
@@ -9246,8 +9229,7 @@ async function loadCCEquipo() {
     let usuarios = [];
     let uMap = {};
     if (asigs.length) {
-      const uIds = asigs.map(a=>a.coordi_id).join(',');
-      usuarios = await db.get('usuarios', `?id=in.(${uIds})`);
+      usuarios = await khUsuarios.listar({ ids: asigs.map(a=>a.coordi_id) }); // [sec-usuarios]
       uMap = Object.fromEntries(usuarios.map(u=>[u.id,u]));
       // Guardar referencia de usuario en cada asignación (para rooming)
       _ccAsignados = asigs.map(a => ({ ...a, _usuario: uMap[a.coordi_id]||{} }));
@@ -9287,9 +9269,7 @@ async function loadCCEquipo() {
             sinAsignacion.map(c => (c.creador_email||'').toLowerCase()).filter(Boolean)
           )];
           const lookups = await Promise.all(correosUnicos.map(c =>
-            db.get('usuarios',
-              `?correo=eq.${encodeURIComponent(c)}&rol=eq.cc&select=id,nombre,correo,foto_url,rol&limit=1`
-            ).catch(()=>[])
+            khUsuarios.listar({ correo: c, rol: 'cc' }).catch(()=>[]) // [sec-usuarios]
           ));
           const ccMap = {};
           lookups.forEach((arr, i) => { if (arr[0]) ccMap[correosUnicos[i]] = arr[0]; });
@@ -9379,7 +9359,7 @@ async function loadCCEquipo() {
 async function abrirModalAsignarCoordi() {
   const rolesAsignables = ['coordinador','cc','mister_popo','maestro_roshi','bulma'];
   let usuarios = [];
-  try { usuarios = await db.get('usuarios', `?activo=eq.true&order=nombre.asc`); }
+  try { usuarios = await khUsuarios.listar({ activos: true, orden: 'nombre' }); } // [sec-usuarios]
   catch(e) {}
   // Excluir ya asignados
   const asignadosIds = _ccAsignados.map(a=>a.coordi_id);
@@ -9443,7 +9423,7 @@ async function guardarAsignacionCoordi() {
     });
     // Correo con link aceptar/declinar
     const ev = _ccEventosCache.find(e=>e.id===_ccEventoActual);
-    const [usuario] = await db.get('usuarios', `?id=eq.${coordiId}`);
+    const usuario = await khUsuarios.obtener(coordiId); // [sec-usuarios]
     const asigId = Array.isArray(asig) ? asig[0]?.id : asig?.id;
     const baseUrl = window.location.origin + window.location.pathname;
     const linkAceptar = `${baseUrl}?accion=aceptar&asig=${asigId}`;
@@ -9495,7 +9475,7 @@ async function reenviarNotificacion(asigId) {
   if (!asig) return;
   const ev = _ccEventosCache.find(e=>e.id===_ccEventoActual);
   try {
-    const [usuario] = await db.get('usuarios', `?id=eq.${asig.coordi_id}`);
+    const usuario = await khUsuarios.obtener(asig.coordi_id); // [sec-usuarios]
     const baseUrl = window.location.origin + window.location.pathname;
     const linkAceptar = `${baseUrl}?accion=aceptar&asig=${asigId}`;
     const linkDeclinar = `${baseUrl}?accion=declinar&asig=${asigId}`;
@@ -9552,7 +9532,7 @@ async function manejarAccionAsignacion() {
       // Notificar a Memo
       const _asigD = await db.get('eventos_coordi', `?id=eq.${asigId}`).then(r=>r[0]).catch(()=>({}));
       const _evD = _asigD?.evento_id ? await db.get('eventos_meta',`?slug=eq.${_asigD.evento_id}&select=nombre`).then(r=>r[0]?.nombre||'').catch(()=>'') : '';
-      const _uD  = _asigD?.coordi_id ? await db.get('usuarios',`?id=eq.${_asigD.coordi_id}`).then(r=>r[0]?.nombre||'').catch(()=>'') : '';
+      const _uD  = _asigD?.coordi_id ? await khUsuarios.obtener(_asigD.coordi_id).then(u=>u?.nombre||'').catch(()=>'') : ''; // [sec-usuarios]
       await enviarAlertaMemo('tour_declinado', { nombre: _uD, evento: _evD, motivo });
       setTimeout(() => alert('Respuesta registrada. Memo será notificado.'), 500);
     } catch(e) { console.warn(e); }
@@ -9570,7 +9550,7 @@ async function _upsertViajeroStaff(asigId) {
   const [asig] = await db.get('eventos_coordi', `?id=eq.${asigId}&select=id,evento_id,coordi_id&limit=1`);
   if (!asig || !asig.evento_id || !asig.coordi_id) return null;
 
-  const [u] = await db.get('usuarios', `?id=eq.${asig.coordi_id}&select=id,nombre,correo,celular,talla_playera,num_emergencia,nombre_emergencia,rol&limit=1`);
+  const u = await khUsuarios.obtener(asig.coordi_id); // [sec-usuarios]
   if (!u) return null;
 
   // Idempotencia: chequear por correo (siempre presente en viajeros_evento).
@@ -9624,8 +9604,7 @@ async function notificarEquipoListas() {
   const aceptados = _ccAsignados.filter(a => a.status === 'aceptado');
   if (!aceptados.length) { alert('No hay equipo que haya aceptado aún'); return; }
   const ev = _ccEventosCache.find(e=>e.id===_ccEventoActual);
-  const uIds = aceptados.map(a=>a.coordi_id).join(',');
-  const usuarios = await db.get('usuarios', `?id=in.(${uIds})`);
+  const usuarios = await khUsuarios.listar({ ids: aceptados.map(a=>a.coordi_id) }); // [sec-usuarios]
   let enviados = 0;
   for (const u of usuarios) {
     const email = u.correo_notif || u.correo;
@@ -11375,7 +11354,7 @@ async function loadMTReportes() {
     const uIds = [...new Set(_mtReportesCache.map(r=>r.coordi_id).filter(Boolean))];
     const [evs, users] = await Promise.all([
       eIds.length ? db.get('eventos_meta', `?slug=in.(${eIds.join(',')})&select=slug,nombre,fecha,fecha_fin`) : [],
-      uIds.length ? db.get('usuarios', `?id=in.(${uIds.join(',')})`) : [],
+      uIds.length ? khUsuarios.listar({ ids: uIds }) : [], // [sec-usuarios]
     ]);
     const evMap = Object.fromEntries(evs.map(e=>[e.slug,e]));
     const uMap  = Object.fromEntries(users.map(u=>[u.id,u]));
@@ -11540,7 +11519,7 @@ async function loadMTPendientes() {
     const uIds = [...new Set([...reportes.map(r=>r.coordi_id), ...eventosCoordi.map(e=>e.coordi_id)].filter(Boolean))];
     const [evs, usuarios] = await Promise.all([
       eIds.length ? db.get('eventos_meta', `?slug=in.(${eIds.join(',')})&select=slug,nombre,fecha,fecha_fin`) : [],
-      uIds.length ? db.get('usuarios', `?id=in.(${uIds.join(',')})`) : [],
+      uIds.length ? khUsuarios.listar({ ids: uIds }) : [], // [sec-usuarios]
     ]);
     const evMap = Object.fromEntries(evs.map(e=>[e.slug,e]));
     const uMap  = Object.fromEntries(usuarios.map(u=>[u.id,u]));
@@ -11660,7 +11639,7 @@ async function loadMTDeudas() {
     const uIds = [...new Set(_mtDeudasCache.map(d=>d.coordi_id).filter(Boolean))];
     const eIds = [...new Set(_mtDeudasCache.map(d=>d.evento_id).filter(Boolean))];
     const [usuarios, eventos] = await Promise.all([
-      uIds.length ? db.get('usuarios', `?id=in.(${uIds.join(',')})`) : [],
+      uIds.length ? khUsuarios.listar({ ids: uIds }) : [], // [sec-usuarios]
       eIds.length ? db.get('eventos_meta', `?slug=in.(${eIds.join(',')})&select=slug,nombre,fecha,fecha_fin`) : [],
     ]);
     const uMap = Object.fromEntries(usuarios.map(u=>[u.id,u]));
@@ -11782,7 +11761,7 @@ async function loadMTResumen() {
   if (!el) return;
   try {
     const [usuarios, eventos, reportes, asigs] = await Promise.all([
-      db.get('usuarios', '?activo=eq.true&select=id,rol'),
+      khUsuarios.listar({ activos: true }), // [sec-usuarios]
       db.get('eventos', '?order=fecha.desc&limit=5&select=id,nombre,fecha'),
       db.get('reportes_evento', '?status=in.(enviado,aprobado_popo)&select=id,status'),
       db.get('eventos_coordi', '?status=eq.pendiente&select=id'),
@@ -11837,7 +11816,7 @@ async function loadMTUsuarios() {
   if (!list) return;
   list.innerHTML = '<div class="loading-state"><div class="spinner"></div></div>';
   try {
-    _mtUsuariosCache = await db.get('usuarios', '?order=nombre.asc');
+    _mtUsuariosCache = await khUsuarios.listar({ orden: 'nombre' }); // [sec-usuarios]
     if (countEl) countEl.textContent = `${_mtUsuariosCache.length} usuarios`;
     renderMTUsuarios(_mtUsuariosCache);
   } catch(e) { list.innerHTML = `<div class="alert alert-error">${e.message}</div>`; }
@@ -11899,7 +11878,7 @@ async function toggleActivoUsuario(id, activo) {
   const accion = activo ? 'desactivar' : 'activar';
   if (!confirm(`¿${accion.charAt(0).toUpperCase()+accion.slice(1)} este usuario?`)) return;
   try {
-    await db.patch('usuarios', id, { activo: !activo });
+    await khUsuarios.actualizar(id, { activo: !activo }); // [sec-usuarios]
     await loadMTUsuarios();
     // Alerta si se desactiva
     if (activo) await enviarAlertaMemo('usuario_desactivado', { id });
@@ -11912,8 +11891,7 @@ async function abrirEditarUsuarioMT(id) {
   // Fallback: si la cache no lo tiene (stale, no cargada), traer de DB.
   if (!u) {
     try {
-      const rows = await db.get('usuarios', `?id=eq.${encodeURIComponent(id)}&limit=1`);
-      u = rows && rows[0];
+      u = await khUsuarios.obtener(id); // [sec-usuarios]
     } catch(e) { /* u sigue undefined */ }
   }
   if (!u || !u.id) {
@@ -12004,9 +11982,9 @@ async function guardarUsuarioMT() {
     nombre, rol, username: username||null,
     permisos_extra: { tabs_extra: tabsExtra, tabs_bloqueados: tabsBloq },
   };
-  if (pass) body.password_hash = pass;
+  if (pass) body.password = pass; // [sec-usuarios] texto plano; el server lo hashea (bcrypt)
   try {
-    await db.patch('usuarios', id, body);
+    await khUsuarios.actualizar(id, body); // [sec-usuarios]
     if (alertEl) alertEl.innerHTML='<div class="alert alert-success">✅ Guardado</div>';
     setTimeout(()=>{ closeModal('modal-mt-usuario'); loadMTUsuarios(); }, 800);
   } catch(e) { showErr(e.message); }
@@ -12083,7 +12061,7 @@ async function loadMTStrikes() {
   if (!list) return;
   list.innerHTML = '<div class="loading-state"><div class="spinner"></div></div>';
   try {
-    const usuarios = await db.get('usuarios', '?order=strikes.desc&select=id,nombre,rol,strikes,activo');
+    const usuarios = await khUsuarios.listar({ orden: 'strikes' }); // [sec-usuarios]
     const conStrikes = usuarios.filter(u => (u.strikes||0) > 0);
     const sinStrikes = usuarios.filter(u => (u.strikes||0) === 0);
     const rolLabels = { maestro_roshi:'Maestro Roshi', bulma:'Bulma', mister_popo:'Mister Popo', coordinador:'Coordinador', cc:'CC', vendedor:'Vendedor' };
@@ -12150,7 +12128,7 @@ async function ponerStrikeDesdePanel() {
 async function aplicarStrike(userId, nombre, strikesActuales, motivo) {
   const nuevos = strikesActuales + 1;
   try {
-    await db.patch('usuarios', userId, { strikes: nuevos });
+    await khUsuarios.actualizar(userId, { strikes: nuevos }); // [sec-usuarios]
     // Log del strike
     await db.post('strikes_log', {
       coordi_id: userId,
@@ -12160,7 +12138,7 @@ async function aplicarStrike(userId, nombre, strikesActuales, motivo) {
       created_at: new Date().toISOString(),
     }).catch(()=>{});
     // Email al usuario
-    const [u] = await db.get('usuarios', `?id=eq.${userId}`);
+    const u = await khUsuarios.obtener(userId); // [sec-usuarios]
     const email = u?.correo_notif || u?.correo;
     if (email) {
       await enviarEmailSistema(email, `⚠️ Strike registrado — Kamehouse`,
@@ -12181,7 +12159,7 @@ async function aplicarStrike(userId, nombre, strikesActuales, motivo) {
     if (nuevos >= 2) await enviarAlertaMemo('strikes', { nombre, strikes: nuevos, motivo });
     // Suspender si llegó a 3
     if (nuevos >= 3) {
-      await db.patch('usuarios', userId, { activo: false });
+      await khUsuarios.actualizar(userId, { activo: false }); // [sec-usuarios]
     }
     await loadMTStrikes();
   } catch(e) { alert(e.message); }
@@ -12191,7 +12169,7 @@ async function quitarStrike(userId, nombre, strikesActuales) {
   if (!confirm(`¿Quitar 1 strike a ${nombre}?`)) return;
   const nuevos = Math.max(0, strikesActuales - 1);
   try {
-    await db.patch('usuarios', userId, { strikes: nuevos });
+    await khUsuarios.actualizar(userId, { strikes: nuevos }); // [sec-usuarios]
     await loadMTStrikes();
   } catch(e) { alert(e.message); }
 }
@@ -12522,7 +12500,7 @@ async function loadReportes() {
       const uIds = [...new Set(_reportesCache.map(r => r.coordi_id).filter(Boolean))];
       const [evs, users] = await Promise.all([
         eIds.length ? db.get('eventos_meta', `?slug=in.(${eIds.join(',')})&select=slug,nombre,fecha,fecha_fin`) : [],
-        uIds.length ? db.get('usuarios', `?id=in.(${uIds.join(',')})`) : [],
+        uIds.length ? khUsuarios.listar({ ids: uIds }) : [], // [sec-usuarios]
       ]);
       const evMap = Object.fromEntries(evs.map(e => [e.slug, e]));
       const uMap  = Object.fromEntries(users.map(u => [u.id, u]));

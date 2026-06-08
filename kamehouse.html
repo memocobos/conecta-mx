@@ -294,6 +294,27 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Montse
  cursor:pointer;transition:all .2s;
 }
 .btn-logout:hover{border-color:var(--red);color:var(--red)}
+/* ── Campanita de notificaciones (DC2c-A) ── */
+.notif-wrap{position:relative;display:flex;align-items:center}
+.topbar-bell{position:relative;background:none;border:none;cursor:pointer;font-size:18px;line-height:1;padding:4px;color:var(--ts);transition:color .2s}
+.topbar-bell:hover{color:var(--text)}
+.notif-badge{position:absolute;top:-2px;right:-3px;min-width:16px;height:16px;padding:0 4px;border-radius:8px;background:var(--red);color:#fff;font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:700;align-items:center;justify-content:center;line-height:1;box-sizing:border-box}
+.notif-panel{position:absolute;top:calc(100% + 10px);right:0;width:340px;max-width:90vw;max-height:440px;overflow-y:auto;background:var(--bg2);border:1px solid var(--border);border-radius:10px;box-shadow:0 12px 40px rgba(0,0,0,.5);z-index:1000}
+.notif-panel-head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:12px 14px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--bg2)}
+.notif-panel-title{font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--text)}
+.notif-mark-all{background:none;border:none;color:var(--orange);cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.04em;white-space:nowrap}
+.notif-mark-all:hover{text-decoration:underline}
+.notif-item{display:flex;gap:10px;padding:12px 14px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .15s}
+.notif-item:last-child{border-bottom:none}
+.notif-item:hover{background:var(--bg3)}
+.notif-item.unread{background:rgba(255,107,0,.06)}
+.notif-dot{width:7px;height:7px;border-radius:50%;background:var(--orange);flex-shrink:0;margin-top:5px}
+.notif-dot.read{background:transparent}
+.notif-item-body{flex:1;min-width:0}
+.notif-item-title{font-family:'Rajdhani',sans-serif;font-weight:700;font-size:13px;color:var(--text)}
+.notif-item-msg{font-size:12px;color:var(--ts);margin-top:2px;line-height:1.35}
+.notif-item-time{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--ts);margin-top:4px;letter-spacing:.05em}
+.notif-empty{padding:28px 14px;text-align:center;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--ts);letter-spacing:.05em}
 
 /* ═══════════════════════════════════════════════
  NAV — SIDEBAR agrupado (desktop) + BARRA INFERIOR (móvil)  · D2
@@ -1891,6 +1912,10 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
  <div class="topbar-right">
  <div class="topbar-dot"></div>
  <div class="topbar-user" id="topbar-user-info">—</div>
+ <div class="notif-wrap" id="notif-wrap">
+   <button class="topbar-bell" onclick="_toggleNotifPanel(event)" aria-label="Notificaciones" title="Notificaciones">🔔<span class="notif-badge" id="notif-badge" style="display:none">0</span></button>
+   <div class="notif-panel" id="notif-panel" style="display:none"></div>
+ </div>
  <button class="btn-logout" onclick="doLogout()">Salir</button>
  </div>
  </div>
@@ -4285,6 +4310,125 @@ async function khAdminFetch(url, options) {
   return fetch(url, options);
 }
 
+// ── NOTIFICACIONES IN-APP (DC2c-A) ──────────────────────────────────────────
+// Capa in-app que acompaña los emails. Lecturas/marcado scopeados por el JWT.
+let _notifCache = [];
+
+async function _cargarNotificaciones() {
+  try {
+    const r = await khAdminFetch('/.netlify/functions/notificaciones', {
+      method: 'POST', body: JSON.stringify({ accion: 'list' }),
+    });
+    const data = await r.json();
+    if (!r.ok || !data.ok) throw new Error(data.error || 'fail');
+    _notifCache = data.notificaciones || [];
+    _pintarBadgeNotif(data.no_leidas || 0);
+    _renderNotifPanel();
+  } catch (e) {
+    _pintarBadgeNotif(0); // fails-soft: oculta badge, no rompe el panel
+  }
+}
+
+function _pintarBadgeNotif(n) {
+  const badge = document.getElementById('notif-badge');
+  if (!badge) return;
+  if (n > 0) { badge.textContent = n > 99 ? '99+' : String(n); badge.style.display = 'flex'; }
+  else { badge.style.display = 'none'; }
+}
+
+function _toggleNotifPanel(ev) {
+  if (ev) ev.stopPropagation();
+  const panel = document.getElementById('notif-panel');
+  if (!panel) return;
+  if (panel.style.display === 'block') { _closeNotifPanel(); return; }
+  _renderNotifPanel();
+  panel.style.display = 'block';
+  setTimeout(() => document.addEventListener('click', _notifOutsideHandler), 0);
+}
+
+function _notifOutsideHandler(ev) {
+  const wrap = document.getElementById('notif-wrap');
+  if (wrap && wrap.contains(ev.target)) return; // click dentro del wrap: ignora
+  _closeNotifPanel();
+}
+
+function _closeNotifPanel() {
+  const panel = document.getElementById('notif-panel');
+  if (panel) panel.style.display = 'none';
+  document.removeEventListener('click', _notifOutsideHandler);
+}
+
+function _renderNotifPanel() {
+  const panel = document.getElementById('notif-panel');
+  if (!panel) return;
+  const items = _notifCache.length ? _notifCache.map(n => {
+    const linkArg = n.link ? `'${String(n.link).replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'` : 'null';
+    return `
+    <div class="notif-item ${n.leida ? '' : 'unread'}" onclick="_marcarNotifLeida('${n.id}', ${linkArg})">
+      <div class="notif-dot ${n.leida ? 'read' : ''}"></div>
+      <div class="notif-item-body">
+        ${n.titulo ? `<div class="notif-item-title">${_escNotif(n.titulo)}</div>` : ''}
+        <div class="notif-item-msg">${_escNotif(n.mensaje)}</div>
+        <div class="notif-item-time">${_haceCuanto(n.created_at)}</div>
+      </div>
+    </div>`;
+  }).join('') : '<div class="notif-empty">// sin notificaciones</div>';
+  panel.innerHTML = `
+    <div class="notif-panel-head">
+      <div class="notif-panel-title">Notificaciones</div>
+      ${_notifCache.some(n => !n.leida) ? '<button class="notif-mark-all" onclick="_marcarTodasNotif(event)">Marcar todas leídas</button>' : ''}
+    </div>
+    ${items}`;
+}
+
+async function _marcarNotifLeida(id, link) {
+  try {
+    await khAdminFetch('/.netlify/functions/notificaciones', {
+      method: 'POST', body: JSON.stringify({ accion: 'marcar_leida', id }),
+    });
+  } catch (e) {}
+  await _cargarNotificaciones();
+  if (link) { _closeNotifPanel(); window.location.href = link; }
+}
+
+async function _marcarTodasNotif(ev) {
+  if (ev) ev.stopPropagation();
+  try {
+    await khAdminFetch('/.netlify/functions/notificaciones', {
+      method: 'POST', body: JSON.stringify({ accion: 'marcar_todas' }),
+    });
+  } catch (e) {}
+  await _cargarNotificaciones();
+}
+
+// Crea una notif vía la función (accion:'crear'). Fails-soft: NUNCA lanza, para
+// no bloquear la acción principal (email/strike) si la notif falla.
+async function _crearNotif(payload) {
+  try {
+    await khAdminFetch('/.netlify/functions/notificaciones', {
+      method: 'POST', body: JSON.stringify(Object.assign({ accion: 'crear' }, payload)),
+    });
+  } catch (e) { /* fails-soft */ }
+}
+
+function _escNotif(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+function _haceCuanto(ts) {
+  if (!ts) return '';
+  const then = new Date(ts).getTime();
+  if (isNaN(then)) return '';
+  const s = Math.floor((Date.now() - then) / 1000);
+  if (s < 60) return 'hace un momento';
+  const m = Math.floor(s / 60); if (m < 60) return `hace ${m} min`;
+  const h = Math.floor(m / 60); if (h < 24) return `hace ${h} h`;
+  const d = Math.floor(h / 24); if (d < 7) return `hace ${d} d`;
+  return new Date(ts).toLocaleDateString('es-MX', { day: '2-digit', month: 'short' });
+}
+
 async function doLogin() {
   const credentials = document.getElementById('login-user').value.trim().toLowerCase();
   const pass        = document.getElementById('login-pass').value.trim();
@@ -4367,6 +4511,7 @@ function enterApp() {
   aplicarPermisosUI();
   aplicarTemaCoordi();
   applyTema(currentUser.tema_acento);
+  _cargarNotificaciones(); // fails-soft: pinta el badge si hay no leídas
   bootApp();
 }
 
@@ -9305,6 +9450,11 @@ async function guardarAsignacionCoordi() {
         }),
       });
     }
+    // Notificación in-app al coordi (además del email). Fails-soft.
+    await _crearNotif({
+      usuario_id: coordiId, tipo: 'asignacion', titulo: 'Nuevo evento asignado',
+      mensaje: `Te asignaron: ${ev?.nombre || 'un evento'}. Entra a tu perfil para verlo.`,
+    });
     alertEl.innerHTML='<div class="alert alert-success">✅ Asignado y notificado</div>';
     setTimeout(async ()=>{ closeModal('modal-asignar-coordi'); await loadCCEquipo(); }, 900);
   } catch(e) { alertEl.innerHTML=`<div class="alert alert-error">${e.message}</div>`; }
@@ -9475,6 +9625,11 @@ async function notificarEquipoListas() {
           <p style="color:#888899;font-size:12px;margin-top:32px">Conecta Reynosa · conectareynosa.mx</p>
         </div>`,
       }),
+    });
+    // Notificación in-app (además del email). Fails-soft.
+    await _crearNotif({
+      usuario_id: u.id, tipo: 'listas', titulo: 'Listas actualizadas',
+      mensaje: `Las listas de ${ev?.nombre || 'tu evento'} ya están listas. Descárgalas en tu perfil.`,
     });
     enviados++;
   }
@@ -11994,6 +12149,11 @@ async function aplicarStrike(userId, nombre, strikesActuales, motivo) {
          ${nuevos >= 3 ? `<p style="color:#FF4444"><strong>Tu cuenta ha sido suspendida.</strong></p>` : ''}`
       );
     }
+    // Notificación in-app del strike (además del email). Fails-soft.
+    await _crearNotif({
+      usuario_id: userId, tipo: 'strike', titulo: 'Recibiste un strike',
+      mensaje: `Tienes ${nuevos}/3 strikes.`,
+    });
     // Alerta a Memo si llegó a 2 o 3
     if (nuevos >= 2) await enviarAlertaMemo('strikes', { nombre, strikes: nuevos, motivo });
     // Suspender si llegó a 3

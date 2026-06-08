@@ -4727,6 +4727,24 @@ const khUsuarios = {
   actualizar(id, patch) { return this._call({ accion: 'actualizar', id, patch }); },
 };
 
+// [sec-contratos] Acceso a contratos_creadores vía Netlify Function con
+// service_role (cerramos la lectura anon). Solo maestro_roshi/bulma.
+// firma_data/ine/ip_firma NUNCA viajan al front (excluidos en admin-contratos.js).
+const khContratos = {
+  async _call(payload) {
+    const r = await khAdminFetch('/.netlify/functions/admin-contratos', {
+      method: 'POST', body: JSON.stringify(payload),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || j.ok === false) throw new Error(j.error || ('admin-contratos ' + r.status));
+    return j;
+  },
+  // listar({ estado?, evento_fecha?, creador?, evento?, limit? }) → array de contratos
+  listar(opts) { return this._call(Object.assign({ accion: 'listar' }, opts || {})).then(j => j.contratos || []); },
+  // obtener(id) → un contrato (objeto) o null
+  obtener(id) { return this._call({ accion: 'obtener', id }).then(j => j.contrato || null); },
+};
+
 // [sec-usuarios] Registro por invitación (flujo PRE-JWT): el invite_token es la
 // credencial. fetch directo (no khAdminFetch) porque el invitado aún no tiene JWT.
 async function khRegistroInvitado(payload) {
@@ -9246,8 +9264,8 @@ async function loadCCEquipo() {
     let pendientesFirma = [];
     try {
       if (ev.fecha) {
-        const ctos = await db.get('contratos_creadores',
-          `?estado=eq.pendiente&evento_fecha=eq.${ev.fecha}&order=enviado_at.desc&select=id,token,creador_nombre,creador_email,evento_nombre,evento_fecha,enviado_at`);
+        // [sec-contratos] antes db.get('contratos_creadores', ...) con anon key.
+        const ctos = await khContratos.listar({ estado: 'pendiente', evento_fecha: ev.fecha });
         const evNombre  = (ev.nombre||'').toLowerCase().trim();
         const evArtista = (ev.artista||'').toLowerCase().trim();
         const matched = ctos.filter(c => {
@@ -13702,7 +13720,8 @@ async function loadContratosList() {
   const tbody = document.getElementById('ctr-tbody');
   if (!tbody) return;
   try {
-    const rows = await db.get('contratos_creadores', '?select=id,token,creador_nombre,creador_email,evento_nombre,evento_fecha,contrato_fecha,ofrecimiento,expectativas,estado,enviado_at,firmado_at&order=enviado_at.desc&limit=200');
+    // [sec-contratos] antes db.get('contratos_creadores', ...) con anon key.
+    const rows = await khContratos.listar({ limit: 200 });
     _contratosCache = rows || [];
     if (!_contratosCache.length) {
       tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--ts);padding:30px;font-size:12px;letter-spacing:.1em;text-transform:uppercase">Sin contratos todavía. Crea el primero en "+ Nuevo".</td></tr>`;

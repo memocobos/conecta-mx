@@ -7623,9 +7623,18 @@ async function renderGZ() {
     grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:48px;color:var(--ts);font-family:JetBrains Mono,monospace;font-size:11px;letter-spacing:.1em">// sin miembros en esta categoria</div>';
     return;
   }
-  // Cargar puntos para todos
+  // Cargar puntos para todos: manuales (tours_pasados) + auto (tours asignados por
+  // slug, DC2d). Fails-soft: si fallan asignaciones o EV, cae a solo manuales.
   let allTours = [];
   try { allTours = await db.get('tours_pasados', '?fecha_aprox=gte.2026-01-01'); } catch(e){}
+  let asignacionesDe = {};
+  let evMap = {};
+  try {
+    const asignaciones = await db.get('eventos_coordi', '?status=eq.aceptado&select=coordi_id,evento_id,status');
+    const evArr = await _fetchEVFromIndex();
+    evArr.forEach(e => { if (e && e.id) evMap[e.id] = e; });
+    asignaciones.forEach(a => { (asignacionesDe[a.coordi_id] = asignacionesDe[a.coordi_id] || []).push(a); });
+  } catch(e){ asignacionesDe = {}; evMap = {}; }
   const anioActual = new Date().getFullYear();
   grid.innerHTML = lista.map(u => {
     const iniciales = u.nombre.split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase();
@@ -7635,7 +7644,7 @@ async function renderGZ() {
     const partes = u.nombre.split(' ');
     const nombreCorto = partes[0] + (partes[1] ? ' ' + partes[1][0] + '.' : '');
     const misToures = allTours.filter(t => t.usuario_id === u.id);
-    const pts = calcularPuntosAnio(misToures, anioActual);
+    const pts = calcularPuntosCombinados(misToures, asignacionesDe[u.id] || [], evMap, anioActual).total;
     return `<div class="gz-card" onclick="abrirPerfil('${u.id}')">
       ${esYo ? '<div class="gz-badge-yo">TÚ</div>' : ''}
       ${cumple ? '<div class="gz-badge-cumple">🎂</div>' : ''}

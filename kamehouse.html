@@ -4745,6 +4745,34 @@ const khContratos = {
   obtener(id) { return this._call({ accion: 'obtener', id }).then(j => j.contrato || null); },
 };
 
+// [sec-reportes] Acceso a reportes_evento vía Netlify Function con service_role
+// (cerramos lectura/escritura anon). El backend hace cumplir los roles y el
+// anti-escalación: el coordi SOLO ve/edita SU reporte y nunca cambia el estado
+// de aprobación. evento_id es slug (no uuid).
+const khReportes = {
+  async _call(payload) {
+    const r = await khAdminFetch('/.netlify/functions/admin-reportes', {
+      method: 'POST', body: JSON.stringify(payload),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || j.ok === false) throw new Error(j.error || ('admin-reportes ' + r.status));
+    return j;
+  },
+  // listar({ estado?, evento_id?, coordi_id?, limit? }) → array de reportes
+  // (el backend fuerza coordi_id al del JWT cuando el rol es coordinador)
+  listar(opts) { return this._call(Object.assign({ accion: 'listar' }, opts || {})).then(j => j.reportes || []); },
+  // guardarMio(body) → { ok, id } — coordi crea/edita SU reporte (status borrador|enviado)
+  guardarMio(body) { return this._call(Object.assign({ accion: 'guardar_mio' }, body || {})); },
+  // enviarMio(id) → coordi pone SU reporte en 'enviado'
+  enviarMio(id) { return this._call({ accion: 'enviar_mio', id }); },
+  // moderación
+  aprobarPopo(id) { return this._call({ accion: 'aprobar_popo', id }); },
+  aprobarFinal(id) { return this._call({ accion: 'aprobar_final', id }); },
+  rechazar(id, motivo) { return this._call({ accion: 'rechazar', id, motivo }); },
+  marcarKitsRecibidos(id, kits_detalle) { return this._call({ accion: 'marcar_kits_recibidos', id, kits_detalle }); },
+  eliminar(id) { return this._call({ accion: 'eliminar', id }); },
+};
+
 // [sec-usuarios] Registro por invitación (flujo PRE-JWT): el invite_token es la
 // credencial. fetch directo (no khAdminFetch) porque el invitado aún no tiene JWT.
 async function khRegistroInvitado(payload) {
@@ -11366,7 +11394,7 @@ async function loadMTReportes() {
   if (!list) return;
   list.innerHTML = '<div class="loading-state"><div class="spinner"></div>Cargando reportes…</div>';
   try {
-    _mtReportesCache = await db.get('reportes_evento', '?order=created_at.desc&limit=100');
+    _mtReportesCache = await khReportes.listar({ limit: 100 }); // [sec-reportes]
     // Join eventos y coordis
     const eIds = [...new Set(_mtReportesCache.map(r=>r.evento_id).filter(Boolean))];
     const uIds = [...new Set(_mtReportesCache.map(r=>r.coordi_id).filter(Boolean))];
@@ -11528,7 +11556,7 @@ async function loadMTPendientes() {
   try {
     const ahora = new Date();
     const [reportes, eventosCoordi] = await Promise.all([
-      db.get('reportes_evento', '?status=eq.aprobado_memo&select=*'),
+      khReportes.listar({ estado: 'aprobado_memo' }), // [sec-reportes]
       db.get('eventos_coordi', '?status=eq.aceptado&select=*'),
     ]);
 
@@ -11577,7 +11605,8 @@ async function loadMTPendientes() {
       if (fechaIni > ahora) continue;
       // ¿ya hay reporte enviado?
       const yaTieneReporte = reportes.some(r => r.evento_id===ec.evento_id && r.coordi_id===ec.coordi_id) ||
-        await db.get('reportes_evento', `?evento_id=eq.${ec.evento_id}&coordi_id=eq.${ec.coordi_id}&status=in.(enviado,aprobado_popo,aprobado_memo)`).then(r=>r.length>0).catch(()=>false);
+        // [sec-reportes]
+        await khReportes.listar({ evento_id: ec.evento_id, coordi_id: ec.coordi_id, estado: 'enviado,aprobado_popo,aprobado_memo' }).then(r=>r.length>0).catch(()=>false);
       if (yaTieneReporte) continue;
       const horasRestantes = (deadline - ahora) / (1000*60*60);
       reportesPendientes.push({
@@ -11757,7 +11786,7 @@ async function mtAprobarReporte(id, desdeStatus) {
 async function mtEliminarReporte(id) {
   if (!confirm('¿Eliminar este reporte permanentemente? Esto no se puede deshacer.')) return;
   try {
-    await db.delete('reportes_evento', id);
+    await khReportes.eliminar(id); // [sec-reportes]
     await loadMTReportes();
   } catch(e) { alert('Error: ' + e.message); }
 }
@@ -11766,7 +11795,7 @@ async function mtRechazarReporte(id) {
   const motivo = prompt('Motivo del rechazo:');
   if (!motivo) return;
   try {
-    await db.patch('reportes_evento', id, { status: 'rechazado', rechazo_motivo: motivo });
+    await khReportes.rechazar(id, motivo); // [sec-reportes]
     const r = _mtReportesCache.find(x=>x.id===id);
     await enviarAlertaMemo('reporte_rechazado', { coordi: r?._coordi?.nombre||'Coordi', motivo });
     await loadMTReportes();
@@ -11781,7 +11810,7 @@ async function loadMTResumen() {
     const [usuarios, eventos, reportes, asigs] = await Promise.all([
       khUsuarios.listar({ activos: true }), // [sec-usuarios]
       db.get('eventos', '?order=fecha.desc&limit=5&select=id,nombre,fecha'),
-      db.get('reportes_evento', '?status=in.(enviado,aprobado_popo)&select=id,status'),
+      khReportes.listar({ estado: 'enviado,aprobado_popo' }), // [sec-reportes]
       db.get('eventos_coordi', '?status=eq.pendiente&select=id'),
     ]);
     const porRol = {};
@@ -12506,11 +12535,9 @@ async function loadReportes() {
     // Cargar piezas de bodega (para el formulario)
     _bodegaPiezasCache = await db.get('kits_inventario', '?order=pieza.asc').then(r => r.map(x => ({...x, nombre: x.nombre||x.pieza}))).catch(() => []);
 
-    let query = '?order=created_at.desc&limit=100';
-    if (rol === 'coordinador') {
-      query += `&coordi_id=eq.${currentUser.id}`;
-    }
-    _reportesCache = await db.get('reportes_evento', query);
+    // [sec-reportes] El backend acota por rol: si es coordinador, fuerza
+    // coordi_id = su id (ve SOLO sus reportes). No mandamos coordi_id desde aquí.
+    _reportesCache = await khReportes.listar({ limit: 100 });
 
     // Join manual con eventos y coordis
     if (_reportesCache.length) {
@@ -12927,13 +12954,12 @@ async function guardarReporte(nuevoStatus) {
 
   try {
     alert.innerHTML = '<div class="alert" style="border-color:var(--border)">Guardando…</div>';
-    if (id) {
-      await db.patch('reportes_evento', id, body);
-    } else {
-      // CAMBIO 2: upsert por (evento_id,coordi_id) para no chocar con la constraint;
-      // captura el id devuelto y lo escribe en #rep-id (2do guardado = PATCH).
-      const rows = await db.upsert('reportes_evento', body, 'evento_id,coordi_id');
-      const newId = Array.isArray(rows) ? (rows[0] && rows[0].id) : (rows && rows.id);
+    // [sec-reportes] guardar_mio: el backend FUERZA coordi_id = su JWT y solo
+    // acepta status borrador|enviado. Con id → PATCH (verifica propiedad);
+    // sin id → upsert on_conflict(evento_id,coordi_id). Mismo shape de body.
+    const _res = await khReportes.guardarMio(id ? { ...body, id } : body);
+    if (!id) {
+      const newId = _res && _res.id;
       if (newId) { const rf = document.getElementById('rep-id'); if (rf) rf.value = newId; }
     }
     alert.innerHTML = `<div class="alert alert-success">${nuevoStatus === 'enviado' ? '✅ Reporte enviado' : '✅ Borrador guardado'}</div>`;
@@ -12951,7 +12977,7 @@ async function enviarReporte(id) {
   if (!r) return;
   if (!confirm('¿Confirmas enviar este reporte para revisión?')) return;
   try {
-    await db.patch('reportes_evento', id, { status: 'enviado' });
+    await khReportes.enviarMio(id); // [sec-reportes]
     loadReportes();
   } catch(e) { alert(e.message); }
 }
@@ -12959,17 +12985,14 @@ async function enviarReporte(id) {
 async function aprobarReportePopo(id) {
   if (!confirm('¿Aprobar este reporte y enviarlo a Memo para revisión final?')) return;
   try {
-    await db.patch('reportes_evento', id, { status: 'aprobado_popo' });
+    await khReportes.aprobarPopo(id); // [sec-reportes]
     loadReportes();
   } catch(e) { alert(e.message); }
 }
 
 // Función compartida — aprueba reporte y descuenta stock
 async function ejecutarAprobacionFinal(id, reporte) {
-  await db.patch('reportes_evento', id, {
-    status: 'aprobado_memo',
-    fecha_aprobado: new Date().toISOString()
-  });
+  await khReportes.aprobarFinal(id); // [sec-reportes]
   // Descontar kits del inventario
   const kits = reporte?.kits_detalle
     ? (typeof reporte.kits_detalle==='string' ? JSON.parse(reporte.kits_detalle) : reporte.kits_detalle)
@@ -13020,10 +13043,7 @@ async function rechazarReporte(id) {
   const motivo = prompt('Motivo del rechazo (el coordi lo verá):');
   if (!motivo) return;
   try {
-    await db.patch('reportes_evento', id, {
-      status: 'rechazado',
-      rechazo_motivo: motivo,
-    });
+    await khReportes.rechazar(id, motivo); // [sec-reportes]
     // Alerta a Memo
     const r = _reportesCache.find(x=>x.id===id);
     await enviarAlertaMemo('reporte_rechazado', { coordi: r?._coordi?.nombre||'Coordi', motivo });
@@ -13039,10 +13059,7 @@ async function marcarKitsRecibidos(id) {
     // Marcar kits como recibidos en el reporte
     const kits = typeof r.kits_detalle === 'string' ? JSON.parse(r.kits_detalle) : (r.kits_detalle || []);
     const kitsActualizados = kits.map(k => ({ ...k, recibido: true }));
-    await db.patch('reportes_evento', id, {
-      kits_detalle: JSON.stringify(kitsActualizados),
-      updated_at: new Date().toISOString()
-    });
+    await khReportes.marcarKitsRecibidos(id, JSON.stringify(kitsActualizados)); // [sec-reportes]
 
     // Actualizar stock en bodega_piezas
     for (const k of kits.filter(k => (k.cantidad_sobrante||0) > 0 && !k.recibido)) {

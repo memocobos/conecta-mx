@@ -635,6 +635,56 @@ main{
   *,*::before,*::after{animation:none!important;transition:none!important}
   .tc-hero.is-loading{background:#0c0c0c}
 }
+
+/* ===================================================================== */
+/* [login-festival] view-auth épico — SOLO piel (auth intacta)           */
+/* ===================================================================== */
+.auth-hero{position:relative;z-index:1}
+.auth-hero::before{
+  content:'';position:absolute;left:-12%;top:-46%;width:78%;height:170%;z-index:-1;
+  background:radial-gradient(closest-side, rgba(232,255,76,.26), rgba(232,255,76,.05) 60%, transparent 72%);
+  filter:blur(22px);animation:pv-glowpulse 4.2s ease-in-out infinite;pointer-events:none;
+}
+.auth-hero .eyebrow{position:relative}
+#view-auth .auth-hero .h-display{font-size:clamp(40px,12.5vw,62px);line-height:.92}
+@keyframes pv-glowpulse{0%,100%{opacity:.65;transform:scale(1)}50%{opacity:1;transform:scale(1.07)}}
+
+/* Marquesina de artistas vigentes (decorativa) */
+.auth-marquee{
+  margin:18px 0 2px;overflow:hidden;
+  -webkit-mask-image:linear-gradient(90deg,transparent,#000 8%,#000 92%,transparent);
+  mask-image:linear-gradient(90deg,transparent,#000 8%,#000 92%,transparent);
+}
+.mq-track{display:flex;gap:9px;width:max-content;animation:mq-scroll 36s linear infinite}
+.auth-marquee:hover .mq-track{animation-play-state:paused}
+@keyframes mq-scroll{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+.mq-chip{
+  display:flex;align-items:center;gap:8px;flex-shrink:0;
+  background:var(--field-bg);border:1px solid var(--line);border-radius:999px;padding:4px 13px 4px 4px;
+}
+.mq-pic{
+  width:30px;height:30px;border-radius:50%;flex-shrink:0;overflow:hidden;
+  background:linear-gradient(135deg,var(--blue),#000);background-size:cover;background-position:center;
+  display:flex;align-items:center;justify-content:center;
+  font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:13px;color:var(--yel);
+}
+.mq-pic.is-loading{background-image:linear-gradient(100deg,#0c0c0c 30%,#161616 50%,#0c0c0c 70%);background-size:300% 100%;animation:pv-shimmer 1.4s linear infinite}
+.mq-name{font-size:10.5px;font-weight:800;letter-spacing:.05em;white-space:nowrap;color:var(--ink-soft);text-transform:uppercase}
+
+/* Botones del login con brillo que barre */
+#view-auth .btn-primary{position:relative;overflow:hidden}
+#view-auth .btn-primary::after{
+  content:'';position:absolute;top:0;left:-60%;width:38%;height:100%;
+  background:linear-gradient(110deg,transparent,rgba(255,255,255,.5),transparent);
+  transform:skewX(-18deg);animation:pv-shine 3.4s ease-in-out infinite;pointer-events:none;
+}
+@keyframes pv-shine{0%{left:-60%}55%,100%{left:150%}}
+
+/* Entrada escalonada de los nuevos bloques del login */
+.view.is-active .auth-hero{animation:pv-rise .5s cubic-bezier(.2,.7,.2,1) both}
+.view.is-active .auth-marquee{animation:pv-rise .5s cubic-bezier(.2,.7,.2,1) both;animation-delay:.1s}
+.view.is-active #view-auth .card,
+#view-auth.is-active > .card{animation:pv-rise .5s cubic-bezier(.2,.7,.2,1) both;animation-delay:.16s}
 </style>
 </head>
 <body>
@@ -661,9 +711,15 @@ main{
   <!-- VISTA A — LOGIN / REGISTRO                                    -->
   <!-- ============================================================ -->
   <section class="view" id="view-auth" aria-labelledby="auth-title">
-    <div class="eyebrow">Acceso de clientes</div>
-    <h1 class="h-display" id="auth-title">Tu portal <span class="accent">Conecta</span></h1>
-    <p class="subtitle">Entra para ver tus tours, pagos y recibos. Si ya hiciste tu separo, usa el correo con el que te contactamos.</p>
+    <!-- [login-festival] Hero con resplandor neón (decorativo) -->
+    <div class="auth-hero">
+      <div class="eyebrow">Acceso de clientes</div>
+      <h1 class="h-display" id="auth-title">Tu portal <span class="accent">Conecta</span></h1>
+      <p class="subtitle">Entra para ver tus tours, pagos y recibos. Si ya hiciste tu separo, usa el correo con el que te contactamos.</p>
+    </div>
+
+    <!-- [login-festival] Marquesina de artistas vigentes (EV; decorativa, se oculta si falla) -->
+    <div class="auth-marquee" id="auth-marquee" aria-hidden="true" style="display:none"></div>
 
     <div class="card">
       <button type="button" class="btn-google" id="btn-google" data-action="google">
@@ -1520,6 +1576,63 @@ supabase.auth.onAuthStateChange((event, session) => {
   // SIGNED_IN, SIGNED_OUT, TOKEN_REFRESHED, USER_UPDATED, PASSWORD_RECOVERY
   cargarClienteYRutear(session);
 });
+
+// =====================================================================
+// [login-festival] Marquesina decorativa de artistas vigentes (view-auth).
+// Lee el EV PÚBLICO (loadEV → fetch /index.html, sin auth). 100% decorativa:
+// si falla o no hay próximos, OCULTA el contenedor. No toca auth/routing.
+// =====================================================================
+async function _buildLoginMarquee(){
+  const host = document.getElementById('auth-marquee');
+  if (!host) return;
+  let ev;
+  try { ev = await loadEV(); } catch (e) { host.style.display = 'none'; return; }
+  if (!Array.isArray(ev) || !ev.length) { host.style.display = 'none'; return; }
+  const hoy = _hoyISOmx();
+  const prox = ev.filter(e =>
+    e && e.id && e.a && typeof e.ds === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(e.ds) && e.ds >= hoy
+  ).sort((a, b) => a.ds.localeCompare(b.ds)).slice(0, 14);
+  if (!prox.length) { host.style.display = 'none'; return; }
+
+  const SI = window.STATIC_IMGS || {};
+  const chip = (e) => {
+    const url = SI[e.staticImg || e.id] || '';
+    const ini = (e.a.trim()[0] || '?').toUpperCase();
+    return '<div class="mq-chip" data-ev="' + escapeHtml(e.id) + '">'
+      + '<span class="mq-pic' + (url ? '' : ' is-loading') + '"'
+      + (url ? ' style="background-image:url(\'' + url + '\')"' : '') + '>' + (url ? '' : ini) + '</span>'
+      + '<span class="mq-name">' + escapeHtml(e.a) + '</span></div>';
+  };
+  const set = prox.map(chip).join('');
+  host.innerHTML = '<div class="mq-track">' + set + set + '</div>'; // 2 copias = loop sin costura
+  host.style.display = '';
+
+  // Foto async (deezer ?q=) solo para los que no tienen portada estática.
+  prox.forEach(e => {
+    if (SI[e.staticImg || e.id]) return;
+    const sel = (window.CSS && CSS.escape) ? CSS.escape(e.id) : e.id;
+    const pics = host.querySelectorAll('.mq-chip[data-ev="' + sel + '"] .mq-pic.is-loading');
+    if (pics.length) _upgradeChipGroup(e, pics);
+  });
+}
+async function _upgradeChipGroup(e, pics){
+  const q = e.img || e.a;
+  let url = null;
+  if (q) {
+    try {
+      const r = await fetch('/.netlify/functions/deezer?q=' + encodeURIComponent(q));
+      const d = await r.json();
+      const p = d && d.data && d.data[0] && d.data[0].picture_xl;
+      if (p && p.indexOf('d41d8cd98f00b204e9800998ecf8427e') === -1) url = p;
+    } catch (e2) { /* degrada a la inicial */ }
+  }
+  pics.forEach(pic => {
+    if (url) { pic.style.backgroundImage = "url('" + url + "')"; pic.textContent = ''; }
+    pic.classList.remove('is-loading');
+  });
+}
+// Disparo decorativo (no afecta auth ni el routing).
+_buildLoginMarquee();
 
 // =====================================================================
 // Helpers de formato

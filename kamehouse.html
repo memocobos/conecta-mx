@@ -4888,6 +4888,45 @@ const khRooming = {
   eliminar(id) { return this._call({ accion: 'eliminar', id }); },
 };
 
+// [sec-eventos] Tabla `eventos` (UUID legacy del cotizador/capsule) vía Netlify
+// Function con service_role. Lectura: cualquier logueado (boot/ping/selects).
+// Crear/editar/eliminar: maestro_roshi + bulma (lo exige verifyAdminAuth). NO es
+// el catálogo público (ese es el array EV de index.html).
+const khEventos = {
+  async _call(payload) {
+    const r = await khAdminFetch('/.netlify/functions/admin-eventos', {
+      method: 'POST', body: JSON.stringify(payload),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || j.ok === false) throw new Error(j.error || ('admin-eventos ' + r.status));
+    return j;
+  },
+  // listar({ limit? }) → array de eventos (order fecha.desc)
+  listar(opts) { return this._call(Object.assign({ accion: 'listar' }, opts || {})).then(j => j.eventos || []); },
+  // obtener(id) → un evento (objeto) o null
+  obtener(id) { return this._call({ accion: 'obtener', id }).then(j => j.evento || null); },
+  // crear(datos) → { ok, evento } (el cotizador necesita evento.id)
+  crear(datos) { return this._call({ accion: 'crear', datos }); },
+  // actualizar(id, datos) → { ok }
+  actualizar(id, datos) { return this._call({ accion: 'actualizar', id, datos }); },
+  // eliminar(id) → { ok }
+  eliminar(id) { return this._call({ accion: 'eliminar', id }); },
+  // ping() keep-alive Supabase (fails-soft, no rompe nada)
+  ping() { return this._call({ accion: 'listar', limit: 1 }).catch(() => {}); },
+};
+
+// [sec-eventos] Lookup `eventos_meta` por slug vía la misma Function (service_role).
+// SOLO lectura (la escritura es vía eventos-meta-sync.js). Cualquier logueado.
+// Replica EXACTO el shape de hoy: por_slug → row {nombre}; por_slugs → array
+// de {slug,nombre,fecha,fecha_fin}.
+const khEventosMeta = {
+  _call(payload) { return khEventos._call(payload); },
+  // porSlug(slug) → row {nombre} o null
+  porSlug(slug) { return this._call({ accion: 'meta_por_slug', slug }).then(j => j.meta || null); },
+  // porSlugs([slug,...]) → array de {slug,nombre,fecha,fecha_fin}
+  porSlugs(slugs) { return this._call({ accion: 'meta_por_slugs', slugs }).then(j => j.metas || []); },
+};
+
 // [sec-sensibles] deudas_coordi + strikes_log + sistema_alertas vía Netlify Function
 // con service_role. deudas: maestro_roshi+bulma · strikes/alertas: maestro_roshi.
 // strikes_log.por_quien lo fuerza el backend al jwt (anti-spoofing).
@@ -4966,7 +5005,7 @@ function loadPage(name) {
 async function bootApp() {
  // Cargar eventos en cache y poblar todos los selectores
  try {
- _eventosCache = await db.get('eventos', '?order=fecha.desc&limit=200');
+ _eventosCache = await khEventos.listar(); // [sec-eventos]
  populateEventoSelects();
  } catch(e) {
  console.error('Error cargando eventos:', e);
@@ -6613,10 +6652,10 @@ async function guardarEvento() {
  pagos_calendario: JSON.stringify(pagos_cal),
  flash_promo: flash_promo ? JSON.stringify(flash_promo) : null
  };
- if (id) await db.patch('eventos', id, body);
- else await db.post('eventos', body);
+ if (id) await khEventos.actualizar(id, body); // [sec-eventos]
+ else await khEventos.crear(body); // [sec-eventos]
  alerta.innerHTML = '<div class="alert alert-success">Evento guardado</div>';
- _eventosCache = await db.get('eventos', '?order=fecha.desc&limit=200');
+ _eventosCache = await khEventos.listar(); // [sec-eventos]
  populateEventoSelects();
  setTimeout(() => { closeModal('modal-evento'); loadCapsule(); }, 900);
  } catch(e) {
@@ -6626,7 +6665,7 @@ async function guardarEvento() {
 
 async function editarEvento(id) {
  try {
- const [ev] = await db.get('eventos', `?id=eq.${id}`);
+ const ev = await khEventos.obtener(id); // [sec-eventos]
  document.getElementById('evento-id').value = ev.id;
  document.getElementById('ev-artista').value = ev.artista || '';
  document.getElementById('ev-tour').value = ev.tour || '';
@@ -6669,7 +6708,7 @@ async function editarEvento(id) {
 
 async function eliminarEvento(id) {
  if (!confirm('¿Eliminar este evento? Se borrarán también sus reservaciones.')) return;
- try { await db.delete('eventos', id); loadCapsule(); }
+ try { await khEventos.eliminar(id); loadCapsule(); } // [sec-eventos]
  catch(e) { alert(e.message); }
 }
 
@@ -7806,9 +7845,9 @@ async function crearEventoDesdeCotizador() {
       pagos_calendario:JSON.stringify([{l:'Separo',d:'Hoy',s:1},{l:'Pago 1',d:''},{l:'Pago 2',d:''},{l:'Pago 3',d:''}]),
       notas:nota,
     };
-    const [ev]=await db.post('eventos',body);
+    const ev=(await khEventos.crear(body)).evento; // [sec-eventos]
     alertEl.innerHTML='<div class="alert alert-success">✅ Evento creado. Redirigiendo...</div>';
-    _eventosCache=await db.get('eventos','?order=fecha.desc&limit=200');
+    _eventosCache=await khEventos.listar(); // [sec-eventos]
     populateEventoSelects();
     guardarSesionCot();
     setTimeout(()=>{showPage('capsule');if(ev?.id)editarEvento(ev.id);},1200);
@@ -8769,7 +8808,7 @@ async function abrirRanking() {
 // PING anti-pausa Supabase (cada 6 días = 518400000 ms)
 // ═══════════════════════════════════════════════════════════════
 function pingSupabase() {
- db.get('eventos', '?limit=1').catch(() => {});
+ khEventos.ping(); // [sec-eventos]
 }
 setInterval(pingSupabase, 518400000);
 
@@ -9321,7 +9360,7 @@ async function eliminarEventoCC(id) {
   const nombre = ev?.nombre || 'este evento';
   if (!confirm(`¿Eliminar "${nombre}"?\n\nEsto también eliminará viajeros y rooming list. No se puede deshacer.`)) return;
   try {
-    await db.delete('eventos', id);
+    await khEventos.eliminar(id); // [sec-eventos]
     await loadCapsule();
   } catch(e) { alert('Error al eliminar: ' + e.message); }
 }
@@ -9346,8 +9385,8 @@ async function guardarEventoCC() {
   };
   alert.innerHTML='<div class="alert" style="border-color:var(--border)">Guardando…</div>';
   try {
-    if (id) await db.patch('eventos', id, body);
-    else    await db.post('eventos', body);
+    if (id) await khEventos.actualizar(id, body); // [sec-eventos]
+    else    await khEventos.crear(body); // [sec-eventos]
     alert.innerHTML='<div class="alert alert-success">✅ Evento guardado</div>';
     setTimeout(async () => { closeModal('modal-cc-evento'); await loadCapsule(); }, 700);
   } catch(e) { alert.innerHTML=`<div class="alert alert-error">${e.message}</div>`; }
@@ -9711,7 +9750,7 @@ async function manejarAccionAsignacion() {
       window.history.replaceState({}, '', window.location.pathname);
       // Notificar a Memo
       const _asigD = await db.get('eventos_coordi', `?id=eq.${asigId}`).then(r=>r[0]).catch(()=>({}));
-      const _evD = _asigD?.evento_id ? await db.get('eventos_meta',`?slug=eq.${_asigD.evento_id}&select=nombre`).then(r=>r[0]?.nombre||'').catch(()=>'') : '';
+      const _evD = _asigD?.evento_id ? await khEventosMeta.porSlug(_asigD.evento_id).then(m=>m?.nombre||'').catch(()=>'') : ''; // [sec-eventos]
       const _uD  = _asigD?.coordi_id ? await khUsuarios.obtener(_asigD.coordi_id).then(u=>u?.nombre||'').catch(()=>'') : ''; // [sec-usuarios]
       await enviarAlertaMemo('tour_declinado', { nombre: _uD, evento: _evD, motivo });
       setTimeout(() => alert('Respuesta registrada. Memo será notificado.'), 500);
@@ -10584,7 +10623,7 @@ async function exportarRooming(formato) {
 async function descargarListaViajeros(eventoId) {
   try {
     const [ev, viajeros] = await Promise.all([
-      db.get('eventos_meta', `?slug=eq.${eventoId}&select=nombre`).then(r=>r[0]||{}),
+      khEventosMeta.porSlug(eventoId).then(m=>m||{}), // [sec-eventos]
       db.get('viajeros_evento', `?evento_id=eq.${eventoId}&order=nombre.asc`),
     ]);
     if (!viajeros.length) { alert('No hay viajeros registrados para este evento'); return; }
@@ -10602,7 +10641,7 @@ async function descargarListaViajeros(eventoId) {
 async function descargarRoomingList(eventoId) {
   try {
     const [ev, habs] = await Promise.all([
-      db.get('eventos_meta', `?slug=eq.${eventoId}&select=nombre`).then(r=>r[0]||{}),
+      khEventosMeta.porSlug(eventoId).then(m=>m||{}), // [sec-eventos]
       khRooming.listar(eventoId), // [sec-sensibles]
     ]);
     if (!habs.length) { alert('No hay rooming list para este evento'); return; }
@@ -11533,7 +11572,7 @@ async function loadMTReportes() {
     const eIds = [...new Set(_mtReportesCache.map(r=>r.evento_id).filter(Boolean))];
     const uIds = [...new Set(_mtReportesCache.map(r=>r.coordi_id).filter(Boolean))];
     const [evs, users] = await Promise.all([
-      eIds.length ? db.get('eventos_meta', `?slug=in.(${eIds.join(',')})&select=slug,nombre,fecha,fecha_fin`) : [],
+      eIds.length ? khEventosMeta.porSlugs(eIds) : [], // [sec-eventos]
       uIds.length ? khUsuarios.listar({ ids: uIds }) : [], // [sec-usuarios]
     ]);
     const evMap = Object.fromEntries(evs.map(e=>[e.slug,e]));
@@ -11698,7 +11737,7 @@ async function loadMTPendientes() {
     const eIds = [...new Set([...reportes.map(r=>r.evento_id), ...eventosCoordi.map(e=>e.evento_id)].filter(Boolean))];
     const uIds = [...new Set([...reportes.map(r=>r.coordi_id), ...eventosCoordi.map(e=>e.coordi_id)].filter(Boolean))];
     const [evs, usuarios] = await Promise.all([
-      eIds.length ? db.get('eventos_meta', `?slug=in.(${eIds.join(',')})&select=slug,nombre,fecha,fecha_fin`) : [],
+      eIds.length ? khEventosMeta.porSlugs(eIds) : [], // [sec-eventos]
       uIds.length ? khUsuarios.listar({ ids: uIds }) : [], // [sec-usuarios]
     ]);
     const evMap = Object.fromEntries(evs.map(e=>[e.slug,e]));
@@ -11821,7 +11860,7 @@ async function loadMTDeudas() {
     const eIds = [...new Set(_mtDeudasCache.map(d=>d.evento_id).filter(Boolean))];
     const [usuarios, eventos] = await Promise.all([
       uIds.length ? khUsuarios.listar({ ids: uIds }) : [], // [sec-usuarios]
-      eIds.length ? db.get('eventos_meta', `?slug=in.(${eIds.join(',')})&select=slug,nombre,fecha,fecha_fin`) : [],
+      eIds.length ? khEventosMeta.porSlugs(eIds) : [], // [sec-eventos]
     ]);
     const uMap = Object.fromEntries(usuarios.map(u=>[u.id,u]));
     const evMap = Object.fromEntries(eventos.map(e=>[e.slug,e]));
@@ -11943,7 +11982,7 @@ async function loadMTResumen() {
   try {
     const [usuarios, eventos, reportes, asigs] = await Promise.all([
       khUsuarios.listar({ activos: true }), // [sec-usuarios]
-      db.get('eventos', '?order=fecha.desc&limit=5&select=id,nombre,fecha'),
+      khEventos.listar({ limit: 5 }), // [sec-eventos]
       khReportes.listar({ estado: 'enviado,aprobado_popo' }), // [sec-reportes]
       db.get('eventos_coordi', '?status=eq.pendiente&select=id'),
     ]);
@@ -12672,7 +12711,7 @@ async function loadReportes() {
       const eIds = [...new Set(_reportesCache.map(r => r.evento_id).filter(Boolean))];
       const uIds = [...new Set(_reportesCache.map(r => r.coordi_id).filter(Boolean))];
       const [evs, users] = await Promise.all([
-        eIds.length ? db.get('eventos_meta', `?slug=in.(${eIds.join(',')})&select=slug,nombre,fecha,fecha_fin`) : [],
+        eIds.length ? khEventosMeta.porSlugs(eIds) : [], // [sec-eventos]
         uIds.length ? khUsuarios.listar({ ids: uIds }) : [], // [sec-usuarios]
       ]);
       const evMap = Object.fromEntries(evs.map(e => [e.slug, e]));

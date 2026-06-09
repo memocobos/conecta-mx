@@ -2535,17 +2535,21 @@ function getQuincenas(from, until, max, diasAntes){
   var dias = (diasAntes!=null && isFinite(diasAntes)) ? diasAntes : 14;
   var result=[];
   var capped=new Date(until.getTime() - dias*24*3600*1000);
+  // [fix-rol-buffer] Mismo criterio que index: saltar la quincena que empieza
+  // dentro de los 5 días del separo (quien separa el 23 NO paga la del 24 mar-1
+  // abr, su siguiente cobro es la del 9-16 abr). Antes usaba q1s>=from (sin buffer).
+  var cutoff=new Date(from.getTime() + 5*24*3600*1000);
   var d=new Date(from); d.setDate(1);
   while(d<=capped && result.length<max){
     var mm=String(d.getMonth()+1).padStart(2,'0');
     var q1s=new Date(d.getFullYear(),d.getMonth(),9);
     var q1e=new Date(d.getFullYear(),d.getMonth(),16);
-    if(q1s>=from && q1e<=capped){
+    if(q1s>cutoff && q1e<=capped){
       result.push({lbl:'9 al 16 de '+(MESES[mm]||''), d:q1s, e:q1e});
     }
     var q2s=new Date(d.getFullYear(),d.getMonth(),24);
     var q2e=new Date(d.getFullYear(),d.getMonth()+1,1);
-    if(q2s>=from && q2e<=capped){
+    if(q2s>cutoff && q2e<=capped){
       var mn=String((d.getMonth()+2>12?1:d.getMonth()+2)).padStart(2,'0');
       result.push({lbl:'24 '+(MESES[mm]||'')+' al 1 de '+(MESES[mn]||''), d:q2s, e:q2e});
     }

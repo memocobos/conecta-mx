@@ -685,6 +685,50 @@ main{
 .view.is-active .auth-marquee{animation:pv-rise .5s cubic-bezier(.2,.7,.2,1) both;animation-delay:.1s}
 .view.is-active #view-auth .card,
 #view-auth.is-active > .card{animation:pv-rise .5s cubic-bezier(.2,.7,.2,1) both;animation-delay:.16s}
+
+/* ===================================================================== */
+/* [avisos] Panel de avisos del cliente (derivado, solo lectura)         */
+/* ===================================================================== */
+.dash-bell-wrap{position:relative;flex-shrink:0}
+.dash-bell{cursor:pointer}
+.dash-bell.has-avisos{color:var(--yel);border-color:rgba(232,255,76,.45);box-shadow:0 0 14px rgba(232,255,76,.15)}
+.dash-bell-badge{
+  position:absolute;top:-3px;right:-3px;min-width:18px;height:18px;padding:0 4px;
+  border-radius:999px;background:var(--red);color:#fff;border:2px solid #000;
+  font-family:'JetBrains Mono',monospace;font-weight:700;font-size:10px;
+  display:flex;align-items:center;justify-content:center;
+}
+.avisos-panel{
+  position:absolute;top:52px;right:0;width:300px;max-width:84vw;z-index:200;
+  background:var(--card);border:1px solid var(--line-strong);border-radius:14px;
+  box-shadow:0 14px 44px rgba(0,0,0,.6);overflow:hidden;
+  animation:pv-rise .22s cubic-bezier(.2,.7,.2,1) both;
+}
+.avisos-head{
+  font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:16px;text-transform:uppercase;
+  letter-spacing:.03em;padding:13px 16px 10px;border-bottom:1px solid var(--line);
+}
+.avisos-list{max-height:60vh;overflow-y:auto;padding:6px}
+.avisos-empty{padding:22px 16px;text-align:center;color:var(--ink-mute);font-size:13px;font-weight:600}
+.aviso{
+  display:flex;gap:11px;padding:11px 12px;border-radius:10px;margin:4px 2px;
+  background:var(--field-bg);border:1px solid var(--line);border-left:3px solid var(--ink-mute);
+}
+.aviso.sev-alta{border-left-color:var(--red);background:rgba(255,40,59,.06)}
+.aviso.sev-media{border-left-color:var(--yel);background:rgba(232,255,76,.05)}
+.aviso-ico{width:26px;height:26px;flex-shrink:0;border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:14px}
+.aviso.sev-alta .aviso-ico{background:rgba(255,40,59,.14);color:#ffb0b8}
+.aviso.sev-media .aviso-ico{background:rgba(232,255,76,.14);color:var(--yel)}
+.aviso-body{flex:1;min-width:0}
+.aviso-titulo{font-size:13px;font-weight:800;line-height:1.25;color:#fff}
+.aviso-detalle{font-size:11px;color:var(--ink-soft);font-weight:600;margin-top:3px;line-height:1.4}
+.aviso-accion{
+  margin-top:8px;display:inline-flex;align-items:center;gap:5px;
+  background:transparent;border:1px solid var(--line-strong);color:var(--yel);
+  border-radius:999px;padding:5px 11px;font-family:'Montserrat',sans-serif;
+  font-weight:800;font-size:10px;letter-spacing:.06em;text-transform:uppercase;cursor:pointer;
+}
+.aviso-accion:hover{border-color:var(--yel);background:rgba(232,255,76,.08)}
 </style>
 </head>
 <body>
@@ -872,8 +916,16 @@ main{
         <h1 class="dash-hola" id="dash-title">Hola, <span id="dash-nombre" class="accent" style="color:var(--yel)">Cliente</span></h1>
         <span class="dash-cliente">CLIENTE <span id="dash-numero" class="mono">#0000</span></span>
       </div>
-      <div class="dash-bell" aria-hidden="true" title="Avisos (próximamente)">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+      <!-- [avisos] Campanita interactiva: badge = nº de avisos activos + panel -->
+      <div class="dash-bell-wrap" id="avisos-wrap">
+        <button type="button" class="dash-bell" id="avisos-btn" aria-label="Avisos" aria-haspopup="true" aria-expanded="false">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+          <span class="dash-bell-badge" id="avisos-badge" style="display:none">0</span>
+        </button>
+        <div class="avisos-panel" id="avisos-panel" role="dialog" aria-label="Tus avisos" style="display:none">
+          <div class="avisos-head">Avisos</div>
+          <div class="avisos-list" id="avisos-list"></div>
+        </div>
       </div>
     </div>
 
@@ -1743,6 +1795,7 @@ async function renderToursList(){
 
   _toursCache = data || [];
   _renderToursUI();
+  cargarAvisos(_toursCache); // [avisos] deriva avisos del cliente (fails-soft, no bloquea)
 }
 
 // [portal-v1] Clasifica _toursCache en próximos/pasados, pinta stats + pestaña activa.
@@ -1830,6 +1883,147 @@ document.body.addEventListener('click', (e) => {
   $$('.dash-tab').forEach(b => b.classList.toggle('is-active', b === tab));
   _renderToursUI();
 });
+
+// =====================================================================
+// [avisos] Panel de avisos del cliente — DERIVADO de pagos + solicitudes
+// (proyecto PORTAL). Sin tabla nueva, solo lectura. RLS ya scopea por cliente.
+// =====================================================================
+let _avisosCache = [];
+
+async function cargarAvisos(solicitudes){
+  if (!perfilExistente) return;
+  const sols = Array.isArray(solicitudes) ? solicitudes : (_toursCache || []);
+  const solById = {};
+  sols.forEach(s => { if (s && s.id) solById[s.id] = s; });
+
+  // Una sola query barata: pagos vencidos/pendientes del cliente (RLS + índices).
+  let pagos = [];
+  try {
+    const { data, error } = await supabase
+      .from('pagos')
+      .select('solicitud_id,monto,fecha_esperada,estado,concepto')
+      .eq('auth_user_id', perfilExistente.auth_user_id)
+      .in('estado', ['vencido', 'pendiente']);
+    if (!error && Array.isArray(data)) pagos = data;
+  } catch (e) { /* fails-soft: sin pagos, igual derivamos cancelados */ }
+
+  _avisosCache = derivarAvisos(sols, pagos, solById);
+  renderAvisos();
+}
+
+function _nombreEvento(s){
+  if (!s) return 'tu tour';
+  const ev = _evBySlug(s.evento_id);
+  return (ev && ev.a) || s.evento_nombre || 'tu tour';
+}
+function _diasEntreISO(a, b){
+  return Math.round((new Date(b + 'T12:00:00').getTime() - new Date(a + 'T12:00:00').getTime()) / 86400000);
+}
+
+// PURA: (solicitudes, pagos, mapa) → [{tipo, severidad, titulo, detalle, solicitud_id, accion?}]
+function derivarAvisos(solicitudes, pagos, solById){
+  const hoy = _hoyISOmx();
+  const out = [];
+
+  // 1) Tours cancelados (alta).
+  (solicitudes || []).forEach(s => {
+    if (s && s.estado === 'cancelado'){
+      out.push({ tipo:'cancelado', severidad:'alta', solicitud_id:s.id,
+        titulo:'Tu tour de ' + _nombreEvento(s) + ' fue dado de baja',
+        detalle:'Si crees que es un error, escríbenos.',
+        accion:{ tipo:'wa' } });
+    }
+  });
+
+  // 2) Pagos vencidos (alta).
+  (pagos || []).forEach(p => {
+    if (p.estado !== 'vencido') return;
+    const s = solById[p.solicitud_id];
+    if (s && s.estado === 'cancelado') return; // no avisar pagos de tours dados de baja
+    out.push({ tipo:'vencido', severidad:'alta', solicitud_id:p.solicitud_id,
+      titulo:'Tienes un pago vencido de ' + _nombreEvento(s),
+      detalle:fmtMxn(p.monto) + ' · venció el ' + fmtFechaCorta(p.fecha_esperada),
+      accion: s ? { tipo:'tour' } : { tipo:'wa' } });
+  });
+
+  // 3) Próximo abono pendiente por solicitud (media), solo si vence en <= 14 días.
+  const VENTANA_DIAS = 14;
+  const proxPorSol = {};
+  (pagos || []).forEach(p => {
+    if (p.estado !== 'pendiente' || !p.fecha_esperada || p.fecha_esperada < hoy) return;
+    const s = solById[p.solicitud_id];
+    if (s && s.estado === 'cancelado') return;
+    const cur = proxPorSol[p.solicitud_id];
+    if (!cur || p.fecha_esperada < cur.fecha_esperada) proxPorSol[p.solicitud_id] = p;
+  });
+  Object.keys(proxPorSol).forEach(solId => {
+    const p = proxPorSol[solId];
+    const dias = _diasEntreISO(hoy, p.fecha_esperada);
+    if (dias > VENTANA_DIAS) return; // no saturar: solo abonos cercanos
+    const s = solById[solId];
+    const cuando = dias === 0 ? ' · es hoy' : dias === 1 ? ' · es mañana' : ' · faltan ' + dias + ' días';
+    out.push({ tipo:'proximo', severidad:'media', solicitud_id:solId,
+      titulo:'Tu próximo abono de ' + _nombreEvento(s) + ' vence el ' + fmtFechaCorta(p.fecha_esperada),
+      detalle:fmtMxn(p.monto) + cuando,
+      accion: s ? { tipo:'tour' } : null });
+  });
+
+  return out;
+}
+
+function renderAvisos(){
+  const badge = document.getElementById('avisos-badge');
+  const btn   = document.getElementById('avisos-btn');
+  const list  = document.getElementById('avisos-list');
+  if (!badge || !btn || !list) return;
+  const n = _avisosCache.length;
+  if (n > 0){ badge.textContent = n > 9 ? '9+' : String(n); badge.style.display = ''; btn.classList.add('has-avisos'); }
+  else { badge.style.display = 'none'; btn.classList.remove('has-avisos'); }
+
+  const ICO = { vencido:'!', cancelado:'✕', proximo:'⏳' };
+  list.innerHTML = n === 0
+    ? '<div class="avisos-empty">No tienes avisos 🎉</div>'
+    : _avisosCache.map((a, i) => {
+        let accionBtn = '';
+        if (a.accion && a.accion.tipo === 'tour') accionBtn = '<button type="button" class="aviso-accion" data-aviso-accion="tour" data-aviso-idx="' + i + '">Ver plan de pagos →</button>';
+        else if (a.accion && a.accion.tipo === 'wa') accionBtn = '<button type="button" class="aviso-accion" data-aviso-accion="wa" data-aviso-idx="' + i + '">Escríbenos por WhatsApp</button>';
+        return '<div class="aviso sev-' + a.severidad + '">'
+          + '<div class="aviso-ico">' + (ICO[a.tipo] || '•') + '</div>'
+          + '<div class="aviso-body">'
+          + '<div class="aviso-titulo">' + escapeHtml(a.titulo) + '</div>'
+          + '<div class="aviso-detalle">' + escapeHtml(a.detalle || '') + '</div>'
+          + accionBtn
+          + '</div></div>';
+      }).join('');
+}
+
+function _toggleAvisos(open){
+  const panel = document.getElementById('avisos-panel');
+  const btn = document.getElementById('avisos-btn');
+  if (!panel || !btn) return;
+  const show = (open == null) ? (panel.style.display === 'none') : open;
+  panel.style.display = show ? '' : 'none';
+  btn.setAttribute('aria-expanded', show ? 'true' : 'false');
+}
+
+// Abrir/cerrar campana + acciones + click-fuera (un solo listener).
+document.body.addEventListener('click', (e) => {
+  if (e.target.closest('#avisos-btn')){ e.stopPropagation(); _toggleAvisos(); return; }
+  const acc = e.target.closest('[data-aviso-accion]');
+  if (acc){
+    const a = _avisosCache[parseInt(acc.dataset.avisoIdx, 10)];
+    _toggleAvisos(false);
+    if (a && acc.dataset.avisoAccion === 'tour'){
+      const tour = (_toursCache || []).find(t => t.id === a.solicitud_id);
+      if (tour) abrirTour(tour);
+    } else if (acc.dataset.avisoAccion === 'wa'){
+      window.open('https://wa.me/528119771072', '_blank', 'noopener');
+    }
+    return;
+  }
+  if (!e.target.closest('#avisos-panel')) _toggleAvisos(false);
+});
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') _toggleAvisos(false); });
 
 // =====================================================================
 // Vista E — Plan de pagos del cliente (SOLO LECTURA)

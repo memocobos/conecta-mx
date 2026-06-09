@@ -12074,20 +12074,37 @@ function renderMTUsuarios(lista) {
 }
 
 async function eliminarUsuarioMT(id, nombre, rol) {
+  // [fix-deluser] La acción segura/primaria es DESACTIVAR (toggleActivoUsuario,
+  // reversible). El borrado FÍSICO solo procede si el server confirma que el
+  // usuario está 100% limpio; si tiene dependientes, el backend responde 409 y
+  // aquí lo explicamos y sugerimos desactivar (nunca borramos en cascada).
   if (['maestro_roshi','bulma'].includes(rol)) {
     alert('No puedes eliminar a Maestro Roshi ni a Bulma desde aquí.');
     return;
   }
-  if (!confirm(`¿Eliminar permanentemente a "${nombre}"?\n\nEsta acción no se puede deshacer.`)) return;
+  if (!confirm(`¿Eliminar permanentemente a "${nombre}"?\n\nSolo se puede si NO tiene historial (deudas, asignaciones, strikes, reportes, viajeros…). Si tiene, desactívalo en vez de borrarlo. Esta acción no se puede deshacer.`)) return;
   try {
-    // DELETE via Netlify Function — anon ya no tiene permiso DELETE sobre usuarios.
     const r = await khAdminFetch('/.netlify/functions/admin-eliminar-usuario', {
       method: 'POST',
       body: JSON.stringify({ userId: id }),
     });
-    if (!r.ok) {
-      const j = await r.json().catch(() => ({ error: 'Error ' + r.status }));
-      throw new Error(j.error || 'Error desconocido');
+    const j = await r.json().catch(() => ({}));
+    if (r.status === 409 && j.motivo === 'tiene_dependientes') {
+      // [fix-deluser] Mensaje legible del candado de dependientes.
+      const d = j.detalle || {};
+      const partes = [];
+      if (d.deudas) partes.push(`${d.deudas} deuda${d.deudas!==1?'s':''}${d.deudas_pendientes?` (${d.deudas_pendientes} pendiente${d.deudas_pendientes!==1?'s':''})`:''}`);
+      if (d.asignaciones) partes.push(`${d.asignaciones} asignación${d.asignaciones!==1?'es':''}`);
+      if (d.strikes) partes.push(`${d.strikes} strike${d.strikes!==1?'s':''}`);
+      if (d.reportes) partes.push(`${d.reportes} reporte${d.reportes!==1?'s':''}`);
+      if (d.viajeros) partes.push(`${d.viajeros} viajero${d.viajeros!==1?'s':''}`);
+      if (d.tours) partes.push(`${d.tours} tour${d.tours!==1?'s':''}`);
+      if (d.notificaciones) partes.push(`${d.notificaciones} notificación${d.notificaciones!==1?'es':''}`);
+      alert(`No se puede eliminar a "${nombre}": tiene ${partes.join(', ')}.\n\n${j.sugerencia || 'Desactívalo en vez de eliminarlo (conserva su historial).'}`);
+      return;
+    }
+    if (!r.ok || j.ok === false) {
+      throw new Error(j.error || ('Error ' + r.status));
     }
     await loadMTUsuarios();
   } catch(e) { alert('Error al eliminar: ' + e.message); }

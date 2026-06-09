@@ -2885,6 +2885,20 @@ document.body.addEventListener('click', async (e) => {
   const fechaEv = (ev.multifecha && wizState.multifechaIdx != null) ? ev.multifecha[wizState.multifechaIdx].lbl : (ev.f || ev.ds);
   const nombreEvento = ev.a + ' · ' + (fechaEv || '');
 
+  // [fix-tipohab] tipo_habitacion solo aplica a paquetes CON hotel (PLUS/RIDE/STAY
+  // con hotel y sin noHotel). CHEAP (solo boleto) y eventos sin hotel → NULL (el
+  // constraint permite NULL; un valor stale de wizState.hab violaba el check).
+  // Además clampeamos al set válido para que un hotel con nombre no estándar
+  // nunca rompa el insert.
+  const _HAB_OK = ['compartida', 'triple', 'doble', 'individual'];
+  const _incluyeHotel = (wizState.pkg === 'PLUS' || wizState.pkg === 'RIDE' || wizState.pkg === 'STAY')
+    && (ev.hotel || HOTEL_STD_FALLBACK).length && !ev.noHotel;
+  let _tipoHab = null;
+  if (_incluyeHotel && wizState.hab) {
+    const _v = String(wizState.hab.n || '').toLowerCase();
+    _tipoHab = _HAB_OK.includes(_v) ? _v : null;
+  }
+
   const payload = {
     cliente_id: perfilExistente.id,
     auth_user_id: perfilExistente.auth_user_id,
@@ -2893,7 +2907,7 @@ document.body.addEventListener('click', async (e) => {
     paquete: wizState.pkg,
     zona: wizState.zona ? wizState.zona.n : 'N/A',
     num_personas: wizState.personas,
-    tipo_habitacion: wizState.hab ? wizState.hab.n.toLowerCase() : null,
+    tipo_habitacion: _tipoHab,
     lleva_vuelo: !!wizState.llevaVuelo,
     codigo_vuelo: wizState.codigoVuelo || null,
     codigo_descuento: wizState.codigoDescuento || null,

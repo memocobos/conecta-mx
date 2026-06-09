@@ -4927,6 +4927,43 @@ const khEventosMeta = {
   porSlugs(slugs) { return this._call({ accion: 'meta_por_slugs', slugs }).then(j => j.metas || []); },
 };
 
+// [sec-coordi] Asignaciones (eventos_coordi) vía Netlify Function con service_role.
+// Lectura: cualquier logueado (listas del panel). crear/eliminar: maestro_roshi+bulma.
+// responder (aceptar/declinar): el backend EXIGE que la asignación sea del jwtUserId
+// (salvo admin) — cierra el hueco del UUID enumerable del email-link.
+const khAsignaciones = {
+  async _call(payload) {
+    const r = await khAdminFetch('/.netlify/functions/admin-coordi-asignaciones', {
+      method: 'POST', body: JSON.stringify(payload),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || j.ok === false) throw new Error(j.error || ('admin-coordi-asignaciones ' + r.status));
+    return j;
+  },
+  // listar({ coordi_id?, evento_id?, status? }) → array de asignaciones
+  listar(opts) { return this._call(Object.assign({ accion: 'listar' }, opts || {})).then(j => j.asignaciones || []); },
+  // crear({ evento_id, coordi_id, indicaciones? }) → { ok, asignacion } (necesita asignacion.id)
+  crear(datos) { return this._call(Object.assign({ accion: 'crear' }, datos || {})); },
+  // eliminar(id) → { ok }
+  eliminar(id) { return this._call({ accion: 'eliminar', id }); },
+  // responder(id, 'aceptar'|'declinar', motivo?) → { ok, asignacion:{evento_id,coordi_id,status} }
+  responder(id, decision, motivo) { return this._call({ accion: 'responder', id, decision, motivo }); },
+};
+
+// [sec-coordi] viajeros_evento (KH, PII) vía la misma Function (service_role).
+// upsert_staff: identidad del coordi sale de `usuarios` server-side (anti-spoof);
+// owner-coordi o admin. listar/descargar: admin o coordi del evento. eliminar: admin.
+// (El tab Viajeros del panel y el alta manual son del proyecto PORTAL, no de aquí.)
+const khViajeros = {
+  _call(payload) { return khAsignaciones._call(payload); },
+  // upsertStaff(asigId) → { ok, viajero } — best-effort (el caller envuelve en try/catch)
+  upsertStaff(asigId) { return this._call({ accion: 'viajero_upsert_staff', asig_id: asigId }).then(j => j.viajero || null); },
+  // listar(eventoId) → array de viajeros (whitelist PII)
+  listar(eventoId) { return this._call({ accion: 'viajero_listar', evento_id: eventoId }).then(j => j.viajeros || []); },
+  // eliminar(id) → { ok }
+  eliminar(id) { return this._call({ accion: 'viajero_eliminar', id }); },
+};
+
 // [sec-sensibles] deudas_coordi + strikes_log + sistema_alertas vía Netlify Function
 // con service_role. deudas: maestro_roshi+bulma · strikes/alertas: maestro_roshi.
 // strikes_log.por_quien lo fuerza el backend al jwt (anti-spoofing).
@@ -8038,7 +8075,7 @@ async function renderGZ() {
   let asignacionesDe = {};
   let evMap = {};
   try {
-    const asignaciones = await db.get('eventos_coordi', '?status=eq.aceptado&select=coordi_id,evento_id,status');
+    const asignaciones = await khAsignaciones.listar({ status: 'aceptado' }); // [sec-coordi]
     const evArr = await _fetchEVFromIndex();
     evArr.forEach(e => { if (e && e.id) evMap[e.id] = e; });
     asignaciones.forEach(a => { (asignacionesDe[a.coordi_id] = asignacionesDe[a.coordi_id] || []).push(a); });
@@ -8237,7 +8274,7 @@ async function abrirPerfil(userId) {
     // Trae el id de la asignación (necesario para FK de deliverables). El
     // evento_id es slug (Fase A); los datos del evento los adjuntamos desde el
     // EV más abajo (ya no usamos el embed eventos(...), sin FK).
-    evAsignados = await db.get('eventos_coordi', `?coordi_id=eq.${userId}&select=id,evento_id,indicaciones,status`);
+    evAsignados = await khAsignaciones.listar({ coordi_id: userId }); // [sec-coordi]
   } catch(e) {}
 
   // Si la usuaria es Creador de Contenido, cargar y/o auto-popular deliverables
@@ -8371,7 +8408,7 @@ async function renderMiPerfil(modoEdicion = false) {
     currentUser = { ...currentUser, ...u };
 
     const toursPasados = await khTours.listar({ usuario_id: u.id }); // [sec-tours]
-    const evAsignados = await db.get('eventos_coordi', `?coordi_id=eq.${u.id}&select=id,evento_id,indicaciones,status`).catch(() => []);
+    const evAsignados = await khAsignaciones.listar({ coordi_id: u.id }).catch(() => []); // [sec-coordi]
     if (u.rol === 'cc' && evAsignados.length) {
       await _ensureDeliverables(evAsignados);
     }
@@ -8747,7 +8784,7 @@ async function abrirRanking() {
     const tours = await khTours.listar({ desde: '2026-01-01' }); // [sec-tours]
     const usuarios = await khUsuarios.listar({ activos: true, orden: 'nombre' }); // [sec-usuarios]
     // Tours asignados aceptados (de TODOS) → puntos AUTO derivados del EV por slug (DC2d).
-    const asignaciones = await db.get('eventos_coordi', '?status=eq.aceptado&select=coordi_id,evento_id,status');
+    const asignaciones = await khAsignaciones.listar({ status: 'aceptado' }); // [sec-coordi]
     const evArr = await _fetchEVFromIndex();
     const evMap = {};
     evArr.forEach(e => { if (e && e.id) evMap[e.id] = e; });
@@ -9442,7 +9479,7 @@ async function loadCCEquipo() {
   return;
   try {
     const ev = _ccEventosCache.find(e => e.id === _ccEventoActual) || {};
-    const asigs = await db.get('eventos_coordi', `?evento_id=eq.${_ccEventoActual}`);
+    const asigs = await khAsignaciones.listar({ evento_id: _ccEventoActual }); // [sec-coordi]
     _ccAsignados = asigs;
 
     let usuarios = [];
@@ -9634,16 +9671,15 @@ async function guardarAsignacionCoordi() {
   if (!coordiId) { alertEl.innerHTML='<div class="alert alert-error">Selecciona una persona</div>'; return; }
   alertEl.innerHTML='<div class="alert" style="border-color:var(--border)">Guardando…</div>';
   try {
-    const asig = await db.post('eventos_coordi', {
+    const asig = await khAsignaciones.crear({ // [sec-coordi]
       evento_id: _ccEventoActual,
       coordi_id: coordiId,
       indicaciones,
-      status: 'pendiente',
     });
     // Correo con link aceptar/declinar
     const ev = _ccEventosCache.find(e=>e.id===_ccEventoActual);
     const usuario = await khUsuarios.obtener(coordiId); // [sec-usuarios]
-    const asigId = Array.isArray(asig) ? asig[0]?.id : asig?.id;
+    const asigId = asig?.asignacion?.id; // [sec-coordi]
     const baseUrl = window.location.origin + window.location.pathname;
     const linkAceptar = `${baseUrl}?accion=aceptar&asig=${asigId}`;
     const linkDeclinar = `${baseUrl}?accion=declinar&asig=${asigId}`;
@@ -9684,7 +9720,7 @@ async function guardarAsignacionCoordi() {
 
 async function desasignarCoordi(asigId) {
   if (!confirm('¿Desasignar esta persona del evento?')) return;
-  try { await db.delete('eventos_coordi', asigId); await loadCCEquipo(); }
+  try { await khAsignaciones.eliminar(asigId); await loadCCEquipo(); } // [sec-coordi]
   catch(e) { alert(e.message); }
 }
 
@@ -9732,7 +9768,7 @@ async function manejarAccionAsignacion() {
 
   if (accion === 'aceptar') {
     try {
-      await db.patch('eventos_coordi', asigId, { status: 'aceptado' });
+      await khAsignaciones.responder(asigId, 'aceptar'); // [sec-coordi] (anti-escalación: el backend exige que sea TU asignación)
       // Auto-agregar al usuario aceptante como viajero del evento (best-effort).
       // Si falla, la aceptación del tour se completa igual.
       try { await _upsertViajeroStaff(asigId); }
@@ -9746,10 +9782,10 @@ async function manejarAccionAsignacion() {
   if (accion === 'declinar') {
     const motivo = prompt('¿Por qué no puedes asistir? (opcional):') || '';
     try {
-      await db.patch('eventos_coordi', asigId, { status: 'declinado', motivo_declinacion: motivo });
+      const _resp = await khAsignaciones.responder(asigId, 'declinar', motivo); // [sec-coordi] (anti-escalación)
+      const _asigD = _resp?.asignacion || {}; // [sec-coordi] el backend devuelve evento_id/coordi_id (sin GET extra)
       window.history.replaceState({}, '', window.location.pathname);
       // Notificar a Memo
-      const _asigD = await db.get('eventos_coordi', `?id=eq.${asigId}`).then(r=>r[0]).catch(()=>({}));
       const _evD = _asigD?.evento_id ? await khEventosMeta.porSlug(_asigD.evento_id).then(m=>m?.nombre||'').catch(()=>'') : ''; // [sec-eventos]
       const _uD  = _asigD?.coordi_id ? await khUsuarios.obtener(_asigD.coordi_id).then(u=>u?.nombre||'').catch(()=>'') : ''; // [sec-usuarios]
       await enviarAlertaMemo('tour_declinado', { nombre: _uD, evento: _evD, motivo });
@@ -9758,50 +9794,13 @@ async function manejarAccionAsignacion() {
   }
 }
 
-// Inserta al usuario aceptante como viajero del evento (staff). Idempotente:
-// si ya existe (evento_id, correo) o (evento_id, usuario_id) no duplica.
+// [sec-coordi] Inserta al usuario aceptante como viajero del evento (staff).
+// Toda la lógica (lookup del asig, identidad desde `usuarios`, idempotencia por
+// correo, fallback de columnas tipo_viajero/usuario_id) vive ahora server-side en
+// admin-coordi-asignaciones.js con service_role + anti-escalación (owner o admin).
 // Best-effort — el caller envuelve en try/catch para que la aceptación nunca falle.
-// La columna `tipo_viajero`/`usuario_id` puede no existir aún en prod (migración
-// supabase-viajeros-tipo.sql pendiente): si Postgres rechaza el INSERT por
-// columna desconocida, reintenta sin esos campos y usa el marker en `notas`
-// para que _esStaff() siga reconociendo la fila.
 async function _upsertViajeroStaff(asigId) {
-  const [asig] = await db.get('eventos_coordi', `?id=eq.${asigId}&select=id,evento_id,coordi_id&limit=1`);
-  if (!asig || !asig.evento_id || !asig.coordi_id) return null;
-
-  const u = await khUsuarios.obtener(asig.coordi_id); // [sec-usuarios]
-  if (!u) return null;
-
-  // Idempotencia: chequear por correo (siempre presente en viajeros_evento).
-  if (u.correo) {
-    const existing = await db.get(
-      'viajeros_evento',
-      `?evento_id=eq.${asig.evento_id}&correo=eq.${encodeURIComponent(u.correo)}&select=id&limit=1`
-    );
-    if (existing.length) return existing[0];
-  }
-
-  const baseBody = {
-    evento_id: asig.evento_id,
-    nombre: u.nombre,
-    celular: u.celular || null,
-    correo: u.correo || null,
-    talla_playera: u.talla_playera || null,
-    num_emergencia: u.num_emergencia || null,
-    emergencia_nombre: u.nombre_emergencia || null,
-    tipo_paquete: 'PLUS',
-    notas: `[STAFF:${u.rol || 'staff'}] Asignación automática por aceptar tour`,
-  };
-
-  try {
-    return await db.post('viajeros_evento', { ...baseBody, tipo_viajero: u.rol || 'staff', usuario_id: u.id });
-  } catch(e) {
-    if (/tipo_viajero|usuario_id|schema cache/i.test(e.message)) {
-      console.warn('[viajero-staff] migración pendiente, insert sin tipo_viajero/usuario_id');
-      return await db.post('viajeros_evento', baseBody);
-    }
-    throw e;
-  }
+  return await khViajeros.upsertStaff(asigId); // [sec-coordi]
 }
 
 // Backfill: asegura que todo CC con status='aceptado' tenga su fila en
@@ -10272,7 +10271,7 @@ async function guardarViajero() {
 
 async function eliminarViajero(id) {
   if (!confirm('¿Eliminar este viajero?')) return;
-  try { await db.delete('viajeros_evento', id); await loadViajeros(); }
+  try { await khViajeros.eliminar(id); await loadViajeros(); } // [sec-coordi]
   catch(e) { alert(e.message); }
 }
 
@@ -10624,7 +10623,7 @@ async function descargarListaViajeros(eventoId) {
   try {
     const [ev, viajeros] = await Promise.all([
       khEventosMeta.porSlug(eventoId).then(m=>m||{}), // [sec-eventos]
-      db.get('viajeros_evento', `?evento_id=eq.${eventoId}&order=nombre.asc`),
+      khViajeros.listar(eventoId), // [sec-coordi]
     ]);
     if (!viajeros.length) { alert('No hay viajeros registrados para este evento'); return; }
     const titulo = `Viajeros — ${ev.nombre||'Evento'}`;
@@ -11730,7 +11729,7 @@ async function loadMTPendientes() {
     const ahora = new Date();
     const [reportes, eventosCoordi] = await Promise.all([
       khReportes.listar({ estado: 'aprobado_memo' }), // [sec-reportes]
-      db.get('eventos_coordi', '?status=eq.aceptado&select=*'),
+      khAsignaciones.listar({ status: 'aceptado' }), // [sec-coordi]
     ]);
 
     // Cargar eventos y usuarios
@@ -11984,7 +11983,7 @@ async function loadMTResumen() {
       khUsuarios.listar({ activos: true }), // [sec-usuarios]
       khEventos.listar({ limit: 5 }), // [sec-eventos]
       khReportes.listar({ estado: 'enviado,aprobado_popo' }), // [sec-reportes]
-      db.get('eventos_coordi', '?status=eq.pendiente&select=id'),
+      khAsignaciones.listar({ status: 'pendiente' }), // [sec-coordi]
     ]);
     const porRol = {};
     usuarios.forEach(u => { porRol[u.rol] = (porRol[u.rol]||0)+1; });
@@ -12825,7 +12824,7 @@ async function abrirModalReporte(reporteId) {
   // NO consultamos la tabla `eventos` (UUID).
   let evAsig = [];
   try {
-    const asigs = await db.get('eventos_coordi', `?coordi_id=eq.${currentUser.id}&select=evento_id`);
+    const asigs = await khAsignaciones.listar({ coordi_id: currentUser.id }); // [sec-coordi]
     const slugs = [...new Set((asigs || []).map(a => a.evento_id).filter(Boolean))];
     if (slugs.length) {
       const evArr = await _fetchEVFromIndex().catch(() => []);

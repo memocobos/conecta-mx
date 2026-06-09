@@ -59,6 +59,12 @@
 [functions."radar-alertas"]
   schedule = "0 14,2 * * *"
 
+# Auto-sync de eventos_meta desde el EV de index.html (U1). Parsea EV server-side
+# y hace upsert por slug (nunca borra). Corre ANTES de recordatorio-eventos-diario
+# para que éste lea una proyección fresca. 13:00 UTC = 7:00 AM hora México (2 h antes).
+[functions."eventos-meta-sync-cron"]
+  schedule = "0 13 * * *"
+
 # Recordatorio "tu evento es pronto" para coordis (U3 / DC2c-B). Lee eventos_meta
 # por slug y avisa (campanita + correo) a quien aceptó eventos en los próximos
 # DIAS_ANTES días. 15:00 UTC = 9:00 AM hora México.

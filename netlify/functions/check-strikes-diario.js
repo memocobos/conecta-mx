@@ -71,7 +71,7 @@ function _debeAplicarStrike(usuario) {
 // evaluamos eventos cuyo último día (fecha_fin || fecha) sea POSTERIOR a esta
 // fecha de corte. Ajusta FECHA_CORTE_STRIKES (YYYY-MM-DD) cuando el sistema ya
 // esté en operación real. Comparación lexicográfica (fechas ISO ordenan bien).
-const FECHA_CORTE_STRIKES = '2026-06-07'; // ← Memo: muévela cuando arranque en serio
+const FECHA_CORTE_STRIKES = '2026-07-01'; // [sec-strikes] FECHA_CORTE movida a 1-jul-2026 (gracia junio post-reset)
 function _antesDelCorte(ev) {
   const ult = _ultimoDiaEvento(ev);
   return !ult || ult < FECHA_CORTE_STRIKES;

@@ -294,6 +294,13 @@ main{
 .tour-hero .h-display{font-size:clamp(28px,8vw,40px)}
 .tour-sub{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-top:10px}
 .tour-sub .tour-sub-meta{font-size:11px;color:var(--ink-mute);font-weight:700;letter-spacing:.12em;text-transform:uppercase}
+/* [foto-detalle] Foto COMPLETA del artista en el detalle del tour (sin recorte).
+   contain → muestra la imagen entera; el fondo suave hace que las franjas se vean
+   intencionales. Oculta por defecto; se muestra al cargar (onerror/sin imagen → none). */
+.tour-photo{
+  display:block;width:100%;max-height:280px;object-fit:contain;
+  background:#0a0a12;border:1px solid var(--line);border-radius:14px;margin-top:14px;
+}
 
 .resumen-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;text-align:center}
 .res-item{display:flex;flex-direction:column;gap:4px}
@@ -1917,6 +1924,38 @@ function _artStaticUrl(t){
   const SI = window.STATIC_IMGS || {};
   return SI[ev.staticImg || ev.id] || null;
 }
+
+// [foto-detalle] Resolución de la foto de deezer como URL (misma fuente que el
+// dashboard: ?q=<artista> → picture_xl, con guard del hash vacío). Devuelve URL o
+// null. (El dashboard usa _upgradeArt, que muta .tc-hero y no devuelve URL; aquí
+// necesitamos la URL para un <img>, así que reusamos _evBySlug y la misma cadena.)
+async function _artDeezerUrl(t){
+  const ev = _evBySlug(t.evento_id);
+  const q = ev && (ev.img || ev.a);
+  if (!q) return null;
+  try {
+    const r = await fetch('/.netlify/functions/deezer?q=' + encodeURIComponent(q));
+    const d = await r.json();
+    const pic = d && d.data && d.data[0] && d.data[0].picture_xl;
+    return (pic && pic.indexOf('d41d8cd98f00b204e9800998ecf8427e') === -1) ? pic : null;
+  } catch (e) { return null; }
+}
+
+// [foto-detalle] Si el detalle no tiene foto estática, resuelve deezer una vez,
+// la CACHEA en t._artDeezer (para que los re-render del head la incluyan inline) y
+// pinta el <img> actual. Fail-soft: si no hay imagen, el bloque queda oculto.
+async function _resolverFotoDeezerDetalle(t){
+  if (!t || _artStaticUrl(t) || t._artDeezer) return; // ya hay static o cache
+  const url = await _artDeezerUrl(t);
+  if (!url) return;
+  t._artDeezer = url;
+  const img = document.getElementById('tour-photo');
+  if (img && _tourActual === t){
+    img.onerror = () => { img.style.display = 'none'; };
+    img.onload = () => { img.style.display = 'block'; };
+    img.src = url;
+  }
+}
 // Fallback Deezer (foto del artista por nombre, ?q=) — igual que loadArtistImg del index.
 async function _upgradeArt(card, t){
   const ev = _evBySlug(t.evento_id);
@@ -2198,6 +2237,10 @@ function tourSubMeta(t){
 }
 
 function tourHeadHtml(t){
+  // [foto-detalle] Foto del artista (misma cadena que el dashboard): static por slug
+  // si existe; si no, la URL de deezer ya resuelta y cacheada en t._artDeezer. Inline
+  // → sobrevive los re-render del head (loading → plan). Si no hay, va oculta.
+  const _art = _artStaticUrl(t) || t._artDeezer || '';
   return `
     <div class="tour-hero">
       <div class="eyebrow" style="margin-bottom:6px">Tu tour</div>
@@ -2206,6 +2249,8 @@ function tourHeadHtml(t){
         <span class="tour-sub-meta">${tourSubMeta(t)}</span>
         <span class="badge badge-${t.estado}">${ESTADOS_LBL[t.estado] || t.estado}</span>
       </div>
+      <img class="tour-photo" id="tour-photo" alt="" src="${escapeHtml(_art)}"
+           style="display:${_art ? 'block' : 'none'}" onerror="this.style.display='none'">
     </div>`;
 }
 
@@ -2218,6 +2263,7 @@ function abrirTour(t){
   const cont = $('#tour-content');
   const head = tourHeadHtml(t);
   showView('tour');
+  _resolverFotoDeezerDetalle(t); // [foto-detalle] foto completa async (fail-soft; static ya va inline)
 
   if (t.estado === 'pendiente'){
     cont.innerHTML = head + tourMsgCard('info', 'En revisión',

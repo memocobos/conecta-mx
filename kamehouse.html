@@ -4871,6 +4871,45 @@ const khWaitlist = {
   resetNotificado(eventoId) { return this._call({ accion: 'reset_notificado', evento_id: eventoId }); },
 };
 
+// [sec-sensibles] rooming_habitaciones vía Netlify Function con service_role
+// (maestro_roshi + bulma). Cierra lectura/escritura anon.
+const khRooming = {
+  async _call(payload) {
+    const r = await khAdminFetch('/.netlify/functions/admin-rooming', {
+      method: 'POST', body: JSON.stringify(payload),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || j.ok === false) throw new Error(j.error || ('admin-rooming ' + r.status));
+    return j;
+  },
+  listar(eventoId) { return this._call({ accion: 'listar', evento_id: eventoId }).then(j => j.habitaciones || []); },
+  crear(body) { return this._call(Object.assign({ accion: 'crear' }, body || {})); },
+  actualizar(id, patch) { return this._call({ accion: 'actualizar', id, patch }); },
+  eliminar(id) { return this._call({ accion: 'eliminar', id }); },
+};
+
+// [sec-sensibles] deudas_coordi + strikes_log + sistema_alertas vía Netlify Function
+// con service_role. deudas: maestro_roshi+bulma · strikes/alertas: maestro_roshi.
+// strikes_log.por_quien lo fuerza el backend al jwt (anti-spoofing).
+const khCoordi = {
+  async _call(payload) {
+    const r = await khAdminFetch('/.netlify/functions/admin-coordi-control', {
+      method: 'POST', body: JSON.stringify(payload),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || j.ok === false) throw new Error(j.error || ('admin-coordi-control ' + r.status));
+    return j;
+  },
+  // deudas
+  deudasListar(opts) { return this._call(Object.assign({ accion: 'deudas_listar' }, opts || {})).then(j => j.deudas || []); },
+  deudasMarcarPagada(id) { return this._call({ accion: 'deudas_marcar_pagada', id }); },
+  deudasEliminar(id) { return this._call({ accion: 'deudas_eliminar', id }); },
+  // strikes (por_quien lo pone el backend)
+  strikeCrear(coordi_id, accionStrike, motivo, evento_id) { return this._call({ accion: 'strike_crear', coordi_id, tipo_accion: accionStrike, motivo, evento_id }); },
+  // sistema_alertas (solo lectura)
+  alertasListar() { return this._call({ accion: 'sistema_alertas_listar' }).then(j => j.alertas || []); },
+};
+
 // [sec-usuarios] Registro por invitación (flujo PRE-JWT): el invite_token es la
 // credencial. fetch directo (no khAdminFetch) porque el invitado aún no tiene JWT.
 async function khRegistroInvitado(payload) {
@@ -8082,7 +8121,7 @@ async function gestionarStrikes(userId, nombre, strikesActuales) {
   try {
     await khUsuarios.actualizar(userId, { strikes: nuevo }); // [sec-usuarios]
     try {
-      await db.post('strikes_log', { coordi_id: userId, accion: accion === '+' ? 'asignado' : 'quitado', motivo: motivo || null, por_quien: currentUser.id });
+      await khCoordi.strikeCrear(userId, accion === '+' ? 'asignado' : 'quitado', motivo || null); // [sec-sensibles] por_quien lo pone el backend
     } catch(e) {}
     if (nuevo >= 3) {
       const usuario = _gzCache.find(u => u.id === userId);
@@ -9506,7 +9545,7 @@ async function abrirModalAsignarCoordi() {
   const asignadosIds = _ccAsignados.map(a=>a.coordi_id);
   usuarios = usuarios.filter(u => rolesAsignables.includes(u.rol) && !asignadosIds.includes(u.id));
   // Cargar deudas pendientes de cada usuario para advertir
-  const deudasPend = await db.get('deudas_coordi', '?pagado=eq.false&select=coordi_id,monto').catch(()=>[]);
+  const deudasPend = await khCoordi.deudasListar({ pagado: false }).catch(()=>[]); // [sec-sensibles]
   const deudasPorUser = {};
   deudasPend.forEach(d => {
     if (!deudasPorUser[d.coordi_id]) deudasPorUser[d.coordi_id] = 0;
@@ -10362,7 +10401,7 @@ async function guardarHotel() {
     incluye_desayuno: document.getElementById('hot-desayuno')?.checked||false,
   };
   for (const h of _ccHabitaciones) {
-    await db.patch('rooming_habitaciones', h.id, {
+    await khRooming.actualizar(h.id, { // [sec-sensibles]
       hotel_nombre:    _ccHotelInfo.nombre,
       hotel_direccion: _ccHotelInfo.direccion,
       incluye_desayuno:_ccHotelInfo.incluye_desayuno,
@@ -10485,8 +10524,8 @@ async function guardarHabitacion() {
     incluye_desayuno:_ccHotelInfo?.incluye_desayuno||false,
   };
   try {
-    if (id) await db.patch('rooming_habitaciones', id, body);
-    else    await db.post('rooming_habitaciones', body);
+    if (id) await khRooming.actualizar(id, body); // [sec-sensibles]
+    else    await khRooming.crear(body); // [sec-sensibles]
     closeModal('modal-habitacion');
     await loadRooming();
   } catch(e) { document.getElementById('hab-alert').innerHTML=`<div class="alert alert-error">${e.message}</div>`; }
@@ -10494,7 +10533,7 @@ async function guardarHabitacion() {
 
 async function eliminarHabitacion(id) {
   if (!confirm('¿Eliminar esta habitación?')) return;
-  try { await db.delete('rooming_habitaciones', id); await loadRooming(); }
+  try { await khRooming.eliminar(id); await loadRooming(); } // [sec-sensibles]
   catch(e) { alert(e.message); }
 }
 async function exportarRooming(formato) {
@@ -10564,7 +10603,7 @@ async function descargarRoomingList(eventoId) {
   try {
     const [ev, habs] = await Promise.all([
       db.get('eventos_meta', `?slug=eq.${eventoId}&select=nombre`).then(r=>r[0]||{}),
-      db.get('rooming_habitaciones', `?evento_id=eq.${eventoId}&order=orden.asc`),
+      khRooming.listar(eventoId), // [sec-sensibles]
     ]);
     if (!habs.length) { alert('No hay rooming list para este evento'); return; }
     const tipoLabels = {individual:'Individual',doble:'Doble',triple:'Triple',cuadruple:'Cuádruple'};
@@ -11777,7 +11816,7 @@ async function loadMTDeudas() {
   if (!list) return;
   list.innerHTML = '<div class="loading-state"><div class="spinner"></div></div>';
   try {
-    _mtDeudasCache = await db.get('deudas_coordi', '?order=created_at.desc&limit=200').catch(()=>[]);
+    _mtDeudasCache = await khCoordi.deudasListar({ limit: 200 }).catch(()=>[]); // [sec-sensibles]
     const uIds = [...new Set(_mtDeudasCache.map(d=>d.coordi_id).filter(Boolean))];
     const eIds = [...new Set(_mtDeudasCache.map(d=>d.evento_id).filter(Boolean))];
     const [usuarios, eventos] = await Promise.all([
@@ -11855,7 +11894,7 @@ function renderMTDeudas(lista, filtro) {
 async function marcarDeudaPagada(id) {
   if (!confirm('¿Marcar esta deuda como pagada?')) return;
   try {
-    await db.patch('deudas_coordi', id, { pagado: true, fecha_pago: new Date().toISOString() });
+    await khCoordi.deudasMarcarPagada(id); // [sec-sensibles]
     await loadMTDeudas();
   } catch(e) { alert(e.message); }
 }
@@ -11863,7 +11902,7 @@ async function marcarDeudaPagada(id) {
 async function eliminarDeuda(id) {
   if (!confirm('¿Eliminar esta deuda?')) return;
   try {
-    await db.delete('deudas_coordi', id);
+    await khCoordi.deudasEliminar(id); // [sec-sensibles]
     await loadMTDeudas();
   } catch(e) { alert(e.message); }
 }
@@ -12272,13 +12311,7 @@ async function aplicarStrike(userId, nombre, strikesActuales, motivo) {
   try {
     await khUsuarios.actualizar(userId, { strikes: nuevos }); // [sec-usuarios]
     // Log del strike
-    await db.post('strikes_log', {
-      coordi_id: userId,
-      accion: 'strike_manual',
-      motivo,
-      por_quien: currentUser?.id,
-      created_at: new Date().toISOString(),
-    }).catch(()=>{});
+    await khCoordi.strikeCrear(userId, 'strike_manual', motivo).catch(()=>{}); // [sec-sensibles] por_quien lo pone el backend
     // Email al usuario
     const u = await khUsuarios.obtener(userId); // [sec-usuarios]
     const email = u?.correo_notif || u?.correo;
@@ -12322,7 +12355,7 @@ async function loadMTAlertas() {
   if (!list) return;
   list.innerHTML = '<div class="loading-state"><div class="spinner"></div></div>';
   try {
-    const alertas = await db.get('sistema_alertas', '?order=created_at.desc&limit=50').catch(()=>[]);
+    const alertas = await khCoordi.alertasListar().catch(()=>[]); // [sec-sensibles]
     if (!alertas.length) {
       list.innerHTML = '<div class="empty-state"><div class="empty-icon">·</div>Sin alertas recientes</div>';
       return;

@@ -1111,17 +1111,7 @@ main{
             <div class="err">Elige una habitación</div>
           </div>
 
-          <div class="field">
-            <div class="wiz-toggle" id="wiz-vuelo-toggle" tabindex="0" role="switch" aria-checked="false">
-              <span class="tg-label">¿Llevas vuelo propio?</span>
-              <span class="tg-switch"></span>
-            </div>
-          </div>
-
-          <div class="field" id="wiz-vuelo-field" style="display:none">
-            <label for="wiz-vuelo-codigo">Código de vuelo</label>
-            <input id="wiz-vuelo-codigo" type="text" placeholder="AM 123 / VB 456" autocomplete="off">
-          </div>
+          <!-- [fase1] "¿Llevas vuelo propio?" retirado del wizard (se maneja manual con la config de transporte). -->
 
           <div class="field">
             <label for="wiz-codigo">Código de descuento <span style="color:var(--ink-mute);font-weight:500">(opcional)</span></label>
@@ -1144,7 +1134,7 @@ main{
     <div class="wiz-step" data-step="4" id="wiz-step-4">
       <div class="eyebrow">Paso 4</div>
       <h2 class="h-display">Resumen y <span class="accent">precio</span></h2>
-      <p class="subtitle">Revisa antes de confirmar. Te confirmamos por WhatsApp.</p>
+      <p class="subtitle">Revisa antes de confirmar. Te confirmamos por correo (ahí te llega tu contrato).</p>
       <div class="card">
         <div class="wiz-summary-rows" id="wiz-summary"></div>
       </div>
@@ -2587,8 +2577,6 @@ const wizState = {
   zona: null,
   hab: null,
   personas: 1,
-  llevaVuelo: false,
-  codigoVuelo: '',
   codigoDescuento: '',
   notas: '',
   solicitudId: null,
@@ -2603,8 +2591,6 @@ function resetWizard(){
   wizState.zona = null;
   wizState.hab = null;
   wizState.personas = 1;
-  wizState.llevaVuelo = false;
-  wizState.codigoVuelo = '';
   wizState.codigoDescuento = '';
   wizState.notas = '';
   wizState.solicitudId = null;
@@ -2613,10 +2599,6 @@ function resetWizard(){
   $('#wiz-personas').value = '1';
   $('#wiz-codigo').value = '';
   $('#wiz-notas').value = '';
-  $('#wiz-vuelo-codigo').value = '';
-  $('#wiz-vuelo-toggle').classList.remove('on');
-  $('#wiz-vuelo-toggle').setAttribute('aria-checked','false');
-  $('#wiz-vuelo-field').style.display = 'none';
   $('#wiz-upload').classList.remove('has-file');
   $('#wiz-file').value = '';
   $('#wiz-file-preview').src = '';
@@ -2865,15 +2847,7 @@ $('#wiz-personas').addEventListener('change', (e) => {
   wizState.personas = parseInt(e.target.value, 10) || 1;
 });
 
-// Vuelo toggle
-$('#wiz-vuelo-toggle').addEventListener('click', () => {
-  const t = $('#wiz-vuelo-toggle');
-  const on = !t.classList.contains('on');
-  t.classList.toggle('on', on);
-  t.setAttribute('aria-checked', on ? 'true' : 'false');
-  $('#wiz-vuelo-field').style.display = on ? '' : 'none';
-  wizState.llevaVuelo = on;
-});
+// [fase1] Vuelo propio retirado del wizard (handler eliminado).
 
 // Ir a resumen
 document.body.addEventListener('click', (e) => {
@@ -2895,7 +2869,6 @@ document.body.addEventListener('click', (e) => {
     showAlert($('#wiz-alert'), 'error', 'Elige una habitación.');
     return;
   }
-  wizState.codigoVuelo = $('#wiz-vuelo-codigo').value.trim();
   wizState.codigoDescuento = $('#wiz-codigo').value.trim();
   wizState.notas = $('#wiz-notas').value.trim();
   poblarResumen();
@@ -2920,7 +2893,6 @@ function poblarResumen(){
     pkg !== 'RIDE' ? ['Zona', escapeHtml(wizState.zona.n)] : null,
     ['Personas', String(wizState.personas)],
     wizState.hab ? ['Habitación', escapeHtml(wizState.hab.n)] : null,
-    wizState.llevaVuelo ? ['Vuelo propio', wizState.codigoVuelo ? escapeHtml(wizState.codigoVuelo) : 'Sí'] : null,
     wizState.codigoDescuento ? ['Código', escapeHtml(wizState.codigoDescuento)] : null
   ].filter(Boolean);
 
@@ -2963,8 +2935,8 @@ document.body.addEventListener('click', async (e) => {
     zona: wizState.zona ? wizState.zona.n : 'N/A',
     num_personas: wizState.personas,
     tipo_habitacion: wizState.hab ? wizState.hab.n.toLowerCase() : null,
-    lleva_vuelo: !!wizState.llevaVuelo,
-    codigo_vuelo: wizState.codigoVuelo || null,
+    lleva_vuelo: false,        // [fase1] vuelo propio retirado del wizard (default del schema)
+    codigo_vuelo: null,
     codigo_descuento: wizState.codigoDescuento || null,
     precio_total: calc.total,
     monto_separo: calc.separoTotal,

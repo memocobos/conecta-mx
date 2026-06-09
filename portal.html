@@ -294,6 +294,28 @@ main{
 .tour-hero .h-display{font-size:clamp(28px,8vw,40px)}
 .tour-sub{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-top:10px}
 .tour-sub .tour-sub-meta{font-size:11px;color:var(--ink-mute);font-weight:700;letter-spacing:.12em;text-transform:uppercase}
+/* [foto-detalle] Clon del .d-hero del index: foto en COVER encuadrada a la cara
+   (object-position center 20%, sin franjas), fondo difuminado de la misma foto, y
+   fade inferior a negro (no overlay uniforme). Oculto por defecto; se muestra al cargar. */
+.tour-photo-box{
+  position:relative;width:100%;height:280px;margin-top:14px;
+  border-radius:14px;overflow:hidden;border:1px solid var(--line);
+  background:linear-gradient(135deg,#0a0a1a 0%,#0000cd 50%,#000050 100%);
+}
+.tour-photo-bg{
+  position:absolute;inset:0;width:100%;height:100%;z-index:0;
+  object-fit:cover;object-position:center;
+  filter:blur(20px) brightness(.4) saturate(1.5);transform:scale(1.1);
+}
+.tour-photo-fg{
+  position:absolute;inset:0;width:100%;height:100%;z-index:1;
+  object-fit:cover;object-position:center 20%;
+  filter:brightness(.75) saturate(1.1);
+}
+.tour-photo-box::after{
+  content:'';position:absolute;left:0;right:0;bottom:0;height:180px;z-index:2;
+  background:linear-gradient(transparent,rgba(0,0,0,.95));pointer-events:none;
+}
 
 .resumen-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;text-align:center}
 .res-item{display:flex;flex-direction:column;gap:4px}
@@ -1917,6 +1939,42 @@ function _artStaticUrl(t){
   const SI = window.STATIC_IMGS || {};
   return SI[ev.staticImg || ev.id] || null;
 }
+
+// [foto-detalle] Foto de deezer como URL (misma fuente que el dashboard/index:
+// ?q=<artista> → picture_xl con guard del hash vacío). Devuelve URL o null. (El
+// _upgradeArt del dashboard muta .tc-hero y no devuelve URL; aquí necesitamos la URL
+// para aplicarla a las dos capas del detalle.)
+async function _artDeezerUrl(t){
+  const ev = _evBySlug(t.evento_id);
+  const q = ev && (ev.img || ev.a);
+  if (!q) return null;
+  try {
+    const r = await fetch('/.netlify/functions/deezer?q=' + encodeURIComponent(q));
+    const d = await r.json();
+    const pic = d && d.data && d.data[0] && d.data[0].picture_xl;
+    return (pic && pic.indexOf('d41d8cd98f00b204e9800998ecf8427e') === -1) ? pic : null;
+  } catch (e) { return null; }
+}
+
+// [foto-detalle] Resuelve la URL UNA vez (static ya va inline; deezer async) y la
+// aplica a las DOS capas (fondo blur + frente cover). Cachea en t._artUrl para que
+// los re-render del head la incluyan inline. Fail-soft: sin imagen → bloque oculto.
+async function _resolverFotoDetalle(t){
+  if (!t || _artStaticUrl(t) || t._artUrl) return; // static inline o cache ya puesta
+  const url = await _artDeezerUrl(t);
+  if (!url) return;                                 // sin imagen → el box ya está oculto
+  t._artUrl = url;
+  const box = document.getElementById('tour-photo-box');
+  if (!box || _tourActual !== t) return;
+  const bg = document.getElementById('tour-photo-bg');
+  const fg = document.getElementById('tour-photo-fg');
+  if (bg) bg.src = url;
+  if (fg){
+    fg.onload  = () => { box.style.display = 'block'; };
+    fg.onerror = () => { box.style.display = 'none'; };
+    fg.src = url;
+  }
+}
 // Fallback Deezer (foto del artista por nombre, ?q=) — igual que loadArtistImg del index.
 async function _upgradeArt(card, t){
   const ev = _evBySlug(t.evento_id);
@@ -2198,6 +2256,11 @@ function tourSubMeta(t){
 }
 
 function tourHeadHtml(t){
+  // [foto-detalle] URL de la foto (misma cadena del dashboard, por slug): static si
+  // existe; si no, la de deezer ya resuelta y cacheada en t._artUrl. La MISMA url va a
+  // las dos capas (fondo blur + frente cover). Inline → sobrevive los re-render del head.
+  // Sin imagen → el bloque va oculto y se queda así (fail-soft).
+  const _art = _artStaticUrl(t) || t._artUrl || '';
   return `
     <div class="tour-hero">
       <div class="eyebrow" style="margin-bottom:6px">Tu tour</div>
@@ -2205,6 +2268,11 @@ function tourHeadHtml(t){
       <div class="tour-sub">
         <span class="tour-sub-meta">${tourSubMeta(t)}</span>
         <span class="badge badge-${t.estado}">${ESTADOS_LBL[t.estado] || t.estado}</span>
+      </div>
+      <div class="tour-photo-box" id="tour-photo-box" style="display:${_art ? 'block' : 'none'}">
+        <img class="tour-photo-bg" id="tour-photo-bg" alt="" aria-hidden="true" src="${escapeHtml(_art)}">
+        <img class="tour-photo-fg" id="tour-photo-fg" alt="" src="${escapeHtml(_art)}"
+             onerror="var b=document.getElementById('tour-photo-box');if(b)b.style.display='none'">
       </div>
     </div>`;
 }
@@ -2218,6 +2286,7 @@ function abrirTour(t){
   const cont = $('#tour-content');
   const head = tourHeadHtml(t);
   showView('tour');
+  _resolverFotoDetalle(t); // [foto-detalle] foto async (fail-soft; static ya va inline)
 
   if (t.estado === 'pendiente'){
     cont.innerHTML = head + tourMsgCard('info', 'En revisión',

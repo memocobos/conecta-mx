@@ -4829,6 +4829,48 @@ const khKits = {
   eliminar(id) { return this._call({ accion: 'eliminar', id }); },
 };
 
+// [sec-radar-wl] Radar del Dragón vía Netlify Function con service_role (cerramos
+// anon de main/pagos/rol_eventos_uso + radar_alertas + el RPC radar_metricas).
+// Solo maestro_roshi. La función reenvía el RPC tal cual y reproduce la paginación.
+const khRadar = {
+  async _call(payload) {
+    const r = await khAdminFetch('/.netlify/functions/admin-radar', {
+      method: 'POST', body: JSON.stringify(payload),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || j.ok === false) throw new Error(j.error || ('admin-radar ' + r.status));
+    return j;
+  },
+  // metricas(rango) → respuesta del RPC radar_metricas TAL CUAL
+  metricas(rango) { return this._call({ accion: 'metricas', rango }).then(j => j.metricas); },
+  // mainMetrics(sinceISO, untilISO|null) → RPC radar_main_metrics TAL CUAL (comparativas)
+  mainMetrics(since, until) { return this._call({ accion: 'main_metrics', since, until: until || undefined }).then(j => j.metricas); },
+  // fetch({ table, select?, since, until? }) → array de filas (paginado server-side)
+  fetch(opts) { return this._call(Object.assign({ accion: 'fetch' }, opts || {})).then(j => j.rows || []); },
+  alertasListar() { return this._call({ accion: 'alertas_listar' }).then(j => j.rows || []); },
+  alertasNoVistas() { return this._call({ accion: 'alertas_no_vistas' }).then(j => j.rows || []); },
+  alertaVista(id) { return this._call({ accion: 'alerta_vista', id }); },
+  alertasVistaTodas() { return this._call({ accion: 'alertas_vista_todas' }); },
+};
+
+// [sec-radar-wl] Lista de espera vía Netlify Function con service_role (cerramos anon
+// de eventos_waitlist + eventos_estado_snapshot). Solo maestro_roshi. PII (email/nombre)
+// whitelisteada server-side y solo llega a admin autenticado.
+const khWaitlist = {
+  async _call(payload) {
+    const r = await khAdminFetch('/.netlify/functions/admin-waitlist', {
+      method: 'POST', body: JSON.stringify(payload),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || j.ok === false) throw new Error(j.error || ('admin-waitlist ' + r.status));
+    return j;
+  },
+  listar() { return this._call({ accion: 'listar' }).then(j => j.rows || []); },
+  snapshot() { return this._call({ accion: 'snapshot' }).then(j => j.rows || []); },
+  eliminar(eventoId) { return this._call({ accion: 'eliminar', evento_id: eventoId }); },
+  resetNotificado(eventoId) { return this._call({ accion: 'reset_notificado', evento_id: eventoId }); },
+};
+
 // [sec-usuarios] Registro por invitación (flujo PRE-JWT): el invite_token es la
 // credencial. fetch directo (no khAdminFetch) porque el invitado aún no tiene JWT.
 async function khRegistroInvitado(payload) {
@@ -13905,14 +13947,7 @@ async function eliminarContrato(token, nombre, btn) {
 // ═══════════════════════════════════════════════════════════════
 let _waitlistCache = [];
 let _snapshotCache = {};
-
-async function _wlSb(path) {
-  const res = await fetch(`${SB_URL}/rest/v1/${path}`, {
-    headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` },
-  });
-  if (!res.ok) throw new Error(`SB ${res.status}`);
-  return res.json();
-}
+// [sec-radar-wl] _wlSb (lectura anon directa) eliminado → khWaitlist.listar()/snapshot().
 
 function copiarLinkProximos(btn) {
   const url = 'https://conectareynosa.mx/proximos';
@@ -13945,8 +13980,8 @@ async function loadWaitlist() {
   let rows = [], snap = [];
   try {
     [rows, snap] = await Promise.all([
-      _wlSb('eventos_waitlist?select=id,evento_id,evento_nombre,nombre,email,notificado,notificado_at,created_at&order=created_at.desc'),
-      _wlSb('eventos_estado_snapshot?select=evento_id,estado'),
+      khWaitlist.listar(),   // [sec-radar-wl]
+      khWaitlist.snapshot(), // [sec-radar-wl]
     ]);
   } catch (e) {
     if (summary) summary.textContent = 'Error cargando: ' + e.message;
@@ -14123,11 +14158,7 @@ async function wlNotificar(eventoId, totalRegs, pendientes) {
   // Si es reenvío, primero reset notificado=false para los que ya fueron notificados.
   if (pendientes === 0 && totalRegs > 0) {
     try {
-      await fetch(`${SB_URL}/rest/v1/eventos_waitlist?evento_id=eq.${encodeURIComponent(eventoId)}`, {
-        method: 'PATCH',
-        headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ notificado: false, notificado_at: null }),
-      });
+      await khWaitlist.resetNotificado(eventoId); // [sec-radar-wl]
     } catch (e) { alert('No se pudo resetear el flag: ' + e.message); return; }
   }
 
@@ -14566,7 +14597,9 @@ var _radarEvCache = { count: null, ts: 0 }; // eventos activos: 5 min TTL
 var _radarRpcCache = {};
 async function _radarGetMetricas(rango){
   if (_radarRpcCache[rango]) return _radarRpcCache[rango];
-  const data = await db.rpc('radar_metricas', { p_rango: rango });
+  // [sec-radar-wl] antes db.rpc('radar_metricas') con anon. Ahora admin-radar
+  // ejecuta el RPC con service_role y reenvía la respuesta TAL CUAL.
+  const data = await khRadar.metricas(rango);
   _radarRpcCache[rango] = data;
   return data;
 }
@@ -14903,73 +14936,21 @@ async function loadRadar(silent){
 }
 
 async function _radarFetch(table, sinceISO, untilISO){
-  // Paginación con Range headers — Supabase/PostgREST tiene db-max-rows
-  // server-side. El cap real puede ser distinto al esperado (medido: 5000),
-  // por eso NO confiamos en `rows.length < PAGE_SIZE` como señal de fin
-  // (rompía si el server cappeaba silenciosamente). Avanzamos por
-  // rows.length REAL y usamos Content-Range para detectar fin de datos.
-  //
-  // Si el path ya trae querystring (ej. 'tabla?select=...'), concatenamos
-  // con '&'. Antes asumíamos siempre '?', lo que producía URLs con dos
-  // signos de interrogación y PostgREST devolvía 400 PGRST100.
-  const sep = table.indexOf('?') >= 0 ? '&' : '?';
-  let filters = `${sep}created_at=gte.${encodeURIComponent(sinceISO)}`;
-  if (untilISO) filters += `&created_at=lt.${encodeURIComponent(untilISO)}`;
-  filters += '&order=created_at.desc';
-  const url = `${SB_URL}/rest/v1/${table}${filters}`;
-
-  const PAGE_SIZE = 5000;     // matchea db-max-rows actual del server (medido)
-  const MAX_ROWS  = 100000;   // cap defensivo — UI se vuelve pesada más allá
-  const all = [];
-  let off = 0;
-  while (off < MAX_ROWS) {
-    let resp;
-    try {
-      resp = await fetch(url, {
-        headers: {
-          apikey: SB_KEY,
-          Authorization: 'Bearer ' + SB_KEY,
-          'Range-Unit': 'items',
-          'Range': off + '-' + (off + PAGE_SIZE - 1),
-          Prefer: 'count=exact',
-        },
-      });
-    } catch (e) {
-      // Falla de red en una página: aborta paginación pero devuelve lo
-      // acumulado hasta ahora. Render parcial > render vacío.
-      console.warn('[_radarFetch] network error at offset', off, table, e);
-      break;
-    }
-    if (!resp.ok) {
-      // 416 Range Not Satisfiable: el offset quedó fuera del total. Señal
-      // limpia de "no hay más filas", no es error.
-      if (resp.status === 416) break;
-      // Otros errores: log y abort, devolver acumulado. Si pasa en la primera
-      // página (off=0) y no hay filas todavía, propagamos para no enmascarar
-      // problemas de auth/CSP/RLS.
-      if (off === 0 && all.length === 0) {
-        throw new Error('HTTP ' + resp.status + ' ' + table);
-      }
-      console.warn('[_radarFetch] HTTP', resp.status, 'at offset', off, table);
-      break;
-    }
-    const rows = await resp.json();
-    if (!Array.isArray(rows) || rows.length === 0) break;
-    all.push(...rows);
-    // Content-Range nos dice el total real (ej. "0-4999/34865"). Si ya
-    // acumulamos >= total, terminamos sin un round-trip extra.
-    const cr = resp.headers.get('content-range') || '';
-    const total = parseInt((cr.split('/')[1] || '0'), 10);
-    if (Number.isFinite(total) && total > 0 && all.length >= total) break;
-    // Avanzar por lo que REALMENTE recibimos (no por PAGE_SIZE asumido).
-    // Esto es robusto si el server cappea silenciosamente bajo el PAGE_SIZE pedido.
-    off += rows.length;
+  // [sec-radar-wl] Antes leía /rest/v1 con la anon key + paginación Range/Content-Range
+  // aquí en el cliente. Ahora delega en admin-radar (service_role), que reproduce
+  // EXACTAMENTE los mismos filtros (created_at gte/lt), order y paginación, y devuelve
+  // el array completo. Conservamos la firma (table, sinceISO, untilISO) para no tocar
+  // los 6 call sites. `table` puede traer '?select=...'.
+  const qi = table.indexOf('?');
+  const tbl = qi >= 0 ? table.slice(0, qi) : table;
+  let select;
+  if (qi >= 0) {
+    const params = new URLSearchParams(table.slice(qi + 1));
+    select = params.get('select') || undefined;
   }
-  if (all.length >= MAX_ROWS) {
-    console.warn('[Radar] Cap alcanzado:', MAX_ROWS, 'filas para', table, '— datos pueden estar truncados.');
-  }
-  return all;
+  return khRadar.fetch({ table: tbl, select, since: sinceISO, until: untilISO || undefined });
 }
+
 
 // ── Helpers visuales del Radar ────────────────────────────
 // Bucketing por día: devuelve array de N valores (uno por día) terminando en HOY.
@@ -15326,10 +15307,7 @@ async function loadRadarPagos(){
 
 // ── ALERTAS ────────────────────────────────────────────────
 async function loadRadarAlertas(){
-  const r = await fetch(`${SB_URL}/rest/v1/radar_alertas?select=*&order=created_at.desc&limit=200`,
-    { headers: { apikey: SB_KEY, Authorization: 'Bearer ' + SB_KEY } });
-  if (!r.ok) throw new Error('HTTP ' + r.status + ' alertas');
-  _radarCache.alertas = await r.json();
+  _radarCache.alertas = await khRadar.alertasListar(); // [sec-radar-wl]
   renderAlertasFiltered('all');
   refreshAlertasBadge();
 }
@@ -15358,11 +15336,7 @@ function renderAlertasFiltered(filtro){
   list.querySelectorAll('.rdr-alert.no-vista').forEach(item => {
     item.addEventListener('click', async () => {
       const id = item.dataset.id;
-      await fetch(`${SB_URL}/rest/v1/radar_alertas?id=eq.${id}`, {
-        method:'PATCH',
-        headers:{ apikey:SB_KEY, Authorization:'Bearer '+SB_KEY, 'Content-Type':'application/json', Prefer:'return=minimal' },
-        body: JSON.stringify({ vista:true })
-      }).catch(() => {});
+      await khRadar.alertaVista(id).catch(() => {}); // [sec-radar-wl]
       const a = _radarCache.alertas.find(x => x.id === id); if (a) a.vista = true;
       item.classList.remove('no-vista'); item.classList.add('vista');
       refreshAlertasBadge();
@@ -15372,10 +15346,7 @@ function renderAlertasFiltered(filtro){
 
 async function refreshAlertasBadge(){
   try {
-    const r = await fetch(`${SB_URL}/rest/v1/radar_alertas?vista=eq.false&select=id&limit=200`,
-      { headers: { apikey: SB_KEY, Authorization: 'Bearer ' + SB_KEY } });
-    if (!r.ok) return;
-    const rows = await r.json();
+    const rows = await khRadar.alertasNoVistas(); // [sec-radar-wl]
     const badge = document.getElementById('radar-alertas-badge');
     if (!badge) return;
     if (rows.length > 0) { badge.style.display = 'inline-flex'; badge.textContent = rows.length; }
@@ -15386,11 +15357,7 @@ async function refreshAlertasBadge(){
 async function markAllAlertsRead(){
   if (!confirm('¿Marcar TODAS las alertas como leídas?')) return;
   try {
-    await fetch(`${SB_URL}/rest/v1/radar_alertas?vista=eq.false`, {
-      method:'PATCH',
-      headers:{ apikey:SB_KEY, Authorization:'Bearer '+SB_KEY, 'Content-Type':'application/json', Prefer:'return=minimal' },
-      body: JSON.stringify({ vista:true })
-    });
+    await khRadar.alertasVistaTodas(); // [sec-radar-wl]
     (_radarCache.alertas || []).forEach(a => a.vista = true);
     renderAlertasFiltered('all');
     refreshAlertasBadge();
@@ -15447,9 +15414,9 @@ async function loadRadarComparativas(){
   // Comparativas usa ventanas propias (no los 5 rangos fijos), así que llama al
   // helper radar_main_metrics con fechas explícitas — sin pasar por _radarRpcCache.
   // OJO: usa los campos _n (COUNT de filas), NO los DISTINCT, para igualar el histórico.
-  const [act, prev] = await Promise.all([
-    db.rpc('radar_main_metrics', { p_since: r.actSince.toISOString(),  p_until: r.actUntil  ? r.actUntil.toISOString()  : null }),
-    db.rpc('radar_main_metrics', { p_since: r.prevSince.toISOString(), p_until: r.prevUntil ? r.prevUntil.toISOString() : null })
+  const [act, prev] = await Promise.all([ // [sec-radar-wl] antes db.rpc anon → admin-radar service_role
+    khRadar.mainMetrics(r.actSince.toISOString(),  r.actUntil  ? r.actUntil.toISOString()  : null),
+    khRadar.mainMetrics(r.prevSince.toISOString(), r.prevUntil ? r.prevUntil.toISOString() : null)
   ]);
   const num = v => Number(v) || 0;
   const items = [

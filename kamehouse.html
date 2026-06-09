@@ -10980,7 +10980,7 @@ function abrirResetCliente(clienteId) {
 
     <div id="rc-alert" style="margin-bottom:10px"></div>
     <div style="display:flex;gap:10px;justify-content:flex-end">
-      <button class="btn btn-ghost btn-sm" onclick="closeModal('rc')">Cancelar</button>
+      <button class="btn btn-ghost btn-sm" onclick="cerrarModal('rc')">Cancelar</button>
       <button class="btn btn-red btn-sm" id="rc-confirm-btn" onclick="ejecutarResetCliente('${_spEscape(clienteId)}')">Ejecutar</button>
     </div>`;
 
@@ -11024,8 +11024,8 @@ async function ejecutarResetCliente(clienteId) {
     });
     const data = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(data.error || ('Error ' + r.status));
-    closeModal('rc');
-    closeModal('sp-detalle');
+    cerrarModal('rc'); // [fix-404] crearModal usa cerrarModal (closeModal pide id completo y truena con null)
+    cerrarModal('sp-detalle');
     const msg = modo === 'total'
       ? `Cliente eliminado (${data.solicitudes_borradas} solicitud(es), cuenta ${data.auth_user_borrado ? 'borrada' : 'no encontrada'}).`
       : `Cliente reseteado (${data.solicitudes_borradas} solicitud(es) y sus pagos borrados).`;

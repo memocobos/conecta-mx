@@ -512,6 +512,129 @@ main{
   .fab{bottom:14px;right:14px;padding:12px 16px;font-size:12px}
   .wiz-pkgs{grid-template-columns:1fr}
 }
+
+/* ===================================================================== */
+/* [portal-v1] Rediseño festival vibrante — PIEL (no toca lógica)        */
+/* ===================================================================== */
+
+/* --- Animaciones de entrada (escalonadas) --- */
+@keyframes pv-rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+@keyframes pv-pop{from{opacity:0;transform:scale(.92)}to{opacity:1;transform:none}}
+@keyframes pv-shimmer{0%{background-position:-180% 0}100%{background-position:180% 0}}
+@keyframes pv-glow{0%,100%{box-shadow:0 0 0 rgba(232,255,76,0)}50%{box-shadow:0 0 18px rgba(232,255,76,.18)}}
+.view.is-active .eyebrow,
+.view.is-active .h-display,
+.view.is-active .dash-header,
+.view.is-active .subtitle,
+.view.is-active > .card,
+.view.is-active > .dash-actions,
+.view.is-active > .dash-footer{animation:pv-rise .5s cubic-bezier(.2,.7,.2,1) both}
+.view.is-active .h-display{animation-delay:.04s}
+.view.is-active .subtitle{animation-delay:.08s}
+.view.is-active > .card{animation-delay:.12s}
+.view.is-active > .card:nth-of-type(2){animation-delay:.18s}
+.view.is-active > .dash-actions{animation-delay:.22s}
+.tour-card{animation:pv-rise .45s cubic-bezier(.2,.7,.2,1) both}
+.tour-card:nth-child(1){animation-delay:.02s}
+.tour-card:nth-child(2){animation-delay:.08s}
+.tour-card:nth-child(3){animation-delay:.14s}
+.tour-card:nth-child(4){animation-delay:.20s}
+.tour-card:nth-child(n+5){animation-delay:.26s}
+
+/* --- Tarjeta de tour con HERO de artista --- */
+.tour-card{padding:0;overflow:hidden}
+.tc-hero{
+  position:relative;height:118px;
+  background:linear-gradient(135deg,var(--blue),#000 70%);
+  background-size:cover;background-position:center top;
+  display:flex;align-items:flex-end;
+}
+.tc-hero.is-loading{background-image:linear-gradient(100deg,#0c0c0c 30%,#161616 50%,#0c0c0c 70%);background-size:300% 100%;animation:pv-shimmer 1.4s linear infinite}
+.tc-hero::after{content:'';position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.05) 0%,rgba(0,0,0,.55) 60%,#000 100%)}
+.tc-hero .tc-hero-name{
+  position:relative;z-index:1;padding:10px 14px;font-family:'Barlow Condensed',sans-serif;
+  font-weight:900;font-size:22px;line-height:.98;text-transform:uppercase;letter-spacing:.01em;
+  color:#fff;text-shadow:0 2px 10px rgba(0,0,0,.8);max-width:78%;
+}
+.tc-hero .badge{position:absolute;top:10px;right:10px;z-index:2}
+.tc-countdown{
+  position:absolute;top:10px;left:10px;z-index:2;
+  display:inline-flex;align-items:center;gap:6px;
+  background:rgba(232,255,76,.92);color:#000;border-radius:999px;padding:4px 10px;
+  font-family:'JetBrains Mono',monospace;font-weight:700;font-size:10px;letter-spacing:.04em;
+}
+.tc-countdown.is-soon{background:var(--red);color:#fff;animation:pv-glow 1.8s ease-in-out infinite}
+.tc-body{padding:12px 14px 13px;display:flex;flex-direction:column;gap:8px}
+.tour-card .tc-meta{margin-top:0}
+.tour-card.is-pasado{opacity:.62;filter:saturate(.7)}
+.tour-card.is-pasado .tc-hero{filter:grayscale(.55)}
+
+/* --- Pestañas Próximos / Pasados del dashboard --- */
+.dash-tabs{
+  display:flex;gap:6px;background:var(--field-bg);border:1px solid var(--line);
+  border-radius:10px;padding:4px;margin-bottom:14px;
+}
+.dash-tab{
+  flex:1;background:transparent;color:var(--ink-soft);border:none;border-radius:8px;
+  padding:9px 6px;font-family:'Montserrat',sans-serif;font-weight:800;font-size:11px;
+  letter-spacing:.08em;text-transform:uppercase;cursor:pointer;min-height:40px;
+  transition:background .15s,color .15s;display:flex;align-items:center;justify-content:center;gap:6px;
+}
+.dash-tab .cnt{font-family:'JetBrains Mono',monospace;font-size:10px;opacity:.8}
+.dash-tab.is-active{background:var(--yel);color:#000}
+
+/* --- Fila de stats (total / próximos / pasados) --- */
+.dash-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:2px 0 4px}
+.stat{
+  background:var(--field-bg);border:1px solid var(--line);border-radius:12px;
+  padding:14px 10px;text-align:center;animation:pv-pop .5s cubic-bezier(.2,.7,.2,1) both;
+}
+.dash-stats .stat:nth-child(2){animation-delay:.06s}
+.dash-stats .stat:nth-child(3){animation-delay:.12s}
+.stat .n{font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:30px;line-height:1;color:var(--yel)}
+.stat.pas .n{color:var(--ink-soft)}
+.stat .l{font-size:9px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-mute);margin-top:5px}
+
+/* --- Header: avatar (inicial) + campana (visual, sin badge real aún) --- */
+.dash-top{display:flex;align-items:center;gap:12px;margin-bottom:14px}
+.dash-avatar{
+  width:46px;height:46px;flex-shrink:0;border-radius:50%;
+  background:linear-gradient(135deg,var(--yel),var(--green));color:#000;
+  display:flex;align-items:center;justify-content:center;
+  font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:22px;
+  box-shadow:0 4px 14px rgba(232,255,76,.25);
+}
+.dash-top .dash-header{margin-bottom:0;flex:1;min-width:0}
+.dash-bell{
+  width:42px;height:42px;flex-shrink:0;border-radius:50%;
+  background:var(--field-bg);border:1px solid var(--line);color:var(--ink-soft);
+  display:flex;align-items:center;justify-content:center;
+}
+.dash-bell svg{width:20px;height:20px}
+
+/* --- Barra de links externos --- */
+.portal-links{
+  display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:24px;
+}
+.portal-link{
+  display:flex;flex-direction:column;align-items:center;gap:6px;
+  background:var(--field-bg);border:1px solid var(--line);border-radius:12px;
+  padding:13px 6px;text-decoration:none;color:var(--ink-soft);
+  transition:transform .12s,border-color .15s,color .15s,background .15s;
+}
+.portal-link:hover{transform:translateY(-2px);border-color:var(--yel);color:var(--yel)}
+.portal-link svg{width:22px;height:22px}
+.portal-link .pl-txt{font-size:9px;font-weight:800;letter-spacing:.08em;text-transform:uppercase}
+.portal-link.wa:hover{border-color:var(--green);color:var(--green)}
+
+/* --- Barra de progreso animada (amplifica la existente) --- */
+.prog-fill{background:linear-gradient(90deg,var(--green),var(--yel));box-shadow:0 0 12px rgba(136,234,78,.4);animation:pv-rise .4s both}
+
+/* --- Respeta prefers-reduced-motion: desactiva TODO lo animado --- */
+@media(prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation:none!important;transition:none!important}
+  .tc-hero.is-loading{background:#0c0c0c}
+}
 </style>
 </head>
 <body>
@@ -686,9 +809,23 @@ main{
   <!-- VISTA C — DASHBOARD                                           -->
   <!-- ============================================================ -->
   <section class="view" id="view-dashboard" aria-labelledby="dash-title">
-    <div class="dash-header">
-      <h1 class="dash-hola" id="dash-title">Hola, <span id="dash-nombre" class="accent" style="color:var(--yel)">Cliente</span></h1>
-      <span class="dash-cliente">CLIENTE <span id="dash-numero" class="mono">#0000</span></span>
+    <!-- [portal-v1] Header con avatar (inicial) + campana (visual, sin badge real) -->
+    <div class="dash-top">
+      <div class="dash-avatar" id="dash-avatar" aria-hidden="true">C</div>
+      <div class="dash-header">
+        <h1 class="dash-hola" id="dash-title">Hola, <span id="dash-nombre" class="accent" style="color:var(--yel)">Cliente</span></h1>
+        <span class="dash-cliente">CLIENTE <span id="dash-numero" class="mono">#0000</span></span>
+      </div>
+      <div class="dash-bell" aria-hidden="true" title="Avisos (próximamente)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+      </div>
+    </div>
+
+    <!-- [portal-v1] Stats calculadas (total/próximos/pasados) — solo presentación -->
+    <div class="dash-stats">
+      <div class="stat"><div class="n" id="stat-total">0</div><div class="l">Tours</div></div>
+      <div class="stat"><div class="n" id="stat-prox">0</div><div class="l">Próximos</div></div>
+      <div class="stat pas"><div class="n" id="stat-pas">0</div><div class="l">Pasados</div></div>
     </div>
 
     <div class="card">
@@ -696,25 +833,13 @@ main{
         <div class="eyebrow" style="margin:0">Tus tours</div>
         <button type="button" class="btn-pill" data-action="new-tour">+ Nuevo</button>
       </div>
+      <!-- [portal-v1] Pestañas Próximos/Pasados (misma data, solo divide y rinde) -->
+      <div class="dash-tabs" id="dash-tabs" role="tablist">
+        <button type="button" class="dash-tab is-active" data-toursfilter="proximos" role="tab">Próximos <span class="cnt" id="tab-cnt-prox"></span></button>
+        <button type="button" class="dash-tab" data-toursfilter="pasados" role="tab">Pasados <span class="cnt" id="tab-cnt-pas"></span></button>
+      </div>
       <div id="tours-list" class="tours-list" aria-live="polite">
         <div class="tours-loading"><div class="b-spin" style="width:24px;height:24px"></div></div>
-      </div>
-    </div>
-
-    <div class="card">
-      <div class="eyebrow" style="margin:0 0 14px">Próximas funciones</div>
-      <div class="dash-tiles">
-
-        <div class="tile">
-          <div class="tile-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M8 13h8"/><path d="M8 17h5"/></svg>
-          </div>
-          <div class="tile-body">
-            <div class="tile-title">Recibos</div>
-            <div class="tile-meta">Próximamente</div>
-          </div>
-        </div>
-
       </div>
     </div>
 
@@ -722,6 +847,26 @@ main{
       <button type="button" class="btn btn-secondary" data-action="edit-profile">Editar mi perfil</button>
       <button type="button" class="btn btn-danger" data-action="logout">Cerrar sesión</button>
     </div>
+
+    <!-- [portal-v1] Barra de links externos (reusa los del index; "Tours" abre el sitio) -->
+    <nav class="portal-links" aria-label="Enlaces">
+      <a class="portal-link" href="https://conectareynosa.mx" target="_blank" rel="noopener">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+        <span class="pl-txt">Tours</span>
+      </a>
+      <a class="portal-link wa" href="https://wa.me/528119771072" target="_blank" rel="noopener">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.45 1.32 4.95L2 22l5.25-1.38c1.45.79 3.08 1.21 4.79 1.21 5.46 0 9.91-4.45 9.91-9.91C21.95 6.45 17.5 2 12.04 2m5.8 14.01c-.24.68-1.42 1.31-1.95 1.36-.5.05-1.13.07-1.82-.11-.42-.13-.96-.31-1.65-.61-2.9-1.25-4.79-4.17-4.94-4.36-.14-.19-1.18-1.57-1.18-2.99s.75-2.12 1.01-2.41c.26-.29.57-.36.76-.36l.55.01c.18.01.41-.07.64.49.24.57.81 1.97.88 2.11.07.14.12.31.02.5-.1.19-.15.31-.29.48-.14.17-.3.38-.43.5-.14.14-.29.29-.12.57.17.28.74 1.22 1.59 1.98 1.09.97 2.01 1.27 2.29 1.42.28.14.45.12.61-.07.17-.19.71-.83.9-1.11.19-.29.38-.24.64-.14.26.09 1.66.78 1.94.93.29.14.48.21.55.33.07.12.07.68-.17 1.36"/></svg>
+        <span class="pl-txt">WhatsApp</span>
+      </a>
+      <a class="portal-link" href="https://instagram.com/conectareynosa" target="_blank" rel="noopener">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><line x1="17.5" y1="6.5" x2="17.5" y2="6.5"/></svg>
+        <span class="pl-txt">Instagram</span>
+      </a>
+      <a class="portal-link" href="https://tiktok.com/@conectareynosa" target="_blank" rel="noopener">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M16.5 3c.3 2.1 1.6 3.7 3.7 4v2.4c-1.3.1-2.6-.3-3.7-1v6.1c0 3.3-2.6 5.5-5.6 5.5C8 20 5.7 17.9 5.7 15c0-2.7 2.1-4.9 4.9-4.9.3 0 .6 0 .9.1v2.5c-.3-.1-.6-.2-.9-.2-1.4 0-2.4 1.1-2.4 2.5s1.1 2.5 2.5 2.5 2.4-1.1 2.4-2.5V3z"/></svg>
+        <span class="pl-txt">TikTok</span>
+      </a>
+    </nav>
 
     <div class="dash-footer">
       ¿Tienes un plan de pagos anterior?<br>
@@ -905,6 +1050,11 @@ main{
 <button type="button" class="fab" id="fab-new-tour" data-action="new-tour" aria-label="Nuevo tour">
   <span class="plus">+</span><span>Agregar tour</span>
 </button>
+
+<!-- [portal-v1] Portadas estáticas de eventos (window.STATIC_IMGS) para la foto de
+     artista en las tarjetas de tour. Mismo archivo que usa el index. Si falla la
+     carga, el portal degrada a gradiente + nombre (no rompe). -->
+<script src="/imgs.js" onerror="window.STATIC_IMGS=window.STATIC_IMGS||{}"></script>
 
 <!-- Credenciales del proyecto Supabase del portal (anon key es segura por RLS) -->
 <script>
@@ -1246,6 +1396,9 @@ function renderDashboard(c){
   const primerNombre = (c.nombre_completo || 'Cliente').split(' ')[0];
   $('#dash-nombre').textContent = primerNombre;
   $('#dash-numero').textContent = '#' + (c.numero_cliente || '0000');
+  // [portal-v1] avatar = inicial del nombre (placeholder, sin subida)
+  const av = $('#dash-avatar');
+  if (av) av.textContent = (primerNombre.trim()[0] || 'C').toUpperCase();
 }
 
 document.querySelector('[data-action="edit-profile"]').addEventListener('click', () => {
@@ -1407,14 +1560,62 @@ const ESTADOS_LBL = {
 let _toursCache = [];   // últimas solicitudes cargadas (para abrir su plan)
 let _tourActual = null; // tour cuyo plan se está mostrando
 
+// [portal-v1] Estado de la pestaña activa del dashboard (presentación).
+let _toursTab = 'proximos';
+
+// [portal-v1] Helpers de presentación (fecha del evento vía EV por slug, art).
+function _hoyISOmx(){ return new Date().toLocaleDateString('en-CA', { timeZone: 'America/Mexico_City' }); }
+function _evBySlug(eventoId){
+  if (!eventoId || !Array.isArray(EV)) return null;
+  const base = String(eventoId).split('#')[0];
+  return EV.find(e => e && e.id === base) || null;
+}
+function _tourFechaISO(t){
+  const ev = _evBySlug(t.evento_id);
+  return (ev && typeof ev.ds === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(ev.ds)) ? ev.ds : null;
+}
+function _diasFaltan(iso){
+  if (!iso) return null;
+  const a = new Date(_hoyISOmx() + 'T12:00:00').getTime();
+  const b = new Date(iso + 'T12:00:00').getTime();
+  return Math.round((b - a) / 86400000);
+}
+function _artStaticUrl(t){
+  const ev = _evBySlug(t.evento_id);
+  if (!ev) return null;
+  const SI = window.STATIC_IMGS || {};
+  return SI[ev.staticImg || ev.id] || null;
+}
+// Fallback Deezer (foto del artista por nombre, ?q=) — igual que loadArtistImg del index.
+async function _upgradeArt(card, t){
+  const ev = _evBySlug(t.evento_id);
+  const q = ev && (ev.img || ev.a);
+  const hero = card && card.querySelector('.tc-hero');
+  if (!hero) return;
+  if (!q){ hero.classList.remove('is-loading'); return; }
+  try {
+    const r = await fetch('/.netlify/functions/deezer?q=' + encodeURIComponent(q));
+    const d = await r.json();
+    const pic = d && d.data && d.data[0] && d.data[0].picture_xl;
+    if (pic && pic.indexOf('d41d8cd98f00b204e9800998ecf8427e') === -1){
+      hero.style.backgroundImage = "url('" + pic + "')";
+    }
+  } catch (e) { /* degrada al gradiente */ }
+  hero.classList.remove('is-loading');
+}
+
 async function renderToursList(){
   const cont = $('#tours-list');
   if (!perfilExistente) return;
   cont.innerHTML = '<div class="tours-loading"><div class="b-spin" style="width:24px;height:24px"></div></div>';
 
+  // EV para fecha/imagen (cacheado). Si falla, seguimos sin fecha/art (no rompe).
+  try { await loadEV(); } catch (e) { /* sin EV: todo va a "próximos", sin countdown */ }
+
   const { data, error } = await supabase
     .from('solicitudes_tour')
-    .select('id,evento_nombre,paquete,zona,num_personas,precio_total,monto_separo,estado,created_at')
+    // [portal-v1] +evento_id (read-only) para cruzar el slug con el EV y sacar la fecha/foto.
+    .select('id,evento_id,evento_nombre,paquete,zona,num_personas,precio_total,monto_separo,estado,created_at')
     .eq('auth_user_id', perfilExistente.auth_user_id)
     .order('created_at', { ascending: false })
     .limit(20);
@@ -1425,7 +1626,30 @@ async function renderToursList(){
     return;
   }
 
-  if (!data || data.length === 0){
+  _toursCache = data || [];
+  _renderToursUI();
+}
+
+// [portal-v1] Clasifica _toursCache en próximos/pasados, pinta stats + pestaña activa.
+function _renderToursUI(){
+  const cont = $('#tours-list');
+  if (!cont) return;
+  const hoy = _hoyISOmx();
+  const conMeta = (_toursCache || []).map(t => {
+    const iso = _tourFechaISO(t);
+    return { t, iso, esPasado: iso ? (iso < hoy) : false }; // sin fecha confiable → próximo
+  });
+  const prox = conMeta.filter(x => !x.esPasado);
+  const pas  = conMeta.filter(x => x.esPasado);
+
+  const setTxt = (sel, v) => { const el = $(sel); if (el) el.textContent = v; };
+  setTxt('#stat-total', _toursCache.length);
+  setTxt('#stat-prox', prox.length);
+  setTxt('#stat-pas', pas.length);
+  setTxt('#tab-cnt-prox', prox.length ? '(' + prox.length + ')' : '');
+  setTxt('#tab-cnt-pas', pas.length ? '(' + pas.length + ')' : '');
+
+  if (!_toursCache.length){
     cont.innerHTML = `
       <div class="tour-empty">
         <b>Sin solicitudes todavía</b>
@@ -1439,31 +1663,58 @@ async function renderToursList(){
     return;
   }
 
-  _toursCache = data;
-  cont.innerHTML = data.map(t => `
-    <article class="tour-card" data-tour-id="${escapeHtml(t.id)}" role="button" tabindex="0">
-      <div class="tc-top">
-        <div>
-          <div class="tc-name">${escapeHtml(t.evento_nombre)}</div>
-          <div class="tc-meta">${escapeHtml(t.paquete)} · ${escapeHtml(t.zona)}${t.num_personas > 1 ? ' · ' + t.num_personas + ' pers.' : ''}</div>
-        </div>
-        <span class="badge badge-${t.estado}">${ESTADOS_LBL[t.estado] || t.estado}</span>
-      </div>
-      <div class="tc-row">
-        <div class="tc-money">
-          <span class="lbl">Separo</span>
-          <span class="val">${fmtMxn(t.monto_separo)}</span>
-        </div>
-        <div class="tc-money" style="text-align:right">
-          <span class="lbl">Total</span>
-          <span class="val total">${fmtMxn(t.precio_total)}</span>
-        </div>
-      </div>
-      <div class="tc-date">${fmtFechaLarga(t.created_at)}</div>
-      <div class="tc-cta">Ver plan de pagos →</div>
-    </article>
-  `).join('');
+  const grupo = _toursTab === 'pasados' ? pas : prox;
+  if (!grupo.length){
+    cont.innerHTML = _toursTab === 'pasados'
+      ? '<div class="tour-empty"><b>Sin tours pasados</b>Aquí aparecerán tus eventos ya vividos.</div>'
+      : '<div class="tour-empty"><b>Sin tours próximos</b>Crea uno nuevo para tu siguiente viaje.</div>';
+    return;
+  }
+
+  cont.innerHTML = grupo.map(({ t, iso, esPasado }) => _tourCardHtml(t, iso, esPasado)).join('');
+  // Upgrade asíncrono de la foto (los que no tienen portada estática).
+  grupo.forEach(({ t }) => {
+    const card = cont.querySelector('.tour-card[data-tour-id="' + t.id + '"]');
+    if (card && card.querySelector('.tc-hero.is-loading')) _upgradeArt(card, t);
+  });
 }
+
+function _tourCardHtml(t, iso, esPasado){
+  const staticUrl = _artStaticUrl(t);
+  const heroAttr  = staticUrl ? ` style="background-image:url('${staticUrl}')"` : '';
+  const heroLoad  = staticUrl ? '' : ' is-loading';
+  let countdown = '';
+  if (!esPasado){
+    const d = _diasFaltan(iso);
+    if (d != null && d > 0) countdown = `<span class="tc-countdown${d <= 15 ? ' is-soon' : ''}">⏳ Faltan ${d} día${d !== 1 ? 's' : ''}</span>`;
+    else if (d === 0) countdown = '<span class="tc-countdown is-soon">¡Es hoy!</span>';
+  }
+  return `
+    <article class="tour-card${esPasado ? ' is-pasado' : ''}" data-tour-id="${escapeHtml(t.id)}" role="button" tabindex="0">
+      <div class="tc-hero${heroLoad}"${heroAttr}>
+        ${countdown}
+        <span class="badge badge-${t.estado}">${ESTADOS_LBL[t.estado] || t.estado}</span>
+        <div class="tc-hero-name">${escapeHtml(t.evento_nombre)}</div>
+      </div>
+      <div class="tc-body">
+        <div class="tc-meta">${escapeHtml(t.paquete)} · ${escapeHtml(t.zona)}${t.num_personas > 1 ? ' · ' + t.num_personas + ' pers.' : ''}</div>
+        <div class="tc-row">
+          <div class="tc-money"><span class="lbl">Separo</span><span class="val">${fmtMxn(t.monto_separo)}</span></div>
+          <div class="tc-money" style="text-align:right"><span class="lbl">Total</span><span class="val total">${fmtMxn(t.precio_total)}</span></div>
+        </div>
+        <div class="tc-cta">Ver plan de pagos →</div>
+      </div>
+    </article>`;
+}
+
+// [portal-v1] Cambio de pestaña Próximos/Pasados — solo re-render (misma data).
+document.body.addEventListener('click', (e) => {
+  const tab = e.target.closest('.dash-tab[data-toursfilter]');
+  if (!tab) return;
+  _toursTab = tab.dataset.toursfilter === 'pasados' ? 'pasados' : 'proximos';
+  $$('.dash-tab').forEach(b => b.classList.toggle('is-active', b === tab));
+  _renderToursUI();
+});
 
 // =====================================================================
 // Vista E — Plan de pagos del cliente (SOLO LECTURA)

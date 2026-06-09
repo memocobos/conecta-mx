@@ -1500,6 +1500,7 @@ async function intentarReclamarWalkin(session){
 async function cargarClienteYRutear(session){
   if (!session){
     showView('auth');
+    _buildLoginMarquee(); // [login-festival] visitante sin sesión → arma la marquesina (post módulo-eval, EV ya cargable)
     return;
   }
   const { data, error } = await supabase
@@ -1631,8 +1632,9 @@ async function _upgradeChipGroup(e, pics){
     pic.classList.remove('is-loading');
   });
 }
-// Disparo decorativo (no afecta auth ni el routing).
-_buildLoginMarquee();
+// [login-festival] La construcción se dispara desde cargarClienteYRutear (rama
+// sin sesión), NO aquí: a esta altura del módulo `EV`/`loadEVPromise` (let) aún
+// están en TDZ y loadEV() lanzaría ReferenceError → marquesina oculta.
 
 // =====================================================================
 // Helpers de formato

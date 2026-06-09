@@ -729,6 +729,26 @@ main{
   font-weight:800;font-size:10px;letter-spacing:.06em;text-transform:uppercase;cursor:pointer;
 }
 .aviso-accion:hover{border-color:var(--yel);background:rgba(232,255,76,.08)}
+
+/* ===================================================================== */
+/* [avatar] Foto de perfil del cliente                                   */
+/* ===================================================================== */
+.dash-avatar{overflow:hidden}
+.dash-avatar img{width:100%;height:100%;object-fit:cover;display:block}
+.avatar-edit{display:flex;align-items:center;gap:16px;margin-bottom:18px}
+.avatar-preview{
+  width:74px;height:74px;flex-shrink:0;border-radius:50%;overflow:hidden;
+  background:linear-gradient(135deg,var(--yel),var(--green));color:#000;
+  display:flex;align-items:center;justify-content:center;
+  font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:34px;
+  box-shadow:0 4px 16px rgba(232,255,76,.22);
+}
+.avatar-preview img{width:100%;height:100%;object-fit:cover;display:block}
+.avatar-edit-body{flex:1;min-width:0;display:flex;flex-direction:column;gap:6px;align-items:flex-start}
+.avatar-btn{width:auto;min-height:42px;padding:0 18px;cursor:pointer;display:inline-flex}
+.avatar-btn.is-loading .spinner{display:inline-block}
+.avatar-btn.is-loading .label{opacity:.6}
+.avatar-hint{font-size:11px;color:var(--ink-mute);font-weight:600;line-height:1.35}
 </style>
 </head>
 <body>
@@ -839,6 +859,19 @@ main{
 
     <div class="card">
       <div class="alert" id="profile-alert" role="status"></div>
+
+      <!-- [avatar] Control de foto de perfil (flujo independiente del guardado del form) -->
+      <div class="avatar-edit">
+        <div class="avatar-preview" id="avatar-preview" aria-hidden="true">C</div>
+        <div class="avatar-edit-body">
+          <label class="btn btn-secondary avatar-btn" id="avatar-btn" for="avatar-file">
+            <span class="spinner"></span><span class="label" id="avatar-btn-label">Subir foto</span>
+          </label>
+          <input type="file" id="avatar-file" accept="image/*,.heic,.heif" hidden>
+          <div class="avatar-hint">JPG, PNG, WEBP o HEIC · se recorta cuadrada</div>
+        </div>
+      </div>
+      <div class="alert" id="avatar-alert" role="status"></div>
 
       <form class="form" id="form-profile" autocomplete="on" novalidate>
         <div class="field">
@@ -1445,7 +1478,118 @@ function prellenarPerfil(c){
   $('#p-emerg-rel').value    = c.contacto_emergencia_relacion || '';
   // Disparar aviso de edad si corresponde
   $('#p-nacimiento').dispatchEvent(new Event('change'));
+  // [avatar] preview de la foto actual + etiqueta del botón
+  pintarAvatar(c);
+  const lbl = $('#avatar-btn-label');
+  if (lbl) lbl.textContent = c.avatar_url ? 'Cambiar foto' : 'Subir foto';
 }
+
+// =====================================================================
+// [avatar] Foto de perfil: decode (incl. HEIC iOS) → JPEG cuadrado ~512px →
+// Storage (bucket público 'avatars') → clientes.avatar_url. Fails-soft.
+// Decoder portado de contrato.html (cadena de intentos), adaptado a Blob cuadrado.
+// =====================================================================
+
+// Center-crop a cuadrado `size` y exporta JPEG como Blob (canvas.toBlob).
+function _drawSquareBlob(source, size, quality){
+  const w = source.width || source.naturalWidth;
+  const h = source.height || source.naturalHeight;
+  if (!w || !h) throw new Error('dimensiones 0');
+  const side = Math.min(w, h);
+  const sx = Math.round((w - side) / 2);
+  const sy = Math.round((h - side) / 2);
+  const cnv = document.createElement('canvas');
+  cnv.width = size; cnv.height = size;
+  const ctx = cnv.getContext('2d');
+  if (!ctx) throw new Error('getContext null');
+  ctx.fillStyle = '#000'; ctx.fillRect(0, 0, size, size);
+  ctx.drawImage(source, sx, sy, side, side, 0, 0, size, size);
+  return new Promise((res, rej) => {
+    cnv.toBlob(b => b ? res(b) : rej(new Error('toBlob vacío')), 'image/jpeg', quality);
+  });
+}
+
+// Intento 1: createImageBitmap (decodifica HEIC en iOS 15+). Intento 2: <img>+objectURL.
+async function _avatarToBlob(file, size = 512, quality = 0.82){
+  if (typeof createImageBitmap === 'function'){
+    let bmp = null;
+    try {
+      bmp = await createImageBitmap(file);
+      const blob = await _drawSquareBlob(bmp, size, quality);
+      if (bmp.close) { try { bmp.close(); } catch (_) {} }
+      return blob;
+    } catch (e) {
+      if (bmp && bmp.close) { try { bmp.close(); } catch (_) {} }
+    }
+  }
+  const objUrl = URL.createObjectURL(file);
+  try {
+    const img = await new Promise((res, rej) => {
+      const i = new Image();
+      const t = setTimeout(() => rej(new Error('timeout >15s')), 15000);
+      i.onload = () => { clearTimeout(t); res(i); };
+      i.onerror = () => { clearTimeout(t); rej(new Error('Image.onerror')); };
+      i.src = objUrl;
+    });
+    return await _drawSquareBlob(img, size, quality);
+  } finally { URL.revokeObjectURL(objUrl); }
+  // (Sin 3er intento "raw": un HEIC sin decodificar no se podría mostrar como avatar.)
+}
+
+function _avatarLoading(on){
+  const btn = $('#avatar-btn');
+  const input = $('#avatar-file');
+  if (btn) btn.classList.toggle('is-loading', !!on);
+  if (input) input.disabled = !!on;
+}
+
+const AVATAR_MAX_BYTES = 12 * 1024 * 1024; // antes de decodificar (la salida queda ~512px)
+
+async function subirAvatar(file){
+  const alertEl = $('#avatar-alert');
+  if (!perfilExistente || !file) return;
+  // Valida mime/size ANTES de decodificar.
+  const okTipo = /^image\//i.test(file.type || '') || /\.(jpe?g|png|webp|heic|heif)$/i.test(file.name || '');
+  if (!okTipo){ showAlert(alertEl, 'error', 'Elige una imagen (JPG, PNG, WEBP o HEIC).'); return; }
+  if (file.size > AVATAR_MAX_BYTES){ showAlert(alertEl, 'error', 'La imagen es muy grande (máx 12 MB).'); return; }
+  hideAlert(alertEl);
+  _avatarLoading(true);
+
+  let blob;
+  try { blob = await _avatarToBlob(file); }
+  catch (e) { _avatarLoading(false); showAlert(alertEl, 'error', 'No pudimos procesar esa imagen. Intenta con una foto JPG o PNG.'); return; }
+
+  const path = perfilExistente.auth_user_id + '/avatar.jpg';
+  const { error: upErr } = await supabase.storage
+    .from('avatars')
+    .upload(path, blob, { contentType: 'image/jpeg', upsert: true });
+  if (upErr){ _avatarLoading(false); showAlert(alertEl, 'error', 'No se pudo subir: ' + (upErr.message || '')); return; }
+
+  const { data: pub } = supabase.storage.from('avatars').getPublicUrl(path);
+  const url = (pub && pub.publicUrl ? pub.publicUrl : '') + '?v=' + Date.now();
+
+  const { error: updErr } = await supabase
+    .from('clientes')
+    .update({ avatar_url: url })
+    .eq('auth_user_id', perfilExistente.auth_user_id);
+  _avatarLoading(false);
+  if (updErr){ showAlert(alertEl, 'error', 'Foto subida pero no se guardó la referencia: ' + (updErr.message || '')); return; }
+
+  perfilExistente.avatar_url = url;
+  pintarAvatar(perfilExistente); // refresca preview + dashboard
+  const lbl = $('#avatar-btn-label'); if (lbl) lbl.textContent = 'Cambiar foto';
+  showAlert(alertEl, 'success', '¡Foto de perfil actualizada!');
+}
+
+(function(){
+  const input = document.getElementById('avatar-file');
+  if (!input) return;
+  input.addEventListener('change', (e) => {
+    const f = e.target.files && e.target.files[0];
+    e.target.value = ''; // permite re-subir el mismo archivo
+    if (f) subirAvatar(f);
+  });
+})();
 
 $('#form-profile').addEventListener('submit', async (e) => {
   e.preventDefault();
@@ -1504,9 +1648,29 @@ function renderDashboard(c){
   const primerNombre = (c.nombre_completo || 'Cliente').split(' ')[0];
   $('#dash-nombre').textContent = primerNombre;
   $('#dash-numero').textContent = '#' + (c.numero_cliente || '0000');
-  // [portal-v1] avatar = inicial del nombre (placeholder, sin subida)
-  const av = $('#dash-avatar');
-  if (av) av.textContent = (primerNombre.trim()[0] || 'C').toUpperCase();
+  // [avatar] pinta foto si existe (avatar_url), si no la inicial (fails-soft 404→inicial)
+  pintarAvatar(c);
+}
+
+// [avatar] Pinta el avatar (dashboard + preview de profile): <img> si hay avatar_url,
+// con fallback a la inicial del nombre. Si la imagen 404ea, onerror → inicial.
+function pintarAvatar(c){
+  const url = c && c.avatar_url;
+  const inicial = (((c && c.nombre_completo) || 'Cliente').trim()[0] || 'C').toUpperCase();
+  ['#dash-avatar', '#avatar-preview'].forEach(sel => {
+    const el = document.querySelector(sel);
+    if (!el) return;
+    if (url){
+      el.textContent = '';
+      const img = document.createElement('img');
+      img.alt = '';
+      img.onerror = () => { el.textContent = inicial; };
+      img.src = url;
+      el.appendChild(img);
+    } else {
+      el.textContent = inicial;
+    }
+  });
 }
 
 document.querySelector('[data-action="edit-profile"]').addEventListener('click', () => {

@@ -10927,6 +10927,11 @@ async function verSolicitudPortal(id) {
         ${s.comprobante_separo_url ? 'Cargando vista previa…' : '<span style="color:var(--ts)">Sin comprobante subido por el cliente</span>'}
       </div>
     `)}
+
+    ${seccion('⚠ Zona de peligro', `
+      <div style="font-size:12px;color:var(--ts);margin-bottom:10px;line-height:1.5">Resetea o elimina a <b style="color:var(--ink)">${_spEscape(c.nombre_completo || '—')}</b> del Portal para que pueda empezar de cero (borra tours, pagos, comprobantes y foto).</div>
+      <button class="btn btn-red btn-sm" onclick="abrirResetCliente('${_spEscape(s.cliente_id)}')" style="font-size:11px">Resetear / Eliminar cliente</button>
+    `)}
   `;
 
   crearModal('sp-detalle', `Solicitud · ${s.evento_nombre || ''}`, contenido);
@@ -10936,6 +10941,99 @@ async function verSolicitudPortal(id) {
 
   if (s.comprobante_separo_url) {
     cargarComprobanteSP(s.id);
+  }
+}
+
+// ── Resetear / Eliminar cliente del Portal (herramienta admin destructiva) ──
+// Candado: confirmación por nombre + modo. 'total' (borra la cuenta) solo lo ve
+// maestro_roshi. El servidor revalida rol + confirmación (no confiamos en el front).
+function abrirResetCliente(clienteId) {
+  const sols = (_spCache || []).filter(x => x.cliente_id === clienteId);
+  const c = (sols[0] && sols[0].clientes) || {};
+  const nombre = c.nombre_completo || '';
+  const numero = c.numero_cliente || '—';
+  const nSol = sols.length;
+  const esRoshi = currentUser && currentUser.rol === 'maestro_roshi';
+
+  const modoTotal = esRoshi ? `
+      <label style="display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border:1px solid rgba(255,40,59,.4);border-radius:8px;cursor:pointer;background:rgba(255,40,59,.05)">
+        <input type="radio" name="rc-modo" value="total" onchange="_rcSync()" style="margin-top:3px">
+        <div><div style="font-weight:600;color:var(--red)">Eliminar TODO (borra la cuenta)</div><div style="font-size:11px;color:var(--ts)">Borra también su usuario de acceso. <b style="color:var(--red)">IRREVERSIBLE.</b></div></div>
+      </label>` : '';
+
+  const contenido = `
+    <div style="font-size:13px;margin-bottom:14px">Cliente <b>${_spEscape(nombre || '—')}</b> · <span style="font-family:'JetBrains Mono',monospace;color:var(--orange)">#${_spEscape(numero)}</span></div>
+    <div style="font-size:12px;color:var(--ts);margin-bottom:14px;line-height:1.5">Se borrarán <b style="color:var(--ink)">${nSol}</b> solicitud${nSol === 1 ? '' : 'es'} (con sus pagos), sus comprobantes y su foto de perfil.</div>
+
+    <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:14px">
+      <label style="display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border:1px solid var(--border);border-radius:8px;cursor:pointer">
+        <input type="radio" name="rc-modo" value="reset" checked onchange="_rcSync()" style="margin-top:3px">
+        <div><div style="font-weight:600">Resetear (conserva la cuenta)</div><div style="font-size:11px;color:var(--ts)">Vacía tours/pagos/comprobantes/foto. El cliente conserva su login y empieza de cero.</div></div>
+      </label>
+      ${modoTotal}
+    </div>
+
+    <div id="rc-confirm-wrap" style="display:none;margin-bottom:14px">
+      <div style="font-size:12px;color:var(--red);font-weight:600;margin-bottom:6px">Para confirmar el borrado TOTAL, escribe el nombre exacto del cliente:</div>
+      <input id="rc-nombre-input" type="text" oninput="_rcSync()" placeholder="${_spEscape(nombre)}" style="width:100%;padding:9px 11px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;color:var(--ink);font-size:13px">
+    </div>
+
+    <div id="rc-alert" style="margin-bottom:10px"></div>
+    <div style="display:flex;gap:10px;justify-content:flex-end">
+      <button class="btn btn-ghost btn-sm" onclick="closeModal('rc')">Cancelar</button>
+      <button class="btn btn-red btn-sm" id="rc-confirm-btn" onclick="ejecutarResetCliente('${_spEscape(clienteId)}')">Ejecutar</button>
+    </div>`;
+
+  crearModal('rc', 'Resetear / Eliminar cliente', contenido);
+  // Guardar el nombre esperado para la validación del front (el server revalida igual).
+  window._rcNombre = nombre;
+  _rcSync();
+}
+
+// Habilita/deshabilita el botón según modo + (para 'total') el nombre escrito.
+function _rcSync() {
+  const modo = (document.querySelector('input[name="rc-modo"]:checked') || {}).value || 'reset';
+  const wrap = document.getElementById('rc-confirm-wrap');
+  const btn = document.getElementById('rc-confirm-btn');
+  if (wrap) wrap.style.display = modo === 'total' ? 'block' : 'none';
+  if (!btn) return;
+  if (modo === 'total') {
+    const val = (document.getElementById('rc-nombre-input') || {}).value || '';
+    btn.disabled = val.trim() !== String(window._rcNombre || '').trim();
+    btn.textContent = 'Eliminar TODO';
+  } else {
+    btn.disabled = false;
+    btn.textContent = 'Resetear cliente';
+  }
+}
+
+async function ejecutarResetCliente(clienteId) {
+  const modo = (document.querySelector('input[name="rc-modo"]:checked') || {}).value || 'reset';
+  const alertEl = document.getElementById('rc-alert');
+  // confirmacion: para 'total' lo que escribió; para 'reset' el nombre conocido (el server revalida).
+  const confirmacion = modo === 'total'
+    ? ((document.getElementById('rc-nombre-input') || {}).value || '').trim()
+    : String(window._rcNombre || '').trim();
+  const btn = document.getElementById('rc-confirm-btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Ejecutando…'; }
+  try {
+    const r = await fetch('/.netlify/functions/admin-portal-cliente-reset', {
+      method: 'POST',
+      headers: _spAdminHeaders(),
+      body: JSON.stringify({ cliente_id: clienteId, modo, confirmacion }),
+    });
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(data.error || ('Error ' + r.status));
+    closeModal('rc');
+    closeModal('sp-detalle');
+    const msg = modo === 'total'
+      ? `Cliente eliminado (${data.solicitudes_borradas} solicitud(es), cuenta ${data.auth_user_borrado ? 'borrada' : 'no encontrada'}).`
+      : `Cliente reseteado (${data.solicitudes_borradas} solicitud(es) y sus pagos borrados).`;
+    showToast(msg, 'success');
+    loadSolicitudesPortal();
+  } catch (e) {
+    if (alertEl) alertEl.innerHTML = `<div class="alert alert-error" style="font-size:12px">${_spEscape(e.message)}</div>`;
+    if (btn) { btn.disabled = false; _rcSync(); }
   }
 }
 

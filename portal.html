@@ -1133,6 +1133,8 @@ main{
             <label for="wiz-hab">Tipo de habitación</label>
             <select id="wiz-hab"></select>
             <div class="err">Elige una habitación</div>
+            <!-- [candado] Nota para grupos grandes (N>4): el reparto real lo hará el módulo de acompañantes. -->
+            <div id="wiz-hab-nota" class="hint" style="display:none;margin-top:6px;font-size:11px;color:var(--ink-mute)">El detalle de habitaciones se define al registrar a tus acompañantes.</div>
           </div>
 
           <!-- [fase1] "¿Llevas vuelo propio?" retirado del wizard (se maneja manual con la config de transporte). -->
@@ -2537,6 +2539,27 @@ function habCostPP(hab, ev){
   return hab.pp != null ? hab.pp : (hab.e || 0);
 }
 
+// [candado] Tipos de habitación que acepta el constraint de solicitudes_tour.
+const TIPOS_HAB_VALIDOS = ['compartida', 'triple', 'doble', 'individual'];
+
+// [candado] ¿El cuarto es compartido? (siempre válido para cualquier N, igual que el index.)
+function esCompartida(hab){
+  return !!hab && (hab.k === 'compartida' || /^compartida/i.test(hab.n || ''));
+}
+
+// [candado] Deriva tipo_habitacion para el payload SIN rebotar el constraint:
+//   1) hab.k canónico (eventos nuevos: 'compartida'|'triple'|'doble'|'individual')
+//   2) primera palabra del nombre ("Compartida (4)" → 'compartida')
+//   3) null seguro si no mapea (en vez del viejo hab.n.toLowerCase() que metía
+//      "compartida (4)" y violaba el check).
+function derivarTipoHab(hab){
+  if (!hab) return null;
+  const k = (hab.k || '').toLowerCase();
+  if (TIPOS_HAB_VALIDOS.includes(k)) return k;
+  const w = String(hab.n || '').toLowerCase().split(/[\s(]/)[0];
+  return TIPOS_HAB_VALIDOS.includes(w) ? w : null;
+}
+
 function fechaUltima(ev){
   // Para multifecha tomamos la última fecha disponible para decidir si el evento todavía sirve.
   if (ev.dsList && ev.dsList.length) return ev.dsList[ev.dsList.length - 1];
@@ -2862,14 +2885,33 @@ $('#wiz-zona').addEventListener('change', (e) => {
 });
 
 function poblarHabitaciones(){
+  // [candado] Filtra los cuartos según el nº de personas, como el index:
+  //   compartida siempre válida; los demás solo si hab.viaj incluye N; eventos sin
+  //   viaj (HOTEL_STD) no se filtran (todos válidos). N>4 → solo compartida + nota.
   const sel = $('#wiz-hab');
-  const habs = getHabs(wizState.ev);
+  const ev = wizState.ev;
+  const habs = getHabs(ev);
+  const N = wizState.personas || 1;
+  const grupoGrande = N > 4;
+  const aplica = (h) => esCompartida(h) || (h.viaj ? h.viaj.includes(N) : true);
+  // Conservamos el índice ORIGINAL como value (el change handler lee habs[i] del array completo).
+  const opciones = habs
+    .map((h, i) => ({ h, i }))
+    .filter(({ h }) => grupoGrande ? esCompartida(h) : aplica(h));
   sel.innerHTML = '<option value="">— Elige habitación —</option>' +
-    habs.map((h, i) => {
-      const cost = habCostPP(h, wizState.ev);
+    opciones.map(({ h, i }) => {
+      const cost = habCostPP(h, ev);
       const lbl = h.n + (cost > 0 ? ' (+' + fmtMxn(cost) + '/persona)' : ' (sin costo extra)');
       return `<option value="${i}">${escapeHtml(lbl)}</option>`;
     }).join('');
+  // Nota para grupos grandes (el reparto real lo hará el módulo de acompañantes).
+  const nota = $('#wiz-hab-nota');
+  if (nota) nota.style.display = grupoGrande ? '' : 'none';
+  // Reset si el cuarto elegido ya no aplica para el nuevo N (evita mandar hab inválida — lección de stale).
+  if (wizState.hab && !opciones.some(({ i }) => habs[i] === wizState.hab)){
+    wizState.hab = null;
+    sel.value = '';
+  }
 }
 
 $('#wiz-hab').addEventListener('change', (e) => {
@@ -2881,6 +2923,7 @@ $('#wiz-hab').addEventListener('change', (e) => {
 
 $('#wiz-personas').addEventListener('change', (e) => {
   wizState.personas = parseInt(e.target.value, 10) || 1;
+  poblarHabitaciones(); // [candado] re-filtra cuartos por N y resetea hab inválida
 });
 
 // [fase1] Vuelo propio retirado del wizard (handler eliminado).
@@ -2970,7 +3013,7 @@ document.body.addEventListener('click', async (e) => {
     paquete: wizState.pkg,
     zona: wizState.zona ? wizState.zona.n : 'N/A',
     num_personas: wizState.personas,
-    tipo_habitacion: wizState.hab ? wizState.hab.n.toLowerCase() : null,
+    tipo_habitacion: derivarTipoHab(wizState.hab),
     lleva_vuelo: false,        // [fase1] vuelo propio retirado del wizard (default del schema)
     codigo_vuelo: null,
     codigo_descuento: wizState.codigoDescuento || null,

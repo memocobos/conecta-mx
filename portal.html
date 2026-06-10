@@ -3011,16 +3011,40 @@ function poblarResumen(){
     wizState.codigoDescuento ? ['Código', escapeHtml(wizState.codigoDescuento)] : null
   ].filter(Boolean);
 
+  // [2E] Desglose honesto (solo presentación; los montos vienen tal cual de calc):
+  //  - PLUS/STAY: la zona es el PAQUETE TODO INCLUIDO (no "boleto"); el único extra
+  //    separable es la habitación (upgrade). Habitación 0 (compartida) → "incluida".
+  //  - RIDE: transporte + habitación (separados de verdad). CHEAP: solo boleto.
+  //  - Línea "Por persona" (subtotal) + total/separo del grupo, con el por-persona aparte.
   const dsg = calc.desglose;
-  if (dsg.boleto > 0)     rows.push(['Boleto (por persona)',    fmtMxn(dsg.boleto)]);
-  if (dsg.hotel > 0)      rows.push(['Hotel (por persona)',     '+' + fmtMxn(dsg.hotel)]);
-  if (dsg.transporte > 0) rows.push(['Transporte (por persona)','+' + fmtMxn(dsg.transporte)]);
-  if (dsg.stayDiscount > 0) rows.push(['Descuento STAY',         '-' + fmtMxn(dsg.stayDiscount)]);
-  if (wizState.personas > 1) rows.push(['× ' + wizState.personas + ' personas', '']);
+  const N = wizState.personas;
+  const SR = (k, v) => `<div class="sr"><span class="sr-k">${k}</span><span class="sr-v">${v}</span></div>`;
 
-  let html = rows.map(([k,v]) => `<div class="sr"><span class="sr-k">${k}</span><span class="sr-v">${v}</span></div>`).join('');
-  html += `<div class="sr sep"><span class="sr-k">Separo (primer pago)</span><span class="sr-v">${fmtMxn(calc.separoTotal)}</span></div>`;
-  html += `<div class="sr total"><span class="sr-k">Precio total</span><span class="sr-v">${fmtMxn(calc.total)}</span></div>`;
+  let html = rows.map(([k, v]) => SR(k, v)).join('');
+
+  // Componentes POR PERSONA según paquete (lo que los datos permiten separar)
+  const comp = [];
+  if (pkg === 'PLUS' || pkg === 'STAY'){
+    comp.push(['Paquete (todo incluido)', fmtMxn(dsg.boleto)]);
+    if (pkg === 'STAY' && dsg.stayDiscount > 0) comp.push(['Sin transporte', '−' + fmtMxn(dsg.stayDiscount)]);
+  } else if (pkg === 'RIDE'){
+    comp.push(['Transporte', fmtMxn(dsg.transporte)]);
+  } else if (pkg === 'CHEAP'){
+    comp.push(['Boleto', fmtMxn(dsg.boleto)]);
+  }
+  if (pkg !== 'CHEAP' && wizState.hab){
+    comp.push(dsg.hotel > 0 ? ['Habitación (upgrade)', '+' + fmtMxn(dsg.hotel)] : ['Habitación', 'incluida']);
+  }
+
+  html += `<div class="sr" style="margin-top:8px"><span class="sr-k" style="color:var(--ink-mute);font-size:10px;letter-spacing:.08em;text-transform:uppercase">Desglose por persona</span><span class="sr-v"></span></div>`;
+  html += comp.map(([k, v]) => SR(k, v)).join('');
+  html += `<div class="sr" style="border-top:1px solid rgba(255,255,255,.12);font-weight:800"><span class="sr-k">Por persona</span><span class="sr-v">${fmtMxn(calc.perP)}</span></div>`;
+
+  // Grupo
+  if (N > 1) html += SR('× ' + N + ' personas', '');
+  html += `<div class="sr sep"><span class="sr-k">Primer pago (separo)</span><span class="sr-v">${fmtMxn(calc.separoTotal)}</span></div>`;
+  if (N > 1) html += `<div class="sr"><span class="sr-k" style="color:var(--ink-mute);font-size:11px">${fmtMxn(calc.sep)}/persona × ${N}</span><span class="sr-v"></span></div>`;
+  html += `<div class="sr total"><span class="sr-k">Total del grupo</span><span class="sr-v">${fmtMxn(calc.total)}</span></div>`;
   $('#wiz-summary').innerHTML = html;
 }
 

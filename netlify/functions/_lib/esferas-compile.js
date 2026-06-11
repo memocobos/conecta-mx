@@ -46,20 +46,29 @@ function fDisplay(fecha_inicio) {
 
 // Byte-exacto: comillas simples, sin espacios extra. banco:BANCO_DEFAULT SIN
 // comillas (referencia a variable). cdmx:true, SOLO si ciudad==='CDMX'.
+// `added` deriva de created_at de la fila (estable entre re-publicaciones); si no
+// hay, cae a hoy (todayMx). `music` (Deezer track id) solo si viene, tras added.
 function generarObj(esfera, hoy) {
   const nombre = esfera.nombre || '';
   const status = esfera.status || '';
   const ciudad = esfera.ciudad || '';
   const fi = esfera.fecha_inicio || null;
   const ds = fi ? String(fi).slice(0, 10) : '';
+  const added = esfera.created_at ? String(esfera.created_at).slice(0, 10) : hoy;
+  const music = esfera.music ? ("music:'" + escStr(esfera.music) + "',") : '';
+  const color = escStr(esfera.color || 'azul');
+  const venue = escStr(esfera.venue || '');
   const cdmx = (ciudad === 'CDMX') ? 'cdmx:true,' : '';
   return "{id:'" + escStr(esfera.slug) +
-    "',added:'" + hoy +
-    "',c:'azul',img:'" + escStr(nombre) +
+    "',added:'" + added +
+    "'," + music +
+    "c:'" + color +
+    "',img:'" + escStr(nombre) +
     "',a:'" + escStr(nombre) +
     "',f:'" + escStr(fDisplay(fi)) +
     "',ds:'" + escStr(ds) +
-    "',v:'',st:'" + escStr(status) +
+    "',v:'" + venue +
+    "',st:'" + escStr(status) +
     "'," + cdmx +
     "inc:[],banco:BANCO_DEFAULT,zonas:[],hotel:[],pagos:[]}";
 }

@@ -2847,6 +2847,26 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
       <option value="proceso">En proceso</option>
      </select>
     </div>
+    <div class="form-group">
+     <label>Venue</label>
+     <input class="cot-input" id="esf-venue" placeholder="ej. Estadio GNP, CDMX" style="width:100%">
+    </div>
+    <div class="form-group">
+     <label>Color</label>
+     <select class="cot-input" id="esf-color" style="width:100%">
+      <option value="azul">azul</option>
+      <option value="rojo">rojo</option>
+      <option value="rosa">rosa</option>
+      <option value="gris">gris</option>
+      <option value="verde">verde</option>
+      <option value="amarillo">amarillo</option>
+     </select>
+    </div>
+    <div class="form-group">
+     <label>Música — Deezer track ID</label>
+     <input class="cot-input" id="esf-music" placeholder="ej. 2893837431" style="width:100%">
+     <div style="font-size:11px;color:var(--ts);margin-top:4px">opcional · ID de pista de Deezer</div>
+    </div>
     <button class="btn btn-primary" id="esf-submit-btn" onclick="submitEsferaForm()">Crear evento</button>
     <button class="btn btn-ghost" id="esf-cancel-edit" style="margin-left:8px;display:none" onclick="cancelarEdicionEsfera()">Cancelar edición</button>
     <div id="esf-alert" style="margin-top:10px"></div>
@@ -12710,7 +12730,7 @@ async function loadEsferasEventos() {
       <thead><tr><th>Slug</th><th>Nombre</th><th>Fecha</th><th>Ciudad</th><th>Status</th><th>Publicación</th><th>Acciones</th></tr></thead>
       <tbody>${filas.map(e => `<tr>
         <td style="font-family:'JetBrains Mono',monospace;font-size:12px">${_esfEsc(e.slug)}</td>
-        <td style="font-weight:600">${_esfEsc(e.nombre)}</td>
+        <td style="font-weight:600">${_esfEsc(e.nombre)}${e.venue ? `<br><span style="font-size:10px;color:var(--ts);font-weight:400">${_esfEsc(e.venue)}</span>` : ''}</td>
         <td style="font-size:12px">${_esfEsc(e.fecha_inicio) || '—'}</td>
         <td style="font-size:12px">${_esfEsc(e.ciudad) || '—'}</td>
         <td style="font-size:11px;color:var(--orange)">${_esfEsc(e.status) || 'A la venta'}</td>
@@ -12733,6 +12753,9 @@ async function crearEsferaEvento() {
     ciudad:       document.getElementById('esf-ciudad')?.value || null,
     tipo:         document.getElementById('esf-tipo')?.value || null,
     status:       document.getElementById('esf-status')?.value || '',
+    venue:        document.getElementById('esf-venue')?.value.trim() || null,
+    color:        document.getElementById('esf-color')?.value || 'azul',
+    music:        document.getElementById('esf-music')?.value.trim() || null,
   };
   const alertEl = document.getElementById('esf-alert');
   try {
@@ -12745,7 +12768,7 @@ async function crearEsferaEvento() {
     }
     alertEl.innerHTML='<div class="alert alert-success">✅ Evento creado</div>';
     setTimeout(()=>alertEl.innerHTML='', 2000);
-    ['esf-slug','esf-nombre','esf-fecha'].forEach(id => { const el=document.getElementById(id); if (el) el.value=''; });
+    ['esf-slug','esf-nombre','esf-fecha','esf-venue','esf-music'].forEach(id => { const el=document.getElementById(id); if (el) el.value=''; });
     loadEsferasEventos();
   } catch(e) { alertEl.innerHTML=`<div class="alert alert-error">${e.message}</div>`; }
 }
@@ -12772,6 +12795,9 @@ function editarEsfera(slug) {
   set('esf-ciudad', row.ciudad || 'MTY');
   set('esf-tipo', row.tipo || 'concierto');
   set('esf-status', row.status || '');
+  set('esf-venue', row.venue || '');
+  set('esf-color', row.color || 'azul');
+  set('esf-music', row.music || '');
   const tit = document.getElementById('esf-form-titulo'); if (tit) tit.textContent = '// EDITAR EVENTO: ' + slug;
   const btn = document.getElementById('esf-submit-btn'); if (btn) btn.textContent = 'Guardar cambios';
   const cancel = document.getElementById('esf-cancel-edit'); if (cancel) cancel.style.display = '';
@@ -12783,10 +12809,11 @@ function cancelarEdicionEsfera() {
   window._esfEditSlug = null;
   const sEl = document.getElementById('esf-slug');
   if (sEl) { sEl.readOnly = false; sEl.style.opacity = ''; sEl.value = ''; }
-  ['esf-nombre','esf-fecha'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+  ['esf-nombre','esf-fecha','esf-venue','esf-music'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
   const ciudad = document.getElementById('esf-ciudad'); if (ciudad) ciudad.value = 'MTY';
   const tipo = document.getElementById('esf-tipo'); if (tipo) tipo.value = 'concierto';
   const status = document.getElementById('esf-status'); if (status) status.value = '';
+  const color = document.getElementById('esf-color'); if (color) color.value = 'azul';
   const tit = document.getElementById('esf-form-titulo'); if (tit) tit.textContent = '// NUEVO EVENTO';
   const btn = document.getElementById('esf-submit-btn'); if (btn) btn.textContent = 'Crear evento';
   const cancel = document.getElementById('esf-cancel-edit'); if (cancel) cancel.style.display = 'none';
@@ -12803,6 +12830,9 @@ async function guardarCambiosEsfera() {
     ciudad:       document.getElementById('esf-ciudad')?.value || null,
     tipo:         document.getElementById('esf-tipo')?.value || null,
     status:       document.getElementById('esf-status')?.value || '',
+    venue:        document.getElementById('esf-venue')?.value.trim() || null,
+    color:        document.getElementById('esf-color')?.value || 'azul',
+    music:        document.getElementById('esf-music')?.value.trim() || null,
   };
   const alertEl = document.getElementById('esf-alert');
   try {

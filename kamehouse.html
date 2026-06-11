@@ -2903,6 +2903,15 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
     #esf-preview-card .tproc::before{background:#fff;box-shadow:0 0 6px rgba(255,255,255,.8)}
     #esf-preview-card .ev-tag.tpronto{background:#e8ff4c;color:#000;font-weight:900}
     #esf-preview-card .ev-tag.tpronto::before{background:#000}
+    #esf-preview-card .ev-bottom{display:flex;align-items:center;justify-content:space-between;padding-top:8px;border-top:1px solid rgba(255,255,255,.07);flex-wrap:wrap;gap:6px}
+    #esf-preview-card .ev-card.proxi .ev-bottom{justify-content:center;border-top:none;padding-top:0}
+    #esf-preview-card .ev-prox-badge{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;background:#e8ff4c;color:#000;padding:14px 12px;font-size:13px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;font-family:'Montserrat',sans-serif;border-radius:8px;text-align:center;line-height:1.1}
+    #esf-preview-card .ev-prox-badge::before{content:'🔔'}
+    #esf-preview-card .ev-prox-sub{display:block;font-size:9px;letter-spacing:.18em;color:rgba(0,0,0,.55);margin-top:3px;font-weight:800}
+    #esf-preview-card .ev-price-lbl{font-size:8.5px;color:rgba(255,255,255,.3);font-weight:700;text-transform:uppercase;letter-spacing:.07em}
+    #esf-preview-card .ev-price-wa{font-size:12px;font-weight:900;color:#88ea4e}
+    #esf-preview-card .ev-cta{display:inline-block;background:#ff283b;color:#fff;font-size:9px;font-weight:900;padding:8px 11px;text-transform:uppercase;letter-spacing:.07em;border:none;font-family:'Montserrat',sans-serif}
+    #esf-preview-card .ev-cta-wa{background:#25D366}
    </style>
    <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:20px">
     <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.15em;color:var(--ts);margin-bottom:12px">// 👁️ VISTA PREVIA · cómo se verá la card</div>
@@ -12911,7 +12920,7 @@ function _esfPreviewStatus(st) {
   switch (st) {
     case 'agotado':       return { txt:'Agotado',         cls:'tag',     cardCls:'agotado' };
     case 'proceso':       return { txt:'En Proceso',      cls:'tproc',   cardCls:'proceso' };
-    case 'proximamente':  return { txt:'Próximamente',    cls:'tpronto', cardCls:'' };
+    case 'proximamente':  return { txt:'Próximamente',    cls:'tpronto', cardCls:'proxi' };
     case 'por-confirmar': return { txt:'Por confirmar',   cls:'tpc',     cardCls:'' };
     case 'ultimos':       return { txt:'Últimos lugares', cls:'tu',      cardCls:'' };
     default:              return { txt:'A la venta',      cls:'td',      cardCls:'' };
@@ -12920,6 +12929,20 @@ function _esfPreviewStatus(st) {
 
 let _esfPreviewImgTimer = null;
 const _esfPreviewImgCache = {}; // nombre → src|null (null = sin foto)
+
+// Zona inferior (.ev-bottom) tal como la arma el index según status. Los eventos
+// de Esferas no llevan precios (zonas:[]), así que los no-especiales muestran
+// "Informes / Cotiza por WA". SOLO VISUAL en el preview (sin onclick).
+function _esfPreviewBottom(status) {
+  if (status === 'proximamente') {
+    return '<div class="ev-bottom"><div class="ev-prox-badge">AVÍSAME<span class="ev-prox-sub">Lista de espera</span></div></div>';
+  }
+  if (status === 'agotado' || status === 'proceso') {
+    return ''; // el overlay cubre la card; el bottom real queda vacío
+  }
+  const cta = (status === 'por-confirmar') ? '' : '<span class="ev-cta ev-cta-wa">WhatsApp</span>';
+  return '<div class="ev-bottom"><div><div class="ev-price-lbl">Informes</div><div class="ev-price-wa">Cotiza por WA</div></div>' + cta + '</div>';
+}
 
 function renderEsferaPreview() {
   const cont = document.getElementById('esf-preview-card');
@@ -12945,7 +12968,7 @@ function renderEsferaPreview() {
         `<div class="ev-fecha">${_esfEsc(_esfPreviewFDisplay(fecha))}</div>` +
         `<div class="ev-artist">${_esfEsc(nombre || 'Nombre del evento')}</div>` +
         `<div class="ev-venue">${_esfEsc(venue)}</div>` +
-      `</div></div>` +
+      `</div>` + _esfPreviewBottom(status) + `</div>` +
     `</div>`;
   // Foto: debounce 500ms; solo si el nombre aún no se consultó.
   if (nombre && cached === undefined) {

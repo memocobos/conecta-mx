@@ -1976,7 +1976,7 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
   <div class="nav-group">
    <div class="nav-group-title">Eventos</div>
    <button class="nav-btn" onclick="showPage('cotizador')" id="nav-cotizador"><svg class="nav-ic"><use href="#ic-cotizador"/></svg><span>Palacio de Kamisama</span></button>
-   <button class="nav-btn" onclick="showPage('esferas')" id="nav-esferas"><span>🐉 Esferas del Dragón</span></button>
+   <button class="nav-btn" onclick="showPage('esferas')" id="nav-esferas"><span>Esferas del Dragón</span></button>
    <button class="nav-btn" onclick="showPage('radar')" id="nav-radar"><svg class="nav-ic"><use href="#ic-radar"/></svg><span>Radar del Dragón</span></button>
   </div>
 
@@ -2809,7 +2809,7 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
   <div style="max-width:560px;display:flex;flex-direction:column;gap:20px">
    <!-- Form: nuevo evento -->
    <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:20px">
-    <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.15em;color:var(--ts);margin-bottom:16px">// NUEVO EVENTO</div>
+    <div id="esf-form-titulo" style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.15em;color:var(--ts);margin-bottom:16px">// NUEVO EVENTO</div>
     <div class="form-group">
      <label>Slug</label>
      <input class="cot-input" id="esf-slug" placeholder="ej. alvaro-diaz (minúsculas, números, guiones)" style="width:100%">
@@ -2847,7 +2847,8 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
       <option value="proceso">En proceso</option>
      </select>
     </div>
-    <button class="btn btn-primary" onclick="crearEsferaEvento()">Crear evento</button>
+    <button class="btn btn-primary" id="esf-submit-btn" onclick="submitEsferaForm()">Crear evento</button>
+    <button class="btn btn-ghost" id="esf-cancel-edit" style="margin-left:8px;display:none" onclick="cancelarEdicionEsfera()">Cancelar edición</button>
     <div id="esf-alert" style="margin-top:10px"></div>
    </div>
 
@@ -12700,12 +12701,13 @@ async function loadEsferasEventos() {
     }
     const { eventos } = await r.json();
     const filas = eventos || [];
+    window._esfRows = filas; // cache para el modo edición
     if (!filas.length) {
       cont.innerHTML = '<div class="empty-state"><div class="empty-icon">·</div>Sin eventos registrados</div>';
       return;
     }
     cont.innerHTML = `<div class="table-wrap"><table>
-      <thead><tr><th>Slug</th><th>Nombre</th><th>Fecha</th><th>Ciudad</th><th>Status</th><th>Publicación</th></tr></thead>
+      <thead><tr><th>Slug</th><th>Nombre</th><th>Fecha</th><th>Ciudad</th><th>Status</th><th>Publicación</th><th>Acciones</th></tr></thead>
       <tbody>${filas.map(e => `<tr>
         <td style="font-family:'JetBrains Mono',monospace;font-size:12px">${_esfEsc(e.slug)}</td>
         <td style="font-weight:600">${_esfEsc(e.nombre)}</td>
@@ -12715,6 +12717,7 @@ async function loadEsferasEventos() {
         <td>${e.publicado
           ? `<span class="badge badge-green">publicado</span> <button class="btn btn-ghost btn-sm" style="font-size:10px" onclick="despublicarEsfera('${_esfEsc(e.slug)}')">🗑️ Despublicar</button>`
           : '<span class="badge badge-gray">borrador</span>'}</td>
+        <td><button class="btn btn-ghost btn-sm" style="font-size:10px" onclick="editarEsfera('${_esfEsc(e.slug)}')">✏️ Editar</button></td>
       </tr>`).join('')}</tbody>
     </table></div>`;
   } catch(e) {
@@ -12747,6 +12750,76 @@ async function crearEsferaEvento() {
   } catch(e) { alertEl.innerHTML=`<div class="alert alert-error">${e.message}</div>`; }
 }
 
+// ── Edición de una Esfera (modo edit del mismo form) ─────────────────────────
+// window._esfEditSlug marca el modo: null=crear, '<slug>'=editar. El botón
+// despacha a crear o a actualizar según el modo.
+window._esfEditSlug = null;
+
+function submitEsferaForm() {
+  if (window._esfEditSlug) guardarCambiosEsfera();
+  else crearEsferaEvento();
+}
+
+function editarEsfera(slug) {
+  const row = (window._esfRows || []).find(r => r && r.slug === slug);
+  if (!row) return;
+  window._esfEditSlug = slug;
+  const set = (id, val) => { const el = document.getElementById(id); if (el) el.value = val; };
+  const sEl = document.getElementById('esf-slug');
+  if (sEl) { sEl.value = row.slug || ''; sEl.readOnly = true; sEl.style.opacity = '0.6'; }
+  set('esf-nombre', row.nombre || '');
+  set('esf-fecha', (row.fecha_inicio || '').slice(0, 10));
+  set('esf-ciudad', row.ciudad || 'MTY');
+  set('esf-tipo', row.tipo || 'concierto');
+  set('esf-status', row.status || '');
+  const tit = document.getElementById('esf-form-titulo'); if (tit) tit.textContent = '// EDITAR EVENTO: ' + slug;
+  const btn = document.getElementById('esf-submit-btn'); if (btn) btn.textContent = 'Guardar cambios';
+  const cancel = document.getElementById('esf-cancel-edit'); if (cancel) cancel.style.display = '';
+  const al = document.getElementById('esf-alert'); if (al) al.innerHTML = '';
+  if (sEl) sEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+function cancelarEdicionEsfera() {
+  window._esfEditSlug = null;
+  const sEl = document.getElementById('esf-slug');
+  if (sEl) { sEl.readOnly = false; sEl.style.opacity = ''; sEl.value = ''; }
+  ['esf-nombre','esf-fecha'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+  const ciudad = document.getElementById('esf-ciudad'); if (ciudad) ciudad.value = 'MTY';
+  const tipo = document.getElementById('esf-tipo'); if (tipo) tipo.value = 'concierto';
+  const status = document.getElementById('esf-status'); if (status) status.value = '';
+  const tit = document.getElementById('esf-form-titulo'); if (tit) tit.textContent = '// NUEVO EVENTO';
+  const btn = document.getElementById('esf-submit-btn'); if (btn) btn.textContent = 'Crear evento';
+  const cancel = document.getElementById('esf-cancel-edit'); if (cancel) cancel.style.display = 'none';
+  const al = document.getElementById('esf-alert'); if (al) al.innerHTML = '';
+}
+
+async function guardarCambiosEsfera() {
+  const slug = window._esfEditSlug;
+  if (!slug) return;
+  const body = {
+    slug,
+    nombre:       document.getElementById('esf-nombre')?.value.trim() || '',
+    fecha_inicio: document.getElementById('esf-fecha')?.value || null,
+    ciudad:       document.getElementById('esf-ciudad')?.value || null,
+    tipo:         document.getElementById('esf-tipo')?.value || null,
+    status:       document.getElementById('esf-status')?.value || '',
+  };
+  const alertEl = document.getElementById('esf-alert');
+  try {
+    const r = await khAdminFetch('/.netlify/functions/esferas-actualizar', { method:'POST', body: JSON.stringify(body) });
+    if (!r.ok) {
+      const detail = await r.json().catch(()=>({ error: r.statusText }));
+      throw new Error(detail.error || 'Error guardando');
+    }
+    cancelarEdicionEsfera();
+    if (alertEl) {
+      alertEl.innerHTML = '<div class="alert alert-success">✅ Cambios guardados</div>';
+      setTimeout(()=>{ if (alertEl) alertEl.innerHTML = ''; }, 2000);
+    }
+    loadEsferasEventos();
+  } catch(e) { if (alertEl) alertEl.innerHTML = `<div class="alert alert-error">${e.message}</div>`; }
+}
+
 // Pieza 2a · dry-run del compilador. Solo lectura/preview: la function NO escribe
 // al repo (sin PUT). Renderiza cuántos se insertarían, la validación
 // kamehouse/portal, los objetos generados y el preview del var EV resultante.
@@ -12761,19 +12834,23 @@ async function probarCompiladoDryRun() {
     window._esfUltimoDryRun = data;
     const v = data.validacion || {};
     const aIns = data.a_insertar || [];
-    const ya = data.ya_en_ev || [];
+    const aAct = data.a_actualizar || [];
     const badge = (ok) => ok
       ? '<span class="badge badge-green">OK</span>'
       : '<span class="badge badge-red">FALLÓ</span>';
     const preBox = (txt) => `<pre style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px;overflow:auto;font-size:11px;white-space:pre-wrap;word-break:break-all;margin:0 0 8px">${_esfEsc(txt)}</pre>`;
     let html = '';
-    html += `<div style="font-size:13px;margin-bottom:6px">Se insertarían: <b>${aIns.length}</b> · Ya en EV: <b>${ya.length}</b></div>`;
+    html += `<div style="font-size:13px;margin-bottom:6px">Insertar: <b>${aIns.length}</b> · Actualizar: <b>${aAct.length}</b>${data.sin_cambios ? ' · <b>sin cambios</b>' : ''}</div>`;
     html += `<div style="font-size:13px;margin-bottom:6px">Validación portal: ${badge(v.portal_ok)} &nbsp; kamehouse: ${badge(v.kamehouse_ok)}</div>`;
-    html += `<div style="font-size:12px;color:var(--ts);margin-bottom:8px">EV antes: ${v.ev_antes} → después: ${v.ev_despues} · nuevos encontrados: ${(v.nuevos_encontrados||[]).map(_esfEsc).join(', ') || '—'}</div>`;
+    html += `<div style="font-size:12px;color:var(--ts);margin-bottom:8px">EV antes: ${v.ev_antes} → después: ${v.ev_despues} · presentes: ${(v.nuevos_encontrados||[]).map(_esfEsc).join(', ') || '—'}</div>`;
     if (v.error) html += `<div class="alert alert-error" style="margin-bottom:8px">${_esfEsc(v.error)}</div>`;
     if (aIns.length) {
       html += `<div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.12em;color:var(--ts);margin:10px 0 6px">// objetos a insertar</div>`;
       html += aIns.map(it => preBox(it.obj)).join('');
+    }
+    if (aAct.length) {
+      html += `<div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.12em;color:var(--ts);margin:10px 0 6px">// objetos a actualizar (reemplazo en su lugar)</div>`;
+      html += aAct.map(it => preBox(it.obj)).join('');
     }
     if (data.preview) {
       html += `<div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.12em;color:var(--ts);margin:10px 0 6px">// preview var EV=[ resultante</div>`;
@@ -12791,10 +12868,12 @@ async function probarCompiladoDryRun() {
 async function publicarEsferas() {
   const panel = document.getElementById('esf-dryrun-panel');
   const ult = window._esfUltimoDryRun;
-  const n = (ult && Array.isArray(ult.a_insertar)) ? ult.a_insertar.length : null;
+  const n = (ult && (Array.isArray(ult.a_insertar) || Array.isArray(ult.a_actualizar)))
+    ? ((ult.a_insertar || []).length + (ult.a_actualizar || []).length)
+    : null;
   const msg = (n != null)
     ? `Esto escribirá ${n} evento(s) al index.html de producción y hará un commit. ¿Continuar?`
-    : 'Esto escribirá los eventos nuevos al index.html de producción y hará un commit. ¿Continuar?';
+    : 'Esto escribirá los eventos nuevos/editados al index.html de producción y hará un commit. ¿Continuar?';
   if (!window.confirm(msg)) return;
   if (panel) panel.innerHTML = '<div class="loading-state"><div class="spinner"></div>Publicando…</div>';
   try {
@@ -12807,8 +12886,8 @@ async function publicarEsferas() {
     }
     if (!r.ok || !data.ok) throw new Error(data.error || ('Error ' + r.status));
     const pub = data.publicados || [];
-    if (!pub.length) {
-      panel.innerHTML = '<div class="alert alert-success">Sin eventos nuevos por publicar.</div>';
+    if (data.sin_cambios || !pub.length) {
+      panel.innerHTML = '<div class="alert alert-success">Sin cambios — el index ya estaba al día.</div>';
     } else {
       panel.innerHTML = `<div class="alert alert-success">✅ Publicados ${pub.length}: ${pub.map(_esfEsc).join(', ')} · commit ${_esfEsc(data.commit || '')}</div>`;
     }

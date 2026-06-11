@@ -65,8 +65,8 @@ exports.handler = async (event) => {
     }
     const content = Buffer.from(fileData.content.replace(/\n/g, ''), 'base64').toString('utf8');
 
-    // 3. Compilar + validar (lógica compartida; sin escribir nada).
-    const { contenidoNuevo, aInsertar, yaEnEv, validacion } = compilarEV({ esferas, indexHtml: content });
+    // 3. Compilar + validar (lógica compartida; UPSERT, sin escribir nada).
+    const { contenidoNuevo, aInsertar, aActualizar, validacion, sin_cambios } = compilarEV({ esferas, indexHtml: content });
 
     // 4. Preview: primeros ~600 chars del var EV=[ resultante.
     const idxEV = contenidoNuevo.indexOf('var EV=[');
@@ -77,8 +77,9 @@ exports.handler = async (event) => {
       headers,
       body: JSON.stringify({
         ok: true,
-        ya_en_ev: yaEnEv,
         a_insertar: aInsertar,
+        a_actualizar: aActualizar,
+        sin_cambios,
         validacion,
         preview,
       }),

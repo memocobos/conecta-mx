@@ -110,8 +110,9 @@ exports.handler = async (event) => {
     const sha = fileData.sha;
     const content = Buffer.from(fileData.content.replace(/\n/g, ''), 'base64').toString('utf8');
 
-    // 4. Compilar + validar (lógica compartida).
-    const { contenidoNuevo, aInsertar, validacion } = compilarEV({ esferas, indexHtml: content });
+    // 4. Compilar + validar (lógica compartida; UPSERT: inserta nuevos, reemplaza
+    //    existentes en su lugar).
+    const { contenidoNuevo, aInsertar, aActualizar, validacion, sin_cambios } = compilarEV({ esferas, indexHtml: content });
 
     // 5. CANDADO DURO: sin validación perfecta de AMBOS parsers, NO se escribe.
     //    No se omite por ningún flag.
@@ -123,17 +124,18 @@ exports.handler = async (event) => {
       };
     }
 
-    // Nada nuevo que publicar: no hace PUT (evita commit vacío).
-    if (aInsertar.length === 0) {
+    // Nada cambió (ni insertar ni actualizar con diferencia real): no hace PUT
+    // (evita commit redundante).
+    if (sin_cambios) {
       return {
         statusCode: 200,
         headers,
-        body: JSON.stringify({ ok: true, branch, publicados: [], commit: null, validacion, nota: 'Sin eventos nuevos por publicar' }),
+        body: JSON.stringify({ ok: true, branch, sin_cambios: true, publicados: [], commit: null, validacion }),
       };
     }
 
-    // 6. PUT del contenido compilado.
-    const slugs = aInsertar.map(x => x.slug);
+    // 6. PUT del contenido compilado. publicados = insertados + actualizados.
+    const slugs = aInsertar.map(x => x.slug).concat(aActualizar.map(x => x.slug));
     const encoded = Buffer.from(contenidoNuevo, 'utf8').toString('base64');
     const putRes = await fetch(`https://api.github.com/repos/${REPO}/contents/${FILE}`, {
       method: 'PUT',

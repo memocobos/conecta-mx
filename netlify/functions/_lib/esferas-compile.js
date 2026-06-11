@@ -125,27 +125,35 @@ function compilarEV({ esferas, indexHtml }) {
   const evAntes = extraerEVKamehouse(content);
   const idsAntes = new Set(evAntes.map(e => e && e.id).filter(Boolean));
 
-  // Construir objeto por cada Esfera cuyo slug NO esté en el EV.
+  // UPSERT: cada Esfera genera su obj. Si su slug YA está en el EV → aActualizar
+  // (reemplazar en su lugar); si NO → aInsertar.
   const hoy = todayMx();
-  const yaEnEv = [];
   const aInsertar = [];
-  const nuevosSlugs = [];
+  const aActualizar = [];
   for (const esf of (Array.isArray(esferas) ? esferas : [])) {
     if (!esf || !esf.slug) continue;
-    if (idsAntes.has(esf.slug)) { yaEnEv.push(esf.slug); continue; }
-    aInsertar.push({ slug: esf.slug, obj: generarObj(esf, hoy) });
-    nuevosSlugs.push(esf.slug);
+    const obj = generarObj(esf, hoy);
+    if (idsAntes.has(esf.slug)) aActualizar.push({ slug: esf.slug, obj });
+    else aInsertar.push({ slug: esf.slug, obj });
   }
 
-  // Insertar en memoria, una sola vez, justo después del marcador. Deja intacto
-  // `var EV=[` para no romper al Radar.
+  // Primero reemplaza los existentes EN SU LUGAR (balanceo, sin tocar comas
+  // vecinas), luego inserta los nuevos tras `var EV=[` (marcador intacto).
   let contenidoNuevo = content;
+  for (const it of aActualizar) {
+    contenidoNuevo = reemplazarEnEV(contenidoNuevo, it.slug, it.obj);
+  }
   if (aInsertar.length > 0) {
     const bloque = aInsertar.map(x => x.obj).join(',\n  ');
-    contenidoNuevo = content.replace('var EV=[', 'var EV=[\n  ' + bloque + ',');
+    contenidoNuevo = contenidoNuevo.replace('var EV=[', 'var EV=[\n  ' + bloque + ',');
   }
 
-  // VALIDACIÓN con AMBOS parsers sobre el contenido modificado.
+  // GUARDA: si nada cambió, avisar para evitar un PUT redundante.
+  const sin_cambios = (contenidoNuevo === content);
+
+  // VALIDACIÓN con AMBOS parsers: todos los slugs (insertados + actualizados)
+  // deben aparecer y el array debe parsear.
+  const targetSlugs = aInsertar.map(x => x.slug).concat(aActualizar.map(x => x.slug));
   const validacion = {
     kamehouse_ok: false,
     portal_ok: false,
@@ -158,10 +166,10 @@ function compilarEV({ esferas, indexHtml }) {
   try {
     const evKame = extraerEVKamehouse(contenidoNuevo);
     const ids = new Set(evKame.map(e => e && e.id).filter(Boolean));
-    const faltan = nuevosSlugs.filter(s => !ids.has(s));
+    const faltan = targetSlugs.filter(s => !ids.has(s));
     validacion.kamehouse_ok = (faltan.length === 0);
     validacion.ev_despues = evKame.length;
-    validacion.nuevos_encontrados = nuevosSlugs.filter(s => ids.has(s));
+    validacion.nuevos_encontrados = targetSlugs.filter(s => ids.has(s));
     if (faltan.length) validacion.error = 'kamehouse: faltan ids ' + faltan.join(', ');
   } catch (e) {
     validacion.kamehouse_ok = false;
@@ -171,7 +179,7 @@ function compilarEV({ esferas, indexHtml }) {
   try {
     const evPortal = extraerEVPortal(contenidoNuevo);
     const idsP = new Set(evPortal.map(e => e && e.id).filter(Boolean));
-    const faltanP = nuevosSlugs.filter(s => !idsP.has(s));
+    const faltanP = targetSlugs.filter(s => !idsP.has(s));
     validacion.portal_ok = (faltanP.length === 0);
     if (validacion.ev_despues == null) validacion.ev_despues = evPortal.length;
     if (faltanP.length && !validacion.error) validacion.error = 'portal: faltan ids ' + faltanP.join(', ');
@@ -180,7 +188,7 @@ function compilarEV({ esferas, indexHtml }) {
     if (!validacion.error) validacion.error = 'portal parser: ' + e.message;
   }
 
-  return { contenidoNuevo, aInsertar, yaEnEv, validacion };
+  return { contenidoNuevo, aInsertar, aActualizar, validacion, sin_cambios };
 }
 
 // ── Despublicar: quitar un objeto del EV por id (balanceo de llaves) ───────────
@@ -219,26 +227,19 @@ function _validarSlugFuera(content, slug, evAntesLen) {
   return v;
 }
 
-// quitarDelEV({ indexHtml, slug }) → { contenidoNuevo, encontrado, validacion }
-// Localiza el objeto cuyo id===slug dentro de `var EV=[` por BALANCEO DE LLAVES
-// (respeta strings y anidación zonas:[{...}]), lo borra completo incluyendo su
-// coma, sin tocar el marcador ni otros eventos, y valida con los dos parsers.
-function quitarDelEV({ indexHtml, slug }) {
-  const content = String(indexHtml || '');
+// _localizarObjeto(content, slug) → {start,end} | null
+// Localiza el objeto top-level cuyo id===slug dentro de `var EV=[` por BALANCEO
+// DE LLAVES (respeta strings y anidación zonas:[{...}]; confirma obj.id===slug
+// parseando el objeto aislado). Devuelve los índices [start,end) del objeto.
+function _localizarObjeto(content, slug) {
   const target = String(slug || '');
-
-  // Valida que el EV base parsea (y da el conteo "antes").
-  const evAntes = extraerEVKamehouse(content);
-
   const m = content.match(/var\s+EV\s*=\s*\[/);
   if (!m) throw new Error('var EV no encontrado');
   const arrStart = m.index + m[0].length - 1; // apunta al '['
   const needle = "id:'" + target + "'";
 
-  // Escaneo de los objetos top-level del array (brace===0 && bracket===1 marca
-  // el inicio/fin de cada objeto directo del array), ignorando strings.
+  // brace===0 && bracket===1 marca el inicio/fin de cada objeto directo del array.
   let inStr = false, sc = '', esc = false, brace = 0, bracket = 1, objStart = -1;
-  let found = null;
   for (let i = arrStart + 1; i < content.length; i++) {
     const ch = content[i];
     if (esc) { esc = false; continue; }
@@ -254,14 +255,36 @@ function quitarDelEV({ indexHtml, slug }) {
         if (objText.includes(needle)) {
           let obj = null;
           try { obj = _parseObjeto(objText); } catch (_) { obj = null; }
-          if (obj && obj.id === target) { found = { start: objStart, end: i + 1 }; break; }
+          if (obj && obj.id === target) return { start: objStart, end: i + 1 };
         }
         objStart = -1;
       }
       continue;
     }
   }
+  return null;
+}
 
+// reemplazarEnEV(content, slug, nuevoObj) → string
+// Sustituye el objeto id===slug por nuevoObj, SIN tocar comas vecinas ni otros
+// eventos. Si no lo encuentra, devuelve el contenido sin cambios.
+function reemplazarEnEV(content, slug, nuevoObj) {
+  const loc = _localizarObjeto(content, slug);
+  if (!loc) return content;
+  return content.slice(0, loc.start) + nuevoObj + content.slice(loc.end);
+}
+
+// quitarDelEV({ indexHtml, slug }) → { contenidoNuevo, encontrado, validacion }
+// Localiza el objeto por balanceo, lo borra completo incluyendo su coma, sin
+// tocar el marcador ni otros eventos, y valida con los dos parsers.
+function quitarDelEV({ indexHtml, slug }) {
+  const content = String(indexHtml || '');
+  const target = String(slug || '');
+
+  // Valida que el EV base parsea (y da el conteo "antes").
+  const evAntes = extraerEVKamehouse(content);
+
+  const found = _localizarObjeto(content, target);
   if (!found) {
     return { contenidoNuevo: content, encontrado: false, validacion: _validarSlugFuera(content, target, evAntes.length) };
   }
@@ -283,4 +306,4 @@ function quitarDelEV({ indexHtml, slug }) {
   return { contenidoNuevo, encontrado: true, validacion: _validarSlugFuera(contenidoNuevo, target, evAntes.length) };
 }
 
-module.exports = { compilarEV, quitarDelEV, todayMx };
+module.exports = { compilarEV, quitarDelEV, reemplazarEnEV, todayMx };

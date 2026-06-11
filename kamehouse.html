@@ -2872,6 +2872,44 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
     <div id="esf-alert" style="margin-top:10px"></div>
    </div>
 
+   <!-- Vista previa de la card (UI pura: solo lee el form + foto Deezer, NO escribe) -->
+   <style>
+    #esf-preview-card .ev-card{background:#111;border:1px solid rgba(255,255,255,.06);position:relative;overflow:hidden}
+    #esf-preview-card .ev-card.agotado::after{content:'AGOTADO';position:absolute;inset:0;background:rgba(255,40,59,.85);display:grid;place-items:center;font-size:22px;font-weight:900;color:#fff;letter-spacing:.15em;z-index:10;font-family:'Montserrat',sans-serif}
+    #esf-preview-card .ev-card.agotado .ev-img{filter:brightness(.25) grayscale(1)}
+    #esf-preview-card .ev-card.proceso::after{content:'EN PROCESO';position:absolute;inset:0;background:rgba(0,0,205,.85);display:grid;place-items:center;font-size:18px;font-weight:900;color:#fff;letter-spacing:.15em;z-index:10;font-family:'Montserrat',sans-serif}
+    #esf-preview-card .ev-stripe{height:5px}
+    #esf-preview-card .ev-img{width:100%;height:100%;object-fit:cover;object-position:center top;display:block;filter:brightness(.65)}
+    #esf-preview-card .ev-img-wrap{position:relative;overflow:hidden;width:100%;aspect-ratio:1/1;background:#1a1a1a}
+    #esf-preview-card .ev-img-wrap::after{content:'';position:absolute;bottom:0;left:0;right:0;height:60px;background:linear-gradient(transparent,#111)}
+    #esf-preview-card .ev-img-placeholder{position:relative;width:100%;aspect-ratio:1/1;background:#1a1a1a;display:flex;align-items:center;justify-content:center}
+    #esf-preview-card .ev-img-initials{font-size:36px;font-weight:900;color:rgba(255,255,255,.1);text-transform:uppercase;letter-spacing:-.02em}
+    #esf-preview-card .ev-body{padding:11px 12px 9px}
+    #esf-preview-card .ev-top{margin-bottom:8px}
+    #esf-preview-card .ev-fecha{font-size:9.5px;font-weight:700;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px}
+    #esf-preview-card .ev-artist{font-family:'Barlow Condensed','Montserrat',sans-serif;font-size:22px;font-weight:900;color:#fff;text-transform:uppercase;line-height:.95;letter-spacing:.01em;margin-bottom:4px}
+    #esf-preview-card .ev-venue{font-size:9.5px;color:rgba(255,255,255,.35);font-weight:600;text-transform:uppercase;letter-spacing:.04em;margin-top:2px}
+    #esf-preview-card .ev-tag{position:absolute;top:8px;left:8px;z-index:5;background:rgba(0,0,0,.6);font-size:9px;font-weight:900;padding:5px 9px;text-transform:uppercase;letter-spacing:.08em;white-space:nowrap;display:inline-flex;align-items:center;gap:5px;border:none}
+    #esf-preview-card .ev-tag::before{content:'';width:6px;height:6px;border-radius:50%;flex-shrink:0}
+    #esf-preview-card .td{background:rgba(0,0,0,.5);color:#88ea4e}
+    #esf-preview-card .td::before{background:#88ea4e;box-shadow:0 0 6px #88ea4e}
+    #esf-preview-card .tu{background:rgba(0,0,0,.5);color:#ff283b}
+    #esf-preview-card .tu::before{background:#ff283b}
+    #esf-preview-card .tag{background:rgba(0,0,0,.5);color:rgba(255,255,255,.3)}
+    #esf-preview-card .tag::before{background:rgba(255,255,255,.2)}
+    #esf-preview-card .tpc{background:rgba(0,0,0,.5);color:#e8ff4c}
+    #esf-preview-card .tpc::before{background:#e8ff4c}
+    #esf-preview-card .tproc{background:#0000cd;color:#fff}
+    #esf-preview-card .tproc::before{background:#fff;box-shadow:0 0 6px rgba(255,255,255,.8)}
+    #esf-preview-card .ev-tag.tpronto{background:#e8ff4c;color:#000;font-weight:900}
+    #esf-preview-card .ev-tag.tpronto::before{background:#000}
+   </style>
+   <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:20px">
+    <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.15em;color:var(--ts);margin-bottom:12px">// 👁️ VISTA PREVIA · cómo se verá la card</div>
+    <div id="esf-preview-card" style="max-width:240px;margin:0 auto"></div>
+    <div style="font-size:11px;color:var(--ts);margin-top:10px;text-align:center">Foto vía Deezer (búsqueda por nombre). Solo vista previa — no crea ni publica.</div>
+   </div>
+
    <!-- Listado -->
    <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:20px">
     <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.15em;color:var(--ts);margin-bottom:14px">// EVENTOS REGISTRADOS</div>
@@ -12710,6 +12748,7 @@ function _esfEsc(s) {
 }
 
 async function loadEsferasEventos() {
+  _esfPreviewInit();
   const cont = document.getElementById('esf-listado');
   if (!cont) return;
   cont.innerHTML = '<div class="loading-state"><div class="spinner"></div>Cargando…</div>';
@@ -12802,6 +12841,7 @@ function editarEsfera(slug) {
   const btn = document.getElementById('esf-submit-btn'); if (btn) btn.textContent = 'Guardar cambios';
   const cancel = document.getElementById('esf-cancel-edit'); if (cancel) cancel.style.display = '';
   const al = document.getElementById('esf-alert'); if (al) al.innerHTML = '';
+  renderEsferaPreview();
   if (sEl) sEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
 
@@ -12818,6 +12858,7 @@ function cancelarEdicionEsfera() {
   const btn = document.getElementById('esf-submit-btn'); if (btn) btn.textContent = 'Crear evento';
   const cancel = document.getElementById('esf-cancel-edit'); if (cancel) cancel.style.display = 'none';
   const al = document.getElementById('esf-alert'); if (al) al.innerHTML = '';
+  renderEsferaPreview();
 }
 
 async function guardarCambiosEsfera() {
@@ -12848,6 +12889,96 @@ async function guardarCambiosEsfera() {
     }
     loadEsferasEventos();
   } catch(e) { if (alertEl) alertEl.innerHTML = `<div class="alert alert-error">${e.message}</div>`; }
+}
+
+// ── Vista previa de la card (UI pura) ────────────────────────────────────────
+// Renderiza en vivo cómo se verá la .ev-card del index con los valores del form.
+// El único fetch es a /.netlify/functions/deezer (foto), con debounce. No escribe.
+const ESF_PREVIEW_COLORS = { azul:'#0000cd', rojo:'#ff283b', rosa:'#ff4bd1', gris:'#888', verde:'#88ea4e', amarillo:'#e8ff4c' };
+const ESF_PREVIEW_MESES = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+
+function _esfPreviewFDisplay(fi) {
+  if (!fi) return 'Por confirmar';
+  const m = String(fi).slice(0, 10).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return 'Por confirmar';
+  const mes = ESF_PREVIEW_MESES[parseInt(m[2], 10) - 1];
+  if (!mes) return 'Por confirmar';
+  return parseInt(m[3], 10) + ' ' + mes + ' ' + m[1];
+}
+
+// status del form → {txt, cls (clase del tag), cardCls (overlay)}
+function _esfPreviewStatus(st) {
+  switch (st) {
+    case 'agotado':       return { txt:'Agotado',         cls:'tag',     cardCls:'agotado' };
+    case 'proceso':       return { txt:'En Proceso',      cls:'tproc',   cardCls:'proceso' };
+    case 'proximamente':  return { txt:'Próximamente',    cls:'tpronto', cardCls:'' };
+    case 'por-confirmar': return { txt:'Por confirmar',   cls:'tpc',     cardCls:'' };
+    case 'ultimos':       return { txt:'Últimos lugares', cls:'tu',      cardCls:'' };
+    default:              return { txt:'A la venta',      cls:'td',      cardCls:'' };
+  }
+}
+
+let _esfPreviewImgTimer = null;
+const _esfPreviewImgCache = {}; // nombre → src|null (null = sin foto)
+
+function renderEsferaPreview() {
+  const cont = document.getElementById('esf-preview-card');
+  if (!cont) return;
+  const nombre = (document.getElementById('esf-nombre')?.value || '').trim();
+  const fecha  = document.getElementById('esf-fecha')?.value || '';
+  const status = document.getElementById('esf-status')?.value || '';
+  const venue  = (document.getElementById('esf-venue')?.value || '').trim();
+  const color  = document.getElementById('esf-color')?.value || 'azul';
+  const st = _esfPreviewStatus(status);
+  const accent = ESF_PREVIEW_COLORS[color] || '#0000cd';
+  const initials = (nombre || '··').substring(0, 2).toUpperCase();
+  const cached = _esfPreviewImgCache[nombre];
+  const imgHTML = cached
+    ? `<div class="ev-img-wrap"><img class="ev-img" src="${_esfEsc(cached)}" alt=""></div>`
+    : `<div class="ev-img-placeholder"><span class="ev-img-initials">${_esfEsc(initials)}</span></div>`;
+  cont.innerHTML =
+    `<div class="ev-card ${st.cardCls}">` +
+      `<div class="ev-stripe" style="background:${accent}"></div>` +
+      imgHTML +
+      `<span class="ev-tag ${st.cls}">${_esfEsc(st.txt)}</span>` +
+      `<div class="ev-body"><div class="ev-top">` +
+        `<div class="ev-fecha">${_esfEsc(_esfPreviewFDisplay(fecha))}</div>` +
+        `<div class="ev-artist">${_esfEsc(nombre || 'Nombre del evento')}</div>` +
+        `<div class="ev-venue">${_esfEsc(venue)}</div>` +
+      `</div></div>` +
+    `</div>`;
+  // Foto: debounce 500ms; solo si el nombre aún no se consultó.
+  if (nombre && cached === undefined) {
+    clearTimeout(_esfPreviewImgTimer);
+    _esfPreviewImgTimer = setTimeout(() => _esfPreviewLoadFoto(nombre), 500);
+  }
+}
+
+function _esfPreviewLoadFoto(nombre) {
+  fetch('/.netlify/functions/deezer?q=' + encodeURIComponent(nombre))
+    .then(r => r.json())
+    .then(d => {
+      let src = null;
+      if (d && d.data && d.data[0] && d.data[0].picture_xl &&
+          d.data[0].picture_xl.indexOf('d41d8cd98f00b204e9800998ecf8427e') === -1) {
+        src = d.data[0].picture_xl;
+      }
+      _esfPreviewImgCache[nombre] = src;
+      const actual = (document.getElementById('esf-nombre')?.value || '').trim();
+      if (actual === nombre) renderEsferaPreview();
+    })
+    .catch(() => { _esfPreviewImgCache[nombre] = null; });
+}
+
+function _esfPreviewInit() {
+  if (!window._esfPreviewBound) {
+    window._esfPreviewBound = true;
+    ['esf-nombre','esf-fecha','esf-status','esf-venue','esf-color'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) { el.addEventListener('input', renderEsferaPreview); el.addEventListener('change', renderEsferaPreview); }
+    });
+  }
+  renderEsferaPreview();
 }
 
 // Pieza 2a · dry-run del compilador. Solo lectura/preview: la function NO escribe

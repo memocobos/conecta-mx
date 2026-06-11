@@ -2862,6 +2862,7 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
     <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.15em;color:var(--ts);margin-bottom:8px">// COMPILADOR · DRY-RUN (no escribe al repo)</div>
     <div style="font-size:12px;color:var(--ts);margin-bottom:14px;line-height:1.5">Construye en memoria el objeto-evento de cada Esfera que aún no esté en el array EV de index.html y valida que parsea igual en portal y kamehouse. Solo lectura: no toca el repo.</div>
     <button class="btn btn-primary" onclick="probarCompiladoDryRun()">🔍 Probar compilado (dry-run)</button>
+    <button class="btn btn-primary" style="margin-left:8px;background:var(--green);border-color:var(--green);color:#04210f" onclick="publicarEsferas()">🚀 Publicar al sitio</button>
     <div id="esf-dryrun-panel" style="margin-top:14px"></div>
    </div>
   </div>
@@ -12704,13 +12705,14 @@ async function loadEsferasEventos() {
       return;
     }
     cont.innerHTML = `<div class="table-wrap"><table>
-      <thead><tr><th>Slug</th><th>Nombre</th><th>Fecha</th><th>Ciudad</th><th>Status</th></tr></thead>
+      <thead><tr><th>Slug</th><th>Nombre</th><th>Fecha</th><th>Ciudad</th><th>Status</th><th>Publicación</th></tr></thead>
       <tbody>${filas.map(e => `<tr>
         <td style="font-family:'JetBrains Mono',monospace;font-size:12px">${_esfEsc(e.slug)}</td>
         <td style="font-weight:600">${_esfEsc(e.nombre)}</td>
         <td style="font-size:12px">${_esfEsc(e.fecha_inicio) || '—'}</td>
         <td style="font-size:12px">${_esfEsc(e.ciudad) || '—'}</td>
         <td style="font-size:11px;color:var(--orange)">${_esfEsc(e.status) || 'A la venta'}</td>
+        <td>${e.publicado ? '<span class="badge badge-green">publicado</span>' : '<span class="badge badge-gray">borrador</span>'}</td>
       </tr>`).join('')}</tbody>
     </table></div>`;
   } catch(e) {
@@ -12754,6 +12756,7 @@ async function probarCompiladoDryRun() {
     const r = await khAdminFetch('/.netlify/functions/esferas-compilar-dryrun', { method:'POST' });
     const data = await r.json().catch(()=>({}));
     if (!r.ok || !data.ok) throw new Error(data.error || ('Error ' + r.status));
+    window._esfUltimoDryRun = data;
     const v = data.validacion || {};
     const aIns = data.a_insertar || [];
     const ya = data.ya_en_ev || [];
@@ -12775,6 +12778,39 @@ async function probarCompiladoDryRun() {
       html += preBox(data.preview);
     }
     panel.innerHTML = html;
+  } catch(e) {
+    panel.innerHTML = `<div class="alert alert-error">${e.message}</div>`;
+  }
+}
+
+// Pieza 2b · escritura real al index (a main, sin branch). El candado de
+// validación vive en la function esferas-publicar (422 si no pasa) — aquí solo
+// confirmamos y mostramos el resultado. Tras éxito recarga el listado.
+async function publicarEsferas() {
+  const panel = document.getElementById('esf-dryrun-panel');
+  const ult = window._esfUltimoDryRun;
+  const n = (ult && Array.isArray(ult.a_insertar)) ? ult.a_insertar.length : null;
+  const msg = (n != null)
+    ? `Esto escribirá ${n} evento(s) al index.html de producción y hará un commit. ¿Continuar?`
+    : 'Esto escribirá los eventos nuevos al index.html de producción y hará un commit. ¿Continuar?';
+  if (!window.confirm(msg)) return;
+  if (panel) panel.innerHTML = '<div class="loading-state"><div class="spinner"></div>Publicando…</div>';
+  try {
+    const r = await khAdminFetch('/.netlify/functions/esferas-publicar', { method:'POST', body: JSON.stringify({}) });
+    const data = await r.json().catch(()=>({}));
+    if (r.status === 422) {
+      const v = data.validacion || {};
+      panel.innerHTML = `<div class="alert alert-error">Validación falló — no se escribió nada.${v.error ? (' ' + _esfEsc(v.error)) : ''}</div>`;
+      return;
+    }
+    if (!r.ok || !data.ok) throw new Error(data.error || ('Error ' + r.status));
+    const pub = data.publicados || [];
+    if (!pub.length) {
+      panel.innerHTML = '<div class="alert alert-success">Sin eventos nuevos por publicar.</div>';
+    } else {
+      panel.innerHTML = `<div class="alert alert-success">✅ Publicados ${pub.length}: ${pub.map(_esfEsc).join(', ')} · commit ${_esfEsc(data.commit || '')}</div>`;
+    }
+    loadEsferasEventos();
   } catch(e) {
     panel.innerHTML = `<div class="alert alert-error">${e.message}</div>`;
   }

@@ -12712,7 +12712,9 @@ async function loadEsferasEventos() {
         <td style="font-size:12px">${_esfEsc(e.fecha_inicio) || '—'}</td>
         <td style="font-size:12px">${_esfEsc(e.ciudad) || '—'}</td>
         <td style="font-size:11px;color:var(--orange)">${_esfEsc(e.status) || 'A la venta'}</td>
-        <td>${e.publicado ? '<span class="badge badge-green">publicado</span>' : '<span class="badge badge-gray">borrador</span>'}</td>
+        <td>${e.publicado
+          ? `<span class="badge badge-green">publicado</span> <button class="btn btn-ghost btn-sm" style="font-size:10px" onclick="despublicarEsfera('${_esfEsc(e.slug)}')">🗑️ Despublicar</button>`
+          : '<span class="badge badge-gray">borrador</span>'}</td>
       </tr>`).join('')}</tbody>
     </table></div>`;
   } catch(e) {
@@ -12809,6 +12811,37 @@ async function publicarEsferas() {
       panel.innerHTML = '<div class="alert alert-success">Sin eventos nuevos por publicar.</div>';
     } else {
       panel.innerHTML = `<div class="alert alert-success">✅ Publicados ${pub.length}: ${pub.map(_esfEsc).join(', ')} · commit ${_esfEsc(data.commit || '')}</div>`;
+    }
+    loadEsferasEventos();
+  } catch(e) {
+    panel.innerHTML = `<div class="alert alert-error">${e.message}</div>`;
+  }
+}
+
+// Despublicar: quita el evento del index de producción (PUT a main) y marca
+// publicado=false. El candado/salvaguarda viven en la function esferas-despublicar
+// (422 si no valida, 403 si el slug no es de Esferas). Tras éxito recarga el listado.
+async function despublicarEsfera(slug) {
+  if (!window.confirm(`Esto quitará ${slug} del index de producción. ¿Continuar?`)) return;
+  const panel = document.getElementById('esf-dryrun-panel');
+  if (panel) panel.innerHTML = `<div class="loading-state"><div class="spinner"></div>Despublicando ${_esfEsc(slug)}…</div>`;
+  try {
+    const r = await khAdminFetch('/.netlify/functions/esferas-despublicar', { method:'POST', body: JSON.stringify({ slug }) });
+    const data = await r.json().catch(()=>({}));
+    if (r.status === 403) {
+      panel.innerHTML = `<div class="alert alert-error">${_esfEsc(data.error || 'No gestionado por Esferas')}</div>`;
+      return;
+    }
+    if (r.status === 422) {
+      const v = data.validacion || {};
+      panel.innerHTML = `<div class="alert alert-error">Validación falló — no se escribió nada.${v.error ? (' ' + _esfEsc(v.error)) : ''}</div>`;
+      return;
+    }
+    if (!r.ok || !data.ok) throw new Error(data.error || ('Error ' + r.status));
+    if (data.encontrado === false) {
+      panel.innerHTML = `<div class="alert alert-success">${_esfEsc(slug)} ya no estaba en el index.</div>`;
+    } else {
+      panel.innerHTML = `<div class="alert alert-success">✅ Despublicado ${_esfEsc(slug)} · commit ${_esfEsc(data.commit || '')}</div>`;
     }
     loadEsferasEventos();
   } catch(e) {

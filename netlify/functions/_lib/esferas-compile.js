@@ -183,4 +183,104 @@ function compilarEV({ esferas, indexHtml }) {
   return { contenidoNuevo, aInsertar, yaEnEv, validacion };
 }
 
-module.exports = { compilarEV, todayMx };
+// ── Despublicar: quitar un objeto del EV por id (balanceo de llaves) ───────────
+
+// Parsea un único objeto-evento aislado (con los mismos stubs que el parser
+// kamehouse). Devuelve el objeto o lanza.
+function _parseObjeto(objText) {
+  const stubs = 'var BANCO_DEFAULT={},BANCO_HEY={},HOTEL_CDM=[],HOTEL_STD=[];';
+  return new Function(stubs + 'return (' + objText + ');')();
+}
+
+// Valida un contenido con AMBOS parsers exigiendo que `slug` ya NO esté en el EV.
+function _validarSlugFuera(content, slug, evAntesLen) {
+  const v = { kamehouse_ok: false, portal_ok: false, ev_antes: evAntesLen, ev_despues: null, slug_fuera: false, error: null };
+  try {
+    const ev = extraerEVKamehouse(content);
+    const tiene = ev.some(e => e && e.id === slug);
+    v.ev_despues = ev.length;
+    v.slug_fuera = !tiene;
+    v.kamehouse_ok = !tiene;
+    if (tiene) v.error = 'kamehouse: el slug sigue presente';
+  } catch (e) {
+    v.kamehouse_ok = false;
+    v.error = 'kamehouse parser: ' + e.message;
+  }
+  try {
+    const ev = extraerEVPortal(content);
+    const tiene = ev.some(e => e && e.id === slug);
+    if (v.ev_despues == null) v.ev_despues = ev.length;
+    v.portal_ok = !tiene;
+    if (tiene && !v.error) v.error = 'portal: el slug sigue presente';
+  } catch (e) {
+    v.portal_ok = false;
+    if (!v.error) v.error = 'portal parser: ' + e.message;
+  }
+  return v;
+}
+
+// quitarDelEV({ indexHtml, slug }) → { contenidoNuevo, encontrado, validacion }
+// Localiza el objeto cuyo id===slug dentro de `var EV=[` por BALANCEO DE LLAVES
+// (respeta strings y anidación zonas:[{...}]), lo borra completo incluyendo su
+// coma, sin tocar el marcador ni otros eventos, y valida con los dos parsers.
+function quitarDelEV({ indexHtml, slug }) {
+  const content = String(indexHtml || '');
+  const target = String(slug || '');
+
+  // Valida que el EV base parsea (y da el conteo "antes").
+  const evAntes = extraerEVKamehouse(content);
+
+  const m = content.match(/var\s+EV\s*=\s*\[/);
+  if (!m) throw new Error('var EV no encontrado');
+  const arrStart = m.index + m[0].length - 1; // apunta al '['
+  const needle = "id:'" + target + "'";
+
+  // Escaneo de los objetos top-level del array (brace===0 && bracket===1 marca
+  // el inicio/fin de cada objeto directo del array), ignorando strings.
+  let inStr = false, sc = '', esc = false, brace = 0, bracket = 1, objStart = -1;
+  let found = null;
+  for (let i = arrStart + 1; i < content.length; i++) {
+    const ch = content[i];
+    if (esc) { esc = false; continue; }
+    if (inStr) { if (ch === '\\') { esc = true; continue; } if (ch === sc) inStr = false; continue; }
+    if (ch === '"' || ch === "'") { inStr = true; sc = ch; continue; }
+    if (ch === '[') { bracket++; continue; }
+    if (ch === ']') { bracket--; if (bracket === 0) break; continue; }
+    if (ch === '{') { if (brace === 0 && bracket === 1) objStart = i; brace++; continue; }
+    if (ch === '}') {
+      brace--;
+      if (brace === 0 && bracket === 1 && objStart >= 0) {
+        const objText = content.slice(objStart, i + 1);
+        if (objText.includes(needle)) {
+          let obj = null;
+          try { obj = _parseObjeto(objText); } catch (_) { obj = null; }
+          if (obj && obj.id === target) { found = { start: objStart, end: i + 1 }; break; }
+        }
+        objStart = -1;
+      }
+      continue;
+    }
+  }
+
+  if (!found) {
+    return { contenidoNuevo: content, encontrado: false, validacion: _validarSlugFuera(content, target, evAntes.length) };
+  }
+
+  // Borrar el objeto + una coma adyacente: trailing preferente; si es el último
+  // elemento, la coma previa.
+  let s = found.start, e = found.end;
+  let after = e;
+  while (after < content.length && /\s/.test(content[after])) after++;
+  if (content[after] === ',') {
+    e = after + 1;
+  } else {
+    let b = s - 1;
+    while (b >= 0 && /\s/.test(content[b])) b--;
+    if (content[b] === ',') { s = b; }
+  }
+  const contenidoNuevo = content.slice(0, s) + content.slice(e);
+
+  return { contenidoNuevo, encontrado: true, validacion: _validarSlugFuera(contenidoNuevo, target, evAntes.length) };
+}
+
+module.exports = { compilarEV, quitarDelEV, todayMx };

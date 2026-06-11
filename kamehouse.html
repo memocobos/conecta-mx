@@ -2856,6 +2856,14 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
     <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.15em;color:var(--ts);margin-bottom:14px">// EVENTOS REGISTRADOS</div>
     <div id="esf-listado"><div class="loading-state"><div class="spinner"></div>Cargando…</div></div>
    </div>
+
+   <!-- Dry-run del compilador (Pieza 2a · solo lectura/preview, NO escribe al repo) -->
+   <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:20px">
+    <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.15em;color:var(--ts);margin-bottom:8px">// COMPILADOR · DRY-RUN (no escribe al repo)</div>
+    <div style="font-size:12px;color:var(--ts);margin-bottom:14px;line-height:1.5">Construye en memoria el objeto-evento de cada Esfera que aún no esté en el array EV de index.html y valida que parsea igual en portal y kamehouse. Solo lectura: no toca el repo.</div>
+    <button class="btn btn-primary" onclick="probarCompiladoDryRun()">🔍 Probar compilado (dry-run)</button>
+    <div id="esf-dryrun-panel" style="margin-top:14px"></div>
+   </div>
   </div>
  </div>
 
@@ -12733,6 +12741,43 @@ async function crearEsferaEvento() {
     ['esf-slug','esf-nombre','esf-fecha'].forEach(id => { const el=document.getElementById(id); if (el) el.value=''; });
     loadEsferasEventos();
   } catch(e) { alertEl.innerHTML=`<div class="alert alert-error">${e.message}</div>`; }
+}
+
+// Pieza 2a · dry-run del compilador. Solo lectura/preview: la function NO escribe
+// al repo (sin PUT). Renderiza cuántos se insertarían, la validación
+// kamehouse/portal, los objetos generados y el preview del var EV resultante.
+async function probarCompiladoDryRun() {
+  const panel = document.getElementById('esf-dryrun-panel');
+  if (!panel) return;
+  panel.innerHTML = '<div class="loading-state"><div class="spinner"></div>Compilando (dry-run)…</div>';
+  try {
+    const r = await khAdminFetch('/.netlify/functions/esferas-compilar-dryrun', { method:'POST' });
+    const data = await r.json().catch(()=>({}));
+    if (!r.ok || !data.ok) throw new Error(data.error || ('Error ' + r.status));
+    const v = data.validacion || {};
+    const aIns = data.a_insertar || [];
+    const ya = data.ya_en_ev || [];
+    const badge = (ok) => ok
+      ? '<span class="badge badge-green">OK</span>'
+      : '<span class="badge badge-red">FALLÓ</span>';
+    const preBox = (txt) => `<pre style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px;overflow:auto;font-size:11px;white-space:pre-wrap;word-break:break-all;margin:0 0 8px">${_esfEsc(txt)}</pre>`;
+    let html = '';
+    html += `<div style="font-size:13px;margin-bottom:6px">Se insertarían: <b>${aIns.length}</b> · Ya en EV: <b>${ya.length}</b></div>`;
+    html += `<div style="font-size:13px;margin-bottom:6px">Validación portal: ${badge(v.portal_ok)} &nbsp; kamehouse: ${badge(v.kamehouse_ok)}</div>`;
+    html += `<div style="font-size:12px;color:var(--ts);margin-bottom:8px">EV antes: ${v.ev_antes} → después: ${v.ev_despues} · nuevos encontrados: ${(v.nuevos_encontrados||[]).map(_esfEsc).join(', ') || '—'}</div>`;
+    if (v.error) html += `<div class="alert alert-error" style="margin-bottom:8px">${_esfEsc(v.error)}</div>`;
+    if (aIns.length) {
+      html += `<div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.12em;color:var(--ts);margin:10px 0 6px">// objetos a insertar</div>`;
+      html += aIns.map(it => preBox(it.obj)).join('');
+    }
+    if (data.preview) {
+      html += `<div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.12em;color:var(--ts);margin:10px 0 6px">// preview var EV=[ resultante</div>`;
+      html += preBox(data.preview);
+    }
+    panel.innerHTML = html;
+  } catch(e) {
+    panel.innerHTML = `<div class="alert alert-error">${e.message}</div>`;
+  }
 }
 
 // ── U1: sincronizar tabla espejo eventos_meta desde el EV (index.html) ──────

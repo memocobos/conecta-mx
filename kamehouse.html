@@ -1976,6 +1976,7 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
   <div class="nav-group">
    <div class="nav-group-title">Eventos</div>
    <button class="nav-btn" onclick="showPage('cotizador')" id="nav-cotizador"><svg class="nav-ic"><use href="#ic-cotizador"/></svg><span>Palacio de Kamisama</span></button>
+   <button class="nav-btn" onclick="showPage('esferas')" id="nav-esferas"><span>🐉 Esferas del Dragón</span></button>
    <button class="nav-btn" onclick="showPage('radar')" id="nav-radar"><svg class="nav-ic"><use href="#ic-radar"/></svg><span>Radar del Dragón</span></button>
   </div>
 
@@ -2795,6 +2796,68 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
      <div class="modal-overlay" id="modal-mt-usuario"></div>
      <!-- Modal: ver como rol -->
      <div class="modal-overlay" id="modal-mt-vercomo"></div>
+
+ <!-- ─── ESFERAS DEL DRAGÓN (Pieza 1 · alta aditiva en tabla esferas_eventos) ─── -->
+ <div class="page" id="page-esferas">
+  <div class="page-hero">
+   <div>
+    <div class="page-title">ESFERAS DEL DRAGÓN</div>
+    <div class="page-sub">// alta de eventos · tabla nueva esferas_eventos</div>
+   </div>
+  </div>
+
+  <div style="max-width:560px;display:flex;flex-direction:column;gap:20px">
+   <!-- Form: nuevo evento -->
+   <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:20px">
+    <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.15em;color:var(--ts);margin-bottom:16px">// NUEVO EVENTO</div>
+    <div class="form-group">
+     <label>Slug</label>
+     <input class="cot-input" id="esf-slug" placeholder="ej. alvaro-diaz (minúsculas, números, guiones)" style="width:100%">
+    </div>
+    <div class="form-group">
+     <label>Nombre</label>
+     <input class="cot-input" id="esf-nombre" placeholder="Nombre del evento…" style="width:100%">
+    </div>
+    <div class="form-group">
+     <label>Fecha inicio</label>
+     <input class="cot-input" type="date" id="esf-fecha" style="width:100%">
+    </div>
+    <div class="form-group">
+     <label>Ciudad</label>
+     <select class="cot-input" id="esf-ciudad" style="width:100%">
+      <option value="MTY">MTY</option>
+      <option value="CDMX">CDMX</option>
+     </select>
+    </div>
+    <div class="form-group">
+     <label>Tipo</label>
+     <select class="cot-input" id="esf-tipo" style="width:100%">
+      <option value="concierto">Concierto</option>
+      <option value="festival">Festival</option>
+     </select>
+    </div>
+    <div class="form-group">
+     <label>Status</label>
+     <select class="cot-input" id="esf-status" style="width:100%">
+      <option value="">A la venta</option>
+      <option value="proximamente">Próximamente</option>
+      <option value="por-confirmar">Por confirmar</option>
+      <option value="ultimos">Últimos</option>
+      <option value="agotado">Agotado</option>
+      <option value="proceso">En proceso</option>
+     </select>
+    </div>
+    <button class="btn btn-primary" onclick="crearEsferaEvento()">Crear evento</button>
+    <div id="esf-alert" style="margin-top:10px"></div>
+   </div>
+
+   <!-- Listado -->
+   <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:20px">
+    <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.15em;color:var(--ts);margin-bottom:14px">// EVENTOS REGISTRADOS</div>
+    <div id="esf-listado"><div class="loading-state"><div class="spinner"></div>Cargando…</div></div>
+   </div>
+  </div>
+ </div>
 
  <div class="page" id="page-cotizador">
   <div class="page-hero">
@@ -5034,6 +5097,7 @@ function loadPage(name) {
  if (name === 'cotizador') initCotizador();
  if (name === 'montana') loadMontana();
  if (name === 'radar') initRadarTab();
+ if (name === 'esferas') loadEsferasEventos();
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -12604,6 +12668,70 @@ async function guardarConfigCuenta() {
     if (config) _mtConfig = config;
     alertEl.innerHTML='<div class="alert alert-success">✅ Cuenta guardada</div>';
     setTimeout(()=>alertEl.innerHTML='', 2000);
+  } catch(e) { alertEl.innerHTML=`<div class="alert alert-error">${e.message}</div>`; }
+}
+
+// ── ESFERAS DEL DRAGÓN (Pieza 1) ─────────────────────────────────────────────
+// Aditivo puro: alta y listado en la tabla nueva esferas_eventos vía Functions
+// propias (esferas-crear / esferas-listar). No toca EV, eventos_meta, portal ni
+// ninguna otra página. Mismo patrón khAdminFetch + alerts que guardarConfigCuenta.
+function _esfEsc(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+}
+
+async function loadEsferasEventos() {
+  const cont = document.getElementById('esf-listado');
+  if (!cont) return;
+  cont.innerHTML = '<div class="loading-state"><div class="spinner"></div>Cargando…</div>';
+  try {
+    const r = await khAdminFetch('/.netlify/functions/esferas-listar', { method:'POST' });
+    if (!r.ok) {
+      const d = await r.json().catch(()=>({ error: r.statusText }));
+      throw new Error(d.error || 'Error cargando');
+    }
+    const { eventos } = await r.json();
+    const filas = eventos || [];
+    if (!filas.length) {
+      cont.innerHTML = '<div class="empty-state"><div class="empty-icon">·</div>Sin eventos registrados</div>';
+      return;
+    }
+    cont.innerHTML = `<div class="table-wrap"><table>
+      <thead><tr><th>Slug</th><th>Nombre</th><th>Fecha</th><th>Ciudad</th><th>Status</th></tr></thead>
+      <tbody>${filas.map(e => `<tr>
+        <td style="font-family:'JetBrains Mono',monospace;font-size:12px">${_esfEsc(e.slug)}</td>
+        <td style="font-weight:600">${_esfEsc(e.nombre)}</td>
+        <td style="font-size:12px">${_esfEsc(e.fecha_inicio) || '—'}</td>
+        <td style="font-size:12px">${_esfEsc(e.ciudad) || '—'}</td>
+        <td style="font-size:11px;color:var(--orange)">${_esfEsc(e.status) || 'A la venta'}</td>
+      </tr>`).join('')}</tbody>
+    </table></div>`;
+  } catch(e) {
+    cont.innerHTML = `<div class="alert alert-error">${e.message}</div>`;
+  }
+}
+
+async function crearEsferaEvento() {
+  const body = {
+    slug:         document.getElementById('esf-slug')?.value.trim().toLowerCase() || '',
+    nombre:       document.getElementById('esf-nombre')?.value.trim() || '',
+    fecha_inicio: document.getElementById('esf-fecha')?.value || null,
+    ciudad:       document.getElementById('esf-ciudad')?.value || null,
+    tipo:         document.getElementById('esf-tipo')?.value || null,
+    status:       document.getElementById('esf-status')?.value || '',
+  };
+  const alertEl = document.getElementById('esf-alert');
+  try {
+    const r = await khAdminFetch('/.netlify/functions/esferas-crear', {
+      method:'POST', body: JSON.stringify(body),
+    });
+    if (!r.ok) {
+      const detail = await r.json().catch(()=>({ error: r.statusText }));
+      throw new Error(detail.error || 'Error creando');
+    }
+    alertEl.innerHTML='<div class="alert alert-success">✅ Evento creado</div>';
+    setTimeout(()=>alertEl.innerHTML='', 2000);
+    ['esf-slug','esf-nombre','esf-fecha'].forEach(id => { const el=document.getElementById(id); if (el) el.value=''; });
+    loadEsferasEventos();
   } catch(e) { alertEl.innerHTML=`<div class="alert alert-error">${e.message}</div>`; }
 }
 

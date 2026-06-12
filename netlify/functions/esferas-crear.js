@@ -26,8 +26,34 @@ const SB_KEY = process.env.SUPABASE_SERVICE_KEY_KAMEHOUSE;
 // Whitelist estricta. 'publicado' deliberadamente AUSENTE: queda en su default DB.
 const CAMPOS_PERMITIDOS = new Set([
   'slug', 'nombre', 'titulo', 'fecha_inicio', 'ciudad', 'tipo', 'status',
-  'venue', 'music',
+  'venue', 'music', 'fechas_extra',
 ]);
+
+// fechas_extra: JSON array de fechas ADICIONALES 'YYYY-MM-DD' (multifecha-ficha).
+// Acepta array o string JSON. Saneo: descarta no-fechas, dedupe, ordena. Si no
+// queda nada útil → null (cae a fecha única). Devuelve string JSON o null.
+const FECHA_RE = /^\d{4}-\d{2}-\d{2}$/;
+function saneFechasExtra(v) {
+  let arr = v;
+  if (typeof v === 'string') { try { arr = JSON.parse(v); } catch { return null; } }
+  if (!Array.isArray(arr)) return null;
+  const seen = new Set();
+  const out = [];
+  for (const x of arr) {
+    if (typeof x !== 'string') continue;
+    const s = x.slice(0, 10);
+    if (!FECHA_RE.test(s)) continue;
+    const mo = parseInt(s.slice(5, 7), 10);
+    const d = parseInt(s.slice(8, 10), 10);
+    if (mo < 1 || mo > 12 || d < 1 || d > 31) continue;
+    if (seen.has(s)) continue;
+    seen.add(s);
+    out.push(s);
+  }
+  if (!out.length) return null;
+  out.sort();
+  return JSON.stringify(out);
+}
 
 const SLUG_RE = /^[a-z0-9-]+$/;
 // Status de Esferas (simplificado): Disponible / Próximamente / Últimos / Agotado.
@@ -64,6 +90,7 @@ exports.handler = async (event) => {
   const sane = {};
   for (const [k, v] of Object.entries(body)) {
     if (!CAMPOS_PERMITIDOS.has(k)) continue;
+    if (k === 'fechas_extra') { sane[k] = saneFechasExtra(v); continue; }
     if (v === null || v === '') sane[k] = (k === 'status') ? '' : null;
     else sane[k] = String(v);
   }

@@ -2844,6 +2844,9 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
     <div class="form-group">
      <label>Fecha inicio</label>
      <input class="cot-input" type="date" id="esf-fecha" style="width:100%">
+     <div id="esf-fechas-extra"></div>
+     <button class="btn btn-ghost" type="button" onclick="_esfAddFechaExtra()" style="margin-top:8px">+ Agregar otra fecha</button>
+     <div style="font-size:11px;color:var(--ts);margin-top:4px">Para conciertos con varias fechas del mismo artista (ej. 3 noches). Los precios por fecha se manejan aparte.</div>
     </div>
     <div class="form-group">
      <label>Ciudad</label>
@@ -12819,6 +12822,7 @@ async function crearEsferaEvento() {
     status:       document.getElementById('esf-status')?.value || '',
     venue:        document.getElementById('esf-venue')?.value.trim() || null,
     music:        document.getElementById('esf-music')?.value.trim() || null,
+    fechas_extra: _esfGetFechasExtra(),
   };
   const alertEl = document.getElementById('esf-alert');
   try {
@@ -12832,6 +12836,7 @@ async function crearEsferaEvento() {
     alertEl.innerHTML='<div class="alert alert-success">✅ Evento creado</div>';
     setTimeout(()=>alertEl.innerHTML='', 2000);
     ['esf-slug','esf-nombre','esf-titulo','esf-fecha','esf-venue','esf-music'].forEach(id => { const el=document.getElementById(id); if (el) el.value=''; });
+    _esfClearFechasExtra();
     const chosenEl = document.getElementById('esf-music-chosen'); if (chosenEl) chosenEl.textContent = '';
     const resEl = document.getElementById('esf-music-results'); if (resEl) resEl.innerHTML = '';
     loadEsferasEventos();
@@ -12873,6 +12878,45 @@ function _esfCiudadSet(ciudad) {
   }
 }
 
+// ── Fechas adicionales (multifecha-ficha: varias fechas del mismo artista) ───
+// Inputs date extra bajo "Fecha inicio". Se guardan como JSON array en
+// `fechas_extra` (solo las no vacías). NO tocan precios/zonas.
+function _esfAddFechaExtra(value) {
+  const cont = document.getElementById('esf-fechas-extra');
+  if (!cont) return;
+  const row = document.createElement('div');
+  row.className = 'esf-fecha-extra-row';
+  row.style.cssText = 'display:flex;gap:8px;margin-top:8px';
+  const inp = document.createElement('input');
+  inp.type = 'date';
+  inp.className = 'cot-input esf-fecha-extra';
+  inp.style.flex = '1';
+  if (value) inp.value = String(value).slice(0, 10);
+  inp.addEventListener('input', renderEsferaPreview);
+  inp.addEventListener('change', renderEsferaPreview);
+  const del = document.createElement('button');
+  del.type = 'button';
+  del.className = 'btn btn-ghost';
+  del.textContent = '✕';
+  del.title = 'Quitar esta fecha';
+  del.onclick = () => { row.remove(); renderEsferaPreview(); };
+  row.appendChild(inp);
+  row.appendChild(del);
+  cont.appendChild(row);
+  renderEsferaPreview();
+}
+
+function _esfGetFechasExtra() {
+  return Array.from(document.querySelectorAll('#esf-fechas-extra .esf-fecha-extra'))
+    .map((el) => (el.value || '').trim())
+    .filter(Boolean);
+}
+
+function _esfClearFechasExtra() {
+  const cont = document.getElementById('esf-fechas-extra');
+  if (cont) cont.innerHTML = '';
+}
+
 function submitEsferaForm() {
   if (window._esfEditSlug) guardarCambiosEsfera();
   else crearEsferaEvento();
@@ -12888,6 +12932,11 @@ function editarEsfera(slug) {
   set('esf-nombre', row.nombre || '');
   set('esf-titulo', row.titulo || '');
   set('esf-fecha', (row.fecha_inicio || '').slice(0, 10));
+  // Fechas adicionales: re-crear inputs desde fechas_extra (texto JSON o array).
+  _esfClearFechasExtra();
+  let _fe = row.fechas_extra;
+  if (typeof _fe === 'string') { try { _fe = JSON.parse(_fe); } catch { _fe = []; } }
+  if (Array.isArray(_fe)) _fe.forEach((d) => { if (typeof d === 'string') _esfAddFechaExtra(d); });
   _esfCiudadSet(row.ciudad || 'MTY');
   set('esf-tipo', row.tipo || 'concierto');
   set('esf-status', row.status || '');
@@ -12908,6 +12957,7 @@ function cancelarEdicionEsfera() {
   const sEl = document.getElementById('esf-slug');
   if (sEl) { sEl.readOnly = false; sEl.style.opacity = ''; sEl.value = ''; }
   ['esf-nombre','esf-titulo','esf-fecha','esf-venue','esf-music'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+  _esfClearFechasExtra();
   _esfCiudadSet('MTY');
   const tipo = document.getElementById('esf-tipo'); if (tipo) tipo.value = 'concierto';
   const status = document.getElementById('esf-status'); if (status) status.value = '';
@@ -12933,6 +12983,7 @@ async function guardarCambiosEsfera() {
     status:       document.getElementById('esf-status')?.value || '',
     venue:        document.getElementById('esf-venue')?.value.trim() || null,
     music:        document.getElementById('esf-music')?.value.trim() || null,
+    fechas_extra: _esfGetFechasExtra(),
   };
   const alertEl = document.getElementById('esf-alert');
   try {
@@ -12962,6 +13013,44 @@ function _esfPreviewFDisplay(fi) {
   const mes = ESF_PREVIEW_MESES[parseInt(m[2], 10) - 1];
   if (!mes) return 'Por confirmar';
   return parseInt(m[3], 10) + ' ' + mes + ' ' + m[1];
+}
+
+// Display combinado para 2+ fechas (ordenadas, 'YYYY-MM-DD'). Espejo de
+// fDisplayMulti en _lib/esferas-compile.js: mismo mes → "7, 9 y 10 may 2026";
+// cruzan meses → "30 nov y 2 dic 2026"; cruzan años → año en cada una.
+function _esfPreviewFDisplayMulti(fechas) {
+  const parts = fechas.map((s) => ({
+    y: s.slice(0, 4), mo: parseInt(s.slice(5, 7), 10), d: parseInt(s.slice(8, 10), 10),
+  }));
+  const joinHuman = (items) => (items.length <= 1
+    ? (items[0] || '')
+    : items.slice(0, -1).join(', ') + ' y ' + items[items.length - 1]);
+  const sameYear = parts.every((p) => p.y === parts[0].y);
+  const sameMonth = sameYear && parts.every((p) => p.mo === parts[0].mo);
+  if (sameMonth) {
+    const mes = ESF_PREVIEW_MESES[parts[0].mo - 1] || '';
+    return joinHuman(parts.map((p) => String(p.d))) + ' ' + mes + ' ' + parts[0].y;
+  }
+  if (sameYear) {
+    const items = parts.map((p) => String(p.d) + ' ' + (ESF_PREVIEW_MESES[p.mo - 1] || ''));
+    return joinHuman(items) + ' ' + parts[0].y;
+  }
+  const items = parts.map((p) => String(p.d) + ' ' + (ESF_PREVIEW_MESES[p.mo - 1] || '') + ' ' + p.y);
+  return joinHuman(items);
+}
+
+// Junta la fecha base + las extra → array ordenado y dedupe de 'YYYY-MM-DD'.
+function _esfPreviewFechas() {
+  const base = document.getElementById('esf-fecha')?.value || '';
+  const re = /^\d{4}-\d{2}-\d{2}$/;
+  const seen = {};
+  const out = [];
+  [base].concat(_esfGetFechasExtra()).forEach((d) => {
+    const s = String(d || '').slice(0, 10);
+    if (re.test(s) && !seen[s]) { seen[s] = 1; out.push(s); }
+  });
+  out.sort();
+  return out;
 }
 
 // status del form → {txt, cls (clase del tag), cardCls (overlay)}
@@ -12999,6 +13088,8 @@ function renderEsferaPreview() {
   const nombre = (document.getElementById('esf-nombre')?.value || '').trim();
   const titulo = (document.getElementById('esf-titulo')?.value || '').trim();
   const fecha  = document.getElementById('esf-fecha')?.value || '';
+  const fechas = _esfPreviewFechas();
+  const fDisp  = (fechas.length >= 2) ? _esfPreviewFDisplayMulti(fechas) : _esfPreviewFDisplay(fechas[0] || fecha);
   const status = document.getElementById('esf-status')?.value || '';
   const venue  = (document.getElementById('esf-venue')?.value || '').trim();
   const st = _esfPreviewStatus(status);
@@ -13012,7 +13103,7 @@ function renderEsferaPreview() {
       imgHTML +
       `<span class="ev-tag ${st.cls}">${_esfEsc(st.txt)}</span>` +
       `<div class="ev-body"><div class="ev-top">` +
-        `<div class="ev-fecha">${_esfEsc(_esfPreviewFDisplay(fecha))}</div>` +
+        `<div class="ev-fecha">${_esfEsc(fDisp)}</div>` +
         `<div class="ev-artist">${_esfEsc(titulo || nombre || 'Nombre del evento')}</div>` +
         `<div class="ev-venue">${_esfEsc(venue)}</div>` +
       `</div>` + _esfPreviewBottom(status) + `</div>` +

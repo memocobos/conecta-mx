@@ -44,6 +44,53 @@ function fDisplay(fecha_inicio) {
   return parseInt(m[3], 10) + ' ' + mes + ' ' + m[1];
 }
 
+const FECHA_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+// `fechas_extra` (texto JSON desde la DB, o array) → array de 'YYYY-MM-DD' válidas.
+// Basura → []. NO ordena ni dedupe (eso lo hace generarObj junto con fecha_inicio).
+function parseFechasExtra(raw) {
+  let arr = raw;
+  if (typeof raw === 'string') {
+    try { arr = JSON.parse(raw); } catch (_) { return []; }
+  }
+  if (!Array.isArray(arr)) return [];
+  const out = [];
+  for (const x of arr) {
+    if (typeof x !== 'string') continue;
+    const s = x.slice(0, 10);
+    if (FECHA_RE.test(s)) out.push(s);
+  }
+  return out;
+}
+
+// Display combinado para 2+ fechas (ya ordenadas y validadas 'YYYY-MM-DD').
+//   mismo mes y año  → "7, 9 y 10 may 2026"
+//   cruzan meses     → "30 nov y 2 dic 2026"  (mes en cada una, año una vez)
+//   cruzan años      → "30 dic 2026 y 2 ene 2027" (año en cada una)
+function fDisplayMulti(fechas) {
+  const parts = fechas.map((s) => ({
+    y: s.slice(0, 4),
+    mo: parseInt(s.slice(5, 7), 10),
+    d: parseInt(s.slice(8, 10), 10),
+  }));
+  // "a, b y c" — los primeros con ", " y el último con " y ".
+  const joinHuman = (items) => (items.length <= 1
+    ? (items[0] || '')
+    : items.slice(0, -1).join(', ') + ' y ' + items[items.length - 1]);
+  const sameYear = parts.every((p) => p.y === parts[0].y);
+  const sameMonth = sameYear && parts.every((p) => p.mo === parts[0].mo);
+  if (sameMonth) {
+    const mes = MESES[parts[0].mo - 1] || '';
+    return joinHuman(parts.map((p) => String(p.d))) + ' ' + mes + ' ' + parts[0].y;
+  }
+  if (sameYear) {
+    const items = parts.map((p) => String(p.d) + ' ' + (MESES[p.mo - 1] || ''));
+    return joinHuman(items) + ' ' + parts[0].y;
+  }
+  const items = parts.map((p) => String(p.d) + ' ' + (MESES[p.mo - 1] || '') + ' ' + p.y);
+  return joinHuman(items);
+}
+
 // Byte-exacto: comillas simples, sin espacios extra. banco:BANCO_DEFAULT SIN
 // comillas (referencia a variable). cdmx:true, SOLO si ciudad==='CDMX'.
 // `added` deriva de created_at de la fila (estable entre re-publicaciones); si no
@@ -54,6 +101,19 @@ function generarObj(esfera, hoy) {
   const ciudad = esfera.ciudad || '';
   const fi = esfera.fecha_inicio || null;
   const ds = fi ? String(fi).slice(0, 10) : '';
+  // Multifecha-ficha: [fecha_inicio, ...fechas_extra] válidas, ordenadas, dedupe.
+  const fechas = [];
+  const vistas = new Set();
+  for (const d of [ds].concat(parseFechasExtra(esfera.fechas_extra))) {
+    if (FECHA_RE.test(d) && !vistas.has(d)) { vistas.add(d); fechas.push(d); }
+  }
+  fechas.sort();
+  const esMulti = fechas.length >= 2;
+  const dsFinal = fechas.length ? fechas[0] : ds;        // primera cronológica
+  const fStr = esMulti ? fDisplayMulti(fechas) : fDisplay(dsFinal || fi);
+  const dsListStr = esMulti
+    ? ('dsList:[' + fechas.map((d) => "'" + d + "'").join(',') + '],')
+    : '';
   const added = esfera.created_at ? String(esfera.created_at).slice(0, 10) : hoy;
   const music = esfera.music ? ("music:'" + escStr(esfera.music) + "',") : '';
   const color = escStr(esfera.color || 'azul');
@@ -65,9 +125,10 @@ function generarObj(esfera, hoy) {
     "c:'" + color +
     "',img:'" + escStr(nombre) +
     "',a:'" + escStr(esfera.titulo || nombre) +
-    "',f:'" + escStr(fDisplay(fi)) +
-    "',ds:'" + escStr(ds) +
-    "',v:'" + venue +
+    "',f:'" + escStr(fStr) +
+    "',ds:'" + escStr(dsFinal) +
+    "'," + dsListStr +
+    "v:'" + venue +
     "',st:'" + escStr(status) +
     "'," + cdmx +
     "inc:[],banco:BANCO_DEFAULT,zonas:[],hotel:[],pagos:[]}";

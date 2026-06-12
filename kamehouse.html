@@ -2835,10 +2835,12 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
     </div>
     <div class="form-group">
      <label>Ciudad</label>
-     <select class="cot-input" id="esf-ciudad" style="width:100%">
+     <select class="cot-input" id="esf-ciudad" style="width:100%" onchange="_esfCiudadToggle()">
       <option value="MTY">MTY</option>
       <option value="CDMX">CDMX</option>
+      <option value="__otra">Otra ciudad…</option>
      </select>
+     <input class="cot-input" id="esf-ciudad-otra" placeholder="ej. Guadalajara" style="width:100%;margin-top:8px;display:none">
     </div>
     <div class="form-group">
      <label>Status</label>
@@ -2852,6 +2854,7 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
     <div class="form-group">
      <label>Venue</label>
      <input class="cot-input" id="esf-venue" placeholder="ej. Estadio GNP, CDMX" style="width:100%">
+     <div style="font-size:11px;color:var(--ts);margin-top:4px">Incluye la ciudad en el venue (ej. "Auditorio Telmex, Guadalajara") para que el sitio la ubique bien.</div>
     </div>
     <div class="form-group">
      <label>Música (Deezer)</label>
@@ -12794,7 +12797,7 @@ async function crearEsferaEvento() {
     nombre:       document.getElementById('esf-nombre')?.value.trim() || '',
     titulo:       document.getElementById('esf-titulo')?.value.trim() || null,
     fecha_inicio: document.getElementById('esf-fecha')?.value || null,
-    ciudad:       document.getElementById('esf-ciudad')?.value || null,
+    ciudad:       _esfCiudadValue() || null,
     tipo:         document.getElementById('esf-tipo')?.value || null,
     status:       document.getElementById('esf-status')?.value || '',
     venue:        document.getElementById('esf-venue')?.value.trim() || null,
@@ -12823,6 +12826,36 @@ async function crearEsferaEvento() {
 // despacha a crear o a actualizar según el modo.
 window._esfEditSlug = null;
 
+// Ciudad: MTY / CDMX / "Otra ciudad…" (texto libre). El valor guardado en `ciudad`
+// es 'MTY', 'CDMX' o el texto escrito. cdmx:true solo lo emite generarObj para CDMX.
+function _esfCiudadToggle() {
+  const sel = document.getElementById('esf-ciudad');
+  const otra = document.getElementById('esf-ciudad-otra');
+  if (!sel || !otra) return;
+  otra.style.display = (sel.value === '__otra') ? '' : 'none';
+}
+
+function _esfCiudadValue() {
+  const sel = document.getElementById('esf-ciudad');
+  if (!sel) return '';
+  if (sel.value === '__otra') return (document.getElementById('esf-ciudad-otra')?.value || '').trim();
+  return sel.value;
+}
+
+function _esfCiudadSet(ciudad) {
+  const sel = document.getElementById('esf-ciudad');
+  const otra = document.getElementById('esf-ciudad-otra');
+  if (!sel) return;
+  const c = ciudad || 'MTY';
+  if (c === 'MTY' || c === 'CDMX') {
+    sel.value = c;
+    if (otra) { otra.value = ''; otra.style.display = 'none'; }
+  } else {
+    sel.value = '__otra';
+    if (otra) { otra.value = c; otra.style.display = ''; }
+  }
+}
+
 function submitEsferaForm() {
   if (window._esfEditSlug) guardarCambiosEsfera();
   else crearEsferaEvento();
@@ -12838,7 +12871,7 @@ function editarEsfera(slug) {
   set('esf-nombre', row.nombre || '');
   set('esf-titulo', row.titulo || '');
   set('esf-fecha', (row.fecha_inicio || '').slice(0, 10));
-  set('esf-ciudad', row.ciudad || 'MTY');
+  _esfCiudadSet(row.ciudad || 'MTY');
   set('esf-tipo', row.tipo || 'concierto');
   set('esf-status', row.status || '');
   set('esf-venue', row.venue || '');
@@ -12858,7 +12891,7 @@ function cancelarEdicionEsfera() {
   const sEl = document.getElementById('esf-slug');
   if (sEl) { sEl.readOnly = false; sEl.style.opacity = ''; sEl.value = ''; }
   ['esf-nombre','esf-titulo','esf-fecha','esf-venue','esf-music'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
-  const ciudad = document.getElementById('esf-ciudad'); if (ciudad) ciudad.value = 'MTY';
+  _esfCiudadSet('MTY');
   const tipo = document.getElementById('esf-tipo'); if (tipo) tipo.value = 'concierto';
   const status = document.getElementById('esf-status'); if (status) status.value = '';
   const chosenEl = document.getElementById('esf-music-chosen'); if (chosenEl) chosenEl.textContent = '';
@@ -12878,7 +12911,7 @@ async function guardarCambiosEsfera() {
     nombre:       document.getElementById('esf-nombre')?.value.trim() || '',
     titulo:       document.getElementById('esf-titulo')?.value.trim() || null,
     fecha_inicio: document.getElementById('esf-fecha')?.value || null,
-    ciudad:       document.getElementById('esf-ciudad')?.value || null,
+    ciudad:       _esfCiudadValue() || null,
     tipo:         document.getElementById('esf-tipo')?.value || null,
     status:       document.getElementById('esf-status')?.value || '',
     venue:        document.getElementById('esf-venue')?.value.trim() || null,

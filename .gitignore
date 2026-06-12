@@ -3,3 +3,8 @@ config.js
 Manual De Marca.pdf
 .env
 node_modules/
+
+# Skills (impeccable / agent harness — no versionar)
+.claude/
+.agents/
+skills-lock.json

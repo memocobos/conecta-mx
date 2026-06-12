@@ -2815,8 +2815,19 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
      <input class="cot-input" id="esf-slug" placeholder="ej. alvaro-diaz (minúsculas, números, guiones)" style="width:100%">
     </div>
     <div class="form-group">
-     <label>Nombre</label>
-     <input class="cot-input" id="esf-nombre" placeholder="Nombre del evento…" style="width:100%">
+     <label>Nombre / Artista (para buscar foto)</label>
+     <input class="cot-input" id="esf-nombre" placeholder="ej. Morat" style="width:100%">
+    </div>
+    <div class="form-group">
+     <label>Título del tour (opcional)</label>
+     <input class="cot-input" id="esf-titulo" placeholder="ej. Morat - Ya Es Mañana Tour" style="width:100%">
+    </div>
+    <div class="form-group">
+     <label>Tipo</label>
+     <select class="cot-input" id="esf-tipo" style="width:100%">
+      <option value="concierto">Concierto</option>
+      <option value="festival">Festival</option>
+     </select>
     </div>
     <div class="form-group">
      <label>Fecha inicio</label>
@@ -2830,21 +2841,12 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
      </select>
     </div>
     <div class="form-group">
-     <label>Tipo</label>
-     <select class="cot-input" id="esf-tipo" style="width:100%">
-      <option value="concierto">Concierto</option>
-      <option value="festival">Festival</option>
-     </select>
-    </div>
-    <div class="form-group">
      <label>Status</label>
      <select class="cot-input" id="esf-status" style="width:100%">
       <option value="">A la venta</option>
       <option value="proximamente">Próximamente</option>
-      <option value="por-confirmar">Por confirmar</option>
       <option value="ultimos">Últimos</option>
       <option value="agotado">Agotado</option>
-      <option value="proceso">En proceso</option>
      </select>
     </div>
     <div class="form-group">
@@ -2874,10 +2876,10 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
 
    <!-- Vista previa de la card (UI pura: solo lee el form + foto Deezer, NO escribe) -->
    <style>
-    #esf-preview-card .ev-card{background:#111;border:1px solid rgba(255,255,255,.06);position:relative;overflow:hidden}
-    #esf-preview-card .ev-card.agotado::after{content:'AGOTADO';position:absolute;inset:0;background:rgba(255,40,59,.85);display:grid;place-items:center;font-size:22px;font-weight:900;color:#fff;letter-spacing:.15em;z-index:10;font-family:'Montserrat',sans-serif}
+    #esf-preview-card .ev-card{background:#111;border:1px solid rgba(255,255,255,.08);position:relative;overflow:hidden;border-radius:16px}
+    #esf-preview-card .ev-card.agotado::after{content:'AGOTADO';position:absolute;inset:0;background:rgba(255,40,59,.85);display:grid;place-items:center;font-size:22px;font-weight:900;color:#fff;letter-spacing:.15em;z-index:10;font-family:'Montserrat',sans-serif;border-radius:16px}
     #esf-preview-card .ev-card.agotado .ev-img{filter:brightness(.25) grayscale(1)}
-    #esf-preview-card .ev-card.proceso::after{content:'EN PROCESO';position:absolute;inset:0;background:rgba(0,0,205,.85);display:grid;place-items:center;font-size:18px;font-weight:900;color:#fff;letter-spacing:.15em;z-index:10;font-family:'Montserrat',sans-serif}
+    #esf-preview-card .ev-card.proceso::after{content:'EN PROCESO';position:absolute;inset:0;background:rgba(0,0,205,.85);display:grid;place-items:center;font-size:18px;font-weight:900;color:#fff;letter-spacing:.15em;z-index:10;font-family:'Montserrat',sans-serif;border-radius:16px}
     #esf-preview-card .ev-stripe{height:5px}
     #esf-preview-card .ev-img{width:100%;height:100%;object-fit:cover;object-position:center top;display:block;filter:brightness(.65)}
     #esf-preview-card .ev-img-wrap{position:relative;overflow:hidden;width:100%;aspect-ratio:1/1;background:#1a1a1a}
@@ -12797,6 +12799,7 @@ async function crearEsferaEvento() {
   const body = {
     slug:         document.getElementById('esf-slug')?.value.trim().toLowerCase() || '',
     nombre:       document.getElementById('esf-nombre')?.value.trim() || '',
+    titulo:       document.getElementById('esf-titulo')?.value.trim() || null,
     fecha_inicio: document.getElementById('esf-fecha')?.value || null,
     ciudad:       document.getElementById('esf-ciudad')?.value || null,
     tipo:         document.getElementById('esf-tipo')?.value || null,
@@ -12816,7 +12819,7 @@ async function crearEsferaEvento() {
     }
     alertEl.innerHTML='<div class="alert alert-success">✅ Evento creado</div>';
     setTimeout(()=>alertEl.innerHTML='', 2000);
-    ['esf-slug','esf-nombre','esf-fecha','esf-venue','esf-music'].forEach(id => { const el=document.getElementById(id); if (el) el.value=''; });
+    ['esf-slug','esf-nombre','esf-titulo','esf-fecha','esf-venue','esf-music'].forEach(id => { const el=document.getElementById(id); if (el) el.value=''; });
     loadEsferasEventos();
   } catch(e) { alertEl.innerHTML=`<div class="alert alert-error">${e.message}</div>`; }
 }
@@ -12839,6 +12842,7 @@ function editarEsfera(slug) {
   const sEl = document.getElementById('esf-slug');
   if (sEl) { sEl.value = row.slug || ''; sEl.readOnly = true; sEl.style.opacity = '0.6'; }
   set('esf-nombre', row.nombre || '');
+  set('esf-titulo', row.titulo || '');
   set('esf-fecha', (row.fecha_inicio || '').slice(0, 10));
   set('esf-ciudad', row.ciudad || 'MTY');
   set('esf-tipo', row.tipo || 'concierto');
@@ -12858,7 +12862,7 @@ function cancelarEdicionEsfera() {
   window._esfEditSlug = null;
   const sEl = document.getElementById('esf-slug');
   if (sEl) { sEl.readOnly = false; sEl.style.opacity = ''; sEl.value = ''; }
-  ['esf-nombre','esf-fecha','esf-venue','esf-music'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+  ['esf-nombre','esf-titulo','esf-fecha','esf-venue','esf-music'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
   const ciudad = document.getElementById('esf-ciudad'); if (ciudad) ciudad.value = 'MTY';
   const tipo = document.getElementById('esf-tipo'); if (tipo) tipo.value = 'concierto';
   const status = document.getElementById('esf-status'); if (status) status.value = '';
@@ -12876,6 +12880,7 @@ async function guardarCambiosEsfera() {
   const body = {
     slug,
     nombre:       document.getElementById('esf-nombre')?.value.trim() || '',
+    titulo:       document.getElementById('esf-titulo')?.value.trim() || null,
     fecha_inicio: document.getElementById('esf-fecha')?.value || null,
     ciudad:       document.getElementById('esf-ciudad')?.value || null,
     tipo:         document.getElementById('esf-tipo')?.value || null,
@@ -12948,6 +12953,7 @@ function renderEsferaPreview() {
   const cont = document.getElementById('esf-preview-card');
   if (!cont) return;
   const nombre = (document.getElementById('esf-nombre')?.value || '').trim();
+  const titulo = (document.getElementById('esf-titulo')?.value || '').trim();
   const fecha  = document.getElementById('esf-fecha')?.value || '';
   const status = document.getElementById('esf-status')?.value || '';
   const venue  = (document.getElementById('esf-venue')?.value || '').trim();
@@ -12966,7 +12972,7 @@ function renderEsferaPreview() {
       `<span class="ev-tag ${st.cls}">${_esfEsc(st.txt)}</span>` +
       `<div class="ev-body"><div class="ev-top">` +
         `<div class="ev-fecha">${_esfEsc(_esfPreviewFDisplay(fecha))}</div>` +
-        `<div class="ev-artist">${_esfEsc(nombre || 'Nombre del evento')}</div>` +
+        `<div class="ev-artist">${_esfEsc(titulo || nombre || 'Nombre del evento')}</div>` +
         `<div class="ev-venue">${_esfEsc(venue)}</div>` +
       `</div>` + _esfPreviewBottom(status) + `</div>` +
     `</div>`;
@@ -12996,7 +13002,7 @@ function _esfPreviewLoadFoto(nombre) {
 function _esfPreviewInit() {
   if (!window._esfPreviewBound) {
     window._esfPreviewBound = true;
-    ['esf-nombre','esf-fecha','esf-status','esf-venue','esf-color'].forEach(id => {
+    ['esf-nombre','esf-titulo','esf-fecha','esf-status','esf-venue','esf-color'].forEach(id => {
       const el = document.getElementById(id);
       if (el) { el.addEventListener('input', renderEsferaPreview); el.addEventListener('change', renderEsferaPreview); }
     });

@@ -25,12 +25,13 @@ const SB_KEY = process.env.SUPABASE_SERVICE_KEY_KAMEHOUSE;
 
 // Whitelist estricta. 'publicado' deliberadamente AUSENTE: queda en su default DB.
 const CAMPOS_PERMITIDOS = new Set([
-  'slug', 'nombre', 'fecha_inicio', 'ciudad', 'tipo', 'status',
+  'slug', 'nombre', 'titulo', 'fecha_inicio', 'ciudad', 'tipo', 'status',
   'venue', 'color', 'music',
 ]);
 
 const SLUG_RE = /^[a-z0-9-]+$/;
-const STATUS_PERMITIDOS = new Set(['', 'proximamente', 'por-confirmar', 'ultimos', 'agotado', 'proceso']);
+// Status de Esferas (simplificado): A la venta / Próximamente / Últimos / Agotado.
+const STATUS_PERMITIDOS = new Set(['', 'proximamente', 'ultimos', 'agotado']);
 // Colores reales soportados por index.html (clases de color del EV).
 const COLOR_PERMITIDOS = new Set(['azul', 'rojo', 'rosa', 'gris', 'verde', 'amarillo']);
 

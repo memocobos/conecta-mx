@@ -64,7 +64,7 @@ function generarObj(esfera, hoy) {
     "'," + music +
     "c:'" + color +
     "',img:'" + escStr(nombre) +
-    "',a:'" + escStr(nombre) +
+    "',a:'" + escStr(esfera.titulo || nombre) +
     "',f:'" + escStr(fDisplay(fi)) +
     "',ds:'" + escStr(ds) +
     "',v:'" + venue +

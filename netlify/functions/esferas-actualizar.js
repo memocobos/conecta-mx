@@ -21,8 +21,9 @@ const SB_URL = 'https://npgnhsmwpcipxgvfxrho.supabase.co';
 const SB_KEY = process.env.SUPABASE_SERVICE_KEY_KAMEHOUSE;
 
 // Whitelist EDITABLE. slug AUSENTE a propósito (identidad / PK, no se edita).
-const CAMPOS_EDITABLES = new Set(['nombre', 'fecha_inicio', 'ciudad', 'tipo', 'status', 'venue', 'color', 'music']);
-const STATUS_PERMITIDOS = new Set(['', 'proximamente', 'por-confirmar', 'ultimos', 'agotado', 'proceso']);
+const CAMPOS_EDITABLES = new Set(['nombre', 'titulo', 'fecha_inicio', 'ciudad', 'tipo', 'status', 'venue', 'color', 'music']);
+// Status de Esferas (simplificado): A la venta / Próximamente / Últimos / Agotado.
+const STATUS_PERMITIDOS = new Set(['', 'proximamente', 'ultimos', 'agotado']);
 const COLOR_PERMITIDOS = new Set(['azul', 'rojo', 'rosa', 'gris', 'verde', 'amarillo']);
 
 exports.handler = async (event) => {

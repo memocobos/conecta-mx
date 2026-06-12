@@ -2481,8 +2481,11 @@ function cerrarProximosBanner(){
   var b=document.getElementById('proximos-banner');
   if(b)b.style.display='none';
 }
+// Normaliza para búsqueda: minúsculas + quita acentos (Á->a, í->i) pero CONSERVA
+// espacios, para que "alvaro dias" encuentre "Álvaro Díaz".
+function _searchNorm(s){return(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim();}
 function filterEvents(){
-  var q=(document.getElementById('ev-search').value||'').toLowerCase().trim();
+  var q=_searchNorm(document.getElementById('ev-search').value||'');
   var f=_activeFilter;
   var cards=document.querySelectorAll('#ev-list .ev-card, #ev-list .mes-label, #ev-list .pc-block');
   // We need to re-render filtered — easier to show/hide cards
@@ -2500,7 +2503,7 @@ function filterEvents(){
     var ev=EV.find(function(e){return e.id===evId;});
     if(!ev){card.style.display='none';continue;}
     // Text search
-    var matchQ=!q||(ev.a.toLowerCase().includes(q))||(ev.v.toLowerCase().includes(q))||(ev.f.toLowerCase().includes(q));
+    var matchQ=!q||(_searchNorm(ev.a).includes(q))||(_searchNorm(ev.v).includes(q))||(_searchNorm(ev.f).includes(q));
     // Past event detection
     var evPast=!!ev._past;
     // Location filter — past events only show in 'pasados' filter

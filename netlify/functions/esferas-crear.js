@@ -26,14 +26,12 @@ const SB_KEY = process.env.SUPABASE_SERVICE_KEY_KAMEHOUSE;
 // Whitelist estricta. 'publicado' deliberadamente AUSENTE: queda en su default DB.
 const CAMPOS_PERMITIDOS = new Set([
   'slug', 'nombre', 'titulo', 'fecha_inicio', 'ciudad', 'tipo', 'status',
-  'venue', 'color', 'music',
+  'venue', 'music',
 ]);
 
 const SLUG_RE = /^[a-z0-9-]+$/;
-// Status de Esferas (simplificado): A la venta / Próximamente / Últimos / Agotado.
+// Status de Esferas (simplificado): Disponible / Próximamente / Últimos / Agotado.
 const STATUS_PERMITIDOS = new Set(['', 'proximamente', 'ultimos', 'agotado']);
-// Colores reales soportados por index.html (clases de color del EV).
-const COLOR_PERMITIDOS = new Set(['azul', 'rojo', 'rosa', 'gris', 'verde', 'amarillo']);
 
 exports.handler = async (event) => {
   const __origin = corsCheck(event);
@@ -85,12 +83,6 @@ exports.handler = async (event) => {
   if (sane.status === undefined || sane.status === null) sane.status = '';
   if (!STATUS_PERMITIDOS.has(sane.status)) {
     return { statusCode: 400, headers, body: JSON.stringify({ error: 'Status no permitido' }) };
-  }
-
-  // color: default 'azul' si vacío; si viene, debe estar permitido.
-  if (!sane.color) sane.color = 'azul';
-  if (!COLOR_PERMITIDOS.has(sane.color)) {
-    return { statusCode: 400, headers, body: JSON.stringify({ error: 'Color no permitido' }) };
   }
 
   // INSERT vía PostgREST. return=representation para devolver el row creado.

@@ -1,7 +1,8 @@
 // Deezer proxy.
-// Default:        /.netlify/functions/deezer?q=<artista>              → search artist (fotos)
-// Track preview:  /.netlify/functions/deezer?q=<artista>&type=track   → {preview, title, artist}
-// Track by id:    /.netlify/functions/deezer?id=<track_id>            → {preview, title, artist}
+// Default:        /.netlify/functions/deezer?q=<artista>                  → search artist (fotos)
+// Track preview:  /.netlify/functions/deezer?q=<artista>&type=track       → {preview, title, artist}
+// Track by id:    /.netlify/functions/deezer?id=<track_id>                → {preview, title, artist}
+// Track list:     /.netlify/functions/deezer?q=<artista>&type=tracklist   → {results:[{id,title,artist,album,cover,preview}]}
 
 function cleanQuery(raw) {
   return String(raw || '')
@@ -51,6 +52,29 @@ exports.handler = async function(event) {
   const type = (qs.type || '').toLowerCase();
 
   try {
+    // === Track list mode (buscador de música del panel — elegir una pista) ===
+    if (type === 'tracklist') {
+      const url = `https://api.deezer.com/search?q=${encodeURIComponent(q)}&limit=8`;
+      const res = await fetch(url);
+      if (!res.ok) {
+        return { statusCode: res.status, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ error: 'Deezer search failed' }) };
+      }
+      const data = await res.json();
+      const results = ((data && data.data) || []).slice(0, 8).map(t => ({
+        id: t.id,
+        title: t.title,
+        artist: t.artist && t.artist.name,
+        album: t.album && t.album.title,
+        cover: t.album && t.album.cover_small,
+        preview: t.preview || null,
+      }));
+      return {
+        statusCode: 200,
+        headers: { 'Content-Type': 'application/json', 'Cache-Control': 'private, max-age=300' },
+        body: JSON.stringify({ results }),
+      };
+    }
+
     // === Track preview mode ===
     if (type === 'track') {
       const query = cleanQuery(q);

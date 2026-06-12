@@ -2843,7 +2843,7 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
     <div class="form-group">
      <label>Status</label>
      <select class="cot-input" id="esf-status" style="width:100%">
-      <option value="">A la venta</option>
+      <option value="">Disponible</option>
       <option value="proximamente">Próximamente</option>
       <option value="ultimos">Últimos</option>
       <option value="agotado">Agotado</option>
@@ -2854,20 +2854,14 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
      <input class="cot-input" id="esf-venue" placeholder="ej. Estadio GNP, CDMX" style="width:100%">
     </div>
     <div class="form-group">
-     <label>Color</label>
-     <select class="cot-input" id="esf-color" style="width:100%">
-      <option value="azul">azul</option>
-      <option value="rojo">rojo</option>
-      <option value="rosa">rosa</option>
-      <option value="gris">gris</option>
-      <option value="verde">verde</option>
-      <option value="amarillo">amarillo</option>
-     </select>
-    </div>
-    <div class="form-group">
-     <label>Música — Deezer track ID</label>
-     <input class="cot-input" id="esf-music" placeholder="ej. 2893837431" style="width:100%">
-     <div style="font-size:11px;color:var(--ts);margin-top:4px">opcional · ID de pista de Deezer</div>
+     <label>Música (Deezer)</label>
+     <div style="display:flex;gap:8px">
+      <input class="cot-input" id="esf-music" placeholder="track ID (ej. 2893837431)" style="flex:1">
+      <button class="btn btn-ghost" type="button" onclick="buscarMusicaEsfera()">🔍 Buscar música</button>
+     </div>
+     <div style="font-size:11px;color:var(--ts);margin-top:4px">Opcional — si no eliges, el sitio busca la música por el nombre.</div>
+     <div id="esf-music-chosen" style="font-size:11px;color:var(--green);margin-top:4px"></div>
+     <div id="esf-music-results" style="margin-top:8px"></div>
     </div>
     <button class="btn btn-primary" id="esf-submit-btn" onclick="submitEsferaForm()">Crear evento</button>
     <button class="btn btn-ghost" id="esf-cancel-edit" style="margin-left:8px;display:none" onclick="cancelarEdicionEsfera()">Cancelar edición</button>
@@ -2880,7 +2874,6 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
     #esf-preview-card .ev-card.agotado::after{content:'AGOTADO';position:absolute;inset:0;background:rgba(255,40,59,.85);display:grid;place-items:center;font-size:22px;font-weight:900;color:#fff;letter-spacing:.15em;z-index:10;font-family:'Montserrat',sans-serif;border-radius:16px}
     #esf-preview-card .ev-card.agotado .ev-img{filter:brightness(.25) grayscale(1)}
     #esf-preview-card .ev-card.proceso::after{content:'EN PROCESO';position:absolute;inset:0;background:rgba(0,0,205,.85);display:grid;place-items:center;font-size:18px;font-weight:900;color:#fff;letter-spacing:.15em;z-index:10;font-family:'Montserrat',sans-serif;border-radius:16px}
-    #esf-preview-card .ev-stripe{height:5px}
     #esf-preview-card .ev-img{width:100%;height:100%;object-fit:cover;object-position:center top;display:block;filter:brightness(.65)}
     #esf-preview-card .ev-img-wrap{position:relative;overflow:hidden;width:100%;aspect-ratio:1/1;background:#1a1a1a}
     #esf-preview-card .ev-img-wrap::after{content:'';position:absolute;bottom:0;left:0;right:0;height:60px;background:linear-gradient(transparent,#111)}
@@ -12783,7 +12776,7 @@ async function loadEsferasEventos() {
         <td style="font-weight:600">${_esfEsc(e.nombre)}${e.venue ? `<br><span style="font-size:10px;color:var(--ts);font-weight:400">${_esfEsc(e.venue)}</span>` : ''}</td>
         <td style="font-size:12px">${_esfEsc(e.fecha_inicio) || '—'}</td>
         <td style="font-size:12px">${_esfEsc(e.ciudad) || '—'}</td>
-        <td style="font-size:11px;color:var(--orange)">${_esfEsc(e.status) || 'A la venta'}</td>
+        <td style="font-size:11px;color:var(--orange)">${_esfEsc(e.status) || 'Disponible'}</td>
         <td>${e.publicado
           ? `<span class="badge badge-green">publicado</span> <button class="btn btn-ghost btn-sm" style="font-size:10px" onclick="despublicarEsfera('${_esfEsc(e.slug)}')">🗑️ Despublicar</button>`
           : '<span class="badge badge-gray">borrador</span>'}</td>
@@ -12805,7 +12798,6 @@ async function crearEsferaEvento() {
     tipo:         document.getElementById('esf-tipo')?.value || null,
     status:       document.getElementById('esf-status')?.value || '',
     venue:        document.getElementById('esf-venue')?.value.trim() || null,
-    color:        document.getElementById('esf-color')?.value || 'azul',
     music:        document.getElementById('esf-music')?.value.trim() || null,
   };
   const alertEl = document.getElementById('esf-alert');
@@ -12820,6 +12812,8 @@ async function crearEsferaEvento() {
     alertEl.innerHTML='<div class="alert alert-success">✅ Evento creado</div>';
     setTimeout(()=>alertEl.innerHTML='', 2000);
     ['esf-slug','esf-nombre','esf-titulo','esf-fecha','esf-venue','esf-music'].forEach(id => { const el=document.getElementById(id); if (el) el.value=''; });
+    const chosenEl = document.getElementById('esf-music-chosen'); if (chosenEl) chosenEl.textContent = '';
+    const resEl = document.getElementById('esf-music-results'); if (resEl) resEl.innerHTML = '';
     loadEsferasEventos();
   } catch(e) { alertEl.innerHTML=`<div class="alert alert-error">${e.message}</div>`; }
 }
@@ -12848,8 +12842,9 @@ function editarEsfera(slug) {
   set('esf-tipo', row.tipo || 'concierto');
   set('esf-status', row.status || '');
   set('esf-venue', row.venue || '');
-  set('esf-color', row.color || 'azul');
   set('esf-music', row.music || '');
+  const chosenEl = document.getElementById('esf-music-chosen'); if (chosenEl) chosenEl.textContent = '';
+  const resEl = document.getElementById('esf-music-results'); if (resEl) resEl.innerHTML = '';
   const tit = document.getElementById('esf-form-titulo'); if (tit) tit.textContent = '// EDITAR EVENTO: ' + slug;
   const btn = document.getElementById('esf-submit-btn'); if (btn) btn.textContent = 'Guardar cambios';
   const cancel = document.getElementById('esf-cancel-edit'); if (cancel) cancel.style.display = '';
@@ -12866,7 +12861,8 @@ function cancelarEdicionEsfera() {
   const ciudad = document.getElementById('esf-ciudad'); if (ciudad) ciudad.value = 'MTY';
   const tipo = document.getElementById('esf-tipo'); if (tipo) tipo.value = 'concierto';
   const status = document.getElementById('esf-status'); if (status) status.value = '';
-  const color = document.getElementById('esf-color'); if (color) color.value = 'azul';
+  const chosenEl = document.getElementById('esf-music-chosen'); if (chosenEl) chosenEl.textContent = '';
+  const resEl = document.getElementById('esf-music-results'); if (resEl) resEl.innerHTML = '';
   const tit = document.getElementById('esf-form-titulo'); if (tit) tit.textContent = '// NUEVO EVENTO';
   const btn = document.getElementById('esf-submit-btn'); if (btn) btn.textContent = 'Crear evento';
   const cancel = document.getElementById('esf-cancel-edit'); if (cancel) cancel.style.display = 'none';
@@ -12886,7 +12882,6 @@ async function guardarCambiosEsfera() {
     tipo:         document.getElementById('esf-tipo')?.value || null,
     status:       document.getElementById('esf-status')?.value || '',
     venue:        document.getElementById('esf-venue')?.value.trim() || null,
-    color:        document.getElementById('esf-color')?.value || 'azul',
     music:        document.getElementById('esf-music')?.value.trim() || null,
   };
   const alertEl = document.getElementById('esf-alert');
@@ -12908,7 +12903,6 @@ async function guardarCambiosEsfera() {
 // ── Vista previa de la card (UI pura) ────────────────────────────────────────
 // Renderiza en vivo cómo se verá la .ev-card del index con los valores del form.
 // El único fetch es a /.netlify/functions/deezer (foto), con debounce. No escribe.
-const ESF_PREVIEW_COLORS = { azul:'#0000cd', rojo:'#ff283b', rosa:'#ff4bd1', gris:'#888', verde:'#88ea4e', amarillo:'#e8ff4c' };
 const ESF_PREVIEW_MESES = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
 
 function _esfPreviewFDisplay(fi) {
@@ -12928,7 +12922,7 @@ function _esfPreviewStatus(st) {
     case 'proximamente':  return { txt:'Próximamente',    cls:'tpronto', cardCls:'proxi' };
     case 'por-confirmar': return { txt:'Por confirmar',   cls:'tpc',     cardCls:'' };
     case 'ultimos':       return { txt:'Últimos lugares', cls:'tu',      cardCls:'' };
-    default:              return { txt:'A la venta',      cls:'td',      cardCls:'' };
+    default:              return { txt:'Disponible',       cls:'td',      cardCls:'' };
   }
 }
 
@@ -12957,9 +12951,7 @@ function renderEsferaPreview() {
   const fecha  = document.getElementById('esf-fecha')?.value || '';
   const status = document.getElementById('esf-status')?.value || '';
   const venue  = (document.getElementById('esf-venue')?.value || '').trim();
-  const color  = document.getElementById('esf-color')?.value || 'azul';
   const st = _esfPreviewStatus(status);
-  const accent = ESF_PREVIEW_COLORS[color] || '#0000cd';
   const initials = (nombre || '··').substring(0, 2).toUpperCase();
   const cached = _esfPreviewImgCache[nombre];
   const imgHTML = cached
@@ -12967,7 +12959,6 @@ function renderEsferaPreview() {
     : `<div class="ev-img-placeholder"><span class="ev-img-initials">${_esfEsc(initials)}</span></div>`;
   cont.innerHTML =
     `<div class="ev-card ${st.cardCls}">` +
-      `<div class="ev-stripe" style="background:${accent}"></div>` +
       imgHTML +
       `<span class="ev-tag ${st.cls}">${_esfEsc(st.txt)}</span>` +
       `<div class="ev-body"><div class="ev-top">` +
@@ -13002,12 +12993,84 @@ function _esfPreviewLoadFoto(nombre) {
 function _esfPreviewInit() {
   if (!window._esfPreviewBound) {
     window._esfPreviewBound = true;
-    ['esf-nombre','esf-titulo','esf-fecha','esf-status','esf-venue','esf-color'].forEach(id => {
+    ['esf-nombre','esf-titulo','esf-fecha','esf-status','esf-venue'].forEach(id => {
       const el = document.getElementById(id);
       if (el) { el.addEventListener('input', renderEsferaPreview); el.addEventListener('change', renderEsferaPreview); }
     });
   }
   renderEsferaPreview();
+}
+
+// ── Buscador de música Deezer (UI pura: solo lee de /functions/deezer) ────────
+// Escribes el artista (campo Nombre), buscas pistas, eliges una → guarda el
+// track ID. El ▶ reproduce el preview de 30s. No escribe a repo ni Supabase.
+let _esfMusicAudio = null;
+function _esfMusicStopAudio() {
+  if (_esfMusicAudio) { try { _esfMusicAudio.pause(); } catch(_){} _esfMusicAudio = null; }
+}
+
+async function buscarMusicaEsfera() {
+  const nombre = (document.getElementById('esf-nombre')?.value || '').trim();
+  const cont = document.getElementById('esf-music-results');
+  if (!cont) return;
+  if (!nombre) { cont.innerHTML = '<div style="font-size:11px;color:var(--orange)">Escribe primero el Nombre / Artista.</div>'; return; }
+  cont.innerHTML = '<div class="loading-state"><div class="spinner"></div>Buscando…</div>';
+  try {
+    const r = await fetch('/.netlify/functions/deezer?type=tracklist&q=' + encodeURIComponent(nombre));
+    const d = await r.json().catch(() => ({}));
+    const items = (d && d.results) || [];
+    cont.innerHTML = '';
+    if (!items.length) { cont.innerHTML = '<div style="font-size:11px;color:var(--ts)">Sin resultados.</div>'; return; }
+    items.forEach(t => {
+      const row = document.createElement('div');
+      row.style.cssText = 'display:flex;align-items:center;gap:8px;padding:6px;border:1px solid var(--border);border-radius:8px;margin-bottom:6px';
+      const cover = document.createElement(t.cover ? 'img' : 'div');
+      cover.style.cssText = 'width:36px;height:36px;border-radius:4px;flex-shrink:0;background:var(--bg);object-fit:cover';
+      if (t.cover) cover.src = t.cover;
+      const info = document.createElement('div');
+      info.style.cssText = 'flex:1;min-width:0';
+      const ti = document.createElement('div');
+      ti.style.cssText = 'font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis';
+      ti.textContent = t.title || '';
+      const su = document.createElement('div');
+      su.style.cssText = 'font-size:10px;color:var(--ts);white-space:nowrap;overflow:hidden;text-overflow:ellipsis';
+      su.textContent = (t.artist || '') + (t.album ? ' · ' + t.album : '');
+      info.appendChild(ti); info.appendChild(su);
+      row.appendChild(cover); row.appendChild(info);
+      if (t.preview) {
+        const play = document.createElement('button');
+        play.type = 'button'; play.className = 'btn btn-ghost btn-sm'; play.style.fontSize = '11px'; play.textContent = '▶';
+        play.addEventListener('click', () => _esfMusicPlay(t.preview, play));
+        row.appendChild(play);
+      }
+      const pick = document.createElement('button');
+      pick.type = 'button'; pick.className = 'btn btn-primary btn-sm'; pick.style.fontSize = '10px'; pick.textContent = 'Elegir';
+      pick.addEventListener('click', () => _esfMusicElegir(String(t.id), (t.title || '') + ' — ' + (t.artist || '')));
+      row.appendChild(pick);
+      cont.appendChild(row);
+    });
+  } catch (e) {
+    cont.innerHTML = `<div class="alert alert-error">${_esfEsc(e.message)}</div>`;
+  }
+}
+
+function _esfMusicPlay(url, btn) {
+  if (_esfMusicAudio && _esfMusicAudio._url === url && !_esfMusicAudio.paused) {
+    _esfMusicStopAudio(); if (btn) btn.textContent = '▶'; return;
+  }
+  _esfMusicStopAudio();
+  document.querySelectorAll('#esf-music-results button').forEach(b => { if (b.textContent === '⏸') b.textContent = '▶'; });
+  const a = new Audio(url); a._url = url; _esfMusicAudio = a;
+  a.play().catch(() => {});
+  if (btn) btn.textContent = '⏸';
+  a.onended = () => { if (btn) btn.textContent = '▶'; _esfMusicAudio = null; };
+}
+
+function _esfMusicElegir(id, label) {
+  const inp = document.getElementById('esf-music'); if (inp) inp.value = id;
+  const chosen = document.getElementById('esf-music-chosen'); if (chosen) chosen.textContent = '✓ ' + label + ' (id ' + id + ')';
+  const cont = document.getElementById('esf-music-results'); if (cont) cont.innerHTML = '';
+  _esfMusicStopAudio();
 }
 
 // Pieza 2a · dry-run del compilador. Solo lectura/preview: la function NO escribe

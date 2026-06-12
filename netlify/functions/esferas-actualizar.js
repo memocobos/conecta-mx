@@ -21,10 +21,9 @@ const SB_URL = 'https://npgnhsmwpcipxgvfxrho.supabase.co';
 const SB_KEY = process.env.SUPABASE_SERVICE_KEY_KAMEHOUSE;
 
 // Whitelist EDITABLE. slug AUSENTE a propósito (identidad / PK, no se edita).
-const CAMPOS_EDITABLES = new Set(['nombre', 'titulo', 'fecha_inicio', 'ciudad', 'tipo', 'status', 'venue', 'color', 'music']);
-// Status de Esferas (simplificado): A la venta / Próximamente / Últimos / Agotado.
+const CAMPOS_EDITABLES = new Set(['nombre', 'titulo', 'fecha_inicio', 'ciudad', 'tipo', 'status', 'venue', 'music']);
+// Status de Esferas (simplificado): Disponible / Próximamente / Últimos / Agotado.
 const STATUS_PERMITIDOS = new Set(['', 'proximamente', 'ultimos', 'agotado']);
-const COLOR_PERMITIDOS = new Set(['azul', 'rojo', 'rosa', 'gris', 'verde', 'amarillo']);
 
 exports.handler = async (event) => {
   const __origin = corsCheck(event);
@@ -69,13 +68,6 @@ exports.handler = async (event) => {
   // status, si viene, debe estar permitido.
   if ('status' in sane && !STATUS_PERMITIDOS.has(sane.status)) {
     return { statusCode: 400, headers, body: JSON.stringify({ error: 'Status no permitido' }) };
-  }
-  // color, si viene: vacío → 'azul'; si no, debe estar permitido.
-  if ('color' in sane) {
-    if (!sane.color) sane.color = 'azul';
-    if (!COLOR_PERMITIDOS.has(sane.color)) {
-      return { statusCode: 400, headers, body: JSON.stringify({ error: 'Color no permitido' }) };
-    }
   }
   if (Object.keys(sane).length === 0) {
     return { statusCode: 400, headers, body: JSON.stringify({ error: 'No hay campos editables en el body' }) };

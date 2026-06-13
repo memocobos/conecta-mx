@@ -112,6 +112,37 @@ function zonasSegmento(esfera) {
   return seg;
 }
 
+// B2 — `pagos` (texto JSON desde la DB, o array) → filas {l, d} en orden.
+// Basura → []. Descarta filas sin label.
+function parsePagos(raw) {
+  let arr = raw;
+  if (typeof raw === 'string') {
+    try { arr = JSON.parse(raw); } catch (_) { return []; }
+  }
+  if (!Array.isArray(arr)) return [];
+  const out = [];
+  for (const p of arr) {
+    if (!p || typeof p !== 'object') continue;
+    const l = (typeof p.l === 'string' ? p.l : '').trim();
+    if (!l) continue;
+    const d = (typeof p.d === 'string' ? p.d : '').trim();
+    out.push({ l, d });
+  }
+  return out;
+}
+
+// B2 — emite "pagos:[{l,d,s},...]" byte-exacto en orden. `s` se DERIVA del label
+// (1 solo si l==='separo', case-insensitive). Sin pagos → "pagos:[]" byte-igual.
+function pagosSegmento(esfera) {
+  const rows = parsePagos(esfera.pagos);
+  if (!rows.length) return 'pagos:[]';
+  const items = rows.map((p) => {
+    const s = (p.l.trim().toLowerCase() === 'separo') ? 1 : 0;
+    return "{l:'" + escStr(p.l) + "',d:'" + escStr(p.d) + "',s:" + s + '}';
+  }).join(',');
+  return 'pagos:[' + items + ']';
+}
+
 // Display combinado para 2+ fechas (ya ordenadas y validadas 'YYYY-MM-DD').
 //   mismo mes y año  → "7, 9 y 10 may 2026"
 //   cruzan meses     → "30 nov y 2 dic 2026"  (mes en cada una, año una vez)
@@ -180,7 +211,7 @@ function generarObj(esfera, hoy) {
     "v:'" + venue +
     "',st:'" + escStr(status) +
     "'," + cdmx +
-    "inc:[],banco:BANCO_DEFAULT," + zonasSegmento(esfera) + ",hotel:[],pagos:[]}";
+    "inc:[],banco:BANCO_DEFAULT," + zonasSegmento(esfera) + ",hotel:[]," + pagosSegmento(esfera) + "}";
 }
 
 // ── Parsers de validación (idénticos a los consumidores) ──────────────────────

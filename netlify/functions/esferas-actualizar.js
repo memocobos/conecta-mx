@@ -21,7 +21,26 @@ const SB_URL = 'https://npgnhsmwpcipxgvfxrho.supabase.co';
 const SB_KEY = process.env.SUPABASE_SERVICE_KEY_KAMEHOUSE;
 
 // Whitelist EDITABLE. slug AUSENTE a propósito (identidad / PK, no se edita).
-const CAMPOS_EDITABLES = new Set(['nombre', 'titulo', 'fecha_inicio', 'ciudad', 'tipo', 'status', 'venue', 'music', 'fechas_extra', 'zonas']);
+const CAMPOS_EDITABLES = new Set(['nombre', 'titulo', 'fecha_inicio', 'ciudad', 'tipo', 'status', 'venue', 'music', 'fechas_extra', 'zonas', 'pagos']);
+
+// pagos (B2): JSON array de objetos {l,d}. Acepta array o string JSON. Saneo:
+// descarta filas sin label, trim. `s` NO se guarda (se deriva al compilar).
+// Basura o sin filas → null (limpia / cae a pagos:[]). Devuelve string JSON o null.
+function sanePagos(v) {
+  let arr = v;
+  if (typeof v === 'string') { try { arr = JSON.parse(v); } catch { return null; } }
+  if (!Array.isArray(arr)) return null;
+  const out = [];
+  for (const p of arr) {
+    if (!p || typeof p !== 'object') continue;
+    const l = (typeof p.l === 'string' ? p.l : '').trim();
+    if (!l) continue;
+    const d = (typeof p.d === 'string' ? p.d : '').trim();
+    out.push({ l, d });
+  }
+  if (!out.length) return null;
+  return JSON.stringify(out);
+}
 
 // zonas (B1): JSON array de objetos {n,p,pc?,vip,ag}. Acepta array o string
 // JSON. Saneo: descarta filas sin nombre, normaliza números/flags. Basura o
@@ -109,6 +128,7 @@ exports.handler = async (event) => {
     if (!CAMPOS_EDITABLES.has(k)) continue;
     if (k === 'fechas_extra') { sane[k] = saneFechasExtra(v); continue; }
     if (k === 'zonas') { sane[k] = saneZonas(v); continue; }
+    if (k === 'pagos') { sane[k] = sanePagos(v); continue; }
     if (v === null || v === '') sane[k] = (k === 'status') ? '' : null;
     else sane[k] = String(v);
   }

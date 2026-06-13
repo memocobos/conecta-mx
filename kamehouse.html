@@ -2881,6 +2881,12 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
      <div id="esf-music-chosen" style="font-size:11px;color:var(--green);margin-top:4px"></div>
      <div id="esf-music-results" style="margin-top:8px"></div>
     </div>
+    <div class="form-group">
+     <label>Zonas y precios</label>
+     <div id="esf-zonas"></div>
+     <button class="btn btn-ghost" type="button" onclick="_esfAddZona()" style="margin-top:8px">+ Agregar zona</button>
+     <div style="font-size:11px;color:var(--ts);margin-top:4px">El precio CHEAP es opcional. Si ninguna zona tiene CHEAP, el evento solo ofrece paquete PLUS.</div>
+    </div>
     <button class="btn btn-primary" id="esf-submit-btn" onclick="submitEsferaForm()">Crear evento</button>
     <button class="btn btn-ghost" id="esf-cancel-edit" style="margin-left:8px;display:none" onclick="cancelarEdicionEsfera()">Cancelar edición</button>
     <div id="esf-alert" style="margin-top:10px"></div>
@@ -12823,6 +12829,7 @@ async function crearEsferaEvento() {
     venue:        document.getElementById('esf-venue')?.value.trim() || null,
     music:        document.getElementById('esf-music')?.value.trim() || null,
     fechas_extra: _esfGetFechasExtra(),
+    zonas: _esfGetZonas(),
   };
   const alertEl = document.getElementById('esf-alert');
   try {
@@ -12837,6 +12844,7 @@ async function crearEsferaEvento() {
     setTimeout(()=>alertEl.innerHTML='', 2000);
     ['esf-slug','esf-nombre','esf-titulo','esf-fecha','esf-venue','esf-music'].forEach(id => { const el=document.getElementById(id); if (el) el.value=''; });
     _esfClearFechasExtra();
+    _esfClearZonas();
     const chosenEl = document.getElementById('esf-music-chosen'); if (chosenEl) chosenEl.textContent = '';
     const resEl = document.getElementById('esf-music-results'); if (resEl) resEl.innerHTML = '';
     loadEsferasEventos();
@@ -12917,6 +12925,66 @@ function _esfClearFechasExtra() {
   if (cont) cont.innerHTML = '';
 }
 
+// ── Zonas y precios (B1: zonas de venta, sin hotel/pagos) ────────────────────
+// Cada fila: [Nombre] [$ PLUS] [$ CHEAP opcional] [☐ VIP] [☐ Agotada] [✕].
+// El ORDEN de captura se respeta (es el orden del cotizador). Se guarda como
+// JSON en `zonas` (solo filas con nombre).
+function _esfAddZona(data) {
+  const cont = document.getElementById('esf-zonas');
+  if (!cont) return;
+  const d = data || {};
+  const row = document.createElement('div');
+  row.className = 'esf-zona-row';
+  row.style.cssText = 'display:flex;gap:6px;margin-top:6px;align-items:center;flex-wrap:wrap';
+  row.innerHTML =
+    '<input class="cot-input esf-zona-n" placeholder="Zona" style="flex:2;min-width:110px">' +
+    '<input class="cot-input esf-zona-p" type="number" min="0" placeholder="$ PLUS" style="flex:1;min-width:78px">' +
+    '<input class="cot-input esf-zona-pc" type="number" min="0" placeholder="$ CHEAP" style="flex:1;min-width:78px">' +
+    '<label style="font-size:11px;display:flex;align-items:center;gap:3px;white-space:nowrap"><input type="checkbox" class="esf-zona-vip">VIP</label>' +
+    '<label style="font-size:11px;display:flex;align-items:center;gap:3px;white-space:nowrap"><input type="checkbox" class="esf-zona-ag">Agotada</label>' +
+    '<button type="button" class="btn btn-ghost esf-zona-del" title="Quitar zona">✕</button>';
+  row.querySelector('.esf-zona-n').value = (typeof d.n === 'string') ? d.n : '';
+  if (d.p) row.querySelector('.esf-zona-p').value = d.p;
+  if (d.pc) row.querySelector('.esf-zona-pc').value = d.pc;
+  if (d.vip) row.querySelector('.esf-zona-vip').checked = true;
+  if (d.ag) row.querySelector('.esf-zona-ag').checked = true;
+  row.querySelectorAll('input').forEach((el) => {
+    el.addEventListener('input', renderEsferaPreview);
+    el.addEventListener('change', renderEsferaPreview);
+  });
+  row.querySelector('.esf-zona-del').onclick = () => { row.remove(); renderEsferaPreview(); };
+  cont.appendChild(row);
+  renderEsferaPreview();
+}
+
+function _esfGetZonas() {
+  return Array.from(document.querySelectorAll('#esf-zonas .esf-zona-row')).map((row) => {
+    const n = (row.querySelector('.esf-zona-n')?.value || '').trim();
+    const p = parseInt(row.querySelector('.esf-zona-p')?.value || '0', 10) || 0;
+    const pc = parseInt(row.querySelector('.esf-zona-pc')?.value || '0', 10) || 0;
+    const vip = row.querySelector('.esf-zona-vip')?.checked ? 1 : 0;
+    const ag = row.querySelector('.esf-zona-ag')?.checked ? 1 : 0;
+    return { n, p, pc, vip, ag };
+  }).filter((z) => z.n);
+}
+
+function _esfClearZonas() {
+  const cont = document.getElementById('esf-zonas');
+  if (cont) cont.innerHTML = '';
+}
+
+// minP del preview = espeja la card real del index: menor precio PLUS (p>0,
+// no agotada). 0 si no hay zonas vendibles.
+function _esfPreviewMinP() {
+  const avail = _esfGetZonas().filter((z) => !z.ag && z.p > 0);
+  if (!avail.length) return 0;
+  return Math.min.apply(null, avail.map((z) => z.p));
+}
+
+function _esfFmtMoney(n) {
+  return '$' + Math.round(n || 0).toLocaleString('es-MX');
+}
+
 function submitEsferaForm() {
   if (window._esfEditSlug) guardarCambiosEsfera();
   else crearEsferaEvento();
@@ -12937,6 +13005,11 @@ function editarEsfera(slug) {
   let _fe = row.fechas_extra;
   if (typeof _fe === 'string') { try { _fe = JSON.parse(_fe); } catch { _fe = []; } }
   if (Array.isArray(_fe)) _fe.forEach((d) => { if (typeof d === 'string') _esfAddFechaExtra(d); });
+  // Zonas: re-crear filas desde `zonas` (texto JSON o array).
+  _esfClearZonas();
+  let _zs = row.zonas;
+  if (typeof _zs === 'string') { try { _zs = JSON.parse(_zs); } catch { _zs = []; } }
+  if (Array.isArray(_zs)) _zs.forEach((z) => { if (z && typeof z === 'object') _esfAddZona(z); });
   _esfCiudadSet(row.ciudad || 'MTY');
   set('esf-tipo', row.tipo || 'concierto');
   set('esf-status', row.status || '');
@@ -12958,6 +13031,7 @@ function cancelarEdicionEsfera() {
   if (sEl) { sEl.readOnly = false; sEl.style.opacity = ''; sEl.value = ''; }
   ['esf-nombre','esf-titulo','esf-fecha','esf-venue','esf-music'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
   _esfClearFechasExtra();
+  _esfClearZonas();
   _esfCiudadSet('MTY');
   const tipo = document.getElementById('esf-tipo'); if (tipo) tipo.value = 'concierto';
   const status = document.getElementById('esf-status'); if (status) status.value = '';
@@ -12984,6 +13058,7 @@ async function guardarCambiosEsfera() {
     venue:        document.getElementById('esf-venue')?.value.trim() || null,
     music:        document.getElementById('esf-music')?.value.trim() || null,
     fechas_extra: _esfGetFechasExtra(),
+    zonas: _esfGetZonas(),
   };
   const alertEl = document.getElementById('esf-alert');
   try {
@@ -13068,15 +13143,18 @@ function _esfPreviewStatus(st) {
 let _esfPreviewImgTimer = null;
 const _esfPreviewImgCache = {}; // nombre → src|null (null = sin foto)
 
-// Zona inferior (.ev-bottom) tal como la arma el index según status. Los eventos
-// de Esferas no llevan precios (zonas:[]), así que los no-especiales muestran
+// Zona inferior (.ev-bottom) tal como la arma el index según status. Con zonas
+// con precio (desde>0) muestra "Desde $X" como la card real; sin zonas cae a
 // "Informes / Cotiza por WA". SOLO VISUAL en el preview (sin onclick).
-function _esfPreviewBottom(status) {
+function _esfPreviewBottom(status, desde) {
   if (status === 'proximamente') {
     return '<div class="ev-bottom"><div class="ev-prox-badge">AVÍSAME<span class="ev-prox-sub">Lista de espera</span></div></div>';
   }
   if (status === 'agotado' || status === 'proceso') {
     return ''; // el overlay cubre la card; el bottom real queda vacío
+  }
+  if (desde > 0) {
+    return '<div class="ev-bottom"><div><div class="ev-price-lbl">Desde</div><div class="ev-price">' + _esfFmtMoney(desde) + '</div></div><span class="ev-cta ev-cta-wa">WhatsApp</span></div>';
   }
   const cta = (status === 'por-confirmar') ? '' : '<span class="ev-cta ev-cta-wa">WhatsApp</span>';
   return '<div class="ev-bottom"><div><div class="ev-price-lbl">Informes</div><div class="ev-price-wa">Cotiza por WA</div></div>' + cta + '</div>';
@@ -13106,7 +13184,7 @@ function renderEsferaPreview() {
         `<div class="ev-fecha">${_esfEsc(fDisp)}</div>` +
         `<div class="ev-artist">${_esfEsc(titulo || nombre || 'Nombre del evento')}</div>` +
         `<div class="ev-venue">${_esfEsc(venue)}</div>` +
-      `</div>` + _esfPreviewBottom(status) + `</div>` +
+      `</div>` + _esfPreviewBottom(status, _esfPreviewMinP()) + `</div>` +
     `</div>`;
   // Foto: debounce 500ms; solo si el nombre aún no se consultó.
   if (nombre && cached === undefined) {

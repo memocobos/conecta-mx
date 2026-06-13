@@ -63,6 +63,55 @@ function parseFechasExtra(raw) {
   return out;
 }
 
+// B1 — `zonas` (texto JSON desde la DB, o array) → filas normalizadas en el
+// ORDEN capturado: {n, p, pc, vip, ag}. Basura → []. Descarta filas sin nombre.
+function parseZonas(raw) {
+  let arr = raw;
+  if (typeof raw === 'string') {
+    try { arr = JSON.parse(raw); } catch (_) { return []; }
+  }
+  if (!Array.isArray(arr)) return [];
+  const out = [];
+  for (const z of arr) {
+    if (!z || typeof z !== 'object') continue;
+    const n = (typeof z.n === 'string' ? z.n : '').trim();
+    if (!n) continue;
+    const p = Number(z.p);
+    const pc = Number(z.pc);
+    out.push({
+      n,
+      p: (Number.isFinite(p) && p > 0) ? Math.round(p) : 0,
+      pc: (Number.isFinite(pc) && pc > 0) ? Math.round(pc) : 0,
+      vip: (z.vip === 1 || z.vip === true || z.vip === '1') ? 1 : 0,
+      ag: (z.ag === 1 || z.ag === true || z.ag === '1') ? 1 : 0,
+    });
+  }
+  return out;
+}
+
+// B1 — emite el segmento "zonas:[...]" (+ ",cheapZonas:[...]" si alguna zona
+// tiene pc>0) byte-exacto: comillas simples, sin espacios, vip:1/ag:1 solo si
+// truthy. Sin zonas válidas → "zonas:[]" (byte-igual a hoy).
+function zonasSegmento(esfera) {
+  const rows = parseZonas(esfera.zonas);
+  if (!rows.length) return 'zonas:[]';
+  const plus = rows.map((z) =>
+    "{n:'" + escStr(z.n) + "',p:" + z.p + (z.vip ? ',vip:1' : '') + (z.ag ? ',ag:1' : '') + '}'
+  ).join(',');
+  let seg = 'zonas:[' + plus + ']';
+  // cheapZonas SOLO si alguna zona tiene precio cheap. Espeja TODAS las zonas:
+  // disponible (no ag y pc>0) → p:pc; el resto → p:0,ag:1 (patrón legacy).
+  if (rows.some((z) => z.pc > 0)) {
+    const cheap = rows.map((z) => {
+      const avail = !z.ag && z.pc > 0;
+      return "{n:'" + escStr(z.n) + "',p:" + (avail ? z.pc : 0) +
+        (z.vip ? ',vip:1' : '') + (avail ? '' : ',ag:1') + '}';
+    }).join(',');
+    seg += ',cheapZonas:[' + cheap + ']';
+  }
+  return seg;
+}
+
 // Display combinado para 2+ fechas (ya ordenadas y validadas 'YYYY-MM-DD').
 //   mismo mes y año  → "7, 9 y 10 may 2026"
 //   cruzan meses     → "30 nov y 2 dic 2026"  (mes en cada una, año una vez)
@@ -131,7 +180,7 @@ function generarObj(esfera, hoy) {
     "v:'" + venue +
     "',st:'" + escStr(status) +
     "'," + cdmx +
-    "inc:[],banco:BANCO_DEFAULT,zonas:[],hotel:[],pagos:[]}";
+    "inc:[],banco:BANCO_DEFAULT," + zonasSegmento(esfera) + ",hotel:[],pagos:[]}";
 }
 
 // ── Parsers de validación (idénticos a los consumidores) ──────────────────────

@@ -21,7 +21,31 @@ const SB_URL = 'https://npgnhsmwpcipxgvfxrho.supabase.co';
 const SB_KEY = process.env.SUPABASE_SERVICE_KEY_KAMEHOUSE;
 
 // Whitelist EDITABLE. slug AUSENTE a propósito (identidad / PK, no se edita).
-const CAMPOS_EDITABLES = new Set(['nombre', 'titulo', 'fecha_inicio', 'ciudad', 'tipo', 'status', 'venue', 'music', 'fechas_extra']);
+const CAMPOS_EDITABLES = new Set(['nombre', 'titulo', 'fecha_inicio', 'ciudad', 'tipo', 'status', 'venue', 'music', 'fechas_extra', 'zonas']);
+
+// zonas (B1): JSON array de objetos {n,p,pc?,vip,ag}. Acepta array o string
+// JSON. Saneo: descarta filas sin nombre, normaliza números/flags. Basura o
+// sin filas → null (limpia / cae a evento sin zonas). Devuelve string JSON o null.
+function saneZonas(v) {
+  let arr = v;
+  if (typeof v === 'string') { try { arr = JSON.parse(v); } catch { return null; } }
+  if (!Array.isArray(arr)) return null;
+  const out = [];
+  for (const z of arr) {
+    if (!z || typeof z !== 'object') continue;
+    const n = (typeof z.n === 'string' ? z.n : '').trim();
+    if (!n) continue;
+    const p = Number(z.p);
+    const pc = Number(z.pc);
+    const row = { n, p: (Number.isFinite(p) && p > 0) ? Math.round(p) : 0 };
+    if (Number.isFinite(pc) && pc > 0) row.pc = Math.round(pc);
+    if (z.vip === 1 || z.vip === true || z.vip === '1') row.vip = 1;
+    if (z.ag === 1 || z.ag === true || z.ag === '1') row.ag = 1;
+    out.push(row);
+  }
+  if (!out.length) return null;
+  return JSON.stringify(out);
+}
 
 // fechas_extra: JSON array de fechas ADICIONALES 'YYYY-MM-DD' (multifecha-ficha).
 // Acepta array o string JSON. Saneo: descarta no-fechas, dedupe, ordena. Si no
@@ -84,6 +108,7 @@ exports.handler = async (event) => {
   for (const [k, v] of Object.entries(body)) {
     if (!CAMPOS_EDITABLES.has(k)) continue;
     if (k === 'fechas_extra') { sane[k] = saneFechasExtra(v); continue; }
+    if (k === 'zonas') { sane[k] = saneZonas(v); continue; }
     if (v === null || v === '') sane[k] = (k === 'status') ? '' : null;
     else sane[k] = String(v);
   }

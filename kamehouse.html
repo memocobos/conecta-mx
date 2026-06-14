@@ -2893,6 +2893,19 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
      <button class="btn btn-ghost" type="button" onclick="_esfAddPago()" style="margin-top:8px">+ Agregar pago</button>
      <div style="font-size:11px;color:var(--ts);margin-top:4px">Orden = calendario de quincenas. El "Separo" (Hoy) es el apartado inicial.</div>
     </div>
+    <div class="form-group">
+     <label>Hotel</label>
+     <label style="display:flex;align-items:center;gap:8px;font-size:12px;cursor:pointer">
+      <input type="checkbox" id="esf-hotel-custom" onchange="_esfHotelToggle()"> Personalizar hotel de este evento
+     </label>
+     <div id="esf-hotel-off" style="font-size:11px;color:var(--ts);margin-top:4px">Usa el hotel estándar de la ciudad.</div>
+     <div id="esf-hotel-on" style="display:none;margin-top:8px">
+      <label style="font-size:11px">Costo total de la habitación</label>
+      <input class="cot-input" type="number" min="0" id="esf-hotel-total" placeholder="ej. 2600" oninput="_esfHotelRecalc()" style="width:100%">
+      <div id="esf-hotel-items" style="margin-top:8px"></div>
+      <div style="font-size:11px;color:var(--ts);margin-top:4px">Extras POR PERSONA (ya descuentan el lugar del PLUS). Se calculan solos; puedes ajustar cualquiera a mano.</div>
+     </div>
+    </div>
     <button class="btn btn-primary" id="esf-submit-btn" onclick="submitEsferaForm()">Crear evento</button>
     <button class="btn btn-ghost" id="esf-cancel-edit" style="margin-left:8px;display:none" onclick="cancelarEdicionEsfera()">Cancelar edición</button>
     <div id="esf-alert" style="margin-top:10px"></div>
@@ -12837,6 +12850,7 @@ async function crearEsferaEvento() {
     fechas_extra: _esfGetFechasExtra(),
     zonas: _esfGetZonas(),
     pagos: _esfGetPagos(),
+    hotel: _esfGetHotel(),
   };
   const alertEl = document.getElementById('esf-alert');
   try {
@@ -12853,6 +12867,7 @@ async function crearEsferaEvento() {
     _esfClearFechasExtra();
     _esfClearZonas();
     _esfSeedPagosDefault();
+    _esfClearHotel();
     const chosenEl = document.getElementById('esf-music-chosen'); if (chosenEl) chosenEl.textContent = '';
     const resEl = document.getElementById('esf-music-results'); if (resEl) resEl.innerHTML = '';
     loadEsferasEventos();
@@ -13022,6 +13037,94 @@ function _esfSeedPagosDefault() {
   _esfAddPago({ l: 'Pago 1', d: '' });
 }
 
+// ── Hotel custom (B2b) ───────────────────────────────────────────────────────
+// Toggle apagado → default de ciudad (no se captura nada). Encendido → costo
+// total + 4 tipos FIJOS con su viaj interno; el extra POR PERSONA se autocalcula
+// con la fórmula (base=total/4; extra=ceil((4-pers)*base/pers)) y es editable.
+const _ESF_HOTEL_TIPOS = [
+  { n: 'Compartida', pers: 4, viaj: [1, 2, 3, 4] },
+  { n: 'Individual', pers: 1, viaj: [1] },
+  { n: 'Doble', pers: 2, viaj: [2] },
+  { n: 'Triple', pers: 3, viaj: [3] },
+];
+function _esfHotelExtra(total, pers) {
+  const base = (total || 0) / 4;
+  return Math.ceil((4 - pers) * base / pers);
+}
+function _esfHotelRenderRows() {
+  const cont = document.getElementById('esf-hotel-items');
+  if (!cont) return;
+  cont.innerHTML = '';
+  _ESF_HOTEL_TIPOS.forEach((t) => {
+    const row = document.createElement('div');
+    row.className = 'esf-hotel-row';
+    row.dataset.n = t.n;
+    row.dataset.viaj = t.viaj.join(',');
+    row.style.cssText = 'display:flex;gap:8px;margin-top:6px;align-items:center';
+    row.innerHTML =
+      '<div style="flex:1;font-size:12px">' + t.n + ' <span style="color:var(--ts)">(' + t.pers + 'p)</span></div>' +
+      '<input class="cot-input esf-hotel-e" type="number" min="0" style="flex:0 0 120px" placeholder="$ por persona">';
+    cont.appendChild(row);
+  });
+}
+// Recalcula los 4 extras desde el costo total (sobrescribe — incluidos ajustes
+// manuales; ese es el único momento en que se reescriben, como pide el spec).
+function _esfHotelRecalc() {
+  const total = parseInt(document.getElementById('esf-hotel-total')?.value || '0', 10) || 0;
+  document.querySelectorAll('#esf-hotel-items .esf-hotel-row').forEach((row) => {
+    const t = _ESF_HOTEL_TIPOS.find((x) => x.n === row.dataset.n);
+    row.querySelector('.esf-hotel-e').value = _esfHotelExtra(total, t ? t.pers : 4);
+  });
+}
+function _esfHotelToggle() {
+  const on = !!document.getElementById('esf-hotel-custom')?.checked;
+  const onBox = document.getElementById('esf-hotel-on');
+  const offBox = document.getElementById('esf-hotel-off');
+  if (onBox) onBox.style.display = on ? '' : 'none';
+  if (offBox) offBox.style.display = on ? 'none' : '';
+  if (on && !document.querySelector('#esf-hotel-items .esf-hotel-row')) {
+    _esfHotelRenderRows();
+    _esfHotelRecalc();
+  }
+}
+// Devuelve el objeto {custom,total,items} o null (toggle apagado = default ciudad).
+function _esfGetHotel() {
+  if (!document.getElementById('esf-hotel-custom')?.checked) return null;
+  const total = parseInt(document.getElementById('esf-hotel-total')?.value || '0', 10) || 0;
+  const items = Array.from(document.querySelectorAll('#esf-hotel-items .esf-hotel-row')).map((row) => ({
+    n: row.dataset.n,
+    e: parseInt(row.querySelector('.esf-hotel-e')?.value || '0', 10) || 0,
+    viaj: row.dataset.viaj.split(',').map((x) => parseInt(x, 10)).filter((x) => !isNaN(x)),
+  }));
+  return { custom: true, total, items };
+}
+function _esfClearHotel() {
+  const chk = document.getElementById('esf-hotel-custom');
+  if (chk) chk.checked = false;
+  const total = document.getElementById('esf-hotel-total');
+  if (total) total.value = '';
+  const items = document.getElementById('esf-hotel-items');
+  if (items) items.innerHTML = '';
+  _esfHotelToggle();
+}
+// Re-poblar en modo editar desde `hotel` (texto JSON u objeto). custom:false → off.
+function _esfHotelPopulate(raw) {
+  _esfClearHotel();
+  let h = raw;
+  if (typeof h === 'string') { try { h = JSON.parse(h); } catch { h = null; } }
+  if (!h || !h.custom || !Array.isArray(h.items) || !h.items.length) return;
+  const chk = document.getElementById('esf-hotel-custom');
+  if (chk) chk.checked = true;
+  _esfHotelToggle();              // muestra el panel y crea las 4 filas
+  const totalEl = document.getElementById('esf-hotel-total');
+  if (totalEl) totalEl.value = (h.total != null) ? h.total : '';
+  const byName = {};
+  h.items.forEach((it) => { if (it && typeof it.n === 'string') byName[it.n.trim()] = it.e; });
+  document.querySelectorAll('#esf-hotel-items .esf-hotel-row').forEach((row) => {
+    if (byName[row.dataset.n] != null) row.querySelector('.esf-hotel-e').value = byName[row.dataset.n];
+  });
+}
+
 // minP del preview = espeja la card real del index: menor precio PLUS (p>0,
 // no agotada). 0 si no hay zonas vendibles.
 function _esfPreviewMinP() {
@@ -13064,6 +13167,8 @@ function editarEsfera(slug) {
   let _pg = row.pagos;
   if (typeof _pg === 'string') { try { _pg = JSON.parse(_pg); } catch { _pg = []; } }
   if (Array.isArray(_pg)) _pg.forEach((p) => { if (p && typeof p === 'object') _esfAddPago(p); });
+  // Hotel custom: re-poblar desde `hotel` (texto JSON u objeto); custom:false → off.
+  _esfHotelPopulate(row.hotel);
   _esfCiudadSet(row.ciudad || 'MTY');
   set('esf-tipo', row.tipo || 'concierto');
   set('esf-status', row.status || '');
@@ -13087,6 +13192,7 @@ function cancelarEdicionEsfera() {
   _esfClearFechasExtra();
   _esfClearZonas();
   _esfSeedPagosDefault();
+  _esfClearHotel();
   _esfCiudadSet('MTY');
   const tipo = document.getElementById('esf-tipo'); if (tipo) tipo.value = 'concierto';
   const status = document.getElementById('esf-status'); if (status) status.value = '';
@@ -13115,6 +13221,7 @@ async function guardarCambiosEsfera() {
     fechas_extra: _esfGetFechasExtra(),
     zonas: _esfGetZonas(),
     pagos: _esfGetPagos(),
+    hotel: _esfGetHotel(),
   };
   const alertEl = document.getElementById('esf-alert');
   try {

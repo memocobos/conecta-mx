@@ -143,6 +143,44 @@ function pagosSegmento(esfera) {
   return 'pagos:[' + items + ']';
 }
 
+// B2b — `hotel` (texto JSON o objeto). Solo si {custom:true, items:[...]} →
+// filas {n, e(POR PERSONA), viaj}. Sin custom / basura / sin items → null
+// (el evento usa el default de ciudad, sin override).
+function parseHotel(raw) {
+  let obj = raw;
+  if (typeof raw === 'string') {
+    try { obj = JSON.parse(raw); } catch (_) { return null; }
+  }
+  if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return null;
+  if (!obj.custom || !Array.isArray(obj.items)) return null;
+  const items = [];
+  for (const it of obj.items) {
+    if (!it || typeof it !== 'object') continue;
+    const n = (typeof it.n === 'string' ? it.n : '').trim();
+    if (!n) continue;
+    const e = Number(it.e);
+    const viaj = Array.isArray(it.viaj)
+      ? it.viaj.map((x) => parseInt(x, 10)).filter((x) => Number.isInteger(x) && x >= 1 && x <= 4)
+      : [];
+    items.push({ n, e: (Number.isFinite(e) && e > 0) ? Math.round(e) : 0, viaj });
+  }
+  if (!items.length) return null;
+  return items;
+}
+
+// B2b — emite el segmento de hotel. Sin custom → "hotel:[]" byte-igual a hoy
+// (default de ciudad). Con custom → "hotelOverride:true,hotelPP:true,hotel:[...]"
+// byte-exacto (e POR PERSONA, viaj sin espacios).
+function hotelSegmento(esfera) {
+  const items = parseHotel(esfera.hotel);
+  if (!items) return 'hotel:[]';
+  const arr = items.map((it) => {
+    const viajStr = it.viaj.length ? (',viaj:[' + it.viaj.join(',') + ']') : '';
+    return "{n:'" + escStr(it.n) + "',e:" + it.e + viajStr + '}';
+  }).join(',');
+  return 'hotelOverride:true,hotelPP:true,hotel:[' + arr + ']';
+}
+
 // Display combinado para 2+ fechas (ya ordenadas y validadas 'YYYY-MM-DD').
 //   mismo mes y año  → "7, 9 y 10 may 2026"
 //   cruzan meses     → "30 nov y 2 dic 2026"  (mes en cada una, año una vez)
@@ -211,7 +249,7 @@ function generarObj(esfera, hoy) {
     "v:'" + venue +
     "',st:'" + escStr(status) +
     "'," + cdmx +
-    "inc:[],banco:BANCO_DEFAULT," + zonasSegmento(esfera) + ",hotel:[]," + pagosSegmento(esfera) + "}";
+    "inc:[],banco:BANCO_DEFAULT," + zonasSegmento(esfera) + "," + hotelSegmento(esfera) + "," + pagosSegmento(esfera) + "}";
 }
 
 // ── Parsers de validación (idénticos a los consumidores) ──────────────────────

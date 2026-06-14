@@ -1,0 +1,21 @@
+-- =============================================================================
+-- Esferas del Dragón — ETAPA B2b (HOTEL CUSTOM): hotel por evento cuando el
+-- costo difiere del estándar de ciudad. Agrega la columna `hotel`.
+--
+-- JSON objeto:
+--   {"custom":true,"total":2600,"items":[
+--     {"n":"Compartida","e":0,"viaj":[1,2,3,4]},
+--     {"n":"Individual","e":1950,"viaj":[1]},
+--     {"n":"Doble","e":650,"viaj":[2]},
+--     {"n":"Triple","e":217,"viaj":[3]}]}
+--   custom:false / ausente → usar el default de ciudad (HOTEL_MTY/CDM), sin override.
+--
+-- `e` = EXTRA POR PERSONA (ya descuenta el lugar del PLUS). El compilador emite
+-- hotelOverride:true,hotelPP:true (el costo NO se vuelve a dividir).
+-- Fórmula: base=total/4; extra = ceil((4-pers)*base/pers) por tipo.
+--
+-- Ejecuta una sola vez en Supabase (SQL editor). Idempotente.
+-- =============================================================================
+
+ALTER TABLE esferas_eventos ADD COLUMN IF NOT EXISTS hotel text;
+-- JSON {custom,total,items[{n,e,viaj}]} del hotel custom; ausente = default ciudad.

@@ -26,8 +26,32 @@ const SB_KEY = process.env.SUPABASE_SERVICE_KEY_KAMEHOUSE;
 // Whitelist estricta. 'publicado' deliberadamente AUSENTE: queda en su default DB.
 const CAMPOS_PERMITIDOS = new Set([
   'slug', 'nombre', 'titulo', 'fecha_inicio', 'ciudad', 'tipo', 'status',
-  'venue', 'music', 'fechas_extra', 'zonas', 'pagos',
+  'venue', 'music', 'fechas_extra', 'zonas', 'pagos', 'hotel',
 ]);
+
+// hotel (B2b): JSON {custom, total, items:[{n,e,viaj}]}. `e` = extra POR PERSONA.
+// Si custom falso / sin items válidos → null (cae a default de ciudad). Devuelve
+// string JSON {custom:true,total,items} o null.
+function saneHotel(v) {
+  let obj = v;
+  if (typeof v === 'string') { try { obj = JSON.parse(v); } catch { return null; } }
+  if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return null;
+  if (!obj.custom || !Array.isArray(obj.items)) return null;
+  const items = [];
+  for (const it of obj.items) {
+    if (!it || typeof it !== 'object') continue;
+    const n = (typeof it.n === 'string' ? it.n : '').trim();
+    if (!n) continue;
+    const e = Number(it.e);
+    const viaj = Array.isArray(it.viaj)
+      ? it.viaj.map((x) => parseInt(x, 10)).filter((x) => Number.isInteger(x) && x >= 1 && x <= 4)
+      : [];
+    items.push({ n, e: (Number.isFinite(e) && e > 0) ? Math.round(e) : 0, viaj });
+  }
+  if (!items.length) return null;
+  const total = Number(obj.total);
+  return JSON.stringify({ custom: true, total: (Number.isFinite(total) && total > 0) ? Math.round(total) : 0, items });
+}
 
 // pagos (B2): JSON array de objetos {l,d}. Acepta array o string JSON. Saneo:
 // descarta filas sin label, trim. `s` NO se guarda (se deriva al compilar).
@@ -136,6 +160,7 @@ exports.handler = async (event) => {
     if (k === 'fechas_extra') { sane[k] = saneFechasExtra(v); continue; }
     if (k === 'zonas') { sane[k] = saneZonas(v); continue; }
     if (k === 'pagos') { sane[k] = sanePagos(v); continue; }
+    if (k === 'hotel') { sane[k] = saneHotel(v); continue; }
     if (v === null || v === '') sane[k] = (k === 'status') ? '' : null;
     else sane[k] = String(v);
   }

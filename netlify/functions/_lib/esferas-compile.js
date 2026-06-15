@@ -64,7 +64,8 @@ function parseFechasExtra(raw) {
 }
 
 // B1 — `zonas` (texto JSON desde la DB, o array) → filas normalizadas en el
-// ORDEN capturado: {n, p, pc, vip, ag}. Basura → []. Descarta filas sin nombre.
+// ORDEN capturado: {n, p, pc, ag}. Basura → []. Descarta filas sin nombre.
+// (VIP eliminado: ya no se captura ni se emite.)
 function parseZonas(raw) {
   let arr = raw;
   if (typeof raw === 'string') {
@@ -82,7 +83,6 @@ function parseZonas(raw) {
       n,
       p: (Number.isFinite(p) && p > 0) ? Math.round(p) : 0,
       pc: (Number.isFinite(pc) && pc > 0) ? Math.round(pc) : 0,
-      vip: (z.vip === 1 || z.vip === true || z.vip === '1') ? 1 : 0,
       ag: (z.ag === 1 || z.ag === true || z.ag === '1') ? 1 : 0,
     });
   }
@@ -90,13 +90,13 @@ function parseZonas(raw) {
 }
 
 // B1 — emite el segmento "zonas:[...]" (+ ",cheapZonas:[...]" si alguna zona
-// tiene pc>0) byte-exacto: comillas simples, sin espacios, vip:1/ag:1 solo si
-// truthy. Sin zonas válidas → "zonas:[]" (byte-igual a hoy).
+// tiene pc>0) byte-exacto: comillas simples, sin espacios, ag:1 solo si truthy.
+// Sin zonas válidas → "zonas:[]" (byte-igual a hoy). NO emite vip nunca.
 function zonasSegmento(esfera) {
   const rows = parseZonas(esfera.zonas);
   if (!rows.length) return 'zonas:[]';
   const plus = rows.map((z) =>
-    "{n:'" + escStr(z.n) + "',p:" + z.p + (z.vip ? ',vip:1' : '') + (z.ag ? ',ag:1' : '') + '}'
+    "{n:'" + escStr(z.n) + "',p:" + z.p + (z.ag ? ',ag:1' : '') + '}'
   ).join(',');
   let seg = 'zonas:[' + plus + ']';
   // cheapZonas SOLO si alguna zona tiene precio cheap. Espeja TODAS las zonas:
@@ -105,42 +105,19 @@ function zonasSegmento(esfera) {
     const cheap = rows.map((z) => {
       const avail = !z.ag && z.pc > 0;
       return "{n:'" + escStr(z.n) + "',p:" + (avail ? z.pc : 0) +
-        (z.vip ? ',vip:1' : '') + (avail ? '' : ',ag:1') + '}';
+        (avail ? '' : ',ag:1') + '}';
     }).join(',');
     seg += ',cheapZonas:[' + cheap + ']';
   }
   return seg;
 }
 
-// B2 — `pagos` (texto JSON desde la DB, o array) → filas {l, d} en orden.
-// Basura → []. Descarta filas sin label.
-function parsePagos(raw) {
-  let arr = raw;
-  if (typeof raw === 'string') {
-    try { arr = JSON.parse(raw); } catch (_) { return []; }
-  }
-  if (!Array.isArray(arr)) return [];
-  const out = [];
-  for (const p of arr) {
-    if (!p || typeof p !== 'object') continue;
-    const l = (typeof p.l === 'string' ? p.l : '').trim();
-    if (!l) continue;
-    const d = (typeof p.d === 'string' ? p.d : '').trim();
-    out.push({ l, d });
-  }
-  return out;
-}
-
-// B2 — emite "pagos:[{l,d,s},...]" byte-exacto en orden. `s` se DERIVA del label
-// (1 solo si l==='separo', case-insensitive). Sin pagos → "pagos:[]" byte-igual.
-function pagosSegmento(esfera) {
-  const rows = parsePagos(esfera.pagos);
-  if (!rows.length) return 'pagos:[]';
-  const items = rows.map((p) => {
-    const s = (p.l.trim().toLowerCase() === 'separo') ? 1 : 0;
-    return "{l:'" + escStr(p.l) + "',d:'" + escStr(p.d) + "',s:" + s + '}';
-  }).join(',');
-  return 'pagos:[' + items + ']';
+// B2 — el plan de pagos es AUTOMÁTICO en index.html (getQuincenas arma Separo +
+// Pago 1..N por quincenas). El campo `pagos` del EV es dato muerto: ningún render
+// lo lee. Por eso SIEMPRE emitimos "pagos:[]" (byte-igual a un evento sin pagos).
+// No se captura ni se compila plan custom.
+function pagosSegmento() {
+  return 'pagos:[]';
 }
 
 // B2b — `hotel` (texto JSON o objeto). Solo si {custom:true, items:[...]} →
@@ -249,7 +226,7 @@ function generarObj(esfera, hoy) {
     "v:'" + venue +
     "',st:'" + escStr(status) +
     "'," + cdmx +
-    "inc:[],banco:BANCO_DEFAULT," + zonasSegmento(esfera) + "," + hotelSegmento(esfera) + "," + pagosSegmento(esfera) + "}";
+    "inc:[],banco:BANCO_DEFAULT," + zonasSegmento(esfera) + "," + hotelSegmento(esfera) + "," + pagosSegmento() + "}";
 }
 
 // ── Parsers de validación (idénticos a los consumidores) ──────────────────────

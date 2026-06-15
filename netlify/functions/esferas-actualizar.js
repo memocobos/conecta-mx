@@ -21,7 +21,7 @@ const SB_URL = 'https://npgnhsmwpcipxgvfxrho.supabase.co';
 const SB_KEY = process.env.SUPABASE_SERVICE_KEY_KAMEHOUSE;
 
 // Whitelist EDITABLE. slug AUSENTE a propósito (identidad / PK, no se edita).
-const CAMPOS_EDITABLES = new Set(['nombre', 'titulo', 'fecha_inicio', 'ciudad', 'tipo', 'status', 'venue', 'music', 'fechas_extra', 'zonas', 'pagos', 'hotel']);
+const CAMPOS_EDITABLES = new Set(['nombre', 'titulo', 'fecha_inicio', 'ciudad', 'tipo', 'status', 'venue', 'music', 'fechas_extra', 'zonas', 'hotel']);
 
 // hotel (B2b): JSON {custom, total, items:[{n,e,viaj}]}. `e` = extra POR PERSONA.
 // Si custom falso / sin items válidos → null (limpia / cae a default de ciudad).
@@ -46,28 +46,10 @@ function saneHotel(v) {
   return JSON.stringify({ custom: true, total: (Number.isFinite(total) && total > 0) ? Math.round(total) : 0, items });
 }
 
-// pagos (B2): JSON array de objetos {l,d}. Acepta array o string JSON. Saneo:
-// descarta filas sin label, trim. `s` NO se guarda (se deriva al compilar).
-// Basura o sin filas → null (limpia / cae a pagos:[]). Devuelve string JSON o null.
-function sanePagos(v) {
-  let arr = v;
-  if (typeof v === 'string') { try { arr = JSON.parse(v); } catch { return null; } }
-  if (!Array.isArray(arr)) return null;
-  const out = [];
-  for (const p of arr) {
-    if (!p || typeof p !== 'object') continue;
-    const l = (typeof p.l === 'string' ? p.l : '').trim();
-    if (!l) continue;
-    const d = (typeof p.d === 'string' ? p.d : '').trim();
-    out.push({ l, d });
-  }
-  if (!out.length) return null;
-  return JSON.stringify(out);
-}
-
-// zonas (B1): JSON array de objetos {n,p,pc?,vip,ag}. Acepta array o string
+// zonas (B1): JSON array de objetos {n,p,pc?,ag}. Acepta array o string
 // JSON. Saneo: descarta filas sin nombre, normaliza números/flags. Basura o
 // sin filas → null (limpia / cae a evento sin zonas). Devuelve string JSON o null.
+// (VIP ignorado si llega: ya no se usa.)
 function saneZonas(v) {
   let arr = v;
   if (typeof v === 'string') { try { arr = JSON.parse(v); } catch { return null; } }
@@ -81,7 +63,6 @@ function saneZonas(v) {
     const pc = Number(z.pc);
     const row = { n, p: (Number.isFinite(p) && p > 0) ? Math.round(p) : 0 };
     if (Number.isFinite(pc) && pc > 0) row.pc = Math.round(pc);
-    if (z.vip === 1 || z.vip === true || z.vip === '1') row.vip = 1;
     if (z.ag === 1 || z.ag === true || z.ag === '1') row.ag = 1;
     out.push(row);
   }
@@ -151,7 +132,6 @@ exports.handler = async (event) => {
     if (!CAMPOS_EDITABLES.has(k)) continue;
     if (k === 'fechas_extra') { sane[k] = saneFechasExtra(v); continue; }
     if (k === 'zonas') { sane[k] = saneZonas(v); continue; }
-    if (k === 'pagos') { sane[k] = sanePagos(v); continue; }
     if (k === 'hotel') { sane[k] = saneHotel(v); continue; }
     if (v === null || v === '') sane[k] = (k === 'status') ? '' : null;
     else sane[k] = String(v);

@@ -2888,12 +2888,6 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
      <div style="font-size:11px;color:var(--ts);margin-top:4px">El precio CHEAP es opcional. Si ninguna zona tiene CHEAP, el evento solo ofrece paquete PLUS.</div>
     </div>
     <div class="form-group">
-     <label>Plan de pagos</label>
-     <div id="esf-pagos"></div>
-     <button class="btn btn-ghost" type="button" onclick="_esfAddPago()" style="margin-top:8px">+ Agregar pago</button>
-     <div style="font-size:11px;color:var(--ts);margin-top:4px">Orden = calendario de quincenas. El "Separo" (Hoy) es el apartado inicial.</div>
-    </div>
-    <div class="form-group">
      <label>Hotel</label>
      <label style="display:flex;align-items:center;gap:8px;font-size:12px;cursor:pointer">
       <input type="checkbox" id="esf-hotel-custom" onchange="_esfHotelToggle()"> Personalizar hotel de este evento
@@ -12849,7 +12843,6 @@ async function crearEsferaEvento() {
     music:        document.getElementById('esf-music')?.value.trim() || null,
     fechas_extra: _esfGetFechasExtra(),
     zonas: _esfGetZonas(),
-    pagos: _esfGetPagos(),
     hotel: _esfGetHotel(),
   };
   const alertEl = document.getElementById('esf-alert');
@@ -12866,7 +12859,6 @@ async function crearEsferaEvento() {
     ['esf-slug','esf-nombre','esf-titulo','esf-fecha','esf-venue','esf-music'].forEach(id => { const el=document.getElementById(id); if (el) el.value=''; });
     _esfClearFechasExtra();
     _esfClearZonas();
-    _esfSeedPagosDefault();
     _esfClearHotel();
     const chosenEl = document.getElementById('esf-music-chosen'); if (chosenEl) chosenEl.textContent = '';
     const resEl = document.getElementById('esf-music-results'); if (resEl) resEl.innerHTML = '';
@@ -12949,7 +12941,7 @@ function _esfClearFechasExtra() {
 }
 
 // ── Zonas y precios (B1: zonas de venta, sin hotel/pagos) ────────────────────
-// Cada fila: [Nombre] [$ PLUS] [$ CHEAP opcional] [☐ VIP] [☐ Agotada] [✕].
+// Cada fila: [Nombre] [$ PLUS] [$ CHEAP opcional] [☐ Agotada] [✕].
 // El ORDEN de captura se respeta (es el orden del cotizador). Se guarda como
 // JSON en `zonas` (solo filas con nombre).
 function _esfAddZona(data) {
@@ -12963,13 +12955,11 @@ function _esfAddZona(data) {
     '<input class="cot-input esf-zona-n" placeholder="Zona" style="flex:2;min-width:110px">' +
     '<input class="cot-input esf-zona-p" type="number" min="0" placeholder="$ PLUS" style="flex:1;min-width:78px">' +
     '<input class="cot-input esf-zona-pc" type="number" min="0" placeholder="$ CHEAP" style="flex:1;min-width:78px">' +
-    '<label style="font-size:11px;display:flex;align-items:center;gap:3px;white-space:nowrap"><input type="checkbox" class="esf-zona-vip">VIP</label>' +
     '<label style="font-size:11px;display:flex;align-items:center;gap:3px;white-space:nowrap"><input type="checkbox" class="esf-zona-ag">Agotada</label>' +
     '<button type="button" class="btn btn-ghost esf-zona-del" title="Quitar zona">✕</button>';
   row.querySelector('.esf-zona-n').value = (typeof d.n === 'string') ? d.n : '';
   if (d.p) row.querySelector('.esf-zona-p').value = d.p;
   if (d.pc) row.querySelector('.esf-zona-pc').value = d.pc;
-  if (d.vip) row.querySelector('.esf-zona-vip').checked = true;
   if (d.ag) row.querySelector('.esf-zona-ag').checked = true;
   row.querySelectorAll('input').forEach((el) => {
     el.addEventListener('input', renderEsferaPreview);
@@ -12985,56 +12975,14 @@ function _esfGetZonas() {
     const n = (row.querySelector('.esf-zona-n')?.value || '').trim();
     const p = parseInt(row.querySelector('.esf-zona-p')?.value || '0', 10) || 0;
     const pc = parseInt(row.querySelector('.esf-zona-pc')?.value || '0', 10) || 0;
-    const vip = row.querySelector('.esf-zona-vip')?.checked ? 1 : 0;
     const ag = row.querySelector('.esf-zona-ag')?.checked ? 1 : 0;
-    return { n, p, pc, vip, ag };
+    return { n, p, pc, ag };
   }).filter((z) => z.n);
 }
 
 function _esfClearZonas() {
   const cont = document.getElementById('esf-zonas');
   if (cont) cont.innerHTML = '';
-}
-
-// ── Plan de pagos (B2: calendario de quincenas) ──────────────────────────────
-// Cada fila: [Label (Separo, Pago 1…)] [Fechas texto libre] [✕]. El ORDEN se
-// respeta. Se guarda como JSON [{l,d}] en `pagos`; `s` se deriva del label al
-// compilar (Separo → s:1). Reusa el patrón de modal-evento (sin tocarlo).
-function _esfAddPago(data) {
-  const cont = document.getElementById('esf-pagos');
-  if (!cont) return;
-  const d = data || {};
-  const row = document.createElement('div');
-  row.className = 'esf-pago-row';
-  row.style.cssText = 'display:flex;gap:6px;margin-top:6px;align-items:center';
-  row.innerHTML =
-    '<input class="cot-input esf-pago-l" placeholder="Label (ej. Separo, Pago 1)" style="flex:1;min-width:110px">' +
-    '<input class="cot-input esf-pago-d" placeholder="Fechas (ej. 9-16 abr)" style="flex:2;min-width:120px">' +
-    '<button type="button" class="btn btn-ghost esf-pago-del" title="Quitar pago">✕</button>';
-  row.querySelector('.esf-pago-l').value = (typeof d.l === 'string') ? d.l : '';
-  row.querySelector('.esf-pago-d').value = (typeof d.d === 'string') ? d.d : '';
-  row.querySelector('.esf-pago-del').onclick = () => { row.remove(); };
-  cont.appendChild(row);
-}
-
-function _esfGetPagos() {
-  return Array.from(document.querySelectorAll('#esf-pagos .esf-pago-row')).map((row) => {
-    const l = (row.querySelector('.esf-pago-l')?.value || '').trim();
-    const d = (row.querySelector('.esf-pago-d')?.value || '').trim();
-    return { l, d };
-  }).filter((p) => p.l);
-}
-
-function _esfClearPagos() {
-  const cont = document.getElementById('esf-pagos');
-  if (cont) cont.innerHTML = '';
-}
-
-// Estado "nuevo evento": pre-carga Separo (Hoy) + Pago 1 (sin fecha).
-function _esfSeedPagosDefault() {
-  _esfClearPagos();
-  _esfAddPago({ l: 'Separo', d: 'Hoy' });
-  _esfAddPago({ l: 'Pago 1', d: '' });
 }
 
 // ── Hotel custom (B2b) ───────────────────────────────────────────────────────
@@ -13162,11 +13110,6 @@ function editarEsfera(slug) {
   let _zs = row.zonas;
   if (typeof _zs === 'string') { try { _zs = JSON.parse(_zs); } catch { _zs = []; } }
   if (Array.isArray(_zs)) _zs.forEach((z) => { if (z && typeof z === 'object') _esfAddZona(z); });
-  // Pagos: re-crear filas desde `pagos` (texto JSON o array).
-  _esfClearPagos();
-  let _pg = row.pagos;
-  if (typeof _pg === 'string') { try { _pg = JSON.parse(_pg); } catch { _pg = []; } }
-  if (Array.isArray(_pg)) _pg.forEach((p) => { if (p && typeof p === 'object') _esfAddPago(p); });
   // Hotel custom: re-poblar desde `hotel` (texto JSON u objeto); custom:false → off.
   _esfHotelPopulate(row.hotel);
   _esfCiudadSet(row.ciudad || 'MTY');
@@ -13191,7 +13134,6 @@ function cancelarEdicionEsfera() {
   ['esf-nombre','esf-titulo','esf-fecha','esf-venue','esf-music'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
   _esfClearFechasExtra();
   _esfClearZonas();
-  _esfSeedPagosDefault();
   _esfClearHotel();
   _esfCiudadSet('MTY');
   const tipo = document.getElementById('esf-tipo'); if (tipo) tipo.value = 'concierto';
@@ -13220,7 +13162,6 @@ async function guardarCambiosEsfera() {
     music:        document.getElementById('esf-music')?.value.trim() || null,
     fechas_extra: _esfGetFechasExtra(),
     zonas: _esfGetZonas(),
-    pagos: _esfGetPagos(),
     hotel: _esfGetHotel(),
   };
   const alertEl = document.getElementById('esf-alert');
@@ -13379,8 +13320,6 @@ function _esfPreviewInit() {
       const el = document.getElementById(id);
       if (el) { el.addEventListener('input', renderEsferaPreview); el.addEventListener('change', renderEsferaPreview); }
     });
-    // Estado inicial = nuevo evento: sembrar Separo + Pago 1 (sin pisar edición).
-    if (!window._esfEditSlug && !document.querySelector('#esf-pagos .esf-pago-row')) _esfSeedPagosDefault();
   }
   renderEsferaPreview();
 }

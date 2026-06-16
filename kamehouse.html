@@ -1939,6 +1939,7 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
   <symbol id="ic-cotizador" viewBox="0 0 24 24"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M8 7h8M8 11h2M12 11h2M8 15h2M12 15h2"/></symbol>
   <symbol id="ic-radar" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/><path d="M12 12l6-4"/></symbol>
   <symbol id="ic-esferas" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7l1.4 3.6L17 12l-3.6 1.4L12 17l-1.4-3.6L7 12l3.6-1.4z"/></symbol>
+  <symbol id="ic-kamisama" viewBox="0 0 24 24"><path d="M3 9l9-5 9 5"/><path d="M5 9v10M19 9v10M3 20h18"/><path d="M9 20v-6h6v6"/></symbol>
   <symbol id="ic-recibos" viewBox="0 0 24 24"><path d="M6 2h12v20l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6"/></symbol>
   <symbol id="ic-contratos" viewBox="0 0 24 24"><path d="M6 2h8l4 4v16H6z"/><path d="M14 2v4h4"/><path d="M9 14l2 2 4-4"/></symbol>
   <symbol id="ic-waitlist" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
@@ -1976,7 +1977,7 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
 
   <div class="nav-group">
    <div class="nav-group-title">Eventos</div>
-   <button class="nav-btn" onclick="showPage('cotizador')" id="nav-cotizador"><svg class="nav-ic"><use href="#ic-cotizador"/></svg><span>Palacio de Kamisama</span></button>
+   <button class="nav-btn" onclick="showPage('kamisama')" id="nav-kamisama"><svg class="nav-ic"><use href="#ic-kamisama"/></svg><span>Palacio de Kamisama</span></button>
    <button class="nav-btn" onclick="showPage('esferas')" id="nav-esferas"><svg class="nav-ic"><use href="#ic-esferas"/></svg><span>Esferas del Dragón</span></button>
    <button class="nav-btn" onclick="showPage('radar')" id="nav-radar"><svg class="nav-ic"><use href="#ic-radar"/></svg><span>Radar del Dragón</span></button>
   </div>
@@ -3007,335 +3008,21 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
   </div>
  </div>
 
- <div class="page" id="page-cotizador">
+ <div class="page" id="page-kamisama">
   <div class="page-hero">
    <div>
     <div class="page-title">PALACIO DE KAMISAMA</div>
-    <div class="page-sub">// cotizador · estimado vs real</div>
-   </div>
-   <div style="display:flex;gap:8px">
-    <button class="btn btn-ghost btn-sm" onclick="guardarSesionCot()">Guardar sesión</button>
-    <button class="btn btn-ghost btn-sm" onclick="resetCotizador()">↺ Limpiar</button>
+    <div class="page-sub">// inventario de boletos · compras y abonos a proveedores</div>
    </div>
   </div>
-
- <div class="cot-tabs">
- <button class="cot-tab active" onclick="switchCotMode('preventa',this)">Preventa / Cotización</button>
- <button class="cot-tab" onclick="switchCotMode('postevento',this)">Post-Evento / Real</button>
- </div>
-
- <!-- ══ PREVENTA ══ -->
- <div class="cot-mode active" id="cot-mode-preventa">
- <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
-
- <!-- COL IZQ -->
- <div style="display:flex;flex-direction:column;gap:14px">
-
- <!-- EVENTO -->
- <div class="card">
- <div class="cot-section-label"><span>📌 Evento</span></div>
- <div class="form-row cols-2">
- <div class="form-group">
- <label>Artista / Nombre *</label>
- <input type="text" class="cot-input" id="cot-artista" placeholder="Ej: Bad Bunny" oninput="_debouncedRecalc()">
- </div>
- <div class="form-group">
- <label>Tour / Show</label>
- <input type="text" class="cot-input" id="cot-tour" placeholder="Ej: Most Wanted Tour" oninput="_debouncedRecalc()">
- </div>
- </div>
-
- <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
- <label style="font-size:9px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:var(--ts)">Fechas</label>
- <button class="btn btn-ghost btn-sm" onclick="agregarFechaCot()">+ Fecha</button>
- </div>
- <div id="cot-fechas-lista"></div>
-
- <div class="form-row cols-2" style="margin-top:8px">
- <div class="form-group">
- <label>Ciudad *</label>
- <select class="cot-input" id="cot-ciudad" onchange="onCotCiudadChange()">
- <option value="monterrey">Monterrey</option>
- <option value="cdmx">CDMX</option>
- <option value="otra">Otra ciudad</option>
- </select>
- </div>
- <div class="form-group">
- <label>Tipo</label>
- <select class="cot-input" id="cot-tipo" onchange="onCotTipoChange()">
- <option value="concierto">Concierto</option>
- <option value="festival">Festival multidía</option>
- </select>
- </div>
- </div>
-
- <div class="form-group" style="margin-top:6px">
- <label>Venue</label>
- <div style="position:relative">
- <input type="text" class="cot-input" id="cot-venue" placeholder="Ej: Estadio GNP" oninput="filtrarVenues(this.value);_debouncedRecalc()" autocomplete="off">
- <div id="cot-venue-sugg" style="display:none;position:absolute;z-index:50;left:0;right:0;top:100%;background:var(--bg3);border:1px solid var(--border);border-radius:6px;margin-top:2px;max-height:140px;overflow-y:auto"></div>
- </div>
- <div style="display:flex;gap:6px;margin-top:6px">
- <button class="btn btn-ghost btn-sm" onclick="guardarVenueCat()">+ Guardar venue</button>
- <button class="btn btn-ghost btn-sm" onclick="verVenuesCat()">Catálogo</button>
- </div>
- </div>
-
- <div id="cot-festival-row" style="display:none;margin-top:6px">
- <div class="form-row cols-2">
- <div class="form-group">
- <label>Días del festival</label>
- <input type="number" class="cot-input" id="cot-dias-festival" min="1" max="7" value="3" oninput="syncFestivalNoches();_debouncedRecalc()">
- </div>
- <div class="form-group">
- <label>Noches de hotel</label>
- <input type="number" class="cot-input" id="cot-noches-festival" min="1" max="7" value="3" oninput="syncFestivalNoches();_debouncedRecalc()">
- </div>
- </div>
- </div>
- </div>
-
- <!-- TRANSPORTE -->
- <div class="card">
- <div class="cot-section-label"><span>🚌 Transporte</span><button class="btn btn-ghost btn-sm" onclick="agregarUnidad()">+ Unidad</button></div>
- <div id="cot-cdmx-nota" style="display:none;font-size:11px;color:var(--blue);margin-bottom:10px;padding:8px 10px;background:rgba(94,167,255,.08);border-radius:6px;border:1px solid rgba(94,167,255,.2)">
- CDMX: el transporte largo no aplica. Solo traslados internos (aeropuerto, hotel, venue).
- </div>
- <div id="cot-unidades-lista"></div>
- <div style="margin-top:10px;display:grid;grid-template-columns:1fr 1fr;gap:8px;padding-top:8px;border-top:1px solid var(--border)">
- <div style="font-size:11px;color:var(--ts)">Capacidad neta: <span id="cot-capacidad-neta" style="color:var(--gold);font-weight:700">0</span> pax</div>
- <div style="font-size:11px;color:var(--ts)">Costo transporte: <span id="cot-costo-transporte-lbl" style="color:var(--gold);font-weight:700">$0</span></div>
- </div>
- <div style="margin-top:8px">
- <label style="font-size:9px;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:var(--ts)">🅿️ Estacionamiento ($)</label>
- <input type="number" class="cot-input" id="cot-estacionamiento" placeholder="0" min="0" style="margin-top:4px" oninput="_debouncedRecalc()">
- </div>
- </div>
-
- <!-- HOTEL -->
- <div class="card">
- <div class="cot-section-label"><span>🏨 Hotel</span></div>
- <div class="form-row cols-2">
- <div class="form-group">
- <label>Costo por habitación ($) *</label>
- <input type="number" class="cot-input" id="cot-hotel-precio" min="0" oninput="_debouncedRecalc()" placeholder="Ej: 10000">
- </div>
- <div class="form-group">
- <label>Noches</label>
- <input type="number" class="cot-input" id="cot-hotel-noches" min="1" value="1" oninput="_debouncedRecalc()">
- </div>
- </div>
- <div style="font-size:11px;color:var(--ts2);margin-top:4px">Cotizador usa: precio ÷ 4 personas × noches por viajero. Extras (doble/individual) se cobran aparte en la reservación.</div>
- </div>
-
- <!-- KIT -->
- <div class="card">
- <div class="cot-section-label"><span>🎁 Kit del viajero</span></div>
- <div id="cot-kit-lista"></div>
- <div id="cot-kit-extras"></div>
- <button class="btn btn-ghost btn-sm" onclick="agregarKitExtra()" style="margin-top:8px">+ Otro item</button>
- <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border);font-size:12px;color:var(--ts)">
- Costo kit total: <span id="cot-kit-total" style="color:var(--gold);font-weight:700">$0</span>
- </div>
- </div>
-
- <!-- ZONAS -->
- <div class="card">
- <div class="cot-section-label"><span>🎟️ Zonas / Boletos</span><button class="btn btn-ghost btn-sm" onclick="agregarZonaCot()">+ Zona</button></div>
- <div style="font-size:11px;color:var(--ts);margin-bottom:10px">El precio del boleto se suma al costo base logístico por zona.</div>
- <div id="cot-zonas-lista"></div>
- <div style="display:flex;gap:6px;margin-top:8px">
-   <button class="btn btn-ghost btn-sm" onclick="guardarZonasCatalogo()">💾 Guardar zonas en catálogo</button>
-   <button class="btn btn-ghost btn-sm" onclick="verZonasCatalogo()">Catálogo de zonas</button>
- </div>
- </div>
-
- <!-- STAFF -->
- <div class="card">
- <div class="cot-section-label"><span>Staff</span></div>
-
- <!-- Coordinadores -->
- <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
- <div style="font-size:10px;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:var(--ts)">Coordinadores</div>
- <button class="btn btn-ghost btn-sm" onclick="agregarCoordinator()">+ Coordinador</button>
- </div>
- <div id="cot-coordis-lista"></div>
-
- <!-- Choferes -->
- <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
- <div style="font-size:10px;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:var(--ts);margin-bottom:8px">Choferes</div>
- <div style="display:flex;align-items:center;gap:10px">
- <input type="number" class="cot-input" id="cot-num-choferes" min="0" value="1" style="width:60px" oninput="_debouncedRecalc()">
- <div style="font-size:12px;color:var(--ts)">
- <span id="cot-choferes-habs" style="color:var(--gold);font-weight:600">1 hab</span> ·
- <span id="cot-choferes-costo" style="color:var(--gold);font-weight:600">$0</span>
- </div>
- </div>
- <div style="font-size:10px;color:var(--ts2);margin-top:4px">1 cama por chofer · 2 choferes = 1 cuarto doble · 3 = doble + individual</div>
- </div>
-
- <!-- Creadores de contenido -->
- <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
- <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
- <div style="font-size:10px;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:var(--ts)">Creadores de Contenido</div>
- <button class="btn btn-ghost btn-sm" onclick="agregarCC()">+ CC</button>
- </div>
- <div id="cot-cc-lista"></div>
- </div>
-
- <!-- Gastos extra -->
- <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
- <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
- <div style="font-size:10px;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:var(--ts)">Gastos Extra</div>
- <button class="btn btn-ghost btn-sm" onclick="agregarGastoExtra()">+ Gasto</button>
- </div>
- <div id="cot-gastos-extra"></div>
- </div>
-
- <!-- Ganancia por paquete -->
- <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
- <div style="font-size:10px;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:var(--ts);margin-bottom:8px">Ganancia por Paquete</div>
- <div class="form-row cols-2">
- <div class="form-group">
- <label>Ganancia PLUS ($)</label>
- <input type="number" class="cot-input" id="cot-ganancia-plus" value="1000" min="0" oninput="_debouncedRecalc()">
- </div>
- <div class="form-group">
- <label>Ganancia CHEAP ($)</label>
- <input type="number" class="cot-input" id="cot-ganancia-cheap" value="1000" min="0" oninput="_debouncedRecalc()">
- </div>
- </div>
- <div style="font-size:10px;color:var(--ts2);margin-top:4px">STAY = PLUS − $500 · RIDE = fijo $2,700 Mty / $2,900 CDMX</div>
- </div>
- </div>
-
- </div><!-- /col izq -->
-
- <!-- COL DER -->
- <div style="display:flex;flex-direction:column;gap:14px">
-
- <!-- HEADER EVENTO -->
- <div class="cot-event-header" id="cot-event-header">
- <div class="cot-event-header-titulo" id="cot-header-titulo">—</div>
- <div class="cot-event-header-sub" id="cot-header-sub"></div>
- </div>
-
- <!-- DESGLOSE -->
- <div class="card" style="border-color:rgba(255,107,0,.3)">
- <div class="cot-section-label" style="color:var(--orange)"><span> Desglose por Persona</span></div>
- <div id="cot-desglose"><div class="empty-state" style="padding:20px">Llena los campos para ver el cálculo</div></div>
- </div>
-
- <!-- ESCENARIOS -->
- <div class="card" style="border-color:rgba(255,215,0,.25)">
- <div class="cot-section-label" style="color:var(--gold)"><span>Escenarios (base logística)</span></div>
- <div style="font-size:11px;color:var(--ts);margin-bottom:10px">Basado en capacidad neta del transporte. El boleto se suma por zona.</div>
- <div id="cot-escenarios"><div class="empty-state" style="padding:20px">Agrega transporte para ver escenarios</div></div>
- </div>
-
- <!-- PRECIOS POR PAQUETE -->
- <div class="card">
- <div class="cot-section-label"><span>Precios por Paquete y Zona</span></div>
- <div style="font-size:11px;color:var(--ts);margin-bottom:10px">Escenario realista (80% capacidad)</div>
- <div id="cot-precios-paquetes"><div class="empty-state" style="padding:16px">Agrega zonas para ver precios</div></div>
- </div>
-
- <!-- CREAR EVENTO -->
- <div class="card" style="border-color:rgba(61,220,132,.3)">
- <div class="cot-section-label" style="color:var(--green)"><span>🚀 Crear Evento en Capsule Corp</span></div>
- <div style="font-size:12px;color:var(--ts);margin-bottom:14px">La info pasa a Capsule Corp. Terminas de vestirlo y lo publicas.</div>
- <button class="btn btn-primary" style="width:100%;padding:14px" onclick="crearEventoDesdeCotizador()">✅ Crear Evento</button>
- <div id="cot-crear-alert" style="margin-top:10px"></div>
- </div>
-
- <!-- SESIONES -->
- <div class="card">
- <div class="cot-section-label"><span>📁 Sesiones Guardadas</span></div>
- <div id="cot-sesiones-lista"><div style="font-size:12px;color:var(--ts)">Sin sesiones guardadas</div></div>
- </div>
-
- </div><!-- /col der -->
- </div><!-- /grid preventa -->
- </div><!-- /mode preventa -->
-
- <!-- ══ POST-EVENTO ══ -->
- <div class="cot-mode" id="cot-mode-postevento">
- <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
- <div style="display:flex;flex-direction:column;gap:14px">
- <div class="card">
- <div class="cot-section-label"><span>📂 Selecciona evento</span></div>
- <select class="cot-input" id="post-sesion-sel" onchange="cargarSesionPostEvento(this.value)">
- <option value="">Selecciona...</option>
- </select>
- </div>
- <div class="card" id="post-datos-card" style="display:none">
- <div class="cot-section-label"><span> Datos Reales</span></div>
- <div class="form-row cols-2">
- <div class="form-group"><label>Viajeros PLUS reales</label><input type="number" class="cot-input" id="post-plus" min="0" value="0" oninput="calcularPostEvento()"></div>
- <div class="form-group"><label>Viajeros STAY reales</label><input type="number" class="cot-input" id="post-stay" min="0" value="0" oninput="calcularPostEvento()"></div>
- </div>
- <div class="form-row cols-2">
- <div class="form-group"><label>Viajeros RIDE reales</label><input type="number" class="cot-input" id="post-ride" min="0" value="0" oninput="calcularPostEvento()"></div>
- <div class="form-group"><label>Viajeros CHEAP reales</label><input type="number" class="cot-input" id="post-cheap" min="0" value="0" oninput="calcularPostEvento()"></div>
- </div>
- <div style="height:1px;background:var(--border);margin:10px 0"></div>
- <div class="form-row cols-2">
- <div class="form-group"><label>Costo transporte real ($)</label><input type="number" class="cot-input" id="post-costo-transporte" min="0" value="0" oninput="calcularPostEvento()"></div>
- <div class="form-group"><label>Costo hotel real ($)</label><input type="number" class="cot-input" id="post-costo-hotel" min="0" value="0" oninput="calcularPostEvento()"></div>
- </div>
- <div class="form-row cols-2">
- <div class="form-group"><label>Costo kits real ($)</label><input type="number" class="cot-input" id="post-costo-kits" min="0" value="0" oninput="calcularPostEvento()"></div>
- <div class="form-group"><label>Costo boletos real ($)</label><input type="number" class="cot-input" id="post-costo-boletos" min="0" value="0" oninput="calcularPostEvento()"></div>
- </div>
- <div class="form-row cols-2">
- <div class="form-group"><label>Gastos extra reales ($)</label><input type="number" class="cot-input" id="post-gastos-extra" min="0" value="0" oninput="calcularPostEvento()"></div>
- <div class="form-group"><label>Ingresos totales ($)</label><input type="number" class="cot-input" id="post-ingresos" min="0" value="0" oninput="calcularPostEvento()"></div>
- </div>
- <div style="margin-top:10px">
- <label style="font-size:11px;color:var(--ts);display:block;margin-bottom:4px">Notas post-evento (ventas en persona, reventa, etc.)</label>
- <textarea class="cot-input" id="post-notas" rows="3" placeholder="Ej: 3 boletos vendidos en puerta, 2 reventas..."></textarea>
- </div>
- <button class="btn btn-primary" style="width:100%;margin-top:10px" onclick="guardarPostEvento()">💾 Guardar datos reales</button>
- </div>
- </div>
- <div style="display:flex;flex-direction:column;gap:14px">
- <div class="card" id="post-comparativa-card" style="display:none">
- <div class="cot-section-label" style="color:var(--orange)"><span>📈 Estimado vs Real</span></div>
- <div id="post-comparativa"></div>
- </div>
- <div class="card" id="post-resultado-card" style="display:none">
- <div class="cot-section-label" style="color:var(--green)"><span>✅ Resultado Final</span></div>
- <div id="post-resultado"></div>
- </div>
- </div>
- </div>
- </div><!-- /mode postevento -->
-
- <!-- MODAL VENUES -->
- <div class="modal-overlay" id="modal-venues">
- <div class="modal" style="max-width:480px">
- <div class="modal-header">
- <div class="modal-title">Catálogo de Venues</div>
- <button class="modal-close" onclick="closeModal('modal-venues')">✕</button>
- </div>
- <div class="modal-body"><div id="venues-lista"></div></div>
- </div>
- </div>
-
- <div class="modal-overlay" id="modal-zonas-cat">
- <div class="modal" style="max-width:520px">
- <div class="modal-header">
- <div class="modal-title">Catálogo de Zonas</div>
- <button class="modal-close" onclick="closeModal('modal-zonas-cat')">✕</button>
- </div>
- <div class="modal-body">
-   <div style="font-size:11px;color:var(--ts);margin-bottom:12px">Zonas guardadas de eventos anteriores. Haz clic en una para cargarla al cotizador actual.</div>
-   <div id="zonas-cat-lista"></div>
- </div>
- </div>
- </div>
-
- </div><!-- /page-cotizador -->
+  <div class="card">
+   <div id="kamisama-content" class="empty-state" style="padding:48px 16px;text-align:center">
+    <div class="empty-icon"></div>
+    <div style="font-family:'Rajdhani',sans-serif;font-weight:700;font-size:18px;margin-bottom:6px">Palacio de Kamisama — Capa 1</div>
+    <div style="font-size:12px;color:var(--ts);line-height:1.6;max-width:420px;margin:0 auto">Inventario manual de boletos: compras (lotes) y abonos a proveedores.<br>En construcción — próximamente.</div>
+   </div>
+  </div>
+ </div><!-- /page-kamisama -->
 
 
  <!-- ─── CONTRATOS ─── -->
@@ -4469,8 +4156,8 @@ let disenoLoaded = false;
 let _cotIniciado = false;
 
 const PERMISOS_TABS = {
-  maestro_roshi: ['resumen','pagos','eventos','gastos','ingresos','saldos','ventas','inventario','reportes','capsule','solicitudes_portal','equipo','cotizador','herramientas','radar','montana'],
-  bulma:         ['resumen','pagos','eventos','gastos','ingresos','saldos','ventas','inventario','reportes','capsule','solicitudes_portal','equipo','cotizador','herramientas'],
+  maestro_roshi: ['resumen','pagos','eventos','gastos','ingresos','saldos','ventas','inventario','reportes','capsule','solicitudes_portal','equipo','kamisama','herramientas','radar','montana'],
+  bulma:         ['resumen','pagos','eventos','gastos','ingresos','saldos','ventas','inventario','reportes','capsule','solicitudes_portal','equipo','herramientas'],
   mister_popo:   ['inventario','reportes','equipo'],
   coordinador:   ['inventario','reportes','equipo'],
   cc:            ['equipo'],
@@ -4827,7 +4514,7 @@ function aplicarPermisosUI() {
   const extras = currentUser.permisos_extra?.tabs_extra || [];
   const bloqueados = currentUser.permisos_extra?.tabs_bloqueados || [];
   const tabsPermitidos = [...new Set([...base, ...extras])].filter(t => !bloqueados.includes(t));
-  const allTabs = ['resumen','pagos','eventos','gastos','ingresos','saldos','ventas','inventario','reportes','equipo','capsule','solicitudes_portal','cotizador','radar','montana'];
+  const allTabs = ['resumen','pagos','eventos','gastos','ingresos','saldos','ventas','inventario','reportes','equipo','capsule','solicitudes_portal','kamisama','radar','montana'];
   allTabs.forEach(tab => {
     const btn = document.getElementById('nav-' + tab);
     if (btn) btn.style.display = tabsPermitidos.includes(tab) ? '' : 'none';
@@ -5242,7 +4929,7 @@ function loadPage(name) {
  if (name === 'equipo') loadEquipo();
  if (name === 'capsule') loadCapsule();
  if (name === 'solicitudes_portal') loadSolicitudesPortal();
- if (name === 'cotizador') initCotizador();
+ if (name === 'kamisama') loadKamisama();
  if (name === 'montana') loadMontana();
  if (name === 'radar') initRadarTab();
  if (name === 'esferas') loadEsferasEventos();
@@ -7213,10 +6900,17 @@ const VEHICULOS = [
   {label:'Van — 14 pax',       capacidad:14},
 ];
 
+// ── Palacio de Kamisama — Capa 1 (inventario de boletos) ─────────────────────
+// Placeholder. El contenido real (compras/lotes + abonos a proveedores) llega en
+// la implementación de la Capa 1. loadKamisama() se invoca desde loadPage().
+function loadKamisama() {
+  // Sin carga remota todavía: la página muestra su placeholder estático.
+}
+
 const HOTEL_DEFAULT = {monterrey:2500, cdmx:2900, otra:0};
 let _vendedoresCache = [];
 
-// ── INIT ──
+// ── INIT (cotizador — código conservado; ya no accesible desde el nav) ──
 async function initCotizador() {
   if (_cotIniciado) return;
   _cotIniciado = true;
@@ -12452,7 +12146,7 @@ async function abrirEditarUsuarioMT(id) {
   const permisos = u.permisos_extra || {};
   const tabsExtra = permisos.tabs_extra || [];
   const tabsBloq  = permisos.tabs_bloqueados || [];
-  const todasTabs = ['resumen','pagos','eventos','gastos','ventas','inventario','reportes','capsule','equipo','cotizador'];
+  const todasTabs = ['resumen','pagos','eventos','gastos','ventas','inventario','reportes','capsule','equipo','kamisama'];
 
   document.getElementById('modal-mt-usuario').innerHTML = `
     <div class="modal" style="max-width:520px">

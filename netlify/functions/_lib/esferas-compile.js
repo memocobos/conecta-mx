@@ -63,6 +63,23 @@ function parseFechasExtra(raw) {
   return out;
 }
 
+// `inc` (texto JSON desde la DB, o array) → array de strings no vacíos (trim),
+// en orden. Basura → []. Es la lista "qué incluye" del evento.
+function parseInc(raw) {
+  let arr = raw;
+  if (typeof raw === 'string') {
+    try { arr = JSON.parse(raw); } catch (_) { return []; }
+  }
+  if (!Array.isArray(arr)) return [];
+  const out = [];
+  for (const x of arr) {
+    if (typeof x !== 'string') continue;
+    const s = x.trim();
+    if (s) out.push(s);
+  }
+  return out;
+}
+
 // B1 — `zonas` (texto JSON desde la DB, o array) → filas normalizadas en el
 // ORDEN capturado: {n, p, pc, ag}. Basura → []. Descarta filas sin nombre.
 // (VIP eliminado: ya no se captura ni se emite.)
@@ -217,6 +234,21 @@ function generarObj(esfera, hoy) {
   // mapa: URL pública de la imagen subida (bucket mapas-eventos). Si vacío, NO se
   // emite → byte-igual a hoy. El render de index.html acepta URL directa o clave.
   const mapa = esfera.mapa ? ("mapa:'" + escStr(esfera.mapa) + "',") : '';
+  // inc: lista "qué incluye". Array no vacío → inc:['<esc>',...]; vacío → inc:[].
+  const incRows = parseInc(esfera.inc);
+  const incSeg = incRows.length
+    ? ("inc:[" + incRows.map((s) => "'" + escStr(s) + "'").join(',') + ']')
+    : 'inc:[]';
+  // sep: separo PLUS. SIEMPRE presente (como los eventos reales). null/ausente → 500.
+  const sepN = (esfera.sep != null && Number.isFinite(Number(esfera.sep)) && Number(esfera.sep) >= 0)
+    ? Math.round(Number(esfera.sep)) : 500;
+  // sepCheap: SOLO si el evento tiene cheapZonas (alguna pc>0) Y sep_cheap definido.
+  const tieneCheap = parseZonas(esfera.zonas).some((z) => z.pc > 0);
+  const sepCheapSeg = (tieneCheap && esfera.sep_cheap != null
+    && Number.isFinite(Number(esfera.sep_cheap)) && Number(esfera.sep_cheap) >= 0)
+    ? (',sepCheap:' + Math.round(Number(esfera.sep_cheap))) : '';
+  // nota: aviso especial. Si hay → nota:'<esc>'; si vacío → no emitir.
+  const notaSeg = esfera.nota ? (",nota:'" + escStr(esfera.nota) + "'") : '';
   return "{id:'" + escStr(esfera.slug) +
     "',added:'" + added +
     "'," + music +
@@ -229,7 +261,8 @@ function generarObj(esfera, hoy) {
     "v:'" + venue +
     "',st:'" + escStr(status) +
     "'," + cdmx + mapa +
-    "inc:[],banco:BANCO_DEFAULT," + zonasSegmento(esfera) + "," + hotelSegmento(esfera) + "," + pagosSegmento() + "}";
+    incSeg + ",sep:" + sepN + sepCheapSeg + notaSeg +
+    ",banco:BANCO_DEFAULT," + zonasSegmento(esfera) + "," + hotelSegmento(esfera) + "," + pagosSegmento() + "}";
 }
 
 // ── Parsers de validación (idénticos a los consumidores) ──────────────────────

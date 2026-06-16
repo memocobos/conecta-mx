@@ -27,7 +27,38 @@ const SB_KEY = process.env.SUPABASE_SERVICE_KEY_KAMEHOUSE;
 const CAMPOS_PERMITIDOS = new Set([
   'slug', 'nombre', 'titulo', 'fecha_inicio', 'ciudad', 'tipo', 'status',
   'venue', 'music', 'fechas_extra', 'zonas', 'hotel', 'mapa',
+  'inc', 'sep', 'sep_cheap', 'nota',
 ]);
+
+// inc: JSON array de strings ("qué incluye"). Acepta array o string JSON. Saneo:
+// trim, descarta vacíos/no-strings. Sin filas → null. Devuelve string JSON o null.
+function saneInc(v) {
+  let arr = v;
+  if (typeof v === 'string') { try { arr = JSON.parse(v); } catch { return null; } }
+  if (!Array.isArray(arr)) return null;
+  const out = [];
+  for (const x of arr) {
+    if (typeof x !== 'string') continue;
+    const s = x.trim();
+    if (s) out.push(s);
+  }
+  if (!out.length) return null;
+  return JSON.stringify(out);
+}
+
+// sep / sep_cheap: entero >= 0. Basura/negativo/vacío → null (el compilador pone
+// el default 500 para sep; omite sepCheap). Devuelve number o null.
+function saneInt(v) {
+  if (v === null || v === '' || v === undefined) return null;
+  const n = Number(v);
+  return (Number.isFinite(n) && n >= 0) ? Math.round(n) : null;
+}
+
+// nota: texto libre (aviso). Trim. Vacío → null. Devuelve string o null.
+function saneNota(v) {
+  const s = (typeof v === 'string') ? v.trim() : '';
+  return s || null;
+}
 
 // hotel (B2b): JSON {custom, total, items:[{n,e,viaj}]}. `e` = extra POR PERSONA.
 // Si custom falso / sin items válidos → null (cae a default de ciudad). Devuelve
@@ -151,6 +182,9 @@ exports.handler = async (event) => {
     if (k === 'zonas') { sane[k] = saneZonas(v); continue; }
     if (k === 'hotel') { sane[k] = saneHotel(v); continue; }
     if (k === 'mapa') { sane[k] = saneMapa(v); continue; }
+    if (k === 'inc') { sane[k] = saneInc(v); continue; }
+    if (k === 'sep' || k === 'sep_cheap') { sane[k] = saneInt(v); continue; }
+    if (k === 'nota') { sane[k] = saneNota(v); continue; }
     if (v === null || v === '') sane[k] = (k === 'status') ? '' : null;
     else sane[k] = String(v);
   }

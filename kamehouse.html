@@ -1938,6 +1938,7 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
   <symbol id="ic-montana" viewBox="0 0 24 24"><path d="M3 20h18L14 7l-3 5-2-3z"/></symbol>
   <symbol id="ic-cotizador" viewBox="0 0 24 24"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M8 7h8M8 11h2M12 11h2M8 15h2M12 15h2"/></symbol>
   <symbol id="ic-radar" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/><path d="M12 12l6-4"/></symbol>
+  <symbol id="ic-esferas" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7l1.4 3.6L17 12l-3.6 1.4L12 17l-1.4-3.6L7 12l3.6-1.4z"/></symbol>
   <symbol id="ic-recibos" viewBox="0 0 24 24"><path d="M6 2h12v20l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6"/></symbol>
   <symbol id="ic-contratos" viewBox="0 0 24 24"><path d="M6 2h8l4 4v16H6z"/><path d="M14 2v4h4"/><path d="M9 14l2 2 4-4"/></symbol>
   <symbol id="ic-waitlist" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
@@ -1976,7 +1977,7 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
   <div class="nav-group">
    <div class="nav-group-title">Eventos</div>
    <button class="nav-btn" onclick="showPage('cotizador')" id="nav-cotizador"><svg class="nav-ic"><use href="#ic-cotizador"/></svg><span>Palacio de Kamisama</span></button>
-   <button class="nav-btn" onclick="showPage('esferas')" id="nav-esferas"><span>Esferas del Dragón</span></button>
+   <button class="nav-btn" onclick="showPage('esferas')" id="nav-esferas"><svg class="nav-ic"><use href="#ic-esferas"/></svg><span>Esferas del Dragón</span></button>
    <button class="nav-btn" onclick="showPage('radar')" id="nav-radar"><svg class="nav-ic"><use href="#ic-radar"/></svg><span>Radar del Dragón</span></button>
   </div>
 
@@ -2855,7 +2856,7 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
       <option value="CDMX">CDMX</option>
       <option value="__otra">Otra ciudad…</option>
      </select>
-     <input class="cot-input" id="esf-ciudad-otra" placeholder="ej. Guadalajara" style="width:100%;margin-top:8px;display:none">
+     <input class="cot-input" id="esf-ciudad-otra" placeholder="ej. Guadalajara" style="width:100%;margin-top:8px;display:none" oninput="_esfCityChanged()">
     </div>
     <div class="form-group">
      <label>Status</label>
@@ -2868,7 +2869,7 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
     </div>
     <div class="form-group">
      <label>Venue</label>
-     <input class="cot-input" id="esf-venue" placeholder="ej. Estadio GNP, CDMX" style="width:100%">
+     <input class="cot-input" id="esf-venue" placeholder="ej. Estadio GNP, CDMX" style="width:100%" oninput="_esfCityChanged()">
      <div style="font-size:11px;color:var(--ts);margin-top:4px">Incluye la ciudad en el venue (ej. "Auditorio Telmex, Guadalajara") para que el sitio la ubique bien.</div>
     </div>
     <div class="form-group">
@@ -2910,6 +2911,28 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
      </div>
      <div id="esf-mapa-preview" style="margin-top:8px;display:none"><img id="esf-mapa-img" src="" alt="Mapa del venue" style="max-width:240px;max-height:180px;border:1px solid var(--border);border-radius:6px"></div>
      <div style="font-size:11px;color:var(--ts);margin-top:4px">Imagen del mapa de zonas (conciertos). Sin mapa → el sitio muestra "Mapa próximamente".</div>
+    </div>
+    <div class="form-group">
+     <label>Qué incluye</label>
+     <div id="esf-inc"></div>
+     <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
+      <button class="btn btn-ghost" type="button" onclick="_esfAddInc()">+ Agregar</button>
+      <button class="btn btn-ghost" type="button" onclick="_esfIncDefault()">Restaurar default de la ciudad</button>
+     </div>
+     <div style="font-size:11px;color:var(--ts);margin-top:4px">Lista "qué incluye" del paquete. Se pre-llena por ciudad; puedes editarla a mano.</div>
+    </div>
+    <div class="form-group">
+     <label>Separo</label>
+     <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <div style="flex:1;min-width:130px"><label style="font-size:11px">Separo PLUS $</label><input class="cot-input esf-sep" type="number" min="0" id="esf-sep" placeholder="500" style="width:100%"></div>
+      <div style="flex:1;min-width:130px"><label style="font-size:11px">Separo CHEAP $</label><input class="cot-input esf-sep" type="number" min="0" id="esf-sep-cheap" placeholder="500" style="width:100%"></div>
+     </div>
+     <div style="font-size:11px;color:var(--ts);margin-top:4px">Default 500. El CHEAP solo aplica si alguna zona tiene precio CHEAP.</div>
+    </div>
+    <div class="form-group">
+     <label>Nota / aviso</label>
+     <input class="cot-input" id="esf-nota" placeholder="ej. NO incluye transporte a CDMX." style="width:100%">
+     <div style="font-size:11px;color:var(--ts);margin-top:4px">Opcional. En CDMX se pre-llena con "NO incluye transporte a CDMX." (editable).</div>
     </div>
     <button class="btn btn-primary" id="esf-submit-btn" onclick="submitEsferaForm()">Crear evento</button>
     <button class="btn btn-ghost" id="esf-cancel-edit" style="margin-left:8px;display:none" onclick="cancelarEdicionEsfera()">Cancelar edición</button>
@@ -12856,6 +12879,10 @@ async function crearEsferaEvento() {
     zonas: _esfGetZonas(),
     hotel: _esfGetHotel(),
     mapa: _esfGetMapa(),
+    inc: _esfGetInc(),
+    sep: _esfGetSep(),
+    sep_cheap: _esfGetSepCheap(),
+    nota: _esfGetNota(),
   };
   const alertEl = document.getElementById('esf-alert');
   try {
@@ -12873,6 +12900,7 @@ async function crearEsferaEvento() {
     _esfClearZonas();
     _esfClearHotel();
     _esfMapaClear();
+    _esfSeedDefaults();
     const chosenEl = document.getElementById('esf-music-chosen'); if (chosenEl) chosenEl.textContent = '';
     const resEl = document.getElementById('esf-music-results'); if (resEl) resEl.innerHTML = '';
     loadEsferasEventos();
@@ -12891,6 +12919,7 @@ function _esfCiudadToggle() {
   const otra = document.getElementById('esf-ciudad-otra');
   if (!sel || !otra) return;
   otra.style.display = (sel.value === '__otra') ? '' : 'none';
+  _esfCityChanged();
 }
 
 function _esfCiudadValue() {
@@ -12912,6 +12941,112 @@ function _esfCiudadSet(ciudad) {
     sel.value = '__otra';
     if (otra) { otra.value = c; otra.style.display = ''; }
   }
+}
+
+// ── Qué incluye (inc) + separo (sep/sep_cheap) + nota ────────────────────────
+// Defaults de la lista "qué incluye" por ciudad y texto de nota para CDMX.
+const _ESF_INC_MTY  = ['Boleto zona elegida', 'Transporte Reynosa-Mty', 'Hospedaje compartido', 'Kit Conecta'];
+const _ESF_INC_CDMX = ['Boleto zona elegida', 'Traslados CDMX', 'Hospedaje compartido', 'Kit Conecta'];
+const _ESF_NOTA_CDMX = 'NO incluye transporte a CDMX.';
+
+// CDMX si la ciudad es 'CDMX' o el venue menciona CDMX.
+function _esfIsCDMX() {
+  if (_esfCiudadValue().toUpperCase() === 'CDMX') return true;
+  const v = (document.getElementById('esf-venue')?.value || '').toUpperCase();
+  return v.indexOf('CDMX') >= 0;
+}
+function _esfIncDefaultList() { return (_esfIsCDMX() ? _ESF_INC_CDMX : _ESF_INC_MTY).slice(); }
+
+function _esfAddInc(text) {
+  const cont = document.getElementById('esf-inc');
+  if (!cont) return;
+  const row = document.createElement('div');
+  row.className = 'esf-inc-row';
+  row.style.cssText = 'display:flex;gap:6px;margin-top:6px;align-items:center';
+  row.innerHTML =
+    '<input class="cot-input esf-inc-t" placeholder="ej. Boleto zona elegida" style="flex:1;min-width:160px">' +
+    '<button type="button" class="btn btn-ghost esf-inc-del" title="Quitar">✕</button>';
+  row.querySelector('.esf-inc-t').value = (typeof text === 'string') ? text : '';
+  row.querySelector('.esf-inc-del').onclick = () => { row.remove(); };
+  cont.appendChild(row);
+}
+
+function _esfGetInc() {
+  return Array.from(document.querySelectorAll('#esf-inc .esf-inc-row'))
+    .map((row) => (row.querySelector('.esf-inc-t')?.value || '').trim())
+    .filter(Boolean);
+}
+
+function _esfClearInc() {
+  const cont = document.getElementById('esf-inc');
+  if (cont) cont.innerHTML = '';
+}
+
+// Regenera la lista con el default de la ciudad actual (botón "Restaurar default").
+function _esfIncDefault() {
+  _esfClearInc();
+  _esfIncDefaultList().forEach((t) => _esfAddInc(t));
+}
+
+// ¿La lista actual es "intacta" (vacía o igual a uno de los defaults conocidos)?
+// Si sí, se puede re-generar al cambiar de ciudad sin pisar ediciones manuales.
+function _esfIncEsDefault() {
+  const cur = _esfGetInc();
+  if (!cur.length) return true;
+  const eq = (a, b) => a.length === b.length && a.every((x, i) => x === b[i]);
+  return eq(cur, _ESF_INC_MTY) || eq(cur, _ESF_INC_CDMX);
+}
+
+// Disparado al cambiar ciudad/venue. Solo re-llena inc/nota si están "intactos"
+// (default o vacío) — respeta cualquier edición manual.
+function _esfCityChanged() {
+  if (_esfIncEsDefault()) _esfIncDefault();
+  const notaEl = document.getElementById('esf-nota');
+  if (notaEl) {
+    const v = notaEl.value.trim();
+    if (v === '' || v === _ESF_NOTA_CDMX) notaEl.value = _esfIsCDMX() ? _ESF_NOTA_CDMX : '';
+  }
+}
+
+function _esfGetSep() {
+  const v = document.getElementById('esf-sep')?.value;
+  const n = parseInt(v, 10);
+  return (Number.isFinite(n) && n >= 0) ? n : 500;
+}
+function _esfGetSepCheap() {
+  const v = document.getElementById('esf-sep-cheap')?.value;
+  const n = parseInt(v, 10);
+  return (Number.isFinite(n) && n >= 0) ? n : 500;
+}
+function _esfGetNota() { return (document.getElementById('esf-nota')?.value || '').trim(); }
+
+// Estado "nuevo evento": siembra inc default de la ciudad + separo 500.
+function _esfSeedDefaults() {
+  _esfIncDefault();
+  const sep = document.getElementById('esf-sep'); if (sep) sep.value = 500;
+  const sepC = document.getElementById('esf-sep-cheap'); if (sepC) sepC.value = 500;
+  const nota = document.getElementById('esf-nota'); if (nota) nota.value = _esfIsCDMX() ? _ESF_NOTA_CDMX : '';
+}
+
+function _esfClearIncSepNota() {
+  _esfClearInc();
+  const sep = document.getElementById('esf-sep'); if (sep) sep.value = '';
+  const sepC = document.getElementById('esf-sep-cheap'); if (sepC) sepC.value = '';
+  const nota = document.getElementById('esf-nota'); if (nota) nota.value = '';
+}
+
+// Modo editar: re-poblar inc (array/JSON) + sep/sep_cheap + nota desde la fila.
+function _esfIncSepNotaPopulate(row) {
+  _esfClearInc();
+  let inc = row.inc;
+  if (typeof inc === 'string') { try { inc = JSON.parse(inc); } catch { inc = []; } }
+  if (Array.isArray(inc)) inc.forEach((t) => { if (typeof t === 'string' && t.trim()) _esfAddInc(t); });
+  const sep = document.getElementById('esf-sep');
+  if (sep) sep.value = (row.sep != null && row.sep !== '') ? row.sep : 500;
+  const sepC = document.getElementById('esf-sep-cheap');
+  if (sepC) sepC.value = (row.sep_cheap != null && row.sep_cheap !== '') ? row.sep_cheap : 500;
+  const nota = document.getElementById('esf-nota');
+  if (nota) nota.value = (typeof row.nota === 'string') ? row.nota : '';
 }
 
 // ── Fechas adicionales (multifecha-ficha: varias fechas del mismo artista) ───
@@ -13217,6 +13352,8 @@ function editarEsfera(slug) {
   _esfHotelPopulate(row.hotel);
   // Mapa: re-poblar preview desde la URL guardada (o limpiar si no hay).
   _esfMapaPopulate(row.mapa);
+  // Qué incluye + separo + nota: re-poblar desde la fila.
+  _esfIncSepNotaPopulate(row);
   _esfCiudadSet(row.ciudad || 'MTY');
   set('esf-tipo', row.tipo || 'concierto');
   set('esf-status', row.status || '');
@@ -13242,6 +13379,7 @@ function cancelarEdicionEsfera() {
   _esfClearHotel();
   _esfMapaClear();
   _esfCiudadSet('MTY');
+  _esfSeedDefaults();
   const tipo = document.getElementById('esf-tipo'); if (tipo) tipo.value = 'concierto';
   const status = document.getElementById('esf-status'); if (status) status.value = '';
   const chosenEl = document.getElementById('esf-music-chosen'); if (chosenEl) chosenEl.textContent = '';
@@ -13270,6 +13408,10 @@ async function guardarCambiosEsfera() {
     zonas: _esfGetZonas(),
     hotel: _esfGetHotel(),
     mapa: _esfGetMapa(),
+    inc: _esfGetInc(),
+    sep: _esfGetSep(),
+    sep_cheap: _esfGetSepCheap(),
+    nota: _esfGetNota(),
   };
   const alertEl = document.getElementById('esf-alert');
   try {
@@ -13428,6 +13570,8 @@ function _esfPreviewInit() {
       if (el) { el.addEventListener('input', renderEsferaPreview); el.addEventListener('change', renderEsferaPreview); }
     });
   }
+  // Estado inicial = nuevo evento: sembrar inc default + separo 500 (sin pisar edición).
+  if (!window._esfEditSlug && !document.querySelector('#esf-inc .esf-inc-row')) _esfSeedDefaults();
   renderEsferaPreview();
 }
 

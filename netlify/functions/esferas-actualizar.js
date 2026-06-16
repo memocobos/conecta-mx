@@ -21,7 +21,7 @@ const SB_URL = 'https://npgnhsmwpcipxgvfxrho.supabase.co';
 const SB_KEY = process.env.SUPABASE_SERVICE_KEY_KAMEHOUSE;
 
 // Whitelist EDITABLE. slug AUSENTE a propósito (identidad / PK, no se edita).
-const CAMPOS_EDITABLES = new Set(['nombre', 'titulo', 'fecha_inicio', 'ciudad', 'tipo', 'status', 'venue', 'music', 'fechas_extra', 'zonas', 'hotel']);
+const CAMPOS_EDITABLES = new Set(['nombre', 'titulo', 'fecha_inicio', 'ciudad', 'tipo', 'status', 'venue', 'music', 'fechas_extra', 'zonas', 'hotel', 'mapa']);
 
 // hotel (B2b): JSON {custom, total, items:[{n,e,viaj}]}. `e` = extra POR PERSONA.
 // Si custom falso / sin items válidos → null (limpia / cae a default de ciudad).
@@ -95,6 +95,15 @@ function saneFechasExtra(v) {
   out.sort();
   return JSON.stringify(out);
 }
+// mapa: URL pública del mapa del venue (subido a bucket mapas-eventos). Acepta
+// URL http(s) o ruta absoluta; cualquier otra cosa → '' (limpia / sin mapa). El
+// compilador solo emite mapa si no está vacío. Devuelve string ('' = limpiar).
+function saneMapa(v) {
+  const s = (typeof v === 'string') ? v.trim() : '';
+  if (!s) return '';
+  return (/^https?:\/\//.test(s) || s.charAt(0) === '/') ? s : '';
+}
+
 // Status de Esferas (simplificado): Disponible / Próximamente / Últimos / Agotado.
 const STATUS_PERMITIDOS = new Set(['', 'proximamente', 'ultimos', 'agotado']);
 
@@ -133,6 +142,7 @@ exports.handler = async (event) => {
     if (k === 'fechas_extra') { sane[k] = saneFechasExtra(v); continue; }
     if (k === 'zonas') { sane[k] = saneZonas(v); continue; }
     if (k === 'hotel') { sane[k] = saneHotel(v); continue; }
+    if (k === 'mapa') { sane[k] = saneMapa(v); continue; }
     if (v === null || v === '') sane[k] = (k === 'status') ? '' : null;
     else sane[k] = String(v);
   }

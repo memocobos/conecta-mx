@@ -214,6 +214,9 @@ function generarObj(esfera, hoy) {
   const color = escStr(esfera.color || 'azul');
   const venue = escStr(esfera.venue || '');
   const cdmx = (ciudad === 'CDMX') ? 'cdmx:true,' : '';
+  // mapa: URL pública de la imagen subida (bucket mapas-eventos). Si vacío, NO se
+  // emite → byte-igual a hoy. El render de index.html acepta URL directa o clave.
+  const mapa = esfera.mapa ? ("mapa:'" + escStr(esfera.mapa) + "',") : '';
   return "{id:'" + escStr(esfera.slug) +
     "',added:'" + added +
     "'," + music +
@@ -225,7 +228,7 @@ function generarObj(esfera, hoy) {
     "'," + dsListStr +
     "v:'" + venue +
     "',st:'" + escStr(status) +
-    "'," + cdmx +
+    "'," + cdmx + mapa +
     "inc:[],banco:BANCO_DEFAULT," + zonasSegmento(esfera) + "," + hotelSegmento(esfera) + "," + pagosSegmento() + "}";
 }
 

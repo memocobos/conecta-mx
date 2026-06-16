@@ -26,7 +26,7 @@ const SB_KEY = process.env.SUPABASE_SERVICE_KEY_KAMEHOUSE;
 // Whitelist estricta. 'publicado' deliberadamente AUSENTE: queda en su default DB.
 const CAMPOS_PERMITIDOS = new Set([
   'slug', 'nombre', 'titulo', 'fecha_inicio', 'ciudad', 'tipo', 'status',
-  'venue', 'music', 'fechas_extra', 'zonas', 'hotel',
+  'venue', 'music', 'fechas_extra', 'zonas', 'hotel', 'mapa',
 ]);
 
 // hotel (B2b): JSON {custom, total, items:[{n,e,viaj}]}. `e` = extra POR PERSONA.
@@ -103,6 +103,15 @@ function saneFechasExtra(v) {
   return JSON.stringify(out);
 }
 
+// mapa: URL pública del mapa del venue (subido a bucket mapas-eventos). Acepta
+// URL http(s) o ruta absoluta; cualquier otra cosa → '' (sin mapa). El compilador
+// solo emite mapa si no está vacío. Devuelve string ('' = limpiar / sin mapa).
+function saneMapa(v) {
+  const s = (typeof v === 'string') ? v.trim() : '';
+  if (!s) return '';
+  return (/^https?:\/\//.test(s) || s.charAt(0) === '/') ? s : '';
+}
+
 const SLUG_RE = /^[a-z0-9-]+$/;
 // Status de Esferas (simplificado): Disponible / Próximamente / Últimos / Agotado.
 const STATUS_PERMITIDOS = new Set(['', 'proximamente', 'ultimos', 'agotado']);
@@ -141,6 +150,7 @@ exports.handler = async (event) => {
     if (k === 'fechas_extra') { sane[k] = saneFechasExtra(v); continue; }
     if (k === 'zonas') { sane[k] = saneZonas(v); continue; }
     if (k === 'hotel') { sane[k] = saneHotel(v); continue; }
+    if (k === 'mapa') { sane[k] = saneMapa(v); continue; }
     if (v === null || v === '') sane[k] = (k === 'status') ? '' : null;
     else sane[k] = String(v);
   }

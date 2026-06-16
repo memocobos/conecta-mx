@@ -3016,11 +3016,14 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
    </div>
   </div>
   <div class="card">
-   <div id="kamisama-content" class="empty-state" style="padding:48px 16px;text-align:center">
-    <div class="empty-icon"></div>
-    <div style="font-family:'Rajdhani',sans-serif;font-weight:700;font-size:18px;margin-bottom:6px">Palacio de Kamisama — Capa 1</div>
-    <div style="font-size:12px;color:var(--ts);line-height:1.6;max-width:420px;margin:0 auto">Inventario manual de boletos: compras (lotes) y abonos a proveedores.<br>En construcción — próximamente.</div>
+   <div style="font-family:'Rajdhani',sans-serif;font-weight:700;font-size:16px;margin-bottom:4px">Proveedores</div>
+   <div style="font-size:11px;color:var(--ts);margin-bottom:14px">Catálogo de proveedores. Las compras y los abonos elegirán de aquí.</div>
+   <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+    <input id="kam-prov-nombre" class="cot-input" placeholder="Nombre del proveedor" maxlength="80" style="flex:1;min-width:180px" onkeydown="if(event.key==='Enter')_kamProveedorCrear()">
+    <button class="btn btn-primary" type="button" onclick="_kamProveedorCrear()">Agregar proveedor</button>
    </div>
+   <div id="kam-prov-alert" style="margin-bottom:10px"></div>
+   <div id="kam-prov-list"><div class="loading-state"><div class="spinner"></div>Cargando…</div></div>
   </div>
  </div><!-- /page-kamisama -->
 
@@ -6900,11 +6903,60 @@ const VEHICULOS = [
   {label:'Van — 14 pax',       capacidad:14},
 ];
 
-// ── Palacio de Kamisama — Capa 1 (inventario de boletos) ─────────────────────
-// Placeholder. El contenido real (compras/lotes + abonos a proveedores) llega en
-// la implementación de la Capa 1. loadKamisama() se invoca desde loadPage().
+// ── Palacio de Kamisama — Capa 1 ─────────────────────────────────────────────
+// 1b: catálogo de Proveedores (admin-proveedores). loadKamisama() se invoca desde
+// loadPage(); por ahora solo carga la lista de proveedores.
 function loadKamisama() {
-  // Sin carga remota todavía: la página muestra su placeholder estático.
+  _kamProveedoresLoad();
+}
+
+async function _kamProveedoresLoad() {
+  const cont = document.getElementById('kam-prov-list');
+  if (!cont) return;
+  cont.innerHTML = '<div class="loading-state"><div class="spinner"></div>Cargando…</div>';
+  try {
+    const r = await khAdminFetch('/.netlify/functions/admin-proveedores', {
+      method: 'POST', body: JSON.stringify({ accion: 'listar' }),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok || !d.ok) throw new Error(d.error || 'No se pudieron cargar los proveedores');
+    const provs = d.proveedores || [];
+    if (!provs.length) {
+      cont.innerHTML = '<div class="empty-state"><div class="empty-icon"></div>Sin proveedores todavía</div>';
+      return;
+    }
+    cont.innerHTML =
+      '<table style="width:100%;border-collapse:collapse"><tbody>' +
+      provs.map((p) =>
+        '<tr style="border-top:1px solid var(--border)"><td style="padding:8px 4px;font-size:13px">' +
+        _esfEsc(p.nombre) + '</td></tr>'
+      ).join('') +
+      '</tbody></table>';
+  } catch (e) {
+    cont.innerHTML = `<div class="alert alert-error">${_esfEsc(e.message)}</div>`;
+  }
+}
+
+async function _kamProveedorCrear() {
+  const inp = document.getElementById('kam-prov-nombre');
+  const alertEl = document.getElementById('kam-prov-alert');
+  if (alertEl) alertEl.innerHTML = '';
+  const nombre = (inp?.value || '').trim();
+  if (!nombre) {
+    if (alertEl) alertEl.innerHTML = '<div class="alert alert-error">Escribe el nombre del proveedor.</div>';
+    return;
+  }
+  try {
+    const r = await khAdminFetch('/.netlify/functions/admin-proveedores', {
+      method: 'POST', body: JSON.stringify({ accion: 'crear', nombre }),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok || !d.ok) throw new Error(d.error || 'No se pudo agregar el proveedor');
+    if (inp) inp.value = '';
+    _kamProveedoresLoad();
+  } catch (e) {
+    if (alertEl) alertEl.innerHTML = `<div class="alert alert-error">${_esfEsc(e.message)}</div>`;
+  }
 }
 
 const HOTEL_DEFAULT = {monterrey:2500, cdmx:2900, otra:0};

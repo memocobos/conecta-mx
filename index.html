@@ -3847,10 +3847,18 @@ function selTransporteBtn(btn,cost,name){
 
 
 
+// ev.mapa puede ser una URL/ruta directa (mapa subido a Storage) o una clave
+// legacy de MAPAS (los 56 mapas en el repo). esMapaUrl detecta lo primero.
+function esMapaUrl(x){return typeof x==='string'&&(/^https?:\/\//.test(x)||x.indexOf('/')===0);}
+function mapaSrc(m){ // URL directa tal cual; si no, traduce la clave vía MAPAS.
+  if(!m)return'';
+  if(esMapaUrl(m))return m;
+  return (typeof MAPAS!=='undefined'&&MAPAS&&MAPAS[m])?MAPAS[m]:'';
+}
 function actualizarMapaBtn(){
   var btn=$$('w-mapa-btn');
   if(!btn)return;
-  if(cur&&cur.mapa&&typeof MAPAS!=='undefined'&&MAPAS&&MAPAS[cur.mapa]){
+  if(cur&&cur.mapa&&mapaSrc(cur.mapa)){
     btn.style.display='block';
     btn.disabled=false;
     btn.textContent='Ver mapa del venue';
@@ -3867,11 +3875,13 @@ function actualizarMapaBtn(){
   }
 }
 function abrirMapa(){
-  // Guards: cur presente, cur.mapa presente, MAPAS disponible (script cargó), key existe
-  if(!cur||!cur.mapa||typeof MAPAS==='undefined'||!MAPAS||!MAPAS[cur.mapa])return;
+  // Guards: cur presente, cur.mapa presente, y resuelve a un src (URL directa o clave MAPAS).
+  if(!cur||!cur.mapa)return;
+  var src=mapaSrc(cur.mapa);
+  if(!src)return;
   var modal=document.getElementById('mapa-modal');
   var img=document.getElementById('mapa-img');
-  if(img) img.src=MAPAS[cur.mapa];
+  if(img) img.src=src;
   if(modal) modal.style.display='flex';
 }
 function cerrarMapa(){

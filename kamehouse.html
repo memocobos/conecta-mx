@@ -2900,6 +2900,17 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
       <div style="font-size:11px;color:var(--ts);margin-top:4px">Extras POR PERSONA (ya descuentan el lugar del PLUS). Se calculan solos; puedes ajustar cualquiera a mano.</div>
      </div>
     </div>
+    <div class="form-group">
+     <label>Mapa del venue</label>
+     <input type="file" id="esf-mapa-file" accept="image/*" style="display:none" onchange="_esfMapaPick(event)">
+     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <button class="btn btn-ghost" type="button" id="esf-mapa-btn" onclick="document.getElementById('esf-mapa-file').click()">Subir mapa</button>
+      <button class="btn btn-ghost" type="button" id="esf-mapa-clear" style="display:none" onclick="_esfMapaClear()">Quitar mapa</button>
+      <span id="esf-mapa-status" style="font-size:11px;color:var(--ts)"></span>
+     </div>
+     <div id="esf-mapa-preview" style="margin-top:8px;display:none"><img id="esf-mapa-img" src="" alt="Mapa del venue" style="max-width:240px;max-height:180px;border:1px solid var(--border);border-radius:6px"></div>
+     <div style="font-size:11px;color:var(--ts);margin-top:4px">Imagen del mapa de zonas (conciertos). Sin mapa → el sitio muestra "Mapa próximamente".</div>
+    </div>
     <button class="btn btn-primary" id="esf-submit-btn" onclick="submitEsferaForm()">Crear evento</button>
     <button class="btn btn-ghost" id="esf-cancel-edit" style="margin-left:8px;display:none" onclick="cancelarEdicionEsfera()">Cancelar edición</button>
     <div id="esf-alert" style="margin-top:10px"></div>
@@ -12844,6 +12855,7 @@ async function crearEsferaEvento() {
     fechas_extra: _esfGetFechasExtra(),
     zonas: _esfGetZonas(),
     hotel: _esfGetHotel(),
+    mapa: _esfGetMapa(),
   };
   const alertEl = document.getElementById('esf-alert');
   try {
@@ -12860,6 +12872,7 @@ async function crearEsferaEvento() {
     _esfClearFechasExtra();
     _esfClearZonas();
     _esfClearHotel();
+    _esfMapaClear();
     const chosenEl = document.getElementById('esf-music-chosen'); if (chosenEl) chosenEl.textContent = '';
     const resEl = document.getElementById('esf-music-results'); if (resEl) resEl.innerHTML = '';
     loadEsferasEventos();
@@ -13073,6 +13086,96 @@ function _esfHotelPopulate(raw) {
   });
 }
 
+// ── Mapa del venue (imagen → bucket público mapas-eventos) ───────────────────
+// Estado: URL pública del mapa ya subido ('' = sin mapa). Se manda en el campo
+// `mapa` al crear/actualizar. La imagen se redimensiona a máx 1400px de ancho y
+// se sube como webp antes de mandarla (no inflar el bucket).
+var _esfMapaUrl = '';
+
+function _esfMapaShow(url) {
+  _esfMapaUrl = url || '';
+  const prev = document.getElementById('esf-mapa-preview');
+  const img = document.getElementById('esf-mapa-img');
+  const clr = document.getElementById('esf-mapa-clear');
+  if (_esfMapaUrl) {
+    if (img) img.src = _esfMapaUrl;
+    if (prev) prev.style.display = '';
+    if (clr) clr.style.display = '';
+  } else {
+    if (img) img.src = '';
+    if (prev) prev.style.display = 'none';
+    if (clr) clr.style.display = 'none';
+  }
+}
+
+function _esfMapaClear() {
+  _esfMapaShow('');
+  const f = document.getElementById('esf-mapa-file');
+  if (f) f.value = '';
+  const st = document.getElementById('esf-mapa-status');
+  if (st) st.textContent = '';
+}
+
+function _esfGetMapa() { return _esfMapaUrl || ''; }
+
+// Modo editar: re-poblar preview desde el `mapa` guardado (URL) o limpiar.
+function _esfMapaPopulate(url) {
+  _esfMapaShow((typeof url === 'string' && url.trim()) ? url.trim() : '');
+}
+
+// Redimensiona el archivo a máx 1400px de ancho y devuelve un dataUrl webp ~0.85.
+function _esfMapaResize(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const img = new Image();
+      img.onload = () => {
+        const MAX = 1400;
+        let w = img.width, h = img.height;
+        if (w > MAX) { h = Math.round(h * MAX / w); w = MAX; }
+        const canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL('image/webp', 0.85));
+      };
+      img.onerror = reject;
+      img.src = ev.target.result;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+async function _esfMapaPick(event) {
+  const file = event.target.files && event.target.files[0];
+  if (!file) return;
+  const slug = (document.getElementById('esf-slug')?.value || '').trim().toLowerCase();
+  if (!slug) {
+    alert('Primero pon el slug del evento (nombra el archivo del mapa).');
+    event.target.value = '';
+    return;
+  }
+  const st = document.getElementById('esf-mapa-status');
+  if (st) st.textContent = 'Subiendo…';
+  try {
+    const dataUrl = await _esfMapaResize(file);
+    const r = await khAdminFetch('/.netlify/functions/esferas-subir-mapa', {
+      method: 'POST', body: JSON.stringify({ slug, dataUrl }),
+    });
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok || !data.ok || !data.url) throw new Error(data.error || 'No se pudo subir el mapa');
+    // Cache-bust en el preview: el bucket hace upsert sobre el mismo path.
+    _esfMapaShow(data.url);
+    const img = document.getElementById('esf-mapa-img');
+    if (img) img.src = data.url + '?t=' + (img._t = (img._t || 0) + 1);
+    if (st) st.textContent = 'Mapa subido ✓';
+  } catch (e) {
+    if (st) st.textContent = 'Error: ' + e.message;
+  } finally {
+    event.target.value = '';
+  }
+}
+
 // minP del preview = espeja la card real del index: menor precio PLUS (p>0,
 // no agotada). 0 si no hay zonas vendibles.
 function _esfPreviewMinP() {
@@ -13112,6 +13215,8 @@ function editarEsfera(slug) {
   if (Array.isArray(_zs)) _zs.forEach((z) => { if (z && typeof z === 'object') _esfAddZona(z); });
   // Hotel custom: re-poblar desde `hotel` (texto JSON u objeto); custom:false → off.
   _esfHotelPopulate(row.hotel);
+  // Mapa: re-poblar preview desde la URL guardada (o limpiar si no hay).
+  _esfMapaPopulate(row.mapa);
   _esfCiudadSet(row.ciudad || 'MTY');
   set('esf-tipo', row.tipo || 'concierto');
   set('esf-status', row.status || '');
@@ -13135,6 +13240,7 @@ function cancelarEdicionEsfera() {
   _esfClearFechasExtra();
   _esfClearZonas();
   _esfClearHotel();
+  _esfMapaClear();
   _esfCiudadSet('MTY');
   const tipo = document.getElementById('esf-tipo'); if (tipo) tipo.value = 'concierto';
   const status = document.getElementById('esf-status'); if (status) status.value = '';
@@ -13163,6 +13269,7 @@ async function guardarCambiosEsfera() {
     fechas_extra: _esfGetFechasExtra(),
     zonas: _esfGetZonas(),
     hotel: _esfGetHotel(),
+    mapa: _esfGetMapa(),
   };
   const alertEl = document.getElementById('esf-alert');
   try {

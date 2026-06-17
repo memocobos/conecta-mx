@@ -2870,7 +2870,10 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
     </div>
     <div class="form-group">
      <label>Venue</label>
-     <input class="cot-input" id="esf-venue" placeholder="ej. Estadio GNP, CDMX" style="width:100%" oninput="_esfCityChanged()">
+     <div style="position:relative">
+      <input class="cot-input" id="esf-venue" placeholder="ej. Estadio GNP, CDMX" style="width:100%" autocomplete="off" oninput="_esfCityChanged();_esfVenueSugg()" onblur="setTimeout(_esfVenueSuggHide,150)">
+      <div id="esf-venue-sugg" style="display:none;position:absolute;left:0;right:0;top:100%;z-index:30;background:var(--bg2);border:1px solid var(--border);border-top:none;border-radius:0 0 var(--radius) var(--radius);max-height:220px;overflow:auto"></div>
+     </div>
      <div style="font-size:11px;color:var(--ts);margin-top:4px">Incluye la ciudad en el venue (ej. "Auditorio Telmex, Guadalajara") para que el sitio la ubique bien.</div>
     </div>
     <div class="form-group">
@@ -2886,7 +2889,11 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
     <div class="form-group">
      <label>Zonas y precios</label>
      <div id="esf-zonas"></div>
-     <button class="btn btn-ghost" type="button" onclick="_esfAddZona()" style="margin-top:8px">+ Agregar zona</button>
+     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
+      <button class="btn btn-ghost" type="button" onclick="_esfAddZona()">+ Agregar zona</button>
+      <button class="btn btn-ghost" type="button" onclick="_esfGuardarVenueZonas()" title="Guarda los NOMBRES de zona (sin precios) para este venue">💾 Guardar zonas de este venue</button>
+     </div>
+     <div id="esf-venue-cat-msg" style="font-size:11px;margin-top:4px"></div>
      <div style="font-size:11px;color:var(--ts);margin-top:4px">El precio CHEAP es opcional. Si ninguna zona tiene CHEAP, el evento solo ofrece paquete PLUS.</div>
     </div>
     <div class="form-group">
@@ -12860,6 +12867,7 @@ function _esfEsc(s) {
 
 async function loadEsferasEventos() {
   _esfPreviewInit();
+  _esfLoadVenuesCat(); // best-effort, no bloquea el listado
   const cont = document.getElementById('esf-listado');
   if (!cont) return;
   cont.innerHTML = '<div class="loading-state"><div class="spinner"></div>Cargando…</div>';
@@ -13123,6 +13131,85 @@ function _esfClearFechasExtra() {
 // Cada fila: [Nombre] [$ PLUS] [$ CHEAP opcional] [☐ Agotada] [✕].
 // El ORDEN de captura se respeta (es el orden del cotizador). Se guarda como
 // JSON en `zonas` (solo filas con nombre).
+// ── Catálogo venue→zonas (Esferas) — admin-venues-catalogo (KH, maestro_roshi) ──
+// Cachea el catálogo al entrar a Esferas; autocompleta #esf-venue y precarga los
+// NOMBRES de zona (precio en blanco → p:0 → el index NO las enciende hasta capturar
+// precio real, candado 2c-iii). NO toca el catálogo viejo del cotizador (localStorage,
+// huérfano). Guarda/lee SOLO nombres, nunca precios.
+let _esfVenuesCat = [];
+
+async function _esfLoadVenuesCat() {
+  try {
+    const r = await khAdminFetch('/.netlify/functions/admin-venues-catalogo', {
+      method: 'POST', body: JSON.stringify({ accion: 'listar' }),
+    });
+    if (!r.ok) return;
+    const d = await r.json().catch(() => ({}));
+    _esfVenuesCat = Array.isArray(d.venues) ? d.venues : [];
+  } catch (e) { /* best-effort: sin catálogo, el venue sigue siendo texto libre */ }
+}
+
+function _esfVenueSugg() {
+  const box = document.getElementById('esf-venue-sugg');
+  const inp = document.getElementById('esf-venue');
+  if (!box || !inp) return;
+  const q = (inp.value || '').trim().toLowerCase();
+  if (!q || !_esfVenuesCat.length) { box.style.display = 'none'; box.innerHTML = ''; return; }
+  const m = [];
+  _esfVenuesCat.forEach((v, idx) => {
+    if (String(v.venue || '').toLowerCase().includes(q)) m.push({ v, idx });
+  });
+  const top = m.slice(0, 8);
+  if (!top.length) { box.style.display = 'none'; box.innerHTML = ''; return; }
+  // Pasamos el ÍNDICE (no el texto) al handler → evita problemas de escape con
+  // venues que traen comillas. El texto visible va escapado con _esfEsc.
+  box.innerHTML = top.map(({ v, idx }) => {
+    const nz = Array.isArray(v.zonas) ? v.zonas.length : 0;
+    return `<div style="padding:8px 10px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border)" onmousedown="_esfPickVenueIdx(${idx})">${_esfEsc(v.venue)} <span style="color:var(--ts);font-size:11px">· ${nz} zona${nz !== 1 ? 's' : ''}</span></div>`;
+  }).join('');
+  box.style.display = 'block';
+}
+
+function _esfVenueSuggHide() {
+  const box = document.getElementById('esf-venue-sugg');
+  if (box) box.style.display = 'none';
+}
+
+function _esfPickVenueIdx(idx) {
+  const cat = _esfVenuesCat[idx];
+  if (!cat) return;
+  const inp = document.getElementById('esf-venue');
+  if (inp) { inp.value = cat.venue; _esfCityChanged(); }
+  _esfVenueSuggHide();
+  const zonas = Array.isArray(cat.zonas) ? cat.zonas.filter(n => typeof n === 'string' && n.trim()) : [];
+  if (!zonas.length) return;
+  if (!confirm('¿Cargar las zonas de este venue? Reemplazará las zonas actuales')) return;
+  _esfClearZonas();
+  zonas.forEach(n => _esfAddZona({ n: n.trim() })); // precio en blanco a propósito
+}
+
+async function _esfGuardarVenueZonas() {
+  const msg = document.getElementById('esf-venue-cat-msg');
+  const setMsg = (color, txt) => { if (msg) { msg.style.color = color; msg.textContent = txt; } };
+  const venue = (document.getElementById('esf-venue')?.value || '').trim();
+  if (!venue) { setMsg('var(--red)', 'Captura el venue primero.'); return; }
+  const nombres = _esfGetZonas().map(z => z.n).filter(n => n && n.trim());
+  if (!nombres.length) { setMsg('var(--red)', 'No hay zonas con nombre para guardar.'); return; }
+  setMsg('var(--ts)', 'Guardando…');
+  try {
+    const r = await khAdminFetch('/.netlify/functions/admin-venues-catalogo', {
+      method: 'POST', body: JSON.stringify({ accion: 'guardar', venue, zonas: nombres }),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok || d.ok === false) throw new Error(d.error || ('admin-venues-catalogo ' + r.status));
+    setMsg('var(--green)', `✅ Zonas guardadas para "${d.venue || venue}".`);
+    await _esfLoadVenuesCat();
+    setTimeout(() => setMsg('var(--ts)', ''), 2500);
+  } catch (e) {
+    setMsg('var(--red)', e.message);
+  }
+}
+
 function _esfAddZona(data) {
   const cont = document.getElementById('esf-zonas');
   if (!cont) return;

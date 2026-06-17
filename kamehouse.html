@@ -7009,16 +7009,28 @@ async function _kamComprasLoad() {
     const ev = (Array.isArray(evArr) ? evArr : []).find((e) => e && e.id === evId);
     const zonasEV = (ev && Array.isArray(ev.zonas)) ? ev.zonas : [];
 
-    const [cRes, pRes] = await Promise.all([
+    const [cRes, pRes, vRes] = await Promise.all([
       khAdminFetch('/.netlify/functions/admin-compras', { method: 'POST', body: JSON.stringify({ accion: 'listar', evento_id: evId }) }),
       khAdminFetch('/.netlify/functions/admin-proveedores', { method: 'POST', body: JSON.stringify({ accion: 'listar' }) }),
+      khAdminFetch('/.netlify/functions/admin-vendidos-evento', { method: 'POST', body: JSON.stringify({ evento_id: evId }) }),
     ]);
     const cData = await cRes.json().catch(() => ({}));
     const pData = await pRes.json().catch(() => ({}));
+    const vData = await vRes.json().catch(() => ({}));
     if (!cRes.ok || !cData.ok) throw new Error(cData.error || 'No se pudieron cargar las compras');
     if (!pRes.ok || !pData.ok) throw new Error(pData.error || 'No se pudieron cargar los proveedores');
     const compras = cData.compras || [];
     _kamProvCache = pData.proveedores || [];
+
+    // Vendidos por zona (Portal, vía 2a; ya filtrado por estados que cuentan). Si
+    // la lectura falla, se degrada a {} (no rompe el inventario). Claves con trim.
+    const vendidosMap = {};
+    if (vRes.ok && vData.ok && vData.vendidos) {
+      Object.keys(vData.vendidos).forEach((k) => {
+        const key = String(k).trim();
+        vendidosMap[key] = (vendidosMap[key] || 0) + (parseInt(vData.vendidos[k], 10) || 0);
+      });
+    }
 
     // Deuda agrupada POR PROVEEDOR (cantidad × costo_unitario de sus compras).
     const deudaPorProveedor = {};
@@ -7049,6 +7061,9 @@ async function _kamComprasLoad() {
       const stock = cz.reduce((s, c) => s + (parseInt(c.cantidad, 10) || 0), 0);
       const deuda = cz.reduce((s, c) => s + (parseInt(c.cantidad, 10) || 0) * (Number(c.costo_unitario) || 0), 0);
       totalEvento += deuda;
+      const vendidos = vendidosMap[String(zona).trim()] || 0;
+      const disponible = stock - vendidos;
+      const dispColor = disponible > 0 ? 'var(--green)' : 'var(--red)';
       const filas = cz.length
         ? cz.map((c) => {
             const sub = (parseInt(c.cantidad, 10) || 0) * (Number(c.costo_unitario) || 0);
@@ -7065,7 +7080,7 @@ async function _kamComprasLoad() {
       html += `<div style="border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:12px">
         <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:8px">
           <div style="font-family:'Rajdhani',sans-serif;font-weight:700;font-size:15px">${_esfEsc(zona)}</div>
-          <div style="font-size:12px;color:var(--ts)">Stock: <b style="color:var(--fg)">${stock}</b> · Deuda: <b style="color:var(--fg)">${_kamMoney(deuda)}</b></div>
+          <div style="font-size:12px;color:var(--ts)">Stock: <b style="color:var(--fg)">${stock}</b> · Vendidos: <b style="color:var(--fg)">${vendidos}</b> · Disponible: <b style="color:${dispColor};font-size:13px">${disponible}</b> · Deuda: <b style="color:var(--fg)">${_kamMoney(deuda)}</b></div>
         </div>
         <table style="width:100%;border-collapse:collapse;margin-bottom:8px"><tbody>${filas}</tbody></table>
         <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">

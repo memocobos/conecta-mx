@@ -7020,6 +7020,16 @@ async function _kamComprasLoad() {
     const compras = cData.compras || [];
     _kamProvCache = pData.proveedores || [];
 
+    // Deuda agrupada POR PROVEEDOR (cantidad × costo_unitario de sus compras).
+    const deudaPorProveedor = {};
+    compras.forEach((c) => {
+      const pid = c.proveedor_id;
+      if (!pid) return;
+      const sub = (parseInt(c.cantidad, 10) || 0) * (Number(c.costo_unitario) || 0);
+      if (!deudaPorProveedor[pid]) deudaPorProveedor[pid] = { nombre: c.proveedor_nombre || '—', deuda: 0 };
+      deudaPorProveedor[pid].deuda += sub;
+    });
+
     if (!zonasEV.length && !compras.length) {
       cont.innerHTML = '<div class="empty-state"><div class="empty-icon"></div>Este evento aún no tiene zonas</div>';
       return;
@@ -7070,10 +7080,126 @@ async function _kamComprasLoad() {
     });
     html += `<div style="text-align:right;font-size:14px;font-weight:700;margin-top:4px">Deuda del evento: ${_kamMoney(totalEvento)}</div>`;
     html += '<div id="kam-compras-alert" style="margin-top:10px"></div>';
+    html += '<div id="kam-abonos" style="margin-top:16px"></div>';
     cont.innerHTML = html;
+    _kamAbonosLoad(evId, deudaPorProveedor);
   } catch (e) {
     cont.innerHTML = `<div class="alert alert-error">${_esfEsc(e.message)}</div>`;
   }
+}
+
+// ── Abonos a proveedores (pagos) ─────────────────────────────────────────────
+// deudaPorProveedor = { proveedor_id: { nombre, deuda } } calculado de las compras.
+function _kamAbonosAlert(msg) {
+  const a = document.getElementById('kam-abonos-alert');
+  if (a) a.innerHTML = `<div class="alert alert-error">${_esfEsc(msg)}</div>`;
+}
+
+async function _kamAbonosLoad(slug, deudaPorProveedor) {
+  const cont = document.getElementById('kam-abonos');
+  if (!cont) return;
+  cont.innerHTML = '<div class="loading-state"><div class="spinner"></div>Cargando abonos…</div>';
+  try {
+    const r = await khAdminFetch('/.netlify/functions/admin-abonos', {
+      method: 'POST', body: JSON.stringify({ accion: 'listar', evento_id: slug }),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok || !d.ok) throw new Error(d.error || 'No se pudieron cargar los abonos');
+    const abonos = d.abonos || [];
+
+    // Abonado por proveedor.
+    const abonadoPorProveedor = {};
+    abonos.forEach((a) => {
+      const pid = a.proveedor_id;
+      if (!pid) return;
+      abonadoPorProveedor[pid] = (abonadoPorProveedor[pid] || 0) + (Number(a.monto) || 0);
+    });
+
+    // Unión de proveedores con deuda o con abonos.
+    const pids = [];
+    Object.keys(deudaPorProveedor || {}).forEach((pid) => { if (!pids.includes(pid)) pids.push(pid); });
+    Object.keys(abonadoPorProveedor).forEach((pid) => { if (!pids.includes(pid)) pids.push(pid); });
+
+    const nombreDe = (pid) => (deudaPorProveedor[pid] && deudaPorProveedor[pid].nombre)
+      || (abonos.find((a) => a.proveedor_id === pid) || {}).proveedor_nombre || '—';
+
+    let deudaTotal = 0, abonadoTotal = 0;
+    const lineas = pids.map((pid) => {
+      const deuda = (deudaPorProveedor[pid] && deudaPorProveedor[pid].deuda) || 0;
+      const abonado = abonadoPorProveedor[pid] || 0;
+      deudaTotal += deuda; abonadoTotal += abonado;
+      const saldo = deuda - abonado;
+      return `<div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;font-size:12px;padding:5px 0;border-top:1px solid var(--border)">
+        <span style="font-weight:700">${_esfEsc(nombreDe(pid))}</span>
+        <span style="color:var(--ts)">Deuda ${_kamMoney(deuda)} · Abonado ${_kamMoney(abonado)} · Saldo <b style="color:var(--fg)">${_kamMoney(saldo)}</b></span>
+      </div>`;
+    }).join('');
+
+    // Proveedores con deuda → opciones del form de abono.
+    const conDeuda = Object.keys(deudaPorProveedor || {});
+    const provOpts = conDeuda.map((pid) => `<option value="${_esfEsc(pid)}">${_esfEsc(deudaPorProveedor[pid].nombre)}</option>`).join('');
+    const form = conDeuda.length
+      ? `<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:10px 0">
+          <select class="cot-input" id="kam-abono-prov" style="min-width:130px">${provOpts}</select>
+          <input class="cot-input" id="kam-abono-monto" type="number" min="0" step="0.01" placeholder="Monto" style="width:110px">
+          <input class="cot-input" id="kam-abono-fecha" type="date" value="${_kamToday()}" style="width:150px">
+          <input class="cot-input" id="kam-abono-nota" placeholder="Nota (opcional)" maxlength="500" style="flex:1;min-width:120px">
+          <button class="btn btn-primary btn-sm" type="button" onclick="_kamAbonoCrear('${_esfEsc(slug)}')">REGISTRAR ABONO</button>
+        </div>`
+      : '<div style="font-size:12px;color:var(--ts);margin:10px 0">Registra compras primero.</div>';
+
+    const filasAbonos = abonos.length
+      ? abonos.map((a) => `<tr style="border-top:1px solid var(--border)">
+          <td style="padding:6px 4px;font-size:12px;color:var(--ts)">${_esfEsc(a.fecha || '')}</td>
+          <td style="padding:6px 4px;font-size:12px">${_esfEsc(a.proveedor_nombre || '—')}</td>
+          <td style="padding:6px 4px;font-size:12px">${_kamMoney(a.monto)}</td>
+          <td style="padding:6px 4px;font-size:12px;color:var(--ts)">${_esfEsc(a.nota || '')}</td>
+          <td style="padding:6px 4px;text-align:right"><button class="btn btn-ghost btn-sm" type="button" onclick="_kamAbonoEliminar('${_esfEsc(a.id)}','${_esfEsc(slug)}')" title="Eliminar abono">✕</button></td>
+        </tr>`).join('')
+      : '<tr><td colspan="5" style="padding:6px 4px;font-size:12px;color:var(--ts)">Sin abonos registrados</td></tr>';
+
+    const saldoTotal = deudaTotal - abonadoTotal;
+    cont.innerHTML = `<div style="border:1px solid var(--border);border-radius:8px;padding:12px">
+      <div style="font-family:'Rajdhani',sans-serif;font-weight:700;font-size:15px;margin-bottom:8px">Abonos a proveedores</div>
+      ${lineas || '<div style="font-size:12px;color:var(--ts)">Sin deuda ni abonos todavía.</div>'}
+      ${form}
+      <div id="kam-abonos-alert" style="margin-bottom:8px"></div>
+      <table style="width:100%;border-collapse:collapse"><tbody>${filasAbonos}</tbody></table>
+      <div style="text-align:right;font-size:13px;font-weight:700;margin-top:10px">Deuda total ${_kamMoney(deudaTotal)} · Abonado total ${_kamMoney(abonadoTotal)} · Saldo total ${_kamMoney(saldoTotal)}</div>
+    </div>`;
+  } catch (e) {
+    cont.innerHTML = `<div class="alert alert-error">${_esfEsc(e.message)}</div>`;
+  }
+}
+
+async function _kamAbonoCrear(slug) {
+  _kamAbonosAlert('');
+  const prov = document.getElementById('kam-abono-prov')?.value || '';
+  const montoN = Number(document.getElementById('kam-abono-monto')?.value);
+  const fecha = document.getElementById('kam-abono-fecha')?.value || '';
+  const nota = (document.getElementById('kam-abono-nota')?.value || '').trim();
+  if (!prov) { _kamAbonosAlert('Elige un proveedor.'); return; }
+  if (!Number.isFinite(montoN) || montoN <= 0) { _kamAbonosAlert('El monto debe ser mayor a 0.'); return; }
+  if (fecha && !/^\d{4}-\d{2}-\d{2}$/.test(fecha)) { _kamAbonosAlert('Fecha inválida.'); return; }
+  try {
+    const r = await khAdminFetch('/.netlify/functions/admin-abonos', {
+      method: 'POST',
+      body: JSON.stringify({ accion: 'crear', evento_id: slug, proveedor_id: prov, monto: montoN, fecha: fecha || null, nota: nota || null }),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok || !d.ok) throw new Error(d.error || 'No se pudo registrar el abono');
+    _kamComprasLoad();
+  } catch (e) { _kamAbonosAlert(e.message); }
+}
+
+async function _kamAbonoEliminar(id, slug) {
+  if (!confirm('¿Eliminar este abono?')) return;
+  try {
+    const r = await khAdminFetch('/.netlify/functions/admin-abonos', { method: 'POST', body: JSON.stringify({ accion: 'eliminar', id }) });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok || !d.ok) throw new Error(d.error || 'No se pudo eliminar el abono');
+    _kamComprasLoad();
+  } catch (e) { _kamAbonosAlert(e.message); }
 }
 
 async function _kamCompraCrear(zi) {

@@ -58,5 +58,6 @@ window.STATIC_IMGS={
   'trueno':'imgs/trueno.webp',
   'ultramexico':'imgs/ultramexico.webp',
   'wwemexico':'imgs/wwemexico.jpg',
-  'wweraw':'imgs/wweraw.jpg'
+  'wweraw':'imgs/wweraw.jpg',
+  'wwesmackdown':'imgs/perfilsmack.jpg'
 };

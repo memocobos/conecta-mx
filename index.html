@@ -3102,6 +3102,9 @@ function showDetail(id, _skipHistory){
   document.body.setAttribute('data-ev',cur.id);
   selZ=null;selH=null;selViaj=0;selPkg=null;selFechaIdx=0;
   if(cur.multifecha) cur._fechaIdx=0;
+  // Capa 2 (Tuerca 2c-ii): pregunta al inventario real qué zonas apagar/encender.
+  // Async y fail-closed: si falla o el evento no se gestiona, el render no cambia.
+  loadDisponibilidad(cur.id);
 
   $$('d-fecha').textContent=cur.f;
   $$('d-artist').textContent=cur.a;
@@ -3510,13 +3513,7 @@ function selPaquete(btn,pkg){
         $$('d-zonas').innerHTML='<div style="text-align:center;padding:20px;color:rgba(255,255,255,.4);font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.06em">Próximamente — costos disponibles muy pronto</div>';
         $$('w-zona-card').style.display='block';
       } else {
-      var zonasToShow;
-      if(selPkg==='cheap'){
-        if(hasFecha&&cur.multifecha[selFechaIdx]&&cur.multifecha[selFechaIdx].cheapZonas){zonasToShow=cur.multifecha[selFechaIdx].cheapZonas;}
-        else if(cur.cheapZonas){zonasToShow=cur.cheapZonas;}
-      }
-      else if(hasFecha){zonasToShow=cur.multifecha[selFechaIdx].zonas;}
-      else{zonasToShow=cur.zonas;}
+      var zonasToShow=currentZonasToShow();
       buildZonaButtons(zonasToShow);
       actualizarMapaBtn();
       $$('w-zona-card').style.display='block';
@@ -3652,13 +3649,74 @@ function selDia(btn,idx){
   for(var i=0;i<pb.length;i++)pb[i].classList.remove('active');
 }
 
+// ----- Disponibilidad por zona (Capa 2, Palacio de Kamisama) -----
+// Overlay leído en render: { evId, map:{ "<zona trim>": true(agotada)|false(disponible) } }.
+// NO mutamos el EV (minP, cards del catálogo y demás consumidores quedan intactos);
+// el ajuste del .ag vive solo aquí y aplica únicamente al render del detalle abierto.
+var dispOverlay=null;
+
+function loadDisponibilidad(evId){
+  dispOverlay=null;  // limpia el del evento anterior de inmediato
+  fetch('/.netlify/functions/disponibilidad-evento',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({evento_id:evId})
+  }).then(function(r){return r.ok?r.json():null;}).then(function(d){
+    // Fallback estricto: cualquier cosa que no sea ok+gestionado → no tocar nada.
+    if(!d||!d.ok||d.gestionado!==true)return;
+    if(!cur||cur.id!==evId)return;  // el detalle cambió o se cerró mientras esperábamos
+    var map={};
+    var gest=Array.isArray(d.zonas_gestionadas)?d.zonas_gestionadas:[];
+    var ago=Array.isArray(d.zonas_agotadas)?d.zonas_agotadas:[];
+    // Gestionada y con disponible → encender (false). El Palacio manda: ignora el ag manual.
+    for(var i=0;i<gest.length;i++){map[String(gest[i]).trim()]=false;}
+    // Agotada → apagar (true). Override sobre lo anterior; zonas_agotadas ⊆ zonas_gestionadas.
+    for(var j=0;j<ago.length;j++){map[String(ago[j]).trim()]=true;}
+    dispOverlay={evId:evId,map:map};
+    rerenderZonasDisp();  // si las zonas ya están pintadas, vuelve a pintarlas
+  }).catch(function(){});  // red/timeout → fallback: no tocar nada
+}
+
+// Devuelve el array de zonas que el wizard mostraría ahora mismo (mismo criterio que
+// el paso de zonas), o null si no aplica (ej. fecha "próximamente").
+function currentZonasToShow(){
+  if(!cur)return null;
+  var hasFecha=!!cur.multifecha;
+  if(hasFecha&&cur.multifecha[selFechaIdx]&&cur.multifecha[selFechaIdx].prox)return null;
+  var zonasToShow;
+  if(selPkg==='cheap'){
+    if(hasFecha&&cur.multifecha[selFechaIdx]&&cur.multifecha[selFechaIdx].cheapZonas){zonasToShow=cur.multifecha[selFechaIdx].cheapZonas;}
+    else if(cur.cheapZonas){zonasToShow=cur.cheapZonas;}
+  }
+  else if(hasFecha){zonasToShow=cur.multifecha[selFechaIdx].zonas;}
+  else{zonasToShow=cur.zonas;}
+  return zonasToShow;
+}
+
+// Re-pinta las zonas con el overlay ya aplicado, solo si la tarjeta de zonas está visible.
+function rerenderZonasDisp(){
+  var card=$$('w-zona-card');
+  if(!card||getComputedStyle(card).display==='none')return;
+  var zonasToShow=currentZonasToShow();
+  if(!zonasToShow||!zonasToShow.length)return;
+  buildZonaButtons(zonasToShow);
+}
+
 function buildZonaButtons(zonas){
   var h='';
   for(var i=0;i<zonas.length;i++){
     var z=zonas[i];
+    // ag efectivo: el inventario real (overlay) manda sobre el ag manual del EV, pero
+    // solo en zonas gestionadas (presentes en el map). Sin overlay → respeta z.ag.
+    var effAg=z.ag;
+    if(dispOverlay&&cur&&dispOverlay.evId===cur.id){
+      var ov=dispOverlay.map[(z.n||'').trim()];
+      if(ov===true)effAg=1;        // agotada según inventario real
+      else if(ov===false)effAg=0;  // gestionada y disponible → encender
+    }
     if(z.prox){
       h+='<button class="z-btn ag" disabled style="opacity:.6;font-style:italic"><div class="z-name">'+z.n+'</div><div class="z-ag">Próximamente</div></button>';
-    } else if(z.ag){
+    } else if(effAg){
       var agP=z.p;
       if(selPkg==='stay'&&cur){agP=z.p-(cur.sep||500);if(agP<0)agP=z.p;}
       h+='<button class="z-btn ag" disabled><span class="z-name">'+z.n+'</span><span class="z-precio">'+fmt(agP)+'</span><span class="z-ag-badge">AGOTADO</span></button>';

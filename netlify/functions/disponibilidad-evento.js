@@ -11,10 +11,14 @@
 // Una zona está AGOTADA si tiene stock registrado (aparece en compras) y
 // stock − vendidos <= 0.
 //
-// SEGURIDAD (es pública): la respuesta expone SOLO nombres de zonas agotadas.
-// NUNCA stock, vendidos, costos ni totales. Forma exacta:
-//   { ok:true, evento_id, gestionado:<bool>, zonas_agotadas:[ "<nombre>", ... ] }
-//   gestionado = el evento tiene al menos una compra registrada.
+// SEGURIDAD (es pública): la respuesta expone SOLO nombres de zonas (gestionadas
+// y agotadas). NUNCA stock, vendidos, costos ni totales. Forma exacta:
+//   { ok:true, evento_id, gestionado:<bool>,
+//     zonas_gestionadas:[ "<nombre>", ... ], zonas_agotadas:[ "<nombre>", ... ] }
+//   gestionado          = el evento tiene al menos una compra registrada.
+//   zonas_gestionadas   = zonas con stock registrado (cualquier compra, aunque
+//                         el disponible siga > 0). Las que el Palacio controla.
+//   zonas_agotadas      = subconjunto de zonas_gestionadas con disponible <= 0.
 //
 // Sin auth (NO verifyAdminAuth). Env vars: SUPABASE_*_KAMEHOUSE (KH) +
 // PORTAL_SUPABASE_* (Portal). Read-only en ambos proyectos.
@@ -97,12 +101,17 @@ exports.handler = async (event) => {
       vendidosPorZona[zona] = (vendidosPorZona[zona] || 0) + n;
     });
 
-    // Agotada: zona con stock registrado y stock − vendidos <= 0. Solo nombres.
-    const zonas_agotadas = Object.keys(stockPorZona).filter(
+    // Gestionadas: zonas con stock registrado (las que el Palacio controla). Solo
+    // nombres, nunca cantidades.
+    const zonas_gestionadas = Object.keys(stockPorZona);
+
+    // Agotada: zona gestionada con stock − vendidos <= 0. zonas_agotadas ⊆
+    // zonas_gestionadas (se filtra sobre las mismas llaves). Solo nombres.
+    const zonas_agotadas = zonas_gestionadas.filter(
       (zona) => (stockPorZona[zona] - (vendidosPorZona[zona] || 0)) <= 0
     );
 
-    return jsonRes(200, { ok: true, evento_id, gestionado, zonas_agotadas });
+    return jsonRes(200, { ok: true, evento_id, gestionado, zonas_gestionadas, zonas_agotadas });
   } catch (e) {
     return jsonRes(502, { ok: false, error: 'No se pudo calcular la disponibilidad' });
   }

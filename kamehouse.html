@@ -3025,6 +3025,14 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
    <div id="kam-prov-alert" style="margin-bottom:10px"></div>
    <div id="kam-prov-list"><div class="loading-state"><div class="spinner"></div>Cargando…</div></div>
   </div>
+  <div class="card">
+   <div style="font-family:'Rajdhani',sans-serif;font-weight:700;font-size:16px;margin-bottom:4px">Inventario de boletos</div>
+   <div style="font-size:11px;color:var(--ts);margin-bottom:14px">Elige un evento y registra compras por zona. El stock y la deuda se calculan de las compras.</div>
+   <select id="kam-evt-sel" class="cot-input" style="width:100%;margin-bottom:12px" onchange="_kamComprasLoad()">
+    <option value="">— Elige un evento —</option>
+   </select>
+   <div id="kam-compras"></div>
+  </div>
  </div><!-- /page-kamisama -->
 
 
@@ -6904,10 +6912,11 @@ const VEHICULOS = [
 ];
 
 // ── Palacio de Kamisama — Capa 1 ─────────────────────────────────────────────
-// 1b: catálogo de Proveedores (admin-proveedores). loadKamisama() se invoca desde
-// loadPage(); por ahora solo carga la lista de proveedores.
+// 1b: catálogo de Proveedores (admin-proveedores). 1c: compras por evento/zona
+// (admin-compras). loadKamisama() se invoca desde loadPage().
 function loadKamisama() {
   _kamProveedoresLoad();
+  _kamPopulateEventos();
 }
 
 async function _kamProveedoresLoad() {
@@ -6957,6 +6966,150 @@ async function _kamProveedorCrear() {
   } catch (e) {
     if (alertEl) alertEl.innerHTML = `<div class="alert alert-error">${_esfEsc(e.message)}</div>`;
   }
+}
+
+// ── Inventario de boletos (compras por evento/zona) ──────────────────────────
+let _kamProvCache = [];   // proveedores para los <select> de las zonas
+let _kamZonasMap = {};    // índice de zona (zi) -> nombre de zona (para el alta)
+
+function _kamMoney(n) { return '$' + (Number(n) || 0).toLocaleString('es-MX', { maximumFractionDigits: 2 }); }
+function _kamToday() { try { return new Date().toLocaleDateString('en-CA'); } catch (_) { return ''; } }
+function _kamComprasAlert(msg) {
+  const a = document.getElementById('kam-compras-alert');
+  if (a) a.innerHTML = `<div class="alert alert-error">${_esfEsc(msg)}</div>`;
+}
+
+// Puebla el <select> de eventos desde el EV del index (solo zonas raíz en Capa 1).
+async function _kamPopulateEventos() {
+  const sel = document.getElementById('kam-evt-sel');
+  if (!sel) return;
+  try {
+    const ev = await _fetchEVFromIndex();
+    const opts = (Array.isArray(ev) ? ev : [])
+      .filter((e) => e && e.id)
+      .slice()
+      .sort((a, b) => String(a.a || a.id).localeCompare(String(b.a || b.id)))
+      .map((e) => `<option value="${_esfEsc(e.id)}">${_esfEsc(e.a || e.id)}</option>`)
+      .join('');
+    sel.innerHTML = '<option value="">— Elige un evento —</option>' + opts;
+  } catch (_) { /* deja el placeholder */ }
+}
+
+// Carga y pinta las compras del evento elegido, agrupadas por zona, con stock y
+// deuda por zona y total del evento. Recalcula en cada carga (alta/borrado).
+async function _kamComprasLoad() {
+  const sel = document.getElementById('kam-evt-sel');
+  const cont = document.getElementById('kam-compras');
+  if (!sel || !cont) return;
+  const evId = sel.value;
+  if (!evId) { cont.innerHTML = ''; return; }
+  cont.innerHTML = '<div class="loading-state"><div class="spinner"></div>Cargando…</div>';
+  try {
+    const evArr = await _fetchEVFromIndex();
+    const ev = (Array.isArray(evArr) ? evArr : []).find((e) => e && e.id === evId);
+    const zonasEV = (ev && Array.isArray(ev.zonas)) ? ev.zonas : [];
+
+    const [cRes, pRes] = await Promise.all([
+      khAdminFetch('/.netlify/functions/admin-compras', { method: 'POST', body: JSON.stringify({ accion: 'listar', evento_id: evId }) }),
+      khAdminFetch('/.netlify/functions/admin-proveedores', { method: 'POST', body: JSON.stringify({ accion: 'listar' }) }),
+    ]);
+    const cData = await cRes.json().catch(() => ({}));
+    const pData = await pRes.json().catch(() => ({}));
+    if (!cRes.ok || !cData.ok) throw new Error(cData.error || 'No se pudieron cargar las compras');
+    if (!pRes.ok || !pData.ok) throw new Error(pData.error || 'No se pudieron cargar los proveedores');
+    const compras = cData.compras || [];
+    _kamProvCache = pData.proveedores || [];
+
+    if (!zonasEV.length && !compras.length) {
+      cont.innerHTML = '<div class="empty-state"><div class="empty-icon"></div>Este evento aún no tiene zonas</div>';
+      return;
+    }
+    // Unión de zonas: las del EV (orden + permiten captura) + las que ya tengan
+    // compras (por si una zona se renombró en el index después de comprar).
+    const zonaNames = [];
+    zonasEV.forEach((z) => { const n = (z && z.n != null) ? String(z.n) : ''; if (n && !zonaNames.includes(n)) zonaNames.push(n); });
+    compras.forEach((c) => { const n = String(c.zona || ''); if (n && !zonaNames.includes(n)) zonaNames.push(n); });
+
+    _kamZonasMap = {};
+    let totalEvento = 0;
+    let html = '';
+    zonaNames.forEach((zona, zi) => {
+      _kamZonasMap[zi] = zona;
+      const cz = compras.filter((c) => String(c.zona) === zona);
+      const stock = cz.reduce((s, c) => s + (parseInt(c.cantidad, 10) || 0), 0);
+      const deuda = cz.reduce((s, c) => s + (parseInt(c.cantidad, 10) || 0) * (Number(c.costo_unitario) || 0), 0);
+      totalEvento += deuda;
+      const filas = cz.length
+        ? cz.map((c) => {
+            const sub = (parseInt(c.cantidad, 10) || 0) * (Number(c.costo_unitario) || 0);
+            return `<tr style="border-top:1px solid var(--border)">
+              <td style="padding:6px 4px;font-size:12px">${parseInt(c.cantidad, 10) || 0} × ${_kamMoney(c.costo_unitario)}</td>
+              <td style="padding:6px 4px;font-size:12px;color:var(--ts)">${_esfEsc(c.proveedor_nombre || '—')}</td>
+              <td style="padding:6px 4px;font-size:12px;color:var(--ts)">${_esfEsc(c.fecha || '')}</td>
+              <td style="padding:6px 4px;font-size:12px">${_kamMoney(sub)}</td>
+              <td style="padding:6px 4px;text-align:right"><button class="btn btn-ghost btn-sm" type="button" onclick="_kamCompraEliminar('${_esfEsc(c.id)}')" title="Eliminar compra">✕</button></td>
+            </tr>`;
+          }).join('')
+        : '<tr><td colspan="5" style="padding:6px 4px;font-size:12px;color:var(--ts)">Sin compras en esta zona</td></tr>';
+      const provOpts = _kamProvCache.map((p) => `<option value="${_esfEsc(p.id)}">${_esfEsc(p.nombre)}</option>`).join('');
+      html += `<div style="border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:12px">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:8px">
+          <div style="font-family:'Rajdhani',sans-serif;font-weight:700;font-size:15px">${_esfEsc(zona)}</div>
+          <div style="font-size:12px;color:var(--ts)">Stock: <b style="color:var(--fg)">${stock}</b> · Deuda: <b style="color:var(--fg)">${_kamMoney(deuda)}</b></div>
+        </div>
+        <table style="width:100%;border-collapse:collapse;margin-bottom:8px"><tbody>${filas}</tbody></table>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+          <input class="cot-input" id="kam-c-cant-${zi}" type="number" min="0" placeholder="Cantidad" style="width:90px">
+          <input class="cot-input" id="kam-c-costo-${zi}" type="number" min="0" step="0.01" placeholder="Costo unit." style="width:110px">
+          <select class="cot-input" id="kam-c-prov-${zi}" style="min-width:130px">${provOpts}</select>
+          <input class="cot-input" id="kam-c-fecha-${zi}" type="date" value="${_kamToday()}" style="width:150px">
+          <input class="cot-input" id="kam-c-nota-${zi}" placeholder="Nota (opcional)" maxlength="500" style="flex:1;min-width:120px">
+          <button class="btn btn-primary btn-sm" type="button" onclick="_kamCompraCrear(${zi})">Agregar compra</button>
+        </div>
+      </div>`;
+    });
+    html += `<div style="text-align:right;font-size:14px;font-weight:700;margin-top:4px">Deuda del evento: ${_kamMoney(totalEvento)}</div>`;
+    html += '<div id="kam-compras-alert" style="margin-top:10px"></div>';
+    cont.innerHTML = html;
+  } catch (e) {
+    cont.innerHTML = `<div class="alert alert-error">${_esfEsc(e.message)}</div>`;
+  }
+}
+
+async function _kamCompraCrear(zi) {
+  const sel = document.getElementById('kam-evt-sel');
+  const evId = sel ? sel.value : '';
+  const zona = _kamZonasMap[zi];
+  if (!evId || zona == null) return;
+  _kamComprasAlert('');
+  const cantN = parseInt(document.getElementById('kam-c-cant-' + zi)?.value, 10);
+  const costoN = Number(document.getElementById('kam-c-costo-' + zi)?.value);
+  const prov = document.getElementById('kam-c-prov-' + zi)?.value || '';
+  const fecha = document.getElementById('kam-c-fecha-' + zi)?.value || '';
+  const nota = (document.getElementById('kam-c-nota-' + zi)?.value || '').trim();
+  if (!Number.isInteger(cantN) || cantN < 0) { _kamComprasAlert('Cantidad inválida (entero >= 0).'); return; }
+  if (!Number.isFinite(costoN) || costoN < 0) { _kamComprasAlert('Costo unitario inválido (>= 0).'); return; }
+  if (!prov) { _kamComprasAlert('Elige un proveedor.'); return; }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha)) { _kamComprasAlert('Fecha inválida.'); return; }
+  try {
+    const r = await khAdminFetch('/.netlify/functions/admin-compras', {
+      method: 'POST',
+      body: JSON.stringify({ accion: 'crear', evento_id: evId, zona, cantidad: cantN, costo_unitario: costoN, proveedor_id: prov, fecha, nota: nota || null }),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok || !d.ok) throw new Error(d.error || 'No se pudo registrar la compra');
+    _kamComprasLoad();
+  } catch (e) { _kamComprasAlert(e.message); }
+}
+
+async function _kamCompraEliminar(id) {
+  if (!confirm('¿Eliminar esta compra?')) return;
+  try {
+    const r = await khAdminFetch('/.netlify/functions/admin-compras', { method: 'POST', body: JSON.stringify({ accion: 'eliminar', id }) });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok || !d.ok) throw new Error(d.error || 'No se pudo eliminar la compra');
+    _kamComprasLoad();
+  } catch (e) { _kamComprasAlert(e.message); }
 }
 
 const HOTEL_DEFAULT = {monterrey:2500, cdmx:2900, otra:0};

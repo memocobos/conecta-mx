@@ -3712,7 +3712,11 @@ function buildZonaButtons(zonas){
     if(dispOverlay&&cur&&dispOverlay.evId===cur.id){
       var ov=dispOverlay.map[(z.n||'').trim()];
       if(ov===true)effAg=1;        // agotada según inventario real
-      else if(ov===false)effAg=0;  // gestionada y disponible → encender
+      // Candado p:0 (Tuerca 2c-iii): el Palacio quiere encender, pero si el EV no
+      // tiene precio real (!z.p cubre 0/null/undefined) NO encendemos — la dejamos
+      // agotada para no ofrecerla al cliente en $0. Las zonas free (GRATIS) sí se
+      // encienden. Apagar (ov===true) se respeta siempre, sin importar el precio.
+      else if(ov===false) effAg = (z.p || z.free) ? 0 : 1;
     }
     if(z.prox){
       h+='<button class="z-btn ag" disabled style="opacity:.6;font-style:italic"><div class="z-name">'+z.n+'</div><div class="z-ag">Próximamente</div></button>';

@@ -93,6 +93,45 @@ function build(EV) {
   }).sort((a, b) => a.venue.localeCompare(b.venue));
 }
 
+// Mapa de CURACIÓN MANUAL (Memo). Se aplica DESPUÉS de la normalización
+// conservadora. Clave = nombre oficial auto-generado (tal cual sale de build());
+// valor = nombre final. Varias claves → mismo valor = FUSIÓN (se unen sus zonas,
+// dedup case-insensitive). Una clave → nombre distinto = RENAME/ortografía. Lo no
+// listado se queda igual. Solo nombres de zona, nunca precios.
+const CURACION = {
+  // ── Fusiones manuales (unir zonas) ──
+  'Arena Monterrey': 'Arena Monterrey, Mty',
+  'Auditorio Banamex, Mty': 'Auditorio Citibanamex, Mty',
+  'Monterrey': 'Auditorio Citibanamex, Mty',
+  'Autodromo H. Rodriguez, CDMX': 'Autódromo Hermanos Rodríguez, CDMX',
+  'Estadio GNP, CDMX': 'Estadio GNP Seguros, CDMX',
+  'Foro Sol, CDMX': 'Estadio GNP Seguros, CDMX',
+  // ── Renames (mismo venue, nombre nuevo) ──
+  'Guadalupe, NL': 'Expo Guadalupe, N.L.',
+  'Jardines de México, CDMX': 'Jardines de México, Morelos',
+  'Parque Fundidora, Mty': 'Parque Fundidora', // sin ciudad, intencional
+  // ── Ortografía correcta en oficiales ──
+  'Autodromo Querétaro': 'Autódromo Querétaro',
+  'Escenario GNP, MTY': 'Escenario GNP, Mty',
+};
+
+// Aplica CURACION sobre el resultado de build(). Devuelve { venues, unmatched }
+// donde unmatched lista claves del mapa que no calzaron con ningún oficial
+// auto-generado (señal de typo en el mapa).
+function curate(venues) {
+  const unmatched = new Set(Object.keys(CURACION));
+  const byFinal = {};
+  venues.forEach((v) => {
+    const final = CURACION[v.venue] || v.venue;
+    if (CURACION[v.venue]) unmatched.delete(v.venue);
+    const g = (byFinal[final] = byFinal[final] || { venue: final, zonas: [], _seen: new Set() });
+    v.zonas.forEach((n) => { const low = n.toLowerCase(); if (!g._seen.has(low)) { g._seen.add(low); g.zonas.push(n); } });
+  });
+  const out = Object.values(byFinal).map((g) => ({ venue: g.venue, zonas: g.zonas }))
+    .sort((a, b) => a.venue.localeCompare(b.venue));
+  return { venues: out, unmatched: [...unmatched] };
+}
+
 // Llama a la acción `guardar`. Devuelve {ok} o {ok:false, error} (sin throw).
 async function guardar(venue, zonas) {
   const res = await fetch(FN_URL, {
@@ -109,10 +148,19 @@ async function guardar(venue, zonas) {
 async function main() {
   const html = fs.readFileSync(INDEX_PATH, 'utf8');
   const EV = extractEV(html);
-  const venues = build(EV);
-  const merges = venues.filter((v) => Object.keys(v.variants).length > 1);
-  console.log(`EV: ${EV.length} eventos → ${venues.length} venues (${merges.length} fusionados)`);
-  merges.forEach((v) => console.log(`  fusión → "${v.venue}"  ${JSON.stringify(v.variants)}  (${v.zonas.length} zonas)`));
+  const auto = build(EV);
+  const autoMerges = auto.filter((v) => Object.keys(v.variants).length > 1);
+  console.log(`EV: ${EV.length} eventos → ${auto.length} venues auto (${autoMerges.length} fusiones conservadoras)`);
+  autoMerges.forEach((v) => console.log(`  auto → "${v.venue}"  ${JSON.stringify(v.variants)}  (${v.zonas.length} zonas)`));
+
+  // Curación manual (fusiones/renames/ortografía de Memo) encima de lo auto.
+  const cur = curate(auto);
+  const venues = cur.venues;
+  if (cur.unmatched.length) {
+    console.error(`\n⚠️ Claves de CURACION que NO calzaron con ningún oficial auto (revisa typos):`);
+    cur.unmatched.forEach((k) => console.error(`    "${k}"`));
+  }
+  console.log(`\nTras curación manual: ${venues.length} venues finales.`);
 
   if (DRY) {
     console.log('\n[DRY-RUN] No se escribe nada. Venues a sembrar:');

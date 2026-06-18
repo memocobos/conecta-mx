@@ -7,11 +7,15 @@
 // el resto del Palacio). Molde calcado de admin-proveedores.js.
 //
 // Body JSON: { accion, ... }
-//   - 'listar'   {}                       → { ok, venues:[{venue, zonas}] }  (orden venue)
-//   - 'guardar'  { venue, zonas:[nombres] } → { ok, venue }
+//   - 'listar'       {}                        → { ok, venues:[{venue, zonas}] }  (orden venue)
+//   - 'guardar'      { venue, zonas:[nombres] } → { ok, venue }
 //        UPSERT por `venue` (on_conflict=venue): si existe, actualiza zonas; no duplica.
 //        Nombres: .trim() a cada zona, descarta vacíos y duplicados case-insensitive.
 //        El catálogo guarda SOLO nombres de zona — NUNCA precios.
+//   - 'borrar_zona'  { venue, zona }           → { ok, venue, zonas }
+//        Quita UNA zona suelta del array del venue (match por nombre trim,
+//        case-insensitive) y guarda. NUNCA borra la fila del venue (aunque quede
+//        sin zonas). No toca eventos ya creados; solo deja de sugerir esa zona.
 //
 // Whitelist de escritura EXACTA al .sql: SOLO `venue`, `zonas`.
 // Env vars (KH): SUPABASE_URL_KAMEHOUSE, SUPABASE_SERVICE_KEY_KAMEHOUSE, JWT_SECRET.
@@ -24,6 +28,7 @@ const ROLES_PALACIO = ['maestro_roshi']; // el catálogo es solo de maestro_rosh
 const ACCIONES = {
   listar: ROLES_PALACIO,
   guardar: ROLES_PALACIO,
+  borrar_zona: ROLES_PALACIO,
 };
 
 // Columnas que viajan al navegador (existen en el .sql). No nombrar otras.
@@ -118,6 +123,41 @@ exports.handler = async (event) => {
       const rows = await r.json();
       const saved = (Array.isArray(rows) && rows[0]) ? rows[0].venue : venue;
       return ok(headers, { venue: saved });
+    }
+
+    // ── venues_catalogo: borrar_zona (quita una zona suelta del venue) ───
+    if (accion === 'borrar_zona') {
+      const venue = (typeof body.venue === 'string') ? body.venue.trim() : '';
+      const zona  = (typeof body.zona  === 'string') ? body.zona.trim()  : '';
+      if (!venue) return bad(headers, 'El venue es obligatorio');
+      if (!zona)  return bad(headers, 'La zona es obligatoria');
+
+      // Leer la fila del venue (match exacto por venue).
+      const spGet = new URLSearchParams();
+      spGet.set('select', VEN_COLS);
+      spGet.append('venue', `eq.${venue}`);
+      spGet.set('limit', '1');
+      const rGet = await fetch(`${baseVen}?${spGet.toString()}`, { headers: sbHeaders });
+      if (!rGet.ok) return upstream(headers, await rGet.text(), 'consulta');
+      const rows = await rGet.json();
+      if (!Array.isArray(rows) || !rows.length) return bad(headers, 'Venue no encontrado en el catálogo');
+
+      // Quitar la zona (match por nombre trim, case-insensitive). Solo zona
+      // suelta: la fila del venue NO se borra aunque quede sin zonas.
+      const actuales = Array.isArray(rows[0].zonas) ? rows[0].zonas : [];
+      const low = zona.toLowerCase();
+      const zonas = actuales.filter((n) => String(n || '').trim().toLowerCase() !== low);
+
+      const spU = new URLSearchParams();
+      spU.append('venue', `eq.${venue}`);
+      const rU = await fetch(`${baseVen}?${spU.toString()}`, {
+        method: 'PATCH',
+        headers: { ...sbHeaders, Prefer: 'return=representation' },
+        body: JSON.stringify({ zonas }), // whitelist: SOLO zonas
+      });
+      if (!rU.ok) return upstream(headers, await rU.text(), 'update');
+      const updated = await rU.json();
+      return ok(headers, { venue, zonas: (Array.isArray(updated) && updated[0]) ? updated[0].zonas : zonas });
     }
 
     return bad(headers, 'accion inválida');

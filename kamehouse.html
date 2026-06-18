@@ -12934,6 +12934,9 @@ async function crearEsferaEvento() {
     }
     alertEl.innerHTML='<div class="alert alert-success">✅ Evento creado</div>';
     setTimeout(()=>alertEl.innerHTML='', 2000);
+    // Auto-guardado a la libreta: suma a venues_catalogo los NOMBRES de zona usados
+    // (best-effort; usa body porque el DOM se limpia abajo). Nunca precios.
+    _esfAutoGuardarLibreta(body.venue, body.zonas);
     ['esf-slug','esf-nombre','esf-titulo','esf-fecha','esf-venue','esf-music'].forEach(id => { const el=document.getElementById(id); if (el) el.value=''; });
     _esfClearFechasExtra();
     _esfClearZonas();
@@ -13176,16 +13179,14 @@ function _esfVenueSuggHide() {
 }
 
 function _esfPickVenueIdx(idx) {
+  // Solo completa el NOMBRE del venue y cierra el dropdown. La precarga masiva de
+  // zonas del #138 se retiró: ahora las zonas se eligen una por una desde el
+  // dropdown por fila (_esfZonaSugg), que lee la libreta de este venue.
   const cat = _esfVenuesCat[idx];
   if (!cat) return;
   const inp = document.getElementById('esf-venue');
   if (inp) { inp.value = cat.venue; _esfCityChanged(); }
   _esfVenueSuggHide();
-  const zonas = Array.isArray(cat.zonas) ? cat.zonas.filter(n => typeof n === 'string' && n.trim()) : [];
-  if (!zonas.length) return;
-  if (!confirm('¿Cargar las zonas de este venue? Reemplazará las zonas actuales')) return;
-  _esfClearZonas();
-  zonas.forEach(n => _esfAddZona({ n: n.trim() })); // precio en blanco a propósito
 }
 
 async function _esfGuardarVenueZonas() {
@@ -13210,6 +13211,81 @@ async function _esfGuardarVenueZonas() {
   }
 }
 
+// Zonas de la libreta para el venue tecleado en #esf-venue. Match por nombre
+// (trim, case-insensitive exacto — NO fuzzy). [] si el venue no está en la libreta.
+function _esfVenueZonas() {
+  const venue = (document.getElementById('esf-venue')?.value || '').trim().toLowerCase();
+  if (!venue || !Array.isArray(_esfVenuesCat)) return [];
+  const hit = _esfVenuesCat.find((v) => String(v.venue || '').trim().toLowerCase() === venue);
+  return (hit && Array.isArray(hit.zonas)) ? hit.zonas.filter((n) => typeof n === 'string' && n.trim()) : [];
+}
+
+// Dropdown por fila: sugiere las zonas guardadas del venue actual, filtradas por
+// lo tecleado. Clic en una la pone en el campo; la ✕ la borra de la LIBRETA.
+function _esfZonaSugg(inp) {
+  if (!inp || !inp.parentNode) return;
+  const box = inp.parentNode.querySelector('.esf-zona-sugg');
+  if (!box) return;
+  const venue = (document.getElementById('esf-venue')?.value || '').trim();
+  const zonas = _esfVenueZonas();
+  const q = (inp.value || '').trim().toLowerCase();
+  const matches = zonas.filter((n) => !q || n.toLowerCase().includes(q)).slice(0, 12);
+  if (!matches.length) { box.style.display = 'none'; box.innerHTML = ''; return; }
+  box.innerHTML = '';
+  const hint = document.createElement('div');
+  hint.textContent = '✕ quita de la libreta (sugerencias), no del evento';
+  hint.style.cssText = 'padding:5px 10px;font-size:10px;color:var(--ts);border-bottom:1px solid var(--border)';
+  box.appendChild(hint);
+  matches.forEach((name) => {
+    const item = document.createElement('div');
+    item.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:6px;padding:7px 10px;border-bottom:1px solid var(--border)';
+    const label = document.createElement('span');
+    label.textContent = name;
+    label.style.cssText = 'flex:1;cursor:pointer;font-size:13px';
+    label.addEventListener('mousedown', (e) => { e.preventDefault(); inp.value = name; _esfZonaSuggHide(inp); renderEsferaPreview(); });
+    const del = document.createElement('button');
+    del.type = 'button';
+    del.textContent = '✕';
+    del.title = 'Quitar de la libreta (sugerencias), no del evento';
+    del.style.cssText = 'background:none;border:none;color:var(--red);cursor:pointer;font-size:12px;flex-shrink:0';
+    del.addEventListener('mousedown', (e) => { e.preventDefault(); _esfZonaBorrar(venue, name, inp); });
+    item.appendChild(label);
+    item.appendChild(del);
+    box.appendChild(item);
+  });
+  box.style.display = 'block';
+}
+
+function _esfZonaSuggHide(inp) {
+  const box = (inp && inp.parentNode) ? inp.parentNode.querySelector('.esf-zona-sugg') : null;
+  if (box) box.style.display = 'none';
+}
+
+// Borra UNA zona de la libreta del venue (no toca el evento). Refresca caché y
+// re-pinta el dropdown. Best-effort.
+async function _esfZonaBorrar(venue, zona, inp) {
+  if (!venue || !zona) return;
+  await khAdminFetch('/.netlify/functions/admin-venues-catalogo', {
+    method: 'POST', body: JSON.stringify({ accion: 'borrar_zona', venue, zona }),
+  }).then((r) => r && r.json().catch(() => ({}))).catch(() => null);
+  await _esfLoadVenuesCat();
+  if (inp) _esfZonaSugg(inp);
+}
+
+// Auto-guardado a la libreta tras crear un evento: suma los NOMBRES usados al
+// venue (upsert hace merge+dedup). Best-effort (no rompe la creación). Nunca precios.
+async function _esfAutoGuardarLibreta(venue, zonasObjs) {
+  const v = (venue || '').trim();
+  if (!v) return;
+  const nombres = (Array.isArray(zonasObjs) ? zonasObjs : [])
+    .map((z) => (z && z.n) ? String(z.n).trim() : '').filter(Boolean);
+  if (!nombres.length) return;
+  await khAdminFetch('/.netlify/functions/admin-venues-catalogo', {
+    method: 'POST', body: JSON.stringify({ accion: 'guardar', venue: v, zonas: nombres }),
+  }).then((r) => r && r.json().catch(() => ({}))).catch(() => null);
+  await _esfLoadVenuesCat();
+}
+
 function _esfAddZona(data) {
   const cont = document.getElementById('esf-zonas');
   if (!cont) return;
@@ -13218,7 +13294,10 @@ function _esfAddZona(data) {
   row.className = 'esf-zona-row';
   row.style.cssText = 'display:flex;gap:6px;margin-top:6px;align-items:center;flex-wrap:wrap';
   row.innerHTML =
-    '<input class="cot-input esf-zona-n" placeholder="Zona" style="flex:2;min-width:110px">' +
+    '<div class="esf-zona-nwrap" style="position:relative;flex:2;min-width:110px">' +
+      '<input class="cot-input esf-zona-n" placeholder="Zona" style="width:100%" autocomplete="off">' +
+      '<div class="esf-zona-sugg" style="display:none;position:absolute;left:0;right:0;top:100%;z-index:30;background:var(--bg2);border:1px solid var(--border);border-top:none;border-radius:0 0 var(--radius) var(--radius);max-height:200px;overflow:auto"></div>' +
+    '</div>' +
     '<input class="cot-input esf-zona-p" type="number" min="0" placeholder="$ PLUS" style="flex:1;min-width:78px">' +
     '<input class="cot-input esf-zona-pc" type="number" min="0" placeholder="$ CHEAP" style="flex:1;min-width:78px">' +
     '<label style="font-size:11px;display:flex;align-items:center;gap:3px;white-space:nowrap"><input type="checkbox" class="esf-zona-ag">Agotada</label>' +
@@ -13231,6 +13310,11 @@ function _esfAddZona(data) {
     el.addEventListener('input', renderEsferaPreview);
     el.addEventListener('change', renderEsferaPreview);
   });
+  // Dropdown de la libreta en el campo de nombre (sin romper renderEsferaPreview).
+  const _nInp = row.querySelector('.esf-zona-n');
+  _nInp.addEventListener('focus', () => _esfZonaSugg(_nInp));
+  _nInp.addEventListener('input', () => _esfZonaSugg(_nInp));
+  _nInp.addEventListener('blur', () => setTimeout(() => _esfZonaSuggHide(_nInp), 150));
   row.querySelector('.esf-zona-del').onclick = () => { row.remove(); renderEsferaPreview(); };
   cont.appendChild(row);
   renderEsferaPreview();

@@ -2006,6 +2006,9 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
    </div>
   </div>
 
+ <!-- Franja 1 del dashboard: el dinero (caja total + cuentas + por cobrar) -->
+ <div id="resumen-dinero" style="display:none;margin-bottom:16px"></div>
+
  <div class="metrics-grid" id="metrics-grid">
  <div class="metric">
  <div class="metric-label">Cobrado</div>
@@ -5204,6 +5207,9 @@ async function loadResumen() {
     const ev = await _fetchEVFromIndex();
     _renderResumenProximos(ev, activos);
     _renderResumenAtrasados(activos, cancelados);
+    // Franja 1: el dinero (caja total + cuentas + por cobrar). Reusa el porCobrar
+    // ya calculado (mismo valor que m-porcobrar). Best-effort, fire-and-forget.
+    _renderResumenDinero(porCobrar);
     // Franja 2: tabla utilidad por evento. Best-effort, fire-and-forget — no
     // bloquea ni rompe el resto del Resumen si admin-utilidad-evento falla.
     _renderResumenUtilidad(ev);
@@ -5211,6 +5217,60 @@ async function loadResumen() {
     if (proxEl) proxEl.innerHTML = `<div class="alert alert-error">${_spEscape(e.message)}</div>`;
     if (atrEl)  atrEl.innerHTML  = '';
   }
+}
+
+// ── Franja 1 del dashboard: el dinero (caja total + cuentas + por cobrar) ────
+// Reusa admin-saldos (misma fuente que la página Saldos). Best-effort: si falla,
+// la franja muestra un aviso y el resto del Resumen sigue (mirror de _utilCargar).
+let _resumenSaldosCache = null;  // respuesta de admin-saldos | null
+
+async function _saldosCargar(force) {
+  if (_resumenSaldosCache && !force) return _resumenSaldosCache;
+  try {
+    const r = await fetch('/.netlify/functions/admin-saldos', {
+      method: 'POST', headers: _spAdminHeaders(), body: JSON.stringify({}),
+    });
+    const d = await r.json();
+    if (!r.ok || d.ok === false) throw new Error(d.error || 'No se pudieron cargar los saldos');
+    _resumenSaldosCache = d;
+    return _resumenSaldosCache;
+  } catch (e) {
+    return null;
+  }
+}
+
+// Pinta la franja: caja total (héroe, full-width) + fila de cuentas + por cobrar
+// (+ otros si != 0). `porCobrar` viene de loadResumen (mismo valor que m-porcobrar).
+async function _renderResumenDinero(porCobrar) {
+  const cont = document.getElementById('resumen-dinero');
+  if (!cont) return;
+  const d = await _saldosCargar(true);  // fresco al entrar al Resumen
+  if (!d) {
+    cont.style.display = '';
+    cont.innerHTML = '<div style="font-size:12px;color:var(--ts);padding:10px 0">No se pudo cargar el dinero (saldos).</div>';
+    return;
+  }
+  const cuentas = d.cuentas || {};
+  const orden = ['BBVA', 'Banamex', 'Efectivo'];
+  const otros = Number(d.otros_total || 0);
+  const cajaTotal = orden.reduce((a, n) => a + Number((cuentas[n] || {}).saldo || 0), 0) + otros;
+
+  const stat = (lbl, val) => {
+    const color = Number(val) < 0 ? 'var(--red)' : '';
+    return `<div class="cob-stat"><div class="cob-stat-lbl">${lbl}</div><div class="cob-stat-val" style="${color ? 'color:' + color : ''}">${_spFmtMxn(Number(val || 0))}</div></div>`;
+  };
+  const cuentasHTML = orden.map(n => stat(n, (cuentas[n] || {}).saldo || 0)).join('') +
+    `<div class="cob-stat"><div class="cob-stat-lbl">Por cobrar</div><div class="cob-stat-val" style="color:var(--orange)">${_spFmtMxn(Number(porCobrar || 0))}</div></div>` +
+    (otros !== 0 ? stat('Otros (sin cuenta)', otros) : '');
+
+  const heroColor = cajaTotal < 0 ? 'var(--red)' : 'var(--green)';
+  cont.style.display = '';
+  cont.innerHTML = `
+    <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:16px 20px;margin-bottom:12px">
+      <div class="cob-stat-lbl" style="margin-bottom:6px">Caja total de la empresa</div>
+      <div style="font-family:'Zen Dots',sans-serif;font-size:34px;font-weight:800;color:${heroColor};line-height:1.1">${_spFmtMxn(cajaTotal)}</div>
+    </div>
+    <div class="cob-stats" style="margin-bottom:0">${cuentasHTML}</div>`;
 }
 
 // ── Franja 2 del dashboard: tabla "Utilidad por evento" (web) ────────────────

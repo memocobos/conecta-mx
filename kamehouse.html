@@ -2019,7 +2019,10 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
  <div class="metric-value green" id="m-cobrado">—</div>
  <div class="metric-sub">Total ingresado</div>
  </div>
- <div class="metric">
+ <!-- "Por Cobrar" OCULTA (no borrada): el valor vive en la franja del dinero (#146).
+      #m-porcobrar se sigue llenando en loadResumen y la franja reusa esa variable;
+      borrar la tarjeta rompería esa cadena. display:none evita el duplicado visual. -->
+ <div class="metric" style="display:none">
  <div class="metric-label">Por Cobrar</div>
  <div class="metric-value" id="m-porcobrar">—</div>
  <div class="metric-sub">Saldo pendiente</div>

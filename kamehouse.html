@@ -5549,16 +5549,27 @@ function _renderResumenProximos(ev, activos) {
   }).join('');
 }
 
-// Atrasados: tours activos con pago vencido (_cobEsAtrasado). Vista accionable
-// con botón de WhatsApp al cliente. Si no hay, estado vacío amable.
+// Días de atraso = hoy − fecha_esperada (ambos a mediodía para evitar bordes DST,
+// como "próximos"). >=0; nunca negativo (los atrasados ya filtran fecha < hoy).
+function _cobDiasAtraso(fechaISO) {
+  if (!fechaISO) return 0;
+  const hoy = Date.parse(_cobHoyISO() + 'T12:00:00');
+  const f = Date.parse(String(fechaISO) + 'T12:00:00');
+  if (isNaN(hoy) || isNaN(f)) return 0;
+  return Math.max(0, Math.round((hoy - f) / 86400000));
+}
+
+// Atrasados (Franja 3 del dashboard): tours activos con pago vencido. Header de
+// conteo en ámbar (N>0), días de atraso, evento, saldo y WhatsApp. Orden días DESC
+// (más atrasado arriba). Máx 10 + "ver todos en Pagos". Fila clickable → Pagos
+// (el botón WhatsApp hace stopPropagation para no navegar). Reusa la cobranza ya
+// cargada (activos); no re-fetch.
 function _renderResumenAtrasados(activos, cancelados) {
   const el = document.getElementById('atrasados-lista');
   if (!el) return;
-  const atr = (activos || []).filter(_cobEsAtrasado).sort((a, b) => {
-    const fa = (a.pago.proximo && a.pago.proximo.fecha_esperada) || '9999-12-31';
-    const fb = (b.pago.proximo && b.pago.proximo.fecha_esperada) || '9999-12-31';
-    return fa < fb ? -1 : (fa > fb ? 1 : 0);
-  });
+  const atr = (activos || []).filter(_cobEsAtrasado)
+    .map(t => ({ t, dias: _cobDiasAtraso(((t.pago || {}).proximo || {}).fecha_esperada) }))
+    .sort((a, b) => b.dias - a.dias);  // más atrasado arriba
   const nCanc = (cancelados || []).length;
   const pie = nCanc ? `<div style="margin-top:12px;font-size:11px;color:var(--ts)">${nCanc} tour${nCanc === 1 ? '' : 's'} cancelado${nCanc === 1 ? '' : 's'} (no cuentan en los totales).</div>` : '';
 
@@ -5567,21 +5578,27 @@ function _renderResumenAtrasados(activos, cancelados) {
     return;
   }
 
-  el.innerHTML = atr.map(t => {
+  const N = atr.length;
+  const header = `<div style="display:flex;align-items:center;gap:8px;color:var(--orange);font-weight:700;font-size:13px;margin-bottom:8px">⚠️ ${N} viajero${N === 1 ? '' : 's'} atrasado${N === 1 ? '' : 's'}</div>`;
+  const LIMITE = 10;
+  const visibles = atr.slice(0, LIMITE);
+
+  const filas = visibles.map(({ t, dias }) => {
     const c = t.clientes || {};
     const pago = t.pago || {};
     const evL = _cobEventoLabel(t);
     const prox = pago.proximo;
     const wa = _cobWaHref(t);
     const waBtn = wa
-      ? `<a class="btn btn-green btn-sm" href="${wa}" target="_blank" rel="noopener" style="font-size:11px;text-decoration:none">WhatsApp</a>`
+      ? `<a class="btn btn-green btn-sm" href="${wa}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="font-size:11px;text-decoration:none">WhatsApp</a>`
       : `<span style="font-size:11px;color:var(--ts)">${_spEscape(c.celular || 's/tel')}</span>`;
     const venceTxt = prox ? ('Venció ' + _spEscape(prox.fecha_esperada)) : '';
+    const diasTxt = `${dias} día${dias === 1 ? '' : 's'} de atraso`;
     return `
-    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px solid var(--border)">
+    <div class="dash-click" onclick="showPage('pagos')" title="Gestionar en Pagos" style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px solid var(--border)">
       <div>
         <div style="font-weight:600;font-size:14px">${_spEscape(c.nombre_completo || '—')}</div>
-        <div style="font-size:11px;color:var(--ts)">${_spEscape(evL.nombre)}${evL.fecha ? ' · ' + _spEscape(evL.fecha) : ''}${venceTxt ? ' · ' + venceTxt : ''}</div>
+        <div style="font-size:11px"><span style="color:var(--orange);font-weight:700">${diasTxt}</span><span style="color:var(--ts)"> · ${_spEscape(evL.nombre)}${evL.fecha ? ' · ' + _spEscape(evL.fecha) : ''}${venceTxt ? ' · ' + venceTxt : ''}</span></div>
       </div>
       <div style="display:flex;align-items:center;gap:12px;white-space:nowrap">
         <div style="text-align:right">
@@ -5591,7 +5608,13 @@ function _renderResumenAtrasados(activos, cancelados) {
         ${waBtn}
       </div>
     </div>`;
-  }).join('') + pie;
+  }).join('');
+
+  const verTodos = (N > LIMITE)
+    ? `<div class="dash-click" onclick="showPage('pagos')" style="text-align:center;padding:10px 0;font-size:12px;color:var(--orange);font-weight:700">ver todos (${N}) en Pagos →</div>`
+    : '';
+
+  el.innerHTML = header + filas + verTodos + pie;
 }
 
 // ═══════════════════════════════════════════════════════════════

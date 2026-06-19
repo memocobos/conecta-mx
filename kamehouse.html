@@ -648,6 +648,10 @@ tr:hover td{background:var(--bg3)}
 /* ═══════════════════════════════════════════════
  RESPONSIVE
 ═══════════════════════════════════════════════ */
+/* Click-through del dashboard: cursor + hover sutil en lo que navega a su pestaña */
+.dash-click{cursor:pointer;transition:background .12s,border-color .12s}
+.dash-click:hover{background:rgba(255,255,255,.05)}
+tr.dash-click:hover{background:rgba(255,255,255,.04)}
 /* Utilidad por evento: tabla en web, tarjetas en móvil (Dashboard Franja 2 · 3b) */
 .util-cards-view{display:none}
 @media(max-width:640px){.util-table-view{display:none}.util-cards-view{display:block}}
@@ -5255,18 +5259,19 @@ async function _renderResumenDinero(porCobrar) {
   const otros = Number(d.otros_total || 0);
   const cajaTotal = orden.reduce((a, n) => a + Number((cuentas[n] || {}).saldo || 0), 0) + otros;
 
+  // stat de cuenta → navega a Saldos (click-through).
   const stat = (lbl, val) => {
     const color = Number(val) < 0 ? 'var(--red)' : '';
-    return `<div class="cob-stat"><div class="cob-stat-lbl">${lbl}</div><div class="cob-stat-val" style="${color ? 'color:' + color : ''}">${_spFmtMxn(Number(val || 0))}</div></div>`;
+    return `<div class="cob-stat dash-click" onclick="showPage('saldos')" title="Ver Saldos"><div class="cob-stat-lbl">${lbl}</div><div class="cob-stat-val" style="${color ? 'color:' + color : ''}">${_spFmtMxn(Number(val || 0))}</div></div>`;
   };
   const cuentasHTML = orden.map(n => stat(n, (cuentas[n] || {}).saldo || 0)).join('') +
-    `<div class="cob-stat"><div class="cob-stat-lbl">Por cobrar</div><div class="cob-stat-val" style="color:var(--orange)">${_spFmtMxn(Number(porCobrar || 0))}</div></div>` +
+    `<div class="cob-stat dash-click" onclick="showPage('pagos')" title="Ver cobranza"><div class="cob-stat-lbl">Por cobrar</div><div class="cob-stat-val" style="color:var(--orange)">${_spFmtMxn(Number(porCobrar || 0))}</div></div>` +
     (otros !== 0 ? stat('Otros (sin cuenta)', otros) : '');
 
   const heroColor = cajaTotal < 0 ? 'var(--red)' : 'var(--green)';
   cont.style.display = '';
   cont.innerHTML = `
-    <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:16px 20px;margin-bottom:12px">
+    <div class="dash-click" onclick="showPage('saldos')" title="Ver Saldos" style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:16px 20px;margin-bottom:12px">
       <div class="cob-stat-lbl" style="margin-bottom:6px">Caja total de la empresa</div>
       <div style="font-family:'Zen Dots',sans-serif;font-size:34px;font-weight:800;color:${heroColor};line-height:1.1">${_spFmtMxn(cajaTotal)}</div>
     </div>
@@ -5374,7 +5379,7 @@ function _resumenUtilPintar() {
   const fila = (r) => {
     const sem = _resumenUtilSemaforo(r.caja, r.proyectado);
     const semTitle = (r.caja >= 0) ? 'Caja positiva' : (r.proyectado >= 0 ? 'Caja negativa, proyectado positivo' : 'Caja y proyectado negativos');
-    return `<tr style="border-bottom:1px solid var(--border)">
+    return `<tr class="dash-click" onclick="_evtIrA('${r.slug}')" title="Ver en Por evento" style="border-bottom:1px solid var(--border)">
       <td style="padding:6px 8px;font-weight:600;white-space:nowrap">${_spEscape(r.nombre)}</td>
       <td style="padding:6px 8px;font-size:11px;color:var(--ts);white-space:nowrap">${_spEscape(r.fecha || '—')}</td>
       ${_resumenUtilMxnCell(r.cobrado)}${_resumenUtilMxnCell(r.ingresos)}${_resumenUtilMxnCell(r.vendido)}${_resumenUtilMxnCell(r.gastos)}${_resumenUtilMxnCell(r.caja)}${_resumenUtilMxnCell(r.proyectado)}${_resumenUtilMxnCell(r.falta)}
@@ -5420,7 +5425,7 @@ function _resumenUtilPintar() {
   const mny = _resumenUtilMxn;
   const card = (r) => {
     const sem = _resumenUtilSemaforo(r.caja, r.proyectado);
-    return `<div style="background:var(--bg2);border:1px solid var(--border);border-left:4px solid ${sem};border-radius:var(--radius);padding:12px 14px;margin-bottom:10px">
+    return `<div class="dash-click" onclick="_evtIrA('${r.slug}')" title="Ver en Por evento" style="background:var(--bg2);border:1px solid var(--border);border-left:4px solid ${sem};border-radius:var(--radius);padding:12px 14px;margin-bottom:10px">
       <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:10px">
         <div><div style="font-weight:700;font-size:14px">${_spEscape(r.nombre)}</div><div style="font-size:11px;color:var(--ts)">${_spEscape(r.fecha || '—')}</div></div>
         <span style="display:inline-block;width:13px;height:13px;border-radius:50%;background:${sem};flex-shrink:0;margin-top:3px"></span>
@@ -5894,8 +5899,26 @@ let _evtSelectorPoblado = false;
 
 // Puebla #selector-evento desde EV (index.html), con multifecha por separado
 // (base#idx), igual que el filtro de la Fase 3.1. Corre una sola vez.
+// Click-through → "Por evento": el click guarda el slug pendiente y navega; el
+// auto-select se aplica cuando el selector ya está poblado (sin setTimeout).
+let _evtPendingSelect = null;
+function _evtIrA(slug) { _evtPendingSelect = slug || null; showPage('eventos'); }
+function _evtAplicarPendiente() {
+  if (!_evtPendingSelect) return;
+  const sel = document.getElementById('selector-evento');
+  if (!sel) return;
+  const base = String(_evtPendingSelect);
+  _evtPendingSelect = null;
+  let match = '';
+  for (let i = 0; i < sel.options.length; i++) {
+    const v = sel.options[i].value;
+    if (v && (v === base || v.split('#')[0] === base)) { match = v; break; }
+  }
+  if (match) { sel.value = match; sel.dispatchEvent(new Event('change')); }
+}
+
 async function _evtPoblarSelector() {
-  if (_evtSelectorPoblado) return;
+  if (_evtSelectorPoblado) { _evtAplicarPendiente(); return; }
   const sel = document.getElementById('selector-evento');
   if (!sel) return;
   const ev = await _fetchEVFromIndex();
@@ -5919,6 +5942,7 @@ async function _evtPoblarSelector() {
     }
   });
   _evtSelectorPoblado = true;
+  _evtAplicarPendiente();
 }
 
 // Carga los tours ACTIVOS del evento elegido (filtra la cache de cobranza) y pinta.

@@ -5209,13 +5209,15 @@ async function loadResumen() {
     }
 
     const ev = await _fetchEVFromIndex();
-    _renderResumenProximos(ev, activos);
+    // 1) Primero lo que NO depende de la utilidad, para que aparezca rápido:
+    //    Franja 3 (atrasados) + Franja 1 (dinero — prioridad #1, no debe esperar).
     _renderResumenAtrasados(activos, cancelados);
-    // Franja 1: el dinero (caja total + cuentas + por cobrar). Reusa el porCobrar
-    // ya calculado (mismo valor que m-porcobrar). Best-effort, fire-and-forget.
-    _renderResumenDinero(porCobrar);
-    // Franja 2: tabla utilidad por evento. Best-effort, fire-and-forget — no
-    // bloquea ni rompe el resto del Resumen si admin-utilidad-evento falla.
+    _renderResumenDinero(porCobrar);  // reusa el porCobrar ya calculado (= m-porcobrar)
+    // 2) Carga la utilidad UNA sola vez (compartida, fresca). Best-effort: si falla,
+    //    _utilG3Cache queda null → salud neutra y lo de abajo igual pinta.
+    await _utilCargar(true);
+    // 3) Ya con la cache lista: Franja 4 (próximos con salud) + Franja 2 (tabla).
+    _renderResumenProximos(ev, activos);
     _renderResumenUtilidad(ev);
   } catch (e) {
     if (proxEl) proxEl.innerHTML = `<div class="alert alert-error">${_spEscape(e.message)}</div>`;
@@ -5289,7 +5291,7 @@ let _resumenUtilSort = { col: 'ds', dir: 'asc' }; // orden por defecto: fecha as
 async function _renderResumenUtilidad(ev) {
   const cont = document.getElementById('resumen-utilidad-tabla');
   if (!cont) return;
-  const util = await _utilCargar(true);  // fresco al entrar al Resumen
+  const util = await _utilCargar();  // usa la cache que loadResumen ya cargó (sin doble fetch)
   if (!util) {
     cont.innerHTML = '<div style="font-size:12px;color:var(--ts)">No se pudo cargar la utilidad por evento.</div>';
     return;
@@ -5515,6 +5517,20 @@ function _resumenUtilCSV() {
 
 // Próximos eventos: desde EV (index.html), fechas futuras, máx 10, con su dinero
 // agregado de la cobranza ACTIVA (cobrado + # viajeros, casando base y base#idx).
+// Días hasta una fecha futura = fecha − hoy (ambos a mediodía, evita bordes DST).
+function _diasHasta(fechaISO) {
+  if (!fechaISO) return null;
+  const hoy = Date.parse(_cobHoyISO() + 'T12:00:00');
+  const f = Date.parse(String(fechaISO) + 'T12:00:00');
+  if (isNaN(hoy) || isNaN(f)) return null;
+  return Math.round((f - hoy) / 86400000);
+}
+
+// Próximos eventos (Franja 4 del dashboard) CON SALUD: semáforo por evento + %
+// cobrado (de _utilG3Cache, mismo criterio que la tabla utilidad), monto/viajeros
+// de cobranza (sin cambiar), badge "¡pronto!" si <7 días, y fila clickable → Por
+// evento. Lee _utilG3Cache que loadResumen ya cargó (carga compartida y esperada);
+// gris/neutro si no hay datos. No toca _renderResumenUtilidad ni el resto del Resumen.
 function _renderResumenProximos(ev, activos) {
   const el = document.getElementById('proximos-eventos');
   if (!el) return;
@@ -5530,16 +5546,37 @@ function _renderResumenProximos(ev, activos) {
     return;
   }
 
+  const utilEvs = (_utilG3Cache && _utilG3Cache.eventos) || {};
+
   el.innerHTML = futuros.map(e => {
     const tours   = (activos || []).filter(t => _cobTourMatchEvento(t, e.id));
     const cobrado = tours.reduce((a, t) => a + Number((t.pago || {}).abonado || 0), 0);
     const fecha   = e.f || e.ds || '';
     const lugar   = e.v ? (' · ' + _spEscape(e.v)) : '';
+    const baseSlug = String(e.id).split('#')[0];
+
+    // Salud (de la cache de utilidad). Gris/neutro si el evento no está en la cache.
+    const u = utilEvs[baseSlug];
+    const sem = u ? _resumenUtilSemaforo(Number(u.caja || 0), Number(u.proyectado || 0)) : 'var(--ts)';
+    const semTitle = u ? 'Salud (caja/proyectado)' : 'Sin movimientos registrados';
+    const pctTxt = (u && Number(u.vendido || 0) > 0)
+      ? `${Math.round(Number(u.cobrado || 0) / Number(u.vendido) * 100)}% cobrado`
+      : '— cobrado';
+
+    // Badge "¡pronto!" si faltan menos de 7 días (y no es pasado).
+    const dias = _diasHasta(e.ds);
+    const pronto = (dias !== null && dias >= 0 && dias < 7)
+      ? ' <span style="font-size:9px;font-weight:800;color:#000;background:var(--orange);border-radius:4px;padding:1px 6px;letter-spacing:.03em">¡PRONTO!</span>'
+      : '';
+
     return `
-    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px solid var(--border)">
-      <div>
-        <div style="font-weight:600;font-size:14px">${_spEscape(e.a)}</div>
-        <div style="font-size:11px;color:var(--ts)">${_spEscape(fecha)}${lugar}</div>
+    <div class="dash-click" onclick="_evtIrA('${baseSlug}')" title="Ver en Por evento" style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px solid var(--border)">
+      <div style="display:flex;align-items:center;gap:10px;min-width:0">
+        <span title="${semTitle}" style="display:inline-block;width:11px;height:11px;border-radius:50%;background:${sem};flex-shrink:0"></span>
+        <div style="min-width:0">
+          <div style="font-weight:600;font-size:14px">${_spEscape(e.a)}${pronto}</div>
+          <div style="font-size:11px;color:var(--ts)">${_spEscape(fecha)}${lugar} · ${pctTxt}</div>
+        </div>
       </div>
       <div style="text-align:right;white-space:nowrap">
         <div style="font-size:13px;color:var(--green)">${_spFmtMxn(cobrado)}</div>

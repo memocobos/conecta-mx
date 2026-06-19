@@ -2175,6 +2175,12 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
  </div>
  </div>
 
+ <!-- Caja total de la empresa (dato global, suma de todos los eventos) -->
+ <div id="evt-caja-empresa" style="display:none;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:10px 16px;margin-bottom:12px;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+   <div class="cob-stat-lbl" style="margin-bottom:0">Caja total de la empresa</div>
+   <div class="cob-stat-val" id="evt-caja-empresa-val" style="font-size:18px">—</div>
+ </div>
+
  <!-- Resumen financiero del evento -->
  <div class="cob-stats" id="evt-stats" style="display:none">
    <div class="cob-stat"><div class="cob-stat-lbl">Vendido</div><div class="cob-stat-val" id="evt-vendido">—</div></div>
@@ -2183,7 +2189,15 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
    <div class="cob-stat"><div class="cob-stat-lbl">Viajeros</div><div class="cob-stat-val" id="evt-viajeros">—</div></div>
    <div class="cob-stat"><div class="cob-stat-lbl">Atrasados</div><div class="cob-stat-val red" id="evt-atrasados">—</div></div>
    <div class="cob-stat"><div class="cob-stat-lbl">Gastos</div><div class="cob-stat-val red" id="evt-gastos">—</div></div>
-   <div class="cob-stat"><div class="cob-stat-lbl">Utilidad</div><div class="cob-stat-val green" id="evt-utilidad">—</div></div>
+   <div class="cob-stat"><div class="cob-stat-lbl">Utilidad facturada</div><div class="cob-stat-val green" id="evt-utilidad">—</div></div>
+ </div>
+
+ <!-- Caja / Proyectado / Falta por cobrar del evento (de admin-utilidad-evento). Visibilidad
+      propia: existe aunque el evento tenga 0 viajeros (por ingresos/gastos sueltos). -->
+ <div class="cob-stats" id="evt-caja-stats" style="display:none">
+   <div class="cob-stat"><div class="cob-stat-lbl">Caja</div><div class="cob-stat-val green" id="evt-caja">—</div></div>
+   <div class="cob-stat"><div class="cob-stat-lbl">Proyectado</div><div class="cob-stat-val" id="evt-proyectado">—</div></div>
+   <div class="cob-stat"><div class="cob-stat-lbl">Falta por cobrar</div><div class="cob-stat-val orange" id="evt-falta">—</div></div>
  </div>
 
  <!-- Desglose por paquete / zona -->
@@ -5065,6 +5079,74 @@ async function _cobCargarGastos(force) {
   }
 }
 
+// ── Capa 3: utilidad por evento (admin-utilidad-evento) ──────────────────────
+let _utilG3Cache = null;  // { eventos, sin_evento, totales } | null
+
+// Trae la utilidad por evento (todos los eventos) una sola vez. Best-effort: si
+// falla devuelve null y NO cachea — la vista sigue pintando lo demás (igual
+// criterio que _cobCargarGastos).
+async function _utilCargar(force) {
+  if (_utilG3Cache && !force) return _utilG3Cache;
+  try {
+    const r = await fetch('/.netlify/functions/admin-utilidad-evento', {
+      method: 'POST',
+      headers: _spAdminHeaders(),
+      body: JSON.stringify({}),
+    });
+    const d = await r.json();
+    if (!r.ok || d.ok === false) throw new Error(d.error || 'No se pudo cargar la utilidad');
+    _utilG3Cache = {
+      eventos:    (d.eventos && typeof d.eventos === 'object') ? d.eventos : {},
+      sin_evento: d.sin_evento || null,
+      totales:    d.totales || {},
+    };
+    return _utilG3Cache;
+  } catch (e) {
+    return null;
+  }
+}
+
+// Pinta el banner de caja total de empresa y el bloque Caja/Proyectado/Falta del
+// evento (por BASE del slug), desde el cache. Visibilidad propia (no depende de
+// tours.length). Si no hay datos, oculta los bloques nuevos.
+function _renderUtilidadEvento(evBase) {
+  const cajaStats = document.getElementById('evt-caja-stats');
+  const banner    = document.getElementById('evt-caja-empresa');
+  const cache = _utilG3Cache;
+  if (!cache) {
+    if (cajaStats) cajaStats.style.display = 'none';
+    if (banner)    banner.style.display = 'none';
+    return;
+  }
+  // Caja total de la empresa (global; rojo si negativa).
+  const cajaEmp = Number((cache.totales || {}).caja_total_empresa || 0);
+  const bval = document.getElementById('evt-caja-empresa-val');
+  if (bval) {
+    bval.textContent = _spFmtMxn(cajaEmp);
+    bval.className = 'cob-stat-val ' + (cajaEmp < 0 ? 'red' : 'green');
+  }
+  if (banner) banner.style.display = 'flex';
+
+  // Bloque del evento seleccionado (caja/proyectado verde-o-rojo; falta naranja).
+  if (!evBase) { if (cajaStats) cajaStats.style.display = 'none'; return; }
+  const e = (cache.eventos && cache.eventos[evBase]) || { caja: 0, proyectado: 0, falta_por_cobrar: 0 };
+  const setSemaforo = (id, v) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.textContent = _spFmtMxn(Number(v || 0));
+    el.className = 'cob-stat-val ' + (Number(v || 0) < 0 ? 'red' : 'green');
+  };
+  setSemaforo('evt-caja', e.caja);
+  setSemaforo('evt-proyectado', e.proyectado);
+  const elFalta = document.getElementById('evt-falta');
+  if (elFalta) {
+    const f = Number(e.falta_por_cobrar || 0);
+    elFalta.textContent = _spFmtMxn(f);
+    elFalta.className = 'cob-stat-val ' + (f < 0 ? 'red' : 'orange');
+  }
+  if (cajaStats) cajaStats.style.display = '';
+}
+
 async function loadResumen() {
   const proxEl = document.getElementById('proximos-eventos');
   const atrEl  = document.getElementById('atrasados-lista');
@@ -5539,6 +5621,10 @@ async function loadPorEvento() {
     _evtTours = []; _evtFiltrados = [];
     if (stats) stats.style.display = 'none';
     if (desg)  desg.style.display = 'none';
+    const cajaStats = document.getElementById('evt-caja-stats');
+    const cajaEmp   = document.getElementById('evt-caja-empresa');
+    if (cajaStats) cajaStats.style.display = 'none';
+    if (cajaEmp)   cajaEmp.style.display = 'none';
     tbody.innerHTML = '<tr><td colspan="8"><div class="empty-state"><div class="empty-icon">·</div>Selecciona un evento para ver los viajeros</div></td></tr>';
     return;
   }
@@ -5546,7 +5632,8 @@ async function loadPorEvento() {
   tbody.innerHTML = '<tr><td colspan="8"><div class="loading-state"><div class="spinner"></div>Cargando…</div></td></tr>';
   try {
     const { activos } = await _cobCargarTodo();
-    await _cobCargarGastos();   // cachea gastos para que _renderPorEvento sume en memoria
+    // Gastos (para _renderPorEvento) + utilidad por evento, en paralelo. Best-effort.
+    await Promise.all([_cobCargarGastos(), _utilCargar()]);
     _evtTours = (activos || []).filter(t => _cobTourMatchEvento(t, evId));
     _renderPorEvento();
   } catch (e) {
@@ -5594,6 +5681,10 @@ function _renderPorEvento() {
   setTxt('evt-utilidad', _spFmtMxn(evtUtil));
   const elEvtUtil = document.getElementById('evt-utilidad');
   if (elEvtUtil) elEvtUtil.className = 'cob-stat-val ' + (evtUtil >= 0 ? 'green' : 'red');
+
+  // Capa 3: Caja / Proyectado / Falta del evento + caja total empresa (admin-utilidad-evento).
+  // Bloque aditivo, con visibilidad propia (independiente de tours.length).
+  _renderUtilidadEvento(evBase);
 
   if (stats) stats.style.display = tours.length ? '' : 'none';
   if (desg)  desg.style.display  = tours.length ? '' : 'none';

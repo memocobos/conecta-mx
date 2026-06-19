@@ -5209,13 +5209,15 @@ async function loadResumen() {
     }
 
     const ev = await _fetchEVFromIndex();
-    _renderResumenProximos(ev, activos);
+    // 1) Primero lo que NO depende de la utilidad, para que aparezca rápido:
+    //    Franja 3 (atrasados) + Franja 1 (dinero — prioridad #1, no debe esperar).
     _renderResumenAtrasados(activos, cancelados);
-    // Franja 1: el dinero (caja total + cuentas + por cobrar). Reusa el porCobrar
-    // ya calculado (mismo valor que m-porcobrar). Best-effort, fire-and-forget.
-    _renderResumenDinero(porCobrar);
-    // Franja 2: tabla utilidad por evento. Best-effort, fire-and-forget — no
-    // bloquea ni rompe el resto del Resumen si admin-utilidad-evento falla.
+    _renderResumenDinero(porCobrar);  // reusa el porCobrar ya calculado (= m-porcobrar)
+    // 2) Carga la utilidad UNA sola vez (compartida, fresca). Best-effort: si falla,
+    //    _utilG3Cache queda null → salud neutra y lo de abajo igual pinta.
+    await _utilCargar(true);
+    // 3) Ya con la cache lista: Franja 4 (próximos con salud) + Franja 2 (tabla).
+    _renderResumenProximos(ev, activos);
     _renderResumenUtilidad(ev);
   } catch (e) {
     if (proxEl) proxEl.innerHTML = `<div class="alert alert-error">${_spEscape(e.message)}</div>`;
@@ -5289,7 +5291,7 @@ let _resumenUtilSort = { col: 'ds', dir: 'asc' }; // orden por defecto: fecha as
 async function _renderResumenUtilidad(ev) {
   const cont = document.getElementById('resumen-utilidad-tabla');
   if (!cont) return;
-  const util = await _utilCargar(true);  // fresco al entrar al Resumen
+  const util = await _utilCargar();  // usa la cache que loadResumen ya cargó (sin doble fetch)
   if (!util) {
     cont.innerHTML = '<div style="font-size:12px;color:var(--ts)">No se pudo cargar la utilidad por evento.</div>';
     return;
@@ -5527,12 +5529,11 @@ function _diasHasta(fechaISO) {
 // Próximos eventos (Franja 4 del dashboard) CON SALUD: semáforo por evento + %
 // cobrado (de _utilG3Cache, mismo criterio que la tabla utilidad), monto/viajeros
 // de cobranza (sin cambiar), badge "¡pronto!" si <7 días, y fila clickable → Por
-// evento. Async: await _utilCargar() (best-effort; gris si no hay datos). No toca
-// _renderResumenUtilidad ni el resto del Resumen.
-async function _renderResumenProximos(ev, activos) {
+// evento. Lee _utilG3Cache que loadResumen ya cargó (carga compartida y esperada);
+// gris/neutro si no hay datos. No toca _renderResumenUtilidad ni el resto del Resumen.
+function _renderResumenProximos(ev, activos) {
   const el = document.getElementById('proximos-eventos');
   if (!el) return;
-  await _utilCargar();  // best-effort: llena/usa _utilG3Cache; null si falla → salud neutra
   const today = _cobHoyISO();
   const futuros = (ev || [])
     .filter(e => e && e.id && e.a && (!e.ds || e.ds >= today))

@@ -5305,10 +5305,12 @@ async function _renderResumenUtilidad(ev) {
   const evs = util.eventos || {};
   _resumenUtilRows = Object.keys(evs).map(slug => {
     const d = evs[slug] || {};
-    const meta = evMap[slug] || { nombre: slug, fecha: '', ds: '' };
+    const meta = evMap[slug];                 // undefined = slug con movimientos pero NO en el EV
+    const m = meta || { nombre: slug, fecha: '', ds: '' };
     const vendido = Number(d.vendido || 0), cobrado = Number(d.cobrado || 0);
     return {
-      slug, nombre: meta.nombre, fecha: meta.fecha, ds: meta.ds || '',
+      slug, nombre: m.nombre, fecha: m.fecha, ds: m.ds || '',
+      desconocido: !meta,                     // typo de captura: slug que no existe en el EV
       cobrado, ingresos: Number(d.ingresos || 0), vendido,
       gastos: Number(d.gastos || 0), caja: Number(d.caja || 0),
       proyectado: Number(d.proyectado || 0), falta: Number(d.falta_por_cobrar || 0),
@@ -5344,16 +5346,19 @@ function _resumenUtilPintar() {
     return;
   }
 
-  // Caja acumulada: running-sum de caja en orden CRONOLÓGICO (ds asc), fijada por
-  // evento aunque luego se reordene la tabla.
+  // Caja acumulada: running-sum de caja en orden CRONOLÓGICO, SOLO sobre filas con
+  // fecha (ds). Los desconocidos / sin fecha NO entran al acumulado → su celda va "—".
   const acum = {};
   let run = 0;
-  rows.slice().sort((a, b) => String(a.ds).localeCompare(String(b.ds))).forEach(r => { run += r.caja; acum[r.slug] = run; });
+  rows.filter(r => r.ds).sort((a, b) => String(a.ds).localeCompare(String(b.ds))).forEach(r => { run += r.caja; acum[r.slug] = run; });
 
-  // Orden actual (la columna 'fecha' ordena por ds).
+  // Orden de 2 niveles: primario los DESCONOCIDOS siempre al final; secundario la
+  // columna elegida (la columna 'fecha' ordena por ds).
   const s = _resumenUtilSort;
   const key = (r) => (s.col === 'fecha') ? r.ds : r[s.col];
   rows.sort((a, b) => {
+    const da = a.desconocido ? 1 : 0, db = b.desconocido ? 1 : 0;
+    if (da !== db) return da - db;            // conocidos primero, desconocidos al final
     const ka = key(a), kb = key(b);
     let c;
     if (typeof ka === 'number' && typeof kb === 'number') c = ka - kb;
@@ -5381,16 +5386,23 @@ function _resumenUtilPintar() {
     `<th style="${thStyle};text-align:center;cursor:default">Salud</th>` +
     `<th style="${thStyle};text-align:right;cursor:default">Caja acum.</th>`;
 
+  const acumCell = (r) => (r.slug in acum)
+    ? _resumenUtilMxnCell(acum[r.slug])
+    : '<td style="text-align:right;color:var(--ts)">—</td>';
+  const marcaDesc = '<span style="color:var(--orange);font-size:10px;font-weight:700;white-space:nowrap"> ⚠️ evento desconocido</span>';
+
   const fila = (r) => {
     const sem = _resumenUtilSemaforo(r.caja, r.proyectado);
     const semTitle = (r.caja >= 0) ? 'Caja positiva' : (r.proyectado >= 0 ? 'Caja negativa, proyectado positivo' : 'Caja y proyectado negativos');
-    return `<tr class="dash-click" onclick="_evtIrA('${r.slug}')" title="Ver en Por evento" style="border-bottom:1px solid var(--border)">
-      <td style="padding:6px 8px;font-weight:600;white-space:nowrap">${_spEscape(r.nombre)}</td>
+    // Desconocido: NO clickable (no hay a dónde ir); conocidos siguen → Por evento.
+    const rowAttrs = r.desconocido ? '' : ` class="dash-click" onclick="_evtIrA('${r.slug}')" title="Ver en Por evento"`;
+    return `<tr${rowAttrs} style="border-bottom:1px solid var(--border)">
+      <td style="padding:6px 8px;font-weight:600;white-space:nowrap">${_spEscape(r.nombre)}${r.desconocido ? marcaDesc : ''}</td>
       <td style="padding:6px 8px;font-size:11px;color:var(--ts);white-space:nowrap">${_spEscape(r.fecha || '—')}</td>
       ${_resumenUtilMxnCell(r.cobrado)}${_resumenUtilMxnCell(r.ingresos)}${_resumenUtilMxnCell(r.vendido)}${_resumenUtilMxnCell(r.gastos)}${_resumenUtilMxnCell(r.caja)}${_resumenUtilMxnCell(r.proyectado)}${_resumenUtilMxnCell(r.falta)}
       <td style="text-align:right;font-variant-numeric:tabular-nums">${Math.round(r.pct * 100)}%</td>
       <td style="text-align:center"><span title="${semTitle}" style="display:inline-block;width:11px;height:11px;border-radius:50%;background:${sem}"></span></td>
-      ${_resumenUtilMxnCell(acum[r.slug])}
+      ${acumCell(r)}
     </tr>`;
   };
 
@@ -5430,9 +5442,10 @@ function _resumenUtilPintar() {
   const mny = _resumenUtilMxn;
   const card = (r) => {
     const sem = _resumenUtilSemaforo(r.caja, r.proyectado);
-    return `<div class="dash-click" onclick="_evtIrA('${r.slug}')" title="Ver en Por evento" style="background:var(--bg2);border:1px solid var(--border);border-left:4px solid ${sem};border-radius:var(--radius);padding:12px 14px;margin-bottom:10px">
+    const cardAttrs = r.desconocido ? '' : ` class="dash-click" onclick="_evtIrA('${r.slug}')" title="Ver en Por evento"`;
+    return `<div${cardAttrs} style="background:var(--bg2);border:1px solid var(--border);border-left:4px solid ${sem};border-radius:var(--radius);padding:12px 14px;margin-bottom:10px">
       <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:10px">
-        <div><div style="font-weight:700;font-size:14px">${_spEscape(r.nombre)}</div><div style="font-size:11px;color:var(--ts)">${_spEscape(r.fecha || '—')}</div></div>
+        <div><div style="font-weight:700;font-size:14px">${_spEscape(r.nombre)}${r.desconocido ? marcaDesc : ''}</div><div style="font-size:11px;color:var(--ts)">${_spEscape(r.fecha || '—')}</div></div>
         <span style="display:inline-block;width:13px;height:13px;border-radius:50%;background:${sem};flex-shrink:0;margin-top:3px"></span>
       </div>
       <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px">
@@ -5441,7 +5454,7 @@ function _resumenUtilPintar() {
         <div style="flex:1 1 92px"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--ts)">Falta x cobrar</div><div style="font-size:16px;font-weight:700;color:${r.falta < 0 ? 'var(--red)' : 'var(--orange)'}">${_spFmtMxn(r.falta)}</div></div>
       </div>
       <div style="display:flex;gap:6px 14px;flex-wrap:wrap;font-size:11px;color:var(--ts);border-top:1px solid var(--border);padding-top:8px">
-        <span>Cobrado ${mny(r.cobrado)}</span><span>Ingresos ${mny(r.ingresos)}</span><span>Vendido ${mny(r.vendido)}</span><span>Gastos ${mny(r.gastos)}</span><span>% cob ${Math.round(r.pct * 100)}%</span><span>Caja acum ${mny(acum[r.slug])}</span>
+        <span>Cobrado ${mny(r.cobrado)}</span><span>Ingresos ${mny(r.ingresos)}</span><span>Vendido ${mny(r.vendido)}</span><span>Gastos ${mny(r.gastos)}</span><span>% cob ${Math.round(r.pct * 100)}%</span><span>Caja acum ${(r.slug in acum) ? mny(acum[r.slug]) : '—'}</span>
       </div>
     </div>`;
   };
@@ -5497,12 +5510,13 @@ function _resumenUtilCSV() {
   const rows = _resumenUtilRows.slice();
   const s = _resumenUtilSort;
   const key = (r) => (s.col === 'fecha') ? r.ds : r[s.col];
-  rows.sort((a, b) => { const ka = key(a), kb = key(b); let c = (typeof ka === 'number' && typeof kb === 'number') ? ka - kb : String(ka).localeCompare(String(kb)); return s.dir === 'asc' ? c : -c; });
+  rows.sort((a, b) => { const da = a.desconocido ? 1 : 0, db = b.desconocido ? 1 : 0; if (da !== db) return da - db; const ka = key(a), kb = key(b); let c = (typeof ka === 'number' && typeof kb === 'number') ? ka - kb : String(ka).localeCompare(String(kb)); return s.dir === 'asc' ? c : -c; });
   const lines = [head.map(cell).join(',')];
   let tc = 0, ti = 0, tv = 0, tg = 0, tk = 0, tp = 0, tf = 0;
   rows.forEach(r => {
     tc += r.cobrado; ti += r.ingresos; tv += r.vendido; tg += r.gastos; tk += r.caja; tp += r.proyectado; tf += r.falta;
-    lines.push([r.nombre, r.fecha, r.cobrado, r.ingresos, r.vendido, r.gastos, r.caja, r.proyectado, r.falta, Math.round(r.pct * 100) + '%'].map(cell).join(','));
+    const nom = r.desconocido ? (r.nombre + ' (evento desconocido)') : r.nombre;
+    lines.push([nom, r.fecha, r.cobrado, r.ingresos, r.vendido, r.gastos, r.caja, r.proyectado, r.falta, Math.round(r.pct * 100) + '%'].map(cell).join(','));
   });
   if (_resumenUtilSin) {
     const x = _resumenUtilSin;

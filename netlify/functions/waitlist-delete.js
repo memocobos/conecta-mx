@@ -5,14 +5,31 @@
 // Necesario porque RLS de eventos_waitlist solo expone INSERT y SELECT al
 // anon key — los DELETE deben hacerse con service key desde el server.
 
+const { verifyAdminAuth, corsCheck } = require('./_lib/verify-admin');
+
 const SB_URL = "https://npgnhsmwpcipxgvfxrho.supabase.co";
 const SB_KEY = process.env.SUPABASE_SERVICE_KEY_KAMEHOUSE;
 
-function ok(b)  { return { statusCode: 200, headers: { "Content-Type": "application/json" }, body: JSON.stringify(b) }; }
-function bad(c,m){ return { statusCode: c, headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ok:false, error:m }) }; }
-
 exports.handler = async function (event) {
+  const __origin = corsCheck(event);
+  const respHeaders = {
+    'Access-Control-Allow-Origin': __origin || 'null',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Vary': 'Origin',
+    'Content-Type': 'application/json',
+  };
+  const ok  = (b)   => ({ statusCode: 200, headers: respHeaders, body: JSON.stringify(b) });
+  const bad = (c,m) => ({ statusCode: c,   headers: respHeaders, body: JSON.stringify({ ok:false, error:m }) });
+
+  if (event.httpMethod === "OPTIONS") return { statusCode: 204, headers: respHeaders, body: '' };
   if (event.httpMethod !== "POST") return bad(405, "Method not allowed");
+  if (!__origin) return bad(403, "Origen no permitido");
+
+  // DELETE destructivo (eventos_waitlist + snapshot) con service_role — solo admin.
+  const auth = verifyAdminAuth(event, ['maestro_roshi','bulma']);
+  if (!auth.valid) return bad(auth.status, auth.error);
+
   if (!SB_KEY) return bad(500, "SUPABASE_SERVICE_KEY_KAMEHOUSE no configurado");
 
   let payload = {};

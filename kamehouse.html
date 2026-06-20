@@ -16173,10 +16173,10 @@ async function wlEliminarEvento(eventoId, total) {
 
   try {
     // RLS de eventos_waitlist no expone DELETE al anon key — pasamos por la
-    // Netlify Function que tiene service key.
-    const r = await fetch('/.netlify/functions/waitlist-delete', {
+    // Netlify Function que tiene service key. khAdminFetch adjunta el JWT admin
+    // (Authorization: Bearer) que verifyAdminAuth valida en el backend.
+    const r = await khAdminFetch('/.netlify/functions/waitlist-delete', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ evento_id: eventoId }),
     });
     const d = await r.json().catch(() => ({}));

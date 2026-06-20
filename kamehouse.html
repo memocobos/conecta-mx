@@ -16209,7 +16209,10 @@ async function wlNotificar(eventoId, totalRegs, pendientes) {
     qs.set('horas', String(params.horas));
   }
   try {
-    const r = await fetch(`/.netlify/functions/waitlist-notify?${qs.toString()}`);
+    // POST (no GET) a propósito: un GET same-origin no manda header Origin y
+    // rompería el corsCheck del backend. khAdminFetch adjunta el JWT admin que
+    // verifyAdminAuth valida en la rama force. La querystring se conserva.
+    const r = await khAdminFetch(`/.netlify/functions/waitlist-notify?${qs.toString()}`, { method: 'POST' });
     const d = await r.json().catch(() => ({}));
     if (!r.ok || !d.ok) { alert('Error: ' + (d.error || r.status)); return; }
     const suffix = params.codigo ? ` (con código ${params.codigo} · ${params.descuento}% · ${params.horas}h)` : '';

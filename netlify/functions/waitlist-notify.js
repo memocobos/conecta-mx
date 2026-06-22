@@ -14,6 +14,8 @@
 //
 // Configurado como cron diario en netlify.toml a las 14:00 UTC (8 AM CDMX).
 
+const { verifyAdminAuth, corsCheck } = require('./_lib/verify-admin');
+
 const SB_URL      = "https://npgnhsmwpcipxgvfxrho.supabase.co";
 const SB_KEY      = process.env.SUPABASE_SERVICE_KEY_KAMEHOUSE;
 const RESEND_KEY  = process.env.RESEND_API_KEY || process.env.RESEND_KEY;
@@ -233,6 +235,14 @@ exports.handler = async function (event) {
 
   // ── FORCE MODE: notificar a una lista específica desde kamehouse ──
   if (force && forceId) {
+    // Candado: el modo force dispara emails masivos desde kamehouse, así que
+    // exige admin. El cron AUTO entra por el camino de abajo (sin querystring,
+    // sin Authorization) y NO pasa por aquí — este guard no lo afecta.
+    const __origin = corsCheck(event);
+    if (!__origin) return bad(403, "Origen no permitido");
+    const auth = verifyAdminAuth(event, ['maestro_roshi','bulma']);
+    if (!auth.valid) return bad(auth.status, auth.error);
+
     // Necesitamos el nombre/fecha/venue. Los traemos del primer registro
     // de la waitlist (evento_nombre quedó guardado al subscribirse).
     let row;

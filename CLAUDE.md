@@ -49,7 +49,7 @@
 4. Recibe link grupo WhatsApp del evento
 
 ## Fase 2 — Portal Clientes (EN CONSTRUCCIÓN)
-- Stack: Airtable + Softr + Make.com (~$100 USD/mes)
+- Stack: Supabase (KH npgnhsmwpcipxgvfxrho + Portal muvvrstnkxsxfpkhbntq) + Netlify Functions + vanilla HTML/JS
 - ~150 clientes activos mensuales
 - Excel actual: 58 pestañas, 1 por evento
 
@@ -62,7 +62,7 @@
 - AC/DC solo en filtro Pasados
 - Morat 3 dic: costos pendientes
 - Lineups: Warped y EDC pendientes
-- Fase 2: Airtable pendiente
+- Fase 2 (Portal Clientes): en construcción sobre Supabase
 - Contratos digitales: pendiente
 
 ## Datos Bancarios

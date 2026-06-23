@@ -2313,10 +2313,16 @@ function populateHabs(){
         if(state.pkg === 'cheap') setStep(4);
         else if(!transporteNeeded()) setStep(4);
         else {
-          // CDMX no-cheap: NO avanzar. El transp-wrap está abajo de la habitación dentro
-          // del mismo step 3 — en móvil queda fuera del viewport y el usuario asume que
-          // se brincó. Scroll automático lo hace visible. Solo la PRIMERA vez (cuando el
-          // transporte sigue en el default 'sin') para no pelearse con la elección del user.
+          // CDMX no-cheap: NO marcamos el paso 3 como 'done' (en móvil eso ocultaría
+          // el transporte). Pero SÍ desbloqueamos el paso 4 (separo) para que el cliente
+          // pueda poner su fecha de inmediato — el transporte default 'sin' ya es válido
+          // y queda visible/ajustable arriba. [fix-rol-cdmx-separo]
+          var step4el = document.getElementById('step4');
+          if(step4el) step4el.classList.remove('locked');
+          // transp-wrap está abajo de la habitación dentro del mismo step 3 — en móvil
+          // queda fuera del viewport y el usuario asume que se brincó. Scroll automático
+          // lo hace visible. Solo la PRIMERA vez (cuando el transporte sigue en el default
+          // 'sin') para no pelearse con la elección del user.
           if(!state.transporte || state.transporte.k === 'sin'){
             var transp = document.getElementById('transp-wrap');
             if(transp) setTimeout(function(){

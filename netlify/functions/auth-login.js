@@ -10,12 +10,11 @@
 // Body JSON: { credentials: <correo o username>, password: <string> }
 // Devuelve : { ok: true, token: '<JWT>', user: { id, correo, nombre, rol, ... } }
 //
-// Passwords: bcrypt con fallback texto plano (transición):
-//   La columna `usuarios.password_hash` se migró a bcrypt cost 10.
-//   Si el valor empieza con '$2' → bcrypt.compare. Si no → secureCompare
-//   (texto plano timing-safe) como fallback temporal hasta que todos los
-//   registros estén migrados. Eliminar el fallback cuando los 18 estén en
-//   bcrypt (idempotente: `migrate-bcrypt.js` ya cubre los pendientes).
+// Passwords: solo bcrypt.
+//   La columna `usuarios.password_hash` está migrada a bcrypt cost 10
+//   (verificado en vivo: 17/17 usuarios con hash '$2…'). Solo bcrypt.compare
+//   es válido; cualquier hash que no empiece con '$2' = no match (login
+//   rechazado). El fallback temporal de texto plano ya fue eliminado.
 //
 // Env vars requeridas:
 //   - SUPABASE_URL_KAMEHOUSE  (fallback SUPABASE_URL)
@@ -122,8 +121,8 @@ exports.handler = async (event) => {
   }
 
   // ── Compare password ──
-  // Si password_hash empieza con '$2' → bcrypt. Si no → fallback texto plano
-  // timing-safe (transición). Eliminar el fallback cuando todos estén migrados.
+  // Solo bcrypt: si password_hash empieza con '$2' → bcrypt.compare.
+  // Cualquier otro valor = no match (login rechazado).
   if (!user || !(await passwordMatches(password, user.password_hash || ''))) {
     return badRequest(event, 401, 'Credenciales inválidas');
   }
@@ -176,24 +175,13 @@ exports.handler = async (event) => {
 // Rate limiting helpers
 // ───────────────────────────────────────────────────────────────────────
 
-// Compara password contra hash bcrypt o, como fallback, contra texto plano
-// timing-safe. Centralizado para que remover el fallback sea cambiar una sola
-// función cuando todos los registros estén migrados.
+// Compara password contra hash bcrypt. Solo se acepta bcrypt: si el hash no
+// empieza con '$2' (caso que ya no debería ocurrir — todos migrados) devuelve
+// false en vez de lanzar, para rechazar el login limpiamente.
 async function passwordMatches(plain, stored) {
-  if (!stored) return false;
-  if (stored.startsWith('$2')) {
-    try { return await bcrypt.compare(plain, stored); }
-    catch (_) { return false; }
-  }
-  return secureCompare(stored, plain);
-}
-
-// Comparison timing-safe (string vs string)
-function secureCompare(a, b) {
-  if (typeof a !== 'string' || typeof b !== 'string') return false;
-  if (a.length !== b.length) return false;
-  const crypto = require('crypto');
-  return crypto.timingSafeEqual(Buffer.from(a), Buffer.from(b));
+  if (!stored || !stored.startsWith('$2')) return false;
+  try { return await bcrypt.compare(plain, stored); }
+  catch (_) { return false; }
 }
 
 // Incrementa el contador. Si excede MAX dentro de la ventana, devuelve blocked.

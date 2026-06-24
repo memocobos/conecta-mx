@@ -15137,15 +15137,6 @@ async function ejecutarAprobacionFinal(id, reporte) {
       if (pieza) {
         const nuevaCantidad = Math.max(0, (pieza.cantidad||0) - (k.cantidad_sacada||0) + (k.cantidad_sobrante||0));
         await khKits.actualizar(k.pieza_id, { cantidad: nuevaCantidad }); // [sec-kits]
-        // Registrar movimiento si la tabla existe
-        await db.post('bodega_movimientos', {
-          pieza_id: k.pieza_id,
-          tipo: 'salida',
-          cantidad: k.cantidad_sacada - (k.cantidad_sobrante||0),
-          motivo: `Reporte aprobado — evento ${reporte.evento_id}`,
-          usuario_id: reporte.coordi_id,
-          created_at: new Date().toISOString(),
-        }).catch(()=>{});
       }
     } catch(e) { console.warn('Stock update error:', k.pieza_id, e.message); }
   }
@@ -15194,27 +15185,6 @@ async function marcarKitsRecibidos(id) {
     const kits = typeof r.kits_detalle === 'string' ? JSON.parse(r.kits_detalle) : (r.kits_detalle || []);
     const kitsActualizados = kits.map(k => ({ ...k, recibido: true }));
     await khReportes.marcarKitsRecibidos(id, JSON.stringify(kitsActualizados)); // [sec-reportes]
-
-    // Actualizar stock en bodega_piezas
-    for (const k of kits.filter(k => (k.cantidad_sobrante||0) > 0 && !k.recibido)) {
-      try {
-        const [pieza] = await db.get('bodega_piezas', `?id=eq.${k.pieza_id}`).catch(() => [null]);
-        if (pieza) {
-          await db.patch('bodega_piezas', k.pieza_id, {
-            cantidad: (pieza.cantidad || 0) + k.cantidad_sobrante
-          });
-          // Registrar movimiento en bodega_movimientos
-          await db.post('bodega_movimientos', {
-            pieza_id: k.pieza_id,
-            tipo: 'entrada',
-            cantidad: k.cantidad_sobrante,
-            motivo: `Sobrante reporte evento ${r.evento_id}`,
-            usuario_id: currentUser.id,
-            created_at: new Date().toISOString()
-          });
-        }
-      } catch(e2) { console.warn('No se pudo actualizar pieza', k.pieza_id, e2.message); }
-    }
 
     alert('✅ Kits marcados como recibidos y actualizados en bodega.');
     loadReportes();

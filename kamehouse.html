@@ -15261,6 +15261,34 @@ const _DELIVERABLES_DEFAULT = [
   "Post collab con fotos",
 ];
 
+// [sec-deliverables] Acceso a deliverables_creadoras vía Netlify Function con
+// service_role (cerramos lectura/escritura anon). El backend hace cumplir el
+// candado: cc SOLO ve/edita/borra los deliverables de SUS asignaciones;
+// maestro_roshi/bulma todo. Es un checklist (estado/link/notas), no archivos.
+const khDeliverables = {
+  async _call(payload) {
+    const r = await khAdminFetch('/.netlify/functions/admin-deliverables', {
+      method: 'POST', body: JSON.stringify(payload),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || j.ok === false) throw new Error(j.error || ('admin-deliverables ' + r.status));
+    return j;
+  },
+  // listar(ids[]) → array de deliverables de esas asignaciones (filtrado server-side por dueño)
+  listar(eventoCoordiIds) { return this._call({ accion: 'listar', evento_coordi_ids: eventoCoordiIds }).then(j => j.rows || []); },
+  // obtener(id) → un deliverable o null (para prellenar prompts)
+  obtener(id) { return this._call({ accion: 'obtener', id }).then(j => j.row || null); },
+  // crearDefaults(ecId, [desc,...]) → array insertado
+  crearDefaults(eventoCoordiId, descripciones) { return this._call({ accion: 'crear_defaults', evento_coordi_id: eventoCoordiId, descripciones }).then(j => j.rows || []); },
+  // addExtra(ecId, desc) → fila insertada
+  addExtra(eventoCoordiId, descripcion) { return this._call({ accion: 'add_extra', evento_coordi_id: eventoCoordiId, descripcion }).then(j => j.row || null); },
+  // toggle(id) → fila actualizada (estado invertido server-side)
+  toggle(id) { return this._call({ accion: 'toggle', id }).then(j => j.row || null); },
+  editarLink(id, link) { return this._call({ accion: 'editar_link', id, link_contenido: link }); },
+  editarNotas(id, notas) { return this._call({ accion: 'editar_notas', id, notas }); },
+  borrar(id) { return this._call({ accion: 'borrar', id }); },
+};
+
 // Anota cada item de evAsignados con su array .deliverables. Si una asignación
 // no tiene ninguno, crea los 3 defaults para evento del flujo de contratos.
 async function _ensureDeliverables(evAsignados) {
@@ -15269,8 +15297,7 @@ async function _ensureDeliverables(evAsignados) {
   if (!ids.length) return;
   let rows = [];
   try {
-    const inList = ids.map(id => '"' + id + '"').join(',');
-    rows = await db.get('deliverables_creadoras', `?evento_coordi_id=in.(${inList})&order=created_at.asc`);
+    rows = await khDeliverables.listar(ids); // [sec-deliverables]
   } catch (e) {
     console.warn('[deliverables] read falló:', e.message);
     return;
@@ -15284,16 +15311,7 @@ async function _ensureDeliverables(evAsignados) {
     let list = byId[e.id] || [];
     if (!list.length) {
       try {
-        const inserted = [];
-        for (const desc of _DELIVERABLES_DEFAULT) {
-          const [row] = await db.post('deliverables_creadoras', {
-            evento_coordi_id: e.id,
-            descripcion: desc,
-            estado: 'pendiente',
-          });
-          if (row) inserted.push(row);
-        }
-        list = inserted;
+        list = await khDeliverables.crearDefaults(e.id, _DELIVERABLES_DEFAULT); // [sec-deliverables]
       } catch (err) {
         console.warn('[deliverables] auto-popular falló para', e.id, err.message);
       }
@@ -15353,33 +15371,29 @@ function _escDeliv(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c 
 
 async function _delivToggle(id, userId) {
   try {
-    const [actual] = await db.get('deliverables_creadoras', `?id=eq.${id}&limit=1`);
-    if (!actual) return;
-    const nuevo = actual.estado === 'completado' ? 'pendiente' : 'completado';
-    const patch = { estado: nuevo, completado_at: nuevo === 'completado' ? new Date().toISOString() : null };
-    await db.patch('deliverables_creadoras', id, patch);
+    await khDeliverables.toggle(id); // [sec-deliverables] estado se invierte server-side
     _delivRefreshProfile(userId);
   } catch (e) { alert('Error: ' + e.message); }
 }
 
 async function _delivEditarLink(id, userId) {
   try {
-    const [actual] = await db.get('deliverables_creadoras', `?id=eq.${id}&limit=1`);
+    const actual = await khDeliverables.obtener(id); // [sec-deliverables]
     if (!actual) return;
     const nuevo = prompt('Link del contenido entregado (URL)\n— deja vacío para quitar el link:', actual.link_contenido || '');
     if (nuevo === null) return;
-    await db.patch('deliverables_creadoras', id, { link_contenido: nuevo.trim() || null });
+    await khDeliverables.editarLink(id, nuevo.trim() || null); // [sec-deliverables]
     _delivRefreshProfile(userId);
   } catch (e) { alert('Error: ' + e.message); }
 }
 
 async function _delivEditarNotas(id, userId) {
   try {
-    const [actual] = await db.get('deliverables_creadoras', `?id=eq.${id}&limit=1`);
+    const actual = await khDeliverables.obtener(id); // [sec-deliverables]
     if (!actual) return;
     const nuevo = prompt('Notas para este deliverable:', actual.notas || '');
     if (nuevo === null) return;
-    await db.patch('deliverables_creadoras', id, { notas: nuevo.trim() || null });
+    await khDeliverables.editarNotas(id, nuevo.trim() || null); // [sec-deliverables]
     _delivRefreshProfile(userId);
   } catch (e) { alert('Error: ' + e.message); }
 }
@@ -15387,7 +15401,7 @@ async function _delivEditarNotas(id, userId) {
 async function _delivBorrar(id, userId) {
   if (!confirm('¿Eliminar este deliverable?')) return;
   try {
-    await db.delete('deliverables_creadoras', id);
+    await khDeliverables.borrar(id); // [sec-deliverables]
     _delivRefreshProfile(userId);
   } catch (e) { alert('Error: ' + e.message); }
 }
@@ -15396,11 +15410,7 @@ async function _delivAdd(eventoCoordiId, userId) {
   const desc = prompt('Descripción del deliverable extra:\n(ej. "Video backstage", "Story con marca patrocinadora")');
   if (!desc || !desc.trim()) return;
   try {
-    await db.post('deliverables_creadoras', {
-      evento_coordi_id: eventoCoordiId,
-      descripcion: desc.trim(),
-      estado: 'pendiente',
-    });
+    await khDeliverables.addExtra(eventoCoordiId, desc.trim()); // [sec-deliverables]
     _delivRefreshProfile(userId);
   } catch (e) { alert('Error: ' + e.message); }
 }

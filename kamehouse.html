@@ -4024,62 +4024,6 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
  </div>
 </div>
 
-<!-- Modal: Vendedor/Equipo -->
-<div class="modal-overlay" id="modal-vendedor">
- <div class="modal">
- <div class="modal-header">
- <div class="modal-title">Miembro del Equipo</div>
- <button class="modal-close" onclick="closeModal('modal-vendedor')"></button>
- </div>
- <div class="modal-body">
- <div id="vendedor-alert"></div>
- <input type="hidden" id="vend-id">
- <div class="form-row cols-2">
- <div class="form-group">
- <label>Nombre Completo *</label>
- <input type="text" id="vend-nombre" placeholder="Nombre completo">
- </div>
- <div class="form-group">
- <label>Rol *</label>
- <select id="vend-rol">
- <option>Vendedor</option>
- <option>Coordinador</option>
- <option>Auxiliar</option>
- <option>Creador Contenido</option>
- </select>
- </div>
- </div>
- <div class="form-row cols-2">
- <div class="form-group">
- <label>Teléfono</label>
- <input type="text" id="vend-tel" placeholder="8991234567">
- </div>
- <div class="form-group">
- <label>Correo</label>
- <input type="email" id="vend-correo" placeholder="correo@ejemplo.com">
- </div>
- </div>
- <div class="form-row cols-2">
- <div class="form-group">
- <label>Talla Playera</label>
- <select id="vend-talla">
- <option>XS</option><option>S</option><option>M</option>
- <option>L</option><option>XL</option><option>XXL</option>
- </select>
- </div>
- <div class="form-group">
- <label>Comisión por Venta CHEAP</label>
- <input type="number" id="vend-comision" placeholder="200">
- </div>
- </div>
- </div>
- <div class="modal-footer">
- <button class="btn btn-ghost" onclick="closeModal('modal-vendedor')">Cancelar</button>
- <button class="btn btn-primary" onclick="guardarVendedor()">Guardar</button>
- </div>
- </div>
-</div>
-
 
 <!-- Modal: Vista previa del contrato (pre-envío) -->
 <div class="modal-overlay" id="modal-contrato-preview">
@@ -6897,44 +6841,6 @@ async function eliminarKit(id) {
  if (!confirm('¿Eliminar esta pieza del inventario?')) return;
  try { await khKits.eliminar(id); loadInventario(); } // [sec-kits]
  catch(e) { alert(e.message); }
-}
-
-// ═══════════════════════════════════════════════════════════════
-// EQUIPO
-// ═══════════════════════════════════════════════════════════════
-async function guardarVendedor() {
- const id = document.getElementById('vend-id').value;
- const nombre = document.getElementById('vend-nombre').value.trim();
- const rol = document.getElementById('vend-rol').value;
- const tel = document.getElementById('vend-tel').value.trim();
- const correo = document.getElementById('vend-correo').value.trim();
- const talla = document.getElementById('vend-talla').value;
- const comision= parseFloat(document.getElementById('vend-comision').value) || 0;
- const alerta = document.getElementById('vendedor-alert');
-
- if (!nombre) { alerta.innerHTML = '<div class="alert alert-error">El nombre es obligatorio</div>'; return; }
- try {
- const body = { nombre, rol, telefono: tel||null, correo: correo||null,
- talla_playera: talla, comision };
- if (id) await db.patch('vendedores', id, body);
- else await db.post('vendedores', body);
- alerta.innerHTML = '<div class="alert alert-success"> Guardado</div>';
- setTimeout(() => { closeModal('modal-vendedor'); loadEquipo(); }, 900);
- } catch(e) { alerta.innerHTML = `<div class="alert alert-error">${e.message}</div>`; }
-}
-
-async function editarVendedor(id) {
- try {
- const [v] = await db.get('vendedores', `?id=eq.${id}`);
- document.getElementById('vend-id').value = v.id;
- document.getElementById('vend-nombre').value = v.nombre;
- document.getElementById('vend-rol').value = v.rol;
- document.getElementById('vend-tel').value = v.telefono || '';
- document.getElementById('vend-correo').value = v.correo || '';
- document.getElementById('vend-talla').value = v.talla_playera || 'M';
- document.getElementById('vend-comision').value = v.comision || 0;
- openModal('modal-vendedor');
- } catch(e) { alert(e.message); }
 }
 
 // ═══════════════════════════════════════════════════════════════

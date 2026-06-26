@@ -5696,7 +5696,12 @@ async function loadPagos() {
   }
 }
 
-function _cobHoyISO() { return new Date().toISOString().slice(0, 10); }
+function _cobHoyISO() {
+  // Hoy en hora MX (America/Monterrey), formato YYYY-MM-DD.
+  // NO usar toISOString(): es UTC y cerca de medianoche MX marca atrasados
+  // un día antes (MX = UTC-6). Patrón consistente con _kamToday() y demás.
+  return new Date().toLocaleDateString('en-CA', { timeZone: 'America/Monterrey' });
+}
 
 // Atrasado: tiene un próximo pago pendiente con fecha_esperada anterior a hoy.
 // Cancelado/liquidado nunca cuenta como atrasado.

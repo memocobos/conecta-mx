@@ -10415,14 +10415,14 @@ async function exportarRooming(formato) {
     <table><thead><tr><th>Habitación</th><th>Tipo</th><th>Ocupantes</th></tr></thead>
     <tbody>${_ccHabitaciones.map(h=>{
       const ocp = filtrarOcp(h.ocupantes?(typeof h.ocupantes==='string'?JSON.parse(h.ocupantes):h.ocupantes):[]);
-      return `<tr><td>${h.numero||'—'}</td><td>${tipoLabel[h.tipo]||h.tipo}</td><td>${ocp.join('<br>')||'—'}</td></tr>`;
+      return `<tr><td>${h.numero_hab||'—'}</td><td>${tipoLabel[h.tipo]||h.tipo}</td><td>${ocp.join('<br>')||'—'}</td></tr>`;
     }).join('')}</tbody></table></body></html>`;
     _descargarHTML(`rooming-${ev?.nombre||'evento'}${sufijoFile}.html`, html);
   } else {
     const headers = ['Habitación','Tipo','Ocupantes'];
     const rows = _ccHabitaciones.map(h => {
       const ocp = filtrarOcp(h.ocupantes?(typeof h.ocupantes==='string'?JSON.parse(h.ocupantes):h.ocupantes):[]);
-      return [h.numero||'',tipoLabel[h.tipo]||h.tipo,ocp.join(' | ')].map(c=>`"${String(c).replace(/"/g,'""')}"`).join(',');
+      return [h.numero_hab||'',tipoLabel[h.tipo]||h.tipo,ocp.join(' | ')].map(c=>`"${String(c).replace(/"/g,'""')}"`).join(',');
     });
     const csv = [headers.join(','),...rows].join('\n');
     const a = document.createElement('a');

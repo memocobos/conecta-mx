@@ -44,6 +44,13 @@
 [functions."marcar-vencidos-diario"]
   schedule = "0 8 * * *"
 
+# Morosidad escalada del PORTAL — días 17 y 2 manda correo por nivel (1=aviso,
+# 2=congelado, 3=última advertencia) a clientes con quincenas vencidas. Solo
+# notifica (no da de baja). 14:00 UTC = 8:00 AM hora México, DESPUÉS de
+# marcar-vencidos-diario (08:00 UTC), para leer los vencidos ya marcados del corte.
+[functions."portal-morosidad-diario"]
+  schedule = "0 14 17,2 * *"
+
 # Recordatorios de pago de /rol — 14:00 UTC = 8:00 AM CDMX
 [functions."rol-recordatorios"]
   schedule = "0 14 * * *"

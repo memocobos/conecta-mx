@@ -4689,6 +4689,22 @@ const khReportes = {
   eliminar(id) { return this._call({ accion: 'eliminar', id }); },
 };
 
+// [sec-ventas] Acceso a la vista resumen_eventos vía Netlify Function con
+// service_role (cierra el último acceso anon de finanzas). Gateado a admin
+// (maestro_roshi, bulma) mientras el rol vendedor / "Mis Ventas" no exista.
+const khVentas = {
+  async _call(payload) {
+    const r = await khAdminFetch('/.netlify/functions/admin-ventas-resumen', {
+      method: 'POST', body: JSON.stringify(payload),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || j.ok === false) throw new Error(j.error || ('admin-ventas-resumen ' + r.status));
+    return j;
+  },
+  // listar() → array de eventos de la vista resumen_eventos
+  listar() { return this._call({ accion: 'listar' }).then(j => j.eventos || []); },
+};
+
 // [sec-tours] Acceso a tours_pasados vía Netlify Function con service_role
 // (cerramos lectura/escritura anon). Lectura: cualquier logueado. Crear/eliminar:
 // el backend exige que el tour sea del propio usuario salvo admin (maestro_roshi/bulma).
@@ -6747,7 +6763,7 @@ async function loadVentas() {
  const el = document.getElementById('ventas-content');
  el.innerHTML = '<div class="loading-state"><div class="spinner"></div>Cargando…</div>';
  try {
- const eventos = await db.get('resumen_eventos', '?order=fecha.desc&limit=50');
+ const eventos = await khVentas.listar();
  if (!eventos.length) {
  el.innerHTML = '<div class="empty-state"><div class="empty-icon"></div>Sin datos aún</div>';
  return;

@@ -29,6 +29,8 @@ const ACCIONES = { listar: ROLES, crear: ROLES, actualizar: ROLES, eliminar: ROL
 const COLS = 'id,evento_id,tipo,orden,numero_hab,ocupantes,hotel_nombre,hotel_direccion,incluye_desayuno';
 // Campos que el cliente puede setear (evento_id solo en crear).
 const FIELDS = ['tipo', 'orden', 'numero_hab', 'ocupantes', 'hotel_nombre', 'hotel_direccion', 'incluye_desayuno'];
+// Capacidad por tipo de habitación (igual que el front, kamehouse.html:10111).
+const CAPACIDAD_HAB = { individual: 1, doble: 2, triple: 3, cuadruple: 4 };
 
 exports.handler = async (event) => {
   const __origin = corsCheck(event);
@@ -87,6 +89,12 @@ exports.handler = async (event) => {
       if (!SLUG_RE.test(eventoId)) {
         return { statusCode: 400, headers, body: JSON.stringify({ error: 'evento_id inválido' }) };
       }
+      const ocupCrear = parseOcupantes(body.ocupantes);
+      if (ocupCrear === null) {
+        return { statusCode: 400, headers, body: JSON.stringify({ error: 'ocupantes debe ser una lista de nombres' }) };
+      }
+      const errCrear = await validarRooming(base, sbHeaders, eventoId, body.tipo, ocupCrear, null);
+      if (errCrear) return { statusCode: 400, headers, body: JSON.stringify({ error: errCrear }) };
       const fila = buildFila(body);
       fila.evento_id = eventoId;
       const r = await fetch(base, {
@@ -108,6 +116,27 @@ exports.handler = async (event) => {
         return { statusCode: 400, headers, body: JSON.stringify({ error: 'id inválido' }) };
       }
       const patch = (body.patch && typeof body.patch === 'object') ? body.patch : {};
+
+      // Validar capacidad/duplicados si el patch toca ocupantes o tipo. El patch
+      // es parcial: se lee la fila actual para los valores que no vengan.
+      if (('ocupantes' in patch) || (patch.tipo != null)) {
+        const aR = await fetch(`${base}?id=eq.${id}&select=evento_id,tipo,ocupantes&limit=1`, { headers: sbHeaders });
+        if (!aR.ok) {
+          const detail = await aR.text();
+          return { statusCode: 502, headers, body: JSON.stringify({ error: 'KH rechazó la consulta de la habitación', detail }) };
+        }
+        const aArr = await aR.json();
+        const filaActual = Array.isArray(aArr) ? aArr[0] : null;
+        if (!filaActual) return { statusCode: 404, headers, body: JSON.stringify({ error: 'Habitación no encontrada' }) };
+        const tipoEf = (patch.tipo != null) ? patch.tipo : filaActual.tipo;
+        const ocupEf = ('ocupantes' in patch) ? parseOcupantes(patch.ocupantes) : (parseOcupantes(filaActual.ocupantes) || []);
+        if (ocupEf === null) {
+          return { statusCode: 400, headers, body: JSON.stringify({ error: 'ocupantes debe ser una lista de nombres' }) };
+        }
+        const errAct = await validarRooming(base, sbHeaders, filaActual.evento_id, tipoEf, ocupEf, id);
+        if (errAct) return { statusCode: 400, headers, body: JSON.stringify({ error: errAct }) };
+      }
+
       const fila = buildFila(patch);
       if (!Object.keys(fila).length) {
         return { statusCode: 400, headers, body: JSON.stringify({ error: 'Nada que actualizar' }) };
@@ -147,6 +176,39 @@ exports.handler = async (event) => {
 };
 
 // ----- helpers -----
+
+// Normaliza `ocupantes` (jsonb; el front manda JSON.stringify de un array de
+// nombres). Devuelve array de strings limpios, o null si es inválido.
+function parseOcupantes(oc) {
+  if (oc == null) return [];
+  let arr = oc;
+  if (typeof oc === 'string') { try { arr = JSON.parse(oc); } catch { return null; } }
+  if (!Array.isArray(arr)) return null;
+  return arr.filter(x => typeof x === 'string' && x.trim()).map(x => x.trim());
+}
+
+// Validación server-side (defensa en profundidad): capacidad por tipo, sin
+// viajeros duplicados dentro del cuarto NI entre cuartos del mismo evento, con
+// "Chofer" exento. Devuelve un string de error en español, o null si todo OK.
+async function validarRooming(base, sbHeaders, eventoId, tipo, ocupantes, idActual) {
+  const cap = CAPACIDAD_HAB[tipo] || 1;
+  if (ocupantes.length > cap) return `Máximo ${cap} persona(s) en habitación ${tipo}`;
+  const sinChofer = ocupantes.filter(n => n !== 'Chofer');
+  if (new Set(sinChofer).size !== sinChofer.length) return 'Hay un viajero repetido dentro del mismo cuarto';
+  // Dedup ENTRE cuartos del mismo evento (excluye la habitación actual en 'actualizar').
+  let url = `${base}?evento_id=eq.${encodeURIComponent(eventoId)}&select=id,ocupantes`;
+  if (idActual) url += `&id=neq.${idActual}`;
+  const r = await fetch(url, { headers: sbHeaders });
+  if (r.ok) {
+    const otras = await r.json();
+    const ocupadosOtros = new Set();
+    for (const h of (Array.isArray(otras) ? otras : [])) {
+      for (const n of (parseOcupantes(h.ocupantes) || [])) if (n !== 'Chofer') ocupadosOtros.add(n);
+    }
+    for (const n of sinChofer) if (ocupadosOtros.has(n)) return `${n} ya está asignado en otro cuarto de este evento`;
+  }
+  return null;
+}
 
 // Whitelist de campos seteable (tipo/orden/numero_hab/ocupantes/hotel_*/incluye_desayuno).
 function buildFila(src) {

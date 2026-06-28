@@ -10263,7 +10263,7 @@ function abrirModalHabitacion(id) {
   const h = id ? (_ccHabitaciones.find(x => x.id === id) || {}) : {};
   const ocupantes = h?.ocupantes ? (typeof h.ocupantes==='string'?JSON.parse(h.ocupantes):h.ocupantes) : [];
   const tipoActual = h.tipo || 'doble';
-  const nombresViajeros = _ccViajeros.map(v => v.nombre);
+  const nombresViajeros = _ccViajeros.map(v => v.clientes?.nombre_completo).filter(Boolean);
 
   // Combinar viajeros + equipo asignado
   const nombresEquipo = _ccAsignados.map(a => a._usuario?.nombre||'').filter(Boolean);
@@ -10338,7 +10338,7 @@ function actualizarOcupantesHab(tipo) {
       .flatMap(h=>h.ocupantes?(typeof h.ocupantes==='string'?JSON.parse(h.ocupantes):h.ocupantes):[])
       .filter(n=>n&&n!=='Chofer')
   );
-  const dispViajeros = _ccViajeros.map(v=>v.nombre).filter(n=>!yaAsig.has(n));
+  const dispViajeros = _ccViajeros.map(v=>v.clientes?.nombre_completo).filter(n=>n&&!yaAsig.has(n));
   const dispEquipo   = _ccAsignados.map(a=>a._usuario?.nombre||'').filter(n=>n&&!yaAsig.has(n));
   container.innerHTML = Array.from({length: cap}).map((_, i) => `
     <div style="margin-bottom:8px">

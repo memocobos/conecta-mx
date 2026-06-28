@@ -10946,6 +10946,66 @@ function renderPlanPagosSP(solicitudId, estadoSolicitud) {
 
   const filas = pagos.map(p => _spRenderFilaPago(solicitudId, p)).join('');
   target.innerHTML = resumen + `<div style="display:flex;flex-direction:column;gap:8px">${filas}</div>`;
+
+  // Bitácora de movimientos (pagos_auditoria) — colapsable, lazy-load.
+  target.innerHTML += `
+    <div style="margin-top:14px;border-top:1px solid var(--border);padding-top:10px">
+      <button class="btn btn-ghost btn-sm" style="font-size:11px" onclick="toggleBitacoraSP('${_spEscape(solicitudId)}')">Ver movimientos ▾</button>
+      <div id="sp-audit-${_spEscape(solicitudId)}" style="display:none;margin-top:10px"></div>
+    </div>`;
+}
+
+// Alterna la bitácora colapsable; la primera vez que se abre (div vacío) carga
+// los movimientos. Actualiza la flecha ▾/▴ del botón.
+function toggleBitacoraSP(solicitudId) {
+  const div = document.getElementById('sp-audit-' + solicitudId);
+  if (!div) return;
+  const abrir = div.style.display === 'none';
+  div.style.display = abrir ? '' : 'none';
+  const btn = div.parentElement && div.parentElement.querySelector('button');
+  if (btn) btn.textContent = abrir ? 'Ver movimientos ▴' : 'Ver movimientos ▾';
+  if (abrir && !div.dataset.cargado) cargarBitacoraSP(solicitudId);
+}
+
+// Trae la bitácora de pagos_auditoria y la pinta línea por línea (más reciente
+// primero, como ya viene del backend). Best-effort: si truena, muestra el error.
+async function cargarBitacoraSP(solicitudId) {
+  const div = document.getElementById('sp-audit-' + solicitudId);
+  if (!div) return;
+  div.innerHTML = `<span style="color:var(--ts);font-size:12px">Cargando movimientos…</span>`;
+  try {
+    const r = await fetch('/.netlify/functions/admin-pagos-auditoria-list', {
+      method: 'POST',
+      headers: _spAdminHeaders(),
+      body: JSON.stringify({ solicitud_id: solicitudId }),
+    });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || 'No se pudo cargar la bitácora');
+    const movs = Array.isArray(data.movimientos) ? data.movimientos : [];
+    if (!movs.length) {
+      div.innerHTML = `<span style="color:var(--ts);font-size:12px">Sin movimientos registrados aún.</span>`;
+      div.dataset.cargado = '1';
+      return;
+    }
+    div.innerHTML = movs.map(m => {
+      const esPago = m.accion === 'pagado';
+      const color = esPago ? '#3DDC84' : 'var(--orange)';
+      const numPago = (m.pagos && m.pagos.numero_pago != null) ? m.pagos.numero_pago : '?';
+      const monto = (esPago && m.monto_pagado != null) ? ` · ${_spFmtMxn(m.monto_pagado)}` : '';
+      const fecha = m.creado_en
+        ? new Date(m.creado_en).toLocaleString('es-MX', { timeZone: 'America/Monterrey', dateStyle: 'medium', timeStyle: 'short' })
+        : '';
+      return `
+      <div style="display:flex;align-items:center;gap:8px;padding:5px 0;font-size:12px">
+        <span style="flex:none;width:8px;height:8px;border-radius:50%;background:${color}"></span>
+        <span style="color:var(--ink)">Pago #${numPago} · ${_spEscape(m.accion)} por ${_spEscape(m.actor)}${monto}</span>
+        <span style="margin-left:auto;color:var(--ts);white-space:nowrap">${_spEscape(fecha)}</span>
+      </div>`;
+    }).join('');
+    div.dataset.cargado = '1';
+  } catch (e) {
+    div.innerHTML = `<span style="color:#FF6B6B;font-size:12px">Error: ${_spEscape(e.message)}</span>`;
+  }
 }
 
 function _spRenderFilaPago(solicitudId, p) {

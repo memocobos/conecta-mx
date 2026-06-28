@@ -11278,7 +11278,7 @@ async function _spCalcularPlanPagos(s) {
           numero_pago: i + 2,
           concepto: quincenas[i].lbl,
           monto: Math.round(m),
-          fecha_esperada: _spYmd(quincenas[i].d),
+          fecha_esperada: _spYmd(quincenas[i].e),
         });
       }
     } else {

@@ -156,6 +156,34 @@ exports.handler = async (event) => {
         if (!SLUG_RE.test(ev)) return { statusCode: 400, headers, body: JSON.stringify({ error: 'evento_id inválido' }) };
         fila.evento_id = ev;
       }
+
+      // El strike MANUAL aplica igual que el automático (aplicarStrike del cron):
+      // PATCH contador ANTES del log, luego suspensión, luego correo. Sin guard de
+      // fecha (es deliberado y aplica de inmediato).
+
+      // 2. Leer el usuario.
+      const uR = await fetch(`${restBase}/usuarios?id=eq.${coordiId}&select=nombre,strikes,correo,correo_notif`, { headers: sbHeaders });
+      if (!uR.ok) {
+        const detail = await uR.text();
+        return { statusCode: 502, headers, body: JSON.stringify({ error: 'KH rechazó la consulta del coordi', detail }) };
+      }
+      const uArr = await uR.json();
+      const u = Array.isArray(uArr) ? uArr[0] : null;
+      if (!u) return { statusCode: 404, headers, body: JSON.stringify({ error: 'coordi no encontrado' }) };
+
+      // 3. Incrementar el contador ANTES del log (así un reintento no duplica el log).
+      const nuevos = (u.strikes || 0) + 1;
+      const incR = await fetch(`${restBase}/usuarios?id=eq.${coordiId}`, {
+        method: 'PATCH',
+        headers: { ...sbHeaders, Prefer: 'return=minimal' },
+        body: JSON.stringify({ strikes: nuevos }),
+      });
+      if (!incR.ok) {
+        const detail = await incR.text();
+        return { statusCode: 502, headers, body: JSON.stringify({ error: 'KH rechazó el incremento de strikes', detail }) };
+      }
+
+      // 4. Insertar la fila en strikes_log.
       const r = await fetch(`${restBase}/strikes_log`, {
         method: 'POST',
         headers: { ...sbHeaders, Prefer: 'return=minimal' },
@@ -165,7 +193,39 @@ exports.handler = async (event) => {
         const detail = await r.text();
         return { statusCode: 502, headers, body: JSON.stringify({ error: 'KH rechazó el insert', detail }) };
       }
-      return { statusCode: 200, headers, body: JSON.stringify({ ok: true }) };
+
+      // 5. Suspensión al llegar a 3 (si falla, loggea pero no abortes: el strike
+      //    y el contador ya quedaron aplicados).
+      if (nuevos >= 3) {
+        const susR = await fetch(`${restBase}/usuarios?id=eq.${coordiId}`, {
+          method: 'PATCH',
+          headers: { ...sbHeaders, Prefer: 'return=minimal' },
+          body: JSON.stringify({ activo: false }),
+        }).catch(() => null);
+        if (!susR || !susR.ok) console.error('[coordi-control] suspensión a 3 falló (no crítica):', coordiId);
+      }
+
+      // 6. Correo al coordi, BEST-EFFORT (su fallo no afecta el return).
+      try {
+        const email = u.correo_notif || u.correo;
+        if (email) {
+          await enviarCorreo(email, '⚠️ Strike — Kamehouse',
+            `<div style="font-family:Arial,sans-serif;background:#0a0a0f;color:#f0f0f5;padding:32px;border-radius:12px;max-width:520px;margin:0 auto">
+              <h2 style="color:#FF6B00">Strike</h2>
+              <p>Hola <strong>${u.nombre}</strong>,</p>
+              <p><strong>Motivo:</strong> ${fila.motivo || 'No especificado'}</p>
+              <p><strong>Strikes:</strong> ${nuevos}/3</p>
+              ${nuevos >= 2 ? '<p style="color:#FFB703">⚠️ Al llegar a 3 tu cuenta será suspendida.</p>' : ''}
+              ${nuevos >= 3 ? '<p style="color:#FF4444">🚫 Cuenta suspendida.</p>' : ''}
+              <p style="color:#888;font-size:12px">Conecta Reynosa</p>
+            </div>`);
+        }
+      } catch (e) {
+        console.error('[coordi-control] correo de strike falló (no crítico):', e.message);
+      }
+
+      // 7. Listo.
+      return { statusCode: 200, headers, body: JSON.stringify({ ok: true, strikes: nuevos, suspendido: nuevos >= 3 }) };
     }
 
     // ── sistema_alertas_listar (solo lectura) ──────────────────────────────────
@@ -185,6 +245,18 @@ exports.handler = async (event) => {
 };
 
 // ----- helpers -----
+
+// Remitente INTERNO del equipo (no el de cliente): correcto para un strike al
+// staff. Copia del patrón de check-strikes-diario.js; .catch loggea (best-effort).
+async function enviarCorreo(to, subject, html) {
+  const KEY = process.env.RESEND_KEY || process.env.RESEND_API_KEY;
+  if (!KEY || !to) return;
+  await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${KEY}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ from: 'Kamehouse <kamehouse@conectareynosa.mx>', to, subject, html }),
+  }).catch((e) => console.error('[coordi-control] Email:', e.message));
+}
 
 function readEnv() {
   const KH_SB_URL = process.env.SUPABASE_URL_KAMEHOUSE || process.env.SUPABASE_URL;

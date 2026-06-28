@@ -60,7 +60,7 @@ const ACCIONES = {
 const EC_COLS = 'id,evento_id,coordi_id,indicaciones,status,motivo_declinacion';
 
 // Whitelist ESTRICTA de `viajeros_evento` (PII) — solo lo que la descarga usa.
-const VE_READ_COLS = 'id,evento_id,nombre,correo,celular,talla_playera,num_emergencia,emergencia_nombre,tipo_paquete,zona_boleto,notas,tipo_viajero,usuario_id,created_at';
+const VE_READ_COLS = 'id,evento_id,nombre,correo,celular,talla_playera,num_emergencia,emergencia_nombre,tipo_paquete,zona_boleto,notas,tipo_viajero,usuario_id,created_at:creado_en';
 
 exports.handler = async (event) => {
   const __origin = corsCheck(event);

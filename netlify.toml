@@ -44,6 +44,12 @@
 [functions."marcar-vencidos-diario"]
   schedule = "0 8 * * *"
 
+# Recordatorio AMABLE de abono del PORTAL — días 9 y 24 (apertura de cada ventana
+# de pago) avisa a clientes AL CORRIENTE el monto de su abono de la quincena. Solo
+# notifica. 14:00 UTC = 8:00 AM hora México.
+[functions."portal-recordatorios-diario"]
+  schedule = "0 14 9,24 * *"
+
 # Morosidad escalada del PORTAL — días 17 y 2 manda correo por nivel (1=aviso,
 # 2=congelado, 3=última advertencia) a clientes con quincenas vencidas. Solo
 # notifica (no da de baja). 14:00 UTC = 8:00 AM hora México, DESPUÉS de

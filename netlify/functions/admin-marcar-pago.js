@@ -163,7 +163,7 @@ exports.handler = async (event) => {
     const todos = await allR.json();
 
     // 3. Leer el estado actual de la solicitud y reconciliar si hace falta.
-    const solUrl = `${env.PORTAL_SB_URL}/rest/v1/solicitudes_tour?id=eq.${solicitudId}&select=id,estado,precio_total`;
+    const solUrl = `${env.PORTAL_SB_URL}/rest/v1/solicitudes_tour?id=eq.${solicitudId}&select=id,estado,precio_total,evento_nombre,clientes(nombre_completo,correo)`;
     const solR = await fetch(solUrl, { headers: sbHeaders });
     if (!solR.ok) {
       const detail = await solR.text();
@@ -207,6 +207,28 @@ exports.handler = async (event) => {
         return { statusCode: 502, headers, body: JSON.stringify({ error: 'Pago actualizado, pero falló la reconciliación del estado de la solicitud', detail }) };
       }
       estadoSolicitud = nuevoEstadoSol;
+
+      // Felicitación al CLIENTE cuando el tour queda LIQUIDADO (solo 'pagado').
+      // Fail-soft: cualquier fallo del correo se loggea y NO afecta la respuesta
+      // (el pago ya quedó bien marcado). La degradación a 'en_pagos' no manda nada.
+      if (nuevoEstadoSol === 'pagado') {
+        try {
+          const cli = Array.isArray(solicitud.clientes)
+            ? (solicitud.clientes[0] || {})
+            : (solicitud.clientes || {});
+          const correo = cli.correo && String(cli.correo).trim();
+          if (correo) {
+            const nombre = String(cli.nombre_completo || 'cliente').trim().split(/\s+/)[0] || 'cliente';
+            const evento = solicitud.evento_nombre || solicitudId || 'tu evento';
+            const asunto = `🎉 ¡Listo! Tu viaje a ${evento} está pagado`;
+            const cuerpo = `<p style="margin:0 0 14px 0">¡Felicidades! Terminaste de pagar tu viaje a <strong>${escapeHtml(evento)}</strong>. Tu lugar está <strong>100% asegurado</strong>.</p>
+        <p style="margin:0">Pronto te compartiremos los detalles finales. ¡Nos vemos pronto!</p>`;
+            await enviarCorreo(correo, asunto, wrapHtml(nombre, cuerpo));
+          }
+        } catch (e) {
+          console.error('[marcar-pago] correo liquidado falló (no crítico):', e.message);
+        }
+      }
     }
 
     return {
@@ -244,4 +266,43 @@ function readEnv() {
     return { error: 'Faltan env vars (PORTAL_SUPABASE_URL/SERVICE_KEY)' };
   }
   return { PORTAL_SB_URL, PORTAL_SB_SERVICE };
+}
+
+// ----- correo (mismo patrón/estilo que portal-morosidad-diario.js) -----
+
+// Remitente de cara al CLIENTE (no el de Kamehouse, que es interno del equipo).
+const FROM = process.env.RESEND_FROM_COBRANZA || 'Conecta Reynosa <admin@conectareynosa.mx>';
+
+// Envío fail-soft: devuelve true si se despachó, false si faltó key/destinatario
+// o el fetch falló. NUNCA lanza (el .catch absorbe).
+async function enviarCorreo(to, subject, html) {
+  const KEY = process.env.RESEND_KEY || process.env.RESEND_API_KEY;
+  if (!KEY || !to) return false;
+  const r = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${KEY}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ from: FROM, to, subject, html }),
+  }).catch((e) => { console.error('[marcar-pago] Email:', e.message); return null; });
+  return !!(r && r.ok);
+}
+
+function escapeHtml(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+// Envoltura HTML simple (saludo + párrafo + cierre), estilo Conecta Reynosa.
+function wrapHtml(nombre, cuerpoHtml) {
+  return `<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#000;font-family:Helvetica,Arial,sans-serif;color:#fff">
+  <div style="max-width:520px;margin:0 auto;padding:32px 24px">
+    <div style="font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:rgba(255,255,255,.55);margin-bottom:18px">
+      <span style="color:#ff283b;font-weight:900">Conecta</span> <span style="font-style:italic;font-weight:900">MX</span> · Cobranza
+    </div>
+    <p style="font-size:16px;line-height:1.6;margin:0 0 16px 0">Hola <strong>${escapeHtml(nombre)}</strong>,</p>
+    <div style="font-size:15px;line-height:1.65;color:rgba(255,255,255,.88)">${cuerpoHtml}</div>
+    <p style="font-size:13px;line-height:1.6;color:rgba(255,255,255,.55);margin:28px 0 0 0;border-top:1px solid rgba(255,255,255,.1);padding-top:16px">— Equipo Conecta Reynosa</p>
+  </div>
+</body></html>`;
 }

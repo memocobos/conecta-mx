@@ -109,6 +109,22 @@ exports.handler = async (event) => {
 
   // ---- 5. Armar y enviar email ----
   const fmtMxn = (n) => '$' + Number(n || 0).toLocaleString('es-MX', { maximumFractionDigits: 2 });
+
+  // [cordura-precio] Chequeos baratos contra precios manipulados. NO recalcula la
+  // tarifa (vive en el portal); solo marca valores absurdos para que el admin los
+  // revise antes de aceptar. PISO_PP_MXN es un piso de cordura por persona, ajustable.
+  const PISO_PP_MXN = 500;
+  const _precio = Number(solicitud.precio_total);
+  const _separo = Number(solicitud.monto_separo);
+  const _np     = Number(solicitud.num_personas) || 0;
+  const alertasCordura = [];
+  if (!(_precio > 0))                                   alertasCordura.push('Precio total ≤ 0');
+  if (!(_separo > 0))                                   alertasCordura.push('Separo ≤ 0');
+  if (_precio > 0 && _separo > _precio)                 alertasCordura.push('Separo mayor al precio total');
+  if (!(_np >= 1 && _np <= 9))                          alertasCordura.push('Número de personas fuera de 1–9');
+  if (_np >= 1 && _precio > 0 && _precio < _np * PISO_PP_MXN)
+                                                        alertasCordura.push(`Precio por persona muy bajo (menor a ${fmtMxn(PISO_PP_MXN)})`);
+
   const fechaSolicitud = new Date(solicitud.created_at).toLocaleString('es-MX', {
     timeZone: 'America/Monterrey',
     dateStyle: 'medium',
@@ -123,6 +139,14 @@ exports.handler = async (event) => {
         <div style="font-size:22px;font-weight:900;margin-top:4px">${escapeHtml(solicitud.evento_nombre)}</div>
       </div>
       <div style="padding:22px;background:#0a0a0a">
+        ${alertasCordura.length ? `
+        <div style="background:#ff283b;color:#fff;padding:14px 16px;border-radius:8px;margin-bottom:18px;font-size:13px;font-weight:700">
+          ⚠️ REVISAR PRECIO antes de aceptar:
+          <ul style="margin:8px 0 0;padding-left:20px;font-weight:600">
+            ${alertasCordura.map(a => `<li>${a}</li>`).join('')}
+          </ul>
+          <div style="margin-top:8px;font-weight:600">Recibido — Precio: ${fmtMxn(solicitud.precio_total)} · Separo: ${fmtMxn(solicitud.monto_separo)} · Personas: ${solicitud.num_personas}</div>
+        </div>` : ''}
         <table style="width:100%;border-collapse:collapse;color:#fff;font-size:14px">
           ${row('Cliente', `${escapeHtml(cliente.nombre_completo)} <span style="color:#e8ff4c;font-family:monospace">#${cliente.numero_cliente}</span>`)}
           ${row('Correo', escapeHtml(cliente.correo))}

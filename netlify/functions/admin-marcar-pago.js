@@ -154,6 +154,29 @@ exports.handler = async (event) => {
 
     // 2. Leer TODOS los pagos de la solicitud para reconciliar su estado.
     const solicitudId = pago.solicitud_id;
+
+    // 1b. Auditoría BEST-EFFORT del acto HUMANO (pagar/revertir) en pagos_auditoria.
+    // Toma los valores del `pago` YA actualizado (estado real aplicado). Su fallo
+    // NUNCA rompe la operación. El vencido automático del cron NO pasa por aquí.
+    try {
+      const actor = (auth.user && (auth.user.correo || auth.user.rol)) || 'admin';
+      await fetch(`${env.PORTAL_SB_URL}/rest/v1/pagos_auditoria`, {
+        method: 'POST',
+        headers: { ...sbHeaders, Prefer: 'return=minimal' },
+        body: JSON.stringify({
+          pago_id:      pago.id,
+          solicitud_id: pago.solicitud_id,
+          accion:       accion === 'pagar' ? 'pagado' : 'revertido',
+          actor,
+          monto_pagado: pago.monto_pagado ?? null,
+          metodo:       pago.metodo ?? null,
+          cuenta:       pago.cuenta ?? null,
+        }),
+      });
+    } catch (e) {
+      console.error('[marcar-pago] auditoría falló (no crítica):', e.message);
+    }
+
     const allUrl = `${env.PORTAL_SB_URL}/rest/v1/pagos?solicitud_id=eq.${solicitudId}&select=estado,monto,monto_pagado`;
     const allR = await fetch(allUrl, { headers: sbHeaders });
     if (!allR.ok) {

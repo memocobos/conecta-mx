@@ -148,6 +148,52 @@ exports.handler = async (event) => {
     </div>
   `;
 
+  // ---- 5b. Confirmación AL CLIENTE (best-effort, FAIL-SOFT) ----
+  // Cumple la promesa del portal de "te confirmamos por correo". Su fallo NUNCA
+  // debe afectar el correo al admin ni el return de la función (try/catch propio).
+  try {
+    if (cliente.correo) {
+      const primerNombre = String(cliente.nombre_completo || 'cliente').trim().split(/\s+/)[0] || 'cliente';
+      const htmlCliente = `
+        <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;max-width:600px;margin:0 auto;background:#000;color:#fff;padding:0">
+          <div style="background:#e8ff4c;color:#000;padding:18px 22px;border-bottom:4px solid #ff283b">
+            <div style="font-size:11px;font-weight:700;letter-spacing:.18em;text-transform:uppercase">Recibimos tu solicitud</div>
+            <div style="font-size:22px;font-weight:900;margin-top:4px">${escapeHtml(solicitud.evento_nombre)}</div>
+          </div>
+          <div style="padding:22px;background:#0a0a0a">
+            <p style="font-size:16px;font-weight:700;margin:0 0 14px">¡Hola ${escapeHtml(primerNombre)}!</p>
+            <p style="font-size:14px;line-height:1.6;color:rgba(255,255,255,.85);margin:0 0 18px">
+              Recibimos tu solicitud para tu viaje a <b style="color:#e8ff4c">${escapeHtml(solicitud.evento_nombre)}</b> y nuestro equipo ya la está revisando. Te confirmaremos muy pronto. Puedes seguir el estado desde tu portal cuando quieras.
+            </p>
+            <table style="width:100%;border-collapse:collapse;color:#fff;font-size:14px">
+              ${row('Evento', escapeHtml(solicitud.evento_nombre))}
+              ${row('Paquete', `<b style="color:#e8ff4c">${escapeHtml(solicitud.paquete)}</b>`)}
+              ${row('Zona', escapeHtml(solicitud.zona))}
+              ${row('Personas', String(solicitud.num_personas))}
+              ${solicitud.tipo_habitacion ? row('Habitación', capitalize(solicitud.tipo_habitacion)) : ''}
+              ${row('Precio total', `<b>${fmtMxn(solicitud.precio_total)}</b>`)}
+              ${row('Separo', `<b style="color:#e8ff4c">${fmtMxn(solicitud.monto_separo)}</b>`)}
+            </table>
+            <p style="margin-top:22px;font-size:14px;color:rgba(255,255,255,.85)">¡Gracias por viajar con Conecta!</p>
+          </div>
+        </div>
+      `;
+      const rc = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${RESEND_KEY}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          from: 'Conecta Reynosa <admin@conectareynosa.mx>',
+          to: [cliente.correo],
+          subject: `✅ Recibimos tu solicitud para ${solicitud.evento_nombre}`,
+          html: htmlCliente,
+        }),
+      });
+      if (!rc.ok) console.error('[nueva-solicitud] correo cliente no OK:', rc.status, await rc.text());
+    }
+  } catch (e) {
+    console.error('[nueva-solicitud] correo cliente falló (no crítico):', e.message);
+  }
+
   try {
     const resp = await fetch('https://api.resend.com/emails', {
       method: 'POST',

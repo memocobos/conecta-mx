@@ -10390,8 +10390,14 @@ async function exportarRooming(formato) {
   // Set de nombres staff del evento — solo necesario cuando se quiere filtrar.
   let staffNames = new Set();
   if (excluirStaff) {
-    const staffVj = (_ccViajeros || []).filter(_esStaff);
-    staffNames = new Set(staffVj.map(v => (v.nombre || '').trim().toLowerCase()));
+    // El staff que ocupa cuartos viene de _ccAsignados (equipo coordi/cc, con
+    // a._usuario.nombre), NO de _ccViajeros (clientes del Portal, nunca staff).
+    // El chofer NO se excluye (es huésped real del hotel).
+    staffNames = new Set(
+      (_ccAsignados || [])
+        .map(a => (a._usuario?.nombre || '').trim().toLowerCase())
+        .filter(Boolean)
+    );
   }
   const filtrarOcp = ocp => excluirStaff
     ? ocp.filter(n => !staffNames.has(String(n || '').trim().toLowerCase()))

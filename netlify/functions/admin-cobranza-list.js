@@ -115,7 +115,11 @@ exports.handler = async (event) => {
     // Agregar por solicitud: abonado + próximo pendiente (fecha más cercana).
     const abonadoPor = {};
     const proximoPor = {};
+    const vencidosPor = {};
     for (const p of (Array.isArray(pagos) ? pagos : [])) {
+      if (p.estado === 'vencido') {
+        vencidosPor[p.solicitud_id] = (vencidosPor[p.solicitud_id] || 0) + 1;
+      }
       if (p.estado === 'pagado') {
         // monto REAL pagado: COALESCE(monto_pagado, monto) — los pagos previos
         // a la Fase 3.2 tienen monto_pagado NULL y suman su monto del plan.
@@ -149,7 +153,7 @@ exports.handler = async (event) => {
         estado:        s.estado,
         created_at:    s.created_at,
         clientes:      s.clientes || {},
-        pago:          { total, abonado, restante, proximo: proximoPor[s.id] || null },
+        pago:          { total, abonado, restante, proximo: proximoPor[s.id] || null, vencidos: vencidosPor[s.id] || 0 },
       };
     });
 

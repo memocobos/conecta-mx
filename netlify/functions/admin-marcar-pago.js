@@ -37,6 +37,7 @@ const METODOS_VALIDOS = ['transferencia','deposito','efectivo'];
 // `cuenta` = a qué cuenta ENTRÓ el dinero (distinto de `metodo`). Opcional.
 const CUENTAS_VALIDAS = ['BBVA','Banamex','Efectivo','Otro'];
 const MAX_REFERENCIA = 120;
+const TOLERANCIA_MXN = 1; // absorbe redondeos de centavos en el reparto del plan
 
 exports.handler = async (event) => {
   const __origin = corsCheck(event);
@@ -153,17 +154,16 @@ exports.handler = async (event) => {
 
     // 2. Leer TODOS los pagos de la solicitud para reconciliar su estado.
     const solicitudId = pago.solicitud_id;
-    const allUrl = `${env.PORTAL_SB_URL}/rest/v1/pagos?solicitud_id=eq.${solicitudId}&select=estado`;
+    const allUrl = `${env.PORTAL_SB_URL}/rest/v1/pagos?solicitud_id=eq.${solicitudId}&select=estado,monto,monto_pagado`;
     const allR = await fetch(allUrl, { headers: sbHeaders });
     if (!allR.ok) {
       const detail = await allR.text();
       return { statusCode: 502, headers, body: JSON.stringify({ error: 'Supabase rechazó la consulta de pagos', detail }) };
     }
     const todos = await allR.json();
-    const todosPagados = Array.isArray(todos) && todos.length > 0 && todos.every(p => p.estado === 'pagado');
 
     // 3. Leer el estado actual de la solicitud y reconciliar si hace falta.
-    const solUrl = `${env.PORTAL_SB_URL}/rest/v1/solicitudes_tour?id=eq.${solicitudId}&select=id,estado`;
+    const solUrl = `${env.PORTAL_SB_URL}/rest/v1/solicitudes_tour?id=eq.${solicitudId}&select=id,estado,precio_total`;
     const solR = await fetch(solUrl, { headers: sbHeaders });
     if (!solR.ok) {
       const detail = await solR.text();
@@ -174,10 +174,25 @@ exports.handler = async (event) => {
     const estadoPrevio = solicitud ? solicitud.estado : null;
     let estadoSolicitud = estadoPrevio;
 
+    // Dinero REAL cobrado = suma de pagos 'pagado' con COALESCE(monto_pagado, monto).
+    // MISMA definición de caja que admin-utilidad-evento y admin-cobranza-list.
+    const sumaReal = (Array.isArray(todos) ? todos : []).reduce((acc, p) => {
+      if (!p || p.estado !== 'pagado') return acc;
+      const real = (p.monto_pagado == null) ? Number(p.monto || 0) : Number(p.monto_pagado || 0);
+      return acc + (Number.isFinite(real) ? real : 0);
+    }, 0);
+    const precioTotal = Number((solicitud && solicitud.precio_total) || 0);
+    const dineroCuadra = sumaReal >= (precioTotal - TOLERANCIA_MXN);
+
+    // 'pagado' exige AMBAS: todas las parcialidades con palomita Y que el dinero
+    // real cuadre contra precio_total (tol $1). Si una de las dos falla y la
+    // solicitud estaba 'pagado', se degrada a 'en_pagos' (corrige el dato mal
+    // marcado al tocar uno de sus pagos; no hay barrido masivo).
+    const todosPagados = Array.isArray(todos) && todos.length > 0 && todos.every(p => p.estado === 'pagado');
     let nuevoEstadoSol = null;
-    if (todosPagados && estadoPrevio !== 'pagado') {
+    if (todosPagados && dineroCuadra && estadoPrevio !== 'pagado') {
       nuevoEstadoSol = 'pagado';
-    } else if (!todosPagados && estadoPrevio === 'pagado') {
+    } else if ((!todosPagados || !dineroCuadra) && estadoPrevio === 'pagado') {
       nuevoEstadoSol = 'en_pagos';
     }
 

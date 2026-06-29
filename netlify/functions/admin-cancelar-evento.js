@@ -70,7 +70,8 @@ exports.handler = async (event) => {
       }),
     });
     if (!r.ok) return { error: await r.text() };
-    return {};
+    const j = await r.json();
+    return { id: Array.isArray(j) ? (j[0] && j[0].id) : undefined };
   }
 
   try {
@@ -186,14 +187,21 @@ exports.handler = async (event) => {
     const reg = await registrarCancelacion(nombre, solicitudes.length, reembolsoRows.length, montoTotal);
     if (reg.error) return { statusCode: 502, headers, body: JSON.stringify({ error: 'No se registró la cancelación', detail: reg.error }) };
 
-    // 7. KH: crear los reembolsos (insert en lote, best-effort: loggea si falla).
+    // 7. KH: crear los reembolsos (insert en lote ATÓMICO). BLOQUEANTE: si falla,
+    //    rollback de la bitácora y abortar — no damos de baja nada (reintentable).
     if (reembolsoRows.length) {
       const rRes = await fetch(`${env.KH_URL}/rest/v1/reembolsos`, {
         method: 'POST',
         headers: { ...khHeaders, Prefer: 'return=minimal' },
         body: JSON.stringify(reembolsoRows),
       }).catch(() => null);
-      if (!rRes || !rRes.ok) console.error('[cancelar-evento] fallo creando reembolsos para', slug, rRes ? await rRes.text() : '');
+      if (!rRes || !rRes.ok) {
+        const detail = rRes ? await rRes.text() : 'fetch falló';
+        await fetch(`${env.KH_URL}/rest/v1/eventos_cancelaciones?id=eq.${encodeURIComponent(reg.id)}`, {
+          method: 'DELETE', headers: khHeaders,
+        }).catch(() => {});
+        return { statusCode: 502, headers, body: JSON.stringify({ error: 'No se registraron los reembolsos; no se canceló nada, reintenta', detail }) };
+      }
     }
 
     // 8. Portal: dar de baja las solicitudes (DESPUÉS de calcular/registrar reembolsos).

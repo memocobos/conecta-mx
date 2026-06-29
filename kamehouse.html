@@ -2663,6 +2663,7 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
      <div class="modal-overlay" id="modal-habitacion"></div>
      <div class="modal-overlay" id="modal-asignar-coordi"></div>
      <div class="modal-overlay" id="modal-posponer"></div>
+     <div class="modal-overlay" id="modal-avisar"></div>
 
      <!-- ─── SOLICITUDES PORTAL (Fase 2.2b) ─── -->
      <div class="page" id="page-solicitudes_portal">
@@ -12522,7 +12523,7 @@ async function loadEsferasEventos() {
         <td>${e.publicado
           ? `<span class="badge badge-green">publicado</span> <button class="btn btn-ghost btn-sm" style="font-size:10px" onclick="despublicarEsfera('${_esfEsc(e.slug)}')">🗑️ Despublicar</button>`
           : '<span class="badge badge-gray">borrador</span>'}</td>
-        <td><button class="btn btn-ghost btn-sm" style="font-size:10px" onclick="editarEsfera('${_esfEsc(e.slug)}')">✏️ Editar</button> <button class="btn btn-ghost btn-sm" style="font-size:10px" onclick="posponerEsfera('${_esfEsc(e.slug)}')">📅 Posponer</button></td>
+        <td><button class="btn btn-ghost btn-sm" style="font-size:10px" onclick="editarEsfera('${_esfEsc(e.slug)}')">✏️ Editar</button> <button class="btn btn-ghost btn-sm" style="font-size:10px" onclick="posponerEsfera('${_esfEsc(e.slug)}')">📅 Posponer</button> <button class="btn btn-ghost btn-sm" style="font-size:10px" onclick="avisarPosposicion('${_esfEsc(e.slug)}')">✉️ Avisar</button></td>
       </tr>`).join('')}</tbody>
     </table></div>`;
   } catch(e) {
@@ -12589,6 +12590,62 @@ async function confirmarPosponer(slug) {
     setTimeout(() => { closeModal('modal-posponer'); loadEsferasEventos(); }, 1800);
   } catch (e) {
     if (alertEl) alertEl.innerHTML = `<div class="alert alert-error">${e.message}</div>`;
+  }
+}
+
+// ── Avisar a clientes de la posposición (Fase 2) ─────────────────────────────
+// Dispara admin-avisar-posposicion (usa la última posposición registrada).
+function avisarPosposicion(slug) {
+  const ev = (window._esfRows || []).find(e => e && e.slug === slug);
+  if (!ev) { alert('No se encontró el evento en la lista. Recarga e intenta de nuevo.'); return; }
+  document.getElementById('modal-avisar').innerHTML = `
+    <div class="modal" style="max-width:420px">
+      <div class="modal-header">
+        <div class="modal-title" style="font-family:'Zen Dots',sans-serif;font-size:15px">✉️ Avisar a clientes</div>
+        <button class="modal-close" onclick="closeModal('modal-avisar')">×</button>
+      </div>
+      <div class="modal-body">
+        <div style="font-size:13px;margin-bottom:12px">
+          <b>${_esfEsc(ev.nombre)}</b>
+        </div>
+        <div style="font-size:12px;color:var(--ts);line-height:1.55;margin-bottom:12px">
+          Se enviará el aviso del cambio de fecha a los clientes <b>activos</b> (no cancelados) de este evento, usando la última posposición registrada. Asegúrate de haber republicado el evento en Esferas antes de avisar.
+        </div>
+        <div id="av-alert"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" onclick="closeModal('modal-avisar')">Cancelar</button>
+        <button class="btn btn-primary" id="av-enviar-btn" onclick="confirmarAviso('${_esfEsc(slug)}')">Enviar avisos</button>
+      </div>
+    </div>`;
+  openModal('modal-avisar');
+}
+
+async function confirmarAviso(slug) {
+  const alertEl = document.getElementById('av-alert');
+  const btn = document.getElementById('av-enviar-btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Enviando…'; }
+  if (alertEl) alertEl.innerHTML = '<div class="alert alert-info">Enviando…</div>';
+  try {
+    const r = await khAdminFetch('/.netlify/functions/admin-avisar-posposicion', {
+      method: 'POST',
+      body: JSON.stringify({ slug }),
+    });
+    if (!r.ok) {
+      const d = await r.json().catch(() => ({ error: r.statusText }));
+      if (alertEl) alertEl.innerHTML = `<div class="alert alert-error">${d.error || 'No se pudo avisar'}</div>`;
+      if (btn) { btn.disabled = false; btn.textContent = 'Enviar avisos'; }
+      return;
+    }
+    const d = await r.json();
+    const msg = (d.total === 0)
+      ? 'No hay clientes activos para avisar.'
+      : `✅ ${d.enviados} aviso(s) enviado(s)${d.fallidos ? ` · ${d.fallidos} fallido(s)` : ''}`;
+    if (alertEl) alertEl.innerHTML = `<div class="alert alert-success">${msg}</div>`;
+    setTimeout(() => closeModal('modal-avisar'), 2000);
+  } catch (e) {
+    if (alertEl) alertEl.innerHTML = `<div class="alert alert-error">${e.message}</div>`;
+    if (btn) { btn.disabled = false; btn.textContent = 'Enviar avisos'; }
   }
 }
 

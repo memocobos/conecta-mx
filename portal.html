@@ -2543,10 +2543,21 @@ function getHabs(ev, multifechaIdx){
 }
 
 // Hotel.e en MXN por persona (HOTEL_STD ya es per-person; hotelPP fuerza per-person en hoteles custom)
+// [2C] Costo de habitación POR PERSONA. Detección por capas (el orden importa):
+//   1) hotelPP → e ya es per-persona (flag explícito del evento).
+//   2) pp presente → per-persona explícito (formato inline nuevo).
+//   3) viaj presente (sin pp/hotelPP) → e es el TOTAL del cuarto → dividir por la
+//      capacidad (Doble[2]→2, Triple[3]→3). Arregla HOTEL_CDM, que guarda e total
+//      y antes se cobraba tal cual (Doble 2×, Triple 3×).
+//   4) si no → e ya es per-persona (HOTEL_STD, que no trae viaj).
 function habCostPP(hab, ev){
   if (!hab) return 0;
   if (ev && ev.hotelPP) return hab.e || 0;
-  return hab.pp != null ? hab.pp : (hab.e || 0);
+  if (hab.pp != null) return hab.pp;
+  if (Array.isArray(hab.viaj) && hab.viaj.length){
+    return Math.ceil((hab.e || 0) / Math.max(...hab.viaj));
+  }
+  return hab.e || 0;
 }
 
 // [candado] Tipos de habitación que acepta el constraint de solicitudes_tour.

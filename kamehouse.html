@@ -2665,6 +2665,7 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
      <div class="modal-overlay" id="modal-posponer"></div>
      <div class="modal-overlay" id="modal-avisar"></div>
      <div class="modal-overlay" id="modal-recalcular"></div>
+     <div class="modal-overlay" id="modal-cancelar-evento"></div>
 
      <!-- ─── SOLICITUDES PORTAL (Fase 2.2b) ─── -->
      <div class="page" id="page-solicitudes_portal">
@@ -12524,7 +12525,7 @@ async function loadEsferasEventos() {
         <td>${e.publicado
           ? `<span class="badge badge-green">publicado</span> <button class="btn btn-ghost btn-sm" style="font-size:10px" onclick="despublicarEsfera('${_esfEsc(e.slug)}')">🗑️ Despublicar</button>`
           : '<span class="badge badge-gray">borrador</span>'}</td>
-        <td><button class="btn btn-ghost btn-sm" style="font-size:10px" onclick="editarEsfera('${_esfEsc(e.slug)}')">✏️ Editar</button> <button class="btn btn-ghost btn-sm" style="font-size:10px" onclick="posponerEsfera('${_esfEsc(e.slug)}')">📅 Posponer</button> <button class="btn btn-ghost btn-sm" style="font-size:10px" onclick="recalcularPagosPosposicion('${_esfEsc(e.slug)}')">🔄 Recalcular</button> <button class="btn btn-ghost btn-sm" style="font-size:10px" onclick="avisarPosposicion('${_esfEsc(e.slug)}')">✉️ Avisar</button></td>
+        <td><button class="btn btn-ghost btn-sm" style="font-size:10px" onclick="editarEsfera('${_esfEsc(e.slug)}')">✏️ Editar</button> <button class="btn btn-ghost btn-sm" style="font-size:10px" onclick="posponerEsfera('${_esfEsc(e.slug)}')">📅 Posponer</button> <button class="btn btn-ghost btn-sm" style="font-size:10px" onclick="recalcularPagosPosposicion('${_esfEsc(e.slug)}')">🔄 Recalcular</button> <button class="btn btn-ghost btn-sm" style="font-size:10px" onclick="avisarPosposicion('${_esfEsc(e.slug)}')">✉️ Avisar</button> <button class="btn btn-ghost btn-sm" style="font-size:10px;color:var(--red)" onclick="cancelarEventoCompleto('${_esfEsc(e.slug)}')">🚫 Cancelar</button></td>
       </tr>`).join('')}</tbody>
     </table></div>`;
   } catch(e) {
@@ -12704,6 +12705,71 @@ async function confirmarRecalculo(slug) {
   } catch (e) {
     if (alertEl) alertEl.innerHTML = `<div class="alert alert-error">${e.message}</div>`;
     if (btn) { btn.disabled = false; btn.textContent = 'Recalcular'; }
+  }
+}
+
+// ── Cancelar evento (Fase 1, DESTRUCTIVO) ────────────────────────────────────
+// Dispara admin-cancelar-evento. Confirmación reforzada: hay que teclear el slug.
+function cancelarEventoCompleto(slug) {
+  const ev = (window._esfRows || []).find(e => e && e.slug === slug);
+  if (!ev) { alert('No se encontró el evento en la lista. Recarga e intenta de nuevo.'); return; }
+  document.getElementById('modal-cancelar-evento').innerHTML = `
+    <div class="modal" style="max-width:440px">
+      <div class="modal-header">
+        <div class="modal-title" style="font-family:'Zen Dots',sans-serif;font-size:15px;color:var(--red)">🚫 Cancelar evento</div>
+        <button class="modal-close" onclick="closeModal('modal-cancelar-evento')">×</button>
+      </div>
+      <div class="modal-body">
+        <div style="border:1px solid var(--red);border-radius:8px;padding:12px 14px;margin-bottom:14px;font-size:13px;line-height:1.55;color:var(--red)">
+          Vas a <b>CANCELAR</b> <b>${_esfEsc(ev.nombre)}</b>. Esto da de baja a TODOS los clientes activos y genera la lista de reembolsos por todo lo que pagaron. Es <b>IRREVERSIBLE</b>.
+        </div>
+        <div class="form-group">
+          <label>Motivo (opcional)</label>
+          <input type="text" class="cot-input" id="ce-motivo" placeholder="Motivo (opcional)" maxlength="200" style="width:100%">
+        </div>
+        <div class="form-group">
+          <label>Para confirmar, escribe el slug: <b>${_esfEsc(slug)}</b></label>
+          <input type="text" class="cot-input" id="ce-confirm" placeholder="Escribe: ${_esfEsc(slug)}" autocomplete="off" style="width:100%">
+        </div>
+        <div id="ce-alert"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" onclick="closeModal('modal-cancelar-evento')">Cerrar</button>
+        <button class="btn btn-primary" id="ce-enviar-btn" style="background:var(--red);border-color:var(--red)" onclick="confirmarCancelacionEvento('${_esfEsc(slug)}')">Cancelar evento</button>
+      </div>
+    </div>`;
+  openModal('modal-cancelar-evento');
+}
+
+async function confirmarCancelacionEvento(slug) {
+  const alertEl = document.getElementById('ce-alert');
+  const btn = document.getElementById('ce-enviar-btn');
+  const confirm = (document.getElementById('ce-confirm')?.value || '').trim();
+  if (confirm !== slug) {
+    if (alertEl) alertEl.innerHTML = `<div class="alert alert-error">El slug no coincide; escribe '${_esfEsc(slug)}' para confirmar</div>`;
+    return;
+  }
+  const motivo = (document.getElementById('ce-motivo')?.value || '').trim();
+  if (btn) { btn.disabled = true; btn.textContent = 'Cancelando…'; }
+  if (alertEl) alertEl.innerHTML = '<div class="alert alert-info">Cancelando…</div>';
+  try {
+    const r = await khAdminFetch('/.netlify/functions/admin-cancelar-evento', {
+      method: 'POST',
+      body: JSON.stringify({ slug, motivo: motivo || undefined }),
+    });
+    if (!r.ok) {
+      const d = await r.json().catch(() => ({ error: r.statusText }));
+      if (alertEl) alertEl.innerHTML = `<div class="alert alert-error">${d.error || 'No se pudo cancelar'}</div>`;
+      if (btn) { btn.disabled = false; btn.textContent = 'Cancelar evento'; }
+      return;
+    }
+    const d = await r.json();
+    const msg = `✅ Evento cancelado · ${d.solicitudes_baja} baja(s) · ${d.reembolsos_creados} reembolso(s) · total ${formatMXN(d.monto_total)}${d.bajas_fallidas ? ` · ⚠ ${d.bajas_fallidas} fallida(s)` : ''}`;
+    if (alertEl) alertEl.innerHTML = `<div class="alert alert-success">${msg}</div>`;
+    setTimeout(() => { closeModal('modal-cancelar-evento'); loadEsferasEventos(); }, 3000);
+  } catch (e) {
+    if (alertEl) alertEl.innerHTML = `<div class="alert alert-error">${e.message}</div>`;
+    if (btn) { btn.disabled = false; btn.textContent = 'Cancelar evento'; }
   }
 }
 

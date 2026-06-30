@@ -1985,6 +1985,7 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
    <div class="nav-group-title">Eventos</div>
    <button class="nav-btn" onclick="showPage('kamisama')" id="nav-kamisama"><svg class="nav-ic"><use href="#ic-kamisama"/></svg><span>Palacio de Kamisama</span></button>
    <button class="nav-btn" onclick="showPage('esferas')" id="nav-esferas"><svg class="nav-ic"><use href="#ic-esferas"/></svg><span>Esferas del Dragón</span></button>
+   <button class="nav-btn" onclick="showPage('yamcha')" id="nav-yamcha"><svg class="nav-ic"><use href="#ic-saldos"/></svg><span>La derrota de Yamcha</span></button>
    <button class="nav-btn" onclick="showPage('radar')" id="nav-radar"><svg class="nav-ic"><use href="#ic-radar"/></svg><span>Radar del Dragón</span></button>
   </div>
 
@@ -2666,6 +2667,7 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
      <div class="modal-overlay" id="modal-avisar"></div>
      <div class="modal-overlay" id="modal-recalcular"></div>
      <div class="modal-overlay" id="modal-cancelar-evento"></div>
+     <div class="modal-overlay" id="modal-yamcha-datos"></div>
 
      <!-- ─── SOLICITUDES PORTAL (Fase 2.2b) ─── -->
      <div class="page" id="page-solicitudes_portal">
@@ -2849,6 +2851,17 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
      <div class="modal-overlay" id="modal-mt-vercomo"></div>
 
  <!-- ─── ESFERAS DEL DRAGÓN (Pieza 1 · alta aditiva en tabla esferas_eventos) ─── -->
+ <div class="page" id="page-yamcha">
+  <div class="page-hero">
+   <div>
+    <div class="page-title">LA DERROTA DE YAMCHA · REEMBOLSOS</div>
+    <div class="page-sub">// devoluciones por eventos cancelados · la caja baja conforme marcas cada transferencia</div>
+   </div>
+  </div>
+  <div id="yamcha-totales" style="margin-bottom:16px"></div>
+  <div id="yamcha-lista"><div class="loading-state"><div class="spinner"></div>Cargando…</div></div>
+ </div>
+
  <div class="page" id="page-esferas">
   <div class="page-hero">
    <div>
@@ -4166,7 +4179,7 @@ let recibosLoaded = false;
 let disenoLoaded = false;
 
 const PERMISOS_TABS = {
-  maestro_roshi: ['resumen','pagos','eventos','gastos','ingresos','saldos','ventas','inventario','reportes','capsule','solicitudes_portal','equipo','kamisama','herramientas','radar','montana'],
+  maestro_roshi: ['resumen','pagos','eventos','gastos','ingresos','saldos','ventas','inventario','reportes','capsule','solicitudes_portal','equipo','kamisama','herramientas','radar','montana','yamcha'],
   bulma:         ['resumen','pagos','eventos','gastos','ingresos','saldos','ventas','inventario','reportes','capsule','solicitudes_portal','equipo','herramientas'],
   mister_popo:   ['inventario','reportes','equipo'],
   coordinador:   ['inventario','reportes','equipo'],
@@ -4524,7 +4537,7 @@ function aplicarPermisosUI() {
   const extras = currentUser.permisos_extra?.tabs_extra || [];
   const bloqueados = currentUser.permisos_extra?.tabs_bloqueados || [];
   const tabsPermitidos = [...new Set([...base, ...extras])].filter(t => !bloqueados.includes(t));
-  const allTabs = ['resumen','pagos','eventos','gastos','ingresos','saldos','ventas','inventario','reportes','equipo','capsule','solicitudes_portal','kamisama','radar','montana'];
+  const allTabs = ['resumen','pagos','eventos','gastos','ingresos','saldos','ventas','inventario','reportes','equipo','capsule','solicitudes_portal','kamisama','radar','montana','yamcha'];
   allTabs.forEach(tab => {
     const btn = document.getElementById('nav-' + tab);
     if (btn) btn.style.display = tabsPermitidos.includes(tab) ? '' : 'none';
@@ -4959,6 +4972,7 @@ function loadPage(name) {
  if (name === 'montana') loadMontana();
  if (name === 'radar') initRadarTab();
  if (name === 'esferas') loadEsferasEventos();
+ if (name === 'yamcha') loadYamcha();
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -12771,6 +12785,174 @@ async function confirmarCancelacionEvento(slug) {
     if (alertEl) alertEl.innerHTML = `<div class="alert alert-error">${e.message}</div>`;
     if (btn) { btn.disabled = false; btn.textContent = 'Cancelar evento'; }
   }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// LA DERROTA DE YAMCHA — Panel de Reembolsos (Cancelar evento · Fase 3b)
+// ═══════════════════════════════════════════════════════════════
+async function loadYamcha() {
+  const lista = document.getElementById('yamcha-lista');
+  const totEl = document.getElementById('yamcha-totales');
+  if (!lista) return;
+  lista.innerHTML = '<div class="loading-state"><div class="spinner"></div>Cargando…</div>';
+  if (totEl) totEl.innerHTML = '';
+  try {
+    const r = await khAdminFetch('/.netlify/functions/admin-reembolsos', {
+      method: 'POST', body: JSON.stringify({ accion: 'listar' }),
+    });
+    if (!r.ok) {
+      const d = await r.json().catch(() => ({ error: r.statusText }));
+      lista.innerHTML = `<div class="alert alert-error">${_esfEsc(d.error || 'Error cargando reembolsos')}</div>`;
+      return;
+    }
+    const { reembolsos, totales } = await r.json();
+    const filas = Array.isArray(reembolsos) ? reembolsos : [];
+    window._yamchaRows = filas;
+    const t = totales || { pendiente_monto: 0, pendiente_n: 0, transferido_monto: 0, transferido_n: 0 };
+
+    if (totEl) totEl.innerHTML = `
+      <div class="metrics-grid">
+        <div class="metric">
+          <div class="metric-label">Pendiente por reembolsar</div>
+          <div class="metric-value red">${formatMXN(t.pendiente_monto)}</div>
+          <div style="font-size:11px;color:var(--ts)">${t.pendiente_n} cliente(s)</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">Ya transferido</div>
+          <div class="metric-value" style="color:#3DDC84">${formatMXN(t.transferido_monto)}</div>
+          <div style="font-size:11px;color:var(--ts)">${t.transferido_n} cliente(s)</div>
+        </div>
+      </div>`;
+
+    if (!filas.length) {
+      lista.innerHTML = '<div class="empty-state"><div class="empty-icon">✓</div>Sin reembolsos registrados</div>';
+      return;
+    }
+
+    // Agrupar por evento_slug (conserva el orden creado_en.desc del backend).
+    const grupos = [];
+    const idx = {};
+    for (const f of filas) {
+      if (!(f.evento_slug in idx)) { idx[f.evento_slug] = grupos.length; grupos.push({ slug: f.evento_slug, nombre: f.evento_nombre, rows: [] }); }
+      grupos[idx[f.evento_slug]].rows.push(f);
+    }
+
+    lista.innerHTML = grupos.map(g => {
+      const filasHtml = g.rows.map(rb => {
+        const esPend = rb.estado === 'pendiente';
+        const badge = esPend
+          ? '<span style="display:inline-block;padding:2px 8px;border-radius:10px;background:rgba(255,165,0,.15);color:var(--orange);font-size:11px;font-weight:700">pendiente</span>'
+          : '<span style="display:inline-block;padding:2px 8px;border-radius:10px;background:rgba(61,220,132,.15);color:#3DDC84;font-size:11px;font-weight:700">transferido</span>';
+        const accionEstado = esPend
+          ? `<button class="btn btn-ghost btn-sm" style="font-size:10px" onclick="transferirReembolso('${_esfEsc(rb.id)}')">✅ Marcar transferido</button>`
+          : `<button class="btn btn-ghost btn-sm" style="font-size:10px" onclick="desmarcarReembolso('${_esfEsc(rb.id)}')">↩️ Desmarcar</button>`;
+        return `<tr>
+          <td><div style="font-weight:600">${_esfEsc(rb.cliente_nombre || '—')}</div><div style="font-size:11px;color:var(--ts)">${_esfEsc(rb.cliente_correo || '')}</div></td>
+          <td style="font-weight:700">${formatMXN(rb.monto)}</td>
+          <td style="font-size:12px;max-width:220px;white-space:pre-wrap">${_esfEsc(rb.datos_bancarios || '—')}</td>
+          <td>${badge}</td>
+          <td style="white-space:nowrap"><button class="btn btn-ghost btn-sm" style="font-size:10px" onclick="editarDatosReembolso('${_esfEsc(rb.id)}')">✏️ Datos</button> ${accionEstado}</td>
+        </tr>`;
+      }).join('');
+      return `<div class="card" style="margin-bottom:16px">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:10px">
+          <div style="font-weight:700;font-size:15px">${_esfEsc(g.nombre || g.slug)}</div>
+          <button class="btn btn-ghost btn-sm" style="font-size:11px" onclick="avisarReembolsos('${_esfEsc(g.slug)}')">✉️ Avisar a clientes</button>
+        </div>
+        <div class="table-wrap"><table>
+          <thead><tr><th>Cliente</th><th>Monto</th><th>Datos bancarios</th><th>Estado</th><th>Acciones</th></tr></thead>
+          <tbody>${filasHtml}</tbody>
+        </table></div>
+      </div>`;
+    }).join('');
+  } catch (e) {
+    lista.innerHTML = `<div class="alert alert-error">${_esfEsc(e.message)}</div>`;
+  }
+}
+
+async function avisarReembolsos(slug) {
+  if (!confirm('¿Mandar el correo de cancelación + reembolso a los clientes con reembolso pendiente de este evento?')) return;
+  try {
+    const r = await khAdminFetch('/.netlify/functions/admin-avisar-cancelacion', {
+      method: 'POST', body: JSON.stringify({ slug }),
+    });
+    const d = await r.json().catch(() => ({ error: r.statusText }));
+    if (!r.ok) { showToast(d.error || 'No se pudo avisar', 'error'); return; }
+    showToast(`✉️ ${d.enviados || 0} enviado(s)${d.fallidos ? ` · ⚠ ${d.fallidos} fallido(s)` : ''}`, 'success');
+  } catch (e) {
+    showToast(e.message, 'error');
+  }
+}
+
+function editarDatosReembolso(id) {
+  const rb = (window._yamchaRows || []).find(x => x && x.id === id);
+  if (!rb) { alert('No se encontró el reembolso. Recarga e intenta de nuevo.'); return; }
+  document.getElementById('modal-yamcha-datos').innerHTML = `
+    <div class="modal" style="max-width:460px">
+      <div class="modal-header">
+        <div class="modal-title" style="font-family:'Zen Dots',sans-serif;font-size:15px">✏️ Datos de reembolso</div>
+        <button class="modal-close" onclick="closeModal('modal-yamcha-datos')">×</button>
+      </div>
+      <div class="modal-body">
+        <div style="font-size:13px;margin-bottom:12px"><b>${_esfEsc(rb.cliente_nombre || '—')}</b> · ${formatMXN(rb.monto)}<br><span style="font-size:11px;color:var(--ts)">${_esfEsc(rb.cliente_correo || '')}</span></div>
+        <div class="form-group">
+          <label>Datos bancarios (CLABE, banco, titular)</label>
+          <textarea class="cot-input" id="ya-datos" rows="3" style="width:100%" placeholder="Lo que respondió el cliente por correo">${_esfEsc(rb.datos_bancarios || '')}</textarea>
+        </div>
+        <div class="form-group">
+          <label>Notas</label>
+          <textarea class="cot-input" id="ya-notas" rows="2" style="width:100%">${_esfEsc(rb.notas || '')}</textarea>
+        </div>
+        <div id="ya-alert"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" onclick="closeModal('modal-yamcha-datos')">Cancelar</button>
+        <button class="btn btn-primary" onclick="guardarDatosReembolso('${_esfEsc(id)}')">Guardar</button>
+      </div>
+    </div>`;
+  openModal('modal-yamcha-datos');
+}
+
+async function guardarDatosReembolso(id) {
+  const alertEl = document.getElementById('ya-alert');
+  const datos_bancarios = (document.getElementById('ya-datos')?.value || '').trim();
+  const notas = (document.getElementById('ya-notas')?.value || '').trim();
+  try {
+    const r = await khAdminFetch('/.netlify/functions/admin-reembolsos', {
+      method: 'POST', body: JSON.stringify({ accion: 'guardar_datos', id, datos_bancarios, notas }),
+    });
+    if (!r.ok) {
+      const d = await r.json().catch(() => ({ error: r.statusText }));
+      if (alertEl) alertEl.innerHTML = `<div class="alert alert-error">${_esfEsc(d.error || 'No se pudo guardar')}</div>`;
+      return;
+    }
+    closeModal('modal-yamcha-datos');
+    loadYamcha();
+  } catch (e) {
+    if (alertEl) alertEl.innerHTML = `<div class="alert alert-error">${_esfEsc(e.message)}</div>`;
+  }
+}
+
+async function transferirReembolso(id) {
+  if (!confirm('¿Marcar como transferido? La caja del evento bajará por este monto.')) return;
+  try {
+    const r = await khAdminFetch('/.netlify/functions/admin-reembolsos', {
+      method: 'POST', body: JSON.stringify({ accion: 'marcar_transferido', id }),
+    });
+    if (!r.ok) { const d = await r.json().catch(() => ({ error: r.statusText })); showToast(d.error || 'No se pudo marcar', 'error'); return; }
+    loadYamcha();
+  } catch (e) { showToast(e.message, 'error'); }
+}
+
+async function desmarcarReembolso(id) {
+  if (!confirm('¿Desmarcar este reembolso? Volverá a pendiente.')) return;
+  try {
+    const r = await khAdminFetch('/.netlify/functions/admin-reembolsos', {
+      method: 'POST', body: JSON.stringify({ accion: 'desmarcar', id }),
+    });
+    if (!r.ok) { const d = await r.json().catch(() => ({ error: r.statusText })); showToast(d.error || 'No se pudo desmarcar', 'error'); return; }
+    loadYamcha();
+  } catch (e) { showToast(e.message, 'error'); }
 }
 
 async function crearEsferaEvento() {

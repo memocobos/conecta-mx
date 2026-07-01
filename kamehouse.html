@@ -2910,14 +2910,31 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
     </div>
     <div class="form-group">
      <label>Tipo</label>
-     <select class="cot-input" id="esf-tipo" style="width:100%">
+     <select class="cot-input" id="esf-tipo" style="width:100%" onchange="_esfTipoChange()">
       <option value="concierto">Concierto</option>
       <option value="festival">Festival</option>
      </select>
     </div>
     <div class="form-group">
      <label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="esf-es-festival" onchange="_esfToggleFestival()"> ¿Es festival?</label>
-     <div id="esf-festival-box" style="display:none;margin-top:8px;padding:12px;border:1px dashed var(--border);border-radius:8px;font-size:12px;color:var(--ts)">🐉 Aquí se arma el festival: portada, lineup, música, switches y paquetes — en construcción.</div>
+     <div id="esf-festival-box" style="display:none;margin-top:8px;padding:12px;border:1px dashed var(--border);border-radius:8px">
+      <label style="display:flex;align-items:center;gap:8px;font-size:12px;cursor:pointer;margin-bottom:8px">
+       <input type="checkbox" id="esf-fest-cheap" checked> ¿Vende paquete económico (cheap)?
+      </label>
+      <label style="display:flex;align-items:center;gap:8px;font-size:12px;cursor:pointer">
+       <input type="checkbox" id="esf-fest-stay" checked> ¿Incluye hotel (stay)?
+      </label>
+      <div style="font-size:11px;color:var(--ts);margin:2px 0 8px 24px">apagado = ida y vuelta sin hotel (Fan Fest)</div>
+      <label style="display:flex;align-items:center;gap:8px;font-size:12px;cursor:pointer;margin-bottom:10px">
+       <input type="checkbox" id="esf-fest-ride"> ¿Vende ride (transporte suelto / ida y vuelta)?
+      </label>
+      <label style="font-size:11px">Transporte a la ciudad:</label>
+      <select class="cot-input" id="esf-fest-transporte" style="width:100%">
+       <option value="cdmx">CDMX (bus/vuelo aparte, como extra)</option>
+       <option value="local">Local (bus incluido desde Reynosa, como concierto)</option>
+      </select>
+      <!-- 2c: portada/lineup/música · 2d: paquetes -->
+     </div>
     </div>
     <div class="form-group">
      <label>Fecha inicio</label>
@@ -13090,6 +13107,7 @@ async function crearEsferaEvento() {
     _esfSeedDefaults();
     const _fchk = document.getElementById('esf-es-festival'); if (_fchk) _fchk.checked = false;
     _esfToggleFestival();
+    _esfFestivalPopulate({});   // cache + switches a default
     const chosenEl = document.getElementById('esf-music-chosen'); if (chosenEl) chosenEl.textContent = '';
     const resEl = document.getElementById('esf-music-results'); if (resEl) resEl.innerHTML = '';
     loadEsferasEventos();
@@ -13210,17 +13228,51 @@ function _esfGetSepCheap() {
 function _esfGetNota() { return (document.getElementById('esf-nota')?.value || '').trim(); }
 
 // Modo festival: interruptor + box. Apagado → _esfGetFestival()=null → concierto,
-// flujo idéntico a hoy. La captura real (portada/lineup/switches/paquetes) llega
-// en 2b+; por ahora el hook devuelve null.
+// flujo idéntico a hoy. 2b: switches de módulos; 2c/2d agregan portada/lineup/paquetes.
 function _esfToggleFestival() {
   const on = !!document.getElementById('esf-es-festival')?.checked;
   const box = document.getElementById('esf-festival-box');
   if (box) box.style.display = on ? '' : 'none';
 }
+
+// Elegir tipo "Festival" enciende el interruptor (y muestra el box). Elegir otro
+// tipo NO lo apaga a la fuerza: el interruptor manda.
+function _esfTipoChange() {
+  if (document.getElementById('esf-tipo')?.value === 'festival') {
+    const chk = document.getElementById('esf-es-festival');
+    if (chk) chk.checked = true;
+    _esfToggleFestival();
+  }
+}
+
+// Cache del festival en edición. Preserva llaves futuras (portada/lineup/paquetes
+// de 2c/2d) al reescribir solo .switches.
+window._esfFestival = {};
+
+// Puebla los 4 controles desde fest.switches con defaults (cheap/stay ON, ride OFF,
+// transporte cdmx). fest = objeto ya parseado o null/{}.
+function _esfFestivalPopulate(fest) {
+  window._esfFestival = (fest && typeof fest === 'object') ? fest : {};
+  const sw = (window._esfFestival.switches && typeof window._esfFestival.switches === 'object') ? window._esfFestival.switches : {};
+  const setChk = (id, v) => { const el = document.getElementById(id); if (el) el.checked = v; };
+  setChk('esf-fest-cheap', sw.cheap !== undefined ? !!sw.cheap : true);
+  setChk('esf-fest-stay',  sw.stay  !== undefined ? !!sw.stay  : true);
+  setChk('esf-fest-ride',  sw.ride  !== undefined ? !!sw.ride  : false);
+  const tr = document.getElementById('esf-fest-transporte'); if (tr) tr.value = (sw.transporte === 'local') ? 'local' : 'cdmx';
+}
+
 function _esfGetFestival() {
-  // TODO(2b+): si el interruptor está encendido, armar y devolver el objeto del
-  // festival (lineup, música, switches, paquetes). Por ahora null = concierto.
-  return null;
+  // Apagado → concierto (null). Encendido → parte del cache (preserva llaves de
+  // 2c/2d) y reescribe solo .switches con el estado actual de los controles.
+  if (!document.getElementById('esf-es-festival')?.checked) return null;
+  const base = window._esfFestival || {};
+  base.switches = {
+    cheap:      !!document.getElementById('esf-fest-cheap')?.checked,
+    stay:       !!document.getElementById('esf-fest-stay')?.checked,
+    ride:       !!document.getElementById('esf-fest-ride')?.checked,
+    transporte: document.getElementById('esf-fest-transporte')?.value || 'cdmx',
+  };
+  return base;
 }
 
 // Estado "nuevo evento": siembra inc default de la ciudad + separo 500.
@@ -13719,10 +13771,14 @@ function editarEsfera(slug) {
   _esfIncSepNotaPopulate(row);
   _esfCiudadSet(row.ciudad || 'MTY');
   set('esf-tipo', row.tipo || 'concierto');
-  // Modo festival: encender el interruptor si el evento tiene `festival` no-null.
+  // Modo festival: encender el interruptor si el evento tiene `festival` no-null,
+  // y poblar los switches desde el objeto guardado (parseado).
   const festOn = row.festival != null && row.festival !== '';
   const fchk = document.getElementById('esf-es-festival'); if (fchk) fchk.checked = festOn;
   _esfToggleFestival();
+  let _fest = row.festival;
+  if (typeof _fest === 'string') { try { _fest = JSON.parse(_fest); } catch { _fest = null; } }
+  _esfFestivalPopulate(_fest);
   set('esf-status', row.status || '');
   set('esf-venue', row.venue || '');
   set('esf-music', row.music || '');
@@ -13748,6 +13804,9 @@ function cancelarEdicionEsfera() {
   _esfCiudadSet('MTY');
   _esfSeedDefaults();
   const tipo = document.getElementById('esf-tipo'); if (tipo) tipo.value = 'concierto';
+  const _fchk2 = document.getElementById('esf-es-festival'); if (_fchk2) _fchk2.checked = false;
+  _esfToggleFestival();
+  _esfFestivalPopulate({});   // festival off + switches a default
   const status = document.getElementById('esf-status'); if (status) status.value = '';
   const chosenEl = document.getElementById('esf-music-chosen'); if (chosenEl) chosenEl.textContent = '';
   const resEl = document.getElementById('esf-music-results'); if (resEl) resEl.innerHTML = '';

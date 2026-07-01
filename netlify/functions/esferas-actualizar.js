@@ -21,7 +21,17 @@ const SB_URL = 'https://npgnhsmwpcipxgvfxrho.supabase.co';
 const SB_KEY = process.env.SUPABASE_SERVICE_KEY_KAMEHOUSE;
 
 // Whitelist EDITABLE. slug AUSENTE a propósito (identidad / PK, no se edita).
-const CAMPOS_EDITABLES = new Set(['nombre', 'titulo', 'fecha_inicio', 'ciudad', 'tipo', 'status', 'venue', 'music', 'fechas_extra', 'zonas', 'hotel', 'mapa', 'inc', 'sep', 'sep_cheap', 'nota']);
+const CAMPOS_EDITABLES = new Set(['nombre', 'titulo', 'fecha_inicio', 'ciudad', 'tipo', 'status', 'venue', 'music', 'fechas_extra', 'zonas', 'hotel', 'mapa', 'inc', 'sep', 'sep_cheap', 'nota', 'festival']);
+
+// festival: JSON del festival (lineup/switches/paquetes) o null = concierto.
+// Acepta string JSON o objeto; vacío/basura → null (nunca rompe). Igual que zonas.
+function saneFestival(v) {
+  if (v == null || v === '') return null;
+  let obj = v;
+  if (typeof v === 'string') { try { obj = JSON.parse(v); } catch { return null; } }
+  if (!obj || typeof obj !== 'object') return null;
+  return JSON.stringify(obj);
+}
 
 // inc: JSON array de strings ("qué incluye"). Acepta array o string JSON. Saneo:
 // trim, descarta vacíos/no-strings. Sin filas → null (limpia). String JSON o null.
@@ -175,6 +185,7 @@ exports.handler = async (event) => {
     if (k === 'inc') { sane[k] = saneInc(v); continue; }
     if (k === 'sep' || k === 'sep_cheap') { sane[k] = saneInt(v); continue; }
     if (k === 'nota') { sane[k] = saneNota(v); continue; }
+    if (k === 'festival') { sane[k] = saneFestival(v); continue; }
     if (v === null || v === '') sane[k] = (k === 'status') ? '' : null;
     else sane[k] = String(v);
   }

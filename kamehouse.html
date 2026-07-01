@@ -14222,6 +14222,7 @@ function _esfPaqRender() {
   const el = document.getElementById('esf-fest-paq-list');
   if (!el) return;
   if (!_esfPaquetes.length) { el.innerHTML = '<div style="font-size:11px;color:var(--ts)">Sin paquetes aún.</div>'; return; }
+  const cheapOn = !!document.getElementById('esf-fest-cheap')?.checked;  // el precio cheap (pc) solo si el switch cheap está encendido
   el.innerHTML = _esfPaquetes.map((p, i) => `
     <div style="border:1px solid var(--border);border-radius:8px;padding:10px;margin-bottom:8px;background:var(--bg2)">
       <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px">
@@ -14244,7 +14245,31 @@ function _esfPaqRender() {
           <input class="cot-input" type="number" min="0" style="width:100%" value="${Number(p.ride) || 0}" oninput="_esfPaquetes[${i}].ride = Number(this.value)">
         </div>
       </div>
+      <div style="margin-top:8px">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:4px">
+          <span style="font-size:11px;color:var(--ts)">Zonas</span>
+          <button type="button" class="btn btn-ghost btn-sm" style="font-size:10px" onclick="_esfPaqZonaAdd(${i})">+ Agregar zona</button>
+        </div>
+        ${(Array.isArray(p.zonas) && p.zonas.length) ? p.zonas.map((z, zi) => `
+          <div style="display:flex;gap:6px;align-items:center;margin-bottom:4px;flex-wrap:wrap">
+            <input class="cot-input" style="flex:2;min-width:100px" placeholder="Zona" value="${_esfEsc(z.n)}" oninput="_esfPaquetes[${i}].zonas[${zi}].n = this.value">
+            <input class="cot-input" type="number" min="0" style="flex:1;min-width:70px" placeholder="$" value="${Number(z.p) || 0}" oninput="_esfPaquetes[${i}].zonas[${zi}].p = Number(this.value)">
+            ${cheapOn ? `<input class="cot-input" type="number" min="0" style="flex:1;min-width:70px" placeholder="$ cheap" value="${Number(z.pc) || 0}" oninput="_esfPaquetes[${i}].zonas[${zi}].pc = Number(this.value)">` : ''}
+            <button type="button" class="btn btn-ghost btn-sm" style="font-size:10px" onclick="_esfPaqZonaRemove(${i}, ${zi})">✕</button>
+          </div>`).join('') : '<div style="font-size:11px;color:var(--ts)">Sin zonas.</div>'}
+      </div>
     </div>`).join('');
+}
+
+function _esfPaqZonaAdd(pi) {
+  if (!_esfPaquetes[pi]) return;
+  if (!Array.isArray(_esfPaquetes[pi].zonas)) _esfPaquetes[pi].zonas = [];
+  _esfPaquetes[pi].zonas.push({ n: '', p: 0, pc: 0 });
+  _esfPaqRender();
+}
+function _esfPaqZonaRemove(pi, zi) {
+  if (_esfPaquetes[pi] && Array.isArray(_esfPaquetes[pi].zonas)) _esfPaquetes[pi].zonas.splice(zi, 1);
+  _esfPaqRender();
 }
 
 function _esfMusicPlay(url, btn) {

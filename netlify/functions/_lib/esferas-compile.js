@@ -203,11 +203,168 @@ function fDisplayMulti(fechas) {
   return joinHuman(items);
 }
 
+// ── Festival (Pieza 3a) ───────────────────────────────────────────────────────
+
+// `festival` (texto JSON u objeto) → { switches, portada, lineup, lineup_mostrar,
+// paquetes:[...] } o null (null/inválido → concierto). Defensivo. Defaults del
+// capturador: cheap/stay ON, ride OFF, transporte cdmx, lineup_mostrar ON.
+function parseFestival(raw) {
+  if (raw == null) return null;
+  let obj = raw;
+  if (typeof raw === 'string') {
+    const s = raw.trim();
+    if (!s || s === 'null') return null;
+    try { obj = JSON.parse(s); } catch (_) { return null; }
+  }
+  if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return null;
+  const sw = (obj.switches && typeof obj.switches === 'object') ? obj.switches : {};
+  return {
+    switches: {
+      cheap: sw.cheap !== false,
+      stay: sw.stay !== false,
+      ride: !!sw.ride,
+      transporte: (sw.transporte === 'local') ? 'local' : 'cdmx',
+    },
+    portada: (typeof obj.portada === 'string' && obj.portada.trim()) ? obj.portada.trim() : null,
+    lineup: (typeof obj.lineup === 'string' && obj.lineup.trim()) ? obj.lineup.trim() : null,
+    lineup_mostrar: obj.lineup_mostrar !== false,
+    paquetes: Array.isArray(obj.paquetes) ? obj.paquetes : [],
+  };
+}
+
+// k canónico del hotel derivado del nombre.
+function _festHotelK(n) {
+  const s = String(n == null ? '' : n).toLowerCase();
+  if (s.indexOf('compartida') >= 0) return 'compartida';
+  if (s.indexOf('triple') >= 0) return 'triple';
+  if (s.indexOf('doble') >= 0) return 'doble';
+  if (s.indexOf('individual') >= 0) return 'individual';
+  return '';
+}
+// desc del hotel (compartida = frase especial; el resto "Tu parte del cuarto <k>";
+// + " · N noches" si noches>1). Calcado del molde de coronacapital.
+function _festHotelDesc(k, noches) {
+  const base = (k === 'compartida')
+    ? 'Compartes cuarto con otros viajeros'
+    : ('Tu parte del cuarto ' + (k || 'compartido'));
+  return base + (noches > 1 ? (' · ' + noches + ' noches') : '');
+}
+// Normaliza las zonas de un paquete → [{n,p,pc}] con n no vacío.
+function _festZonaRows(zonas) {
+  return (Array.isArray(zonas) ? zonas : [])
+    .map((z) => ({
+      n: (z && typeof z.n === 'string') ? z.n.trim() : '',
+      p: Number(z && z.p) || 0,
+      pc: Number(z && z.pc) || 0,
+    }))
+    .filter((z) => z.n);
+}
+
+// Genera el objeto EV en FORMATO FESTIVAL (multifecha rico + flags), byte-exacto,
+// calcado de coronacapital. Base (id/added/c/a/f/ds/v/st/inc/sep/banco/pagos) igual
+// que concierto. La música rotativa (music por multifecha) es la 3b — aquí NO va.
+function generarObjFestival(esfera, fest, hoy) {
+  const cheapOn = fest.switches.cheap;
+  const stayOn = fest.switches.stay;
+  const nombre = esfera.nombre || '';
+  const status = esfera.status || '';
+
+  // Fechas del evento (f/ds) igual que concierto; multifecha reemplaza a dsList.
+  const fi = esfera.fecha_inicio || null;
+  const dsRaw = fi ? String(fi).slice(0, 10) : '';
+  const fechas = [];
+  const vistas = new Set();
+  for (const d of [dsRaw].concat(parseFechasExtra(esfera.fechas_extra))) {
+    if (FECHA_RE.test(d) && !vistas.has(d)) { vistas.add(d); fechas.push(d); }
+  }
+  fechas.sort();
+  const dsFinal = fechas.length ? fechas[0] : dsRaw;
+  const fStr = (fechas.length >= 2) ? fDisplayMulti(fechas) : fDisplay(dsFinal || fi);
+
+  const added = esfera.created_at ? String(esfera.created_at).slice(0, 10) : hoy;
+  const color = escStr(esfera.color || 'azul');
+  const venue = escStr(esfera.venue || '');
+  const incRows = parseInc(esfera.inc);
+  const incSeg = incRows.length
+    ? ('inc:[' + incRows.map((s) => "'" + escStr(s) + "'").join(',') + ']')
+    : 'inc:[]';
+  const sepN = (esfera.sep != null && Number.isFinite(Number(esfera.sep)) && Number(esfera.sep) >= 0)
+    ? Math.round(Number(esfera.sep)) : 500;
+  const notaSeg = esfera.nota ? (",nota:'" + escStr(esfera.nota) + "'") : '';
+
+  // Flags (mismo orden que coronacapital).
+  let flags = '';
+  if (fest.switches.transporte === 'cdmx') flags += 'cdmx:true,noBus:true,';
+  const anyHotel = stayOn && fest.paquetes.some((p) => Array.isArray(p.hotel) && p.hotel.length);
+  if (anyHotel) flags += 'hotelOverride:true,hotelPP:true,';
+  if (stayOn === false) flags += 'noStay:true,';
+  if (cheapOn === false) flags += 'noCheap:true,cheapSoon:true,';
+
+  // Portada → staticImg + img:false; si no → img:'<nombre>'.
+  const imgSeg = fest.portada
+    ? ("staticImg:'" + escStr(fest.portada) + "',img:false,")
+    : ("img:'" + escStr(nombre) + "',");
+  const lineupSeg = (fest.lineup && fest.lineup_mostrar) ? ("lineup:'" + escStr(fest.lineup) + "',") : '';
+
+  // multifecha: una entrada por paquete.
+  const mfStr = fest.paquetes.map((p) => {
+    const rows = _festZonaRows(p.zonas);
+    const noches = Number(p.noches) || 0;
+    let mf = "{lbl:'" + escStr(p.lbl || '') + "'";
+    const pds = (typeof p.ds === 'string' && FECHA_RE.test(String(p.ds).slice(0, 10))) ? String(p.ds).slice(0, 10) : '';
+    if (pds) mf += ",ds:'" + pds + "'";
+    mf += ',noches:' + noches;
+    mf += ',zonas:[' + rows.map((z) => "{n:'" + escStr(z.n) + "',p:" + Math.round(z.p) + '}').join(',') + ']';
+    if (cheapOn && rows.some((z) => z.pc > 0)) {
+      mf += ',cheapZonas:[' + rows.filter((z) => z.pc > 0).map((z) => "{n:'" + escStr(z.n) + "',p:" + Math.round(z.pc) + '}').join(',') + ']';
+    }
+    const ride = Number(p.ride) || 0;
+    if (ride > 0) mf += ',ride:' + Math.round(ride);
+    if (stayOn && Array.isArray(p.hotel) && p.hotel.length) {
+      const hstr = p.hotel.map((h) => {
+        const k = _festHotelK(h && h.n);
+        const e = Math.round(Number(h && h.e) || 0);
+        const viaj = (h && Array.isArray(h.viaj))
+          ? h.viaj.map((x) => parseInt(x, 10)).filter((x) => Number.isInteger(x) && x >= 1 && x <= 4)
+          : [];
+        return "{k:'" + k + "',n:'" + escStr(h && h.n) + "',e:" + e + ',pp:' + e +
+          ',viaj:[' + viaj.join(',') + "],desc:'" + escStr(_festHotelDesc(k, noches)) + "'}";
+      }).join(',');
+      mf += ',hotel:[' + hstr + ']';
+    }
+    return mf + '}';
+  }).join(',');
+
+  // Zonas top-level (fallback que el index espera) = del PRIMER paquete.
+  const firstRows = _festZonaRows(fest.paquetes[0] && fest.paquetes[0].zonas);
+  let topZonas = 'zonas:[' + firstRows.map((z) => "{n:'" + escStr(z.n) + "',p:" + Math.round(z.p) + '}').join(',') + ']';
+  if (cheapOn && firstRows.some((z) => z.pc > 0)) {
+    topZonas += ',cheapZonas:[' + firstRows.filter((z) => z.pc > 0).map((z) => "{n:'" + escStr(z.n) + "',p:" + Math.round(z.pc) + '}').join(',') + ']';
+  }
+
+  return "{id:'" + escStr(esfera.slug) +
+    "',added:'" + added +
+    "'," + flags +
+    "c:'" + color +
+    "'," + imgSeg + lineupSeg +
+    "a:'" + escStr(esfera.titulo || nombre) +
+    "',f:'" + escStr(fStr) +
+    "',ds:'" + escStr(dsFinal) +
+    "',v:'" + venue +
+    "',st:'" + escStr(status) +
+    "'," + incSeg + ',sep:' + sepN + notaSeg +
+    ',banco:BANCO_DEFAULT,multifecha:[' + mfStr + '],' + topZonas + ',' + pagosSegmento() + '}';
+}
+
 // Byte-exacto: comillas simples, sin espacios extra. banco:BANCO_DEFAULT SIN
 // comillas (referencia a variable). cdmx:true, SOLO si ciudad==='CDMX'.
 // `added` deriva de created_at de la fila (estable entre re-publicaciones); si no
 // hay, cae a hoy (todayMx). `music` (Deezer track id) solo si viene, tras added.
 function generarObj(esfera, hoy) {
+  // Bifurcación: si es festival con paquetes → formato festival; si no, concierto
+  // (flujo ACTUAL, byte-igual).
+  const fest = parseFestival(esfera.festival);
+  if (fest && Array.isArray(fest.paquetes) && fest.paquetes.length) return generarObjFestival(esfera, fest, hoy);
   const nombre = esfera.nombre || '';
   const status = esfera.status || '';
   const ciudad = esfera.ciudad || '';

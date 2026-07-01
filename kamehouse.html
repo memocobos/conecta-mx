@@ -13312,7 +13312,7 @@ function _esfFestivalPopulate(fest) {
   _esfPaquetes = Array.isArray(window._esfFestival.paquetes) ? window._esfFestival.paquetes.map(p => ({
     lbl: p.lbl || '', ds: p.ds || '', noches: p.noches || 0, ride: p.ride || 0,
     zonas: Array.isArray(p.zonas) ? p.zonas : [], cheapZonas: Array.isArray(p.cheapZonas) ? p.cheapZonas : [],
-    hotel: Array.isArray(p.hotel) ? p.hotel : [],
+    hotel: Array.isArray(p.hotel) ? p.hotel : [], hotelTotal: Number(p.hotelTotal) || 0,
   })) : [];
   _esfPaqRender();
 }
@@ -14223,6 +14223,8 @@ function _esfPaqRender() {
   if (!el) return;
   if (!_esfPaquetes.length) { el.innerHTML = '<div style="font-size:11px;color:var(--ts)">Sin paquetes aún.</div>'; return; }
   const cheapOn = !!document.getElementById('esf-fest-cheap')?.checked;  // el precio cheap (pc) solo si el switch cheap está encendido
+  const stayOn = !!document.getElementById('esf-fest-stay')?.checked;    // hoteles solo si el switch stay está encendido
+  if (stayOn) _esfPaquetes.forEach((_, i) => _esfPaqHotelEnsure(i));     // asegura los 4 tipos fijos por paquete
   el.innerHTML = _esfPaquetes.map((p, i) => `
     <div style="border:1px solid var(--border);border-radius:8px;padding:10px;margin-bottom:8px;background:var(--bg2)">
       <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px">
@@ -14258,7 +14260,46 @@ function _esfPaqRender() {
             <button type="button" class="btn btn-ghost btn-sm" style="font-size:10px" onclick="_esfPaqZonaRemove(${i}, ${zi})">✕</button>
           </div>`).join('') : '<div style="font-size:11px;color:var(--ts)">Sin zonas.</div>'}
       </div>
+      ${stayOn ? `
+      <div style="margin-top:8px">
+        <div style="font-size:11px;color:var(--ts);margin-bottom:4px">Hoteles</div>
+        <label style="font-size:11px">Costo total de la habitación</label>
+        <input class="cot-input" type="number" min="0" style="width:100%;margin-bottom:6px" value="${Number(p.hotelTotal) || 0}" oninput="_esfPaqHotelTotal(${i}, this.value)">
+        ${(Array.isArray(p.hotel) ? p.hotel : []).map((h, hi) => {
+          const t = _ESF_HOTEL_TIPOS.find(x => x.n === h.n);
+          const pers = t ? t.pers : 4;
+          return `<div style="display:flex;gap:6px;align-items:center;margin-bottom:4px;flex-wrap:wrap">
+            <span style="flex:1;min-width:110px;font-size:12px">${_esfEsc(h.n)} (${pers}p)</span>
+            <input class="cot-input" type="number" min="0" style="flex:1;min-width:80px" placeholder="$ extra" value="${Number(h.e) || 0}" oninput="_esfPaquetes[${i}].hotel[${hi}].e = Number(this.value)">
+          </div>`;
+        }).join('')}
+        <div style="font-size:11px;color:var(--ts);margin-top:2px">Compartida = base; el sistema calcula los extras; puedes ajustarlos a mano.</div>
+      </div>` : ''}
     </div>`).join('');
+}
+
+// Asegura los 4 tipos fijos de hotel en el paquete, preservando extras ya puestos
+// (match por n). Reusa _ESF_HOTEL_TIPOS de conciertos (n/pers/viaj).
+function _esfPaqHotelEnsure(pi) {
+  if (!_esfPaquetes[pi]) return;
+  const prev = Array.isArray(_esfPaquetes[pi].hotel) ? _esfPaquetes[pi].hotel : [];
+  _esfPaquetes[pi].hotel = _ESF_HOTEL_TIPOS.map((t) => {
+    const found = prev.find((h) => h && h.n === t.n);
+    return { n: t.n, e: found ? (Number(found.e) || 0) : 0, viaj: t.viaj.slice() };
+  });
+}
+
+// Recalcula los extras de los 4 tipos desde el costo total (misma fórmula que
+// conciertos: _esfHotelExtra). El admin puede ajustarlos a mano después.
+function _esfPaqHotelTotal(pi, val) {
+  if (!_esfPaquetes[pi]) return;
+  _esfPaquetes[pi].hotelTotal = Number(val) || 0;
+  _esfPaqHotelEnsure(pi);
+  _esfPaquetes[pi].hotel.forEach((h) => {
+    const t = _ESF_HOTEL_TIPOS.find((x) => x.n === h.n);
+    h.e = _esfHotelExtra(_esfPaquetes[pi].hotelTotal, t ? t.pers : 4);
+  });
+  _esfPaqRender();
 }
 
 function _esfPaqZonaAdd(pi) {

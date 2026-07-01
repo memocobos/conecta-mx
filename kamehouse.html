@@ -2574,6 +2574,7 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
         <button class="gz-filter" id="ccf-proximos" onclick="filtrarCCEventos('proximo',this)">// próximos</button>
         <button class="gz-filter" id="ccf-pasados" onclick="filtrarCCEventos('pasado',this)">// pasados</button>
        </div>
+       <input type="text" id="cc-buscar" placeholder="Buscar evento por nombre…" autocomplete="off" oninput="filtrarCapsule()" style="width:100%;padding:8px 10px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;color:var(--ink);font-size:13px;margin-bottom:10px">
        <div id="cc-eventos-grid"></div>
       </div>
 
@@ -9048,6 +9049,7 @@ let _ccViajeros = [];
 let _ccHabitaciones = [];
 let _ccEventosCache = [];
 let _ccAsignados = [];
+let _ccFiltroFecha = 'todos';   // filtro de fecha activo (todos/proximo/pasado); se combina con el buscador
 
 const TIPOS_EVENTO = {
   concierto: 'Concierto',
@@ -9120,11 +9122,22 @@ function showCCSubTab(sub, btn) {
   });
 }
 
-// ── Filtro eventos ───────────────────────────────────────────
+// ── Filtro eventos (fecha + buscador, combinados) ────────────
 function filtrarCCEventos(filtro, btn) {
   document.querySelectorAll('#page-capsule .gz-filter[id^="ccf-"]').forEach(b => b.classList.remove('active'));
   if (btn) btn.classList.add('active');
-  renderCCEventos(_ccEventosCache, filtro);
+  _ccFiltroFecha = filtro;        // recuerda el filtro de fecha activo
+  filtrarCapsule();               // re-aplica fecha + texto del buscador
+}
+
+// Buscador por nombre; se combina con el filtro de fecha activo (_ccFiltroFecha).
+// Texto vacío → solo aplica el filtro de fecha (igual que antes).
+function filtrarCapsule() {
+  const q = (document.getElementById('cc-buscar')?.value || '').trim().toLowerCase();
+  const lista = q
+    ? _ccEventosCache.filter(e => String(e.nombre || '').toLowerCase().includes(q))
+    : _ccEventosCache;
+  renderCCEventos(lista, _ccFiltroFecha);
 }
 
 function renderCCEventos(lista, filtro) {

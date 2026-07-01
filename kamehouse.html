@@ -2918,6 +2918,30 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
     <div class="form-group">
      <label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="esf-es-festival" onchange="_esfToggleFestival()"> ¿Es festival?</label>
      <div id="esf-festival-box" style="display:none;margin-top:8px;padding:12px;border:1px dashed var(--border);border-radius:8px">
+      <!-- 2c: portada + lineup -->
+      <div style="margin-bottom:10px">
+       <label style="font-size:12px">Portada del festival</label>
+       <input type="file" id="esf-fest-portada-file" accept="image/*" style="display:none" onchange="_esfFestPortadaPick(event)">
+       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:4px">
+        <button class="btn btn-ghost" type="button" id="esf-fest-portada-btn" onclick="document.getElementById('esf-fest-portada-file').click()">Subir portada</button>
+        <button class="btn btn-ghost" type="button" id="esf-fest-portada-clear" style="display:none" onclick="_esfFestPortadaClear()">Quitar</button>
+        <span id="esf-fest-portada-status" style="font-size:11px;color:var(--ts)"></span>
+       </div>
+       <div id="esf-fest-portada-preview" style="margin-top:8px;display:none"><img id="esf-fest-portada-img" src="" alt="Portada del festival" style="max-width:240px;max-height:180px;border:1px solid var(--border);border-radius:6px"></div>
+      </div>
+      <div style="margin-bottom:10px">
+       <label style="font-size:12px">Lineup del festival</label>
+       <input type="file" id="esf-fest-lineup-file" accept="image/*" style="display:none" onchange="_esfFestLineupPick(event)">
+       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:4px">
+        <button class="btn btn-ghost" type="button" id="esf-fest-lineup-btn" onclick="document.getElementById('esf-fest-lineup-file').click()">Subir lineup</button>
+        <button class="btn btn-ghost" type="button" id="esf-fest-lineup-clear" style="display:none" onclick="_esfFestLineupClear()">Quitar</button>
+        <span id="esf-fest-lineup-status" style="font-size:11px;color:var(--ts)"></span>
+       </div>
+       <div id="esf-fest-lineup-preview" style="margin-top:8px;display:none"><img id="esf-fest-lineup-img" src="" alt="Lineup del festival" style="max-width:240px;max-height:180px;border:1px solid var(--border);border-radius:6px"></div>
+       <label style="display:flex;align-items:center;gap:8px;font-size:12px;cursor:pointer;margin-top:6px">
+        <input type="checkbox" id="esf-fest-lineup-show" checked> Mostrar lineup en el sitio
+       </label>
+      </div>
       <label style="display:flex;align-items:center;gap:8px;font-size:12px;cursor:pointer;margin-bottom:8px">
        <input type="checkbox" id="esf-fest-cheap" checked> ¿Vende paquete económico (cheap)?
       </label>
@@ -2933,7 +2957,7 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
        <option value="cdmx">CDMX (bus/vuelo aparte, como extra)</option>
        <option value="local">Local (bus incluido desde Reynosa, como concierto)</option>
       </select>
-      <!-- 2c: portada/lineup/música · 2d: paquetes -->
+      <!-- 2d: paquetes -->
      </div>
     </div>
     <div class="form-group">
@@ -13259,6 +13283,10 @@ function _esfFestivalPopulate(fest) {
   setChk('esf-fest-stay',  sw.stay  !== undefined ? !!sw.stay  : true);
   setChk('esf-fest-ride',  sw.ride  !== undefined ? !!sw.ride  : false);
   const tr = document.getElementById('esf-fest-transporte'); if (tr) tr.value = (sw.transporte === 'local') ? 'local' : 'cdmx';
+  // Portada + lineup: preview desde las URLs guardadas (o limpiar).
+  _esfFestImgShow('portada', window._esfFestival.portada || '');
+  _esfFestImgShow('lineup',  window._esfFestival.lineup  || '');
+  setChk('esf-fest-lineup-show', window._esfFestival.lineup_mostrar !== undefined ? !!window._esfFestival.lineup_mostrar : true);
 }
 
 function _esfGetFestival() {
@@ -13272,6 +13300,9 @@ function _esfGetFestival() {
     ride:       !!document.getElementById('esf-fest-ride')?.checked,
     transporte: document.getElementById('esf-fest-transporte')?.value || 'cdmx',
   };
+  base.portada = _esfPortadaUrl || null;
+  base.lineup = _esfLineupUrl || null;
+  base.lineup_mostrar = !!document.getElementById('esf-fest-lineup-show')?.checked;
   return base;
 }
 
@@ -13667,6 +13698,55 @@ function _esfMapaClear() {
 }
 
 function _esfGetMapa() { return _esfMapaUrl || ''; }
+
+// ── Festival: portada + lineup (calcado del mapa; reusa _esfMapaResize) ──────
+var _esfPortadaUrl = '';
+var _esfLineupUrl = '';
+
+// kind ∈ {'portada','lineup'}. Muestra/oculta preview + guarda la URL en su var.
+function _esfFestImgShow(kind, url) {
+  const u = url || '';
+  if (kind === 'portada') _esfPortadaUrl = u; else _esfLineupUrl = u;
+  const prev = document.getElementById('esf-fest-' + kind + '-preview');
+  const img  = document.getElementById('esf-fest-' + kind + '-img');
+  const clr  = document.getElementById('esf-fest-' + kind + '-clear');
+  if (u) { if (img) img.src = u; if (prev) prev.style.display = ''; if (clr) clr.style.display = ''; }
+  else   { if (img) img.src = ''; if (prev) prev.style.display = 'none'; if (clr) clr.style.display = 'none'; }
+}
+function _esfFestImgClear(kind) {
+  _esfFestImgShow(kind, '');
+  const f = document.getElementById('esf-fest-' + kind + '-file'); if (f) f.value = '';
+  const st = document.getElementById('esf-fest-' + kind + '-status'); if (st) st.textContent = '';
+}
+async function _esfFestImgPick(kind, event) {
+  const file = event.target.files && event.target.files[0];
+  if (!file) return;
+  const slug = (document.getElementById('esf-slug')?.value || '').trim().toLowerCase();
+  if (!slug) { alert('Primero pon el slug del evento (nombra el archivo).'); event.target.value = ''; return; }
+  const st = document.getElementById('esf-fest-' + kind + '-status'); if (st) st.textContent = 'Subiendo…';
+  try {
+    const dataUrl = await _esfMapaResize(file);
+    const r = await khAdminFetch('/.netlify/functions/esferas-subir-imagen', {
+      method: 'POST', body: JSON.stringify({ slug, dataUrl, tipo: kind }),
+    });
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok || !data.ok || !data.url) throw new Error(data.error || 'No se pudo subir');
+    _esfFestImgShow(kind, data.url);
+    const img = document.getElementById('esf-fest-' + kind + '-img');
+    if (img) img.src = data.url + '?t=' + (img._t = (img._t || 0) + 1); // cache-bust (upsert mismo path)
+    if (st) st.textContent = 'Subido ✓';
+  } catch (e) {
+    if (st) st.textContent = 'Error: ' + e.message;
+  } finally {
+    event.target.value = '';
+  }
+}
+function _esfFestPortadaPick(event) { return _esfFestImgPick('portada', event); }
+function _esfFestPortadaShow(url) { _esfFestImgShow('portada', url); }
+function _esfFestPortadaClear() { _esfFestImgClear('portada'); }
+function _esfFestLineupPick(event) { return _esfFestImgPick('lineup', event); }
+function _esfFestLineupShow(url) { _esfFestImgShow('lineup', url); }
+function _esfFestLineupClear() { _esfFestImgClear('lineup'); }
 
 // Modo editar: re-poblar preview desde el `mapa` guardado (URL) o limpiar.
 function _esfMapaPopulate(url) {

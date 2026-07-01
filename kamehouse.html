@@ -2916,6 +2916,10 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
      </select>
     </div>
     <div class="form-group">
+     <label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="esf-es-festival" onchange="_esfToggleFestival()"> ¿Es festival?</label>
+     <div id="esf-festival-box" style="display:none;margin-top:8px;padding:12px;border:1px dashed var(--border);border-radius:8px;font-size:12px;color:var(--ts)">🐉 Aquí se arma el festival: portada, lineup, música, switches y paquetes — en construcción.</div>
+    </div>
+    <div class="form-group">
      <label>Fecha inicio</label>
      <input class="cot-input" type="date" id="esf-fecha" style="width:100%">
      <div id="esf-fechas-extra"></div>
@@ -13062,6 +13066,7 @@ async function crearEsferaEvento() {
     sep: _esfGetSep(),
     sep_cheap: _esfGetSepCheap(),
     nota: _esfGetNota(),
+    festival: _esfGetFestival(),
   };
   const alertEl = document.getElementById('esf-alert');
   try {
@@ -13083,6 +13088,8 @@ async function crearEsferaEvento() {
     _esfClearHotel();
     _esfMapaClear();
     _esfSeedDefaults();
+    const _fchk = document.getElementById('esf-es-festival'); if (_fchk) _fchk.checked = false;
+    _esfToggleFestival();
     const chosenEl = document.getElementById('esf-music-chosen'); if (chosenEl) chosenEl.textContent = '';
     const resEl = document.getElementById('esf-music-results'); if (resEl) resEl.innerHTML = '';
     loadEsferasEventos();
@@ -13201,6 +13208,20 @@ function _esfGetSepCheap() {
   return (Number.isFinite(n) && n >= 0) ? n : 500;
 }
 function _esfGetNota() { return (document.getElementById('esf-nota')?.value || '').trim(); }
+
+// Modo festival: interruptor + box. Apagado → _esfGetFestival()=null → concierto,
+// flujo idéntico a hoy. La captura real (portada/lineup/switches/paquetes) llega
+// en 2b+; por ahora el hook devuelve null.
+function _esfToggleFestival() {
+  const on = !!document.getElementById('esf-es-festival')?.checked;
+  const box = document.getElementById('esf-festival-box');
+  if (box) box.style.display = on ? '' : 'none';
+}
+function _esfGetFestival() {
+  // TODO(2b+): si el interruptor está encendido, armar y devolver el objeto del
+  // festival (lineup, música, switches, paquetes). Por ahora null = concierto.
+  return null;
+}
 
 // Estado "nuevo evento": siembra inc default de la ciudad + separo 500.
 function _esfSeedDefaults() {
@@ -13698,6 +13719,10 @@ function editarEsfera(slug) {
   _esfIncSepNotaPopulate(row);
   _esfCiudadSet(row.ciudad || 'MTY');
   set('esf-tipo', row.tipo || 'concierto');
+  // Modo festival: encender el interruptor si el evento tiene `festival` no-null.
+  const festOn = row.festival != null && row.festival !== '';
+  const fchk = document.getElementById('esf-es-festival'); if (fchk) fchk.checked = festOn;
+  _esfToggleFestival();
   set('esf-status', row.status || '');
   set('esf-venue', row.venue || '');
   set('esf-music', row.music || '');
@@ -13754,6 +13779,7 @@ async function guardarCambiosEsfera() {
     sep: _esfGetSep(),
     sep_cheap: _esfGetSepCheap(),
     nota: _esfGetNota(),
+    festival: _esfGetFestival(),
   };
   const alertEl = document.getElementById('esf-alert');
   try {

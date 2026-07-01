@@ -12648,7 +12648,7 @@ async function loadEsferasEventos() {
         <td style="font-size:11px;color:var(--orange)">${_esfEsc(e.status) || 'Disponible'}</td>
         <td>${e.publicado
           ? `<span class="badge badge-green">publicado</span> <button class="btn btn-ghost btn-sm" style="font-size:10px" onclick="despublicarEsfera('${_esfEsc(e.slug)}')">🗑️ Despublicar</button>`
-          : '<span class="badge badge-gray">borrador</span>'}</td>
+          : `<span class="badge badge-gray">borrador</span> <button class="btn btn-ghost btn-sm" style="font-size:10px;color:var(--red)" onclick="eliminarEsfera('${_esfEsc(e.slug)}')">🗑️ Eliminar</button>`}</td>
         <td><button class="btn btn-ghost btn-sm" style="font-size:10px" onclick="editarEsfera('${_esfEsc(e.slug)}')">✏️ Editar</button> <button class="btn btn-ghost btn-sm" style="font-size:10px" onclick="posponerEsfera('${_esfEsc(e.slug)}')">📅 Posponer</button> <button class="btn btn-ghost btn-sm" style="font-size:10px" onclick="recalcularPagosPosposicion('${_esfEsc(e.slug)}')">🔄 Recalcular</button> <button class="btn btn-ghost btn-sm" style="font-size:10px" onclick="avisarPosposicion('${_esfEsc(e.slug)}')">✉️ Avisar</button> <button class="btn btn-ghost btn-sm" style="font-size:10px;color:var(--red)" onclick="cancelarEventoCompleto('${_esfEsc(e.slug)}')">🚫 Cancelar</button></td>
       </tr>`).join('')}</tbody>
     </table></div>`;
@@ -14449,6 +14449,25 @@ async function despublicarEsfera(slug) {
     loadEsferasEventos();
   } catch(e) {
     panel.innerHTML = `<div class="alert alert-error">${e.message}</div>`;
+  }
+}
+
+async function eliminarEsfera(slug) {
+  if (!window.confirm(`¿Eliminar DEFINITIVAMENTE '${slug}' de la lista de Esferas? Borra el borrador del evento. (Debe estar despublicado.)`)) return;
+  const panel = document.getElementById('esf-dryrun-panel');
+  if (panel) panel.innerHTML = `<div class="loading-state"><div class="spinner"></div>Eliminando ${_esfEsc(slug)}…</div>`;
+  try {
+    const r = await khAdminFetch('/.netlify/functions/esferas-eliminar', { method:'POST', body: JSON.stringify({ slug }) });
+    const data = await r.json().catch(()=>({}));
+    if (r.status === 409 || r.status === 404) {
+      if (panel) panel.innerHTML = `<div class="alert alert-error">${_esfEsc(data.error || ('Error ' + r.status))}</div>`;
+      return;
+    }
+    if (!r.ok || !data.ok) throw new Error(data.error || ('Error ' + r.status));
+    if (panel) panel.innerHTML = `<div class="alert alert-success">🗑️ Eliminado ${_esfEsc(slug)} de la lista de Esferas.</div>`;
+    loadEsferasEventos();
+  } catch(e) {
+    if (panel) panel.innerHTML = `<div class="alert alert-error">${e.message}</div>`;
   }
 }
 

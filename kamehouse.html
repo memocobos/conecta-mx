@@ -2942,6 +2942,16 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
         <input type="checkbox" id="esf-fest-lineup-show" checked> Mostrar lineup en el sitio
        </label>
       </div>
+      <div style="margin-bottom:10px">
+       <label style="font-size:12px">Música (rotativa)</label>
+       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:4px">
+        <input class="cot-input" id="esf-fest-music-q" placeholder="artista…" style="flex:1;min-width:120px" onkeydown="if(event.key==='Enter'){event.preventDefault();_esfFestMusicBuscar();}">
+        <button class="btn btn-ghost" type="button" onclick="_esfFestMusicBuscar()">Buscar</button>
+       </div>
+       <div id="esf-fest-music-results" style="margin-top:8px"></div>
+       <div id="esf-fest-music-list" style="margin-top:8px"></div>
+       <div style="font-size:11px;color:var(--ts);margin-top:4px">El sitio mostrará una al azar a cada visitante.</div>
+      </div>
       <label style="display:flex;align-items:center;gap:8px;font-size:12px;cursor:pointer;margin-bottom:8px">
        <input type="checkbox" id="esf-fest-cheap" checked> ¿Vende paquete económico (cheap)?
       </label>
@@ -13287,6 +13297,9 @@ function _esfFestivalPopulate(fest) {
   _esfFestImgShow('portada', window._esfFestival.portada || '');
   _esfFestImgShow('lineup',  window._esfFestival.lineup  || '');
   setChk('esf-fest-lineup-show', window._esfFestival.lineup_mostrar !== undefined ? !!window._esfFestival.lineup_mostrar : true);
+  // Música rotativa: precargar la lista guardada.
+  _esfMusicaLista = Array.isArray(window._esfFestival.musica) ? window._esfFestival.musica.slice() : [];
+  _esfMusicaRender();
 }
 
 function _esfGetFestival() {
@@ -13303,6 +13316,7 @@ function _esfGetFestival() {
   base.portada = _esfPortadaUrl || null;
   base.lineup = _esfLineupUrl || null;
   base.lineup_mostrar = !!document.getElementById('esf-fest-lineup-show')?.checked;
+  base.musica = _esfMusicaLista.slice();
   return base;
 }
 
@@ -14090,14 +14104,14 @@ function _esfMusicStopAudio() {
   if (_esfMusicAudio) { try { _esfMusicAudio.pause(); } catch(_){} _esfMusicAudio = null; }
 }
 
-async function buscarMusicaEsfera() {
-  const nombre = (document.getElementById('esf-nombre')?.value || '').trim();
-  const cont = document.getElementById('esf-music-results');
+// Buscador Deezer reusable: fetch + render de filas en `cont`; "Elegir" llama
+// onPick(id, label). Lo usan conciertos (buscarMusicaEsfera) y la lista rotativa
+// del festival (_esfFestMusicBuscar) sin cambiar el comportamiento de conciertos.
+async function _esfMusicBuscar(query, cont, onPick) {
   if (!cont) return;
-  if (!nombre) { cont.innerHTML = '<div style="font-size:11px;color:var(--orange)">Escribe primero el Nombre / Artista.</div>'; return; }
   cont.innerHTML = '<div class="loading-state"><div class="spinner"></div>Buscando…</div>';
   try {
-    const r = await fetch('/.netlify/functions/deezer?type=tracklist&q=' + encodeURIComponent(nombre));
+    const r = await fetch('/.netlify/functions/deezer?type=tracklist&q=' + encodeURIComponent(query));
     const d = await r.json().catch(() => ({}));
     const items = (d && d.results) || [];
     cont.innerHTML = '';
@@ -14126,13 +14140,54 @@ async function buscarMusicaEsfera() {
       }
       const pick = document.createElement('button');
       pick.type = 'button'; pick.className = 'btn btn-primary btn-sm'; pick.style.fontSize = '10px'; pick.textContent = 'Elegir';
-      pick.addEventListener('click', () => _esfMusicElegir(String(t.id), (t.title || '') + ' — ' + (t.artist || '')));
+      pick.addEventListener('click', () => onPick(String(t.id), (t.title || '') + ' — ' + (t.artist || '')));
       row.appendChild(pick);
       cont.appendChild(row);
     });
   } catch (e) {
     cont.innerHTML = `<div class="alert alert-error">${_esfEsc(e.message)}</div>`;
   }
+}
+
+// Conciertos: busca por el Nombre/Artista y pone UN track id en #esf-music.
+function buscarMusicaEsfera() {
+  const nombre = (document.getElementById('esf-nombre')?.value || '').trim();
+  const cont = document.getElementById('esf-music-results');
+  if (!cont) return;
+  if (!nombre) { cont.innerHTML = '<div style="font-size:11px;color:var(--orange)">Escribe primero el Nombre / Artista.</div>'; return; }
+  _esfMusicBuscar(nombre, cont, _esfMusicElegir);
+}
+
+// Festival: mini-buscador que ARMA la lista rotativa (festival.musica).
+function _esfFestMusicBuscar() {
+  const q = (document.getElementById('esf-fest-music-q')?.value || '').trim();
+  const cont = document.getElementById('esf-fest-music-results');
+  if (!cont) return;
+  if (!q) { cont.innerHTML = '<div style="font-size:11px;color:var(--orange)">Escribe un artista.</div>'; return; }
+  _esfMusicBuscar(q, cont, _esfMusicaAdd);
+}
+
+// Lista de música rotativa del festival: [{id,label}].
+var _esfMusicaLista = [];
+function _esfMusicaAdd(id, label) {
+  if (!_esfMusicaLista.some(m => m.id === id)) _esfMusicaLista.push({ id: id, label: label });
+  _esfMusicaRender();
+  const res = document.getElementById('esf-fest-music-results'); if (res) res.innerHTML = '';
+  const q = document.getElementById('esf-fest-music-q'); if (q) q.value = '';
+}
+function _esfMusicaRemove(id) {
+  _esfMusicaLista = _esfMusicaLista.filter(m => m.id !== id);
+  _esfMusicaRender();
+}
+function _esfMusicaRender() {
+  const el = document.getElementById('esf-fest-music-list');
+  if (!el) return;
+  if (!_esfMusicaLista.length) { el.innerHTML = '<div style="font-size:11px;color:var(--ts)">Sin canciones aún.</div>'; return; }
+  el.innerHTML = _esfMusicaLista.map(m => `
+    <div style="display:inline-flex;align-items:center;gap:6px;padding:4px 8px;background:var(--bg3);border:1px solid var(--border);border-radius:14px;margin:0 6px 6px 0;font-size:12px">
+      <span>${_esfEsc(m.label)}</span>
+      <button type="button" class="btn btn-ghost btn-sm" style="font-size:10px;padding:0 5px" onclick="_esfMusicaRemove('${_esfEsc(m.id)}')">✕</button>
+    </div>`).join('');
 }
 
 function _esfMusicPlay(url, btn) {

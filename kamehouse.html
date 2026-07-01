@@ -12888,7 +12888,17 @@ async function confirmarCancelacionEvento(slug) {
       return;
     }
     const d = await r.json();
-    const msg = `✅ Evento cancelado · ${d.solicitudes_baja} baja(s) · ${d.reembolsos_creados} reembolso(s) · total ${formatMXN(d.monto_total)}${d.bajas_fallidas ? ` · ⚠ ${d.bajas_fallidas} fallida(s)` : ''}`;
+    // Best-effort: despublicar del sitio (idempotente). Un fallo aquí NO revierte
+    // la cancelación ya hecha — solo avisa para hacerlo a mano con 🗑️ Despublicar.
+    let despubMsg = '';
+    try {
+      const rd = await khAdminFetch('/.netlify/functions/esferas-despublicar', { method:'POST', body: JSON.stringify({ slug }) });
+      despubMsg = rd.ok ? ' y despublicado del sitio'
+                        : '. ⚠️ No se pudo despublicar del sitio automáticamente — usa el botón 🗑️ Despublicar';
+    } catch (_) {
+      despubMsg = '. ⚠️ No se pudo despublicar del sitio automáticamente — usa el botón 🗑️ Despublicar';
+    }
+    const msg = `✅ Evento cancelado · ${d.solicitudes_baja} baja(s) · ${d.reembolsos_creados} reembolso(s) · total ${formatMXN(d.monto_total)}${d.bajas_fallidas ? ` · ⚠ ${d.bajas_fallidas} fallida(s)` : ''}${despubMsg}`;
     if (alertEl) alertEl.innerHTML = `<div class="alert alert-success">${msg}</div>`;
     setTimeout(() => { closeModal('modal-cancelar-evento'); loadEsferasEventos(); }, 3000);
   } catch (e) {

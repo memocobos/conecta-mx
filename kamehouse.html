@@ -2967,7 +2967,15 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
        <option value="cdmx">CDMX (bus/vuelo aparte, como extra)</option>
        <option value="local">Local (bus incluido desde Reynosa, como concierto)</option>
       </select>
-      <!-- 2d: paquetes -->
+      <!-- 2e: paquetes del festival -->
+      <div style="margin-top:6px;border-top:1px solid var(--border);padding-top:10px">
+       <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px">
+        <label style="font-size:12px">Paquetes</label>
+        <button class="btn btn-ghost btn-sm" type="button" style="font-size:11px" onclick="_esfPaqAdd()">+ Agregar paquete</button>
+       </div>
+       <div id="esf-fest-paq-list"></div>
+       <div style="font-size:11px;color:var(--ts);margin-top:4px">Las zonas y hoteles de cada paquete se agregan en el siguiente paso.</div>
+      </div>
      </div>
     </div>
     <div class="form-group">
@@ -13300,6 +13308,13 @@ function _esfFestivalPopulate(fest) {
   // Música rotativa: precargar la lista guardada.
   _esfMusicaLista = Array.isArray(window._esfFestival.musica) ? window._esfFestival.musica.slice() : [];
   _esfMusicaRender();
+  // Paquetes: precargar preservando zonas/cheapZonas/hotel (2e-ii/iii los llenan).
+  _esfPaquetes = Array.isArray(window._esfFestival.paquetes) ? window._esfFestival.paquetes.map(p => ({
+    lbl: p.lbl || '', ds: p.ds || '', noches: p.noches || 0, ride: p.ride || 0,
+    zonas: Array.isArray(p.zonas) ? p.zonas : [], cheapZonas: Array.isArray(p.cheapZonas) ? p.cheapZonas : [],
+    hotel: Array.isArray(p.hotel) ? p.hotel : [],
+  })) : [];
+  _esfPaqRender();
 }
 
 function _esfGetFestival() {
@@ -13317,6 +13332,7 @@ function _esfGetFestival() {
   base.lineup = _esfLineupUrl || null;
   base.lineup_mostrar = !!document.getElementById('esf-fest-lineup-show')?.checked;
   base.musica = _esfMusicaLista.slice();
+  base.paquetes = _esfPaquetes;   // ya trae zonas/cheapZonas/hotel (vacíos en 2e-i)
   return base;
 }
 
@@ -14187,6 +14203,47 @@ function _esfMusicaRender() {
     <div style="display:inline-flex;align-items:center;gap:6px;padding:4px 8px;background:var(--bg3);border:1px solid var(--border);border-radius:14px;margin:0 6px 6px 0;font-size:12px">
       <span>${_esfEsc(m.label)}</span>
       <button type="button" class="btn btn-ghost btn-sm" style="font-size:10px;padding:0 5px" onclick="_esfMusicaRemove('${_esfEsc(m.id)}')">✕</button>
+    </div>`).join('');
+}
+
+// ── Festival: paquetes por duración (2e-i, campos básicos) ───────────────────
+// zonas/cheapZonas/hotel quedan vacíos aquí; se llenan en 2e-ii/iii. La música NO
+// va por paquete (vive en festival.musica).
+var _esfPaquetes = [];  // [{ lbl, ds, noches, ride, zonas:[], cheapZonas:[], hotel:[] }]
+function _esfPaqAdd() {
+  _esfPaquetes.push({ lbl: '', ds: '', noches: 1, ride: 0, zonas: [], cheapZonas: [], hotel: [] });
+  _esfPaqRender();
+}
+function _esfPaqRemove(idx) {
+  _esfPaquetes.splice(idx, 1);
+  _esfPaqRender();
+}
+function _esfPaqRender() {
+  const el = document.getElementById('esf-fest-paq-list');
+  if (!el) return;
+  if (!_esfPaquetes.length) { el.innerHTML = '<div style="font-size:11px;color:var(--ts)">Sin paquetes aún.</div>'; return; }
+  el.innerHTML = _esfPaquetes.map((p, i) => `
+    <div style="border:1px solid var(--border);border-radius:8px;padding:10px;margin-bottom:8px;background:var(--bg2)">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px">
+        <span style="font-size:11px;color:var(--ts)">Paquete ${i + 1}</span>
+        <button type="button" class="btn btn-ghost btn-sm" style="font-size:10px" onclick="_esfPaqRemove(${i})">Quitar</button>
+      </div>
+      <label style="font-size:11px">Etiqueta</label>
+      <input class="cot-input" style="width:100%;margin-bottom:6px" placeholder="Vie 20 nov · 1 día" value="${_esfEsc(p.lbl)}" oninput="_esfPaquetes[${i}].lbl = this.value">
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <div style="flex:1;min-width:120px">
+          <label style="font-size:11px">Fecha</label>
+          <input class="cot-input" type="date" style="width:100%" value="${_esfEsc(p.ds)}" oninput="_esfPaquetes[${i}].ds = this.value">
+        </div>
+        <div style="flex:1;min-width:90px">
+          <label style="font-size:11px">Noches</label>
+          <input class="cot-input" type="number" min="0" style="width:100%" value="${Number(p.noches) || 0}" oninput="_esfPaquetes[${i}].noches = Number(this.value)">
+        </div>
+        <div style="flex:1;min-width:90px">
+          <label style="font-size:11px">Ride / transporte</label>
+          <input class="cot-input" type="number" min="0" style="width:100%" value="${Number(p.ride) || 0}" oninput="_esfPaquetes[${i}].ride = Number(this.value)">
+        </div>
+      </div>
     </div>`).join('');
 }
 

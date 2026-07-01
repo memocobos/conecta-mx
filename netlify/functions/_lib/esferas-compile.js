@@ -228,6 +228,7 @@ function parseFestival(raw) {
     portada: (typeof obj.portada === 'string' && obj.portada.trim()) ? obj.portada.trim() : null,
     lineup: (typeof obj.lineup === 'string' && obj.lineup.trim()) ? obj.lineup.trim() : null,
     lineup_mostrar: obj.lineup_mostrar !== false,
+    musica: Array.isArray(obj.musica) ? obj.musica : [],
     paquetes: Array.isArray(obj.paquetes) ? obj.paquetes : [],
   };
 }
@@ -342,9 +343,18 @@ function generarObjFestival(esfera, fest, hoy) {
     topZonas += ',cheapZonas:[' + firstRows.filter((z) => z.pc > 0).map((z) => "{n:'" + escStr(z.n) + "',p:" + Math.round(z.pc) + '}').join(',') + ']';
   }
 
+  // Música rotativa (3b): lista de ids Deezer del festival. El sitio elige UNA al
+  // azar por visita (evMusicQuery). Sin ids → no se emite.
+  const musIds = Array.isArray(fest.musica)
+    ? fest.musica.map((m) => (m && m.id != null) ? String(m.id).trim() : '').filter(Boolean)
+    : [];
+  const musicListSeg = musIds.length
+    ? ('musicList:[' + musIds.map((id) => "'" + escStr(id) + "'").join(',') + '],')
+    : '';
+
   return "{id:'" + escStr(esfera.slug) +
     "',added:'" + added +
-    "'," + flags +
+    "'," + musicListSeg + flags +
     "c:'" + color +
     "'," + imgSeg + lineupSeg +
     "a:'" + escStr(esfera.titulo || nombre) +

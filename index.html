@@ -1902,6 +1902,12 @@ function evMusicQuery(ev,idx){
     if(mf.music)return 'id:'+mf.music;
     if(mf.musicSearch)return mf.musicSearch;
   }
+  // Música rotativa del festival: una canción al azar por visita, cacheada por
+  // carga en ev._musicPick (estable en la sesión, distinta entre visitas).
+  if(ev.musicList&&ev.musicList.length){
+    if(ev._musicPick==null)ev._musicPick=ev.musicList[Math.floor(Math.random()*ev.musicList.length)];
+    return 'id:'+ev._musicPick;
+  }
   if(ev.music)return 'id:'+ev.music;
   return ev.musicSearch||ev.previewQuery||ev.img||ev.a||'';
 }

@@ -2917,7 +2917,42 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
     </div>
     <div class="form-group">
      <label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="esf-es-festival" onchange="_esfToggleFestival()"> ¿Es festival?</label>
-     <div id="esf-festival-box" style="display:none;margin-top:8px;padding:12px;border:1px dashed var(--border);border-radius:8px">
+    </div>
+    <div class="form-group">
+     <label>Fecha inicio</label>
+     <input class="cot-input" type="date" id="esf-fecha" style="width:100%">
+     <div id="esf-fechas-extra"></div>
+     <button class="btn btn-ghost" type="button" onclick="_esfAddFechaExtra()" style="margin-top:8px">+ Agregar otra fecha</button>
+     <div style="font-size:11px;color:var(--ts);margin-top:4px">Para eventos con varias fechas (ej. 2da fecha por agotarse). Los precios por fecha vienen en otra etapa.</div>
+    </div>
+    <div class="form-group">
+     <label>Ciudad</label>
+     <select class="cot-input" id="esf-ciudad" style="width:100%" onchange="_esfCiudadToggle()">
+      <option value="MTY">MTY</option>
+      <option value="CDMX">CDMX</option>
+      <option value="__otra">Otra ciudad…</option>
+     </select>
+     <input class="cot-input" id="esf-ciudad-otra" placeholder="ej. Guadalajara" style="width:100%;margin-top:8px;display:none" oninput="_esfCityChanged()">
+    </div>
+    <div class="form-group">
+     <label>Venue</label>
+     <div style="position:relative">
+      <input class="cot-input" id="esf-venue" placeholder="ej. Estadio GNP, CDMX" style="width:100%" autocomplete="off" oninput="_esfCityChanged();_esfVenueSugg()" onblur="setTimeout(_esfVenueSuggHide,150)">
+      <div id="esf-venue-sugg" style="display:none;position:absolute;left:0;right:0;top:100%;z-index:30;background:var(--bg2);border:1px solid var(--border);border-top:none;border-radius:0 0 var(--radius) var(--radius);max-height:220px;overflow:auto"></div>
+     </div>
+     <div style="font-size:11px;color:var(--ts);margin-top:4px">Incluye la ciudad en el venue (ej. "Auditorio Telmex, Guadalajara") para que el sitio la ubique bien.</div>
+    </div>
+    <div class="form-group">
+     <label>Status</label>
+     <select class="cot-input" id="esf-status" style="width:100%">
+      <option value="">Disponible</option>
+      <option value="proximamente">Próximamente</option>
+      <option value="ultimos">Últimos</option>
+      <option value="agotado">Agotado</option>
+     </select>
+    </div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.15em;color:var(--ts);margin:24px 0 16px">// FESTIVAL</div>
+    <div id="esf-festival-box" style="display:none;margin-top:8px;padding:12px;border:1px dashed var(--border);border-radius:8px">
       <!-- 2c: portada + lineup -->
       <div style="margin-bottom:10px">
        <label style="font-size:12px">Portada del festival</label>
@@ -2977,40 +3012,7 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
        <div style="font-size:11px;color:var(--ts);margin-top:4px">Las zonas y hoteles de cada paquete se agregan en el siguiente paso.</div>
       </div>
      </div>
-    </div>
-    <div class="form-group">
-     <label>Fecha inicio</label>
-     <input class="cot-input" type="date" id="esf-fecha" style="width:100%">
-     <div id="esf-fechas-extra"></div>
-     <button class="btn btn-ghost" type="button" onclick="_esfAddFechaExtra()" style="margin-top:8px">+ Agregar otra fecha</button>
-     <div style="font-size:11px;color:var(--ts);margin-top:4px">Para eventos con varias fechas (ej. 2da fecha por agotarse). Los precios por fecha vienen en otra etapa.</div>
-    </div>
-    <div class="form-group">
-     <label>Ciudad</label>
-     <select class="cot-input" id="esf-ciudad" style="width:100%" onchange="_esfCiudadToggle()">
-      <option value="MTY">MTY</option>
-      <option value="CDMX">CDMX</option>
-      <option value="__otra">Otra ciudad…</option>
-     </select>
-     <input class="cot-input" id="esf-ciudad-otra" placeholder="ej. Guadalajara" style="width:100%;margin-top:8px;display:none" oninput="_esfCityChanged()">
-    </div>
-    <div class="form-group">
-     <label>Status</label>
-     <select class="cot-input" id="esf-status" style="width:100%">
-      <option value="">Disponible</option>
-      <option value="proximamente">Próximamente</option>
-      <option value="ultimos">Últimos</option>
-      <option value="agotado">Agotado</option>
-     </select>
-    </div>
-    <div class="form-group">
-     <label>Venue</label>
-     <div style="position:relative">
-      <input class="cot-input" id="esf-venue" placeholder="ej. Estadio GNP, CDMX" style="width:100%" autocomplete="off" oninput="_esfCityChanged();_esfVenueSugg()" onblur="setTimeout(_esfVenueSuggHide,150)">
-      <div id="esf-venue-sugg" style="display:none;position:absolute;left:0;right:0;top:100%;z-index:30;background:var(--bg2);border:1px solid var(--border);border-top:none;border-radius:0 0 var(--radius) var(--radius);max-height:220px;overflow:auto"></div>
-     </div>
-     <div style="font-size:11px;color:var(--ts);margin-top:4px">Incluye la ciudad en el venue (ej. "Auditorio Telmex, Guadalajara") para que el sitio la ubique bien.</div>
-    </div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.15em;color:var(--ts);margin:24px 0 16px">// BOLETOS · HOTEL · MÚSICA</div>
     <div class="form-group" id="esf-grp-music">
      <label>Música (Deezer)</label>
      <div style="display:flex;gap:8px">
@@ -3044,6 +3046,7 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
       <div style="font-size:11px;color:var(--ts);margin-top:4px">Extras POR PERSONA (ya descuentan el lugar del PLUS). Se calculan solos; puedes ajustar cualquiera a mano.</div>
      </div>
     </div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.15em;color:var(--ts);margin:24px 0 16px">// EXTRAS</div>
     <div class="form-group">
      <label>Mapa del venue</label>
      <input type="file" id="esf-mapa-file" accept="image/*" style="display:none" onchange="_esfMapaPick(event)">

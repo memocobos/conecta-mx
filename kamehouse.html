@@ -348,6 +348,14 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Montse
  font-size:9px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;
  color:var(--ts2);padding:6px 12px 5px;
 }
+/* Grupos colapsables por título (clic en el título → oculta/muestra sus botones).
+   El colapso es por CLASE + CSS, nunca tocando el style.display de cada botón,
+   así el gating por rol (display:none inline) se respeta al expandir. La flecha y
+   el cursor se excluyen del título de Herramientas (no es colapsable). */
+.nav-group.collapsed .nav-btn{display:none !important}
+.nav-group-title:not(#nav-herramientas){cursor:pointer;display:flex;align-items:center;justify-content:space-between}
+.nav-group-title:not(#nav-herramientas)::after{content:'▾';font-size:10px;opacity:.6;transition:transform .15s}
+.nav-group.collapsed .nav-group-title::after{transform:rotate(-90deg)}
 
 /* Items: pestañas (.nav-btn) + herramientas (.nav-dropdown-item) */
 .nav-btn,.nav-dropdown-item{
@@ -1957,7 +1965,7 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
   <div class="nav-brand">KAMEHOUSE<span class="nav-brand-dot"></span></div>
 
   <div class="nav-group">
-   <div class="nav-group-title">Operación</div>
+   <div class="nav-group-title" onclick="toggleNavGroup(this)">Operación</div>
    <button class="nav-btn active" onclick="showPage('resumen')" id="nav-resumen"><svg class="nav-ic"><use href="#ic-resumen"/></svg><span>Resumen</span></button>
    <button class="nav-btn" onclick="showPage('pagos')" id="nav-pagos"><svg class="nav-ic"><use href="#ic-pagos"/></svg><span>Pagos</span></button>
    <button class="nav-btn" onclick="showPage('eventos')" id="nav-eventos"><svg class="nav-ic"><use href="#ic-eventos"/></svg><span>Por Evento</span></button>
@@ -1966,7 +1974,7 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
   </div>
 
   <div class="nav-group">
-   <div class="nav-group-title">Inventario &amp; Ventas</div>
+   <div class="nav-group-title" onclick="toggleNavGroup(this)">Inventario &amp; Ventas</div>
    <button class="nav-btn" onclick="showPage('inventario')" id="nav-inventario"><svg class="nav-ic"><use href="#ic-inventario"/></svg><span>Torre de Karin</span></button>
    <button class="nav-btn" onclick="showPage('gastos')" id="nav-gastos"><svg class="nav-ic"><use href="#ic-gastos"/></svg><span>Gastos</span></button>
    <button class="nav-btn" onclick="showPage('ingresos')" id="nav-ingresos"><svg class="nav-ic"><use href="#ic-ingresos"/></svg><span>Ingresos</span></button>
@@ -1976,13 +1984,13 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
   </div>
 
   <div class="nav-group">
-   <div class="nav-group-title">Equipo</div>
+   <div class="nav-group-title" onclick="toggleNavGroup(this)">Equipo</div>
    <button class="nav-btn" onclick="showPage('equipo')" id="nav-equipo"><svg class="nav-ic"><use href="#ic-equipo"/></svg><span>Guerreros Z</span></button>
    <button class="nav-btn" onclick="showPage('montana')" id="nav-montana"><svg class="nav-ic"><use href="#ic-montana"/></svg><span>Montaña Pai</span></button>
   </div>
 
   <div class="nav-group">
-   <div class="nav-group-title">Eventos</div>
+   <div class="nav-group-title" onclick="toggleNavGroup(this)">Eventos</div>
    <button class="nav-btn" onclick="showPage('kamisama')" id="nav-kamisama"><svg class="nav-ic"><use href="#ic-kamisama"/></svg><span>Palacio de Kamisama</span></button>
    <button class="nav-btn" onclick="showPage('esferas')" id="nav-esferas"><svg class="nav-ic"><use href="#ic-esferas"/></svg><span>Esferas del Dragón</span></button>
    <button class="nav-btn" onclick="showPage('yamcha')" id="nav-yamcha"><svg class="nav-ic"><use href="#ic-saldos"/></svg><span>La derrota de Yamcha</span></button>
@@ -4948,6 +4956,9 @@ function showPage(name) {
  if (navBtn) {
    navBtn.classList.add('active');
    actualizarLabelNavMobile(navBtn.textContent.trim());
+   // No esconder dónde estás: si la vista activa cae en un grupo colapsado, ábrelo.
+   const grp = navBtn.closest('.nav-group');
+   if (grp) grp.classList.remove('collapsed');
  }
  cerrarNavMobile();
  loadPage(name);
@@ -9023,6 +9034,22 @@ function _khNavSync(name) {
     g.style.display = algunoVisible ? '' : 'none';
   });
 }
+
+// Colapsar/expandir un grupo del nav por su título. Persiste en localStorage por
+// texto del título. Solo la CLASE 'collapsed' (los botones se ocultan por CSS),
+// nunca el style.display individual → no rompe el gating por rol.
+function toggleNavGroup(titleEl) {
+  const group = titleEl.parentElement;
+  const colapsado = group.classList.toggle('collapsed');
+  try { localStorage.setItem('navcol:' + titleEl.textContent.trim(), colapsado ? '1' : '0'); } catch (e) {}
+}
+
+// Restaura el estado colapsado guardado (solo los títulos colapsables llevan onclick).
+(function restoreNavGroups() {
+  document.querySelectorAll('#kh-sidebar .nav-group-title[onclick]').forEach(t => {
+    try { if (localStorage.getItem('navcol:' + t.textContent.trim()) === '1') t.parentElement.classList.add('collapsed'); } catch (e) {}
+  });
+})();
 
 // En móvil, cualquier click dentro del sidebar (pestaña o herramienta) cierra el drawer.
 (function wireSidebarDrawer() {

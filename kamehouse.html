@@ -3011,7 +3011,7 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
      </div>
      <div style="font-size:11px;color:var(--ts);margin-top:4px">Incluye la ciudad en el venue (ej. "Auditorio Telmex, Guadalajara") para que el sitio la ubique bien.</div>
     </div>
-    <div class="form-group">
+    <div class="form-group" id="esf-grp-music">
      <label>Música (Deezer)</label>
      <div style="display:flex;gap:8px">
       <input class="cot-input" id="esf-music" placeholder="track ID (ej. 2893837431)" style="flex:1">
@@ -3021,7 +3021,7 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
      <div id="esf-music-chosen" style="font-size:11px;color:var(--green);margin-top:4px"></div>
      <div id="esf-music-results" style="margin-top:8px"></div>
     </div>
-    <div class="form-group">
+    <div class="form-group" id="esf-grp-zonas">
      <label>Zonas y precios</label>
      <div id="esf-zonas"></div>
      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
@@ -3031,7 +3031,7 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
      <div id="esf-venue-cat-msg" style="font-size:11px;margin-top:4px"></div>
      <div style="font-size:11px;color:var(--ts);margin-top:4px">El precio CHEAP es opcional. Si ninguna zona tiene CHEAP, el evento solo ofrece paquete PLUS.</div>
     </div>
-    <div class="form-group">
+    <div class="form-group" id="esf-grp-hotel">
      <label>Hotel</label>
      <label style="display:flex;align-items:center;gap:8px;font-size:12px;cursor:pointer">
       <input type="checkbox" id="esf-hotel-custom" onchange="_esfHotelToggle()"> Personalizar hotel de este evento
@@ -13275,6 +13275,12 @@ function _esfToggleFestival() {
   const on = !!document.getElementById('esf-es-festival')?.checked;
   const box = document.getElementById('esf-festival-box');
   if (box) box.style.display = on ? '' : 'none';
+  // R1: en festival, ocultar los grupos de CONCIERTO (música/zonas/hotel) — el
+  // festival los tiene en sus paquetes. '' = display natural del form-group.
+  ['esf-grp-music', 'esf-grp-zonas', 'esf-grp-hotel'].forEach((id) => {
+    const g = document.getElementById(id);
+    if (g) g.style.display = on ? 'none' : '';
+  });
 }
 
 // Elegir tipo "Festival" enciende el interruptor (y muestra el box). Elegir otro

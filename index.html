@@ -3523,8 +3523,13 @@ function selPaquete(btn,pkg){
       // CHEAP uses cheapZonas price
       var cz=mf.cheapZonas[selBoleto];
       selZ={n:cz.n,p:cz.p};
+    } else if((pkg==='plus'||pkg==='stay')&&selBoleto&&mf&&mf.zonas&&mf.zonas[selBoleto]){
+      // PLUS/STAY: re-derivar la zona desde el boleto elegido. selPaquete()
+      // limpió selZ al entrar (línea selZ=null), así que hay que restaurarlo
+      // aquí o calcular() sale en `if(hasZona&&!selZ)return;` y nunca da el costo.
+      var bz=mf.zonas[selBoleto];
+      selZ={n:bz.n,p:bz.p};
     }
-    // selZ already set by selBoletoBtn for plus/stay
     $$('w-zona-card').style.display='none';
     $$('w-transport-card').style.display='none';
     if(hasHotel){

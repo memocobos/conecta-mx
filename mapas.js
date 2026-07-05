@@ -50,5 +50,6 @@ window.MAPAS={
   'straykids':'mapas/straykids.webp',
   'louistomlinson':'mapas/louistomlinson.webp',
   'juniorh':'mapas/juniorh.webp',
-  'armado':'mapas/armado.png'
+  'armado':'mapas/armado.png',
+  'soyluna':'mapas/soylunamapa.jpg'
 };

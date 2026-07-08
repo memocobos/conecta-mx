@@ -3522,6 +3522,14 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
          <div id="rsi-origenes" class="rdr-bars"><div class="rdr-empty">Cargando…</div></div>
        </div>
      </div>
+     <!-- // VENTAS VS TRÁFICO -->
+     <div class="rdr-card" style="margin-top:14px">
+       <div class="rdr-card-head">
+         <div class="rdr-card-title"><span class="ico">⇄</span>Ventas vs tráfico</div>
+         <div class="rdr-card-meta">Visitas (sesiones únicas) × solicitudes por evento</div>
+       </div>
+       <div id="rsi-ventas-trafico" style="overflow-x:auto"><div class="rdr-empty">Cargando…</div></div>
+     </div>
    </section>
 
    <!-- ═══════════ SUB-PESTAÑA: /Rol ═══════════ -->
@@ -4863,6 +4871,8 @@ const khRadar = {
   mainMetrics(since, until) { return this._call({ accion: 'main_metrics', since, until: until || undefined }).then(j => j.metricas); },
   // fetch({ table, select?, since, until? }) → array de filas (paginado server-side)
   fetch(opts) { return this._call(Object.assign({ accion: 'fetch' }, opts || {})).then(j => j.rows || []); },
+  // ventasTrafico({ since, until? }) → [{ evento_id, evento_nombre, visitas, ventas, conv }]
+  ventasTrafico(opts) { return this._call(Object.assign({ accion: 'ventas_trafico' }, opts || {})).then(j => j.rows || []); },
   alertasListar() { return this._call({ accion: 'alertas_listar' }).then(j => j.rows || []); },
   alertasNoVistas() { return this._call({ accion: 'alertas_no_vistas' }).then(j => j.rows || []); },
   alertaVista(id) { return this._call({ accion: 'alerta_vista', id }); },
@@ -12720,6 +12730,12 @@ async function confirmarPosponer(slug) {
     if (d.pagos_fallidos > 0 || d.pagos_error) {
       extra += ' ⚠️ Algunas fechas de pago no se pudieron recorrer — revísalas en el Portal.';
     }
+    if (d.correos_enviados > 0) {
+      extra += ` 📧 Se avisó a ${d.correos_enviados} viajero${d.correos_enviados === 1 ? '' : 's'} por correo.`;
+    }
+    if (d.correos_fallidos > 0 || d.correos_error) {
+      extra += ' ⚠️ Algunos correos no salieron.';
+    }
     if (alertEl) alertEl.innerHTML = `<div class="alert alert-success">✅ Pospuesto de ${_esfEsc(d.fecha_anterior)} a ${_esfEsc(d.fecha_nueva)}. ${_esfEsc(d.recordatorio || '')}${_esfEsc(extra)}</div>`;
     setTimeout(() => { closeModal('modal-posponer'); loadEsferasEventos(); }, 1800);
   } catch (e) {
@@ -17308,6 +17324,41 @@ async function loadRadarSitio(){
         const pct = n/oTotal*100;
         return `<div class="row"><span class="k">${_radarEsc(k)}</span><div class="t"><div class="f" style="width:${pct.toFixed(1)}%"></div></div><span class="p">${pct.toFixed(1)}%</span></div>`;
       }).join('');
+
+  // Ventas vs tráfico — cruce KH visitas × Portal ventas por evento. Mismo
+  // since/until (rango) que el resto de la pestaña. Falla suave (su propia card).
+  const vtEl = document.getElementById('rsi-ventas-trafico');
+  if (vtEl) {
+    try {
+      const vt = await khRadar.ventasTrafico({ since: _radarSinceISO() });
+      vtEl.innerHTML = (!vt.length)
+        ? '<div class="rdr-empty">Sin datos en el rango</div>'
+        : `<table style="width:100%;border-collapse:collapse;font-size:12px;min-width:420px">
+             <thead><tr style="text-align:left;color:var(--ts);font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.1em;text-transform:uppercase">
+               <th style="padding:6px 8px">Evento</th>
+               <th style="padding:6px 8px;text-align:right">Visitas</th>
+               <th style="padding:6px 8px;text-align:right">Ventas</th>
+               <th style="padding:6px 8px;text-align:right">Conversión</th>
+             </tr></thead>
+             <tbody>${vt.map(r => {
+               const visitas = Number(r.visitas) || 0;
+               const ventas  = Number(r.ventas) || 0;
+               const convPct = (r.conv == null) ? '—' : (r.conv * 100).toFixed(1) + '%';
+               const alerta  = (visitas >= 50 && ventas === 0);   // mucho ojo: tráfico sin venta
+               const buena   = (r.conv != null && r.conv >= 0.03); // conversión sana
+               const convColor = buena ? 'var(--gold)' : (alerta ? 'var(--red)' : 'inherit');
+               return `<tr style="border-top:1px solid var(--rdr-border)${alerta ? ';color:var(--red)' : ''}">
+                 <td style="padding:6px 8px">${_esfEsc(r.evento_nombre)}</td>
+                 <td style="padding:6px 8px;text-align:right">${visitas.toLocaleString('es-MX')}</td>
+                 <td style="padding:6px 8px;text-align:right">${ventas.toLocaleString('es-MX')}</td>
+                 <td style="padding:6px 8px;text-align:right;font-weight:700;color:${convColor}">${_esfEsc(convPct)}</td>
+               </tr>`;
+             }).join('')}</tbody>
+           </table>`;
+    } catch (e) {
+      vtEl.innerHTML = `<div class="rdr-empty">No se pudo cargar: ${_esfEsc(e.message)}</div>`;
+    }
+  }
 }
 
 // ── /PAGOS ─────────────────────────────────────────────────

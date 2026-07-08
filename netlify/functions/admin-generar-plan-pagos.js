@@ -30,6 +30,12 @@ const { verifyAdminAuth, corsCheck } = require('./_lib/verify-admin');
 const ESTADO_PAGO_INICIAL = 'pendiente';
 const MAX_PAGOS = 20; // separo + hasta ~10 quincenas; 20 es tope defensivo holgado
 
+// Correo de bienvenida al cliente (mismo patrón que portal-recordatorios-diario).
+// Si falta la key NO se trona la generación del plan: se reporta correo_error.
+const RESEND_KEY = process.env.RESEND_API_KEY || process.env.RESEND_KEY;
+// Remitente de cara al CLIENTE (no el interno del equipo).
+const RESEND_FROM = process.env.RESEND_FROM_COBRANZA || 'Conecta Reynosa <admin@conectareynosa.mx>';
+
 exports.handler = async (event) => {
   const __origin = corsCheck(event);
   const headers = {
@@ -105,7 +111,7 @@ exports.handler = async (event) => {
 
   try {
     // 1. Traer la solicitud para obtener cliente_id y auth_user_id.
-    const solUrl = `${env.PORTAL_SB_URL}/rest/v1/solicitudes_tour?id=eq.${solicitudId}&select=id,cliente_id,auth_user_id`;
+    const solUrl = `${env.PORTAL_SB_URL}/rest/v1/solicitudes_tour?id=eq.${solicitudId}&select=id,cliente_id,auth_user_id,evento_nombre`;
     const solR = await fetch(solUrl, { headers: sbHeaders });
     if (!solR.ok) {
       const detail = await solR.text();
@@ -160,10 +166,48 @@ exports.handler = async (event) => {
       return { statusCode: 502, headers, body: JSON.stringify({ error: 'Supabase rechazó la inserción del plan', detail }) };
     }
     const insertados = await insR.json();
+
+    // 4. Correo de bienvenida al cliente con su plan completo (solo en la
+    //    primera generación — ya_existia:false). Best-effort: un fallo aquí NO
+    //    revierte el plan, solo se reporta.
+    const correoInfo = {};
+    if (!RESEND_KEY) {
+      correoInfo.correo_error = 'Resend no configurado';
+    } else {
+      try {
+        const cliR = await fetch(
+          `${env.PORTAL_SB_URL}/rest/v1/clientes?id=eq.${encodeURIComponent(solicitud.cliente_id)}&select=nombre_completo,correo`,
+          { headers: sbHeaders }
+        );
+        if (!cliR.ok) throw new Error('clientes: ' + await cliR.text());
+        const cliArr = await cliR.json();
+        const cli = Array.isArray(cliArr) ? (cliArr[0] || {}) : {};
+        const correo = (cli.correo && typeof cli.correo === 'string') ? cli.correo.trim() : '';
+        if (!correo || !correo.includes('@')) {
+          correoInfo.correo_enviado = false; // cliente sin correo válido
+        } else {
+          const nombre = String(cli.nombre_completo || 'cliente').trim().split(/\s+/)[0] || 'cliente';
+          const eventoNombre = solicitud.evento_nombre || 'tu evento';
+          const asunto = `🎫 Tu plan de pagos — ${eventoNombre}`;
+          const html = planHtml(nombre, eventoNombre, insertados);
+          const r = await fetch('https://api.resend.com/emails', {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${RESEND_KEY}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ from: RESEND_FROM, to: correo, subject: asunto, html }),
+          });
+          correoInfo.correo_enviado = !!(r && r.ok);
+          if (!(r && r.ok)) correoInfo.correo_error = 'Resend rechazó el envío';
+        }
+      } catch (e) {
+        correoInfo.correo_enviado = false;
+        correoInfo.correo_error = e.message;
+      }
+    }
+
     return {
       statusCode: 200,
       headers,
-      body: JSON.stringify({ ok: true, ya_existia: false, pagos: insertados, admin: { id: auth.user.id, correo: auth.user.correo } }),
+      body: JSON.stringify({ ok: true, ya_existia: false, pagos: insertados, admin: { id: auth.user.id, correo: auth.user.correo }, ...correoInfo }),
     };
   } catch (e) {
     return { statusCode: 502, headers, body: JSON.stringify({ error: 'Error generando plan de pagos', detail: e.message }) };
@@ -179,4 +223,63 @@ function readEnv() {
     return { error: 'Faltan env vars (PORTAL_SUPABASE_URL/SERVICE_KEY)' };
   }
   return { PORTAL_SB_URL, PORTAL_SB_SERVICE };
+}
+
+function escapeHtml(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+// "$1,234 MXN" — mismo formato que los correos de cobranza.
+function fmtMxn(n) {
+  return '$' + Math.round(Number(n) || 0).toLocaleString('es-MX') + ' MXN';
+}
+
+// Envoltura HTML negra estilo Conecta MX (molde de portal-recordatorios-diario).
+function wrapHtml(nombre, cuerpoHtml) {
+  return `<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#000;font-family:Helvetica,Arial,sans-serif;color:#fff">
+  <div style="max-width:520px;margin:0 auto;padding:32px 24px">
+    <div style="font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:rgba(255,255,255,.55);margin-bottom:18px">
+      <span style="color:#ff283b;font-weight:900">Conecta</span> <span style="font-style:italic;font-weight:900">MX</span>
+    </div>
+    <p style="font-size:16px;line-height:1.6;margin:0 0 16px 0">Hola <strong>${escapeHtml(nombre)}</strong>,</p>
+    <div style="font-size:15px;line-height:1.65;color:rgba(255,255,255,.88)">${cuerpoHtml}</div>
+    <p style="font-size:13px;line-height:1.6;color:rgba(255,255,255,.55);margin:28px 0 0 0;border-top:1px solid rgba(255,255,255,.1);padding-top:16px">— Equipo Conecta Reynosa</p>
+  </div>
+</body></html>`;
+}
+
+// Correo de bienvenida con el plan completo (todas las filas insertadas).
+function planHtml(nombre, eventoNombre, pagos) {
+  const rows = [...(Array.isArray(pagos) ? pagos : [])].sort((a, b) => (a.numero_pago || 0) - (b.numero_pago || 0));
+  const total = rows.reduce((s, p) => s + (Number(p.monto) || 0), 0);
+  const filas = rows.map((p) => {
+    const abono = escapeHtml(p.concepto || ('Abono ' + p.numero_pago));
+    const monto = escapeHtml(fmtMxn(p.monto));
+    const fecha = escapeHtml(String(p.fecha_esperada || '').slice(0, 10));
+    return `<tr>
+      <td style="padding:8px 10px;border-bottom:1px solid rgba(255,255,255,.1)">${abono}</td>
+      <td style="padding:8px 10px;border-bottom:1px solid rgba(255,255,255,.1);text-align:right;white-space:nowrap">${monto}</td>
+      <td style="padding:8px 10px;border-bottom:1px solid rgba(255,255,255,.1);text-align:right;white-space:nowrap">${fecha}</td>
+    </tr>`;
+  }).join('');
+  const cuerpo = `<p style="margin:0 0 14px 0">¡Tu lugar para <strong>${escapeHtml(eventoNombre)}</strong> quedó apartado! Este es tu plan de pagos:</p>
+  <table style="width:100%;border-collapse:collapse;font-size:14px;margin:0 0 16px 0">
+    <thead><tr style="color:rgba(255,255,255,.55);font-size:12px;text-transform:uppercase;letter-spacing:.08em">
+      <th style="padding:8px 10px;text-align:left;border-bottom:1px solid rgba(255,255,255,.2)">Abono</th>
+      <th style="padding:8px 10px;text-align:right;border-bottom:1px solid rgba(255,255,255,.2)">Monto</th>
+      <th style="padding:8px 10px;text-align:right;border-bottom:1px solid rgba(255,255,255,.2)">Fecha límite</th>
+    </tr></thead>
+    <tbody>${filas}</tbody>
+    <tfoot><tr>
+      <td style="padding:10px;font-weight:900">Total</td>
+      <td style="padding:10px;text-align:right;font-weight:900;color:#e8ff4c;white-space:nowrap">${escapeHtml(fmtMxn(total))}</td>
+      <td></td>
+    </tr></tfoot>
+  </table>
+  <p style="margin:0 0 14px 0;font-size:13px;color:rgba(255,255,255,.7)">Cada abono debe cubrirse a más tardar en su fecha límite. Recuerda que los pagos no son reembolsables salvo cancelación total del evento.</p>
+  <p style="margin:0">Cualquier duda, respóndenos por WhatsApp. — Conecta Reynosa</p>`;
+  return wrapHtml(nombre, cuerpo);
 }

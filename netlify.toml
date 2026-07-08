@@ -83,3 +83,10 @@
 # DIAS_ANTES días. 15:00 UTC = 9:00 AM hora México.
 [functions."recordatorio-eventos-diario"]
   schedule = "0 15 * * *"
+
+# "Tu abono vence HOY" del PORTAL — DIARIO. Avisa a clientes con un pago pendiente
+# cuya fecha_esperada = hoy (hora MX). Cierra la escalera de cobranza (apertura 9/24
+# → vence hoy → morosidad 17/2). Solo notifica; NO cambia estados. Salta cancelados
+# y a quien ya tiene pagos vencidos (los cubre morosidad). 14:00 UTC = 8:00 AM MX.
+[functions."vence-hoy-diario"]
+  schedule = "0 14 * * *"

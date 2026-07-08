@@ -31,6 +31,11 @@ const { verifyAdminAuth, corsCheck } = require('./_lib/verify-admin');
 
 const ROLES_RADAR = ['maestro_roshi']; // PERMISOS_TABS: el Radar es solo de maestro_roshi.
 
+// Portal (solicitudes_tour) — solo lo usa la acción 'ventas_trafico'. Si falta,
+// esa acción da 500; las demás (KH-only) NO se ven afectadas.
+const PORTAL_URL = process.env.PORTAL_SUPABASE_URL;
+const PORTAL_KEY = process.env.PORTAL_SUPABASE_SERVICE_KEY;
+
 const RADAR_TABLES = ['main_eventos_uso', 'pagos_eventos_uso', 'rol_eventos_uso', 'eventos_waitlist'];
 const SELECT_RE = /^[a-zA-Z0-9_,]+$/;            // lista de columnas PostgREST
 const ISO_RE = /^\d{4}-\d{2}-\d{2}[T0-9:.Z+\-]*$/; // timestamptz ISO (since/until)
@@ -41,6 +46,7 @@ const ACCIONES = {
   metricas: ROLES_RADAR,
   main_metrics: ROLES_RADAR,
   fetch: ROLES_RADAR,
+  ventas_trafico: ROLES_RADAR,
   alertas_listar: ROLES_RADAR,
   alertas_no_vistas: ROLES_RADAR,
   alerta_vista: ROLES_RADAR,
@@ -49,6 +55,7 @@ const ACCIONES = {
 
 const PAGE_SIZE = 5000;
 const MAX_ROWS = 100000;
+const VT_CHUNK = 1000; // ventas_trafico: chunk de paginación (Range/Content-Range)
 
 exports.handler = async (event) => {
   const __origin = corsCheck(event);
@@ -244,6 +251,87 @@ exports.handler = async (event) => {
       return { statusCode: 200, headers, body: JSON.stringify({ ok: true }) };
     }
 
+    // ── ventas_trafico (cruce KH visitas × Portal ventas por evento) ─────────
+    if (accion === 'ventas_trafico') {
+      if (!PORTAL_URL || !PORTAL_KEY) {
+        return { statusCode: 500, headers, body: JSON.stringify({ error: 'Faltan env vars Portal (PORTAL_SUPABASE_URL/PORTAL_SUPABASE_SERVICE_KEY)' }) };
+      }
+      const since = String(body.since || '').trim();
+      if (!ISO_RE.test(since)) {
+        return { statusCode: 400, headers, body: JSON.stringify({ error: 'since inválido (ISO)' }) };
+      }
+      let until = '';
+      if (body.until != null && body.until !== '') {
+        until = String(body.until).trim();
+        if (!ISO_RE.test(until)) {
+          return { statusCode: 400, headers, body: JSON.stringify({ error: 'until inválido (ISO)' }) };
+        }
+      }
+
+      // a. KH: visitas del sitio (main_eventos_uso). Sesiones únicas por evento.
+      let khQs = 'select=evento_id,evento_nombre,session_id';
+      khQs += `&created_at=gte.${encodeURIComponent(since)}`;
+      if (until) khQs += `&created_at=lt.${encodeURIComponent(until)}`;
+      khQs += '&order=created_at.desc';
+      let usoRows;
+      try {
+        usoRows = await readAllPaged(`${restBase}/main_eventos_uso?${khQs}`, sbHeaders, VT_CHUNK);
+      } catch (e) {
+        return { statusCode: 502, headers, body: JSON.stringify({ error: 'KH rechazó la consulta de visitas', detail: e.message }) };
+      }
+      const visMap = new Map(); // evento_id → { nombre, sesiones:Set }
+      for (const row of usoRows) {
+        const id = row && row.evento_id;
+        if (!id) continue; // ignorar filas sin evento_id
+        let e = visMap.get(id);
+        if (!e) { e = { nombre: null, sesiones: new Set() }; visMap.set(id, e); }
+        if (row.evento_nombre) e.nombre = row.evento_nombre; // el último visto
+        if (row.session_id != null) e.sesiones.add(row.session_id);
+      }
+
+      // b. Portal: ventas (solicitudes_tour no canceladas). Conteo por evento.
+      const portalHeaders = { apikey: PORTAL_KEY, Authorization: `Bearer ${PORTAL_KEY}`, 'Content-Type': 'application/json' };
+      let ptQs = 'select=evento_id,evento_nombre';
+      ptQs += `&created_at=gte.${encodeURIComponent(since)}`;
+      if (until) ptQs += `&created_at=lt.${encodeURIComponent(until)}`;
+      ptQs += '&estado=neq.cancelado&order=created_at.desc';
+      let solRows;
+      try {
+        solRows = await readAllPaged(`${PORTAL_URL}/rest/v1/solicitudes_tour?${ptQs}`, portalHeaders, VT_CHUNK);
+      } catch (e) {
+        return { statusCode: 502, headers, body: JSON.stringify({ error: 'Portal rechazó la consulta de ventas', detail: e.message }) };
+      }
+      const ventMap = new Map(); // evento_id → { nombre, count }
+      for (const row of solRows) {
+        const id = row && row.evento_id;
+        if (!id) continue;
+        let e = ventMap.get(id);
+        if (!e) { e = { nombre: null, count: 0 }; ventMap.set(id, e); }
+        e.count++;
+        if (row.evento_nombre) e.nombre = row.evento_nombre;
+      }
+
+      // c. Merge por slug (unión de ambos lados).
+      const ids = new Set([...visMap.keys(), ...ventMap.keys()]);
+      const rows = [];
+      for (const id of ids) {
+        const v = visMap.get(id);
+        const s = ventMap.get(id);
+        const visitas = v ? v.sesiones.size : 0;
+        const ventas = s ? s.count : 0;
+        const nombre = (v && v.nombre) || (s && s.nombre) || id;
+        rows.push({
+          evento_id: id,
+          evento_nombre: nombre,
+          visitas,
+          ventas,
+          conv: visitas > 0 ? ventas / visitas : null,
+        });
+      }
+      rows.sort((a, b) => b.visitas - a.visitas);
+      return { statusCode: 200, headers, body: JSON.stringify({ ok: true, rows }) };
+    }
+
     return { statusCode: 400, headers, body: JSON.stringify({ error: 'accion inválida' }) };
   } catch (e) {
     return { statusCode: 502, headers, body: JSON.stringify({ error: 'Error en admin-radar', detail: e.message }) };
@@ -261,4 +349,30 @@ function readEnv() {
     return { error: 'Faltan env vars KH (SUPABASE_URL_KAMEHOUSE/SERVICE_KEY_KAMEHOUSE)' };
   }
   return { KH_SB_URL, KH_SB_SERVICE };
+}
+
+// Lectura paginada por Range/Content-Range (mismo patrón que la acción 'fetch').
+// Lanza en el primer fallo de la primera página; después de eso corta y devuelve
+// lo acumulado. `url` ya trae el query string; `chunk` = tamaño de página.
+async function readAllPaged(url, hdrs, chunk) {
+  const all = [];
+  let off = 0;
+  while (off < MAX_ROWS) {
+    const resp = await fetch(url, {
+      headers: { ...hdrs, 'Range-Unit': 'items', Range: off + '-' + (off + chunk - 1), Prefer: 'count=exact' },
+    });
+    if (!resp.ok) {
+      if (resp.status === 416) break; // offset fuera del total → fin
+      if (off === 0 && all.length === 0) throw new Error(await resp.text());
+      break;
+    }
+    const rows = await resp.json();
+    if (!Array.isArray(rows) || rows.length === 0) break;
+    all.push(...rows);
+    const cr = resp.headers.get('content-range') || '';
+    const total = parseInt((cr.split('/')[1] || '0'), 10);
+    if (Number.isFinite(total) && total > 0 && all.length >= total) break;
+    off += rows.length;
+  }
+  return all;
 }

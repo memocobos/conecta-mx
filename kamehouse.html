@@ -10200,7 +10200,10 @@ async function guardarViajero() {
     if (!rp.ok) throw new Error(dataP.error || 'Falló la generación del plan de pagos');
 
     closeModal('modal-viajero');
-    showToast('Viajero dado de alta con su plan de pagos', 'success');
+    let extraCorreo = '';
+    if (dataP.correo_enviado) extraCorreo = ' 📧 Plan enviado al cliente por correo.';
+    else if (dataP.correo_error || dataP.correo_enviado === false) extraCorreo = ' ⚠️ El plan se creó pero el correo no salió.';
+    showToast('Viajero dado de alta con su plan de pagos.' + extraCorreo, 'success');
     await loadViajeros();
   } catch(e) {
     if (solicitudId) {
@@ -11616,7 +11619,10 @@ async function guardarCambioEstadoSP(solicitudId) {
       if (dataP.ya_existia) {
         showToast('El plan de pagos ya existía — no se duplicó', 'success');
       } else {
-        showToast('Plan de pagos generado (' + (dataP.pagos || []).length + ' pagos)', 'success');
+        let extraCorreo = '';
+        if (dataP.correo_enviado) extraCorreo = ' 📧 Plan enviado al cliente por correo.';
+        else if (dataP.correo_error || dataP.correo_enviado === false) extraCorreo = ' ⚠️ El plan se creó pero el correo no salió.';
+        showToast('Plan de pagos generado (' + (dataP.pagos || []).length + ' pagos).' + extraCorreo, 'success');
       }
       if (btn) btn.textContent = 'Guardando…';
     }

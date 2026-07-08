@@ -27,6 +27,9 @@ const SB_KEY = process.env.SUPABASE_SERVICE_KEY_KAMEHOUSE;
 const PORTAL_URL = process.env.PORTAL_SUPABASE_URL;
 const PORTAL_KEY = process.env.PORTAL_SUPABASE_SERVICE_KEY;
 
+// Resend (aviso a viajeros — Fase 2b). Si falta NO se trona la posposición.
+const RESEND_KEY = process.env.RESEND_API_KEY || process.env.RESEND_KEY;
+
 const FECHA_RE = /^\d{4}-\d{2}-\d{2}$/;
 const MS_DIA = 86400000;
 
@@ -137,19 +140,23 @@ exports.handler = async (event) => {
       (Date.parse(fechaNueva + 'T00:00:00Z') - Date.parse(String(fechaAnterior).slice(0, 10) + 'T00:00:00Z')) / MS_DIA
     );
     const pagosInfo = { pagos_recorridos: 0, pagos_fallidos: 0, delta_dias: deltaDias };
+    // Solicitudes no canceladas del evento; se consultan aquí (2a) y se reusan
+    // en el bloque de correos (2b). null = todavía no se consultaron.
+    let solicitudRows = null;
 
     if (deltaDias !== 0) {
       try {
         const portalHeaders = { apikey: PORTAL_KEY, Authorization: `Bearer ${PORTAL_KEY}`, 'Content-Type': 'application/json' };
 
-        // a. Solicitudes NO canceladas del evento.
+        // a. Solicitudes NO canceladas del evento (cliente_id para el aviso 2b).
         const solRes = await fetch(
-          `${PORTAL_URL}/rest/v1/solicitudes_tour?evento_id=eq.${encodeURIComponent(slug)}&estado=neq.cancelado&select=id`,
+          `${PORTAL_URL}/rest/v1/solicitudes_tour?evento_id=eq.${encodeURIComponent(slug)}&estado=neq.cancelado&select=id,cliente_id`,
           { headers: portalHeaders }
         );
         if (!solRes.ok) throw new Error('solicitudes: ' + await solRes.text());
         const solRows = await solRes.json();
-        const solicitudIds = [...new Set((Array.isArray(solRows) ? solRows : []).map(s => s && s.id).filter(Boolean))];
+        solicitudRows = Array.isArray(solRows) ? solRows : [];
+        const solicitudIds = [...new Set(solicitudRows.map(s => s && s.id).filter(Boolean))];
 
         if (solicitudIds.length) {
           // b. Pagos pendientes (estado ≠ 'pagado') con fecha esperada.
@@ -183,7 +190,69 @@ exports.handler = async (event) => {
       }
     }
 
-    // 6. Listo. El evento NO se republica aquí (lo hace el admin desde Esferas).
+    // 6. Avisar por correo a los viajeros (Fase 2b). AUTOMÁTICO y best-effort:
+    //    un fallo aquí NO revierte la posposición ni el recorrido de pagos.
+    const correosInfo = { correos_enviados: 0, correos_fallidos: 0 };
+    if (!RESEND_KEY) {
+      correosInfo.correos_error = 'Resend no configurado';
+    } else {
+      try {
+        const portalHeaders = { apikey: PORTAL_KEY, Authorization: `Bearer ${PORTAL_KEY}`, 'Content-Type': 'application/json' };
+
+        // a. Solicitudes no canceladas: reusar las de la 2a; si no se consultaron
+        //    (deltaDias === 0), consultarlas aquí.
+        if (solicitudRows === null) {
+          const solRes2 = await fetch(
+            `${PORTAL_URL}/rest/v1/solicitudes_tour?evento_id=eq.${encodeURIComponent(slug)}&estado=neq.cancelado&select=id,cliente_id`,
+            { headers: portalHeaders }
+          );
+          if (!solRes2.ok) throw new Error('solicitudes: ' + await solRes2.text());
+          const solRows2 = await solRes2.json();
+          solicitudRows = Array.isArray(solRows2) ? solRows2 : [];
+        }
+
+        const clienteIds = [...new Set(solicitudRows.map(s => s && s.cliente_id).filter(Boolean))];
+        if (clienteIds.length) {
+          // b. Datos de los clientes (Portal, service_role).
+          const cliRes = await fetch(
+            `${PORTAL_URL}/rest/v1/clientes?id=in.(${clienteIds.join(',')})&select=id,nombre_completo,correo`,
+            { headers: portalHeaders }
+          );
+          if (!cliRes.ok) throw new Error('clientes: ' + await cliRes.text());
+          const cliRows = await cliRes.json();
+
+          // c. Dedup por correo (trim/lower, exigir '@').
+          const vistos = new Set();
+          const destinatarios = [];
+          for (const c of (Array.isArray(cliRows) ? cliRows : [])) {
+            const correo = (c && typeof c.correo === 'string') ? c.correo.trim().toLowerCase() : '';
+            if (!correo || !correo.includes('@') || vistos.has(correo)) continue;
+            vistos.add(correo);
+            destinatarios.push({ correo, nombre: c.nombre_completo });
+          }
+
+          // d. Enviar con Resend (allSettled; escapeHtml en todo dato del HTML).
+          const subject = `📅 Cambio de fecha: ${ev.nombre}`;
+          const resultados = await Promise.allSettled(destinatarios.map(d => {
+            const html = posponerHtml(d.nombre, ev.nombre, fechaAnterior, fechaNueva, pagosInfo.pagos_recorridos > 0);
+            return fetch('https://api.resend.com/emails', {
+              method: 'POST',
+              headers: { Authorization: `Bearer ${RESEND_KEY}`, 'Content-Type': 'application/json' },
+              body: JSON.stringify({ from: 'Conecta Reynosa <admin@conectareynosa.mx>', to: [d.correo], subject, html }),
+            });
+          }));
+          for (const r of resultados) {
+            if (r.status === 'fulfilled' && r.value && r.value.ok) correosInfo.correos_enviados++;
+            else correosInfo.correos_fallidos++;
+          }
+        }
+      } catch (e) {
+        // El bloque de correos truena completo: la posposición sigue siendo exitosa.
+        correosInfo.correos_error = e.message;
+      }
+    }
+
+    // 7. Listo. El evento NO se republica aquí (lo hace el admin desde Esferas).
     return {
       statusCode: 200,
       headers,
@@ -194,9 +263,45 @@ exports.handler = async (event) => {
         fecha_nueva: fechaNueva,
         recordatorio: 'Republica el evento desde Esferas para que el sitio muestre la nueva fecha',
         ...pagosInfo,
+        ...correosInfo,
       }),
     };
   } catch (e) {
     return { statusCode: 502, headers, body: JSON.stringify({ error: 'Error escribiendo a Supabase', detail: e.message }) };
   }
 };
+
+// ----- helpers -----
+
+function escapeHtml(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+// Correo de aviso de cambio de fecha (molde de admin-avisar-cancelacion).
+function posponerHtml(nombre, eventoNombre, fechaAnterior, fechaNueva, pagosRecorridos) {
+  const nom = escapeHtml(nombre || 'viajero');
+  const ev = escapeHtml(eventoNombre);
+  const fa = escapeHtml(fechaAnterior);
+  const fn = escapeHtml(fechaNueva);
+  const pagosLinea = pagosRecorridos
+    ? `<p style="margin:0 0 14px 0">Tus fechas de pago pendientes se recorrieron los mismos días; las verás actualizadas en tu portal.</p>`
+    : '';
+  return `<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#000;font-family:Helvetica,Arial,sans-serif;color:#fff">
+  <div style="max-width:520px;margin:0 auto;padding:32px 24px">
+    <div style="font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:rgba(255,255,255,.55);margin-bottom:18px">
+      <span style="color:#ff283b;font-weight:900">Conecta</span> <span style="font-style:italic;font-weight:900">MX</span>
+    </div>
+    <p style="font-size:16px;line-height:1.6;margin:0 0 16px 0">Hola <strong>${nom}</strong>,</p>
+    <div style="font-size:15px;line-height:1.65;color:rgba(255,255,255,.88)">
+      <p style="margin:0 0 14px 0">Tu evento <b style="color:#e8ff4c">${ev}</b> cambió de fecha: antes <b>${fa}</b> &rarr; ahora <b>${fn}</b>.</p>
+      <p style="margin:0 0 14px 0">Tu lugar y todo lo que ya pagaste siguen asegurados; tu paquete queda igual, solo cambia la fecha.</p>
+      ${pagosLinea}
+      <p style="margin:0">Cualquier duda, respóndenos por WhatsApp.</p>
+    </div>
+    <p style="font-size:13px;line-height:1.6;color:rgba(255,255,255,.55);margin:28px 0 0 0;border-top:1px solid rgba(255,255,255,.1);padding-top:16px">— Conecta Reynosa</p>
+  </div>
+</body></html>`;
+}

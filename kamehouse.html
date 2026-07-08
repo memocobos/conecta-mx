@@ -12720,6 +12720,12 @@ async function confirmarPosponer(slug) {
     if (d.pagos_fallidos > 0 || d.pagos_error) {
       extra += ' ⚠️ Algunas fechas de pago no se pudieron recorrer — revísalas en el Portal.';
     }
+    if (d.correos_enviados > 0) {
+      extra += ` 📧 Se avisó a ${d.correos_enviados} viajero${d.correos_enviados === 1 ? '' : 's'} por correo.`;
+    }
+    if (d.correos_fallidos > 0 || d.correos_error) {
+      extra += ' ⚠️ Algunos correos no salieron.';
+    }
     if (alertEl) alertEl.innerHTML = `<div class="alert alert-success">✅ Pospuesto de ${_esfEsc(d.fecha_anterior)} a ${_esfEsc(d.fecha_nueva)}. ${_esfEsc(d.recordatorio || '')}${_esfEsc(extra)}</div>`;
     setTimeout(() => { closeModal('modal-posponer'); loadEsferasEventos(); }, 1800);
   } catch (e) {

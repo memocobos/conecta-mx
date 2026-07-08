@@ -23,7 +23,12 @@ const { verifyAdminAuth, corsCheck } = require('./_lib/verify-admin');
 const SB_URL = 'https://npgnhsmwpcipxgvfxrho.supabase.co';
 const SB_KEY = process.env.SUPABASE_SERVICE_KEY_KAMEHOUSE;
 
+// Portal (solicitudes/pagos) — mismo patrón que admin-cancelar-evento.
+const PORTAL_URL = process.env.PORTAL_SUPABASE_URL;
+const PORTAL_KEY = process.env.PORTAL_SUPABASE_SERVICE_KEY;
+
 const FECHA_RE = /^\d{4}-\d{2}-\d{2}$/;
+const MS_DIA = 86400000;
 
 exports.handler = async (event) => {
   const __origin = corsCheck(event);
@@ -45,6 +50,7 @@ exports.handler = async (event) => {
   if (!auth.valid) return { statusCode: auth.status, headers, body: JSON.stringify({ error: auth.error }) };
 
   if (!SB_KEY) return { statusCode: 500, headers, body: JSON.stringify({ error: 'SUPABASE_SERVICE_KEY_KAMEHOUSE no configurado' }) };
+  if (!PORTAL_URL || !PORTAL_KEY) return { statusCode: 500, headers, body: JSON.stringify({ error: 'Portal Supabase no configurado (PORTAL_SUPABASE_URL / PORTAL_SUPABASE_SERVICE_KEY)' }) };
 
   let body;
   try { body = JSON.parse(event.body || '{}'); }
@@ -124,7 +130,60 @@ exports.handler = async (event) => {
       return { statusCode: 502, headers, body: JSON.stringify({ error: 'No se pudo cambiar la fecha', detail }) };
     }
 
-    // 5. Listo. El evento NO se republica aquí (lo hace el admin desde Esferas).
+    // 5. Recorrer las fechas de pago PENDIENTES el mismo número de días que se
+    //    movió el evento (Opción A). Las pagadas NO se tocan. Best-effort: un
+    //    fallo aquí NO revierte la posposición (ya quedó) — solo se reporta.
+    const deltaDias = Math.round(
+      (Date.parse(fechaNueva + 'T00:00:00Z') - Date.parse(String(fechaAnterior).slice(0, 10) + 'T00:00:00Z')) / MS_DIA
+    );
+    const pagosInfo = { pagos_recorridos: 0, pagos_fallidos: 0, delta_dias: deltaDias };
+
+    if (deltaDias !== 0) {
+      try {
+        const portalHeaders = { apikey: PORTAL_KEY, Authorization: `Bearer ${PORTAL_KEY}`, 'Content-Type': 'application/json' };
+
+        // a. Solicitudes NO canceladas del evento.
+        const solRes = await fetch(
+          `${PORTAL_URL}/rest/v1/solicitudes_tour?evento_id=eq.${encodeURIComponent(slug)}&estado=neq.cancelado&select=id`,
+          { headers: portalHeaders }
+        );
+        if (!solRes.ok) throw new Error('solicitudes: ' + await solRes.text());
+        const solRows = await solRes.json();
+        const solicitudIds = [...new Set((Array.isArray(solRows) ? solRows : []).map(s => s && s.id).filter(Boolean))];
+
+        if (solicitudIds.length) {
+          // b. Pagos pendientes (estado ≠ 'pagado') con fecha esperada.
+          const pagRes = await fetch(
+            `${PORTAL_URL}/rest/v1/pagos?solicitud_id=in.(${solicitudIds.join(',')})&estado=neq.pagado&fecha_esperada=not.is.null&select=id,fecha_esperada`,
+            { headers: portalHeaders }
+          );
+          if (!pagRes.ok) throw new Error('pagos: ' + await pagRes.text());
+          const pagos = await pagRes.json();
+          const lista = Array.isArray(pagos) ? pagos : [];
+
+          // c+d. Recorrer cada fecha_esperada el delta y guardar (allSettled).
+          const patches = await Promise.allSettled(lista.map((p) => {
+            const base = String(p.fecha_esperada).slice(0, 10);
+            const nuevaFecha = new Date(Date.parse(base + 'T00:00:00Z') + deltaDias * MS_DIA).toISOString().slice(0, 10);
+            return fetch(`${PORTAL_URL}/rest/v1/pagos?id=eq.${encodeURIComponent(p.id)}`, {
+              method: 'PATCH',
+              headers: { ...portalHeaders, Prefer: 'return=minimal' },
+              body: JSON.stringify({ fecha_esperada: nuevaFecha }),
+            });
+          }));
+          for (const r of patches) {
+            if (r.status === 'fulfilled' && r.value && r.value.ok) pagosInfo.pagos_recorridos++;
+            else pagosInfo.pagos_fallidos++;
+          }
+        }
+      } catch (e) {
+        // El bloque de pagos truena completo: la posposición sigue siendo exitosa.
+        pagosInfo.pagos_error = true;
+        pagosInfo.pagos_error_detail = e.message;
+      }
+    }
+
+    // 6. Listo. El evento NO se republica aquí (lo hace el admin desde Esferas).
     return {
       statusCode: 200,
       headers,
@@ -134,6 +193,7 @@ exports.handler = async (event) => {
         fecha_anterior: fechaAnterior,
         fecha_nueva: fechaNueva,
         recordatorio: 'Republica el evento desde Esferas para que el sitio muestre la nueva fecha',
+        ...pagosInfo,
       }),
     };
   } catch (e) {

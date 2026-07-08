@@ -12712,7 +12712,15 @@ async function confirmarPosponer(slug) {
       return;
     }
     const d = await r.json();
-    if (alertEl) alertEl.innerHTML = `<div class="alert alert-success">✅ Pospuesto de ${_esfEsc(d.fecha_anterior)} a ${_esfEsc(d.fecha_nueva)}. ${_esfEsc(d.recordatorio || '')}</div>`;
+    let extra = '';
+    if (d.pagos_recorridos > 0) {
+      const signo = (d.delta_dias > 0 ? '+' : '') + d.delta_dias;
+      extra += ` ✅ Se recorrieron ${d.pagos_recorridos} fecha${d.pagos_recorridos === 1 ? '' : 's'} de pago pendiente${d.pagos_recorridos === 1 ? '' : 's'} (${signo} días).`;
+    }
+    if (d.pagos_fallidos > 0 || d.pagos_error) {
+      extra += ' ⚠️ Algunas fechas de pago no se pudieron recorrer — revísalas en el Portal.';
+    }
+    if (alertEl) alertEl.innerHTML = `<div class="alert alert-success">✅ Pospuesto de ${_esfEsc(d.fecha_anterior)} a ${_esfEsc(d.fecha_nueva)}. ${_esfEsc(d.recordatorio || '')}${_esfEsc(extra)}</div>`;
     setTimeout(() => { closeModal('modal-posponer'); loadEsferasEventos(); }, 1800);
   } catch (e) {
     if (alertEl) alertEl.innerHTML = `<div class="alert alert-error">${e.message}</div>`;

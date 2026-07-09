@@ -2434,7 +2434,7 @@ async function renderAcompanantes(t){
   try {
     const res = await supabase
       .from('lugares')
-      .select('id,numero,nombre,correo,fecha_nacimiento,estado,paquete,zona,tipo_habitacion,precio,cliente_id')
+      .select('id,numero,nombre,correo,fecha_nacimiento,estado,paquete,zona,tipo_habitacion,precio,cliente_id,invitacion_enviada_at,invitacion_aceptada_at')
       .eq('solicitud_id', t.id)
       .order('numero', { ascending: true });
     if (res.error) throw res.error;
@@ -2457,6 +2457,8 @@ async function renderAcompanantes(t){
 
   const chip = (txt) => `<span style="display:inline-block;padding:2px 8px;margin:2px 4px 0 0;border-radius:999px;background:var(--field-bg);border:1px solid var(--line);font-size:10px;font-weight:700;letter-spacing:.04em;color:var(--ink-soft)">${escapeHtml(txt)}</span>`;
   const chipMenor = `<span style="display:inline-block;padding:2px 8px;margin:2px 4px 0 0;border-radius:999px;background:rgba(255,184,76,.12);border:1px solid rgba(255,184,76,.5);font-size:10px;font-weight:900;letter-spacing:.06em;color:#ffb84c">MENOR</span>`;
+  const chipInvitado  = `<span style="display:inline-block;padding:2px 8px;margin:2px 4px 0 0;border-radius:999px;background:rgba(0,0,205,.22);border:1px solid rgba(0,0,205,.6);font-size:10px;font-weight:900;letter-spacing:.06em;color:#9aa5ff">INVITADO</span>`;
+  const chipConectado = `<span style="display:inline-block;padding:2px 8px;margin:2px 4px 0 0;border-radius:999px;background:rgba(136,234,78,.14);border:1px solid rgba(136,234,78,.4);font-size:10px;font-weight:900;letter-spacing:.06em;color:var(--green)">CONECTADO ✓</span>`;
 
   const filas = data.map((l) => {
     const editable = l.estado === 'activo' && Number(l.numero) >= 2; // el #1 = titular (su perfil)
@@ -2487,8 +2489,14 @@ async function renderAcompanantes(t){
       ? `<span style="color:var(--ink-mute)">Por registrar</span>`
       : escapeHtml(nombre);
 
+    const tieneCorreo = !!(l.correo && String(l.correo).trim());
+    const aceptada = !!l.invitacion_aceptada_at;
+
     let chips = [l.paquete, l.zona, l.tipo_habitacion].filter(v => v != null && String(v).trim() !== '').map(chip).join('');
     if (_esMenor(l.fecha_nacimiento)) chips += chipMenor; // MENOR además de los chips existentes
+    // Estado de la invitación (la aceptación llega en F2-t2; el chip ya queda listo).
+    if (aceptada) chips += chipConectado;
+    else if (l.invitacion_enviada_at) chips += chipInvitado;
     const precioHtml = (l.precio != null) ? fmtMxn(l.precio) : '';
 
     let etiqueta = '';
@@ -2500,19 +2508,24 @@ async function renderAcompanantes(t){
       etiqueta = `<span style="display:inline-block;margin-left:6px;padding:1px 7px;border-radius:999px;font-size:9px;font-weight:900;letter-spacing:.1em;color:#ffb84c;border:1px solid rgba(255,184,76,.5);background:rgba(255,184,76,.12)">TRASPASADO</span>`;
     }
 
-    const btnHtml = editable
+    const btnEditar = editable
       ? `<button type="button" data-lugar-edit="${escapeHtml(l.id)}" style="padding:4px 12px;border-radius:999px;border:1px solid var(--line-strong);background:var(--field-bg);color:var(--ink);font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap">${tieneNombre ? 'Editar' : 'Registrar'}</button>`
+      : '';
+    // Invitar: solo si es editable, ya tiene nombre + correo, y aún no acepta.
+    const btnInvitar = (editable && tieneNombre && tieneCorreo && !aceptada)
+      ? `<button type="button" data-lugar-invite="${escapeHtml(l.id)}" style="padding:4px 12px;border-radius:999px;border:1px solid var(--line-strong);background:var(--field-bg);color:var(--ink);font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap">${l.invitacion_enviada_at ? 'Reenviar' : '📧 Invitar'}</button>`
       : '';
 
     return `
-      <div class="pago-row">
+      <div class="pago-row" data-lugar-row="${escapeHtml(l.id)}">
         <div class="pago-info">
           <div class="pago-concepto" style="${tachado}">#${escapeHtml(l.numero)} · ${nombreHtml}${etiqueta}</div>
           ${chips ? `<div class="pago-fecha">${chips}</div>` : ''}
         </div>
         <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">
           ${precioHtml ? `<div class="pago-monto">${precioHtml}</div>` : ''}
-          ${btnHtml}
+          ${(btnEditar || btnInvitar) ? `<div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end">${btnEditar}${btnInvitar}</div>` : ''}
+          <div class="inv-err" style="display:none;color:var(--red);font-size:11px;font-weight:700;text-align:right"></div>
         </div>
       </div>`;
   }).join('');
@@ -2578,13 +2591,45 @@ async function _guardarLugar(lugarId, btn){
   }
 }
 
-// Delegación (una sola vez): abrir/cerrar el mini-form y guardar.
+// Invitar acompañante: manda el correo con el link (token) vía Netlify Function.
+// El token NUNCA se muestra en la UI; solo viaja en el correo. Fail-soft en la UI.
+async function _invitarLugar(lugarId, btn){
+  const row = btn.closest('[data-lugar-row]');
+  const errEl = row && row.querySelector('.inv-err');
+  const showErr = (m) => { if (errEl){ errEl.textContent = m; errEl.style.display = 'block'; } };
+  if (errEl){ errEl.style.display = 'none'; errEl.textContent = ''; }
+
+  const prevTxt = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = 'Enviando…';
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    const jwt = session && session.access_token;
+    if (!jwt) throw new Error('Tu sesión expiró, vuelve a entrar.');
+    const r = await fetch('/.netlify/functions/portal-lugar-invitar', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + jwt },
+      body: JSON.stringify({ lugar_id: lugarId }),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || j.ok === false) throw new Error(j.error || ('Error ' + r.status));
+    if (_tourActual) renderAcompanantes(_tourActual);
+  } catch (e) {
+    showErr((e && e.message) || 'No se pudo enviar la invitación.');
+    btn.disabled = false;
+    btn.textContent = prevTxt;
+  }
+}
+
+// Delegación (una sola vez): abrir/cerrar el mini-form, guardar e invitar.
 document.body.addEventListener('click', (e) => {
   const editBtn = e.target.closest('[data-lugar-edit]');
   if (editBtn){ _lugarEditando = editBtn.getAttribute('data-lugar-edit'); if (_tourActual) renderAcompanantes(_tourActual); return; }
   if (e.target.closest('[data-lugar-cancel]')){ _lugarEditando = null; if (_tourActual) renderAcompanantes(_tourActual); return; }
   const saveBtn = e.target.closest('[data-lugar-save]');
   if (saveBtn){ _guardarLugar(saveBtn.getAttribute('data-lugar-save'), saveBtn); return; }
+  const inviteBtn = e.target.closest('[data-lugar-invite]');
+  if (inviteBtn){ _invitarLugar(inviteBtn.getAttribute('data-lugar-invite'), inviteBtn); return; }
 });
 
 // [acordeon] Interacción de la tarjeta de tour:

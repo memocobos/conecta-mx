@@ -2322,9 +2322,10 @@ function abrirTour(t){
       'Este tour fue cancelado. Si crees que es un error, escríbenos por WhatsApp.');
     return;
   }
-  // en_pagos | pagado → cargar plan
+  // en_pagos | pagado → cargar plan; luego, debajo, la card de acompañantes
+  // (solo lectura, fails-soft — no afecta el plan).
   cont.innerHTML = head + '<div class="card"><div class="tours-loading"><div class="b-spin" style="width:24px;height:24px"></div></div></div>';
-  renderPlanPagos(t, head);
+  renderPlanPagos(t, head).then(() => renderAcompanantes(t));
 }
 
 async function renderPlanPagos(t, head){
@@ -2418,6 +2419,79 @@ async function renderPlanPagos(t, head){
       <div class="eyebrow" style="margin-bottom:8px">¿Cómo pago?</div>
       <p>Haz tu pago y manda el comprobante por WhatsApp. Consulta los datos bancarios en <a href="/pagos">la página de pagos →</a></p>
     </div>`;
+}
+
+// [acompañantes F1-t2] Card SOLO LECTURA de los "lugares" de la solicitud. Se
+// pinta DEBAJO del plan (append en #tour-content). Lee directo con supabase-js
+// anon + RLS (lugares_select_titular). Fails-soft: cualquier error → no pinta
+// nada y no rompe el plan. La captura llega en la siguiente tuerca.
+async function renderAcompanantes(t){
+  if (_tourActual !== t) return;
+  let data;
+  try {
+    const res = await supabase
+      .from('lugares')
+      .select('numero,nombre,correo,estado,paquete,zona,tipo_habitacion,precio,cliente_id')
+      .eq('solicitud_id', t.id)
+      .order('numero', { ascending: true });
+    if (res.error) throw res.error;
+    data = res.data;
+  } catch (e) {
+    console.warn('[portal] lugares (fail-soft):', e && (e.message || e));
+    return;
+  }
+
+  // Si el usuario ya navegó a otro tour, o no hay 2+ lugares, no pintamos nada.
+  if (_tourActual !== t) return;
+  if (!Array.isArray(data) || data.length < 2) return;
+
+  const cont = $('#tour-content');
+  if (!cont || cont.querySelector('#acompanantes-card')) return;
+
+  const esRegistrado = (l) => !!((l.nombre && String(l.nombre).trim()) || l.cliente_id);
+  const registrados = data.filter(esRegistrado).length;
+  const N = data.length;
+
+  const chip = (txt) => `<span style="display:inline-block;padding:2px 8px;margin:2px 4px 0 0;border-radius:999px;background:var(--field-bg);border:1px solid var(--line);font-size:10px;font-weight:700;letter-spacing:.04em;color:var(--ink-soft)">${escapeHtml(txt)}</span>`;
+
+  const filas = data.map((l) => {
+    let nombre = (l.nombre && String(l.nombre).trim()) || '';
+    // El #1 es el titular: si su lugar no trae nombre, usa el del perfil.
+    if (!nombre && l.numero === 1) nombre = (perfilExistente && perfilExistente.nombre_completo) || '';
+    const porRegistrar = !nombre;
+    const nombreHtml = porRegistrar
+      ? `<span style="color:var(--ink-mute)">Por registrar</span>`
+      : escapeHtml(nombre);
+
+    const chips = [l.paquete, l.zona, l.tipo_habitacion].filter(v => v != null && String(v).trim() !== '').map(chip).join('');
+    const precioHtml = (l.precio != null) ? fmtMxn(l.precio) : '';
+
+    let etiqueta = '';
+    let tachado = '';
+    if (l.estado === 'baja'){
+      tachado = 'text-decoration:line-through;opacity:.6;';
+      etiqueta = `<span style="display:inline-block;margin-left:6px;padding:1px 7px;border-radius:999px;font-size:9px;font-weight:900;letter-spacing:.1em;color:var(--red);border:1px solid rgba(255,40,59,.5);background:rgba(255,40,59,.12)">BAJA</span>`;
+    } else if (l.estado === 'traspasado'){
+      etiqueta = `<span style="display:inline-block;margin-left:6px;padding:1px 7px;border-radius:999px;font-size:9px;font-weight:900;letter-spacing:.1em;color:#ffb84c;border:1px solid rgba(255,184,76,.5);background:rgba(255,184,76,.12)">TRASPASADO</span>`;
+    }
+
+    return `
+      <div class="pago-row">
+        <div class="pago-info">
+          <div class="pago-concepto" style="${tachado}">#${escapeHtml(l.numero)} · ${nombreHtml}${etiqueta}</div>
+          ${chips ? `<div class="pago-fecha">${chips}</div>` : ''}
+        </div>
+        ${precioHtml ? `<div class="pago-monto">${precioHtml}</div>` : ''}
+      </div>`;
+  }).join('');
+
+  const cardHtml = `
+    <div class="card" id="acompanantes-card">
+      <div class="eyebrow" style="margin-bottom:14px">👥 Mis acompañantes · <span style="color:var(--ink-soft)">${registrados} de ${N} registrados</span></div>
+      <div class="pago-list">${filas}</div>
+      <p style="margin:12px 0 0 0;font-size:12px;color:var(--ink-mute)">Pronto podrás registrar aquí a tus acompañantes.</p>
+    </div>`;
+  cont.insertAdjacentHTML('beforeend', cardHtml);
 }
 
 // [acordeon] Interacción de la tarjeta de tour:

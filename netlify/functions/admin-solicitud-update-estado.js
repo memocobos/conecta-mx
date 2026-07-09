@@ -18,6 +18,7 @@
 // =============================================================================
 
 const { verifyAdminAuth, corsCheck } = require('./_lib/verify-admin');
+const { ensureLugares } = require('./_lib/portal-lugares');
 
 const ESTADOS_VALIDOS = ['pendiente','en_pagos','pagado','cancelado'];
 
@@ -86,10 +87,30 @@ exports.handler = async (event) => {
     if (!actualizada) {
       return { statusCode: 404, headers, body: JSON.stringify({ error: 'Solicitud no encontrada' }) };
     }
+
+    // Al aprobar (en_pagos) se crean los N lugares de la solicitud. Best-effort:
+    // un fallo aquí NO revierte el cambio de estado; solo se reporta. La fila que
+    // regresó el PATCH (return=representation) ya trae los campos que necesitamos,
+    // así que no hace falta un GET extra.
+    const lugaresInfo = {};
+    if (nuevoEstado === 'en_pagos') {
+      const portalHeaders = {
+        apikey: env.PORTAL_SB_SERVICE,
+        Authorization: `Bearer ${env.PORTAL_SB_SERVICE}`,
+        'Content-Type': 'application/json',
+      };
+      try {
+        const res = await ensureLugares({ portalUrl: env.PORTAL_SB_URL, portalHeaders, solicitud: actualizada });
+        lugaresInfo.lugares_creados = res.creados;
+      } catch (e) {
+        lugaresInfo.lugares_error = e.message;
+      }
+    }
+
     return {
       statusCode: 200,
       headers,
-      body: JSON.stringify({ ok: true, solicitud: actualizada, admin: { id: auth.user.id, correo: auth.user.correo } }),
+      body: JSON.stringify({ ok: true, solicitud: actualizada, admin: { id: auth.user.id, correo: auth.user.correo }, ...lugaresInfo }),
     };
   } catch (e) {
     return { statusCode: 502, headers, body: JSON.stringify({ error: 'Error actualizando solicitud', detail: e.message }) };

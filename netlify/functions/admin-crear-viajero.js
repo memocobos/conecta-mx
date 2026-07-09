@@ -25,6 +25,7 @@
 // =============================================================================
 
 const { verifyAdminAuth, corsCheck } = require('./_lib/verify-admin');
+const { ensureLugares } = require('./_lib/portal-lugares');
 
 const PAQUETES_VALIDOS = ['PLUS','RIDE','STAY','CHEAP'];
 const HABITACIONES_VALIDAS = ['compartida','triple','doble','individual'];
@@ -170,6 +171,17 @@ exports.handler = async (event) => {
       return { statusCode: 502, headers, body: JSON.stringify({ error: 'No se pudo crear la solicitud', cliente_id: cliente.id }) };
     }
 
+    // El walk-in nace 'en_pagos' → crear sus N lugares. Best-effort: un fallo aquí
+    // NO revierte cliente/solicitud; solo se reporta. La fila recién creada
+    // (return=representation) ya trae todos los campos que necesita el helper.
+    const lugaresInfo = {};
+    try {
+      const res = await ensureLugares({ portalUrl: env.PORTAL_SB_URL, portalHeaders: sbHeaders, solicitud });
+      lugaresInfo.lugares_creados = res.creados;
+    } catch (e) {
+      lugaresInfo.lugares_error = e.message;
+    }
+
     return {
       statusCode: 200,
       headers,
@@ -178,6 +190,7 @@ exports.handler = async (event) => {
         cliente_id: cliente.id,
         solicitud_id: solicitud.id,
         admin: { id: auth.user.id, correo: auth.user.correo },
+        ...lugaresInfo,
       }),
     };
   } catch (e) {

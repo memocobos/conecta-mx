@@ -2421,17 +2421,20 @@ async function renderPlanPagos(t, head){
     </div>`;
 }
 
-// [acompañantes F1-t2] Card SOLO LECTURA de los "lugares" de la solicitud. Se
-// pinta DEBAJO del plan (append en #tour-content). Lee directo con supabase-js
-// anon + RLS (lugares_select_titular). Fails-soft: cualquier error → no pinta
-// nada y no rompe el plan. La captura llega en la siguiente tuerca.
+// [acompañantes F1-t2/t3] Card de los "lugares" de la solicitud, DEBAJO del plan
+// (append en #tour-content). Lee directo con supabase-js anon + RLS
+// (lugares_select_titular). La ESCRITURA (t3) va por Netlify Function
+// (portal-lugar-actualizar), nunca anon directo. Fails-soft en la lectura:
+// cualquier error → no pinta nada y no rompe el plan.
+let _lugarEditando = null; // id del lugar cuyo mini-form está abierto (o null)
+
 async function renderAcompanantes(t){
   if (_tourActual !== t) return;
   let data;
   try {
     const res = await supabase
       .from('lugares')
-      .select('numero,nombre,correo,estado,paquete,zona,tipo_habitacion,precio,cliente_id')
+      .select('id,numero,nombre,correo,fecha_nacimiento,estado,paquete,zona,tipo_habitacion,precio,cliente_id')
       .eq('solicitud_id', t.id)
       .order('numero', { ascending: true });
     if (res.error) throw res.error;
@@ -2446,15 +2449,36 @@ async function renderAcompanantes(t){
   if (!Array.isArray(data) || data.length < 2) return;
 
   const cont = $('#tour-content');
-  if (!cont || cont.querySelector('#acompanantes-card')) return;
+  if (!cont) return;
 
   const esRegistrado = (l) => !!((l.nombre && String(l.nombre).trim()) || l.cliente_id);
   const registrados = data.filter(esRegistrado).length;
   const N = data.length;
 
   const chip = (txt) => `<span style="display:inline-block;padding:2px 8px;margin:2px 4px 0 0;border-radius:999px;background:var(--field-bg);border:1px solid var(--line);font-size:10px;font-weight:700;letter-spacing:.04em;color:var(--ink-soft)">${escapeHtml(txt)}</span>`;
+  const chipMenor = `<span style="display:inline-block;padding:2px 8px;margin:2px 4px 0 0;border-radius:999px;background:rgba(255,184,76,.12);border:1px solid rgba(255,184,76,.5);font-size:10px;font-weight:900;letter-spacing:.06em;color:#ffb84c">MENOR</span>`;
 
   const filas = data.map((l) => {
+    const editable = l.estado === 'activo' && Number(l.numero) >= 2; // el #1 = titular (su perfil)
+    const tieneNombre = !!(l.nombre && String(l.nombre).trim());
+
+    // ── Mini-form inline de captura (solo el lugar que se está editando) ──
+    if (editable && l.id === _lugarEditando){
+      return `
+        <div class="pago-row" data-lugar-row="${escapeHtml(l.id)}" style="display:block">
+          <div class="pago-concepto" style="margin-bottom:10px">#${escapeHtml(l.numero)} · Acompañante</div>
+          <div class="field" style="margin-bottom:8px"><label>Nombre completo</label><input class="lug-nombre" type="text" maxlength="120" value="${escapeHtml(l.nombre || '')}" placeholder="Nombre y apellidos"></div>
+          <div class="field" style="margin-bottom:8px"><label>Correo (opcional)</label><input class="lug-correo" type="email" value="${escapeHtml(l.correo || '')}" placeholder="correo@ejemplo.com"></div>
+          <div class="field" style="margin-bottom:8px"><label>Fecha de nacimiento (opcional)</label><input class="lug-fnac" type="date" value="${escapeHtml((l.fecha_nacimiento || '').slice(0, 10))}"></div>
+          <div class="lug-err" style="color:var(--red);font-size:12px;font-weight:700;margin-bottom:8px;display:none"></div>
+          <div style="display:flex;gap:8px;justify-content:flex-end">
+            <button type="button" data-lugar-cancel style="padding:7px 14px;border-radius:999px;border:1px solid var(--line-strong);background:transparent;color:var(--ink-soft);font-size:12px;font-weight:700;cursor:pointer">Cancelar</button>
+            <button type="button" data-lugar-save="${escapeHtml(l.id)}" style="padding:7px 16px;border-radius:999px;border:none;background:var(--yel);color:#000;font-size:12px;font-weight:900;cursor:pointer">Guardar</button>
+          </div>
+        </div>`;
+    }
+
+    // ── Fila normal (lectura) ──
     let nombre = (l.nombre && String(l.nombre).trim()) || '';
     // El #1 es el titular: si su lugar no trae nombre, usa el del perfil.
     if (!nombre && l.numero === 1) nombre = (perfilExistente && perfilExistente.nombre_completo) || '';
@@ -2463,7 +2487,8 @@ async function renderAcompanantes(t){
       ? `<span style="color:var(--ink-mute)">Por registrar</span>`
       : escapeHtml(nombre);
 
-    const chips = [l.paquete, l.zona, l.tipo_habitacion].filter(v => v != null && String(v).trim() !== '').map(chip).join('');
+    let chips = [l.paquete, l.zona, l.tipo_habitacion].filter(v => v != null && String(v).trim() !== '').map(chip).join('');
+    if (_esMenor(l.fecha_nacimiento)) chips += chipMenor; // MENOR además de los chips existentes
     const precioHtml = (l.precio != null) ? fmtMxn(l.precio) : '';
 
     let etiqueta = '';
@@ -2475,13 +2500,20 @@ async function renderAcompanantes(t){
       etiqueta = `<span style="display:inline-block;margin-left:6px;padding:1px 7px;border-radius:999px;font-size:9px;font-weight:900;letter-spacing:.1em;color:#ffb84c;border:1px solid rgba(255,184,76,.5);background:rgba(255,184,76,.12)">TRASPASADO</span>`;
     }
 
+    const btnHtml = editable
+      ? `<button type="button" data-lugar-edit="${escapeHtml(l.id)}" style="padding:4px 12px;border-radius:999px;border:1px solid var(--line-strong);background:var(--field-bg);color:var(--ink);font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap">${tieneNombre ? 'Editar' : 'Registrar'}</button>`
+      : '';
+
     return `
       <div class="pago-row">
         <div class="pago-info">
           <div class="pago-concepto" style="${tachado}">#${escapeHtml(l.numero)} · ${nombreHtml}${etiqueta}</div>
           ${chips ? `<div class="pago-fecha">${chips}</div>` : ''}
         </div>
-        ${precioHtml ? `<div class="pago-monto">${precioHtml}</div>` : ''}
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">
+          ${precioHtml ? `<div class="pago-monto">${precioHtml}</div>` : ''}
+          ${btnHtml}
+        </div>
       </div>`;
   }).join('');
 
@@ -2489,10 +2521,71 @@ async function renderAcompanantes(t){
     <div class="card" id="acompanantes-card">
       <div class="eyebrow" style="margin-bottom:14px">👥 Mis acompañantes · <span style="color:var(--ink-soft)">${registrados} de ${N} registrados</span></div>
       <div class="pago-list">${filas}</div>
-      <p style="margin:12px 0 0 0;font-size:12px;color:var(--ink-mute)">Pronto podrás registrar aquí a tus acompañantes.</p>
+      <p style="margin:12px 0 0 0;font-size:12px;color:var(--ink-mute)">Registra a cada acompañante con su nombre. El correo y la fecha de nacimiento son opcionales.</p>
     </div>`;
+  const prev = cont.querySelector('#acompanantes-card');
+  if (prev) prev.remove();
   cont.insertAdjacentHTML('beforeend', cardHtml);
 }
+
+// < 18 años cumplidos HOY a partir de una fecha 'YYYY-MM-DD'. Falso si no hay fecha.
+function _esMenor(fnac){
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(fnac || '').slice(0, 10));
+  if (!m) return false;
+  const hoy = new Date();
+  let edad = hoy.getFullYear() - Number(m[1]);
+  const mm = hoy.getMonth() + 1, dd = hoy.getDate();
+  if (mm < Number(m[2]) || (mm === Number(m[2]) && dd < Number(m[3]))) edad--;
+  return edad < 18;
+}
+
+// Escritura del titular: guarda nombre/correo/fecha_nacimiento de un lugar vía
+// Netlify Function (valida sesión + dueño server-side). Fail-soft en la UI.
+async function _guardarLugar(lugarId, btn){
+  const row = btn.closest('[data-lugar-row]');
+  if (!row) return;
+  const nombre = (row.querySelector('.lug-nombre') && row.querySelector('.lug-nombre').value || '').trim();
+  const correo = (row.querySelector('.lug-correo') && row.querySelector('.lug-correo').value || '').trim();
+  const fnac   = (row.querySelector('.lug-fnac') && row.querySelector('.lug-fnac').value || '').trim();
+  const errEl  = row.querySelector('.lug-err');
+  const showErr = (m) => { if (errEl){ errEl.textContent = m; errEl.style.display = 'block'; } };
+  if (errEl){ errEl.style.display = 'none'; errEl.textContent = ''; }
+  if (!nombre){ showErr('Escribe el nombre del acompañante.'); return; }
+
+  const prevTxt = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = 'Guardando…';
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    const jwt = session && session.access_token;
+    if (!jwt) throw new Error('Tu sesión expiró, vuelve a entrar.');
+    const payload = { lugar_id: lugarId, nombre };
+    if (correo) payload.correo = correo;
+    if (fnac)   payload.fecha_nacimiento = fnac;
+    const r = await fetch('/.netlify/functions/portal-lugar-actualizar', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + jwt },
+      body: JSON.stringify(payload),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || j.ok === false) throw new Error(j.error || ('Error ' + r.status));
+    _lugarEditando = null;
+    if (_tourActual) renderAcompanantes(_tourActual);
+  } catch (e) {
+    showErr((e && e.message) || 'No se pudo guardar.');
+    btn.disabled = false;
+    btn.textContent = prevTxt;
+  }
+}
+
+// Delegación (una sola vez): abrir/cerrar el mini-form y guardar.
+document.body.addEventListener('click', (e) => {
+  const editBtn = e.target.closest('[data-lugar-edit]');
+  if (editBtn){ _lugarEditando = editBtn.getAttribute('data-lugar-edit'); if (_tourActual) renderAcompanantes(_tourActual); return; }
+  if (e.target.closest('[data-lugar-cancel]')){ _lugarEditando = null; if (_tourActual) renderAcompanantes(_tourActual); return; }
+  const saveBtn = e.target.closest('[data-lugar-save]');
+  if (saveBtn){ _guardarLugar(saveBtn.getAttribute('data-lugar-save'), saveBtn); return; }
+});
 
 // [acordeon] Interacción de la tarjeta de tour:
 //   - tap en "Ver plan de pagos" (data-tc-open) → abre el plan (abrirTour, intacto).

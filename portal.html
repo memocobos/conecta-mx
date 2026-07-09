@@ -831,6 +831,9 @@ main{
     <!-- [login-festival] Marquesina de artistas vigentes (EV; decorativa, se oculta si falla) -->
     <div class="auth-marquee" id="auth-marquee" aria-hidden="true" style="display:none"></div>
 
+    <!-- [invitacion] Aviso si el visitante llegó con un link de invitación pendiente -->
+    <div id="inv-banner" style="display:none;margin:0 0 14px 0;padding:12px 14px;border-radius:12px;background:rgba(232,255,76,.08);border:1px solid rgba(232,255,76,.35);color:var(--ink);font-size:13px;font-weight:600;line-height:1.45">🎫 Tienes una invitación a un viaje — entra o crea tu cuenta para aceptarla.</div>
+
     <div class="card">
       <button type="button" class="btn-google" id="btn-google" data-action="google">
         <svg viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
@@ -1672,6 +1675,7 @@ $('#form-profile').addEventListener('submit', async (e) => {
   perfilExistente = resp.data;
   renderDashboard(perfilExistente);
   showView('dashboard');
+  _procesarInvitacionPendiente(); // [invitacion] acepta si el nuevo usuario llegó por un link
 });
 
 $('#btn-cancel-profile').addEventListener('click', () => {
@@ -1758,6 +1762,7 @@ async function cargarClienteYRutear(session){
   if (!session){
     showView('auth');
     _buildLoginMarquee(); // [login-festival] visitante sin sesión → arma la marquesina (post módulo-eval, EV ya cargable)
+    _mostrarBannerInvitacion(); // [invitacion] aviso si llegó con un link pendiente
     return;
   }
   const { data, error } = await supabase
@@ -1796,6 +1801,7 @@ async function cargarClienteYRutear(session){
           renderDashboard(dataReclamada);
           showView('dashboard');
           renderToursList();
+          _procesarInvitacionPendiente(session); // [invitacion] acepta si hay token pendiente
         }
         return;
       }
@@ -1823,6 +1829,99 @@ async function cargarClienteYRutear(session){
     .then(() => {}, () => {});
   showView('dashboard');
   renderToursList(); // dispara fetch async, render cuando llegue
+  _procesarInvitacionPendiente(session); // [invitacion] acepta si hay token pendiente
+}
+
+// =====================================================================
+// [invitacion] Aceptación de invitación de acompañante (F2-t2)
+// =====================================================================
+const INV_KEY = 'conecta_invitacion_pendiente';
+let _invEnProceso = false;
+
+// Captura el token del correo ANTES de rutear/auth y lo limpia de la URL, para
+// que sobreviva al redirect de Google OAuth / a la confirmación de signup.
+(function _capturarInvitacion(){
+  try {
+    const tok = new URLSearchParams(location.search).get('invitacion');
+    if (tok){
+      localStorage.setItem(INV_KEY, tok);
+      const url = new URL(location.href);
+      url.searchParams.delete('invitacion');
+      history.replaceState(null, '', url.pathname + url.search + url.hash);
+    }
+  } catch (e) { /* no-op */ }
+})();
+
+function _tokenInvitacionPendiente(){
+  try { return localStorage.getItem(INV_KEY) || ''; } catch { return ''; }
+}
+function _limpiarInvitacionPendiente(){
+  try { localStorage.removeItem(INV_KEY); } catch {}
+}
+
+// Banner discreto en la vista de login cuando hay una invitación pendiente.
+function _mostrarBannerInvitacion(){
+  const el = document.getElementById('inv-banner');
+  if (!el) return;
+  el.style.display = _tokenInvitacionPendiente() ? 'block' : 'none';
+}
+
+// Toast auto-descartable (el portal no tiene sistema de toasts). textContent →
+// sin riesgo de inyección con el mensaje del backend.
+function _invToast(msg, isError){
+  let el = document.getElementById('inv-toast');
+  if (!el){
+    el = document.createElement('div');
+    el.id = 'inv-toast';
+    el.style.cssText = 'position:fixed;left:50%;bottom:24px;transform:translateX(-50%);max-width:min(92vw,440px);z-index:9999;padding:13px 18px;border-radius:12px;font-size:14px;font-weight:700;line-height:1.4;box-shadow:0 8px 30px rgba(0,0,0,.5);text-align:center';
+    document.body.appendChild(el);
+  }
+  el.style.background = isError ? 'rgba(255,40,59,.14)' : 'rgba(136,234,78,.14)';
+  el.style.border = '1px solid ' + (isError ? 'rgba(255,40,59,.55)' : 'rgba(136,234,78,.5)');
+  el.style.color = isError ? '#ffb0b8' : '#bff5a0';
+  el.textContent = msg;
+  el.style.display = 'block';
+  clearTimeout(el._t);
+  el._t = setTimeout(() => { el.style.display = 'none'; }, isError ? 9000 : 5000);
+}
+
+// Con sesión + perfil listos: si hay token pendiente, lo aceptamos vía backend
+// (valida sesión + dueño + correo). El token 403 (correo distinto) NO se borra,
+// para que el usuario pueda salir y entrar con el correo correcto.
+async function _procesarInvitacionPendiente(session){
+  if (_invEnProceso) return;
+  const tok = _tokenInvitacionPendiente();
+  if (!tok) return;
+  _invEnProceso = true;
+  try {
+    // Si no nos pasan la sesión (p.ej. tras completar el perfil), la pedimos.
+    if (!session){
+      const { data } = await supabase.auth.getSession();
+      session = data && data.session;
+    }
+    const jwt = session && session.access_token;
+    if (!jwt) return;
+    const r = await fetch('/.netlify/functions/portal-invitacion-aceptar', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + jwt },
+      body: JSON.stringify({ token: tok }),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (r.ok && j.ok){
+      _limpiarInvitacionPendiente();
+      const ev = j.evento_nombre ? (' para ' + j.evento_nombre) : '';
+      _invToast('🎉 ¡Listo! Aceptaste tu lugar' + ev + '.');
+      return;
+    }
+    // Definitivos (404 inválida / 409 usada o cancelada) → limpiar. 403 (correo
+    // distinto) y transitorios → conservar para reintentar.
+    if (r.status === 404 || r.status === 409) _limpiarInvitacionPendiente();
+    _invToast((j && j.error) || 'No se pudo aceptar la invitación.', true);
+  } catch (e) {
+    console.warn('[portal] aceptar invitación falló', e); // red: conservar y reintentar
+  } finally {
+    _invEnProceso = false;
+  }
 }
 
 (async function init(){

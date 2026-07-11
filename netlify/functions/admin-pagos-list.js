@@ -63,7 +63,24 @@ exports.handler = async (event) => {
       return { statusCode: 502, headers, body: JSON.stringify({ error: 'Supabase rechazó la consulta de pagos', detail }) };
     }
     const pagos = await r.json();
-    return { statusCode: 200, headers, body: JSON.stringify({ ok: true, pagos: Array.isArray(pagos) ? pagos : [] }) };
+
+    // Lugares de la solicitud (F3-t4b): la UI agrupa el plan por lugar y necesita
+    // numero/nombre/cliente_id para los sub-encabezados. Best-effort: si falla,
+    // se devuelve lugares:[] SIN romper la respuesta de pagos (planes grupales
+    // viejos no traen lugar_id y simplemente ignoran esto).
+    let lugares = [];
+    try {
+      const lr = await fetch(
+        `${env.PORTAL_SB_URL}/rest/v1/lugares?solicitud_id=eq.${solicitudId}&select=id,numero,nombre,cliente_id,estado&order=numero.asc`,
+        { headers: sbHeaders }
+      );
+      if (lr.ok) {
+        const arr = await lr.json();
+        if (Array.isArray(arr)) lugares = arr;
+      }
+    } catch (_) { /* best-effort: la UI degrada a sin-etiquetas */ }
+
+    return { statusCode: 200, headers, body: JSON.stringify({ ok: true, pagos: Array.isArray(pagos) ? pagos : [], lugares }) };
   } catch (e) {
     return { statusCode: 502, headers, body: JSON.stringify({ error: 'Error consultando pagos', detail: e.message }) };
   }

@@ -139,7 +139,10 @@ exports.handler = async (event) => {
     // ---- 3d. ¿Ya estaba aceptada? Idempotente para el MISMO usuario. ----
     if (lugar.invitacion_aceptada_at) {
       if (clienteId && lugar.cliente_id === clienteId) {
-        return { statusCode: 200, headers, body: JSON.stringify({ ok: true, ya_aceptada: true, evento_nombre: eventoNombre }) };
+        // Re-click del link ya aceptado: re-apunta por si el plan (#229) se generó
+        // DESPUÉS de aceptar y sus cuotas quedaron al titular. Idempotente/best-effort.
+        const reap = await reapuntarCuotas(SB_URL, sbHeaders, lugar.id, clienteId, user.id);
+        return { statusCode: 200, headers, body: JSON.stringify({ ok: true, ya_aceptada: true, evento_nombre: eventoNombre, ...reap }) };
       }
       return { statusCode: 409, headers, body: JSON.stringify({ error: 'Esta invitación ya fue usada' }) };
     }
@@ -185,13 +188,42 @@ exports.handler = async (event) => {
       return { statusCode: 502, headers, body: JSON.stringify({ error: 'No se pudo aceptar la invitación', detail }) };
     }
 
-    return { statusCode: 200, headers, body: JSON.stringify({ ok: true, evento_nombre: eventoNombre }) };
+    // ---- 7. Re-apuntar al acompañante las cuotas NO pagadas de su lugar (F3-t3).
+    //         Best-effort: un fallo NO revierte la aceptación (ya hecha arriba).
+    const reap = await reapuntarCuotas(SB_URL, sbHeaders, lugar.id, clienteId, user.id);
+
+    return { statusCode: 200, headers, body: JSON.stringify({ ok: true, evento_nombre: eventoNombre, ...reap }) };
   } catch (e) {
     return { statusCode: 502, headers, body: JSON.stringify({ error: 'Error aceptando la invitación', detail: e.message }) };
   }
 };
 
 // ----- helpers -----
+
+// F3-t3: re-apunta al acompañante las cuotas NO pagadas de SU lugar (las que se
+// generaron al titular porque el lugar aún no tenía dueño, #229). Best-effort:
+// NUNCA lanza — un fallo aquí no revierte la aceptación, solo se reporta. Las
+// cuotas 'pagado' quedan intactas (historia contable de quien las pagó);
+// pendientes Y vencidas se re-apuntan (si debe, la deuda es suya). Idempotente:
+// re-aplicar deja los mismos valores.
+async function reapuntarCuotas(SB_URL, sbHeaders, lugarId, clienteId, authUserId) {
+  try {
+    const nowISO = new Date().toISOString();
+    const r = await fetch(
+      `${SB_URL}/rest/v1/pagos?lugar_id=eq.${encodeURIComponent(lugarId)}&estado=neq.pagado`,
+      {
+        method: 'PATCH',
+        headers: { ...sbHeaders, Prefer: 'return=representation' },
+        body: JSON.stringify({ cliente_id: clienteId, auth_user_id: authUserId, updated_at: nowISO }),
+      }
+    );
+    if (!r.ok) return { cuotas_error: true };
+    const arr = await r.json();
+    return { cuotas_reapuntadas: Array.isArray(arr) ? arr.length : 0 };
+  } catch (e) {
+    return { cuotas_error: true };
+  }
+}
 
 async function buscarClienteId(SB_URL, sbHeaders, authUserId) {
   const r = await fetch(

@@ -1033,6 +1033,10 @@ main{
       </div>
     </div>
 
+    <!-- [acompanante] Viajes donde el usuario es acompañante (lugar ligado en #226).
+         Se llena vía portal-mis-lugares (fails-soft): vacío o error → queda oculto. -->
+    <div id="mis-viajes-acomp"></div>
+
     <div class="dash-actions">
       <button type="button" class="btn btn-secondary" data-action="edit-profile">Editar mi perfil</button>
       <button type="button" class="btn btn-danger" data-action="logout">Cerrar sesión</button>
@@ -1801,6 +1805,7 @@ async function cargarClienteYRutear(session){
           renderDashboard(dataReclamada);
           showView('dashboard');
           renderToursList();
+          renderMisViajesAcomp(); // [acompanante] viajes donde es acompañante (fails-soft)
           _procesarInvitacionPendiente(session); // [invitacion] acepta si hay token pendiente
         }
         return;
@@ -1829,6 +1834,7 @@ async function cargarClienteYRutear(session){
     .then(() => {}, () => {});
   showView('dashboard');
   renderToursList(); // dispara fetch async, render cuando llegue
+  renderMisViajesAcomp(); // [acompanante] viajes donde es acompañante (fails-soft)
   _procesarInvitacionPendiente(session); // [invitacion] acepta si hay token pendiente
 }
 
@@ -1911,6 +1917,7 @@ async function _procesarInvitacionPendiente(session){
       _limpiarInvitacionPendiente();
       const ev = j.evento_nombre ? (' para ' + j.evento_nombre) : '';
       _invToast('🎉 ¡Listo! Aceptaste tu lugar' + ev + '.');
+      renderMisViajesAcomp(); // [acompanante] su viaje recién aceptado ya aparece
       return;
     }
     // Definitivos (404 inválida / 409 usada o cancelada) → limpiar. 403 (correo
@@ -2218,6 +2225,67 @@ function _tourCardHtml(t, iso, esPasado, abierta){
         <button type="button" class="tc-cta" data-tc-open>Ver plan de pagos →</button>
       </div>
     </article>`;
+}
+
+// [acompanante] Card "Mis viajes como acompañante" — DESPUÉS de la lista de tours
+// propios. Lee vía Netlify Function (portal-mis-lugares), que devuelve SOLO datos
+// curados de cada lugar (evento + paquete/zona/hab/precio/estado), nunca la
+// solicitud del grupo. Fails-soft: error o lista vacía → no pinta nada.
+async function renderMisViajesAcomp(){
+  const cont = $('#mis-viajes-acomp');
+  if (!cont) return;
+  let lugares;
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    const jwt = session && session.access_token;
+    if (!jwt) { cont.innerHTML = ''; return; }
+    const r = await fetch('/.netlify/functions/portal-mis-lugares', {
+      method: 'GET',
+      headers: { Authorization: 'Bearer ' + jwt },
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || !j.ok) { cont.innerHTML = ''; return; }
+    lugares = Array.isArray(j.lugares) ? j.lugares : [];
+  } catch (e) {
+    console.warn('[portal] mis viajes acompañante (fail-soft):', e && (e.message || e));
+    cont.innerHTML = '';
+    return;
+  }
+
+  if (!lugares.length){ cont.innerHTML = ''; return; } // sin viajes de acompañante → oculto
+
+  const chip = (txt) => `<span style="display:inline-block;padding:2px 8px;margin:2px 4px 0 0;border-radius:999px;background:var(--field-bg);border:1px solid var(--line);font-size:10px;font-weight:700;letter-spacing:.04em;color:var(--ink-soft)">${escapeHtml(txt)}</span>`;
+
+  const filas = lugares.map((l) => {
+    const chips = [l.paquete, l.zona, l.tipo_habitacion]
+      .filter(v => v != null && String(v).trim() !== '')
+      .map(chip).join('');
+    const precioHtml = (l.precio != null) ? fmtMxn(l.precio) : '';
+
+    let etiqueta = '', tachado = '';
+    if (l.estado === 'baja'){
+      tachado = 'text-decoration:line-through;opacity:.6;';
+      etiqueta = `<span style="display:inline-block;margin-left:6px;padding:1px 7px;border-radius:999px;font-size:9px;font-weight:900;letter-spacing:.1em;color:var(--red);border:1px solid rgba(255,40,59,.5);background:rgba(255,40,59,.12)">BAJA</span>`;
+    } else if (l.estado === 'traspasado'){
+      etiqueta = `<span style="display:inline-block;margin-left:6px;padding:1px 7px;border-radius:999px;font-size:9px;font-weight:900;letter-spacing:.1em;color:#ffb84c;border:1px solid rgba(255,184,76,.5);background:rgba(255,184,76,.12)">TRASPASADO</span>`;
+    }
+
+    return `
+      <div class="pago-row">
+        <div class="pago-info">
+          <div class="pago-concepto" style="${tachado}">${escapeHtml(l.evento_nombre || 'Tu viaje')}${etiqueta}</div>
+          ${chips ? `<div class="pago-fecha">${chips}</div>` : ''}
+        </div>
+        ${precioHtml ? `<div class="pago-monto">${precioHtml}</div>` : ''}
+      </div>`;
+  }).join('');
+
+  cont.innerHTML = `
+    <div class="card" id="mis-viajes-acomp-card">
+      <div class="eyebrow" style="margin-bottom:14px">🎒 Mis viajes como acompañante</div>
+      <div class="pago-list">${filas}</div>
+      <p style="margin:12px 0 0 0;font-size:12px;color:var(--ink-mute)">Los pagos de este viaje los administra quien organizó el grupo.</p>
+    </div>`;
 }
 
 // [portal-v1] Cambio de pestaña Próximos/Pasados — solo re-render (misma data).

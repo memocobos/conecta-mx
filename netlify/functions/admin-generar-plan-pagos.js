@@ -111,7 +111,7 @@ exports.handler = async (event) => {
 
   try {
     // 1. Traer la solicitud para obtener cliente_id y auth_user_id.
-    const solUrl = `${env.PORTAL_SB_URL}/rest/v1/solicitudes_tour?id=eq.${solicitudId}&select=id,cliente_id,auth_user_id,evento_nombre`;
+    const solUrl = `${env.PORTAL_SB_URL}/rest/v1/solicitudes_tour?id=eq.${solicitudId}&select=id,cliente_id,auth_user_id,evento_nombre,precio_total`;
     const solR = await fetch(solUrl, { headers: sbHeaders });
     if (!solR.ok) {
       const detail = await solR.text();
@@ -135,19 +135,107 @@ exports.handler = async (event) => {
       return { statusCode: 200, headers, body: JSON.stringify({ ok: true, ya_existia: true, pagos: existentes }) };
     }
 
-    // 3. Insertar el plan con service_role, completando datos desde la solicitud.
+    // 3. ¿La solicitud tiene lugares activos (#222)? Entonces el plan va POR
+    //    LUGAR: cada lugar sus cuotas por su propio precio, con las MISMAS
+    //    fechas/estructura. Sin lugares (solicitudes previas al módulo) → plan
+    //    grupal de siempre, lugar_id null (COMPAT TOTAL). Los lugares
+    //    baja/traspasado NO reciben plan (filtro estado=activo).
+    const lugUrl = `${env.PORTAL_SB_URL}/rest/v1/lugares?solicitud_id=eq.${solicitudId}&estado=eq.activo&select=id,numero,precio,cliente_id&order=numero.asc`;
+    const lugR = await fetch(lugUrl, { headers: sbHeaders });
+    if (!lugR.ok) {
+      const detail = await lugR.text();
+      return { statusCode: 502, headers, body: JSON.stringify({ error: 'Supabase rechazó la consulta de lugares', detail }) };
+    }
+    const lugaresRaw = await lugR.json();
+    const lugares = Array.isArray(lugaresRaw) ? lugaresRaw : [];
+
     const registradoPor = (auth.user && (auth.user.correo || auth.user.rol)) || 'admin';
-    const rows = pagos.map((p) => ({
+    const baseRow = (extra) => ({
       solicitud_id:   solicitud.id,
-      cliente_id:     solicitud.cliente_id,
-      auth_user_id:   solicitud.auth_user_id,
-      numero_pago:    p.numero_pago,
-      concepto:       p.concepto.trim(),
-      monto:          p.monto,
-      fecha_esperada: p.fecha_esperada,
       estado:         ESTADO_PAGO_INICIAL,
       registrado_por: registradoPor,
-    }));
+      ...extra,
+    });
+
+    const planPorLugar = lugares.length > 0;
+    const lugaresPlanificados = lugares.length;
+    let rows;
+
+    if (!planPorLugar) {
+      // ── Plan GRUPAL (comportamiento actual, INTACTO). lugar_id null. ──
+      rows = pagos.map((p) => baseRow({
+        cliente_id:     solicitud.cliente_id,
+        auth_user_id:   solicitud.auth_user_id,
+        lugar_id:       null,
+        numero_pago:    p.numero_pago,
+        concepto:       p.concepto.trim(),
+        monto:          p.monto,
+        fecha_esperada: p.fecha_esperada,
+      }));
+    } else {
+      // ── Plan POR LUGAR. Cada lugar suma EXACTO su precio. ──
+      const numLugares = lugares.length;
+      const planTotal = pagos.reduce((s, p) => s + p.monto, 0);
+      const precioTotalSol = Number(solicitud.precio_total) || 0;
+
+      // Precio de cada lugar: su lugar.precio; si null → precio_total/numLugares.
+      const preciosLugar = lugares.map((l) =>
+        (l.precio != null && isFinite(Number(l.precio)))
+          ? Number(l.precio)
+          : round2(precioTotalSol / numLugares)
+      );
+
+      // Candado: nunca generar planes en $0 por accidente. Si el plan cobra algo
+      // (alguna cuota > 0) pero algún lugar quedó en precio <= 0 → error claro.
+      const hayCuotaConMonto = pagos.some((p) => p.monto > 0);
+      if (hayCuotaConMonto && preciosLugar.some((pr) => pr <= 0)) {
+        return { statusCode: 400, headers, body: JSON.stringify({ error: 'Configura el precio de los lugares antes de generar el plan' }) };
+      }
+
+      // auth_user_id de cada lugar YA aceptado (cliente_id propio). El titular y
+      // los lugares aún sin aceptar heredan cliente_id/auth_user_id de la solicitud.
+      const cids = [...new Set(lugares.map((l) => l.cliente_id).filter(Boolean))];
+      const authByCliente = {};
+      if (cids.length) {
+        const inList = cids.map((id) => encodeURIComponent(id)).join(',');
+        const cliR = await fetch(
+          `${env.PORTAL_SB_URL}/rest/v1/clientes?id=in.(${inList})&select=id,auth_user_id`,
+          { headers: sbHeaders }
+        );
+        if (!cliR.ok) {
+          const detail = await cliR.text();
+          return { statusCode: 502, headers, body: JSON.stringify({ error: 'Supabase rechazó la consulta de clientes de lugares', detail }) };
+        }
+        (await cliR.json()).forEach((c) => { authByCliente[c.id] = c.auth_user_id; });
+      }
+
+      rows = [];
+      lugares.forEach((l, li) => {
+        const precioLugar = preciosLugar[li];
+        const cid = l.cliente_id || solicitud.cliente_id;
+        const aid = l.cliente_id ? (authByCliente[l.cliente_id] || null) : solicitud.auth_user_id;
+        let acum = 0;
+        pagos.forEach((c, ci) => {
+          const esUltima = ci === pagos.length - 1;
+          // Todas menos la última: proporcional al precio del lugar. La última
+          // cuadra los centavos (precio − suma anteriores) → suma EXACTA, nunca
+          // se pierde ni se inventa dinero.
+          const monto = esUltima
+            ? round2(precioLugar - acum)
+            : (planTotal > 0 ? round2(c.monto * (precioLugar / planTotal)) : 0);
+          if (!esUltima) acum += monto;
+          rows.push(baseRow({
+            cliente_id:     cid,
+            auth_user_id:   aid,
+            lugar_id:       l.id,
+            numero_pago:    c.numero_pago,
+            concepto:       c.concepto.trim(),
+            monto,
+            fecha_esperada: c.fecha_esperada,
+          }));
+        });
+      });
+    }
 
     const insR = await fetch(restBase, {
       method: 'POST',
@@ -189,7 +277,13 @@ exports.handler = async (event) => {
           const nombre = String(cli.nombre_completo || 'cliente').trim().split(/\s+/)[0] || 'cliente';
           const eventoNombre = solicitud.evento_nombre || 'tu evento';
           const asunto = `🎫 Tu plan de pagos — ${eventoNombre}`;
-          const html = planHtml(nombre, eventoNombre, insertados);
+          // El correo SIEMPRE muestra el plan GRUPAL (las cuotas que mandó Bulma,
+          // totales sin cambiar) — no las filas por lugar. Si el grupo tiene 2+
+          // lugares, se agrega una línea avisando que cada lugar lleva su plan.
+          const grupoNota = (planPorLugar && lugaresPlanificados >= 2)
+            ? `Tu grupo tiene ${lugaresPlanificados} lugares — cada lugar lleva su propio plan y saldo, visibles en el portal.`
+            : '';
+          const html = planHtml(nombre, eventoNombre, pagos, grupoNota);
           const r = await fetch('https://api.resend.com/emails', {
             method: 'POST',
             headers: { Authorization: `Bearer ${RESEND_KEY}`, 'Content-Type': 'application/json' },
@@ -207,7 +301,7 @@ exports.handler = async (event) => {
     return {
       statusCode: 200,
       headers,
-      body: JSON.stringify({ ok: true, ya_existia: false, pagos: insertados, admin: { id: auth.user.id, correo: auth.user.correo }, ...correoInfo }),
+      body: JSON.stringify({ ok: true, ya_existia: false, pagos: insertados, admin: { id: auth.user.id, correo: auth.user.correo }, plan_por_lugar: planPorLugar, lugares_planificados: lugaresPlanificados, cuotas_insertadas: Array.isArray(insertados) ? insertados.length : rows.length, ...correoInfo }),
     };
   } catch (e) {
     return { statusCode: 502, headers, body: JSON.stringify({ error: 'Error generando plan de pagos', detail: e.message }) };
@@ -236,6 +330,11 @@ function fmtMxn(n) {
   return '$' + Math.round(Number(n) || 0).toLocaleString('es-MX') + ' MXN';
 }
 
+// Redondeo a 2 decimales (centavos). Dinero: se usa en TODO el reparto por lugar.
+function round2(n) {
+  return Math.round((Number(n) || 0) * 100) / 100;
+}
+
 // Envoltura HTML negra estilo Conecta MX (molde de portal-recordatorios-diario).
 function wrapHtml(nombre, cuerpoHtml) {
   return `<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
@@ -252,7 +351,8 @@ function wrapHtml(nombre, cuerpoHtml) {
 }
 
 // Correo de bienvenida con el plan completo (todas las filas insertadas).
-function planHtml(nombre, eventoNombre, pagos) {
+// grupoNota (opcional): línea extra cuando el grupo tiene 2+ lugares.
+function planHtml(nombre, eventoNombre, pagos, grupoNota) {
   const rows = [...(Array.isArray(pagos) ? pagos : [])].sort((a, b) => (a.numero_pago || 0) - (b.numero_pago || 0));
   const total = rows.reduce((s, p) => s + (Number(p.monto) || 0), 0);
   const filas = rows.map((p) => {
@@ -280,6 +380,7 @@ function planHtml(nombre, eventoNombre, pagos) {
     </tr></tfoot>
   </table>
   <p style="margin:0 0 14px 0;font-size:13px;color:rgba(255,255,255,.7)">Cada abono debe cubrirse a más tardar en su fecha límite. Recuerda que los pagos no son reembolsables salvo cancelación total del evento.</p>
+  ${grupoNota ? `<p style="margin:0 0 14px 0;font-size:13px;color:#e8ff4c">${escapeHtml(grupoNota)}</p>` : ''}
   <p style="margin:0">Cualquier duda, respóndenos por WhatsApp. — Conecta Reynosa</p>`;
   return wrapHtml(nombre, cuerpo);
 }

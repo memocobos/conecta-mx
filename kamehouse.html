@@ -10634,6 +10634,10 @@ let _spEventosVistos = new Map();
 // Clave: solicitud_id, valor: array de pagos. Lo llena cargarPlanPagosSP y lo
 // re-renderiza renderPlanPagosSP tras marcar/revertir (Fase 2.3c).
 let _spPlanCache = {};
+// Lugares de cada solicitud (F3-t4b): para agrupar el plan por lugar y etiquetar.
+let _spLugaresCache = {};
+// Contexto del pago grupal en curso por solicitud: { monto, fecha, metodo, referencia, propuesta:[] }.
+let _spGrupoCache = {};
 
 // Headers para las 3 admin-* functions. Antes mandaba x-kh-user-id +
 // x-kh-correo (validados con anon key contra usuarios). Tras Security Phase 2
@@ -11075,6 +11079,7 @@ async function cargarPlanPagosSP(solicitudId, estadoSolicitud, paquete) {
     const data = await r.json();
     if (!r.ok) throw new Error(data.error || 'No se pudo obtener el plan de pagos');
     _spPlanCache[solicitudId] = Array.isArray(data.pagos) ? data.pagos : [];
+    _spLugaresCache[solicitudId] = Array.isArray(data.lugares) ? data.lugares : [];
     renderPlanPagosSP(solicitudId, estadoSolicitud);
   } catch (e) {
     target.innerHTML = `<span style="color:#FF6B6B">Error: ${_spEscape(e.message)}</span>`;
@@ -11107,8 +11112,14 @@ function renderPlanPagosSP(solicitudId, estadoSolicitud) {
       <div><div style="color:var(--ts);text-transform:uppercase;letter-spacing:.08em;font-size:10px">Restante</div><b style="font-size:14px;color:var(--orange)">${_spFmtMxn(restante)}</b></div>
     </div>`;
 
-  const filas = pagos.map(p => _spRenderFilaPago(solicitudId, p)).join('');
-  target.innerHTML = resumen + `<div style="display:flex;flex-direction:column;gap:8px">${filas}</div>`;
+  // Plan POR LUGAR (#229): si alguna cuota trae lugar_id, se agrupa por lugar y
+  // se ofrece el pago grupal. Planes grupales viejos (lugar_id null) → render
+  // EXACTO de siempre (lista plana, sin encabezados).
+  const porLugar = pagos.some(p => p.lugar_id != null);
+  const cuerpo = porLugar
+    ? _spRenderPlanPorLugar(solicitudId, pagos)
+    : `<div style="display:flex;flex-direction:column;gap:8px">${pagos.map(p => _spRenderFilaPago(solicitudId, p)).join('')}</div>`;
+  target.innerHTML = resumen + cuerpo;
 
   // Bitácora de movimientos (pagos_auditoria) — colapsable, lazy-load.
   target.innerHTML += `
@@ -11116,6 +11127,208 @@ function renderPlanPagosSP(solicitudId, estadoSolicitud) {
       <button class="btn btn-ghost btn-sm" style="font-size:11px" onclick="toggleBitacoraSP('${_spEscape(solicitudId)}')">Ver movimientos ▾</button>
       <div id="sp-audit-${_spEscape(solicitudId)}" style="display:none;margin-top:10px"></div>
     </div>`;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// PLAN POR LUGAR + PAGO GRUPAL (Acompañantes F3-t4b)
+// Agrupa las cuotas por lugar y ofrece el flujo grupal (backend #231:
+// admin-aplicar-pago-grupo, modos proponer/aplicar). NO toca marcarPagoSP/
+// revertirPagoSP: las filas por lugar reusan _spRenderFilaPago sin cambios.
+// ═══════════════════════════════════════════════════════════════
+
+// Chip verde "CONECTADO ✓" (el lugar ya tiene cliente_id: el acompañante aceptó).
+const _SP_CHIP_CONECTADO = `<span style="display:inline-block;padding:2px 8px;border-radius:999px;background:rgba(61,220,132,.15);border:1px solid rgba(61,220,132,.5);font-size:10px;font-weight:800;letter-spacing:.04em;color:#3DDC84">CONECTADO ✓</span>`;
+
+function _spRenderPlanPorLugar(solicitudId, pagos) {
+  const solSafe = _spEscape(solicitudId);
+  const lugById = {};
+  (_spLugaresCache[solicitudId] || []).forEach(l => { lugById[l.id] = l; });
+
+  // Agrupar las cuotas por lugar_id, ordenando los lugares por su numero.
+  const grupos = {};
+  pagos.forEach(p => { const k = p.lugar_id || '_'; (grupos[k] = grupos[k] || []).push(p); });
+  const keys = Object.keys(grupos).sort((a, b) => {
+    const na = (lugById[a] && lugById[a].numero != null) ? Number(lugById[a].numero) : 9999;
+    const nb = (lugById[b] && lugById[b].numero != null) ? Number(lugById[b].numero) : 9999;
+    return na - nb;
+  });
+
+  const botonGrupo = `
+    <div id="sp-grupo-${solSafe}" style="margin-bottom:12px">
+      <button class="btn btn-primary btn-sm" style="font-size:11px" onclick="abrirPagoGrupoSP('${solSafe}')">💰 Aplicar pago grupal</button>
+    </div>`;
+
+  const secciones = keys.map(k => {
+    const lg = lugById[k];
+    const ps = grupos[k];
+    const num = lg && lg.numero != null ? lg.numero : '?';
+    const nombre = (lg && lg.nombre && String(lg.nombre).trim()) ? lg.nombre : 'Por registrar';
+    const conectado = (lg && lg.cliente_id) ? _SP_CHIP_CONECTADO : '';
+    const subPagado = ps.filter(p => p.estado === 'pagado').reduce((a, p) => a + (Number(p.monto_pagado ?? p.monto) || 0), 0);
+    const subTotal = ps.reduce((a, p) => a + Number(p.monto || 0), 0);
+    const filas = ps.map(p => _spRenderFilaPago(solicitudId, p)).join('');
+    return `
+      <div style="border:1px solid var(--border);border-radius:10px;padding:10px 10px 12px;margin-bottom:8px;background:var(--bg2)">
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:9px">
+          <b style="font-size:13px">Lugar #${_spEscape(num)} · ${_spEscape(nombre)}</b>
+          ${conectado}
+          <span style="margin-left:auto;font-size:11px;color:var(--ts);white-space:nowrap">Pagado ${_spFmtMxn(subPagado)} de ${_spFmtMxn(subTotal)}</span>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:8px">${filas}</div>
+      </div>`;
+  }).join('');
+
+  return botonGrupo + secciones;
+}
+
+// Abre el mini-form del pago grupal (monto + fecha + método + referencia).
+function abrirPagoGrupoSP(solicitudId) {
+  const box = document.getElementById('sp-grupo-' + solicitudId);
+  if (!box) return;
+  const solSafe = _spEscape(solicitudId);
+  const hoy = _spYmd(new Date());
+  const opciones = _SP_METODOS_UI.map(k => `<option value="${k}">${_SP_METODO_LBL[k]}</option>`).join('');
+  const lbl = 'display:block;font-size:9px;letter-spacing:.1em;color:var(--ts);text-transform:uppercase;margin-bottom:3px';
+  const inp = 'padding:7px 8px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;color:var(--ink);font-size:12px';
+  box.innerHTML = `
+    <div style="padding:12px;background:var(--bg3);border:1px solid var(--border);border-radius:10px">
+      <div style="font-size:12px;font-weight:700;margin-bottom:4px">💰 Pago grupal</div>
+      <div style="font-size:11px;color:var(--ts);margin-bottom:10px">Una transferencia del titular se reparte entre las cuotas de los lugares (cascada por fecha). El sistema propone; tú confirmas.</div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
+        <div><label style="${lbl}">Monto recibido</label><input type="number" id="sp-grupo-monto-${solSafe}" min="0" step="0.01" placeholder="0.00" style="width:130px;${inp}"></div>
+        <div><label style="${lbl}">Fecha</label><input type="date" id="sp-grupo-fecha-${solSafe}" value="${_spEscape(hoy)}" style="${inp}"></div>
+        <div><label style="${lbl}">Método</label><select id="sp-grupo-metodo-${solSafe}" style="${inp}">${opciones}</select></div>
+        <div style="flex:1;min-width:150px"><label style="${lbl}">Referencia (opcional)</label><input type="text" id="sp-grupo-ref-${solSafe}" maxlength="120" placeholder="folio, últimos 4 dígitos, etc." style="width:100%;${inp}"></div>
+      </div>
+      <div style="margin-top:10px;display:flex;gap:8px;justify-content:flex-end">
+        <button class="btn btn-ghost btn-sm" style="font-size:11px" onclick="cerrarPagoGrupoSP('${solSafe}')">Cancelar</button>
+        <button class="btn btn-primary btn-sm" id="sp-grupo-btn-${solSafe}" style="font-size:11px" onclick="proponerPagoGrupoSP('${solSafe}')">Proponer reparto</button>
+      </div>
+      <div id="sp-grupo-prop-${solSafe}" style="margin-top:12px"></div>
+    </div>`;
+}
+
+// Cancelar: limpia el contexto y restaura el botón (sin escribir nada).
+function cerrarPagoGrupoSP(solicitudId) {
+  delete _spGrupoCache[solicitudId];
+  const box = document.getElementById('sp-grupo-' + solicitudId);
+  if (box) box.innerHTML = `<button class="btn btn-primary btn-sm" style="font-size:11px" onclick="abrirPagoGrupoSP('${_spEscape(solicitudId)}')">💰 Aplicar pago grupal</button>`;
+}
+
+// MODO proponer: pide al backend la cascada de cuotas para el monto dado.
+async function proponerPagoGrupoSP(solicitudId) {
+  const montoRaw = ((document.getElementById('sp-grupo-monto-' + solicitudId) || {}).value || '').trim();
+  const monto = Number(montoRaw);
+  if (!Number.isFinite(monto) || monto <= 0) { showToast('Escribe un monto válido (> 0)', 'error'); return; }
+  const fecha = (document.getElementById('sp-grupo-fecha-' + solicitudId) || {}).value || '';
+  const metodo = (document.getElementById('sp-grupo-metodo-' + solicitudId) || {}).value || '';
+  const referencia = ((document.getElementById('sp-grupo-ref-' + solicitudId) || {}).value || '').trim();
+  const btn = document.getElementById('sp-grupo-btn-' + solicitudId);
+  if (btn) { btn.disabled = true; btn.textContent = 'Calculando…'; }
+  try {
+    const r = await fetch('/.netlify/functions/admin-aplicar-pago-grupo', {
+      method: 'POST',
+      headers: _spAdminHeaders(),
+      body: JSON.stringify({ solicitud_id: solicitudId, modo: 'proponer', monto }),
+    });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || 'No se pudo calcular la propuesta');
+    _spGrupoCache[solicitudId] = { monto, fecha, metodo, referencia, propuesta: Array.isArray(data.propuesta) ? data.propuesta : [] };
+    _spRenderPropuestaGrupo(solicitudId);
+  } catch (e) {
+    showToast('Error: ' + e.message, 'error');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Proponer reparto'; }
+  }
+}
+
+// Pinta la propuesta: un checkbox por cuota (pre-palomeadas), pie con la suma en
+// vivo, y el botón "Confirmar y aplicar".
+function _spRenderPropuestaGrupo(solicitudId) {
+  const cont = document.getElementById('sp-grupo-prop-' + solicitudId);
+  const ctx = _spGrupoCache[solicitudId];
+  if (!cont || !ctx) return;
+  const solSafe = _spEscape(solicitudId);
+  if (!ctx.propuesta.length) {
+    cont.innerHTML = `<div style="border-top:1px solid var(--border);padding-top:10px;font-size:12px;color:var(--orange)">Con ${_spFmtMxn(ctx.monto)} no alcanza para cubrir ninguna cuota completa. Sobrante: ${_spFmtMxn(ctx.monto)}.</div>`;
+    return;
+  }
+  const filas = ctx.propuesta.map(c => `
+    <label style="display:flex;align-items:center;gap:8px;padding:6px 0;font-size:12px;cursor:pointer">
+      <input type="checkbox" checked data-id="${_spEscape(c.pago_id)}" data-monto="${_spEscape(Number(c.monto || 0))}" onchange="_spGrupoRecalc('${solSafe}')">
+      <span>Cuota ${_spEscape(c.numero_pago)} · Lugar #${_spEscape(c.lugar_numero)}${(c.lugar_nombre && String(c.lugar_nombre).trim()) ? ' (' + _spEscape(c.lugar_nombre) + ')' : ''} · ${_spEscape(c.concepto)}</span>
+      <span style="margin-left:auto;white-space:nowrap"><b>${_spFmtMxn(c.monto)}</b></span>
+    </label>`).join('');
+  cont.innerHTML = `
+    <div style="border-top:1px solid var(--border);padding-top:10px">
+      <div style="font-size:11px;color:var(--ts);margin-bottom:4px">Propuesta (cascada por fecha). Despalomea las que no quieras aplicar:</div>
+      <div id="sp-grupo-lista-${solSafe}">${filas}</div>
+      <div id="sp-grupo-pie-${solSafe}" style="margin-top:8px;font-size:12px"></div>
+      <div style="margin-top:10px;display:flex;gap:8px;justify-content:flex-end">
+        <button class="btn btn-ghost btn-sm" style="font-size:11px" onclick="cerrarPagoGrupoSP('${solSafe}')">Cancelar</button>
+        <button class="btn btn-primary btn-sm" id="sp-grupo-aplicar-${solSafe}" style="font-size:11px" onclick="aplicarPagoGrupoSP('${solSafe}')">Confirmar y aplicar</button>
+      </div>
+    </div>`;
+  _spGrupoRecalc(solicitudId);
+}
+
+// Recalcula en vivo el pie (suma palomeada + sobrante) al palomear/despalomear.
+function _spGrupoRecalc(solicitudId) {
+  const ctx = _spGrupoCache[solicitudId];
+  const lista = document.getElementById('sp-grupo-lista-' + solicitudId);
+  const pie = document.getElementById('sp-grupo-pie-' + solicitudId);
+  if (!ctx || !lista || !pie) return;
+  let suma = 0, n = 0;
+  lista.querySelectorAll('input[type=checkbox]').forEach(cb => {
+    if (cb.checked) { suma += Number(cb.dataset.monto || 0); n++; }
+  });
+  suma = Math.round(suma * 100) / 100;
+  const sobrante = Math.round((ctx.monto - suma) * 100) / 100;
+  pie.innerHTML = `Se aplicarán: <b style="color:#3DDC84">${_spFmtMxn(suma)}</b> (${n} cuota${n !== 1 ? 's' : ''}) · Sobrante sin aplicar: <b style="color:var(--orange)">${_spFmtMxn(sobrante)}</b>`;
+  const btn = document.getElementById('sp-grupo-aplicar-' + solicitudId);
+  if (btn) btn.disabled = (n === 0);
+}
+
+// MODO aplicar: manda las cuotas palomeadas + fecha/método/referencia. En 409
+// (algo cambió) muestra el detalle del backend y refresca el plan.
+async function aplicarPagoGrupoSP(solicitudId) {
+  const ctx = _spGrupoCache[solicitudId];
+  const lista = document.getElementById('sp-grupo-lista-' + solicitudId);
+  if (!ctx || !lista) return;
+  const pagoIds = [];
+  lista.querySelectorAll('input[type=checkbox]').forEach(cb => { if (cb.checked) pagoIds.push(cb.dataset.id); });
+  if (!pagoIds.length) { showToast('Selecciona al menos una cuota', 'error'); return; }
+  const btn = document.getElementById('sp-grupo-aplicar-' + solicitudId);
+  if (btn) { btn.disabled = true; btn.textContent = 'Aplicando…'; }
+  try {
+    const r = await fetch('/.netlify/functions/admin-aplicar-pago-grupo', {
+      method: 'POST',
+      headers: _spAdminHeaders(),
+      body: JSON.stringify({
+        solicitud_id: solicitudId,
+        modo: 'aplicar',
+        pago_ids: pagoIds,
+        fecha_pagada: ctx.fecha || undefined,
+        metodo: ctx.metodo || undefined,
+        referencia: ctx.referencia || undefined,
+      }),
+    });
+    const data = await r.json();
+    if (!r.ok) {
+      const det = data.detalle ? (' (' + _spEscape(JSON.stringify(data.detalle)) + ')') : '';
+      showToast('Error: ' + (data.error || 'No se pudo aplicar') + det, 'error');
+      if (r.status === 409) { delete _spGrupoCache[solicitudId]; await _spRefrescarPlanYLista(solicitudId, undefined); }
+      return;
+    }
+    delete _spGrupoCache[solicitudId];
+    const n = data.aplicados || 0;
+    showToast('✅ ' + n + ' cuota' + (n !== 1 ? 's' : '') + ' aplicada' + (n !== 1 ? 's' : '') + ' — ' + (data.solicitud_estado || ''), 'success');
+    await _spRefrescarPlanYLista(solicitudId, data.solicitud_estado);
+  } catch (e) {
+    showToast('Error: ' + e.message, 'error');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Confirmar y aplicar'; }
+  }
 }
 
 // Alterna la bitácora colapsable; la primera vez que se abre (div vacío) carga

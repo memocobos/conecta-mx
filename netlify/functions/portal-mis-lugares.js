@@ -128,6 +128,9 @@ exports.handler = async (event) => {
       if (!sol) continue;                       // solicitud borrada/inaccesible → fuera
       if (sol.estado === 'cancelado') continue; // viaje cancelado → no lo mostramos
       out.push({
+        // El id del lugar es SUYO (su cuenta lo aceptó) → sirve para que el portal
+        // consulte su mini-plan de pagos vía RLS (F3-t6). No expone nada ajeno.
+        lugar_id: l.id,
         evento_id: sol.evento_id,
         evento_nombre: sol.evento_nombre,
         numero: l.numero,

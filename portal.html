@@ -2254,9 +2254,25 @@ async function renderMisViajesAcomp(){
 
   if (!lugares.length){ cont.innerHTML = ''; return; } // sin viajes de acompañante → oculto
 
+  // [F3-t6] Mini-plan de cada lugar: query DIRECTA a pagos por lugar_id. El RLS
+  // (pagos.auth_user_id) solo le devuelve las cuotas que YA son suyas (#229/#230).
+  // Fails-soft: si truena o no hay cuotas, ese viaje conserva la nota de siempre.
+  const planes = await Promise.all(lugares.map(async (l) => {
+    if (!l.lugar_id) return [];
+    try {
+      const { data, error } = await supabase
+        .from('pagos')
+        .select('numero_pago,concepto,monto,monto_pagado,fecha_esperada,fecha_pagada,estado')
+        .eq('lugar_id', l.lugar_id)
+        .order('numero_pago', { ascending: true });
+      if (error) return [];
+      return Array.isArray(data) ? data : [];
+    } catch (e) { return []; }
+  }));
+
   const chip = (txt) => `<span style="display:inline-block;padding:2px 8px;margin:2px 4px 0 0;border-radius:999px;background:var(--field-bg);border:1px solid var(--line);font-size:10px;font-weight:700;letter-spacing:.04em;color:var(--ink-soft)">${escapeHtml(txt)}</span>`;
 
-  const filas = lugares.map((l) => {
+  const bloques = lugares.map((l, i) => {
     const chips = [l.paquete, l.zona, l.tipo_habitacion]
       .filter(v => v != null && String(v).trim() !== '')
       .map(chip).join('');
@@ -2270,21 +2286,53 @@ async function renderMisViajesAcomp(){
       etiqueta = `<span style="display:inline-block;margin-left:6px;padding:1px 7px;border-radius:999px;font-size:9px;font-weight:900;letter-spacing:.1em;color:#ffb84c;border:1px solid rgba(255,184,76,.5);background:rgba(255,184,76,.12)">TRASPASADO</span>`;
     }
 
+    const pagos = planes[i] || [];
+    // Con cuotas suyas → su mini-plan; sin cuotas (plan no generado / no re-apuntado) → la nota.
+    const detalle = pagos.length
+      ? _miniPlanAcompHtml(pagos)
+      : `<p style="margin:8px 0 0 0;font-size:12px;color:var(--ink-mute)">Los pagos de este viaje los administra quien organizó el grupo.</p>`;
+
     return `
-      <div class="pago-row">
-        <div class="pago-info">
-          <div class="pago-concepto" style="${tachado}">${escapeHtml(l.evento_nombre || 'Tu viaje')}${etiqueta}</div>
-          ${chips ? `<div class="pago-fecha">${chips}</div>` : ''}
+      <div style="padding:12px 0;border-top:1px solid var(--line)">
+        <div style="display:flex;align-items:flex-start;gap:10px">
+          <div style="flex:1;min-width:0">
+            <div class="pago-concepto" style="${tachado}">${escapeHtml(l.evento_nombre || 'Tu viaje')}${etiqueta}</div>
+            ${chips ? `<div class="pago-fecha" style="margin-top:4px">${chips}</div>` : ''}
+          </div>
+          ${precioHtml ? `<div class="pago-monto">${precioHtml}</div>` : ''}
         </div>
-        ${precioHtml ? `<div class="pago-monto">${precioHtml}</div>` : ''}
+        ${detalle}
       </div>`;
   }).join('');
 
   cont.innerHTML = `
     <div class="card" id="mis-viajes-acomp-card">
-      <div class="eyebrow" style="margin-bottom:14px">🎒 Mis viajes como acompañante</div>
-      <div class="pago-list">${filas}</div>
-      <p style="margin:12px 0 0 0;font-size:12px;color:var(--ink-mute)">Los pagos de este viaje los administra quien organizó el grupo.</p>
+      <div class="eyebrow" style="margin-bottom:6px">🎒 Mis viajes como acompañante</div>
+      ${bloques}
+    </div>`;
+}
+
+// [F3-t6] Mini-plan de pagos del acompañante (sus cuotas de un lugar). Solo lectura.
+// Abonado = monto REAL pagado (monto_pagado ?? monto), igual que renderPlanPagos.
+function _miniPlanAcompHtml(pagos){
+  const total   = pagos.reduce((s, p) => s + (Number(p.monto) || 0), 0);
+  const abonado = pagos.filter(p => p.estado === 'pagado').reduce((s, p) => s + (Number(p.monto_pagado ?? p.monto) || 0), 0);
+  const falta   = Math.max(0, total - abonado);
+  const filas = pagos.map(p => {
+    const ic = p.estado === 'pagado' ? '✅' : (p.estado === 'vencido' ? '🔴' : '⏳');
+    const cuando = (p.estado === 'pagado' && p.fecha_pagada)
+      ? ('pagada ' + fmtFechaCorta(p.fecha_pagada))
+      : ('vence ' + fmtFechaCorta(p.fecha_esperada));
+    return `<div style="display:flex;align-items:center;gap:8px;font-size:12px;padding:3px 0;color:var(--ink-soft)">
+      <span>${ic}</span>
+      <span>Cuota ${escapeHtml(p.numero_pago)} · <b>${fmtMxn(p.monto)}</b></span>
+      <span style="margin-left:auto;color:var(--ink-mute)">${escapeHtml(cuando)}</span>
+    </div>`;
+  }).join('');
+  return `
+    <div style="margin-top:10px;border-top:1px solid var(--line);padding-top:8px">
+      ${filas}
+      <div style="margin-top:6px;font-size:12px;font-weight:700">Pagado <span style="color:var(--green)">${fmtMxn(abonado)}</span> de ${fmtMxn(total)} — te falta <span style="color:var(--red)">${fmtMxn(falta)}</span></div>
     </div>`;
 }
 
@@ -2495,6 +2543,55 @@ function abrirTour(t){
   renderPlanPagos(t, head).then(() => renderAcompanantes(t));
 }
 
+// [F3-t6] Fila de una cuota del plan (render de siempre). Extraída para reusarla
+// tanto en la lista plana como en el agrupado por lugar del titular.
+function _planFilaHtml(p){
+  const cls  = p.estado === 'pagado' ? 'is-pagado' : (p.estado === 'vencido' ? 'is-vencido' : 'is-pend');
+  const ico  = p.estado === 'pagado' ? '✓' : (p.estado === 'vencido' ? '!' : '');
+  const sub  = p.estado === 'pagado' && p.fecha_pagada
+    ? 'Pagado el ' + fmtFechaCorta(p.fecha_pagada)
+    : (p.estado === 'vencido' ? 'Venció el ' + fmtFechaCorta(p.fecha_esperada)
+                              : 'Para el ' + fmtFechaCorta(p.fecha_esperada));
+  return `
+      <div class="pago-row ${cls}">
+        <div class="pago-ico">${ico}</div>
+        <div class="pago-info">
+          <div class="pago-concepto">${escapeHtml(p.concepto)}</div>
+          <div class="pago-fecha">${sub}</div>
+        </div>
+        <div class="pago-monto">${fmtMxn(p.monto)}</div>
+      </div>`;
+}
+
+// [F3-t6] Agrupa las cuotas por lugar (plan por lugar). Sub-encabezado
+// "Lugar #N · nombre" (+ ✓ si conectado) + subtotal por lugar. Solo lectura.
+function _planGrupoLugarHtml(data, lugById){
+  const grupos = {};
+  data.forEach(p => { const k = p.lugar_id || '_'; (grupos[k] = grupos[k] || []).push(p); });
+  const keys = Object.keys(grupos).sort((a, b) => {
+    const na = (lugById[a] && lugById[a].numero != null) ? Number(lugById[a].numero) : 9999;
+    const nb = (lugById[b] && lugById[b].numero != null) ? Number(lugById[b].numero) : 9999;
+    return na - nb;
+  });
+  return keys.map(k => {
+    const lg = lugById[k];
+    const ps = grupos[k];
+    const num = (lg && lg.numero != null) ? lg.numero : '?';
+    const nombre = (lg && lg.nombre && String(lg.nombre).trim()) ? lg.nombre : 'Por registrar';
+    const check = (lg && lg.cliente_id) ? ' <span style="color:var(--green)">✓</span>' : '';
+    const subPag = ps.filter(p => p.estado === 'pagado').reduce((s, p) => s + (Number(p.monto_pagado ?? p.monto) || 0), 0);
+    const subTot = ps.reduce((s, p) => s + (Number(p.monto) || 0), 0);
+    return `
+      <div style="margin-bottom:16px">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0 0 8px 0">
+          <b style="font-size:13px">Lugar #${escapeHtml(num)} · ${escapeHtml(nombre)}${check}</b>
+          <span style="margin-left:auto;font-size:11px;color:var(--ink-mute)">Pagado ${fmtMxn(subPag)} de ${fmtMxn(subTot)}</span>
+        </div>
+        ${ps.map(_planFilaHtml).join('')}
+      </div>`;
+  }).join('');
+}
+
 async function renderPlanPagos(t, head){
   const cont = $('#tour-content');
 
@@ -2546,23 +2643,27 @@ async function renderPlanPagos(t, head){
     proxHtml = `<div class="prox-pago is-ok"><div class="prox-monto" style="font-size:24px">${txt}</div></div>`;
   }
 
-  const filas = data.map(p => {
-    const cls  = p.estado === 'pagado' ? 'is-pagado' : (p.estado === 'vencido' ? 'is-vencido' : 'is-pend');
-    const ico  = p.estado === 'pagado' ? '✓' : (p.estado === 'vencido' ? '!' : '');
-    const sub  = p.estado === 'pagado' && p.fecha_pagada
-      ? 'Pagado el ' + fmtFechaCorta(p.fecha_pagada)
-      : (p.estado === 'vencido' ? 'Venció el ' + fmtFechaCorta(p.fecha_esperada)
-                                : 'Para el ' + fmtFechaCorta(p.fecha_esperada));
-    return `
-      <div class="pago-row ${cls}">
-        <div class="pago-ico">${ico}</div>
-        <div class="pago-info">
-          <div class="pago-concepto">${escapeHtml(p.concepto)}</div>
-          <div class="pago-fecha">${sub}</div>
-        </div>
-        <div class="pago-monto">${fmtMxn(p.monto)}</div>
-      </div>`;
-  }).join('');
+  // [F3-t6] Si el plan es POR LUGAR (alguna cuota trae lugar_id), agrupar por lugar
+  // con sub-encabezado + subtotal; si no (planes viejos), lista plana EXACTA de hoy.
+  const porLugar = data.some(p => p.lugar_id != null);
+  let filas;
+  if (!porLugar){
+    filas = data.map(_planFilaHtml).join('');
+  } else {
+    // Nombres/estado de los lugares (RLS lugares_select_titular). Fails-soft: si
+    // falla, se agrupa igual por lugar_id pero sin etiquetas.
+    let lugById = {};
+    try {
+      const { data: lugs } = await supabase
+        .from('lugares')
+        .select('id,numero,nombre,cliente_id')
+        .eq('solicitud_id', t.id)
+        .order('numero', { ascending: true });
+      if (_tourActual !== t) return;
+      (Array.isArray(lugs) ? lugs : []).forEach(l => { lugById[l.id] = l; });
+    } catch (e) { /* fails-soft: sin etiquetas */ }
+    filas = _planGrupoLugarHtml(data, lugById);
+  }
 
   cont.innerHTML = head + `
     <div class="card">

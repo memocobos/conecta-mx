@@ -105,13 +105,28 @@ function correoNivel(nivel, evento, restanteFmt) {
 }
 
 // Lee pagos por solicitud en lotes (evita URLs gigantes con in.(...) enorme).
+// F3-t5: trae cliente_id (dueño de la cuota) para calcular nivel/deuda por persona.
 async function leerPagos(solIds) {
   const LOTE = 100;
   const out = [];
   for (let i = 0; i < solIds.length; i += LOTE) {
     const chunk = solIds.slice(i, i + LOTE);
     const rows = await sb(
-      `pagos?solicitud_id=in.(${chunk.join(',')})&select=solicitud_id,estado,monto,monto_pagado&limit=5000`
+      `pagos?solicitud_id=in.(${chunk.join(',')})&select=solicitud_id,cliente_id,estado,monto,monto_pagado&limit=5000`
+    );
+    if (Array.isArray(rows)) out.push(...rows);
+  }
+  return out;
+}
+
+// Lee clientes (dueños de las cuotas) por id en lotes, para nombre/correo.
+async function leerClientes(cliIds) {
+  const LOTE = 100;
+  const out = [];
+  for (let i = 0; i < cliIds.length; i += LOTE) {
+    const chunk = cliIds.slice(i, i + LOTE);
+    const rows = await sb(
+      `clientes?id=in.(${chunk.join(',')})&select=id,nombre_completo,correo&limit=5000`
     );
     if (Array.isArray(rows)) out.push(...rows);
   }
@@ -126,48 +141,71 @@ exports.handler = async function () {
   }
 
   // 1) Solicitudes en_pagos (las pagadas no deben; las pendientes no tienen plan;
-  //    las canceladas quedan fuera).
+  //    las canceladas quedan fuera). cliente_id = titular (fallback de dueño).
   const solicitudes = await sb(
-    'solicitudes_tour?estado=eq.en_pagos&select=id,evento_id,evento_nombre,precio_total,clientes(nombre_completo,correo)'
+    'solicitudes_tour?estado=eq.en_pagos&select=id,evento_id,evento_nombre,cliente_id'
   );
   if (!Array.isArray(solicitudes) || !solicitudes.length) {
     console.log('[morosidad] Fin. solicitudes en_pagos:0');
     return { statusCode: 200, body: JSON.stringify({ ok: true, n1: 0, n2: 0, n3: 0, sinCorreo: 0 }) };
   }
+  const solMap = {};
+  for (const s of solicitudes) if (s && s.id) solMap[s.id] = s;
 
-  // 2) Pagos de esas solicitudes.
+  // 2) Pagos de esas solicitudes (con cliente_id del dueño).
   const ids = solicitudes.map(s => s.id);
   const pagos = await leerPagos(ids);
 
-  // 3) Agregar por solicitud: vencidos + abonado (COALESCE(monto_pagado,monto)).
-  const vencidosPor = {};
-  const abonadoPor = {};
+  // 3) Agregar por (solicitud, DUEÑO de la cuota) (F3-t5): vencidos de esa persona,
+  //    su total (suma de SUS cuotas) y su abonado real (COALESCE(monto_pagado,monto)).
+  //    En planes viejos el dueño es siempre el titular y la suma de sus cuotas = el
+  //    precio_total → nivel/deuda idénticos a hoy.
+  const SEP = '|';
+  const vencidosSC = {}; // "solId|cid" → conteo vencidas de esa persona
+  const totalSC = {};    // "solId|cid" → suma de SUS cuotas (monto)
+  const abonadoSC = {};  // "solId|cid" → suma real pagada por esa persona
   for (const p of pagos) {
+    const sol = solMap[p.solicitud_id];
+    if (!sol) continue;
+    const cid = p.cliente_id || sol.cliente_id; // DUEÑO (fallback titular)
+    if (!cid) continue;
+    const key = p.solicitud_id + SEP + cid;
+    totalSC[key] = (totalSC[key] || 0) + Number(p.monto || 0);
     if (p.estado === 'vencido') {
-      vencidosPor[p.solicitud_id] = (vencidosPor[p.solicitud_id] || 0) + 1;
+      vencidosSC[key] = (vencidosSC[key] || 0) + 1;
     } else if (p.estado === 'pagado') {
       const real = (p.monto_pagado == null) ? p.monto : p.monto_pagado;
-      abonadoPor[p.solicitud_id] = (abonadoPor[p.solicitud_id] || 0) + Number(real || 0);
+      abonadoSC[key] = (abonadoSC[key] || 0) + Number(real || 0);
     }
   }
 
-  // 4) Para cada solicitud con vencidos >= 1, mandar el correo del nivel.
-  let n1 = 0, n2 = 0, n3 = 0, sinCorreo = 0, fallidos = 0;
-  for (const s of solicitudes) {
-    const vencidos = vencidosPor[s.id] || 0;
-    if (vencidos < 1) continue;
+  // 3b) Datos de los dueños (nombre/correo) por su cliente_id.
+  const ownerIds = [...new Set(Object.keys(vencidosSC).map(k => k.split(SEP)[1]))];
+  const clientes = ownerIds.length ? await leerClientes(ownerIds) : [];
+  const cliMap = {};
+  for (const c of clientes) if (c && c.id) cliMap[c.id] = c;
 
-    const cli = Array.isArray(s.clientes) ? (s.clientes[0] || {}) : (s.clientes || {});
-    const correo = cli.correo && String(cli.correo).trim();
-    const nombreFull = cli.nombre_completo || 'cliente';
+  // 4) Para cada PERSONA con vencidas >= 1, mandarle SU correo del nivel con SU deuda.
+  let n1 = 0, n2 = 0, n3 = 0, sinCorreo = 0, fallidos = 0;
+  for (const key of Object.keys(vencidosSC)) {
+    const vencidos = vencidosSC[key] || 0;
+    if (vencidos < 1) continue;
+    const solId = key.slice(0, key.indexOf(SEP));
+    const cid   = key.slice(key.indexOf(SEP) + 1);
+    const sol = solMap[solId];
+    if (!sol) continue;
+
+    const c = cliMap[cid] || {};
+    const correo = c.correo && String(c.correo).trim();
+    const nombreFull = c.nombre_completo || 'cliente';
     const nombre = String(nombreFull).trim().split(/\s+/)[0] || 'cliente';
-    const evento = s.evento_nombre || s.evento_id || 'tu evento';
-    const restante = Math.max(0, Number(s.precio_total || 0) - (abonadoPor[s.id] || 0));
+    const evento = sol.evento_nombre || sol.evento_id || 'tu evento';
+    const restante = Math.max(0, (totalSC[key] || 0) - (abonadoSC[key] || 0));
     const nivel = Math.min(vencidos, 3);
 
     if (!correo) {
       sinCorreo++;
-      console.warn(`[morosidad] solicitud ${s.id} (${nombreFull}) nivel ${nivel} SIN correo — saltada.`);
+      console.warn(`[morosidad] (${solId}/${nombreFull}) nivel ${nivel} SIN correo — saltada.`);
       continue;
     }
 

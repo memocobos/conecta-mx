@@ -74,13 +74,29 @@ function wrapHtml(nombre, cuerpoHtml) {
 }
 
 // Lee pagos por solicitud en lotes (evita URLs gigantes con in.(...) enorme).
+// F3-t5: trae cliente_id (dueño de la cuota) y lugar_id (para saber si el plan
+// es por lugar y agregar la nota al titular).
 async function leerPagos(solIds) {
   const LOTE = 100;
   const out = [];
   for (let i = 0; i < solIds.length; i += LOTE) {
     const chunk = solIds.slice(i, i + LOTE);
     const rows = await sb(
-      `pagos?solicitud_id=in.(${chunk.join(',')})&select=solicitud_id,estado,monto,fecha_esperada&limit=5000`
+      `pagos?solicitud_id=in.(${chunk.join(',')})&select=solicitud_id,cliente_id,estado,monto,fecha_esperada,lugar_id&limit=5000`
+    );
+    if (Array.isArray(rows)) out.push(...rows);
+  }
+  return out;
+}
+
+// Lee clientes (dueños de las cuotas) por id en lotes, para nombre/correo.
+async function leerClientes(cliIds) {
+  const LOTE = 100;
+  const out = [];
+  for (let i = 0; i < cliIds.length; i += LOTE) {
+    const chunk = cliIds.slice(i, i + LOTE);
+    const rows = await sb(
+      `clientes?id=in.(${chunk.join(',')})&select=id,nombre_completo,correo&limit=5000`
     );
     if (Array.isArray(rows)) out.push(...rows);
   }
@@ -95,56 +111,85 @@ exports.handler = async function () {
   }
 
   // 1) Solicitudes en_pagos (las pagadas no deben; las pendientes no tienen plan;
-  //    las canceladas quedan fuera). No hace falta precio_total: no mostramos saldo.
+  //    las canceladas quedan fuera). cliente_id = titular (fallback de dueño).
   const solicitudes = await sb(
-    'solicitudes_tour?estado=eq.en_pagos&select=id,evento_id,evento_nombre,clientes(nombre_completo,correo)'
+    'solicitudes_tour?estado=eq.en_pagos&select=id,evento_id,evento_nombre,cliente_id'
   );
   if (!Array.isArray(solicitudes) || !solicitudes.length) {
     console.log('[recordatorios] Fin. solicitudes en_pagos:0');
     return { statusCode: 200, body: JSON.stringify({ ok: true, mandados: 0, sinCorreo: 0, conVencidos: 0, sinPendientes: 0, fallidos: 0 }) };
   }
+  const solMap = {};
+  for (const s of solicitudes) if (s && s.id) solMap[s.id] = s;
 
-  // 2) Pagos de esas solicitudes (con fecha_esperada para hallar el próximo).
+  // 2) Pagos de esas solicitudes (con cliente_id del dueño + fecha + lugar_id).
   const ids = solicitudes.map(s => s.id);
   const pagos = await leerPagos(ids);
 
-  // 3) Por solicitud: contar vencidos y quedarse con el pendiente más TEMPRANO.
-  const vencidosPor = {};
-  const proximoPor = {};   // pendiente con fecha_esperada mínima = "el abono de ahora"
+  // 3) Por (solicitud, DUEÑO de la cuota) (F3-t5): vencidos + pendientes de ESA
+  //    persona. En planes viejos el dueño es siempre el titular → una sola llave
+  //    por solicitud = idéntico a hoy. porLugarSol marca los planes por lugar.
+  const SEP = '|';
+  const vencidosSC = {};   // "solId|cid" → conteo de vencidas de esa persona
+  const pendientesSC = {}; // "solId|cid" → [{ monto, fecha }]
+  const porLugarSol = {};  // solId → true si alguna cuota trae lugar_id
   for (const p of pagos) {
+    const sol = solMap[p.solicitud_id];
+    if (!sol) continue;
+    if (p.lugar_id != null) porLugarSol[p.solicitud_id] = true;
+    const cid = p.cliente_id || sol.cliente_id; // DUEÑO (fallback titular)
+    if (!cid) continue;
+    const key = p.solicitud_id + SEP + cid;
     if (p.estado === 'vencido') {
-      vencidosPor[p.solicitud_id] = (vencidosPor[p.solicitud_id] || 0) + 1;
+      vencidosSC[key] = (vencidosSC[key] || 0) + 1;
     } else if (p.estado === 'pendiente') {
-      const prev = proximoPor[p.solicitud_id];
-      if (!prev || String(p.fecha_esperada || '') < String(prev.fecha_esperada || '')) {
-        proximoPor[p.solicitud_id] = { monto: Number(p.monto || 0), fecha_esperada: p.fecha_esperada };
-      }
+      (pendientesSC[key] = pendientesSC[key] || []).push({ monto: Number(p.monto || 0), fecha: p.fecha_esperada });
     }
   }
 
-  // 4) Mandar el recordatorio amable solo a los AL CORRIENTE con abono pendiente.
-  let mandados = 0, sinCorreo = 0, conVencidos = 0, sinPendientes = 0, fallidos = 0;
-  for (const s of solicitudes) {
-    if ((vencidosPor[s.id] || 0) >= 1) { conVencidos++; continue; } // los regaña morosidad
-    const proximo = proximoPor[s.id];
-    if (!proximo) { sinPendientes++; continue; }                   // ya no debe en esta solicitud
+  // 3b) Datos de los dueños (nombre/correo) por su cliente_id.
+  const ownerIds = [...new Set(Object.keys(pendientesSC).map(k => k.split(SEP)[1]))];
+  const clientes = ownerIds.length ? await leerClientes(ownerIds) : [];
+  const cliMap = {};
+  for (const c of clientes) if (c && c.id) cliMap[c.id] = c;
 
-    const cli = Array.isArray(s.clientes) ? (s.clientes[0] || {}) : (s.clientes || {});
-    const correo = cli.correo && String(cli.correo).trim();
-    const nombreFull = cli.nombre_completo || 'cliente';
+  // 4) Mandar el amable a cada PERSONA al corriente (sin vencidas suyas) con abono
+  //    pendiente. Su abono "de ahora" = sus cuota(s) en la fecha pendiente más
+  //    temprana (suma si 2+, p.ej. el titular con lugares sin conectar).
+  let mandados = 0, sinCorreo = 0, conVencidos = 0, sinPendientes = 0, fallidos = 0;
+  for (const key of Object.keys(pendientesSC)) {
+    if ((vencidosSC[key] || 0) >= 1) { conVencidos++; continue; } // a esa persona la regaña morosidad
+    const solId = key.slice(0, key.indexOf(SEP));
+    const cid   = key.slice(key.indexOf(SEP) + 1);
+    const sol = solMap[solId];
+    if (!sol) continue;
+    const pend = pendientesSC[key];
+    let minFecha = null;
+    for (const q of pend) { const f = String(q.fecha || ''); if (minFecha === null || f < minFecha) minFecha = f; }
+    const montoAbonoNum = pend.reduce((a, q) => a + (String(q.fecha || '') === minFecha ? q.monto : 0), 0);
+
+    const c = cliMap[cid] || {};
+    const correo = c.correo && String(c.correo).trim();
+    const nombreFull = c.nombre_completo || 'cliente';
     const nombre = String(nombreFull).trim().split(/\s+/)[0] || 'cliente';
-    const evento = s.evento_nombre || s.evento_id || 'tu evento';
-    const montoAbono = fmtMxn(proximo.monto);
+    const evento = sol.evento_nombre || sol.evento_id || 'tu evento';
+    const montoAbono = fmtMxn(montoAbonoNum);
 
     if (!correo) {
       sinCorreo++;
-      console.warn(`[recordatorios] solicitud ${s.id} (${nombreFull}) SIN correo — saltada.`);
+      console.warn(`[recordatorios] (${solId}/${nombreFull}) SIN correo — saltada.`);
       continue;
     }
 
+    // Nota SOLO al titular de un plan por lugar: su monto es el SUYO, no el del grupo.
+    const esTitular = (cid === sol.cliente_id);
+    const notaGrupo = (porLugarSol[solId] && esTitular)
+      ? `<p style="margin:0 0 14px 0;font-size:13px;color:rgba(255,255,255,.7)">Este es <strong>tu</strong> abono del viaje; cada acompañante con su cuenta recibe el suyo por separado.</p>`
+      : '';
+
     const asunto = `Es momento de tu abono para ${evento} 🎵`;
     const cuerpo = `<p style="margin:0 0 14px 0">Ya abrió tu ventana de pago para tu viaje a <strong>${escapeHtml(evento)}</strong>. Tu abono de esta quincena es de <strong>${montoAbono}</strong>.</p>
-    <p style="margin:0 0 14px 0">Realízalo antes de que cierre para mantener tu lugar al corriente, y envíanos tu comprobante.</p>
+    ${notaGrupo}<p style="margin:0 0 14px 0">Realízalo antes de que cierre para mantener tu lugar al corriente, y envíanos tu comprobante.</p>
     <p style="margin:0">¡Gracias por viajar con Conecta!</p>`;
     const ok = await enviarCorreo(correo, asunto, wrapHtml(nombre, cuerpo));
     if (!ok) { fallidos++; continue; }

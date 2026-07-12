@@ -86,7 +86,7 @@ async function leerPagosEstado(solIds) {
   for (let i = 0; i < solIds.length; i += LOTE) {
     const chunk = solIds.slice(i, i + LOTE);
     const rows = await sb(
-      `pagos?solicitud_id=in.(${chunk.join(',')})&select=solicitud_id,estado&limit=5000`
+      `pagos?solicitud_id=in.(${chunk.join(',')})&select=solicitud_id,cliente_id,estado&limit=5000`
     );
     if (Array.isArray(rows)) out.push(...rows);
   }
@@ -133,7 +133,7 @@ exports.handler = async function () {
 
   // 2) Pagos PENDIENTES que vencen HOY (por fecha_esperada exacta → cualquier calendario).
   const pagosHoy = await sb(
-    `pagos?estado=eq.pendiente&fecha_esperada=eq.${hoy}&select=solicitud_id,monto,numero_pago,concepto&limit=5000`
+    `pagos?estado=eq.pendiente&fecha_esperada=eq.${hoy}&select=solicitud_id,cliente_id,monto,numero_pago,concepto&limit=5000`
   );
   if (!Array.isArray(pagosHoy) || !pagosHoy.length) {
     console.log(`[vence-hoy] Fin. hoy=${hoy} pagos que vencen hoy:0`);
@@ -146,22 +146,27 @@ exports.handler = async function () {
   const solMap = {}; // id → { cliente_id, evento_nombre }
   for (const s of solicitudes) if (s && s.id) solMap[s.id] = s;
 
-  // 4) Anti-doble-correo: solicitudes con algún pago 'vencido' → las regaña morosidad.
+  // 4) Anti-doble-correo POR PERSONA (F3-t5): quien tenga alguna cuota SUYA
+  //    'vencida' (por su cliente_id) ya está en la escalera de morosidad → se
+  //    salta aquí. En planes viejos toda cuota es del titular → idéntico a hoy.
   const pagosEstado = await leerPagosEstado(Object.keys(solMap));
-  const vencidosPor = {};
+  const vencidosPorCliente = {};
   for (const p of pagosEstado) {
-    if (p.estado === 'vencido') vencidosPor[p.solicitud_id] = (vencidosPor[p.solicitud_id] || 0) + 1;
+    if (p.estado !== 'vencido') continue;
+    const sol = solMap[p.solicitud_id];
+    const cid = p.cliente_id || (sol && sol.cliente_id); // fallback: titular de la solicitud
+    if (cid) vencidosPorCliente[cid] = (vencidosPorCliente[cid] || 0) + 1;
   }
 
-  // 5) Agrupar por cliente_id (un cliente con 2+ pagos que vencen hoy → un solo
-  //    correo con la suma y todos los conceptos).
+  // 5) Agrupar por DUEÑO de la cuota (pago.cliente_id; fallback titular). Un
+  //    cliente con 2+ cuotas que vencen hoy → un solo correo con suma y conceptos.
   const porCliente = {}; // cliente_id → { montoSum, conceptos:[], evento_nombre }
   for (const p of pagosHoy) {
     const sol = solMap[p.solicitud_id];
-    if (!sol) continue;                                   // solicitud cancelada / inexistente
-    if ((vencidosPor[p.solicitud_id] || 0) >= 1) continue; // ya en morosidad
-    const cid = sol.cliente_id;
+    if (!sol) continue;                                        // solicitud cancelada / inexistente
+    const cid = p.cliente_id || sol.cliente_id;                // DUEÑO de la cuota
     if (!cid) continue;
+    if ((vencidosPorCliente[cid] || 0) >= 1) continue;         // esa persona ya está en morosidad
     let acc = porCliente[cid];
     if (!acc) { acc = { montoSum: 0, conceptos: [], evento_nombre: sol.evento_nombre || 'tu evento' }; porCliente[cid] = acc; }
     acc.montoSum += Number(p.monto) || 0;

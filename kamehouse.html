@@ -2652,6 +2652,7 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
             <input type="checkbox" id="cc-rooming-excluir-staff" style="accent-color:var(--orange)">
             <span>excluir staff</span>
           </label>
+          <button class="btn btn-ghost btn-sm" onclick="imprimirListaHotel()" style="font-size:10px">🖨️ Lista para hotel</button>
           <button class="btn btn-ghost btn-sm" onclick="exportarRooming('excel')" style="font-size:10px">↓ CSV</button>
           <button class="btn btn-ghost btn-sm" onclick="exportarRooming('pdf')" style="font-size:10px">↓ PDF</button>
           <button class="btn btn-primary btn-sm" disabled title="Próximamente — la asignación fina de cuartos llega en una fase posterior" style="opacity:.5;cursor:not-allowed">+ Habitación</button>
@@ -10483,6 +10484,142 @@ async function loadRooming() {
       <div style="display:flex;flex-wrap:wrap;gap:6px">${chips}</div>
     </div>`;
   }).join('');
+}
+
+// ═══════════════════════════════════════════════════════════════
+// [acompañantes F6-t1] LISTA PARA EL HOTEL imprimible. Solo lectura: junta los
+// grupos del Portal (khRoomingGrupos) + el rooming KH (_ccViajeros por tipo) y
+// abre una ventana MÍNIMA en NEGRO SOBRE BLANCO que dispara print() (el usuario
+// elige "Guardar como PDF"), patrón del PDF de contratos (#227). Sin dinero.
+// ═══════════════════════════════════════════════════════════════
+
+// Helper reusable (la t2 lo reusa): ventana mínima imprimible, sin el CSS de KH.
+function _printVentana(titulo, htmlCuerpo) {
+  const w = window.open('', '_blank');
+  if (!w) { alert('Permite las ventanas emergentes para generar la lista.'); return; }
+  const generado = new Date().toLocaleString('es-MX', { timeZone: 'America/Monterrey', dateStyle: 'long', timeStyle: 'short' });
+  const doc = `<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"><title>${_esfEsc(titulo)}</title>
+<style>
+  @page { size: letter; margin: 14mm; }
+  *,*::before,*::after { box-sizing: border-box; }
+  body { font-family: -apple-system, system-ui, "Segoe UI", Arial, sans-serif; color:#000; background:#fff; margin:0; font-size:12px; line-height:1.4; }
+  .cx-eyebrow { font-size:10px; letter-spacing:.22em; text-transform:uppercase; color:#666; margin-bottom:6px }
+  .cx-eyebrow b { color:#ff283b; font-weight:900 }
+  h1 { font-size:18px; margin:0 0 2px }
+  .cx-sub { color:#555; font-size:11px; margin:0 0 18px }
+  h2 { font-size:13px; text-transform:uppercase; letter-spacing:.05em; border-bottom:2px solid #000; padding-bottom:4px; margin:22px 0 10px }
+  table { width:100%; border-collapse:collapse; margin:0 0 12px }
+  th,td { text-align:left; padding:6px 8px; border-bottom:1px solid #ccc; vertical-align:top }
+  th { font-size:10px; text-transform:uppercase; letter-spacing:.04em; color:#444; border-bottom:1px solid #000 }
+  section, tr, h2, .cx-grupo { break-inside: avoid }
+  .cx-resumen { margin-top:20px; padding-top:10px; border-top:2px solid #000; font-size:12px }
+  .cx-muted { color:#888 }
+</style></head>
+<body>
+  <div class="cx-eyebrow"><b>Conecta</b> MX</div>
+  <h1>${_esfEsc(titulo)}</h1>
+  <div class="cx-sub">Generado el ${_esfEsc(generado)}</div>
+  ${htmlCuerpo}
+  <script>window.onload=function(){setTimeout(function(){window.print();},120);};<\/script>
+</body></html>`;
+  w.document.open(); w.document.write(doc); w.document.close();
+}
+
+// Etiqueta capitalizada del tipo de cuarto (Sección 2 usa minúsculas).
+function _rgTipoLabel(t) {
+  const s = String(t || '').toLowerCase();
+  return ({ compartida: 'Compartida', doble: 'Doble', triple: 'Triple', individual: 'Individual', cuadruple: 'Cuádruple' }[s]) || (t || '—');
+}
+
+async function imprimirListaHotel() {
+  if (!_ccEventoActual) { alert('Selecciona un evento primero.'); return; }
+  const ev = _ccEventosCache.find(e => e.id === _ccEventoActual) || {};
+  const eventoNombre = ev.nombre || _ccEventoActual;
+
+  // ── Datos frescos ──
+  let grupos = [];
+  try { grupos = await khRoomingGrupos.listar(_ccEventoActual); } catch (e) { grupos = []; }
+  const viajeros = Array.isArray(_ccViajeros) ? _ccViajeros : [];
+
+  // Conteo de cuartos por tipo (Sección 1, cuartos reales del puzzle) + personas.
+  const cuartosPorTipo = {}; // 'Compartida' → n
+  let personasGrupos = 0, personasStaff = 0;
+
+  // ── SECCIÓN 1 — Cuartos de grupos (Portal) ──
+  const filasCuartos = [];
+  const sinAcomodar = []; // { titular, personas:[nombre] }
+  grupos.forEach(g => {
+    const titular = (g.titular_nombre && String(g.titular_nombre).trim()) || 'Titular';
+    const activos = (g.lugares || []).filter(l => l.estado === 'activo');
+    personasGrupos += activos.length;
+    const nombreDe = (l) => (l.nombre && String(l.nombre).trim()) ? l.nombre : ('Lugar #' + l.numero + ' — por confirmar');
+    const ocupPorHab = {};
+    activos.forEach(l => { if (l.habitacion_grupo_id) { (ocupPorHab[l.habitacion_grupo_id] = ocupPorHab[l.habitacion_grupo_id] || []).push(l); } });
+    (g.habitaciones || []).forEach(h => {
+      const ocup = ocupPorHab[h.id] || [];
+      const lbl = _rgTipoLabel(h.tipo);
+      cuartosPorTipo[lbl] = (cuartosPorTipo[lbl] || 0) + 1;
+      const nombres = ocup.length ? ocup.map(nombreDe).map(_esfEsc).join(', ') : '<span class="cx-muted">(vacío)</span>';
+      filasCuartos.push(`<tr>
+        <td>${_esfEsc('Grupo de ' + titular + ' · Cuarto ' + h.orden)}</td>
+        <td>${_esfEsc(lbl)}</td>
+        <td>${nombres}</td>
+        <td>${ocup.length}/${_esfEsc(h.capacidad)}</td>
+      </tr>`);
+    });
+    // Personas activas sin cuarto asignado → SIN ACOMODAR.
+    const sc = activos.filter(l => !l.habitacion_grupo_id);
+    if (sc.length) sinAcomodar.push({ titular, personas: sc.map(nombreDe) });
+  });
+
+  let seccion1 = `<h2>Cuartos de grupos</h2>`;
+  if (filasCuartos.length) {
+    seccion1 += `<table><thead><tr><th>Cuarto</th><th>Tipo</th><th>Ocupantes</th><th>Ocup.</th></tr></thead><tbody>${filasCuartos.join('')}</tbody></table>`;
+  } else {
+    seccion1 += `<div class="cx-muted">Sin cuartos armados por los grupos.</div>`;
+  }
+  if (sinAcomodar.length) {
+    seccion1 += `<h2>Sin acomodar</h2>` + sinAcomodar.map(s =>
+      `<div class="cx-grupo" style="margin-bottom:8px"><b>Grupo de ${_esfEsc(s.titular)}:</b> ${s.personas.map(_esfEsc).join(', ')}</div>`
+    ).join('');
+  }
+
+  // ── SECCIÓN 2 — Staff / rooming interno (KH), agrupado por tipo (como loadRooming) ──
+  const VALIDOS = ['compartida', 'doble', 'triple', 'individual'];
+  const porTipo = { compartida: [], doble: [], triple: [], individual: [], _sin: [] };
+  viajeros.forEach(v => {
+    const t = VALIDOS.includes(v.tipo_habitacion) ? v.tipo_habitacion : '_sin';
+    porTipo[t].push(v);
+    personasStaff += Number(v.num_personas) > 0 ? Number(v.num_personas) : 1;
+    // El resumen de "cuartos por tipo" cuenta solo cuartos REALES (Sección 1); el
+    // rooming KH agrupa por tipo pedido, no forma cuartos discretos → no suma aquí.
+  });
+  const filasStaff = [];
+  [...VALIDOS, '_sin'].forEach(t => {
+    (porTipo[t] || []).forEach(v => {
+      const c = v.clientes || {};
+      const meta = [v.paquete, v.zona, (Number(v.num_personas) > 1) ? (v.num_personas + ' pers.') : null].filter(Boolean).join(' · ');
+      filasStaff.push(`<tr>
+        <td>${_esfEsc(t === '_sin' ? 'Sin habitación' : _rgTipoLabel(t))}</td>
+        <td>${_esfEsc(c.nombre_completo || '—')}</td>
+        <td>${_esfEsc(meta)}</td>
+      </tr>`);
+    });
+  });
+  let seccion2 = `<h2>Staff / rooming interno</h2>`;
+  seccion2 += filasStaff.length
+    ? `<table><thead><tr><th>Tipo</th><th>Viajero</th><th>Paquete · Zona</th></tr></thead><tbody>${filasStaff.join('')}</tbody></table>`
+    : `<div class="cx-muted">Sin viajeros en el rooming interno.</div>`;
+
+  // ── Resumen ──
+  const tiposResumen = Object.keys(cuartosPorTipo).filter(k => cuartosPorTipo[k] > 0)
+    .map(k => `${cuartosPorTipo[k]} ${k}${cuartosPorTipo[k] !== 1 ? 's' : ''}`).join(' · ');
+  const resumen = `<div class="cx-resumen">
+    <div><b>Cuartos de grupos por tipo:</b> ${tiposResumen ? _esfEsc(tiposResumen) : '<span class="cx-muted">ninguno</span>'}</div>
+    <div style="margin-top:4px"><b>Total de personas:</b> ${personasGrupos + personasStaff} <span class="cx-muted">(${personasGrupos} en grupos · ${personasStaff} en rooming interno)</span></div>
+  </div>`;
+
+  _printVentana('Lista para hotel — ' + eventoNombre, seccion1 + seccion2 + resumen);
 }
 
 function renderHotelInfo() {

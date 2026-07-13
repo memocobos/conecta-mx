@@ -2663,6 +2663,14 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
          <button class="btn btn-ghost btn-sm" onclick="exportarRooming('pdf')" style="font-size:11px">↓ PDF completo</button>
          <button class="btn btn-primary" onclick="notificarEquipoListas()">Enviar listas al equipo</button>
         </div>
+
+        <!-- [F4-t4] Cuartos armados por los titulares en el Portal (puzzle de grupos) -->
+        <div style="margin-top:24px;padding-top:16px;border-top:1px solid var(--border)">
+         <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.12em;color:var(--ts);margin-bottom:4px">// CUARTOS DE LOS GRUPOS (PORTAL)</div>
+         <div style="font-size:11px;color:var(--ts);margin-bottom:12px">Los arman los titulares desde su portal. Aquí puedes ajustarlos (crear/eliminar cuartos, mover personas).</div>
+         <div id="rg-err" style="display:none;margin-bottom:10px" class="alert alert-error"></div>
+         <div id="cc-grupos-portal"><div style="color:var(--ts);font-size:12px">Cargando…</div></div>
+        </div>
        </div>
       </div>
      </div>
@@ -4913,6 +4921,150 @@ const khRooming = {
   actualizar(id, patch) { return this._call({ accion: 'actualizar', id, patch }); },
   eliminar(id) { return this._call({ accion: 'eliminar', id }); },
 };
+
+// ═══════════════════════════════════════════════════════════════
+// [acompañantes F4-t4] ROOMING DE GRUPOS (Portal) — sección NUEVA del sub-tab
+// Rooming de Capsule, DEBAJO del rooming KH (que NO se toca). Muestra y ajusta los
+// cuartos que los titulares armaron en el Portal, vía admin-rooming-grupos (#235
+// espejo con auth admin). Mismo lenguaje visual del puzzle del portal (#237).
+// ═══════════════════════════════════════════════════════════════
+const khRoomingGrupos = {
+  async _call(payload) {
+    const r = await khAdminFetch('/.netlify/functions/admin-rooming-grupos', {
+      method: 'POST', body: JSON.stringify(payload),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || j.ok === false) throw new Error(j.error || ('admin-rooming-grupos ' + r.status));
+    return j;
+  },
+  listar(eventoId) { return this._call({ accion: 'listar', evento_id: eventoId }).then(j => j.grupos || []); },
+  accion(payload) { return this._call(payload); },
+};
+
+const _RG_TIPOS = [ // orden del negocio: Compartida (base) → Individual.
+  { tipo: 'Compartida', cap: 4 }, { tipo: 'Triple', cap: 3 },
+  { tipo: 'Doble', cap: 2 }, { tipo: 'Individual', cap: 1 },
+];
+let _rgGrupos = [];        // último listado (para re-render en colapso sin re-fetch)
+let _rgAbiertos = {};      // solicitud_id → bool (card colapsable)
+
+// Carga best-effort junto a loadRooming. Fails-soft: si truena, muestra el error;
+// si el evento no tiene grupos, muestra la nota vacía.
+async function loadGruposPortal() {
+  const cont = document.getElementById('cc-grupos-portal');
+  if (!cont) return;
+  if (!_ccEventoActual) { cont.innerHTML = ''; return; }
+  cont.innerHTML = '<div style="color:var(--ts);font-size:12px">Cargando cuartos de los grupos…</div>';
+  let grupos;
+  try {
+    grupos = await khRoomingGrupos.listar(_ccEventoActual);
+  } catch (e) {
+    cont.innerHTML = `<div class="alert alert-error" style="font-size:12px">${_esfEsc(e.message || 'Error')}</div>`;
+    return;
+  }
+  _rgGrupos = Array.isArray(grupos) ? grupos : [];
+  _rgRender();
+}
+
+function _rgRender() {
+  const cont = document.getElementById('cc-grupos-portal');
+  if (!cont) return;
+  if (!_rgGrupos.length) {
+    cont.innerHTML = '<div style="color:var(--ts);font-size:12px">Sin grupos con acompañantes en este evento.</div>';
+    return;
+  }
+  cont.innerHTML = _rgGrupos.map(_rgGrupoHtml).join('');
+}
+
+function _rgGrupoHtml(g) {
+  const solSafe = _esfEsc(g.solicitud_id);
+  const activos = (g.lugares || []).filter(l => l.estado === 'activo');
+  const N = activos.length;
+  const nombreDe = (l) => (l.nombre && String(l.nombre).trim()) ? l.nombre : ('Lugar #' + l.numero);
+  const ocupPorHab = {};
+  activos.forEach(l => { if (l.habitacion_grupo_id) { (ocupPorHab[l.habitacion_grupo_id] = ocupPorHab[l.habitacion_grupo_id] || []).push(l); } });
+  const asignados = activos.filter(l => l.habitacion_grupo_id).length;
+  const sinCuarto = activos.filter(l => !l.habitacion_grupo_id);
+  const sumaCap = (g.habitaciones || []).reduce((a, h) => a + (Number(h.capacidad) || 0), 0);
+  const cubre = sumaCap >= N;
+  const abierto = !!_rgAbiertos[g.solicitud_id];
+
+  const header = `
+    <button type="button" data-rg-toggle="${solSafe}" style="width:100%;display:flex;align-items:center;gap:10px;background:transparent;border:none;color:var(--ink);cursor:pointer;text-align:left;padding:0">
+      <span style="font-family:'Rajdhani',sans-serif;font-weight:700;font-size:16px">Grupo de ${_esfEsc(g.titular_nombre)}</span>
+      <span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--ts);letter-spacing:.08em">asignados ${asignados} de ${N}</span>
+      <span style="margin-left:auto;color:var(--ts);font-size:12px">${abierto ? '▴' : '▾'}</span>
+    </button>`;
+
+  if (!abierto) {
+    return `<div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:12px 16px;margin-bottom:10px">${header}</div>`;
+  }
+
+  const pickerHtml = (habId) => sinCuarto.length
+    ? `<div style="display:flex;flex-wrap:wrap;gap:6px">${sinCuarto.map(l => `<button type="button" data-rg-asignar="${_esfEsc(l.id)}" data-rg-hab="${_esfEsc(habId)}" style="padding:5px 12px;border-radius:20px;border:1px solid var(--border);background:var(--bg3);color:var(--ink);font-size:12px;cursor:pointer">${_esfEsc(nombreDe(l))}</button>`).join('')}</div>`
+    : `<div style="font-size:12px;color:var(--ts)">Ya no hay personas sin cuarto.</div>`;
+
+  const cuartos = (g.habitaciones || []).map(h => {
+    const ocup = ocupPorHab[h.id] || [];
+    const lleno = ocup.length >= Number(h.capacidad || 0);
+    const chips = ocup.map(l => `<span style="display:inline-flex;align-items:center;gap:6px;padding:3px 6px 3px 10px;margin:2px 4px 0 0;border-radius:20px;background:var(--bg3);border:1px solid var(--border);font-size:12px">${_esfEsc(nombreDe(l))}<button type="button" data-rg-quitar="${_esfEsc(l.id)}" title="Quitar" style="border:none;background:transparent;color:var(--ts);font-size:14px;line-height:1;cursor:pointer;padding:0 2px">×</button></span>`).join('');
+    return `
+      <div style="border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:8px">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <b style="font-size:13px">Cuarto ${_esfEsc(h.orden)} · ${_esfEsc(h.tipo)}</b>
+          <span style="font-size:12px;color:${lleno ? 'var(--green)' : 'var(--ts)'}">(${ocup.length}/${_esfEsc(h.capacidad)})</span>
+          <button type="button" data-rg-del="${_esfEsc(h.id)}" title="Eliminar cuarto" style="margin-left:auto;border:none;background:transparent;font-size:15px;cursor:pointer">🗑️</button>
+        </div>
+        <div style="margin-top:8px">${chips || '<span style="font-size:12px;color:var(--ts)">Cuarto vacío</span>'}</div>
+        ${(!lleno && sinCuarto.length) ? `<div style="margin-top:8px"><button type="button" data-rg-add="${_esfEsc(h.id)}" style="padding:5px 12px;border-radius:20px;border:1px dashed var(--border);background:transparent;color:var(--ts);font-size:12px;cursor:pointer">+ Asignar</button></div>` : ''}
+        <div id="rg-picker-${_esfEsc(h.id)}" style="display:none;margin-top:8px">${pickerHtml(h.id)}</div>
+      </div>`;
+  }).join('');
+
+  const agregar = cubre
+    ? `<button type="button" disabled style="width:100%;padding:10px;border-radius:10px;border:1px solid var(--border);background:transparent;color:var(--ts);font-size:12px;cursor:not-allowed">Los cuartos ya cubren a todo el grupo</button>`
+    : `<button type="button" data-rg-addroom="${solSafe}" style="width:100%;padding:10px;border-radius:10px;border:1px dashed var(--border);background:transparent;color:var(--ink);font-size:12px;font-weight:700;cursor:pointer">＋ Agregar cuarto</button>
+       <div id="rg-tipos-${solSafe}" style="display:none;margin-top:8px"><div style="display:flex;flex-wrap:wrap;gap:6px">${_RG_TIPOS.map(x => `<button type="button" data-rg-crear="${x.tipo}" data-rg-sol="${solSafe}" style="padding:6px 14px;border-radius:20px;border:1px solid var(--border);background:var(--bg3);color:var(--ink);font-size:12px;cursor:pointer">${x.tipo} (${x.cap})</button>`).join('')}</div></div>`;
+
+  return `
+    <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:12px 16px;margin-bottom:10px">
+      ${header}
+      <div style="margin-top:12px">${cuartos}<div style="margin-top:4px">${agregar}</div></div>
+    </div>`;
+}
+
+// Escritura → admin-rooming-grupos; éxito re-fetch+re-pinta, error a #rg-err.
+async function _rgAccion(payload, btn) {
+  const errEl = document.getElementById('rg-err');
+  if (errEl) { errEl.style.display = 'none'; errEl.textContent = ''; }
+  const prev = btn ? btn.textContent : '';
+  if (btn) { btn.disabled = true; btn.textContent = '…'; }
+  try {
+    await khRoomingGrupos.accion(payload);
+    loadGruposPortal();
+  } catch (e) {
+    if (errEl) { errEl.textContent = e.message || 'No se pudo.'; errEl.style.display = 'block'; }
+    if (btn) { btn.disabled = false; btn.textContent = prev; }
+  }
+}
+
+// Delegación única de los controles del rooming de grupos.
+document.body.addEventListener('click', (e) => {
+  const tg = e.target.closest('[data-rg-toggle]');
+  if (tg) { const id = tg.getAttribute('data-rg-toggle'); _rgAbiertos[id] = !_rgAbiertos[id]; _rgRender(); return; }
+  const add = e.target.closest('[data-rg-add]');
+  if (add) { const p = document.getElementById('rg-picker-' + add.getAttribute('data-rg-add')); if (p) p.style.display = (p.style.display === 'none' ? '' : 'none'); return; }
+  const addRoom = e.target.closest('[data-rg-addroom]');
+  if (addRoom) { const tp = document.getElementById('rg-tipos-' + addRoom.getAttribute('data-rg-addroom')); if (tp) tp.style.display = (tp.style.display === 'none' ? 'block' : 'none'); return; }
+  const asg = e.target.closest('[data-rg-asignar]');
+  if (asg) { _rgAccion({ accion: 'asignar', lugar_id: asg.getAttribute('data-rg-asignar'), habitacion_id: asg.getAttribute('data-rg-hab') }, asg); return; }
+  const qt = e.target.closest('[data-rg-quitar]');
+  if (qt) { _rgAccion({ accion: 'quitar', lugar_id: qt.getAttribute('data-rg-quitar') }, qt); return; }
+  const cr = e.target.closest('[data-rg-crear]');
+  if (cr) { _rgAccion({ accion: 'crear_habitacion', solicitud_id: cr.getAttribute('data-rg-sol'), tipo: cr.getAttribute('data-rg-crear') }, cr); return; }
+  const dl = e.target.closest('[data-rg-del]');
+  if (dl) { if (confirm('¿Eliminar este cuarto? Las personas asignadas quedarán sin cuarto.')) _rgAccion({ accion: 'eliminar_habitacion', habitacion_id: dl.getAttribute('data-rg-del') }, dl); return; }
+});
 
 // [sec-eventos] Tabla `eventos` (UUID legacy del cotizador/capsule) vía Netlify
 // Function con service_role. Lectura: cualquier logueado (boot/ping/selects).
@@ -10275,6 +10427,7 @@ const TIPO_COL      = { individual: 'var(--ts)', doble: 'var(--blue)', triple: '
 // sin habitación (paquetes sin hotel, p.ej. RIDE/CHEAP) caen en "Sin habitación".
 async function loadRooming() {
   if (!_ccEventoActual) return;
+  loadGruposPortal(); // [F4-t4] cuartos del Portal (best-effort, fails-soft, no bloquea)
   const list    = document.getElementById('cc-rooming-list');
   const resumen = document.getElementById('cc-rooming-resumen');
   if (!list) return;

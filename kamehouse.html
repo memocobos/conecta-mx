@@ -11329,6 +11329,25 @@ function _spRenderPlanPorLugar(solicitudId, pagos) {
     const btnBaja = (lg && estado === 'activo' && Number(num) >= 2)
       ? `<button class="btn btn-ghost btn-sm" style="font-size:10px;color:#FF6B6B;border-color:rgba(255,107,107,.4)" onclick="darBajaLugarSP('${_spEscape(lg.id)}','${solSafe}')">⬇︎ Baja</button>`
       : '';
+    // [F5-t2] Botón "Traspasar": lugares numero>=2 ACTIVOS o en BAJA (revivir para el nuevo).
+    const puedeTraspasar = lg && Number(num) >= 2 && (estado === 'activo' || estado === 'baja');
+    const lgSafe = lg ? _spEscape(lg.id) : '';
+    const btnTraspaso = puedeTraspasar
+      ? `<button class="btn btn-ghost btn-sm" style="font-size:10px" onclick="_spToggleTraspaso('${lgSafe}')">⇄ Traspasar</button>`
+      : '';
+    const inpTras = 'width:100%;padding:7px 8px;margin-bottom:6px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;color:var(--ink);font-size:12px';
+    const formTraspaso = puedeTraspasar
+      ? `<div id="sp-traspaso-${lgSafe}" style="display:none;margin:0 0 10px;padding:10px 12px;background:var(--bg3);border:1px solid var(--border);border-radius:8px">
+          <div style="font-size:11px;color:var(--ts);margin-bottom:8px">Traspasar a otra persona — conserva lo abonado y lo restante; al nuevo le llega su invitación.</div>
+          <input id="sp-tras-nombre-${lgSafe}" type="text" maxlength="120" placeholder="Nombre del nuevo ocupante" style="${inpTras}">
+          <input id="sp-tras-correo-${lgSafe}" type="email" placeholder="Correo del nuevo ocupante" style="${inpTras}">
+          <input id="sp-tras-motivo-${lgSafe}" type="text" maxlength="500" placeholder="Motivo (opcional)" style="${inpTras}">
+          <div style="display:flex;gap:8px;justify-content:flex-end">
+            <button class="btn btn-ghost btn-sm" style="font-size:11px" onclick="_spToggleTraspaso('${lgSafe}')">Cancelar</button>
+            <button class="btn btn-primary btn-sm" style="font-size:11px" onclick="traspasarLugarSP('${lgSafe}','${solSafe}')">Confirmar traspaso</button>
+          </div>
+        </div>`
+      : '';
     const subPagado = ps.filter(p => p.estado === 'pagado').reduce((a, p) => a + (Number(p.monto_pagado ?? p.monto) || 0), 0);
     const subTotal = ps.reduce((a, p) => a + Number(p.monto || 0), 0);
     const filas = ps.map(p => _spRenderFilaPago(solicitudId, p)).join('');
@@ -11338,8 +11357,9 @@ function _spRenderPlanPorLugar(solicitudId, pagos) {
           <b style="font-size:13px;${nombreStyle}">Lugar #${_spEscape(num)} · ${_spEscape(nombre)}</b>
           ${etiquetaEstado}${conectado}
           <span style="margin-left:auto;font-size:11px;color:var(--ts);white-space:nowrap">Pagado ${_spFmtMxn(subPagado)} de ${_spFmtMxn(subTotal)}</span>
-          ${btnBaja}
+          ${btnBaja}${btnTraspaso}
         </div>
+        ${formTraspaso}
         <div style="display:flex;flex-direction:column;gap:8px">${filas}</div>
       </div>`;
   }).join('');
@@ -11368,6 +11388,47 @@ async function darBajaLugarSP(lugarId, solicitudId){
     if (j.abonado_del_lugar) partes.push(`${_spFmtMxn(j.abonado_del_lugar)} abonado no reembolsable`);
     if (j.correo_titular) partes.push('titular avisado');
     showToast('Lugar dado de baja — ' + partes.join(' · '), 'success');
+    await _spRefrescarPlanYLista(solicitudId, undefined);
+  } catch (e) {
+    showToast('Error: ' + e.message, 'error');
+  }
+}
+
+// [F5-t2] Abre/cierra el mini-form de traspaso de un lugar.
+function _spToggleTraspaso(lugarId){
+  const f = document.getElementById('sp-traspaso-' + lugarId);
+  if (f) f.style.display = (f.style.display === 'none' ? '' : 'none');
+}
+
+// [F5-t2] Traspasa el lugar a otra persona (Bulma). Conserva lo abonado y lo
+// restante; al nuevo le llega su invitación por correo (acepta con #226/#230).
+async function traspasarLugarSP(lugarId, solicitudId){
+  const nombre = ((document.getElementById('sp-tras-nombre-' + lugarId) || {}).value || '').trim();
+  const correo = ((document.getElementById('sp-tras-correo-' + lugarId) || {}).value || '').trim();
+  const motivo = ((document.getElementById('sp-tras-motivo-' + lugarId) || {}).value || '').trim();
+  if (!nombre) { showToast('Escribe el nombre del nuevo ocupante', 'error'); return; }
+  if (!correo || !correo.includes('@')) { showToast('Escribe un correo válido del nuevo ocupante', 'error'); return; }
+
+  const lg = (_spLugaresCache[solicitudId] || []).find(x => x.id === lugarId) || {};
+  const num = (lg.numero != null) ? lg.numero : '?';
+  // Abonado del lugar (si se conoce, del cache del plan) para el confirm.
+  const pagosLugar = (_spPlanCache[solicitudId] || []).filter(p => p.lugar_id === lugarId);
+  const abonado = pagosLugar.filter(p => p.estado === 'pagado').reduce((a, p) => a + (Number(p.monto_pagado ?? p.monto) || 0), 0);
+  const abonadoTxt = abonado ? ` (${_spFmtMxn(abonado)} abonado)` : '';
+  if (!confirm(`¿Traspasar el lugar #${num} a ${nombre}? Conserva lo abonado${abonadoTxt} y lo restante; al nuevo le llega su invitación por correo.`)) return;
+
+  try {
+    const r = await khAdminFetch('/.netlify/functions/admin-lugar-traspasar', {
+      method: 'POST',
+      body: JSON.stringify({ lugar_id: lugarId, nombre, correo, motivo: motivo || undefined }),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || j.ok === false) throw new Error(j.error || ('admin-lugar-traspasar ' + r.status));
+    const partes = [];
+    if (j.revivido) partes.push('lugar revivido');
+    if (j.cuotas_reactivadas) partes.push(`${j.cuotas_reactivadas} cuota(s) reactivada(s)`);
+    partes.push(j.invitacion_enviada ? 'invitación enviada' : 'invitación NO salió (reenvía)');
+    showToast('Lugar traspasado — ' + partes.join(' · '), j.invitacion_enviada ? 'success' : 'error');
     await _spRefrescarPlanYLista(solicitudId, undefined);
   } catch (e) {
     showToast('Error: ' + e.message, 'error');

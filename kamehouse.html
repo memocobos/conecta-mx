@@ -11317,21 +11317,61 @@ function _spRenderPlanPorLugar(solicitudId, pagos) {
     const num = lg && lg.numero != null ? lg.numero : '?';
     const nombre = (lg && lg.nombre && String(lg.nombre).trim()) ? lg.nombre : 'Por registrar';
     const conectado = (lg && lg.cliente_id) ? _SP_CHIP_CONECTADO : '';
+    // [F5-t1] Estado del lugar: baja (tachado+rojo) / traspasado (ámbar) / activo.
+    const estado = (lg && lg.estado) ? lg.estado : 'activo';
+    const nombreStyle = estado === 'baja' ? 'text-decoration:line-through;opacity:.6;' : '';
+    const etiquetaEstado = estado === 'baja'
+      ? `<span style="padding:1px 7px;border-radius:999px;font-size:9px;font-weight:900;letter-spacing:.1em;color:#FF6B6B;border:1px solid rgba(255,107,107,.5);background:rgba(255,107,107,.12)">BAJA</span>`
+      : (estado === 'traspasado'
+        ? `<span style="padding:1px 7px;border-radius:999px;font-size:9px;font-weight:900;letter-spacing:.1em;color:#FFB703;border:1px solid rgba(255,183,3,.5);background:rgba(255,183,3,.12)">TRASPASADO</span>`
+        : '');
+    // Botón "Baja": solo lugares ACTIVOS que no sean el titular (#1).
+    const btnBaja = (lg && estado === 'activo' && Number(num) >= 2)
+      ? `<button class="btn btn-ghost btn-sm" style="font-size:10px;color:#FF6B6B;border-color:rgba(255,107,107,.4)" onclick="darBajaLugarSP('${_spEscape(lg.id)}','${solSafe}')">⬇︎ Baja</button>`
+      : '';
     const subPagado = ps.filter(p => p.estado === 'pagado').reduce((a, p) => a + (Number(p.monto_pagado ?? p.monto) || 0), 0);
     const subTotal = ps.reduce((a, p) => a + Number(p.monto || 0), 0);
     const filas = ps.map(p => _spRenderFilaPago(solicitudId, p)).join('');
     return `
       <div style="border:1px solid var(--border);border-radius:10px;padding:10px 10px 12px;margin-bottom:8px;background:var(--bg2)">
-        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:9px">
-          <b style="font-size:13px">Lugar #${_spEscape(num)} · ${_spEscape(nombre)}</b>
-          ${conectado}
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:9px">
+          <b style="font-size:13px;${nombreStyle}">Lugar #${_spEscape(num)} · ${_spEscape(nombre)}</b>
+          ${etiquetaEstado}${conectado}
           <span style="margin-left:auto;font-size:11px;color:var(--ts);white-space:nowrap">Pagado ${_spFmtMxn(subPagado)} de ${_spFmtMxn(subTotal)}</span>
+          ${btnBaja}
         </div>
         <div style="display:flex;flex-direction:column;gap:8px">${filas}</div>
       </div>`;
   }).join('');
 
   return botonGrupo + secciones;
+}
+
+// [F5-t1] Dar de BAJA un lugar (Bulma). Política: cae SOLO ese lugar, sus cuotas
+// pendientes se anulan y lo abonado NO se devuelve. El titular queda avisado por
+// correo. El nombre/numero se leen del cache (evita romper el onclick con comillas).
+async function darBajaLugarSP(lugarId, solicitudId){
+  const lg = (_spLugaresCache[solicitudId] || []).find(x => x.id === lugarId) || {};
+  const num = (lg.numero != null) ? lg.numero : '?';
+  const nombre = (lg.nombre && String(lg.nombre).trim()) ? lg.nombre : ('Lugar #' + num);
+  const motivo = prompt('Motivo de la baja (opcional):', '');
+  if (motivo === null) return; // canceló el prompt
+  if (!confirm(`¿Dar de baja el lugar #${num} (${nombre})? Sus cuotas pendientes se anulan y lo abonado NO se devuelve.`)) return;
+  try {
+    const r = await khAdminFetch('/.netlify/functions/admin-lugar-baja', {
+      method: 'POST',
+      body: JSON.stringify({ lugar_id: lugarId, motivo: (motivo && motivo.trim()) ? motivo.trim() : undefined }),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || j.ok === false) throw new Error(j.error || ('admin-lugar-baja ' + r.status));
+    const partes = [`${j.cuotas_anuladas || 0} cuota(s) anulada(s)`];
+    if (j.abonado_del_lugar) partes.push(`${_spFmtMxn(j.abonado_del_lugar)} abonado no reembolsable`);
+    if (j.correo_titular) partes.push('titular avisado');
+    showToast('Lugar dado de baja — ' + partes.join(' · '), 'success');
+    await _spRefrescarPlanYLista(solicitudId, undefined);
+  } catch (e) {
+    showToast('Error: ' + e.message, 'error');
+  }
 }
 
 // Abre el mini-form del pago grupal (monto + fecha + método + referencia).

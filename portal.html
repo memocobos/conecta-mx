@@ -2540,7 +2540,7 @@ function abrirTour(t){
   // en_pagos | pagado → cargar plan; luego, debajo, la card de acompañantes
   // (solo lectura, fails-soft — no afecta el plan).
   cont.innerHTML = head + '<div class="card"><div class="tours-loading"><div class="b-spin" style="width:24px;height:24px"></div></div></div>';
-  renderPlanPagos(t, head).then(() => renderAcompanantes(t));
+  renderPlanPagos(t, head).then(() => renderAcompanantes(t)).then(() => renderPuzzle(t));
 }
 
 // [F3-t6] Fila de una cuota del plan (render de siempre). Extraída para reusarla
@@ -2898,6 +2898,167 @@ document.body.addEventListener('click', (e) => {
   if (saveBtn){ _guardarLugar(saveBtn.getAttribute('data-lugar-save'), saveBtn); return; }
   const inviteBtn = e.target.closest('[data-lugar-invite]');
   if (inviteBtn){ _invitarLugar(inviteBtn.getAttribute('data-lugar-invite'), inviteBtn); return; }
+});
+
+// ═══════════════════════════════════════════════════════════════
+// [acompañantes F4-t3] PUZZLE DE CUARTOS — card en el detalle del tour, DESPUÉS
+// de la de acompañantes (append en #tour-content). Lee lugares + habitaciones_grupo
+// por RLS (el titular ve las suyas); la ESCRITURA va por portal-puzzle (#235,
+// nunca anon directo). Pensada para CELULAR: tocar, no arrastrar. Fails-soft.
+// ═══════════════════════════════════════════════════════════════
+const _PUZ_TIPOS = [ // orden del negocio: la Compartida es la base/default.
+  { tipo: 'Compartida', cap: 4 }, { tipo: 'Triple', cap: 3 },
+  { tipo: 'Doble', cap: 2 }, { tipo: 'Individual', cap: 1 },
+];
+
+// Greedy simple: Compartidas de 4 mientras queden >=4 sin cubrir; el residuo va a
+// Triple(3)/Doble(2)/Individual(1). Solo texto (no auto-crea).
+function _puzSugerencia(falta){
+  if (falta <= 0) return '';
+  const comp = Math.floor(falta / 4), resto = falta % 4;
+  const partes = [];
+  if (comp) partes.push(comp + (comp === 1 ? ' Compartida' : ' Compartidas'));
+  if (resto === 3) partes.push('1 Triple');
+  else if (resto === 2) partes.push('1 Doble');
+  else if (resto === 1) partes.push('1 Individual');
+  return partes.join(' + ');
+}
+
+async function renderPuzzle(t){
+  if (_tourActual !== t) return;
+  let lugares, habs;
+  try {
+    const [lr, hr] = await Promise.all([
+      supabase.from('lugares').select('id,numero,nombre,estado,cliente_id,habitacion_grupo_id').eq('solicitud_id', t.id).order('numero', { ascending: true }),
+      supabase.from('habitaciones_grupo').select('id,tipo,capacidad,orden').eq('solicitud_id', t.id).order('orden', { ascending: true }),
+    ]);
+    if (lr.error) throw lr.error;
+    if (hr.error) throw hr.error;
+    lugares = Array.isArray(lr.data) ? lr.data : [];
+    habs = Array.isArray(hr.data) ? hr.data : [];
+  } catch (e) {
+    console.warn('[portal] puzzle (fail-soft):', e && (e.message || e));
+    return; // fails-soft: no pinta nada
+  }
+  if (_tourActual !== t) return;
+  if (lugares.length < 2) return; // solo con 2+ lugares
+
+  const cont = $('#tour-content');
+  if (!cont) return;
+
+  const activos = lugares.filter(l => l.estado === 'activo');
+  const N = activos.length;
+  const nombreDe = (l) => {
+    const n = (l.nombre && String(l.nombre).trim());
+    if (n) return n;
+    if (Number(l.numero) === 1 && perfilExistente && perfilExistente.nombre_completo) return perfilExistente.nombre_completo;
+    return 'Lugar #' + l.numero;
+  };
+
+  const ocupPorHab = {};
+  activos.forEach(l => { if (l.habitacion_grupo_id){ (ocupPorHab[l.habitacion_grupo_id] = ocupPorHab[l.habitacion_grupo_id] || []).push(l); } });
+  const asignados = activos.filter(l => l.habitacion_grupo_id).length;
+  const sinCuarto = activos.filter(l => !l.habitacion_grupo_id);
+  const sumaCap = habs.reduce((a, h) => a + (Number(h.capacidad) || 0), 0);
+  const cubreTodos = sumaCap >= N; // espejo del candado de sensatez del server
+
+  // Picker de lugares sin cuarto (para "+ Asignar"). Toca uno → asignar.
+  const pickerHtml = (habId) => sinCuarto.length
+    ? `<div style="display:flex;flex-wrap:wrap;gap:6px">${sinCuarto.map(l => `
+        <button type="button" data-puz-asignar="${escapeHtml(l.id)}" data-puz-hab="${escapeHtml(habId)}" style="padding:5px 12px;border-radius:999px;border:1px solid var(--line-strong);background:var(--field-bg);color:var(--ink);font-size:12px;font-weight:700;cursor:pointer">${escapeHtml(nombreDe(l))}</button>`).join('')}</div>`
+    : `<div style="font-size:12px;color:var(--ink-mute)">Ya no hay personas sin cuarto.</div>`;
+
+  const cuartosHtml = habs.map(h => {
+    const ocup = ocupPorHab[h.id] || [];
+    const lleno = ocup.length >= Number(h.capacidad || 0);
+    const chips = ocup.map(l => `
+      <span style="display:inline-flex;align-items:center;gap:6px;padding:3px 6px 3px 10px;margin:2px 4px 0 0;border-radius:999px;background:var(--field-bg);border:1px solid var(--line);font-size:12px;color:var(--ink)">
+        ${escapeHtml(nombreDe(l))}
+        <button type="button" data-puz-quitar="${escapeHtml(l.id)}" title="Quitar del cuarto" style="border:none;background:transparent;color:var(--ink-mute);font-size:14px;line-height:1;cursor:pointer;padding:0 2px">×</button>
+      </span>`).join('');
+    return `
+      <div style="border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-bottom:10px">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <b style="font-size:13px">Cuarto ${escapeHtml(h.orden)} · ${escapeHtml(h.tipo)}</b>
+          <span style="font-size:12px;color:${lleno ? 'var(--green)' : 'var(--ink-mute)'}">(${ocup.length}/${escapeHtml(h.capacidad)})</span>
+          <button type="button" data-puz-del="${escapeHtml(h.id)}" title="Eliminar cuarto" style="margin-left:auto;border:none;background:transparent;font-size:15px;cursor:pointer">🗑️</button>
+        </div>
+        <div style="margin-top:8px">${chips || '<span style="font-size:12px;color:var(--ink-mute)">Cuarto vacío</span>'}</div>
+        ${(!lleno && sinCuarto.length) ? `<div style="margin-top:8px"><button type="button" data-puz-add="${escapeHtml(h.id)}" style="padding:5px 12px;border-radius:999px;border:1px dashed var(--line-strong);background:transparent;color:var(--ink-soft);font-size:12px;font-weight:700;cursor:pointer">+ Asignar</button></div>` : ''}
+        <div id="puz-picker-${escapeHtml(h.id)}" style="display:none;margin-top:8px">${pickerHtml(h.id)}</div>
+      </div>`;
+  }).join('');
+
+  const falta = N - sumaCap;
+  const sugerencia = (!cubreTodos) ? _puzSugerencia(falta) : '';
+  const sugerenciaHtml = sugerencia
+    ? `<p style="margin:0 0 10px 0;font-size:12px;color:var(--ink-soft)">💡 Sugerencia: ${escapeHtml(sugerencia)}</p>`
+    : '';
+
+  const agregarHtml = cubreTodos
+    ? `<button type="button" disabled style="width:100%;padding:11px;border-radius:12px;border:1px solid var(--line);background:transparent;color:var(--ink-mute);font-size:13px;font-weight:700;cursor:not-allowed">Tus cuartos ya cubren a todo el grupo</button>`
+    : `
+      <button type="button" data-puz-addroom style="width:100%;padding:11px;border-radius:12px;border:1px dashed var(--line-strong);background:transparent;color:var(--ink);font-size:13px;font-weight:800;cursor:pointer">＋ Agregar cuarto</button>
+      <div id="puz-tipos" style="display:none;margin-top:8px">
+        <div style="display:flex;flex-wrap:wrap;gap:6px">
+          ${_PUZ_TIPOS.map(x => `<button type="button" data-puz-crear="${x.tipo}" style="padding:7px 14px;border-radius:999px;border:1px solid var(--line-strong);background:var(--field-bg);color:var(--ink);font-size:12px;font-weight:700;cursor:pointer">${x.tipo} (${x.cap})</button>`).join('')}
+        </div>
+      </div>`;
+
+  const cardHtml = `
+    <div class="card" id="puzzle-card">
+      <div class="eyebrow" style="margin-bottom:10px">🛏️ Cuartos del grupo · <span style="color:var(--ink-soft)">Asignados ${asignados} de ${N}</span></div>
+      ${sugerenciaHtml}
+      ${cuartosHtml}
+      <div style="margin-top:6px">${agregarHtml}</div>
+      <div id="puz-err" style="display:none;margin-top:10px;color:var(--red);font-size:12px;font-weight:700"></div>
+      <p style="margin:12px 0 0 0;font-size:12px;color:var(--ink-mute)">Los precios de tu paquete no cambian por el acomodo de cuartos; cualquier ajuste especial se hace con nosotros por WhatsApp.</p>
+    </div>`;
+
+  const prev = cont.querySelector('#puzzle-card');
+  if (prev) prev.remove();
+  cont.insertAdjacentHTML('beforeend', cardHtml);
+}
+
+// Toda escritura del puzzle → POST a portal-puzzle (Bearer del getSession). Botón
+// deshabilitado mientras opera; éxito → re-pinta la card; error → mensaje del backend.
+async function _puzzleAccion(payload, btn){
+  const errEl = document.getElementById('puz-err');
+  if (errEl){ errEl.style.display = 'none'; errEl.textContent = ''; }
+  const prevTxt = btn ? btn.textContent : '';
+  if (btn){ btn.disabled = true; btn.textContent = '…'; }
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    const jwt = session && session.access_token;
+    if (!jwt) throw new Error('Tu sesión expiró, vuelve a entrar.');
+    const r = await fetch('/.netlify/functions/portal-puzzle', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + jwt },
+      body: JSON.stringify(payload),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || j.ok === false) throw new Error(j.error || ('Error ' + r.status));
+    if (_tourActual) renderPuzzle(_tourActual); // remove-then-append idempotente
+  } catch (e) {
+    if (errEl){ errEl.textContent = (e && e.message) || 'No se pudo.'; errEl.style.display = 'block'; }
+    if (btn){ btn.disabled = false; btn.textContent = prevTxt; }
+  }
+}
+
+// Delegación única de los controles del puzzle.
+document.body.addEventListener('click', (e) => {
+  const addBtn = e.target.closest('[data-puz-add]');
+  if (addBtn){ const p = document.getElementById('puz-picker-' + addBtn.getAttribute('data-puz-add')); if (p) p.style.display = (p.style.display === 'none' ? '' : 'none'); return; }
+  const addRoom = e.target.closest('[data-puz-addroom]');
+  if (addRoom){ const tp = document.getElementById('puz-tipos'); if (tp) tp.style.display = (tp.style.display === 'none' ? 'block' : 'none'); return; }
+  const asignBtn = e.target.closest('[data-puz-asignar]');
+  if (asignBtn){ _puzzleAccion({ accion: 'asignar', lugar_id: asignBtn.getAttribute('data-puz-asignar'), habitacion_id: asignBtn.getAttribute('data-puz-hab') }, asignBtn); return; }
+  const quitarBtn = e.target.closest('[data-puz-quitar]');
+  if (quitarBtn){ _puzzleAccion({ accion: 'quitar', lugar_id: quitarBtn.getAttribute('data-puz-quitar') }, quitarBtn); return; }
+  const crearBtn = e.target.closest('[data-puz-crear]');
+  if (crearBtn){ if (!_tourActual) return; _puzzleAccion({ accion: 'crear_habitacion', solicitud_id: _tourActual.id, tipo: crearBtn.getAttribute('data-puz-crear') }, crearBtn); return; }
+  const delBtn = e.target.closest('[data-puz-del]');
+  if (delBtn){ if (confirm('¿Eliminar este cuarto? Las personas asignadas quedarán sin cuarto (sus precios no cambian).')) _puzzleAccion({ accion: 'eliminar_habitacion', habitacion_id: delBtn.getAttribute('data-puz-del') }, delBtn); return; }
 });
 
 // [acordeon] Interacción de la tarjeta de tour:

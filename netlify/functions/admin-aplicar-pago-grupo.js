@@ -286,14 +286,20 @@ async function reconciliar(env, sbHeaders, solicitudId) {
   const estadoPrevio = solicitud ? solicitud.estado : null;
   let estadoSolicitud = estadoPrevio;
 
-  const sumaReal = (Array.isArray(todos) ? todos : []).reduce((acc, p) => {
-    if (!p || p.estado !== 'pagado') return acc;
+  // [F5] Reconciliación sobre CUOTAS VIVAS (estado !== 'cancelado'). Tras una baja de
+  // lugar (#239) sus cuotas no pagadas quedan 'cancelado'; se EXCLUYEN para que el
+  // grupo pueda liquidar lo de los lugares vivos. Sin bajas, las vivas ≡ el plan
+  // completo (Σ vivas ≈ precio_total, tolerancia de $1). CALCA EXACTA de
+  // admin-marcar-pago / admin-lugar-baja (las 3 deben quedar idénticas).
+  const vivas = (Array.isArray(todos) ? todos : []).filter(p => p && p.estado !== 'cancelado');
+  const sumaReal = vivas.reduce((acc, p) => {
+    if (p.estado !== 'pagado') return acc;
     const real = (p.monto_pagado == null) ? Number(p.monto || 0) : Number(p.monto_pagado || 0);
     return acc + (Number.isFinite(real) ? real : 0);
   }, 0);
-  const precioTotal = Number((solicitud && solicitud.precio_total) || 0);
-  const dineroCuadra = sumaReal >= (precioTotal - TOLERANCIA_MXN);
-  const todosPagados = Array.isArray(todos) && todos.length > 0 && todos.every((p) => p.estado === 'pagado');
+  const esperado = vivas.reduce((acc, p) => acc + (Number(p.monto || 0) || 0), 0);
+  const dineroCuadra = sumaReal >= (esperado - TOLERANCIA_MXN);
+  const todosPagados = vivas.length > 0 && vivas.every((p) => p.estado === 'pagado');
 
   let nuevoEstadoSol = null;
   if (todosPagados && dineroCuadra && estadoPrevio !== 'pagado') {

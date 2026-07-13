@@ -197,21 +197,30 @@ exports.handler = async (event) => {
     const estadoPrevio = solicitud ? solicitud.estado : null;
     let estadoSolicitud = estadoPrevio;
 
-    // Dinero REAL cobrado = suma de pagos 'pagado' con COALESCE(monto_pagado, monto).
-    // MISMA definición de caja que admin-utilidad-evento y admin-cobranza-list.
-    const sumaReal = (Array.isArray(todos) ? todos : []).reduce((acc, p) => {
-      if (!p || p.estado !== 'pagado') return acc;
+    // [F5] Reconciliación sobre CUOTAS VIVAS (estado !== 'cancelado'). Tras una baja
+    // de lugar (#239) sus cuotas no pagadas quedan 'cancelado'; se EXCLUYEN para que
+    // el grupo pueda liquidar lo de los lugares vivos. Sin bajas, las vivas ≡ el plan
+    // completo (Σ vivas ≈ precio_total, misma tolerancia de $1 por centavos).
+    // MISMA transformación en admin-aplicar-pago-grupo y admin-lugar-baja (las 3 idénticas).
+    const vivas = (Array.isArray(todos) ? todos : []).filter(p => p && p.estado !== 'cancelado');
+    // Dinero REAL cobrado de las VIVAS pagadas = COALESCE(monto_pagado, monto). Lo
+    // pagado de un lugar dado de baja es historia contable (se retuvo) pero NO cuenta
+    // aquí — simetría con excluirlo del esperado.
+    const sumaReal = vivas.reduce((acc, p) => {
+      if (p.estado !== 'pagado') return acc;
       const real = (p.monto_pagado == null) ? Number(p.monto || 0) : Number(p.monto_pagado || 0);
       return acc + (Number.isFinite(real) ? real : 0);
     }, 0);
-    const precioTotal = Number((solicitud && solicitud.precio_total) || 0);
-    const dineroCuadra = sumaReal >= (precioTotal - TOLERANCIA_MXN);
+    // Esperado = Σ monto de las VIVAS (ya no precio_total: tras una baja, lo esperado
+    // es lo de los lugares vivos).
+    const esperado = vivas.reduce((acc, p) => acc + (Number(p.monto || 0) || 0), 0);
+    const dineroCuadra = sumaReal >= (esperado - TOLERANCIA_MXN);
 
-    // 'pagado' exige AMBAS: todas las parcialidades con palomita Y que el dinero
-    // real cuadre contra precio_total (tol $1). Si una de las dos falla y la
-    // solicitud estaba 'pagado', se degrada a 'en_pagos' (corrige el dato mal
-    // marcado al tocar uno de sus pagos; no hay barrido masivo).
-    const todosPagados = Array.isArray(todos) && todos.length > 0 && todos.every(p => p.estado === 'pagado');
+    // 'pagado' exige AMBAS: todas las cuotas VIVAS con palomita Y que el dinero real
+    // cuadre contra lo esperado (tol $1). Si una de las dos falla y la solicitud
+    // estaba 'pagado', se degrada a 'en_pagos' (corrige el dato mal marcado al tocar
+    // uno de sus pagos; no hay barrido masivo).
+    const todosPagados = vivas.length > 0 && vivas.every(p => p.estado === 'pagado');
     let nuevoEstadoSol = null;
     if (todosPagados && dineroCuadra && estadoPrevio !== 'pagado') {
       nuevoEstadoSol = 'pagado';

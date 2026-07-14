@@ -104,6 +104,10 @@ exports.handler = async (event) => {
     if (accion === 'listar') {
       const eventoId = String(body.evento_id || '').trim();
       if (!eventoId || !SLUG_RE.test(eventoId)) return json(400, { error: 'evento_id inválido' });
+      // [F6-t2] Con todos:true, la lista de COORDIS incluye también solicitudes de 1
+      // lugar y enriquece cada lugar con el contacto de su persona. SIN el flag, la
+      // respuesta queda EXACTA de hoy (#238/#242 no se enteran).
+      const todos = body.todos === true;
 
       const solR = await fetch(
         `${PORTAL_URL}/rest/v1/solicitudes_tour?evento_id=eq.${enc(eventoId)}&estado=neq.cancelado`
@@ -118,8 +122,10 @@ exports.handler = async (event) => {
       const solIds = sols.map(s => s.id);
       const inSol = solIds.map(enc).join(',');
 
+      // Los campos extra (correo/paquete/zona/fecha_nacimiento) se seleccionan
+      // siempre pero SOLO se emiten con `todos` — el map base los ignora.
       const [lugR, habR] = await Promise.all([
-        fetch(`${PORTAL_URL}/rest/v1/lugares?solicitud_id=in.(${inSol})&select=id,solicitud_id,numero,nombre,estado,habitacion_grupo_id,cliente_id&order=numero.asc`, { headers: sbHeaders }),
+        fetch(`${PORTAL_URL}/rest/v1/lugares?solicitud_id=in.(${inSol})&select=id,solicitud_id,numero,nombre,estado,habitacion_grupo_id,cliente_id,correo,paquete,zona,fecha_nacimiento&order=numero.asc`, { headers: sbHeaders }),
         fetch(`${PORTAL_URL}/rest/v1/habitaciones_grupo?solicitud_id=in.(${inSol})&select=id,solicitud_id,tipo,capacidad,orden&order=orden.asc`, { headers: sbHeaders }),
       ]);
       if (!lugR.ok) return json(502, { error: 'Supabase rechazó la consulta de lugares', detail: await lugR.text() });
@@ -127,11 +133,14 @@ exports.handler = async (event) => {
       const lugares = await lugR.json();
       const habitaciones = await habR.json();
 
-      // Nombres de los titulares.
-      const cliIds = [...new Set(sols.map(s => s.cliente_id).filter(Boolean))];
+      // Clientes: titulares siempre (para titular_nombre). Con `todos`, también los
+      // dueños de cada lugar + columnas de contacto (correo/celular).
+      const lugCliIds = todos ? (Array.isArray(lugares) ? lugares : []).filter(l => l.cliente_id).map(l => l.cliente_id) : [];
+      const cliIds = [...new Set([...sols.map(s => s.cliente_id), ...lugCliIds].filter(Boolean))];
+      const cliSelect = todos ? 'id,nombre_completo,correo,celular' : 'id,nombre_completo';
       const cliMap = {};
       if (cliIds.length) {
-        const cliR = await fetch(`${PORTAL_URL}/rest/v1/clientes?id=in.(${cliIds.map(enc).join(',')})&select=id,nombre_completo`, { headers: sbHeaders });
+        const cliR = await fetch(`${PORTAL_URL}/rest/v1/clientes?id=in.(${cliIds.map(enc).join(',')})&select=${cliSelect}`, { headers: sbHeaders });
         if (cliR.ok) (await cliR.json()).forEach(c => { cliMap[c.id] = c; });
       }
 
@@ -142,16 +151,33 @@ exports.handler = async (event) => {
       const grupos = [];
       for (const s of sols) {
         const lugs = lugPorSol[s.id] || [];
-        if (lugs.length < 2) continue; // solo grupos con 2+ lugares (los demás no tienen puzzle)
+        // Sin `todos`: solo grupos con 2+ lugares (los demás no tienen puzzle).
+        // Con `todos`: cualquiera con al menos 1 lugar (incluye los individuales).
+        if (todos ? !lugs.length : lugs.length < 2) continue;
         const cli = cliMap[s.cliente_id] || {};
         grupos.push({
           solicitud_id: s.id,
           titular_nombre: (cli.nombre_completo && String(cli.nombre_completo).trim()) || 'Titular',
           evento_nombre: s.evento_nombre || '',
-          lugares: lugs.map(l => ({
-            id: l.id, numero: l.numero, nombre: l.nombre, estado: l.estado,
-            habitacion_grupo_id: l.habitacion_grupo_id, cliente_id: l.cliente_id,
-          })),
+          lugares: lugs.map(l => {
+            const base = {
+              id: l.id, numero: l.numero, nombre: l.nombre, estado: l.estado,
+              habitacion_grupo_id: l.habitacion_grupo_id, cliente_id: l.cliente_id,
+            };
+            if (!todos) return base;
+            // Contacto: si el lugar tiene cliente (aceptó) → su perfil; si no → lo
+            // capturado en el lugar (nombre/correo). celular solo del perfil.
+            const lc = l.cliente_id ? (cliMap[l.cliente_id] || {}) : {};
+            return {
+              ...base,
+              nombre: (l.nombre && String(l.nombre).trim()) || (lc.nombre_completo || null),
+              correo: l.cliente_id ? (lc.correo || null) : (l.correo || null),
+              celular: l.cliente_id ? (lc.celular || null) : null,
+              paquete: l.paquete || null,
+              zona: l.zona || null,
+              fecha_nacimiento: l.fecha_nacimiento || null,
+            };
+          }),
           habitaciones: (habPorSol[s.id] || []).map(h => ({ id: h.id, tipo: h.tipo, capacidad: h.capacidad, orden: h.orden })),
         });
       }

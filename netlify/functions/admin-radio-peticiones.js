@@ -19,6 +19,12 @@ const { verifyAdminAuth, corsCheck } = require('./_lib/verify-admin');
 const ID_RE = /^[0-9a-fA-F-]{1,40}$/; // uuid o entero
 
 exports.handler = async (event) => {
+  // Origin CRUDO para distinguir "cross-origin no permitido" de "sin Origin".
+  // corsCheck devuelve null en ambos casos, pero un GET same-origin (como el de
+  // loadRadio en kamehouse) NO manda header Origin → no debe bloquearse; el JWT
+  // (verifyAdminAuth) es el candado real. Las admin-* POST-only nunca ven este
+  // caso porque un POST same-origin sí manda Origin.
+  const __rawOrigin = (event.headers && (event.headers.origin || event.headers.Origin)) || '';
   const __origin = corsCheck(event);
   const headers = {
     'Access-Control-Allow-Origin': __origin || 'null',
@@ -32,7 +38,8 @@ exports.handler = async (event) => {
   if (event.httpMethod !== 'GET' && event.httpMethod !== 'POST') {
     return { statusCode: 405, headers, body: JSON.stringify({ error: 'Method not allowed' }) };
   }
-  if (!__origin) return { statusCode: 403, headers, body: JSON.stringify({ error: 'Origen no permitido' }) };
+  // Bloquear SOLO cuando vino un Origin y no está permitido (cross-origin real).
+  if (__rawOrigin && !__origin) return { statusCode: 403, headers, body: JSON.stringify({ error: 'Origen no permitido' }) };
 
   const auth = verifyAdminAuth(event, ['maestro_roshi']);
   if (!auth.valid) return { statusCode: auth.status, headers, body: JSON.stringify({ error: auth.error }) };

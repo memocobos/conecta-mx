@@ -384,7 +384,7 @@ playBtn.addEventListener('click', function(){
   }
 });
 
-function esc(s){ return String(s || '').replace(/</g,'&lt;'); }
+function esc(s){ return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;'); }
 
 function actualizar(){
   fetch(API).then(function(r){ return r.json(); }).then(function(data){

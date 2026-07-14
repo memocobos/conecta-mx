@@ -3,6 +3,8 @@
 // privado `ine-creadores`. Actualiza el estado del contrato a 'firmado' y manda
 // notificaciones a admin@conectareynosa.mx y a la creadora.
 
+const { aplicarModoPrueba } = require('./_lib/correo-guard');
+
 const SB_URL = "https://npgnhsmwpcipxgvfxrho.supabase.co";
 const SB_KEY = process.env.SUPABASE_SERVICE_KEY_KAMEHOUSE;
 const RESEND_KEY = process.env.RESEND_API_KEY || process.env.RESEND_KEY;
@@ -79,6 +81,7 @@ async function sendEmail(to, subject, html) {
     console.warn("[contrato-firmar] RESEND_KEY no configurado, skip:", to);
     return false;
   }
+  ({ to, subject } = aplicarModoPrueba({ to, subject }));
   const r = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: { Authorization: `Bearer ${RESEND_KEY}`, "Content-Type": "application/json" },

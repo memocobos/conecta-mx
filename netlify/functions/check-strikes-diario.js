@@ -2,6 +2,8 @@
 // Esta función es disparada por el schedule en netlify.toml
 // Corre todos los días a las 00:00 UTC (6 PM hora CDMX)
 
+const { aplicarModoPrueba } = require('./_lib/correo-guard');
+
 const SB_URL = process.env.SUPABASE_URL_KAMEHOUSE || process.env.SUPABASE_URL;
 const SB_KEY = process.env.SUPABASE_SERVICE_KEY_KAMEHOUSE
             || process.env.SUPABASE_SERVICE_KEY
@@ -25,6 +27,7 @@ async function sb(path, opts = {}) {
 async function enviarCorreo(to, subject, html) {
   const KEY = process.env.RESEND_KEY || process.env.RESEND_API_KEY;
   if (!KEY || !to) return;
+  ({ to, subject } = aplicarModoPrueba({ to, subject }));
   await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: { Authorization: `Bearer ${KEY}`, "Content-Type": "application/json" },

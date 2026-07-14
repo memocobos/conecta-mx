@@ -20,6 +20,7 @@
 // =============================================================================
 
 const crypto = require('crypto');
+const { aplicarModoPrueba } = require('./_lib/correo-guard');
 
 const UUID_RE = /^[0-9a-f-]{36}$/i;
 const PORTAL_BASE = 'https://conectareynosa.mx/portal.html';
@@ -179,10 +180,11 @@ exports.handler = async (event) => {
     const asunto = `🎫 ${titular} te agregó a un viaje — ${eventoNombre}`;
     const html = invitarHtml(lugar.nombre, titular, eventoNombre, url);
 
+    const __mp = aplicarModoPrueba({ to: correo, subject: asunto });
     const mailR = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: { Authorization: `Bearer ${RESEND_KEY}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ from: FROM, to: correo, subject: asunto, html }),
+      body: JSON.stringify({ from: FROM, to: __mp.to, subject: __mp.subject, html }),
     }).catch(() => null);
     if (!mailR || !mailR.ok) {
       const detail = mailR ? await mailR.text() : 'fetch falló';

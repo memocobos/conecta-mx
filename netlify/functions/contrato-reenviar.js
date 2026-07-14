@@ -4,6 +4,7 @@
 // contrato-crear.js para mantener consistencia.
 
 const { verifyAdminAuth, corsCheck } = require('./_lib/verify-admin');
+const { aplicarModoPrueba } = require('./_lib/correo-guard');
 
 const SB_URL = "https://npgnhsmwpcipxgvfxrho.supabase.co";
 const SB_KEY = process.env.SUPABASE_SERVICE_KEY_KAMEHOUSE;
@@ -108,13 +109,14 @@ exports.handler = async function (event) {
 
   const link = `${SITE}/contrato?t=${token}`;
   try {
+    const __mp = aplicarModoPrueba({ to: row.creador_email, subject: `Recordatorio: tu contrato de colaboración con Conecta Reynosa - ${row.evento_nombre}` });
     const r = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: { Authorization: `Bearer ${RESEND_KEY}`, "Content-Type": "application/json" },
       body: JSON.stringify({
         from: FROM,
-        to: row.creador_email,
-        subject: `Recordatorio: tu contrato de colaboración con Conecta Reynosa - ${row.evento_nombre}`,
+        to: __mp.to,
+        subject: __mp.subject,
         html: invitationEmail({
           creador_nombre: row.creador_nombre,
           evento_nombre: row.evento_nombre,

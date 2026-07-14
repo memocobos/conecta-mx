@@ -14,6 +14,8 @@
 // dry_run (?dry_run=1 o body {dry_run:true}): NO inserta NI manda correos;
 // solo arma y devuelve la lista de avisos que MANDARÍA.
 
+const { aplicarModoPrueba } = require('./_lib/correo-guard');
+
 const SB_URL = process.env.SUPABASE_URL_KAMEHOUSE || process.env.SUPABASE_URL;
 const SB_KEY = process.env.SUPABASE_SERVICE_KEY_KAMEHOUSE
             || process.env.SUPABASE_SERVICE_KEY
@@ -39,6 +41,7 @@ async function sb(path, opts = {}) {
 async function enviarCorreo(to, subject, html) {
   const KEY = process.env.RESEND_KEY || process.env.RESEND_API_KEY;
   if (!KEY || !to) return;
+  ({ to, subject } = aplicarModoPrueba({ to, subject }));
   await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: { Authorization: `Bearer ${KEY}`, "Content-Type": "application/json" },

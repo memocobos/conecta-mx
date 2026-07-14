@@ -23,6 +23,7 @@
 // =============================================================================
 
 const { verifyAdminAuth, corsCheck } = require('./_lib/verify-admin');
+const { aplicarModoPrueba } = require('./_lib/correo-guard');
 
 const UUID_RE = /^[0-9a-f-]{36}$/i;
 const METODOS_VALIDOS = ['transferencia','deposito','efectivo'];
@@ -372,6 +373,7 @@ const FROM = process.env.RESEND_FROM_COBRANZA || 'Conecta Reynosa <admin@conecta
 async function enviarCorreo(to, subject, html) {
   const KEY = process.env.RESEND_KEY || process.env.RESEND_API_KEY;
   if (!KEY || !to) return false;
+  ({ to, subject } = aplicarModoPrueba({ to, subject }));
   const r = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: { Authorization: `Bearer ${KEY}`, 'Content-Type': 'application/json' },

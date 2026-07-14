@@ -14,6 +14,8 @@
 // Conexión directa al Supabase del PORTAL con service_role (estilo
 // portal-morosidad-diario). Reusa PORTAL_SUPABASE_URL / PORTAL_SUPABASE_SERVICE_KEY.
 
+const { aplicarModoPrueba } = require('./_lib/correo-guard');
+
 const SB_URL = process.env.PORTAL_SUPABASE_URL;
 const SB_KEY = process.env.PORTAL_SUPABASE_SERVICE_KEY;
 const HEADERS = {
@@ -39,6 +41,7 @@ async function sb(path, opts = {}) {
 async function enviarCorreo(to, subject, html) {
   const KEY = process.env.RESEND_KEY || process.env.RESEND_API_KEY;
   if (!KEY || !to) return false;
+  ({ to, subject } = aplicarModoPrueba({ to, subject }));
   const r = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: { Authorization: `Bearer ${KEY}`, 'Content-Type': 'application/json' },

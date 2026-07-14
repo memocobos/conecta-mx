@@ -18,6 +18,7 @@
 // =============================================================================
 
 const { verifyAdminAuth, corsCheck } = require('./_lib/verify-admin');
+const { aplicarModoPrueba } = require('./_lib/correo-guard');
 
 const PORTAL_URL = 'https://conectareynosa.mx/portal';
 
@@ -108,13 +109,14 @@ exports.handler = async (event) => {
       </div>
     `;
 
+    const __mp = aplicarModoPrueba({ to: [cliente.correo], subject });
     const resp = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: { Authorization: 'Bearer ' + RESEND_KEY, 'Content-Type': 'application/json' },
       body: JSON.stringify({
         from: 'Conecta Reynosa <admin@conectareynosa.mx>',
-        to: [cliente.correo],
-        subject,
+        to: __mp.to,
+        subject: __mp.subject,
         html,
       }),
     });

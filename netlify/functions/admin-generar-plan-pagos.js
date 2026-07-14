@@ -26,6 +26,7 @@
 // =============================================================================
 
 const { verifyAdminAuth, corsCheck } = require('./_lib/verify-admin');
+const { aplicarModoPrueba } = require('./_lib/correo-guard');
 
 const ESTADO_PAGO_INICIAL = 'pendiente';
 const MAX_PAGOS = 20; // separo + hasta ~10 quincenas; 20 es tope defensivo holgado
@@ -284,10 +285,11 @@ exports.handler = async (event) => {
             ? `Tu grupo tiene ${lugaresPlanificados} lugares — cada lugar lleva su propio plan y saldo, visibles en el portal.`
             : '';
           const html = planHtml(nombre, eventoNombre, pagos, grupoNota);
+          const __mp = aplicarModoPrueba({ to: correo, subject: asunto });
           const r = await fetch('https://api.resend.com/emails', {
             method: 'POST',
             headers: { Authorization: `Bearer ${RESEND_KEY}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ from: RESEND_FROM, to: correo, subject: asunto, html }),
+            body: JSON.stringify({ from: RESEND_FROM, to: __mp.to, subject: __mp.subject, html }),
           });
           correoInfo.correo_enviado = !!(r && r.ok);
           if (!(r && r.ok)) correoInfo.correo_error = 'Resend rechazó el envío';

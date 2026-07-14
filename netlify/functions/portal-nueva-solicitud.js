@@ -17,6 +17,8 @@
 //   - RESEND_KEY (o RESEND_API_KEY como fallback)
 // =============================================================================
 
+const { aplicarModoPrueba } = require('./_lib/correo-guard');
+
 exports.handler = async (event) => {
   const headers = {
     'Access-Control-Allow-Origin': '*',
@@ -202,13 +204,14 @@ exports.handler = async (event) => {
           </div>
         </div>
       `;
+      const __mp1 = aplicarModoPrueba({ to: [cliente.correo], subject: `✅ Recibimos tu solicitud para ${solicitud.evento_nombre}` });
       const rc = await fetch('https://api.resend.com/emails', {
         method: 'POST',
         headers: { Authorization: `Bearer ${RESEND_KEY}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({
           from: 'Conecta Reynosa <admin@conectareynosa.mx>',
-          to: [cliente.correo],
-          subject: `✅ Recibimos tu solicitud para ${solicitud.evento_nombre}`,
+          to: __mp1.to,
+          subject: __mp1.subject,
           html: htmlCliente,
         }),
       });
@@ -219,14 +222,15 @@ exports.handler = async (event) => {
   }
 
   try {
+    const __mp2 = aplicarModoPrueba({ to: ['admin@conectareynosa.mx'], subject });
     const resp = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: { Authorization: `Bearer ${RESEND_KEY}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
         from: 'Portal Conecta <admin@conectareynosa.mx>',
-        to: ['admin@conectareynosa.mx'],
+        to: __mp2.to,
         reply_to: cliente.correo,
-        subject,
+        subject: __mp2.subject,
         html,
       }),
     });

@@ -29,6 +29,7 @@
 // =============================================================================
 
 const { verifyAdminAuth, corsCheck } = require('./_lib/verify-admin');
+const { aplicarModoPrueba } = require('./_lib/correo-guard');
 
 // `metodo` = CÓMO pagó (solo formas de pago; ya no incluye bancos). La BD aún
 // acepta los viejos (bbva/hey/otro) para no violar filas existentes, pero la UI
@@ -310,6 +311,7 @@ const FROM = process.env.RESEND_FROM_COBRANZA || 'Conecta Reynosa <admin@conecta
 async function enviarCorreo(to, subject, html) {
   const KEY = process.env.RESEND_KEY || process.env.RESEND_API_KEY;
   if (!KEY || !to) return false;
+  ({ to, subject } = aplicarModoPrueba({ to, subject }));
   const r = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: { Authorization: `Bearer ${KEY}`, 'Content-Type': 'application/json' },

@@ -3,6 +3,8 @@
 // Llamado desde rol.html cuando el cliente activa los recordatorios por email.
 // Después del INSERT exitoso envía un email de bienvenida instantáneo vía Resend.
 
+const { aplicarModoPrueba } = require('./_lib/correo-guard');
+
 const SB_URL       = process.env.SUPABASE_URL;
 const SB_KEY       = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
 const RESEND_KEY   = process.env.RESEND_API_KEY || process.env.RESEND_KEY;
@@ -52,6 +54,7 @@ async function sendEmail(to, subject, html) {
     console.warn("[rol-subscribe] RESEND_API_KEY no configurado, skip welcome:", to);
     return false;
   }
+  ({ to, subject } = aplicarModoPrueba({ to, subject }));
   const res = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: { Authorization: `Bearer ${RESEND_KEY}`, "Content-Type": "application/json" },

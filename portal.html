@@ -2292,6 +2292,14 @@ async function renderMisViajesAcomp(){
       ? _miniPlanAcompHtml(pagos)
       : `<p style="margin:8px 0 0 0;font-size:12px;color:var(--ink-mute)">Los pagos de este viaje los administra quien organizó el grupo.</p>`;
 
+    // [F4] Cuarto asignado (o "por asignar"). Los nombres de compañeros ya vienen
+    // curados del backend (solo nombre/número). Solo lectura.
+    const hab = l.habitacion;
+    const companeros = (hab && Array.isArray(hab.companeros)) ? hab.companeros : [];
+    const cuartoHtml = hab
+      ? `<p style="margin:8px 0 0 0;font-size:12px;color:var(--ink-soft)">🛏️ Cuarto ${escapeHtml(hab.orden)} · ${escapeHtml(hab.tipo)}${companeros.length ? ' — con ' + companeros.map(escapeHtml).join(', ') : ''}</p>`
+      : `<p style="margin:8px 0 0 0;font-size:12px;color:var(--ink-mute)">🛏️ Cuarto por asignar — lo organiza quien armó tu grupo.</p>`;
+
     return `
       <div style="padding:12px 0;border-top:1px solid var(--line)">
         <div style="display:flex;align-items:flex-start;gap:10px">
@@ -2301,6 +2309,7 @@ async function renderMisViajesAcomp(){
           </div>
           ${precioHtml ? `<div class="pago-monto">${precioHtml}</div>` : ''}
         </div>
+        ${cuartoHtml}
         ${detalle}
       </div>`;
   }).join('');

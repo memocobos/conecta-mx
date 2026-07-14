@@ -91,7 +91,7 @@ exports.handler = async (event) => {
     // ---- 3. Sus lugares como ACOMPAÑANTE (numero>=2). El #1 = su titular. ----
     const lugR = await fetch(
       `${SB_URL}/rest/v1/lugares?cliente_id=eq.${encodeURIComponent(cliente.id)}&numero=gte.2`
-      + `&select=id,numero,nombre,paquete,zona,tipo_habitacion,precio,estado,solicitud_id,invitacion_aceptada_at`,
+      + `&select=id,numero,nombre,paquete,zona,tipo_habitacion,precio,estado,solicitud_id,invitacion_aceptada_at,habitacion_grupo_id`,
       { headers: sbHeaders }
     );
     if (!lugR.ok) {
@@ -101,6 +101,22 @@ exports.handler = async (event) => {
     const lugares = await lugR.json();
     if (!Array.isArray(lugares) || lugares.length === 0) {
       return { statusCode: 200, headers, body: JSON.stringify({ ok: true, lugares: [] }) };
+    }
+
+    // ---- 3b. Su CUARTO asignado (F4): habitación + compañeros de cuarto. ----
+    //      Solo para lugares con habitacion_grupo_id. CURADO: de los compañeros
+    //      solo se toma nombre/numero (nada de correos/estados/cliente_id/pagos).
+    const habIds = [...new Set(lugares.map(l => l.habitacion_grupo_id).filter(Boolean))];
+    const habById = {};
+    const ocupPorHab = {};
+    if (habIds.length) {
+      const inHab = habIds.map(id => encodeURIComponent(id)).join(',');
+      const [habR, ocupR] = await Promise.all([
+        fetch(`${SB_URL}/rest/v1/habitaciones_grupo?id=in.(${inHab})&select=id,tipo,orden`, { headers: sbHeaders }),
+        fetch(`${SB_URL}/rest/v1/lugares?habitacion_grupo_id=in.(${inHab})&estado=eq.activo&select=id,nombre,numero,habitacion_grupo_id`, { headers: sbHeaders }),
+      ]);
+      if (habR.ok) (await habR.json()).forEach(h => { habById[h.id] = h; });
+      if (ocupR.ok) (await ocupR.json()).forEach(o => { (ocupPorHab[o.habitacion_grupo_id] = ocupPorHab[o.habitacion_grupo_id] || []).push(o); });
     }
 
     // ---- 4. Cruzar con las solicitudes (solo evento + estado). ----
@@ -127,6 +143,15 @@ exports.handler = async (event) => {
       const sol = solById[l.solicitud_id];
       if (!sol) continue;                       // solicitud borrada/inaccesible → fuera
       if (sol.estado === 'cancelado') continue; // viaje cancelado → no lo mostramos
+      // Cuarto asignado (o null). Compañeros = OTROS ocupantes activos, solo nombre.
+      let habitacion = null;
+      const hab = l.habitacion_grupo_id ? habById[l.habitacion_grupo_id] : null;
+      if (hab) {
+        const companeros = (ocupPorHab[l.habitacion_grupo_id] || [])
+          .filter(o => o.id !== l.id)
+          .map(o => (o.nombre && String(o.nombre).trim()) ? String(o.nombre).trim() : ('Lugar #' + o.numero));
+        habitacion = { orden: hab.orden, tipo: hab.tipo, companeros };
+      }
       out.push({
         // El id del lugar es SUYO (su cuenta lo aceptó) → sirve para que el portal
         // consulte su mini-plan de pagos vía RLS (F3-t6). No expone nada ajeno.
@@ -139,6 +164,7 @@ exports.handler = async (event) => {
         tipo_habitacion: l.tipo_habitacion,
         precio: l.precio,
         estado: l.estado,
+        habitacion,
       });
     }
 

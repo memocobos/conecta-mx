@@ -269,10 +269,12 @@ async function aplicar(env, sbHeaders, headers, solicitudId, body, auth) {
   };
 }
 
-// Reconciliación IDÉNTICA a admin-marcar-pago: 'pagado' exige todas las cuotas
+// Reconciliación IDÉNTICA a admin-marcar-pago y admin-lugar-baja (F5-t1b, #240):
+// sobre las CUOTAS VIVAS (estado !== 'cancelado'), 'pagado' exige que todas estén
 // con palomita Y que el dinero real (COALESCE(monto_pagado,monto)) cuadre contra
-// precio_total (tol $1). Si no y estaba 'pagado' → 'en_pagos'. Felicita al
-// liquidar (fail-soft). Devuelve el estado final de la solicitud.
+// el ESPERADO = Σ montos de las vivas (ya no precio_total; tras una baja lo esperado
+// es lo de los lugares vivos; sin bajas Σ vivas ≡ el plan, tol $1). Si no y estaba
+// 'pagado' → 'en_pagos'. Felicita al liquidar (fail-soft). Devuelve el estado final.
 async function reconciliar(env, sbHeaders, solicitudId) {
   const allUrl = `${env.PORTAL_SB_URL}/rest/v1/pagos?solicitud_id=eq.${solicitudId}&select=estado,monto,monto_pagado`;
   const allR = await fetch(allUrl, { headers: sbHeaders });

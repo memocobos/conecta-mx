@@ -3,6 +3,8 @@
 // Para cada suscripción activa en rol_recordatorios, si HOY coincide con la fecha
 // de algún pago en su array `pagos`, manda un email vía Resend.
 
+const { aplicarModoPrueba } = require('./_lib/correo-guard');
+
 const SB_URL      = process.env.SUPABASE_URL;
 const SB_KEY      = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
 const RESEND_KEY  = process.env.RESEND_API_KEY || process.env.RESEND_KEY;
@@ -51,6 +53,7 @@ async function sendEmail(to, subject, html) {
     console.warn("[rol-recordatorios] RESEND_API_KEY no configurado, skip:", to);
     return false;
   }
+  ({ to, subject } = aplicarModoPrueba({ to, subject }));
   const res = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: { Authorization: `Bearer ${RESEND_KEY}`, "Content-Type": "application/json" },

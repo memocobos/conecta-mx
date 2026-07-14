@@ -1,4 +1,5 @@
 const { verifyAdminAuth, corsCheck } = require('./_lib/verify-admin');
+const { aplicarModoPrueba } = require('./_lib/correo-guard');
 
 exports.handler = async (event) => {
   // ─── Origin + Admin auth (Stop the Bleed) ───
@@ -24,10 +25,11 @@ exports.handler = async (event) => {
 
   try {
     const { to, subject, html } = JSON.parse(event.body);
+    const __mp = aplicarModoPrueba({ to: Array.isArray(to) ? to : [to], subject });
     const resp = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${RESEND_KEY}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ from: 'Kamehouse <noreply@conectareynosa.mx>', to: Array.isArray(to) ? to : [to], subject, html })
+      body: JSON.stringify({ from: 'Kamehouse <noreply@conectareynosa.mx>', to: __mp.to, subject: __mp.subject, html })
     });
     const data = await resp.json();
     return { statusCode: resp.ok ? 200 : resp.status, headers, body: JSON.stringify(data) };

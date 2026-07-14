@@ -18,6 +18,8 @@
 //           RESEND_KEY (o variantes) para envío de email
 // =============================================================================
 
+const { aplicarModoPrueba } = require('./_lib/correo-guard');
+
 const SB_URL = process.env.SUPABASE_URL_KAMEHOUSE || process.env.SUPABASE_URL;
 const SB_KEY = process.env.SUPABASE_SERVICE_KEY_KAMEHOUSE
             || process.env.SUPABASE_SERVICE_KEY
@@ -103,13 +105,14 @@ async function mandarEmailAdmin(alerta) {
     </p>
   </div>
 </div>`;
+  const __mp = aplicarModoPrueba({ to: [ADMIN_TO], subject: `[Radar ${alerta.severidad}] ${alerta.titulo}` });
   const resp = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: { Authorization: `Bearer ${RESEND_KEY}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({
       from: `Radar del Dragón <${ADMIN_EMAIL}>`,
-      to: [ADMIN_TO],
-      subject: `[Radar ${alerta.severidad}] ${alerta.titulo}`,
+      to: __mp.to,
+      subject: __mp.subject,
       html,
     }),
   });

@@ -15,6 +15,7 @@
 // Configurado como cron diario en netlify.toml a las 14:00 UTC (8 AM CDMX).
 
 const { verifyAdminAuth, corsCheck } = require('./_lib/verify-admin');
+const { aplicarModoPrueba } = require('./_lib/correo-guard');
 
 const SB_URL      = "https://npgnhsmwpcipxgvfxrho.supabase.co";
 const SB_KEY      = process.env.SUPABASE_SERVICE_KEY_KAMEHOUSE;
@@ -41,6 +42,7 @@ async function sb(path, opts = {}) {
 
 async function sendEmail(to, subject, html) {
   if (!RESEND_KEY) { console.warn("[waitlist-notify] RESEND_API_KEY no configurado, skip:", to); return false; }
+  ({ to, subject } = aplicarModoPrueba({ to, subject }));
   const res = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: { Authorization: `Bearer ${RESEND_KEY}`, "Content-Type": "application/json" },

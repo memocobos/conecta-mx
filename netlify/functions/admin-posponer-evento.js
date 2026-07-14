@@ -19,6 +19,7 @@
 // =============================================================================
 
 const { verifyAdminAuth, corsCheck } = require('./_lib/verify-admin');
+const { aplicarModoPrueba } = require('./_lib/correo-guard');
 
 const SB_URL = 'https://npgnhsmwpcipxgvfxrho.supabase.co';
 const SB_KEY = process.env.SUPABASE_SERVICE_KEY_KAMEHOUSE;
@@ -235,10 +236,11 @@ exports.handler = async (event) => {
           const subject = `📅 Cambio de fecha: ${ev.nombre}`;
           const resultados = await Promise.allSettled(destinatarios.map(d => {
             const html = posponerHtml(d.nombre, ev.nombre, fechaAnterior, fechaNueva, pagosInfo.pagos_recorridos > 0);
+            const __mp = aplicarModoPrueba({ to: [d.correo], subject });
             return fetch('https://api.resend.com/emails', {
               method: 'POST',
               headers: { Authorization: `Bearer ${RESEND_KEY}`, 'Content-Type': 'application/json' },
-              body: JSON.stringify({ from: 'Conecta Reynosa <admin@conectareynosa.mx>', to: [d.correo], subject, html }),
+              body: JSON.stringify({ from: 'Conecta Reynosa <admin@conectareynosa.mx>', to: __mp.to, subject: __mp.subject, html }),
             });
           }));
           for (const r of resultados) {

@@ -4,6 +4,7 @@
 // a la creadora con el link para firmar: https://conectareynosa.mx/contrato?t=TOKEN.
 
 const crypto = require("crypto");
+const { aplicarModoPrueba } = require('./_lib/correo-guard');
 const { verifyAdminAuth, corsCheck } = require('./_lib/verify-admin');
 
 const SB_URL = "https://npgnhsmwpcipxgvfxrho.supabase.co";
@@ -44,6 +45,7 @@ async function sendEmail(to, subject, html) {
     console.warn("[contrato-crear] RESEND_KEY no configurado, no se manda email a:", to);
     return false;
   }
+  ({ to, subject } = aplicarModoPrueba({ to, subject }));
   const r = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: { Authorization: `Bearer ${RESEND_KEY}`, "Content-Type": "application/json" },

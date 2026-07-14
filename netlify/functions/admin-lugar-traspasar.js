@@ -18,6 +18,7 @@
 // =============================================================================
 
 const crypto = require('crypto');
+const { aplicarModoPrueba } = require('./_lib/correo-guard');
 const { verifyAdminAuth, corsCheck } = require('./_lib/verify-admin');
 
 const UUID_RE = /^[0-9a-f-]{36}$/i;
@@ -295,6 +296,7 @@ const FROM = 'Conecta Reynosa <admin@conectareynosa.mx>';
 async function enviarCorreo(to, subject, html) {
   const KEY = process.env.RESEND_API_KEY || process.env.RESEND_KEY;
   if (!KEY || !to) return false;
+  ({ to, subject } = aplicarModoPrueba({ to, subject }));
   const r = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: { Authorization: `Bearer ${KEY}`, 'Content-Type': 'application/json' },

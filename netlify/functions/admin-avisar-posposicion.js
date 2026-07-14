@@ -17,6 +17,7 @@
 // =============================================================================
 
 const { verifyAdminAuth, corsCheck } = require('./_lib/verify-admin');
+const { aplicarModoPrueba } = require('./_lib/correo-guard');
 
 exports.handler = async (event) => {
   const __origin = corsCheck(event);
@@ -115,10 +116,11 @@ exports.handler = async (event) => {
     const subject = `Tu viaje a ${eventoNombre} cambió de fecha`;
     const resultados = await Promise.allSettled(destinatarios.map(d => {
       const html = avisoHtml(d.nombre, eventoNombre, fechaAnterior, fechaNueva, motivo);
+      const __mp = aplicarModoPrueba({ to: [d.correo], subject });
       return fetch('https://api.resend.com/emails', {
         method: 'POST',
         headers: { Authorization: `Bearer ${env.RESEND_KEY}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ from: 'Conecta Reynosa <admin@conectareynosa.mx>', to: [d.correo], subject, html }),
+        body: JSON.stringify({ from: 'Conecta Reynosa <admin@conectareynosa.mx>', to: __mp.to, subject: __mp.subject, html }),
       });
     }));
 

@@ -2653,6 +2653,7 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
             <span>excluir staff</span>
           </label>
           <button class="btn btn-ghost btn-sm" onclick="imprimirListaHotel()" style="font-size:10px">🖨️ Lista para hotel</button>
+          <button class="btn btn-ghost btn-sm" onclick="imprimirListaCoordis()" style="font-size:10px">🖨️ Lista para coordis</button>
           <button class="btn btn-ghost btn-sm" onclick="exportarRooming('excel')" style="font-size:10px">↓ CSV</button>
           <button class="btn btn-ghost btn-sm" onclick="exportarRooming('pdf')" style="font-size:10px">↓ PDF</button>
           <button class="btn btn-primary btn-sm" disabled title="Próximamente — la asignación fina de cuartos llega en una fase posterior" style="opacity:.5;cursor:not-allowed">+ Habitación</button>
@@ -4938,7 +4939,7 @@ const khRoomingGrupos = {
     if (!r.ok || j.ok === false) throw new Error(j.error || ('admin-rooming-grupos ' + r.status));
     return j;
   },
-  listar(eventoId) { return this._call({ accion: 'listar', evento_id: eventoId }).then(j => j.grupos || []); },
+  listar(eventoId, opts) { const p = { accion: 'listar', evento_id: eventoId }; if (opts && opts.todos) p.todos = true; return this._call(p).then(j => j.grupos || []); },
   accion(payload) { return this._call(payload); },
 };
 
@@ -10620,6 +10621,92 @@ async function imprimirListaHotel() {
   </div>`;
 
   _printVentana('Lista para hotel — ' + eventoNombre, seccion1 + seccion2 + resumen);
+}
+
+// < 18 años cumplidos HOY a partir de 'YYYY-MM-DD'. Falso sin fecha.
+function _rgEsMenor(fnac) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(fnac || '').slice(0, 10));
+  if (!m) return false;
+  const hoy = new Date();
+  let edad = hoy.getFullYear() - Number(m[1]);
+  const mm = hoy.getMonth() + 1, dd = hoy.getDate();
+  if (mm < Number(m[2]) || (mm === Number(m[2]) && dd < Number(m[3]))) edad--;
+  return edad < 18;
+}
+
+// [F6-t2] LISTA PARA COORDIS: TODO viajero del evento (grupos, individuales y staff)
+// con contacto, cuarto, paquete/zona y bandera de menor. Reusa _printVentana (#242).
+async function imprimirListaCoordis() {
+  if (!_ccEventoActual) { alert('Selecciona un evento primero.'); return; }
+  const ev = _ccEventosCache.find(e => e.id === _ccEventoActual) || {};
+  const eventoNombre = ev.nombre || _ccEventoActual;
+
+  let grupos = [];
+  try { grupos = await khRoomingGrupos.listar(_ccEventoActual, { todos: true }); } catch (e) { grupos = []; }
+  const viajeros = Array.isArray(_ccViajeros) ? _ccViajeros : [];
+
+  let totalPersonas = 0, totalMenores = 0;
+
+  // ── Filas de grupos/individuales (solo lugares ACTIVOS), ordenadas por titular y numero ──
+  const gruposOrd = [...grupos].sort((a, b) => String(a.titular_nombre || '').localeCompare(String(b.titular_nombre || ''), 'es'));
+  const filas = [];
+  gruposOrd.forEach(g => {
+    const esIndividual = (g.lugares || []).length === 1;
+    const grupoLbl = esIndividual ? 'Individual' : ('Grupo de ' + (g.titular_nombre || 'Titular'));
+    const habById = {};
+    (g.habitaciones || []).forEach(h => { habById[h.id] = h; });
+    (g.lugares || []).filter(l => l.estado === 'activo').forEach(l => {
+      totalPersonas++;
+      const nombre = (l.nombre && String(l.nombre).trim()) ? l.nombre : ('Lugar #' + l.numero + ' — por confirmar');
+      const contacto = (l.celular && String(l.celular).trim()) || (l.correo && String(l.correo).trim()) || '—';
+      const hab = l.habitacion_grupo_id ? habById[l.habitacion_grupo_id] : null;
+      const cuarto = hab ? (_rgTipoLabel(hab.tipo) + ' #' + hab.orden) : '—';
+      const pz = [l.paquete, l.zona].filter(v => v != null && String(v).trim() !== '').join(' · ');
+      const menor = _rgEsMenor(l.fecha_nacimiento);
+      if (menor) totalMenores++;
+      filas.push(`<tr>
+        <td>${_esfEsc(nombre)}</td>
+        <td>${_esfEsc(contacto)}</td>
+        <td>${_esfEsc(grupoLbl)}</td>
+        <td>${_esfEsc(cuarto)}</td>
+        <td>${_esfEsc(pz)}</td>
+        <td>${menor ? '<b>MENOR</b>' : ''}</td>
+      </tr>`);
+    });
+  });
+  let cuerpo = `<h2>Viajeros del evento</h2>`;
+  cuerpo += filas.length
+    ? `<table><thead><tr><th>Nombre</th><th>Contacto</th><th>Grupo</th><th>Cuarto</th><th>Paquete · Zona</th><th>Notas</th></tr></thead><tbody>${filas.join('')}</tbody></table>`
+    : `<div class="cx-muted">Sin viajeros de grupos/individuales en este evento.</div>`;
+
+  // ── Sección STAFF (rooming KH, _ccViajeros) con su celular ──
+  const filasStaff = [];
+  let personasStaff = 0;
+  viajeros.forEach(v => {
+    const c = v.clientes || {};
+    const nP = Number(v.num_personas) > 0 ? Number(v.num_personas) : 1;
+    personasStaff += nP;
+    const contacto = (c.celular && String(c.celular).trim()) || (c.correo && String(c.correo).trim()) || '—';
+    const pz = [v.paquete, v.zona, (nP > 1 ? nP + ' pers.' : null)].filter(Boolean).join(' · ');
+    filasStaff.push(`<tr>
+      <td>${_esfEsc(c.nombre_completo || '—')}</td>
+      <td>${_esfEsc(contacto)}</td>
+      <td>${_esfEsc(v.tipo_habitacion ? _rgTipoLabel(v.tipo_habitacion) : '—')}</td>
+      <td>${_esfEsc(pz)}</td>
+    </tr>`);
+  });
+  cuerpo += `<h2>Staff / rooming interno</h2>`;
+  cuerpo += filasStaff.length
+    ? `<table><thead><tr><th>Viajero</th><th>Contacto</th><th>Tipo</th><th>Paquete · Zona</th></tr></thead><tbody>${filasStaff.join('')}</tbody></table>`
+    : `<div class="cx-muted">Sin viajeros en el rooming interno.</div>`;
+
+  // ── Resumen ──
+  cuerpo += `<div class="cx-resumen">
+    <div><b>Total de viajeros:</b> ${totalPersonas + personasStaff} <span class="cx-muted">(${totalPersonas} en grupos/individuales · ${personasStaff} en rooming interno)</span></div>
+    <div style="margin-top:4px"><b>Menores de edad:</b> ${totalMenores}</div>
+  </div>`;
+
+  _printVentana('Lista para coordis — ' + eventoNombre, cuerpo);
 }
 
 function renderHotelInfo() {

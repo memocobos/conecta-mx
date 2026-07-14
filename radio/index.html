@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Radio Conecta 🔴 EN VIVO — La música de Conecta Reynosa 24/7</title>
+<meta name="description" content="Escucha Radio Conecta en vivo. La música de Conecta Reynosa sonando 24 horas, gratis, desde Reynosa para el mundo.">
+<meta name="theme-color" content="#000000">
+<meta property="og:title" content="Radio Conecta 🔴 EN VIVO">
+<meta property="og:description" content="La música de Conecta Reynosa sonando 24/7. Dale play.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://conectareynosa.mx/radio">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@900&family=Montserrat:wght@400;500;600;700;900&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --c-bg:#000;
+    --c-ink:#fff;
+    --c-amarillo:#e8ff4c;
+    --c-rojo:#ff283b;
+    --c-azul:#0000cd;
+    --c-verde:#88ea4e;
+    --c-rosa:#ff4bd1;
+    --c-wa:#25d366;
+    --c-muted:rgba(255,255,255,.45);
+    --c-line:rgba(255,255,255,.08);
+    --font-display:'Barlow Condensed','Montserrat',sans-serif;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    font-family:'Montserrat',sans-serif;
+    background:var(--c-bg);
+    color:var(--c-ink);
+    min-height:100vh;
+    -webkit-font-smoothing:antialiased;
+    overflow-x:hidden;
+  }
+  a{color:inherit}
+
+  /* ===== Ticker superior ===== */
+  .ticker{
+    background:var(--c-amarillo);
+    color:#000;
+    overflow:hidden;
+    white-space:nowrap;
+    padding:7px 0;
+    font-family:var(--font-display);
+    font-size:15px;
+    letter-spacing:.06em;
+    text-transform:uppercase;
+  }
+  .tickerInner{
+    display:inline-block;
+    animation:marquee 22s linear infinite;
+  }
+  @keyframes marquee{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
+
+  /* ===== Header ===== */
+  header{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:16px 20px;
+    border-bottom:1px solid var(--c-line);
+  }
+  .logo{
+    font-family:var(--font-display);
+    font-size:26px;
+    text-decoration:none;
+    letter-spacing:.02em;
+    line-height:1;
+  }
+  .logo em{font-style:normal;color:var(--c-amarillo)}
+  .liveTag{
+    display:flex;align-items:center;gap:7px;
+    font-family:var(--font-display);
+    font-size:16px;letter-spacing:.12em;
+    color:var(--c-rojo);
+  }
+  .liveTag .dot{
+    width:9px;height:9px;border-radius:50%;
+    background:var(--c-rojo);
+    box-shadow:0 0 12px var(--c-rojo);
+    animation:latido 1.3s infinite;
+  }
+  @keyframes latido{0%,100%{opacity:1}50%{opacity:.25}}
+
+  /* ===== Escenario ===== */
+  main{
+    max-width:560px;
+    margin:0 auto;
+    padding:34px 20px 70px;
+    position:relative;
+  }
+
+  /* Glow ambiente detrás de la carátula */
+  .glow{
+    position:absolute;top:60px;left:50%;
+    width:340px;height:340px;
+    transform:translateX(-50%);
+    background:radial-gradient(circle, rgba(232,255,76,.14) 0%, transparent 65%);
+    pointer-events:none;
+    z-index:0;
+  }
+
+  .escenario{position:relative;z-index:1;text-align:center}
+
+  .kicker{
+    font-family:var(--font-display);
+    font-size:17px;letter-spacing:.22em;
+    text-transform:uppercase;
+    color:var(--c-muted);
+    margin-bottom:20px;
+  }
+  .kicker b{color:var(--c-amarillo);font-weight:900}
+
+  .artWrap{
+    position:relative;
+    width:min(72vw, 300px);
+    margin:0 auto 24px;
+  }
+  .caratula{
+    width:100%;aspect-ratio:1;
+    object-fit:cover;
+    border-radius:10px;
+    background:#111;
+    box-shadow:0 24px 70px rgba(0,0,0,.8), 0 0 0 1px var(--c-line);
+    display:block;
+  }
+  /* Ecualizador vivo sobre la esquina de la carátula */
+  .eq{
+    position:absolute;bottom:-1px;right:-1px;
+    background:var(--c-amarillo);
+    border-radius:10px 0 10px 0;
+    padding:9px 12px 7px;
+    display:none;
+    align-items:flex-end;gap:3px;
+    height:34px;
+  }
+  .eq.on{display:flex}
+  .eq i{
+    width:4px;background:#000;border-radius:2px;
+    animation:eqbar 0.9s ease-in-out infinite;
+  }
+  .eq i:nth-child(1){height:60%;animation-delay:0s}
+  .eq i:nth-child(2){height:100%;animation-delay:.15s}
+  .eq i:nth-child(3){height:45%;animation-delay:.3s}
+  .eq i:nth-child(4){height:80%;animation-delay:.45s}
+  @keyframes eqbar{0%,100%{transform:scaleY(.4)}50%{transform:scaleY(1)}}
+
+  .cancion{
+    font-family:var(--font-display);
+    font-size:clamp(34px, 9vw, 52px);
+    line-height:.98;
+    text-transform:uppercase;
+    letter-spacing:.01em;
+    margin-bottom:8px;
+  }
+  .artista{
+    font-family:var(--font-display);
+    font-size:clamp(20px, 5.5vw, 26px);
+    color:var(--c-amarillo);
+    text-transform:uppercase;
+    letter-spacing:.05em;
+    margin-bottom:26px;
+  }
+
+  /* ===== Controles ===== */
+  .controles{
+    display:flex;align-items:center;justify-content:center;gap:26px;
+    margin-bottom:14px;
+  }
+  #playBtn{
+    width:84px;height:84px;border-radius:50%;
+    background:var(--c-amarillo);color:#000;
+    border:none;cursor:pointer;
+    font-size:30px;
+    display:flex;align-items:center;justify-content:center;
+    box-shadow:0 0 0 6px rgba(232,255,76,.12), 0 14px 40px rgba(232,255,76,.25);
+    transition:transform .15s, box-shadow .15s;
+    flex-shrink:0;
+  }
+  #playBtn:hover{transform:scale(1.06);box-shadow:0 0 0 9px rgba(232,255,76,.16), 0 14px 46px rgba(232,255,76,.35)}
+  #playBtn:active{transform:scale(.96)}
+  #playBtn.cargando{animation:girando 1s linear infinite}
+  @keyframes girando{to{transform:rotate(360deg)}}
+
+  .volWrap{
+    display:flex;align-items:center;gap:10px;
+    color:var(--c-muted);font-size:16px;
+  }
+  #vol{
+    -webkit-appearance:none;width:110px;height:3px;
+    background:rgba(255,255,255,.18);border-radius:2px;outline:none;cursor:pointer;
+  }
+  #vol::-webkit-slider-thumb{
+    -webkit-appearance:none;width:15px;height:15px;border-radius:50%;
+    background:var(--c-amarillo);cursor:pointer;
+  }
+  @media (max-width:420px){ .volWrap{display:none} }
+
+  .oyentes{
+    font-size:12.5px;color:var(--c-muted);
+    min-height:18px;
+  }
+  .oyentes b{color:var(--c-verde);font-weight:700}
+
+  /* ===== Historial ===== */
+  .seccion{margin-top:44px;position:relative;z-index:1}
+  .seccionTitulo{
+    font-family:var(--font-display);
+    font-size:24px;text-transform:uppercase;letter-spacing:.06em;
+    margin-bottom:14px;
+    display:flex;align-items:center;gap:10px;
+  }
+  .seccionTitulo::after{
+    content:'';flex:1;height:1px;background:var(--c-line);
+  }
+  .histItem{
+    display:flex;align-items:center;gap:14px;
+    padding:11px 0;
+    border-bottom:1px solid var(--c-line);
+  }
+  .histItem:last-child{border-bottom:none}
+  .histItem img{
+    width:46px;height:46px;border-radius:8px;object-fit:cover;
+    background:#111;flex-shrink:0;
+  }
+  .histMeta{min-width:0;text-align:left}
+  .histTitulo{
+    font-weight:700;font-size:14px;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  }
+  .histArtista{
+    font-size:12px;color:var(--c-muted);
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  }
+
+  /* ===== CTA ===== */
+  .cta{
+    margin-top:48px;
+    border:1px solid var(--c-line);
+    border-radius:16px;
+    padding:32px 24px;
+    text-align:center;
+    position:relative;
+    overflow:hidden;
+  }
+  .cta::before{
+    content:'';position:absolute;inset:0;
+    background:radial-gradient(ellipse at top, rgba(232,255,76,.08), transparent 60%);
+    pointer-events:none;
+  }
+  .cta h2{
+    font-family:var(--font-display);
+    font-size:clamp(30px, 8vw, 40px);
+    line-height:1;text-transform:uppercase;
+    margin-bottom:10px;
+  }
+  .cta h2 em{font-style:normal;color:var(--c-amarillo)}
+  .cta p{
+    font-size:14px;color:var(--c-muted);
+    margin-bottom:22px;
+    max-width:400px;margin-left:auto;margin-right:auto;
+  }
+  .ctaBotones{
+    display:flex;flex-direction:column;gap:10px;
+    position:relative;
+  }
+  .btn{
+    display:block;
+    padding:16px 20px;border-radius:10px;
+    font-family:var(--font-display);
+    font-size:20px;text-transform:uppercase;letter-spacing:.06em;
+    text-decoration:none;
+    transition:transform .15s, filter .15s;
+  }
+  .btn:hover{filter:brightness(1.1)}
+  .btn:active{transform:scale(.98)}
+  .btnAmarillo{background:var(--c-amarillo);color:#000}
+  .btnWA{background:var(--c-wa);color:#fff}
+
+  footer{
+    text-align:center;
+    padding:34px 20px;
+    border-top:1px solid var(--c-line);
+    font-size:12px;color:var(--c-muted);
+  }
+  footer a{color:var(--c-amarillo);text-decoration:none;font-weight:700}
+</style>
+</head>
+<body>
+
+<div class="ticker">
+  <div class="tickerInner">
+    RADIO CONECTA 🔴 EN VIVO · LA MÚSICA DE CONECTA REYNOSA · SONANDO 24/7 · TODOS LOS GÉNEROS · DESDE REYNOSA PARA EL MUNDO 🌎 &nbsp;·&nbsp;
+    RADIO CONECTA 🔴 EN VIVO · LA MÚSICA DE CONECTA REYNOSA · SONANDO 24/7 · TODOS LOS GÉNEROS · DESDE REYNOSA PARA EL MUNDO 🌎 &nbsp;·&nbsp;
+  </div>
+</div>
+
+<header>
+  <a class="logo" href="https://conectareynosa.mx">CONECTA<em>MX.</em></a>
+  <div class="liveTag"><span class="dot"></span>RADIO EN VIVO</div>
+</header>
+
+<main>
+  <div class="glow"></div>
+
+  <div class="escenario">
+    <div class="kicker">SONANDO <b>AHORA</b></div>
+
+    <div class="artWrap">
+      <img class="caratula" id="art" src="" alt="Carátula del álbum">
+      <div class="eq" id="eq"><i></i><i></i><i></i><i></i></div>
+    </div>
+
+    <h1 class="cancion" id="titulo">Radio Conecta</h1>
+    <div class="artista" id="artista">Dale play 🎶</div>
+
+    <div class="controles">
+      <div class="volWrap">🔉 <input type="range" id="vol" min="0" max="100" value="90"></div>
+      <button id="playBtn" title="Reproducir">▶</button>
+    </div>
+    <div class="oyentes" id="oyentes"></div>
+  </div>
+
+  <div class="seccion">
+    <div class="seccionTitulo">Recién sonaron</div>
+    <div id="historial">
+      <div class="histItem"><div class="histMeta"><div class="histArtista">Cargando historial...</div></div></div>
+    </div>
+  </div>
+
+  <div class="cta">
+    <h2>¿Te gusta lo que suena?<br><em>Vívelo en vivo.</em></h2>
+    <p>Nosotros te llevamos al concierto: transporte, hotel, boleto y kit Conecta — pagando en quincenas sin estrés.</p>
+    <div class="ctaBotones">
+      <a class="btn btnAmarillo" href="https://conectareynosa.mx">🎫 Ver próximos eventos →</a>
+      <a class="btn btnWA" href="https://wa.me/528119771072?text=Hola!%20Escuch%C3%A9%20Radio%20Conecta%20y%20quiero%20info%20de%20los%20tours%20%F0%9F%8E%B6">💬 Cotizar por WhatsApp</a>
+    </div>
+  </div>
+</main>
+
+<footer>
+  Radio Conecta · <a href="https://conectareynosa.mx">Conecta Reynosa</a> © 2026<br>
+  Viajando a conciertos desde 2013 🚌🎶
+</footer>
+
+<audio id="player" preload="none"></audio>
+
+<script>
+var STREAM = 'https://radio.conectareynosa.mx/listen/radioconecta/radio.mp3';
+var API = 'https://radio.conectareynosa.mx/api/nowplaying/radioconecta';
+
+var player = document.getElementById('player');
+var playBtn = document.getElementById('playBtn');
+var eq = document.getElementById('eq');
+var tocando = false;
+
+player.volume = 0.9;
+document.getElementById('vol').addEventListener('input', function(){
+  player.volume = this.value / 100;
+});
+
+playBtn.addEventListener('click', function(){
+  if(tocando){
+    player.pause();
+    player.src = '';
+    tocando = false;
+    playBtn.textContent = '▶';
+    eq.classList.remove('on');
+  } else {
+    playBtn.classList.add('cargando');
+    playBtn.textContent = '◌';
+    player.src = STREAM + '?t=' + Date.now();
+    player.play().then(function(){
+      tocando = true;
+      playBtn.classList.remove('cargando');
+      playBtn.textContent = '⏸';
+      eq.classList.add('on');
+    }).catch(function(){
+      playBtn.classList.remove('cargando');
+      playBtn.textContent = '▶';
+    });
+  }
+});
+
+function esc(s){ return String(s || '').replace(/</g,'&lt;'); }
+
+function actualizar(){
+  fetch(API).then(function(r){ return r.json(); }).then(function(data){
+    var np = data.now_playing;
+    if(np && np.song){
+      document.getElementById('titulo').textContent = np.song.title || 'Radio Conecta';
+      document.getElementById('artista').textContent = np.song.artist || '';
+      if(np.song.art) document.getElementById('art').src = np.song.art;
+      document.title = '🔴 ' + (np.song.title || 'Radio Conecta') + ' — Radio Conecta';
+    }
+    var oy = data.listeners && data.listeners.current;
+    document.getElementById('oyentes').innerHTML = (oy && oy > 0)
+      ? '🎧 <b>' + oy + '</b> ' + (oy === 1 ? 'persona escuchando ahora' : 'personas escuchando ahora')
+      : '';
+    var hist = data.song_history || [];
+    if(hist.length){
+      var html = '';
+      for(var i = 0; i < Math.min(hist.length, 5); i++){
+        var s = hist[i].song;
+        html += '<div class="histItem">' +
+          '<img src="' + esc(s.art) + '" alt="" loading="lazy">' +
+          '<div class="histMeta">' +
+          '<div class="histTitulo">' + esc(s.title) + '</div>' +
+          '<div class="histArtista">' + esc(s.artist) + '</div>' +
+          '</div></div>';
+      }
+      document.getElementById('historial').innerHTML = html;
+    }
+  }).catch(function(){ /* siguiente intento */ });
+}
+
+actualizar();
+setInterval(actualizar, 15000);
+</script>
+</body>
+</html>

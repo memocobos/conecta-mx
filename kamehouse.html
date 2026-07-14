@@ -1995,6 +1995,7 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
    <button class="nav-btn" onclick="showPage('esferas')" id="nav-esferas"><svg class="nav-ic"><use href="#ic-esferas"/></svg><span>Esferas del Dragón</span></button>
    <button class="nav-btn" onclick="showPage('yamcha')" id="nav-yamcha"><svg class="nav-ic"><use href="#ic-saldos"/></svg><span>La derrota de Yamcha</span></button>
    <button class="nav-btn" onclick="showPage('radar')" id="nav-radar"><svg class="nav-ic"><use href="#ic-radar"/></svg><span>Radar del Dragón</span></button>
+   <button class="nav-btn" onclick="showPage('radio')" id="nav-radio"><svg class="nav-ic"><use href="#ic-radar"/></svg><span>📻 Kaio-sama</span></button>
   </div>
 
   <div class="nav-group" id="nav-dropdown-herramientas">
@@ -3193,6 +3194,49 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
   </div>
  </div><!-- /page-kamisama -->
 
+ <!-- ─── KAIO-SAMA · Admin de Radio Conecta (solo maestro_roshi) ─── -->
+ <div class="page" id="page-radio">
+  <div class="page-hero">
+   <div>
+    <div class="page-title">📻 Kaio-sama — Radio Conecta</div>
+    <div class="page-sub">// peticiones de canción y el muro público</div>
+   </div>
+   <button class="btn btn-ghost btn-sm" onclick="loadRadio()" style="font-size:11px">↻ Refrescar</button>
+  </div>
+
+  <div style="display:flex;gap:8px;margin:14px 0;flex-wrap:wrap">
+   <button class="gz-filter active" id="radio-tab-btn-peticiones" onclick="showRadioTab('peticiones',this)">Peticiones <span id="radio-pet-cnt"></span></button>
+   <button class="gz-filter" id="radio-tab-btn-muro" onclick="showRadioTab('muro',this)">El Muro</button>
+  </div>
+
+  <!-- TAB 1: Peticiones -->
+  <div id="radio-tab-peticiones">
+   <div style="display:flex;justify-content:flex-end;margin-bottom:10px">
+    <button class="gz-filter active" id="radio-pet-filtro" onclick="toggleRadioPetFiltro(this)">Solo pendientes</button>
+   </div>
+   <div class="table-wrap">
+    <table>
+     <thead><tr><th>Fecha</th><th>Nombre</th><th>Petición</th><th>Estado</th><th>Acción</th></tr></thead>
+     <tbody id="radio-pet-tbody">
+      <tr><td colspan="5"><div class="loading-state"><div class="spinner"></div>Cargando…</div></td></tr>
+     </tbody>
+    </table>
+   </div>
+  </div>
+
+  <!-- TAB 2: El Muro -->
+  <div id="radio-tab-muro" style="display:none">
+   <div class="table-wrap">
+    <table>
+     <thead><tr><th>Fecha</th><th>Nombre</th><th>Mensaje</th><th>Estado</th><th>Acción</th></tr></thead>
+     <tbody id="radio-muro-tbody">
+      <tr><td colspan="5"><div class="loading-state"><div class="spinner"></div>Cargando…</div></td></tr>
+     </tbody>
+    </table>
+   </div>
+  </div>
+ </div><!-- /page-radio -->
+
 
  <!-- ─── CONTRATOS ─── -->
  <div class="page" id="page-contratos">
@@ -4276,7 +4320,7 @@ let recibosLoaded = false;
 let disenoLoaded = false;
 
 const PERMISOS_TABS = {
-  maestro_roshi: ['resumen','pagos','eventos','gastos','ingresos','saldos','ventas','inventario','reportes','capsule','solicitudes_portal','equipo','kamisama','herramientas','radar','montana','yamcha'],
+  maestro_roshi: ['resumen','pagos','eventos','gastos','ingresos','saldos','ventas','inventario','reportes','capsule','solicitudes_portal','equipo','kamisama','herramientas','radar','montana','yamcha','radio'],
   bulma:         ['resumen','pagos','eventos','gastos','ingresos','saldos','ventas','inventario','reportes','capsule','solicitudes_portal','equipo','herramientas'],
   mister_popo:   ['inventario','reportes','equipo'],
   coordinador:   ['inventario','reportes','equipo'],
@@ -4634,7 +4678,7 @@ function aplicarPermisosUI() {
   const extras = currentUser.permisos_extra?.tabs_extra || [];
   const bloqueados = currentUser.permisos_extra?.tabs_bloqueados || [];
   const tabsPermitidos = [...new Set([...base, ...extras])].filter(t => !bloqueados.includes(t));
-  const allTabs = ['resumen','pagos','eventos','gastos','ingresos','saldos','ventas','inventario','reportes','equipo','capsule','solicitudes_portal','kamisama','radar','montana','yamcha'];
+  const allTabs = ['resumen','pagos','eventos','gastos','ingresos','saldos','ventas','inventario','reportes','equipo','capsule','solicitudes_portal','kamisama','radar','montana','yamcha','radio'];
   allTabs.forEach(tab => {
     const btn = document.getElementById('nav-' + tab);
     if (btn) btn.style.display = tabsPermitidos.includes(tab) ? '' : 'none';
@@ -5219,6 +5263,144 @@ function loadPage(name) {
  if (name === 'radar') initRadarTab();
  if (name === 'esferas') loadEsferasEventos();
  if (name === 'yamcha') loadYamcha();
+ if (name === 'radio') loadRadio();
+}
+
+// ═══════════════════════════════════════════════════════════════
+// KAIO-SAMA — Admin de Radio Conecta (peticiones + muro). Solo maestro_roshi.
+// Lee/escribe radio_peticiones y radio_muro (Portal) vía admin-radio-* (service_role).
+// ═══════════════════════════════════════════════════════════════
+let _radioPeticiones = [], _radioMuro = [], _radioSoloPend = true;
+
+function _radioFecha(ts) {
+  if (!ts) return '—';
+  const d = new Date(ts);
+  if (isNaN(d.getTime())) return '—';
+  return d.toLocaleString('es-MX', { timeZone: 'America/Monterrey', dateStyle: 'short', timeStyle: 'short' });
+}
+
+// Carga ambas listas al entrar (patrón de las demás loadX). Fails-soft.
+async function loadRadio() {
+  try {
+    const [rp, rm] = await Promise.all([
+      khAdminFetch('/.netlify/functions/admin-radio-peticiones'),
+      khAdminFetch('/.netlify/functions/admin-radio-muro'),
+    ]);
+    const jp = await rp.json().catch(() => ({}));
+    const jm = await rm.json().catch(() => ({}));
+    if (!rp.ok || jp.ok === false) throw new Error(jp.error || ('peticiones ' + rp.status));
+    if (!rm.ok || jm.ok === false) throw new Error(jm.error || ('muro ' + rm.status));
+    _radioPeticiones = Array.isArray(jp.peticiones) ? jp.peticiones : [];
+    _radioMuro = Array.isArray(jm.mensajes) ? jm.mensajes : [];
+    _renderRadioPeticiones();
+    _renderRadioMuro();
+  } catch (e) {
+    showToast('Error cargando Radio: ' + e.message, 'error');
+    const p = document.getElementById('radio-pet-tbody');
+    const m = document.getElementById('radio-muro-tbody');
+    if (p) p.innerHTML = `<tr><td colspan="5" style="color:#FF6B6B">Error: ${_spEscape(e.message)}</td></tr>`;
+    if (m) m.innerHTML = `<tr><td colspan="5" style="color:#FF6B6B">Error: ${_spEscape(e.message)}</td></tr>`;
+  }
+}
+
+function showRadioTab(sub, btn) {
+  document.querySelectorAll('#page-radio .gz-filter[id^="radio-tab-btn"]').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  ['peticiones', 'muro'].forEach(s => {
+    const el = document.getElementById('radio-tab-' + s);
+    if (el) el.style.display = s === sub ? '' : 'none';
+  });
+}
+
+function toggleRadioPetFiltro(btn) {
+  _radioSoloPend = !_radioSoloPend;
+  if (btn) btn.textContent = _radioSoloPend ? 'Solo pendientes' : 'Todas';
+  if (btn) btn.classList.toggle('active', _radioSoloPend);
+  _renderRadioPeticiones();
+}
+
+function _renderRadioPeticiones() {
+  const tb = document.getElementById('radio-pet-tbody');
+  if (!tb) return;
+  const pendientes = _radioPeticiones.filter(p => !p.atendida).length;
+  const cnt = document.getElementById('radio-pet-cnt');
+  if (cnt) cnt.textContent = pendientes ? '(' + pendientes + ')' : '';
+  const rows = _radioSoloPend ? _radioPeticiones.filter(p => !p.atendida) : _radioPeticiones;
+  if (!rows.length) {
+    tb.innerHTML = `<tr><td colspan="5" style="color:var(--ts)">${_radioSoloPend ? 'Sin peticiones pendientes 🎶' : 'Sin peticiones todavía'}</td></tr>`;
+    return;
+  }
+  tb.innerHTML = rows.map(p => {
+    const id = _spEscape(p.id);
+    const estado = p.atendida
+      ? '<span style="color:#3DDC84">✓ Atendida</span>'
+      : '<span style="color:var(--orange)">⏳ Pendiente</span>';
+    const accion = p.atendida
+      ? `<button class="btn btn-ghost btn-sm" style="font-size:11px" onclick="radioAtender('${id}',false)">↩ Reabrir</button>`
+      : `<button class="btn btn-primary btn-sm" style="font-size:11px" onclick="radioAtender('${id}',true)">✓ Atendida</button>`;
+    return `<tr${p.atendida ? ' style="opacity:.55"' : ''}>
+      <td style="white-space:nowrap">${_spEscape(_radioFecha(p.creado))}</td>
+      <td>${_spEscape(p.nombre || '—')}</td>
+      <td>${_spEscape(p.peticion || '')}</td>
+      <td>${estado}</td>
+      <td>${accion}</td>
+    </tr>`;
+  }).join('');
+}
+
+function _renderRadioMuro() {
+  const tb = document.getElementById('radio-muro-tbody');
+  if (!tb) return;
+  if (!_radioMuro.length) {
+    tb.innerHTML = `<tr><td colspan="5" style="color:var(--ts)">El muro está vacío</td></tr>`;
+    return;
+  }
+  tb.innerHTML = _radioMuro.map(m => {
+    const id = _spEscape(m.id);
+    const estado = m.visible
+      ? '<span style="color:#3DDC84">👁 Visible</span>'
+      : '<span style="color:var(--ts)">🙈 Oculto</span>';
+    const accion = m.visible
+      ? `<button class="btn btn-ghost btn-sm" style="font-size:11px" onclick="radioMuroVisible('${id}',false)">🙈 Ocultar</button>`
+      : `<button class="btn btn-primary btn-sm" style="font-size:11px" onclick="radioMuroVisible('${id}',true)">👁 Mostrar</button>`;
+    return `<tr${m.visible ? '' : ' style="opacity:.45"'}>
+      <td style="white-space:nowrap">${_spEscape(_radioFecha(m.creado))}</td>
+      <td>${_spEscape(m.nombre || '—')}</td>
+      <td>${_spEscape(m.mensaje || '')}</td>
+      <td>${estado}</td>
+      <td>${accion}</td>
+    </tr>`;
+  }).join('');
+}
+
+async function radioAtender(id, atendida) {
+  try {
+    const r = await khAdminFetch('/.netlify/functions/admin-radio-peticiones', {
+      method: 'POST', body: JSON.stringify({ id, atendida }),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || j.ok === false) throw new Error(j.error || ('Error ' + r.status));
+    const it = _radioPeticiones.find(p => String(p.id) === String(id));
+    if (it) it.atendida = atendida;
+    _renderRadioPeticiones();
+  } catch (e) {
+    showToast('Error: ' + e.message, 'error');
+  }
+}
+
+async function radioMuroVisible(id, visible) {
+  try {
+    const r = await khAdminFetch('/.netlify/functions/admin-radio-muro', {
+      method: 'POST', body: JSON.stringify({ id, visible }),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || j.ok === false) throw new Error(j.error || ('Error ' + r.status));
+    const it = _radioMuro.find(m => String(m.id) === String(id));
+    if (it) it.visible = visible;
+    _renderRadioMuro();
+  } catch (e) {
+    showToast('Error: ' + e.message, 'error');
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════

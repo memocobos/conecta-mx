@@ -1995,7 +1995,7 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
    <button class="nav-btn" onclick="showPage('esferas')" id="nav-esferas"><svg class="nav-ic"><use href="#ic-esferas"/></svg><span>Esferas del Dragón</span></button>
    <button class="nav-btn" onclick="showPage('yamcha')" id="nav-yamcha"><svg class="nav-ic"><use href="#ic-saldos"/></svg><span>La derrota de Yamcha</span></button>
    <button class="nav-btn" onclick="showPage('radar')" id="nav-radar"><svg class="nav-ic"><use href="#ic-radar"/></svg><span>Radar del Dragón</span></button>
-   <button class="nav-btn" onclick="showPage('radio')" id="nav-radio"><svg class="nav-ic"><use href="#ic-radar"/></svg><span>📻 Kaio-sama</span></button>
+   <button class="nav-btn" onclick="showPage('radio')" id="nav-radio"><svg class="nav-ic"><use href="#ic-radar"/></svg><span>Kaio-sama</span></button>
   </div>
 
   <div class="nav-group" id="nav-dropdown-herramientas">
@@ -3207,6 +3207,7 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
   <div style="display:flex;gap:8px;margin:14px 0;flex-wrap:wrap">
    <button class="gz-filter active" id="radio-tab-btn-peticiones" onclick="showRadioTab('peticiones',this)">Peticiones <span id="radio-pet-cnt"></span></button>
    <button class="gz-filter" id="radio-tab-btn-muro" onclick="showRadioTab('muro',this)">El Muro</button>
+   <button class="gz-filter" id="radio-tab-btn-numeros" onclick="showRadioTab('numeros',this)">Números</button>
   </div>
 
   <!-- TAB 1: Peticiones -->
@@ -3233,6 +3234,27 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
       <tr><td colspan="5"><div class="loading-state"><div class="spinner"></div>Cargando…</div></td></tr>
      </tbody>
     </table>
+   </div>
+  </div>
+
+  <!-- TAB 3: Números -->
+  <div id="radio-tab-numeros" style="display:none">
+   <div class="metrics-grid">
+    <div class="metric">
+     <div class="metric-label">Oyentes ahora</div>
+     <div class="metric-value green" id="radio-num-oyentes">…</div>
+     <div class="metric-sub" id="radio-num-sonando">cargando…</div>
+    </div>
+    <div class="metric">
+     <div class="metric-label">Likes esta semana</div>
+     <div class="metric-value" id="radio-num-likes">…</div>
+     <div class="metric-sub" id="radio-num-top3">cargando…</div>
+    </div>
+    <div class="metric">
+     <div class="metric-label">Peticiones pendientes</div>
+     <div class="metric-value red" id="radio-num-peticiones">…</div>
+     <div class="metric-sub">sin atender</div>
+    </div>
    </div>
   </div>
  </div><!-- /page-radio -->
@@ -5318,10 +5340,64 @@ async function loadRadio() {
 function showRadioTab(sub, btn) {
   document.querySelectorAll('#page-radio .gz-filter[id^="radio-tab-btn"]').forEach(b => b.classList.remove('active'));
   if (btn) btn.classList.add('active');
-  ['peticiones', 'muro'].forEach(s => {
+  ['peticiones', 'muro', 'numeros'].forEach(s => {
     const el = document.getElementById('radio-tab-' + s);
     if (el) el.style.display = s === sub ? '' : 'none';
   });
+  if (sub === 'numeros') loadRadioNumeros();
+}
+
+// Tab "Números" — 3 tarjetas con endpoints EXISTENTES (sin functions nuevas).
+// Peticiones pendientes sale de lo ya cargado por loadRadio; oyentes y likes se
+// piden aquí (fail-soft, cada card independiente).
+async function loadRadioNumeros() {
+  // ── Peticiones pendientes (reutiliza admin-radio-peticiones vía _radioPeticiones) ──
+  const pend = _radioPeticiones.filter(p => !p.atendida).length;
+  const elPet = document.getElementById('radio-num-peticiones');
+  if (elPet) elPet.textContent = pend;
+
+  // ── Oyentes ahora + canción sonando (API pública de la radio, fetch cliente) ──
+  fetch('https://radio.conectareynosa.mx/api/nowplaying/radioconecta')
+    .then(r => r.json())
+    .then(d => {
+      const oy = (d && d.listeners && Number(d.listeners.current)) || 0;
+      const elOy = document.getElementById('radio-num-oyentes');
+      if (elOy) elOy.textContent = oy;
+      const s = d && d.now_playing && d.now_playing.song;
+      const elSon = document.getElementById('radio-num-sonando');
+      if (elSon) elSon.textContent = (s && (s.title || s.artist))
+        ? '♪ ' + [s.title, s.artist].filter(Boolean).join(' — ')
+        : 'sin datos';
+    })
+    .catch(() => {
+      const elOy = document.getElementById('radio-num-oyentes');
+      const elSon = document.getElementById('radio-num-sonando');
+      if (elOy) elOy.textContent = '—';
+      if (elSon) elSon.textContent = 'no disponible';
+    });
+
+  // ── Likes esta semana: GET público del top → suma counts + top 3 ──
+  fetch('/.netlify/functions/radio-like')
+    .then(r => r.json())
+    .then(d => {
+      const top = (d && Array.isArray(d.top)) ? d.top : [];
+      const total = top.reduce((a, t) => a + (Number(t.likes) || 0), 0);
+      const elLk = document.getElementById('radio-num-likes');
+      if (elLk) elLk.textContent = total;
+      const elT3 = document.getElementById('radio-num-top3');
+      if (elT3) elT3.innerHTML = top.length
+        ? top.slice(0, 3).map((t, i) => {
+            const label = [(t.titulo || ''), (t.artista || '')].filter(Boolean).join(' — ') || 'sin título';
+            return (i + 1) + '. ' + _spEscape(label) + ' · ❤️ ' + (Number(t.likes) || 0);
+          }).join('<br>')
+        : 'aún sin likes';
+    })
+    .catch(() => {
+      const elLk = document.getElementById('radio-num-likes');
+      const elT3 = document.getElementById('radio-num-top3');
+      if (elLk) elLk.textContent = '—';
+      if (elT3) elT3.textContent = 'no disponible';
+    });
 }
 
 function toggleRadioPetFiltro(btn) {

@@ -11744,10 +11744,19 @@ function renderPlanPagosSP(solicitudId, estadoSolicitud) {
   if (!target) return;
   const pagos = _spPlanCache[solicitudId] || [];
   if (!pagos.length) {
-    const msg = estadoSolicitud === 'pendiente'
-      ? 'Aún sin plan — aprueba la solicitud (cambia el estado a “En pagos”) para generarlo.'
-      : 'Sin plan de pagos para esta solicitud.';
-    target.innerHTML = `<span style="color:var(--ts)">${msg}</span>`;
+    if (estadoSolicitud === 'pendiente') {
+      target.innerHTML = `<span style="color:var(--ts)">Aún sin plan — aprueba la solicitud (cambia el estado a “En pagos”) para generarlo.</span>`;
+      return;
+    }
+    // 'en_pagos'/'pagado' pueden quedar SIN plan si la generación falló al aprobar
+    // (piloto) → botón de recuperación. 'cancelado' u otros estados → solo el
+    // mensaje (el plan nace al aprobar, no aquí).
+    const solSafe = _spEscape(solicitudId);
+    const puedeRecuperar = estadoSolicitud === 'en_pagos' || estadoSolicitud === 'pagado';
+    target.innerHTML = `<span style="color:var(--ts)">Sin plan de pagos para esta solicitud.</span>`
+      + (puedeRecuperar
+        ? `<div style="margin-top:10px"><button id="sp-gen-plan-btn-${solSafe}" class="btn btn-primary btn-sm" style="font-size:11px" onclick="_spGenerarPlanRecuperacion('${solSafe}','${_spEscape(estadoSolicitud)}')">⚙️ Generar plan de pagos</button></div>`
+        : '');
     return;
   }
 
@@ -12558,6 +12567,57 @@ function abrirCambiarEstadoSP(solicitudId) {
   document.getElementById('modal-sp-cambiar-estado').querySelector('.modal').style.maxWidth = '480px';
 }
 
+// Camino COMPARTIDO de generación del plan (sin duplicar lógica): calcula el
+// plan y lo POSTea al backend idempotente; devuelve la respuesta parseada (dataP)
+// o lanza con el mensaje de error. Lo usan el aprobar (generar-primero) y el
+// botón de recuperación del modal. Cada caller hace su propio toast de éxito.
+async function _spGenerarPlanPagosBackend(s, solicitudId) {
+  const plan = await _spCalcularPlanPagos(s);
+  if (!plan.ok) throw new Error(plan.error || 'No se pudo calcular el plan de pagos');
+  const rp = await fetch('/.netlify/functions/admin-generar-plan-pagos', {
+    method: 'POST',
+    headers: _spAdminHeaders(),
+    body: JSON.stringify({ solicitud_id: solicitudId, pagos: plan.pagos }),
+  });
+  const dataP = await rp.json();
+  if (!rp.ok) {
+    // Adjuntamos el detail del backend al Error sin meterlo al mensaje: el aprobar
+    // lo ignora (comportamiento intacto) y la recuperación sí lo muestra.
+    const err = new Error(dataP.error || 'Error generando el plan de pagos');
+    if (dataP.detail) err.detail = dataP.detail;
+    throw err;
+  }
+  return dataP;
+}
+
+// Recuperación (piloto): una solicitud puede quedar en_pagos/pagado SIN plan si
+// la generación falló al aprobar. Este botón reusa el MISMO camino del aprobar
+// (_spGenerarPlanPagosBackend) para generarlo a mano, sin tocar el flujo de
+// aprobar. Al terminar refresca #sp-plan.
+async function _spGenerarPlanRecuperacion(solicitudId, estadoSolicitud) {
+  if (!confirm('¿Generar el plan de pagos de esta solicitud ahora?')) return;
+  const s = _spCache.find(x => x.id === solicitudId);
+  if (!s) { showToast('No se encontró la solicitud en memoria', 'error'); return; }
+  const btn = document.getElementById('sp-gen-plan-btn-' + solicitudId);
+  if (btn) { btn.disabled = true; btn.textContent = 'Generando…'; }
+  try {
+    const dataP = await _spGenerarPlanPagosBackend(s, solicitudId);
+    if (dataP.ya_existia) {
+      showToast('El plan de pagos ya existía — no se duplicó', 'success');
+    } else {
+      const cuotas = dataP.cuotas_insertadas != null ? dataP.cuotas_insertadas : (dataP.pagos || []).length;
+      const lug = dataP.lugares_asegurados || 0;
+      showToast('Plan generado: ' + cuotas + ' cuotas' + (lug ? ' · ' + lug + ' lugares asegurados' : '') + '.', 'success');
+    }
+    // Éxito → refrescar el plan (esto re-renderiza #sp-plan y quita el botón).
+    cargarPlanPagosSP(solicitudId, estadoSolicitud);
+  } catch (e) {
+    const detalle = e && e.detail ? ' — ' + e.detail : '';
+    showToast('No se pudo generar el plan: ' + e.message + detalle, 'error');
+    if (btn) { btn.disabled = false; btn.textContent = '⚙️ Generar plan de pagos'; }
+  }
+}
+
 async function guardarCambioEstadoSP(solicitudId) {
   const btn = document.getElementById('sp-btn-guardar-estado');
   const estado = document.getElementById('sp-nuevo-estado').value;
@@ -12574,15 +12634,7 @@ async function guardarCambioEstadoSP(solicitudId) {
     // función backend es idempotente, así que re-aprobar NO duplica.
     if (estado === 'en_pagos') {
       if (btn) btn.textContent = 'Generando plan…';
-      const plan = await _spCalcularPlanPagos(s);
-      if (!plan.ok) throw new Error(plan.error || 'No se pudo calcular el plan de pagos');
-      const rp = await fetch('/.netlify/functions/admin-generar-plan-pagos', {
-        method: 'POST',
-        headers: _spAdminHeaders(),
-        body: JSON.stringify({ solicitud_id: solicitudId, pagos: plan.pagos }),
-      });
-      const dataP = await rp.json();
-      if (!rp.ok) throw new Error(dataP.error || 'Error generando el plan de pagos');
+      const dataP = await _spGenerarPlanPagosBackend(s, solicitudId);
       if (dataP.ya_existia) {
         showToast('El plan de pagos ya existía — no se duplicó', 'success');
       } else {

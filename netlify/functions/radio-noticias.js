@@ -8,16 +8,29 @@
 //   GET → { titulares: [...] }  (hasta 8, sin el sufijo " - <fuente>")
 //         Si el fetch falla → { titulares: [] } con 200 (nunca error al cliente).
 //
-// Cache en memoria del módulo por 30 min (se comparte entre invocaciones mientras
+// FRESCURA: se pide con `when:2d` (48h). Si esa ventana devuelve menos de 3
+// titulares (noticia escasa / fin de semana), se reintenta con `when:7d` y se
+// usa la que traiga más. Los dos fetch son secuenciales, así que cada uno tiene
+// un timeout acotado para caber en el límite de 10s de Netlify.
+//
+// Cache en memoria del módulo por 15 min (se comparte entre invocaciones mientras
 // la lambda siga caliente). Guard de origen estilo #253 (solo bloquea un Origin
 // cross-origin no permitido; el GET same-origin del ticker pasa).
 // =============================================================================
 
 const { corsCheck } = require('./_lib/verify-admin');
 
-const RSS_URL = 'https://news.google.com/rss/search?q=m%C3%BAsica%20conciertos%20artistas&hl=es-419&gl=MX&ceid=MX:es-419';
-const TTL_MS  = 30 * 60 * 1000; // 30 minutos
-const MAX     = 8;
+// La ventana (`when:`) es lo único que cambia entre el intento y el reintento.
+const rssUrl = (ventana) =>
+  'https://news.google.com/rss/search?q=m%C3%BAsica%20conciertos%20artistas%20when%3A' +
+  ventana + '&hl=es-419&gl=MX&ceid=MX:es-419';
+
+const VENTANA_CORTA = '2d';
+const VENTANA_AMPLIA = '7d';
+const MIN_TITULARES = 3;      // menos que esto con 2d → reintentar con 7d
+const FETCH_MS = 4000;        // por intento; 2 intentos = 8s < 10s de Netlify
+const TTL_MS   = 15 * 60 * 1000; // 15 minutos
+const MAX      = 8;
 
 // Cache a nivel de módulo (persiste mientras la lambda esté caliente).
 let _cache = { ts: 0, titulares: [] };
@@ -46,23 +59,17 @@ exports.handler = async (event) => {
   }
 
   try {
-    const ac = new AbortController();
-    const timer = setTimeout(() => ac.abort(), 8000);
-    let xml;
-    try {
-      const r = await fetch(RSS_URL, {
-        headers: { 'User-Agent': 'Mozilla/5.0 (conecta-radio-noticias)' },
-        signal: ac.signal,
-      });
-      if (!r.ok) throw new Error('rss ' + r.status);
-      xml = await r.text();
-    } finally {
-      clearTimeout(timer);
+    // 1er intento: últimas 48h (lo más fresco).
+    let titulares = await intentarVentana(VENTANA_CORTA);
+
+    // Si 2d trae poco (o el fetch falló), ampliar a 7d y quedarnos con la mejor.
+    if (titulares.length < MIN_TITULARES) {
+      const amplio = await intentarVentana(VENTANA_AMPLIA);
+      if (amplio.length > titulares.length) titulares = amplio;
     }
 
-    const titulares = parseTitulares(xml);
     if (titulares.length) _cache = { ts: Date.now(), titulares };
-    // Si el parseo vino vacío pero hay cache previa (aunque sea vieja), servirla.
+    // Si ambas ventanas vinieron vacías pero hay cache previa (aunque sea vieja), servirla.
     return json(200, { titulares: titulares.length ? titulares : _cache.titulares });
   } catch (e) {
     // Nunca error al cliente: cache vieja si existe, o lista vacía.
@@ -71,6 +78,25 @@ exports.handler = async (event) => {
 };
 
 // ----- helpers -----
+
+// Fetch + parseo de una ventana. NUNCA lanza: un fallo (red, status, timeout)
+// devuelve [] para que el reintento/cache decidan. Así un 2d caído no tumba el 7d.
+async function intentarVentana(ventana) {
+  const ac = new AbortController();
+  const timer = setTimeout(() => ac.abort(), FETCH_MS);
+  try {
+    const r = await fetch(rssUrl(ventana), {
+      headers: { 'User-Agent': 'Mozilla/5.0 (conecta-radio-noticias)' },
+      signal: ac.signal,
+    });
+    if (!r.ok) throw new Error('rss ' + r.status);
+    return parseTitulares(await r.text());
+  } catch (e) {
+    return [];
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 // Parseo simple del RSS (sin librería XML): titles de cada <item>, primeros 8,
 // sin el sufijo " - <fuente>" que Google News añade.

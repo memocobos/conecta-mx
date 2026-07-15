@@ -27,6 +27,7 @@
 
 const { verifyAdminAuth, corsCheck } = require('./_lib/verify-admin');
 const { aplicarModoPrueba } = require('./_lib/correo-guard');
+const { ensureLugares } = require('./_lib/portal-lugares');
 
 const ESTADO_PAGO_INICIAL = 'pendiente';
 const MAX_PAGOS = 20; // separo + hasta ~10 quincenas; 20 es tope defensivo holgado
@@ -112,7 +113,9 @@ exports.handler = async (event) => {
 
   try {
     // 1. Traer la solicitud para obtener cliente_id y auth_user_id.
-    const solUrl = `${env.PORTAL_SB_URL}/rest/v1/solicitudes_tour?id=eq.${solicitudId}&select=id,cliente_id,auth_user_id,evento_nombre,precio_total`;
+    // El SELECT incluye lo que ensureLugares necesita (num_personas/paquete/zona/
+    // tipo_habitacion) además de lo del plan (cliente_id/auth_user_id/precio_total).
+    const solUrl = `${env.PORTAL_SB_URL}/rest/v1/solicitudes_tour?id=eq.${solicitudId}&select=id,cliente_id,auth_user_id,evento_nombre,precio_total,num_personas,paquete,zona,tipo_habitacion`;
     const solR = await fetch(solUrl, { headers: sbHeaders });
     if (!solR.ok) {
       const detail = await solR.text();
@@ -134,6 +137,22 @@ exports.handler = async (event) => {
     const existentes = await existR.json();
     if (Array.isArray(existentes) && existentes.length > 0) {
       return { statusCode: 200, headers, body: JSON.stringify({ ok: true, ya_existia: true, pagos: existentes }) };
+    }
+
+    // 2.5 [fix integración] Asegurar los lugares ANTES de decidir el tipo de plan.
+    //     El flujo de aprobar en kamehouse genera el plan ANTES de cambiar el
+    //     estado (~línea 12408), y los lugares nacen en el cambio de estado (#222),
+    //     DESPUÉS. Sin esto, aquí se verían 0 lugares → plan grupal, y el por-lugar
+    //     (#229) nunca aplicaría en esa ruta (el walk-in funciona por orden inverso).
+    //     ensureLugares es IDEMPOTENTE: si ya existen es no-op (el ensure posterior
+    //     de update-estado también). Best-effort: si truena, seguimos al chequeo
+    //     normal (peor caso degrada a grupal, como hoy; nunca rompe la generación).
+    let lugaresAsegurados = 0;
+    try {
+      const ens = await ensureLugares({ portalUrl: env.PORTAL_SB_URL, portalHeaders: sbHeaders, solicitud });
+      lugaresAsegurados = (ens && ens.creados) || 0;
+    } catch (_e) {
+      // best-effort: seguimos; el GET de abajo verá lo que ya exista.
     }
 
     // 3. ¿La solicitud tiene lugares activos (#222)? Entonces el plan va POR
@@ -303,7 +322,7 @@ exports.handler = async (event) => {
     return {
       statusCode: 200,
       headers,
-      body: JSON.stringify({ ok: true, ya_existia: false, pagos: insertados, admin: { id: auth.user.id, correo: auth.user.correo }, plan_por_lugar: planPorLugar, lugares_planificados: lugaresPlanificados, cuotas_insertadas: Array.isArray(insertados) ? insertados.length : rows.length, ...correoInfo }),
+      body: JSON.stringify({ ok: true, ya_existia: false, pagos: insertados, admin: { id: auth.user.id, correo: auth.user.correo }, plan_por_lugar: planPorLugar, lugares_planificados: lugaresPlanificados, lugares_asegurados: lugaresAsegurados, cuotas_insertadas: Array.isArray(insertados) ? insertados.length : rows.length, ...correoInfo }),
     };
   } catch (e) {
     return { statusCode: 502, headers, body: JSON.stringify({ error: 'Error generando plan de pagos', detail: e.message }) };

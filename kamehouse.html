@@ -5022,6 +5022,15 @@ function _rgRender() {
   cont.innerHTML = _rgGrupos.map(_rgGrupoHtml).join('');
 }
 
+// Multifecha: índice de fecha (0-based) de un evento_id 'slug#idx', o null en
+// fecha única. El chip visible es "Fecha <idx+1>". [rooming-multifecha]
+function _rgFechaIdx(eventoId) {
+  const p = String(eventoId || '').split('#');
+  if (p.length < 2 || p[1] === '') return null;
+  const n = parseInt(p[1], 10);
+  return (Number.isFinite(n) && n >= 0) ? n : null;
+}
+
 function _rgGrupoHtml(g) {
   const solSafe = _esfEsc(g.solicitud_id);
   const activos = (g.lugares || []).filter(l => l.estado === 'activo');
@@ -5034,10 +5043,13 @@ function _rgGrupoHtml(g) {
   const sumaCap = (g.habitaciones || []).reduce((a, h) => a + (Number(h.capacidad) || 0), 0);
   const cubre = sumaCap >= N;
   const abierto = !!_rgAbiertos[g.solicitud_id];
+  // Multifecha: chip "Fecha N" junto al título (fecha única → sin chip).
+  const _fi = _rgFechaIdx(g.evento_id);
+  const fechaChip = _fi === null ? '' : `<span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--ts);border:1px solid var(--border);border-radius:20px;padding:1px 8px;letter-spacing:.06em">Fecha ${_fi + 1}</span>`;
 
   const header = `
     <button type="button" data-rg-toggle="${solSafe}" style="width:100%;display:flex;align-items:center;gap:10px;background:transparent;border:none;color:var(--ink);cursor:pointer;text-align:left;padding:0">
-      <span style="font-family:'Rajdhani',sans-serif;font-weight:700;font-size:16px">Grupo de ${_esfEsc(g.titular_nombre)}</span>
+      <span style="font-family:'Rajdhani',sans-serif;font-weight:700;font-size:16px">Grupo de ${_esfEsc(g.titular_nombre)}</span>${fechaChip}
       <span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--ts);letter-spacing:.08em">asignados ${asignados} de ${N}</span>
       <span style="margin-left:auto;color:var(--ts);font-size:12px">${abierto ? '▴' : '▾'}</span>
     </button>`;
@@ -10733,6 +10745,9 @@ async function imprimirListaHotel() {
   const sinAcomodar = []; // { titular, personas:[nombre] }
   grupos.forEach(g => {
     const titular = (g.titular_nombre && String(g.titular_nombre).trim()) || 'Titular';
+    // Multifecha: chip "Fecha N" en la etiqueta del grupo (fecha única → '').
+    const _fi = _rgFechaIdx(g.evento_id);
+    const fechaChip = _fi === null ? '' : ` <span style="font-size:11px;color:#555;border:1px solid #bbb;border-radius:10px;padding:0 6px">Fecha ${_fi + 1}</span>`;
     const activos = (g.lugares || []).filter(l => l.estado === 'activo');
     personasGrupos += activos.length;
     const nombreDe = (l) => (l.nombre && String(l.nombre).trim()) ? l.nombre : ('Lugar #' + l.numero + ' — por confirmar');
@@ -10744,7 +10759,7 @@ async function imprimirListaHotel() {
       cuartosPorTipo[lbl] = (cuartosPorTipo[lbl] || 0) + 1;
       const nombres = ocup.length ? ocup.map(nombreDe).map(_esfEsc).join(', ') : '<span class="cx-muted">(vacío)</span>';
       filasCuartos.push(`<tr>
-        <td>${_esfEsc('Grupo de ' + titular + ' · Cuarto ' + h.orden)}</td>
+        <td>${_esfEsc('Grupo de ' + titular + ' · Cuarto ' + h.orden)}${fechaChip}</td>
         <td>${_esfEsc(lbl)}</td>
         <td>${nombres}</td>
         <td>${ocup.length}/${_esfEsc(h.capacidad)}</td>
@@ -10752,7 +10767,7 @@ async function imprimirListaHotel() {
     });
     // Personas activas sin cuarto asignado → SIN ACOMODAR.
     const sc = activos.filter(l => !l.habitacion_grupo_id);
-    if (sc.length) sinAcomodar.push({ titular, personas: sc.map(nombreDe) });
+    if (sc.length) sinAcomodar.push({ titular, fechaChip, personas: sc.map(nombreDe) });
   });
 
   let seccion1 = `<h2>Cuartos de grupos</h2>`;
@@ -10763,7 +10778,7 @@ async function imprimirListaHotel() {
   }
   if (sinAcomodar.length) {
     seccion1 += `<h2>Sin acomodar</h2>` + sinAcomodar.map(s =>
-      `<div class="cx-grupo" style="margin-bottom:8px"><b>Grupo de ${_esfEsc(s.titular)}:</b> ${s.personas.map(_esfEsc).join(', ')}</div>`
+      `<div class="cx-grupo" style="margin-bottom:8px"><b>Grupo de ${_esfEsc(s.titular)}:</b>${s.fechaChip || ''} ${s.personas.map(_esfEsc).join(', ')}</div>`
     ).join('');
   }
 
@@ -10835,6 +10850,9 @@ async function imprimirListaCoordis() {
   gruposOrd.forEach(g => {
     const esIndividual = (g.lugares || []).length === 1;
     const grupoLbl = esIndividual ? 'Individual' : ('Grupo de ' + (g.titular_nombre || 'Titular'));
+    // Multifecha: chip "Fecha N" junto a la etiqueta del grupo (fecha única → '').
+    const _fi = _rgFechaIdx(g.evento_id);
+    const fechaChip = _fi === null ? '' : ` <span style="font-size:11px;color:#555;border:1px solid #bbb;border-radius:10px;padding:0 6px">Fecha ${_fi + 1}</span>`;
     const habById = {};
     (g.habitaciones || []).forEach(h => { habById[h.id] = h; });
     (g.lugares || []).filter(l => l.estado === 'activo').forEach(l => {
@@ -10849,7 +10867,7 @@ async function imprimirListaCoordis() {
       filas.push(`<tr>
         <td>${_esfEsc(nombre)}</td>
         <td>${_esfEsc(contacto)}</td>
-        <td>${_esfEsc(grupoLbl)}</td>
+        <td>${_esfEsc(grupoLbl)}${fechaChip}</td>
         <td>${_esfEsc(cuarto)}</td>
         <td>${_esfEsc(pz)}</td>
         <td>${menor ? '<b>MENOR</b>' : ''}</td>

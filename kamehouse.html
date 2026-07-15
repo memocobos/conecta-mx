@@ -11824,7 +11824,9 @@ function _spRenderPlanPorLugar(solicitudId, pagos) {
     const lg = lugById[k];
     const ps = grupos[k];
     const num = lg && lg.numero != null ? lg.numero : '?';
-    const nombre = (lg && lg.nombre && String(lg.nombre).trim()) ? lg.nombre : 'Por registrar';
+    // Retroactivo (sin SQL): lugares 1 viejos sin nombre → "Titular" (el #1 es el
+    // titular; los nuevos ya nacen con su nombre vía ensureLugares).
+    const nombre = (lg && lg.nombre && String(lg.nombre).trim()) ? lg.nombre : (Number(num) === 1 ? 'Titular' : 'Por registrar');
     const conectado = (lg && lg.cliente_id) ? _SP_CHIP_CONECTADO : '';
     // [F5-t1] Estado del lugar: baja (tachado+rojo) / traspasado (ámbar) / activo.
     const estado = (lg && lg.estado) ? lg.estado : 'activo';

@@ -104,14 +104,26 @@ exports.handler = async (event) => {
     if (accion === 'listar') {
       const eventoId = String(body.evento_id || '').trim();
       if (!eventoId || !SLUG_RE.test(eventoId)) return json(400, { error: 'evento_id inválido' });
+      // Multifecha: el Portal guarda las solicitudes con evento_id='slug#idx'
+      // (portal.html: ev.id + '#' + multifechaIdx). El front lista por el slug
+      // BASE, así que hay que reunir la base + todas sus fechas. slugBase = el
+      // slug sin el sufijo '#idx', re-saneado a SOLO [a-z0-9_-] antes de entrar
+      // al filtro like (anti-inyección en el or= de PostgREST).
+      const slugBase = eventoId.split('#')[0];
+      if (!/^[a-z0-9_-]+$/.test(slugBase)) return json(400, { error: 'evento_id inválido' });
       // [F6-t2] Con todos:true, la lista de COORDIS incluye también solicitudes de 1
       // lugar y enriquece cada lugar con el contacto de su persona. SIN el flag, la
       // respuesta queda EXACTA de hoy (#238/#242 no se enteran).
       const todos = body.todos === true;
 
+      // Unión base + fechas: or=(evento_id.eq.<slug>, evento_id.like.<slug>#*).
+      // El '#' viaja como %23 (si no, HTTP lo tomaría como fragmento) y el '*' es
+      // el comodín de PostgREST like. slugBase ya está saneado a [a-z0-9_-], así
+      // que es seguro interpolarlo sin encodeURIComponent (que rompería el or=).
+      const eventoFiltro = `or=(evento_id.eq.${slugBase},evento_id.like.${slugBase}%23*)`;
       const solR = await fetch(
-        `${PORTAL_URL}/rest/v1/solicitudes_tour?evento_id=eq.${enc(eventoId)}&estado=neq.cancelado`
-        + `&select=id,cliente_id,evento_nombre,num_personas`,
+        `${PORTAL_URL}/rest/v1/solicitudes_tour?${eventoFiltro}&estado=neq.cancelado`
+        + `&select=id,cliente_id,evento_id,evento_nombre,num_personas`,
         { headers: sbHeaders }
       );
       if (!solR.ok) return json(502, { error: 'Supabase rechazó la consulta de solicitudes', detail: await solR.text() });
@@ -159,6 +171,7 @@ exports.handler = async (event) => {
           solicitud_id: s.id,
           titular_nombre: (cli.nombre_completo && String(cli.nombre_completo).trim()) || 'Titular',
           evento_nombre: s.evento_nombre || '',
+          evento_id: s.evento_id || '', // real (con #idx en multifecha) → el front distingue fechas
           lugares: lugs.map(l => {
             const base = {
               id: l.id, numero: l.numero, nombre: l.nombre, estado: l.estado,

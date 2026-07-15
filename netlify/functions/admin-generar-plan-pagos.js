@@ -264,12 +264,20 @@ exports.handler = async (event) => {
     });
     if (!insR.ok) {
       const detail = await insR.text();
-      // 23505 = unique_violation → carrera con otra aprobación simultánea.
-      // Tratamos como idempotente: devolvemos lo que ya quedó guardado.
+      // 23505 = unique_violation → posible carrera con otra aprobación simultánea.
+      // Tratamos como idempotente SOLO si el re-fetch trae filas.
       if (insR.status === 409 || detail.includes('23505')) {
         const reR = await fetch(existUrl, { headers: sbHeaders });
-        const yaPagos = reR.ok ? await reR.json() : [];
-        return { statusCode: 200, headers, body: JSON.stringify({ ok: true, ya_existia: true, pagos: yaPagos }) };
+        const yaPagos = (reR.ok ? await reR.json() : []) || [];
+        // [piloto jul-2026] Si el re-fetch trae 0 filas, el 23505/409 NO fue una
+        // carrera: el insert falló DE VERDAD (p.ej. una restricción UNIQUE mal
+        // puesta) y responder ya_existia:true con cero cuotas lo enmascara como
+        // éxito — así se nos escondió el bug de la UNIQUE. NO fingir éxito:
+        // devolver el 502 con el detail original del insert.
+        if (Array.isArray(yaPagos) && yaPagos.length > 0) {
+          return { statusCode: 200, headers, body: JSON.stringify({ ok: true, ya_existia: true, pagos: yaPagos }) };
+        }
+        return { statusCode: 502, headers, body: JSON.stringify({ error: 'Supabase rechazó la inserción del plan', detail }) };
       }
       return { statusCode: 502, headers, body: JSON.stringify({ error: 'Supabase rechazó la inserción del plan', detail }) };
     }

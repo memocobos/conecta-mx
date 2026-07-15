@@ -10,6 +10,11 @@
 <meta property="og:description" content="La música de Conecta Reynosa sonando 24/7. Dale play.">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://conectareynosa.mx/radio">
+<link rel="manifest" href="/radio/manifest.json">
+<link rel="apple-touch-icon" href="/radio/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-title" content="Radio Conecta">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@900&family=Montserrat:wght@400;500;600;700;900&display=swap" rel="stylesheet">
 <style>
@@ -39,7 +44,6 @@
   button{font-family:inherit}
   img{max-width:100%}
 
-  /* ===== Fondo ambiente (carátula difuminada) ===== */
   #ambiente{
     position:fixed;
     top:-10%;left:-10%;right:-10%;bottom:-10%;
@@ -52,9 +56,7 @@
     z-index:0;
     pointer-events:none;
   }
-  #ambiente.off{background-image:none !important}
 
-  /* ===== Ticker ===== */
   .ticker{
     position:relative;z-index:2;
     background:var(--c-amarillo);
@@ -75,7 +77,6 @@
   @-webkit-keyframes marquee{0%{-webkit-transform:translateX(0)}100%{-webkit-transform:translateX(-50%)}}
   @keyframes marquee{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
 
-  /* ===== Header ===== */
   header{
     position:relative;z-index:2;
     display:flex;align-items:center;justify-content:space-between;
@@ -90,7 +91,7 @@
     line-height:1;
   }
   .logo em{font-style:normal;color:var(--c-amarillo)}
-  .headerDer{display:flex;align-items:center;gap:16px}
+  .headerDer{display:flex;align-items:center;gap:12px}
   .liveTag{
     display:flex;align-items:center;gap:7px;
     font-family:var(--font-display);
@@ -106,17 +107,20 @@
   }
   @-webkit-keyframes latido{0%,100%{opacity:1}50%{opacity:.25}}
   @keyframes latido{0%,100%{opacity:1}50%{opacity:.25}}
-  #fsBtn{
+  .hBtn{
     background:none;border:1px solid var(--c-line);
     color:var(--c-muted);
-    width:36px;height:36px;border-radius:50%;
-    cursor:pointer;font-size:15px;
-    display:flex;align-items:center;justify-content:center;
+    height:36px;border-radius:18px;
+    padding:0 12px;
+    cursor:pointer;font-size:13px;
+    display:none;align-items:center;gap:6px;
     transition:all .2s;
+    font-weight:700;
   }
-  #fsBtn:hover{color:var(--c-amarillo);border-color:var(--c-amarillo)}
+  .hBtn.visible{display:flex}
+  .hBtn:hover{color:var(--c-amarillo);border-color:var(--c-amarillo)}
+  #fsBtn{width:36px;padding:0;justify-content:center;display:flex;border-radius:50%;font-size:15px}
 
-  /* ===== Main ===== */
   main{
     position:relative;z-index:1;
     max-width:560px;
@@ -139,7 +143,7 @@
     position:relative;
     width:72vw;
     max-width:300px;
-    margin:0 auto 24px;
+    margin:0 auto 22px;
   }
   .caratula{
     width:100%;
@@ -151,7 +155,6 @@
     box-shadow:0 24px 70px rgba(0,0,0,.8), 0 0 0 1px var(--c-line);
     display:block;
   }
-  /* Fallback para navegadores viejos sin aspect-ratio */
   @supports not (aspect-ratio: 1/1){
     .caratula{height:72vw;max-height:300px}
   }
@@ -179,6 +182,16 @@
   @-webkit-keyframes eqbar{0%,100%{-webkit-transform:scaleY(.3)}50%{-webkit-transform:scaleY(1)}}
   @keyframes eqbar{0%,100%{transform:scaleY(.3)}50%{transform:scaleY(1)}}
 
+  .pillGenero{
+    display:none;
+    font-family:var(--font-display);
+    font-size:14px;letter-spacing:.1em;text-transform:uppercase;
+    color:#000;background:var(--c-rosa);
+    padding:3px 12px;border-radius:14px;
+    margin:0 auto 12px;
+  }
+  .pillGenero.visible{display:inline-block}
+
   .cancion{
     font-family:var(--font-display);
     font-size:34px;
@@ -195,22 +208,43 @@
     color:var(--c-amarillo);
     text-transform:uppercase;
     letter-spacing:.05em;
-    margin-bottom:22px;
+    margin-bottom:16px;
   }
 
-  /* ===== Visualizador de barras ===== */
+  /* ===== Progreso ===== */
+  .progresoWrap{
+    max-width:340px;margin:0 auto 6px;
+    display:flex;align-items:center;gap:10px;
+    font-size:11px;color:var(--c-muted);
+    font-variant-numeric:tabular-nums;
+  }
+  .progresoBar{
+    flex:1;height:3px;background:rgba(255,255,255,.14);
+    border-radius:2px;overflow:hidden;
+  }
+  .progresoFill{
+    height:100%;width:0%;
+    background:var(--c-amarillo);
+    border-radius:2px;
+    transition:width 1s linear;
+  }
+  .siguiente{
+    font-size:12px;color:var(--c-muted);
+    margin-bottom:16px;min-height:16px;
+  }
+  .siguiente b{color:var(--c-ink);font-weight:600}
+
   #viz{
     width:100%;
     max-width:340px;
     height:44px;
-    margin:0 auto 20px;
+    margin:0 auto 18px;
     display:block;
   }
 
-  /* ===== Controles ===== */
   .controles{
     display:flex;align-items:center;justify-content:center;gap:26px;
-    margin-bottom:14px;
+    margin-bottom:16px;
   }
   #playBtn{
     width:84px;height:84px;border-radius:50%;
@@ -244,6 +278,31 @@
   }
   @media (max-width:430px){ .volWrap{display:none} }
 
+  /* ===== Acciones sociales ===== */
+  .acciones{
+    display:flex;justify-content:center;gap:10px;
+    flex-wrap:wrap;
+    margin-bottom:12px;
+  }
+  .accionBtn{
+    display:flex;align-items:center;gap:7px;
+    background:rgba(255,255,255,.07);
+    border:1px solid var(--c-line);
+    color:var(--c-ink);
+    border-radius:22px;
+    padding:10px 16px;
+    font-size:13px;font-weight:700;
+    cursor:pointer;
+    transition:all .2s;
+  }
+  .accionBtn:hover{border-color:var(--c-amarillo)}
+  .accionBtn:active{-webkit-transform:scale(.96);transform:scale(.96)}
+  .accionBtn.liked{
+    background:rgba(255,40,59,.18);
+    border-color:var(--c-rojo);
+    color:var(--c-rojo);
+  }
+
   .oyentes{
     font-size:12.5px;color:var(--c-muted);
     min-height:18px;
@@ -274,7 +333,7 @@
     width:46px;height:46px;border-radius:8px;object-fit:cover;
     background:#111;flex-shrink:0;
   }
-  .histMeta{min-width:0;text-align:left}
+  .histMeta{min-width:0;text-align:left;flex:1}
   .histTitulo{
     font-weight:700;font-size:14px;
     white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
@@ -284,7 +343,19 @@
     white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
   }
 
-  /* ===== El Muro ===== */
+  /* Top 10 */
+  .topNum{
+    font-family:var(--font-display);
+    font-size:26px;color:var(--c-amarillo);
+    width:34px;text-align:center;flex-shrink:0;
+  }
+  .topLikes{
+    font-size:12px;color:var(--c-rojo);font-weight:700;
+    flex-shrink:0;
+  }
+  .topVacio{color:var(--c-muted);font-size:13px;padding:10px 0}
+
+  /* Muro */
   .muroLista{margin-bottom:18px}
   .muroItem{
     padding:12px 0;
@@ -300,9 +371,7 @@
   .muroMsg{font-size:14px;line-height:1.45;margin-top:2px}
   .muroVacio{color:var(--c-muted);font-size:13px;padding:10px 0}
 
-  .formulario{
-    display:flex;flex-direction:column;gap:10px;
-  }
+  .formulario{display:flex;flex-direction:column;gap:10px}
   .formulario input, .formulario textarea{
     background:rgba(255,255,255,.06);
     border:1px solid var(--c-line);
@@ -334,7 +403,6 @@
   .formOk{color:var(--c-verde);font-size:13px;min-height:18px}
   .hpot{position:absolute;left:-9999px;opacity:0;height:0;overflow:hidden}
 
-  /* ===== CTA ===== */
   .cta{
     margin-top:48px;
     border:1px solid var(--c-line);
@@ -381,11 +449,12 @@
   }
   footer a{color:var(--c-amarillo);text-decoration:none;font-weight:700}
 
-  /* ===== Modo Pantalla (para la oficina) ===== */
+  /* ===== Modo Pantalla ===== */
   body.pantalla .ticker,
   body.pantalla .seccion,
   body.pantalla .cta,
   body.pantalla footer,
+  body.pantalla .acciones,
   body.pantalla .kicker{display:none}
   body.pantalla main{
     max-width:none;
@@ -394,8 +463,7 @@
     align-items:center;justify-content:center;
     padding:20px;
   }
-  body.pantalla .artWrap{max-width:min(52vh, 480px);width:60vw}
-  body.pantalla .caratula{box-shadow:0 40px 120px rgba(0,0,0,.9), 0 0 0 1px var(--c-line)}
+  body.pantalla .artWrap{max-width:min(50vh, 460px);width:58vw}
   body.pantalla .cancion{font-size:clamp(40px, 6vw, 90px)}
   body.pantalla .artista{font-size:clamp(24px, 3.5vw, 44px)}
   body.pantalla #viz{max-width:480px;height:60px}
@@ -415,8 +483,9 @@
 <header>
   <a class="logo" href="https://conectareynosa.mx">CONECTA<em>MX.</em></a>
   <div class="headerDer">
-    <div class="liveTag"><span class="dot"></span>RADIO EN VIVO</div>
-    <button id="fsBtn" title="Modo pantalla completa">⛶</button>
+    <button class="hBtn" id="pwaBtn">📲 Instalar</button>
+    <div class="liveTag"><span class="dot"></span>EN VIVO</div>
+    <button class="hBtn visible" id="fsBtn" title="Modo pantalla completa">⛶</button>
   </div>
 </header>
 
@@ -425,12 +494,20 @@
     <div class="kicker">SONANDO <b>AHORA</b></div>
 
     <div class="artWrap">
-      <img class="caratula" id="art" src="" alt="Carátula del álbum">
+      <img class="caratula" id="art" src="" alt="Carátula del álbum" crossorigin="anonymous">
       <div class="eq" id="eq"><i></i><i></i><i></i><i></i></div>
     </div>
 
+    <span class="pillGenero" id="genero"></span>
     <h1 class="cancion" id="titulo">Radio Conecta</h1>
     <div class="artista" id="artista">Dale play 🎶</div>
+
+    <div class="progresoWrap">
+      <span id="tCur">0:00</span>
+      <div class="progresoBar"><div class="progresoFill" id="progresoFill"></div></div>
+      <span id="tTot">0:00</span>
+    </div>
+    <div class="siguiente" id="siguiente"></div>
 
     <canvas id="viz"></canvas>
 
@@ -438,8 +515,20 @@
       <div class="volWrap">🔉 <input type="range" id="vol" min="0" max="100" value="90"></div>
       <button id="playBtn" title="Reproducir">▶</button>
     </div>
+
+    <div class="acciones">
+      <button class="accionBtn" id="likeBtn">🤍 Me gusta</button>
+      <button class="accionBtn" id="shareBtn">📤 Compartir</button>
+      <button class="accionBtn" id="storyBtn">📸 Story</button>
+    </div>
+
     <div class="oyentes" id="oyentes"></div>
     <div id="avisoPlay"></div>
+  </div>
+
+  <div class="seccion">
+    <div class="seccionTitulo">🏆 Top 10 de la semana</div>
+    <div id="top10"><div class="topVacio">Dale ❤️ a tus rolas favoritas para armar el Top 🔥</div></div>
   </div>
 
   <div class="seccion">
@@ -500,11 +589,15 @@ var STREAM = 'https://radio.conectareynosa.mx/listen/radioconecta/radio.mp3';
 var API = 'https://radio.conectareynosa.mx/api/nowplaying/radioconecta';
 var FN_MURO = '/.netlify/functions/radio-muro';
 var FN_PETICION = '/.netlify/functions/radio-peticion';
+var FN_LIKE = '/.netlify/functions/radio-like';
+var URL_RADIO = 'https://conectareynosa.mx/radio';
 
 var player = document.getElementById('player');
 var playBtn = document.getElementById('playBtn');
 var eq = document.getElementById('eq');
 var tocando = false;
+var actual = null; // canción actual {id, title, artist, art, genre}
+var prog = { elapsed:0, duration:0, marca:0 };
 
 player.volume = 0.9;
 document.getElementById('vol').addEventListener('input', function(){
@@ -548,20 +641,35 @@ playBtn.addEventListener('click', function(){
 });
 
 function esc(s){ return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;'); }
+function fmt(s){ s = Math.max(0, Math.floor(s)); var m = Math.floor(s/60); var r = s%60; return m + ':' + (r<10?'0':'') + r; }
 
 /* ===== Now Playing ===== */
 function actualizar(){
   fetch(API).then(function(r){ return r.json(); }).then(function(data){
     var np = data.now_playing;
     if(np && np.song){
-      document.getElementById('titulo').textContent = np.song.title || 'Radio Conecta';
-      document.getElementById('artista').textContent = np.song.artist || '';
-      if(np.song.art){
-        document.getElementById('art').src = np.song.art;
-        document.getElementById('ambiente').style.backgroundImage = 'url("' + np.song.art.replace(/"/g,'%22') + '")';
+      var s = np.song;
+      var esNueva = !actual || actual.id !== s.id;
+      actual = { id: s.id, title: s.title || '', artist: s.artist || '', art: s.art || '', genre: s.genre || '' };
+      document.getElementById('titulo').textContent = actual.title || 'Radio Conecta';
+      document.getElementById('artista').textContent = actual.artist;
+      if(actual.art){
+        document.getElementById('art').src = actual.art;
+        document.getElementById('ambiente').style.backgroundImage = 'url("' + actual.art.replace(/"/g,'%22') + '")';
       }
-      document.title = '🔴 ' + (np.song.title || 'Radio Conecta') + ' — Radio Conecta';
+      var pg = document.getElementById('genero');
+      if(actual.genre){ pg.textContent = actual.genre; pg.classList.add('visible'); }
+      else pg.classList.remove('visible');
+      document.title = '🔴 ' + (actual.title || 'Radio Conecta') + ' — Radio Conecta';
+      if(esNueva) refrescarLike();
+      prog.elapsed = np.elapsed || 0;
+      prog.duration = np.duration || 0;
+      prog.marca = Date.now();
     }
+    var pn = data.playing_next;
+    document.getElementById('siguiente').innerHTML = (pn && pn.song && pn.song.title)
+      ? 'A continuación: <b>' + esc(pn.song.title) + '</b> — ' + esc(pn.song.artist || '')
+      : '';
     var oy = data.listeners && data.listeners.current;
     document.getElementById('oyentes').innerHTML = (oy && oy > 0)
       ? '🎧 <b>' + oy + '</b> ' + (oy === 1 ? 'persona escuchando ahora' : 'personas escuchando ahora')
@@ -570,12 +678,12 @@ function actualizar(){
     if(hist.length){
       var html = '';
       for(var i = 0; i < Math.min(hist.length, 5); i++){
-        var s = hist[i].song;
+        var h = hist[i].song;
         html += '<div class="histItem">' +
-          '<img src="' + esc(s.art) + '" alt="" loading="lazy">' +
+          '<img src="' + esc(h.art) + '" alt="" loading="lazy">' +
           '<div class="histMeta">' +
-          '<div class="histTitulo">' + esc(s.title) + '</div>' +
-          '<div class="histArtista">' + esc(s.artist) + '</div>' +
+          '<div class="histTitulo">' + esc(h.title) + '</div>' +
+          '<div class="histArtista">' + esc(h.artist) + '</div>' +
           '</div></div>';
       }
       document.getElementById('historial').innerHTML = html;
@@ -584,6 +692,192 @@ function actualizar(){
 }
 actualizar();
 setInterval(actualizar, 15000);
+
+/* Progreso local (avanza entre polls) */
+setInterval(function(){
+  if(!prog.duration){ return; }
+  var el = prog.elapsed + (Date.now() - prog.marca)/1000;
+  if(el > prog.duration) el = prog.duration;
+  document.getElementById('progresoFill').style.width = (el/prog.duration*100) + '%';
+  document.getElementById('tCur').textContent = fmt(el);
+  document.getElementById('tTot').textContent = fmt(prog.duration);
+}, 1000);
+
+/* ===== Likes ===== */
+function yaLikeada(id){
+  try{ return (localStorage.getItem('rc_likes') || '').indexOf(id) !== -1; }catch(e){ return false; }
+}
+function marcarLikeada(id){
+  try{
+    var v = localStorage.getItem('rc_likes') || '';
+    localStorage.setItem('rc_likes', (v + ',' + id).slice(-2000));
+  }catch(e){}
+}
+function refrescarLike(){
+  var btn = document.getElementById('likeBtn');
+  if(actual && yaLikeada(actual.id)){
+    btn.classList.add('liked');
+    btn.innerHTML = '❤️ Te gusta';
+  } else {
+    btn.classList.remove('liked');
+    btn.innerHTML = '🤍 Me gusta';
+  }
+}
+document.getElementById('likeBtn').addEventListener('click', function(){
+  if(!actual || yaLikeada(actual.id)) return;
+  var btn = this;
+  btn.classList.add('liked');
+  btn.innerHTML = '❤️ ¡Gracias!';
+  marcarLikeada(actual.id);
+  fetch(FN_LIKE, {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ song_id: actual.id, titulo: actual.title, artista: actual.artist, art: actual.art })
+  }).then(function(){ cargarTop(); }).catch(function(){});
+  setTimeout(refrescarLike, 2500);
+});
+
+/* ===== Top 10 ===== */
+function cargarTop(){
+  fetch(FN_LIKE).then(function(r){ return r.json(); }).then(function(data){
+    var top = data.top || [];
+    var el = document.getElementById('top10');
+    if(!top.length){
+      el.innerHTML = '<div class="topVacio">Dale ❤️ a tus rolas favoritas para armar el Top 🔥</div>';
+      return;
+    }
+    var html = '';
+    for(var i=0; i<top.length; i++){
+      var t = top[i];
+      html += '<div class="histItem">' +
+        '<div class="topNum">' + (i+1) + '</div>' +
+        '<img src="' + esc(t.art) + '" alt="" loading="lazy">' +
+        '<div class="histMeta">' +
+        '<div class="histTitulo">' + esc(t.titulo) + '</div>' +
+        '<div class="histArtista">' + esc(t.artista) + '</div>' +
+        '</div>' +
+        '<div class="topLikes">❤️ ' + t.likes + '</div>' +
+        '</div>';
+    }
+    el.innerHTML = html;
+  }).catch(function(){});
+}
+cargarTop();
+setInterval(cargarTop, 120000);
+
+/* ===== Compartir ===== */
+document.getElementById('shareBtn').addEventListener('click', function(){
+  var texto = actual && actual.title
+    ? '🔴 Estoy escuchando "' + actual.title + '" de ' + actual.artist + ' en Radio Conecta 📻 ¡Escúchala tú también!'
+    : '🔴 Estoy escuchando Radio Conecta 📻 ¡Escúchala tú también!';
+  if(navigator.share){
+    navigator.share({ title:'Radio Conecta', text: texto, url: URL_RADIO }).catch(function(){});
+  } else {
+    window.open('https://wa.me/?text=' + encodeURIComponent(texto + ' ' + URL_RADIO), '_blank');
+  }
+});
+
+/* ===== Tarjeta para Stories ===== */
+document.getElementById('storyBtn').addEventListener('click', function(){
+  var btn = this;
+  btn.innerHTML = '📸 Generando...';
+  var listo = function(){ btn.innerHTML = '📸 Story'; };
+  var fuentes = (document.fonts && document.fonts.ready) ? document.fonts.ready : Promise.resolve();
+  fuentes.then(function(){
+    var c = document.createElement('canvas');
+    c.width = 1080; c.height = 1920;
+    var x = c.getContext('2d');
+    // Fondo negro
+    x.fillStyle = '#000'; x.fillRect(0,0,1080,1920);
+
+    var dibujarResto = function(conArte){
+      // Barra amarilla superior
+      x.fillStyle = '#e8ff4c';
+      x.fillRect(0, 120, 1080, 64);
+      x.fillStyle = '#000';
+      x.font = '900 40px "Barlow Condensed", sans-serif';
+      x.textAlign = 'center';
+      x.fillText('RADIO CONECTA  ·  EN VIVO 24/7  ·  🌎', 540, 165);
+
+      // Kicker
+      x.fillStyle = 'rgba(255,255,255,.5)';
+      x.font = '900 42px "Barlow Condensed", sans-serif';
+      x.fillText('E S T O Y   E S C U C H A N D O', 540, conArte ? 1310 : 800);
+
+      // Título
+      x.fillStyle = '#fff';
+      x.font = '900 92px "Barlow Condensed", sans-serif';
+      var titulo = (actual && actual.title ? actual.title : 'Radio Conecta').toUpperCase();
+      if(titulo.length > 22) titulo = titulo.slice(0,21) + '…';
+      x.fillText(titulo, 540, conArte ? 1420 : 920);
+
+      // Artista
+      x.fillStyle = '#e8ff4c';
+      x.font = '900 60px "Barlow Condensed", sans-serif';
+      var art = (actual && actual.artist ? actual.artist : '').toUpperCase();
+      if(art.length > 26) art = art.slice(0,25) + '…';
+      x.fillText(art, 540, conArte ? 1500 : 1010);
+
+      // Punto rojo + EN VIVO
+      x.fillStyle = '#ff283b';
+      x.beginPath(); x.arc(440, 1580, 12, 0, Math.PI*2); x.fill();
+      x.font = '900 38px "Barlow Condensed", sans-serif';
+      x.fillText('E N   V I V O', 560, 1594);
+
+      // URL abajo
+      x.fillStyle = '#e8ff4c';
+      x.font = '900 52px "Barlow Condensed", sans-serif';
+      x.fillText('conectareynosa.mx/radio', 540, 1780);
+
+      // Exportar
+      c.toBlob(function(blob){
+        if(!blob){ listo(); return; }
+        var file = new File([blob], 'radio-conecta-story.png', {type:'image/png'});
+        if(navigator.canShare && navigator.canShare({files:[file]})){
+          navigator.share({ files:[file], title:'Radio Conecta' }).then(listo).catch(listo);
+        } else {
+          var a = document.createElement('a');
+          a.href = URL.createObjectURL(blob);
+          a.download = 'radio-conecta-story.png';
+          document.body.appendChild(a); a.click(); a.remove();
+          listo();
+        }
+      }, 'image/png');
+    };
+
+    // Intentar dibujar la carátula (puede fallar por CORS → fallback sin arte)
+    if(actual && actual.art){
+      var img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = function(){
+        try{
+          var size = 760, ax = (1080-size)/2, ay = 340;
+          x.save();
+          // sombra
+          x.shadowColor = 'rgba(232,255,76,.25)';
+          x.shadowBlur = 80;
+          // recorte redondeado
+          var r = 24;
+          x.beginPath();
+          x.moveTo(ax+r, ay);
+          x.arcTo(ax+size, ay, ax+size, ay+size, r);
+          x.arcTo(ax+size, ay+size, ax, ay+size, r);
+          x.arcTo(ax, ay+size, ax, ay, r);
+          x.arcTo(ax, ay, ax+size, ay, r);
+          x.closePath();
+          x.clip();
+          x.drawImage(img, ax, ay, size, size);
+          x.restore();
+          dibujarResto(true);
+        }catch(e){ dibujarResto(false); }
+      };
+      img.onerror = function(){ dibujarResto(false); };
+      img.src = actual.art;
+    } else {
+      dibujarResto(false);
+    }
+  });
+});
 
 /* ===== Visualizador ===== */
 var viz = document.getElementById('viz');
@@ -656,6 +950,36 @@ document.getElementById('fsBtn').addEventListener('click', function(){
     }
   }catch(e){}
 });
+
+/* ===== PWA ===== */
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.register('/radio/sw.js').catch(function(){});
+}
+var deferredPrompt = null;
+window.addEventListener('beforeinstallprompt', function(e){
+  e.preventDefault();
+  deferredPrompt = e;
+  document.getElementById('pwaBtn').classList.add('visible');
+});
+document.getElementById('pwaBtn').addEventListener('click', function(){
+  var btn = this;
+  if(deferredPrompt){
+    deferredPrompt.prompt();
+    deferredPrompt.userChoice.then(function(){ deferredPrompt = null; btn.classList.remove('visible'); });
+  }
+});
+// Hint iOS: mostrar botón con instrucciones (iOS no soporta beforeinstallprompt)
+(function(){
+  var esIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+  var yaApp = window.matchMedia && window.matchMedia('(display-mode: standalone)').matches;
+  if(esIOS && !yaApp){
+    var btn = document.getElementById('pwaBtn');
+    btn.classList.add('visible');
+    btn.addEventListener('click', function(){
+      alert('Para instalar Radio Conecta en tu iPhone:\n\n1. Toca el botón Compartir (el cuadrito con flecha ↑)\n2. Elige "Agregar a pantalla de inicio"\n3. ¡Listo! 📻');
+    });
+  }
+})();
 
 /* ===== El Muro ===== */
 function cargarMuro(){

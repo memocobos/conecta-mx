@@ -28,7 +28,7 @@ const SITE_URL = process.env.URL || process.env.DEPLOY_PRIME_URL || 'https://con
 
 // Festivales: días por slug (igual que FESTIVALES en kamehouse.html).
 const FESTIVALES = {
-  palnorte: 3, edc2026: 3, edc2027: 3, coronacapital: 3,
+  palnorte: 3, edc2026: 3, coronacapital: 3,
   emblema: 2, arre: 2, ultramexico: 2, flowfest: 2,
 };
 

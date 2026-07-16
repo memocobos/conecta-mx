@@ -26,7 +26,6 @@ window.STATIC_IMGS={
   'warped':'imgs/warped.jpg',
   'pulsognp':'imgs/pulsognp.jpg',
   'dalemixx':'imgs/dalemixx.jpg',
-  'edc2027':'imgs/edc2027.jpg',
   'knotfest':'imgs/knotfest.jpg',
   'fanfest':'imgs/fanfest.webp',
   'kit_portada':'imgs/kit_portada.png',

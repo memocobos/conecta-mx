@@ -2597,6 +2597,7 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
         <button class="gz-filter active" id="cc-sub-btn-equipo" onclick="showCCSubTab('equipo',this)">Equipo</button>
         <button class="gz-filter" id="cc-sub-btn-viajeros" onclick="showCCSubTab('viajeros',this)">Viajeros</button>
         <button class="gz-filter" id="cc-sub-btn-rooming" onclick="showCCSubTab('rooming',this)">Rooming</button>
+        <button class="gz-filter" id="cc-sub-btn-transporte" onclick="showCCSubTab('transporte',this)">🚌 Transporte</button>
        </div>
 
        <!-- SUB: EQUIPO ASIGNADO -->
@@ -2674,6 +2675,12 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
          <div id="rg-err" style="display:none;margin-bottom:10px" class="alert alert-error"></div>
          <div id="cc-grupos-portal"><div style="color:var(--ts);font-size:12px">Cargando…</div></div>
         </div>
+       </div>
+
+       <!-- SUB: TRANSPORTE — ☁️ Nube Voladora F3. Todo se pinta desde _trRender(). -->
+       <div id="cc-sub-transporte" style="display:none">
+        <div id="tr-err" style="display:none;margin-bottom:10px" class="alert alert-error"></div>
+        <div id="cc-transporte"><div style="color:var(--ts);font-size:12px">Cargando transporte…</div></div>
        </div>
       </div>
      </div>
@@ -5144,6 +5151,410 @@ document.body.addEventListener('click', (e) => {
   if (cr) { _rgAccion({ accion: 'crear_habitacion', solicitud_id: cr.getAttribute('data-rg-sol'), tipo: cr.getAttribute('data-rg-crear') }, cr); return; }
   const dl = e.target.closest('[data-rg-del]');
   if (dl) { if (confirm('¿Eliminar este cuarto? Las personas asignadas quedarán sin cuarto.')) _rgAccion({ accion: 'eliminar_habitacion', habitacion_id: dl.getAttribute('data-rg-del') }, dl); return; }
+});
+
+// ═══════════════════════════════════════════════════════════════════
+// ☁️ NUBE VOLADORA F3 — sub-tab "🚌 Transporte" (UI de Bulma)
+//
+// Backend: admin-transporte (#264). REGLA DE ORO: Bulma asigna POR CUARTO —
+// tocar un ladrillo (cuarto/suelto/personaje) arma un LOTE y las unidades se
+// vuelven botones para elegir destino ("¿a cuál unidad?").
+// Molde visual: khRoomingGrupos + la sección de cuartos de grupos (#238).
+// ═══════════════════════════════════════════════════════════════════
+const khTransporte = {
+  async _call(payload) {
+    const r = await khAdminFetch('/.netlify/functions/admin-transporte', {
+      method: 'POST', body: JSON.stringify(payload),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || j.ok === false) throw new Error(j.error || ('admin-transporte ' + r.status));
+    return j;
+  },
+  listar(eventoId) { return this._call({ accion: 'listar', evento_id: eventoId }); },
+  accion(payload) { return this._call(payload); },
+};
+
+const _TR_TIPOS = ['Van', 'Autobús', 'Otro'];
+let _trData = null;       // último 'listar' (unidades + universo + resumen)
+let _trSel = null;        // lote elegido: { label, lote:[{tipo,ref}] } | null
+let _trFormAbierto = false;
+
+// Carga + pinta. Fails-soft: el error se queda en la sección, no tumba el detalle.
+async function loadTransporte(eventoId) {
+  const cont = document.getElementById('cc-transporte');
+  if (!cont) return;
+  const ev = eventoId || _ccEventoActual;
+  if (!ev) { cont.innerHTML = ''; return; }
+  cont.innerHTML = '<div style="color:var(--ts);font-size:12px">Cargando transporte…</div>';
+  try {
+    _trData = await khTransporte.listar(ev);
+  } catch (e) {
+    _trData = null;
+    cont.innerHTML = `<div class="alert alert-error" style="font-size:12px">${_esfEsc(e.message || 'No se pudo cargar el transporte')}</div>`;
+    return;
+  }
+  _trSel = null; // toda recarga cancela la selección en curso
+  _trRender();
+}
+
+// ── Render (remove-then-append: una sola escritura de innerHTML) ──────
+function _trRender() {
+  const cont = document.getElementById('cc-transporte');
+  if (!cont || !_trData) return;
+  const d = _trData;
+  const unidades = d.unidades || [];
+  const uni = d.universo || {};
+  const pendientes = _trPendientes(uni);
+  const vacio = !unidades.length && !pendientes.total;
+
+  cont.innerHTML = [
+    _trCabeceraHtml(d.resumen || {}),
+    _trFormHtml(),
+    _trBarraSeleccionHtml(),
+    vacio ? _trVacioHtml() : '',
+    unidades.length ? `<div style="margin-top:14px">${unidades.map(_trUnidadHtml).join('')}</div>` : '',
+    (!vacio && pendientes.total) ? _trLadrillosHtml(uni, pendientes) : '',
+    (!vacio && !pendientes.total && unidades.length)
+      ? '<div style="margin-top:16px;padding:14px;border:1px dashed var(--border);border-radius:var(--radius);text-align:center;color:var(--green);font-size:12px">✓ Todos tienen lugar. Los personajes que falten súbelos desde aquí cuando los necesites.</div>'
+      : '',
+  ].join('');
+}
+
+function _trVacioHtml() {
+  return `<div class="empty-state" style="padding:36px">
+    <div class="empty-icon" style="font-size:28px">🚌</div>
+    <div style="margin-top:6px">Crea la primera unidad — si caben todos, se suben solos.</div>
+  </div>`;
+}
+
+function _trCabeceraHtml(r) {
+  const deficit = Number(r.deficit || 0);
+  const banner = deficit > 0
+    ? `<div class="alert alert-error" style="margin:10px 0 0;font-size:12px">⚠️ Faltan ${deficit} asiento${deficit === 1 ? '' : 's'} — agrega unidades</div>`
+    : '';
+  return `
+    <div style="display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap">
+      <div style="display:flex;gap:14px;flex-wrap:wrap;font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.08em;color:var(--ts)">
+        <span>👥 ${Number(r.total_pasajeros || 0)} pasajeros</span>
+        <span>💺 ${Number(r.total_asientos_netos || 0)} asientos netos</span>
+      </div>
+      <button type="button" class="btn btn-primary btn-sm" data-tr-form="1">${_trFormAbierto ? '× Cancelar' : '＋ Agregar unidad'}</button>
+    </div>
+    ${banner}`;
+}
+
+// Mini-form inline (nada de modal): el alta es parte de la sección.
+function _trFormHtml() {
+  if (!_trFormAbierto) return '';
+  return `
+    <div style="margin-top:12px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px">
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
+        <label style="display:flex;flex-direction:column;gap:4px;font-size:11px;color:var(--ts)">Tipo
+          <select id="tr-f-tipo" class="cot-input" style="min-width:120px">
+            ${_TR_TIPOS.map(t => `<option value="${t}">${t}</option>`).join('')}
+          </select>
+        </label>
+        <label style="display:flex;flex-direction:column;gap:4px;font-size:11px;color:var(--ts)">Capacidad
+          <input id="tr-f-cap" class="cot-input" type="number" min="1" max="100" step="1" value="15" style="width:100px">
+        </label>
+        <label style="display:flex;flex-direction:column;gap:4px;font-size:11px;color:var(--ts)">Chofer (opcional)
+          <input id="tr-f-chofer" class="cot-input" type="text" maxlength="120" placeholder="Nombre" style="min-width:160px">
+        </label>
+      </div>
+      <div style="display:flex;gap:16px;flex-wrap:wrap;margin-top:12px">
+        <label style="display:inline-flex;align-items:center;gap:6px;font-size:11px;color:var(--ts);cursor:pointer">
+          <input type="checkbox" id="tr-f-chofer-ocupa" checked style="accent-color:var(--orange)">
+          <span>el chofer ocupa asiento</span>
+        </label>
+        <label style="display:inline-flex;align-items:center;gap:6px;font-size:11px;color:var(--ts);cursor:pointer">
+          <input type="checkbox" id="tr-f-auto" checked style="accent-color:var(--orange)">
+          <span>🪄 Subir a todos si caben</span>
+        </label>
+      </div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px">
+        <button type="button" class="btn btn-ghost btn-sm" data-tr-form="0">Cancelar</button>
+        <button type="button" class="btn btn-primary btn-sm" data-tr-crear="1">Crear unidad</button>
+      </div>
+    </div>`;
+}
+
+// Modo "¿a cuál unidad?": barra arriba con el lote elegido y su salida.
+// Sin unidades no hay a dónde subirlos: en vez de "elige la unidad ↓" sobre una
+// lista vacía (callejón sin salida), la barra dice qué falta hacer.
+function _trBarraSeleccionHtml() {
+  if (!_trSel) return '';
+  const n = _trSel.lote.length;
+  const hayUnidades = !!(_trData && (_trData.unidades || []).length);
+  const texto = hayUnidades
+    ? `Subiendo <b>${_esfEsc(_trSel.label)}</b> · ${n} persona${n === 1 ? '' : 's'} — elige la unidad ↓`
+    : `<b>${_esfEsc(_trSel.label)}</b> · ${n} persona${n === 1 ? '' : 's'} — primero crea una unidad para subirlos.`;
+  return `
+    <div style="margin-top:12px;background:rgba(200,226,58,.08);border:1px solid var(--border2);border-radius:var(--radius);padding:10px 14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <span style="font-size:12px">${texto}</span>
+      <button type="button" class="btn btn-ghost btn-sm" data-tr-cancelar="1" style="margin-left:auto;font-size:11px">Cancelar</button>
+    </div>`;
+}
+
+function _trUnidadHtml(u) {
+  const pax = Number(u.pasajeros_count || 0);
+  const neta = Number(u.capacidad_neta || 0);
+  const libres = Number(u.libres || 0);
+  const lleno = pax >= neta;
+  const idSafe = _esfEsc(u.id);
+
+  // En modo selección la unidad ENTERA es el botón de destino.
+  const enSeleccion = !!_trSel;
+  const cabe = enSeleccion ? _trCabenEnUnidad(u, _trSel.lote) : true;
+
+  const chofer = u.chofer_ocupa || u.chofer_nombre
+    ? `<span style="font-size:11px;color:var(--ts)">🚗 chofer: ${_esfEsc(u.chofer_nombre || 'ocupa asiento')}</span>`
+    : '';
+
+  const coordis = (_trData && _trData.universo && _trData.universo.personajes) || [];
+  const selCoordi = `
+    <select data-tr-coordi="${idSafe}" class="cot-input" style="font-size:11px;padding:4px 8px;min-width:150px" ${enSeleccion ? 'disabled' : ''}>
+      <option value="">— sin coordinador —</option>
+      ${coordis.map(c => `<option value="${_esfEsc(c.ref)}"${u.coordi_id === c.ref ? ' selected' : ''}>${_esfEsc(c.nombre)}${c.rol ? ' · ' + _esfEsc(c.rol) : ''}</option>`).join('')}
+    </select>`;
+
+  const chips = (u.pasajeros || []).map(p => `
+    <span style="display:inline-flex;align-items:center;gap:6px;padding:3px 6px 3px 10px;margin:2px 4px 0 0;border-radius:20px;background:var(--bg3);border:1px solid var(--border);font-size:12px">
+      ${_esfEsc(p.nombre_cache || 'Sin nombre')}
+      <button type="button" data-tr-quitar="${_esfEsc(p.pasajero_ref)}" data-tr-ptipo="${_esfEsc(p.pasajero_tipo)}" data-tr-unidad="${idSafe}" title="Quitar de la unidad" style="border:none;background:transparent;color:var(--ts);font-size:14px;line-height:1;cursor:pointer;padding:0 2px">×</button>
+    </span>`).join('');
+
+  const cabecera = `
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+      <b style="font-size:14px">Unidad ${_esfEsc(u.orden)} · ${_esfEsc(u.tipo)}</b>
+      <span style="font-size:12px;color:${lleno ? 'var(--green)' : 'var(--ts)'}">(${pax}/${neta})</span>
+      ${chofer}
+      ${enSeleccion ? '' : `<span style="margin-left:auto;display:flex;gap:6px;align-items:center">
+        ${selCoordi}
+        <button type="button" data-tr-cap="${idSafe}" title="Editar capacidad" style="border:none;background:transparent;font-size:14px;cursor:pointer">✏️</button>
+        <button type="button" data-tr-del="${idSafe}" title="Eliminar unidad" style="border:none;background:transparent;font-size:15px;cursor:pointer">🗑️</button>
+      </span>`}
+    </div>
+    <div style="margin-top:8px">${chips || '<span style="font-size:12px;color:var(--ts)">Unidad vacía</span>'}</div>`;
+
+  if (!enSeleccion) {
+    return `<div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:12px 16px;margin-bottom:10px">${cabecera}</div>`;
+  }
+
+  // Botón de destino: deshabilitado si el LOTE completo no cabe.
+  const motivo = cabe ? '' : `<div style="margin-top:6px;font-size:11px;color:var(--red)">solo caben ${libres}</div>`;
+  return `
+    <button type="button" ${cabe ? `data-tr-destino="${idSafe}"` : 'disabled'}
+      style="display:block;width:100%;text-align:left;background:var(--bg2);border:1px solid ${cabe ? 'var(--border2)' : 'var(--border)'};border-radius:var(--radius);padding:12px 16px;margin-bottom:10px;color:var(--text);cursor:${cabe ? 'pointer' : 'not-allowed'};opacity:${cabe ? '1' : '.5'};font:inherit">
+      ${cabecera}${motivo}
+    </button>`;
+}
+
+// ── Ladrillos sin asignar ────────────────────────────────────────────
+// Solo PENDIENTES: los ya asignados viven como chips dentro de su unidad.
+function _trPendientes(uni) {
+  const pend = (arr) => (arr || []).filter(p => !p.unidad_id);
+  const cuartos = [
+    ...(uni.cuartos_portal || []).map(c => ({ ...c, _mundo: 'portal', _tipoPax: 'lugar' })),
+    ...(uni.cuartos_kh || []).map(c => ({ ...c, _mundo: 'kh', _tipoPax: 'viajero' })),
+  ].map(c => ({ ...c, _pend: pend(c.ocupantes) })).filter(c => c._pend.length);
+  const sueltos = [
+    ...pend(uni.lugares_sueltos).map(p => ({ ...p, _tipoPax: 'lugar' })),
+    ...pend(uni.viajeros_sueltos).map(p => ({ ...p, _tipoPax: 'viajero' })),
+  ];
+  const personajes = pend(uni.personajes).map(p => ({ ...p, _tipoPax: 'usuario' }));
+  return { cuartos, sueltos, personajes, total: cuartos.length + sueltos.length + personajes.length };
+}
+
+// Chip "Fecha N" del evento_id real (slug#idx) — mismo criterio que #255.
+function _trFechaChip(eventoId) {
+  const i = _rgFechaIdx(eventoId);
+  if (i === null) return '';
+  return `<span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--ts);border:1px solid var(--border);border-radius:20px;padding:1px 8px;letter-spacing:.06em;margin-left:6px">Fecha ${i + 1}</span>`;
+}
+
+function _trLadrillosHtml(uni, pend) {
+  const bloque = (titulo, ayuda, cuerpo) => `
+    <div style="margin-top:20px">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.12em;color:var(--ts);margin-bottom:4px">// ${titulo}</div>
+      <div style="font-size:11px;color:var(--ts);margin-bottom:10px">${ayuda}</div>
+      ${cuerpo}
+    </div>`;
+
+  const out = [];
+
+  if (pend.cuartos.length) {
+    const chips = pend.cuartos.map((c, i) => {
+      const n = c._pend.length;
+      const total = (c.ocupantes || []).length;
+      const yaN = total - n;
+      const nombres = c._pend.map(p => _trCorto(p.nombre)).join(' · ');
+      const etiqueta = c._mundo === 'kh'
+        ? `Cuarto ${_esfEsc(c.numero_hab || c.orden || '')}${c.hotel_nombre ? ' · ' + _esfEsc(c.hotel_nombre) : ''}`
+        : `Cuarto ${_esfEsc(c.orden || (i + 1))} · ${_esfEsc(c.tipo || '')}`;
+      return `
+        <button type="button" data-tr-lote="cuarto:${i}" style="text-align:left;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:10px 14px;margin:0 8px 8px 0;color:var(--text);cursor:pointer;font:inherit;min-width:220px;max-width:100%">
+          <div style="display:flex;align-items:center;flex-wrap:wrap">
+            <b style="font-size:13px">${etiqueta}</b>${_trFechaChip(c.evento_id)}
+          </div>
+          <div style="font-size:11px;color:var(--ts);margin-top:3px">${n} persona${n === 1 ? '' : 's'}${yaN ? ` · (${yaN} de ${total} ya asignados)` : ''}</div>
+          <div style="font-size:12px;margin-top:4px">${_esfEsc(nombres)}</div>
+        </button>`;
+    }).join('');
+    out.push(bloque('🛏️ CUARTOS', 'Toca un cuarto y elige su unidad — sube el cuarto completo de un jalón.', `<div style="display:flex;flex-wrap:wrap">${chips}</div>`));
+  }
+
+  if (pend.sueltos.length) {
+    const chips = pend.sueltos.map((p, i) => _trChipPersona(`suelto:${i}`, p.nombre, _trFechaChip(p.evento_id))).join('');
+    out.push(bloque('🧍 SUELTOS', 'Personas sin cuarto asignado.', `<div style="display:flex;flex-wrap:wrap;gap:6px">${chips}</div>`));
+  }
+
+  if (pend.personajes.length) {
+    const chips = pend.personajes.map((p, i) =>
+      _trChipPersona(`personaje:${i}`, p.nombre,
+        `<span style="font-size:10px;color:var(--ts);margin-left:6px">${_esfEsc(p.rol || '')}</span>`)
+    ).join('');
+    out.push(bloque('🎭 PERSONAJES', 'Coordis y creadoras. Nunca se suben solos — tú decides en qué unidad viajan.', `<div style="display:flex;flex-wrap:wrap;gap:6px">${chips}</div>`));
+  }
+
+  return out.join('');
+}
+
+function _trChipPersona(key, nombre, extra) {
+  return `<button type="button" data-tr-lote="${key}" style="display:inline-flex;align-items:center;padding:6px 12px;border-radius:20px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-size:12px;cursor:pointer;font-family:inherit">${_esfEsc(nombre)}${extra || ''}</button>`;
+}
+
+function _trCorto(n) {
+  const s = String(n || '').trim();
+  const p = s.split(/\s+/);
+  return p.length > 1 ? `${p[0]} ${p[1][0]}.` : (p[0] || '—');
+}
+
+// ¿Cabe el LOTE completo? Los que ya están en ESA unidad no ocupan asiento nuevo.
+function _trCabenEnUnidad(u, lote) {
+  const yaAqui = new Set((u.pasajeros || []).map(p => `${p.pasajero_tipo}:${p.pasajero_ref}`));
+  const nuevos = lote.filter(p => !yaAqui.has(`${p.tipo}:${p.ref}`)).length;
+  return nuevos <= Number(u.libres || 0);
+}
+
+// ── Acciones ─────────────────────────────────────────────────────────
+async function _trAccion(payload, btn, okMsg) {
+  const errEl = document.getElementById('tr-err');
+  if (errEl) { errEl.style.display = 'none'; errEl.textContent = ''; }
+  const prev = btn ? btn.textContent : '';
+  if (btn) { btn.disabled = true; btn.textContent = '…'; }
+  try {
+    const j = await khTransporte.accion(payload);
+    if (okMsg) showToast(okMsg(j), 'success');
+    await loadTransporte(_ccEventoActual);
+  } catch (e) {
+    // El 409 del backend (cupo / "Primero baja pasajeros") se muestra TAL CUAL.
+    if (errEl) { errEl.textContent = e.message || 'No se pudo.'; errEl.style.display = 'block'; }
+    if (btn) { btn.disabled = false; btn.textContent = prev; }
+  }
+}
+
+function _trLoteDe(key) {
+  if (!_trData) return null;
+  const pend = _trPendientes(_trData.universo || {});
+  const [clase, iRaw] = String(key).split(':');
+  const i = parseInt(iRaw, 10);
+  if (clase === 'cuarto') {
+    const c = pend.cuartos[i]; if (!c) return null;
+    const etiqueta = c._mundo === 'kh' ? `Cuarto ${c.numero_hab || c.orden || ''}` : `Cuarto ${c.orden || (i + 1)} · ${c.tipo || ''}`;
+    return { label: etiqueta.trim(), lote: c._pend.map(p => ({ tipo: c._tipoPax, ref: p.ref })) };
+  }
+  const p = clase === 'suelto' ? pend.sueltos[i] : pend.personajes[i];
+  if (!p) return null;
+  return { label: p.nombre, lote: [{ tipo: p._tipoPax, ref: p.ref }] };
+}
+
+// Delegación única de los controles del transporte (molde del rooming de grupos).
+document.body.addEventListener('click', (e) => {
+  const form = e.target.closest('[data-tr-form]');
+  if (form) { _trFormAbierto = form.getAttribute('data-tr-form') === '1' ? !_trFormAbierto : false; _trSel = null; _trRender(); return; }
+
+  const crear = e.target.closest('[data-tr-crear]');
+  if (crear) {
+    const cap = parseInt((document.getElementById('tr-f-cap') || {}).value, 10);
+    if (!Number.isInteger(cap) || cap < 1 || cap > 100) {
+      const errEl = document.getElementById('tr-err');
+      if (errEl) { errEl.textContent = 'La capacidad debe ser un número entero entre 1 y 100.'; errEl.style.display = 'block'; }
+      return;
+    }
+    _trFormAbierto = false;
+    _trAccion({
+      accion: 'crear_unidad',
+      evento_id: _ccEventoActual,
+      tipo: (document.getElementById('tr-f-tipo') || {}).value,
+      capacidad: cap,
+      chofer_ocupa: !!(document.getElementById('tr-f-chofer-ocupa') || {}).checked,
+      chofer_nombre: (document.getElementById('tr-f-chofer') || {}).value || null,
+      autollenar: !!(document.getElementById('tr-f-auto') || {}).checked,
+    }, crear, (j) => j.auto_asignados
+      ? `Unidad creada — se subieron ${j.auto_asignados} pasajeros 🪄`
+      : 'Unidad creada');
+    return;
+  }
+
+  const lote = e.target.closest('[data-tr-lote]');
+  if (lote) { _trSel = _trLoteDe(lote.getAttribute('data-tr-lote')); _trFormAbierto = false; _trRender(); return; }
+
+  const cancelar = e.target.closest('[data-tr-cancelar]');
+  if (cancelar) { _trSel = null; _trRender(); return; }
+
+  const destino = e.target.closest('[data-tr-destino]');
+  if (destino && _trSel) {
+    const sel = _trSel;
+    _trAccion({ accion: 'asignar', unidad_id: destino.getAttribute('data-tr-destino'), pasajeros: sel.lote }, null,
+      (j) => j.movidos ? `Listo — ${j.asignados} subidos, ${j.movidos} movidos` : `${sel.label} a bordo`);
+    return;
+  }
+
+  const quitar = e.target.closest('[data-tr-quitar]');
+  if (quitar) {
+    _trAccion({
+      accion: 'quitar',
+      unidad_id: quitar.getAttribute('data-tr-unidad'),
+      pasajeros: [{ tipo: quitar.getAttribute('data-tr-ptipo'), ref: quitar.getAttribute('data-tr-quitar') }],
+    }, quitar);
+    return;
+  }
+
+  const cap = e.target.closest('[data-tr-cap]');
+  if (cap) {
+    const u = (_trData.unidades || []).find(x => x.id === cap.getAttribute('data-tr-cap'));
+    if (!u) return;
+    const v = prompt(`Capacidad de la Unidad ${u.orden} (1-100).\nHoy: ${u.capacidad} · van ${u.pasajeros_count}`, String(u.capacidad));
+    if (v === null) return;
+    const n = parseInt(v, 10);
+    if (!Number.isInteger(n)) return;
+    _trAccion({ accion: 'editar_unidad', unidad_id: u.id, capacidad: n }, cap);
+    return;
+  }
+
+  const del = e.target.closest('[data-tr-del]');
+  if (del) {
+    const u = (_trData.unidades || []).find(x => x.id === del.getAttribute('data-tr-del'));
+    const aviso = u && u.pasajeros_count
+      ? `¿Eliminar la Unidad ${u.orden}? Sus ${u.pasajeros_count} pasajeros quedarán sin asignar.`
+      : '¿Eliminar esta unidad?';
+    if (confirm(aviso)) _trAccion({ accion: 'eliminar_unidad', unidad_id: del.getAttribute('data-tr-del') }, del,
+      (j) => j.desasignados ? `Unidad eliminada — ${j.desasignados} quedaron sin asignar` : 'Unidad eliminada');
+    return;
+  }
+});
+
+// Coordinador: el <select> no es click, es change.
+document.body.addEventListener('change', (e) => {
+  const sel = e.target.closest('[data-tr-coordi]');
+  if (sel) { _trAccion({ accion: 'editar_unidad', unidad_id: sel.getAttribute('data-tr-coordi'), coordi_id: sel.value || null }, null); return; }
+  // Default de Memo: al elegir Van el chofer ocupa asiento; en lo demás no.
+  // Queda editable — esto solo mueve el default al cambiar el tipo.
+  const tipo = e.target.closest('#tr-f-tipo');
+  if (tipo) {
+    const ck = document.getElementById('tr-f-chofer-ocupa');
+    if (ck) ck.checked = tipo.value === 'Van';
+  }
 });
 
 // [sec-eventos] Tabla `eventos` (UUID legacy del cotizador/capsule) vía Netlify
@@ -9646,10 +10057,13 @@ function showCCTab(tab, btn) {
 function showCCSubTab(sub, btn) {
   document.querySelectorAll('#page-capsule .gz-filter[id^="cc-sub-btn"]').forEach(b => b.classList.remove('active'));
   if (btn) btn.classList.add('active');
-  ['equipo','viajeros','rooming'].forEach(s => {
+  ['equipo','viajeros','rooming','transporte'].forEach(s => {
     const el = document.getElementById(`cc-sub-${s}`);
     if (el) el.style.display = s === sub ? '' : 'none';
   });
+  // [F3] Transporte carga LAZY al abrir su sub-tab (no encarece abrirDetalleEvento)
+  // y se refresca en cada visita. Fails-soft: no bloquea al resto del detalle.
+  if (sub === 'transporte' && _ccEventoActual) loadTransporte(_ccEventoActual);
 }
 
 // ── Filtro eventos (fecha + buscador, combinados) ────────────

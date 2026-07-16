@@ -3394,7 +3394,13 @@ document.body.addEventListener('click', (e) => {
   // del login/`wiz-done` (renderToursList: re-consulta + repinta contadores).
   // Se lee ANTES de resetWizard(), que pone solicitudId en null.
   const creada = !!wizState.solicitudId;
-  if (wizState.step === 6 || confirm('¿Seguro? Perderás los datos ingresados.')){
+  // El mensaje sigue al mismo gate: "Perderás los datos ingresados" es MENTIRA una
+  // vez creada la solicitud (solo se omite el comprobante) y asusta al cliente
+  // haciéndole creer que perdería su tour.
+  const aviso = creada
+    ? 'Tu solicitud ya quedó guardada ✅ — solo se omite el comprobante (puedes subirlo después).\n\n¿Cerrar?'
+    : '¿Seguro? Perderás los datos ingresados.';
+  if (wizState.step === 6 || confirm(aviso)){
     resetWizard();
     showView('dashboard');
     if (creada) renderToursList(); // async: pinta su spinner y repinta al llegar

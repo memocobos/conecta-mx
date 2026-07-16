@@ -5178,6 +5178,7 @@ const _TR_TIPOS = ['Van', 'Autobús', 'Otro'];
 let _trData = null;       // último 'listar' (unidades + universo + resumen)
 let _trSel = null;        // lote elegido: { label, lote:[{tipo,ref}] } | null
 let _trFormAbierto = false;
+let _trSinCoordi = [];    // [F4] órdenes que el último envío no pudo mandar (sin coordi)
 
 // Carga + pinta. Fails-soft: el error se queda en la sección, no tumba el detalle.
 async function loadTransporte(eventoId) {
@@ -5238,7 +5239,11 @@ function _trCabeceraHtml(r) {
         <span>👥 ${Number(r.total_pasajeros || 0)} pasajeros</span>
         <span>💺 ${Number(r.total_asientos_netos || 0)} asientos netos</span>
       </div>
-      <button type="button" class="btn btn-primary btn-sm" data-tr-form="1">${_trFormAbierto ? '× Cancelar' : '＋ Agregar unidad'}</button>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <button type="button" class="btn btn-ghost btn-sm" data-tr-print="1" style="font-size:10px">🖨️ Lista por unidad</button>
+        <button type="button" class="btn btn-ghost btn-sm" data-tr-enviar="1" style="font-size:10px">📧 Enviar su lista a cada coordi</button>
+        <button type="button" class="btn btn-primary btn-sm" data-tr-form="1">${_trFormAbierto ? '× Cancelar' : '＋ Agregar unidad'}</button>
+      </div>
     </div>
     ${banner}`;
 }
@@ -5323,10 +5328,17 @@ function _trUnidadHtml(u) {
       <button type="button" data-tr-quitar="${_esfEsc(p.pasajero_ref)}" data-tr-ptipo="${_esfEsc(p.pasajero_tipo)}" data-tr-unidad="${idSafe}" title="Quitar de la unidad" style="border:none;background:transparent;color:var(--ts);font-size:14px;line-height:1;cursor:pointer;padding:0 2px">×</button>
     </span>`).join('');
 
+  // [F4] El último envío no pudo mandar esta: se resalta hasta que tenga coordi.
+  const faltaCoordi = _trSinCoordi.indexOf(u.orden) !== -1 && !u.coordi_id;
+  const notaCoordi = faltaCoordi
+    ? '<span style="font-size:11px;color:var(--red);border:1px solid var(--red);border-radius:20px;padding:1px 8px">asigna coordinador</span>'
+    : '';
+
   const cabecera = `
     <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
       <b style="font-size:14px">Unidad ${_esfEsc(u.orden)} · ${_esfEsc(u.tipo)}</b>
       <span style="font-size:12px;color:${lleno ? 'var(--green)' : 'var(--ts)'}">(${pax}/${neta})</span>
+      ${_trFechaChip(u.evento_id)}${notaCoordi}
       ${chofer}
       ${enSeleccion ? '' : `<span style="margin-left:auto;display:flex;gap:6px;align-items:center">
         ${selCoordi}
@@ -5337,7 +5349,7 @@ function _trUnidadHtml(u) {
     <div style="margin-top:8px">${chips || '<span style="font-size:12px;color:var(--ts)">Unidad vacía</span>'}</div>`;
 
   if (!enSeleccion) {
-    return `<div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:12px 16px;margin-bottom:10px">${cabecera}</div>`;
+    return `<div style="background:var(--bg2);border:1px solid ${faltaCoordi ? 'var(--red)' : 'var(--border)'};border-radius:var(--radius);padding:12px 16px;margin-bottom:10px">${cabecera}</div>`;
   }
 
   // Botón de destino: deshabilitado si el LOTE completo no cabe.
@@ -5453,6 +5465,71 @@ async function _trAccion(payload, btn, okMsg) {
   }
 }
 
+// ── [F4] Lista imprimible POR UNIDAD ─────────────────────────────────
+// Se arma con los datos YA cargados del listar (sin fetch). Una sección por
+// unidad; las grandes abren página nueva para que cada coordi se lleve la suya.
+function _trImprimir() {
+  if (!_trData) return;
+  const unidades = _trData.unidades || [];
+  if (!unidades.length) { showToast('No hay unidades que imprimir.', 'error'); return; }
+  const ev = (_ccEventosCache.find(e => e.id === _ccEventoActual) || {}).nombre || _ccEventoActual;
+  const totalPax = unidades.reduce((a, u) => a + Number(u.pasajeros_count || 0), 0);
+
+  const secciones = unidades.map((u, i) => {
+    const pax = u.pasajeros || [];
+    // Salto de página antes de una unidad grande (salvo la primera): break-inside
+    // avoid sola no basta cuando la tabla no cabe en lo que queda de hoja.
+    const salto = (i > 0 && pax.length > 12) ? 'break-before:page;page-break-before:always;' : '';
+    const meta = [
+      u.coordi ? `Coordinador: <b>${_esfEsc(u.coordi.nombre)}</b>` : '<span class="cx-muted">Sin coordinador</span>',
+      (u.chofer_nombre || u.chofer_ocupa) ? `Chofer: <b>${_esfEsc(u.chofer_nombre || 'sí, ocupa asiento')}</b>` : '',
+    ].filter(Boolean).join(' · ');
+    const fi = _rgFechaIdx(u.evento_id);
+    const fecha = fi === null ? '' : ` · Fecha ${fi + 1}`;
+
+    const tabla = pax.length
+      ? `<table><thead><tr><th style="width:34px">#</th><th>Pasajero</th></tr></thead><tbody>
+           ${pax.map((p, n) => `<tr><td>${n + 1}</td><td>${_esfEsc(p.nombre_cache || 'Sin nombre')}</td></tr>`).join('')}
+         </tbody></table>
+         <div style="font-size:11px;color:#555">Total de la unidad: <b>${pax.length}</b></div>`
+      : '<div class="cx-muted">(sin pasajeros asignados)</div>';
+
+    return `<section style="${salto}">
+      <h2>Unidad ${_esfEsc(u.orden)} · ${_esfEsc(u.tipo)} (${Number(u.ocupados || 0)}/${_esfEsc(u.capacidad)})${fecha}</h2>
+      <div style="font-size:11px;color:#555;margin:0 0 10px">${meta}</div>
+      ${tabla}
+    </section>`;
+  }).join('');
+
+  const pie = `<div class="cx-resumen">Total del evento: <b>${totalPax}</b> pasajero${totalPax === 1 ? '' : 's'} en <b>${unidades.length}</b> unidad${unidades.length === 1 ? '' : 'es'}.</div>`;
+  _printVentana(`Transporte — ${ev}`, secciones + pie);
+}
+
+// ── [F4] Enviar a cada coordi la lista de SU unidad ──────────────────
+// No re-fetch: el envío no cambia datos. Solo repinta para resaltar las que
+// quedaron sin coordi.
+async function _trEnviarListas(btn) {
+  if (!confirm('Se enviará a cada coordinador el correo con la lista de SU unidad. ¿Continuar?')) return;
+  const errEl = document.getElementById('tr-err');
+  if (errEl) { errEl.style.display = 'none'; errEl.textContent = ''; }
+  const prev = btn ? btn.textContent : '';
+  if (btn) { btn.disabled = true; btn.textContent = 'Enviando…'; }
+  try {
+    const j = await khTransporte.accion({ accion: 'enviar_listas', evento_id: _ccEventoActual });
+    _trSinCoordi = j.sin_coordi || [];
+    const partes = [`${j.enviadas || 0} enviada${j.enviadas === 1 ? '' : 's'}`];
+    if (_trSinCoordi.length) partes.push(`${_trSinCoordi.length} sin coordinador`);
+    if ((j.sin_correo || []).length) partes.push(`${j.sin_correo.length} sin correo`);
+    if ((j.vacias || []).length) partes.push(`${j.vacias.length} vacía${j.vacias.length === 1 ? '' : 's'}`);
+    if (j.errores) partes.push(`${j.errores} con error`);
+    showToast(partes.join(' · '), (j.errores || !j.enviadas) ? 'error' : 'success');
+    _trRender();
+  } catch (e) {
+    if (errEl) { errEl.textContent = e.message || 'No se pudieron enviar las listas.'; errEl.style.display = 'block'; }
+  }
+  if (btn) { btn.disabled = false; btn.textContent = prev; }
+}
+
 function _trLoteDe(key) {
   if (!_trData) return null;
   const pend = _trPendientes(_trData.universo || {});
@@ -5470,6 +5547,12 @@ function _trLoteDe(key) {
 
 // Delegación única de los controles del transporte (molde del rooming de grupos).
 document.body.addEventListener('click', (e) => {
+  const pr = e.target.closest('[data-tr-print]');
+  if (pr) { _trImprimir(); return; }
+
+  const env = e.target.closest('[data-tr-enviar]');
+  if (env) { _trEnviarListas(env); return; }
+
   const form = e.target.closest('[data-tr-form]');
   if (form) { _trFormAbierto = form.getAttribute('data-tr-form') === '1' ? !_trFormAbierto : false; _trSel = null; _trRender(); return; }
 

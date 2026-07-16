@@ -47,6 +47,7 @@
 // =============================================================================
 
 const { verifyAdminAuth, corsCheck } = require('./_lib/verify-admin');
+const { aplicarModoPrueba } = require('./_lib/correo-guard'); // [F4] OBLIGATORIO en todo envío
 
 const UUID_RE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
 const SLUG_RE = /^[A-Za-z0-9_#.\-]+$/;   // evento_id (slug del EV, p.ej. 'karolg#2')
@@ -65,6 +66,7 @@ const ACCIONES = {
   quitar: ROLES,
   editar_unidad: ROLES,
   eliminar_unidad: ROLES,
+  enviar_listas: ROLES,
 };
 
 const U_COLS = 'id,evento_id,tipo,capacidad,orden,chofer_ocupa,chofer_nombre,coordi_id,notas';
@@ -365,6 +367,60 @@ exports.handler = async (event) => {
       return json(200, { ok: true, desasignados: desasignadas.length });
     }
 
+    // ═══════════════ enviar_listas ═══════════════ [F4]
+    // A CADA coordi, el correo con SU unidad. Best-effort (allSettled): un envío
+    // que truena no tumba a los demás; la respuesta dice exactamente qué faltó.
+    if (accion === 'enviar_listas') {
+      const eventoId = limpiaEvento(body.evento_id);
+      if (!eventoId) return json(400, { error: 'evento_id inválido' });
+      const RESEND_KEY = process.env.RESEND_KEY || process.env.RESEND_API_KEY;
+      if (!RESEND_KEY) return json(500, { error: 'Falta RESEND_KEY' });
+
+      const [unidades, pasajeros] = await cargarUnidades(kh, eventoId); // mismos helpers del listar
+      const vacio = { ok: true, enviadas: 0, sin_coordi: [], sin_correo: [], vacias: [], errores: 0 };
+      if (!unidades.length) return json(200, vacio);
+
+      const eventoNombre = await nombreDeEvento(kh, eventoId);
+
+      const coordiIds = [...new Set(unidades.map(u => u.coordi_id).filter(Boolean))];
+      const coordiMap = {};
+      if (coordiIds.length) {
+        const us = await kh.get(`usuarios?id=in.(${coordiIds.map(enc).join(',')})&select=id,nombre,correo`);
+        us.forEach(u => { coordiMap[u.id] = u; });
+      }
+
+      const sin_coordi = [], sin_correo = [], vacias = [], envios = [];
+      for (const u of unidades) {
+        const pax = pasajeros.filter(p => p.unidad_id === u.id);
+        if (!pax.length) { vacias.push(u.orden); continue; }        // sin gente no hay lista que mandar
+        if (!u.coordi_id) { sin_coordi.push(u.orden); continue; }
+        const c = coordiMap[u.coordi_id];
+        const correo = (c && typeof c.correo === 'string') ? c.correo.trim() : '';
+        if (!correo || !correo.includes('@')) { sin_correo.push(u.orden); continue; }
+        envios.push({ u, pax, coordi: c, correo });
+      }
+      if (!envios.length) return json(200, { ...vacio, sin_coordi, sin_correo, vacias });
+
+      const resultados = await Promise.allSettled(envios.map(e => {
+        const subject = `🚌 Tu unidad — ${eventoNombre}: Unidad ${e.u.orden} (${e.u.tipo})`;
+        const html = listaUnidadHtml(e.coordi.nombre, eventoNombre, e.u, e.pax);
+        // El guard va SIEMPRE justo antes del fetch, sobre el destinatario resuelto.
+        const __mp = aplicarModoPrueba({ to: [e.correo], subject });
+        return fetch('https://api.resend.com/emails', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${RESEND_KEY}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ from: 'Conecta Reynosa <admin@conectareynosa.mx>', to: __mp.to, subject: __mp.subject, html }),
+        });
+      }));
+
+      let enviadas = 0, errores = 0;
+      for (const r of resultados) {
+        if (r.status === 'fulfilled' && r.value && r.value.ok) enviadas++;
+        else errores++;
+      }
+      return json(200, { ok: true, enviadas, sin_coordi, sin_correo, vacias, errores });
+    }
+
     return json(400, { error: 'accion inválida' });
   } catch (e) {
     if (e instanceof SbError) return json(502, { error: e.message, detail: e.detail });
@@ -606,6 +662,68 @@ async function contarPasajeros(kh, unidadId) {
 async function getUnidad(kh, unidadId) {
   const rows = await kh.get(`transporte_unidades?id=eq.${enc(unidadId)}&select=${U_COLS}&limit=1`);
   return rows[0] || null;
+}
+
+// ----- [F4] correo por unidad -----
+
+// Nombre bonito del evento para el asunto. `eventos_meta` va por SLUG BASE (sin
+// '#idx'). Best-effort: si no está, el asunto usa el evento_id tal cual.
+async function nombreDeEvento(kh, eventoId) {
+  const slugBase = String(eventoId).split('#')[0];
+  try {
+    const rows = await kh.get(`eventos_meta?slug=eq.${enc(slugBase)}&select=nombre&limit=1`);
+    const n = rows[0] && rows[0].nombre && String(rows[0].nombre).trim();
+    return n || eventoId;
+  } catch (e) {
+    return eventoId;
+  }
+}
+
+// Molde negro Conecta (calca de admin-avisar-cancelacion). TODO dato escapado.
+function listaUnidadHtml(coordiNombre, eventoNombre, u, pax) {
+  const nom = escapeHtml((coordiNombre && String(coordiNombre).trim()) || 'coordi');
+  const ev = escapeHtml(eventoNombre);
+  const neta = capacidadNeta(u.capacidad, u.chofer_ocupa);
+  const filas = pax.map((p, i) => `
+      <tr>
+        <td style="padding:7px 10px;border-bottom:1px solid rgba(255,255,255,.1);color:rgba(255,255,255,.45);width:32px">${i + 1}</td>
+        <td style="padding:7px 10px;border-bottom:1px solid rgba(255,255,255,.1)">${escapeHtml(p.nombre_cache || 'Sin nombre')}</td>
+      </tr>`).join('');
+
+  const dato = (k, v) => `<tr><td style="padding:3px 0;color:rgba(255,255,255,.55);width:120px">${escapeHtml(k)}</td><td style="padding:3px 0"><b>${escapeHtml(v)}</b></td></tr>`;
+  const chofer = (u.chofer_nombre || u.chofer_ocupa)
+    ? dato('Chofer', u.chofer_nombre || 'sí, ocupa asiento')
+    : '';
+
+  return `<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#000;font-family:Helvetica,Arial,sans-serif;color:#fff">
+  <div style="max-width:520px;margin:0 auto;padding:32px 24px">
+    <div style="font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:rgba(255,255,255,.55);margin-bottom:18px">
+      <span style="color:#ff283b;font-weight:900">Conecta</span> <span style="font-style:italic;font-weight:900">MX</span>
+    </div>
+    <p style="font-size:16px;line-height:1.6;margin:0 0 16px 0">Hola <strong>${nom}</strong>,</p>
+    <div style="font-size:15px;line-height:1.65;color:rgba(255,255,255,.88)">
+      <p style="margin:0 0 14px 0">Esta es tu unidad para <b style="color:#e8ff4c">${ev}</b>.</p>
+    </div>
+    <table style="width:100%;border-collapse:collapse;font-size:14px;margin:0 0 20px 0">
+      ${dato('Unidad', `${u.orden} · ${u.tipo}`)}
+      ${dato('Capacidad', `${u.capacidad} (${neta} para pasajeros)`)}
+      ${chofer}
+      ${dato('Ocupados', `${pax.length} de ${neta}`)}
+    </table>
+    <div style="font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:rgba(255,255,255,.55);margin-bottom:6px">Tus pasajeros</div>
+    <table style="width:100%;border-collapse:collapse;font-size:14px">${filas}</table>
+    <p style="font-size:14px;margin:14px 0 0 0"><b>Total: ${pax.length} pasajero${pax.length === 1 ? '' : 's'}</b></p>
+    <p style="font-size:13px;line-height:1.6;color:rgba(255,255,255,.88);margin:20px 0 0 0">Cualquier cambio de última hora se te avisa por este medio — preséntate con esta lista.</p>
+    <p style="font-size:13px;line-height:1.6;color:rgba(255,255,255,.55);margin:28px 0 0 0;border-top:1px solid rgba(255,255,255,.1);padding-top:16px">— Equipo Conecta Reynosa</p>
+  </div>
+</body></html>`;
+}
+
+function escapeHtml(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
 // ----- helpers -----

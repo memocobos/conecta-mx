@@ -5170,7 +5170,11 @@ const khTransporte = {
     if (!r.ok || j.ok === false) throw new Error(j.error || ('admin-transporte ' + r.status));
     return j;
   },
-  listar(eventoId) { return this._call({ accion: 'listar', evento_id: eventoId }); },
+  listar(eventoId, fecha) {
+    const p = { accion: 'listar', evento_id: eventoId };
+    if (fecha) p.fecha = fecha; // [v2] día activo; sin fecha = evento simple
+    return this._call(p);
+  },
   accion(payload) { return this._call(payload); },
 };
 
@@ -5179,23 +5183,83 @@ let _trData = null;       // último 'listar' (unidades + universo + resumen)
 let _trSel = null;        // lote elegido: { label, lote:[{tipo,ref}] } | null
 let _trFormAbierto = false;
 let _trSinCoordi = [];    // [F4] órdenes que el último envío no pudo mandar (sin coordi)
+let _trDia = null;        // [v2] fecha del pill activo (null = evento simple)
+let _trClonAbierto = null; // [v2] unidad_id con el picker de clonar desplegado
+let _trCobertura = null;  // [v2] idx → { lbl, dias:[fecha] } del EV (chip de cobertura)
 
 // Carga + pinta. Fails-soft: el error se queda en la sección, no tumba el detalle.
-async function loadTransporte(eventoId) {
+// [v2] `fecha` = el pill activo. Si no se pasa y el evento va por días, se hace un
+// primer listar SIN fecha solo para saber cuáles son los días, y se recarga con el
+// primero. Evento simple: una sola llamada, exactamente como antes.
+async function loadTransporte(eventoId, fecha) {
   const cont = document.getElementById('cc-transporte');
   if (!cont) return;
   const ev = eventoId || _ccEventoActual;
   if (!ev) { cont.innerHTML = ''; return; }
   cont.innerHTML = '<div style="color:var(--ts);font-size:12px">Cargando transporte…</div>';
   try {
-    _trData = await khTransporte.listar(ev);
+    let d = await khTransporte.listar(ev, fecha || undefined);
+    // Festival por días sin día elegido → arrancar en el primero.
+    if (!fecha && Array.isArray(d.dias) && d.dias.length) {
+      _trDia = d.dias[0].fecha;
+      d = await khTransporte.listar(ev, _trDia);
+    } else {
+      _trDia = Array.isArray(d.dias) && d.dias.length ? (fecha || null) : null;
+    }
+    _trData = d;
   } catch (e) {
     _trData = null;
     cont.innerHTML = `<div class="alert alert-error" style="font-size:12px">${_esfEsc(e.message || 'No se pudo cargar el transporte')}</div>`;
     return;
   }
-  _trSel = null; // toda recarga cancela la selección en curso
+  _trSel = null;          // toda recarga cancela la selección en curso
+  _trClonAbierto = null;
+  await _trCargarCobertura(ev); // best-effort: alimenta el chip de cobertura
   _trRender();
+}
+
+// [v2] Cobertura de cada idx (lbl + días) desde el EV — el backend manda el
+// `evento_id` de cada persona ('slug#idx') y los días del evento, pero NO el lbl
+// del idx ni cuántos días cubre. Eso vive en el catálogo, que la UI ya sabe leer
+// (`_fetchEVFromIndex`, cacheado). Best-effort: sin esto solo se pierde el chip.
+async function _trCargarCobertura(eventoId) {
+  _trCobertura = null;
+  if (!_trEsPorDias()) return;
+  try {
+    const arr = await _fetchEVFromIndex();
+    const e = (arr || []).find(x => x && x.id === String(eventoId).split('#')[0]);
+    if (!e || !Array.isArray(e.multifecha)) return;
+    const out = {};
+    e.multifecha.forEach((m, i) => {
+      const noches = Number(m && m.noches);
+      if (!m || !m.ds || !Number.isInteger(noches) || noches < 1) return;
+      const dias = [];
+      for (let k = 0; k < noches; k++) dias.push(_trSumaDias(m.ds, k));
+      out[i] = { lbl: m.lbl ? String(m.lbl) : null, dias };
+    });
+    _trCobertura = out;
+  } catch (e) { /* sin catálogo: el chip simplemente no sale */ }
+}
+
+// Mismo cálculo que el backend (ds .. ds+noches-1), anclado a mediodía UTC.
+function _trSumaDias(iso, n) {
+  const d = new Date(iso + 'T12:00:00Z');
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+
+// ¿El evento cargado va por días? (el backend solo manda `dias` en ese caso)
+function _trEsPorDias() {
+  return !!(_trData && Array.isArray(_trData.dias) && _trData.dias.length);
+}
+
+function _trDiasHtml() {
+  if (!_trEsPorDias()) return '';
+  const pills = _trData.dias.map(d => {
+    const activo = d.fecha === _trDia;
+    return `<button type="button" data-tr-dia="${_esfEsc(d.fecha)}" class="gz-filter${activo ? ' active' : ''}" style="font-size:11px">${_esfEsc(d.label)}</button>`;
+  }).join('');
+  return `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px">${pills}</div>`;
 }
 
 // ── Render (remove-then-append: una sola escritura de innerHTML) ──────
@@ -5209,6 +5273,7 @@ function _trRender() {
   const vacio = !unidades.length && !pendientes.total;
 
   cont.innerHTML = [
+    _trDiasHtml(),            // [v2] pills de día (vacío en evento simple)
     _trCabeceraHtml(d.resumen || {}),
     _trFormHtml(),
     _trBarraSeleccionHtml(),
@@ -5229,9 +5294,12 @@ function _trVacioHtml() {
 }
 
 function _trCabeceraHtml(r) {
+  const porDias = _trEsPorDias();
   const deficit = Number(r.deficit || 0);
+  // En festival el resumen y el déficit son DEL DÍA activo (el backend ya los
+  // calcula así) — se dice, para que no se lea como global.
   const banner = deficit > 0
-    ? `<div class="alert alert-error" style="margin:10px 0 0;font-size:12px">⚠️ Faltan ${deficit} asiento${deficit === 1 ? '' : 's'} — agrega unidades</div>`
+    ? `<div class="alert alert-error" style="margin:10px 0 0;font-size:12px">⚠️ Faltan ${deficit} asiento${deficit === 1 ? '' : 's'}${porDias ? ' este día' : ''} — agrega unidades</div>`
     : '';
   return `
     <div style="display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap">
@@ -5242,6 +5310,7 @@ function _trCabeceraHtml(r) {
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
         <button type="button" class="btn btn-ghost btn-sm" data-tr-print="1" style="font-size:10px">🖨️ Lista por unidad</button>
         <button type="button" class="btn btn-ghost btn-sm" data-tr-enviar="1" style="font-size:10px">📧 Enviar su lista a cada coordi</button>
+        ${porDias ? '<button type="button" class="btn btn-ghost btn-sm" data-tr-enviar-todos="1" style="font-size:10px">📧 Enviar TODOS los días</button>' : ''}
         <button type="button" class="btn btn-primary btn-sm" data-tr-form="1">${_trFormAbierto ? '× Cancelar' : '＋ Agregar unidad'}</button>
       </div>
     </div>
@@ -5249,10 +5318,17 @@ function _trCabeceraHtml(r) {
 }
 
 // Mini-form inline (nada de modal): el alta es parte de la sección.
+// [v2] En festival la fecha NO se pregunta: es la del pill activo. Se dice en el
+// encabezado para que Bulma sepa a qué día está agregando.
 function _trFormHtml() {
   if (!_trFormAbierto) return '';
+  const dia = _trEsPorDias() ? (_trData.dias.find(d => d.fecha === _trDia) || {}).label : null;
+  const encabezado = dia
+    ? `<div style="font-size:11px;color:var(--ts);margin-bottom:10px">Nueva unidad para <b style="color:var(--text)">${_esfEsc(dia)}</b></div>`
+    : '';
   return `
     <div style="margin-top:12px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px">
+      ${encabezado}
       <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
         <label style="display:flex;flex-direction:column;gap:4px;font-size:11px;color:var(--ts)">Tipo
           <select id="tr-f-tipo" class="cot-input" style="min-width:120px">
@@ -5273,7 +5349,7 @@ function _trFormHtml() {
         </label>
         <label style="display:inline-flex;align-items:center;gap:6px;font-size:11px;color:var(--ts);cursor:pointer">
           <input type="checkbox" id="tr-f-auto" checked style="accent-color:var(--orange)">
-          <span>🪄 Subir a todos si caben</span>
+          <span>🪄 ${dia ? 'Subir a todos los de este día si caben' : 'Subir a todos si caben'}</span>
         </label>
       </div>
       <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px">
@@ -5342,6 +5418,7 @@ function _trUnidadHtml(u) {
       ${chofer}
       ${enSeleccion ? '' : `<span style="margin-left:auto;display:flex;gap:6px;align-items:center">
         ${selCoordi}
+        ${_trEsPorDias() ? `<button type="button" data-tr-clonar="${idSafe}" title="Clonar a otros días" style="border:none;background:transparent;font-size:14px;cursor:pointer">⧉</button>` : ''}
         <button type="button" data-tr-cap="${idSafe}" title="Editar capacidad" style="border:none;background:transparent;font-size:14px;cursor:pointer">✏️</button>
         <button type="button" data-tr-del="${idSafe}" title="Eliminar unidad" style="border:none;background:transparent;font-size:15px;cursor:pointer">🗑️</button>
       </span>`}
@@ -5349,7 +5426,7 @@ function _trUnidadHtml(u) {
     <div style="margin-top:8px">${chips || '<span style="font-size:12px;color:var(--ts)">Unidad vacía</span>'}</div>`;
 
   if (!enSeleccion) {
-    return `<div style="background:var(--bg2);border:1px solid ${faltaCoordi ? 'var(--red)' : 'var(--border)'};border-radius:var(--radius);padding:12px 16px;margin-bottom:10px">${cabecera}</div>`;
+    return `<div style="background:var(--bg2);border:1px solid ${faltaCoordi ? 'var(--red)' : 'var(--border)'};border-radius:var(--radius);padding:12px 16px;margin-bottom:10px">${cabecera}${_trClonPickerHtml(u)}</div>`;
   }
 
   // Botón de destino: deshabilitado si el LOTE completo no cabe.
@@ -5359,6 +5436,30 @@ function _trUnidadHtml(u) {
       style="display:block;width:100%;text-align:left;background:var(--bg2);border:1px solid ${cabe ? 'var(--border2)' : 'var(--border)'};border-radius:var(--radius);padding:12px 16px;margin-bottom:10px;color:var(--text);cursor:${cabe ? 'pointer' : 'not-allowed'};opacity:${cabe ? '1' : '.5'};font:inherit">
       ${cabecera}${motivo}
     </button>`;
+}
+
+// [v2] Picker de clonado: los OTROS días del evento. Copia el molde de la unidad
+// (tipo/capacidad/chofer/coordi/notas) — NUNCA los pasajeros, y se dice.
+function _trClonPickerHtml(u) {
+  if (_trClonAbierto !== u.id || !_trEsPorDias()) return '';
+  const otros = _trData.dias.filter(d => d.fecha !== u.fecha);
+  if (!otros.length) {
+    return '<div style="margin-top:10px;font-size:11px;color:var(--ts)">No hay otros días a los que clonar.</div>';
+  }
+  const checks = otros.map(d => `
+    <label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;margin-right:12px">
+      <input type="checkbox" data-tr-clon-fecha="${_esfEsc(d.fecha)}" style="accent-color:var(--orange)">
+      <span>${_esfEsc(d.label)}</span>
+    </label>`).join('');
+  return `
+    <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">
+      <div style="font-size:11px;color:var(--ts);margin-bottom:8px">Copiar esta unidad (tipo, capacidad, chofer y coordinador) a otros días. <b>Va sin pasajeros</b>: cada día se llena aparte.</div>
+      <div style="display:flex;flex-wrap:wrap;align-items:center;gap:6px">
+        ${checks}
+        <button type="button" class="btn btn-primary btn-sm" data-tr-clon-ok="${_esfEsc(u.id)}" style="font-size:11px">⧉ Clonar</button>
+        <button type="button" class="btn btn-ghost btn-sm" data-tr-clon-cancel="1" style="font-size:11px">Cancelar</button>
+      </div>
+    </div>`;
 }
 
 // ── Ladrillos sin asignar ────────────────────────────────────────────
@@ -5377,11 +5478,25 @@ function _trPendientes(uni) {
   return { cuartos, sueltos, personajes, total: cuartos.length + sueltos.length + personajes.length };
 }
 
-// Chip "Fecha N" del evento_id real (slug#idx) — mismo criterio que #255.
+// Chip del ladrillo. En multifecha NORMAL (Harry Styles) sigue siendo "Fecha N"
+// (#255). En festival POR DÍAS ese número no le dice nada a Bulma —lo que le sirve
+// es saber que a esa persona la va a volver a ver en otros pills—, así que se
+// reemplaza por su COBERTURA ("🎫 Vie + Sáb · 2 días"), y SOLO si cubre más días
+// que el activo: si solo viene a este día, el chip sería ruido.
 function _trFechaChip(eventoId) {
+  if (_trEsPorDias()) return _trCoberturaChip(eventoId);
   const i = _rgFechaIdx(eventoId);
   if (i === null) return '';
   return `<span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--ts);border:1px solid var(--border);border-radius:20px;padding:1px 8px;letter-spacing:.06em;margin-left:6px">Fecha ${i + 1}</span>`;
+}
+
+function _trCoberturaChip(eventoId) {
+  const i = _rgFechaIdx(eventoId);
+  if (i === null || !_trCobertura) return '';
+  const cob = _trCobertura[i];
+  if (!cob || cob.dias.length <= 1) return ''; // solo este día → sin chip
+  const txt = cob.lbl || (cob.dias.length + ' días');
+  return `<span title="También aparece en los otros días que cubre" style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--orange);border:1px solid var(--border2);border-radius:20px;padding:1px 8px;letter-spacing:.06em;margin-left:6px">🎫 ${_esfEsc(txt)}</span>`;
 }
 
 function _trLadrillosHtml(uni, pend) {
@@ -5435,6 +5550,12 @@ function _trChipPersona(key, nombre, extra) {
   return `<button type="button" data-tr-lote="${key}" style="display:inline-flex;align-items:center;padding:6px 12px;border-radius:20px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-size:12px;cursor:pointer;font-family:inherit">${_esfEsc(nombre)}${extra || ''}</button>`;
 }
 
+// ['Sáb 21','Dom 22'] → 'Sáb 21 y Dom 22'
+function _trListaEs(xs) {
+  if (xs.length <= 1) return xs[0] || '';
+  return xs.slice(0, -1).join(', ') + ' y ' + xs[xs.length - 1];
+}
+
 function _trCorto(n) {
   const s = String(n || '').trim();
   const p = s.split(/\s+/);
@@ -5457,7 +5578,9 @@ async function _trAccion(payload, btn, okMsg) {
   try {
     const j = await khTransporte.accion(payload);
     if (okMsg) showToast(okMsg(j), 'success');
-    await loadTransporte(_ccEventoActual);
+    // [v2] Se recarga EN EL MISMO DÍA: perder el pill activo tras cada acción
+    // sería desorientador (y en clonar, la unidad nueva vive en OTRO día).
+    await loadTransporte(_ccEventoActual, _trDia || undefined);
   } catch (e) {
     // El 409 del backend (cupo / "Primero baja pasajeros") se muestra TAL CUAL.
     if (errEl) { errEl.textContent = e.message || 'No se pudo.'; errEl.style.display = 'block'; }
@@ -5472,7 +5595,11 @@ function _trImprimir() {
   if (!_trData) return;
   const unidades = _trData.unidades || [];
   if (!unidades.length) { showToast('No hay unidades que imprimir.', 'error'); return; }
-  const ev = (_ccEventosCache.find(e => e.id === _ccEventoActual) || {}).nombre || _ccEventoActual;
+  let ev = (_ccEventosCache.find(e => e.id === _ccEventoActual) || {}).nombre || _ccEventoActual;
+  // [v2] `unidades` ya viene solo del día activo (el listar se hizo con fecha) →
+  // el documento es el de ESE día y el título lo dice.
+  const dia = _trEsPorDias() ? (_trData.dias.find(d => d.fecha === _trDia) || {}).label : null;
+  if (dia) ev += ' · ' + dia;
   const totalPax = unidades.reduce((a, u) => a + Number(u.pasajeros_count || 0), 0);
 
   const secciones = unidades.map((u, i) => {
@@ -5501,21 +5628,31 @@ function _trImprimir() {
     </section>`;
   }).join('');
 
-  const pie = `<div class="cx-resumen">Total del evento: <b>${totalPax}</b> pasajero${totalPax === 1 ? '' : 's'} en <b>${unidades.length}</b> unidad${unidades.length === 1 ? '' : 'es'}.</div>`;
+  const pie = `<div class="cx-resumen">Total ${dia ? 'del día' : 'del evento'}: <b>${totalPax}</b> pasajero${totalPax === 1 ? '' : 's'} en <b>${unidades.length}</b> unidad${unidades.length === 1 ? '' : 'es'}.</div>`;
   _printVentana(`Transporte — ${ev}`, secciones + pie);
 }
 
 // ── [F4] Enviar a cada coordi la lista de SU unidad ──────────────────
 // No re-fetch: el envío no cambia datos. Solo repinta para resaltar las que
 // quedaron sin coordi.
-async function _trEnviarListas(btn) {
-  if (!confirm('Se enviará a cada coordinador el correo con la lista de SU unidad. ¿Continuar?')) return;
+// [v2] `todos` = mandar las corridas de TODOS los días (sin fecha). Por default
+// manda solo el día activo, que es lo que Bulma está viendo.
+async function _trEnviarListas(btn, todos) {
+  const dia = _trEsPorDias() ? (_trData.dias.find(d => d.fecha === _trDia) || {}).label : null;
+  const aviso = (todos && _trEsPorDias())
+    ? 'Se enviará a cada coordinador el correo con la lista de SU unidad, de TODOS los días del evento. ¿Continuar?'
+    : (dia
+        ? `Se enviará a cada coordinador el correo con la lista de SU unidad del ${dia}. ¿Continuar?`
+        : 'Se enviará a cada coordinador el correo con la lista de SU unidad. ¿Continuar?');
+  if (!confirm(aviso)) return;
   const errEl = document.getElementById('tr-err');
   if (errEl) { errEl.style.display = 'none'; errEl.textContent = ''; }
   const prev = btn ? btn.textContent : '';
   if (btn) { btn.disabled = true; btn.textContent = 'Enviando…'; }
   try {
-    const j = await khTransporte.accion({ accion: 'enviar_listas', evento_id: _ccEventoActual });
+    const payload = { accion: 'enviar_listas', evento_id: _ccEventoActual };
+    if (!todos && _trDia) payload.fecha = _trDia; // sin fecha = todos los días
+    const j = await khTransporte.accion(payload);
     _trSinCoordi = j.sin_coordi || [];
     const partes = [`${j.enviadas || 0} enviada${j.enviadas === 1 ? '' : 's'}`];
     if (_trSinCoordi.length) partes.push(`${_trSinCoordi.length} sin coordinador`);
@@ -5551,7 +5688,43 @@ document.body.addEventListener('click', (e) => {
   if (pr) { _trImprimir(); return; }
 
   const env = e.target.closest('[data-tr-enviar]');
-  if (env) { _trEnviarListas(env); return; }
+  if (env) { _trEnviarListas(env, false); return; }
+
+  // [v2] Días
+  const envTodos = e.target.closest('[data-tr-enviar-todos]');
+  if (envTodos) { _trEnviarListas(envTodos, true); return; }
+
+  const pill = e.target.closest('[data-tr-dia]');
+  if (pill) {
+    const f = pill.getAttribute('data-tr-dia');
+    if (f !== _trDia) { _trFormAbierto = false; loadTransporte(_ccEventoActual, f); }
+    return;
+  }
+
+  const clon = e.target.closest('[data-tr-clonar]');
+  if (clon) {
+    const id = clon.getAttribute('data-tr-clonar');
+    _trClonAbierto = (_trClonAbierto === id) ? null : id;
+    _trSel = null; _trRender();
+    return;
+  }
+  if (e.target.closest('[data-tr-clon-cancel]')) { _trClonAbierto = null; _trRender(); return; }
+
+  const clonOk = e.target.closest('[data-tr-clon-ok]');
+  if (clonOk) {
+    const fechas = [...document.querySelectorAll('[data-tr-clon-fecha]')]
+      .filter(c => c.checked).map(c => c.getAttribute('data-tr-clon-fecha'));
+    if (!fechas.length) {
+      const errEl = document.getElementById('tr-err');
+      if (errEl) { errEl.textContent = 'Elige al menos un día al cual clonar.'; errEl.style.display = 'block'; }
+      return;
+    }
+    const labels = fechas.map(f => (_trData.dias.find(d => d.fecha === f) || {}).label || f);
+    _trClonAbierto = null;
+    _trAccion({ accion: 'clonar_unidad', unidad_id: clonOk.getAttribute('data-tr-clon-ok'), fechas }, clonOk,
+      () => `Unidad clonada a ${_trListaEs(labels)} — va sin pasajeros`);
+    return;
+  }
 
   const form = e.target.closest('[data-tr-form]');
   if (form) { _trFormAbierto = form.getAttribute('data-tr-form') === '1' ? !_trFormAbierto : false; _trSel = null; _trRender(); return; }
@@ -5568,6 +5741,9 @@ document.body.addEventListener('click', (e) => {
     _trAccion({
       accion: 'crear_unidad',
       evento_id: _ccEventoActual,
+      // [v2] La fecha NO se pregunta: es la del pill activo (null en evento simple,
+      // donde el backend además la rechaza).
+      ...(_trDia ? { fecha: _trDia } : {}),
       tipo: (document.getElementById('tr-f-tipo') || {}).value,
       capacidad: cap,
       chofer_ocupa: !!(document.getElementById('tr-f-chofer-ocupa') || {}).checked,

@@ -113,19 +113,27 @@ exports.handler = async function(event) {
     }
 
     // === Default: artist search (backward compat — usado por loadArtistImg) ===
-    // Deezer NO ordena por popularidad: con limit=1 el primer resultado suele ser
-    // un homónimo oscuro (p.ej. buscar "Rosalia" devolvía "Rosal-IA" de 49 fans en
-    // vez de ROSALÍA de 1M) o un artista con foto placeholder. Se piden varios y se
-    // elige el MÁS SEGUIDO con imagen real → la foto correcta, sin tocar el catálogo.
+    // Deezer NO ordena por popularidad y su match es DIFUSO, así que con limit=1 el
+    // primer resultado suele ser el artista equivocado. Se piden varios y se elige:
+    //   1) entre los de NOMBRE EXACTO (sin acentos/mayúsculas) con foto real, el más
+    //      seguido — esto evita dos trampas a la vez: el homónimo oscuro (buscar
+    //      "Rosalia" traía "Rosal-IA" de 49 fans en vez de ROSALÍA de 1M) y el
+    //      parecido difuso (buscar "Aitana" traía "Ariana Grande" de 13M por letras
+    //      similares, tapando a la Aitana real).
+    //   2) si nadie coincide exacto, el más seguido con foto real (mejor esfuerzo).
+    //   3) si nadie tiene foto, el orden de Deezer (data[0]) para no romper el
+    //      fallback del front (AudioDB/iniciales).
     const url = `https://api.deezer.com/search/artist?q=${encodeURIComponent(q)}&limit=15`;
     const response = await fetch(url);
     const data = await response.json();
     const lista = (data && Array.isArray(data.data)) ? data.data : [];
     const PLACEHOLDER = 'd41d8cd98f00b204e9800998ecf8427e'; // MD5 del string vacío = foto ausente
+    const norm = (s) => String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+    const qn = norm(q);
     const conFoto = lista.filter(a => a && a.picture_xl && a.picture_xl.indexOf(PLACEHOLDER) === -1);
-    // El más seguido con foto real; si ninguno tiene foto, se conserva el orden de
-    // Deezer (data[0]) para no romper el fallback del front (AudioDB/iniciales).
-    const mejor = conFoto.slice().sort((a, b) => (b.nb_fan || 0) - (a.nb_fan || 0))[0];
+    const exactos = conFoto.filter(a => norm(a.name) === qn);
+    const pool = exactos.length ? exactos : conFoto;
+    const mejor = pool.slice().sort((a, b) => (b.nb_fan || 0) - (a.nb_fan || 0))[0];
     const salida = mejor
       ? { data: [mejor, ...lista.filter(a => a !== mejor)], total: data.total }
       : data;

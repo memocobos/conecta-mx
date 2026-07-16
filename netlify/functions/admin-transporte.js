@@ -396,9 +396,13 @@ async function cargarMundoPortal(portal, eventoId, asignadoPor) {
   if (!/^[a-z0-9_-]+$/.test(slugBase)) return vacio;
 
   const filtro = `or=(evento_id.eq.${slugBase},evento_id.like.${slugBase}%23*)`;
-  const sols = await portal.get(`solicitudes_tour?${filtro}&estado=neq.cancelado&select=id`);
+  // [F3] `evento_id` viaja además del id: como este listar une el slug base + TODAS
+  // sus fechas, cada cuarto/lugar tiene que decir de qué fecha es (chip "Fecha N").
+  const sols = await portal.get(`solicitudes_tour?${filtro}&estado=neq.cancelado&select=id,evento_id`);
   if (!sols.length) return vacio;
   const inSol = sols.map(s => enc(s.id)).join(',');
+  const eventoPorSol = {};
+  sols.forEach(s => { eventoPorSol[s.id] = s.evento_id || null; });
 
   const [lugares, habs] = await Promise.all([
     portal.get(`lugares?solicitud_id=in.(${inSol})&estado=eq.activo&select=id,solicitud_id,numero,nombre,habitacion_grupo_id,cliente_id&order=numero.asc`),
@@ -417,6 +421,7 @@ async function cargarMundoPortal(portal, eventoId, asignadoPor) {
     ref: l.id,
     nombre: nombreDe(l) || (cliMap[l.cliente_id] && cliMap[l.cliente_id].nombre_completo) || `Lugar #${l.numero}`,
     unidad_id: asignadoPor[`lugar:${l.id}`] || null,
+    evento_id: eventoPorSol[l.solicitud_id] || null, // real, con #idx si es multifecha
   });
 
   const cuartos = habs.map(h => {
@@ -424,6 +429,7 @@ async function cargarMundoPortal(portal, eventoId, asignadoPor) {
     return {
       id: h.id, tipo: h.tipo, capacidad: h.capacidad, orden: h.orden,
       solicitud_id: h.solicitud_id,
+      evento_id: eventoPorSol[h.solicitud_id] || null, // real, con #idx si es multifecha
       ocupantes,
       asignados: ocupantes.filter(o => o.unidad_id).length,
     };
@@ -437,14 +443,19 @@ async function cargarMundoPortal(portal, eventoId, asignadoPor) {
 // `rooming_habitaciones` es un uuid de la tabla legacy `eventos` (ver cabecera).
 async function cargarMundoKH(kh, eventoId, asignadoPor) {
   const viajeros = await kh.get(
-    `viajeros_evento?evento_id=eq.${enc(eventoId)}&select=id,nombre,habitacion_id&order=nombre.asc`
+    `viajeros_evento?evento_id=eq.${enc(eventoId)}&select=id,nombre,habitacion_id,evento_id&order=nombre.asc`
   );
   if (!viajeros.length) return { cuartos: [], sueltos: [], total_clientes: 0 };
 
+  // [F3] `evento_id` viaja igual que en el mundo Portal, por simetría del payload.
+  // Aquí SIEMPRE es el evento pedido (el filtro es eq exacto): el mundo KH no une
+  // fechas, así que en la práctica el chip "Fecha N" solo aparece en los cuartos
+  // del Portal — pero la UI no tiene que saberlo.
   const persona = (v) => ({
     ref: v.id,
     nombre: nombreDe(v) || 'Viajero',
     unidad_id: asignadoPor[`viajero:${v.id}`] || null,
+    evento_id: v.evento_id || null,
   });
 
   const habIds = [...new Set(viajeros.map(v => v.habitacion_id).filter(Boolean))];
@@ -459,6 +470,7 @@ async function cargarMundoKH(kh, eventoId, asignadoPor) {
     const ocupantes = viajeros.filter(v => v.habitacion_id === h.id).map(persona);
     return {
       id: h.id, numero_hab: h.numero_hab, tipo: h.tipo, hotel_nombre: h.hotel_nombre, orden: h.orden,
+      evento_id: (ocupantes[0] && ocupantes[0].evento_id) || eventoId,
       ocupantes,
       asignados: ocupantes.filter(o => o.unidad_id).length,
     };

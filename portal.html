@@ -3387,9 +3387,17 @@ document.body.addEventListener('click', (e) => {
 document.body.addEventListener('click', (e) => {
   const t = e.target.closest('[data-action="wiz-cancel"]');
   if (!t) return;
+  // [piloto-h1] El paso 4 ya INSERTÓ la solicitud, así que del paso 5 en adelante
+  // "Cancelar" no descarta nada: sale de un tour que YA existe. Sin refrescar, el
+  // dashboard queda viejo y el tour recién creado no aparece hasta recargar —
+  // el cliente cree que su solicitud no entró. Se reusa la MISMA ruta de carga
+  // del login/`wiz-done` (renderToursList: re-consulta + repinta contadores).
+  // Se lee ANTES de resetWizard(), que pone solicitudId en null.
+  const creada = !!wizState.solicitudId;
   if (wizState.step === 6 || confirm('¿Seguro? Perderás los datos ingresados.')){
     resetWizard();
     showView('dashboard');
+    if (creada) renderToursList(); // async: pinta su spinner y repinta al llegar
   }
 });
 

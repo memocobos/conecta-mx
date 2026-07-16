@@ -113,16 +113,29 @@ exports.handler = async function(event) {
     }
 
     // === Default: artist search (backward compat — usado por loadArtistImg) ===
-    const url = `https://api.deezer.com/search/artist?q=${encodeURIComponent(q)}&limit=1`;
+    // Deezer NO ordena por popularidad: con limit=1 el primer resultado suele ser
+    // un homónimo oscuro (p.ej. buscar "Rosalia" devolvía "Rosal-IA" de 49 fans en
+    // vez de ROSALÍA de 1M) o un artista con foto placeholder. Se piden varios y se
+    // elige el MÁS SEGUIDO con imagen real → la foto correcta, sin tocar el catálogo.
+    const url = `https://api.deezer.com/search/artist?q=${encodeURIComponent(q)}&limit=15`;
     const response = await fetch(url);
     const data = await response.json();
+    const lista = (data && Array.isArray(data.data)) ? data.data : [];
+    const PLACEHOLDER = 'd41d8cd98f00b204e9800998ecf8427e'; // MD5 del string vacío = foto ausente
+    const conFoto = lista.filter(a => a && a.picture_xl && a.picture_xl.indexOf(PLACEHOLDER) === -1);
+    // El más seguido con foto real; si ninguno tiene foto, se conserva el orden de
+    // Deezer (data[0]) para no romper el fallback del front (AudioDB/iniciales).
+    const mejor = conFoto.slice().sort((a, b) => (b.nb_fan || 0) - (a.nb_fan || 0))[0];
+    const salida = mejor
+      ? { data: [mejor, ...lista.filter(a => a !== mejor)], total: data.total }
+      : data;
     return {
       statusCode: 200,
       headers: {
         'Access-Control-Allow-Origin': '*',
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify(data)
+      body: JSON.stringify(salida)
     };
   } catch (err) {
     return {

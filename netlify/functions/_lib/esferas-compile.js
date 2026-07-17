@@ -416,12 +416,17 @@ function generarObj(esfera, hoy) {
     ? (',sepCheap:' + Math.round(Number(esfera.sep_cheap))) : '';
   // nota: aviso especial. Si hay → nota:'<esc>'; si vacío → no emitir.
   const notaSeg = esfera.nota ? (",nota:'" + escStr(esfera.nota) + "'") : '';
+  // Foto (portada manual del concierto) → staticImg + img:false; si no → img:'<nombre>'
+  // (byte-igual a hoy). Mismo molde que el branch de festival (fest.portada).
+  const imgSeg = esfera.foto
+    ? ("staticImg:'" + escStr(esfera.foto) + "',img:false,")
+    : ("img:'" + escStr(nombre) + "',");
   return "{id:'" + escStr(esfera.slug) +
     "',added:'" + added +
     "'," + music +
     "c:'" + color +
-    "',img:'" + escStr(nombre) +
-    "',a:'" + escStr(esfera.titulo || nombre) +
+    "'," + imgSeg +
+    "a:'" + escStr(esfera.titulo || nombre) +
     "',f:'" + escStr(fStr) +
     "',ds:'" + escStr(dsFinal) +
     "'," + dsListStr +

@@ -21,7 +21,7 @@ const SB_URL = 'https://npgnhsmwpcipxgvfxrho.supabase.co';
 const SB_KEY = process.env.SUPABASE_SERVICE_KEY_KAMEHOUSE;
 
 // Whitelist EDITABLE. slug AUSENTE a propósito (identidad / PK, no se edita).
-const CAMPOS_EDITABLES = new Set(['nombre', 'titulo', 'fecha_inicio', 'ciudad', 'tipo', 'status', 'venue', 'music', 'fechas_extra', 'zonas', 'hotel', 'mapa', 'inc', 'sep', 'sep_cheap', 'nota', 'festival']);
+const CAMPOS_EDITABLES = new Set(['nombre', 'titulo', 'fecha_inicio', 'ciudad', 'tipo', 'status', 'venue', 'music', 'fechas_extra', 'zonas', 'hotel', 'mapa', 'inc', 'sep', 'sep_cheap', 'nota', 'festival', 'foto']);
 
 // festival: JSON del festival (lineup/switches/paquetes) o null = concierto.
 // Acepta string JSON o objeto; vacío/basura → null (nunca rompe). Igual que zonas.
@@ -143,6 +143,15 @@ function saneMapa(v) {
   return (/^https?:\/\//.test(s) || s.charAt(0) === '/') ? s : '';
 }
 
+// foto: URL pública de la portada del CONCIERTO (bucket mapas-eventos, tipo
+// portada). Igual que mapa: acepta URL http(s) o ruta absoluta; otra cosa → ''
+// (limpia / sin foto). El compilador emite staticImg+img:false solo si no vacío.
+function saneFoto(v) {
+  const s = (typeof v === 'string') ? v.trim() : '';
+  if (!s) return '';
+  return (/^https?:\/\//.test(s) || s.charAt(0) === '/') ? s : '';
+}
+
 // Status de Esferas (simplificado): Disponible / Próximamente / Últimos / Agotado.
 const STATUS_PERMITIDOS = new Set(['', 'proximamente', 'ultimos', 'agotado']);
 
@@ -182,6 +191,7 @@ exports.handler = async (event) => {
     if (k === 'zonas') { sane[k] = saneZonas(v); continue; }
     if (k === 'hotel') { sane[k] = saneHotel(v); continue; }
     if (k === 'mapa') { sane[k] = saneMapa(v); continue; }
+    if (k === 'foto') { sane[k] = saneFoto(v); continue; }
     if (k === 'inc') { sane[k] = saneInc(v); continue; }
     if (k === 'sep' || k === 'sep_cheap') { sane[k] = saneInt(v); continue; }
     if (k === 'nota') { sane[k] = saneNota(v); continue; }

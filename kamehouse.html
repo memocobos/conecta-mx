@@ -3069,6 +3069,17 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
     </div>
     <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.15em;color:var(--ts);margin:24px 0 16px">// EXTRAS</div>
     <div class="form-group">
+     <label>Foto de portada (concierto)</label>
+     <input type="file" id="esf-foto-file" accept="image/*" style="display:none" onchange="_esfFotoPick(event)">
+     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <button class="btn btn-ghost" type="button" id="esf-foto-btn" onclick="document.getElementById('esf-foto-file').click()">Subir foto</button>
+      <button class="btn btn-ghost" type="button" id="esf-foto-clear" style="display:none" onclick="_esfFotoClear()">Quitar</button>
+      <span id="esf-foto-status" style="font-size:11px;color:var(--ts)"></span>
+     </div>
+     <div id="esf-foto-preview" style="margin-top:8px;display:none"><img id="esf-foto-img" src="" alt="Foto de portada" style="max-width:240px;max-height:180px;border:1px solid var(--border);border-radius:6px"></div>
+     <div style="font-size:11px;color:var(--ts);margin-top:4px">Portada manual del concierto (reemplaza la foto de Deezer). Los festivales usan su propia portada en el panel de festival.</div>
+    </div>
+    <div class="form-group">
      <label>Mapa del venue</label>
      <input type="file" id="esf-mapa-file" accept="image/*" style="display:none" onchange="_esfMapaPick(event)">
      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
@@ -14851,6 +14862,7 @@ async function crearEsferaEvento() {
     zonas: _esfGetZonas(),
     hotel: _esfGetHotel(),
     mapa: _esfGetMapa(),
+    foto: _esfGetFoto(),
     inc: _esfGetInc(),
     sep: _esfGetSep(),
     sep_cheap: _esfGetSepCheap(),
@@ -14876,6 +14888,7 @@ async function crearEsferaEvento() {
     _esfClearZonas();
     _esfClearHotel();
     _esfMapaClear();
+    _esfFotoClear();
     _esfSeedDefaults();
     const _fchk = document.getElementById('esf-es-festival'); if (_fchk) _fchk.checked = false;
     _esfToggleFestival();
@@ -15465,6 +15478,53 @@ function _esfMapaClear() {
 
 function _esfGetMapa() { return _esfMapaUrl || ''; }
 
+// ── Concierto: foto de portada (calcado del mapa; reusa _esfMapaResize) ──────
+// Sube a esferas-subir-imagen tipo:'portada' (path <slug>-portada); la URL se
+// guarda en la columna `foto`. El compilador emite staticImg + img:false, y el
+// render de index.html la usa directa (TUERCA A). Reemplaza la foto de Deezer.
+var _esfFotoUrl = '';
+function _esfFotoShow(url) {
+  _esfFotoUrl = url || '';
+  const prev = document.getElementById('esf-foto-preview');
+  const img  = document.getElementById('esf-foto-img');
+  const clr  = document.getElementById('esf-foto-clear');
+  if (_esfFotoUrl) { if (img) img.src = _esfFotoUrl; if (prev) prev.style.display = ''; if (clr) clr.style.display = ''; }
+  else { if (img) img.src = ''; if (prev) prev.style.display = 'none'; if (clr) clr.style.display = 'none'; }
+}
+function _esfFotoClear() {
+  _esfFotoShow('');
+  const f = document.getElementById('esf-foto-file'); if (f) f.value = '';
+  const st = document.getElementById('esf-foto-status'); if (st) st.textContent = '';
+}
+// Modo editar: re-poblar preview desde la URL guardada en `foto` (o limpiar).
+function _esfFotoPopulate(url) {
+  _esfFotoShow((typeof url === 'string' && url.trim()) ? url.trim() : '');
+}
+function _esfGetFoto() { return _esfFotoUrl || ''; }
+async function _esfFotoPick(event) {
+  const file = event.target.files && event.target.files[0];
+  if (!file) return;
+  const slug = (document.getElementById('esf-slug')?.value || '').trim().toLowerCase();
+  if (!slug) { alert('Primero pon el slug del evento (nombra el archivo).'); event.target.value = ''; return; }
+  const st = document.getElementById('esf-foto-status'); if (st) st.textContent = 'Subiendo…';
+  try {
+    const dataUrl = await _esfMapaResize(file);
+    const r = await khAdminFetch('/.netlify/functions/esferas-subir-imagen', {
+      method: 'POST', body: JSON.stringify({ slug, dataUrl, tipo: 'portada' }),
+    });
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok || !data.ok || !data.url) throw new Error(data.error || 'No se pudo subir la foto');
+    _esfFotoShow(data.url);
+    const img = document.getElementById('esf-foto-img');
+    if (img) img.src = data.url + '?t=' + (img._t = (img._t || 0) + 1); // cache-bust (upsert mismo path)
+    if (st) st.textContent = 'Subida ✓';
+  } catch (e) {
+    if (st) st.textContent = 'Error: ' + e.message;
+  } finally {
+    event.target.value = '';
+  }
+}
+
 // ── Festival: portada + lineup (calcado del mapa; reusa _esfMapaResize) ──────
 var _esfPortadaUrl = '';
 var _esfLineupUrl = '';
@@ -15613,6 +15673,8 @@ function editarEsfera(slug) {
   _esfHotelPopulate(row.hotel);
   // Mapa: re-poblar preview desde la URL guardada (o limpiar si no hay).
   _esfMapaPopulate(row.mapa);
+  // Foto de portada (concierto): re-poblar preview desde `foto` (o limpiar).
+  _esfFotoPopulate(row.foto);
   // Qué incluye + separo + nota: re-poblar desde la fila.
   _esfIncSepNotaPopulate(row);
   _esfCiudadSet(row.ciudad || 'MTY');
@@ -15647,6 +15709,7 @@ function cancelarEdicionEsfera() {
   _esfClearZonas();
   _esfClearHotel();
   _esfMapaClear();
+  _esfFotoClear();
   _esfCiudadSet('MTY');
   _esfSeedDefaults();
   const tipo = document.getElementById('esf-tipo'); if (tipo) tipo.value = 'concierto';
@@ -15680,6 +15743,7 @@ async function guardarCambiosEsfera() {
     zonas: _esfGetZonas(),
     hotel: _esfGetHotel(),
     mapa: _esfGetMapa(),
+    foto: _esfGetFoto(),
     inc: _esfGetInc(),
     sep: _esfGetSep(),
     sep_cheap: _esfGetSepCheap(),

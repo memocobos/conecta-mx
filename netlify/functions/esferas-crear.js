@@ -27,7 +27,7 @@ const SB_KEY = process.env.SUPABASE_SERVICE_KEY_KAMEHOUSE;
 const CAMPOS_PERMITIDOS = new Set([
   'slug', 'nombre', 'titulo', 'fecha_inicio', 'ciudad', 'tipo', 'status',
   'venue', 'music', 'fechas_extra', 'zonas', 'hotel', 'mapa',
-  'inc', 'sep', 'sep_cheap', 'nota', 'festival',
+  'inc', 'sep', 'sep_cheap', 'nota', 'festival', 'foto',
 ]);
 
 // festival: JSON del festival (lineup/switches/paquetes) o null = concierto.
@@ -153,6 +153,15 @@ function saneMapa(v) {
   return (/^https?:\/\//.test(s) || s.charAt(0) === '/') ? s : '';
 }
 
+// foto: URL pública de la portada del CONCIERTO (bucket mapas-eventos, tipo
+// portada). Igual que mapa: acepta URL http(s) o ruta absoluta; otra cosa → ''
+// (sin foto). El compilador emite staticImg+img:false solo si no está vacío.
+function saneFoto(v) {
+  const s = (typeof v === 'string') ? v.trim() : '';
+  if (!s) return '';
+  return (/^https?:\/\//.test(s) || s.charAt(0) === '/') ? s : '';
+}
+
 const SLUG_RE = /^[a-z0-9-]+$/;
 // Status de Esferas (simplificado): Disponible / Próximamente / Últimos / Agotado.
 const STATUS_PERMITIDOS = new Set(['', 'proximamente', 'ultimos', 'agotado']);
@@ -192,6 +201,7 @@ exports.handler = async (event) => {
     if (k === 'zonas') { sane[k] = saneZonas(v); continue; }
     if (k === 'hotel') { sane[k] = saneHotel(v); continue; }
     if (k === 'mapa') { sane[k] = saneMapa(v); continue; }
+    if (k === 'foto') { sane[k] = saneFoto(v); continue; }
     if (k === 'inc') { sane[k] = saneInc(v); continue; }
     if (k === 'sep' || k === 'sep_cheap') { sane[k] = saneInt(v); continue; }
     if (k === 'nota') { sane[k] = saneNota(v); continue; }

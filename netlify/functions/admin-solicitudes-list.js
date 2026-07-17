@@ -49,14 +49,34 @@ exports.handler = async (event) => {
   catch { return { statusCode: 400, headers, body: JSON.stringify({ error: 'JSON inválido' }) }; }
 
   const params = new URLSearchParams();
-  params.set('select', '*,clientes(numero_cliente,nombre_completo,correo,celular,talla_playera,contacto_emergencia_nombre,contacto_emergencia_telefono,contacto_emergencia_relacion)');
+  // con_pagos (aditivo, ADITIVO/gated): embebe las cuotas del plan para calcular
+  // abonado/total en la lista SIN una llamada por fila. Lo usa el sub-tab "Pagos"
+  // de Capsule Corp (T1). Sin el flag, el shape es idéntico al de siempre.
+  const selectPagos = body.con_pagos ? ',pagos(monto,monto_pagado,estado)' : '';
+  params.set('select', `*,clientes(numero_cliente,nombre_completo,correo,celular,talla_playera,contacto_emergencia_nombre,contacto_emergencia_telefono,contacto_emergencia_relacion)${selectPagos}`);
   params.set('order', 'created_at.desc');
 
   if (body.estado && ['pendiente','en_pagos','pagado','cancelado'].includes(body.estado)) {
     params.append('estado', `eq.${body.estado}`);
   }
+  // evento_id: por defecto match exacto (eq). multifecha (aditivo/gated): un
+  // festival guarda sus fechas como 'slug#N', así que unimos el slug base + todas
+  // sus fechas con or=(eq,like slug%23*). Patrón calcado de admin-transporte /
+  // admin-rooming-grupos. El or=(...) con %23 se pega CRUDO a la URL (no pasa por
+  // URLSearchParams, que lo doble-encodearía). slugBase re-saneado (anti-inyección).
+  let orEventoRaw = '';
   if (body.evento_id && typeof body.evento_id === 'string') {
-    params.append('evento_id', `eq.${body.evento_id}`);
+    if (body.multifecha) {
+      const slugBase = body.evento_id.split('#')[0];
+      if (/^[a-z0-9_-]+$/.test(slugBase)) {
+        orEventoRaw = `or=(evento_id.eq.${slugBase},evento_id.like.${slugBase}%23*)`;
+      } else {
+        // slug con caracteres raros: cae al match exacto (nunca inyecta al or=).
+        params.append('evento_id', `eq.${body.evento_id}`);
+      }
+    } else {
+      params.append('evento_id', `eq.${body.evento_id}`);
+    }
   }
   if (body.desde) params.append('created_at', `gte.${body.desde}`);
   if (body.hasta) params.append('created_at', `lte.${body.hasta}`);
@@ -67,7 +87,7 @@ exports.handler = async (event) => {
 
   let solicitudes;
   try {
-    const url = `${env.PORTAL_SB_URL}/rest/v1/solicitudes_tour?${params.toString()}`;
+    const url = `${env.PORTAL_SB_URL}/rest/v1/solicitudes_tour?${params.toString()}${orEventoRaw ? '&' + orEventoRaw : ''}`;
     const r = await fetch(url, {
       headers: {
         apikey: env.PORTAL_SB_SERVICE,

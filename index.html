@@ -2090,7 +2090,7 @@ function renderCatalog(){
     else if(isNF){priceH='<div><div class="ev-price-lbl">Informes</div><div class="ev-price-wa">Cotiza por WA</div></div>';}
     else if(!hasZ||isSV||isProc){priceH='<div><div class="ev-price-lbl">Informes</div><div class="ev-price-wa">Cotiza por WA</div></div>';}
     else{priceH='<div><div class="ev-price-lbl">Desde</div><div class="ev-price">'+fmt(minP(ev))+'</div></div>';}
-    var staticSrc=STATIC_IMGS[ev.id]||STATIC_IMGS[ev.staticImg];
+    var staticSrc=(ev.staticImg&&(ev.staticImg.indexOf('http')===0||ev.staticImg.indexOf('data:')===0))?ev.staticImg:(STATIC_IMGS[ev.id]||STATIC_IMGS[ev.staticImg]);
     if(!ev.img&&ev.img!==false&&!staticSrc&&ev.a) ev.img=ev.a.replace(/ - .*/,'').replace(/ en .*/,'').replace(/ Mexico.*/,'');
     var imgHTML='';
     var playBtn='';
@@ -2612,6 +2612,7 @@ function injectEventStructuredData(){
     return min===Infinity?null:min;
   }
   function imgUrl(ev){
+    if(ev.staticImg&&(ev.staticImg.indexOf('http')===0||ev.staticImg.indexOf('data:')===0))return ev.staticImg;
     var s=(typeof STATIC_IMGS!=='undefined'&&STATIC_IMGS)?
       (STATIC_IMGS[ev.id]||STATIC_IMGS[ev.staticImg]):null;
     if(!s)return BASE+'/icon-512.png';
@@ -3180,7 +3181,7 @@ function showDetail(id, _skipHistory){
   // Hero image
   var heroImg=$$('d-hero-img');
   if(heroImg){
-    var staticSrc=STATIC_IMGS[cur.staticImg||cur.id];
+    var staticSrc=(cur.staticImg&&(cur.staticImg.indexOf('http')===0||cur.staticImg.indexOf('data:')===0))?cur.staticImg:STATIC_IMGS[cur.staticImg||cur.id];
     var heroBg=document.getElementById('d-hero-bg');
     if(staticSrc){
       heroImg.src=staticSrc;

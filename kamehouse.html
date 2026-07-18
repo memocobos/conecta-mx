@@ -2598,6 +2598,7 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
         <button class="gz-filter" id="cc-sub-btn-viajeros" onclick="showCCSubTab('viajeros',this)">Viajeros</button>
         <button class="gz-filter" id="cc-sub-btn-rooming" onclick="showCCSubTab('rooming',this)">Rooming</button>
         <button class="gz-filter" id="cc-sub-btn-transporte" onclick="showCCSubTab('transporte',this)">🚌 Transporte</button>
+        <button class="gz-filter" id="cc-sub-btn-pagos" onclick="showCCSubTab('pagos',this)">💳 Pagos</button>
        </div>
 
        <!-- SUB: EQUIPO ASIGNADO -->
@@ -2681,6 +2682,13 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
        <div id="cc-sub-transporte" style="display:none">
         <div id="tr-err" style="display:none;margin-bottom:10px" class="alert alert-error"></div>
         <div id="cc-transporte"><div style="color:var(--ts);font-size:12px">Cargando transporte…</div></div>
+       </div>
+
+       <!-- SUB: PAGOS — 💳 Bandeja de separos (T1). Solicitudes aprobadas del evento
+            (en_pagos + pagado). El detalle abre el MISMO modal global de solicitud. -->
+       <div id="cc-sub-pagos" style="display:none">
+        <div id="cc-pagos-header" style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);padding:12px 16px;margin-bottom:14px;font-size:12px;color:var(--ts)"></div>
+        <div id="cc-pagos-list"><div style="color:var(--ts);font-size:12px">Cargando pagos…</div></div>
        </div>
       </div>
      </div>
@@ -10327,13 +10335,155 @@ function showCCTab(tab, btn) {
 function showCCSubTab(sub, btn) {
   document.querySelectorAll('#page-capsule .gz-filter[id^="cc-sub-btn"]').forEach(b => b.classList.remove('active'));
   if (btn) btn.classList.add('active');
-  ['equipo','viajeros','rooming','transporte'].forEach(s => {
+  ['equipo','viajeros','rooming','transporte','pagos'].forEach(s => {
     const el = document.getElementById(`cc-sub-${s}`);
     if (el) el.style.display = s === sub ? '' : 'none';
   });
   // [F3] Transporte carga LAZY al abrir su sub-tab (no encarece abrirDetalleEvento)
   // y se refresca en cada visita. Fails-soft: no bloquea al resto del detalle.
   if (sub === 'transporte' && _ccEventoActual) loadTransporte(_ccEventoActual);
+  // [Pagos-T1] Bandeja de separos: carga LAZY al abrir, se refresca en cada visita.
+  if (sub === 'pagos' && _ccEventoActual) loadCCPagos(_ccEventoActual);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// [Pagos-T1] Sub-tab "💳 Pagos" de Capsule Corp — bandeja de separos.
+// La casa nueva de las solicitudes APROBADAS (en_pagos + pagado) de un evento.
+// Reusa admin-solicitudes-list (flags multifecha+con_pagos) y el MISMO modal
+// global de detalle de solicitud. Convive con "Solicitudes Portal" hasta la T2.
+// ═══════════════════════════════════════════════════════════════════════════
+let _ccPagos = [];              // filas aprobadas del evento actual (con pagos embebidos)
+let _ccPagosCtx = false;        // true = el modal de solicitud se abrió DESDE este sub-tab
+let _ccPagosLoading = false;
+
+// Abonado/Total de una solicitud desde sus cuotas embebidas (pagos). Fórmula
+// IDÉNTICA al modal / admin-cobranza-list: total = Σ monto del plan; abonado =
+// Σ (monto_pagado ?? monto) de las cuotas 'pagado'. Sin plan aún → total cae a
+// precio_total para que la barra tenga denominador.
+function _ccPagoStats(s) {
+  const pagos = Array.isArray(s.pagos) ? s.pagos : [];
+  const total = pagos.reduce((a, p) => a + Number(p.monto || 0), 0) || Number(s.precio_total || 0) || 0;
+  const abonado = pagos.filter(p => p.estado === 'pagado')
+    .reduce((a, p) => a + (Number(p.monto_pagado ?? p.monto) || 0), 0);
+  return { total, abonado };
+}
+
+// Pill de estado — en_pagos amarillo · pagado verde (colores de la spec T1).
+function _ccPagoEstadoPill(estado) {
+  const map = {
+    en_pagos: { t: 'En pagos', c: '#e8a800', bg: 'rgba(232,168,0,.12)', bd: 'rgba(232,168,0,.35)' },
+    pagado:   { t: 'Pagado',   c: '#3DDC84', bg: 'rgba(61,220,132,.12)', bd: 'rgba(61,220,132,.35)' },
+  };
+  const m = map[estado] || { t: estado || '—', c: 'var(--ts)', bg: 'var(--bg3)', bd: 'var(--border)' };
+  return `<span style="font-family:'JetBrains Mono',monospace;font-size:10px;padding:2px 8px;border-radius:20px;color:${m.c};background:${m.bg};border:1px solid ${m.bd};white-space:nowrap">${m.t}</span>`;
+}
+
+async function loadCCPagos(eventoId) {
+  if (_ccPagosLoading) return;
+  _ccPagosLoading = true;
+  const listEl = document.getElementById('cc-pagos-list');
+  const headEl = document.getElementById('cc-pagos-header');
+  if (listEl) listEl.innerHTML = '<div style="padding:20px;text-align:center;color:var(--ts);font-family:\'JetBrains Mono\',monospace;font-size:11px">// cargando pagos…</div>';
+  try {
+    const r = await fetch('/.netlify/functions/admin-solicitudes-list', {
+      method: 'POST',
+      headers: _spAdminHeaders(),
+      // multifecha: trae el slug base + todas sus fechas (festival). con_pagos:
+      // embebe las cuotas para calcular abonado/total sin llamada por fila.
+      body: JSON.stringify({ evento_id: eventoId, multifecha: true, con_pagos: true, limit: 500 }),
+    });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || 'Error cargando pagos');
+    // SOLO aprobadas: en_pagos + pagado (las pendientes se quedan en la T2).
+    _ccPagos = (data.solicitudes || []).filter(s => s.estado === 'en_pagos' || s.estado === 'pagado');
+    // Puente al modal global: el modal y sus sub-acciones buscan por _spCache.find.
+    // Unimos (por id) las filas de Capsule a _spCache para que funcionen invocadas
+    // desde aquí. Es transitorio: entrar a Solicitudes Portal recarga _spCache.
+    const byId = new Map((_spCache || []).map(x => [x.id, x]));
+    _ccPagos.forEach(s => byId.set(s.id, s));
+    _spCache = Array.from(byId.values());
+    _renderCCPagos();
+  } catch (e) {
+    if (listEl) listEl.innerHTML = `<div style="padding:20px;text-align:center;color:#FF6B6B">Error: ${_spEscape(e.message)}</div>`;
+    if (headEl) headEl.textContent = '';
+    showToast('No se pudieron cargar los pagos: ' + e.message, 'error');
+  } finally {
+    _ccPagosLoading = false;
+  }
+}
+
+function _renderCCPagos() {
+  const listEl = document.getElementById('cc-pagos-list');
+  const headEl = document.getElementById('cc-pagos-header');
+  if (!listEl) return;
+
+  if (!_ccPagos.length) {
+    if (headEl) headEl.textContent = '';
+    listEl.innerHTML = '<div class="empty-state"><div class="empty-icon">·</div>Aún no hay solicitudes aprobadas en este evento.</div>';
+    return;
+  }
+
+  // Cabecera: N solicitudes · $X abonado de $Y (suma de la lista).
+  let sumAbon = 0, sumTotal = 0;
+  _ccPagos.forEach(s => { const st = _ccPagoStats(s); sumAbon += st.abonado; sumTotal += st.total; });
+  if (headEl) {
+    const n = _ccPagos.length;
+    headEl.innerHTML = `<b style="color:var(--ink)">${n}</b> solicitud${n === 1 ? '' : 'es'} aprobada${n === 1 ? '' : 's'} · <b style="color:#3DDC84">${_spFmtMxn(sumAbon)}</b> abonado de <b style="color:var(--ink)">${_spFmtMxn(sumTotal)}</b>`;
+  }
+
+  const head = `
+    <thead>
+      <tr style="background:var(--bg3);text-align:left">
+        <th style="padding:9px 8px;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ts)">Cliente</th>
+        <th style="padding:9px 8px;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ts);white-space:nowrap">Solicitud</th>
+        <th style="padding:9px 8px;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ts)">Paquete / Zona</th>
+        <th style="padding:9px 8px;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ts);text-align:center">Pers.</th>
+        <th style="padding:9px 8px;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ts);min-width:160px">Abonado / Total</th>
+        <th style="padding:9px 8px;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ts)">Estado</th>
+        <th style="padding:9px 8px"></th>
+      </tr>
+    </thead>`;
+
+  const body = _ccPagos.map(s => {
+    const c = s.clientes || {};
+    const st = _ccPagoStats(s);
+    const pct = st.total > 0 ? Math.min(100, Math.round(st.abonado / st.total * 100)) : 0;
+    const barColor = s.estado === 'pagado' ? '#3DDC84' : 'var(--orange)';
+    // Chip multifecha "Fecha N" (fecha única → sin chip). Reusa _rgFechaIdx.
+    const fi = _rgFechaIdx(s.evento_id);
+    const chip = fi === null ? '' : `<span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--ts);border:1px solid var(--border);border-radius:20px;padding:1px 7px;letter-spacing:.06em;margin-left:6px">Fecha ${fi + 1}</span>`;
+    return `
+      <tr style="border-top:1px solid var(--border)">
+        <td style="padding:9px 8px;font-size:13px">${_spEscape(c.nombre_completo || '—')}<br><span style="font-family:'JetBrains Mono',monospace;color:var(--orange);font-size:11px">#${_spEscape(c.numero_cliente || '—')}</span></td>
+        <td style="padding:9px 8px;font-size:12px;color:var(--ts);white-space:nowrap" title="${_spEscape(_spFmtFechaAbs(s.created_at))}">${_spEscape(_spFmtFechaRel(s.created_at))}${chip}</td>
+        <td style="padding:9px 8px;font-size:12px"><b>${_spEscape(s.paquete || '—')}</b>${s.zona ? `<br><span style="color:var(--ts)">${_spEscape(s.zona)}</span>` : ''}</td>
+        <td style="padding:9px 8px;font-size:13px;text-align:center">${Number(s.num_personas || 0) || '—'}</td>
+        <td style="padding:9px 8px;font-size:12px">
+          <div style="display:flex;justify-content:space-between;gap:8px;margin-bottom:3px"><b style="color:#3DDC84">${_spFmtMxn(st.abonado)}</b><span style="color:var(--ts)">${_spFmtMxn(st.total)}</span></div>
+          <div style="height:5px;background:var(--bg3);border-radius:3px;overflow:hidden"><div style="height:100%;width:${pct}%;background:${barColor};border-radius:3px"></div></div>
+        </td>
+        <td style="padding:9px 8px">${_ccPagoEstadoPill(s.estado)}</td>
+        <td style="padding:9px 8px;text-align:right;white-space:nowrap"><button class="btn btn-ghost btn-sm" onclick="verSolicitudPagosCC('${_spEscape(s.id)}')" style="font-size:11px">Ver detalles</button></td>
+      </tr>`;
+  }).join('');
+
+  listEl.innerHTML = `<div class="table-wrap"><table style="width:100%;border-collapse:collapse">${head}<tbody>${body}</tbody></table></div>`;
+}
+
+// "Ver detalles" desde el sub-tab Pagos: marca el contexto para que los refrescos
+// del modal actualicen ESTA lista (no la página Solicitudes Portal) y abre el
+// MISMO modal global de siempre.
+function verSolicitudPagosCC(id) {
+  _ccPagosCtx = true;
+  verSolicitudPortal(id);
+}
+
+// Refresco de la lista de fondo tras una acción del modal de solicitud. Si el
+// modal se abrió desde el sub-tab Pagos (T1) → refresca ESE sub-tab (y re-mergea
+// a _spCache); si no → la página Solicitudes Portal, como siempre. [Pagos-T1]
+function _spRefrescarLista() {
+  if (_ccPagosCtx && _ccEventoActual) { loadCCPagos(_ccEventoActual); return; }
+  loadSolicitudesPortal();
 }
 
 // ── Filtro eventos (fecha + buscador, combinados) ────────────
@@ -12056,6 +12206,7 @@ function _spPoblarDropdownEventos() {
 async function loadSolicitudesPortal() {
   if (_spLoading) return;
   _spLoading = true;
+  _ccPagosCtx = false;   // [Pagos-T1] entrar a Solicitudes Portal = contexto SP autoritativo
 
   const tableEl = document.getElementById('sp-table');
   const contadoresEl = document.getElementById('sp-contadores');
@@ -12328,7 +12479,7 @@ async function ejecutarResetCliente(clienteId) {
       ? `Cliente eliminado (${data.solicitudes_borradas} solicitud(es), cuenta ${data.auth_user_borrado ? 'borrada' : 'no encontrada'}).`
       : `Cliente reseteado (${data.solicitudes_borradas} solicitud(es) y sus pagos borrados).`;
     showToast(msg, 'success');
-    loadSolicitudesPortal();
+    _spRefrescarLista();
   } catch (e) {
     if (alertEl) alertEl.innerHTML = `<div class="alert alert-error" style="font-size:12px">${_spEscape(e.message)}</div>`;
     if (btn) { btn.disabled = false; _rcSync(); }
@@ -13085,7 +13236,7 @@ async function revertirPagoSP(solicitudId, pagoId) {
 // es el estado ya reconciliado por el backend, para la lógica de "sin plan".
 async function _spRefrescarPlanYLista(solicitudId, estadoSolicitud) {
   await cargarPlanPagosSP(solicitudId, estadoSolicitud);
-  loadSolicitudesPortal();
+  _spRefrescarLista();
   // Si el plan se está viendo desde el modal de la pestaña Pagos (Fase 3),
   // refresca también su tabla para que Total/Abonado/Resta queden al día.
   const cob = document.getElementById('modal-cobranza-plan');
@@ -13342,7 +13493,7 @@ async function guardarCambioEstadoSP(solicitudId) {
     showToast('Solicitud actualizada', 'success');
     cerrarModal('sp-cambiar-estado');
     cerrarModal('sp-detalle');
-    loadSolicitudesPortal();
+    _spRefrescarLista();
   } catch (e) {
     showToast('No se pudo guardar: ' + e.message, 'error');
   } finally {

@@ -299,6 +299,9 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Montse
 .topbar-bell{position:relative;background:none;border:none;cursor:pointer;font-size:18px;line-height:1;padding:4px;color:var(--ts);transition:color .2s}
 .topbar-bell:hover{color:var(--text)}
 .notif-badge{position:absolute;top:-2px;right:-3px;min-width:16px;height:16px;padding:0 4px;border-radius:8px;background:var(--red);color:#fff;font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:700;align-items:center;justify-content:center;line-height:1;box-sizing:border-box}
+/* [Bandeja-T2] Badge de pendientes en el nav "Solicitudes Portal". Inline al
+   final del botón (nav-btn es flex-row) con margin-left:auto. */
+.sp-nav-badge{margin-left:auto;min-width:16px;height:16px;padding:0 5px;border-radius:8px;background:var(--red);color:#fff;font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center;line-height:1;box-sizing:border-box;flex-shrink:0}
 .notif-panel{position:absolute;top:calc(100% + 10px);right:0;width:340px;max-width:90vw;max-height:440px;overflow-y:auto;background:var(--bg2);border:1px solid var(--border);border-radius:10px;box-shadow:0 12px 40px rgba(0,0,0,.5);z-index:1000}
 .notif-panel-head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:12px 14px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--bg2)}
 .notif-panel-title{font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--text)}
@@ -1970,7 +1973,7 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
    <button class="nav-btn" onclick="showPage('pagos')" id="nav-pagos"><svg class="nav-ic"><use href="#ic-pagos"/></svg><span>Pagos</span></button>
    <button class="nav-btn" onclick="showPage('eventos')" id="nav-eventos"><svg class="nav-ic"><use href="#ic-eventos"/></svg><span>Por Evento</span></button>
    <button class="nav-btn" onclick="showPage('capsule')" id="nav-capsule"><svg class="nav-ic"><use href="#ic-capsule"/></svg><span>Capsule Corp</span></button>
-   <button class="nav-btn" onclick="showPage('solicitudes_portal')" id="nav-solicitudes_portal"><svg class="nav-ic"><use href="#ic-solicitudes"/></svg><span>Solicitudes Portal</span></button>
+   <button class="nav-btn" onclick="showPage('solicitudes_portal')" id="nav-solicitudes_portal"><svg class="nav-ic"><use href="#ic-solicitudes"/></svg><span>Solicitudes Portal</span><span class="sp-nav-badge" id="sp-nav-badge" style="display:none">0</span></button>
   </div>
 
   <div class="nav-group">
@@ -2710,7 +2713,7 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
       <div class="page-hero">
        <div>
         <div class="page-title">📥 SOLICITUDES PORTAL</div>
-        <div class="page-sub">// clientes pidiendo separar tour desde el portal</div>
+        <div class="page-sub">// Bandeja de separos — solicitudes esperando aprobación. Las aprobadas viven en Capsule Corp → Pagos.</div>
        </div>
        <button class="btn btn-ghost" onclick="loadSolicitudesPortal()" id="sp-btn-refresh">↻ Refrescar</button>
       </div>
@@ -2728,12 +2731,10 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
        </div>
        <div>
         <label style="display:block;font-size:10px;letter-spacing:.12em;color:var(--ts);text-transform:uppercase;margin-bottom:4px">Estado</label>
+        <!-- [Bandeja-T2] Solo pendientes + canceladas. en_pagos/pagado viven en Capsule → Pagos. -->
         <select id="sp-filtro-estado" onchange="loadSolicitudesPortal()" style="width:100%;padding:8px 10px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;color:var(--ink);font-size:13px">
-         <option value="">Todos</option>
-         <option value="pendiente">Pendiente</option>
-         <option value="en_pagos">En pagos</option>
-         <option value="pagado">Pagado</option>
-         <option value="cancelado">Cancelado</option>
+         <option value="pendiente" selected>Pendientes</option>
+         <option value="cancelado">Canceladas</option>
         </select>
        </div>
        <div>
@@ -4641,6 +4642,7 @@ function enterApp() {
   aplicarTemaCoordi();
   applyTema(currentUser.tema_acento);
   _cargarNotificaciones(); // fails-soft: pinta el badge si hay no leídas
+  _spContarPendientes();   // [Bandeja-T2] pinta el badge de pendientes en el nav (fails-soft)
   bootApp();
 }
 
@@ -12203,6 +12205,30 @@ function _spPoblarDropdownEventos() {
   if (valorActual && _spEventosVistos.has(valorActual)) sel.value = valorActual;
 }
 
+// [Bandeja-T2] Badge de pendientes en el nav. Pinta el número; 0 → sin badge.
+function _spPintarBadgePendientes(n) {
+  const b = document.getElementById('sp-nav-badge');
+  if (!b) return;
+  if (n > 0) { b.textContent = n > 99 ? '99+' : String(n); b.style.display = 'flex'; }
+  else { b.style.display = 'none'; }
+}
+
+// Cuenta las solicitudes PENDIENTES (independiente del filtro activo, para que el
+// badge sea correcto aun viendo "Canceladas"). Reusa admin-solicitudes-list (sin
+// tocar backend). Fails-soft: si truena (p.ej. rol sin permiso), no pinta ni rompe.
+async function _spContarPendientes() {
+  try {
+    const r = await fetch('/.netlify/functions/admin-solicitudes-list', {
+      method: 'POST',
+      headers: _spAdminHeaders(),
+      body: JSON.stringify({ estado: 'pendiente', limit: 500 }),
+    });
+    if (!r.ok) return;
+    const data = await r.json();
+    _spPintarBadgePendientes(Number(data.count) || 0);
+  } catch (e) { /* fails-soft */ }
+}
+
 async function loadSolicitudesPortal() {
   if (_spLoading) return;
   _spLoading = true;
@@ -12233,15 +12259,15 @@ async function loadSolicitudesPortal() {
     _spPoblarDropdownEventos();
     if (contadoresEl) {
       const c = data.contadores || {};
+      // [Bandeja-T2] Solo pendiente + cancelado (en_pagos/pagado viven en Capsule → Pagos).
       contadoresEl.innerHTML = [
         `<span style="color:#e8a800">⏳ ${c.pendiente || 0} pendiente${(c.pendiente||0)===1?'':'s'}</span>`,
-        `<span style="color:#3aa1c4">▸ ${c.en_pagos || 0} en pagos</span>`,
-        `<span style="color:#3DDC84">✓ ${c.pagado || 0} pagado${(c.pagado||0)===1?'':'s'}</span>`,
-        `<span style="color:#FF6B6B">✕ ${c.cancelado || 0} cancelado${(c.cancelado||0)===1?'':'s'}</span>`,
+        `<span style="color:#FF6B6B">✕ ${c.cancelado || 0} cancelada${(c.cancelado||0)===1?'':'s'}</span>`,
         `<span style="margin-left:auto">// ${data.count} mostradas</span>`,
       ].join('');
     }
     renderSolicitudesPortal();
+    _spContarPendientes();   // [Bandeja-T2] refresca el badge del nav (incl. tras aprobar/rechazar)
   } catch (e) {
     if (tableEl) tableEl.innerHTML = `<div style="padding:24px;text-align:center;color:#FF6B6B">Error: ${_spEscape(e.message)}</div>`;
     showToast('No se pudieron cargar las solicitudes: ' + e.message, 'error');
@@ -13490,7 +13516,13 @@ async function guardarCambioEstadoSP(solicitudId) {
     });
     const data = await r.json();
     if (!r.ok) throw new Error(data.error || 'Error guardando');
-    showToast('Solicitud actualizada', 'success');
+    // [Bandeja-T2] Al aprobar (→ en_pagos) la fila deja la bandeja: el toast dice
+    // a dónde se fue. Otros cambios (p.ej. cancelar) conservan el toast genérico.
+    if (estado === 'en_pagos') {
+      showToast('Aprobada ✓ — ahora vive en Capsule → ' + (s.evento_nombre || 'su evento') + ' → Pagos', 'success');
+    } else {
+      showToast('Solicitud actualizada', 'success');
+    }
     cerrarModal('sp-cambiar-estado');
     cerrarModal('sp-detalle');
     _spRefrescarLista();

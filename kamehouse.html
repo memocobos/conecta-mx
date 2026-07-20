@@ -3320,6 +3320,23 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
  .ks-toggle{font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.08em;text-transform:uppercase;padding:8px 14px;border-radius:999px;border:1px solid var(--border);background:var(--bg2);color:var(--ts);cursor:pointer;min-height:38px}
  .ks-toggle.active{border-color:var(--gold);color:var(--gold);background:rgba(232,255,76,.08)}
 
+ /* Editor de metadata (Fase 4): buscador, resultados, tracks clickeables, portada */
+ .ks-search{display:flex;gap:8px;flex-wrap:wrap}
+ .ks-search-input{flex:1;min-width:180px;background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:999px;padding:9px 16px;color:var(--text);font-family:'Montserrat',sans-serif;font-size:13px;outline:none;transition:border-color .2s}
+ .ks-search-input:focus{border-color:var(--gold)}
+ .ks-results{margin-top:12px;display:flex;flex-direction:column}
+ .ks-result{display:flex;align-items:center;gap:12px;padding:8px;border-radius:8px;cursor:pointer;transition:background .15s}
+ .ks-result:hover{background:rgba(255,255,255,.05)}
+ .ks-result+.ks-result{margin-top:2px}
+ .ks-track-click{cursor:pointer;border-radius:8px;transition:background .15s}
+ .ks-track-click:hover{background:rgba(255,255,255,.05)}
+ .ks-hero-click{cursor:pointer}
+ .ks-hero-titulo.ks-hero-click:hover{text-decoration:underline;text-decoration-thickness:2px;text-underline-offset:3px}
+ .ks-edit-top{display:flex;gap:16px;align-items:flex-start}
+ .ks-cover{position:relative;width:96px;height:96px;flex-shrink:0;border-radius:10px;overflow:hidden;border:1px solid var(--border)}
+ .ks-cover img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+ .ks-cover .ks-art-ph{font-size:26px}
+
  /* Tabla scoped: en desktop hereda el estilo KameHouse; en móvil → cards */
  .ks-table-wrap{border-radius:var(--radius);border:1px solid var(--border);overflow:hidden}
 
@@ -3367,12 +3384,12 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
   <div class="ks-hero">
    <div class="ks-hero-bg is-empty" id="ks-hero-bg"></div>
    <div class="ks-hero-inner">
-    <div class="ks-hero-art" id="ks-hero-art">
+    <div class="ks-hero-art ks-hero-click" id="ks-hero-art" onclick="radioMediaAbrirSonando()" title="Editar esta canción">
      <div class="ks-art-ph" id="ks-hero-ph"></div>
     </div>
     <div class="ks-hero-body">
      <div class="ks-eyebrow"><span class="ks-live-dot"></span> En vivo · Sonando ahora</div>
-     <div class="ks-hero-titulo" id="ks-hero-titulo">Cargando…</div>
+     <div class="ks-hero-titulo ks-hero-click" id="ks-hero-titulo" onclick="radioMediaAbrirSonando()" title="Editar esta canción">Cargando…</div>
      <div class="ks-hero-artista" id="ks-hero-artista"></div>
      <div class="ks-hero-foot">
       <div class="ks-meter"><span class="ks-meter-num" id="ks-hero-oyentes">—</span><span class="ks-meter-lbl">oyentes ahora</span></div>
@@ -3441,6 +3458,17 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
   <!-- TAB 4: Control remoto -->
   <div id="radio-tab-control" style="display:none">
 
+   <div class="ks-panel">
+    <div class="ks-panel-title">Buscar canción en la biblioteca</div>
+    <div class="ks-search">
+     <input type="text" id="radio-media-q" class="ks-search-input" placeholder="Título, artista o álbum…" autocomplete="off"
+            onkeydown="if(event.key==='Enter')radioMediaBuscar()">
+     <button class="btn btn-primary btn-sm" onclick="radioMediaBuscar()" style="font-size:11px">Buscar</button>
+    </div>
+    <div id="radio-media-res" class="ks-results"></div>
+    <div style="color:var(--ts);font-size:11px;margin-top:10px;line-height:1.5">Edita título, artista, álbum y portada dentro del archivo original. Toca una canción de abajo o de un resultado para editarla.</div>
+   </div>
+
    <div class="ks-grid-2">
     <div class="ks-panel">
      <div class="ks-panel-title">A continuación</div>
@@ -3471,6 +3499,43 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
 
   </div>
  </div><!-- /page-radio -->
+
+ <!-- Modal Editar canción (Kaio-sama Fase 4) -->
+ <div class="modal-overlay" id="modal-radio-media">
+  <div class="modal">
+   <div class="modal-header">
+    <div class="modal-title">Editar canción</div>
+    <button class="modal-close" onclick="closeModal('modal-radio-media')">✕</button>
+   </div>
+   <div class="modal-body">
+    <div id="radio-media-alert"></div>
+    <input type="hidden" id="rm-ruta">
+    <div class="ks-edit-top">
+     <div class="ks-cover" id="rm-cover">
+      <div class="ks-art-ph" id="rm-cover-ph"></div>
+     </div>
+     <div style="flex:1;min-width:0">
+      <input type="file" id="rm-file" accept="image/jpeg,image/png" onchange="radioMediaPreviewPortada(this)" style="display:none">
+      <button type="button" class="btn btn-ghost btn-sm" style="font-size:11px" onclick="document.getElementById('rm-file').click()">Cambiar portada</button>
+      <div style="color:var(--ts);font-size:11px;margin-top:8px;line-height:1.5">JPG o PNG. Se ajusta a máx 1000px antes de subir.</div>
+     </div>
+    </div>
+
+    <div class="form-group" style="margin-top:16px"><label>Título</label><input type="text" id="rm-titulo" autocomplete="off"></div>
+    <div class="form-group"><label>Artista</label><input type="text" id="rm-artista" autocomplete="off"></div>
+    <div class="form-group"><label>Álbum</label><input type="text" id="rm-album" autocomplete="off"></div>
+    <div class="form-group"><label>Artista del álbum</label><input type="text" id="rm-artista-album" autocomplete="off">
+     <div style="color:var(--ts);font-size:11px;margin-top:6px;line-height:1.5">Para unificar un álbum partido, pon el mismo Álbum y Artista del álbum en todas sus canciones (en compilaciones usa 'Varios').</div>
+    </div>
+
+    <div style="color:var(--ts);font-size:11px;margin-top:14px;line-height:1.5;border-top:1px solid var(--border);padding-top:12px">El cambio se escribe en el archivo original. La radio lo refleja en ~5 min y tu música personal en ~15 min.</div>
+   </div>
+   <div class="modal-footer">
+    <button class="btn btn-ghost btn-sm" onclick="closeModal('modal-radio-media')" style="font-size:11px">Cancelar</button>
+    <button class="btn btn-primary btn-sm" id="rm-guardar" onclick="radioMediaGuardar()" style="font-size:11px">Guardar</button>
+   </div>
+  </div>
+ </div>
 
 
  <!-- ─── CONTRATOS ─── -->
@@ -6397,7 +6462,8 @@ function _radioInicialesArt(txt) {
 
 // Fila de track (cola / recién sonaron). Placeholder con iniciales SIEMPRE detrás;
 // la carátula va encima con onerror que la oculta — nunca se ve la imagen rota.
-// idx = número de orden (cola) o null (historial).
+// idx = número de orden (cola) o null (historial). Clickeable → editar (Fase 4):
+// busca por título+artista en la biblioteca y abre el resultado más parecido.
 function _radioTrackHtml(titulo, artista, art, idx) {
   titulo = titulo || 'sin título';
   artista = artista || '';
@@ -6407,7 +6473,8 @@ function _radioTrackHtml(titulo, artista, art, idx) {
     ? `<img src="${_spEscape(art)}" alt="" loading="lazy" onerror="this.style.display='none'">`
     : '';
   const idxHtml = (idx != null) ? `<span class="ks-track-idx">${idx}</span>` : '';
-  return `<div class="ks-track">${idxHtml}<div class="ks-art">${ph}${img}</div>
+  const oc = `radioMediaAbrirPorNombre('${_radioJs(titulo)}','${_radioJs(artista)}')`;
+  return `<div class="ks-track ks-track-click" onclick="${oc}" title="Editar esta canción">${idxHtml}<div class="ks-art">${ph}${img}</div>
     <div class="ks-track-txt">
       <div class="ks-track-t">${_spEscape(titulo)}</div>
       <div class="ks-track-a">${_spEscape(artista)}</div>
@@ -6460,6 +6527,209 @@ function _radioCopyFallback(text, done) {
   } catch (e) {
     showToast('No se pudo copiar. Link: ' + text, 'error');
   }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// KAIO-SAMA FASE 4 — Editor permanente de metadata y portadas.
+// Todo pasa por admin-radio-media (AzuraCast files + editor del NAS server-side).
+// El cambio se escribe DENTRO del archivo original.
+// ═══════════════════════════════════════════════════════════════
+let _radioMediaResults = [];    // últimos resultados de búsqueda (índice → archivo)
+let _radioMediaNuevaPortada = null; // { imagen(base64), mime } elegida en el modal
+
+// Escape para incrustar texto dentro de un onclick='fn("...")' (contexto JS + HTML).
+function _radioJs(s) {
+  return String(s == null ? '' : s)
+    .replace(/\\/g, '\\\\').replace(/'/g, "\\'")
+    .replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/[\r\n]+/g, ' ');
+}
+
+// GET ?buscar= → biblioteca de AzuraCast. Devuelve array de archivos.
+async function _radioMediaSearch(q) {
+  const r = await khAdminFetch('/.netlify/functions/admin-radio-media?buscar=' + encodeURIComponent(q));
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok || j.ok === false) throw new Error(j.error || ('Error ' + r.status));
+  return Array.isArray(j.archivos) ? j.archivos : [];
+}
+
+// Buscador del tab Control.
+async function radioMediaBuscar() {
+  const inp = document.getElementById('radio-media-q');
+  const box = document.getElementById('radio-media-res');
+  const q = (inp ? inp.value : '').trim();
+  if (!box) return;
+  if (!q) { box.innerHTML = ''; return; }
+  box.innerHTML = '<div class="loading-state"><div class="spinner"></div>Buscando…</div>';
+  try {
+    _radioMediaResults = await _radioMediaSearch(q);
+    if (!_radioMediaResults.length) {
+      box.innerHTML = '<div style="color:var(--ts);font-size:13px;padding:6px 0">Sin resultados en la biblioteca.</div>';
+      return;
+    }
+    box.innerHTML = _radioMediaResults.map((a, i) => _radioResultHtml(a, i)).join('');
+  } catch (e) {
+    box.innerHTML = '<div style="color:#FF6B6B;font-size:13px">Error: ' + _spEscape(e.message) + '</div>';
+  }
+}
+
+function _radioResultHtml(a, i) {
+  const ini = _radioInicialesArt(a.artista || a.titulo);
+  const ph = `<div class="ks-art-ph">${_spEscape(ini)}</div>`;
+  const img = a.art
+    ? `<img src="${_spEscape(a.art)}" alt="" loading="lazy" onerror="this.style.display='none'">`
+    : '';
+  const sub = [a.artista, a.album].filter(Boolean).join(' · ');
+  return `<div class="ks-result" onclick="radioMediaAbrirModalIdx(${i})" title="Editar esta canción">
+    <div class="ks-art">${ph}${img}</div>
+    <div class="ks-track-txt">
+      <div class="ks-track-t">${_spEscape(a.titulo || 'sin título')}</div>
+      <div class="ks-track-a">${_spEscape(sub)}</div>
+    </div></div>`;
+}
+
+// Click en un track de cola / historial / hero → busca por nombre y abre el mejor.
+async function radioMediaAbrirPorNombre(titulo, artista) {
+  const q = [titulo, artista].filter(Boolean).join(' ').trim();
+  if (!q) return;
+  try {
+    const arch = await _radioMediaSearch(q);
+    if (!arch.length) { showToast('No encontré esa canción en la biblioteca.', 'error'); return; }
+    const tl = String(titulo || '').toLowerCase().trim();
+    const best = arch.find(a => String(a.titulo || '').toLowerCase().trim() === tl) || arch[0];
+    radioMediaAbrirModal(best);
+  } catch (e) {
+    showToast('Error buscando: ' + e.message, 'error');
+  }
+}
+
+// Click en "Sonando ahora" (hero) → edita la canción al aire.
+function radioMediaAbrirSonando() {
+  const t = document.getElementById('ks-hero-titulo');
+  const a = document.getElementById('ks-hero-artista');
+  const tit = t ? t.textContent.trim() : '';
+  const art = a ? a.textContent.trim() : '';
+  if (!tit || tit === 'Cargando…' || tit === 'Sin datos' || tit === 'No disponible') return;
+  radioMediaAbrirPorNombre(tit, art);
+}
+
+function radioMediaAbrirModalIdx(i) {
+  const a = _radioMediaResults[i];
+  if (a) radioMediaAbrirModal(a);
+}
+
+// Abre el modal con los datos del archivo y refina con los tags reales (/leer).
+async function radioMediaAbrirModal(a) {
+  if (!a || !a.ruta) { showToast('Esa canción no tiene ruta editable.', 'error'); return; }
+  _radioMediaNuevaPortada = null;
+  document.getElementById('rm-ruta').value = a.ruta;
+  document.getElementById('rm-titulo').value = a.titulo || '';
+  document.getElementById('rm-artista').value = a.artista || '';
+  document.getElementById('rm-album').value = a.album || '';
+  document.getElementById('rm-artista-album').value = a.artista || ''; // provisional hasta /leer
+  const fileInp = document.getElementById('rm-file'); if (fileInp) fileInp.value = '';
+  _radioMediaSetCover(a.art, a.artista || a.titulo);
+  _radioMediaAlert('', false);
+  openModal('modal-radio-media');
+  // Refinar con los tags REALES del archivo (incluye artista_album).
+  try {
+    const r = await khAdminFetch('/.netlify/functions/admin-radio-media?leer=' + encodeURIComponent(a.ruta));
+    const j = await r.json().catch(() => ({}));
+    if (r.ok && j.ok !== false) {
+      if (j.titulo)  document.getElementById('rm-titulo').value = j.titulo;
+      if (j.artista) document.getElementById('rm-artista').value = j.artista;
+      if (j.album != null)  document.getElementById('rm-album').value = j.album;
+      // Artista del álbum: lo que devuelva /leer, o igual al artista si viene vacío.
+      const aa = (j.artista_album && j.artista_album.trim()) ? j.artista_album : (j.artista || a.artista || '');
+      document.getElementById('rm-artista-album').value = aa;
+    }
+  } catch (e) { /* nos quedamos con los valores del resultado de búsqueda */ }
+}
+
+function _radioMediaSetCover(url, nombre) {
+  const box = document.getElementById('rm-cover');
+  if (!box) return;
+  const prev = box.querySelector('img'); if (prev) prev.remove();
+  const ph = document.getElementById('rm-cover-ph'); if (ph) ph.textContent = _radioInicialesArt(nombre);
+  if (url) {
+    const img = document.createElement('img');
+    img.alt = ''; img.onerror = () => img.remove(); img.src = url;
+    box.appendChild(img);
+  }
+}
+
+// Elige nueva portada: valida, redimensiona a máx 1000px en cliente, guarda base64.
+function radioMediaPreviewPortada(input) {
+  const f = input.files && input.files[0];
+  if (!f) return;
+  if (!/^image\/(jpeg|png)$/.test(f.type)) { showToast('Usa una imagen JPG o PNG.', 'error'); input.value = ''; return; }
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const im = new Image();
+    im.onload = () => {
+      const max = 1000;
+      let w = im.naturalWidth || im.width, h = im.naturalHeight || im.height;
+      if (w > max || h > max) { const s = Math.min(max / w, max / h); w = Math.round(w * s); h = Math.round(h * s); }
+      const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+      cv.getContext('2d').drawImage(im, 0, 0, w, h);
+      const mime = (f.type === 'image/png') ? 'image/png' : 'image/jpeg';
+      const dataUrl = cv.toDataURL(mime, mime === 'image/jpeg' ? 0.9 : undefined);
+      const b64 = (dataUrl.split(',')[1]) || '';
+      _radioMediaNuevaPortada = { imagen: b64, mime };
+      const box = document.getElementById('rm-cover');
+      if (box) { const prev = box.querySelector('img'); if (prev) prev.remove(); const img = document.createElement('img'); img.alt = ''; img.src = dataUrl; box.appendChild(img); }
+    };
+    im.onerror = () => showToast('No pude leer esa imagen.', 'error');
+    im.src = e.target.result;
+  };
+  reader.onerror = () => showToast('No pude leer el archivo.', 'error');
+  reader.readAsDataURL(f);
+}
+
+// Guarda tags (y portada si hay una nueva). Escribe DENTRO del archivo original.
+async function radioMediaGuardar() {
+  const btn = document.getElementById('rm-guardar');
+  const ruta = document.getElementById('rm-ruta').value;
+  if (!ruta) { _radioMediaAlert('Falta la ruta del archivo.', true); return; }
+  const titulo        = document.getElementById('rm-titulo').value.trim();
+  const artista       = document.getElementById('rm-artista').value.trim();
+  const album         = document.getElementById('rm-album').value.trim();
+  const artista_album = document.getElementById('rm-artista-album').value.trim();
+  if (btn) btn.disabled = true;
+  _radioMediaAlert('Guardando…', false);
+  try {
+    // 1) Tags
+    const r = await khAdminFetch('/.netlify/functions/admin-radio-media', {
+      method: 'POST', body: JSON.stringify({ accion: 'editar', ruta, titulo, artista, album, artista_album }),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || j.ok === false) throw new Error(j.error || ('Error ' + r.status));
+    // 2) Portada (solo si el usuario eligió una nueva)
+    if (_radioMediaNuevaPortada) {
+      const rp = await khAdminFetch('/.netlify/functions/admin-radio-media', {
+        method: 'POST', body: JSON.stringify({ accion: 'portada', ruta, imagen: _radioMediaNuevaPortada.imagen, mime: _radioMediaNuevaPortada.mime }),
+      });
+      const jp = await rp.json().catch(() => ({}));
+      if (!rp.ok || jp.ok === false) throw new Error(jp.error || ('Portada: error ' + rp.status));
+    }
+    showToast('Cambios guardados en el archivo.', 'success');
+    _radioMediaNuevaPortada = null;
+    closeModal('modal-radio-media');
+    setTimeout(() => { _loadRadioHero(); }, 600); // refresca la vista (la radio tarda ~5 min)
+  } catch (e) {
+    _radioMediaAlert('No se pudo guardar: ' + e.message, true);
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+function _radioMediaAlert(msg, isErr) {
+  const el = document.getElementById('radio-media-alert');
+  if (!el) return;
+  if (!msg) { el.innerHTML = ''; return; }
+  const style = isErr
+    ? 'border:1px solid rgba(255,90,77,.4);color:var(--red);background:rgba(255,90,77,.1)'
+    : 'border:1px solid var(--border);color:var(--ts);background:rgba(255,255,255,.03)';
+  el.innerHTML = `<div style="padding:9px 12px;border-radius:8px;font-size:12px;margin-bottom:14px;${style}">${_spEscape(msg)}</div>`;
 }
 
 // Acción POST genérica al control. btnId se deshabilita mientras corre.

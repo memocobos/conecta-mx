@@ -3961,10 +3961,10 @@ function buildTransporteButtons(){
     if(diasRestantes>15){
       h+='<button class="z-btn" data-t="bus" data-cost="2500" onclick="selTransporteBtn(this,2500,\'Autobús\')"><div class="z-name"><svg class="ic"><use href="#ic-bus"/></svg> Autobús</div><div class="z-price">$2,500</div></button>';
     } else {
-      h+='<button class="z-btn" data-t="bus" onclick="window.open(\'https://wa.me/528119771072?text='+encodeURIComponent('Hola! Quiero cotizar autobús para '+cur.a+' ('+cur.f+')')+'\',\'_blank\')"><div class="z-name">Autobús</div><div class="z-price" style="font-size:11px;color:rgba(255,255,255,.5)">Cotiza por WhatsApp</div></button>';
+      h+='<button class="z-btn" data-t="bus" onclick="window.open(\'https://wa.me/528119771072?text='+encodeURIComponent('Hola! Quiero cotizar autobús para '+cur.a+' ('+cur.f+')')+'\',\'_blank\')"><div class="z-name">🚌 Autobús</div><div class="z-price" style="font-size:11px;color:rgba(255,255,255,.5)">Cotiza por WhatsApp</div></button>';
     }
   }
-  h+='<button class="z-btn" data-t="avion" onclick="window.open(\'https://wa.me/528132321405?text='+encodeURIComponent('Hola! Quiero cotizar un vuelo para '+cur.a+' ('+cur.f+')')+'\',\'_blank\')"><div class="z-name">Avión</div><div class="z-price" style="font-size:11px;color:rgba(255,255,255,.5)">Cotiza por WhatsApp</div></button>';
+  h+='<button class="z-btn" data-t="avion" onclick="window.open(\'https://wa.me/528132321405?text='+encodeURIComponent('Hola! Quiero cotizar un vuelo para '+cur.a+' ('+cur.f+')')+'\',\'_blank\')"><div class="z-name">✈️ Avión</div><div class="z-price" style="font-size:11px;color:rgba(255,255,255,.5)">Cotiza por WhatsApp</div></button>';
   h+='<button class="z-btn" data-t="sin" data-cost="0" onclick="selTransporteBtn(this,0,\'Sin transporte\')" style="display:flex;align-items:center;justify-content:center"><div class="z-name" style="margin:0">Sin transporte</div></button>';
   $$('d-transport').innerHTML=h;
   $$('d-placeholder').style.display='block';
@@ -4491,29 +4491,29 @@ function buildCotizacionMsg(quincenas,pagoQ){
   var fechaHoy=hoy.getDate()+'/'+(hoy.getMonth()+1)+'/'+hoy.getFullYear();
   var fechaMsg=cur.f;
   if(cur.multifecha&&cur.multifecha[selFechaIdx]&&cur.multifecha[selFechaIdx].lbl&&!cur.diaFirst) fechaMsg=cur.multifecha[selFechaIdx].lbl;
-  var msg='Hola! Quiero reservar mi lugar'+
-    '\n\n*'+cur.a+'*'+
-    '\n'+fechaMsg+
-    '\n'+cur.v+
-    '\n\n*Paquete:* '+pkgNames[selPkg]+
-    '\n*Viajeros:* '+selViaj+(selViaj===1?' persona':' personas');
-  if(selZ) msg+='\n*Zona:* '+selZ.n+' ('+fmt(selZ.p)+')';
-  if(selH&&selH.e>0) msg+='\n*Habitación:* '+selH.n+' (+'+fmt(selH.e)+(cur.hotelPP?'/persona':'')+')';
-  else if(selH) msg+='\n*Habitación:* '+selH.n+' (incluida)';
-  if(selTransporte&&selTransporte.cost>0) msg+='\n*Transporte:* '+selTransporte.n+' (+'+fmt(selTransporte.cost)+'/persona)';
-  msg+='\n\n*Costo por persona:* '+fmt(costoXPersona);
-  if(_promoActivo) msg+='\n*Código aplicado:* '+_promoActivo.code+(_promoActivo.hideAmount?'':(_promoActivo.amount?' (-'+fmt(_promoActivo.amount)+'/persona)':' (-'+_promoActivo.pct+'%)'));
-  if(selViaj>1) msg+='\n*Total del grupo:* '+fmt(total);
-  msg+='\n*Separo hoy:* '+fmt(sepActualCalc);
-  msg+='\n*Resto a cubrir:* '+fmt(resto);
+  var msg='Hola! Quiero reservar mi lugar 🎉'+
+    '\n\n🎤 *'+cur.a+'*'+
+    '\n📅 '+fechaMsg+
+    '\n📍 '+cur.v+
+    '\n\n📦 *Paquete:* '+pkgNames[selPkg]+
+    '\n👥 *Viajeros:* '+selViaj+(selViaj===1?' persona':' personas');
+  if(selZ) msg+='\n🎫 *Zona:* '+selZ.n+' ('+fmt(selZ.p)+')';
+  if(selH&&selH.e>0) msg+='\n🏨 *Habitación:* '+selH.n+' (+'+fmt(selH.e)+(cur.hotelPP?'/persona':'')+')';
+  else if(selH) msg+='\n🏨 *Habitación:* '+selH.n+' (incluida)';
+  if(selTransporte&&selTransporte.cost>0) msg+='\n🚌 *Transporte:* '+selTransporte.n+' (+'+fmt(selTransporte.cost)+'/persona)';
+  msg+='\n\n💰 *Costo por persona:* '+fmt(costoXPersona);
+  if(_promoActivo) msg+='\n🏷️ *Código aplicado:* '+_promoActivo.code+(_promoActivo.hideAmount?'':(_promoActivo.amount?' (-'+fmt(_promoActivo.amount)+'/persona)':' (-'+_promoActivo.pct+'%)'));
+  if(selViaj>1) msg+='\n💵 *Total del grupo:* '+fmt(total);
+  msg+='\n💳 *Separo hoy:* '+fmt(sepActualCalc);
+  msg+='\n💸 *Resto a cubrir:* '+fmt(resto);
   if(quincenas&&quincenas.length>0){
-    msg+='\n\n*Calendario de pagos:*';
+    msg+='\n\n📆 *Calendario de pagos:*';
     msg+='\n  Separo — '+fmt(sepActualCalc)+' (hoy)';
     for(var i=0;i<quincenas.length;i++){
       msg+='\n  Pago '+(i+1)+' — '+fmt(pagoQ)+' ('+quincenas[i].lbl+')';
     }
   }
-  msg+='\n\nFecha de solicitud: '+fechaHoy;
+  msg+='\n\n📋 Fecha de solicitud: '+fechaHoy;
   msg+='\n\n¿Qué sigue para reservar?';
   return msg;
 }

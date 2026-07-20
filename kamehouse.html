@@ -3337,6 +3337,26 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
  .ks-cover img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
  .ks-cover .ks-art-ph{font-size:26px}
 
+ /* Biblioteca (explorador): migajas, abecedario, carpetas, paginación */
+ .ks-bib-search{margin-bottom:12px}
+ .ks-crumbs{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-bottom:12px;font-family:'Barlow Condensed',sans-serif;font-size:15px;font-weight:700;letter-spacing:.03em}
+ .ks-crumb{color:var(--ts)}
+ .ks-crumb-link{color:var(--gold);cursor:pointer}
+ .ks-crumb-link:hover{text-decoration:underline}
+ .ks-crumb-sep{color:var(--ts2)}
+ .ks-abc{position:sticky;top:0;z-index:6;display:flex;flex-wrap:wrap;gap:4px;padding:8px 0;background:var(--bg);margin-bottom:12px}
+ .ks-abc-btn{min-width:28px;height:28px;padding:0 7px;border-radius:6px;border:1px solid var(--border);background:var(--bg2);color:var(--ts);font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;transition:all .15s}
+ .ks-abc-btn:hover{border-color:var(--border2);color:var(--text)}
+ .ks-abc-btn.active{background:var(--gold);border-color:var(--gold);color:#0a0a0a}
+ .ks-folder-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:10px}
+ .ks-folder{display:flex;align-items:center;gap:10px;padding:12px 14px;border:1px solid var(--border);border-radius:10px;background:var(--bg2);cursor:pointer;transition:border-color .15s,background .15s;min-height:52px}
+ .ks-folder:hover{border-color:var(--gold);background:rgba(255,255,255,.03)}
+ .ks-folder-name{font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+ .ks-folder-chev{margin-left:auto;color:var(--ts2);font-size:18px;line-height:1;flex-shrink:0}
+ .ks-badges{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+ .ks-pager{display:flex;align-items:center;justify-content:center;gap:12px;margin-top:16px}
+ .ks-pager-info{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--ts)}
+
  /* Tabla scoped: en desktop hereda el estilo KameHouse; en móvil → cards */
  .ks-table-wrap{border-radius:var(--radius);border:1px solid var(--border);overflow:hidden}
 
@@ -3352,6 +3372,10 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
   .ks-tab{flex:1 1 auto;justify-content:center;min-height:44px}
   .ks-quick .btn{flex:1 1 100%;justify-content:center;min-height:44px}
   .ks-stat-num{font-size:38px}
+  .ks-folder-grid{grid-template-columns:1fr}
+  .ks-folder{min-height:52px}
+  .ks-abc-btn{min-width:32px;height:32px}
+  .ks-pager .btn{min-height:44px}
 
   /* Peticiones y Muro: tablas → cards apiladas, sin scroll horizontal */
   .ks-table-wrap{border:none;overflow:visible}
@@ -3405,6 +3429,7 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
    <button class="ks-tab" id="radio-tab-btn-muro" onclick="showRadioTab('muro',this)">El Muro</button>
    <button class="ks-tab" id="radio-tab-btn-numeros" onclick="showRadioTab('numeros',this)">Números</button>
    <button class="ks-tab" id="radio-tab-btn-control" onclick="showRadioTab('control',this)">Control</button>
+   <button class="ks-tab" id="radio-tab-btn-biblioteca" onclick="showRadioTab('biblioteca',this)">Biblioteca</button>
   </div>
 
   <!-- TAB 1: Peticiones -->
@@ -3498,6 +3523,18 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
    </div>
 
   </div>
+
+  <!-- TAB 5: Biblioteca — explorador de toda la música -->
+  <div id="radio-tab-biblioteca" style="display:none">
+   <div id="bib-crumbs" class="ks-crumbs"></div>
+   <div id="bib-toolbar" class="ks-bib-search">
+    <input type="text" id="bib-buscar" class="ks-search-input" placeholder="Buscar artista…" autocomplete="off" oninput="_bibOnBuscar(this.value)">
+   </div>
+   <div id="bib-abc" class="ks-abc"></div>
+   <div id="bib-contenido"><div class="loading-state"><div class="spinner"></div>Cargando…</div></div>
+   <div id="bib-paginacion" class="ks-pager"></div>
+  </div>
+
  </div><!-- /page-radio -->
 
  <!-- Modal Editar canción (Kaio-sama Fase 4) -->
@@ -6289,12 +6326,13 @@ async function loadRadio() {
 function showRadioTab(sub, btn) {
   document.querySelectorAll('#page-radio .ks-tab').forEach(b => b.classList.remove('active'));
   if (btn) btn.classList.add('active');
-  ['peticiones', 'muro', 'numeros', 'control'].forEach(s => {
+  ['peticiones', 'muro', 'numeros', 'control', 'biblioteca'].forEach(s => {
     const el = document.getElementById('radio-tab-' + s);
     if (el) el.style.display = s === sub ? '' : 'none';
   });
   if (sub === 'numeros') loadRadioNumeros();
   if (sub === 'control') loadRadioControl();
+  if (sub === 'biblioteca') loadRadioBiblioteca();
 }
 
 // ── HERO "Sonando ahora" — centro de control, visible en todos los tabs ──────
@@ -6786,6 +6824,231 @@ function _radioMediaAlert(msg, isErr) {
     ? 'border:1px solid rgba(255,90,77,.4);color:var(--red);background:rgba(255,90,77,.1)'
     : 'border:1px solid var(--border);color:var(--ts);background:rgba(255,255,255,.03)';
   el.innerHTML = `<div style="padding:9px 12px;border-radius:8px;font-size:12px;margin-bottom:14px;${style}">${_spEscape(msg)}</div>`;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// KAIO-SAMA — Tab BIBLIOTECA: explorador de toda la música.
+// Navega files/list por carpeta (admin-radio-media ?dir=). Raíz = artistas
+// (carpetas), luego álbumes, luego canciones. Cada canción abre el modal de
+// edición existente con su ruta directa. Reutiliza toda la infraestructura.
+// ═══════════════════════════════════════════════════════════════
+let _bibArtistas = null;   // cache de carpetas raíz [{nombre,ruta}] (todas las páginas)
+let _bibCrumbs = [];       // profundidad actual [{nombre,ruta}] (vacío = raíz/artistas)
+let _bibLetra = '';        // filtro de letra activo ('' = todas)
+let _bibBusqueda = '';     // filtro de búsqueda de artista (client-side)
+let _bibArchivos = [];     // archivos del nivel actual (para abrir modal por índice)
+let _bibPagina = 1;
+let _bibTotalPaginas = 1;
+
+async function loadRadioBiblioteca() {
+  _bibCrumbs = [];
+  _bibRenderCrumbs();
+  if (_bibArtistas) { _bibRenderRaiz(); return; }
+  const cont = document.getElementById('bib-contenido');
+  _bibToggleRaizUI(true);
+  if (cont) cont.innerHTML = '<div class="loading-state"><div class="spinner"></div>Cargando biblioteca…</div>';
+  try {
+    _bibArtistas = await _bibCargarRaizTodo();
+    _bibRenderRaiz();
+  } catch (e) {
+    if (cont) cont.innerHTML = `<div style="color:#FF6B6B;font-size:13px">Error: ${_spEscape(e.message)}</div>`;
+  }
+}
+
+// GET ?dir= de una carpeta (una página).
+async function _bibFetchDir(ruta, page) {
+  const r = await khAdminFetch('/.netlify/functions/admin-radio-media?dir=' + encodeURIComponent(ruta) + '&page=' + (page || 1));
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok || j.ok === false) throw new Error(j.error || ('Error ' + r.status));
+  return {
+    carpetas: Array.isArray(j.carpetas) ? j.carpetas : [],
+    archivos: Array.isArray(j.archivos) ? j.archivos : [],
+    pagina: j.pagina || 1,
+    total_paginas: j.total_paginas || 1,
+  };
+}
+
+// Carga TODAS las páginas de la raíz (solo carpetas → ligero) y ordena A-Z.
+async function _bibCargarRaizTodo() {
+  let page = 1, carpetas = [], guard = 0;
+  while (guard++ < 50) {
+    const d = await _bibFetchDir('', page);
+    carpetas = carpetas.concat(d.carpetas);
+    if (page >= d.total_paginas) break;
+    page++;
+  }
+  carpetas.sort((a, b) => String(a.nombre).localeCompare(String(b.nombre), 'es', { sensitivity: 'base' }));
+  return carpetas;
+}
+
+// Primera letra normalizada (sin acentos): A-Z o '#'.
+function _bibLetraDe(nombre) {
+  const c = String(nombre || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().charAt(0).toUpperCase();
+  return (c >= 'A' && c <= 'Z') ? c : '#';
+}
+
+function _bibArtistasFiltrados() {
+  let arr = _bibArtistas || [];
+  if (_bibLetra) arr = arr.filter(a => _bibLetraDe(a.nombre) === _bibLetra);
+  if (_bibBusqueda) {
+    const q = _bibBusqueda.toLowerCase();
+    arr = arr.filter(a => String(a.nombre || '').toLowerCase().includes(q));
+  }
+  return arr;
+}
+
+function _bibAbecedarioHtml() {
+  const letras = ['Todas'];
+  for (let i = 65; i <= 90; i++) letras.push(String.fromCharCode(i));
+  letras.push('#');
+  return letras.map(l => {
+    const val = (l === 'Todas') ? '' : l;
+    const activo = (_bibLetra === val) ? ' active' : '';
+    return `<button class="ks-abc-btn${activo}" onclick="_bibFiltrarLetra('${val}')">${l}</button>`;
+  }).join('');
+}
+
+function _bibFiltrarLetra(l) {
+  _bibLetra = l || '';
+  _bibRenderRaiz();
+}
+
+function _bibOnBuscar(v) {
+  _bibBusqueda = String(v || '').trim();
+  _bibRenderRaiz();
+}
+
+function _bibRenderRaiz() {
+  _bibRenderCrumbs();
+  _bibToggleRaizUI(true);
+  const abc = document.getElementById('bib-abc'); if (abc) abc.innerHTML = _bibAbecedarioHtml();
+  const pager = document.getElementById('bib-paginacion'); if (pager) pager.innerHTML = '';
+  const cont = document.getElementById('bib-contenido'); if (!cont) return;
+  const arts = _bibArtistasFiltrados();
+  if (!arts.length) {
+    cont.innerHTML = '<div style="color:var(--ts);font-size:13px;padding:12px 0">Sin artistas para ese filtro.</div>';
+    return;
+  }
+  cont.innerHTML = '<div class="ks-folder-grid">' + arts.map(a => _bibFolderHtml(a)).join('') + '</div>';
+}
+
+function _bibFolderHtml(a) {
+  const oc = `_bibIrDir('${_radioJs(a.ruta)}','${_radioJs(a.nombre)}')`;
+  return `<div class="ks-folder" onclick="${oc}" title="Abrir">
+    <div class="ks-folder-name">${_spEscape(a.nombre || nombreCorto(a.ruta))}</div>
+    <span class="ks-folder-chev">›</span>
+  </div>`;
+}
+function nombreCorto(p) { const s = String(p || '').replace(/\/+$/, ''); const i = s.lastIndexOf('/'); return i >= 0 ? s.slice(i + 1) : s; }
+
+// Entrar a una carpeta (artista o álbum): agrega migaja y carga.
+async function _bibIrDir(ruta, nombre) {
+  _bibCrumbs.push({ nombre, ruta });
+  await _bibMostrarDir(ruta, 1);
+}
+
+async function _bibMostrarDir(ruta, page) {
+  _bibRenderCrumbs();
+  _bibToggleRaizUI(false);
+  const cont = document.getElementById('bib-contenido');
+  const pager = document.getElementById('bib-paginacion'); if (pager) pager.innerHTML = '';
+  if (cont) cont.innerHTML = '<div class="loading-state"><div class="spinner"></div>Cargando…</div>';
+  try {
+    const d = await _bibFetchDir(ruta, page);
+    _bibArchivos = d.archivos;
+    _bibPagina = d.pagina;
+    _bibTotalPaginas = d.total_paginas;
+    _bibRenderDir(d, ruta);
+  } catch (e) {
+    if (cont) cont.innerHTML = `<div style="color:#FF6B6B;font-size:13px">Error: ${_spEscape(e.message)}</div>`;
+  }
+}
+
+function _bibRenderDir(d, ruta) {
+  const cont = document.getElementById('bib-contenido'); if (!cont) return;
+  let html = '';
+  if (d.carpetas.length) {
+    html += '<div class="ks-folder-grid">' + d.carpetas.map(c => _bibFolderHtml(c)).join('') + '</div>';
+  }
+  if (d.archivos.length) {
+    html += `<div class="ks-results" style="margin-top:${d.carpetas.length ? '14px' : '0'}">`
+      + d.archivos.map((a, i) => _bibTrackHtml(a, i)).join('') + '</div>';
+  }
+  if (!d.carpetas.length && !d.archivos.length) {
+    html = '<div style="color:var(--ts);font-size:13px;padding:12px 0">Esta carpeta está vacía.</div>';
+  }
+  cont.innerHTML = html;
+  _bibRenderPaginacion(ruta);
+}
+
+// Canción de la biblioteca: miniatura + metadata + badges de auxilio + abre modal.
+function _bibTrackHtml(a, i) {
+  const ini = _radioInicialesArt(a.artista || a.titulo);
+  const ph = `<div class="ks-art-ph">${_spEscape(ini)}</div>`;
+  const img = a.art
+    ? `<img src="${_spEscape(a.art)}" alt="" loading="lazy" onerror="this.style.display='none'">`
+    : '';
+  const badges = [];
+  if (!String(a.titulo || '').trim())  badges.push('<span class="badge badge-red">sin título</span>');
+  if (!String(a.artista || '').trim()) badges.push('<span class="badge badge-orange">sin artista</span>');
+  if (!String(a.album || '').trim())   badges.push('<span class="badge badge-orange">sin álbum</span>');
+  const sub = [a.artista, a.album].filter(Boolean).join(' · ');
+  return `<div class="ks-result" onclick="_bibAbrirArchivo(${i})" title="Editar esta canción">
+    <div class="ks-art">${ph}${img}</div>
+    <div class="ks-track-txt">
+      <div class="ks-track-t">${_spEscape(a.titulo || '(sin título)')}</div>
+      <div class="ks-track-a">${_spEscape(sub || '—')}</div>
+      ${badges.length ? `<div class="ks-badges">${badges.join('')}</div>` : ''}
+    </div></div>`;
+}
+
+function _bibAbrirArchivo(i) {
+  const a = _bibArchivos[i];
+  if (a) radioMediaAbrirModal(a); // ruta directa, sin pasar por búsqueda
+}
+
+// Migajas: Artistas > Artista > Álbum …
+function _bibRenderCrumbs() {
+  const el = document.getElementById('bib-crumbs'); if (!el) return;
+  const parts = [`<span class="ks-crumb${_bibCrumbs.length ? ' ks-crumb-link' : ''}" onclick="_bibVolverRaiz()">Artistas</span>`];
+  _bibCrumbs.forEach((c, idx) => {
+    const last = (idx === _bibCrumbs.length - 1);
+    parts.push('<span class="ks-crumb-sep">›</span>');
+    parts.push(`<span class="ks-crumb${last ? '' : ' ks-crumb-link'}"${last ? '' : ` onclick="_bibVolverA(${idx})"`}>${_spEscape(c.nombre)}</span>`);
+  });
+  el.innerHTML = parts.join('');
+}
+
+function _bibVolverRaiz() {
+  _bibCrumbs = [];
+  _bibRenderRaiz(); // conserva el filtro de letra/búsqueda activo
+}
+
+function _bibVolverA(idx) {
+  const target = _bibCrumbs[idx];
+  _bibCrumbs = _bibCrumbs.slice(0, idx + 1);
+  _bibMostrarDir(target.ruta, 1);
+}
+
+function _bibRenderPaginacion(ruta) {
+  const el = document.getElementById('bib-paginacion'); if (!el) return;
+  if (_bibTotalPaginas <= 1) { el.innerHTML = ''; return; }
+  const prev = _bibPagina > 1, next = _bibPagina < _bibTotalPaginas;
+  el.innerHTML =
+    `<button class="btn btn-ghost btn-sm" ${prev ? '' : 'disabled'} onclick="_bibPaginar('${_radioJs(ruta)}',${_bibPagina - 1})" style="font-size:11px">Anterior</button>`
+    + `<span class="ks-pager-info">Página ${_bibPagina} de ${_bibTotalPaginas}</span>`
+    + `<button class="btn btn-ghost btn-sm" ${next ? '' : 'disabled'} onclick="_bibPaginar('${_radioJs(ruta)}',${_bibPagina + 1})" style="font-size:11px">Siguiente</button>`;
+}
+
+function _bibPaginar(ruta, page) {
+  _bibMostrarDir(ruta, page);
+}
+
+function _bibToggleRaizUI(show) {
+  const abc = document.getElementById('bib-abc');
+  const tb = document.getElementById('bib-toolbar');
+  if (abc) abc.style.display = show ? '' : 'none';
+  if (tb) tb.style.display = show ? '' : 'none';
 }
 
 // Acción POST genérica al control. btnId se deshabilita mientras corre.

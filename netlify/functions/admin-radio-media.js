@@ -80,20 +80,40 @@ exports.handler = async (event) => {
         const data = await r.json().catch(() => ({}));
         const rows = (data && Array.isArray(data.rows)) ? data.rows : [];
         const archivos = rows
-          .filter(row => row && row.type === 'media')
-          .map(row => {
-            const m = (row && row.media) || {};
-            return {
-              ruta:    row.path || m.path || '',
-              titulo:  m.title  || '',
-              artista: m.artist || '',
-              album:   m.album  || '',
-              art:     artMedia(m),
-            };
-          })
+          .filter(esMedia)
+          .map(mediaDeRow)
           .filter(a => a.ruta)
           .slice(0, 20);
         return { statusCode: 200, headers, body: JSON.stringify({ ok: true, archivos }) };
+      }
+
+      // GET ?dir= → navegar la biblioteca (files/list por carpeta, sin buscar).
+      // dir vacío = raíz. Separa carpetas (directorios) de archivos (media).
+      if (q.dir != null) {
+        const dir = String(q.dir);
+        if (dir && !rutaValida(dir)) return { statusCode: 400, headers, body: JSON.stringify({ error: 'dir inválido' }) };
+        const page = Math.max(1, parseInt(q.page, 10) || 1);
+        const url = `${AZ_BASE}/api/station/${STATION}/files/list`
+          + `?currentDirectory=${encodeURIComponent(dir)}&rowCount=100&current=${page}`;
+        const r = await httpFetch(url, { headers: azHeaders });
+        if (!r.ok) {
+          const detail = await r.text().catch(() => '');
+          return { statusCode: 502, headers, body: JSON.stringify({ error: 'AzuraCast rechazó la navegación', detail }) };
+        }
+        const data = await r.json().catch(() => ({}));
+        const rows = (data && Array.isArray(data.rows)) ? data.rows : [];
+        const carpetas = rows.filter(esCarpeta).map(row => ({
+          nombre: nombreDeRuta(row.path),
+          ruta:   row.path || '',
+        })).filter(c => c.ruta);
+        const archivos = rows.filter(esMedia).map(mediaDeRow).filter(a => a.ruta);
+        const total = (data.total != null) ? Number(data.total)
+          : (data.filtered != null ? Number(data.filtered) : rows.length);
+        const total_paginas = Number.isFinite(total) && total > 0
+          ? Math.max(1, Math.ceil(total / 100))
+          : (rows.length >= 100 ? page + 1 : page); // sin total: avanza hasta página corta
+        const pagina = Number(data.current) || page;
+        return { statusCode: 200, headers, body: JSON.stringify({ ok: true, carpetas, archivos, pagina, total_paginas }) };
       }
 
       // GET ?leer= → tags actuales DENTRO del archivo (editor /leer)
@@ -115,7 +135,7 @@ exports.handler = async (event) => {
         }) };
       }
 
-      return { statusCode: 400, headers, body: JSON.stringify({ error: 'falta buscar o leer' }) };
+      return { statusCode: 400, headers, body: JSON.stringify({ error: 'falta buscar, dir o leer' }) };
     }
 
     // ───────────────────────── POST ─────────────────────────
@@ -177,6 +197,30 @@ exports.handler = async (event) => {
 // ----- helpers -----
 
 function campo(v) { return (v == null) ? '' : String(v); }
+
+// Clasificación de un row de files/list.
+function esMedia(row)   { return !!(row && row.type === 'media'); }
+function esCarpeta(row) { return !!(row && (row.type === 'directory' || row.type === 'dir')); }
+
+// Mapea un row de media al shape que consume el frontend (mismo criterio que el
+// buscador): metadata en row.media, art con host público.
+function mediaDeRow(row) {
+  const m = (row && row.media) || {};
+  return {
+    ruta:    row.path || m.path || '',
+    titulo:  m.title  || '',
+    artista: m.artist || '',
+    album:   m.album  || '',
+    art:     artMedia(m),
+  };
+}
+
+// Último segmento de una ruta relativa (nombre de carpeta).
+function nombreDeRuta(p) {
+  const s = String(p || '').replace(/\/+$/, '');
+  const i = s.lastIndexOf('/');
+  return (i >= 0) ? s.slice(i + 1) : s;
+}
 
 // Ruta relativa segura: sin traversal, sin raíz absoluta, sin nulos.
 function rutaValida(r) {

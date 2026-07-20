@@ -115,7 +115,7 @@ body.wizard-open{overscroll-behavior:none}
 .ev-card.proxi:hover{transform:translateY(-2px)}
 .ev-card.proxi .ev-bottom{justify-content:center}
 .ev-prox-badge{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;background:#e8ff4c;color:#000;padding:14px 12px;font-size:13px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;font-family:'Montserrat',sans-serif;border-radius:8px;text-align:center;line-height:1.1}
-.ev-prox-badge::before{content:'🔔'}
+.ev-prox-badge::before{content:''}
 .ev-prox-sub{display:block;font-size:9px;letter-spacing:.18em;color:rgba(0,0,0,.55);margin-top:3px;font-weight:800}
 .ev-card.pasado{cursor:default;pointer-events:none;opacity:.55}
 .ev-card.pasado .ev-img{filter:brightness(.35) grayscale(.6)}
@@ -972,6 +972,17 @@ src="https://www.facebook.com/tr?id=1685907946147007&ev=PageView&noscript=1"
 </head>
 <body>
 
+<!-- [Barrida 2/3] Mini-sprite de iconos (SOLO los que usa index) + helper .ic.
+     Mismo trazo 24x24 que kamehouse; el icono hereda color y tamaño del texto. -->
+<style>.ic{width:1em;height:1em;vertical-align:-0.12em;flex-shrink:0;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}</style>
+<svg aria-hidden="true" focusable="false" style="position:absolute;width:0;height:0;overflow:hidden"><defs>
+  <symbol id="ic-bus" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M3 11h18"/><circle cx="7.5" cy="20" r="1.5"/><circle cx="16.5" cy="20" r="1.5"/></symbol>
+  <symbol id="ic-avion" viewBox="0 0 24 24"><path d="M21 15.5v-2L13 9V4a1.5 1.5 0 0 0-3 0v5l-8 4.5v2l8-2.2V19l-2.2 1.5v1.5L11 21.7l3.2 1.3v-1.5L12 19v-3.7z"/></symbol>
+  <symbol id="ic-pagos" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></symbol>
+  <symbol id="ic-portapapeles" viewBox="0 0 24 24"><rect x="5" y="4" width="14" height="17" rx="2"/><rect x="9" y="2" width="6" height="4" rx="1"/><path d="M9 11h6M9 15h4"/></symbol>
+  <symbol id="ic-campana" viewBox="0 0 24 24"><path d="M6 16c1-1 1-3 1-6a5 5 0 0 1 10 0c0 3 0 5 1 6z"/><path d="M10 19a2 2 0 0 0 4 0"/></symbol>
+</defs></svg>
+
 <div class="progress" id="progress"></div>
 
 <nav class="nav">
@@ -984,11 +995,11 @@ src="https://www.facebook.com/tr?id=1685907946147007&ev=PageView&noscript=1"
   <div class="nav-right" id="nav-right">
     <div class="nav-cli-links">
       <a href="/rol" class="nav-cli-link" title="Mi plan de pagos">
-        <span class="nli">📋</span><span class="nlt">Mi Plan de Pagos</span>
+        <span class="nli"><svg class="ic"><use href="#ic-portapapeles"/></svg></span><span class="nlt">Mi Plan de Pagos</span>
       </a>
       <span class="nav-cli-sep">•</span>
       <a href="/pagos" class="nav-cli-link" title="Datos bancarios">
-        <span class="nli">💳</span><span class="nlt">Datos Bancarios</span>
+        <span class="nli"><svg class="ic"><use href="#ic-pagos"/></svg></span><span class="nlt">Datos Bancarios</span>
       </a>
     </div>
     <div class="nav-socials">
@@ -1053,7 +1064,7 @@ src="https://www.facebook.com/tr?id=1685907946147007&ev=PageView&noscript=1"
   <div class="catalog" id="catalog-anchor">
     <div id="proximos-banner" style="display:none;margin:12px 16px 8px;background:#e8ff4c;color:#000;border:1px solid #d4e642;padding:14px 44px 14px 16px;position:relative;font-family:Montserrat,sans-serif">
       <div style="display:flex;align-items:flex-start;gap:10px">
-        <span style="font-size:20px;line-height:1;flex-shrink:0">🔔</span>
+        <span style="font-size:20px;line-height:1;flex-shrink:0"><svg class="ic"><use href="#ic-campana"/></svg></span>
         <div style="font-size:13px;line-height:1.4;font-weight:700">
           <strong style="display:block;font-size:11px;letter-spacing:.14em;text-transform:uppercase;margin-bottom:4px;font-weight:900">Próximos Tours</strong>
           Regístrate en la lista de espera y te avisaremos en cuanto publiquemos precios y zonas.
@@ -1063,17 +1074,17 @@ src="https://www.facebook.com/tr?id=1685907946147007&ev=PageView&noscript=1"
     </div>
     <div id="search-bar" style="padding:12px 16px 4px">
   <div style="display:flex;gap:8px;margin-bottom:10px">
-    <input id="ev-search" type="text" placeholder="🔍  Buscar evento..." 
+    <input id="ev-search" type="text" placeholder=" Buscar evento..." 
       oninput="filterEvents()"
       style="flex:1;background:#1a1a1a;border:2px solid rgba(255,255,255,.12);color:#fff;padding:10px 14px;font-size:13px;font-family:Montserrat,sans-serif;font-weight:600;outline:none"
     >
   </div>
   <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px" id="filter-btns">
     <button class="fbtn active" onclick="setFilter(this,'all')">Todos</button>
-    <button class="fbtn" onclick="setFilter(this,'nuevos')">✨ Nuevos</button>
-    <button class="fbtn fbtn-top10" onclick="setFilter(this,'top10')">🔥 LOS MÁS BUSCADOS</button>
-    <button class="fbtn fbtn-proximos" onclick="setFilter(this,'proximos')">📅 Próximos</button>
-    <button class="fbtn fbtn-deportes" onclick="setFilter(this,'deportes')">🤼 Deportes</button>
+    <button class="fbtn" onclick="setFilter(this,'nuevos')">Nuevos</button>
+    <button class="fbtn fbtn-top10" onclick="setFilter(this,'top10')">LOS MÁS BUSCADOS</button>
+    <button class="fbtn fbtn-proximos" onclick="setFilter(this,'proximos')">Próximos</button>
+    <button class="fbtn fbtn-deportes" onclick="setFilter(this,'deportes')">Deportes</button>
     <button class="fbtn" onclick="setFilter(this,'disp')">Disponibles</button>
     <button class="fbtn" onclick="setFilter(this,'ult')">Últimos</button>
     <button class="fbtn" onclick="setFilter(this,'mty')">Monterrey</button>
@@ -1118,12 +1129,12 @@ src="https://www.facebook.com/tr?id=1685907946147007&ev=PageView&noscript=1"
     <div class="wiz-lbl"><span class="wiz-num-badge">0</span>¿Cómo quieres viajar?</div>
     <div class="wiz-transmodo-grid">
       <button class="wiz-btn wiz-transmodo-btn wiz-transmodo-disabled" type="button" onclick="selTransModo('bus')" aria-disabled="true">
-        <div class="wiz-transmodo-ico">🚌</div>
+        <div class="wiz-transmodo-ico"><svg class="ic"><use href="#ic-bus"/></svg></div>
         <div class="wiz-transmodo-name">Autobús<small>desde Reynosa</small></div>
         <div class="wiz-transmodo-badge">PRÓXIMAMENTE</div>
       </button>
       <button class="wiz-btn wiz-transmodo-btn" type="button" onclick="selTransModo('avion')">
-        <div class="wiz-transmodo-ico">✈️</div>
+        <div class="wiz-transmodo-ico"><svg class="ic"><use href="#ic-avion"/></svg></div>
         <div class="wiz-transmodo-name">Avión<small>Reynosa-CDMX</small></div>
         <div class="wiz-transmodo-badge wiz-transmodo-on">DISPONIBLE</div>
       </button>
@@ -1242,10 +1253,10 @@ src="https://www.facebook.com/tr?id=1685907946147007&ev=PageView&noscript=1"
     <div class="card"><div class="card-lbl">Calendario de pagos</div><table class="pagos-tbl" id="r-tabla"></table></div>
     <a class="wa-btn" id="r-wa" href="#" onclick="event.preventDefault();abrirModalPago()">Reservar mi lugar</a>
     <button class="share-btn" onclick="generarImagenCotizacion()" style="display:none" id="btn-share">
-      ⬇️ Descargar cotización
+      ↓ Descargar cotización
     </button>
     <div id="r-vuelo-box" style="display:none;margin-top:10px">
-      <a class="vuelo-btn" id="r-vuelo" href="#" target="_blank">✈️ ¿Quieres cotizar tu vuelo?</a>
+      <a class="vuelo-btn" id="r-vuelo" href="#" target="_blank">¿Quieres cotizar tu vuelo?</a>
     </div>
   </div>
 
@@ -1270,7 +1281,7 @@ src="https://www.facebook.com/tr?id=1685907946147007&ev=PageView&noscript=1"
     <div class="cli-banner-sub">Consulta tu plan de pagos o pásate por los datos bancarios para hacer tu siguiente depósito.</div>
     <div class="cli-banner-grid">
       <a href="/rol" class="cli-card">
-        <div class="cci">📋</div>
+        <div class="cci"><svg class="ic"><use href="#ic-portapapeles"/></svg></div>
         <div class="ccm">
           <div class="cct">Ver mi plan de pagos</div>
           <div class="ccs">Consulta cuándo te toca cada pago</div>
@@ -1278,7 +1289,7 @@ src="https://www.facebook.com/tr?id=1685907946147007&ev=PageView&noscript=1"
         <span class="cca" aria-hidden="true">→</span>
       </a>
       <a href="/pagos" class="cli-card alt">
-        <div class="cci">💳</div>
+        <div class="cci"><svg class="ic"><use href="#ic-pagos"/></svg></div>
         <div class="ccm">
           <div class="cct">Datos bancarios</div>
           <div class="ccs">BBVA · Banamex</div>
@@ -2081,7 +2092,7 @@ function renderCatalog(){
     var isUlt=st==='ultimos'||(!isAg&&!isSV&&!isPC2&&!isProc&&!isNF&&!isPronto&&!isProxi&&_pct<40&&_pct>0);
     var isPoca=!isAg&&!isUlt&&!isSV&&!isPC2&&!isProc&&!isNF&&!isPronto&&!isProxi&&_pct>=40&&_pct<60;
     hasZ=ev.zonas.length>0;
-    var tagTxt=isAg?'Agotado':isProxi?'Próximamente':isPronto?'Próximamente':isNF?'🔄 Próximamente nueva fecha':isProc?'En Proceso':isUlt?'Últimos lugares':isPoca?'Poca disponibilidad':isSV?'Solo viaje':isPC2?'Por confirmar':'Disponible';
+    var tagTxt=isAg?'Agotado':isProxi?'Próximamente':isPronto?'Próximamente':isNF?'↻ Próximamente nueva fecha':isProc?'En Proceso':isUlt?'Últimos lugares':isPoca?'Poca disponibilidad':isSV?'Solo viaje':isPC2?'Por confirmar':'Disponible';
     var tagCls=isAg?'tag':isProxi?'tpronto':isPronto?'tpronto':isNF?'tnf':isProc?'tproc':isUlt?'tu':isPoca?'tpoca':isSV?'tsv':isPC2?'tpc':'td';
     }
     var priceH='';
@@ -2135,9 +2146,9 @@ function renderCatalog(){
           (isProxi?proxBadge:(isPast||isAg||isPronto?'':priceH)+ctaH)+
         '</div>'+
         (ev.preventa&&!isPast&&!isAg&&Date.now()<ev.preventa.expiresTs?'<div class="ev-preventa-badge" data-preventa-expires="'+ev.preventa.expiresTs+'">Preventa termina en: <span class="preventa-timer">--:--:--</span></div>':'')+
-        (ev.promo&&ev.promoCode&&!isPast&&!isAg?'<div class="ev-promo-badge">🏷️ USA CÓDIGO: '+ev.promoCode+'</div>':'')+
-        (ev.flashPromo&&!isPast&&!isAg&&Date.now()<ev.flashPromo.expiresTs?'<div class="ev-flash-badge" data-flash-expires="'+ev.flashPromo.expiresTs+'">🔥 USA CÓDIGO: '+ev.flashPromo.code+' · <span class="flash-timer"></span></div>':'')+
-        (ev.lineup&&LINEUPS[ev.lineup]?'<button class="ev-lineup-btn" data-lineup="'+ev.lineup+'" onclick="event.stopPropagation();abrirLineup(\''+ev.lineup+'\',\''+ev.a.replace(/'/g,"\\'")+'\')">🎵 Ver Line Up</button>':'')+
+        (ev.promo&&ev.promoCode&&!isPast&&!isAg?'<div class="ev-promo-badge">USA CÓDIGO: '+ev.promoCode+'</div>':'')+
+        (ev.flashPromo&&!isPast&&!isAg&&Date.now()<ev.flashPromo.expiresTs?'<div class="ev-flash-badge" data-flash-expires="'+ev.flashPromo.expiresTs+'">USA CÓDIGO: '+ev.flashPromo.code+' · <span class="flash-timer"></span></div>':'')+
+        (ev.lineup&&LINEUPS[ev.lineup]?'<button class="ev-lineup-btn" data-lineup="'+ev.lineup+'" onclick="event.stopPropagation();abrirLineup(\''+ev.lineup+'\',\''+ev.a.replace(/'/g,"\\'")+'\')">Ver Line Up</button>':'')+
       '</div>';
     if(!isPast&&!isAg){
       (function(evv,sv,proc,nf,proxi){
@@ -2170,7 +2181,7 @@ function renderCatalog(){
   for(var _pi=0;_pi<PC_EVENTS.length;_pi++){
     pcHTML+='<span style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);color:rgba(255,255,255,.5);font-size:10px;font-weight:700;padding:4px 10px;text-transform:uppercase;letter-spacing:.04em;font-family:Montserrat,sans-serif">'+PC_EVENTS[_pi]+'</span>';
   }
-  pcHTML+='</div><a href="https://whatsapp.com/channel/0029Vb7JuO1IN9ipDaGVV92f" target="_blank" style="display:inline-flex;align-items:center;gap:7px;background:#25D366;color:#fff;font-size:10px;font-weight:900;padding:9px 18px;text-decoration:none;text-transform:uppercase;letter-spacing:.08em;font-family:Montserrat,sans-serif;border-radius:2px">🔔 Recibir notificaciones</a>';
+  pcHTML+='</div><a href="https://whatsapp.com/channel/0029Vb7JuO1IN9ipDaGVV92f" target="_blank" style="display:inline-flex;align-items:center;gap:7px;background:#25D366;color:#fff;font-size:10px;font-weight:900;padding:9px 18px;text-decoration:none;text-transform:uppercase;letter-spacing:.08em;font-family:Montserrat,sans-serif;border-radius:2px"><svg class="ic"><use href="#ic-campana"/></svg> Recibir notificaciones</a>';
   pcBlock.innerHTML=pcHTML;
   list.appendChild(pcBlock);
 }
@@ -2474,7 +2485,7 @@ function applyTop10Badges(){
     if(id && _top10Rank[id]){
       var b=document.createElement('span');
       b.className='ev-top-badge';
-      b.textContent='🔥 #'+_top10Rank[id];
+      b.textContent='#'+_top10Rank[id];
       c.appendChild(b);
     }
   }
@@ -3119,7 +3130,7 @@ function actualizarIncluye(){
   }
   // Add bus if selected
   if(selTransporte&&selTransporte.cost>0){
-    items.push('🚌 Autobús Reynosa-'+getCiudad(cur));
+    items.push('Autobús Reynosa-'+getCiudad(cur));
   }
   $$('d-inc').innerHTML='<div style="font-size:11px;color:rgba(255,255,255,.6);font-weight:700;text-transform:uppercase;line-height:2">'+items.join(' · ')+'</div>';
   $$('w-inc-card').style.display='block';
@@ -3145,7 +3156,7 @@ function getCiudad(ev){
 }
 function txtTransporte(ev){
   if(isCDMX(ev)){
-    if(selTransporte&&selTransporte.cost>0) return '🚌 Autobús Reynosa-CDMX';
+    if(selTransporte&&selTransporte.cost>0) return 'Autobús Reynosa-CDMX';
     return 'Traslados en CDMX';
   }
   return 'Transporte Reynosa-'+getCiudad(ev);
@@ -3616,7 +3627,7 @@ function buildFechaButtons(){
   for(var i=0;i<cur.multifecha.length;i++){
     var mf=cur.multifecha[i];
     if(mf.prox){
-      fH+='<button class="f-btn f-prox" disabled>'+mf.lbl+'<br><small>🔄 Próximamente</small></button>';
+      fH+='<button class="f-btn f-prox" disabled>'+mf.lbl+'<br><small>↻ Próximamente</small></button>';
       continue;
     }
     // Una fecha solo se marca AGOTADA si el paquete elegido necesita zona y
@@ -3678,7 +3689,7 @@ function buildDiaButtons(){
   for(var i=0;i<cur.multifecha.length;i++){
     var mf=cur.multifecha[i];
     if(mf.prox){
-      fH+='<button class="f-btn f-prox" disabled>'+mf.lbl+'<br><small>🔄 Próximamente</small></button>';
+      fH+='<button class="f-btn f-prox" disabled>'+mf.lbl+'<br><small>↻ Próximamente</small></button>';
       continue;
     }
     fH+='<button class="f-btn'+(i===selFechaIdx?' active':'')+'" onclick="selDia(this,'+i+')">'+mf.lbl+'</button>';
@@ -3948,13 +3959,13 @@ function buildTransporteButtons(){
   var h='';
   if(!hideBus){
     if(diasRestantes>15){
-      h+='<button class="z-btn" data-t="bus" data-cost="2500" onclick="selTransporteBtn(this,2500,\'Autobús\')"><div class="z-name">🚌 Autobús</div><div class="z-price">$2,500</div></button>';
+      h+='<button class="z-btn" data-t="bus" data-cost="2500" onclick="selTransporteBtn(this,2500,\'Autobús\')"><div class="z-name"><svg class="ic"><use href="#ic-bus"/></svg> Autobús</div><div class="z-price">$2,500</div></button>';
     } else {
-      h+='<button class="z-btn" data-t="bus" onclick="window.open(\'https://wa.me/528119771072?text='+encodeURIComponent('Hola! Quiero cotizar autobús para '+cur.a+' ('+cur.f+')')+'\',\'_blank\')"><div class="z-name">🚌 Autobús</div><div class="z-price" style="font-size:11px;color:rgba(255,255,255,.5)">Cotiza por WhatsApp</div></button>';
+      h+='<button class="z-btn" data-t="bus" onclick="window.open(\'https://wa.me/528119771072?text='+encodeURIComponent('Hola! Quiero cotizar autobús para '+cur.a+' ('+cur.f+')')+'\',\'_blank\')"><div class="z-name">Autobús</div><div class="z-price" style="font-size:11px;color:rgba(255,255,255,.5)">Cotiza por WhatsApp</div></button>';
     }
   }
-  h+='<button class="z-btn" data-t="avion" onclick="window.open(\'https://wa.me/528132321405?text='+encodeURIComponent('Hola! Quiero cotizar un vuelo para '+cur.a+' ('+cur.f+')')+'\',\'_blank\')"><div class="z-name">✈️ Avión</div><div class="z-price" style="font-size:11px;color:rgba(255,255,255,.5)">Cotiza por WhatsApp</div></button>';
-  h+='<button class="z-btn" data-t="sin" data-cost="0" onclick="selTransporteBtn(this,0,\'Sin transporte\')" style="display:flex;align-items:center;justify-content:center"><div class="z-name" style="margin:0">🚶 Sin transporte</div></button>';
+  h+='<button class="z-btn" data-t="avion" onclick="window.open(\'https://wa.me/528132321405?text='+encodeURIComponent('Hola! Quiero cotizar un vuelo para '+cur.a+' ('+cur.f+')')+'\',\'_blank\')"><div class="z-name">Avión</div><div class="z-price" style="font-size:11px;color:rgba(255,255,255,.5)">Cotiza por WhatsApp</div></button>';
+  h+='<button class="z-btn" data-t="sin" data-cost="0" onclick="selTransporteBtn(this,0,\'Sin transporte\')" style="display:flex;align-items:center;justify-content:center"><div class="z-name" style="margin:0">Sin transporte</div></button>';
   $$('d-transport').innerHTML=h;
   $$('d-placeholder').style.display='block';
   $$('d-result').style.display='none';
@@ -3993,7 +4004,7 @@ function actualizarMapaBtn(){
   } else {
     btn.style.display='block';
     btn.disabled=true;
-    btn.textContent='🗺️ Mapa próximamente';
+    btn.textContent='Mapa próximamente';
     btn.style.opacity='.35';
     btn.style.cursor='default';
     btn.onclick=null;
@@ -4017,7 +4028,7 @@ function abrirModalPago(){
   try{window.trackInitiateCheckout&&window.trackInitiateCheckout(cur.a,selPkg,total);}catch(e){}
   try{ trackMainEvent('main_modal_pago_abierto', {}); }catch(e){}
   $$('pago-subtitulo').textContent='Separa tu lugar en '+cur.a+' — '+cur.f;
-  $$('pago-monto').textContent='💳 '+fmt(sepActualCalc);
+  $$('pago-monto').textContent=''+fmt(sepActualCalc);
   var b=getBanco();
   var bankH='<div class="pago-bank-name">'+b.nombre+'</div>'+
     '<div class="pago-bank-row"><span class="pago-bank-lbl">Tarjeta</span><span class="pago-bank-val">'+b.tarjeta+'</span></div>'+
@@ -4028,7 +4039,7 @@ function abrirModalPago(){
   var msgDudas=msgSinFinal+'\n\nTengo dudas sobre mi reservación, ¿me podrían ayudar?';
   var isHey=(b===BANCO_HEY);
   $$('pago-btn-comprobante').href=isHey?'https://wa.me/'+WA+'?text='+encodeURIComponent(msgSinFinal):'https://m.me/ConectaRey?text='+encodeURIComponent(msgSinFinal);
-  $$('pago-btn-comprobante').textContent=isHey?'📲 Ya pagué, enviar comprobante por WhatsApp':'📸 Enviar comprobante por Messenger';
+  $$('pago-btn-comprobante').textContent=isHey?'Ya pagué, enviar comprobante por WhatsApp':'Enviar comprobante por Messenger';
   var instr=$$('pago-msg-instruccion');
   if(instr)instr.style.display=isHey?'none':'block';
   $$('pago-btn-dudas').href='https://wa.me/'+WA+'?text='+encodeURIComponent(msgDudas);
@@ -4237,18 +4248,18 @@ function generarImagenCotizacion(){
   link.click();
 
   var btn=document.getElementById('btn-share');
-  if(btn){btn.textContent='✅ ¡Descargado!';setTimeout(function(){btn.textContent='⬇️ Descargar cotización';},2500);}
+  if(btn){btn.textContent='✓ ¡Descargado!';setTimeout(function(){btn.textContent='↓ Descargar cotización';},2500);}
 }
 
 function copiarAlPortapapeles(texto,btn,resetTxt){
   if(navigator.clipboard){
     navigator.clipboard.writeText(texto).then(function(){
-      if(btn){btn.textContent='✅ ¡Copiado!';setTimeout(function(){btn.textContent=resetTxt||'📋 Copiar';},2500);}
+      if(btn){btn.textContent='✓ ¡Copiado!';setTimeout(function(){btn.textContent=resetTxt||'Copiar';},2500);}
     });
   } else {
     var ta=document.createElement('textarea');
     ta.value=texto;document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta);
-    if(btn){btn.textContent='✅ ¡Copiado!';setTimeout(function(){btn.textContent=resetTxt||'📋 Copiar';},2500);}
+    if(btn){btn.textContent='✓ ¡Copiado!';setTimeout(function(){btn.textContent=resetTxt||'Copiar';},2500);}
   }
 }
 
@@ -4465,7 +4476,7 @@ function calcular(){
       vueloBox.style.display='block';
       var vueloMsg='Hola, quiero cotizar mi vuelo para este paquete:\n\n'+_lastCotizacion;
       vueloBtn.href='https://wa.me/528132321405?text='+encodeURIComponent(vueloMsg);
-      vueloBtn.textContent=cur.rideOnly?'🚌 ¿Cómo llego a CDMX? Cotiza tu traslado':'✈️ ¿Quieres cotizar tu vuelo?';
+      vueloBtn.textContent=cur.rideOnly?'¿Cómo llego a CDMX? Cotiza tu traslado':'¿Quieres cotizar tu vuelo?';
     } else {
       vueloBox.style.display='none';
     }
@@ -4480,29 +4491,29 @@ function buildCotizacionMsg(quincenas,pagoQ){
   var fechaHoy=hoy.getDate()+'/'+(hoy.getMonth()+1)+'/'+hoy.getFullYear();
   var fechaMsg=cur.f;
   if(cur.multifecha&&cur.multifecha[selFechaIdx]&&cur.multifecha[selFechaIdx].lbl&&!cur.diaFirst) fechaMsg=cur.multifecha[selFechaIdx].lbl;
-  var msg='Hola! Quiero reservar mi lugar 🎉'+
-    '\n\n🎤 *'+cur.a+'*'+
-    '\n📅 '+fechaMsg+
-    '\n📍 '+cur.v+
-    '\n\n📦 *Paquete:* '+pkgNames[selPkg]+
-    '\n👥 *Viajeros:* '+selViaj+(selViaj===1?' persona':' personas');
-  if(selZ) msg+='\n🎫 *Zona:* '+selZ.n+' ('+fmt(selZ.p)+')';
-  if(selH&&selH.e>0) msg+='\n🏨 *Habitación:* '+selH.n+' (+'+fmt(selH.e)+(cur.hotelPP?'/persona':'')+')';
-  else if(selH) msg+='\n🏨 *Habitación:* '+selH.n+' (incluida)';
-  if(selTransporte&&selTransporte.cost>0) msg+='\n🚌 *Transporte:* '+selTransporte.n+' (+'+fmt(selTransporte.cost)+'/persona)';
-  msg+='\n\n💰 *Costo por persona:* '+fmt(costoXPersona);
-  if(_promoActivo) msg+='\n🏷️ *Código aplicado:* '+_promoActivo.code+(_promoActivo.hideAmount?'':(_promoActivo.amount?' (-'+fmt(_promoActivo.amount)+'/persona)':' (-'+_promoActivo.pct+'%)'));
-  if(selViaj>1) msg+='\n💵 *Total del grupo:* '+fmt(total);
-  msg+='\n💳 *Separo hoy:* '+fmt(sepActualCalc);
-  msg+='\n💸 *Resto a cubrir:* '+fmt(resto);
+  var msg='Hola! Quiero reservar mi lugar'+
+    '\n\n*'+cur.a+'*'+
+    '\n'+fechaMsg+
+    '\n'+cur.v+
+    '\n\n*Paquete:* '+pkgNames[selPkg]+
+    '\n*Viajeros:* '+selViaj+(selViaj===1?' persona':' personas');
+  if(selZ) msg+='\n*Zona:* '+selZ.n+' ('+fmt(selZ.p)+')';
+  if(selH&&selH.e>0) msg+='\n*Habitación:* '+selH.n+' (+'+fmt(selH.e)+(cur.hotelPP?'/persona':'')+')';
+  else if(selH) msg+='\n*Habitación:* '+selH.n+' (incluida)';
+  if(selTransporte&&selTransporte.cost>0) msg+='\n*Transporte:* '+selTransporte.n+' (+'+fmt(selTransporte.cost)+'/persona)';
+  msg+='\n\n*Costo por persona:* '+fmt(costoXPersona);
+  if(_promoActivo) msg+='\n*Código aplicado:* '+_promoActivo.code+(_promoActivo.hideAmount?'':(_promoActivo.amount?' (-'+fmt(_promoActivo.amount)+'/persona)':' (-'+_promoActivo.pct+'%)'));
+  if(selViaj>1) msg+='\n*Total del grupo:* '+fmt(total);
+  msg+='\n*Separo hoy:* '+fmt(sepActualCalc);
+  msg+='\n*Resto a cubrir:* '+fmt(resto);
   if(quincenas&&quincenas.length>0){
-    msg+='\n\n📆 *Calendario de pagos:*';
+    msg+='\n\n*Calendario de pagos:*';
     msg+='\n  Separo — '+fmt(sepActualCalc)+' (hoy)';
     for(var i=0;i<quincenas.length;i++){
       msg+='\n  Pago '+(i+1)+' — '+fmt(pagoQ)+' ('+quincenas[i].lbl+')';
     }
   }
-  msg+='\n\n📋 Fecha de solicitud: '+fechaHoy;
+  msg+='\n\nFecha de solicitud: '+fechaHoy;
   msg+='\n\n¿Qué sigue para reservar?';
   return msg;
 }
@@ -4587,7 +4598,7 @@ function getQuincenas(from, until, max){
 <div class="bienvenida-bg" id="bienvenida-bg" onclick="cerrarBienvenida()">
   <div class="bienvenida-box" onclick="event.stopPropagation()">
     <button class="bienvenida-close" onclick="cerrarBienvenida()">✕</button>
-    <div class="bienvenida-title" id="bvn-title">¡Bienvenido a Conecta Reynosa! 🎉</div>
+    <div class="bienvenida-title" id="bvn-title">¡Bienvenido a Conecta Reynosa!</div>
     <div class="bienvenida-text" id="bvn-text">Cotiza tu viaje a tus conciertos favoritos en menos de 60 segundos.</div>
     <button class="bienvenida-btn" onclick="cerrarBienvenida();document.getElementById('ev-list').scrollIntoView({behavior:'smooth'})">Ver eventos y cotizar →</button>
     <button class="bienvenida-skip" onclick="cerrarBienvenida()">Continuar</button>
@@ -4596,9 +4607,9 @@ function getQuincenas(from, until, max){
 <div class="promo-modal-bg" id="promo-modal-bg" onclick="cerrarPromoModal()">
   <div class="promo-modal-box" id="promo-modal-box" onclick="event.stopPropagation()">
     <button class="promo-modal-close" onclick="cerrarPromoModal()">✕</button>
-    <span class="promo-modal-sparkle" style="top:8px;left:12px;animation-delay:0s">✨</span>
-    <span class="promo-modal-sparkle" style="bottom:12px;right:16px;animation-delay:.5s">✨</span>
-    <span class="promo-modal-sparkle" style="top:40%;left:8px;animation-delay:1s">⭐</span>
+    <span class="promo-modal-sparkle" style="top:8px;left:12px;animation-delay:0s"></span>
+    <span class="promo-modal-sparkle" style="bottom:12px;right:16px;animation-delay:.5s"></span>
+    <span class="promo-modal-sparkle" style="top:40%;left:8px;animation-delay:1s"></span>
     <div class="promo-modal-emoji" id="promo-modal-emoji">🍔</div>
     <div class="promo-modal-title" id="promo-modal-title"></div>
     <div class="promo-modal-desc" id="promo-modal-desc"></div>
@@ -4607,10 +4618,10 @@ function getQuincenas(from, until, max){
 <div class="nf-modal-bg" id="nf-modal-bg" onclick="cerrarNfModal()">
   <div class="nf-modal" onclick="event.stopPropagation()">
     <button class="nf-modal-close" onclick="cerrarNfModal()">✕</button>
-    <div class="nf-modal-emoji">🔄</div>
+    <div class="nf-modal-emoji">↻</div>
     <div class="nf-modal-title">Nueva fecha próximamente</div>
     <div class="nf-modal-text">Esta fecha está agotada pero viene una nueva. Únete a nuestro canal de WhatsApp — ahí anunciamos las ventas antes que en cualquier otro lugar.</div>
-    <a class="nf-modal-btn" href="https://whatsapp.com/channel/0029Vb7JuO1IN9ipDaGVV92f" target="_blank" onclick="cerrarNfModal()">📲 Unirme al canal de WhatsApp</a>
+    <a class="nf-modal-btn" href="https://whatsapp.com/channel/0029Vb7JuO1IN9ipDaGVV92f" target="_blank" onclick="cerrarNfModal()">Unirme al canal de WhatsApp</a>
     <button class="nf-modal-skip" onclick="cerrarNfModal();document.getElementById('ev-list').scrollIntoView({behavior:'smooth'})">Ver otros eventos</button>
   </div>
 </div>
@@ -4634,7 +4645,7 @@ function getQuincenas(from, until, max){
   <div class="pago-modal" onclick="event.stopPropagation()">
     <button class="pago-close" onclick="cerrarModalPago()">✕</button>
     <div class="pago-modal-head">
-      <h3 id="pago-titulo">¡Estás a un paso! 🎉</h3>
+      <h3 id="pago-titulo">¡Estás a un paso!</h3>
       <p id="pago-subtitulo"></p>
     </div>
     <div class="pago-modal-body">
@@ -4645,8 +4656,8 @@ function getQuincenas(from, until, max){
       <div class="pago-bank" id="pago-bank-info"></div>
       <div class="pago-actions">
         <p id="pago-msg-instruccion" style="display:none;margin:0 0 10px;font-family:Montserrat,sans-serif;font-size:11px;font-weight:600;color:#e8ff4c;opacity:.85;text-align:center;letter-spacing:.02em;line-height:1.35">Envía tu comprobante de pago por Messenger para confirmar tu lugar</p>
-        <a class="pago-btn-primary" id="pago-btn-comprobante" href="#" target="_blank">📲 Ya pagué, enviar comprobante</a>
-        <a class="pago-btn-secondary" id="pago-btn-dudas" href="#" target="_blank">💬 Tengo dudas, hablar con alguien</a>
+        <a class="pago-btn-primary" id="pago-btn-comprobante" href="#" target="_blank">Ya pagué, enviar comprobante</a>
+        <a class="pago-btn-secondary" id="pago-btn-dudas" href="#" target="_blank">Tengo dudas, hablar con alguien</a>
       </div>
     </div>
   </div>

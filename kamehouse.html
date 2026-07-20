@@ -375,6 +375,9 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Montse
  width:18px;height:18px;flex-shrink:0;stroke:currentColor;fill:none;
  stroke-width:2;stroke-linecap:round;stroke-linejoin:round;
 }
+/* [Barrida 1/3] Ícono inline que hereda tamaño y color del texto donde vive
+   (botones, chips, títulos). Reemplaza a los pictogramas de color/emoji. */
+.ic{width:1em;height:1em;vertical-align:-0.12em;flex-shrink:0;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 .nav-btn>span,.nav-dropdown-item>span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .nav-btn:hover,.nav-dropdown-item:hover{color:var(--text);background:rgba(255,255,255,.04)}
 .nav-btn.active,.nav-dropdown-item.active{
@@ -860,7 +863,7 @@ tr.dash-click:hover{background:rgba(255,255,255,.04)}
 
 
 /* ═══════════════════════════════════════════════
-   TEMA XIMENA — Pink Cyber Kawaii Sanrio 🌸
+   TEMA XIMENA — Pink Cyber Kawaii Sanrio
 ═══════════════════════════════════════════════ */
 body.tema-ximena {
   --orange: #FF6BCB;
@@ -874,7 +877,7 @@ body.tema-ximena {
     #1a0f1c !important;
 }
 body.tema-ximena::before {
-  content: '✨ 💖 ⭐ 💕 🌸 ✨ 💖 ⭐ 💕 🌸 ✨ 💖 ⭐ 💕 🌸 ✨ 💖 ⭐ 💕 🌸';
+  content: '✦ ✦ ✦ ✦';
   position: fixed; top: 0; left: 0; right: 0; bottom: 0;
   font-size: 24px; opacity: 0.04; pointer-events: none; z-index: 0;
   letter-spacing: 80px; line-height: 90px; word-spacing: 40px;
@@ -903,7 +906,7 @@ body.tema-ximena .alert-success { background: linear-gradient(135deg, rgba(255,1
 
 
 /* ═══════════════════════════════════════════════
-   TEMA AMERICA — Fondo blanco con rosa pastel 🤍
+   TEMA AMERICA — Fondo blanco con rosa pastel
 ═══════════════════════════════════════════════ */
 body.tema-america {
   --orange: #E8739A;
@@ -1040,7 +1043,7 @@ body.tema-america .k-mono { color: #C0507A !important; }
 
 
 /* ═══════════════════════════════════════════════
-   TEMA REGINNA — Rosa con destellos blancos 🌹
+   TEMA REGINNA — Rosa con destellos blancos
 ═══════════════════════════════════════════════ */
 body.tema-reginna {
   --orange: #FF4D8D;
@@ -1071,7 +1074,7 @@ body.tema-reginna .gz-stat-bar { background: linear-gradient(90deg, #FF4D8D, #FF
 body.tema-reginna .tour-item { border-left-color: #FF4D8D !important; }
 
 /* ═══════════════════════════════════════════════
-   TEMA LUIS — Morado/Blanco/Verde · Sr. Piccolo 💚
+   TEMA LUIS — Morado/Blanco/Verde · Sr. Piccolo
 ═══════════════════════════════════════════════ */
 body.tema-luis {
   --orange: #7C3AED;
@@ -1097,7 +1100,7 @@ body.tema-luis table th { color: #9F67F5 !important; border-bottom: 2px solid rg
 body.tema-luis .perfil-card-header { background: linear-gradient(135deg, rgba(124,58,237,0.15), rgba(61,220,132,0.05)) !important; }
 
 /* ═══════════════════════════════════════════════
-   TEMA LAURA — Blanco/Beige con Dorado ✨
+   TEMA LAURA — Blanco/Beige con Dorado
 ═══════════════════════════════════════════════ */
 body.tema-laura {
   --orange: #C9973A;
@@ -1134,7 +1137,7 @@ body.tema-laura .perfil-card-header { background: linear-gradient(135deg, #FDF8E
 body.tema-laura ::selection { background: #C9973A !important; color: #fff !important; }
 
 /* ═══════════════════════════════════════════════
-   TEMA BRITTANY — Rosa claro con destellos dorados 🌸✨
+   TEMA BRITTANY — Rosa claro con destellos dorados
 ═══════════════════════════════════════════════ */
 body.tema-brittany {
   --orange: #F472B6;
@@ -1146,7 +1149,7 @@ body.tema-brittany {
     radial-gradient(ellipse at 85% 15%, rgba(245,158,11,0.08) 0%, transparent 50%), #100810 !important;
 }
 body.tema-brittany::before {
-  content: '✨ ✦ ✨ ✦ ✨ ✦ ✨ ✦ ✨ ✦ ✨ ✦ ✨ ✦ ✨ ✦';
+  content: '✦ ✦ ✦ ✦ ✦ ✦ ✦ ✦';
   position: fixed; top: 0; left: 0; right: 0; bottom: 0;
   font-size: 18px; opacity: 0.05; pointer-events: none; z-index: 0;
   letter-spacing: 70px; line-height: 85px; color: #F59E0B;
@@ -1167,7 +1170,7 @@ body.tema-brittany table th { color: #FBCFE8 !important; border-bottom: 2px soli
 body.tema-brittany .perfil-card-header { background: linear-gradient(135deg, rgba(244,114,182,0.12), rgba(245,158,11,0.06)) !important; }
 
 /* ═══════════════════════════════════════════════
-   TEMA AXEL — Plateado/Blanco Celeste · Ultra Instinct ⚡
+   TEMA AXEL — Plateado/Blanco Celeste · Ultra Instinct
 ═══════════════════════════════════════════════ */
 body.tema-axel {
   --orange: #94A3C8;
@@ -1931,7 +1934,7 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
  <div class="topbar-dot"></div>
  <div class="topbar-user" id="topbar-user-info">—</div>
  <div class="notif-wrap" id="notif-wrap">
-   <button class="topbar-bell" onclick="_toggleNotifPanel(event)" aria-label="Notificaciones" title="Notificaciones">🔔<span class="notif-badge" id="notif-badge" style="display:none">0</span></button>
+   <button class="topbar-bell" onclick="_toggleNotifPanel(event)" aria-label="Notificaciones" title="Notificaciones"><svg class="ic"><use href="#ic-campana"/></svg><span class="notif-badge" id="notif-badge" style="display:none">0</span></button>
    <div class="notif-panel" id="notif-panel" style="display:none"></div>
  </div>
  <button class="btn-logout" onclick="doLogout()">Salir</button>
@@ -1962,6 +1965,34 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
   <symbol id="ic-waitlist" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
   <symbol id="ic-diseno" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="8" cy="10" r="1.1"/><circle cx="12" cy="8" r="1.1"/><circle cx="16" cy="10" r="1.1"/></symbol>
   <symbol id="ic-mas" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></symbol>
+  <!-- [Barrida 1/3] Íconos añadidos para reemplazar pictogramas de color (mismo trazo 24x24). -->
+  <symbol id="ic-campana" viewBox="0 0 24 24"><path d="M6 16c1-1 1-3 1-6a5 5 0 0 1 10 0c0 3 0 5 1 6z"/><path d="M10 19a2 2 0 0 0 4 0"/></symbol>
+  <symbol id="ic-basura" viewBox="0 0 24 24"><path d="M4 7h16"/><path d="M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/><path d="M6 7l1 13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-13"/><path d="M10 11v6M14 11v6"/></symbol>
+  <symbol id="ic-ojo" viewBox="0 0 24 24"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></symbol>
+  <symbol id="ic-alerta" viewBox="0 0 24 24"><path d="M12 3l10 18H2z"/><path d="M12 10v5"/><path d="M12 18h.01"/></symbol>
+  <symbol id="ic-bus" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M3 11h18"/><circle cx="7.5" cy="20" r="1.5"/><circle cx="16.5" cy="20" r="1.5"/></symbol>
+  <symbol id="ic-impresora" viewBox="0 0 24 24"><path d="M7 9V4h10v5"/><rect x="3" y="9" width="18" height="7" rx="1"/><rect x="7" y="14" width="10" height="6"/></symbol>
+  <symbol id="ic-correo" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 7l10 6 10-6"/></symbol>
+  <symbol id="ic-dinero" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M14.5 9.5a2.5 2 0 0 0-5 .3c0 2.7 5 1 5 3.7a2.5 2 0 0 1-5 .3"/><path d="M12 7v1M12 16v1"/></symbol>
+  <symbol id="ic-engrane" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M19.1 4.9L17 7M7 17l-2.1 2.1"/></symbol>
+  <symbol id="ic-magia" viewBox="0 0 24 24"><path d="M4 20L15 9"/><path d="M17 3l.9 2.1L20 6l-2.1.9L17 9l-.9-2.1L14 6l2.1-.9z"/><path d="M13 7l2 2"/></symbol>
+  <symbol id="ic-persona" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M5 20c0-4 3-6 7-6s7 2 7 6"/></symbol>
+  <symbol id="ic-lupa" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.5-4.5"/></symbol>
+  <symbol id="ic-documento" viewBox="0 0 24 24"><path d="M6 3h9l4 4v14H6z"/><path d="M15 3v4h4"/><path d="M9 12h6M9 16h6"/></symbol>
+  <symbol id="ic-portapapeles" viewBox="0 0 24 24"><rect x="5" y="4" width="14" height="17" rx="2"/><rect x="9" y="2" width="6" height="4" rx="1"/><path d="M9 11h6M9 15h4"/></symbol>
+  <symbol id="ic-clip" viewBox="0 0 24 24"><path d="M8 12V7a4 4 0 0 1 8 0v9a2.5 2.5 0 0 1-5 0V8"/></symbol>
+  <symbol id="ic-prohibido" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M5.6 5.6l12.8 12.8"/></symbol>
+  <symbol id="ic-enlace" viewBox="0 0 24 24"><path d="M10 14a5 5 0 0 0 7 0l2-2a5 5 0 0 0-7-7l-1 1"/><path d="M14 10a5 5 0 0 0-7 0l-2 2a5 5 0 0 0 7 7l1-1"/></symbol>
+  <symbol id="ic-boleto" viewBox="0 0 24 24"><path d="M4 7h16v3a2 2 0 0 0 0 4v3H4v-3a2 2 0 0 0 0-4z"/><path d="M12 7v2M12 13v4"/></symbol>
+  <symbol id="ic-candado" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/><path d="M12 15v2"/></symbol>
+  <symbol id="ic-diana" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.3"/></symbol>
+  <symbol id="ic-pastel" viewBox="0 0 24 24"><path d="M5 21V12h14v9"/><path d="M4 21h16"/><path d="M5 15c1.4 0 1.4-1.5 2.8-1.5S9.2 15 10.6 15s1.4-1.5 2.8-1.5S14.8 15 16.2 15s1.4-1.5 2.8-1.5"/><path d="M12 6v3"/><circle cx="12" cy="4.5" r="1"/></symbol>
+  <symbol id="ic-lapiz" viewBox="0 0 24 24"><path d="M4 20l1-4L16 5l3 3L8 19z"/><path d="M14 7l3 3"/></symbol>
+  <symbol id="ic-guardar" viewBox="0 0 24 24"><path d="M5 3h11l3 3v15H5z"/><path d="M8 3v5h7V4"/><rect x="8" y="13" width="8" height="6"/></symbol>
+  <symbol id="ic-corazon" viewBox="0 0 24 24"><path d="M12 21C7 16 3 12.5 3 8.5A3.5 3.5 0 0 1 12 6a3.5 3.5 0 0 1 9 2.5C21 12.5 17 16 12 21z"/></symbol>
+  <symbol id="ic-bandera" viewBox="0 0 24 24"><path d="M6 21V4"/><path d="M6 4h11l-2 4 2 4H6"/></symbol>
+  <symbol id="ic-descargar" viewBox="0 0 24 24"><path d="M12 3v12"/><path d="M8 11l4 4 4-4"/><path d="M4 20h16"/></symbol>
+  <symbol id="ic-cama" viewBox="0 0 24 24"><path d="M3 8v11M3 12h18v7M21 12v-2a2 2 0 0 0-2-2H9a2 2 0 0 0-2 2v2"/><circle cx="6.5" cy="10" r="1"/></symbol>
  </defs></svg>
 
  <nav class="nav" id="kh-sidebar" aria-label="Navegación principal">
@@ -2510,7 +2541,7 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
       <div id="gz-tab-lista">
        <!-- Label solo lectura para roles no-admin -->
        <div id="gz-solo-lectura-label" style="display:none;align-items:center;gap:8px;margin-bottom:14px;padding:8px 14px;background:rgba(255,183,3,.06);border:1px solid rgba(255,183,3,.15);border-radius:8px">
-         <span style="font-size:14px">👁</span>
+         <span style="font-size:14px"><svg class="ic"><use href="#ic-ojo"/></svg></span>
          <span style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.1em;color:var(--gold)">SOLO LECTURA — puedes ver los perfiles de tu equipo, no editarlos</span>
        </div>
        <div style="display:flex;gap:8px;margin-bottom:18px;flex-wrap:wrap">
@@ -2600,8 +2631,8 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
         <button class="gz-filter active" id="cc-sub-btn-equipo" onclick="showCCSubTab('equipo',this)">Equipo</button>
         <button class="gz-filter" id="cc-sub-btn-viajeros" onclick="showCCSubTab('viajeros',this)">Viajeros</button>
         <button class="gz-filter" id="cc-sub-btn-rooming" onclick="showCCSubTab('rooming',this)">Rooming</button>
-        <button class="gz-filter" id="cc-sub-btn-transporte" onclick="showCCSubTab('transporte',this)">🚌 Transporte</button>
-        <button class="gz-filter" id="cc-sub-btn-pagos" onclick="showCCSubTab('pagos',this)">💳 Pagos</button>
+        <button class="gz-filter" id="cc-sub-btn-transporte" onclick="showCCSubTab('transporte',this)"><svg class="ic"><use href="#ic-bus"/></svg> Transporte</button>
+        <button class="gz-filter" id="cc-sub-btn-pagos" onclick="showCCSubTab('pagos',this)"><svg class="ic"><use href="#ic-pagos"/></svg> Pagos</button>
        </div>
 
        <!-- SUB: EQUIPO ASIGNADO -->
@@ -2658,8 +2689,8 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
             <input type="checkbox" id="cc-rooming-excluir-staff" style="accent-color:var(--orange)">
             <span>excluir staff</span>
           </label>
-          <button class="btn btn-ghost btn-sm" onclick="imprimirListaHotel()" style="font-size:10px">🖨️ Lista para hotel</button>
-          <button class="btn btn-ghost btn-sm" onclick="imprimirListaCoordis()" style="font-size:10px">🖨️ Lista para coordis</button>
+          <button class="btn btn-ghost btn-sm" onclick="imprimirListaHotel()" style="font-size:10px"><svg class="ic"><use href="#ic-impresora"/></svg> Lista para hotel</button>
+          <button class="btn btn-ghost btn-sm" onclick="imprimirListaCoordis()" style="font-size:10px"><svg class="ic"><use href="#ic-impresora"/></svg> Lista para coordis</button>
           <button class="btn btn-ghost btn-sm" onclick="exportarRooming('excel')" style="font-size:10px">↓ CSV</button>
           <button class="btn btn-ghost btn-sm" onclick="exportarRooming('pdf')" style="font-size:10px">↓ PDF</button>
           <button class="btn btn-primary btn-sm" disabled title="Próximamente — la asignación fina de cuartos llega en una fase posterior" style="opacity:.5;cursor:not-allowed">+ Habitación</button>
@@ -2681,13 +2712,13 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
         </div>
        </div>
 
-       <!-- SUB: TRANSPORTE — ☁️ Nube Voladora F3. Todo se pinta desde _trRender(). -->
+       <!-- SUB: TRANSPORTE — Nube Voladora F3. Todo se pinta desde _trRender(). -->
        <div id="cc-sub-transporte" style="display:none">
         <div id="tr-err" style="display:none;margin-bottom:10px" class="alert alert-error"></div>
         <div id="cc-transporte"><div style="color:var(--ts);font-size:12px">Cargando transporte…</div></div>
        </div>
 
-       <!-- SUB: PAGOS — 💳 Bandeja de separos (T1). Solicitudes aprobadas del evento
+       <!-- SUB: PAGOS — Bandeja de separos (T1). Solicitudes aprobadas del evento
             (en_pagos + pagado). El detalle abre el MISMO modal global de solicitud. -->
        <div id="cc-sub-pagos" style="display:none">
         <div id="cc-pagos-header" style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);padding:12px 16px;margin-bottom:14px;font-size:12px;color:var(--ts)"></div>
@@ -2712,7 +2743,7 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
      <div class="page" id="page-solicitudes_portal">
       <div class="page-hero">
        <div>
-        <div class="page-title">📥 SOLICITUDES PORTAL</div>
+        <div class="page-title"><svg class="ic"><use href="#ic-solicitudes"/></svg> SOLICITUDES PORTAL</div>
         <div class="page-sub">// Bandeja de separos — solicitudes esperando aprobación. Las aprobadas viven en Capsule Corp → Pagos.</div>
        </div>
        <button class="btn btn-ghost" onclick="loadSolicitudesPortal()" id="sp-btn-refresh">↻ Refrescar</button>
@@ -3047,7 +3078,7 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
      <label>Música (Deezer)</label>
      <div style="display:flex;gap:8px">
       <input class="cot-input" id="esf-music" placeholder="track ID (ej. 2893837431)" style="flex:1">
-      <button class="btn btn-ghost" type="button" onclick="buscarMusicaEsfera()">🔍 Buscar música</button>
+      <button class="btn btn-ghost" type="button" onclick="buscarMusicaEsfera()"><svg class="ic"><use href="#ic-lupa"/></svg> Buscar música</button>
      </div>
      <div style="font-size:11px;color:var(--ts);margin-top:4px">Opcional — si no eliges, el sitio busca la música por el nombre.</div>
      <div id="esf-music-chosen" style="font-size:11px;color:var(--green);margin-top:4px"></div>
@@ -3058,7 +3089,7 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
      <div id="esf-zonas"></div>
      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
       <button class="btn btn-ghost" type="button" onclick="_esfAddZona()">+ Agregar zona</button>
-      <button class="btn btn-ghost" type="button" onclick="_esfGuardarVenueZonas()" title="Guarda los NOMBRES de zona (sin precios) para este venue">💾 Guardar zonas de este venue</button>
+      <button class="btn btn-ghost" type="button" onclick="_esfGuardarVenueZonas()" title="Guarda los NOMBRES de zona (sin precios) para este venue"><svg class="ic"><use href="#ic-guardar"/></svg> Guardar zonas de este venue</button>
      </div>
      <div id="esf-venue-cat-msg" style="font-size:11px;margin-top:4px"></div>
      <div style="font-size:11px;color:var(--ts);margin-top:4px">El precio CHEAP es opcional. Si ninguna zona tiene CHEAP, el evento solo ofrece paquete PLUS.</div>
@@ -3161,7 +3192,7 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
     #esf-preview-card .ev-bottom{display:flex;align-items:center;justify-content:space-between;padding-top:8px;border-top:1px solid rgba(255,255,255,.07);flex-wrap:wrap;gap:6px}
     #esf-preview-card .ev-card.proxi .ev-bottom{justify-content:center;border-top:none;padding-top:0}
     #esf-preview-card .ev-prox-badge{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;background:#e8ff4c;color:#000;padding:14px 12px;font-size:13px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;font-family:'Montserrat',sans-serif;border-radius:8px;text-align:center;line-height:1.1}
-    #esf-preview-card .ev-prox-badge::before{content:'🔔'}
+    #esf-preview-card .ev-prox-badge::before{content:'<svg class="ic"><use href="#ic-campana"/></svg>'}
     #esf-preview-card .ev-prox-sub{display:block;font-size:9px;letter-spacing:.18em;color:rgba(0,0,0,.55);margin-top:3px;font-weight:800}
     #esf-preview-card .ev-price-lbl{font-size:8.5px;color:rgba(255,255,255,.3);font-weight:700;text-transform:uppercase;letter-spacing:.07em}
     #esf-preview-card .ev-price-wa{font-size:12px;font-weight:900;color:#88ea4e}
@@ -3169,7 +3200,7 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
     #esf-preview-card .ev-cta-wa{background:#25D366}
    </style>
    <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:20px">
-    <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.15em;color:var(--ts);margin-bottom:12px">// 👁️ VISTA PREVIA · cómo se verá la card</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.15em;color:var(--ts);margin-bottom:12px">// <svg class="ic"><use href="#ic-ojo"/></svg> VISTA PREVIA · cómo se verá la card</div>
     <div id="esf-preview-card" style="max-width:240px;margin:0 auto"></div>
     <div style="font-size:11px;color:var(--ts);margin-top:10px;text-align:center">Foto vía Deezer (búsqueda por nombre). Solo vista previa — no crea ni publica.</div>
    </div>
@@ -3187,8 +3218,8 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
    <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:20px">
     <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.15em;color:var(--ts);margin-bottom:8px">// COMPILADOR · DRY-RUN (no escribe al repo)</div>
     <div style="font-size:12px;color:var(--ts);margin-bottom:14px;line-height:1.5">Construye en memoria el objeto-evento de cada Esfera que aún no esté en el array EV de index.html y valida que parsea igual en portal y kamehouse. Solo lectura: no toca el repo.</div>
-    <button class="btn btn-primary" onclick="probarCompiladoDryRun()">🔍 Probar compilado (dry-run)</button>
-    <button class="btn btn-primary" style="margin-left:8px;background:var(--green);border-color:var(--green);color:#04210f" onclick="publicarEsferas()">🚀 Publicar al sitio</button>
+    <button class="btn btn-primary" onclick="probarCompiladoDryRun()"><svg class="ic"><use href="#ic-lupa"/></svg> Probar compilado (dry-run)</button>
+    <button class="btn btn-primary" style="margin-left:8px;background:var(--green);border-color:var(--green);color:#04210f" onclick="publicarEsferas()">Publicar al sitio</button>
     <div id="esf-dryrun-panel" style="margin-top:14px"></div>
    </div>
   </div>
@@ -3290,7 +3321,7 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
  <!-- ─── CONTRATOS ─── -->
  <div class="page" id="page-contratos">
    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px;flex-wrap:wrap">
-     <h2 style="margin:0;font-family:'Zen Dots',sans-serif;font-size:22px;letter-spacing:.02em">📝 Contratos creadoras</h2>
+     <h2 style="margin:0;font-family:'Zen Dots',sans-serif;font-size:22px;letter-spacing:.02em"><svg class="ic"><use href="#ic-lapiz"/></svg> Contratos creadoras</h2>
      <div class="contratos-tabs" style="display:inline-flex;gap:0;border:1px solid var(--border);border-radius:8px;overflow:hidden">
        <button id="ctr-tab-listado" class="ctr-tab active" onclick="switchContratoView('listado')" style="background:transparent;border:0;color:var(--ts);padding:8px 16px;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;font-family:inherit">Listado</button>
        <button id="ctr-tab-nuevo" class="ctr-tab" onclick="switchContratoView('nuevo')" style="background:transparent;border:0;color:var(--ts);padding:8px 16px;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;font-family:inherit;border-left:1px solid var(--border)">+ Nuevo</button>
@@ -3380,8 +3411,8 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
        </div>
 
        <div style="display:flex;gap:10px;margin-top:18px;flex-wrap:wrap">
-         <button class="btn btn-ghost" onclick="previewContrato()">👁 Vista previa</button>
-         <button class="btn btn-primary" id="ctr-btn-enviar" onclick="enviarContrato()">📨 Enviar por correo</button>
+         <button class="btn btn-ghost" onclick="previewContrato()"><svg class="ic"><use href="#ic-ojo"/></svg> Vista previa</button>
+         <button class="btn btn-primary" id="ctr-btn-enviar" onclick="enviarContrato()"><svg class="ic"><use href="#ic-correo"/></svg> Enviar por correo</button>
          <button class="btn btn-ghost" id="ctr-btn-cancelar-edit" onclick="cancelarEdicionContrato()" style="display:none;color:#ff6666;border-color:rgba(255,68,68,.3)">Cancelar edición</button>
        </div>
      </div>
@@ -3391,9 +3422,9 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
  <!-- ─── LISTA DE ESPERA ─── -->
  <div class="page" id="page-waitlist">
    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px;flex-wrap:wrap">
-     <h2 style="margin:0;font-family:'Zen Dots',sans-serif;font-size:22px;letter-spacing:.02em">🔔 Lista de espera</h2>
+     <h2 style="margin:0;font-family:'Zen Dots',sans-serif;font-size:22px;letter-spacing:.02em"><svg class="ic"><use href="#ic-campana"/></svg> Lista de espera</h2>
      <div style="display:flex;gap:8px;flex-wrap:wrap">
-       <button class="btn btn-sm" id="btn-copiar-proximos" onclick="copiarLinkProximos(this)" style="background:#e8ff4c;color:#000;font-weight:900">📋 Copiar link de próximos tours</button>
+       <button class="btn btn-sm" id="btn-copiar-proximos" onclick="copiarLinkProximos(this)" style="background:#e8ff4c;color:#000;font-weight:900"><svg class="ic"><use href="#ic-portapapeles"/></svg> Copiar link de próximos tours</button>
        <button class="btn btn-ghost btn-sm" onclick="loadWaitlist()">↻ Refrescar</button>
      </div>
    </div>
@@ -3458,7 +3489,7 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
      <button data-sub="sitio"   type="button"><span class="rdr-tab-ico">⊕</span> Sitio</button>
      <button data-sub="rol"     type="button"><span class="rdr-tab-ico">≡</span> /Rol</button>
      <button data-sub="pagos"   type="button"><span class="rdr-tab-ico">$</span> /Pagos</button>
-     <button data-sub="alertas" type="button"><span class="rdr-tab-ico">⚠</span> Alertas<span class="rdr-badge" id="radar-alertas-badge" style="display:none">0</span></button>
+     <button data-sub="alertas" type="button"><span class="rdr-tab-ico"><svg class="ic"><use href="#ic-alerta"/></svg></span> Alertas<span class="rdr-badge" id="radar-alertas-badge" style="display:none">0</span></button>
      <button data-sub="comparativas" type="button"><span class="rdr-tab-ico">↔</span> Comparativas</button>
    </div>
 
@@ -3597,11 +3628,11 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
        <div class="rdr-kpi"><div class="rdr-kpi-lbl">Música reproducida</div><div class="rdr-kpi-num"><span class="rdr-kpi-val" id="rsi-musica">—</span></div></div>
      </div>
      <div style="margin-bottom:18px;text-align:right">
-       <button class="rdr-status-line" style="border:1px solid var(--rdr-border);background:transparent;color:var(--rdr-yel);padding:8px 16px;border-radius:6px;cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:900;letter-spacing:.14em;text-transform:uppercase" onclick="exportRadarCSV('main')">📥 Export CSV</button>
+       <button class="rdr-status-line" style="border:1px solid var(--rdr-border);background:transparent;color:var(--rdr-yel);padding:8px 16px;border-radius:6px;cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:900;letter-spacing:.14em;text-transform:uppercase" onclick="exportRadarCSV('main')"><svg class="ic"><use href="#ic-descargar"/></svg> Export CSV</button>
      </div>
      <div class="rdr-grid-2">
        <div class="rdr-card">
-         <div class="rdr-card-head"><div class="rdr-card-title"><span class="ico">★</span>Top 10 eventos más vistos</div></div>
+         <div class="rdr-card-head"><div class="rdr-card-title"><span class="ico">✦</span>Top 10 eventos más vistos</div></div>
          <ol id="rsi-eventos-top" class="rdr-rank"><li class="rdr-empty">Cargando…</li></ol>
        </div>
        <div class="rdr-card">
@@ -3617,7 +3648,7 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
          <ol id="rsi-filtros" class="rdr-rank"><li class="rdr-empty">Cargando…</li></ol>
        </div>
        <div class="rdr-card">
-         <div class="rdr-card-head"><div class="rdr-card-title"><span class="ico">⚑</span>Códigos: válidos vs no válidos</div></div>
+         <div class="rdr-card-head"><div class="rdr-card-title"><span class="ico"><svg class="ic"><use href="#ic-bandera"/></svg></span>Códigos: válidos vs no válidos</div></div>
          <div id="rsi-codigos-detalle" class="rdr-bars"><div class="rdr-empty">Cargando…</div></div>
        </div>
        <div class="rdr-card">
@@ -3707,14 +3738,14 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
 
      <!-- Export CSV bar -->
      <div style="margin:18px 0;text-align:right">
-       <button style="border:1px solid var(--rdr-border);background:transparent;color:var(--rdr-yel);padding:8px 16px;border-radius:6px;cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:900;letter-spacing:.14em;text-transform:uppercase" onclick="exportRolAnalyticsCSV()">📥 Export CSV</button>
+       <button style="border:1px solid var(--rdr-border);background:transparent;color:var(--rdr-yel);padding:8px 16px;border-radius:6px;cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:900;letter-spacing:.14em;text-transform:uppercase" onclick="exportRolAnalyticsCSV()"><svg class="ic"><use href="#ic-descargar"/></svg> Export CSV</button>
      </div>
 
      <!-- Top eventos + Donut paquetes -->
      <div class="rdr-grid-2">
        <div class="rdr-card">
          <div class="rdr-card-head">
-           <div class="rdr-card-title"><span class="ico">🎯</span>Eventos más consultados en /Rol</div>
+           <div class="rdr-card-title"><span class="ico"><svg class="ic"><use href="#ic-diana"/></svg></span>Eventos más consultados en /Rol</div>
            <div class="rdr-card-meta" id="rro-eventos-meta">—</div>
          </div>
          <ol id="rro-eventos-top" class="rdr-rank"><li class="rdr-empty">Cargando…</li></ol>
@@ -3748,7 +3779,7 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
        </div>
        <div class="rdr-card">
          <div class="rdr-card-head">
-           <div class="rdr-card-title"><span class="ico">🔗</span>Métodos de compartir</div>
+           <div class="rdr-card-title"><span class="ico"><svg class="ic"><use href="#ic-enlace"/></svg></span>Métodos de compartir</div>
          </div>
          <div id="rro-share" class="rdr-bars"><div class="rdr-empty">Cargando…</div></div>
        </div>
@@ -3772,7 +3803,7 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
        <div class="rdr-kpi"><div class="rdr-kpi-lbl">Clicks a WhatsApp</div><div class="rdr-kpi-num"><span class="rdr-kpi-val" id="rpa-wa">—</span></div></div>
      </div>
      <div style="margin-bottom:18px;text-align:right">
-       <button style="border:1px solid var(--rdr-border);background:transparent;color:var(--rdr-yel);padding:8px 16px;border-radius:6px;cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:900;letter-spacing:.14em;text-transform:uppercase" onclick="exportRadarCSV('pagos')">📥 Export CSV</button>
+       <button style="border:1px solid var(--rdr-border);background:transparent;color:var(--rdr-yel);padding:8px 16px;border-radius:6px;cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:900;letter-spacing:.14em;text-transform:uppercase" onclick="exportRadarCSV('pagos')"><svg class="ic"><use href="#ic-descargar"/></svg> Export CSV</button>
      </div>
      <div class="rdr-grid-2">
        <div class="rdr-card">
@@ -4251,7 +4282,7 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
     </div>
     <div class="modal-footer">
       <button class="btn btn-ghost" onclick="closeModal('modal-contrato-preview')">Cerrar</button>
-      <button class="btn btn-primary" onclick="closeModal('modal-contrato-preview');enviarContrato()">📨 Enviar este contrato</button>
+      <button class="btn btn-primary" onclick="closeModal('modal-contrato-preview');enviarContrato()"><svg class="ic"><use href="#ic-correo"/></svg> Enviar este contrato</button>
     </div>
   </div>
 </div>
@@ -4273,7 +4304,7 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
 <div class="modal-overlay" id="modal-wl-notif" role="dialog" aria-modal="true">
   <div class="modal" style="max-width:480px">
     <div class="modal-header">
-      <span class="modal-title">🔔 Notificar lista de espera</span>
+      <span class="modal-title"><svg class="ic"><use href="#ic-campana"/></svg> Notificar lista de espera</span>
       <button type="button" class="modal-close" id="wl-notif-close" aria-label="Cerrar">✕</button>
     </div>
     <div class="modal-body">
@@ -5121,7 +5152,7 @@ function _rgGrupoHtml(g) {
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
           <b style="font-size:13px">Cuarto ${_esfEsc(h.orden)} · ${_esfEsc(h.tipo)}</b>
           <span style="font-size:12px;color:${lleno ? 'var(--green)' : 'var(--ts)'}">(${ocup.length}/${_esfEsc(h.capacidad)})</span>
-          <button type="button" data-rg-del="${_esfEsc(h.id)}" title="Eliminar cuarto" style="margin-left:auto;border:none;background:transparent;font-size:15px;cursor:pointer">🗑️</button>
+          <button type="button" data-rg-del="${_esfEsc(h.id)}" title="Eliminar cuarto" style="margin-left:auto;border:none;background:transparent;font-size:15px;cursor:pointer"><svg class="ic"><use href="#ic-basura"/></svg></button>
         </div>
         <div style="margin-top:8px">${chips || '<span style="font-size:12px;color:var(--ts)">Cuarto vacío</span>'}</div>
         ${(!lleno && sinCuarto.length) ? `<div style="margin-top:8px"><button type="button" data-rg-add="${_esfEsc(h.id)}" style="padding:5px 12px;border-radius:20px;border:1px dashed var(--border);background:transparent;color:var(--ts);font-size:12px;cursor:pointer">+ Asignar</button></div>` : ''}
@@ -5175,7 +5206,7 @@ document.body.addEventListener('click', (e) => {
 });
 
 // ═══════════════════════════════════════════════════════════════════
-// ☁️ NUBE VOLADORA F3 — sub-tab "🚌 Transporte" (UI de Bulma)
+// NUBE VOLADORA F3 — sub-tab "Transporte" (UI de Bulma)
 //
 // Backend: admin-transporte (#264). REGLA DE ORO: Bulma asigna POR CUARTO —
 // tocar un ladrillo (cuarto/suelto/personaje) arma un LOTE y las unidades se
@@ -5309,7 +5340,7 @@ function _trRender() {
 
 function _trVacioHtml() {
   return `<div class="empty-state" style="padding:36px">
-    <div class="empty-icon" style="font-size:28px">🚌</div>
+    <div class="empty-icon" style="font-size:28px"><svg class="ic"><use href="#ic-bus"/></svg></div>
     <div style="margin-top:6px">Crea la primera unidad — si caben todos, se suben solos.</div>
   </div>`;
 }
@@ -5320,18 +5351,18 @@ function _trCabeceraHtml(r) {
   // En festival el resumen y el déficit son DEL DÍA activo (el backend ya los
   // calcula así) — se dice, para que no se lea como global.
   const banner = deficit > 0
-    ? `<div class="alert alert-error" style="margin:10px 0 0;font-size:12px">⚠️ Faltan ${deficit} asiento${deficit === 1 ? '' : 's'}${porDias ? ' este día' : ''} — agrega unidades</div>`
+    ? `<div class="alert alert-error" style="margin:10px 0 0;font-size:12px"><svg class="ic"><use href="#ic-alerta"/></svg> Faltan ${deficit} asiento${deficit === 1 ? '' : 's'}${porDias ? ' este día' : ''} — agrega unidades</div>`
     : '';
   return `
     <div style="display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap">
       <div style="display:flex;gap:14px;flex-wrap:wrap;font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.08em;color:var(--ts)">
-        <span>👥 ${Number(r.total_pasajeros || 0)} pasajeros</span>
-        <span>💺 ${Number(r.total_asientos_netos || 0)} asientos netos</span>
+        <span><svg class="ic"><use href="#ic-equipo"/></svg> ${Number(r.total_pasajeros || 0)} pasajeros</span>
+        <span>${Number(r.total_asientos_netos || 0)} asientos netos</span>
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-        <button type="button" class="btn btn-ghost btn-sm" data-tr-print="1" style="font-size:10px">🖨️ Lista por unidad</button>
-        <button type="button" class="btn btn-ghost btn-sm" data-tr-enviar="1" style="font-size:10px">📧 Enviar su lista a cada coordi</button>
-        ${porDias ? '<button type="button" class="btn btn-ghost btn-sm" data-tr-enviar-todos="1" style="font-size:10px">📧 Enviar TODOS los días</button>' : ''}
+        <button type="button" class="btn btn-ghost btn-sm" data-tr-print="1" style="font-size:10px"><svg class="ic"><use href="#ic-impresora"/></svg> Lista por unidad</button>
+        <button type="button" class="btn btn-ghost btn-sm" data-tr-enviar="1" style="font-size:10px"><svg class="ic"><use href="#ic-correo"/></svg> Enviar su lista a cada coordi</button>
+        ${porDias ? '<button type="button" class="btn btn-ghost btn-sm" data-tr-enviar-todos="1" style="font-size:10px"><svg class="ic"><use href="#ic-correo"/></svg> Enviar TODOS los días</button>' : ''}
         <button type="button" class="btn btn-primary btn-sm" data-tr-form="1">${_trFormAbierto ? '× Cancelar' : '＋ Agregar unidad'}</button>
       </div>
     </div>
@@ -5370,7 +5401,7 @@ function _trFormHtml() {
         </label>
         <label style="display:inline-flex;align-items:center;gap:6px;font-size:11px;color:var(--ts);cursor:pointer">
           <input type="checkbox" id="tr-f-auto" checked style="accent-color:var(--orange)">
-          <span>🪄 ${dia ? 'Subir a todos los de este día si caben' : 'Subir a todos si caben'}</span>
+          <span><svg class="ic"><use href="#ic-magia"/></svg> ${dia ? 'Subir a todos los de este día si caben' : 'Subir a todos si caben'}</span>
         </label>
       </div>
       <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px">
@@ -5409,7 +5440,7 @@ function _trUnidadHtml(u) {
   const cabe = enSeleccion ? _trCabenEnUnidad(u, _trSel.lote) : true;
 
   const chofer = u.chofer_ocupa || u.chofer_nombre
-    ? `<span style="font-size:11px;color:var(--ts)">🚗 chofer: ${_esfEsc(u.chofer_nombre || 'ocupa asiento')}</span>`
+    ? `<span style="font-size:11px;color:var(--ts)">chofer: ${_esfEsc(u.chofer_nombre || 'ocupa asiento')}</span>`
     : '';
 
   const coordis = (_trData && _trData.universo && _trData.universo.personajes) || [];
@@ -5440,8 +5471,8 @@ function _trUnidadHtml(u) {
       ${enSeleccion ? '' : `<span style="margin-left:auto;display:flex;gap:6px;align-items:center">
         ${selCoordi}
         ${_trEsPorDias() ? `<button type="button" data-tr-clonar="${idSafe}" title="Clonar a otros días" style="border:none;background:transparent;font-size:14px;cursor:pointer">⧉</button>` : ''}
-        <button type="button" data-tr-cap="${idSafe}" title="Editar capacidad" style="border:none;background:transparent;font-size:14px;cursor:pointer">✏️</button>
-        <button type="button" data-tr-del="${idSafe}" title="Eliminar unidad" style="border:none;background:transparent;font-size:15px;cursor:pointer">🗑️</button>
+        <button type="button" data-tr-cap="${idSafe}" title="Editar capacidad" style="border:none;background:transparent;font-size:14px;cursor:pointer"><svg class="ic"><use href="#ic-lapiz"/></svg></button>
+        <button type="button" data-tr-del="${idSafe}" title="Eliminar unidad" style="border:none;background:transparent;font-size:15px;cursor:pointer"><svg class="ic"><use href="#ic-basura"/></svg></button>
       </span>`}
     </div>
     <div style="margin-top:8px">${chips || '<span style="font-size:12px;color:var(--ts)">Unidad vacía</span>'}</div>`;
@@ -5502,7 +5533,7 @@ function _trPendientes(uni) {
 // Chip del ladrillo. En multifecha NORMAL (Harry Styles) sigue siendo "Fecha N"
 // (#255). En festival POR DÍAS ese número no le dice nada a Bulma —lo que le sirve
 // es saber que a esa persona la va a volver a ver en otros pills—, así que se
-// reemplaza por su COBERTURA ("🎫 Vie + Sáb · 2 días"), y SOLO si cubre más días
+// reemplaza por su COBERTURA ("Vie + Sáb · 2 días"), y SOLO si cubre más días
 // que el activo: si solo viene a este día, el chip sería ruido.
 function _trFechaChip(eventoId) {
   if (_trEsPorDias()) return _trCoberturaChip(eventoId);
@@ -5517,7 +5548,7 @@ function _trCoberturaChip(eventoId) {
   const cob = _trCobertura[i];
   if (!cob || cob.dias.length <= 1) return ''; // solo este día → sin chip
   const txt = cob.lbl || (cob.dias.length + ' días');
-  return `<span title="También aparece en los otros días que cubre" style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--orange);border:1px solid var(--border2);border-radius:20px;padding:1px 8px;letter-spacing:.06em;margin-left:6px">🎫 ${_esfEsc(txt)}</span>`;
+  return `<span title="También aparece en los otros días que cubre" style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--orange);border:1px solid var(--border2);border-radius:20px;padding:1px 8px;letter-spacing:.06em;margin-left:6px"><svg class="ic"><use href="#ic-boleto"/></svg> ${_esfEsc(txt)}</span>`;
 }
 
 function _trLadrillosHtml(uni, pend) {
@@ -5548,12 +5579,12 @@ function _trLadrillosHtml(uni, pend) {
           <div style="font-size:12px;margin-top:4px">${_esfEsc(nombres)}</div>
         </button>`;
     }).join('');
-    out.push(bloque('🛏️ CUARTOS', 'Toca un cuarto y elige su unidad — sube el cuarto completo de un jalón.', `<div style="display:flex;flex-wrap:wrap">${chips}</div>`));
+    out.push(bloque('<svg class="ic"><use href="#ic-cama"/></svg> CUARTOS', 'Toca un cuarto y elige su unidad — sube el cuarto completo de un jalón.', `<div style="display:flex;flex-wrap:wrap">${chips}</div>`));
   }
 
   if (pend.sueltos.length) {
     const chips = pend.sueltos.map((p, i) => _trChipPersona(`suelto:${i}`, p.nombre, _trFechaChip(p.evento_id))).join('');
-    out.push(bloque('🧍 SUELTOS', 'Personas sin cuarto asignado.', `<div style="display:flex;flex-wrap:wrap;gap:6px">${chips}</div>`));
+    out.push(bloque('<svg class="ic"><use href="#ic-persona"/></svg> SUELTOS', 'Personas sin cuarto asignado.', `<div style="display:flex;flex-wrap:wrap;gap:6px">${chips}</div>`));
   }
 
   if (pend.personajes.length) {
@@ -5561,7 +5592,7 @@ function _trLadrillosHtml(uni, pend) {
       _trChipPersona(`personaje:${i}`, p.nombre,
         `<span style="font-size:10px;color:var(--ts);margin-left:6px">${_esfEsc(p.rol || '')}</span>`)
     ).join('');
-    out.push(bloque('🎭 PERSONAJES', 'Coordis y creadoras. Nunca se suben solos — tú decides en qué unidad viajan.', `<div style="display:flex;flex-wrap:wrap;gap:6px">${chips}</div>`));
+    out.push(bloque('<svg class="ic"><use href="#ic-persona"/></svg> PERSONAJES', 'Coordis y creadoras. Nunca se suben solos — tú decides en qué unidad viajan.', `<div style="display:flex;flex-wrap:wrap;gap:6px">${chips}</div>`));
   }
 
   return out.join('');
@@ -5771,7 +5802,7 @@ document.body.addEventListener('click', (e) => {
       chofer_nombre: (document.getElementById('tr-f-chofer') || {}).value || null,
       autollenar: !!(document.getElementById('tr-f-auto') || {}).checked,
     }, crear, (j) => j.auto_asignados
-      ? `Unidad creada — se subieron ${j.auto_asignados} pasajeros 🪄`
+      ? `Unidad creada — se subieron ${j.auto_asignados} pasajeros <svg class="ic"><use href="#ic-magia"/></svg>`
       : 'Unidad creada');
     return;
   }
@@ -6057,7 +6088,7 @@ async function loadRadioNumeros() {
       const s = d && d.now_playing && d.now_playing.song;
       const elSon = document.getElementById('radio-num-sonando');
       if (elSon) elSon.textContent = (s && (s.title || s.artist))
-        ? '♪ ' + [s.title, s.artist].filter(Boolean).join(' — ')
+        ? '' + [s.title, s.artist].filter(Boolean).join(' — ')
         : 'sin datos';
     })
     .catch(() => {
@@ -6079,7 +6110,7 @@ async function loadRadioNumeros() {
       if (elT3) elT3.innerHTML = top.length
         ? top.slice(0, 3).map((t, i) => {
             const label = [(t.titulo || ''), (t.artista || '')].filter(Boolean).join(' — ') || 'sin título';
-            return (i + 1) + '. ' + _spEscape(label) + ' · ❤️ ' + (Number(t.likes) || 0);
+            return (i + 1) + '. ' + _spEscape(label) + ' · <svg class="ic"><use href="#ic-corazon"/></svg> ' + (Number(t.likes) || 0);
           }).join('<br>')
         : 'aún sin likes';
     })
@@ -6106,7 +6137,7 @@ function _renderRadioPeticiones() {
   if (cnt) cnt.textContent = pendientes ? '(' + pendientes + ')' : '';
   const rows = _radioSoloPend ? _radioPeticiones.filter(p => !p.atendida) : _radioPeticiones;
   if (!rows.length) {
-    tb.innerHTML = `<tr><td colspan="5" style="color:var(--ts)">${_radioSoloPend ? 'Sin peticiones pendientes 🎶' : 'Sin peticiones todavía'}</td></tr>`;
+    tb.innerHTML = `<tr><td colspan="5" style="color:var(--ts)">${_radioSoloPend ? 'Sin peticiones pendientes' : 'Sin peticiones todavía'}</td></tr>`;
     return;
   }
   tb.innerHTML = rows.map(p => {
@@ -6137,11 +6168,11 @@ function _renderRadioMuro() {
   tb.innerHTML = _radioMuro.map(m => {
     const id = _spEscape(m.id);
     const estado = m.visible
-      ? '<span style="color:#3DDC84">👁 Visible</span>'
-      : '<span style="color:var(--ts)">🙈 Oculto</span>';
+      ? '<span style="color:#3DDC84"><svg class="ic"><use href="#ic-ojo"/></svg> Visible</span>'
+      : '<span style="color:var(--ts)">Oculto</span>';
     const accion = m.visible
-      ? `<button class="btn btn-ghost btn-sm" style="font-size:11px" onclick="radioMuroVisible('${id}',false)">🙈 Ocultar</button>`
-      : `<button class="btn btn-primary btn-sm" style="font-size:11px" onclick="radioMuroVisible('${id}',true)">👁 Mostrar</button>`;
+      ? `<button class="btn btn-ghost btn-sm" style="font-size:11px" onclick="radioMuroVisible('${id}',false)">Ocultar</button>`
+      : `<button class="btn btn-primary btn-sm" style="font-size:11px" onclick="radioMuroVisible('${id}',true)"><svg class="ic"><use href="#ic-ojo"/></svg> Mostrar</button>`;
     return `<tr${m.visible ? '' : ' style="opacity:.45"'}>
       <td style="white-space:nowrap">${_spEscape(_radioFecha(m.creado))}</td>
       <td>${_spEscape(m.nombre || '—')}</td>
@@ -6513,7 +6544,7 @@ async function _renderResumenUtilidad(ev) {
   _resumenUtilPintar();
 }
 
-// Semáforo de salud: 🟢 caja≥0 / 🟡 caja<0 pero proyectado≥0 / 🔴 ambos<0.
+// Semáforo de salud: caja≥0 / caja<0 pero proyectado≥0 / ambos<0.
 function _resumenUtilSemaforo(caja, proyectado) {
   if (caja >= 0) return 'var(--green)';
   if (proyectado >= 0) return 'var(--gold)';
@@ -6581,7 +6612,7 @@ function _resumenUtilPintar() {
   const acumCell = (r) => (r.slug in acum)
     ? _resumenUtilMxnCell(acum[r.slug])
     : '<td style="text-align:right;color:var(--ts)">—</td>';
-  const marcaDesc = '<span style="color:var(--orange);font-size:10px;font-weight:700;white-space:nowrap"> ⚠️ evento desconocido</span>';
+  const marcaDesc = '<span style="color:var(--orange);font-size:10px;font-weight:700;white-space:nowrap"> <svg class="ic"><use href="#ic-alerta"/></svg> evento desconocido</span>';
 
   const fila = (r) => {
     const sem = _resumenUtilSemaforo(r.caja, r.proyectado);
@@ -6825,7 +6856,7 @@ function _renderResumenAtrasados(activos, cancelados) {
   }
 
   const N = atr.length;
-  const header = `<div style="display:flex;align-items:center;gap:8px;color:var(--orange);font-weight:700;font-size:13px;margin-bottom:8px">⚠️ ${N} viajero${N === 1 ? '' : 's'} atrasado${N === 1 ? '' : 's'}</div>`;
+  const header = `<div style="display:flex;align-items:center;gap:8px;color:var(--orange);font-weight:700;font-size:13px;margin-bottom:8px"><svg class="ic"><use href="#ic-alerta"/></svg> ${N} viajero${N === 1 ? '' : 's'} atrasado${N === 1 ? '' : 's'}</div>`;
   const LIMITE = 10;
   const visibles = atr.slice(0, LIMITE);
 
@@ -6876,7 +6907,7 @@ function _renderResumenRiesgoBaja(activos) {
   if (!enRiesgo.length) { card.style.display = 'none'; el.innerHTML = ''; return; }
   card.style.display = '';
   const N = enRiesgo.length;
-  const header = `<div style="display:flex;align-items:center;gap:8px;color:var(--red);font-weight:700;font-size:13px;margin-bottom:8px">⚠️ ${N} en riesgo de baja</div>`;
+  const header = `<div style="display:flex;align-items:center;gap:8px;color:var(--red);font-weight:700;font-size:13px;margin-bottom:8px"><svg class="ic"><use href="#ic-alerta"/></svg> ${N} en riesgo de baja</div>`;
   const filas = enRiesgo.map(t => {
     const c = t.clientes || {};
     const pago = t.pago || {};
@@ -7513,7 +7544,7 @@ async function loadGastos() {
  <td>${g.cuenta ? `<span class="badge badge-gray">${_spEscape(g.cuenta)}</span>` : '<span style="font-size:12px;color:var(--ts)">—</span>'}</td>
  <td style="font-size:12px">${_spEscape(g.metodo_pago||'—')}</td>
  <td style="white-space:nowrap">
- <button class="btn btn-ghost btn-sm" onclick="editarGasto('${g.id}')">✏️ Editar</button>
+ <button class="btn btn-ghost btn-sm" onclick="editarGasto('${g.id}')"><svg class="ic"><use href="#ic-lapiz"/></svg> Editar</button>
  <button class="btn btn-red btn-sm" onclick="eliminarGasto('${g.id}')"></button>
  </td>
  </tr>`).join('');
@@ -7756,7 +7787,7 @@ async function loadIngresos() {
  <td>${g.cuenta ? `<span class="badge badge-gray">${_spEscape(g.cuenta)}</span>` : '<span style="font-size:12px;color:var(--ts)">—</span>'}</td>
  <td style="font-size:12px">${_spEscape(g.metodo_pago||'—')}</td>
  <td style="white-space:nowrap">
- <button class="btn btn-ghost btn-sm" onclick="editarIngreso('${g.id}')">✏️ Editar</button>
+ <button class="btn btn-ghost btn-sm" onclick="editarIngreso('${g.id}')"><svg class="ic"><use href="#ic-lapiz"/></svg> Editar</button>
  <button class="btn btn-red btn-sm" onclick="eliminarIngreso('${g.id}')"></button>
  </td>
  </tr>`).join('');
@@ -8070,7 +8101,7 @@ async function loadInventario() {
  const valor = i.cantidad * i.costo_unitario;
  const alerta = i.cantidad <= i.stock_minimo;
  return `<tr>
- <td style="font-weight:600">${i.pieza}${alerta ? ' <span style="color:var(--red)">⚠</span>' : ''}</td>
+ <td style="font-weight:600">${i.pieza}${alerta ? ' <span style="color:var(--red)"><svg class="ic"><use href="#ic-alerta"/></svg></span>' : ''}</td>
  <td style="color:${alerta ? 'var(--red)' : 'var(--text)'};font-weight:600">${i.cantidad}</td>
  ${verCostos ? `<td>${formatMXN(i.costo_unitario)}</td><td style="font-weight:600">${formatMXN(valor)}</td>` : ''}
  <td style="color:var(--ts)">${i.stock_minimo}</td>
@@ -9136,7 +9167,7 @@ async function renderGZ() {
     const pts = calcularPuntosCombinados(misToures, asignacionesDe[u.id] || [], evMap, anioActual).total;
     return `<div class="gz-card" onclick="abrirPerfil('${u.id}')">
       ${esYo ? '<div class="gz-badge-yo">TÚ</div>' : ''}
-      ${cumple ? '<div class="gz-badge-cumple">🎂</div>' : ''}
+      ${cumple ? '<div class="gz-badge-cumple"><svg class="ic"><use href="#ic-pastel"/></svg></div>' : ''}
       <div class="gz-card-inner">
         <div class="gz-avatar">
           ${u.foto_url ? `<img src="${u.foto_url}" alt="${u.nombre}">` : iniciales}
@@ -9196,14 +9227,14 @@ async function enviarInvitacion() {
     const nuevo = await khUsuarios.crear(correo, rol); // [sec-usuarios]
     link = `${APP_URL}?token=${nuevo.invite_token}`;
     await sendEmail(correo, 'Bienvenido al equipo de Conecta Reynosa', buildInviteEmail(correo.split('@')[0], rol, link));
-    alertEl.innerHTML = '<div class="alert" style="background:rgba(45,198,83,.1);color:var(--green)">✅ Invitación enviada a ' + correo + '</div>';
+    alertEl.innerHTML = '<div class="alert" style="background:rgba(45,198,83,.1);color:var(--green)">✓ Invitación enviada a ' + correo + '</div>';
     document.getElementById('inv-correo').value = '';
     setTimeout(() => alertEl.innerHTML = '', 5000);
     loadEquipo();
   } catch(emailErr) {
     // Si el email falla, el usuario YA se creó en Supabase — mostrar el link para copiar
     alertEl.innerHTML = `<div class="alert" style="background:rgba(255,183,3,.08);color:var(--gold);font-size:13px;line-height:1.6">
-      <div style="margin-bottom:8px">⚠️ El usuario se creó pero el email no se pudo enviar.</div>
+      <div style="margin-bottom:8px"><svg class="ic"><use href="#ic-alerta"/></svg> El usuario se creó pero el email no se pudo enviar.</div>
       <div style="font-family:'JetBrains Mono',monospace;font-size:10px;margin-bottom:8px">Manda este link por WhatsApp:</div>
       <input readonly value="${link}" style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:8px 10px;font-family:'JetBrains Mono',monospace;font-size:11px;cursor:text" onclick="this.select();document.execCommand('copy')">
       <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--ts);margin-top:6px">// click en el link para copiarlo · expira en 48h</div>
@@ -9490,7 +9521,7 @@ function renderPerfilCompleto(u, toursPasados, evAsignados, iniciales, edad, cum
           </div>
           <div style="flex:1;min-width:200px">
             <div style="font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.18em;color:var(--ts);margin-bottom:6px">// id_${u.id.slice(0,8)}</div>
-            <div style="font-family:'Rajdhani',sans-serif;font-size:30px;font-weight:700;line-height:1;margin-bottom:8px;letter-spacing:-.01em">${u.nombre}${cumple ? ' <span style="font-size:24px">🎂</span>' : ''}</div>
+            <div style="font-family:'Rajdhani',sans-serif;font-size:30px;font-weight:700;line-height:1;margin-bottom:8px;letter-spacing:-.01em">${u.nombre}${cumple ? ' <span style="font-size:24px"><svg class="ic"><use href="#ic-pastel"/></svg></span>' : ''}</div>
             <div style="display:inline-block;font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--gold);border:1px solid rgba(255,183,3,.3);padding:4px 10px;margin-bottom:6px">${ROL_LABELS[u.rol] || u.rol}</div>
             ${edad ? `<div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--ts);margin-top:4px">${edad} años</div>` : ''}
           </div>
@@ -9575,7 +9606,7 @@ function renderPerfilCompleto(u, toursPasados, evAsignados, iniciales, edad, cum
               <div>
                 <div class="tour-item-name" style="font-size:16px">${ev.nombre || ev.artista || '—'}</div>
                 <div class="tour-item-meta">${ev.artista?ev.artista+' · ':''}${ev.ciudad||''} ${fechaEv?'· '+fechaEv.toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric'}):''}</div>
-                ${u.rol !== 'cc' && e.indicaciones ? `<div style="font-size:11px;color:var(--ts);margin-top:5px;font-style:italic">📌 ${e.indicaciones}</div>` : ''}
+                ${u.rol !== 'cc' && e.indicaciones ? `<div style="font-size:11px;color:var(--ts);margin-top:5px;font-style:italic">${e.indicaciones}</div>` : ''}
                 ${ev.notas_internas ? `<div style="font-size:11px;color:var(--ts);margin-top:4px"><span class="k-mono-sm" style="margin-right:6px">EQUIPO</span>${ev.notas_internas}</div>` : ''}
               </div>
               <span style="font-size:10px;white-space:nowrap;color:${stColor[e.status]||'var(--ts)'}">
@@ -9843,7 +9874,7 @@ async function abrirRanking() {
       return { ...u, tours: misToures, ptsAnio, numTours, iniciales };
     });
     rankingData.sort((a, b) => b.ptsAnio - a.ptsAnio);
-    const medallaEmoji = ['🥇','🥈','🥉'];
+    const medallaEmoji = ['1°','2°','3°'];
     const tieneTours = rankingData.some(u => u.ptsAnio > 0);
 
     const modalEl = document.getElementById('modal-ranking');
@@ -9860,7 +9891,7 @@ async function abrirRanking() {
             <div style="font-family:'Zen Dots',cursive;font-size:22px;background:linear-gradient(90deg,var(--orange),var(--gold));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">RANKING ${anioActual}</div>
             <span style="font-size:24px"></span>
           </div>
-          <div style="font-family:Rajdhani;font-size:13px;color:var(--gold);margin-top:8px;font-weight:600">El líder al final del año gana un tour gratis 🎉</div>
+          <div style="font-family:Rajdhani;font-size:13px;color:var(--gold);margin-top:8px;font-weight:600">El líder al final del año gana un tour gratis</div>
           <div style="font-family:JetBrains Mono;font-size:10px;color:var(--ts);margin-top:4px;letter-spacing:.04em">// concierto: 3pts · festival 1d: 5pts · 2d: 7pts · 3d: 10pts</div>
         </div>
         <div style="padding:20px 28px 28px">
@@ -10349,7 +10380,7 @@ function showCCSubTab(sub, btn) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// [Pagos-T1] Sub-tab "💳 Pagos" de Capsule Corp — bandeja de separos.
+// [Pagos-T1] Sub-tab "Pagos" de Capsule Corp — bandeja de separos.
 // La casa nueva de las solicitudes APROBADAS (en_pagos + pagado) de un evento.
 // Reusa admin-solicitudes-list (flags multifecha+con_pagos) y el MISMO modal
 // global de detalle de solicitud. Convive con "Solicitudes Portal" hasta la T2.
@@ -10543,7 +10574,7 @@ function renderCCEventos(lista, filtro) {
           <button class="btn btn-primary btn-sm" onclick="event.stopPropagation();abrirDetalleEvento('${e.id}')" style="font-size:11px">Ver →</button>
         </div>
       </div>
-      ${e.notas_internas ? `<div style="margin-top:10px;font-size:11px;color:var(--ts);padding:8px 12px;background:rgba(255,255,255,.03);border-radius:6px;border-left:2px solid var(--border)">📌 ${e.notas_internas}</div>` : ''}
+      ${e.notas_internas ? `<div style="margin-top:10px;font-size:11px;color:var(--ts);padding:8px 12px;background:rgba(255,255,255,.03);border-radius:6px;border-left:2px solid var(--border)">${e.notas_internas}</div>` : ''}
     </div>`;
   }).join('');
 }
@@ -10641,7 +10672,7 @@ async function guardarEventoCC() {
   try {
     if (id) await khEventos.actualizar(id, body); // [sec-eventos]
     else    await khEventos.crear(body); // [sec-eventos]
-    alert.innerHTML='<div class="alert alert-success">✅ Evento guardado</div>';
+    alert.innerHTML='<div class="alert alert-success">✓ Evento guardado</div>';
     setTimeout(async () => { closeModal('modal-cc-evento'); await loadCapsule(); }, 700);
   } catch(e) { alert.innerHTML=`<div class="alert alert-error">${e.message}</div>`; }
 }
@@ -10809,7 +10840,7 @@ async function loadCCEquipo() {
             </div>
             <div>
               <div style="font-family:'Rajdhani',sans-serif;font-weight:700;font-size:16px">${nombre}</div>
-              <div style="font-size:10px;font-family:'JetBrains Mono',monospace;color:var(--ts)">cc · <span style="color:${COLOR_PEND_FIRMA};font-weight:700">✍️ PENDIENTE DE FIRMA</span></div>
+              <div style="font-size:10px;font-family:'JetBrains Mono',monospace;color:var(--ts)">cc · <span style="color:${COLOR_PEND_FIRMA};font-weight:700"><svg class="ic"><use href="#ic-lapiz"/></svg> PENDIENTE DE FIRMA</span></div>
             </div>
           </div>
         </div>
@@ -10838,8 +10869,8 @@ async function abrirModalAsignarCoordi() {
 
   const opts = usuarios.map(u => {
     const deuda = deudasPorUser[u.id]||0;
-    const warn = deuda > 0 ? ` ⚠ debe ${formatMXN(deuda)}` : '';
-    const strike = u.strikes >= 2 ? ` ⚠ ${u.strikes} strikes` : '';
+    const warn = deuda > 0 ? ` <svg class="ic"><use href="#ic-alerta"/></svg> debe ${formatMXN(deuda)}` : '';
+    const strike = u.strikes >= 2 ? ` <svg class="ic"><use href="#ic-alerta"/></svg> ${u.strikes} strikes` : '';
     return `<option value="${u.id}">${u.nombre} · ${u.rol}${warn}${strike}</option>`;
   }).join('');
   document.getElementById('modal-asignar-coordi').innerHTML = `
@@ -10921,7 +10952,7 @@ async function guardarAsignacionCoordi() {
       usuario_id: coordiId, tipo: 'asignacion', titulo: 'Nuevo evento asignado',
       mensaje: `Te asignaron: ${ev?.nombre || 'un evento'}. Entra a tu perfil para verlo.`,
     });
-    alertEl.innerHTML='<div class="alert alert-success">✅ Asignado y notificado</div>';
+    alertEl.innerHTML='<div class="alert alert-success">✓ Asignado y notificado</div>';
     setTimeout(async ()=>{ closeModal('modal-asignar-coordi'); await loadCCEquipo(); }, 900);
   } catch(e) { alertEl.innerHTML=`<div class="alert alert-error">${e.message}</div>`; }
 }
@@ -10962,7 +10993,7 @@ async function reenviarNotificacion(asigId) {
           </div>`,
         }),
       });
-      alert('✅ Recordatorio enviado');
+      alert('✓ Recordatorio enviado');
     }
   } catch(e) { alert(e.message); }
 }
@@ -10983,7 +11014,7 @@ async function manejarAccionAsignacion() {
       catch(e) { console.warn('[viajero-staff] upsert falló:', e.message); }
       // Limpiar URL
       window.history.replaceState({}, '', window.location.pathname);
-      setTimeout(() => alert('✅ ¡Tour aceptado! Aparecerá en tu perfil.'), 500);
+      setTimeout(() => alert('✓ ¡Tour aceptado! Aparecerá en tu perfil.'), 500);
     } catch(e) { console.warn(e); }
   }
 
@@ -11061,7 +11092,7 @@ async function notificarEquipoListas() {
     });
     enviados++;
   }
-  alert(`✅ Notificación enviada a ${enviados} persona${enviados!==1?'s':''}`);
+  alert(`✓ Notificación enviada a ${enviados} persona${enviados!==1?'s':''}`);
 }
 
 
@@ -11148,7 +11179,7 @@ function _renderViajerosTabla() {
       const paq = v.paquete || '';
       const esWalkinSinCuenta = c.creado_por_admin && !c.auth_user_id;
       const botonInvitar = (esWalkinSinCuenta && c.correo)
-        ? `<br><button class="btn btn-ghost btn-sm" style="font-size:10px;margin-top:5px" onclick="invitarWalkin('${_spEscape(c.id)}', this)">✉ Invitar al portal</button>`
+        ? `<br><button class="btn btn-ghost btn-sm" style="font-size:10px;margin-top:5px" onclick="invitarWalkin('${_spEscape(c.id)}', this)"><svg class="ic"><use href="#ic-correo"/></svg> Invitar al portal</button>`
         : '';
       return `<tr>
       <td style="font-weight:600">${c.nombre_completo || '—'} ${_badgeCliente(c)}${c.correo ? `<br><span style="color:var(--ts);font-size:11px;font-weight:400">${c.correo}</span>` : ''}${botonInvitar}</td>
@@ -11182,7 +11213,7 @@ async function invitarWalkin(clienteId, btn) {
     if (btn) btn.textContent = '✓ Invitado';
   } catch(e) {
     showToast('Error: ' + e.message, 'error');
-    if (btn) { btn.disabled = false; btn.textContent = '✉ Invitar al portal'; }
+    if (btn) { btn.disabled = false; btn.textContent = 'Invitar al portal'; }
   }
 }
 
@@ -11461,8 +11492,8 @@ async function guardarViajero() {
 
     closeModal('modal-viajero');
     let extraCorreo = '';
-    if (dataP.correo_enviado) extraCorreo = ' 📧 Plan enviado al cliente por correo.';
-    else if (dataP.correo_error || dataP.correo_enviado === false) extraCorreo = ' ⚠️ El plan se creó pero el correo no salió.';
+    if (dataP.correo_enviado) extraCorreo = ' <svg class="ic"><use href="#ic-correo"/></svg> Plan enviado al cliente por correo.';
+    else if (dataP.correo_error || dataP.correo_enviado === false) extraCorreo = ' <svg class="ic"><use href="#ic-alerta"/></svg> El plan se creó pero el correo no salió.';
     showToast('Viajero dado de alta con su plan de pagos.' + extraCorreo, 'success');
     await loadViajeros();
   } catch(e) {
@@ -11946,7 +11977,7 @@ function abrirModalHabitacion(id) {
         <div class="form-group">
           <label>Asignar ocupantes</label>
           <div id="hab-ocupantes-container">${selects(tipoActual, ocupantes)}</div>
-          ${!nombresViajeros.length?'<div style="font-size:11px;color:var(--ts);margin-top:4px">⚠ Agrega viajeros primero para poder asignarlos</div>':''}
+          ${!nombresViajeros.length?'<div style="font-size:11px;color:var(--ts);margin-top:4px"><svg class="ic"><use href="#ic-alerta"/></svg> Agrega viajeros primero para poder asignarlos</div>':''}
         </div>
         <div id="hab-alert"></div>
       </div>
@@ -12318,7 +12349,7 @@ function renderSolicitudesPortal() {
         <th style="padding:10px 8px;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ts);text-align:right">Separo</th>
         <th style="padding:10px 8px;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ts);text-align:right">Total</th>
         <th style="padding:10px 8px;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ts)">Estado</th>
-        <th style="padding:10px 8px;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ts);text-align:center">📎</th>
+        <th style="padding:10px 8px;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ts);text-align:center"><svg class="ic"><use href="#ic-clip"/></svg></th>
         <th style="padding:10px 8px;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ts)"></th>
       </tr>
     </thead>`;
@@ -12337,7 +12368,7 @@ function renderSolicitudesPortal() {
         <td style="padding:10px 8px;font-size:12px;text-align:right;white-space:nowrap">${_spFmtMxn(s.monto_separo)}</td>
         <td style="padding:10px 8px;font-size:12px;text-align:right;white-space:nowrap"><b>${_spFmtMxn(s.precio_total)}</b></td>
         <td style="padding:10px 8px">${_spBadgeEstado(s.estado)}</td>
-        <td style="padding:10px 8px;text-align:center;font-size:14px">${tieneComprob ? '📎' : '<span style="color:var(--ts)">—</span>'}</td>
+        <td style="padding:10px 8px;text-align:center;font-size:14px">${tieneComprob ? '<svg class="ic"><use href="#ic-clip"/></svg>' : '<span style="color:var(--ts)">—</span>'}</td>
         <td style="padding:10px 8px;text-align:right;white-space:nowrap"><button class="btn btn-ghost btn-sm" onclick="verSolicitudPortal('${_spEscape(s.id)}')" style="font-size:11px">Ver detalles</button></td>
       </tr>`;
   }).join('');
@@ -12403,7 +12434,7 @@ async function verSolicitudPortal(id) {
       </div>
     `)}
 
-    ${seccion('⚠ Zona de peligro', `
+    ${seccion('<svg class="ic"><use href="#ic-alerta"/></svg> Zona de peligro', `
       <div style="font-size:12px;color:var(--ts);margin-bottom:10px;line-height:1.5">Resetea o elimina a <b style="color:var(--ink)">${_spEscape(c.nombre_completo || '—')}</b> del Portal para que pueda empezar de cero (borra tours, pagos, comprobantes y foto).</div>
       <button class="btn btn-red btn-sm" onclick="abrirResetCliente('${_spEscape(s.cliente_id)}')" style="font-size:11px">Resetear / Eliminar cliente</button>
     `)}
@@ -12616,7 +12647,7 @@ function renderPlanPagosSP(solicitudId, estadoSolicitud) {
     const puedeRecuperar = estadoSolicitud === 'en_pagos' || estadoSolicitud === 'pagado';
     target.innerHTML = `<span style="color:var(--ts)">Sin plan de pagos para esta solicitud.</span>`
       + (puedeRecuperar
-        ? `<div style="margin-top:10px"><button id="sp-gen-plan-btn-${solSafe}" class="btn btn-primary btn-sm" style="font-size:11px" onclick="_spGenerarPlanRecuperacion('${solSafe}','${_spEscape(estadoSolicitud)}')">⚙️ Generar plan de pagos</button></div>`
+        ? `<div style="margin-top:10px"><button id="sp-gen-plan-btn-${solSafe}" class="btn btn-primary btn-sm" style="font-size:11px" onclick="_spGenerarPlanRecuperacion('${solSafe}','${_spEscape(estadoSolicitud)}')"><svg class="ic"><use href="#ic-engrane"/></svg> Generar plan de pagos</button></div>`
         : '');
     return;
   }
@@ -12678,7 +12709,7 @@ function _spRenderPlanPorLugar(solicitudId, pagos) {
 
   const botonGrupo = `
     <div id="sp-grupo-${solSafe}" style="margin-bottom:12px">
-      <button class="btn btn-primary btn-sm" style="font-size:11px" onclick="abrirPagoGrupoSP('${solSafe}')">💰 Aplicar pago grupal</button>
+      <button class="btn btn-primary btn-sm" style="font-size:11px" onclick="abrirPagoGrupoSP('${solSafe}')"><svg class="ic"><use href="#ic-dinero"/></svg> Aplicar pago grupal</button>
     </div>`;
 
   const secciones = keys.map(k => {
@@ -12699,7 +12730,7 @@ function _spRenderPlanPorLugar(solicitudId, pagos) {
         : '');
     // Botón "Baja": solo lugares ACTIVOS que no sean el titular (#1).
     const btnBaja = (lg && estado === 'activo' && Number(num) >= 2)
-      ? `<button class="btn btn-ghost btn-sm" style="font-size:10px;color:#FF6B6B;border-color:rgba(255,107,107,.4)" onclick="darBajaLugarSP('${_spEscape(lg.id)}','${solSafe}')">⬇︎ Baja</button>`
+      ? `<button class="btn btn-ghost btn-sm" style="font-size:10px;color:#FF6B6B;border-color:rgba(255,107,107,.4)" onclick="darBajaLugarSP('${_spEscape(lg.id)}','${solSafe}')">↓︎ Baja</button>`
       : '';
     // [F5-t2] Botón "Traspasar": lugares numero>=2 ACTIVOS o en BAJA (revivir para el nuevo).
     const puedeTraspasar = lg && Number(num) >= 2 && (estado === 'activo' || estado === 'baja');
@@ -12818,7 +12849,7 @@ function abrirPagoGrupoSP(solicitudId) {
   const inp = 'padding:7px 8px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;color:var(--ink);font-size:12px';
   box.innerHTML = `
     <div style="padding:12px;background:var(--bg3);border:1px solid var(--border);border-radius:10px">
-      <div style="font-size:12px;font-weight:700;margin-bottom:4px">💰 Pago grupal</div>
+      <div style="font-size:12px;font-weight:700;margin-bottom:4px"><svg class="ic"><use href="#ic-dinero"/></svg> Pago grupal</div>
       <div style="font-size:11px;color:var(--ts);margin-bottom:10px">Una transferencia del titular se reparte entre las cuotas de los lugares (cascada por fecha). El sistema propone; tú confirmas.</div>
       <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
         <div><label style="${lbl}">Monto recibido</label><input type="number" id="sp-grupo-monto-${solSafe}" min="0" step="0.01" placeholder="0.00" style="width:130px;${inp}"></div>
@@ -12838,7 +12869,7 @@ function abrirPagoGrupoSP(solicitudId) {
 function cerrarPagoGrupoSP(solicitudId) {
   delete _spGrupoCache[solicitudId];
   const box = document.getElementById('sp-grupo-' + solicitudId);
-  if (box) box.innerHTML = `<button class="btn btn-primary btn-sm" style="font-size:11px" onclick="abrirPagoGrupoSP('${_spEscape(solicitudId)}')">💰 Aplicar pago grupal</button>`;
+  if (box) box.innerHTML = `<button class="btn btn-primary btn-sm" style="font-size:11px" onclick="abrirPagoGrupoSP('${_spEscape(solicitudId)}')"><svg class="ic"><use href="#ic-dinero"/></svg> Aplicar pago grupal</button>`;
 }
 
 // MODO proponer: pide al backend la cascada de cuotas para el monto dado.
@@ -12948,7 +12979,7 @@ async function aplicarPagoGrupoSP(solicitudId) {
     }
     delete _spGrupoCache[solicitudId];
     const n = data.aplicados || 0;
-    showToast('✅ ' + n + ' cuota' + (n !== 1 ? 's' : '') + ' aplicada' + (n !== 1 ? 's' : '') + ' — ' + (data.solicitud_estado || ''), 'success');
+    showToast('✓ ' + n + ' cuota' + (n !== 1 ? 's' : '') + ' aplicada' + (n !== 1 ? 's' : '') + ' — ' + (data.solicitud_estado || ''), 'success');
     await _spRefrescarPlanYLista(solicitudId, data.solicitud_estado);
   } catch (e) {
     showToast('Error: ' + e.message, 'error');
@@ -13086,7 +13117,7 @@ function _spRenderFilaPago(solicitudId, p) {
   // Enlace para ver el comprobante del pago si ya tiene uno (firma on-demand,
   // igual que el del separo). El separo (pago #1) se ve en su propia sección.
   const comprobHtml = (p.comprobante_url && Number(p.numero_pago) !== 1)
-    ? `<div style="margin-top:6px"><button class="btn btn-ghost btn-sm" style="font-size:11px" onclick="verComprobantePagoSP('${idSafe}')">📎 Ver comprobante</button></div>`
+    ? `<div style="margin-top:6px"><button class="btn btn-ghost btn-sm" style="font-size:11px" onclick="verComprobantePagoSP('${idSafe}')"><svg class="ic"><use href="#ic-clip"/></svg> Ver comprobante</button></div>`
     : '';
 
   return `
@@ -13477,7 +13508,7 @@ async function _spGenerarPlanRecuperacion(solicitudId, estadoSolicitud) {
   } catch (e) {
     const detalle = e && e.detail ? ' — ' + e.detail : '';
     showToast('No se pudo generar el plan: ' + e.message + detalle, 'error');
-    if (btn) { btn.disabled = false; btn.textContent = '⚙️ Generar plan de pagos'; }
+    if (btn) { btn.disabled = false; btn.textContent = 'Generar plan de pagos'; }
   }
 }
 
@@ -13502,8 +13533,8 @@ async function guardarCambioEstadoSP(solicitudId) {
         showToast('El plan de pagos ya existía — no se duplicó', 'success');
       } else {
         let extraCorreo = '';
-        if (dataP.correo_enviado) extraCorreo = ' 📧 Plan enviado al cliente por correo.';
-        else if (dataP.correo_error || dataP.correo_enviado === false) extraCorreo = ' ⚠️ El plan se creó pero el correo no salió.';
+        if (dataP.correo_enviado) extraCorreo = ' <svg class="ic"><use href="#ic-correo"/></svg> Plan enviado al cliente por correo.';
+        else if (dataP.correo_error || dataP.correo_enviado === false) extraCorreo = ' <svg class="ic"><use href="#ic-alerta"/></svg> El plan se creó pero el correo no salió.';
         showToast('Plan de pagos generado (' + (dataP.pagos || []).length + ' pagos).' + extraCorreo, 'success');
       }
       if (btn) btn.textContent = 'Guardando…';
@@ -13604,12 +13635,12 @@ function renderMTReportes(lista, filtro) {
   const statusInfo = {
     borrador:      { label:'Borrador',           color:'var(--ts)',    icon:'⎘' },
     enviado:       { label:'Pendiente revisión',color:'var(--gold)', icon:'⏳' },
-    rechazado:     { label:'Rechazado',         color:'var(--red)',  icon:'❌' },
-    aprobado_popo: { label:'En revisión Roshi', color:'var(--blue)', icon:'🔍' },
-    aprobado_memo: { label:'Aprobado',           color:'var(--green)',icon:'✅' },
+    rechazado:     { label:'Rechazado',         color:'var(--red)',  icon:'✕' },
+    aprobado_popo: { label:'En revisión Roshi', color:'var(--blue)', icon:'<svg class="ic"><use href="#ic-lupa"/></svg>' },
+    aprobado_memo: { label:'Aprobado',           color:'var(--green)',icon:'✓' },
   };
   list.innerHTML = filtrada.map(r => {
-    const s = statusInfo[r.status]||{label:r.status,color:'var(--ts)',icon:'📄'};
+    const s = statusInfo[r.status]||{label:r.status,color:'var(--ts)',icon:'<svg class="ic"><use href="#ic-documento"/></svg>'};
     const ev = r._evento;
     const coo = r._coordi;
     const dif = r.diferencia||0;
@@ -13823,7 +13854,7 @@ async function loadMTPendientes() {
         <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.12em;color:var(--ts);margin-bottom:12px">// REPORTES PENDIENTES (límite 48 hrs)</div>
         ${reportesPendientes.length ? reportesPendientes.map(p => {
           const col = p.vencido ? 'var(--red)' : p.horasRestantes < 12 ? 'var(--orange)' : 'var(--gold)';
-          const lbl = p.vencido ? `⚠ VENCIDO HACE ${Math.floor(Math.abs(p.horasRestantes))}h` : `${Math.floor(p.horasRestantes)}h restantes`;
+          const lbl = p.vencido ? `<svg class="ic"><use href="#ic-alerta"/></svg> VENCIDO HACE ${Math.floor(Math.abs(p.horasRestantes))}h` : `${Math.floor(p.horasRestantes)}h restantes`;
           return `<div style="background:var(--bg2);border:1px solid var(--border);border-left:3px solid ${col};border-radius:var(--radius);padding:12px 18px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
             <div>
               <div style="font-weight:700;font-size:14px">${p.coordi?.nombre||'—'}</div>
@@ -13831,14 +13862,14 @@ async function loadMTPendientes() {
             </div>
             <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:${col};font-weight:700">${lbl}</div>
           </div>`;
-        }).join('') : '<div style="font-size:12px;color:var(--green)">✅ Sin reportes pendientes</div>'}
+        }).join('') : '<div style="font-size:12px;color:var(--green)">✓ Sin reportes pendientes</div>'}
       </div>
 
       <div>
         <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.12em;color:var(--ts);margin-bottom:12px">// SOBRANTES POR DEVOLVER (límite 5 días)</div>
         ${devolPendientes.length ? devolPendientes.map(d => {
           const col = d.vencido ? 'var(--red)' : d.diasRestantes < 1 ? 'var(--orange)' : 'var(--gold)';
-          const lbl = d.vencido ? `⚠ VENCIDO HACE ${Math.floor(Math.abs(d.diasRestantes))}d` : `${Math.ceil(d.diasRestantes)}d restantes`;
+          const lbl = d.vencido ? `<svg class="ic"><use href="#ic-alerta"/></svg> VENCIDO HACE ${Math.floor(Math.abs(d.diasRestantes))}d` : `${Math.ceil(d.diasRestantes)}d restantes`;
           return `<div style="background:var(--bg2);border:1px solid var(--border);border-left:3px solid ${col};border-radius:var(--radius);padding:12px 18px;margin-bottom:8px">
             <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
               <div>
@@ -13849,7 +13880,7 @@ async function loadMTPendientes() {
             </div>
             <div style="margin-top:8px;font-size:11px;color:var(--ts)">Pendiente: ${d.sobrantes.map(s=>`${s.pieza_nombre||'kit'} ×${s.cantidad_sobrante}`).join(', ')}</div>
           </div>`;
-        }).join('') : '<div style="font-size:12px;color:var(--green)">✅ Sin devoluciones pendientes</div>'}
+        }).join('') : '<div style="font-size:12px;color:var(--green)">✓ Sin devoluciones pendientes</div>'}
       </div>`;
   } catch(e) { el.innerHTML = `<div class="alert alert-error">${e.message}</div>`; }
 }
@@ -14068,10 +14099,10 @@ function renderMTUsuarios(lista) {
       <div style="flex:1;min-width:140px">
         <div style="font-family:'Rajdhani',sans-serif;font-weight:700;font-size:15px">${u.nombre||'—'} ${u.activo?'':'<span style="font-size:10px;color:var(--red)">[INACTIVO]</span>'}</div>
         <div style="font-size:10px;font-family:'JetBrains Mono',monospace;color:var(--ts)">${rolLabels[u.rol]||u.rol} · ${u.correo||u.username||''}</div>
-        ${u.strikes ? `<div style="font-size:10px;color:var(--red);margin-top:2px">⚠ ${u.strikes} strike${u.strikes!==1?'s':''}</div>` : ''}
+        ${u.strikes ? `<div style="font-size:10px;color:var(--red);margin-top:2px"><svg class="ic"><use href="#ic-alerta"/></svg> ${u.strikes} strike${u.strikes!==1?'s':''}</div>` : ''}
       </div>
       <div style="display:flex;gap:6px;flex-wrap:wrap">
-        <button class="btn btn-ghost btn-sm" onclick="abrirVerComo('${u.id}','${u.rol}')" style="font-size:10px;font-family:'JetBrains Mono',monospace">👁 Ver como</button>
+        <button class="btn btn-ghost btn-sm" onclick="abrirVerComo('${u.id}','${u.rol}')" style="font-size:10px;font-family:'JetBrains Mono',monospace"><svg class="ic"><use href="#ic-ojo"/></svg> Ver como</button>
         <button class="btn btn-ghost btn-sm" onclick="abrirEditarUsuarioMT('${u.id}')" style="font-size:10px">⎘ Editar</button>
         <button class="btn ${u.activo?'btn-red':'btn-green'} btn-sm" onclick="toggleActivoUsuario('${u.id}',${u.activo})" style="font-size:10px">${u.activo?'Desactivar':'Activar'}</button>
         <button class="btn btn-red btn-sm" onclick="eliminarUsuarioMT('${u.id}','${u.nombre.replace(/'/g,"\\'")}','${u.rol}')" style="font-size:10px;opacity:.7" title="Eliminar permanentemente">✕</button>
@@ -14227,7 +14258,7 @@ async function guardarUsuarioMT() {
   if (pass) body.password = pass; // [sec-usuarios] texto plano; el server lo hashea (bcrypt)
   try {
     await khUsuarios.actualizar(id, body); // [sec-usuarios]
-    if (alertEl) alertEl.innerHTML='<div class="alert alert-success">✅ Guardado</div>';
+    if (alertEl) alertEl.innerHTML='<div class="alert alert-success">✓ Guardado</div>';
     setTimeout(()=>{ closeModal('modal-mt-usuario'); loadMTUsuarios(); }, 800);
   } catch(e) { showErr(e.message); }
 }
@@ -14245,7 +14276,7 @@ function abrirVerComo(userId, rol) {
       <div class="modal-body">
         <p style="font-size:13px;color:var(--ts);margin-bottom:16px">Vas a simular la vista del sistema como si fueras <strong style="color:var(--text)">${u.nombre}</strong> (${u.rol}). Tu sesión de Maestro Roshi se restaura al salir.</p>
         <div style="background:rgba(255,183,3,.06);border:1px solid rgba(255,183,3,.2);border-radius:8px;padding:12px;font-size:11px;color:var(--gold)">
-          ⚠️ Solo es una vista — no puedes hacer cambios que afecten a ${u.nombre}
+          <svg class="ic"><use href="#ic-alerta"/></svg> Solo es una vista — no puedes hacer cambios que afecten a ${u.nombre}
         </div>
       </div>
       <div class="modal-footer">
@@ -14279,7 +14310,7 @@ function mostrarBannerVerComo(nombre) {
     banner.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:9999;background:rgba(255,183,3,.95);color:#0a0a0f;padding:10px 20px;font-family:JetBrains Mono,monospace;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:space-between;letter-spacing:.05em';
     document.body.appendChild(banner);
   }
-  banner.innerHTML = `<span>👁 MODO VISTA — viendo como: ${nombre.toUpperCase()}</span>
+  banner.innerHTML = `<span><svg class="ic"><use href="#ic-ojo"/></svg> MODO VISTA — viendo como: ${nombre.toUpperCase()}</span>
     <button onclick="salirVerComo()" style="background:var(--bg);border:none;padding:6px 14px;border-radius:6px;cursor:pointer;font-family:JetBrains Mono,monospace;font-size:11px;font-weight:700">✕ Salir y volver a Roshi</button>`;
 }
 
@@ -14326,7 +14357,7 @@ async function loadMTStrikes() {
               </div>
             </div>
           </div>`;
-        }).join('') : '<div style="font-size:12px;color:var(--green);padding:12px">✅ Nadie tiene strikes</div>'}
+        }).join('') : '<div style="font-size:12px;color:var(--green);padding:12px">✓ Nadie tiene strikes</div>'}
       </div>
       <div>
         <div class="k-mono" style="margin-bottom:12px">// PONER STRIKE A CUALQUIER USUARIO</div>
@@ -14363,7 +14394,7 @@ async function ponerStrikeDesdePanel() {
   if (!motivo) { alertEl.innerHTML='<div class="alert alert-error">Ingresa el motivo</div>'; return; }
   const u = _mtUsuariosCache.find(x=>x.id===userId) || {};
   await aplicarStrike(userId, u.nombre||'Usuario', u.strikes||0, motivo);
-  alertEl.innerHTML='<div class="alert alert-success">✅ Strike aplicado</div>';
+  alertEl.innerHTML='<div class="alert alert-success">✓ Strike aplicado</div>';
   setTimeout(()=>{ alertEl.innerHTML=''; loadMTStrikes(); }, 1500);
 }
 
@@ -14422,18 +14453,18 @@ async function loadMTAlertas() {
       return;
     }
     const tipoInfo = {
-      strike_auto:        { icon:'⚠️', color:'var(--orange)', label:'Strike automático' },
-      strike_manual:      { icon:'🎯', color:'var(--orange)', label:'Strike manual' },
-      strikes:            { icon:'⚠️', color:'var(--orange)', label:'Strike' },
-      tour_declinado:     { icon:'❌', color:'var(--red)',    label:'Tour declinado' },
-      reporte_rechazado:  { icon:'📋', color:'var(--red)',    label:'Reporte rechazado' },
-      nuevo_usuario:      { icon:'👤', color:'var(--green)',  label:'Nuevo usuario' },
-      advertencia:        { icon:'⚠️', color:'var(--gold)',   label:'Advertencia' },
-      suspension:         { icon:'🚫', color:'var(--red)',    label:'Suspensión' },
-      usuario_desactivado:{ icon:'🔒', color:'var(--red)',    label:'Usuario desactivado' },
+      strike_auto:        { icon:'<svg class="ic"><use href="#ic-alerta"/></svg>', color:'var(--orange)', label:'Strike automático' },
+      strike_manual:      { icon:'<svg class="ic"><use href="#ic-diana"/></svg>', color:'var(--orange)', label:'Strike manual' },
+      strikes:            { icon:'<svg class="ic"><use href="#ic-alerta"/></svg>', color:'var(--orange)', label:'Strike' },
+      tour_declinado:     { icon:'✕', color:'var(--red)',    label:'Tour declinado' },
+      reporte_rechazado:  { icon:'<svg class="ic"><use href="#ic-portapapeles"/></svg>', color:'var(--red)',    label:'Reporte rechazado' },
+      nuevo_usuario:      { icon:'<svg class="ic"><use href="#ic-persona"/></svg>', color:'var(--green)',  label:'Nuevo usuario' },
+      advertencia:        { icon:'<svg class="ic"><use href="#ic-alerta"/></svg>', color:'var(--gold)',   label:'Advertencia' },
+      suspension:         { icon:'<svg class="ic"><use href="#ic-prohibido"/></svg>', color:'var(--red)',    label:'Suspensión' },
+      usuario_desactivado:{ icon:'<svg class="ic"><use href="#ic-candado"/></svg>', color:'var(--red)',    label:'Usuario desactivado' },
     };
     list.innerHTML = alertas.map(a => {
-      const ti = tipoInfo[a.tipo] || { icon:'🔔', color:'var(--ts)', label: a.tipo };
+      const ti = tipoInfo[a.tipo] || { icon:'<svg class="ic"><use href="#ic-campana"/></svg>', color:'var(--ts)', label: a.tipo };
       const fecha = _tsToDate(a.created_at) || new Date();
       return `<div style="background:var(--bg2);border:1px solid var(--border);border-left:3px solid ${ti.color};border-radius:var(--radius);padding:12px 18px;margin-bottom:8px;${a.leida?'opacity:.5':''}">
         <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;flex-wrap:wrap">
@@ -14510,7 +14541,7 @@ async function guardarConfigCuenta() {
     }
     const { config } = await r.json();
     if (config) _mtConfig = config;
-    alertEl.innerHTML='<div class="alert alert-success">✅ Cuenta guardada</div>';
+    alertEl.innerHTML='<div class="alert alert-success">✓ Cuenta guardada</div>';
     setTimeout(()=>alertEl.innerHTML='', 2000);
   } catch(e) { alertEl.innerHTML=`<div class="alert alert-error">${e.message}</div>`; }
 }
@@ -14551,9 +14582,9 @@ async function loadEsferasEventos() {
         <td style="font-size:12px">${_esfEsc(e.ciudad) || '—'}</td>
         <td style="font-size:11px;color:var(--orange)">${_esfEsc(e.status) || 'Disponible'}</td>
         <td>${e.publicado
-          ? `<span class="badge badge-green">publicado</span> <button class="btn btn-ghost btn-sm" style="font-size:10px" onclick="despublicarEsfera('${_esfEsc(e.slug)}')">🗑️ Despublicar</button>`
-          : `<span class="badge badge-gray">borrador</span> <button class="btn btn-ghost btn-sm" style="font-size:10px;color:var(--red)" onclick="eliminarEsfera('${_esfEsc(e.slug)}')">🗑️ Eliminar</button>`}</td>
-        <td><button class="btn btn-ghost btn-sm" style="font-size:10px" onclick="editarEsfera('${_esfEsc(e.slug)}')">✏️ Editar</button> <button class="btn btn-ghost btn-sm" style="font-size:10px" onclick="posponerEsfera('${_esfEsc(e.slug)}')">📅 Posponer</button> <button class="btn btn-ghost btn-sm" style="font-size:10px" onclick="recalcularPagosPosposicion('${_esfEsc(e.slug)}')">🔄 Recalcular</button> <button class="btn btn-ghost btn-sm" style="font-size:10px" onclick="avisarPosposicion('${_esfEsc(e.slug)}')">✉️ Avisar</button> <button class="btn btn-ghost btn-sm" style="font-size:10px;color:var(--red)" onclick="cancelarEventoCompleto('${_esfEsc(e.slug)}')">🚫 Cancelar</button></td>
+          ? `<span class="badge badge-green">publicado</span> <button class="btn btn-ghost btn-sm" style="font-size:10px" onclick="despublicarEsfera('${_esfEsc(e.slug)}')"><svg class="ic"><use href="#ic-basura"/></svg> Despublicar</button>`
+          : `<span class="badge badge-gray">borrador</span> <button class="btn btn-ghost btn-sm" style="font-size:10px;color:var(--red)" onclick="eliminarEsfera('${_esfEsc(e.slug)}')"><svg class="ic"><use href="#ic-basura"/></svg> Eliminar</button>`}</td>
+        <td><button class="btn btn-ghost btn-sm" style="font-size:10px" onclick="editarEsfera('${_esfEsc(e.slug)}')"><svg class="ic"><use href="#ic-lapiz"/></svg> Editar</button> <button class="btn btn-ghost btn-sm" style="font-size:10px" onclick="posponerEsfera('${_esfEsc(e.slug)}')"><svg class="ic"><use href="#ic-eventos"/></svg> Posponer</button> <button class="btn btn-ghost btn-sm" style="font-size:10px" onclick="recalcularPagosPosposicion('${_esfEsc(e.slug)}')">↻ Recalcular</button> <button class="btn btn-ghost btn-sm" style="font-size:10px" onclick="avisarPosposicion('${_esfEsc(e.slug)}')"><svg class="ic"><use href="#ic-correo"/></svg> Avisar</button> <button class="btn btn-ghost btn-sm" style="font-size:10px;color:var(--red)" onclick="cancelarEventoCompleto('${_esfEsc(e.slug)}')"><svg class="ic"><use href="#ic-prohibido"/></svg> Cancelar</button></td>
       </tr>`).join('')}</tbody>
     </table></div>`;
   } catch(e) {
@@ -14571,7 +14602,7 @@ function posponerEsfera(slug) {
   document.getElementById('modal-posponer').innerHTML = `
     <div class="modal" style="max-width:420px">
       <div class="modal-header">
-        <div class="modal-title" style="font-family:'Zen Dots',sans-serif;font-size:15px">📅 Posponer evento</div>
+        <div class="modal-title" style="font-family:'Zen Dots',sans-serif;font-size:15px"><svg class="ic"><use href="#ic-eventos"/></svg> Posponer evento</div>
         <button class="modal-close" onclick="closeModal('modal-posponer')">×</button>
       </div>
       <div class="modal-body">
@@ -14619,18 +14650,18 @@ async function confirmarPosponer(slug) {
     let extra = '';
     if (d.pagos_recorridos > 0) {
       const signo = (d.delta_dias > 0 ? '+' : '') + d.delta_dias;
-      extra += ` ✅ Se recorrieron ${d.pagos_recorridos} fecha${d.pagos_recorridos === 1 ? '' : 's'} de pago pendiente${d.pagos_recorridos === 1 ? '' : 's'} (${signo} días).`;
+      extra += ` ✓ Se recorrieron ${d.pagos_recorridos} fecha${d.pagos_recorridos === 1 ? '' : 's'} de pago pendiente${d.pagos_recorridos === 1 ? '' : 's'} (${signo} días).`;
     }
     if (d.pagos_fallidos > 0 || d.pagos_error) {
-      extra += ' ⚠️ Algunas fechas de pago no se pudieron recorrer — revísalas en el Portal.';
+      extra += ' <svg class="ic"><use href="#ic-alerta"/></svg> Algunas fechas de pago no se pudieron recorrer — revísalas en el Portal.';
     }
     if (d.correos_enviados > 0) {
-      extra += ` 📧 Se avisó a ${d.correos_enviados} viajero${d.correos_enviados === 1 ? '' : 's'} por correo.`;
+      extra += ` <svg class="ic"><use href="#ic-correo"/></svg> Se avisó a ${d.correos_enviados} viajero${d.correos_enviados === 1 ? '' : 's'} por correo.`;
     }
     if (d.correos_fallidos > 0 || d.correos_error) {
-      extra += ' ⚠️ Algunos correos no salieron.';
+      extra += ' <svg class="ic"><use href="#ic-alerta"/></svg> Algunos correos no salieron.';
     }
-    if (alertEl) alertEl.innerHTML = `<div class="alert alert-success">✅ Pospuesto de ${_esfEsc(d.fecha_anterior)} a ${_esfEsc(d.fecha_nueva)}. ${_esfEsc(d.recordatorio || '')}${_esfEsc(extra)}</div>`;
+    if (alertEl) alertEl.innerHTML = `<div class="alert alert-success">✓ Pospuesto de ${_esfEsc(d.fecha_anterior)} a ${_esfEsc(d.fecha_nueva)}. ${_esfEsc(d.recordatorio || '')}${_esfEsc(extra)}</div>`;
     setTimeout(() => { closeModal('modal-posponer'); loadEsferasEventos(); }, 1800);
   } catch (e) {
     if (alertEl) alertEl.innerHTML = `<div class="alert alert-error">${e.message}</div>`;
@@ -14645,7 +14676,7 @@ function avisarPosposicion(slug) {
   document.getElementById('modal-avisar').innerHTML = `
     <div class="modal" style="max-width:420px">
       <div class="modal-header">
-        <div class="modal-title" style="font-family:'Zen Dots',sans-serif;font-size:15px">✉️ Avisar a clientes</div>
+        <div class="modal-title" style="font-family:'Zen Dots',sans-serif;font-size:15px"><svg class="ic"><use href="#ic-correo"/></svg> Avisar a clientes</div>
         <button class="modal-close" onclick="closeModal('modal-avisar')">×</button>
       </div>
       <div class="modal-body">
@@ -14684,7 +14715,7 @@ async function confirmarAviso(slug) {
     const d = await r.json();
     const msg = (d.total === 0)
       ? 'No hay clientes activos para avisar.'
-      : `✅ ${d.enviados} aviso(s) enviado(s)${d.fallidos ? ` · ${d.fallidos} fallido(s)` : ''}`;
+      : `✓ ${d.enviados} aviso(s) enviado(s)${d.fallidos ? ` · ${d.fallidos} fallido(s)` : ''}`;
     if (alertEl) alertEl.innerHTML = `<div class="alert alert-success">${msg}</div>`;
     setTimeout(() => closeModal('modal-avisar'), 2000);
   } catch (e) {
@@ -14702,7 +14733,7 @@ function recalcularPagosPosposicion(slug) {
   document.getElementById('modal-recalcular').innerHTML = `
     <div class="modal" style="max-width:420px">
       <div class="modal-header">
-        <div class="modal-title" style="font-family:'Zen Dots',sans-serif;font-size:15px">🔄 Recalcular pagos</div>
+        <div class="modal-title" style="font-family:'Zen Dots',sans-serif;font-size:15px">↻ Recalcular pagos</div>
         <button class="modal-close" onclick="closeModal('modal-recalcular')">×</button>
       </div>
       <div class="modal-body">
@@ -14741,7 +14772,7 @@ async function confirmarRecalculo(slug) {
     const d = await r.json();
     const msg = (d.movidos === 0)
       ? 'No había cuotas pendientes que mover.'
-      : `✅ ${d.movidos} cuota(s) movida(s) · offset ${d.offset_dias} días${d.fallidos ? ` · ${d.fallidos} fallida(s)` : ''}`;
+      : `✓ ${d.movidos} cuota(s) movida(s) · offset ${d.offset_dias} días${d.fallidos ? ` · ${d.fallidos} fallida(s)` : ''}`;
     if (alertEl) alertEl.innerHTML = `<div class="alert alert-success">${msg}</div>`;
     setTimeout(() => closeModal('modal-recalcular'), 2500);
   } catch (e) {
@@ -14758,7 +14789,7 @@ function cancelarEventoCompleto(slug) {
   document.getElementById('modal-cancelar-evento').innerHTML = `
     <div class="modal" style="max-width:440px">
       <div class="modal-header">
-        <div class="modal-title" style="font-family:'Zen Dots',sans-serif;font-size:15px;color:var(--red)">🚫 Cancelar evento</div>
+        <div class="modal-title" style="font-family:'Zen Dots',sans-serif;font-size:15px;color:var(--red)"><svg class="ic"><use href="#ic-prohibido"/></svg> Cancelar evento</div>
         <button class="modal-close" onclick="closeModal('modal-cancelar-evento')">×</button>
       </div>
       <div class="modal-body">
@@ -14806,7 +14837,7 @@ async function confirmarCancelacionEvento(slug) {
       return;
     }
     const d = await r.json();
-    const msg = `✅ Evento cancelado · ${d.solicitudes_baja} baja(s) · ${d.reembolsos_creados} reembolso(s) · total ${formatMXN(d.monto_total)}${d.bajas_fallidas ? ` · ⚠ ${d.bajas_fallidas} fallida(s)` : ''}`;
+    const msg = `✓ Evento cancelado · ${d.solicitudes_baja} baja(s) · ${d.reembolsos_creados} reembolso(s) · total ${formatMXN(d.monto_total)}${d.bajas_fallidas ? ` · <svg class="ic"><use href="#ic-alerta"/></svg> ${d.bajas_fallidas} fallida(s)` : ''}`;
     if (alertEl) alertEl.innerHTML = `<div class="alert alert-success">${msg}</div>`;
     setTimeout(() => { closeModal('modal-cancelar-evento'); loadEsferasEventos(); }, 3000);
   } catch (e) {
@@ -14872,20 +14903,20 @@ async function loadYamcha() {
           ? '<span style="display:inline-block;padding:2px 8px;border-radius:10px;background:rgba(255,165,0,.15);color:var(--orange);font-size:11px;font-weight:700">pendiente</span>'
           : '<span style="display:inline-block;padding:2px 8px;border-radius:10px;background:rgba(61,220,132,.15);color:#3DDC84;font-size:11px;font-weight:700">transferido</span>';
         const accionEstado = esPend
-          ? `<button class="btn btn-ghost btn-sm" style="font-size:10px" onclick="transferirReembolso('${_esfEsc(rb.id)}')">✅ Marcar transferido</button>`
+          ? `<button class="btn btn-ghost btn-sm" style="font-size:10px" onclick="transferirReembolso('${_esfEsc(rb.id)}')">✓ Marcar transferido</button>`
           : `<button class="btn btn-ghost btn-sm" style="font-size:10px" onclick="desmarcarReembolso('${_esfEsc(rb.id)}')">↩️ Desmarcar</button>`;
         return `<tr>
           <td><div style="font-weight:600">${_esfEsc(rb.cliente_nombre || '—')}</div><div style="font-size:11px;color:var(--ts)">${_esfEsc(rb.cliente_correo || '')}</div></td>
           <td style="font-weight:700">${formatMXN(rb.monto)}</td>
           <td style="font-size:12px;max-width:220px;white-space:pre-wrap">${_esfEsc(rb.datos_bancarios || '—')}</td>
           <td>${badge}</td>
-          <td style="white-space:nowrap"><button class="btn btn-ghost btn-sm" style="font-size:10px" onclick="editarDatosReembolso('${_esfEsc(rb.id)}')">✏️ Datos</button> ${accionEstado}</td>
+          <td style="white-space:nowrap"><button class="btn btn-ghost btn-sm" style="font-size:10px" onclick="editarDatosReembolso('${_esfEsc(rb.id)}')"><svg class="ic"><use href="#ic-lapiz"/></svg> Datos</button> ${accionEstado}</td>
         </tr>`;
       }).join('');
       return `<div class="card" style="margin-bottom:16px">
         <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:10px">
           <div style="font-weight:700;font-size:15px">${_esfEsc(g.nombre || g.slug)}</div>
-          <button class="btn btn-ghost btn-sm" style="font-size:11px" onclick="avisarReembolsos('${_esfEsc(g.slug)}')">✉️ Avisar a clientes</button>
+          <button class="btn btn-ghost btn-sm" style="font-size:11px" onclick="avisarReembolsos('${_esfEsc(g.slug)}')"><svg class="ic"><use href="#ic-correo"/></svg> Avisar a clientes</button>
         </div>
         <div class="table-wrap"><table>
           <thead><tr><th>Cliente</th><th>Monto</th><th>Datos bancarios</th><th>Estado</th><th>Acciones</th></tr></thead>
@@ -14906,7 +14937,7 @@ async function avisarReembolsos(slug) {
     });
     const d = await r.json().catch(() => ({ error: r.statusText }));
     if (!r.ok) { showToast(d.error || 'No se pudo avisar', 'error'); return; }
-    showToast(`✉️ ${d.enviados || 0} enviado(s)${d.fallidos ? ` · ⚠ ${d.fallidos} fallido(s)` : ''}`, 'success');
+    showToast(`<svg class="ic"><use href="#ic-correo"/></svg> ${d.enviados || 0} enviado(s)${d.fallidos ? ` · <svg class="ic"><use href="#ic-alerta"/></svg> ${d.fallidos} fallido(s)` : ''}`, 'success');
   } catch (e) {
     showToast(e.message, 'error');
   }
@@ -14918,7 +14949,7 @@ function editarDatosReembolso(id) {
   document.getElementById('modal-yamcha-datos').innerHTML = `
     <div class="modal" style="max-width:460px">
       <div class="modal-header">
-        <div class="modal-title" style="font-family:'Zen Dots',sans-serif;font-size:15px">✏️ Datos de reembolso</div>
+        <div class="modal-title" style="font-family:'Zen Dots',sans-serif;font-size:15px"><svg class="ic"><use href="#ic-lapiz"/></svg> Datos de reembolso</div>
         <button class="modal-close" onclick="closeModal('modal-yamcha-datos')">×</button>
       </div>
       <div class="modal-body">
@@ -14967,7 +14998,7 @@ function transferirReembolso(id) {
   document.getElementById('modal-yamcha-transferir').innerHTML = `
     <div class="modal" style="max-width:420px">
       <div class="modal-header">
-        <div class="modal-title" style="font-family:'Zen Dots',sans-serif;font-size:15px">✅ Marcar transferido</div>
+        <div class="modal-title" style="font-family:'Zen Dots',sans-serif;font-size:15px">✓ Marcar transferido</div>
         <button class="modal-close" onclick="closeModal('modal-yamcha-transferir')">×</button>
       </div>
       <div class="modal-body">
@@ -15061,7 +15092,7 @@ async function crearEsferaEvento() {
       const detail = await r.json().catch(()=>({ error: r.statusText }));
       throw new Error(detail.error || 'Error creando');
     }
-    alertEl.innerHTML='<div class="alert alert-success">✅ Evento creado</div>';
+    alertEl.innerHTML='<div class="alert alert-success">✓ Evento creado</div>';
     setTimeout(()=>alertEl.innerHTML='', 2000);
     // Auto-guardado a la libreta: suma a venues_catalogo los NOMBRES de zona usados
     // (best-effort; usa body porque el DOM se limpia abajo). Nunca precios.
@@ -15337,7 +15368,7 @@ function _esfClearFechasExtra() {
 }
 
 // ── Zonas y precios (B1: zonas de venta, sin hotel/pagos) ────────────────────
-// Cada fila: [Nombre] [$ PLUS] [$ CHEAP opcional] [☐ Agotada] [✕].
+// Cada fila: [Nombre] [$ PLUS] [$ CHEAP opcional] [○ Agotada] [✕].
 // El ORDEN de captura se respeta (es el orden del cotizador). Se guarda como
 // JSON en `zonas` (solo filas con nombre).
 // ── Catálogo venue→zonas (Esferas) — admin-venues-catalogo (KH, maestro_roshi) ──
@@ -15409,7 +15440,7 @@ async function _esfGuardarVenueZonas() {
     });
     const d = await r.json().catch(() => ({}));
     if (!r.ok || d.ok === false) throw new Error(d.error || ('admin-venues-catalogo ' + r.status));
-    setMsg('var(--green)', `✅ Zonas guardadas para "${d.venue || venue}".`);
+    setMsg('var(--green)', `✓ Zonas guardadas para "${d.venue || venue}".`);
     await _esfLoadVenuesCat();
     setTimeout(() => setMsg('var(--ts)', ''), 2500);
   } catch (e) {
@@ -15942,7 +15973,7 @@ async function guardarCambiosEsfera() {
     }
     cancelarEdicionEsfera();
     if (alertEl) {
-      alertEl.innerHTML = '<div class="alert alert-success">✅ Cambios guardados</div>';
+      alertEl.innerHTML = '<div class="alert alert-success">✓ Cambios guardados</div>';
       setTimeout(()=>{ if (alertEl) alertEl.innerHTML = ''; }, 2000);
     }
     loadEsferasEventos();
@@ -16384,7 +16415,7 @@ async function publicarEsferas() {
     if (data.sin_cambios || !pub.length) {
       panel.innerHTML = '<div class="alert alert-success">Sin cambios — el index ya estaba al día.</div>';
     } else {
-      panel.innerHTML = `<div class="alert alert-success">✅ Publicados ${pub.length}: ${pub.map(_esfEsc).join(', ')} · commit ${_esfEsc(data.commit || '')}</div>`;
+      panel.innerHTML = `<div class="alert alert-success">✓ Publicados ${pub.length}: ${pub.map(_esfEsc).join(', ')} · commit ${_esfEsc(data.commit || '')}</div>`;
     }
     loadEsferasEventos();
   } catch(e) {
@@ -16415,7 +16446,7 @@ async function despublicarEsfera(slug) {
     if (data.encontrado === false) {
       panel.innerHTML = `<div class="alert alert-success">${_esfEsc(slug)} ya no estaba en el index.</div>`;
     } else {
-      panel.innerHTML = `<div class="alert alert-success">✅ Despublicado ${_esfEsc(slug)} · commit ${_esfEsc(data.commit || '')}</div>`;
+      panel.innerHTML = `<div class="alert alert-success">✓ Despublicado ${_esfEsc(slug)} · commit ${_esfEsc(data.commit || '')}</div>`;
     }
     loadEsferasEventos();
   } catch(e) {
@@ -16435,7 +16466,7 @@ async function eliminarEsfera(slug) {
       return;
     }
     if (!r.ok || !data.ok) throw new Error(data.error || ('Error ' + r.status));
-    if (panel) panel.innerHTML = `<div class="alert alert-success">🗑️ Eliminado ${_esfEsc(slug)} de la lista de Esferas.</div>`;
+    if (panel) panel.innerHTML = `<div class="alert alert-success"><svg class="ic"><use href="#ic-basura"/></svg> Eliminado ${_esfEsc(slug)} de la lista de Esferas.</div>`;
     loadEsferasEventos();
   } catch(e) {
     if (panel) panel.innerHTML = `<div class="alert alert-error">${e.message}</div>`;
@@ -16503,7 +16534,7 @@ async function _sincronizarEventosMeta(btn) {
     });
     const data = await r.json().catch(() => ({}));
     if (!r.ok || !data.ok) throw new Error(data.error || 'Error sincronizando');
-    if (alertEl) alertEl.innerHTML = `<div class="alert alert-success">✅ ${data.upserted} evento${data.upserted !== 1 ? 's' : ''} sincronizado${data.upserted !== 1 ? 's' : ''}</div>`;
+    if (alertEl) alertEl.innerHTML = `<div class="alert alert-success">✓ ${data.upserted} evento${data.upserted !== 1 ? 's' : ''} sincronizado${data.upserted !== 1 ? 's' : ''}</div>`;
     setTimeout(() => { if (alertEl) alertEl.innerHTML = ''; }, 3000);
   } catch (e) {
     if (alertEl) alertEl.innerHTML = `<div class="alert alert-error">${e.message}</div>`;
@@ -16528,7 +16559,7 @@ async function guardarConfigMensaje() {
     }
     const { config } = await r.json();
     if (config) _mtConfig = config;
-    alertEl.innerHTML='<div class="alert alert-success">✅ Mensaje guardado</div>';
+    alertEl.innerHTML='<div class="alert alert-success">✓ Mensaje guardado</div>';
     setTimeout(()=>alertEl.innerHTML='', 2000);
   } catch(e) { alertEl.innerHTML=`<div class="alert alert-error">${e.message}</div>`; }
 }
@@ -16697,13 +16728,13 @@ function renderReportes(lista, filtro) {
   const statusInfo = {
     borrador:       { label:'Borrador',          color:'var(--ts)',    icon:'⎘' },
     enviado:        { label:'Pendiente revisión', color:'var(--gold)',  icon:'⏳' },
-    rechazado:      { label:'Rechazado',          color:'var(--red)',   icon:'❌' },
-    aprobado_popo:  { label:'En revisión Roshi',  color:'var(--blue)',  icon:'🔍' },
-    aprobado_memo:  { label:'Aprobado',           color:'var(--green)', icon:'✅' },
+    rechazado:      { label:'Rechazado',          color:'var(--red)',   icon:'✕' },
+    aprobado_popo:  { label:'En revisión Roshi',  color:'var(--blue)',  icon:'<svg class="ic"><use href="#ic-lupa"/></svg>' },
+    aprobado_memo:  { label:'Aprobado',           color:'var(--green)', icon:'✓' },
   };
 
   container.innerHTML = filtrada.map(r => {
-    const s = statusInfo[r.status] || { label: r.status, color:'var(--ts)', icon:'📄' };
+    const s = statusInfo[r.status] || { label: r.status, color:'var(--ts)', icon:'<svg class="ic"><use href="#ic-documento"/></svg>' };
     const ev = r._evento;
     const coo = r._coordi;
     const dif = r.diferencia ?? 0;
@@ -16729,7 +16760,7 @@ function renderReportes(lista, filtro) {
     }
     // Popo: marcar kits recibidos cuando aprobado_memo
     if (rol === 'mister_popo' && r.status === 'aprobado_memo' && kits.some(k => (k.cantidad_sobrante||0) > 0 && !k.recibido)) {
-      btns += `<button class="btn btn-ghost btn-sm" onclick="marcarKitsRecibidos('${r.id}')" style="border-color:rgba(62,220,132,.4);color:var(--green)">📦 Marcar Recibido</button>`;
+      btns += `<button class="btn btn-ghost btn-sm" onclick="marcarKitsRecibidos('${r.id}')" style="border-color:rgba(62,220,132,.4);color:var(--green)">Marcar Recibido</button>`;
     }
     if (btns) btns = `<div class="modal-footer" style="padding:0;margin-top:12px;justify-content:flex-end;gap:8px;flex-wrap:wrap">${btns}</div>`;
 
@@ -16843,7 +16874,7 @@ async function abrirModalReporte(reporteId) {
 
   // CAMBIO 4: aviso de rechazo visible al reabrir un reporte rechazado
   const rechazoBanner = (reporte && reporte.status === 'rechazado')
-    ? '<div class="alert alert-error" style="margin-bottom:16px">⚠️ Reporte rechazado. ' + (reporte.rechazo_motivo ? 'Motivo: ' + reporte.rechazo_motivo : 'Corrígelo y reenvíalo.') + '</div>'
+    ? '<div class="alert alert-error" style="margin-bottom:16px"><svg class="ic"><use href="#ic-alerta"/></svg> Reporte rechazado. ' + (reporte.rechazo_motivo ? 'Motivo: ' + reporte.rechazo_motivo : 'Corrígelo y reenvíalo.') + '</div>'
     : '';
 
   document.getElementById('modal-reporte').innerHTML = `
@@ -16912,7 +16943,7 @@ async function abrirModalReporte(reporteId) {
           </div>
           <!-- CLABE si gastó de más -->
           <div id="rep-clabe-section" style="display:none;margin-top:16px;padding-top:12px;border-top:1px solid var(--border)">
-            <div style="font-size:11px;color:var(--red);margin-bottom:8px">⚠️ Gastaste más de lo recibido. Ingresa tu cuenta para que Memo te reembolse.</div>
+            <div style="font-size:11px;color:var(--red);margin-bottom:8px"><svg class="ic"><use href="#ic-alerta"/></svg> Gastaste más de lo recibido. Ingresa tu cuenta para que Memo te reembolse.</div>
             <div class="form-group" style="margin:0">
               <label>CLABE / Cuenta bancaria</label>
               <input type="text" class="cot-input" id="rep-clabe" placeholder="18 dígitos o datos bancarios" value="${reporte?.cuenta_bancaria_coordi||''}" style="width:100%">
@@ -17078,7 +17109,7 @@ async function guardarReporte(nuevoStatus) {
       const newId = _res && _res.id;
       if (newId) { const rf = document.getElementById('rep-id'); if (rf) rf.value = newId; }
     }
-    alert.innerHTML = `<div class="alert alert-success">${nuevoStatus === 'enviado' ? '✅ Reporte enviado' : '✅ Borrador guardado'}</div>`;
+    alert.innerHTML = `<div class="alert alert-success">${nuevoStatus === 'enviado' ? '✓ Reporte enviado' : '✓ Borrador guardado'}</div>`;
     setTimeout(() => { closeModal('modal-reporte'); loadReportes(); }, 900);
   } catch(e) {
     alert.innerHTML = `<div class="alert alert-error">${e.message}</div>`;
@@ -17126,11 +17157,11 @@ async function ejecutarAprobacionFinal(id, reporte) {
   const dif = reporte?.diferencia || 0;
   const clabe = reporte?.cuenta_bancaria_coordi || 'no registrada';
   if (dif > 0) {
-    alert(`✅ Aprobado y stock actualizado.\n\nSobró ${formatMXN(dif)}.\nEl coordi debe regresar ese dinero a tu cuenta.`);
+    alert(`✓ Aprobado y stock actualizado.\n\nSobró ${formatMXN(dif)}.\nEl coordi debe regresar ese dinero a tu cuenta.`);
   } else if (dif < 0) {
-    alert(`✅ Aprobado y stock actualizado.\n\n⚠️ El coordi gastó ${formatMXN(Math.abs(dif))} de más.\nDepositar a: ${clabe}`);
+    alert(`✓ Aprobado y stock actualizado.\n\nEl coordi gastó ${formatMXN(Math.abs(dif))} de más.\nDepositar a: ${clabe}`);
   } else {
-    alert('✅ Reporte aprobado y stock actualizado.');
+    alert('✓ Reporte aprobado y stock actualizado.');
   }
 }
 
@@ -17168,7 +17199,7 @@ async function marcarKitsRecibidos(id) {
     const kitsActualizados = kits.map(k => ({ ...k, recibido: true }));
     await khReportes.marcarKitsRecibidos(id, JSON.stringify(kitsActualizados)); // [sec-reportes]
 
-    alert('✅ Kits marcados como recibidos y actualizados en bodega.');
+    alert('✓ Kits marcados como recibidos y actualizados en bodega.');
     loadReportes();
     // Refrescar inventario si está activo
     if (document.getElementById('page-inventario').classList.contains('active')) loadInventario();
@@ -17331,7 +17362,7 @@ function _renderDeliverableItem(d, u) {
       <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;flex-wrap:wrap">
         <div style="flex:1;min-width:0">
           <div style="display:flex;align-items:center;gap:8px">
-            <span style="font-family:'JetBrains Mono',monospace;font-size:13px;color:${color}">${done ? '☑' : '☐'}</span>
+            <span style="font-family:'JetBrains Mono',monospace;font-size:13px;color:${color}">${done ? '✓' : '○'}</span>
             <span style="color:var(--text);font-weight:600">${_escDeliv(d.descripcion)}</span>
             <span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:${color};letter-spacing:.1em;text-transform:uppercase">${done ? 'Entregado'+fechaTxt : 'Pendiente'}</span>
           </div>
@@ -17340,8 +17371,8 @@ function _renderDeliverableItem(d, u) {
         </div>
         <div style="display:flex;gap:4px;flex-wrap:wrap">
           <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();_delivToggle('${d.id}','${u.id}')" style="font-size:9px;font-family:'JetBrains Mono',monospace;padding:3px 7px">${done ? '↻ marcar pendiente' : '✓ marcar entregado'}</button>
-          <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();_delivEditarLink('${d.id}','${u.id}')" style="font-size:9px;font-family:'JetBrains Mono',monospace;padding:3px 7px" title="Link del contenido">🔗</button>
-          <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();_delivEditarNotas('${d.id}','${u.id}')" style="font-size:9px;font-family:'JetBrains Mono',monospace;padding:3px 7px" title="Notas">✎</button>
+          <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();_delivEditarLink('${d.id}','${u.id}')" style="font-size:9px;font-family:'JetBrains Mono',monospace;padding:3px 7px" title="Link del contenido"><svg class="ic"><use href="#ic-enlace"/></svg></button>
+          <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();_delivEditarNotas('${d.id}','${u.id}')" style="font-size:9px;font-family:'JetBrains Mono',monospace;padding:3px 7px" title="Notas"><svg class="ic"><use href="#ic-lapiz"/></svg></button>
           <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();_delivBorrar('${d.id}','${u.id}')" style="font-size:9px;font-family:'JetBrains Mono',monospace;padding:3px 7px;color:var(--red);border-color:rgba(230,57,70,.3)" title="Eliminar">×</button>
         </div>
       </div>
@@ -17730,7 +17761,7 @@ function previewContrato() {
   const err = _validateCtrForm(d);
   const alert = document.getElementById('ctr-alert');
   if (err) {
-    alert.innerHTML = `<div style="padding:10px 14px;background:rgba(255,68,68,.12);border:1px solid rgba(255,68,68,.4);color:#ffb3b3;border-radius:6px;margin-bottom:14px;font-size:13px">⚠ ${err}</div>`;
+    alert.innerHTML = `<div style="padding:10px 14px;background:rgba(255,68,68,.12);border:1px solid rgba(255,68,68,.4);color:#ffb3b3;border-radius:6px;margin-bottom:14px;font-size:13px"><svg class="ic"><use href="#ic-alerta"/></svg> ${err}</div>`;
     return;
   }
   alert.innerHTML = '';
@@ -17745,7 +17776,7 @@ async function enviarContrato() {
   const alert = document.getElementById('ctr-alert');
   const btn = document.getElementById('ctr-btn-enviar');
   if (err) {
-    alert.innerHTML = `<div style="padding:10px 14px;background:rgba(255,68,68,.12);border:1px solid rgba(255,68,68,.4);color:#ffb3b3;border-radius:6px;margin-bottom:14px;font-size:13px">⚠ ${err}</div>`;
+    alert.innerHTML = `<div style="padding:10px 14px;background:rgba(255,68,68,.12);border:1px solid rgba(255,68,68,.4);color:#ffb3b3;border-radius:6px;margin-bottom:14px;font-size:13px"><svg class="ic"><use href="#ic-alerta"/></svg> ${err}</div>`;
     return;
   }
   alert.innerHTML = '';
@@ -17775,7 +17806,7 @@ async function enviarContrato() {
     _contratosEditingToken = null;
     setTimeout(() => { switchContratoView('listado'); loadContratosList(); _resetFormUI(); }, 1100);
   } catch (e) {
-    alert.innerHTML = `<div style="padding:10px 14px;background:rgba(255,68,68,.12);border:1px solid rgba(255,68,68,.4);color:#ffb3b3;border-radius:6px;margin-bottom:14px;font-size:13px">⚠ ${_escCtr(e.message)}</div>`;
+    alert.innerHTML = `<div style="padding:10px 14px;background:rgba(255,68,68,.12);border:1px solid rgba(255,68,68,.4);color:#ffb3b3;border-radius:6px;margin-bottom:14px;font-size:13px"><svg class="ic"><use href="#ic-alerta"/></svg> ${_escCtr(e.message)}</div>`;
   } finally {
     btn.disabled = false;
     btn.textContent = original;
@@ -17795,7 +17826,7 @@ function _resetFormUI() {
   if (fc) fc.value = new Date().toISOString().slice(0,10);
   // Botón principal
   const btn = document.getElementById('ctr-btn-enviar');
-  if (btn) btn.textContent = '📨 Enviar por correo';
+  if (btn) btn.textContent = 'Enviar por correo';
   // Toggle cancelar / titulo edición
   const cancelBtn = document.getElementById('ctr-btn-cancelar-edit');
   if (cancelBtn) cancelBtn.style.display = 'none';
@@ -17812,7 +17843,7 @@ function _loadContratoEnForm(c) {
   document.getElementById('ctr-contrato-fecha').value = (c.contrato_fecha || '').slice(0,10);
   document.getElementById('ctr-ofrecimiento').value = (Array.isArray(c.ofrecimiento) ? c.ofrecimiento : []).join('\n');
   document.getElementById('ctr-expectativas').value = (Array.isArray(c.expectativas) ? c.expectativas : []).join('\n');
-  document.getElementById('ctr-btn-enviar').textContent = '💾 Guardar cambios';
+  document.getElementById('ctr-btn-enviar').textContent = 'Guardar cambios';
   const cancelBtn = document.getElementById('ctr-btn-cancelar-edit');
   if (cancelBtn) cancelBtn.style.display = '';
   const banner = document.getElementById('ctr-banner-edit');
@@ -17952,8 +17983,8 @@ let _snapshotCache = {};
 
 function copiarLinkProximos(btn) {
   const url = 'https://conectareynosa.mx/proximos';
-  const restore = () => { if (btn) { btn.textContent = '📋 Copiar link de próximos tours'; btn.disabled = false; } };
-  const ok = () => { if (btn) { btn.textContent = '✅ Copiado'; btn.disabled = true; setTimeout(restore, 2000); } };
+  const restore = () => { if (btn) { btn.textContent = 'Copiar link de próximos tours'; btn.disabled = false; } };
+  const ok = () => { if (btn) { btn.textContent = '✓ Copiado'; btn.disabled = true; setTimeout(restore, 2000); } };
   const fallback = () => {
     try {
       const ta = document.createElement('textarea');
@@ -17962,7 +17993,7 @@ function copiarLinkProximos(btn) {
       document.execCommand('copy'); document.body.removeChild(ta);
       ok();
     } catch (e) {
-      if (btn) { btn.textContent = '⚠️ Copia manual: ' + url; setTimeout(restore, 3500); }
+      if (btn) { btn.textContent = 'Copia manual: ' + url; setTimeout(restore, 3500); }
     }
   };
   if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -18004,7 +18035,7 @@ async function loadWaitlist() {
   if (summary) summary.textContent = `Total: ${total} ${total === 1 ? 'persona' : 'personas'} en ${eventos.length} ${eventos.length === 1 ? 'evento' : 'eventos'}`;
 
   if (!eventos.length) {
-    groups.innerHTML = '<div class="empty-state" style="padding:40px;text-align:center;color:var(--ts);border:1px dashed var(--border);border-radius:10px"><div style="font-size:36px;margin-bottom:8px">🔔</div><div style="font-size:13px;letter-spacing:.06em">No hay registros todavía. Cuando alguien se registre en un evento &laquo;Próximamente&raquo;, aparecerá aquí.</div></div>';
+    groups.innerHTML = '<div class="empty-state" style="padding:40px;text-align:center;color:var(--ts);border:1px dashed var(--border);border-radius:10px"><div style="font-size:36px;margin-bottom:8px"><svg class="ic"><use href="#ic-campana"/></svg></div><div style="font-size:13px;letter-spacing:.06em">No hay registros todavía. Cuando alguien se registre en un evento &laquo;Próximamente&raquo;, aparecerá aquí.</div></div>';
     return;
   }
 
@@ -18019,7 +18050,7 @@ async function loadWaitlist() {
     const notifLabel = (pendientes > 0) ? `Notificar a ${pendientes} ahora` : 'Reenviar notificación';
     return `<div style="background:var(--bg2,#0a0a0a);border:1px solid var(--border);border-left:4px solid #e8ff4c;border-radius:10px;padding:18px 20px">
       <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:6px">
-        <div style="font-size:15px;font-weight:800;color:#fff;flex:1 1 auto">📅 ${_wlEsc(g.evento_nombre)}</div>
+        <div style="font-size:15px;font-weight:800;color:#fff;flex:1 1 auto"><svg class="ic"><use href="#ic-eventos"/></svg> ${_wlEsc(g.evento_nombre)}</div>
         <span style="font-size:10px;letter-spacing:.14em;padding:4px 10px;border-radius:4px;background:${tagBg};border:1px solid ${tagBorder};color:${tagColor};font-weight:800">${tagText}</span>
       </div>
       <div style="font-size:12px;color:var(--ts);margin-bottom:12px;letter-spacing:.04em">
@@ -18029,7 +18060,7 @@ async function loadWaitlist() {
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         <button class="btn btn-ghost btn-sm" onclick="wlVerRegistrados('${_wlEsc(g.evento_id)}')">Ver registrados</button>
         <button class="btn btn-primary btn-sm" onclick="wlNotificar('${_wlEsc(g.evento_id)}', ${g.rows.length}, ${pendientes})">${notifLabel}</button>
-        ${['maestro_roshi','bulma'].includes(currentUser?.rol) ? `<button class="btn btn-ghost btn-sm" style="color:#ff6666;border-color:rgba(255,68,68,.3)" onclick="wlEliminarEvento('${_wlEsc(g.evento_id)}', ${g.rows.length})">🗑 Eliminar evento de la lista</button>` : ''}
+        ${['maestro_roshi','bulma'].includes(currentUser?.rol) ? `<button class="btn btn-ghost btn-sm" style="color:#ff6666;border-color:rgba(255,68,68,.3)" onclick="wlEliminarEvento('${_wlEsc(g.evento_id)}', ${g.rows.length})"><svg class="ic"><use href="#ic-basura"/></svg> Eliminar evento de la lista</button>` : ''}
       </div>
     </div>`;
   }).join('');

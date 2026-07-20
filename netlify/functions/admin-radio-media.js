@@ -69,23 +69,30 @@ exports.handler = async (event) => {
       if (q.buscar != null) {
         const texto = String(q.buscar).trim();
         if (!texto) return { statusCode: 400, headers, body: JSON.stringify({ error: 'buscar vacío' }) };
-        const url = `${AZ_BASE}/api/station/${STATION}/files/list?searchPhrase=${encodeURIComponent(texto)}`;
+        const url = `${AZ_BASE}/api/station/${STATION}/files/list?searchPhrase=${encodeURIComponent(texto)}&rowCount=20`;
         const r = await httpFetch(url, { headers: azHeaders });
         if (!r.ok) {
           const detail = await r.text().catch(() => '');
           return { statusCode: 502, headers, body: JSON.stringify({ error: 'AzuraCast rechazó la búsqueda', detail }) };
         }
-        const raw = await r.json().catch(() => []);
-        const archivos = (Array.isArray(raw) ? raw : []).map(it => {
-          const m = (it && it.media) || it || {};
-          return {
-            ruta:    it.path || it.path_short || m.path || '',
-            titulo:  m.title  || '',
-            artista: m.artist || '',
-            album:   m.album  || '',
-            art:     artPublica(m),
-          };
-        }).filter(a => a.ruta).slice(0, 20);
+        // La respuesta real trae los resultados en data.rows; cada row lleva su
+        // metadata en row.media. Descartamos carpetas (type !== 'media').
+        const data = await r.json().catch(() => ({}));
+        const rows = (data && Array.isArray(data.rows)) ? data.rows : [];
+        const archivos = rows
+          .filter(row => row && row.type === 'media')
+          .map(row => {
+            const m = (row && row.media) || {};
+            return {
+              ruta:    row.path || m.path || '',
+              titulo:  m.title  || '',
+              artista: m.artist || '',
+              album:   m.album  || '',
+              art:     artMedia(m),
+            };
+          })
+          .filter(a => a.ruta)
+          .slice(0, 20);
         return { statusCode: 200, headers, body: JSON.stringify({ ok: true, archivos }) };
       }
 
@@ -176,6 +183,18 @@ function rutaValida(r) {
   if (typeof r !== 'string' || !r || r.length > 1024) return false;
   if (r.includes('..') || r.startsWith('/') || r.indexOf('\0') !== -1) return false;
   return true;
+}
+
+// Carátula de un media de files/list. row.media.art viene RELATIVO
+// ("/api/station/1/art/..."), así que le anteponemos el host público. Si no
+// trae art, caemos al criterio por id/unique_id (artPublica).
+function artMedia(m) {
+  const raw = (m && m.art) ? String(m.art) : '';
+  if (raw) {
+    if (raw.indexOf('http') === 0) return raw;               // ya absoluta
+    return AZ_BASE + (raw.charAt(0) === '/' ? raw : '/' + raw);
+  }
+  return artPublica(m);
 }
 
 // Carátula pública (mismo criterio del fix 4c365ec): si `art` ya apunta al host

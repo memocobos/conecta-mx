@@ -3253,29 +3253,150 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
  </div><!-- /page-kamisama -->
 
  <!-- ─── KAIO-SAMA · Admin de Radio Conecta (solo maestro_roshi) ─── -->
+ <!-- Estilos SCOPED al módulo Kaio-sama (.ks-*). No tocan el resto de KameHouse. -->
+ <style id="ks-styles">
+ /* Hero centro de control: carátula difuminada de fondo + ficha nítida encima */
+ .ks-hero{position:relative;overflow:hidden;border:1px solid var(--border);border-radius:var(--radius);margin-bottom:16px;isolation:isolate}
+ .ks-hero-bg{position:absolute;inset:-45px;z-index:-2;background-size:cover;background-position:center;filter:blur(40px) saturate(1.35) brightness(.5);transform:scale(1.12);opacity:.9}
+ .ks-hero-bg.is-empty{background:linear-gradient(135deg,var(--bg3),var(--bg2))}
+ .ks-hero::after{content:'';position:absolute;inset:0;z-index:-1;background:linear-gradient(90deg,rgba(6,6,8,.94) 0%,rgba(6,6,8,.74) 52%,rgba(6,6,8,.5) 100%)}
+ .ks-hero-inner{display:flex;align-items:center;gap:22px;padding:22px 24px;flex-wrap:wrap}
+ .ks-hero-art{position:relative;width:128px;height:128px;flex-shrink:0;border-radius:10px;overflow:hidden;box-shadow:0 10px 34px rgba(0,0,0,.55);border:1px solid rgba(255,255,255,.12)}
+ .ks-hero-art img,.ks-art img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+ .ks-art-ph{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,var(--bg4),var(--bg3));font-family:'Barlow Condensed',sans-serif;font-weight:900;color:var(--ts);letter-spacing:.04em}
+ .ks-hero-art .ks-art-ph{font-size:34px}
+ .ks-hero-body{flex:1;min-width:220px}
+ .ks-eyebrow{display:inline-flex;align-items:center;gap:8px;font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;letter-spacing:.2em;text-transform:uppercase;color:var(--green);margin-bottom:10px}
+ .ks-live-dot{width:8px;height:8px;border-radius:50%;background:var(--green);animation:ksPulse 1.8s infinite}
+ @keyframes ksPulse{0%{box-shadow:0 0 0 0 rgba(87,227,137,.6)}70%{box-shadow:0 0 0 9px rgba(87,227,137,0)}100%{box-shadow:0 0 0 0 rgba(87,227,137,0)}}
+ .ks-hero-titulo{font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:clamp(26px,4vw,40px);line-height:1.02;letter-spacing:.01em;color:var(--text);margin-bottom:4px;overflow-wrap:anywhere}
+ .ks-hero-artista{font-family:'Montserrat',sans-serif;font-size:15px;color:var(--ts);margin-bottom:16px}
+ .ks-hero-foot{display:flex;align-items:center;gap:18px;flex-wrap:wrap}
+ .ks-meter{display:flex;align-items:baseline;gap:8px}
+ .ks-meter-num{font-family:'JetBrains Mono',monospace;font-weight:700;font-size:26px;color:var(--gold);line-height:1}
+ .ks-meter-lbl{font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--ts)}
+
+ /* Tabs como pills, pegados arriba al hacer scroll */
+ .ks-tabs{position:sticky;top:0;z-index:8;display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding:12px 0;margin:0 0 16px;background:var(--bg);border-bottom:1px solid var(--border)}
+ .ks-tab{position:relative;display:inline-flex;align-items:center;gap:8px;font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:13px;letter-spacing:.08em;text-transform:uppercase;padding:9px 18px;border-radius:999px;border:1px solid var(--border);background:var(--bg2);color:var(--ts);cursor:pointer;transition:all .18s;min-height:38px}
+ .ks-tab:hover{border-color:var(--border2);color:var(--text)}
+ .ks-tab.active{background:var(--gold);border-color:var(--gold);color:#0a0a0a}
+ .ks-tab-badge{min-width:20px;height:20px;padding:0 6px;border-radius:999px;background:var(--red);color:#fff;font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;display:none;align-items:center;justify-content:center;line-height:1}
+ .ks-tab-badge.show{display:inline-flex}
+ .ks-tab.active .ks-tab-badge{background:#0a0a0a;color:var(--gold)}
+
+ /* Paneles y listas del tab Control */
+ .ks-panel{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:16px}
+ .ks-panel+.ks-panel{margin-top:16px}
+ .ks-grid-2{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px}
+ .ks-grid-2 .ks-panel{margin-top:0}
+ .ks-panel-title{font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--ts);margin-bottom:14px}
+ .ks-track{display:flex;align-items:center;gap:12px;padding:8px 0}
+ .ks-track+.ks-track{border-top:1px solid var(--border)}
+ .ks-track-idx{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--ts2);width:18px;text-align:right;flex-shrink:0}
+ .ks-art{position:relative;width:44px;height:44px;border-radius:7px;overflow:hidden;flex-shrink:0}
+ .ks-art .ks-art-ph{font-size:13px}
+ .ks-track-txt{min-width:0}
+ .ks-track-t{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+ .ks-track-a{color:var(--ts);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+ .ks-quick{display:flex;gap:10px;flex-wrap:wrap}
+
+ /* Tiles de Números — dato grande tipo display + tendencia */
+ .ks-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px}
+ .ks-stat{position:relative;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:18px;overflow:hidden;transition:border-color .2s}
+ .ks-stat:hover{border-color:var(--border2)}
+ .ks-stat-label{font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--ts);margin-bottom:10px}
+ .ks-stat-row{display:flex;align-items:baseline;gap:10px}
+ .ks-stat-num{font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:44px;line-height:.9;color:var(--gold)}
+ .ks-stat-num.green{color:var(--green)}
+ .ks-stat-num.red{color:var(--red)}
+ .ks-stat-trend{font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700;letter-spacing:.03em}
+ .ks-stat-trend.up{color:var(--green)}
+ .ks-stat-trend.down{color:var(--red)}
+ .ks-stat-trend.flat{color:var(--ts2)}
+ .ks-stat-sub{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--ts2);margin-top:10px;line-height:1.6}
+
+ /* Toggle "Solo pendientes" (pill) */
+ .ks-toggle{font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.08em;text-transform:uppercase;padding:8px 14px;border-radius:999px;border:1px solid var(--border);background:var(--bg2);color:var(--ts);cursor:pointer;min-height:38px}
+ .ks-toggle.active{border-color:var(--gold);color:var(--gold);background:rgba(232,255,76,.08)}
+
+ /* Tabla scoped: en desktop hereda el estilo KameHouse; en móvil → cards */
+ .ks-table-wrap{border-radius:var(--radius);border:1px solid var(--border);overflow:hidden}
+
+ @media(max-width:768px){
+  .ks-hero-inner{gap:16px;padding:16px}
+  .ks-hero-art{width:84px;height:84px}
+  .ks-hero-art .ks-art-ph{font-size:24px}
+  .ks-hero-titulo{font-size:clamp(20px,7vw,26px)}
+  .ks-hero-artista{margin-bottom:12px}
+  .ks-hero-foot{gap:14px}
+  .ks-meter-num{font-size:22px}
+  .ks-grid-2{grid-template-columns:1fr}
+  .ks-tab{flex:1 1 auto;justify-content:center;min-height:44px}
+  .ks-quick .btn{flex:1 1 100%;justify-content:center;min-height:44px}
+  .ks-stat-num{font-size:38px}
+
+  /* Peticiones y Muro: tablas → cards apiladas, sin scroll horizontal */
+  .ks-table-wrap{border:none;overflow:visible}
+  .ks-table thead{display:none}
+  .ks-table,.ks-table tbody,.ks-table tr,.ks-table td{display:block;width:100%}
+  .ks-table tr{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:12px;padding:6px 4px}
+  .ks-table tr:hover td{background:transparent}
+  .ks-table td{border:none;padding:9px 14px;font-size:14px;display:flex;gap:12px;align-items:flex-start}
+  .ks-table td::before{content:attr(data-label);flex:0 0 84px;font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--ts);padding-top:3px}
+  .ks-table td[colspan]{display:block;text-align:center;padding:16px}
+  .ks-table td[colspan]::before{display:none}
+  .ks-table td[data-label="Acción"]{display:block;border-top:1px solid var(--border);margin-top:4px;padding-top:12px}
+  .ks-table td[data-label="Acción"]::before{display:none}
+  .ks-table td[data-label="Acción"] .btn{width:100%;justify-content:center;min-height:44px;font-size:12px}
+ }
+ @media(prefers-reduced-motion:reduce){
+  .ks-live-dot{animation:none}
+ }
+ </style>
  <div class="page" id="page-radio">
   <div class="page-hero">
    <div>
     <div class="page-title">Kaio-sama — Radio Conecta</div>
-    <div class="page-sub">// peticiones de canción y el muro público</div>
+    <div class="page-sub">// centro de control de la transmisión en vivo</div>
    </div>
    <button class="btn btn-ghost btn-sm" onclick="loadRadio()" style="font-size:11px">↻ Refrescar</button>
   </div>
 
-  <div style="display:flex;gap:8px;margin:14px 0;flex-wrap:wrap">
-   <button class="gz-filter active" id="radio-tab-btn-peticiones" onclick="showRadioTab('peticiones',this)">Peticiones <span id="radio-pet-cnt"></span></button>
-   <button class="gz-filter" id="radio-tab-btn-muro" onclick="showRadioTab('muro',this)">El Muro</button>
-   <button class="gz-filter" id="radio-tab-btn-numeros" onclick="showRadioTab('numeros',this)">Números</button>
-   <button class="gz-filter" id="radio-tab-btn-control" onclick="showRadioTab('control',this)">Control</button>
+  <!-- HERO — Sonando ahora (visible en todos los tabs) -->
+  <div class="ks-hero">
+   <div class="ks-hero-bg is-empty" id="ks-hero-bg"></div>
+   <div class="ks-hero-inner">
+    <div class="ks-hero-art" id="ks-hero-art">
+     <div class="ks-art-ph" id="ks-hero-ph"></div>
+    </div>
+    <div class="ks-hero-body">
+     <div class="ks-eyebrow"><span class="ks-live-dot"></span> En vivo · Sonando ahora</div>
+     <div class="ks-hero-titulo" id="ks-hero-titulo">Cargando…</div>
+     <div class="ks-hero-artista" id="ks-hero-artista"></div>
+     <div class="ks-hero-foot">
+      <div class="ks-meter"><span class="ks-meter-num" id="ks-hero-oyentes">—</span><span class="ks-meter-lbl">oyentes ahora</span></div>
+      <button class="btn btn-ghost btn-sm" id="ks-hero-saltar" onclick="radioControlSaltar()" style="font-size:11px">Saltar canción</button>
+     </div>
+    </div>
+   </div>
+  </div>
+
+  <!-- Tabs como pills sticky -->
+  <div class="ks-tabs">
+   <button class="ks-tab active" id="radio-tab-btn-peticiones" onclick="showRadioTab('peticiones',this)">Peticiones <span class="ks-tab-badge" id="radio-pet-badge"></span></button>
+   <button class="ks-tab" id="radio-tab-btn-muro" onclick="showRadioTab('muro',this)">El Muro</button>
+   <button class="ks-tab" id="radio-tab-btn-numeros" onclick="showRadioTab('numeros',this)">Números</button>
+   <button class="ks-tab" id="radio-tab-btn-control" onclick="showRadioTab('control',this)">Control</button>
   </div>
 
   <!-- TAB 1: Peticiones -->
   <div id="radio-tab-peticiones">
-   <div style="display:flex;justify-content:flex-end;margin-bottom:10px">
-    <button class="gz-filter active" id="radio-pet-filtro" onclick="toggleRadioPetFiltro(this)">Solo pendientes</button>
+   <div style="display:flex;justify-content:flex-end;margin-bottom:12px">
+    <button class="ks-toggle active" id="radio-pet-filtro" onclick="toggleRadioPetFiltro(this)">Solo pendientes</button>
    </div>
-   <div class="table-wrap">
-    <table>
+   <div class="ks-table-wrap">
+    <table class="ks-table">
      <thead><tr><th>Fecha</th><th>Nombre</th><th>Petición</th><th>Estado</th><th>Acción</th></tr></thead>
      <tbody id="radio-pet-tbody">
       <tr><td colspan="5"><div class="loading-state"><div class="spinner"></div>Cargando…</div></td></tr>
@@ -3286,8 +3407,8 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
 
   <!-- TAB 2: El Muro -->
   <div id="radio-tab-muro" style="display:none">
-   <div class="table-wrap">
-    <table>
+   <div class="ks-table-wrap">
+    <table class="ks-table">
      <thead><tr><th>Fecha</th><th>Nombre</th><th>Mensaje</th><th>Estado</th><th>Acción</th></tr></thead>
      <tbody id="radio-muro-tbody">
       <tr><td colspan="5"><div class="loading-state"><div class="spinner"></div>Cargando…</div></td></tr>
@@ -3298,21 +3419,21 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
 
   <!-- TAB 3: Números -->
   <div id="radio-tab-numeros" style="display:none">
-   <div class="metrics-grid">
-    <div class="metric">
-     <div class="metric-label">Oyentes ahora</div>
-     <div class="metric-value green" id="radio-num-oyentes">…</div>
-     <div class="metric-sub" id="radio-num-sonando">cargando…</div>
+   <div class="ks-stats">
+    <div class="ks-stat">
+     <div class="ks-stat-label">Oyentes ahora</div>
+     <div class="ks-stat-row"><span class="ks-stat-num green" id="radio-num-oyentes">—</span><span class="ks-stat-trend flat" id="radio-num-oyentes-tr"></span></div>
+     <div class="ks-stat-sub" id="radio-num-sonando">cargando…</div>
     </div>
-    <div class="metric">
-     <div class="metric-label">Likes esta semana</div>
-     <div class="metric-value" id="radio-num-likes">…</div>
-     <div class="metric-sub" id="radio-num-top3">cargando…</div>
+    <div class="ks-stat">
+     <div class="ks-stat-label">Likes esta semana</div>
+     <div class="ks-stat-row"><span class="ks-stat-num" id="radio-num-likes">—</span><span class="ks-stat-trend flat" id="radio-num-likes-tr"></span></div>
+     <div class="ks-stat-sub" id="radio-num-top3">cargando…</div>
     </div>
-    <div class="metric">
-     <div class="metric-label">Peticiones pendientes</div>
-     <div class="metric-value red" id="radio-num-peticiones">…</div>
-     <div class="metric-sub">sin atender</div>
+    <div class="ks-stat">
+     <div class="ks-stat-label">Peticiones pendientes</div>
+     <div class="ks-stat-row"><span class="ks-stat-num red" id="radio-num-peticiones">—</span><span class="ks-stat-trend flat" id="radio-num-peticiones-tr"></span></div>
+     <div class="ks-stat-sub">sin atender</div>
     </div>
    </div>
   </div>
@@ -3320,30 +3441,27 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
   <!-- TAB 4: Control remoto -->
   <div id="radio-tab-control" style="display:none">
 
-   <!-- Sonando ahora -->
-   <div style="border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:16px">
-    <div class="metric-label" style="margin-bottom:12px">Sonando ahora</div>
-    <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
-     <img id="radio-ctrl-caratula" src="" alt="" style="width:64px;height:64px;border-radius:8px;object-fit:cover;background:rgba(255,255,255,.05);flex-shrink:0;display:none">
-     <div style="min-width:0;flex:1">
-      <div id="radio-ctrl-titulo" style="font-weight:700;font-size:15px">cargando…</div>
-      <div id="radio-ctrl-artista" style="color:var(--ts);font-size:13px"></div>
-     </div>
-     <button class="btn btn-ghost btn-sm" id="radio-ctrl-saltar" onclick="radioControlSaltar()" style="font-size:11px;white-space:nowrap">Saltar canción</button>
+   <div class="ks-grid-2">
+    <div class="ks-panel">
+     <div class="ks-panel-title">A continuación</div>
+     <div id="radio-ctrl-cola"><div class="loading-state"><div class="spinner"></div>Cargando…</div></div>
+    </div>
+    <div class="ks-panel">
+     <div class="ks-panel-title">Recién sonaron</div>
+     <div id="radio-ctrl-historial"><div class="loading-state"><div class="spinner"></div>Cargando…</div></div>
     </div>
    </div>
 
-   <!-- A continuación (cola) -->
-   <div style="border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:16px">
-    <div class="metric-label" style="margin-bottom:12px">A continuación</div>
-    <div id="radio-ctrl-cola" style="display:flex;flex-direction:column;gap:8px">
-     <div class="loading-state"><div class="spinner"></div>Cargando…</div>
+   <div class="ks-panel">
+    <div class="ks-panel-title">Accesos rápidos</div>
+    <div class="ks-quick">
+     <a class="btn btn-ghost btn-sm" href="https://conectareynosa.mx/radio" target="_blank" rel="noopener" style="font-size:11px">Abrir página pública</a>
+     <button class="btn btn-ghost btn-sm" id="radio-ctrl-copiar" onclick="radioCopiarStream(this)" style="font-size:11px">Copiar link del stream</button>
     </div>
    </div>
 
-   <!-- Acciones de estación -->
-   <div style="border:1px solid var(--border);border-radius:12px;padding:16px">
-    <div class="metric-label" style="margin-bottom:12px">Estación</div>
+   <div class="ks-panel">
+    <div class="ks-panel-title">Estación</div>
     <div style="display:flex;gap:10px;flex-wrap:wrap">
      <button class="btn btn-ghost btn-sm" id="radio-ctrl-recargar" onclick="radioControlRecargar()" style="font-size:11px">Recargar playlists</button>
      <button class="btn btn-sm" id="radio-ctrl-reiniciar" onclick="radioControlReiniciar()" style="font-size:11px;border:1px solid var(--red);color:var(--red);background:transparent">Reiniciar transmisión</button>
@@ -6064,6 +6182,11 @@ function loadPage(name) {
 // Lee/escribe radio_peticiones y radio_muro (Portal) vía admin-radio-* (service_role).
 // ═══════════════════════════════════════════════════════════════
 let _radioPeticiones = [], _radioMuro = [], _radioSoloPend = true;
+const RADIO_NOWPLAYING = 'https://radio.conectareynosa.mx/api/nowplaying/radioconecta';
+const RADIO_STREAM_URL = 'https://radio.conectareynosa.mx/listen/radioconecta/radio.mp3';
+let _radioHeroTimer = null;
+// Snapshot en memoria (sesión) para la tendencia de las tarjetas de Números.
+let _radioNumPrev = { oyentes: null, likes: null, peticiones: null };
 
 function _radioFecha(ts) {
   if (!ts) return '—';
@@ -6074,6 +6197,8 @@ function _radioFecha(ts) {
 
 // Carga ambas listas al entrar (patrón de las demás loadX). Fails-soft.
 async function loadRadio() {
+  _loadRadioHero();       // el hero vive fuera del try: se pinta aunque el admin falle
+  _radioHeroStart();      // auto-refresh cada 15s (una sola vez)
   try {
     const [rp, rm] = await Promise.all([
       khAdminFetch('/.netlify/functions/admin-radio-peticiones'),
@@ -6097,7 +6222,7 @@ async function loadRadio() {
 }
 
 function showRadioTab(sub, btn) {
-  document.querySelectorAll('#page-radio .gz-filter[id^="radio-tab-btn"]').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('#page-radio .ks-tab').forEach(b => b.classList.remove('active'));
   if (btn) btn.classList.add('active');
   ['peticiones', 'muro', 'numeros', 'control'].forEach(s => {
     const el = document.getElementById('radio-tab-' + s);
@@ -6107,22 +6232,77 @@ function showRadioTab(sub, btn) {
   if (sub === 'control') loadRadioControl();
 }
 
+// ── HERO "Sonando ahora" — centro de control, visible en todos los tabs ──────
+// Carátula difuminada de fondo + ficha nítida + oyentes en vivo. API pública
+// nowplaying (misma que Números). Auto-refresh cada 15s, pausado si la página no
+// está visible. Sin functions nuevas.
+function _radioHeroStart() {
+  if (_radioHeroTimer) return;
+  _radioHeroTimer = setInterval(() => {
+    const pg = document.getElementById('page-radio');
+    if (document.hidden || !pg || !pg.classList.contains('active')) return;
+    _loadRadioHero();
+  }, 15000);
+}
+
+function _loadRadioHero() {
+  fetch(RADIO_NOWPLAYING)
+    .then(r => r.json())
+    .then(d => {
+      const s = (d && d.now_playing && d.now_playing.song) || {};
+      const oy = (d && d.listeners && Number(d.listeners.current)) || 0;
+      const t = document.getElementById('ks-hero-titulo');
+      const a = document.getElementById('ks-hero-artista');
+      const o = document.getElementById('ks-hero-oyentes');
+      const ph = document.getElementById('ks-hero-ph');
+      if (t) t.textContent = s.title || 'Sin datos';
+      if (a) a.textContent = s.artist || '';
+      if (o) o.textContent = oy;
+      if (ph) ph.textContent = _radioInicialesArt(s.artist || s.title);
+      _radioSetArt(document.getElementById('ks-hero-art'), document.getElementById('ks-hero-bg'), s.art);
+    })
+    .catch(() => {
+      const t = document.getElementById('ks-hero-titulo');
+      const o = document.getElementById('ks-hero-oyentes');
+      if (t) t.textContent = 'No disponible';
+      if (o) o.textContent = '—';
+    });
+}
+
+// Pinta la carátula nítida sobre el placeholder y usa la misma imagen difuminada
+// de fondo. Si la imagen falla (onerror), se oculta y quedan placeholder + fondo
+// neutro — nunca se ve el ícono de imagen rota.
+function _radioSetArt(artEl, bgEl, url) {
+  if (!artEl) return;
+  const prev = artEl.querySelector('img');
+  if (prev) prev.remove();
+  if (!url) {
+    if (bgEl) { bgEl.style.backgroundImage = ''; bgEl.classList.add('is-empty'); }
+    return;
+  }
+  const img = document.createElement('img');
+  img.alt = '';
+  img.onload = () => { if (bgEl) { bgEl.style.backgroundImage = 'url("' + url + '")'; bgEl.classList.remove('is-empty'); } };
+  img.onerror = () => { img.remove(); if (bgEl) { bgEl.style.backgroundImage = ''; bgEl.classList.add('is-empty'); } };
+  img.src = url;
+  artEl.appendChild(img);
+}
+
 // Tab "Números" — 3 tarjetas con endpoints EXISTENTES (sin functions nuevas).
 // Peticiones pendientes sale de lo ya cargado por loadRadio; oyentes y likes se
-// piden aquí (fail-soft, cada card independiente).
+// piden aquí (fail-soft, cada card independiente). Cada dato muestra su tendencia
+// (▲/▼) contra la última carga guardada en memoria de sesión.
 async function loadRadioNumeros() {
   // ── Peticiones pendientes (reutiliza admin-radio-peticiones vía _radioPeticiones) ──
   const pend = _radioPeticiones.filter(p => !p.atendida).length;
-  const elPet = document.getElementById('radio-num-peticiones');
-  if (elPet) elPet.textContent = pend;
+  _radioSetNum('peticiones', pend, true); // neutral: más pendientes no es "bueno/malo"
 
   // ── Oyentes ahora + canción sonando (API pública de la radio, fetch cliente) ──
-  fetch('https://radio.conectareynosa.mx/api/nowplaying/radioconecta')
+  fetch(RADIO_NOWPLAYING)
     .then(r => r.json())
     .then(d => {
       const oy = (d && d.listeners && Number(d.listeners.current)) || 0;
-      const elOy = document.getElementById('radio-num-oyentes');
-      if (elOy) elOy.textContent = oy;
+      _radioSetNum('oyentes', oy);
       const s = d && d.now_playing && d.now_playing.song;
       const elSon = document.getElementById('radio-num-sonando');
       if (elSon) elSon.textContent = (s && (s.title || s.artist))
@@ -6142,8 +6322,7 @@ async function loadRadioNumeros() {
     .then(d => {
       const top = (d && Array.isArray(d.top)) ? d.top : [];
       const total = top.reduce((a, t) => a + (Number(t.likes) || 0), 0);
-      const elLk = document.getElementById('radio-num-likes');
-      if (elLk) elLk.textContent = total;
+      _radioSetNum('likes', total);
       const elT3 = document.getElementById('radio-num-top3');
       if (elT3) elT3.innerHTML = top.length
         ? top.slice(0, 3).map((t, i) => {
@@ -6160,35 +6339,52 @@ async function loadRadioNumeros() {
     });
 }
 
-// ── TAB "Control" — control remoto de la estación (Fase 3) ──────────────────
-// "Sonando ahora" sale de la API pública nowplaying (igual que Números). La cola
-// y las acciones (saltar/recargar/reiniciar) pasan por admin-radio-control, que
-// habla con AzuraCast con la API key server-side. Cada bloque falla-soft.
-function loadRadioControl() {
-  _loadRadioSonando();
-  _loadRadioCola();
+// Actualiza el número grande + su indicador de tendencia contra la carga previa.
+// neutral=true muestra el cambio en tono apagado (sin verde/rojo de valor).
+function _radioSetNum(key, val, neutral) {
+  const numEl = document.getElementById('radio-num-' + key);
+  const trEl = document.getElementById('radio-num-' + key + '-tr');
+  if (numEl) numEl.textContent = val;
+  if (trEl) {
+    const prev = _radioNumPrev[key];
+    let cls = 'flat', txt = '';
+    if (prev != null && val !== prev) {
+      const up = val > prev;
+      cls = neutral ? 'flat' : (up ? 'up' : 'down');
+      txt = up ? ('▲ +' + (val - prev)) : ('▼ −' + (prev - val));
+    } else if (prev != null) {
+      txt = '– sin cambio';
+    }
+    trEl.className = 'ks-stat-trend ' + cls;
+    trEl.textContent = txt;
+  }
+  _radioNumPrev[key] = val;
 }
 
-function _loadRadioSonando() {
-  const elT = document.getElementById('radio-ctrl-titulo');
-  const elA = document.getElementById('radio-ctrl-artista');
-  const elC = document.getElementById('radio-ctrl-caratula');
-  fetch('https://radio.conectareynosa.mx/api/nowplaying/radioconecta')
+// ── TAB "Control" — control remoto de la estación (Fase 3) ──────────────────
+// La cola y las acciones (saltar/recargar/reiniciar) pasan por admin-radio-control
+// (API key server-side). "Recién sonaron" sale de song_history de nowplaying
+// pública. El "Sonando ahora" ya vive en el hero. Cada bloque falla-soft.
+function loadRadioControl() {
+  _loadRadioCola();
+  _loadRadioHistorial();
+}
+
+// "Recién sonaron" — últimas 5 de song_history (nowplaying pública).
+function _loadRadioHistorial() {
+  const box = document.getElementById('radio-ctrl-historial');
+  if (!box) return;
+  fetch(RADIO_NOWPLAYING)
     .then(r => r.json())
     .then(d => {
-      const s = (d && d.now_playing && d.now_playing.song) || {};
-      if (elT) elT.textContent = s.title || 'sin datos';
-      if (elA) elA.textContent = s.artist || '';
-      if (elC) {
-        if (s.art) { elC.src = s.art; elC.style.display = ''; }
-        else { elC.removeAttribute('src'); elC.style.display = 'none'; }
-      }
+      const hist = (d && Array.isArray(d.song_history)) ? d.song_history.slice(0, 5) : [];
+      if (!hist.length) { box.innerHTML = `<div style="color:var(--ts);font-size:13px">Sin historial todavía.</div>`; return; }
+      box.innerHTML = hist.map(h => {
+        const s = (h && h.song) || {};
+        return _radioTrackHtml(s.title, s.artist, s.art, null);
+      }).join('');
     })
-    .catch(() => {
-      if (elT) elT.textContent = 'no disponible';
-      if (elA) elA.textContent = '';
-      if (elC) elC.style.display = 'none';
-    });
+    .catch(() => { box.innerHTML = `<div style="color:var(--ts);font-size:13px">No disponible.</div>`; });
 }
 
 // Hasta 2 iniciales del artista (o título) para el placeholder de la carátula.
@@ -6197,6 +6393,25 @@ function _radioInicialesArt(txt) {
   if (!w.length) return '';
   if (w.length === 1) return w[0].slice(0, 2).toUpperCase();
   return (w[0][0] + w[1][0]).toUpperCase();
+}
+
+// Fila de track (cola / recién sonaron). Placeholder con iniciales SIEMPRE detrás;
+// la carátula va encima con onerror que la oculta — nunca se ve la imagen rota.
+// idx = número de orden (cola) o null (historial).
+function _radioTrackHtml(titulo, artista, art, idx) {
+  titulo = titulo || 'sin título';
+  artista = artista || '';
+  const ini = _radioInicialesArt(artista || titulo);
+  const ph = `<div class="ks-art-ph">${_spEscape(ini)}</div>`;
+  const img = art
+    ? `<img src="${_spEscape(art)}" alt="" loading="lazy" onerror="this.style.display='none'">`
+    : '';
+  const idxHtml = (idx != null) ? `<span class="ks-track-idx">${idx}</span>` : '';
+  return `<div class="ks-track">${idxHtml}<div class="ks-art">${ph}${img}</div>
+    <div class="ks-track-txt">
+      <div class="ks-track-t">${_spEscape(titulo)}</div>
+      <div class="ks-track-a">${_spEscape(artista)}</div>
+    </div></div>`;
 }
 
 async function _loadRadioCola() {
@@ -6212,29 +6427,38 @@ async function _loadRadioCola() {
       box.innerHTML = `<div style="color:var(--ts);font-size:13px">La cola está vacía.</div>`;
       return;
     }
-    box.innerHTML = cola.map((c, i) => {
-      const titulo = c.titulo || 'sin título';
-      const artista = c.artista || '';
-      // Placeholder gris con iniciales SIEMPRE detrás; la carátula va encima y,
-      // si falla (onerror), se oculta y deja ver el placeholder — nunca se ve el
-      // ícono de imagen rota.
-      const ini = _radioInicialesArt(artista || titulo);
-      const ph = `<div style="position:absolute;inset:0;width:40px;height:40px;border-radius:6px;background:rgba(255,255,255,.08);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:var(--ts)">${_spEscape(ini)}</div>`;
-      const img = c.caratula
-        ? `<img src="${_spEscape(c.caratula)}" alt="" loading="lazy" onerror="this.style.display='none'" style="position:absolute;inset:0;width:40px;height:40px;border-radius:6px;object-fit:cover">`
-        : '';
-      const car = `<div style="position:relative;width:40px;height:40px;flex-shrink:0">${ph}${img}</div>`;
-      return `<div style="display:flex;align-items:center;gap:10px">
-        <span style="color:var(--ts);font-size:12px;width:18px;text-align:right;flex-shrink:0">${i + 1}</span>
-        ${car}
-        <div style="min-width:0">
-          <div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${_spEscape(titulo)}</div>
-          <div style="color:var(--ts);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${_spEscape(artista)}</div>
-        </div>
-      </div>`;
-    }).join('');
+    box.innerHTML = cola.map((c, i) => _radioTrackHtml(c.titulo, c.artista, c.caratula, i + 1)).join('');
   } catch (e) {
     box.innerHTML = `<div style="color:#FF6B6B;font-size:13px">Error: ${_spEscape(e.message)}</div>`;
+  }
+}
+
+// Copia el link del stream al portapapeles con confirmación visual en el botón.
+function radioCopiarStream(btn) {
+  const done = () => {
+    if (btn) {
+      const orig = btn.textContent;
+      btn.textContent = 'Copiado';
+      btn.disabled = true;
+      setTimeout(() => { btn.textContent = orig; btn.disabled = false; }, 1800);
+    }
+    showToast('Link del stream copiado.', 'success');
+  };
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(RADIO_STREAM_URL).then(done).catch(() => _radioCopyFallback(RADIO_STREAM_URL, done));
+  } else {
+    _radioCopyFallback(RADIO_STREAM_URL, done);
+  }
+}
+function _radioCopyFallback(text, done) {
+  try {
+    const ta = document.createElement('textarea');
+    ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.focus(); ta.select();
+    document.execCommand('copy'); ta.remove();
+    done();
+  } catch (e) {
+    showToast('No se pudo copiar. Link: ' + text, 'error');
   }
 }
 
@@ -6260,8 +6484,8 @@ async function _radioControlAccion(accion, btnId, okMsg) {
 
 async function radioControlSaltar() {
   if (!confirm('¿Saltar la canción que está sonando ahora?')) return;
-  const ok = await _radioControlAccion('saltar', 'radio-ctrl-saltar', 'Canción saltada.');
-  if (ok) { setTimeout(() => { _loadRadioSonando(); _loadRadioCola(); }, 1500); }
+  const ok = await _radioControlAccion('saltar', 'ks-hero-saltar', 'Canción saltada.');
+  if (ok) { setTimeout(() => { _loadRadioHero(); _loadRadioCola(); _loadRadioHistorial(); }, 1500); }
 }
 
 async function radioControlRecargar() {
@@ -6285,8 +6509,8 @@ function _renderRadioPeticiones() {
   const tb = document.getElementById('radio-pet-tbody');
   if (!tb) return;
   const pendientes = _radioPeticiones.filter(p => !p.atendida).length;
-  const cnt = document.getElementById('radio-pet-cnt');
-  if (cnt) cnt.textContent = pendientes ? '(' + pendientes + ')' : '';
+  const badge = document.getElementById('radio-pet-badge');
+  if (badge) { badge.textContent = pendientes; badge.classList.toggle('show', pendientes > 0); }
   const rows = _radioSoloPend ? _radioPeticiones.filter(p => !p.atendida) : _radioPeticiones;
   if (!rows.length) {
     tb.innerHTML = `<tr><td colspan="5" style="color:var(--ts)">${_radioSoloPend ? 'Sin peticiones pendientes' : 'Sin peticiones todavía'}</td></tr>`;
@@ -6295,17 +6519,17 @@ function _renderRadioPeticiones() {
   tb.innerHTML = rows.map(p => {
     const id = _spEscape(p.id);
     const estado = p.atendida
-      ? '<span style="color:#3DDC84">✓ Atendida</span>'
-      : '<span style="color:var(--orange)">⏳ Pendiente</span>';
+      ? '<span class="badge badge-green">Atendida</span>'
+      : '<span class="badge badge-orange">Pendiente</span>';
     const accion = p.atendida
-      ? `<button class="btn btn-ghost btn-sm" style="font-size:11px" onclick="radioAtender('${id}',false)">↩ Reabrir</button>`
-      : `<button class="btn btn-primary btn-sm" style="font-size:11px" onclick="radioAtender('${id}',true)">✓ Atendida</button>`;
+      ? `<button class="btn btn-ghost btn-sm" style="font-size:11px" onclick="radioAtender('${id}',false)">Reabrir</button>`
+      : `<button class="btn btn-primary btn-sm" style="font-size:11px" onclick="radioAtender('${id}',true)">Atender</button>`;
     return `<tr${p.atendida ? ' style="opacity:.55"' : ''}>
-      <td style="white-space:nowrap">${_spEscape(_radioFecha(p.creado))}</td>
-      <td>${_spEscape(p.nombre || '—')}</td>
-      <td>${_spEscape(p.peticion || '')}</td>
-      <td>${estado}</td>
-      <td>${accion}</td>
+      <td data-label="Fecha" style="white-space:nowrap">${_spEscape(_radioFecha(p.creado))}</td>
+      <td data-label="Nombre">${_spEscape(p.nombre || '—')}</td>
+      <td data-label="Petición">${_spEscape(p.peticion || '')}</td>
+      <td data-label="Estado">${estado}</td>
+      <td data-label="Acción">${accion}</td>
     </tr>`;
   }).join('');
 }
@@ -6320,17 +6544,17 @@ function _renderRadioMuro() {
   tb.innerHTML = _radioMuro.map(m => {
     const id = _spEscape(m.id);
     const estado = m.visible
-      ? '<span style="color:#3DDC84"><svg class="ic"><use href="#ic-ojo"/></svg> Visible</span>'
-      : '<span style="color:var(--ts)">Oculto</span>';
+      ? '<span class="badge badge-green"><svg class="ic"><use href="#ic-ojo"/></svg> Visible</span>'
+      : '<span class="badge badge-gray">Oculto</span>';
     const accion = m.visible
       ? `<button class="btn btn-ghost btn-sm" style="font-size:11px" onclick="radioMuroVisible('${id}',false)">Ocultar</button>`
-      : `<button class="btn btn-primary btn-sm" style="font-size:11px" onclick="radioMuroVisible('${id}',true)"><svg class="ic"><use href="#ic-ojo"/></svg> Mostrar</button>`;
+      : `<button class="btn btn-primary btn-sm" style="font-size:11px" onclick="radioMuroVisible('${id}',true)">Mostrar</button>`;
     return `<tr${m.visible ? '' : ' style="opacity:.45"'}>
-      <td style="white-space:nowrap">${_spEscape(_radioFecha(m.creado))}</td>
-      <td>${_spEscape(m.nombre || '—')}</td>
-      <td>${_spEscape(m.mensaje || '')}</td>
-      <td>${estado}</td>
-      <td>${accion}</td>
+      <td data-label="Fecha" style="white-space:nowrap">${_spEscape(_radioFecha(m.creado))}</td>
+      <td data-label="Nombre">${_spEscape(m.nombre || '—')}</td>
+      <td data-label="Mensaje">${_spEscape(m.mensaje || '')}</td>
+      <td data-label="Estado">${estado}</td>
+      <td data-label="Acción">${accion}</td>
     </tr>`;
   }).join('');
 }

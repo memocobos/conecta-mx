@@ -6715,6 +6715,11 @@ function radioMediaAbrirModalIdx(i) {
 async function radioMediaAbrirModal(a) {
   if (!a || !a.ruta) { showToast('Esa canción no tiene ruta editable.', 'error'); return; }
   _radioMediaNuevaPortada = null;
+  // openModal PRIMERO: limpia el primer input[type=hidden] del modal (que es
+  // #rm-ruta). Si abriéramos DESPUÉS de fijar la ruta, la borraría y el guardado
+  // fallaría con "Falta la ruta del archivo" (bug que afectaba a búsqueda y a
+  // Biblioteca por igual). Abrir antes de poblar deja la ruta intacta.
+  openModal('modal-radio-media');
   document.getElementById('rm-ruta').value = a.ruta;
   document.getElementById('rm-titulo').value = a.titulo || '';
   document.getElementById('rm-artista').value = a.artista || '';
@@ -6723,7 +6728,6 @@ async function radioMediaAbrirModal(a) {
   const fileInp = document.getElementById('rm-file'); if (fileInp) fileInp.value = '';
   _radioMediaSetCover(a.art, a.artista || a.titulo);
   _radioMediaAlert('', false);
-  openModal('modal-radio-media');
   // Refinar con los tags REALES del archivo (incluye artista_album).
   try {
     const r = await khAdminFetch('/.netlify/functions/admin-radio-media?leer=' + encodeURIComponent(a.ruta));

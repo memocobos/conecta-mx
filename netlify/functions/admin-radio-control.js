@@ -77,7 +77,7 @@ exports.handler = async (event) => {
         return {
           titulo:  s.title  || '',
           artista: s.artist || '',
-          caratula: s.art   || '',
+          caratula: artPublica(s),
         };
       });
       return { statusCode: 200, headers, body: JSON.stringify({ ok: true, cola }) };
@@ -105,6 +105,23 @@ exports.handler = async (event) => {
 };
 
 // ----- helpers -----
+
+// Carátula pública para un elemento de la cola. El endpoint admin /queue suele
+// devolver `art` armado con la base URL INTERNA del backend de AzuraCast
+// (IP/host de Docker), que el navegador no puede cargar — a diferencia de
+// nowplaying, que ya resuelve al host público. Si `art` no es una URL del host
+// público, la reconstruimos con el patrón público a partir del id de la canción:
+//   https://radio.conectareynosa.mx/api/station/1/art/{id}
+// Sin id ni URL pública → '' (el frontend muestra el placeholder con iniciales).
+const PUBLIC_ART_PREFIX = `${AZ_BASE}/api/station/${STATION}/art/`;
+
+function artPublica(s) {
+  const raw = (s && s.art) ? String(s.art) : '';
+  if (raw && raw.indexOf(`${AZ_BASE}/`) === 0) return raw; // ya es pública
+  const id = (s && (s.id || s.unique_id)) ? String(s.id || s.unique_id) : '';
+  if (id) return PUBLIC_ART_PREFIX + encodeURIComponent(id);
+  return '';
+}
 
 // fetch con timeout duro de 8s (AbortController). Node 18+ (fetch/AbortController globales en Netlify).
 async function azFetch(url, options) {

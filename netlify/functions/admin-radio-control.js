@@ -107,20 +107,21 @@ exports.handler = async (event) => {
 // ----- helpers -----
 
 // Carátula pública para un elemento de la cola. El endpoint admin /queue suele
-// devolver `art` armado con la base URL INTERNA del backend de AzuraCast
-// (IP/host de Docker), que el navegador no puede cargar — a diferencia de
-// nowplaying, que ya resuelve al host público. Si `art` no es una URL del host
-// público, la reconstruimos con el patrón público a partir del id de la canción:
-//   https://radio.conectareynosa.mx/api/station/1/art/{id}
-// Sin id ni URL pública → '' (el frontend muestra el placeholder con iniciales).
-const PUBLIC_ART_PREFIX = `${AZ_BASE}/api/station/${STATION}/art/`;
-
+// devolver `art` con la base URL INTERNA del backend de AzuraCast (IP/host de
+// Docker), que el navegador no puede cargar. NO la reconstruimos desde el id
+// (ese id es el hash artista+título de la canción, no el unique_id del media, y
+// resuelve a arte ajeno o al default): tomamos la URL de arte ORIGINAL y solo
+// reemplazamos el origin por el host público, conservando path+query intactos
+// (ese path ya trae el unique_id correcto). Sin URL de arte → '' (placeholder).
 function artPublica(s) {
   const raw = (s && s.art) ? String(s.art) : '';
-  if (raw && raw.indexOf(`${AZ_BASE}/`) === 0) return raw; // ya es pública
-  const id = (s && (s.id || s.unique_id)) ? String(s.id || s.unique_id) : '';
-  if (id) return PUBLIC_ART_PREFIX + encodeURIComponent(id);
-  return '';
+  if (!raw) return '';
+  try {
+    const u = new URL(raw, AZ_BASE); // parsea absolutas (host interno) y relativas
+    return AZ_BASE + u.pathname + u.search;
+  } catch (e) {
+    return (raw.charAt(0) === '/') ? (AZ_BASE + raw) : raw;
+  }
 }
 
 // fetch con timeout duro de 8s (AbortController). Node 18+ (fetch/AbortController globales en Netlify).

@@ -6446,10 +6446,23 @@ function _loadRadioHistorial() {
       if (!hist.length) { box.innerHTML = `<div style="color:var(--ts);font-size:13px">Sin historial todavía.</div>`; return; }
       box.innerHTML = hist.map(h => {
         const s = (h && h.song) || {};
-        return _radioTrackHtml(s.title, s.artist, s.art, null);
+        return _radioTrackHtml(s.title, s.artist, _radioArtHost(s.art), null);
       }).join('');
     })
     .catch(() => { box.innerHTML = `<div style="color:var(--ts);font-size:13px">No disponible.</div>`; });
+}
+
+// Normaliza una URL de arte al host público conservando path+query (que ya trae
+// el unique_id correcto). NO inventa /art/{id}. Sin URL → '' (placeholder).
+function _radioArtHost(url) {
+  const raw = String(url || '');
+  if (!raw) return '';
+  try {
+    const u = new URL(raw, 'https://radio.conectareynosa.mx');
+    return 'https://radio.conectareynosa.mx' + u.pathname + u.search;
+  } catch (e) {
+    return (raw.charAt(0) === '/') ? ('https://radio.conectareynosa.mx' + raw) : raw;
+  }
 }
 
 // Hasta 2 iniciales del artista (o título) para el placeholder de la carátula.
@@ -6494,7 +6507,7 @@ async function _loadRadioCola() {
       box.innerHTML = `<div style="color:var(--ts);font-size:13px">La cola está vacía.</div>`;
       return;
     }
-    box.innerHTML = cola.map((c, i) => _radioTrackHtml(c.titulo, c.artista, c.caratula, i + 1)).join('');
+    box.innerHTML = cola.map((c, i) => _radioTrackHtml(c.titulo, c.artista, _radioArtHost(c.caratula), i + 1)).join('');
   } catch (e) {
     box.innerHTML = `<div style="color:#FF6B6B;font-size:13px">Error: ${_spEscape(e.message)}</div>`;
   }

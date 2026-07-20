@@ -6589,17 +6589,60 @@ function _radioResultHtml(a, i) {
 
 // Click en un track de cola / historial / hero → busca por nombre y abre el mejor.
 async function radioMediaAbrirPorNombre(titulo, artista) {
-  const q = [titulo, artista].filter(Boolean).join(' ').trim();
-  if (!q) return;
+  const tit = String(titulo || '').trim();
+  const art = String(artista || '').trim();
+  if (!tit) return;
+  // AzuraCast matchea substring sobre "Artista - Título"; mandar título+artista
+  // concatenados no coincide con ese orden → 0 filas. Buscamos SOLO por título.
   try {
-    const arch = await _radioMediaSearch(q);
-    if (!arch.length) { showToast('No encontré esa canción en la biblioteca.', 'error'); return; }
-    const tl = String(titulo || '').toLowerCase().trim();
-    const best = arch.find(a => String(a.titulo || '').toLowerCase().trim() === tl) || arch[0];
-    radioMediaAbrirModal(best);
+    let arch = await _radioMediaSearch(tit);
+    let best = _radioMediaMejorPorArtista(arch, art);
+    // Fallback: si el título no trajo nada, busca por artista y filtra por título.
+    if (!best && art) {
+      const porArtista = await _radioMediaSearch(art);
+      best = _radioMediaMejorPorTitulo(porArtista, tit);
+    }
+    if (best) { radioMediaAbrirModal(best); return; }
+    // Nada automático: deja que Memo elija a mano con el buscador precargado.
+    _radioMediaEnfocarBuscador(tit);
   } catch (e) {
     showToast('Error buscando: ' + e.message, 'error');
   }
+}
+
+function _ciIncluye(a, b) {
+  a = String(a || '').toLowerCase().trim();
+  b = String(b || '').toLowerCase().trim();
+  if (!a || !b) return false;
+  return a.includes(b) || b.includes(a);
+}
+
+// De los resultados, el de artista más parecido (includes en ambos sentidos);
+// si no hay artista de referencia, el primero. null si la lista viene vacía.
+function _radioMediaMejorPorArtista(arch, artista) {
+  if (!arch || !arch.length) return null;
+  if (!artista) return arch[0];
+  return arch.find(a => _ciIncluye(a.artista, artista)) || arch[0];
+}
+
+// De los resultados (buscados por artista), el de título más parecido.
+function _radioMediaMejorPorTitulo(arch, titulo) {
+  if (!arch || !arch.length) return null;
+  return arch.find(a => _ciIncluye(a.titulo, titulo)) || null;
+}
+
+// Salta al tab Control, precarga el buscador con el título y lo enfoca.
+function _radioMediaEnfocarBuscador(titulo) {
+  const btn = document.getElementById('radio-tab-btn-control');
+  if (btn) showRadioTab('control', btn);
+  const inp = document.getElementById('radio-media-q');
+  if (inp) {
+    inp.value = titulo;
+    inp.focus();
+    inp.select();
+    radioMediaBuscar();
+  }
+  showToast('No encontré esa canción sola. Búscala y elígela a mano.', 'error');
 }
 
 // Click en "Sonando ahora" (hero) → edita la canción al aire.

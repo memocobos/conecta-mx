@@ -6191,6 +6191,14 @@ function _loadRadioSonando() {
     });
 }
 
+// Hasta 2 iniciales del artista (o título) para el placeholder de la carátula.
+function _radioInicialesArt(txt) {
+  const w = String(txt || '').trim().split(/\s+/).filter(Boolean);
+  if (!w.length) return '';
+  if (w.length === 1) return w[0].slice(0, 2).toUpperCase();
+  return (w[0][0] + w[1][0]).toUpperCase();
+}
+
 async function _loadRadioCola() {
   const box = document.getElementById('radio-ctrl-cola');
   if (!box) return;
@@ -6207,9 +6215,15 @@ async function _loadRadioCola() {
     box.innerHTML = cola.map((c, i) => {
       const titulo = c.titulo || 'sin título';
       const artista = c.artista || '';
-      const car = c.caratula
-        ? `<img src="${_spEscape(c.caratula)}" alt="" style="width:40px;height:40px;border-radius:6px;object-fit:cover;flex-shrink:0">`
-        : `<div style="width:40px;height:40px;border-radius:6px;background:rgba(255,255,255,.05);flex-shrink:0"></div>`;
+      // Placeholder gris con iniciales SIEMPRE detrás; la carátula va encima y,
+      // si falla (onerror), se oculta y deja ver el placeholder — nunca se ve el
+      // ícono de imagen rota.
+      const ini = _radioInicialesArt(artista || titulo);
+      const ph = `<div style="position:absolute;inset:0;width:40px;height:40px;border-radius:6px;background:rgba(255,255,255,.08);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:var(--ts)">${_spEscape(ini)}</div>`;
+      const img = c.caratula
+        ? `<img src="${_spEscape(c.caratula)}" alt="" loading="lazy" onerror="this.style.display='none'" style="position:absolute;inset:0;width:40px;height:40px;border-radius:6px;object-fit:cover">`
+        : '';
+      const car = `<div style="position:relative;width:40px;height:40px;flex-shrink:0">${ph}${img}</div>`;
       return `<div style="display:flex;align-items:center;gap:10px">
         <span style="color:var(--ts);font-size:12px;width:18px;text-align:right;flex-shrink:0">${i + 1}</span>
         ${car}

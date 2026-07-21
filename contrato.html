@@ -420,9 +420,235 @@ const CLAUSULAS = [
   }
 ];
 
+// ── VÍA B (F5): Coordinadores (endurecido) + Giveaway ─────────────────
+// Texto FIEL de contratos-viaB-v3.1-TEXTO-OFICIAL.md. El flujo de firma
+// (canvas + INE + acepto) es EL MISMO que el de creadoras — se reusan los MISMOS
+// ids del DOM (#firmaCanvas, #fileFrente/#fileReverso, #acepto, #btnFirmar), así
+// que la lógica de firma no se duplica. Solo cambian encabezado y cláusulas.
+// {{FECHA_NACIMIENTO}} y {{EMERGENCIA_*}} no se capturan en este flujo → se
+// muestran como línea en blanco salvo que vengan en `datos`.
+function _fillBlank(v) {
+  return (v == null || String(v).trim() === '') ? '__________' : escapeHtml(String(v));
+}
+function _viaBCtx(c, opts) {
+  const firmado = opts.estado === 'firmado';
+  const d = c.datos || {};
+  const em = (d.emergencia && typeof d.emergencia === 'object') ? d.emergencia : {};
+  return {
+    nombre: escapeHtml(c.creador_nombre || ''),
+    fnac: _fillBlank(d.fecha_nacimiento),
+    firmaTxt: firmado ? escapeHtml(fmtFechaLarga((c.vigencia_inicio || '').slice(0,10))) : 'tu firma',
+    finTxt:   firmado ? escapeHtml(fmtFechaLarga((c.vigencia_fin || '').slice(0,10)))    : 'un (1) año después',
+    vigResumen: firmado
+      ? `del ${escapeHtml(fmtFechaLarga((c.vigencia_inicio||'').slice(0,10)))} al ${escapeHtml(fmtFechaLarga((c.vigencia_fin||'').slice(0,10)))}`
+      : '1 (un) año a partir de tu firma',
+    emNom: _fillBlank(em.nombre),
+    emTel: _fillBlank(em.telefono),
+    emPar: _fillBlank(em.parentesco),
+    evento: escapeHtml(c.evento_nombre || ''),
+    fechaEvento: escapeHtml(fmtFechaCorta(c.evento_fecha)),
+    desglose: escapeHtml(String(d.desglose_premio || '__________')),
+    valor: (d.valor_premio && Number(d.valor_premio)) ? Number(d.valor_premio).toLocaleString('es-MX') : '__________',
+  };
+}
+
+// Cláusulas del COORDINADOR (12). cuerpo(x) recibe el ctx de _viaBCtx.
+const CLAUSULAS_COORDINADOR = [
+  { ord:'PRIMERA', t:'Naturaleza NO laboral, explicada', cuerpo:()=>`<p>Esta es una colaboración por intercambio: el coordinador apoya en los viajes y recibe los beneficios de la cláusula Tercera. No hay salario, no hay subordinación laboral, no hay prestaciones ni derechos de una relación de trabajo. Participar es voluntario; los compromisos de este contrato existen porque el coordinador acepta el intercambio, no porque sea empleado.</p>` },
+  { ord:'SEGUNDA', t:'Funciones, con estándar de cumplimiento', cuerpo:()=>`<p>El coordinador se compromete a: apoyar la logística completa del tour (control de pasajeros, boletos, habitaciones, equipaje y horarios) SIGUIENDO LAS LISTAS Y HERRAMIENTAS DEL SISTEMA que la agencia le proporcione; mantener comunicación constante por los grupos oficiales; entregar los kits y materiales oficiales completos; realizar pagos menores entregando SIEMPRE comprobantes; y velar por la seguridad, imagen y experiencia de los viajeros. El estándar es simple: si está en la lista, se cumple y se registra; lo no registrado se considera no hecho.</p>` },
+  { ord:'TERCERA', t:'Beneficios del intercambio', cuerpo:()=>`<p>Por cada tour en que participe: transporte (terrestre o aéreo según destino), hospedaje en hotel de categoría cuatro estrellas, boleto en la mejor localidad disponible, y Kit Conecta. En accidente o enfermedad durante el viaje, la agencia cubre los gastos médicos iniciales hasta que reciba atención formal. Estos beneficios no constituyen salario.</p>` },
+  { ord:'CUARTA', t:'Comisiones por venta', cuerpo:()=>`<p>El coordinador podrá vender boletos de los tours con una comisión del <b>30% sobre la ganancia neta</b> del boleto (no sobre el total de la venta). Las condiciones de pago de la comisión se notifican por escrito o medio digital en cada campaña.</p>` },
+  { ord:'QUINTA', t:'Materiales y bodega — con plazo', cuerpo:()=>`<p>Todo material, boleto, dinero o equipo confiado queda bajo resguardo personal del coordinador. Los sobrantes y equipos deben devolverse en óptimas condiciones <b>EN UN MÁXIMO DE 5 (CINCO) DÍAS NATURALES</b> después del viaje. Daño, pérdida o no devolución obliga a reponer el costo vigente del artículo. Las salidas y devoluciones se declaran en el sistema de bodega de la agencia.</p>` },
+  { ord:'SEXTA', t:'Registro de faltas (strikes)', cuerpo:()=>`<p>Las faltas operativas y de conducta se registran en el sistema y se acumulan. La acumulación de <b>3 (tres) faltas</b> causa la suspensión de la colaboración, independientemente de que una sola falta grave pueda causar la terminación inmediata conforme a la cláusula Décima.</p>` },
+  { ord:'SÉPTIMA', t:'Imagen, uniforme y redes', cuerpo:()=>`<p>La imagen pública y el comportamiento digital del coordinador deben ser coherentes con los valores de la marca. El uso de uniforme o gafete oficial es obligatorio cuando se proporcione. El coordinador mantendrá comunicación activa en los grupos oficiales de WhatsApp; podrá compartir contenido personal del viaje respetando la imagen de Conecta, y compartirá oportunamente el contenido que la agencia requiera para promoción. Todo material audiovisual generado en viajes o eventos podrá ser usado por Conecta para fines promocionales sin pago adicional.</p>` },
+  { ord:'OCTAVA', t:'CONDUCTA — tolerancia cero, sin ambigüedades', cuerpo:()=>`<p>Durante viajes, eventos y actividades internas queda <b>ESTRICTAMENTE PROHIBIDO</b>, y constituye <b class="multa">FALTA GRAVE</b> con terminación inmediata:</p>
+<ol style="list-style:lower-alpha">
+<li>el <b>ACOSO SEXUAL</b> u hostigamiento en cualquier forma hacia viajeros, compañeros, choferes o terceros;</li>
+<li>la <b>EMBRIAGUEZ</b>: el consumo de alcohol solo se permite de manera moderada y NUNCA al grado de afectar la operación, la seguridad o la imagen del grupo — estar ebrio en funciones es falta grave;</li>
+<li>el consumo, posesión o distribución de <b>DROGAS</b> o sustancias ilegales;</li>
+<li>las <b>RELACIONES ROMÁNTICAS O SEXUALES CON VIAJEROS</b> durante los tours: el coordinador está en función de servicio y de autoridad, y esa línea no se cruza;</li>
+<li><b>VINCULAR LA MARCA A CONTENIDO PARA ADULTOS</b>: la agencia respeta la vida privada y las actividades lícitas de cada quien, pero queda prohibido usar uniformes, gafetes, materiales, instalaciones, viajes o el nombre de Conecta en contenido para adultos o plataformas de contenido erótico (OnlyFans u otras), o aprovechar el rol de coordinador para promoverlo;</li>
+<li>los <b>ESCÁNDALOS PÚBLICOS ("funas")</b>: protagonizar o provocar conflictos públicos, en persona o en redes, que dañen la reputación de la agencia.</li>
+</ol>
+<p>Cualquiera de estas conductas termina el contrato de inmediato, sin indemnización, con pérdida de beneficios del viaje en curso y sin perjuicio de las acciones legales que procedan.</p>` },
+  { ord:'NOVENA', t:'Respeto, confidencialidad y exclusividad', cuerpo:()=>`<p>Trato respetuoso y cordial con viajeros, choferes y compañeros en todo momento — el acoso, la discriminación y la violencia son falta grave. Toda la información interna (estrategias, precios, bases de datos, logística, listas de viajeros, documentación) es <b>CONFIDENCIAL</b> y no puede divulgarse ni usarse para fines ajenos, obligación que SOBREVIVE a la terminación del contrato. Durante la vigencia, el coordinador no colaborará con agencias competidoras sin autorización escrita; si no puede asistir a un evento confirmado, propondrá suplente sujeto a aprobación previa.</p>` },
+  { ord:'DÉCIMA', t:'Faltas graves y terminación', cuerpo:()=>`<p>Son causa de terminación inmediata y pérdida de derechos: no presentarse a un viaje confirmado; abandonar un tour sin autorización; faltar al respeto a viajeros o compañeros; afectar la imagen o reputación de Conecta; y cualquiera de las conductas de la cláusula Octava. La terminación no genera indemnización ni pago adicional. En las fiestas y eventos internos aplica la misma conducta profesional que en los viajes oficiales.</p>` },
+  { ord:'DÉCIMA PRIMERA', t:'Emergencia e identidad', cuerpo:x=>`<p>El coordinador designa contacto de emergencia: <b>${x.emNom}</b> (${x.emTel}, ${x.emPar}), asume los riesgos del viaje en los términos de la cláusula Décima del contrato de viajero, autoriza primeros auxilios y atención médica de ser necesario, y anexa su INE como evidencia de identidad.</p>` },
+  { ord:'DÉCIMA SEGUNDA', t:'Vigencia anual y formalidades', cuerpo:x=>`<p>Este contrato dura <b>1 (UN) AÑO</b> desde su firma (${x.firmaTxt} → ${x.finTxt}); su renovación requiere nueva firma. Cualquiera de las partes puede terminarlo antes con aviso escrito de 15 días naturales. Las modificaciones solo valen por escrito; los acuerdos verbales no tienen validez. Las notificaciones por los canales oficiales (correo institucional o WhatsApp autorizado) son legalmente válidas. Jurisdicción: Monterrey, Nuevo León. La firma digital tiene la misma validez que la autógrafa.</p>` },
+];
+
+// Cláusulas del GIVEAWAY (6).
+const CLAUSULAS_GIVEAWAY = [
+  { ord:'PRIMERA', t:'Objeto — qué incluye exactamente tu premio', cuerpo:x=>`<p>LA AGENCIA otorga a EL GANADOR un viaje gratuito al evento <b>${x.evento}</b> (${x.fechaEvento}) que incluye, sin costo alguno para él: <b>${x.desglose}</b> (por ejemplo: boleto/abono en zona ____; transporte redondo desde ____; traslados internos del itinerario; hospedaje en habitación compartida; Kit Conecta con una comida y artículos promocionales). Lo que NO esté listado aquí no forma parte del premio (consumos personales, compras, gastos extra).</p>` },
+  { ord:'SEGUNDA', t:'Condiciones — explicadas una por una', cuerpo:x=>`<ol style="list-style:lower-alpha">
+<li><b>PERSONAL E INTRANSFERIBLE</b>: el premio es para EL GANADOR y nadie más; no puede cederse, venderse, ni cambiarse por dinero, otro evento, fecha o destino — si no puede asistir, el premio simplemente se pierde.</li>
+<li><b>ASISTENCIA COMPLETA</b>: ganar incluye el compromiso de tomar el viaje completo, respetando horarios y actividades del itinerario; el premio es la experiencia entera, no partes de ella.</li>
+<li><b>PENALIZACIÓN</b>: si EL GANADOR no se presenta, decide no tomar el viaje completo, o incumple alguna regla del tour, deberá <b class="multa">CUBRIR EL COSTO TOTAL DEL VIAJE</b>, equivalente a <b>$${x.valor} MXN</b> — porque ese lugar tuvo un costo real que la agencia absorbió como premio.</li>
+<li>A cambio, LA AGENCIA se obliga a entregar el viaje completo tal como se especifica, con todos los servicios incluidos.</li>
+</ol>` },
+  { ord:'TERCERA', t:'Responsabilidad, conducta y reglas del viaje', cuerpo:()=>`<p>El viaje se realiza bajo las condiciones operativas normales del tour. LA AGENCIA no responde por factores externos (retrasos ajenos, clima, eventualidades fuera de su control). EL GANADOR se compromete a comportarse con respeto y seguir las indicaciones del personal durante todo el tour, y queda sujeto a las políticas de terceros, las multas de hotel y el deslinde de responsabilidad en los mismos términos de las cláusulas Novena y Décima del contrato de viajero, que declara conocer (incluido: seguro de viajero DENTRO del autobús; DENTRO del evento la responsabilidad es de los organizadores).</p>` },
+  { ord:'CUARTA', t:'Emergencia e identidad', cuerpo:x=>`<p>Contacto de emergencia: <b>${x.emNom}</b> (${x.emTel}, ${x.emPar}); INE anexa como evidencia de identidad.</p>` },
+  { ord:'QUINTA', t:'Imagen', cuerpo:()=>`<p>EL GANADOR autoriza el uso de su nombre e imagen en las publicaciones de la dinámica y del viaje en los canales oficiales de LA AGENCIA, sin pago adicional — es parte natural de ganar una dinámica pública.</p>` },
+  { ord:'SEXTA', t:'Aceptación', cuerpo:()=>`<p>EL GANADOR firma de conformidad, reconociendo que recibe el premio completo bajo estas condiciones: casilla de términos + firma electrónica + INE anexa.</p>` },
+];
+
+function _clausulaViaB(cl, x) {
+  return `
+    <section class="clausula">
+      <h2><span class="num">${escapeHtml(cl.ord)}</span>${escapeHtml(cl.t)}</h2>
+      ${cl.cuerpo(x)}
+    </section>`;
+}
+
+// Sección de firma para VÍA B — MISMOS ids que creadoras (flujo reutilizado).
+function _firmaViaB(c, opts, rol) {
+  if (opts.estado === 'pendiente') {
+    return `
+      <section class="firma-section">
+        <div class="panel-title">Firmas</div>
+        <div class="firma-acept">
+          Yo, <b>${escapeHtml(c.creador_nombre)}</b>, he leído, entendido y aceptado los términos y condiciones de este contrato. Firmo abajo para constancia.
+        </div>
+        <p class="panel-sub">Dibuja tu firma con el dedo (móvil) o el mouse. Si te sale mal, presiona "Limpiar firma".</p>
+        <div class="canvas-wrap">
+          <canvas id="firmaCanvas"></canvas>
+        </div>
+        <div class="canvas-actions">
+          <span>Tu firma se guarda como imagen.</span>
+          <button type="button" id="btnLimpiarFirma">Limpiar firma</button>
+        </div>
+
+        <div class="ine-section">
+          <div class="panel-title" style="font-size:18px;margin-top:24px">📸 Credencial INE</div>
+          <p class="panel-sub">Sube foto del frente y reverso. Se guarda privada en nuestros servidores.</p>
+          <div class="ine-uploads">
+            <label data-side="frente" id="lblFrente">
+              <span class="lbl-title">Frente del INE</span>
+              <span class="lbl-hint">Toca para tomar/subir foto</span>
+              <input type="file" id="fileFrente" accept="image/*" capture="environment">
+            </label>
+            <label data-side="reverso" id="lblReverso">
+              <span class="lbl-title">Reverso del INE</span>
+              <span class="lbl-hint">Toca para tomar/subir foto</span>
+              <input type="file" id="fileReverso" accept="image/*" capture="environment">
+            </label>
+          </div>
+        </div>
+
+        <label class="check-section">
+          <input type="checkbox" id="acepto">
+          <span>He leído y acepto los términos del contrato.</span>
+        </label>
+
+        <div class="submit-area">
+          <button class="btn-submit" id="btnFirmar" disabled>Enviar contrato firmado</button>
+          <div class="form-err" id="formErr"></div>
+        </div>
+
+        <div style="margin-top:24px;padding-top:18px;border-top:1px solid rgba(255,255,255,.1);font-size:11px;color:rgba(255,255,255,.45);letter-spacing:.04em">
+          Por parte de la Agencia firma <b style="color:rgba(255,255,255,.7)">Guillermo Alexander Cobos Vizcarra</b> — Representante legal de Conecta Reynosa.
+        </div>
+      </section>`;
+  }
+  if (opts.estado === 'firmado') {
+    const ine = c.ine_urls || {};
+    return `
+      <section class="firmas-rendered">
+        <div class="firmas-title">Firmas</div>
+        <div class="grid">
+          <div class="firma-block">
+            <span class="label-mini">Firma del ${escapeHtml(rol)}</span>
+            <div class="firma-nombre">${escapeHtml(c.creador_nombre)}</div>
+            <div class="firma-box">
+              ${c.firma_data ? `<img src="${escapeHtml(c.firma_data)}" alt="Firma">` : `<span style="color:#999;font-size:12px">Firma no disponible</span>`}
+            </div>
+            <div class="firma-rol">Firmado: ${escapeHtml(fmtFechaLarga((c.firmado_at || "").slice(0,10)))}</div>
+          </div>
+          <div class="firma-block">
+            <span class="label-mini">Firma del Representante de Conecta Reynosa</span>
+            <div class="firma-nombre">Guillermo Alexander Cobos Vizcarra</div>
+            <div class="firma-box">
+              <img src="${FIRMA_GUILLERMO_SRC}" alt="Firma de Guillermo Cobos">
+            </div>
+            <div class="firma-rol">Representante · Conecta Reynosa</div>
+          </div>
+        </div>
+
+        <div class="ine-rendered">
+          <span class="label-mini">📸 Credencial INE entregada</span>
+          <div class="ine-thumbs">
+            ${ine.frente ? `<a href="${escapeHtml(ine.frente)}" target="_blank" rel="noopener"><img src="${escapeHtml(ine.frente)}" alt="INE frente"></a>` : '<div style="border:1px solid var(--border);padding:20px;font-size:11px;color:#aaa;text-align:center">FRENTE no disponible</div>'}
+            ${ine.reverso ? `<a href="${escapeHtml(ine.reverso)}" target="_blank" rel="noopener"><img src="${escapeHtml(ine.reverso)}" alt="INE reverso"></a>` : '<div style="border:1px solid var(--border);padding:20px;font-size:11px;color:#aaa;text-align:center">REVERSO no disponible</div>'}
+          </div>
+        </div>
+      </section>`;
+  }
+  return '';
+}
+
+function renderDocViaB(c, opts) {
+  const x = _viaBCtx(c, opts);
+  const esCoord = c.plantilla === 'coordinador';
+  const rol = esCoord ? 'Coordinador(a)' : 'Ganador';
+  const tituloDoc = esCoord
+    ? 'Contrato de colaboración — Coordinadores'
+    : 'Contrato de aceptación de premio — Giveaway';
+
+  const header = `
+    <div class="doc-header">
+      <img class="logo" src="${LOGO_SRC}" alt="Conecta MX Reynosa">
+      <h1>${escapeHtml(tituloDoc)}</h1>
+      <p class="subtitle">Conecta MX · Reynosa · Monterrey, N.L.</p>
+    </div>`;
+
+  const meta = esCoord
+    ? `<div class="doc-meta">
+        <div class="meta-row"><span class="lbl">Coordinador(a):</span><span class="val">${x.nombre}</span></div>
+        <div class="meta-row"><span class="lbl">Fecha de nacimiento:</span><span class="val">${x.fnac}</span></div>
+        <div class="meta-row"><span class="lbl">Vigencia:</span><span class="val">${x.vigResumen}</span></div>
+      </div>`
+    : `<div class="doc-meta">
+        <div class="meta-row"><span class="lbl">Ganador(a):</span><span class="val">${x.nombre}</span></div>
+        <div class="meta-row"><span class="lbl">Evento:</span><span class="val">${x.evento}</span></div>
+        <div class="meta-row"><span class="lbl">Fecha del evento:</span><span class="val">${x.fechaEvento}</span></div>
+      </div>`;
+
+  const intro = esCoord
+    ? `<section class="clausula"><p>Entre <b>CONECTA MX · REYNOSA</b>, representada por Guillermo Alexander Cobos Vizcarra ("LA AGENCIA"), y <b>${x.nombre}</b> ("EL COORDINADOR"), se celebra el presente contrato de colaboración por intercambio. INE anexa · Vigencia: ${x.vigResumen}.</p></section>`
+    : `<section class="clausula"><p>Entre <b>CONECTA MX · REYNOSA</b>, con domicilio en Vía Centauro 5070, Condocasas Cumbres, Monterrey, N.L. ("LA AGENCIA"), y <b>${x.nombre}</b> ("EL GANADOR"), para formalizar la entrega y condiciones del premio del giveaway.</p></section>`;
+
+  const set = esCoord ? CLAUSULAS_COORDINADOR : CLAUSULAS_GIVEAWAY;
+  const clausulasHtml = set.map(cl => _clausulaViaB(cl, x)).join('');
+
+  const printBar = opts.estado === 'firmado' ? `
+      <div class="print-bar">
+        <button type="button" class="print-btn" onclick="window.print()">⬇️ Descargar PDF</button>
+        <span class="print-tip">Elige "Guardar como PDF" como destino.</span>
+      </div>` : '';
+
+  return `
+    <div class="container">
+      ${printBar}
+      <article class="doc">
+        ${header}
+        ${meta}
+        ${intro}
+        ${clausulasHtml}
+        ${_firmaViaB(c, opts, rol)}
+      </article>
+    </div>
+    ${FOOTER}
+  `;
+}
+
 // ── Render principal ──────────────────────────────────────────────────
 function renderDoc(c, opts) {
   opts = opts || {};
+  // VÍA B (F5): coordinador/giveaway van por su propio render; 'creadora'
+  // (default) sigue EXACTAMENTE el flujo de abajo, sin un solo cambio.
+  if (c && (c.plantilla === 'coordinador' || c.plantilla === 'giveaway')) {
+    return renderDocViaB(c, opts);
+  }
   const docMeta = `
     <div class="doc-meta">
       <div class="meta-row"><span class="lbl">Fecha del contrato:</span><span class="val">${escapeHtml(fmtFechaLarga(c.contrato_fecha))}</span></div>

@@ -95,6 +95,13 @@ exports.handler = async function (event) {
         contrato_fecha: row.contrato_fecha,
         ofrecimiento: row.ofrecimiento,
         expectativas: row.expectativas,
+        // VÍA B (F5): plantilla + datos jsonb + vigencia. Aditivo — para 'creadora'
+        // (default) plantilla viene 'creadora' y datos/vigencia null: la página los
+        // ignora y renderiza idéntico a siempre.
+        plantilla: row.plantilla || 'creadora',
+        datos: row.datos || null,
+        vigencia_inicio: row.vigencia_inicio || null,
+        vigencia_fin: row.vigencia_fin || null,
         estado: row.estado,
         firma_data: row.estado === "firmado" ? row.firma_data : null,
         firmado_at: row.firmado_at,

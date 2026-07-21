@@ -32,6 +32,15 @@ function escapeHtml(s) {
     ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 }
 
+// VÍA B (F5): vigencia de coordinadores = 1 año desde la firma. 'YYYY-MM-DD' + 1
+// año, recortando el día al último del mes destino (29-feb → 28-feb en año no bisiesto).
+function _masUnAnio(iso) {
+  const [y, m, d] = String(iso).split("-").map(Number);
+  const ultimoDia = new Date(Date.UTC(y + 1, m, 0)).getUTCDate();
+  const dd = Math.min(d, ultimoDia);
+  return `${y + 1}-${String(m).padStart(2, "0")}-${String(dd).padStart(2, "0")}`;
+}
+
 // Acepta data URL `data:image/<sub>;base64,XYZ` con cualquier subtipo image/*
 // (jpeg, png, webp, heic, heif, gif, etc.). Devuelve {bytes, mime, ext} o null.
 function parseImageData(dataStr) {
@@ -193,6 +202,22 @@ exports.handler = async function (event) {
     || (event.headers["x-forwarded-for"] || "").split(",")[0].trim()
     || null;
 
+  // VÍA B (F5): al firmar un 'coordinador' se sella la vigencia de 1 año
+  // (inicio = hoy en hora MX, fin = +1 año). Las otras plantillas NO tocan
+  // vigencia (queda null). 'en-CA' → 'YYYY-MM-DD'.
+  const patch = {
+    firma_data: firma,
+    ine: { frente: frentePath, reverso: reversoPath },
+    estado: "firmado",
+    firmado_at: new Date().toISOString(),
+    ip_firma: ip,
+  };
+  if (contrato.plantilla === "coordinador") {
+    const hoyMX = new Date().toLocaleDateString("en-CA", { timeZone: "America/Monterrey" });
+    patch.vigencia_inicio = hoyMX;
+    patch.vigencia_fin = _masUnAnio(hoyMX);
+  }
+
   // Actualizar registro.
   try {
     const r = await fetch(`${SB_URL}/rest/v1/contratos_creadores?id=eq.${contrato.id}`, {
@@ -203,13 +228,7 @@ exports.handler = async function (event) {
         "Content-Type": "application/json",
         Prefer: "return=representation",
       },
-      body: JSON.stringify({
-        firma_data: firma,
-        ine: { frente: frentePath, reverso: reversoPath },
-        estado: "firmado",
-        firmado_at: new Date().toISOString(),
-        ip_firma: ip,
-      }),
+      body: JSON.stringify(patch),
     });
     if (!r.ok) {
       console.error("[contrato-firmar] PATCH error:", r.status, await r.text());

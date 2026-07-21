@@ -45,6 +45,10 @@ const COLS = [
   'id', 'token', 'creador_nombre', 'creador_email', 'evento_nombre',
   'evento_fecha', 'contrato_fecha', 'ofrecimiento', 'expectativas',
   'estado', 'enviado_at', 'firmado_at', 'created_at',
+  // VÍA B (F5): plantilla + vigencia (coordinadores) para el chip y el aviso
+  // "vence en N días" del listado. `datos` (jsonb) NO se incluye aquí (el listado
+  // no lo usa y mantiene la whitelist mínima).
+  'plantilla', 'vigencia_inicio', 'vigencia_fin',
 ].join(',');
 
 exports.handler = async (event) => {

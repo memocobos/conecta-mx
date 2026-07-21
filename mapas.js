@@ -51,5 +51,6 @@ window.MAPAS={
   'louistomlinson':'mapas/louistomlinson.webp',
   'juniorh':'mapas/juniorh.webp',
   'armado':'mapas/armado.png',
-  'soyluna':'mapas/soylunamapa.jpg'
+  'soyluna':'mapas/soylunamapa.jpg',
+  'calle24':'mapas/calle24.webp'
 };

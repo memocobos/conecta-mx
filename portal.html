@@ -247,6 +247,15 @@ main{
 .btn-pill:hover{transform:translateY(-1px);filter:brightness(1.05)}
 .tours-list{display:flex;flex-direction:column;gap:10px}
 .tours-loading{display:flex;justify-content:center;padding:18px}
+/* [F3a] Alerta + chips de contrato */
+.contrato-banner-alert{display:flex;align-items:center;gap:12px;margin-bottom:14px;padding:14px 16px;border-radius:12px;background:rgba(255,184,76,.12);border:1px solid rgba(255,184,76,.5);color:var(--ink)}
+.contrato-banner-alert .ic{width:22px;height:22px;color:#ffb84c;flex-shrink:0}
+.cbn-btn{flex-shrink:0;padding:9px 16px;border-radius:999px;border:none;background:var(--yel);color:#000;font-weight:900;font-size:13px;cursor:pointer;text-decoration:none;white-space:nowrap}
+.ctr-chip{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:999px;font-size:10px;font-weight:900;letter-spacing:.04em;white-space:nowrap}
+.ctr-chip .ic{width:13px;height:13px}
+.ctr-chip-ok{background:rgba(136,234,78,.14);border:1px solid rgba(136,234,78,.4);color:var(--green)}
+.ctr-chip-pend{background:rgba(255,184,76,.12);border:1px solid rgba(255,184,76,.5);color:#ffb84c}
+.ctr-firmar-btn{display:inline-block;padding:5px 14px;border-radius:999px;background:var(--yel);color:#000;font-size:11px;font-weight:900;text-decoration:none;white-space:nowrap}
 .tour-empty{
   text-align:center;padding:18px 8px;color:var(--ink-soft);font-size:13px;line-height:1.5;
 }
@@ -1036,6 +1045,8 @@ main{
         <div class="eyebrow" style="margin:0">Tus tours</div>
         <button type="button" class="btn-pill" data-action="new-tour">+ Nuevo</button>
       </div>
+      <!-- [F3a] Alerta de contratos pendientes de firma (visibles para el usuario). -->
+      <div id="contrato-banner"></div>
       <!-- [portal-v1] Pestañas Próximos/Pasados (misma data, solo divide y rinde) -->
       <div class="dash-tabs" id="dash-tabs" role="tablist">
         <button type="button" class="dash-tab is-active" data-toursfilter="proximos" role="tab">Próximos <span class="cnt" id="tab-cnt-prox"></span></button>
@@ -1819,6 +1830,7 @@ async function cargarClienteYRutear(session){
           showView('dashboard');
           renderToursList();
           renderMisViajesAcomp(); // [acompanante] viajes donde es acompañante (fails-soft)
+          loadContratosEstado();  // [F3a] alerta + chips de contratos (fails-soft)
           _procesarInvitacionPendiente(session); // [invitacion] acepta si hay token pendiente
         }
         return;
@@ -1848,6 +1860,7 @@ async function cargarClienteYRutear(session){
   showView('dashboard');
   renderToursList(); // dispara fetch async, render cuando llegue
   renderMisViajesAcomp(); // [acompanante] viajes donde es acompañante (fails-soft)
+  loadContratosEstado();  // [F3a] alerta + chips de contratos (fails-soft)
   _procesarInvitacionPendiente(session); // [invitacion] acepta si hay token pendiente
 }
 
@@ -2240,6 +2253,61 @@ function _tourCardHtml(t, iso, esPasado, abierta){
     </article>`;
 }
 
+// [F3a] Estado de contratos por lugar. El token viene GATEADO por la regla de
+// visibilidad server-side (portal-contratos) — nunca llegan tokens ajenos. Los
+// consumen el banner del dashboard y ambas tarjetas de lugares (keyed por lugar_id).
+let _contratosMap = {};   // { [lugar_id]: { estado, token? } }
+let _contratosPend = [];  // [{ lugar_id, token, evento_nombre }] — pendientes firmables por mí
+
+async function loadContratosEstado(){
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    const jwt = session && session.access_token;
+    if (!jwt){ _contratosMap = {}; _contratosPend = []; renderContratoBanner(); return; }
+    const r = await fetch('/.netlify/functions/portal-contratos', { headers: { Authorization: 'Bearer ' + jwt } });
+    const j = await r.json().catch(() => ({}));
+    if (r.ok && j.ok){ _contratosMap = j.contratos || {}; _contratosPend = Array.isArray(j.pendientes) ? j.pendientes : []; }
+    else { _contratosMap = {}; _contratosPend = []; }
+  } catch (e) {
+    console.warn('[portal] contratos (fail-soft):', e && (e.message || e));
+    _contratosMap = {}; _contratosPend = [];
+  }
+  renderContratoBanner();
+  // Re-pinta las tarjetas que dependen del mapa (pueden haberse pintado antes de llegar).
+  try { renderMisViajesAcomp(); } catch (e) {}
+  try { if (_tourActual) renderAcompanantes(_tourActual); } catch (e) {}
+}
+
+function renderContratoBanner(){
+  const box = $('#contrato-banner'); if (!box) return;
+  const n = _contratosPend.length;
+  if (!n){ box.innerHTML = ''; return; }
+  const plural = n === 1 ? 'contrato pendiente' : 'contratos pendientes';
+  const btn = n === 1
+    ? `<a href="/contrato-viajero.html?token=${encodeURIComponent(_contratosPend[0].token)}" target="_blank" rel="noopener" class="cbn-btn">Firmar ahora</a>`
+    : `<button type="button" class="cbn-btn" onclick="document.getElementById('tours-list').scrollIntoView({behavior:'smooth'})">Firmar ahora</button>`;
+  box.innerHTML = `
+    <div class="contrato-banner-alert">
+      <svg class="ic"><use href="#ic-alerta"/></svg>
+      <div style="flex:1"><b>Tienes ${n} ${plural} de firma.</b><br><span style="font-size:12px;opacity:.85">Fírmalo antes de tu viaje para asegurar tu lugar.</span></div>
+      ${btn}
+    </div>`;
+}
+
+// Chip o botón de contrato para un lugar, según lo que devolvió portal-contratos.
+// Sin entrada (solicitud vieja pre-módulo) → cadena vacía (la UI no muestra nada).
+function _contratoLugarHtml(lugarId){
+  const c = _contratosMap[lugarId];
+  if (!c) return '';
+  if (c.estado === 'firmado'){
+    return `<span class="ctr-chip ctr-chip-ok"><svg class="ic"><use href="#ic-check-circulo"/></svg> Contrato firmado</span>`;
+  }
+  if (c.token){
+    return `<a href="/contrato-viajero.html?token=${encodeURIComponent(c.token)}" target="_blank" rel="noopener" class="ctr-firmar-btn">Firmar contrato</a>`;
+  }
+  return `<span class="ctr-chip ctr-chip-pend">Pendiente de firma</span>`;
+}
+
 // [acompanante] Card "Mis viajes como acompañante" — DESPUÉS de la lista de tours
 // propios. Lee vía Netlify Function (portal-mis-lugares), que devuelve SOLO datos
 // curados de cada lugar (evento + paquete/zona/hab/precio/estado), nunca la
@@ -2323,6 +2391,7 @@ async function renderMisViajesAcomp(){
           ${precioHtml ? `<div class="pago-monto">${precioHtml}</div>` : ''}
         </div>
         ${cuartoHtml}
+        ${(l.estado === 'activo' && _contratoLugarHtml(l.lugar_id)) ? `<div style="margin-top:8px">${_contratoLugarHtml(l.lugar_id)}</div>` : ''}
         ${detalle}
       </div>`;
   }).join('');
@@ -2819,6 +2888,7 @@ async function renderAcompanantes(t){
         <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">
           ${precioHtml ? `<div class="pago-monto">${precioHtml}</div>` : ''}
           ${(btnEditar || btnInvitar) ? `<div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end">${btnEditar}${btnInvitar}</div>` : ''}
+          ${(l.estado === 'activo' && _contratoLugarHtml(l.id)) ? `<div>${_contratoLugarHtml(l.id)}</div>` : ''}
           <div class="inv-err" style="display:none;color:var(--red);font-size:11px;font-weight:700;text-align:right"></div>
         </div>
       </div>`;

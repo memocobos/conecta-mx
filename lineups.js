@@ -8,5 +8,10 @@ window.LINEUPS={
   'pulsolineup':'lineups/pulsolineup.jpg',
   'arre':'lineups/arre.webp',
   'vaiven':'lineups/vaiven.webp',
-  'warped':'lineups/warped.webp'
+  'warped':'lineups/warped.webp',
+  'coronacapital':'lineups/coronacapital.webp',
+  'dalemix':'lineups/dalemix.webp',
+  'knotfest':'lineups/knotfest.webp',
+  'straykids':'lineups/straykids.webp',
+  'flowfest':'lineups/flowfest.webp'
 };

@@ -60,10 +60,7 @@
 
 ## Pendientes
 - AC/DC solo en filtro Pasados
-- Morat 3 dic: costos pendientes
-- Lineups: Warped y EDC pendientes
 - Fase 2 (Portal Clientes): en construcción sobre Supabase
-- Contratos digitales: pendiente
 
 ## Datos Bancarios
 - BBVA Bancomer / Tarjeta: 4152 3139 7573 0487

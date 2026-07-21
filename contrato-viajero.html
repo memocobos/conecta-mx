@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow">
+<title>Firma tu contrato · Conecta Reynosa</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800;900&family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="icon" type="image/png" href="/icon-192.png">
+<style>
+  /* Esqueleto y marca CLONADOS de contrato.html (creadoras) — identidad ya resuelta. */
+  *,*::before,*::after{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{font-family:'Montserrat',-apple-system,BlinkMacSystemFont,sans-serif;color:#222;background:#e9eaee;line-height:1.55;-webkit-font-smoothing:antialiased;-webkit-text-size-adjust:100%}
+  :root{--negro:#000;--blanco:#fff;--amarillo:#e8ff4c;--rojo:#ff283b;--azul:#0000cd;--gris:#9a9a9a;--gris-claro:#e6e6e6;--border:#d8d8d8;--verde:#1a9e57}
+
+  .state-screen{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px 24px;text-align:center;background:#000;color:#fff}
+  .state-screen h1{font-family:'Barlow Condensed',sans-serif;font-size:44px;line-height:.95;text-transform:uppercase;margin:20px 0 12px;color:var(--amarillo)}
+  .state-screen p{max-width:400px;color:rgba(255,255,255,.72);font-size:15px;margin:0 0 24px}
+  .state-screen .badge-tag{font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:rgba(255,255,255,.5);font-weight:700}
+  .state-screen a.btn-link,.state-screen button.btn-link{display:inline-block;background:var(--amarillo);color:#000;padding:14px 28px;font-weight:900;letter-spacing:.06em;text-transform:uppercase;text-decoration:none;font-size:14px;border:0;cursor:pointer;font-family:inherit}
+  .state-screen .exito-emoji{font-size:64px;line-height:1}
+
+  .container{max-width:820px;margin:0 auto;padding:0}
+  .doc{background:#fff;padding:34px 22px 28px;min-height:60vh}
+  @media (min-width:760px){.doc{padding:60px 72px 56px;margin:32px auto;box-shadow:0 8px 60px rgba(0,0,0,.12);border:1px solid var(--border)}}
+
+  .doc-header{text-align:center;border-bottom:3px solid #000;padding-bottom:24px;margin-bottom:30px}
+  .doc-header .logo{display:block;margin:0 auto 22px;width:240px;max-width:75%;height:auto}
+  .doc-header h1{font-family:'Barlow Condensed','Montserrat',sans-serif;text-transform:uppercase;font-size:22px;line-height:1.15;letter-spacing:.02em;color:#000;margin:0 0 6px;font-weight:800}
+  .doc-header .subtitle{font-family:'Barlow Condensed','Montserrat',sans-serif;text-transform:uppercase;font-size:13px;color:var(--rojo);font-weight:800;letter-spacing:.14em;margin:0}
+  @media (min-width:760px){.doc-header h1{font-size:27px}}
+
+  .doc-meta{background:#fafafa;border-left:6px solid var(--amarillo);padding:18px 22px;margin-bottom:26px;display:flex;flex-direction:column;gap:8px}
+  .doc-meta .meta-row{display:flex;flex-wrap:wrap;align-items:baseline;gap:8px;font-size:13.5px}
+  .doc-meta .meta-row .lbl{font-family:'Barlow Condensed',sans-serif;text-transform:uppercase;color:var(--rojo);font-weight:800;letter-spacing:.1em;font-size:11px;min-width:120px}
+  .doc-meta .meta-row .val{color:#000;font-weight:700}
+
+  .estado-chip{display:inline-block;font-family:'Barlow Condensed',sans-serif;font-weight:800;letter-spacing:.08em;text-transform:uppercase;font-size:12px;padding:5px 12px;border-radius:0}
+  .estado-chip.pendiente{background:#fff3cd;color:#8a6d00;border:1px solid #e6c200}
+  .estado-chip.firmado{background:#e6f6ee;color:var(--verde);border:1px solid #9ad9b8}
+
+  .clausula{margin-top:26px}
+  .clausula h2{font-family:'Barlow Condensed','Montserrat',sans-serif;text-transform:uppercase;font-size:20px;letter-spacing:.04em;margin:0 0 10px;color:#000;border-bottom:2px solid #000;padding-bottom:6px;line-height:1.15}
+  .clausula h2 .num{color:var(--rojo);font-weight:900;margin-right:10px}
+  .clausula p{font-size:14px;line-height:1.7;margin:0 0 10px;color:#1a1a1a}
+  .clausula b{font-weight:800}
+  .clausula .rojo{color:var(--rojo);font-weight:800}
+
+  .decl{font-size:13.5px;line-height:1.7;color:#1a1a1a;margin:0 0 8px}
+
+  /* Anexos */
+  .anexo{margin-top:34px;border-top:3px solid #000;padding-top:20px}
+  .anexo h2{font-family:'Barlow Condensed',sans-serif;text-transform:uppercase;font-size:20px;letter-spacing:.04em;margin:0 0 12px;color:#000}
+  .anexo h2 .num{color:var(--rojo);margin-right:8px;font-weight:900}
+  .cuenta-box{background:#000;color:#fff;padding:16px 18px;margin:14px 0;border-left:5px solid var(--amarillo)}
+  .cuenta-box .cuenta-titulo{font-family:'Barlow Condensed',sans-serif;text-transform:uppercase;font-size:12px;letter-spacing:.16em;color:var(--amarillo);font-weight:800;margin-bottom:8px}
+  .cuenta-box .cuenta-linea{font-size:14px;margin:3px 0}
+  .cuenta-box .cuenta-linea b{color:#fff}
+  .cuenta-box .clabe{font-size:19px;font-weight:800;letter-spacing:.06em;font-family:'Barlow Condensed',monospace}
+
+  .cuotas-table{width:100%;border-collapse:collapse;margin:14px 0;font-size:13.5px}
+  .cuotas-table th{background:#000;color:#fff;text-align:left;padding:10px 12px;font-family:'Barlow Condensed',sans-serif;text-transform:uppercase;letter-spacing:.06em;font-size:12px;font-weight:800}
+  .cuotas-table td{padding:10px 12px;border-bottom:1px solid var(--border)}
+  .cuotas-table tbody tr:nth-child(even){background:#fafafa}
+  .cuotas-table td.mont,.cuotas-table th.mont{text-align:right;white-space:nowrap;font-weight:700}
+  .cuotas-table tfoot td{font-weight:900;border-top:2px solid #000;background:#f2f2f2}
+  .cuota-estado{font-size:10px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;padding:2px 7px;border-radius:0}
+  .cuota-estado.pagado{background:#e6f6ee;color:var(--verde)}
+  .cuota-estado.pendiente{background:#f0f0f0;color:#666}
+  .cuota-estado.vencido{background:rgba(255,40,59,.14);color:var(--rojo)}
+  .cuota-estado.cancelado{background:#eee;color:#999;text-decoration:line-through}
+  @media (max-width:560px){
+    .cuotas-table thead{display:none}
+    .cuotas-table tbody tr{display:block;border:1px solid var(--border);margin-bottom:10px;padding:6px 4px}
+    .cuotas-table tbody td{display:flex;justify-content:space-between;gap:12px;border:none;padding:7px 12px;text-align:right}
+    .cuotas-table tbody td::before{content:attr(data-lbl);font-family:'Barlow Condensed',sans-serif;text-transform:uppercase;font-size:11px;letter-spacing:.06em;color:var(--rojo);font-weight:800}
+    .cuotas-table tfoot td{display:flex;justify-content:space-between}
+  }
+  .como-leer{background:#fafafa;border:1px solid var(--border);padding:14px 18px;margin:14px 0;font-size:13px;line-height:1.7}
+  .como-leer b{color:#000}
+
+  .menor-aviso{background:rgba(255,40,59,.08);border:2px solid var(--rojo);padding:16px 18px;margin:14px 0;font-size:14px;line-height:1.7}
+  .menor-aviso b{color:var(--rojo);font-weight:800}
+
+  /* Firma */
+  .firma-section{margin-top:38px;padding:24px 22px;background:#000;color:#fff}
+  .firma-section .panel-title{font-family:'Barlow Condensed',sans-serif;text-transform:uppercase;font-size:22px;letter-spacing:.05em;color:var(--amarillo);margin:0 0 6px;font-weight:800}
+  .firma-section .panel-sub{font-size:12px;color:rgba(255,255,255,.65);margin:0 0 16px;line-height:1.5}
+  .firma-step{margin-top:24px}
+  .firma-step .step-lbl{font-family:'Barlow Condensed',sans-serif;text-transform:uppercase;font-size:15px;letter-spacing:.04em;color:#fff;font-weight:800;margin:0 0 10px;display:flex;align-items:center;gap:10px}
+  .firma-step .step-num{width:26px;height:26px;flex:0 0 26px;background:var(--amarillo);color:#000;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:14px}
+
+  .check-section{display:flex;gap:12px;align-items:flex-start;font-size:13.5px;line-height:1.55;color:rgba(255,255,255,.9);background:#fafafa;color:#000;padding:16px 18px;border-left:4px solid var(--amarillo)}
+  .check-section input{margin-top:2px;width:20px;height:20px;flex:0 0 20px;accent-color:var(--amarillo)}
+
+  .ine-uploads{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .ine-uploads label{display:flex;flex-direction:column;justify-content:center;align-items:center;gap:6px;border:2px dashed rgba(255,255,255,.25);padding:24px 12px;text-align:center;font-size:12px;cursor:pointer;background:rgba(255,255,255,.03);position:relative;overflow:hidden;min-height:130px;transition:border-color .2s,background .2s}
+  .ine-uploads label:hover{border-color:var(--amarillo);background:rgba(232,255,76,.08)}
+  .ine-uploads label.has-file{border-style:solid;border-color:var(--amarillo);padding:0}
+  .ine-uploads label .lbl-title{font-weight:900;letter-spacing:.12em;text-transform:uppercase;font-size:11px;color:rgba(255,255,255,.85)}
+  .ine-uploads label .lbl-hint{font-size:10px;color:rgba(255,255,255,.45);letter-spacing:.06em}
+  .ine-uploads label .preview-img{width:100%;height:130px;object-fit:cover;display:block}
+  .ine-uploads input[type=file]{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
+
+  .canvas-wrap{background:#fff;position:relative;border:2px dashed rgba(255,255,255,.18);overflow:hidden}
+  #firmaCanvas{display:block;width:100%;height:200px;touch-action:none;cursor:crosshair;background:#fff}
+  .canvas-actions{display:flex;justify-content:space-between;align-items:center;margin-top:10px;font-size:12px;color:rgba(255,255,255,.5)}
+  .canvas-actions button{background:transparent;border:1px solid rgba(255,255,255,.3);color:#fff;padding:8px 16px;font-size:11px;text-transform:uppercase;letter-spacing:.1em;font-weight:700;cursor:pointer;font-family:'Montserrat',sans-serif}
+  .canvas-actions button:hover{background:rgba(255,255,255,.05)}
+
+  .field-grid{display:grid;grid-template-columns:1fr;gap:12px}
+  @media (min-width:560px){.field-grid.cols-3{grid-template-columns:1fr 1fr 1fr}}
+  .fld label{display:block;font-family:'Barlow Condensed',sans-serif;text-transform:uppercase;font-size:11px;letter-spacing:.1em;color:rgba(255,255,255,.6);font-weight:800;margin-bottom:5px}
+  .fld input{width:100%;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.2);color:#fff;padding:12px 14px;font-size:15px;font-family:'Montserrat',sans-serif;border-radius:0}
+  .fld input:focus{outline:none;border-color:var(--amarillo)}
+
+  .submit-area{margin-top:28px}
+  .btn-submit{width:100%;background:var(--amarillo);color:#000;border:0;padding:18px;font-weight:900;font-size:16px;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;font-family:'Montserrat',sans-serif}
+  .btn-submit:disabled{opacity:.5;cursor:not-allowed}
+  .btn-submit:active:not(:disabled){transform:translateY(1px)}
+  .form-hint{margin-top:12px;font-size:12.5px;color:rgba(255,255,255,.6);line-height:1.6}
+  .form-hint .falta{color:#ffd24d;font-weight:700}
+  .form-err{display:none;margin-top:14px;padding:12px 14px;background:rgba(255,40,59,.15);border:1px solid var(--rojo);color:#ffb3ba;font-size:13px;white-space:pre-line}
+  .form-err.show{display:block}
+
+  .firmado-sello{margin-top:38px;border-top:3px solid #000;padding-top:22px}
+  .firmado-sello .sello-box{background:#e6f6ee;border:1px solid #9ad9b8;padding:18px 20px;display:flex;align-items:center;gap:14px}
+  .firmado-sello .sello-ic{width:44px;height:44px;flex:0 0 44px;color:var(--verde)}
+  .firmado-sello .sello-txt{font-size:14px;line-height:1.55}
+  .firmado-sello .sello-txt b{font-weight:800;color:#000}
+
+  footer.doc-footer{padding:24px 24px 40px;text-align:center;font-size:11px;color:#666;letter-spacing:.14em;text-transform:uppercase}
+  footer.doc-footer a{color:var(--rojo);text-decoration:none;font-weight:800}
+  .loading{min-height:60vh;display:flex;align-items:center;justify-content:center;color:#666;font-size:13px;letter-spacing:.16em;text-transform:uppercase}
+  @keyframes ctr-spin{to{transform:rotate(360deg)}}
+
+  .print-bar{max-width:820px;margin:20px auto 0;padding:0 22px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+  .print-btn{background:#000;color:#fff;border:0;padding:12px 22px;font-weight:800;font-size:13px;letter-spacing:.05em;text-transform:uppercase;cursor:pointer;font-family:'Montserrat',sans-serif}
+  .print-btn:hover{background:var(--rojo)}
+  .print-tip{font-size:12px;color:#666}
+
+  @media print{
+    body{background:#fff}
+    .doc{box-shadow:none;border:none;padding:0 8px;margin:0;max-width:100%}
+    .firma-section,footer.doc-footer,.print-bar{display:none !important}
+    @page{size:letter;margin:14mm}
+    .clausula,.anexo,.cuotas-table tr,h2{break-inside:avoid}
+    .cuenta-box,.cuotas-table th{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    a{color:inherit;text-decoration:none}
+  }
+</style>
+</head>
+<body>
+
+<div id="root"><div class="loading">Cargando contrato…</div></div>
+
+<!-- sprite mínimo (icono de check para el sello firmado — interfaz sin emojis) -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><symbol id="cv-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8 12.5l2.5 2.5L16 9.5"/></symbol></svg>
+
+<script>
+const API_OBTENER = "/.netlify/functions/contrato-viajero-obtener";
+const API_FIRMAR  = "/.netlify/functions/contrato-viajero-firmar";
+const LOGO_SRC = "/imgs/logo-conecta-mx.png";
+const WA_URL = "https://wa.me/528119771072";
+
+function $id(id){ return document.getElementById(id); }
+function escapeHtml(s){ return String(s==null?"":s).replace(/[&<>"']/g,c=>({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c])); }
+function getToken(){ const u=new URLSearchParams(location.search); return (u.get("token")||u.get("t")||"").trim(); }
+function fmtFechaLarga(iso){ if(!iso) return "—"; const [y,m,d]=String(iso).split("-"); if(!y||!m||!d) return String(iso); const meses=["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"]; return `${parseInt(d,10)} de ${meses[parseInt(m,10)-1]||""} de ${y}`; }
+function fmtMoney(n){ const v=Number(n)||0; return "$"+v.toLocaleString("es-MX",{minimumFractionDigits:0,maximumFractionDigits:2})+" MXN"; }
+function folioCorto(tok){ return String(tok||"").slice(0,10).toUpperCase(); }
+
+// Estado en memoria de lo que el usuario acaba de firmar (para el PDF completo
+// sin re-consultar). En una recarga de contrato ya firmado esto queda null y la
+// vista de solo-lectura muestra "en archivo" donde aplica.
+let _signed = null;
+
+// Cuenta bancaria del paquete, ya resuelta por el backend (cuentaParaPaquete).
+function cuentaTexto(cuenta){
+  if(!cuenta) return "la cuenta que te indicamos por correo";
+  return `${cuenta.nombre} · CLABE ${cuenta.clabe}`;
+}
+function desglosePaquete(pkg, zona, hab){
+  const p = String(pkg||"").toLowerCase();
+  const z = zona ? `boleto en zona ${escapeHtml(zona)}` : "boleto";
+  const h = hab ? `hospedaje en habitación ${escapeHtml(hab)}` : "hospedaje";
+  if(p==="ride")  return `${h}, transporte redondo y Kit Conecta (sin boleto)`;
+  if(p==="stay")  return `${z}, ${h} y Kit Conecta (sin transporte)`;
+  if(p==="cheap") return `${z} y Kit Conecta (solo boleto)`;
+  return `${z}, transporte redondo, ${h} y Kit Conecta`;
+}
+function paqueteLabel(pkg){
+  const m={plus:"PLUS — Todo incluido",ride:"RIDE — Sin boleto",stay:"STAY — Sin transporte",cheap:"CHEAP — Solo boleto"};
+  return m[String(pkg||"").toLowerCase()] || (pkg?String(pkg).toUpperCase():"—");
+}
+
+// ── CLÁUSULAS v3.1 — transcripción FIEL del texto oficial (contrato-viajero-v3.1-TEXTO-OFICIAL.md).
+//    El texto es fijo; solo se inyectan los datos {{...}} vía escapeHtml. ──────
+const CLAUSULAS_V31 = [
+  { num:"Primera", titulo:"Objeto", cuerpo:c=>`<p>LA AGENCIA prestará a EL VIAJERO los servicios del paquete <b>${escapeHtml(paqueteLabel(c.paquete))}</b> para el evento <b>${escapeHtml(c.evento.nombre)}</b>: ${desglosePaquete(c.paquete,c.zona,c.habitacion)}. Este contrato ampara <b>UN (1) lugar</b>. Los detalles operativos se comunicarán por los canales oficiales.</p>` },
+  { num:"Segunda", titulo:"Precio", cuerpo:c=>`<p>El precio total del lugar es de <b>${fmtMoney(c.precio)}</b>, pagadero conforme al rol de pagos del <b>Anexo A</b>, parte integrante de este contrato.</p>` },
+  { num:"Tercera", titulo:"Pagos, cuentas oficiales e impago", cuerpo:c=>`<p>Los pagos se realizarán en las fechas exactas del Anexo A, mediante transferencia o depósito EXCLUSIVAMENTE a la cuenta bancaria que el sistema indica para su paquete y evento en el Anexo A y en los correos oficiales de cobranza (<b>${escapeHtml(cuentaTexto(c.cuenta))}</b>) — como regla general: paquete CHEAP → Banamex; paquete RIDE → BBVA; paquete PLUS → la cuenta asignada al evento (BBVA salvo indicación distinta) —, salvo que LA AGENCIA indique otra por escrito. Un depósito realizado a una cuenta distinta a la indicada genera un <span class="rojo">CARGO ADMINISTRATIVO de $350 MXN</span> por la gestión de su localización y aplicación. EL VIAJERO conservará y enviará su comprobante de cada pago. <span class="rojo">LA FALTA DE PAGO PUNTUAL será causa de RESCISIÓN</span> sin necesidad de resolución judicial: EL VIAJERO perderá su lugar y lo pagado quedará a favor de LA AGENCIA como pena convencional. El separo no es reembolsable.</p>` },
+  { num:"Cuarta", titulo:"No reembolsos y plazo cuando excepcionalmente procedan", cuerpo:()=>`<p><b>NO EXISTEN REEMBOLSOS</b> de los servicios contratados. Única excepción: la cancelación total y definitiva del evento por el organizador, en cuyo caso se estará a las políticas del promotor y la boletera respecto del boleto. Cuando un reembolso proceda conforme a lo anterior, se realizará en un plazo de <b>15 (quince) a 20 (veinte) días naturales</b> posteriores a la confirmación de la cancelación, notificándose a EL VIAJERO por correo electrónico el monto y la vía de devolución.</p>` },
+  { num:"Quinta", titulo:"Traspaso de lugar", cuerpo:()=>`<p>EL VIAJERO podrá traspasar su lugar a otra persona solicitándolo a LA AGENCIA por los canales oficiales: <b>SIN COSTO</b> si la solicitud se realiza hasta 5 (cinco) días naturales antes de la fecha del viaje; con un <b>CARGO ADMINISTRATIVO de $350 MXN</b> si se solicita dentro de los últimos 5 días. Todo traspaso requiere que la persona receptora firme su propio contrato y queda sujeto a la aprobación operativa de LA AGENCIA (listas de hotel, transporte y acceso ya enviadas pueden hacerlo inviable).</p>` },
+  { num:"Sexta", titulo:"Vigencia", cuerpo:()=>`<p>Desde la firma y hasta la prestación total de los servicios y el cumplimiento de las obligaciones de pago.</p>` },
+  { num:"Séptima", titulo:"Caso fortuito y fuerza mayor", cuerpo:()=>`<p>EL VIAJERO libera a LA AGENCIA por hechos imprevisibles e irresistibles ajenos a las partes: fenómenos naturales, actos de autoridad, contingencias sanitarias, y cancelaciones o cambios del artista, promotor o recinto.</p>` },
+  { num:"Octava", titulo:"Cambios de terceros", cuerpo:()=>`<p>Fechas, horarios y condiciones del evento dependen del organizador y pueden cambiar sin responsabilidad para LA AGENCIA. En reprogramaciones, los servicios se trasladan a la nueva fecha en los términos que LA AGENCIA comunique, sin derecho a reembolso.</p>` },
+  { num:"Novena", titulo:"Políticas de terceros y multas de hotel", cuerpo:()=>`<p>EL VIAJERO respetará las políticas de los terceros involucrados: hoteles (horarios de entrada y salida, prohibición de fumar, reglas de la habitación), transportes (<b>LOS TRANSPORTES NO ESPERAN</b>; el equipaje viaja bajo responsabilidad exclusiva de EL VIAJERO) y recinto/boletera. <b>MULTAS DE HOTEL:</b> cualquier multa o sanción impuesta por el hotel a la habitación de EL VIAJERO (daños, fumar, ruido, objetos faltantes u otras infracciones a su reglamento) genera un cargo de <span class="rojo">$300 USD (trescientos dólares americanos)</span>, pagadero en pesos mexicanos al tipo de cambio del día del cargo, y EL VIAJERO <b>NO PODRÁ ABANDONAR EL HOTEL</b> hasta liquidarlo; LA AGENCIA podrá además repercutir cualquier cargo adicional que el hotel documente.</p>` },
+  { num:"Décima", titulo:"Asunción de riesgos, deslinde y coberturas", cuerpo:()=>`<p>EL VIAJERO comprende que el evento y el viaje implican riesgos de todo tipo —incluyendo lesiones, heridas e incluso la muerte— y los asume con pleno conocimiento. En su nombre y el de sus parientes más cercanos, libera y se compromete a no demandar a LA AGENCIA, organizadores, patrocinadores, agentes, voluntarios y representantes. <b>COBERTURAS, con toda claridad:</b> ① DENTRO DEL AUTOBÚS, EL VIAJERO cuenta con el SEGURO DE VIAJERO de la empresa transportista contratada (en vuelos, el de la aerolínea); ② DENTRO DEL EVENTO, la seguridad e incidentes son RESPONSABILIDAD DE LOS ORGANIZADORES DEL EVENTO conforme a sus propios términos; ③ LA AGENCIA no es aseguradora ni responde por incidentes en ninguno de esos ámbitos. EL VIAJERO autoriza que se le presten primeros auxilios o se procure atención médica de ser necesario.</p>` },
+  { num:"Décima Primera", titulo:"Contacto de emergencia", cuerpo:c=>`<p>${c.__emergenciaTexto || 'Los datos de contacto de emergencia se registran en la sección de firma de abajo y forman parte de este contrato.'}</p>` },
+  { num:"Décima Segunda", titulo:"Datos personales", cuerpo:()=>`<p>Los datos e imágenes de identificación se usarán exclusivamente para la prestación del servicio, su cobranza y la seguridad del viaje, conforme al aviso de privacidad en <b>conectareynosa.mx</b>.</p>` },
+  { num:"Décima Tercera", titulo:"Jurisdicción", cuerpo:()=>`<p>Las partes se someten a las leyes y tribunales de Monterrey, Nuevo León, renunciando a cualquier otro fuero.</p>` },
+];
+
+// ── Render del documento completo ──────────────────────────────────────
+function renderDoc(c){
+  const firmado = c.estado === "firmado";
+  const em = _signed && _signed.emergencia;
+  if(em) c.__emergenciaTexto = `<b>${escapeHtml(em.nombre)}</b> · tel. <b>${escapeHtml(em.telefono)}</b> · parentesco: <b>${escapeHtml(em.parentesco)}</b>.`;
+  else if(firmado) c.__emergenciaTexto = 'Registrado y en archivo de LA AGENCIA (Cláusula Décima Primera).';
+
+  const header = `
+    <div class="doc-header">
+      <img class="logo" src="${LOGO_SRC}" alt="Conecta Reynosa" onerror="this.style.display='none'">
+      <h1>Contrato de prestación de servicios turísticos y deslinde de responsabilidad</h1>
+      <p class="subtitle">Conecta MX · Reynosa · v${escapeHtml(c.version_texto||"3.1")}</p>
+    </div>`;
+
+  const chip = firmado
+    ? `<span class="estado-chip firmado">Firmado ${c.firmado_at?("· "+escapeHtml(fmtFechaLarga(String(c.firmado_at).slice(0,10)))):""}</span>`
+    : `<span class="estado-chip pendiente">Pendiente de firma</span>`;
+
+  const meta = `
+    <div class="doc-meta">
+      <div class="meta-row"><span class="lbl">Folio</span><span class="val">${escapeHtml(folioCorto(c.__token))}</span></div>
+      <div class="meta-row"><span class="lbl">Viajero</span><span class="val">${escapeHtml(c.lugar_nombre||"—")}</span></div>
+      <div class="meta-row"><span class="lbl">Titular del grupo</span><span class="val">${escapeHtml(c.titular_nombre||"—")}</span></div>
+      <div class="meta-row"><span class="lbl">Evento</span><span class="val">${escapeHtml(c.evento.nombre||"—")}</span></div>
+      <div class="meta-row"><span class="lbl">Fecha</span><span class="val">${escapeHtml(c.evento.fecha||"—")}</span></div>
+      <div class="meta-row"><span class="lbl">Lugar</span><span class="val">${escapeHtml([c.evento.venue,c.evento.ciudad].filter(Boolean).join(" · ")||"—")}</span></div>
+      <div class="meta-row"><span class="lbl">Paquete</span><span class="val">${escapeHtml(paqueteLabel(c.paquete))}${c.zona?(" · zona "+escapeHtml(c.zona)):""}</span></div>
+      <div class="meta-row"><span class="lbl">Precio del lugar</span><span class="val">${fmtMoney(c.precio)}</span></div>
+      <div class="meta-row"><span class="lbl">Estado</span><span class="val">${chip}</span></div>
+    </div>`;
+
+  const decl = `
+    <div class="clausula">
+      <h2><span class="num">§</span>Declaraciones</h2>
+      <p class="decl">1.1. Declara <b>CONECTA MX. REYNOSA</b>, representada por Guillermo Alexander Cobos Vizcarra, con domicilio para oír y recibir notificaciones en Vía Centauro 5070, Condocasas Cumbres, Monterrey, Nuevo León ("LA AGENCIA"), ser una agencia dedicada a la organización de viajes a conciertos y festivales en toda la República Mexicana, y que es su voluntad celebrar el presente contrato.</p>
+      <p class="decl">1.2. Declara <b>${escapeHtml(c.lugar_nombre||"EL VIAJERO")}</b> ("EL VIAJERO") ser mayor de edad —o comparecer por conducto de su padre, madre o tutor conforme al Anexo B—, identificarse con su INE (imágenes anexas), señalar el correo registrado en su cuenta para notificaciones, y conocer los precios, condiciones y características de los servicios que contrata.</p>
+      <p class="decl">1.3. Las partes se reconocen la personalidad con que comparecen y se obligan conforme a las siguientes cláusulas.</p>
+    </div>`;
+
+  const clausulas = CLAUSULAS_V31.map(cl=>`
+    <div class="clausula">
+      <h2><span class="num">${escapeHtml(cl.num)}.</span>${escapeHtml(cl.titulo)}</h2>
+      ${cl.cuerpo(c)}
+    </div>`).join("");
+
+  const acept = `
+    <div class="clausula">
+      <h2><span class="num">✓</span>Aceptación</h2>
+      <p>EL VIAJERO manifiesta que leyó y comprendió este contrato y lo acepta mediante: ① la casilla de términos y condiciones, ② su firma electrónica, ③ las imágenes de su INE.</p>
+    </div>`;
+
+  // ANEXO A — tabla de cuotas real + cuenta bancaria
+  const plan = Array.isArray(c.plan) ? c.plan : [];
+  const total = plan.reduce((s,p)=>s+(Number(p.monto)||0),0);
+  const filas = plan.length ? plan.map(p=>`
+      <tr>
+        <td data-lbl="#">${escapeHtml(p.numero)}</td>
+        <td data-lbl="Concepto">${escapeHtml(p.etiqueta||"—")}</td>
+        <td data-lbl="Fecha límite">${escapeHtml(fmtFechaLarga(p.fecha))}</td>
+        <td class="mont" data-lbl="Monto">${fmtMoney(p.monto)}</td>
+        <td data-lbl="Estado"><span class="cuota-estado ${escapeHtml(p.estado||"pendiente")}">${escapeHtml(p.estado||"pendiente")}</span></td>
+      </tr>`).join("")
+    : `<tr><td colspan="5" style="text-align:center;color:#888">Tu plan de pagos se generó al aprobar tu solicitud. Si no ves cuotas, contáctanos.</td></tr>`;
+  const anexoA = `
+    <div class="anexo">
+      <h2><span class="num">Anexo A —</span>Tu rol de pagos</h2>
+      <p>Tu lugar se paga en parcialidades. Esta tabla es <b>TU calendario exacto</b> — el sistema la llena con tu plan real al aprobarse tu solicitud.</p>
+      <div class="cuenta-box">
+        <div class="cuenta-titulo">Tu cuenta para depositar (paquete ${escapeHtml(paqueteLabel(c.paquete))})</div>
+        <div class="cuenta-linea"><b>${escapeHtml(c.cuenta?c.cuenta.nombre:"—")}</b></div>
+        <div class="cuenta-linea">CLABE <span class="clabe">${escapeHtml(c.cuenta?c.cuenta.clabe:"—")}</span></div>
+        <div class="cuenta-linea">Tarjeta ${escapeHtml(c.cuenta?c.cuenta.tarjeta:"—")}</div>
+        <div class="cuenta-linea">Titular: ${escapeHtml(c.cuenta?c.cuenta.titular:"—")}</div>
+      </div>
+      <table class="cuotas-table">
+        <thead><tr><th>#</th><th>Concepto</th><th>Fecha límite</th><th class="mont">Monto</th><th>Estado</th></tr></thead>
+        <tbody>${filas}</tbody>
+        <tfoot><tr><td colspan="3">TOTAL</td><td class="mont">${fmtMoney(total)}</td><td></td></tr></tfoot>
+      </table>
+      <div class="como-leer">
+        <b>Cómo leer tu rol de pagos, en corto:</b> ① cada fila es un pago con su fecha límite — puedes adelantar, no atrasar; ② paga <b>SOLO</b> a la cuenta de tu paquete (arriba) y envía tu comprobante; ③ recibirás recordatorios por correo; ④ si una fecha vence sin pago, aplica la cláusula Tercera (pérdida del lugar y de lo abonado); ⑤ depositar en una cuenta que no es la tuya genera <b>$350 MXN</b> de cargo administrativo.
+      </div>
+    </div>`;
+
+  // ANEXO B — solo si es menor
+  const tutorNombre = (_signed && _signed.firmante_nombre) || "";
+  const anexoB = c.tipo === "menor" ? `
+    <div class="anexo">
+      <h2><span class="num">Anexo B —</span>Menores de edad</h2>
+      <div class="menor-aviso">
+        <b>REGLA GENERAL:</b> el menor SÍ tiene su contrato completo — su boleto es su contrato, con su rol de pagos y todas las cláusulas. Pero un menor no puede firmar: <b>TODO lo firma su padre, madre o tutor</b> en su representación — el contrato principal Y este anexo — con la firma electrónica y la <b>INE DEL TUTOR</b>. El menor no firma nada.
+      </div>
+      <p>Yo, <b>${escapeHtml(tutorNombre || "________________")}</b>, padre/madre/tutor de <b>${escapeHtml(c.lugar_nombre||"________")}</b>${c.edad!=null?`, de <b>${escapeHtml(c.edad)}</b> años`:""}, declaro: a) que firmé en su representación el contrato de folio <b>${escapeHtml(folioCorto(c.__token))}</b> y acepté íntegramente sus términos, incluida la cláusula Décima; b) que consiento su participación en el evento <b>${escapeHtml(c.evento.nombre)}</b> y en el viaje; c) que autorizo primeros auxilios y atención médica de ser necesario; d) que estaré localizable durante el viaje en los datos de emergencia proporcionados.</p>
+    </div>` : "";
+
+  // Sección de firma (solo pendiente) o sello firmado
+  let firmaBloque = "";
+  if(!firmado){
+    firmaBloque = `
+    <section class="firma-section" id="firmaSection">
+      <div class="panel-title">Firma tu contrato</div>
+      <p class="panel-sub">Desde tu celular, en 3 pasos. Sin los 3 no se habilita el botón.</p>
+
+      <div class="firma-step">
+        <div class="step-lbl"><span class="step-num">1</span> Acepta los términos</div>
+        <label class="check-section">
+          <input type="checkbox" id="acepto">
+          <span>He leído y acepto los términos y condiciones de este contrato, incluidas las cláusulas de deslinde de responsabilidad y de pagos.</span>
+        </label>
+      </div>
+
+      <div class="firma-step">
+        <div class="step-lbl"><span class="step-num">2</span> Sube tu INE${c.tipo==="menor"?" (del tutor)":""}</div>
+        <div class="ine-uploads">
+          <label data-side="frente" id="lblFrente">
+            <span class="lbl-title">Frente del INE</span>
+            <span class="lbl-hint">Toca para tomar/subir foto</span>
+            <input type="file" id="fileFrente" accept="image/*,.heic,.heif" capture="environment">
+          </label>
+          <label data-side="reverso" id="lblReverso">
+            <span class="lbl-title">Reverso del INE</span>
+            <span class="lbl-hint">Toca para tomar/subir foto</span>
+            <input type="file" id="fileReverso" accept="image/*,.heic,.heif" capture="environment">
+          </label>
+        </div>
+      </div>
+
+      <div class="firma-step">
+        <div class="step-lbl"><span class="step-num">3</span> Firma${c.tipo==="menor"?" (el tutor)":""}</div>
+        <div class="canvas-wrap"><canvas id="firmaCanvas"></canvas></div>
+        <div class="canvas-actions"><span>Tu firma se guarda como imagen.</span><button type="button" id="btnLimpiarFirma">Limpiar firma</button></div>
+      </div>
+
+      ${c.tipo==="menor"?`
+      <div class="firma-step">
+        <div class="step-lbl"><span class="step-num">+</span> Nombre del tutor que firma</div>
+        <div class="fld"><label>Nombre completo del padre, madre o tutor</label><input type="text" id="firmanteNombre" placeholder="Ej: María López García" autocomplete="name"></div>
+      </div>`:""}
+
+      <div class="firma-step">
+        <div class="step-lbl"><span class="step-num">+</span> Contacto de emergencia</div>
+        <div class="field-grid cols-3">
+          <div class="fld"><label>Nombre</label><input type="text" id="emNombre" placeholder="Nombre completo" autocomplete="off"></div>
+          <div class="fld"><label>Teléfono</label><input type="tel" id="emTel" placeholder="10 dígitos" inputmode="tel" autocomplete="off"></div>
+          <div class="fld"><label>Parentesco</label><input type="text" id="emParen" placeholder="Ej: Madre" autocomplete="off"></div>
+        </div>
+      </div>
+
+      <div class="submit-area">
+        <button class="btn-submit" id="btnFirmar" disabled>Firmar contrato</button>
+        <div class="form-hint" id="formHint"></div>
+        <div class="form-err" id="formErr"></div>
+      </div>
+    </section>`;
+  } else {
+    firmaBloque = `
+    <div class="firmado-sello">
+      <div class="sello-box">
+        <svg class="sello-ic"><use href="#cv-check"/></svg>
+        <div class="sello-txt"><b>Contrato firmado.</b> ${c.firmado_at?("Firmado el "+escapeHtml(fmtFechaLarga(String(c.firmado_at).slice(0,10)))+"."):""} Guarda tu PDF con el botón de arriba. Tu firma e INE quedaron resguardados de forma privada.</div>
+      </div>
+    </div>`;
+  }
+
+  const printBar = firmado ? `
+    <div class="print-bar">
+      <button type="button" class="print-btn" onclick="window.print()">Descargar mi contrato en PDF</button>
+      <span class="print-tip">Elige "Guardar como PDF" como destino.</span>
+    </div>` : "";
+
+  return `
+    <div class="container">
+      ${printBar}
+      <article class="doc">
+        ${header}
+        ${meta}
+        ${decl}
+        ${clausulas}
+        ${acept}
+        ${anexoA}
+        ${anexoB}
+        ${firmaBloque}
+      </article>
+    </div>
+    <footer class="doc-footer">Conecta Reynosa · <a href="https://conectareynosa.mx">conectareynosa.mx</a> · Guillermo Alexander Cobos Vizcarra</footer>`;
+}
+
+// ── Canvas de firma (clonado de contrato.html) ─────────────────────────
+function setupFirmaCanvas(){
+  const canvas=$id("firmaCanvas"); if(!canvas) return null;
+  const dpr=window.devicePixelRatio||1;
+  let drawing=false, hasInk=false;
+  function fit(){
+    if(hasInk) return;
+    const rect=canvas.getBoundingClientRect();
+    canvas.width=rect.width*dpr; canvas.height=200*dpr;
+    const ctx=canvas.getContext("2d");
+    ctx.scale(dpr,dpr); ctx.lineWidth=2.4; ctx.lineCap="round"; ctx.lineJoin="round"; ctx.strokeStyle="#111"; ctx.fillStyle="#fff"; ctx.fillRect(0,0,canvas.width,canvas.height);
+  }
+  fit(); window.addEventListener("resize",fit);
+  const ctx=canvas.getContext("2d");
+  function pos(e){ const r=canvas.getBoundingClientRect(); const t=e.touches?e.touches[0]:e; return {x:t.clientX-r.left,y:t.clientY-r.top}; }
+  function start(e){ e.preventDefault(); drawing=true; const p=pos(e); ctx.beginPath(); ctx.moveTo(p.x,p.y); }
+  function move(e){ if(!drawing) return; e.preventDefault(); const p=pos(e); ctx.lineTo(p.x,p.y); ctx.stroke(); hasInk=true; }
+  function end(){ drawing=false; }
+  canvas.addEventListener("mousedown",start); canvas.addEventListener("mousemove",move); canvas.addEventListener("mouseup",end); canvas.addEventListener("mouseleave",end);
+  canvas.addEventListener("touchstart",start,{passive:false}); canvas.addEventListener("touchmove",move,{passive:false}); canvas.addEventListener("touchend",end);
+  function doClear(){ hasInk=false; fit(); }
+  return { clear:doClear, hasInk:()=>hasInk, setHasInk:v=>{hasInk=v;}, dataURL:()=>canvas.toDataURL("image/png") };
+}
+
+// ── Pipeline INE (clonado de contrato.html: decode HEIC + compresión) ──
+function _drawToJpeg(source,maxDim,quality){
+  let w=source.width||source.naturalWidth, h=source.height||source.naturalHeight;
+  if(!w||!h) throw new Error("dimensiones 0");
+  const longest=Math.max(w,h);
+  if(longest>maxDim){ const r=maxDim/longest; w=Math.round(w*r); h=Math.round(h*r); }
+  const cnv=document.createElement("canvas"); cnv.width=w; cnv.height=h;
+  const ctx=cnv.getContext("2d"); if(!ctx) throw new Error("getContext null");
+  ctx.fillStyle="#fff"; ctx.fillRect(0,0,w,h); ctx.drawImage(source,0,0,w,h);
+  const dataUrl=cnv.toDataURL("image/jpeg",quality);
+  if(!dataUrl||dataUrl.length<1000) throw new Error("canvas produjo dataURL vacío");
+  return { dataUrl, w, h };
+}
+async function _decodeViaImage(file,maxDim,quality){
+  const objUrl=URL.createObjectURL(file);
+  try{
+    const img=await new Promise((res,rej)=>{ const i=new Image(); const t=setTimeout(()=>rej(new Error("timeout >15s")),15000); i.onload=()=>{clearTimeout(t);res(i);}; i.onerror=()=>{clearTimeout(t);rej(new Error("Image.onerror"));}; i.src=objUrl; });
+    return _drawToJpeg(img,maxDim,quality);
+  } finally { URL.revokeObjectURL(objUrl); }
+}
+function _readAsDataUrl(file){
+  return new Promise((resolve,reject)=>{ const r=new FileReader(); const t=setTimeout(()=>reject(new Error("timeout leyendo")),30000); r.onload=()=>{clearTimeout(t);resolve(r.result);}; r.onerror=()=>{clearTimeout(t);reject(new Error("FileReader.onerror"));}; r.readAsDataURL(file); });
+}
+async function _decodeToJpeg(file,maxDim=1600,quality=0.78){
+  const isHeic=/^image\/(heic|heif)$/i.test(file.type||"");
+  if(typeof createImageBitmap==="function"){
+    let bmp=null;
+    try{ bmp=await createImageBitmap(file); const {dataUrl}=_drawToJpeg(bmp,maxDim,quality); return {dataUrl,method:"createImageBitmap"}; }
+    catch(e){} finally { if(bmp&&bmp.close) try{bmp.close();}catch(_){} }
+  }
+  try{ const {dataUrl}=await _decodeViaImage(file,maxDim,quality); return {dataUrl,method:"image"}; }catch(e){}
+  if(isHeic) throw Object.assign(new Error("HEIC sin decoder disponible"),{isHeic:true});
+  if(file.size>2*1024*1024) throw new Error("decoder fail y file.size >2MB");
+  const dataUrl=await _readAsDataUrl(file); return {dataUrl,method:"fallback-raw"};
+}
+function _spinnerHtml(t){ return `<div style="display:flex;flex-direction:column;align-items:center;gap:10px;padding:18px 8px;font-size:11px;color:rgba(255,255,255,.7);letter-spacing:.1em;text-transform:uppercase"><div style="width:24px;height:24px;border:2px solid rgba(232,255,76,.25);border-top-color:#e8ff4c;border-radius:50%;animation:ctr-spin 0.8s linear infinite"></div><span>${t}</span></div>`; }
+function _fileInputHtml(id){ return `<input type="file" id="${id}" accept="image/*,.heic,.heif" capture="environment">`; }
+function _sizeBadgeHtml(side,dataUrl){
+  const mb=(dataUrl?dataUrl.length:0)*0.75/1024/1024;
+  const color=mb<2?"#88ea4e":(mb<3?"#e8ff4c":"#ff8888");
+  const lbl=side==="frente"?"Frente":"Reverso";
+  return `<div data-badge="1" style="position:absolute;bottom:6px;left:6px;right:6px;background:rgba(0,0,0,.78);color:${color};padding:6px 10px;font-size:11px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;text-align:center;pointer-events:none">${lbl}: ${mb.toFixed(2)} MB</div>`;
+}
+const MSG_FOTOS_HEIC="Tu foto está en formato HEIC (típico de iPhone). Ve a Ajustes → Cámara → Formatos → \"Más compatible\", toma de nuevo la foto del INE, y vuelve a subirla.";
+const MSG_FOTOS_NO_BAJAN="Tus fotos tienen tanto detalle que no podemos enviarlas. En iPhone: Ajustes → Cámara → Formatos → \"Más compatible\". En Android: baja la resolución de la cámara. Luego toma de nuevo frente y reverso.";
+const COMPRESS_STEPS=[{maxDim:1400,quality:0.72},{maxDim:1200,quality:0.65},{maxDim:1000,quality:0.60}];
+
+function setupFileInput(side){
+  const inputId=side==="frente"?"fileFrente":"fileReverso";
+  const labelId=side==="frente"?"lblFrente":"lblReverso";
+  const label=$id(labelId);
+  const state={ dataUrl:null, file:null, method:null, needsManualConversion:false };
+  async function onPick(ev){
+    const inp=ev.target; const f=inp.files&&inp.files[0]; if(!f) return;
+    if(f.size>30*1024*1024){ alert("La foto supera 30 MB."); inp.value=""; return; }
+    label.classList.add("has-file");
+    label.innerHTML=_spinnerHtml("Procesando foto…")+_fileInputHtml(inputId); bindNewInput();
+    try{
+      const r=await _decodeToJpeg(f);
+      state.dataUrl=r.dataUrl; state.file=f; state.method=r.method; state.needsManualConversion=false;
+      label.innerHTML=`<img class="preview-img" src="${state.dataUrl}" alt="${side}">`+_sizeBadgeHtml(side,state.dataUrl)+_fileInputHtml(inputId);
+      bindNewInput();
+    }catch(e){
+      state.dataUrl=null; state.file=f; state.needsManualConversion=(e.isHeic===true);
+      label.classList.remove("has-file");
+      label.innerHTML=`<span class="lbl-title">${side==="frente"?"Frente":"Reverso"} del INE</span><span class="lbl-hint" style="color:#ffb3ba">No se pudo procesar — toca para reintentar</span>`+_fileInputHtml(inputId);
+      bindNewInput();
+      alert(state.needsManualConversion?MSG_FOTOS_HEIC:"No pudimos procesar esa foto. Intenta con otra.");
+    }
+    checkSubmit();
+  }
+  function bindNewInput(){ const inp=$id(inputId); if(inp){ inp.removeEventListener("change",onPick); inp.addEventListener("change",onPick); } }
+  function refreshBadge(){ if(!state.dataUrl) return; const old=label.querySelector("div[data-badge]"); if(old) old.remove(); label.insertAdjacentHTML("beforeend",_sizeBadgeHtml(side,state.dataUrl)); }
+  state.refreshBadge=refreshBadge;
+  bindNewInput();
+  return state;
+}
+
+// ── Habilitar botón + razón visible ────────────────────────────────────
+let firma, ineFrenteState, ineReversoState;
+function _val(id){ const el=$id(id); return el?el.value.trim():""; }
+function _esMenor(){ return _curTipo==="menor"; }
+let _curTipo="adulto";
+function checkSubmit(){
+  const btn=$id("btnFirmar"); if(!btn) return;
+  const faltan=[];
+  if(!($id("acepto")&&$id("acepto").checked)) faltan.push("acepta los términos");
+  if(!(ineFrenteState&&ineFrenteState.dataUrl)) faltan.push("INE frente");
+  if(!(ineReversoState&&ineReversoState.dataUrl)) faltan.push("INE reverso");
+  if(!(firma&&firma.hasInk())) faltan.push("tu firma");
+  if(!_val("emNombre")||!_val("emTel")||!_val("emParen")) faltan.push("contacto de emergencia (nombre, teléfono y parentesco)");
+  if(_esMenor()&&!_val("firmanteNombre")) faltan.push("nombre del tutor que firma");
+  btn.disabled=faltan.length>0;
+  const hint=$id("formHint");
+  if(hint) hint.innerHTML = faltan.length ? ("Falta: <span class=\"falta\">"+faltan.map(escapeHtml).join(", ")+"</span>.") : "Todo listo — puedes firmar.";
+}
+
+// ── Enviar ─────────────────────────────────────────────────────────────
+async function enviarFirma(token,btn,errBox){
+  if(btn.disabled) return;
+  btn.disabled=true; const original=btn.textContent; btn.textContent="Enviando…"; errBox.classList.remove("show");
+  try{
+    const firmaData=firma&&firma.dataURL?firma.dataURL():"";
+    if(!firmaData.startsWith("data:image/")) throw new Error("La firma se borró. Vuelve a firmar antes de enviar.");
+    if(!ineFrenteState.dataUrl) throw new Error("Falta la foto del frente del INE.");
+    if(!ineReversoState.dataUrl) throw new Error("Falta la foto del reverso del INE.");
+    if([ineFrenteState,ineReversoState].some(s=>s.needsManualConversion)) throw new Error(MSG_FOTOS_HEIC);
+
+    const emergencia={ nombre:_val("emNombre"), telefono:_val("emTel"), parentesco:_val("emParen") };
+    const firmante_nombre=_val("firmanteNombre");
+
+    const buildPayload=()=>({ token, firma:firmaData, ine_frente:ineFrenteState.dataUrl, ine_reverso:ineReversoState.dataUrl, emergencia, firmante_nombre:firmante_nombre||undefined, acepto:true });
+    const sizeMB=p=>JSON.stringify(p).length/1024/1024;
+    let payload=buildPayload(), curMB=sizeMB(payload);
+
+    if(curMB>4){
+      const compresibles=[ineFrenteState,ineReversoState].filter(s=>s.file);
+      if(!compresibles.length) throw new Error(MSG_FOTOS_NO_BAJAN);
+      btn.textContent="Optimizando fotos…";
+      for(const step of COMPRESS_STEPS){
+        for(const s of compresibles){ try{ const r=await _decodeToJpeg(s.file,step.maxDim,step.quality); s.dataUrl=r.dataUrl; if(s.refreshBadge) s.refreshBadge(); }catch(e){} }
+        payload=buildPayload(); curMB=sizeMB(payload); if(curMB<=5) break;
+      }
+      btn.textContent="Enviando…";
+    }
+    if(curMB>5.5) throw new Error(MSG_FOTOS_NO_BAJAN);
+
+    const resp=await fetch(API_FIRMAR,{ method:"POST", headers:{ "Content-Type":"application/json" }, body:JSON.stringify(payload) });
+    let j; try{ j=await resp.json(); }catch(e2){ throw new Error("Respuesta del servidor no válida (status "+resp.status+")"); }
+    if(!resp.ok||!j.ok){
+      if(resp.status===409){ mostrarError(errBox,"Este contrato ya estaba firmado. Recargando…",btn,original); setTimeout(loadContrato,1500); return; }
+      throw new Error(j.error||("Error "+resp.status));
+    }
+    // Éxito: guardamos lo firmado en memoria para el PDF completo, y celebramos.
+    _signed={ emergencia, firmante_nombre:firmante_nombre||null, firmadoAt:new Date().toISOString() };
+    mostrarExito();
+  }catch(e){
+    mostrarError(errBox,e.message||"No pudimos guardar tu firma. Intenta de nuevo.",btn,original);
+  }
+}
+function mostrarError(errBox,msg,btn,original){ errBox.textContent=msg; errBox.classList.add("show"); if(btn){ btn.disabled=false; btn.textContent=original; } }
+
+function mostrarExito(){
+  const root=$id("root");
+  root.innerHTML=`
+    <div class="state-screen">
+      <div class="exito-emoji">🎉</div>
+      <span class="badge-tag">Contrato firmado</span>
+      <h1>¡Listo, quedó firmado!</h1>
+      <p>Guardamos tu firma, tu INE y tus datos de forma privada. Nos vemos en el viaje. Descarga tu copia en PDF para tus registros.</p>
+      <button class="btn-link" id="btnVerFirmado">Ver / descargar mi contrato</button>
+    </div>`;
+  $id("btnVerFirmado").addEventListener("click",()=>{
+    if(!_ultimoContrato) return;
+    _ultimoContrato.estado="firmado";
+    _ultimoContrato.firmado_at=(_signed&&_signed.firmadoAt)||new Date().toISOString();
+    pintar(_ultimoContrato);
+    window.scrollTo(0,0);
+  });
+}
+
+// ── Carga ──────────────────────────────────────────────────────────────
+let _ultimoContrato=null;
+function pintar(c){
+  _ultimoContrato=c; _curTipo=c.tipo||"adulto";
+  $id("root").innerHTML=renderDoc(c);
+  if(c.estado!=="firmado"){
+    firma=setupFirmaCanvas();
+    ineFrenteState=setupFileInput("frente");
+    ineReversoState=setupFileInput("reverso");
+    $id("btnLimpiarFirma").addEventListener("click",()=>{ firma.clear(); firma.setHasInk(false); checkSubmit(); });
+    const cv=$id("firmaCanvas"); cv.addEventListener("mouseup",checkSubmit); cv.addEventListener("touchend",checkSubmit);
+    $id("acepto").addEventListener("change",checkSubmit);
+    ["emNombre","emTel","emParen","firmanteNombre"].forEach(id=>{ const el=$id(id); if(el) el.addEventListener("input",checkSubmit); });
+    $id("btnFirmar").addEventListener("click",()=>enviarFirma(getToken(),$id("btnFirmar"),$id("formErr")));
+    checkSubmit();
+  }
+}
+
+function pantallaEstado(badge,titulo,texto,accionHtml){
+  $id("root").innerHTML=`
+    <div class="state-screen">
+      <span class="badge-tag">${escapeHtml(badge)}</span>
+      <h1>${escapeHtml(titulo)}</h1>
+      <p>${escapeHtml(texto)}</p>
+      ${accionHtml||""}
+    </div>`;
+}
+
+async function loadContrato(){
+  const token=getToken();
+  if(!token){ pantallaEstado("Link inválido","Falta el token","Este link no incluye un token. Pídele a Conecta Reynosa que te reenvíe tu contrato.",`<a class="btn-link" href="https://conectareynosa.mx">Ir al sitio</a>`); return; }
+  $id("root").innerHTML=`<div class="loading">Cargando contrato…</div>`;
+  let resp,data;
+  try{
+    resp=await fetch(API_OBTENER,{ method:"POST", headers:{ "Content-Type":"application/json" }, body:JSON.stringify({ token }) });
+    data=await resp.json();
+  }catch(e){
+    pantallaEstado("Error de red","Inténtalo de nuevo","No pudimos cargar tu contrato. Revisa tu conexión.",`<a class="btn-link" href="javascript:location.reload()">Reintentar</a>`); return;
+  }
+  if(resp.status===410){ pantallaEstado("Contrato reemplazado","Este contrato ya no está vigente","Este contrato fue reemplazado por uno nuevo. Revisa tu correo o contáctanos y con gusto te ayudamos.",`<a class="btn-link" href="${WA_URL}">Escríbenos por WhatsApp</a>`); return; }
+  if(resp.status===404){ pantallaEstado("No encontrado","No encontramos este contrato","El link no es válido o expiró. Si crees que es un error, escríbenos y lo revisamos.",`<a class="btn-link" href="${WA_URL}">Escríbenos por WhatsApp</a>`); return; }
+  if(!resp.ok||!data||!data.ok){ pantallaEstado("Aviso","No pudimos abrir tu contrato",(data&&data.error)?data.error:"Intenta de nuevo en un momento.",`<a class="btn-link" href="javascript:location.reload()">Reintentar</a>`); return; }
+
+  const c=data.contrato; c.__token=token;
+  pintar(c);
+  window.scrollTo(0,0);
+}
+
+loadContrato();
+</script>
+</body>
+</html>

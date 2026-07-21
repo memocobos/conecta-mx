@@ -117,6 +117,29 @@ exports.handler = async (event) => {
     });
   }
 
+  // con_contratos (aditivo/gated): por solicitud, { total, firmados } de sus
+  // contratos vivos — para el contador "N/M firmados" del sub-tab Pagos (F3b).
+  // Best-effort: si falla, las filas simplemente no traen `contratos`.
+  if (body.con_contratos && solicitudes.length) {
+    try {
+      const ids = solicitudes.map((s) => s.id).filter(Boolean);
+      const inS = ids.map(encodeURIComponent).join(',');
+      const cr = await fetch(
+        `${env.PORTAL_SB_URL}/rest/v1/contratos_viajeros?solicitud_id=in.(${inS})&estado=neq.anulado&select=solicitud_id,estado`,
+        { headers: { apikey: env.PORTAL_SB_SERVICE, Authorization: `Bearer ${env.PORTAL_SB_SERVICE}` } }
+      );
+      if (cr.ok) {
+        const cts = await cr.json();
+        const acc = {};
+        (Array.isArray(cts) ? cts : []).forEach((c) => {
+          const a = (acc[c.solicitud_id] = acc[c.solicitud_id] || { total: 0, firmados: 0 });
+          a.total++; if (c.estado === 'firmado') a.firmados++;
+        });
+        solicitudes.forEach((s) => { if (acc[s.id]) s.contratos = acc[s.id]; });
+      }
+    } catch (_) { /* best-effort */ }
+  }
+
   // Contadores por estado sobre el resultado bruto (sin search), útil para el header.
   const contadores = { pendiente: 0, en_pagos: 0, pagado: 0, cancelado: 0 };
   for (const s of solicitudes) {

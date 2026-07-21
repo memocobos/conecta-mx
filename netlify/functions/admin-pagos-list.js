@@ -71,7 +71,7 @@ exports.handler = async (event) => {
     let lugares = [];
     try {
       const lr = await fetch(
-        `${env.PORTAL_SB_URL}/rest/v1/lugares?solicitud_id=eq.${solicitudId}&select=id,numero,nombre,cliente_id,estado&order=numero.asc`,
+        `${env.PORTAL_SB_URL}/rest/v1/lugares?solicitud_id=eq.${solicitudId}&select=id,numero,nombre,cliente_id,estado,paquete,boleto_entregado_at&order=numero.asc`,
         { headers: sbHeaders }
       );
       if (lr.ok) {
@@ -79,6 +79,26 @@ exports.handler = async (event) => {
         if (Array.isArray(arr)) lugares = arr;
       }
     } catch (_) { /* best-effort: la UI degrada a sin-etiquetas */ }
+
+    // [F3b] Contrato vivo por lugar: { estado, token }. Bulma es admin → el token
+    // SÍ viaja (para "copiar link de firma"). Best-effort: si falla, los lugares
+    // quedan sin `contrato` y la UI no pinta chips (solicitudes viejas pre-módulo).
+    try {
+      const ids = lugares.map(l => l.id).filter(Boolean);
+      if (ids.length) {
+        const inLug = ids.map(encodeURIComponent).join(',');
+        const cr = await fetch(
+          `${env.PORTAL_SB_URL}/rest/v1/contratos_viajeros?lugar_id=in.(${inLug})&estado=neq.anulado&select=lugar_id,estado,token`,
+          { headers: sbHeaders }
+        );
+        if (cr.ok) {
+          const cts = await cr.json();
+          const byLug = {};
+          (Array.isArray(cts) ? cts : []).forEach(c => { byLug[c.lugar_id] = { estado: c.estado, token: c.token }; });
+          lugares.forEach(l => { if (byLug[l.id]) l.contrato = byLug[l.id]; });
+        }
+      }
+    } catch (_) { /* best-effort */ }
 
     return { statusCode: 200, headers, body: JSON.stringify({ ok: true, pagos: Array.isArray(pagos) ? pagos : [], lugares }) };
   } catch (e) {

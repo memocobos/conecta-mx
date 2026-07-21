@@ -11407,6 +11407,17 @@ function _ccPagoEstadoPill(estado) {
   return `<span style="font-family:'JetBrains Mono',monospace;font-size:10px;padding:2px 8px;border-radius:20px;color:${m.c};background:${m.bg};border:1px solid ${m.bd};white-space:nowrap">${m.t}</span>`;
 }
 
+// [F3b] Contador compacto "N/M firmados" por solicitud (verde si todos firmados,
+// ámbar si faltan). Sin contratos (solicitud vieja) → nada.
+function _ccContratosPill(c) {
+  if (!c || !Number(c.total)) return '';
+  const firmados = Number(c.firmados) || 0, total = Number(c.total) || 0;
+  const todos = firmados >= total;
+  const col = todos ? { c: '#3DDC84', bg: 'rgba(61,220,132,.12)', bd: 'rgba(61,220,132,.35)' }
+                    : { c: '#e8a800', bg: 'rgba(232,168,0,.12)', bd: 'rgba(232,168,0,.35)' };
+  return `<span title="Contratos firmados del grupo" style="display:inline-block;margin-left:6px;font-family:'JetBrains Mono',monospace;font-size:10px;padding:2px 8px;border-radius:20px;color:${col.c};background:${col.bg};border:1px solid ${col.bd};white-space:nowrap"><svg class="ic" style="width:11px;height:11px;vertical-align:-1px"><use href="#ic-boleto"/></svg> ${firmados}/${total} firmados</span>`;
+}
+
 async function loadCCPagos(eventoId) {
   if (_ccPagosLoading) return;
   _ccPagosLoading = true;
@@ -11419,7 +11430,7 @@ async function loadCCPagos(eventoId) {
       headers: _spAdminHeaders(),
       // multifecha: trae el slug base + todas sus fechas (festival). con_pagos:
       // embebe las cuotas para calcular abonado/total sin llamada por fila.
-      body: JSON.stringify({ evento_id: eventoId, multifecha: true, con_pagos: true, limit: 500 }),
+      body: JSON.stringify({ evento_id: eventoId, multifecha: true, con_pagos: true, con_contratos: true, limit: 500 }),
     });
     const data = await r.json();
     if (!r.ok) throw new Error(data.error || 'Error cargando pagos');
@@ -11491,7 +11502,7 @@ function _renderCCPagos() {
           <div style="display:flex;justify-content:space-between;gap:8px;margin-bottom:3px"><b style="color:#3DDC84">${_spFmtMxn(st.abonado)}</b><span style="color:var(--ts)">${_spFmtMxn(st.total)}</span></div>
           <div style="height:5px;background:var(--bg3);border-radius:3px;overflow:hidden"><div style="height:100%;width:${pct}%;background:${barColor};border-radius:3px"></div></div>
         </td>
-        <td style="padding:9px 8px">${_ccPagoEstadoPill(s.estado)}</td>
+        <td style="padding:9px 8px">${_ccPagoEstadoPill(s.estado)}${_ccContratosPill(s.contratos)}</td>
         <td style="padding:9px 8px;text-align:right;white-space:nowrap"><button class="btn btn-ghost btn-sm" onclick="verSolicitudPagosCC('${_spEscape(s.id)}')" style="font-size:11px">Ver detalles</button></td>
       </tr>`;
   }).join('');
@@ -13689,6 +13700,69 @@ function renderPlanPagosSP(solicitudId, estadoSolicitud) {
 // Chip verde "CONECTADO ✓" (el lugar ya tiene cliente_id: el acompañante aceptó).
 const _SP_CHIP_CONECTADO = `<span style="display:inline-block;padding:2px 8px;border-radius:999px;background:rgba(61,220,132,.15);border:1px solid rgba(61,220,132,.5);font-size:10px;font-weight:800;letter-spacing:.04em;color:#3DDC84">CONECTADO ✓</span>`;
 
+// [F3b] Chip de contrato del lugar (verde firmado / ámbar pendiente). '' si no hay
+// contrato vivo (solicitud vieja pre-módulo).
+function _spContratoChip(lg){
+  const c = lg && lg.contrato; if (!c || !c.estado) return '';
+  if (c.estado === 'firmado')
+    return `<span style="display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:999px;background:rgba(61,220,132,.15);border:1px solid rgba(61,220,132,.5);font-size:10px;font-weight:800;color:#3DDC84"><svg class="ic" style="width:12px;height:12px"><use href="#ic-boleto"/></svg> Contrato ✓</span>`;
+  return `<span style="display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:999px;background:rgba(232,168,0,.12);border:1px solid rgba(232,168,0,.4);font-size:10px;font-weight:800;color:#e8a800"><svg class="ic" style="width:12px;height:12px"><use href="#ic-alerta"/></svg> Contrato pendiente</span>`;
+}
+// [F3b] Botón discreto "copiar link de firma" (solo pendiente + token; Bulma es admin).
+function _spCopyLinkBtn(lg){
+  const c = lg && lg.contrato; if (!c || c.estado === 'firmado' || !c.token) return '';
+  return `<button class="btn btn-ghost btn-sm" style="font-size:10px" onclick="spCopiarLinkFirma('${_spEscape(c.token)}',this)"><svg class="ic"><use href="#ic-enlace"/></svg> Copiar link de firma</button>`;
+}
+// [F3b] Casilla "Boleto entregado" — SOLO lugares de paquete CHEAP. Deshabilitada
+// con tooltip si el contrato no está firmado (el servidor la rebota igual).
+function _spBoletoRow(lg, solSafe){
+  if (!lg || String(lg.paquete || '').toLowerCase() !== 'cheap') return '';
+  const firmado = !!(lg.contrato && lg.contrato.estado === 'firmado');
+  const entregado = !!lg.boleto_entregado_at;
+  const lgSafe = _spEscape(lg.id);
+  const bloqueado = (!firmado && !entregado);
+  const fecha = entregado ? _spFmtFechaRel(lg.boleto_entregado_at) : '';
+  return `<label style="display:flex;align-items:center;gap:8px;margin:2px 0 8px;font-size:12px;${bloqueado ? 'opacity:.6;' : ''}"${bloqueado ? ' title="Requiere contrato firmado"' : ''}>
+    <input type="checkbox" ${entregado ? 'checked' : ''} ${bloqueado ? 'disabled' : ''} onchange="spToggleBoleto('${lgSafe}','${solSafe}',this)" style="width:16px;height:16px;accent-color:var(--gold)">
+    <svg class="ic" style="width:14px;height:14px;color:var(--gold)"><use href="#ic-boleto"/></svg>
+    <span>Boleto entregado${entregado && fecha ? ` <span style="color:var(--ts)">· ${_spEscape(fecha)}</span>` : ''}</span>
+    ${bloqueado ? `<span style="color:var(--ts);font-size:11px">— requiere contrato firmado</span>` : ''}
+  </label>`;
+}
+// [F3b] Copiar el link de firma al portapapeles (para reenviar por WhatsApp).
+async function spCopiarLinkFirma(token, btn){
+  const url = location.origin + '/contrato-viajero.html?token=' + encodeURIComponent(token);
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) await navigator.clipboard.writeText(url);
+    else { const ta = document.createElement('textarea'); ta.value = url; ta.style.position = 'fixed'; ta.style.opacity = '0'; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); }
+    if (btn){ const o = btn.innerHTML; btn.innerHTML = 'Copiado ✓'; setTimeout(() => { btn.innerHTML = o; }, 1600); }
+    showToast('Link de firma copiado.', 'success');
+  } catch (e) { showToast('No se pudo copiar. Link: ' + url, 'error'); }
+}
+// [F3b] Marcar/des-marcar boleto entregado. El CANDADO está en el server (409 si
+// no hay contrato firmado); aquí mostramos el mensaje tal cual y revertimos.
+async function spToggleBoleto(lugarId, solicitudId, cb){
+  const entregar = !!cb.checked;
+  cb.disabled = true;
+  try {
+    const r = await fetch('/.netlify/functions/admin-lugar-boleto', {
+      method: 'POST', headers: _spAdminHeaders(), body: JSON.stringify({ lugar_id: lugarId, entregado: entregar }),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || j.ok === false){
+      cb.checked = !entregar; cb.disabled = false;
+      showToast(j.error || ('Error ' + r.status), 'error'); // 409 → '⛔ Sin contrato firmado...'
+      return;
+    }
+    const lg = (_spLugaresCache[solicitudId] || []).find(x => x.id === lugarId);
+    if (lg) lg.boleto_entregado_at = j.boleto_entregado_at || null;
+    showToast(entregar ? 'Boleto marcado como entregado.' : 'Se des-marcó el boleto.', 'success');
+    renderPlanPagosSP(solicitudId, 'en_pagos'); // re-pinta el plan (fecha/estado)
+  } catch (e){
+    cb.checked = !entregar; cb.disabled = false; showToast('Error: ' + e.message, 'error');
+  }
+}
+
 function _spRenderPlanPorLugar(solicitudId, pagos) {
   const solSafe = _spEscape(solicitudId);
   const lugById = {};
@@ -13754,10 +13828,11 @@ function _spRenderPlanPorLugar(solicitudId, pagos) {
       <div style="border:1px solid var(--border);border-radius:10px;padding:10px 10px 12px;margin-bottom:8px;background:var(--bg2)">
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:9px">
           <b style="font-size:13px;${nombreStyle}">Lugar #${_spEscape(num)} · ${_spEscape(nombre)}</b>
-          ${etiquetaEstado}${conectado}
+          ${etiquetaEstado}${conectado}${_spContratoChip(lg)}
           <span style="margin-left:auto;font-size:11px;color:var(--ts);white-space:nowrap">Pagado ${_spFmtMxn(subPagado)} de ${_spFmtMxn(subTotal)}</span>
-          ${btnBaja}${btnTraspaso}
+          ${btnBaja}${btnTraspaso}${_spCopyLinkBtn(lg)}
         </div>
+        ${_spBoletoRow(lg, solSafe)}
         ${formTraspaso}
         <div style="display:flex;flex-direction:column;gap:8px">${filas}</div>
       </div>`;

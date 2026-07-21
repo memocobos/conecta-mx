@@ -15,6 +15,8 @@
 // portal-morosidad-diario). Reusa PORTAL_SUPABASE_URL / PORTAL_SUPABASE_SERVICE_KEY.
 
 const { aplicarModoPrueba } = require('./_lib/correo-guard');
+const { fetchCatalogo } = require('./_lib/catalogo-index');
+const { resolverCuentaDeCatalogo, cajaCuentaHtml } = require('./_lib/cuenta-deposito');
 
 const SB_URL = process.env.PORTAL_SUPABASE_URL;
 const SB_KEY = process.env.PORTAL_SUPABASE_SERVICE_KEY;
@@ -116,7 +118,7 @@ exports.handler = async function () {
   // 1) Solicitudes en_pagos (las pagadas no deben; las pendientes no tienen plan;
   //    las canceladas quedan fuera). cliente_id = titular (fallback de dueño).
   const solicitudes = await sb(
-    'solicitudes_tour?estado=eq.en_pagos&select=id,evento_id,evento_nombre,cliente_id'
+    'solicitudes_tour?estado=eq.en_pagos&select=id,evento_id,evento_nombre,cliente_id,paquete'
   );
   if (!Array.isArray(solicitudes) || !solicitudes.length) {
     console.log('[recordatorios] Fin. solicitudes en_pagos:0');
@@ -124,6 +126,10 @@ exports.handler = async function () {
   }
   const solMap = {};
   for (const s of solicitudes) if (s && s.id) solMap[s.id] = s;
+
+  // Gancho 2: catálogo (best-effort) para la caja de cuenta bancaria por paquete.
+  // Si el catálogo está caído, catalogo=null → los correos salen SIN caja (igual a hoy).
+  const catalogo = await fetchCatalogo();
 
   // 2) Pagos de esas solicitudes (con cliente_id del dueño + fecha + lugar_id).
   const ids = solicitudes.map(s => s.id);
@@ -190,9 +196,11 @@ exports.handler = async function () {
       ? `<p style="margin:0 0 14px 0;font-size:13px;color:rgba(255,255,255,.7)">Este es <strong>tu</strong> abono del viaje; cada acompañante con su cuenta recibe el suyo por separado.</p>`
       : '';
 
+    const cajaCuenta = cajaCuentaHtml(resolverCuentaDeCatalogo(catalogo, sol.evento_id, sol.paquete));
+
     const asunto = `Es momento de tu abono para ${evento} 🎵`;
     const cuerpo = `<p style="margin:0 0 14px 0">Ya abrió tu ventana de pago para tu viaje a <strong>${escapeHtml(evento)}</strong>. Tu abono de esta quincena es de <strong>${montoAbono}</strong>.</p>
-    ${notaGrupo}<p style="margin:0 0 14px 0">Realízalo antes de que cierre para mantener tu lugar al corriente, y envíanos tu comprobante.</p>
+    ${notaGrupo}<p style="margin:0 0 14px 0">Realízalo antes de que cierre para mantener tu lugar al corriente, y envíanos tu comprobante.</p>${cajaCuenta}
     <p style="margin:0">¡Gracias por viajar con Conecta!</p>`;
     const ok = await enviarCorreo(correo, asunto, wrapHtml(nombre, cuerpo));
     if (!ok) { fallidos++; continue; }

@@ -90,3 +90,12 @@
 # y a quien ya tiene pagos vencidos (los cubre morosidad). 14:00 UTC = 8:00 AM MX.
 [functions."vence-hoy-diario"]
   schedule = "0 14 * * *"
+
+# Contratos F4 — alertas pre-viaje de contratos SIN FIRMAR. DIARIO. A 7 días de la
+# PRIMERA fecha del evento (catalogo-index.ds) y diario los últimos 3 (días 3/2/1)
+# manda: (1) UN resumen al admin con pendientes + lugares sin contrato por evento y
+# (2) recordatorio de firma al cliente (dueño del lugar si conectado, si no al
+# titular). "Sin firma no hay servicio" necesita tiempo de reacción. Solo notifica;
+# no toca el motor ni los estados. 14:00 UTC = 8:00 AM MX, slot de cobranza.
+[functions."contratos-alerta-cron"]
+  schedule = "0 14 * * *"

@@ -20,6 +20,8 @@
 //                       PORTAL_SUPABASE_SERVICE_KEY. (Sin env vars nuevas.)
 // =============================================================================
 
+const { crearContratoParaLugar } = require('./_lib/contratos-viajeros');
+
 const UUID_RE = /^[0-9a-f-]{36}$/i;
 
 exports.handler = async (event) => {
@@ -86,7 +88,7 @@ exports.handler = async (event) => {
     // ---- 3a. Buscar el lugar por token ----
     const lugR = await fetch(
       `${SB_URL}/rest/v1/lugares?invitacion_token=eq.${encodeURIComponent(token)}`
-      + `&select=id,solicitud_id,numero,nombre,correo,estado,cliente_id,invitacion_aceptada_at&limit=1`,
+      + `&select=id,solicitud_id,numero,nombre,correo,estado,cliente_id,invitacion_aceptada_at,fecha_nacimiento&limit=1`,
       { headers: sbHeaders }
     );
     if (!lugR.ok) {
@@ -116,7 +118,7 @@ exports.handler = async (event) => {
 
     // ---- 3e. La solicitud no debe estar cancelada (y traer evento_nombre) ----
     const solR = await fetch(
-      `${SB_URL}/rest/v1/solicitudes_tour?id=eq.${encodeURIComponent(lugar.solicitud_id)}&select=evento_nombre,estado&limit=1`,
+      `${SB_URL}/rest/v1/solicitudes_tour?id=eq.${encodeURIComponent(lugar.solicitud_id)}&select=evento_nombre,estado,evento_id&limit=1`,
       { headers: sbHeaders }
     );
     if (!solR.ok) {
@@ -142,6 +144,7 @@ exports.handler = async (event) => {
         // Re-click del link ya aceptado: re-apunta por si el plan (#229) se generó
         // DESPUÉS de aceptar y sus cuotas quedaron al titular. Idempotente/best-effort.
         const reap = await reapuntarCuotas(SB_URL, sbHeaders, lugar.id, clienteId, user.id);
+        await _ensureContrato(SB_URL, sbHeaders, lugar, solicitud); // F2a: por si aún no tenía contrato
         return { statusCode: 200, headers, body: JSON.stringify({ ok: true, ya_aceptada: true, evento_nombre: eventoNombre, ...reap }) };
       }
       return { statusCode: 409, headers, body: JSON.stringify({ error: 'Esta invitación ya fue usada' }) };
@@ -192,6 +195,10 @@ exports.handler = async (event) => {
     //         Best-effort: un fallo NO revierte la aceptación (ya hecha arriba).
     const reap = await reapuntarCuotas(SB_URL, sbHeaders, lugar.id, clienteId, user.id);
 
+    // ---- 8. Contrato F2a: si su lugar no tiene contrato vivo, crearlo (insert
+    //         directo, idempotente). SIN correo aquí — su portal se lo muestra en F3.
+    await _ensureContrato(SB_URL, sbHeaders, lugar, solicitud);
+
     return { statusCode: 200, headers, body: JSON.stringify({ ok: true, evento_nombre: eventoNombre, ...reap }) };
   } catch (e) {
     return { statusCode: 502, headers, body: JSON.stringify({ error: 'Error aceptando la invitación', detail: e.message }) };
@@ -199,6 +206,22 @@ exports.handler = async (event) => {
 };
 
 // ----- helpers -----
+
+// F2a: asegura un contrato vivo para el lugar del acompañante. Insert directo
+// (idempotente: 23505 → ya existe). Best-effort: NUNCA lanza — no revierte la
+// aceptación. Sin correo (su portal muestra el contrato en F3).
+async function _ensureContrato(SB_URL, sbHeaders, lugar, solicitud) {
+  try {
+    await crearContratoParaLugar({
+      portalUrl: SB_URL,
+      portalHeaders: sbHeaders,
+      lugar: { id: lugar.id, fecha_nacimiento: lugar.fecha_nacimiento },
+      solicitud: { id: lugar.solicitud_id, evento_id: solicitud && solicitud.evento_id },
+    });
+  } catch (e) {
+    console.warn('[invitacion-aceptar] contrato F2a:', e.message);
+  }
+}
 
 // F3-t3: re-apunta al acompañante las cuotas NO pagadas de SU lugar (las que se
 // generaron al titular porque el lugar aún no tenía dueño, #229). Best-effort:

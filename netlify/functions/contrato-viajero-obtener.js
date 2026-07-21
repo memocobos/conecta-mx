@@ -44,7 +44,7 @@ exports.handler = async (event) => {
     // 1) contrato por token
     const cr = await fetch(
       `${SB_URL}/rest/v1/contratos_viajeros?token=eq.${encodeURIComponent(token)}`
-      + `&select=id,lugar_id,solicitud_id,evento_id,tipo,estado,version_texto,firmado_at&limit=1`,
+      + `&select=id,lugar_id,solicitud_id,evento_id,tipo,estado,version_texto,firmado_at,emergencia,firmante_nombre&limit=1`,
       { headers: sb }
     );
     if (!cr.ok) return { statusCode: 502, headers, body: JSON.stringify({ error: 'Supabase rechazó la consulta' }) };
@@ -121,6 +121,12 @@ exports.handler = async (event) => {
       cuenta,
     };
     if (c.tipo === 'menor') contrato.edad = edadDe(lugar.fecha_nacimiento);
+    // Snapshot de la firma solo cuando ya está firmado (para que el PDF recargado
+    // salga completo con el contacto de emergencia y el nombre del tutor).
+    if (c.estado === 'firmado') {
+      contrato.emergencia = (c.emergencia && typeof c.emergencia === 'object') ? c.emergencia : null;
+      contrato.firmante_nombre = c.firmante_nombre || null;
+    }
 
     return { statusCode: 200, headers, body: JSON.stringify({ ok: true, contrato }) };
   } catch (e) {

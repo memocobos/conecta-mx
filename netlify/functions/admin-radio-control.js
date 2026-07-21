@@ -9,6 +9,9 @@
 //   POST { accion:"saltar"   } → POST /api/station/1/backend/skip → { ok:true }
 //   POST { accion:"recargar"  } → POST /api/station/1/reload       → { ok:true }
 //   POST { accion:"reiniciar" } → POST /api/station/1/restart      → { ok:true }
+//   POST { accion:"sincronizar_playlist" } → asigna TODAS las carpetas raíz de
+//     la biblioteca a la playlist "Todo Aleatorio" (id 2) vía files/batch →
+//     { ok:true, carpetas:N }. Idempotente (AzuraCast no duplica).
 //
 // Seguridad: MISMO patrón que admin-radio-peticiones (corregido en #253) —
 // distingue "cross-origin real" (Origin presente y no permitido → 403) de
@@ -89,6 +92,51 @@ exports.handler = async (event) => {
     catch { return { statusCode: 400, headers, body: JSON.stringify({ error: 'JSON inválido' }) }; }
 
     const accion = (body && body.accion) ? String(body.accion) : '';
+
+    // ---- POST { accion:"sincronizar_playlist" } ----
+    // Asigna todas las carpetas raíz de la biblioteca a la playlist "Todo
+    // Aleatorio" (id 2). Al asignar a nivel CARPETA (setPlaylistsForFolder de
+    // AzuraCast), las canciones futuras de esos artistas entran a la rotación
+    // solas. Idempotente: re-asignar no duplica.
+    if (accion === 'sincronizar_playlist') {
+      // a) carpetas raíz: files/list currentDirectory vacío, todas las páginas,
+      //    solo rows de tipo directorio → sus paths.
+      const dirs = [];
+      let page = 1, guard = 0;
+      while (guard++ < 50) {
+        const url = `${AZ_BASE}/api/station/${STATION}/files/list?currentDirectory=&rowCount=100&current=${page}`;
+        const rl = await azFetch(url, { headers: azHeaders });
+        if (!rl.ok) {
+          const detail = await rl.text().catch(() => '');
+          return { statusCode: 502, headers, body: JSON.stringify({ error: 'AzuraCast rechazó la lista de carpetas', detail }) };
+        }
+        const data = await rl.json().catch(() => ({}));
+        const rows = (data && Array.isArray(data.rows)) ? data.rows : [];
+        for (const row of rows) {
+          if (row && (row.type === 'directory' || row.type === 'dir') && row.path) dirs.push(String(row.path));
+        }
+        const total = (data.total != null) ? Number(data.total)
+          : (data.filtered != null ? Number(data.filtered) : rows.length);
+        const totalPag = Number.isFinite(total) && total > 0 ? Math.ceil(total / 100) : (rows.length >= 100 ? page + 1 : page);
+        if (page >= totalPag) break;
+        page++;
+      }
+      if (!dirs.length) return { statusCode: 200, headers, body: JSON.stringify({ ok: true, carpetas: 0 }) };
+
+      // b) asignación en lote a la playlist (shape verificado contra el source
+      //    rolling de AzuraCast BatchAction: dirs/files = paths, playlists = ids).
+      const rb = await azFetch(`${AZ_BASE}/api/station/${STATION}/files/batch`, {
+        method: 'PUT',
+        headers: { ...azHeaders, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ do: 'playlist', dirs, files: [], playlists: [2] }),
+      });
+      if (!rb.ok) {
+        const detail = await rb.text().catch(() => '');
+        return { statusCode: 502, headers, body: JSON.stringify({ error: 'AzuraCast rechazó la asignación a la playlist', detail }) };
+      }
+      return { statusCode: 200, headers, body: JSON.stringify({ ok: true, carpetas: dirs.length }) };
+    }
+
     const spec = ACCIONES_POST[accion];
     if (!spec) return { statusCode: 400, headers, body: JSON.stringify({ error: 'accion inválida' }) };
 

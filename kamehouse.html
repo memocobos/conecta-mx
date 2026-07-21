@@ -3517,9 +3517,11 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
     <div class="ks-panel-title">Estación</div>
     <div style="display:flex;gap:10px;flex-wrap:wrap">
      <button class="btn btn-ghost btn-sm" id="radio-ctrl-recargar" onclick="radioControlRecargar()" style="font-size:11px">Recargar playlists</button>
+     <button class="btn btn-ghost btn-sm" id="radio-ctrl-sincronizar" onclick="radioControlSincronizar()" style="font-size:11px">Sincronizar playlist</button>
      <button class="btn btn-sm" id="radio-ctrl-reiniciar" onclick="radioControlReiniciar()" style="font-size:11px;border:1px solid var(--red);color:var(--red);background:transparent">Reiniciar transmisión</button>
     </div>
-    <div style="color:var(--ts);font-size:11px;margin-top:10px;line-height:1.5">Recargar playlists relee la programación sin cortar el aire. Reiniciar transmisión desconecta a los oyentes unos segundos.</div>
+    <div id="radio-ctrl-sync-res" style="color:var(--green);font-size:11px;margin-top:10px;line-height:1.5;display:none"></div>
+    <div style="color:var(--ts);font-size:11px;margin-top:10px;line-height:1.5">Recargar playlists relee la programación sin cortar el aire. Sincronizar playlist mete todas las carpetas de la biblioteca a Todo Aleatorio — úsalo tras agregar artistas nuevos; los cambios se reflejan en la rotación en ~5 min. Reiniciar transmisión desconecta a los oyentes unos segundos.</div>
    </div>
 
   </div>
@@ -7083,6 +7085,31 @@ async function radioControlSaltar() {
 
 async function radioControlRecargar() {
   await _radioControlAccion('recargar', 'radio-ctrl-recargar', 'Playlists recargadas.');
+}
+
+// Asigna todas las carpetas raíz a la playlist Todo Aleatorio (para que los
+// artistas nuevos entren a la rotación). Lee la cuenta de carpetas del response.
+async function radioControlSincronizar() {
+  if (!confirm('¿Sincronizar la playlist Todo Aleatorio con todas las carpetas de la biblioteca?\n\nMete los artistas nuevos a la rotación (no duplica los que ya estaban).')) return;
+  const btn = document.getElementById('radio-ctrl-sincronizar');
+  const res = document.getElementById('radio-ctrl-sync-res');
+  const orig = btn ? btn.textContent : '';
+  if (btn) { btn.disabled = true; btn.textContent = 'Sincronizando…'; }
+  if (res) res.style.display = 'none';
+  try {
+    const r = await khAdminFetch('/.netlify/functions/admin-radio-control', {
+      method: 'POST', body: JSON.stringify({ accion: 'sincronizar_playlist' }),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || j.ok === false) throw new Error(j.error || ('Error ' + r.status));
+    const n = Number(j.carpetas) || 0;
+    showToast(n + ' carpeta' + (n !== 1 ? 's' : '') + ' sincronizada' + (n !== 1 ? 's' : '') + '.', 'success');
+    if (res) { res.textContent = n + ' carpeta' + (n !== 1 ? 's' : '') + ' sincronizada' + (n !== 1 ? 's' : '') + ' con Todo Aleatorio.'; res.style.display = ''; }
+  } catch (e) {
+    showToast('Error: ' + e.message, 'error');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = orig; }
+  }
 }
 
 async function radioControlReiniciar() {

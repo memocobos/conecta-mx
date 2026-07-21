@@ -122,6 +122,13 @@ exports.handler = async function (event) {
   try { data = JSON.parse(event.body || "{}"); }
   catch { return bad(400, "JSON inválido"); }
 
+  // VÍA B (F5): plantilla decide qué se pide. Default 'creadora' = comportamiento
+  // idéntico al de siempre (ofrecimiento/expectativas obligatorios).
+  const PLANTILLAS = ["creadora", "coordinador", "giveaway"];
+  const plantilla = PLANTILLAS.includes(String(data.plantilla || "").trim())
+    ? String(data.plantilla).trim()
+    : "creadora";
+
   const creador_nombre = String(data.creador_nombre || "").trim();
   const creador_email = String(data.creador_email || "").trim().toLowerCase();
   const evento_nombre = String(data.evento_nombre || "").trim();
@@ -130,13 +137,26 @@ exports.handler = async function (event) {
   const ofrecimiento = normList(data.ofrecimiento);
   const expectativas = normList(data.expectativas);
 
-  if (creador_nombre.length < 2) return bad(400, "Nombre de creadora inválido");
+  if (creador_nombre.length < 2) return bad(400, "Nombre inválido");
   if (!EMAIL_RE.test(creador_email)) return bad(400, "Email inválido");
   if (evento_nombre.length < 2) return bad(400, "Evento inválido");
   if (!ISO_DATE_RE.test(evento_fecha)) return bad(400, "Fecha del evento inválida (YYYY-MM-DD)");
   if (contrato_fecha && !ISO_DATE_RE.test(contrato_fecha)) return bad(400, "Fecha del contrato inválida");
-  if (!ofrecimiento) return bad(400, "Falta lista de ofrecimiento");
-  if (!expectativas) return bad(400, "Faltan expectativas del creador");
+
+  // ofrecimiento/expectativas SOLO son obligatorios para 'creadora' (intercambio
+  // de contenido). Coordinador y giveaway no los usan.
+  let datos = null;
+  if (plantilla === "creadora") {
+    if (!ofrecimiento) return bad(400, "Falta lista de ofrecimiento");
+    if (!expectativas) return bad(400, "Faltan expectativas del creador");
+  } else if (plantilla === "giveaway") {
+    // Giveaway pide: desglose del premio (texto) + valor del premio (MXN).
+    const desglose_premio = String((data.datos && data.datos.desglose_premio) || "").trim();
+    const valor_premio = Math.round(Number((data.datos && data.datos.valor_premio) || 0));
+    if (desglose_premio.length < 3) return bad(400, "Falta el desglose del premio");
+    if (!Number.isFinite(valor_premio) || valor_premio <= 0) return bad(400, "Valor del premio inválido");
+    datos = { desglose_premio, valor_premio };
+  }
 
   const token = crypto.randomBytes(20).toString("hex");
 
@@ -147,9 +167,12 @@ exports.handler = async function (event) {
     evento_nombre,
     evento_fecha,
     contrato_fecha: contrato_fecha || new Date().toISOString().slice(0, 10),
-    ofrecimiento,
-    expectativas,
+    // Non-creadora no manda listas: se guardan vacías (no rompen NOT NULL ni el render).
+    ofrecimiento: plantilla === "creadora" ? ofrecimiento : [],
+    expectativas: plantilla === "creadora" ? expectativas : [],
     estado: "pendiente",
+    plantilla,
+    datos,
   };
 
   let created;

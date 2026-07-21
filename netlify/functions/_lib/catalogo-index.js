@@ -8,11 +8,16 @@
 // stubs auto-resueltos) exponiéndolo como lib para el resto de functions.
 // (El cron NO se toca: sigue con su copia.)
 //
-//   fetchCatalogo() → { [slug]: { ds, multifecha: [{ idx, lbl, ds, noches }] } }
-//                     o null si el fetch/parseo falla (BEST-EFFORT).
+//   fetchCatalogo() → { [slug]: { nombre, venue, ciudad, ds, multifecha:[{idx,lbl,ds,noches}],
+//                                 banco, bancoCheap } }  o null (BEST-EFFORT).
+//   cuentaParaPaquete(ev, paquete) → { nombre, clabe, tarjeta, titular } — MISMA
+//                     regla que getBanco() del index (cheap→Banamex, ride→BBVA,
+//                     plus/stay→ev.banco||BBVA). Las constantes se replican aquí.
 //
-// Solo se exponen esos campos: quien consuma esto necesita la forma temporal del
-// evento, no precios ni zonas.
+// El transporte solo usa ds/multifecha; los campos extra (nombre/venue/banco) son
+// ADITIVOS y no cambian esa forma. Para poder devolver el banco real, el parseo
+// SIEMBRA BANCO_DEFAULT/BANCO_HEY con sus valores (en vez de stubearlos a
+// undefined como los demás globals).
 //
 // Cache en memoria del módulo (se comparte mientras la lambda siga tibia). El
 // catálogo cambia con cada deploy del index, así que un TTL corto basta.
@@ -22,6 +27,34 @@
 
 const SITE_URL = process.env.URL || process.env.DEPLOY_PRIME_URL || 'https://conectareynosa.mx';
 const TTL_MS = 10 * 60 * 1000; // 10 min
+
+// Constantes de banco replicadas del index.html (var BANCO_DEFAULT / BANCO_HEY).
+// Si cambian allá, actualizar aquí. Se usan tanto para SEMBRAR el parseo del EV
+// (así `banco:` resuelve al objeto real) como para cuentaParaPaquete().
+const BANCO_DEFAULT = { nombre: 'BBVA Bancomer', tarjeta: '4152 3139 7573 0487', clabe: '012822004639334319', titular: 'Guillermo Alexander Cobos Vizcarra' };
+const BANCO_HEY     = { nombre: 'Banamex',        tarjeta: '5206 9403 0472 6407', clabe: '002580702305539377', titular: 'Guillermo Cobos Vizcarra' };
+
+// Devuelve solo los 4 campos que consumen los contratos (sin `link`).
+function _cuenta(b) {
+  if (!b) return null;
+  return { nombre: b.nombre || '', clabe: b.clabe || '', tarjeta: b.tarjeta || '', titular: b.titular || '' };
+}
+
+// Ciudad a partir del venue "Auditorio Banamex, MTY" → "MTY". Null si no aplica.
+function _ciudadDeVenue(v) {
+  const s = String(v || '');
+  const i = s.lastIndexOf(',');
+  return i >= 0 ? s.slice(i + 1).trim() : null;
+}
+
+// MISMA regla que getBanco() del index: cheap→Banamex, ride→BBVA, plus/stay→ev.banco||BBVA.
+// `ev` es la entrada del catálogo (con .banco ya resuelto) o cualquier objeto con .banco.
+function cuentaParaPaquete(ev, paquete) {
+  const p = String(paquete || '').toLowerCase();
+  if (p === 'cheap') return _cuenta(BANCO_HEY);
+  if (p === 'ride')  return _cuenta(BANCO_DEFAULT);
+  return _cuenta((ev && ev.banco) || BANCO_DEFAULT);
+}
 
 // Cache a nivel de módulo. `catalogo: null` con ts fresco NO se cachea: un fallo
 // no debe condenar a la lambda a 10 min de degradación.
@@ -37,6 +70,13 @@ async function fetchCatalogo() {
     for (const e of (ev || [])) {
       if (!e || !e.id || typeof e.id !== 'string') continue;
       catalogo[e.id] = {
+        // ADITIVO para contratos: nombre/venue/ciudad/banco. Transporte no los usa.
+        nombre: (e.a != null) ? String(e.a) : null,
+        fecha:  (e.f != null) ? String(e.f) : null,   // display humano ("13 dic 2026")
+        venue:  (e.v != null) ? String(e.v) : null,
+        ciudad: _ciudadDeVenue(e.v),
+        banco:      _cuenta(e.banco),                 // objeto o null (BANCO_* ya sembrado)
+        bancoCheap: _cuenta(e.bancoCheap),
         ds: e.ds || null,
         multifecha: Array.isArray(e.multifecha) && e.multifecha.length
           ? e.multifecha.map((m, i) => ({
@@ -84,9 +124,13 @@ function parseEV(html) {
   if (end < 0) throw new Error('Array EV sin cerrar');
   const arrText = html.slice(start, end);
 
+  // SIEMBRA los bancos con sus valores reales (para que `banco:`/`bancoCheap:`
+  // resuelvan a objetos); el resto de globals se auto-stubbean a undefined.
+  const seed = 'var BANCO_DEFAULT=' + JSON.stringify(BANCO_DEFAULT)
+             + ',BANCO_HEY=' + JSON.stringify(BANCO_HEY) + ';';
   const stubs = new Set();
   for (let intento = 0; intento < 60; intento++) {
-    const prelude = stubs.size ? 'var ' + [...stubs].map((s) => s + '=undefined').join(',') + ';' : '';
+    const prelude = seed + (stubs.size ? 'var ' + [...stubs].map((s) => s + '=undefined').join(',') + ';' : '');
     try {
       const out = new Function(prelude + 'return ' + arrText + ';')();
       if (!Array.isArray(out)) throw new Error('EV no es array');
@@ -100,4 +144,4 @@ function parseEV(html) {
   throw new Error('EV: demasiados globals sin resolver');
 }
 
-module.exports = { fetchCatalogo };
+module.exports = { fetchCatalogo, cuentaParaPaquete };

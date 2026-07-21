@@ -19,6 +19,11 @@
 
 const { verifyAdminAuth, corsCheck } = require('./_lib/verify-admin');
 const { ensureLugares } = require('./_lib/portal-lugares');
+const { generarContratosDeSolicitud } = require('./_lib/contratos-viajeros');
+const { aplicarModoPrueba } = require('./_lib/correo-guard');
+
+const SITE_URL = (process.env.SITE_URL || process.env.URL || 'https://conectareynosa.mx').replace(/\/$/, '');
+const RESEND_KEY = process.env.RESEND_KEY || process.env.RESEND_API_KEY;
 
 const ESTADOS_VALIDOS = ['pendiente','en_pagos','pagado','cancelado'];
 
@@ -105,6 +110,19 @@ exports.handler = async (event) => {
       } catch (e) {
         lugaresInfo.lugares_error = e.message;
       }
+
+      // Contratos F2a: un contrato 'pendiente' por lugar + UN correo al titular.
+      // Best-effort en su propio try: la aprobación NO debe fallar si esto falla.
+      try {
+        const cg = await generarContratosDeSolicitud({ portalUrl: env.PORTAL_SB_URL, portalHeaders, solicitud: actualizada });
+        lugaresInfo.contratos_creados = cg.creados;
+        if (cg.titularToken) {
+          const mail = await enviarCorreoContratoTitular(env, portalHeaders, actualizada, cg.titularToken);
+          lugaresInfo.contrato_correo = mail;
+        }
+      } catch (e) {
+        lugaresInfo.contratos_error = e.message;
+      }
     }
 
     return {
@@ -118,6 +136,55 @@ exports.handler = async (event) => {
 };
 
 // ----- helpers -----
+
+// Correo al TITULAR con el link para firmar su contrato. Best-effort: NUNCA
+// lanza (devuelve un string de estado). Pasa por aplicarModoPrueba (en modo
+// prueba desvía el destino y prefija el asunto). El link usa el token del
+// contrato del lugar #1; los acompañantes firman el suyo desde su portal.
+async function enviarCorreoContratoTitular(env, portalHeaders, solicitud, token) {
+  try {
+    if (!RESEND_KEY) return 'sin RESEND_KEY';
+    // correo del titular: del cliente de la solicitud.
+    let correo = '';
+    if (solicitud.cliente_id) {
+      const cr = await fetch(
+        `${env.PORTAL_SB_URL}/rest/v1/clientes?id=eq.${encodeURIComponent(solicitud.cliente_id)}&select=correo,nombre_completo&limit=1`,
+        { headers: portalHeaders }
+      );
+      if (cr.ok) { const a = await cr.json().catch(() => []); correo = (a[0] && a[0].correo) || ''; }
+    }
+    if (!correo) return 'sin correo del titular';
+
+    const evento = solicitud.evento_nombre || 'tu evento';
+    const link = `${SITE_URL}/contrato-viajero.html?token=${encodeURIComponent(token)}`;
+    const subject = '📜 Firma tu contrato — ' + evento;
+    const html = `
+      <div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;color:#111">
+        <h2 style="margin:0 0 12px">Firma tu contrato de viaje</h2>
+        <p>¡Tu lugar para <b>${escHtml(evento)}</b> quedó aprobado! Antes de tu viaje necesitamos tu contrato firmado.</p>
+        <p style="margin:20px 0">
+          <a href="${link}" style="background:#e8ff4c;color:#0a0a0a;padding:12px 22px;border-radius:8px;text-decoration:none;font-weight:800">Firmar mi contrato</a>
+        </p>
+        <p style="font-size:13px;color:#555">Cada acompañante firmará el suyo desde su propio portal al conectarse — no necesitas firmar por ellos.</p>
+        <p style="font-size:12px;color:#888;word-break:break-all">Si el botón no abre: ${link}</p>
+      </div>`;
+    const mp = aplicarModoPrueba({ to: [correo], subject });
+    const resp = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${RESEND_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ from: 'Portal Conecta <admin@conectareynosa.mx>', to: mp.to, subject: mp.subject, html }),
+    });
+    return resp.ok ? 'enviado' : ('resend ' + resp.status);
+  } catch (e) {
+    return 'error: ' + e.message;
+  }
+}
+
+function escHtml(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, (c) => (
+    { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
+  ));
+}
 
 function readEnv() {
   const PORTAL_SB_URL     = process.env.PORTAL_SUPABASE_URL;

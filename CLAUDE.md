@@ -59,7 +59,6 @@
 - Manual: Manual_De_Marca.pdf en el repo
 
 ## Pendientes
-- AC/DC solo en filtro Pasados
 - Fase 2 (Portal Clientes): en construcción sobre Supabase
 
 ## Datos Bancarios

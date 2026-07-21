@@ -1201,11 +1201,11 @@ main{
       <p class="subtitle">Opcional pero acelera tu aprobación.</p>
       <div class="card">
         <label class="wiz-upload" id="wiz-upload">
-          <input type="file" id="wiz-file" accept="image/jpeg,image/png,image/webp,application/pdf">
+          <input type="file" id="wiz-file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif,application/pdf">
           <div class="up-icon">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
           </div>
-          <div class="up-text">Toca para elegir archivo<br><span class="up-hint">JPG, PNG, WEBP o PDF · máx 5 MB</span></div>
+          <div class="up-text">Toca para elegir archivo<br><span class="up-hint">JPG, PNG, WEBP, HEIC o PDF · la foto se comprime sola</span></div>
           <img class="up-preview" id="wiz-file-preview" alt="">
           <div class="up-name" id="wiz-file-name"></div>
         </label>
@@ -3812,33 +3812,87 @@ async function notificarAdminNuevaSolicitud(solicitudId){
 }
 
 // ---------- Paso 5: Comprobante ----------
-$('#wiz-file').addEventListener('change', (e) => {
+// Compresión en navegador ANTES de subir (calca _esfMapaResize de kamehouse):
+// imagen → canvas lado largo ≤1600px → WebP 0.85. Decodifica HEIC vía
+// createImageBitmap (iOS) con fallback a <img>. Devuelve un File .webp. Los PDF
+// NO pasan por aquí (se suben tal cual). Si la compresión falla, el caller usa
+// el archivo original para no bloquear al cliente.
+async function _comprimirComprobante(file){
+  const MAX = 1600, Q = 0.85;
+  let source = null, bmp = null, objUrl = null;
+  if (typeof createImageBitmap === 'function'){
+    try { bmp = await createImageBitmap(file); source = bmp; } catch (e) { /* fallback abajo */ }
+  }
+  if (!source){
+    objUrl = URL.createObjectURL(file);
+    source = await new Promise((res, rej) => {
+      const i = new Image();
+      const t = setTimeout(() => rej(new Error('timeout >15s')), 15000);
+      i.onload = () => { clearTimeout(t); res(i); };
+      i.onerror = () => { clearTimeout(t); rej(new Error('Image.onerror')); };
+      i.src = objUrl;
+    });
+  }
+  try {
+    const w0 = source.width || source.naturalWidth, h0 = source.height || source.naturalHeight;
+    if (!w0 || !h0) throw new Error('dimensiones 0');
+    let w = w0, h = h0;
+    const longest = Math.max(w, h);
+    if (longest > MAX){ const r = MAX / longest; w = Math.round(w * r); h = Math.round(h * r); }
+    const cnv = document.createElement('canvas');
+    cnv.width = w; cnv.height = h;
+    const ctx = cnv.getContext('2d');
+    if (!ctx) throw new Error('getContext null');
+    ctx.drawImage(source, 0, 0, w, h);
+    const blob = await new Promise((res, rej) => cnv.toBlob(b => b ? res(b) : rej(new Error('toBlob vacío')), 'image/webp', Q));
+    const base = (file.name || 'comprobante').replace(/\.[^.]+$/, '') || 'comprobante';
+    return new File([blob], base + '.webp', { type: 'image/webp' });
+  } finally {
+    if (bmp && bmp.close) { try { bmp.close(); } catch (_) {} }
+    if (objUrl) URL.revokeObjectURL(objUrl);
+  }
+}
+
+$('#wiz-file').addEventListener('change', async (e) => {
   const f = e.target.files && e.target.files[0];
   if (!f) return;
-  // Validar tamaño y tipo
-  const MAX = 5 * 1024 * 1024;
+  const isPdf = f.type === 'application/pdf' || /\.pdf$/i.test(f.name || '');
+  const isImg = /^image\//i.test(f.type || '') || /\.(jpe?g|png|webp|heic|heif)$/i.test(f.name || '');
+  if (!isPdf && !isImg){
+    showAlert($('#wiz-alert'), 'error', 'Solo aceptamos JPG, PNG, WEBP, HEIC o PDF.');
+    e.target.value = '';
+    return;
+  }
+  // Los PDF no se comprimen; a las imágenes las comprimimos, así que aceptamos
+  // fotos de celular grandes (hasta 30 MB) — el resultado sube en KB.
+  const MAX = isPdf ? (10 * 1024 * 1024) : (30 * 1024 * 1024);
   if (f.size > MAX){
-    showAlert($('#wiz-alert'), 'error', 'El archivo pesa más de 5 MB. Comprime o elige otro.');
+    showAlert($('#wiz-alert'), 'error', 'El archivo pesa más de ' + (isPdf ? '10' : '30') + ' MB. Elige otro.');
     e.target.value = '';
     return;
   }
-  const okTypes = ['image/jpeg','image/png','image/webp','application/pdf'];
-  if (!okTypes.includes(f.type)){
-    showAlert($('#wiz-alert'), 'error', 'Solo aceptamos JPG, PNG, WEBP o PDF.');
-    e.target.value = '';
-    return;
-  }
-  wizState.file = f;
-  $('#wiz-upload').classList.add('has-file');
-  $('#wiz-file-name').textContent = f.name + ' · ' + Math.round(f.size / 1024) + ' KB';
-  // Preview si es imagen
-  if (f.type.startsWith('image/')){
-    const url = URL.createObjectURL(f);
-    $('#wiz-file-preview').src = url;
-    $('#wiz-file-preview').style.display = 'block';
-  } else {
+  hideAlert($('#wiz-alert'));
+
+  if (isPdf){
+    wizState.file = f;
+    $('#wiz-upload').classList.add('has-file');
+    $('#wiz-file-name').textContent = f.name + ' · ' + Math.round(f.size / 1024) + ' KB';
     $('#wiz-file-preview').style.display = 'none';
+    return;
   }
+
+  // Imagen → comprimir antes de subir. Si falla, usamos el original.
+  $('#wiz-upload').classList.add('has-file');
+  $('#wiz-file-name').textContent = 'Comprimiendo…';
+  $('#wiz-file-preview').style.display = 'none';
+  let out = f;
+  try { out = await _comprimirComprobante(f); }
+  catch (err) { console.warn('[portal] compresión de comprobante falló, subo original', err); out = f; }
+  wizState.file = out;
+  $('#wiz-file-name').textContent = out.name + ' · ' + Math.round(out.size / 1024) + ' KB';
+  const url = URL.createObjectURL(out);
+  $('#wiz-file-preview').src = url;
+  $('#wiz-file-preview').style.display = 'block';
 });
 
 document.body.addEventListener('click', async (e) => {

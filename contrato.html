@@ -663,7 +663,7 @@ async function _decodeViaImage(file, maxDim, quality) {
 //   2. URL.createObjectURL + new Image() — fallback para navegadores sin ImageBitmap.
 //   3. _readAsDataUrl(file) crudo — SOLO si NO es HEIC y file.size < 2 MB.
 // Devuelve { dataUrl, method, attempts }. Tira con e.attempts y e.isHeic en error.
-async function _decodeToJpeg(file, maxDim = 1800, quality = 0.78) {
+async function _decodeToJpeg(file, maxDim = 1600, quality = 0.78) {
   const attempts = [];
   const isHeic = /^image\/(heic|heif)$/i.test(file.type || "");
   _log("decode start: type=" + (file.type || "(empty)") + " size=" + file.size +

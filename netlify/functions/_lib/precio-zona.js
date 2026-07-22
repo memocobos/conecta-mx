@@ -7,11 +7,8 @@
 // cálculo del sitio (calcular() de index.html): total, costo por persona y el
 // SEPARO, que ES la ganancia garantizada de Memo (regla del módulo — D1).
 //
-// OJO — STAY: el descuento de stay se toma de `ev.sep` (NO de `stayOffset`), para
-// ser FIEL al cotizador real del sitio (calcular() usa cur.sep). El campo
-// `stayOffset` del EV solo lo usa la tarjeta/preview, no el cobro real; hay una
-// inconsistencia histórica en el sitio (p.ej. melanie sep 500 / stayOffset 600).
-// Se replica lo que REALMENTE se cobra. [Pendiente: Memo decide si unificar.]
+// STAY: el descuento de stay = `ev.sep` (única verdad, igual que calcular() del
+// sitio y la tarjeta). Decisión de Memo: el descuento anunciado no vive en el EV.
 //
 // El precio total con hotel/transporte requiere que el caller pase el hotel
 // elegido y (en CDMX) el costo de transporte; la función marca requiere_hotel /
@@ -92,7 +89,7 @@ function _calcularPrecio(ev, opts) {
   const hotelTotal = ev.hotelPP ? (hotelRaw * selViaj) : hotelRaw;
   const _mfR = (ev.multifecha && ev.multifecha[fechaIdx] && ev.multifecha[fechaIdx].ride) || 0;
   const rideBase = _mfR || ev.ride || (cdmx ? 2900 : 2700);
-  const stayDiscount = ev.sep || 500; // FIEL a calcular(): usa ev.sep, NO stayOffset.
+  const stayDiscount = ev.sep || 500; // sep es la única verdad del descuento STAY.
 
   let total = 0, costoXPersona = 0;
   if (paquete === 'plus') {

@@ -20,6 +20,8 @@
 const { verifyAdminAuth, corsCheck } = require('./_lib/verify-admin');
 
 const MSG_SIN_FIRMA = '⛔ Sin contrato firmado no se entrega boleto.';
+// [F5b] Ventas de vendedor: 2ª condición de entrega (separo cubierto con validados).
+const MSG_SEPARO = '⛔ El separo aún no está cubierto con abonos validados por Bulma.';
 
 exports.handler = async (event) => {
   const __origin = corsCheck(event);
@@ -59,7 +61,7 @@ exports.handler = async (event) => {
 
   try {
     // ---- El lugar (notas para la auditoría) ----
-    const lr = await fetch(`${PORTAL_URL}/rest/v1/lugares?id=eq.${enc(lugarId)}&select=id,notas&limit=1`, { headers: sb });
+    const lr = await fetch(`${PORTAL_URL}/rest/v1/lugares?id=eq.${enc(lugarId)}&select=id,notas,solicitud_id&limit=1`, { headers: sb });
     if (!lr.ok) return { statusCode: 502, headers, body: JSON.stringify({ error: 'Supabase rechazó la consulta del lugar', detail: await lr.text() }) };
     const lugar = (await lr.json().catch(() => []))[0];
     if (!lugar) return { statusCode: 404, headers, body: JSON.stringify({ error: 'Lugar no encontrado' }) };
@@ -73,6 +75,38 @@ exports.handler = async (event) => {
       const ct = cr.ok ? (await cr.json().catch(() => []))[0] : null;
       if (!ct || ct.estado !== 'firmado') {
         return { statusCode: 409, headers, body: JSON.stringify({ error: MSG_SIN_FIRMA }) };
+      }
+
+      // [F5b] 2ª condición SOLO para ventas de VENDEDOR (solicitud.vendedor_id no nulo):
+      // el separo (precio_sellado.separo) debe estar cubierto con abonos VALIDADOS
+      // (estado='pagado'). El 409 nombra la condición que falta. Ventas normales del
+      // portal (vendedor_id null) o sin separo sellado: esta condición NO aplica.
+      if (lugar.solicitud_id) {
+        const sr = await fetch(
+          `${PORTAL_URL}/rest/v1/solicitudes_tour?id=eq.${enc(lugar.solicitud_id)}&select=vendedor_id,precio_sellado&limit=1`,
+          { headers: sb }
+        );
+        const sol = sr.ok ? (await sr.json().catch(() => []))[0] : null;
+        if (sol && sol.vendedor_id) {
+          const separo = Number(sol.precio_sellado && sol.precio_sellado.separo) || 0;
+          if (separo > 0) {
+            const pr = await fetch(
+              `${PORTAL_URL}/rest/v1/pagos?solicitud_id=eq.${enc(lugar.solicitud_id)}&select=estado,monto,monto_pagado`,
+              { headers: sb }
+            );
+            const pagos = pr.ok ? (await pr.json().catch(() => [])) : [];
+            // Validado = Σ COALESCE(monto_pagado, monto) de los pagos 'pagado' (mismo
+            // criterio que la reconciliación de admin-marcar-pago).
+            const validado = (Array.isArray(pagos) ? pagos : []).reduce((acc, p) => {
+              if (!p || p.estado !== 'pagado') return acc;
+              const real = (p.monto_pagado == null) ? Number(p.monto || 0) : Number(p.monto_pagado || 0);
+              return acc + (Number.isFinite(real) ? real : 0);
+            }, 0);
+            if (validado < separo - 0.5) {
+              return { statusCode: 409, headers, body: JSON.stringify({ error: MSG_SEPARO }) };
+            }
+          }
+        }
       }
     }
 

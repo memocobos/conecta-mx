@@ -187,7 +187,7 @@ exports.handler = async (event) => {
     const todos = await allR.json();
 
     // 3. Leer el estado actual de la solicitud y reconciliar si hace falta.
-    const solUrl = `${env.PORTAL_SB_URL}/rest/v1/solicitudes_tour?id=eq.${solicitudId}&select=id,estado,precio_total,evento_nombre,clientes(nombre_completo,correo)`;
+    const solUrl = `${env.PORTAL_SB_URL}/rest/v1/solicitudes_tour?id=eq.${solicitudId}&select=id,estado,precio_total,evento_nombre,vendedor_id,clientes(nombre_completo,correo)`;
     const solR = await fetch(solUrl, { headers: sbHeaders });
     if (!solR.ok) {
       const detail = await solR.text();
@@ -197,6 +197,12 @@ exports.handler = async (event) => {
     const solicitud = Array.isArray(solArr) ? solArr[0] : null;
     const estadoPrevio = solicitud ? solicitud.estado : null;
     let estadoSolicitud = estadoPrevio;
+
+    // [F5b] Ventas de VENDEDOR (vendedor_id no nulo): su ciclo de estado NO lo maneja
+    // la cobranza del cliente — lo cierra el módulo Vendedores (Bulma a mano / F5c). Un
+    // abono del vendedor validado JAMÁS debe auto-flipear la venta a 'pagado' ni disparar
+    // el correo de "liquidado" al comprador. Cliente normal (vendedor_id null): SIN CAMBIO.
+    const esVentaVendedor = !!(solicitud && solicitud.vendedor_id);
 
     // [F5] Reconciliación sobre CUOTAS VIVAS (estado !== 'cancelado'). Tras una baja
     // de lugar (#239) sus cuotas no pagadas quedan 'cancelado'; se EXCLUYEN para que
@@ -223,7 +229,10 @@ exports.handler = async (event) => {
     // uno de sus pagos; no hay barrido masivo).
     const todosPagados = vivas.length > 0 && vivas.every(p => p.estado === 'pagado');
     let nuevoEstadoSol = null;
-    if (todosPagados && dineroCuadra && estadoPrevio !== 'pagado') {
+    if (esVentaVendedor) {
+      // [F5b] no auto-gestionar el estado de una venta de vendedor (ver arriba).
+      nuevoEstadoSol = null;
+    } else if (todosPagados && dineroCuadra && estadoPrevio !== 'pagado') {
       nuevoEstadoSol = 'pagado';
     } else if ((!todosPagados || !dineroCuadra) && estadoPrevio === 'pagado') {
       nuevoEstadoSol = 'en_pagos';

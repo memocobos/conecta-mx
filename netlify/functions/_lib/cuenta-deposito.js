@@ -2,7 +2,7 @@
 // _lib/cuenta-deposito  (Gancho 2 del machote — cuenta bancaria correcta por paquete)
 //
 // FUENTE ÚNICA de la regla: cuentaParaPaquete() de _lib/catalogo-index (cheap→
-// Banamex, ride→BBVA, plus/stay→ev.banco||BBVA, con los bancos reales sembrados).
+// Banamex SIEMPRE; ride/plus/stay→ev.banco||BBVA, con los bancos reales sembrados).
 // Aquí NO se replica la regla: solo se resuelve el slug del catálogo y se pinta la
 // caja del correo. Best-effort estricto: sin catálogo o sin evento → null / sin
 // caja, JAMÁS una cuenta equivocada.

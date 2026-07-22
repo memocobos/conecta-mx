@@ -3366,6 +3366,18 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
 
  /* Biblioteca (explorador): migajas, abecedario, carpetas, paginación */
  .ks-bib-search{margin-bottom:12px}
+ /* Avisos inteligentes: filas compactas por severidad + banner crítico de caída */
+ .ks-aviso-caida{display:none;background:rgba(255,68,68,.14);border:1px solid rgba(255,68,68,.5);color:#FF6B6B;font-family:'Barlow Condensed',sans-serif;font-size:24px;font-weight:900;letter-spacing:.12em;text-transform:uppercase;text-align:center;padding:16px;border-radius:10px;margin-bottom:14px}
+ .ks-avisos{display:flex;flex-direction:column;gap:6px;margin-bottom:14px}
+ .ks-avisos:empty{display:none}
+ .ks-aviso{display:flex;align-items:center;gap:10px;padding:9px 14px;border-radius:8px;border:1px solid var(--border);font-size:12.5px;font-family:'Montserrat',sans-serif;text-align:left}
+ .ks-aviso.warn{border-color:rgba(230,190,80,.45);background:rgba(230,190,80,.08)}
+ .ks-aviso.good{border-color:rgba(120,220,120,.4);background:rgba(120,220,120,.07)}
+ .ks-aviso.click{cursor:pointer;transition:background .15s}
+ .ks-aviso.click:hover{background:rgba(255,255,255,.06)}
+ .ks-aviso-tag{flex-shrink:0;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:2px 8px;border-radius:6px}
+ .ks-aviso.warn .ks-aviso-tag{background:rgba(230,190,80,.16);color:var(--gold)}
+ .ks-aviso.good .ks-aviso-tag{background:rgba(120,220,120,.14);color:#7ddc78}
  /* Reportes de Números: barras simples (CSS, sin librerías) + lista de oyentes */
  .ks-bars{display:flex;align-items:flex-end;gap:2px;height:90px;margin-top:10px}
  .ks-bars .kb{flex:1;background:var(--gold);opacity:.32;border-radius:2px 2px 0 0;min-height:2px}
@@ -3446,6 +3458,9 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
    <button class="btn btn-ghost btn-sm" onclick="loadRadio()" style="font-size:11px">↻ Refrescar</button>
   </div>
 
+  <!-- AVISO CRÍTICO — radio caída (arriba de todo; se quita solo al volver) -->
+  <div id="ks-aviso-caida" class="ks-aviso-caida">La radio no responde</div>
+
   <!-- HERO — Sonando ahora (visible en todos los tabs) -->
   <div class="ks-hero">
    <div class="ks-hero-bg is-empty" id="ks-hero-bg"></div>
@@ -3464,6 +3479,9 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
     </div>
    </div>
   </div>
+
+  <!-- AVISOS — se calculan al cargar; sin avisos, el bloque no se ve (:empty) -->
+  <div id="ks-avisos" class="ks-avisos"></div>
 
   <!-- Tabs como pills sticky -->
   <div class="ks-tabs">
@@ -6481,6 +6499,7 @@ function _radioFecha(ts) {
 async function loadRadio() {
   _loadRadioHero();       // el hero vive fuera del try: se pinta aunque el admin falle
   _radioHeroStart();      // auto-refresh cada 15s (una sola vez)
+  _avisosCargar();        // avisos inteligentes (fail-soft por fuente)
   try {
     const [rp, rm] = await Promise.all([
       khAdminFetch('/.netlify/functions/admin-radio-peticiones'),
@@ -6626,6 +6645,104 @@ async function loadRadioNumeros() {
       if (elLk) elLk.textContent = '—';
       if (elT3) elT3.textContent = 'no disponible';
     });
+}
+
+// ── Avisos inteligentes (bloque bajo el hero; solo aparecen cuando existen) ──
+// Cada fuente es independiente y fail-soft: si falla, ese aviso no aparece.
+let _avisoCaidaTimer = null;
+let _avisoPicoHecho = false;   // el pico de oyentes se evalúa UNA vez por carga
+
+function _avisosCargar() {
+  const box = document.getElementById('ks-avisos');
+  if (box) box.innerHTML = '';
+  _avisoRadioCheck();   // crítica (con 1 reintento) + alimenta el pico de oyentes
+  if (!_avisoCaidaTimer) _avisoCaidaTimer = setInterval(_avisoRadioCheck, 60000);
+  _avisoRepetidas();
+  _avisoPeticionesAnejas();
+  _avisoRachaLikes();
+}
+
+// Fila compacta con severidad (warn amarillo / good verde). onclick opcional.
+function _avisoAdd(sev, tag, html, onClick) {
+  const box = document.getElementById('ks-avisos');
+  if (!box) return;
+  const div = document.createElement('div');
+  div.className = 'ks-aviso ' + sev + (onClick ? ' click' : '');
+  div.innerHTML = '<span class="ks-aviso-tag">' + tag + '</span><span>' + html + '</span>';
+  if (onClick) div.addEventListener('click', onClick);
+  box.appendChild(div);
+}
+
+// 1. RADIO CAÍDA (crítica): nowplaying con 1 reintento; banner rojo arriba de
+//    todo; re-chequeo cada 60s y se quita solo al volver.
+async function _avisoRadioCheck() {
+  const banner = document.getElementById('ks-aviso-caida');
+  if (!banner) return;
+  const intento = () => fetch(RADIO_NOWPLAYING).then(r => { if (!r.ok) throw new Error('http ' + r.status); return r.json(); });
+  try {
+    let d;
+    try { d = await intento(); }
+    catch (e) { await new Promise(res => setTimeout(res, 2000)); d = await intento(); }
+    banner.style.display = 'none';
+    _avisoOyentesPico(d);
+  } catch (e) {
+    banner.style.display = '';
+  }
+}
+
+// 3. OYENTES ARRIBA DE LO NORMAL: promedio móvil (EMA) en localStorage de visitas
+//    previas; alerta si los actuales superan el DOBLE del promedio (mínimo 5) y
+//    ya hay 3+ visitas de historia (evita falsos positivos al estrenar).
+function _avisoOyentesPico(d) {
+  if (_avisoPicoHecho) return;
+  _avisoPicoHecho = true;
+  const cur = (d && d.listeners && Number(d.listeners.current)) || 0;
+  let st = null;
+  try { st = JSON.parse(localStorage.getItem('ks-oyentes-avg') || 'null'); } catch (e) {}
+  const avg = st ? Number(st.avg) : NaN;
+  const n = (st && Number(st.n)) || 0;
+  if (n >= 3 && Number.isFinite(avg) && cur >= 5 && cur > avg * 2) {
+    _avisoAdd('good', 'Pico', 'Pico de oyentes: <b>' + cur + '</b> conectados (promedio ' + Math.round(avg) + ')');
+  }
+  const nuevoAvg = (Number.isFinite(avg) && n > 0) ? (avg + (cur - avg) * 0.3) : cur;
+  try { localStorage.setItem('ks-oyentes-avg', JSON.stringify({ avg: nuevoAvg, n: Math.min(n + 1, 50) })); } catch (e) {}
+}
+
+// 2. CANCIÓN REPETIDA: 3+ veces en 24h (history de AzuraCast, agregado server-side).
+async function _avisoRepetidas() {
+  try {
+    const d = await _rnGet('repetidas');
+    (Array.isArray(d.repetidas) ? d.repetidas : []).forEach(c => {
+      _avisoAdd('warn', 'Repetida',
+        '<b>' + _spEscape(c.titulo) + '</b>' + (c.artista ? ' — ' + _spEscape(c.artista) : '') + ' sonó <b>' + (Number(c.veces) || 0) + '</b> veces en 24h',
+        () => radioMediaAbrirPorNombre(c.titulo, c.artista));
+    });
+  } catch (e) { /* fail-soft */ }
+}
+
+// 4. PETICIONES AÑEJAS: pendientes con 3+ días → click al tab Peticiones.
+async function _avisoPeticionesAnejas() {
+  try {
+    const d = await _rnGet('peticiones_resumen');
+    const v = Number(d.viejas_3d) || 0;
+    if (v > 0) {
+      _avisoAdd('warn', 'Peticiones',
+        '<b>' + v + '</b> peticion' + (v === 1 ? '' : 'es') + ' lleva' + (v === 1 ? '' : 'n') + ' más de 3 días sin atender',
+        () => showRadioTab('peticiones', document.getElementById('radio-tab-btn-peticiones')));
+    }
+  } catch (e) { /* fail-soft */ }
+}
+
+// 5. RACHA DE LIKES: 5+ likes HOY (día MX) → click al modal de edición.
+async function _avisoRachaLikes() {
+  try {
+    const d = await _rnGet('likes_hoy');
+    (Array.isArray(d.rachas) ? d.rachas : []).forEach(c => {
+      _avisoAdd('good', 'Likes',
+        '<b>' + _spEscape(c.titulo || 'sin título') + '</b>' + (c.artista ? ' — ' + _spEscape(c.artista) : '') + ' está recibiendo likes hoy (' + (Number(c.likes) || 0) + ')',
+        () => radioMediaAbrirPorNombre(c.titulo, c.artista));
+    });
+  } catch (e) { /* fail-soft */ }
 }
 
 // ── Reportes de Números (admin-radio-stats) — todos fail-soft por tarjeta ────

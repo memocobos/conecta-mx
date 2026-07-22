@@ -48,8 +48,10 @@ const DIAS = 7;
 const TOP_N = 20;
 const PET_VIEJA_DIAS = 3;
 
-const ACCIONES_PORTAL = ['top20', 'likes_dias', 'peticiones_resumen'];
-const ACCIONES_AZ = ['oyentes', 'unicos', 'horas', 'mas_tocadas'];
+const ACCIONES_PORTAL = ['top20', 'likes_dias', 'peticiones_resumen', 'likes_hoy'];
+const ACCIONES_AZ = ['oyentes', 'unicos', 'horas', 'mas_tocadas', 'repetidas'];
+const REPETIDA_MIN = 3;   // aviso: sonó 3+ veces en 24h
+const RACHA_MIN = 5;      // aviso: 5+ likes hoy
 
 exports.handler = async (event) => {
   // Origin CRUDO: un GET same-origin no manda Origin → no se bloquea; el JWT es
@@ -156,6 +158,33 @@ exports.handler = async (event) => {
         });
         return json(200, { ok: true, canciones });
       }
+
+      // ── repetidas: canciones que sonaron 3+ veces en las últimas 24h ──────
+      // /api/station/1/history con start/end (AcceptsDateRange). El history usa
+      // Paginator (misma lección que files/list): la respuesta puede venir plana
+      // o envuelta en {rows:[...]} → se aceptan ambas. Filas DetailedSongHistory
+      // con song{title,artist,text}.
+      if (accion === 'repetidas') {
+        const url = `${AZ_BASE}/api/station/${STATION}/history?start=${enc(fechaHoraMx(-24 * 60 * 60 * 1000))}&end=${enc(fechaHoraMx(0))}&rowCount=1000`;
+        const r = await azFetch(url, { headers: az });
+        if (!r.ok) return json(502, { error: 'AzuraCast rechazó history', detail: await r.text() });
+        const d = await r.json();
+        const filas = Array.isArray(d) ? d : ((d && Array.isArray(d.rows)) ? d.rows : []);
+        const porCancion = {};
+        for (const f of filas) {
+          const s = (f && f.song) || {};
+          const titulo = s.title || s.text || '';
+          if (!titulo) continue;
+          const key = (titulo + '|' + (s.artist || '')).toLowerCase();
+          if (!porCancion[key]) porCancion[key] = { titulo, artista: s.artist || '', veces: 0 };
+          porCancion[key].veces += 1;
+        }
+        const repetidas = Object.values(porCancion)
+          .filter((c) => c.veces >= REPETIDA_MIN)
+          .sort((a, b) => b.veces - a.veces)
+          .slice(0, 10);
+        return json(200, { ok: true, repetidas });
+      }
     }
 
     // ═══ Acciones Portal (service_role) ═══════════════════════════════════════
@@ -205,6 +234,30 @@ exports.handler = async (event) => {
       return json(200, { ok: true, dias });
     }
 
+    // ── likes_hoy: canciones con 5+ likes HOY (día MX, filtrado en la function) ─
+    if (accion === 'likes_hoy') {
+      // Trae las últimas 24h y filtra al día MX real aquí (Reynosa sigue DST
+      // fronterizo — no se hace aritmética de tz a mano).
+      const desde = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+      const url = `${env.PORTAL_SB_URL}/rest/v1/radio_likes?select=song_id,titulo,artista,creado&creado=gte.${enc(desde)}&order=creado.desc&limit=10000`;
+      const r = await fetch(url, { headers: sb });
+      if (!r.ok) return json(502, { error: 'Supabase rechazó la consulta', detail: await r.text() });
+      const rows = await r.json();
+      const hoy = fechaMx(0);
+      const porSong = {};
+      for (const row of (Array.isArray(rows) ? rows : [])) {
+        if (!row || !row.song_id || diaMxDe(row.creado) !== hoy) continue;
+        const sid = String(row.song_id);
+        if (!porSong[sid]) porSong[sid] = { titulo: row.titulo || '', artista: row.artista || '', likes: 0 };
+        porSong[sid].likes += 1;
+      }
+      const rachas = Object.values(porSong)
+        .filter((c) => c.likes >= RACHA_MIN)
+        .sort((a, b) => b.likes - a.likes)
+        .slice(0, 5);
+      return json(200, { ok: true, rachas });
+    }
+
     // ── peticiones_resumen: pendientes vs atendidas + pendientes 3+ días ─────
     if (accion === 'peticiones_resumen') {
       const url = `${env.PORTAL_SB_URL}/rest/v1/radio_peticiones?select=atendida,creado&limit=10000`;
@@ -237,6 +290,17 @@ function enc(s) { return encodeURIComponent(s); }
 function fechaMx(offsetDias) {
   const d = new Date(Date.now() + offsetDias * 24 * 60 * 60 * 1000);
   return d.toLocaleDateString('en-CA', { timeZone: TZ });
+}
+
+// 'YYYY-MM-DD HH:mm:ss' en hora MX, con offset en ms (0 = ahora, negativo = atrás).
+// hourCycle h23 evita el "24:xx" de algunos engines con hour12:false.
+function fechaHoraMx(offsetMs) {
+  const d = new Date(Date.now() + offsetMs);
+  return d.toLocaleString('en-CA', {
+    timeZone: TZ, hourCycle: 'h23',
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+  }).replace(',', '');
 }
 
 // Día MX ('YYYY-MM-DD') de un timestamp ISO; '' si no parsea.

@@ -3,32 +3,40 @@
 //
 // ÚLTIMA fase del módulo Vendedores. Cierre 100% MANUAL de Memo (solo maestro_roshi);
 // NADA automático dispara liquidaciones. La comisión del vendedor por PLUS/STAY/RIDE
-// se calcula con la fórmula de bolsa promedio de Memo y se CONGELA al liquidar (si la
-// utilidad del Palacio cambia después, la liquidación NO se recalcula sola).
+// se calcula con la fórmula de bolsa promedio y se CONGELA al liquidar.
+//
+// ⚠️ PUENTE slug ↔ uuid (dos mundos distintos, sin mapeo en la base):
+//   · Los PAQUETES vendidos y las ventas de vendedor viven en el Portal, llaveados por
+//     SLUG del catálogo (solicitudes_tour.evento_id).
+//   · La UTILIDAD vive en el Palacio (KH), vista `resumen_eventos` cuya `id` es el UUID
+//     de la tabla legacy `eventos` — NO el slug. No existe columna slug en `eventos`.
+//   Como liquidar es manual, admin-only y una vez por evento, el EMPAREJAMIENTO lo
+//   CONFIRMA MEMO en la pantalla: elige (1) slug del catálogo y (2) evento del Palacio
+//   (uuid), con sugerencia por nombre/artista/fecha (best-effort en la UI, editable).
+//   El snapshot guarda AMBOS (evento_id slug + palacio_evento_id uuid) para auditoría.
 //
 // FÓRMULA (documentada):
-//   ganancia_por_paquete = round( utilidad_evento / total_paquetes_vendidos )
-//     · utilidad_evento     = resumen_eventos.utilidad_actual (KH/Palacio), por slug base.
-//     · total_paquetes      = Σ num_personas de solicitudes_tour NO canceladas del evento
-//       (estados pendiente/en_pagos/pagado) en TODOS los canales y TODOS los tipos
-//       (web + vendedores + walk-ins, incl. CHEAP) — misma fuente que admin-vendidos-evento.
-//   comisión_vendedor = round( 0.30 × ganancia_por_paquete × nº de paquetes PLUS/STAY/RIDE
-//       que ÉL vendió, no cancelados ). Sus CHEAP quedan FUERA del numerador (esa economía
-//       ya se cobró vía separo, F5a) pero SÍ cuentan en el total del evento (denominador).
-//   Redondeo a pesos (Math.round). Comisión negativa (utilidad < 0) se clampa a 0.
+//   ganancia_por_paquete = round( utilidad_evento / total_paquetes )
+//     · utilidad_evento = resumen_eventos.utilidad_actual (KH), por el UUID que Memo confirmó.
+//     · total_paquetes  = Σ num_personas de solicitudes_tour NO canceladas del evento
+//       (pendiente/en_pagos/pagado) en TODOS los canales y tipos (incl. CHEAP), por SLUG
+//       base — misma fuente que admin-vendidos-evento.
+//   comisión_vendedor = round( 0.30 × ganancia_por_paquete × nº PLUS/STAY/RIDE que ÉL
+//     vendió, no cancelados ). CHEAP del vendedor FUERA del numerador (ya cobró vía separo
+//     F5a) pero DENTRO del total. Redondeo a pesos; comisión negativa → clamp 0.
 //   Multifecha: se AGREGA por slug base (evento_id 'slug' + 'slug#idx').
 //
 // Acciones:
-//   · 'previsualizar'  {evento_id} → maestro_roshi. La foto COMPLETA sin escribir.
-//   · 'liquidar'       {evento_id} → maestro_roshi. Congela y ESCRIBE comisiones_liquidadas
+//   · 'palacio_eventos' {}                        → maestro_roshi. Lista resumen_eventos
+//       (id uuid, nombre, artista, fecha, ciudad, utilidad_actual) para el picker + sugerencia.
+//   · 'previsualizar'  {evento_id, palacio_evento_id} → maestro_roshi. Foto SIN escribir.
+//   · 'liquidar'       {evento_id, palacio_evento_id} → maestro_roshi. Congela y ESCRIBE
 //       (READ-THEN-WRITE, jamás on_conflict). Evento ya liquidado → 409.
-//   · 'marcar_pagada'  {evento_id, vendedor_id} → maestro_roshi. Sella pagado_at/pagado_por.
-//   · 'mis_comisiones' {} → vendedor+admin. SOLO las del que llama (vendedor_id del JWT):
-//       {evento_id, monto, estado}. 🔒 Nunca utilidad del evento ni comisiones de otros.
+//   · 'marcar_pagada'  {evento_id, vendedor_id}   → maestro_roshi. Sella pagado_at/por.
+//   · 'mis_comisiones' {}                         → vendedor+admin. SOLO las del que llama.
 //
 // LÍMITES: LEE Palacio (resumen_eventos) y Portal (solicitudes_tour); NO toca compras/
-// resumen/cobranza/contratos/crons/F5a/F5b. Env: KH (resumen_eventos/usuarios/
-// comisiones_liquidadas) + Portal (solicitudes_tour) + JWT_SECRET.
+// resumen/cobranza/contratos/crons/F5a/F5b. Env: KH + Portal + JWT_SECRET.
 // =============================================================================
 
 const { verifyAdminAuth, corsCheck } = require('./_lib/verify-admin');
@@ -38,10 +46,11 @@ try { ({ fetchCatalogo } = require('./_lib/catalogo-index')); } catch (_) { fetc
 const ROLES_PALACIO = ['maestro_roshi'];
 const ROLES_VENDEDOR = ['vendedor', 'maestro_roshi', 'bulma'];
 const ACCIONES = {
-  previsualizar: ROLES_PALACIO, liquidar: ROLES_PALACIO,
+  palacio_eventos: ROLES_PALACIO, previsualizar: ROLES_PALACIO, liquidar: ROLES_PALACIO,
   marcar_pagada: ROLES_PALACIO, mis_comisiones: ROLES_VENDEDOR,
 };
 const EVENTO_RE = /^[A-Za-z0-9_.#-]+$/;
+const UUID_RE = /^[0-9a-f-]{36}$/i;
 const ESTADOS_CUENTAN = ['pendiente', 'en_pagos', 'pagado'];   // cancelado FUERA
 const PSR = ['plus', 'stay', 'ride'];                          // CHEAP fuera del numerador
 const PCT = 0.30;
@@ -50,13 +59,12 @@ const PCT = 0.30;
 //    solicitudes: [{ vendedor_id, paquete, num_personas }] YA filtradas a no-canceladas.
 function _calcular(utilidad, solicitudes) {
   const rows = Array.isArray(solicitudes) ? solicitudes : [];
-  // Denominador: TODOS los paquetes del evento (todos los canales y tipos, incl. CHEAP).
   let totalPaquetes = 0;
   const porVendedor = {};   // vendedor_id → paquetes PSR (numerador; CHEAP excluido)
   for (const s of rows) {
     const n = parseInt(s && s.num_personas, 10);
     if (!Number.isInteger(n) || n <= 0) continue;
-    totalPaquetes += n;
+    totalPaquetes += n;   // denominador: TODOS los canales y tipos (incl. CHEAP)
     const vend = s && s.vendedor_id != null ? String(s.vendedor_id) : '';
     const paq = String((s && s.paquete) || '').toLowerCase();
     if (vend && PSR.includes(paq)) porVendedor[vend] = (porVendedor[vend] || 0) + n;
@@ -105,7 +113,15 @@ exports.handler = async (event) => {
   const enc = encodeURIComponent;
 
   try {
-    // ── mis_comisiones (vendedor): SOLO lo suyo, sin utilidad ni ajenos ───────
+    // ── palacio_eventos: catálogo del Palacio (uuid) para el picker + sugerencia ─
+    if (accion === 'palacio_eventos') {
+      const r = await fetch(`${env.KH_SB_URL}/rest/v1/resumen_eventos?select=id,nombre,artista,fecha,ciudad,utilidad_actual&order=fecha.desc&limit=300`, { headers: kh });
+      if (!r.ok) return json(502, { error: 'KH rechazó resumen_eventos', detail: await r.text() });
+      const eventos = (await r.json().catch(() => [])) || [];
+      return json(200, { ok: true, eventos });
+    }
+
+    // ── mis_comisiones (vendedor): SOLO lo suyo, sin utilidad ni ajenos ────────
     if (accion === 'mis_comisiones') {
       const vendId = String(auth.user.id || '');
       if (!vendId) return json(200, { ok: true, comisiones: [] });
@@ -120,10 +136,10 @@ exports.handler = async (event) => {
         monto: Number(x.monto) || 0,
         estado: x.pagado_at ? 'pagada' : 'calculada',
       }));
-      return json(200, { ok: true, comisiones });   // 🔒 sin utilidad, sin ganancia_base, sin otros vendedores
+      return json(200, { ok: true, comisiones });   // 🔒 sin utilidad, sin ganancia_base, sin otros
     }
 
-    // ── Validación de evento_id (base) para las acciones del Palacio ──────────
+    // ── evento_id (slug) para el resto ────────────────────────────────────────
     const rawEvento = String(body.evento_id || '').trim();
     if (!rawEvento || !EVENTO_RE.test(rawEvento) || rawEvento.length > 120) return json(400, { error: 'evento_id inválido' });
     const slug = rawEvento.split('#')[0];   // multifecha → slug base
@@ -145,13 +161,18 @@ exports.handler = async (event) => {
       return json(200, { ok: true, comision: Array.isArray(arr) ? arr[0] : arr });
     }
 
-    // ── previsualizar / liquidar: leer utilidad + solicitudes → foto ──────────
-    // Utilidad del Palacio (resumen_eventos, KH) por slug base.
-    const uR = await fetch(`${env.KH_SB_URL}/rest/v1/resumen_eventos?id=eq.${enc(slug)}&select=id,nombre,utilidad_actual,total_viajeros&limit=1`, { headers: kh });
+    // ── previsualizar / liquidar: EXIGEN el par confirmado (slug + uuid Palacio) ─
+    const palacioId = String(body.palacio_evento_id || '').trim();
+    if (!palacioId || !UUID_RE.test(palacioId)) {
+      return json(400, { error: 'Falta confirmar el evento del Palacio (uuid). Elígelo en la pantalla — el slug y el Palacio son mundos distintos.' });
+    }
+    // Utilidad del Palacio por el UUID que Memo confirmó.
+    const uR = await fetch(`${env.KH_SB_URL}/rest/v1/resumen_eventos?id=eq.${enc(palacioId)}&select=id,nombre,artista,fecha,utilidad_actual,total_viajeros&limit=1`, { headers: kh });
     if (!uR.ok) return json(502, { error: 'KH rechazó resumen_eventos', detail: await uR.text() });
     const evRow = ((await uR.json().catch(() => [])) || [])[0] || null;
+    const eventoEncontrado = !!evRow;
     const utilidad = evRow ? (Number(evRow.utilidad_actual) || 0) : 0;
-    const eventoNombre = (evRow && evRow.nombre) || slug;
+    const palacioNombre = (evRow && evRow.nombre) || null;
 
     // Solicitudes NO canceladas del evento (slug base + slug#idx) — todos los canales.
     const orClause = `or=(evento_id.eq.${enc(slug)},evento_id.like.${enc(slug)}%23*)`;
@@ -162,7 +183,7 @@ exports.handler = async (event) => {
 
     const foto = _calcular(utilidad, solicitudes);
 
-    // Nombres de vendedor (KH usuarios) + estado ya-liquidado (comisiones_liquidadas).
+    // Nombres de vendedor (KH usuarios) + estado ya-liquidado (comisiones_liquidadas, por slug).
     const ids = foto.vendedores.map(v => v.vendedor_id);
     let nombrePorId = {};
     if (ids.length) {
@@ -187,26 +208,29 @@ exports.handler = async (event) => {
       };
     });
     const snapshot = {
-      evento_id: slug, evento_nombre: eventoNombre,
+      evento_id: slug,
+      palacio_evento_id: palacioId,
+      palacio_evento_nombre: palacioNombre,
+      evento_encontrado: eventoEncontrado,   // false → el uuid no casó; no liquidar a ciegas
       utilidad: foto.utilidad, total_paquetes: foto.total_paquetes,
       ganancia_por_paquete: foto.ganancia_por_paquete, pct: foto.pct,
-      evento_encontrado: !!evRow,   // si false: resumen_eventos no casó por id=slug → revisar
       ya_liquidado: yaLiquidado,
       vendedores,
     };
 
     if (accion === 'previsualizar') return json(200, { ok: true, ...snapshot });   // NO escribe
 
-    // ── liquidar: candado de re-liquidación + escritura CONGELADA ─────────────
-    if (yaLiquidado) {
-      return json(409, { error: 'Este evento ya fue liquidado. Para rehacerlo, borra sus filas de comisiones_liquidadas (evento_id = ' + slug + ') a mano y vuelve a liquidar.' });
-    }
+    // ── liquidar: candados + escritura CONGELADA (guarda el par slug↔uuid) ─────
+    if (!eventoEncontrado) return json(400, { error: 'No encontré ese evento del Palacio (uuid) en resumen_eventos. Vuelve a confirmar el par antes de liquidar.' });
+    if (yaLiquidado) return json(409, { error: 'Este evento ya fue liquidado. Para rehacerlo, borra sus filas de comisiones_liquidadas (evento_id = ' + slug + ') a mano y vuelve a liquidar.' });
     if (!vendedores.length) return json(400, { error: 'No hay ventas PLUS/STAY/RIDE de vendedor para liquidar en este evento' });
 
     const creado = new Date().toISOString();
-    const detalleBase = { utilidad: foto.utilidad, total_paquetes: foto.total_paquetes, ganancia_por_paquete: foto.ganancia_por_paquete, pct: foto.pct };
+    const detalleBase = { utilidad: foto.utilidad, total_paquetes: foto.total_paquetes, ganancia_por_paquete: foto.ganancia_por_paquete, pct: foto.pct, palacio_evento_id: palacioId, palacio_evento: palacioNombre };
     const filas = vendedores.map(v => ({
-      evento_id: slug, vendedor_id: v.vendedor_id,
+      evento_id: slug,
+      palacio_evento_id: palacioId,   // puente confirmado, congelado en la fila
+      vendedor_id: v.vendedor_id,
       ganancia_base: foto.ganancia_por_paquete,
       monto: v.comision,
       detalle: { ...detalleBase, paquetes_vendedor: v.paquetes, comision: v.comision },
@@ -220,7 +244,7 @@ exports.handler = async (event) => {
       return json(502, { error: 'No se pudieron escribir las liquidaciones', detail });
     }
     const escritas = await insR.json().catch(() => []);
-    return json(200, { ok: true, evento_id: slug, evento_nombre: eventoNombre, liquidadas: Array.isArray(escritas) ? escritas.length : filas.length, ...snapshot });
+    return json(200, { ok: true, liquidadas: Array.isArray(escritas) ? escritas.length : filas.length, ...snapshot });
   } catch (e) {
     return json(502, { error: 'Error en admin-liquidacion', detail: e.message });
   }

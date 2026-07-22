@@ -185,6 +185,27 @@ exports.handler = async function (event) {
   if (!contrato) return bad(404, "Contrato no encontrado");
   if (contrato.estado === "firmado") return bad(409, "El contrato ya fue firmado");
 
+  // VÍA B: CAPTURA AL FIRMAR de la plantilla 'creadora' (decisión de Memo:
+  // "no más por tenerlas"). fecha de nacimiento + contacto de emergencia son
+  // OBLIGATORIOS para firmar — se validan ANTES de subir el INE (mismo patrón:
+  // 400 accionable). Solo aplica a firmas NUEVAS de 'creadora'; los contratos
+  // ya firmados no se tocan (el 409 de arriba lo garantiza) y las otras
+  // plantillas ignoran datos_firma del cliente (coordinador jala del perfil KH
+  // server-side; giveaway es tuerca aparte).
+  const esCreadora = !contrato.plantilla || contrato.plantilla === "creadora";
+  let datosFirma = null;
+  if (esCreadora) {
+    const df = (data.datos_firma && typeof data.datos_firma === "object") ? data.datos_firma : {};
+    const fnac = String(df.fecha_nacimiento || "").trim();
+    const em = (df.emergencia && typeof df.emergencia === "object") ? df.emergencia : {};
+    const emNom = String(em.nombre || "").trim().slice(0, 120);
+    const emTel = String(em.telefono || "").trim().slice(0, 30);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(fnac)) return bad(400, "Falta tu fecha de nacimiento");
+    if (!emNom) return bad(400, "Falta el nombre de tu contacto de emergencia");
+    if (!emTel) return bad(400, "Falta el teléfono de tu contacto de emergencia");
+    datosFirma = { fecha_nacimiento: fnac, emergencia: { nombre: emNom, telefono: emTel } };
+  }
+
   // Subir INE frente + reverso. Path: <token>/frente.<ext>, <token>/reverso.<ext>.
   const frentePath = `${token}/frente.${frente.ext}`;
   const reversoPath = `${token}/reverso.${reverso.ext}`;
@@ -216,7 +237,19 @@ exports.handler = async function (event) {
     const hoyMX = new Date().toLocaleDateString("en-CA", { timeZone: "America/Monterrey" });
     patch.vigencia_inicio = hoyMX;
     patch.vigencia_fin = _masUnAnio(hoyMX);
+    // VÍA B: CONGELAR el perfil KH en datos jsonb AL FIRMAR (snapshot, como
+    // todo lo sellado). Best-effort: correo que no casa o perfil incompleto →
+    // datos como estaban (líneas en blanco), la firma jamás se rompe. Lo ya
+    // presente en datos (capturado a mano) SIEMPRE gana sobre el perfil.
+    try {
+      const congelado = await _perfilCoordinadorEnDatos(contrato.datos, contrato.creador_email);
+      if (congelado) patch.datos = congelado;
+    } catch (e) {
+      console.warn("[contrato-firmar] snapshot perfil coordinador falló (best-effort):", e.message);
+    }
   }
+  // Captura de la creadora → congelada en datos jsonb (lo capturado gana).
+  if (datosFirma) patch.datos = { ...(contrato.datos || {}), ...datosFirma };
 
   // Actualizar registro.
   try {
@@ -273,6 +306,31 @@ exports.handler = async function (event) {
     body: JSON.stringify({ ok: true, asignacion }),
   };
 };
+
+// ─── Snapshot del perfil KH del coordinador ───────────────────────────
+// Fusiona usuarios(correo) → {fecha_nacimiento, emergencia:{nombre,telefono}}
+// sobre `datos` SIN pisar lo existente. Devuelve el objeto fusionado o null si
+// no hay nada que congelar (correo sin perfil / perfil vacío). Misma fusión que
+// contrato-obtener — aquí queda SELLADA en la fila al firmar.
+async function _perfilCoordinadorEnDatos(datos, correo) {
+  const mail = String(correo || "").trim();
+  if (!mail) return null;
+  const r = await fetch(
+    `${SB_URL}/rest/v1/usuarios?correo=eq.${encodeURIComponent(mail)}&select=fecha_nacimiento,nombre_emergencia,num_emergencia&limit=1`,
+    { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` } }
+  );
+  if (!r.ok) return null;
+  const [perfil] = await r.json();
+  if (!perfil) return null;
+  const d = { ...(datos || {}) };
+  const em = (d.emergencia && typeof d.emergencia === "object") ? { ...d.emergencia } : {};
+  let sumo = false;
+  if (!d.fecha_nacimiento && perfil.fecha_nacimiento) { d.fecha_nacimiento = perfil.fecha_nacimiento; sumo = true; }
+  if (!em.nombre && perfil.nombre_emergencia) { em.nombre = perfil.nombre_emergencia; sumo = true; }
+  if (!em.telefono && perfil.num_emergencia) { em.telefono = perfil.num_emergencia; sumo = true; }
+  if (Object.keys(em).length) d.emergencia = em;
+  return sumo ? d : null;
+}
 
 // ─── Auto-asignación de evento ────────────────────────────────────────
 // Busca el usuario rol='cc' por correo y, si encuentra evento por fecha/nombre,

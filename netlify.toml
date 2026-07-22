@@ -99,3 +99,10 @@
 # no toca el motor ni los estados. 14:00 UTC = 8:00 AM MX, slot de cobranza.
 [functions."contratos-alerta-cron"]
   schedule = "0 14 * * *"
+
+# Vendedores F4 — expiración del límite de 8 días de las VENTAS de vendedor. DIARIO.
+# Barre solicitudes_tour con vendedor_id aún PENDIENTES cuyo vende_limite venció (o
+# vence hoy/mañana) y manda UN resumen al admin para que Bulma reaccione. SOLO
+# NOTIFICA — jamás cancela (la cancelación es manual en KameHouse). 14:00 UTC = 8 AM MX.
+[functions."ventas-limite-cron"]
+  schedule = "0 14 * * *"

@@ -3366,6 +3366,15 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
 
  /* Biblioteca (explorador): migajas, abecedario, carpetas, paginación */
  .ks-bib-search{margin-bottom:12px}
+ /* Reportes de Números: barras simples (CSS, sin librerías) + lista de oyentes */
+ .ks-bars{display:flex;align-items:flex-end;gap:2px;height:90px;margin-top:10px}
+ .ks-bars .kb{flex:1;background:var(--gold);opacity:.32;border-radius:2px 2px 0 0;min-height:2px}
+ .ks-bars .kb.max{opacity:1}
+ .ks-bars-lbl{display:flex;justify-content:space-between;margin-top:4px;font-size:9px;color:var(--ts)}
+ .ks-bars-lbl.cols{justify-content:normal;gap:2px}
+ .ks-bars-lbl.cols span{flex:1;text-align:center}
+ .rn-oy{display:flex;justify-content:space-between;gap:10px;padding:5px 0;border-top:1px solid var(--border);font-size:12px}
+ .rn-oy-t{color:var(--ts);white-space:nowrap}
  /* Top 20 semanal (Números): posición, likes, atenuado 11-20 y línea de corte */
  .ks-top-pos{flex-shrink:0;width:26px;text-align:right;font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:700;color:var(--ts);font-variant-numeric:tabular-nums}
  .ks-top-likes{flex-shrink:0;font-size:12px;font-weight:700;color:var(--ts);white-space:nowrap}
@@ -3509,6 +3518,40 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
      <div class="ks-stat-label">Peticiones pendientes</div>
      <div class="ks-stat-row"><span class="ks-stat-num red" id="radio-num-peticiones">—</span><span class="ks-stat-trend flat" id="radio-num-peticiones-tr"></span></div>
      <div class="ks-stat-sub">sin atender</div>
+    </div>
+   </div>
+
+   <!-- Reportes de AzuraCast + Portal (lazy al abrir el tab; fail-soft por tarjeta) -->
+   <div class="ks-grid-2" style="margin-top:14px">
+    <div class="ks-panel">
+     <div class="ks-panel-title">Oyentes conectados</div>
+     <div id="rn-oyentes"><div class="loading-state"><div class="spinner"></div>Cargando…</div></div>
+    </div>
+    <div class="ks-panel">
+     <div class="ks-panel-title">Oyentes únicos</div>
+     <div id="rn-unicos"><div class="loading-state"><div class="spinner"></div>Cargando…</div></div>
+    </div>
+   </div>
+   <div class="ks-grid-2" style="margin-top:14px">
+    <div class="ks-panel">
+     <div class="ks-panel-title">Horas pico (7 días)</div>
+     <div style="color:var(--ts);font-size:11px">A qué horas te escuchan más.</div>
+     <div id="rn-horas"><div class="loading-state"><div class="spinner"></div>Cargando…</div></div>
+    </div>
+    <div class="ks-panel">
+     <div class="ks-panel-title">Likes por día (7 días)</div>
+     <div id="rn-likes-dias"><div class="loading-state"><div class="spinner"></div>Cargando…</div></div>
+    </div>
+   </div>
+   <div class="ks-grid-2" style="margin-top:14px">
+    <div class="ks-panel">
+     <div class="ks-panel-title">Las más tocadas (7 días)</div>
+     <div style="color:var(--ts);font-size:11px;margin-bottom:6px">Reproducciones del AutoDJ. Toca una para editarla.</div>
+     <div id="rn-mas-tocadas"><div class="loading-state"><div class="spinner"></div>Cargando…</div></div>
+    </div>
+    <div class="ks-panel">
+     <div class="ks-panel-title">Peticiones</div>
+     <div id="rn-peticiones"><div class="loading-state"><div class="spinner"></div>Cargando…</div></div>
     </div>
    </div>
 
@@ -6540,6 +6583,9 @@ async function loadRadioNumeros() {
   // ── Top 20 semanal (admin-radio-stats; fail-soft, panel independiente) ──
   _radioTop20Load();
 
+  // ── Reportes (lazy al abrir el tab; cada tarjeta es independiente) ──
+  _rnOyentes(); _rnUnicos(); _rnHoras(); _rnMasTocadas(); _rnLikesDias(); _rnPeticionesResumen();
+
   // ── Oyentes ahora + canción sonando (API pública de la radio, fetch cliente) ──
   fetch(RADIO_NOWPLAYING)
     .then(r => r.json())
@@ -6580,6 +6626,149 @@ async function loadRadioNumeros() {
       if (elLk) elLk.textContent = '—';
       if (elT3) elT3.textContent = 'no disponible';
     });
+}
+
+// ── Reportes de Números (admin-radio-stats) — todos fail-soft por tarjeta ────
+async function _rnGet(accion) {
+  const r = await khAdminFetch('/.netlify/functions/admin-radio-stats?accion=' + accion);
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok || !d.ok) throw new Error(d.error || ('Error ' + r.status));
+  return d;
+}
+function _rnSinDatos(id) {
+  const el = document.getElementById(id);
+  if (el) el.innerHTML = '<div style="color:var(--ts);font-size:12px;padding:4px 0">Sin datos</div>';
+}
+function _rnTiempo(seg) {
+  seg = Number(seg) || 0;
+  if (seg < 60) return seg + ' s';
+  const min = Math.floor(seg / 60);
+  if (min < 60) return min + ' min';
+  return Math.floor(min / 60) + ' h ' + (min % 60) + ' min';
+}
+// Barras CSS puras. titulos[i] va al title (tooltip). La barra máxima resalta.
+function _rnBarras(data, titulos) {
+  const max = Math.max.apply(null, data.concat([1]));
+  const maxVal = Math.max.apply(null, data);
+  const maxIdx = data.indexOf(maxVal);
+  return '<div class="ks-bars">' + data.map((v, i) =>
+    `<div class="kb${(i === maxIdx && v > 0) ? ' max' : ''}" style="height:${Math.max(3, Math.round(v / max * 100))}%" title="${_spEscape((titulos[i] || '') + ': ' + v)}"></div>`
+  ).join('') + '</div>';
+}
+
+// 1. Oyentes conectados AHORA (tarjeta expandible con la lista).
+async function _rnOyentes() {
+  const el = document.getElementById('rn-oyentes');
+  if (!el) return;
+  try {
+    const d = await _rnGet('oyentes');
+    const resumen = (d.por_lugar || []).map(p => p.n + ' en ' + String(p.lugar).split(',')[0]).join(' · ') || 'nadie conectado ahora';
+    const lista = (d.oyentes || []).map(o =>
+      `<div class="rn-oy"><span>${_spEscape(o.lugar)}</span><span class="rn-oy-t">${_rnTiempo(o.tiempo_seg)}</span></div>`).join('');
+    el.innerHTML = `
+      <div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap">
+        <span class="ks-stat-num green" style="font-size:30px">${Number(d.total) || 0}</span>
+        <span style="color:var(--ts);font-size:12px">${_spEscape(resumen)}</span>
+      </div>
+      ${d.total ? `<button class="btn btn-ghost btn-sm" style="font-size:11px;margin-top:8px" onclick="_rnToggleOyentes(this)">Ver lista</button>
+      <div id="rn-oyentes-lista" style="display:none;margin-top:8px">${lista}</div>` : ''}`;
+  } catch (e) { _rnSinDatos('rn-oyentes'); }
+}
+function _rnToggleOyentes(btn) {
+  const l = document.getElementById('rn-oyentes-lista');
+  if (!l) return;
+  const abierto = l.style.display !== 'none';
+  l.style.display = abierto ? 'none' : '';
+  btn.textContent = abierto ? 'Ver lista' : 'Ocultar lista';
+}
+
+// 2. Oyentes ÚNICOS (report mode de AzuraCast): hoy y últimos 7 días.
+async function _rnUnicos() {
+  const el = document.getElementById('rn-unicos');
+  if (!el) return;
+  try {
+    const d = await _rnGet('unicos');
+    el.innerHTML = `<div style="display:flex;gap:26px;flex-wrap:wrap">
+      <div><div class="ks-stat-label">Hoy</div><div class="ks-stat-num" style="font-size:30px">${Number(d.hoy) || 0}</div></div>
+      <div><div class="ks-stat-label">Últimos 7 días</div><div class="ks-stat-num" style="font-size:30px">${Number(d.semana) || 0}</div></div>
+    </div>`;
+  } catch (e) { _rnSinDatos('rn-unicos'); }
+}
+
+// 3. Horas pico: barras de oyentes por hora del día.
+async function _rnHoras() {
+  const el = document.getElementById('rn-horas');
+  if (!el) return;
+  try {
+    const d = await _rnGet('horas');
+    const data = Array.isArray(d.data) ? d.data : [];
+    if (!data.length) { _rnSinDatos('rn-horas'); return; }
+    const labels = (Array.isArray(d.labels) && d.labels.length === data.length)
+      ? d.labels : data.map((_, i) => i + 'h');
+    const maxVal = Math.max.apply(null, data);
+    const maxIdx = data.indexOf(maxVal);
+    const pico = maxVal > 0 ? `<div style="margin-top:6px;font-size:11px;color:var(--ts)">Pico: <b style="color:var(--text)">${_spEscape(String(labels[maxIdx]))}</b> · ${maxVal} oyentes</div>` : '';
+    el.innerHTML = _rnBarras(data, labels) +
+      '<div class="ks-bars-lbl"><span>' + _spEscape(String(labels[0] || '')) + '</span><span>' + _spEscape(String(labels[Math.floor(labels.length / 2)] || '')) + '</span><span>' + _spEscape(String(labels[labels.length - 1] || '')) + '</span></div>' + pico;
+  } catch (e) { _rnSinDatos('rn-horas'); }
+}
+
+// 4. Las más tocadas del AutoDJ (7 días) — clickeables al modal de edición.
+let _rnMasTocadasData = [];
+async function _rnMasTocadas() {
+  const el = document.getElementById('rn-mas-tocadas');
+  if (!el) return;
+  try {
+    const d = await _rnGet('mas_tocadas');
+    _rnMasTocadasData = Array.isArray(d.canciones) ? d.canciones : [];
+    if (!_rnMasTocadasData.length) { _rnSinDatos('rn-mas-tocadas'); return; }
+    el.innerHTML = _rnMasTocadasData.map((c, i) => `<div class="ks-result" onclick="_rnMasTocadasAbrir(${i})" title="Editar esta canción">
+      <div class="ks-top-pos">${i + 1}</div>
+      <div class="ks-track-txt">
+        <div class="ks-track-t">${_spEscape(c.titulo || 'sin título')}</div>
+        <div class="ks-track-a">${_spEscape(c.artista || '')}</div>
+      </div>
+      <div class="ks-top-likes">${Number(c.veces) || 0}×</div>
+    </div>`).join('');
+  } catch (e) { _rnSinDatos('rn-mas-tocadas'); }
+}
+function _rnMasTocadasAbrir(i) {
+  const c = _rnMasTocadasData[i];
+  if (c) radioMediaAbrirPorNombre(c.titulo, c.artista);
+}
+
+// 5. Likes por día (mini-barras de 7 días, agrupado en la function).
+async function _rnLikesDias() {
+  const el = document.getElementById('rn-likes-dias');
+  if (!el) return;
+  try {
+    const d = await _rnGet('likes_dias');
+    const dias = Array.isArray(d.dias) ? d.dias : [];
+    if (!dias.length) { _rnSinDatos('rn-likes-dias'); return; }
+    const data = dias.map(x => Number(x.likes) || 0);
+    const lbls = dias.map(x => {
+      try { return new Date(x.dia + 'T12:00:00Z').toLocaleDateString('es-MX', { weekday: 'short', timeZone: 'UTC' }); }
+      catch (e) { return x.dia; }
+    });
+    el.innerHTML = _rnBarras(data, dias.map(x => x.dia)) +
+      '<div class="ks-bars-lbl cols">' + lbls.map(l => '<span>' + _spEscape(l) + '</span>').join('') + '</div>' +
+      `<div style="margin-top:6px;font-size:11px;color:var(--ts)">Total: <b style="color:var(--text)">${data.reduce((a, b) => a + b, 0)}</b> likes en 7 días</div>`;
+  } catch (e) { _rnSinDatos('rn-likes-dias'); }
+}
+
+// 6. Peticiones: pendientes vs atendidas (histórico) + pendientes con 3+ días.
+async function _rnPeticionesResumen() {
+  const el = document.getElementById('rn-peticiones');
+  if (!el) return;
+  try {
+    const d = await _rnGet('peticiones_resumen');
+    const viejas = Number(d.viejas_3d) || 0;
+    el.innerHTML = `<div style="display:flex;gap:26px;flex-wrap:wrap">
+      <div><div class="ks-stat-label">Pendientes</div><div class="ks-stat-num red" style="font-size:30px">${Number(d.pendientes) || 0}</div></div>
+      <div><div class="ks-stat-label">Atendidas (histórico)</div><div class="ks-stat-num green" style="font-size:30px">${Number(d.atendidas) || 0}</div></div>
+    </div>
+    ${viejas ? `<div style="margin-top:8px;font-size:12px;color:#FF6B6B">${viejas} pendiente${viejas === 1 ? '' : 's'} lleva${viejas === 1 ? '' : 'n'} 3+ días sin atender</div>` : ''}`;
+  } catch (e) { _rnSinDatos('rn-peticiones'); }
 }
 
 // ── Top 20 semanal (admin-radio-stats?accion=top20) ─────────────────────────

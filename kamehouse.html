@@ -19111,12 +19111,98 @@ async function _vtaMisVentas() {
         <td>${_vtaEsc(v.evento_nombre || v.evento_id || '')}</td>
         <td>${_vtaEsc(v.zona || '')}<br><span style="color:var(--ts);font-size:11px">${_vtaEsc(v.paquete || '')}</span></td>
         <td style="text-align:right">${_vtaFmt(total)}${separoHtml}</td>
-        <td>${_vtaEsc(v.estado || '')}</td>
+        <td>${_vtaEsc(v.estado || '')}<br><button class="btn btn-ghost btn-sm" style="font-size:11px;margin-top:4px" onclick="_vtaAbonos('${_vtaEsc(v.id)}')"><svg class="ic" style="width:11px;height:11px;vertical-align:-1px"><use href="#ic-pagos"/></svg> Abonos</button></td>
         <td>${limCell}</td>
         ${accCell}
-      </tr>`;
+      </tr>
+      <tr id="vta-ab-row-${_vtaEsc(v.id)}" style="display:none"><td colspan="8" id="vta-ab-cell-${_vtaEsc(v.id)}" style="background:rgba(255,255,255,.02);padding:14px 16px"></td></tr>`;
     }).join('');
   } catch (e) { tb.innerHTML = `<tr><td colspan="8" style="text-align:center;color:var(--red);padding:24px">${_vtaEsc(e.message || 'Error')}</td></tr>`; }
+}
+
+// [F5b] Abonos del vendedor por venta. El abono es SU pago a Conecta; nace POR
+// VALIDAR (no suma) hasta que Bulma lo confirme en su flujo. Privacidad: el panel
+// muestra "separo a cubrir" (neutro) — nunca matriz/comisión/ganancia.
+async function _vtaAbonos(solicitudId) {
+  const row = document.getElementById('vta-ab-row-' + solicitudId);
+  const cell = document.getElementById('vta-ab-cell-' + solicitudId);
+  if (!row || !cell) return;
+  if (row.style.display !== 'none') { row.style.display = 'none'; return; }  // toggle cerrar
+  row.style.display = '';
+  cell.innerHTML = '<div class="loading-state"><div class="spinner"></div>Cargando…</div>';
+  await _vtaAbonosCargar(solicitudId);
+}
+
+async function _vtaAbonosCargar(solicitudId) {
+  const cell = document.getElementById('vta-ab-cell-' + solicitudId);
+  if (!cell) return;
+  try {
+    const r = await khAdminFetch('/.netlify/functions/admin-venta-abono', { method: 'POST', body: JSON.stringify({ accion: 'estado_venta', solicitud_id: solicitudId }) });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || !j.ok) throw new Error(j.error || ('Error ' + r.status));
+    _vtaAbonosRender(solicitudId, j);
+  } catch (e) { cell.innerHTML = `<div style="color:var(--red);font-size:12px">${_vtaEsc(e.message || 'Error')}</div>`; }
+}
+
+function _vtaAbonosRender(solicitudId, j) {
+  const cell = document.getElementById('vta-ab-cell-' + solicitudId);
+  if (!cell) return;
+  const idS = _vtaEsc(solicitudId);
+  const chip = (txt, color) => `<span style="display:inline-block;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;color:${color};border:1px solid ${color}55">${txt}</span>`;
+  const sepChip = j.separo_cubierto ? chip('SEPARO CUBIERTO', 'var(--green)') : chip('SEPARO PENDIENTE', 'var(--orange)');
+  const abonosHtml = (Array.isArray(j.abonos) && j.abonos.length)
+    ? j.abonos.map(a => {
+        const est = a.estado === 'pagado' ? chip('validado', 'var(--green)') : (a.estado === 'cancelado' ? chip('cancelado', 'var(--ts)') : chip('por validar', 'var(--orange)'));
+        const comp = a.tiene_comprobante ? ' · <span style="color:var(--ts)">comprobante ✓</span>' : '';
+        return `<div style="display:flex;justify-content:space-between;gap:10px;padding:5px 0;border-top:1px solid var(--border);font-size:12px"><span>${_vtaFmt(a.monto)}${comp}</span>${est}</div>`;
+      }).join('')
+    : '<div style="font-size:11px;color:var(--ts);padding:6px 0">Sin abonos todavía</div>';
+  cell.innerHTML = `
+    <div style="display:flex;gap:18px;flex-wrap:wrap;align-items:flex-end;margin-bottom:10px;font-size:13px">
+      <div><div style="font-size:10px;color:var(--ts);text-transform:uppercase;letter-spacing:.08em">Costo sellado</div><b style="font-size:16px">${_vtaFmt(j.total_sellado)}</b></div>
+      <div><div style="font-size:10px;color:var(--ts);text-transform:uppercase;letter-spacing:.08em">Separo a cubrir</div><b style="font-size:16px;color:var(--orange)">${_vtaFmt(j.separo_a_cubrir)}</b> ${sepChip}</div>
+      <div><div style="font-size:10px;color:var(--ts);text-transform:uppercase;letter-spacing:.08em">Validado</div><b style="font-size:16px;color:var(--green)">${_vtaFmt(j.validado)}</b></div>
+      <div><div style="font-size:10px;color:var(--ts);text-transform:uppercase;letter-spacing:.08em">Por validar</div><b style="font-size:16px">${_vtaFmt(j.pendiente_validar)}</b></div>
+      <div><div style="font-size:10px;color:var(--ts);text-transform:uppercase;letter-spacing:.08em">Falta</div><b style="font-size:16px">${_vtaFmt(j.falta_total)}</b></div>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:4px">
+      <input type="number" id="vta-ab-monto-${idS}" min="1" placeholder="Monto del abono" class="cot-input" style="width:150px">
+      <input type="file" id="vta-ab-file-${idS}" accept="image/jpeg,image/png,image/webp,application/pdf" style="font-size:11px;color:var(--ts);max-width:220px">
+      <button class="btn btn-primary btn-sm" id="vta-ab-btn-${idS}" onclick="_vtaAbonoRegistrar('${idS}')">Registrar abono</button>
+    </div>
+    <div id="vta-ab-alert-${idS}" style="font-size:11px;margin:4px 0"></div>
+    <div style="font-size:10px;color:var(--ts);margin-bottom:6px">El abono queda <b>por validar</b> hasta que Bulma lo confirme; no suma hasta entonces. No puedes editar ni borrar abonos.</div>
+    <div style="margin-top:4px">${abonosHtml}</div>`;
+}
+
+async function _vtaAbonoRegistrar(solicitudId) {
+  const alert = document.getElementById('vta-ab-alert-' + solicitudId);
+  const set = (m, err) => { if (alert) alert.innerHTML = m ? `<span style="color:${err ? 'var(--red)' : 'var(--green)'}">${_vtaEsc(m)}</span>` : ''; };
+  const montoEl = document.getElementById('vta-ab-monto-' + solicitudId);
+  const fileEl = document.getElementById('vta-ab-file-' + solicitudId);
+  const btn = document.getElementById('vta-ab-btn-' + solicitudId);
+  const monto = Number(((montoEl && montoEl.value) || '').trim());
+  if (!Number.isFinite(monto) || monto <= 0) return set('Escribe un monto válido (> 0)', true);
+  const file = fileEl && fileEl.files && fileEl.files[0];
+  if (file) {
+    const OK = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
+    if (!OK.includes(file.type)) return set('Comprobante: usa JPG, PNG, WEBP o PDF', true);
+    if (file.size > 4 * 1024 * 1024) return set('Comprobante muy grande (máx 4 MB)', true);
+  }
+  if (btn) { btn.disabled = true; btn.textContent = 'Registrando…'; }
+  try {
+    let comprobante;
+    if (file) comprobante = { file_base64: await _spLeerArchivoBase64(file), mime: file.type };
+    const r = await khAdminFetch('/.netlify/functions/admin-venta-abono', { method: 'POST', body: JSON.stringify({ accion: 'registrar', solicitud_id: solicitudId, monto, comprobante }) });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || !j.ok) throw new Error(j.error || ('Error ' + r.status));
+    if (file && !j.comprobante_subido) set('Abono registrado (por validar), pero el comprobante no se subió: ' + (j.comprobante_error || ''), true);
+    else set('Abono registrado — queda por validar', false);
+    if (montoEl) montoEl.value = '';
+    if (fileEl) fileEl.value = '';
+    await _vtaAbonosCargar(solicitudId);
+  } catch (e) { set(e.message || 'No se pudo registrar', true); }
+  finally { if (btn) { btn.disabled = false; btn.textContent = 'Registrar abono'; } }
 }
 
 // [F4] Cancelar una venta VENCIDA (solo admin). Reusa el flujo de cancelación

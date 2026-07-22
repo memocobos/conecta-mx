@@ -11,8 +11,16 @@
 // Body JSON: { accion, ... }
 //   - 'listar' { slug? } → { ok, reembolsos:[...], totales:{...} }
 //   - 'guardar_datos' { id, datos_bancarios?, notas? } → { ok }
-//   - 'marcar_transferido' { id } → { ok }
+//   - 'marcar_transferido' { id, cuenta } → { ok, correo_enviado }
 //   - 'desmarcar' { id } → { ok }
+//
+// Correo "Tu reembolso fue enviado" (marcar_transferido): al marcar, se manda
+// un correo automático al cliente con el monto y la vía de devolución (SOLO la
+// terminación de la cuenta — JAMÁS la cuenta completa). Best-effort estricto:
+// si Resend falla, el marcado NO se revierte (el dinero ya se movió); se
+// reporta correo_enviado:false en la respuesta. `desmarcar` no manda nada.
+// Si Bulma re-marca tras desmarcar, el correo se RE-ENVÍA (comportamiento
+// natural del flujo; la rama idempotente {ya:true} no manda).
 //
 // Columnas (ya existen en .sql): id, evento_slug, evento_nombre, cliente_nombre,
 //   cliente_correo, monto, estado, datos_bancarios, notas, creado_en, transferido_en.
@@ -20,6 +28,7 @@
 // =============================================================================
 
 const { verifyAdminAuth, corsCheck } = require('./_lib/verify-admin');
+const { aplicarModoPrueba } = require('./_lib/correo-guard');
 
 const ROLES_PALACIO = ['maestro_roshi']; // el Palacio es solo de maestro_roshi
 
@@ -127,7 +136,7 @@ exports.handler = async (event) => {
       if (!CUENTAS.includes(cuenta)) return bad(headers, 'cuenta inválida');
 
       // Leer el reembolso.
-      const rGet = await fetch(`${base}?id=eq.${id}&select=evento_slug,evento_nombre,cliente_nombre,monto,estado,gasto_id&limit=1`, { headers: sbHeaders });
+      const rGet = await fetch(`${base}?id=eq.${id}&select=evento_slug,evento_nombre,cliente_nombre,cliente_correo,monto,estado,gasto_id,datos_bancarios&limit=1`, { headers: sbHeaders });
       if (!rGet.ok) return upstream(headers, await rGet.text(), 'consulta');
       const rows = await rGet.json();
       const rb = Array.isArray(rows) ? rows[0] : null;
@@ -169,7 +178,12 @@ exports.handler = async (event) => {
         }
         return upstream(headers, await pRes.text(), 'update');
       }
-      return ok(headers, {});
+
+      // Correo "Tu reembolso fue enviado" al cliente. Best-effort ESTRICTO:
+      // el transferido ya quedó marcado y el gasto registrado; un fallo aquí
+      // solo se reporta (correo_enviado:false), nunca revierte.
+      const correo_enviado = await enviarCorreoTransferido(env, rb).catch(() => false);
+      return ok(headers, { correo_enviado });
     }
 
     // ── desmarcar (vuelve a pendiente, borra la salida de gastos) ─────────
@@ -202,6 +216,82 @@ exports.handler = async (event) => {
 };
 
 // ----- helpers -----
+
+// Manda el correo de confirmación de transferencia al cliente. Devuelve
+// true/false (nunca lanza hacia el caller de marcar_transferido).
+async function enviarCorreoTransferido(env, rb) {
+  if (!env.RESEND_KEY) return false;
+  const correo = (rb && typeof rb.cliente_correo === 'string') ? rb.cliente_correo.trim().toLowerCase() : '';
+  if (!correo || !correo.includes('@')) return false;
+  const subject = 'Tu reembolso fue enviado';
+  const html = correoTransferidoHtml(rb.cliente_nombre, rb.evento_nombre || rb.evento_slug, rb.monto, rb.datos_bancarios);
+  const __mp = aplicarModoPrueba({ to: [correo], subject });
+  const resp = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${env.RESEND_KEY}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ from: 'Conecta Reynosa <admin@conectareynosa.mx>', to: __mp.to, subject: __mp.subject, html }),
+  });
+  return resp.ok;
+}
+
+// Vía de devolución para el correo: SOLO la terminación de la cuenta (últimos
+// 4 dígitos del número más largo en datos_bancarios) — JAMÁS la cuenta
+// completa. Si no hay dígitos suficientes, frase genérica.
+function viaDevolucion(datosBancarios) {
+  const s = String(datosBancarios == null ? '' : datosBancarios);
+  // Runs de dígitos que pueden venir agrupados con espacios o guiones.
+  const runs = s.match(/(?:\d[\s-]?){7,}\d/g) || [];
+  let cuenta = '';
+  for (const run of runs) {
+    const digits = run.replace(/\D/g, '');
+    if (digits.length > cuenta.length) cuenta = digits;
+  }
+  const banco = detectarBanco(s);
+  if (cuenta.length >= 8) {
+    return `tu cuenta${banco ? ' ' + banco : ''} con terminación ${cuenta.slice(-4)}`;
+  }
+  return `la cuenta${banco ? ' ' + banco : ''} que nos proporcionaste`;
+}
+
+const BANCOS = ['BBVA', 'Banamex', 'Banorte', 'Santander', 'HSBC', 'Scotiabank', 'Banco Azteca', 'BanCoppel', 'Inbursa', 'Banregio', 'Afirme', 'Spin', 'Nu', 'Klar', 'Hey Banco', 'STP', 'Mercado Pago'];
+function detectarBanco(s) {
+  const low = String(s || '').toLowerCase();
+  for (const b of BANCOS) { if (low.includes(b.toLowerCase())) return b; }
+  return '';
+}
+
+function correoTransferidoHtml(nombre, eventoNombre, monto, datosBancarios) {
+  const ev = escapeHtml(eventoNombre);
+  const nom = escapeHtml(nombre || 'viajero');
+  const mxn = escapeHtml(fmtMXN(monto));
+  const via = escapeHtml(viaDevolucion(datosBancarios));
+  return `<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#000;font-family:Helvetica,Arial,sans-serif;color:#fff">
+  <div style="max-width:520px;margin:0 auto;padding:32px 24px">
+    <div style="font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:rgba(255,255,255,.55);margin-bottom:18px">
+      <span style="color:#ff283b;font-weight:900">Conecta</span> <span style="font-style:italic;font-weight:900">MX</span>
+    </div>
+    <p style="font-size:16px;line-height:1.6;margin:0 0 16px 0">Hola <strong>${nom}</strong>,</p>
+    <div style="font-size:15px;line-height:1.65;color:rgba(255,255,255,.88)">
+      <p style="margin:0 0 14px 0"><b style="color:#88ea4e">Tu reembolso fue enviado.</b> Ya transferimos <b>${mxn}</b> por la cancelación de <b style="color:#e8ff4c">${ev}</b> a ${via}.</p>
+      <p style="margin:0 0 14px 0">Dependiendo de tu banco, puede tardar unas horas en reflejarse. Si en 24 horas no lo ves, responde a este correo y lo revisamos.</p>
+      <p style="margin:0">Gracias por tu paciencia y por viajar con nosotros. Esperamos verte pronto en el siguiente evento.</p>
+    </div>
+    <p style="font-size:13px;line-height:1.6;color:rgba(255,255,255,.55);margin:28px 0 0 0;border-top:1px solid rgba(255,255,255,.1);padding-top:16px">— Equipo Conecta Reynosa</p>
+  </div>
+</body></html>`;
+}
+
+function escapeHtml(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+// número → "$1,234.00" (es-MX).
+function fmtMXN(n) {
+  return new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN', minimumFractionDigits: 2 }).format(Number(n) || 0);
+}
 
 async function patchReembolso(headers, sbHeaders, base, id, patch) {
   const r = await fetch(`${base}?id=eq.${id}`, {
@@ -240,5 +330,8 @@ function readEnv() {
   if (!PORTAL_SB_URL || !PORTAL_SB_SERVICE) {
     return { error: 'Faltan env vars Portal (PORTAL_SUPABASE_URL/SERVICE_KEY)' };
   }
-  return { KH_SB_URL, KH_SB_SERVICE, PORTAL_SB_URL, PORTAL_SB_SERVICE };
+  // RESEND_KEY es OPCIONAL: sin ella, marcar_transferido opera igual pero
+  // reporta correo_enviado:false (best-effort — el correo nunca bloquea).
+  const RESEND_KEY = process.env.RESEND_KEY || process.env.RESEND_API_KEY || '';
+  return { KH_SB_URL, KH_SB_SERVICE, PORTAL_SB_URL, PORTAL_SB_SERVICE, RESEND_KEY };
 }

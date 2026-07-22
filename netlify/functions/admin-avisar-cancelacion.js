@@ -148,6 +148,7 @@ function avisoHtml(nombre, eventoNombre, monto) {
     <div style="font-size:15px;line-height:1.65;color:rgba(255,255,255,.88)">
       <p style="margin:0 0 14px 0">Lamentamos informarte que <b style="color:#e8ff4c">${ev}</b> fue cancelado. Te reembolsaremos íntegramente lo que pagaste: <b>${mxn}</b>.</p>
       <p style="margin:0 0 14px 0">Para procesar tu devolución, por favor responde a este correo con tus datos bancarios: <b>CLABE, banco y nombre del titular</b>. En cuanto los recibamos, haremos la transferencia.</p>
+      <p style="margin:0 0 14px 0">Tu reembolso se realizará en un plazo de <b>15 (quince) a 20 (veinte) días naturales</b> posteriores a la confirmación de la cancelación; te notificaremos por correo electrónico el monto y la vía de devolución.</p>
       <p style="margin:0">Una disculpa por el inconveniente.</p>
     </div>
     <p style="font-size:13px;line-height:1.6;color:rgba(255,255,255,.55);margin:28px 0 0 0;border-top:1px solid rgba(255,255,255,.1);padding-top:16px">— Equipo Conecta Reynosa</p>

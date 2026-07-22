@@ -16960,6 +16960,10 @@ async function confirmarTransferencia(id) {
       return;
     }
     closeModal('modal-yamcha-transferir');
+    const d = await r.json().catch(() => ({}));
+    if (d.ya) showToast('Ya estaba transferido; no se reenvió correo', 'info');
+    else if (d.correo_enviado) showToast('Transferido ✓ y correo enviado al cliente', 'success');
+    else showToast('Transferido ✓ pero el correo al cliente NO salió — avísale tú', 'error');
     loadYamcha();
   } catch (e) {
     if (alertEl) alertEl.innerHTML = `<div class="alert alert-error">${_esfEsc(e.message)}</div>`;

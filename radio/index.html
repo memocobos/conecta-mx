@@ -380,6 +380,21 @@
   .muroMsg{font-size:14px;line-height:1.45;margin-top:2px}
   .muroVacio{color:var(--c-muted);font-size:13px;padding:10px 0}
 
+  .pedidasLista{margin-bottom:22px}
+  .pedidaItem{
+    padding:11px 0;
+    border-bottom:1px solid var(--c-line);
+    text-align:left;
+  }
+  .pedidaItem:last-child{border-bottom:none}
+  .pedidaMsg{font-size:14.5px;line-height:1.4}
+  .pedidaLbl{
+    font-family:var(--font-display);
+    text-transform:uppercase;letter-spacing:.05em;
+    color:var(--c-amarillo);font-size:13px;margin-right:5px;
+  }
+  .pedidaPor{font-size:12px;color:var(--c-muted);margin-top:3px}
+
   .formulario{display:flex;flex-direction:column;gap:10px}
   .formulario input, .formulario textarea{
     background:rgba(255,255,255,.06);
@@ -644,6 +659,10 @@
   </div>
 
   <div class="seccion" id="sec-pedir">
+    <div class="pedidasBox" id="pedidasBox" style="display:none">
+      <div class="seccionTitulo">Pedidas por ustedes</div>
+      <div class="pedidasLista" id="pedidasLista"></div>
+    </div>
     <div class="seccionTitulo">Pide tu rola</div>
     <p style="font-size:13px;color:var(--c-muted);margin-bottom:14px;text-align:left">
       ¿No encuentras tu canción o tu artista favorito? Pídelo aquí y lo agregamos a la estación.
@@ -1184,6 +1203,29 @@ document.getElementById('formMuro').addEventListener('submit', function(e){
   });
 });
 
+/* ===== Pedidas por ustedes (peticiones ATENDIDAS) ===== */
+function cargarPedidas(){
+  fetch(FN_PETICION).then(function(r){ return r.json(); }).then(function(res){
+    var box = document.getElementById('pedidasBox');
+    var lista = document.getElementById('pedidasLista');
+    var arr = (res && res.ok && res.atendidas) ? res.atendidas : [];
+    if(!arr.length){ box.style.display = 'none'; return; }
+    var html = '';
+    for(var i=0;i<arr.length;i++){
+      var nombre = (arr[i].nombre || '').trim();
+      var por = nombre ? esc(nombre) : 'un oyente';
+      html += '<div class="pedidaItem">' +
+        '<div class="pedidaMsg"><span class="pedidaLbl">Ya suena:</span>' + esc(arr[i].peticion || '') + '</div>' +
+        '<div class="pedidaPor">pedida por ' + por + '</div>' +
+      '</div>';
+    }
+    lista.innerHTML = html;
+    box.style.display = '';
+  }).catch(function(){ /* fail-soft: deja la sección oculta */ });
+}
+cargarPedidas();
+setInterval(cargarPedidas, 300000);
+
 /* ===== Peticiones ===== */
 document.getElementById('formPeticion').addEventListener('submit', function(e){
   e.preventDefault();
@@ -1200,7 +1242,7 @@ document.getElementById('formPeticion').addEventListener('submit', function(e){
     })
   }).then(function(r){ return r.json(); }).then(function(res){
     if(res.ok){
-      ok.textContent = '¡Recibida! La buscamos y la subimos a la estación.';
+      ok.textContent = '¡Recibida! La conseguimos y la subimos a la estación — normalmente tarda 1-2 días.';
       document.getElementById('petTexto').value = '';
       setTimeout(function(){ ok.textContent=''; btn.disabled=false; }, 8000);
     } else {

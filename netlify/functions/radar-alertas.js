@@ -12,6 +12,10 @@
 //   - cotizacion_caida    (alta)   semana con -30% cotizaciones vs anterior
 //   - codigo_intentos_falla (media) código intentado 20+ veces sin éxito
 //
+// Sección extra SOLO por correo (sin INSERT en radar_alertas):
+//   - ⏰ Reembolsos por vencer: pendientes con +10 días naturales desde la
+//     cancelación (el contrato promete 15-20). Ver detectarReembolsosPorVencer.
+//
 // Deduplicación: cada tipo+contexto solo se inserta una vez por día.
 //
 // Env vars: SUPABASE_URL_KAMEHOUSE / SUPABASE_SERVICE_KEY_KAMEHOUSE
@@ -326,6 +330,83 @@ async function detectarCodigoFalla(resumen) {
   }
 }
 
+// ⏰ Reembolsos por vencer — chismoso para Memo. El contrato v3.1 promete el
+// reembolso en 15-20 días naturales desde la confirmación de la cancelación;
+// este detector avisa cuando un reembolso PENDIENTE (tabla `reembolsos`, KH)
+// lleva MÁS de 10 días naturales desde su creación (la cancelación), para que
+// nunca se venza el plazo. Los que NO tienen datos bancarios capturados son
+// DOBLE URGENTE (ni siquiera se puede transferir). Ordenados por días desc.
+//
+// SOLO NOTIFICA: cero escrituras (no inserta en radar_alertas ni toca nada).
+// Sin dedup persistente: mientras haya añejos, el correo sale en cada corrida
+// del cron (2x/día) — chismoso a propósito. Sin añejos → ni correo ni rastro
+// en el resumen (cero ruido).
+async function detectarReembolsosPorVencer(resumen) {
+  const dayMs = 24 * 3600 * 1000;
+  const ahora = Date.now();
+  const corte = new Date(ahora - 10 * dayMs).toISOString(); // creado hace MÁS de 10 días
+  const rows = await sb(
+    `reembolsos?estado=eq.pendiente` +
+    `&creado_en=lt.${encodeURIComponent(corte)}` +
+    `&select=cliente_nombre,evento_nombre,evento_slug,monto,creado_en,datos_bancarios` +
+    `&order=creado_en.asc&limit=1000` // creado más viejo primero = días desc
+  );
+  const lista = (rows || []).map(r => ({
+    cliente: r.cliente_nombre || 'cliente',
+    evento: r.evento_nombre || r.evento_slug || '?',
+    monto: Number(r.monto) || 0,
+    dias: Math.floor((ahora - new Date(r.creado_en).getTime()) / dayMs),
+    sin_datos: !(r.datos_bancarios && String(r.datos_bancarios).trim()),
+  }));
+  if (!lista.length) return; // sin añejos → sección ausente, radar intacto
+
+  resumen.reembolsos_por_vencer = lista.length;
+  if (!RESEND_KEY) return;
+
+  const fmtMXN = n => new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN', minimumFractionDigits: 2 }).format(Number(n) || 0);
+  const filas = lista.map(x => `
+    <tr>
+      <td style="padding:8px 10px;border-bottom:1px solid rgba(255,255,255,.12);font-size:13px;color:#fff">${escapeHtml(x.cliente)}</td>
+      <td style="padding:8px 10px;border-bottom:1px solid rgba(255,255,255,.12);font-size:13px;color:rgba(255,255,255,.85)">${escapeHtml(x.evento)}</td>
+      <td style="padding:8px 10px;border-bottom:1px solid rgba(255,255,255,.12);font-size:13px;color:#fff;white-space:nowrap">${escapeHtml(fmtMXN(x.monto))}</td>
+      <td style="padding:8px 10px;border-bottom:1px solid rgba(255,255,255,.12);font-size:13px;font-weight:700;color:${x.dias >= 15 ? '#ff283b' : '#e8ff4c'}">${x.dias} días</td>
+      <td style="padding:8px 10px;border-bottom:1px solid rgba(255,255,255,.12);font-size:12px;${x.sin_datos ? 'color:#ff283b;font-weight:900' : 'color:#88ea4e'}">${x.sin_datos ? '🚨 SIN DATOS BANCARIOS' : 'con datos'}</td>
+    </tr>`).join('');
+  const html = `
+<div style="font-family:Arial,sans-serif;max-width:640px;background:#0a0a0a;color:#fff;padding:0">
+  <div style="background:#e8ff4c;color:#000;padding:18px;border-bottom:4px solid #ff283b">
+    <div style="font-size:11px;font-weight:700;letter-spacing:.18em;text-transform:uppercase">Radar del Dragón · Reembolsos</div>
+    <div style="font-size:20px;font-weight:900;margin-top:4px">⏰ Reembolsos por vencer (${lista.length})</div>
+  </div>
+  <div style="padding:22px">
+    <p style="font-size:14px;line-height:1.55;color:#fff;margin:0 0 14px 0">
+      Estos reembolsos siguen <b>pendientes</b> con más de 10 días naturales desde la cancelación.
+      El contrato promete transferir en <b>15 a 20 días naturales</b> — los marcados en rojo ya están en zona de riesgo,
+      y los <b style="color:#ff283b">SIN DATOS BANCARIOS</b> son doble urgente: ni siquiera se pueden transferir.
+    </p>
+    <table style="border-collapse:collapse;width:100%">
+      <tr>
+        <th style="text-align:left;padding:8px 10px;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.5);border-bottom:2px solid rgba(255,255,255,.25)">Cliente</th>
+        <th style="text-align:left;padding:8px 10px;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.5);border-bottom:2px solid rgba(255,255,255,.25)">Evento</th>
+        <th style="text-align:left;padding:8px 10px;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.5);border-bottom:2px solid rgba(255,255,255,.25)">Monto</th>
+        <th style="text-align:left;padding:8px 10px;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.5);border-bottom:2px solid rgba(255,255,255,.25)">Días</th>
+        <th style="text-align:left;padding:8px 10px;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.5);border-bottom:2px solid rgba(255,255,255,.25)">Datos</th>
+      </tr>
+      ${filas}
+    </table>
+    <p style="margin-top:18px;font-size:12px;color:rgba(255,255,255,.7)">
+      Márcalos en <a href="https://conectareynosa.mx/kamehouse" style="color:#e8ff4c;text-decoration:none;font-weight:700">Kamehouse → Palacio → Reembolsos</a> en cuanto transfieras.
+    </p>
+  </div>
+</div>`;
+  const __mp = aplicarModoPrueba({ to: [ADMIN_TO], subject: `[Radar] ⏰ ${lista.length} reembolso${lista.length === 1 ? '' : 's'} por vencer` });
+  await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${RESEND_KEY}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ from: `Radar del Dragón <${ADMIN_EMAIL}>`, to: __mp.to, subject: __mp.subject, html }),
+  });
+}
+
 // =============================================================================
 // Handler
 // =============================================================================
@@ -338,5 +419,6 @@ exports.handler = async (event) => {
   try { await detectarWaitlist(resumen); }           catch (e) { resumen.errores.push('waitlist: ' + e.message); }
   try { await detectarCotizacionesCaida(resumen); }  catch (e) { resumen.errores.push('cot: ' + e.message); }
   try { await detectarCodigoFalla(resumen); }        catch (e) { resumen.errores.push('cod: ' + e.message); }
+  try { await detectarReembolsosPorVencer(resumen); } catch (e) { resumen.errores.push('reembolsos: ' + e.message); }
   return { statusCode: 200, body: JSON.stringify(resumen) };
 };

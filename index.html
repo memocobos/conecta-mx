@@ -1366,14 +1366,73 @@ src="https://www.facebook.com/tr?id=1685907946147007&ev=PageView&noscript=1"
   <svg viewBox="0 0 24 24" fill="currentColor" width="28" height="28"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
 </a>
 <!-- Botón flotante Radio (solo home) — esquina inferior-IZQUIERDA, libre (wa-float va a la derecha) -->
-<a href="/radio" class="radio-float" title="Escuchar Radio Conecta en vivo"><span class="radio-float-dot"></span>RADIO EN VIVO</a>
+<!-- Mini-reproductor vivo de Radio Conecta (reemplaza el viejo botón "RADIO EN VIVO"). Scoped .rcp-* -->
+<div class="rcp" id="rcp">
+  <span class="rcp-eq" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+  <a class="rcp-text" href="/radio" aria-label="Abrir Radio Conecta">
+    <span class="rcp-brand"><span class="rcp-dot"></span>RADIO CONECTA</span>
+    <span class="rcp-song" id="rcp-song">EN VIVO</span>
+  </a>
+  <button class="rcp-play" id="rcp-play" type="button" aria-label="Reproducir Radio Conecta" aria-pressed="false">
+    <svg class="rcp-ic rcp-ic-play" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>
+    <svg class="rcp-ic rcp-ic-pause" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5h4v14H6zM14 5h4v14h-4z"/></svg>
+  </button>
+  <audio id="rcp-audio" preload="none"></audio>
+</div>
 <style>
-.radio-float{position:fixed;bottom:20px;left:20px;z-index:998;display:inline-flex;align-items:center;gap:8px;background:#e8ff4c;color:#000;font-family:'Barlow Condensed','Montserrat',sans-serif;font-weight:900;font-size:15px;letter-spacing:.05em;text-transform:uppercase;text-decoration:none;padding:10px 16px;border-radius:999px;box-shadow:0 4px 16px rgba(0,0,0,.35);transition:transform .2s,box-shadow .2s}
-.radio-float:hover{transform:scale(1.06);box-shadow:0 6px 20px rgba(0,0,0,.45)}
-.radio-float-dot{width:9px;height:9px;border-radius:50%;background:#ff283b;flex-shrink:0;animation:radioFloatPulse 1.4s ease-in-out infinite}
-@keyframes radioFloatPulse{0%{box-shadow:0 0 0 0 rgba(255,40,59,.6)}70%{box-shadow:0 0 0 8px rgba(255,40,59,0)}100%{box-shadow:0 0 0 0 rgba(255,40,59,0)}}
-@media(max-width:768px){.radio-float{bottom:90px}}
+.rcp{position:fixed;bottom:20px;left:20px;z-index:998;display:flex;align-items:center;gap:10px;background:#e8ff4c;color:#000;padding:8px 12px;border-radius:999px;box-shadow:0 4px 16px rgba(0,0,0,.35);max-width:calc(100vw - 40px);font-family:'Barlow Condensed','Montserrat',sans-serif}
+.rcp-eq{flex-shrink:0;display:flex;align-items:flex-end;gap:2px;width:18px;height:16px}
+.rcp-eq i{flex:1;background:#000;border-radius:1px;transform-origin:bottom;transform:scaleY(.32)}
+.rcp.rcp-playing .rcp-eq i{animation:rcpEq .9s ease-in-out infinite}
+.rcp-eq i:nth-child(1){animation-delay:0s}
+.rcp-eq i:nth-child(2){animation-delay:.15s}
+.rcp-eq i:nth-child(3){animation-delay:.3s}
+.rcp-eq i:nth-child(4){animation-delay:.45s}
+@keyframes rcpEq{0%,100%{transform:scaleY(.3)}50%{transform:scaleY(1)}}
+.rcp-text{min-width:0;display:flex;flex-direction:column;gap:1px;text-decoration:none;color:#000;line-height:1.06;max-width:240px}
+.rcp-brand{display:flex;align-items:center;gap:5px;font-size:9px;font-weight:900;letter-spacing:.12em;text-transform:uppercase}
+.rcp-dot{width:7px;height:7px;border-radius:50%;background:#ff283b;flex-shrink:0;animation:rcpPulse 1.4s ease-in-out infinite}
+.rcp-song{font-weight:900;font-size:15px;letter-spacing:.02em;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rcp-play{flex-shrink:0;width:34px;height:34px;padding:0;border:none;border-radius:50%;background:#000;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:transform .15s}
+.rcp-play:hover{transform:scale(1.08)}
+.rcp-ic{width:18px;height:18px;fill:#e8ff4c;display:block}
+.rcp-ic-pause{display:none}
+.rcp.rcp-playing .rcp-ic-play{display:none}
+.rcp.rcp-playing .rcp-ic-pause{display:block}
+@keyframes rcpPulse{0%{box-shadow:0 0 0 0 rgba(255,40,59,.6)}70%{box-shadow:0 0 0 6px rgba(255,40,59,0)}100%{box-shadow:0 0 0 0 rgba(255,40,59,0)}}
+@media(min-width:769px){.rcp-text{max-width:300px}}
+@media(max-width:768px){.rcp{bottom:90px}}
+@media(prefers-reduced-motion:reduce){.rcp-eq i,.rcp-dot{animation:none!important}}
 </style>
+<script>
+(function(){
+  var el=document.getElementById('rcp'); if(!el) return;
+  var songEl=document.getElementById('rcp-song'),playBtn=document.getElementById('rcp-play'),audio=document.getElementById('rcp-audio');
+  var RCP_API='https://radio.conectareynosa.mx/api/nowplaying/radioconecta';
+  var RCP_STREAM='https://radio.conectareynosa.mx/listen/radioconecta/radio.mp3';
+  // Now playing cada 15s. Fail-soft: si la API cae, deja "EN VIVO" y el link sigue vivo.
+  function pintar(){
+    fetch(RCP_API).then(function(r){return r.json();}).then(function(d){
+      var s=d&&d.now_playing&&d.now_playing.song;
+      if(s&&(s.title||s.artist)){
+        var t=(s.title||'').trim(),a=(s.artist||'').trim();
+        songEl.textContent=a?(t?t+' — '+a:a):(t||'EN VIVO');
+      }else{ songEl.textContent='EN VIVO'; }
+    }).catch(function(){ songEl.textContent='EN VIVO'; });
+  }
+  pintar(); setInterval(pintar,15000);
+  // Play/pausa in situ (cache-buster). Solo el botón reproduce; el texto es el link a /radio.
+  playBtn.addEventListener('click',function(e){
+    e.preventDefault(); e.stopPropagation();
+    if(audio.paused){ try{ audio.src=RCP_STREAM+'?_='+Date.now(); var p=audio.play(); if(p&&p.catch)p.catch(function(){}); }catch(err){} }
+    else{ audio.pause(); }
+  });
+  audio.addEventListener('playing',function(){ el.classList.add('rcp-playing'); playBtn.setAttribute('aria-pressed','true'); playBtn.setAttribute('aria-label','Pausar Radio Conecta'); });
+  audio.addEventListener('pause',function(){ el.classList.remove('rcp-playing'); playBtn.setAttribute('aria-pressed','false'); playBtn.setAttribute('aria-label','Reproducir Radio Conecta'); });
+  audio.addEventListener('ended',function(){ el.classList.remove('rcp-playing'); });
+  audio.addEventListener('error',function(){ el.classList.remove('rcp-playing'); playBtn.setAttribute('aria-pressed','false'); });
+})();
+</script>
 <style>
 .wa-float{position:fixed;bottom:20px;right:20px;width:56px;height:56px;background:#25D366;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;text-decoration:none;z-index:999;box-shadow:0 4px 16px rgba(37,211,102,.4);transition:transform .2s,box-shadow .2s}
 .wa-float:hover{transform:scale(1.1);box-shadow:0 6px 20px rgba(37,211,102,.6)}

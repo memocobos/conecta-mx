@@ -3261,6 +3261,15 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
    <div id="kam-com-alert" style="margin-bottom:10px"></div>
    <div id="kam-com-body"></div>
   </div>
+  <div class="card">
+   <div style="font-family:'Rajdhani',sans-serif;font-weight:700;font-size:16px;margin-bottom:4px">Liquidaciones de vendedores (30%)</div>
+   <div style="font-size:11px;color:var(--ts);margin-bottom:14px">Cierre <b>MANUAL</b> al terminar el evento. Comisión = <b>30% × (utilidad del evento ÷ total de paquetes vendidos en todos los canales) × paquetes PLUS/STAY/RIDE de cada vendedor</b>. Los CHEAP del vendedor quedan <b>fuera</b> (ya pagaron su comisión-separo). Al liquidar, el cálculo se <b>congela</b> (no se recalcula solo si cambia la utilidad).</div>
+   <select id="kam-liq-evt" class="cot-input" style="width:100%;margin-bottom:12px" onchange="_liqPrevisualizar()">
+    <option value="">— Elige un evento —</option>
+   </select>
+   <div id="kam-liq-alert" style="margin-bottom:10px"></div>
+   <div id="kam-liq-body"></div>
+  </div>
  </div><!-- /page-kamisama -->
 
  <!-- ─── KAIO-SAMA · Admin de Radio Conecta (solo maestro_roshi) ─── -->
@@ -3635,6 +3644,7 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
 
    <div id="vta-view-mis" class="contratos-view" style="display:none">
      <div style="display:flex;justify-content:flex-end;margin-bottom:10px"><button class="btn btn-ghost btn-sm" onclick="_vtaMisVentas()">↻ Refrescar</button></div>
+     <div id="vta-mis-comisiones" style="margin-bottom:14px"></div>
      <div class="table-wrap">
        <table>
          <thead><tr><th>Cliente</th><th id="vta-th-vendedor" style="display:none">Vendedor</th><th>Evento</th><th>Zona / Paquete</th><th style="text-align:right">Total / Separo</th><th>Estado</th><th>Límite</th><th id="vta-th-acc" style="display:none;text-align:right">Acciones</th></tr></thead>
@@ -9728,6 +9738,7 @@ function loadKamisama() {
   _kamProveedoresLoad();
   _kamPopulateEventos();
   _comPopulateEventos();
+  _liqPopulateEventos();
 }
 
 async function _kamProveedoresLoad() {
@@ -9912,6 +9923,99 @@ async function _comGuardar(i) {
     _comAlert(z.zona + ' guardada — costo vendedor ' + _comFmt(Math.round(costo_matriz) + Math.round(comision)), false);
     _comLoad();
   } catch (e) { _comAlert(e.message, true); }
+}
+
+// ── Liquidaciones de vendedores (F5c — pantalla de Memo, solo maestro_roshi) ──
+// Cierre MANUAL: previsualizar (foto sin escribir) → "Cerrar y liquidar" (congela) →
+// lista con estado calculada/pagada + "Marcar pagada". Agrega por slug base.
+function _liqFmt(n) { return '$' + Math.round(Number(n) || 0).toLocaleString('es-MX'); }
+function _liqAlert(m, err) { const a = document.getElementById('kam-liq-alert'); if (a) a.innerHTML = m ? `<div class="alert ${err ? 'alert-error' : 'alert-success'}">${_esfEsc(m)}</div>` : ''; }
+
+async function _liqPopulateEventos() {
+  const sel = document.getElementById('kam-liq-evt');
+  if (!sel) return;
+  try {
+    const ev = await _fetchEVFromIndex();
+    const opts = (Array.isArray(ev) ? ev : [])
+      .filter((e) => e && e.id)
+      .slice()
+      .sort((a, b) => String(a.a || a.id).localeCompare(String(b.a || b.id)))
+      .map((e) => `<option value="${_esfEsc(e.id)}">${_esfEsc(e.a || e.id)}</option>`)
+      .join('');
+    sel.innerHTML = '<option value="">— Elige un evento —</option>' + opts;
+  } catch (_) { /* deja el placeholder */ }
+}
+
+async function _liqPrevisualizar() {
+  const body = document.getElementById('kam-liq-body');
+  if (!body) return;
+  _liqAlert('');
+  const eid = document.getElementById('kam-liq-evt').value;
+  if (!eid) { body.innerHTML = ''; return; }
+  body.innerHTML = '<div class="loading-state"><div class="spinner"></div>Calculando…</div>';
+  try {
+    const r = await khAdminFetch('/.netlify/functions/admin-liquidacion', { method: 'POST', body: JSON.stringify({ accion: 'previsualizar', evento_id: eid }) });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || !j.ok) throw new Error(j.error || ('Error ' + r.status));
+    _liqRender(j);
+  } catch (e) { body.innerHTML = `<div class="alert alert-error">${_esfEsc(e.message)}</div>`; }
+}
+
+function _liqRender(j) {
+  const body = document.getElementById('kam-liq-body');
+  if (!body) return;
+  const eidS = _esfEsc(j.evento_id);
+  const avisoEv = j.evento_encontrado ? '' : `<div class="alert alert-error" style="margin-bottom:10px">⚠️ No encontré este evento en resumen_eventos (Palacio) por su slug — la utilidad se está tomando como $0. Revisa el id antes de liquidar.</div>`;
+  const chip = (txt, color) => `<span style="display:inline-block;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;color:${color};border:1px solid ${color}55">${txt}</span>`;
+  const filas = (Array.isArray(j.vendedores) && j.vendedores.length)
+    ? j.vendedores.map(v => {
+        const est = v.liquidada ? (v.estado === 'pagada' ? chip('pagada', 'var(--green)') : chip('calculada', 'var(--orange)')) : chip('sin liquidar', 'var(--ts)');
+        const btn = (v.liquidada && v.estado !== 'pagada')
+          ? `<button class="btn btn-ghost btn-sm" style="font-size:11px" onclick="_liqMarcarPagada('${eidS}','${_esfEsc(v.vendedor_id)}')">Marcar pagada</button>` : '';
+        return `<tr style="border-top:1px solid var(--border)">
+          <td style="padding:7px 4px;font-size:13px">${_esfEsc(v.vendedor_nombre)}</td>
+          <td style="padding:7px 4px;text-align:right;font-size:13px">${v.paquetes}</td>
+          <td style="padding:7px 4px;text-align:right;font-size:13px"><b>${_liqFmt(v.comision)}</b></td>
+          <td style="padding:7px 4px;text-align:center">${est}</td>
+          <td style="padding:7px 4px;text-align:right">${btn}</td>
+        </tr>`;
+      }).join('')
+    : '<tr><td colspan="5" style="padding:12px;text-align:center;color:var(--ts);font-size:12px">Sin ventas PLUS/STAY/RIDE de vendedor en este evento</td></tr>';
+  const accion = (!j.ya_liquidado && Array.isArray(j.vendedores) && j.vendedores.length)
+    ? `<button class="btn btn-primary" style="margin-top:12px" onclick="_liqLiquidar('${eidS}')">Cerrar y liquidar</button>`
+    : (j.ya_liquidado ? `<div style="margin-top:12px;font-size:11px;color:var(--green)">✓ Evento ya liquidado (cálculo congelado).</div>` : '');
+  body.innerHTML = `${avisoEv}
+    <div style="display:flex;gap:18px;flex-wrap:wrap;margin-bottom:12px;font-size:13px">
+      <div><div style="font-size:10px;color:var(--ts);text-transform:uppercase;letter-spacing:.08em">Utilidad del evento</div><b style="font-size:16px">${_liqFmt(j.utilidad)}</b></div>
+      <div><div style="font-size:10px;color:var(--ts);text-transform:uppercase;letter-spacing:.08em">Paquetes vendidos</div><b style="font-size:16px">${j.total_paquetes}</b></div>
+      <div><div style="font-size:10px;color:var(--ts);text-transform:uppercase;letter-spacing:.08em">Ganancia / paquete</div><b style="font-size:16px">${_liqFmt(j.ganancia_por_paquete)}</b></div>
+      <div><div style="font-size:10px;color:var(--ts);text-transform:uppercase;letter-spacing:.08em">% comisión</div><b style="font-size:16px">${Math.round((j.pct || 0) * 100)}%</b></div>
+    </div>
+    <table style="width:100%;border-collapse:collapse"><thead><tr style="font-size:10px;color:var(--ts);text-transform:uppercase;letter-spacing:.08em"><th style="text-align:left;padding:4px">Vendedor</th><th style="text-align:right;padding:4px">Paq. PSR</th><th style="text-align:right;padding:4px">Comisión</th><th style="text-align:center;padding:4px">Estado</th><th></th></tr></thead><tbody>${filas}</tbody></table>
+    ${accion}`;
+}
+
+async function _liqLiquidar(eid) {
+  const j = { total: 0 };
+  if (!confirm('¿Cerrar y liquidar este evento? El cálculo se CONGELA: si la utilidad cambia después, la liquidación NO se recalcula. Se registran las comisiones de los vendedores.')) return;
+  _liqAlert('');
+  try {
+    const r = await khAdminFetch('/.netlify/functions/admin-liquidacion', { method: 'POST', body: JSON.stringify({ accion: 'liquidar', evento_id: eid }) });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok || !d.ok) throw new Error(d.error || ('Error ' + r.status));
+    _liqAlert('Liquidado: ' + (d.liquidadas || 0) + ' comisión(es) registradas y congeladas.', false);
+    _liqRender(d);
+  } catch (e) { _liqAlert(e.message, true); }
+}
+
+async function _liqMarcarPagada(eid, vendedorId) {
+  try {
+    const r = await khAdminFetch('/.netlify/functions/admin-liquidacion', { method: 'POST', body: JSON.stringify({ accion: 'marcar_pagada', evento_id: eid, vendedor_id: vendedorId }) });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok || !d.ok) throw new Error(d.error || ('Error ' + r.status));
+    _liqAlert('Comisión marcada como pagada.', false);
+    _liqPrevisualizar();
+  } catch (e) { _liqAlert(e.message, true); }
 }
 
 // Carga y pinta las compras del evento elegido, agrupadas por zona, con stock y
@@ -19074,6 +19178,7 @@ async function _vtaRegistrar() {
 async function _vtaMisVentas() {
   const tb = document.getElementById('vta-mis-tbody');
   if (!tb) return;
+  _vtaMisComisiones();   // [F5c] panel de comisiones liquidadas del vendedor (solo lo suyo)
   try {
     const r = await khAdminFetch('/.netlify/functions/admin-ventas-resumen', { method: 'POST', body: JSON.stringify({ accion: 'mis_ventas' }) });
     const j = await r.json().catch(() => ({}));
@@ -19118,6 +19223,27 @@ async function _vtaMisVentas() {
       <tr id="vta-ab-row-${_vtaEsc(v.id)}" style="display:none"><td colspan="8" id="vta-ab-cell-${_vtaEsc(v.id)}" style="background:rgba(255,255,255,.02);padding:14px 16px"></td></tr>`;
     }).join('');
   } catch (e) { tb.innerHTML = `<tr><td colspan="8" style="text-align:center;color:var(--red);padding:24px">${_vtaEsc(e.message || 'Error')}</td></tr>`; }
+}
+
+// [F5c] Comisiones liquidadas del vendedor (30% al cierre). SOLO lo suyo: monto +
+// estado (calculada/pagada). El backend NUNCA devuelve la utilidad del evento ni las
+// comisiones de otros vendedores (privacidad de siempre).
+async function _vtaMisComisiones() {
+  const box = document.getElementById('vta-mis-comisiones');
+  if (!box) return;
+  try {
+    const r = await khAdminFetch('/.netlify/functions/admin-liquidacion', { method: 'POST', body: JSON.stringify({ accion: 'mis_comisiones' }) });
+    const j = await r.json().catch(() => ({}));
+    const lista = (r.ok && j.ok && Array.isArray(j.comisiones)) ? j.comisiones : [];
+    if (!lista.length) { box.innerHTML = ''; return; }
+    const chip = (txt, color) => `<span style="display:inline-block;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;color:${color};border:1px solid ${color}55">${txt}</span>`;
+    const filas = lista.map(c => `<div style="display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-top:1px solid var(--border);font-size:13px">
+      <span>${_vtaEsc(c.evento_nombre || c.evento_id)}</span>
+      <span><b>${_vtaFmt(c.monto)}</b> ${c.estado === 'pagada' ? chip('pagada', 'var(--green)') : chip('por pagar', 'var(--orange)')}</span></div>`).join('');
+    box.innerHTML = `<div style="border:1px solid var(--border);border-radius:8px;padding:12px 14px">
+      <div style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--ts);margin-bottom:4px">Mis comisiones liquidadas</div>
+      ${filas}</div>`;
+  } catch (e) { box.innerHTML = ''; }
 }
 
 // [F5b] Abonos del vendedor por venta. El abono es SU pago a Conecta; nace POR

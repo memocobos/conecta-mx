@@ -2590,9 +2590,8 @@ function computeStatePlan(){
   var habE = (pkg==='cheap')?0:(hab?(hab.pp!=null?hab.pp:hab.e):0);
   var zonaP = (state.precio!=null && state.precio>0) ? state.precio : (z.p||0);
   var rideBase=ev.ride||(cdmx?2900:2700);
-  // Descuento STAY: `stayOffset` (cuando existe) overridea `sep`. Permite
-  // que el separo y el descuento de hotel sean valores distintos por evento.
-  var stayDiscount=(ev.stayOffset!=null)?ev.stayOffset:(ev.sep||500);
+  // Descuento STAY = sep (única verdad; el descuento anunciado no vive en el EV).
+  var stayDiscount=ev.sep||500;
   // Transporte CDMX: solo cuenta para paquetes no-cheap; el wizard de index.html
   // fuerza Sin transporte $0 para cheap, mismo aquí.
   var transpCost = (pkg !== 'cheap' && state.transporte && state.transporte.cost > 0) ? state.transporte.cost : 0;
@@ -2989,7 +2988,7 @@ function buildPlanForTour(t){
   var habE=(pkg==='cheap')?0:(t.habE||0);
   var zonaP=t.precio||0;
   var rideBase=ev.ride||(isCDMX(ev)?2900:2700);
-  var stayDiscount=(ev.stayOffset!=null)?ev.stayOffset:(ev.sep||500);
+  var stayDiscount=ev.sep||500;
   var transpCost = (pkg !== 'cheap' && t.transp && t.transp.cost > 0) ? t.transp.cost : 0;
   var perP=0;
   if(pkg==='plus')      perP=zonaP+habE+transpCost;

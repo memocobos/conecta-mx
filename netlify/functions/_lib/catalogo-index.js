@@ -9,7 +9,7 @@
 // (El cron NO se toca: sigue con su copia.)
 //
 //   fetchCatalogo() → { [slug]: { nombre, venue, ciudad, ds, multifecha:[{idx,lbl,ds,noches}],
-//                                 banco, bancoCheap } }  o null (BEST-EFFORT).
+//                                 banco } }  o null (BEST-EFFORT).
 //   cuentaParaPaquete(ev, paquete) → { nombre, clabe, tarjeta, titular } — MISMA
 //                     regla que getBanco() del index: cheap→Banamex (SIEMPRE),
 //                     ride/plus/stay→ev.banco||BANCO_DEFAULT (BBVA). Las constantes
@@ -77,7 +77,6 @@ async function fetchCatalogo() {
         venue:  (e.v != null) ? String(e.v) : null,
         ciudad: _ciudadDeVenue(e.v),
         banco:      _cuenta(e.banco),                 // objeto o null (BANCO_* ya sembrado)
-        bancoCheap: _cuenta(e.bancoCheap),
         ds: e.ds || null,
         multifecha: Array.isArray(e.multifecha) && e.multifecha.length
           ? e.multifecha.map((m, i) => ({
@@ -125,8 +124,8 @@ function parseEV(html) {
   if (end < 0) throw new Error('Array EV sin cerrar');
   const arrText = html.slice(start, end);
 
-  // SIEMBRA los bancos con sus valores reales (para que `banco:`/`bancoCheap:`
-  // resuelvan a objetos); el resto de globals se auto-stubbean a undefined.
+  // SIEMBRA los bancos con sus valores reales (para que `banco:` resuelva a
+  // objetos); el resto de globals se auto-stubbean a undefined.
   const seed = 'var BANCO_DEFAULT=' + JSON.stringify(BANCO_DEFAULT)
              + ',BANCO_HEY=' + JSON.stringify(BANCO_HEY) + ';';
   const stubs = new Set();

@@ -1380,8 +1380,9 @@ src="https://www.facebook.com/tr?id=1685907946147007&ev=PageView&noscript=1"
   <audio id="rcp-audio" preload="none"></audio>
 </div>
 <style>
-.rcp{position:fixed;bottom:20px;left:20px;z-index:998;display:flex;align-items:center;gap:10px;background:#e8ff4c;color:#000;padding:8px 12px;border-radius:999px;box-shadow:0 4px 16px rgba(0,0,0,.35);max-width:calc(100vw - 40px);font-family:'Barlow Condensed','Montserrat',sans-serif}
-.rcp-eq{flex-shrink:0;display:flex;align-items:flex-end;gap:2px;width:18px;height:16px}
+/* Arriba-derecha, justo debajo del nav sticky (56px + 8px). Compacto, una línea. */
+.rcp{position:fixed;top:64px;right:16px;z-index:998;display:flex;align-items:center;gap:8px;height:44px;background:#e8ff4c;color:#000;padding:0 6px 0 12px;border-radius:999px;box-shadow:0 2px 10px rgba(0,0,0,.25);max-width:min(420px,calc(100vw - 32px));font-family:'Barlow Condensed','Montserrat',sans-serif}
+.rcp-eq{flex-shrink:0;display:flex;align-items:flex-end;gap:2px;width:14px;height:13px}
 .rcp-eq i{flex:1;background:#000;border-radius:1px;transform-origin:bottom;transform:scaleY(.32)}
 .rcp.rcp-playing .rcp-eq i{animation:rcpEq .9s ease-in-out infinite}
 .rcp-eq i:nth-child(1){animation-delay:0s}
@@ -1389,19 +1390,20 @@ src="https://www.facebook.com/tr?id=1685907946147007&ev=PageView&noscript=1"
 .rcp-eq i:nth-child(3){animation-delay:.3s}
 .rcp-eq i:nth-child(4){animation-delay:.45s}
 @keyframes rcpEq{0%,100%{transform:scaleY(.3)}50%{transform:scaleY(1)}}
-.rcp-text{min-width:0;display:flex;flex-direction:column;gap:1px;text-decoration:none;color:#000;line-height:1.06;max-width:240px}
-.rcp-brand{display:flex;align-items:center;gap:5px;font-size:9px;font-weight:900;letter-spacing:.12em;text-transform:uppercase}
-.rcp-dot{width:7px;height:7px;border-radius:50%;background:#ff283b;flex-shrink:0;animation:rcpPulse 1.4s ease-in-out infinite}
-.rcp-song{font-weight:900;font-size:15px;letter-spacing:.02em;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.rcp-play{flex-shrink:0;width:34px;height:34px;padding:0;border:none;border-radius:50%;background:#000;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:transform .15s}
+.rcp-text{min-width:0;display:flex;align-items:center;gap:7px;text-decoration:none;color:#000;line-height:1}
+.rcp-brand{flex-shrink:0;display:flex;align-items:center;gap:5px;font-size:10px;font-weight:900;letter-spacing:.1em;text-transform:uppercase}
+.rcp-dot{width:6px;height:6px;border-radius:50%;background:#ff283b;flex-shrink:0;animation:rcpPulse 1.4s ease-in-out infinite}
+.rcp-song{font-weight:900;font-size:14px;letter-spacing:.02em;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rcp-play{flex-shrink:0;width:32px;height:32px;padding:0;border:none;border-radius:50%;background:#000;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:transform .15s}
 .rcp-play:hover{transform:scale(1.08)}
-.rcp-ic{width:18px;height:18px;fill:#e8ff4c;display:block}
+.rcp-ic{width:16px;height:16px;fill:#e8ff4c;display:block}
 .rcp-ic-pause{display:none}
 .rcp.rcp-playing .rcp-ic-play{display:none}
 .rcp.rcp-playing .rcp-ic-pause{display:block}
 @keyframes rcpPulse{0%{box-shadow:0 0 0 0 rgba(255,40,59,.6)}70%{box-shadow:0 0 0 6px rgba(255,40,59,0)}100%{box-shadow:0 0 0 0 rgba(255,40,59,0)}}
-@media(min-width:769px){.rcp-text{max-width:300px}}
-@media(max-width:768px){.rcp{bottom:90px}}
+@media(max-width:768px){.rcp{top:64px;right:12px;max-width:70vw}}
+/* El wizard esconde el nav y pone sus barras fijas arriba — el reproductor se quita para no encimarse. */
+body.wizard-open .rcp{display:none}
 @media(prefers-reduced-motion:reduce){.rcp-eq i,.rcp-dot{animation:none!important}}
 </style>
 <script>

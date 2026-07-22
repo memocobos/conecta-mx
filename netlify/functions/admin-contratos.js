@@ -45,11 +45,14 @@ const COLS = [
   'id', 'token', 'creador_nombre', 'creador_email', 'evento_nombre',
   'evento_fecha', 'contrato_fecha', 'ofrecimiento', 'expectativas',
   'estado', 'enviado_at', 'firmado_at', 'created_at',
-  // VÍA B (F5): plantilla + vigencia (coordinadores) para el chip y el aviso
-  // "vence en N días" del listado. `datos` (jsonb) NO se incluye aquí (el listado
-  // no lo usa y mantiene la whitelist mínima).
-  'plantilla', 'vigencia_inicio', 'vigencia_fin',
+  // VÍA B (F5): plantilla + vigencia (coordinadores/team) para el chip y el
+  // aviso "vence en N días" del listado. `datos` (jsonb) NO se incluye aquí (el
+  // listado no lo usa y mantiene la whitelist mínima) — SOLO viaja en 'obtener'
+  // (detalle admin: ahí vive el Anexo C confidencial de creadora_team).
+  'plantilla', 'vigencia_inicio', 'vigencia_fin', 'vigencia_meses',
 ].join(',');
+// Detalle (accion 'obtener'): whitelist + datos jsonb. Solo admins llegan aquí.
+const COLS_DETALLE = COLS + ',datos';
 
 exports.handler = async (event) => {
   const __origin = corsCheck(event);
@@ -122,6 +125,38 @@ exports.handler = async (event) => {
         return { statusCode: 502, headers, body: JSON.stringify({ error: 'KH rechazó la consulta', detail }) };
       }
       const contratos = await r.json();
+
+      // STRIKES (solo lectura, best-effort): a las filas 'creadora_team'
+      // FIRMADAS se les cuelga el contador del sistema de strikes existente
+      // (usuarios.strikes, casado por correo). Si la consulta falla, el listado
+      // sale igual que siempre — jamás bloquea. El sistema de strikes NO se toca.
+      try {
+        const lista = Array.isArray(contratos) ? contratos : [];
+        const correos = [...new Set(lista
+          .filter(c => c && c.plantilla === 'creadora_team' && c.estado === 'firmado' && c.creador_email)
+          .map(c => String(c.creador_email).toLowerCase()))];
+        if (correos.length) {
+          const inList = correos.map(c => `"${c.replace(/"/g, '')}"`).join(',');
+          const uR = await fetch(
+            `${env.KH_SB_URL}/rest/v1/usuarios?correo=in.(${encodeURIComponent(inList)})&select=correo,strikes`,
+            { headers: sbHeaders }
+          );
+          if (uR.ok) {
+            const usuarios = await uR.json().catch(() => []);
+            const strikesPor = {};
+            (Array.isArray(usuarios) ? usuarios : []).forEach(u => {
+              if (u && u.correo) strikesPor[String(u.correo).toLowerCase()] = Number(u.strikes) || 0;
+            });
+            lista.forEach(c => {
+              if (c && c.plantilla === 'creadora_team' && c.estado === 'firmado') {
+                const s = strikesPor[String(c.creador_email || '').toLowerCase()];
+                if (s !== undefined) c.strikes = s;
+              }
+            });
+          }
+        }
+      } catch (e) { /* best-effort: listado sin strikes */ }
+
       return { statusCode: 200, headers, body: JSON.stringify({ ok: true, contratos }) };
     }
 
@@ -132,7 +167,7 @@ exports.handler = async (event) => {
         return { statusCode: 400, headers, body: JSON.stringify({ error: 'id inválido' }) };
       }
       const sp = new URLSearchParams();
-      sp.set('select', COLS);
+      sp.set('select', COLS_DETALLE);
       sp.append('id', `eq.${id}`);
       sp.set('limit', '1');
       const r = await fetch(`${base}?${sp.toString()}`, { headers: sbHeaders });

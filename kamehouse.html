@@ -3782,9 +3782,19 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
              <option value="creadora">Creadora de contenido</option>
              <option value="coordinador">Coordinador(a)</option>
              <option value="giveaway">Giveaway (premio)</option>
+             <option value="creadora_team">Creadora TEAM (Imagen Oficial)</option>
            </select>
          </div>
-         <div class="form-group" style="align-self:end;opacity:.6"><div style="font-size:11px;color:var(--ts);letter-spacing:.08em;text-transform:uppercase">Creadora = flujo de siempre</div></div>
+         <div class="form-group" id="ctr-vigencia-wrap" style="display:none">
+           <label>Vigencia *</label>
+           <select id="ctr-vigencia">
+             <option value="3">3 meses</option>
+             <option value="6">6 meses</option>
+             <option value="9">9 meses</option>
+             <option value="12">12 meses</option>
+           </select>
+         </div>
+         <div class="form-group" id="ctr-plantilla-hint" style="align-self:end;opacity:.6"><div style="font-size:11px;color:var(--ts);letter-spacing:.08em;text-transform:uppercase">Creadora = flujo de siempre</div></div>
        </div>
        <div class="form-row cols-2">
          <div class="form-group">
@@ -19992,18 +20002,27 @@ El Creador de Contenido se compromete a:
 // — VÍA B (F5): cláusulas de COORDINADOR (12) y GIVEAWAY (6) para la vista previa
 //   admin. Texto FIEL de contratos-viaB-v3.1-TEXTO-OFICIAL.md (mismo que renderiza
 //   contrato.html en la firma). {{campos}} se inyectan vía el ctx de _viaBCtxKh.
+// VIGENCIA CONFIGURABLE: meses → "seis (6)" (mismo helper que contrato.html).
+function _vigenciaLetraKh(n) {
+  const map = { 3: 'tres (3)', 6: 'seis (6)', 9: 'nueve (9)', 12: 'doce (12)' };
+  return map[n] || (n + ' (' + n + ')');
+}
 function _viaBCtxKh(c) {
   const firmado = c.estado === 'firmado';
   const d = c.datos || {};
   const em = (d.emergencia && typeof d.emergencia === 'object') ? d.emergencia : {};
   const _fb = v => (v == null || String(v).trim() === '') ? '__________' : _escCtr(String(v));
+  const vigMeses = Math.round(Number(c.vigencia_meses)) || (c.plantilla === 'creadora_team' ? 3 : 12);
   return {
     nombre: _escCtr(c.creador_nombre || ''), fnac: _fb(d.fecha_nacimiento),
+    vigMeses,
+    vigDura: _vigenciaLetraKh(vigMeses).toUpperCase() + ' MESES',
+    vigLetra: _vigenciaLetraKh(vigMeses),
     firmaTxt: firmado ? _escCtr(_fmtFechaLargaCtr((c.vigencia_inicio||'').slice(0,10))) : 'tu firma',
-    finTxt:   firmado ? _escCtr(_fmtFechaLargaCtr((c.vigencia_fin||'').slice(0,10)))    : 'un (1) año después',
+    finTxt:   firmado ? _escCtr(_fmtFechaLargaCtr((c.vigencia_fin||'').slice(0,10)))    : `${_vigenciaLetraKh(vigMeses)} meses después`,
     vigResumen: firmado
       ? `del ${_escCtr(_fmtFechaLargaCtr((c.vigencia_inicio||'').slice(0,10)))} al ${_escCtr(_fmtFechaLargaCtr((c.vigencia_fin||'').slice(0,10)))}`
-      : '1 (un) año a partir de tu firma',
+      : `${_vigenciaLetraKh(vigMeses)} meses a partir de tu firma`,
     emNom: _fb(em.nombre), emTel: _fb(em.telefono), emPar: _fb(em.parentesco),
     evento: _escCtr(c.evento_nombre || ''), fechaEvento: _escCtr(_fmtFechaCortaCtr(c.evento_fecha)),
     desglose: _escCtr(String(d.desglose_premio || '__________')),
@@ -20031,7 +20050,7 @@ Cualquiera de estas conductas termina el contrato de inmediato, sin indemnizaci�
   { ord:'NOVENA', t:'Respeto, confidencialidad y exclusividad', body:()=>`Trato respetuoso y cordial con viajeros, choferes y compañeros en todo momento — el acoso, la discriminación y la violencia son falta grave. Toda la información interna (estrategias, precios, bases de datos, logística, listas de viajeros, documentación) es <b>CONFIDENCIAL</b> y no puede divulgarse ni usarse para fines ajenos, obligación que SOBREVIVE a la terminación del contrato. Durante la vigencia, el coordinador no colaborará con agencias competidoras sin autorización escrita; si no puede asistir a un evento confirmado, propondrá suplente sujeto a aprobación previa.` },
   { ord:'DÉCIMA', t:'Faltas graves y terminación', body:()=>`Son causa de terminación inmediata y pérdida de derechos: no presentarse a un viaje confirmado; abandonar un tour sin autorización; faltar al respeto a viajeros o compañeros; afectar la imagen o reputación de Conecta; y cualquiera de las conductas de la cláusula Octava. La terminación no genera indemnización ni pago adicional. En las fiestas y eventos internos aplica la misma conducta profesional que en los viajes oficiales.` },
   { ord:'DÉCIMA PRIMERA', t:'Emergencia e identidad', body:x=>`El coordinador designa contacto de emergencia: <b>${x.emNom}</b> (${x.emTel}, ${x.emPar}), asume los riesgos del viaje en los términos de la cláusula Décima del contrato de viajero, autoriza primeros auxilios y atención médica de ser necesario, y anexa su INE como evidencia de identidad.` },
-  { ord:'DÉCIMA SEGUNDA', t:'Vigencia anual y formalidades', body:x=>`Este contrato dura <b>1 (UN) AÑO</b> desde su firma (${x.firmaTxt} → ${x.finTxt}); su renovación requiere nueva firma. Cualquiera de las partes puede terminarlo antes con aviso escrito de 15 días naturales. Las modificaciones solo valen por escrito; los acuerdos verbales no tienen validez. Las notificaciones por los canales oficiales (correo institucional o WhatsApp autorizado) son legalmente válidas. Jurisdicción: Monterrey, Nuevo León. La firma digital tiene la misma validez que la autógrafa.` },
+  { ord:'DÉCIMA SEGUNDA', t:'Vigencia y formalidades', body:x=>`Este contrato dura <b>${x.vigDura}</b> desde su firma (${x.firmaTxt} → ${x.finTxt}); su renovación requiere nueva firma. Cualquiera de las partes puede terminarlo antes con aviso escrito de 15 días naturales. Las modificaciones solo valen por escrito; los acuerdos verbales no tienen validez. Las notificaciones por los canales oficiales (correo institucional o WhatsApp autorizado) son legalmente válidas. Jurisdicción: Monterrey, Nuevo León. La firma digital tiene la misma validez que la autógrafa.` },
 ];
 const _CTR_GIVE = [
   { ord:'PRIMERA', t:'Objeto — qué incluye exactamente tu premio', body:x=>`LA AGENCIA otorga a EL GANADOR un viaje gratuito al evento <b>${x.evento}</b> (${x.fechaEvento}) que incluye, sin costo alguno para él: <b>${x.desglose}</b> (por ejemplo: boleto/abono en zona ____; transporte redondo desde ____; traslados internos del itinerario; hospedaje en habitación compartida; Kit Conecta con una comida y artículos promocionales). Lo que NO esté listado aquí no forma parte del premio (consumos personales, compras, gastos extra).` },
@@ -20048,7 +20067,37 @@ const _CTR_GIVE = [
 ];
 
 // Vista previa admin para VÍA B. Devuelve HTML (mismo look que _renderContratoHTML).
+// CREADORA_TEAM: la vista previa muestra proemio + vigencia + los TÍTULOS de las
+// 18 cláusulas — el texto completo vive SOLO en contrato.html (fuente:
+// contrato-team-v1-TEXTO-OFICIAL.md v1.1); no se transcribe dos veces para que
+// jamás diverja del canónico.
+const _CTR_TEAM_TITULOS = [
+  ['PRIMERA','Objeto, alcance del rol y naturaleza de la relación'],['SEGUNDA','Vigencia, periodo de prueba y posible renovación'],
+  ['TERCERA','Entregables semanales, organización y flujo de trabajo'],['CUARTA','Requisitos técnicos, calidad, formato y estándares'],
+  ['QUINTA','Beneficios del intercambio'],['SEXTA','Entrega, revisión, aprobación y correcciones'],
+  ['SÉPTIMA','Asignación de eventos, avisos y rechazos (45% máx. de rechazos)'],['OCTAVA','Etiquetado, collab, hashtags y redes en modo público'],
+  ['NOVENA','Propiedad intelectual, uso de imagen y derechos de explotación'],['DÉCIMA','Imagen pública, contenido sensual, contenido prohibido y reputación'],
+  ['DÉCIMA PRIMERA','Conducta, alcohol, drogas y presentación en cámara'],['DÉCIMA SEGUNDA','Confidencialidad y no divulgación'],
+  ['DÉCIMA TERCERA','Exclusividad'],['DÉCIMA CUARTA','Incumplimientos, clasificación y sanciones (3 strikes = terminación)'],
+  ['DÉCIMA QUINTA','Pérdidas, negligencias y daños'],['DÉCIMA SEXTA','Terminación y rescisión'],
+  ['DÉCIMA SÉPTIMA','Modificaciones'],['DÉCIMA OCTAVA','Jurisdicción'],
+];
+function _renderContratoTeamKh(c) {
+  const x = _viaBCtxKh(c);
+  const titulos = _CTR_TEAM_TITULOS.map(([ord, t]) => `
+    <div style="padding:7px 0 7px 12px;border-left:4px solid #e8ff4c;margin-top:8px;font-size:13px;color:#000">
+      <span style="color:#ff283b;font-weight:900;margin-right:8px">${_escCtr(ord)}</span><b>${_escCtr(t)}</b>
+    </div>`).join('');
+  return `
+    <div style="display:flex;flex-wrap:wrap;gap:18px 28px;font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:#666;font-weight:700"><span><b style="color:#000">Creadora (Imagen Oficial):</b> ${x.nombre}</span><span><b style="color:#000">Vigencia:</b> ${x.vigLetra} meses</span></div>
+    <h2 style="font-family:'Barlow Condensed','Montserrat',sans-serif;font-size:34px;line-height:.92;text-transform:uppercase;margin:14px 0 0;color:#000">Contrato marco · Creadora TEAM<small style="display:block;font-size:13px;color:#ff283b;font-weight:800;letter-spacing:.18em;margin-top:6px">Imagen Oficial · periodo de prueba</small></h2>
+    <p style="font-size:13.5px;line-height:1.6;color:#222;margin-top:14px">Entre <b>CONECTA REYNOSA</b> (Guillermo Cobos Vizcarra, Director General) y <b>${x.nombre}</b> ("LA CREADORA"), con vigencia de <b>${x.vigLetra} meses</b> a partir de la firma. Al firmar, la creadora completa sus datos del proemio y el <b>Anexo C (Declaración Discreta, confidencial)</b>.</p>
+    <div style="margin-top:16px;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:#666;font-weight:800">18 cláusulas — texto oficial v1.1</div>
+    ${titulos}
+    <p style="margin-top:16px;font-size:12px;color:#666">El texto completo (fiel a contrato-team-v1-TEXTO-OFICIAL.md) se muestra en la página de firma /contrato — esta vista previa solo resume.</p>`;
+}
 function _renderContratoViaBHTML(c) {
+  if (c && c.plantilla === 'creadora_team') return _renderContratoTeamKh(c);
   const x = _viaBCtxKh(c);
   const esCoord = c.plantilla === 'coordinador';
   const set = esCoord ? _CTR_COORDINADOR : _CTR_GIVE;
@@ -20239,12 +20288,21 @@ function onContratoEventoChange() {
 }
 
 // VÍA B (F5): muestra/oculta los campos según la plantilla elegida.
+// VIGENCIA CONFIGURABLE: el selector 3/6/9/12 solo aplica a coordinador y
+// creadora_team; al cambiar de plantilla se pone su default (coord 12, team 3).
 function onCtrPlantillaChange() {
   const p = (document.getElementById('ctr-plantilla') || {}).value || 'creadora';
   const fc = document.getElementById('ctr-fields-creadora');
   const fg = document.getElementById('ctr-fields-giveaway');
   if (fc) fc.style.display = (p === 'creadora') ? '' : 'none';
   if (fg) fg.style.display = (p === 'giveaway') ? '' : 'none';
+  const vw = document.getElementById('ctr-vigencia-wrap');
+  const vs = document.getElementById('ctr-vigencia');
+  const hint = document.getElementById('ctr-plantilla-hint');
+  const conVigencia = (p === 'coordinador' || p === 'creadora_team');
+  if (vw) vw.style.display = conVigencia ? '' : 'none';
+  if (hint) hint.style.display = conVigencia ? 'none' : '';
+  if (vs && conVigencia) vs.value = (p === 'coordinador') ? '12' : '3';
 }
 
 function _ctrFormData() {
@@ -20260,6 +20318,11 @@ function _ctrFormData() {
       valor_premio: Math.round(Number(document.getElementById('ctr-premio-valor').value || '0')) || 0,
     };
   }
+  // VIGENCIA CONFIGURABLE: solo viaja para coordinador/creadora_team.
+  let vigencia_meses;
+  if (plantilla === 'coordinador' || plantilla === 'creadora_team') {
+    vigencia_meses = Math.round(Number((document.getElementById('ctr-vigencia') || {}).value)) || (plantilla === 'coordinador' ? 12 : 3);
+  }
   return {
     plantilla,
     creador_nombre: (document.getElementById('ctr-nombre').value || '').trim(),
@@ -20270,6 +20333,7 @@ function _ctrFormData() {
     ofrecimiento: _splitLineas(document.getElementById('ctr-ofrecimiento').value),
     expectativas: _splitLineas(document.getElementById('ctr-expectativas').value),
     datos,
+    vigencia_meses,
   };
 }
 
@@ -20289,9 +20353,9 @@ function _validateCtrForm(d) {
 }
 
 function _renderContratoHTML(c) {
-  // VÍA B (F5): coordinador/giveaway van por su propia vista previa; 'creadora'
-  // (default) sigue EXACTAMENTE igual que siempre.
-  if (c && (c.plantilla === 'coordinador' || c.plantilla === 'giveaway')) return _renderContratoViaBHTML(c);
+  // VÍA B (F5): coordinador/giveaway/creadora_team van por su propia vista
+  // previa; 'creadora' (default) sigue EXACTAMENTE igual que siempre.
+  if (c && (c.plantilla === 'coordinador' || c.plantilla === 'giveaway' || c.plantilla === 'creadora_team')) return _renderContratoViaBHTML(c);
   const partes = `
     <div style="border-top:3px solid #000;border-bottom:1px solid #ddd;padding:18px 0;margin:20px 0">
       <p style="margin:0 0 8px;font-size:14px"><b>Conecta MX</b> · Agencia organizadora de viajes a conciertos y festivales · representada por Guillermo Alexander Cobos Vizcarra (Reynosa, Tamaulipas).</p>
@@ -20408,6 +20472,11 @@ function _loadContratoEnForm(c) {
     const vl = document.getElementById('ctr-premio-valor'); if (vl) vl.value = c.datos.valor_premio || '';
   }
   if (typeof onCtrPlantillaChange === 'function') onCtrPlantillaChange();
+  // Vigencia guardada DESPUÉS del change (que pone el default de la plantilla).
+  if (c.vigencia_meses) {
+    const vs = document.getElementById('ctr-vigencia');
+    if (vs) vs.value = String(c.vigencia_meses);
+  }
   document.getElementById('ctr-nombre').value = c.creador_nombre || '';
   document.getElementById('ctr-email').value = c.creador_email || '';
   document.getElementById('ctr-evento-nombre').value = c.evento_nombre || '';
@@ -20435,16 +20504,26 @@ function cancelarEdicionContrato() {
 // — VÍA B (F5): chip de plantilla + aviso de vigencia para el listado ————
 function _ctrPlantillaChip(p) {
   const map = {
-    creadora:    { txt:'Creadora',    c:'#e8ff4c', bg:'rgba(232,255,76,.14)',  bd:'rgba(232,255,76,.4)' },
-    coordinador: { txt:'Coordinador', c:'#7cc4ff', bg:'rgba(124,196,255,.14)', bd:'rgba(124,196,255,.4)' },
-    giveaway:    { txt:'Giveaway',    c:'#ff9edb', bg:'rgba(255,158,219,.14)', bd:'rgba(255,158,219,.4)' },
+    creadora:      { txt:'Creadora',    c:'#e8ff4c', bg:'rgba(232,255,76,.14)',  bd:'rgba(232,255,76,.4)' },
+    coordinador:   { txt:'Coordinador', c:'#7cc4ff', bg:'rgba(124,196,255,.14)', bd:'rgba(124,196,255,.4)' },
+    giveaway:      { txt:'Giveaway',    c:'#ff9edb', bg:'rgba(255,158,219,.14)', bd:'rgba(255,158,219,.4)' },
+    creadora_team: { txt:'Team',        c:'#c9a2ff', bg:'rgba(201,162,255,.14)', bd:'rgba(201,162,255,.4)' },
   };
   const s = map[p] || map.creadora;
   return `<span style="display:inline-block;font-size:9px;letter-spacing:.1em;text-transform:uppercase;font-weight:800;padding:2px 7px;border-radius:4px;color:${s.c};background:${s.bg};border:1px solid ${s.bd}">${s.txt}</span>`;
 }
-// Aviso "vence en N días" para coordinadores firmados cuando falten ≤30 días.
+// Contador de STRIKES (solo lectura) para creadora_team firmada. Reusa los
+// puntitos .gz-strike-dot existentes. El dato viene de admin-contratos
+// (usuarios.strikes por correo, best-effort) — sin dato, no pinta nada.
+function _ctrStrikesChip(c) {
+  if (!c || c.plantilla !== 'creadora_team' || c.estado !== 'firmado' || c.strikes === undefined) return '';
+  const s = Number(c.strikes) || 0;
+  const dots = [1,2,3].map(n => `<div class="gz-strike-dot ${s >= n ? 'active' : ''}"></div>`).join('');
+  return `<span style="display:inline-flex;align-items:center;gap:6px;margin-left:6px;font-size:9px;letter-spacing:.08em;text-transform:uppercase;font-weight:800;color:${s >= 3 ? 'var(--red)' : 'var(--ts)'}" title="Strikes del sistema (usuarios.strikes). La baja al llegar a 3 es decisión manual de Memo."><span class="gz-strike-dots" style="display:inline-flex;gap:2px">${dots}</span> ${s}/3</span>`;
+}
+// Aviso "vence en N días" para coordinadores/team firmados cuando falten ≤30 días.
 function _ctrVigenciaAviso(c) {
-  if (!c || c.plantilla !== 'coordinador' || !c.vigencia_fin) return '';
+  if (!c || (c.plantilla !== 'coordinador' && c.plantilla !== 'creadora_team') || !c.vigencia_fin) return '';
   const hoy = new Date(new Date().toLocaleDateString('en-CA', { timeZone: 'America/Monterrey' }) + 'T00:00:00');
   const fin = new Date(String(c.vigencia_fin).slice(0,10) + 'T00:00:00');
   const dias = Math.round((fin - hoy) / 86400000);
@@ -20481,6 +20560,7 @@ async function loadContratosList() {
       const acciones = firmado
         ? `
           <button class="btn btn-ghost" style="padding:5px 10px;font-size:11px" onclick="verContratoFirmado('${tokenSafe}','${nombreSafe}')">Ver</button>
+          ${c.plantilla === 'creadora_team' ? `<button class="btn btn-ghost" style="padding:5px 10px;font-size:11px;color:#c9a2ff;border-color:rgba(201,162,255,.3)" onclick="verAnexoC('${_escCtr(c.id)}','${nombreSafe}')">Anexo C</button>` : ''}
           <button class="btn btn-ghost" style="padding:5px 10px;font-size:11px;color:#ff6666;border-color:rgba(255,68,68,.3)" onclick="eliminarContrato('${tokenSafe}','${nombreSafe}',this)">Eliminar</button>`
         : `
           <button class="btn btn-ghost" style="padding:5px 10px;font-size:11px" onclick="editarContrato('${tokenSafe}')">Editar</button>
@@ -20491,7 +20571,7 @@ async function loadContratosList() {
         <td><b>${nombreSafe}</b> ${_ctrPlantillaChip(c.plantilla)}<br><span style="color:var(--ts);font-size:11px">${_escCtr(c.creador_email)}</span></td>
         <td>${_escCtr(c.evento_nombre)}<br><span style="color:var(--ts);font-size:11px">${_fmtFechaCortaCtr(c.evento_fecha)}</span></td>
         <td>${fechaEnviado}</td>
-        <td>${badge}${_ctrVigenciaAviso(c)}</td>
+        <td>${badge}${_ctrVigenciaAviso(c)}${_ctrStrikesChip(c)}</td>
         <td style="text-align:right;white-space:nowrap">${acciones}</td>
       </tr>`;
     }).join('');
@@ -20504,6 +20584,52 @@ function verContratoFirmado(token, nombre) {
   document.getElementById('ctr-ver-titulo').textContent = nombre || '';
   document.getElementById('ctr-ver-iframe').src = '/contrato?t=' + encodeURIComponent(token);
   openModal('modal-contrato-ver');
+}
+
+// 🔒 ANEXO C (Declaración Discreta) — SOLO ADMIN. El endpoint público de
+// contrato lo poda; aquí se pide por admin-contratos (accion 'obtener', que sí
+// trae datos) y se pinta en una sección COLAPSADA. Confidencial: gestión de
+// riesgo reputacional, sin difusión.
+async function verAnexoC(id, nombre) {
+  const body = document.getElementById('ctr-preview-body');
+  if (!body) return;
+  body.innerHTML = '<div class="loading-state"><div class="spinner"></div>Cargando…</div>';
+  openModal('modal-contrato-preview');
+  try {
+    const c = await khContratos.obtener(id);
+    const ax = c && c.datos && c.datos.anexo_c;
+    const d = (c && c.datos) || {};
+    const CUENTAS = { no: 'No', si: 'Sí' };
+    const ESTADOS = { nunca: 'Nunca existió', baja: 'Dada de baja', vigente_sin_uso: 'Vigente (sin uso)', vigente_en_uso: 'Vigente (en uso)' };
+    const INTENCION = { no_reactivar: 'No reactivar / no crear', acuerdo: 'Requiere acuerdo especial' };
+    const fila = (k, v) => `<div style="display:flex;gap:12px;padding:8px 0;border-bottom:1px solid #eee"><div style="flex:1;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#666;font-weight:700">${k}</div><div style="flex:1.4;font-size:13px;color:#000">${_escCtr(v || '—')}</div></div>`;
+    const proemio = `
+      ${fila('Origen', d.origen)}
+      ${fila('Domicilio', d.domicilio)}
+      ${fila('Ciudad/Estado', d.ciudad_estado)}`;
+    const anexo = !ax
+      ? '<p style="font-size:13px;color:#666;margin-top:10px">Este contrato no tiene Anexo C capturado (se llena al firmar).</p>'
+      : `
+      <details style="margin-top:14px;border:1px solid rgba(201,162,255,.5);border-radius:8px;padding:10px 14px;background:rgba(201,162,255,.06)">
+        <summary style="cursor:pointer;font-weight:800;font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:#7a4fc9">🔒 Anexo C — Declaración Discreta (confidencial)</summary>
+        <div style="margin-top:10px">
+          ${fila('¿Cuentas de contenido adulto?', CUENTAS[ax.cuentas_previas] || ax.cuentas_previas)}
+          ${ax.plataformas ? fila('Plataforma y estatus', ax.plataformas) : ''}
+          ${fila('Estado actual', ESTADOS[ax.estado_actual] || ax.estado_actual)}
+          ${fila('¿Material previo que pueda circular?', CUENTAS[ax.material_previo] || ax.material_previo)}
+          ${ax.material_desc ? fila('Descripción general', ax.material_desc) : ''}
+          ${fila('Intención futura', INTENCION[ax.intencion] || ax.intencion)}
+          ${ax.intencion_det ? fila('Detalle del acuerdo', ax.intencion_det) : ''}
+          <p style="font-size:11px;color:#999;margin:10px 0 0">Estrictamente confidencial: solo gestión de riesgo reputacional, sin difusión. Jamás aparece en el contrato público.</p>
+        </div>
+      </details>`;
+    body.innerHTML = `
+      <h2 style="font-family:'Barlow Condensed','Montserrat',sans-serif;font-size:28px;text-transform:uppercase;margin:0 0 12px;color:#000">${_escCtr(nombre || (c && c.creador_nombre) || '')}<small style="display:block;font-size:12px;color:#ff283b;font-weight:800;letter-spacing:.18em;margin-top:4px">Datos del contrato TEAM</small></h2>
+      ${proemio}
+      ${anexo}`;
+  } catch (e) {
+    body.innerHTML = `<div class="alert alert-error">${_escCtr(e.message)}</div>`;
+  }
 }
 
 async function reenviarContratoEmail(token, btn) {

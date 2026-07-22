@@ -3366,6 +3366,12 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
 
  /* Biblioteca (explorador): migajas, abecedario, carpetas, paginación */
  .ks-bib-search{margin-bottom:12px}
+ /* Top 20 semanal (Números): posición, likes, atenuado 11-20 y línea de corte */
+ .ks-top-pos{flex-shrink:0;width:26px;text-align:right;font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:700;color:var(--ts);font-variant-numeric:tabular-nums}
+ .ks-top-likes{flex-shrink:0;font-size:12px;font-weight:700;color:var(--ts);white-space:nowrap}
+ .ks-result.ks-dim{opacity:.55}
+ .ks-top-cut{display:flex;align-items:center;gap:10px;margin:8px 0;color:var(--ts);font-size:10px;letter-spacing:.08em;text-transform:uppercase;font-family:'Montserrat',sans-serif}
+ .ks-top-cut::before,.ks-top-cut::after{content:'';flex:1;height:1px;background:var(--border)}
  .ks-crumbs{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-bottom:12px;font-family:'Barlow Condensed',sans-serif;font-size:15px;font-weight:700;letter-spacing:.03em}
  .ks-crumb{color:var(--ts)}
  .ks-crumb-link{color:var(--gold);cursor:pointer}
@@ -3505,6 +3511,12 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
      <div class="ks-stat-sub">sin atender</div>
     </div>
    </div>
+
+   <div class="ks-panel" style="margin-top:14px">
+    <div class="ks-panel-title">Top 20 de la semana</div>
+    <div style="color:var(--ts);font-size:11px;margin-bottom:10px;line-height:1.5">El Top 10 público y las 10 que vienen empujando (11-20). Toca una canción para editarla.</div>
+    <div id="radio-top20"><div class="loading-state"><div class="spinner"></div>Cargando…</div></div>
+   </div>
   </div>
 
   <!-- TAB 4: Control remoto -->
@@ -3556,6 +3568,12 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
   <!-- TAB 5: Biblioteca — explorador de toda la música -->
   <div id="radio-tab-biblioteca" style="display:none">
    <div id="bib-crumbs" class="ks-crumbs"></div>
+   <!-- Buscador global por CANCIÓN (GET ?buscar=; siempre visible, no lo toca _bibToggleRaizUI) -->
+   <div class="ks-search" style="margin-bottom:12px">
+    <input type="text" id="bib-song-q" class="ks-search-input" placeholder="Buscar canción (título)…" autocomplete="off" onkeydown="if(event.key==='Enter')bibBuscarCancion()">
+    <button class="btn btn-primary btn-sm" onclick="bibBuscarCancion()" style="font-size:11px">Buscar</button>
+   </div>
+   <div id="bib-song-res" class="ks-results" style="margin-bottom:8px"></div>
    <div id="bib-toolbar" class="ks-bib-search">
     <input type="text" id="bib-buscar" class="ks-search-input" placeholder="Buscar artista…" autocomplete="off" oninput="_bibOnBuscar(this.value)">
    </div>
@@ -6519,6 +6537,9 @@ async function loadRadioNumeros() {
   const pend = _radioPeticiones.filter(p => !p.atendida).length;
   _radioSetNum('peticiones', pend, true); // neutral: más pendientes no es "bueno/malo"
 
+  // ── Top 20 semanal (admin-radio-stats; fail-soft, panel independiente) ──
+  _radioTop20Load();
+
   // ── Oyentes ahora + canción sonando (API pública de la radio, fetch cliente) ──
   fetch(RADIO_NOWPLAYING)
     .then(r => r.json())
@@ -6559,6 +6580,51 @@ async function loadRadioNumeros() {
       if (elLk) elLk.textContent = '—';
       if (elT3) elT3.textContent = 'no disponible';
     });
+}
+
+// ── Top 20 semanal (admin-radio-stats?accion=top20) ─────────────────────────
+// El Top 10 público + las 10 siguientes (11-20, atenuadas tras la línea de
+// corte) para ver cómo se moverá la semana. Cada fila abre el modal de edición
+// con el MISMO resolver del click-to-edit de Control (radioMediaAbrirPorNombre).
+let _radioTop20Data = [];
+
+async function _radioTop20Load() {
+  const box = document.getElementById('radio-top20');
+  if (!box) return;
+  try {
+    const r = await khAdminFetch('/.netlify/functions/admin-radio-stats?accion=top20');
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok || !d.ok) throw new Error(d.error || ('Error ' + r.status));
+    _radioTop20Data = Array.isArray(d.top) ? d.top : [];
+    if (!_radioTop20Data.length) {
+      box.innerHTML = '<div style="color:var(--ts);font-size:13px;padding:6px 0">Aún sin likes esta semana.</div>';
+      return;
+    }
+    let html = '';
+    _radioTop20Data.forEach((t, i) => {
+      const pos = i + 1;
+      if (pos === 11) html += '<div class="ks-top-cut">línea de corte del Top público</div>';
+      const ini = _radioInicialesArt(t.artista || t.titulo);
+      const img = t.art ? `<img src="${_spEscape(t.art)}" alt="" loading="lazy" onerror="this.style.display='none'">` : '';
+      html += `<div class="ks-result${pos > 10 ? ' ks-dim' : ''}" onclick="_radioTop20Abrir(${i})" title="Editar esta canción">
+        <div class="ks-top-pos">${pos}</div>
+        <div class="ks-art"><div class="ks-art-ph">${_spEscape(ini)}</div>${img}</div>
+        <div class="ks-track-txt">
+          <div class="ks-track-t">${_spEscape(t.titulo || 'sin título')}</div>
+          <div class="ks-track-a">${_spEscape(t.artista || '')}</div>
+        </div>
+        <div class="ks-top-likes"><svg class="ic"><use href="#ic-corazon"/></svg> ${Number(t.likes) || 0}</div>
+      </div>`;
+    });
+    box.innerHTML = html;
+  } catch (e) {
+    box.innerHTML = '<div style="color:#FF6B6B;font-size:13px">Error: ' + _spEscape(e.message) + '</div>';
+  }
+}
+
+function _radioTop20Abrir(i) {
+  const t = _radioTop20Data[i];
+  if (t) radioMediaAbrirPorNombre(t.titulo, t.artista);
 }
 
 // Actualiza el número grande + su indicador de tendencia contra la carga previa.
@@ -6723,6 +6789,26 @@ async function _radioMediaSearch(q) {
 }
 
 // Buscador del tab Control.
+// Biblioteca: buscador global por CANCIÓN (mismo GET ?buscar= del Control, que
+// busca en títulos/rutas). Reusa _radioMediaResults + _radioResultHtml → el click
+// abre el mismo modal de edición, sin navegar carpetas.
+async function bibBuscarCancion() {
+  const inp = document.getElementById('bib-song-q');
+  const box = document.getElementById('bib-song-res');
+  const q = (inp ? inp.value : '').trim();
+  if (!box) return;
+  if (!q) { box.innerHTML = ''; return; }
+  box.innerHTML = '<div class="loading-state"><div class="spinner"></div>Buscando…</div>';
+  try {
+    _radioMediaResults = await _radioMediaSearch(q);
+    box.innerHTML = _radioMediaResults.length
+      ? _radioMediaResults.map((a, i) => _radioResultHtml(a, i)).join('')
+      : '<div style="color:var(--ts);font-size:13px;padding:6px 0">Sin resultados en la biblioteca.</div>';
+  } catch (e) {
+    box.innerHTML = '<div style="color:#FF6B6B;font-size:13px">Error: ' + _spEscape(e.message) + '</div>';
+  }
+}
+
 async function radioMediaBuscar() {
   const inp = document.getElementById('radio-media-q');
   const box = document.getElementById('radio-media-res');

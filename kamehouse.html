@@ -2014,6 +2014,7 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
    <button class="nav-btn" onclick="showPage('ingresos')" id="nav-ingresos"><svg class="nav-ic"><use href="#ic-ingresos"/></svg><span>Ingresos</span></button>
    <button class="nav-btn" onclick="showPage('saldos')" id="nav-saldos"><svg class="nav-ic"><use href="#ic-saldos"/></svg><span>Saldos</span></button>
    <button class="nav-btn" onclick="showPage('ventas')" id="nav-ventas"><svg class="nav-ic"><use href="#ic-ventas"/></svg><span>Mis Ventas</span></button>
+   <button class="nav-btn" onclick="showPage('cotizar')" id="nav-cotizar"><svg class="nav-ic"><use href="#ic-boleto"/></svg><span>Ventas</span></button>
    <button class="nav-btn" onclick="showPage('reportes')" id="nav-reportes"><svg class="nav-ic"><use href="#ic-reportes"/></svg><span>Reportes</span></button>
   </div>
 
@@ -3577,6 +3578,62 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
  </div>
 
 
+ <!-- ─── VENTAS (VENDEDORES F3) — Cotizar/Vender + Mis Ventas ─── -->
+ <div class="page" id="page-cotizar">
+   <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px;flex-wrap:wrap">
+     <h2 style="margin:0;font-family:'Zen Dots',sans-serif;font-size:22px;letter-spacing:.02em"><svg class="ic"><use href="#ic-boleto"/></svg> Ventas</h2>
+     <div class="contratos-tabs" style="display:inline-flex;border:1px solid var(--border);border-radius:8px;overflow:hidden">
+       <button id="vta-tab-vender" class="ctr-tab active" onclick="_vtaSwitch('vender')" style="background:rgba(255,107,0,.12);border:0;color:var(--orange);padding:8px 16px;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;font-family:inherit">Cotizar / Vender</button>
+       <button id="vta-tab-mis" class="ctr-tab" onclick="_vtaSwitch('mis')" style="background:transparent;border:0;color:var(--ts);padding:8px 16px;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;font-family:inherit;border-left:1px solid var(--border)">Mis Ventas</button>
+     </div>
+   </div>
+
+   <div id="vta-view-vender" class="contratos-view">
+     <div id="vta-alert"></div>
+     <div style="max-width:720px">
+       <div class="form-row cols-2">
+         <div class="form-group"><label>Evento *</label><select id="vta-evento" onchange="_vtaOnEvento()"><option value="">— Elige un evento —</option></select></div>
+         <div class="form-group" id="vta-fecha-wrap" style="display:none"><label>Fecha *</label><select id="vta-fecha" onchange="_vtaRecalc()"></select></div>
+       </div>
+       <div class="form-row cols-2">
+         <div class="form-group"><label>Paquete *</label><select id="vta-paquete" onchange="_vtaRecalc()"><option value="plus">PLUS</option><option value="ride">RIDE</option><option value="stay">STAY</option><option value="cheap">CHEAP</option></select></div>
+         <div class="form-group"><label>Personas *</label><input type="number" id="vta-num" min="1" max="12" value="1" oninput="_vtaRecalc()"></div>
+       </div>
+       <div class="form-row cols-2">
+         <div class="form-group">
+           <label>Zona * <svg class="ic" style="width:12px;height:12px;opacity:.65;vertical-align:-1px"><use href="#ic-candado"/></svg> <span style="font-size:10px;color:var(--ts);text-transform:none;letter-spacing:0">precio fijo del catálogo</span></label>
+           <select id="vta-zona" onchange="_vtaRecalc()"><option value="">— Elige un evento primero —</option></select>
+         </div>
+         <div class="form-group" id="vta-hotel-wrap" style="display:none"><label>Hotel</label><select id="vta-hotel" onchange="_vtaRecalc()"></select></div>
+       </div>
+
+       <div id="vta-resumen" style="display:none;margin:6px 0 16px;padding:14px 16px;background:var(--bg3);border:1px solid var(--border);border-radius:10px"></div>
+
+       <div style="font-size:11px;color:var(--ts);letter-spacing:.1em;text-transform:uppercase;margin:14px 0 8px;border-top:1px solid var(--border);padding-top:12px">Datos del cliente</div>
+       <div class="form-row cols-2">
+         <div class="form-group"><label>Nombre *</label><input id="vta-cli-nombre" maxlength="200" placeholder="Nombre completo"></div>
+         <div class="form-group"><label>Correo *</label><input id="vta-cli-correo" type="email" maxlength="200" placeholder="cliente@correo.com"></div>
+       </div>
+       <div class="form-row cols-2">
+         <div class="form-group"><label>Teléfono</label><input id="vta-cli-tel" maxlength="40" placeholder="Opcional"></div>
+         <div class="form-group"></div>
+       </div>
+
+       <button class="btn btn-primary" id="vta-btn" onclick="_vtaRegistrar()"><svg class="ic"><use href="#ic-guardar"/></svg> Registrar venta</button>
+     </div>
+   </div>
+
+   <div id="vta-view-mis" class="contratos-view" style="display:none">
+     <div style="display:flex;justify-content:flex-end;margin-bottom:10px"><button class="btn btn-ghost btn-sm" onclick="_vtaMisVentas()">↻ Refrescar</button></div>
+     <div class="table-wrap">
+       <table>
+         <thead><tr><th>Cliente</th><th id="vta-th-vendedor" style="display:none">Vendedor</th><th>Evento</th><th>Zona / Paquete</th><th style="text-align:right">Total / Separo</th><th>Estado</th><th>Límite</th></tr></thead>
+         <tbody id="vta-mis-tbody"><tr><td colspan="7" style="text-align:center;color:var(--ts);padding:30px;font-size:12px;letter-spacing:.1em;text-transform:uppercase">Cargando…</td></tr></tbody>
+       </table>
+     </div>
+   </div>
+ </div>
+
  <!-- ─── CONTRATOS ─── -->
  <div class="page" id="page-contratos">
    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px;flex-wrap:wrap">
@@ -4689,12 +4746,14 @@ let recibosLoaded = false;
 let disenoLoaded = false;
 
 const PERMISOS_TABS = {
-  maestro_roshi: ['resumen','pagos','eventos','gastos','ingresos','saldos','ventas','inventario','reportes','capsule','solicitudes_portal','equipo','kamisama','herramientas','radar','montana','yamcha','radio'],
-  bulma:         ['resumen','pagos','eventos','gastos','ingresos','saldos','ventas','inventario','reportes','capsule','solicitudes_portal','equipo','herramientas'],
+  maestro_roshi: ['resumen','pagos','eventos','gastos','ingresos','saldos','ventas','cotizar','inventario','reportes','capsule','solicitudes_portal','equipo','kamisama','herramientas','radar','montana','yamcha','radio'],
+  bulma:         ['resumen','pagos','eventos','gastos','ingresos','saldos','ventas','cotizar','inventario','reportes','capsule','solicitudes_portal','equipo','herramientas'],
   mister_popo:   ['inventario','reportes','equipo'],
   coordinador:   ['inventario','reportes','equipo'],
   cc:            ['equipo'],
-  vendedor:      ['ventas','equipo']
+  // Vendedor: su sección de Ventas (Cotizar/Vender + Mis Ventas) + Guerreros Z.
+  // (Antes tenía 'ventas' —el dashboard de finanzas admin— que le devolvía 403.)
+  vendedor:      ['cotizar','equipo']
 };
 
 // Qué tabs de Guerreros Z puede ver cada rol
@@ -5048,7 +5107,7 @@ function aplicarPermisosUI() {
   const extras = currentUser.permisos_extra?.tabs_extra || [];
   const bloqueados = currentUser.permisos_extra?.tabs_bloqueados || [];
   const tabsPermitidos = [...new Set([...base, ...extras])].filter(t => !bloqueados.includes(t));
-  const allTabs = ['resumen','pagos','eventos','gastos','ingresos','saldos','ventas','inventario','reportes','equipo','capsule','solicitudes_portal','kamisama','radar','montana','yamcha','radio'];
+  const allTabs = ['resumen','pagos','eventos','gastos','ingresos','saldos','ventas','cotizar','inventario','reportes','equipo','capsule','solicitudes_portal','kamisama','radar','montana','yamcha','radio'];
   allTabs.forEach(tab => {
     const btn = document.getElementById('nav-' + tab);
     if (btn) btn.style.display = tabsPermitidos.includes(tab) ? '' : 'none';
@@ -6290,6 +6349,7 @@ function showPage(name) {
 }
 
 function loadPage(name) {
+ if (name === 'cotizar') loadCotizar();
  if (name === 'resumen') loadResumen();
  if (name === 'pagos') loadPagos();
  if (name === 'eventos') _evtPoblarSelector();
@@ -18613,6 +18673,262 @@ function _delivRefreshProfile(userId) {
     cerrarModal('ver-perfil');
     abrirPerfil(userId);
   }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// VENTAS · vendedores (F3) — Cotizar/Vender + Mis Ventas
+// El precio es SIEMPRE del catálogo (candado): el vendedor no teclea precios.
+// El display se calcula con _vtaCalc (port FIEL de _lib/precio-zona) y el backend
+// lo re-sella con resolverPrecioVenta al registrar → mismo snapshot.
+// ═══════════════════════════════════════════════════════════════
+let _vtaEV = null;         // catálogo EV (crudo) cacheado
+let _vtaEvento = null;     // evento seleccionado (objeto EV)
+let _vtaAgotadas = {};     // evento_id → Set de zonas agotadas (disponibilidad-evento)
+
+function _vtaEsc(s) { return _escCtr(s); }
+function _vtaFmt(n) { return '$' + Math.round(Number(n) || 0).toLocaleString('es-MX'); }
+
+// Días naturales evento−hoy (mediodía UTC) — igual que _lib/precio-zona.
+function _vtaDias(evISO, hoyISO) {
+  const m1 = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(evISO || ''));
+  const m2 = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(hoyISO || ''));
+  if (!m1 || !m2) return null;
+  return Math.round((Date.UTC(+m1[1], +m1[2] - 1, +m1[3]) - Date.UTC(+m2[1], +m2[2] - 1, +m2[3])) / 86400000);
+}
+function _vtaHoyMx() { return new Date().toLocaleDateString('en-CA', { timeZone: 'America/Monterrey' }); }
+function _vtaEsCDMX(ev) { const v = ev && ev.v ? String(ev.v).toUpperCase() : ''; return v.includes('CDMX') || v.includes('CIUDAD DE MEXICO'); }
+function _vtaZonaLista(ev, paquete, fi) { const mf = ev.multifecha && ev.multifecha[fi]; if (paquete === 'cheap') return (mf && mf.cheapZonas) || ev.cheapZonas || []; return (mf && mf.zonas) || ev.zonas || []; }
+
+// PORT FIEL de _lib/precio-zona._calcularPrecio (display; el backend re-sella).
+function _vtaCalc(ev, opts) {
+  if (!ev) return { ok: false, motivo: 'evento no encontrado' };
+  const paquete = String(opts.paquete || '').toLowerCase();
+  if (['plus', 'ride', 'stay', 'cheap'].indexOf(paquete) < 0) return { ok: false, motivo: 'paquete inválido' };
+  const selViaj = Math.floor(Number(opts.num_personas) || 0);
+  if (selViaj < 1) return { ok: false, motivo: 'num_personas inválido' };
+  const fi = Number.isFinite(Number(opts.fecha_idx)) ? Number(opts.fecha_idx) : 0;
+  const hoyISO = opts.hoyISO || _vtaHoyMx();
+  const cdmx = _vtaEsCDMX(ev);
+  const hasZona = (paquete === 'plus' || paquete === 'stay' || paquete === 'cheap') || (paquete === 'ride' && ev.forceZona);
+  const hasHotel = (paquete === 'plus' || paquete === 'ride' || paquete === 'stay') && !ev.noHotel;
+  let selZ = null;
+  if (hasZona) {
+    selZ = _vtaZonaLista(ev, paquete, fi).filter(z => z && z.n === String(opts.zona || ''))[0] || null;
+    if (!selZ) return { ok: false, motivo: 'zona no encontrada' };
+    if (!(Number(selZ.p) > 0)) return { ok: false, motivo: 'zona agotada / sin precio' };
+  }
+  let selH = null;
+  const requiereHotel = hasHotel && !opts.hotel_nombre;
+  if (hasHotel && opts.hotel_nombre) { selH = (ev.hotel || []).filter(h => h && h.n === opts.hotel_nombre)[0] || null; if (!selH) return { ok: false, motivo: 'hotel no encontrado' }; }
+  const requiereTransporte = cdmx && paquete !== 'cheap' && (opts.transporte_cost == null);
+  const zonaP = selZ ? (Number(selZ.p) || 0) : 0;
+  const hotelRaw = selH ? (Number(selH.e) || 0) : 0;
+  const hotelPP = ev.hotelPP ? hotelRaw : Math.ceil(hotelRaw / selViaj);
+  const hotelTotal = ev.hotelPP ? (hotelRaw * selViaj) : hotelRaw;
+  const _mfR = (ev.multifecha && ev.multifecha[fi] && ev.multifecha[fi].ride) || 0;
+  const rideBase = _mfR || ev.ride || (cdmx ? 2900 : 2700);
+  const stayDiscount = ev.sep || 500;
+  let total = 0, cxp = 0;
+  if (paquete === 'plus') { if (ev.diaFirst) { total = zonaP + hotelTotal; cxp = Math.ceil(zonaP / selViaj) + hotelPP; } else { total = zonaP * selViaj + hotelTotal; cxp = zonaP + hotelPP; } }
+  else if (paquete === 'ride') { const r = (ev.rideOnly && zonaP > 0) ? zonaP : rideBase; total = r * selViaj + hotelTotal; cxp = r + hotelPP; }
+  else if (paquete === 'stay') { cxp = zonaP - stayDiscount + hotelPP; if (cxp < 0) cxp = zonaP + hotelPP; total = cxp * selViaj; }
+  else { if (ev.diaFirst) { total = zonaP; cxp = Math.ceil(zonaP / selViaj); } else { total = zonaP * selViaj; cxp = zonaP; } }
+  const tCost = Number(opts.transporte_cost) || 0;
+  total += tCost * selViaj; cxp += tCost;
+  let separo;
+  if (paquete === 'cheap') {
+    let cs = (ev.sepCheap !== undefined) ? ev.sepCheap : 1000;
+    if (selZ) { const cz = ((ev.multifecha && ev.multifecha[fi] && ev.multifecha[fi].cheapZonas) || ev.cheapZonas || []).filter(z => z && z.n === selZ.n)[0]; if (cz && cz.sepEspecial !== undefined) cs = cz.sepEspecial; }
+    separo = (Number(cs) || 0) * selViaj;
+  } else {
+    const dias = _vtaDias(ev.ds, hoyISO);
+    if (dias != null && dias <= 15) separo = Math.ceil(cxp * 0.5) * selViaj;
+    else { let s = ev.sep; if (paquete === 'ride' && ev.sepRide !== undefined) s = ev.sepRide; if (ev.sepZonas && selZ && ev.sepZonas[selZ.n] !== undefined) s = ev.sepZonas[selZ.n]; separo = (Number(s) || 0) * selViaj; }
+  }
+  if (!(total > 0) || !(cxp > 0)) return { ok: false, motivo: 'precio no disponible' };
+  return { ok: true, paquete, zona: selZ ? selZ.n : null, num_personas: selViaj, precio_unit: cxp, total, separo, resto: total - separo, requiere_hotel: requiereHotel, requiere_transporte: requiereTransporte };
+}
+
+async function loadCotizar() {
+  _vtaSwitch('vender');
+  const sel = document.getElementById('vta-evento');
+  if (sel && sel.options.length <= 1) {
+    try {
+      _vtaEV = await _fetchEVFromIndex();
+      const hoy = _vtaHoyMx();
+      const vivos = (_vtaEV || []).filter(e => e && e.id && e.a && (!e.ds || e.ds >= hoy)).sort((a, b) => String(a.ds || '9999').localeCompare(String(b.ds || '9999')));
+      vivos.forEach(e => { const o = document.createElement('option'); o.value = e.id; o.textContent = e.a + (e.f ? ' · ' + e.f : ''); sel.appendChild(o); });
+    } catch (e) { /* sin catálogo: el select queda vacío */ }
+  }
+}
+
+function _vtaSwitch(view) {
+  const vender = view === 'vender';
+  document.getElementById('vta-view-vender').style.display = vender ? '' : 'none';
+  document.getElementById('vta-view-mis').style.display = vender ? 'none' : '';
+  const tv = document.getElementById('vta-tab-vender'), tm = document.getElementById('vta-tab-mis');
+  [[tv, vender], [tm, !vender]].forEach(([b, on]) => { if (b) { b.style.background = on ? 'rgba(255,107,0,.12)' : 'transparent'; b.style.color = on ? 'var(--orange)' : 'var(--ts)'; } });
+  if (!vender) _vtaMisVentas();
+}
+
+async function _vtaOnEvento() {
+  const id = document.getElementById('vta-evento').value;
+  _vtaEvento = (_vtaEV || []).filter(e => e && e.id === id)[0] || null;
+  // Fecha (multifecha)
+  const fw = document.getElementById('vta-fecha-wrap'), fsel = document.getElementById('vta-fecha');
+  fsel.innerHTML = '';
+  if (_vtaEvento && Array.isArray(_vtaEvento.multifecha) && _vtaEvento.multifecha.length) {
+    _vtaEvento.multifecha.forEach((m, i) => { const o = document.createElement('option'); o.value = String(i); o.textContent = (m && m.lbl) ? m.lbl : ('Fecha ' + (i + 1)); fsel.appendChild(o); });
+    fw.style.display = '';
+  } else { fw.style.display = 'none'; }
+  // Disponibilidad (apaga agotadas). Best-effort.
+  _vtaAgotadas[id] = new Set();
+  if (_vtaEvento) {
+    try {
+      const r = await fetch('/.netlify/functions/disponibilidad-evento', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ evento_id: _vtaEventoId() }) });
+      const j = await r.json().catch(() => ({}));
+      if (j && j.ok && Array.isArray(j.zonas_agotadas)) _vtaAgotadas[id] = new Set(j.zonas_agotadas.map(z => String(z).trim()));
+    } catch (e) { /* sin disponibilidad: no se apaga nada (el backend valida al registrar) */ }
+  }
+  _vtaPoblarHotel();
+  _vtaPoblarZonas();
+  _vtaRecalc();
+}
+
+// evento_id con multifecha → 'slug#idx'.
+function _vtaEventoId() {
+  if (!_vtaEvento) return '';
+  const fw = document.getElementById('vta-fecha-wrap');
+  if (fw && fw.style.display !== 'none') { const fi = document.getElementById('vta-fecha').value; if (fi !== '') return _vtaEvento.id + '#' + fi; }
+  return _vtaEvento.id;
+}
+
+function _vtaPoblarZonas() {
+  const zsel = document.getElementById('vta-zona');
+  zsel.innerHTML = '';
+  if (!_vtaEvento) { zsel.innerHTML = '<option value="">— Elige un evento primero —</option>'; return; }
+  const paquete = document.getElementById('vta-paquete').value;
+  const fi = (document.getElementById('vta-fecha-wrap').style.display !== 'none') ? (parseInt(document.getElementById('vta-fecha').value, 10) || 0) : 0;
+  const lista = _vtaZonaLista(_vtaEvento, paquete, fi);
+  const agot = _vtaAgotadas[_vtaEvento.id] || new Set();
+  const disp = lista.filter(z => z && Number(z.p) > 0);
+  if (!disp.length) { zsel.innerHTML = '<option value="">— sin zonas con precio —</option>'; return; }
+  zsel.innerHTML = '<option value="">— Elige zona —</option>';
+  disp.forEach(z => {
+    const o = document.createElement('option');
+    const off = agot.has(String(z.n).trim());
+    o.value = z.n;
+    o.textContent = z.n + ' · ' + _vtaFmt(z.p) + (off ? ' — AGOTADA' : '');
+    if (off) { o.disabled = true; o.style.color = '#888'; }
+    zsel.appendChild(o);
+  });
+}
+
+function _vtaPoblarHotel() {
+  const hw = document.getElementById('vta-hotel-wrap'), hsel = document.getElementById('vta-hotel');
+  const paquete = document.getElementById('vta-paquete').value;
+  const hasHotel = _vtaEvento && (paquete === 'plus' || paquete === 'ride' || paquete === 'stay') && !_vtaEvento.noHotel && Array.isArray(_vtaEvento.hotel) && _vtaEvento.hotel.length;
+  if (!hasHotel) { hw.style.display = 'none'; hsel.innerHTML = ''; return; }
+  hsel.innerHTML = '';
+  _vtaEvento.hotel.forEach(h => { if (!h || !h.n) return; const o = document.createElement('option'); o.value = h.n; o.textContent = h.n + (Number(h.e) > 0 ? ' (+' + _vtaFmt(h.e) + (_vtaEvento.hotelPP ? '/persona' : '') + ')' : ''); hsel.appendChild(o); });
+  hw.style.display = '';
+}
+
+function _vtaRecalc() {
+  const box = document.getElementById('vta-resumen');
+  if (!_vtaEvento) { box.style.display = 'none'; return; }
+  // Repoblar zonas/hotel si cambió paquete/fecha (precio depende de ellos).
+  _vtaPoblarHotel();
+  const zsel = document.getElementById('vta-zona');
+  const paquete = document.getElementById('vta-paquete').value;
+  const num = parseInt(document.getElementById('vta-num').value, 10) || 1;
+  const hotel = (document.getElementById('vta-hotel-wrap').style.display !== 'none') ? document.getElementById('vta-hotel').value : null;
+  const fi = (document.getElementById('vta-fecha-wrap').style.display !== 'none') ? (parseInt(document.getElementById('vta-fecha').value, 10) || 0) : 0;
+  const zona = zsel.value;
+  if (!zona) { box.style.display = 'none'; return; }
+  const pr = _vtaCalc(_vtaEvento, { paquete, zona, num_personas: num, hotel_nombre: hotel, fecha_idx: fi });
+  if (!pr.ok) { box.style.display = 'none'; return; }
+  const limite = (() => { const d = new Date(_vtaHoyMx() + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() + 8); return d.toISOString().slice(0, 10); })();
+  box.style.display = '';
+  box.innerHTML = `
+    <div style="display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;font-size:14px">
+      <div><div style="font-size:10px;color:var(--ts);text-transform:uppercase;letter-spacing:.08em">Total</div><b style="font-size:18px">${_vtaFmt(pr.total)}</b> <span style="font-size:11px;color:var(--ts)">(${num} pers.)</span></div>
+      <div><div style="font-size:10px;color:var(--ts);text-transform:uppercase;letter-spacing:.08em">Separo</div><b style="font-size:18px;color:var(--orange)">${_vtaFmt(pr.separo)}</b></div>
+      <div><div style="font-size:10px;color:var(--ts);text-transform:uppercase;letter-spacing:.08em">Fecha límite</div><b style="font-size:14px">${limite}</b> <span style="font-size:11px;color:var(--ts)">(8 días)</span></div>
+    </div>
+    ${(pr.requiere_hotel || pr.requiere_transporte) ? `<div style="margin-top:8px;font-size:11px;color:#ffb020"><svg class="ic" style="width:12px;height:12px;vertical-align:-1px"><use href="#ic-alerta"/></svg> ${pr.requiere_transporte ? 'El transporte a CDMX se cotiza aparte con Bulma. ' : ''}${pr.requiere_hotel ? 'Falta elegir hotel.' : ''}</div>` : ''}
+    <div style="margin-top:6px;font-size:10px;color:var(--ts)"><svg class="ic" style="width:11px;height:11px;vertical-align:-1px"><use href="#ic-candado"/></svg> Precio fijo del catálogo — el sistema lo sella al registrar.</div>`;
+}
+
+async function _vtaRegistrar() {
+  const alert = document.getElementById('vta-alert');
+  const setErr = (m) => { alert.innerHTML = `<div style="padding:10px 14px;background:rgba(255,68,68,.12);border:1px solid rgba(255,68,68,.4);color:#ffb3b3;border-radius:6px;margin-bottom:14px;font-size:13px"><svg class="ic"><use href="#ic-alerta"/></svg> ${_vtaEsc(m)}</div>`; };
+  if (!_vtaEvento) return setErr('Elige un evento');
+  const paquete = document.getElementById('vta-paquete').value;
+  const zona = document.getElementById('vta-zona').value;
+  const num = parseInt(document.getElementById('vta-num').value, 10) || 0;
+  const hotel = (document.getElementById('vta-hotel-wrap').style.display !== 'none') ? document.getElementById('vta-hotel').value : null;
+  const fi = (document.getElementById('vta-fecha-wrap').style.display !== 'none') ? (parseInt(document.getElementById('vta-fecha').value, 10) || 0) : 0;
+  const nombre = (document.getElementById('vta-cli-nombre').value || '').trim();
+  const correo = (document.getElementById('vta-cli-correo').value || '').trim();
+  const telefono = (document.getElementById('vta-cli-tel').value || '').trim();
+  if (!zona) return setErr('Elige una zona');
+  if (num < 1 || num > 12) return setErr('Personas entre 1 y 12');
+  if (!nombre) return setErr('Escribe el nombre del cliente');
+  if (!correo || correo.indexOf('@') < 0) return setErr('Escribe un correo válido del cliente');
+  alert.innerHTML = '';
+  const btn = document.getElementById('vta-btn'); const orig = btn.textContent;
+  btn.disabled = true; btn.textContent = 'Registrando…';
+  try {
+    const r = await khAdminFetch('/.netlify/functions/admin-venta-crear', {
+      method: 'POST',
+      body: JSON.stringify({ evento_id: _vtaEventoId(), fecha_idx: fi, paquete, zona, hotel: hotel || undefined, num_personas: num, cliente: { nombre, correo, telefono: telefono || undefined } }),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || j.ok === false) { setErr(j.error || ('Error ' + r.status)); return; }  // 409/502 tal cual
+    showToast('Venta registrada — folio ' + String(j.solicitud_id || '').slice(0, 8) + ' · límite ' + (j.vende_limite || '') + (j.cliente_reusado ? ' · cliente existente' : ''), 'success');
+    // Limpiar cliente + refrescar Mis Ventas
+    ['vta-cli-nombre', 'vta-cli-correo', 'vta-cli-tel'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+    document.getElementById('vta-resumen').style.display = 'none';
+  } catch (e) { setErr(e.message || 'No se pudo registrar'); }
+  finally { btn.disabled = false; btn.textContent = orig; }
+}
+
+async function _vtaMisVentas() {
+  const tb = document.getElementById('vta-mis-tbody');
+  if (!tb) return;
+  try {
+    const r = await khAdminFetch('/.netlify/functions/admin-ventas-resumen', { method: 'POST', body: JSON.stringify({ accion: 'mis_ventas' }) });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || j.ok === false) { tb.innerHTML = `<tr><td colspan="7" style="text-align:center;color:var(--red);padding:24px">${_vtaEsc(j.error || ('Error ' + r.status))}</td></tr>`; return; }
+    const thV = document.getElementById('vta-th-vendedor');
+    if (thV) thV.style.display = j.es_admin ? '' : 'none';
+    const ventas = Array.isArray(j.ventas) ? j.ventas : [];
+    if (!ventas.length) { tb.innerHTML = `<tr><td colspan="7" style="text-align:center;color:var(--ts);padding:30px;font-size:12px;letter-spacing:.1em;text-transform:uppercase">Sin ventas todavía</td></tr>`; return; }
+    const hoy = _vtaHoyMx();
+    tb.innerHTML = ventas.map(v => {
+      const c = (v.clientes && (Array.isArray(v.clientes) ? v.clientes[0] : v.clientes)) || {};
+      const snap = v.precio_sellado || {};
+      const total = (snap.total != null) ? snap.total : v.precio_total;
+      const separo = (snap.separo != null) ? snap.separo : v.monto_separo;
+      const dias = _vtaDias(v.vende_limite, hoy);
+      let limCell = _vtaEsc(v.vende_limite || '—');
+      if (v.vende_limite && dias != null && v.estado === 'pendiente') {
+        if (dias < 0) limCell = `<span style="color:#ff6666;font-weight:700"><svg class="ic" style="width:11px;height:11px;vertical-align:-1px"><use href="#ic-alerta"/></svg> venció (${limCell})</span>`;
+        else if (dias <= 2) limCell = `<span style="color:#ffb020;font-weight:700"><svg class="ic" style="width:11px;height:11px;vertical-align:-1px"><use href="#ic-alerta"/></svg> vence en ${dias}d</span>`;
+      }
+      const vendedorCell = j.es_admin ? `<td style="font-size:12px;color:var(--ts)">${_vtaEsc(v.vendedor_nombre || (v.vendedor_id || '').slice(0, 8))}</td>` : '';
+      return `<tr>
+        <td><b>${_vtaEsc(c.nombre_completo || '—')}</b><br><span style="color:var(--ts);font-size:11px">${_vtaEsc(c.correo || '')}</span></td>
+        ${vendedorCell}
+        <td>${_vtaEsc(v.evento_nombre || v.evento_id || '')}</td>
+        <td>${_vtaEsc(v.zona || '')}<br><span style="color:var(--ts);font-size:11px">${_vtaEsc(v.paquete || '')}</span></td>
+        <td style="text-align:right">${_vtaFmt(total)}<br><span style="color:var(--orange);font-size:11px">sep ${_vtaFmt(separo)}</span></td>
+        <td>${_vtaEsc(v.estado || '')}</td>
+        <td>${limCell}</td>
+      </tr>`;
+    }).join('');
+  } catch (e) { tb.innerHTML = `<tr><td colspan="7" style="text-align:center;color:var(--red);padding:24px">${_vtaEsc(e.message || 'Error')}</td></tr>`; }
 }
 
 // ═══════════════════════════════════════════════════════════════

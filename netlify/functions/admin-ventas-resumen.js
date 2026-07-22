@@ -1,34 +1,39 @@
 // =============================================================================
-// admin-ventas-resumen.js — Acceso server-side a la vista `resumen_eventos` (KH)
+// admin-ventas-resumen.js — Lecturas server-side de ventas (KH + Portal)
 //
-// Cierra el ÚLTIMO acceso anon de finanzas: kamehouse.html `loadVentas()` ("Mis
-// Ventas") leía `resumen_eventos` con la anon key. Esa vista expone
-// total_cobrar/cobrado/pendiente/costos/utilidad por evento → no debe ser anon.
-// Todo pasa por aquí con service_role + verifyAdminAuth. Mismo patrón de LECTURA
-// que admin-reportes.js.
+// Dos acciones:
+//  · 'listar'     → vista `resumen_eventos` (KH), finanzas por evento. SOLO admin
+//                   (maestro_roshi/bulma). Whitelist COLS. Sin cambios de conducta.
+//  · 'mis_ventas' → (VENDEDORES F3) ventas del Portal `solicitudes_tour` con
+//                   vendedor_id. Rol VENDEDOR → SOLO sus ventas (vendedor_id =
+//                   su usuarios.id del JWT, forzado server-side; jamás ve ajenas
+//                   ni las del portal con vendedor_id null). Admin → TODAS las de
+//                   vendedor (+ nombre del vendedor resuelto desde usuarios KH).
 //
-// El rol vendedor / "Mis Ventas" como feature AÚN NO está construido, así que
-// por ahora esto se gatea a admin (maestro_roshi, bulma). Cuando exista el rol
-// vendedor se reabrirá el gate aquí; el mapa de tabs y el rol no se tocan.
+// Seguridad: Authorization Bearer <JWT> (verifyAdminAuth) + corsCheck. service_role
+// nunca se expone. El filtro por vendedor sale del JWT, NUNCA del request.
 //
-// Body JSON: { accion:'listar' } → { ok, eventos:[...] }. Otra acción → 400.
-//
-// Seguridad: Authorization Bearer <JWT> (verifyAdminAuth) + corsCheck. SELECT con
-// whitelist explícita COLS (NO select=*). service_role nunca se expone.
-//
-// Env vars (reusa las de KH): SUPABASE_URL_KAMEHOUSE, SUPABASE_SERVICE_KEY_KAMEHOUSE,
-//   JWT_SECRET (lo lee verifyAdminAuth).
+// Env: SUPABASE_URL_KAMEHOUSE/SERVICE_KEY_KAMEHOUSE (resumen_eventos + usuarios),
+//      PORTAL_SUPABASE_URL/SERVICE_KEY (solicitudes_tour, solo para mis_ventas),
+//      JWT_SECRET (verifyAdminAuth).
 // =============================================================================
 
 const { verifyAdminAuth, corsCheck } = require('./_lib/verify-admin');
 
 const ROLES_ADMIN = ['maestro_roshi', 'bulma'];
+const ROLES_VENTAS = ['vendedor', 'maestro_roshi', 'bulma'];
 
-// Whitelist de columnas que SÍ viajan al navegador (las que el render de "Mis
-// Ventas" ya usa). NO select=* — la vista trae finanzas sensibles.
+// Whitelist de la vista resumen_eventos (finanzas por evento). NO select=*.
 const COLS = [
   'id', 'nombre', 'artista', 'fecha', 'ciudad', 'status', 'total_viajeros',
   'total_cobrar', 'total_cobrado', 'total_pendiente', 'total_costos', 'utilidad_actual',
+].join(',');
+
+// Columnas de una venta (solicitudes_tour) que viajan a "Mis Ventas".
+const VENTA_COLS = [
+  'id', 'evento_id', 'evento_nombre', 'zona', 'paquete', 'num_personas',
+  'precio_total', 'monto_separo', 'estado', 'vende_limite', 'vendedor_id',
+  'precio_sellado', 'created_at', 'clientes(nombre_completo,correo)',
 ].join(',');
 
 exports.handler = async (event) => {
@@ -40,44 +45,74 @@ exports.handler = async (event) => {
     'Vary': 'Origin',
     'Content-Type': 'application/json',
   };
+  const json = (s, b) => ({ statusCode: s, headers, body: JSON.stringify(b) });
 
   if (event.httpMethod === 'OPTIONS') return { statusCode: 204, headers, body: '' };
-  if (event.httpMethod !== 'POST') {
-    return { statusCode: 405, headers, body: JSON.stringify({ error: 'Method not allowed' }) };
-  }
-  if (!__origin) return { statusCode: 403, headers, body: JSON.stringify({ error: 'Origen no permitido' }) };
+  if (event.httpMethod !== 'POST') return json(405, { error: 'Method not allowed' });
+  if (!__origin) return json(403, { error: 'Origen no permitido' });
 
   let body;
   try { body = JSON.parse(event.body || '{}'); }
-  catch { return { statusCode: 400, headers, body: JSON.stringify({ error: 'JSON inválido' }) }; }
+  catch { return json(400, { error: 'JSON inválido' }); }
 
-  if (body.accion !== 'listar') {
-    return { statusCode: 400, headers, body: JSON.stringify({ error: 'accion inválida' }) };
-  }
+  const accion = body.accion;
+  if (accion !== 'listar' && accion !== 'mis_ventas') return json(400, { error: 'accion inválida' });
 
-  const auth = verifyAdminAuth(event, ROLES_ADMIN);
-  if (!auth.valid) return { statusCode: auth.status, headers, body: JSON.stringify({ error: auth.error }) };
+  // Gate por acción: listar = admin; mis_ventas = vendedor + admin.
+  const auth = verifyAdminAuth(event, accion === 'mis_ventas' ? ROLES_VENTAS : ROLES_ADMIN);
+  if (!auth.valid) return json(auth.status, { error: auth.error });
 
   const env = readEnv();
-  if (env.error) return { statusCode: 500, headers, body: JSON.stringify({ error: env.error }) };
+  if (env.error) return json(500, { error: env.error });
 
-  const sbHeaders = {
-    apikey: env.KH_SB_SERVICE,
-    Authorization: 'Bearer ' + env.KH_SB_SERVICE,
-    'Content-Type': 'application/json',
-  };
-  const base = `${env.KH_SB_URL}/rest/v1/resumen_eventos`;
+  const khHeaders = { apikey: env.KH_SB_SERVICE, Authorization: 'Bearer ' + env.KH_SB_SERVICE, 'Content-Type': 'application/json' };
 
   try {
-    const r = await fetch(`${base}?select=${COLS}&order=fecha.desc&limit=50`, { headers: sbHeaders });
-    if (!r.ok) {
-      const detail = await r.text();
-      return { statusCode: 502, headers, body: JSON.stringify({ error: 'KH rechazó la consulta', detail }) };
+    // ── listar (finanzas por evento) — INTACTO ────────────────────────────
+    if (accion === 'listar') {
+      const r = await fetch(`${env.KH_SB_URL}/rest/v1/resumen_eventos?select=${COLS}&order=fecha.desc&limit=50`, { headers: khHeaders });
+      if (!r.ok) return json(502, { error: 'KH rechazó la consulta', detail: await r.text() });
+      const eventos = await r.json();
+      return json(200, { ok: true, eventos: Array.isArray(eventos) ? eventos : [] });
     }
-    const eventos = await r.json();
-    return { statusCode: 200, headers, body: JSON.stringify({ ok: true, eventos: Array.isArray(eventos) ? eventos : [] }) };
+
+    // ── mis_ventas (VENDEDORES F3) ────────────────────────────────────────
+    if (!env.PORTAL_SB_URL || !env.PORTAL_SB_SERVICE) return json(500, { error: 'Faltan env vars Portal (PORTAL_SUPABASE_URL/SERVICE_KEY)' });
+    const portalHeaders = { apikey: env.PORTAL_SB_SERVICE, Authorization: 'Bearer ' + env.PORTAL_SB_SERVICE };
+
+    const esAdmin = ROLES_ADMIN.includes(auth.user.rol);
+    const sp = new URLSearchParams();
+    sp.set('select', VENTA_COLS);
+    if (esAdmin) {
+      sp.append('vendedor_id', 'not.is.null');           // admin: TODAS las de vendedor
+    } else {
+      sp.append('vendedor_id', `eq.${auth.user.id}`);    // vendedor: SOLO las suyas (del JWT)
+    }
+    sp.set('order', 'created_at.desc');
+    sp.set('limit', '200');
+
+    const vr = await fetch(`${env.PORTAL_SB_URL}/rest/v1/solicitudes_tour?${sp.toString()}`, { headers: portalHeaders });
+    if (!vr.ok) return json(502, { error: 'Portal rechazó la consulta', detail: await vr.text() });
+    let ventas = await vr.json();
+    ventas = Array.isArray(ventas) ? ventas : [];
+
+    // Admin: resolver el NOMBRE del vendedor (usuarios KH) por su id.
+    if (esAdmin && ventas.length) {
+      const ids = [...new Set(ventas.map(v => v.vendedor_id).filter(Boolean))];
+      if (ids.length) {
+        const inList = ids.map(encodeURIComponent).join(',');
+        const ur = await fetch(`${env.KH_SB_URL}/rest/v1/usuarios?id=in.(${inList})&select=id,nombre`, { headers: khHeaders });
+        if (ur.ok) {
+          const nombrePorId = {};
+          (await ur.json().catch(() => [])).forEach(u => { if (u && u.id) nombrePorId[u.id] = u.nombre || null; });
+          ventas.forEach(v => { v.vendedor_nombre = nombrePorId[v.vendedor_id] || null; });
+        }
+      }
+    }
+
+    return json(200, { ok: true, es_admin: esAdmin, ventas });
   } catch (e) {
-    return { statusCode: 502, headers, body: JSON.stringify({ error: 'Error en admin-ventas-resumen', detail: e.message }) };
+    return json(502, { error: 'Error en admin-ventas-resumen', detail: e.message });
   }
 };
 
@@ -91,5 +126,7 @@ function readEnv() {
   if (!KH_SB_URL || !KH_SB_SERVICE) {
     return { error: 'Faltan env vars KH (SUPABASE_URL_KAMEHOUSE/SERVICE_KEY_KAMEHOUSE)' };
   }
-  return { KH_SB_URL, KH_SB_SERVICE };
+  const PORTAL_SB_URL = process.env.PORTAL_SUPABASE_URL;
+  const PORTAL_SB_SERVICE = process.env.PORTAL_SUPABASE_SERVICE_KEY;
+  return { KH_SB_URL, KH_SB_SERVICE, PORTAL_SB_URL, PORTAL_SB_SERVICE };
 }

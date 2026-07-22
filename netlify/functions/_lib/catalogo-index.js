@@ -95,6 +95,25 @@ async function fetchCatalogo() {
   }
 }
 
+// Cache del EV crudo (array de eventos tal cual, con zonas/precios/sep/hotel).
+let _cacheRaw = { ts: 0, ev: null };
+
+// Devuelve el array EV CRUDO (los objetos de evento completos, con zonas, precios,
+// sep, hotel, etc.) — fuente única para quien necesite los PRECIOS de venta
+// (vendedores). Best-effort: NUNCA lanza; null si no se puede leer. Cache propio
+// (misma TTL que el catálogo curado).
+async function fetchEventosRaw() {
+  if (_cacheRaw.ev && (Date.now() - _cacheRaw.ts) < TTL_MS) return _cacheRaw.ev;
+  try {
+    const ev = await fetchEV();
+    if (!Array.isArray(ev)) return null;
+    _cacheRaw = { ts: Date.now(), ev };
+    return ev;
+  } catch (e) {
+    return null;
+  }
+}
+
 // ----- copiado de eventos-meta-sync-cron (mismo approach, sin tocar el cron) -----
 
 async function fetchEV() {
@@ -144,4 +163,4 @@ function parseEV(html) {
   throw new Error('EV: demasiados globals sin resolver');
 }
 
-module.exports = { fetchCatalogo, cuentaParaPaquete };
+module.exports = { fetchCatalogo, cuentaParaPaquete, fetchEventosRaw };

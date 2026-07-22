@@ -11,8 +11,9 @@
 //   fetchCatalogo() → { [slug]: { nombre, venue, ciudad, ds, multifecha:[{idx,lbl,ds,noches}],
 //                                 banco, bancoCheap } }  o null (BEST-EFFORT).
 //   cuentaParaPaquete(ev, paquete) → { nombre, clabe, tarjeta, titular } — MISMA
-//                     regla que getBanco() del index (cheap→Banamex, ride→BBVA,
-//                     plus/stay→ev.banco||BBVA). Las constantes se replican aquí.
+//                     regla que getBanco() del index: cheap→Banamex (SIEMPRE),
+//                     ride/plus/stay→ev.banco||BANCO_DEFAULT (BBVA). Las constantes
+//                     se replican aquí.
 //
 // El transporte solo usa ds/multifecha; los campos extra (nombre/venue/banco) son
 // ADITIVOS y no cambian esa forma. Para poder devolver el banco real, el parseo
@@ -47,12 +48,12 @@ function _ciudadDeVenue(v) {
   return i >= 0 ? s.slice(i + 1).trim() : null;
 }
 
-// MISMA regla que getBanco() del index: cheap→Banamex, ride→BBVA, plus/stay→ev.banco||BBVA.
-// `ev` es la entrada del catálogo (con .banco ya resuelto) o cualquier objeto con .banco.
+// MISMA regla que getBanco() del index: cheap→Banamex (SIEMPRE); ride/plus/stay
+// siguen el banco del evento → ev.banco||BANCO_DEFAULT (BBVA). `ev` es la entrada
+// del catálogo (con .banco ya resuelto) o cualquier objeto con .banco.
 function cuentaParaPaquete(ev, paquete) {
   const p = String(paquete || '').toLowerCase();
   if (p === 'cheap') return _cuenta(BANCO_HEY);
-  if (p === 'ride')  return _cuenta(BANCO_DEFAULT);
   return _cuenta((ev && ev.banco) || BANCO_DEFAULT);
 }
 

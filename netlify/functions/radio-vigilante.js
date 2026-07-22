@@ -23,14 +23,17 @@
 //       de ultimo_aviso SOLO se escribe si el correo salió (si Resend falla, se
 //       reintenta a la corrida siguiente).
 //
-// Correo: Resend (RESEND_API_KEY existente) con el remitente del dominio, vía
-// aplicarModoPrueba como todos los emisores. Destinatario: hcgcobos@gmail.com.
+// Correo: Resend (RESEND_API_KEY existente) con el remitente del dominio.
+// ⚠️ EXCEPCIÓN AL MODO PRUEBA (decisión de Memo): estas son alertas de
+// EMERGENCIA de infraestructura, no correo a clientes. CORREOS_MODO vive en
+// 'prueba' en producción y así se queda — si el vigilante pasara por
+// aplicarModoPrueba, la alerta de radio caída se desviaría al buzón de
+// calibración y Memo NUNCA se enteraría. Por eso este emisor NO usa
+// correo-guard: alerta y recuperación van SIEMPRE directo a hcgcobos@gmail.com.
 //
 // Env: PORTAL_SUPABASE_URL, PORTAL_SUPABASE_SERVICE_KEY, RESEND_API_KEY (o
-// RESEND_KEY), CORREOS_MODO/CORREOS_PRUEBA_DESTINO (correo-guard).
+// RESEND_KEY).
 // =============================================================================
-
-const { aplicarModoPrueba } = require('./_lib/correo-guard');
 
 const NOWPLAYING = 'https://radio.conectareynosa.mx/api/nowplaying/radioconecta';
 const ADMIN_TO = 'hcgcobos@gmail.com';
@@ -179,15 +182,17 @@ async function enviarRecuperada(caidaDesdeISO, nowMs) {
   return enviar(ADMIN_TO, 'Radio Conecta se recuperó', html);
 }
 
-// Envío (aplica modo prueba). Fail-soft: false si no hay key o Resend rechaza.
+// Envío DIRECTO — SIN aplicarModoPrueba, a propósito (ver cabecera): alerta de
+// emergencia; con CORREOS_MODO='prueba' permanente en prod, desviarla al buzón
+// de calibración dejaría a Memo ciego ante una caída real. Fail-soft: false si
+// no hay key o Resend rechaza.
 async function enviar(to, subject, html) {
   const KEY = process.env.RESEND_API_KEY || process.env.RESEND_KEY;
   if (!KEY || !to) return false;
-  const mp = aplicarModoPrueba({ to: Array.isArray(to) ? to : [to], subject });
   const r = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: { Authorization: `Bearer ${KEY}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ from: FROM_ADMIN, to: mp.to, subject: mp.subject, html }),
+    body: JSON.stringify({ from: FROM_ADMIN, to: Array.isArray(to) ? to : [to], subject, html }),
   }).catch((e) => { console.error('[radio-vigilante] Email:', e.message); return null; });
   return !!(r && r.ok);
 }

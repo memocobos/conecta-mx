@@ -110,6 +110,22 @@ exports.handler = async (event) => {
       }
     }
 
+    // 🔒 PRIVACIDAD DURA (F5a): el VENDEDOR jamás ve el desglose CHEAP. En sus
+    // ventas CHEAP, separo = comisión de Memo → se OMITE (separo/resto). Solo ve el
+    // costo final (precio_total). Para admin no se toca (conoce el modelo).
+    if (!esAdmin) {
+      ventas.forEach(v => {
+        if (String(v.paquete || '').toUpperCase() === 'CHEAP') {
+          v.monto_separo = null;
+          if (v.precio_sellado && typeof v.precio_sellado === 'object') {
+            const s = { ...v.precio_sellado };
+            delete s.separo; delete s.resto;
+            v.precio_sellado = s;
+          }
+        }
+      });
+    }
+
     return json(200, { ok: true, es_admin: esAdmin, ventas });
   } catch (e) {
     return json(502, { error: 'Error en admin-ventas-resumen', detail: e.message });

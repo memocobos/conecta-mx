@@ -13836,7 +13836,7 @@ function _spRenderPlanPorLugar(solicitudId, pagos) {
     const puedeTraspasar = lg && Number(num) >= 2 && (estado === 'activo' || estado === 'baja');
     const lgSafe = lg ? _spEscape(lg.id) : '';
     const btnTraspaso = puedeTraspasar
-      ? `<button class="btn btn-ghost btn-sm" style="font-size:10px" onclick="_spToggleTraspaso('${lgSafe}')">⇄ Traspasar</button>`
+      ? `<button class="btn btn-ghost btn-sm" style="font-size:10px" onclick="_spToggleTraspaso('${lgSafe}','${solSafe}')">⇄ Traspasar</button>`
       : '';
     const inpTras = 'width:100%;padding:7px 8px;margin-bottom:6px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;color:var(--ink);font-size:12px';
     const formTraspaso = puedeTraspasar
@@ -13845,6 +13845,10 @@ function _spRenderPlanPorLugar(solicitudId, pagos) {
           <input id="sp-tras-nombre-${lgSafe}" type="text" maxlength="120" placeholder="Nombre del nuevo ocupante" style="${inpTras}">
           <input id="sp-tras-correo-${lgSafe}" type="email" placeholder="Correo del nuevo ocupante" style="${inpTras}">
           <input id="sp-tras-motivo-${lgSafe}" type="text" maxlength="500" placeholder="Motivo (opcional)" style="${inpTras}">
+          <div id="sp-tras-cargo-${lgSafe}" style="font-size:11px;margin:2px 0 8px;color:var(--ts)">Calculando cargo…</div>
+          <label id="sp-tras-forzar-wrap-${lgSafe}" style="display:none;font-size:11px;color:var(--orange);margin-bottom:8px;cursor:pointer;align-items:center;gap:6px">
+            <input type="checkbox" id="sp-tras-forzar-${lgSafe}" style="vertical-align:-1px"> Aplicar cargo de $350
+          </label>
           <div style="display:flex;gap:8px;justify-content:flex-end">
             <button class="btn btn-ghost btn-sm" style="font-size:11px" onclick="_spToggleTraspaso('${lgSafe}')">Cancelar</button>
             <button class="btn btn-primary btn-sm" style="font-size:11px" onclick="traspasarLugarSP('${lgSafe}','${solSafe}')">Confirmar traspaso</button>
@@ -13898,10 +13902,63 @@ async function darBajaLugarSP(lugarId, solicitudId){
   }
 }
 
-// [F5-t2] Abre/cierra el mini-form de traspaso de un lugar.
-function _spToggleTraspaso(lugarId){
+// [F5-t2] Abre/cierra el mini-form de traspaso de un lugar. Al ABRIR, calcula el
+// cargo por traspaso (Gancho 1) y lo muestra antes de confirmar.
+function _spToggleTraspaso(lugarId, solicitudId){
   const f = document.getElementById('sp-traspaso-' + lugarId);
-  if (f) f.style.display = (f.style.display === 'none' ? '' : 'none');
+  if (!f) return;
+  const abriendo = (f.style.display === 'none');
+  f.style.display = abriendo ? '' : 'none';
+  if (abriendo && solicitudId) _spPintarCargoTraspaso(lugarId, solicitudId);
+}
+
+// [Gancho 1] Días hasta la PRIMERA fecha del evento (ds), hoy en hora MX (patrón
+// en-CA/Monterrey del cron F4). null si no se puede parsear.
+function _spDiasHastaEvento(dsISO){
+  const hoy = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Monterrey' });
+  const a = Date.parse(String(dsISO).slice(0,10) + 'T00:00:00Z');
+  const b = Date.parse(hoy + 'T00:00:00Z');
+  if (isNaN(a) || isNaN(b)) return null;
+  return Math.round((a - b) / 86400000);
+}
+
+// [Gancho 1] Días hasta el evento de una solicitud (best-effort). Usa el evento_id
+// del cache sp + el ds del catálogo (EV de index.html, cacheado). Multifecha: slug
+// base. null si no se puede calcular → el backend decide (o Bulma con la casilla).
+async function _spCalcDiasTraspaso(solicitudId){
+  try {
+    const sol = (_spCache || []).find(x => x && x.id === solicitudId);
+    const evId = sol && sol.evento_id;
+    if (!evId) return null;
+    const ev = (await _fetchEVFromIndex() || []).find(e => e && e.id === String(evId).split('#')[0]);
+    if (!ev || !ev.ds) return null;
+    return _spDiasHastaEvento(ev.ds);
+  } catch (e) { return null; }
+}
+
+// [Gancho 1] Pinta la consecuencia del cargo en el mini-form + muestra la casilla
+// manual solo cuando NO se pudo calcular los días.
+async function _spPintarCargoTraspaso(lugarId, solicitudId){
+  const box = document.getElementById('sp-tras-cargo-' + lugarId);
+  const wrap = document.getElementById('sp-tras-forzar-wrap-' + lugarId);
+  const chk = document.getElementById('sp-tras-forzar-' + lugarId);
+  if (!box) return;
+  const dias = await _spCalcDiasTraspaso(solicitudId);
+  if (dias == null) {
+    box.innerHTML = '⚠️ No pude calcular los días del evento; decide tú si aplicar el cargo.';
+    box.style.color = 'var(--orange)';
+    if (wrap) wrap.style.display = 'flex';
+  } else {
+    if (wrap) wrap.style.display = 'none';
+    if (chk) chk.checked = false;
+    if (dias <= 5) {
+      box.innerHTML = `⚠️ Evento en <b>${dias} día${dias === 1 ? '' : 's'}</b> → se sumará un <b>cargo de $350</b> al plan.`;
+      box.style.color = 'var(--orange)';
+    } else {
+      box.innerHTML = `Sin cargo (faltan <b>${dias} días</b> para el evento).`;
+      box.style.color = 'var(--ts)';
+    }
+  }
 }
 
 // [F5-t2] Traspasa el lugar a otra persona (Bulma). Conserva lo abonado y lo
@@ -13919,12 +13976,23 @@ async function traspasarLugarSP(lugarId, solicitudId){
   const pagosLugar = (_spPlanCache[solicitudId] || []).filter(p => p.lugar_id === lugarId);
   const abonado = pagosLugar.filter(p => p.estado === 'pagado').reduce((a, p) => a + (Number(p.monto_pagado ?? p.monto) || 0), 0);
   const abonadoTxt = abonado ? ` (${_spFmtMxn(abonado)} abonado)` : '';
-  if (!confirm(`¿Traspasar el lugar #${num} a ${nombre}? Conserva lo abonado${abonadoTxt} y lo restante; al nuevo le llega su invitación por correo.`)) return;
+
+  // [Gancho 1] Consecuencia del cargo ANTES de confirmar. La casilla manual solo
+  // fuerza el cargo cuando los días son indeterminados.
+  const dias = await _spCalcDiasTraspaso(solicitudId);
+  const forzar = !!((document.getElementById('sp-tras-forzar-' + lugarId) || {}).checked);
+  let cargoMsg;
+  if (dias == null) cargoMsg = forzar
+    ? '\n\n⚠️ Se aplicará un cargo de $350 (forzado manual).'
+    : '\n\n(No se pudieron calcular los días; el sistema decidirá el cargo.)';
+  else if (dias <= 5) cargoMsg = `\n\n⚠️ Evento en ${dias} día(s): se sumará un cargo de $350 al plan.`;
+  else cargoMsg = `\n\nSin cargo (faltan ${dias} días para el evento).`;
+  if (!confirm(`¿Traspasar el lugar #${num} a ${nombre}? Conserva lo abonado${abonadoTxt} y lo restante; al nuevo le llega su invitación por correo.${cargoMsg}`)) return;
 
   try {
     const r = await khAdminFetch('/.netlify/functions/admin-lugar-traspasar', {
       method: 'POST',
-      body: JSON.stringify({ lugar_id: lugarId, nombre, correo, motivo: motivo || undefined }),
+      body: JSON.stringify({ lugar_id: lugarId, nombre, correo, motivo: motivo || undefined, forzar_cargo: forzar || undefined }),
     });
     const j = await r.json().catch(() => ({}));
     if (!r.ok || j.ok === false) throw new Error(j.error || ('admin-lugar-traspasar ' + r.status));
@@ -13932,6 +14000,14 @@ async function traspasarLugarSP(lugarId, solicitudId){
     if (j.revivido) partes.push('lugar revivido');
     if (j.cuotas_reactivadas) partes.push(`${j.cuotas_reactivadas} cuota(s) reactivada(s)`);
     partes.push(j.invitacion_enviada ? 'invitación enviada' : 'invitación NO salió (reenvía)');
+    // [Gancho 1] Reflejar el cargo en el toast.
+    const ct = j.cargo_traspaso;
+    if (ct) {
+      if (ct.error) partes.push('⚠️ el cargo de $350 NO se pudo sumar');
+      else if (ct.aplicado) partes.push(`cargo de $${ct.monto} sumado al plan`);
+      else if (ct.indeterminado) partes.push('sin cargo (días indeterminados)');
+      else partes.push('sin cargo');
+    }
     showToast('Lugar traspasado — ' + partes.join(' · '), j.invitacion_enviada ? 'success' : 'error');
     await _spRefrescarPlanYLista(solicitudId, undefined);
   } catch (e) {

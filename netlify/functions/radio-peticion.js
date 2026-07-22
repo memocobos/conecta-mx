@@ -7,6 +7,8 @@
 //   POST { nombre, peticion } → inserta en radio_peticiones y responde { ok:true }
 //     valida: peticion 1-120 chars (requerida); nombre máx 30 (puede ir vacío).
 //     Si no cumple → 400 { ok:false, error }.
+//   GET → { ok:true, atendidas:[{nombre,peticion}] } — últimas 8 ATENDIDAS
+//     (atendida=true), creado desc. SOLO nombre + peticion. Mismo endpoint público.
 //
 // Variables de entorno: PORTAL_SUPABASE_URL, PORTAL_SUPABASE_SERVICE_KEY.
 // =============================================================================
@@ -21,14 +23,34 @@ exports.handler = async (event) => {
   const headers = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': 'Content-Type',
-    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
     'Content-Type': 'application/json',
   };
   const json = (statusCode, payload) => ({ statusCode, headers, body: JSON.stringify(payload) });
 
   if (event.httpMethod === 'OPTIONS') return { statusCode: 200, headers, body: '' };
-  if (event.httpMethod !== 'POST') return json(405, { ok: false, error: 'Method not allowed' });
   if (!SB_URL || !SB_SERVICE) return json(500, { ok: false, error: 'Portal Supabase no configurado' });
+
+  const sbAuth = { apikey: SB_SERVICE, Authorization: 'Bearer ' + SB_SERVICE };
+
+  // GET → últimas 8 ATENDIDAS (solo nombre + peticion), creado desc. Público, igual que el POST.
+  if (event.httpMethod === 'GET') {
+    try {
+      const url = `${SB_URL}/rest/v1/radio_peticiones?atendida=eq.true&select=nombre,peticion&order=creado.desc&limit=8`;
+      const r = await fetch(url, { headers: sbAuth });
+      if (!r.ok) return json(502, { ok: false, error: 'No se pudieron leer las peticiones', detail: await r.text() });
+      const rows = await r.json();
+      const atendidas = (Array.isArray(rows) ? rows : []).map((p) => ({
+        nombre:   (p && p.nombre)   ? String(p.nombre)   : '',
+        peticion: (p && p.peticion) ? String(p.peticion) : '',
+      }));
+      return json(200, { ok: true, atendidas });
+    } catch (e) {
+      return json(502, { ok: false, error: 'Error leyendo las peticiones', detail: e.message });
+    }
+  }
+
+  if (event.httpMethod !== 'POST') return json(405, { ok: false, error: 'Method not allowed' });
 
   let body;
   try { body = JSON.parse(event.body || '{}'); }

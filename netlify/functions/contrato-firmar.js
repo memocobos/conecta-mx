@@ -32,13 +32,18 @@ function escapeHtml(s) {
     ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 }
 
-// VÍA B (F5): vigencia de coordinadores = 1 año desde la firma. 'YYYY-MM-DD' + 1
-// año, recortando el día al último del mes destino (29-feb → 28-feb en año no bisiesto).
-function _masUnAnio(iso) {
+// VIGENCIA CONFIGURABLE: 'YYYY-MM-DD' + N meses, recortando el día al último
+// del mes destino (31-ago + 6 → 28-feb; 29-feb + 12 → 28-feb en año no
+// bisiesto). Generaliza el _masUnAnio original (que era el caso meses=12).
+function _masMeses(iso, meses) {
   const [y, m, d] = String(iso).split("-").map(Number);
-  const ultimoDia = new Date(Date.UTC(y + 1, m, 0)).getUTCDate();
+  const n = Math.round(Number(meses)) || 12;
+  const totalM = (m - 1) + n;               // mes destino, base 0
+  const y2 = y + Math.floor(totalM / 12);
+  const m2 = (totalM % 12) + 1;             // base 1
+  const ultimoDia = new Date(Date.UTC(y2, m2, 0)).getUTCDate();
   const dd = Math.min(d, ultimoDia);
-  return `${y + 1}-${String(m).padStart(2, "0")}-${String(dd).padStart(2, "0")}`;
+  return `${y2}-${String(m2).padStart(2, "0")}-${String(dd).padStart(2, "0")}`;
 }
 
 // Acepta data URL `data:image/<sub>;base64,XYZ` con cualquier subtipo image/*
@@ -193,6 +198,7 @@ exports.handler = async function (event) {
   // plantillas ignoran datos_firma del cliente (coordinador jala del perfil KH
   // server-side; giveaway es tuerca aparte).
   const esCreadora = !contrato.plantilla || contrato.plantilla === "creadora";
+  const esTeam = contrato.plantilla === "creadora_team";
   let datosFirma = null;
   if (esCreadora) {
     const df = (data.datos_firma && typeof data.datos_firma === "object") ? data.datos_firma : {};
@@ -204,6 +210,50 @@ exports.handler = async function (event) {
     if (!emNom) return bad(400, "Falta el nombre de tu contacto de emergencia");
     if (!emTel) return bad(400, "Falta el teléfono de tu contacto de emergencia");
     datosFirma = { fecha_nacimiento: fnac, emergencia: { nombre: emNom, telefono: emTel } };
+  }
+
+  // CREADORA_TEAM: captura al firmar = datos del PROEMIO (si no vienen ya en
+  // datos, capturados a mano o del perfil) + ANEXO C (Declaración Discreta)
+  // OBLIGATORIO. Todo se valida ANTES de subir el INE y se CONGELA en datos.
+  // El Anexo C es CONFIDENCIAL: se guarda aquí y solo lo sirve admin-contratos
+  // (contrato-obtener lo PODA de la respuesta pública).
+  if (esTeam) {
+    const df = (data.datos_firma && typeof data.datos_firma === "object") ? data.datos_firma : {};
+    const ya = (contrato.datos && typeof contrato.datos === "object") ? contrato.datos : {};
+    const t = (v, max) => String(v || "").trim().slice(0, max);
+    const origen = ya.origen || t(df.origen, 120);
+    const domicilio = ya.domicilio || t(df.domicilio, 200);
+    const ciudad_estado = ya.ciudad_estado || t(df.ciudad_estado, 120);
+    if (!origen) return bad(400, "Falta tu lugar de origen");
+    if (!domicilio) return bad(400, "Falta tu domicilio");
+    if (!ciudad_estado) return bad(400, "Falta tu ciudad y estado");
+    const ax = (df.anexo_c && typeof df.anexo_c === "object") ? df.anexo_c : {};
+    const cuentas = t(ax.cuentas_previas, 10);
+    const estado_actual = t(ax.estado_actual, 20);
+    const material = t(ax.material_previo, 10);
+    const intencion = t(ax.intencion, 20);
+    if (!["no", "si"].includes(cuentas)) return bad(400, "Anexo C: responde si has tenido cuentas de contenido adulto");
+    const plataformas = t(ax.plataformas, 300);
+    if (cuentas === "si" && !plataformas) return bad(400, "Anexo C: especifica plataforma y estatus");
+    if (!["nunca", "baja", "vigente_sin_uso", "vigente_en_uso"].includes(estado_actual)) return bad(400, "Anexo C: indica el estado actual");
+    if (!["no", "si"].includes(material)) return bad(400, "Anexo C: responde si existe material previo");
+    const material_desc = t(ax.material_desc, 500);
+    if (material === "si" && !material_desc) return bad(400, "Anexo C: describe de forma general el material previo");
+    if (!["no_reactivar", "acuerdo"].includes(intencion)) return bad(400, "Anexo C: indica tu intención futura");
+    const intencion_det = t(ax.intencion_det, 300);
+    if (intencion === "acuerdo" && !intencion_det) return bad(400, "Anexo C: detalla el acuerdo especial requerido");
+    datosFirma = {
+      origen, domicilio, ciudad_estado,
+      anexo_c: {
+        cuentas_previas: cuentas,
+        plataformas: cuentas === "si" ? plataformas : null,
+        estado_actual,
+        material_previo: material,
+        material_desc: material === "si" ? material_desc : null,
+        intencion,
+        intencion_det: intencion === "acuerdo" ? intencion_det : null,
+      },
+    };
   }
 
   // Subir INE frente + reverso. Path: <token>/frente.<ext>, <token>/reverso.<ext>.
@@ -233,10 +283,15 @@ exports.handler = async function (event) {
     firmado_at: new Date().toISOString(),
     ip_firma: ip,
   };
-  if (contrato.plantilla === "coordinador") {
+  if (contrato.plantilla === "coordinador" || esTeam) {
+    // VIGENCIA CONFIGURABLE: fin = inicio + vigencia_meses. Legacy retrocompatible:
+    // coordinador con vigencia_meses null → 12 (idéntico al _masUnAnio de siempre);
+    // team null → 3. Lo YA FIRMADO nunca pasa por aquí (409 arriba) — su vigencia
+    // sellada no se recalcula.
     const hoyMX = new Date().toLocaleDateString("en-CA", { timeZone: "America/Monterrey" });
+    const meses = Math.round(Number(contrato.vigencia_meses)) || (esTeam ? 3 : 12);
     patch.vigencia_inicio = hoyMX;
-    patch.vigencia_fin = _masUnAnio(hoyMX);
+    patch.vigencia_fin = _masMeses(hoyMX, meses);
     // VÍA B: CONGELAR el perfil KH en datos jsonb AL FIRMAR (snapshot, como
     // todo lo sellado). Best-effort: correo que no casa o perfil incompleto →
     // datos como estaban (líneas en blanco), la firma jamás se rompe. Lo ya
@@ -248,8 +303,9 @@ exports.handler = async function (event) {
       console.warn("[contrato-firmar] snapshot perfil coordinador falló (best-effort):", e.message);
     }
   }
-  // Captura de la creadora → congelada en datos jsonb (lo capturado gana).
-  if (datosFirma) patch.datos = { ...(contrato.datos || {}), ...datosFirma };
+  // Captura de la creadora / team → congelada en datos jsonb SOBRE lo que ya
+  // haya (incluido el snapshot del perfil de arriba; lo capturado gana).
+  if (datosFirma) patch.datos = { ...(contrato.datos || {}), ...(patch.datos || {}), ...datosFirma };
 
   // Actualizar registro.
   try {
@@ -306,6 +362,9 @@ exports.handler = async function (event) {
     body: JSON.stringify({ ok: true, asignacion }),
   };
 };
+
+// Helper puro exportado para el arnés (patrón admin-lugar-traspasar).
+exports._masMeses = _masMeses;
 
 // ─── Snapshot del perfil KH del coordinador ───────────────────────────
 // Fusiona usuarios(correo) → {fecha_nacimiento, emergencia:{nombre,telefono}}

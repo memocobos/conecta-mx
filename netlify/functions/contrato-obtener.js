@@ -101,12 +101,19 @@ exports.handler = async function (event) {
   // casa, perfil incompleto o error → datos como están (líneas en blanco de
   // hoy, nunca truena). Lo ya presente en datos (capturado a mano) SIEMPRE gana.
   let datos = row.datos || null;
-  if (row.plantilla === "coordinador" && row.estado !== "firmado") {
+  if ((row.plantilla === "coordinador" || row.plantilla === "creadora_team") && row.estado !== "firmado") {
     try {
       datos = await _fusionarPerfilCoordinador(datos, row.creador_email);
     } catch (e) {
       console.warn("[contrato-obtener] perfil coordinador falló (best-effort):", e.message);
     }
+  }
+
+  // 🔒 ANEXO C (Declaración Discreta) es CONFIDENCIAL: JAMÁS viaja por este
+  // endpoint público (por token). Solo admin-contratos (JWT admin) lo sirve.
+  if (datos && typeof datos === "object" && "anexo_c" in datos) {
+    const { anexo_c, ...resto } = datos;
+    datos = Object.keys(resto).length ? resto : null;
   }
 
   // Firmar URLs del INE si está firmado y existen los paths.
@@ -141,6 +148,13 @@ exports.handler = async function (event) {
         datos,
         vigencia_inicio: row.vigencia_inicio || null,
         vigencia_fin: row.vigencia_fin || null,
+        // VIGENCIA CONFIGURABLE (coordinador/team): meses elegidos por Memo.
+        vigencia_meses: row.vigencia_meses || null,
+        // 🔒 {{DOMICILIO_EMPRESA}} solo para creadora_team, desde env — JAMÁS
+        // en el repo. Ausente → null y la página pinta "____________".
+        domicilio_empresa: row.plantilla === 'creadora_team'
+          ? (process.env.CONTRATO_DOMICILIO_EMPRESA || null)
+          : undefined,
         estado: row.estado,
         firma_data: row.estado === "firmado" ? row.firma_data : null,
         firmado_at: row.firmado_at,

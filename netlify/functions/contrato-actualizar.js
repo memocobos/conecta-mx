@@ -110,6 +110,14 @@ exports.handler = async function (event) {
     if (!v) return bad(400, "Lista de expectativas vacía");
     patch.expectativas = v;
   }
+  // VIGENCIA CONFIGURABLE (aditivo): editable mientras el contrato esté
+  // pendiente (el 409 de arriba protege lo firmado — la vigencia sellada de un
+  // contrato firmado jamás se recalcula). Solo la usan coordinador/creadora_team.
+  if (data.vigencia_meses !== undefined && data.vigencia_meses !== null && data.vigencia_meses !== "") {
+    const v = Math.round(Number(data.vigencia_meses));
+    if (![3, 6, 9, 12].includes(v)) return bad(400, "Vigencia inválida (3, 6, 9 o 12 meses)");
+    patch.vigencia_meses = v;
+  }
 
   if (!Object.keys(patch).length) return bad(400, "Nada que actualizar");
 

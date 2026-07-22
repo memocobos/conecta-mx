@@ -432,18 +432,28 @@ const CLAUSULAS = [
 function _fillBlank(v) {
   return (v == null || String(v).trim() === '') ? '__________' : escapeHtml(String(v));
 }
+// VIGENCIA CONFIGURABLE: meses → "seis (6)" (letra y número, como pide el
+// texto oficial). Valores fuera del catálogo caen a "N (N)".
+function _vigenciaLetra(n) {
+  const map = { 3: 'tres (3)', 6: 'seis (6)', 9: 'nueve (9)', 12: 'doce (12)' };
+  return map[n] || (n + ' (' + n + ')');
+}
 function _viaBCtx(c, opts) {
   const firmado = opts.estado === 'firmado';
   const d = c.datos || {};
   const em = (d.emergencia && typeof d.emergencia === 'object') ? d.emergencia : {};
+  // Meses reales del contrato (coordinador legacy sin vigencia_meses → 12).
+  const vigMeses = Math.round(Number(c.vigencia_meses)) || 12;
   return {
     nombre: escapeHtml(c.creador_nombre || ''),
     fnac: _fillBlank(d.fecha_nacimiento),
+    vigMeses,
+    vigDura: _vigenciaLetra(vigMeses).toUpperCase() + ' MESES',
     firmaTxt: firmado ? escapeHtml(fmtFechaLarga((c.vigencia_inicio || '').slice(0,10))) : 'tu firma',
-    finTxt:   firmado ? escapeHtml(fmtFechaLarga((c.vigencia_fin || '').slice(0,10)))    : 'un (1) año después',
+    finTxt:   firmado ? escapeHtml(fmtFechaLarga((c.vigencia_fin || '').slice(0,10)))    : `${_vigenciaLetra(vigMeses)} meses después`,
     vigResumen: firmado
       ? `del ${escapeHtml(fmtFechaLarga((c.vigencia_inicio||'').slice(0,10)))} al ${escapeHtml(fmtFechaLarga((c.vigencia_fin||'').slice(0,10)))}`
-      : '1 (un) año a partir de tu firma',
+      : `${_vigenciaLetra(vigMeses)} meses a partir de tu firma`,
     emNom: _fillBlank(em.nombre),
     emTel: _fillBlank(em.telefono),
     emPar: _fillBlank(em.parentesco),
@@ -476,7 +486,7 @@ const CLAUSULAS_COORDINADOR = [
   { ord:'NOVENA', t:'Respeto, confidencialidad y exclusividad', cuerpo:()=>`<p>Trato respetuoso y cordial con viajeros, choferes y compañeros en todo momento — el acoso, la discriminación y la violencia son falta grave. Toda la información interna (estrategias, precios, bases de datos, logística, listas de viajeros, documentación) es <b>CONFIDENCIAL</b> y no puede divulgarse ni usarse para fines ajenos, obligación que SOBREVIVE a la terminación del contrato. Durante la vigencia, el coordinador no colaborará con agencias competidoras sin autorización escrita; si no puede asistir a un evento confirmado, propondrá suplente sujeto a aprobación previa.</p>` },
   { ord:'DÉCIMA', t:'Faltas graves y terminación', cuerpo:()=>`<p>Son causa de terminación inmediata y pérdida de derechos: no presentarse a un viaje confirmado; abandonar un tour sin autorización; faltar al respeto a viajeros o compañeros; afectar la imagen o reputación de Conecta; y cualquiera de las conductas de la cláusula Octava. La terminación no genera indemnización ni pago adicional. En las fiestas y eventos internos aplica la misma conducta profesional que en los viajes oficiales.</p>` },
   { ord:'DÉCIMA PRIMERA', t:'Emergencia e identidad', cuerpo:x=>`<p>El coordinador designa contacto de emergencia: <b>${x.emNom}</b> (${x.emTel}, ${x.emPar}), asume los riesgos del viaje en los términos de la cláusula Décima del contrato de viajero, autoriza primeros auxilios y atención médica de ser necesario, y anexa su INE como evidencia de identidad.</p>` },
-  { ord:'DÉCIMA SEGUNDA', t:'Vigencia anual y formalidades', cuerpo:x=>`<p>Este contrato dura <b>1 (UN) AÑO</b> desde su firma (${x.firmaTxt} → ${x.finTxt}); su renovación requiere nueva firma. Cualquiera de las partes puede terminarlo antes con aviso escrito de 15 días naturales. Las modificaciones solo valen por escrito; los acuerdos verbales no tienen validez. Las notificaciones por los canales oficiales (correo institucional o WhatsApp autorizado) son legalmente válidas. Jurisdicción: Monterrey, Nuevo León. La firma digital tiene la misma validez que la autógrafa.</p>` },
+  { ord:'DÉCIMA SEGUNDA', t:'Vigencia y formalidades', cuerpo:x=>`<p>Este contrato dura <b>${x.vigDura}</b> desde su firma (${x.firmaTxt} → ${x.finTxt}); su renovación requiere nueva firma. Cualquiera de las partes puede terminarlo antes con aviso escrito de 15 días naturales. Las modificaciones solo valen por escrito; los acuerdos verbales no tienen validez. Las notificaciones por los canales oficiales (correo institucional o WhatsApp autorizado) son legalmente válidas. Jurisdicción: Monterrey, Nuevo León. La firma digital tiene la misma validez que la autógrafa.</p>` },
 ];
 
 // Cláusulas del GIVEAWAY (6).
@@ -500,6 +510,404 @@ function _clausulaViaB(cl, x) {
       <h2><span class="num">${escapeHtml(cl.ord)}</span>${escapeHtml(cl.t)}</h2>
       ${cl.cuerpo(x)}
     </section>`;
+}
+
+// ── CREADORA_TEAM: texto FIEL de contrato-team-v1-TEXTO-OFICIAL.md v1.1 ──────
+// 18 cláusulas (14.4 = 3 strikes, NUEVA de Memo) + proemio + declaraciones +
+// Anexo C (CONFIDENCIAL — jamás en este render público; se llena al firmar y
+// solo lo ve admin en Kamehouse). {{VIGENCIA_MESES}} → x.vigTeam (letra y
+// número); {{DOMICILIO_EMPRESA}} → x.domEmpresa (viene del server desde env,
+// jamás del repo).
+const CLAUSULAS_TEAM = [
+  { ord:'PRIMERA', t:'Objeto, alcance del rol y naturaleza de la relación', cuerpo:x=>`
+<p><b>1.1 Objeto.</b> LA EMPRESA contrata los servicios de LA CREADORA, quien acepta, para desempeñarse como "CREADORA DE CONTENIDO E IMAGEN OFICIAL DE CONECTA REYNOSA", obligándose a generar contenido audiovisual, participar en actividades de difusión y representación pública de la marca, y colaborar en campañas y dinámicas, todo ello a cambio de un intercambio de beneficios descrito en este CONTRATO.</p>
+<p><b>1.2 Alcance del rol (Imagen Oficial).</b> Además de crear contenido, LA CREADORA asume una función de representación pública que incluye, de manera enunciativa mas no limitativa:</p>
+<ol style="list-style:lower-alpha">
+<li>Aparecer frente a cámara en contenidos de LA EMPRESA (reels, TikToks, historias, cápsulas, anuncios, entrevistas, dinámicas, trends).</li>
+<li>Realizar "street content" (salir a la calle a preguntar, dinámicas con público, retos, recomendaciones, top 5, outfits, canciones, tips de compra, tips de viaje, experiencias Conecta, etc.), cuando sea solicitado y planeado.</li>
+<li>Asistir y participar en eventos, conciertos, festivales, viajes, reuniones creativas, llamados de grabación, activaciones y dinámicas que LA EMPRESA programe, conforme a las reglas de asignación y aviso establecidas en este CONTRATO.</li>
+<li>Representar a LA EMPRESA con un tono alegre, humano, cordial y profesional, evitando expresiones, actitudes o contenidos que puedan afectar la reputación de la marca.</li>
+<li>Aceptar aparecer en contenido grupal del equipo cuando sea requerido por LA EMPRESA (salvo causas de fuerza mayor debidamente justificadas).</li>
+</ol>
+<p><b>1.3 Naturaleza de la relación.</b> LAS PARTES acuerdan que este CONTRATO es de prestación de servicios por intercambio y no constituye relación laboral; por lo tanto, no genera prestaciones laborales. LA CREADORA organiza su tiempo de manera flexible, obligándose al cumplimiento por entregables y asistencias conforme a este documento.</p>` },
+  { ord:'SEGUNDA', t:'Vigencia, periodo de prueba y posible renovación', cuerpo:x=>`
+<p><b>2.1 Vigencia.</b> El presente CONTRATO tendrá una vigencia de <b>${x.vigTeam}</b> meses, contados a partir de la fecha de firma.</p>
+<p><b>2.2 Periodo de prueba.</b> LAS PARTES reconocen que este período constituye un periodo de prueba para evaluar desempeño, cumplimiento, resultados, métricas, compatibilidad con la marca, y estándares de conducta e imagen.</p>
+<p><b>2.3 Renovación.</b> Al concluir la vigencia, LAS PARTES podrán, si así lo desean, celebrar un segundo contrato por el resto del año, pudiendo incluir un esquema mixto (intercambio + pago por evento) u otras condiciones. La renovación no es automática.</p>` },
+  { ord:'TERCERA', t:'Entregables semanales, organización y flujo de trabajo', cuerpo:()=>`
+<p><b>3.1 Entregables mínimos.</b> LA CREADORA deberá entregar mínimo obligatorio de dos (2) a tres (3) videos por semana.</p>
+<p><b>3.2 Organización semanal.</b></p>
+<ol style="list-style:lower-alpha">
+<li>Planeación: Se realizará junta los lunes (presencial o virtual) para acordar ideas, guiones, formato, enfoque y objetivos de la semana.</li>
+<li>Producción: Se ejecutará de martes a domingo, con flexibilidad de horarios, siempre que se cumpla el mínimo de entregables y los lineamientos.</li>
+<li>Semanas sin evento: En semanas sin viajes/eventos, el contenido se enfocará en eventos próximos, artistas por venir, recomendaciones, tendencias, tips, top 5, outfits, dinámicas, etc., según lo defina LA EMPRESA.</li>
+</ol>
+<p><b>3.3 Propuesta de ideas.</b> LA CREADORA presentará previamente ideas/temas para aprobación. La producción se realizará únicamente con ideas alineadas y aprobadas por LA EMPRESA.</p>
+<p><b>3.4 Publicación sujeta a aprobación.</b> Queda estrictamente prohibido publicar material relacionado con LA EMPRESA, sus eventos o beneficios sin autorización previa (ver Cláusula Sexta).</p>` },
+  { ord:'CUARTA', t:'Requisitos técnicos, calidad, formato y estándares', cuerpo:()=>`
+<p><b>4.1 Calidad mínima obligatoria.</b></p>
+<ol style="list-style:lower-alpha">
+<li>Video: HD o 4K.</li>
+<li>Audio: claro, estable, sin saturación; voz comprensible.</li>
+<li>Imagen: buena iluminación, encuadre cuidado, estabilidad (ideal gimbal o estabilización), sin filtros que degraden la calidad.</li>
+</ol>
+<p><b>4.2 Formato.</b></p>
+<ol style="list-style:lower-alpha">
+<li>Formato principal: Vertical 1080 x 1920 (9:16) para Reels/TikTok/Shorts.</li>
+<li>Compresión: evitar compresión excesiva; entregar archivo nativo o exportación de alta calidad.</li>
+<li>Duración: según tendencia y objetivo; cuando sea campaña, LA EMPRESA definirá duración mínima/máxima.</li>
+</ol>
+<p><b>4.3 Lineamientos de grabación.</b></p>
+<ol style="list-style:lower-alpha">
+<li>Evitar contraluces extremos y espacios oscuros sin apoyo de luz.</li>
+<li>Evitar ruido ambiente que impida entender el mensaje.</li>
+<li>Cuidar dicción y tono; lenguaje respetuoso, sin groserías si no es parte aprobada del guion.</li>
+<li>Mostrar experiencia: no grabar únicamente al artista; incluir ambiente, logística, trayecto, convivencia, emociones, "behind the scenes", kits, etc., de forma creativa, positiva y auténtica.</li>
+</ol>
+<p><b>4.4 Estándar de marca.</b> LA EMPRESA podrá proporcionar lineamientos de marca (tono, estilo, frases, hashtags, formatos, "do's & don'ts"). LA CREADORA se obliga a respetarlos.</p>` },
+  { ord:'QUINTA', t:'Beneficios del intercambio', cuerpo:()=>`
+<p><b>5.1 Naturaleza del intercambio.</b> Este CONTRATO es 100% por intercambio: LA CREADORA recibe beneficios/logística para asistir a eventos y producir contenido, a cambio de los servicios de creación y representación.</p>
+<p><b>5.2 Beneficios por evento asignado.</b> Según el evento y logística, LA EMPRESA podrá otorgar:</p>
+<ol style="list-style:lower-alpha">
+<li>Transporte redondo aéreo o terrestre (según se requiera).</li>
+<li>Hospedaje por las noches necesarias.</li>
+<li>Traslados relacionados con el evento (según aplique).</li>
+<li>Kit Conecta (según el evento).</li>
+<li>Boleto/acceso al evento.</li>
+</ol>
+<p><b>5.3 Asignación de zona del boleto.</b> La zona/tipo de acceso será asignada por LA EMPRESA en función de desempeño, ventas, alcance, material emitido, resultados y necesidades operativas.</p>
+<p><b>5.4 Acompañante (regla clara).</b></p>
+<ol style="list-style:lower-alpha">
+<li>LA CREADORA podrá llevar acompañante únicamente si LA EMPRESA lo autoriza para ese evento y logística.</li>
+<li>En caso de autorización, el acompañante cubrirá el 100% de sus gastos (transporte, hospedaje, comidas, traslados, accesos), salvo que LA EMPRESA por escrito (mensaje/whatsapp/correo) indique lo contrario.</li>
+<li>El acompañante no genera obligación para LA EMPRESA y su conducta no deberá afectar la operación ni la imagen de LA EMPRESA.</li>
+<li>LA EMPRESA podrá revocar la autorización del acompañante cuando la logística o seguridad lo requieran.</li>
+</ol>` },
+  { ord:'SEXTA', t:'Entrega, revisión, aprobación y correcciones', cuerpo:()=>`
+<p><b>6.1 Entrega previa y revisión obligatoria.</b> Todo material deberá entregarse a LA EMPRESA antes de publicarse, para revisión y aprobación.</p>
+<p><b>6.2 Prohibición de publicar sin revisión.</b> Publicar sin autorización será considerado incumplimiento grave.</p>
+<p><b>6.3 Correcciones.</b> LA EMPRESA podrá solicitar las correcciones que considere necesarias. LA CREADORA deberá atender correcciones en un plazo máximo de 24 horas desde la solicitud, salvo causa justificada.</p>
+<p><b>6.4 Canales de entrega.</b> La entrega se realizará por el medio que LA EMPRESA determine (Drive, carpeta, WhatsApp, WeTransfer, etc.), conservando archivos en alta calidad.</p>` },
+  { ord:'SÉPTIMA', t:'Asignación de eventos, avisos y rechazos', cuerpo:()=>`
+<p><b>7.1 Selección y asignación.</b> LA EMPRESA asignará a LA CREADORA los eventos a cubrir durante la vigencia, considerando logística, estrategia y calendario.</p>
+<p><b>7.2 Aviso mínimo para rechazar.</b> LA CREADORA deberá confirmar disponibilidad y, en su caso, rechazar participación con mínimo 15 días de anticipación al evento.</p>
+<p><b>7.3 Regla de reasignación y no retorno.</b></p>
+<ol style="list-style:lower-alpha">
+<li>Una vez que LA CREADORA rechace un evento, el evento se asignará a otra creadora dentro de la lista de espera y/o reserva de LA EMPRESA.</li>
+<li>En ese supuesto, LA CREADORA no podrá volver a solicitar dicho evento.</li>
+</ol>
+<p><b>7.4 Porcentaje máximo de rechazos (periodo de prueba).</b> Durante la vigencia del CONTRATO, LA CREADORA no podrá rechazar más de cuarenta y cinco por ciento (45%) de los eventos asignados. Rebasar ese porcentaje faculta a LA EMPRESA a dar por terminado el CONTRATO por incumplimiento de disponibilidad mínima para el rol.</p>
+<p><b>7.5 Baja por múltiples cancelaciones tardías.</b> Si LA CREADORA, habiendo aceptado un evento, solicita bajarse posteriormente por motivos personales, deberá avisar con el mismo mínimo de 15 días. En caso de repetición o afectación operativa, LA EMPRESA podrá disminuir prioridad de asignación y/o no renovar.</p>` },
+  { ord:'OCTAVA', t:'Etiquetado, collab, hashtags y redes en modo público', cuerpo:()=>`
+<p><b>8.1 Modo Collab obligatorio.</b> Toda publicación autorizada relacionada con LA EMPRESA deberá realizarse, cuando la plataforma lo permita, en modo colaboración ("Collab") con las cuentas oficiales de LA EMPRESA, además de etiquetar a LA EMPRESA en texto y/o stickers.</p>
+<p><b>8.2 Hashtags obligatorios.</b> En publicaciones autorizadas deberán incluirse, según aplique:</p>
+<p><b>#Viajaconexpertos</b><br><b>#Seguimosconectando</b></p>
+<p>y aquellos adicionales que LA EMPRESA defina para campañas específicas.</p>
+<p><b>8.3 Historias durante evento.</b> LA CREADORA deberá realizar menciones durante el evento (historias IG/TikTok, según aplique) mostrando experiencia y ambiente, con enfoque creativo y positivo.</p>
+<p><b>8.4 Redes en modo público.</b> LA CREADORA se obliga a mantener sus cuentas donde se publique contenido vinculado a LA EMPRESA en modo público durante:</p>
+<ol style="list-style:lower-alpha">
+<li>la duración del evento y cobertura, y</li>
+<li>un lapso mínimo de 10 a 15 días posteriores a la publicación del contenido relacionado.</li>
+</ol>` },
+  { ord:'NOVENA', t:'Propiedad intelectual, uso de imagen y derechos de explotación', cuerpo:()=>`
+<p><b>9.1 Propiedad del contenido.</b> Todo contenido creado dentro del marco de este CONTRATO (videos, fotos, tomas, audios, guiones, versiones editadas, "raw footage", behind the scenes) será propiedad exclusiva de LA EMPRESA.</p>
+<p><b>9.2 Uso indefinido.</b> LA EMPRESA podrá usar el contenido y la imagen de LA CREADORA de manera indefinida, incluso concluido el CONTRATO, para fines publicitarios, promocionales, históricos, campañas, anuncios pagados, reels, historias destacadas, sitio web y cualquier medio digital o físico de LA EMPRESA.</p>
+<p><b>9.3 Publicidad pagada.</b> LA CREADORA autoriza expresamente el uso de su imagen en anuncios pagados (Meta Ads/TikTok Ads y equivalentes) sin requerir autorizaciones adicionales, salvo que LA EMPRESA determine por estrategia un consentimiento específico.</p>
+<p><b>9.4 No reutilización por LA CREADORA.</b> LA CREADORA no podrá reutilizar, revender, repostear (fuera de lo autorizado), ni explotar por cuenta propia el material de LA EMPRESA.</p>
+<p><b>9.5 Ideas y conceptos.</b></p>
+<ol style="list-style:lower-alpha">
+<li>Las ideas no materializadas siguen perteneciendo a quien las proponga.</li>
+<li>En el momento en que una idea se convierte en un activo digital/físico producido para LA EMPRESA (guion aprobado, video grabado, campaña ejecutada, arte o concepto implementado), dicho resultado pasa a ser propiedad de LA EMPRESA conforme a esta cláusula.</li>
+</ol>` },
+  { ord:'DÉCIMA', t:'Imagen pública, contenido sensual, contenido prohibido y reputación', cuerpo:()=>`
+<p><b>10.1 Reconocimiento del rol.</b> LA CREADORA acepta que, al ser Imagen Oficial, su conducta y presencia digital pueden impactar directa o indirectamente en LA EMPRESA. Por lo tanto, se obliga a cuidar su imagen pública y privada mientras dure el CONTRATO.</p>
+<p><b>10.2 Contenido permitido (sensualidad no vulgar).</b> Se permite una imagen atractiva o sensual (outfits, escotes, faldas, tendencias de moda), siempre que:</p>
+<ol style="list-style:lower-alpha">
+<li>no sea vulgar, degradante o explícita,</li>
+<li>no tenga intención sexual explícita, y</li>
+<li>no genere daño directo o indirecto a LA EMPRESA (rechazo masivo, odio, funas, controversias o asociación negativa con la marca).</li>
+</ol>
+<p><b>10.3 Contenido estrictamente prohibido.</b> Queda estrictamente prohibido, antes, durante y después del CONTRATO, que LA CREADORA mantenga o genere material de las siguientes características cuando exista vínculo identificable con LA EMPRESA o impacto reputacional hacia la marca:</p>
+<ol style="list-style:lower-alpha">
+<li>Contenido sexual explícito (actos sexuales, simulaciones explícitas, pornografía).</li>
+<li>Desnudos totales o parciales de naturaleza sexual o de explotación.</li>
+<li>Material íntimo distribuido con fines de morbo o monetización sexual.</li>
+<li>Contenido que promueva odio, discriminación o violencia.</li>
+<li>Contenido que genere controversia severa por vulnerar estándares de marca.</li>
+</ol>
+<p><b>10.4 Plataformas de contenido adulto.</b></p>
+<ol style="list-style:lower-alpha">
+<li>LA CREADORA no podrá operar, promover o monetizar cuentas de contenido sexual/adulto (OnlyFans/Fansly/Patreon NSFW u otras similares) durante la vigencia del CONTRATO.</li>
+<li>Si LA CREADORA tuvo cuentas previas, deberá declararlo por escrito a LA EMPRESA mediante el llenado del ANEXO C (Declaración Discreta) (existencia, estatus vigente o baja, intención futura), para llegar a un acuerdo por escrito sobre riesgos y límites reputacionales.</li>
+</ol>
+<p><b>10.5 Controversias, funas y crisis reputacional.</b> Se considerará "controversia grave" cualquiera de las siguientes:</p>
+<ol style="list-style:lower-alpha">
+<li>tendencia negativa masiva ("hate") por conducta o contenido de LA CREADORA,</li>
+<li>denuncias públicas serias que afecten reputación,</li>
+<li>exposición mediática negativa vinculada a LA EMPRESA,</li>
+<li>problemas legales o acusaciones públicas que comprometan la imagen de LA EMPRESA.</li>
+</ol>
+<p>Si ocurren dos (2) episodios de controversia grave durante la vigencia, LA EMPRESA podrá rescindir el CONTRATO.</p>
+<p><b>10.6 Política e ideología.</b> LA CREADORA se compromete a evitar publicaciones o discusiones políticas/ideológicas polarizantes que puedan generar odio o división y repercutir en LA EMPRESA.</p>
+<p><b>10.7 Obligación de notificación.</b> LA CREADORA deberá notificar de inmediato a LA EMPRESA sobre cualquier situación que pudiera detonar filtración, controversia, conflicto público o riesgo reputacional.</p>
+<p><b>10.8 Filtraciones.</b> En caso de filtración (real o falsa) de material íntimo o contenido de alta controversia:</p>
+<ol style="list-style:lower-alpha">
+<li>LA EMPRESA podrá suspender temporalmente el CONTRATO y actividades públicas,</li>
+<li>se realizará una evaluación interna del impacto reputacional,</li>
+<li>en función del impacto, LA EMPRESA podrá rescindir definitivamente sin responsabilidad.</li>
+</ol>` },
+  { ord:'DÉCIMA PRIMERA', t:'Conducta, alcohol, drogas y presentación en cámara', cuerpo:()=>`
+<p><b>11.1 Estándar general.</b> LA CREADORA deberá mantener, dentro y fuera de eventos asignados, una conducta que no ponga en riesgo la operación ni la reputación de LA EMPRESA.</p>
+<p><b>11.2 Alcohol.</b> Se permite consumo moderado y aparición en contextos sociales normales, siempre que LA CREADORA:</p>
+<ol style="list-style:lower-alpha">
+<li>no aparezca "pasada de copas",</li>
+<li>no se muestre en situaciones vergonzosas, agresivas o inapropiadas,</li>
+<li>no se afecte su dicción, postura o comportamiento frente a cámara.</li>
+</ol>
+<p><b>11.3 Drogas o estupefacientes.</b> Queda estrictamente prohibido aparecer, grabar o publicar material bajo efectos de drogas o estupefacientes. La sola apariencia pública en ese estado, vinculada directa o indirectamente con LA EMPRESA, será causa de rescisión.</p>
+<p><b>11.4 Conducta en eventos y viajes.</b> LA CREADORA se obliga a:</p>
+<ol style="list-style:lower-alpha">
+<li>respetar horarios y llamados,</li>
+<li>no poner en riesgo accesos, vuelos, logística o seguridad,</li>
+<li>actuar con respeto hacia clientes, staff, promotores y terceros,</li>
+<li>evitar confrontaciones públicas.</li>
+</ol>
+<p><b>11.5 Contenido amistoso.</b> Se permiten trends, bromas y dinámicas siempre que sean amistosas, alegres y no humillantes o peligrosas.</p>
+<p><b>11.6 Representación positiva.</b> LA CREADORA se obliga a hablar positivamente de LA EMPRESA incluso en escenarios de contratiempos, canalizando cualquier queja de manera privada y nunca pública.</p>` },
+  { ord:'DÉCIMA SEGUNDA', t:'Confidencialidad y no divulgación', cuerpo:()=>`
+<p><b>12.1 Alcance.</b> Se considera información confidencial toda aquella relacionada con LA EMPRESA, incluyendo de manera enunciativa:</p>
+<ol style="list-style:lower-alpha">
+<li>estrategias de venta, precios, márgenes, asignación de boletos, zonas, proveedores, listas, acuerdos con promotores, logística interna, procesos, guiones, campañas, métricas, reportes, bases de datos, conflictos, decisiones internas y cualquier información no pública.</li>
+</ol>
+<p><b>12.2 Prohibición de divulgar.</b> LA CREADORA se obliga a no divulgar, publicar, filtrar, comentar o insinuar información confidencial por ningún medio (redes sociales, chats, terceros, entrevistas, podcasts, lives), salvo autorización expresa por escrito de LA EMPRESA.</p>
+<p><b>12.3 Vigencia extendida.</b> La confidencialidad subsistirá durante el CONTRATO y después de su terminación sin límite de tiempo respecto a información sensible.</p>
+<p><b>12.4 Medidas ante incumplimiento.</b> La violación a la confidencialidad se considera incumplimiento grave y faculta a LA EMPRESA a rescindir el CONTRATO de forma inmediata, además de reclamar daños y perjuicios cuando proceda.</p>` },
+  { ord:'DÉCIMA TERCERA', t:'Exclusividad', cuerpo:()=>`
+<p><b>13.1</b> LA CREADORA no podrá colaborar, directa o indirectamente, con negocios relacionados con: turismo, boletos, hospedaje, transporte, eventos o cualquier giro similar/competidor de LA EMPRESA, durante la vigencia del CONTRATO.</p>
+<p><b>13.2</b> Podrá colaborar con marcas ajenas a esos giros siempre que no afecten a LA EMPRESA directa o indirectamente.</p>` },
+  { ord:'DÉCIMA CUARTA', t:'Incumplimientos, clasificación y sanciones', cuerpo:()=>`
+<p><b>14.1 Incumplimientos leves.</b> Se consideran leves, entre otros: retrasos menores, fallas subsanables, omisiones menores de formato que se corrijan de inmediato. LA EMPRESA tolerará hasta cinco (5) incumplimientos leves acumulados.</p>
+<p><b>14.2 Incumplimientos graves.</b> Se consideran graves, entre otros:</p>
+<ol style="list-style:lower-alpha">
+<li>publicar sin autorización,</li>
+<li>violar exclusividad,</li>
+<li>violar confidencialidad,</li>
+<li>daño reputacional,</li>
+<li>aparecer bajo efectos de drogas,</li>
+<li>incumplimiento reiterado de entregables mínimos,</li>
+<li>incumplimiento de redes públicas o collabs obligatorios.</li>
+</ol>
+<p><b>14.3 Sanciones.</b> LA EMPRESA podrá aplicar, según gravedad:</p>
+<ol style="list-style:lower-alpha">
+<li>advertencia,</li>
+<li>reducción de prioridad en eventos,</li>
+<li>suspensión temporal,</li>
+<li>rescisión inmediata.</li>
+</ol>
+<p><b>14.4 Sistema de strikes.</b> LA EMPRESA llevará un registro interno de faltas ("strikes") derivadas de los incumplimientos descritos en este CONTRATO. LA CREADORA acepta que, al acumular <b class="multa">tres (3) strikes</b> durante la vigencia, LA EMPRESA podrá dar por terminado el CONTRATO de forma inmediata y sin responsabilidad, sin perjuicio de las demás sanciones previstas en la cláusula 14.3.</p>` },
+  { ord:'DÉCIMA QUINTA', t:'Pérdidas, negligencias y daños', cuerpo:()=>`
+<p><b>15.1</b> Si LA CREADORA por negligencia provoca pérdida de vuelos, boletos, accesos, reservaciones o cargos, deberá pagar una multa equivalente al costo total del daño.</p>
+<p><b>15.2</b> En caso de llegar tarde, perder accesos o afectar la operación, LA EMPRESA podrá rescindir el CONTRATO; la penalización específica se determinará conforme al daño generado y se hará constar por escrito en ese momento.</p>` },
+  { ord:'DÉCIMA SEXTA', t:'Terminación y rescisión', cuerpo:()=>`
+<p>LA EMPRESA podrá rescindir el CONTRATO sin responsabilidad cuando exista:</p>
+<ol style="list-style:lower-alpha">
+<li>daño reputacional,</li>
+<li>incumplimiento grave,</li>
+<li>exceder el porcentaje máximo de rechazos,</li>
+<li>resultados/métricas insatisfactorias,</li>
+<li>conductas contrarias a la imagen y valores de LA EMPRESA.</li>
+</ol>` },
+  { ord:'DÉCIMA SÉPTIMA', t:'Modificaciones', cuerpo:()=>`
+<p>Cualquier modificación deberá constar por escrito y firmada por LAS PARTES (o mediante acuerdo por escrito vía mensaje verificable).</p>` },
+  { ord:'DÉCIMA OCTAVA', t:'Jurisdicción', cuerpo:()=>`
+<p>Para la interpretación y cumplimiento del presente CONTRATO, LAS PARTES se someten a las leyes y tribunales competentes de Reynosa, Tamaulipas, renunciando a cualquier otro fuero.</p>` },
+];
+
+function _teamCtx(c, opts) {
+  const d = (c.datos && typeof c.datos === 'object') ? c.datos : {};
+  return {
+    nombre: escapeHtml(c.creador_nombre || ''),
+    origen: _fillBlank(d.origen),
+    domicilio: _fillBlank(d.domicilio),
+    ciudad: _fillBlank(d.ciudad_estado),
+    // 🔒 Del server (env CONTRATO_DOMICILIO_EMPRESA). Ausente → línea en blanco.
+    domEmpresa: (c.domicilio_empresa && String(c.domicilio_empresa).trim()) ? escapeHtml(c.domicilio_empresa) : '____________',
+    vigTeam: escapeHtml(_vigenciaLetra(Math.round(Number(c.vigencia_meses)) || 3)),
+    firmadoTxt: opts.estado === 'firmado' ? escapeHtml(fmtFechaLarga((c.firmado_at || '').slice(0,10))) : '',
+  };
+}
+
+const _TEAM_INP = 'display:block;width:100%;margin-top:5px;padding:11px 12px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.22);border-radius:6px;color:#fff;font-size:14px;box-sizing:border-box';
+const _TEAM_LBL = 'display:block;font-size:12px;color:rgba(255,255,255,.7)';
+
+// Campos del PROEMIO que la creadora llena al firmar SOLO si no vienen ya en
+// datos (capturados a mano por admin o del perfil). Los que ya existen no se
+// vuelven a pedir.
+function _teamProemioInputs(c) {
+  const d = (c.datos && typeof c.datos === 'object') ? c.datos : {};
+  const faltan = [];
+  if (!d.origen) faltan.push(`<label style="${_TEAM_LBL}">Lugar de origen (ciudad, estado)<input type="text" id="teamOrigen" maxlength="120" placeholder="Ej: Reynosa, Tamaulipas" style="${_TEAM_INP}"></label>`);
+  if (!d.domicilio) faltan.push(`<label style="${_TEAM_LBL}">Domicilio<input type="text" id="teamDomicilio" maxlength="200" placeholder="Calle, número, colonia" style="${_TEAM_INP}"></label>`);
+  if (!d.ciudad_estado) faltan.push(`<label style="${_TEAM_LBL}">Ciudad y estado donde vives<input type="text" id="teamCiudad" maxlength="120" placeholder="Ej: Reynosa, Tamaulipas" style="${_TEAM_INP}"></label>`);
+  if (!faltan.length) return '';
+  return `
+        <div class="datos-firma-section">
+          <div class="panel-title" style="font-size:18px;margin-top:24px">🪪 Tus datos del contrato</div>
+          <p class="panel-sub">Estos datos completan el proemio de tu contrato. Son obligatorios para firmar.</p>
+          <div style="display:grid;gap:12px">${faltan.join('')}</div>
+        </div>`;
+}
+
+// ANEXO C (Declaración Discreta) — formulario OBLIGATORIO al firmar. 4 bloques
+// con opciones y campos condicionales. CONFIDENCIAL: se manda al backend y se
+// congela en datos; JAMÁS se pinta en el contrato firmado público.
+function _teamAnexoCForm() {
+  return `
+        <div class="datos-firma-section" id="anexoCForm">
+          <div class="panel-title" style="font-size:18px;margin-top:24px">🔒 Anexo C — Declaración Discreta (confidencial)</div>
+          <p class="panel-sub">Declaras bajo protesta de decir verdad. Este anexo es estrictamente confidencial: solo se usa para gestión de riesgo reputacional, sin difusión, y NO aparece en tu contrato público. Es obligatorio para firmar.</p>
+          <div style="display:grid;gap:12px">
+            <label style="${_TEAM_LBL}">¿Has tenido cuentas en plataformas de contenido adulto/sexual?
+              <select id="axCuentas" style="${_TEAM_INP}" onchange="_teamAxToggle();checkSubmit()">
+                <option value="">— Elige —</option>
+                <option value="no">No</option>
+                <option value="si">Sí</option>
+              </select>
+            </label>
+            <label style="${_TEAM_LBL};display:none" id="axPlataformasWrap">Especifica plataforma y estatus
+              <input type="text" id="axPlataformas" maxlength="300" placeholder="Ej: OnlyFans, dada de baja en 2024" style="${_TEAM_INP}">
+            </label>
+            <label style="${_TEAM_LBL}">Estado actual
+              <select id="axEstado" style="${_TEAM_INP}" onchange="checkSubmit()">
+                <option value="">— Elige —</option>
+                <option value="nunca">Nunca existió</option>
+                <option value="baja">Dada de baja</option>
+                <option value="vigente_sin_uso">Vigente (sin uso)</option>
+                <option value="vigente_en_uso">Vigente (en uso)</option>
+              </select>
+            </label>
+            <label style="${_TEAM_LBL}">¿Existe material previo susceptible de circular o ser re-subido por terceros?
+              <select id="axMaterial" style="${_TEAM_INP}" onchange="_teamAxToggle();checkSubmit()">
+                <option value="">— Elige —</option>
+                <option value="no">No</option>
+                <option value="si">Sí</option>
+              </select>
+            </label>
+            <label style="${_TEAM_LBL};display:none" id="axMaterialDescWrap">Describe de forma general (sin adjuntar)
+              <input type="text" id="axMaterialDesc" maxlength="500" placeholder="Descripción general" style="${_TEAM_INP}">
+            </label>
+            <label style="${_TEAM_LBL}">Intención futura durante el contrato
+              <select id="axIntencion" style="${_TEAM_INP}" onchange="_teamAxToggle();checkSubmit()">
+                <option value="">— Elige —</option>
+                <option value="no_reactivar">No reactivar / no crear</option>
+                <option value="acuerdo">Requiere acuerdo especial</option>
+              </select>
+            </label>
+            <label style="${_TEAM_LBL};display:none" id="axIntencionDetWrap">Detalla el acuerdo especial requerido
+              <input type="text" id="axIntencionDet" maxlength="300" placeholder="Detalle" style="${_TEAM_INP}">
+            </label>
+          </div>
+        </div>`;
+}
+
+// Muestra/oculta los campos condicionales del Anexo C.
+function _teamAxToggle() {
+  const pares = [
+    ['axCuentas', 'si', 'axPlataformasWrap'],
+    ['axMaterial', 'si', 'axMaterialDescWrap'],
+    ['axIntencion', 'acuerdo', 'axIntencionDetWrap'],
+  ];
+  for (const [selId, val, wrapId] of pares) {
+    const sel = document.getElementById(selId);
+    const wrap = document.getElementById(wrapId);
+    if (sel && wrap) wrap.style.display = (sel.value === val) ? 'block' : 'none';
+  }
+}
+
+function renderDocTeam(c, opts) {
+  const x = _teamCtx(c, opts);
+  const header = `
+    <div class="doc-header">
+      <img class="logo" src="${LOGO_SRC}" alt="Conecta MX Reynosa">
+      <h1>Contrato marco de prestación de servicios por intercambio</h1>
+      <p class="subtitle">"Creadora de Contenido e Imagen Oficial" · Conecta Reynosa (periodo de prueba)</p>
+    </div>`;
+  const proemio = `
+    <section class="clausula">
+      <p>En la ciudad de Reynosa, Tamaulipas, a la fecha de firma que se asentará al momento de la suscripción, comparecen por una parte:</p>
+      <p><b>GUILLERMO COBOS VIZCARRA</b>, originario de Reynosa, Tamaulipas, con domicilio en ${x.domEmpresa}, quien actúa en su carácter de Director General de <b>CONECTA REYNOSA</b> (en lo sucesivo, "LA EMPRESA");</p>
+      <p>y por la otra parte:</p>
+      <p><b>${x.nombre}</b>, (en lo sucesivo, "LA CREADORA"), quien manifiesta ser originaria de <b>${x.origen}</b>, con domicilio en <b>${x.domicilio}</b>, en la ciudad de <b>${x.ciudad}</b>;</p>
+      <p>a quienes conjuntamente se les denominará "LAS PARTES", quienes celebran el presente Contrato de Prestación de Servicios por Intercambio (en adelante, el "CONTRATO") al tenor de las siguientes:</p>
+    </section>`;
+  const declaraciones = `
+    <section class="clausula">
+      <h2><span class="num">—</span>Declaraciones</h2>
+      <p><b>I. Declara LA EMPRESA que:</b></p>
+      <ol style="list-style:lower-alpha">
+      <li>Es un proyecto/empresa dedicado a la comercialización, operación y promoción de experiencias turísticas y paquetes para conciertos, festivales y eventos, incluyendo (según aplique) logística de transporte, hospedaje, traslados, kits y gestión de accesos/boletos.</li>
+      <li>Requiere fortalecer su presencia y posicionamiento en redes sociales mediante contenido audiovisual periódico, así como contar con una Imagen Oficial que represente a la marca frente a cámara.</li>
+      <li>Cuenta con facultades suficientes para obligarse en los términos del presente CONTRATO.</li>
+      </ol>
+      <p><b>II. Declara LA CREADORA que:</b></p>
+      <ol style="list-style:lower-alpha">
+      <li>Cuenta con habilidades, experiencia y disponibilidad para la creación de contenido digital (video/foto), así como para aparecer frente a cámara y realizar dinámicas en redes y en calle, conforme a los lineamientos de LA EMPRESA.</li>
+      <li>Reconoce que su participación implica representar públicamente la marca y actuar con estándares de conducta e imagen acordes a una Imagen Oficial.</li>
+      <li>Proporcionará a LA EMPRESA, previo a la firma, identificación oficial vigente y comprobante de domicilio, así como los datos necesarios para integrar el expediente contractual. Asimismo, reconoce que deberá llenar el ANEXO C (Declaración Discreta) previo a la firma del CONTRATO.</li>
+      </ol>
+      <p><b>III. Declaran LAS PARTES que:</b></p>
+      <ol style="list-style:lower-alpha">
+      <li>Se reconocen la personalidad con la que comparecen.</li>
+      <li>Es su voluntad celebrar el presente CONTRATO, sujetándose a lo aquí establecido.</li>
+      </ol>
+      <p>En virtud de lo anterior, LAS PARTES acuerdan las siguientes:</p>
+    </section>`;
+  const clausulasHtml = CLAUSULAS_TEAM.map(cl => _clausulaViaB(cl, x)).join('');
+
+  // Sección de firma: MISMO flujo (canvas + INE + acepto, mismos ids) + datos
+  // del proemio que falten + ANEXO C obligatorio. En firmado: firmas + INE, con
+  // el domicilio de la empresa en el bloque de firmas — y JAMÁS el Anexo C.
+  let firmaSection = '';
+  if (opts.estado === 'pendiente') {
+    firmaSection = _firmaViaB(c, opts, 'Creadora').replace(
+      '<label class="check-section">',
+      `${_teamProemioInputs(c)}${_teamAnexoCForm()}
+        <label class="check-section">`
+    );
+  } else if (opts.estado === 'firmado') {
+    firmaSection = `
+      <section class="clausula">
+        <h2><span class="num">—</span>Firmas</h2>
+        <p>Leído que fue el presente CONTRATO y enteradas LAS PARTES de su alcance legal, lo firman por duplicado.</p>
+        <p><b>LA EMPRESA</b><br>Guillermo Cobos Vizcarra<br>Director General – Conecta Reynosa<br>Domicilio: ${x.domEmpresa}</p>
+        <p><b>LA CREADORA</b><br>${x.nombre}<br>${x.domicilio}<br>Ciudad/Estado: ${x.ciudad}</p>
+      </section>
+      ${_firmaViaB(c, opts, 'Creadora')}`;
+  }
+
+  const printBar = opts.estado === 'firmado' ? `
+      <div class="print-bar">
+        <button type="button" class="print-btn" onclick="window.print()">⬇️ Descargar PDF</button>
+        <span class="print-tip">Elige "Guardar como PDF" como destino.</span>
+      </div>` : '';
+
+  return `
+    <div class="container">
+      ${printBar}
+      <article class="doc">
+        ${header}
+        <div class="doc-meta">
+          <div class="meta-row"><span class="lbl">Creadora (Imagen Oficial):</span><span class="val">${x.nombre}</span></div>
+          <div class="meta-row"><span class="lbl">Vigencia:</span><span class="val">${x.vigTeam} meses${x.firmadoTxt ? ` · firmado el ${x.firmadoTxt}` : ' a partir de tu firma'}</span></div>
+        </div>
+        ${proemio}
+        ${declaraciones}
+        ${clausulasHtml}
+        ${firmaSection}
+      </article>
+    </div>
+    ${FOOTER}
+  `;
 }
 
 // Sección de firma para VÍA B — MISMOS ids que creadoras (flujo reutilizado).
@@ -646,10 +1054,14 @@ function renderDocViaB(c, opts) {
 // ── Render principal ──────────────────────────────────────────────────
 function renderDoc(c, opts) {
   opts = opts || {};
-  // VÍA B (F5): coordinador/giveaway van por su propio render; 'creadora'
-  // (default) sigue EXACTAMENTE el flujo de abajo, sin un solo cambio.
+  // VÍA B (F5): coordinador/giveaway van por su propio render; creadora_team
+  // por el suyo (texto oficial v1.1); 'creadora' (default) sigue EXACTAMENTE
+  // el flujo de abajo, sin un solo cambio.
   if (c && (c.plantilla === 'coordinador' || c.plantilla === 'giveaway')) {
     return renderDocViaB(c, opts);
+  }
+  if (c && c.plantilla === 'creadora_team') {
+    return renderDocTeam(c, opts);
   }
   // Datos capturados al firmar (fnac + emergencia): solo se pintan SI EXISTEN
   // en datos jsonb — los contratos viejos sin datos rinden EXACTO como siempre.
@@ -1152,25 +1564,67 @@ let firma, ineFrenteState, ineReversoState;
 // que no los pintan) devuelven true y quedan EXACTO como antes.
 function _datosFirmaOk() {
   const f = document.getElementById("fnacInput");
-  if (!f) return true;
+  if (!f) return _teamDatosOk();
   const n = document.getElementById("emNomInput");
   const t = document.getElementById("emTelInput");
   return !!(f.value && n && n.value.trim() && t && t.value.trim());
 }
 
+// Captura al firmar de CREADORA_TEAM: datos del proemio que falten + Anexo C
+// completo (con sus condicionales). Flujos sin el form del Anexo C → true.
+function _teamDatosOk() {
+  const ax = document.getElementById("axCuentas");
+  if (!ax) return true;
+  const val = id => { const el = document.getElementById(id); return el ? String(el.value || "").trim() : null; };
+  // Proemio: los inputs solo existen si el dato falta — todos los presentes son obligatorios.
+  for (const id of ["teamOrigen", "teamDomicilio", "teamCiudad"]) {
+    const el = document.getElementById(id);
+    if (el && !String(el.value || "").trim()) return false;
+  }
+  const cuentas = val("axCuentas");
+  if (cuentas !== "no" && cuentas !== "si") return false;
+  if (cuentas === "si" && !val("axPlataformas")) return false;
+  if (!["nunca", "baja", "vigente_sin_uso", "vigente_en_uso"].includes(val("axEstado"))) return false;
+  const material = val("axMaterial");
+  if (material !== "no" && material !== "si") return false;
+  if (material === "si" && !val("axMaterialDesc")) return false;
+  const intencion = val("axIntencion");
+  if (intencion !== "no_reactivar" && intencion !== "acuerdo") return false;
+  if (intencion === "acuerdo" && !val("axIntencionDet")) return false;
+  return true;
+}
+
 // Payload de la captura para contrato-firmar. null si el flujo no la pinta.
 function _datosFirmaPayload() {
   const f = document.getElementById("fnacInput");
-  if (!f) return null;
-  const n = document.getElementById("emNomInput");
-  const t = document.getElementById("emTelInput");
-  return {
-    fecha_nacimiento: f.value || "",
-    emergencia: {
-      nombre: ((n && n.value) || "").trim(),
-      telefono: ((t && t.value) || "").trim(),
-    },
-  };
+  if (f) {
+    const n = document.getElementById("emNomInput");
+    const t = document.getElementById("emTelInput");
+    return {
+      fecha_nacimiento: f.value || "",
+      emergencia: {
+        nombre: ((n && n.value) || "").trim(),
+        telefono: ((t && t.value) || "").trim(),
+      },
+    };
+  }
+  // CREADORA_TEAM: proemio (solo inputs presentes) + Anexo C.
+  const ax = document.getElementById("axCuentas");
+  if (!ax) return null;
+  const val = id => { const el = document.getElementById(id); return el ? String(el.value || "").trim() : ""; };
+  const p = { anexo_c: {
+    cuentas_previas: val("axCuentas"),
+    plataformas: val("axPlataformas"),
+    estado_actual: val("axEstado"),
+    material_previo: val("axMaterial"),
+    material_desc: val("axMaterialDesc"),
+    intencion: val("axIntencion"),
+    intencion_det: val("axIntencionDet"),
+  } };
+  if (document.getElementById("teamOrigen")) p.origen = val("teamOrigen");
+  if (document.getElementById("teamDomicilio")) p.domicilio = val("teamDomicilio");
+  if (document.getElementById("teamCiudad")) p.ciudad_estado = val("teamCiudad");
+  return p;
 }
 
 function checkSubmit() {
@@ -1397,8 +1851,10 @@ async function loadContrato() {
     document.getElementById("firmaCanvas").addEventListener("mouseup", checkSubmit);
     document.getElementById("firmaCanvas").addEventListener("touchend", checkSubmit);
     document.getElementById("acepto").addEventListener("change", checkSubmit);
-    // Captura al firmar (solo existe en el flujo de creadora).
-    ["fnacInput", "emNomInput", "emTelInput"].forEach((id) => {
+    // Captura al firmar (creadora: fnac/emergencia · team: proemio + Anexo C).
+    ["fnacInput", "emNomInput", "emTelInput",
+     "teamOrigen", "teamDomicilio", "teamCiudad",
+     "axCuentas", "axPlataformas", "axEstado", "axMaterial", "axMaterialDesc", "axIntencion", "axIntencionDet"].forEach((id) => {
       const el = document.getElementById(id);
       if (el) { el.addEventListener("input", checkSubmit); el.addEventListener("change", checkSubmit); }
     });

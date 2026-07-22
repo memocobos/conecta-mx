@@ -124,10 +124,25 @@ exports.handler = async function (event) {
 
   // VÍA B (F5): plantilla decide qué se pide. Default 'creadora' = comportamiento
   // idéntico al de siempre (ofrecimiento/expectativas obligatorios).
-  const PLANTILLAS = ["creadora", "coordinador", "giveaway"];
+  const PLANTILLAS = ["creadora", "coordinador", "giveaway", "creadora_team"];
   const plantilla = PLANTILLAS.includes(String(data.plantilla || "").trim())
     ? String(data.plantilla).trim()
     : "creadora";
+
+  // VIGENCIA CONFIGURABLE (coordinador + creadora_team): Memo elige 3/6/9/12
+  // meses al crear. Default: coordinador 12 (retrocompatible), team 3 (periodo
+  // de prueba). Otras plantillas no llevan vigencia (null).
+  const VIGENCIAS = [3, 6, 9, 12];
+  let vigencia_meses = null;
+  if (plantilla === "coordinador" || plantilla === "creadora_team") {
+    if (data.vigencia_meses !== undefined && data.vigencia_meses !== null && data.vigencia_meses !== "") {
+      const v = Math.round(Number(data.vigencia_meses));
+      if (!VIGENCIAS.includes(v)) return bad(400, "Vigencia inválida (3, 6, 9 o 12 meses)");
+      vigencia_meses = v;
+    } else {
+      vigencia_meses = plantilla === "coordinador" ? 12 : 3;
+    }
+  }
 
   const creador_nombre = String(data.creador_nombre || "").trim();
   const creador_email = String(data.creador_email || "").trim().toLowerCase();
@@ -173,6 +188,7 @@ exports.handler = async function (event) {
     estado: "pendiente",
     plantilla,
     datos,
+    vigencia_meses,
   };
 
   let created;

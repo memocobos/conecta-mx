@@ -3253,7 +3253,7 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
   </div>
   <div class="card">
    <div style="font-family:'Rajdhani',sans-serif;font-weight:700;font-size:16px;margin-bottom:4px">Comisiones CHEAP (vendedores)</div>
-   <div style="font-size:11px;color:var(--ts);margin-bottom:14px">Por zona: fija el <b>costo matriz</b> (te sugiero la última compra) y tu <b>comisión</b>. El vendedor cobra <b>matriz + comisión</b> — la comisión es tu ganancia y se cobra primero. Sin comisión, la zona NO se puede vender en CHEAP. El vendedor jamás ve este desglose.</div>
+   <div style="font-size:11px;color:var(--ts);margin-bottom:14px">Elige el evento y ves TODAS sus zonas CHEAP en una tabla: stock, costo de Palacio (tu última compra, automático) y <b>TU GANANCIA</b> — lo único que escribes. El costo del vendedor se suma en vivo y con <b>💾 Guardar todo</b> queda. La matriz guardada <b>no se mueve sola</b>: si tu última compra difiere, la fila te avisa y tú decides. Sin ganancia asignada, la zona NO se vende en CHEAP. El vendedor jamás ve este desglose.</div>
    <select id="kam-com-evt" class="cot-input" style="width:100%;margin-bottom:10px" onchange="_comOnEvento()">
     <option value="">— Elige un evento —</option>
    </select>
@@ -10262,6 +10262,23 @@ function _comEventoId() {
   return id;
 }
 
+// Fecha relativa corta para frescura ("hace 3 h", "hace 2 días"). '' si inválida.
+function _khHaceRel(iso) {
+  const t = Date.parse(iso || '');
+  if (!Number.isFinite(t)) return '';
+  const s = Math.max(0, Math.floor((Date.now() - t) / 1000));
+  if (s < 60) return 'hace un momento';
+  if (s < 3600) return 'hace ' + Math.floor(s / 60) + ' min';
+  if (s < 86400) return 'hace ' + Math.floor(s / 3600) + ' h';
+  const d = Math.floor(s / 86400);
+  return 'hace ' + d + (d === 1 ? ' día' : ' días');
+}
+
+// Tabla única WIZARD: veo todo → escribo MI GANANCIA → 💾 Guardar todo.
+// La matriz se pinta AUTO (última compra) en zonas nuevas y GUARDADA en las
+// configuradas — jamás se auto-mueve: si la última compra difiere, la fila
+// avisa con chip + botón "actualizar matriz" (pre-llena; Memo confirma al
+// guardar). La matriz sigue editable a mano ("editar").
 async function _comLoad() {
   const body = document.getElementById('kam-com-body');
   if (!body) return;
@@ -10276,52 +10293,114 @@ async function _comLoad() {
     _comZonas = Array.isArray(j.zonas) ? j.zonas : [];
     if (!_comZonas.length) { body.innerHTML = '<div class="empty-state"><div class="empty-icon"></div>Sin zonas CHEAP ni compras para este evento.</div>'; return; }
     const rows = _comZonas.map((z, i) => {
-      const matrizVal = (z.costo_matriz != null) ? z.costo_matriz : (z.sugerencia_matriz != null ? z.sugerencia_matriz : '');
-      const sug = (z.sugerencia_matriz != null) ? ('última compra ' + _comFmt(z.sugerencia_matriz)) : 'sin compras';
+      // Matriz que se pinta: la GUARDADA si existe (no se auto-mueve); si no, AUTO = última compra.
+      const matrizVal = z.configurada ? (z.costo_matriz != null ? z.costo_matriz : '') : (z.sugerencia_matriz != null ? z.sugerencia_matriz : '');
+      const ganVal = (z.configurada && z.comision != null) ? z.comision : '';
+      z._origM = String(matrizVal); z._origG = String(ganVal); // baseline para "solo filas modificadas"
+      const stockTxt = z.agotada
+        ? '<span style="color:var(--red);font-weight:700">AGOTADA</span>'
+        : (z.stock != null ? z.stock + ' disp.' : '—');
+      const matrizNota = z.configurada ? 'matriz guardada' : (z.sugerencia_matriz != null ? 'AUTO · tu última compra' : 'sin compras');
+      // Control de mercado: la matriz guardada no se mueve sola. Divergencia → chip.
+      const diverge = z.configurada && z.sugerencia_matriz != null && Number(z.sugerencia_matriz) !== Number(z.costo_matriz);
+      const chip = diverge
+        ? `<div style="margin-top:4px;font-size:10px;color:var(--orange);font-weight:700">tu última compra: ${_comFmt(z.sugerencia_matriz)} ≠ matriz guardada ${_comFmt(z.costo_matriz)} <button class="btn btn-ghost btn-sm" type="button" style="font-size:10px;padding:1px 6px" onclick="_comUsarUltimaCompra(${i})">actualizar matriz</button></div>`
+        : '';
       const badge = z.configurada
         ? '<span style="font-size:10px;color:var(--green);font-weight:700">✓ configurada</span>'
         : '<span style="font-size:10px;color:var(--orange);font-weight:700">pendiente</span>';
       return `<tr style="border-top:1px solid var(--border)">
         <td style="padding:8px 4px;font-size:13px"><b>${_comEsc(z.zona)}</b><br>${badge}</td>
-        <td style="padding:8px 4px"><input type="number" min="0" id="com-m-${i}" class="cot-input" style="width:110px" value="${matrizVal}" placeholder="matriz" oninput="_comCalcFila(${i})"><br><span style="font-size:10px;color:var(--ts)">${sug}</span></td>
-        <td style="padding:8px 4px"><input type="number" min="0" id="com-c-${i}" class="cot-input" style="width:110px" value="${z.comision != null ? z.comision : ''}" placeholder="comisión" oninput="_comCalcFila(${i})"></td>
-        <td style="padding:8px 4px;text-align:right;font-size:13px"><span id="com-t-${i}">—</span><br><span style="font-size:10px;color:var(--ts)">costo vendedor</span></td>
-        <td style="padding:8px 4px;text-align:right"><button class="btn btn-primary btn-sm" type="button" onclick="_comGuardar(${i})">Guardar</button></td>
+        <td style="padding:8px 4px;font-size:12px">${stockTxt}</td>
+        <td style="padding:8px 4px"><input type="number" min="0" id="com-m-${i}" class="cot-input" style="width:100px" value="${matrizVal}" readonly oninput="_comCalcFila(${i})"> <button class="btn btn-ghost btn-sm" type="button" style="font-size:10px;padding:1px 6px" onclick="_comEditarMatriz(${i})">editar</button><br><span style="font-size:10px;color:var(--ts)">${matrizNota}</span>${chip}</td>
+        <td style="padding:8px 4px"><input type="number" min="0" id="com-g-${i}" class="cot-input" style="width:100px" value="${ganVal}" placeholder="tu ganancia" oninput="_comCalcFila(${i})"></td>
+        <td style="padding:8px 4px;text-align:right;font-size:13px"><b><span id="com-t-${i}">—</span></b><br><span style="font-size:10px;color:var(--ts)">costo vendedor</span></td>
       </tr>`;
     }).join('');
-    body.innerHTML = `<table style="width:100%;border-collapse:collapse"><thead><tr style="font-size:10px;color:var(--ts);text-transform:uppercase;letter-spacing:.08em"><th style="text-align:left;padding:4px">Zona</th><th style="text-align:left;padding:4px">Costo matriz</th><th style="text-align:left;padding:4px">Comisión</th><th style="text-align:right;padding:4px">Vendedor</th><th></th></tr></thead><tbody>${rows}</tbody></table>`;
+    body.innerHTML = `<table style="width:100%;border-collapse:collapse"><thead><tr style="font-size:10px;color:var(--ts);text-transform:uppercase;letter-spacing:.08em"><th style="text-align:left;padding:4px">Zona</th><th style="text-align:left;padding:4px">Stock</th><th style="text-align:left;padding:4px">Costo Palacio</th><th style="text-align:left;padding:4px">Tu ganancia</th><th style="text-align:right;padding:4px">Vendedor</th></tr></thead><tbody>${rows}</tbody></table>
+      <div style="display:flex;justify-content:flex-end;align-items:center;gap:10px;margin-top:12px">
+        <span id="com-mod-note" style="font-size:11px;color:var(--ts)"></span>
+        <button class="btn btn-primary" type="button" onclick="_comGuardarTodo()">💾 Guardar todo</button>
+      </div>`;
     _comZonas.forEach((z, i) => _comCalcFila(i));
   } catch (e) {
     body.innerHTML = `<div class="alert alert-error">${_comEsc(e.message)}</div>`;
   }
 }
 
-// Recalcula el costo del vendedor (matriz+comisión) en vivo para una fila.
-function _comCalcFila(i) {
-  const m = Number(document.getElementById('com-m-' + i)?.value);
-  const c = Number(document.getElementById('com-c-' + i)?.value);
-  const out = document.getElementById('com-t-' + i);
-  if (!out) return;
-  if (Number.isFinite(m) && Number.isFinite(c) && document.getElementById('com-m-' + i).value !== '' && document.getElementById('com-c-' + i).value !== '') out.textContent = _comFmt(m + c);
-  else out.textContent = '—';
+// ¿La fila i cambió respecto a lo que pintó el último listar?
+function _comFilaModificada(i) {
+  const z = _comZonas[i];
+  const m = document.getElementById('com-m-' + i), g = document.getElementById('com-g-' + i);
+  if (!z || !m || !g) return false;
+  return String(m.value) !== z._origM || String(g.value) !== z._origG;
 }
 
-async function _comGuardar(i) {
+// Recalcula el costo del vendedor (matriz+ganancia) EN VIVO para una fila y el
+// contador de filas por guardar. NO guarda nada.
+function _comCalcFila(i) {
+  const mEl = document.getElementById('com-m-' + i), gEl = document.getElementById('com-g-' + i);
+  const out = document.getElementById('com-t-' + i);
+  if (!out) return;
+  const m = Number(mEl?.value), g = Number(gEl?.value);
+  if (mEl && gEl && mEl.value !== '' && gEl.value !== '' && Number.isFinite(m) && Number.isFinite(g)) out.textContent = _comFmt(m + g);
+  else out.textContent = '—';
+  const note = document.getElementById('com-mod-note');
+  if (note) {
+    const n = _comZonas.reduce((acc, _, k) => acc + (_comFilaModificada(k) ? 1 : 0), 0);
+    note.textContent = n ? (n + (n === 1 ? ' fila por guardar' : ' filas por guardar')) : '';
+  }
+}
+
+// Habilita la edición manual de la matriz (Memo puede poner otro número).
+function _comEditarMatriz(i) {
+  const el = document.getElementById('com-m-' + i);
+  if (!el) return;
+  el.readOnly = false;
+  el.focus();
+}
+
+// Chip de divergencia → pre-llena la matriz con la última compra. NO guarda:
+// Memo confirma con 💾 Guardar todo.
+function _comUsarUltimaCompra(i) {
   const z = _comZonas[i];
-  if (!z) return;
+  const el = document.getElementById('com-m-' + i);
+  if (!z || !el || z.sugerencia_matriz == null) return;
+  el.value = z.sugerencia_matriz;
+  _comCalcFila(i);
+}
+
+// 💾 Guarda EN LOTE solo las filas modificadas — cada una por el read-then-write
+// existente del backend (accion 'guardar', jamás on_conflict).
+async function _comGuardarTodo() {
   const eid = _comEventoId();
-  const mEl = document.getElementById('com-m-' + i), cEl = document.getElementById('com-c-' + i);
-  const costo_matriz = Number(mEl?.value), comision = Number(cEl?.value);
   if (!eid) return _comAlert('Elige un evento', true);
-  if (mEl.value === '' || !Number.isFinite(costo_matriz) || costo_matriz < 0) return _comAlert('Costo matriz inválido en ' + z.zona, true);
-  if (cEl.value === '' || !Number.isFinite(comision) || comision < 0) return _comAlert('Comisión inválida en ' + z.zona, true);
-  try {
-    const r = await khAdminFetch('/.netlify/functions/admin-comisiones-zona', { method: 'POST', body: JSON.stringify({ accion: 'guardar', evento_id: eid, zona: z.zona, costo_matriz: Math.round(costo_matriz), comision: Math.round(comision) }) });
-    const j = await r.json().catch(() => ({}));
-    if (!r.ok || !j.ok) throw new Error(j.error || ('Error ' + r.status));
-    _comAlert(z.zona + ' guardada — costo vendedor ' + _comFmt(Math.round(costo_matriz) + Math.round(comision)), false);
-    _comLoad();
-  } catch (e) { _comAlert(e.message, true); }
+  const mods = _comZonas.map((z, i) => i).filter(i => _comFilaModificada(i));
+  if (!mods.length) return _comAlert('Nada que guardar — no hay filas modificadas', true);
+  // Validación previa de TODAS las filas modificadas (no guarda a medias por datos malos).
+  for (const i of mods) {
+    const z = _comZonas[i];
+    const m = document.getElementById('com-m-' + i), g = document.getElementById('com-g-' + i);
+    if (!m || m.value === '' || !Number.isFinite(Number(m.value)) || Number(m.value) < 0) return _comAlert('Costo de Palacio inválido en ' + z.zona, true);
+    if (!g || g.value === '' || !Number.isFinite(Number(g.value)) || Number(g.value) < 0) return _comAlert('Ganancia inválida en ' + z.zona, true);
+  }
+  let okN = 0; const errores = [];
+  for (const i of mods) {
+    const z = _comZonas[i];
+    const costo_matriz = Math.round(Number(document.getElementById('com-m-' + i).value));
+    const comision = Math.round(Number(document.getElementById('com-g-' + i).value));
+    try {
+      const r = await khAdminFetch('/.netlify/functions/admin-comisiones-zona', { method: 'POST', body: JSON.stringify({ accion: 'guardar', evento_id: eid, zona: z.zona, costo_matriz, comision }) });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok || !j.ok) throw new Error(j.error || ('Error ' + r.status));
+      okN++;
+    } catch (e) { errores.push(z.zona + ': ' + e.message); }
+  }
+  // Recargar PRIMERO (refresca baseline/chips) y alertar DESPUÉS: _comLoad
+  // limpia la alerta al arrancar y se comería el resumen del guardado.
+  await _comLoad();
+  if (errores.length) _comAlert(okN + ' guardada(s); fallaron ' + errores.length + ' → ' + errores.join(' · '), true);
+  else _comAlert(okN + (okN === 1 ? ' zona guardada' : ' zonas guardadas') + ' ✓', false);
 }
 
 // ── Liquidaciones de vendedores (F5c — pantalla de Memo, solo maestro_roshi) ──
@@ -19529,8 +19608,11 @@ function _vtaPoblarZonas() {
       const info = mapa[z] || {};
       const o = document.createElement('option');
       const off = !!info.agotada;
+      // Frescura del costo (actualizado_at de comisiones_zona) — SOLO la fecha;
+      // el vendedor sigue sin ver matriz/comisión/desglose jamás.
+      const frescura = info.actualizado_at ? ' · actualizado ' + _khHaceRel(info.actualizado_at) : '';
       o.value = z;
-      o.textContent = z + ' · ' + _vtaFmt(info.costo) + (off ? ' — AGOTADA' : (info.stock != null ? ' (' + info.stock + ' disp.)' : ''));
+      o.textContent = z + ' · ' + _vtaFmt(info.costo) + (off ? ' — AGOTADA' : (info.stock != null ? ' (' + info.stock + ' disp.)' : '')) + frescura;
       if (off) { o.disabled = true; o.style.color = '#888'; }
       zsel.appendChild(o);
     });

@@ -11,12 +11,15 @@
 //
 // Acciones:
 //   · 'listar'         {evento_id} → maestro_roshi. Zonas del evento con
-//       {zona, costo_matriz, comision, costo_vendedor, sugerencia_matriz, configurada}.
+//       {zona, costo_matriz, comision, costo_vendedor, sugerencia_matriz, configurada,
+//        stock, agotada, actualizado_at}  (stock/agotada best-effort vía
+//        _lib/disponibilidad — aditivo para la tabla wizard de Memo).
 //   · 'guardar'        {evento_id, zona, costo_matriz, comision} → maestro_roshi.
 //       READ-THEN-WRITE (JAMÁS on_conflict): PATCH si existe, INSERT si no; 23505 →
 //       reintenta el PATCH (lección 42P10 del transporte).
 //   · 'costo_vendedor' {evento_id} → vendedor+admin. SOLO zonas con comisión
-//       asignada → {zona, costo, stock, agotada}. Sin desglose.
+//       asignada → {zona, costo, stock, agotada, actualizado_at}. Sin desglose:
+//       actualizado_at es solo FRESCURA del costo — jamás matriz/comisión.
 //
 // Env: SUPABASE_URL_KAMEHOUSE/SERVICE_KEY_KAMEHOUSE (comisiones_zona + compras),
 //      PORTAL_SUPABASE_URL/SERVICE_KEY (solo 'costo_vendedor', para el stock).
@@ -71,7 +74,7 @@ exports.handler = async (event) => {
     // ── listar (Memo): comisiones + prefill de la última compra ────────────
     if (accion === 'listar') {
       const [comR, compR] = await Promise.all([
-        fetch(`${baseCom}?evento_id=eq.${enc(evento_id)}&select=zona,costo_matriz,comision&order=zona.asc`, { headers: kh }),
+        fetch(`${baseCom}?evento_id=eq.${enc(evento_id)}&select=zona,costo_matriz,comision,actualizado_at&order=zona.asc`, { headers: kh }),
         fetch(`${baseCompras}?evento_id=eq.${enc(evento_id)}&select=zona,costo_unitario,fecha&order=fecha.asc`, { headers: kh }),
       ]);
       if (!comR.ok) return json(502, { error: 'KH rechazó comisiones', detail: await comR.text() });
@@ -86,10 +89,21 @@ exports.handler = async (event) => {
       const comByZona = {};
       (Array.isArray(comisiones) ? comisiones : []).forEach(c => { comByZona[String(c.zona).trim()] = c; });
       const zonas = [...new Set([...Object.keys(comByZona), ...Object.keys(sug)])].sort();
+      // Stock por zona (best-effort, aditivo — mismo patrón que costo_vendedor).
+      // Sin env de Portal o con error → stock null, la tabla lo pinta "—".
+      let disp = null;
+      if (env.PORTAL_SB_URL && env.PORTAL_SB_SERVICE) {
+        try {
+          disp = await cargarDisponibilidad({ khUrl: env.KH_SB_URL, khKey: env.KH_SB_SERVICE, portalUrl: env.PORTAL_SB_URL, portalKey: env.PORTAL_SB_SERVICE, evento_id });
+          if (disp && disp.error) disp = null;
+        } catch (_) { disp = null; }
+      }
       const out = zonas.map(z => {
         const c = comByZona[z];
         const matriz = c ? Number(c.costo_matriz) || 0 : null;
         const comision = c ? Number(c.comision) || 0 : 0;
+        let stock = null, agotada = false;
+        if (disp) { const ev = evaluarZona(disp, z, 1); if (ev.gestionada) { stock = ev.restante; agotada = ev.agotada; } }
         return {
           zona: z,
           configurada: !!c,
@@ -97,6 +111,9 @@ exports.handler = async (event) => {
           comision: comision,
           costo_vendedor: c ? (matriz + comision) : null,
           sugerencia_matriz: (sug[z] != null) ? sug[z] : null,
+          stock,
+          agotada,
+          actualizado_at: c ? (c.actualizado_at || null) : null,
         };
       });
       return json(200, { ok: true, zonas: out });
@@ -140,7 +157,7 @@ exports.handler = async (event) => {
 
     // ── costo_vendedor (vendedor+admin): SOLO costo final + stock ──────────
     if (accion === 'costo_vendedor') {
-      const comR = await fetch(`${baseCom}?evento_id=eq.${enc(evento_id)}&select=zona,costo_matriz,comision`, { headers: kh });
+      const comR = await fetch(`${baseCom}?evento_id=eq.${enc(evento_id)}&select=zona,costo_matriz,comision,actualizado_at`, { headers: kh });
       if (!comR.ok) return json(502, { error: 'KH rechazó comisiones', detail: await comR.text() });
       const comisiones = await comR.json().catch(() => []);
       if (!Array.isArray(comisiones) || !comisiones.length) return json(200, { ok: true, zonas: [] });
@@ -158,7 +175,8 @@ exports.handler = async (event) => {
         const costo = (Number(c.costo_matriz) || 0) + (Number(c.comision) || 0);  // SOLO el final; sin desglose
         let stock = null, agotada = false;
         if (disp) { const ev = evaluarZona(disp, zona, 1); if (ev.gestionada) { stock = ev.restante; agotada = ev.agotada; } }
-        return { zona, costo, stock, agotada };
+        // actualizado_at = FRESCURA del costo para el vendedor. Jamás matriz/comisión.
+        return { zona, costo, stock, agotada, actualizado_at: c.actualizado_at || null };
       });
       return json(200, { ok: true, zonas: out });
     }

@@ -5,6 +5,7 @@ Manual De Marca.pdf
 node_modules/
 
 # Skills (impeccable / agent harness — no versionar)
-.claude/
+.claude/*
+!.claude/skills/
 .agents/
 skills-lock.json

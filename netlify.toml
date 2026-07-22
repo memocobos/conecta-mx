@@ -100,6 +100,13 @@
 [functions."contratos-alerta-cron"]
   schedule = "0 14 * * *"
 
+# Vigilante de Radio Conecta — checa el nowplaying CADA 10 MINUTOS (timeout 8s +
+# 1 reintento a los 15s). Si 2 corridas seguidas fallan (~20 min de caída) manda
+# UN correo de alerta a Memo (máx 1 cada 6 h mientras siga caída) y otro al
+# recuperarse (con duración). Estado en Portal `radio_vigilante` (1 fila).
+[functions."radio-vigilante"]
+  schedule = "*/10 * * * *"
+
 # Vendedores F4 — expiración del límite de 8 días de las VENTAS de vendedor. DIARIO.
 # Barre solicitudes_tour con vendedor_id aún PENDIENTES cuyo vende_limite venció (o
 # vence hoy/mañana) y manda UN resumen al admin para que Bulma reaccione. SOLO

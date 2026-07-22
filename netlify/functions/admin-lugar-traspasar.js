@@ -20,6 +20,12 @@
 const crypto = require('crypto');
 const { aplicarModoPrueba } = require('./_lib/correo-guard');
 const { verifyAdminAuth, corsCheck } = require('./_lib/verify-admin');
+const { fetchCatalogo } = require('./_lib/catalogo-index');
+
+// Gancho 1 del machote: traspaso gratis a 6+ días del evento; $350 dentro de los
+// últimos 5 (el día 5 exacto YA cobra; incluye 0 y negativos).
+const CARGO_TRASPASO_MXN = 350;
+const CARGO_TRASPASO_UMBRAL_DIAS = 5;
 
 const UUID_RE = /^[0-9a-f-]{36}$/i;
 const ROLES = ['maestro_roshi', 'bulma'];
@@ -75,6 +81,10 @@ exports.handler = async (event) => {
   if (motivo != null && typeof motivo !== 'string') return json(400, { error: 'motivo debe ser texto' });
   motivo = motivo ? String(motivo).trim().slice(0, MAX_MOTIVO) : '';
 
+  // Gancho 1: casilla manual "Aplicar cargo de $350" (solo aplica cuando el
+  // backend NO pudo calcular los días — evento indeterminado).
+  const forzarCargo = body.forzar_cargo === true;
+
   const sbHeaders = {
     apikey: PORTAL_KEY,
     Authorization: 'Bearer ' + PORTAL_KEY,
@@ -104,7 +114,7 @@ exports.handler = async (event) => {
 
     // ---- 3. La solicitud no debe estar cancelada (+ titular para re-apuntar/correo) ----
     const solR = await fetch(
-      `${PORTAL_URL}/rest/v1/solicitudes_tour?id=eq.${enc(lugar.solicitud_id)}&select=id,estado,evento_nombre,cliente_id,auth_user_id&limit=1`,
+      `${PORTAL_URL}/rest/v1/solicitudes_tour?id=eq.${enc(lugar.solicitud_id)}&select=id,estado,evento_nombre,evento_id,cliente_id,auth_user_id&limit=1`,
       { headers: sbHeaders }
     );
     if (!solR.ok) return json(502, { error: 'Supabase rechazó la consulta de la solicitud', detail: await solR.text() });
@@ -115,6 +125,15 @@ exports.handler = async (event) => {
     const eventoNombre = solicitud.evento_nombre || 'tu viaje';
 
     const nowISO = new Date().toISOString();
+
+    // ---- 3b. Gancho 1: decidir el cargo por traspaso ($350 si el evento está a
+    //          ≤5 días de su PRIMERA fecha). Best-effort del catálogo: si no hay
+    //          catálogo o el evento no trae ds → indeterminado (no cobra auto).
+    //          Se DECIDE aquí; el INSERT va después de traspasar (paso 4e). ----
+    const _hoyMx = hoyMx();
+    const catalogo = await fetchCatalogo();
+    const diasEvento = _diasHastaEvento(catalogo, solicitud.evento_id, _hoyMx);
+    const decisionCargo = _decidirCargo({ dias: diasEvento, forzar: forzarCargo });
 
     // ---- 4a. Nota del traspaso (identidad saliente → entrante) ----
     const nombreViejo = (lugar.nombre && String(lugar.nombre).trim()) ? String(lugar.nombre).trim() : 'sin registrar';
@@ -222,8 +241,52 @@ exports.handler = async (event) => {
       correoError = e.message;
     }
 
+    // ---- 4e. Gancho 1: si corresponde cobrar, INSERTAR la cuota nueva del cargo
+    //          ($350) en el plan. INSERT DIRECTO — JAMÁS on_conflict (índices
+    //          parciales pagos_lugar_uq / pagos_grupal_uq). numero_pago = max+1 del
+    //          plan de ESTE lugar; si el plan es grupal (el lugar no tiene cuotas
+    //          propias, #229) → max+1 de la solicitud. Best-effort: si el INSERT
+    //          truena NO se tumba el traspaso (ya ocurrió); se reporta el error. ----
+    let cargoTraspaso = decisionCargo.cargo_traspaso;
+    if (decisionCargo.cobra) {
+      try {
+        let maxNum = 0;
+        const lugNumR = await fetch(
+          `${PORTAL_URL}/rest/v1/pagos?lugar_id=eq.${enc(lugarId)}&select=numero_pago`, { headers: sbHeaders }
+        );
+        const lugNums = lugNumR.ok ? await lugNumR.json() : [];
+        if (Array.isArray(lugNums) && lugNums.length) {
+          maxNum = lugNums.reduce((m, r) => Math.max(m, Number(r.numero_pago) || 0), 0);
+        } else {
+          const solNumR = await fetch(
+            `${PORTAL_URL}/rest/v1/pagos?solicitud_id=eq.${enc(lugar.solicitud_id)}&select=numero_pago`, { headers: sbHeaders }
+          );
+          const solNums = solNumR.ok ? await solNumR.json() : [];
+          maxNum = (Array.isArray(solNums) ? solNums : []).reduce((m, r) => Math.max(m, Number(r.numero_pago) || 0), 0);
+        }
+        const numeroPago = maxNum + 1;
+        const registradoPor = (auth.user && (auth.user.correo || auth.user.rol)) || 'traspaso';
+        const insR = await fetch(`${PORTAL_URL}/rest/v1/pagos`, {
+          method: 'POST',
+          headers: { ...sbHeaders, Prefer: 'return=minimal' },
+          body: JSON.stringify(_filaCargo({ lugarId, solicitud, hoyISO: _hoyMx, numeroPago, registradoPor })),
+        });
+        if (!insR.ok) {
+          const detail = await insR.text();
+          console.error('[lugar-traspasar] cargo insert falló:', detail);
+          cargoTraspaso = { ...decisionCargo.cargo_traspaso, aplicado: false, error: 'no se pudo insertar el cargo' };
+        } else {
+          cargoTraspaso = { ...decisionCargo.cargo_traspaso, numero_pago: numeroPago };
+        }
+      } catch (e) {
+        console.error('[lugar-traspasar] cargo excepción:', e.message);
+        cargoTraspaso = { ...decisionCargo.cargo_traspaso, aplicado: false, error: e.message };
+      }
+    }
+
     // ---- 5. Reconciliación de la solicitud (best-effort, lógica de #240 "cuotas
-    //         vivas"). Reactivar cuotas puede degradar un 'pagado' → 'en_pagos'. ----
+    //         vivas"). Reactivar cuotas puede degradar un 'pagado' → 'en_pagos'.
+    //         Ya cuenta el cargo recién insertado (una cuota pendiente más). ----
     let solicitudEstado = solicitud.estado;
     try {
       const allR = await fetch(
@@ -267,6 +330,7 @@ exports.handler = async (event) => {
       invitacion_enviada: invitacionEnviada,
       correo_error: correoError || undefined,
       solicitud_estado: solicitudEstado,
+      cargo_traspaso: cargoTraspaso,
     });
   } catch (e) {
     return json(502, { error: 'Error traspasando el lugar', detail: e.message });
@@ -332,3 +396,64 @@ function invitarHtml(nombreLugar, titular, eventoNombre, url) {
     <p style="margin:0;font-size:13px;color:rgba(255,255,255,.55)">Si no reconoces este viaje, ignora este correo.</p>`;
   return wrapHtml(nombreLugar || 'viajero', cuerpo);
 }
+
+// ----- Gancho 1: cargo por traspaso (lógica PURA, testeable en arnés) -----
+
+// Días entre dos fechas 'YYYY-MM-DD' (evento - hoy) a medianoche UTC (patrón F4).
+function _daysUntil(evISO, hoyISO) {
+  const m1 = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(evISO || ''));
+  const m2 = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(hoyISO || ''));
+  if (!m1 || !m2) return null;
+  const a = Date.UTC(+m1[1], +m1[2] - 1, +m1[3]);
+  const b = Date.UTC(+m2[1], +m2[2] - 1, +m2[3]);
+  return Math.round((a - b) / 86400000);
+}
+
+// Días hasta la PRIMERA fecha del evento (ds del catálogo). Multifecha: slug base
+// (slug#idx → slug). null si no hay catálogo o el evento no trae ds (best-effort).
+function _diasHastaEvento(catalogo, evento_id, hoyISO) {
+  if (!catalogo) return null;
+  const slug = String(evento_id || '').split('#')[0];
+  const ce = catalogo[slug];
+  if (!ce || !ce.ds) return null;
+  return _daysUntil(ce.ds, hoyISO);
+}
+
+// Decide si se cobra. dias≤5 (incluye 0 y negativos) → cobra; dias≥6 → gratis.
+// Si el backend calculó los días, la REGLA manda (el forzado manual se ignora);
+// solo cuando es indeterminado (dias=null) el forzado manual decide.
+function _decidirCargo({ dias, forzar }) {
+  if (dias != null) {
+    if (dias <= CARGO_TRASPASO_UMBRAL_DIAS) {
+      return { cobra: true, cargo_traspaso: { aplicado: true, monto: CARGO_TRASPASO_MXN, dias } };
+    }
+    return { cobra: false, cargo_traspaso: { aplicado: false, monto: 0, dias } };
+  }
+  if (forzar === true) {
+    return { cobra: true, cargo_traspaso: { aplicado: true, monto: CARGO_TRASPASO_MXN, dias: null, forzado: true } };
+  }
+  return { cobra: false, cargo_traspaso: { indeterminado: true } };
+}
+
+// Fila de la cuota del cargo (misma forma que admin-generar-plan-pagos #229).
+function _filaCargo({ lugarId, solicitud, hoyISO, numeroPago, registradoPor }) {
+  return {
+    solicitud_id: solicitud.id,
+    cliente_id: solicitud.cliente_id,
+    auth_user_id: solicitud.auth_user_id,
+    lugar_id: lugarId,
+    numero_pago: numeroPago,
+    concepto: 'Cargo por traspaso',
+    monto: CARGO_TRASPASO_MXN,
+    fecha_esperada: hoyISO,
+    estado: 'pendiente',
+    registrado_por: registradoPor,
+  };
+}
+
+// Exports para el arnés (Netlify solo usa exports.handler).
+exports._daysUntil = _daysUntil;
+exports._diasHastaEvento = _diasHastaEvento;
+exports._decidirCargo = _decidirCargo;
+exports._filaCargo = _filaCargo;
+exports.CARGO_TRASPASO_MXN = CARGO_TRASPASO_MXN;

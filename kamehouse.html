@@ -10989,9 +10989,54 @@ async function loadEquipo() {
   showGZTab(tabInicial, btnInicial);
 }
 
+// 💤 F6: inactividad de vendedores (solo admin, best-effort). id → info del
+// endpoint admin-vendedor-inactividad; si falla, nadie se marca.
+let _gzInactividad = null;
+async function _gzCargarInactividad() {
+  if (!currentUser || (currentUser.rol !== 'maestro_roshi' && currentUser.rol !== 'bulma')) return;
+  try {
+    const r = await khAdminFetch('/.netlify/functions/admin-vendedor-inactividad', {
+      method: 'POST', body: JSON.stringify({ accion: 'estado' }),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (r.ok && j.ok && Array.isArray(j.vendedores)) {
+      _gzInactividad = {};
+      j.vendedores.forEach(v => { if (v && v.id) _gzInactividad[v.id] = v; });
+    }
+  } catch (e) { /* best-effort: sin chip */ }
+}
+
+// "Dar otra oportunidad": reinicia el reloj (vendedor_reactivado_at = ahora).
+// NO destructivo — el usuario no se borra ni cambia de rol.
+async function gzReactivarVendedor(userId, nombre) {
+  if (!confirm(`¿Dar otra oportunidad a ${nombre}? El reloj de inactividad se reinicia desde hoy (3 meses).`)) return;
+  try {
+    const r = await khAdminFetch('/.netlify/functions/admin-vendedor-inactividad', {
+      method: 'POST', body: JSON.stringify({ accion: 'reactivar', usuario_id: userId }),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || !j.ok) throw new Error(j.error || ('Error ' + r.status));
+    showToast('Reactivado ✓ — el reloj cuenta desde hoy', 'success');
+    _gzInactividad = null;
+    await _gzCargarInactividad();
+    renderGZ();
+  } catch (e) { showToast(e.message, 'error'); }
+}
+
+function _gzChipInactivo(u) {
+  if (!u || u.rol !== 'vendedor' || !_gzInactividad) return '';
+  const info = _gzInactividad[u.id];
+  if (!info || !info.inactivo) return '';
+  return `<div style="margin-top:8px;display:flex;flex-direction:column;gap:6px;align-items:center">
+    <span style="font-size:9px;letter-spacing:.08em;text-transform:uppercase;font-weight:800;padding:2px 8px;border-radius:4px;color:#ff6666;background:rgba(255,68,68,.14);border:1px solid rgba(255,68,68,.4)">💤 inactivo (sin ventas en 3 meses)</span>
+    <button class="btn btn-ghost btn-sm" style="font-size:10px;padding:3px 10px" onclick="event.stopPropagation();gzReactivarVendedor('${_esfEsc(u.id)}','${_esfEsc(u.nombre).replace(/'/g, '&#39;')}')">Dar otra oportunidad</button>
+  </div>`;
+}
+
 async function renderGZ() {
   const grid = document.getElementById('gz-grid');
   if (!grid) return;
+  if (_gzInactividad === null) await _gzCargarInactividad();
   let lista = _gzCache;
   if (_gzFilter !== 'todos') lista = lista.filter(u => u.rol === _gzFilter);
   if (!lista.length) {
@@ -11043,6 +11088,7 @@ async function renderGZ() {
             <div class="gz-stat-label">strikes</div>
           </div>
         </div>
+        ${_gzChipInactivo(u)}
       </div>
     </div>`;
   }).join('');
@@ -19526,7 +19572,42 @@ function _vtaCalc(ev, opts) {
   return { ok: true, paquete, zona: selZ ? selZ.n : null, num_personas: selViaj, precio_unit: cxp, total, separo, resto: total - separo, requiere_hotel: requiereHotel, requiere_transporte: requiereTransporte };
 }
 
+// 💤 F6: puerta del cotizador para el VENDEDOR. Pregunta al backend (que es
+// quien manda: todas las functions de ventas ya bloquean) y si la cuenta está
+// inactiva pinta el aviso en lugar de la UI. Best-effort: cualquier otro error
+// → la página carga normal (jamás dejar fuera a un activo por red).
+async function _vtaGateInactivo() {
+  try {
+    const r = await khAdminFetch('/.netlify/functions/admin-ventas-resumen', { method: 'POST', body: JSON.stringify({ accion: 'mis_ventas' }) });
+    if (r.status !== 403) return false;
+    const j = await r.json().catch(() => ({}));
+    if (j.codigo !== 'vendedor_inactivo') return false;
+    const vv = document.getElementById('vta-view-vender'), vm = document.getElementById('vta-view-mis');
+    if (vv) vv.style.display = 'none';
+    if (vm) vm.style.display = 'none';
+    let av = document.getElementById('vta-inactivo-aviso');
+    if (!av) {
+      av = document.createElement('div');
+      av.id = 'vta-inactivo-aviso';
+      const page = document.getElementById('page-cotizar');
+      if (page) page.appendChild(av);
+    }
+    av.innerHTML = `<div style="max-width:560px;margin:40px auto;text-align:center;padding:32px 24px;border:1px solid rgba(255,68,68,.4);border-radius:12px;background:rgba(255,68,68,.06)">
+      <div style="font-size:34px;margin-bottom:10px">💤</div>
+      <div style="font-family:'Rajdhani',sans-serif;font-weight:700;font-size:18px;margin-bottom:10px;color:#ff6666">Cuenta de vendedor inactiva</div>
+      <div style="font-size:13px;line-height:1.6;color:var(--ts)">${_esfEsc(j.error || 'Tu cuenta de vendedor está inactiva por no registrar ventas en 3 meses — contacta a Conecta para reactivarla')}</div>
+    </div>`;
+    return true;
+  } catch (e) { return false; }
+}
+
 async function loadCotizar() {
+  // 💤 F6: candado de inactividad del vendedor — evaluado en vivo en la puerta.
+  if (currentUser && currentUser.rol === 'vendedor') {
+    if (await _vtaGateInactivo()) return;
+    const av = document.getElementById('vta-inactivo-aviso');
+    if (av) av.remove(); // reactivado → la página vuelve a la normalidad
+  }
   _vtaSwitch('vender');
   const sel = document.getElementById('vta-evento');
   if (sel && sel.options.length <= 1) {

@@ -26,6 +26,7 @@
 // =============================================================================
 
 const { verifyAdminAuth, corsCheck } = require('./_lib/verify-admin');
+const { verificarVendedorActivo, AVISO_INACTIVO } = require('./_lib/vendedor-activo');
 
 const ROLES = ['vendedor', 'maestro_roshi', 'bulma'];
 const ROLES_ADMIN = ['maestro_roshi', 'bulma'];
@@ -51,6 +52,13 @@ exports.handler = async (event) => {
 
   const auth = verifyAdminAuth(event, ROLES);
   if (!auth.valid) return json(auth.status, { error: auth.error });
+
+  // 💤 F6: candado de inactividad — vendedor con 3+ meses y CERO ventas queda
+  // bloqueado EN LA PUERTA (evaluado en vivo, best-effort: en error entra).
+  if (auth.user.rol === 'vendedor') {
+    const chk = await verificarVendedorActivo(auth.user);
+    if (!chk.activo) return json(403, { error: AVISO_INACTIVO, codigo: 'vendedor_inactivo' });
+  }
 
   const env = readEnv();
   if (env.error) return json(500, { error: env.error });

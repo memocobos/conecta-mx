@@ -425,8 +425,10 @@ const CLAUSULAS = [
 // (canvas + INE + acepto) es EL MISMO que el de creadoras — se reusan los MISMOS
 // ids del DOM (#firmaCanvas, #fileFrente/#fileReverso, #acepto, #btnFirmar), así
 // que la lógica de firma no se duplica. Solo cambian encabezado y cláusulas.
-// {{FECHA_NACIMIENTO}} y {{EMERGENCIA_*}} no se capturan en este flujo → se
-// muestran como línea en blanco salvo que vengan en `datos`.
+// {{FECHA_NACIMIENTO}} y {{EMERGENCIA_*}} vienen en `datos`: para coordinador,
+// contrato-obtener los auto-llena del perfil KH (usuarios por correo) y
+// contrato-firmar los CONGELA al firmar; si el correo no casa o faltan datos →
+// línea en blanco (nunca truena). Giveaway sigue en blanco (tuerca aparte).
 function _fillBlank(v) {
   return (v == null || String(v).trim() === '') ? '__________' : escapeHtml(String(v));
 }
@@ -649,11 +651,18 @@ function renderDoc(c, opts) {
   if (c && (c.plantilla === 'coordinador' || c.plantilla === 'giveaway')) {
     return renderDocViaB(c, opts);
   }
+  // Datos capturados al firmar (fnac + emergencia): solo se pintan SI EXISTEN
+  // en datos jsonb — los contratos viejos sin datos rinden EXACTO como siempre.
+  const _dc = (c.datos && typeof c.datos === 'object') ? c.datos : {};
+  const _dcEm = (_dc.emergencia && typeof _dc.emergencia === 'object') ? _dc.emergencia : {};
+  const filasDatos = (_dc.fecha_nacimiento || _dcEm.nombre || _dcEm.telefono) ? `
+      <div class="meta-row"><span class="lbl">Fecha de nacimiento:</span><span class="val">${escapeHtml(_dc.fecha_nacimiento || '—')}</span></div>
+      <div class="meta-row"><span class="lbl">Contacto de emergencia:</span><span class="val">${escapeHtml(_dcEm.nombre || '—')}${_dcEm.telefono ? ' · ' + escapeHtml(_dcEm.telefono) : ''}</span></div>` : '';
   const docMeta = `
     <div class="doc-meta">
       <div class="meta-row"><span class="lbl">Fecha del contrato:</span><span class="val">${escapeHtml(fmtFechaLarga(c.contrato_fecha))}</span></div>
       <div class="meta-row"><span class="lbl">Concierto / Festival / Evento:</span><span class="val">${escapeHtml(c.evento_nombre)}</span></div>
-      <div class="meta-row"><span class="lbl">Fecha del evento:</span><span class="val">${escapeHtml(fmtFechaCorta(c.evento_fecha))}</span></div>
+      <div class="meta-row"><span class="lbl">Fecha del evento:</span><span class="val">${escapeHtml(fmtFechaCorta(c.evento_fecha))}</span></div>${filasDatos}
     </div>`;
 
   const header = `
@@ -700,6 +709,22 @@ function renderDoc(c, opts) {
               <span class="lbl-title">Reverso del INE</span>
               <span class="lbl-hint">Toca para tomar/subir foto</span>
               <input type="file" id="fileReverso" accept="image/*" capture="environment">
+            </label>
+          </div>
+        </div>
+
+        <div class="datos-firma-section">
+          <div class="panel-title" style="font-size:18px;margin-top:24px">🪪 Tus datos</div>
+          <p class="panel-sub">Para tu seguridad en los viajes: tu fecha de nacimiento y a quién llamamos si hay una emergencia. Son obligatorios para firmar.</p>
+          <div style="display:grid;gap:12px">
+            <label style="display:block;font-size:12px;color:rgba(255,255,255,.7)">Fecha de nacimiento
+              <input type="date" id="fnacInput" style="display:block;width:100%;margin-top:5px;padding:11px 12px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.22);border-radius:6px;color:#fff;font-size:14px;box-sizing:border-box;color-scheme:dark">
+            </label>
+            <label style="display:block;font-size:12px;color:rgba(255,255,255,.7)">Contacto de emergencia — nombre
+              <input type="text" id="emNomInput" maxlength="120" placeholder="Nombre de tu contacto" style="display:block;width:100%;margin-top:5px;padding:11px 12px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.22);border-radius:6px;color:#fff;font-size:14px;box-sizing:border-box">
+            </label>
+            <label style="display:block;font-size:12px;color:rgba(255,255,255,.7)">Contacto de emergencia — teléfono
+              <input type="tel" id="emTelInput" maxlength="30" placeholder="10 dígitos" style="display:block;width:100%;margin-top:5px;padding:11px 12px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.22);border-radius:6px;color:#fff;font-size:14px;box-sizing:border-box">
             </label>
           </div>
         </div>
@@ -1121,11 +1146,38 @@ function _fileInputHtml(id) {
 }
 
 let firma, ineFrenteState, ineReversoState;
+
+// Captura al firmar (plantilla creadora): fecha de nacimiento + contacto de
+// emergencia OBLIGATORIOS. Los flujos sin estos inputs (coordinador/giveaway,
+// que no los pintan) devuelven true y quedan EXACTO como antes.
+function _datosFirmaOk() {
+  const f = document.getElementById("fnacInput");
+  if (!f) return true;
+  const n = document.getElementById("emNomInput");
+  const t = document.getElementById("emTelInput");
+  return !!(f.value && n && n.value.trim() && t && t.value.trim());
+}
+
+// Payload de la captura para contrato-firmar. null si el flujo no la pinta.
+function _datosFirmaPayload() {
+  const f = document.getElementById("fnacInput");
+  if (!f) return null;
+  const n = document.getElementById("emNomInput");
+  const t = document.getElementById("emTelInput");
+  return {
+    fecha_nacimiento: f.value || "",
+    emergencia: {
+      nombre: ((n && n.value) || "").trim(),
+      telefono: ((t && t.value) || "").trim(),
+    },
+  };
+}
+
 function checkSubmit() {
   const accept = document.getElementById("acepto");
   const btn = document.getElementById("btnFirmar");
   if (!btn) return;
-  btn.disabled = !(firma && firma.hasInk() && ineFrenteState.dataUrl && ineReversoState.dataUrl && accept.checked);
+  btn.disabled = !(firma && firma.hasInk() && ineFrenteState.dataUrl && ineReversoState.dataUrl && accept.checked && _datosFirmaOk());
 }
 
 // Mensaje accionable que mostramos cuando ni la cascada de compresión logra
@@ -1187,12 +1239,18 @@ async function enviarFirma(token, btn, errBox) {
       throw new Error(MSG_FOTOS_HEIC);
     }
 
-    const buildPayload = () => ({
-      token,
-      firma_data: firmaData,
-      ine_frente: ineFrenteState.dataUrl,
-      ine_reverso: ineReversoState.dataUrl,
-    });
+    const buildPayload = () => {
+      const p = {
+        token,
+        firma_data: firmaData,
+        ine_frente: ineFrenteState.dataUrl,
+        ine_reverso: ineReversoState.dataUrl,
+      };
+      // Captura de la creadora (fnac + emergencia). null en flujos sin captura.
+      const df = _datosFirmaPayload();
+      if (df) p.datos_firma = df;
+      return p;
+    };
     const sizeMB = (p) => JSON.stringify(p).length / 1024 / 1024;
 
     let payload = buildPayload();
@@ -1339,6 +1397,11 @@ async function loadContrato() {
     document.getElementById("firmaCanvas").addEventListener("mouseup", checkSubmit);
     document.getElementById("firmaCanvas").addEventListener("touchend", checkSubmit);
     document.getElementById("acepto").addEventListener("change", checkSubmit);
+    // Captura al firmar (solo existe en el flujo de creadora).
+    ["fnacInput", "emNomInput", "emTelInput"].forEach((id) => {
+      const el = document.getElementById(id);
+      if (el) { el.addEventListener("input", checkSubmit); el.addEventListener("change", checkSubmit); }
+    });
     document.getElementById("btnFirmar").addEventListener("click", () => {
       const errBox = document.getElementById("formErr");
       enviarFirma(getToken(), document.getElementById("btnFirmar"), errBox);

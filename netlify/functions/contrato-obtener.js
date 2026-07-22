@@ -19,6 +19,29 @@ function bad(status, msg) {
   return { statusCode: status, headers: HEADERS, body: JSON.stringify({ ok: false, error: msg }) };
 }
 
+// Fusiona el perfil KH del coordinador (usuarios por correo) sobre `datos`
+// SIN pisar lo que ya exista. Devuelve el datos fusionado (o el original si el
+// correo no casa / no hay nada que sumar). Lanza solo en error de red — el
+// caller lo trata como best-effort.
+async function _fusionarPerfilCoordinador(datos, correo) {
+  const mail = String(correo || "").trim();
+  if (!mail) return datos;
+  const r = await fetch(
+    `${SB_URL}/rest/v1/usuarios?correo=eq.${encodeURIComponent(mail)}&select=fecha_nacimiento,nombre_emergencia,num_emergencia&limit=1`,
+    { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` } }
+  );
+  if (!r.ok) return datos;
+  const [perfil] = await r.json();
+  if (!perfil) return datos;
+  const d = { ...(datos || {}) };
+  const em = (d.emergencia && typeof d.emergencia === "object") ? { ...d.emergencia } : {};
+  if (!d.fecha_nacimiento && perfil.fecha_nacimiento) d.fecha_nacimiento = perfil.fecha_nacimiento;
+  if (!em.nombre && perfil.nombre_emergencia) em.nombre = perfil.nombre_emergencia;
+  if (!em.telefono && perfil.num_emergencia) em.telefono = perfil.num_emergencia;
+  if (Object.keys(em).length) d.emergencia = em;
+  return Object.keys(d).length ? d : datos;
+}
+
 async function signUrl(path) {
   try {
     const r = await fetch(`${SB_URL}/storage/v1/object/sign/${BUCKET}/${encodeURI(path)}`, {
@@ -70,6 +93,22 @@ exports.handler = async function (event) {
 
   if (!row) return bad(404, "Contrato no encontrado");
 
+  // VÍA B: auto-llenado del COORDINADOR desde su perfil KH (usuarios). Casa el
+  // correo del contrato contra usuarios.correo y jala fecha_nacimiento +
+  // nombre/num de emergencia para llenar el texto v3.1. SOLO mientras NO está
+  // firmado — al firmar, contrato-firmar CONGELA el snapshot en datos jsonb y
+  // aquí ya se sirve lo congelado tal cual. Best-effort estricto: correo que no
+  // casa, perfil incompleto o error → datos como están (líneas en blanco de
+  // hoy, nunca truena). Lo ya presente en datos (capturado a mano) SIEMPRE gana.
+  let datos = row.datos || null;
+  if (row.plantilla === "coordinador" && row.estado !== "firmado") {
+    try {
+      datos = await _fusionarPerfilCoordinador(datos, row.creador_email);
+    } catch (e) {
+      console.warn("[contrato-obtener] perfil coordinador falló (best-effort):", e.message);
+    }
+  }
+
   // Firmar URLs del INE si está firmado y existen los paths.
   let ine_urls = null;
   if (row.estado === "firmado" && row.ine && (row.ine.frente || row.ine.reverso)) {
@@ -99,7 +138,7 @@ exports.handler = async function (event) {
         // (default) plantilla viene 'creadora' y datos/vigencia null: la página los
         // ignora y renderiza idéntico a siempre.
         plantilla: row.plantilla || 'creadora',
-        datos: row.datos || null,
+        datos,
         vigencia_inicio: row.vigencia_inicio || null,
         vigencia_fin: row.vigencia_fin || null,
         estado: row.estado,

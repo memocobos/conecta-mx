@@ -57,9 +57,27 @@ function _snapshotPrecio(pr, extra) {
     fecha_idx: (extra && extra.fecha_idx) || 0,
     requiere_hotel: !!pr.requiere_hotel,
     requiere_transporte: !!pr.requiere_transporte,
-    fuente: 'EV',
+    fuente: pr.fuente || 'EV',   // 'EV' (web) o 'COMISION_ZONA' (CHEAP de vendedor)
     sellado_at: (extra && extra.sellado_at) || new Date().toISOString(),
   };
+}
+
+// VENDEDORES F5a — precio CHEAP del vendedor: NO viene del catálogo web, sino de
+// comisiones_zona (Palacio KH). costo del vendedor = costo_matriz + comision;
+// separo = comision (ganancia de Memo, se cobra primero). Rechaza si la zona no
+// tiene comisión asignada. Best-effort: sin comisión → no se puede vender.
+async function _precioCheapVendedor(khUrl, khKey, eventoId, zona, num) {
+  const enc = encodeURIComponent;
+  const r = await fetch(`${khUrl}/rest/v1/comisiones_zona?evento_id=eq.${enc(eventoId)}&zona=eq.${enc(zona)}&select=costo_matriz,comision&limit=1`,
+    { headers: { apikey: khKey, Authorization: 'Bearer ' + khKey } });
+  if (!r.ok) return { ok: false, motivo: 'No se pudo leer la comisión de la zona' };
+  const row = ((await r.json().catch(() => [])) || [])[0] || null;
+  if (!row) return { ok: false, motivo: 'Esta zona CHEAP no tiene comisión asignada — pídele a Memo que la configure en el Palacio.' };
+  const matriz = Number(row.costo_matriz) || 0;
+  const comision = Number(row.comision) || 0;
+  const unit = matriz + comision;
+  if (!(unit > 0)) return { ok: false, motivo: 'El costo/comisión de esta zona es 0 — Memo debe configurarlo.' };
+  return { ok: true, paquete: 'cheap', zona, num_personas: num, precio_unit: unit, total: unit * num, separo: comision * num, resto: matriz * num, fuente: 'COMISION_ZONA' };
 }
 
 function _bad(headers, status, error, extra) {
@@ -136,12 +154,21 @@ exports.handler = async (event) => {
       return _bad(headers, 409, msg, { restante: ev.restante });
     }
 
-    // ── 2. SELLA el precio desde el catálogo (candado). El precio NUNCA viene del request.
-    const pr = await resolverPrecioVenta({ evento_id: eventoId, paquete, zona, num_personas: numPersonas, hotel_nombre: hotel, hoyISO });
-    if (!pr.ok) {
-      if (pr.indeterminado) return _bad(headers, 502, 'No se pudo sellar el precio: catálogo no disponible. Intenta de nuevo (nunca se inventa un precio).');
-      const status = /agotada|no encontrada|no disponible/i.test(pr.motivo || '') ? 409 : 400;
-      return _bad(headers, status, pr.motivo || 'No se pudo sellar el precio');
+    // ── 2. SELLA el precio (candado). El precio NUNCA viene del request.
+    //    CHEAP de vendedor = economía propia (comisiones_zona, Palacio KH); el resto
+    //    de paquetes = precio web (resolverPrecioVenta). El CHEAP web del cliente NO
+    //    pasa por aquí (esto es solo el motor del vendedor).
+    let pr;
+    if (paquete === 'cheap') {
+      pr = await _precioCheapVendedor(env.KH_SB_URL, env.KH_SB_SERVICE, eventoId, zona, numPersonas);
+      if (!pr.ok) return _bad(headers, /comisión asignada|configur/i.test(pr.motivo || '') ? 409 : 400, pr.motivo || 'No se pudo sellar el precio CHEAP');
+    } else {
+      pr = await resolverPrecioVenta({ evento_id: eventoId, paquete, zona, num_personas: numPersonas, hotel_nombre: hotel, hoyISO });
+      if (!pr.ok) {
+        if (pr.indeterminado) return _bad(headers, 502, 'No se pudo sellar el precio: catálogo no disponible. Intenta de nuevo (nunca se inventa un precio).');
+        const status = /agotada|no encontrada|no disponible/i.test(pr.motivo || '') ? 409 : 400;
+        return _bad(headers, status, pr.motivo || 'No se pudo sellar el precio');
+      }
     }
 
     // Nombre del evento (display) desde el catálogo curado (best-effort → slug).
@@ -246,3 +273,4 @@ function readEnv() {
 // Exports para el arnés (Netlify solo usa exports.handler).
 exports._vendeLimite = _vendeLimite;
 exports._snapshotPrecio = _snapshotPrecio;
+exports._precioCheapVendedor = _precioCheapVendedor;

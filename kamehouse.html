@@ -3251,6 +3251,16 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
    </select>
    <div id="kam-compras"></div>
   </div>
+  <div class="card">
+   <div style="font-family:'Rajdhani',sans-serif;font-weight:700;font-size:16px;margin-bottom:4px">Comisiones CHEAP (vendedores)</div>
+   <div style="font-size:11px;color:var(--ts);margin-bottom:14px">Por zona: fija el <b>costo matriz</b> (te sugiero la última compra) y tu <b>comisión</b>. El vendedor cobra <b>matriz + comisión</b> — la comisión es tu ganancia y se cobra primero. Sin comisión, la zona NO se puede vender en CHEAP. El vendedor jamás ve este desglose.</div>
+   <select id="kam-com-evt" class="cot-input" style="width:100%;margin-bottom:10px" onchange="_comOnEvento()">
+    <option value="">— Elige un evento —</option>
+   </select>
+   <select id="kam-com-fecha" class="cot-input" style="width:100%;margin-bottom:12px;display:none" onchange="_comLoad()"></select>
+   <div id="kam-com-alert" style="margin-bottom:10px"></div>
+   <div id="kam-com-body"></div>
+  </div>
  </div><!-- /page-kamisama -->
 
  <!-- ─── KAIO-SAMA · Admin de Radio Conecta (solo maestro_roshi) ─── -->
@@ -3593,10 +3603,10 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
      <div style="max-width:720px">
        <div class="form-row cols-2">
          <div class="form-group"><label>Evento *</label><select id="vta-evento" onchange="_vtaOnEvento()"><option value="">— Elige un evento —</option></select></div>
-         <div class="form-group" id="vta-fecha-wrap" style="display:none"><label>Fecha *</label><select id="vta-fecha" onchange="_vtaRecalc()"></select></div>
+         <div class="form-group" id="vta-fecha-wrap" style="display:none"><label>Fecha *</label><select id="vta-fecha" onchange="_vtaResync()"></select></div>
        </div>
        <div class="form-row cols-2">
-         <div class="form-group"><label>Paquete *</label><select id="vta-paquete" onchange="_vtaRecalc()"><option value="plus">PLUS</option><option value="ride">RIDE</option><option value="stay">STAY</option><option value="cheap">CHEAP</option></select></div>
+         <div class="form-group"><label>Paquete *</label><select id="vta-paquete" onchange="_vtaResync()"><option value="plus">PLUS</option><option value="ride">RIDE</option><option value="stay">STAY</option><option value="cheap">CHEAP</option></select></div>
          <div class="form-group"><label>Personas *</label><input type="number" id="vta-num" min="1" max="12" value="1" oninput="_vtaRecalc()"></div>
        </div>
        <div class="form-row cols-2">
@@ -9717,6 +9727,7 @@ document.addEventListener('keydown', e => {
 function loadKamisama() {
   _kamProveedoresLoad();
   _kamPopulateEventos();
+  _comPopulateEventos();
 }
 
 async function _kamProveedoresLoad() {
@@ -9793,6 +9804,114 @@ async function _kamPopulateEventos() {
       .join('');
     sel.innerHTML = '<option value="">— Elige un evento —</option>' + opts;
   } catch (_) { /* deja el placeholder */ }
+}
+
+// ── Comisiones CHEAP por zona (F5a — pantalla de Memo, solo maestro_roshi) ────
+// El evento_id que se guarda/consulta DEBE ser idéntico al que usa el vendedor al
+// cotizar (_vtaEventoId): 'slug' o 'slug#idx' para multifecha. Por eso el selector
+// espeja esa lógica (evento + fecha).
+let _comEVCache = [];   // EV crudo del index (para leer multifecha)
+let _comZonas = [];     // último `listar` (index de fila → zona)
+function _comEsc(s) { return _esfEsc(s); }
+function _comFmt(n) { return '$' + Math.round(Number(n) || 0).toLocaleString('es-MX'); }
+function _comAlert(m, err) { const a = document.getElementById('kam-com-alert'); if (a) a.innerHTML = m ? `<div class="alert ${err ? 'alert-error' : 'alert-success'}">${_comEsc(m)}</div>` : ''; }
+
+async function _comPopulateEventos() {
+  const sel = document.getElementById('kam-com-evt');
+  if (!sel) return;
+  try {
+    const ev = await _fetchEVFromIndex();
+    _comEVCache = Array.isArray(ev) ? ev : [];
+    const opts = _comEVCache
+      .filter((e) => e && e.id)
+      .slice()
+      .sort((a, b) => String(a.a || a.id).localeCompare(String(b.a || b.id)))
+      .map((e) => `<option value="${_comEsc(e.id)}">${_comEsc(e.a || e.id)}</option>`)
+      .join('');
+    sel.innerHTML = '<option value="">— Elige un evento —</option>' + opts;
+  } catch (_) { /* deja el placeholder */ }
+}
+
+function _comOnEvento() {
+  const ev = _comEVCache.find((e) => e && e.id === document.getElementById('kam-com-evt').value);
+  const fsel = document.getElementById('kam-com-fecha');
+  fsel.innerHTML = '';
+  if (ev && Array.isArray(ev.multifecha) && ev.multifecha.length) {
+    ev.multifecha.forEach((m, i) => { const o = document.createElement('option'); o.value = String(i); o.textContent = (m && m.lbl) ? m.lbl : ('Fecha ' + (i + 1)); fsel.appendChild(o); });
+    fsel.style.display = '';
+  } else { fsel.style.display = 'none'; }
+  _comLoad();
+}
+
+// evento_id compuesto — MISMO formato que _vtaEventoId del cotizador del vendedor.
+function _comEventoId() {
+  const id = document.getElementById('kam-com-evt').value;
+  if (!id) return '';
+  const fsel = document.getElementById('kam-com-fecha');
+  if (fsel && fsel.style.display !== 'none' && fsel.value !== '') return id + '#' + fsel.value;
+  return id;
+}
+
+async function _comLoad() {
+  const body = document.getElementById('kam-com-body');
+  if (!body) return;
+  _comAlert('');
+  const eid = _comEventoId();
+  if (!eid) { body.innerHTML = ''; return; }
+  body.innerHTML = '<div class="loading-state"><div class="spinner"></div>Cargando…</div>';
+  try {
+    const r = await khAdminFetch('/.netlify/functions/admin-comisiones-zona', { method: 'POST', body: JSON.stringify({ accion: 'listar', evento_id: eid }) });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || !j.ok) throw new Error(j.error || ('Error ' + r.status));
+    _comZonas = Array.isArray(j.zonas) ? j.zonas : [];
+    if (!_comZonas.length) { body.innerHTML = '<div class="empty-state"><div class="empty-icon"></div>Sin zonas CHEAP ni compras para este evento.</div>'; return; }
+    const rows = _comZonas.map((z, i) => {
+      const matrizVal = (z.costo_matriz != null) ? z.costo_matriz : (z.sugerencia_matriz != null ? z.sugerencia_matriz : '');
+      const sug = (z.sugerencia_matriz != null) ? ('última compra ' + _comFmt(z.sugerencia_matriz)) : 'sin compras';
+      const badge = z.configurada
+        ? '<span style="font-size:10px;color:var(--green);font-weight:700">✓ configurada</span>'
+        : '<span style="font-size:10px;color:var(--orange);font-weight:700">pendiente</span>';
+      return `<tr style="border-top:1px solid var(--border)">
+        <td style="padding:8px 4px;font-size:13px"><b>${_comEsc(z.zona)}</b><br>${badge}</td>
+        <td style="padding:8px 4px"><input type="number" min="0" id="com-m-${i}" class="cot-input" style="width:110px" value="${matrizVal}" placeholder="matriz" oninput="_comCalcFila(${i})"><br><span style="font-size:10px;color:var(--ts)">${sug}</span></td>
+        <td style="padding:8px 4px"><input type="number" min="0" id="com-c-${i}" class="cot-input" style="width:110px" value="${z.comision != null ? z.comision : ''}" placeholder="comisión" oninput="_comCalcFila(${i})"></td>
+        <td style="padding:8px 4px;text-align:right;font-size:13px"><span id="com-t-${i}">—</span><br><span style="font-size:10px;color:var(--ts)">costo vendedor</span></td>
+        <td style="padding:8px 4px;text-align:right"><button class="btn btn-primary btn-sm" type="button" onclick="_comGuardar(${i})">Guardar</button></td>
+      </tr>`;
+    }).join('');
+    body.innerHTML = `<table style="width:100%;border-collapse:collapse"><thead><tr style="font-size:10px;color:var(--ts);text-transform:uppercase;letter-spacing:.08em"><th style="text-align:left;padding:4px">Zona</th><th style="text-align:left;padding:4px">Costo matriz</th><th style="text-align:left;padding:4px">Comisión</th><th style="text-align:right;padding:4px">Vendedor</th><th></th></tr></thead><tbody>${rows}</tbody></table>`;
+    _comZonas.forEach((z, i) => _comCalcFila(i));
+  } catch (e) {
+    body.innerHTML = `<div class="alert alert-error">${_comEsc(e.message)}</div>`;
+  }
+}
+
+// Recalcula el costo del vendedor (matriz+comisión) en vivo para una fila.
+function _comCalcFila(i) {
+  const m = Number(document.getElementById('com-m-' + i)?.value);
+  const c = Number(document.getElementById('com-c-' + i)?.value);
+  const out = document.getElementById('com-t-' + i);
+  if (!out) return;
+  if (Number.isFinite(m) && Number.isFinite(c) && document.getElementById('com-m-' + i).value !== '' && document.getElementById('com-c-' + i).value !== '') out.textContent = _comFmt(m + c);
+  else out.textContent = '—';
+}
+
+async function _comGuardar(i) {
+  const z = _comZonas[i];
+  if (!z) return;
+  const eid = _comEventoId();
+  const mEl = document.getElementById('com-m-' + i), cEl = document.getElementById('com-c-' + i);
+  const costo_matriz = Number(mEl?.value), comision = Number(cEl?.value);
+  if (!eid) return _comAlert('Elige un evento', true);
+  if (mEl.value === '' || !Number.isFinite(costo_matriz) || costo_matriz < 0) return _comAlert('Costo matriz inválido en ' + z.zona, true);
+  if (cEl.value === '' || !Number.isFinite(comision) || comision < 0) return _comAlert('Comisión inválida en ' + z.zona, true);
+  try {
+    const r = await khAdminFetch('/.netlify/functions/admin-comisiones-zona', { method: 'POST', body: JSON.stringify({ accion: 'guardar', evento_id: eid, zona: z.zona, costo_matriz: Math.round(costo_matriz), comision: Math.round(comision) }) });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || !j.ok) throw new Error(j.error || ('Error ' + r.status));
+    _comAlert(z.zona + ' guardada — costo vendedor ' + _comFmt(Math.round(costo_matriz) + Math.round(comision)), false);
+    _comLoad();
+  } catch (e) { _comAlert(e.message, true); }
 }
 
 // Carga y pinta las compras del evento elegido, agrupadas por zona, con stock y
@@ -18685,6 +18804,9 @@ let _vtaEV = null;         // catálogo EV (crudo) cacheado
 let _vtaEvento = null;     // evento seleccionado (objeto EV)
 let _vtaAgotadas = {};     // evento_id → Set de zonas agotadas (disponibilidad-evento)
 let _vtaVentasCache = [];  // última lista de Mis Ventas (para el botón de cancelar)
+// F5a — CHEAP de vendedor: costo por zona desde comisiones_zona (matriz+comisión).
+// evento_id(#idx) → { zona → {costo, stock, agotada} }. SOLO costo final (sin desglose).
+let _vtaCostoCheap = {};
 
 function _vtaEsc(s) { return _escCtr(s); }
 function _vtaFmt(n) { return '$' + Math.round(Number(n) || 0).toLocaleString('es-MX'); }
@@ -18791,9 +18913,30 @@ async function _vtaOnEvento() {
       if (j && j.ok && Array.isArray(j.zonas_agotadas)) _vtaAgotadas[id] = new Set(j.zonas_agotadas.map(z => String(z).trim()));
     } catch (e) { /* sin disponibilidad: no se apaga nada (el backend valida al registrar) */ }
   }
+  await _vtaResync();
+}
+
+// Repuebla hotel + zonas según paquete/fecha (para CHEAP carga el costo del vendedor
+// desde comisiones_zona) y recalcula. Lo llaman evento/paquete/fecha (cambian la lista).
+async function _vtaResync() {
   _vtaPoblarHotel();
+  const paquete = document.getElementById('vta-paquete').value;
+  if (paquete === 'cheap' && _vtaEvento) await _vtaCargarCostoCheap(_vtaEventoId());
   _vtaPoblarZonas();
   _vtaRecalc();
+}
+
+// Carga el costo CHEAP del vendedor por zona (matriz+comisión, SIN desglose) + stock.
+// Cachea por evento_id(#idx). Best-effort: si falla, deja mapa vacío (sin zonas CHEAP).
+async function _vtaCargarCostoCheap(eid) {
+  if (!eid || _vtaCostoCheap[eid]) return;
+  const map = {};
+  try {
+    const r = await khAdminFetch('/.netlify/functions/admin-comisiones-zona', { method: 'POST', body: JSON.stringify({ accion: 'costo_vendedor', evento_id: eid }) });
+    const j = await r.json().catch(() => ({}));
+    if (r.ok && j && j.ok && Array.isArray(j.zonas)) j.zonas.forEach(z => { if (z && z.zona != null) map[String(z.zona).trim()] = z; });
+  } catch (e) { /* sin costos: el select CHEAP quedará vacío y el backend validará al registrar */ }
+  _vtaCostoCheap[eid] = map;
 }
 
 // evento_id con multifecha → 'slug#idx'.
@@ -18810,6 +18953,24 @@ function _vtaPoblarZonas() {
   if (!_vtaEvento) { zsel.innerHTML = '<option value="">— Elige un evento primero —</option>'; return; }
   const paquete = document.getElementById('vta-paquete').value;
   const fi = (document.getElementById('vta-fecha-wrap').style.display !== 'none') ? (parseInt(document.getElementById('vta-fecha').value, 10) || 0) : 0;
+  // CHEAP de vendedor: zonas y costo vienen de comisiones_zona (no del EV). Solo se
+  // ofrecen zonas con comisión asignada; sin comisión → no se puede vender esa zona.
+  if (paquete === 'cheap') {
+    const mapa = _vtaCostoCheap[_vtaEventoId()] || {};
+    const zonas = Object.keys(mapa);
+    if (!zonas.length) { zsel.innerHTML = '<option value="">— sin zonas CHEAP configuradas (pídele a Memo la comisión) —</option>'; return; }
+    zsel.innerHTML = '<option value="">— Elige zona —</option>';
+    zonas.sort().forEach(z => {
+      const info = mapa[z] || {};
+      const o = document.createElement('option');
+      const off = !!info.agotada;
+      o.value = z;
+      o.textContent = z + ' · ' + _vtaFmt(info.costo) + (off ? ' — AGOTADA' : (info.stock != null ? ' (' + info.stock + ' disp.)' : ''));
+      if (off) { o.disabled = true; o.style.color = '#888'; }
+      zsel.appendChild(o);
+    });
+    return;
+  }
   const lista = _vtaZonaLista(_vtaEvento, paquete, fi);
   const agot = _vtaAgotadas[_vtaEvento.id] || new Set();
   const disp = lista.filter(z => z && Number(z.p) > 0);
@@ -18847,9 +19008,24 @@ function _vtaRecalc() {
   const fi = (document.getElementById('vta-fecha-wrap').style.display !== 'none') ? (parseInt(document.getElementById('vta-fecha').value, 10) || 0) : 0;
   const zona = zsel.value;
   if (!zona) { box.style.display = 'none'; return; }
+  const limite = (() => { const d = new Date(_vtaHoyMx() + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() + 8); return d.toISOString().slice(0, 10); })();
+  // CHEAP de vendedor: el costo sale de comisiones_zona (matriz+comisión). El vendedor
+  // ve SOLO el costo final; el separo (=comisión de Memo) es privado y NO se muestra.
+  if (paquete === 'cheap') {
+    const info = (_vtaCostoCheap[_vtaEventoId()] || {})[zona];
+    if (!info || info.costo == null) { box.style.display = 'none'; return; }
+    const total = (Number(info.costo) || 0) * num;
+    box.style.display = '';
+    box.innerHTML = `
+      <div style="display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;font-size:14px">
+        <div><div style="font-size:10px;color:var(--ts);text-transform:uppercase;letter-spacing:.08em">Total</div><b style="font-size:18px">${_vtaFmt(total)}</b> <span style="font-size:11px;color:var(--ts)">(${num} pers. · ${_vtaFmt(info.costo)} c/u)</span></div>
+        <div><div style="font-size:10px;color:var(--ts);text-transform:uppercase;letter-spacing:.08em">Fecha límite</div><b style="font-size:14px">${limite}</b> <span style="font-size:11px;color:var(--ts)">(8 días)</span></div>
+      </div>
+      <div style="margin-top:6px;font-size:10px;color:var(--ts)"><svg class="ic" style="width:11px;height:11px;vertical-align:-1px"><use href="#ic-candado"/></svg> Costo CHEAP fijo — el sistema lo sella al registrar.</div>`;
+    return;
+  }
   const pr = _vtaCalc(_vtaEvento, { paquete, zona, num_personas: num, hotel_nombre: hotel, fecha_idx: fi });
   if (!pr.ok) { box.style.display = 'none'; return; }
-  const limite = (() => { const d = new Date(_vtaHoyMx() + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() + 8); return d.toISOString().slice(0, 10); })();
   box.style.display = '';
   box.innerHTML = `
     <div style="display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;font-size:14px">
@@ -18914,7 +19090,9 @@ async function _vtaMisVentas() {
       const c = (v.clientes && (Array.isArray(v.clientes) ? v.clientes[0] : v.clientes)) || {};
       const snap = v.precio_sellado || {};
       const total = (snap.total != null) ? snap.total : v.precio_total;
+      // separo puede venir OMITIDO (privacidad CHEAP del vendedor) → no se muestra.
       const separo = (snap.separo != null) ? snap.separo : v.monto_separo;
+      const separoHtml = (separo != null) ? `<br><span style="color:var(--orange);font-size:11px">sep ${_vtaFmt(separo)}</span>` : '';
       const dias = _vtaDias(v.vende_limite, hoy);
       let limCell = _vtaEsc(v.vende_limite || '—');
       if (v.vende_limite && dias != null && v.estado === 'pendiente') {
@@ -18932,7 +19110,7 @@ async function _vtaMisVentas() {
         ${vendedorCell}
         <td>${_vtaEsc(v.evento_nombre || v.evento_id || '')}</td>
         <td>${_vtaEsc(v.zona || '')}<br><span style="color:var(--ts);font-size:11px">${_vtaEsc(v.paquete || '')}</span></td>
-        <td style="text-align:right">${_vtaFmt(total)}<br><span style="color:var(--orange);font-size:11px">sep ${_vtaFmt(separo)}</span></td>
+        <td style="text-align:right">${_vtaFmt(total)}${separoHtml}</td>
         <td>${_vtaEsc(v.estado || '')}</td>
         <td>${limCell}</td>
         ${accCell}

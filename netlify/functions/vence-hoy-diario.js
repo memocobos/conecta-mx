@@ -21,6 +21,8 @@
 // portal-recordatorios-diario). Reusa PORTAL_SUPABASE_URL / PORTAL_SUPABASE_SERVICE_KEY.
 
 const { aplicarModoPrueba } = require('./_lib/correo-guard');
+const { fetchCatalogo } = require('./_lib/catalogo-index');
+const { resolverCuentaDeCatalogo, cajaCuentaHtml } = require('./_lib/cuenta-deposito');
 
 const SB_URL = process.env.PORTAL_SUPABASE_URL;
 const SB_KEY = process.env.PORTAL_SUPABASE_SERVICE_KEY;
@@ -103,7 +105,7 @@ async function leerSolicitudes(solIds) {
   for (let i = 0; i < solIds.length; i += LOTE) {
     const chunk = solIds.slice(i, i + LOTE);
     const rows = await sb(
-      `solicitudes_tour?id=in.(${chunk.join(',')})&estado=neq.cancelado&select=id,cliente_id,evento_nombre&limit=5000`
+      `solicitudes_tour?id=in.(${chunk.join(',')})&estado=neq.cancelado&select=id,cliente_id,evento_nombre,evento_id,paquete&limit=5000`
     );
     if (Array.isArray(rows)) out.push(...rows);
   }
@@ -146,8 +148,12 @@ exports.handler = async function () {
   // 3) Solicitudes NO canceladas de esos pagos (las canceladas se saltan).
   const solIds = [...new Set(pagosHoy.map(p => p.solicitud_id).filter(Boolean))];
   const solicitudes = await leerSolicitudes(solIds);
-  const solMap = {}; // id → { cliente_id, evento_nombre }
+  const solMap = {}; // id → { cliente_id, evento_nombre, evento_id, paquete }
   for (const s of solicitudes) if (s && s.id) solMap[s.id] = s;
+
+  // Gancho 2: catálogo (best-effort) para la caja de cuenta por paquete. Caído →
+  // catalogo=null → correos SIN caja (idéntico a hoy).
+  const catalogo = await fetchCatalogo();
 
   // 4) Anti-doble-correo POR PERSONA (F3-t5): quien tenga alguna cuota SUYA
   //    'vencida' (por su cliente_id) ya está en la escalera de morosidad → se
@@ -171,9 +177,16 @@ exports.handler = async function () {
     if (!cid) continue;
     if ((vencidosPorCliente[cid] || 0) >= 1) continue;         // esa persona ya está en morosidad
     let acc = porCliente[cid];
-    if (!acc) { acc = { montoSum: 0, conceptos: [], evento_nombre: sol.evento_nombre || 'tu evento' }; porCliente[cid] = acc; }
+    if (!acc) { acc = { montoSum: 0, conceptos: [], evento_nombre: sol.evento_nombre || 'tu evento', cuentaKey: undefined, cuenta: null }; porCliente[cid] = acc; }
     acc.montoSum += Number(p.monto) || 0;
     acc.conceptos.push(p.concepto || ('Abono ' + p.numero_pago));
+    // Cuenta bancaria del paquete de ESTA cuota. Si las cuotas de hoy de un mismo
+    // cliente resuelven a bancos distintos → conflicto → NO se pinta caja (jamás
+    // una cuenta equivocada).
+    const _cta = resolverCuentaDeCatalogo(catalogo, sol.evento_id, sol.paquete);
+    const _ck = _cta ? (_cta.clabe || _cta.tarjeta || 'x') : null;
+    if (acc.cuentaKey === undefined) { acc.cuentaKey = _ck; acc.cuenta = _cta; }
+    else if (acc.cuentaKey !== _ck) { acc.cuentaConflict = true; }
   }
   const cliIds = Object.keys(porCliente);
   if (!cliIds.length) {
@@ -195,9 +208,14 @@ exports.handler = async function () {
     const acc = porCliente[cid];
     const nombre = String(c.nombre_completo || 'cliente').trim().split(/\s+/)[0] || 'cliente';
     let d = destinatarios[correo];
-    if (!d) { d = { nombre, montoSum: 0, conceptos: [], evento_nombre: acc.evento_nombre }; destinatarios[correo] = d; }
+    if (!d) { d = { nombre, montoSum: 0, conceptos: [], evento_nombre: acc.evento_nombre, cuentaKey: undefined, cuenta: null }; destinatarios[correo] = d; }
     d.montoSum += acc.montoSum;
     d.conceptos.push(...acc.conceptos);
+    // Fusión de cuenta al deduplicar por correo: si difiere entre cid's → conflicto.
+    const accCk = acc.cuentaConflict ? '__conflict__' : acc.cuentaKey;
+    const accCta = acc.cuentaConflict ? null : acc.cuenta;
+    if (d.cuentaKey === undefined) { d.cuentaKey = accCk; d.cuenta = accCta; }
+    else if (d.cuentaKey !== accCk) { d.cuentaKey = '__conflict__'; d.cuenta = null; }
   }
 
   // 7) Enviar el aviso "vence hoy".
@@ -209,7 +227,7 @@ exports.handler = async function () {
     const concepto = d.conceptos.join(' + ');
     const asunto = `⏰ Tu abono vence HOY — ${evento}`;
     const cuerpo = `<p style="margin:0 0 14px 0">Hoy es el <strong>último día</strong> para cubrir tu abono de <strong>${escapeHtml(monto)}</strong> (${escapeHtml(concepto)}) de tu viaje a <strong>${escapeHtml(evento)}</strong>.</p>
-    <p style="margin:0 0 14px 0">Después de hoy el pago queda <strong>vencido</strong> y tu lugar entra en riesgo.</p>
+    <p style="margin:0 0 14px 0">Después de hoy el pago queda <strong>vencido</strong> y tu lugar entra en riesgo.</p>${cajaCuentaHtml(d.cuenta)}
     <p style="margin:0">Manda tu comprobante por WhatsApp hoy mismo. — Conecta Reynosa</p>`;
     return enviarCorreo(correo, asunto, wrapHtml(d.nombre, cuerpo));
   }));

@@ -2710,6 +2710,24 @@ async function renderPlanPagos(t, head){
     return;
   }
 
+  // [Gancho 2] Cuenta bancaria correcta del tour (según su paquete), calculada
+  // SERVER-SIDE. Best-effort: si falla o no hay catálogo, _cuentaTour queda null y
+  // la tarjeta "¿Cómo pago?" cae al texto de siempre (link a /pagos).
+  let _cuentaTour = null;
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    const _jwt = session && session.access_token;
+    if (_jwt){
+      const rc = await fetch('/.netlify/functions/portal-cuenta-tour', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + _jwt },
+        body: JSON.stringify({ solicitud_id: t.id }),
+      });
+      if (rc.ok){ const jc = await rc.json().catch(() => ({})); if (jc && jc.ok && jc.cuenta) _cuentaTour = jc.cuenta; }
+    }
+  } catch (e) { /* best-effort: sin caja */ }
+  if (_tourActual !== t) return;
+
   const total   = Number(t.precio_total) || 0;
   // Abonado = monto REAL pagado: monto_pagado si existe, si no el del plan
   // (COALESCE). Pagos previos a la Fase 3.2 tienen monto_pagado NULL.
@@ -2778,10 +2796,22 @@ async function renderPlanPagos(t, head){
       <div class="pago-list">${filas}</div>
     </div>
 
+    ${_cuentaTour ? `
+    <div class="card como-pagar">
+      <div class="eyebrow" style="margin-bottom:8px">¿Cómo pago?</div>
+      <p style="margin:0 0 12px">Haz tu depósito a la cuenta de <b>tu paquete</b> y manda el comprobante por WhatsApp.</p>
+      <div style="border:1px solid var(--line,#e5e5e5);border-radius:10px;padding:12px 14px;display:grid;gap:6px">
+        ${_cuentaTour.banco   ? `<div style="display:flex;justify-content:space-between;gap:12px;font-size:14px"><span style="color:var(--ink-mute)">Banco</span><b>${escapeHtml(_cuentaTour.banco)}</b></div>` : ''}
+        ${_cuentaTour.tarjeta ? `<div style="display:flex;justify-content:space-between;gap:12px;font-size:14px"><span style="color:var(--ink-mute)">Tarjeta</span><b>${escapeHtml(_cuentaTour.tarjeta)}</b></div>` : ''}
+        ${_cuentaTour.clabe   ? `<div style="display:flex;justify-content:space-between;gap:12px;font-size:14px"><span style="color:var(--ink-mute)">CLABE</span><b>${escapeHtml(_cuentaTour.clabe)}</b></div>` : ''}
+        ${_cuentaTour.titular ? `<div style="display:flex;justify-content:space-between;gap:12px;font-size:14px"><span style="color:var(--ink-mute)">Titular</span><b>${escapeHtml(_cuentaTour.titular)}</b></div>` : ''}
+      </div>
+      <p style="margin:12px 0 0;font-size:13px;color:var(--ink-mute)">También puedes consultar <a href="/pagos">la página de pagos →</a></p>
+    </div>` : `
     <div class="card como-pagar">
       <div class="eyebrow" style="margin-bottom:8px">¿Cómo pago?</div>
       <p>Haz tu pago y manda el comprobante por WhatsApp. Consulta los datos bancarios en <a href="/pagos">la página de pagos →</a></p>
-    </div>`;
+    </div>`}`;
 }
 
 // [acompañantes F1-t2/t3] Card de los "lugares" de la solicitud, DEBAJO del plan

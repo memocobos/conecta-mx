@@ -3103,7 +3103,7 @@ function setMonth(btn,m){
 function isCDMX(ev){ return ev.v && (ev.v.toUpperCase().includes('CDMX') || ev.v.toUpperCase().includes('CIUDAD DE MEXICO')); }
 function getBanco(){
   if(selPkg==='cheap')return BANCO_HEY;
-  if(selPkg==='ride')return BANCO_DEFAULT;
+  // ride/plus/stay siguen el banco del evento: cur.banco||BANCO_DEFAULT.
   return(cur&&cur.banco)||BANCO_DEFAULT;
 }
 function actualizarIncluye(){

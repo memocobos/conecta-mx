@@ -17,6 +17,8 @@
 // Envío vía Resend con remitente de cara al cliente (RESEND_FROM_COBRANZA).
 
 const { aplicarModoPrueba } = require('./_lib/correo-guard');
+const { fetchCatalogo } = require('./_lib/catalogo-index');
+const { resolverCuentaDeCatalogo, cajaCuentaHtml } = require('./_lib/cuenta-deposito');
 
 const SB_URL = process.env.PORTAL_SUPABASE_URL;
 const SB_KEY = process.env.PORTAL_SUPABASE_SERVICE_KEY;
@@ -146,7 +148,7 @@ exports.handler = async function () {
   // 1) Solicitudes en_pagos (las pagadas no deben; las pendientes no tienen plan;
   //    las canceladas quedan fuera). cliente_id = titular (fallback de dueño).
   const solicitudes = await sb(
-    'solicitudes_tour?estado=eq.en_pagos&select=id,evento_id,evento_nombre,cliente_id'
+    'solicitudes_tour?estado=eq.en_pagos&select=id,evento_id,evento_nombre,cliente_id,paquete'
   );
   if (!Array.isArray(solicitudes) || !solicitudes.length) {
     console.log('[morosidad] Fin. solicitudes en_pagos:0');
@@ -154,6 +156,10 @@ exports.handler = async function () {
   }
   const solMap = {};
   for (const s of solicitudes) if (s && s.id) solMap[s.id] = s;
+
+  // Gancho 2: catálogo (best-effort) para la caja de cuenta por paquete. Caído →
+  // catalogo=null → correos SIN caja (idéntico a hoy).
+  const catalogo = await fetchCatalogo();
 
   // 2) Pagos de esas solicitudes (con cliente_id del dueño).
   const ids = solicitudes.map(s => s.id);
@@ -213,7 +219,8 @@ exports.handler = async function () {
     }
 
     const { asunto, cuerpo } = correoNivel(nivel, evento, fmtMxn(restante));
-    const ok = await enviarCorreo(correo, asunto, wrapHtml(nombre, cuerpo));
+    const cajaCuenta = cajaCuentaHtml(resolverCuentaDeCatalogo(catalogo, sol.evento_id, sol.paquete));
+    const ok = await enviarCorreo(correo, asunto, wrapHtml(nombre, cuerpo + cajaCuenta));
     if (!ok) { fallidos++; continue; }
     if (nivel === 1) n1++; else if (nivel === 2) n2++; else n3++;
   }

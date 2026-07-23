@@ -187,6 +187,30 @@ exports.handler = async (event) => {
       return { statusCode: 200, headers, body: JSON.stringify({ ok: true }) };
     }
 
+    // POST borrar → elimina el archivo del disco PARA SIEMPRE (editor /borrar,
+    // mismo candado X-Editor-Key; el editor limpia la carpeta si queda vacía).
+    // Best-effort ADICIONAL: aviso a AzuraCast (files/batch delete) para que
+    // purgue su registro de inmediato — si el aviso falla, igual responde ok:
+    // su escáner lo detecta solo en ≤5 min. Afecta radio, Navidrome y el
+    // archivo (misma carpeta para los tres).
+    if (accion === 'borrar') {
+      const r = await httpFetch(`${EDITOR_BASE}/borrar`, { method: 'POST', headers: edHeaders, body: JSON.stringify({ ruta }) });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok || !j || j.ok !== true) {
+        return { statusCode: 502, headers, body: JSON.stringify({ error: (j && j.error) || 'El editor no pudo borrar el archivo' }) };
+      }
+      let az_avisado = false;
+      try {
+        const rb = await httpFetch(`${AZ_BASE}/api/station/${STATION}/files/batch`, {
+          method: 'POST',
+          headers: { ...azHeaders, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ do: 'delete', files: [ruta], dirs: [] }),
+        });
+        az_avisado = !!rb.ok;
+      } catch (e) { /* best-effort: el escáner de AzuraCast lo levanta solo */ }
+      return { statusCode: 200, headers, body: JSON.stringify({ ok: true, az_avisado }) };
+    }
+
     return { statusCode: 400, headers, body: JSON.stringify({ error: 'accion inválida' }) };
   } catch (e) {
     const msg = (e && e.name === 'AbortError') ? 'El servicio no respondió (timeout)' : (e.message || 'Error');

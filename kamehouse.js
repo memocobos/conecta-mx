@@ -307,7 +307,69 @@ function enterApp() {
     _cargarNotificaciones(); // badge de no leídas
     _spContarPendientes();   // [Bandeja-T2] badge de pendientes en el nav
     checkMensajeDia();       // banner mensaje del día (chrome)
+    _kmSearchInit();         // buscadores universales en las listas de datos
   });
+}
+
+// ═══════════════════════════════════════════════════════════════
+// BUSCADORES UNIVERSALES (client-side) — una barrita por panel que filtra por
+// TEXTO las filas/tarjetas YA renderizadas. NO toca datos, queries ni backend
+// (cero riesgo). Un MutationObserver re-aplica el filtro tras cualquier
+// re-render del contenedor (sort, filtros, refresco). Idempotente: se monta
+// una sola vez por contenedor. Los paneles con buscador propio (Capsule/cc-buscar,
+// Guerreros Z, equipo, biblioteca, cobranza) NO se tocan.
+// ═══════════════════════════════════════════════════════════════
+const _KM_SEARCH = [
+  ['proximos-eventos', '.dash-click', 'Buscar evento…'],
+  ['atrasados-lista',  '.dash-click', 'Buscar viajero atrasado…'],
+  ['tabla-pagos',      'tr',          'Buscar viajero, evento, teléfono…'],
+  ['tabla-viajeros',   'tr',          'Buscar viajero, zona, estado…'],
+  ['tabla-gastos',     'tr',          'Buscar gasto, concepto, evento…'],
+  ['tabla-ingresos',   'tr',          'Buscar ingreso, cliente, evento…'],
+  ['tabla-inventario', 'tr',          'Buscar pieza…'],
+  ['saldos-content',   '.saldo-card', 'Buscar cuenta…'],
+  ['ventas-content',   '.card',       'Buscar evento…'],
+  ['reportes-list',    '',            'Buscar reporte, evento, coordinador…'],
+  ['sp-table',         'tbody tr',    'Buscar solicitud, cliente, evento…'],
+];
+
+// Normaliza para búsqueda insensible a acentos/mayúsculas: "Julión"→"julion",
+// "PEÑA"→"pena". Así la gente teclea sin acentos y encuentra igual.
+function _kmNorm(s) { return String(s == null ? '' : s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, ''); }
+
+// Filtra por texto visible las filas/tarjetas del contenedor (itemSel vacío =
+// hijos directos). Solo cambia display → no dispara el observer de childList.
+function _kmBuscar(contId, itemSel) {
+  const cont = document.getElementById(contId);
+  if (!cont) return;
+  const inp = document.getElementById('kmb-' + contId);
+  const q = _kmNorm((inp ? inp.value : '').trim());
+  const items = itemSel ? cont.querySelectorAll(itemSel) : cont.children;
+  Array.prototype.forEach.call(items, (node) => {
+    const hit = !q || _kmNorm(node.textContent).includes(q);
+    node.style.display = hit ? '' : 'none';
+  });
+}
+
+// Monta (idempotente) la barrita antes de la tabla/lista y engancha el observer.
+function _kmSearchMount(contId, itemSel, placeholder) {
+  const cont = document.getElementById(contId);
+  if (!cont || cont._kmWired) return;
+  cont._kmWired = true;
+  const anchor = cont.closest('.table-wrap') || cont.closest('table') || cont;
+  if (!anchor.parentNode) return;   // contenedor sin padre en el DOM → no monta
+  const wrap = document.createElement('div');
+  wrap.style.cssText = 'margin:0 0 10px';
+  const esc = String(itemSel || '').replace(/'/g, "\\'");
+  wrap.innerHTML = `<input type="text" id="kmb-${contId}" class="cot-input" autocomplete="off" placeholder="${_esfEsc(placeholder)}" oninput="_kmBuscar('${contId}','${esc}')" style="width:100%;max-width:340px;box-sizing:border-box">`;
+  anchor.parentNode.insertBefore(wrap, anchor);
+  new MutationObserver(() => _kmBuscar(contId, itemSel)).observe(cont, { childList: true });
+  _kmBuscar(contId, itemSel);   // re-aplica si quedó texto de antes
+}
+
+function _kmSearchInit() {
+  // Fail-safe POR PANEL: un contenedor problemático no debe tumbar los demás.
+  _KM_SEARCH.forEach(([id, sel, ph]) => { try { _kmSearchMount(id, sel, ph); } catch (_) {} });
 }
 
 

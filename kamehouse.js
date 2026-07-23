@@ -173,7 +173,25 @@ async function _marcarNotifLeida(id, link) {
     });
   } catch (e) {}
   await _cargarNotificaciones();
-  if (link) { _closeNotifPanel(); window.location.href = link; }
+  if (link) { _closeNotifPanel(); _notifNav(link); }
+}
+
+// Navega al destino de una notificación. Tokens internos (p.ej. 'perfil') abren
+// el tab IN-APP sin recargar; una URL http/https navega normal. Fails-soft.
+function _notifNav(link) {
+  try {
+    const l = String(link || '').trim();
+    if (!l) return;
+    if (/^https?:\/\//i.test(l)) { window.location.href = l; return; }
+    if (l === 'perfil' || l === 'app:perfil') {
+      showPage('equipo');
+      const btn = document.querySelector('.gz-tab-btn[onclick*="miperfil"]');
+      showGZTab('miperfil', btn || null);
+      return;
+    }
+    // Fallback: trátalo como ruta/URL.
+    window.location.href = l;
+  } catch (_) { /* fails-soft: no rompe el panel */ }
 }
 
 async function _marcarTodasNotif(ev) {
@@ -8471,6 +8489,7 @@ async function guardarAsignacionCoordi() {
     await _crearNotif({
       usuario_id: coordiId, tipo: 'asignacion', titulo: 'Nuevo evento asignado',
       mensaje: `Te asignaron: ${ev?.nombre || 'un evento'}. Entra a tu perfil para verlo.`,
+      link: 'perfil',
     });
     alertEl.innerHTML='<div class="alert alert-success">✓ Asignado y notificado</div>';
     setTimeout(async ()=>{ closeModal('modal-asignar-coordi'); await loadCCEquipo(); }, 900);
@@ -8609,6 +8628,7 @@ async function notificarEquipoListas() {
     await _crearNotif({
       usuario_id: u.id, tipo: 'listas', titulo: 'Listas actualizadas',
       mensaje: `Las listas de ${ev?.nombre || 'tu evento'} ya están listas. Descárgalas en tu perfil.`,
+      link: 'perfil',
     });
     enviados++;
   }
@@ -12081,6 +12101,7 @@ async function aplicarStrike(userId, nombre, strikesActuales, motivo) {
     await _crearNotif({
       usuario_id: userId, tipo: 'strike', titulo: 'Recibiste un strike',
       mensaje: `Tienes ${nuevos}/3 strikes.`,
+      link: 'perfil',
     });
     // Alerta a Memo si llegó a 2 o 3
     if (nuevos >= 2) await enviarAlertaMemo('strikes', { nombre, strikes: nuevos, motivo });
@@ -17871,25 +17892,52 @@ function renderAlertasFiltered(filtro){
   if (arr.length === 0) { list.innerHTML = '<div class="rdr-empty">Sin alertas en este filtro</div>'; return; }
   list.innerHTML = arr.map(a => {
     const fecha = new Date(a.created_at).toLocaleString('es-MX', { dateStyle:'medium', timeStyle:'short' });
-    return `<div class="rdr-alert sev-${a.severidad} ${a.vista?'vista':'no-vista'}" data-id="${a.id}">
+    const dest = _radarAlertaDestino(a.tipo);
+    return `<div class="rdr-alert sev-${a.severidad} ${a.vista?'vista':'no-vista'}" data-id="${a.id}" data-tipo="${_radarEsc(a.tipo)}"${dest ? ' style="cursor:pointer"' : ''}>
       <div class="dot"></div>
       <div class="body">
         <div class="titulo">${_radarEsc(a.titulo)}</div>
         <div class="mensaje">${_radarEsc(a.mensaje)}</div>
       </div>
-      <div class="meta">${fecha}<br><span class="tipo">${_radarEsc(a.tipo)}</span></div>
+      <div class="meta">${fecha}<br><span class="tipo">${_radarEsc(a.tipo)}</span>${dest ? `<br><span class="rdr-ir">Ir a resolver →</span>` : ''}</div>
     </div>`;
   }).join('');
-  // Marcar como vista al click
-  list.querySelectorAll('.rdr-alert.no-vista').forEach(item => {
+  // Al click: marca vista (si aplica) y LLEVA a donde se resuelve (por tipo).
+  list.querySelectorAll('.rdr-alert').forEach(item => {
     item.addEventListener('click', async () => {
       const id = item.dataset.id;
-      await khRadar.alertaVista(id).catch(() => {}); // [sec-radar-wl]
-      const a = _radarCache.alertas.find(x => x.id === id); if (a) a.vista = true;
-      item.classList.remove('no-vista'); item.classList.add('vista');
-      refreshAlertasBadge();
+      if (item.classList.contains('no-vista')) {
+        await khRadar.alertaVista(id).catch(() => {}); // [sec-radar-wl]
+        const a = _radarCache.alertas.find(x => x.id === id); if (a) a.vista = true;
+        item.classList.remove('no-vista'); item.classList.add('vista');
+        refreshAlertasBadge();
+      }
+      _radarAlertaIr(item.dataset.tipo);   // navega al destino (si el tipo tiene uno)
     });
   });
+}
+
+// Mapa tipo de alerta → dónde se RESUELVE. null = informativa sin destino claro
+// (solo marca vista). waitlist_hito → el tab de Lista de espera (avisar a la lista);
+// tráfico/cotizaciones/códigos → sub-tab "Sitio" del Radar (sus métricas).
+function _radarAlertaDestino(tipo) {
+  if (tipo === 'waitlist_hito') return { herramienta: 'waitlist' };
+  if (['trafico_pico', 'trafico_caida', 'cotizacion_caida', 'codigo_intentos_falla'].includes(tipo)) return { radarSub: 'sitio' };
+  return null;
+}
+
+function _radarAlertaIr(tipo) {
+  const dest = _radarAlertaDestino(tipo);
+  if (!dest) return;
+  if (dest.herramienta) { showHerramienta(dest.herramienta); return; }
+  if (dest.radarSub) _radarGoSub(dest.radarSub);
+}
+
+// Cambia de sub-tab del Radar reutilizando el handler del botón (setea _radarSub,
+// alterna secciones y dispara el loader de esa vista).
+function _radarGoSub(sub) {
+  const btn = document.querySelector('#radar-subs button[data-sub="' + sub + '"]');
+  if (btn) btn.click();
 }
 
 async function refreshAlertasBadge(){

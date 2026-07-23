@@ -2609,7 +2609,7 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
         <div id="gz-filtros-admin" style="display:none;gap:6px;flex-wrap:wrap">
          <button class="gz-filter active" onclick="filtrarGZ('todos',this)">// todos</button>
          <button class="gz-filter" onclick="filtrarGZ('coordinador',this)">// coordinadores</button>
-         <button class="gz-filter" onclick="filtrarGZ('mister_popo',this)">// mister popo</button>
+         <button class="gz-filter" onclick="filtrarGZ('mister_popo',this)">// maestro karin</button>
          <button class="gz-filter" onclick="filtrarGZ('bulma',this)">// bulma</button>
          <button class="gz-filter" onclick="filtrarGZ('vendedor',this)">// vendedores</button>
          <button class="gz-filter" onclick="filtrarGZ('cc',this)">// cc</button>
@@ -2628,7 +2628,7 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
             <div class="perfil-field-label" style="margin-bottom:6px">Rol *</div>
             <select class="cot-input" id="inv-rol">
               <option value="bulma">Bulma</option>
-              <option value="mister_popo">Mister Popo</option>
+              <option value="mister_popo">Maestro Karin</option>
               <option value="coordinador">Coordinador</option>
               <option value="cc">Creador de Contenido</option>
               <option value="vendedor">Vendedor</option>
@@ -5199,7 +5199,7 @@ function checkSession() {
 function enterApp() {
   document.getElementById('login-screen').style.display = 'none';
   document.getElementById('app').classList.add('visible');
-  const roleLabels = { maestro_roshi:'Maestro Roshi', bulma:'Bulma', mister_popo:'Mister Popo', coordinador:'Coordinador', cc:'CC', vendedor:'Vendedor' };
+  const roleLabels = { maestro_roshi:'Maestro Roshi', bulma:'Bulma', mister_popo:'Maestro Karin', coordinador:'Coordinador', cc:'CC', vendedor:'Vendedor' };
   document.getElementById('topbar-user-info').textContent = `${currentUser.nombre} · ${roleLabels[currentUser.rol] || currentUser.rol}`;
   aplicarPermisosUI();
   aplicarTemaCoordi();
@@ -11227,7 +11227,7 @@ let _gzFilter = 'todos';
 const ROL_LABELS = {
   maestro_roshi: 'Maestro Roshi',
   bulma: 'Bulma',
-  mister_popo: 'Mister Popo',
+  mister_popo: 'Maestro Karin',
   coordinador: 'Coordinador',
   cc: 'Creador de Contenido',
   vendedor: 'Vendedor'
@@ -16506,7 +16506,7 @@ async function loadMTResumen() {
     ]);
     const porRol = {};
     usuarios.forEach(u => { porRol[u.rol] = (porRol[u.rol]||0)+1; });
-    const rolLabels = { maestro_roshi:'Maestro Roshi', bulma:'Bulma', mister_popo:'Mister Popo', coordinador:'Coordi', cc:'CC', vendedor:'Vendedor' };
+    const rolLabels = { maestro_roshi:'Maestro Roshi', bulma:'Bulma', mister_popo:'Maestro Karin', coordinador:'Coordi', cc:'CC', vendedor:'Vendedor' };
 
     el.innerHTML = `
       <!-- Métricas rápidas -->
@@ -16571,7 +16571,7 @@ function filtrarMTUsuarios() {
 function renderMTUsuarios(lista) {
   const list = document.getElementById('mt-usuarios-list');
   if (!lista.length) { list.innerHTML='<div class="empty-state">Sin resultados</div>'; return; }
-  const rolLabels = { maestro_roshi:'Maestro Roshi', bulma:'Bulma', mister_popo:'Mister Popo', coordinador:'Coordinador', cc:'CC', vendedor:'Vendedor' };
+  const rolLabels = { maestro_roshi:'Maestro Roshi', bulma:'Bulma', mister_popo:'Maestro Karin', coordinador:'Coordinador', cc:'CC', vendedor:'Vendedor' };
   list.innerHTML = lista.map(u => `
     <div style="background:var(--bg2);border:1px solid ${u.activo?'var(--border)':'rgba(255,68,68,.2)'};border-radius:var(--radius);padding:14px 18px;margin-bottom:8px;display:flex;align-items:center;gap:14px;flex-wrap:wrap">
       <div style="width:36px;height:36px;border-radius:50%;background:var(--bg3);overflow:hidden;flex-shrink:0;display:flex;align-items:center;justify-content:center">
@@ -16656,7 +16656,7 @@ async function abrirEditarUsuarioMT(id) {
   // Source of truth para guardarUsuarioMT — no dependemos de un input hidden.
   _mtEditandoUserId = u.id;
   const rolOpts = ['maestro_roshi','bulma','mister_popo','coordinador','cc','vendedor'];
-  const rolLabels = { maestro_roshi:'Maestro Roshi', bulma:'Bulma', mister_popo:'Mister Popo', coordinador:'Coordinador', cc:'CC', vendedor:'Vendedor' };
+  const rolLabels = { maestro_roshi:'Maestro Roshi', bulma:'Bulma', mister_popo:'Maestro Karin', coordinador:'Coordinador', cc:'CC', vendedor:'Vendedor' };
   // Tabs extra / bloqueadas actuales
   const permisos = u.permisos_extra || {};
   const tabsExtra = permisos.tabs_extra || [];
@@ -16819,7 +16819,7 @@ async function loadMTStrikes() {
     const usuarios = await khUsuarios.listar({ orden: 'strikes' }); // [sec-usuarios]
     const conStrikes = usuarios.filter(u => (u.strikes||0) > 0);
     const sinStrikes = usuarios.filter(u => (u.strikes||0) === 0);
-    const rolLabels = { maestro_roshi:'Maestro Roshi', bulma:'Bulma', mister_popo:'Mister Popo', coordinador:'Coordinador', cc:'CC', vendedor:'Vendedor' };
+    const rolLabels = { maestro_roshi:'Maestro Roshi', bulma:'Bulma', mister_popo:'Maestro Karin', coordinador:'Coordinador', cc:'CC', vendedor:'Vendedor' };
 
     list.innerHTML = `
       <div style="margin-bottom:20px">
@@ -19079,9 +19079,9 @@ async function enviarAlertaMemo(tipo, datos = {}) {
         emailBody = `<p>${datos.nombre} declinó el tour <strong>${datos.evento}</strong>.</p>${datos.motivo?`<p><strong>Motivo:</strong> ${datos.motivo}</p>`:''}`;
         break;
       case 'reporte_rechazado':
-        mensaje = `Mister Popo rechazó el reporte de ${datos.coordi||'un coordi'}${datos.motivo?': '+datos.motivo:''}`;
-        emailSubject = `Reporte rechazado por Mister Popo`;
-        emailBody = `<p>Mister Popo rechazó el reporte post-evento de <strong>${datos.coordi}</strong>.</p>${datos.motivo?`<p><strong>Motivo:</strong> ${datos.motivo}</p>`:''}`;
+        mensaje = `Maestro Karin rechazó el reporte de ${datos.coordi||'un coordi'}${datos.motivo?': '+datos.motivo:''}`;
+        emailSubject = `Reporte rechazado por Maestro Karin`;
+        emailBody = `<p>Maestro Karin rechazó el reporte post-evento de <strong>${datos.coordi}</strong>.</p>${datos.motivo?`<p><strong>Motivo:</strong> ${datos.motivo}</p>`:''}`;
         break;
       case 'nuevo_usuario':
         mensaje = `Nuevo usuario registrado: ${datos.nombre||''}`;

@@ -5949,17 +5949,13 @@ async function _comGuardarTodo() {
 }
 
 // ── Liquidaciones de vendedores (F5c — pantalla de Memo, solo maestro_roshi) ──
-// Cierre MANUAL. PUENTE slug↔uuid: el slug (catálogo/Portal) da paquetes y ventas;
-// el evento del Palacio (uuid, resumen_eventos) da la utilidad. NO hay mapeo en la
-// base → Memo confirma el par (con sugerencia por nombre/artista/fecha) antes de
-// previsualizar. El snapshot guarda ambos. Flujo: elegir slug → confirmar Palacio →
-// Previsualizar (sin escribir) → "Cerrar y liquidar" (congela) → Marcar pagada.
+// Cierre MANUAL. Todo vive en el mundo SLUG: el evento del catálogo da paquetes,
+// ventas de vendedor Y la caja real (cobrado + ingresos − gastos = utilidad). Se
+// eliminó el puente slug↔uuid del Palacio. Flujo: elegir evento → Previsualizar
+// (sin escribir) → "Cerrar y liquidar" (congela) → Marcar pagada.
 let _liqEVCache = [];        // EV del catálogo (slug + nombre/artista/fecha)
-let _liqPalacioCache = [];   // resumen_eventos (uuid + nombre/artista/fecha)
 function _liqFmt(n) { return '$' + Math.round(Number(n) || 0).toLocaleString('es-MX'); }
 function _liqAlert(m, err) { const a = document.getElementById('kam-liq-alert'); if (a) a.innerHTML = m ? `<div class="alert ${err ? 'alert-error' : 'alert-success'}">${_esfEsc(m)}</div>` : ''; }
-function _liqNorm(s) { return String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]/g, ''); }
-function _liqYear(s) { const m = /(\d{4})/.exec(String(s || '')); return m ? m[1] : ''; }
 
 async function _liqPopulateEventos() {
   const sel = document.getElementById('kam-liq-evt');
@@ -5975,51 +5971,15 @@ async function _liqPopulateEventos() {
       .join('');
     sel.innerHTML = '<option value="">— Elige un evento —</option>' + opts;
   } catch (_) { /* deja el placeholder */ }
-  // Catálogo del Palacio (uuid) para el par + sugerencia (best-effort).
-  try {
-    const r = await khAdminFetch('/.netlify/functions/admin-liquidacion', { method: 'POST', body: JSON.stringify({ accion: 'palacio_eventos' }) });
-    const j = await r.json().catch(() => ({}));
-    _liqPalacioCache = (r.ok && j.ok && Array.isArray(j.eventos)) ? j.eventos : [];
-  } catch (_) { _liqPalacioCache = []; }
 }
 
-// Elegir slug → armar el dropdown del Palacio con la SUGERENCIA preseleccionada
-// (editable). NO previsualiza: Memo confirma y aprieta el botón (una sugerencia
-// equivocada jamás se auto-aplica).
+// Elegir evento → previsualizar directo (la caja real sale del mismo slug).
 function _liqOnEvento() {
   _liqAlert('');
-  const par = document.getElementById('kam-liq-par');
   const body = document.getElementById('kam-liq-body');
-  const pal = document.getElementById('kam-liq-palacio');
-  const sug = document.getElementById('kam-liq-sug');
-  if (body) body.innerHTML = '';
   const slug = document.getElementById('kam-liq-evt').value;
-  if (!slug) { if (par) par.style.display = 'none'; return; }
-  const ev = _liqEVCache.find(e => e && e.id === slug) || {};
-  // Sugerencia: mejor match por artista/nombre (+ año de fecha) contra el Palacio.
-  const evKey = _liqNorm(ev.a || ev.id), evYear = _liqYear(ev.f);
-  let mejor = null, mejorScore = 0;
-  _liqPalacioCache.forEach(p => {
-    if (!p || !p.id) return;
-    const pk = _liqNorm((p.artista || '') + (p.nombre || ''));
-    let score = 0;
-    if (evKey && pk) { if (pk.includes(evKey) || evKey.includes(pk)) score += 2; }
-    if (evYear && _liqYear(p.fecha) === evYear) score += 1;
-    if (score > mejorScore) { mejorScore = score; mejor = p; }
-  });
-  const opts = _liqPalacioCache
-    .slice()
-    .sort((a, b) => String(a.fecha || '').localeCompare(String(b.fecha || '')))
-    .map(p => {
-      const lbl = [(p.artista || p.nombre || p.id), p.fecha ? ('· ' + p.fecha) : '', p.ciudad ? ('· ' + p.ciudad) : ''].filter(Boolean).join(' ');
-      const selAttr = (mejor && p.id === mejor.id) ? ' selected' : '';
-      return `<option value="${_esfEsc(p.id)}"${selAttr}>${_esfEsc(lbl)}</option>`;
-    }).join('');
-  if (pal) pal.innerHTML = '<option value="">— Elige el evento del Palacio —</option>' + opts;
-  if (sug) sug.innerHTML = mejor
-    ? `Sugerencia: <b>${_esfEsc(mejor.artista || mejor.nombre)}</b>${mejor.fecha ? ' · ' + _esfEsc(mejor.fecha) : ''} — confírmala o cámbiala.`
-    : (_liqPalacioCache.length ? 'Sin coincidencia clara — elige el evento del Palacio a mano.' : 'No pude cargar el catálogo del Palacio.');
-  if (par) par.style.display = '';
+  if (!slug) { if (body) body.innerHTML = ''; return; }
+  _liqPrevisualizar();
 }
 
 async function _liqPrevisualizar() {
@@ -6027,12 +5987,10 @@ async function _liqPrevisualizar() {
   if (!body) return;
   _liqAlert('');
   const slug = document.getElementById('kam-liq-evt').value;
-  const palacioId = (document.getElementById('kam-liq-palacio') || {}).value || '';
   if (!slug) { body.innerHTML = ''; return; }
-  if (!palacioId) { _liqAlert('Confirma el evento del Palacio (paso 2) antes de previsualizar.', true); return; }
   body.innerHTML = '<div class="loading-state"><div class="spinner"></div>Calculando…</div>';
   try {
-    const r = await khAdminFetch('/.netlify/functions/admin-liquidacion', { method: 'POST', body: JSON.stringify({ accion: 'previsualizar', evento_id: slug, palacio_evento_id: palacioId }) });
+    const r = await khAdminFetch('/.netlify/functions/admin-liquidacion', { method: 'POST', body: JSON.stringify({ accion: 'previsualizar', evento_id: slug }) });
     const j = await r.json().catch(() => ({}));
     if (!r.ok || !j.ok) throw new Error(j.error || ('Error ' + r.status));
     _liqRender(j);
@@ -6043,9 +6001,7 @@ function _liqRender(j) {
   const body = document.getElementById('kam-liq-body');
   if (!body) return;
   const eidS = _esfEsc(j.evento_id);
-  const palS = _esfEsc(j.palacio_evento_id || '');
-  const avisoEv = j.evento_encontrado ? '' : `<div class="alert alert-error" style="margin-bottom:10px">⚠️ No encontré ese evento del Palacio (uuid) en resumen_eventos — la utilidad se toma como $0. Vuelve a confirmar el par antes de liquidar.</div>`;
-  const parInfo = j.palacio_evento_nombre ? `<div style="font-size:10px;color:var(--ts);margin-bottom:10px">Par confirmado: <b>${_esfEsc(j.evento_id)}</b> (catálogo) ↔ <b>${_esfEsc(j.palacio_evento_nombre)}</b> (Palacio)</div>` : '';
+  const cajaAviso = (Number(j.utilidad) <= 0) ? `<div class="alert alert-error" style="margin-bottom:10px">⚠️ La caja real del evento es ${_liqFmt(j.utilidad)} (≤ 0). No se puede liquidar el 30% sobre una caja no positiva — espera a cobrar más o revisa gastos/ingresos.</div>` : '';
   const chip = (txt, color) => `<span style="display:inline-block;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;color:${color};border:1px solid ${color}55">${txt}</span>`;
   const filas = (Array.isArray(j.vendedores) && j.vendedores.length)
     ? j.vendedores.map(v => {
@@ -6061,27 +6017,30 @@ function _liqRender(j) {
         </tr>`;
       }).join('')
     : '<tr><td colspan="5" style="padding:12px;text-align:center;color:var(--ts);font-size:12px">Sin ventas PLUS/STAY/RIDE de vendedor en este evento</td></tr>';
-  const puedeLiquidar = !j.ya_liquidado && j.evento_encontrado && Array.isArray(j.vendedores) && j.vendedores.length;
+  const puedeLiquidar = !j.ya_liquidado && Number(j.utilidad) > 0 && Array.isArray(j.vendedores) && j.vendedores.length;
   const accion = puedeLiquidar
-    ? `<button class="btn btn-primary" style="margin-top:12px" onclick="_liqLiquidar('${eidS}','${palS}')">Cerrar y liquidar</button>`
+    ? `<button class="btn btn-primary" style="margin-top:12px" onclick="_liqLiquidar('${eidS}')">Cerrar y liquidar</button>`
     : (j.ya_liquidado ? `<div style="margin-top:12px;font-size:11px;color:var(--green)">✓ Evento ya liquidado (cálculo congelado).</div>` : '');
-  body.innerHTML = `${avisoEv}${parInfo}
-    <div style="display:flex;gap:18px;flex-wrap:wrap;margin-bottom:12px;font-size:13px">
-      <div><div style="font-size:10px;color:var(--ts);text-transform:uppercase;letter-spacing:.08em">Utilidad del evento</div><b style="font-size:16px">${_liqFmt(j.utilidad)}</b></div>
+  // Desglose de la caja real (de dónde sale la utilidad).
+  const cajaBreak = `<div style="font-size:10px;color:var(--ts);margin-bottom:12px">Caja = cobrado ${_liqFmt(j.cobrado)} + ingresos ${_liqFmt(j.ingresos)} − gastos ${_liqFmt(j.gastos)}</div>`;
+  body.innerHTML = `${cajaAviso}
+    <div style="display:flex;gap:18px;flex-wrap:wrap;margin-bottom:6px;font-size:13px">
+      <div><div style="font-size:10px;color:var(--ts);text-transform:uppercase;letter-spacing:.08em">Caja real (utilidad)</div><b style="font-size:16px">${_liqFmt(j.utilidad)}</b></div>
       <div><div style="font-size:10px;color:var(--ts);text-transform:uppercase;letter-spacing:.08em">Paquetes vendidos</div><b style="font-size:16px">${j.total_paquetes}</b></div>
       <div><div style="font-size:10px;color:var(--ts);text-transform:uppercase;letter-spacing:.08em">Ganancia / paquete</div><b style="font-size:16px">${_liqFmt(j.ganancia_por_paquete)}</b></div>
       <div><div style="font-size:10px;color:var(--ts);text-transform:uppercase;letter-spacing:.08em">% comisión</div><b style="font-size:16px">${Math.round((j.pct || 0) * 100)}%</b></div>
     </div>
+    ${cajaBreak}
     <table style="width:100%;border-collapse:collapse"><thead><tr style="font-size:10px;color:var(--ts);text-transform:uppercase;letter-spacing:.08em"><th style="text-align:left;padding:4px">Vendedor</th><th style="text-align:right;padding:4px">Paq. PSR</th><th style="text-align:right;padding:4px">Comisión</th><th style="text-align:center;padding:4px">Estado</th><th></th></tr></thead><tbody>${filas}</tbody></table>
     ${accion}`;
 }
 
-async function _liqLiquidar(slug, palacioId) {
-  if (!palacioId) { _liqAlert('Falta confirmar el evento del Palacio.', true); return; }
-  if (!confirm('¿Cerrar y liquidar este evento? El cálculo se CONGELA (si la utilidad cambia después, NO se recalcula). Se registran las comisiones de los vendedores con el par catálogo↔Palacio.')) return;
+async function _liqLiquidar(slug) {
+  if (!slug) { _liqAlert('Elige un evento.', true); return; }
+  if (!confirm('¿Cerrar y liquidar este evento? El cálculo se CONGELA (si la caja cambia después, NO se recalcula). Se registran las comisiones de los vendedores con la caja real de hoy.')) return;
   _liqAlert('');
   try {
-    const r = await khAdminFetch('/.netlify/functions/admin-liquidacion', { method: 'POST', body: JSON.stringify({ accion: 'liquidar', evento_id: slug, palacio_evento_id: palacioId }) });
+    const r = await khAdminFetch('/.netlify/functions/admin-liquidacion', { method: 'POST', body: JSON.stringify({ accion: 'liquidar', evento_id: slug }) });
     const d = await r.json().catch(() => ({}));
     if (!r.ok || !d.ok) throw new Error(d.error || ('Error ' + r.status));
     _liqAlert('Liquidado: ' + (d.liquidadas || 0) + ' comisión(es) registradas y congeladas.', false);

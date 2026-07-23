@@ -1391,17 +1391,11 @@
   </div>
   <div class="card">
    <div style="font-family:'Rajdhani',sans-serif;font-weight:700;font-size:16px;margin-bottom:4px">Liquidaciones de vendedores (30%)</div>
-   <div style="font-size:11px;color:var(--ts);margin-bottom:14px">Cierre <b>MANUAL</b> al terminar el evento. Comisión = <b>30% × (utilidad del evento ÷ total de paquetes vendidos en todos los canales) × paquetes PLUS/STAY/RIDE de cada vendedor</b>. Los CHEAP del vendedor quedan <b>fuera</b> (ya pagaron su comisión-separo). Al liquidar, el cálculo se <b>congela</b> (no se recalcula solo si cambia la utilidad).</div>
-   <label style="font-size:11px;color:var(--ts)">1) Evento del catálogo (slug — paquetes y ventas de vendedor)</label>
+   <div style="font-size:11px;color:var(--ts);margin-bottom:14px">Cierre <b>MANUAL</b> al terminar el evento. Comisión = <b>30% × (caja real del evento ÷ total de paquetes vendidos en todos los canales) × paquetes PLUS/STAY/RIDE de cada vendedor</b>. La <b>utilidad es la CAJA real</b> (cobrado + ingresos − gastos), la misma del Palacio. Los CHEAP del vendedor quedan <b>fuera</b> (ya pagaron su comisión-separo). Al liquidar, el cálculo se <b>congela</b> (no se recalcula solo si la caja cambia después).</div>
+   <label style="font-size:11px;color:var(--ts)">Evento del catálogo (paquetes, ventas de vendedor y caja real)</label>
    <select id="kam-liq-evt" class="cot-input" style="width:100%;margin:4px 0 12px" onchange="_liqOnEvento()">
     <option value="">— Elige un evento —</option>
    </select>
-   <div id="kam-liq-par" style="display:none;margin-bottom:12px;padding:10px 12px;border:1px solid var(--border);border-radius:8px">
-    <label style="font-size:11px;color:var(--ts)">2) Evento del <b>Palacio</b> (de aquí sale la utilidad) — <b>confírmalo</b>: el slug y el Palacio son mundos distintos, sin mapeo automático.</label>
-    <select id="kam-liq-palacio" class="cot-input" style="width:100%;margin:4px 0"></select>
-    <div id="kam-liq-sug" style="font-size:10px;color:var(--ts);margin-bottom:8px"></div>
-    <button class="btn btn-primary btn-sm" onclick="_liqPrevisualizar()">Previsualizar</button>
-   </div>
    <div id="kam-liq-alert" style="margin-bottom:10px"></div>
    <div id="kam-liq-body"></div>
   </div>

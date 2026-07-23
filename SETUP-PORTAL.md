@@ -327,15 +327,15 @@ El archivo `netlify.toml` en la raíz del repo tiene una directiva **Content-Sec
 
 **Hoy** la línea `connect-src` ya incluye:
 ```
-connect-src 'self' https://api.anthropic.com https://*.supabase.co wss://*.supabase.co https://lcffgrrwbbbgorooawyd.supabase.co;
+connect-src 'self' https://api.anthropic.com https://*.supabase.co wss://*.supabase.co https://npgnhsmwpcipxgvfxrho.supabase.co;
 ```
 
 El wildcard `https://*.supabase.co` ya cubre **cualquier** subdominio de Supabase, incluido tu nuevo proyecto `conecta-portal`. ✅
 
-**Pero** hay un proyecto Supabase hardcodeado al final (`https://lcffgrrwbbbgorooawyd.supabase.co`). Cuando llegue Fase 2.1 vamos a agregar específicamente la URL del nuevo proyecto al lado de ese, así:
+**Pero** hay un proyecto Supabase hardcodeado al final (`https://npgnhsmwpcipxgvfxrho.supabase.co` — KameHouse; antes apuntaba al proyecto viejo ya migrado). Cuando llegue Fase 2.1 vamos a agregar específicamente la URL del nuevo proyecto al lado de ese, así:
 
 ```
-connect-src 'self' https://api.anthropic.com https://*.supabase.co wss://*.supabase.co https://lcffgrrwbbbgorooawyd.supabase.co https://TU_PROYECTO.supabase.co;
+connect-src 'self' https://api.anthropic.com https://*.supabase.co wss://*.supabase.co https://npgnhsmwpcipxgvfxrho.supabase.co https://TU_PROYECTO.supabase.co;
 ```
 
 (El wildcard ya lo cubriría, pero hardcodear ambos es práctica explícita y deja claro qué proyectos se usan.)

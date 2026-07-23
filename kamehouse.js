@@ -1,0 +1,17995 @@
+
+// ═══════════════════════════════════════════════════════════════
+// CONFIG
+// ═══════════════════════════════════════════════════════════════
+const SB_URL = 'https://npgnhsmwpcipxgvfxrho.supabase.co';
+const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5wZ25oc213cGNpcHhndmZ4cmhvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczMDEwNTMsImV4cCI6MjA5Mjg3NzA1M30.08Fp0YaIkD1okEWB8ao3HoPpdaq6rFi2kzAYGZ72jQg';
+
+// ═══════════════════════════════════════════════════════════════
+// AUTH — Login simple con Netlify Function
+// ═══════════════════════════════════════════════════════════════
+// Credenciales hardcodeadas aquí solo como fallback de desarrollo.
+// En producción, esto se valida en Netlify Function.
+// ═══════════════════════════════════════════════════════════════
+// AUTH — Multi-usuario con roles
+// ═══════════════════════════════════════════════════════════════
+const SESSION_KEY = 'kh_session_v2';
+const SESSION_HOURS = 8;
+
+let currentUser = null;
+let _karinCatFilter = 'all';
+let _karinPiezasCache = [];
+let recibosLoaded = false;
+let disenoLoaded = false;
+
+const PERMISOS_TABS = {
+  maestro_roshi: ['resumen','pagos','eventos','gastos','ingresos','saldos','ventas','cotizar','inventario','reportes','capsule','solicitudes_portal','equipo','kamisama','herramientas','radar','montana','yamcha','radio'],
+  bulma:         ['resumen','pagos','eventos','gastos','ingresos','saldos','ventas','cotizar','inventario','reportes','capsule','solicitudes_portal','equipo','herramientas'],
+  mister_popo:   ['inventario','reportes','equipo'],
+  coordinador:   ['inventario','reportes','equipo'],
+  cc:            ['equipo'],
+  // Vendedor: su sección de Ventas (Cotizar/Vender + Mis Ventas) + Guerreros Z.
+  // (Antes tenía 'ventas' —el dashboard de finanzas admin— que le devolvía 403.)
+  vendedor:      ['cotizar','equipo']
+};
+
+// Qué tabs de Guerreros Z puede ver cada rol
+const GZ_TABS_PERMITIDAS = {
+  maestro_roshi: ['lista','invitar','miperfil'],
+  bulma:         ['lista','invitar','miperfil'],
+  mister_popo:   ['lista','miperfil'],
+  coordinador:   ['lista','miperfil'],
+  cc:            ['lista','miperfil'],
+  vendedor:      ['lista','miperfil'],
+};
+
+// ── TOAST ──
+function showToast(msg, tipo) {
+  tipo = tipo || 'error';
+  var col = tipo === 'error' ? '#FF4444' : tipo === 'success' ? '#3DDC84' : '#FFD700';
+  var t = document.getElementById('_kh_toast');
+  if (!t) {
+    t = document.createElement('div');
+    t.id = '_kh_toast';
+    t.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);z-index:9999;max-width:420px;width:90%;pointer-events:none;transition:opacity .3s';
+    document.body.appendChild(t);
+  }
+  t.innerHTML = '<div style="background:rgba(20,20,30,.95);border:1px solid '+col+';border-radius:10px;padding:12px 18px;font-size:13px;color:'+col+'">'+msg+'</div>';
+  t.style.opacity = '1';
+  clearTimeout(t._timer);
+  t._timer = setTimeout(function(){ t.style.opacity = '0'; }, 3500);
+}
+
+// JWT del backend tras login exitoso. Se manda como Authorization Bearer en
+// requests a admin functions (contrato-*, send-invite, github-publish, etc.).
+// Se preserva en localStorage para sobrevivir reloads.
+const KH_JWT_KEY = 'kh_jwt_v1';
+function khGetJwt() { try { return localStorage.getItem(KH_JWT_KEY) || ''; } catch (e) { return ''; } }
+function khSetJwt(t) { try { if (t) localStorage.setItem(KH_JWT_KEY, t); else localStorage.removeItem(KH_JWT_KEY); } catch (e) {} }
+// [sec-401] guarda para no disparar logout-storm cuando varios fetch caen 401 a la vez
+let _khSessionExpired = false;
+
+// Wrapper de fetch que agrega Authorization Bearer automáticamente.
+// Usar para endpoints admin (contrato-*, send-invite, github-publish, etc.)
+// que ahora requieren JWT. Si el JWT expiró/es inválido, el endpoint devolverá
+// 401 y el caller debe manejar el re-login.
+async function khAdminFetch(url, options) {
+  options = options || {};
+  const jwt = khGetJwt();
+  const baseHeaders = { 'Content-Type': 'application/json' };
+  options.headers = Object.assign(
+    {},
+    baseHeaders,
+    options.headers || {},
+    jwt ? { 'Authorization': 'Bearer ' + jwt } : {}
+  );
+  const resp = await fetch(url, options);
+  // [sec-401] Sesión zombie: si el JWT expiró/inválido, ningún admin fetch sirve. En vez de
+  // fallar en silencio (todo 401), forzamos re-login UNA vez con aviso. Igual devolvemos resp
+  // para no romper al caller en vuelo.
+  if (resp.status === 401 && !_khSessionExpired) {
+    _khSessionExpired = true;
+    showToast('Tu sesión expiró. Vuelve a iniciar sesión.', 'error');
+    doLogout();
+  }
+  return resp;
+}
+
+// ── NOTIFICACIONES IN-APP (DC2c-A) ──────────────────────────────────────────
+// Capa in-app que acompaña los emails. Lecturas/marcado scopeados por el JWT.
+let _notifCache = [];
+
+async function _cargarNotificaciones() {
+  try {
+    const r = await khAdminFetch('/.netlify/functions/notificaciones', {
+      method: 'POST', body: JSON.stringify({ accion: 'list' }),
+    });
+    const data = await r.json();
+    if (!r.ok || !data.ok) throw new Error(data.error || 'fail');
+    _notifCache = data.notificaciones || [];
+    _pintarBadgeNotif(data.no_leidas || 0);
+    _renderNotifPanel();
+  } catch (e) {
+    _pintarBadgeNotif(0); // fails-soft: oculta badge, no rompe el panel
+  }
+}
+
+function _pintarBadgeNotif(n) {
+  const badge = document.getElementById('notif-badge');
+  if (!badge) return;
+  if (n > 0) { badge.textContent = n > 99 ? '99+' : String(n); badge.style.display = 'flex'; }
+  else { badge.style.display = 'none'; }
+}
+
+function _toggleNotifPanel(ev) {
+  if (ev) ev.stopPropagation();
+  const panel = document.getElementById('notif-panel');
+  if (!panel) return;
+  if (panel.style.display === 'block') { _closeNotifPanel(); return; }
+  _renderNotifPanel();
+  panel.style.display = 'block';
+  setTimeout(() => document.addEventListener('click', _notifOutsideHandler), 0);
+}
+
+function _notifOutsideHandler(ev) {
+  const wrap = document.getElementById('notif-wrap');
+  if (wrap && wrap.contains(ev.target)) return; // click dentro del wrap: ignora
+  _closeNotifPanel();
+}
+
+function _closeNotifPanel() {
+  const panel = document.getElementById('notif-panel');
+  if (panel) panel.style.display = 'none';
+  document.removeEventListener('click', _notifOutsideHandler);
+}
+
+function _renderNotifPanel() {
+  const panel = document.getElementById('notif-panel');
+  if (!panel) return;
+  const items = _notifCache.length ? _notifCache.map(n => {
+    const linkArg = n.link ? `'${String(n.link).replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'` : 'null';
+    return `
+    <div class="notif-item ${n.leida ? '' : 'unread'}" onclick="_marcarNotifLeida('${n.id}', ${linkArg})">
+      <div class="notif-dot ${n.leida ? 'read' : ''}"></div>
+      <div class="notif-item-body">
+        ${n.titulo ? `<div class="notif-item-title">${_escNotif(n.titulo)}</div>` : ''}
+        <div class="notif-item-msg">${_escNotif(n.mensaje)}</div>
+        <div class="notif-item-time">${_haceCuanto(n.created_at)}</div>
+      </div>
+    </div>`;
+  }).join('') : '<div class="notif-empty">// sin notificaciones</div>';
+  panel.innerHTML = `
+    <div class="notif-panel-head">
+      <div class="notif-panel-title">Notificaciones</div>
+      ${_notifCache.some(n => !n.leida) ? '<button class="notif-mark-all" onclick="_marcarTodasNotif(event)">Marcar todas leídas</button>' : ''}
+    </div>
+    ${items}`;
+}
+
+async function _marcarNotifLeida(id, link) {
+  try {
+    await khAdminFetch('/.netlify/functions/notificaciones', {
+      method: 'POST', body: JSON.stringify({ accion: 'marcar_leida', id }),
+    });
+  } catch (e) {}
+  await _cargarNotificaciones();
+  if (link) { _closeNotifPanel(); window.location.href = link; }
+}
+
+async function _marcarTodasNotif(ev) {
+  if (ev) ev.stopPropagation();
+  try {
+    await khAdminFetch('/.netlify/functions/notificaciones', {
+      method: 'POST', body: JSON.stringify({ accion: 'marcar_todas' }),
+    });
+  } catch (e) {}
+  await _cargarNotificaciones();
+}
+
+// Crea una notif vía la función (accion:'crear'). Fails-soft: NUNCA lanza, para
+// no bloquear la acción principal (email/strike) si la notif falla.
+async function _crearNotif(payload) {
+  try {
+    await khAdminFetch('/.netlify/functions/notificaciones', {
+      method: 'POST', body: JSON.stringify(Object.assign({ accion: 'crear' }, payload)),
+    });
+  } catch (e) { /* fails-soft */ }
+}
+
+function _escNotif(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+function _haceCuanto(ts) {
+  if (!ts) return '';
+  const then = new Date(ts).getTime();
+  if (isNaN(then)) return '';
+  const s = Math.floor((Date.now() - then) / 1000);
+  if (s < 60) return 'hace un momento';
+  const m = Math.floor(s / 60); if (m < 60) return `hace ${m} min`;
+  const h = Math.floor(m / 60); if (h < 24) return `hace ${h} h`;
+  const d = Math.floor(h / 24); if (d < 7) return `hace ${d} d`;
+  return new Date(ts).toLocaleDateString('es-MX', { day: '2-digit', month: 'short' });
+}
+
+async function doLogin() {
+  const credentials = document.getElementById('login-user').value.trim().toLowerCase();
+  const pass        = document.getElementById('login-pass').value.trim();
+  const errEl       = document.getElementById('login-error');
+  const btn         = document.getElementById('login-btn');
+  if (!credentials || !pass) {
+    errEl.textContent = 'Ingresa correo y contraseña';
+    errEl.style.display = 'block';
+    setTimeout(() => errEl.style.display = 'none', 3000);
+    return;
+  }
+  btn.textContent = 'Entrando…'; btn.disabled = true;
+  try {
+    // Login pasa por Netlify Function que usa service_role — el cliente
+    // ya NO consulta usuarios directamente con anon key. Service Stop the Bleed.
+    const resp = await fetch('/.netlify/functions/auth-login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ credentials, password: pass }),
+    });
+    let data;
+    try { data = await resp.json(); } catch (e) { data = {}; }
+    if (resp.status === 429) {
+      throw new Error(data.error || 'Demasiados intentos. Intenta más tarde.');
+    }
+    if (!resp.ok || !data.ok) {
+      throw new Error(data.error || 'Credenciales inválidas');
+    }
+    currentUser = data.user;
+    khSetJwt(data.token);
+    _khSessionExpired = false; // [sec-401] sesión fresca, rearma el manejador
+    sessionStorage.setItem(SESSION_KEY, JSON.stringify({
+      user: data.user,
+      expires: Date.now() + (data.ttl ? data.ttl * 1000 : SESSION_HOURS * 3600000),
+    }));
+    enterApp();
+  } catch(e) {
+    errEl.textContent = e.message || 'Error al iniciar sesión';
+    errEl.style.display = 'block';
+    setTimeout(() => errEl.style.display = 'none', 4000);
+  } finally {
+    btn.textContent = 'Entrar'; btn.disabled = false;
+  }
+}
+
+function doLogout() {
+  currentUser = null;
+  sessionStorage.removeItem(SESSION_KEY);
+  khSetJwt(null);
+  document.getElementById('app').classList.remove('visible');
+  document.getElementById('login-screen').style.display = 'flex';
+  document.getElementById('login-pass').value = '';
+}
+
+function checkSession() {
+  const raw = sessionStorage.getItem(SESSION_KEY);
+  if (!raw) return false;
+  try {
+    const s = JSON.parse(raw);
+    if (Date.now() > s.expires) {
+      sessionStorage.removeItem(SESSION_KEY);
+      khSetJwt(null);
+      return false;
+    }
+    // Si la sesión vive pero perdimos el JWT (ej. localStorage clearado),
+    // forzamos re-login. Sin JWT no podemos invocar admin functions.
+    if (!khGetJwt()) {
+      sessionStorage.removeItem(SESSION_KEY);
+      return false;
+    }
+    currentUser = s.user;
+    return true;
+  } catch { return false; }
+}
+
+function enterApp() {
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('app').classList.add('visible');
+  const roleLabels = { maestro_roshi:'Maestro Roshi', bulma:'Bulma', mister_popo:'Maestro Karin', coordinador:'Coordinador', cc:'CC', vendedor:'Vendedor' };
+  document.getElementById('topbar-user-info').textContent = `${currentUser.nombre} · ${roleLabels[currentUser.rol] || currentUser.rol}`;
+  aplicarPermisosUI();
+  aplicarTemaCoordi();
+  applyTema(currentUser.tema_acento);
+  // [PERF v1] Boot mínimo: el CRITICAL PATH carga solo sesión/permisos (arriba,
+  // sin fetch) + la pestaña visible (bootApp → loadResumen). Los badges de
+  // chrome (notificaciones, pendientes) NO bloquean el primer render: se
+  // difieren a idle para que la vista aparezca antes. Siguen fails-soft.
+  bootApp();
+  const _idle = window.requestIdleCallback || (fn => setTimeout(fn, 200));
+  _idle(() => {
+    _cargarNotificaciones(); // badge de no leídas
+    _spContarPendientes();   // [Bandeja-T2] badge de pendientes en el nav
+    checkMensajeDia();       // banner mensaje del día (chrome)
+  });
+}
+
+
+// ── SISTEMA DE TEMAS POR COORDI ──
+function aplicarTemaCoordi() {
+  if (!currentUser) return;
+  const nombre = (currentUser.nombre || '').toLowerCase().trim();
+  // Mapa: nombre del coordi → clase CSS del tema
+  const temas = {
+    'ximena payán': 'tema-ximena',
+    'ximena payan': 'tema-ximena',
+    'america aglae torruco ibarra': 'tema-america',
+    'america torruco': 'tema-america',
+    'reginna valencia valencia': 'tema-reginna',
+    'reginna valencia': 'tema-reginna',
+    'luis alfonso padilla': 'tema-luis',
+    'laura montes': 'tema-laura',
+    'brittany hernandez': 'tema-brittany',
+    'axel francisco estrada gonzalez': 'tema-axel',
+    'axel estrada': 'tema-axel',
+  };
+  // Limpiar temas previos
+  document.body.className = document.body.className.replace(/\btema-\w+/g, '').trim();
+  // Precedencia DC1: si el usuario eligió acento personal (tema_acento), ESE manda.
+  // No aplicamos el tema-coordi viejo (sus colores con !important pisarían el
+  // acento que va por variables CSS). El body queda sin clase tema-XXX.
+  if (currentUser.tema_acento) return;
+  // Aplicar tema si existe
+  const clase = temas[nombre];
+  if (clase) document.body.classList.add(clase);
+}
+
+// ── TEMA DE ACENTO PERSONALIZADO (DC1) ──
+// Cada usuario elige su color de acento; se guarda en usuarios.tema_acento.
+// Solo presets brillantes (texto oscuro legible encima). null = lima por defecto.
+const TEMA_PRESETS = [
+  { hex: '#e8ff4c', nombre: 'Lima' },
+  { hex: '#ff3ea5', nombre: 'Magenta' },
+  { hex: '#3ee0ff', nombre: 'Cyan' },
+  { hex: '#ffa033', nombre: 'Ámbar' },
+  { hex: '#ff6b4c', nombre: 'Coral' },
+];
+
+// Oscurece un hex por un factor (0.12 = 12% más oscuro).
+function _hexOscurecer(hex, factor) {
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex || '');
+  if (!m) return hex;
+  const n = parseInt(m[1], 16);
+  const ajusta = v => Math.round(v * (1 - factor)).toString(16).padStart(2, '0');
+  return '#' + ajusta((n >> 16) & 255) + ajusta((n >> 8) & 255) + ajusta(n & 255);
+}
+// Convierte un hex a rgba(...) con el alpha dado.
+function _hexAlpha(hex, alpha) {
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex || '');
+  if (!m) return hex;
+  const n = parseInt(m[1], 16);
+  return 'rgba(' + ((n >> 16) & 255) + ',' + ((n >> 8) & 255) + ',' + (n & 255) + ',' + alpha + ')';
+}
+// Sobrescribe los tokens de acento en :root. Si no hay hex, deja el lima por defecto.
+function applyTema(hex) {
+  if (!hex) return;
+  const root = document.documentElement.style;
+  root.setProperty('--gold', hex);
+  root.setProperty('--gold2', _hexOscurecer(hex, 0.12));
+  root.setProperty('--orange', hex);
+  root.setProperty('--orange2', hex);
+  root.setProperty('--border2', _hexAlpha(hex, 0.28));
+}
+
+// Marca el preset elegido en el formulario de perfil (no guarda hasta "Guardar").
+function seleccionarTema(hex, el) {
+  const inp = document.getElementById('mp-tema_acento');
+  if (inp) inp.value = hex;
+  document.querySelectorAll('.tema-dot').forEach(d => d.classList.remove('sel'));
+  if (el) el.classList.add('sel');
+}
+
+function aplicarPermisosUI() {
+  if (!currentUser) return;
+  const rol = currentUser.rol;
+  const base = PERMISOS_TABS[rol] || [];
+  const extras = currentUser.permisos_extra?.tabs_extra || [];
+  const bloqueados = currentUser.permisos_extra?.tabs_bloqueados || [];
+  const tabsPermitidos = [...new Set([...base, ...extras])].filter(t => !bloqueados.includes(t));
+  const allTabs = ['resumen','pagos','eventos','gastos','ingresos','saldos','ventas','cotizar','inventario','reportes','equipo','capsule','solicitudes_portal','kamisama','radar','montana','yamcha','radio'];
+  allTabs.forEach(tab => {
+    const btn = document.getElementById('nav-' + tab);
+    if (btn) btn.style.display = tabsPermitidos.includes(tab) ? '' : 'none';
+  });
+  const dropdownHerr = document.getElementById('nav-dropdown-herramientas');
+  if (dropdownHerr) dropdownHerr.style.display = ['maestro_roshi','bulma'].includes(rol) ? '' : 'none';
+  const karinAdminBtns = document.getElementById('karin-admin-btns');
+  if (karinAdminBtns) karinAdminBtns.style.display = ['maestro_roshi','mister_popo'].includes(rol) ? 'flex' : 'none';
+
+  // Ocultar botones de tabs de Guerreros Z segun rol
+  const gzPermitidas = GZ_TABS_PERMITIDAS[rol] || ['lista','miperfil'];
+  const btnLista   = document.querySelector('.gz-tab-btn[onclick*=\'lista\']');
+  const btnInvitar = document.querySelector('.gz-tab-btn[onclick*=\'invitar\']');
+  const btnPerfil  = document.querySelector('.gz-tab-btn[onclick*=\'miperfil\']');
+  if (btnLista)   btnLista.style.display   = gzPermitidas.includes('lista')    ? '' : 'none';
+  if (btnInvitar) btnInvitar.style.display = gzPermitidas.includes('invitar')  ? '' : 'none';
+  if (btnPerfil)  btnPerfil.style.display  = gzPermitidas.includes('miperfil') ? '' : 'none';
+  // Ranking: todos los que llegan a GZ lo pueden ver
+  const btnRanking = document.querySelector('[onclick*=\'abrirRanking\']');
+  if (btnRanking) btnRanking.style.display = '';
+  // Filtros de Guerreros Z: solo admins
+  const gzFiltros = document.getElementById('gz-filtros-admin');
+  if (gzFiltros) gzFiltros.style.display = ['maestro_roshi','bulma'].includes(rol) ? 'flex' : 'none';
+  // Etiqueta de solo lectura para roles no-admin en la lista
+  const soloLecturaLabel = document.getElementById('gz-solo-lectura-label');
+  const esAdmin = ['maestro_roshi','bulma'].includes(rol);
+  if (soloLecturaLabel) soloLecturaLabel.style.display = esAdmin ? 'none' : 'flex';
+
+  showPage(tabsPermitidos[0] || 'resumen');
+}
+
+const _loginPassEl = document.getElementById('login-pass');
+if (_loginPassEl) _loginPassEl.addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+const loginUserEl = document.getElementById('login-user');
+if (loginUserEl) loginUserEl.addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('login-pass').focus(); });
+
+// ═══════════════════════════════════════════════════════════════
+// SUPABASE — Capa de datos
+// ═══════════════════════════════════════════════════════════════
+const db = {
+ headers: {
+ 'apikey': SB_KEY,
+ 'Authorization': 'Bearer ' + SB_KEY,
+ 'Content-Type': 'application/json',
+ 'Prefer': 'return=representation'
+ },
+
+ async get(table, params = '') {
+ const r = await fetch(`${SB_URL}/rest/v1/${table}${params}`, { headers: db.headers });
+ if (!r.ok) throw new Error(await r.text());
+ return r.json();
+ },
+
+ async post(table, body) {
+ const r = await fetch(`${SB_URL}/rest/v1/${table}`, {
+ method: 'POST', headers: db.headers, body: JSON.stringify(body)
+ });
+ if (!r.ok) throw new Error(await r.text());
+ return r.json();
+ },
+
+ async upsert(table, body, onConflict) {
+ const r = await fetch(`${SB_URL}/rest/v1/${table}?on_conflict=${onConflict}`, {
+ method: 'POST',
+ headers: Object.assign({}, db.headers, { 'Prefer': 'resolution=merge-duplicates,return=representation' }),
+ body: JSON.stringify(body)
+ });
+ if (!r.ok) throw new Error(await r.text());
+ return r.json();
+ },
+
+ async patch(table, id, body) {
+ const r = await fetch(`${SB_URL}/rest/v1/${table}?id=eq.${id}`, {
+ method: 'PATCH', headers: db.headers, body: JSON.stringify(body)
+ });
+ if (!r.ok) throw new Error(await r.text());
+ return r.json();
+ },
+
+ async delete(table, id) {
+ const r = await fetch(`${SB_URL}/rest/v1/${table}?id=eq.${id}`, {
+ method: 'DELETE', headers: db.headers
+ });
+ if (!r.ok) throw new Error(await r.text());
+ return true;
+ },
+
+ // Llama una función Postgres vía PostgREST: POST /rest/v1/rpc/<fn> con body {args}.
+ async rpc(fn, body) {
+ const r = await fetch(`${SB_URL}/rest/v1/rpc/${fn}`, {
+ method: 'POST', headers: db.headers, body: JSON.stringify(body || {})
+ });
+ if (!r.ok) throw new Error(await r.text());
+ return r.json();
+ }
+};
+
+// [sec-usuarios] Acceso a la tabla `usuarios` vía Netlify Function (service_role).
+// Reemplaza db.get/post/patch('usuarios', ...). El RLS de `usuarios` ya NO expone
+// PII (nombre/correo/rol/password_hash) a la anon key. La función whitelistea
+// columnas (nunca devuelve password_hash) y hashea cualquier password con bcrypt.
+const khUsuarios = {
+  async _call(payload) {
+    const r = await khAdminFetch('/.netlify/functions/admin-usuarios', {
+      method: 'POST', body: JSON.stringify(payload),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || j.ok === false) throw new Error(j.error || ('admin-usuarios ' + r.status));
+    return j;
+  },
+  // listar({ activos?, ids?, rol?, correo?, orden? }) → array de usuarios (sin password)
+  listar(opts) { return this._call(Object.assign({ accion: 'listar' }, opts || {})).then(j => j.usuarios || []); },
+  // obtener(id) → un usuario (objeto) o null
+  obtener(id) { return this._call({ accion: 'obtener', id }).then(j => j.usuario || null); },
+  // verificarUsername(username, excludeId?) → bool disponible
+  verificarUsername(username, excludeId) { return this._call({ accion: 'verificar_username', username, excludeId }).then(j => j.disponible); },
+  // crear(correo, rol) → { id, correo, nombre, rol, invite_token }
+  crear(correo, rol) { return this._call({ accion: 'crear', correo, rol }).then(j => j.usuario); },
+  // actualizar(id, patch) → ok (password en patch.password se hashea server-side)
+  actualizar(id, patch) { return this._call({ accion: 'actualizar', id, patch }); },
+};
+
+// [sec-contratos] Acceso a contratos_creadores vía Netlify Function con
+// service_role (cerramos la lectura anon). Solo maestro_roshi/bulma.
+// firma_data/ine/ip_firma NUNCA viajan al front (excluidos en admin-contratos.js).
+const khContratos = {
+  async _call(payload) {
+    const r = await khAdminFetch('/.netlify/functions/admin-contratos', {
+      method: 'POST', body: JSON.stringify(payload),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || j.ok === false) throw new Error(j.error || ('admin-contratos ' + r.status));
+    return j;
+  },
+  // listar({ estado?, evento_fecha?, creador?, evento?, limit? }) → array de contratos
+  listar(opts) { return this._call(Object.assign({ accion: 'listar' }, opts || {})).then(j => j.contratos || []); },
+  // obtener(id) → un contrato (objeto) o null
+  obtener(id) { return this._call({ accion: 'obtener', id }).then(j => j.contrato || null); },
+};
+
+// [TORRE v2 F3] Salidas de bodega vía admin-salidas (service_role en el backend).
+// El error conserva j (e.data) para pintar los 409 del backend tal cual (sin_stock).
+const khSalidas = {
+  async _call(payload) {
+    const r = await khAdminFetch('/.netlify/functions/admin-salidas', {
+      method: 'POST', body: JSON.stringify(payload),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || j.ok === false) {
+      const e = new Error(j.error || ('admin-salidas ' + r.status));
+      e.data = j; e.status = r.status;
+      throw e;
+    }
+    return j;
+  },
+  crear(evento_id, detalle, notas) { return this._call({ accion: 'crear', evento_id, detalle, notas }); },
+  // [F4b] listar guarda la cuenta de LA EMPRESA (si el backend la mandó) para
+  // pintarla junto a los faltantes pendientes del viajero.
+  listar(opts) { return this._call(Object.assign({ accion: 'listar' }, opts || {})).then(j => { khSalidas.ultimaCuentaEmpresa = j.cuenta_empresa || null; return j.salidas || []; }); },
+  darSalida(id) { return this._call({ accion: 'dar_salida', id }); },
+  rechazar(id, motivo) { return this._call({ accion: 'rechazar', id, motivo }); },
+  cancelar(id) { return this._call({ accion: 'cancelar', id }); },
+  faltantesPagado(id) { return this._call({ accion: 'faltantes_pagado', id }); }, // [F4b] SOLO Memo
+  ultimaCuentaEmpresa: null,
+};
+
+// [sec-reportes] Acceso a reportes_evento vía Netlify Function con service_role
+// (cerramos lectura/escritura anon). El backend hace cumplir los roles y el
+// anti-escalación: el coordi SOLO ve/edita SU reporte y nunca cambia el estado
+// de aprobación. evento_id es slug (no uuid).
+const khReportes = {
+  async _call(payload) {
+    const r = await khAdminFetch('/.netlify/functions/admin-reportes', {
+      method: 'POST', body: JSON.stringify(payload),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || j.ok === false) {
+      // [TORRE v2 F4b] e.data conserva el JSON del 409 (diferencias/cobrable)
+      const e = new Error(j.error || ('admin-reportes ' + r.status));
+      e.data = j; e.status = r.status;
+      throw e;
+    }
+    return j;
+  },
+  // listar({ estado?, evento_id?, coordi_id?, limit? }) → array de reportes
+  // (el backend fuerza coordi_id al del JWT cuando el rol es coordinador)
+  listar(opts) { return this._call(Object.assign({ accion: 'listar' }, opts || {})).then(j => j.reportes || []); },
+  // guardarMio(body) → { ok, id } — coordi crea/edita SU reporte (status borrador|enviado)
+  guardarMio(body) { return this._call(Object.assign({ accion: 'guardar_mio' }, body || {})); },
+  // enviarMio(id) → coordi pone SU reporte en 'enviado'
+  enviarMio(id) { return this._call({ accion: 'enviar_mio', id }); },
+  // moderación
+  aprobarPopo(id) { return this._call({ accion: 'aprobar_popo', id }); },
+  // [F4b] destranca el 409 de comparación COBRANDO los faltantes (queda registro)
+  aprobarPopoCobrando(id) { return this._call({ accion: 'aprobar_popo', id, cobrar_faltantes: true }); },
+  aprobarFinal(id) { return this._call({ accion: 'aprobar_final', id }); },
+  rechazar(id, motivo) { return this._call({ accion: 'rechazar', id, motivo }); },
+  marcarKitsRecibidos(id, kits_detalle) { return this._call({ accion: 'marcar_kits_recibidos', id, kits_detalle }); },
+  eliminar(id) { return this._call({ accion: 'eliminar', id }); },
+};
+
+// [sec-ventas] Acceso a la vista resumen_eventos vía Netlify Function con
+// service_role (cierra el último acceso anon de finanzas). Gateado a admin
+// (maestro_roshi, bulma) mientras el rol vendedor / "Mis Ventas" no exista.
+const khVentas = {
+  async _call(payload) {
+    const r = await khAdminFetch('/.netlify/functions/admin-ventas-resumen', {
+      method: 'POST', body: JSON.stringify(payload),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || j.ok === false) throw new Error(j.error || ('admin-ventas-resumen ' + r.status));
+    return j;
+  },
+  // listar() → array de eventos de la vista resumen_eventos
+  listar() { return this._call({ accion: 'listar' }).then(j => j.eventos || []); },
+};
+
+// [sec-tours] Acceso a tours_pasados vía Netlify Function con service_role
+// (cerramos lectura/escritura anon). Lectura: cualquier logueado. Crear/eliminar:
+// el backend exige que el tour sea del propio usuario salvo admin (maestro_roshi/bulma).
+const khTours = {
+  async _call(payload) {
+    const r = await khAdminFetch('/.netlify/functions/admin-tours', {
+      method: 'POST', body: JSON.stringify(payload),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || j.ok === false) throw new Error(j.error || ('admin-tours ' + r.status));
+    return j;
+  },
+  // listar({ usuario_id?, desde?, limit? }) → array de tours
+  listar(opts) { return this._call(Object.assign({ accion: 'listar' }, opts || {})).then(j => j.tours || []); },
+  // crear(tour) → { ok, tour }
+  crear(tour) { return this._call(Object.assign({ accion: 'crear' }, tour || {})); },
+  // eliminar(id) → { ok }
+  eliminar(id) { return this._call({ accion: 'eliminar', id }); },
+};
+
+// [sec-kits] Acceso a kits_inventario vía Netlify Function con service_role
+// (cerramos lectura/escritura anon). Lectura: popo/coordi/admins (costo oculto a
+// no-admins). Crear/editar/eliminar: mister_popo + admins (verifyAdminAuth lo exige).
+const khKits = {
+  async _call(payload) {
+    const r = await khAdminFetch('/.netlify/functions/admin-kits', {
+      method: 'POST', body: JSON.stringify(payload),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || j.ok === false) throw new Error(j.error || ('admin-kits ' + r.status));
+    return j;
+  },
+  // listar() → array de piezas (order pieza.asc)
+  listar() { return this._call({ accion: 'listar' }).then(j => j.kits || []); },
+  // obtener(id) → una pieza (con costo) o null
+  obtener(id) { return this._call({ accion: 'obtener', id }).then(j => j.kit || null); },
+  // crear(body) → { ok, kit }
+  crear(body) { return this._call(Object.assign({ accion: 'crear' }, body || {})); },
+  // actualizar(id, patch) → { ok }
+  actualizar(id, patch) { return this._call({ accion: 'actualizar', id, patch }); },
+  // eliminar(id) → { ok }
+  eliminar(id) { return this._call({ accion: 'eliminar', id }); },
+};
+
+// [sec-radar-wl] Radar del Dragón vía Netlify Function con service_role (cerramos
+// anon de main/pagos/rol_eventos_uso + radar_alertas + el RPC radar_metricas).
+// Solo maestro_roshi. La función reenvía el RPC tal cual y reproduce la paginación.
+const khRadar = {
+  async _call(payload) {
+    const r = await khAdminFetch('/.netlify/functions/admin-radar', {
+      method: 'POST', body: JSON.stringify(payload),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || j.ok === false) throw new Error(j.error || ('admin-radar ' + r.status));
+    return j;
+  },
+  // metricas(rango) → respuesta del RPC radar_metricas TAL CUAL
+  metricas(rango) { return this._call({ accion: 'metricas', rango }).then(j => j.metricas); },
+  // mainMetrics(sinceISO, untilISO|null) → RPC radar_main_metrics TAL CUAL (comparativas)
+  mainMetrics(since, until) { return this._call({ accion: 'main_metrics', since, until: until || undefined }).then(j => j.metricas); },
+  // fetch({ table, select?, since, until? }) → array de filas (paginado server-side)
+  fetch(opts) { return this._call(Object.assign({ accion: 'fetch' }, opts || {})).then(j => j.rows || []); },
+  // ventasTrafico({ since, until? }) → [{ evento_id, evento_nombre, visitas, ventas, conv }]
+  ventasTrafico(opts) { return this._call(Object.assign({ accion: 'ventas_trafico' }, opts || {})).then(j => j.rows || []); },
+  alertasListar() { return this._call({ accion: 'alertas_listar' }).then(j => j.rows || []); },
+  alertasNoVistas() { return this._call({ accion: 'alertas_no_vistas' }).then(j => j.rows || []); },
+  alertaVista(id) { return this._call({ accion: 'alerta_vista', id }); },
+  alertasVistaTodas() { return this._call({ accion: 'alertas_vista_todas' }); },
+};
+
+// [sec-radar-wl] Lista de espera vía Netlify Function con service_role (cerramos anon
+// de eventos_waitlist + eventos_estado_snapshot). Solo maestro_roshi. PII (email/nombre)
+// whitelisteada server-side y solo llega a admin autenticado.
+const khWaitlist = {
+  async _call(payload) {
+    const r = await khAdminFetch('/.netlify/functions/admin-waitlist', {
+      method: 'POST', body: JSON.stringify(payload),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || j.ok === false) throw new Error(j.error || ('admin-waitlist ' + r.status));
+    return j;
+  },
+  listar() { return this._call({ accion: 'listar' }).then(j => j.rows || []); },
+  snapshot() { return this._call({ accion: 'snapshot' }).then(j => j.rows || []); },
+  eliminar(eventoId) { return this._call({ accion: 'eliminar', evento_id: eventoId }); },
+  resetNotificado(eventoId) { return this._call({ accion: 'reset_notificado', evento_id: eventoId }); },
+};
+
+// [sec-sensibles] rooming_habitaciones vía Netlify Function con service_role
+// (maestro_roshi + bulma). Cierra lectura/escritura anon.
+const khRooming = {
+  async _call(payload) {
+    const r = await khAdminFetch('/.netlify/functions/admin-rooming', {
+      method: 'POST', body: JSON.stringify(payload),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || j.ok === false) throw new Error(j.error || ('admin-rooming ' + r.status));
+    return j;
+  },
+  listar(eventoId) { return this._call({ accion: 'listar', evento_id: eventoId }).then(j => j.habitaciones || []); },
+  crear(body) { return this._call(Object.assign({ accion: 'crear' }, body || {})); },
+  actualizar(id, patch) { return this._call({ accion: 'actualizar', id, patch }); },
+  eliminar(id) { return this._call({ accion: 'eliminar', id }); },
+};
+
+// ═══════════════════════════════════════════════════════════════
+// [acompañantes F4-t4] ROOMING DE GRUPOS (Portal) — sección NUEVA del sub-tab
+// Rooming de Capsule, DEBAJO del rooming KH (que NO se toca). Muestra y ajusta los
+// cuartos que los titulares armaron en el Portal, vía admin-rooming-grupos (#235
+// espejo con auth admin). Mismo lenguaje visual del puzzle del portal (#237).
+// ═══════════════════════════════════════════════════════════════
+const khRoomingGrupos = {
+  async _call(payload) {
+    const r = await khAdminFetch('/.netlify/functions/admin-rooming-grupos', {
+      method: 'POST', body: JSON.stringify(payload),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || j.ok === false) throw new Error(j.error || ('admin-rooming-grupos ' + r.status));
+    return j;
+  },
+  listar(eventoId, opts) { const p = { accion: 'listar', evento_id: eventoId }; if (opts && opts.todos) p.todos = true; return this._call(p).then(j => j.grupos || []); },
+  accion(payload) { return this._call(payload); },
+};
+
+const _RG_TIPOS = [ // orden del negocio: Compartida (base) → Individual.
+  { tipo: 'Compartida', cap: 4 }, { tipo: 'Triple', cap: 3 },
+  { tipo: 'Doble', cap: 2 }, { tipo: 'Individual', cap: 1 },
+];
+let _rgGrupos = [];        // último listado (para re-render en colapso sin re-fetch)
+let _rgAbiertos = {};      // solicitud_id → bool (card colapsable)
+
+// Carga best-effort junto a loadRooming. Fails-soft: si truena, muestra el error;
+// si el evento no tiene grupos, muestra la nota vacía.
+async function loadGruposPortal() {
+  const cont = document.getElementById('cc-grupos-portal');
+  if (!cont) return;
+  if (!_ccEventoActual) { cont.innerHTML = ''; return; }
+  cont.innerHTML = '<div style="color:var(--ts);font-size:12px">Cargando cuartos de los grupos…</div>';
+  let grupos;
+  try {
+    grupos = await khRoomingGrupos.listar(_ccEventoActual);
+  } catch (e) {
+    cont.innerHTML = `<div class="alert alert-error" style="font-size:12px">${_esfEsc(e.message || 'Error')}</div>`;
+    return;
+  }
+  _rgGrupos = Array.isArray(grupos) ? grupos : [];
+  _rgRender();
+}
+
+function _rgRender() {
+  const cont = document.getElementById('cc-grupos-portal');
+  if (!cont) return;
+  if (!_rgGrupos.length) {
+    cont.innerHTML = '<div style="color:var(--ts);font-size:12px">Sin grupos con acompañantes en este evento.</div>';
+    return;
+  }
+  cont.innerHTML = _rgGrupos.map(_rgGrupoHtml).join('');
+}
+
+// Multifecha: índice de fecha (0-based) de un evento_id 'slug#idx', o null en
+// fecha única. El chip visible es "Fecha <idx+1>". [rooming-multifecha]
+function _rgFechaIdx(eventoId) {
+  const p = String(eventoId || '').split('#');
+  if (p.length < 2 || p[1] === '') return null;
+  const n = parseInt(p[1], 10);
+  return (Number.isFinite(n) && n >= 0) ? n : null;
+}
+
+function _rgGrupoHtml(g) {
+  const solSafe = _esfEsc(g.solicitud_id);
+  const activos = (g.lugares || []).filter(l => l.estado === 'activo');
+  const N = activos.length;
+  const nombreDe = (l) => (l.nombre && String(l.nombre).trim()) ? l.nombre : ('Lugar #' + l.numero);
+  const ocupPorHab = {};
+  activos.forEach(l => { if (l.habitacion_grupo_id) { (ocupPorHab[l.habitacion_grupo_id] = ocupPorHab[l.habitacion_grupo_id] || []).push(l); } });
+  const asignados = activos.filter(l => l.habitacion_grupo_id).length;
+  const sinCuarto = activos.filter(l => !l.habitacion_grupo_id);
+  const sumaCap = (g.habitaciones || []).reduce((a, h) => a + (Number(h.capacidad) || 0), 0);
+  const cubre = sumaCap >= N;
+  const abierto = !!_rgAbiertos[g.solicitud_id];
+  // Multifecha: chip "Fecha N" junto al título (fecha única → sin chip).
+  const _fi = _rgFechaIdx(g.evento_id);
+  const fechaChip = _fi === null ? '' : `<span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--ts);border:1px solid var(--border);border-radius:20px;padding:1px 8px;letter-spacing:.06em">Fecha ${_fi + 1}</span>`;
+
+  const header = `
+    <button type="button" data-rg-toggle="${solSafe}" style="width:100%;display:flex;align-items:center;gap:10px;background:transparent;border:none;color:var(--ink);cursor:pointer;text-align:left;padding:0">
+      <span style="font-family:'Rajdhani',sans-serif;font-weight:700;font-size:16px">Grupo de ${_esfEsc(g.titular_nombre)}</span>${fechaChip}
+      <span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--ts);letter-spacing:.08em">asignados ${asignados} de ${N}</span>
+      <span style="margin-left:auto;color:var(--ts);font-size:12px">${abierto ? '▴' : '▾'}</span>
+    </button>`;
+
+  if (!abierto) {
+    return `<div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:12px 16px;margin-bottom:10px">${header}</div>`;
+  }
+
+  const pickerHtml = (habId) => sinCuarto.length
+    ? `<div style="display:flex;flex-wrap:wrap;gap:6px">${sinCuarto.map(l => `<button type="button" data-rg-asignar="${_esfEsc(l.id)}" data-rg-hab="${_esfEsc(habId)}" style="padding:5px 12px;border-radius:20px;border:1px solid var(--border);background:var(--bg3);color:var(--ink);font-size:12px;cursor:pointer">${_esfEsc(nombreDe(l))}</button>`).join('')}</div>`
+    : `<div style="font-size:12px;color:var(--ts)">Ya no hay personas sin cuarto.</div>`;
+
+  const cuartos = (g.habitaciones || []).map(h => {
+    const ocup = ocupPorHab[h.id] || [];
+    const lleno = ocup.length >= Number(h.capacidad || 0);
+    const chips = ocup.map(l => `<span style="display:inline-flex;align-items:center;gap:6px;padding:3px 6px 3px 10px;margin:2px 4px 0 0;border-radius:20px;background:var(--bg3);border:1px solid var(--border);font-size:12px">${_esfEsc(nombreDe(l))}<button type="button" data-rg-quitar="${_esfEsc(l.id)}" title="Quitar" style="border:none;background:transparent;color:var(--ts);font-size:14px;line-height:1;cursor:pointer;padding:0 2px">×</button></span>`).join('');
+    return `
+      <div style="border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:8px">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <b style="font-size:13px">Cuarto ${_esfEsc(h.orden)} · ${_esfEsc(h.tipo)}</b>
+          <span style="font-size:12px;color:${lleno ? 'var(--green)' : 'var(--ts)'}">(${ocup.length}/${_esfEsc(h.capacidad)})</span>
+          <button type="button" data-rg-del="${_esfEsc(h.id)}" title="Eliminar cuarto" style="margin-left:auto;border:none;background:transparent;font-size:15px;cursor:pointer"><svg class="ic"><use href="#ic-basura"/></svg></button>
+        </div>
+        <div style="margin-top:8px">${chips || '<span style="font-size:12px;color:var(--ts)">Cuarto vacío</span>'}</div>
+        ${(!lleno && sinCuarto.length) ? `<div style="margin-top:8px"><button type="button" data-rg-add="${_esfEsc(h.id)}" style="padding:5px 12px;border-radius:20px;border:1px dashed var(--border);background:transparent;color:var(--ts);font-size:12px;cursor:pointer">+ Asignar</button></div>` : ''}
+        <div id="rg-picker-${_esfEsc(h.id)}" style="display:none;margin-top:8px">${pickerHtml(h.id)}</div>
+      </div>`;
+  }).join('');
+
+  const agregar = cubre
+    ? `<button type="button" disabled style="width:100%;padding:10px;border-radius:10px;border:1px solid var(--border);background:transparent;color:var(--ts);font-size:12px;cursor:not-allowed">Los cuartos ya cubren a todo el grupo</button>`
+    : `<button type="button" data-rg-addroom="${solSafe}" style="width:100%;padding:10px;border-radius:10px;border:1px dashed var(--border);background:transparent;color:var(--ink);font-size:12px;font-weight:700;cursor:pointer">＋ Agregar cuarto</button>
+       <div id="rg-tipos-${solSafe}" style="display:none;margin-top:8px"><div style="display:flex;flex-wrap:wrap;gap:6px">${_RG_TIPOS.map(x => `<button type="button" data-rg-crear="${x.tipo}" data-rg-sol="${solSafe}" style="padding:6px 14px;border-radius:20px;border:1px solid var(--border);background:var(--bg3);color:var(--ink);font-size:12px;cursor:pointer">${x.tipo} (${x.cap})</button>`).join('')}</div></div>`;
+
+  return `
+    <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:12px 16px;margin-bottom:10px">
+      ${header}
+      <div style="margin-top:12px">${cuartos}<div style="margin-top:4px">${agregar}</div></div>
+    </div>`;
+}
+
+// Escritura → admin-rooming-grupos; éxito re-fetch+re-pinta, error a #rg-err.
+async function _rgAccion(payload, btn) {
+  const errEl = document.getElementById('rg-err');
+  if (errEl) { errEl.style.display = 'none'; errEl.textContent = ''; }
+  const prev = btn ? btn.textContent : '';
+  if (btn) { btn.disabled = true; btn.textContent = '…'; }
+  try {
+    await khRoomingGrupos.accion(payload);
+    loadGruposPortal();
+  } catch (e) {
+    if (errEl) { errEl.textContent = e.message || 'No se pudo.'; errEl.style.display = 'block'; }
+    if (btn) { btn.disabled = false; btn.textContent = prev; }
+  }
+}
+
+// Delegación única de los controles del rooming de grupos.
+document.body.addEventListener('click', (e) => {
+  const tg = e.target.closest('[data-rg-toggle]');
+  if (tg) { const id = tg.getAttribute('data-rg-toggle'); _rgAbiertos[id] = !_rgAbiertos[id]; _rgRender(); return; }
+  const add = e.target.closest('[data-rg-add]');
+  if (add) { const p = document.getElementById('rg-picker-' + add.getAttribute('data-rg-add')); if (p) p.style.display = (p.style.display === 'none' ? '' : 'none'); return; }
+  const addRoom = e.target.closest('[data-rg-addroom]');
+  if (addRoom) { const tp = document.getElementById('rg-tipos-' + addRoom.getAttribute('data-rg-addroom')); if (tp) tp.style.display = (tp.style.display === 'none' ? 'block' : 'none'); return; }
+  const asg = e.target.closest('[data-rg-asignar]');
+  if (asg) { _rgAccion({ accion: 'asignar', lugar_id: asg.getAttribute('data-rg-asignar'), habitacion_id: asg.getAttribute('data-rg-hab') }, asg); return; }
+  const qt = e.target.closest('[data-rg-quitar]');
+  if (qt) { _rgAccion({ accion: 'quitar', lugar_id: qt.getAttribute('data-rg-quitar') }, qt); return; }
+  const cr = e.target.closest('[data-rg-crear]');
+  if (cr) { _rgAccion({ accion: 'crear_habitacion', solicitud_id: cr.getAttribute('data-rg-sol'), tipo: cr.getAttribute('data-rg-crear') }, cr); return; }
+  const dl = e.target.closest('[data-rg-del]');
+  if (dl) { if (confirm('¿Eliminar este cuarto? Las personas asignadas quedarán sin cuarto.')) _rgAccion({ accion: 'eliminar_habitacion', habitacion_id: dl.getAttribute('data-rg-del') }, dl); return; }
+});
+
+// ═══════════════════════════════════════════════════════════════════
+// NUBE VOLADORA F3 — sub-tab "Transporte" (UI de Bulma)
+//
+// Backend: admin-transporte (#264). REGLA DE ORO: Bulma asigna POR CUARTO —
+// tocar un ladrillo (cuarto/suelto/personaje) arma un LOTE y las unidades se
+// vuelven botones para elegir destino ("¿a cuál unidad?").
+// Molde visual: khRoomingGrupos + la sección de cuartos de grupos (#238).
+// ═══════════════════════════════════════════════════════════════════
+const khTransporte = {
+  async _call(payload) {
+    const r = await khAdminFetch('/.netlify/functions/admin-transporte', {
+      method: 'POST', body: JSON.stringify(payload),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || j.ok === false) throw new Error(j.error || ('admin-transporte ' + r.status));
+    return j;
+  },
+  listar(eventoId, fecha) {
+    const p = { accion: 'listar', evento_id: eventoId };
+    if (fecha) p.fecha = fecha; // [v2] día activo; sin fecha = evento simple
+    return this._call(p);
+  },
+  accion(payload) { return this._call(payload); },
+};
+
+const _TR_TIPOS = ['Van', 'Autobús', 'Otro'];
+let _trData = null;       // último 'listar' (unidades + universo + resumen)
+let _trSel = null;        // lote elegido: { label, lote:[{tipo,ref}] } | null
+let _trFormAbierto = false;
+let _trSinCoordi = [];    // [F4] órdenes que el último envío no pudo mandar (sin coordi)
+let _trDia = null;        // [v2] fecha del pill activo (null = evento simple)
+let _trClonAbierto = null; // [v2] unidad_id con el picker de clonar desplegado
+let _trCobertura = null;  // [v2] idx → { lbl, dias:[fecha] } del EV (chip de cobertura)
+
+// Carga + pinta. Fails-soft: el error se queda en la sección, no tumba el detalle.
+// [v2] `fecha` = el pill activo. Si no se pasa y el evento va por días, se hace un
+// primer listar SIN fecha solo para saber cuáles son los días, y se recarga con el
+// primero. Evento simple: una sola llamada, exactamente como antes.
+async function loadTransporte(eventoId, fecha) {
+  const cont = document.getElementById('cc-transporte');
+  if (!cont) return;
+  const ev = eventoId || _ccEventoActual;
+  if (!ev) { cont.innerHTML = ''; return; }
+  cont.innerHTML = '<div style="color:var(--ts);font-size:12px">Cargando transporte…</div>';
+  try {
+    let d = await khTransporte.listar(ev, fecha || undefined);
+    // Festival por días sin día elegido → arrancar en el primero.
+    if (!fecha && Array.isArray(d.dias) && d.dias.length) {
+      _trDia = d.dias[0].fecha;
+      d = await khTransporte.listar(ev, _trDia);
+    } else {
+      _trDia = Array.isArray(d.dias) && d.dias.length ? (fecha || null) : null;
+    }
+    _trData = d;
+  } catch (e) {
+    _trData = null;
+    cont.innerHTML = `<div class="alert alert-error" style="font-size:12px">${_esfEsc(e.message || 'No se pudo cargar el transporte')}</div>`;
+    return;
+  }
+  _trSel = null;          // toda recarga cancela la selección en curso
+  _trClonAbierto = null;
+  await _trCargarCobertura(ev); // best-effort: alimenta el chip de cobertura
+  _trRender();
+}
+
+// [v2] Cobertura de cada idx (lbl + días) desde el EV — el backend manda el
+// `evento_id` de cada persona ('slug#idx') y los días del evento, pero NO el lbl
+// del idx ni cuántos días cubre. Eso vive en el catálogo, que la UI ya sabe leer
+// (`_fetchEVFromIndex`, cacheado). Best-effort: sin esto solo se pierde el chip.
+async function _trCargarCobertura(eventoId) {
+  _trCobertura = null;
+  if (!_trEsPorDias()) return;
+  try {
+    const arr = await _fetchEVFromIndex();
+    const e = (arr || []).find(x => x && x.id === String(eventoId).split('#')[0]);
+    if (!e || !Array.isArray(e.multifecha)) return;
+    const out = {};
+    e.multifecha.forEach((m, i) => {
+      const noches = Number(m && m.noches);
+      if (!m || !m.ds || !Number.isInteger(noches) || noches < 1) return;
+      const dias = [];
+      for (let k = 0; k < noches; k++) dias.push(_trSumaDias(m.ds, k));
+      out[i] = { lbl: m.lbl ? String(m.lbl) : null, dias };
+    });
+    _trCobertura = out;
+  } catch (e) { /* sin catálogo: el chip simplemente no sale */ }
+}
+
+// Mismo cálculo que el backend (ds .. ds+noches-1), anclado a mediodía UTC.
+function _trSumaDias(iso, n) {
+  const d = new Date(iso + 'T12:00:00Z');
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+
+// ¿El evento cargado va por días? (el backend solo manda `dias` en ese caso)
+function _trEsPorDias() {
+  return !!(_trData && Array.isArray(_trData.dias) && _trData.dias.length);
+}
+
+function _trDiasHtml() {
+  if (!_trEsPorDias()) return '';
+  const pills = _trData.dias.map(d => {
+    const activo = d.fecha === _trDia;
+    return `<button type="button" data-tr-dia="${_esfEsc(d.fecha)}" class="gz-filter${activo ? ' active' : ''}" style="font-size:11px">${_esfEsc(d.label)}</button>`;
+  }).join('');
+  return `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px">${pills}</div>`;
+}
+
+// ── Render (remove-then-append: una sola escritura de innerHTML) ──────
+function _trRender() {
+  const cont = document.getElementById('cc-transporte');
+  if (!cont || !_trData) return;
+  const d = _trData;
+  const unidades = d.unidades || [];
+  const uni = d.universo || {};
+  const pendientes = _trPendientes(uni);
+  const vacio = !unidades.length && !pendientes.total;
+
+  cont.innerHTML = [
+    _trDiasHtml(),            // [v2] pills de día (vacío en evento simple)
+    _trCabeceraHtml(d.resumen || {}),
+    _trFormHtml(),
+    _trBarraSeleccionHtml(),
+    vacio ? _trVacioHtml() : '',
+    unidades.length ? `<div style="margin-top:14px">${unidades.map(_trUnidadHtml).join('')}</div>` : '',
+    (!vacio && pendientes.total) ? _trLadrillosHtml(uni, pendientes) : '',
+    (!vacio && !pendientes.total && unidades.length)
+      ? '<div style="margin-top:16px;padding:14px;border:1px dashed var(--border);border-radius:var(--radius);text-align:center;color:var(--green);font-size:12px">✓ Todos tienen lugar. Los personajes que falten súbelos desde aquí cuando los necesites.</div>'
+      : '',
+  ].join('');
+}
+
+function _trVacioHtml() {
+  return `<div class="empty-state" style="padding:36px">
+    <div class="empty-icon" style="font-size:28px"><svg class="ic"><use href="#ic-bus"/></svg></div>
+    <div style="margin-top:6px">Crea la primera unidad — si caben todos, se suben solos.</div>
+  </div>`;
+}
+
+function _trCabeceraHtml(r) {
+  const porDias = _trEsPorDias();
+  const deficit = Number(r.deficit || 0);
+  // En festival el resumen y el déficit son DEL DÍA activo (el backend ya los
+  // calcula así) — se dice, para que no se lea como global.
+  const banner = deficit > 0
+    ? `<div class="alert alert-error" style="margin:10px 0 0;font-size:12px"><svg class="ic"><use href="#ic-alerta"/></svg> Faltan ${deficit} asiento${deficit === 1 ? '' : 's'}${porDias ? ' este día' : ''} — agrega unidades</div>`
+    : '';
+  return `
+    <div style="display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap">
+      <div style="display:flex;gap:14px;flex-wrap:wrap;font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.08em;color:var(--ts)">
+        <span><svg class="ic"><use href="#ic-equipo"/></svg> ${Number(r.total_pasajeros || 0)} pasajeros</span>
+        <span>${Number(r.total_asientos_netos || 0)} asientos netos</span>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <button type="button" class="btn btn-ghost btn-sm" data-tr-print="1" style="font-size:10px"><svg class="ic"><use href="#ic-impresora"/></svg> Lista por unidad</button>
+        <button type="button" class="btn btn-ghost btn-sm" data-tr-enviar="1" style="font-size:10px"><svg class="ic"><use href="#ic-correo"/></svg> Enviar su lista a cada coordi</button>
+        ${porDias ? '<button type="button" class="btn btn-ghost btn-sm" data-tr-enviar-todos="1" style="font-size:10px"><svg class="ic"><use href="#ic-correo"/></svg> Enviar TODOS los días</button>' : ''}
+        <button type="button" class="btn btn-primary btn-sm" data-tr-form="1">${_trFormAbierto ? '× Cancelar' : '＋ Agregar unidad'}</button>
+      </div>
+    </div>
+    ${banner}`;
+}
+
+// Mini-form inline (nada de modal): el alta es parte de la sección.
+// [v2] En festival la fecha NO se pregunta: es la del pill activo. Se dice en el
+// encabezado para que Bulma sepa a qué día está agregando.
+function _trFormHtml() {
+  if (!_trFormAbierto) return '';
+  const dia = _trEsPorDias() ? (_trData.dias.find(d => d.fecha === _trDia) || {}).label : null;
+  const encabezado = dia
+    ? `<div style="font-size:11px;color:var(--ts);margin-bottom:10px">Nueva unidad para <b style="color:var(--text)">${_esfEsc(dia)}</b></div>`
+    : '';
+  return `
+    <div style="margin-top:12px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px">
+      ${encabezado}
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
+        <label style="display:flex;flex-direction:column;gap:4px;font-size:11px;color:var(--ts)">Tipo
+          <select id="tr-f-tipo" class="cot-input" style="min-width:120px">
+            ${_TR_TIPOS.map(t => `<option value="${t}">${t}</option>`).join('')}
+          </select>
+        </label>
+        <label style="display:flex;flex-direction:column;gap:4px;font-size:11px;color:var(--ts)">Capacidad
+          <input id="tr-f-cap" class="cot-input" type="number" min="1" max="100" step="1" value="15" style="width:100px">
+        </label>
+        <label style="display:flex;flex-direction:column;gap:4px;font-size:11px;color:var(--ts)">Chofer (opcional)
+          <input id="tr-f-chofer" class="cot-input" type="text" maxlength="120" placeholder="Nombre" style="min-width:160px">
+        </label>
+      </div>
+      <div style="display:flex;gap:16px;flex-wrap:wrap;margin-top:12px">
+        <label style="display:inline-flex;align-items:center;gap:6px;font-size:11px;color:var(--ts);cursor:pointer">
+          <input type="checkbox" id="tr-f-chofer-ocupa" checked style="accent-color:var(--orange)">
+          <span>el chofer ocupa asiento</span>
+        </label>
+        <label style="display:inline-flex;align-items:center;gap:6px;font-size:11px;color:var(--ts);cursor:pointer">
+          <input type="checkbox" id="tr-f-auto" checked style="accent-color:var(--orange)">
+          <span><svg class="ic"><use href="#ic-magia"/></svg> ${dia ? 'Subir a todos los de este día si caben' : 'Subir a todos si caben'}</span>
+        </label>
+      </div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px">
+        <button type="button" class="btn btn-ghost btn-sm" data-tr-form="0">Cancelar</button>
+        <button type="button" class="btn btn-primary btn-sm" data-tr-crear="1">Crear unidad</button>
+      </div>
+    </div>`;
+}
+
+// Modo "¿a cuál unidad?": barra arriba con el lote elegido y su salida.
+// Sin unidades no hay a dónde subirlos: en vez de "elige la unidad ↓" sobre una
+// lista vacía (callejón sin salida), la barra dice qué falta hacer.
+function _trBarraSeleccionHtml() {
+  if (!_trSel) return '';
+  const n = _trSel.lote.length;
+  const hayUnidades = !!(_trData && (_trData.unidades || []).length);
+  const texto = hayUnidades
+    ? `Subiendo <b>${_esfEsc(_trSel.label)}</b> · ${n} persona${n === 1 ? '' : 's'} — elige la unidad ↓`
+    : `<b>${_esfEsc(_trSel.label)}</b> · ${n} persona${n === 1 ? '' : 's'} — primero crea una unidad para subirlos.`;
+  return `
+    <div style="margin-top:12px;background:rgba(200,226,58,.08);border:1px solid var(--border2);border-radius:var(--radius);padding:10px 14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <span style="font-size:12px">${texto}</span>
+      <button type="button" class="btn btn-ghost btn-sm" data-tr-cancelar="1" style="margin-left:auto;font-size:11px">Cancelar</button>
+    </div>`;
+}
+
+function _trUnidadHtml(u) {
+  const pax = Number(u.pasajeros_count || 0);
+  const neta = Number(u.capacidad_neta || 0);
+  const libres = Number(u.libres || 0);
+  const lleno = pax >= neta;
+  const idSafe = _esfEsc(u.id);
+
+  // En modo selección la unidad ENTERA es el botón de destino.
+  const enSeleccion = !!_trSel;
+  const cabe = enSeleccion ? _trCabenEnUnidad(u, _trSel.lote) : true;
+
+  const chofer = u.chofer_ocupa || u.chofer_nombre
+    ? `<span style="font-size:11px;color:var(--ts)">chofer: ${_esfEsc(u.chofer_nombre || 'ocupa asiento')}</span>`
+    : '';
+
+  const coordis = (_trData && _trData.universo && _trData.universo.personajes) || [];
+  const selCoordi = `
+    <select data-tr-coordi="${idSafe}" class="cot-input" style="font-size:11px;padding:4px 8px;min-width:150px" ${enSeleccion ? 'disabled' : ''}>
+      <option value="">— sin coordinador —</option>
+      ${coordis.map(c => `<option value="${_esfEsc(c.ref)}"${u.coordi_id === c.ref ? ' selected' : ''}>${_esfEsc(c.nombre)}${c.rol ? ' · ' + _esfEsc(c.rol) : ''}</option>`).join('')}
+    </select>`;
+
+  const chips = (u.pasajeros || []).map(p => `
+    <span style="display:inline-flex;align-items:center;gap:6px;padding:3px 6px 3px 10px;margin:2px 4px 0 0;border-radius:20px;background:var(--bg3);border:1px solid var(--border);font-size:12px">
+      ${_esfEsc(p.nombre_cache || 'Sin nombre')}
+      <button type="button" data-tr-quitar="${_esfEsc(p.pasajero_ref)}" data-tr-ptipo="${_esfEsc(p.pasajero_tipo)}" data-tr-unidad="${idSafe}" title="Quitar de la unidad" style="border:none;background:transparent;color:var(--ts);font-size:14px;line-height:1;cursor:pointer;padding:0 2px">×</button>
+    </span>`).join('');
+
+  // [F4] El último envío no pudo mandar esta: se resalta hasta que tenga coordi.
+  const faltaCoordi = _trSinCoordi.indexOf(u.orden) !== -1 && !u.coordi_id;
+  const notaCoordi = faltaCoordi
+    ? '<span style="font-size:11px;color:var(--red);border:1px solid var(--red);border-radius:20px;padding:1px 8px">asigna coordinador</span>'
+    : '';
+
+  const cabecera = `
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+      <b style="font-size:14px">Unidad ${_esfEsc(u.orden)} · ${_esfEsc(u.tipo)}</b>
+      <span style="font-size:12px;color:${lleno ? 'var(--green)' : 'var(--ts)'}">(${pax}/${neta})</span>
+      ${_trFechaChip(u.evento_id)}${notaCoordi}
+      ${chofer}
+      ${enSeleccion ? '' : `<span style="margin-left:auto;display:flex;gap:6px;align-items:center">
+        ${selCoordi}
+        ${_trEsPorDias() ? `<button type="button" data-tr-clonar="${idSafe}" title="Clonar a otros días" style="border:none;background:transparent;font-size:14px;cursor:pointer">⧉</button>` : ''}
+        <button type="button" data-tr-cap="${idSafe}" title="Editar capacidad" style="border:none;background:transparent;font-size:14px;cursor:pointer"><svg class="ic"><use href="#ic-lapiz"/></svg></button>
+        <button type="button" data-tr-del="${idSafe}" title="Eliminar unidad" style="border:none;background:transparent;font-size:15px;cursor:pointer"><svg class="ic"><use href="#ic-basura"/></svg></button>
+      </span>`}
+    </div>
+    <div style="margin-top:8px">${chips || '<span style="font-size:12px;color:var(--ts)">Unidad vacía</span>'}</div>`;
+
+  if (!enSeleccion) {
+    return `<div style="background:var(--bg2);border:1px solid ${faltaCoordi ? 'var(--red)' : 'var(--border)'};border-radius:var(--radius);padding:12px 16px;margin-bottom:10px">${cabecera}${_trClonPickerHtml(u)}</div>`;
+  }
+
+  // Botón de destino: deshabilitado si el LOTE completo no cabe.
+  const motivo = cabe ? '' : `<div style="margin-top:6px;font-size:11px;color:var(--red)">solo caben ${libres}</div>`;
+  return `
+    <button type="button" ${cabe ? `data-tr-destino="${idSafe}"` : 'disabled'}
+      style="display:block;width:100%;text-align:left;background:var(--bg2);border:1px solid ${cabe ? 'var(--border2)' : 'var(--border)'};border-radius:var(--radius);padding:12px 16px;margin-bottom:10px;color:var(--text);cursor:${cabe ? 'pointer' : 'not-allowed'};opacity:${cabe ? '1' : '.5'};font:inherit">
+      ${cabecera}${motivo}
+    </button>`;
+}
+
+// [v2] Picker de clonado: los OTROS días del evento. Copia el molde de la unidad
+// (tipo/capacidad/chofer/coordi/notas) — NUNCA los pasajeros, y se dice.
+function _trClonPickerHtml(u) {
+  if (_trClonAbierto !== u.id || !_trEsPorDias()) return '';
+  const otros = _trData.dias.filter(d => d.fecha !== u.fecha);
+  if (!otros.length) {
+    return '<div style="margin-top:10px;font-size:11px;color:var(--ts)">No hay otros días a los que clonar.</div>';
+  }
+  const checks = otros.map(d => `
+    <label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;margin-right:12px">
+      <input type="checkbox" data-tr-clon-fecha="${_esfEsc(d.fecha)}" style="accent-color:var(--orange)">
+      <span>${_esfEsc(d.label)}</span>
+    </label>`).join('');
+  return `
+    <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">
+      <div style="font-size:11px;color:var(--ts);margin-bottom:8px">Copiar esta unidad (tipo, capacidad, chofer y coordinador) a otros días. <b>Va sin pasajeros</b>: cada día se llena aparte.</div>
+      <div style="display:flex;flex-wrap:wrap;align-items:center;gap:6px">
+        ${checks}
+        <button type="button" class="btn btn-primary btn-sm" data-tr-clon-ok="${_esfEsc(u.id)}" style="font-size:11px">⧉ Clonar</button>
+        <button type="button" class="btn btn-ghost btn-sm" data-tr-clon-cancel="1" style="font-size:11px">Cancelar</button>
+      </div>
+    </div>`;
+}
+
+// ── Ladrillos sin asignar ────────────────────────────────────────────
+// Solo PENDIENTES: los ya asignados viven como chips dentro de su unidad.
+function _trPendientes(uni) {
+  const pend = (arr) => (arr || []).filter(p => !p.unidad_id);
+  const cuartos = [
+    ...(uni.cuartos_portal || []).map(c => ({ ...c, _mundo: 'portal', _tipoPax: 'lugar' })),
+    ...(uni.cuartos_kh || []).map(c => ({ ...c, _mundo: 'kh', _tipoPax: 'viajero' })),
+  ].map(c => ({ ...c, _pend: pend(c.ocupantes) })).filter(c => c._pend.length);
+  const sueltos = [
+    ...pend(uni.lugares_sueltos).map(p => ({ ...p, _tipoPax: 'lugar' })),
+    ...pend(uni.viajeros_sueltos).map(p => ({ ...p, _tipoPax: 'viajero' })),
+  ];
+  const personajes = pend(uni.personajes).map(p => ({ ...p, _tipoPax: 'usuario' }));
+  return { cuartos, sueltos, personajes, total: cuartos.length + sueltos.length + personajes.length };
+}
+
+// Chip del ladrillo. En multifecha NORMAL (Harry Styles) sigue siendo "Fecha N"
+// (#255). En festival POR DÍAS ese número no le dice nada a Bulma —lo que le sirve
+// es saber que a esa persona la va a volver a ver en otros pills—, así que se
+// reemplaza por su COBERTURA ("Vie + Sáb · 2 días"), y SOLO si cubre más días
+// que el activo: si solo viene a este día, el chip sería ruido.
+function _trFechaChip(eventoId) {
+  if (_trEsPorDias()) return _trCoberturaChip(eventoId);
+  const i = _rgFechaIdx(eventoId);
+  if (i === null) return '';
+  return `<span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--ts);border:1px solid var(--border);border-radius:20px;padding:1px 8px;letter-spacing:.06em;margin-left:6px">Fecha ${i + 1}</span>`;
+}
+
+function _trCoberturaChip(eventoId) {
+  const i = _rgFechaIdx(eventoId);
+  if (i === null || !_trCobertura) return '';
+  const cob = _trCobertura[i];
+  if (!cob || cob.dias.length <= 1) return ''; // solo este día → sin chip
+  const txt = cob.lbl || (cob.dias.length + ' días');
+  return `<span title="También aparece en los otros días que cubre" style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--orange);border:1px solid var(--border2);border-radius:20px;padding:1px 8px;letter-spacing:.06em;margin-left:6px"><svg class="ic"><use href="#ic-boleto"/></svg> ${_esfEsc(txt)}</span>`;
+}
+
+function _trLadrillosHtml(uni, pend) {
+  const bloque = (titulo, ayuda, cuerpo) => `
+    <div style="margin-top:20px">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.12em;color:var(--ts);margin-bottom:4px">// ${titulo}</div>
+      <div style="font-size:11px;color:var(--ts);margin-bottom:10px">${ayuda}</div>
+      ${cuerpo}
+    </div>`;
+
+  const out = [];
+
+  if (pend.cuartos.length) {
+    const chips = pend.cuartos.map((c, i) => {
+      const n = c._pend.length;
+      const total = (c.ocupantes || []).length;
+      const yaN = total - n;
+      const nombres = c._pend.map(p => _trCorto(p.nombre)).join(' · ');
+      const etiqueta = c._mundo === 'kh'
+        ? `Cuarto ${_esfEsc(c.numero_hab || c.orden || '')}${c.hotel_nombre ? ' · ' + _esfEsc(c.hotel_nombre) : ''}`
+        : `Cuarto ${_esfEsc(c.orden || (i + 1))} · ${_esfEsc(c.tipo || '')}`;
+      return `
+        <button type="button" data-tr-lote="cuarto:${i}" style="text-align:left;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:10px 14px;margin:0 8px 8px 0;color:var(--text);cursor:pointer;font:inherit;min-width:220px;max-width:100%">
+          <div style="display:flex;align-items:center;flex-wrap:wrap">
+            <b style="font-size:13px">${etiqueta}</b>${_trFechaChip(c.evento_id)}
+          </div>
+          <div style="font-size:11px;color:var(--ts);margin-top:3px">${n} persona${n === 1 ? '' : 's'}${yaN ? ` · (${yaN} de ${total} ya asignados)` : ''}</div>
+          <div style="font-size:12px;margin-top:4px">${_esfEsc(nombres)}</div>
+        </button>`;
+    }).join('');
+    out.push(bloque('<svg class="ic"><use href="#ic-cama"/></svg> CUARTOS', 'Toca un cuarto y elige su unidad — sube el cuarto completo de un jalón.', `<div style="display:flex;flex-wrap:wrap">${chips}</div>`));
+  }
+
+  if (pend.sueltos.length) {
+    const chips = pend.sueltos.map((p, i) => _trChipPersona(`suelto:${i}`, p.nombre, _trFechaChip(p.evento_id))).join('');
+    out.push(bloque('<svg class="ic"><use href="#ic-persona"/></svg> SUELTOS', 'Personas sin cuarto asignado.', `<div style="display:flex;flex-wrap:wrap;gap:6px">${chips}</div>`));
+  }
+
+  if (pend.personajes.length) {
+    const chips = pend.personajes.map((p, i) =>
+      _trChipPersona(`personaje:${i}`, p.nombre,
+        `<span style="font-size:10px;color:var(--ts);margin-left:6px">${_esfEsc(p.rol || '')}</span>`)
+    ).join('');
+    out.push(bloque('<svg class="ic"><use href="#ic-persona"/></svg> PERSONAJES', 'Coordis y creadoras. Nunca se suben solos — tú decides en qué unidad viajan.', `<div style="display:flex;flex-wrap:wrap;gap:6px">${chips}</div>`));
+  }
+
+  return out.join('');
+}
+
+function _trChipPersona(key, nombre, extra) {
+  return `<button type="button" data-tr-lote="${key}" style="display:inline-flex;align-items:center;padding:6px 12px;border-radius:20px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-size:12px;cursor:pointer;font-family:inherit">${_esfEsc(nombre)}${extra || ''}</button>`;
+}
+
+// ['Sáb 21','Dom 22'] → 'Sáb 21 y Dom 22'
+function _trListaEs(xs) {
+  if (xs.length <= 1) return xs[0] || '';
+  return xs.slice(0, -1).join(', ') + ' y ' + xs[xs.length - 1];
+}
+
+function _trCorto(n) {
+  const s = String(n || '').trim();
+  const p = s.split(/\s+/);
+  return p.length > 1 ? `${p[0]} ${p[1][0]}.` : (p[0] || '—');
+}
+
+// ¿Cabe el LOTE completo? Los que ya están en ESA unidad no ocupan asiento nuevo.
+function _trCabenEnUnidad(u, lote) {
+  const yaAqui = new Set((u.pasajeros || []).map(p => `${p.pasajero_tipo}:${p.pasajero_ref}`));
+  const nuevos = lote.filter(p => !yaAqui.has(`${p.tipo}:${p.ref}`)).length;
+  return nuevos <= Number(u.libres || 0);
+}
+
+// ── Acciones ─────────────────────────────────────────────────────────
+async function _trAccion(payload, btn, okMsg) {
+  const errEl = document.getElementById('tr-err');
+  if (errEl) { errEl.style.display = 'none'; errEl.textContent = ''; }
+  const prev = btn ? btn.textContent : '';
+  if (btn) { btn.disabled = true; btn.textContent = '…'; }
+  try {
+    const j = await khTransporte.accion(payload);
+    if (okMsg) showToast(okMsg(j), 'success');
+    // [v2] Se recarga EN EL MISMO DÍA: perder el pill activo tras cada acción
+    // sería desorientador (y en clonar, la unidad nueva vive en OTRO día).
+    await loadTransporte(_ccEventoActual, _trDia || undefined);
+  } catch (e) {
+    // El 409 del backend (cupo / "Primero baja pasajeros") se muestra TAL CUAL.
+    if (errEl) { errEl.textContent = e.message || 'No se pudo.'; errEl.style.display = 'block'; }
+    if (btn) { btn.disabled = false; btn.textContent = prev; }
+  }
+}
+
+// ── [F4] Lista imprimible POR UNIDAD ─────────────────────────────────
+// Se arma con los datos YA cargados del listar (sin fetch). Una sección por
+// unidad; las grandes abren página nueva para que cada coordi se lleve la suya.
+function _trImprimir() {
+  if (!_trData) return;
+  const unidades = _trData.unidades || [];
+  if (!unidades.length) { showToast('No hay unidades que imprimir.', 'error'); return; }
+  let ev = (_ccEventosCache.find(e => e.id === _ccEventoActual) || {}).nombre || _ccEventoActual;
+  // [v2] `unidades` ya viene solo del día activo (el listar se hizo con fecha) →
+  // el documento es el de ESE día y el título lo dice.
+  const dia = _trEsPorDias() ? (_trData.dias.find(d => d.fecha === _trDia) || {}).label : null;
+  if (dia) ev += ' · ' + dia;
+  const totalPax = unidades.reduce((a, u) => a + Number(u.pasajeros_count || 0), 0);
+
+  const secciones = unidades.map((u, i) => {
+    const pax = u.pasajeros || [];
+    // Salto de página antes de una unidad grande (salvo la primera): break-inside
+    // avoid sola no basta cuando la tabla no cabe en lo que queda de hoja.
+    const salto = (i > 0 && pax.length > 12) ? 'break-before:page;page-break-before:always;' : '';
+    const meta = [
+      u.coordi ? `Coordinador: <b>${_esfEsc(u.coordi.nombre)}</b>` : '<span class="cx-muted">Sin coordinador</span>',
+      (u.chofer_nombre || u.chofer_ocupa) ? `Chofer: <b>${_esfEsc(u.chofer_nombre || 'sí, ocupa asiento')}</b>` : '',
+    ].filter(Boolean).join(' · ');
+    const fi = _rgFechaIdx(u.evento_id);
+    const fecha = fi === null ? '' : ` · Fecha ${fi + 1}`;
+
+    const tabla = pax.length
+      ? `<table><thead><tr><th style="width:34px">#</th><th>Pasajero</th></tr></thead><tbody>
+           ${pax.map((p, n) => `<tr><td>${n + 1}</td><td>${_esfEsc(p.nombre_cache || 'Sin nombre')}</td></tr>`).join('')}
+         </tbody></table>
+         <div style="font-size:11px;color:#555">Total de la unidad: <b>${pax.length}</b></div>`
+      : '<div class="cx-muted">(sin pasajeros asignados)</div>';
+
+    return `<section style="${salto}">
+      <h2>Unidad ${_esfEsc(u.orden)} · ${_esfEsc(u.tipo)} (${Number(u.ocupados || 0)}/${_esfEsc(u.capacidad)})${fecha}</h2>
+      <div style="font-size:11px;color:#555;margin:0 0 10px">${meta}</div>
+      ${tabla}
+    </section>`;
+  }).join('');
+
+  const pie = `<div class="cx-resumen">Total ${dia ? 'del día' : 'del evento'}: <b>${totalPax}</b> pasajero${totalPax === 1 ? '' : 's'} en <b>${unidades.length}</b> unidad${unidades.length === 1 ? '' : 'es'}.</div>`;
+  _printVentana(`Transporte — ${ev}`, secciones + pie);
+}
+
+// ── [F4] Enviar a cada coordi la lista de SU unidad ──────────────────
+// No re-fetch: el envío no cambia datos. Solo repinta para resaltar las que
+// quedaron sin coordi.
+// [v2] `todos` = mandar las corridas de TODOS los días (sin fecha). Por default
+// manda solo el día activo, que es lo que Bulma está viendo.
+async function _trEnviarListas(btn, todos) {
+  const dia = _trEsPorDias() ? (_trData.dias.find(d => d.fecha === _trDia) || {}).label : null;
+  const aviso = (todos && _trEsPorDias())
+    ? 'Se enviará a cada coordinador el correo con la lista de SU unidad, de TODOS los días del evento. ¿Continuar?'
+    : (dia
+        ? `Se enviará a cada coordinador el correo con la lista de SU unidad del ${dia}. ¿Continuar?`
+        : 'Se enviará a cada coordinador el correo con la lista de SU unidad. ¿Continuar?');
+  if (!confirm(aviso)) return;
+  const errEl = document.getElementById('tr-err');
+  if (errEl) { errEl.style.display = 'none'; errEl.textContent = ''; }
+  const prev = btn ? btn.textContent : '';
+  if (btn) { btn.disabled = true; btn.textContent = 'Enviando…'; }
+  try {
+    const payload = { accion: 'enviar_listas', evento_id: _ccEventoActual };
+    if (!todos && _trDia) payload.fecha = _trDia; // sin fecha = todos los días
+    const j = await khTransporte.accion(payload);
+    _trSinCoordi = j.sin_coordi || [];
+    const partes = [`${j.enviadas || 0} enviada${j.enviadas === 1 ? '' : 's'}`];
+    if (_trSinCoordi.length) partes.push(`${_trSinCoordi.length} sin coordinador`);
+    if ((j.sin_correo || []).length) partes.push(`${j.sin_correo.length} sin correo`);
+    if ((j.vacias || []).length) partes.push(`${j.vacias.length} vacía${j.vacias.length === 1 ? '' : 's'}`);
+    if (j.errores) partes.push(`${j.errores} con error`);
+    showToast(partes.join(' · '), (j.errores || !j.enviadas) ? 'error' : 'success');
+    _trRender();
+  } catch (e) {
+    if (errEl) { errEl.textContent = e.message || 'No se pudieron enviar las listas.'; errEl.style.display = 'block'; }
+  }
+  if (btn) { btn.disabled = false; btn.textContent = prev; }
+}
+
+function _trLoteDe(key) {
+  if (!_trData) return null;
+  const pend = _trPendientes(_trData.universo || {});
+  const [clase, iRaw] = String(key).split(':');
+  const i = parseInt(iRaw, 10);
+  if (clase === 'cuarto') {
+    const c = pend.cuartos[i]; if (!c) return null;
+    const etiqueta = c._mundo === 'kh' ? `Cuarto ${c.numero_hab || c.orden || ''}` : `Cuarto ${c.orden || (i + 1)} · ${c.tipo || ''}`;
+    return { label: etiqueta.trim(), lote: c._pend.map(p => ({ tipo: c._tipoPax, ref: p.ref })) };
+  }
+  const p = clase === 'suelto' ? pend.sueltos[i] : pend.personajes[i];
+  if (!p) return null;
+  return { label: p.nombre, lote: [{ tipo: p._tipoPax, ref: p.ref }] };
+}
+
+// Delegación única de los controles del transporte (molde del rooming de grupos).
+document.body.addEventListener('click', (e) => {
+  const pr = e.target.closest('[data-tr-print]');
+  if (pr) { _trImprimir(); return; }
+
+  const env = e.target.closest('[data-tr-enviar]');
+  if (env) { _trEnviarListas(env, false); return; }
+
+  // [v2] Días
+  const envTodos = e.target.closest('[data-tr-enviar-todos]');
+  if (envTodos) { _trEnviarListas(envTodos, true); return; }
+
+  const pill = e.target.closest('[data-tr-dia]');
+  if (pill) {
+    const f = pill.getAttribute('data-tr-dia');
+    if (f !== _trDia) { _trFormAbierto = false; loadTransporte(_ccEventoActual, f); }
+    return;
+  }
+
+  const clon = e.target.closest('[data-tr-clonar]');
+  if (clon) {
+    const id = clon.getAttribute('data-tr-clonar');
+    _trClonAbierto = (_trClonAbierto === id) ? null : id;
+    _trSel = null; _trRender();
+    return;
+  }
+  if (e.target.closest('[data-tr-clon-cancel]')) { _trClonAbierto = null; _trRender(); return; }
+
+  const clonOk = e.target.closest('[data-tr-clon-ok]');
+  if (clonOk) {
+    const fechas = [...document.querySelectorAll('[data-tr-clon-fecha]')]
+      .filter(c => c.checked).map(c => c.getAttribute('data-tr-clon-fecha'));
+    if (!fechas.length) {
+      const errEl = document.getElementById('tr-err');
+      if (errEl) { errEl.textContent = 'Elige al menos un día al cual clonar.'; errEl.style.display = 'block'; }
+      return;
+    }
+    const labels = fechas.map(f => (_trData.dias.find(d => d.fecha === f) || {}).label || f);
+    _trClonAbierto = null;
+    _trAccion({ accion: 'clonar_unidad', unidad_id: clonOk.getAttribute('data-tr-clon-ok'), fechas }, clonOk,
+      () => `Unidad clonada a ${_trListaEs(labels)} — va sin pasajeros`);
+    return;
+  }
+
+  const form = e.target.closest('[data-tr-form]');
+  if (form) { _trFormAbierto = form.getAttribute('data-tr-form') === '1' ? !_trFormAbierto : false; _trSel = null; _trRender(); return; }
+
+  const crear = e.target.closest('[data-tr-crear]');
+  if (crear) {
+    const cap = parseInt((document.getElementById('tr-f-cap') || {}).value, 10);
+    if (!Number.isInteger(cap) || cap < 1 || cap > 100) {
+      const errEl = document.getElementById('tr-err');
+      if (errEl) { errEl.textContent = 'La capacidad debe ser un número entero entre 1 y 100.'; errEl.style.display = 'block'; }
+      return;
+    }
+    _trFormAbierto = false;
+    _trAccion({
+      accion: 'crear_unidad',
+      evento_id: _ccEventoActual,
+      // [v2] La fecha NO se pregunta: es la del pill activo (null en evento simple,
+      // donde el backend además la rechaza).
+      ...(_trDia ? { fecha: _trDia } : {}),
+      tipo: (document.getElementById('tr-f-tipo') || {}).value,
+      capacidad: cap,
+      chofer_ocupa: !!(document.getElementById('tr-f-chofer-ocupa') || {}).checked,
+      chofer_nombre: (document.getElementById('tr-f-chofer') || {}).value || null,
+      autollenar: !!(document.getElementById('tr-f-auto') || {}).checked,
+    }, crear, (j) => j.auto_asignados
+      ? `Unidad creada — se subieron ${j.auto_asignados} pasajeros <svg class="ic"><use href="#ic-magia"/></svg>`
+      : 'Unidad creada');
+    return;
+  }
+
+  const lote = e.target.closest('[data-tr-lote]');
+  if (lote) { _trSel = _trLoteDe(lote.getAttribute('data-tr-lote')); _trFormAbierto = false; _trRender(); return; }
+
+  const cancelar = e.target.closest('[data-tr-cancelar]');
+  if (cancelar) { _trSel = null; _trRender(); return; }
+
+  const destino = e.target.closest('[data-tr-destino]');
+  if (destino && _trSel) {
+    const sel = _trSel;
+    _trAccion({ accion: 'asignar', unidad_id: destino.getAttribute('data-tr-destino'), pasajeros: sel.lote }, null,
+      (j) => j.movidos ? `Listo — ${j.asignados} subidos, ${j.movidos} movidos` : `${sel.label} a bordo`);
+    return;
+  }
+
+  const quitar = e.target.closest('[data-tr-quitar]');
+  if (quitar) {
+    _trAccion({
+      accion: 'quitar',
+      unidad_id: quitar.getAttribute('data-tr-unidad'),
+      pasajeros: [{ tipo: quitar.getAttribute('data-tr-ptipo'), ref: quitar.getAttribute('data-tr-quitar') }],
+    }, quitar);
+    return;
+  }
+
+  const cap = e.target.closest('[data-tr-cap]');
+  if (cap) {
+    const u = (_trData.unidades || []).find(x => x.id === cap.getAttribute('data-tr-cap'));
+    if (!u) return;
+    const v = prompt(`Capacidad de la Unidad ${u.orden} (1-100).\nHoy: ${u.capacidad} · van ${u.pasajeros_count}`, String(u.capacidad));
+    if (v === null) return;
+    const n = parseInt(v, 10);
+    if (!Number.isInteger(n)) return;
+    _trAccion({ accion: 'editar_unidad', unidad_id: u.id, capacidad: n }, cap);
+    return;
+  }
+
+  const del = e.target.closest('[data-tr-del]');
+  if (del) {
+    const u = (_trData.unidades || []).find(x => x.id === del.getAttribute('data-tr-del'));
+    const aviso = u && u.pasajeros_count
+      ? `¿Eliminar la Unidad ${u.orden}? Sus ${u.pasajeros_count} pasajeros quedarán sin asignar.`
+      : '¿Eliminar esta unidad?';
+    if (confirm(aviso)) _trAccion({ accion: 'eliminar_unidad', unidad_id: del.getAttribute('data-tr-del') }, del,
+      (j) => j.desasignados ? `Unidad eliminada — ${j.desasignados} quedaron sin asignar` : 'Unidad eliminada');
+    return;
+  }
+});
+
+// Coordinador: el <select> no es click, es change.
+document.body.addEventListener('change', (e) => {
+  const sel = e.target.closest('[data-tr-coordi]');
+  if (sel) { _trAccion({ accion: 'editar_unidad', unidad_id: sel.getAttribute('data-tr-coordi'), coordi_id: sel.value || null }, null); return; }
+  // Default de Memo: al elegir Van el chofer ocupa asiento; en lo demás no.
+  // Queda editable — esto solo mueve el default al cambiar el tipo.
+  const tipo = e.target.closest('#tr-f-tipo');
+  if (tipo) {
+    const ck = document.getElementById('tr-f-chofer-ocupa');
+    if (ck) ck.checked = tipo.value === 'Van';
+  }
+});
+
+// [sec-eventos] Tabla `eventos` (UUID legacy del cotizador/capsule) vía Netlify
+// Function con service_role. Lectura: cualquier logueado (boot/ping/selects).
+// Crear/editar/eliminar: maestro_roshi + bulma (lo exige verifyAdminAuth). NO es
+// el catálogo público (ese es el array EV de index.html).
+const khEventos = {
+  async _call(payload) {
+    const r = await khAdminFetch('/.netlify/functions/admin-eventos', {
+      method: 'POST', body: JSON.stringify(payload),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || j.ok === false) throw new Error(j.error || ('admin-eventos ' + r.status));
+    return j;
+  },
+  // listar({ limit? }) → array de eventos (order fecha.desc)
+  listar(opts) { return this._call(Object.assign({ accion: 'listar' }, opts || {})).then(j => j.eventos || []); },
+  // obtener(id) → un evento (objeto) o null
+  obtener(id) { return this._call({ accion: 'obtener', id }).then(j => j.evento || null); },
+  // crear(datos) → { ok, evento } (el cotizador necesita evento.id)
+  crear(datos) { return this._call({ accion: 'crear', datos }); },
+  // actualizar(id, datos) → { ok }
+  actualizar(id, datos) { return this._call({ accion: 'actualizar', id, datos }); },
+  // eliminar(id) → { ok }
+  eliminar(id) { return this._call({ accion: 'eliminar', id }); },
+  // ping() keep-alive Supabase (fails-soft, no rompe nada)
+  ping() { return this._call({ accion: 'listar', limit: 1 }).catch(() => {}); },
+};
+
+// [sec-eventos] Lookup `eventos_meta` por slug vía la misma Function (service_role).
+// SOLO lectura (la escritura es vía eventos-meta-sync.js). Cualquier logueado.
+// Replica EXACTO el shape de hoy: por_slug → row {nombre}; por_slugs → array
+// de {slug,nombre,fecha,fecha_fin}.
+const khEventosMeta = {
+  _call(payload) { return khEventos._call(payload); },
+  // porSlug(slug) → row {nombre} o null
+  porSlug(slug) { return this._call({ accion: 'meta_por_slug', slug }).then(j => j.meta || null); },
+  // porSlugs([slug,...]) → array de {slug,nombre,fecha,fecha_fin}
+  porSlugs(slugs) { return this._call({ accion: 'meta_por_slugs', slugs }).then(j => j.metas || []); },
+};
+
+// [sec-coordi] Asignaciones (eventos_coordi) vía Netlify Function con service_role.
+// Lectura: cualquier logueado (listas del panel). crear/eliminar: maestro_roshi+bulma.
+// responder (aceptar/declinar): el backend EXIGE que la asignación sea del jwtUserId
+// (salvo admin) — cierra el hueco del UUID enumerable del email-link.
+const khAsignaciones = {
+  async _call(payload) {
+    const r = await khAdminFetch('/.netlify/functions/admin-coordi-asignaciones', {
+      method: 'POST', body: JSON.stringify(payload),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || j.ok === false) throw new Error(j.error || ('admin-coordi-asignaciones ' + r.status));
+    return j;
+  },
+  // listar({ coordi_id?, evento_id?, status? }) → array de asignaciones
+  listar(opts) { return this._call(Object.assign({ accion: 'listar' }, opts || {})).then(j => j.asignaciones || []); },
+  // crear({ evento_id, coordi_id, indicaciones? }) → { ok, asignacion } (necesita asignacion.id)
+  crear(datos) { return this._call(Object.assign({ accion: 'crear' }, datos || {})); },
+  // eliminar(id) → { ok }
+  eliminar(id) { return this._call({ accion: 'eliminar', id }); },
+  // responder(id, 'aceptar'|'declinar', motivo?) → { ok, asignacion:{evento_id,coordi_id,status} }
+  responder(id, decision, motivo) { return this._call({ accion: 'responder', id, decision, motivo }); },
+};
+
+// [sec-coordi] viajeros_evento (KH, PII) vía la misma Function (service_role).
+// upsert_staff: identidad del coordi sale de `usuarios` server-side (anti-spoof);
+// owner-coordi o admin. listar/descargar: admin o coordi del evento. eliminar: admin.
+// (El tab Viajeros del panel y el alta manual son del proyecto PORTAL, no de aquí.)
+const khViajeros = {
+  _call(payload) { return khAsignaciones._call(payload); },
+  // upsertStaff(asigId) → { ok, viajero } — best-effort (el caller envuelve en try/catch)
+  upsertStaff(asigId) { return this._call({ accion: 'viajero_upsert_staff', asig_id: asigId }).then(j => j.viajero || null); },
+  // listar(eventoId) → array de viajeros (whitelist PII)
+  listar(eventoId) { return this._call({ accion: 'viajero_listar', evento_id: eventoId }).then(j => j.viajeros || []); },
+  // eliminar(id) → { ok }
+  eliminar(id) { return this._call({ accion: 'viajero_eliminar', id }); },
+};
+
+// [sec-sensibles] deudas_coordi + strikes_log + sistema_alertas vía Netlify Function
+// con service_role. deudas: maestro_roshi+bulma · strikes/alertas: maestro_roshi.
+// strikes_log.por_quien lo fuerza el backend al jwt (anti-spoofing).
+const khCoordi = {
+  async _call(payload) {
+    const r = await khAdminFetch('/.netlify/functions/admin-coordi-control', {
+      method: 'POST', body: JSON.stringify(payload),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || j.ok === false) throw new Error(j.error || ('admin-coordi-control ' + r.status));
+    return j;
+  },
+  // deudas
+  deudasListar(opts) { return this._call(Object.assign({ accion: 'deudas_listar' }, opts || {})).then(j => j.deudas || []); },
+  deudasMarcarPagada(id) { return this._call({ accion: 'deudas_marcar_pagada', id }); },
+  deudasEliminar(id) { return this._call({ accion: 'deudas_eliminar', id }); },
+  // strikes (por_quien lo pone el backend)
+  strikeCrear(coordi_id, accionStrike, motivo, evento_id) { return this._call({ accion: 'strike_crear', coordi_id, tipo_accion: accionStrike, motivo, evento_id }); },
+  // sistema_alertas (solo lectura)
+  alertasListar() { return this._call({ accion: 'sistema_alertas_listar' }).then(j => j.alertas || []); },
+};
+
+// [sec-usuarios] Registro por invitación (flujo PRE-JWT): el invite_token es la
+// credencial. fetch directo (no khAdminFetch) porque el invitado aún no tiene JWT.
+async function khRegistroInvitado(payload) {
+  const r = await fetch('/.netlify/functions/registro-invitado', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
+  });
+  return r.json().catch(() => ({ ok: false, error: 'Respuesta inválida del servidor' }));
+}
+
+// Cache local (para no re-fetchear todo el tiempo)
+let _eventosCache = [];
+
+// ═══════════════════════════════════════════════════════════════
+// NAVEGACIÓN
+// ═══════════════════════════════════════════════════════════════
+function showPage(name) {
+ document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+ document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+ document.getElementById(`page-${name}`).classList.add('active');
+ const navBtn = document.getElementById(`nav-${name}`);
+ if (navBtn) {
+   navBtn.classList.add('active');
+   actualizarLabelNavMobile(navBtn.textContent.trim());
+   // No esconder dónde estás: si la vista activa cae en un grupo colapsado, ábrelo.
+   const grp = navBtn.closest('.nav-group');
+   if (grp) grp.classList.remove('collapsed');
+ }
+ cerrarNavMobile();
+ loadPage(name);
+ // D2: sincroniza la barra inferior móvil (estado activo + visibilidad por rol)
+ // y oculta grupos del sidebar que quedaron vacíos. Única adición a showPage.
+ if (typeof _khNavSync === 'function') _khNavSync(name);
+}
+
+function loadPage(name) {
+ if (name === 'cotizar') loadCotizar();
+ if (name === 'resumen') loadResumen();
+ if (name === 'pagos') loadPagos();
+ if (name === 'eventos') _evtPoblarSelector();
+ if (name === 'gastos') loadGastos();
+ if (name === 'ingresos') loadIngresos();
+ if (name === 'saldos') loadSaldos();
+ if (name === 'ventas') loadVentas();
+ if (name === 'inventario') loadInventario();
+ if (name === 'reportes') loadReportes();
+ if (name === 'capsule') loadCapsule();
+ if (name === 'equipo') loadEquipo();
+ if (name === 'capsule') loadCapsule();
+ if (name === 'solicitudes_portal') loadSolicitudesPortal();
+ if (name === 'kamisama') loadKamisama();
+ if (name === 'montana') loadMontana();
+ if (name === 'radar') initRadarTab();
+ if (name === 'esferas') loadEsferasEventos();
+ if (name === 'yamcha') loadYamcha();
+ if (name === 'radio') loadRadio();
+}
+
+// ═══════════════════════════════════════════════════════════════
+// KAIO-SAMA — Admin de Radio Conecta (peticiones + muro). Solo maestro_roshi.
+// Lee/escribe radio_peticiones y radio_muro (Portal) vía admin-radio-* (service_role).
+// ═══════════════════════════════════════════════════════════════
+let _radioPeticiones = [], _radioMuro = [], _radioSoloPend = true;
+const RADIO_NOWPLAYING = 'https://radio.conectareynosa.mx/api/nowplaying/radioconecta';
+const RADIO_STREAM_URL = 'https://radio.conectareynosa.mx/listen/radioconecta/radio.mp3';
+let _radioHeroTimer = null;
+// Snapshot en memoria (sesión) para la tendencia de las tarjetas de Números.
+let _radioNumPrev = { oyentes: null, likes: null, peticiones: null };
+
+function _radioFecha(ts) {
+  if (!ts) return '—';
+  const d = new Date(ts);
+  if (isNaN(d.getTime())) return '—';
+  return d.toLocaleString('es-MX', { timeZone: 'America/Monterrey', dateStyle: 'short', timeStyle: 'short' });
+}
+
+// Carga ambas listas al entrar (patrón de las demás loadX). Fails-soft.
+async function loadRadio() {
+  _loadRadioHero();       // el hero vive fuera del try: se pinta aunque el admin falle
+  _radioHeroStart();      // auto-refresh cada 15s (una sola vez)
+  _avisosCargar();        // avisos inteligentes (fail-soft por fuente)
+  try {
+    const [rp, rm] = await Promise.all([
+      khAdminFetch('/.netlify/functions/admin-radio-peticiones'),
+      khAdminFetch('/.netlify/functions/admin-radio-muro'),
+    ]);
+    const jp = await rp.json().catch(() => ({}));
+    const jm = await rm.json().catch(() => ({}));
+    if (!rp.ok || jp.ok === false) throw new Error(jp.error || ('peticiones ' + rp.status));
+    if (!rm.ok || jm.ok === false) throw new Error(jm.error || ('muro ' + rm.status));
+    _radioPeticiones = Array.isArray(jp.peticiones) ? jp.peticiones : [];
+    _radioMuro = Array.isArray(jm.mensajes) ? jm.mensajes : [];
+    _renderRadioPeticiones();
+    _renderRadioMuro();
+  } catch (e) {
+    showToast('Error cargando Radio: ' + e.message, 'error');
+    const p = document.getElementById('radio-pet-tbody');
+    const m = document.getElementById('radio-muro-tbody');
+    if (p) p.innerHTML = `<tr><td colspan="5" style="color:#FF6B6B">Error: ${_spEscape(e.message)}</td></tr>`;
+    if (m) m.innerHTML = `<tr><td colspan="5" style="color:#FF6B6B">Error: ${_spEscape(e.message)}</td></tr>`;
+  }
+}
+
+function showRadioTab(sub, btn) {
+  document.querySelectorAll('#page-radio .ks-tab').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  ['peticiones', 'muro', 'numeros', 'control', 'biblioteca'].forEach(s => {
+    const el = document.getElementById('radio-tab-' + s);
+    if (el) el.style.display = s === sub ? '' : 'none';
+  });
+  if (sub === 'numeros') loadRadioNumeros();
+  if (sub === 'control') loadRadioControl();
+  if (sub === 'biblioteca') loadRadioBiblioteca();
+}
+
+// ── HERO "Sonando ahora" — centro de control, visible en todos los tabs ──────
+// Carátula difuminada de fondo + ficha nítida + oyentes en vivo. API pública
+// nowplaying (misma que Números). Auto-refresh cada 15s, pausado si la página no
+// está visible. Sin functions nuevas.
+function _radioHeroStart() {
+  if (_radioHeroTimer) return;
+  _radioHeroTimer = setInterval(() => {
+    const pg = document.getElementById('page-radio');
+    if (document.hidden || !pg || !pg.classList.contains('active')) return;
+    _loadRadioHero();
+  }, 15000);
+}
+
+function _loadRadioHero() {
+  fetch(RADIO_NOWPLAYING)
+    .then(r => r.json())
+    .then(d => {
+      const s = (d && d.now_playing && d.now_playing.song) || {};
+      const oy = (d && d.listeners && Number(d.listeners.current)) || 0;
+      const t = document.getElementById('ks-hero-titulo');
+      const a = document.getElementById('ks-hero-artista');
+      const o = document.getElementById('ks-hero-oyentes');
+      const ph = document.getElementById('ks-hero-ph');
+      if (t) t.textContent = s.title || 'Sin datos';
+      if (a) a.textContent = s.artist || '';
+      if (o) o.textContent = oy;
+      if (ph) ph.textContent = _radioInicialesArt(s.artist || s.title);
+      _radioSetArt(document.getElementById('ks-hero-art'), document.getElementById('ks-hero-bg'), s.art);
+    })
+    .catch(() => {
+      const t = document.getElementById('ks-hero-titulo');
+      const o = document.getElementById('ks-hero-oyentes');
+      if (t) t.textContent = 'No disponible';
+      if (o) o.textContent = '—';
+    });
+}
+
+// Pinta la carátula nítida sobre el placeholder y usa la misma imagen difuminada
+// de fondo. Si la imagen falla (onerror), se oculta y quedan placeholder + fondo
+// neutro — nunca se ve el ícono de imagen rota.
+function _radioSetArt(artEl, bgEl, url) {
+  if (!artEl) return;
+  const prev = artEl.querySelector('img');
+  if (prev) prev.remove();
+  if (!url) {
+    if (bgEl) { bgEl.style.backgroundImage = ''; bgEl.classList.add('is-empty'); }
+    return;
+  }
+  const img = document.createElement('img');
+  img.alt = '';
+  img.onload = () => { if (bgEl) { bgEl.style.backgroundImage = 'url("' + url + '")'; bgEl.classList.remove('is-empty'); } };
+  img.onerror = () => { img.remove(); if (bgEl) { bgEl.style.backgroundImage = ''; bgEl.classList.add('is-empty'); } };
+  img.src = url;
+  artEl.appendChild(img);
+}
+
+// Tab "Números" — 3 tarjetas con endpoints EXISTENTES (sin functions nuevas).
+// Peticiones pendientes sale de lo ya cargado por loadRadio; oyentes y likes se
+// piden aquí (fail-soft, cada card independiente). Cada dato muestra su tendencia
+// (▲/▼) contra la última carga guardada en memoria de sesión.
+async function loadRadioNumeros() {
+  // ── Peticiones pendientes (reutiliza admin-radio-peticiones vía _radioPeticiones) ──
+  const pend = _radioPeticiones.filter(p => !p.atendida).length;
+  _radioSetNum('peticiones', pend, true); // neutral: más pendientes no es "bueno/malo"
+
+  // ── Top 20 semanal (admin-radio-stats; fail-soft, panel independiente) ──
+  _radioTop20Load();
+
+  // ── Reportes (lazy al abrir el tab; cada tarjeta es independiente) ──
+  _rnOyentes(); _rnUnicos(); _rnHoras(); _rnMasTocadas(); _rnLikesDias(); _rnPeticionesResumen();
+
+  // ── Oyentes ahora + canción sonando (API pública de la radio, fetch cliente) ──
+  fetch(RADIO_NOWPLAYING)
+    .then(r => r.json())
+    .then(d => {
+      const oy = (d && d.listeners && Number(d.listeners.current)) || 0;
+      _radioSetNum('oyentes', oy);
+      const s = d && d.now_playing && d.now_playing.song;
+      const elSon = document.getElementById('radio-num-sonando');
+      if (elSon) elSon.textContent = (s && (s.title || s.artist))
+        ? '' + [s.title, s.artist].filter(Boolean).join(' — ')
+        : 'sin datos';
+    })
+    .catch(() => {
+      const elOy = document.getElementById('radio-num-oyentes');
+      const elSon = document.getElementById('radio-num-sonando');
+      if (elOy) elOy.textContent = '—';
+      if (elSon) elSon.textContent = 'no disponible';
+    });
+
+  // ── Likes esta semana: GET público del top → suma counts + top 3 ──
+  fetch('/.netlify/functions/radio-like')
+    .then(r => r.json())
+    .then(d => {
+      const top = (d && Array.isArray(d.top)) ? d.top : [];
+      const total = top.reduce((a, t) => a + (Number(t.likes) || 0), 0);
+      _radioSetNum('likes', total);
+      const elT3 = document.getElementById('radio-num-top3');
+      if (elT3) elT3.innerHTML = top.length
+        ? top.slice(0, 3).map((t, i) => {
+            const label = [(t.titulo || ''), (t.artista || '')].filter(Boolean).join(' — ') || 'sin título';
+            return (i + 1) + '. ' + _spEscape(label) + ' · <svg class="ic"><use href="#ic-corazon"/></svg> ' + (Number(t.likes) || 0);
+          }).join('<br>')
+        : 'aún sin likes';
+    })
+    .catch(() => {
+      const elLk = document.getElementById('radio-num-likes');
+      const elT3 = document.getElementById('radio-num-top3');
+      if (elLk) elLk.textContent = '—';
+      if (elT3) elT3.textContent = 'no disponible';
+    });
+}
+
+// ── Avisos inteligentes (bloque bajo el hero; solo aparecen cuando existen) ──
+// Cada fuente es independiente y fail-soft: si falla, ese aviso no aparece.
+let _avisoCaidaTimer = null;
+let _avisoPicoHecho = false;   // el pico de oyentes se evalúa UNA vez por carga
+
+function _avisosCargar() {
+  const box = document.getElementById('ks-avisos');
+  if (box) box.innerHTML = '';
+  _avisoRadioCheck();   // crítica (con 1 reintento) + alimenta el pico de oyentes
+  if (!_avisoCaidaTimer) _avisoCaidaTimer = setInterval(_avisoRadioCheck, 60000);
+  _avisoRepetidas();
+  _avisoPeticionesAnejas();
+  _avisoRachaLikes();
+}
+
+// Fila compacta con severidad (warn amarillo / good verde). onclick opcional.
+function _avisoAdd(sev, tag, html, onClick) {
+  const box = document.getElementById('ks-avisos');
+  if (!box) return;
+  const div = document.createElement('div');
+  div.className = 'ks-aviso ' + sev + (onClick ? ' click' : '');
+  div.innerHTML = '<span class="ks-aviso-tag">' + tag + '</span><span>' + html + '</span>';
+  if (onClick) div.addEventListener('click', onClick);
+  box.appendChild(div);
+}
+
+// 1. RADIO CAÍDA (crítica): nowplaying con 1 reintento; banner rojo arriba de
+//    todo; re-chequeo cada 60s y se quita solo al volver.
+async function _avisoRadioCheck() {
+  const banner = document.getElementById('ks-aviso-caida');
+  if (!banner) return;
+  const intento = () => fetch(RADIO_NOWPLAYING).then(r => { if (!r.ok) throw new Error('http ' + r.status); return r.json(); });
+  try {
+    let d;
+    try { d = await intento(); }
+    catch (e) { await new Promise(res => setTimeout(res, 2000)); d = await intento(); }
+    banner.style.display = 'none';
+    _avisoOyentesPico(d);
+  } catch (e) {
+    banner.style.display = '';
+  }
+}
+
+// 3. OYENTES ARRIBA DE LO NORMAL: promedio móvil (EMA) en localStorage de visitas
+//    previas; alerta si los actuales superan el DOBLE del promedio (mínimo 5) y
+//    ya hay 3+ visitas de historia (evita falsos positivos al estrenar).
+function _avisoOyentesPico(d) {
+  if (_avisoPicoHecho) return;
+  _avisoPicoHecho = true;
+  const cur = (d && d.listeners && Number(d.listeners.current)) || 0;
+  let st = null;
+  try { st = JSON.parse(localStorage.getItem('ks-oyentes-avg') || 'null'); } catch (e) {}
+  const avg = st ? Number(st.avg) : NaN;
+  const n = (st && Number(st.n)) || 0;
+  if (n >= 3 && Number.isFinite(avg) && cur >= 5 && cur > avg * 2) {
+    _avisoAdd('good', 'Pico', 'Pico de oyentes: <b>' + cur + '</b> conectados (promedio ' + Math.round(avg) + ')');
+  }
+  const nuevoAvg = (Number.isFinite(avg) && n > 0) ? (avg + (cur - avg) * 0.3) : cur;
+  try { localStorage.setItem('ks-oyentes-avg', JSON.stringify({ avg: nuevoAvg, n: Math.min(n + 1, 50) })); } catch (e) {}
+}
+
+// 2. CANCIÓN REPETIDA: 3+ veces en 24h (history de AzuraCast, agregado server-side).
+async function _avisoRepetidas() {
+  try {
+    const d = await _rnGet('repetidas');
+    (Array.isArray(d.repetidas) ? d.repetidas : []).forEach(c => {
+      _avisoAdd('warn', 'Repetida',
+        '<b>' + _spEscape(c.titulo) + '</b>' + (c.artista ? ' — ' + _spEscape(c.artista) : '') + ' sonó <b>' + (Number(c.veces) || 0) + '</b> veces en 24h',
+        () => radioMediaAbrirPorNombre(c.titulo, c.artista));
+    });
+  } catch (e) { /* fail-soft */ }
+}
+
+// 4. PETICIONES AÑEJAS: pendientes con 3+ días → click al tab Peticiones.
+async function _avisoPeticionesAnejas() {
+  try {
+    const d = await _rnGet('peticiones_resumen');
+    const v = Number(d.viejas_3d) || 0;
+    if (v > 0) {
+      _avisoAdd('warn', 'Peticiones',
+        '<b>' + v + '</b> peticion' + (v === 1 ? '' : 'es') + ' lleva' + (v === 1 ? '' : 'n') + ' más de 3 días sin atender',
+        () => showRadioTab('peticiones', document.getElementById('radio-tab-btn-peticiones')));
+    }
+  } catch (e) { /* fail-soft */ }
+}
+
+// 5. RACHA DE LIKES: 5+ likes HOY (día MX) → click al modal de edición.
+async function _avisoRachaLikes() {
+  try {
+    const d = await _rnGet('likes_hoy');
+    (Array.isArray(d.rachas) ? d.rachas : []).forEach(c => {
+      _avisoAdd('good', 'Likes',
+        '<b>' + _spEscape(c.titulo || 'sin título') + '</b>' + (c.artista ? ' — ' + _spEscape(c.artista) : '') + ' está recibiendo likes hoy (' + (Number(c.likes) || 0) + ')',
+        () => radioMediaAbrirPorNombre(c.titulo, c.artista));
+    });
+  } catch (e) { /* fail-soft */ }
+}
+
+// ── Reportes de Números (admin-radio-stats) — todos fail-soft por tarjeta ────
+async function _rnGet(accion) {
+  const r = await khAdminFetch('/.netlify/functions/admin-radio-stats?accion=' + accion);
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok || !d.ok) throw new Error(d.error || ('Error ' + r.status));
+  return d;
+}
+function _rnSinDatos(id) {
+  const el = document.getElementById(id);
+  if (el) el.innerHTML = '<div style="color:var(--ts);font-size:12px;padding:4px 0">Sin datos</div>';
+}
+function _rnTiempo(seg) {
+  seg = Number(seg) || 0;
+  if (seg < 60) return seg + ' s';
+  const min = Math.floor(seg / 60);
+  if (min < 60) return min + ' min';
+  return Math.floor(min / 60) + ' h ' + (min % 60) + ' min';
+}
+// Barras CSS puras. titulos[i] va al title (tooltip). La barra máxima resalta.
+function _rnBarras(data, titulos) {
+  const max = Math.max.apply(null, data.concat([1]));
+  const maxVal = Math.max.apply(null, data);
+  const maxIdx = data.indexOf(maxVal);
+  return '<div class="ks-bars">' + data.map((v, i) =>
+    `<div class="kb${(i === maxIdx && v > 0) ? ' max' : ''}" style="height:${Math.max(3, Math.round(v / max * 100))}%" title="${_spEscape((titulos[i] || '') + ': ' + v)}"></div>`
+  ).join('') + '</div>';
+}
+
+// 1. Oyentes conectados AHORA (tarjeta expandible con la lista).
+async function _rnOyentes() {
+  const el = document.getElementById('rn-oyentes');
+  if (!el) return;
+  try {
+    const d = await _rnGet('oyentes');
+    const resumen = (d.por_lugar || []).map(p => p.n + ' en ' + String(p.lugar).split(',')[0]).join(' · ') || 'nadie conectado ahora';
+    const lista = (d.oyentes || []).map(o =>
+      `<div class="rn-oy"><span>${_spEscape(o.lugar)}</span><span class="rn-oy-t">${_rnTiempo(o.tiempo_seg)}</span></div>`).join('');
+    el.innerHTML = `
+      <div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap">
+        <span class="ks-stat-num green" style="font-size:30px">${Number(d.total) || 0}</span>
+        <span style="color:var(--ts);font-size:12px">${_spEscape(resumen)}</span>
+      </div>
+      ${d.total ? `<button class="btn btn-ghost btn-sm" style="font-size:11px;margin-top:8px" onclick="_rnToggleOyentes(this)">Ver lista</button>
+      <div id="rn-oyentes-lista" style="display:none;margin-top:8px">${lista}</div>` : ''}`;
+  } catch (e) { _rnSinDatos('rn-oyentes'); }
+}
+function _rnToggleOyentes(btn) {
+  const l = document.getElementById('rn-oyentes-lista');
+  if (!l) return;
+  const abierto = l.style.display !== 'none';
+  l.style.display = abierto ? 'none' : '';
+  btn.textContent = abierto ? 'Ver lista' : 'Ocultar lista';
+}
+
+// 2. Oyentes ÚNICOS (report mode de AzuraCast): hoy y últimos 7 días.
+async function _rnUnicos() {
+  const el = document.getElementById('rn-unicos');
+  if (!el) return;
+  try {
+    const d = await _rnGet('unicos');
+    el.innerHTML = `<div style="display:flex;gap:26px;flex-wrap:wrap">
+      <div><div class="ks-stat-label">Hoy</div><div class="ks-stat-num" style="font-size:30px">${Number(d.hoy) || 0}</div></div>
+      <div><div class="ks-stat-label">Últimos 7 días</div><div class="ks-stat-num" style="font-size:30px">${Number(d.semana) || 0}</div></div>
+    </div>`;
+  } catch (e) { _rnSinDatos('rn-unicos'); }
+}
+
+// 3. Horas pico: barras de oyentes por hora del día.
+async function _rnHoras() {
+  const el = document.getElementById('rn-horas');
+  if (!el) return;
+  try {
+    const d = await _rnGet('horas');
+    const data = Array.isArray(d.data) ? d.data : [];
+    if (!data.length) { _rnSinDatos('rn-horas'); return; }
+    const labels = (Array.isArray(d.labels) && d.labels.length === data.length)
+      ? d.labels : data.map((_, i) => i + 'h');
+    const maxVal = Math.max.apply(null, data);
+    const maxIdx = data.indexOf(maxVal);
+    const pico = maxVal > 0 ? `<div style="margin-top:6px;font-size:11px;color:var(--ts)">Pico: <b style="color:var(--text)">${_spEscape(String(labels[maxIdx]))}</b> · ${maxVal} oyentes</div>` : '';
+    el.innerHTML = _rnBarras(data, labels) +
+      '<div class="ks-bars-lbl"><span>' + _spEscape(String(labels[0] || '')) + '</span><span>' + _spEscape(String(labels[Math.floor(labels.length / 2)] || '')) + '</span><span>' + _spEscape(String(labels[labels.length - 1] || '')) + '</span></div>' + pico;
+  } catch (e) { _rnSinDatos('rn-horas'); }
+}
+
+// 4. Las más tocadas del AutoDJ (7 días) — clickeables al modal de edición.
+let _rnMasTocadasData = [];
+async function _rnMasTocadas() {
+  const el = document.getElementById('rn-mas-tocadas');
+  if (!el) return;
+  try {
+    const d = await _rnGet('mas_tocadas');
+    _rnMasTocadasData = Array.isArray(d.canciones) ? d.canciones : [];
+    if (!_rnMasTocadasData.length) { _rnSinDatos('rn-mas-tocadas'); return; }
+    el.innerHTML = _rnMasTocadasData.map((c, i) => `<div class="ks-result" onclick="_rnMasTocadasAbrir(${i})" title="Editar esta canción">
+      <div class="ks-top-pos">${i + 1}</div>
+      <div class="ks-track-txt">
+        <div class="ks-track-t">${_spEscape(c.titulo || 'sin título')}</div>
+        <div class="ks-track-a">${_spEscape(c.artista || '')}</div>
+      </div>
+      <div class="ks-top-likes">${Number(c.veces) || 0}×</div>
+    </div>`).join('');
+  } catch (e) { _rnSinDatos('rn-mas-tocadas'); }
+}
+function _rnMasTocadasAbrir(i) {
+  const c = _rnMasTocadasData[i];
+  if (c) radioMediaAbrirPorNombre(c.titulo, c.artista);
+}
+
+// 5. Likes por día (mini-barras de 7 días, agrupado en la function).
+async function _rnLikesDias() {
+  const el = document.getElementById('rn-likes-dias');
+  if (!el) return;
+  try {
+    const d = await _rnGet('likes_dias');
+    const dias = Array.isArray(d.dias) ? d.dias : [];
+    if (!dias.length) { _rnSinDatos('rn-likes-dias'); return; }
+    const data = dias.map(x => Number(x.likes) || 0);
+    const lbls = dias.map(x => {
+      try { return new Date(x.dia + 'T12:00:00Z').toLocaleDateString('es-MX', { weekday: 'short', timeZone: 'UTC' }); }
+      catch (e) { return x.dia; }
+    });
+    el.innerHTML = _rnBarras(data, dias.map(x => x.dia)) +
+      '<div class="ks-bars-lbl cols">' + lbls.map(l => '<span>' + _spEscape(l) + '</span>').join('') + '</div>' +
+      `<div style="margin-top:6px;font-size:11px;color:var(--ts)">Total: <b style="color:var(--text)">${data.reduce((a, b) => a + b, 0)}</b> likes en 7 días</div>`;
+  } catch (e) { _rnSinDatos('rn-likes-dias'); }
+}
+
+// 6. Peticiones: pendientes vs atendidas (histórico) + pendientes con 3+ días.
+async function _rnPeticionesResumen() {
+  const el = document.getElementById('rn-peticiones');
+  if (!el) return;
+  try {
+    const d = await _rnGet('peticiones_resumen');
+    const viejas = Number(d.viejas_3d) || 0;
+    el.innerHTML = `<div style="display:flex;gap:26px;flex-wrap:wrap">
+      <div><div class="ks-stat-label">Pendientes</div><div class="ks-stat-num red" style="font-size:30px">${Number(d.pendientes) || 0}</div></div>
+      <div><div class="ks-stat-label">Atendidas (histórico)</div><div class="ks-stat-num green" style="font-size:30px">${Number(d.atendidas) || 0}</div></div>
+    </div>
+    ${viejas ? `<div style="margin-top:8px;font-size:12px;color:#FF6B6B">${viejas} pendiente${viejas === 1 ? '' : 's'} lleva${viejas === 1 ? '' : 'n'} 3+ días sin atender</div>` : ''}`;
+  } catch (e) { _rnSinDatos('rn-peticiones'); }
+}
+
+// ── Top 20 semanal (admin-radio-stats?accion=top20) ─────────────────────────
+// El Top 10 público + las 10 siguientes (11-20, atenuadas tras la línea de
+// corte) para ver cómo se moverá la semana. Cada fila abre el modal de edición
+// con el MISMO resolver del click-to-edit de Control (radioMediaAbrirPorNombre).
+let _radioTop20Data = [];
+
+async function _radioTop20Load() {
+  const box = document.getElementById('radio-top20');
+  if (!box) return;
+  try {
+    const r = await khAdminFetch('/.netlify/functions/admin-radio-stats?accion=top20');
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok || !d.ok) throw new Error(d.error || ('Error ' + r.status));
+    _radioTop20Data = Array.isArray(d.top) ? d.top : [];
+    if (!_radioTop20Data.length) {
+      box.innerHTML = '<div style="color:var(--ts);font-size:13px;padding:6px 0">Aún sin likes esta semana.</div>';
+      return;
+    }
+    let html = '';
+    _radioTop20Data.forEach((t, i) => {
+      const pos = i + 1;
+      if (pos === 11) html += '<div class="ks-top-cut">línea de corte del Top público</div>';
+      const ini = _radioInicialesArt(t.artista || t.titulo);
+      const img = t.art ? `<img src="${_spEscape(t.art)}" alt="" loading="lazy" onerror="this.style.display='none'">` : '';
+      html += `<div class="ks-result${pos > 10 ? ' ks-dim' : ''}" onclick="_radioTop20Abrir(${i})" title="Editar esta canción">
+        <div class="ks-top-pos">${pos}</div>
+        <div class="ks-art"><div class="ks-art-ph">${_spEscape(ini)}</div>${img}</div>
+        <div class="ks-track-txt">
+          <div class="ks-track-t">${_spEscape(t.titulo || 'sin título')}</div>
+          <div class="ks-track-a">${_spEscape(t.artista || '')}</div>
+        </div>
+        <div class="ks-top-likes"><svg class="ic"><use href="#ic-corazon"/></svg> ${Number(t.likes) || 0}</div>
+      </div>`;
+    });
+    box.innerHTML = html;
+  } catch (e) {
+    box.innerHTML = '<div style="color:#FF6B6B;font-size:13px">Error: ' + _spEscape(e.message) + '</div>';
+  }
+}
+
+function _radioTop20Abrir(i) {
+  const t = _radioTop20Data[i];
+  if (t) radioMediaAbrirPorNombre(t.titulo, t.artista);
+}
+
+// Actualiza el número grande + su indicador de tendencia contra la carga previa.
+// neutral=true muestra el cambio en tono apagado (sin verde/rojo de valor).
+function _radioSetNum(key, val, neutral) {
+  const numEl = document.getElementById('radio-num-' + key);
+  const trEl = document.getElementById('radio-num-' + key + '-tr');
+  if (numEl) numEl.textContent = val;
+  if (trEl) {
+    const prev = _radioNumPrev[key];
+    let cls = 'flat', txt = '';
+    if (prev != null && val !== prev) {
+      const up = val > prev;
+      cls = neutral ? 'flat' : (up ? 'up' : 'down');
+      txt = up ? ('▲ +' + (val - prev)) : ('▼ −' + (prev - val));
+    } else if (prev != null) {
+      txt = '– sin cambio';
+    }
+    trEl.className = 'ks-stat-trend ' + cls;
+    trEl.textContent = txt;
+  }
+  _radioNumPrev[key] = val;
+}
+
+// ── TAB "Control" — control remoto de la estación (Fase 3) ──────────────────
+// La cola y las acciones (saltar/recargar/reiniciar) pasan por admin-radio-control
+// (API key server-side). "Recién sonaron" sale de song_history de nowplaying
+// pública. El "Sonando ahora" ya vive en el hero. Cada bloque falla-soft.
+function loadRadioControl() {
+  _loadRadioCola();
+  _loadRadioHistorial();
+}
+
+// "Recién sonaron" — últimas 5 de song_history (nowplaying pública).
+function _loadRadioHistorial() {
+  const box = document.getElementById('radio-ctrl-historial');
+  if (!box) return;
+  fetch(RADIO_NOWPLAYING)
+    .then(r => r.json())
+    .then(d => {
+      const hist = (d && Array.isArray(d.song_history)) ? d.song_history.slice(0, 5) : [];
+      if (!hist.length) { box.innerHTML = `<div style="color:var(--ts);font-size:13px">Sin historial todavía.</div>`; return; }
+      box.innerHTML = hist.map(h => {
+        const s = (h && h.song) || {};
+        return _radioTrackHtml(s.title, s.artist, _radioArtHost(s.art), null);
+      }).join('');
+    })
+    .catch(() => { box.innerHTML = `<div style="color:var(--ts);font-size:13px">No disponible.</div>`; });
+}
+
+// Normaliza una URL de arte al host público conservando path+query (que ya trae
+// el unique_id correcto). NO inventa /art/{id}. Sin URL → '' (placeholder).
+function _radioArtHost(url) {
+  const raw = String(url || '');
+  if (!raw) return '';
+  try {
+    const u = new URL(raw, 'https://radio.conectareynosa.mx');
+    return 'https://radio.conectareynosa.mx' + u.pathname + u.search;
+  } catch (e) {
+    return (raw.charAt(0) === '/') ? ('https://radio.conectareynosa.mx' + raw) : raw;
+  }
+}
+
+// Hasta 2 iniciales del artista (o título) para el placeholder de la carátula.
+function _radioInicialesArt(txt) {
+  const w = String(txt || '').trim().split(/\s+/).filter(Boolean);
+  if (!w.length) return '';
+  if (w.length === 1) return w[0].slice(0, 2).toUpperCase();
+  return (w[0][0] + w[1][0]).toUpperCase();
+}
+
+// Fila de track (cola / recién sonaron). Placeholder con iniciales SIEMPRE detrás;
+// la carátula va encima con onerror que la oculta — nunca se ve la imagen rota.
+// idx = número de orden (cola) o null (historial). Clickeable → editar (Fase 4):
+// busca por título+artista en la biblioteca y abre el resultado más parecido.
+function _radioTrackHtml(titulo, artista, art, idx) {
+  titulo = titulo || 'sin título';
+  artista = artista || '';
+  const ini = _radioInicialesArt(artista || titulo);
+  const ph = `<div class="ks-art-ph">${_spEscape(ini)}</div>`;
+  const img = art
+    ? `<img src="${_spEscape(art)}" alt="" loading="lazy" onerror="this.style.display='none'">`
+    : '';
+  const idxHtml = (idx != null) ? `<span class="ks-track-idx">${idx}</span>` : '';
+  const oc = `radioMediaAbrirPorNombre('${_radioJs(titulo)}','${_radioJs(artista)}')`;
+  return `<div class="ks-track ks-track-click" onclick="${oc}" title="Editar esta canción">${idxHtml}<div class="ks-art">${ph}${img}</div>
+    <div class="ks-track-txt">
+      <div class="ks-track-t">${_spEscape(titulo)}</div>
+      <div class="ks-track-a">${_spEscape(artista)}</div>
+    </div></div>`;
+}
+
+async function _loadRadioCola() {
+  const box = document.getElementById('radio-ctrl-cola');
+  if (!box) return;
+  box.innerHTML = '<div class="loading-state"><div class="spinner"></div>Cargando…</div>';
+  try {
+    const r = await khAdminFetch('/.netlify/functions/admin-radio-control?accion=cola');
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || j.ok === false) throw new Error(j.error || ('Error ' + r.status));
+    const cola = Array.isArray(j.cola) ? j.cola : [];
+    if (!cola.length) {
+      box.innerHTML = `<div style="color:var(--ts);font-size:13px">La cola está vacía.</div>`;
+      return;
+    }
+    box.innerHTML = cola.map((c, i) => _radioTrackHtml(c.titulo, c.artista, _radioArtHost(c.caratula), i + 1)).join('');
+  } catch (e) {
+    box.innerHTML = `<div style="color:#FF6B6B;font-size:13px">Error: ${_spEscape(e.message)}</div>`;
+  }
+}
+
+// Copia el link del stream al portapapeles con confirmación visual en el botón.
+function radioCopiarStream(btn) {
+  const done = () => {
+    if (btn) {
+      const orig = btn.textContent;
+      btn.textContent = 'Copiado';
+      btn.disabled = true;
+      setTimeout(() => { btn.textContent = orig; btn.disabled = false; }, 1800);
+    }
+    showToast('Link del stream copiado.', 'success');
+  };
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(RADIO_STREAM_URL).then(done).catch(() => _radioCopyFallback(RADIO_STREAM_URL, done));
+  } else {
+    _radioCopyFallback(RADIO_STREAM_URL, done);
+  }
+}
+function _radioCopyFallback(text, done) {
+  try {
+    const ta = document.createElement('textarea');
+    ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.focus(); ta.select();
+    document.execCommand('copy'); ta.remove();
+    done();
+  } catch (e) {
+    showToast('No se pudo copiar. Link: ' + text, 'error');
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// KAIO-SAMA FASE 4 — Editor permanente de metadata y portadas.
+// Todo pasa por admin-radio-media (AzuraCast files + editor del NAS server-side).
+// El cambio se escribe DENTRO del archivo original.
+// ═══════════════════════════════════════════════════════════════
+let _radioMediaResults = [];    // últimos resultados de búsqueda (índice → archivo)
+let _radioMediaNuevaPortada = null; // { imagen(base64), mime } elegida en el modal
+
+// Escape para incrustar texto dentro de un onclick='fn("...")' (contexto JS + HTML).
+function _radioJs(s) {
+  return String(s == null ? '' : s)
+    .replace(/\\/g, '\\\\').replace(/'/g, "\\'")
+    .replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/[\r\n]+/g, ' ');
+}
+
+// GET ?buscar= → biblioteca de AzuraCast. Devuelve array de archivos.
+async function _radioMediaSearch(q) {
+  const r = await khAdminFetch('/.netlify/functions/admin-radio-media?buscar=' + encodeURIComponent(q));
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok || j.ok === false) throw new Error(j.error || ('Error ' + r.status));
+  return Array.isArray(j.archivos) ? j.archivos : [];
+}
+
+// Buscador del tab Control.
+// Biblioteca: buscador global por CANCIÓN (mismo GET ?buscar= del Control, que
+// busca en títulos/rutas). Reusa _radioMediaResults + _radioResultHtml → el click
+// abre el mismo modal de edición, sin navegar carpetas.
+async function bibBuscarCancion() {
+  const inp = document.getElementById('bib-song-q');
+  const box = document.getElementById('bib-song-res');
+  const q = (inp ? inp.value : '').trim();
+  if (!box) return;
+  if (!q) { box.innerHTML = ''; return; }
+  box.innerHTML = '<div class="loading-state"><div class="spinner"></div>Buscando…</div>';
+  try {
+    _radioMediaResults = await _radioMediaSearch(q);
+    box.innerHTML = _radioMediaResults.length
+      ? _radioMediaResults.map((a, i) => _radioResultHtml(a, i)).join('')
+      : '<div style="color:var(--ts);font-size:13px;padding:6px 0">Sin resultados en la biblioteca.</div>';
+  } catch (e) {
+    box.innerHTML = '<div style="color:#FF6B6B;font-size:13px">Error: ' + _spEscape(e.message) + '</div>';
+  }
+}
+
+async function radioMediaBuscar() {
+  const inp = document.getElementById('radio-media-q');
+  const box = document.getElementById('radio-media-res');
+  const q = (inp ? inp.value : '').trim();
+  if (!box) return;
+  if (!q) { box.innerHTML = ''; return; }
+  box.innerHTML = '<div class="loading-state"><div class="spinner"></div>Buscando…</div>';
+  try {
+    _radioMediaResults = await _radioMediaSearch(q);
+    if (!_radioMediaResults.length) {
+      box.innerHTML = '<div style="color:var(--ts);font-size:13px;padding:6px 0">Sin resultados en la biblioteca.</div>';
+      return;
+    }
+    box.innerHTML = _radioMediaResults.map((a, i) => _radioResultHtml(a, i)).join('');
+  } catch (e) {
+    box.innerHTML = '<div style="color:#FF6B6B;font-size:13px">Error: ' + _spEscape(e.message) + '</div>';
+  }
+}
+
+function _radioResultHtml(a, i) {
+  const ini = _radioInicialesArt(a.artista || a.titulo);
+  const ph = `<div class="ks-art-ph">${_spEscape(ini)}</div>`;
+  const img = a.art
+    ? `<img src="${_spEscape(a.art)}" alt="" loading="lazy" onerror="this.style.display='none'">`
+    : '';
+  const sub = [a.artista, a.album].filter(Boolean).join(' · ');
+  return `<div class="ks-result" onclick="radioMediaAbrirModalIdx(${i})" title="Editar esta canción">
+    <div class="ks-art">${ph}${img}</div>
+    <div class="ks-track-txt">
+      <div class="ks-track-t">${_spEscape(a.titulo || 'sin título')}</div>
+      <div class="ks-track-a">${_spEscape(sub)}</div>
+    </div></div>`;
+}
+
+// Click en un track de cola / historial / hero → busca por nombre y abre el mejor.
+async function radioMediaAbrirPorNombre(titulo, artista) {
+  const tit = String(titulo || '').trim();
+  const art = String(artista || '').trim();
+  if (!tit) return;
+  // AzuraCast matchea substring sobre "Artista - Título"; mandar título+artista
+  // concatenados no coincide con ese orden → 0 filas. Buscamos SOLO por título.
+  try {
+    let arch = await _radioMediaSearch(tit);
+    let best = _radioMediaMejorPorArtista(arch, art);
+    // Fallback: si el título no trajo nada, busca por artista y filtra por título.
+    if (!best && art) {
+      const porArtista = await _radioMediaSearch(art);
+      best = _radioMediaMejorPorTitulo(porArtista, tit);
+    }
+    if (best) { radioMediaAbrirModal(best); return; }
+    // Nada automático: deja que Memo elija a mano con el buscador precargado.
+    _radioMediaEnfocarBuscador(tit);
+  } catch (e) {
+    showToast('Error buscando: ' + e.message, 'error');
+  }
+}
+
+function _ciIncluye(a, b) {
+  a = String(a || '').toLowerCase().trim();
+  b = String(b || '').toLowerCase().trim();
+  if (!a || !b) return false;
+  return a.includes(b) || b.includes(a);
+}
+
+// De los resultados, el de artista más parecido (includes en ambos sentidos);
+// si no hay artista de referencia, el primero. null si la lista viene vacía.
+function _radioMediaMejorPorArtista(arch, artista) {
+  if (!arch || !arch.length) return null;
+  if (!artista) return arch[0];
+  return arch.find(a => _ciIncluye(a.artista, artista)) || arch[0];
+}
+
+// De los resultados (buscados por artista), el de título más parecido.
+function _radioMediaMejorPorTitulo(arch, titulo) {
+  if (!arch || !arch.length) return null;
+  return arch.find(a => _ciIncluye(a.titulo, titulo)) || null;
+}
+
+// Salta al tab Control, precarga el buscador con el título y lo enfoca.
+function _radioMediaEnfocarBuscador(titulo) {
+  const btn = document.getElementById('radio-tab-btn-control');
+  if (btn) showRadioTab('control', btn);
+  const inp = document.getElementById('radio-media-q');
+  if (inp) {
+    inp.value = titulo;
+    inp.focus();
+    inp.select();
+    radioMediaBuscar();
+  }
+  showToast('No encontré esa canción sola. Búscala y elígela a mano.', 'error');
+}
+
+// Click en "Sonando ahora" (hero) → edita la canción al aire.
+function radioMediaAbrirSonando() {
+  const t = document.getElementById('ks-hero-titulo');
+  const a = document.getElementById('ks-hero-artista');
+  const tit = t ? t.textContent.trim() : '';
+  const art = a ? a.textContent.trim() : '';
+  if (!tit || tit === 'Cargando…' || tit === 'Sin datos' || tit === 'No disponible') return;
+  radioMediaAbrirPorNombre(tit, art);
+}
+
+function radioMediaAbrirModalIdx(i) {
+  const a = _radioMediaResults[i];
+  if (a) radioMediaAbrirModal(a);
+}
+
+// Abre el modal con los datos del archivo y refina con los tags reales (/leer).
+async function radioMediaAbrirModal(a) {
+  if (!a || !a.ruta) { showToast('Esa canción no tiene ruta editable.', 'error'); return; }
+  _radioMediaNuevaPortada = null;
+  // openModal PRIMERO: limpia el primer input[type=hidden] del modal (que es
+  // #rm-ruta). Si abriéramos DESPUÉS de fijar la ruta, la borraría y el guardado
+  // fallaría con "Falta la ruta del archivo" (bug que afectaba a búsqueda y a
+  // Biblioteca por igual). Abrir antes de poblar deja la ruta intacta.
+  openModal('modal-radio-media');
+  document.getElementById('rm-ruta').value = a.ruta;
+  document.getElementById('rm-titulo').value = a.titulo || '';
+  document.getElementById('rm-artista').value = a.artista || '';
+  document.getElementById('rm-album').value = a.album || '';
+  document.getElementById('rm-artista-album').value = a.artista || ''; // provisional hasta /leer
+  const fileInp = document.getElementById('rm-file'); if (fileInp) fileInp.value = '';
+  _radioMediaSetCover(a.art, a.artista || a.titulo);
+  _radioMediaAlert('', false);
+  radioMediaBorrarCancelar(); // resetea la advertencia de eliminar (modal reusado)
+  // Refinar con los tags REALES del archivo (incluye artista_album).
+  try {
+    const r = await khAdminFetch('/.netlify/functions/admin-radio-media?leer=' + encodeURIComponent(a.ruta));
+    const j = await r.json().catch(() => ({}));
+    if (r.ok && j.ok !== false) {
+      if (j.titulo)  document.getElementById('rm-titulo').value = j.titulo;
+      if (j.artista) document.getElementById('rm-artista').value = j.artista;
+      if (j.album != null)  document.getElementById('rm-album').value = j.album;
+      // Artista del álbum: lo que devuelva /leer, o igual al artista si viene vacío.
+      const aa = (j.artista_album && j.artista_album.trim()) ? j.artista_album : (j.artista || a.artista || '');
+      document.getElementById('rm-artista-album').value = aa;
+    }
+  } catch (e) { /* nos quedamos con los valores del resultado de búsqueda */ }
+}
+
+function _radioMediaSetCover(url, nombre) {
+  const box = document.getElementById('rm-cover');
+  if (!box) return;
+  const prev = box.querySelector('img'); if (prev) prev.remove();
+  const ph = document.getElementById('rm-cover-ph'); if (ph) ph.textContent = _radioInicialesArt(nombre);
+  if (url) {
+    const img = document.createElement('img');
+    img.alt = ''; img.onerror = () => img.remove(); img.src = url;
+    box.appendChild(img);
+  }
+}
+
+// Elige nueva portada: valida, redimensiona a máx 1000px en cliente, guarda base64.
+function radioMediaPreviewPortada(input) {
+  const f = input.files && input.files[0];
+  if (!f) return;
+  if (!/^image\/(jpeg|png)$/.test(f.type)) { showToast('Usa una imagen JPG o PNG.', 'error'); input.value = ''; return; }
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const im = new Image();
+    im.onload = () => {
+      const max = 1000;
+      let w = im.naturalWidth || im.width, h = im.naturalHeight || im.height;
+      if (w > max || h > max) { const s = Math.min(max / w, max / h); w = Math.round(w * s); h = Math.round(h * s); }
+      const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+      cv.getContext('2d').drawImage(im, 0, 0, w, h);
+      const mime = (f.type === 'image/png') ? 'image/png' : 'image/jpeg';
+      const dataUrl = cv.toDataURL(mime, mime === 'image/jpeg' ? 0.9 : undefined);
+      const b64 = (dataUrl.split(',')[1]) || '';
+      _radioMediaNuevaPortada = { imagen: b64, mime };
+      const box = document.getElementById('rm-cover');
+      if (box) { const prev = box.querySelector('img'); if (prev) prev.remove(); const img = document.createElement('img'); img.alt = ''; img.src = dataUrl; box.appendChild(img); }
+    };
+    im.onerror = () => showToast('No pude leer esa imagen.', 'error');
+    im.src = e.target.result;
+  };
+  reader.onerror = () => showToast('No pude leer el archivo.', 'error');
+  reader.readAsDataURL(f);
+}
+
+// Guarda tags (y portada si hay una nueva). Escribe DENTRO del archivo original.
+async function radioMediaGuardar() {
+  const btn = document.getElementById('rm-guardar');
+  const ruta = document.getElementById('rm-ruta').value;
+  if (!ruta) { _radioMediaAlert('Falta la ruta del archivo.', true); return; }
+  const titulo        = document.getElementById('rm-titulo').value.trim();
+  const artista       = document.getElementById('rm-artista').value.trim();
+  const album         = document.getElementById('rm-album').value.trim();
+  const artista_album = document.getElementById('rm-artista-album').value.trim();
+  if (btn) btn.disabled = true;
+  _radioMediaAlert('Guardando…', false);
+  try {
+    // 1) Tags
+    const r = await khAdminFetch('/.netlify/functions/admin-radio-media', {
+      method: 'POST', body: JSON.stringify({ accion: 'editar', ruta, titulo, artista, album, artista_album }),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || j.ok === false) throw new Error(j.error || ('Error ' + r.status));
+    // 2) Portada (solo si el usuario eligió una nueva)
+    if (_radioMediaNuevaPortada) {
+      const rp = await khAdminFetch('/.netlify/functions/admin-radio-media', {
+        method: 'POST', body: JSON.stringify({ accion: 'portada', ruta, imagen: _radioMediaNuevaPortada.imagen, mime: _radioMediaNuevaPortada.mime }),
+      });
+      const jp = await rp.json().catch(() => ({}));
+      if (!rp.ok || jp.ok === false) throw new Error(jp.error || ('Portada: error ' + rp.status));
+    }
+    showToast('Cambios guardados en el archivo.', 'success');
+    _radioMediaNuevaPortada = null;
+    closeModal('modal-radio-media');
+    setTimeout(() => { _loadRadioHero(); }, 600); // refresca la vista (la radio tarda ~5 min)
+  } catch (e) {
+    _radioMediaAlert('No se pudo guardar: ' + e.message, true);
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+function _radioMediaAlert(msg, isErr) {
+  const el = document.getElementById('radio-media-alert');
+  if (!el) return;
+  if (!msg) { el.innerHTML = ''; return; }
+  const style = isErr
+    ? 'border:1px solid rgba(255,90,77,.4);color:var(--red);background:rgba(255,90,77,.1)'
+    : 'border:1px solid var(--border);color:var(--ts);background:rgba(255,255,255,.03)';
+  el.innerHTML = `<div style="padding:9px 12px;border-radius:8px;font-size:12px;margin-bottom:14px;${style}">${_spEscape(msg)}</div>`;
+}
+
+// ── Eliminar canción (doble confirmación fuerte) ──────────────────────────
+// Primer click: advertencia inline. "Sí, eliminar" → borra del disco PARA
+// SIEMPRE vía admin-radio-media {accion:'borrar'} (editor del NAS /borrar +
+// aviso best-effort a AzuraCast). Tras eliminar: cierra el modal, toast y
+// refresca la vista de donde vino (Biblioteca o buscador).
+function radioMediaBorrarPedir() {
+  const box = document.getElementById('rm-borrar-confirm');
+  const btn = document.getElementById('rm-borrar');
+  if (box) box.style.display = 'block';
+  if (btn) btn.style.display = 'none';
+}
+
+function radioMediaBorrarCancelar() {
+  const box = document.getElementById('rm-borrar-confirm');
+  const btn = document.getElementById('rm-borrar');
+  if (box) box.style.display = 'none';
+  if (btn) btn.style.display = '';
+}
+
+async function radioMediaBorrar() {
+  const ruta = document.getElementById('rm-ruta').value;
+  if (!ruta) { _radioMediaAlert('Falta la ruta del archivo.', true); return; }
+  const btn = document.getElementById('rm-borrar-si');
+  if (btn) btn.disabled = true;
+  _radioMediaAlert('Eliminando…', false);
+  try {
+    const r = await khAdminFetch('/.netlify/functions/admin-radio-media', {
+      method: 'POST', body: JSON.stringify({ accion: 'borrar', ruta }),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || j.ok === false) throw new Error(j.error || ('Error ' + r.status));
+    closeModal('modal-radio-media');
+    showToast('Canción eliminada', 'success');
+    _radioMediaRefrescarOrigen();
+  } catch (e) {
+    _radioMediaAlert('No se pudo eliminar: ' + e.message, true);
+  } finally {
+    if (btn) btn.disabled = false;
+    radioMediaBorrarCancelar();
+  }
+}
+
+// Refresca la vista de donde vino la canción eliminada: la carpeta abierta de
+// Biblioteca y/o los resultados vivos del buscador. Fails-soft.
+function _radioMediaRefrescarOrigen() {
+  try {
+    if (Array.isArray(_bibCrumbs) && _bibCrumbs.length) {
+      _bibMostrarDir(_bibCrumbs[_bibCrumbs.length - 1].ruta, _bibPagina);
+    }
+    const q = document.getElementById('radio-media-q');
+    const res = document.getElementById('radio-media-res');
+    if (q && q.value.trim() && res && res.innerHTML.trim()) radioMediaBuscar();
+  } catch (e) { /* fails-soft */ }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// KAIO-SAMA — Tab BIBLIOTECA: explorador de toda la música.
+// Navega files/list por carpeta (admin-radio-media ?dir=). Raíz = artistas
+// (carpetas), luego álbumes, luego canciones. Cada canción abre el modal de
+// edición existente con su ruta directa. Reutiliza toda la infraestructura.
+// ═══════════════════════════════════════════════════════════════
+let _bibArtistas = null;   // cache de carpetas raíz [{nombre,ruta}] (todas las páginas)
+let _bibCrumbs = [];       // profundidad actual [{nombre,ruta}] (vacío = raíz/artistas)
+let _bibLetra = '';        // filtro de letra activo ('' = todas)
+let _bibBusqueda = '';     // filtro de búsqueda de artista (client-side)
+let _bibArchivos = [];     // archivos del nivel actual (para abrir modal por índice)
+let _bibPagina = 1;
+let _bibTotalPaginas = 1;
+
+async function loadRadioBiblioteca() {
+  _bibCrumbs = [];
+  _bibRenderCrumbs();
+  if (_bibArtistas) { _bibRenderRaiz(); return; }
+  const cont = document.getElementById('bib-contenido');
+  _bibToggleRaizUI(true);
+  if (cont) cont.innerHTML = '<div class="loading-state"><div class="spinner"></div>Cargando biblioteca…</div>';
+  try {
+    _bibArtistas = await _bibCargarRaizTodo();
+    _bibRenderRaiz();
+  } catch (e) {
+    if (cont) cont.innerHTML = `<div style="color:#FF6B6B;font-size:13px">Error: ${_spEscape(e.message)}</div>`;
+  }
+}
+
+// GET ?dir= de una carpeta (una página).
+async function _bibFetchDir(ruta, page) {
+  const r = await khAdminFetch('/.netlify/functions/admin-radio-media?dir=' + encodeURIComponent(ruta) + '&page=' + (page || 1));
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok || j.ok === false) throw new Error(j.error || ('Error ' + r.status));
+  return {
+    carpetas: Array.isArray(j.carpetas) ? j.carpetas : [],
+    archivos: Array.isArray(j.archivos) ? j.archivos : [],
+    pagina: j.pagina || 1,
+    total_paginas: j.total_paginas || 1,
+  };
+}
+
+// Carga TODAS las páginas de la raíz (solo carpetas → ligero) y ordena A-Z.
+async function _bibCargarRaizTodo() {
+  let page = 1, carpetas = [], guard = 0;
+  while (guard++ < 50) {
+    const d = await _bibFetchDir('', page);
+    carpetas = carpetas.concat(d.carpetas);
+    if (page >= d.total_paginas) break;
+    page++;
+  }
+  carpetas.sort((a, b) => String(a.nombre).localeCompare(String(b.nombre), 'es', { sensitivity: 'base' }));
+  return carpetas;
+}
+
+// Primera letra normalizada (sin acentos): A-Z o '#'.
+function _bibLetraDe(nombre) {
+  const c = String(nombre || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().charAt(0).toUpperCase();
+  return (c >= 'A' && c <= 'Z') ? c : '#';
+}
+
+function _bibArtistasFiltrados() {
+  let arr = _bibArtistas || [];
+  if (_bibLetra) arr = arr.filter(a => _bibLetraDe(a.nombre) === _bibLetra);
+  if (_bibBusqueda) {
+    const q = _bibBusqueda.toLowerCase();
+    arr = arr.filter(a => String(a.nombre || '').toLowerCase().includes(q));
+  }
+  return arr;
+}
+
+function _bibAbecedarioHtml() {
+  const letras = ['Todas'];
+  for (let i = 65; i <= 90; i++) letras.push(String.fromCharCode(i));
+  letras.push('#');
+  return letras.map(l => {
+    const val = (l === 'Todas') ? '' : l;
+    const activo = (_bibLetra === val) ? ' active' : '';
+    return `<button class="ks-abc-btn${activo}" onclick="_bibFiltrarLetra('${val}')">${l}</button>`;
+  }).join('');
+}
+
+function _bibFiltrarLetra(l) {
+  _bibLetra = l || '';
+  _bibRenderRaiz();
+}
+
+function _bibOnBuscar(v) {
+  _bibBusqueda = String(v || '').trim();
+  _bibRenderRaiz();
+}
+
+function _bibRenderRaiz() {
+  _bibRenderCrumbs();
+  _bibToggleRaizUI(true);
+  const abc = document.getElementById('bib-abc'); if (abc) abc.innerHTML = _bibAbecedarioHtml();
+  const pager = document.getElementById('bib-paginacion'); if (pager) pager.innerHTML = '';
+  const cont = document.getElementById('bib-contenido'); if (!cont) return;
+  const arts = _bibArtistasFiltrados();
+  if (!arts.length) {
+    cont.innerHTML = '<div style="color:var(--ts);font-size:13px;padding:12px 0">Sin artistas para ese filtro.</div>';
+    return;
+  }
+  cont.innerHTML = '<div class="ks-folder-grid">' + arts.map(a => _bibFolderHtml(a)).join('') + '</div>';
+}
+
+function _bibFolderHtml(a) {
+  const oc = `_bibIrDir('${_radioJs(a.ruta)}','${_radioJs(a.nombre)}')`;
+  return `<div class="ks-folder" onclick="${oc}" title="Abrir">
+    <div class="ks-folder-name">${_spEscape(a.nombre || nombreCorto(a.ruta))}</div>
+    <span class="ks-folder-chev">›</span>
+  </div>`;
+}
+function nombreCorto(p) { const s = String(p || '').replace(/\/+$/, ''); const i = s.lastIndexOf('/'); return i >= 0 ? s.slice(i + 1) : s; }
+
+// Entrar a una carpeta (artista o álbum): agrega migaja y carga.
+async function _bibIrDir(ruta, nombre) {
+  _bibCrumbs.push({ nombre, ruta });
+  await _bibMostrarDir(ruta, 1);
+}
+
+async function _bibMostrarDir(ruta, page) {
+  _bibRenderCrumbs();
+  _bibToggleRaizUI(false);
+  const cont = document.getElementById('bib-contenido');
+  const pager = document.getElementById('bib-paginacion'); if (pager) pager.innerHTML = '';
+  if (cont) cont.innerHTML = '<div class="loading-state"><div class="spinner"></div>Cargando…</div>';
+  try {
+    const d = await _bibFetchDir(ruta, page);
+    _bibArchivos = d.archivos;
+    _bibPagina = d.pagina;
+    _bibTotalPaginas = d.total_paginas;
+    _bibRenderDir(d, ruta);
+  } catch (e) {
+    if (cont) cont.innerHTML = `<div style="color:#FF6B6B;font-size:13px">Error: ${_spEscape(e.message)}</div>`;
+  }
+}
+
+function _bibRenderDir(d, ruta) {
+  const cont = document.getElementById('bib-contenido'); if (!cont) return;
+  let html = '';
+  if (d.carpetas.length) {
+    html += '<div class="ks-folder-grid">' + d.carpetas.map(c => _bibFolderHtml(c)).join('') + '</div>';
+  }
+  if (d.archivos.length) {
+    html += `<div class="ks-results" style="margin-top:${d.carpetas.length ? '14px' : '0'}">`
+      + d.archivos.map((a, i) => _bibTrackHtml(a, i)).join('') + '</div>';
+  }
+  if (!d.carpetas.length && !d.archivos.length) {
+    html = '<div style="color:var(--ts);font-size:13px;padding:12px 0">Esta carpeta está vacía.</div>';
+  }
+  cont.innerHTML = html;
+  _bibRenderPaginacion(ruta);
+}
+
+// Canción de la biblioteca: miniatura + metadata + badges de auxilio + abre modal.
+function _bibTrackHtml(a, i) {
+  const ini = _radioInicialesArt(a.artista || a.titulo);
+  const ph = `<div class="ks-art-ph">${_spEscape(ini)}</div>`;
+  const img = a.art
+    ? `<img src="${_spEscape(a.art)}" alt="" loading="lazy" onerror="this.style.display='none'">`
+    : '';
+  const badges = [];
+  if (!String(a.titulo || '').trim())  badges.push('<span class="badge badge-red">sin título</span>');
+  if (!String(a.artista || '').trim()) badges.push('<span class="badge badge-orange">sin artista</span>');
+  if (!String(a.album || '').trim())   badges.push('<span class="badge badge-orange">sin álbum</span>');
+  const sub = [a.artista, a.album].filter(Boolean).join(' · ');
+  return `<div class="ks-result" onclick="_bibAbrirArchivo(${i})" title="Editar esta canción">
+    <div class="ks-art">${ph}${img}</div>
+    <div class="ks-track-txt">
+      <div class="ks-track-t">${_spEscape(a.titulo || '(sin título)')}</div>
+      <div class="ks-track-a">${_spEscape(sub || '—')}</div>
+      ${badges.length ? `<div class="ks-badges">${badges.join('')}</div>` : ''}
+    </div></div>`;
+}
+
+function _bibAbrirArchivo(i) {
+  const a = _bibArchivos[i];
+  if (a) radioMediaAbrirModal(a); // ruta directa, sin pasar por búsqueda
+}
+
+// Migajas: Artistas > Artista > Álbum …
+function _bibRenderCrumbs() {
+  const el = document.getElementById('bib-crumbs'); if (!el) return;
+  const parts = [`<span class="ks-crumb${_bibCrumbs.length ? ' ks-crumb-link' : ''}" onclick="_bibVolverRaiz()">Artistas</span>`];
+  _bibCrumbs.forEach((c, idx) => {
+    const last = (idx === _bibCrumbs.length - 1);
+    parts.push('<span class="ks-crumb-sep">›</span>');
+    parts.push(`<span class="ks-crumb${last ? '' : ' ks-crumb-link'}"${last ? '' : ` onclick="_bibVolverA(${idx})"`}>${_spEscape(c.nombre)}</span>`);
+  });
+  el.innerHTML = parts.join('');
+}
+
+function _bibVolverRaiz() {
+  _bibCrumbs = [];
+  _bibRenderRaiz(); // conserva el filtro de letra/búsqueda activo
+}
+
+function _bibVolverA(idx) {
+  const target = _bibCrumbs[idx];
+  _bibCrumbs = _bibCrumbs.slice(0, idx + 1);
+  _bibMostrarDir(target.ruta, 1);
+}
+
+function _bibRenderPaginacion(ruta) {
+  const el = document.getElementById('bib-paginacion'); if (!el) return;
+  if (_bibTotalPaginas <= 1) { el.innerHTML = ''; return; }
+  const prev = _bibPagina > 1, next = _bibPagina < _bibTotalPaginas;
+  el.innerHTML =
+    `<button class="btn btn-ghost btn-sm" ${prev ? '' : 'disabled'} onclick="_bibPaginar('${_radioJs(ruta)}',${_bibPagina - 1})" style="font-size:11px">Anterior</button>`
+    + `<span class="ks-pager-info">Página ${_bibPagina} de ${_bibTotalPaginas}</span>`
+    + `<button class="btn btn-ghost btn-sm" ${next ? '' : 'disabled'} onclick="_bibPaginar('${_radioJs(ruta)}',${_bibPagina + 1})" style="font-size:11px">Siguiente</button>`;
+}
+
+function _bibPaginar(ruta, page) {
+  _bibMostrarDir(ruta, page);
+}
+
+function _bibToggleRaizUI(show) {
+  const abc = document.getElementById('bib-abc');
+  const tb = document.getElementById('bib-toolbar');
+  if (abc) abc.style.display = show ? '' : 'none';
+  if (tb) tb.style.display = show ? '' : 'none';
+}
+
+// Acción POST genérica al control. btnId se deshabilita mientras corre.
+async function _radioControlAccion(accion, btnId, okMsg) {
+  const btn = btnId && document.getElementById(btnId);
+  if (btn) btn.disabled = true;
+  try {
+    const r = await khAdminFetch('/.netlify/functions/admin-radio-control', {
+      method: 'POST', body: JSON.stringify({ accion }),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || j.ok === false) throw new Error(j.error || ('Error ' + r.status));
+    showToast(okMsg, 'success');
+    return true;
+  } catch (e) {
+    showToast('Error: ' + e.message, 'error');
+    return false;
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+async function radioControlSaltar() {
+  if (!confirm('¿Saltar la canción que está sonando ahora?')) return;
+  const ok = await _radioControlAccion('saltar', 'ks-hero-saltar', 'Canción saltada.');
+  if (ok) { setTimeout(() => { _loadRadioHero(); _loadRadioCola(); _loadRadioHistorial(); }, 1500); }
+}
+
+async function radioControlRecargar() {
+  await _radioControlAccion('recargar', 'radio-ctrl-recargar', 'Playlists recargadas.');
+}
+
+// Asigna todas las carpetas raíz a la playlist Todo Aleatorio (para que los
+// artistas nuevos entren a la rotación). Lee la cuenta de carpetas del response.
+async function radioControlSincronizar() {
+  if (!confirm('¿Sincronizar la playlist Todo Aleatorio con todas las carpetas de la biblioteca?\n\nMete los artistas nuevos a la rotación (no duplica los que ya estaban).')) return;
+  const btn = document.getElementById('radio-ctrl-sincronizar');
+  const res = document.getElementById('radio-ctrl-sync-res');
+  const orig = btn ? btn.textContent : '';
+  if (btn) { btn.disabled = true; btn.textContent = 'Sincronizando…'; }
+  if (res) res.style.display = 'none';
+  try {
+    const r = await khAdminFetch('/.netlify/functions/admin-radio-control', {
+      method: 'POST', body: JSON.stringify({ accion: 'sincronizar_playlist' }),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || j.ok === false) throw new Error(j.error || ('Error ' + r.status));
+    const n = Number(j.carpetas) || 0;
+    showToast(n + ' carpeta' + (n !== 1 ? 's' : '') + ' sincronizada' + (n !== 1 ? 's' : '') + '.', 'success');
+    if (res) { res.textContent = n + ' carpeta' + (n !== 1 ? 's' : '') + ' sincronizada' + (n !== 1 ? 's' : '') + ' con Todo Aleatorio.'; res.style.display = ''; }
+  } catch (e) {
+    showToast('Error: ' + e.message, 'error');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = orig; }
+  }
+}
+
+async function radioControlReiniciar() {
+  if (!confirm('Reiniciar la transmisión DESCONECTA a todos los oyentes unos segundos.\n\n¿Seguro que quieres reiniciar?')) return;
+  if (!confirm('Confirmación final: la transmisión se corta y vuelve sola en unos segundos. ¿Reiniciar ahora?')) return;
+  await _radioControlAccion('reiniciar', 'radio-ctrl-reiniciar', 'Transmisión reiniciándose…');
+}
+
+function toggleRadioPetFiltro(btn) {
+  _radioSoloPend = !_radioSoloPend;
+  if (btn) btn.textContent = _radioSoloPend ? 'Solo pendientes' : 'Todas';
+  if (btn) btn.classList.toggle('active', _radioSoloPend);
+  _renderRadioPeticiones();
+}
+
+function _renderRadioPeticiones() {
+  const tb = document.getElementById('radio-pet-tbody');
+  if (!tb) return;
+  const pendientes = _radioPeticiones.filter(p => !p.atendida).length;
+  const badge = document.getElementById('radio-pet-badge');
+  if (badge) { badge.textContent = pendientes; badge.classList.toggle('show', pendientes > 0); }
+  const rows = _radioSoloPend ? _radioPeticiones.filter(p => !p.atendida) : _radioPeticiones;
+  if (!rows.length) {
+    tb.innerHTML = `<tr><td colspan="5" style="color:var(--ts)">${_radioSoloPend ? 'Sin peticiones pendientes' : 'Sin peticiones todavía'}</td></tr>`;
+    return;
+  }
+  tb.innerHTML = rows.map(p => {
+    const id = _spEscape(p.id);
+    const estado = p.atendida
+      ? '<span class="badge badge-green">Atendida</span>'
+      : '<span class="badge badge-orange">Pendiente</span>';
+    const accion = p.atendida
+      ? `<button class="btn btn-ghost btn-sm" style="font-size:11px" onclick="radioAtender('${id}',false)">Reabrir</button>`
+      : `<button class="btn btn-primary btn-sm" style="font-size:11px" onclick="radioAtender('${id}',true)">Atender</button>`;
+    return `<tr${p.atendida ? ' style="opacity:.55"' : ''}>
+      <td data-label="Fecha" style="white-space:nowrap">${_spEscape(_radioFecha(p.creado))}</td>
+      <td data-label="Nombre">${_spEscape(p.nombre || '—')}</td>
+      <td data-label="Petición">${_spEscape(p.peticion || '')}</td>
+      <td data-label="Estado">${estado}</td>
+      <td data-label="Acción">${accion}</td>
+    </tr>`;
+  }).join('');
+}
+
+function _renderRadioMuro() {
+  const tb = document.getElementById('radio-muro-tbody');
+  if (!tb) return;
+  if (!_radioMuro.length) {
+    tb.innerHTML = `<tr><td colspan="5" style="color:var(--ts)">El muro está vacío</td></tr>`;
+    return;
+  }
+  tb.innerHTML = _radioMuro.map(m => {
+    const id = _spEscape(m.id);
+    const estado = m.visible
+      ? '<span class="badge badge-green"><svg class="ic"><use href="#ic-ojo"/></svg> Visible</span>'
+      : '<span class="badge badge-gray">Oculto</span>';
+    const accion = m.visible
+      ? `<button class="btn btn-ghost btn-sm" style="font-size:11px" onclick="radioMuroVisible('${id}',false)">Ocultar</button>`
+      : `<button class="btn btn-primary btn-sm" style="font-size:11px" onclick="radioMuroVisible('${id}',true)">Mostrar</button>`;
+    return `<tr${m.visible ? '' : ' style="opacity:.45"'}>
+      <td data-label="Fecha" style="white-space:nowrap">${_spEscape(_radioFecha(m.creado))}</td>
+      <td data-label="Nombre">${_spEscape(m.nombre || '—')}</td>
+      <td data-label="Mensaje">${_spEscape(m.mensaje || '')}</td>
+      <td data-label="Estado">${estado}</td>
+      <td data-label="Acción">${accion}</td>
+    </tr>`;
+  }).join('');
+}
+
+async function radioAtender(id, atendida) {
+  try {
+    const r = await khAdminFetch('/.netlify/functions/admin-radio-peticiones', {
+      method: 'POST', body: JSON.stringify({ id, atendida }),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || j.ok === false) throw new Error(j.error || ('Error ' + r.status));
+    const it = _radioPeticiones.find(p => String(p.id) === String(id));
+    if (it) it.atendida = atendida;
+    _renderRadioPeticiones();
+  } catch (e) {
+    showToast('Error: ' + e.message, 'error');
+  }
+}
+
+async function radioMuroVisible(id, visible) {
+  try {
+    const r = await khAdminFetch('/.netlify/functions/admin-radio-muro', {
+      method: 'POST', body: JSON.stringify({ id, visible }),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || j.ok === false) throw new Error(j.error || ('Error ' + r.status));
+    const it = _radioMuro.find(m => String(m.id) === String(id));
+    if (it) it.visible = visible;
+    _renderRadioMuro();
+  } catch (e) {
+    showToast('Error: ' + e.message, 'error');
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// BOOT — Arranca todo
+// ═══════════════════════════════════════════════════════════════
+async function bootApp() {
+ // [PERF v1] Se eliminó del boot la carga de TODOS los eventos
+ // (khEventos.listar + populateEventoSelects): populateEventoSelects es un
+ // no-op —su único destino, el <select id="pago-evento">, ya no existe en el
+ // DOM— y _eventosCache no lo lee nadie más en el arranque (el flujo de
+ // guardar evento re-carga por su cuenta). Era un fetch de tabla completa
+ // puro desperdicio en cada entrada.
+ // Establecer fecha de hoy en formularios
+ const today = new Date().toISOString().split('T')[0];
+ ['pago-fecha','gasto-fecha','ev-fecha'].forEach(id => {
+ const el = document.getElementById(id);
+ if (el) el.value = today;
+ });
+ // Cargar resumen (la pestaña visible — único contenido del critical path)
+ loadResumen();
+ // Manejar links de aceptar/declinar tour desde correo (barato + intención
+ // directa del usuario: se queda en el critical path).
+ manejarAccionAsignacion();
+ // [PERF v1] checkMensajeDia (banner de chrome, no la vista) se difirió a idle
+ // en enterApp, junto con los badges — fuera del critical path del arranque.
+}
+
+function populateEventoSelects() {
+ const selects = [
+ // 'filtro-evento-pagos' lo puebla _poblarFiltroEventoPagos() desde EV (Fase 3 cobranza).
+ // 'selector-evento' lo puebla _evtPoblarSelector() desde EV (Fase 4 Por Evento).
+ // 'filtro-evento-gastos'/'gasto-evento' los puebla _poblarSelectsGastos() desde EV (G1).
+ 'pago-evento'
+ ];
+ selects.forEach(id => {
+ const el = document.getElementById(id);
+ if (!el) return;
+ const firstOpt = el.options[0];
+ el.innerHTML = '';
+ if (firstOpt) el.appendChild(firstOpt.cloneNode(true));
+ _eventosCache.forEach(ev => {
+ const opt = document.createElement('option');
+ opt.value = ev.id;
+ opt.textContent = `${ev.artista}${ev.tour ? ' — '+ev.tour : ''} · ${fmtFecha(ev.fecha)}`;
+ el.appendChild(opt);
+ });
+ });
+}
+
+// ═══════════════════════════════════════════════════════════════
+// RESUMEN
+// ═══════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════
+// FASE 4 — Resumen y Por Evento sobre el MODELO DEL PORTAL
+// Reusan admin-cobranza-list (mismos helpers que la Fase 3.1). Solo LEEN y suman.
+// Los TOTALES de dinero EXCLUYEN cancelados; estos se cuentan aparte.
+// ═══════════════════════════════════════════════════════════════
+let _cobTodoCache = null;   // { activos:[], cancelados:[], capHit:bool } | null
+let _gastosG2Cache = null;  // { lista:[], total:Number } | null — gastos para Resumen/Por Evento
+let _evtTours = [];         // tours ACTIVOS del evento seleccionado en Por Evento
+let _evtFiltrados = [];     // subconjunto filtrado de la tabla (para CSV)
+
+// Trae TODA la cobranza (activos por default + cancelados) una sola vez. La pestaña
+// Pagos mantiene su propia _cobranzaCache; esta cache es para Resumen/Por Evento.
+async function _cobCargarTodo(force) {
+  if (_cobTodoCache && !force) return _cobTodoCache;
+  await _poblarFiltroEventoPagos();   // garantiza _cobEVMap (multifecha) poblado
+  const hdrs = _spAdminHeaders();
+  const pedir = (estado) => fetch('/.netlify/functions/admin-cobranza-list', {
+    method: 'POST',
+    headers: hdrs,
+    body: JSON.stringify(estado ? { estado } : {}),
+  }).then(r => r.json().then(d => ({ ok: r.ok, d })));
+  const [act, can] = await Promise.all([pedir(null), pedir('cancelado')]);
+  if (!act.ok) throw new Error((act.d && act.d.error) || 'No se pudo cargar la cobranza');
+  const activos    = Array.isArray(act.d.tours) ? act.d.tours : [];
+  const cancelados = (can.ok && Array.isArray(can.d.tours)) ? can.d.tours : [];
+  // admin-cobranza-list topa en 300; si llegamos al tope, los totales podrían estar
+  // incompletos (avisamos en Resumen en vez de mostrar números silenciosamente cortos).
+  _cobTodoCache = { activos, cancelados, capHit: activos.length >= 300 };
+  return _cobTodoCache;
+}
+
+// ¿El tour pertenece al evento del filtro? Mismo criterio que la Fase 3.1:
+// valor con '#': match exacto (fecha de multifecha); valor base: base o base#idx.
+function _cobTourMatchEvento(t, evId) {
+  if (!evId) return true;
+  if (evId.indexOf('#') >= 0) return t.evento_id === evId;
+  return t.evento_id === evId || (typeof t.evento_id === 'string' && t.evento_id.startsWith(evId + '#'));
+}
+
+// Trae TODOS los gastos una sola vez (cache en memoria, estilo _cobTodoCache) para
+// sumarlos en Resumen y Por Evento. admin-gastos-list con body {} = todos (incluye los
+// "General"). Si la función falla, devolvemos 0 y NO cacheamos (reintenta a la próxima)
+// para no tronar el Resumen: los demás números deben seguir saliendo.
+async function _cobCargarGastos(force) {
+  if (_gastosG2Cache && !force) return _gastosG2Cache;
+  try {
+    const r = await fetch('/.netlify/functions/admin-gastos-list', {
+      method: 'POST',
+      headers: _spAdminHeaders(),
+      body: JSON.stringify({}),
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || 'No se pudieron cargar los gastos');
+    const lista = Array.isArray(d.gastos) ? d.gastos : [];
+    const total = Number(d.total || 0) || lista.reduce((a, g) => a + Number(g.monto || 0), 0);
+    _gastosG2Cache = { lista, total };
+    return _gastosG2Cache;
+  } catch (e) {
+    return { lista: [], total: 0 };
+  }
+}
+
+// ── Capa 3: utilidad por evento (admin-utilidad-evento) ──────────────────────
+let _utilG3Cache = null;  // { eventos, sin_evento, totales } | null
+
+// Trae la utilidad por evento (todos los eventos) una sola vez. Best-effort: si
+// falla devuelve null y NO cachea — la vista sigue pintando lo demás (igual
+// criterio que _cobCargarGastos).
+async function _utilCargar(force) {
+  if (_utilG3Cache && !force) return _utilG3Cache;
+  try {
+    const r = await fetch('/.netlify/functions/admin-utilidad-evento', {
+      method: 'POST',
+      headers: _spAdminHeaders(),
+      body: JSON.stringify({}),
+    });
+    const d = await r.json();
+    if (!r.ok || d.ok === false) throw new Error(d.error || 'No se pudo cargar la utilidad');
+    _utilG3Cache = {
+      eventos:    (d.eventos && typeof d.eventos === 'object') ? d.eventos : {},
+      sin_evento: d.sin_evento || null,
+      totales:    d.totales || {},
+    };
+    return _utilG3Cache;
+  } catch (e) {
+    return null;
+  }
+}
+
+// Pinta el banner de caja total de empresa y el bloque Caja/Proyectado/Falta del
+// evento (por BASE del slug), desde el cache. Visibilidad propia (no depende de
+// tours.length). Si no hay datos, oculta los bloques nuevos.
+function _renderUtilidadEvento(evBase) {
+  const cajaStats = document.getElementById('evt-caja-stats');
+  const banner    = document.getElementById('evt-caja-empresa');
+  const cache = _utilG3Cache;
+  if (!cache) {
+    if (cajaStats) cajaStats.style.display = 'none';
+    if (banner)    banner.style.display = 'none';
+    return;
+  }
+  // Caja total de la empresa (global; rojo si negativa).
+  const cajaEmp = Number((cache.totales || {}).caja_total_empresa || 0);
+  const bval = document.getElementById('evt-caja-empresa-val');
+  if (bval) {
+    bval.textContent = _spFmtMxn(cajaEmp);
+    bval.className = 'cob-stat-val ' + (cajaEmp < 0 ? 'red' : 'green');
+  }
+  if (banner) banner.style.display = 'flex';
+
+  // Bloque del evento seleccionado (caja/proyectado verde-o-rojo; falta naranja).
+  if (!evBase) { if (cajaStats) cajaStats.style.display = 'none'; return; }
+  const e = (cache.eventos && cache.eventos[evBase]) || { caja: 0, proyectado: 0, falta_por_cobrar: 0 };
+  const setSemaforo = (id, v) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.textContent = _spFmtMxn(Number(v || 0));
+    el.className = 'cob-stat-val ' + (Number(v || 0) < 0 ? 'red' : 'green');
+  };
+  setSemaforo('evt-caja', e.caja);
+  setSemaforo('evt-proyectado', e.proyectado);
+  const elFalta = document.getElementById('evt-falta');
+  if (elFalta) {
+    const f = Number(e.falta_por_cobrar || 0);
+    elFalta.textContent = _spFmtMxn(f);
+    elFalta.className = 'cob-stat-val ' + (f < 0 ? 'red' : 'orange');
+  }
+  if (cajaStats) cajaStats.style.display = '';
+}
+
+async function loadResumen() {
+  const proxEl = document.getElementById('proximos-eventos');
+  const atrEl  = document.getElementById('atrasados-lista');
+  if (proxEl) proxEl.innerHTML = '<div class="loading-state"><div class="spinner"></div>Cargando…</div>';
+  if (atrEl)  atrEl.innerHTML  = '<div class="loading-state"><div class="spinner"></div>Cargando…</div>';
+
+  try {
+    const { activos, cancelados, capHit } = await _cobCargarTodo(true);  // siempre fresco al entrar
+
+    // 5 métricas — solo ACTIVOS (en_pagos, pagado). Cancelados no son ingreso ni venta.
+    const cobrado   = activos.reduce((a, t) => a + Number((t.pago || {}).abonado  || 0), 0);
+    const porCobrar = activos.reduce((a, t) => a + Number((t.pago || {}).restante || 0), 0);
+    const facturado = activos.reduce((a, t) => a + Number((t.pago || {}).total    || 0), 0);
+    const eventosActivos = new Set(activos.map(t => t.evento_id)).size;
+    const setTxt = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+    setTxt('m-cobrado',   _spFmtMxn(cobrado));
+    setTxt('m-porcobrar', _spFmtMxn(porCobrar));
+    setTxt('m-facturado', _spFmtMxn(facturado));
+    setTxt('m-viajeros',  String(activos.length));
+    setTxt('m-eventos',   String(eventosActivos));
+
+    // Gastos + Utilidad (G2). Suma de TODOS los gastos (incluye los "General").
+    // _cobCargarGastos devuelve 0 si la función falla, sin tronar el Resumen.
+    const { total: totalGastos } = await _cobCargarGastos(true);
+    setTxt('m-gastos', _spFmtMxn(totalGastos));
+    const utilidad = facturado - totalGastos;
+    setTxt('m-utilidad', _spFmtMxn(utilidad));
+    const elUtil = document.getElementById('m-utilidad');
+    if (elUtil) elUtil.className = 'metric-value ' + (utilidad >= 0 ? 'green' : 'red');
+
+    const aviso = document.getElementById('resumen-cap-aviso');
+    if (aviso) {
+      if (capHit) {
+        aviso.textContent = 'Mostrando los primeros 300 tours activos — los totales podrían estar incompletos. (Pendiente: paginación cuando se superen 300.)';
+        aviso.style.display = '';
+      } else {
+        aviso.style.display = 'none';
+      }
+    }
+
+    const ev = await _fetchEVFromIndex();
+    // 1) Primero lo que NO depende de la utilidad, para que aparezca rápido:
+    //    Franja 3 (atrasados) + Franja 1 (dinero — prioridad #1, no debe esperar).
+    _renderResumenAtrasados(activos, cancelados);
+    _renderResumenRiesgoBaja(activos);
+    _renderResumenDinero(porCobrar);  // reusa el porCobrar ya calculado (= m-porcobrar)
+    // 2) Carga la utilidad UNA sola vez (compartida, fresca). Best-effort: si falla,
+    //    _utilG3Cache queda null → salud neutra y lo de abajo igual pinta.
+    await _utilCargar(true);
+    // 3) Ya con la cache lista: Franja 4 (próximos con salud) + Franja 2 (tabla).
+    _renderResumenProximos(ev, activos);
+    _renderResumenUtilidad(ev);
+  } catch (e) {
+    if (proxEl) proxEl.innerHTML = `<div class="alert alert-error">${_spEscape(e.message)}</div>`;
+    if (atrEl)  atrEl.innerHTML  = '';
+  }
+}
+
+// ── Franja 1 del dashboard: el dinero (caja total + cuentas + por cobrar) ────
+// Reusa admin-saldos (misma fuente que la página Saldos). Best-effort: si falla,
+// la franja muestra un aviso y el resto del Resumen sigue (mirror de _utilCargar).
+let _resumenSaldosCache = null;  // respuesta de admin-saldos | null
+
+async function _saldosCargar(force) {
+  if (_resumenSaldosCache && !force) return _resumenSaldosCache;
+  try {
+    const r = await fetch('/.netlify/functions/admin-saldos', {
+      method: 'POST', headers: _spAdminHeaders(), body: JSON.stringify({}),
+    });
+    const d = await r.json();
+    if (!r.ok || d.ok === false) throw new Error(d.error || 'No se pudieron cargar los saldos');
+    _resumenSaldosCache = d;
+    return _resumenSaldosCache;
+  } catch (e) {
+    return null;
+  }
+}
+
+// Pinta la franja: caja total (héroe, full-width) + fila de cuentas + por cobrar
+// (+ otros si != 0). `porCobrar` viene de loadResumen (mismo valor que m-porcobrar).
+async function _renderResumenDinero(porCobrar) {
+  const cont = document.getElementById('resumen-dinero');
+  if (!cont) return;
+  const d = await _saldosCargar(true);  // fresco al entrar al Resumen
+  if (!d) {
+    cont.style.display = '';
+    cont.innerHTML = '<div style="font-size:12px;color:var(--ts);padding:10px 0">No se pudo cargar el dinero (saldos).</div>';
+    return;
+  }
+  const cuentas = d.cuentas || {};
+  const orden = ['BBVA', 'Banamex', 'Efectivo'];
+  const otros = Number(d.otros_total || 0);
+  const cajaTotal = orden.reduce((a, n) => a + Number((cuentas[n] || {}).saldo || 0), 0) + otros;
+
+  // stat de cuenta → navega a Saldos (click-through).
+  const stat = (lbl, val) => {
+    const color = Number(val) < 0 ? 'var(--red)' : '';
+    return `<div class="cob-stat dash-click" onclick="showPage('saldos')" title="Ver Saldos"><div class="cob-stat-lbl">${lbl}</div><div class="cob-stat-val" style="${color ? 'color:' + color : ''}">${_spFmtMxn(Number(val || 0))}</div></div>`;
+  };
+  const cuentasHTML = orden.map(n => stat(n, (cuentas[n] || {}).saldo || 0)).join('') +
+    `<div class="cob-stat dash-click" onclick="showPage('pagos')" title="Ver cobranza"><div class="cob-stat-lbl">Por cobrar</div><div class="cob-stat-val" style="color:var(--orange)">${_spFmtMxn(Number(porCobrar || 0))}</div></div>` +
+    (otros !== 0 ? stat('Otros (sin cuenta)', otros) : '');
+
+  const heroColor = cajaTotal < 0 ? 'var(--red)' : 'var(--green)';
+  cont.style.display = '';
+  cont.innerHTML = `
+    <div class="dash-click" onclick="showPage('saldos')" title="Ver Saldos" style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:16px 20px;margin-bottom:12px">
+      <div class="cob-stat-lbl" style="margin-bottom:6px">Caja total de la empresa</div>
+      <div style="font-family:'Zen Dots',sans-serif;font-size:34px;font-weight:800;color:${heroColor};line-height:1.1">${_spFmtMxn(cajaTotal)}</div>
+    </div>
+    <div class="cob-stats" style="margin-bottom:0">${cuentasHTML}</div>`;
+}
+
+// ── Franja 2 del dashboard: tabla "Utilidad por evento" (web) ────────────────
+// Reusa _utilCargar (#143) + el mapa de nombres/fechas de _fetchEVFromIndex.
+// Best-effort: si la utilidad no carga, la card muestra un aviso y el resto del
+// Resumen queda intacto. Agrupa por BASE (el backend ya suma multifecha en base).
+let _resumenUtilRows = [];                       // filas de eventos (con datos)
+let _resumenUtilSin = null;                      // bloque sin_evento
+let _resumenUtilSort = { col: 'ds', dir: 'asc' }; // orden por defecto: fecha asc
+
+async function _renderResumenUtilidad(ev) {
+  const cont = document.getElementById('resumen-utilidad-tabla');
+  if (!cont) return;
+  const util = await _utilCargar();  // usa la cache que loadResumen ya cargó (sin doble fetch)
+  if (!util) {
+    cont.innerHTML = '<div style="font-size:12px;color:var(--ts)">No se pudo cargar la utilidad por evento.</div>';
+    return;
+  }
+  // baseSlug (e.id) -> { nombre, fecha, ds } desde EV (patrón _gastosEVMap).
+  const evMap = {};
+  (ev || []).forEach(e => { if (e && e.id) evMap[e.id] = { nombre: e.a || e.id, fecha: e.f || '', ds: e.ds || '' }; });
+  const evs = util.eventos || {};
+  _resumenUtilRows = Object.keys(evs).map(slug => {
+    const d = evs[slug] || {};
+    const meta = evMap[slug];                 // undefined = slug con movimientos pero NO en el EV
+    const m = meta || { nombre: slug, fecha: '', ds: '' };
+    const vendido = Number(d.vendido || 0), cobrado = Number(d.cobrado || 0);
+    return {
+      slug, nombre: m.nombre, fecha: m.fecha, ds: m.ds || '',
+      desconocido: !meta,                     // typo de captura: slug que no existe en el EV
+      cobrado, ingresos: Number(d.ingresos || 0), vendido,
+      gastos: Number(d.gastos || 0), caja: Number(d.caja || 0),
+      proyectado: Number(d.proyectado || 0), falta: Number(d.falta_por_cobrar || 0),
+      pct: vendido > 0 ? (cobrado / vendido) : 0,
+    };
+  });
+  _resumenUtilSin = util.sin_evento || null;
+  _resumenUtilPintar();
+}
+
+// Semáforo de salud: caja≥0 / caja<0 pero proyectado≥0 / ambos<0.
+function _resumenUtilSemaforo(caja, proyectado) {
+  if (caja >= 0) return 'var(--green)';
+  if (proyectado >= 0) return 'var(--gold)';
+  return 'var(--red)';
+}
+function _resumenUtilMxnCell(v, align) {
+  const col = (Number(v) < 0) ? 'var(--red)' : '';
+  return `<td style="text-align:${align || 'right'};font-variant-numeric:tabular-nums;${col ? 'color:' + col : ''}">${_spFmtMxn(Number(v || 0))}</td>`;
+}
+// Monto para TARJETAS (móvil): span con rojo si negativo (el _resumenUtilMxnCell devuelve <td>).
+function _resumenUtilMxn(v) {
+  const n = Number(v || 0);
+  return `<span style="${n < 0 ? 'color:var(--red)' : ''}">${_spFmtMxn(n)}</span>`;
+}
+
+function _resumenUtilPintar() {
+  const cont = document.getElementById('resumen-utilidad-tabla');
+  if (!cont) return;
+  const rows = _resumenUtilRows.slice();
+  if (!rows.length && !_resumenUtilSin) {
+    cont.innerHTML = '<div style="font-size:12px;color:var(--ts)">Sin datos de utilidad por evento todavía.</div>';
+    return;
+  }
+
+  // Caja acumulada: running-sum de caja en orden CRONOLÓGICO, SOLO sobre filas con
+  // fecha (ds). Los desconocidos / sin fecha NO entran al acumulado → su celda va "—".
+  const acum = {};
+  let run = 0;
+  rows.filter(r => r.ds).sort((a, b) => String(a.ds).localeCompare(String(b.ds))).forEach(r => { run += r.caja; acum[r.slug] = run; });
+
+  // Orden de 2 niveles: primario los DESCONOCIDOS siempre al final; secundario la
+  // columna elegida (la columna 'fecha' ordena por ds).
+  const s = _resumenUtilSort;
+  const key = (r) => (s.col === 'fecha') ? r.ds : r[s.col];
+  rows.sort((a, b) => {
+    const da = a.desconocido ? 1 : 0, db = b.desconocido ? 1 : 0;
+    if (da !== db) return da - db;            // conocidos primero, desconocidos al final
+    const ka = key(a), kb = key(b);
+    let c;
+    if (typeof ka === 'number' && typeof kb === 'number') c = ka - kb;
+    else c = String(ka).localeCompare(String(kb));
+    return s.dir === 'asc' ? c : -c;
+  });
+
+  const COLS = [
+    { k: 'nombre', lbl: 'Evento', num: false },
+    { k: 'fecha',  lbl: 'Fecha',  num: false },
+    { k: 'cobrado', lbl: 'Cobrado', num: true },
+    { k: 'ingresos', lbl: 'Ingresos', num: true },
+    { k: 'vendido', lbl: 'Vendido', num: true },
+    { k: 'gastos', lbl: 'Gastos', num: true },
+    { k: 'caja', lbl: 'Caja', num: true },
+    { k: 'proyectado', lbl: 'Proyectado', num: true },
+    { k: 'falta', lbl: 'Falta x cobrar', num: true },
+    { k: 'pct', lbl: '% cob', num: true },
+  ];
+  const arrow = (k) => (s.col === k || (k === 'fecha' && s.col === 'fecha')) ? (s.dir === 'asc' ? ' ▲' : ' ▼') : '';
+  const thStyle = 'padding:7px 8px;border-bottom:1px solid var(--border);font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--ts);white-space:nowrap;cursor:pointer';
+  const head = COLS.map(c =>
+    `<th style="${thStyle};text-align:${c.num ? 'right' : 'left'}" onclick="_resumenUtilSortBy('${c.k}')">${c.lbl}${arrow(c.k)}</th>`
+  ).join('') +
+    `<th style="${thStyle};text-align:center;cursor:default">Salud</th>` +
+    `<th style="${thStyle};text-align:right;cursor:default">Caja acum.</th>`;
+
+  const acumCell = (r) => (r.slug in acum)
+    ? _resumenUtilMxnCell(acum[r.slug])
+    : '<td style="text-align:right;color:var(--ts)">—</td>';
+  const marcaDesc = '<span style="color:var(--orange);font-size:10px;font-weight:700;white-space:nowrap"> <svg class="ic"><use href="#ic-alerta"/></svg> evento desconocido</span>';
+
+  const fila = (r) => {
+    const sem = _resumenUtilSemaforo(r.caja, r.proyectado);
+    const semTitle = (r.caja >= 0) ? 'Caja positiva' : (r.proyectado >= 0 ? 'Caja negativa, proyectado positivo' : 'Caja y proyectado negativos');
+    // Desconocido: NO clickable (no hay a dónde ir); conocidos siguen → Por evento.
+    const rowAttrs = r.desconocido ? '' : ` class="dash-click" onclick="_evtIrA('${r.slug}')" title="Ver en Por evento"`;
+    return `<tr${rowAttrs} style="border-bottom:1px solid var(--border)">
+      <td style="padding:6px 8px;font-weight:600;white-space:nowrap">${_spEscape(r.nombre)}${r.desconocido ? marcaDesc : ''}</td>
+      <td style="padding:6px 8px;font-size:11px;color:var(--ts);white-space:nowrap">${_spEscape(r.fecha || '—')}</td>
+      ${_resumenUtilMxnCell(r.cobrado)}${_resumenUtilMxnCell(r.ingresos)}${_resumenUtilMxnCell(r.vendido)}${_resumenUtilMxnCell(r.gastos)}${_resumenUtilMxnCell(r.caja)}${_resumenUtilMxnCell(r.proyectado)}${_resumenUtilMxnCell(r.falta)}
+      <td style="text-align:right;font-variant-numeric:tabular-nums">${Math.round(r.pct * 100)}%</td>
+      <td style="text-align:center"><span title="${semTitle}" style="display:inline-block;width:11px;height:11px;border-radius:50%;background:${sem}"></span></td>
+      ${acumCell(r)}
+    </tr>`;
+  };
+
+  // Fila "Sin evento" (dinero real sin evento_id), separada antes de totales.
+  let sinFila = '';
+  let totCaja = 0, totCob = 0, totIng = 0, totVen = 0, totGas = 0, totProy = 0, totFalta = 0;
+  rows.forEach(r => { totCob += r.cobrado; totIng += r.ingresos; totVen += r.vendido; totGas += r.gastos; totCaja += r.caja; totProy += r.proyectado; totFalta += r.falta; });
+  let sinC = 0, sinI = 0, sinV = 0, sinG = 0, sinK = 0, sinP = 0, sinF = 0;
+  if (_resumenUtilSin) {
+    const x = _resumenUtilSin;
+    sinC = Number(x.cobrado || 0); sinI = Number(x.ingresos || 0); sinV = Number(x.vendido || 0); sinG = Number(x.gastos || 0); sinK = Number(x.caja || 0); sinP = Number(x.proyectado || 0); sinF = Number(x.falta_por_cobrar || 0);
+    totCob += sinC; totIng += sinI; totVen += sinV; totGas += sinG; totCaja += sinK; totProy += sinP; totFalta += sinF;
+    sinFila = `<tr style="border-bottom:1px solid var(--border);opacity:.85">
+      <td style="padding:6px 8px;font-style:italic;color:var(--ts)">Sin evento</td>
+      <td style="padding:6px 8px"></td>
+      ${_resumenUtilMxnCell(sinC)}${_resumenUtilMxnCell(sinI)}${_resumenUtilMxnCell(sinV)}${_resumenUtilMxnCell(sinG)}${_resumenUtilMxnCell(sinK)}${_resumenUtilMxnCell(sinP)}${_resumenUtilMxnCell(sinF)}
+      <td style="text-align:right">${sinV > 0 ? Math.round(sinC / sinV * 100) : 0}%</td>
+      <td></td><td></td>
+    </tr>`;
+  }
+  const totPct = totVen > 0 ? Math.round(totCob / totVen * 100) : 0;
+  const totFila = `<tr style="border-top:2px solid var(--border);font-weight:800">
+    <td style="padding:8px;text-transform:uppercase;font-size:11px;letter-spacing:.06em">Total</td>
+    <td></td>
+    ${_resumenUtilMxnCell(totCob)}${_resumenUtilMxnCell(totIng)}${_resumenUtilMxnCell(totVen)}${_resumenUtilMxnCell(totGas)}${_resumenUtilMxnCell(totCaja)}${_resumenUtilMxnCell(totProy)}${_resumenUtilMxnCell(totFalta)}
+    <td style="text-align:right">${totPct}%</td>
+    <td></td><td></td>
+  </tr>`;
+
+  // Tabla (web ≥640px): HTML idéntico al de #144, solo envuelto en .util-table-view abajo.
+  const tableHTML = `<table style="width:100%;border-collapse:collapse;font-size:12px;min-width:880px">
+    <thead><tr>${head}</tr></thead>
+    <tbody>${rows.map(fila).join('')}${sinFila}${totFila}</tbody>
+  </table>`;
+
+  // ── Vista de TARJETAS (móvil <640px) — MISMA data (rows/acum/totales), otra presentación ──
+  const mny = _resumenUtilMxn;
+  const card = (r) => {
+    const sem = _resumenUtilSemaforo(r.caja, r.proyectado);
+    const cardAttrs = r.desconocido ? '' : ` class="dash-click" onclick="_evtIrA('${r.slug}')" title="Ver en Por evento"`;
+    return `<div${cardAttrs} style="background:var(--bg2);border:1px solid var(--border);border-left:4px solid ${sem};border-radius:var(--radius);padding:12px 14px;margin-bottom:10px">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:10px">
+        <div><div style="font-weight:700;font-size:14px">${_spEscape(r.nombre)}${r.desconocido ? marcaDesc : ''}</div><div style="font-size:11px;color:var(--ts)">${_spEscape(r.fecha || '—')}</div></div>
+        <span style="display:inline-block;width:13px;height:13px;border-radius:50%;background:${sem};flex-shrink:0;margin-top:3px"></span>
+      </div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px">
+        <div style="flex:1 1 92px"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--ts)">Caja</div><div style="font-family:'Zen Dots',sans-serif;font-size:19px;color:${r.caja < 0 ? 'var(--red)' : 'var(--green)'}">${_spFmtMxn(r.caja)}</div></div>
+        <div style="flex:1 1 92px"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--ts)">Proyectado</div><div style="font-size:16px;font-weight:700;color:${r.proyectado < 0 ? 'var(--red)' : ''}">${_spFmtMxn(r.proyectado)}</div></div>
+        <div style="flex:1 1 92px"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--ts)">Falta x cobrar</div><div style="font-size:16px;font-weight:700;color:${r.falta < 0 ? 'var(--red)' : 'var(--orange)'}">${_spFmtMxn(r.falta)}</div></div>
+      </div>
+      <div style="display:flex;gap:6px 14px;flex-wrap:wrap;font-size:11px;color:var(--ts);border-top:1px solid var(--border);padding-top:8px">
+        <span>Cobrado ${mny(r.cobrado)}</span><span>Ingresos ${mny(r.ingresos)}</span><span>Vendido ${mny(r.vendido)}</span><span>Gastos ${mny(r.gastos)}</span><span>% cob ${Math.round(r.pct * 100)}%</span><span>Caja acum ${(r.slug in acum) ? mny(acum[r.slug]) : '—'}</span>
+      </div>
+    </div>`;
+  };
+  // Tarjeta especial (Sin evento / Total): sin borde-semáforo, estilo distinto.
+  const cardEsp = (titulo, dashed, k, p, f, c, i, v, g) => {
+    const pct = v > 0 ? Math.round(c / v * 100) : 0;
+    return `<div style="background:var(--bg2);border:${dashed ? '1px dashed' : '2px solid'} var(--border);border-radius:var(--radius);padding:12px 14px;margin-bottom:10px">
+      <div style="text-transform:uppercase;font-size:11px;letter-spacing:.06em;font-weight:800;color:var(--ts);margin-bottom:10px">${titulo}</div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px">
+        <div style="flex:1 1 92px"><div style="font-size:10px;text-transform:uppercase;color:var(--ts)">Caja</div><div style="font-family:'Zen Dots',sans-serif;font-size:18px;color:${k < 0 ? 'var(--red)' : 'var(--green)'}">${_spFmtMxn(k)}</div></div>
+        <div style="flex:1 1 92px"><div style="font-size:10px;text-transform:uppercase;color:var(--ts)">Proyectado</div><div style="font-size:15px;font-weight:700;color:${p < 0 ? 'var(--red)' : ''}">${_spFmtMxn(p)}</div></div>
+        <div style="flex:1 1 92px"><div style="font-size:10px;text-transform:uppercase;color:var(--ts)">Falta x cobrar</div><div style="font-size:15px;font-weight:700;color:${f < 0 ? 'var(--red)' : 'var(--orange)'}">${_spFmtMxn(f)}</div></div>
+      </div>
+      <div style="display:flex;gap:6px 14px;flex-wrap:wrap;font-size:11px;color:var(--ts);border-top:1px solid var(--border);padding-top:8px">
+        <span>Cobrado ${mny(c)}</span><span>Ingresos ${mny(i)}</span><span>Vendido ${mny(v)}</span><span>Gastos ${mny(g)}</span><span>% cob ${pct}%</span>
+      </div>
+    </div>`;
+  };
+  const SORT_OPTS = [
+    { v: 'fecha', l: 'Fecha' }, { v: 'caja', l: 'Caja' }, { v: 'falta', l: 'Falta x cobrar' },
+    { v: 'cobrado', l: 'Cobrado' }, { v: 'vendido', l: 'Vendido' }, { v: 'gastos', l: 'Gastos' }, { v: 'pct', l: '% cobrado' },
+  ];
+  const selCol = (s.col === 'ds') ? 'fecha' : s.col;  // el default 'ds' equivale a 'fecha' en el selector
+  const selectorHTML = `<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+    <label style="font-size:11px;color:var(--ts);white-space:nowrap">Ordenar por:</label>
+    <select onchange="_resumenUtilSortBy(this.value)" style="flex:1;background:var(--bg2);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:7px 9px;font-size:12px">
+      ${SORT_OPTS.map(o => `<option value="${o.v}"${selCol === o.v ? ' selected' : ''}>${o.l}</option>`).join('')}
+    </select>
+  </div>`;
+  const sinCard = _resumenUtilSin ? cardEsp('Sin evento', true, sinK, sinP, sinF, sinC, sinI, sinV, sinG) : '';
+  const totCard = cardEsp('Total', false, totCaja, totProy, totFalta, totCob, totIng, totVen, totGas);
+  const cardsHTML = selectorHTML + rows.map(card).join('') + sinCard + totCard;
+
+  cont.innerHTML = `<div class="util-table-view">${tableHTML}</div><div class="util-cards-view">${cardsHTML}</div>`;
+}
+
+function _resumenUtilSortBy(col) {
+  const s = _resumenUtilSort;
+  if (s.col === col) s.dir = (s.dir === 'asc' ? 'desc' : 'asc');
+  else { s.col = col; s.dir = (col === 'nombre' || col === 'fecha') ? 'asc' : 'desc'; }
+  _resumenUtilPintar();
+}
+
+// Export CSV (orden actual + Sin evento + Total). Patrón vanilla del repo.
+function _resumenUtilCSV() {
+  if (!_resumenUtilRows.length && !_resumenUtilSin) return;
+  const head = ['Evento', 'Fecha', 'Cobrado', 'Ingresos', 'Vendido', 'Gastos', 'Caja', 'Proyectado', 'Falta_por_cobrar', 'Pct_cobrado'];
+  const cell = (v) => {
+    const s = String(v == null ? '' : v);
+    return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+  };
+  // Reusa el mismo orden visible.
+  const rows = _resumenUtilRows.slice();
+  const s = _resumenUtilSort;
+  const key = (r) => (s.col === 'fecha') ? r.ds : r[s.col];
+  rows.sort((a, b) => { const da = a.desconocido ? 1 : 0, db = b.desconocido ? 1 : 0; if (da !== db) return da - db; const ka = key(a), kb = key(b); let c = (typeof ka === 'number' && typeof kb === 'number') ? ka - kb : String(ka).localeCompare(String(kb)); return s.dir === 'asc' ? c : -c; });
+  const lines = [head.map(cell).join(',')];
+  let tc = 0, ti = 0, tv = 0, tg = 0, tk = 0, tp = 0, tf = 0;
+  rows.forEach(r => {
+    tc += r.cobrado; ti += r.ingresos; tv += r.vendido; tg += r.gastos; tk += r.caja; tp += r.proyectado; tf += r.falta;
+    const nom = r.desconocido ? (r.nombre + ' (evento desconocido)') : r.nombre;
+    lines.push([nom, r.fecha, r.cobrado, r.ingresos, r.vendido, r.gastos, r.caja, r.proyectado, r.falta, Math.round(r.pct * 100) + '%'].map(cell).join(','));
+  });
+  if (_resumenUtilSin) {
+    const x = _resumenUtilSin;
+    const xc = Number(x.cobrado || 0), xi = Number(x.ingresos || 0), xv = Number(x.vendido || 0), xg = Number(x.gastos || 0), xk = Number(x.caja || 0), xp = Number(x.proyectado || 0), xf = Number(x.falta_por_cobrar || 0);
+    tc += xc; ti += xi; tv += xv; tg += xg; tk += xk; tp += xp; tf += xf;
+    lines.push(['Sin evento', '', xc, xi, xv, xg, xk, xp, xf, (xv > 0 ? Math.round(xc / xv * 100) : 0) + '%'].map(cell).join(','));
+  }
+  lines.push(['Total', '', tc, ti, tv, tg, tk, tp, tf, (tv > 0 ? Math.round(tc / tv * 100) : 0) + '%'].map(cell).join(','));
+  const csv = lines.join('\n');
+  const a = document.createElement('a');
+  a.href = 'data:text/csv;charset=utf-8,﻿' + encodeURIComponent(csv);
+  a.download = 'utilidad-por-evento.csv';
+  a.click();
+}
+
+// Próximos eventos: desde EV (index.html), fechas futuras, máx 10, con su dinero
+// agregado de la cobranza ACTIVA (cobrado + # viajeros, casando base y base#idx).
+// Días hasta una fecha futura = fecha − hoy (ambos a mediodía, evita bordes DST).
+function _diasHasta(fechaISO) {
+  if (!fechaISO) return null;
+  const hoy = Date.parse(_cobHoyISO() + 'T12:00:00');
+  const f = Date.parse(String(fechaISO) + 'T12:00:00');
+  if (isNaN(hoy) || isNaN(f)) return null;
+  return Math.round((f - hoy) / 86400000);
+}
+
+// Próximos eventos (Franja 4 del dashboard) CON SALUD: semáforo por evento + %
+// cobrado (de _utilG3Cache, mismo criterio que la tabla utilidad), monto/viajeros
+// de cobranza (sin cambiar), badge "¡pronto!" si <7 días, y fila clickable → Por
+// evento. Lee _utilG3Cache que loadResumen ya cargó (carga compartida y esperada);
+// gris/neutro si no hay datos. No toca _renderResumenUtilidad ni el resto del Resumen.
+function _renderResumenProximos(ev, activos) {
+  const el = document.getElementById('proximos-eventos');
+  if (!el) return;
+  const today = _cobHoyISO();
+  const futuros = (ev || [])
+    .filter(e => e && e.id && e.a && (!e.ds || e.ds >= today))
+    .slice()
+    .sort((a, b) => String(a.ds || '9999').localeCompare(String(b.ds || '9999')))
+    .slice(0, 10);
+
+  if (!futuros.length) {
+    el.innerHTML = '<div class="empty-state"><div class="empty-icon">·</div>Sin eventos próximos</div>';
+    return;
+  }
+
+  const utilEvs = (_utilG3Cache && _utilG3Cache.eventos) || {};
+
+  el.innerHTML = futuros.map(e => {
+    const tours   = (activos || []).filter(t => _cobTourMatchEvento(t, e.id));
+    const cobrado = tours.reduce((a, t) => a + Number((t.pago || {}).abonado || 0), 0);
+    const fecha   = e.f || e.ds || '';
+    const lugar   = e.v ? (' · ' + _spEscape(e.v)) : '';
+    const baseSlug = String(e.id).split('#')[0];
+
+    // Salud (de la cache de utilidad). Gris/neutro si el evento no está en la cache.
+    const u = utilEvs[baseSlug];
+    const sem = u ? _resumenUtilSemaforo(Number(u.caja || 0), Number(u.proyectado || 0)) : 'var(--ts)';
+    const semTitle = u ? 'Salud (caja/proyectado)' : 'Sin movimientos registrados';
+    const pctTxt = (u && Number(u.vendido || 0) > 0)
+      ? `${Math.round(Number(u.cobrado || 0) / Number(u.vendido) * 100)}% cobrado`
+      : '— cobrado';
+
+    // Badge "¡pronto!" si faltan menos de 7 días (y no es pasado).
+    const dias = _diasHasta(e.ds);
+    const pronto = (dias !== null && dias >= 0 && dias < 7)
+      ? ' <span style="font-size:9px;font-weight:800;color:#000;background:var(--orange);border-radius:4px;padding:1px 6px;letter-spacing:.03em">¡PRONTO!</span>'
+      : '';
+
+    return `
+    <div class="dash-click" onclick="_evtIrA('${baseSlug}')" title="Ver en Por evento" style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px solid var(--border)">
+      <div style="display:flex;align-items:center;gap:10px;min-width:0">
+        <span title="${semTitle}" style="display:inline-block;width:11px;height:11px;border-radius:50%;background:${sem};flex-shrink:0"></span>
+        <div style="min-width:0">
+          <div style="font-weight:600;font-size:14px">${_spEscape(e.a)}${pronto}</div>
+          <div style="font-size:11px;color:var(--ts)">${_spEscape(fecha)}${lugar} · ${pctTxt}</div>
+        </div>
+      </div>
+      <div style="text-align:right;white-space:nowrap">
+        <div style="font-size:13px;color:var(--green)">${_spFmtMxn(cobrado)}</div>
+        <div style="font-size:11px;color:var(--ts)">${tours.length} viajero${tours.length === 1 ? '' : 's'}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// Días de atraso = hoy − fecha_esperada (ambos a mediodía para evitar bordes DST,
+// como "próximos"). >=0; nunca negativo (los atrasados ya filtran fecha < hoy).
+function _cobDiasAtraso(fechaISO) {
+  if (!fechaISO) return 0;
+  const hoy = Date.parse(_cobHoyISO() + 'T12:00:00');
+  const f = Date.parse(String(fechaISO) + 'T12:00:00');
+  if (isNaN(hoy) || isNaN(f)) return 0;
+  return Math.max(0, Math.round((hoy - f) / 86400000));
+}
+
+// Atrasados (Franja 3 del dashboard): tours activos con pago vencido. Header de
+// conteo en ámbar (N>0), días de atraso, evento, saldo y WhatsApp. Orden días DESC
+// (más atrasado arriba). Máx 10 + "ver todos en Pagos". Fila clickable → Pagos
+// (el botón WhatsApp hace stopPropagation para no navegar). Reusa la cobranza ya
+// cargada (activos); no re-fetch.
+function _renderResumenAtrasados(activos, cancelados) {
+  const el = document.getElementById('atrasados-lista');
+  if (!el) return;
+  const atr = (activos || []).filter(_cobEsAtrasado)
+    .map(t => ({ t, dias: _cobDiasAtraso(((t.pago || {}).proximo || {}).fecha_esperada) }))
+    .sort((a, b) => b.dias - a.dias);  // más atrasado arriba
+  const nCanc = (cancelados || []).length;
+  const pie = nCanc ? `<div style="margin-top:12px;font-size:11px;color:var(--ts)">${nCanc} tour${nCanc === 1 ? '' : 's'} cancelado${nCanc === 1 ? '' : 's'} (no cuentan en los totales).</div>` : '';
+
+  if (!atr.length) {
+    el.innerHTML = '<div class="empty-state"><div class="empty-icon">✓</div>Nadie atrasado — todos al corriente.</div>' + pie;
+    return;
+  }
+
+  const N = atr.length;
+  const header = `<div style="display:flex;align-items:center;gap:8px;color:var(--orange);font-weight:700;font-size:13px;margin-bottom:8px"><svg class="ic"><use href="#ic-alerta"/></svg> ${N} viajero${N === 1 ? '' : 's'} atrasado${N === 1 ? '' : 's'}</div>`;
+  const LIMITE = 10;
+  const visibles = atr.slice(0, LIMITE);
+
+  const filas = visibles.map(({ t, dias }) => {
+    const c = t.clientes || {};
+    const pago = t.pago || {};
+    const evL = _cobEventoLabel(t);
+    const prox = pago.proximo;
+    const wa = _cobWaHref(t);
+    const waBtn = wa
+      ? `<a class="btn btn-green btn-sm" href="${wa}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="font-size:11px;text-decoration:none">WhatsApp</a>`
+      : `<span style="font-size:11px;color:var(--ts)">${_spEscape(c.celular || 's/tel')}</span>`;
+    const venceTxt = prox ? ('Venció ' + _spEscape(prox.fecha_esperada)) : '';
+    const diasTxt = `${dias} día${dias === 1 ? '' : 's'} de atraso`;
+    return `
+    <div class="dash-click" onclick="showPage('pagos')" title="Gestionar en Pagos" style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px solid var(--border)">
+      <div>
+        <div style="font-weight:600;font-size:14px">${_spEscape(c.nombre_completo || '—')}</div>
+        <div style="font-size:11px"><span style="color:var(--orange);font-weight:700">${diasTxt}</span><span style="color:var(--ts)"> · ${_spEscape(evL.nombre)}${evL.fecha ? ' · ' + _spEscape(evL.fecha) : ''}${venceTxt ? ' · ' + venceTxt : ''}</span></div>
+      </div>
+      <div style="display:flex;align-items:center;gap:12px;white-space:nowrap">
+        <div style="text-align:right">
+          <div style="font-size:13px;color:var(--orange)">${_spFmtMxn(pago.restante)}</div>
+          <div style="font-size:10px;color:var(--ts)">saldo</div>
+        </div>
+        ${waBtn}
+      </div>
+    </div>`;
+  }).join('');
+
+  const verTodos = (N > LIMITE)
+    ? `<div class="dash-click" onclick="showPage('pagos')" style="text-align:center;padding:10px 0;font-size:12px;color:var(--orange);font-weight:700">ver todos (${N}) en Pagos →</div>`
+    : '';
+
+  el.innerHTML = header + filas + verTodos + pie;
+}
+
+// En riesgo de baja (Nivel 3 morosidad): clientes con 3+ quincenas vencidas.
+// Solo visibilidad — clickea al plan; NO da de baja ni manda correos (eso es
+// humano en el modal). Reusa los mismos helpers y molde de fila que atrasados.
+function _renderResumenRiesgoBaja(activos) {
+  const card = document.getElementById('riesgo-baja-card');
+  const el = document.getElementById('riesgo-baja-lista');
+  if (!card || !el) return;
+  const enRiesgo = (activos || [])
+    .filter(t => Number((t.pago || {}).vencidos || 0) >= 3)
+    .sort((a, b) => Number((b.pago||{}).vencidos||0) - Number((a.pago||{}).vencidos||0));
+  if (!enRiesgo.length) { card.style.display = 'none'; el.innerHTML = ''; return; }
+  card.style.display = '';
+  const N = enRiesgo.length;
+  const header = `<div style="display:flex;align-items:center;gap:8px;color:var(--red);font-weight:700;font-size:13px;margin-bottom:8px"><svg class="ic"><use href="#ic-alerta"/></svg> ${N} en riesgo de baja</div>`;
+  const filas = enRiesgo.map(t => {
+    const c = t.clientes || {};
+    const pago = t.pago || {};
+    const nv = Number(pago.vencidos || 0);
+    const evL = _cobEventoLabel(t);
+    const wa = _cobWaHref(t);
+    const waBtn = wa
+      ? `<a class="btn btn-green btn-sm" href="${wa}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="font-size:11px;text-decoration:none">WhatsApp</a>`
+      : `<span style="font-size:11px;color:var(--ts)">${_spEscape(c.celular || 's/tel')}</span>`;
+    return `
+    <div class="dash-click" onclick="abrirPlanCobranza('${_spEscape(t.id)}')" title="Ver plan y decidir" style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px solid var(--border)">
+      <div>
+        <div style="font-weight:600;font-size:14px">${_spEscape(c.nombre_completo || '—')}</div>
+        <div style="font-size:11px"><span style="color:var(--red);font-weight:700">${nv} quincena${nv===1?'':'s'} vencida${nv===1?'':'s'}</span><span style="color:var(--ts)"> · ${_spEscape(evL.nombre)}${evL.fecha ? ' · ' + _spEscape(evL.fecha) : ''}</span></div>
+      </div>
+      <div style="display:flex;align-items:center;gap:12px;white-space:nowrap">
+        <div style="text-align:right">
+          <div style="font-size:13px;color:var(--red)">${_spFmtMxn(pago.restante)}</div>
+          <div style="font-size:10px;color:var(--ts)">saldo</div>
+        </div>
+        ${waBtn}
+      </div>
+    </div>`;
+  }).join('');
+  el.innerHTML = header + filas;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// PAGOS
+// ═══════════════════════════════════════════════════════════════
+// ── PAGOS = CENTRO DE COBRANZA sobre el portal (Fase 3) ───────────────────
+// loadPagos lista los tours activos (solicitudes_tour en_pagos/pagado) vía
+// admin-cobranza-list, con su avance de cobranza. "Registrar pago" reusa el
+// flujo de la 2.3c (cargarPlanPagosSP/marcarPagoSP/revertirPagoSP) en un modal.
+let _cobranzaCache = [];          // todos los tours cargados (activos + cancelados)
+let _cobFiltrados = [];           // última lista filtrada (para CSV)
+let _cobranzaEventoSelectPoblado = false;
+let _cobEVMap = {};               // evento_id (base o base#idx) -> { nombre, fecha }
+let _cobSortKey = 'proximo';      // nombre | evento | resta | proximo
+let _cobSortDir = 'asc';
+
+const _COB_PAQ_BG = { 'PLUS':'rgba(255,183,3,.15)','STAY':'rgba(94,167,255,.15)','RIDE':'rgba(61,220,132,.15)','CHEAP':'rgba(255,107,0,.12)' };
+const _COB_PAQ_FG = { 'PLUS':'var(--gold)','STAY':'var(--blue)','RIDE':'var(--green)','CHEAP':'var(--orange)' };
+
+// Puebla el filtro de Evento desde EV (index.html) y arma _cobEVMap para resolver
+// nombre/fecha por evento_id. Multifecha: una opción por fecha (valor base#idx,
+// ej. "Karol G · 6 Noviembre"); evento normal usa el id base. Corre una sola vez.
+async function _poblarFiltroEventoPagos() {
+  if (_cobranzaEventoSelectPoblado) return;
+  const sel = document.getElementById('filtro-evento-pagos');
+  const ev = await _fetchEVFromIndex();
+  const eventos = (ev || []).filter(e => e && e.id && e.a)
+    .slice().sort((a, b) => String(b.ds || '').localeCompare(String(a.ds || '')));
+  const opciones = [];
+  eventos.forEach(e => {
+    if (Array.isArray(e.multifecha) && e.multifecha.length) {
+      e.multifecha.forEach((mf, i) => {
+        const lbl = (mf && mf.lbl) ? mf.lbl : ('Fecha ' + (i + 1));
+        const id = e.id + '#' + i;
+        _cobEVMap[id] = { nombre: e.a, fecha: lbl };
+        opciones.push({ value: id, label: e.a + ' · ' + lbl });
+      });
+    } else {
+      _cobEVMap[e.id] = { nombre: e.a, fecha: '' };
+      opciones.push({ value: e.id, label: e.a });
+    }
+  });
+  if (sel) {
+    while (sel.options.length > 1) sel.remove(1);
+    opciones.forEach(o => {
+      const opt = document.createElement('option');
+      opt.value = o.value;
+      opt.textContent = o.label;
+      sel.appendChild(opt);
+    });
+  }
+  _cobranzaEventoSelectPoblado = true;
+}
+
+// Carga UNA vez la lista completa (activos por defecto + cancelados) en
+// _cobranzaCache y delega todo el filtrado/orden a _renderCobranza (client-side,
+// instantáneo). El refresh tras marcar un pago vuelve a llamar a loadPagos.
+async function loadPagos() {
+  const tbody = document.getElementById('tabla-pagos');
+  if (!tbody) return;
+  await _poblarFiltroEventoPagos();
+  tbody.innerHTML = '<tr><td colspan="10"><div class="loading-state"><div class="spinner"></div>Cargando…</div></td></tr>';
+
+  try {
+    const hdrs = _spAdminHeaders();
+    const pedir = (estado) => fetch('/.netlify/functions/admin-cobranza-list', {
+      method: 'POST',
+      headers: hdrs,
+      body: JSON.stringify(estado ? { estado } : {}),
+    }).then(r => r.json().then(d => ({ ok: r.ok, d })));
+    const [act, can] = await Promise.all([pedir(null), pedir('cancelado')]);
+    if (!act.ok) throw new Error((act.d && act.d.error) || 'No se pudo cargar la cobranza');
+    const activos    = Array.isArray(act.d.tours) ? act.d.tours : [];
+    const cancelados = (can.ok && Array.isArray(can.d.tours)) ? can.d.tours : [];
+    _cobranzaCache = activos.concat(cancelados);
+    _renderCobranza();
+  } catch (e) {
+    _cobranzaCache = [];
+    _cobFiltrados = [];
+    ['pagos-cnt-viajeros','pagos-cnt-atrasados','pagos-ingresado','pagos-porcobrar']
+      .forEach(id => { const el = document.getElementById(id); if (el) el.textContent = '—'; });
+    tbody.innerHTML = `<tr><td colspan="10"><div class="alert alert-error">${_spEscape(e.message)}</div></td></tr>`;
+  }
+}
+
+function _cobHoyISO() {
+  // Hoy en hora MX (America/Monterrey), formato YYYY-MM-DD.
+  // NO usar toISOString(): es UTC y cerca de medianoche MX marca atrasados
+  // un día antes (MX = UTC-6). Patrón consistente con _kamToday() y demás.
+  return new Date().toLocaleDateString('en-CA', { timeZone: 'America/Monterrey' });
+}
+
+// Atrasado: tiene un próximo pago pendiente con fecha_esperada anterior a hoy.
+// Cancelado/liquidado nunca cuenta como atrasado.
+function _cobEsAtrasado(t) {
+  if (!t || t.estado === 'cancelado') return false;
+  const p = (t.pago || {}).proximo;
+  return !!(p && p.fecha_esperada && String(p.fecha_esperada) < _cobHoyISO());
+}
+
+// Nombre del evento + fecha (solo si es multifecha y la fecha no está ya en el nombre).
+function _cobEventoLabel(t) {
+  const nombre = t.evento_nombre || t.evento_id || '—';
+  const map = _cobEVMap[t.evento_id];
+  if (map && map.fecha && !String(nombre).toLowerCase().includes(String(map.fecha).toLowerCase())) {
+    return { nombre, fecha: map.fecha };
+  }
+  return { nombre, fecha: '' };
+}
+
+function _cobDigits(s) { return String(s || '').replace(/\D/g, ''); }
+
+// Enlace WhatsApp al cliente con recordatorio prellenado. Devuelve null si el
+// celular no resuelve a 10 dígitos (entonces se muestra sin enlace).
+function _cobWaHref(t) {
+  const c = t.clientes || {};
+  let d = _cobDigits(c.celular);
+  if (d.length === 13 && d.startsWith('521')) d = d.slice(3);
+  else if (d.length === 12 && d.startsWith('52')) d = d.slice(2);
+  if (d.length !== 10) return null;
+  const primer = (String(c.nombre_completo || '').trim().split(/\s+/)[0]) || 'viajero';
+  const prox = (t.pago || {}).proximo;
+  const evN = t.evento_nombre || 'tu tour';
+  let msg;
+  if (prox) {
+    msg = 'Hola ' + primer + ', te recordamos tu pago de Conecta Reynosa para ' + evN +
+          '. Tu próximo pago es de ' + _spFmtMxn(prox.monto) + ' antes del ' + prox.fecha_esperada +
+          '. Cuando lo realices, mándanos tu comprobante. ¡Gracias!';
+  } else {
+    msg = 'Hola ' + primer + ', te saludamos de Conecta Reynosa. ¡Gracias por viajar con nosotros!';
+  }
+  return 'https://wa.me/52' + d + '?text=' + encodeURIComponent(msg);
+}
+
+// Aplica búsqueda/filtros/orden sobre _cobranzaCache (sin re-fetch) y pinta tabla,
+// contadores y flechas de orden.
+function _renderCobranza() {
+  const tbody = document.getElementById('tabla-pagos');
+  if (!tbody) return;
+  const evId   = (document.getElementById('filtro-evento-pagos') || {}).value || '';
+  const estado = (document.getElementById('filtro-status-pagos') || {}).value || '';
+  const q      = ((document.getElementById('filtro-nombre-pagos') || {}).value || '').trim().toLowerCase();
+  const soloAtr = !!(document.getElementById('filtro-atrasados-pagos') || {}).checked;
+
+  let lista = (_cobranzaCache || []).slice();
+
+  if (estado) lista = lista.filter(t => t.estado === estado);
+
+  if (evId) {
+    if (evId.indexOf('#') >= 0) lista = lista.filter(t => t.evento_id === evId);
+    else lista = lista.filter(t => t.evento_id === evId || (typeof t.evento_id === 'string' && t.evento_id.startsWith(evId + '#')));
+  }
+
+  if (q) {
+    lista = lista.filter(t => {
+      const c = t.clientes || {};
+      const hay = [c.nombre_completo, t.evento_nombre, t.zona, c.celular]
+        .map(x => String(x || '').toLowerCase()).join(' ');
+      return hay.indexOf(q) >= 0;
+    });
+  }
+
+  if (soloAtr) lista = lista.filter(_cobEsAtrasado);
+
+  const dir = _cobSortDir === 'desc' ? -1 : 1;
+  lista.sort((a, b) => {
+    if (_cobSortKey === 'nombre') {
+      return String((a.clientes||{}).nombre_completo||'').localeCompare(String((b.clientes||{}).nombre_completo||''), 'es', { sensitivity:'base' }) * dir;
+    }
+    if (_cobSortKey === 'evento') {
+      return String(a.evento_nombre||'').localeCompare(String(b.evento_nombre||''), 'es', { sensitivity:'base' }) * dir;
+    }
+    if (_cobSortKey === 'resta') {
+      return (Number((a.pago||{}).restante||0) - Number((b.pago||{}).restante||0)) * dir;
+    }
+    const fa = ((a.pago||{}).proximo && a.pago.proximo.fecha_esperada) || '9999-12-31';
+    const fb = ((b.pago||{}).proximo && b.pago.proximo.fecha_esperada) || '9999-12-31';
+    if (fa === fb) return 0;
+    return (fa < fb ? -1 : 1) * dir;
+  });
+
+  _cobFiltrados = lista;
+
+  // Contadores de la lista filtrada.
+  const nAtr = lista.filter(_cobEsAtrasado).length;
+  const ingresado = lista.reduce((a, t) => a + Number((t.pago||{}).abonado||0), 0);
+  const porCobrar = lista.reduce((a, t) => a + Number((t.pago||{}).restante||0), 0);
+  const setTxt = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+  setTxt('pagos-cnt-viajeros', String(lista.length));
+  setTxt('pagos-cnt-atrasados', String(nAtr));
+  setTxt('pagos-ingresado', _spFmtMxn(ingresado));
+  setTxt('pagos-porcobrar', _spFmtMxn(porCobrar));
+
+  // Flechas de orden.
+  document.querySelectorAll('.cob-arrow').forEach(s => { s.textContent = ''; });
+  const arr = document.querySelector('.cob-arrow[data-k="' + _cobSortKey + '"]');
+  if (arr) arr.textContent = _cobSortDir === 'asc' ? '▲' : '▼';
+
+  if (!lista.length) {
+    tbody.innerHTML = '<tr><td colspan="10"><div class="empty-state"><div class="empty-icon">·</div>Sin tours que coincidan con los filtros</div></td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = lista.map(t => {
+    const c = t.clientes || {};
+    const pago = t.pago || {};
+    const paq = t.paquete || '';
+    const prox = pago.proximo;
+    const atr = _cobEsAtrasado(t);
+    const evL = _cobEventoLabel(t);
+    const wa = _cobWaHref(t);
+    const telTxt = _spEscape(c.celular || '—');
+    const telCell = wa
+      ? `<a href="${wa}" target="_blank" rel="noopener" style="color:var(--green);text-decoration:none;white-space:nowrap" title="Enviar recordatorio por WhatsApp">${telTxt} ↗</a>`
+      : `<span style="color:var(--ts)">${telTxt}</span>`;
+    const proxCell = prox
+      ? `<div style="white-space:nowrap"><b>${_spFmtMxn(prox.monto)}</b></div><div style="font-size:11px;color:${atr?'var(--red)':'var(--ts)'}">${_spEscape(prox.fecha_esperada)}</div>`
+      : '<span style="color:var(--ts)">—</span>';
+    const rowCls = atr ? 'cob-atrasado' : (t.estado === 'pagado' ? 'cob-pagado' : '');
+    return `<tr class="${rowCls}">
+      <td><div style="font-weight:600">${_spEscape(c.nombre_completo || '—')}</div><div style="margin-top:3px">${_badgeCliente(c)}</div></td>
+      <td style="font-size:12px">${telCell}</td>
+      <td style="font-size:12px">${_spEscape(evL.nombre)}${evL.fecha?`<br><span style="color:var(--ts);font-size:11px">${_spEscape(evL.fecha)}</span>`:''}</td>
+      <td style="font-size:12px">${_spEscape(t.zona || '—')}</td>
+      <td>${paq ? `<span style="font-size:10px;font-weight:700;padding:2px 10px;border-radius:4px;background:${_COB_PAQ_BG[paq]||'rgba(255,255,255,.06)'};color:${_COB_PAQ_FG[paq]||'var(--ts)'}">${_spEscape(paq)}</span>` : '—'}</td>
+      <td>${proxCell}</td>
+      <td style="color:var(--green)">${_spFmtMxn(pago.abonado)}</td>
+      <td style="color:${(pago.restante||0) > 0 ? 'var(--orange)' : 'var(--green)'}">${_spFmtMxn(pago.restante)}</td>
+      <td style="white-space:nowrap">${_spBadgeEstado(t.estado)}${atr?'<span class="cob-badge-atraso">Atrasado</span>':''}</td>
+      <td><button class="btn btn-primary btn-sm" style="font-size:11px" onclick="abrirPlanCobranza('${_spEscape(t.id)}')">Registrar pago</button></td>
+    </tr>`;
+  }).join('');
+}
+
+// Cambia la columna/dirección de orden y re-pinta. Texto asc por defecto;
+// montos/saldo arrancan desc (lo más grande primero); próximo pago asc (lo más cercano).
+function _cobSort(key) {
+  if (_cobSortKey === key) {
+    _cobSortDir = (_cobSortDir === 'asc') ? 'desc' : 'asc';
+  } else {
+    _cobSortKey = key;
+    _cobSortDir = (key === 'resta') ? 'desc' : 'asc';
+  }
+  _renderCobranza();
+}
+
+function _cobCsvCell(v) {
+  const s = String(v == null ? '' : v);
+  return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+}
+
+// Exporta la lista FILTRADA actual a CSV (mismas columnas que la tabla).
+function _cobExportCSV() {
+  const rows = _cobFiltrados || [];
+  if (!rows.length) { showToast('No hay filas que exportar', 'error'); return; }
+  const head = ['Viajero','Telefono','Evento','Fecha','Zona','Paquete','Proximo_monto','Proximo_fecha','Abonado','Resta','Estado','Atrasado'];
+  const lines = [head.join(',')];
+  rows.forEach(t => {
+    const c = t.clientes || {};
+    const pago = t.pago || {};
+    const prox = pago.proximo;
+    const evL = _cobEventoLabel(t);
+    lines.push([
+      _cobCsvCell(c.nombre_completo || ''),
+      _cobCsvCell(c.celular || ''),
+      _cobCsvCell(evL.nombre),
+      _cobCsvCell(evL.fecha),
+      _cobCsvCell(t.zona || ''),
+      _cobCsvCell(t.paquete || ''),
+      _cobCsvCell(prox ? prox.monto : ''),
+      _cobCsvCell(prox ? prox.fecha_esperada : ''),
+      _cobCsvCell(pago.abonado || 0),
+      _cobCsvCell(pago.restante || 0),
+      _cobCsvCell(t.estado || ''),
+      _cobCsvCell(_cobEsAtrasado(t) ? 'Si' : 'No'),
+    ].join(','));
+  });
+  const csv = '﻿' + lines.join('\r\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'cobranza.csv';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+// Abre el plan de una solicitud en un modal, reusando el render de la 2.3c.
+// El render apunta a #sp-plan-<id>; marcarPagoSP/revertirPagoSP refrescan ese
+// div y, al detectar este modal abierto, también loadPagos() (ver _spRefrescarPlanYLista).
+function abrirPlanCobranza(solicitudId) {
+  const t = (_cobranzaCache || []).find(x => x.id === solicitudId)
+    || ((_cobTodoCache ? _cobTodoCache.activos.concat(_cobTodoCache.cancelados) : []).find(x => x.id === solicitudId));
+  const c = (t && t.clientes) || {};
+  const eventoNombre = (t && t.evento_nombre) || '';
+  const contenido = `
+    <div style="font-size:12px;color:var(--ts);margin-bottom:12px">Viajero <b style="color:var(--ink)">${_spEscape(c.nombre_completo || '—')}</b> · ${_spEscape(eventoNombre)}</div>
+    <div id="sp-plan-${_spEscape(solicitudId)}" style="font-size:13px;color:var(--ts)">Cargando plan…</div>`;
+  crearModal('cobranza-plan', 'Plan de pagos · ' + eventoNombre, contenido);
+  const m = document.getElementById('modal-cobranza-plan');
+  if (m) { const inner = m.querySelector('.modal'); if (inner) inner.style.maxWidth = '640px'; }
+  cargarPlanPagosSP(solicitudId, t ? t.estado : 'en_pagos', t ? t.paquete : undefined);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// POR EVENTO — Análisis financiero por evento (Fase 4, sobre el portal)
+// ═══════════════════════════════════════════════════════════════
+let _evtSelectorPoblado = false;
+
+// Puebla #selector-evento desde EV (index.html), con multifecha por separado
+// (base#idx), igual que el filtro de la Fase 3.1. Corre una sola vez.
+// Click-through → "Por evento": el click guarda el slug pendiente y navega; el
+// auto-select se aplica cuando el selector ya está poblado (sin setTimeout).
+let _evtPendingSelect = null;
+function _evtIrA(slug) { _evtPendingSelect = slug || null; showPage('eventos'); }
+function _evtAplicarPendiente() {
+  if (!_evtPendingSelect) return;
+  const sel = document.getElementById('selector-evento');
+  if (!sel) return;
+  const base = String(_evtPendingSelect);
+  _evtPendingSelect = null;
+  let match = '';
+  for (let i = 0; i < sel.options.length; i++) {
+    const v = sel.options[i].value;
+    if (v && (v === base || v.split('#')[0] === base)) { match = v; break; }
+  }
+  if (match) { sel.value = match; sel.dispatchEvent(new Event('change')); }
+}
+
+async function _evtPoblarSelector() {
+  if (_evtSelectorPoblado) { _evtAplicarPendiente(); return; }
+  const sel = document.getElementById('selector-evento');
+  if (!sel) return;
+  const ev = await _fetchEVFromIndex();
+  const eventos = (ev || []).filter(e => e && e.id && e.a)
+    .slice().sort((a, b) => String(b.ds || '').localeCompare(String(a.ds || '')));
+  while (sel.options.length > 1) sel.remove(1);
+  eventos.forEach(e => {
+    if (Array.isArray(e.multifecha) && e.multifecha.length) {
+      e.multifecha.forEach((mf, i) => {
+        const lbl = (mf && mf.lbl) ? mf.lbl : ('Fecha ' + (i + 1));
+        const opt = document.createElement('option');
+        opt.value = e.id + '#' + i;
+        opt.textContent = e.a + ' · ' + lbl;
+        sel.appendChild(opt);
+      });
+    } else {
+      const opt = document.createElement('option');
+      opt.value = e.id;
+      opt.textContent = e.a;
+      sel.appendChild(opt);
+    }
+  });
+  _evtSelectorPoblado = true;
+  _evtAplicarPendiente();
+}
+
+// Carga los tours ACTIVOS del evento elegido (filtra la cache de cobranza) y pinta.
+async function loadPorEvento() {
+  const evId = document.getElementById('selector-evento').value;
+  const tbody = document.getElementById('tabla-viajeros');
+  const stats = document.getElementById('evt-stats');
+  const desg  = document.getElementById('evt-desglose');
+  if (!tbody) return;
+
+  if (!evId) {
+    _evtTours = []; _evtFiltrados = [];
+    if (stats) stats.style.display = 'none';
+    if (desg)  desg.style.display = 'none';
+    const cajaStats = document.getElementById('evt-caja-stats');
+    const cajaEmp   = document.getElementById('evt-caja-empresa');
+    if (cajaStats) cajaStats.style.display = 'none';
+    if (cajaEmp)   cajaEmp.style.display = 'none';
+    tbody.innerHTML = '<tr><td colspan="8"><div class="empty-state"><div class="empty-icon">·</div>Selecciona un evento para ver los viajeros</div></td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = '<tr><td colspan="8"><div class="loading-state"><div class="spinner"></div>Cargando…</div></td></tr>';
+  try {
+    const { activos } = await _cobCargarTodo();
+    // Gastos (para _renderPorEvento) + utilidad por evento, en paralelo. Best-effort.
+    await Promise.all([_cobCargarGastos(), _utilCargar()]);
+    _evtTours = (activos || []).filter(t => _cobTourMatchEvento(t, evId));
+    _renderPorEvento();
+  } catch (e) {
+    if (stats) stats.style.display = 'none';
+    if (desg)  desg.style.display = 'none';
+    tbody.innerHTML = `<tr><td colspan="8"><div class="alert alert-error">${_spEscape(e.message)}</div></td></tr>`;
+  }
+}
+
+// Pinta resumen financiero (sobre TODO el evento), desglose por paquete/zona y la
+// tabla (sujeta a los filtros de paquete y saldo). _evtTours = tours del evento.
+function _renderPorEvento() {
+  const tbody = document.getElementById('tabla-viajeros');
+  const stats = document.getElementById('evt-stats');
+  const desg  = document.getElementById('evt-desglose');
+  if (!tbody) return;
+  const tours = _evtTours || [];
+
+  // Resumen financiero del evento (no depende de los filtros de la tabla).
+  const vendido   = tours.reduce((a, t) => a + Number((t.pago || {}).total    || 0), 0);
+  const cobrado   = tours.reduce((a, t) => a + Number((t.pago || {}).abonado  || 0), 0);
+  const porCobrar = tours.reduce((a, t) => a + Number((t.pago || {}).restante || 0), 0);
+  const atrasados = tours.filter(_cobEsAtrasado).length;
+  const setTxt = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+  setTxt('evt-vendido',   _spFmtMxn(vendido));
+  setTxt('evt-cobrado',   _spFmtMxn(cobrado));
+  setTxt('evt-porcobrar', _spFmtMxn(porCobrar));
+  setTxt('evt-viajeros',  String(tours.length));
+  setTxt('evt-atrasados', String(atrasados));
+
+  // Gastos + Utilidad del evento (G2). Match por BASE del evento_id (cuenta aunque el
+  // evento sea multifecha). Los "General" (evento_id null) NO se incluyen aquí. Usa la
+  // lista ya cacheada por _cobCargarGastos — sin llamada extra por evento.
+  const evIdSel = (document.getElementById('selector-evento') || {}).value || '';
+  const evBase  = evIdSel.split('#')[0];
+  const gastosLista = (_gastosG2Cache && _gastosG2Cache.lista) || [];
+  const gastosEvt = evBase
+    ? gastosLista.reduce((a, g) => {
+        const gBase = String(g.evento_id || '').split('#')[0];
+        return (g.evento_id && gBase === evBase) ? a + Number(g.monto || 0) : a;
+      }, 0)
+    : 0;
+  setTxt('evt-gastos', _spFmtMxn(gastosEvt));
+  const evtUtil = vendido - gastosEvt;
+  setTxt('evt-utilidad', _spFmtMxn(evtUtil));
+  const elEvtUtil = document.getElementById('evt-utilidad');
+  if (elEvtUtil) elEvtUtil.className = 'cob-stat-val ' + (evtUtil >= 0 ? 'green' : 'red');
+
+  // Capa 3: Caja / Proyectado / Falta del evento + caja total empresa (admin-utilidad-evento).
+  // Bloque aditivo, con visibilidad propia (independiente de tours.length).
+  _renderUtilidadEvento(evBase);
+
+  if (stats) stats.style.display = tours.length ? '' : 'none';
+  if (desg)  desg.style.display  = tours.length ? '' : 'none';
+
+  // Desglose por paquete (# viajeros + cobrado) y por zona (# viajeros).
+  const porPaq = {};
+  const porZona = {};
+  tours.forEach(t => {
+    const paq = t.paquete || '—';
+    porPaq[paq] = porPaq[paq] || { n: 0, cobrado: 0 };
+    porPaq[paq].n++;
+    porPaq[paq].cobrado += Number((t.pago || {}).abonado || 0);
+    const z = t.zona || '—';
+    porZona[z] = (porZona[z] || 0) + 1;
+  });
+  const elPaq = document.getElementById('evt-por-paquete');
+  if (elPaq) {
+    const orden = ['PLUS', 'STAY', 'RIDE', 'CHEAP'];
+    const claves = Object.keys(porPaq).sort((a, b) => {
+      const ia = orden.indexOf(a), ib = orden.indexOf(b);
+      return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib);
+    });
+    elPaq.innerHTML = claves.map(k => {
+      const bg = _COB_PAQ_BG[k] || 'rgba(255,255,255,.06)';
+      const fg = _COB_PAQ_FG[k] || 'var(--ts)';
+      return `<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:6px 0;border-bottom:1px solid var(--border)">
+        <span style="font-size:11px;font-weight:700;padding:2px 10px;border-radius:4px;background:${bg};color:${fg}">${_spEscape(k)}</span>
+        <span style="font-size:12px;color:var(--ts)">${porPaq[k].n} viaj. · <span style="color:var(--green)">${_spFmtMxn(porPaq[k].cobrado)}</span></span>
+      </div>`;
+    }).join('') || '<div style="font-size:12px;color:var(--ts)">—</div>';
+  }
+  const elZona = document.getElementById('evt-por-zona');
+  if (elZona) {
+    const claves = Object.keys(porZona).sort((a, b) => porZona[b] - porZona[a]);
+    elZona.innerHTML = claves.map(z =>
+      `<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:6px 0;border-bottom:1px solid var(--border)">
+        <span style="font-size:12px">${_spEscape(z)}</span>
+        <span style="font-size:12px;color:var(--ts)">${porZona[z]} viaj.</span>
+      </div>`
+    ).join('') || '<div style="font-size:12px;color:var(--ts)">—</div>';
+  }
+
+  // Tabla (con filtros de paquete y saldo).
+  const paquete = document.getElementById('filtro-paquete').value;
+  const saldo   = document.getElementById('filtro-saldo').value;
+  let rows = tours.slice();
+  if (paquete) rows = rows.filter(t => t.paquete === paquete);
+  if (saldo === 'pendiente') rows = rows.filter(t => Number((t.pago || {}).restante || 0) > 0);
+  if (saldo === 'liquidado') rows = rows.filter(t => Number((t.pago || {}).restante || 0) <= 0);
+  _evtFiltrados = rows;
+
+  if (!rows.length) {
+    tbody.innerHTML = '<tr><td colspan="8"><div class="empty-state"><div class="empty-icon">·</div>Sin viajeros con esos filtros</div></td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = rows.map(t => {
+    const c = t.clientes || {};
+    const pago = t.pago || {};
+    const paq = t.paquete || '';
+    const atr = _cobEsAtrasado(t);
+    const wa = _cobWaHref(t);
+    const waCell = wa
+      ? `<a class="btn btn-green btn-sm" href="${wa}" target="_blank" rel="noopener" style="font-size:11px;text-decoration:none">WhatsApp</a>`
+      : `<span style="font-size:11px;color:var(--ts)">${_spEscape(c.celular || '—')}</span>`;
+    const rowCls = atr ? 'cob-atrasado' : (t.estado === 'pagado' ? 'cob-pagado' : '');
+    return `<tr class="${rowCls}">
+      <td><div style="font-weight:600;font-size:13px">${_spEscape(c.nombre_completo || '—')}</div><div style="font-size:10px;color:var(--ts)">${_spEscape(c.correo || '')}</div></td>
+      <td>${paq ? `<span style="font-size:10px;font-weight:700;padding:2px 10px;border-radius:4px;background:${_COB_PAQ_BG[paq]||'rgba(255,255,255,.06)'};color:${_COB_PAQ_FG[paq]||'var(--ts)'}">${_spEscape(paq)}</span>` : '—'}</td>
+      <td style="font-size:12px">${_spEscape(t.zona || '—')}</td>
+      <td style="font-weight:600">${_spFmtMxn(pago.total)}</td>
+      <td style="color:var(--green)">${_spFmtMxn(pago.abonado)}</td>
+      <td style="color:${(pago.restante||0) > 0 ? 'var(--orange)' : 'var(--green)'}">${_spFmtMxn(pago.restante)}</td>
+      <td style="white-space:nowrap">${_spBadgeEstado(t.estado)}${atr ? '<span class="cob-badge-atraso">Atrasado</span>' : ''}</td>
+      <td>${waCell}</td>
+    </tr>`;
+  }).join('');
+}
+
+// Exporta la tabla filtrada del evento reusando _cobExportCSV (mismo shape de tour).
+function _evtExportCSV() {
+  _cobFiltrados = _evtFiltrados || [];
+  _cobExportCSV();
+}
+
+// ═══════════════════════════════════════════════════════════════
+// GASTOS — reconstruido sobre el PORTAL (G1)
+// Tabla public.gastos del portal, ligada a eventos del EV (igual que ingresos).
+// Todo pasa por funciones admin con service_role; el cliente NO accede.
+// ═══════════════════════════════════════════════════════════════
+let _gastosSelectsPoblado = false;
+let _gastosEVMap = {};   // evento_id (base o base#idx) -> { nombre, fecha }
+let _gastosListCache = [];   // últimos gastos pintados (para editarGasto)
+let _gastoEditId = null;     // id del gasto en edición; null = modo crear
+
+// Puebla filtro-evento-gastos y gasto-evento desde EV (con multifecha), igual que
+// Pagos/Por Evento. Conserva la primera opción de cada select (Todos / General) y
+// llena _gastosEVMap para resolver el nombre del evento en la tabla.
+async function _poblarSelectsGastos() {
+  if (_gastosSelectsPoblado) return;
+  const ev = await _fetchEVFromIndex();
+  const eventos = (ev || []).filter(e => e && e.id && e.a)
+    .slice().sort((a, b) => String(b.ds || '').localeCompare(String(a.ds || '')));
+  const opciones = [];
+  eventos.forEach(e => {
+    if (Array.isArray(e.multifecha) && e.multifecha.length) {
+      e.multifecha.forEach((mf, i) => {
+        const lbl = (mf && mf.lbl) ? mf.lbl : ('Fecha ' + (i + 1));
+        const id = e.id + '#' + i;
+        _gastosEVMap[id] = { nombre: e.a, fecha: lbl };
+        opciones.push({ value: id, label: e.a + ' · ' + lbl });
+      });
+    } else {
+      _gastosEVMap[e.id] = { nombre: e.a, fecha: '' };
+      opciones.push({ value: e.id, label: e.a });
+    }
+  });
+  ['filtro-evento-gastos', 'gasto-evento'].forEach(selId => {
+    const sel = document.getElementById(selId);
+    if (!sel) return;
+    while (sel.options.length > 1) sel.remove(1);   // conserva la 1ª opción (Todos / General)
+    opciones.forEach(o => {
+      const opt = document.createElement('option');
+      opt.value = o.value;
+      opt.textContent = o.label;
+      sel.appendChild(opt);
+    });
+  });
+  _gastosSelectsPoblado = true;
+}
+
+// Nombre del evento para la tabla, resuelto desde EV. evento_id vacío = General.
+function _gastoEventoLabel(eventoId) {
+  if (!eventoId) return 'General';
+  const map = _gastosEVMap[eventoId];
+  if (!map) return eventoId;
+  return map.fecha ? (map.nombre + ' · ' + map.fecha) : map.nombre;
+}
+
+async function loadGastos() {
+ const tbody = document.getElementById('tabla-gastos');
+ if (!tbody) return;
+ await _poblarSelectsGastos();
+ tbody.innerHTML = '<tr><td colspan="8"><div class="loading-state"><div class="spinner"></div>Cargando…</div></td></tr>';
+
+ const evId = document.getElementById('filtro-evento-gastos').value;
+ const cat = document.getElementById('filtro-cat-gastos').value;
+
+ try {
+ const r = await fetch('/.netlify/functions/admin-gastos-list', {
+ method: 'POST',
+ headers: _spAdminHeaders(),
+ body: JSON.stringify({ evento_id: evId || undefined, categoria: cat || undefined }),
+ });
+ const d = await r.json();
+ if (!r.ok) throw new Error(d.error || 'No se pudieron cargar los gastos');
+ const gastos = Array.isArray(d.gastos) ? d.gastos : [];
+ _gastosListCache = gastos;   // para que editarGasto pre-llene desde memoria
+
+ document.getElementById('g-total').textContent = _spFmtMxn(d.total || 0);
+ document.getElementById('g-mes').textContent = _spFmtMxn(d.total_mes || 0);
+
+ if (!gastos.length) {
+ tbody.innerHTML = '<tr><td colspan="8"><div class="empty-state"><div class="empty-icon"></div>Sin gastos registrados</div></td></tr>';
+ return;
+ }
+
+ tbody.innerHTML = gastos.map(g => `<tr>
+ <td style="font-size:12px">${fmtFecha(g.fecha)}</td>
+ <td style="font-weight:600">${_spEscape(g.concepto)}</td>
+ <td><span class="badge badge-gray">${_spEscape(g.categoria||'—')}</span></td>
+ <td style="font-size:12px;color:var(--ts)">${_spEscape(_gastoEventoLabel(g.evento_id))}</td>
+ <td style="color:var(--red);font-weight:600">${_spFmtMxn(g.monto)}</td>
+ <td>${g.cuenta ? `<span class="badge badge-gray">${_spEscape(g.cuenta)}</span>` : '<span style="font-size:12px;color:var(--ts)">—</span>'}</td>
+ <td style="font-size:12px">${_spEscape(g.metodo_pago||'—')}</td>
+ <td style="white-space:nowrap">
+ <button class="btn btn-ghost btn-sm" onclick="editarGasto('${g.id}')"><svg class="ic"><use href="#ic-lapiz"/></svg> Editar</button>
+ <button class="btn btn-red btn-sm" onclick="eliminarGasto('${g.id}')"></button>
+ </td>
+ </tr>`).join('');
+ } catch(e) {
+ tbody.innerHTML = `<tr><td colspan="8"><div class="alert alert-error">${_spEscape(e.message)}</div></td></tr>`;
+ }
+}
+
+// Abre el modal en modo CREAR: limpia el id de edición, vacía el form y restablece
+// los textos del modal. Lo dispara el botón "+ Registrar Gasto".
+function nuevoGasto() {
+ _gastoEditId = null;
+ ['gasto-concepto', 'gasto-monto', 'gasto-fecha', 'gasto-notas'].forEach(id => {
+   const el = document.getElementById(id); if (el) el.value = '';
+ });
+ ['gasto-categoria', 'gasto-metodo', 'gasto-cuenta'].forEach(id => {
+   const el = document.getElementById(id); if (el) el.selectedIndex = 0;
+ });
+ // Método por default (Transferencia) con Banco (BBVA) visible.
+ _gastoOnMetodoChange();
+ const ev = document.getElementById('gasto-evento'); if (ev) ev.value = '';
+ const tit = document.getElementById('gasto-modal-title'); if (tit) tit.textContent = 'Registrar Gasto';
+ const btn = document.getElementById('gasto-save-btn');   if (btn) btn.textContent = 'Guardar Gasto';
+ openModal('modal-gasto');
+}
+
+// Muestra/oculta el selector de Banco según el método (igual que pagos): Transferencia
+// y Depósito lo muestran (el dinero entra a un banco); Efectivo lo oculta (cuenta = 'Efectivo').
+function _gastoOnMetodoChange() {
+ const metodo = (document.getElementById('gasto-metodo') || {}).value || '';
+ const wrap = document.getElementById('gasto-banco-wrap');
+ if (wrap) wrap.style.display = (metodo === 'Efectivo') ? 'none' : '';
+}
+
+// Abre el modal en modo EDICIÓN, pre-llenado con el gasto (desde _gastosListCache).
+// Guarda el id en _gastoEditId para que guardarGasto haga UPDATE en vez de INSERT.
+async function editarGasto(id) {
+ await _poblarSelectsGastos();   // garantiza que gasto-evento tenga las opciones
+ const g = (_gastosListCache || []).find(x => String(x.id) === String(id));
+ if (!g) { alert('No se encontró el gasto a editar'); return; }
+ _gastoEditId = id;
+ const set = (elId, v) => { const el = document.getElementById(elId); if (el) el.value = (v == null ? '' : v); };
+ set('gasto-concepto', g.concepto);
+ set('gasto-monto',    g.monto);
+ set('gasto-fecha',    g.fecha);
+ set('gasto-categoria', g.categoria);
+ // Método: solo los 3 válidos; si la cuenta fue 'Efectivo', el método queda en Efectivo.
+ const _metodosGasto = ['Transferencia', 'Depósito', 'Efectivo'];
+ let _metodoSel = _metodosGasto.includes(g.metodo_pago) ? g.metodo_pago : 'Transferencia';
+ if (g.cuenta === 'Efectivo') _metodoSel = 'Efectivo';
+ set('gasto-metodo', _metodoSel);
+ // Banco: pre-selecciona BBVA/Banamex si así estaba; si no, default (BBVA).
+ if (g.cuenta === 'BBVA' || g.cuenta === 'Banamex') set('gasto-cuenta', g.cuenta);
+ else document.getElementById('gasto-cuenta').selectedIndex = 0;
+ _gastoOnMetodoChange();  // muestra/oculta el Banco según el método elegido
+ set('gasto-evento',   g.evento_id || '');
+ set('gasto-notas',    g.notas);
+ const tit = document.getElementById('gasto-modal-title'); if (tit) tit.textContent = 'Editar Gasto';
+ const btn = document.getElementById('gasto-save-btn');   if (btn) btn.textContent = 'Guardar Cambios';
+ openModal('modal-gasto');
+}
+
+async function guardarGasto() {
+ const concepto = document.getElementById('gasto-concepto').value.trim();
+ const monto = parseFloat(document.getElementById('gasto-monto').value);
+ const fecha = document.getElementById('gasto-fecha').value;
+ const categoria = document.getElementById('gasto-categoria').value;
+ const evId = document.getElementById('gasto-evento').value;
+ const metodo = document.getElementById('gasto-metodo').value;
+ // Cuenta = a dónde entró el dinero: Efectivo → 'Efectivo'; si no, el Banco elegido.
+ const banco = document.getElementById('gasto-cuenta').value;
+ const cuenta = (metodo === 'Efectivo') ? 'Efectivo' : banco;
+ const notas = document.getElementById('gasto-notas').value;
+ const alerta = document.getElementById('gasto-alert');
+
+ if (!concepto || !(monto >= 0) || !fecha) {
+ alerta.innerHTML = '<div class="alert alert-error">Concepto, monto y fecha son obligatorios</div>';
+ return;
+ }
+
+ const editando = !!_gastoEditId;
+ const url = editando ? '/.netlify/functions/admin-gasto-editar' : '/.netlify/functions/admin-gasto-crear';
+ const payload = {
+ concepto, monto, fecha, categoria, metodo_pago: metodo,
+ cuenta: cuenta || undefined,
+ evento_id: evId || undefined, notas: notas || undefined
+ };
+ if (editando) payload.id = _gastoEditId;
+
+ try {
+ const r = await fetch(url, {
+ method: 'POST',
+ headers: _spAdminHeaders(),
+ body: JSON.stringify(payload),
+ });
+ const d = await r.json();
+ if (!r.ok) throw new Error(d.error || (editando ? 'No se pudo actualizar el gasto' : 'No se pudo registrar el gasto'));
+ alerta.innerHTML = `<div class="alert alert-success">${editando ? 'Gasto actualizado' : 'Gasto registrado'}</div>`;
+ _gastoEditId = null;
+ setTimeout(() => { closeModal('modal-gasto'); loadGastos(); }, 1000);
+ } catch(e) {
+ alerta.innerHTML = `<div class="alert alert-error">${_spEscape(e.message)}</div>`;
+ }
+}
+
+async function eliminarGasto(id) {
+ if (!confirm('¿Eliminar este gasto?')) return;
+ try {
+ const r = await fetch('/.netlify/functions/admin-gasto-eliminar', {
+ method: 'POST',
+ headers: _spAdminHeaders(),
+ body: JSON.stringify({ id }),
+ });
+ const d = await r.json();
+ if (!r.ok) throw new Error(d.error || 'No se pudo eliminar el gasto');
+ loadGastos();
+ } catch(e) { alert(e.message); }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// INGRESOS (S2 — entradas sueltas; clon del módulo Gastos)
+// ═══════════════════════════════════════════════════════════════
+let _ingresosSelectsPoblado = false;
+let _ingresosEVMap = {};       // evento_id (base o base#idx) -> { nombre, fecha }
+let _ingresosClientesMap = {}; // cliente_id (uuid) -> { nombre, celular }
+let _ingresosListCache = [];   // últimos ingresos pintados (para editarIngreso)
+let _ingresoEditId = null;     // id del ingreso en edición; null = modo crear
+
+// Puebla los selects de evento (filtro + modal) desde EV y el select de cliente
+// desde admin-clientes-min; llena los mapas para resolver nombres en la tabla.
+async function _poblarSelectsIngresos() {
+  if (_ingresosSelectsPoblado) return;
+
+  // ── Eventos desde EV (igual que gastos) ──
+  const ev = await _fetchEVFromIndex();
+  const eventos = (ev || []).filter(e => e && e.id && e.a)
+    .slice().sort((a, b) => String(b.ds || '').localeCompare(String(a.ds || '')));
+  const opciones = [];
+  eventos.forEach(e => {
+    if (Array.isArray(e.multifecha) && e.multifecha.length) {
+      e.multifecha.forEach((mf, i) => {
+        const lbl = (mf && mf.lbl) ? mf.lbl : ('Fecha ' + (i + 1));
+        const id = e.id + '#' + i;
+        _ingresosEVMap[id] = { nombre: e.a, fecha: lbl };
+        opciones.push({ value: id, label: e.a + ' · ' + lbl });
+      });
+    } else {
+      _ingresosEVMap[e.id] = { nombre: e.a, fecha: '' };
+      opciones.push({ value: e.id, label: e.a });
+    }
+  });
+  ['filtro-evento-ingresos', 'ingreso-evento'].forEach(selId => {
+    const sel = document.getElementById(selId);
+    if (!sel) return;
+    while (sel.options.length > 1) sel.remove(1);   // conserva la 1ª opción (Todos / Sin evento)
+    opciones.forEach(o => {
+      const opt = document.createElement('option');
+      opt.value = o.value;
+      opt.textContent = o.label;
+      sel.appendChild(opt);
+    });
+  });
+
+  // ── Clientes desde admin-clientes-min (solo para el select del modal) ──
+  try {
+    const r = await fetch('/.netlify/functions/admin-clientes-min', {
+      method: 'POST',
+      headers: _spAdminHeaders(),
+      body: JSON.stringify({}),
+    });
+    const d = await r.json();
+    if (r.ok) {
+      const clientes = Array.isArray(d.clientes) ? d.clientes : [];
+      const selCli = document.getElementById('ingreso-cliente');
+      clientes.forEach(c => {
+        _ingresosClientesMap[c.id] = { nombre: c.nombre_completo, celular: c.celular };
+        if (selCli) {
+          const opt = document.createElement('option');
+          opt.value = c.id;
+          opt.textContent = (c.nombre_completo || 'Cliente') + (c.celular ? (' — ' + c.celular) : '');
+          selCli.appendChild(opt);
+        }
+      });
+    }
+  } catch (e) { /* el select de cliente queda solo con "— (ninguno) —" */ }
+
+  _ingresosSelectsPoblado = true;
+}
+
+// Nombre del evento para la tabla, resuelto desde EV. evento_id vacío = sin evento.
+function _ingresoEventoLabel(eventoId) {
+  if (!eventoId) return '—';
+  const map = _ingresosEVMap[eventoId];
+  if (!map) return eventoId;
+  return map.fecha ? (map.nombre + ' · ' + map.fecha) : map.nombre;
+}
+
+// Nombre del cliente para la tabla, resuelto desde la lista de clientes.
+function _ingresoClienteLabel(clienteId) {
+  if (!clienteId) return '—';
+  const c = _ingresosClientesMap[clienteId];
+  return c ? c.nombre : '—';
+}
+
+async function loadIngresos() {
+ const tbody = document.getElementById('tabla-ingresos');
+ if (!tbody) return;
+ await _poblarSelectsIngresos();
+ tbody.innerHTML = '<tr><td colspan="9"><div class="loading-state"><div class="spinner"></div>Cargando…</div></td></tr>';
+
+ const evId = document.getElementById('filtro-evento-ingresos').value;
+ const cat = document.getElementById('filtro-cat-ingresos').value;
+
+ try {
+ const r = await fetch('/.netlify/functions/admin-ingresos-list', {
+ method: 'POST',
+ headers: _spAdminHeaders(),
+ body: JSON.stringify({ evento_id: evId || undefined, categoria: cat || undefined }),
+ });
+ const d = await r.json();
+ if (!r.ok) throw new Error(d.error || 'No se pudieron cargar los ingresos');
+ const ingresos = Array.isArray(d.ingresos) ? d.ingresos : [];
+ _ingresosListCache = ingresos;   // para que editarIngreso pre-llene desde memoria
+
+ document.getElementById('i-total').textContent = _spFmtMxn(d.total || 0);
+ document.getElementById('i-mes').textContent = _spFmtMxn(d.total_mes || 0);
+
+ if (!ingresos.length) {
+ tbody.innerHTML = '<tr><td colspan="9"><div class="empty-state"><div class="empty-icon"></div>Sin ingresos registrados</div></td></tr>';
+ return;
+ }
+
+ tbody.innerHTML = ingresos.map(g => `<tr>
+ <td style="font-size:12px">${fmtFecha(g.fecha)}</td>
+ <td style="font-weight:600">${_spEscape(g.concepto)}</td>
+ <td><span class="badge badge-gray">${_spEscape(g.categoria||'—')}</span></td>
+ <td style="font-size:12px;color:var(--ts)">${_spEscape(_ingresoClienteLabel(g.cliente_id))}</td>
+ <td style="font-size:12px;color:var(--ts)">${_spEscape(_ingresoEventoLabel(g.evento_id))}</td>
+ <td style="color:var(--green);font-weight:600">${_spFmtMxn(g.monto)}</td>
+ <td>${g.cuenta ? `<span class="badge badge-gray">${_spEscape(g.cuenta)}</span>` : '<span style="font-size:12px;color:var(--ts)">—</span>'}</td>
+ <td style="font-size:12px">${_spEscape(g.metodo_pago||'—')}</td>
+ <td style="white-space:nowrap">
+ <button class="btn btn-ghost btn-sm" onclick="editarIngreso('${g.id}')"><svg class="ic"><use href="#ic-lapiz"/></svg> Editar</button>
+ <button class="btn btn-red btn-sm" onclick="eliminarIngreso('${g.id}')"></button>
+ </td>
+ </tr>`).join('');
+ } catch(e) {
+ tbody.innerHTML = `<tr><td colspan="9"><div class="alert alert-error">${_spEscape(e.message)}</div></td></tr>`;
+ }
+}
+
+// Abre el modal en modo CREAR: limpia el id de edición, vacía el form y restablece
+// los textos del modal. Lo dispara el botón "+ Registrar Ingreso".
+function nuevoIngreso() {
+ _ingresoEditId = null;
+ ['ingreso-concepto', 'ingreso-monto', 'ingreso-fecha', 'ingreso-notas'].forEach(id => {
+   const el = document.getElementById(id); if (el) el.value = '';
+ });
+ ['ingreso-categoria', 'ingreso-metodo', 'ingreso-cuenta'].forEach(id => {
+   const el = document.getElementById(id); if (el) el.selectedIndex = 0;
+ });
+ // Método por default (Transferencia) con Banco (BBVA) visible.
+ _ingresoOnMetodoChange();
+ const ev = document.getElementById('ingreso-evento'); if (ev) ev.value = '';
+ const cli = document.getElementById('ingreso-cliente'); if (cli) cli.value = '';
+ const tit = document.getElementById('ingreso-modal-title'); if (tit) tit.textContent = 'Registrar Ingreso';
+ const btn = document.getElementById('ingreso-save-btn');   if (btn) btn.textContent = 'Guardar Ingreso';
+ _poblarSelectsIngresos().then(() => openModal('modal-ingreso'));
+}
+
+// Muestra/oculta el selector de Banco según el método (igual que gastos): Transferencia
+// y Depósito lo muestran; Efectivo lo oculta (cuenta = 'Efectivo').
+function _ingresoOnMetodoChange() {
+ const metodo = (document.getElementById('ingreso-metodo') || {}).value || '';
+ const wrap = document.getElementById('ingreso-banco-wrap');
+ if (wrap) wrap.style.display = (metodo === 'Efectivo') ? 'none' : '';
+}
+
+// Abre el modal en modo EDICIÓN, pre-llenado con el ingreso (desde _ingresosListCache).
+// Guarda el id en _ingresoEditId para que guardarIngreso haga UPDATE en vez de INSERT.
+async function editarIngreso(id) {
+ await _poblarSelectsIngresos();   // garantiza que evento/cliente tengan opciones
+ const g = (_ingresosListCache || []).find(x => String(x.id) === String(id));
+ if (!g) { alert('No se encontró el ingreso a editar'); return; }
+ _ingresoEditId = id;
+ const set = (elId, v) => { const el = document.getElementById(elId); if (el) el.value = (v == null ? '' : v); };
+ set('ingreso-concepto', g.concepto);
+ set('ingreso-monto',    g.monto);
+ set('ingreso-fecha',    g.fecha);
+ set('ingreso-categoria', g.categoria);
+ // Método: solo los 3 válidos; si la cuenta fue 'Efectivo', el método queda en Efectivo.
+ const _metodosIngreso = ['Transferencia', 'Depósito', 'Efectivo'];
+ let _metodoSel = _metodosIngreso.includes(g.metodo_pago) ? g.metodo_pago : 'Transferencia';
+ if (g.cuenta === 'Efectivo') _metodoSel = 'Efectivo';
+ set('ingreso-metodo', _metodoSel);
+ // Banco: pre-selecciona BBVA/Banamex si así estaba; si no, default (BBVA).
+ if (g.cuenta === 'BBVA' || g.cuenta === 'Banamex') set('ingreso-cuenta', g.cuenta);
+ else document.getElementById('ingreso-cuenta').selectedIndex = 0;
+ _ingresoOnMetodoChange();  // muestra/oculta el Banco según el método elegido
+ set('ingreso-evento',  g.evento_id || '');
+ set('ingreso-cliente', g.cliente_id || '');
+ set('ingreso-notas',   g.notas);
+ const tit = document.getElementById('ingreso-modal-title'); if (tit) tit.textContent = 'Editar Ingreso';
+ const btn = document.getElementById('ingreso-save-btn');   if (btn) btn.textContent = 'Guardar Cambios';
+ openModal('modal-ingreso');
+}
+
+async function guardarIngreso() {
+ const concepto = document.getElementById('ingreso-concepto').value.trim();
+ const monto = parseFloat(document.getElementById('ingreso-monto').value);
+ const fecha = document.getElementById('ingreso-fecha').value;
+ const categoria = document.getElementById('ingreso-categoria').value;
+ const evId = document.getElementById('ingreso-evento').value;
+ const clienteId = document.getElementById('ingreso-cliente').value;
+ const metodo = document.getElementById('ingreso-metodo').value;
+ // Cuenta = a dónde entró el dinero: Efectivo → 'Efectivo'; si no, el Banco elegido.
+ const banco = document.getElementById('ingreso-cuenta').value;
+ const cuenta = (metodo === 'Efectivo') ? 'Efectivo' : banco;
+ const notas = document.getElementById('ingreso-notas').value;
+ const alerta = document.getElementById('ingreso-alert');
+
+ if (!concepto || !(monto >= 0) || !fecha) {
+ alerta.innerHTML = '<div class="alert alert-error">Concepto, monto y fecha son obligatorios</div>';
+ return;
+ }
+
+ const editando = !!_ingresoEditId;
+ const url = editando ? '/.netlify/functions/admin-ingreso-editar' : '/.netlify/functions/admin-ingreso-crear';
+ const payload = {
+ concepto, monto, fecha, categoria, metodo_pago: metodo,
+ cuenta: cuenta || undefined,
+ evento_id: evId || undefined, cliente_id: clienteId || undefined, notas: notas || undefined
+ };
+ if (editando) payload.id = _ingresoEditId;
+
+ try {
+ const r = await fetch(url, {
+ method: 'POST',
+ headers: _spAdminHeaders(),
+ body: JSON.stringify(payload),
+ });
+ const d = await r.json();
+ if (!r.ok) throw new Error(d.error || (editando ? 'No se pudo actualizar el ingreso' : 'No se pudo registrar el ingreso'));
+ alerta.innerHTML = `<div class="alert alert-success">${editando ? 'Ingreso actualizado' : 'Ingreso registrado'}</div>`;
+ _ingresoEditId = null;
+ setTimeout(() => { closeModal('modal-ingreso'); loadIngresos(); }, 1000);
+ } catch(e) {
+ alerta.innerHTML = `<div class="alert alert-error">${_spEscape(e.message)}</div>`;
+ }
+}
+
+async function eliminarIngreso(id) {
+ if (!confirm('¿Eliminar este ingreso?')) return;
+ try {
+ const r = await fetch('/.netlify/functions/admin-ingreso-eliminar', {
+ method: 'POST',
+ headers: _spAdminHeaders(),
+ body: JSON.stringify({ id }),
+ });
+ const d = await r.json();
+ if (!r.ok) throw new Error(d.error || 'No se pudo eliminar el ingreso');
+ loadIngresos();
+ } catch(e) { alert(e.message); }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// SALDOS (S3 — visor de saldos por cuenta; solo LECTURA vía admin-saldos)
+// ═══════════════════════════════════════════════════════════════
+let _saldosData = null;
+let _saldoDetalleActivo = null;   // nombre de la cuenta con detalle abierto, o null
+
+async function loadSaldos() {
+ const el = document.getElementById('saldos-content');
+ if (!el) return;
+ _saldoDetalleActivo = null;
+ const panel = document.getElementById('saldo-detalle-panel');
+ if (panel) { panel.style.display = 'none'; panel.innerHTML = ''; }
+ el.innerHTML = '<div class="loading-state"><div class="spinner"></div>Cargando…</div>';
+ try {
+ const r = await fetch('/.netlify/functions/admin-saldos', {
+ method: 'POST',
+ headers: _spAdminHeaders(),
+ body: JSON.stringify({}),
+ });
+ const d = await r.json();
+ if (!r.ok) throw new Error(d.error || 'No se pudieron cargar los saldos');
+ _saldosData = d;
+ _renderSaldos(d);
+ } catch(e) {
+ el.innerHTML = `<div class="alert alert-error">${_spEscape(e.message)}</div>`;
+ }
+}
+
+function _renderSaldos(d) {
+ const el = document.getElementById('saldos-content');
+ if (!el) return;
+ const cuentas = d.cuentas || {};
+ const orden = ['BBVA', 'Banamex', 'Efectivo'];
+ const cards = orden.map(nombre => {
+   const c = cuentas[nombre] || { entradas: 0, salidas: 0, saldo: 0 };
+   const saldoColor = (Number(c.saldo) >= 0) ? 'var(--green)' : 'var(--red)';
+   return `<div class="card saldo-card" style="cursor:pointer" onclick="_toggleSaldoDetalle('${nombre}')">
+     <div style="display:flex;justify-content:space-between;align-items:center">
+       <div style="font-weight:700;letter-spacing:.04em">${nombre}</div>
+       <span style="font-size:11px;color:var(--ts)">ver detalle ▾</span>
+     </div>
+     <div style="font-size:28px;font-weight:800;color:${saldoColor};margin:10px 0 6px">${_spFmtMxn(c.saldo)}</div>
+     <div style="font-size:12px;color:var(--ts)">Entradas ${_spFmtMxn(c.entradas)} · Salidas ${_spFmtMxn(c.salidas)}</div>
+   </div>`;
+ }).join('');
+ const grid = `<div class="metrics-grid">${cards}</div>`;
+
+ let pie = '';
+ if (Number(d.otros_total || 0) !== 0) {
+   pie = `<div style="font-size:12px;color:var(--ts);margin-top:12px">${_spFmtMxn(d.otros_total)} en Otro/sin cuenta (no mostrado en las tarjetas).</div>`;
+ }
+ const stamp = d.generado_at ? `<div style="font-size:11px;color:var(--ts);margin-top:6px">Actualizado: ${_spFmtFechaAbs(d.generado_at)}</div>` : '';
+ el.innerHTML = grid + pie + stamp;
+}
+
+// Abre/cierra el panel de detalle (compartido, debajo de las tarjetas) para una cuenta.
+function _toggleSaldoDetalle(nombre) {
+ const panel = document.getElementById('saldo-detalle-panel');
+ if (!panel || !_saldosData) return;
+ if (_saldoDetalleActivo === nombre) {   // clic en la misma → cerrar
+   panel.style.display = 'none';
+   panel.innerHTML = '';
+   _saldoDetalleActivo = null;
+   return;
+ }
+ const c = (_saldosData.cuentas || {})[nombre];
+ if (!c) return;
+ _saldoDetalleActivo = nombre;
+ panel.innerHTML = `<div style="font-weight:700;margin-bottom:12px">Detalle · ${nombre}</div>` + _renderSaldoDetalle(c);
+ panel.style.display = '';
+}
+
+function _renderSaldoDetalle(c) {
+ const linea = (izq, monto, color) =>
+   `<div style="display:flex;justify-content:space-between;gap:12px;font-size:12px;padding:3px 0">
+      <span>${izq}</span><span style="color:${color};white-space:nowrap">${monto}</span>
+    </div>`;
+ const seccion = (titulo, subtotal, color, filas) =>
+   `<div style="margin-bottom:14px">
+      <div style="display:flex;justify-content:space-between;font-weight:600;font-size:13px;margin-bottom:4px">
+        <span>${titulo}</span><span style="color:${color}">${subtotal}</span>
+      </div>${filas}
+    </div>`;
+
+ const pagosFilas = (c.pagos || []).length
+   ? c.pagos.map(p => linea(`${fmtFecha(p.fecha)} · ${_spEscape(p.cliente || '—')}${p.evento ? (' · ' + _spEscape(p.evento)) : ''}`, _spFmtMxn(p.monto), 'var(--green)')).join('')
+   : '<div style="font-size:12px;color:var(--ts)">Sin pagos cobrados</div>';
+ const ingFilas = (c.ingresos || []).length
+   ? c.ingresos.map(i => linea(`${fmtFecha(i.fecha)} · ${_spEscape(i.concepto || '—')}`, _spFmtMxn(i.monto), 'var(--green)')).join('')
+   : '<div style="font-size:12px;color:var(--ts)">Sin ingresos sueltos</div>';
+ const gasFilas = (c.gastos || []).length
+   ? c.gastos.map(g => linea(`${fmtFecha(g.fecha)} · ${_spEscape(g.concepto || '—')}`, '−' + _spFmtMxn(g.monto), 'var(--red)')).join('')
+   : '<div style="font-size:12px;color:var(--ts)">Sin gastos</div>';
+
+ return seccion('+ Pagos cobrados', _spFmtMxn(c.entradas_pagos), 'var(--green)', pagosFilas)
+   + seccion('+ Ingresos sueltos', _spFmtMxn(c.entradas_ingresos), 'var(--green)', ingFilas)
+   + seccion('− Gastos', '−' + _spFmtMxn(c.salidas_gastos), 'var(--red)', gasFilas)
+   + `<div style="display:flex;justify-content:space-between;font-weight:800;font-size:15px;border-top:1px solid var(--border);padding-top:10px;margin-top:4px">
+        <span>= Saldo</span><span style="color:${Number(c.saldo) >= 0 ? 'var(--green)' : 'var(--red)'}">${_spFmtMxn(c.saldo)}</span>
+      </div>`;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// MIS VENTAS
+// ═══════════════════════════════════════════════════════════════
+async function loadVentas() {
+ const el = document.getElementById('ventas-content');
+ el.innerHTML = '<div class="loading-state"><div class="spinner"></div>Cargando…</div>';
+ try {
+ const eventos = await khVentas.listar();
+ if (!eventos.length) {
+ el.innerHTML = '<div class="empty-state"><div class="empty-icon"></div>Sin datos aún</div>';
+ return;
+ }
+ el.innerHTML = eventos.map(ev => `
+ <div class="card" style="margin-bottom:12px">
+ <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px">
+ <div>
+ <div style="font-family:\'Barlow Condensed\',sans-serif;font-size:18px;font-weight:800">
+ ${ev.artista || ev.nombre}
+ </div>
+ <div style="font-size:11px;color:var(--ts)">${fmtFecha(ev.fecha)} · ${ev.ciudad}</div>
+ </div>
+ <div style="text-align:right">
+ ${badgeStatus(ev.status)}
+ <div style="font-size:11px;color:var(--ts);margin-top:4px">${ev.total_viajeros} viajeros</div>
+ </div>
+ </div>
+ <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:12px">
+ <div>
+ <div style="font-size:9px;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:var(--ts);margin-bottom:4px">Facturado</div>
+ <div style="font-family:\'Barlow Condensed\',sans-serif;font-size:20px;font-weight:900">${formatMXN(ev.total_cobrar)}</div>
+ </div>
+ <div>
+ <div style="font-size:9px;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:var(--ts);margin-bottom:4px">Cobrado</div>
+ <div style="font-family:\'Barlow Condensed\',sans-serif;font-size:20px;font-weight:900;color:var(--green)">${formatMXN(ev.total_cobrado)}</div>
+ </div>
+ <div>
+ <div style="font-size:9px;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:var(--ts);margin-bottom:4px">Pendiente</div>
+ <div style="font-family:\'Barlow Condensed\',sans-serif;font-size:20px;font-weight:900;color:var(--red)">${formatMXN(ev.total_pendiente)}</div>
+ </div>
+ <div>
+ <div style="font-size:9px;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:var(--ts);margin-bottom:4px">Costos</div>
+ <div style="font-family:\'Barlow Condensed\',sans-serif;font-size:20px;font-weight:900;color:var(--ts)">${formatMXN(ev.total_costos)}</div>
+ </div>
+ <div>
+ <div style="font-size:9px;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:var(--ts);margin-bottom:4px">Utilidad</div>
+ <div style="font-family:\'Barlow Condensed\',sans-serif;font-size:20px;font-weight:900;color:${ev.utilidad_actual >= 0 ? 'var(--green)' : 'var(--red)'}">${formatMXN(ev.utilidad_actual)}</div>
+ </div>
+ </div>
+ </div>
+ `).join('');
+ } catch(e) {
+ el.innerHTML = `<div class="alert alert-error">${e.message}</div>`;
+ }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// INVENTARIO
+// ═══════════════════════════════════════════════════════════════
+async function loadInventario() {
+ const tbody = document.getElementById('tabla-inventario');
+ const verCostos = !['mister_popo','coordinador','cc'].includes(currentUser?.rol);
+ try {
+ const items = await khKits.listar(); // [sec-kits]
+ const valorTotal = items.reduce((s, i) => s + (i.cantidad * i.costo_unitario), 0);
+ const piezasTotal = items.reduce((s, i) => s + (i.cantidad || 0), 0);
+ const invValorEl = document.getElementById('inv-valor');
+ const invValorWrap = document.getElementById('inv-valor-wrap');
+ if (invValorWrap) invValorWrap.style.display = verCostos ? '' : 'none';
+ if (invValorEl) invValorEl.textContent = formatMXN(valorTotal);
+ document.getElementById('inv-piezas').textContent = piezasTotal.toLocaleString('es-MX');
+
+ // Ajustar headers de tabla
+ const thead = document.querySelector('#tabla-inventario')?.closest('table')?.querySelector('thead tr');
+ if (thead) {
+   const ths = thead.querySelectorAll('th');
+   // th[2]=costo_unitario, th[3]=valor_total
+   if (ths[2]) ths[2].style.display = verCostos ? '' : 'none';
+   if (ths[3]) ths[3].style.display = verCostos ? '' : 'none';
+ }
+
+ if (!items.length) {
+ tbody.innerHTML = `<tr><td colspan="${verCostos ? 7 : 5}"><div class="empty-state"><div class="empty-icon"></div>Sin items en inventario</div></td></tr>`;
+ return;
+ }
+ const puedeEditarKarin = ['maestro_roshi','bulma','mister_popo'].includes(currentUser?.rol);
+ tbody.innerHTML = items.map(i => {
+ const valor = i.cantidad * i.costo_unitario;
+ const alerta = i.cantidad <= i.stock_minimo;
+ return `<tr>
+ <td style="font-weight:600">${i.pieza}${i.retornable ? ' <span style="font-size:9px;letter-spacing:.06em;text-transform:uppercase;font-weight:800;padding:1px 6px;border-radius:4px;color:#7cc4ff;background:rgba(124,196,255,.12);border:1px solid rgba(124,196,255,.35)" title="Retornable: en las salidas queda como PRESTADA y la comparación del regreso la exige de vuelta siempre">↻ siempre vuelve</span>' : ''}${alerta ? ' <span style="color:var(--red)"><svg class="ic"><use href="#ic-alerta"/></svg></span>' : ''}</td>
+ <td style="color:${alerta ? 'var(--red)' : 'var(--text)'};font-weight:600">${i.cantidad}</td>
+ ${verCostos ? `<td>${formatMXN(i.costo_unitario)}</td><td style="font-weight:600">${formatMXN(valor)}</td>` : ''}
+ <td style="color:var(--ts)">${i.stock_minimo}</td>
+ <td style="font-size:12px;color:var(--ts)">${i.proveedor||'—'}</td>
+ <td>${puedeEditarKarin ? `
+ <button class="btn btn-ghost btn-sm" onclick="editarKit('${i.id}')">⎘</button>
+ <button class="btn btn-red btn-sm" onclick="eliminarKit('${i.id}')">✕</button>
+ ` : '—'}</td>
+ </tr>`;
+ }).join('');
+ } catch(e) {
+ tbody.innerHTML = `<tr><td colspan="7"><div class="alert alert-error">${e.message}</div></td></tr>`;
+ }
+ loadTorreSalidas(); // [TORRE v2 F3] bandeja + prestado (fails-soft, solo cuidador/admins)
+}
+
+async function guardarKit() {
+ const id = document.getElementById('kit-id').value;
+ const pieza = document.getElementById('kit-pieza').value.trim();
+ const cantidad = parseInt(document.getElementById('kit-cantidad').value);
+ const costo = parseFloat(document.getElementById('kit-costo').value);
+ const minimo = parseInt(document.getElementById('kit-minimo').value) || 0;
+ const proveedor= document.getElementById('kit-proveedor').value.trim();
+ const retornable = !!document.getElementById('kit-retornable')?.checked;
+ const alerta = document.getElementById('kit-alert');
+
+ if (!pieza || isNaN(cantidad) || isNaN(costo)) {
+ alerta.innerHTML = '<div class="alert alert-error">Pieza, cantidad y costo son obligatorios</div>';
+ return;
+ }
+ try {
+ const body = { pieza, cantidad, costo_unitario: costo, stock_minimo: minimo, proveedor: proveedor || null, retornable };
+ if (id) await khKits.actualizar(id, body); // [sec-kits]
+ else await khKits.crear(body); // [sec-kits]
+ alerta.innerHTML = '<div class="alert alert-success"> Guardado</div>';
+ setTimeout(() => { closeModal('modal-kit'); loadInventario(); }, 900);
+ } catch(e) {
+ alerta.innerHTML = `<div class="alert alert-error">${e.message}</div>`;
+ }
+}
+
+async function editarKit(id) {
+  // Limpiar form y abrir modal primero
+  document.getElementById('kit-id').value = '';
+  document.getElementById('kit-pieza').value = '';
+  document.getElementById('kit-cantidad').value = '';
+  document.getElementById('kit-costo').value = '';
+  document.getElementById('kit-minimo').value = '';
+  document.getElementById('kit-proveedor').value = '';
+  const retChk = document.getElementById('kit-retornable'); if (retChk) retChk.checked = false;
+  openModal('modal-kit');
+  try {
+    const item = await khKits.obtener(id); // [sec-kits]
+    if (!item) { closeModal('modal-kit'); showToast('Kit no encontrado'); return; }
+    // Llenar con datos reales
+    document.getElementById('kit-id').value = item.id;
+    document.getElementById('kit-pieza').value = item.pieza;
+    document.getElementById('kit-cantidad').value = item.cantidad;
+    document.getElementById('kit-costo').value = item.costo_unitario;
+    document.getElementById('kit-minimo').value = item.stock_minimo || 0;
+    document.getElementById('kit-proveedor').value = item.proveedor || '';
+    const retChk2 = document.getElementById('kit-retornable'); if (retChk2) retChk2.checked = !!item.retornable;
+  } catch(e) { closeModal('modal-kit'); showToast(e.message); }
+}
+
+async function eliminarKit(id) {
+ if (!confirm('¿Eliminar esta pieza del inventario?')) return;
+ try { await khKits.eliminar(id); loadInventario(); } // [sec-kits]
+ catch(e) { alert(e.message); }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// TORRE v2 F3 — SALIDAS DE BODEGA (permiso previo, D1)
+// La zona de Reportes pide; la Torre autoriza. El backend (admin-salidas F2)
+// es quien manda: aquí solo se pinta y los 409 se muestran tal cual.
+// ═══════════════════════════════════════════════════════════════
+function _salEsc(s) { return _esfEsc(s); }
+function _salChipEstado(e) {
+  const map = {
+    solicitada: { txt: 'solicitada', c: '#ffb020', bg: 'rgba(255,176,32,.14)', bd: 'rgba(255,176,32,.4)' },
+    autorizada: { txt: 'autorizada', c: '#3ddc84', bg: 'rgba(61,220,132,.14)', bd: 'rgba(61,220,132,.4)' },
+    rechazada:  { txt: 'rechazada',  c: '#ff6666', bg: 'rgba(255,68,68,.14)',  bd: 'rgba(255,68,68,.4)' },
+    cancelada:  { txt: 'cancelada',  c: 'var(--ts)', bg: 'rgba(255,255,255,.05)', bd: 'var(--border)' },
+    cerrada:    { txt: 'cerrada',    c: '#7cc4ff', bg: 'rgba(124,196,255,.14)', bd: 'rgba(124,196,255,.4)' },
+  };
+  const x = map[e] || map.solicitada;
+  return `<span style="display:inline-block;font-size:9px;letter-spacing:.08em;text-transform:uppercase;font-weight:800;padding:2px 7px;border-radius:4px;color:${x.c};background:${x.bg};border:1px solid ${x.bd}">${x.txt}</span>`;
+}
+function _salResumenDetalle(detalle) {
+  return (Array.isArray(detalle) ? detalle : [])
+    .map(d => `${Number(d.cantidad) || 0}× ${_salEsc(d.pieza)}${d.retornable ? ' <span style="color:#7cc4ff;font-weight:700">↻</span>' : ''}`)
+    .join(' · ');
+}
+
+// Vista de la zona de Reportes: 'reportes' (default) o 'salidas'.
+function repVista(v) {
+  const rep = v === 'reportes';
+  const f = document.getElementById('rep-filtros'); if (f) f.style.display = rep ? 'flex' : 'none';
+  const l = document.getElementById('reportes-list'); if (l) l.style.display = rep ? '' : 'none';
+  const hb = document.getElementById('reportes-header-btns'); if (hb) hb.style.display = rep ? 'flex' : 'none';
+  const z = document.getElementById('salidas-zona'); if (z) z.style.display = rep ? 'none' : '';
+  const tr = document.getElementById('rep-tab-reportes'), ts = document.getElementById('rep-tab-salidas');
+  [[tr, rep], [ts, !rep]].forEach(([b, on]) => { if (b) { b.style.background = on ? 'rgba(255,107,0,.12)' : 'transparent'; b.style.color = on ? 'var(--orange)' : 'var(--ts)'; } });
+  if (!rep) loadSalidasZona();
+}
+
+let _salPiezas = [];
+async function loadSalidasZona() {
+  // Evento del catálogo (vivos, patrón _fetchEVFromIndex).
+  const sel = document.getElementById('sal-evento');
+  if (sel && sel.options.length <= 1) {
+    try {
+      const ev = await _fetchEVFromIndex();
+      const hoy = new Date().toISOString().slice(0, 10);
+      const vivos = (ev || []).filter(e => e && e.id && e.a && (!e.ds || e.ds >= hoy)).sort((a, b) => String(a.ds || '9999').localeCompare(String(b.ds || '9999')));
+      vivos.forEach(e => { const o = document.createElement('option'); o.value = e.id; o.textContent = e.a + (e.f ? ' · ' + e.f : ''); sel.appendChild(o); });
+    } catch (e) { /* select vacío: sin catálogo */ }
+  }
+  await loadSalPiezas();
+  loadMisSalidas();
+}
+
+async function loadSalPiezas() {
+  const box = document.getElementById('sal-piezas');
+  if (!box) return;
+  try {
+    _salPiezas = await khKits.listar(); // [sec-kits] el backend omite costos a no-admins
+    if (!_salPiezas.length) { box.innerHTML = '<div style="font-size:12px;color:var(--ts)">Sin piezas en el inventario</div>'; return; }
+    box.innerHTML = _salPiezas.map((p, i) => `
+      <div style="display:flex;align-items:center;gap:10px">
+        <input type="number" id="sal-cant-${i}" min="0" value="0" class="cot-input" style="width:80px">
+        <div style="flex:1;font-size:13px">${_salEsc(p.pieza)}${p.retornable ? ' <span style="font-size:9px;letter-spacing:.06em;text-transform:uppercase;font-weight:800;padding:1px 6px;border-radius:4px;color:#7cc4ff;background:rgba(124,196,255,.12);border:1px solid rgba(124,196,255,.35)">↻ siempre vuelve</span>' : ''}</div>
+        <div style="font-size:11px;color:var(--ts)">${Number(p.cantidad) || 0} disp.</div>
+      </div>`).join('');
+  } catch (e) { box.innerHTML = `<div class="alert alert-error">${_salEsc(e.message)}</div>`; }
+}
+
+function _salAlert(m, err) {
+  const a = document.getElementById('sal-alert');
+  if (a) a.innerHTML = m ? `<div class="alert ${err ? 'alert-error' : 'alert-success'}">${_salEsc(m)}</div>` : '';
+}
+
+async function crearSalidaBodega() {
+  const eid = (document.getElementById('sal-evento') || {}).value || '';
+  if (!eid) return _salAlert('Elige un evento', true);
+  const detalle = [];
+  _salPiezas.forEach((p, i) => {
+    const n = parseInt((document.getElementById('sal-cant-' + i) || {}).value, 10) || 0;
+    if (n > 0) detalle.push({ pieza_id: p.id, cantidad: n });
+  });
+  if (!detalle.length) return _salAlert('Pon cantidad a al menos una pieza', true);
+  const notas = ((document.getElementById('sal-notas') || {}).value || '').trim() || null;
+  const btn = document.getElementById('sal-btn-crear');
+  if (btn) btn.disabled = true;
+  try {
+    const j = await khSalidas.crear(eid, detalle, notas);
+    _salAlert('Salida solicitada — el cuidador ya tiene tu lista' + (j.correo_enviado === false ? ' (el correo no salió; avísale tú)' : ''), false);
+    _salPiezas.forEach((p, i) => { const el = document.getElementById('sal-cant-' + i); if (el) el.value = '0'; });
+    const nt = document.getElementById('sal-notas'); if (nt) nt.value = '';
+    loadMisSalidas();
+  } catch (e) {
+    const extra = (e.data && e.data.sin_stock)
+      ? ' — ' + e.data.sin_stock.map(x => `${x.pieza}: ${x.disponible} disp.`).join(', ')
+      : '';
+    _salAlert(e.message + extra, true);
+  } finally { if (btn) btn.disabled = false; }
+}
+
+async function loadMisSalidas() {
+  const box = document.getElementById('sal-mis');
+  if (!box) return;
+  try {
+    const salidas = await khSalidas.listar({ limit: 50 }); // el backend acota: el viajero SOLO ve lo suyo
+    if (!salidas.length) { box.innerHTML = '<div style="font-size:12px;color:var(--ts);letter-spacing:.08em;text-transform:uppercase;text-align:center;padding:18px">Sin salidas todavía</div>'; return; }
+    box.innerHTML = salidas.map(s => `
+      <div style="border:1px solid var(--border);border-radius:8px;padding:10px 14px;margin-bottom:8px">
+        <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap">
+          <div style="font-size:13px"><b>${_salEsc(s.evento_id)}</b> ${_salChipEstado(s.estado)}</div>
+          <div style="font-size:11px;color:var(--ts)">${_salEsc(String(s.creado_en || '').slice(0, 10))}</div>
+        </div>
+        <div style="font-size:12px;color:var(--ts);margin-top:6px">${_salResumenDetalle(s.detalle)}</div>
+        ${Number(s.faltantes_monto) > 0 ? _salFaltantesHtml(s) : ''}
+        ${s.estado === 'rechazada' ? '<div style="font-size:11px;color:#ff6666;margin-top:4px">Rechazada — el motivo te llegó por correo</div>' : ''}
+        ${s.estado === 'solicitada' ? `<div style="margin-top:8px"><button class="btn btn-ghost btn-sm" style="color:#ff6666;border-color:rgba(255,68,68,.3)" onclick="cancelarSalidaBodega('${_salEsc(s.id)}')">Cancelar</button></div>` : ''}
+      </div>`).join('');
+  } catch (e) { box.innerHTML = `<div class="alert alert-error">${_salEsc(e.message)}</div>`; }
+}
+
+// [TORRE v2 F4b] Faltantes cobrados del viajero: monto, vence y la cuenta de
+// LA EMPRESA para liquidar (viene del backend; sin cuenta → pide el dato).
+function _salFaltantesHtml(s) {
+  const pagado = !!s.faltantes_pagado_at;
+  const vence = String(s.faltantes_vence || '').slice(0, 10);
+  const c = khSalidas.ultimaCuentaEmpresa;
+  const cuentaTxt = pagado ? '' : c
+    ? `Paga a: <b>${_salEsc(c.nombre || 'BBVA')}</b>${c.tarjeta ? ' · tarjeta ' + _salEsc(c.tarjeta) : ''}${c.clabe ? ' · CLABE ' + _salEsc(c.clabe) : ''}${c.titular ? ' · ' + _salEsc(c.titular) : ''} — y manda tu comprobante a Conecta`
+    : 'Pide a Conecta la cuenta para depositar';
+  return `<div style="margin-top:6px;padding:8px 10px;border:1px solid ${pagado ? 'rgba(61,220,132,.35)' : 'rgba(255,176,32,.35)'};border-radius:6px;background:${pagado ? 'rgba(61,220,132,.06)' : 'rgba(255,176,32,.06)'}">
+    <div style="font-size:12px;font-weight:700;color:${pagado ? 'var(--green)' : '#ffb020'}">Faltantes cobrados: ${formatMXN(Number(s.faltantes_monto) || 0)}${pagado ? ' — PAGADO' : vence ? ' · vence el ' + _salEsc(vence) : ''}</div>
+    ${cuentaTxt ? `<div style="font-size:11px;color:var(--ts);margin-top:3px">${cuentaTxt}</div>` : ''}
+  </div>`;
+}
+
+async function cancelarSalidaBodega(id) {
+  if (!confirm('¿Cancelar esta salida? Una salida enviada no se edita — cancela y crea otra.')) return;
+  try { await khSalidas.cancelar(id); showToast('Salida cancelada', 'success'); loadMisSalidas(); }
+  catch (e) { showToast(e.message, 'error'); }
+}
+
+// ── Torre: bandeja del cuidador + prestado ahorita ─────────────────────
+let _torreBandeja = [];
+async function loadTorreSalidas() {
+  const esCuidador = ['mister_popo', 'maestro_roshi', 'bulma'].includes(currentUser?.rol);
+  const bc = document.getElementById('torre-bandeja-card'), pc = document.getElementById('torre-prestado-card'), fc = document.getElementById('torre-faltantes-card');
+  if (!esCuidador) { if (bc) bc.style.display = 'none'; if (pc) pc.style.display = 'none'; if (fc) fc.style.display = 'none'; return; }
+  if (bc) bc.style.display = '';
+  if (pc) pc.style.display = '';
+  if (fc) fc.style.display = '';
+  const bb = document.getElementById('torre-bandeja'), pp = document.getElementById('torre-prestado');
+  try {
+    const [pendientes, autorizadas, todas] = await Promise.all([
+      khSalidas.listar({ estado: 'solicitada' }),
+      khSalidas.listar({ estado: 'autorizada' }),
+      khSalidas.listar({ limit: 200 }), // [F4b] faltantes viven en autorizadas Y cerradas
+    ]);
+    _torreBandeja = pendientes;
+    const conFaltantes = (todas || []).filter(x => Number(x.faltantes_monto) > 0);
+    // Nombres de solicitantes (best-effort: sin nombres, cae al rol).
+    let uMap = {};
+    try {
+      const ids = [...new Set(pendientes.concat(autorizadas).concat(conFaltantes).map(s => s.solicitante_id).filter(Boolean))];
+      if (ids.length) (await khUsuarios.listar({ ids })).forEach(u => { uMap[u.id] = u; }); // [sec-usuarios]
+    } catch (e) { uMap = {}; }
+    const quien = s => { const u = uMap[s.solicitante_id]; return u && u.nombre ? u.nombre : (s.solicitante_rol || '?'); };
+
+    if (bb) {
+      bb.innerHTML = !pendientes.length
+        ? '<div style="font-size:12px;color:var(--ts);letter-spacing:.08em;text-transform:uppercase;text-align:center;padding:18px">Nada por autorizar</div>'
+        : pendientes.map(s => `
+          <div style="border:1px solid var(--border);border-radius:8px;padding:10px 14px;margin-bottom:8px">
+            <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap">
+              <div style="font-size:13px"><b>${_salEsc(quien(s))}</b> · ${_salEsc(s.evento_id)}</div>
+              <div style="font-size:11px;color:var(--ts)">${_salEsc(String(s.creado_en || '').slice(0, 10))}</div>
+            </div>
+            <div style="font-size:12px;color:var(--ts);margin-top:6px">${_salResumenDetalle(s.detalle)}</div>
+            ${s.notas ? `<div style="font-size:11px;color:var(--ts);margin-top:4px">Notas: ${_salEsc(s.notas)}</div>` : ''}
+            <div style="display:flex;gap:8px;margin-top:10px">
+              <button class="btn btn-primary btn-sm" onclick="darSalidaUI('${_salEsc(s.id)}')">Dar salida</button>
+              <button class="btn btn-ghost btn-sm" style="color:#ff6666;border-color:rgba(255,68,68,.3)" onclick="rechazarSalidaUI('${_salEsc(s.id)}')">Rechazar</button>
+            </div>
+          </div>`).join('');
+    }
+
+    if (pp) {
+      const filas = [];
+      autorizadas.forEach(s => (Array.isArray(s.detalle) ? s.detalle : []).forEach(d => {
+        if (d.retornable) filas.push({ pieza: d.pieza, cantidad: d.cantidad, quien: quien(s), evento: s.evento_id, desde: String(s.autorizada_en || '').slice(0, 10) });
+      }));
+      pp.innerHTML = !filas.length
+        ? '<div style="font-size:12px;color:var(--ts);letter-spacing:.08em;text-transform:uppercase;text-align:center;padding:18px">Nada prestado ahorita</div>'
+        : `<div class="table-wrap"><table><thead><tr>
+            <th>Pieza</th><th>Cant.</th><th>Quién la trae</th><th>Evento</th><th>Desde</th>
+          </tr></thead><tbody>${filas.map(f => `<tr>
+            <td style="font-weight:600">${_salEsc(f.pieza)}</td>
+            <td>${Number(f.cantidad) || 0}</td>
+            <td>${_salEsc(f.quien)}</td>
+            <td style="font-size:12px;color:var(--ts)">${_salEsc(f.evento)}</td>
+            <td style="font-size:12px;color:var(--ts)">${_salEsc(f.desde)}</td>
+          </tr>`).join('')}</tbody></table></div>`;
+    }
+
+    // [TORRE v2 F4b] Faltantes por cobrar: monto, quién, vence, estado, y el
+    // botón "Marcar pagado" SOLO para Memo (descongela al instante).
+    const ff = document.getElementById('torre-faltantes');
+    if (ff) {
+      const hoyMX = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Monterrey' });
+      const esRoshi = currentUser?.rol === 'maestro_roshi';
+      ff.innerHTML = !conFaltantes.length
+        ? '<div style="font-size:12px;color:var(--ts);letter-spacing:.08em;text-transform:uppercase;text-align:center;padding:18px">Sin faltantes cobrados</div>'
+        : conFaltantes.map(x => {
+            const pagado = !!x.faltantes_pagado_at;
+            const vence = String(x.faltantes_vence || '').slice(0, 10);
+            const vencido = !pagado && vence && vence < hoyMX;
+            const chip = pagado
+              ? '<span style="font-size:9px;letter-spacing:.08em;text-transform:uppercase;font-weight:800;padding:2px 7px;border-radius:4px;color:#3ddc84;background:rgba(61,220,132,.14);border:1px solid rgba(61,220,132,.4)">pagado</span>'
+              : vencido
+                ? '<span style="font-size:9px;letter-spacing:.08em;text-transform:uppercase;font-weight:800;padding:2px 7px;border-radius:4px;color:#ff6666;background:rgba(255,68,68,.14);border:1px solid rgba(255,68,68,.4)">vencido — congelado</span>'
+                : '<span style="font-size:9px;letter-spacing:.08em;text-transform:uppercase;font-weight:800;padding:2px 7px;border-radius:4px;color:#ffb020;background:rgba(255,176,32,.14);border:1px solid rgba(255,176,32,.4)">por cobrar</span>';
+            const piezasTxt = (Array.isArray(x.faltantes) ? x.faltantes : []).map(f => `${f.cantidad}× ${_salEsc(f.pieza)}`).join(' · ');
+            return `
+          <div style="border:1px solid var(--border);border-radius:8px;padding:10px 14px;margin-bottom:8px">
+            <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap">
+              <div style="font-size:13px"><b>${_salEsc(quien(x))}</b> · ${_salEsc(x.evento_id)} ${chip}</div>
+              <div style="font-family:'Zen Dots',sans-serif;font-size:15px;color:${pagado ? 'var(--green)' : vencido ? 'var(--red)' : 'var(--gold)'}">${formatMXN(Number(x.faltantes_monto) || 0)}</div>
+            </div>
+            ${piezasTxt ? `<div style="font-size:12px;color:var(--ts);margin-top:6px">${piezasTxt}</div>` : ''}
+            <div style="font-size:11px;color:var(--ts);margin-top:4px">${pagado ? 'Pagado el ' + _salEsc(String(x.faltantes_pagado_at).slice(0, 10)) : vence ? 'Vence el ' + _salEsc(vence) : 'El plazo de 15 días arranca con la aprobación final de Memo'}</div>
+            ${(!pagado && esRoshi) ? `<div style="margin-top:8px"><button class="btn btn-primary btn-sm" onclick="marcarFaltantesPagadoUI('${_salEsc(x.id)}')">Marcar pagado</button></div>` : ''}
+          </div>`;
+          }).join('');
+    }
+  } catch (e) {
+    if (bb) bb.innerHTML = `<div class="alert alert-error">${_salEsc(e.message)}</div>`;
+    if (pp) pp.innerHTML = '';
+  }
+}
+
+async function darSalidaUI(id) {
+  const s = _torreBandeja.find(x => x.id === id);
+  const detalleTxt = s ? (Array.isArray(s.detalle) ? s.detalle : []).map(d => `${d.cantidad}× ${d.pieza}`).join(', ') : '';
+  if (!confirm(`¿Dar salida?${detalleTxt ? '\n\n' + detalleTxt : ''}\n\nEl stock se descuenta en automático y Maestro Roshi recibe el FYI.`)) return;
+  try {
+    const j = await khSalidas.darSalida(id);
+    showToast('Salida autorizada — stock descontado' + (j.correo_solicitante === false ? ' (el correo al solicitante no salió)' : ''), 'success');
+    loadInventario(); // stock cambió: refresca tabla + bandeja + prestado
+  } catch (e) {
+    const extra = (e.data && e.data.sin_stock)
+      ? ' — ' + e.data.sin_stock.map(x => `${x.pieza}: ${x.disponible} disp.`).join(', ')
+      : '';
+    showToast(e.message + extra, 'error'); // los 409 del backend, tal cual
+  }
+}
+
+async function rechazarSalidaUI(id) {
+  const motivo = prompt('Motivo del rechazo (le llega por correo al solicitante):');
+  if (motivo === null) return;
+  try {
+    await khSalidas.rechazar(id, motivo.trim() || null);
+    showToast('Salida rechazada', 'success');
+    loadTorreSalidas();
+  } catch (e) { showToast(e.message, 'error'); }
+}
+
+// [TORRE v2 F4b] "Marcar pagado" — SOLO Memo. Sella el pago y DESCONGELA
+// (el candado de crear salidas se calcula en vivo, así que basta con esto).
+async function marcarFaltantesPagadoUI(id) {
+  if (!confirm('¿Marcar estos faltantes como PAGADOS? Se descongela al instante y el cron ya no aplicará strike por este cobro.')) return;
+  try {
+    await khSalidas.faltantesPagado(id);
+    showToast('Faltantes pagados ✓ — descongelado', 'success');
+    loadTorreSalidas();
+  } catch (e) { showToast(e.message, 'error'); }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════
+// CAPSULE CORP — EVENTOS
+// ═══════════════════════════════════════════════════════════════
+let _capsuleFilter = 'todos';
+let _capsuleCache = [];
+
+// loadCapsule → ver implementación completa abajo
+
+function filtrarCapsule(filtro, btn) {
+ _capsuleFilter = filtro;
+ document.querySelectorAll('.capsule-filter').forEach(b => b.classList.remove('active'));
+ btn.classList.add('active');
+ renderCapsule();
+}
+
+function renderCapsule() {
+ const tbody = document.getElementById('tabla-eventos');
+ const hoy = new Date().toISOString().split('T')[0];
+ let rows = _capsuleCache;
+
+ if (_capsuleFilter === 'futuro') rows = rows.filter(e => e.fecha >= hoy);
+ if (_capsuleFilter === 'pasado') rows = rows.filter(e => e.fecha < hoy);
+ if (_capsuleFilter === 'proceso') rows = rows.filter(e => e.status === 'En Proceso' || e.status === 'proceso');
+
+ if (!rows.length) {
+ tbody.innerHTML = '<tr><td colspan="8"><div class="empty-state"><div class="empty-icon"></div>Sin eventos con ese filtro</div></td></tr>';
+ return;
+ }
+
+ tbody.innerHTML = rows.map(ev => {
+ const esPasado = ev.fecha < hoy;
+ const zonas = ev.zonas_plus ? JSON.parse(ev.zonas_plus) : [];
+ const zonasStr = zonas.length ? zonas.filter(z => !z.ag).map(z => z.n).join(', ') : '—';
+ const paquetes = [];
+ if (ev.tiene_transporte_largo || ev.tiene_traslados_internos) paquetes.push('PLUS');
+ if (ev.ride_precio > 0) paquetes.push('RIDE');
+ paquetes.push('CHEAP');
+
+ return `<tr style="${esPasado ? 'opacity:.55' : ''}">
+ <td>
+ <div style="font-weight:700;font-size:13px">${ev.artista || ev.nombre}</div>
+ <div style="font-size:10px;color:var(--ts)">${ev.tour || ev.tipo || 'Concierto'}</div>
+ </td>
+ <td style="font-size:12px;white-space:nowrap">${fmtFecha(ev.fecha)}</td>
+ <td>
+ <div style="font-size:12px;font-weight:600">${ev.ciudad}</div>
+ <div style="font-size:10px;color:var(--ts)">${ev.venue || ''}</div>
+ </td>
+ <td style="font-size:11px">${paquetes.map(p => `<span class="badge ${p==='PLUS'?'badge-orange':p==='RIDE'?'badge-gold':'badge-gray'}">${p}</span>`).join(' ')}</td>
+ <td style="font-size:11px;max-width:140px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${zonasStr}</td>
+ <td>${badgeStatus(ev.status)}</td>
+ <td style="font-weight:600">${ev.total_viajeros || 0}</td>
+ <td style="white-space:nowrap">
+ <button class="btn btn-ghost btn-sm" onclick="editarEvento('${ev.id}')">Editar</button>
+ <button class="btn btn-red btn-sm" onclick="eliminarEvento('${ev.id}')">Borrar</button>
+ </td>
+ </tr>`;
+ }).join('');
+}
+
+function abrirNuevoEvento() {
+ // Reset formulario
+ document.getElementById('evento-id').value = '';
+ document.getElementById('ev-artista').value = '';
+ document.getElementById('ev-tour').value = '';
+ document.getElementById('ev-fecha').value = '';
+ document.getElementById('ev-fecha-fin').value = '';
+ document.getElementById('ev-ciudad').value = '';
+ document.getElementById('ev-venue').value = '';
+ document.getElementById('ev-tipo').value = 'Concierto';
+ document.getElementById('ev-color').value = 'azul';
+ document.getElementById('ev-promotor').value = '';
+ document.getElementById('ev-nota').value = '';
+ document.getElementById('ev-status').value = '';
+ document.getElementById('ev-banco').value = 'default';
+ document.getElementById('ev-cdmx').checked = false;
+ document.getElementById('ev-traslados').checked = false;
+ document.getElementById('ev-transporte').checked = false;
+ document.getElementById('ev-promo').checked = false;
+ document.getElementById('ev-rideonly').checked = false;
+ document.getElementById('ev-cheaponly').checked = false;
+ document.getElementById('ev-listonly').checked = false;
+ document.getElementById('ev-sep').value = '';
+ document.getElementById('ev-ride').value = '';
+ document.getElementById('ev-imagen').value = '';
+ document.getElementById('ev-dsc-codigo').value = '';
+ document.getElementById('ev-dsc-pct').value = '';
+ document.getElementById('ev-dsc-exp').value = '';
+ document.getElementById('ev-notas').value = '';
+ document.getElementById('modal-evento-title').textContent = 'Nuevo Evento';
+ // Reset listas dinámicas
+ iniciarIncluye([]);
+ iniciarZonas('plus', []);
+ iniciarZonas('cheap', []);
+ iniciarHotel([]);
+ iniciarPagos([]);
+ openModal('modal-evento');
+}
+
+async function guardarEvento() {
+ const id = document.getElementById('evento-id').value;
+ const artista = document.getElementById('ev-artista').value.trim();
+ const tour = document.getElementById('ev-tour').value.trim();
+ const fecha = document.getElementById('ev-fecha').value;
+ const fechaFin = document.getElementById('ev-fecha-fin').value;
+ const ciudad = document.getElementById('ev-ciudad').value.trim();
+ const venue = document.getElementById('ev-venue').value.trim();
+ const tipo = document.getElementById('ev-tipo').value;
+ const color = document.getElementById('ev-color').value;
+ const promotor = document.getElementById('ev-promotor').value.trim();
+ const nota = document.getElementById('ev-nota').value.trim();
+ const status = document.getElementById('ev-status').value || 'Disponible';
+ const banco = document.getElementById('ev-banco').value;
+ const cdmx = document.getElementById('ev-cdmx').checked;
+ const traslados = document.getElementById('ev-traslados').checked;
+ const transporte = document.getElementById('ev-transporte').checked;
+ const promo = document.getElementById('ev-promo').checked;
+ const rideOnly = document.getElementById('ev-rideonly').checked;
+ const cheapOnly = document.getElementById('ev-cheaponly').checked;
+ const listOnly = document.getElementById('ev-listonly').checked;
+ const sep = parseFloat(document.getElementById('ev-sep').value) || 0;
+ const ride = parseFloat(document.getElementById('ev-ride').value) || 0;
+ const imagen = document.getElementById('ev-imagen').value.trim();
+ const notas = document.getElementById('ev-notas').value.trim();
+ const dscCodigo = document.getElementById('ev-dsc-codigo').value.trim();
+ const dscPct = parseFloat(document.getElementById('ev-dsc-pct').value) || 0;
+ const dscExp = document.getElementById('ev-dsc-exp').value;
+ const alerta = document.getElementById('evento-alert');
+
+ if (!artista || !fecha || !ciudad || !venue) {
+ alerta.innerHTML = '<div class="alert alert-error">Artista, fecha, ciudad y venue son obligatorios</div>';
+ return;
+ }
+
+ // Leer listas dinámicas
+ const incluye = leerIncluye();
+ const zonas_plus = leerZonas('plus');
+ const zonas_cheap = leerZonas('cheap');
+ const hotel = leerHotel();
+ const pagos_cal = leerPagos();
+ const flash_promo = dscCodigo ? { code: dscCodigo, pct: dscPct, expiresTs: dscExp ? new Date(dscExp).getTime() : null } : null;
+
+ try {
+ const body = {
+ artista, nombre: artista,
+ tour: tour || null,
+ fecha,
+ fecha_fin: fechaFin || null,
+ ciudad, venue, tipo,
+ color: color || 'azul',
+ promotor: promotor || null,
+ nota_cliente: nota || null,
+ status,
+ banco,
+ cdmx,
+ tiene_traslados_internos: traslados,
+ tiene_transporte_largo: transporte,
+ promo,
+ ride_only: rideOnly,
+ cheap_only: cheapOnly,
+ list_only: listOnly,
+ separo: sep,
+ ride_precio: ride,
+ imagen_url: imagen || null,
+ notas: notas || null,
+ incluye: JSON.stringify(incluye),
+ zonas_plus: JSON.stringify(zonas_plus),
+ zonas_cheap: JSON.stringify(zonas_cheap),
+ hotel_opciones: JSON.stringify(hotel),
+ pagos_calendario: JSON.stringify(pagos_cal),
+ flash_promo: flash_promo ? JSON.stringify(flash_promo) : null
+ };
+ if (id) await khEventos.actualizar(id, body); // [sec-eventos]
+ else await khEventos.crear(body); // [sec-eventos]
+ alerta.innerHTML = '<div class="alert alert-success">Evento guardado</div>';
+ _eventosCache = await khEventos.listar(); // [sec-eventos]
+ populateEventoSelects();
+ setTimeout(() => { closeModal('modal-evento'); loadCapsule(); }, 900);
+ } catch(e) {
+ alerta.innerHTML = `<div class="alert alert-error">${e.message}</div>`;
+ }
+}
+
+async function editarEvento(id) {
+ try {
+ const ev = await khEventos.obtener(id); // [sec-eventos]
+ document.getElementById('evento-id').value = ev.id;
+ document.getElementById('ev-artista').value = ev.artista || '';
+ document.getElementById('ev-tour').value = ev.tour || '';
+ document.getElementById('ev-fecha').value = ev.fecha || '';
+ document.getElementById('ev-fecha-fin').value = ev.fecha_fin || '';
+ document.getElementById('ev-ciudad').value = ev.ciudad || '';
+ document.getElementById('ev-venue').value = ev.venue || '';
+ document.getElementById('ev-tipo').value = ev.tipo || 'Concierto';
+ document.getElementById('ev-color').value = ev.color || 'azul';
+ document.getElementById('ev-promotor').value = ev.promotor || '';
+ document.getElementById('ev-nota').value = ev.nota_cliente || '';
+ document.getElementById('ev-status').value = ev.status || '';
+ document.getElementById('ev-banco').value = ev.banco || 'default';
+ document.getElementById('ev-cdmx').checked = !!ev.cdmx;
+ document.getElementById('ev-traslados').checked = !!ev.tiene_traslados_internos;
+ document.getElementById('ev-transporte').checked = !!ev.tiene_transporte_largo;
+ document.getElementById('ev-promo').checked = !!ev.promo;
+ document.getElementById('ev-rideonly').checked = !!ev.ride_only;
+ document.getElementById('ev-cheaponly').checked = !!ev.cheap_only;
+ document.getElementById('ev-listonly').checked = !!ev.list_only;
+ document.getElementById('ev-sep').value = ev.separo || '';
+ document.getElementById('ev-ride').value = ev.ride_precio || '';
+ document.getElementById('ev-imagen').value = ev.imagen_url || '';
+ document.getElementById('ev-notas').value = ev.notas || '';
+ // Flash promo
+ const fp = ev.flash_promo ? (typeof ev.flash_promo === 'string' ? JSON.parse(ev.flash_promo) : ev.flash_promo) : null;
+ document.getElementById('ev-dsc-codigo').value = fp?.code || '';
+ document.getElementById('ev-dsc-pct').value = fp?.pct || '';
+ document.getElementById('ev-dsc-exp').value = fp?.expiresTs ? new Date(fp.expiresTs).toISOString().slice(0,16) : '';
+ // Listas dinámicas
+ iniciarIncluye(ev.incluye ? JSON.parse(ev.incluye) : []);
+ iniciarZonas('plus', ev.zonas_plus ? JSON.parse(ev.zonas_plus) : []);
+ iniciarZonas('cheap', ev.zonas_cheap ? JSON.parse(ev.zonas_cheap) : []);
+ iniciarHotel(ev.hotel_opciones ? JSON.parse(ev.hotel_opciones) : []);
+ iniciarPagos(ev.pagos_calendario ? JSON.parse(ev.pagos_calendario) : []);
+ document.getElementById('modal-evento-title').textContent = 'Editar: ' + ev.artista;
+ openModal('modal-evento');
+ } catch(e) { alert('Error al cargar evento: ' + e.message); }
+}
+
+async function eliminarEvento(id) {
+ if (!confirm('¿Eliminar este evento? Se borrarán también sus reservaciones.')) return;
+ try { await khEventos.eliminar(id); loadCapsule(); } // [sec-eventos]
+ catch(e) { alert(e.message); }
+}
+
+// ─── LISTAS DINÁMICAS DEL FORMULARIO ───
+
+function iniciarIncluye(items) {
+ const c = document.getElementById('ev-incluye-lista');
+ c.innerHTML = '';
+ (items.length ? items : ['']).forEach(v => agregarIncluyeItem(v));
+}
+function agregarIncluye() { agregarIncluyeItem(''); }
+function agregarIncluyeItem(val) {
+ const c = document.getElementById('ev-incluye-lista');
+ const d = document.createElement('div');
+ d.style.cssText = 'display:flex;gap:6px;margin-bottom:6px';
+ d.innerHTML = `<input type="text" placeholder="Ej: Boleto zona elegida" value="${val}"
+ style="flex:1;background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:7px;
+ padding:8px 10px;color:var(--text);font-family:Montserrat,sans-serif;font-size:12px;outline:none">
+ <button class="btn btn-red btn-sm" onclick="this.parentElement.remove()">X</button>`;
+ c.appendChild(d);
+}
+function leerIncluye() {
+ return Array.from(document.querySelectorAll('#ev-incluye-lista input'))
+ .map(i => i.value.trim()).filter(Boolean);
+}
+
+function iniciarZonas(tipo, items) {
+ const c = document.getElementById(`ev-zonas-${tipo}`);
+ c.innerHTML = '';
+ (items.length ? items : []).forEach(z => agregarZonaItem(tipo, z));
+}
+function agregarZona(tipo) { agregarZonaItem(tipo, {}); }
+function agregarZonaItem(tipo, z) {
+ const c = document.getElementById(`ev-zonas-${tipo}`);
+ const d = document.createElement('div');
+ d.style.cssText = 'display:grid;grid-template-columns:2fr 1fr auto auto auto;gap:6px;margin-bottom:6px;align-items:center';
+ d.innerHTML = `
+ <input type="text" placeholder="Nombre zona" value="${z.n||''}"
+ style="background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:7px;
+ padding:8px 10px;color:var(--text);font-family:Montserrat,sans-serif;font-size:12px;outline:none">
+ <input type="number" placeholder="Precio" value="${z.p||''}" min="0"
+ style="background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:7px;
+ padding:8px 10px;color:var(--text);font-family:Montserrat,sans-serif;font-size:12px;outline:none">
+ <label style="display:flex;align-items:center;gap:4px;font-size:11px;cursor:pointer;white-space:nowrap">
+ <input type="checkbox" ${z.vip?'checked':''}> VIP
+ </label>
+ <label style="display:flex;align-items:center;gap:4px;font-size:11px;cursor:pointer;white-space:nowrap">
+ <input type="checkbox" ${z.ag?'checked':''}> Agotado
+ </label>
+ <button class="btn btn-red btn-sm" onclick="this.parentElement.remove()">X</button>`;
+ c.appendChild(d);
+}
+function leerZonas(tipo) {
+ return Array.from(document.querySelectorAll(`#ev-zonas-${tipo} > div`)).map(d => {
+ const inputs = d.querySelectorAll('input');
+ const checks = d.querySelectorAll('input[type=checkbox]');
+ const n = inputs[0].value.trim();
+ const p = parseFloat(inputs[1].value) || 0;
+ if (!n) return null;
+ const obj = { n, p };
+ if (checks[0].checked) obj.vip = 1;
+ if (checks[1].checked) obj.ag = 1;
+ return obj;
+ }).filter(Boolean);
+}
+
+function iniciarHotel(items) {
+ const c = document.getElementById('ev-hotel-lista');
+ c.innerHTML = '';
+ (items.length ? items : [
+ {n:'Compartida', e:0},
+ {n:'Triple', e:250},
+ {n:'Doble', e:650},
+ {n:'Individual', e:1960}
+ ]).forEach(h => agregarHotelItem(h));
+}
+function agregarHotel() { agregarHotelItem({n:'', e:0}); }
+function agregarHotelItem(h) {
+ const c = document.getElementById('ev-hotel-lista');
+ const d = document.createElement('div');
+ d.style.cssText = 'display:grid;grid-template-columns:2fr 1fr auto;gap:6px;margin-bottom:6px;align-items:center';
+ d.innerHTML = `
+ <input type="text" placeholder="Tipo habitación" value="${h.n||''}"
+ style="background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:7px;
+ padding:8px 10px;color:var(--text);font-family:Montserrat,sans-serif;font-size:12px;outline:none">
+ <input type="number" placeholder="Extra $" value="${h.e||0}" min="0"
+ style="background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:7px;
+ padding:8px 10px;color:var(--text);font-family:Montserrat,sans-serif;font-size:12px;outline:none">
+ <button class="btn btn-red btn-sm" onclick="this.parentElement.remove()">X</button>`;
+ c.appendChild(d);
+}
+function leerHotel() {
+ return Array.from(document.querySelectorAll('#ev-hotel-lista > div')).map(d => {
+ const inputs = d.querySelectorAll('input');
+ const n = inputs[0].value.trim();
+ if (!n) return null;
+ return { n, e: parseFloat(inputs[1].value) || 0 };
+ }).filter(Boolean);
+}
+
+function iniciarPagos(items) {
+ const c = document.getElementById('ev-pagos-lista');
+ c.innerHTML = '';
+ (items.length ? items : [
+ {l:'Separo', d:'Hoy'},
+ {l:'Pago 1', d:''}
+ ]).forEach(p => agregarPagoItem(p));
+}
+function agregarPago() { agregarPagoItem({l:'', d:''}); }
+function agregarPagoItem(p) {
+ const c = document.getElementById('ev-pagos-lista');
+ const d = document.createElement('div');
+ d.style.cssText = 'display:grid;grid-template-columns:1fr 2fr auto;gap:6px;margin-bottom:6px;align-items:center';
+ d.innerHTML = `
+ <input type="text" placeholder="Label (Separo, Pago 1...)" value="${p.l||''}"
+ style="background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:7px;
+ padding:8px 10px;color:var(--text);font-family:Montserrat,sans-serif;font-size:12px;outline:none">
+ <input type="text" placeholder="Fechas (ej: 9-16 abr)" value="${p.d||''}"
+ style="background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:7px;
+ padding:8px 10px;color:var(--text);font-family:Montserrat,sans-serif;font-size:12px;outline:none">
+ <button class="btn btn-red btn-sm" onclick="this.parentElement.remove()">X</button>`;
+ c.appendChild(d);
+}
+function leerPagos() {
+ return Array.from(document.querySelectorAll('#ev-pagos-lista > div')).map(d => {
+ const inputs = d.querySelectorAll('input');
+ const l = inputs[0].value.trim();
+ if (!l) return null;
+ return { l, d: inputs[1].value.trim(), s: l.toLowerCase() === 'separo' ? 1 : 0 };
+ }).filter(Boolean);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// UTILIDADES
+// ═══════════════════════════════════════════════════════════════
+function formatMXN(n) {
+ if (n === null || n === undefined || n === '') return '—';
+ return new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN', minimumFractionDigits: 0 }).format(n);
+}
+
+function fmtFecha(d) {
+ if (!d) return '—';
+ const date = new Date(d + 'T12:00:00');
+ return date.toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+function badgeStatus(s) {
+ const map = {
+ 'Disponible':'badge-green','Últimos Lugares':'badge-orange',
+ 'Pocos Lugares':'badge-orange','En Proceso':'badge-blue',
+ 'Agotado':'badge-red','Pasado':'badge-gray','Por Confirmar':'badge-gold'
+ };
+ return `<span class="badge ${map[s]||'badge-gray'}">${s||'—'}</span>`;
+}
+
+function wapp(tel, nombre) {
+ if (!tel) return alert('Sin número registrado');
+ const num = tel.toString().replace(/\D/g,'');
+ const msg = encodeURIComponent(`Hola ${nombre}, te contactamos de Conecta Reynosa `);
+ const num52 = num.startsWith('52') ? num : '52' + num;
+ window.open(`https://wa.me/${num52}?text=${msg}`, '_blank');
+}
+
+function openModal(id) {
+ // Limpiar alertas
+ const alerta = document.querySelector(`#${id} [id$="-alert"]`);
+ if (alerta) alerta.innerHTML = '';
+ // Reset hidden ids
+ const hiddenId = document.querySelector(`#${id} input[type=hidden]`);
+ if (hiddenId) hiddenId.value = '';
+ document.getElementById(id).classList.add('open');
+}
+
+function closeModal(id) {
+ document.getElementById(id).classList.remove('open');
+ if (id === 'modal-gasto') _gastoEditId = null;   // sal de modo edición al cerrar
+ if (id === 'modal-ingreso') _ingresoEditId = null;   // sal de modo edición al cerrar
+}
+
+// ─── Modal dinámico (creado en JS, no en HTML) ───
+function crearModal(nombre, titulo, contenidoHTML) {
+  const modalId = 'modal-' + nombre;
+  // Si ya existe, actualiza contenido
+  let el = document.getElementById(modalId);
+  if (!el) {
+    el = document.createElement('div');
+    el.className = 'modal-overlay';
+    el.id = modalId;
+    el.innerHTML = `<div class="modal" style="max-width:640px;width:95%">
+      <div class="modal-header" id="${modalId}-header">
+        <span id="${modalId}-title"></span>
+        <button class="modal-close" onclick="cerrarModal('${nombre}')">✕</button>
+      </div>
+      <div class="modal-body" id="${modalId}-body"></div>
+    </div>`;
+    el.addEventListener('click', function(e) {
+      if (e.target === this) cerrarModal(nombre);
+    });
+    document.body.appendChild(el);
+  }
+  const titleEl = document.getElementById(modalId + '-title');
+  const bodyEl  = document.getElementById(modalId + '-body');
+  if (titleEl) titleEl.textContent = titulo;
+  if (bodyEl)  bodyEl.innerHTML = contenidoHTML;
+  el.classList.add('open');
+}
+
+function cerrarModal(nombre) {
+  const el = document.getElementById('modal-' + nombre);
+  if (el) el.classList.remove('open');
+}
+
+// Cerrar modales al click en overlay
+document.querySelectorAll('.modal-overlay').forEach(overlay => {
+ overlay.addEventListener('click', function(e) {
+ if (e.target === this) this.classList.remove('open');
+ });
+});
+
+// ESC cierra modales
+document.addEventListener('keydown', e => {
+ if (e.key === 'Escape') {
+ document.querySelectorAll('.modal-overlay.open').forEach(m => m.classList.remove('open'));
+ }
+});
+
+// ── Palacio de Kamisama — Capa 1 ─────────────────────────────────────────────
+// 1b: catálogo de Proveedores (admin-proveedores). 1c: compras por evento/zona
+// (admin-compras). loadKamisama() se invoca desde loadPage().
+function loadKamisama() {
+  _kamProveedoresLoad();
+  _kamPopulateEventos();
+  _comPopulateEventos();
+  _liqPopulateEventos();
+}
+
+async function _kamProveedoresLoad() {
+  const cont = document.getElementById('kam-prov-list');
+  if (!cont) return;
+  cont.innerHTML = '<div class="loading-state"><div class="spinner"></div>Cargando…</div>';
+  try {
+    const r = await khAdminFetch('/.netlify/functions/admin-proveedores', {
+      method: 'POST', body: JSON.stringify({ accion: 'listar' }),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok || !d.ok) throw new Error(d.error || 'No se pudieron cargar los proveedores');
+    const provs = d.proveedores || [];
+    if (!provs.length) {
+      cont.innerHTML = '<div class="empty-state"><div class="empty-icon"></div>Sin proveedores todavía</div>';
+      return;
+    }
+    cont.innerHTML =
+      '<table style="width:100%;border-collapse:collapse"><tbody>' +
+      provs.map((p) =>
+        '<tr style="border-top:1px solid var(--border)"><td style="padding:8px 4px;font-size:13px">' +
+        _esfEsc(p.nombre) + '</td></tr>'
+      ).join('') +
+      '</tbody></table>';
+  } catch (e) {
+    cont.innerHTML = `<div class="alert alert-error">${_esfEsc(e.message)}</div>`;
+  }
+}
+
+async function _kamProveedorCrear() {
+  const inp = document.getElementById('kam-prov-nombre');
+  const alertEl = document.getElementById('kam-prov-alert');
+  if (alertEl) alertEl.innerHTML = '';
+  const nombre = (inp?.value || '').trim();
+  if (!nombre) {
+    if (alertEl) alertEl.innerHTML = '<div class="alert alert-error">Escribe el nombre del proveedor.</div>';
+    return;
+  }
+  try {
+    const r = await khAdminFetch('/.netlify/functions/admin-proveedores', {
+      method: 'POST', body: JSON.stringify({ accion: 'crear', nombre }),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok || !d.ok) throw new Error(d.error || 'No se pudo agregar el proveedor');
+    if (inp) inp.value = '';
+    _kamProveedoresLoad();
+  } catch (e) {
+    if (alertEl) alertEl.innerHTML = `<div class="alert alert-error">${_esfEsc(e.message)}</div>`;
+  }
+}
+
+// ── Inventario de boletos (compras por evento/zona) ──────────────────────────
+let _kamProvCache = [];   // proveedores para los <select> de las zonas
+let _kamZonasMap = {};    // índice de zona (zi) -> nombre de zona (para el alta)
+
+function _kamMoney(n) { return '$' + (Number(n) || 0).toLocaleString('es-MX', { maximumFractionDigits: 2 }); }
+function _kamToday() { try { return new Date().toLocaleDateString('en-CA'); } catch (_) { return ''; } }
+function _kamComprasAlert(msg) {
+  const a = document.getElementById('kam-compras-alert');
+  if (a) a.innerHTML = `<div class="alert alert-error">${_esfEsc(msg)}</div>`;
+}
+
+// Puebla el <select> de eventos desde el EV del index (solo zonas raíz en Capa 1).
+async function _kamPopulateEventos() {
+  const sel = document.getElementById('kam-evt-sel');
+  if (!sel) return;
+  try {
+    const ev = await _fetchEVFromIndex();
+    const opts = (Array.isArray(ev) ? ev : [])
+      .filter((e) => e && e.id)
+      .slice()
+      .sort((a, b) => String(a.a || a.id).localeCompare(String(b.a || b.id)))
+      .map((e) => `<option value="${_esfEsc(e.id)}">${_esfEsc(e.a || e.id)}</option>`)
+      .join('');
+    sel.innerHTML = '<option value="">— Elige un evento —</option>' + opts;
+  } catch (_) { /* deja el placeholder */ }
+}
+
+// ── Comisiones CHEAP por zona (F5a — pantalla de Memo, solo maestro_roshi) ────
+// El evento_id que se guarda/consulta DEBE ser idéntico al que usa el vendedor al
+// cotizar (_vtaEventoId): 'slug' o 'slug#idx' para multifecha. Por eso el selector
+// espeja esa lógica (evento + fecha).
+let _comEVCache = [];   // EV crudo del index (para leer multifecha)
+let _comZonas = [];     // último `listar` (index de fila → zona)
+function _comEsc(s) { return _esfEsc(s); }
+function _comFmt(n) { return '$' + Math.round(Number(n) || 0).toLocaleString('es-MX'); }
+function _comAlert(m, err) { const a = document.getElementById('kam-com-alert'); if (a) a.innerHTML = m ? `<div class="alert ${err ? 'alert-error' : 'alert-success'}">${_comEsc(m)}</div>` : ''; }
+
+async function _comPopulateEventos() {
+  const sel = document.getElementById('kam-com-evt');
+  if (!sel) return;
+  try {
+    const ev = await _fetchEVFromIndex();
+    _comEVCache = Array.isArray(ev) ? ev : [];
+    const opts = _comEVCache
+      .filter((e) => e && e.id)
+      .slice()
+      .sort((a, b) => String(a.a || a.id).localeCompare(String(b.a || b.id)))
+      .map((e) => `<option value="${_comEsc(e.id)}">${_comEsc(e.a || e.id)}</option>`)
+      .join('');
+    sel.innerHTML = '<option value="">— Elige un evento —</option>' + opts;
+  } catch (_) { /* deja el placeholder */ }
+}
+
+function _comOnEvento() {
+  const ev = _comEVCache.find((e) => e && e.id === document.getElementById('kam-com-evt').value);
+  const fsel = document.getElementById('kam-com-fecha');
+  fsel.innerHTML = '';
+  if (ev && Array.isArray(ev.multifecha) && ev.multifecha.length) {
+    ev.multifecha.forEach((m, i) => { const o = document.createElement('option'); o.value = String(i); o.textContent = (m && m.lbl) ? m.lbl : ('Fecha ' + (i + 1)); fsel.appendChild(o); });
+    fsel.style.display = '';
+  } else { fsel.style.display = 'none'; }
+  _comLoad();
+}
+
+// evento_id compuesto — MISMO formato que _vtaEventoId del cotizador del vendedor.
+function _comEventoId() {
+  const id = document.getElementById('kam-com-evt').value;
+  if (!id) return '';
+  const fsel = document.getElementById('kam-com-fecha');
+  if (fsel && fsel.style.display !== 'none' && fsel.value !== '') return id + '#' + fsel.value;
+  return id;
+}
+
+// Fecha relativa corta para frescura ("hace 3 h", "hace 2 días"). '' si inválida.
+function _khHaceRel(iso) {
+  const t = Date.parse(iso || '');
+  if (!Number.isFinite(t)) return '';
+  const s = Math.max(0, Math.floor((Date.now() - t) / 1000));
+  if (s < 60) return 'hace un momento';
+  if (s < 3600) return 'hace ' + Math.floor(s / 60) + ' min';
+  if (s < 86400) return 'hace ' + Math.floor(s / 3600) + ' h';
+  const d = Math.floor(s / 86400);
+  return 'hace ' + d + (d === 1 ? ' día' : ' días');
+}
+
+// Tabla única WIZARD: veo todo → escribo MI GANANCIA → 💾 Guardar todo.
+// La matriz se pinta AUTO (última compra) en zonas nuevas y GUARDADA en las
+// configuradas — jamás se auto-mueve: si la última compra difiere, la fila
+// avisa con chip + botón "actualizar matriz" (pre-llena; Memo confirma al
+// guardar). La matriz sigue editable a mano ("editar").
+async function _comLoad() {
+  const body = document.getElementById('kam-com-body');
+  if (!body) return;
+  _comAlert('');
+  const eid = _comEventoId();
+  if (!eid) { body.innerHTML = ''; return; }
+  body.innerHTML = '<div class="loading-state"><div class="spinner"></div>Cargando…</div>';
+  try {
+    const r = await khAdminFetch('/.netlify/functions/admin-comisiones-zona', { method: 'POST', body: JSON.stringify({ accion: 'listar', evento_id: eid }) });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || !j.ok) throw new Error(j.error || ('Error ' + r.status));
+    _comZonas = Array.isArray(j.zonas) ? j.zonas : [];
+    if (!_comZonas.length) { body.innerHTML = '<div class="empty-state"><div class="empty-icon"></div>Sin zonas CHEAP ni compras para este evento.</div>'; return; }
+    const rows = _comZonas.map((z, i) => {
+      // Matriz que se pinta: la GUARDADA si existe (no se auto-mueve); si no, AUTO = última compra.
+      const matrizVal = z.configurada ? (z.costo_matriz != null ? z.costo_matriz : '') : (z.sugerencia_matriz != null ? z.sugerencia_matriz : '');
+      const ganVal = (z.configurada && z.comision != null) ? z.comision : '';
+      z._origM = String(matrizVal); z._origG = String(ganVal); // baseline para "solo filas modificadas"
+      const stockTxt = z.agotada
+        ? '<span style="color:var(--red);font-weight:700">AGOTADA</span>'
+        : (z.stock != null ? z.stock + ' disp.' : '—');
+      const matrizNota = z.configurada ? 'matriz guardada' : (z.sugerencia_matriz != null ? 'AUTO · tu última compra' : 'sin compras');
+      // Control de mercado: la matriz guardada no se mueve sola. Divergencia → chip.
+      const diverge = z.configurada && z.sugerencia_matriz != null && Number(z.sugerencia_matriz) !== Number(z.costo_matriz);
+      const chip = diverge
+        ? `<div style="margin-top:4px;font-size:10px;color:var(--orange);font-weight:700">tu última compra: ${_comFmt(z.sugerencia_matriz)} ≠ matriz guardada ${_comFmt(z.costo_matriz)} <button class="btn btn-ghost btn-sm" type="button" style="font-size:10px;padding:1px 6px" onclick="_comUsarUltimaCompra(${i})">actualizar matriz</button></div>`
+        : '';
+      const badge = z.configurada
+        ? '<span style="font-size:10px;color:var(--green);font-weight:700">✓ configurada</span>'
+        : '<span style="font-size:10px;color:var(--orange);font-weight:700">pendiente</span>';
+      return `<tr style="border-top:1px solid var(--border)">
+        <td style="padding:8px 4px;font-size:13px"><b>${_comEsc(z.zona)}</b><br>${badge}</td>
+        <td style="padding:8px 4px;font-size:12px">${stockTxt}</td>
+        <td style="padding:8px 4px"><input type="number" min="0" id="com-m-${i}" class="cot-input" style="width:100px" value="${matrizVal}" readonly oninput="_comCalcFila(${i})"> <button class="btn btn-ghost btn-sm" type="button" style="font-size:10px;padding:1px 6px" onclick="_comEditarMatriz(${i})">editar</button><br><span style="font-size:10px;color:var(--ts)">${matrizNota}</span>${chip}</td>
+        <td style="padding:8px 4px"><input type="number" min="0" id="com-g-${i}" class="cot-input" style="width:100px" value="${ganVal}" placeholder="tu ganancia" oninput="_comCalcFila(${i})"></td>
+        <td style="padding:8px 4px;text-align:right;font-size:13px"><b><span id="com-t-${i}">—</span></b><br><span style="font-size:10px;color:var(--ts)">costo vendedor</span></td>
+      </tr>`;
+    }).join('');
+    body.innerHTML = `<table style="width:100%;border-collapse:collapse"><thead><tr style="font-size:10px;color:var(--ts);text-transform:uppercase;letter-spacing:.08em"><th style="text-align:left;padding:4px">Zona</th><th style="text-align:left;padding:4px">Stock</th><th style="text-align:left;padding:4px">Costo Palacio</th><th style="text-align:left;padding:4px">Tu ganancia</th><th style="text-align:right;padding:4px">Vendedor</th></tr></thead><tbody>${rows}</tbody></table>
+      <div style="display:flex;justify-content:flex-end;align-items:center;gap:10px;margin-top:12px">
+        <span id="com-mod-note" style="font-size:11px;color:var(--ts)"></span>
+        <button class="btn btn-primary" type="button" onclick="_comGuardarTodo()">💾 Guardar todo</button>
+      </div>`;
+    _comZonas.forEach((z, i) => _comCalcFila(i));
+  } catch (e) {
+    body.innerHTML = `<div class="alert alert-error">${_comEsc(e.message)}</div>`;
+  }
+}
+
+// ¿La fila i cambió respecto a lo que pintó el último listar?
+function _comFilaModificada(i) {
+  const z = _comZonas[i];
+  const m = document.getElementById('com-m-' + i), g = document.getElementById('com-g-' + i);
+  if (!z || !m || !g) return false;
+  return String(m.value) !== z._origM || String(g.value) !== z._origG;
+}
+
+// Recalcula el costo del vendedor (matriz+ganancia) EN VIVO para una fila y el
+// contador de filas por guardar. NO guarda nada.
+function _comCalcFila(i) {
+  const mEl = document.getElementById('com-m-' + i), gEl = document.getElementById('com-g-' + i);
+  const out = document.getElementById('com-t-' + i);
+  if (!out) return;
+  const m = Number(mEl?.value), g = Number(gEl?.value);
+  if (mEl && gEl && mEl.value !== '' && gEl.value !== '' && Number.isFinite(m) && Number.isFinite(g)) out.textContent = _comFmt(m + g);
+  else out.textContent = '—';
+  const note = document.getElementById('com-mod-note');
+  if (note) {
+    const n = _comZonas.reduce((acc, _, k) => acc + (_comFilaModificada(k) ? 1 : 0), 0);
+    note.textContent = n ? (n + (n === 1 ? ' fila por guardar' : ' filas por guardar')) : '';
+  }
+}
+
+// Habilita la edición manual de la matriz (Memo puede poner otro número).
+function _comEditarMatriz(i) {
+  const el = document.getElementById('com-m-' + i);
+  if (!el) return;
+  el.readOnly = false;
+  el.focus();
+}
+
+// Chip de divergencia → pre-llena la matriz con la última compra. NO guarda:
+// Memo confirma con 💾 Guardar todo.
+function _comUsarUltimaCompra(i) {
+  const z = _comZonas[i];
+  const el = document.getElementById('com-m-' + i);
+  if (!z || !el || z.sugerencia_matriz == null) return;
+  el.value = z.sugerencia_matriz;
+  _comCalcFila(i);
+}
+
+// 💾 Guarda EN LOTE solo las filas modificadas — cada una por el read-then-write
+// existente del backend (accion 'guardar', jamás on_conflict).
+async function _comGuardarTodo() {
+  const eid = _comEventoId();
+  if (!eid) return _comAlert('Elige un evento', true);
+  const mods = _comZonas.map((z, i) => i).filter(i => _comFilaModificada(i));
+  if (!mods.length) return _comAlert('Nada que guardar — no hay filas modificadas', true);
+  // Validación previa de TODAS las filas modificadas (no guarda a medias por datos malos).
+  for (const i of mods) {
+    const z = _comZonas[i];
+    const m = document.getElementById('com-m-' + i), g = document.getElementById('com-g-' + i);
+    if (!m || m.value === '' || !Number.isFinite(Number(m.value)) || Number(m.value) < 0) return _comAlert('Costo de Palacio inválido en ' + z.zona, true);
+    if (!g || g.value === '' || !Number.isFinite(Number(g.value)) || Number(g.value) < 0) return _comAlert('Ganancia inválida en ' + z.zona, true);
+  }
+  let okN = 0; const errores = [];
+  for (const i of mods) {
+    const z = _comZonas[i];
+    const costo_matriz = Math.round(Number(document.getElementById('com-m-' + i).value));
+    const comision = Math.round(Number(document.getElementById('com-g-' + i).value));
+    try {
+      const r = await khAdminFetch('/.netlify/functions/admin-comisiones-zona', { method: 'POST', body: JSON.stringify({ accion: 'guardar', evento_id: eid, zona: z.zona, costo_matriz, comision }) });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok || !j.ok) throw new Error(j.error || ('Error ' + r.status));
+      okN++;
+    } catch (e) { errores.push(z.zona + ': ' + e.message); }
+  }
+  // Recargar PRIMERO (refresca baseline/chips) y alertar DESPUÉS: _comLoad
+  // limpia la alerta al arrancar y se comería el resumen del guardado.
+  await _comLoad();
+  if (errores.length) _comAlert(okN + ' guardada(s); fallaron ' + errores.length + ' → ' + errores.join(' · '), true);
+  else _comAlert(okN + (okN === 1 ? ' zona guardada' : ' zonas guardadas') + ' ✓', false);
+}
+
+// ── Liquidaciones de vendedores (F5c — pantalla de Memo, solo maestro_roshi) ──
+// Cierre MANUAL. PUENTE slug↔uuid: el slug (catálogo/Portal) da paquetes y ventas;
+// el evento del Palacio (uuid, resumen_eventos) da la utilidad. NO hay mapeo en la
+// base → Memo confirma el par (con sugerencia por nombre/artista/fecha) antes de
+// previsualizar. El snapshot guarda ambos. Flujo: elegir slug → confirmar Palacio →
+// Previsualizar (sin escribir) → "Cerrar y liquidar" (congela) → Marcar pagada.
+let _liqEVCache = [];        // EV del catálogo (slug + nombre/artista/fecha)
+let _liqPalacioCache = [];   // resumen_eventos (uuid + nombre/artista/fecha)
+function _liqFmt(n) { return '$' + Math.round(Number(n) || 0).toLocaleString('es-MX'); }
+function _liqAlert(m, err) { const a = document.getElementById('kam-liq-alert'); if (a) a.innerHTML = m ? `<div class="alert ${err ? 'alert-error' : 'alert-success'}">${_esfEsc(m)}</div>` : ''; }
+function _liqNorm(s) { return String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]/g, ''); }
+function _liqYear(s) { const m = /(\d{4})/.exec(String(s || '')); return m ? m[1] : ''; }
+
+async function _liqPopulateEventos() {
+  const sel = document.getElementById('kam-liq-evt');
+  if (!sel) return;
+  try {
+    const ev = await _fetchEVFromIndex();
+    _liqEVCache = Array.isArray(ev) ? ev : [];
+    const opts = _liqEVCache
+      .filter((e) => e && e.id)
+      .slice()
+      .sort((a, b) => String(a.a || a.id).localeCompare(String(b.a || b.id)))
+      .map((e) => `<option value="${_esfEsc(e.id)}">${_esfEsc(e.a || e.id)}</option>`)
+      .join('');
+    sel.innerHTML = '<option value="">— Elige un evento —</option>' + opts;
+  } catch (_) { /* deja el placeholder */ }
+  // Catálogo del Palacio (uuid) para el par + sugerencia (best-effort).
+  try {
+    const r = await khAdminFetch('/.netlify/functions/admin-liquidacion', { method: 'POST', body: JSON.stringify({ accion: 'palacio_eventos' }) });
+    const j = await r.json().catch(() => ({}));
+    _liqPalacioCache = (r.ok && j.ok && Array.isArray(j.eventos)) ? j.eventos : [];
+  } catch (_) { _liqPalacioCache = []; }
+}
+
+// Elegir slug → armar el dropdown del Palacio con la SUGERENCIA preseleccionada
+// (editable). NO previsualiza: Memo confirma y aprieta el botón (una sugerencia
+// equivocada jamás se auto-aplica).
+function _liqOnEvento() {
+  _liqAlert('');
+  const par = document.getElementById('kam-liq-par');
+  const body = document.getElementById('kam-liq-body');
+  const pal = document.getElementById('kam-liq-palacio');
+  const sug = document.getElementById('kam-liq-sug');
+  if (body) body.innerHTML = '';
+  const slug = document.getElementById('kam-liq-evt').value;
+  if (!slug) { if (par) par.style.display = 'none'; return; }
+  const ev = _liqEVCache.find(e => e && e.id === slug) || {};
+  // Sugerencia: mejor match por artista/nombre (+ año de fecha) contra el Palacio.
+  const evKey = _liqNorm(ev.a || ev.id), evYear = _liqYear(ev.f);
+  let mejor = null, mejorScore = 0;
+  _liqPalacioCache.forEach(p => {
+    if (!p || !p.id) return;
+    const pk = _liqNorm((p.artista || '') + (p.nombre || ''));
+    let score = 0;
+    if (evKey && pk) { if (pk.includes(evKey) || evKey.includes(pk)) score += 2; }
+    if (evYear && _liqYear(p.fecha) === evYear) score += 1;
+    if (score > mejorScore) { mejorScore = score; mejor = p; }
+  });
+  const opts = _liqPalacioCache
+    .slice()
+    .sort((a, b) => String(a.fecha || '').localeCompare(String(b.fecha || '')))
+    .map(p => {
+      const lbl = [(p.artista || p.nombre || p.id), p.fecha ? ('· ' + p.fecha) : '', p.ciudad ? ('· ' + p.ciudad) : ''].filter(Boolean).join(' ');
+      const selAttr = (mejor && p.id === mejor.id) ? ' selected' : '';
+      return `<option value="${_esfEsc(p.id)}"${selAttr}>${_esfEsc(lbl)}</option>`;
+    }).join('');
+  if (pal) pal.innerHTML = '<option value="">— Elige el evento del Palacio —</option>' + opts;
+  if (sug) sug.innerHTML = mejor
+    ? `Sugerencia: <b>${_esfEsc(mejor.artista || mejor.nombre)}</b>${mejor.fecha ? ' · ' + _esfEsc(mejor.fecha) : ''} — confírmala o cámbiala.`
+    : (_liqPalacioCache.length ? 'Sin coincidencia clara — elige el evento del Palacio a mano.' : 'No pude cargar el catálogo del Palacio.');
+  if (par) par.style.display = '';
+}
+
+async function _liqPrevisualizar() {
+  const body = document.getElementById('kam-liq-body');
+  if (!body) return;
+  _liqAlert('');
+  const slug = document.getElementById('kam-liq-evt').value;
+  const palacioId = (document.getElementById('kam-liq-palacio') || {}).value || '';
+  if (!slug) { body.innerHTML = ''; return; }
+  if (!palacioId) { _liqAlert('Confirma el evento del Palacio (paso 2) antes de previsualizar.', true); return; }
+  body.innerHTML = '<div class="loading-state"><div class="spinner"></div>Calculando…</div>';
+  try {
+    const r = await khAdminFetch('/.netlify/functions/admin-liquidacion', { method: 'POST', body: JSON.stringify({ accion: 'previsualizar', evento_id: slug, palacio_evento_id: palacioId }) });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || !j.ok) throw new Error(j.error || ('Error ' + r.status));
+    _liqRender(j);
+  } catch (e) { body.innerHTML = `<div class="alert alert-error">${_esfEsc(e.message)}</div>`; }
+}
+
+function _liqRender(j) {
+  const body = document.getElementById('kam-liq-body');
+  if (!body) return;
+  const eidS = _esfEsc(j.evento_id);
+  const palS = _esfEsc(j.palacio_evento_id || '');
+  const avisoEv = j.evento_encontrado ? '' : `<div class="alert alert-error" style="margin-bottom:10px">⚠️ No encontré ese evento del Palacio (uuid) en resumen_eventos — la utilidad se toma como $0. Vuelve a confirmar el par antes de liquidar.</div>`;
+  const parInfo = j.palacio_evento_nombre ? `<div style="font-size:10px;color:var(--ts);margin-bottom:10px">Par confirmado: <b>${_esfEsc(j.evento_id)}</b> (catálogo) ↔ <b>${_esfEsc(j.palacio_evento_nombre)}</b> (Palacio)</div>` : '';
+  const chip = (txt, color) => `<span style="display:inline-block;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;color:${color};border:1px solid ${color}55">${txt}</span>`;
+  const filas = (Array.isArray(j.vendedores) && j.vendedores.length)
+    ? j.vendedores.map(v => {
+        const est = v.liquidada ? (v.estado === 'pagada' ? chip('pagada', 'var(--green)') : chip('calculada', 'var(--orange)')) : chip('sin liquidar', 'var(--ts)');
+        const btn = (v.liquidada && v.estado !== 'pagada')
+          ? `<button class="btn btn-ghost btn-sm" style="font-size:11px" onclick="_liqMarcarPagada('${eidS}','${_esfEsc(v.vendedor_id)}')">Marcar pagada</button>` : '';
+        return `<tr style="border-top:1px solid var(--border)">
+          <td style="padding:7px 4px;font-size:13px">${_esfEsc(v.vendedor_nombre)}</td>
+          <td style="padding:7px 4px;text-align:right;font-size:13px">${v.paquetes}</td>
+          <td style="padding:7px 4px;text-align:right;font-size:13px"><b>${_liqFmt(v.comision)}</b></td>
+          <td style="padding:7px 4px;text-align:center">${est}</td>
+          <td style="padding:7px 4px;text-align:right">${btn}</td>
+        </tr>`;
+      }).join('')
+    : '<tr><td colspan="5" style="padding:12px;text-align:center;color:var(--ts);font-size:12px">Sin ventas PLUS/STAY/RIDE de vendedor en este evento</td></tr>';
+  const puedeLiquidar = !j.ya_liquidado && j.evento_encontrado && Array.isArray(j.vendedores) && j.vendedores.length;
+  const accion = puedeLiquidar
+    ? `<button class="btn btn-primary" style="margin-top:12px" onclick="_liqLiquidar('${eidS}','${palS}')">Cerrar y liquidar</button>`
+    : (j.ya_liquidado ? `<div style="margin-top:12px;font-size:11px;color:var(--green)">✓ Evento ya liquidado (cálculo congelado).</div>` : '');
+  body.innerHTML = `${avisoEv}${parInfo}
+    <div style="display:flex;gap:18px;flex-wrap:wrap;margin-bottom:12px;font-size:13px">
+      <div><div style="font-size:10px;color:var(--ts);text-transform:uppercase;letter-spacing:.08em">Utilidad del evento</div><b style="font-size:16px">${_liqFmt(j.utilidad)}</b></div>
+      <div><div style="font-size:10px;color:var(--ts);text-transform:uppercase;letter-spacing:.08em">Paquetes vendidos</div><b style="font-size:16px">${j.total_paquetes}</b></div>
+      <div><div style="font-size:10px;color:var(--ts);text-transform:uppercase;letter-spacing:.08em">Ganancia / paquete</div><b style="font-size:16px">${_liqFmt(j.ganancia_por_paquete)}</b></div>
+      <div><div style="font-size:10px;color:var(--ts);text-transform:uppercase;letter-spacing:.08em">% comisión</div><b style="font-size:16px">${Math.round((j.pct || 0) * 100)}%</b></div>
+    </div>
+    <table style="width:100%;border-collapse:collapse"><thead><tr style="font-size:10px;color:var(--ts);text-transform:uppercase;letter-spacing:.08em"><th style="text-align:left;padding:4px">Vendedor</th><th style="text-align:right;padding:4px">Paq. PSR</th><th style="text-align:right;padding:4px">Comisión</th><th style="text-align:center;padding:4px">Estado</th><th></th></tr></thead><tbody>${filas}</tbody></table>
+    ${accion}`;
+}
+
+async function _liqLiquidar(slug, palacioId) {
+  if (!palacioId) { _liqAlert('Falta confirmar el evento del Palacio.', true); return; }
+  if (!confirm('¿Cerrar y liquidar este evento? El cálculo se CONGELA (si la utilidad cambia después, NO se recalcula). Se registran las comisiones de los vendedores con el par catálogo↔Palacio.')) return;
+  _liqAlert('');
+  try {
+    const r = await khAdminFetch('/.netlify/functions/admin-liquidacion', { method: 'POST', body: JSON.stringify({ accion: 'liquidar', evento_id: slug, palacio_evento_id: palacioId }) });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok || !d.ok) throw new Error(d.error || ('Error ' + r.status));
+    _liqAlert('Liquidado: ' + (d.liquidadas || 0) + ' comisión(es) registradas y congeladas.', false);
+    _liqRender(d);
+  } catch (e) { _liqAlert(e.message, true); }
+}
+
+async function _liqMarcarPagada(slug, vendedorId) {
+  try {
+    const r = await khAdminFetch('/.netlify/functions/admin-liquidacion', { method: 'POST', body: JSON.stringify({ accion: 'marcar_pagada', evento_id: slug, vendedor_id: vendedorId }) });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok || !d.ok) throw new Error(d.error || ('Error ' + r.status));
+    _liqAlert('Comisión marcada como pagada.', false);
+    _liqPrevisualizar();
+  } catch (e) { _liqAlert(e.message, true); }
+}
+
+// Carga y pinta las compras del evento elegido, agrupadas por zona, con stock y
+// deuda por zona y total del evento. Recalcula en cada carga (alta/borrado).
+async function _kamComprasLoad() {
+  const sel = document.getElementById('kam-evt-sel');
+  const cont = document.getElementById('kam-compras');
+  if (!sel || !cont) return;
+  const evId = sel.value;
+  if (!evId) { cont.innerHTML = ''; return; }
+  cont.innerHTML = '<div class="loading-state"><div class="spinner"></div>Cargando…</div>';
+  try {
+    const evArr = await _fetchEVFromIndex();
+    const ev = (Array.isArray(evArr) ? evArr : []).find((e) => e && e.id === evId);
+    const zonasEV = (ev && Array.isArray(ev.zonas)) ? ev.zonas : [];
+
+    const [cRes, pRes, vRes] = await Promise.all([
+      khAdminFetch('/.netlify/functions/admin-compras', { method: 'POST', body: JSON.stringify({ accion: 'listar', evento_id: evId }) }),
+      khAdminFetch('/.netlify/functions/admin-proveedores', { method: 'POST', body: JSON.stringify({ accion: 'listar' }) }),
+      khAdminFetch('/.netlify/functions/admin-vendidos-evento', { method: 'POST', body: JSON.stringify({ evento_id: evId }) }),
+    ]);
+    const cData = await cRes.json().catch(() => ({}));
+    const pData = await pRes.json().catch(() => ({}));
+    const vData = await vRes.json().catch(() => ({}));
+    if (!cRes.ok || !cData.ok) throw new Error(cData.error || 'No se pudieron cargar las compras');
+    if (!pRes.ok || !pData.ok) throw new Error(pData.error || 'No se pudieron cargar los proveedores');
+    const compras = cData.compras || [];
+    _kamProvCache = pData.proveedores || [];
+
+    // Vendidos por zona (Portal, vía 2a; ya filtrado por estados que cuentan). Si
+    // la lectura falla, se degrada a {} (no rompe el inventario). Claves con trim.
+    const vendidosMap = {};
+    if (vRes.ok && vData.ok && vData.vendidos) {
+      Object.keys(vData.vendidos).forEach((k) => {
+        const key = String(k).trim();
+        vendidosMap[key] = (vendidosMap[key] || 0) + (parseInt(vData.vendidos[k], 10) || 0);
+      });
+    }
+
+    // Deuda agrupada POR PROVEEDOR (cantidad × costo_unitario de sus compras).
+    const deudaPorProveedor = {};
+    compras.forEach((c) => {
+      const pid = c.proveedor_id;
+      if (!pid) return;
+      const sub = (parseInt(c.cantidad, 10) || 0) * (Number(c.costo_unitario) || 0);
+      if (!deudaPorProveedor[pid]) deudaPorProveedor[pid] = { nombre: c.proveedor_nombre || '—', deuda: 0 };
+      deudaPorProveedor[pid].deuda += sub;
+    });
+
+    if (!zonasEV.length && !compras.length) {
+      cont.innerHTML = '<div class="empty-state"><div class="empty-icon"></div>Este evento aún no tiene zonas</div>';
+      return;
+    }
+    // Unión de zonas: las del EV (orden + permiten captura) + las que ya tengan
+    // compras (por si una zona se renombró en el index después de comprar).
+    const zonaNames = [];
+    zonasEV.forEach((z) => { const n = (z && z.n != null) ? String(z.n) : ''; if (n && !zonaNames.includes(n)) zonaNames.push(n); });
+    compras.forEach((c) => { const n = String(c.zona || ''); if (n && !zonaNames.includes(n)) zonaNames.push(n); });
+
+    _kamZonasMap = {};
+    let totalEvento = 0;
+    let html = '';
+    zonaNames.forEach((zona, zi) => {
+      _kamZonasMap[zi] = zona;
+      const cz = compras.filter((c) => String(c.zona) === zona);
+      const stock = cz.reduce((s, c) => s + (parseInt(c.cantidad, 10) || 0), 0);
+      const deuda = cz.reduce((s, c) => s + (parseInt(c.cantidad, 10) || 0) * (Number(c.costo_unitario) || 0), 0);
+      totalEvento += deuda;
+      const vendidos = vendidosMap[String(zona).trim()] || 0;
+      const disponible = stock - vendidos;
+      const dispColor = disponible > 0 ? 'var(--green)' : 'var(--red)';
+      const filas = cz.length
+        ? cz.map((c) => {
+            const sub = (parseInt(c.cantidad, 10) || 0) * (Number(c.costo_unitario) || 0);
+            return `<tr style="border-top:1px solid var(--border)">
+              <td style="padding:6px 4px;font-size:12px">${parseInt(c.cantidad, 10) || 0} × ${_kamMoney(c.costo_unitario)}</td>
+              <td style="padding:6px 4px;font-size:12px;color:var(--ts)">${_esfEsc(c.proveedor_nombre || '—')}</td>
+              <td style="padding:6px 4px;font-size:12px;color:var(--ts)">${_esfEsc(c.fecha || '')}</td>
+              <td style="padding:6px 4px;font-size:12px">${_kamMoney(sub)}</td>
+              <td style="padding:6px 4px;text-align:right"><button class="btn btn-ghost btn-sm" type="button" onclick="_kamCompraEliminar('${_esfEsc(c.id)}')" title="Eliminar compra">✕</button></td>
+            </tr>`;
+          }).join('')
+        : '<tr><td colspan="5" style="padding:6px 4px;font-size:12px;color:var(--ts)">Sin compras en esta zona</td></tr>';
+      const provOpts = _kamProvCache.map((p) => `<option value="${_esfEsc(p.id)}">${_esfEsc(p.nombre)}</option>`).join('');
+      html += `<div style="border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:12px">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:8px">
+          <div style="font-family:'Rajdhani',sans-serif;font-weight:700;font-size:15px">${_esfEsc(zona)}</div>
+          <div style="font-size:12px;color:var(--ts)">Stock: <b style="color:var(--fg)">${stock}</b> · Vendidos: <b style="color:var(--fg)">${vendidos}</b> · Disponible: <b style="color:${dispColor};font-size:13px">${disponible}</b> · Deuda: <b style="color:var(--fg)">${_kamMoney(deuda)}</b></div>
+        </div>
+        <table style="width:100%;border-collapse:collapse;margin-bottom:8px"><tbody>${filas}</tbody></table>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+          <input class="cot-input" id="kam-c-cant-${zi}" type="number" min="0" placeholder="Cantidad" style="width:90px">
+          <input class="cot-input" id="kam-c-costo-${zi}" type="number" min="0" step="0.01" placeholder="Costo unit." style="width:110px">
+          <select class="cot-input" id="kam-c-prov-${zi}" style="min-width:130px">${provOpts}</select>
+          <input class="cot-input" id="kam-c-fecha-${zi}" type="date" value="${_kamToday()}" style="width:150px">
+          <input class="cot-input" id="kam-c-nota-${zi}" placeholder="Nota (opcional)" maxlength="500" style="flex:1;min-width:120px">
+          <button class="btn btn-primary btn-sm" type="button" onclick="_kamCompraCrear(${zi})">Agregar compra</button>
+        </div>
+      </div>`;
+    });
+    html += `<div style="text-align:right;font-size:14px;font-weight:700;margin-top:4px">Deuda del evento: ${_kamMoney(totalEvento)}</div>`;
+    html += '<div id="kam-compras-alert" style="margin-top:10px"></div>';
+    html += '<div id="kam-abonos" style="margin-top:16px"></div>';
+    cont.innerHTML = html;
+    _kamAbonosLoad(evId, deudaPorProveedor);
+  } catch (e) {
+    cont.innerHTML = `<div class="alert alert-error">${_esfEsc(e.message)}</div>`;
+  }
+}
+
+// ── Abonos a proveedores (pagos) ─────────────────────────────────────────────
+// deudaPorProveedor = { proveedor_id: { nombre, deuda } } calculado de las compras.
+function _kamAbonosAlert(msg) {
+  const a = document.getElementById('kam-abonos-alert');
+  if (a) a.innerHTML = `<div class="alert alert-error">${_esfEsc(msg)}</div>`;
+}
+
+async function _kamAbonosLoad(slug, deudaPorProveedor) {
+  const cont = document.getElementById('kam-abonos');
+  if (!cont) return;
+  cont.innerHTML = '<div class="loading-state"><div class="spinner"></div>Cargando abonos…</div>';
+  try {
+    const r = await khAdminFetch('/.netlify/functions/admin-abonos', {
+      method: 'POST', body: JSON.stringify({ accion: 'listar', evento_id: slug }),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok || !d.ok) throw new Error(d.error || 'No se pudieron cargar los abonos');
+    const abonos = d.abonos || [];
+
+    // Abonado por proveedor.
+    const abonadoPorProveedor = {};
+    abonos.forEach((a) => {
+      const pid = a.proveedor_id;
+      if (!pid) return;
+      abonadoPorProveedor[pid] = (abonadoPorProveedor[pid] || 0) + (Number(a.monto) || 0);
+    });
+
+    // Unión de proveedores con deuda o con abonos.
+    const pids = [];
+    Object.keys(deudaPorProveedor || {}).forEach((pid) => { if (!pids.includes(pid)) pids.push(pid); });
+    Object.keys(abonadoPorProveedor).forEach((pid) => { if (!pids.includes(pid)) pids.push(pid); });
+
+    const nombreDe = (pid) => (deudaPorProveedor[pid] && deudaPorProveedor[pid].nombre)
+      || (abonos.find((a) => a.proveedor_id === pid) || {}).proveedor_nombre || '—';
+
+    let deudaTotal = 0, abonadoTotal = 0;
+    const lineas = pids.map((pid) => {
+      const deuda = (deudaPorProveedor[pid] && deudaPorProveedor[pid].deuda) || 0;
+      const abonado = abonadoPorProveedor[pid] || 0;
+      deudaTotal += deuda; abonadoTotal += abonado;
+      const saldo = deuda - abonado;
+      return `<div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;font-size:12px;padding:5px 0;border-top:1px solid var(--border)">
+        <span style="font-weight:700">${_esfEsc(nombreDe(pid))}</span>
+        <span style="color:var(--ts)">Deuda ${_kamMoney(deuda)} · Abonado ${_kamMoney(abonado)} · Saldo <b style="color:var(--fg)">${_kamMoney(saldo)}</b></span>
+      </div>`;
+    }).join('');
+
+    // Proveedores con deuda → opciones del form de abono.
+    const conDeuda = Object.keys(deudaPorProveedor || {});
+    const provOpts = conDeuda.map((pid) => `<option value="${_esfEsc(pid)}">${_esfEsc(deudaPorProveedor[pid].nombre)}</option>`).join('');
+    const form = conDeuda.length
+      ? `<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:10px 0">
+          <select class="cot-input" id="kam-abono-prov" style="min-width:130px">${provOpts}</select>
+          <input class="cot-input" id="kam-abono-monto" type="number" min="0" step="0.01" placeholder="Monto" style="width:110px">
+          <input class="cot-input" id="kam-abono-fecha" type="date" value="${_kamToday()}" style="width:150px">
+          <input class="cot-input" id="kam-abono-nota" placeholder="Nota (opcional)" maxlength="500" style="flex:1;min-width:120px">
+          <button class="btn btn-primary btn-sm" type="button" onclick="_kamAbonoCrear('${_esfEsc(slug)}')">REGISTRAR ABONO</button>
+        </div>`
+      : '<div style="font-size:12px;color:var(--ts);margin:10px 0">Registra compras primero.</div>';
+
+    const filasAbonos = abonos.length
+      ? abonos.map((a) => `<tr style="border-top:1px solid var(--border)">
+          <td style="padding:6px 4px;font-size:12px;color:var(--ts)">${_esfEsc(a.fecha || '')}</td>
+          <td style="padding:6px 4px;font-size:12px">${_esfEsc(a.proveedor_nombre || '—')}</td>
+          <td style="padding:6px 4px;font-size:12px">${_kamMoney(a.monto)}</td>
+          <td style="padding:6px 4px;font-size:12px;color:var(--ts)">${_esfEsc(a.nota || '')}</td>
+          <td style="padding:6px 4px;text-align:right"><button class="btn btn-ghost btn-sm" type="button" onclick="_kamAbonoEliminar('${_esfEsc(a.id)}','${_esfEsc(slug)}')" title="Eliminar abono">✕</button></td>
+        </tr>`).join('')
+      : '<tr><td colspan="5" style="padding:6px 4px;font-size:12px;color:var(--ts)">Sin abonos registrados</td></tr>';
+
+    const saldoTotal = deudaTotal - abonadoTotal;
+    cont.innerHTML = `<div style="border:1px solid var(--border);border-radius:8px;padding:12px">
+      <div style="font-family:'Rajdhani',sans-serif;font-weight:700;font-size:15px;margin-bottom:8px">Abonos a proveedores</div>
+      ${lineas || '<div style="font-size:12px;color:var(--ts)">Sin deuda ni abonos todavía.</div>'}
+      ${form}
+      <div id="kam-abonos-alert" style="margin-bottom:8px"></div>
+      <table style="width:100%;border-collapse:collapse"><tbody>${filasAbonos}</tbody></table>
+      <div style="text-align:right;font-size:13px;font-weight:700;margin-top:10px">Deuda total ${_kamMoney(deudaTotal)} · Abonado total ${_kamMoney(abonadoTotal)} · Saldo total ${_kamMoney(saldoTotal)}</div>
+    </div>`;
+  } catch (e) {
+    cont.innerHTML = `<div class="alert alert-error">${_esfEsc(e.message)}</div>`;
+  }
+}
+
+async function _kamAbonoCrear(slug) {
+  _kamAbonosAlert('');
+  const prov = document.getElementById('kam-abono-prov')?.value || '';
+  const montoN = Number(document.getElementById('kam-abono-monto')?.value);
+  const fecha = document.getElementById('kam-abono-fecha')?.value || '';
+  const nota = (document.getElementById('kam-abono-nota')?.value || '').trim();
+  if (!prov) { _kamAbonosAlert('Elige un proveedor.'); return; }
+  if (!Number.isFinite(montoN) || montoN <= 0) { _kamAbonosAlert('El monto debe ser mayor a 0.'); return; }
+  if (fecha && !/^\d{4}-\d{2}-\d{2}$/.test(fecha)) { _kamAbonosAlert('Fecha inválida.'); return; }
+  try {
+    const r = await khAdminFetch('/.netlify/functions/admin-abonos', {
+      method: 'POST',
+      body: JSON.stringify({ accion: 'crear', evento_id: slug, proveedor_id: prov, monto: montoN, fecha: fecha || null, nota: nota || null }),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok || !d.ok) throw new Error(d.error || 'No se pudo registrar el abono');
+    _kamComprasLoad();
+  } catch (e) { _kamAbonosAlert(e.message); }
+}
+
+async function _kamAbonoEliminar(id, slug) {
+  if (!confirm('¿Eliminar este abono?')) return;
+  try {
+    const r = await khAdminFetch('/.netlify/functions/admin-abonos', { method: 'POST', body: JSON.stringify({ accion: 'eliminar', id }) });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok || !d.ok) throw new Error(d.error || 'No se pudo eliminar el abono');
+    _kamComprasLoad();
+  } catch (e) { _kamAbonosAlert(e.message); }
+}
+
+async function _kamCompraCrear(zi) {
+  const sel = document.getElementById('kam-evt-sel');
+  const evId = sel ? sel.value : '';
+  const zona = _kamZonasMap[zi];
+  if (!evId || zona == null) return;
+  _kamComprasAlert('');
+  const cantN = parseInt(document.getElementById('kam-c-cant-' + zi)?.value, 10);
+  const costoN = Number(document.getElementById('kam-c-costo-' + zi)?.value);
+  const prov = document.getElementById('kam-c-prov-' + zi)?.value || '';
+  const fecha = document.getElementById('kam-c-fecha-' + zi)?.value || '';
+  const nota = (document.getElementById('kam-c-nota-' + zi)?.value || '').trim();
+  if (!Number.isInteger(cantN) || cantN < 0) { _kamComprasAlert('Cantidad inválida (entero >= 0).'); return; }
+  if (!Number.isFinite(costoN) || costoN < 0) { _kamComprasAlert('Costo unitario inválido (>= 0).'); return; }
+  if (!prov) { _kamComprasAlert('Elige un proveedor.'); return; }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha)) { _kamComprasAlert('Fecha inválida.'); return; }
+  try {
+    const r = await khAdminFetch('/.netlify/functions/admin-compras', {
+      method: 'POST',
+      body: JSON.stringify({ accion: 'crear', evento_id: evId, zona, cantidad: cantN, costo_unitario: costoN, proveedor_id: prov, fecha, nota: nota || null }),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok || !d.ok) throw new Error(d.error || 'No se pudo registrar la compra');
+    _kamComprasLoad();
+  } catch (e) { _kamComprasAlert(e.message); }
+}
+
+async function _kamCompraEliminar(id) {
+  if (!confirm('¿Eliminar esta compra?')) return;
+  try {
+    const r = await khAdminFetch('/.netlify/functions/admin-compras', { method: 'POST', body: JSON.stringify({ accion: 'eliminar', id }) });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok || !d.ok) throw new Error(d.error || 'No se pudo eliminar la compra');
+    _kamComprasLoad();
+  } catch (e) { _kamComprasAlert(e.message); }
+}
+
+
+// ═══════════════════════════════════════════════════════════════
+// GUERREROS Z — Sistema de perfiles, invitaciones, ranking
+// ═══════════════════════════════════════════════════════════════
+const EMAIL_ENDPOINT = '/.netlify/functions/send-invite';
+
+async function sendEmail(to, subject, html) {
+  const resp = await khAdminFetch(EMAIL_ENDPOINT, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ to, subject, html })
+  });
+  if (!resp.ok) {
+    let msg = 'Error enviando email';
+    try { const err = await resp.json(); msg = err.error || err.message || msg; } catch(e) {}
+    throw new Error(msg);
+  }
+  return true;
+}
+const APP_URL = 'https://conectareynosa.mx/kamehouse';
+
+let _gzCache = [];
+let _gzFilter = 'todos';
+
+const ROL_LABELS = {
+  maestro_roshi: 'Maestro Roshi',
+  bulma: 'Bulma',
+  mister_popo: 'Maestro Karin',
+  coordinador: 'Coordinador',
+  cc: 'Creador de Contenido',
+  vendedor: 'Vendedor'
+};
+
+const PUNTOS_TOUR = {
+  concierto: 3,
+  festival_1d: 5,
+  festival_2d: 7,
+  festival_3d: 10
+};
+
+// Festivales (multi-día) por SLUG del EV → nº de días. Todo lo demás (incl. multifecha)
+// cuenta como concierto. Usado para derivar puntos AUTO de los tours asignados (DC2d).
+const FESTIVALES = {
+  palnorte: 3, edc2026: 3, coronacapital: 3,
+  emblema: 2, arre: 2, ultramexico: 2, flowfest: 2
+};
+
+const TIPO_TOUR_LABEL = {
+  concierto: 'Concierto',
+  festival_1d: 'Festival 1 día',
+  festival_2d: 'Festival 2 días',
+  festival_3d: 'Festival 3 días'
+};
+
+function calcularEdad(fechaNac) {
+  const hoy = new Date();
+  const nac = new Date(fechaNac);
+  let edad = hoy.getFullYear() - nac.getFullYear();
+  const m = hoy.getMonth() - nac.getMonth();
+  if (m < 0 || (m === 0 && hoy.getDate() < nac.getDate())) edad--;
+  return edad;
+}
+
+function esCumple(fechaNac) {
+  const hoy = new Date();
+  const nac = new Date(fechaNac);
+  return hoy.getMonth() === nac.getMonth() && hoy.getDate() === nac.getDate();
+}
+
+function calcularPuntos(tours) {
+  return tours.reduce((total, t) => {
+    if (!t.fecha_aprox) return total;
+    const año = new Date(t.fecha_aprox).getFullYear();
+    if (año < 2026) return total;
+    return total + (PUNTOS_TOUR[t.tipo_tour] || 0);
+  }, 0);
+}
+
+function calcularPuntosAnio(tours, anio) {
+  return tours.reduce((total, t) => {
+    if (!t.fecha_aprox) return total;
+    if (new Date(t.fecha_aprox).getFullYear() !== anio) return total;
+    return total + (PUNTOS_TOUR[t.tipo_tour] || 0);
+  }, 0);
+}
+
+// ── Puntos AUTO desde tours asignados (DC2d) ────────────────────────────────
+// Las asignaciones (eventos_coordi.evento_id) son SLUGS del EV (ej. 'palnorte',
+// 'karolg#2'). Derivamos tipo y fecha desde el EV — no desde la tabla 'eventos' de KH.
+
+// Clasifica una asignación por su slug. Festival si el slug base está en FESTIVALES.
+function tipoTourDeAsignacion(eventoId, evMap) {
+  const base = String(eventoId || '').split('#')[0];
+  if (FESTIVALES[base]) {
+    const dias = Math.min(FESTIVALES[base], 3);
+    return 'festival_' + dias + 'd';
+  }
+  return 'concierto';
+}
+
+// Fecha "fin" de la asignación (para saber si YA PASÓ). null si el slug no está en EV.
+function fechaFinAsignacion(eventoId, evMap) {
+  const parts = String(eventoId || '').split('#');
+  const base = parts[0];
+  const idx = parts[1];
+  const ev = evMap[base];
+  if (!ev) return null;
+  if (FESTIVALES[base]) {
+    if (!ev.ds) return null;
+    const fin = new Date(ev.ds + 'T12:00:00');
+    fin.setDate(fin.getDate() + (Math.min(FESTIVALES[base], 3) - 1));
+    return fin;
+  }
+  // Concierto: multifecha (#idx) usa dsList/multifecha[idx].ds; simple usa ev.ds.
+  const fechaStr = (idx != null
+    ? ((ev.dsList && ev.dsList[idx]) || (ev.multifecha && ev.multifecha[idx] && ev.multifecha[idx].ds))
+    : null) || ev.ds;
+  if (!fechaStr) return null;
+  return new Date(fechaStr + 'T12:00:00');
+}
+
+// Suma puntos de las asignaciones aceptadas YA PASADAS que caen en 'anio'.
+function puntosAutoDeUsuario(asignacionesAceptadas, evMap, anio) {
+  const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
+  let pts = 0;
+  const detalle = [];
+  (asignacionesAceptadas || []).forEach(a => {
+    const fin = fechaFinAsignacion(a.evento_id, evMap);
+    if (!fin) return;                       // slug ausente del EV (legacy UUID / borrado) → no cuenta
+    if (!(fin < hoy)) return;               // futura o de hoy → no cuenta
+    if (fin.getFullYear() !== anio) return; // de otro año → no cuenta aquí
+    const base = String(a.evento_id).split('#')[0];
+    const ev = evMap[base];
+    const tipo = tipoTourDeAsignacion(a.evento_id, evMap);
+    const p = PUNTOS_TOUR[tipo] || 0;
+    pts += p;
+    detalle.push({ nombre: (ev && ev.a) || base, tipo_tour: tipo, pts: p, fecha: fin });
+  });
+  return { pts, detalle };
+}
+
+// Combina puntos manuales (tours_pasados, fuera del sistema) + auto (asignaciones).
+// No deduplica: convención = manual son tours fuera del sistema.
+function calcularPuntosCombinados(toursPasadosUsuario, asignacionesUsuario, evMap, anio) {
+  const manuales = calcularPuntosAnio(toursPasadosUsuario || [], anio);
+  const aceptadas = (asignacionesUsuario || []).filter(a => a.status === 'aceptado');
+  const auto = puntosAutoDeUsuario(aceptadas, evMap, anio);
+  return { total: manuales + auto.pts, manuales, auto: auto.pts, detalleAuto: auto.detalle };
+}
+
+async function loadEquipo() {
+  const grid = document.getElementById('gz-grid');
+  if (!grid) return;
+  try {
+    _gzCache = await khUsuarios.listar({ activos: true, orden: 'nombre' }); // [sec-usuarios]
+    renderGZ();
+  } catch(e) {
+    grid.innerHTML = `<div class="alert alert-error">${e.message}</div>`;
+  }
+  // Mostrar la tab correcta según rol al entrar a Guerreros Z
+  // Todos los roles ahora pueden ver la lista del equipo (solo lectura)
+  const gzPermitidas = GZ_TABS_PERMITIDAS[currentUser?.rol] || ['lista','miperfil'];
+  const tabInicial = gzPermitidas.includes('lista') ? 'lista' : 'miperfil';
+  const btnInicial = document.querySelector(`.gz-tab-btn[onclick*="${tabInicial}"]`);
+  showGZTab(tabInicial, btnInicial);
+}
+
+// 💤 F6: inactividad de vendedores (solo admin, best-effort). id → info del
+// endpoint admin-vendedor-inactividad; si falla, nadie se marca.
+let _gzInactividad = null;
+async function _gzCargarInactividad() {
+  if (!currentUser || (currentUser.rol !== 'maestro_roshi' && currentUser.rol !== 'bulma')) return;
+  try {
+    const r = await khAdminFetch('/.netlify/functions/admin-vendedor-inactividad', {
+      method: 'POST', body: JSON.stringify({ accion: 'estado' }),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (r.ok && j.ok && Array.isArray(j.vendedores)) {
+      _gzInactividad = {};
+      j.vendedores.forEach(v => { if (v && v.id) _gzInactividad[v.id] = v; });
+    }
+  } catch (e) { /* best-effort: sin chip */ }
+}
+
+// "Dar otra oportunidad": reinicia el reloj (vendedor_reactivado_at = ahora).
+// NO destructivo — el usuario no se borra ni cambia de rol.
+async function gzReactivarVendedor(userId, nombre) {
+  if (!confirm(`¿Dar otra oportunidad a ${nombre}? El reloj de inactividad se reinicia desde hoy (3 meses).`)) return;
+  try {
+    const r = await khAdminFetch('/.netlify/functions/admin-vendedor-inactividad', {
+      method: 'POST', body: JSON.stringify({ accion: 'reactivar', usuario_id: userId }),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || !j.ok) throw new Error(j.error || ('Error ' + r.status));
+    showToast('Reactivado ✓ — el reloj cuenta desde hoy', 'success');
+    _gzInactividad = null;
+    await _gzCargarInactividad();
+    renderGZ();
+  } catch (e) { showToast(e.message, 'error'); }
+}
+
+// ⏳ Vigencias de contratos en Guerreros Z (solo admin, best-effort). Reusa
+// khContratos.listar (patrón #288/#309 — jamás service_role al navegador):
+// correo → contrato VIVO firmado de coordinador/creadora_team (el de
+// vigencia_fin más lejana). Fails-soft: si contratos no responde, _gzContratos
+// queda null y las cards salen como hoy (sin chip, ni siquiera "sin contrato").
+let _gzContratos = null;
+async function _gzCargarContratos() {
+  if (!currentUser || (currentUser.rol !== 'maestro_roshi' && currentUser.rol !== 'bulma')) return;
+  try {
+    const rows = await khContratos.listar({ estado: 'firmado', limit: 500 });
+    const mapa = {};
+    (rows || []).forEach(c => {
+      if (!c || (c.plantilla !== 'coordinador' && c.plantilla !== 'creadora_team') || !c.creador_email) return;
+      const k = String(c.creador_email).toLowerCase();
+      const prev = mapa[k];
+      if (!prev || String(c.vigencia_fin || '') > String(prev.vigencia_fin || '')) mapa[k] = c;
+    });
+    _gzContratos = mapa;
+  } catch (e) { /* fails-soft: cards como hoy */ }
+}
+
+// 'YYYY-MM-DD' → '15-oct-2026' para el chip.
+function _gzFmtVig(iso) {
+  const [y, m, d] = String(iso || '').slice(0, 10).split('-');
+  if (!y || !m || !d) return iso || '?';
+  const meses = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+  return `${parseInt(d, 10)}-${meses[parseInt(m, 10) - 1] || '?'}-${y}`;
+}
+
+// Chip de vigencia del contrato para roles que firman vía B (coordinador/cc).
+// Normal si falta lejos, ámbar ≤30 días, rojo vencido; sin contrato → discreto.
+function _gzChipContrato(u) {
+  if (!u || (u.rol !== 'coordinador' && u.rol !== 'cc') || !_gzContratos) return '';
+  const ICO = '<svg class="ic" style="width:11px;height:11px"><use href="#ic-contratos"/></svg>';
+  const base = 'display:inline-flex;align-items:center;gap:4px;margin-top:8px;font-size:9px;letter-spacing:.06em;text-transform:uppercase;font-weight:800;padding:2px 8px;border-radius:4px;';
+  const c = _gzContratos[String(u.correo || '').toLowerCase()];
+  if (!c || !c.vigencia_fin) {
+    return `<span style="${base}color:var(--ts);background:rgba(255,255,255,.05);border:1px solid var(--border)">${ICO} sin contrato</span>`;
+  }
+  const hoy = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Monterrey' });
+  const dias = Math.round((new Date(String(c.vigencia_fin).slice(0, 10) + 'T00:00:00Z') - new Date(hoy + 'T00:00:00Z')) / 86400000);
+  const fecha = _esfEsc(_gzFmtVig(c.vigencia_fin));
+  if (dias < 0) {
+    return `<span style="${base}color:#ff6666;background:rgba(255,68,68,.14);border:1px solid rgba(255,68,68,.4)">${ICO} venció ${fecha}</span>`;
+  }
+  if (dias <= 30) {
+    return `<span style="${base}color:#ffb020;background:rgba(255,176,32,.14);border:1px solid rgba(255,176,32,.4)">${ICO} vence ${fecha}</span>`;
+  }
+  return `<span style="${base}color:var(--ts);background:rgba(255,255,255,.05);border:1px solid var(--border)">${ICO} vence ${fecha}</span>`;
+}
+
+function _gzChipInactivo(u) {
+  if (!u || u.rol !== 'vendedor' || !_gzInactividad) return '';
+  const info = _gzInactividad[u.id];
+  if (!info || !info.inactivo) return '';
+  return `<div style="margin-top:8px;display:flex;flex-direction:column;gap:6px;align-items:center">
+    <span style="font-size:9px;letter-spacing:.08em;text-transform:uppercase;font-weight:800;padding:2px 8px;border-radius:4px;color:#ff6666;background:rgba(255,68,68,.14);border:1px solid rgba(255,68,68,.4)">💤 inactivo (sin ventas en 3 meses)</span>
+    <button class="btn btn-ghost btn-sm" style="font-size:10px;padding:3px 10px" onclick="event.stopPropagation();gzReactivarVendedor('${_esfEsc(u.id)}','${_esfEsc(u.nombre).replace(/'/g, '&#39;')}')">Dar otra oportunidad</button>
+  </div>`;
+}
+
+async function renderGZ() {
+  const grid = document.getElementById('gz-grid');
+  if (!grid) return;
+  if (_gzInactividad === null) await _gzCargarInactividad();
+  if (_gzContratos === null) await _gzCargarContratos();
+  let lista = _gzCache;
+  if (_gzFilter !== 'todos') lista = lista.filter(u => u.rol === _gzFilter);
+  if (!lista.length) {
+    grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:48px;color:var(--ts);font-family:JetBrains Mono,monospace;font-size:11px;letter-spacing:.1em">// sin miembros en esta categoria</div>';
+    return;
+  }
+  // Cargar puntos para todos: manuales (tours_pasados) + auto (tours asignados por
+  // slug, DC2d). Fails-soft: si fallan asignaciones o EV, cae a solo manuales.
+  let allTours = [];
+  try { allTours = await khTours.listar({ desde: '2026-01-01' }); } catch(e){} // [sec-tours]
+  let asignacionesDe = {};
+  let evMap = {};
+  try {
+    const asignaciones = await khAsignaciones.listar({ status: 'aceptado' }); // [sec-coordi]
+    const evArr = await _fetchEVFromIndex();
+    evArr.forEach(e => { if (e && e.id) evMap[e.id] = e; });
+    asignaciones.forEach(a => { (asignacionesDe[a.coordi_id] = asignacionesDe[a.coordi_id] || []).push(a); });
+  } catch(e){ asignacionesDe = {}; evMap = {}; }
+  const anioActual = new Date().getFullYear();
+  grid.innerHTML = lista.map(u => {
+    const iniciales = u.nombre.split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase();
+    const strikes = u.strikes || 0;
+    const cumple = u.fecha_nacimiento ? esCumple(u.fecha_nacimiento) : false;
+    const esYo = currentUser && u.id === currentUser.id;
+    const partes = u.nombre.split(' ');
+    const nombreCorto = partes[0] + (partes[1] ? ' ' + partes[1][0] + '.' : '');
+    const misToures = allTours.filter(t => t.usuario_id === u.id);
+    const pts = calcularPuntosCombinados(misToures, asignacionesDe[u.id] || [], evMap, anioActual).total;
+    return `<div class="gz-card" onclick="abrirPerfil('${u.id}')">
+      ${esYo ? '<div class="gz-badge-yo">TÚ</div>' : ''}
+      ${cumple ? '<div class="gz-badge-cumple"><svg class="ic"><use href="#ic-pastel"/></svg></div>' : ''}
+      <div class="gz-card-inner">
+        <div class="gz-avatar">
+          ${u.foto_url ? `<img src="${u.foto_url}" alt="${u.nombre}">` : iniciales}
+        </div>
+        <div class="gz-name">${nombreCorto}</div>
+        <div class="gz-rol">${ROL_LABELS[u.rol] || u.rol}</div>
+        <div class="gz-stats">
+          <div class="gz-stat">
+            <div class="gz-stat-value" style="color:var(--gold)">${pts}</div>
+            <div class="gz-stat-label">pts ${new Date().getFullYear()}</div>
+          </div>
+          <div class="gz-stat">
+            <div class="gz-strike-dots">
+              <div class="gz-strike-dot ${strikes >= 1 ? 'active' : ''}"></div>
+              <div class="gz-strike-dot ${strikes >= 2 ? 'active' : ''}"></div>
+              <div class="gz-strike-dot ${strikes >= 3 ? 'active' : ''}"></div>
+            </div>
+            <div class="gz-stat-label">strikes</div>
+          </div>
+        </div>
+        ${_gzChipContrato(u)}${_gzChipInactivo(u)}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function filtrarGZ(filtro, btn) {
+  _gzFilter = filtro;
+  document.querySelectorAll('.gz-filter').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderGZ();
+}
+
+function showGZTab(tab, btn) {
+  ['lista','invitar','miperfil'].forEach(t => {
+    const el = document.getElementById('gz-tab-' + t);
+    if (el) el.style.display = t === tab ? '' : 'none';
+  });
+  document.querySelectorAll('.gz-tab-btn').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  if (tab === 'miperfil') renderMiPerfil();
+  if (tab === 'lista') renderGZ();
+}
+
+// ─── INVITACIONES ───
+async function enviarInvitacion() {
+  const correo = document.getElementById('inv-correo').value.trim().toLowerCase();
+  const rol = document.getElementById('inv-rol').value;
+  const alertEl = document.getElementById('gz-invite-alert');
+  if (!correo) {
+    alertEl.innerHTML = '<div class="alert alert-error">Ingresa el correo</div>';
+    setTimeout(() => alertEl.innerHTML = '', 3000);
+    return;
+  }
+  let link = ''; // [sec-usuarios] el server genera el invite_token y lo devuelve
+  try {
+    alertEl.innerHTML = '<div class="alert" style="background:rgba(255,183,3,.1);color:var(--gold)">Enviando invitación…</div>';
+    const nuevo = await khUsuarios.crear(correo, rol); // [sec-usuarios]
+    link = `${APP_URL}?token=${nuevo.invite_token}`;
+    await sendEmail(correo, 'Bienvenido al equipo de Conecta Reynosa', buildInviteEmail(correo.split('@')[0], rol, link));
+    alertEl.innerHTML = '<div class="alert" style="background:rgba(45,198,83,.1);color:var(--green)">✓ Invitación enviada a ' + correo + '</div>';
+    document.getElementById('inv-correo').value = '';
+    setTimeout(() => alertEl.innerHTML = '', 5000);
+    loadEquipo();
+  } catch(emailErr) {
+    // Si el email falla, el usuario YA se creó en Supabase — mostrar el link para copiar
+    alertEl.innerHTML = `<div class="alert" style="background:rgba(255,183,3,.08);color:var(--gold);font-size:13px;line-height:1.6">
+      <div style="margin-bottom:8px"><svg class="ic"><use href="#ic-alerta"/></svg> El usuario se creó pero el email no se pudo enviar.</div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:10px;margin-bottom:8px">Manda este link por WhatsApp:</div>
+      <input readonly value="${link}" style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:8px 10px;font-family:'JetBrains Mono',monospace;font-size:11px;cursor:text" onclick="this.select();document.execCommand('copy')">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--ts);margin-top:6px">// click en el link para copiarlo · expira en 48h</div>
+    </div>`;
+    document.getElementById('inv-correo').value = '';
+    loadEquipo();
+  }
+}
+
+function buildInviteEmail(nombre, rol, link) {
+  return '<!DOCTYPE html><html><head><meta charset="UTF-8"></head>'
+    + '<body style="margin:0;padding:0;background:#06060A;font-family:Arial,sans-serif">'
+    + '<div style="max-width:520px;margin:40px auto;background:#0D0D14;border:1px solid rgba(232,93,4,.25);border-radius:12px;overflow:hidden">'
+    + '<div style="background:linear-gradient(135deg,#E85D04,#FFB703);padding:28px 32px">'
+    + '<div style="font-size:24px;font-weight:900;letter-spacing:.1em;color:#fff">KAME·HOUSE</div>'
+    + '<div style="font-size:12px;color:rgba(255,255,255,.8);margin-top:4px">Conecta Reynosa</div>'
+    + '</div><div style="padding:32px">'
+    + '<div style="font-size:20px;font-weight:700;color:#EEEEF5;margin-bottom:8px">Hola ' + nombre + ' 👋</div>'
+    + '<div style="color:rgba(238,238,245,.6);font-size:14px;line-height:1.7;margin-bottom:24px">'
+    + 'Memo Cobos te ha invitado a unirte al equipo de <strong style="color:#EEEEF5">Conecta Reynosa</strong> como <strong style="color:#FFB703">' + (ROL_LABELS[rol] || rol) + '</strong>.<br><br>'
+    + 'Haz click en el botón para crear tu perfil. El link expira en <strong>48 horas</strong>.</div>'
+    + '<a href="' + link + '" style="display:inline-block;background:linear-gradient(135deg,#E85D04,#FB8500);color:#fff;text-decoration:none;padding:14px 28px;border-radius:8px;font-weight:700;font-size:14px;letter-spacing:.08em">Crear mi perfil →</a>'
+    + '<div style="margin-top:28px;padding-top:20px;border-top:1px solid rgba(255,255,255,.08);font-size:11px;color:rgba(238,238,245,.3)">Si no esperabas este correo, ignóralo.<br>Link: ' + link + '</div>'
+    + '</div></div></body></html>';
+}
+
+// ─── STRIKES ───
+async function gestionarStrikes(userId, nombre, strikesActuales) {
+  const accion = prompt(`Strikes actuales: ${strikesActuales}/3.\n\nEscribe "+" para agregar strike, "-" para quitar, vacío para cancelar:`);
+  if (!accion) return;
+  const nuevo = accion === '+' ? Math.min(strikesActuales + 1, 3) : Math.max(strikesActuales - 1, 0);
+  if (nuevo === strikesActuales) return;
+  const motivo = prompt(`Motivo:`);
+  if (motivo === null) return;
+  try {
+    await khUsuarios.actualizar(userId, { strikes: nuevo }); // [sec-usuarios]
+    try {
+      await khCoordi.strikeCrear(userId, accion === '+' ? 'asignado' : 'quitado', motivo || null); // [sec-sensibles] por_quien lo pone el backend
+    } catch(e) {}
+    if (nuevo >= 3) {
+      const usuario = _gzCache.find(u => u.id === userId);
+      if (usuario?.correo_notif || usuario?.correo) {
+        await sendEmail(
+          usuario.correo_notif || usuario.correo,
+          '⚠️ Has acumulado 3 strikes',
+          `<div style="font-family:Arial;padding:32px;background:#06060A;color:#EEEEF5"><h2 style="color:#E63946">Aviso importante</h2><p>Has acumulado 3 strikes en el sistema.</p><p>Motivo: <strong>${motivo}</strong></p></div>`
+        ).catch(() => {});
+      }
+    }
+    await loadEquipo();
+    if (document.getElementById('modal-ver-perfil')) {
+      cerrarModal('ver-perfil');
+      abrirPerfil(userId);
+    }
+  } catch(e) { alert('Error: ' + e.message); }
+}
+
+async function confirmarEliminar(userId, nombre) {
+  if (!confirm(`¿Dar de baja a ${nombre}? Esto desactiva su acceso pero conserva su historial.`)) return;
+  try {
+    await khUsuarios.actualizar(userId, { activo: false }); // [sec-usuarios]
+    await loadEquipo();
+  } catch(e) { alert('Error: ' + e.message); }
+}
+
+async function resetearPassword(userId, nombre) {
+  const nueva = prompt(`Nueva contraseña para ${nombre}:\n\nMínimo 8 caracteres`);
+  if (!nueva || nueva.length < 8) { alert('Mínimo 8 caracteres'); return; }
+  try {
+    // La password viaja por HTTPS a la Netlify Function, que la hashea con bcrypt
+    // (service_role). NUNCA se guarda en texto plano ni se toca Supabase directo.
+    const r = await khAdminFetch('/.netlify/functions/reset-password', {
+      method: 'POST',
+      body: JSON.stringify({ userId, nuevaPassword: nueva }),
+    });
+    if (!r.ok) {
+      const j = await r.json().catch(() => ({ error: 'Error ' + r.status }));
+      throw new Error(j.error || 'Error desconocido');
+    }
+    alert(`Contraseña actualizada.`);
+  } catch(e) { alert('Error: ' + e.message); }
+}
+
+async function cambiarRol(userId, rolActual) {
+  const roles = ['coordinador','mister_popo','bulma','cc','vendedor'];
+  const nuevoRol = prompt(`Rol actual: ${rolActual}\n\nEscribe el nuevo rol:\n${roles.join(', ')}`);
+  if (!nuevoRol || !roles.includes(nuevoRol)) return;
+  try {
+    await khUsuarios.actualizar(userId, { rol: nuevoRol }); // [sec-usuarios]
+    cerrarModal('ver-perfil');
+    await loadEquipo();
+  } catch(e) { alert('Error: ' + e.message); }
+}
+
+// ─── VER PERFIL (modal) ───
+async function abrirPerfil(userId) {
+  const usuario = _gzCache.find(u => u.id === userId);
+  if (!usuario) return;
+
+  const esYo = currentUser && usuario.id === currentUser.id;
+  const puedeEditar = esYo || currentUser?.rol === 'maestro_roshi';
+  const iniciales = usuario.nombre.split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase();
+  const edad = usuario.fecha_nacimiento ? calcularEdad(usuario.fecha_nacimiento) : null;
+  const cumple = usuario.fecha_nacimiento ? esCumple(usuario.fecha_nacimiento) : false;
+
+  let toursPasados = [];
+  let evAsignados = [];
+  try {
+    toursPasados = await khTours.listar({ usuario_id: userId }); // [sec-tours]
+  } catch(e) {}
+  try {
+    // Trae el id de la asignación (necesario para FK de deliverables). El
+    // evento_id es slug (Fase A); los datos del evento los adjuntamos desde el
+    // EV más abajo (ya no usamos el embed eventos(...), sin FK).
+    evAsignados = await khAsignaciones.listar({ coordi_id: userId }); // [sec-coordi]
+  } catch(e) {}
+
+  // Si la usuaria es Creador de Contenido, cargar y/o auto-popular deliverables
+  // de cada evento asignado. Sin esto, los .deliverables quedan vacíos y el
+  // panel renderiza el botón de "iniciar tracking".
+  if (usuario.rol === 'cc' && evAsignados.length) {
+    await _ensureDeliverables(evAsignados);
+  }
+
+  // Puntos combinados: manuales (tours_pasados) + auto (asignaciones por slug, DC2d).
+  const _anioPerfil = new Date().getFullYear();
+  const _evArrPerfil = await _fetchEVFromIndex();
+  const _evMapPerfil = {};
+  _evArrPerfil.forEach(e => { if (e && e.id) _evMapPerfil[e.id] = e; });
+  _attachEventoDesdeEV(evAsignados, _evMapPerfil);
+  const _combPerfil = calcularPuntosCombinados(toursPasados, evAsignados, _evMapPerfil, _anioPerfil);
+  const ptsTotal = _combPerfil.total;
+  const ptsAnio = _combPerfil.total;
+  const _detalleAutoPerfil = _combPerfil.detalleAuto;
+
+  const adminSection = currentUser?.rol === 'maestro_roshi' && !esYo ? `
+    <div class="perfil-section-v2" style="border-left-color:var(--red)">
+      <div class="perfil-section-title-v2" style="color:var(--red)">// admin · maestro roshi</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-ghost btn-sm" onclick="resetearPassword('${userId}','${usuario.nombre.replace(/'/g,"\\'")}')" style="font-family:'JetBrains Mono',monospace;font-size:10px">▸ resetear pass</button>
+        <button class="btn btn-ghost btn-sm" onclick="cambiarRol('${userId}','${usuario.rol}')" style="font-family:'JetBrains Mono',monospace;font-size:10px">▸ cambiar rol</button>
+        <button class="btn btn-ghost btn-sm" onclick="gestionarStrikes('${userId}','${usuario.nombre.replace(/'/g,"\\'")}',${usuario.strikes||0})" style="font-family:'JetBrains Mono',monospace;font-size:10px">▸ strikes</button>
+        <button class="btn btn-ghost btn-sm" style="color:var(--red);border-color:rgba(230,57,70,.3);font-family:'JetBrains Mono',monospace;font-size:10px" onclick="cerrarModal('ver-perfil');confirmarEliminar('${userId}','${usuario.nombre.replace(/'/g,"\\'")}')">▸ dar de baja</button>
+      </div>
+    </div>
+  ` : '';
+
+  const perfilHtml = renderPerfilCompleto(usuario, toursPasados, evAsignados, iniciales, edad, cumple, ptsTotal, ptsAnio, esYo, _detalleAutoPerfil) + adminSection;
+
+  crearModal('ver-perfil', '', perfilHtml);
+}
+
+
+
+function abrirAgregarTour(userId) {
+  crearModal('add-tour', 'Agregar Tour', `
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div><div class="perfil-field-label" style="margin-bottom:6px">Artista / Evento *</div><input class="cot-input" id="tp-artista" placeholder="Bad Bunny, Feid, Arre Tour..."></div>
+      <div><div class="perfil-field-label" style="margin-bottom:6px">Ciudad</div><input class="cot-input" id="tp-ciudad" placeholder="Monterrey, CDMX..."></div>
+      <div><div class="perfil-field-label" style="margin-bottom:6px">Fecha aproximada</div><input class="cot-input" type="date" id="tp-fecha"></div>
+      <div><div class="perfil-field-label" style="margin-bottom:6px">Tipo de tour</div>
+        <select class="cot-input" id="tp-tipo">
+          <option value="concierto">Concierto (3 pts)</option>
+          <option value="festival_1d">Festival 1 día (5 pts)</option>
+          <option value="festival_2d">Festival 2 días (7 pts)</option>
+          <option value="festival_3d">Festival 3 días (10 pts)</option>
+        </select></div>
+      <div><div class="perfil-field-label" style="margin-bottom:6px">Tu rol</div>
+        <select class="cot-input" id="tp-rol">
+          <option>Coordinador</option><option>Auxiliar</option><option>Vendedor</option><option>Creador de Contenido</option><option>Otro</option>
+        </select></div>
+      <div><div class="perfil-field-label" style="margin-bottom:6px">Notas</div><input class="cot-input" id="tp-notas" placeholder="Algo especial..."></div>
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
+      <button class="btn btn-ghost" onclick="cerrarModal('add-tour')">Cancelar</button>
+      <button class="btn btn-primary" onclick="guardarTourPasado('${userId}')">Guardar</button>
+    </div>
+  `);
+}
+
+async function guardarTourPasado(userId) {
+  const artista = document.getElementById('tp-artista').value.trim();
+  if (!artista) { alert('El artista es obligatorio'); return; }
+  try {
+    await khTours.crear({ // [sec-tours]
+      usuario_id: userId, artista,
+      ciudad: document.getElementById('tp-ciudad').value.trim() || null,
+      fecha_aprox: document.getElementById('tp-fecha').value || null,
+      tipo_tour: document.getElementById('tp-tipo').value,
+      rol_en_tour: document.getElementById('tp-rol').value,
+      notas: document.getElementById('tp-notas').value.trim() || null
+    });
+    cerrarModal('add-tour');
+    cerrarModal('ver-perfil');
+    if (currentUser && userId === currentUser.id) renderMiPerfil(false);
+    else abrirPerfil(userId);
+  } catch(e) { alert(e.message); }
+}
+
+async function eliminarTourPasado(tourId, userId) {
+  if (!confirm('¿Eliminar este tour del historial?')) return;
+  try {
+    await khTours.eliminar(tourId); // [sec-tours]
+    cerrarModal('ver-perfil');
+    if (currentUser && userId === currentUser.id) renderMiPerfil(false);
+    else abrirPerfil(userId);
+  } catch(e) { alert(e.message); }
+}
+
+// ─── MI PERFIL ───
+async function renderMiPerfil(modoEdicion = false) {
+  if (!currentUser) return;
+  const el = document.getElementById('gz-miperfil-content');
+  if (!el) return;
+
+  if (modoEdicion) {
+    el.innerHTML = renderFormPerfil();
+    // Fetch fresco para tener todos los campos (incluyendo username)
+    try {
+      const uFresh = await khUsuarios.obtener(currentUser.id); // [sec-usuarios]
+      const u = uFresh || currentUser;
+      ['nombre','correo_notif','celular','num_emergencia','nombre_emergencia','talla_playera','fecha_nacimiento','template_sugerido','username'].forEach(campo => {
+        const inp = document.getElementById('mp-' + campo);
+        if (inp && u[campo]) inp.value = u[campo];
+      });
+      // Marca el punto de tema según el valor fresco (por si la sesión venía sin él)
+      if (u.tema_acento) {
+        const dot = document.querySelector(`.tema-dot[data-hex="${u.tema_acento.toLowerCase()}"]`);
+        if (dot) seleccionarTema(u.tema_acento, dot);
+      }
+    } catch(e) {
+      const u = currentUser;
+      ['nombre','correo_notif','celular','num_emergencia','nombre_emergencia','talla_playera','fecha_nacimiento','template_sugerido','username'].forEach(campo => {
+        const inp = document.getElementById('mp-' + campo);
+        if (inp && u[campo]) inp.value = u[campo];
+      });
+    }
+    return;
+  }
+
+  el.innerHTML = '<div class="loading-state"><div class="spinner"></div>Cargando perfil…</div>';
+
+  try {
+    const u = await khUsuarios.obtener(currentUser.id); // [sec-usuarios]
+    if (!u) { el.innerHTML = '<div class="alert alert-error">No se encontró el perfil</div>'; return; }
+    currentUser = { ...currentUser, ...u };
+
+    const toursPasados = await khTours.listar({ usuario_id: u.id }); // [sec-tours]
+    const evAsignados = await khAsignaciones.listar({ coordi_id: u.id }).catch(() => []); // [sec-coordi]
+    if (u.rol === 'cc' && evAsignados.length) {
+      await _ensureDeliverables(evAsignados);
+    }
+
+    const iniciales = u.nombre.split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase();
+    const edad = u.fecha_nacimiento ? calcularEdad(u.fecha_nacimiento) : null;
+    const cumple = u.fecha_nacimiento ? esCumple(u.fecha_nacimiento) : false;
+    // Puntos combinados: manuales + auto (asignaciones por slug, DC2d).
+    const _evArrMP = await _fetchEVFromIndex();
+    const _evMapMP = {};
+    _evArrMP.forEach(e => { if (e && e.id) _evMapMP[e.id] = e; });
+    _attachEventoDesdeEV(evAsignados, _evMapMP);
+    const _combMP = calcularPuntosCombinados(toursPasados, evAsignados, _evMapMP, new Date().getFullYear());
+    const ptsTotal = _combMP.total;
+    const ptsAnio = _combMP.total;
+
+    el.innerHTML = renderPerfilCompleto(u, toursPasados, evAsignados, iniciales, edad, cumple, ptsTotal, ptsAnio, true, _combMP.detalleAuto);
+  } catch(e) {
+    el.innerHTML = `<div class="alert alert-error">${e.message}</div>`;
+  }
+}
+
+function renderPerfilCompleto(u, toursPasados, evAsignados, iniciales, edad, cumple, ptsTotal, ptsAnio, esMiPerfil, detalleAuto) {
+  const strikes = u.strikes || 0;
+  const anioActual = new Date().getFullYear();
+  detalleAuto = detalleAuto || [];
+
+  return `
+    <div class="perfil-card">
+      <div class="perfil-card-header">
+        <div style="display:flex;gap:24px;align-items:center;flex-wrap:wrap">
+          <div class="perfil-avatar-large" ${esMiPerfil ? `onclick="subirFoto('${u.id}')"` : ''}>
+            ${u.foto_url ? `<img src="${u.foto_url}" alt="${u.nombre}">` : iniciales}
+            ${esMiPerfil ? '<div class="upload-hint">Cambiar<br>foto</div>' : ''}
+          </div>
+          <div style="flex:1;min-width:200px">
+            <div style="font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.18em;color:var(--ts);margin-bottom:6px">// id_${u.id.slice(0,8)}</div>
+            <div style="font-family:'Rajdhani',sans-serif;font-size:30px;font-weight:700;line-height:1;margin-bottom:8px;letter-spacing:-.01em">${u.nombre}${cumple ? ' <span style="font-size:24px"><svg class="ic"><use href="#ic-pastel"/></svg></span>' : ''}</div>
+            <div style="display:inline-block;font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--gold);border:1px solid rgba(255,183,3,.3);padding:4px 10px;margin-bottom:6px">${ROL_LABELS[u.rol] || u.rol}</div>
+            ${edad ? `<div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--ts);margin-top:4px">${edad} años</div>` : ''}
+          </div>
+          <div style="display:flex;gap:24px;flex-wrap:wrap">
+            ${u.rol === 'cc' ? (() => {
+              const totalDeliv = evAsignados.reduce((s, e) => s + (e.deliverables ? e.deliverables.length : 0), 0);
+              const okDeliv = evAsignados.reduce((s, e) => s + (e.deliverables ? e.deliverables.filter(d => d.estado === 'completado').length : 0), 0);
+              const ratioColor = totalDeliv === 0 ? 'var(--ts)' : okDeliv === totalDeliv ? 'var(--green)' : okDeliv > 0 ? 'var(--gold)' : 'var(--red)';
+              return `
+                <div style="text-align:center">
+                  <div style="font-family:'Zen Dots',cursive;font-size:24px;line-height:1;color:var(--text)">${evAsignados.length}</div>
+                  <div class="pts-label">Tours asig</div>
+                </div>
+                <div style="text-align:center">
+                  <div style="font-family:'Zen Dots',cursive;font-size:24px;line-height:1;color:${ratioColor}">${okDeliv}/${totalDeliv}</div>
+                  <div class="pts-label">Material</div>
+                </div>
+                <div style="text-align:center">
+                  <div style="font-family:'Zen Dots',cursive;font-size:24px;line-height:1;color:${strikes >= 3 ? 'var(--red)' : strikes >= 2 ? 'var(--gold)' : 'var(--green)'}">${strikes}/3</div>
+                  <div class="pts-label">Strikes</div>
+                </div>
+              `;
+            })() : `
+              <div style="text-align:center">
+                <div class="pts-display">${ptsAnio}</div>
+                <div class="pts-label">PTS ${anioActual}</div>
+              </div>
+              <div style="text-align:center">
+                <div style="font-family:'Zen Dots',cursive;font-size:24px;line-height:1;color:var(--text)">${toursPasados.length + detalleAuto.length}</div>
+                <div class="pts-label">Tours</div>
+              </div>
+              <div style="text-align:center">
+                <div style="font-family:'Zen Dots',cursive;font-size:24px;line-height:1;color:${strikes >= 3 ? 'var(--red)' : strikes >= 2 ? 'var(--gold)' : 'var(--green)'}">${strikes}/3</div>
+                <div class="pts-label">Strikes</div>
+              </div>
+            `}
+          </div>
+        </div>
+      </div>
+
+      ${esMiPerfil ? `
+        <div class="perfil-section" style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn btn-primary" onclick="renderMiPerfil(true)" style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.1em">▸ EDITAR PERFIL</button>
+        </div>
+      ` : ''}
+
+      <div class="perfil-section">
+        <div class="perfil-section-title">Información personal</div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:18px 28px">
+          ${perfilCampo('Correo', u.correo)}
+          ${perfilCampo('Celular', u.celular)}
+          ${perfilCampo('Correo notif', u.correo_notif)}
+          ${perfilCampo('Talla playera', u.talla_playera)}
+          ${perfilCampo('Fecha nacimiento', u.fecha_nacimiento ? fmtFecha(u.fecha_nacimiento) : null)}
+          ${perfilCampo('Emergencia', u.nombre_emergencia ? `${u.nombre_emergencia} · ${u.num_emergencia}` : u.num_emergencia)}
+        </div>
+      </div>
+
+      ${u.template_sugerido ? `
+        <div class="perfil-section">
+          <div class="perfil-section-title">Mi template</div>
+          <div style="background:var(--bg3);border-left:2px solid var(--gold);padding:14px 18px;font-family:'Rajdhani',sans-serif;font-size:14px;font-style:italic;color:var(--text);position:relative">
+            <span style="font-family:'Zen Dots',cursive;font-size:24px;color:var(--gold);position:absolute;top:-2px;left:8px;background:var(--bg2);padding:0 6px;line-height:1">"</span>
+            <div style="padding-top:6px">${u.template_sugerido}</div>
+          </div>
+        </div>
+      ` : ''}
+
+      <div class="perfil-section">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px">
+          <div class="perfil-section-title" style="margin-bottom:0">Tours asignados <span style="color:var(--ts);font-weight:400">[${evAsignados.length}]</span></div>
+        </div>
+        ${evAsignados.length ? evAsignados.map(e => {
+          const ev = e.eventos || {};
+          const hoy = new Date(); hoy.setHours(0,0,0,0);
+          const fechaEv = ev.fecha ? new Date(ev.fecha + 'T12:00:00') : null;
+          const esPasado = fechaEv && fechaEv < hoy;
+          const stColor = { pendiente:'var(--gold)', aceptado:'var(--green)', declinado:'var(--red)' };
+          const stLabel = { pendiente:'Pendiente', aceptado:'Aceptado', declinado:'Declinado' };
+          return `<div class="tour-item" style="border-left-color:${esPasado?'var(--ts)':'var(--orange)'}">
+            <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;flex-wrap:wrap">
+              <div>
+                <div class="tour-item-name" style="font-size:16px">${ev.nombre || ev.artista || '—'}</div>
+                <div class="tour-item-meta">${ev.artista?ev.artista+' · ':''}${ev.ciudad||''} ${fechaEv?'· '+fechaEv.toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric'}):''}</div>
+                ${u.rol !== 'cc' && e.indicaciones ? `<div style="font-size:11px;color:var(--ts);margin-top:5px;font-style:italic">${e.indicaciones}</div>` : ''}
+                ${ev.notas_internas ? `<div style="font-size:11px;color:var(--ts);margin-top:4px"><span class="k-mono-sm" style="margin-right:6px">EQUIPO</span>${ev.notas_internas}</div>` : ''}
+              </div>
+              <span style="font-size:10px;white-space:nowrap;color:${stColor[e.status]||'var(--ts)'}">
+                ${stLabel[e.status]||e.status||''}
+              </span>
+            </div>
+            ${esMiPerfil && ev.id ? `
+            <div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap">
+              <button class="btn btn-ghost btn-sm" onclick="descargarListaViajeros('${ev.id}')" style="font-size:10px;font-family:'JetBrains Mono',monospace">↓ Lista viajeros</button>
+              <button class="btn btn-ghost btn-sm" onclick="descargarRoomingList('${ev.id}')" style="font-size:10px;font-family:'JetBrains Mono',monospace">↓ Rooming list</button>
+            </div>` : ''}
+            ${u.rol === 'cc' && Array.isArray(e.deliverables) ? _renderDeliverablesPanel(e, u) : ''}
+          </div>`;
+        }).join('') : '<div style="font-family:JetBrains Mono,monospace;font-size:11px;color:var(--ts);letter-spacing:.05em">// sin tours asignados</div>'}
+      </div>
+
+      <div class="perfil-section">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px">
+          <div class="perfil-section-title" style="margin-bottom:0">Historial de tours <span style="color:var(--ts);font-weight:400">[${toursPasados.length + detalleAuto.length}]</span></div>
+          <button class="btn btn-ghost btn-sm" onclick="abrirAgregarTour('${u.id}')" style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.08em">+ Agregar</button>
+        </div>
+        ${detalleAuto.map(d => `
+          <div class="tour-item" style="border-left-color:var(--green)">
+            <div class="tour-item-head">
+              <div class="tour-item-name">${d.nombre} <span style="font-family:JetBrains Mono,monospace;font-size:9px;color:var(--green);letter-spacing:.1em">(asignado)</span></div>
+              <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
+                <span class="tour-item-pts">+${d.pts}</span>
+              </div>
+            </div>
+            <div class="tour-item-meta">${TIPO_TOUR_LABEL[d.tipo_tour]||'Tour'} ${d.fecha ? '· ' + fmtFecha(d.fecha.toISOString().slice(0,10)) : ''}</div>
+          </div>`).join('')}
+        ${toursPasados.map(t => {
+          const año = t.fecha_aprox ? new Date(t.fecha_aprox).getFullYear() : null;
+          const sumaPuntos = año && año >= 2026;
+          const ptsTour = PUNTOS_TOUR[t.tipo_tour] || 0;
+          return `
+          <div class="tour-item">
+            <div class="tour-item-head">
+              <div class="tour-item-name">${t.artista}</div>
+              <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
+                ${sumaPuntos ? `<span class="tour-item-pts">+${ptsTour}</span>` : '<span style="font-family:JetBrains Mono,monospace;font-size:9px;color:var(--ts);letter-spacing:.1em">PRE-2026</span>'}
+                <button onclick="event.stopPropagation();eliminarTourPasado('${t.id}','${u.id}')" style="background:none;border:none;color:var(--ts);cursor:pointer;font-size:18px;padding:0 4px">×</button>
+              </div>
+            </div>
+            <div class="tour-item-meta">${TIPO_TOUR_LABEL[t.tipo_tour]||'Tour'} · ${t.ciudad || ''} ${t.fecha_aprox ? '· ' + fmtFecha(t.fecha_aprox) : ''}</div>
+            ${t.notas ? `<div style="font-size:11px;color:var(--ts);margin-top:6px;font-style:italic">${t.notas}</div>` : ''}
+          </div>`;
+        }).join('')}
+        ${(toursPasados.length + detalleAuto.length) === 0 ? '<div style="font-family:JetBrains Mono,monospace;font-size:11px;color:var(--ts);letter-spacing:.05em">// sin historial. Agrega tus tours pre-sistema para construir tu perfil.</div>' : ''}
+      </div>
+    </div>
+  `;
+}
+
+function perfilCampo(label, valor) {
+  return `<div class="perfil-field">
+    <div class="perfil-field-label">${label}</div>
+    <div class="perfil-field-value ${valor ? '' : 'perfil-field-empty'}">${valor || '— sin info'}</div>
+  </div>`;
+}
+
+function renderFormPerfil() {
+  const temaActual = (currentUser.tema_acento || '#e8ff4c').toLowerCase();
+  const temaDots = TEMA_PRESETS.map(t =>
+    `<button type="button" class="tema-dot${t.hex.toLowerCase() === temaActual ? ' sel' : ''}" style="--c:${t.hex}" data-hex="${t.hex.toLowerCase()}" title="${t.nombre}" aria-label="${t.nombre}" onclick="seleccionarTema('${t.hex}', this)"></button>`
+  ).join('');
+  return `
+    <div class="perfil-card" style="max-width:920px">
+      <div class="perfil-card-header" style="padding:24px 28px">
+        <div style="font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.2em;color:var(--ts);margin-bottom:4px">// EDIT_MODE</div>
+        <div style="font-family:'Zen Dots',cursive;font-size:22px;background:linear-gradient(90deg,var(--text),var(--gold));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">Editar mi perfil</div>
+      </div>
+      <div class="perfil-section">
+        <div class="perfil-section-title">Información básica</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+          <div style="grid-column:1/-1"><div class="perfil-field-label" style="margin-bottom:6px">Nombre completo</div><input class="cot-input" id="mp-nombre" placeholder="Tu nombre"></div>
+          <div><div class="perfil-field-label" style="margin-bottom:6px">Celular</div><input class="cot-input" id="mp-celular" placeholder="8991234567" type="tel"></div>
+          <div><div class="perfil-field-label" style="margin-bottom:6px">Talla playera</div><select class="cot-input" id="mp-talla_playera"><option value="">—</option><option>XS</option><option>S</option><option>M</option><option>L</option><option>XL</option><option>XXL</option></select></div>
+          <div><div class="perfil-field-label" style="margin-bottom:6px">Fecha de nacimiento</div><input class="cot-input" id="mp-fecha_nacimiento" type="date"></div>
+          <div><div class="perfil-field-label" style="margin-bottom:6px">Correo notificaciones</div><input class="cot-input" id="mp-correo_notif" type="email" placeholder="tu@correo.com"></div>
+        </div>
+      </div>
+      <div class="perfil-section">
+        <div class="perfil-section-title">Color de tema</div>
+        <div style="font-family:JetBrains Mono;font-size:10px;color:var(--ts);margin-bottom:12px;letter-spacing:.04em">// elige el acento de tu Kamehouse</div>
+        <input type="hidden" id="mp-tema_acento" value="${temaActual}">
+        <div class="tema-dots">${temaDots}</div>
+      </div>
+      <div class="perfil-section">
+        <div class="perfil-section-title">Contacto de emergencia</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+          <div><div class="perfil-field-label" style="margin-bottom:6px">Nombre</div><input class="cot-input" id="mp-nombre_emergencia"></div>
+          <div><div class="perfil-field-label" style="margin-bottom:6px">Número</div><input class="cot-input" id="mp-num_emergencia" type="tel"></div>
+        </div>
+      </div>
+      <div class="perfil-section">
+        <div class="perfil-section-title">Mi template</div>
+        <div style="font-family:JetBrains Mono;font-size:10px;color:var(--ts);margin-bottom:10px;letter-spacing:.04em">// describe el tema visual que te gustaría para tu perfil</div>
+        <textarea class="cot-input" id="mp-template_sugerido" rows="3" placeholder="ej. Tema azul oscuro con detalles dorados estilo Vegeta"></textarea>
+      </div>
+      <div class="perfil-section">
+        <div class="perfil-section-title">Acceso al sistema</div>
+        <div style="font-family:JetBrains Mono;font-size:10px;color:var(--ts);margin-bottom:14px;letter-spacing:.04em">// puedes entrar con tu correo o con tu nombre de usuario</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+          <div style="grid-column:1/-1">
+            <div class="perfil-field-label" style="margin-bottom:4px">Nombre de usuario</div>
+            <div style="font-family:JetBrains Mono;font-size:10px;color:var(--ts);margin-bottom:6px;letter-spacing:.04em">// elige un alias corto para iniciar sesión más rápido</div>
+            <input class="cot-input" id="mp-username" placeholder="ej. memo · mipopo · juanpz" autocomplete="username" style="text-transform:lowercase">
+          </div>
+          <div>
+            <div class="perfil-field-label" style="margin-bottom:4px">Nueva contraseña</div>
+            <div style="font-family:JetBrains Mono;font-size:10px;color:var(--ts);margin-bottom:6px;letter-spacing:.04em">// dejar vacío para no cambiarla</div>
+            <input class="cot-input" id="mp-pass-nueva" type="password" placeholder="Mínimo 6 caracteres" autocomplete="new-password">
+          </div>
+          <div>
+            <div class="perfil-field-label" style="margin-bottom:4px">Confirmar contraseña</div>
+            <div style="font-family:JetBrains Mono;font-size:10px;color:var(--ts);margin-bottom:6px;letter-spacing:.04em">&nbsp;</div>
+            <input class="cot-input" id="mp-pass-confirm" type="password" placeholder="Repite la contraseña" autocomplete="new-password">
+          </div>
+        </div>
+      </div>
+      <div class="perfil-section">
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <button class="btn btn-primary" onclick="guardarMiPerfil()">Guardar cambios</button>
+          <button class="btn btn-ghost" onclick="renderMiPerfil(false)">Cancelar</button>
+        </div>
+        <div id="mp-alert" style="margin-top:12px"></div>
+      </div>
+    </div>
+  `;
+}
+
+async function guardarMiPerfil() {
+  const alertEl = document.getElementById('mp-alert');
+  const passNueva = document.getElementById('mp-pass-nueva')?.value;
+  const passConfirm = document.getElementById('mp-pass-confirm')?.value;
+  if (passNueva && passNueva !== passConfirm) {
+    alertEl.innerHTML = '<div class="alert alert-error">Las contraseñas no coinciden</div>';
+    return;
+  }
+  // Validar username si lo cambió
+  const usernameNuevo = document.getElementById('mp-username')?.value.trim().toLowerCase().replace(/\s+/g,'') || null;
+  if (usernameNuevo) {
+    // Verificar que no esté tomado por otro usuario
+    const disponible = await khUsuarios.verificarUsername(usernameNuevo, currentUser.id); // [sec-usuarios]
+    if (!disponible) {
+      alertEl.innerHTML = '<div class="alert alert-error">Ese nombre de usuario ya está tomado, elige otro</div>';
+      return;
+    }
+  }
+
+  const body = {
+    nombre: document.getElementById('mp-nombre')?.value.trim(),
+    celular: document.getElementById('mp-celular')?.value.trim() || null,
+    talla_playera: document.getElementById('mp-talla_playera')?.value || null,
+    fecha_nacimiento: document.getElementById('mp-fecha_nacimiento')?.value || null,
+    correo_notif: document.getElementById('mp-correo_notif')?.value.trim() || null,
+    nombre_emergencia: document.getElementById('mp-nombre_emergencia')?.value.trim() || null,
+    num_emergencia: document.getElementById('mp-num_emergencia')?.value.trim() || null,
+    template_sugerido: document.getElementById('mp-template_sugerido')?.value.trim() || null,
+    tema_acento: document.getElementById('mp-tema_acento')?.value || null,
+    perfil_completo: true,
+  };
+  if (usernameNuevo) body.username = usernameNuevo;
+  if (passNueva) body.password = passNueva; // [sec-usuarios] texto plano; el server lo hashea (bcrypt)
+  try {
+    await khUsuarios.actualizar(currentUser.id, body); // [sec-usuarios]
+    delete body.password; // [sec-usuarios] no propagar la password en claro a currentUser/sessionStorage
+    alertEl.innerHTML = '<div class="alert" style="background:rgba(45,198,83,.1);color:var(--green)">Perfil guardado</div>';
+    currentUser = { ...currentUser, ...body };
+    // Refrescar la sesión guardada para que el tema persista al recargar
+    const _sesRaw = sessionStorage.getItem(SESSION_KEY);
+    if (_sesRaw) {
+      const _ses = JSON.parse(_sesRaw);
+      _ses.user = { ..._ses.user, ...body };
+      sessionStorage.setItem(SESSION_KEY, JSON.stringify(_ses));
+    }
+    // Re-aplica la precedencia (mismo orden que enterApp): al elegir un acento
+    // personal se quita la clase tema-XXX para que el acento se vea al instante.
+    aplicarTemaCoordi();
+    applyTema(body.tema_acento);
+    setTimeout(() => renderMiPerfil(false), 1200);
+    loadEquipo();
+  } catch(e) {
+    alertEl.innerHTML = `<div class="alert alert-error">${e.message}</div>`;
+  }
+}
+
+// ─── SUBIR FOTO ───
+async function subirFoto(userId) {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'image/jpeg,image/png,image/webp';
+  input.onchange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    if (file.size > 3 * 1024 * 1024) { alert('La foto no puede pesar más de 3MB'); return; }
+
+    // Redimensionar y convertir a base64 (funciona sin Storage bucket)
+    try {
+      const base64url = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          const img = new Image();
+          img.onload = () => {
+            const canvas = document.createElement('canvas');
+            const MAX = 400;
+            let w = img.width, h = img.height;
+            if (w > h) { if (w > MAX) { h = h * MAX / w; w = MAX; } }
+            else { if (h > MAX) { w = w * MAX / h; h = MAX; } }
+            canvas.width = w; canvas.height = h;
+            canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+            resolve(canvas.toDataURL('image/jpeg', 0.82));
+          };
+          img.onerror = reject;
+          img.src = ev.target.result;
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+
+      // Guardar base64 directo en foto_url (sin depender de Storage)
+      await khUsuarios.actualizar(userId, { foto_url: base64url }); // [sec-usuarios]
+
+      // Actualizar sesión si es el usuario actual
+      if (userId === currentUser.id) {
+        currentUser.foto_url = base64url;
+        const raw = sessionStorage.getItem(SESSION_KEY);
+        if (raw) {
+          const s = JSON.parse(raw);
+          s.user.foto_url = base64url;
+          sessionStorage.setItem(SESSION_KEY, JSON.stringify(s));
+        }
+      }
+
+      await loadEquipo();
+      if (userId === currentUser.id) renderMiPerfil(false);
+
+    } catch(e) {
+      alert('Error al procesar la foto: ' + e.message);
+    }
+  };
+  input.click();
+}
+
+// ─── RANKING ───
+async function abrirRanking() {
+  crearModal('ranking', '', '<div class="loading-state"><div class="spinner"></div>Calculando ranking…</div>');
+  try {
+    const tours = await khTours.listar({ desde: '2026-01-01' }); // [sec-tours]
+    const usuarios = await khUsuarios.listar({ activos: true, orden: 'nombre' }); // [sec-usuarios]
+    // Tours asignados aceptados (de TODOS) → puntos AUTO derivados del EV por slug (DC2d).
+    const asignaciones = await khAsignaciones.listar({ status: 'aceptado' }); // [sec-coordi]
+    const evArr = await _fetchEVFromIndex();
+    const evMap = {};
+    evArr.forEach(e => { if (e && e.id) evMap[e.id] = e; });
+    const anioActual = new Date().getFullYear();
+    const rankingData = usuarios.map(u => {
+      const misToures = tours.filter(t => t.usuario_id === u.id);
+      const misAsign = asignaciones.filter(a => a.coordi_id === u.id);
+      const comb = calcularPuntosCombinados(misToures, misAsign, evMap, anioActual);
+      const ptsAnio = comb.total;
+      const numTours = misToures.length + comb.detalleAuto.length;
+      const iniciales = u.nombre.split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase();
+      return { ...u, tours: misToures, ptsAnio, numTours, iniciales };
+    });
+    rankingData.sort((a, b) => b.ptsAnio - a.ptsAnio);
+    const medallaEmoji = ['1°','2°','3°'];
+    const tieneTours = rankingData.some(u => u.ptsAnio > 0);
+
+    const modalEl = document.getElementById('modal-ranking');
+    if (!modalEl) return;
+    const loadingEl = modalEl.querySelector('.loading-state');
+    const bodyEl = loadingEl ? loadingEl.parentElement : null;
+    if (!bodyEl) return;
+
+    bodyEl.innerHTML = `
+      <div style="margin:-24px -24px 0">
+        <div class="perfil-card-header" style="padding:24px 28px">
+          <div style="font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.2em;color:var(--ts);margin-bottom:4px">// LEADERBOARD_${anioActual}</div>
+          <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+            <div style="font-family:'Zen Dots',cursive;font-size:22px;background:linear-gradient(90deg,var(--orange),var(--gold));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">RANKING ${anioActual}</div>
+            <span style="font-size:24px"></span>
+          </div>
+          <div style="font-family:Rajdhani;font-size:13px;color:var(--gold);margin-top:8px;font-weight:600">El líder al final del año gana un tour gratis</div>
+          <div style="font-family:JetBrains Mono;font-size:10px;color:var(--ts);margin-top:4px;letter-spacing:.04em">// concierto: 3pts · festival 1d: 5pts · 2d: 7pts · 3d: 10pts</div>
+        </div>
+        <div style="padding:20px 28px 28px">
+          ${rankingData.map((u, i) => {
+            const top = i < 3 ? `top${i+1}` : '';
+            const esYo = currentUser && u.id === currentUser.id ? 'is-me' : '';
+            const posDisplay = i < 3 ? medallaEmoji[i] : `#${i+1}`;
+            return `<div class="rank-row ${top} ${esYo}">
+              <div class="rank-pos">${posDisplay}</div>
+              <div class="gz-avatar" style="width:44px;height:44px;font-size:14px;flex-shrink:0">${u.foto_url ? `<img src="${u.foto_url}">` : u.iniciales}</div>
+              <div style="flex:1;min-width:0"><div style="font-family:Rajdhani;font-weight:700;font-size:14px">${u.nombre}${esYo ? ' <span style="font-family:JetBrains Mono;font-size:9px;color:var(--orange);letter-spacing:.1em">// TÚ</span>' : ''}</div><div class="gz-rol" style="font-size:9px;margin-bottom:0">${ROL_LABELS[u.rol] || u.rol} · ${u.numTours} tours</div></div>
+              <div style="text-align:right"><div class="rank-pts">${u.ptsAnio}</div><div style="font-family:'JetBrains Mono',monospace;font-size:8px;letter-spacing:.18em;color:var(--ts);text-transform:uppercase">PTS</div></div>
+            </div>`;
+          }).join('')}
+          ${!tieneTours ? `<div style="margin-top:20px;text-align:center;padding:20px;background:var(--bg3);border:1px dashed var(--border);font-family:JetBrains Mono;font-size:11px;color:var(--ts);letter-spacing:.04em">// sin tours registrados en ${anioActual} aún<br><span style="font-size:10px">// agrega tus tours desde tu perfil para empezar a sumar puntos</span></div>` : ''}
+        </div>
+      </div>
+    `;
+  } catch(e) {
+    console.error('Error ranking:', e);
+  }
+}
+
+
+// ═══════════════════════════════════════════════════════════════
+// PING anti-pausa Supabase (cada 6 días = 518400000 ms)
+// ═══════════════════════════════════════════════════════════════
+function pingSupabase() {
+ khEventos.ping(); // [sec-eventos]
+}
+setInterval(pingSupabase, 518400000);
+
+// ═══════════════════════════════════════════════════════════════
+// REGISTRO POR INVITACIÓN
+// ═══════════════════════════════════════════════════════════════
+async function mostrarRegistroInvitado(token) {
+  const screen = document.getElementById('login-screen');
+  screen.style.display = 'flex';
+
+  // Verificar token vía Netlify Function (pre-JWT; el invite_token es la credencial).
+  let usuario = null;
+  let _regReason = '';
+  try {
+    const vr = await khRegistroInvitado({ accion: 'validar', token }); // [sec-usuarios]
+    if (vr.ok) usuario = vr.usuario; else _regReason = vr.reason || 'invalido';
+  } catch(e) { _regReason = 'invalido'; }
+
+  if (!usuario && _regReason === 'expirado') {
+    screen.innerHTML = `
+      <div class="login-bg"></div>
+      <div class="login-card">
+        <div class="login-logo">KAME<span>·</span>HOUSE</div>
+        <div class="login-sub" style="color:var(--red)">Link expirado</div>
+        <p style="color:var(--ts);font-size:13px;text-align:center;margin-top:12px">
+          Este link expiró (48 horas). Pídele a Memo que te mande uno nuevo.
+        </p>
+      </div>`;
+    return;
+  }
+
+  if (!usuario) {
+    screen.innerHTML = `
+      <div class="login-bg"></div>
+      <div class="login-card">
+        <div class="login-logo">KAME<span>·</span>HOUSE</div>
+        <div class="login-sub" style="color:var(--red)">Link inválido o ya usado</div>
+        <p style="color:var(--ts);font-size:13px;text-align:center;margin-top:12px">
+          Este link de invitación ya fue usado o no existe.<br>Pídele a Memo que te mande uno nuevo.
+        </p>
+      </div>`;
+    return;
+  }
+
+  // Mostrar formulario completo
+  screen.innerHTML = `
+    <div class="login-bg"></div>
+    <div class="login-card" style="max-width:420px">
+      <div class="login-logo">KAME<span>·</span>HOUSE</div>
+      <div class="login-sub">Bienvenido al equipo</div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.12em;color:var(--gold);text-align:center;margin-bottom:20px;text-transform:uppercase">
+        ${ROL_LABELS[usuario.rol] || usuario.rol} · Conecta Reynosa
+      </div>
+      <div class="login-field">
+        <label>Tu nombre completo *</label>
+        <input type="text" id="reg-nombre" placeholder="Juan Pérez" autocomplete="name">
+      </div>
+      <div class="login-field">
+        <label>Usuario (para iniciar sesión) *</label>
+        <input type="text" id="reg-username" placeholder="juanpz · mipopo · lo que quieras" autocomplete="username">
+      </div>
+      <div class="login-field">
+        <label>Contraseña *</label>
+        <input type="password" id="reg-pass" placeholder="Mínimo 6 caracteres" autocomplete="new-password">
+      </div>
+      <div class="login-field">
+        <label>Confirmar contraseña *</label>
+        <input type="password" id="reg-pass2" placeholder="Repite tu contraseña" autocomplete="new-password">
+      </div>
+      <div class="login-field">
+        <label>Celular</label>
+        <input type="tel" id="reg-cel" placeholder="81 1234 5678">
+      </div>
+      <div class="login-field">
+        <label>Talla playera</label>
+        <select id="reg-talla" style="background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:10px 12px;font-size:14px;width:100%">
+          <option value="">— Selecciona —</option>
+          <option>XS</option><option>S</option><option>M</option><option>L</option><option>XL</option><option>XXL</option>
+        </select>
+      </div>
+      <button class="login-btn" id="reg-btn" onclick="completarRegistro('${usuario.id}','${token}')">Crear mi cuenta →</button>
+      <div id="reg-error" style="color:var(--red);font-size:13px;text-align:center;min-height:20px;margin-top:8px"></div>
+    </div>`;
+}
+
+async function completarRegistro(userId, token) {
+  const nombre   = (document.getElementById('reg-nombre').value || '').trim();
+  const username = (document.getElementById('reg-username').value || '').trim().toLowerCase().replace(/\s+/g,'');
+  const pass     = document.getElementById('reg-pass').value;
+  const pass2    = document.getElementById('reg-pass2').value;
+  const errEl    = document.getElementById('reg-error');
+  const btn      = document.getElementById('reg-btn');
+
+  if (!nombre)    { errEl.textContent = 'El nombre es obligatorio'; return; }
+  if (!username)  { errEl.textContent = 'Elige un nombre de usuario'; return; }
+  if (pass.length < 6) { errEl.textContent = 'La contraseña debe tener mínimo 6 caracteres'; return; }
+  if (pass !== pass2)  { errEl.textContent = 'Las contraseñas no coinciden'; return; }
+
+  btn.textContent = 'Creando cuenta…'; btn.disabled = true;
+
+  try {
+    const cel   = document.getElementById('reg-cel').value.trim();
+    const talla = document.getElementById('reg-talla').value;
+    // [sec-usuarios] El alta (re-valida token + username, hashea con bcrypt y activa
+    // la cuenta) ocurre server-side. El id se deriva del token, no del cliente.
+    const res = await khRegistroInvitado({
+      accion: 'completar', token, nombre, username, password: pass,
+      celular: cel || undefined, talla_playera: talla || undefined,
+    });
+    if (!res.ok) {
+      errEl.textContent = res.error || 'Error al crear la cuenta';
+      btn.textContent = 'Crear mi cuenta →'; btn.disabled = false;
+      return;
+    }
+    currentUser = res.user;
+    sessionStorage.setItem(SESSION_KEY, JSON.stringify({ user: currentUser, expires: Date.now() + SESSION_HOURS * 3600000 }));
+    window.history.replaceState({}, '', window.location.pathname);
+    enterApp();
+  } catch(e) {
+    errEl.textContent = e.message || 'Error al crear la cuenta';
+    btn.textContent = 'Crear mi cuenta →'; btn.disabled = false;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════════════
+// Detectar si viene de invitación
+const _urlParams = new URLSearchParams(window.location.search);
+const _inviteToken = _urlParams.get('token');
+if (_inviteToken) {
+  mostrarRegistroInvitado(_inviteToken);
+} else if (checkSession()) {
+  enterApp();
+  // Alerta primer login
+  if (currentUser && !currentUser.perfil_completo) { enviarAlertaMemo('nuevo_usuario', { nombre: currentUser.nombre, rol: currentUser.rol }); }
+}
+
+// ── DROPDOWN HERRAMIENTAS ──
+function toggleDropdown(e) {
+  if (e) { e.stopPropagation(); e.preventDefault(); }
+  // En móvil (≤768px) abrimos un bottom-sheet en lugar del dropdown inline,
+  // que tenía race conditions con el outside-click handler y items muy pequeños.
+  if (window.matchMedia('(max-width: 768px)').matches) {
+    openToolsSheet();
+    return;
+  }
+  const dd = document.getElementById('nav-dropdown-herramientas');
+  dd.classList.toggle('open');
+}
+// Cerrar dropdown desktop al hacer click fuera (no aplica al bottom-sheet)
+document.addEventListener('click', function(e) {
+  const dd = document.getElementById('nav-dropdown-herramientas');
+  if (dd && !dd.contains(e.target)) dd.classList.remove('open');
+});
+
+// ── Tools bottom-sheet (móvil) ───────────────────────────────────
+// Construido al vuelo a partir de los items reales del dropdown, así
+// agregar/quitar items en un solo lugar (el HTML del dropdown) se refleja
+// automáticamente en el sheet sin duplicar markup.
+function openToolsSheet() {
+  const sheet = document.getElementById('tools-sheet');
+  const list  = document.getElementById('tools-sheet-list');
+  if (!sheet || !list) return;
+  // Repoblar cada vez por si el rol del usuario filtró visibilidad de items
+  const src = document.querySelectorAll('#nav-dropdown-herramientas .nav-dropdown-item');
+  list.innerHTML = '';
+  src.forEach(srcBtn => {
+    if (srcBtn.offsetParent === null && getComputedStyle(srcBtn).display === 'none') return;
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'tools-sheet-item' + (srcBtn.classList.contains('active') ? ' active' : '');
+    b.dataset.itemId = srcBtn.id;
+    b.innerHTML = `<span>${srcBtn.textContent.trim()}</span><span class="ts-chevron" aria-hidden="true">›</span>`;
+    b.addEventListener('click', () => {
+      closeToolsSheet();
+      // Pequeño delay para que la animación de cierre se vea y el sheet no
+      // tape la transición a la nueva página
+      setTimeout(() => srcBtn.click(), 80);
+    });
+    list.appendChild(b);
+  });
+  sheet.classList.add('open');
+  document.body.style.overflow = 'hidden';
+  cerrarNavMobile(); // por si el wrapper hamburguesa estaba abierto detrás
+}
+
+function closeToolsSheet() {
+  const sheet = document.getElementById('tools-sheet');
+  if (!sheet) return;
+  sheet.classList.remove('open');
+  document.body.style.overflow = '';
+}
+
+// Wire de los triggers del sheet (idempotente — corre solo una vez)
+(function wireToolsSheet() {
+  const sheet = document.getElementById('tools-sheet');
+  if (!sheet || sheet.dataset.wired) return;
+  sheet.dataset.wired = '1';
+  sheet.addEventListener('click', (e) => {
+    // Backdrop click (no panel interno)
+    if (e.target === sheet) closeToolsSheet();
+  });
+  const closeBtn = document.getElementById('tools-sheet-close');
+  if (closeBtn) closeBtn.addEventListener('click', closeToolsSheet);
+  // ESC cierra (útil para usuarios con teclado / orientación landscape con teclado)
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && sheet.classList.contains('open')) closeToolsSheet();
+  });
+  // Si el usuario rota a desktop con el sheet abierto, lo cerramos para
+  // evitar que quede un overlay raro encima del dropdown desktop.
+  let _toolsResizeT = null;
+  window.addEventListener('resize', () => {
+    clearTimeout(_toolsResizeT);
+    _toolsResizeT = setTimeout(() => {
+      if (!window.matchMedia('(max-width: 768px)').matches && sheet.classList.contains('open')) {
+        closeToolsSheet();
+      }
+    }, 150);
+  });
+})();
+
+// HTML del recibos embebido
+// RECIBOS_HTML → base64
+
+
+function showHerramienta(name) {
+  // Cerrar dropdown
+  document.getElementById('nav-dropdown-herramientas').classList.remove('open');
+
+  // Deactivate all pages and nav buttons
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-btn, .nav-dropdown-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.nav-dropdown-item').forEach(b => b.classList.remove('active'));
+
+  // Activate page
+  const page = document.getElementById('page-' + name);
+  if (page) page.classList.add('active');
+
+  // Mark dropdown btn active
+  document.getElementById('nav-herramientas').classList.add('active');
+  const item = document.getElementById('nav-' + name);
+  if (item) item.classList.add('active');
+
+  if (name === 'recibos') {
+    if (!recibosLoaded) {
+      const frame = document.getElementById('frame-recibos');
+      if (frame) {
+        frame.removeAttribute('srcdoc');
+        frame.src = './recibos_v6.html';
+        recibosLoaded = true;
+      }
+    }
+  }
+  if (name === 'diseno') {
+    if (!disenoLoaded) {
+      const frame = document.getElementById('frame-diseno');
+      if (frame) {
+        frame.removeAttribute('srcdoc');
+        frame.src = './diseno.html';
+        disenoLoaded = true;
+      }
+    }
+  }
+  if (name === 'contratos') {
+    loadContratos();
+  }
+  if (name === 'waitlist') {
+    loadWaitlist();
+  }
+  // ROL Analytics se mudó a la pestaña RADAR DEL DRAGÓN como sub-pestaña.
+  // Si el admin sale de cualquier herramienta, paramos los timers del Radar.
+  stopRolAnalyticsAutoRefresh();
+}
+
+// ── NAV MOBILE HAMBURGUESA ──────────────────────────────────
+function toggleNavMobile() {
+  const wrapper = document.getElementById('nav-items-wrapper');
+  const btn = document.getElementById('nav-hamburger-btn');
+  if (!wrapper) return;
+  const open = wrapper.classList.toggle('open');
+  if (btn) btn.classList.toggle('open', open);
+}
+
+function cerrarNavMobile() {
+  const wrapper = document.getElementById('nav-items-wrapper');
+  const btn = document.getElementById('nav-hamburger-btn');
+  if (wrapper) wrapper.classList.remove('open');
+  if (btn) btn.classList.remove('open');
+}
+
+// Actualizar label de sección activa en mobile
+function actualizarLabelNavMobile(nombre) {
+  const label = document.getElementById('nav-mobile-section-label');
+  if (label) label.textContent = nombre.toUpperCase();
+}
+
+// ── D2: SIDEBAR (drawer móvil) + BARRA INFERIOR ─────────────
+// Abrir/cerrar el sidebar como drawer off-canvas en móvil.
+function khAbrirMenu() {
+  const sb = document.getElementById('kh-sidebar');
+  const sc = document.getElementById('kh-scrim');
+  if (sb) sb.classList.add('drawer-open');
+  if (sc) sc.classList.add('show');
+  document.body.style.overflow = 'hidden';
+}
+function khCerrarMenu() {
+  const sb = document.getElementById('kh-sidebar');
+  const sc = document.getElementById('kh-scrim');
+  if (sb) sb.classList.remove('drawer-open');
+  if (sc) sc.classList.remove('show');
+  document.body.style.overflow = '';
+}
+
+// Sincroniza la barra inferior y limpia grupos vacíos del sidebar.
+// NO toca permisos: solo refleja el estado de display que ya aplicó
+// aplicarPermisosUI sobre cada #nav-<tab>.
+function _khNavSync(name) {
+  // Al navegar a una pestaña normal, limpiar el resaltado de items de Herramientas
+  // (showHerramienta lo vuelve a poner cuando se abre una herramienta).
+  document.querySelectorAll('.nav-dropdown-item.active, #nav-herramientas.active')
+    .forEach(b => b.classList.remove('active'));
+  // Barra inferior: marcar destino activo + ocultar los que el rol no permite.
+  document.querySelectorAll('.kh-bb-item[data-tab]').forEach(b => {
+    const tab = b.dataset.tab;
+    b.classList.toggle('active', tab === name);
+    const src = document.getElementById('nav-' + tab);
+    b.style.display = (src && src.style.display !== 'none') ? '' : 'none';
+  });
+  // Ocultar encabezado de grupos del sidebar que quedaron sin items visibles.
+  // El grupo Herramientas se omite: su visibilidad la maneja aplicarPermisosUI.
+  document.querySelectorAll('#kh-sidebar .nav-group').forEach(g => {
+    if (g.id === 'nav-dropdown-herramientas') return;
+    const items = g.querySelectorAll('.nav-btn');
+    const algunoVisible = Array.from(items).some(b => b.style.display !== 'none');
+    g.style.display = algunoVisible ? '' : 'none';
+  });
+}
+
+// Colapsar/expandir un grupo del nav por su título. Persiste en localStorage por
+// texto del título. Solo la CLASE 'collapsed' (los botones se ocultan por CSS),
+// nunca el style.display individual → no rompe el gating por rol.
+function toggleNavGroup(titleEl) {
+  const group = titleEl.parentElement;
+  const colapsado = group.classList.toggle('collapsed');
+  try { localStorage.setItem('navcol:' + titleEl.textContent.trim(), colapsado ? '1' : '0'); } catch (e) {}
+}
+
+// Restaura el estado colapsado guardado (solo los títulos colapsables llevan onclick).
+(function restoreNavGroups() {
+  document.querySelectorAll('#kh-sidebar .nav-group-title[onclick]').forEach(t => {
+    try { if (localStorage.getItem('navcol:' + t.textContent.trim()) === '1') t.parentElement.classList.add('collapsed'); } catch (e) {}
+  });
+})();
+
+// En móvil, cualquier click dentro del sidebar (pestaña o herramienta) cierra el drawer.
+(function wireSidebarDrawer() {
+  const sb = document.getElementById('kh-sidebar');
+  if (!sb || sb.dataset.wiredDrawer) return;
+  sb.dataset.wiredDrawer = '1';
+  sb.addEventListener('click', e => {
+    if (e.target.closest('.nav-btn, .nav-dropdown-item')) khCerrarMenu();
+  });
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') khCerrarMenu();
+  });
+})();
+
+
+// CAPSULE CORPS — reemplazado abajo
+
+
+// ═══════════════════════════════════════════════════════════════
+// CAPSULE CORPS — COMPLETO
+// ═══════════════════════════════════════════════════════════════
+let _ccEventoActual = null;
+let _ccViajeros = [];
+let _ccHabitaciones = [];
+let _ccEventosCache = [];
+let _ccAsignados = [];
+let _ccFiltroFecha = 'todos';   // filtro de fecha activo (todos/proximo/pasado); se combina con el buscador
+
+const TIPOS_EVENTO = {
+  concierto: 'Concierto',
+  festival_1d: 'Festival 1 día',
+  festival_2d: 'Festival 2 días',
+  festival_3d: 'Festival 3 días',
+};
+
+// Capsule sobre el portal (Fase feat/capsule-sobre-portal): la lista de eventos
+// sale del array EV de index.html (misma fuente que el sitio), NO de la tabla
+// vieja `eventos`. _ccEvFromEV mapea cada EV a la forma que espera
+// renderCCEventos / abrirDetalleEvento (id base = el evento_id del portal).
+function _ccEvFromEV(e) {
+  const fecha = e.ds
+    || (Array.isArray(e.multifecha) && e.multifecha[0] && e.multifecha[0].ds)
+    || '';
+  return {
+    id:             e.id,
+    nombre:         e.a || e.id,
+    artista:        '',                       // e.a ya es el nombre; no duplicar
+    ciudad:         e.cdmx ? 'CDMX' : 'MTY',
+    fecha,
+    tipo_evento:    null,                      // → 'Concierto' (fallback de TIPOS_EVENTO)
+    notas_internas: null,
+    zonas_boleto:   [],
+    _ev:            e,
+  };
+}
+
+// Adjunta a cada asignación (eventos_coordi, por slug) los datos del evento
+// tomados del EV ya cargado en cliente (mapa slug→item). Sustituye el viejo
+// embed PostgREST eventos(...), que dependía de una FK eventos_coordi→eventos
+// que ya NO existe (Fase A). Si el slug no está en el EV, deja un fallback con
+// el slug crudo como nombre para no romper el render.
+function _attachEventoDesdeEV(evAsignados, evMap) {
+  (evAsignados || []).forEach(e => {
+    const evItem = e && e.evento_id ? evMap[e.evento_id] : null;
+    e.eventos = evItem ? _ccEvFromEV(evItem) : { id: e.evento_id, nombre: e.evento_id };
+  });
+}
+
+async function loadCapsule() {
+  const g = document.getElementById('cc-eventos-grid');
+  try {
+    const ev = await _fetchEVFromIndex();
+    _ccEventosCache = (ev || [])
+      .filter(e => e && e.id && e.a)
+      .map(_ccEvFromEV)
+      .sort((a, b) => String(b.fecha || '').localeCompare(String(a.fecha || '')));
+    renderCCEventos(_ccEventosCache, 'todos');
+  } catch(e) {
+    if (g) g.innerHTML = `<div class="alert alert-error">${e.message}</div>`;
+  }
+}
+
+// ── Tabs ────────────────────────────────────────────────────
+function showCCTab(tab, btn) {
+  document.querySelectorAll('#page-capsule .gz-filter[id^="cc-tab-btn"]').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  document.getElementById('cc-tab-lista').style.display   = tab === 'lista'   ? '' : 'none';
+  document.getElementById('cc-tab-detalle').style.display = tab === 'detalle' ? '' : 'none';
+}
+
+function showCCSubTab(sub, btn) {
+  document.querySelectorAll('#page-capsule .gz-filter[id^="cc-sub-btn"]').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  ['equipo','viajeros','rooming','transporte','pagos'].forEach(s => {
+    const el = document.getElementById(`cc-sub-${s}`);
+    if (el) el.style.display = s === sub ? '' : 'none';
+  });
+  // [F3] Transporte carga LAZY al abrir su sub-tab (no encarece abrirDetalleEvento)
+  // y se refresca en cada visita. Fails-soft: no bloquea al resto del detalle.
+  if (sub === 'transporte' && _ccEventoActual) loadTransporte(_ccEventoActual);
+  // [Pagos-T1] Bandeja de separos: carga LAZY al abrir, se refresca en cada visita.
+  if (sub === 'pagos' && _ccEventoActual) loadCCPagos(_ccEventoActual);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// [Pagos-T1] Sub-tab "Pagos" de Capsule Corp — bandeja de separos.
+// La casa nueva de las solicitudes APROBADAS (en_pagos + pagado) de un evento.
+// Reusa admin-solicitudes-list (flags multifecha+con_pagos) y el MISMO modal
+// global de detalle de solicitud. Convive con "Solicitudes Portal" hasta la T2.
+// ═══════════════════════════════════════════════════════════════════════════
+let _ccPagos = [];              // filas aprobadas del evento actual (con pagos embebidos)
+let _ccPagosCtx = false;        // true = el modal de solicitud se abrió DESDE este sub-tab
+let _ccPagosLoading = false;
+
+// Abonado/Total de una solicitud desde sus cuotas embebidas (pagos). Fórmula
+// IDÉNTICA al modal / admin-cobranza-list: total = Σ monto del plan; abonado =
+// Σ (monto_pagado ?? monto) de las cuotas 'pagado'. Sin plan aún → total cae a
+// precio_total para que la barra tenga denominador.
+function _ccPagoStats(s) {
+  const pagos = Array.isArray(s.pagos) ? s.pagos : [];
+  const total = pagos.reduce((a, p) => a + Number(p.monto || 0), 0) || Number(s.precio_total || 0) || 0;
+  const abonado = pagos.filter(p => p.estado === 'pagado')
+    .reduce((a, p) => a + (Number(p.monto_pagado ?? p.monto) || 0), 0);
+  return { total, abonado };
+}
+
+// Pill de estado — en_pagos amarillo · pagado verde (colores de la spec T1).
+function _ccPagoEstadoPill(estado) {
+  const map = {
+    en_pagos: { t: 'En pagos', c: '#e8a800', bg: 'rgba(232,168,0,.12)', bd: 'rgba(232,168,0,.35)' },
+    pagado:   { t: 'Pagado',   c: '#3DDC84', bg: 'rgba(61,220,132,.12)', bd: 'rgba(61,220,132,.35)' },
+  };
+  const m = map[estado] || { t: estado || '—', c: 'var(--ts)', bg: 'var(--bg3)', bd: 'var(--border)' };
+  return `<span style="font-family:'JetBrains Mono',monospace;font-size:10px;padding:2px 8px;border-radius:20px;color:${m.c};background:${m.bg};border:1px solid ${m.bd};white-space:nowrap">${m.t}</span>`;
+}
+
+// [F3b] Contador compacto "N/M firmados" por solicitud (verde si todos firmados,
+// ámbar si faltan). Sin contratos (solicitud vieja) → nada.
+function _ccContratosPill(c) {
+  if (!c || !Number(c.total)) return '';
+  const firmados = Number(c.firmados) || 0, total = Number(c.total) || 0;
+  const todos = firmados >= total;
+  const col = todos ? { c: '#3DDC84', bg: 'rgba(61,220,132,.12)', bd: 'rgba(61,220,132,.35)' }
+                    : { c: '#e8a800', bg: 'rgba(232,168,0,.12)', bd: 'rgba(232,168,0,.35)' };
+  return `<span title="Contratos firmados del grupo" style="display:inline-block;margin-left:6px;font-family:'JetBrains Mono',monospace;font-size:10px;padding:2px 8px;border-radius:20px;color:${col.c};background:${col.bg};border:1px solid ${col.bd};white-space:nowrap"><svg class="ic" style="width:11px;height:11px;vertical-align:-1px"><use href="#ic-boleto"/></svg> ${firmados}/${total} firmados</span>`;
+}
+
+async function loadCCPagos(eventoId) {
+  if (_ccPagosLoading) return;
+  _ccPagosLoading = true;
+  const listEl = document.getElementById('cc-pagos-list');
+  const headEl = document.getElementById('cc-pagos-header');
+  if (listEl) listEl.innerHTML = '<div style="padding:20px;text-align:center;color:var(--ts);font-family:\'JetBrains Mono\',monospace;font-size:11px">// cargando pagos…</div>';
+  try {
+    const r = await fetch('/.netlify/functions/admin-solicitudes-list', {
+      method: 'POST',
+      headers: _spAdminHeaders(),
+      // multifecha: trae el slug base + todas sus fechas (festival). con_pagos:
+      // embebe las cuotas para calcular abonado/total sin llamada por fila.
+      body: JSON.stringify({ evento_id: eventoId, multifecha: true, con_pagos: true, con_contratos: true, limit: 500 }),
+    });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || 'Error cargando pagos');
+    // SOLO aprobadas: en_pagos + pagado (las pendientes se quedan en la T2).
+    _ccPagos = (data.solicitudes || []).filter(s => s.estado === 'en_pagos' || s.estado === 'pagado');
+    // Puente al modal global: el modal y sus sub-acciones buscan por _spCache.find.
+    // Unimos (por id) las filas de Capsule a _spCache para que funcionen invocadas
+    // desde aquí. Es transitorio: entrar a Solicitudes Portal recarga _spCache.
+    const byId = new Map((_spCache || []).map(x => [x.id, x]));
+    _ccPagos.forEach(s => byId.set(s.id, s));
+    _spCache = Array.from(byId.values());
+    _renderCCPagos();
+  } catch (e) {
+    if (listEl) listEl.innerHTML = `<div style="padding:20px;text-align:center;color:#FF6B6B">Error: ${_spEscape(e.message)}</div>`;
+    if (headEl) headEl.textContent = '';
+    showToast('No se pudieron cargar los pagos: ' + e.message, 'error');
+  } finally {
+    _ccPagosLoading = false;
+  }
+}
+
+function _renderCCPagos() {
+  const listEl = document.getElementById('cc-pagos-list');
+  const headEl = document.getElementById('cc-pagos-header');
+  if (!listEl) return;
+
+  if (!_ccPagos.length) {
+    if (headEl) headEl.textContent = '';
+    listEl.innerHTML = '<div class="empty-state"><div class="empty-icon">·</div>Aún no hay solicitudes aprobadas en este evento.</div>';
+    return;
+  }
+
+  // Cabecera: N solicitudes · $X abonado de $Y (suma de la lista).
+  let sumAbon = 0, sumTotal = 0;
+  _ccPagos.forEach(s => { const st = _ccPagoStats(s); sumAbon += st.abonado; sumTotal += st.total; });
+  if (headEl) {
+    const n = _ccPagos.length;
+    headEl.innerHTML = `<b style="color:var(--ink)">${n}</b> solicitud${n === 1 ? '' : 'es'} aprobada${n === 1 ? '' : 's'} · <b style="color:#3DDC84">${_spFmtMxn(sumAbon)}</b> abonado de <b style="color:var(--ink)">${_spFmtMxn(sumTotal)}</b>`;
+  }
+
+  const head = `
+    <thead>
+      <tr style="background:var(--bg3);text-align:left">
+        <th style="padding:9px 8px;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ts)">Cliente</th>
+        <th style="padding:9px 8px;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ts);white-space:nowrap">Solicitud</th>
+        <th style="padding:9px 8px;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ts)">Paquete / Zona</th>
+        <th style="padding:9px 8px;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ts);text-align:center">Pers.</th>
+        <th style="padding:9px 8px;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ts);min-width:160px">Abonado / Total</th>
+        <th style="padding:9px 8px;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ts)">Estado</th>
+        <th style="padding:9px 8px"></th>
+      </tr>
+    </thead>`;
+
+  const body = _ccPagos.map(s => {
+    const c = s.clientes || {};
+    const st = _ccPagoStats(s);
+    const pct = st.total > 0 ? Math.min(100, Math.round(st.abonado / st.total * 100)) : 0;
+    const barColor = s.estado === 'pagado' ? '#3DDC84' : 'var(--orange)';
+    // Chip multifecha "Fecha N" (fecha única → sin chip). Reusa _rgFechaIdx.
+    const fi = _rgFechaIdx(s.evento_id);
+    const chip = fi === null ? '' : `<span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--ts);border:1px solid var(--border);border-radius:20px;padding:1px 7px;letter-spacing:.06em;margin-left:6px">Fecha ${fi + 1}</span>`;
+    return `
+      <tr style="border-top:1px solid var(--border)">
+        <td style="padding:9px 8px;font-size:13px">${_spEscape(c.nombre_completo || '—')}<br><span style="font-family:'JetBrains Mono',monospace;color:var(--orange);font-size:11px">#${_spEscape(c.numero_cliente || '—')}</span></td>
+        <td style="padding:9px 8px;font-size:12px;color:var(--ts);white-space:nowrap" title="${_spEscape(_spFmtFechaAbs(s.created_at))}">${_spEscape(_spFmtFechaRel(s.created_at))}${chip}</td>
+        <td style="padding:9px 8px;font-size:12px"><b>${_spEscape(s.paquete || '—')}</b>${s.zona ? `<br><span style="color:var(--ts)">${_spEscape(s.zona)}</span>` : ''}</td>
+        <td style="padding:9px 8px;font-size:13px;text-align:center">${Number(s.num_personas || 0) || '—'}</td>
+        <td style="padding:9px 8px;font-size:12px">
+          <div style="display:flex;justify-content:space-between;gap:8px;margin-bottom:3px"><b style="color:#3DDC84">${_spFmtMxn(st.abonado)}</b><span style="color:var(--ts)">${_spFmtMxn(st.total)}</span></div>
+          <div style="height:5px;background:var(--bg3);border-radius:3px;overflow:hidden"><div style="height:100%;width:${pct}%;background:${barColor};border-radius:3px"></div></div>
+        </td>
+        <td style="padding:9px 8px">${_ccPagoEstadoPill(s.estado)}${_ccContratosPill(s.contratos)}</td>
+        <td style="padding:9px 8px;text-align:right;white-space:nowrap"><button class="btn btn-ghost btn-sm" onclick="verSolicitudPagosCC('${_spEscape(s.id)}')" style="font-size:11px">Ver detalles</button></td>
+      </tr>`;
+  }).join('');
+
+  listEl.innerHTML = `<div class="table-wrap"><table style="width:100%;border-collapse:collapse">${head}<tbody>${body}</tbody></table></div>`;
+}
+
+// "Ver detalles" desde el sub-tab Pagos: marca el contexto para que los refrescos
+// del modal actualicen ESTA lista (no la página Solicitudes Portal) y abre el
+// MISMO modal global de siempre.
+function verSolicitudPagosCC(id) {
+  _ccPagosCtx = true;
+  verSolicitudPortal(id);
+}
+
+// Refresco de la lista de fondo tras una acción del modal de solicitud. Si el
+// modal se abrió desde el sub-tab Pagos (T1) → refresca ESE sub-tab (y re-mergea
+// a _spCache); si no → la página Solicitudes Portal, como siempre. [Pagos-T1]
+function _spRefrescarLista() {
+  if (_ccPagosCtx && _ccEventoActual) { loadCCPagos(_ccEventoActual); return; }
+  loadSolicitudesPortal();
+}
+
+// ── Filtro eventos (fecha + buscador, combinados) ────────────
+function filtrarCCEventos(filtro, btn) {
+  document.querySelectorAll('#page-capsule .gz-filter[id^="ccf-"]').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  _ccFiltroFecha = filtro;        // recuerda el filtro de fecha activo
+  filtrarCapsule();               // re-aplica fecha + texto del buscador
+}
+
+// Buscador por nombre; se combina con el filtro de fecha activo (_ccFiltroFecha).
+// Texto vacío → solo aplica el filtro de fecha (igual que antes).
+function filtrarCapsule() {
+  const q = (document.getElementById('cc-buscar')?.value || '').trim().toLowerCase();
+  const lista = q
+    ? _ccEventosCache.filter(e => String(e.nombre || '').toLowerCase().includes(q))
+    : _ccEventosCache;
+  renderCCEventos(lista, _ccFiltroFecha);
+}
+
+function renderCCEventos(lista, filtro) {
+  const grid = document.getElementById('cc-eventos-grid');
+  const hoy = new Date(); hoy.setHours(0,0,0,0);
+  let filtrada = lista;
+  if (filtro === 'proximo') filtrada = lista.filter(e => new Date(e.fecha+'T12:00:00') >= hoy);
+  if (filtro === 'pasado')  filtrada = lista.filter(e => new Date(e.fecha+'T12:00:00') < hoy);
+
+  if (!filtrada.length) {
+    grid.innerHTML = '<div class="empty-state"><div class="empty-icon">·</div>Sin eventos — crea el primero con "+ Nuevo Evento"</div>';
+    return;
+  }
+  grid.innerHTML = filtrada.map(e => {
+    const fecha = new Date(e.fecha+'T12:00:00');
+    const pasado = fecha < hoy;
+    const tipoLabel = TIPOS_EVENTO[e.tipo_evento] || e.tipo_tour || 'Concierto';
+    return `<div style="background:var(--bg2);border:1px solid var(--border);border-left:3px solid ${pasado?'var(--border)':'var(--orange)'};border-radius:var(--radius);padding:16px 20px;margin-bottom:10px;cursor:pointer;transition:border-color .2s" onclick="abrirDetalleEvento('${e.id}')" onmouseenter="this.style.borderColor='var(--orange)'" onmouseleave="this.style.borderColor='${pasado?'var(--border)':'var(--orange)'}'"">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap">
+        <div>
+          <div style="font-family:'Rajdhani',sans-serif;font-weight:700;font-size:20px;margin-bottom:2px">${e.nombre}</div>
+          <div style="font-size:11px;font-family:'JetBrains Mono',monospace;color:var(--ts)">
+            ${e.artista ? e.artista + ' · ' : ''}${e.ciudad||''} · ${fecha.toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric'})}
+          </div>
+          <div style="margin-top:6px">
+            <span style="font-size:10px;padding:2px 8px;background:rgba(255,107,0,.12);border:1px solid rgba(255,107,0,.25);border-radius:4px;color:var(--orange);font-family:'JetBrains Mono',monospace">${tipoLabel}</span>
+            ${pasado ? `<span style="font-size:10px;padding:2px 8px;background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:4px;color:var(--ts);font-family:'JetBrains Mono',monospace;margin-left:6px">pasado</span>` : ''}
+          </div>
+        </div>
+        <div style="display:flex;gap:6px">
+          <!-- Editar/eliminar OCULTOS: los eventos vienen de index.html (no de la tabla
+               vieja 'eventos'), estos botones apuntan al sistema viejo. Editar eventos =
+               Palacio de Kamisama. Código conservado por si se reusa.
+          <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();abrirModalEditarEvento('${e.id}')" style="font-size:11px">⎘</button>
+          <button class="btn btn-red btn-sm" onclick="event.stopPropagation();eliminarEventoCC('${e.id}')" style="font-size:11px">✕</button>
+          -->
+          <button class="btn btn-primary btn-sm" onclick="event.stopPropagation();abrirDetalleEvento('${e.id}')" style="font-size:11px">Ver →</button>
+        </div>
+      </div>
+      ${e.notas_internas ? `<div style="margin-top:10px;font-size:11px;color:var(--ts);padding:8px 12px;background:rgba(255,255,255,.03);border-radius:6px;border-left:2px solid var(--border)">${e.notas_internas}</div>` : ''}
+    </div>`;
+  }).join('');
+}
+
+// ── Crear / Editar evento ────────────────────────────────────
+function abrirModalCrearEvento() { abrirModalEvento(null); }
+function abrirModalEditarEvento(id) { abrirModalEvento(id); }
+
+function abrirModalEvento(id) {
+  const e = id ? _ccEventosCache.find(x => x.id === id) : {};
+  document.getElementById('modal-cc-evento').innerHTML = `
+    <div class="modal" style="max-width:560px">
+      <div class="modal-header">
+        <div class="modal-title" style="font-family:'Zen Dots',sans-serif;font-size:15px">${id ? 'Editar Evento' : 'Nuevo Evento'}</div>
+        <button class="modal-close" onclick="closeModal('modal-cc-evento')">×</button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="ccev-id" value="${e?.id||''}">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <div class="form-group" style="grid-column:1/-1">
+            <label>Nombre del tour *</label>
+            <input class="cot-input" id="ccev-nombre" value="${e?.nombre||''}" placeholder="Ej: RAMMSTEIN CDMX…" style="width:100%">
+          </div>
+          <div class="form-group" style="grid-column:1/-1">
+            <label>Artista</label>
+            <input class="cot-input" id="ccev-artista" value="${e?.artista||''}" placeholder="Nombre del artista…" style="width:100%">
+          </div>
+          <div class="form-group">
+            <label>Ciudad *</label>
+            <input class="cot-input" id="ccev-ciudad" value="${e?.ciudad||''}" placeholder="CDMX, MTY…">
+          </div>
+          <div class="form-group">
+            <label>Fecha *</label>
+            <input class="cot-input" type="date" id="ccev-fecha" value="${e?.fecha||''}">
+          </div>
+          <div class="form-group" style="grid-column:1/-1">
+            <label>Tipo de evento</label>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              ${Object.entries(TIPOS_EVENTO).map(([k,v]) =>
+                `<label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;padding:6px 12px;border:1px solid var(--border);border-radius:6px;background:${(e?.tipo_evento||'concierto')===k?'rgba(255,107,0,.12)':'transparent'}">
+                  <input type="radio" name="ccev-tipo" value="${k}" ${(e?.tipo_evento||'concierto')===k?'checked':''} style="accent-color:var(--orange)"> ${v}
+                </label>`
+              ).join('')}
+            </div>
+          </div>
+          <div class="form-group" style="grid-column:1/-1">
+            <label>Zonas / tipos de boleto</label>
+            <input class="cot-input" id="ccev-zonas" value="${(e?.zonas_boleto||[]).join(', ')}" placeholder="Floor, GA, VIP, Diamante, Palco… (separadas por coma)" style="width:100%">
+            <div style="font-size:10px;color:var(--ts);margin-top:4px">Escribe las zonas separadas por coma — aparecerán como opciones al agregar viajeros</div>
+          </div>
+          <div class="form-group" style="grid-column:1/-1">
+            <label>Notas internas para el equipo</label>
+            <textarea class="cot-input" id="ccev-notas" rows="3" placeholder="Punto de encuentro, indicaciones generales, dress code…" style="width:100%;resize:vertical">${e?.notas_internas||''}</textarea>
+          </div>
+        </div>
+        <div id="ccev-alert"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" onclick="closeModal('modal-cc-evento')">Cancelar</button>
+        <button class="btn btn-primary" onclick="guardarEventoCC()">Guardar evento</button>
+      </div>
+    </div>`;
+  openModal('modal-cc-evento');
+}
+
+async function eliminarEventoCC(id) {
+  const ev = _ccEventosCache.find(e => e.id === id);
+  const nombre = ev?.nombre || 'este evento';
+  if (!confirm(`¿Eliminar "${nombre}"?\n\nEsto también eliminará viajeros y rooming list. No se puede deshacer.`)) return;
+  try {
+    await khEventos.eliminar(id); // [sec-eventos]
+    await loadCapsule();
+  } catch(e) { alert('Error al eliminar: ' + e.message); }
+}
+
+async function guardarEventoCC() {
+  const id     = document.getElementById('ccev-id')?.value;
+  const nombre = document.getElementById('ccev-nombre')?.value.trim();
+  const ciudad = document.getElementById('ccev-ciudad')?.value.trim();
+  const fecha  = document.getElementById('ccev-fecha')?.value;
+  const alert  = document.getElementById('ccev-alert');
+  if (!nombre) { alert.innerHTML='<div class="alert alert-error">El nombre es obligatorio</div>'; return; }
+  if (!fecha)  { alert.innerHTML='<div class="alert alert-error">La fecha es obligatoria</div>'; return; }
+  const tipo = document.querySelector('input[name="ccev-tipo"]:checked')?.value || 'concierto';
+  const body = {
+    nombre,
+    artista:         document.getElementById('ccev-artista')?.value.trim()||null,
+    ciudad:          ciudad||null,
+    fecha,
+    tipo_evento:     tipo,
+    notas_internas:  document.getElementById('ccev-notas')?.value.trim()||null,
+    zonas_boleto:    (document.getElementById('ccev-zonas')?.value||'').split(',').map(s=>s.trim()).filter(Boolean),
+  };
+  alert.innerHTML='<div class="alert" style="border-color:var(--border)">Guardando…</div>';
+  try {
+    if (id) await khEventos.actualizar(id, body); // [sec-eventos]
+    else    await khEventos.crear(body); // [sec-eventos]
+    alert.innerHTML='<div class="alert alert-success">✓ Evento guardado</div>';
+    setTimeout(async () => { closeModal('modal-cc-evento'); await loadCapsule(); }, 700);
+  } catch(e) { alert.innerHTML=`<div class="alert alert-error">${e.message}</div>`; }
+}
+
+// ── Detalle de evento ────────────────────────────────────────
+async function abrirDetalleEvento(id) {
+  _ccEventoActual = id;
+  const ev = _ccEventosCache.find(e => e.id === id);
+  if (!ev) return;
+
+  // Mostrar tab detalle
+  const btnDetalle = document.getElementById('cc-tab-btn-detalle');
+  if (btnDetalle) btnDetalle.style.display = '';
+  showCCTab('detalle', btnDetalle);
+
+  // Header
+  const header = document.getElementById('cc-detalle-header');
+  if (header) {
+    const fecha = new Date(ev.fecha+'T12:00:00');
+    header.innerHTML = `
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap">
+        <div>
+          <div style="font-family:'Rajdhani',sans-serif;font-weight:700;font-size:22px">${ev.nombre}</div>
+          <div style="font-size:11px;font-family:'JetBrains Mono',monospace;color:var(--ts);margin-top:2px">
+            ${ev.artista?ev.artista+' · ':''}${ev.ciudad||''} · ${fecha.toLocaleDateString('es-MX',{weekday:'long',day:'numeric',month:'long',year:'numeric'})} · ${TIPOS_EVENTO[ev.tipo_evento]||'Concierto'}
+          </div>
+          ${ev.notas_internas?`<div style="margin-top:8px;font-size:11px;color:var(--ts);padding:6px 10px;background:rgba(255,255,255,.03);border-left:2px solid var(--border)">${ev.notas_internas}</div>`:''}
+        </div>
+        <button class="btn btn-ghost btn-sm" onclick="showCCTab('lista', document.getElementById('cc-tab-btn-lista'))" style="font-size:10px">← Todos los eventos</button>
+      </div>`;
+  }
+
+  // Cargar datos. Rooming agrupa _ccViajeros, así que corre DESPUÉS de loadViajeros.
+  showCCSubTab('equipo', document.getElementById('cc-sub-btn-equipo'));
+  await Promise.all([loadCCEquipo(), loadViajeros()]);
+  await loadRooming();
+}
+
+// ── EQUIPO ASIGNADO ──────────────────────────────────────────
+async function loadCCEquipo() {
+  if (!_ccEventoActual) return;
+  const container = document.getElementById('cc-coordis-asignados');
+  const countEl   = document.getElementById('cc-equipo-count');
+  try {
+    const ev = _ccEventosCache.find(e => e.id === _ccEventoActual) || {};
+    const asigs = await khAsignaciones.listar({ evento_id: _ccEventoActual }); // [sec-coordi]
+    _ccAsignados = asigs;
+
+    let usuarios = [];
+    let uMap = {};
+    if (asigs.length) {
+      usuarios = await khUsuarios.listar({ ids: asigs.map(a=>a.coordi_id) }); // [sec-usuarios]
+      uMap = Object.fromEntries(usuarios.map(u=>[u.id,u]));
+      // Guardar referencia de usuario en cada asignación (para rooming)
+      _ccAsignados = asigs.map(a => ({ ...a, _usuario: uMap[a.coordi_id]||{} }));
+      // Backfill: auto-agregar a viajeros_evento a quienes ya están aceptados
+      // pero no aparecen en la lista (idempotente, best-effort).
+      _backfillStaffViajeros().then(() => { if (document.getElementById('cc-viajeros-list')) loadViajeros(); });
+    }
+
+    // ── Contratos pendientes de firma ────────────────────────────
+    // Match: fecha exacta + nombre fuzzy (mismo criterio que
+    // _autoAsignarEvento en contrato-firmar.js:277-303). Solo se listan
+    // creadoras que ya tienen perfil rol='cc' en usuarios — las que no,
+    // se omiten silenciosamente (caso Tipo B, otra sesión).
+    let pendientesFirma = [];
+    try {
+      if (ev.fecha) {
+        // [sec-contratos] antes db.get('contratos_creadores', ...) con anon key.
+        const ctos = await khContratos.listar({ estado: 'pendiente', evento_fecha: ev.fecha });
+        const evNombre  = (ev.nombre||'').toLowerCase().trim();
+        const evArtista = (ev.artista||'').toLowerCase().trim();
+        const matched = ctos.filter(c => {
+          const target = (c.evento_nombre||'').toLowerCase().trim();
+          if (!target || !evNombre) return false;
+          return target.includes(evNombre) || evNombre.includes(target) || (evArtista && target.includes(evArtista));
+        });
+        if (matched.length) {
+          // Dedupe contra eventos_coordi por correo: si ya firmó y se creó
+          // la asignación, la versión confirmada gana.
+          const correosAsignados = new Set(
+            usuarios.map(u => (u.correo||'').toLowerCase()).filter(Boolean)
+          );
+          const sinAsignacion = matched.filter(c =>
+            !correosAsignados.has((c.creador_email||'').toLowerCase())
+          );
+          // Lookup de perfiles rol='cc' por correo. Sin perfil → skip.
+          const correosUnicos = [...new Set(
+            sinAsignacion.map(c => (c.creador_email||'').toLowerCase()).filter(Boolean)
+          )];
+          const lookups = await Promise.all(correosUnicos.map(c =>
+            khUsuarios.listar({ correo: c, rol: 'cc' }).catch(()=>[]) // [sec-usuarios]
+          ));
+          const ccMap = {};
+          lookups.forEach((arr, i) => { if (arr[0]) ccMap[correosUnicos[i]] = arr[0]; });
+          // Dedupe interno: si la misma creadora tiene varios contratos
+          // pendientes al mismo evento, gana el más reciente (orden desc).
+          const seen = new Set();
+          pendientesFirma = sinAsignacion.filter(c => {
+            const em = (c.creador_email||'').toLowerCase();
+            if (!ccMap[em] || seen.has(em)) return false;
+            seen.add(em);
+            return true;
+          }).map(c => ({
+            _contrato: c,
+            _usuario:  ccMap[(c.creador_email||'').toLowerCase()],
+          }));
+        }
+      }
+    } catch(e) { console.warn('[Capsule] contratos pendientes:', e.message); }
+
+    const total = asigs.length + pendientesFirma.length;
+    if (countEl) countEl.textContent = `${total} asignado${total!==1?'s':''}`;
+
+    if (!total) {
+      container.innerHTML = '<div class="empty-state"><div class="empty-icon">·</div>Sin equipo asignado</div>';
+      return;
+    }
+
+    const statusCol = { pendiente:'var(--gold)', aceptado:'var(--green)', declinado:'var(--red)' };
+    const statusLabel = { pendiente:'Pendiente', aceptado:'Aceptó', declinado:'Declinó' };
+    const COLOR_PEND_FIRMA = '#e8ff4c';
+
+    const htmlAsigs = asigs.map(a => {
+      const u = uMap[a.coordi_id]||{};
+      const st = a.status||'pendiente';
+      const esCC = u.rol === 'cc';
+      // CC: no mostrar el bloque de expectativas (la descripción larga del
+      // contrato vive en su perfil → panel "Material Entregado").
+      const indicacionesHtml = (!esCC && a.indicaciones)
+        ? `<div style="font-size:11px;color:var(--ts);margin-top:3px;font-style:italic">${a.indicaciones}</div>`
+        : '';
+      return `<div style="background:var(--bg2);border:1px solid var(--border);border-left:3px solid ${statusCol[st]||'var(--ts)'};border-radius:var(--radius);padding:14px 18px;margin-bottom:10px">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+          <div style="display:flex;align-items:center;gap:12px">
+            <div style="width:40px;height:40px;border-radius:50%;background:var(--bg3);overflow:hidden;flex-shrink:0;display:flex;align-items:center;justify-content:center">
+              ${u.foto_url ? `<img src="${u.foto_url}" style="width:100%;height:100%;object-fit:cover">` :
+              `<span style="font-family:'Zen Dots',sans-serif;font-size:15px;color:var(--orange)">${(u.nombre||'?')[0]}</span>`}
+            </div>
+            <div>
+              <div style="font-family:'Rajdhani',sans-serif;font-weight:700;font-size:16px">${u.nombre||'—'}</div>
+              <div style="font-size:10px;font-family:'JetBrains Mono',monospace;color:var(--ts)">${u.rol||''} · <span style="color:${statusCol[st]||'var(--ts)'}">${statusLabel[st]||st}</span></div>
+              ${indicacionesHtml}
+              ${a.motivo_declinacion ? `<div style="font-size:11px;color:var(--red);margin-top:3px">Motivo: ${a.motivo_declinacion}</div>` : ''}
+            </div>
+          </div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap">
+            ${st==='pendiente' ? `<button class="btn btn-ghost btn-sm" onclick="reenviarNotificacion('${a.id}')" style="font-size:10px">↺ Reenviar</button>` : ''}
+            <button class="btn btn-red btn-sm" onclick="desasignarCoordi('${a.id}')">✕</button>
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+
+    const htmlPend = pendientesFirma.map(p => {
+      const u = p._usuario;
+      const c = p._contrato;
+      const nombre = u.nombre || c.creador_nombre || '—';
+      return `<div style="background:var(--bg2);border:1px solid var(--border);border-left:3px solid ${COLOR_PEND_FIRMA};border-radius:var(--radius);padding:14px 18px;margin-bottom:10px">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+          <div style="display:flex;align-items:center;gap:12px">
+            <div style="width:40px;height:40px;border-radius:50%;background:var(--bg3);overflow:hidden;flex-shrink:0;display:flex;align-items:center;justify-content:center">
+              ${u.foto_url ? `<img src="${u.foto_url}" style="width:100%;height:100%;object-fit:cover">` :
+              `<span style="font-family:'Zen Dots',sans-serif;font-size:15px;color:${COLOR_PEND_FIRMA}">${(nombre||'?')[0]}</span>`}
+            </div>
+            <div>
+              <div style="font-family:'Rajdhani',sans-serif;font-weight:700;font-size:16px">${nombre}</div>
+              <div style="font-size:10px;font-family:'JetBrains Mono',monospace;color:var(--ts)">cc · <span style="color:${COLOR_PEND_FIRMA};font-weight:700"><svg class="ic"><use href="#ic-lapiz"/></svg> PENDIENTE DE FIRMA</span></div>
+            </div>
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+
+    container.innerHTML = htmlAsigs + htmlPend;
+  } catch(e) { container.innerHTML=`<div class="alert alert-error">${e.message}</div>`; }
+}
+
+async function abrirModalAsignarCoordi() {
+  const rolesAsignables = ['coordinador','cc','mister_popo','maestro_roshi','bulma'];
+  let usuarios = [];
+  try { usuarios = await khUsuarios.listar({ activos: true, orden: 'nombre' }); } // [sec-usuarios]
+  catch(e) {}
+  // Excluir ya asignados
+  const asignadosIds = _ccAsignados.map(a=>a.coordi_id);
+  usuarios = usuarios.filter(u => rolesAsignables.includes(u.rol) && !asignadosIds.includes(u.id));
+  // Cargar deudas pendientes de cada usuario para advertir
+  const deudasPend = await khCoordi.deudasListar({ pagado: false }).catch(()=>[]); // [sec-sensibles]
+  const deudasPorUser = {};
+  deudasPend.forEach(d => {
+    if (!deudasPorUser[d.coordi_id]) deudasPorUser[d.coordi_id] = 0;
+    deudasPorUser[d.coordi_id] += (d.monto||0);
+  });
+
+  const opts = usuarios.map(u => {
+    const deuda = deudasPorUser[u.id]||0;
+    const warn = deuda > 0 ? ` <svg class="ic"><use href="#ic-alerta"/></svg> debe ${formatMXN(deuda)}` : '';
+    const strike = u.strikes >= 2 ? ` <svg class="ic"><use href="#ic-alerta"/></svg> ${u.strikes} strikes` : '';
+    return `<option value="${u.id}">${u.nombre} · ${u.rol}${warn}${strike}</option>`;
+  }).join('');
+  document.getElementById('modal-asignar-coordi').innerHTML = `
+    <div class="modal" style="max-width:480px">
+      <div class="modal-header">
+        <div class="modal-title" style="font-family:'Zen Dots',sans-serif;font-size:15px">Asignar persona al evento</div>
+        <button class="modal-close" onclick="closeModal('modal-asignar-coordi')">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label>Persona *</label>
+          <select class="cot-input" id="ac-coordi-sel" style="width:100%">
+            <option value="">— Selecciona —</option>${opts}
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Indicaciones especiales</label>
+          <textarea class="cot-input" id="ac-indicaciones" rows="3" placeholder="Punto de encuentro, responsabilidades, horario…" style="width:100%;resize:vertical"></textarea>
+        </div>
+        <div style="background:rgba(255,183,3,.06);border:1px solid rgba(255,183,3,.15);border-radius:8px;padding:12px;font-size:11px;color:var(--gold);font-family:'JetBrains Mono',monospace">
+          Se enviará un correo con link para aceptar o declinar
+        </div>
+        <div id="ac-alert" style="margin-top:8px"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" onclick="closeModal('modal-asignar-coordi')">Cancelar</button>
+        <button class="btn btn-primary" onclick="guardarAsignacionCoordi()">Asignar y notificar →</button>
+      </div>
+    </div>`;
+  openModal('modal-asignar-coordi');
+}
+
+async function guardarAsignacionCoordi() {
+  const coordiId     = document.getElementById('ac-coordi-sel')?.value;
+  const indicaciones = document.getElementById('ac-indicaciones')?.value.trim()||null;
+  const alertEl      = document.getElementById('ac-alert');
+  if (!coordiId) { alertEl.innerHTML='<div class="alert alert-error">Selecciona una persona</div>'; return; }
+  alertEl.innerHTML='<div class="alert" style="border-color:var(--border)">Guardando…</div>';
+  try {
+    const asig = await khAsignaciones.crear({ // [sec-coordi]
+      evento_id: _ccEventoActual,
+      coordi_id: coordiId,
+      indicaciones,
+    });
+    // Correo con link aceptar/declinar
+    const ev = _ccEventosCache.find(e=>e.id===_ccEventoActual);
+    const usuario = await khUsuarios.obtener(coordiId); // [sec-usuarios]
+    const asigId = asig?.asignacion?.id; // [sec-coordi]
+    const baseUrl = window.location.origin + window.location.pathname;
+    const linkAceptar = `${baseUrl}?accion=aceptar&asig=${asigId}`;
+    const linkDeclinar = `${baseUrl}?accion=declinar&asig=${asigId}`;
+    if (usuario?.correo_notif || usuario?.correo) {
+      await khAdminFetch('/.netlify/functions/send-invite', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({
+          to: usuario.correo_notif || usuario.correo,
+          subject: `Tour asignado: ${ev?.nombre||'Evento'}`,
+          html: `<div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;background:#0a0a0f;color:#f0f0f5;padding:32px;border-radius:12px">
+            <h2 style="color:#FF6B00;margin-bottom:8px">Tour Asignado</h2>
+            <p>Hola <strong>${usuario.nombre}</strong>,</p>
+            <p>Se te ha asignado el siguiente tour:</p>
+            <div style="background:#1a1a24;border-left:3px solid #FF6B00;padding:16px 20px;border-radius:8px;margin:20px 0">
+              <div style="font-size:20px;font-weight:700">${ev?.nombre||''}</div>
+              <div style="color:#888899;font-size:13px">${ev?.artista?ev.artista+' · ':''}${ev?.ciudad||''}</div>
+              <div style="color:#888899;font-size:13px">${ev?.fecha?new Date(ev.fecha+'T12:00:00').toLocaleDateString('es-MX',{weekday:'long',day:'numeric',month:'long',year:'numeric'}):''}</div>
+            </div>
+            ${indicaciones?`<p><strong>Indicaciones:</strong><br><span style="color:#888899">${indicaciones}</span></p>`:''}
+            <div style="margin-top:28px;display:flex;gap:12px;flex-wrap:wrap">
+              <a href="${linkAceptar}" style="background:#FF6B00;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:700">✅ Aceptar tour</a>
+              <a href="${linkDeclinar}" style="background:#1a1a24;color:#f0f0f5;padding:12px 24px;border-radius:8px;text-decoration:none;border:1px solid #333">❌ Declinar</a>
+            </div>
+            <p style="color:#888899;font-size:12px;margin-top:32px">Conecta Reynosa · conectareynosa.mx</p>
+          </div>`,
+        }),
+      });
+    }
+    // Notificación in-app al coordi (además del email). Fails-soft.
+    await _crearNotif({
+      usuario_id: coordiId, tipo: 'asignacion', titulo: 'Nuevo evento asignado',
+      mensaje: `Te asignaron: ${ev?.nombre || 'un evento'}. Entra a tu perfil para verlo.`,
+    });
+    alertEl.innerHTML='<div class="alert alert-success">✓ Asignado y notificado</div>';
+    setTimeout(async ()=>{ closeModal('modal-asignar-coordi'); await loadCCEquipo(); }, 900);
+  } catch(e) { alertEl.innerHTML=`<div class="alert alert-error">${e.message}</div>`; }
+}
+
+async function desasignarCoordi(asigId) {
+  if (!confirm('¿Desasignar esta persona del evento?')) return;
+  try { await khAsignaciones.eliminar(asigId); await loadCCEquipo(); } // [sec-coordi]
+  catch(e) { alert(e.message); }
+}
+
+async function reenviarNotificacion(asigId) {
+  // Reenviar correo de asignación
+  const asig = _ccAsignados.find(a=>a.id===asigId);
+  if (!asig) return;
+  const ev = _ccEventosCache.find(e=>e.id===_ccEventoActual);
+  try {
+    const usuario = await khUsuarios.obtener(asig.coordi_id); // [sec-usuarios]
+    const baseUrl = window.location.origin + window.location.pathname;
+    const linkAceptar = `${baseUrl}?accion=aceptar&asig=${asigId}`;
+    const linkDeclinar = `${baseUrl}?accion=declinar&asig=${asigId}`;
+    if (usuario?.correo_notif || usuario?.correo) {
+      await khAdminFetch('/.netlify/functions/send-invite', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({
+          to: usuario.correo_notif || usuario.correo,
+          subject: `Recordatorio — Tour asignado: ${ev?.nombre||''}`,
+          html: `<div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;background:#0a0a0f;color:#f0f0f5;padding:32px;border-radius:12px">
+            <h2 style="color:#FFB703">Recordatorio de asignación</h2>
+            <p>Hola <strong>${usuario.nombre}</strong>, aún no has respondido a tu asignación:</p>
+            <div style="background:#1a1a24;border-left:3px solid #FF6B00;padding:16px 20px;border-radius:8px;margin:20px 0">
+              <div style="font-size:18px;font-weight:700">${ev?.nombre||''}</div>
+              <div style="color:#888899">${ev?.ciudad||''} · ${ev?.fecha?new Date(ev.fecha+'T12:00:00').toLocaleDateString('es-MX',{day:'numeric',month:'long',year:'numeric'}):''}</div>
+            </div>
+            <div style="margin-top:24px;display:flex;gap:12px;flex-wrap:wrap">
+              <a href="${linkAceptar}" style="background:#FF6B00;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:700">✅ Aceptar</a>
+              <a href="${linkDeclinar}" style="background:#1a1a24;color:#f0f0f5;padding:12px 24px;border-radius:8px;text-decoration:none;border:1px solid #333">❌ Declinar</a>
+            </div>
+          </div>`,
+        }),
+      });
+      alert('✓ Recordatorio enviado');
+    }
+  } catch(e) { alert(e.message); }
+}
+
+// Manejar aceptar/declinar desde URL params al cargar
+async function manejarAccionAsignacion() {
+  const params = new URLSearchParams(window.location.search);
+  const accion = params.get('accion');
+  const asigId = params.get('asig');
+  if (!accion || !asigId) return;
+
+  if (accion === 'aceptar') {
+    try {
+      await khAsignaciones.responder(asigId, 'aceptar'); // [sec-coordi] (anti-escalación: el backend exige que sea TU asignación)
+      // Auto-agregar al usuario aceptante como viajero del evento (best-effort).
+      // Si falla, la aceptación del tour se completa igual.
+      try { await _upsertViajeroStaff(asigId); }
+      catch(e) { console.warn('[viajero-staff] upsert falló:', e.message); }
+      // Limpiar URL
+      window.history.replaceState({}, '', window.location.pathname);
+      setTimeout(() => alert('✓ ¡Tour aceptado! Aparecerá en tu perfil.'), 500);
+    } catch(e) { console.warn(e); }
+  }
+
+  if (accion === 'declinar') {
+    const motivo = prompt('¿Por qué no puedes asistir? (opcional):') || '';
+    try {
+      const _resp = await khAsignaciones.responder(asigId, 'declinar', motivo); // [sec-coordi] (anti-escalación)
+      const _asigD = _resp?.asignacion || {}; // [sec-coordi] el backend devuelve evento_id/coordi_id (sin GET extra)
+      window.history.replaceState({}, '', window.location.pathname);
+      // Notificar a Memo
+      const _evD = _asigD?.evento_id ? await khEventosMeta.porSlug(_asigD.evento_id).then(m=>m?.nombre||'').catch(()=>'') : ''; // [sec-eventos]
+      const _uD  = _asigD?.coordi_id ? await khUsuarios.obtener(_asigD.coordi_id).then(u=>u?.nombre||'').catch(()=>'') : ''; // [sec-usuarios]
+      await enviarAlertaMemo('tour_declinado', { nombre: _uD, evento: _evD, motivo });
+      setTimeout(() => alert('Respuesta registrada. Memo será notificado.'), 500);
+    } catch(e) { console.warn(e); }
+  }
+}
+
+// [sec-coordi] Inserta al usuario aceptante como viajero del evento (staff).
+// Toda la lógica (lookup del asig, identidad desde `usuarios`, idempotencia por
+// correo, fallback de columnas tipo_viajero/usuario_id) vive ahora server-side en
+// admin-coordi-asignaciones.js con service_role + anti-escalación (owner o admin).
+// Best-effort — el caller envuelve en try/catch para que la aceptación nunca falle.
+async function _upsertViajeroStaff(asigId) {
+  return await khViajeros.upsertStaff(asigId); // [sec-coordi]
+}
+
+// Backfill: asegura que todo CC con status='aceptado' tenga su fila en
+// viajeros_evento. Se llama al cargar el detalle del evento en Capsule Corp
+// para auto-curar a quienes aceptaron antes de que existiera _upsertViajeroStaff.
+async function _backfillStaffViajeros() {
+  if (!_ccEventoActual || !Array.isArray(_ccAsignados)) return;
+  const aceptados = _ccAsignados.filter(a => a.status === 'aceptado');
+  if (!aceptados.length) return;
+  for (const a of aceptados) {
+    try { await _upsertViajeroStaff(a.id); }
+    catch(e) { console.warn('[backfill] viajero-staff falló:', e.message); }
+  }
+}
+
+// Notificar a todo el equipo que las listas están listas
+async function notificarEquipoListas() {
+  if (!_ccEventoActual) return;
+  const aceptados = _ccAsignados.filter(a => a.status === 'aceptado');
+  if (!aceptados.length) { alert('No hay equipo que haya aceptado aún'); return; }
+  const ev = _ccEventosCache.find(e=>e.id===_ccEventoActual);
+  const usuarios = await khUsuarios.listar({ ids: aceptados.map(a=>a.coordi_id) }); // [sec-usuarios]
+  let enviados = 0;
+  for (const u of usuarios) {
+    const email = u.correo_notif || u.correo;
+    if (!email) continue;
+    await khAdminFetch('/.netlify/functions/send-invite', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        to: email,
+        subject: `Listas listas: ${ev?.nombre||'Evento'}`,
+        html: `<div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;background:#0a0a0f;color:#f0f0f5;padding:32px;border-radius:12px">
+          <h2 style="color:#FF6B00">Listas actualizadas</h2>
+          <p>Hola <strong>${u.nombre}</strong>,</p>
+          <p>Las listas del evento <strong>${ev?.nombre||''}</strong> ya están listas.</p>
+          <ul style="color:#888899;line-height:2">
+            <li>Lista de viajeros</li>
+            <li>Rooming list</li>
+          </ul>
+          <p>Entra al Kamehouse y revisa tu perfil para descargarlas.</p>
+          <p style="margin-top:16px">No olvides pasar a <strong>Torre de Karin</strong> a recoger los kits antes del evento.</p>
+          <p style="color:#888899;font-size:12px;margin-top:32px">Conecta Reynosa · conectareynosa.mx</p>
+        </div>`,
+      }),
+    });
+    // Notificación in-app (además del email). Fails-soft.
+    await _crearNotif({
+      usuario_id: u.id, tipo: 'listas', titulo: 'Listas actualizadas',
+      mensaje: `Las listas de ${ev?.nombre || 'tu evento'} ya están listas. Descárgalas en tu perfil.`,
+    });
+    enviados++;
+  }
+  alert(`✓ Notificación enviada a ${enviados} persona${enviados!==1?'s':''}`);
+}
+
+
+// ════════════════════════════════
+// VIAJEROS
+// ════════════════════════════════
+let _ccViajerosFiltro = 'todos';   // todos | cliente | staff
+
+function _esStaff(v) {
+  if (!v) return false;
+  if (v.tipo_viajero && v.tipo_viajero !== 'cliente') return true;
+  // Fallback: marker en notas (cuando la columna tipo_viajero no existe aún).
+  if (typeof v.notas === 'string' && /\[STAFF:/i.test(v.notas)) return true;
+  return false;
+}
+
+// Descarga un blob HTML como archivo. Reemplaza window.open()+win.print(),
+// que es bloqueado por Safari iOS y popup-blockers cuando la invocación
+// ocurre tras un await async. El archivo descargado se abre en el navegador
+// del usuario y desde ahí pueden imprimir/guardar como PDF.
+function _descargarHTML(filename, html) {
+  const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 100);
+}
+
+// Extrae el rol de staff a partir de tipo_viajero o del marker en notas.
+function _staffRol(v) {
+  if (!v) return '';
+  if (v.tipo_viajero && v.tipo_viajero !== 'cliente') return v.tipo_viajero;
+  const m = typeof v.notas === 'string' ? v.notas.match(/\[STAFF:([^\]]+)\]/i) : null;
+  return m ? m[1] : '';
+}
+
+function filtrarViajerosCC(filtro, btn) {
+  _ccViajerosFiltro = filtro;
+  document.querySelectorAll('#cc-sub-viajeros .gz-filter').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  _renderViajerosTabla();
+}
+
+// Badges de ESTADO DE CUENTA del cliente (adicionales a los de pago). Reusa la
+// paleta de .badge del CSS. Combina: walk-in sin cuenta → "Walk-in" + "Sin cuenta";
+// walk-in que ya reclamó → "Walk-in" + "En portal"; cliente del portal → "En portal".
+function _badgeCliente(c) {
+  c = c || {};
+  const badges = [];
+  if (c.creado_por_admin) badges.push('<span class="badge badge-gray">Walk-in</span>');
+  if (c.auth_user_id)     badges.push('<span class="badge badge-green">En portal</span>');
+  else                    badges.push('<span class="badge badge-gray" style="opacity:.7">Sin cuenta</span>');
+  return badges.join(' ');
+}
+
+function _renderViajerosTabla() {
+  const list = document.getElementById('cc-viajeros-list');
+  if (!list) return;
+  const todos   = _ccViajeros;
+  const staff   = todos.filter(_esStaff);
+  const clientes = todos.filter(v => !_esStaff(v));
+  // Actualizar contadores en las pestañas
+  const cT = document.getElementById('cc-cnt-todos');   if (cT) cT.textContent = `(${todos.length})`;
+  const cC = document.getElementById('cc-cnt-cliente'); if (cC) cC.textContent = `(${clientes.length})`;
+  const cS = document.getElementById('cc-cnt-staff');   if (cS) cS.textContent = `(${staff.length})`;
+  // Aplicar filtro
+  const filas = _ccViajerosFiltro === 'staff' ? staff
+              : _ccViajerosFiltro === 'cliente' ? clientes
+              : todos;
+  if (!filas.length) {
+    list.innerHTML = `<div class="empty-state"><div class="empty-icon">·</div>${_ccViajerosFiltro==='todos'?'Sin viajeros aprobados para este evento':'Sin viajeros con ese filtro'}</div>`;
+    return;
+  }
+  const paqCol = { 'PLUS':'rgba(255,183,3,.15)','STAY':'rgba(94,167,255,.15)','RIDE':'rgba(61,220,132,.15)','CHEAP':'rgba(255,107,0,.12)' };
+  const paqFg  = { 'PLUS':'var(--gold)','STAY':'var(--blue)','RIDE':'var(--green)','CHEAP':'var(--orange)' };
+  list.innerHTML = `<div class="table-wrap"><table>
+    <thead><tr><th>Nombre</th><th>Celular</th><th>Paquete</th><th>Zona</th><th style="text-align:center">Pers.</th><th style="text-align:right">Total</th><th style="text-align:right">Abonado</th><th style="text-align:right">Restante</th><th>Estado</th></tr></thead>
+    <tbody>${filas.map(v => {
+      const c = v.clientes || {};
+      const pago = v.pago || {};
+      const paq = v.paquete || '';
+      const esWalkinSinCuenta = c.creado_por_admin && !c.auth_user_id;
+      const botonInvitar = (esWalkinSinCuenta && c.correo)
+        ? `<br><button class="btn btn-ghost btn-sm" style="font-size:10px;margin-top:5px" onclick="invitarWalkin('${_spEscape(c.id)}', this)"><svg class="ic"><use href="#ic-correo"/></svg> Invitar al portal</button>`
+        : '';
+      return `<tr>
+      <td style="font-weight:600">${c.nombre_completo || '—'} ${_badgeCliente(c)}${c.correo ? `<br><span style="color:var(--ts);font-size:11px;font-weight:400">${c.correo}</span>` : ''}${botonInvitar}</td>
+      <td style="font-family:'JetBrains Mono',monospace;font-size:12px">${c.celular || '—'}</td>
+      <td>${paq ? `<span style="font-size:10px;font-weight:700;padding:2px 10px;border-radius:4px;background:${paqCol[paq]||'rgba(255,255,255,.06)'};color:${paqFg[paq]||'var(--ts)'}">${paq}</span>` : '—'}</td>
+      <td style="font-size:11px;color:var(--orange);white-space:nowrap">${v.zona || '—'}</td>
+      <td style="text-align:center">${v.num_personas || 1}</td>
+      <td style="text-align:right;font-family:'JetBrains Mono',monospace;font-size:12px">${_spFmtMxn(pago.total)}</td>
+      <td style="text-align:right;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--green)">${_spFmtMxn(pago.abonado)}</td>
+      <td style="text-align:right;font-family:'JetBrains Mono',monospace;font-size:12px;color:${(pago.restante||0) > 0 ? 'var(--orange)' : 'var(--ts)'}">${_spFmtMxn(pago.restante)}</td>
+      <td>${_spBadgeEstado(v.estado)}</td>
+    </tr>`; }).join('')}</tbody>
+  </table></div>`;
+}
+
+// Invita por correo a un walk-in (cliente sin cuenta de portal) para que reclame
+// su cuenta. El enlace real lo hace portal-reclamar-cuenta cuando el cliente se
+// registra con correo verificado. Solo aparece para walk-ins con correo.
+async function invitarWalkin(clienteId, btn) {
+  if (!clienteId) return;
+  if (btn) { btn.disabled = true; btn.textContent = 'Enviando…'; }
+  try {
+    const r = await fetch('/.netlify/functions/admin-invitar-walkin', {
+      method: 'POST',
+      headers: _spAdminHeaders(),
+      body: JSON.stringify({ cliente_id: clienteId }),
+    });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || 'No se pudo invitar');
+    showToast('Invitación enviada a ' + (data.to || 'su correo'), 'success');
+    if (btn) btn.textContent = '✓ Invitado';
+  } catch(e) {
+    showToast('Error: ' + e.message, 'error');
+    if (btn) { btn.disabled = false; btn.textContent = 'Invitar al portal'; }
+  }
+}
+
+async function loadViajeros() {
+  if (!_ccEventoActual) return;
+  const list = document.getElementById('cc-viajeros-list');
+  if (!list) return;
+  list.innerHTML = '<div class="loading-state"><div class="spinner"></div>Cargando…</div>';
+  try {
+    // Viajeros = solicitudes del portal (en_pagos/pagado) de este evento, con
+    // su resumen de pago. service_role vive en la función; aquí va el JWT admin.
+    const r = await fetch('/.netlify/functions/admin-viajeros-evento', {
+      method: 'POST',
+      headers: _spAdminHeaders(),
+      body: JSON.stringify({ evento_id: _ccEventoActual }),
+    });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || 'No se pudieron cargar los viajeros');
+    _ccViajeros = Array.isArray(data.viajeros) ? data.viajeros : [];
+    const countEl = document.getElementById('cc-viajeros-count');
+    if (countEl) countEl.textContent = `${_ccViajeros.length} viajero${_ccViajeros.length!==1?'s':''}`;
+    _renderViajerosTabla();
+  } catch(e) { list.innerHTML = `<div class="alert alert-error">${e.message}</div>`; }
+}
+
+// Alta de walk-in (Fase 2a): captura un cliente de WhatsApp (sin cuenta de
+// portal) y lo da de alta en el MODELO DEL PORTAL (cliente + solicitud en_pagos
+// + plan de pagos). No es edición — el id se ignora; sirve solo para "nuevo".
+// ═══════════════════════════════════════════════════════════════
+// VALIDACIÓN DE CORREO (walk-in) — mismo criterio que el backend
+// (admin-crear-viajero / admin-invitar-walkin). Tapa el hueco de correos mal
+// escritos (ej. "gmail.con") que Resend acepta pero rebotan en silencio.
+// ═══════════════════════════════════════════════════════════════
+let _vjCorreoConfirmado = false;   // el humano eligió "usarlo de todos modos"
+let _vjSugActual = '';             // sugerencia mostrada actualmente
+
+// Formato básico: algo@algo.tld con TLD de 2+ letras, sin espacios.
+function correoFormatoValido(correo) {
+  return /^[^\s@]+@[^\s@]+\.[A-Za-z]{2,}$/.test(String(correo == null ? '' : correo).trim());
+}
+
+// TLD mal escrito → se asume .com.
+const _VJ_TLD_MALOS = { con:1, cm:1, comm:1, ocm:1, cmo:1, vom:1, xom:1, col:1, om:1 };
+// Dominios populares mal escritos → su forma correcta.
+const _VJ_DOMINIOS_MALOS = {
+  'gmial.com':'gmail.com', 'gmai.com':'gmail.com', 'gmail.co':'gmail.com', 'gmaill.com':'gmail.com', 'gnail.com':'gmail.com',
+  'hotmial.com':'hotmail.com', 'hotmal.com':'hotmail.com', 'hotmil.com':'hotmail.com', 'hotmai.com':'hotmail.com',
+  'yaho.com':'yahoo.com', 'yahooo.com':'yahoo.com', 'yhaoo.com':'yahoo.com',
+  'outlok.com':'outlook.com', 'outloo.com':'outlook.com', 'outlock.com':'outlook.com',
+};
+
+// Devuelve una corrección sugerida (string) o null. Conserva la parte local tal
+// como se escribió; solo corrige el dominio/TLD.
+function sugerenciaCorreo(correo) {
+  const raw = String(correo == null ? '' : correo).trim();
+  const at = raw.lastIndexOf('@');
+  if (at < 1 || at === raw.length - 1) return null;
+  const local = raw.slice(0, at);
+  const dominio = raw.slice(at + 1).toLowerCase();
+  if (_VJ_DOMINIOS_MALOS[dominio]) return local + '@' + _VJ_DOMINIOS_MALOS[dominio];
+  const dot = dominio.lastIndexOf('.');
+  if (dot > 0 && _VJ_TLD_MALOS[dominio.slice(dot + 1)]) {
+    return local + '@' + dominio.slice(0, dot) + '.com';
+  }
+  return null;
+}
+
+function _vjLimpiarCorreoHint() {
+  const el = document.getElementById('vj-correo-hint');
+  if (el) el.innerHTML = '';
+}
+
+// Cualquier edición invalida una confirmación previa y limpia el aviso.
+function _vjOnCorreoInput() {
+  _vjCorreoConfirmado = false;
+  _vjLimpiarCorreoHint();
+}
+
+// Feedback temprano al salir del campo (no bloquea; solo informa).
+function _vjChequeoCorreoBlur() {
+  const correo = (document.getElementById('vj-correo')?.value || '').trim();
+  if (!correo) { _vjLimpiarCorreoHint(); return; }
+  if (!correoFormatoValido(correo)) { _vjMostrarCorreoError('El correo no parece válido. Revísalo.'); return; }
+  const sug = sugerenciaCorreo(correo);
+  if (sug && !_vjCorreoConfirmado) { _vjMostrarCorreoSugerencia(sug); }
+  else { _vjLimpiarCorreoHint(); }
+}
+
+function _vjMostrarCorreoError(msg) {
+  const el = document.getElementById('vj-correo-hint');
+  if (el) el.innerHTML = `<div style="font-size:12px;color:var(--red);padding:6px 8px;border:1px solid rgba(255,68,68,.3);border-radius:6px;background:rgba(255,68,68,.08)">${_spEscape(msg)}</div>`;
+}
+
+// Aviso amable con la sugerencia y dos opciones: corregir / usarlo igual.
+function _vjMostrarCorreoSugerencia(sug) {
+  _vjSugActual = sug;
+  const el = document.getElementById('vj-correo-hint');
+  if (!el) return;
+  el.innerHTML = `<div style="font-size:12px;color:var(--text);padding:8px 10px;border:1px solid var(--border2);border-radius:6px;background:rgba(255,107,0,.06)">
+    ¿Quisiste decir <b style="color:var(--orange)">${_spEscape(sug)}</b>?
+    <div style="display:flex;gap:8px;margin-top:8px">
+      <button type="button" class="btn btn-primary btn-sm" style="font-size:11px" onclick="_vjAceptarSugerencia()">Sí, corregir</button>
+      <button type="button" class="btn btn-ghost btn-sm" style="font-size:11px" onclick="_vjUsarDeTodosModos()">Usarlo de todos modos</button>
+    </div>
+  </div>`;
+}
+
+function _vjAceptarSugerencia() {
+  const inp = document.getElementById('vj-correo');
+  if (inp && _vjSugActual) inp.value = _vjSugActual;
+  _vjCorreoConfirmado = false;   // el corregido ya no tendrá sugerencia
+  _vjLimpiarCorreoHint();
+}
+
+function _vjUsarDeTodosModos() {
+  _vjCorreoConfirmado = true;
+  const el = document.getElementById('vj-correo-hint');
+  if (el) el.innerHTML = `<div style="font-size:11px;color:var(--ts)">Se usará el correo tal como lo escribiste — presiona “Guardar viajero”.</div>`;
+}
+
+function abrirModalViajero(id) {
+  _vjCorreoConfirmado = false;
+  const eventos = _ccEventosCache || [];
+  const opcionesEvento = eventos
+    .map(e => `<option value="${_spEscape(e.id)}" ${e.id===_ccEventoActual?'selected':''}>${_spEscape(e.nombre || e.id)}</option>`)
+    .join('');
+  const HABS = ['compartida','triple','doble','individual'];
+  document.getElementById('modal-viajero').innerHTML = `
+    <div class="modal" style="max-width:580px">
+      <div class="modal-header">
+        <div class="modal-title" style="font-family:'Zen Dots',sans-serif;font-size:15px">Nuevo viajero (walk-in)</div>
+        <button class="modal-close" onclick="closeModal('modal-viajero')">×</button>
+      </div>
+      <div class="modal-body">
+        <div style="font-size:11px;color:var(--ts);margin-bottom:14px;font-family:'JetBrains Mono',monospace">// Cliente de WhatsApp sin cuenta de portal. Se crea con su plan de pagos al instante.</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <div class="form-group" style="grid-column:1/-1">
+            <label>Nombre completo *</label>
+            <input class="cot-input" id="vj-nombre" placeholder="Nombre y apellido…" style="width:100%">
+          </div>
+          <div class="form-group">
+            <label>Celular *</label>
+            <input class="cot-input" id="vj-celular" placeholder="811…">
+          </div>
+          <div class="form-group">
+            <label>Correo</label>
+            <input class="cot-input" id="vj-correo" type="email" placeholder="correo@…" oninput="_vjOnCorreoInput()" onblur="_vjChequeoCorreoBlur()">
+            <div style="font-size:10px;color:var(--ts);margin-top:4px">Opcional — necesario para invitarlo al portal después</div>
+            <div id="vj-correo-hint" style="margin-top:6px"></div>
+          </div>
+          <div class="form-group" style="grid-column:1/-1">
+            <label>Evento *</label>
+            <select class="cot-input" id="vj-evento" style="width:100%">
+              ${opcionesEvento || '<option value="">— Sin eventos —</option>'}
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Paquete *</label>
+            <select class="cot-input" id="vj-paquete">
+              <option value="PLUS">PLUS</option>
+              <option value="RIDE">RIDE</option>
+              <option value="STAY">STAY</option>
+              <option value="CHEAP">CHEAP</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Zona / boleto *</label>
+            <input class="cot-input" id="vj-zona" placeholder="Floor, GA, VIP…">
+          </div>
+          <div class="form-group">
+            <label>Personas</label>
+            <input class="cot-input" id="vj-personas" type="number" min="1" max="12" value="1">
+          </div>
+          <div class="form-group">
+            <label>Habitación</label>
+            <select class="cot-input" id="vj-habitacion">
+              <option value="">— Sin habitación —</option>
+              ${HABS.map(h=>`<option value="${h}">${h.charAt(0).toUpperCase()+h.slice(1)}</option>`).join('')}
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Precio total * (MXN)</label>
+            <input class="cot-input" id="vj-precio" type="number" min="0" step="1" placeholder="5000">
+          </div>
+          <div class="form-group">
+            <label>Separo * (MXN)</label>
+            <input class="cot-input" id="vj-separo" type="number" min="0" step="1" placeholder="1000">
+          </div>
+        </div>
+        <div id="vj-alert" style="margin-top:6px"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" onclick="closeModal('modal-viajero')">Cancelar</button>
+        <button class="btn btn-primary" id="vj-guardar-btn" onclick="guardarViajero()">Guardar viajero</button>
+      </div>
+    </div>`;
+  openModal('modal-viajero');
+}
+
+async function guardarViajero() {
+  const alertEl = document.getElementById('vj-alert');
+  const btn = document.getElementById('vj-guardar-btn');
+  const err = (m) => { if (alertEl) alertEl.innerHTML = `<div class="alert alert-error">${m}</div>`; };
+
+  const nombre   = (document.getElementById('vj-nombre')?.value||'').trim();
+  const celular  = (document.getElementById('vj-celular')?.value||'').trim();
+  const correo   = (document.getElementById('vj-correo')?.value||'').trim();
+  const eventoId = document.getElementById('vj-evento')?.value || '';
+  const paquete  = document.getElementById('vj-paquete')?.value || '';
+  const zona     = (document.getElementById('vj-zona')?.value||'').trim();
+  const personas = parseInt(document.getElementById('vj-personas')?.value, 10) || 1;
+  const habitacion = document.getElementById('vj-habitacion')?.value || '';
+  const precioTotal = Number(document.getElementById('vj-precio')?.value);
+  const montoSeparo = Number(document.getElementById('vj-separo')?.value);
+
+  if (!nombre)  return err('El nombre es obligatorio');
+  if (!celular) return err('El celular es obligatorio');
+  if (!eventoId) return err('Selecciona un evento');
+  if (!['PLUS','RIDE','STAY','CHEAP'].includes(paquete)) return err('Selecciona un paquete');
+  if (!zona) return err('La zona es obligatoria');
+  if (!isFinite(precioTotal) || precioTotal < 0) return err('Precio total inválido');
+  if (!isFinite(montoSeparo) || montoSeparo < 0) return err('Separo inválido');
+  if (montoSeparo > precioTotal) return err('El separo no puede ser mayor que el total');
+
+  // Validación del correo (opcional). Formato malo → bloquea. Formato bueno pero
+  // con typo probable → sugiere y espera que el humano acepte o lo use igual.
+  if (correo) {
+    if (!correoFormatoValido(correo)) {
+      _vjMostrarCorreoError('El correo no parece válido. Revísalo.');
+      return err('El correo no parece válido. Revísalo.');
+    }
+    const sug = sugerenciaCorreo(correo);
+    if (sug && !_vjCorreoConfirmado) {
+      _vjMostrarCorreoSugerencia(sug);
+      return;  // espera la decisión del humano (aceptar / usar de todos modos)
+    }
+  }
+
+  const ev = (_ccEventosCache || []).find(e => e.id === eventoId) || {};
+  const eventoNombre = ev.nombre || eventoId;
+
+  if (btn) { btn.disabled = true; btn.textContent = 'Guardando…'; }
+  let solicitudId = null;
+  try {
+    // 1. Crear cliente + solicitud (en_pagos) en el modelo del portal.
+    if (alertEl) alertEl.innerHTML = '<div class="alert" style="border-color:var(--border)">Creando viajero…</div>';
+    const r = await fetch('/.netlify/functions/admin-crear-viajero', {
+      method: 'POST',
+      headers: _spAdminHeaders(),
+      body: JSON.stringify({
+        cliente:   { nombre_completo: nombre, celular, correo: correo || undefined },
+        solicitud: { evento_id: eventoId, evento_nombre: eventoNombre, paquete, zona,
+                     num_personas: personas, tipo_habitacion: habitacion || undefined,
+                     precio_total: precioTotal, monto_separo: montoSeparo },
+      }),
+    });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || 'No se pudo crear el viajero');
+    solicitudId = data.solicitud_id;
+
+    // 2. Generar el plan de pagos reusando la MISMA lógica que al aprobar una
+    //    solicitud (separo #1 'pendiente' + quincenas). Generar-después-de-crear.
+    if (alertEl) alertEl.innerHTML = '<div class="alert" style="border-color:var(--border)">Generando plan de pagos…</div>';
+    const plan = await _spCalcularPlanPagos({
+      evento_id: eventoId, evento_nombre: eventoNombre, paquete,
+      precio_total: precioTotal, monto_separo: montoSeparo,
+    });
+    if (!plan.ok) throw new Error(plan.error || 'No se pudo calcular el plan de pagos');
+    const rp = await fetch('/.netlify/functions/admin-generar-plan-pagos', {
+      method: 'POST',
+      headers: _spAdminHeaders(),
+      body: JSON.stringify({ solicitud_id: solicitudId, pagos: plan.pagos }),
+    });
+    const dataP = await rp.json();
+    if (!rp.ok) throw new Error(dataP.error || 'Falló la generación del plan de pagos');
+
+    closeModal('modal-viajero');
+    let extraCorreo = '';
+    if (dataP.correo_enviado) extraCorreo = ' <svg class="ic"><use href="#ic-correo"/></svg> Plan enviado al cliente por correo.';
+    else if (dataP.correo_error || dataP.correo_enviado === false) extraCorreo = ' <svg class="ic"><use href="#ic-alerta"/></svg> El plan se creó pero el correo no salió.';
+    showToast('Viajero dado de alta con su plan de pagos.' + extraCorreo, 'success');
+    await loadViajeros();
+  } catch(e) {
+    if (solicitudId) {
+      // El cliente+solicitud YA se crearon; reintentar duplicaría el cliente.
+      // Cerramos y refrescamos (el viajero ya aparece) y avisamos del plan.
+      closeModal('modal-viajero');
+      showToast('Viajero creado, pero el plan de pagos falló: ' + e.message + '. Regenéralo desde Solicitudes Portal (cambiar estado a “En pagos”).', 'error');
+      await loadViajeros();
+    } else {
+      err(e.message);
+    }
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Guardar viajero'; }
+  }
+}
+
+async function eliminarViajero(id) {
+  if (!confirm('¿Eliminar este viajero?')) return;
+  try { await khViajeros.eliminar(id); await loadViajeros(); } // [sec-coordi]
+  catch(e) { alert(e.message); }
+}
+
+async function exportarViajeros(formato) {
+  if (!_ccViajeros.length) { alert('No hay viajeros para exportar'); return; }
+  const excluirStaff = !!document.getElementById('cc-export-excluir-staff')?.checked;
+  const lista = excluirStaff ? _ccViajeros.filter(v => !_esStaff(v)) : _ccViajeros;
+  if (!lista.length) { alert('No hay clientes para exportar (todos son staff)'); return; }
+  const ev = _ccEventosCache.find(e => e.id === _ccEventoActual);
+  const sufijoTitulo = excluirStaff ? ' (sin staff)' : '';
+  const titulo = `Viajeros — ${ev?.nombre||'Evento'}${sufijoTitulo}`;
+  const _vNombre = v => (v.clientes || {}).nombre_completo || '';
+  const _vCel    = v => (v.clientes || {}).celular || '';
+  const _vCorreo = v => (v.clientes || {}).correo || '';
+  const _vPago   = v => v.pago || {};
+  if (formato === 'pdf') {
+    const sufijoFile = excluirStaff ? '-sin-staff' : '';
+    const html = `<html><head><meta charset="utf-8"><title>${titulo}</title>
+    <style>body{font-family:Arial,sans-serif;padding:24px}h2{margin-bottom:16px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ccc;padding:8px 12px;font-size:13px}th{background:#f5f5f5}td.num{text-align:right}</style></head><body>
+    <h2>${titulo}</h2>
+    <table><thead><tr><th>#</th><th>Nombre</th><th>Celular</th><th>Correo</th><th>Paquete</th><th>Zona</th><th>Pers.</th><th>Total</th><th>Abonado</th><th>Restante</th><th>Estado</th></tr></thead>
+    <tbody>${lista.map((v,i)=>`<tr><td>${i+1}</td><td>${_vNombre(v)}</td><td>${_vCel(v)}</td><td>${_vCorreo(v)}</td><td>${v.paquete||''}</td><td>${v.zona||''}</td><td>${v.num_personas||1}</td><td class="num">${_spFmtMxn(_vPago(v).total)}</td><td class="num">${_spFmtMxn(_vPago(v).abonado)}</td><td class="num">${_spFmtMxn(_vPago(v).restante)}</td><td>${v.estado||''}</td></tr>`).join('')}</tbody>
+    </table></body></html>`;
+    _descargarHTML(`viajeros-${ev?.nombre||'evento'}${sufijoFile}.html`, html);
+  } else {
+    const headers = ['#','Nombre','Celular','Correo','Paquete','Zona','Personas','Total','Abonado','Restante','Estado'];
+    const rows = lista.map((v,i) => [i+1,_vNombre(v),_vCel(v),_vCorreo(v),v.paquete||'',v.zona||'',v.num_personas||1,_vPago(v).total||0,_vPago(v).abonado||0,_vPago(v).restante||0,v.estado||''].map(c=>`"${String(c).replace(/"/g,'""')}"`).join(','));
+    const csv = [headers.join(','), ...rows].join('\n');
+    const a = document.createElement('a');
+    a.href = 'data:text/csv;charset=utf-8,\uFEFF' + encodeURIComponent(csv);
+    const sufijoFile = excluirStaff ? '-sin-staff' : '';
+    a.download = `viajeros-${ev?.nombre||'evento'}${sufijoFile}.csv`;
+    a.click();
+  }
+}
+
+// ════════════════════════════════
+// ROOMING LIST
+// ════════════════════════════════
+let _hotelSaveTimer = null;
+let _ccHotelInfo = null;
+
+const CAPACIDAD_HAB = { individual: 1, doble: 2, triple: 3, cuadruple: 4 };
+const TIPO_LABELS   = { individual: 'Individual', doble: 'Doble', triple: 'Triple', cuadruple: 'Cuádruple' };
+const TIPO_COL      = { individual: 'var(--ts)', doble: 'var(--blue)', triple: 'var(--gold)', cuadruple: 'var(--orange)' };
+
+// Rooming básico (lectura): agrupa los viajeros del portal (_ccViajeros) por
+// tipo_habitacion. La asignación fina cuarto-por-cuarto es fase futura. Los
+// tipos válidos del portal son compartida|doble|triple|individual; los viajeros
+// sin habitación (paquetes sin hotel, p.ej. RIDE/CHEAP) caen en "Sin habitación".
+async function loadRooming() {
+  if (!_ccEventoActual) return;
+  loadGruposPortal(); // [F4-t4] cuartos del Portal (best-effort, fails-soft, no bloquea)
+  const list    = document.getElementById('cc-rooming-list');
+  const resumen = document.getElementById('cc-rooming-resumen');
+  if (!list) return;
+
+  // Hotel queda como fase futura — mostramos el bloque vacío sin tocar datos viejos.
+  _ccHotelInfo = null;
+  renderHotelInfo();
+
+  const GRUPOS = [
+    { key: 'compartida', label: 'Compartida', col: 'var(--green)' },
+    { key: 'doble',      label: 'Doble',      col: 'var(--blue)' },
+    { key: 'triple',     label: 'Triple',     col: 'var(--gold)' },
+    { key: 'individual', label: 'Individual', col: 'var(--orange)' },
+    { key: '_sin',       label: 'Sin habitación', col: 'var(--ts)' },
+  ];
+  const VALIDOS = ['compartida','doble','triple','individual'];
+  const porTipo = {};
+  GRUPOS.forEach(g => { porTipo[g.key] = []; });
+  (_ccViajeros || []).forEach(v => {
+    const t = VALIDOS.includes(v.tipo_habitacion) ? v.tipo_habitacion : '_sin';
+    porTipo[t].push(v);
+  });
+
+  if (resumen) {
+    resumen.innerHTML = GRUPOS.filter(g => porTipo[g.key].length).map(g =>
+      `<div style="background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:8px 14px;text-align:center;min-width:80px">
+        <div style="font-family:'Zen Dots',sans-serif;font-size:22px;color:${g.col}">${porTipo[g.key].length}</div>
+        <div style="font-size:10px;color:var(--ts)">${g.label}</div>
+      </div>`).join('');
+  }
+
+  const conData = GRUPOS.filter(g => porTipo[g.key].length);
+  if (!conData.length) {
+    list.innerHTML = '<div class="empty-state"><div class="empty-icon">·</div>Sin viajeros aprobados para armar rooming</div>';
+    return;
+  }
+
+  list.innerHTML = conData.map(g => {
+    const miembros = porTipo[g.key];
+    const chips = miembros.map(v => {
+      const c = v.clientes || {};
+      const meta = [v.paquete, v.zona, (v.num_personas && v.num_personas > 1) ? (v.num_personas + ' pers.') : null].filter(Boolean).join(' · ');
+      return `<div style="background:rgba(255,255,255,.07);border:1px solid var(--border);border-radius:6px;padding:6px 14px;font-size:13px">
+        <span style="font-weight:600">${c.nombre_completo || '—'}</span>
+        ${meta ? `<span style="font-size:10px;color:var(--ts);margin-left:8px;font-family:'JetBrains Mono',monospace">${meta}</span>` : ''}
+      </div>`;
+    }).join('');
+    return `<div style="background:var(--bg2);border:1px solid var(--border);border-left:3px solid ${g.col};border-radius:var(--radius);padding:14px 18px;margin-bottom:10px">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap">
+        <span style="font-family:'Rajdhani',sans-serif;font-weight:700;font-size:18px">${g.label}</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:${g.col};letter-spacing:.1em">${miembros.length} ${miembros.length===1?'viajero':'viajeros'}</span>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px">${chips}</div>
+    </div>`;
+  }).join('');
+}
+
+// ═══════════════════════════════════════════════════════════════
+// [acompañantes F6-t1] LISTA PARA EL HOTEL imprimible. Solo lectura: junta los
+// grupos del Portal (khRoomingGrupos) + el rooming KH (_ccViajeros por tipo) y
+// abre una ventana MÍNIMA en NEGRO SOBRE BLANCO que dispara print() (el usuario
+// elige "Guardar como PDF"), patrón del PDF de contratos (#227). Sin dinero.
+// ═══════════════════════════════════════════════════════════════
+
+// Helper reusable (la t2 lo reusa): ventana mínima imprimible, sin el CSS de KH.
+function _printVentana(titulo, htmlCuerpo) {
+  const w = window.open('', '_blank');
+  if (!w) { alert('Permite las ventanas emergentes para generar la lista.'); return; }
+  const generado = new Date().toLocaleString('es-MX', { timeZone: 'America/Monterrey', dateStyle: 'long', timeStyle: 'short' });
+  const doc = `<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"><title>${_esfEsc(titulo)}</title>
+<style>
+  @page { size: letter; margin: 14mm; }
+  *,*::before,*::after { box-sizing: border-box; }
+  body { font-family: -apple-system, system-ui, "Segoe UI", Arial, sans-serif; color:#000; background:#fff; margin:0; font-size:12px; line-height:1.4; }
+  .cx-eyebrow { font-size:10px; letter-spacing:.22em; text-transform:uppercase; color:#666; margin-bottom:6px }
+  .cx-eyebrow b { color:#ff283b; font-weight:900 }
+  h1 { font-size:18px; margin:0 0 2px }
+  .cx-sub { color:#555; font-size:11px; margin:0 0 18px }
+  h2 { font-size:13px; text-transform:uppercase; letter-spacing:.05em; border-bottom:2px solid #000; padding-bottom:4px; margin:22px 0 10px }
+  table { width:100%; border-collapse:collapse; margin:0 0 12px }
+  th,td { text-align:left; padding:6px 8px; border-bottom:1px solid #ccc; vertical-align:top }
+  th { font-size:10px; text-transform:uppercase; letter-spacing:.04em; color:#444; border-bottom:1px solid #000 }
+  section, tr, h2, .cx-grupo { break-inside: avoid }
+  .cx-resumen { margin-top:20px; padding-top:10px; border-top:2px solid #000; font-size:12px }
+  .cx-muted { color:#888 }
+</style></head>
+<body>
+  <div class="cx-eyebrow"><b>Conecta</b> MX</div>
+  <h1>${_esfEsc(titulo)}</h1>
+  <div class="cx-sub">Generado el ${_esfEsc(generado)}</div>
+  ${htmlCuerpo}
+  <script>window.onload=function(){setTimeout(function(){window.print();},120);};<\/script>
+</body></html>`;
+  w.document.open(); w.document.write(doc); w.document.close();
+}
+
+// Etiqueta capitalizada del tipo de cuarto (Sección 2 usa minúsculas).
+function _rgTipoLabel(t) {
+  const s = String(t || '').toLowerCase();
+  return ({ compartida: 'Compartida', doble: 'Doble', triple: 'Triple', individual: 'Individual', cuadruple: 'Cuádruple' }[s]) || (t || '—');
+}
+
+async function imprimirListaHotel() {
+  if (!_ccEventoActual) { alert('Selecciona un evento primero.'); return; }
+  const ev = _ccEventosCache.find(e => e.id === _ccEventoActual) || {};
+  const eventoNombre = ev.nombre || _ccEventoActual;
+
+  // ── Datos frescos ──
+  let grupos = [];
+  try { grupos = await khRoomingGrupos.listar(_ccEventoActual); } catch (e) { grupos = []; }
+  const viajeros = Array.isArray(_ccViajeros) ? _ccViajeros : [];
+
+  // Conteo de cuartos por tipo (Sección 1, cuartos reales del puzzle) + personas.
+  const cuartosPorTipo = {}; // 'Compartida' → n
+  let personasGrupos = 0, personasStaff = 0;
+
+  // ── SECCIÓN 1 — Cuartos de grupos (Portal) ──
+  const filasCuartos = [];
+  const sinAcomodar = []; // { titular, personas:[nombre] }
+  grupos.forEach(g => {
+    const titular = (g.titular_nombre && String(g.titular_nombre).trim()) || 'Titular';
+    // Multifecha: chip "Fecha N" en la etiqueta del grupo (fecha única → '').
+    const _fi = _rgFechaIdx(g.evento_id);
+    const fechaChip = _fi === null ? '' : ` <span style="font-size:11px;color:#555;border:1px solid #bbb;border-radius:10px;padding:0 6px">Fecha ${_fi + 1}</span>`;
+    const activos = (g.lugares || []).filter(l => l.estado === 'activo');
+    personasGrupos += activos.length;
+    const nombreDe = (l) => (l.nombre && String(l.nombre).trim()) ? l.nombre : ('Lugar #' + l.numero + ' — por confirmar');
+    const ocupPorHab = {};
+    activos.forEach(l => { if (l.habitacion_grupo_id) { (ocupPorHab[l.habitacion_grupo_id] = ocupPorHab[l.habitacion_grupo_id] || []).push(l); } });
+    (g.habitaciones || []).forEach(h => {
+      const ocup = ocupPorHab[h.id] || [];
+      const lbl = _rgTipoLabel(h.tipo);
+      cuartosPorTipo[lbl] = (cuartosPorTipo[lbl] || 0) + 1;
+      const nombres = ocup.length ? ocup.map(nombreDe).map(_esfEsc).join(', ') : '<span class="cx-muted">(vacío)</span>';
+      filasCuartos.push(`<tr>
+        <td>${_esfEsc('Grupo de ' + titular + ' · Cuarto ' + h.orden)}${fechaChip}</td>
+        <td>${_esfEsc(lbl)}</td>
+        <td>${nombres}</td>
+        <td>${ocup.length}/${_esfEsc(h.capacidad)}</td>
+      </tr>`);
+    });
+    // Personas activas sin cuarto asignado → SIN ACOMODAR.
+    const sc = activos.filter(l => !l.habitacion_grupo_id);
+    if (sc.length) sinAcomodar.push({ titular, fechaChip, personas: sc.map(nombreDe) });
+  });
+
+  let seccion1 = `<h2>Cuartos de grupos</h2>`;
+  if (filasCuartos.length) {
+    seccion1 += `<table><thead><tr><th>Cuarto</th><th>Tipo</th><th>Ocupantes</th><th>Ocup.</th></tr></thead><tbody>${filasCuartos.join('')}</tbody></table>`;
+  } else {
+    seccion1 += `<div class="cx-muted">Sin cuartos armados por los grupos.</div>`;
+  }
+  if (sinAcomodar.length) {
+    seccion1 += `<h2>Sin acomodar</h2>` + sinAcomodar.map(s =>
+      `<div class="cx-grupo" style="margin-bottom:8px"><b>Grupo de ${_esfEsc(s.titular)}:</b>${s.fechaChip || ''} ${s.personas.map(_esfEsc).join(', ')}</div>`
+    ).join('');
+  }
+
+  // ── SECCIÓN 2 — Staff / rooming interno (KH), agrupado por tipo (como loadRooming) ──
+  const VALIDOS = ['compartida', 'doble', 'triple', 'individual'];
+  const porTipo = { compartida: [], doble: [], triple: [], individual: [], _sin: [] };
+  viajeros.forEach(v => {
+    const t = VALIDOS.includes(v.tipo_habitacion) ? v.tipo_habitacion : '_sin';
+    porTipo[t].push(v);
+    personasStaff += Number(v.num_personas) > 0 ? Number(v.num_personas) : 1;
+    // El resumen de "cuartos por tipo" cuenta solo cuartos REALES (Sección 1); el
+    // rooming KH agrupa por tipo pedido, no forma cuartos discretos → no suma aquí.
+  });
+  const filasStaff = [];
+  [...VALIDOS, '_sin'].forEach(t => {
+    (porTipo[t] || []).forEach(v => {
+      const c = v.clientes || {};
+      const meta = [v.paquete, v.zona, (Number(v.num_personas) > 1) ? (v.num_personas + ' pers.') : null].filter(Boolean).join(' · ');
+      filasStaff.push(`<tr>
+        <td>${_esfEsc(t === '_sin' ? 'Sin habitación' : _rgTipoLabel(t))}</td>
+        <td>${_esfEsc(c.nombre_completo || '—')}</td>
+        <td>${_esfEsc(meta)}</td>
+      </tr>`);
+    });
+  });
+  let seccion2 = `<h2>Staff / rooming interno</h2>`;
+  seccion2 += filasStaff.length
+    ? `<table><thead><tr><th>Tipo</th><th>Viajero</th><th>Paquete · Zona</th></tr></thead><tbody>${filasStaff.join('')}</tbody></table>`
+    : `<div class="cx-muted">Sin viajeros en el rooming interno.</div>`;
+
+  // ── Resumen ──
+  const tiposResumen = Object.keys(cuartosPorTipo).filter(k => cuartosPorTipo[k] > 0)
+    .map(k => `${cuartosPorTipo[k]} ${k}${cuartosPorTipo[k] !== 1 ? 's' : ''}`).join(' · ');
+  const resumen = `<div class="cx-resumen">
+    <div><b>Cuartos de grupos por tipo:</b> ${tiposResumen ? _esfEsc(tiposResumen) : '<span class="cx-muted">ninguno</span>'}</div>
+    <div style="margin-top:4px"><b>Total de personas:</b> ${personasGrupos + personasStaff} <span class="cx-muted">(${personasGrupos} en grupos · ${personasStaff} en rooming interno)</span></div>
+  </div>`;
+
+  _printVentana('Lista para hotel — ' + eventoNombre, seccion1 + seccion2 + resumen);
+}
+
+// < 18 años cumplidos HOY a partir de 'YYYY-MM-DD'. Falso sin fecha.
+function _rgEsMenor(fnac) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(fnac || '').slice(0, 10));
+  if (!m) return false;
+  const hoy = new Date();
+  let edad = hoy.getFullYear() - Number(m[1]);
+  const mm = hoy.getMonth() + 1, dd = hoy.getDate();
+  if (mm < Number(m[2]) || (mm === Number(m[2]) && dd < Number(m[3]))) edad--;
+  return edad < 18;
+}
+
+// [F6-t2] LISTA PARA COORDIS: TODO viajero del evento (grupos, individuales y staff)
+// con contacto, cuarto, paquete/zona y bandera de menor. Reusa _printVentana (#242).
+async function imprimirListaCoordis() {
+  if (!_ccEventoActual) { alert('Selecciona un evento primero.'); return; }
+  const ev = _ccEventosCache.find(e => e.id === _ccEventoActual) || {};
+  const eventoNombre = ev.nombre || _ccEventoActual;
+
+  let grupos = [];
+  try { grupos = await khRoomingGrupos.listar(_ccEventoActual, { todos: true }); } catch (e) { grupos = []; }
+  const viajeros = Array.isArray(_ccViajeros) ? _ccViajeros : [];
+
+  let totalPersonas = 0, totalMenores = 0;
+
+  // ── Filas de grupos/individuales (solo lugares ACTIVOS), ordenadas por titular y numero ──
+  const gruposOrd = [...grupos].sort((a, b) => String(a.titular_nombre || '').localeCompare(String(b.titular_nombre || ''), 'es'));
+  const filas = [];
+  gruposOrd.forEach(g => {
+    const esIndividual = (g.lugares || []).length === 1;
+    const grupoLbl = esIndividual ? 'Individual' : ('Grupo de ' + (g.titular_nombre || 'Titular'));
+    // Multifecha: chip "Fecha N" junto a la etiqueta del grupo (fecha única → '').
+    const _fi = _rgFechaIdx(g.evento_id);
+    const fechaChip = _fi === null ? '' : ` <span style="font-size:11px;color:#555;border:1px solid #bbb;border-radius:10px;padding:0 6px">Fecha ${_fi + 1}</span>`;
+    const habById = {};
+    (g.habitaciones || []).forEach(h => { habById[h.id] = h; });
+    (g.lugares || []).filter(l => l.estado === 'activo').forEach(l => {
+      totalPersonas++;
+      const nombre = (l.nombre && String(l.nombre).trim()) ? l.nombre : ('Lugar #' + l.numero + ' — por confirmar');
+      const contacto = (l.celular && String(l.celular).trim()) || (l.correo && String(l.correo).trim()) || '—';
+      const hab = l.habitacion_grupo_id ? habById[l.habitacion_grupo_id] : null;
+      const cuarto = hab ? (_rgTipoLabel(hab.tipo) + ' #' + hab.orden) : '—';
+      const pz = [l.paquete, l.zona].filter(v => v != null && String(v).trim() !== '').join(' · ');
+      const menor = _rgEsMenor(l.fecha_nacimiento);
+      if (menor) totalMenores++;
+      filas.push(`<tr>
+        <td>${_esfEsc(nombre)}</td>
+        <td>${_esfEsc(contacto)}</td>
+        <td>${_esfEsc(grupoLbl)}${fechaChip}</td>
+        <td>${_esfEsc(cuarto)}</td>
+        <td>${_esfEsc(pz)}</td>
+        <td>${menor ? '<b>MENOR</b>' : ''}</td>
+      </tr>`);
+    });
+  });
+  let cuerpo = `<h2>Viajeros del evento</h2>`;
+  cuerpo += filas.length
+    ? `<table><thead><tr><th>Nombre</th><th>Contacto</th><th>Grupo</th><th>Cuarto</th><th>Paquete · Zona</th><th>Notas</th></tr></thead><tbody>${filas.join('')}</tbody></table>`
+    : `<div class="cx-muted">Sin viajeros de grupos/individuales en este evento.</div>`;
+
+  // ── Sección STAFF (rooming KH, _ccViajeros) con su celular ──
+  const filasStaff = [];
+  let personasStaff = 0;
+  viajeros.forEach(v => {
+    const c = v.clientes || {};
+    const nP = Number(v.num_personas) > 0 ? Number(v.num_personas) : 1;
+    personasStaff += nP;
+    const contacto = (c.celular && String(c.celular).trim()) || (c.correo && String(c.correo).trim()) || '—';
+    const pz = [v.paquete, v.zona, (nP > 1 ? nP + ' pers.' : null)].filter(Boolean).join(' · ');
+    filasStaff.push(`<tr>
+      <td>${_esfEsc(c.nombre_completo || '—')}</td>
+      <td>${_esfEsc(contacto)}</td>
+      <td>${_esfEsc(v.tipo_habitacion ? _rgTipoLabel(v.tipo_habitacion) : '—')}</td>
+      <td>${_esfEsc(pz)}</td>
+    </tr>`);
+  });
+  cuerpo += `<h2>Staff / rooming interno</h2>`;
+  cuerpo += filasStaff.length
+    ? `<table><thead><tr><th>Viajero</th><th>Contacto</th><th>Tipo</th><th>Paquete · Zona</th></tr></thead><tbody>${filasStaff.join('')}</tbody></table>`
+    : `<div class="cx-muted">Sin viajeros en el rooming interno.</div>`;
+
+  // ── Resumen ──
+  cuerpo += `<div class="cx-resumen">
+    <div><b>Total de viajeros:</b> ${totalPersonas + personasStaff} <span class="cx-muted">(${totalPersonas} en grupos/individuales · ${personasStaff} en rooming interno)</span></div>
+    <div style="margin-top:4px"><b>Menores de edad:</b> ${totalMenores}</div>
+  </div>`;
+
+  _printVentana('Lista para coordis — ' + eventoNombre, cuerpo);
+}
+
+function renderHotelInfo() {
+  const el = document.getElementById('cc-hotel-info');
+  if (!el) return;
+  if (!_ccHotelInfo?.nombre) {
+    el.innerHTML = `<div style="color:var(--ts);font-size:12px">Sin hotel — <button class="btn btn-ghost btn-sm" onclick="abrirModalHotel()" style="font-size:11px">+ Agregar hotel</button></div>`;
+    return;
+  }
+  el.innerHTML = `<div style="display:flex;gap:20px;flex-wrap:wrap;align-items:center">
+    <div>
+      <div style="font-family:'Rajdhani',sans-serif;font-weight:700;font-size:18px">${_ccHotelInfo.nombre}</div>
+      ${_ccHotelInfo.direccion?`<div style="font-size:12px;color:var(--ts);margin-top:2px">${_ccHotelInfo.direccion}</div>`:''}
+    </div>
+    <div style="font-size:11px;padding:4px 12px;border-radius:20px;border:1px solid ${_ccHotelInfo.incluye_desayuno?'rgba(61,220,132,.3)':'var(--border)'};color:${_ccHotelInfo.incluye_desayuno?'var(--green)':'var(--ts)'}">
+      ${_ccHotelInfo.incluye_desayuno?'✓ Con desayuno':'✗ Sin desayuno'}
+    </div>
+  </div>`;
+}
+
+function abrirModalHotel() {
+  const h = _ccHotelInfo || {};
+  document.getElementById('modal-habitacion').innerHTML = `
+    <div class="modal" style="max-width:460px">
+      <div class="modal-header">
+        <div class="modal-title" style="font-family:'Zen Dots',sans-serif;font-size:15px">Información del Hotel</div>
+        <button class="modal-close" onclick="closeModal('modal-habitacion')">×</button>
+      </div>
+      <div class="modal-body" style="display:flex;flex-direction:column;gap:14px">
+        <div class="form-group">
+          <label>Nombre del hotel *</label>
+          <input class="cot-input" id="hot-nombre" value="${h.nombre||''}" placeholder="Hotel Camino Real…" style="width:100%">
+        </div>
+        <div class="form-group">
+          <label>Dirección</label>
+          <input class="cot-input" id="hot-dir" value="${h.direccion||''}" placeholder="Calle, colonia, ciudad…" style="width:100%">
+        </div>
+        <label style="display:flex;align-items:center;gap:10px;padding:12px 16px;background:var(--bg3);border-radius:8px;cursor:pointer;border:1px solid var(--border)">
+          <input type="checkbox" id="hot-desayuno" ${h.incluye_desayuno?'checked':''} style="accent-color:var(--green);width:16px;height:16px;cursor:pointer">
+          <span style="font-size:13px">Incluye desayuno</span>
+        </label>
+        <div id="hot-alert"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" onclick="closeModal('modal-habitacion')">Cancelar</button>
+        <button class="btn btn-primary" onclick="guardarHotel()">Guardar hotel</button>
+      </div>
+    </div>`;
+  openModal('modal-habitacion');
+}
+
+async function guardarHotel() {
+  const nombre = document.getElementById('hot-nombre')?.value.trim();
+  if (!nombre) { document.getElementById('hot-alert').innerHTML='<div class="alert alert-error">El nombre es obligatorio</div>'; return; }
+  _ccHotelInfo = {
+    nombre,
+    direccion:        document.getElementById('hot-dir')?.value.trim()||null,
+    incluye_desayuno: document.getElementById('hot-desayuno')?.checked||false,
+  };
+  for (const h of _ccHabitaciones) {
+    await khRooming.actualizar(h.id, { // [sec-sensibles]
+      hotel_nombre:    _ccHotelInfo.nombre,
+      hotel_direccion: _ccHotelInfo.direccion,
+      incluye_desayuno:_ccHotelInfo.incluye_desayuno,
+    }).catch(()=>{});
+  }
+  renderHotelInfo();
+  closeModal('modal-habitacion');
+}
+
+function abrirModalHabitacion(id) {
+  const h = id ? (_ccHabitaciones.find(x => x.id === id) || {}) : {};
+  const ocupantes = h?.ocupantes ? (typeof h.ocupantes==='string'?JSON.parse(h.ocupantes):h.ocupantes) : [];
+  const tipoActual = h.tipo || 'doble';
+  const nombresViajeros = _ccViajeros.map(v => v.clientes?.nombre_completo).filter(Boolean);
+
+  // Combinar viajeros + equipo asignado
+  const nombresEquipo = _ccAsignados.map(a => a._usuario?.nombre||'').filter(Boolean);
+
+  // Personas ya asignadas en OTRAS habitaciones (excluir de disponibles)
+  const yaAsignados = new Set(
+    _ccHabitaciones
+      .filter(h => h.id !== (id||'__none__'))
+      .flatMap(h => h.ocupantes ? (typeof h.ocupantes==='string'?JSON.parse(h.ocupantes):h.ocupantes) : [])
+      .filter(n => n && n !== 'Chofer')
+  );
+
+  function disponibles(lista) {
+    return lista.filter(n => !yaAsignados.has(n));
+  }
+
+  function selects(tipo, ocsActuales) {
+    const c = CAPACIDAD_HAB[tipo] || 1;
+    const dispViajeros = disponibles(nombresViajeros);
+    const dispEquipo   = disponibles(nombresEquipo);
+    return Array.from({length: c}).map((_, i) => `
+      <div style="margin-bottom:8px">
+        <div style="font-size:10px;color:var(--ts);margin-bottom:4px">Lugar ${i+1}</div>
+        <select class="cot-input ocp-select" style="width:100%">
+          <option value="">— Lugar libre —</option>
+          <optgroup label="Viajeros disponibles">
+            ${dispViajeros.map(n=>`<option value="${n}" ${ocsActuales[i]===n?'selected':''}>${n}</option>`).join('')}
+            ${ocsActuales[i] && !dispViajeros.includes(ocsActuales[i]) && nombresViajeros.includes(ocsActuales[i]) ? `<option value="${ocsActuales[i]}" selected>${ocsActuales[i]} ✓</option>` : ''}
+          </optgroup>
+          ${dispEquipo.length ? `<optgroup label="Equipo disponible">${dispEquipo.map(n=>`<option value="${n}" ${ocsActuales[i]===n?'selected':''}>${n}</option>`).join('')}</optgroup>` : ''}
+          <optgroup label="Otros"><option value="Chofer" ${ocsActuales[i]==='Chofer'?'selected':''}>Chofer</option></optgroup>
+        </select>
+      </div>`).join('');
+  }
+
+  document.getElementById('modal-habitacion').innerHTML = `
+    <div class="modal" style="max-width:460px">
+      <div class="modal-header">
+        <div class="modal-title" style="font-family:'Zen Dots',sans-serif;font-size:15px">${id?'Editar Habitación':'Nueva Habitación'}</div>
+        <button class="modal-close" onclick="closeModal('modal-habitacion')">×</button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="hab-id" value="${h?.id||''}">
+        <div class="form-group">
+          <label>Tipo de habitación *</label>
+          <select class="cot-input" id="hab-tipo" onchange="actualizarOcupantesHab(this.value)">
+            ${Object.entries(TIPO_LABELS).map(([k,v])=>`<option value="${k}" ${tipoActual===k?'selected':''}>${v} — máx ${CAPACIDAD_HAB[k]} persona${CAPACIDAD_HAB[k]>1?'s':''}</option>`).join('')}
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Asignar ocupantes</label>
+          <div id="hab-ocupantes-container">${selects(tipoActual, ocupantes)}</div>
+          ${!nombresViajeros.length?'<div style="font-size:11px;color:var(--ts);margin-top:4px"><svg class="ic"><use href="#ic-alerta"/></svg> Agrega viajeros primero para poder asignarlos</div>':''}
+        </div>
+        <div id="hab-alert"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" onclick="closeModal('modal-habitacion')">Cancelar</button>
+        <button class="btn btn-primary" onclick="guardarHabitacion()">Guardar</button>
+      </div>
+    </div>`;
+  openModal('modal-habitacion');
+}
+
+function actualizarOcupantesHab(tipo) {
+  const container = document.getElementById('hab-ocupantes-container');
+  if (!container) return;
+  const cap = CAPACIDAD_HAB[tipo] || 1;
+  const habId = document.getElementById('hab-id')?.value || '__none__';
+  const yaAsig = new Set(
+    _ccHabitaciones.filter(h=>h.id!==habId)
+      .flatMap(h=>h.ocupantes?(typeof h.ocupantes==='string'?JSON.parse(h.ocupantes):h.ocupantes):[])
+      .filter(n=>n&&n!=='Chofer')
+  );
+  const dispViajeros = _ccViajeros.map(v=>v.clientes?.nombre_completo).filter(n=>n&&!yaAsig.has(n));
+  const dispEquipo   = _ccAsignados.map(a=>a._usuario?.nombre||'').filter(n=>n&&!yaAsig.has(n));
+  container.innerHTML = Array.from({length: cap}).map((_, i) => `
+    <div style="margin-bottom:8px">
+      <div style="font-size:10px;color:var(--ts);margin-bottom:4px">Lugar ${i+1}</div>
+      <select class="cot-input ocp-select" style="width:100%">
+        <option value="">— Lugar libre —</option>
+        <optgroup label="Viajeros disponibles">${dispViajeros.map(n=>`<option value="${n}">${n}</option>`).join('')}</optgroup>
+        ${dispEquipo.length ? `<optgroup label="Equipo disponible">${dispEquipo.map(n=>`<option value="${n}">${n}</option>`).join('')}</optgroup>` : ''}
+        <optgroup label="Otros"><option value="Chofer">Chofer</option></optgroup>
+      </select>
+    </div>`).join('');
+}
+
+async function guardarHabitacion() {
+  const id   = document.getElementById('hab-id')?.value;
+  const tipo = document.getElementById('hab-tipo')?.value;
+  const ocupantes = Array.from(document.querySelectorAll('.ocp-select')).map(s=>s.value).filter(Boolean);
+  const cap = CAPACIDAD_HAB[tipo] || 1;
+  if (ocupantes.length > cap) {
+    document.getElementById('hab-alert').innerHTML=`<div class="alert alert-error">Máximo ${cap} persona${cap>1?'s':''} en habitación ${TIPO_LABELS[tipo]}</div>`;
+    return;
+  }
+  const orden = id ? (_ccHabitaciones.find(h=>h.id===id)?.orden||0) : _ccHabitaciones.length + 1;
+  const body = {
+    evento_id:       _ccEventoActual,
+    tipo, orden,
+    numero_hab:      String(id ? (_ccHabitaciones.find(h=>h.id===id)?.orden||orden) : orden),
+    ocupantes:       JSON.stringify(ocupantes),
+    hotel_nombre:    _ccHotelInfo?.nombre||null,
+    hotel_direccion: _ccHotelInfo?.direccion||null,
+    incluye_desayuno:_ccHotelInfo?.incluye_desayuno||false,
+  };
+  try {
+    if (id) await khRooming.actualizar(id, body); // [sec-sensibles]
+    else    await khRooming.crear(body); // [sec-sensibles]
+    closeModal('modal-habitacion');
+    await loadRooming();
+  } catch(e) { document.getElementById('hab-alert').innerHTML=`<div class="alert alert-error">${e.message}</div>`; }
+}
+
+async function eliminarHabitacion(id) {
+  if (!confirm('¿Eliminar esta habitación?')) return;
+  try { await khRooming.eliminar(id); await loadRooming(); } // [sec-sensibles]
+  catch(e) { alert(e.message); }
+}
+async function exportarRooming(formato) {
+  if (!_ccHabitaciones.length) { alert('No hay habitaciones para exportar'); return; }
+  const excluirStaff = !!document.getElementById('cc-rooming-excluir-staff')?.checked;
+  // Set de nombres staff del evento — solo necesario cuando se quiere filtrar.
+  let staffNames = new Set();
+  if (excluirStaff) {
+    // El staff que ocupa cuartos viene de _ccAsignados (equipo coordi/cc, con
+    // a._usuario.nombre), NO de _ccViajeros (clientes del Portal, nunca staff).
+    // El chofer NO se excluye (es huésped real del hotel).
+    staffNames = new Set(
+      (_ccAsignados || [])
+        .map(a => (a._usuario?.nombre || '').trim().toLowerCase())
+        .filter(Boolean)
+    );
+  }
+  const filtrarOcp = ocp => excluirStaff
+    ? ocp.filter(n => !staffNames.has(String(n || '').trim().toLowerCase()))
+    : ocp;
+  const ev = _ccEventosCache.find(e => e.id === _ccEventoActual);
+  const hotel = document.getElementById('cc-hotel-nombre')?.value || '';
+  const sufijoTitulo = excluirStaff ? ' (sin staff)' : '';
+  const titulo = `Rooming List — ${ev?.nombre||'Evento'}${hotel?' · '+hotel:''}${sufijoTitulo}`;
+  const tipoLabel = {individual:'Individual',doble:'Doble',triple:'Triple',cuadruple:'Cuádruple'};
+  if (formato === 'pdf') {
+    const sufijoFile = excluirStaff ? '-sin-staff' : '';
+    const html = `<html><head><meta charset="utf-8"><title>${titulo}</title>
+    <style>body{font-family:Arial,sans-serif;padding:24px}h2{margin-bottom:16px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ccc;padding:8px 12px;font-size:13px;vertical-align:top}th{background:#f5f5f5}</style></head><body>
+    <h2>${titulo}</h2>
+    <table><thead><tr><th>Habitación</th><th>Tipo</th><th>Ocupantes</th></tr></thead>
+    <tbody>${_ccHabitaciones.map(h=>{
+      const ocp = filtrarOcp(h.ocupantes?(typeof h.ocupantes==='string'?JSON.parse(h.ocupantes):h.ocupantes):[]);
+      return `<tr><td>${h.numero_hab||'—'}</td><td>${tipoLabel[h.tipo]||h.tipo}</td><td>${ocp.join('<br>')||'—'}</td></tr>`;
+    }).join('')}</tbody></table></body></html>`;
+    _descargarHTML(`rooming-${ev?.nombre||'evento'}${sufijoFile}.html`, html);
+  } else {
+    const headers = ['Habitación','Tipo','Ocupantes'];
+    const rows = _ccHabitaciones.map(h => {
+      const ocp = filtrarOcp(h.ocupantes?(typeof h.ocupantes==='string'?JSON.parse(h.ocupantes):h.ocupantes):[]);
+      return [h.numero_hab||'',tipoLabel[h.tipo]||h.tipo,ocp.join(' | ')].map(c=>`"${String(c).replace(/"/g,'""')}"`).join(',');
+    });
+    const csv = [headers.join(','),...rows].join('\n');
+    const a = document.createElement('a');
+    a.href = 'data:text/csv;charset=utf-8,\uFEFF'+encodeURIComponent(csv);
+    const sufijoFile = excluirStaff ? '-sin-staff' : '';
+    a.download = `rooming-${ev?.nombre||'evento'}${sufijoFile}.csv`;
+    a.click();
+  }
+}
+
+
+// ── Descargar listas desde perfil del coordi ─────────────────
+async function descargarListaViajeros(eventoId) {
+  try {
+    const [ev, viajeros] = await Promise.all([
+      khEventosMeta.porSlug(eventoId).then(m=>m||{}), // [sec-eventos]
+      khViajeros.listar(eventoId), // [sec-coordi]
+    ]);
+    if (!viajeros.length) { alert('No hay viajeros registrados para este evento'); return; }
+    const titulo = `Viajeros — ${ev.nombre||'Evento'}`;
+    const html = `<html><head><meta charset="utf-8"><title>${titulo}</title>
+    <style>body{font-family:Arial,sans-serif;padding:24px}h2{margin-bottom:4px}p{color:#666;margin-bottom:20px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ccc;padding:8px 12px;font-size:13px}th{background:#f5f5f5}</style></head><body>
+    <h2>${titulo}</h2><p>${ev.artista?ev.artista+' · ':''}${ev.ciudad||''} ${ev.fecha?'· '+new Date(ev.fecha+'T12:00:00').toLocaleDateString('es-MX',{day:'numeric',month:'long',year:'numeric'}):''}</p>
+    <table><thead><tr><th>#</th><th>Nombre</th><th>Paquete</th><th>Zona</th><th>Talla</th><th>Celular</th><th>Emergencia</th><th>Notas</th></tr></thead>
+    <tbody>${viajeros.map((v,i)=>`<tr><td>${i+1}</td><td><strong>${v.nombre}</strong></td><td>${v.tipo_paquete||'—'}</td><td>${v.zona_boleto||'—'}</td><td>${v.talla_playera||'—'}</td><td>${v.celular||'—'}</td><td>${v.num_emergencia||'—'}</td><td>${v.notas||'—'}</td></tr>`).join('')}</tbody>
+    </table></body></html>`;
+    _descargarHTML(`viajeros-${(ev.nombre||'evento').replace(/[^a-zA-Z0-9-_]+/g,'_')}.html`, html);
+  } catch(e) { alert('Error: ' + e.message); }
+}
+
+async function descargarRoomingList(eventoId) {
+  try {
+    const [ev, habs] = await Promise.all([
+      khEventosMeta.porSlug(eventoId).then(m=>m||{}), // [sec-eventos]
+      khRooming.listar(eventoId), // [sec-sensibles]
+    ]);
+    if (!habs.length) { alert('No hay rooming list para este evento'); return; }
+    const tipoLabels = {individual:'Individual',doble:'Doble',triple:'Triple',cuadruple:'Cuádruple'};
+    const titulo = `Rooming List — ${ev.nombre||'Evento'}`;
+    const html = `<html><head><meta charset="utf-8"><title>${titulo}</title>
+    <style>body{font-family:Arial,sans-serif;padding:24px}h2{margin-bottom:4px}p{color:#666;margin-bottom:20px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ccc;padding:8px 12px;font-size:13px;vertical-align:top}th{background:#f5f5f5}</style></head><body>
+    <h2>${titulo}</h2>
+    <p>${habs[0]?.hotel_nombre||''}${habs[0]?.hotel_direccion?' · '+habs[0].hotel_direccion:''}${habs[0]?.incluye_desayuno?' · ✓ Incluye desayuno':''}</p>
+    <table><thead><tr><th>Habitación</th><th>Tipo</th><th>Ocupantes</th></tr></thead>
+    <tbody>${habs.map((h,i)=>{
+      const ocp = h.ocupantes?(typeof h.ocupantes==='string'?JSON.parse(h.ocupantes):h.ocupantes):[];
+      return `<tr><td>Habitación ${i+1}</td><td>${tipoLabels[h.tipo]||h.tipo}</td><td>${ocp.join('<br>')||'—'}</td></tr>`;
+    }).join('')}</tbody></table></body></html>`;
+    _descargarHTML(`rooming-${(ev.nombre||'evento').replace(/[^a-zA-Z0-9-_]+/g,'_')}.html`, html);
+  } catch(e) { alert('Error: ' + e.message); }
+}
+
+
+let _reportesFiltroActual = 'todos';
+
+// ═══════════════════════════════════════════════════════════════
+// SOLICITUDES PORTAL (Fase 2.2b)
+// Vista admin de solicitudes_tour del Supabase NUEVO (conecta-portal).
+// Las queries pasan por Netlify Functions con service_role — el frontend
+// nunca ve la service key. Auth se valida lookup-de-usuario en cada call.
+// ═══════════════════════════════════════════════════════════════
+let _spCache = [];
+let _spLoading = false;
+// Acumulador de eventos vistos en cualquier carga (no se reduce al filtrar) —
+// alimenta el dropdown de filtro de evento. Clave: evento_id, valor: evento_nombre.
+let _spEventosVistos = new Map();
+// Cache del plan de pagos por solicitud abierta en el modal de detalle.
+// Clave: solicitud_id, valor: array de pagos. Lo llena cargarPlanPagosSP y lo
+// re-renderiza renderPlanPagosSP tras marcar/revertir (Fase 2.3c).
+let _spPlanCache = {};
+// Lugares de cada solicitud (F3-t4b): para agrupar el plan por lugar y etiquetar.
+let _spLugaresCache = {};
+// Contexto del pago grupal en curso por solicitud: { monto, fecha, metodo, referencia, propuesta:[] }.
+let _spGrupoCache = {};
+
+// Headers para las 3 admin-* functions. Antes mandaba x-kh-user-id +
+// x-kh-correo (validados con anon key contra usuarios). Tras Security Phase 2
+// usa Authorization: Bearer <JWT> como las otras admin functions.
+// Se conserva esta función porque hay 3 call sites con fetch + headers
+// explícitos. (khAdminFetch sería más limpio pero requeriría refactor de
+// los 3 sites.)
+function _spAdminHeaders() {
+  return {
+    'Content-Type': 'application/json',
+    'Authorization': 'Bearer ' + (khGetJwt() || ''),
+  };
+}
+
+function _spFmtMxn(n) {
+  return '$' + Number(n || 0).toLocaleString('es-MX', { maximumFractionDigits: 2 });
+}
+
+function _spFmtFechaRel(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  const diffMs = Date.now() - d.getTime();
+  const min = Math.round(diffMs / 60000);
+  if (min < 1)  return 'Hace unos segundos';
+  if (min < 60) return `Hace ${min} min`;
+  const h = Math.round(min / 60);
+  if (h < 24)   return `Hace ${h} h`;
+  const dd = Math.round(h / 24);
+  if (dd < 30)  return `Hace ${dd} d`;
+  return d.toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+
+function _spFmtFechaAbs(iso) {
+  if (!iso) return '';
+  return new Date(iso).toLocaleString('es-MX', { timeZone: 'America/Monterrey', dateStyle: 'medium', timeStyle: 'short' });
+}
+
+function _spEscape(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+function _spBadgeEstado(estado) {
+  const map = {
+    pendiente:  { bg: '#fff3cd', fg: '#856404', label: 'Pendiente' },
+    en_pagos:   { bg: '#d1ecf1', fg: '#0c5460', label: 'En pagos' },
+    pagado:     { bg: '#d4edda', fg: '#155724', label: 'Pagado' },
+    cancelado:  { bg: '#f8d7da', fg: '#721c24', label: 'Cancelado' },
+  };
+  const e = map[estado] || { bg: '#eee', fg: '#333', label: estado || '—' };
+  return `<span style="display:inline-block;padding:3px 9px;border-radius:12px;background:${e.bg};color:${e.fg};font-size:11px;font-weight:700;letter-spacing:.04em">${e.label}</span>`;
+}
+
+function _spPoblarDropdownEventos() {
+  // El portal guarda evento_id con el slug del sitio público (ev. "morat-dic-3#0"),
+  // que NO coincide con los UUIDs de la tabla eventos de Kamehouse. Por eso el
+  // dropdown se arma a partir de los evento_id/evento_nombre acumulados en
+  // _spEventosVistos. Importante: el acumulador NUNCA se reduce — si la
+  // armáramos solo desde _spCache, al filtrar por un evento desaparecerían los
+  // demás del dropdown.
+  const sel = document.getElementById('sp-filtro-evento');
+  if (!sel) return;
+  (_spCache || []).forEach(s => {
+    if (s.evento_id && !_spEventosVistos.has(s.evento_id)) {
+      _spEventosVistos.set(s.evento_id, s.evento_nombre || s.evento_id);
+    }
+  });
+  const valorActual = sel.value;
+  const opciones = Array.from(_spEventosVistos.entries())
+    .sort((a, b) => String(a[1]).localeCompare(String(b[1])))
+    .map(([id, nombre]) => `<option value="${_spEscape(id)}">${_spEscape(nombre)}</option>`)
+    .join('');
+  sel.innerHTML = `<option value="">Todos</option>${opciones}`;
+  // Conservar la selección actual aunque el filtro haya escondido el resto.
+  if (valorActual && _spEventosVistos.has(valorActual)) sel.value = valorActual;
+}
+
+// [Bandeja-T2] Badge de pendientes en el nav. Pinta el número; 0 → sin badge.
+function _spPintarBadgePendientes(n) {
+  const b = document.getElementById('sp-nav-badge');
+  if (!b) return;
+  if (n > 0) { b.textContent = n > 99 ? '99+' : String(n); b.style.display = 'flex'; }
+  else { b.style.display = 'none'; }
+}
+
+// Cuenta las solicitudes PENDIENTES (independiente del filtro activo, para que el
+// badge sea correcto aun viendo "Canceladas"). Reusa admin-solicitudes-list (sin
+// tocar backend). Fails-soft: si truena (p.ej. rol sin permiso), no pinta ni rompe.
+async function _spContarPendientes() {
+  try {
+    const r = await fetch('/.netlify/functions/admin-solicitudes-list', {
+      method: 'POST',
+      headers: _spAdminHeaders(),
+      body: JSON.stringify({ estado: 'pendiente', limit: 500 }),
+    });
+    if (!r.ok) return;
+    const data = await r.json();
+    _spPintarBadgePendientes(Number(data.count) || 0);
+  } catch (e) { /* fails-soft */ }
+}
+
+async function loadSolicitudesPortal() {
+  if (_spLoading) return;
+  _spLoading = true;
+  _ccPagosCtx = false;   // [Pagos-T1] entrar a Solicitudes Portal = contexto SP autoritativo
+
+  const tableEl = document.getElementById('sp-table');
+  const contadoresEl = document.getElementById('sp-contadores');
+  const btn = document.getElementById('sp-btn-refresh');
+  if (btn) { btn.disabled = true; btn.textContent = '↻ Cargando…'; }
+  if (tableEl) tableEl.innerHTML = '<div style="padding:24px;text-align:center;color:var(--ts);font-family:\'JetBrains Mono\',monospace;font-size:11px">// cargando solicitudes…</div>';
+
+  const payload = {
+    estado: document.getElementById('sp-filtro-estado').value || undefined,
+    evento_id: document.getElementById('sp-filtro-evento').value || undefined,
+    desde: _spDateToIso(document.getElementById('sp-filtro-desde').value, false),
+    hasta: _spDateToIso(document.getElementById('sp-filtro-hasta').value, true),
+  };
+
+  try {
+    const r = await fetch('/.netlify/functions/admin-solicitudes-list', {
+      method: 'POST',
+      headers: _spAdminHeaders(),
+      body: JSON.stringify(payload),
+    });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || 'Error cargando solicitudes');
+    _spCache = data.solicitudes || [];
+    _spPoblarDropdownEventos();
+    if (contadoresEl) {
+      const c = data.contadores || {};
+      // [Bandeja-T2] Solo pendiente + cancelado (en_pagos/pagado viven en Capsule → Pagos).
+      contadoresEl.innerHTML = [
+        `<span style="color:#e8a800">⏳ ${c.pendiente || 0} pendiente${(c.pendiente||0)===1?'':'s'}</span>`,
+        `<span style="color:#FF6B6B">✕ ${c.cancelado || 0} cancelada${(c.cancelado||0)===1?'':'s'}</span>`,
+        `<span style="margin-left:auto">// ${data.count} mostradas</span>`,
+      ].join('');
+    }
+    renderSolicitudesPortal();
+    _spContarPendientes();   // [Bandeja-T2] refresca el badge del nav (incl. tras aprobar/rechazar)
+  } catch (e) {
+    if (tableEl) tableEl.innerHTML = `<div style="padding:24px;text-align:center;color:#FF6B6B">Error: ${_spEscape(e.message)}</div>`;
+    showToast('No se pudieron cargar las solicitudes: ' + e.message, 'error');
+  } finally {
+    _spLoading = false;
+    if (btn) { btn.disabled = false; btn.textContent = '↻ Refrescar'; }
+  }
+}
+
+function _spDateToIso(yyyyMmDd, endOfDay) {
+  if (!yyyyMmDd) return undefined;
+  // El input <input type="date"> ya viene en formato YYYY-MM-DD. Lo
+  // convertimos a ISO en UTC con offset de México para evitar que un día
+  // se pierda en el borde de medianoche.
+  const t = endOfDay ? 'T23:59:59' : 'T00:00:00';
+  return `${yyyyMmDd}${t}-06:00`;
+}
+
+function renderSolicitudesPortal() {
+  const tableEl = document.getElementById('sp-table');
+  if (!tableEl) return;
+  const q = (document.getElementById('sp-q').value || '').trim().toLowerCase();
+  let rows = _spCache;
+  if (q.length >= 2) {
+    rows = rows.filter(s => {
+      const c = s.clientes || {};
+      return (c.nombre_completo || '').toLowerCase().includes(q)
+          || (c.correo || '').toLowerCase().includes(q)
+          || (s.evento_nombre || '').toLowerCase().includes(q)
+          || String(c.numero_cliente || '').includes(q);
+    });
+  }
+
+  if (!rows.length) {
+    tableEl.innerHTML = '<div class="empty-state"><div class="empty-icon">·</div>Sin solicitudes que coincidan con los filtros</div>';
+    return;
+  }
+
+  const head = `
+    <thead>
+      <tr style="background:var(--bg3);text-align:left">
+        <th style="padding:10px 8px;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ts);white-space:nowrap">Fecha</th>
+        <th style="padding:10px 8px;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ts);white-space:nowrap">#Cliente</th>
+        <th style="padding:10px 8px;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ts)">Cliente</th>
+        <th style="padding:10px 8px;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ts)">Evento</th>
+        <th style="padding:10px 8px;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ts)">Paquete</th>
+        <th style="padding:10px 8px;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ts)">Zona</th>
+        <th style="padding:10px 8px;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ts);text-align:right">Separo</th>
+        <th style="padding:10px 8px;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ts);text-align:right">Total</th>
+        <th style="padding:10px 8px;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ts)">Estado</th>
+        <th style="padding:10px 8px;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ts);text-align:center"><svg class="ic"><use href="#ic-clip"/></svg></th>
+        <th style="padding:10px 8px;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ts)"></th>
+      </tr>
+    </thead>`;
+
+  const body = rows.map(s => {
+    const c = s.clientes || {};
+    const tieneComprob = !!s.comprobante_separo_url;
+    return `
+      <tr style="border-top:1px solid var(--border)">
+        <td style="padding:10px 8px;font-size:12px;color:var(--ts);white-space:nowrap" title="${_spEscape(_spFmtFechaAbs(s.created_at))}">${_spEscape(_spFmtFechaRel(s.created_at))}</td>
+        <td style="padding:10px 8px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--orange);white-space:nowrap">#${_spEscape(c.numero_cliente || '—')}</td>
+        <td style="padding:10px 8px;font-size:13px">${_spEscape(c.nombre_completo || '—')}<br><span style="color:var(--ts);font-size:11px">${_spEscape(c.correo || '')}</span></td>
+        <td style="padding:10px 8px;font-size:13px">${_spEscape(s.evento_nombre || '')}</td>
+        <td style="padding:10px 8px;font-size:13px"><b>${_spEscape(s.paquete || '')}</b></td>
+        <td style="padding:10px 8px;font-size:12px">${_spEscape(s.zona || '')}</td>
+        <td style="padding:10px 8px;font-size:12px;text-align:right;white-space:nowrap">${_spFmtMxn(s.monto_separo)}</td>
+        <td style="padding:10px 8px;font-size:12px;text-align:right;white-space:nowrap"><b>${_spFmtMxn(s.precio_total)}</b></td>
+        <td style="padding:10px 8px">${_spBadgeEstado(s.estado)}</td>
+        <td style="padding:10px 8px;text-align:center;font-size:14px">${tieneComprob ? '<svg class="ic"><use href="#ic-clip"/></svg>' : '<span style="color:var(--ts)">—</span>'}</td>
+        <td style="padding:10px 8px;text-align:right;white-space:nowrap"><button class="btn btn-ghost btn-sm" onclick="verSolicitudPortal('${_spEscape(s.id)}')" style="font-size:11px">Ver detalles</button></td>
+      </tr>`;
+  }).join('');
+
+  tableEl.innerHTML = `<table style="width:100%;border-collapse:collapse">${head}<tbody>${body}</tbody></table>`;
+}
+
+async function verSolicitudPortal(id) {
+  const s = _spCache.find(x => x.id === id);
+  if (!s) { showToast('Solicitud no encontrada en cache, refresca la lista', 'error'); return; }
+  const c = s.clientes || {};
+
+  const seccion = (titulo, html) => `
+    <div style="margin-top:18px;padding-top:14px;border-top:1px solid var(--border)">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.14em;color:var(--orange);text-transform:uppercase;margin-bottom:10px">// ${titulo}</div>
+      ${html}
+    </div>`;
+
+  const row = (k, v) => `<div style="display:grid;grid-template-columns:140px 1fr;gap:10px;padding:4px 0;font-size:13px"><div style="color:var(--ts);font-size:11px;text-transform:uppercase;letter-spacing:.08em">${_spEscape(k)}</div><div>${v == null || v === '' ? '<span style="color:var(--ts)">—</span>' : v}</div></div>`;
+
+  const contenido = `
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px">
+      ${_spBadgeEstado(s.estado)}
+      <button class="btn btn-primary btn-sm" onclick="abrirCambiarEstadoSP('${_spEscape(s.id)}')" style="font-size:11px">Cambiar estado</button>
+      <span style="margin-left:auto;color:var(--ts);font-size:11px;font-family:'JetBrains Mono',monospace">${_spEscape(_spFmtFechaAbs(s.created_at))}</span>
+    </div>
+
+    ${seccion('Cliente', `
+      ${row('Nombre', _spEscape(c.nombre_completo))}
+      ${row('# Cliente', `<span style="font-family:'JetBrains Mono',monospace;color:var(--orange)">#${_spEscape(c.numero_cliente || '—')}</span>`)}
+      ${row('Correo', _spEscape(c.correo))}
+      ${row('Celular', _spEscape(c.celular))}
+      ${row('Talla playera', _spEscape(c.talla_playera))}
+      ${row('Contacto emergencia', `${_spEscape(c.contacto_emergencia_nombre || '')} · ${_spEscape(c.contacto_emergencia_telefono || '')}${c.contacto_emergencia_relacion ? ' · ' + _spEscape(c.contacto_emergencia_relacion) : ''}`)}
+    `)}
+
+    ${seccion('Tour', `
+      ${row('Evento', _spEscape(s.evento_nombre))}
+      ${row('Evento ID', `<span style="font-family:'JetBrains Mono',monospace;color:var(--ts);font-size:11px">${_spEscape(s.evento_id)}</span>`)}
+      ${row('Paquete', `<b>${_spEscape(s.paquete)}</b>`)}
+      ${row('Zona', _spEscape(s.zona))}
+      ${row('Personas', String(s.num_personas))}
+      ${s.tipo_habitacion ? row('Habitación', _spEscape(s.tipo_habitacion)) : ''}
+      ${s.lleva_vuelo ? row('Vuelo propio', s.codigo_vuelo ? _spEscape(s.codigo_vuelo) : 'Sí (sin código)') : ''}
+      ${s.codigo_descuento ? row('Código descuento', _spEscape(s.codigo_descuento)) : ''}
+      ${s.notas_cliente ? row('Notas del cliente', `<i>${_spEscape(s.notas_cliente)}</i>`) : ''}
+    `)}
+
+    ${seccion('Dinero', `
+      ${row('Precio total', `<b>${_spFmtMxn(s.precio_total)}</b>`)}
+      ${row('Monto separo', `<b style="color:var(--orange)">${_spFmtMxn(s.monto_separo)}</b>`)}
+      ${row('Estado actual', _spBadgeEstado(s.estado))}
+      ${s.notas_admin ? row('Notas admin', `<i style="color:var(--ts)">${_spEscape(s.notas_admin)}</i>`) : ''}
+    `)}
+
+    ${seccion('Plan de pagos', `
+      <div id="sp-plan-${_spEscape(s.id)}" style="font-size:13px;color:var(--ts)">Cargando plan…</div>
+    `)}
+
+    ${seccion('Comprobante de separo', `
+      <div id="sp-comprobante-${_spEscape(s.id)}" style="font-size:13px;color:var(--ts)">
+        ${s.comprobante_separo_url ? 'Cargando vista previa…' : '<span style="color:var(--ts)">Sin comprobante subido por el cliente</span>'}
+      </div>
+    `)}
+
+    ${seccion('<svg class="ic"><use href="#ic-alerta"/></svg> Zona de peligro', `
+      <div style="font-size:12px;color:var(--ts);margin-bottom:10px;line-height:1.5">Resetea o elimina a <b style="color:var(--ink)">${_spEscape(c.nombre_completo || '—')}</b> del Portal para que pueda empezar de cero (borra tours, pagos, comprobantes y foto).</div>
+      <button class="btn btn-red btn-sm" onclick="abrirResetCliente('${_spEscape(s.cliente_id)}')" style="font-size:11px">Resetear / Eliminar cliente</button>
+    `)}
+  `;
+
+  crearModal('sp-detalle', `Solicitud · ${s.evento_nombre || ''}`, contenido);
+  document.getElementById('modal-sp-detalle').querySelector('.modal').style.maxWidth = '720px';
+
+  cargarPlanPagosSP(s.id, s.estado, s.paquete);
+
+  if (s.comprobante_separo_url) {
+    cargarComprobanteSP(s.id);
+  }
+}
+
+// ── Resetear / Eliminar cliente del Portal (herramienta admin destructiva) ──
+// Candado: confirmación por nombre + modo. 'total' (borra la cuenta) solo lo ve
+// maestro_roshi. El servidor revalida rol + confirmación (no confiamos en el front).
+function abrirResetCliente(clienteId) {
+  const sols = (_spCache || []).filter(x => x.cliente_id === clienteId);
+  const c = (sols[0] && sols[0].clientes) || {};
+  const nombre = c.nombre_completo || '';
+  const numero = c.numero_cliente || '—';
+  const nSol = sols.length;
+  const esRoshi = currentUser && currentUser.rol === 'maestro_roshi';
+
+  const modoTotal = esRoshi ? `
+      <label style="display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border:1px solid rgba(255,40,59,.4);border-radius:8px;cursor:pointer;background:rgba(255,40,59,.05)">
+        <input type="radio" name="rc-modo" value="total" onchange="_rcSync()" style="margin-top:3px">
+        <div><div style="font-weight:600;color:var(--red)">Eliminar TODO (borra la cuenta)</div><div style="font-size:11px;color:var(--ts)">Borra también su usuario de acceso. <b style="color:var(--red)">IRREVERSIBLE.</b></div></div>
+      </label>` : '';
+
+  const contenido = `
+    <div style="font-size:13px;margin-bottom:14px">Cliente <b>${_spEscape(nombre || '—')}</b> · <span style="font-family:'JetBrains Mono',monospace;color:var(--orange)">#${_spEscape(numero)}</span></div>
+    <div style="font-size:12px;color:var(--ts);margin-bottom:14px;line-height:1.5">Se borrarán <b style="color:var(--ink)">${nSol}</b> solicitud${nSol === 1 ? '' : 'es'} (con sus pagos), sus comprobantes y su foto de perfil.</div>
+
+    <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:14px">
+      <label style="display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border:1px solid var(--border);border-radius:8px;cursor:pointer">
+        <input type="radio" name="rc-modo" value="reset" checked onchange="_rcSync()" style="margin-top:3px">
+        <div><div style="font-weight:600">Resetear (conserva la cuenta)</div><div style="font-size:11px;color:var(--ts)">Vacía tours/pagos/comprobantes/foto. El cliente conserva su login y empieza de cero.</div></div>
+      </label>
+      ${modoTotal}
+    </div>
+
+    <div id="rc-confirm-wrap" style="display:none;margin-bottom:14px">
+      <div style="font-size:12px;color:var(--red);font-weight:600;margin-bottom:6px">Para confirmar el borrado TOTAL, escribe el nombre exacto del cliente:</div>
+      <input id="rc-nombre-input" type="text" oninput="_rcSync()" placeholder="${_spEscape(nombre)}" style="width:100%;padding:9px 11px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;color:var(--ink);font-size:13px">
+    </div>
+
+    <div id="rc-alert" style="margin-bottom:10px"></div>
+    <div style="display:flex;gap:10px;justify-content:flex-end">
+      <button class="btn btn-ghost btn-sm" onclick="cerrarModal('rc')">Cancelar</button>
+      <button class="btn btn-red btn-sm" id="rc-confirm-btn" onclick="ejecutarResetCliente('${_spEscape(clienteId)}')">Ejecutar</button>
+    </div>`;
+
+  crearModal('rc', 'Resetear / Eliminar cliente', contenido);
+  // Guardar el nombre esperado para la validación del front (el server revalida igual).
+  window._rcNombre = nombre;
+  _rcSync();
+}
+
+// Habilita/deshabilita el botón según modo + (para 'total') el nombre escrito.
+function _rcSync() {
+  const modo = (document.querySelector('input[name="rc-modo"]:checked') || {}).value || 'reset';
+  const wrap = document.getElementById('rc-confirm-wrap');
+  const btn = document.getElementById('rc-confirm-btn');
+  if (wrap) wrap.style.display = modo === 'total' ? 'block' : 'none';
+  if (!btn) return;
+  if (modo === 'total') {
+    const val = (document.getElementById('rc-nombre-input') || {}).value || '';
+    btn.disabled = val.trim() !== String(window._rcNombre || '').trim();
+    btn.textContent = 'Eliminar TODO';
+  } else {
+    btn.disabled = false;
+    btn.textContent = 'Resetear cliente';
+  }
+}
+
+async function ejecutarResetCliente(clienteId) {
+  const modo = (document.querySelector('input[name="rc-modo"]:checked') || {}).value || 'reset';
+  const alertEl = document.getElementById('rc-alert');
+  // confirmacion: para 'total' lo que escribió; para 'reset' el nombre conocido (el server revalida).
+  const confirmacion = modo === 'total'
+    ? ((document.getElementById('rc-nombre-input') || {}).value || '').trim()
+    : String(window._rcNombre || '').trim();
+  const btn = document.getElementById('rc-confirm-btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Ejecutando…'; }
+  try {
+    const r = await fetch('/.netlify/functions/admin-portal-cliente-reset', {
+      method: 'POST',
+      headers: _spAdminHeaders(),
+      body: JSON.stringify({ cliente_id: clienteId, modo, confirmacion }),
+    });
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(data.error || ('Error ' + r.status));
+    cerrarModal('rc'); // [fix-404] crearModal usa cerrarModal (closeModal pide id completo y truena con null)
+    cerrarModal('sp-detalle');
+    const msg = modo === 'total'
+      ? `Cliente eliminado (${data.solicitudes_borradas} solicitud(es), cuenta ${data.auth_user_borrado ? 'borrada' : 'no encontrada'}).`
+      : `Cliente reseteado (${data.solicitudes_borradas} solicitud(es) y sus pagos borrados).`;
+    showToast(msg, 'success');
+    _spRefrescarLista();
+  } catch (e) {
+    if (alertEl) alertEl.innerHTML = `<div class="alert alert-error" style="font-size:12px">${_spEscape(e.message)}</div>`;
+    if (btn) { btn.disabled = false; _rcSync(); }
+  }
+}
+
+async function cargarComprobanteSP(solicitudId) {
+  const target = document.getElementById(`sp-comprobante-${solicitudId}`);
+  if (!target) return;
+  try {
+    const r = await fetch('/.netlify/functions/admin-solicitud-comprobante', {
+      method: 'POST',
+      headers: _spAdminHeaders(),
+      body: JSON.stringify({ solicitud_id: solicitudId }),
+    });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || 'No se pudo obtener el comprobante');
+    const isPdf = data.content_type === 'application/pdf';
+    const safeUrl = data.signed_url;
+    target.innerHTML = `
+      <div style="margin-bottom:8px;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--ts);letter-spacing:.08em">// firma válida 1 hora — ${_spEscape(data.path)}</div>
+      ${isPdf
+        ? `<iframe src="${_spEscape(safeUrl)}" style="width:100%;height:480px;border:1px solid var(--border);border-radius:8px"></iframe>`
+        : `<a href="${_spEscape(safeUrl)}" target="_blank" rel="noopener"><img src="${_spEscape(safeUrl)}" style="max-width:100%;max-height:480px;border:1px solid var(--border);border-radius:8px" alt="Comprobante"></a>`}
+      <div style="margin-top:10px;display:flex;gap:8px">
+        <a href="${_spEscape(safeUrl)}" target="_blank" rel="noopener" class="btn btn-ghost btn-sm" style="font-size:11px">↗ Abrir en pestaña nueva</a>
+        <a href="${_spEscape(safeUrl)}" download class="btn btn-primary btn-sm" style="font-size:11px">↓ Descargar</a>
+      </div>
+    `;
+  } catch (e) {
+    target.innerHTML = `<span style="color:#FF6B6B">Error: ${_spEscape(e.message)}</span>`;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// PLAN DE PAGOS (Fase 2.3c) — marcar / revertir pagos desde Kamehouse
+//
+// Carga diferida del plan dentro del modal de detalle (mismo patrón que
+// cargarComprobanteSP, vía admin-pagos-list). Por cada pago: "Marcar pagado"
+// (mini-form con fecha/método/referencia → admin-marcar-pago accion 'pagar') o
+// "Revertir" (accion 'revertir'). El backend reconcilia el estado de la
+// solicitud (todos pagados → 'pagado'; revertir uno → 'en_pagos'). El cliente
+// ve el abono en portal.html en cuanto un pago pasa a 'pagado'.
+// ═══════════════════════════════════════════════════════════════
+
+// `metodo` = CÓMO pagó (forma de pago). Ya no mezcla bancos. Los valores viejos
+// (bbva/hey/otro) siguen mapeados para mostrar pagos antiguos, pero el <select>
+// solo ofrece los 3 nuevos (ver _SP_METODOS_UI).
+const _SP_METODO_LBL = { transferencia:'Transferencia', deposito:'Depósito', efectivo:'Efectivo', bbva:'BBVA', hey:'Banamex', otro:'Otro' };
+const _SP_METODOS_UI = ['transferencia','deposito','efectivo'];
+
+// `cuenta`/banco = a qué cuenta ENTRÓ el dinero (visor de saldos), DISTINTO de
+// método. El selector de BANCO solo ofrece BBVA/Banamex y solo aparece cuando el
+// método es Transferencia o Depósito; con Efectivo la cuenta es 'Efectivo'.
+const _SP_BANCOS = ['BBVA','Banamex'];
+// Paquete de cada solicitud, para el default de cuenta. Lo llena cargarPlanPagosSP
+// (el refresh tras marcar/revertir no trae el paquete, así que lo lee de aquí).
+let _spPaqueteCache = {};
+function _spCuentaDefault(paquete) {
+  return String(paquete || '').toUpperCase() === 'CHEAP' ? 'Banamex' : 'BBVA';
+}
+
+// Badge de estado de un pago. Reusa _spBadgeEstado, agregando 'vencido' (que la
+// tabla pagos permite pero la solicitud no).
+function _spBadgePago(estado) {
+  if (estado === 'vencido') {
+    return `<span style="display:inline-block;padding:3px 9px;border-radius:12px;background:#f8d7da;color:#721c24;font-size:11px;font-weight:700;letter-spacing:.04em">Vencido</span>`;
+  }
+  return _spBadgeEstado(estado);
+}
+
+// Carga diferida del plan (lazy load, igual que cargarComprobanteSP).
+async function cargarPlanPagosSP(solicitudId, estadoSolicitud, paquete) {
+  const target = document.getElementById('sp-plan-' + solicitudId);
+  if (!target) return;
+  // El paquete solo llega al abrir el modal; el refresh tras marcar/revertir no
+  // lo pasa, así que lo cacheamos para el default de cuenta.
+  if (paquete != null) _spPaqueteCache[solicitudId] = paquete;
+  try {
+    const r = await fetch('/.netlify/functions/admin-pagos-list', {
+      method: 'POST',
+      headers: _spAdminHeaders(),
+      body: JSON.stringify({ solicitud_id: solicitudId }),
+    });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || 'No se pudo obtener el plan de pagos');
+    _spPlanCache[solicitudId] = Array.isArray(data.pagos) ? data.pagos : [];
+    _spLugaresCache[solicitudId] = Array.isArray(data.lugares) ? data.lugares : [];
+    renderPlanPagosSP(solicitudId, estadoSolicitud);
+  } catch (e) {
+    target.innerHTML = `<span style="color:#FF6B6B">Error: ${_spEscape(e.message)}</span>`;
+  }
+}
+
+function renderPlanPagosSP(solicitudId, estadoSolicitud) {
+  const target = document.getElementById('sp-plan-' + solicitudId);
+  if (!target) return;
+  const pagos = _spPlanCache[solicitudId] || [];
+  if (!pagos.length) {
+    if (estadoSolicitud === 'pendiente') {
+      target.innerHTML = `<span style="color:var(--ts)">Aún sin plan — aprueba la solicitud (cambia el estado a “En pagos”) para generarlo.</span>`;
+      return;
+    }
+    // 'en_pagos'/'pagado' pueden quedar SIN plan si la generación falló al aprobar
+    // (piloto) → botón de recuperación. 'cancelado' u otros estados → solo el
+    // mensaje (el plan nace al aprobar, no aquí).
+    const solSafe = _spEscape(solicitudId);
+    const puedeRecuperar = estadoSolicitud === 'en_pagos' || estadoSolicitud === 'pagado';
+    target.innerHTML = `<span style="color:var(--ts)">Sin plan de pagos para esta solicitud.</span>`
+      + (puedeRecuperar
+        ? `<div style="margin-top:10px"><button id="sp-gen-plan-btn-${solSafe}" class="btn btn-primary btn-sm" style="font-size:11px" onclick="_spGenerarPlanRecuperacion('${solSafe}','${_spEscape(estadoSolicitud)}')"><svg class="ic"><use href="#ic-engrane"/></svg> Generar plan de pagos</button></div>`
+        : '');
+    return;
+  }
+
+  const total   = pagos.reduce((a, p) => a + Number(p.monto || 0), 0);
+  // Abonado = monto REAL pagado: COALESCE(monto_pagado, monto), igual que en
+  // admin-cobranza-list y el portal del cliente (Fase 3.2). El plan ya trae
+  // monto_pagado (admin-pagos-list usa select=*); NULL = monto del plan.
+  const abonado = pagos.filter(p => p.estado === 'pagado').reduce((a, p) => a + (Number(p.monto_pagado ?? p.monto) || 0), 0);
+  const restante = total - abonado;
+
+  const resumen = `
+    <div style="display:flex;gap:22px;flex-wrap:wrap;padding:10px 12px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;margin-bottom:12px">
+      <div><div style="color:var(--ts);text-transform:uppercase;letter-spacing:.08em;font-size:10px">Total</div><b style="font-size:14px">${_spFmtMxn(total)}</b></div>
+      <div><div style="color:var(--ts);text-transform:uppercase;letter-spacing:.08em;font-size:10px">Abonado</div><b style="font-size:14px;color:#3DDC84">${_spFmtMxn(abonado)}</b></div>
+      <div><div style="color:var(--ts);text-transform:uppercase;letter-spacing:.08em;font-size:10px">Restante</div><b style="font-size:14px;color:var(--orange)">${_spFmtMxn(restante)}</b></div>
+    </div>`;
+
+  // Plan POR LUGAR (#229): si alguna cuota trae lugar_id, se agrupa por lugar y
+  // se ofrece el pago grupal. Planes grupales viejos (lugar_id null) → render
+  // EXACTO de siempre (lista plana, sin encabezados).
+  const porLugar = pagos.some(p => p.lugar_id != null);
+  const cuerpo = porLugar
+    ? _spRenderPlanPorLugar(solicitudId, pagos)
+    : `<div style="display:flex;flex-direction:column;gap:8px">${pagos.map(p => _spRenderFilaPago(solicitudId, p)).join('')}</div>`;
+  target.innerHTML = resumen + cuerpo;
+
+  // Bitácora de movimientos (pagos_auditoria) — colapsable, lazy-load.
+  target.innerHTML += `
+    <div style="margin-top:14px;border-top:1px solid var(--border);padding-top:10px">
+      <button class="btn btn-ghost btn-sm" style="font-size:11px" onclick="toggleBitacoraSP('${_spEscape(solicitudId)}')">Ver movimientos ▾</button>
+      <div id="sp-audit-${_spEscape(solicitudId)}" style="display:none;margin-top:10px"></div>
+    </div>`;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// PLAN POR LUGAR + PAGO GRUPAL (Acompañantes F3-t4b)
+// Agrupa las cuotas por lugar y ofrece el flujo grupal (backend #231:
+// admin-aplicar-pago-grupo, modos proponer/aplicar). NO toca marcarPagoSP/
+// revertirPagoSP: las filas por lugar reusan _spRenderFilaPago sin cambios.
+// ═══════════════════════════════════════════════════════════════
+
+// Chip verde "CONECTADO ✓" (el lugar ya tiene cliente_id: el acompañante aceptó).
+const _SP_CHIP_CONECTADO = `<span style="display:inline-block;padding:2px 8px;border-radius:999px;background:rgba(61,220,132,.15);border:1px solid rgba(61,220,132,.5);font-size:10px;font-weight:800;letter-spacing:.04em;color:#3DDC84">CONECTADO ✓</span>`;
+
+// [F3b] Chip de contrato del lugar (verde firmado / ámbar pendiente). '' si no hay
+// contrato vivo (solicitud vieja pre-módulo).
+function _spContratoChip(lg){
+  const c = lg && lg.contrato; if (!c || !c.estado) return '';
+  if (c.estado === 'firmado')
+    return `<span style="display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:999px;background:rgba(61,220,132,.15);border:1px solid rgba(61,220,132,.5);font-size:10px;font-weight:800;color:#3DDC84"><svg class="ic" style="width:12px;height:12px"><use href="#ic-boleto"/></svg> Contrato ✓</span>`;
+  return `<span style="display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:999px;background:rgba(232,168,0,.12);border:1px solid rgba(232,168,0,.4);font-size:10px;font-weight:800;color:#e8a800"><svg class="ic" style="width:12px;height:12px"><use href="#ic-alerta"/></svg> Contrato pendiente</span>`;
+}
+// [F3b] Botón discreto "copiar link de firma" (solo pendiente + token; Bulma es admin).
+function _spCopyLinkBtn(lg){
+  const c = lg && lg.contrato; if (!c || c.estado === 'firmado' || !c.token) return '';
+  return `<button class="btn btn-ghost btn-sm" style="font-size:10px" onclick="spCopiarLinkFirma('${_spEscape(c.token)}',this)"><svg class="ic"><use href="#ic-enlace"/></svg> Copiar link de firma</button>`;
+}
+// [F3b] Casilla "Boleto entregado" — SOLO lugares de paquete CHEAP. Deshabilitada
+// con tooltip si el contrato no está firmado (el servidor la rebota igual).
+function _spBoletoRow(lg, solSafe){
+  if (!lg || String(lg.paquete || '').toLowerCase() !== 'cheap') return '';
+  const firmado = !!(lg.contrato && lg.contrato.estado === 'firmado');
+  const entregado = !!lg.boleto_entregado_at;
+  const lgSafe = _spEscape(lg.id);
+  const bloqueado = (!firmado && !entregado);
+  const fecha = entregado ? _spFmtFechaRel(lg.boleto_entregado_at) : '';
+  return `<label style="display:flex;align-items:center;gap:8px;margin:2px 0 8px;font-size:12px;${bloqueado ? 'opacity:.6;' : ''}"${bloqueado ? ' title="Requiere contrato firmado"' : ''}>
+    <input type="checkbox" ${entregado ? 'checked' : ''} ${bloqueado ? 'disabled' : ''} onchange="spToggleBoleto('${lgSafe}','${solSafe}',this)" style="width:16px;height:16px;accent-color:var(--gold)">
+    <svg class="ic" style="width:14px;height:14px;color:var(--gold)"><use href="#ic-boleto"/></svg>
+    <span>Boleto entregado${entregado && fecha ? ` <span style="color:var(--ts)">· ${_spEscape(fecha)}</span>` : ''}</span>
+    ${bloqueado ? `<span style="color:var(--ts);font-size:11px">— requiere contrato firmado</span>` : ''}
+  </label>`;
+}
+// [F3b] Copiar el link de firma al portapapeles (para reenviar por WhatsApp).
+async function spCopiarLinkFirma(token, btn){
+  const url = location.origin + '/contrato-viajero.html?token=' + encodeURIComponent(token);
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) await navigator.clipboard.writeText(url);
+    else { const ta = document.createElement('textarea'); ta.value = url; ta.style.position = 'fixed'; ta.style.opacity = '0'; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); }
+    if (btn){ const o = btn.innerHTML; btn.innerHTML = 'Copiado ✓'; setTimeout(() => { btn.innerHTML = o; }, 1600); }
+    showToast('Link de firma copiado.', 'success');
+  } catch (e) { showToast('No se pudo copiar. Link: ' + url, 'error'); }
+}
+// [F3b] Marcar/des-marcar boleto entregado. El CANDADO está en el server (409 si
+// no hay contrato firmado); aquí mostramos el mensaje tal cual y revertimos.
+async function spToggleBoleto(lugarId, solicitudId, cb){
+  const entregar = !!cb.checked;
+  cb.disabled = true;
+  try {
+    const r = await fetch('/.netlify/functions/admin-lugar-boleto', {
+      method: 'POST', headers: _spAdminHeaders(), body: JSON.stringify({ lugar_id: lugarId, entregado: entregar }),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || j.ok === false){
+      cb.checked = !entregar; cb.disabled = false;
+      showToast(j.error || ('Error ' + r.status), 'error'); // 409 → '⛔ Sin contrato firmado...'
+      return;
+    }
+    const lg = (_spLugaresCache[solicitudId] || []).find(x => x.id === lugarId);
+    if (lg) lg.boleto_entregado_at = j.boleto_entregado_at || null;
+    showToast(entregar ? 'Boleto marcado como entregado.' : 'Se des-marcó el boleto.', 'success');
+    renderPlanPagosSP(solicitudId, 'en_pagos'); // re-pinta el plan (fecha/estado)
+  } catch (e){
+    cb.checked = !entregar; cb.disabled = false; showToast('Error: ' + e.message, 'error');
+  }
+}
+
+function _spRenderPlanPorLugar(solicitudId, pagos) {
+  const solSafe = _spEscape(solicitudId);
+  const lugById = {};
+  (_spLugaresCache[solicitudId] || []).forEach(l => { lugById[l.id] = l; });
+
+  // Agrupar las cuotas por lugar_id, ordenando los lugares por su numero.
+  const grupos = {};
+  pagos.forEach(p => { const k = p.lugar_id || '_'; (grupos[k] = grupos[k] || []).push(p); });
+  const keys = Object.keys(grupos).sort((a, b) => {
+    const na = (lugById[a] && lugById[a].numero != null) ? Number(lugById[a].numero) : 9999;
+    const nb = (lugById[b] && lugById[b].numero != null) ? Number(lugById[b].numero) : 9999;
+    return na - nb;
+  });
+
+  const botonGrupo = `
+    <div id="sp-grupo-${solSafe}" style="margin-bottom:12px">
+      <button class="btn btn-primary btn-sm" style="font-size:11px" onclick="abrirPagoGrupoSP('${solSafe}')"><svg class="ic"><use href="#ic-dinero"/></svg> Aplicar pago grupal</button>
+    </div>`;
+
+  const secciones = keys.map(k => {
+    const lg = lugById[k];
+    const ps = grupos[k];
+    const num = lg && lg.numero != null ? lg.numero : '?';
+    // Retroactivo (sin SQL): lugares 1 viejos sin nombre → "Titular" (el #1 es el
+    // titular; los nuevos ya nacen con su nombre vía ensureLugares).
+    const nombre = (lg && lg.nombre && String(lg.nombre).trim()) ? lg.nombre : (Number(num) === 1 ? 'Titular' : 'Por registrar');
+    const conectado = (lg && lg.cliente_id) ? _SP_CHIP_CONECTADO : '';
+    // [F5-t1] Estado del lugar: baja (tachado+rojo) / traspasado (ámbar) / activo.
+    const estado = (lg && lg.estado) ? lg.estado : 'activo';
+    const nombreStyle = estado === 'baja' ? 'text-decoration:line-through;opacity:.6;' : '';
+    const etiquetaEstado = estado === 'baja'
+      ? `<span style="padding:1px 7px;border-radius:999px;font-size:9px;font-weight:900;letter-spacing:.1em;color:#FF6B6B;border:1px solid rgba(255,107,107,.5);background:rgba(255,107,107,.12)">BAJA</span>`
+      : (estado === 'traspasado'
+        ? `<span style="padding:1px 7px;border-radius:999px;font-size:9px;font-weight:900;letter-spacing:.1em;color:#FFB703;border:1px solid rgba(255,183,3,.5);background:rgba(255,183,3,.12)">TRASPASADO</span>`
+        : '');
+    // Botón "Baja": solo lugares ACTIVOS que no sean el titular (#1).
+    const btnBaja = (lg && estado === 'activo' && Number(num) >= 2)
+      ? `<button class="btn btn-ghost btn-sm" style="font-size:10px;color:#FF6B6B;border-color:rgba(255,107,107,.4)" onclick="darBajaLugarSP('${_spEscape(lg.id)}','${solSafe}')">↓︎ Baja</button>`
+      : '';
+    // [F5-t2] Botón "Traspasar": lugares numero>=2 ACTIVOS o en BAJA (revivir para el nuevo).
+    const puedeTraspasar = lg && Number(num) >= 2 && (estado === 'activo' || estado === 'baja');
+    const lgSafe = lg ? _spEscape(lg.id) : '';
+    const btnTraspaso = puedeTraspasar
+      ? `<button class="btn btn-ghost btn-sm" style="font-size:10px" onclick="_spToggleTraspaso('${lgSafe}','${solSafe}')">⇄ Traspasar</button>`
+      : '';
+    const inpTras = 'width:100%;padding:7px 8px;margin-bottom:6px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;color:var(--ink);font-size:12px';
+    const formTraspaso = puedeTraspasar
+      ? `<div id="sp-traspaso-${lgSafe}" style="display:none;margin:0 0 10px;padding:10px 12px;background:var(--bg3);border:1px solid var(--border);border-radius:8px">
+          <div style="font-size:11px;color:var(--ts);margin-bottom:8px">Traspasar a otra persona — conserva lo abonado y lo restante; al nuevo le llega su invitación.</div>
+          <input id="sp-tras-nombre-${lgSafe}" type="text" maxlength="120" placeholder="Nombre del nuevo ocupante" style="${inpTras}">
+          <input id="sp-tras-correo-${lgSafe}" type="email" placeholder="Correo del nuevo ocupante" style="${inpTras}">
+          <input id="sp-tras-motivo-${lgSafe}" type="text" maxlength="500" placeholder="Motivo (opcional)" style="${inpTras}">
+          <div id="sp-tras-cargo-${lgSafe}" style="font-size:11px;margin:2px 0 8px;color:var(--ts)">Calculando cargo…</div>
+          <label id="sp-tras-forzar-wrap-${lgSafe}" style="display:none;font-size:11px;color:var(--orange);margin-bottom:8px;cursor:pointer;align-items:center;gap:6px">
+            <input type="checkbox" id="sp-tras-forzar-${lgSafe}" style="vertical-align:-1px"> Aplicar cargo de $350
+          </label>
+          <div style="display:flex;gap:8px;justify-content:flex-end">
+            <button class="btn btn-ghost btn-sm" style="font-size:11px" onclick="_spToggleTraspaso('${lgSafe}')">Cancelar</button>
+            <button class="btn btn-primary btn-sm" style="font-size:11px" onclick="traspasarLugarSP('${lgSafe}','${solSafe}')">Confirmar traspaso</button>
+          </div>
+        </div>`
+      : '';
+    const subPagado = ps.filter(p => p.estado === 'pagado').reduce((a, p) => a + (Number(p.monto_pagado ?? p.monto) || 0), 0);
+    const subTotal = ps.reduce((a, p) => a + Number(p.monto || 0), 0);
+    const filas = ps.map(p => _spRenderFilaPago(solicitudId, p)).join('');
+    return `
+      <div style="border:1px solid var(--border);border-radius:10px;padding:10px 10px 12px;margin-bottom:8px;background:var(--bg2)">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:9px">
+          <b style="font-size:13px;${nombreStyle}">Lugar #${_spEscape(num)} · ${_spEscape(nombre)}</b>
+          ${etiquetaEstado}${conectado}${_spContratoChip(lg)}
+          <span style="margin-left:auto;font-size:11px;color:var(--ts);white-space:nowrap">Pagado ${_spFmtMxn(subPagado)} de ${_spFmtMxn(subTotal)}</span>
+          ${btnBaja}${btnTraspaso}${_spCopyLinkBtn(lg)}
+        </div>
+        ${_spBoletoRow(lg, solSafe)}
+        ${formTraspaso}
+        <div style="display:flex;flex-direction:column;gap:8px">${filas}</div>
+      </div>`;
+  }).join('');
+
+  return botonGrupo + secciones;
+}
+
+// [F5-t1] Dar de BAJA un lugar (Bulma). Política: cae SOLO ese lugar, sus cuotas
+// pendientes se anulan y lo abonado NO se devuelve. El titular queda avisado por
+// correo. El nombre/numero se leen del cache (evita romper el onclick con comillas).
+async function darBajaLugarSP(lugarId, solicitudId){
+  const lg = (_spLugaresCache[solicitudId] || []).find(x => x.id === lugarId) || {};
+  const num = (lg.numero != null) ? lg.numero : '?';
+  const nombre = (lg.nombre && String(lg.nombre).trim()) ? lg.nombre : ('Lugar #' + num);
+  const motivo = prompt('Motivo de la baja (opcional):', '');
+  if (motivo === null) return; // canceló el prompt
+  if (!confirm(`¿Dar de baja el lugar #${num} (${nombre})? Sus cuotas pendientes se anulan y lo abonado NO se devuelve.`)) return;
+  try {
+    const r = await khAdminFetch('/.netlify/functions/admin-lugar-baja', {
+      method: 'POST',
+      body: JSON.stringify({ lugar_id: lugarId, motivo: (motivo && motivo.trim()) ? motivo.trim() : undefined }),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || j.ok === false) throw new Error(j.error || ('admin-lugar-baja ' + r.status));
+    const partes = [`${j.cuotas_anuladas || 0} cuota(s) anulada(s)`];
+    if (j.abonado_del_lugar) partes.push(`${_spFmtMxn(j.abonado_del_lugar)} abonado no reembolsable`);
+    if (j.correo_titular) partes.push('titular avisado');
+    showToast('Lugar dado de baja — ' + partes.join(' · '), 'success');
+    await _spRefrescarPlanYLista(solicitudId, undefined);
+  } catch (e) {
+    showToast('Error: ' + e.message, 'error');
+  }
+}
+
+// [F5-t2] Abre/cierra el mini-form de traspaso de un lugar. Al ABRIR, calcula el
+// cargo por traspaso (Gancho 1) y lo muestra antes de confirmar.
+function _spToggleTraspaso(lugarId, solicitudId){
+  const f = document.getElementById('sp-traspaso-' + lugarId);
+  if (!f) return;
+  const abriendo = (f.style.display === 'none');
+  f.style.display = abriendo ? '' : 'none';
+  if (abriendo && solicitudId) _spPintarCargoTraspaso(lugarId, solicitudId);
+}
+
+// [Gancho 1] Días hasta la PRIMERA fecha del evento (ds), hoy en hora MX (patrón
+// en-CA/Monterrey del cron F4). null si no se puede parsear.
+function _spDiasHastaEvento(dsISO){
+  const hoy = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Monterrey' });
+  const a = Date.parse(String(dsISO).slice(0,10) + 'T00:00:00Z');
+  const b = Date.parse(hoy + 'T00:00:00Z');
+  if (isNaN(a) || isNaN(b)) return null;
+  return Math.round((a - b) / 86400000);
+}
+
+// [Gancho 1] Días hasta el evento de una solicitud (best-effort). Usa el evento_id
+// del cache sp + el ds del catálogo (EV de index.html, cacheado). Multifecha: slug
+// base. null si no se puede calcular → el backend decide (o Bulma con la casilla).
+async function _spCalcDiasTraspaso(solicitudId){
+  try {
+    const sol = (_spCache || []).find(x => x && x.id === solicitudId);
+    const evId = sol && sol.evento_id;
+    if (!evId) return null;
+    const ev = (await _fetchEVFromIndex() || []).find(e => e && e.id === String(evId).split('#')[0]);
+    if (!ev || !ev.ds) return null;
+    return _spDiasHastaEvento(ev.ds);
+  } catch (e) { return null; }
+}
+
+// [Gancho 1] Pinta la consecuencia del cargo en el mini-form + muestra la casilla
+// manual solo cuando NO se pudo calcular los días.
+async function _spPintarCargoTraspaso(lugarId, solicitudId){
+  const box = document.getElementById('sp-tras-cargo-' + lugarId);
+  const wrap = document.getElementById('sp-tras-forzar-wrap-' + lugarId);
+  const chk = document.getElementById('sp-tras-forzar-' + lugarId);
+  if (!box) return;
+  const dias = await _spCalcDiasTraspaso(solicitudId);
+  if (dias == null) {
+    box.innerHTML = '⚠️ No pude calcular los días del evento; decide tú si aplicar el cargo.';
+    box.style.color = 'var(--orange)';
+    if (wrap) wrap.style.display = 'flex';
+  } else {
+    if (wrap) wrap.style.display = 'none';
+    if (chk) chk.checked = false;
+    if (dias <= 5) {
+      box.innerHTML = `⚠️ Evento en <b>${dias} día${dias === 1 ? '' : 's'}</b> → se sumará un <b>cargo de $350</b> al plan.`;
+      box.style.color = 'var(--orange)';
+    } else {
+      box.innerHTML = `Sin cargo (faltan <b>${dias} días</b> para el evento).`;
+      box.style.color = 'var(--ts)';
+    }
+  }
+}
+
+// [F5-t2] Traspasa el lugar a otra persona (Bulma). Conserva lo abonado y lo
+// restante; al nuevo le llega su invitación por correo (acepta con #226/#230).
+async function traspasarLugarSP(lugarId, solicitudId){
+  const nombre = ((document.getElementById('sp-tras-nombre-' + lugarId) || {}).value || '').trim();
+  const correo = ((document.getElementById('sp-tras-correo-' + lugarId) || {}).value || '').trim();
+  const motivo = ((document.getElementById('sp-tras-motivo-' + lugarId) || {}).value || '').trim();
+  if (!nombre) { showToast('Escribe el nombre del nuevo ocupante', 'error'); return; }
+  if (!correo || !correo.includes('@')) { showToast('Escribe un correo válido del nuevo ocupante', 'error'); return; }
+
+  const lg = (_spLugaresCache[solicitudId] || []).find(x => x.id === lugarId) || {};
+  const num = (lg.numero != null) ? lg.numero : '?';
+  // Abonado del lugar (si se conoce, del cache del plan) para el confirm.
+  const pagosLugar = (_spPlanCache[solicitudId] || []).filter(p => p.lugar_id === lugarId);
+  const abonado = pagosLugar.filter(p => p.estado === 'pagado').reduce((a, p) => a + (Number(p.monto_pagado ?? p.monto) || 0), 0);
+  const abonadoTxt = abonado ? ` (${_spFmtMxn(abonado)} abonado)` : '';
+
+  // [Gancho 1] Consecuencia del cargo ANTES de confirmar. La casilla manual solo
+  // fuerza el cargo cuando los días son indeterminados.
+  const dias = await _spCalcDiasTraspaso(solicitudId);
+  const forzar = !!((document.getElementById('sp-tras-forzar-' + lugarId) || {}).checked);
+  let cargoMsg;
+  if (dias == null) cargoMsg = forzar
+    ? '\n\n⚠️ Se aplicará un cargo de $350 (forzado manual).'
+    : '\n\n(No se pudieron calcular los días; el sistema decidirá el cargo.)';
+  else if (dias <= 5) cargoMsg = `\n\n⚠️ Evento en ${dias} día(s): se sumará un cargo de $350 al plan.`;
+  else cargoMsg = `\n\nSin cargo (faltan ${dias} días para el evento).`;
+  if (!confirm(`¿Traspasar el lugar #${num} a ${nombre}? Conserva lo abonado${abonadoTxt} y lo restante; al nuevo le llega su invitación por correo.${cargoMsg}`)) return;
+
+  try {
+    const r = await khAdminFetch('/.netlify/functions/admin-lugar-traspasar', {
+      method: 'POST',
+      body: JSON.stringify({ lugar_id: lugarId, nombre, correo, motivo: motivo || undefined, forzar_cargo: forzar || undefined }),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || j.ok === false) throw new Error(j.error || ('admin-lugar-traspasar ' + r.status));
+    const partes = [];
+    if (j.revivido) partes.push('lugar revivido');
+    if (j.cuotas_reactivadas) partes.push(`${j.cuotas_reactivadas} cuota(s) reactivada(s)`);
+    partes.push(j.invitacion_enviada ? 'invitación enviada' : 'invitación NO salió (reenvía)');
+    // [Gancho 1] Reflejar el cargo en el toast.
+    const ct = j.cargo_traspaso;
+    if (ct) {
+      if (ct.error) partes.push('⚠️ el cargo de $350 NO se pudo sumar');
+      else if (ct.aplicado) partes.push(`cargo de $${ct.monto} sumado al plan`);
+      else if (ct.indeterminado) partes.push('sin cargo (días indeterminados)');
+      else partes.push('sin cargo');
+    }
+    showToast('Lugar traspasado — ' + partes.join(' · '), j.invitacion_enviada ? 'success' : 'error');
+    await _spRefrescarPlanYLista(solicitudId, undefined);
+  } catch (e) {
+    showToast('Error: ' + e.message, 'error');
+  }
+}
+
+// Abre el mini-form del pago grupal (monto + fecha + método + referencia).
+function abrirPagoGrupoSP(solicitudId) {
+  const box = document.getElementById('sp-grupo-' + solicitudId);
+  if (!box) return;
+  const solSafe = _spEscape(solicitudId);
+  const hoy = _spYmd(new Date());
+  const opciones = _SP_METODOS_UI.map(k => `<option value="${k}">${_SP_METODO_LBL[k]}</option>`).join('');
+  const lbl = 'display:block;font-size:9px;letter-spacing:.1em;color:var(--ts);text-transform:uppercase;margin-bottom:3px';
+  const inp = 'padding:7px 8px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;color:var(--ink);font-size:12px';
+  box.innerHTML = `
+    <div style="padding:12px;background:var(--bg3);border:1px solid var(--border);border-radius:10px">
+      <div style="font-size:12px;font-weight:700;margin-bottom:4px"><svg class="ic"><use href="#ic-dinero"/></svg> Pago grupal</div>
+      <div style="font-size:11px;color:var(--ts);margin-bottom:10px">Una transferencia del titular se reparte entre las cuotas de los lugares (cascada por fecha). El sistema propone; tú confirmas.</div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
+        <div><label style="${lbl}">Monto recibido</label><input type="number" id="sp-grupo-monto-${solSafe}" min="0" step="0.01" placeholder="0.00" style="width:130px;${inp}"></div>
+        <div><label style="${lbl}">Fecha</label><input type="date" id="sp-grupo-fecha-${solSafe}" value="${_spEscape(hoy)}" style="${inp}"></div>
+        <div><label style="${lbl}">Método</label><select id="sp-grupo-metodo-${solSafe}" style="${inp}">${opciones}</select></div>
+        <div style="flex:1;min-width:150px"><label style="${lbl}">Referencia (opcional)</label><input type="text" id="sp-grupo-ref-${solSafe}" maxlength="120" placeholder="folio, últimos 4 dígitos, etc." style="width:100%;${inp}"></div>
+      </div>
+      <div style="margin-top:10px;display:flex;gap:8px;justify-content:flex-end">
+        <button class="btn btn-ghost btn-sm" style="font-size:11px" onclick="cerrarPagoGrupoSP('${solSafe}')">Cancelar</button>
+        <button class="btn btn-primary btn-sm" id="sp-grupo-btn-${solSafe}" style="font-size:11px" onclick="proponerPagoGrupoSP('${solSafe}')">Proponer reparto</button>
+      </div>
+      <div id="sp-grupo-prop-${solSafe}" style="margin-top:12px"></div>
+    </div>`;
+}
+
+// Cancelar: limpia el contexto y restaura el botón (sin escribir nada).
+function cerrarPagoGrupoSP(solicitudId) {
+  delete _spGrupoCache[solicitudId];
+  const box = document.getElementById('sp-grupo-' + solicitudId);
+  if (box) box.innerHTML = `<button class="btn btn-primary btn-sm" style="font-size:11px" onclick="abrirPagoGrupoSP('${_spEscape(solicitudId)}')"><svg class="ic"><use href="#ic-dinero"/></svg> Aplicar pago grupal</button>`;
+}
+
+// MODO proponer: pide al backend la cascada de cuotas para el monto dado.
+async function proponerPagoGrupoSP(solicitudId) {
+  const montoRaw = ((document.getElementById('sp-grupo-monto-' + solicitudId) || {}).value || '').trim();
+  const monto = Number(montoRaw);
+  if (!Number.isFinite(monto) || monto <= 0) { showToast('Escribe un monto válido (> 0)', 'error'); return; }
+  const fecha = (document.getElementById('sp-grupo-fecha-' + solicitudId) || {}).value || '';
+  const metodo = (document.getElementById('sp-grupo-metodo-' + solicitudId) || {}).value || '';
+  const referencia = ((document.getElementById('sp-grupo-ref-' + solicitudId) || {}).value || '').trim();
+  const btn = document.getElementById('sp-grupo-btn-' + solicitudId);
+  if (btn) { btn.disabled = true; btn.textContent = 'Calculando…'; }
+  try {
+    const r = await fetch('/.netlify/functions/admin-aplicar-pago-grupo', {
+      method: 'POST',
+      headers: _spAdminHeaders(),
+      body: JSON.stringify({ solicitud_id: solicitudId, modo: 'proponer', monto }),
+    });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || 'No se pudo calcular la propuesta');
+    _spGrupoCache[solicitudId] = { monto, fecha, metodo, referencia, propuesta: Array.isArray(data.propuesta) ? data.propuesta : [] };
+    _spRenderPropuestaGrupo(solicitudId);
+  } catch (e) {
+    showToast('Error: ' + e.message, 'error');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Proponer reparto'; }
+  }
+}
+
+// Pinta la propuesta: un checkbox por cuota (pre-palomeadas), pie con la suma en
+// vivo, y el botón "Confirmar y aplicar".
+function _spRenderPropuestaGrupo(solicitudId) {
+  const cont = document.getElementById('sp-grupo-prop-' + solicitudId);
+  const ctx = _spGrupoCache[solicitudId];
+  if (!cont || !ctx) return;
+  const solSafe = _spEscape(solicitudId);
+  if (!ctx.propuesta.length) {
+    cont.innerHTML = `<div style="border-top:1px solid var(--border);padding-top:10px;font-size:12px;color:var(--orange)">Con ${_spFmtMxn(ctx.monto)} no alcanza para cubrir ninguna cuota completa. Sobrante: ${_spFmtMxn(ctx.monto)}.</div>`;
+    return;
+  }
+  const filas = ctx.propuesta.map(c => `
+    <label style="display:flex;align-items:center;gap:8px;padding:6px 0;font-size:12px;cursor:pointer">
+      <input type="checkbox" checked data-id="${_spEscape(c.pago_id)}" data-monto="${_spEscape(Number(c.monto || 0))}" onchange="_spGrupoRecalc('${solSafe}')">
+      <span>Cuota ${_spEscape(c.numero_pago)} · Lugar #${_spEscape(c.lugar_numero)}${(c.lugar_nombre && String(c.lugar_nombre).trim()) ? ' (' + _spEscape(c.lugar_nombre) + ')' : ''} · ${_spEscape(c.concepto)}</span>
+      <span style="margin-left:auto;white-space:nowrap"><b>${_spFmtMxn(c.monto)}</b></span>
+    </label>`).join('');
+  cont.innerHTML = `
+    <div style="border-top:1px solid var(--border);padding-top:10px">
+      <div style="font-size:11px;color:var(--ts);margin-bottom:4px">Propuesta (cascada por fecha). Despalomea las que no quieras aplicar:</div>
+      <div id="sp-grupo-lista-${solSafe}">${filas}</div>
+      <div id="sp-grupo-pie-${solSafe}" style="margin-top:8px;font-size:12px"></div>
+      <div style="margin-top:10px;display:flex;gap:8px;justify-content:flex-end">
+        <button class="btn btn-ghost btn-sm" style="font-size:11px" onclick="cerrarPagoGrupoSP('${solSafe}')">Cancelar</button>
+        <button class="btn btn-primary btn-sm" id="sp-grupo-aplicar-${solSafe}" style="font-size:11px" onclick="aplicarPagoGrupoSP('${solSafe}')">Confirmar y aplicar</button>
+      </div>
+    </div>`;
+  _spGrupoRecalc(solicitudId);
+}
+
+// Recalcula en vivo el pie (suma palomeada + sobrante) al palomear/despalomear.
+function _spGrupoRecalc(solicitudId) {
+  const ctx = _spGrupoCache[solicitudId];
+  const lista = document.getElementById('sp-grupo-lista-' + solicitudId);
+  const pie = document.getElementById('sp-grupo-pie-' + solicitudId);
+  if (!ctx || !lista || !pie) return;
+  let suma = 0, n = 0;
+  lista.querySelectorAll('input[type=checkbox]').forEach(cb => {
+    if (cb.checked) { suma += Number(cb.dataset.monto || 0); n++; }
+  });
+  suma = Math.round(suma * 100) / 100;
+  const sobrante = Math.round((ctx.monto - suma) * 100) / 100;
+  pie.innerHTML = `Se aplicarán: <b style="color:#3DDC84">${_spFmtMxn(suma)}</b> (${n} cuota${n !== 1 ? 's' : ''}) · Sobrante sin aplicar: <b style="color:var(--orange)">${_spFmtMxn(sobrante)}</b>`;
+  const btn = document.getElementById('sp-grupo-aplicar-' + solicitudId);
+  if (btn) btn.disabled = (n === 0);
+}
+
+// MODO aplicar: manda las cuotas palomeadas + fecha/método/referencia. En 409
+// (algo cambió) muestra el detalle del backend y refresca el plan.
+async function aplicarPagoGrupoSP(solicitudId) {
+  const ctx = _spGrupoCache[solicitudId];
+  const lista = document.getElementById('sp-grupo-lista-' + solicitudId);
+  if (!ctx || !lista) return;
+  const pagoIds = [];
+  lista.querySelectorAll('input[type=checkbox]').forEach(cb => { if (cb.checked) pagoIds.push(cb.dataset.id); });
+  if (!pagoIds.length) { showToast('Selecciona al menos una cuota', 'error'); return; }
+  const btn = document.getElementById('sp-grupo-aplicar-' + solicitudId);
+  if (btn) { btn.disabled = true; btn.textContent = 'Aplicando…'; }
+  try {
+    const r = await fetch('/.netlify/functions/admin-aplicar-pago-grupo', {
+      method: 'POST',
+      headers: _spAdminHeaders(),
+      body: JSON.stringify({
+        solicitud_id: solicitudId,
+        modo: 'aplicar',
+        pago_ids: pagoIds,
+        fecha_pagada: ctx.fecha || undefined,
+        metodo: ctx.metodo || undefined,
+        referencia: ctx.referencia || undefined,
+      }),
+    });
+    const data = await r.json();
+    if (!r.ok) {
+      const det = data.detalle ? (' (' + _spEscape(JSON.stringify(data.detalle)) + ')') : '';
+      showToast('Error: ' + (data.error || 'No se pudo aplicar') + det, 'error');
+      if (r.status === 409) { delete _spGrupoCache[solicitudId]; await _spRefrescarPlanYLista(solicitudId, undefined); }
+      return;
+    }
+    delete _spGrupoCache[solicitudId];
+    const n = data.aplicados || 0;
+    showToast('✓ ' + n + ' cuota' + (n !== 1 ? 's' : '') + ' aplicada' + (n !== 1 ? 's' : '') + ' — ' + (data.solicitud_estado || ''), 'success');
+    await _spRefrescarPlanYLista(solicitudId, data.solicitud_estado);
+  } catch (e) {
+    showToast('Error: ' + e.message, 'error');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Confirmar y aplicar'; }
+  }
+}
+
+// Alterna la bitácora colapsable; la primera vez que se abre (div vacío) carga
+// los movimientos. Actualiza la flecha ▾/▴ del botón.
+function toggleBitacoraSP(solicitudId) {
+  const div = document.getElementById('sp-audit-' + solicitudId);
+  if (!div) return;
+  const abrir = div.style.display === 'none';
+  div.style.display = abrir ? '' : 'none';
+  const btn = div.parentElement && div.parentElement.querySelector('button');
+  if (btn) btn.textContent = abrir ? 'Ver movimientos ▴' : 'Ver movimientos ▾';
+  if (abrir && !div.dataset.cargado) cargarBitacoraSP(solicitudId);
+}
+
+// Trae la bitácora de pagos_auditoria y la pinta línea por línea (más reciente
+// primero, como ya viene del backend). Best-effort: si truena, muestra el error.
+async function cargarBitacoraSP(solicitudId) {
+  const div = document.getElementById('sp-audit-' + solicitudId);
+  if (!div) return;
+  div.innerHTML = `<span style="color:var(--ts);font-size:12px">Cargando movimientos…</span>`;
+  try {
+    const r = await fetch('/.netlify/functions/admin-pagos-auditoria-list', {
+      method: 'POST',
+      headers: _spAdminHeaders(),
+      body: JSON.stringify({ solicitud_id: solicitudId }),
+    });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || 'No se pudo cargar la bitácora');
+    const movs = Array.isArray(data.movimientos) ? data.movimientos : [];
+    if (!movs.length) {
+      div.innerHTML = `<span style="color:var(--ts);font-size:12px">Sin movimientos registrados aún.</span>`;
+      div.dataset.cargado = '1';
+      return;
+    }
+    div.innerHTML = movs.map(m => {
+      const esPago = m.accion === 'pagado';
+      const color = esPago ? '#3DDC84' : 'var(--orange)';
+      const numPago = (m.pagos && m.pagos.numero_pago != null) ? m.pagos.numero_pago : '?';
+      const monto = (esPago && m.monto_pagado != null) ? ` · ${_spFmtMxn(m.monto_pagado)}` : '';
+      const fecha = m.creado_en
+        ? new Date(m.creado_en).toLocaleString('es-MX', { timeZone: 'America/Monterrey', dateStyle: 'medium', timeStyle: 'short' })
+        : '';
+      return `
+      <div style="display:flex;align-items:center;gap:8px;padding:5px 0;font-size:12px">
+        <span style="flex:none;width:8px;height:8px;border-radius:50%;background:${color}"></span>
+        <span style="color:var(--ink)">Pago #${numPago} · ${_spEscape(m.accion)} por ${_spEscape(m.actor)}${monto}</span>
+        <span style="margin-left:auto;color:var(--ts);white-space:nowrap">${_spEscape(fecha)}</span>
+      </div>`;
+    }).join('');
+    div.dataset.cargado = '1';
+  } catch (e) {
+    div.innerHTML = `<span style="color:#FF6B6B;font-size:12px">Error: ${_spEscape(e.message)}</span>`;
+  }
+}
+
+function _spRenderFilaPago(solicitudId, p) {
+  const idSafe   = _spEscape(p.id);
+  const solSafe  = _spEscape(solicitudId);
+  const esPagado = p.estado === 'pagado';
+
+  let accionHtml;
+  if (esPagado) {
+    // Si se capturó un monto real distinto al del plan, mostrarlo (transparencia).
+    const difMonto = (p.monto_pagado != null && Number(p.monto_pagado) !== Number(p.monto))
+      ? 'Pagado: ' + _spFmtMxn(p.monto_pagado) + ' (esperado: ' + _spFmtMxn(p.monto) + ')'
+      : null;
+    const detalle = [
+      difMonto,
+      p.metodo ? (_SP_METODO_LBL[p.metodo] || p.metodo) : null,
+      p.cuenta ? 'Cuenta: ' + _spEscape(p.cuenta) : null,
+      p.referencia ? 'Ref: ' + _spEscape(p.referencia) : null,
+      p.fecha_pagada ? 'Pagado ' + _spEscape(p.fecha_pagada) : null,
+    ].filter(Boolean).join(' · ');
+    accionHtml = `
+      <div style="margin-top:8px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <span style="font-size:11px;color:#3DDC84">${detalle || 'Pagado'}</span>
+        <button class="btn btn-ghost btn-sm" style="font-size:11px" onclick="revertirPagoSP('${solSafe}','${idSafe}')">Revertir</button>
+      </div>`;
+  } else {
+    const hoy = _spYmd(new Date());
+    // Método: solo las 3 formas de pago nuevas.
+    const opciones = _SP_METODOS_UI
+      .map(k => `<option value="${k}">${_SP_METODO_LBL[k]}</option>`).join('');
+    // Banco: default según el paquete de la solicitud (editable). Solo aplica si
+    // el método es Transferencia o Depósito; con Efectivo se oculta.
+    const bancoDefault = _spCuentaDefault(_spPaqueteCache[solicitudId]);
+    const opcionesBanco = _SP_BANCOS
+      .map(c => `<option value="${c}"${c === bancoDefault ? ' selected' : ''}>${c}</option>`).join('');
+    accionHtml = `
+      <div style="margin-top:8px">
+        <button class="btn btn-primary btn-sm" style="font-size:11px" onclick="abrirFormPagarSP('${idSafe}')">Marcar pagado</button>
+      </div>
+      <div id="sp-form-pago-${idSafe}" style="display:none;margin-top:10px;padding:10px 12px;background:var(--bg3);border:1px solid var(--border);border-radius:8px">
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
+          <div>
+            <label style="display:block;font-size:9px;letter-spacing:.1em;color:var(--ts);text-transform:uppercase;margin-bottom:3px">Monto pagado</label>
+            <input type="number" id="sp-pago-monto-${idSafe}" min="0" step="0.01" value="${_spEscape(Number(p.monto || 0))}" style="width:120px;padding:7px 8px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;color:var(--ink);font-size:12px">
+          </div>
+          <div>
+            <label style="display:block;font-size:9px;letter-spacing:.1em;color:var(--ts);text-transform:uppercase;margin-bottom:3px">Fecha</label>
+            <input type="date" id="sp-pago-fecha-${idSafe}" value="${_spEscape(hoy)}" style="padding:7px 8px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;color:var(--ink);font-size:12px">
+          </div>
+          <div>
+            <label style="display:block;font-size:9px;letter-spacing:.1em;color:var(--ts);text-transform:uppercase;margin-bottom:3px">Método</label>
+            <select id="sp-pago-metodo-${idSafe}" onchange="_spOnMetodoChange('${idSafe}')" style="padding:7px 8px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;color:var(--ink);font-size:12px">${opciones}</select>
+          </div>
+          <div id="sp-pago-banco-wrap-${idSafe}">
+            <label style="display:block;font-size:9px;letter-spacing:.1em;color:var(--ts);text-transform:uppercase;margin-bottom:3px">Banco</label>
+            <select id="sp-pago-banco-${idSafe}" style="padding:7px 8px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;color:var(--ink);font-size:12px">${opcionesBanco}</select>
+          </div>
+          <div style="flex:1;min-width:150px">
+            <label style="display:block;font-size:9px;letter-spacing:.1em;color:var(--ts);text-transform:uppercase;margin-bottom:3px">Referencia (opcional)</label>
+            <input type="text" id="sp-pago-ref-${idSafe}" maxlength="120" placeholder="folio, últimos 4 dígitos, etc." style="width:100%;padding:7px 8px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;color:var(--ink);font-size:12px">
+          </div>
+        </div>
+        <div style="margin-top:6px;font-size:10px;color:var(--ts)">Por defecto el monto del plan — cámbialo si pagó distinto.</div>
+        <div style="margin-top:10px">
+          <label style="display:block;font-size:9px;letter-spacing:.1em;color:var(--ts);text-transform:uppercase;margin-bottom:3px">Comprobante (opcional)</label>
+          <input type="file" id="sp-pago-comprob-${idSafe}" accept="image/jpeg,image/png,image/webp,application/pdf" style="font-size:11px;color:var(--ts);max-width:100%">
+          <div style="margin-top:3px;font-size:10px;color:var(--ts)">JPG, PNG, WEBP o PDF · máx 4 MB</div>
+        </div>
+        <div style="margin-top:10px;display:flex;gap:8px;justify-content:flex-end">
+          <button class="btn btn-ghost btn-sm" style="font-size:11px" onclick="cerrarFormPagarSP('${idSafe}')">Cancelar</button>
+          <button class="btn btn-primary btn-sm" id="sp-pago-btn-${idSafe}" style="font-size:11px" onclick="marcarPagoSP('${solSafe}','${idSafe}')">Confirmar pago</button>
+        </div>
+      </div>`;
+  }
+
+  // Enlace para ver el comprobante del pago si ya tiene uno (firma on-demand,
+  // igual que el del separo). El separo (pago #1) se ve en su propia sección.
+  const comprobHtml = (p.comprobante_url && Number(p.numero_pago) !== 1)
+    ? `<div style="margin-top:6px"><button class="btn btn-ghost btn-sm" style="font-size:11px" onclick="verComprobantePagoSP('${idSafe}')"><svg class="ic"><use href="#ic-clip"/></svg> Ver comprobante</button></div>`
+    : '';
+
+  return `
+    <div style="border:1px solid var(--border);border-radius:8px;padding:10px 12px">
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--orange)">#${_spEscape(p.numero_pago)}</span>
+        <span style="flex:1;font-size:13px">${_spEscape(p.concepto)}</span>
+        <span style="font-size:13px;white-space:nowrap"><b>${_spFmtMxn(p.monto)}</b></span>
+        ${_spBadgePago(p.estado)}
+      </div>
+      <div style="margin-top:3px;font-size:11px;color:var(--ts)">Vence: ${_spEscape(p.fecha_esperada)}${Number(p.numero_pago) === 1 ? ' · Separo (comprobante en la sección de abajo)' : ''}</div>
+      ${accionHtml}
+      ${comprobHtml}
+    </div>`;
+}
+
+function abrirFormPagarSP(pagoId) {
+  const f = document.getElementById('sp-form-pago-' + pagoId);
+  if (f) f.style.display = '';
+  _spOnMetodoChange(pagoId);  // sincroniza la visibilidad del banco con el método
+}
+
+// Muestra/oculta el selector de banco según el método: Transferencia/Depósito lo
+// muestran (el dinero entra a un banco); Efectivo lo oculta (cuenta = 'Efectivo').
+function _spOnMetodoChange(pagoId) {
+  const metodo = (document.getElementById('sp-pago-metodo-' + pagoId) || {}).value || '';
+  const wrap = document.getElementById('sp-pago-banco-wrap-' + pagoId);
+  if (wrap) wrap.style.display = (metodo === 'efectivo') ? 'none' : '';
+}
+
+function cerrarFormPagarSP(pagoId) {
+  const f = document.getElementById('sp-form-pago-' + pagoId);
+  if (f) f.style.display = 'none';
+}
+
+async function marcarPagoSP(solicitudId, pagoId) {
+  const btn = document.getElementById('sp-pago-btn-' + pagoId);
+  const fecha  = (document.getElementById('sp-pago-fecha-' + pagoId) || {}).value || '';
+  const metodo = (document.getElementById('sp-pago-metodo-' + pagoId) || {}).value || '';
+  // Cuenta = a qué cuenta entró el dinero: Efectivo → 'Efectivo'; si no, el banco.
+  const cuenta = (metodo === 'efectivo')
+    ? 'Efectivo'
+    : ((document.getElementById('sp-pago-banco-' + pagoId) || {}).value || '');
+  const ref    = ((document.getElementById('sp-pago-ref-' + pagoId) || {}).value || '').trim();
+  const montoRaw = ((document.getElementById('sp-pago-monto-' + pagoId) || {}).value || '').trim();
+  if (!metodo) { showToast('Elige un método de pago', 'error'); return; }
+
+  // Monto real pagado: prellenado con el del plan, editable. Si queda vacío se
+  // manda undefined (el backend deja NULL = monto del plan, compatibilidad).
+  let montoPagado;
+  if (montoRaw !== '') {
+    montoPagado = Number(montoRaw);
+    if (!Number.isFinite(montoPagado) || montoPagado < 0) {
+      showToast('El monto pagado debe ser un número válido (>= 0)', 'error');
+      return;
+    }
+  }
+
+  if (btn) { btn.disabled = true; btn.textContent = 'Guardando…'; }
+  try {
+    const r = await fetch('/.netlify/functions/admin-marcar-pago', {
+      method: 'POST',
+      headers: _spAdminHeaders(),
+      body: JSON.stringify({
+        pago_id: pagoId,
+        accion: 'pagar',
+        fecha_pagada: fecha || undefined,
+        metodo,
+        cuenta: cuenta || undefined,
+        referencia: ref || undefined,
+        monto_pagado: montoPagado,
+      }),
+    });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || 'No se pudo marcar el pago');
+    if (data.solicitud_estado_cambio === 'pagado') {
+      showToast('Pago registrado — la solicitud quedó totalmente pagada', 'success');
+    } else {
+      showToast('Pago registrado', 'success');
+    }
+    // Comprobante OPCIONAL: si se eligió archivo, súbelo después de marcar el pago.
+    // Si la subida falla, avisa pero NO se revierte el pago (ya quedó registrado).
+    const fileInput = document.getElementById('sp-pago-comprob-' + pagoId);
+    const file = fileInput && fileInput.files && fileInput.files[0];
+    if (file) {
+      try {
+        await _spSubirComprobantePago(pagoId, file);
+        showToast('Comprobante adjuntado', 'success');
+      } catch (e) {
+        showToast('Pago registrado, pero el comprobante no se subió: ' + e.message, 'error');
+      }
+    }
+    await _spRefrescarPlanYLista(solicitudId, data.solicitud_estado);
+  } catch (e) {
+    showToast('Error: ' + e.message, 'error');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Confirmar pago'; }
+  }
+}
+
+// Lee un File a base64 (sin el prefijo data:...;base64,).
+function _spLeerArchivoBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = String(reader.result || '');
+      const comma = result.indexOf(',');
+      resolve(comma >= 0 ? result.slice(comma + 1) : result);
+    };
+    reader.onerror = () => reject(new Error('No se pudo leer el archivo'));
+    reader.readAsDataURL(file);
+  });
+}
+
+// Sube el comprobante de un pago vía la función con service_role (el admin no
+// tiene sesión de Supabase). Valida tipo/tamaño en cliente antes de mandar.
+async function _spSubirComprobantePago(pagoId, file) {
+  const MAX = 4 * 1024 * 1024;
+  const OK_MIME = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
+  if (!OK_MIME.includes(file.type)) throw new Error('Tipo no permitido (usa JPG, PNG, WEBP o PDF)');
+  if (file.size > MAX) throw new Error('El archivo es muy grande, súbelo más liviano (máx 4 MB)');
+  const file_base64 = await _spLeerArchivoBase64(file);
+  const ext = (file.name.split('.').pop() || '').toLowerCase();
+  const r = await fetch('/.netlify/functions/admin-subir-comprobante-pago', {
+    method: 'POST',
+    headers: _spAdminHeaders(),
+    body: JSON.stringify({ pago_id: pagoId, file_base64, mime: file.type, ext }),
+  });
+  const data = await r.json();
+  if (!r.ok) throw new Error(data.error || 'No se pudo subir el comprobante');
+  return data;
+}
+
+// Abre el comprobante de un pago en pestaña nueva (signed url on-demand, igual
+// que el del separo). El bucket es privado: pedimos la firma cada vez.
+async function verComprobantePagoSP(pagoId) {
+  try {
+    const r = await fetch('/.netlify/functions/admin-pago-comprobante', {
+      method: 'POST',
+      headers: _spAdminHeaders(),
+      body: JSON.stringify({ pago_id: pagoId }),
+    });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || 'No se pudo obtener el comprobante');
+    window.open(data.signed_url, '_blank', 'noopener');
+  } catch (e) {
+    showToast('Error: ' + e.message, 'error');
+  }
+}
+
+async function revertirPagoSP(solicitudId, pagoId) {
+  if (!confirm('¿Revertir este pago? Volverá a "pendiente" y se borrarán método, referencia y fecha de pago.')) return;
+  try {
+    const r = await fetch('/.netlify/functions/admin-marcar-pago', {
+      method: 'POST',
+      headers: _spAdminHeaders(),
+      body: JSON.stringify({ pago_id: pagoId, accion: 'revertir' }),
+    });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || 'No se pudo revertir el pago');
+    if (data.solicitud_estado_cambio === 'en_pagos') {
+      showToast('Pago revertido — la solicitud volvió a "En pagos"', 'success');
+    } else {
+      showToast('Pago revertido', 'success');
+    }
+    await _spRefrescarPlanYLista(solicitudId, data.solicitud_estado);
+  } catch (e) {
+    showToast('Error: ' + e.message, 'error');
+  }
+}
+
+// Refresca la sección del plan (re-fetch) y la lista de fondo. estadoSolicitud
+// es el estado ya reconciliado por el backend, para la lógica de "sin plan".
+async function _spRefrescarPlanYLista(solicitudId, estadoSolicitud) {
+  await cargarPlanPagosSP(solicitudId, estadoSolicitud);
+  _spRefrescarLista();
+  // Si el plan se está viendo desde el modal de la pestaña Pagos (Fase 3),
+  // refresca también su tabla para que Total/Abonado/Resta queden al día.
+  const cob = document.getElementById('modal-cobranza-plan');
+  if (cob && cob.classList.contains('open')) loadPagos();
+}
+
+// ═══════════════════════════════════════════════════════════════
+// PLAN DE PAGOS (Fase 2.3a) — generación automática al aprobar
+//
+// Bloque AUTOCONTENIDO. getQuincenas / getPagosManuales son COPIAS fieles de
+// rol.html (NO se modificó rol.html). Cuando el admin cambia el estado de una
+// solicitud a 'en_pagos', _spCalcularPlanPagos arma el plan (separo + quincenas)
+// a partir de precio_total / monto_separo de la solicitud + el evento en
+// _contratosEVCache (ds, diasAntes, multifecha). El plan se persiste vía
+// admin-generar-plan-pagos ANTES de flipear el estado (generar-primero).
+// ═══════════════════════════════════════════════════════════════
+
+const _SP_MESES = {'01':'Enero','02':'Febrero','03':'Marzo','04':'Abril','05':'Mayo','06':'Junio','07':'Julio','08':'Agosto','09':'Septiembre','10':'Octubre','11':'Noviembre','12':'Diciembre'};
+
+// YYYY-MM-DD en hora local (sin desfase de zona horaria de toISOString).
+function _spYmd(d) {
+  return d.getFullYear() + '-' +
+    String(d.getMonth() + 1).padStart(2, '0') + '-' +
+    String(d.getDate()).padStart(2, '0');
+}
+
+// ── COPIA fiel de rol.html: getPagosManuales (override por subfecha) ──────
+function _spGetPagosManuales(ev, fi, fromDate) {
+  if (!ev || !ev.multifecha || fi == null) return null;
+  var mf = ev.multifecha[fi];
+  if (!mf || !Array.isArray(mf.pagos) || mf.pagos.length === 0) return null;
+  var sepD = fromDate || new Date();
+  var list = mf.pagos.map(function(ds) {
+    var d = new Date(ds + 'T12:00:00');
+    var mm = String(d.getMonth() + 1).padStart(2, '0');
+    return { lbl: d.getDate() + ' de ' + (_SP_MESES[mm] || ''), d: d, e: d };
+  });
+  return list.filter(function(p) { return p.d >= sepD; });
+}
+
+// ── COPIA fiel de rol.html: getQuincenas (quincenas 9-16 y 24-1) ─────────
+function _spGetQuincenas(from, until, max, diasAntes) {
+  var dias = (diasAntes != null && isFinite(diasAntes)) ? diasAntes : 14;
+  var result = [];
+  var capped = new Date(until.getTime() - dias * 24 * 3600 * 1000);
+  var d = new Date(from); d.setDate(1);
+  while (d <= capped && result.length < max) {
+    var mm = String(d.getMonth() + 1).padStart(2, '0');
+    var q1s = new Date(d.getFullYear(), d.getMonth(), 9);
+    var q1e = new Date(d.getFullYear(), d.getMonth(), 16);
+    if (q1s >= from && q1e <= capped) {
+      result.push({ lbl: '9 al 16 de ' + (_SP_MESES[mm] || ''), d: q1s, e: q1e });
+    }
+    var q2s = new Date(d.getFullYear(), d.getMonth(), 24);
+    var q2e = new Date(d.getFullYear(), d.getMonth() + 1, 1);
+    if (q2s >= from && q2e <= capped) {
+      var mn = String((d.getMonth() + 2 > 12 ? 1 : d.getMonth() + 2)).padStart(2, '0');
+      result.push({ lbl: '24 ' + (_SP_MESES[mm] || '') + ' al 1 de ' + (_SP_MESES[mn] || ''), d: q2s, e: q2e });
+    }
+    d.setMonth(d.getMonth() + 1);
+  }
+  return result.slice(0, max);
+}
+
+// Arma el plan de pagos para una solicitud. Devuelve:
+//   { ok:true, pagos:[{numero_pago, concepto, monto, fecha_esperada}], evento_nombre }
+//   { ok:false, error:'...' }   (p.ej. evento no encontrado en index.html)
+//
+// Reglas (mismo modelo que rol.html buildPlanState/buildRows):
+//   - pago #1 = Separo: monto = monto_separo, fecha = hoy.
+//   - resto = precio_total - monto_separo, repartido en quincenas (pagoQ por
+//     quincena, la última absorbe el redondeo para cuadrar con precio_total).
+//   - si no caben quincenas (evento muy cercano) y resto > 0 → un solo pago
+//     'Liquidación' por el resto con fecha = fecha del evento.
+async function _spCalcularPlanPagos(s) {
+  const evArr = await _fetchEVFromIndex();
+  // evento_id del portal = ev.id + ('#' + multifechaIdx) si es multifecha.
+  const raw = String(s.evento_id || '');
+  const hashIdx = raw.indexOf('#');
+  const baseId = hashIdx >= 0 ? raw.slice(0, hashIdx) : raw;
+  const fi = hashIdx >= 0 ? parseInt(raw.slice(hashIdx + 1), 10) : null;
+  const ev = (evArr || []).find(e => e && e.id === baseId);
+  if (!ev) {
+    return { ok: false, error: 'Evento "' + baseId + '" no está en index.html (no se pudo calcular el plan). Verifica que el evento siga publicado e intenta de nuevo.' };
+  }
+
+  const precioTotal = Number(s.precio_total) || 0;
+  let montoSeparo = Number(s.monto_separo) || 0;
+  if (montoSeparo > precioTotal) montoSeparo = precioTotal;
+  if (montoSeparo < 0) montoSeparo = 0;
+  const resto = precioTotal - montoSeparo;
+
+  // Fecha del evento: para multifecha, la subfecha elegida; si no, ev.ds.
+  const dsEffective = (ev.multifecha && fi != null && ev.multifecha[fi] && ev.multifecha[fi].ds)
+    ? ev.multifecha[fi].ds
+    : ev.ds;
+  if (!dsEffective) {
+    return { ok: false, error: 'El evento no tiene fecha (ds) — no se puede calcular el plan.' };
+  }
+  const eventDate = new Date(dsEffective + 'T12:00:00');
+
+  // Separo = hoy (primer pago). Las quincenas se cuentan desde hoy.
+  const hoy = new Date();
+  const sepD = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate(), 12, 0, 0);
+
+  const esCheap = String(s.paquete || '').toUpperCase() === 'CHEAP';
+  const maxPagos = esCheap ? 4 : 10;
+
+  const manualPagos = _spGetPagosManuales(ev, fi, sepD);
+  const quincenas = manualPagos
+    ? manualPagos.slice(0, maxPagos)
+    : _spGetQuincenas(sepD, eventDate, maxPagos, ev.diasAntes);
+
+  const pagos = [];
+  // Pago #1 — Separo.
+  pagos.push({ numero_pago: 1, concepto: 'Separo', monto: Math.round(montoSeparo), fecha_esperada: _spYmd(sepD) });
+
+  if (resto > 0) {
+    if (quincenas.length > 0) {
+      const pagoQ = Math.ceil(resto / quincenas.length);
+      let acc = montoSeparo;
+      for (let i = 0; i < quincenas.length; i++) {
+        const m = (i === quincenas.length - 1) ? (precioTotal - acc) : pagoQ;
+        acc += m;
+        pagos.push({
+          numero_pago: i + 2,
+          concepto: quincenas[i].lbl,
+          monto: Math.round(m),
+          fecha_esperada: _spYmd(quincenas[i].e),
+        });
+      }
+    } else {
+      // Evento demasiado cercano para quincenas: una sola liquidación.
+      pagos.push({ numero_pago: 2, concepto: 'Liquidación', monto: Math.round(resto), fecha_esperada: _spYmd(eventDate) });
+    }
+  }
+
+  return { ok: true, pagos, evento_nombre: s.evento_nombre || ev.a || baseId };
+}
+
+function abrirCambiarEstadoSP(solicitudId) {
+  const s = _spCache.find(x => x.id === solicitudId);
+  if (!s) { showToast('Solicitud no encontrada', 'error'); return; }
+  const contenido = `
+    <div style="font-size:12px;color:var(--ts);margin-bottom:14px">Cliente <b style="color:var(--ink)">${_spEscape((s.clientes||{}).nombre_completo || '—')}</b> · ${_spEscape(s.evento_nombre || '')}</div>
+
+    <label style="display:block;font-size:10px;letter-spacing:.12em;color:var(--ts);text-transform:uppercase;margin-bottom:4px">Nuevo estado</label>
+    <select id="sp-nuevo-estado" style="width:100%;padding:10px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;color:var(--ink);font-size:14px;margin-bottom:14px">
+      <option value="pendiente" ${s.estado==='pendiente'?'selected':''}>Pendiente</option>
+      <option value="en_pagos" ${s.estado==='en_pagos'?'selected':''}>En pagos</option>
+      <option value="pagado" ${s.estado==='pagado'?'selected':''}>Pagado</option>
+      <option value="cancelado" ${s.estado==='cancelado'?'selected':''}>Cancelado</option>
+    </select>
+
+    <label style="display:block;font-size:10px;letter-spacing:.12em;color:var(--ts);text-transform:uppercase;margin-bottom:4px">Notas internas (admin)</label>
+    <textarea id="sp-nuevas-notas" rows="3" placeholder="Opcional — solo lo ve el admin" style="width:100%;padding:10px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;color:var(--ink);font-size:13px;resize:vertical;margin-bottom:6px">${_spEscape(s.notas_admin || '')}</textarea>
+    <div style="font-size:11px;color:var(--ts);margin-bottom:14px">El cliente nunca ve estas notas. Dejándolas vacías se conservan las anteriores.</div>
+
+    <div style="display:flex;justify-content:flex-end;gap:8px">
+      <button class="btn btn-ghost" onclick="cerrarModal('sp-cambiar-estado')">Cancelar</button>
+      <button class="btn btn-primary" id="sp-btn-guardar-estado" onclick="guardarCambioEstadoSP('${_spEscape(solicitudId)}')">Guardar</button>
+    </div>
+  `;
+  crearModal('sp-cambiar-estado', 'Cambiar estado de la solicitud', contenido);
+  document.getElementById('modal-sp-cambiar-estado').querySelector('.modal').style.maxWidth = '480px';
+}
+
+// Camino COMPARTIDO de generación del plan (sin duplicar lógica): calcula el
+// plan y lo POSTea al backend idempotente; devuelve la respuesta parseada (dataP)
+// o lanza con el mensaje de error. Lo usan el aprobar (generar-primero) y el
+// botón de recuperación del modal. Cada caller hace su propio toast de éxito.
+async function _spGenerarPlanPagosBackend(s, solicitudId) {
+  const plan = await _spCalcularPlanPagos(s);
+  if (!plan.ok) throw new Error(plan.error || 'No se pudo calcular el plan de pagos');
+  const rp = await fetch('/.netlify/functions/admin-generar-plan-pagos', {
+    method: 'POST',
+    headers: _spAdminHeaders(),
+    body: JSON.stringify({ solicitud_id: solicitudId, pagos: plan.pagos }),
+  });
+  const dataP = await rp.json();
+  if (!rp.ok) {
+    // Adjuntamos el detail del backend al Error sin meterlo al mensaje: el aprobar
+    // lo ignora (comportamiento intacto) y la recuperación sí lo muestra.
+    const err = new Error(dataP.error || 'Error generando el plan de pagos');
+    if (dataP.detail) err.detail = dataP.detail;
+    throw err;
+  }
+  return dataP;
+}
+
+// Recuperación (piloto): una solicitud puede quedar en_pagos/pagado SIN plan si
+// la generación falló al aprobar. Este botón reusa el MISMO camino del aprobar
+// (_spGenerarPlanPagosBackend) para generarlo a mano, sin tocar el flujo de
+// aprobar. Al terminar refresca #sp-plan.
+async function _spGenerarPlanRecuperacion(solicitudId, estadoSolicitud) {
+  if (!confirm('¿Generar el plan de pagos de esta solicitud ahora?')) return;
+  const s = _spCache.find(x => x.id === solicitudId);
+  if (!s) { showToast('No se encontró la solicitud en memoria', 'error'); return; }
+  const btn = document.getElementById('sp-gen-plan-btn-' + solicitudId);
+  if (btn) { btn.disabled = true; btn.textContent = 'Generando…'; }
+  try {
+    const dataP = await _spGenerarPlanPagosBackend(s, solicitudId);
+    if (dataP.ya_existia) {
+      showToast('El plan de pagos ya existía — no se duplicó', 'success');
+    } else {
+      const cuotas = dataP.cuotas_insertadas != null ? dataP.cuotas_insertadas : (dataP.pagos || []).length;
+      const lug = dataP.lugares_asegurados || 0;
+      showToast('Plan generado: ' + cuotas + ' cuotas' + (lug ? ' · ' + lug + ' lugares asegurados' : '') + '.', 'success');
+    }
+    // Éxito → refrescar el plan (esto re-renderiza #sp-plan y quita el botón).
+    cargarPlanPagosSP(solicitudId, estadoSolicitud);
+  } catch (e) {
+    const detalle = e && e.detail ? ' — ' + e.detail : '';
+    showToast('No se pudo generar el plan: ' + e.message + detalle, 'error');
+    if (btn) { btn.disabled = false; btn.textContent = 'Generar plan de pagos'; }
+  }
+}
+
+async function guardarCambioEstadoSP(solicitudId) {
+  const btn = document.getElementById('sp-btn-guardar-estado');
+  const estado = document.getElementById('sp-nuevo-estado').value;
+  const notasInput = document.getElementById('sp-nuevas-notas').value.trim();
+  // Si el textarea quedó igual a las notas previas (autorrellenado), no las re-enviamos
+  // para no spamear el campo con su mismo valor. Solo enviamos cuando cambiaron.
+  const s = _spCache.find(x => x.id === solicitudId) || {};
+  const notasParaEnviar = notasInput && notasInput !== (s.notas_admin || '') ? notasInput : '';
+
+  if (btn) { btn.disabled = true; btn.textContent = 'Guardando…'; }
+  try {
+    // GENERAR-PRIMERO: si pasamos a 'en_pagos', creamos el plan de pagos ANTES
+    // de flipear el estado. Así nunca queda un tour en_pagos sin plan. La
+    // función backend es idempotente, así que re-aprobar NO duplica.
+    if (estado === 'en_pagos') {
+      if (btn) btn.textContent = 'Generando plan…';
+      const dataP = await _spGenerarPlanPagosBackend(s, solicitudId);
+      if (dataP.ya_existia) {
+        showToast('El plan de pagos ya existía — no se duplicó', 'success');
+      } else {
+        let extraCorreo = '';
+        if (dataP.correo_enviado) extraCorreo = ' <svg class="ic"><use href="#ic-correo"/></svg> Plan enviado al cliente por correo.';
+        else if (dataP.correo_error || dataP.correo_enviado === false) extraCorreo = ' <svg class="ic"><use href="#ic-alerta"/></svg> El plan se creó pero el correo no salió.';
+        showToast('Plan de pagos generado (' + (dataP.pagos || []).length + ' pagos).' + extraCorreo, 'success');
+      }
+      if (btn) btn.textContent = 'Guardando…';
+    }
+
+    const r = await fetch('/.netlify/functions/admin-solicitud-update-estado', {
+      method: 'POST',
+      headers: _spAdminHeaders(),
+      body: JSON.stringify({ solicitud_id: solicitudId, nuevo_estado: estado, notas_admin: notasParaEnviar }),
+    });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || 'Error guardando');
+    // [Bandeja-T2] Al aprobar (→ en_pagos) la fila deja la bandeja: el toast dice
+    // a dónde se fue. Otros cambios (p.ej. cancelar) conservan el toast genérico.
+    if (estado === 'en_pagos') {
+      showToast('Aprobada ✓ — ahora vive en Capsule → ' + (s.evento_nombre || 'su evento') + ' → Pagos', 'success');
+    } else {
+      showToast('Solicitud actualizada', 'success');
+    }
+    cerrarModal('sp-cambiar-estado');
+    cerrarModal('sp-detalle');
+    _spRefrescarLista();
+  } catch (e) {
+    showToast('No se pudo guardar: ' + e.message, 'error');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Guardar'; }
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// MONTAÑA PAI — Panel Maestro Roshi
+// ═══════════════════════════════════════════════════════════════
+const MEMO_EMAIL = 'reynosa@conectamexico.mx';
+let _mtUsuariosCache = [];
+// ID del usuario que estamos editando — fuente de verdad para guardarUsuarioMT.
+// Antes usábamos un input hidden value="${u.id}" pero el template literal
+// dentro de innerHTML a veces no popula el .value del input. Variable de
+// scope = a prueba de eso.
+let _mtEditandoUserId = null;
+let _mtConfig = {};
+
+// ── Tabs ────────────────────────────────────────────────────
+let _mtReportesCache = [];
+let _mtReportesFiltro = 'todos';
+let _mtDeudasCache = [];
+let _mtDeudasFiltro = 'pendientes';
+
+function showMTTab(tab, btn) {
+  document.querySelectorAll('#page-montana .gz-filter[id^="mt-tab-btn"]').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  ['resumen','pendientes','reportes','deudas','usuarios','strikes','alertas','config'].forEach(t => {
+    const el = document.getElementById(`mt-tab-${t}`);
+    if (el) el.style.display = t === tab ? '' : 'none';
+  });
+  if (tab === 'reportes')   loadMTReportes();
+  if (tab === 'pendientes') loadMTPendientes();
+  if (tab === 'deudas')     loadMTDeudas();
+}
+
+async function loadMontana() {
+  await Promise.all([loadMTResumen(), loadMTUsuarios(), loadMTStrikes(), loadMTAlertas(), loadMTConfig()]);
+}
+
+async function loadMTReportes() {
+  const list = document.getElementById('mt-reportes-list');
+  if (!list) return;
+  list.innerHTML = '<div class="loading-state"><div class="spinner"></div>Cargando reportes…</div>';
+  try {
+    _mtReportesCache = await khReportes.listar({ limit: 100 }); // [sec-reportes]
+    // Join eventos y coordis
+    const eIds = [...new Set(_mtReportesCache.map(r=>r.evento_id).filter(Boolean))];
+    const uIds = [...new Set(_mtReportesCache.map(r=>r.coordi_id).filter(Boolean))];
+    const [evs, users] = await Promise.all([
+      eIds.length ? khEventosMeta.porSlugs(eIds) : [], // [sec-eventos]
+      uIds.length ? khUsuarios.listar({ ids: uIds }) : [], // [sec-usuarios]
+    ]);
+    const evMap = Object.fromEntries(evs.map(e=>[e.slug,e]));
+    const uMap  = Object.fromEntries(users.map(u=>[u.id,u]));
+    _mtReportesCache = _mtReportesCache.map(r=>({...r, _evento:evMap[r.evento_id]||null, _coordi:uMap[r.coordi_id]||null}));
+    renderMTReportes(_mtReportesCache, _mtReportesFiltro);
+  } catch(e) { list.innerHTML=`<div class="alert alert-error">${e.message}</div>`; }
+}
+
+function filtrarMTReportes(status, btn) {
+  _mtReportesFiltro = status;
+  document.querySelectorAll('#mt-tab-reportes .gz-filter[id^="mtr-fil"]').forEach(b=>b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  renderMTReportes(_mtReportesCache, status);
+}
+
+function renderMTReportes(lista, filtro) {
+  const list = document.getElementById('mt-reportes-list');
+  const filtrada = filtro==='todos' ? lista : lista.filter(r=>r.status===filtro);
+  if (!filtrada.length) {
+    list.innerHTML='<div class="empty-state"><div class="empty-icon">·</div>Sin reportes'+( filtro==='todos'?'':' con este estado')+'</div>';
+    return;
+  }
+  const statusInfo = {
+    borrador:      { label:'Borrador',           color:'var(--ts)',    icon:'⎘' },
+    enviado:       { label:'Pendiente revisión',color:'var(--gold)', icon:'⏳' },
+    rechazado:     { label:'Rechazado',         color:'var(--red)',  icon:'✕' },
+    aprobado_popo: { label:'En revisión Roshi', color:'var(--blue)', icon:'<svg class="ic"><use href="#ic-lupa"/></svg>' },
+    aprobado_memo: { label:'Aprobado',           color:'var(--green)',icon:'✓' },
+  };
+  list.innerHTML = filtrada.map(r => {
+    const s = statusInfo[r.status]||{label:r.status,color:'var(--ts)',icon:'<svg class="ic"><use href="#ic-documento"/></svg>'};
+    const ev = r._evento;
+    const coo = r._coordi;
+    const dif = r.diferencia||0;
+    const difColor = dif>=0?'var(--green)':'var(--red)';
+    const difLabel = dif>=0?`Sobró ${formatMXN(Math.abs(dif))}`:`Debe ${formatMXN(Math.abs(dif))}`;
+    const rol = currentUser?.rol;
+    let btns = '';
+    if (['maestro_roshi','bulma'].includes(rol)) {
+      if (r.status==='enviado') {
+        btns = `<button class="btn btn-primary btn-sm" onclick="mtAprobarReporte('${r.id}','enviado')">✓ Aprobar directo</button>
+                <button class="btn btn-red btn-sm" onclick="mtRechazarReporte('${r.id}')">✗ Rechazar</button>`;
+      } else if (r.status==='aprobado_popo') {
+        btns = `<button class="btn btn-primary btn-sm" onclick="mtAprobarReporte('${r.id}','aprobado_popo')">✓ Aprobar definitivo</button>
+                <button class="btn btn-red btn-sm" onclick="mtRechazarReporte('${r.id}')">✗ Rechazar</button>`;
+      }
+    }
+    return `<div style="background:var(--bg2);border:1px solid var(--border);border-left:3px solid ${s.color};border-radius:var(--radius);padding:16px 20px;margin-bottom:10px">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:10px">
+        <div>
+          <div style="font-family:'Rajdhani',sans-serif;font-size:18px;font-weight:700">${ev?ev.nombre:(r.evento_id||'—')}</div>
+          <div style="font-size:11px;font-family:'JetBrains Mono',monospace;color:var(--ts);margin-top:2px">
+            ${coo?coo.nombre+' · ':''}<span style="color:${s.color}">${s.icon} ${s.label}</span>
+            ${ev?' · '+new Date(ev.fecha+'T12:00:00').toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric'}):''}
+          </div>
+          ${r.rechazo_motivo?`<div style="margin-top:6px;font-size:11px;padding:5px 10px;background:rgba(255,68,68,.08);border-left:2px solid var(--red);color:var(--red)">Motivo rechazo: ${r.rechazo_motivo}</div>`:''}
+        </div>
+        <div style="display:flex;gap:12px;text-align:right">
+          <div><div style="font-size:10px;color:var(--ts)">ENTREGADO</div><div style="font-family:'Zen Dots',sans-serif;font-size:16px;color:var(--gold)">${formatMXN(r.dinero_recibido||0)}</div></div>
+          <div><div style="font-size:10px;color:var(--ts)">GASTADO</div><div style="font-family:'Zen Dots',sans-serif;font-size:16px">${formatMXN(r.total_gastado||0)}</div></div>
+          <div><div style="font-size:10px;color:var(--ts)">DIFERENCIA</div><div style="font-family:'Zen Dots',sans-serif;font-size:16px;color:${difColor}">${difLabel}</div></div>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;margin-top:8px">
+        <button class="btn btn-ghost btn-sm" onclick="mtVerDetalleReporte('${r.id}')" style="font-family:'JetBrains Mono',monospace;font-size:10px">VER DETALLE ↓</button>
+        ${btns}
+        <button class="btn btn-red btn-sm" onclick="mtEliminarReporte('${r.id}')" style="font-size:10px;opacity:.6" title="Eliminar reporte">✕</button>
+      </div>
+      <!-- Detalle expandible -->
+      <div id="mt-rep-det-${r.id}" style="display:none;margin-top:14px;padding-top:14px;border-top:1px solid var(--border)"></div>
+    </div>`;
+  }).join('');
+}
+
+function mtVerDetalleReporte(id) {
+  const el = document.getElementById(`mt-rep-det-${id}`);
+  if (!el) return;
+  if (el.style.display !== 'none') { el.style.display='none'; return; }
+  const r = _mtReportesCache.find(x=>x.id===id);
+  if (!r) return;
+  const kits   = r.kits_detalle   ? (typeof r.kits_detalle==='string'   ? JSON.parse(r.kits_detalle)   : r.kits_detalle)   : [];
+  const gastos = r.gastos_detalle ? (typeof r.gastos_detalle==='string' ? JSON.parse(r.gastos_detalle) : r.gastos_detalle) : [];
+  const coo = r._coordi || {};
+  const ev  = r._evento || {};
+
+  el.innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;flex-wrap:wrap">
+      <!-- Info coordi -->
+      <div>
+        <div class="k-mono" style="margin-bottom:10px">// COORDINADOR</div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <div style="width:36px;height:36px;border-radius:50%;background:var(--bg3);overflow:hidden;flex-shrink:0;display:flex;align-items:center;justify-content:center">
+            ${coo.foto_url?`<img src="${coo.foto_url}" style="width:100%;height:100%;object-fit:cover">`:`<span style="font-family:'Zen Dots',sans-serif;font-size:13px;color:var(--orange)">${(coo.nombre||'?')[0]}</span>`}
+          </div>
+          <div>
+            <div style="font-weight:700;font-size:15px">${coo.nombre||'—'}</div>
+            <div style="font-size:11px;color:var(--ts)">${coo.correo||coo.username||''}</div>
+            <div style="font-size:11px;color:var(--ts)">${coo.celular||''}</div>
+          </div>
+        </div>
+        ${r.cuenta_bancaria_coordi?`<div style="margin-top:10px;font-size:11px;padding:6px 10px;background:rgba(255,68,68,.06);border-left:2px solid var(--red);border-radius:4px">Cuenta: <strong>${r.cuenta_bancaria_coordi}</strong></div>`:''}
+      </div>
+      <!-- Info evento -->
+      <div>
+        <div class="k-mono" style="margin-bottom:10px">// EVENTO</div>
+        <div style="font-weight:700;font-size:15px">${ev.nombre||'—'}</div>
+        <div style="font-size:12px;color:var(--ts)">${ev.artista?ev.artista+' · ':''}${ev.ciudad||''}</div>
+        <div style="font-size:12px;color:var(--ts)">${ev.fecha?new Date(ev.fecha+'T12:00:00').toLocaleDateString('es-MX',{weekday:'long',day:'numeric',month:'long',year:'numeric'}):''}</div>
+      </div>
+    </div>
+
+    <!-- Kits -->
+    ${kits.length ? `
+    <div style="margin-top:16px">
+      <div class="k-mono" style="margin-bottom:10px">// KITS</div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Pieza</th><th>Sacados</th><th>Sobran</th><th>Recibido</th></tr></thead>
+          <tbody>${kits.map(k=>`<tr>
+            <td style="font-weight:600">${k.pieza_nombre||k.pieza_id||'—'}</td>
+            <td>${k.cantidad_sacada||0}</td>
+            <td>${k.cantidad_sobrante||0}</td>
+            <td style="color:${k.recibido?'var(--green)':'var(--ts)'}">${k.recibido?'✓ Recibido':'Pendiente'}</td>
+          </tr>`).join('')}</tbody>
+        </table>
+      </div>
+    </div>` : '<div style="margin-top:12px;font-size:11px;color:var(--ts);font-family:JetBrains Mono,monospace">// sin kits registrados</div>'}
+
+    <!-- Gastos -->
+    ${gastos.length ? `
+    <div style="margin-top:16px">
+      <div class="k-mono" style="margin-bottom:10px">// GASTOS</div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Concepto</th><th style="text-align:right">Monto</th></tr></thead>
+          <tbody>${gastos.map(g=>`<tr><td>${g.concepto||'—'}</td><td style="text-align:right;font-weight:600">${formatMXN(g.monto||0)}</td></tr>`).join('')}
+          <tr style="border-top:2px solid var(--border)"><td style="font-weight:700">TOTAL</td><td style="text-align:right;font-weight:700;font-family:'Zen Dots',sans-serif">${formatMXN(r.total_gastado||0)}</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>` : '<div style="margin-top:12px;font-size:11px;color:var(--ts);font-family:JetBrains Mono,monospace">// sin gastos registrados</div>'}
+
+    ${r.notas?`<div style="margin-top:12px;padding:10px 14px;background:var(--bg3);border-left:2px solid var(--border2);font-size:12px;color:var(--ts)">${r.notas}</div>`:''}
+  `;
+  el.style.display = 'block';
+}
+
+// ── PENDIENTES (cuenta regresiva) ────────────────────────────
+async function loadMTPendientes() {
+  const el = document.getElementById('mt-pendientes-content');
+  if (!el) return;
+  el.innerHTML = '<div class="loading-state"><div class="spinner"></div></div>';
+  try {
+    const ahora = new Date();
+    const [reportes, eventosCoordi] = await Promise.all([
+      khReportes.listar({ estado: 'aprobado_memo' }), // [sec-reportes]
+      khAsignaciones.listar({ status: 'aceptado' }), // [sec-coordi]
+    ]);
+
+    // Cargar eventos y usuarios
+    const eIds = [...new Set([...reportes.map(r=>r.evento_id), ...eventosCoordi.map(e=>e.evento_id)].filter(Boolean))];
+    const uIds = [...new Set([...reportes.map(r=>r.coordi_id), ...eventosCoordi.map(e=>e.coordi_id)].filter(Boolean))];
+    const [evs, usuarios] = await Promise.all([
+      eIds.length ? khEventosMeta.porSlugs(eIds) : [], // [sec-eventos]
+      uIds.length ? khUsuarios.listar({ ids: uIds }) : [], // [sec-usuarios]
+    ]);
+    const evMap = Object.fromEntries(evs.map(e=>[e.slug,e]));
+    const uMap  = Object.fromEntries(usuarios.map(u=>[u.id,u]));
+
+    // Helpers — misma lógica que el cron check-strikes-diario.js
+    // último día del evento = fecha_fin || fecha; contador empieza 00:00 MX día siguiente
+    const _ultimoDia = (ev) => ev && (ev.fecha_fin || ev.fecha);
+    const _inicioContador = (ev) => {
+      const u = _ultimoDia(ev);
+      if (!u) return null;
+      const d = new Date(u + 'T00:00:00-06:00'); // MX = UTC-6 sin DST
+      d.setUTCDate(d.getUTCDate() + 1);
+      return d;
+    };
+    const _deadlineReporte = (ev) => {
+      const s = _inicioContador(ev);
+      return s ? new Date(s.getTime() + 48*60*60*1000) : null;
+    };
+    const _deadlineDevol = (ev) => {
+      const s = _inicioContador(ev);
+      return s ? new Date(s.getTime() + 5*24*60*60*1000) : null;
+    };
+    // Solo Guerreros Z reciben strikes automáticos — excluir creadoras y admins.
+    const _aplicaStrike = (u) => !!u && u.rol !== 'cc' && !['maestro_roshi','bulma'].includes(u.rol);
+
+    // ── 1) Reportes pendientes de levantar (evento ya pasó) ──
+    const reportesPendientes = [];
+    for (const ec of eventosCoordi) {
+      const ev = evMap[ec.evento_id];
+      if (!ev || !ev.fecha) continue;
+      const u = uMap[ec.coordi_id];
+      if (!_aplicaStrike(u)) continue;
+      const deadline = _deadlineReporte(ev);
+      if (!deadline) continue;
+      // Solo eventos ya iniciados (no futuros)
+      const fechaIni = new Date(ev.fecha + 'T12:00:00');
+      if (fechaIni > ahora) continue;
+      // ¿ya hay reporte enviado?
+      const yaTieneReporte = reportes.some(r => r.evento_id===ec.evento_id && r.coordi_id===ec.coordi_id) ||
+        // [sec-reportes]
+        await khReportes.listar({ evento_id: ec.evento_id, coordi_id: ec.coordi_id, estado: 'enviado,aprobado_popo,aprobado_memo' }).then(r=>r.length>0).catch(()=>false);
+      if (yaTieneReporte) continue;
+      const horasRestantes = (deadline - ahora) / (1000*60*60);
+      reportesPendientes.push({
+        coordi: u,
+        evento: ev,
+        horasRestantes,
+        vencido: horasRestantes < 0,
+      });
+    }
+
+    // ── 2) Devoluciones pendientes ──
+    const devolPendientes = [];
+    for (const r of reportes) {
+      if (!r.fecha_aprobado) continue;
+      const kits = r.kits_detalle ? (typeof r.kits_detalle==='string'?JSON.parse(r.kits_detalle):r.kits_detalle) : [];
+      const sobrantes = kits.filter(k => (k.cantidad_sobrante||0) > 0 && !k.recibido);
+      if (!sobrantes.length) continue;
+      const u = uMap[r.coordi_id];
+      if (!_aplicaStrike(u)) continue;
+      const ev = evMap[r.evento_id];
+      const deadline = _deadlineDevol(ev);
+      if (!deadline) continue;
+      const diasRestantes = (deadline - ahora) / (1000*60*60*24);
+      devolPendientes.push({
+        coordi: u,
+        evento: ev,
+        sobrantes,
+        diasRestantes,
+        vencido: diasRestantes < 0,
+        reporteId: r.id,
+      });
+    }
+
+    el.innerHTML = `
+      <div style="margin-bottom:24px">
+        <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.12em;color:var(--ts);margin-bottom:12px">// REPORTES PENDIENTES (límite 48 hrs)</div>
+        ${reportesPendientes.length ? reportesPendientes.map(p => {
+          const col = p.vencido ? 'var(--red)' : p.horasRestantes < 12 ? 'var(--orange)' : 'var(--gold)';
+          const lbl = p.vencido ? `<svg class="ic"><use href="#ic-alerta"/></svg> VENCIDO HACE ${Math.floor(Math.abs(p.horasRestantes))}h` : `${Math.floor(p.horasRestantes)}h restantes`;
+          return `<div style="background:var(--bg2);border:1px solid var(--border);border-left:3px solid ${col};border-radius:var(--radius);padding:12px 18px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
+            <div>
+              <div style="font-weight:700;font-size:14px">${p.coordi?.nombre||'—'}</div>
+              <div style="font-size:11px;color:var(--ts);font-family:'JetBrains Mono',monospace">${p.evento?.nombre||''} · ${p.evento?.fecha?new Date(p.evento.fecha+'T12:00:00').toLocaleDateString('es-MX',{day:'2-digit',month:'short'}):''}</div>
+            </div>
+            <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:${col};font-weight:700">${lbl}</div>
+          </div>`;
+        }).join('') : '<div style="font-size:12px;color:var(--green)">✓ Sin reportes pendientes</div>'}
+      </div>
+
+      <div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.12em;color:var(--ts);margin-bottom:12px">// SOBRANTES POR DEVOLVER (límite 5 días)</div>
+        ${devolPendientes.length ? devolPendientes.map(d => {
+          const col = d.vencido ? 'var(--red)' : d.diasRestantes < 1 ? 'var(--orange)' : 'var(--gold)';
+          const lbl = d.vencido ? `<svg class="ic"><use href="#ic-alerta"/></svg> VENCIDO HACE ${Math.floor(Math.abs(d.diasRestantes))}d` : `${Math.ceil(d.diasRestantes)}d restantes`;
+          return `<div style="background:var(--bg2);border:1px solid var(--border);border-left:3px solid ${col};border-radius:var(--radius);padding:12px 18px;margin-bottom:8px">
+            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
+              <div>
+                <div style="font-weight:700;font-size:14px">${d.coordi?.nombre||'—'}</div>
+                <div style="font-size:11px;color:var(--ts);font-family:'JetBrains Mono',monospace">${d.evento?.nombre||''}</div>
+              </div>
+              <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:${col};font-weight:700">${lbl}</div>
+            </div>
+            <div style="margin-top:8px;font-size:11px;color:var(--ts)">Pendiente: ${d.sobrantes.map(s=>`${s.pieza_nombre||'kit'} ×${s.cantidad_sobrante}`).join(', ')}</div>
+          </div>`;
+        }).join('') : '<div style="font-size:12px;color:var(--green)">✓ Sin devoluciones pendientes</div>'}
+      </div>`;
+  } catch(e) { el.innerHTML = `<div class="alert alert-error">${e.message}</div>`; }
+}
+
+// ── DEUDAS ───────────────────────────────────────────────────
+async function loadMTDeudas() {
+  const list = document.getElementById('mt-deudas-list');
+  if (!list) return;
+  list.innerHTML = '<div class="loading-state"><div class="spinner"></div></div>';
+  try {
+    _mtDeudasCache = await khCoordi.deudasListar({ limit: 200 }).catch(()=>[]); // [sec-sensibles]
+    const uIds = [...new Set(_mtDeudasCache.map(d=>d.coordi_id).filter(Boolean))];
+    const eIds = [...new Set(_mtDeudasCache.map(d=>d.evento_id).filter(Boolean))];
+    const [usuarios, eventos] = await Promise.all([
+      uIds.length ? khUsuarios.listar({ ids: uIds }) : [], // [sec-usuarios]
+      eIds.length ? khEventosMeta.porSlugs(eIds) : [], // [sec-eventos]
+    ]);
+    const uMap = Object.fromEntries(usuarios.map(u=>[u.id,u]));
+    const evMap = Object.fromEntries(eventos.map(e=>[e.slug,e]));
+    _mtDeudasCache = _mtDeudasCache.map(d=>({...d, _coordi:uMap[d.coordi_id], _evento:evMap[d.evento_id]}));
+    renderMTDeudas(_mtDeudasCache, _mtDeudasFiltro);
+  } catch(e) { list.innerHTML = `<div class="alert alert-error">${e.message}</div>`; }
+}
+
+function filtrarMTDeudas(filtro, btn) {
+  _mtDeudasFiltro = filtro;
+  document.querySelectorAll('#mt-tab-deudas .gz-filter[id^="mtd-fil"]').forEach(b=>b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  renderMTDeudas(_mtDeudasCache, filtro);
+}
+
+function renderMTDeudas(lista, filtro) {
+  const list = document.getElementById('mt-deudas-list');
+  let filtrada = lista;
+  if (filtro === 'pendientes') filtrada = lista.filter(d=>!d.pagado);
+  if (filtro === 'pagadas')    filtrada = lista.filter(d=>d.pagado);
+
+  // Total pendiente
+  const totalPend = lista.filter(d=>!d.pagado).reduce((s,d)=>s+(d.monto||0), 0);
+
+  if (!filtrada.length) {
+    list.innerHTML = `<div class="empty-state"><div class="empty-icon">·</div>Sin deudas ${filtro==='pendientes'?'pendientes':filtro}</div>`;
+    return;
+  }
+
+  // Agrupar por coordi
+  const porCoordi = {};
+  filtrada.forEach(d => {
+    const k = d.coordi_id;
+    if (!porCoordi[k]) porCoordi[k] = { coordi: d._coordi, deudas: [], total: 0 };
+    porCoordi[k].deudas.push(d);
+    if (!d.pagado) porCoordi[k].total += (d.monto||0);
+  });
+
+  list.innerHTML = `
+    <div style="background:rgba(255,68,68,.06);border:1px solid rgba(255,68,68,.2);border-radius:8px;padding:14px 18px;margin-bottom:16px">
+      <div style="font-size:11px;color:var(--ts);font-family:'JetBrains Mono',monospace;letter-spacing:.1em">// TOTAL PENDIENTE DE COBRO</div>
+      <div style="font-family:'Zen Dots',sans-serif;font-size:24px;color:var(--red);margin-top:4px">${formatMXN(totalPend)}</div>
+    </div>
+    ${Object.values(porCoordi).map(g => `
+      <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:14px 18px;margin-bottom:10px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:10px">
+          <div>
+            <div style="font-family:'Rajdhani',sans-serif;font-weight:700;font-size:16px">${g.coordi?.nombre||'—'}</div>
+            <div style="font-size:11px;color:var(--ts);font-family:'JetBrains Mono',monospace">${g.coordi?.correo||''}</div>
+          </div>
+          <div style="font-family:'Zen Dots',sans-serif;font-size:18px;color:var(--red)">${formatMXN(g.total)}</div>
+        </div>
+        ${g.deudas.map(d => `
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-top:1px solid var(--border);flex-wrap:wrap;gap:8px">
+            <div style="flex:1;min-width:200px">
+              <div style="font-size:13px">${d.concepto}</div>
+              <div style="font-size:10px;color:var(--ts);font-family:'JetBrains Mono',monospace">${d._evento?.nombre||''} · ${_tsToDate(d.created_at)?.toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric',timeZone:'America/Monterrey'})||'—'}</div>
+            </div>
+            <div style="font-family:'Zen Dots',sans-serif;font-size:14px;color:${d.pagado?'var(--green)':'var(--red)'}">${formatMXN(d.monto)}</div>
+            <div style="display:flex;gap:6px">
+              ${!d.pagado ? `<button class="btn btn-primary btn-sm" onclick="marcarDeudaPagada('${d.id}')" style="font-size:10px">✓ Pagada</button>` : '<span style="font-size:11px;color:var(--green)">✓ Pagada</span>'}
+              <button class="btn btn-red btn-sm" onclick="eliminarDeuda('${d.id}')" style="font-size:10px;opacity:.5">✕</button>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    `).join('')}`;
+}
+
+async function marcarDeudaPagada(id) {
+  if (!confirm('¿Marcar esta deuda como pagada?')) return;
+  try {
+    await khCoordi.deudasMarcarPagada(id); // [sec-sensibles]
+    await loadMTDeudas();
+  } catch(e) { alert(e.message); }
+}
+
+async function eliminarDeuda(id) {
+  if (!confirm('¿Eliminar esta deuda?')) return;
+  try {
+    await khCoordi.deudasEliminar(id); // [sec-sensibles]
+    await loadMTDeudas();
+  } catch(e) { alert(e.message); }
+}
+
+async function mtAprobarReporte(id, desdeStatus) {
+  if (!confirm('¿Aprobar este reporte? Se descontará el stock de Torre de Karin.')) return;
+  try {
+    const r = _mtReportesCache.find(x=>x.id===id);
+    await ejecutarAprobacionFinal(id, r);
+    await loadMTReportes();
+    if (document.getElementById('page-inventario')?.classList.contains('active')) loadInventario();
+  } catch(e) { alert(e.message); }
+}
+
+async function mtEliminarReporte(id) {
+  if (!confirm('¿Eliminar este reporte permanentemente? Esto no se puede deshacer.')) return;
+  try {
+    await khReportes.eliminar(id); // [sec-reportes]
+    await loadMTReportes();
+  } catch(e) { alert('Error: ' + e.message); }
+}
+
+async function mtRechazarReporte(id) {
+  const motivo = prompt('Motivo del rechazo:');
+  if (!motivo) return;
+  try {
+    await khReportes.rechazar(id, motivo); // [sec-reportes]
+    const r = _mtReportesCache.find(x=>x.id===id);
+    await enviarAlertaMemo('reporte_rechazado', { coordi: r?._coordi?.nombre||'Coordi', motivo });
+    await loadMTReportes();
+  } catch(e) { alert(e.message); }
+}
+
+// ── RESUMEN ──────────────────────────────────────────────────
+async function loadMTResumen() {
+  const el = document.getElementById('mt-resumen-content');
+  if (!el) return;
+  try {
+    const [usuarios, eventos, reportes, asigs] = await Promise.all([
+      khUsuarios.listar({ activos: true }), // [sec-usuarios]
+      khEventos.listar({ limit: 5 }), // [sec-eventos]
+      khReportes.listar({ estado: 'enviado,aprobado_popo' }), // [sec-reportes]
+      khAsignaciones.listar({ status: 'pendiente' }), // [sec-coordi]
+    ]);
+    const porRol = {};
+    usuarios.forEach(u => { porRol[u.rol] = (porRol[u.rol]||0)+1; });
+    const rolLabels = { maestro_roshi:'Maestro Roshi', bulma:'Bulma', mister_popo:'Maestro Karin', coordinador:'Coordi', cc:'CC', vendedor:'Vendedor' };
+
+    el.innerHTML = `
+      <!-- Métricas rápidas -->
+      <div class="metrics-grid" style="margin-bottom:24px">
+        <div class="metric"><div class="metric-label">Usuarios activos</div><div class="metric-value">${usuarios.length}</div></div>
+        <div class="metric"><div class="metric-label">Reportes pendientes</div><div class="metric-value" style="color:${reportes.length?'var(--gold)':'var(--green)'}">${reportes.length}</div></div>
+        <div class="metric"><div class="metric-label">Asignaciones sin respuesta</div><div class="metric-value" style="color:${asigs.length?'var(--gold)':'var(--green)'}">${asigs.length}</div></div>
+      </div>
+
+      <!-- Usuarios por rol -->
+      <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:16px 20px;margin-bottom:16px">
+        <div class="k-mono" style="margin-bottom:14px">// EQUIPO POR ROL</div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          ${Object.entries(porRol).map(([rol,count]) =>
+            `<div style="text-align:center;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:10px 16px;min-width:90px">
+              <div style="font-family:'Zen Dots',sans-serif;font-size:22px;color:var(--orange)">${count}</div>
+              <div style="font-size:10px;color:var(--ts)">${rolLabels[rol]||rol}</div>
+            </div>`
+          ).join('')}
+        </div>
+      </div>
+
+      <!-- Próximos eventos -->
+      <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:16px 20px">
+        <div class="k-mono" style="margin-bottom:14px">// PRÓXIMOS EVENTOS</div>
+        ${eventos.length ? eventos.map(e => {
+          const f = new Date(e.fecha+'T12:00:00');
+          const hoy = new Date(); hoy.setHours(0,0,0,0);
+          const dias = Math.ceil((f-hoy)/(1000*60*60*24));
+          return `<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)">
+            <div style="font-weight:600;font-size:14px">${e.nombre}</div>
+            <div style="font-size:11px;font-family:'JetBrains Mono',monospace;color:${dias<=7?'var(--orange)':'var(--ts)'}">
+              ${dias > 0 ? `en ${dias} día${dias!==1?'s':''}` : dias===0 ? '¡HOY!' : 'pasado'}
+            </div>
+          </div>`;
+        }).join('') : '<div style="color:var(--ts);font-size:12px">Sin eventos próximos</div>'}
+      </div>`;
+  } catch(e) { el.innerHTML = `<div class="alert alert-error">${e.message}</div>`; }
+}
+
+// ── USUARIOS ─────────────────────────────────────────────────
+async function loadMTUsuarios() {
+  const list = document.getElementById('mt-usuarios-list');
+  const countEl = document.getElementById('mt-user-count');
+  if (!list) return;
+  list.innerHTML = '<div class="loading-state"><div class="spinner"></div></div>';
+  try {
+    _mtUsuariosCache = await khUsuarios.listar({ orden: 'nombre' }); // [sec-usuarios]
+    if (countEl) countEl.textContent = `${_mtUsuariosCache.length} usuarios`;
+    renderMTUsuarios(_mtUsuariosCache);
+  } catch(e) { list.innerHTML = `<div class="alert alert-error">${e.message}</div>`; }
+}
+
+function filtrarMTUsuarios() {
+  const q = document.getElementById('mt-user-search')?.value.toLowerCase() || '';
+  const filtrado = _mtUsuariosCache.filter(u =>
+    u.nombre?.toLowerCase().includes(q) || u.correo?.toLowerCase().includes(q) || u.rol?.includes(q)
+  );
+  renderMTUsuarios(filtrado);
+}
+
+function renderMTUsuarios(lista) {
+  const list = document.getElementById('mt-usuarios-list');
+  if (!lista.length) { list.innerHTML='<div class="empty-state">Sin resultados</div>'; return; }
+  const rolLabels = { maestro_roshi:'Maestro Roshi', bulma:'Bulma', mister_popo:'Maestro Karin', coordinador:'Coordinador', cc:'CC', vendedor:'Vendedor' };
+  list.innerHTML = lista.map(u => `
+    <div style="background:var(--bg2);border:1px solid ${u.activo?'var(--border)':'rgba(255,68,68,.2)'};border-radius:var(--radius);padding:14px 18px;margin-bottom:8px;display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+      <div style="width:36px;height:36px;border-radius:50%;background:var(--bg3);overflow:hidden;flex-shrink:0;display:flex;align-items:center;justify-content:center">
+        ${u.foto_url ? `<img src="${u.foto_url}" style="width:100%;height:100%;object-fit:cover">` :
+        `<span style="font-family:'Zen Dots',sans-serif;font-size:13px;color:var(--orange)">${(u.nombre||'?')[0]}</span>`}
+      </div>
+      <div style="flex:1;min-width:140px">
+        <div style="font-family:'Rajdhani',sans-serif;font-weight:700;font-size:15px">${u.nombre||'—'} ${u.activo?'':'<span style="font-size:10px;color:var(--red)">[INACTIVO]</span>'}</div>
+        <div style="font-size:10px;font-family:'JetBrains Mono',monospace;color:var(--ts)">${rolLabels[u.rol]||u.rol} · ${u.correo||u.username||''}</div>
+        ${u.strikes ? `<div style="font-size:10px;color:var(--red);margin-top:2px"><svg class="ic"><use href="#ic-alerta"/></svg> ${u.strikes} strike${u.strikes!==1?'s':''}</div>` : ''}
+      </div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        <button class="btn btn-ghost btn-sm" onclick="abrirVerComo('${u.id}','${u.rol}')" style="font-size:10px;font-family:'JetBrains Mono',monospace"><svg class="ic"><use href="#ic-ojo"/></svg> Ver como</button>
+        <button class="btn btn-ghost btn-sm" onclick="abrirEditarUsuarioMT('${u.id}')" style="font-size:10px">⎘ Editar</button>
+        <button class="btn ${u.activo?'btn-red':'btn-green'} btn-sm" onclick="toggleActivoUsuario('${u.id}',${u.activo})" style="font-size:10px">${u.activo?'Desactivar':'Activar'}</button>
+        <button class="btn btn-red btn-sm" onclick="eliminarUsuarioMT('${u.id}','${u.nombre.replace(/'/g,"\\'")}','${u.rol}')" style="font-size:10px;opacity:.7" title="Eliminar permanentemente">✕</button>
+      </div>
+    </div>`).join('');
+}
+
+async function eliminarUsuarioMT(id, nombre, rol) {
+  // [fix-deluser] La acción segura/primaria es DESACTIVAR (toggleActivoUsuario,
+  // reversible). El borrado FÍSICO solo procede si el server confirma que el
+  // usuario está 100% limpio; si tiene dependientes, el backend responde 409 y
+  // aquí lo explicamos y sugerimos desactivar (nunca borramos en cascada).
+  if (['maestro_roshi','bulma'].includes(rol)) {
+    alert('No puedes eliminar a Maestro Roshi ni a Bulma desde aquí.');
+    return;
+  }
+  if (!confirm(`¿Eliminar permanentemente a "${nombre}"?\n\nSolo se puede si NO tiene historial (deudas, asignaciones, strikes, reportes, viajeros…). Si tiene, desactívalo en vez de borrarlo. Esta acción no se puede deshacer.`)) return;
+  try {
+    const r = await khAdminFetch('/.netlify/functions/admin-eliminar-usuario', {
+      method: 'POST',
+      body: JSON.stringify({ userId: id }),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (r.status === 409 && j.motivo === 'tiene_dependientes') {
+      // [fix-deluser] Mensaje legible del candado de dependientes.
+      const d = j.detalle || {};
+      const partes = [];
+      if (d.deudas) partes.push(`${d.deudas} deuda${d.deudas!==1?'s':''}${d.deudas_pendientes?` (${d.deudas_pendientes} pendiente${d.deudas_pendientes!==1?'s':''})`:''}`);
+      if (d.asignaciones) partes.push(`${d.asignaciones} asignación${d.asignaciones!==1?'es':''}`);
+      if (d.strikes) partes.push(`${d.strikes} strike${d.strikes!==1?'s':''}`);
+      if (d.reportes) partes.push(`${d.reportes} reporte${d.reportes!==1?'s':''}`);
+      if (d.viajeros) partes.push(`${d.viajeros} viajero${d.viajeros!==1?'s':''}`);
+      if (d.tours) partes.push(`${d.tours} tour${d.tours!==1?'s':''}`);
+      if (d.notificaciones) partes.push(`${d.notificaciones} notificación${d.notificaciones!==1?'es':''}`);
+      alert(`No se puede eliminar a "${nombre}": tiene ${partes.join(', ')}.\n\n${j.sugerencia || 'Desactívalo en vez de eliminarlo (conserva su historial).'}`);
+      return;
+    }
+    if (!r.ok || j.ok === false) {
+      throw new Error(j.error || ('Error ' + r.status));
+    }
+    await loadMTUsuarios();
+  } catch(e) { alert('Error al eliminar: ' + e.message); }
+}
+
+async function toggleActivoUsuario(id, activo) {
+  const accion = activo ? 'desactivar' : 'activar';
+  if (!confirm(`¿${accion.charAt(0).toUpperCase()+accion.slice(1)} este usuario?`)) return;
+  try {
+    await khUsuarios.actualizar(id, { activo: !activo }); // [sec-usuarios]
+    await loadMTUsuarios();
+    // Alerta si se desactiva
+    if (activo) await enviarAlertaMemo('usuario_desactivado', { id });
+  } catch(e) { alert(e.message); }
+}
+
+async function abrirEditarUsuarioMT(id) {
+  if (!id) { alert('ID de usuario inválido.'); return; }
+  let u = _mtUsuariosCache.find(x => x.id === id);
+  // Fallback: si la cache no lo tiene (stale, no cargada), traer de DB.
+  if (!u) {
+    try {
+      u = await khUsuarios.obtener(id); // [sec-usuarios]
+    } catch(e) { /* u sigue undefined */ }
+  }
+  if (!u || !u.id) {
+    alert('No se pudo cargar el usuario. Refresca la lista y vuelve a intentar.');
+    return;
+  }
+  // Source of truth para guardarUsuarioMT — no dependemos de un input hidden.
+  _mtEditandoUserId = u.id;
+  const rolOpts = ['maestro_roshi','bulma','mister_popo','coordinador','cc','vendedor'];
+  const rolLabels = { maestro_roshi:'Maestro Roshi', bulma:'Bulma', mister_popo:'Maestro Karin', coordinador:'Coordinador', cc:'CC', vendedor:'Vendedor' };
+  // Tabs extra / bloqueadas actuales
+  const permisos = u.permisos_extra || {};
+  const tabsExtra = permisos.tabs_extra || [];
+  const tabsBloq  = permisos.tabs_bloqueados || [];
+  const todasTabs = ['resumen','pagos','eventos','gastos','ventas','inventario','reportes','capsule','equipo','kamisama'];
+
+  document.getElementById('modal-mt-usuario').innerHTML = `
+    <div class="modal" style="max-width:520px">
+      <div class="modal-header">
+        <div class="modal-title" style="font-family:'Zen Dots',sans-serif;font-size:15px">Editar usuario</div>
+        <button class="modal-close" onclick="closeModal('modal-mt-usuario')">×</button>
+      </div>
+      <div class="modal-body" style="max-height:70vh;overflow-y:auto">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <div class="form-group">
+            <label>Nombre</label>
+            <input class="cot-input" id="mtu-nombre" value="${u.nombre||''}" style="width:100%">
+          </div>
+          <div class="form-group">
+            <label>Rol</label>
+            <select class="cot-input" id="mtu-rol" style="width:100%">
+              ${rolOpts.map(r=>`<option value="${r}" ${u.rol===r?'selected':''}>${rolLabels[r]}</option>`).join('')}
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Username</label>
+            <input class="cot-input" id="mtu-username" value="${u.username||''}" style="width:100%">
+          </div>
+          <div class="form-group">
+            <label>Nueva contraseña</label>
+            <input class="cot-input" id="mtu-pass" placeholder="Dejar vacío para no cambiar" style="width:100%">
+          </div>
+        </div>
+        <!-- Tabs extra -->
+        <div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border)">
+          <div class="k-mono" style="margin-bottom:10px">// PERMISOS EXTRA DE TABS</div>
+          <div style="font-size:11px;color:var(--ts);margin-bottom:8px">Tabs adicionales que puede ver (además de las de su rol):</div>
+          <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px">
+            ${todasTabs.map(t=>`<label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:12px;padding:5px 10px;border:1px solid var(--border);border-radius:5px;background:${tabsExtra.includes(t)?'rgba(255,107,0,.1)':'transparent'}">
+              <input type="checkbox" class="mt-tab-extra" value="${t}" ${tabsExtra.includes(t)?'checked':''} style="accent-color:var(--orange)"> ${t}
+            </label>`).join('')}
+          </div>
+          <div style="font-size:11px;color:var(--ts);margin-bottom:8px">Tabs bloqueadas (aunque su rol las tenga):</div>
+          <div style="display:flex;flex-wrap:wrap;gap:6px">
+            ${todasTabs.map(t=>`<label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:12px;padding:5px 10px;border:1px solid var(--border);border-radius:5px;background:${tabsBloq.includes(t)?'rgba(255,68,68,.1)':'transparent'}">
+              <input type="checkbox" class="mt-tab-bloq" value="${t}" ${tabsBloq.includes(t)?'checked':''} style="accent-color:var(--red)"> ${t}
+            </label>`).join('')}
+          </div>
+        </div>
+        <div id="mtu-alert" style="margin-top:12px"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" onclick="closeModal('modal-mt-usuario')">Cancelar</button>
+        <button class="btn btn-primary" onclick="guardarUsuarioMT()">Guardar</button>
+      </div>
+    </div>`;
+  openModal('modal-mt-usuario');
+}
+
+async function guardarUsuarioMT() {
+  const alertEl = document.getElementById('mtu-alert');
+  const showErr = (msg) => { if (alertEl) alertEl.innerHTML = `<div class="alert alert-error">${msg}</div>`; };
+
+  // Source of truth: variable de scope (no input hidden — innerHTML no setea value confiable)
+  const id = _mtEditandoUserId;
+  if (!id) { showErr('Error interno: no se identificó el usuario. Cierra el modal y vuelve a abrirlo.'); return; }
+
+  const nombre   = document.getElementById('mtu-nombre')?.value.trim();
+  const rol      = document.getElementById('mtu-rol')?.value;
+  if (!nombre) { showErr('El nombre es obligatorio.'); return; }
+  if (!rol)    { showErr('El rol es obligatorio.'); return; }
+
+  const username = document.getElementById('mtu-username')?.value.trim();
+  const pass     = document.getElementById('mtu-pass')?.value.trim();
+  const tabsExtra = Array.from(document.querySelectorAll('.mt-tab-extra:checked')).map(c=>c.value);
+  const tabsBloq  = Array.from(document.querySelectorAll('.mt-tab-bloq:checked')).map(c=>c.value);
+  const body = {
+    nombre, rol, username: username||null,
+    permisos_extra: { tabs_extra: tabsExtra, tabs_bloqueados: tabsBloq },
+  };
+  if (pass) body.password = pass; // [sec-usuarios] texto plano; el server lo hashea (bcrypt)
+  try {
+    await khUsuarios.actualizar(id, body); // [sec-usuarios]
+    if (alertEl) alertEl.innerHTML='<div class="alert alert-success">✓ Guardado</div>';
+    setTimeout(()=>{ closeModal('modal-mt-usuario'); loadMTUsuarios(); }, 800);
+  } catch(e) { showErr(e.message); }
+}
+
+// ── VER COMO ROL ─────────────────────────────────────────────
+function abrirVerComo(userId, rol) {
+  const u = _mtUsuariosCache.find(x=>x.id===userId);
+  if (!u) return;
+  document.getElementById('modal-mt-vercomo').innerHTML = `
+    <div class="modal" style="max-width:400px">
+      <div class="modal-header">
+        <div class="modal-title" style="font-family:'Zen Dots',sans-serif;font-size:15px">Ver como: ${u.nombre}</div>
+        <button class="modal-close" onclick="closeModal('modal-mt-vercomo')">×</button>
+      </div>
+      <div class="modal-body">
+        <p style="font-size:13px;color:var(--ts);margin-bottom:16px">Vas a simular la vista del sistema como si fueras <strong style="color:var(--text)">${u.nombre}</strong> (${u.rol}). Tu sesión de Maestro Roshi se restaura al salir.</p>
+        <div style="background:rgba(255,183,3,.06);border:1px solid rgba(255,183,3,.2);border-radius:8px;padding:12px;font-size:11px;color:var(--gold)">
+          <svg class="ic"><use href="#ic-alerta"/></svg> Solo es una vista — no puedes hacer cambios que afecten a ${u.nombre}
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" onclick="closeModal('modal-mt-vercomo')">Cancelar</button>
+        <button class="btn btn-primary" onclick="activarVerComo('${userId}')">Entrar como ${u.nombre} →</button>
+      </div>
+    </div>`;
+  openModal('modal-mt-vercomo');
+}
+
+function activarVerComo(userId) {
+  const u = _mtUsuariosCache.find(x=>x.id===userId);
+  if (!u) return;
+  // Guardar sesión original
+  sessionStorage.setItem('_roshi_session_backup', sessionStorage.getItem(SESSION_KEY));
+  // Simular usuario
+  const fakeSession = { user: { ...u }, expires: Date.now() + 3600000 };
+  sessionStorage.setItem(SESSION_KEY, JSON.stringify(fakeSession));
+  currentUser = u;
+  closeModal('modal-mt-vercomo');
+  // Mostrar banner de aviso y aplicar permisos
+  mostrarBannerVerComo(u.nombre);
+  aplicarPermisosUI();
+}
+
+function mostrarBannerVerComo(nombre) {
+  let banner = document.getElementById('ver-como-banner');
+  if (!banner) {
+    banner = document.createElement('div');
+    banner.id = 'ver-como-banner';
+    banner.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:9999;background:rgba(255,183,3,.95);color:#0a0a0f;padding:10px 20px;font-family:JetBrains Mono,monospace;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:space-between;letter-spacing:.05em';
+    document.body.appendChild(banner);
+  }
+  banner.innerHTML = `<span><svg class="ic"><use href="#ic-ojo"/></svg> MODO VISTA — viendo como: ${nombre.toUpperCase()}</span>
+    <button onclick="salirVerComo()" style="background:var(--bg);border:none;padding:6px 14px;border-radius:6px;cursor:pointer;font-family:JetBrains Mono,monospace;font-size:11px;font-weight:700">✕ Salir y volver a Roshi</button>`;
+}
+
+function salirVerComo() {
+  const backup = sessionStorage.getItem('_roshi_session_backup');
+  if (backup) {
+    sessionStorage.setItem(SESSION_KEY, backup);
+    sessionStorage.removeItem('_roshi_session_backup');
+    const s = JSON.parse(backup);
+    currentUser = s.user;
+  }
+  const banner = document.getElementById('ver-como-banner');
+  if (banner) banner.remove();
+  aplicarPermisosUI();
+  showPage('montana');
+}
+
+// ── STRIKES ──────────────────────────────────────────────────
+async function loadMTStrikes() {
+  const list = document.getElementById('mt-strikes-list');
+  if (!list) return;
+  list.innerHTML = '<div class="loading-state"><div class="spinner"></div></div>';
+  try {
+    const usuarios = await khUsuarios.listar({ orden: 'strikes' }); // [sec-usuarios]
+    const conStrikes = usuarios.filter(u => (u.strikes||0) > 0);
+    const sinStrikes = usuarios.filter(u => (u.strikes||0) === 0);
+    const rolLabels = { maestro_roshi:'Maestro Roshi', bulma:'Bulma', mister_popo:'Maestro Karin', coordinador:'Coordinador', cc:'CC', vendedor:'Vendedor' };
+
+    list.innerHTML = `
+      <div style="margin-bottom:20px">
+        <div class="k-mono" style="margin-bottom:12px">// USUARIOS CON STRIKES</div>
+        ${conStrikes.length ? conStrikes.map(u => {
+          const col = u.strikes >= 3 ? 'var(--red)' : u.strikes >= 2 ? 'var(--orange)' : 'var(--gold)';
+          return `<div style="background:var(--bg2);border:1px solid var(--border);border-left:3px solid ${col};border-radius:var(--radius);padding:14px 18px;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
+            <div>
+              <div style="font-family:'Rajdhani',sans-serif;font-weight:700;font-size:16px">${u.nombre}</div>
+              <div style="font-size:10px;font-family:'JetBrains Mono',monospace;color:var(--ts)">${rolLabels[u.rol]||u.rol}</div>
+            </div>
+            <div style="display:flex;align-items:center;gap:12px">
+              <div style="font-family:'Zen Dots',sans-serif;font-size:28px;color:${col}">${u.strikes}</div>
+              <div style="display:flex;gap:6px">
+                <button class="btn btn-primary btn-sm" onclick="ponerStrikeManual('${u.id}','${u.nombre.replace(/'/g,"\\'")}',${u.strikes})" style="font-size:10px">+ Strike</button>
+                <button class="btn btn-ghost btn-sm" onclick="quitarStrike('${u.id}','${u.nombre.replace(/'/g,"\\'")}',${u.strikes})" style="font-size:10px">− Quitar</button>
+              </div>
+            </div>
+          </div>`;
+        }).join('') : '<div style="font-size:12px;color:var(--green);padding:12px">✓ Nadie tiene strikes</div>'}
+      </div>
+      <div>
+        <div class="k-mono" style="margin-bottom:12px">// PONER STRIKE A CUALQUIER USUARIO</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
+          <div class="form-group" style="margin:0">
+            <label>Usuario</label>
+            <select class="cot-input" id="mt-strike-user" style="min-width:200px">
+              <option value="">— Selecciona —</option>
+              ${usuarios.filter(u=>u.activo).map(u=>`<option value="${u.id}">${u.nombre} (${u.strikes||0} strikes)</option>`).join('')}
+            </select>
+          </div>
+          <div class="form-group" style="margin:0;flex:1;min-width:160px">
+            <label>Motivo</label>
+            <input class="cot-input" id="mt-strike-motivo" placeholder="Motivo del strike…">
+          </div>
+          <button class="btn btn-primary" onclick="ponerStrikeDesdePanel()">Aplicar strike</button>
+        </div>
+        <div id="mt-strike-alert" style="margin-top:8px"></div>
+      </div>`;
+  } catch(e) { list.innerHTML = `<div class="alert alert-error">${e.message}</div>`; }
+}
+
+async function ponerStrikeManual(userId, nombre, strikesActuales) {
+  const motivo = prompt(`Motivo del strike para ${nombre}:`);
+  if (!motivo) return;
+  await aplicarStrike(userId, nombre, strikesActuales, motivo);
+}
+
+async function ponerStrikeDesdePanel() {
+  const userId = document.getElementById('mt-strike-user')?.value;
+  const motivo = document.getElementById('mt-strike-motivo')?.value.trim();
+  const alertEl = document.getElementById('mt-strike-alert');
+  if (!userId) { alertEl.innerHTML='<div class="alert alert-error">Selecciona un usuario</div>'; return; }
+  if (!motivo) { alertEl.innerHTML='<div class="alert alert-error">Ingresa el motivo</div>'; return; }
+  const u = _mtUsuariosCache.find(x=>x.id===userId) || {};
+  await aplicarStrike(userId, u.nombre||'Usuario', u.strikes||0, motivo);
+  alertEl.innerHTML='<div class="alert alert-success">✓ Strike aplicado</div>';
+  setTimeout(()=>{ alertEl.innerHTML=''; loadMTStrikes(); }, 1500);
+}
+
+async function aplicarStrike(userId, nombre, strikesActuales, motivo) {
+  const nuevos = strikesActuales + 1;
+  try {
+    await khUsuarios.actualizar(userId, { strikes: nuevos }); // [sec-usuarios]
+    // Log del strike
+    await khCoordi.strikeCrear(userId, 'strike_manual', motivo).catch(()=>{}); // [sec-sensibles] por_quien lo pone el backend
+    // Email al usuario
+    const u = await khUsuarios.obtener(userId); // [sec-usuarios]
+    const email = u?.correo_notif || u?.correo;
+    if (email) {
+      await enviarEmailSistema(email, `⚠️ Strike registrado — Kamehouse`,
+        `<p>Hola <strong>${nombre}</strong>,</p>
+         <p>Se ha registrado un strike en tu cuenta.</p>
+         <p><strong>Motivo:</strong> ${motivo}</p>
+         <p><strong>Strikes acumulados:</strong> ${nuevos}/3</p>
+         ${nuevos >= 2 ? `<p style="color:#FF4444"><strong>⚠️ Advertencia:</strong> Al llegar a 3 strikes tu cuenta será suspendida.</p>` : ''}
+         ${nuevos >= 3 ? `<p style="color:#FF4444"><strong>Tu cuenta ha sido suspendida.</strong></p>` : ''}`
+      );
+    }
+    // Notificación in-app del strike (además del email). Fails-soft.
+    await _crearNotif({
+      usuario_id: userId, tipo: 'strike', titulo: 'Recibiste un strike',
+      mensaje: `Tienes ${nuevos}/3 strikes.`,
+    });
+    // Alerta a Memo si llegó a 2 o 3
+    if (nuevos >= 2) await enviarAlertaMemo('strikes', { nombre, strikes: nuevos, motivo });
+    // Suspender si llegó a 3
+    if (nuevos >= 3) {
+      await khUsuarios.actualizar(userId, { activo: false }); // [sec-usuarios]
+    }
+    await loadMTStrikes();
+  } catch(e) { alert(e.message); }
+}
+
+async function quitarStrike(userId, nombre, strikesActuales) {
+  if (!confirm(`¿Quitar 1 strike a ${nombre}?`)) return;
+  const nuevos = Math.max(0, strikesActuales - 1);
+  try {
+    await khUsuarios.actualizar(userId, { strikes: nuevos }); // [sec-usuarios]
+    await loadMTStrikes();
+  } catch(e) { alert(e.message); }
+}
+
+// ── ALERTAS ──────────────────────────────────────────────────
+async function loadMTAlertas() {
+  const list = document.getElementById('mt-alertas-list');
+  if (!list) return;
+  list.innerHTML = '<div class="loading-state"><div class="spinner"></div></div>';
+  try {
+    const alertas = await khCoordi.alertasListar().catch(()=>[]); // [sec-sensibles]
+    if (!alertas.length) {
+      list.innerHTML = '<div class="empty-state"><div class="empty-icon">·</div>Sin alertas recientes</div>';
+      return;
+    }
+    const tipoInfo = {
+      strike_auto:        { icon:'<svg class="ic"><use href="#ic-alerta"/></svg>', color:'var(--orange)', label:'Strike automático' },
+      strike_manual:      { icon:'<svg class="ic"><use href="#ic-diana"/></svg>', color:'var(--orange)', label:'Strike manual' },
+      strikes:            { icon:'<svg class="ic"><use href="#ic-alerta"/></svg>', color:'var(--orange)', label:'Strike' },
+      tour_declinado:     { icon:'✕', color:'var(--red)',    label:'Tour declinado' },
+      reporte_rechazado:  { icon:'<svg class="ic"><use href="#ic-portapapeles"/></svg>', color:'var(--red)',    label:'Reporte rechazado' },
+      nuevo_usuario:      { icon:'<svg class="ic"><use href="#ic-persona"/></svg>', color:'var(--green)',  label:'Nuevo usuario' },
+      advertencia:        { icon:'<svg class="ic"><use href="#ic-alerta"/></svg>', color:'var(--gold)',   label:'Advertencia' },
+      suspension:         { icon:'<svg class="ic"><use href="#ic-prohibido"/></svg>', color:'var(--red)',    label:'Suspensión' },
+      usuario_desactivado:{ icon:'<svg class="ic"><use href="#ic-candado"/></svg>', color:'var(--red)',    label:'Usuario desactivado' },
+    };
+    list.innerHTML = alertas.map(a => {
+      const ti = tipoInfo[a.tipo] || { icon:'<svg class="ic"><use href="#ic-campana"/></svg>', color:'var(--ts)', label: a.tipo };
+      const fecha = _tsToDate(a.created_at) || new Date();
+      return `<div style="background:var(--bg2);border:1px solid var(--border);border-left:3px solid ${ti.color};border-radius:var(--radius);padding:12px 18px;margin-bottom:8px;${a.leida?'opacity:.5':''}">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;flex-wrap:wrap">
+          <div>
+            <div style="font-size:13px;font-weight:600">${ti.icon} ${a.mensaje||ti.label}</div>
+            <div style="font-size:10px;font-family:'JetBrains Mono',monospace;color:var(--ts);margin-top:3px">
+              ${fecha.toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric',timeZone:'America/Monterrey'})} ${fecha.toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit',hour12:true,timeZone:'America/Monterrey'})}
+            </div>
+          </div>
+          ${!a.leida ? `<button class="btn btn-ghost btn-sm" onclick="marcarAlertaLeida('${a.id}')" style="font-size:10px">✓ Leída</button>` : ''}
+        </div>
+      </div>`;
+    }).join('');
+  } catch(e) { list.innerHTML = `<div class="alert alert-error">${e.message}</div>`; }
+}
+
+async function marcarAlertaLeida(id) {
+  // UPDATE vía Netlify Function con service_role (RLS bloquea UPDATE anon).
+  try {
+    await khAdminFetch('/.netlify/functions/sistema-alertas-write', {
+      method: 'POST',
+      body: JSON.stringify({ accion: 'marcar_leida', id }),
+    });
+    await loadMTAlertas();
+  }
+  catch(e) { alert(e.message); }
+}
+
+async function marcarTodasLeidas() {
+  // UPDATE de todas las no leídas en una sola llamada (service_role).
+  try {
+    await khAdminFetch('/.netlify/functions/sistema-alertas-write', {
+      method: 'POST',
+      body: JSON.stringify({ accion: 'marcar_todas_leidas' }),
+    });
+    await loadMTAlertas();
+  } catch(e) {}
+}
+
+// ── CONFIG ───────────────────────────────────────────────────
+// sistema_config tiene RLS deny-all desde anon. Todo pasa por Netlify Functions
+// con JWT propio: GET filtra columnas por rol, SAVE exige maestro_roshi.
+async function loadMTConfig() {
+  try {
+    const r = await khAdminFetch('/.netlify/functions/sistema-config-get', { method:'POST' });
+    if (!r.ok) return;
+    const { config: cfg } = await r.json();
+    _mtConfig = cfg || {};
+    document.getElementById('cfg-clabe')?.setAttribute('value', cfg?.cuenta_clabe||'');
+    document.getElementById('cfg-banco')?.setAttribute('value', cfg?.cuenta_banco||'');
+    document.getElementById('cfg-titular')?.setAttribute('value', cfg?.cuenta_titular||'');
+    if (document.getElementById('cfg-clabe')) document.getElementById('cfg-clabe').value = cfg?.cuenta_clabe||'';
+    if (document.getElementById('cfg-banco')) document.getElementById('cfg-banco').value = cfg?.cuenta_banco||'';
+    if (document.getElementById('cfg-titular')) document.getElementById('cfg-titular').value = cfg?.cuenta_titular||'';
+    if (document.getElementById('cfg-mensaje')) document.getElementById('cfg-mensaje').value = cfg?.mensaje_dia||'';
+    if (document.getElementById('cfg-mensaje-activo')) document.getElementById('cfg-mensaje-activo').checked = cfg?.mensaje_activo||false;
+  } catch(e) {}
+}
+
+async function guardarConfigCuenta() {
+  const body = {
+    cuenta_clabe:   document.getElementById('cfg-clabe')?.value.trim()||null,
+    cuenta_banco:   document.getElementById('cfg-banco')?.value.trim()||null,
+    cuenta_titular: document.getElementById('cfg-titular')?.value.trim()||null,
+  };
+  const alertEl = document.getElementById('cfg-cuenta-alert');
+  try {
+    const r = await khAdminFetch('/.netlify/functions/sistema-config-save', {
+      method:'POST', body: JSON.stringify(body),
+    });
+    if (!r.ok) {
+      const detail = await r.json().catch(()=>({ error: r.statusText }));
+      throw new Error(detail.error || 'Error guardando');
+    }
+    const { config } = await r.json();
+    if (config) _mtConfig = config;
+    alertEl.innerHTML='<div class="alert alert-success">✓ Cuenta guardada</div>';
+    setTimeout(()=>alertEl.innerHTML='', 2000);
+  } catch(e) { alertEl.innerHTML=`<div class="alert alert-error">${e.message}</div>`; }
+}
+
+// ── ESFERAS DEL DRAGÓN (Pieza 1) ─────────────────────────────────────────────
+// Aditivo puro: alta y listado en la tabla nueva esferas_eventos vía Functions
+// propias (esferas-crear / esferas-listar). No toca EV, eventos_meta, portal ni
+// ninguna otra página. Mismo patrón khAdminFetch + alerts que guardarConfigCuenta.
+function _esfEsc(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+}
+
+async function loadEsferasEventos() {
+  _esfPreviewInit();
+  _esfLoadVenuesCat(); // best-effort, no bloquea el listado
+  const cont = document.getElementById('esf-listado');
+  if (!cont) return;
+  cont.innerHTML = '<div class="loading-state"><div class="spinner"></div>Cargando…</div>';
+  try {
+    const r = await khAdminFetch('/.netlify/functions/esferas-listar', { method:'POST' });
+    if (!r.ok) {
+      const d = await r.json().catch(()=>({ error: r.statusText }));
+      throw new Error(d.error || 'Error cargando');
+    }
+    const { eventos } = await r.json();
+    const filas = eventos || [];
+    window._esfRows = filas; // cache para el modo edición
+    if (!filas.length) {
+      cont.innerHTML = '<div class="empty-state"><div class="empty-icon">·</div>Sin eventos registrados</div>';
+      return;
+    }
+    cont.innerHTML = `<div class="table-wrap"><table>
+      <thead><tr><th>Slug</th><th>Nombre</th><th>Fecha</th><th>Ciudad</th><th>Status</th><th>Publicación</th><th>Acciones</th></tr></thead>
+      <tbody>${filas.map(e => `<tr>
+        <td style="font-family:'JetBrains Mono',monospace;font-size:12px">${_esfEsc(e.slug)}</td>
+        <td style="font-weight:600">${_esfEsc(e.nombre)}${e.venue ? `<br><span style="font-size:10px;color:var(--ts);font-weight:400">${_esfEsc(e.venue)}</span>` : ''}</td>
+        <td style="font-size:12px">${_esfEsc(e.fecha_inicio) || '—'}</td>
+        <td style="font-size:12px">${_esfEsc(e.ciudad) || '—'}</td>
+        <td style="font-size:11px;color:var(--orange)">${_esfEsc(e.status) || 'Disponible'}</td>
+        <td>${e.publicado
+          ? `<span class="badge badge-green">publicado</span> <button class="btn btn-ghost btn-sm" style="font-size:10px" onclick="despublicarEsfera('${_esfEsc(e.slug)}')"><svg class="ic"><use href="#ic-basura"/></svg> Despublicar</button>`
+          : `<span class="badge badge-gray">borrador</span> <button class="btn btn-ghost btn-sm" style="font-size:10px;color:var(--red)" onclick="eliminarEsfera('${_esfEsc(e.slug)}')"><svg class="ic"><use href="#ic-basura"/></svg> Eliminar</button>`}</td>
+        <td><button class="btn btn-ghost btn-sm" style="font-size:10px" onclick="editarEsfera('${_esfEsc(e.slug)}')"><svg class="ic"><use href="#ic-lapiz"/></svg> Editar</button> <button class="btn btn-ghost btn-sm" style="font-size:10px" onclick="posponerEsfera('${_esfEsc(e.slug)}')"><svg class="ic"><use href="#ic-eventos"/></svg> Posponer</button> <button class="btn btn-ghost btn-sm" style="font-size:10px" onclick="recalcularPagosPosposicion('${_esfEsc(e.slug)}')">↻ Recalcular</button> <button class="btn btn-ghost btn-sm" style="font-size:10px" onclick="avisarPosposicion('${_esfEsc(e.slug)}')"><svg class="ic"><use href="#ic-correo"/></svg> Avisar</button> <button class="btn btn-ghost btn-sm" style="font-size:10px;color:var(--red)" onclick="cancelarEventoCompleto('${_esfEsc(e.slug)}')"><svg class="ic"><use href="#ic-prohibido"/></svg> Cancelar</button></td>
+      </tr>`).join('')}</tbody>
+    </table></div>`;
+  } catch(e) {
+    cont.innerHTML = `<div class="alert alert-error">${e.message}</div>`;
+  }
+}
+
+// ── Posponer evento (Fase 1: bitácora + cambio de fecha) ─────────────────────
+// Dispara admin-posponer-evento. NO republica (eso lo hace el admin desde Esferas).
+function posponerEsfera(slug) {
+  const ev = (window._esfRows || []).find(e => e && e.slug === slug);
+  if (!ev) { alert('No se encontró el evento en la lista. Recarga e intenta de nuevo.'); return; }
+  const fechaActual = ev.fecha_inicio || '';
+  const hoyMx = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Monterrey' });
+  document.getElementById('modal-posponer').innerHTML = `
+    <div class="modal" style="max-width:420px">
+      <div class="modal-header">
+        <div class="modal-title" style="font-family:'Zen Dots',sans-serif;font-size:15px"><svg class="ic"><use href="#ic-eventos"/></svg> Posponer evento</div>
+        <button class="modal-close" onclick="closeModal('modal-posponer')">×</button>
+      </div>
+      <div class="modal-body">
+        <div style="font-size:13px;margin-bottom:12px">
+          <b>${_esfEsc(ev.nombre)}</b><br>
+          <span style="font-size:12px;color:var(--ts)">Fecha actual: ${_esfEsc(fechaActual) || '—'}</span>
+        </div>
+        <div class="form-group">
+          <label>Fecha nueva *</label>
+          <input type="date" class="cot-input" id="pp-fecha-nueva" value="${_esfEsc(fechaActual)}" min="${hoyMx}" style="width:100%">
+        </div>
+        <div class="form-group">
+          <label>Motivo (opcional)</label>
+          <input type="text" class="cot-input" id="pp-motivo" placeholder="Motivo (opcional)" maxlength="200" style="width:100%">
+        </div>
+        <div id="pp-alert"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" onclick="closeModal('modal-posponer')">Cancelar</button>
+        <button class="btn btn-primary" onclick="confirmarPosponer('${_esfEsc(slug)}')">Posponer</button>
+      </div>
+    </div>`;
+  openModal('modal-posponer');
+}
+
+async function confirmarPosponer(slug) {
+  const alertEl = document.getElementById('pp-alert');
+  const fechaNueva = (document.getElementById('pp-fecha-nueva')?.value || '').trim();
+  const motivo = (document.getElementById('pp-motivo')?.value || '').trim();
+  if (!fechaNueva) {
+    if (alertEl) alertEl.innerHTML = '<div class="alert alert-error">Elige la fecha nueva</div>';
+    return;
+  }
+  try {
+    const r = await khAdminFetch('/.netlify/functions/admin-posponer-evento', {
+      method: 'POST',
+      body: JSON.stringify({ slug, fecha_nueva: fechaNueva, motivo: motivo || undefined }),
+    });
+    if (!r.ok) {
+      const d = await r.json().catch(() => ({ error: r.statusText }));
+      if (alertEl) alertEl.innerHTML = `<div class="alert alert-error">${d.error || 'No se pudo posponer'}</div>`;
+      return;
+    }
+    const d = await r.json();
+    let extra = '';
+    if (d.pagos_recorridos > 0) {
+      const signo = (d.delta_dias > 0 ? '+' : '') + d.delta_dias;
+      extra += ` ✓ Se recorrieron ${d.pagos_recorridos} fecha${d.pagos_recorridos === 1 ? '' : 's'} de pago pendiente${d.pagos_recorridos === 1 ? '' : 's'} (${signo} días).`;
+    }
+    if (d.pagos_fallidos > 0 || d.pagos_error) {
+      extra += ' <svg class="ic"><use href="#ic-alerta"/></svg> Algunas fechas de pago no se pudieron recorrer — revísalas en el Portal.';
+    }
+    if (d.correos_enviados > 0) {
+      extra += ` <svg class="ic"><use href="#ic-correo"/></svg> Se avisó a ${d.correos_enviados} viajero${d.correos_enviados === 1 ? '' : 's'} por correo.`;
+    }
+    if (d.correos_fallidos > 0 || d.correos_error) {
+      extra += ' <svg class="ic"><use href="#ic-alerta"/></svg> Algunos correos no salieron.';
+    }
+    if (alertEl) alertEl.innerHTML = `<div class="alert alert-success">✓ Pospuesto de ${_esfEsc(d.fecha_anterior)} a ${_esfEsc(d.fecha_nueva)}. ${_esfEsc(d.recordatorio || '')}${_esfEsc(extra)}</div>`;
+    setTimeout(() => { closeModal('modal-posponer'); loadEsferasEventos(); }, 1800);
+  } catch (e) {
+    if (alertEl) alertEl.innerHTML = `<div class="alert alert-error">${e.message}</div>`;
+  }
+}
+
+// ── Avisar a clientes de la posposición (Fase 2) ─────────────────────────────
+// Dispara admin-avisar-posposicion (usa la última posposición registrada).
+function avisarPosposicion(slug) {
+  const ev = (window._esfRows || []).find(e => e && e.slug === slug);
+  if (!ev) { alert('No se encontró el evento en la lista. Recarga e intenta de nuevo.'); return; }
+  document.getElementById('modal-avisar').innerHTML = `
+    <div class="modal" style="max-width:420px">
+      <div class="modal-header">
+        <div class="modal-title" style="font-family:'Zen Dots',sans-serif;font-size:15px"><svg class="ic"><use href="#ic-correo"/></svg> Avisar a clientes</div>
+        <button class="modal-close" onclick="closeModal('modal-avisar')">×</button>
+      </div>
+      <div class="modal-body">
+        <div style="font-size:13px;margin-bottom:12px">
+          <b>${_esfEsc(ev.nombre)}</b>
+        </div>
+        <div style="font-size:12px;color:var(--ts);line-height:1.55;margin-bottom:12px">
+          Se enviará el aviso del cambio de fecha a los clientes <b>activos</b> (no cancelados) de este evento, usando la última posposición registrada. Asegúrate de haber republicado el evento en Esferas antes de avisar.
+        </div>
+        <div id="av-alert"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" onclick="closeModal('modal-avisar')">Cancelar</button>
+        <button class="btn btn-primary" id="av-enviar-btn" onclick="confirmarAviso('${_esfEsc(slug)}')">Enviar avisos</button>
+      </div>
+    </div>`;
+  openModal('modal-avisar');
+}
+
+async function confirmarAviso(slug) {
+  const alertEl = document.getElementById('av-alert');
+  const btn = document.getElementById('av-enviar-btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Enviando…'; }
+  if (alertEl) alertEl.innerHTML = '<div class="alert alert-info">Enviando…</div>';
+  try {
+    const r = await khAdminFetch('/.netlify/functions/admin-avisar-posposicion', {
+      method: 'POST',
+      body: JSON.stringify({ slug }),
+    });
+    if (!r.ok) {
+      const d = await r.json().catch(() => ({ error: r.statusText }));
+      if (alertEl) alertEl.innerHTML = `<div class="alert alert-error">${d.error || 'No se pudo avisar'}</div>`;
+      if (btn) { btn.disabled = false; btn.textContent = 'Enviar avisos'; }
+      return;
+    }
+    const d = await r.json();
+    const msg = (d.total === 0)
+      ? 'No hay clientes activos para avisar.'
+      : `✓ ${d.enviados} aviso(s) enviado(s)${d.fallidos ? ` · ${d.fallidos} fallido(s)` : ''}`;
+    if (alertEl) alertEl.innerHTML = `<div class="alert alert-success">${msg}</div>`;
+    setTimeout(() => closeModal('modal-avisar'), 2000);
+  } catch (e) {
+    if (alertEl) alertEl.innerHTML = `<div class="alert alert-error">${e.message}</div>`;
+    if (btn) { btn.disabled = false; btn.textContent = 'Enviar avisos'; }
+  }
+}
+
+// ── Recalcular fechas de pagos tras posponer (Fase 3) ────────────────────────
+// Dispara admin-recalcular-pagos-posposicion (mueve las cuotas pendientes el
+// mismo offset que el evento; idempotente, una vez por posposición).
+function recalcularPagosPosposicion(slug) {
+  const ev = (window._esfRows || []).find(e => e && e.slug === slug);
+  if (!ev) { alert('No se encontró el evento en la lista. Recarga e intenta de nuevo.'); return; }
+  document.getElementById('modal-recalcular').innerHTML = `
+    <div class="modal" style="max-width:420px">
+      <div class="modal-header">
+        <div class="modal-title" style="font-family:'Zen Dots',sans-serif;font-size:15px">↻ Recalcular pagos</div>
+        <button class="modal-close" onclick="closeModal('modal-recalcular')">×</button>
+      </div>
+      <div class="modal-body">
+        <div style="font-size:13px;margin-bottom:12px">
+          <b>${_esfEsc(ev.nombre)}</b>
+        </div>
+        <div style="font-size:12px;color:var(--ts);line-height:1.55;margin-bottom:12px">
+          Se recorrerán las fechas de las cuotas <b>pendientes</b> (no las pagadas ni vencidas) de los clientes activos, el mismo número de días que se movió el evento. Los montos NO cambian. Hazlo <b>antes</b> de avisar a los clientes. Solo se puede una vez por posposición.
+        </div>
+        <div id="rec-alert"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" onclick="closeModal('modal-recalcular')">Cancelar</button>
+        <button class="btn btn-primary" id="rec-enviar-btn" onclick="confirmarRecalculo('${_esfEsc(slug)}')">Recalcular</button>
+      </div>
+    </div>`;
+  openModal('modal-recalcular');
+}
+
+async function confirmarRecalculo(slug) {
+  const alertEl = document.getElementById('rec-alert');
+  const btn = document.getElementById('rec-enviar-btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Recalculando…'; }
+  if (alertEl) alertEl.innerHTML = '<div class="alert alert-info">Recalculando…</div>';
+  try {
+    const r = await khAdminFetch('/.netlify/functions/admin-recalcular-pagos-posposicion', {
+      method: 'POST',
+      body: JSON.stringify({ slug }),
+    });
+    if (!r.ok) {
+      const d = await r.json().catch(() => ({ error: r.statusText }));
+      if (alertEl) alertEl.innerHTML = `<div class="alert alert-error">${d.error || 'No se pudo recalcular'}</div>`;
+      if (btn) { btn.disabled = false; btn.textContent = 'Recalcular'; }
+      return;
+    }
+    const d = await r.json();
+    const msg = (d.movidos === 0)
+      ? 'No había cuotas pendientes que mover.'
+      : `✓ ${d.movidos} cuota(s) movida(s) · offset ${d.offset_dias} días${d.fallidos ? ` · ${d.fallidos} fallida(s)` : ''}`;
+    if (alertEl) alertEl.innerHTML = `<div class="alert alert-success">${msg}</div>`;
+    setTimeout(() => closeModal('modal-recalcular'), 2500);
+  } catch (e) {
+    if (alertEl) alertEl.innerHTML = `<div class="alert alert-error">${e.message}</div>`;
+    if (btn) { btn.disabled = false; btn.textContent = 'Recalcular'; }
+  }
+}
+
+// ── Cancelar evento (Fase 1, DESTRUCTIVO) ────────────────────────────────────
+// Dispara admin-cancelar-evento. Confirmación reforzada: hay que teclear el slug.
+function cancelarEventoCompleto(slug) {
+  const ev = (window._esfRows || []).find(e => e && e.slug === slug);
+  if (!ev) { alert('No se encontró el evento en la lista. Recarga e intenta de nuevo.'); return; }
+  document.getElementById('modal-cancelar-evento').innerHTML = `
+    <div class="modal" style="max-width:440px">
+      <div class="modal-header">
+        <div class="modal-title" style="font-family:'Zen Dots',sans-serif;font-size:15px;color:var(--red)"><svg class="ic"><use href="#ic-prohibido"/></svg> Cancelar evento</div>
+        <button class="modal-close" onclick="closeModal('modal-cancelar-evento')">×</button>
+      </div>
+      <div class="modal-body">
+        <div style="border:1px solid var(--red);border-radius:8px;padding:12px 14px;margin-bottom:14px;font-size:13px;line-height:1.55;color:var(--red)">
+          Vas a <b>CANCELAR</b> <b>${_esfEsc(ev.nombre)}</b>. Esto da de baja a TODOS los clientes activos y genera la lista de reembolsos por todo lo que pagaron. Es <b>IRREVERSIBLE</b>.
+        </div>
+        <div class="form-group">
+          <label>Motivo (opcional)</label>
+          <input type="text" class="cot-input" id="ce-motivo" placeholder="Motivo (opcional)" maxlength="200" style="width:100%">
+        </div>
+        <div class="form-group">
+          <label>Para confirmar, escribe el slug: <b>${_esfEsc(slug)}</b></label>
+          <input type="text" class="cot-input" id="ce-confirm" placeholder="Escribe: ${_esfEsc(slug)}" autocomplete="off" style="width:100%">
+        </div>
+        <div id="ce-alert"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" onclick="closeModal('modal-cancelar-evento')">Cerrar</button>
+        <button class="btn btn-primary" id="ce-enviar-btn" style="background:var(--red);border-color:var(--red)" onclick="confirmarCancelacionEvento('${_esfEsc(slug)}')">Cancelar evento</button>
+      </div>
+    </div>`;
+  openModal('modal-cancelar-evento');
+}
+
+async function confirmarCancelacionEvento(slug) {
+  const alertEl = document.getElementById('ce-alert');
+  const btn = document.getElementById('ce-enviar-btn');
+  const confirm = (document.getElementById('ce-confirm')?.value || '').trim();
+  if (confirm !== slug) {
+    if (alertEl) alertEl.innerHTML = `<div class="alert alert-error">El slug no coincide; escribe '${_esfEsc(slug)}' para confirmar</div>`;
+    return;
+  }
+  const motivo = (document.getElementById('ce-motivo')?.value || '').trim();
+  if (btn) { btn.disabled = true; btn.textContent = 'Cancelando…'; }
+  if (alertEl) alertEl.innerHTML = '<div class="alert alert-info">Cancelando…</div>';
+  try {
+    const r = await khAdminFetch('/.netlify/functions/admin-cancelar-evento', {
+      method: 'POST',
+      body: JSON.stringify({ slug, motivo: motivo || undefined }),
+    });
+    if (!r.ok) {
+      const d = await r.json().catch(() => ({ error: r.statusText }));
+      if (alertEl) alertEl.innerHTML = `<div class="alert alert-error">${d.error || 'No se pudo cancelar'}</div>`;
+      if (btn) { btn.disabled = false; btn.textContent = 'Cancelar evento'; }
+      return;
+    }
+    const d = await r.json();
+    const msg = `✓ Evento cancelado · ${d.solicitudes_baja} baja(s) · ${d.reembolsos_creados} reembolso(s) · total ${formatMXN(d.monto_total)}${d.bajas_fallidas ? ` · <svg class="ic"><use href="#ic-alerta"/></svg> ${d.bajas_fallidas} fallida(s)` : ''}`;
+    if (alertEl) alertEl.innerHTML = `<div class="alert alert-success">${msg}</div>`;
+    setTimeout(() => { closeModal('modal-cancelar-evento'); loadEsferasEventos(); }, 3000);
+  } catch (e) {
+    if (alertEl) alertEl.innerHTML = `<div class="alert alert-error">${e.message}</div>`;
+    if (btn) { btn.disabled = false; btn.textContent = 'Cancelar evento'; }
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// LA DERROTA DE YAMCHA — Panel de Reembolsos (Cancelar evento · Fase 3b)
+// ═══════════════════════════════════════════════════════════════
+async function loadYamcha() {
+  const lista = document.getElementById('yamcha-lista');
+  const totEl = document.getElementById('yamcha-totales');
+  if (!lista) return;
+  lista.innerHTML = '<div class="loading-state"><div class="spinner"></div>Cargando…</div>';
+  if (totEl) totEl.innerHTML = '';
+  try {
+    const r = await khAdminFetch('/.netlify/functions/admin-reembolsos', {
+      method: 'POST', body: JSON.stringify({ accion: 'listar' }),
+    });
+    if (!r.ok) {
+      const d = await r.json().catch(() => ({ error: r.statusText }));
+      lista.innerHTML = `<div class="alert alert-error">${_esfEsc(d.error || 'Error cargando reembolsos')}</div>`;
+      return;
+    }
+    const { reembolsos, totales } = await r.json();
+    const filas = Array.isArray(reembolsos) ? reembolsos : [];
+    window._yamchaRows = filas;
+    const t = totales || { pendiente_monto: 0, pendiente_n: 0, transferido_monto: 0, transferido_n: 0 };
+
+    if (totEl) totEl.innerHTML = `
+      <div class="metrics-grid">
+        <div class="metric">
+          <div class="metric-label">Pendiente por reembolsar</div>
+          <div class="metric-value red">${formatMXN(t.pendiente_monto)}</div>
+          <div style="font-size:11px;color:var(--ts)">${t.pendiente_n} cliente(s)</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">Ya transferido</div>
+          <div class="metric-value" style="color:#3DDC84">${formatMXN(t.transferido_monto)}</div>
+          <div style="font-size:11px;color:var(--ts)">${t.transferido_n} cliente(s)</div>
+        </div>
+      </div>`;
+
+    if (!filas.length) {
+      lista.innerHTML = '<div class="empty-state"><div class="empty-icon">✓</div>Sin reembolsos registrados</div>';
+      return;
+    }
+
+    // Agrupar por evento_slug (conserva el orden creado_en.desc del backend).
+    const grupos = [];
+    const idx = {};
+    for (const f of filas) {
+      if (!(f.evento_slug in idx)) { idx[f.evento_slug] = grupos.length; grupos.push({ slug: f.evento_slug, nombre: f.evento_nombre, rows: [] }); }
+      grupos[idx[f.evento_slug]].rows.push(f);
+    }
+
+    lista.innerHTML = grupos.map(g => {
+      const filasHtml = g.rows.map(rb => {
+        const esPend = rb.estado === 'pendiente';
+        const badge = esPend
+          ? '<span style="display:inline-block;padding:2px 8px;border-radius:10px;background:rgba(255,165,0,.15);color:var(--orange);font-size:11px;font-weight:700">pendiente</span>'
+          : '<span style="display:inline-block;padding:2px 8px;border-radius:10px;background:rgba(61,220,132,.15);color:#3DDC84;font-size:11px;font-weight:700">transferido</span>';
+        const accionEstado = esPend
+          ? `<button class="btn btn-ghost btn-sm" style="font-size:10px" onclick="transferirReembolso('${_esfEsc(rb.id)}')">✓ Marcar transferido</button>`
+          : `<button class="btn btn-ghost btn-sm" style="font-size:10px" onclick="desmarcarReembolso('${_esfEsc(rb.id)}')">↩️ Desmarcar</button>`;
+        return `<tr>
+          <td><div style="font-weight:600">${_esfEsc(rb.cliente_nombre || '—')}</div><div style="font-size:11px;color:var(--ts)">${_esfEsc(rb.cliente_correo || '')}</div></td>
+          <td style="font-weight:700">${formatMXN(rb.monto)}</td>
+          <td style="font-size:12px;max-width:220px;white-space:pre-wrap">${_esfEsc(rb.datos_bancarios || '—')}</td>
+          <td>${badge}</td>
+          <td style="white-space:nowrap"><button class="btn btn-ghost btn-sm" style="font-size:10px" onclick="editarDatosReembolso('${_esfEsc(rb.id)}')"><svg class="ic"><use href="#ic-lapiz"/></svg> Datos</button> ${accionEstado}</td>
+        </tr>`;
+      }).join('');
+      return `<div class="card" style="margin-bottom:16px">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:10px">
+          <div style="font-weight:700;font-size:15px">${_esfEsc(g.nombre || g.slug)}</div>
+          <button class="btn btn-ghost btn-sm" style="font-size:11px" onclick="avisarReembolsos('${_esfEsc(g.slug)}')"><svg class="ic"><use href="#ic-correo"/></svg> Avisar a clientes</button>
+        </div>
+        <div class="table-wrap"><table>
+          <thead><tr><th>Cliente</th><th>Monto</th><th>Datos bancarios</th><th>Estado</th><th>Acciones</th></tr></thead>
+          <tbody>${filasHtml}</tbody>
+        </table></div>
+      </div>`;
+    }).join('');
+  } catch (e) {
+    lista.innerHTML = `<div class="alert alert-error">${_esfEsc(e.message)}</div>`;
+  }
+}
+
+async function avisarReembolsos(slug) {
+  if (!confirm('¿Mandar el correo de cancelación + reembolso a los clientes con reembolso pendiente de este evento?')) return;
+  try {
+    const r = await khAdminFetch('/.netlify/functions/admin-avisar-cancelacion', {
+      method: 'POST', body: JSON.stringify({ slug }),
+    });
+    const d = await r.json().catch(() => ({ error: r.statusText }));
+    if (!r.ok) { showToast(d.error || 'No se pudo avisar', 'error'); return; }
+    showToast(`<svg class="ic"><use href="#ic-correo"/></svg> ${d.enviados || 0} enviado(s)${d.fallidos ? ` · <svg class="ic"><use href="#ic-alerta"/></svg> ${d.fallidos} fallido(s)` : ''}`, 'success');
+  } catch (e) {
+    showToast(e.message, 'error');
+  }
+}
+
+function editarDatosReembolso(id) {
+  const rb = (window._yamchaRows || []).find(x => x && x.id === id);
+  if (!rb) { alert('No se encontró el reembolso. Recarga e intenta de nuevo.'); return; }
+  document.getElementById('modal-yamcha-datos').innerHTML = `
+    <div class="modal" style="max-width:460px">
+      <div class="modal-header">
+        <div class="modal-title" style="font-family:'Zen Dots',sans-serif;font-size:15px"><svg class="ic"><use href="#ic-lapiz"/></svg> Datos de reembolso</div>
+        <button class="modal-close" onclick="closeModal('modal-yamcha-datos')">×</button>
+      </div>
+      <div class="modal-body">
+        <div style="font-size:13px;margin-bottom:12px"><b>${_esfEsc(rb.cliente_nombre || '—')}</b> · ${formatMXN(rb.monto)}<br><span style="font-size:11px;color:var(--ts)">${_esfEsc(rb.cliente_correo || '')}</span></div>
+        <div class="form-group">
+          <label>Datos bancarios (CLABE, banco, titular)</label>
+          <textarea class="cot-input" id="ya-datos" rows="3" style="width:100%" placeholder="Lo que respondió el cliente por correo">${_esfEsc(rb.datos_bancarios || '')}</textarea>
+        </div>
+        <div class="form-group">
+          <label>Notas</label>
+          <textarea class="cot-input" id="ya-notas" rows="2" style="width:100%">${_esfEsc(rb.notas || '')}</textarea>
+        </div>
+        <div id="ya-alert"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" onclick="closeModal('modal-yamcha-datos')">Cancelar</button>
+        <button class="btn btn-primary" onclick="guardarDatosReembolso('${_esfEsc(id)}')">Guardar</button>
+      </div>
+    </div>`;
+  openModal('modal-yamcha-datos');
+}
+
+async function guardarDatosReembolso(id) {
+  const alertEl = document.getElementById('ya-alert');
+  const datos_bancarios = (document.getElementById('ya-datos')?.value || '').trim();
+  const notas = (document.getElementById('ya-notas')?.value || '').trim();
+  try {
+    const r = await khAdminFetch('/.netlify/functions/admin-reembolsos', {
+      method: 'POST', body: JSON.stringify({ accion: 'guardar_datos', id, datos_bancarios, notas }),
+    });
+    if (!r.ok) {
+      const d = await r.json().catch(() => ({ error: r.statusText }));
+      if (alertEl) alertEl.innerHTML = `<div class="alert alert-error">${_esfEsc(d.error || 'No se pudo guardar')}</div>`;
+      return;
+    }
+    closeModal('modal-yamcha-datos');
+    loadYamcha();
+  } catch (e) {
+    if (alertEl) alertEl.innerHTML = `<div class="alert alert-error">${_esfEsc(e.message)}</div>`;
+  }
+}
+
+function transferirReembolso(id) {
+  const rb = (window._yamchaRows || []).find(x => x && x.id === id);
+  if (!rb) { alert('No se encontró el reembolso. Recarga e intenta de nuevo.'); return; }
+  document.getElementById('modal-yamcha-transferir').innerHTML = `
+    <div class="modal" style="max-width:420px">
+      <div class="modal-header">
+        <div class="modal-title" style="font-family:'Zen Dots',sans-serif;font-size:15px">✓ Marcar transferido</div>
+        <button class="modal-close" onclick="closeModal('modal-yamcha-transferir')">×</button>
+      </div>
+      <div class="modal-body">
+        <div style="font-size:13px;margin-bottom:14px">Reembolso de <b>${_esfEsc(rb.cliente_nombre || 'cliente')}</b> por <b>${formatMXN(rb.monto)}</b>.</div>
+        <div class="form-group">
+          <label>¿De qué cuenta salió?</label>
+          <select class="cot-input" id="ya-cuenta" style="width:100%">
+            <option value="">Elige cuenta…</option>
+            <option>BBVA</option>
+            <option>Banamex</option>
+            <option>Efectivo</option>
+          </select>
+        </div>
+        <div style="font-size:11px;color:var(--ts);line-height:1.5;margin-bottom:8px">Se registra como salida de esa cuenta; la caja del evento bajará por este monto.</div>
+        <div id="ya-tr-alert"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" onclick="closeModal('modal-yamcha-transferir')">Cancelar</button>
+        <button class="btn btn-primary" id="ya-tr-btn" onclick="confirmarTransferencia('${_esfEsc(id)}')">Confirmar</button>
+      </div>
+    </div>`;
+  openModal('modal-yamcha-transferir');
+}
+
+async function confirmarTransferencia(id) {
+  const alertEl = document.getElementById('ya-tr-alert');
+  const btn = document.getElementById('ya-tr-btn');
+  const cuenta = (document.getElementById('ya-cuenta')?.value || '').trim();
+  if (!cuenta) {
+    if (alertEl) alertEl.innerHTML = '<div class="alert alert-error">Elige una cuenta</div>';
+    return;
+  }
+  if (btn) { btn.disabled = true; btn.textContent = 'Guardando…'; }
+  try {
+    const r = await khAdminFetch('/.netlify/functions/admin-reembolsos', {
+      method: 'POST', body: JSON.stringify({ accion: 'marcar_transferido', id, cuenta }),
+    });
+    if (!r.ok) {
+      const d = await r.json().catch(() => ({ error: r.statusText }));
+      if (alertEl) alertEl.innerHTML = `<div class="alert alert-error">${_esfEsc(d.error || 'No se pudo marcar')}</div>`;
+      if (btn) { btn.disabled = false; btn.textContent = 'Confirmar'; }
+      return;
+    }
+    closeModal('modal-yamcha-transferir');
+    const d = await r.json().catch(() => ({}));
+    if (d.ya) showToast('Ya estaba transferido; no se reenvió correo', 'info');
+    else if (d.correo_enviado) showToast('Transferido ✓ y correo enviado al cliente', 'success');
+    else showToast('Transferido ✓ pero el correo al cliente NO salió — avísale tú', 'error');
+    loadYamcha();
+  } catch (e) {
+    if (alertEl) alertEl.innerHTML = `<div class="alert alert-error">${_esfEsc(e.message)}</div>`;
+    if (btn) { btn.disabled = false; btn.textContent = 'Confirmar'; }
+  }
+}
+
+async function desmarcarReembolso(id) {
+  if (!confirm('¿Desmarcar este reembolso? Volverá a pendiente.')) return;
+  try {
+    const r = await khAdminFetch('/.netlify/functions/admin-reembolsos', {
+      method: 'POST', body: JSON.stringify({ accion: 'desmarcar', id }),
+    });
+    if (!r.ok) { const d = await r.json().catch(() => ({ error: r.statusText })); showToast(d.error || 'No se pudo desmarcar', 'error'); return; }
+    loadYamcha();
+  } catch (e) { showToast(e.message, 'error'); }
+}
+
+async function crearEsferaEvento() {
+  const body = {
+    slug:         document.getElementById('esf-slug')?.value.trim().toLowerCase() || '',
+    nombre:       document.getElementById('esf-nombre')?.value.trim() || '',
+    titulo:       document.getElementById('esf-titulo')?.value.trim() || null,
+    fecha_inicio: document.getElementById('esf-fecha')?.value || null,
+    ciudad:       _esfCiudadValue() || null,
+    tipo:         document.getElementById('esf-tipo')?.value || null,
+    status:       document.getElementById('esf-status')?.value || '',
+    venue:        document.getElementById('esf-venue')?.value.trim() || null,
+    music:        document.getElementById('esf-music')?.value.trim() || null,
+    fechas_extra: _esfGetFechasExtra(),
+    zonas: _esfGetZonas(),
+    hotel: _esfGetHotel(),
+    mapa: _esfGetMapa(),
+    foto: _esfGetFoto(),
+    inc: _esfGetInc(),
+    sep: _esfGetSep(),
+    sep_cheap: _esfGetSepCheap(),
+    nota: _esfGetNota(),
+    festival: _esfGetFestival(),
+  };
+  const alertEl = document.getElementById('esf-alert');
+  try {
+    const r = await khAdminFetch('/.netlify/functions/esferas-crear', {
+      method:'POST', body: JSON.stringify(body),
+    });
+    if (!r.ok) {
+      const detail = await r.json().catch(()=>({ error: r.statusText }));
+      throw new Error(detail.error || 'Error creando');
+    }
+    alertEl.innerHTML='<div class="alert alert-success">✓ Evento creado</div>';
+    setTimeout(()=>alertEl.innerHTML='', 2000);
+    // Auto-guardado a la libreta: suma a venues_catalogo los NOMBRES de zona usados
+    // (best-effort; usa body porque el DOM se limpia abajo). Nunca precios.
+    _esfAutoGuardarLibreta(body.venue, body.zonas);
+    ['esf-slug','esf-nombre','esf-titulo','esf-fecha','esf-venue','esf-music'].forEach(id => { const el=document.getElementById(id); if (el) el.value=''; });
+    _esfClearFechasExtra();
+    _esfClearZonas();
+    _esfClearHotel();
+    _esfMapaClear();
+    _esfFotoClear();
+    _esfSeedDefaults();
+    const _fchk = document.getElementById('esf-es-festival'); if (_fchk) _fchk.checked = false;
+    _esfToggleFestival();
+    _esfFestivalPopulate({});   // cache + switches a default
+    const chosenEl = document.getElementById('esf-music-chosen'); if (chosenEl) chosenEl.textContent = '';
+    const resEl = document.getElementById('esf-music-results'); if (resEl) resEl.innerHTML = '';
+    loadEsferasEventos();
+  } catch(e) { alertEl.innerHTML=`<div class="alert alert-error">${e.message}</div>`; }
+}
+
+// ── Edición de una Esfera (modo edit del mismo form) ─────────────────────────
+// window._esfEditSlug marca el modo: null=crear, '<slug>'=editar. El botón
+// despacha a crear o a actualizar según el modo.
+window._esfEditSlug = null;
+
+// Ciudad: MTY / CDMX / "Otra ciudad…" (texto libre). El valor guardado en `ciudad`
+// es 'MTY', 'CDMX' o el texto escrito. cdmx:true solo lo emite generarObj para CDMX.
+function _esfCiudadToggle() {
+  const sel = document.getElementById('esf-ciudad');
+  const otra = document.getElementById('esf-ciudad-otra');
+  if (!sel || !otra) return;
+  otra.style.display = (sel.value === '__otra') ? '' : 'none';
+  _esfCityChanged();
+}
+
+function _esfCiudadValue() {
+  const sel = document.getElementById('esf-ciudad');
+  if (!sel) return '';
+  if (sel.value === '__otra') return (document.getElementById('esf-ciudad-otra')?.value || '').trim();
+  return sel.value;
+}
+
+function _esfCiudadSet(ciudad) {
+  const sel = document.getElementById('esf-ciudad');
+  const otra = document.getElementById('esf-ciudad-otra');
+  if (!sel) return;
+  const c = ciudad || 'MTY';
+  if (c === 'MTY' || c === 'CDMX') {
+    sel.value = c;
+    if (otra) { otra.value = ''; otra.style.display = 'none'; }
+  } else {
+    sel.value = '__otra';
+    if (otra) { otra.value = c; otra.style.display = ''; }
+  }
+}
+
+// ── Qué incluye (inc) + separo (sep/sep_cheap) + nota ────────────────────────
+// Defaults de la lista "qué incluye" por ciudad y texto de nota para CDMX.
+const _ESF_INC_MTY  = ['Boleto zona elegida', 'Transporte Reynosa-Mty', 'Hospedaje compartido', 'Kit Conecta'];
+const _ESF_INC_CDMX = ['Boleto zona elegida', 'Traslados CDMX', 'Hospedaje compartido', 'Kit Conecta'];
+const _ESF_NOTA_CDMX = 'NO incluye transporte a CDMX.';
+
+// CDMX si la ciudad es 'CDMX' o el venue menciona CDMX.
+function _esfIsCDMX() {
+  if (_esfCiudadValue().toUpperCase() === 'CDMX') return true;
+  const v = (document.getElementById('esf-venue')?.value || '').toUpperCase();
+  return v.indexOf('CDMX') >= 0;
+}
+function _esfIncDefaultList() { return (_esfIsCDMX() ? _ESF_INC_CDMX : _ESF_INC_MTY).slice(); }
+
+function _esfAddInc(text) {
+  const cont = document.getElementById('esf-inc');
+  if (!cont) return;
+  const row = document.createElement('div');
+  row.className = 'esf-inc-row';
+  row.style.cssText = 'display:flex;gap:6px;margin-top:6px;align-items:center';
+  row.innerHTML =
+    '<input class="cot-input esf-inc-t" placeholder="ej. Boleto zona elegida" style="flex:1;min-width:160px">' +
+    '<button type="button" class="btn btn-ghost esf-inc-del" title="Quitar">✕</button>';
+  row.querySelector('.esf-inc-t').value = (typeof text === 'string') ? text : '';
+  row.querySelector('.esf-inc-del').onclick = () => { row.remove(); };
+  cont.appendChild(row);
+}
+
+function _esfGetInc() {
+  return Array.from(document.querySelectorAll('#esf-inc .esf-inc-row'))
+    .map((row) => (row.querySelector('.esf-inc-t')?.value || '').trim())
+    .filter(Boolean);
+}
+
+function _esfClearInc() {
+  const cont = document.getElementById('esf-inc');
+  if (cont) cont.innerHTML = '';
+}
+
+// Regenera la lista con el default de la ciudad actual (botón "Restaurar default").
+function _esfIncDefault() {
+  _esfClearInc();
+  _esfIncDefaultList().forEach((t) => _esfAddInc(t));
+}
+
+// ¿La lista actual es "intacta" (vacía o igual a uno de los defaults conocidos)?
+// Si sí, se puede re-generar al cambiar de ciudad sin pisar ediciones manuales.
+function _esfIncEsDefault() {
+  const cur = _esfGetInc();
+  if (!cur.length) return true;
+  const eq = (a, b) => a.length === b.length && a.every((x, i) => x === b[i]);
+  return eq(cur, _ESF_INC_MTY) || eq(cur, _ESF_INC_CDMX);
+}
+
+// Disparado al cambiar ciudad/venue. Solo re-llena inc/nota si están "intactos"
+// (default o vacío) — respeta cualquier edición manual.
+function _esfCityChanged() {
+  if (_esfIncEsDefault()) _esfIncDefault();
+  const notaEl = document.getElementById('esf-nota');
+  if (notaEl) {
+    const v = notaEl.value.trim();
+    if (v === '' || v === _ESF_NOTA_CDMX) notaEl.value = _esfIsCDMX() ? _ESF_NOTA_CDMX : '';
+  }
+}
+
+function _esfGetSep() {
+  const v = document.getElementById('esf-sep')?.value;
+  const n = parseInt(v, 10);
+  return (Number.isFinite(n) && n >= 0) ? n : 500;
+}
+function _esfGetSepCheap() {
+  const v = document.getElementById('esf-sep-cheap')?.value;
+  const n = parseInt(v, 10);
+  return (Number.isFinite(n) && n >= 0) ? n : 500;
+}
+function _esfGetNota() { return (document.getElementById('esf-nota')?.value || '').trim(); }
+
+// Modo festival: interruptor + box. Apagado → _esfGetFestival()=null → concierto,
+// flujo idéntico a hoy. 2b: switches de módulos; 2c/2d agregan portada/lineup/paquetes.
+function _esfToggleFestival() {
+  const on = !!document.getElementById('esf-es-festival')?.checked;
+  const box = document.getElementById('esf-festival-box');
+  if (box) box.style.display = on ? '' : 'none';
+  // R1: en festival, ocultar los grupos de CONCIERTO (música/zonas/hotel) — el
+  // festival los tiene en sus paquetes. '' = display natural del form-group.
+  ['esf-grp-music', 'esf-grp-zonas', 'esf-grp-hotel'].forEach((id) => {
+    const g = document.getElementById(id);
+    if (g) g.style.display = on ? 'none' : '';
+  });
+}
+
+// Elegir tipo "Festival" enciende el interruptor (y muestra el box). Elegir otro
+// tipo NO lo apaga a la fuerza: el interruptor manda.
+function _esfTipoChange() {
+  if (document.getElementById('esf-tipo')?.value === 'festival') {
+    const chk = document.getElementById('esf-es-festival');
+    if (chk) chk.checked = true;
+    _esfToggleFestival();
+  }
+}
+
+// Cache del festival en edición. Preserva llaves futuras (portada/lineup/paquetes
+// de 2c/2d) al reescribir solo .switches.
+window._esfFestival = {};
+
+// Puebla los 4 controles desde fest.switches con defaults (cheap/stay ON, ride OFF,
+// transporte cdmx). fest = objeto ya parseado o null/{}.
+function _esfFestivalPopulate(fest) {
+  window._esfFestival = (fest && typeof fest === 'object') ? fest : {};
+  const sw = (window._esfFestival.switches && typeof window._esfFestival.switches === 'object') ? window._esfFestival.switches : {};
+  const setChk = (id, v) => { const el = document.getElementById(id); if (el) el.checked = v; };
+  setChk('esf-fest-cheap', sw.cheap !== undefined ? !!sw.cheap : true);
+  setChk('esf-fest-stay',  sw.stay  !== undefined ? !!sw.stay  : true);
+  setChk('esf-fest-ride',  sw.ride  !== undefined ? !!sw.ride  : false);
+  const tr = document.getElementById('esf-fest-transporte'); if (tr) tr.value = (sw.transporte === 'local') ? 'local' : 'cdmx';
+  // Portada + lineup: preview desde las URLs guardadas (o limpiar).
+  _esfFestImgShow('portada', window._esfFestival.portada || '');
+  _esfFestImgShow('lineup',  window._esfFestival.lineup  || '');
+  setChk('esf-fest-lineup-show', window._esfFestival.lineup_mostrar !== undefined ? !!window._esfFestival.lineup_mostrar : true);
+  // Música rotativa: precargar la lista guardada.
+  _esfMusicaLista = Array.isArray(window._esfFestival.musica) ? window._esfFestival.musica.slice() : [];
+  _esfMusicaRender();
+  // Paquetes: precargar preservando zonas/cheapZonas/hotel (2e-ii/iii los llenan).
+  _esfPaquetes = Array.isArray(window._esfFestival.paquetes) ? window._esfFestival.paquetes.map(p => ({
+    lbl: p.lbl || '', ds: p.ds || '', noches: p.noches || 0, ride: p.ride || 0,
+    zonas: Array.isArray(p.zonas) ? p.zonas : [], cheapZonas: Array.isArray(p.cheapZonas) ? p.cheapZonas : [],
+    hotel: Array.isArray(p.hotel) ? p.hotel : [], hotelTotal: Number(p.hotelTotal) || 0,
+  })) : [];
+  _esfPaqRender();
+}
+
+function _esfGetFestival() {
+  // Apagado → concierto (null). Encendido → parte del cache (preserva llaves de
+  // 2c/2d) y reescribe solo .switches con el estado actual de los controles.
+  if (!document.getElementById('esf-es-festival')?.checked) return null;
+  const base = window._esfFestival || {};
+  base.switches = {
+    cheap:      !!document.getElementById('esf-fest-cheap')?.checked,
+    stay:       !!document.getElementById('esf-fest-stay')?.checked,
+    ride:       !!document.getElementById('esf-fest-ride')?.checked,
+    transporte: document.getElementById('esf-fest-transporte')?.value || 'cdmx',
+  };
+  base.portada = _esfPortadaUrl || null;
+  base.lineup = _esfLineupUrl || null;
+  base.lineup_mostrar = !!document.getElementById('esf-fest-lineup-show')?.checked;
+  base.musica = _esfMusicaLista.slice();
+  base.paquetes = _esfPaquetes;   // ya trae zonas/cheapZonas/hotel (vacíos en 2e-i)
+  return base;
+}
+
+// Estado "nuevo evento": siembra inc default de la ciudad + separo 500.
+function _esfSeedDefaults() {
+  _esfIncDefault();
+  const sep = document.getElementById('esf-sep'); if (sep) sep.value = 500;
+  const sepC = document.getElementById('esf-sep-cheap'); if (sepC) sepC.value = 500;
+  const nota = document.getElementById('esf-nota'); if (nota) nota.value = _esfIsCDMX() ? _ESF_NOTA_CDMX : '';
+}
+
+function _esfClearIncSepNota() {
+  _esfClearInc();
+  const sep = document.getElementById('esf-sep'); if (sep) sep.value = '';
+  const sepC = document.getElementById('esf-sep-cheap'); if (sepC) sepC.value = '';
+  const nota = document.getElementById('esf-nota'); if (nota) nota.value = '';
+}
+
+// Modo editar: re-poblar inc (array/JSON) + sep/sep_cheap + nota desde la fila.
+function _esfIncSepNotaPopulate(row) {
+  _esfClearInc();
+  let inc = row.inc;
+  if (typeof inc === 'string') { try { inc = JSON.parse(inc); } catch { inc = []; } }
+  if (Array.isArray(inc)) inc.forEach((t) => { if (typeof t === 'string' && t.trim()) _esfAddInc(t); });
+  const sep = document.getElementById('esf-sep');
+  if (sep) sep.value = (row.sep != null && row.sep !== '') ? row.sep : 500;
+  const sepC = document.getElementById('esf-sep-cheap');
+  if (sepC) sepC.value = (row.sep_cheap != null && row.sep_cheap !== '') ? row.sep_cheap : 500;
+  const nota = document.getElementById('esf-nota');
+  if (nota) nota.value = (typeof row.nota === 'string') ? row.nota : '';
+}
+
+// ── Fechas adicionales (multifecha-ficha: varias fechas del mismo artista) ───
+// Inputs date extra bajo "Fecha inicio". Se guardan como JSON array en
+// `fechas_extra` (solo las no vacías). NO tocan precios/zonas.
+function _esfAddFechaExtra(value) {
+  const cont = document.getElementById('esf-fechas-extra');
+  if (!cont) return;
+  const row = document.createElement('div');
+  row.className = 'esf-fecha-extra-row';
+  row.style.cssText = 'display:flex;gap:8px;margin-top:8px';
+  const inp = document.createElement('input');
+  inp.type = 'date';
+  inp.className = 'cot-input esf-fecha-extra';
+  inp.style.flex = '1';
+  if (value) inp.value = String(value).slice(0, 10);
+  inp.addEventListener('input', renderEsferaPreview);
+  inp.addEventListener('change', renderEsferaPreview);
+  const del = document.createElement('button');
+  del.type = 'button';
+  del.className = 'btn btn-ghost';
+  del.textContent = '✕';
+  del.title = 'Quitar esta fecha';
+  del.onclick = () => { row.remove(); renderEsferaPreview(); };
+  row.appendChild(inp);
+  row.appendChild(del);
+  cont.appendChild(row);
+  renderEsferaPreview();
+}
+
+function _esfGetFechasExtra() {
+  return Array.from(document.querySelectorAll('#esf-fechas-extra .esf-fecha-extra'))
+    .map((el) => (el.value || '').trim())
+    .filter(Boolean);
+}
+
+function _esfClearFechasExtra() {
+  const cont = document.getElementById('esf-fechas-extra');
+  if (cont) cont.innerHTML = '';
+}
+
+// ── Zonas y precios (B1: zonas de venta, sin hotel/pagos) ────────────────────
+// Cada fila: [Nombre] [$ PLUS] [$ CHEAP opcional] [○ Agotada] [✕].
+// El ORDEN de captura se respeta (es el orden del cotizador). Se guarda como
+// JSON en `zonas` (solo filas con nombre).
+// ── Catálogo venue→zonas (Esferas) — admin-venues-catalogo (KH, maestro_roshi) ──
+// Cachea el catálogo al entrar a Esferas; autocompleta #esf-venue y precarga los
+// NOMBRES de zona (precio en blanco → p:0 → el index NO las enciende hasta capturar
+// precio real, candado 2c-iii). NO toca el catálogo viejo del cotizador (localStorage,
+// huérfano). Guarda/lee SOLO nombres, nunca precios.
+let _esfVenuesCat = [];
+
+async function _esfLoadVenuesCat() {
+  try {
+    const r = await khAdminFetch('/.netlify/functions/admin-venues-catalogo', {
+      method: 'POST', body: JSON.stringify({ accion: 'listar' }),
+    });
+    if (!r.ok) return;
+    const d = await r.json().catch(() => ({}));
+    _esfVenuesCat = Array.isArray(d.venues) ? d.venues : [];
+  } catch (e) { /* best-effort: sin catálogo, el venue sigue siendo texto libre */ }
+}
+
+function _esfVenueSugg() {
+  const box = document.getElementById('esf-venue-sugg');
+  const inp = document.getElementById('esf-venue');
+  if (!box || !inp) return;
+  const q = (inp.value || '').trim().toLowerCase();
+  if (!q || !_esfVenuesCat.length) { box.style.display = 'none'; box.innerHTML = ''; return; }
+  const m = [];
+  _esfVenuesCat.forEach((v, idx) => {
+    if (String(v.venue || '').toLowerCase().includes(q)) m.push({ v, idx });
+  });
+  const top = m.slice(0, 8);
+  if (!top.length) { box.style.display = 'none'; box.innerHTML = ''; return; }
+  // Pasamos el ÍNDICE (no el texto) al handler → evita problemas de escape con
+  // venues que traen comillas. El texto visible va escapado con _esfEsc.
+  box.innerHTML = top.map(({ v, idx }) => {
+    const nz = Array.isArray(v.zonas) ? v.zonas.length : 0;
+    return `<div style="padding:8px 10px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border)" onmousedown="_esfPickVenueIdx(${idx})">${_esfEsc(v.venue)} <span style="color:var(--ts);font-size:11px">· ${nz} zona${nz !== 1 ? 's' : ''}</span></div>`;
+  }).join('');
+  box.style.display = 'block';
+}
+
+function _esfVenueSuggHide() {
+  const box = document.getElementById('esf-venue-sugg');
+  if (box) box.style.display = 'none';
+}
+
+function _esfPickVenueIdx(idx) {
+  // Solo completa el NOMBRE del venue y cierra el dropdown. La precarga masiva de
+  // zonas del #138 se retiró: ahora las zonas se eligen una por una desde el
+  // dropdown por fila (_esfZonaSugg), que lee la libreta de este venue.
+  const cat = _esfVenuesCat[idx];
+  if (!cat) return;
+  const inp = document.getElementById('esf-venue');
+  if (inp) { inp.value = cat.venue; _esfCityChanged(); }
+  _esfVenueSuggHide();
+}
+
+async function _esfGuardarVenueZonas() {
+  const msg = document.getElementById('esf-venue-cat-msg');
+  const setMsg = (color, txt) => { if (msg) { msg.style.color = color; msg.textContent = txt; } };
+  const venue = (document.getElementById('esf-venue')?.value || '').trim();
+  if (!venue) { setMsg('var(--red)', 'Captura el venue primero.'); return; }
+  const nombres = _esfGetZonas().map(z => z.n).filter(n => n && n.trim());
+  if (!nombres.length) { setMsg('var(--red)', 'No hay zonas con nombre para guardar.'); return; }
+  setMsg('var(--ts)', 'Guardando…');
+  try {
+    const r = await khAdminFetch('/.netlify/functions/admin-venues-catalogo', {
+      method: 'POST', body: JSON.stringify({ accion: 'guardar', venue, zonas: nombres }),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok || d.ok === false) throw new Error(d.error || ('admin-venues-catalogo ' + r.status));
+    setMsg('var(--green)', `✓ Zonas guardadas para "${d.venue || venue}".`);
+    await _esfLoadVenuesCat();
+    setTimeout(() => setMsg('var(--ts)', ''), 2500);
+  } catch (e) {
+    setMsg('var(--red)', e.message);
+  }
+}
+
+// Zonas de la libreta para el venue tecleado en #esf-venue. Match por nombre
+// (trim, case-insensitive exacto — NO fuzzy). [] si el venue no está en la libreta.
+function _esfVenueZonas() {
+  const venue = (document.getElementById('esf-venue')?.value || '').trim().toLowerCase();
+  if (!venue || !Array.isArray(_esfVenuesCat)) return [];
+  const hit = _esfVenuesCat.find((v) => String(v.venue || '').trim().toLowerCase() === venue);
+  return (hit && Array.isArray(hit.zonas)) ? hit.zonas.filter((n) => typeof n === 'string' && n.trim()) : [];
+}
+
+// Dropdown por fila: sugiere las zonas guardadas del venue actual, filtradas por
+// lo tecleado. Clic en una la pone en el campo; la ✕ la borra de la LIBRETA.
+function _esfZonaSugg(inp) {
+  if (!inp || !inp.parentNode) return;
+  const box = inp.parentNode.querySelector('.esf-zona-sugg');
+  if (!box) return;
+  const venue = (document.getElementById('esf-venue')?.value || '').trim();
+  const zonas = _esfVenueZonas();
+  const q = (inp.value || '').trim().toLowerCase();
+  const matches = zonas.filter((n) => !q || n.toLowerCase().includes(q)).slice(0, 12);
+  if (!matches.length) { box.style.display = 'none'; box.innerHTML = ''; return; }
+  box.innerHTML = '';
+  const hint = document.createElement('div');
+  hint.textContent = '✕ quita de la libreta (sugerencias), no del evento';
+  hint.style.cssText = 'padding:5px 10px;font-size:10px;color:var(--ts);border-bottom:1px solid var(--border)';
+  box.appendChild(hint);
+  matches.forEach((name) => {
+    const item = document.createElement('div');
+    item.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:6px;padding:7px 10px;border-bottom:1px solid var(--border)';
+    const label = document.createElement('span');
+    label.textContent = name;
+    label.style.cssText = 'flex:1;cursor:pointer;font-size:13px';
+    label.addEventListener('mousedown', (e) => { e.preventDefault(); inp.value = name; _esfZonaSuggHide(inp); renderEsferaPreview(); });
+    const del = document.createElement('button');
+    del.type = 'button';
+    del.textContent = '✕';
+    del.title = 'Quitar de la libreta (sugerencias), no del evento';
+    del.style.cssText = 'background:none;border:none;color:var(--red);cursor:pointer;font-size:12px;flex-shrink:0';
+    del.addEventListener('mousedown', (e) => { e.preventDefault(); _esfZonaBorrar(venue, name, inp); });
+    item.appendChild(label);
+    item.appendChild(del);
+    box.appendChild(item);
+  });
+  box.style.display = 'block';
+}
+
+function _esfZonaSuggHide(inp) {
+  const box = (inp && inp.parentNode) ? inp.parentNode.querySelector('.esf-zona-sugg') : null;
+  if (box) box.style.display = 'none';
+}
+
+// Borra UNA zona de la libreta del venue (no toca el evento). Refresca caché y
+// re-pinta el dropdown. Best-effort.
+async function _esfZonaBorrar(venue, zona, inp) {
+  if (!venue || !zona) return;
+  await khAdminFetch('/.netlify/functions/admin-venues-catalogo', {
+    method: 'POST', body: JSON.stringify({ accion: 'borrar_zona', venue, zona }),
+  }).then((r) => r && r.json().catch(() => ({}))).catch(() => null);
+  await _esfLoadVenuesCat();
+  if (inp) _esfZonaSugg(inp);
+}
+
+// Auto-guardado a la libreta tras crear un evento: suma los NOMBRES usados al
+// venue (upsert hace merge+dedup). Best-effort (no rompe la creación). Nunca precios.
+async function _esfAutoGuardarLibreta(venue, zonasObjs) {
+  const v = (venue || '').trim();
+  if (!v) return;
+  const nombres = (Array.isArray(zonasObjs) ? zonasObjs : [])
+    .map((z) => (z && z.n) ? String(z.n).trim() : '').filter(Boolean);
+  if (!nombres.length) return;
+  await khAdminFetch('/.netlify/functions/admin-venues-catalogo', {
+    method: 'POST', body: JSON.stringify({ accion: 'guardar', venue: v, zonas: nombres }),
+  }).then((r) => r && r.json().catch(() => ({}))).catch(() => null);
+  await _esfLoadVenuesCat();
+}
+
+function _esfAddZona(data) {
+  const cont = document.getElementById('esf-zonas');
+  if (!cont) return;
+  const d = data || {};
+  const row = document.createElement('div');
+  row.className = 'esf-zona-row';
+  row.style.cssText = 'display:flex;gap:6px;margin-top:6px;align-items:center;flex-wrap:wrap';
+  row.innerHTML =
+    '<div class="esf-zona-nwrap" style="position:relative;flex:2;min-width:110px">' +
+      '<input class="cot-input esf-zona-n" placeholder="Zona" style="width:100%" autocomplete="off">' +
+      '<div class="esf-zona-sugg" style="display:none;position:absolute;left:0;right:0;top:100%;z-index:30;background:var(--bg2);border:1px solid var(--border);border-top:none;border-radius:0 0 var(--radius) var(--radius);max-height:200px;overflow:auto"></div>' +
+    '</div>' +
+    '<input class="cot-input esf-zona-p" type="number" min="0" placeholder="$ PLUS" style="flex:1;min-width:78px">' +
+    '<input class="cot-input esf-zona-pc" type="number" min="0" placeholder="$ CHEAP" style="flex:1;min-width:78px">' +
+    '<label style="font-size:11px;display:flex;align-items:center;gap:3px;white-space:nowrap"><input type="checkbox" class="esf-zona-ag">Agotada</label>' +
+    '<button type="button" class="btn btn-ghost esf-zona-del" title="Quitar zona">✕</button>';
+  row.querySelector('.esf-zona-n').value = (typeof d.n === 'string') ? d.n : '';
+  if (d.p) row.querySelector('.esf-zona-p').value = d.p;
+  if (d.pc) row.querySelector('.esf-zona-pc').value = d.pc;
+  if (d.ag) row.querySelector('.esf-zona-ag').checked = true;
+  row.querySelectorAll('input').forEach((el) => {
+    el.addEventListener('input', renderEsferaPreview);
+    el.addEventListener('change', renderEsferaPreview);
+  });
+  // Dropdown de la libreta en el campo de nombre (sin romper renderEsferaPreview).
+  const _nInp = row.querySelector('.esf-zona-n');
+  _nInp.addEventListener('focus', () => _esfZonaSugg(_nInp));
+  _nInp.addEventListener('input', () => _esfZonaSugg(_nInp));
+  _nInp.addEventListener('blur', () => setTimeout(() => _esfZonaSuggHide(_nInp), 150));
+  row.querySelector('.esf-zona-del').onclick = () => { row.remove(); renderEsferaPreview(); };
+  cont.appendChild(row);
+  renderEsferaPreview();
+}
+
+function _esfGetZonas() {
+  return Array.from(document.querySelectorAll('#esf-zonas .esf-zona-row')).map((row) => {
+    const n = (row.querySelector('.esf-zona-n')?.value || '').trim();
+    const p = parseInt(row.querySelector('.esf-zona-p')?.value || '0', 10) || 0;
+    const pc = parseInt(row.querySelector('.esf-zona-pc')?.value || '0', 10) || 0;
+    const ag = row.querySelector('.esf-zona-ag')?.checked ? 1 : 0;
+    return { n, p, pc, ag };
+  }).filter((z) => z.n);
+}
+
+function _esfClearZonas() {
+  const cont = document.getElementById('esf-zonas');
+  if (cont) cont.innerHTML = '';
+}
+
+// ── Hotel custom (B2b) ───────────────────────────────────────────────────────
+// Toggle apagado → default de ciudad (no se captura nada). Encendido → costo
+// total + 4 tipos FIJOS con su viaj interno; el extra POR PERSONA se autocalcula
+// con la fórmula (base=total/4; extra=ceil((4-pers)*base/pers)) y es editable.
+const _ESF_HOTEL_TIPOS = [
+  { n: 'Compartida', pers: 4, viaj: [1, 2, 3, 4] },
+  { n: 'Individual', pers: 1, viaj: [1] },
+  { n: 'Doble', pers: 2, viaj: [2] },
+  { n: 'Triple', pers: 3, viaj: [3] },
+];
+function _esfHotelExtra(total, pers) {
+  const base = (total || 0) / 4;
+  return Math.ceil((4 - pers) * base / pers);
+}
+function _esfHotelRenderRows() {
+  const cont = document.getElementById('esf-hotel-items');
+  if (!cont) return;
+  cont.innerHTML = '';
+  _ESF_HOTEL_TIPOS.forEach((t) => {
+    const row = document.createElement('div');
+    row.className = 'esf-hotel-row';
+    row.dataset.n = t.n;
+    row.dataset.viaj = t.viaj.join(',');
+    row.style.cssText = 'display:flex;gap:8px;margin-top:6px;align-items:center';
+    row.innerHTML =
+      '<div style="flex:1;font-size:12px">' + t.n + ' <span style="color:var(--ts)">(' + t.pers + 'p)</span></div>' +
+      '<input class="cot-input esf-hotel-e" type="number" min="0" style="flex:0 0 120px" placeholder="$ por persona">';
+    cont.appendChild(row);
+  });
+}
+// Recalcula los 4 extras desde el costo total (sobrescribe — incluidos ajustes
+// manuales; ese es el único momento en que se reescriben, como pide el spec).
+function _esfHotelRecalc() {
+  const total = parseInt(document.getElementById('esf-hotel-total')?.value || '0', 10) || 0;
+  document.querySelectorAll('#esf-hotel-items .esf-hotel-row').forEach((row) => {
+    const t = _ESF_HOTEL_TIPOS.find((x) => x.n === row.dataset.n);
+    row.querySelector('.esf-hotel-e').value = _esfHotelExtra(total, t ? t.pers : 4);
+  });
+}
+function _esfHotelToggle() {
+  const on = !!document.getElementById('esf-hotel-custom')?.checked;
+  const onBox = document.getElementById('esf-hotel-on');
+  const offBox = document.getElementById('esf-hotel-off');
+  if (onBox) onBox.style.display = on ? '' : 'none';
+  if (offBox) offBox.style.display = on ? 'none' : '';
+  if (on && !document.querySelector('#esf-hotel-items .esf-hotel-row')) {
+    _esfHotelRenderRows();
+    _esfHotelRecalc();
+  }
+}
+// Devuelve el objeto {custom,total,items} o null (toggle apagado = default ciudad).
+function _esfGetHotel() {
+  if (!document.getElementById('esf-hotel-custom')?.checked) return null;
+  const total = parseInt(document.getElementById('esf-hotel-total')?.value || '0', 10) || 0;
+  const items = Array.from(document.querySelectorAll('#esf-hotel-items .esf-hotel-row')).map((row) => ({
+    n: row.dataset.n,
+    e: parseInt(row.querySelector('.esf-hotel-e')?.value || '0', 10) || 0,
+    viaj: row.dataset.viaj.split(',').map((x) => parseInt(x, 10)).filter((x) => !isNaN(x)),
+  }));
+  return { custom: true, total, items };
+}
+function _esfClearHotel() {
+  const chk = document.getElementById('esf-hotel-custom');
+  if (chk) chk.checked = false;
+  const total = document.getElementById('esf-hotel-total');
+  if (total) total.value = '';
+  const items = document.getElementById('esf-hotel-items');
+  if (items) items.innerHTML = '';
+  _esfHotelToggle();
+}
+// Re-poblar en modo editar desde `hotel` (texto JSON u objeto). custom:false → off.
+function _esfHotelPopulate(raw) {
+  _esfClearHotel();
+  let h = raw;
+  if (typeof h === 'string') { try { h = JSON.parse(h); } catch { h = null; } }
+  if (!h || !h.custom || !Array.isArray(h.items) || !h.items.length) return;
+  const chk = document.getElementById('esf-hotel-custom');
+  if (chk) chk.checked = true;
+  _esfHotelToggle();              // muestra el panel y crea las 4 filas
+  const totalEl = document.getElementById('esf-hotel-total');
+  if (totalEl) totalEl.value = (h.total != null) ? h.total : '';
+  const byName = {};
+  h.items.forEach((it) => { if (it && typeof it.n === 'string') byName[it.n.trim()] = it.e; });
+  document.querySelectorAll('#esf-hotel-items .esf-hotel-row').forEach((row) => {
+    if (byName[row.dataset.n] != null) row.querySelector('.esf-hotel-e').value = byName[row.dataset.n];
+  });
+}
+
+// ── Mapa del venue (imagen → bucket público mapas-eventos) ───────────────────
+// Estado: URL pública del mapa ya subido ('' = sin mapa). Se manda en el campo
+// `mapa` al crear/actualizar. La imagen se redimensiona a máx 1400px de ancho y
+// se sube como webp antes de mandarla (no inflar el bucket).
+var _esfMapaUrl = '';
+
+function _esfMapaShow(url) {
+  _esfMapaUrl = url || '';
+  const prev = document.getElementById('esf-mapa-preview');
+  const img = document.getElementById('esf-mapa-img');
+  const clr = document.getElementById('esf-mapa-clear');
+  if (_esfMapaUrl) {
+    if (img) img.src = _esfMapaUrl;
+    if (prev) prev.style.display = '';
+    if (clr) clr.style.display = '';
+  } else {
+    if (img) img.src = '';
+    if (prev) prev.style.display = 'none';
+    if (clr) clr.style.display = 'none';
+  }
+}
+
+function _esfMapaClear() {
+  _esfMapaShow('');
+  const f = document.getElementById('esf-mapa-file');
+  if (f) f.value = '';
+  const st = document.getElementById('esf-mapa-status');
+  if (st) st.textContent = '';
+}
+
+function _esfGetMapa() { return _esfMapaUrl || ''; }
+
+// ── Concierto: foto de portada (calcado del mapa; reusa _esfMapaResize) ──────
+// Sube a esferas-subir-imagen tipo:'portada' (path <slug>-portada); la URL se
+// guarda en la columna `foto`. El compilador emite staticImg + img:false, y el
+// render de index.html la usa directa (TUERCA A). Reemplaza la foto de Deezer.
+var _esfFotoUrl = '';
+function _esfFotoShow(url) {
+  _esfFotoUrl = url || '';
+  const prev = document.getElementById('esf-foto-preview');
+  const img  = document.getElementById('esf-foto-img');
+  const clr  = document.getElementById('esf-foto-clear');
+  if (_esfFotoUrl) { if (img) img.src = _esfFotoUrl; if (prev) prev.style.display = ''; if (clr) clr.style.display = ''; }
+  else { if (img) img.src = ''; if (prev) prev.style.display = 'none'; if (clr) clr.style.display = 'none'; }
+}
+function _esfFotoClear() {
+  _esfFotoShow('');
+  const f = document.getElementById('esf-foto-file'); if (f) f.value = '';
+  const st = document.getElementById('esf-foto-status'); if (st) st.textContent = '';
+}
+// Modo editar: re-poblar preview desde la URL guardada en `foto` (o limpiar).
+function _esfFotoPopulate(url) {
+  _esfFotoShow((typeof url === 'string' && url.trim()) ? url.trim() : '');
+}
+function _esfGetFoto() { return _esfFotoUrl || ''; }
+async function _esfFotoPick(event) {
+  const file = event.target.files && event.target.files[0];
+  if (!file) return;
+  const slug = (document.getElementById('esf-slug')?.value || '').trim().toLowerCase();
+  if (!slug) { alert('Primero pon el slug del evento (nombra el archivo).'); event.target.value = ''; return; }
+  const st = document.getElementById('esf-foto-status'); if (st) st.textContent = 'Subiendo…';
+  try {
+    const dataUrl = await _esfMapaResize(file);
+    const r = await khAdminFetch('/.netlify/functions/esferas-subir-imagen', {
+      method: 'POST', body: JSON.stringify({ slug, dataUrl, tipo: 'portada' }),
+    });
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok || !data.ok || !data.url) throw new Error(data.error || 'No se pudo subir la foto');
+    _esfFotoShow(data.url);
+    const img = document.getElementById('esf-foto-img');
+    if (img) img.src = data.url + '?t=' + (img._t = (img._t || 0) + 1); // cache-bust (upsert mismo path)
+    if (st) st.textContent = 'Subida ✓';
+  } catch (e) {
+    if (st) st.textContent = 'Error: ' + e.message;
+  } finally {
+    event.target.value = '';
+  }
+}
+
+// ── Festival: portada + lineup (calcado del mapa; reusa _esfMapaResize) ──────
+var _esfPortadaUrl = '';
+var _esfLineupUrl = '';
+
+// kind ∈ {'portada','lineup'}. Muestra/oculta preview + guarda la URL en su var.
+function _esfFestImgShow(kind, url) {
+  const u = url || '';
+  if (kind === 'portada') _esfPortadaUrl = u; else _esfLineupUrl = u;
+  const prev = document.getElementById('esf-fest-' + kind + '-preview');
+  const img  = document.getElementById('esf-fest-' + kind + '-img');
+  const clr  = document.getElementById('esf-fest-' + kind + '-clear');
+  if (u) { if (img) img.src = u; if (prev) prev.style.display = ''; if (clr) clr.style.display = ''; }
+  else   { if (img) img.src = ''; if (prev) prev.style.display = 'none'; if (clr) clr.style.display = 'none'; }
+}
+function _esfFestImgClear(kind) {
+  _esfFestImgShow(kind, '');
+  const f = document.getElementById('esf-fest-' + kind + '-file'); if (f) f.value = '';
+  const st = document.getElementById('esf-fest-' + kind + '-status'); if (st) st.textContent = '';
+}
+async function _esfFestImgPick(kind, event) {
+  const file = event.target.files && event.target.files[0];
+  if (!file) return;
+  const slug = (document.getElementById('esf-slug')?.value || '').trim().toLowerCase();
+  if (!slug) { alert('Primero pon el slug del evento (nombra el archivo).'); event.target.value = ''; return; }
+  const st = document.getElementById('esf-fest-' + kind + '-status'); if (st) st.textContent = 'Subiendo…';
+  try {
+    const dataUrl = await _esfMapaResize(file);
+    const r = await khAdminFetch('/.netlify/functions/esferas-subir-imagen', {
+      method: 'POST', body: JSON.stringify({ slug, dataUrl, tipo: kind }),
+    });
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok || !data.ok || !data.url) throw new Error(data.error || 'No se pudo subir');
+    _esfFestImgShow(kind, data.url);
+    const img = document.getElementById('esf-fest-' + kind + '-img');
+    if (img) img.src = data.url + '?t=' + (img._t = (img._t || 0) + 1); // cache-bust (upsert mismo path)
+    if (st) st.textContent = 'Subido ✓';
+  } catch (e) {
+    if (st) st.textContent = 'Error: ' + e.message;
+  } finally {
+    event.target.value = '';
+  }
+}
+function _esfFestPortadaPick(event) { return _esfFestImgPick('portada', event); }
+function _esfFestPortadaShow(url) { _esfFestImgShow('portada', url); }
+function _esfFestPortadaClear() { _esfFestImgClear('portada'); }
+function _esfFestLineupPick(event) { return _esfFestImgPick('lineup', event); }
+function _esfFestLineupShow(url) { _esfFestImgShow('lineup', url); }
+function _esfFestLineupClear() { _esfFestImgClear('lineup'); }
+
+// Modo editar: re-poblar preview desde el `mapa` guardado (URL) o limpiar.
+function _esfMapaPopulate(url) {
+  _esfMapaShow((typeof url === 'string' && url.trim()) ? url.trim() : '');
+}
+
+// Redimensiona el archivo a máx 1400px de ancho y devuelve un dataUrl webp ~0.85.
+function _esfMapaResize(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const img = new Image();
+      img.onload = () => {
+        const MAX = 1400;
+        let w = img.width, h = img.height;
+        if (w > MAX) { h = Math.round(h * MAX / w); w = MAX; }
+        const canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL('image/webp', 0.85));
+      };
+      img.onerror = reject;
+      img.src = ev.target.result;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+async function _esfMapaPick(event) {
+  const file = event.target.files && event.target.files[0];
+  if (!file) return;
+  const slug = (document.getElementById('esf-slug')?.value || '').trim().toLowerCase();
+  if (!slug) {
+    alert('Primero pon el slug del evento (nombra el archivo del mapa).');
+    event.target.value = '';
+    return;
+  }
+  const st = document.getElementById('esf-mapa-status');
+  if (st) st.textContent = 'Subiendo…';
+  try {
+    const dataUrl = await _esfMapaResize(file);
+    const r = await khAdminFetch('/.netlify/functions/esferas-subir-mapa', {
+      method: 'POST', body: JSON.stringify({ slug, dataUrl }),
+    });
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok || !data.ok || !data.url) throw new Error(data.error || 'No se pudo subir el mapa');
+    // Cache-bust en el preview: el bucket hace upsert sobre el mismo path.
+    _esfMapaShow(data.url);
+    const img = document.getElementById('esf-mapa-img');
+    if (img) img.src = data.url + '?t=' + (img._t = (img._t || 0) + 1);
+    if (st) st.textContent = 'Mapa subido ✓';
+  } catch (e) {
+    if (st) st.textContent = 'Error: ' + e.message;
+  } finally {
+    event.target.value = '';
+  }
+}
+
+// minP del preview = espeja la card real del index: menor precio PLUS (p>0,
+// no agotada). 0 si no hay zonas vendibles.
+function _esfPreviewMinP() {
+  const avail = _esfGetZonas().filter((z) => !z.ag && z.p > 0);
+  if (!avail.length) return 0;
+  return Math.min.apply(null, avail.map((z) => z.p));
+}
+
+function _esfFmtMoney(n) {
+  return '$' + Math.round(n || 0).toLocaleString('es-MX');
+}
+
+function submitEsferaForm() {
+  if (window._esfEditSlug) guardarCambiosEsfera();
+  else crearEsferaEvento();
+}
+
+function editarEsfera(slug) {
+  const row = (window._esfRows || []).find(r => r && r.slug === slug);
+  if (!row) return;
+  window._esfEditSlug = slug;
+  const set = (id, val) => { const el = document.getElementById(id); if (el) el.value = val; };
+  const sEl = document.getElementById('esf-slug');
+  if (sEl) { sEl.value = row.slug || ''; sEl.readOnly = true; sEl.style.opacity = '0.6'; }
+  set('esf-nombre', row.nombre || '');
+  set('esf-titulo', row.titulo || '');
+  set('esf-fecha', (row.fecha_inicio || '').slice(0, 10));
+  // Fechas adicionales: re-crear inputs desde fechas_extra (texto JSON o array).
+  _esfClearFechasExtra();
+  let _fe = row.fechas_extra;
+  if (typeof _fe === 'string') { try { _fe = JSON.parse(_fe); } catch { _fe = []; } }
+  if (Array.isArray(_fe)) _fe.forEach((d) => { if (typeof d === 'string') _esfAddFechaExtra(d); });
+  // Zonas: re-crear filas desde `zonas` (texto JSON o array).
+  _esfClearZonas();
+  let _zs = row.zonas;
+  if (typeof _zs === 'string') { try { _zs = JSON.parse(_zs); } catch { _zs = []; } }
+  if (Array.isArray(_zs)) _zs.forEach((z) => { if (z && typeof z === 'object') _esfAddZona(z); });
+  // Hotel custom: re-poblar desde `hotel` (texto JSON u objeto); custom:false → off.
+  _esfHotelPopulate(row.hotel);
+  // Mapa: re-poblar preview desde la URL guardada (o limpiar si no hay).
+  _esfMapaPopulate(row.mapa);
+  // Foto de portada (concierto): re-poblar preview desde `foto` (o limpiar).
+  _esfFotoPopulate(row.foto);
+  // Qué incluye + separo + nota: re-poblar desde la fila.
+  _esfIncSepNotaPopulate(row);
+  _esfCiudadSet(row.ciudad || 'MTY');
+  set('esf-tipo', row.tipo || 'concierto');
+  // Modo festival: encender el interruptor si el evento tiene `festival` no-null,
+  // y poblar los switches desde el objeto guardado (parseado).
+  const festOn = row.festival != null && row.festival !== '';
+  const fchk = document.getElementById('esf-es-festival'); if (fchk) fchk.checked = festOn;
+  _esfToggleFestival();
+  let _fest = row.festival;
+  if (typeof _fest === 'string') { try { _fest = JSON.parse(_fest); } catch { _fest = null; } }
+  _esfFestivalPopulate(_fest);
+  set('esf-status', row.status || '');
+  set('esf-venue', row.venue || '');
+  set('esf-music', row.music || '');
+  const chosenEl = document.getElementById('esf-music-chosen'); if (chosenEl) chosenEl.textContent = '';
+  const resEl = document.getElementById('esf-music-results'); if (resEl) resEl.innerHTML = '';
+  const tit = document.getElementById('esf-form-titulo'); if (tit) tit.textContent = '// EDITAR EVENTO: ' + slug;
+  const btn = document.getElementById('esf-submit-btn'); if (btn) btn.textContent = 'Guardar cambios';
+  const cancel = document.getElementById('esf-cancel-edit'); if (cancel) cancel.style.display = '';
+  const al = document.getElementById('esf-alert'); if (al) al.innerHTML = '';
+  renderEsferaPreview();
+  if (sEl) sEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+function cancelarEdicionEsfera() {
+  window._esfEditSlug = null;
+  const sEl = document.getElementById('esf-slug');
+  if (sEl) { sEl.readOnly = false; sEl.style.opacity = ''; sEl.value = ''; }
+  ['esf-nombre','esf-titulo','esf-fecha','esf-venue','esf-music'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+  _esfClearFechasExtra();
+  _esfClearZonas();
+  _esfClearHotel();
+  _esfMapaClear();
+  _esfFotoClear();
+  _esfCiudadSet('MTY');
+  _esfSeedDefaults();
+  const tipo = document.getElementById('esf-tipo'); if (tipo) tipo.value = 'concierto';
+  const _fchk2 = document.getElementById('esf-es-festival'); if (_fchk2) _fchk2.checked = false;
+  _esfToggleFestival();
+  _esfFestivalPopulate({});   // festival off + switches a default
+  const status = document.getElementById('esf-status'); if (status) status.value = '';
+  const chosenEl = document.getElementById('esf-music-chosen'); if (chosenEl) chosenEl.textContent = '';
+  const resEl = document.getElementById('esf-music-results'); if (resEl) resEl.innerHTML = '';
+  const tit = document.getElementById('esf-form-titulo'); if (tit) tit.textContent = '// NUEVO EVENTO';
+  const btn = document.getElementById('esf-submit-btn'); if (btn) btn.textContent = 'Crear evento';
+  const cancel = document.getElementById('esf-cancel-edit'); if (cancel) cancel.style.display = 'none';
+  const al = document.getElementById('esf-alert'); if (al) al.innerHTML = '';
+  renderEsferaPreview();
+}
+
+async function guardarCambiosEsfera() {
+  const slug = window._esfEditSlug;
+  if (!slug) return;
+  const body = {
+    slug,
+    nombre:       document.getElementById('esf-nombre')?.value.trim() || '',
+    titulo:       document.getElementById('esf-titulo')?.value.trim() || null,
+    fecha_inicio: document.getElementById('esf-fecha')?.value || null,
+    ciudad:       _esfCiudadValue() || null,
+    tipo:         document.getElementById('esf-tipo')?.value || null,
+    status:       document.getElementById('esf-status')?.value || '',
+    venue:        document.getElementById('esf-venue')?.value.trim() || null,
+    music:        document.getElementById('esf-music')?.value.trim() || null,
+    fechas_extra: _esfGetFechasExtra(),
+    zonas: _esfGetZonas(),
+    hotel: _esfGetHotel(),
+    mapa: _esfGetMapa(),
+    foto: _esfGetFoto(),
+    inc: _esfGetInc(),
+    sep: _esfGetSep(),
+    sep_cheap: _esfGetSepCheap(),
+    nota: _esfGetNota(),
+    festival: _esfGetFestival(),
+  };
+  const alertEl = document.getElementById('esf-alert');
+  try {
+    const r = await khAdminFetch('/.netlify/functions/esferas-actualizar', { method:'POST', body: JSON.stringify(body) });
+    if (!r.ok) {
+      const detail = await r.json().catch(()=>({ error: r.statusText }));
+      throw new Error(detail.error || 'Error guardando');
+    }
+    cancelarEdicionEsfera();
+    if (alertEl) {
+      alertEl.innerHTML = '<div class="alert alert-success">✓ Cambios guardados</div>';
+      setTimeout(()=>{ if (alertEl) alertEl.innerHTML = ''; }, 2000);
+    }
+    loadEsferasEventos();
+  } catch(e) { if (alertEl) alertEl.innerHTML = `<div class="alert alert-error">${e.message}</div>`; }
+}
+
+// ── Vista previa de la card (UI pura) ────────────────────────────────────────
+// Renderiza en vivo cómo se verá la .ev-card del index con los valores del form.
+// El único fetch es a /.netlify/functions/deezer (foto), con debounce. No escribe.
+const ESF_PREVIEW_MESES = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+
+function _esfPreviewFDisplay(fi) {
+  if (!fi) return 'Por confirmar';
+  const m = String(fi).slice(0, 10).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return 'Por confirmar';
+  const mes = ESF_PREVIEW_MESES[parseInt(m[2], 10) - 1];
+  if (!mes) return 'Por confirmar';
+  return parseInt(m[3], 10) + ' ' + mes + ' ' + m[1];
+}
+
+// Display combinado para 2+ fechas (ordenadas, 'YYYY-MM-DD'). Espejo de
+// fDisplayMulti en _lib/esferas-compile.js: mismo mes → "7, 9 y 10 may 2026";
+// cruzan meses → "30 nov y 2 dic 2026"; cruzan años → año en cada una.
+function _esfPreviewFDisplayMulti(fechas) {
+  const parts = fechas.map((s) => ({
+    y: s.slice(0, 4), mo: parseInt(s.slice(5, 7), 10), d: parseInt(s.slice(8, 10), 10),
+  }));
+  const joinHuman = (items) => (items.length <= 1
+    ? (items[0] || '')
+    : items.slice(0, -1).join(', ') + ' y ' + items[items.length - 1]);
+  const sameYear = parts.every((p) => p.y === parts[0].y);
+  const sameMonth = sameYear && parts.every((p) => p.mo === parts[0].mo);
+  if (sameMonth) {
+    const mes = ESF_PREVIEW_MESES[parts[0].mo - 1] || '';
+    return joinHuman(parts.map((p) => String(p.d))) + ' ' + mes + ' ' + parts[0].y;
+  }
+  if (sameYear) {
+    const items = parts.map((p) => String(p.d) + ' ' + (ESF_PREVIEW_MESES[p.mo - 1] || ''));
+    return joinHuman(items) + ' ' + parts[0].y;
+  }
+  const items = parts.map((p) => String(p.d) + ' ' + (ESF_PREVIEW_MESES[p.mo - 1] || '') + ' ' + p.y);
+  return joinHuman(items);
+}
+
+// Junta la fecha base + las extra → array ordenado y dedupe de 'YYYY-MM-DD'.
+function _esfPreviewFechas() {
+  const base = document.getElementById('esf-fecha')?.value || '';
+  const re = /^\d{4}-\d{2}-\d{2}$/;
+  const seen = {};
+  const out = [];
+  [base].concat(_esfGetFechasExtra()).forEach((d) => {
+    const s = String(d || '').slice(0, 10);
+    if (re.test(s) && !seen[s]) { seen[s] = 1; out.push(s); }
+  });
+  out.sort();
+  return out;
+}
+
+// status del form → {txt, cls (clase del tag), cardCls (overlay)}
+function _esfPreviewStatus(st) {
+  switch (st) {
+    case 'agotado':       return { txt:'Agotado',         cls:'tag',     cardCls:'agotado' };
+    case 'proceso':       return { txt:'En Proceso',      cls:'tproc',   cardCls:'proceso' };
+    case 'proximamente':  return { txt:'Próximamente',    cls:'tpronto', cardCls:'proxi' };
+    case 'por-confirmar': return { txt:'Por confirmar',   cls:'tpc',     cardCls:'' };
+    case 'ultimos':       return { txt:'Últimos lugares', cls:'tu',      cardCls:'' };
+    default:              return { txt:'Disponible',       cls:'td',      cardCls:'' };
+  }
+}
+
+let _esfPreviewImgTimer = null;
+const _esfPreviewImgCache = {}; // nombre → src|null (null = sin foto)
+
+// Zona inferior (.ev-bottom) tal como la arma el index según status. Con zonas
+// con precio (desde>0) muestra "Desde $X" como la card real; sin zonas cae a
+// "Informes / Cotiza por WA". SOLO VISUAL en el preview (sin onclick).
+function _esfPreviewBottom(status, desde) {
+  if (status === 'proximamente') {
+    return '<div class="ev-bottom"><div class="ev-prox-badge">AVÍSAME<span class="ev-prox-sub">Lista de espera</span></div></div>';
+  }
+  if (status === 'agotado' || status === 'proceso') {
+    return ''; // el overlay cubre la card; el bottom real queda vacío
+  }
+  if (desde > 0) {
+    return '<div class="ev-bottom"><div><div class="ev-price-lbl">Desde</div><div class="ev-price">' + _esfFmtMoney(desde) + '</div></div><span class="ev-cta ev-cta-wa">WhatsApp</span></div>';
+  }
+  const cta = (status === 'por-confirmar') ? '' : '<span class="ev-cta ev-cta-wa">WhatsApp</span>';
+  return '<div class="ev-bottom"><div><div class="ev-price-lbl">Informes</div><div class="ev-price-wa">Cotiza por WA</div></div>' + cta + '</div>';
+}
+
+function renderEsferaPreview() {
+  const cont = document.getElementById('esf-preview-card');
+  if (!cont) return;
+  const nombre = (document.getElementById('esf-nombre')?.value || '').trim();
+  const titulo = (document.getElementById('esf-titulo')?.value || '').trim();
+  const fecha  = document.getElementById('esf-fecha')?.value || '';
+  const fechas = _esfPreviewFechas();
+  const fDisp  = (fechas.length >= 2) ? _esfPreviewFDisplayMulti(fechas) : _esfPreviewFDisplay(fechas[0] || fecha);
+  const status = document.getElementById('esf-status')?.value || '';
+  const venue  = (document.getElementById('esf-venue')?.value || '').trim();
+  const st = _esfPreviewStatus(status);
+  const initials = (nombre || '··').substring(0, 2).toUpperCase();
+  const cached = _esfPreviewImgCache[nombre];
+  const imgHTML = cached
+    ? `<div class="ev-img-wrap"><img class="ev-img" src="${_esfEsc(cached)}" alt=""></div>`
+    : `<div class="ev-img-placeholder"><span class="ev-img-initials">${_esfEsc(initials)}</span></div>`;
+  cont.innerHTML =
+    `<div class="ev-card ${st.cardCls}">` +
+      imgHTML +
+      `<span class="ev-tag ${st.cls}">${_esfEsc(st.txt)}</span>` +
+      `<div class="ev-body"><div class="ev-top">` +
+        `<div class="ev-fecha">${_esfEsc(fDisp)}</div>` +
+        `<div class="ev-artist">${_esfEsc(titulo || nombre || 'Nombre del evento')}</div>` +
+        `<div class="ev-venue">${_esfEsc(venue)}</div>` +
+      `</div>` + _esfPreviewBottom(status, _esfPreviewMinP()) + `</div>` +
+    `</div>`;
+  // Foto: debounce 500ms; solo si el nombre aún no se consultó.
+  if (nombre && cached === undefined) {
+    clearTimeout(_esfPreviewImgTimer);
+    _esfPreviewImgTimer = setTimeout(() => _esfPreviewLoadFoto(nombre), 500);
+  }
+}
+
+function _esfPreviewLoadFoto(nombre) {
+  fetch('/.netlify/functions/deezer?q=' + encodeURIComponent(nombre))
+    .then(r => r.json())
+    .then(d => {
+      let src = null;
+      if (d && d.data && d.data[0] && d.data[0].picture_xl &&
+          d.data[0].picture_xl.indexOf('d41d8cd98f00b204e9800998ecf8427e') === -1) {
+        src = d.data[0].picture_xl;
+      }
+      _esfPreviewImgCache[nombre] = src;
+      const actual = (document.getElementById('esf-nombre')?.value || '').trim();
+      if (actual === nombre) renderEsferaPreview();
+    })
+    .catch(() => { _esfPreviewImgCache[nombre] = null; });
+}
+
+function _esfPreviewInit() {
+  if (!window._esfPreviewBound) {
+    window._esfPreviewBound = true;
+    ['esf-nombre','esf-titulo','esf-fecha','esf-status','esf-venue'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) { el.addEventListener('input', renderEsferaPreview); el.addEventListener('change', renderEsferaPreview); }
+    });
+  }
+  // Estado inicial = nuevo evento: sembrar inc default + separo 500 (sin pisar edición).
+  if (!window._esfEditSlug && !document.querySelector('#esf-inc .esf-inc-row')) _esfSeedDefaults();
+  renderEsferaPreview();
+}
+
+// ── Buscador de música Deezer (UI pura: solo lee de /functions/deezer) ────────
+// Escribes el artista (campo Nombre), buscas pistas, eliges una → guarda el
+// track ID. El ▶ reproduce el preview de 30s. No escribe a repo ni Supabase.
+let _esfMusicAudio = null;
+function _esfMusicStopAudio() {
+  if (_esfMusicAudio) { try { _esfMusicAudio.pause(); } catch(_){} _esfMusicAudio = null; }
+}
+
+// Buscador Deezer reusable: fetch + render de filas en `cont`; "Elegir" llama
+// onPick(id, label). Lo usan conciertos (buscarMusicaEsfera) y la lista rotativa
+// del festival (_esfFestMusicBuscar) sin cambiar el comportamiento de conciertos.
+async function _esfMusicBuscar(query, cont, onPick) {
+  if (!cont) return;
+  cont.innerHTML = '<div class="loading-state"><div class="spinner"></div>Buscando…</div>';
+  try {
+    const r = await fetch('/.netlify/functions/deezer?type=tracklist&q=' + encodeURIComponent(query));
+    const d = await r.json().catch(() => ({}));
+    const items = (d && d.results) || [];
+    cont.innerHTML = '';
+    if (!items.length) { cont.innerHTML = '<div style="font-size:11px;color:var(--ts)">Sin resultados.</div>'; return; }
+    items.forEach(t => {
+      const row = document.createElement('div');
+      row.style.cssText = 'display:flex;align-items:center;gap:8px;padding:6px;border:1px solid var(--border);border-radius:8px;margin-bottom:6px';
+      const cover = document.createElement(t.cover ? 'img' : 'div');
+      cover.style.cssText = 'width:36px;height:36px;border-radius:4px;flex-shrink:0;background:var(--bg);object-fit:cover';
+      if (t.cover) cover.src = t.cover;
+      const info = document.createElement('div');
+      info.style.cssText = 'flex:1;min-width:0';
+      const ti = document.createElement('div');
+      ti.style.cssText = 'font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis';
+      ti.textContent = t.title || '';
+      const su = document.createElement('div');
+      su.style.cssText = 'font-size:10px;color:var(--ts);white-space:nowrap;overflow:hidden;text-overflow:ellipsis';
+      su.textContent = (t.artist || '') + (t.album ? ' · ' + t.album : '');
+      info.appendChild(ti); info.appendChild(su);
+      row.appendChild(cover); row.appendChild(info);
+      if (t.preview) {
+        const play = document.createElement('button');
+        play.type = 'button'; play.className = 'btn btn-ghost btn-sm'; play.style.fontSize = '11px'; play.textContent = '▶';
+        play.addEventListener('click', () => _esfMusicPlay(t.preview, play));
+        row.appendChild(play);
+      }
+      const pick = document.createElement('button');
+      pick.type = 'button'; pick.className = 'btn btn-primary btn-sm'; pick.style.fontSize = '10px'; pick.textContent = 'Elegir';
+      pick.addEventListener('click', () => onPick(String(t.id), (t.title || '') + ' — ' + (t.artist || '')));
+      row.appendChild(pick);
+      cont.appendChild(row);
+    });
+  } catch (e) {
+    cont.innerHTML = `<div class="alert alert-error">${_esfEsc(e.message)}</div>`;
+  }
+}
+
+// Conciertos: busca por el Nombre/Artista y pone UN track id en #esf-music.
+function buscarMusicaEsfera() {
+  const nombre = (document.getElementById('esf-nombre')?.value || '').trim();
+  const cont = document.getElementById('esf-music-results');
+  if (!cont) return;
+  if (!nombre) { cont.innerHTML = '<div style="font-size:11px;color:var(--orange)">Escribe primero el Nombre / Artista.</div>'; return; }
+  _esfMusicBuscar(nombre, cont, _esfMusicElegir);
+}
+
+// Festival: mini-buscador que ARMA la lista rotativa (festival.musica).
+function _esfFestMusicBuscar() {
+  const q = (document.getElementById('esf-fest-music-q')?.value || '').trim();
+  const cont = document.getElementById('esf-fest-music-results');
+  if (!cont) return;
+  if (!q) { cont.innerHTML = '<div style="font-size:11px;color:var(--orange)">Escribe un artista.</div>'; return; }
+  _esfMusicBuscar(q, cont, _esfMusicaAdd);
+}
+
+// Lista de música rotativa del festival: [{id,label}].
+var _esfMusicaLista = [];
+function _esfMusicaAdd(id, label) {
+  if (!_esfMusicaLista.some(m => m.id === id)) _esfMusicaLista.push({ id: id, label: label });
+  _esfMusicaRender();
+  const res = document.getElementById('esf-fest-music-results'); if (res) res.innerHTML = '';
+  const q = document.getElementById('esf-fest-music-q'); if (q) q.value = '';
+}
+function _esfMusicaRemove(id) {
+  _esfMusicaLista = _esfMusicaLista.filter(m => m.id !== id);
+  _esfMusicaRender();
+}
+function _esfMusicaRender() {
+  const el = document.getElementById('esf-fest-music-list');
+  if (!el) return;
+  if (!_esfMusicaLista.length) { el.innerHTML = '<div style="font-size:11px;color:var(--ts)">Sin canciones aún.</div>'; return; }
+  el.innerHTML = _esfMusicaLista.map(m => `
+    <div style="display:inline-flex;align-items:center;gap:6px;padding:4px 8px;background:var(--bg3);border:1px solid var(--border);border-radius:14px;margin:0 6px 6px 0;font-size:12px">
+      <span>${_esfEsc(m.label)}</span>
+      <button type="button" class="btn btn-ghost btn-sm" style="font-size:10px;padding:0 5px" onclick="_esfMusicaRemove('${_esfEsc(m.id)}')">✕</button>
+    </div>`).join('');
+}
+
+// ── Festival: paquetes por duración (2e-i, campos básicos) ───────────────────
+// zonas/cheapZonas/hotel quedan vacíos aquí; se llenan en 2e-ii/iii. La música NO
+// va por paquete (vive en festival.musica).
+var _esfPaquetes = [];  // [{ lbl, ds, noches, ride, zonas:[], cheapZonas:[], hotel:[] }]
+function _esfPaqAdd() {
+  _esfPaquetes.push({ lbl: '', ds: '', noches: 1, ride: 0, zonas: [], cheapZonas: [], hotel: [] });
+  _esfPaqRender();
+}
+function _esfPaqRemove(idx) {
+  _esfPaquetes.splice(idx, 1);
+  _esfPaqRender();
+}
+function _esfPaqRender() {
+  const el = document.getElementById('esf-fest-paq-list');
+  if (!el) return;
+  if (!_esfPaquetes.length) { el.innerHTML = '<div style="font-size:11px;color:var(--ts)">Sin paquetes aún.</div>'; return; }
+  const cheapOn = !!document.getElementById('esf-fest-cheap')?.checked;  // el precio cheap (pc) solo si el switch cheap está encendido
+  const stayOn = !!document.getElementById('esf-fest-stay')?.checked;    // hoteles solo si el switch stay está encendido
+  if (stayOn) _esfPaquetes.forEach((_, i) => _esfPaqHotelEnsure(i));     // asegura los 4 tipos fijos por paquete
+  el.innerHTML = _esfPaquetes.map((p, i) => `
+    <div style="border:1px solid var(--border);border-radius:8px;padding:10px;margin-bottom:8px;background:var(--bg2)">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px">
+        <span style="font-size:11px;color:var(--ts)">Paquete ${i + 1}</span>
+        <button type="button" class="btn btn-ghost btn-sm" style="font-size:10px" onclick="_esfPaqRemove(${i})">Quitar</button>
+      </div>
+      <label style="font-size:11px">Etiqueta</label>
+      <input class="cot-input" style="width:100%;margin-bottom:6px" placeholder="Vie 20 nov · 1 día" value="${_esfEsc(p.lbl)}" oninput="_esfPaquetes[${i}].lbl = this.value">
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <div style="flex:1;min-width:120px">
+          <label style="font-size:11px">Fecha</label>
+          <input class="cot-input" type="date" style="width:100%" value="${_esfEsc(p.ds)}" oninput="_esfPaquetes[${i}].ds = this.value">
+        </div>
+        <div style="flex:1;min-width:90px">
+          <label style="font-size:11px">Noches</label>
+          <input class="cot-input" type="number" min="0" style="width:100%" value="${Number(p.noches) || 0}" oninput="_esfPaquetes[${i}].noches = Number(this.value)">
+        </div>
+        <div style="flex:1;min-width:90px">
+          <label style="font-size:11px">Ride / transporte</label>
+          <input class="cot-input" type="number" min="0" style="width:100%" value="${Number(p.ride) || 0}" oninput="_esfPaquetes[${i}].ride = Number(this.value)">
+        </div>
+      </div>
+      <div style="margin-top:8px">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:4px">
+          <span style="font-size:11px;color:var(--ts)">Zonas</span>
+          <button type="button" class="btn btn-ghost btn-sm" style="font-size:10px" onclick="_esfPaqZonaAdd(${i})">+ Agregar zona</button>
+        </div>
+        ${(Array.isArray(p.zonas) && p.zonas.length) ? p.zonas.map((z, zi) => `
+          <div style="display:flex;gap:6px;align-items:center;margin-bottom:4px;flex-wrap:wrap">
+            <input class="cot-input" style="flex:2;min-width:100px" placeholder="Zona" value="${_esfEsc(z.n)}" oninput="_esfPaquetes[${i}].zonas[${zi}].n = this.value">
+            <input class="cot-input" type="number" min="0" style="flex:1;min-width:70px" placeholder="$" value="${Number(z.p) || 0}" oninput="_esfPaquetes[${i}].zonas[${zi}].p = Number(this.value)">
+            ${cheapOn ? `<input class="cot-input" type="number" min="0" style="flex:1;min-width:70px" placeholder="$ cheap" value="${Number(z.pc) || 0}" oninput="_esfPaquetes[${i}].zonas[${zi}].pc = Number(this.value)">` : ''}
+            <button type="button" class="btn btn-ghost btn-sm" style="font-size:10px" onclick="_esfPaqZonaRemove(${i}, ${zi})">✕</button>
+          </div>`).join('') : '<div style="font-size:11px;color:var(--ts)">Sin zonas.</div>'}
+      </div>
+      ${stayOn ? `
+      <div style="margin-top:8px">
+        <div style="font-size:11px;color:var(--ts);margin-bottom:4px">Hoteles</div>
+        <label style="font-size:11px">Costo total de la habitación</label>
+        <input class="cot-input" type="number" min="0" style="width:100%;margin-bottom:6px" value="${Number(p.hotelTotal) || 0}" oninput="_esfPaqHotelTotal(${i}, this.value)">
+        ${(Array.isArray(p.hotel) ? p.hotel : []).map((h, hi) => {
+          const t = _ESF_HOTEL_TIPOS.find(x => x.n === h.n);
+          const pers = t ? t.pers : 4;
+          return `<div style="display:flex;gap:6px;align-items:center;margin-bottom:4px;flex-wrap:wrap">
+            <span style="flex:1;min-width:110px;font-size:12px">${_esfEsc(h.n)} (${pers}p)</span>
+            <input class="cot-input" type="number" min="0" style="flex:1;min-width:80px" placeholder="$ extra" value="${Number(h.e) || 0}" oninput="_esfPaquetes[${i}].hotel[${hi}].e = Number(this.value)">
+          </div>`;
+        }).join('')}
+        <div style="font-size:11px;color:var(--ts);margin-top:2px">Compartida = base; el sistema calcula los extras; puedes ajustarlos a mano.</div>
+      </div>` : ''}
+    </div>`).join('');
+}
+
+// Asegura los 4 tipos fijos de hotel en el paquete, preservando extras ya puestos
+// (match por n). Reusa _ESF_HOTEL_TIPOS de conciertos (n/pers/viaj).
+function _esfPaqHotelEnsure(pi) {
+  if (!_esfPaquetes[pi]) return;
+  const prev = Array.isArray(_esfPaquetes[pi].hotel) ? _esfPaquetes[pi].hotel : [];
+  _esfPaquetes[pi].hotel = _ESF_HOTEL_TIPOS.map((t) => {
+    const found = prev.find((h) => h && h.n === t.n);
+    return { n: t.n, e: found ? (Number(found.e) || 0) : 0, viaj: t.viaj.slice() };
+  });
+}
+
+// Recalcula los extras de los 4 tipos desde el costo total (misma fórmula que
+// conciertos: _esfHotelExtra). El admin puede ajustarlos a mano después.
+function _esfPaqHotelTotal(pi, val) {
+  if (!_esfPaquetes[pi]) return;
+  _esfPaquetes[pi].hotelTotal = Number(val) || 0;
+  _esfPaqHotelEnsure(pi);
+  _esfPaquetes[pi].hotel.forEach((h) => {
+    const t = _ESF_HOTEL_TIPOS.find((x) => x.n === h.n);
+    h.e = _esfHotelExtra(_esfPaquetes[pi].hotelTotal, t ? t.pers : 4);
+  });
+  _esfPaqRender();
+}
+
+function _esfPaqZonaAdd(pi) {
+  if (!_esfPaquetes[pi]) return;
+  if (!Array.isArray(_esfPaquetes[pi].zonas)) _esfPaquetes[pi].zonas = [];
+  _esfPaquetes[pi].zonas.push({ n: '', p: 0, pc: 0 });
+  _esfPaqRender();
+}
+function _esfPaqZonaRemove(pi, zi) {
+  if (_esfPaquetes[pi] && Array.isArray(_esfPaquetes[pi].zonas)) _esfPaquetes[pi].zonas.splice(zi, 1);
+  _esfPaqRender();
+}
+
+function _esfMusicPlay(url, btn) {
+  if (_esfMusicAudio && _esfMusicAudio._url === url && !_esfMusicAudio.paused) {
+    _esfMusicStopAudio(); if (btn) btn.textContent = '▶'; return;
+  }
+  _esfMusicStopAudio();
+  document.querySelectorAll('#esf-music-results button').forEach(b => { if (b.textContent === '⏸') b.textContent = '▶'; });
+  const a = new Audio(url); a._url = url; _esfMusicAudio = a;
+  a.play().catch(() => {});
+  if (btn) btn.textContent = '⏸';
+  a.onended = () => { if (btn) btn.textContent = '▶'; _esfMusicAudio = null; };
+}
+
+function _esfMusicElegir(id, label) {
+  const inp = document.getElementById('esf-music'); if (inp) inp.value = id;
+  const chosen = document.getElementById('esf-music-chosen'); if (chosen) chosen.textContent = '✓ ' + label + ' (id ' + id + ')';
+  const cont = document.getElementById('esf-music-results'); if (cont) cont.innerHTML = '';
+  _esfMusicStopAudio();
+}
+
+// Pieza 2a · dry-run del compilador. Solo lectura/preview: la function NO escribe
+// al repo (sin PUT). Renderiza cuántos se insertarían, la validación
+// kamehouse/portal, los objetos generados y el preview del var EV resultante.
+async function probarCompiladoDryRun() {
+  const panel = document.getElementById('esf-dryrun-panel');
+  if (!panel) return;
+  panel.innerHTML = '<div class="loading-state"><div class="spinner"></div>Compilando (dry-run)…</div>';
+  try {
+    const r = await khAdminFetch('/.netlify/functions/esferas-compilar-dryrun', { method:'POST' });
+    const data = await r.json().catch(()=>({}));
+    if (!r.ok || !data.ok) throw new Error(data.error || ('Error ' + r.status));
+    window._esfUltimoDryRun = data;
+    const v = data.validacion || {};
+    const aIns = data.a_insertar || [];
+    const aAct = data.a_actualizar || [];
+    const badge = (ok) => ok
+      ? '<span class="badge badge-green">OK</span>'
+      : '<span class="badge badge-red">FALLÓ</span>';
+    const preBox = (txt) => `<pre style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px;overflow:auto;font-size:11px;white-space:pre-wrap;word-break:break-all;margin:0 0 8px">${_esfEsc(txt)}</pre>`;
+    let html = '';
+    html += `<div style="font-size:13px;margin-bottom:6px">Insertar: <b>${aIns.length}</b> · Actualizar: <b>${aAct.length}</b>${data.sin_cambios ? ' · <b>sin cambios</b>' : ''}</div>`;
+    html += `<div style="font-size:13px;margin-bottom:6px">Validación portal: ${badge(v.portal_ok)} &nbsp; kamehouse: ${badge(v.kamehouse_ok)}</div>`;
+    html += `<div style="font-size:12px;color:var(--ts);margin-bottom:8px">EV antes: ${v.ev_antes} → después: ${v.ev_despues} · presentes: ${(v.nuevos_encontrados||[]).map(_esfEsc).join(', ') || '—'}</div>`;
+    if (v.error) html += `<div class="alert alert-error" style="margin-bottom:8px">${_esfEsc(v.error)}</div>`;
+    if (aIns.length) {
+      html += `<div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.12em;color:var(--ts);margin:10px 0 6px">// objetos a insertar</div>`;
+      html += aIns.map(it => preBox(it.obj)).join('');
+    }
+    if (aAct.length) {
+      html += `<div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.12em;color:var(--ts);margin:10px 0 6px">// objetos a actualizar (reemplazo en su lugar)</div>`;
+      html += aAct.map(it => preBox(it.obj)).join('');
+    }
+    if (data.preview) {
+      html += `<div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.12em;color:var(--ts);margin:10px 0 6px">// preview var EV=[ resultante</div>`;
+      html += preBox(data.preview);
+    }
+    panel.innerHTML = html;
+  } catch(e) {
+    panel.innerHTML = `<div class="alert alert-error">${e.message}</div>`;
+  }
+}
+
+// Pieza 2b · escritura real al index (a main, sin branch). El candado de
+// validación vive en la function esferas-publicar (422 si no pasa) — aquí solo
+// confirmamos y mostramos el resultado. Tras éxito recarga el listado.
+async function publicarEsferas() {
+  const panel = document.getElementById('esf-dryrun-panel');
+  const ult = window._esfUltimoDryRun;
+  const n = (ult && (Array.isArray(ult.a_insertar) || Array.isArray(ult.a_actualizar)))
+    ? ((ult.a_insertar || []).length + (ult.a_actualizar || []).length)
+    : null;
+  const msg = (n != null)
+    ? `Esto escribirá ${n} evento(s) al index.html de producción y hará un commit. ¿Continuar?`
+    : 'Esto escribirá los eventos nuevos/editados al index.html de producción y hará un commit. ¿Continuar?';
+  if (!window.confirm(msg)) return;
+  if (panel) panel.innerHTML = '<div class="loading-state"><div class="spinner"></div>Publicando…</div>';
+  try {
+    const r = await khAdminFetch('/.netlify/functions/esferas-publicar', { method:'POST', body: JSON.stringify({}) });
+    const data = await r.json().catch(()=>({}));
+    if (r.status === 422) {
+      const v = data.validacion || {};
+      panel.innerHTML = `<div class="alert alert-error">Validación falló — no se escribió nada.${v.error ? (' ' + _esfEsc(v.error)) : ''}</div>`;
+      return;
+    }
+    if (!r.ok || !data.ok) throw new Error(data.error || ('Error ' + r.status));
+    const pub = data.publicados || [];
+    if (data.sin_cambios || !pub.length) {
+      panel.innerHTML = '<div class="alert alert-success">Sin cambios — el index ya estaba al día.</div>';
+    } else {
+      panel.innerHTML = `<div class="alert alert-success">✓ Publicados ${pub.length}: ${pub.map(_esfEsc).join(', ')} · commit ${_esfEsc(data.commit || '')}</div>`;
+    }
+    loadEsferasEventos();
+  } catch(e) {
+    panel.innerHTML = `<div class="alert alert-error">${e.message}</div>`;
+  }
+}
+
+// Despublicar: quita el evento del index de producción (PUT a main) y marca
+// publicado=false. El candado/salvaguarda viven en la function esferas-despublicar
+// (422 si no valida, 403 si el slug no es de Esferas). Tras éxito recarga el listado.
+async function despublicarEsfera(slug) {
+  if (!window.confirm(`Esto quitará ${slug} del index de producción. ¿Continuar?`)) return;
+  const panel = document.getElementById('esf-dryrun-panel');
+  if (panel) panel.innerHTML = `<div class="loading-state"><div class="spinner"></div>Despublicando ${_esfEsc(slug)}…</div>`;
+  try {
+    const r = await khAdminFetch('/.netlify/functions/esferas-despublicar', { method:'POST', body: JSON.stringify({ slug }) });
+    const data = await r.json().catch(()=>({}));
+    if (r.status === 403) {
+      panel.innerHTML = `<div class="alert alert-error">${_esfEsc(data.error || 'No gestionado por Esferas')}</div>`;
+      return;
+    }
+    if (r.status === 422) {
+      const v = data.validacion || {};
+      panel.innerHTML = `<div class="alert alert-error">Validación falló — no se escribió nada.${v.error ? (' ' + _esfEsc(v.error)) : ''}</div>`;
+      return;
+    }
+    if (!r.ok || !data.ok) throw new Error(data.error || ('Error ' + r.status));
+    if (data.encontrado === false) {
+      panel.innerHTML = `<div class="alert alert-success">${_esfEsc(slug)} ya no estaba en el index.</div>`;
+    } else {
+      panel.innerHTML = `<div class="alert alert-success">✓ Despublicado ${_esfEsc(slug)} · commit ${_esfEsc(data.commit || '')}</div>`;
+    }
+    loadEsferasEventos();
+  } catch(e) {
+    panel.innerHTML = `<div class="alert alert-error">${e.message}</div>`;
+  }
+}
+
+async function eliminarEsfera(slug) {
+  if (!window.confirm(`¿Eliminar DEFINITIVAMENTE '${slug}' de la lista de Esferas? Borra el borrador del evento. (Debe estar despublicado.)`)) return;
+  const panel = document.getElementById('esf-dryrun-panel');
+  if (panel) panel.innerHTML = `<div class="loading-state"><div class="spinner"></div>Eliminando ${_esfEsc(slug)}…</div>`;
+  try {
+    const r = await khAdminFetch('/.netlify/functions/esferas-eliminar', { method:'POST', body: JSON.stringify({ slug }) });
+    const data = await r.json().catch(()=>({}));
+    if (r.status === 409 || r.status === 404) {
+      if (panel) panel.innerHTML = `<div class="alert alert-error">${_esfEsc(data.error || ('Error ' + r.status))}</div>`;
+      return;
+    }
+    if (!r.ok || !data.ok) throw new Error(data.error || ('Error ' + r.status));
+    if (panel) panel.innerHTML = `<div class="alert alert-success"><svg class="ic"><use href="#ic-basura"/></svg> Eliminado ${_esfEsc(slug)} de la lista de Esferas.</div>`;
+    loadEsferasEventos();
+  } catch(e) {
+    if (panel) panel.innerHTML = `<div class="alert alert-error">${e.message}</div>`;
+  }
+}
+
+// ── U1: sincronizar tabla espejo eventos_meta desde el EV (index.html) ──────
+// Lee el EV (client-side, ya lo parsea bien), deriva slug/fecha/fecha_fin/tipo/
+// dias por evento y los manda a la función eventos-meta-sync (upsert por slug).
+// fecha_fin: festival → fecha + (min(dias,3)-1) días; concierto → la ÚLTIMA
+// fecha disponible (max de dsList[]/multifecha[].ds; si no hay, = fecha).
+function _fechaMetaToISO(d) {
+  // d = 'YYYY-MM-DD' (o más). Devuelve 'YYYY-MM-DD' o null.
+  if (typeof d !== 'string' || !d.trim()) return null;
+  const s = d.trim().slice(0, 10);
+  return /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : null;
+}
+
+function _eventoMetaFila(e) {
+  const slug = e.id;
+  if (!slug) return null;
+  const esFest = !!FESTIVALES[slug];
+  const dias = FESTIVALES[slug] || 1;
+  const tipo = esFest ? 'festival' : 'concierto';
+
+  // Todas las fechas candidatas del evento ('YYYY-MM-DD').
+  const cand = [];
+  const push = (x) => { const f = _fechaMetaToISO(x); if (f) cand.push(f); };
+  push(e.ds);
+  if (Array.isArray(e.dsList)) e.dsList.forEach(push);
+  if (Array.isArray(e.multifecha)) e.multifecha.forEach(mf => mf && push(mf.ds));
+
+  const fecha = _fechaMetaToISO(e.ds)
+    || (Array.isArray(e.multifecha) && e.multifecha[0] ? _fechaMetaToISO(e.multifecha[0].ds) : null)
+    || (Array.isArray(e.dsList) ? _fechaMetaToISO(e.dsList[0]) : null)
+    || (cand.length ? cand.slice().sort()[0] : null);
+
+  let fecha_fin;
+  if (esFest && fecha) {
+    const d = new Date(fecha + 'T12:00:00');
+    d.setDate(d.getDate() + (Math.min(dias, 3) - 1));
+    fecha_fin = d.toISOString().slice(0, 10);
+  } else {
+    // Concierto: la última fecha disponible (max), o = fecha si no hay más.
+    fecha_fin = cand.length ? cand.slice().sort().slice(-1)[0] : fecha;
+  }
+
+  return { slug, nombre: e.a || slug, fecha, fecha_fin, tipo, dias };
+}
+
+async function _sincronizarEventosMeta(btn) {
+  const alertEl = document.getElementById('cfg-eventos-meta-alert');
+  if (btn) btn.disabled = true;
+  if (alertEl) alertEl.innerHTML = '<div class="alert" style="border-color:var(--border)">Leyendo eventos…</div>';
+  try {
+    const ev = await _fetchEVFromIndex();
+    const eventos = (ev || [])
+      .filter(e => e && e.id)
+      .map(_eventoMetaFila)
+      .filter(Boolean);
+    if (!eventos.length) throw new Error('No se encontraron eventos en el EV');
+
+    const r = await khAdminFetch('/.netlify/functions/eventos-meta-sync', {
+      method: 'POST', body: JSON.stringify({ eventos }),
+    });
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok || !data.ok) throw new Error(data.error || 'Error sincronizando');
+    if (alertEl) alertEl.innerHTML = `<div class="alert alert-success">✓ ${data.upserted} evento${data.upserted !== 1 ? 's' : ''} sincronizado${data.upserted !== 1 ? 's' : ''}</div>`;
+    setTimeout(() => { if (alertEl) alertEl.innerHTML = ''; }, 3000);
+  } catch (e) {
+    if (alertEl) alertEl.innerHTML = `<div class="alert alert-error">${e.message}</div>`;
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+async function guardarConfigMensaje() {
+  const body = {
+    mensaje_dia:    document.getElementById('cfg-mensaje')?.value.trim()||null,
+    mensaje_activo: document.getElementById('cfg-mensaje-activo')?.checked||false,
+  };
+  const alertEl = document.getElementById('cfg-mensaje-alert');
+  try {
+    const r = await khAdminFetch('/.netlify/functions/sistema-config-save', {
+      method:'POST', body: JSON.stringify(body),
+    });
+    if (!r.ok) {
+      const detail = await r.json().catch(()=>({ error: r.statusText }));
+      throw new Error(detail.error || 'Error guardando');
+    }
+    const { config } = await r.json();
+    if (config) _mtConfig = config;
+    alertEl.innerHTML='<div class="alert alert-success">✓ Mensaje guardado</div>';
+    setTimeout(()=>alertEl.innerHTML='', 2000);
+  } catch(e) { alertEl.innerHTML=`<div class="alert alert-error">${e.message}</div>`; }
+}
+
+// ── SISTEMA DE ALERTAS Y CORREOS ─────────────────────────────
+async function enviarEmailSistema(to, subject, bodyHtml) {
+  try {
+    await khAdminFetch('/.netlify/functions/send-invite', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        to, subject,
+        html: `<div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;background:#0a0a0f;color:#f0f0f5;padding:32px;border-radius:12px">
+          ${bodyHtml}
+          <p style="color:#888899;font-size:12px;margin-top:32px">Kamehouse · Conecta Reynosa</p>
+        </div>`,
+      }),
+    });
+  } catch(e) { console.warn('Email error:', e.message); }
+}
+
+async function enviarAlertaMemo(tipo, datos = {}) {
+  // Guardar en DB
+  try {
+    let mensaje = '';
+    let emailSubject = '';
+    let emailBody = '';
+    switch(tipo) {
+      case 'tour_declinado':
+        mensaje = `${datos.nombre||'Un coordi'} declinó el tour: ${datos.evento||''}${datos.motivo?' — Motivo: '+datos.motivo:''}`;
+        emailSubject = `❌ Tour declinado — ${datos.evento||''}`;
+        emailBody = `<p>${datos.nombre} declinó el tour <strong>${datos.evento}</strong>.</p>${datos.motivo?`<p><strong>Motivo:</strong> ${datos.motivo}</p>`:''}`;
+        break;
+      case 'reporte_rechazado':
+        mensaje = `Maestro Karin rechazó el reporte de ${datos.coordi||'un coordi'}${datos.motivo?': '+datos.motivo:''}`;
+        emailSubject = `Reporte rechazado por Maestro Karin`;
+        emailBody = `<p>Maestro Karin rechazó el reporte post-evento de <strong>${datos.coordi}</strong>.</p>${datos.motivo?`<p><strong>Motivo:</strong> ${datos.motivo}</p>`:''}`;
+        break;
+      case 'nuevo_usuario':
+        mensaje = `Nuevo usuario registrado: ${datos.nombre||''}`;
+        // [2026-05-18] Email "Nuevo guerrero Z" desactivado — genera demasiado ruido
+        // en admin@conectareynosa.mx. La alerta in-app (sistema_alertas) sigue activa.
+        // Si se necesita reactivar, descomentar estas 2 líneas.
+        // emailSubject = `👤 Nuevo guerrero Z: ${datos.nombre||''}`;
+        // emailBody = `<p>Se registró un nuevo usuario: <strong>${datos.nombre}</strong> (${datos.rol||''}).</p>`;
+        break;
+      case 'strikes':
+        mensaje = `${datos.nombre} acumuló ${datos.strikes} strike${datos.strikes!==1?'s':''}${datos.motivo?' — '+datos.motivo:''}`;
+        emailSubject = `⚠️ ${datos.strikes >= 3 ? 'SUSPENSIÓN' : 'Advertencia'} — ${datos.nombre}`;
+        emailBody = `<p><strong>${datos.nombre}</strong> tiene ahora ${datos.strikes} strike${datos.strikes!==1?'s':''}.</p>${datos.motivo?`<p>Motivo: ${datos.motivo}</p>`:''}${datos.strikes>=3?'<p style="color:#FF4444"><strong>Cuenta suspendida automáticamente.</strong></p>':''}`;
+        break;
+      case 'usuario_desactivado':
+        mensaje = `Usuario desactivado desde el panel`;
+        emailSubject = `🔒 Usuario desactivado`;
+        emailBody = `<p>Un usuario fue desactivado desde Montaña Pai.</p>`;
+        break;
+      default:
+        mensaje = JSON.stringify(datos);
+        emailSubject = `Alerta Kamehouse: ${tipo}`;
+        emailBody = `<p>${mensaje}</p>`;
+    }
+    // INSERT vía Netlify Function con service_role: la tabla tiene RLS que
+    // bloquea INSERT desde el cliente anon (daba 401). Mantiene .catch para
+    // degradar elegante si la función falla.
+    await khAdminFetch('/.netlify/functions/sistema-alertas-write', {
+      method: 'POST',
+      body: JSON.stringify({ accion: 'crear', tipo, mensaje }),
+    }).catch(()=>{});
+    // Email a Memo — guard: tipos sin emailSubject (ej. nuevo_usuario desactivado el 2026-05-18) no mandan correo.
+    if (emailSubject) await enviarEmailSistema(MEMO_EMAIL, emailSubject, emailBody);
+  } catch(e) { console.warn('Alerta error:', e.message); }
+}
+
+// Mostrar mensaje del día al entrar — corre post-login para todos los roles.
+// Usa la Function sistema-config-get que para roles non-maestro devuelve solo
+// mensaje_dia y mensaje_activo (los campos cuenta_* nunca llegan al cliente).
+async function checkMensajeDia() {
+  try {
+    const r = await khAdminFetch('/.netlify/functions/sistema-config-get', { method:'POST' });
+    if (!r.ok) return;
+    const { config: cfg } = await r.json();
+    if (cfg?.mensaje_activo && cfg?.mensaje_dia) {
+      let banner = document.getElementById('msg-dia-banner');
+      if (!banner) {
+        banner = document.createElement('div');
+        banner.id = 'msg-dia-banner';
+        banner.style.cssText = 'position:fixed;bottom:20px;right:20px;z-index:9998;background:var(--bg2);border:1px solid var(--border2);border-radius:10px;padding:16px 20px;max-width:320px;box-shadow:0 8px 32px rgba(0,0,0,.5)';
+        document.body.appendChild(banner);
+      }
+      banner.innerHTML = `
+        <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--orange);margin-bottom:8px;letter-spacing:.1em">// MENSAJE DEL DÍA</div>
+        <div style="font-size:13px;color:var(--text);line-height:1.5">${cfg.mensaje_dia}</div>
+        <button onclick="document.getElementById('msg-dia-banner').remove()" style="margin-top:12px;background:none;border:1px solid var(--border);border-radius:6px;padding:4px 12px;color:var(--ts);cursor:pointer;font-size:11px;width:100%">Cerrar</button>`;
+    }
+  } catch(e) {}
+}
+
+
+let _bodegaPiezasCache = [];
+let _eventosAsignadosCache = [];
+
+// ── Carga principal ──────────────────────────────────────────
+async function loadReportes() {
+  const container = document.getElementById('reportes-list');
+  const headerBtns = document.getElementById('reportes-header-btns');
+  const rol = currentUser?.rol;
+
+  // Mostrar botón según rol
+  if (headerBtns) {
+    if (rol === 'coordinador') {
+      headerBtns.innerHTML = `<button class="btn btn-primary" onclick="abrirModalReporte(null)">+ Nuevo Reporte</button>`;
+    } else if (['maestro_roshi','bulma'].includes(rol)) {
+      headerBtns.innerHTML = `<button class="btn btn-ghost btn-sm" onclick="loadReportes()" style="font-family:'JetBrains Mono',monospace;font-size:10px">↺ ACTUALIZAR</button>`;
+    } else {
+      headerBtns.innerHTML = '';
+    }
+  }
+
+  container.innerHTML = '<div class="loading-state"><div class="spinner"></div>Cargando…</div>';
+  try {
+    // Cargar piezas de bodega (para el formulario)
+    _bodegaPiezasCache = await khKits.listar().then(r => r.map(x => ({...x, nombre: x.nombre||x.pieza}))).catch(() => []); // [sec-kits]
+
+    // [sec-reportes] El backend acota por rol: si es coordinador, fuerza
+    // coordi_id = su id (ve SOLO sus reportes). No mandamos coordi_id desde aquí.
+    _reportesCache = await khReportes.listar({ limit: 100 });
+
+    // Join manual con eventos y coordis
+    if (_reportesCache.length) {
+      const eIds = [...new Set(_reportesCache.map(r => r.evento_id).filter(Boolean))];
+      const uIds = [...new Set(_reportesCache.map(r => r.coordi_id).filter(Boolean))];
+      const [evs, users] = await Promise.all([
+        eIds.length ? khEventosMeta.porSlugs(eIds) : [], // [sec-eventos]
+        uIds.length ? khUsuarios.listar({ ids: uIds }) : [], // [sec-usuarios]
+      ]);
+      const evMap = Object.fromEntries(evs.map(e => [e.slug, e]));
+      const uMap  = Object.fromEntries(users.map(u => [u.id, u]));
+      _reportesCache = _reportesCache.map(r => ({
+        ...r,
+        _evento: evMap[r.evento_id] || null,
+        _coordi: uMap[r.coordi_id] || null,
+      }));
+    }
+
+    renderReportes(_reportesCache, _reportesFiltroActual);
+  } catch(e) {
+    container.innerHTML = `<div class="alert alert-error" style="margin-top:20px">Error: ${e.message}</div>`;
+  }
+}
+
+function filtrarReportes(status, btn) {
+  _reportesFiltroActual = status;
+  document.querySelectorAll('#page-reportes .gz-filter').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  renderReportes(_reportesCache, status);
+}
+
+function renderReportes(lista, filtro) {
+  const container = document.getElementById('reportes-list');
+  const filtrada = filtro === 'todos' ? lista : lista.filter(r => r.status === filtro);
+
+  if (!filtrada.length) {
+    container.innerHTML = `<div class="empty-state" style="margin-top:40px"><div class="empty-icon">·</div>Sin reportes${filtro === 'todos' ? '' : ' con este estado'}</div>`;
+    return;
+  }
+
+  const statusInfo = {
+    borrador:       { label:'Borrador',          color:'var(--ts)',    icon:'⎘' },
+    enviado:        { label:'Pendiente revisión', color:'var(--gold)',  icon:'⏳' },
+    rechazado:      { label:'Rechazado',          color:'var(--red)',   icon:'✕' },
+    aprobado_popo:  { label:'En revisión Roshi',  color:'var(--blue)',  icon:'<svg class="ic"><use href="#ic-lupa"/></svg>' },
+    aprobado_memo:  { label:'Aprobado',           color:'var(--green)', icon:'✓' },
+  };
+
+  container.innerHTML = filtrada.map(r => {
+    const s = statusInfo[r.status] || { label: r.status, color:'var(--ts)', icon:'<svg class="ic"><use href="#ic-documento"/></svg>' };
+    const ev = r._evento;
+    const coo = r._coordi;
+    const dif = r.diferencia ?? 0;
+    const difColor = dif >= 0 ? 'var(--green)' : 'var(--red)';
+    const difLabel = dif >= 0 ? `Sobró ${formatMXN(Math.abs(dif))}` : `Debe ${formatMXN(Math.abs(dif))}`;
+    const gastos = r.gastos_detalle ? JSON.parse(typeof r.gastos_detalle === 'string' ? r.gastos_detalle : JSON.stringify(r.gastos_detalle)) : [];
+    const kits   = r.kits_detalle   ? JSON.parse(typeof r.kits_detalle   === 'string' ? r.kits_detalle   : JSON.stringify(r.kits_detalle))   : [];
+
+    // Botones según rol y status
+    const rol = currentUser?.rol;
+    let btns = '';
+    if (rol === 'coordinador' && (r.status === 'borrador' || r.status === 'rechazado')) {
+      btns = `<button class="btn btn-primary btn-sm" onclick="abrirModalReporte('${r.id}')">Editar</button>
+              <button class="btn btn-ghost btn-sm" onclick="enviarReporte('${r.id}')">Enviar →</button>`;
+    }
+    if (rol === 'mister_popo' && r.status === 'enviado') {
+      btns = `<button class="btn btn-primary btn-sm" onclick="aprobarReportePopo('${r.id}')">✓ Aprobar</button>
+              <button class="btn btn-red btn-sm" onclick="rechazarReporte('${r.id}')">✗ Rechazar</button>`;
+    }
+    if (['maestro_roshi','bulma'].includes(rol) && ['aprobado_popo','enviado'].includes(r.status)) {
+      btns = `<button class="btn btn-primary btn-sm" onclick="aprobarReporteMemo('${r.id}')">✓ Aprobar${r.status==='enviado'?' directo':' Definitivo'}</button>
+              <button class="btn btn-red btn-sm" onclick="rechazarReporte('${r.id}')">✗ Rechazar</button>`;
+    }
+    // Popo: marcar kits recibidos cuando aprobado_memo
+    if (rol === 'mister_popo' && r.status === 'aprobado_memo' && kits.some(k => (k.cantidad_sobrante||0) > 0 && !k.recibido)) {
+      btns += `<button class="btn btn-ghost btn-sm" onclick="marcarKitsRecibidos('${r.id}')" style="border-color:rgba(62,220,132,.4);color:var(--green)">Marcar Recibido</button>`;
+    }
+    if (btns) btns = `<div class="modal-footer" style="padding:0;margin-top:12px;justify-content:flex-end;gap:8px;flex-wrap:wrap">${btns}</div>`;
+
+    // Kits sobrantes resumen
+    const kitsSob = kits.filter(k => (k.cantidad_sobrante||0) > 0);
+    const kitsHtml = kitsSob.length ? `<div style="margin-top:8px;font-size:11px;color:var(--ts);font-family:'JetBrains Mono',monospace">
+      SOBRANTES: ${kitsSob.map(k => `${k.nombre||k.pieza_nombre||k.pieza_id} ×${k.cantidad_sobrante}`).join(' · ')}
+    </div>` : '';
+
+    return `<div style="background:var(--bg2);border:1px solid var(--border);border-left:3px solid ${s.color};border-radius:var(--radius);padding:16px 20px;margin-bottom:12px">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap">
+        <div>
+          <div style="font-family:'Rajdhani',sans-serif;font-size:18px;font-weight:700;margin-bottom:2px">${ev ? ev.nombre : (r.evento_id || '—')}</div>
+          ${r.status === 'rechazado' ? '<span style="display:inline-block;background:var(--red);color:#fff;font-size:9px;font-weight:900;letter-spacing:.05em;padding:2px 8px;border-radius:4px;margin-bottom:6px;font-family:\'JetBrains Mono\',monospace">RECHAZADO · CORREGIR</span>' : ''}
+          <div style="font-size:11px;font-family:'JetBrains Mono',monospace;color:var(--ts);margin-bottom:8px">
+            ${ev ? new Date(ev.fecha+'T12:00:00').toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric'}) : ''}
+            ${coo ? ` · ${coo.nombre}` : ''} · <span style="color:${s.color}">${s.icon} ${s.label}</span>
+          </div>
+          <div style="display:flex;gap:20px;flex-wrap:wrap">
+            <div><div style="font-size:10px;letter-spacing:.12em;color:var(--ts)">ENTREGADO</div><div style="font-family:'Zen Dots',sans-serif;font-size:16px">${formatMXN(r.dinero_recibido||0)}</div></div>
+            <div><div style="font-size:10px;letter-spacing:.12em;color:var(--ts)">GASTADO</div><div style="font-family:'Zen Dots',sans-serif;font-size:16px">${formatMXN(r.total_gastado||0)}</div></div>
+            <div><div style="font-size:10px;letter-spacing:.12em;color:var(--ts)">DIFERENCIA</div><div style="font-family:'Zen Dots',sans-serif;font-size:16px;color:${difColor}">${difLabel}</div></div>
+          </div>
+          ${kitsHtml}
+          ${r.rechazo_motivo ? `<div style="margin-top:8px;font-size:11px;padding:6px 10px;background:rgba(255,68,68,.08);border-left:2px solid var(--red);color:var(--red)">Motivo rechazo: ${r.rechazo_motivo}</div>` : ''}
+        </div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <button class="btn btn-ghost btn-sm" onclick="verDetalleReporte('${r.id}')" style="font-family:'JetBrains Mono',monospace;font-size:10px">VER DETALLE</button>
+        </div>
+      </div>
+      ${btns}
+    </div>`;
+  }).join('');
+}
+
+// ── Abrir modal crear/editar reporte ────────────────────────
+async function abrirModalReporte(reporteId) {
+  // El coordi SOLO puede reportar eventos a los que está asignado (decisión de
+  // Memo). Leemos sus asignaciones (evento_id = slug, Fase A) y resolvemos el
+  // nombre/fecha bonita desde el EV ya cargado en cliente. value del option =
+  // slug. Si un slug no está en el EV, mostramos el slug crudo (fallback). Ya
+  // NO consultamos la tabla `eventos` (UUID).
+  let evAsig = [];
+  try {
+    const asigs = await khAsignaciones.listar({ coordi_id: currentUser.id }); // [sec-coordi]
+    const slugs = [...new Set((asigs || []).map(a => a.evento_id).filter(Boolean))];
+    if (slugs.length) {
+      const evArr = await _fetchEVFromIndex().catch(() => []);
+      const evMap = {};
+      (evArr || []).forEach(e => { if (e && e.id) evMap[e.id] = e; });
+      evAsig = slugs.map(slug => {
+        const ev = evMap[slug];
+        const fecha = ev
+          ? (ev.ds || (Array.isArray(ev.multifecha) && ev.multifecha[0] && ev.multifecha[0].ds) || '')
+          : '';
+        return { id: slug, nombre: ev ? (ev.a || slug) : slug, fecha };
+      });
+    }
+  } catch(e) {
+    evAsig = [];
+  }
+  _eventosAsignadosCache = evAsig;
+
+  // Piezas bodega
+  const piezas = _bodegaPiezasCache;
+
+  let reporte = null;
+  if (reporteId) {
+    [reporte] = _reportesCache.filter(r => r.id === reporteId);
+  }
+
+  // Construir kits existentes
+  const kitsActuales = reporte?.kits_detalle
+    ? (typeof reporte.kits_detalle === 'string' ? JSON.parse(reporte.kits_detalle) : reporte.kits_detalle)
+    : [];
+  const gastosActuales = reporte?.gastos_detalle
+    ? (typeof reporte.gastos_detalle === 'string' ? JSON.parse(reporte.gastos_detalle) : reporte.gastos_detalle)
+    : [];
+
+  // Opciones select piezas
+  const piezasOptions = piezas.map(p =>
+    `<option value="${p.id}">${p.nombre || p.pieza}</option>`
+  ).join('');
+
+  // Render kits rows
+  function kitRow(k, idx) {
+    const sel = piezas.map(p => `<option value="${p.id}" ${p.id===k.pieza_id?'selected':''}>${p.nombre||p.pieza}</option>`).join('');
+    return `<div class="kit-row" data-idx="${idx}" style="display:grid;grid-template-columns:1fr 100px 100px 28px;gap:8px;align-items:center;margin-bottom:8px">
+      <select class="cot-input kit-pieza-sel" style="font-size:12px;padding:7px 10px"><option value="">— Pieza —</option>${sel}</select>
+      <input type="number" class="cot-input kit-sacada" placeholder="Sacada" min="0" value="${k.cantidad_sacada||''}" style="font-size:12px;padding:7px 10px">
+      <input type="number" class="cot-input kit-sobrante" placeholder="Sobra" min="0" value="${k.cantidad_sobrante||''}" style="font-size:12px;padding:7px 10px">
+      <button onclick="this.closest('.kit-row').remove()" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:16px;padding:0">×</button>
+    </div>`;
+  }
+  function gastoRow(g, idx) {
+    return `<div class="gasto-row" style="display:grid;grid-template-columns:1fr 130px 28px;gap:8px;align-items:center;margin-bottom:8px">
+      <input type="text" class="cot-input gasto-concepto" placeholder="Concepto" value="${g.concepto||''}" style="font-size:12px;padding:7px 10px">
+      <input type="number" class="cot-input gasto-monto" placeholder="Monto" min="0" value="${g.monto||''}" style="font-size:12px;padding:7px 10px" oninput="recalcReporte()">
+      <button onclick="this.closest('.gasto-row').remove();recalcReporte()" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:16px;padding:0">×</button>
+    </div>`;
+  }
+
+  const kitsHtml   = kitsActuales.map(kitRow).join('') || kitRow({},0);
+  const gastosHtml = gastosActuales.map(gastoRow).join('') || gastoRow({},0);
+
+  const evOptions = evAsig.map(e => {
+    const f = e.fecha ? new Date(e.fecha + 'T12:00:00') : null;
+    const fTxt = (f && !isNaN(f)) ? ' · ' + f.toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric'}) : '';
+    return `<option value="${e.id}" ${e.id===reporte?.evento_id?'selected':''}>${e.nombre}${fTxt}</option>`;
+  }).join('');
+
+  // CAMBIO 4: aviso de rechazo visible al reabrir un reporte rechazado
+  const rechazoBanner = (reporte && reporte.status === 'rechazado')
+    ? '<div class="alert alert-error" style="margin-bottom:16px"><svg class="ic"><use href="#ic-alerta"/></svg> Reporte rechazado. ' + (reporte.rechazo_motivo ? 'Motivo: ' + reporte.rechazo_motivo : 'Corrígelo y reenvíalo.') + '</div>'
+    : '';
+
+  document.getElementById('modal-reporte').innerHTML = `
+    <div class="modal" style="max-width:680px">
+      <div class="modal-header">
+        <div class="modal-title" style="font-family:'Zen Dots',sans-serif;font-size:16px">${reporteId ? 'Editar Reporte' : 'Nuevo Reporte Post-Evento'}</div>
+        <button class="modal-close" onclick="closeModal('modal-reporte')">×</button>
+      </div>
+      <div class="modal-body" style="max-height:75vh;overflow-y:auto">
+        <input type="hidden" id="rep-id" value="${reporte?.id||''}">
+        ${rechazoBanner}
+
+        <div class="form-group" style="margin-bottom:16px">
+          <label>Evento *</label>
+          <select class="cot-input" id="rep-evento" style="width:100%" onchange="repEventoCheck(this.value)">
+            <option value="">Selecciona un evento…</option>
+            ${evOptions}
+          </select>
+        </div>
+
+        <!-- Dinero recibido -->
+        <div style="background:rgba(255,183,3,.06);border:1px solid rgba(255,183,3,.2);border-radius:8px;padding:16px;margin-bottom:20px">
+          <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.15em;color:var(--gold);margin-bottom:10px">// DINERO RECIBIDO DE MEMO</div>
+          <div class="form-group" style="margin:0">
+            <label>Memo me entregó <span style="color:var(--ts);font-weight:400">(0 si no recibió efectivo)</span></label>
+            <input type="number" class="cot-input" id="rep-dinero" placeholder="0.00" min="0" value="${reporte?.dinero_recibido||''}" oninput="recalcReporte()" style="width:220px">
+          </div>
+        </div>
+
+        <!-- Kits -->
+        <div style="margin-bottom:20px">
+          <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.15em;color:var(--ts);margin-bottom:12px;display:flex;align-items:center;justify-content:space-between">
+            <span>// CONTROL DE KITS</span>
+            <button class="btn btn-ghost btn-sm" onclick="agregarKitRow()" style="font-size:10px">+ Agregar item</button>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 100px 100px 28px;gap:8px;margin-bottom:6px">
+            <div style="font-size:10px;color:var(--ts)">PIEZA</div>
+            <div style="font-size:10px;color:var(--ts)">SACADOS</div>
+            <div style="font-size:10px;color:var(--ts)">SOBRAN</div>
+            <div></div>
+          </div>
+          <div id="kits-rows">${kitsHtml}</div>
+        </div>
+
+        <!-- Gastos -->
+        <div style="margin-bottom:20px">
+          <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.15em;color:var(--ts);margin-bottom:12px;display:flex;align-items:center;justify-content:space-between">
+            <span>// GASTOS DEL EVENTO</span>
+            <button class="btn btn-ghost btn-sm" onclick="agregarGastoRow()" style="font-size:10px">+ Agregar gasto</button>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 130px 28px;gap:8px;margin-bottom:6px">
+            <div style="font-size:10px;color:var(--ts)">CONCEPTO</div>
+            <div style="font-size:10px;color:var(--ts)">MONTO</div>
+            <div></div>
+          </div>
+          <div id="gastos-rows">${gastosHtml}</div>
+        </div>
+
+        <!-- Resumen financiero -->
+        <div style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:16px;margin-bottom:16px">
+          <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.15em;color:var(--ts);margin-bottom:12px">// RESUMEN</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;text-align:center">
+            <div><div style="font-size:10px;color:var(--ts)">ENTREGADO</div><div style="font-family:'Zen Dots',sans-serif;font-size:18px;color:var(--gold)" id="rep-total-entregado">$0</div></div>
+            <div><div style="font-size:10px;color:var(--ts)">GASTADO</div><div style="font-family:'Zen Dots',sans-serif;font-size:18px" id="rep-total-gastado">$0</div></div>
+            <div><div style="font-size:10px;color:var(--ts)">DIFERENCIA</div><div style="font-family:'Zen Dots',sans-serif;font-size:18px" id="rep-diferencia">$0</div></div>
+          </div>
+          <!-- CLABE si gastó de más -->
+          <div id="rep-clabe-section" style="display:none;margin-top:16px;padding-top:12px;border-top:1px solid var(--border)">
+            <div style="font-size:11px;color:var(--red);margin-bottom:8px"><svg class="ic"><use href="#ic-alerta"/></svg> Gastaste más de lo recibido. Ingresa tu cuenta para que Memo te reembolse.</div>
+            <div class="form-group" style="margin:0">
+              <label>CLABE / Cuenta bancaria</label>
+              <input type="text" class="cot-input" id="rep-clabe" placeholder="18 dígitos o datos bancarios" value="${reporte?.cuenta_bancaria_coordi||''}" style="width:100%">
+            </div>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Notas adicionales</label>
+          <textarea class="cot-input" id="rep-notas" rows="3" placeholder="Algo importante que Memo deba saber…" style="width:100%;resize:vertical">${reporte?.notas||''}</textarea>
+        </div>
+
+        <div id="rep-alert"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" onclick="closeModal('modal-reporte')">Cancelar</button>
+        <button class="btn btn-ghost" id="rep-btn-borrador" onclick="guardarReporte('borrador')">Guardar borrador</button>
+        <button class="btn btn-primary" id="rep-btn-enviar" onclick="guardarReporte('enviado')">Enviar reporte →</button>
+      </div>
+    </div>`;
+
+  openModal('modal-reporte');
+  recalcReporte();
+}
+
+function agregarKitRow() {
+  const container = document.getElementById('kits-rows');
+  const piezas = _bodegaPiezasCache;
+  const sel = piezas.map(p => `<option value="${p.id}">${p.nombre||p.pieza}</option>`).join('');
+  const div = document.createElement('div');
+  div.className = 'kit-row';
+  div.style.cssText = 'display:grid;grid-template-columns:1fr 100px 100px 28px;gap:8px;align-items:center;margin-bottom:8px';
+  div.innerHTML = `
+    <select class="cot-input kit-pieza-sel" style="font-size:12px;padding:7px 10px"><option value="">— Pieza —</option>${sel}</select>
+    <input type="number" class="cot-input kit-sacada" placeholder="Sacada" min="0" style="font-size:12px;padding:7px 10px">
+    <input type="number" class="cot-input kit-sobrante" placeholder="Sobra" min="0" style="font-size:12px;padding:7px 10px">
+    <button onclick="this.closest('.kit-row').remove()" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:16px;padding:0">×</button>`;
+  container.appendChild(div);
+}
+
+function agregarGastoRow() {
+  const container = document.getElementById('gastos-rows');
+  const div = document.createElement('div');
+  div.className = 'gasto-row';
+  div.style.cssText = 'display:grid;grid-template-columns:1fr 130px 28px;gap:8px;align-items:center;margin-bottom:8px';
+  div.innerHTML = `
+    <input type="text" class="cot-input gasto-concepto" placeholder="Concepto" style="font-size:12px;padding:7px 10px">
+    <input type="number" class="cot-input gasto-monto" placeholder="Monto" min="0" style="font-size:12px;padding:7px 10px" oninput="recalcReporte()">
+    <button onclick="this.closest('.gasto-row').remove();recalcReporte()" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:16px;padding:0">×</button>`;
+  container.appendChild(div);
+}
+
+function recalcReporte() {
+  const entregado = parseFloat(document.getElementById('rep-dinero')?.value) || 0;
+  const montos = Array.from(document.querySelectorAll('.gasto-monto')).map(i => parseFloat(i.value)||0);
+  const gastado = montos.reduce((a,b) => a+b, 0);
+  const dif = entregado - gastado;
+
+  document.getElementById('rep-total-entregado').textContent = formatMXN(entregado);
+  document.getElementById('rep-total-gastado').textContent   = formatMXN(gastado);
+  const difEl = document.getElementById('rep-diferencia');
+  if (difEl) {
+    difEl.textContent = formatMXN(Math.abs(dif));
+    difEl.style.color = dif >= 0 ? 'var(--green)' : 'var(--red)';
+  }
+  const clabeSection = document.getElementById('rep-clabe-section');
+  if (clabeSection) clabeSection.style.display = dif < 0 ? 'block' : 'none';
+}
+
+function leerKitsForm() {
+  const rows = document.querySelectorAll('.kit-row');
+  const result = [];
+  rows.forEach(row => {
+    const piezaId   = row.querySelector('.kit-pieza-sel')?.value;
+    const sacada    = parseInt(row.querySelector('.kit-sacada')?.value) || 0;
+    const sobrante  = parseInt(row.querySelector('.kit-sobrante')?.value) || 0;
+    if (piezaId) {
+      const pieza = _bodegaPiezasCache.find(p => p.id === piezaId);
+      result.push({ pieza_id: piezaId, pieza_nombre: pieza?.nombre || pieza?.pieza || '', cantidad_sacada: sacada, cantidad_sobrante: sobrante, recibido: false });
+    }
+  });
+  return result;
+}
+
+function leerGastosForm() {
+  const rows = document.querySelectorAll('.gasto-row');
+  const result = [];
+  rows.forEach(row => {
+    const concepto = row.querySelector('.gasto-concepto')?.value.trim();
+    const monto    = parseFloat(row.querySelector('.gasto-monto')?.value) || 0;
+    if (concepto || monto) result.push({ concepto: concepto || '—', monto });
+  });
+  return result;
+}
+
+function repEventoCheck(eventoId) {
+  // CAMBIO 1: si el coordi ya tiene fila para este evento, reusarla en vez de crear (evita 23505).
+  if (!eventoId) return;
+  const mine = (_reportesCache || []).filter(r =>
+    String(r.evento_id) === String(eventoId) && String(r.coordi_id) === String(currentUser.id));
+  if (!mine.length) return;
+  const existing = mine[0];
+  const repIdEl = document.getElementById('rep-id');
+  const curId = repIdEl ? repIdEl.value : '';
+  if (curId && String(curId) === String(existing.id)) return;  // ya lo estamos editando
+  const locked = { enviado:'Pendiente revisión', aprobado_popo:'En revisión Roshi', aprobado_memo:'Aprobado' };
+  if (locked[existing.status]) {
+    alert('Ya tienes un reporte de este evento (estado: ' + locked[existing.status] + '). Lo abriré para editarlo.');
+  }
+  abrirModalReporte(existing.id);
+}
+
+async function guardarReporte(nuevoStatus) {
+  const alert = document.getElementById('rep-alert');
+  const id = document.getElementById('rep-id')?.value;
+  const eventoId = document.getElementById('rep-evento')?.value;
+  const dinero = parseFloat(document.getElementById('rep-dinero')?.value) || 0;
+  const notas = document.getElementById('rep-notas')?.value.trim() || '';
+  const clabe = document.getElementById('rep-clabe')?.value.trim() || null;
+
+  if (nuevoStatus === 'enviado' && !eventoId) {
+    alert.innerHTML = '<div class="alert alert-error">Selecciona un evento</div>'; return;
+  }
+  // dinero puede ser 0 (tours donde Memo no entrega efectivo)
+
+  const kits   = leerKitsForm();
+  const gastos = leerGastosForm();
+  const totalGastado = gastos.reduce((a,b) => a + b.monto, 0);
+  const diferencia = dinero - totalGastado;
+
+  if (nuevoStatus === 'enviado' && dinero > 0 && diferencia < 0 && !clabe) {
+    alert.innerHTML = '<div class="alert alert-error">Ingresa tu CLABE: gastaste más de lo recibido</div>'; return;
+  }
+
+  const body = {
+    evento_id: eventoId || null,
+    coordi_id: currentUser.id,
+    status: nuevoStatus,
+    kits_detalle: JSON.stringify(kits),
+    gastos_detalle: JSON.stringify(gastos),
+    dinero_recibido: dinero,
+    total_gastado: totalGastado,
+    diferencia,
+    cuenta_bancaria_coordi: clabe,
+    notas: notas || null,
+  };
+  // CAMBIO 5: al reenviar, limpiar el motivo de rechazo viejo
+  if (nuevoStatus === 'enviado') body.rechazo_motivo = null;
+
+  // CAMBIO 3: anti doble-submit
+  const btnB = document.getElementById('rep-btn-borrador');
+  const btnE = document.getElementById('rep-btn-enviar');
+  if (btnB) btnB.disabled = true;
+  if (btnE) btnE.disabled = true;
+
+  try {
+    alert.innerHTML = '<div class="alert" style="border-color:var(--border)">Guardando…</div>';
+    // [sec-reportes] guardar_mio: el backend FUERZA coordi_id = su JWT y solo
+    // acepta status borrador|enviado. Con id → PATCH (verifica propiedad);
+    // sin id → upsert on_conflict(evento_id,coordi_id). Mismo shape de body.
+    const _res = await khReportes.guardarMio(id ? { ...body, id } : body);
+    if (!id) {
+      const newId = _res && _res.id;
+      if (newId) { const rf = document.getElementById('rep-id'); if (rf) rf.value = newId; }
+    }
+    alert.innerHTML = `<div class="alert alert-success">${nuevoStatus === 'enviado' ? '✓ Reporte enviado' : '✓ Borrador guardado'}</div>`;
+    setTimeout(() => { closeModal('modal-reporte'); loadReportes(); }, 900);
+  } catch(e) {
+    alert.innerHTML = `<div class="alert alert-error">${e.message}</div>`;
+    if (btnB) btnB.disabled = false;
+    if (btnE) btnE.disabled = false;
+  }
+}
+
+async function enviarReporte(id) {
+  // Enviar directamente desde la lista (shortcut)
+  const r = _reportesCache.find(x => x.id === id);
+  if (!r) return;
+  if (!confirm('¿Confirmas enviar este reporte para revisión?')) return;
+  try {
+    await khReportes.enviarMio(id); // [sec-reportes]
+    loadReportes();
+  } catch(e) { alert(e.message); }
+}
+
+// [F4b] línea legible por diferencia de la comparación salida↔reporte.
+function _difTxt(d) {
+  if (d.tipo === 'retornable_incompleto') return `• ${d.pieza}: retornable — llevó ${d.llevado}, devolvió ${d.devuelto} (regresan SIEMPRE completas)`;
+  if (d.tipo === 'declarado_vs_llevado') return `• ${d.pieza}: llevó ${d.llevado}, declaró ${d.declarado}`;
+  if (d.tipo === 'sobrante_mayor_que_sacado') return `• ${d.pieza}: sobrante ${d.sobrante} > sacado ${d.sacado} (error de captura)`;
+  if (d.tipo === 'sin_salida_autorizada') return `• ${d.pieza}: declarado ${d.declarado} SIN salida autorizada`;
+  return `• ${d.pieza}: diferencia`;
+}
+
+async function aprobarReportePopo(id) {
+  if (!confirm('¿Aprobar este reporte y enviarlo a Memo para revisión final?')) return;
+  try {
+    await khReportes.aprobarPopo(id); // [sec-reportes]
+    loadReportes();
+  } catch(e) {
+    const d = e.data || {};
+    // [TORRE v2 F4b] descuadre de bodega: si es COBRABLE, el cuidador puede
+    // aprobar con FALTANTES COBRADOS (al costo de reposición, queda registro;
+    // los 15 días arrancan cuando Memo dé la autorización final).
+    if (Array.isArray(d.diferencias) && d.diferencias.length) {
+      const det = d.diferencias.map(_difTxt).join('\n');
+      if (d.cobrable) {
+        const monto = (d.faltantes_monto_estimado != null) ? formatMXN(d.faltantes_monto_estimado) : 'el costo de reposición';
+        if (confirm(`La salida de bodega y el reporte NO cuadran:\n\n${det}\n\n¿Aprobar con FALTANTES COBRADOS?\nSe le cobrará ${monto} (costo de reposición). Tendrá 15 días naturales para liquidar desde la aprobación final de Memo.`)) {
+          try {
+            const j = await khReportes.aprobarPopoCobrando(id); // [sec-reportes]
+            alert(`✓ Aprobado con faltantes cobrados: ${formatMXN(j.faltantes_monto || 0)}.\nEl registro quedó en la salida de bodega.`);
+            loadReportes();
+          } catch(e2) { alert(e2.message); }
+        }
+        return;
+      }
+      alert(`La salida y el reporte NO cuadran y hay errores de captura (no cobrables) — corrige el reporte:\n\n${det}`);
+      return;
+    }
+    alert(e.message);
+  }
+}
+
+// Función compartida — aprueba reporte y descuenta stock
+async function ejecutarAprobacionFinal(id, reporte) {
+  const jf = await khReportes.aprobarFinal(id); // [sec-reportes]
+  // 🗼 TORRE v2 F4a: si el reporte viene de una SALIDA v2 (lo dice el backend),
+  // el stock YA se descontó al dar salida y las devoluciones las suma el
+  // palomeo de recibido — el descuento legacy de abajo NO corre (evita el
+  // DOBLE descuento). Legacy sin salida → flujo de hoy, byte-igual.
+  if (jf && jf.salida_v2) {
+    const difV2 = reporte?.diferencia || 0;
+    const clabeV2 = reporte?.cuenta_bancaria_coordi || 'no registrada';
+    let msgV2 = '✓ Aprobado. El stock se movió con la salida de bodega; las devoluciones suman cuando palomees "kits recibidos".';
+    if (difV2 > 0) msgV2 += `\n\nSobró ${formatMXN(difV2)}.\nEl coordi debe regresar ese dinero a tu cuenta.`;
+    else if (difV2 < 0) msgV2 += `\n\nEl coordi gastó ${formatMXN(Math.abs(difV2))} de más.\nDepositar a: ${clabeV2}`;
+    alert(msgV2);
+    return;
+  }
+  // Descontar kits del inventario
+  const kits = reporte?.kits_detalle
+    ? (typeof reporte.kits_detalle==='string' ? JSON.parse(reporte.kits_detalle) : reporte.kits_detalle)
+    : [];
+  for (const k of kits.filter(k => (k.cantidad_sacada||0) > 0)) {
+    try {
+      const pieza = await khKits.obtener(k.pieza_id).catch(()=>null); // [sec-kits]
+      if (pieza) {
+        const nuevaCantidad = Math.max(0, (pieza.cantidad||0) - (k.cantidad_sacada||0) + (k.cantidad_sobrante||0));
+        await khKits.actualizar(k.pieza_id, { cantidad: nuevaCantidad }); // [sec-kits]
+      }
+    } catch(e) { console.warn('Stock update error:', k.pieza_id, e.message); }
+  }
+  // Notificación financiera
+  const dif = reporte?.diferencia || 0;
+  const clabe = reporte?.cuenta_bancaria_coordi || 'no registrada';
+  if (dif > 0) {
+    alert(`✓ Aprobado y stock actualizado.\n\nSobró ${formatMXN(dif)}.\nEl coordi debe regresar ese dinero a tu cuenta.`);
+  } else if (dif < 0) {
+    alert(`✓ Aprobado y stock actualizado.\n\nEl coordi gastó ${formatMXN(Math.abs(dif))} de más.\nDepositar a: ${clabe}`);
+  } else {
+    alert('✓ Reporte aprobado y stock actualizado.');
+  }
+}
+
+async function aprobarReporteMemo(id) {
+  const r = _reportesCache.find(x => x.id === id);
+  if (!r) return;
+  if (!confirm('¿Aprobar definitivamente este reporte? Se descontará el stock de Torre de Karin.')) return;
+  try {
+    await ejecutarAprobacionFinal(id, r);
+    loadReportes();
+    // Refrescar inventario si está visible
+    if (document.getElementById('page-inventario')?.classList.contains('active')) loadInventario();
+  } catch(e) { alert(e.message); }
+}
+
+async function rechazarReporte(id) {
+  const motivo = prompt('Motivo del rechazo (el coordi lo verá):');
+  if (!motivo) return;
+  try {
+    await khReportes.rechazar(id, motivo); // [sec-reportes]
+    // Alerta a Memo
+    const r = _reportesCache.find(x=>x.id===id);
+    await enviarAlertaMemo('reporte_rechazado', { coordi: r?._coordi?.nombre||'Coordi', motivo });
+    loadReportes();
+  } catch(e) { alert(e.message); }
+}
+
+async function marcarKitsRecibidos(id) {
+  const r = _reportesCache.find(x => x.id === id);
+  if (!r) return;
+  if (!confirm('¿Confirmar que recibiste los kits sobrantes? Se agregarán al inventario de bodega.')) return;
+  try {
+    // Marcar kits como recibidos en el reporte
+    const kits = typeof r.kits_detalle === 'string' ? JSON.parse(r.kits_detalle) : (r.kits_detalle || []);
+    const kitsActualizados = kits.map(k => ({ ...k, recibido: true }));
+    await khReportes.marcarKitsRecibidos(id, JSON.stringify(kitsActualizados)); // [sec-reportes]
+
+    alert('✓ Kits marcados como recibidos y actualizados en bodega.');
+    loadReportes();
+    // Refrescar inventario si está activo
+    if (document.getElementById('page-inventario').classList.contains('active')) loadInventario();
+  } catch(e) { alert(e.message); }
+}
+
+// ── Ver detalle completo ──────────────────────────────────────
+function verDetalleReporte(id) {
+  const r = _reportesCache.find(x => x.id === id);
+  if (!r) return;
+  const kits   = typeof r.kits_detalle   === 'string' ? JSON.parse(r.kits_detalle)   : (r.kits_detalle   || []);
+  const gastos = typeof r.gastos_detalle === 'string' ? JSON.parse(r.gastos_detalle) : (r.gastos_detalle || []);
+  const dif    = r.diferencia || 0;
+  const difColor = dif >= 0 ? 'var(--green)' : 'var(--red)';
+
+  const kitsHtml = kits.length ? kits.map(k =>
+    `<tr>
+      <td style="font-weight:600">${k.pieza_nombre || k.pieza_id}</td>
+      <td>${k.cantidad_sacada || 0}</td>
+      <td>${k.cantidad_sobrante || 0}</td>
+      <td style="color:${k.recibido ? 'var(--green)' : 'var(--ts)'}">${k.recibido ? '✓ Recibido' : '—'}</td>
+    </tr>`
+  ).join('') : '<tr><td colspan="4" style="color:var(--ts)">Sin kits registrados</td></tr>';
+
+  const gastosHtml = gastos.length ? gastos.map(g =>
+    `<tr><td>${g.concepto}</td><td style="text-align:right;font-weight:600">${formatMXN(g.monto)}</td></tr>`
+  ).join('') : '<tr><td colspan="2" style="color:var(--ts)">Sin gastos</td></tr>';
+
+  document.getElementById('modal-reporte').innerHTML = `
+    <div class="modal" style="max-width:620px">
+      <div class="modal-header">
+        <div>
+          <div class="modal-title" style="font-family:'Zen Dots',sans-serif;font-size:15px">DETALLE REPORTE</div>
+          <div style="font-size:11px;font-family:'JetBrains Mono',monospace;color:var(--ts)">${r._evento?.nombre || r.evento_id} · ${r._coordi?.nombre || ''}</div>
+        </div>
+        <button class="modal-close" onclick="closeModal('modal-reporte')">×</button>
+      </div>
+      <div class="modal-body" style="max-height:75vh;overflow-y:auto">
+        <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.15em;color:var(--ts);margin-bottom:10px">// KITS</div>
+        <div class="table-wrap" style="margin-bottom:20px">
+          <table>
+            <thead><tr><th>Pieza</th><th>Sacados</th><th>Sobran</th><th>Status</th></tr></thead>
+            <tbody>${kitsHtml}</tbody>
+          </table>
+        </div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.15em;color:var(--ts);margin-bottom:10px">// GASTOS</div>
+        <div class="table-wrap" style="margin-bottom:20px">
+          <table>
+            <thead><tr><th>Concepto</th><th style="text-align:right">Monto</th></tr></thead>
+            <tbody>${gastosHtml}</tbody>
+          </table>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;text-align:center;background:var(--bg3);padding:16px;border-radius:8px;margin-bottom:16px">
+          <div><div style="font-size:10px;color:var(--ts)">ENTREGADO</div><div style="font-family:'Zen Dots',sans-serif;font-size:18px;color:var(--gold)">${formatMXN(r.dinero_recibido||0)}</div></div>
+          <div><div style="font-size:10px;color:var(--ts)">GASTADO</div><div style="font-family:'Zen Dots',sans-serif;font-size:18px">${formatMXN(r.total_gastado||0)}</div></div>
+          <div><div style="font-size:10px;color:var(--ts)">DIFERENCIA</div><div style="font-family:'Zen Dots',sans-serif;font-size:18px;color:${difColor}">${formatMXN(Math.abs(dif))}</div></div>
+        </div>
+        ${r.cuenta_bancaria_coordi ? `<div style="padding:10px 14px;background:rgba(255,68,68,.06);border-left:2px solid var(--red);margin-bottom:12px;font-size:12px">Cuenta coordi: <strong>${r.cuenta_bancaria_coordi}</strong></div>` : ''}
+        ${r.notas ? `<div style="padding:10px 14px;background:var(--bg3);border-left:2px solid var(--border2);font-size:12px;color:var(--ts)">Notas: ${r.notas}</div>` : ''}
+      </div>
+      <div class="modal-footer"><button class="btn btn-ghost" onclick="closeModal('modal-reporte')">Cerrar</button></div>
+    </div>`;
+  openModal('modal-reporte');
+}
+
+// ═══════════════════════════════════════════════════════════════
+// DELIVERABLES · material entregable por evento asignado a creadora
+// ═══════════════════════════════════════════════════════════════
+const _DELIVERABLES_DEFAULT = [
+  "Video Reel (1080x1920)",
+  "3-4 menciones en historias",
+  "Post collab con fotos",
+];
+
+// [sec-deliverables] Acceso a deliverables_creadoras vía Netlify Function con
+// service_role (cerramos lectura/escritura anon). El backend hace cumplir el
+// candado: cc SOLO ve/edita/borra los deliverables de SUS asignaciones;
+// maestro_roshi/bulma todo. Es un checklist (estado/link/notas), no archivos.
+const khDeliverables = {
+  async _call(payload) {
+    const r = await khAdminFetch('/.netlify/functions/admin-deliverables', {
+      method: 'POST', body: JSON.stringify(payload),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || j.ok === false) throw new Error(j.error || ('admin-deliverables ' + r.status));
+    return j;
+  },
+  // listar(ids[]) → array de deliverables de esas asignaciones (filtrado server-side por dueño)
+  listar(eventoCoordiIds) { return this._call({ accion: 'listar', evento_coordi_ids: eventoCoordiIds }).then(j => j.rows || []); },
+  // obtener(id) → un deliverable o null (para prellenar prompts)
+  obtener(id) { return this._call({ accion: 'obtener', id }).then(j => j.row || null); },
+  // crearDefaults(ecId, [desc,...]) → array insertado
+  crearDefaults(eventoCoordiId, descripciones) { return this._call({ accion: 'crear_defaults', evento_coordi_id: eventoCoordiId, descripciones }).then(j => j.rows || []); },
+  // addExtra(ecId, desc) → fila insertada
+  addExtra(eventoCoordiId, descripcion) { return this._call({ accion: 'add_extra', evento_coordi_id: eventoCoordiId, descripcion }).then(j => j.row || null); },
+  // toggle(id) → fila actualizada (estado invertido server-side)
+  toggle(id) { return this._call({ accion: 'toggle', id }).then(j => j.row || null); },
+  editarLink(id, link) { return this._call({ accion: 'editar_link', id, link_contenido: link }); },
+  editarNotas(id, notas) { return this._call({ accion: 'editar_notas', id, notas }); },
+  borrar(id) { return this._call({ accion: 'borrar', id }); },
+};
+
+// Anota cada item de evAsignados con su array .deliverables. Si una asignación
+// no tiene ninguno, crea los 3 defaults para evento del flujo de contratos.
+async function _ensureDeliverables(evAsignados) {
+  if (!evAsignados.length) return;
+  const ids = evAsignados.map(e => e.id).filter(Boolean);
+  if (!ids.length) return;
+  let rows = [];
+  try {
+    rows = await khDeliverables.listar(ids); // [sec-deliverables]
+  } catch (e) {
+    console.warn('[deliverables] read falló:', e.message);
+    return;
+  }
+  // Group by evento_coordi_id
+  const byId = {};
+  rows.forEach(r => { (byId[r.evento_coordi_id] = byId[r.evento_coordi_id] || []).push(r); });
+
+  // Para cada asignación, auto-popular si está vacía.
+  for (const e of evAsignados) {
+    let list = byId[e.id] || [];
+    if (!list.length) {
+      try {
+        list = await khDeliverables.crearDefaults(e.id, _DELIVERABLES_DEFAULT); // [sec-deliverables]
+      } catch (err) {
+        console.warn('[deliverables] auto-popular falló para', e.id, err.message);
+      }
+    }
+    e.deliverables = list;
+  }
+}
+
+function _renderDeliverablesPanel(e, u) {
+  const dels = e.deliverables || [];
+  const ok = dels.filter(d => d.estado === 'completado').length;
+  const total = dels.length;
+  return `
+    <div style="margin-top:14px;background:rgba(0,0,0,.18);border:1px solid rgba(255,255,255,.05);border-radius:6px;padding:12px 14px">
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:8px">
+        <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--gold)">▸ Material entregado <span style="color:var(--ts);margin-left:4px">[${ok}/${total}]</span></div>
+        <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();_delivAdd('${e.id}','${u.id}')" style="font-size:10px;font-family:'JetBrains Mono',monospace">+ deliverable</button>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:6px">
+        ${dels.map(d => _renderDeliverableItem(d, u)).join('') || '<div style="font-family:JetBrains Mono,monospace;font-size:10px;color:var(--ts);letter-spacing:.05em">// sin items</div>'}
+      </div>
+    </div>
+  `;
+}
+
+function _renderDeliverableItem(d, u) {
+  const done = d.estado === 'completado';
+  const color = done ? 'var(--green)' : 'var(--gold)';
+  const bg = done ? 'rgba(61,220,132,.08)' : 'rgba(255,183,3,.05)';
+  const fechaTxt = done && d.completado_at
+    ? ' · ' + new Date(d.completado_at).toLocaleDateString('es-MX', { day: '2-digit', month: 'short' })
+    : '';
+  return `
+    <div style="background:${bg};border-left:2px solid ${color};padding:8px 10px;font-size:12px">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;flex-wrap:wrap">
+        <div style="flex:1;min-width:0">
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-family:'JetBrains Mono',monospace;font-size:13px;color:${color}">${done ? '✓' : '○'}</span>
+            <span style="color:var(--text);font-weight:600">${_escDeliv(d.descripcion)}</span>
+            <span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:${color};letter-spacing:.1em;text-transform:uppercase">${done ? 'Entregado'+fechaTxt : 'Pendiente'}</span>
+          </div>
+          ${d.link_contenido ? `<div style="margin-top:4px;font-size:10px;font-family:'JetBrains Mono',monospace;color:var(--ts)">↗ <a href="${_escDeliv(d.link_contenido)}" target="_blank" rel="noopener" style="color:var(--gold)">${_escDeliv(d.link_contenido).slice(0,60)}${d.link_contenido.length>60?'…':''}</a></div>` : ''}
+          ${d.notas ? `<div style="margin-top:4px;font-size:10px;color:var(--ts);font-style:italic">${_escDeliv(d.notas)}</div>` : ''}
+        </div>
+        <div style="display:flex;gap:4px;flex-wrap:wrap">
+          <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();_delivToggle('${d.id}','${u.id}')" style="font-size:9px;font-family:'JetBrains Mono',monospace;padding:3px 7px">${done ? '↻ marcar pendiente' : '✓ marcar entregado'}</button>
+          <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();_delivEditarLink('${d.id}','${u.id}')" style="font-size:9px;font-family:'JetBrains Mono',monospace;padding:3px 7px" title="Link del contenido"><svg class="ic"><use href="#ic-enlace"/></svg></button>
+          <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();_delivEditarNotas('${d.id}','${u.id}')" style="font-size:9px;font-family:'JetBrains Mono',monospace;padding:3px 7px" title="Notas"><svg class="ic"><use href="#ic-lapiz"/></svg></button>
+          <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();_delivBorrar('${d.id}','${u.id}')" style="font-size:9px;font-family:'JetBrains Mono',monospace;padding:3px 7px;color:var(--red);border-color:rgba(230,57,70,.3)" title="Eliminar">×</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function _escDeliv(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c])); }
+
+async function _delivToggle(id, userId) {
+  try {
+    await khDeliverables.toggle(id); // [sec-deliverables] estado se invierte server-side
+    _delivRefreshProfile(userId);
+  } catch (e) { alert('Error: ' + e.message); }
+}
+
+async function _delivEditarLink(id, userId) {
+  try {
+    const actual = await khDeliverables.obtener(id); // [sec-deliverables]
+    if (!actual) return;
+    const nuevo = prompt('Link del contenido entregado (URL)\n— deja vacío para quitar el link:', actual.link_contenido || '');
+    if (nuevo === null) return;
+    await khDeliverables.editarLink(id, nuevo.trim() || null); // [sec-deliverables]
+    _delivRefreshProfile(userId);
+  } catch (e) { alert('Error: ' + e.message); }
+}
+
+async function _delivEditarNotas(id, userId) {
+  try {
+    const actual = await khDeliverables.obtener(id); // [sec-deliverables]
+    if (!actual) return;
+    const nuevo = prompt('Notas para este deliverable:', actual.notas || '');
+    if (nuevo === null) return;
+    await khDeliverables.editarNotas(id, nuevo.trim() || null); // [sec-deliverables]
+    _delivRefreshProfile(userId);
+  } catch (e) { alert('Error: ' + e.message); }
+}
+
+async function _delivBorrar(id, userId) {
+  if (!confirm('¿Eliminar este deliverable?')) return;
+  try {
+    await khDeliverables.borrar(id); // [sec-deliverables]
+    _delivRefreshProfile(userId);
+  } catch (e) { alert('Error: ' + e.message); }
+}
+
+async function _delivAdd(eventoCoordiId, userId) {
+  const desc = prompt('Descripción del deliverable extra:\n(ej. "Video backstage", "Story con marca patrocinadora")');
+  if (!desc || !desc.trim()) return;
+  try {
+    await khDeliverables.addExtra(eventoCoordiId, desc.trim()); // [sec-deliverables]
+    _delivRefreshProfile(userId);
+  } catch (e) { alert('Error: ' + e.message); }
+}
+
+function _delivRefreshProfile(userId) {
+  // Re-abre el mismo modal de perfil. Si es el propio user, renderMiPerfil.
+  if (currentUser && userId === currentUser.id && typeof renderMiPerfil === 'function') {
+    renderMiPerfil(false);
+  } else {
+    cerrarModal('ver-perfil');
+    abrirPerfil(userId);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// VENTAS · vendedores (F3) — Cotizar/Vender + Mis Ventas
+// El precio es SIEMPRE del catálogo (candado): el vendedor no teclea precios.
+// El display se calcula con _vtaCalc (port FIEL de _lib/precio-zona) y el backend
+// lo re-sella con resolverPrecioVenta al registrar → mismo snapshot.
+// ═══════════════════════════════════════════════════════════════
+let _vtaEV = null;         // catálogo EV (crudo) cacheado
+let _vtaEvento = null;     // evento seleccionado (objeto EV)
+let _vtaAgotadas = {};     // evento_id → Set de zonas agotadas (disponibilidad-evento)
+let _vtaVentasCache = [];  // última lista de Mis Ventas (para el botón de cancelar)
+// F5a — CHEAP de vendedor: costo por zona desde comisiones_zona (matriz+comisión).
+// evento_id(#idx) → { zona → {costo, stock, agotada} }. SOLO costo final (sin desglose).
+let _vtaCostoCheap = {};
+
+function _vtaEsc(s) { return _escCtr(s); }
+function _vtaFmt(n) { return '$' + Math.round(Number(n) || 0).toLocaleString('es-MX'); }
+
+// Días naturales evento−hoy (mediodía UTC) — igual que _lib/precio-zona.
+function _vtaDias(evISO, hoyISO) {
+  const m1 = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(evISO || ''));
+  const m2 = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(hoyISO || ''));
+  if (!m1 || !m2) return null;
+  return Math.round((Date.UTC(+m1[1], +m1[2] - 1, +m1[3]) - Date.UTC(+m2[1], +m2[2] - 1, +m2[3])) / 86400000);
+}
+function _vtaHoyMx() { return new Date().toLocaleDateString('en-CA', { timeZone: 'America/Monterrey' }); }
+function _vtaEsCDMX(ev) { const v = ev && ev.v ? String(ev.v).toUpperCase() : ''; return v.includes('CDMX') || v.includes('CIUDAD DE MEXICO'); }
+function _vtaZonaLista(ev, paquete, fi) { const mf = ev.multifecha && ev.multifecha[fi]; if (paquete === 'cheap') return (mf && mf.cheapZonas) || ev.cheapZonas || []; return (mf && mf.zonas) || ev.zonas || []; }
+
+// PORT FIEL de _lib/precio-zona._calcularPrecio (display; el backend re-sella).
+function _vtaCalc(ev, opts) {
+  if (!ev) return { ok: false, motivo: 'evento no encontrado' };
+  const paquete = String(opts.paquete || '').toLowerCase();
+  if (['plus', 'ride', 'stay', 'cheap'].indexOf(paquete) < 0) return { ok: false, motivo: 'paquete inválido' };
+  const selViaj = Math.floor(Number(opts.num_personas) || 0);
+  if (selViaj < 1) return { ok: false, motivo: 'num_personas inválido' };
+  const fi = Number.isFinite(Number(opts.fecha_idx)) ? Number(opts.fecha_idx) : 0;
+  const hoyISO = opts.hoyISO || _vtaHoyMx();
+  const cdmx = _vtaEsCDMX(ev);
+  const hasZona = (paquete === 'plus' || paquete === 'stay' || paquete === 'cheap') || (paquete === 'ride' && ev.forceZona);
+  const hasHotel = (paquete === 'plus' || paquete === 'ride' || paquete === 'stay') && !ev.noHotel;
+  let selZ = null;
+  if (hasZona) {
+    selZ = _vtaZonaLista(ev, paquete, fi).filter(z => z && z.n === String(opts.zona || ''))[0] || null;
+    if (!selZ) return { ok: false, motivo: 'zona no encontrada' };
+    if (!(Number(selZ.p) > 0)) return { ok: false, motivo: 'zona agotada / sin precio' };
+  }
+  let selH = null;
+  const requiereHotel = hasHotel && !opts.hotel_nombre;
+  if (hasHotel && opts.hotel_nombre) { selH = (ev.hotel || []).filter(h => h && h.n === opts.hotel_nombre)[0] || null; if (!selH) return { ok: false, motivo: 'hotel no encontrado' }; }
+  const requiereTransporte = cdmx && paquete !== 'cheap' && (opts.transporte_cost == null);
+  const zonaP = selZ ? (Number(selZ.p) || 0) : 0;
+  const hotelRaw = selH ? (Number(selH.e) || 0) : 0;
+  const hotelPP = ev.hotelPP ? hotelRaw : Math.ceil(hotelRaw / selViaj);
+  const hotelTotal = ev.hotelPP ? (hotelRaw * selViaj) : hotelRaw;
+  const _mfR = (ev.multifecha && ev.multifecha[fi] && ev.multifecha[fi].ride) || 0;
+  const rideBase = _mfR || ev.ride || (cdmx ? 2900 : 2700);
+  const stayDiscount = ev.sep || 500;
+  let total = 0, cxp = 0;
+  if (paquete === 'plus') { if (ev.diaFirst) { total = zonaP + hotelTotal; cxp = Math.ceil(zonaP / selViaj) + hotelPP; } else { total = zonaP * selViaj + hotelTotal; cxp = zonaP + hotelPP; } }
+  else if (paquete === 'ride') { const r = (ev.rideOnly && zonaP > 0) ? zonaP : rideBase; total = r * selViaj + hotelTotal; cxp = r + hotelPP; }
+  else if (paquete === 'stay') { cxp = zonaP - stayDiscount + hotelPP; if (cxp < 0) cxp = zonaP + hotelPP; total = cxp * selViaj; }
+  else { if (ev.diaFirst) { total = zonaP; cxp = Math.ceil(zonaP / selViaj); } else { total = zonaP * selViaj; cxp = zonaP; } }
+  const tCost = Number(opts.transporte_cost) || 0;
+  total += tCost * selViaj; cxp += tCost;
+  let separo;
+  if (paquete === 'cheap') {
+    let cs = (ev.sepCheap !== undefined) ? ev.sepCheap : 1000;
+    if (selZ) { const cz = ((ev.multifecha && ev.multifecha[fi] && ev.multifecha[fi].cheapZonas) || ev.cheapZonas || []).filter(z => z && z.n === selZ.n)[0]; if (cz && cz.sepEspecial !== undefined) cs = cz.sepEspecial; }
+    separo = (Number(cs) || 0) * selViaj;
+  } else {
+    const dias = _vtaDias(ev.ds, hoyISO);
+    if (dias != null && dias <= 15) separo = Math.ceil(cxp * 0.5) * selViaj;
+    else { let s = ev.sep; if (paquete === 'ride' && ev.sepRide !== undefined) s = ev.sepRide; if (ev.sepZonas && selZ && ev.sepZonas[selZ.n] !== undefined) s = ev.sepZonas[selZ.n]; separo = (Number(s) || 0) * selViaj; }
+  }
+  if (!(total > 0) || !(cxp > 0)) return { ok: false, motivo: 'precio no disponible' };
+  return { ok: true, paquete, zona: selZ ? selZ.n : null, num_personas: selViaj, precio_unit: cxp, total, separo, resto: total - separo, requiere_hotel: requiereHotel, requiere_transporte: requiereTransporte };
+}
+
+// 💤 F6: puerta del cotizador para el VENDEDOR. Pregunta al backend (que es
+// quien manda: todas las functions de ventas ya bloquean) y si la cuenta está
+// inactiva pinta el aviso en lugar de la UI. Best-effort: cualquier otro error
+// → la página carga normal (jamás dejar fuera a un activo por red).
+async function _vtaGateInactivo() {
+  try {
+    const r = await khAdminFetch('/.netlify/functions/admin-ventas-resumen', { method: 'POST', body: JSON.stringify({ accion: 'mis_ventas' }) });
+    if (r.status !== 403) return false;
+    const j = await r.json().catch(() => ({}));
+    if (j.codigo !== 'vendedor_inactivo') return false;
+    const vv = document.getElementById('vta-view-vender'), vm = document.getElementById('vta-view-mis');
+    if (vv) vv.style.display = 'none';
+    if (vm) vm.style.display = 'none';
+    let av = document.getElementById('vta-inactivo-aviso');
+    if (!av) {
+      av = document.createElement('div');
+      av.id = 'vta-inactivo-aviso';
+      const page = document.getElementById('page-cotizar');
+      if (page) page.appendChild(av);
+    }
+    av.innerHTML = `<div style="max-width:560px;margin:40px auto;text-align:center;padding:32px 24px;border:1px solid rgba(255,68,68,.4);border-radius:12px;background:rgba(255,68,68,.06)">
+      <div style="font-size:34px;margin-bottom:10px">💤</div>
+      <div style="font-family:'Rajdhani',sans-serif;font-weight:700;font-size:18px;margin-bottom:10px;color:#ff6666">Cuenta de vendedor inactiva</div>
+      <div style="font-size:13px;line-height:1.6;color:var(--ts)">${_esfEsc(j.error || 'Tu cuenta de vendedor está inactiva por no registrar ventas en 3 meses — contacta a Conecta para reactivarla')}</div>
+    </div>`;
+    return true;
+  } catch (e) { return false; }
+}
+
+async function loadCotizar() {
+  // 💤 F6: candado de inactividad del vendedor — evaluado en vivo en la puerta.
+  if (currentUser && currentUser.rol === 'vendedor') {
+    if (await _vtaGateInactivo()) return;
+    const av = document.getElementById('vta-inactivo-aviso');
+    if (av) av.remove(); // reactivado → la página vuelve a la normalidad
+  }
+  _vtaSwitch('vender');
+  const sel = document.getElementById('vta-evento');
+  if (sel && sel.options.length <= 1) {
+    try {
+      _vtaEV = await _fetchEVFromIndex();
+      const hoy = _vtaHoyMx();
+      const vivos = (_vtaEV || []).filter(e => e && e.id && e.a && (!e.ds || e.ds >= hoy)).sort((a, b) => String(a.ds || '9999').localeCompare(String(b.ds || '9999')));
+      vivos.forEach(e => { const o = document.createElement('option'); o.value = e.id; o.textContent = e.a + (e.f ? ' · ' + e.f : ''); sel.appendChild(o); });
+    } catch (e) { /* sin catálogo: el select queda vacío */ }
+  }
+}
+
+function _vtaSwitch(view) {
+  const vender = view === 'vender';
+  document.getElementById('vta-view-vender').style.display = vender ? '' : 'none';
+  document.getElementById('vta-view-mis').style.display = vender ? 'none' : '';
+  const tv = document.getElementById('vta-tab-vender'), tm = document.getElementById('vta-tab-mis');
+  [[tv, vender], [tm, !vender]].forEach(([b, on]) => { if (b) { b.style.background = on ? 'rgba(255,107,0,.12)' : 'transparent'; b.style.color = on ? 'var(--orange)' : 'var(--ts)'; } });
+  if (!vender) _vtaMisVentas();
+}
+
+async function _vtaOnEvento() {
+  const id = document.getElementById('vta-evento').value;
+  _vtaEvento = (_vtaEV || []).filter(e => e && e.id === id)[0] || null;
+  // Fecha (multifecha)
+  const fw = document.getElementById('vta-fecha-wrap'), fsel = document.getElementById('vta-fecha');
+  fsel.innerHTML = '';
+  if (_vtaEvento && Array.isArray(_vtaEvento.multifecha) && _vtaEvento.multifecha.length) {
+    _vtaEvento.multifecha.forEach((m, i) => { const o = document.createElement('option'); o.value = String(i); o.textContent = (m && m.lbl) ? m.lbl : ('Fecha ' + (i + 1)); fsel.appendChild(o); });
+    fw.style.display = '';
+  } else { fw.style.display = 'none'; }
+  // Disponibilidad (apaga agotadas). Best-effort.
+  _vtaAgotadas[id] = new Set();
+  if (_vtaEvento) {
+    try {
+      const r = await fetch('/.netlify/functions/disponibilidad-evento', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ evento_id: _vtaEventoId() }) });
+      const j = await r.json().catch(() => ({}));
+      if (j && j.ok && Array.isArray(j.zonas_agotadas)) _vtaAgotadas[id] = new Set(j.zonas_agotadas.map(z => String(z).trim()));
+    } catch (e) { /* sin disponibilidad: no se apaga nada (el backend valida al registrar) */ }
+  }
+  await _vtaResync();
+}
+
+// Repuebla hotel + zonas según paquete/fecha (para CHEAP carga el costo del vendedor
+// desde comisiones_zona) y recalcula. Lo llaman evento/paquete/fecha (cambian la lista).
+async function _vtaResync() {
+  _vtaPoblarHotel();
+  const paquete = document.getElementById('vta-paquete').value;
+  if (paquete === 'cheap' && _vtaEvento) await _vtaCargarCostoCheap(_vtaEventoId());
+  _vtaPoblarZonas();
+  _vtaRecalc();
+}
+
+// Carga el costo CHEAP del vendedor por zona (matriz+comisión, SIN desglose) + stock.
+// Cachea por evento_id(#idx). Best-effort: si falla, deja mapa vacío (sin zonas CHEAP).
+async function _vtaCargarCostoCheap(eid) {
+  if (!eid || _vtaCostoCheap[eid]) return;
+  const map = {};
+  try {
+    const r = await khAdminFetch('/.netlify/functions/admin-comisiones-zona', { method: 'POST', body: JSON.stringify({ accion: 'costo_vendedor', evento_id: eid }) });
+    const j = await r.json().catch(() => ({}));
+    if (r.ok && j && j.ok && Array.isArray(j.zonas)) j.zonas.forEach(z => { if (z && z.zona != null) map[String(z.zona).trim()] = z; });
+  } catch (e) { /* sin costos: el select CHEAP quedará vacío y el backend validará al registrar */ }
+  _vtaCostoCheap[eid] = map;
+}
+
+// evento_id con multifecha → 'slug#idx'.
+function _vtaEventoId() {
+  if (!_vtaEvento) return '';
+  const fw = document.getElementById('vta-fecha-wrap');
+  if (fw && fw.style.display !== 'none') { const fi = document.getElementById('vta-fecha').value; if (fi !== '') return _vtaEvento.id + '#' + fi; }
+  return _vtaEvento.id;
+}
+
+function _vtaPoblarZonas() {
+  const zsel = document.getElementById('vta-zona');
+  zsel.innerHTML = '';
+  if (!_vtaEvento) { zsel.innerHTML = '<option value="">— Elige un evento primero —</option>'; return; }
+  const paquete = document.getElementById('vta-paquete').value;
+  const fi = (document.getElementById('vta-fecha-wrap').style.display !== 'none') ? (parseInt(document.getElementById('vta-fecha').value, 10) || 0) : 0;
+  // CHEAP de vendedor: zonas y costo vienen de comisiones_zona (no del EV). Solo se
+  // ofrecen zonas con comisión asignada; sin comisión → no se puede vender esa zona.
+  if (paquete === 'cheap') {
+    const mapa = _vtaCostoCheap[_vtaEventoId()] || {};
+    const zonas = Object.keys(mapa);
+    if (!zonas.length) { zsel.innerHTML = '<option value="">— sin zonas CHEAP configuradas (pídele a Memo la comisión) —</option>'; return; }
+    zsel.innerHTML = '<option value="">— Elige zona —</option>';
+    zonas.sort().forEach(z => {
+      const info = mapa[z] || {};
+      const o = document.createElement('option');
+      const off = !!info.agotada;
+      // Frescura del costo (actualizado_at de comisiones_zona) — SOLO la fecha;
+      // el vendedor sigue sin ver matriz/comisión/desglose jamás.
+      const frescura = info.actualizado_at ? ' · actualizado ' + _khHaceRel(info.actualizado_at) : '';
+      o.value = z;
+      o.textContent = z + ' · ' + _vtaFmt(info.costo) + (off ? ' — AGOTADA' : (info.stock != null ? ' (' + info.stock + ' disp.)' : '')) + frescura;
+      if (off) { o.disabled = true; o.style.color = '#888'; }
+      zsel.appendChild(o);
+    });
+    return;
+  }
+  const lista = _vtaZonaLista(_vtaEvento, paquete, fi);
+  const agot = _vtaAgotadas[_vtaEvento.id] || new Set();
+  const disp = lista.filter(z => z && Number(z.p) > 0);
+  if (!disp.length) { zsel.innerHTML = '<option value="">— sin zonas con precio —</option>'; return; }
+  zsel.innerHTML = '<option value="">— Elige zona —</option>';
+  disp.forEach(z => {
+    const o = document.createElement('option');
+    const off = agot.has(String(z.n).trim());
+    o.value = z.n;
+    o.textContent = z.n + ' · ' + _vtaFmt(z.p) + (off ? ' — AGOTADA' : '');
+    if (off) { o.disabled = true; o.style.color = '#888'; }
+    zsel.appendChild(o);
+  });
+}
+
+function _vtaPoblarHotel() {
+  const hw = document.getElementById('vta-hotel-wrap'), hsel = document.getElementById('vta-hotel');
+  const paquete = document.getElementById('vta-paquete').value;
+  const hasHotel = _vtaEvento && (paquete === 'plus' || paquete === 'ride' || paquete === 'stay') && !_vtaEvento.noHotel && Array.isArray(_vtaEvento.hotel) && _vtaEvento.hotel.length;
+  if (!hasHotel) { hw.style.display = 'none'; hsel.innerHTML = ''; return; }
+  hsel.innerHTML = '';
+  _vtaEvento.hotel.forEach(h => { if (!h || !h.n) return; const o = document.createElement('option'); o.value = h.n; o.textContent = h.n + (Number(h.e) > 0 ? ' (+' + _vtaFmt(h.e) + (_vtaEvento.hotelPP ? '/persona' : '') + ')' : ''); hsel.appendChild(o); });
+  hw.style.display = '';
+}
+
+function _vtaRecalc() {
+  const box = document.getElementById('vta-resumen');
+  if (!_vtaEvento) { box.style.display = 'none'; return; }
+  // Repoblar zonas/hotel si cambió paquete/fecha (precio depende de ellos).
+  _vtaPoblarHotel();
+  const zsel = document.getElementById('vta-zona');
+  const paquete = document.getElementById('vta-paquete').value;
+  const num = parseInt(document.getElementById('vta-num').value, 10) || 1;
+  const hotel = (document.getElementById('vta-hotel-wrap').style.display !== 'none') ? document.getElementById('vta-hotel').value : null;
+  const fi = (document.getElementById('vta-fecha-wrap').style.display !== 'none') ? (parseInt(document.getElementById('vta-fecha').value, 10) || 0) : 0;
+  const zona = zsel.value;
+  if (!zona) { box.style.display = 'none'; return; }
+  const limite = (() => { const d = new Date(_vtaHoyMx() + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() + 8); return d.toISOString().slice(0, 10); })();
+  // CHEAP de vendedor: el costo sale de comisiones_zona (matriz+comisión). El vendedor
+  // ve SOLO el costo final; el separo (=comisión de Memo) es privado y NO se muestra.
+  if (paquete === 'cheap') {
+    const info = (_vtaCostoCheap[_vtaEventoId()] || {})[zona];
+    if (!info || info.costo == null) { box.style.display = 'none'; return; }
+    const total = (Number(info.costo) || 0) * num;
+    box.style.display = '';
+    box.innerHTML = `
+      <div style="display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;font-size:14px">
+        <div><div style="font-size:10px;color:var(--ts);text-transform:uppercase;letter-spacing:.08em">Total</div><b style="font-size:18px">${_vtaFmt(total)}</b> <span style="font-size:11px;color:var(--ts)">(${num} pers. · ${_vtaFmt(info.costo)} c/u)</span></div>
+        <div><div style="font-size:10px;color:var(--ts);text-transform:uppercase;letter-spacing:.08em">Fecha límite</div><b style="font-size:14px">${limite}</b> <span style="font-size:11px;color:var(--ts)">(8 días)</span></div>
+      </div>
+      <div style="margin-top:6px;font-size:10px;color:var(--ts)"><svg class="ic" style="width:11px;height:11px;vertical-align:-1px"><use href="#ic-candado"/></svg> Costo CHEAP fijo — el sistema lo sella al registrar.</div>`;
+    return;
+  }
+  const pr = _vtaCalc(_vtaEvento, { paquete, zona, num_personas: num, hotel_nombre: hotel, fecha_idx: fi });
+  if (!pr.ok) { box.style.display = 'none'; return; }
+  box.style.display = '';
+  box.innerHTML = `
+    <div style="display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;font-size:14px">
+      <div><div style="font-size:10px;color:var(--ts);text-transform:uppercase;letter-spacing:.08em">Total</div><b style="font-size:18px">${_vtaFmt(pr.total)}</b> <span style="font-size:11px;color:var(--ts)">(${num} pers.)</span></div>
+      <div><div style="font-size:10px;color:var(--ts);text-transform:uppercase;letter-spacing:.08em">Separo</div><b style="font-size:18px;color:var(--orange)">${_vtaFmt(pr.separo)}</b></div>
+      <div><div style="font-size:10px;color:var(--ts);text-transform:uppercase;letter-spacing:.08em">Fecha límite</div><b style="font-size:14px">${limite}</b> <span style="font-size:11px;color:var(--ts)">(8 días)</span></div>
+    </div>
+    ${(pr.requiere_hotel || pr.requiere_transporte) ? `<div style="margin-top:8px;font-size:11px;color:#ffb020"><svg class="ic" style="width:12px;height:12px;vertical-align:-1px"><use href="#ic-alerta"/></svg> ${pr.requiere_transporte ? 'El transporte a CDMX se cotiza aparte con Bulma. ' : ''}${pr.requiere_hotel ? 'Falta elegir hotel.' : ''}</div>` : ''}
+    <div style="margin-top:6px;font-size:10px;color:var(--ts)"><svg class="ic" style="width:11px;height:11px;vertical-align:-1px"><use href="#ic-candado"/></svg> Precio fijo del catálogo — el sistema lo sella al registrar.</div>`;
+}
+
+async function _vtaRegistrar() {
+  const alert = document.getElementById('vta-alert');
+  const setErr = (m) => { alert.innerHTML = `<div style="padding:10px 14px;background:rgba(255,68,68,.12);border:1px solid rgba(255,68,68,.4);color:#ffb3b3;border-radius:6px;margin-bottom:14px;font-size:13px"><svg class="ic"><use href="#ic-alerta"/></svg> ${_vtaEsc(m)}</div>`; };
+  if (!_vtaEvento) return setErr('Elige un evento');
+  const paquete = document.getElementById('vta-paquete').value;
+  const zona = document.getElementById('vta-zona').value;
+  const num = parseInt(document.getElementById('vta-num').value, 10) || 0;
+  const hotel = (document.getElementById('vta-hotel-wrap').style.display !== 'none') ? document.getElementById('vta-hotel').value : null;
+  const fi = (document.getElementById('vta-fecha-wrap').style.display !== 'none') ? (parseInt(document.getElementById('vta-fecha').value, 10) || 0) : 0;
+  const nombre = (document.getElementById('vta-cli-nombre').value || '').trim();
+  const correo = (document.getElementById('vta-cli-correo').value || '').trim();
+  const telefono = (document.getElementById('vta-cli-tel').value || '').trim();
+  if (!zona) return setErr('Elige una zona');
+  if (num < 1 || num > 12) return setErr('Personas entre 1 y 12');
+  if (!nombre) return setErr('Escribe el nombre del cliente');
+  if (!correo || correo.indexOf('@') < 0) return setErr('Escribe un correo válido del cliente');
+  alert.innerHTML = '';
+  const btn = document.getElementById('vta-btn'); const orig = btn.textContent;
+  btn.disabled = true; btn.textContent = 'Registrando…';
+  try {
+    const r = await khAdminFetch('/.netlify/functions/admin-venta-crear', {
+      method: 'POST',
+      body: JSON.stringify({ evento_id: _vtaEventoId(), fecha_idx: fi, paquete, zona, hotel: hotel || undefined, num_personas: num, cliente: { nombre, correo, telefono: telefono || undefined } }),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || j.ok === false) { setErr(j.error || ('Error ' + r.status)); return; }  // 409/502 tal cual
+    showToast('Venta registrada — folio ' + String(j.solicitud_id || '').slice(0, 8) + ' · límite ' + (j.vende_limite || '') + (j.cliente_reusado ? ' · cliente existente' : ''), 'success');
+    // Limpiar cliente + refrescar Mis Ventas
+    ['vta-cli-nombre', 'vta-cli-correo', 'vta-cli-tel'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+    document.getElementById('vta-resumen').style.display = 'none';
+  } catch (e) { setErr(e.message || 'No se pudo registrar'); }
+  finally { btn.disabled = false; btn.textContent = orig; }
+}
+
+async function _vtaMisVentas() {
+  const tb = document.getElementById('vta-mis-tbody');
+  if (!tb) return;
+  _vtaMisComisiones();   // [F5c] panel de comisiones liquidadas del vendedor (solo lo suyo)
+  try {
+    const r = await khAdminFetch('/.netlify/functions/admin-ventas-resumen', { method: 'POST', body: JSON.stringify({ accion: 'mis_ventas' }) });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || j.ok === false) { tb.innerHTML = `<tr><td colspan="8" style="text-align:center;color:var(--red);padding:24px">${_vtaEsc(j.error || ('Error ' + r.status))}</td></tr>`; return; }
+    const thV = document.getElementById('vta-th-vendedor');
+    if (thV) thV.style.display = j.es_admin ? '' : 'none';
+    const thA = document.getElementById('vta-th-acc');
+    if (thA) thA.style.display = j.es_admin ? '' : 'none'; // solo admin cancela
+    _vtaVentasCache = Array.isArray(j.ventas) ? j.ventas : [];
+    const ventas = _vtaVentasCache;
+    if (!ventas.length) { tb.innerHTML = `<tr><td colspan="8" style="text-align:center;color:var(--ts);padding:30px;font-size:12px;letter-spacing:.1em;text-transform:uppercase">Sin ventas todavía</td></tr>`; return; }
+    const hoy = _vtaHoyMx();
+    tb.innerHTML = ventas.map(v => {
+      const c = (v.clientes && (Array.isArray(v.clientes) ? v.clientes[0] : v.clientes)) || {};
+      const snap = v.precio_sellado || {};
+      const total = (snap.total != null) ? snap.total : v.precio_total;
+      // separo puede venir OMITIDO (privacidad CHEAP del vendedor) → no se muestra.
+      const separo = (snap.separo != null) ? snap.separo : v.monto_separo;
+      const separoHtml = (separo != null) ? `<br><span style="color:var(--orange);font-size:11px">sep ${_vtaFmt(separo)}</span>` : '';
+      const dias = _vtaDias(v.vende_limite, hoy);
+      let limCell = _vtaEsc(v.vende_limite || '—');
+      if (v.vende_limite && dias != null && v.estado === 'pendiente') {
+        if (dias < 0) limCell = `<span style="color:#ff6666;font-weight:700"><svg class="ic" style="width:11px;height:11px;vertical-align:-1px"><use href="#ic-alerta"/></svg> venció (${limCell})</span>`;
+        else if (dias <= 2) limCell = `<span style="color:#ffb020;font-weight:700"><svg class="ic" style="width:11px;height:11px;vertical-align:-1px"><use href="#ic-alerta"/></svg> vence en ${dias}d</span>`;
+      }
+      const vendedorCell = j.es_admin ? `<td style="font-size:12px;color:var(--ts)">${_vtaEsc(v.vendedor_nombre || (v.vendedor_id || '').slice(0, 8))}</td>` : '';
+      // Botón de cancelar SOLO admin y SOLO ventas VENCIDAS aún pendientes.
+      const vencida = (dias != null && dias < 0 && v.estado === 'pendiente');
+      const accCell = j.es_admin
+        ? `<td style="text-align:right;white-space:nowrap">${vencida ? `<button class="btn btn-ghost btn-sm" style="font-size:11px;color:#ff6666;border-color:rgba(255,68,68,.3)" onclick="_vtaCancelar('${_vtaEsc(v.id)}')">Cancelar vencida</button>` : ''}</td>`
+        : '';
+      return `<tr>
+        <td><b>${_vtaEsc(c.nombre_completo || '—')}</b><br><span style="color:var(--ts);font-size:11px">${_vtaEsc(c.correo || '')}</span></td>
+        ${vendedorCell}
+        <td>${_vtaEsc(v.evento_nombre || v.evento_id || '')}</td>
+        <td>${_vtaEsc(v.zona || '')}<br><span style="color:var(--ts);font-size:11px">${_vtaEsc(v.paquete || '')}</span></td>
+        <td style="text-align:right">${_vtaFmt(total)}${separoHtml}</td>
+        <td>${_vtaEsc(v.estado || '')}<br><button class="btn btn-ghost btn-sm" style="font-size:11px;margin-top:4px" onclick="_vtaAbonos('${_vtaEsc(v.id)}')"><svg class="ic" style="width:11px;height:11px;vertical-align:-1px"><use href="#ic-pagos"/></svg> Abonos</button></td>
+        <td>${limCell}</td>
+        ${accCell}
+      </tr>
+      <tr id="vta-ab-row-${_vtaEsc(v.id)}" style="display:none"><td colspan="8" id="vta-ab-cell-${_vtaEsc(v.id)}" style="background:rgba(255,255,255,.02);padding:14px 16px"></td></tr>`;
+    }).join('');
+  } catch (e) { tb.innerHTML = `<tr><td colspan="8" style="text-align:center;color:var(--red);padding:24px">${_vtaEsc(e.message || 'Error')}</td></tr>`; }
+}
+
+// [F5c] Comisiones liquidadas del vendedor (30% al cierre). SOLO lo suyo: monto +
+// estado (calculada/pagada). El backend NUNCA devuelve la utilidad del evento ni las
+// comisiones de otros vendedores (privacidad de siempre).
+async function _vtaMisComisiones() {
+  const box = document.getElementById('vta-mis-comisiones');
+  if (!box) return;
+  try {
+    const r = await khAdminFetch('/.netlify/functions/admin-liquidacion', { method: 'POST', body: JSON.stringify({ accion: 'mis_comisiones' }) });
+    const j = await r.json().catch(() => ({}));
+    const lista = (r.ok && j.ok && Array.isArray(j.comisiones)) ? j.comisiones : [];
+    if (!lista.length) { box.innerHTML = ''; return; }
+    const chip = (txt, color) => `<span style="display:inline-block;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;color:${color};border:1px solid ${color}55">${txt}</span>`;
+    const filas = lista.map(c => `<div style="display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-top:1px solid var(--border);font-size:13px">
+      <span>${_vtaEsc(c.evento_nombre || c.evento_id)}</span>
+      <span><b>${_vtaFmt(c.monto)}</b> ${c.estado === 'pagada' ? chip('pagada', 'var(--green)') : chip('por pagar', 'var(--orange)')}</span></div>`).join('');
+    box.innerHTML = `<div style="border:1px solid var(--border);border-radius:8px;padding:12px 14px">
+      <div style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--ts);margin-bottom:4px">Mis comisiones liquidadas</div>
+      ${filas}</div>`;
+  } catch (e) { box.innerHTML = ''; }
+}
+
+// [F5b] Abonos del vendedor por venta. El abono es SU pago a Conecta; nace POR
+// VALIDAR (no suma) hasta que Bulma lo confirme en su flujo. Privacidad: el panel
+// muestra "separo a cubrir" (neutro) — nunca matriz/comisión/ganancia.
+async function _vtaAbonos(solicitudId) {
+  const row = document.getElementById('vta-ab-row-' + solicitudId);
+  const cell = document.getElementById('vta-ab-cell-' + solicitudId);
+  if (!row || !cell) return;
+  if (row.style.display !== 'none') { row.style.display = 'none'; return; }  // toggle cerrar
+  row.style.display = '';
+  cell.innerHTML = '<div class="loading-state"><div class="spinner"></div>Cargando…</div>';
+  await _vtaAbonosCargar(solicitudId);
+}
+
+async function _vtaAbonosCargar(solicitudId) {
+  const cell = document.getElementById('vta-ab-cell-' + solicitudId);
+  if (!cell) return;
+  try {
+    const r = await khAdminFetch('/.netlify/functions/admin-venta-abono', { method: 'POST', body: JSON.stringify({ accion: 'estado_venta', solicitud_id: solicitudId }) });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || !j.ok) throw new Error(j.error || ('Error ' + r.status));
+    _vtaAbonosRender(solicitudId, j);
+  } catch (e) { cell.innerHTML = `<div style="color:var(--red);font-size:12px">${_vtaEsc(e.message || 'Error')}</div>`; }
+}
+
+function _vtaAbonosRender(solicitudId, j) {
+  const cell = document.getElementById('vta-ab-cell-' + solicitudId);
+  if (!cell) return;
+  const idS = _vtaEsc(solicitudId);
+  const chip = (txt, color) => `<span style="display:inline-block;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;color:${color};border:1px solid ${color}55">${txt}</span>`;
+  const sepChip = j.separo_cubierto ? chip('SEPARO CUBIERTO', 'var(--green)') : chip('SEPARO PENDIENTE', 'var(--orange)');
+  const abonosHtml = (Array.isArray(j.abonos) && j.abonos.length)
+    ? j.abonos.map(a => {
+        const est = a.estado === 'pagado' ? chip('validado', 'var(--green)') : (a.estado === 'cancelado' ? chip('cancelado', 'var(--ts)') : chip('por validar', 'var(--orange)'));
+        const comp = a.tiene_comprobante ? ' · <span style="color:var(--ts)">comprobante ✓</span>' : '';
+        return `<div style="display:flex;justify-content:space-between;gap:10px;padding:5px 0;border-top:1px solid var(--border);font-size:12px"><span>${_vtaFmt(a.monto)}${comp}</span>${est}</div>`;
+      }).join('')
+    : '<div style="font-size:11px;color:var(--ts);padding:6px 0">Sin abonos todavía</div>';
+  cell.innerHTML = `
+    <div style="display:flex;gap:18px;flex-wrap:wrap;align-items:flex-end;margin-bottom:10px;font-size:13px">
+      <div><div style="font-size:10px;color:var(--ts);text-transform:uppercase;letter-spacing:.08em">Costo sellado</div><b style="font-size:16px">${_vtaFmt(j.total_sellado)}</b></div>
+      <div><div style="font-size:10px;color:var(--ts);text-transform:uppercase;letter-spacing:.08em">Separo a cubrir</div><b style="font-size:16px;color:var(--orange)">${_vtaFmt(j.separo_a_cubrir)}</b> ${sepChip}</div>
+      <div><div style="font-size:10px;color:var(--ts);text-transform:uppercase;letter-spacing:.08em">Validado</div><b style="font-size:16px;color:var(--green)">${_vtaFmt(j.validado)}</b></div>
+      <div><div style="font-size:10px;color:var(--ts);text-transform:uppercase;letter-spacing:.08em">Por validar</div><b style="font-size:16px">${_vtaFmt(j.pendiente_validar)}</b></div>
+      <div><div style="font-size:10px;color:var(--ts);text-transform:uppercase;letter-spacing:.08em">Falta</div><b style="font-size:16px">${_vtaFmt(j.falta_total)}</b></div>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:4px">
+      <input type="number" id="vta-ab-monto-${idS}" min="1" placeholder="Monto del abono" class="cot-input" style="width:150px">
+      <input type="file" id="vta-ab-file-${idS}" accept="image/jpeg,image/png,image/webp,application/pdf" style="font-size:11px;color:var(--ts);max-width:220px">
+      <button class="btn btn-primary btn-sm" id="vta-ab-btn-${idS}" onclick="_vtaAbonoRegistrar('${idS}')">Registrar abono</button>
+    </div>
+    <div id="vta-ab-alert-${idS}" style="font-size:11px;margin:4px 0"></div>
+    <div style="font-size:10px;color:var(--ts);margin-bottom:6px">El abono queda <b>por validar</b> hasta que Bulma lo confirme; no suma hasta entonces. No puedes editar ni borrar abonos.</div>
+    <div style="margin-top:4px">${abonosHtml}</div>`;
+}
+
+async function _vtaAbonoRegistrar(solicitudId) {
+  const alert = document.getElementById('vta-ab-alert-' + solicitudId);
+  const set = (m, err) => { if (alert) alert.innerHTML = m ? `<span style="color:${err ? 'var(--red)' : 'var(--green)'}">${_vtaEsc(m)}</span>` : ''; };
+  const montoEl = document.getElementById('vta-ab-monto-' + solicitudId);
+  const fileEl = document.getElementById('vta-ab-file-' + solicitudId);
+  const btn = document.getElementById('vta-ab-btn-' + solicitudId);
+  const monto = Number(((montoEl && montoEl.value) || '').trim());
+  if (!Number.isFinite(monto) || monto <= 0) return set('Escribe un monto válido (> 0)', true);
+  const file = fileEl && fileEl.files && fileEl.files[0];
+  if (file) {
+    const OK = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
+    if (!OK.includes(file.type)) return set('Comprobante: usa JPG, PNG, WEBP o PDF', true);
+    if (file.size > 4 * 1024 * 1024) return set('Comprobante muy grande (máx 4 MB)', true);
+  }
+  if (btn) { btn.disabled = true; btn.textContent = 'Registrando…'; }
+  try {
+    let comprobante;
+    if (file) comprobante = { file_base64: await _spLeerArchivoBase64(file), mime: file.type };
+    const r = await khAdminFetch('/.netlify/functions/admin-venta-abono', { method: 'POST', body: JSON.stringify({ accion: 'registrar', solicitud_id: solicitudId, monto, comprobante }) });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || !j.ok) throw new Error(j.error || ('Error ' + r.status));
+    if (file && !j.comprobante_subido) set('Abono registrado (por validar), pero el comprobante no se subió: ' + (j.comprobante_error || ''), true);
+    else set('Abono registrado — queda por validar', false);
+    if (montoEl) montoEl.value = '';
+    if (fileEl) fileEl.value = '';
+    await _vtaAbonosCargar(solicitudId);
+  } catch (e) { set(e.message || 'No se pudo registrar', true); }
+  finally { if (btn) { btn.disabled = false; btn.textContent = 'Registrar abono'; } }
+}
+
+// [F4] Cancelar una venta VENCIDA (solo admin). Reusa el flujo de cancelación
+// existente (admin-solicitud-update-estado → 'cancelado'), que libera inventario
+// (disponibilidad no cuenta las canceladas) y deja el rastro de siempre. El
+// vendedor no puede: la function gatea a maestro_roshi/bulma (403 si fuerza).
+async function _vtaCancelar(solicitudId) {
+  const v = (_vtaVentasCache || []).find(x => x && x.id === solicitudId) || {};
+  const c = (v.clientes && (Array.isArray(v.clientes) ? v.clientes[0] : v.clientes)) || {};
+  if (!confirm(`¿Cancelar la venta vencida de ${(c.nombre_completo || '—')} para ${(v.evento_nombre || v.evento_id || 'el evento')} (${v.zona || ''} · ${v.paquete || ''})?\n\nLibera el cupo de la zona. No se puede deshacer.`)) return;
+  try {
+    const r = await khAdminFetch('/.netlify/functions/admin-solicitud-update-estado', {
+      method: 'POST',
+      body: JSON.stringify({ solicitud_id: solicitudId, nuevo_estado: 'cancelado' }),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || j.ok === false) { showToast(j.error || ('Error ' + r.status), 'error'); return; }
+    showToast('Venta cancelada — cupo liberado', 'success');
+    _vtaMisVentas();
+  } catch (e) { showToast(e.message || 'No se pudo cancelar', 'error'); }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// CONTRATOS · creadores de contenido
+// ═══════════════════════════════════════════════════════════════
+let _contratosCache = [];
+let _contratosEditingToken = null;        // null = creando, "abc..." = editando
+let _contratosEVCache = null;             // EV array fetched from /index.html
+let _contratosEVPobladoEnSelect = false;
+
+// — Cláusulas legales (idéntico texto que contrato.html) ——————
+const _CTR_CLAUSULAS = [
+  { num:1, t:'Objeto del contrato', body: c => `El presente Contrato regula la colaboración entre <b>CONECTA REYNOSA</b> (en adelante, "la Agencia") y <b>${_escCtr(c.creador_nombre)}</b> (en adelante, "el Creador de Contenido"), mediante un intercambio que incluye beneficios detallados en la cláusula 5, a cambio de la generación y entrega de contenido audiovisual bajo las condiciones descritas en este documento.` },
+  { num:2, t:'Detalle del intercambio', body: c => `<b>2.1 Lo que ofrece la Agencia:</b>${_ulCtr(c.ofrecimiento)}<b style="display:block;margin-top:10px">2.2 Lo que se espera del Creador de Contenido:</b>${_ulCtr(c.expectativas)}` },
+  { num:3, t:'Propiedad del contenido', body: () => `
+<ul style="margin:6px 0 0;padding-left:20px">
+<li>Todo el contenido generado será de propiedad exclusiva de la Agencia.</li>
+<li>Solo la Agencia podrá distribuir, publicar y usar el contenido en sus plataformas.</li>
+<li>Cualquier publicación por parte del Creador de Contenido deberá ser etiquetada como colaboración oficial con la Agencia.</li>
+</ul>` },
+  { num:4, t:'Requisitos del contenido', body: () => `
+<b>4.1 Calidad y formato del contenido</b>
+<ol style="margin:6px 0 12px;padding-left:22px">
+<li><b>Calidad técnica:</b> Material en HD o 4K. Cualquier material de calidad inferior será rechazado.</li>
+<li><b>Formato:</b> Videos en formato Reel o video vertical para redes sociales (1080 × 1920 píxeles).</li>
+<li><b>Iluminación y presentación:</b> Todo contenido, incluidas las menciones durante el evento, deberá tener buena iluminación, claridad y demostrar que el Creador está disfrutando una experiencia increíble.</li>
+</ol>
+
+<b>4.2 Requisitos de la voz</b>
+<ol style="margin:6px 0 12px;padding-left:22px">
+<li><b>Audición clara:</b> sin ruidos de fondo que interfieran con el mensaje.</li>
+<li><b>Buena dicción:</b> hablar de manera clara y entendible.</li>
+<li><b>Tono respetuoso:</b> acorde al profesionalismo de la Agencia.</li>
+<li><b>Adecuación:</b> ajustarse al propósito del video (experiencia, comercial o contenido extra).</li>
+</ol>
+
+<b>4.3 Historias y publicaciones</b>
+<ol style="margin:6px 0 12px;padding-left:22px">
+<li>Las menciones en el evento deberán publicarse como historias en <b>Instagram y/o TikTok</b>.</li>
+<li>Las redes sociales del Creador deberán estar en modo <b>público</b> durante: la duración del evento + un lapso de <b>10 a 15 días</b> posteriores a la publicación del contenido.</li>
+<li>Sanciones por incumplimiento: <span style="color:#ff283b;font-weight:800">25%</span> primera infracción · <span style="color:#ff283b;font-weight:800">50%</span> si persiste.</li>
+</ol>
+
+<b>4.4 Plazo de entrega</b>
+<ol style="margin:6px 0 12px;padding-left:22px">
+<li>El contenido debe ser entregado de <b>2 a 3 días</b> después del evento.</li>
+<li>Multas por retraso: <span style="color:#ff283b;font-weight:800">25%</span> (1–7 días) · <span style="color:#ff283b;font-weight:800">50%</span> (7–10) · <span style="color:#ff283b;font-weight:800">75%</span> (10–15) · <span style="color:#ff283b;font-weight:800">100%</span> (más de 15 días).</li>
+</ol>
+
+<b>4.5 Correcciones</b>
+<ol style="margin:6px 0 12px;padding-left:22px">
+<li>El Creador tiene <b>24 horas</b> para hacer los ajustes solicitados.</li>
+<li>Si no cumple el plazo: <span style="color:#ff283b;font-weight:800">50%</span> del costo del intercambio. Si ningún video cumple con las expectativas: <span style="color:#ff283b;font-weight:800">100%</span>.</li>
+</ol>
+
+<b>4.6 Exclusividad durante el evento:</b> Durante el evento, el Creador no podrá promocionar a otras agencias competidoras o servicios similares de viajes a conciertos. El incumplimiento resultará en cancelación inmediata del contrato y cobro del <span style="color:#ff283b;font-weight:800">100%</span> del intercambio.<br>
+
+<b>4.7 Veto de contenido:</b> La Agencia se reserva el derecho de solicitar la eliminación de contenido publicado que no cumpla con los estándares acordados, en un plazo máximo de <b>24 horas</b>. El no cumplimiento resultará en multa del <span style="color:#ff283b;font-weight:800">50%</span> del valor del intercambio.` },
+  { num:5, t:'Políticas de cancelación', body: () => `
+El contrato podrá cancelarse por las siguientes razones:
+<ol style="margin:8px 0 0;padding-left:22px">
+<li><b>Incumplimiento de calidad</b> (técnica, iluminación, formato, menciones).</li>
+<li><b>Imagen pública:</b> polémicas, problemas legales o comportamientos que afecten la imagen de la Agencia.</li>
+<li><b>Redes sociales privadas</b> durante el plazo estipulado.</li>
+<li><b>Entregas incumplidas:</b> no entrega en tiempo y forma o no realizar las correcciones solicitadas.</li>
+<li><b>Reembolso del intercambio:</b> en caso de incumplimiento total del Creador (no asistencia, no entrega), el Creador deberá reembolsar el valor comercial del intercambio dentro de <b>15 días naturales</b> contados a partir de la fecha del evento.</li>
+</ol>` },
+  { num:6, t:'Beneficios para el Creador de Contenido', body: () => `
+<ol style="margin:6px 0 0;padding-left:22px">
+<li><b>Entradas:</b> acceso al evento o festival en zonas de buena ubicación.</li>
+<li><b>Viaje y alojamiento</b> (si aplica): transporte, traslados, kit Conecta, hospedaje y otros servicios según la logística del evento.</li>
+<li><b>Extras:</b> otros beneficios serán detallados dependiendo del intercambio acordado.</li>
+</ol>` },
+  { num:7, t:'Compromiso del Creador de Contenido', body: () => `
+El Creador de Contenido se compromete a:
+<ol style="margin:8px 0 0;padding-left:22px">
+<li>Generar contenido que represente positivamente la experiencia del evento.</li>
+<li>Aceptar las solicitudes de colaboración etiquetada en redes sociales.</li>
+<li>Publicar historias y menciones durante el evento con buena calidad y en redes públicas.</li>
+<li>Cumplir con las fechas y plazos establecidos para entrega y correcciones.</li>
+</ol>` },
+  { num:8, t:'Cláusulas finales', body: () => `
+<b>8.1 Hashtags</b>
+<ul style="margin:6px 0 12px;padding-left:22px">
+<li><b>#Viajaconexpertos</b></li>
+<li><b>#Seguimosconectando</b></li>
+<li><b>#CMX10</b></li>
+</ul>
+
+<b>8.2 Confidencialidad:</b> Toda la información y beneficios otorgados al Creador son confidenciales y no podrán divulgarse sin autorización de la Agencia.<br>
+
+<b>8.3 Datos personales y uso de imagen:</b> El Creador autoriza el uso de su imagen, nombre y contenido generado para fines promocionales de la Agencia por un periodo indefinido, en todas sus plataformas digitales, redes sociales, campañas publicitarias y materiales promocionales presentes y futuros.<br>
+
+<b>8.4 Jurisdicción:</b> Cualquier controversia derivada del presente contrato será resuelta en los tribunales competentes de <b>Reynosa, Tamaulipas, México</b>, renunciando ambas partes a cualquier otro fuero que pudiera corresponderles.` },
+  { num:9, t:'Firmas', body: () => `Yo, <b>el Creador de Contenido</b>, he leído, entendido y aceptado los términos y condiciones de este contrato. Por parte de la Agencia firma <b>Guillermo Alexander Cobos Vizcarra</b>, Representante de Conecta Reynosa. La firma digital del Creador y el envío de su INE constituyen la aceptación plena del presente contrato.` },
+];
+
+// — VÍA B (F5): cláusulas de COORDINADOR (12) y GIVEAWAY (6) para la vista previa
+//   admin. Texto FIEL de contratos-viaB-v3.1-TEXTO-OFICIAL.md (mismo que renderiza
+//   contrato.html en la firma). {{campos}} se inyectan vía el ctx de _viaBCtxKh.
+// VIGENCIA CONFIGURABLE: meses → "seis (6)" (mismo helper que contrato.html).
+function _vigenciaLetraKh(n) {
+  const map = { 3: 'tres (3)', 6: 'seis (6)', 9: 'nueve (9)', 12: 'doce (12)' };
+  return map[n] || (n + ' (' + n + ')');
+}
+function _viaBCtxKh(c) {
+  const firmado = c.estado === 'firmado';
+  const d = c.datos || {};
+  const em = (d.emergencia && typeof d.emergencia === 'object') ? d.emergencia : {};
+  const _fb = v => (v == null || String(v).trim() === '') ? '__________' : _escCtr(String(v));
+  const vigMeses = Math.round(Number(c.vigencia_meses)) || (c.plantilla === 'creadora_team' ? 3 : 12);
+  return {
+    nombre: _escCtr(c.creador_nombre || ''), fnac: _fb(d.fecha_nacimiento),
+    vigMeses,
+    vigDura: _vigenciaLetraKh(vigMeses).toUpperCase() + ' MESES',
+    vigLetra: _vigenciaLetraKh(vigMeses),
+    firmaTxt: firmado ? _escCtr(_fmtFechaLargaCtr((c.vigencia_inicio||'').slice(0,10))) : 'tu firma',
+    finTxt:   firmado ? _escCtr(_fmtFechaLargaCtr((c.vigencia_fin||'').slice(0,10)))    : `${_vigenciaLetraKh(vigMeses)} meses después`,
+    vigResumen: firmado
+      ? `del ${_escCtr(_fmtFechaLargaCtr((c.vigencia_inicio||'').slice(0,10)))} al ${_escCtr(_fmtFechaLargaCtr((c.vigencia_fin||'').slice(0,10)))}`
+      : `${_vigenciaLetraKh(vigMeses)} meses a partir de tu firma`,
+    emNom: _fb(em.nombre), emTel: _fb(em.telefono), emPar: _fb(em.parentesco),
+    evento: _escCtr(c.evento_nombre || ''), fechaEvento: _escCtr(_fmtFechaCortaCtr(c.evento_fecha)),
+    desglose: _escCtr(String(d.desglose_premio || '__________')),
+    valor: (d.valor_premio && Number(d.valor_premio)) ? Number(d.valor_premio).toLocaleString('es-MX') : '__________',
+  };
+}
+const _CTR_COORDINADOR = [
+  { ord:'PRIMERA', t:'Naturaleza NO laboral, explicada', body:()=>`Esta es una colaboración por intercambio: el coordinador apoya en los viajes y recibe los beneficios de la cláusula Tercera. No hay salario, no hay subordinación laboral, no hay prestaciones ni derechos de una relación de trabajo. Participar es voluntario; los compromisos de este contrato existen porque el coordinador acepta el intercambio, no porque sea empleado.` },
+  { ord:'SEGUNDA', t:'Funciones, con estándar de cumplimiento', body:()=>`El coordinador se compromete a: apoyar la logística completa del tour (control de pasajeros, boletos, habitaciones, equipaje y horarios) SIGUIENDO LAS LISTAS Y HERRAMIENTAS DEL SISTEMA que la agencia le proporcione; mantener comunicación constante por los grupos oficiales; entregar los kits y materiales oficiales completos; realizar pagos menores entregando SIEMPRE comprobantes; y velar por la seguridad, imagen y experiencia de los viajeros. El estándar es simple: si está en la lista, se cumple y se registra; lo no registrado se considera no hecho.` },
+  { ord:'TERCERA', t:'Beneficios del intercambio', body:()=>`Por cada tour en que participe: transporte (terrestre o aéreo según destino), hospedaje en hotel de categoría cuatro estrellas, boleto en la mejor localidad disponible, y Kit Conecta. En accidente o enfermedad durante el viaje, la agencia cubre los gastos médicos iniciales hasta que reciba atención formal. Estos beneficios no constituyen salario.` },
+  { ord:'CUARTA', t:'Comisiones por venta', body:()=>`El coordinador podrá vender boletos de los tours con una comisión del <b>30% sobre la ganancia neta</b> del boleto (no sobre el total de la venta). Las condiciones de pago de la comisión se notifican por escrito o medio digital en cada campaña.` },
+  { ord:'QUINTA', t:'Materiales y bodega — con plazo', body:()=>`Todo material, boleto, dinero o equipo confiado queda bajo resguardo personal del coordinador. Los sobrantes y equipos deben devolverse en óptimas condiciones <b>EN UN MÁXIMO DE 5 (CINCO) DÍAS NATURALES</b> después del viaje. Daño, pérdida o no devolución obliga a reponer el costo vigente del artículo. Las salidas y devoluciones se declaran en el sistema de bodega de la agencia.` },
+  { ord:'SEXTA', t:'Registro de faltas (strikes)', body:()=>`Las faltas operativas y de conducta se registran en el sistema y se acumulan. La acumulación de <b>3 (tres) faltas</b> causa la suspensión de la colaboración, independientemente de que una sola falta grave pueda causar la terminación inmediata conforme a la cláusula Décima.` },
+  { ord:'SÉPTIMA', t:'Imagen, uniforme y redes', body:()=>`La imagen pública y el comportamiento digital del coordinador deben ser coherentes con los valores de la marca. El uso de uniforme o gafete oficial es obligatorio cuando se proporcione. El coordinador mantendrá comunicación activa en los grupos oficiales de WhatsApp; podrá compartir contenido personal del viaje respetando la imagen de Conecta, y compartirá oportunamente el contenido que la agencia requiera para promoción. Todo material audiovisual generado en viajes o eventos podrá ser usado por Conecta para fines promocionales sin pago adicional.` },
+  { ord:'OCTAVA', t:'CONDUCTA — tolerancia cero, sin ambigüedades', body:()=>`Durante viajes, eventos y actividades internas queda <b>ESTRICTAMENTE PROHIBIDO</b>, y constituye <b style="color:#ff283b">FALTA GRAVE</b> con terminación inmediata:
+<ol style="list-style:lower-alpha;margin:8px 0 0;padding-left:22px">
+<li>el <b>ACOSO SEXUAL</b> u hostigamiento en cualquier forma hacia viajeros, compañeros, choferes o terceros;</li>
+<li>la <b>EMBRIAGUEZ</b>: el consumo de alcohol solo se permite de manera moderada y NUNCA al grado de afectar la operación, la seguridad o la imagen del grupo — estar ebrio en funciones es falta grave;</li>
+<li>el consumo, posesión o distribución de <b>DROGAS</b> o sustancias ilegales;</li>
+<li>las <b>RELACIONES ROMÁNTICAS O SEXUALES CON VIAJEROS</b> durante los tours: el coordinador está en función de servicio y de autoridad, y esa línea no se cruza;</li>
+<li><b>VINCULAR LA MARCA A CONTENIDO PARA ADULTOS</b>: la agencia respeta la vida privada y las actividades lícitas de cada quien, pero queda prohibido usar uniformes, gafetes, materiales, instalaciones, viajes o el nombre de Conecta en contenido para adultos o plataformas de contenido erótico (OnlyFans u otras), o aprovechar el rol de coordinador para promoverlo;</li>
+<li>los <b>ESCÁNDALOS PÚBLICOS ("funas")</b>: protagonizar o provocar conflictos públicos, en persona o en redes, que dañen la reputación de la agencia.</li>
+</ol>
+Cualquiera de estas conductas termina el contrato de inmediato, sin indemnización, con pérdida de beneficios del viaje en curso y sin perjuicio de las acciones legales que procedan.` },
+  { ord:'NOVENA', t:'Respeto, confidencialidad y exclusividad', body:()=>`Trato respetuoso y cordial con viajeros, choferes y compañeros en todo momento — el acoso, la discriminación y la violencia son falta grave. Toda la información interna (estrategias, precios, bases de datos, logística, listas de viajeros, documentación) es <b>CONFIDENCIAL</b> y no puede divulgarse ni usarse para fines ajenos, obligación que SOBREVIVE a la terminación del contrato. Durante la vigencia, el coordinador no colaborará con agencias competidoras sin autorización escrita; si no puede asistir a un evento confirmado, propondrá suplente sujeto a aprobación previa.` },
+  { ord:'DÉCIMA', t:'Faltas graves y terminación', body:()=>`Son causa de terminación inmediata y pérdida de derechos: no presentarse a un viaje confirmado; abandonar un tour sin autorización; faltar al respeto a viajeros o compañeros; afectar la imagen o reputación de Conecta; y cualquiera de las conductas de la cláusula Octava. La terminación no genera indemnización ni pago adicional. En las fiestas y eventos internos aplica la misma conducta profesional que en los viajes oficiales.` },
+  { ord:'DÉCIMA PRIMERA', t:'Emergencia e identidad', body:x=>`El coordinador designa contacto de emergencia: <b>${x.emNom}</b> (${x.emTel}, ${x.emPar}), asume los riesgos del viaje en los términos de la cláusula Décima del contrato de viajero, autoriza primeros auxilios y atención médica de ser necesario, y anexa su INE como evidencia de identidad.` },
+  { ord:'DÉCIMA SEGUNDA', t:'Vigencia y formalidades', body:x=>`Este contrato dura <b>${x.vigDura}</b> desde su firma (${x.firmaTxt} → ${x.finTxt}); su renovación requiere nueva firma. Cualquiera de las partes puede terminarlo antes con aviso escrito de 15 días naturales. Las modificaciones solo valen por escrito; los acuerdos verbales no tienen validez. Las notificaciones por los canales oficiales (correo institucional o WhatsApp autorizado) son legalmente válidas. Jurisdicción: Monterrey, Nuevo León. La firma digital tiene la misma validez que la autógrafa.` },
+];
+const _CTR_GIVE = [
+  { ord:'PRIMERA', t:'Objeto — qué incluye exactamente tu premio', body:x=>`LA AGENCIA otorga a EL GANADOR un viaje gratuito al evento <b>${x.evento}</b> (${x.fechaEvento}) que incluye, sin costo alguno para él: <b>${x.desglose}</b> (por ejemplo: boleto/abono en zona ____; transporte redondo desde ____; traslados internos del itinerario; hospedaje en habitación compartida; Kit Conecta con una comida y artículos promocionales). Lo que NO esté listado aquí no forma parte del premio (consumos personales, compras, gastos extra).` },
+  { ord:'SEGUNDA', t:'Condiciones — explicadas una por una', body:x=>`<ol style="list-style:lower-alpha;margin:8px 0 0;padding-left:22px">
+<li><b>PERSONAL E INTRANSFERIBLE</b>: el premio es para EL GANADOR y nadie más; no puede cederse, venderse, ni cambiarse por dinero, otro evento, fecha o destino — si no puede asistir, el premio simplemente se pierde.</li>
+<li><b>ASISTENCIA COMPLETA</b>: ganar incluye el compromiso de tomar el viaje completo, respetando horarios y actividades del itinerario; el premio es la experiencia entera, no partes de ella.</li>
+<li><b>PENALIZACIÓN</b>: si EL GANADOR no se presenta, decide no tomar el viaje completo, o incumple alguna regla del tour, deberá <b style="color:#ff283b">CUBRIR EL COSTO TOTAL DEL VIAJE</b>, equivalente a <b>$${x.valor} MXN</b> — porque ese lugar tuvo un costo real que la agencia absorbió como premio.</li>
+<li>A cambio, LA AGENCIA se obliga a entregar el viaje completo tal como se especifica, con todos los servicios incluidos.</li>
+</ol>` },
+  { ord:'TERCERA', t:'Responsabilidad, conducta y reglas del viaje', body:()=>`El viaje se realiza bajo las condiciones operativas normales del tour. LA AGENCIA no responde por factores externos (retrasos ajenos, clima, eventualidades fuera de su control). EL GANADOR se compromete a comportarse con respeto y seguir las indicaciones del personal durante todo el tour, y queda sujeto a las políticas de terceros, las multas de hotel y el deslinde de responsabilidad en los mismos términos de las cláusulas Novena y Décima del contrato de viajero, que declara conocer (incluido: seguro de viajero DENTRO del autobús; DENTRO del evento la responsabilidad es de los organizadores).` },
+  { ord:'CUARTA', t:'Emergencia e identidad', body:x=>`Contacto de emergencia: <b>${x.emNom}</b> (${x.emTel}, ${x.emPar}); INE anexa como evidencia de identidad.` },
+  { ord:'QUINTA', t:'Imagen', body:()=>`EL GANADOR autoriza el uso de su nombre e imagen en las publicaciones de la dinámica y del viaje en los canales oficiales de LA AGENCIA, sin pago adicional — es parte natural de ganar una dinámica pública.` },
+  { ord:'SEXTA', t:'Aceptación', body:()=>`EL GANADOR firma de conformidad, reconociendo que recibe el premio completo bajo estas condiciones: casilla de términos + firma electrónica + INE anexa.` },
+];
+
+// Vista previa admin para VÍA B. Devuelve HTML (mismo look que _renderContratoHTML).
+// CREADORA_TEAM: la vista previa muestra proemio + vigencia + los TÍTULOS de las
+// 18 cláusulas — el texto completo vive SOLO en contrato.html (fuente:
+// contrato-team-v1-TEXTO-OFICIAL.md v1.1); no se transcribe dos veces para que
+// jamás diverja del canónico.
+const _CTR_TEAM_TITULOS = [
+  ['PRIMERA','Objeto, alcance del rol y naturaleza de la relación'],['SEGUNDA','Vigencia, periodo de prueba y posible renovación'],
+  ['TERCERA','Entregables semanales, organización y flujo de trabajo'],['CUARTA','Requisitos técnicos, calidad, formato y estándares'],
+  ['QUINTA','Beneficios del intercambio'],['SEXTA','Entrega, revisión, aprobación y correcciones'],
+  ['SÉPTIMA','Asignación de eventos, avisos y rechazos (45% máx. de rechazos)'],['OCTAVA','Etiquetado, collab, hashtags y redes en modo público'],
+  ['NOVENA','Propiedad intelectual, uso de imagen y derechos de explotación'],['DÉCIMA','Imagen pública, contenido sensual, contenido prohibido y reputación'],
+  ['DÉCIMA PRIMERA','Conducta, alcohol, drogas y presentación en cámara'],['DÉCIMA SEGUNDA','Confidencialidad y no divulgación'],
+  ['DÉCIMA TERCERA','Exclusividad'],['DÉCIMA CUARTA','Incumplimientos, clasificación y sanciones (3 strikes = terminación)'],
+  ['DÉCIMA QUINTA','Pérdidas, negligencias y daños'],['DÉCIMA SEXTA','Terminación y rescisión'],
+  ['DÉCIMA SÉPTIMA','Modificaciones'],['DÉCIMA OCTAVA','Jurisdicción'],
+];
+function _renderContratoTeamKh(c) {
+  const x = _viaBCtxKh(c);
+  const titulos = _CTR_TEAM_TITULOS.map(([ord, t]) => `
+    <div style="padding:7px 0 7px 12px;border-left:4px solid #e8ff4c;margin-top:8px;font-size:13px;color:#000">
+      <span style="color:#ff283b;font-weight:900;margin-right:8px">${_escCtr(ord)}</span><b>${_escCtr(t)}</b>
+    </div>`).join('');
+  return `
+    <div style="display:flex;flex-wrap:wrap;gap:18px 28px;font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:#666;font-weight:700"><span><b style="color:#000">Creadora (Imagen Oficial):</b> ${x.nombre}</span><span><b style="color:#000">Vigencia:</b> ${x.vigLetra} meses</span></div>
+    <h2 style="font-family:'Barlow Condensed','Montserrat',sans-serif;font-size:34px;line-height:.92;text-transform:uppercase;margin:14px 0 0;color:#000">Contrato marco · Creadora TEAM<small style="display:block;font-size:13px;color:#ff283b;font-weight:800;letter-spacing:.18em;margin-top:6px">Imagen Oficial · periodo de prueba</small></h2>
+    <p style="font-size:13.5px;line-height:1.6;color:#222;margin-top:14px">Entre <b>CONECTA REYNOSA</b> (Guillermo Cobos Vizcarra, Director General) y <b>${x.nombre}</b> ("LA CREADORA"), con vigencia de <b>${x.vigLetra} meses</b> a partir de la firma. Al firmar, la creadora completa sus datos del proemio y el <b>Anexo C (Declaración Discreta, confidencial)</b>.</p>
+    <div style="margin-top:16px;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:#666;font-weight:800">18 cláusulas — texto oficial v1.1</div>
+    ${titulos}
+    <p style="margin-top:16px;font-size:12px;color:#666">El texto completo (fiel a contrato-team-v1-TEXTO-OFICIAL.md) se muestra en la página de firma /contrato — esta vista previa solo resume.</p>`;
+}
+function _renderContratoViaBHTML(c) {
+  if (c && c.plantilla === 'creadora_team') return _renderContratoTeamKh(c);
+  const x = _viaBCtxKh(c);
+  const esCoord = c.plantilla === 'coordinador';
+  const set = esCoord ? _CTR_COORDINADOR : _CTR_GIVE;
+  const tituloDoc = esCoord ? 'Contrato de colaboración · Coordinadores' : 'Contrato de aceptación de premio · Giveaway';
+  const meta = esCoord
+    ? `<div style="display:flex;flex-wrap:wrap;gap:18px 28px;font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:#666;font-weight:700"><span><b style="color:#000">Coordinador(a):</b> ${x.nombre}</span><span><b style="color:#000">Nacimiento:</b> ${x.fnac}</span><span><b style="color:#000">Vigencia:</b> ${x.vigResumen}</span></div>`
+    : `<div style="display:flex;flex-wrap:wrap;gap:18px 28px;font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:#666;font-weight:700"><span><b style="color:#000">Ganador(a):</b> ${x.nombre}</span><span><b style="color:#000">Evento:</b> ${x.evento}</span><span><b style="color:#000">Fecha:</b> ${x.fechaEvento}</span></div>`;
+  const clausulas = set.map(cl => `
+    <div style="margin-top:22px">
+      <h3 style="font-family:'Barlow Condensed','Montserrat',sans-serif;text-transform:uppercase;font-size:20px;letter-spacing:.04em;margin:0 0 10px;border-left:5px solid #e8ff4c;background:linear-gradient(90deg,rgba(232,255,76,.2),transparent 60%);padding:6px 0 6px 12px;color:#000">
+        <span style="color:#ff283b;font-weight:900;font-size:18px;margin-right:10px">${_escCtr(cl.ord)}</span>${_escCtr(cl.t)}
+      </h3>
+      <div style="font-size:13.5px;line-height:1.65;color:#222">${cl.body(x)}</div>
+    </div>`).join('');
+  return `
+    ${meta}
+    <h2 style="font-family:'Barlow Condensed','Montserrat',sans-serif;font-size:34px;line-height:.92;text-transform:uppercase;margin:14px 0 0;color:#000">${_escCtr(tituloDoc)}<small style="display:block;font-size:13px;color:#ff283b;font-weight:800;letter-spacing:.18em;margin-top:6px">${_escCtr(c.evento_nombre || '')}</small></h2>
+    ${clausulas}
+  `;
+}
+
+function _escCtr(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c])); }
+function _ulCtr(arr) { if (!Array.isArray(arr) || !arr.length) return ''; return `<ul style="margin:6px 0 0;padding-left:20px">${arr.map(x => `<li>${_escCtr(x)}</li>`).join('')}</ul>`; }
+function _fmtFechaLargaCtr(iso) {
+  if (!iso) return '—';
+  const [y,m,d] = String(iso).slice(0,10).split('-'); if (!y || !m || !d) return iso;
+  const meses = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+  return `${parseInt(d,10)} de ${meses[parseInt(m,10)-1] || ''} de ${y}`;
+}
+function _fmtFechaCortaCtr(iso) {
+  if (!iso) return '—';
+  const [y,m,d] = String(iso).slice(0,10).split('-'); if (!y || !m || !d) return iso;
+  const meses = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+  return `${parseInt(d,10)} ${meses[parseInt(m,10)-1] || ''}`;
+}
+function _splitLineas(s) {
+  return String(s || '').split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+}
+
+// — Cargar EV array desde /index.html (single source of truth) ———————
+async function _fetchEVFromIndex() {
+  if (_contratosEVCache) return _contratosEVCache;
+  try {
+    const r = await fetch('/index.html', { cache: 'no-cache' });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const html = await r.text();
+    const m = html.match(/var\s+EV\s*=\s*\[/);
+    if (!m) throw new Error('var EV no encontrado en index.html');
+    const start = m.index + m[0].length - 1;
+    let depth = 0, inStr = false, sc = '', esc = false, end = -1;
+    for (let i = start; i < html.length; i++) {
+      const ch = html[i];
+      if (esc) { esc = false; continue; }
+      if (inStr) { if (ch === '\\') { esc = true; continue; } if (ch === sc) inStr = false; continue; }
+      if (ch === '"' || ch === "'") { inStr = true; sc = ch; continue; }
+      if (ch === '[') depth++;
+      else if (ch === ']') { depth--; if (!depth) { end = i + 1; break; } }
+    }
+    if (end < 0) throw new Error('Array EV sin cerrar');
+    const arrText = html.slice(start, end);
+    // Stubs para los globals que el array referencia (BANCO_*, HOTEL_*).
+    const stubs = 'var BANCO_DEFAULT={},BANCO_HEY={},HOTEL_CDM=[],HOTEL_STD=[];';
+    const ev = new Function(stubs + 'return ' + arrText + ';')();
+    if (!Array.isArray(ev)) throw new Error('EV no es array');
+    _contratosEVCache = ev;
+    return ev;
+  } catch (e) {
+    console.warn('[Contratos] No se pudo cargar EV de index.html:', e.message);
+    return [];
+  }
+}
+
+async function _poblarSelectEventos() {
+  if (_contratosEVPobladoEnSelect) return;
+  const sel = document.getElementById('ctr-evento-select');
+  if (!sel) return;
+  const ev = await _fetchEVFromIndex();
+  if (!ev.length) return;
+  const today = new Date().toISOString().slice(0, 10);
+  // Filtrar: solo fechas futuras o sin fecha. Incluye agotados y por-confirmar:
+  // las creadoras son staff y deben poder asociarse a cualquier tour vigente.
+  const filtered = ev.filter(e =>
+    e && e.id && e.a &&
+    (!e.ds || e.ds >= today)
+  );
+  // Orden cronológico ascendente.
+  const sorted = filtered.slice().sort((a, b) => (a.ds || '9999').localeCompare(b.ds || '9999'));
+  // Limpiar opciones existentes salvo la primera ("— Selecciona —").
+  while (sel.options.length > 1) sel.remove(1);
+  sorted.forEach(e => {
+    const opt = document.createElement('option');
+    opt.value = e.id;
+    opt.dataset.nombre = e.a;
+    opt.dataset.fecha = (e.ds || '').slice(0, 10);
+    opt.textContent = e.a;
+    sel.appendChild(opt);
+  });
+  _contratosEVPobladoEnSelect = true;
+}
+
+// — Autocomplete de creadoras previas ————————————————
+// Mapa nombre→email y email→nombre, construido desde _contratosCache (cargado
+// por loadContratosList). Dedupe por email (case-insensitive).
+let _contratosCreadorasNombre2Email = {};
+let _contratosCreadorasEmail2Nombre = {};
+function _rebuildCreadorasDatalists() {
+  const listN = document.getElementById('ctr-datalist-nombres');
+  const listE = document.getElementById('ctr-datalist-emails');
+  if (!listN || !listE) return;
+  _contratosCreadorasNombre2Email = {};
+  _contratosCreadorasEmail2Nombre = {};
+  const seen = new Set();
+  for (const c of (_contratosCache || [])) {
+    const email = (c.creador_email || '').trim().toLowerCase();
+    const nombre = (c.creador_nombre || '').trim();
+    if (!email || !nombre) continue;
+    if (seen.has(email)) continue;
+    seen.add(email);
+    _contratosCreadorasNombre2Email[nombre.toLowerCase()] = { nombre, email };
+    _contratosCreadorasEmail2Nombre[email] = { nombre, email };
+  }
+  // Ordenar alfabéticamente por nombre.
+  const entries = Object.values(_contratosCreadorasEmail2Nombre)
+    .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es', { sensitivity: 'base' }));
+  listN.innerHTML = entries.map(e => `<option value="${_escCtr(e.nombre)}">${_escCtr(e.email)}</option>`).join('');
+  listE.innerHTML = entries.map(e => `<option value="${_escCtr(e.email)}">${_escCtr(e.nombre)}</option>`).join('');
+}
+
+function onCtrNombreInput() {
+  const v = (document.getElementById('ctr-nombre').value || '').trim().toLowerCase();
+  const match = _contratosCreadorasNombre2Email[v];
+  if (match) {
+    const emailEl = document.getElementById('ctr-email');
+    if (emailEl && !emailEl.value) emailEl.value = match.email;
+  }
+}
+function onCtrEmailInput() {
+  const v = (document.getElementById('ctr-email').value || '').trim().toLowerCase();
+  const match = _contratosCreadorasEmail2Nombre[v];
+  if (match) {
+    const nombreEl = document.getElementById('ctr-nombre');
+    if (nombreEl && !nombreEl.value) nombreEl.value = match.nombre;
+  }
+}
+
+// — Boot principal de la pestaña ——————————————————————
+async function loadContratos() {
+  switchContratoView('listado');
+  _contratosEditingToken = null;
+  _resetFormUI();
+  await _poblarSelectEventos();
+  const fc = document.getElementById('ctr-contrato-fecha');
+  if (fc && !fc.value) fc.value = new Date().toISOString().slice(0, 10);
+  await loadContratosList();
+  _rebuildCreadorasDatalists();
+}
+
+function switchContratoView(name) {
+  ['listado','nuevo'].forEach(n => {
+    const tab = document.getElementById('ctr-tab-'+n);
+    const view = document.getElementById('ctr-view-'+n);
+    if (!tab || !view) return;
+    if (n === name) {
+      tab.classList.add('active');
+      tab.style.background = 'rgba(255,107,0,.12)';
+      tab.style.color = 'var(--orange)';
+      view.style.display = '';
+    } else {
+      tab.classList.remove('active');
+      tab.style.background = 'transparent';
+      tab.style.color = 'var(--ts)';
+      view.style.display = 'none';
+    }
+  });
+  // Cuando el usuario manualmente entra a "Nuevo" desde el tab, asegurar que
+  // no estamos en modo edición (a menos que loadContratoEdit ya lo haya seteado).
+  if (name === 'nuevo' && !_contratosEditingToken) _resetFormUI();
+}
+
+function onContratoEventoChange() {
+  const sel = document.getElementById('ctr-evento-select');
+  const opt = sel && sel.selectedOptions && sel.selectedOptions[0];
+  if (!opt || !opt.value) return;
+  const nombreInput = document.getElementById('ctr-evento-nombre');
+  const fechaInput = document.getElementById('ctr-evento-fecha');
+  if (nombreInput && opt.dataset.nombre) nombreInput.value = opt.dataset.nombre;
+  if (fechaInput && opt.dataset.fecha) fechaInput.value = opt.dataset.fecha;
+}
+
+// VÍA B (F5): muestra/oculta los campos según la plantilla elegida.
+// VIGENCIA CONFIGURABLE: el selector 3/6/9/12 solo aplica a coordinador y
+// creadora_team; al cambiar de plantilla se pone su default (coord 12, team 3).
+function onCtrPlantillaChange() {
+  const p = (document.getElementById('ctr-plantilla') || {}).value || 'creadora';
+  const fc = document.getElementById('ctr-fields-creadora');
+  const fg = document.getElementById('ctr-fields-giveaway');
+  if (fc) fc.style.display = (p === 'creadora') ? '' : 'none';
+  if (fg) fg.style.display = (p === 'giveaway') ? '' : 'none';
+  const vw = document.getElementById('ctr-vigencia-wrap');
+  const vs = document.getElementById('ctr-vigencia');
+  const hint = document.getElementById('ctr-plantilla-hint');
+  const conVigencia = (p === 'coordinador' || p === 'creadora_team');
+  if (vw) vw.style.display = conVigencia ? '' : 'none';
+  if (hint) hint.style.display = conVigencia ? 'none' : '';
+  if (vs && conVigencia) vs.value = (p === 'coordinador') ? '12' : '3';
+  // 🗼 Anexo de custodia: la casilla solo existe para coordinador.
+  const cw = document.getElementById('ctr-cuidador-wrap');
+  if (cw) cw.style.display = (p === 'coordinador') ? '' : 'none';
+  if (p !== 'coordinador') { const cc = document.getElementById('ctr-cuidador'); if (cc) cc.checked = false; }
+}
+
+function _ctrFormData() {
+  const sel = document.getElementById('ctr-evento-select');
+  const opt = sel && sel.selectedOptions && sel.selectedOptions[0];
+  const evento_nombre = (document.getElementById('ctr-evento-nombre').value || '').trim()
+    || (opt && opt.dataset.nombre) || '';
+  const plantilla = (document.getElementById('ctr-plantilla') || {}).value || 'creadora';
+  let datos = null;
+  if (plantilla === 'giveaway') {
+    datos = {
+      desglose_premio: (document.getElementById('ctr-premio-desglose').value || '').trim(),
+      valor_premio: Math.round(Number(document.getElementById('ctr-premio-valor').value || '0')) || 0,
+    };
+  }
+  // VIGENCIA CONFIGURABLE: solo viaja para coordinador/creadora_team.
+  let vigencia_meses;
+  if (plantilla === 'coordinador' || plantilla === 'creadora_team') {
+    vigencia_meses = Math.round(Number((document.getElementById('ctr-vigencia') || {}).value)) || (plantilla === 'coordinador' ? 12 : 3);
+  }
+  // 🗼 Anexo de custodia: flag en datos, solo coordinador (el backend valida).
+  let datosExtra = datos;
+  if (plantilla === 'coordinador' && (document.getElementById('ctr-cuidador') || {}).checked) {
+    datosExtra = Object.assign({}, datos, { cuidador_bodega: true });
+  }
+  return {
+    plantilla,
+    creador_nombre: (document.getElementById('ctr-nombre').value || '').trim(),
+    creador_email: (document.getElementById('ctr-email').value || '').trim().toLowerCase(),
+    evento_nombre,
+    evento_fecha: (document.getElementById('ctr-evento-fecha').value || '').trim(),
+    contrato_fecha: (document.getElementById('ctr-contrato-fecha').value || '').trim() || new Date().toISOString().slice(0,10),
+    ofrecimiento: _splitLineas(document.getElementById('ctr-ofrecimiento').value),
+    expectativas: _splitLineas(document.getElementById('ctr-expectativas').value),
+    datos: datosExtra,
+    cuidador_bodega: (plantilla === 'coordinador') ? !!(document.getElementById('ctr-cuidador') || {}).checked : undefined,
+    vigencia_meses,
+  };
+}
+
+function _validateCtrForm(d) {
+  if (!d.creador_nombre || d.creador_nombre.length < 2) return 'Nombre inválido';
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(d.creador_email)) return 'Email inválido';
+  if (!d.evento_nombre) return 'Falta el evento';
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(d.evento_fecha)) return 'Fecha del evento requerida';
+  if (d.plantilla === 'creadora') {
+    if (!d.ofrecimiento.length) return 'Agrega al menos un ítem en "Ofrece la agencia"';
+    if (!d.expectativas.length) return 'Agrega al menos un ítem en "Se espera del creador"';
+  } else if (d.plantilla === 'giveaway') {
+    if (!d.datos || !d.datos.desglose_premio || d.datos.desglose_premio.length < 3) return 'Falta el desglose del premio';
+    if (!d.datos || !(d.datos.valor_premio > 0)) return 'Valor del premio inválido';
+  }
+  return null;
+}
+
+function _renderContratoHTML(c) {
+  // VÍA B (F5): coordinador/giveaway/creadora_team van por su propia vista
+  // previa; 'creadora' (default) sigue EXACTAMENTE igual que siempre.
+  if (c && (c.plantilla === 'coordinador' || c.plantilla === 'giveaway' || c.plantilla === 'creadora_team')) return _renderContratoViaBHTML(c);
+  const partes = `
+    <div style="border-top:3px solid #000;border-bottom:1px solid #ddd;padding:18px 0;margin:20px 0">
+      <p style="margin:0 0 8px;font-size:14px"><b>Conecta MX</b> · Agencia organizadora de viajes a conciertos y festivales · representada por Guillermo Alexander Cobos Vizcarra (Reynosa, Tamaulipas).</p>
+      <p style="color:#ff283b;font-weight:900;letter-spacing:.2em;font-size:11px;text-transform:uppercase;margin:8px 0">—— y ——</p>
+      <p style="margin:0;font-size:14px"><b>${_escCtr(c.creador_nombre)}</b> · Creador(a) de contenido · ${_escCtr(c.creador_email)}.</p>
+    </div>`;
+  const meta = `
+    <div style="display:flex;flex-wrap:wrap;gap:18px 28px;font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:#666;font-weight:700">
+      <span><b style="color:#000">Fecha del contrato:</b> ${_escCtr(_fmtFechaLargaCtr(c.contrato_fecha))}</span>
+      <span><b style="color:#000">Evento:</b> ${_escCtr(c.evento_nombre)}</span>
+      <span><b style="color:#000">Fecha del evento:</b> ${_escCtr(_fmtFechaLargaCtr(c.evento_fecha))}</span>
+    </div>`;
+  const clausulas = _CTR_CLAUSULAS.map(cl => `
+    <div style="margin-top:22px">
+      <h3 style="font-family:'Barlow Condensed','Montserrat',sans-serif;text-transform:uppercase;font-size:20px;letter-spacing:.04em;margin:0 0 10px;border-left:5px solid #e8ff4c;background:linear-gradient(90deg,rgba(232,255,76,.2),transparent 60%);padding:6px 0 6px 12px;color:#000">
+        <span style="color:#ff283b;font-weight:900;font-size:24px;margin-right:10px">${cl.num}.</span>${_escCtr(cl.t)}
+      </h3>
+      <div style="font-size:13.5px;line-height:1.65;color:#222">${cl.body(c)}</div>
+    </div>`).join('');
+
+  return `
+    ${meta}
+    <h2 style="font-family:'Barlow Condensed','Montserrat',sans-serif;font-size:34px;line-height:.92;text-transform:uppercase;margin:14px 0 0;color:#000">Contrato de colaboración<small style="display:block;font-size:13px;color:#ff283b;font-weight:800;letter-spacing:.18em;margin-top:6px">Creadores · ${_escCtr(c.evento_nombre)}</small></h2>
+    ${partes}
+    ${clausulas}
+  `;
+}
+
+function previewContrato() {
+  const d = _ctrFormData();
+  const err = _validateCtrForm(d);
+  const alert = document.getElementById('ctr-alert');
+  if (err) {
+    alert.innerHTML = `<div style="padding:10px 14px;background:rgba(255,68,68,.12);border:1px solid rgba(255,68,68,.4);color:#ffb3b3;border-radius:6px;margin-bottom:14px;font-size:13px"><svg class="ic"><use href="#ic-alerta"/></svg> ${err}</div>`;
+    return;
+  }
+  alert.innerHTML = '';
+  document.getElementById('ctr-preview-body').innerHTML = _renderContratoHTML(d);
+  openModal('modal-contrato-preview');
+}
+
+// — Form submit: crea o actualiza según el estado ——————————————
+async function enviarContrato() {
+  const d = _ctrFormData();
+  const err = _validateCtrForm(d);
+  const alert = document.getElementById('ctr-alert');
+  const btn = document.getElementById('ctr-btn-enviar');
+  if (err) {
+    alert.innerHTML = `<div style="padding:10px 14px;background:rgba(255,68,68,.12);border:1px solid rgba(255,68,68,.4);color:#ffb3b3;border-radius:6px;margin-bottom:14px;font-size:13px"><svg class="ic"><use href="#ic-alerta"/></svg> ${err}</div>`;
+    return;
+  }
+  alert.innerHTML = '';
+  const original = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = _contratosEditingToken ? 'Guardando…' : 'Enviando…';
+  try {
+    let body, endpoint;
+    if (_contratosEditingToken) {
+      endpoint = '/.netlify/functions/contrato-actualizar';
+      body = { token: _contratosEditingToken, ...d };
+    } else {
+      endpoint = '/.netlify/functions/contrato-crear';
+      body = d;
+    }
+    const r = await khAdminFetch(endpoint, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    });
+    const j = await r.json();
+    if (!r.ok || !j.ok) throw new Error(j.error || 'Error');
+
+    const okMsg = _contratosEditingToken
+      ? `<div style="padding:10px 14px;background:rgba(61,220,132,.12);border:1px solid rgba(61,220,132,.4);color:#7ee9b3;border-radius:6px;margin-bottom:14px;font-size:13px">✓ Contrato actualizado. El link enviado a la creadora ya muestra los datos nuevos.</div>`
+      : `<div style="padding:10px 14px;background:rgba(61,220,132,.12);border:1px solid rgba(61,220,132,.4);color:#7ee9b3;border-radius:6px;margin-bottom:14px;font-size:13px">✓ Contrato enviado a <b>${_escCtr(d.creador_email)}</b>${j.emailSent === false ? ' (guardado, pero no se pudo mandar email — revisa RESEND_API_KEY)' : ''}</div>`;
+    alert.innerHTML = okMsg;
+    _contratosEditingToken = null;
+    setTimeout(() => { switchContratoView('listado'); loadContratosList(); _resetFormUI(); }, 1100);
+  } catch (e) {
+    alert.innerHTML = `<div style="padding:10px 14px;background:rgba(255,68,68,.12);border:1px solid rgba(255,68,68,.4);color:#ffb3b3;border-radius:6px;margin-bottom:14px;font-size:13px"><svg class="ic"><use href="#ic-alerta"/></svg> ${_escCtr(e.message)}</div>`;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = original;
+  }
+}
+
+function _resetFormUI() {
+  // Limpia el form + restaura el botón a "Enviar por correo".
+  const ids = ['ctr-nombre','ctr-email','ctr-evento-nombre','ctr-evento-select','ctr-evento-fecha','ctr-ofrecimiento','ctr-expectativas','ctr-premio-desglose','ctr-premio-valor'];
+  ids.forEach(id => { const el = document.getElementById(id); if (el) { if (el.tagName === 'SELECT') el.value = ''; else el.value = ''; } });
+  const _pl = document.getElementById('ctr-plantilla'); if (_pl && !_contratosEditingToken) _pl.value = 'creadora';
+  // Restaurar defaults de textareas
+  const ofr = document.getElementById('ctr-ofrecimiento');
+  const exp = document.getElementById('ctr-expectativas');
+  if (ofr && !_contratosEditingToken) ofr.value = '1 boleto en zona general\n1 Kit Conecta\n1 comida gratis dentro del festival';
+  if (exp && !_contratosEditingToken) exp.value = '1 Video en formato Reel o video vertical para redes sociales (1080 x 1920 píxeles) sobre el evento al que ha sido invitado y de la experiencia del concierto / festival con Conecta Reynosa (modo collab).\n\n3 o 4 menciones en historias de ig el día del evento a Conecta Reynosa, disfrutando del concierto o festival asignado y la experiencia de Conecta utilizando el hashtag #viajaconexpertos o #Seguimosconectando (SÉ CREATIV@ no grabes solo el artista, graba el ambiente, como te la estas pasando, haznos sentir la experiencia desde tu perspectiva)\n\n1 Post dentro del evento (Fotos donde aparezcas) en las redes del creador agradeciendo a Conecta Reynosa por la experiencia y la invitación al evento (Modo Collab)';
+  const fc = document.getElementById('ctr-contrato-fecha');
+  if (fc) fc.value = new Date().toISOString().slice(0,10);
+  // Botón principal
+  const btn = document.getElementById('ctr-btn-enviar');
+  if (btn) btn.textContent = 'Enviar por correo';
+  // Toggle cancelar / titulo edición
+  const cancelBtn = document.getElementById('ctr-btn-cancelar-edit');
+  if (cancelBtn) cancelBtn.style.display = 'none';
+  const banner = document.getElementById('ctr-banner-edit');
+  if (banner) banner.style.display = 'none';
+  const _ccReset = document.getElementById('ctr-cuidador');
+  if (_ccReset && !_contratosEditingToken) _ccReset.checked = false; // 🗼 anexo
+  if (typeof onCtrPlantillaChange === 'function') onCtrPlantillaChange();
+}
+
+function _loadContratoEnForm(c) {
+  const _pl = document.getElementById('ctr-plantilla');
+  if (_pl) _pl.value = c.plantilla || 'creadora';
+  if (c.plantilla === 'giveaway' && c.datos) {
+    const dg = document.getElementById('ctr-premio-desglose'); if (dg) dg.value = c.datos.desglose_premio || '';
+    const vl = document.getElementById('ctr-premio-valor'); if (vl) vl.value = c.datos.valor_premio || '';
+  }
+  if (typeof onCtrPlantillaChange === 'function') onCtrPlantillaChange();
+  // Vigencia guardada DESPUÉS del change (que pone el default de la plantilla).
+  if (c.vigencia_meses) {
+    const vs = document.getElementById('ctr-vigencia');
+    if (vs) vs.value = String(c.vigencia_meses);
+  }
+  // 🗼 Anexo de custodia: marca la casilla si el contrato ya lo trae. El flag
+  // viaja como c.cuidador_bodega (listar) o c.datos.cuidador_bodega (obtener).
+  const _cc = document.getElementById('ctr-cuidador');
+  if (_cc) _cc.checked = (c.cuidador_bodega === true) || !!(c.datos && c.datos.cuidador_bodega === true);
+  document.getElementById('ctr-nombre').value = c.creador_nombre || '';
+  document.getElementById('ctr-email').value = c.creador_email || '';
+  document.getElementById('ctr-evento-nombre').value = c.evento_nombre || '';
+  document.getElementById('ctr-evento-select').value = '';
+  document.getElementById('ctr-evento-fecha').value = (c.evento_fecha || '').slice(0,10);
+  document.getElementById('ctr-contrato-fecha').value = (c.contrato_fecha || '').slice(0,10);
+  document.getElementById('ctr-ofrecimiento').value = (Array.isArray(c.ofrecimiento) ? c.ofrecimiento : []).join('\n');
+  document.getElementById('ctr-expectativas').value = (Array.isArray(c.expectativas) ? c.expectativas : []).join('\n');
+  document.getElementById('ctr-btn-enviar').textContent = 'Guardar cambios';
+  const cancelBtn = document.getElementById('ctr-btn-cancelar-edit');
+  if (cancelBtn) cancelBtn.style.display = '';
+  const banner = document.getElementById('ctr-banner-edit');
+  if (banner) {
+    banner.style.display = '';
+    banner.innerHTML = `Editando contrato de <b>${_escCtr(c.creador_nombre)}</b> · token <code style="font-size:11px;background:rgba(255,255,255,.1);padding:2px 6px;border-radius:3px">${_escCtr((c.token || '').slice(0,8))}…</code>`;
+  }
+}
+
+function cancelarEdicionContrato() {
+  _contratosEditingToken = null;
+  _resetFormUI();
+  switchContratoView('listado');
+}
+
+// — VÍA B (F5): chip de plantilla + aviso de vigencia para el listado ————
+function _ctrPlantillaChip(p) {
+  const map = {
+    creadora:      { txt:'Creadora',    c:'#e8ff4c', bg:'rgba(232,255,76,.14)',  bd:'rgba(232,255,76,.4)' },
+    coordinador:   { txt:'Coordinador', c:'#7cc4ff', bg:'rgba(124,196,255,.14)', bd:'rgba(124,196,255,.4)' },
+    giveaway:      { txt:'Giveaway',    c:'#ff9edb', bg:'rgba(255,158,219,.14)', bd:'rgba(255,158,219,.4)' },
+    creadora_team: { txt:'Team',        c:'#c9a2ff', bg:'rgba(201,162,255,.14)', bd:'rgba(201,162,255,.4)' },
+  };
+  const s = map[p] || map.creadora;
+  return `<span style="display:inline-block;font-size:9px;letter-spacing:.1em;text-transform:uppercase;font-weight:800;padding:2px 7px;border-radius:4px;color:${s.c};background:${s.bg};border:1px solid ${s.bd}">${s.txt}</span>`;
+}
+// 🗼 Chip "cuidador" para coordinadores con el anexo de custodia (flag en
+// datos.cuidador_bodega, expuesto como booleano por admin-contratos listar).
+function _ctrCuidadorChip(c) {
+  if (!c || c.plantilla !== 'coordinador' || c.cuidador_bodega !== true) return '';
+  return `<span style="display:inline-flex;align-items:center;gap:4px;margin-left:6px;font-size:9px;letter-spacing:.1em;text-transform:uppercase;font-weight:800;padding:2px 7px;border-radius:4px;color:#e8ff4c;background:rgba(232,255,76,.14);border:1px solid rgba(232,255,76,.4)" title="También cuidador de bodega — el contrato lleva el Anexo de Custodia (Torre de Karin)"><svg class="ic" style="width:11px;height:11px"><use href="#ic-inventario"/></svg> cuidador</span>`;
+}
+// Contador de STRIKES (solo lectura) para creadora_team firmada. Reusa los
+// puntitos .gz-strike-dot existentes. El dato viene de admin-contratos
+// (usuarios.strikes por correo, best-effort) — sin dato, no pinta nada.
+function _ctrStrikesChip(c) {
+  if (!c || c.plantilla !== 'creadora_team' || c.estado !== 'firmado' || c.strikes === undefined) return '';
+  const s = Number(c.strikes) || 0;
+  const dots = [1,2,3].map(n => `<div class="gz-strike-dot ${s >= n ? 'active' : ''}"></div>`).join('');
+  return `<span style="display:inline-flex;align-items:center;gap:6px;margin-left:6px;font-size:9px;letter-spacing:.08em;text-transform:uppercase;font-weight:800;color:${s >= 3 ? 'var(--red)' : 'var(--ts)'}" title="Strikes del sistema (usuarios.strikes). La baja al llegar a 3 es decisión manual de Memo."><span class="gz-strike-dots" style="display:inline-flex;gap:2px">${dots}</span> ${s}/3</span>`;
+}
+// Aviso "vence en N días" para coordinadores/team firmados cuando falten ≤30 días.
+function _ctrVigenciaAviso(c) {
+  if (!c || (c.plantilla !== 'coordinador' && c.plantilla !== 'creadora_team') || !c.vigencia_fin) return '';
+  const hoy = new Date(new Date().toLocaleDateString('en-CA', { timeZone: 'America/Monterrey' }) + 'T00:00:00');
+  const fin = new Date(String(c.vigencia_fin).slice(0,10) + 'T00:00:00');
+  const dias = Math.round((fin - hoy) / 86400000);
+  if (!Number.isFinite(dias) || dias > 30) return '';
+  const vencido = dias < 0;
+  const col = vencido ? { c:'#ff6666', bg:'rgba(255,68,68,.14)', bd:'rgba(255,68,68,.4)' }
+                      : { c:'#ffb020', bg:'rgba(255,176,32,.14)', bd:'rgba(255,176,32,.4)' };
+  const txt = vencido ? 'Vigencia vencida' : `Vence en ${dias} día${dias === 1 ? '' : 's'}`;
+  return `<span style="display:inline-flex;align-items:center;gap:4px;margin-left:6px;font-size:9px;letter-spacing:.06em;text-transform:uppercase;font-weight:800;padding:2px 7px;border-radius:4px;color:${col.c};background:${col.bg};border:1px solid ${col.bd}"><svg class="ic" style="width:11px;height:11px"><use href="#ic-alerta"/></svg> ${txt}</span>`;
+}
+
+// — Tabla listado + acciones ——————————————————————————
+async function loadContratosList() {
+  const tbody = document.getElementById('ctr-tbody');
+  if (!tbody) return;
+  try {
+    // [sec-contratos] antes db.get('contratos_creadores', ...) con anon key.
+    const rows = await khContratos.listar({ limit: 200 });
+    _contratosCache = rows || [];
+    if (!_contratosCache.length) {
+      tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--ts);padding:30px;font-size:12px;letter-spacing:.1em;text-transform:uppercase">Sin contratos todavía. Crea el primero en "+ Nuevo".</td></tr>`;
+      return;
+    }
+    tbody.innerHTML = _contratosCache.map(c => {
+      const firmado = c.estado === 'firmado';
+      const badge = firmado
+        ? `<span style="background:rgba(61,220,132,.18);color:#3ddc84;border:1px solid rgba(61,220,132,.35);padding:3px 9px;border-radius:4px;font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;font-weight:700">✓ Firmado</span>`
+        : `<span style="background:rgba(255,176,32,.15);color:#ffb020;border:1px solid rgba(255,176,32,.35);padding:3px 9px;border-radius:4px;font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;font-weight:700">⏳ Pendiente</span>`;
+      const fechaEnviado = c.enviado_at
+        ? _tsToDate(c.enviado_at).toLocaleDateString('es-MX',{day:'2-digit',month:'short',timeZone:'America/Monterrey'})
+        : '—';
+      const tokenSafe = _escCtr(c.token);
+      const nombreSafe = _escCtr(c.creador_nombre);
+      const acciones = firmado
+        ? `
+          <button class="btn btn-ghost" style="padding:5px 10px;font-size:11px" onclick="verContratoFirmado('${tokenSafe}','${nombreSafe}')">Ver</button>
+          ${c.plantilla === 'creadora_team' ? `<button class="btn btn-ghost" style="padding:5px 10px;font-size:11px;color:#c9a2ff;border-color:rgba(201,162,255,.3)" onclick="verAnexoC('${_escCtr(c.id)}','${nombreSafe}')">Anexo C</button>` : ''}
+          <button class="btn btn-ghost" style="padding:5px 10px;font-size:11px;color:#ff6666;border-color:rgba(255,68,68,.3)" onclick="eliminarContrato('${tokenSafe}','${nombreSafe}',this)">Eliminar</button>`
+        : `
+          <button class="btn btn-ghost" style="padding:5px 10px;font-size:11px" onclick="editarContrato('${tokenSafe}')">Editar</button>
+          <button class="btn btn-ghost" style="padding:5px 10px;font-size:11px" onclick="reenviarContratoEmail('${tokenSafe}',this)">Reenviar</button>
+          <button class="btn btn-ghost" style="padding:5px 10px;font-size:11px" onclick="copiarLinkContrato('${tokenSafe}',this)">Copiar link</button>
+          <button class="btn btn-ghost" style="padding:5px 10px;font-size:11px;color:#ff6666;border-color:rgba(255,68,68,.3)" onclick="eliminarContrato('${tokenSafe}','${nombreSafe}',this)">Eliminar</button>`;
+      return `<tr>
+        <td><b>${nombreSafe}</b> ${_ctrPlantillaChip(c.plantilla)}${_ctrCuidadorChip(c)}<br><span style="color:var(--ts);font-size:11px">${_escCtr(c.creador_email)}</span></td>
+        <td>${_escCtr(c.evento_nombre)}<br><span style="color:var(--ts);font-size:11px">${_fmtFechaCortaCtr(c.evento_fecha)}</span></td>
+        <td>${fechaEnviado}</td>
+        <td>${badge}${_ctrVigenciaAviso(c)}${_ctrStrikesChip(c)}</td>
+        <td style="text-align:right;white-space:nowrap">${acciones}</td>
+      </tr>`;
+    }).join('');
+  } catch (e) {
+    tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--red);padding:30px;font-size:12px">Error: ${_escCtr(e.message)}</td></tr>`;
+  }
+}
+
+function verContratoFirmado(token, nombre) {
+  document.getElementById('ctr-ver-titulo').textContent = nombre || '';
+  document.getElementById('ctr-ver-iframe').src = '/contrato?t=' + encodeURIComponent(token);
+  openModal('modal-contrato-ver');
+}
+
+// 🔒 ANEXO C (Declaración Discreta) — SOLO ADMIN. El endpoint público de
+// contrato lo poda; aquí se pide por admin-contratos (accion 'obtener', que sí
+// trae datos) y se pinta en una sección COLAPSADA. Confidencial: gestión de
+// riesgo reputacional, sin difusión.
+async function verAnexoC(id, nombre) {
+  const body = document.getElementById('ctr-preview-body');
+  if (!body) return;
+  body.innerHTML = '<div class="loading-state"><div class="spinner"></div>Cargando…</div>';
+  openModal('modal-contrato-preview');
+  try {
+    const c = await khContratos.obtener(id);
+    const ax = c && c.datos && c.datos.anexo_c;
+    const d = (c && c.datos) || {};
+    const CUENTAS = { no: 'No', si: 'Sí' };
+    const ESTADOS = { nunca: 'Nunca existió', baja: 'Dada de baja', vigente_sin_uso: 'Vigente (sin uso)', vigente_en_uso: 'Vigente (en uso)' };
+    const INTENCION = { no_reactivar: 'No reactivar / no crear', acuerdo: 'Requiere acuerdo especial' };
+    const fila = (k, v) => `<div style="display:flex;gap:12px;padding:8px 0;border-bottom:1px solid #eee"><div style="flex:1;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#666;font-weight:700">${k}</div><div style="flex:1.4;font-size:13px;color:#000">${_escCtr(v || '—')}</div></div>`;
+    const proemio = `
+      ${fila('Origen', d.origen)}
+      ${fila('Domicilio', d.domicilio)}
+      ${fila('Ciudad/Estado', d.ciudad_estado)}`;
+    const anexo = !ax
+      ? '<p style="font-size:13px;color:#666;margin-top:10px">Este contrato no tiene Anexo C capturado (se llena al firmar).</p>'
+      : `
+      <details style="margin-top:14px;border:1px solid rgba(201,162,255,.5);border-radius:8px;padding:10px 14px;background:rgba(201,162,255,.06)">
+        <summary style="cursor:pointer;font-weight:800;font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:#7a4fc9">🔒 Anexo C — Declaración Discreta (confidencial)</summary>
+        <div style="margin-top:10px">
+          ${fila('¿Cuentas de contenido adulto?', CUENTAS[ax.cuentas_previas] || ax.cuentas_previas)}
+          ${ax.plataformas ? fila('Plataforma y estatus', ax.plataformas) : ''}
+          ${fila('Estado actual', ESTADOS[ax.estado_actual] || ax.estado_actual)}
+          ${fila('¿Material previo que pueda circular?', CUENTAS[ax.material_previo] || ax.material_previo)}
+          ${ax.material_desc ? fila('Descripción general', ax.material_desc) : ''}
+          ${fila('Intención futura', INTENCION[ax.intencion] || ax.intencion)}
+          ${ax.intencion_det ? fila('Detalle del acuerdo', ax.intencion_det) : ''}
+          <p style="font-size:11px;color:#999;margin:10px 0 0">Estrictamente confidencial: solo gestión de riesgo reputacional, sin difusión. Jamás aparece en el contrato público.</p>
+        </div>
+      </details>`;
+    body.innerHTML = `
+      <h2 style="font-family:'Barlow Condensed','Montserrat',sans-serif;font-size:28px;text-transform:uppercase;margin:0 0 12px;color:#000">${_escCtr(nombre || (c && c.creador_nombre) || '')}<small style="display:block;font-size:12px;color:#ff283b;font-weight:800;letter-spacing:.18em;margin-top:4px">Datos del contrato TEAM</small></h2>
+      ${proemio}
+      ${anexo}`;
+  } catch (e) {
+    body.innerHTML = `<div class="alert alert-error">${_escCtr(e.message)}</div>`;
+  }
+}
+
+async function reenviarContratoEmail(token, btn) {
+  if (!confirm('¿Reenviar email de invitación a la creadora?')) return;
+  const original = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = '…';
+  try {
+    const r = await khAdminFetch('/.netlify/functions/contrato-reenviar', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token }),
+    });
+    const j = await r.json();
+    if (!r.ok || !j.ok) throw new Error(j.error || 'Error al reenviar');
+    btn.textContent = '✓ Enviado';
+    setTimeout(() => { btn.textContent = original; btn.disabled = false; }, 2000);
+  } catch (e) {
+    alert('No se pudo reenviar: ' + e.message);
+    btn.textContent = original;
+    btn.disabled = false;
+  }
+}
+
+async function copiarLinkContrato(token, btn) {
+  const link = location.origin + '/contrato?t=' + encodeURIComponent(token);
+  try {
+    await navigator.clipboard.writeText(link);
+    const original = btn.textContent;
+    btn.textContent = '✓ Copiado';
+    setTimeout(() => { btn.textContent = original; }, 1500);
+  } catch (e) {
+    prompt('Copia este link manualmente:', link);
+  }
+}
+
+function editarContrato(token) {
+  const c = _contratosCache.find(x => x.token === token);
+  if (!c) { alert('Contrato no encontrado en cache'); return; }
+  if (c.estado === 'firmado') { alert('No se puede editar un contrato firmado'); return; }
+  _contratosEditingToken = token;
+  switchContratoView('nuevo');
+  _loadContratoEnForm(c);
+  document.getElementById('ctr-alert').innerHTML = '';
+}
+
+async function eliminarContrato(token, nombre, btn) {
+  if (!confirm(`¿Eliminar este contrato${nombre ? ' de ' + nombre : ''}? Esta acción no se puede deshacer.`)) return;
+  const original = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = '…';
+  try {
+    const r = await khAdminFetch('/.netlify/functions/contrato-eliminar', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token }),
+    });
+    const j = await r.json();
+    if (!r.ok || !j.ok) throw new Error(j.error || 'Error al eliminar');
+    loadContratosList();
+  } catch (e) {
+    alert('No se pudo eliminar: ' + e.message);
+    btn.textContent = original;
+    btn.disabled = false;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// LISTA DE ESPERA (eventos_waitlist + eventos_estado_snapshot)
+// ═══════════════════════════════════════════════════════════════
+let _waitlistCache = [];
+let _snapshotCache = {};
+// [sec-radar-wl] _wlSb (lectura anon directa) eliminado → khWaitlist.listar()/snapshot().
+
+function copiarLinkProximos(btn) {
+  const url = 'https://conectareynosa.mx/proximos';
+  const restore = () => { if (btn) { btn.textContent = 'Copiar link de próximos tours'; btn.disabled = false; } };
+  const ok = () => { if (btn) { btn.textContent = '✓ Copiado'; btn.disabled = true; setTimeout(restore, 2000); } };
+  const fallback = () => {
+    try {
+      const ta = document.createElement('textarea');
+      ta.value = url; ta.style.position = 'fixed'; ta.style.opacity = '0';
+      document.body.appendChild(ta); ta.select();
+      document.execCommand('copy'); document.body.removeChild(ta);
+      ok();
+    } catch (e) {
+      if (btn) { btn.textContent = 'Copia manual: ' + url; setTimeout(restore, 3500); }
+    }
+  };
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(url).then(ok).catch(fallback);
+  } else {
+    fallback();
+  }
+}
+
+async function loadWaitlist() {
+  const summary = document.getElementById('wl-summary');
+  const groups = document.getElementById('wl-groups');
+  if (summary) summary.textContent = 'Cargando…';
+  if (groups) groups.innerHTML = '';
+
+  let rows = [], snap = [];
+  try {
+    [rows, snap] = await Promise.all([
+      khWaitlist.listar(),   // [sec-radar-wl]
+      khWaitlist.snapshot(), // [sec-radar-wl]
+    ]);
+  } catch (e) {
+    if (summary) summary.textContent = 'Error cargando: ' + e.message;
+    return;
+  }
+  _waitlistCache = rows || [];
+  _snapshotCache = {};
+  for (const s of (snap || [])) _snapshotCache[s.evento_id] = s.estado;
+
+  // Agrupar por evento_id, usar el evento_nombre más reciente por evento
+  const byEv = {};
+  for (const r of _waitlistCache) {
+    if (!byEv[r.evento_id]) byEv[r.evento_id] = { evento_id: r.evento_id, evento_nombre: r.evento_nombre, rows: [] };
+    byEv[r.evento_id].rows.push(r);
+  }
+  const eventos = Object.values(byEv).sort((a,b) => b.rows.length - a.rows.length);
+  const total = _waitlistCache.length;
+
+  if (summary) summary.textContent = `Total: ${total} ${total === 1 ? 'persona' : 'personas'} en ${eventos.length} ${eventos.length === 1 ? 'evento' : 'eventos'}`;
+
+  if (!eventos.length) {
+    groups.innerHTML = '<div class="empty-state" style="padding:40px;text-align:center;color:var(--ts);border:1px dashed var(--border);border-radius:10px"><div style="font-size:36px;margin-bottom:8px"><svg class="ic"><use href="#ic-campana"/></svg></div><div style="font-size:13px;letter-spacing:.06em">No hay registros todavía. Cuando alguien se registre en un evento &laquo;Próximamente&raquo;, aparecerá aquí.</div></div>';
+    return;
+  }
+
+  groups.innerHTML = eventos.map(g => {
+    const estadoSnap = _snapshotCache[g.evento_id];
+    const isActivo = estadoSnap === '' || estadoSnap == null;
+    const pendientes = g.rows.filter(r => !r.notificado).length;
+    const tagBg = estadoSnap === 'proximamente' ? 'rgba(232,255,76,.15)' : 'rgba(136,234,78,.15)';
+    const tagBorder = estadoSnap === 'proximamente' ? 'rgba(232,255,76,.5)' : 'rgba(136,234,78,.5)';
+    const tagColor = estadoSnap === 'proximamente' ? '#e8ff4c' : '#88ea4e';
+    const tagText = estadoSnap === 'proximamente' ? 'PRÓXIMAMENTE' : (isActivo ? 'ACTIVO ✓' : (estadoSnap || '—').toUpperCase());
+    const notifLabel = (pendientes > 0) ? `Notificar a ${pendientes} ahora` : 'Reenviar notificación';
+    return `<div style="background:var(--bg2,#0a0a0a);border:1px solid var(--border);border-left:4px solid #e8ff4c;border-radius:10px;padding:18px 20px">
+      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:6px">
+        <div style="font-size:15px;font-weight:800;color:#fff;flex:1 1 auto"><svg class="ic"><use href="#ic-eventos"/></svg> ${_wlEsc(g.evento_nombre)}</div>
+        <span style="font-size:10px;letter-spacing:.14em;padding:4px 10px;border-radius:4px;background:${tagBg};border:1px solid ${tagBorder};color:${tagColor};font-weight:800">${tagText}</span>
+      </div>
+      <div style="font-size:12px;color:var(--ts);margin-bottom:12px;letter-spacing:.04em">
+        ${g.rows.length} ${g.rows.length === 1 ? 'persona registrada' : 'personas registradas'}
+        ${pendientes > 0 ? ` · <span style="color:#e8ff4c;font-weight:700">${pendientes} sin notificar</span>` : ' · <span style="color:#88ea4e">todos notificados</span>'}
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-ghost btn-sm" onclick="wlVerRegistrados('${_wlEsc(g.evento_id)}')">Ver registrados</button>
+        <button class="btn btn-primary btn-sm" onclick="wlNotificar('${_wlEsc(g.evento_id)}', ${g.rows.length}, ${pendientes})">${notifLabel}</button>
+        ${['maestro_roshi','bulma'].includes(currentUser?.rol) ? `<button class="btn btn-ghost btn-sm" style="color:#ff6666;border-color:rgba(255,68,68,.3)" onclick="wlEliminarEvento('${_wlEsc(g.evento_id)}', ${g.rows.length})"><svg class="ic"><use href="#ic-basura"/></svg> Eliminar evento de la lista</button>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function _wlEsc(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+// Construye un Date a prueba de timestamps sin información de zona.
+// Si el ISO no termina en 'Z' ni en offset +HH:MM, se asume UTC y se sufija 'Z'
+// para que JS no lo interprete como hora local del navegador. Esto neutraliza el
+// bug clásico de columnas Postgres `timestamp` (sin time zone) que serializan
+// "2026-05-16T14:58:48.099127" sin sufijo. Si la columna está bien tipada como
+// `timestamptz`, el regex detecta el offset y no se modifica el string.
+function _tsToDate(iso) {
+  if (!iso) return null;
+  const s = String(iso);
+  const fixed = /[Zz]$|[+\-]\d{2}:?\d{2}$/.test(s) ? s : (s + 'Z');
+  return new Date(fixed);
+}
+
+function _wlFmtDate(iso) {
+  if (!iso) return '—';
+  try {
+    return new Intl.DateTimeFormat('es-MX', {
+      day:'2-digit', month:'short', year:'2-digit',
+      hour:'2-digit', minute:'2-digit', hour12:true,
+      timeZone:'America/Monterrey'
+    }).format(_tsToDate(iso));
+  } catch { return iso; }
+}
+
+function wlVerRegistrados(eventoId) {
+  const rows = _waitlistCache.filter(r => r.evento_id === eventoId);
+  const nombreEv = rows[0] ? rows[0].evento_nombre : eventoId;
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(6px)';
+  overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+  overlay.innerHTML = `<div style="background:#0a0a1a;border:1px solid var(--border);border-radius:14px;max-width:800px;width:100%;max-height:88vh;overflow:auto;padding:0">
+    <div style="position:sticky;top:0;background:#0a0a1a;padding:18px 22px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px">
+      <div style="flex:1 1 auto">
+        <div style="font-size:10px;letter-spacing:.16em;color:var(--ts);text-transform:uppercase;margin-bottom:4px">Lista de espera</div>
+        <div style="font-size:16px;font-weight:800;color:#fff">${_wlEsc(nombreEv)}</div>
+        <div style="font-size:11px;color:var(--ts);margin-top:4px">${rows.length} registro${rows.length===1?'':'s'}</div>
+      </div>
+      <button class="btn btn-ghost btn-sm" onclick="wlExportarCSV('${_wlEsc(eventoId)}')">Exportar CSV</button>
+      <button onclick="this.closest('[data-wl-overlay]').remove()" style="background:rgba(255,255,255,.1);border:none;color:#fff;font-size:18px;width:32px;height:32px;border-radius:50%;cursor:pointer">✕</button>
+    </div>
+    <div style="padding:0">
+      <table style="width:100%;border-collapse:collapse;font-size:13px">
+        <thead><tr style="background:rgba(255,255,255,.04);border-bottom:1px solid var(--border)">
+          <th style="text-align:left;padding:10px 16px;font-size:10px;color:var(--ts);letter-spacing:.12em;text-transform:uppercase">Nombre</th>
+          <th style="text-align:left;padding:10px 16px;font-size:10px;color:var(--ts);letter-spacing:.12em;text-transform:uppercase">Email</th>
+          <th style="text-align:left;padding:10px 16px;font-size:10px;color:var(--ts);letter-spacing:.12em;text-transform:uppercase">Registro</th>
+          <th style="text-align:center;padding:10px 16px;font-size:10px;color:var(--ts);letter-spacing:.12em;text-transform:uppercase">Notificado</th>
+        </tr></thead>
+        <tbody>
+          ${rows.map(r => `<tr style="border-bottom:1px solid rgba(255,255,255,.06)">
+            <td style="padding:10px 16px;color:#fff;font-weight:600">${_wlEsc(r.nombre)}</td>
+            <td style="padding:10px 16px;color:rgba(255,255,255,.75)"><a href="mailto:${_wlEsc(r.email)}" style="color:inherit;text-decoration:none">${_wlEsc(r.email)}</a></td>
+            <td style="padding:10px 16px;color:rgba(255,255,255,.6);font-size:11px">${_wlFmtDate(r.created_at)}</td>
+            <td style="padding:10px 16px;text-align:center">${r.notificado ? '<span style="color:#88ea4e">✓</span>' : '<span style="color:rgba(255,255,255,.3)">✗</span>'}</td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>
+  </div>`;
+  overlay.setAttribute('data-wl-overlay', '1');
+  document.body.appendChild(overlay);
+}
+
+function wlExportarCSV(eventoId) {
+  const rows = _waitlistCache.filter(r => r.evento_id === eventoId);
+  if (!rows.length) return;
+  const header = ['Nombre','Email','Fecha registro','Notificado','Notificado at'];
+  const lines = [header.join(',')].concat(rows.map(r => [
+    JSON.stringify(r.nombre || ''),
+    JSON.stringify(r.email || ''),
+    JSON.stringify(r.created_at || ''),
+    r.notificado ? '1' : '0',
+    JSON.stringify(r.notificado_at || ''),
+  ].join(',')));
+  const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `waitlist-${eventoId}.csv`;
+  document.body.appendChild(a); a.click();
+  setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 100);
+}
+
+async function wlEliminarEvento(eventoId, total) {
+  // Defensa en profundidad: el botón ya está gated, pero un usuario podría
+  // invocar la función desde la consola — re-chequeamos el rol.
+  if (!['maestro_roshi','bulma'].includes(currentUser?.rol)) {
+    alert('No tienes permisos para eliminar eventos de la lista de espera.');
+    return;
+  }
+  const grupo = _waitlistCache.find(r => r.evento_id === eventoId);
+  const nombreEv = grupo ? grupo.evento_nombre : eventoId;
+  if (!confirm(`¿Eliminar a las ${total} personas registradas para "${nombreEv}"? Esta acción no se puede deshacer.`)) return;
+
+  try {
+    // RLS de eventos_waitlist no expone DELETE al anon key — pasamos por la
+    // Netlify Function que tiene service key. khAdminFetch adjunta el JWT admin
+    // (Authorization: Bearer) que verifyAdminAuth valida en el backend.
+    const r = await khAdminFetch('/.netlify/functions/waitlist-delete', {
+      method: 'POST',
+      body: JSON.stringify({ evento_id: eventoId }),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok || !d.ok) throw new Error(d.error || ('HTTP ' + r.status));
+    alert(`Eliminados ${d.deleted ?? total} registros de "${nombreEv}".`);
+    loadWaitlist();
+  } catch (e) {
+    alert('No se pudo eliminar: ' + e.message);
+  }
+}
+
+async function wlNotificar(eventoId, totalRegs, pendientes) {
+  // Abre el modal de configuración. El admin puede elegir mandar correo normal
+  // o incluir un código de descuento exclusivo (bloque amarillo en el email).
+  const params = await wlAbrirModalNotif(eventoId, totalRegs, pendientes);
+  if (!params) return; // cancelado
+
+  // Si es reenvío, primero reset notificado=false para los que ya fueron notificados.
+  if (pendientes === 0 && totalRegs > 0) {
+    try {
+      await khWaitlist.resetNotificado(eventoId); // [sec-radar-wl]
+    } catch (e) { alert('No se pudo resetear el flag: ' + e.message); return; }
+  }
+
+  // Disparar la función. Si hay código, lo pasamos por query string.
+  const qs = new URLSearchParams({ force: 'true', evento_id: eventoId });
+  if (params.codigo) {
+    qs.set('codigo', params.codigo);
+    qs.set('descuento', String(params.descuento));
+    qs.set('horas', String(params.horas));
+  }
+  try {
+    // POST (no GET) a propósito: un GET same-origin no manda header Origin y
+    // rompería el corsCheck del backend. khAdminFetch adjunta el JWT admin que
+    // verifyAdminAuth valida en la rama force. La querystring se conserva.
+    const r = await khAdminFetch(`/.netlify/functions/waitlist-notify?${qs.toString()}`, { method: 'POST' });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok || !d.ok) { alert('Error: ' + (d.error || r.status)); return; }
+    const suffix = params.codigo ? ` (con código ${params.codigo} · ${params.descuento}% · ${params.horas}h)` : '';
+    alert(`Enviados ${d.sent || 0} de ${d.total || 0} emails${suffix}.`);
+    loadWaitlist();
+  } catch (e) {
+    alert('Error de red: ' + e.message);
+  }
+}
+
+// ── Modal de configuración de notificación ──────────────────
+// Resuelve a `{codigo, descuento, horas}` o `null` si el admin cancela.
+// Si el checkbox NO está marcado, los 3 campos llegan vacíos y se manda
+// el email sin la sección de código.
+function wlAbrirModalNotif(eventoId, totalRegs, pendientes) {
+  return new Promise(resolve => {
+    const modal = document.getElementById('modal-wl-notif');
+    const $cb   = document.getElementById('wl-notif-usar-codigo');
+    const $box  = document.getElementById('wl-notif-codigo-fields');
+    const $cod  = document.getElementById('wl-notif-codigo');
+    const $desc = document.getElementById('wl-notif-descuento');
+    const $hrs  = document.getElementById('wl-notif-horas');
+    const $err  = document.getElementById('wl-notif-error');
+    const $okBtn   = document.getElementById('wl-notif-submit');
+    const $cancel  = document.getElementById('wl-notif-cancel');
+    const $closeX  = document.getElementById('wl-notif-close');
+    const $evName  = document.getElementById('wl-notif-evento');
+    const $target  = document.getElementById('wl-notif-target');
+
+    // Resolver nombre del evento desde el cache de waitlist (_waitlistCache lo
+    // tiene poblado por loadWaitlist; cada row trae evento_nombre).
+    let evNombre = eventoId;
+    try {
+      if (typeof _waitlistCache !== 'undefined') {
+        const row = (_waitlistCache || []).find(r => r.evento_id === eventoId);
+        if (row && row.evento_nombre) evNombre = row.evento_nombre;
+      }
+    } catch {}
+    $evName.textContent = evNombre;
+    const target = pendientes > 0 ? pendientes : totalRegs;
+    const verbo  = pendientes > 0 ? 'mandar email a' : 'reenviar email a';
+    $target.textContent = `Vas a ${verbo} ${target} ${target === 1 ? 'persona' : 'personas'} registradas.`;
+
+    // Reset estado
+    $cb.checked = false;
+    $box.style.display = 'none';
+    $cod.value = '';
+    $desc.value = '';
+    $hrs.value = '24';
+    $err.style.display = 'none';
+    $err.textContent = '';
+
+    // Wire (idempotente: reemplazamos handlers cada vez para evitar leaks)
+    function cleanup() {
+      modal.classList.remove('open');
+      $cb.removeEventListener('change', onToggle);
+      $okBtn.removeEventListener('click', onOk);
+      $cancel.removeEventListener('click', onCancel);
+      $closeX.removeEventListener('click', onCancel);
+      modal.removeEventListener('click', onBackdrop);
+      document.removeEventListener('keydown', onKey);
+    }
+    function onToggle() {
+      $box.style.display = $cb.checked ? 'block' : 'none';
+      $err.style.display = 'none';
+      if ($cb.checked) setTimeout(() => $cod.focus(), 50);
+    }
+    function onCancel() { cleanup(); resolve(null); }
+    function onBackdrop(e) { if (e.target === modal) onCancel(); }
+    function onKey(e) { if (e.key === 'Escape') onCancel(); }
+    function onOk() {
+      if (!$cb.checked) { cleanup(); resolve({ codigo: '', descuento: 0, horas: 0 }); return; }
+      const cod = ($cod.value || '').trim().toUpperCase();
+      const desc = parseInt($desc.value, 10);
+      const hrs  = parseInt($hrs.value, 10) || 24;
+      if (!cod || !/^[A-Z0-9_-]{2,24}$/.test(cod)) {
+        $err.textContent = 'Código inválido: solo letras, números, _ o − (2-24 chars).';
+        $err.style.display = 'block'; $cod.focus(); return;
+      }
+      if (!Number.isFinite(desc) || desc < 1 || desc > 99) {
+        $err.textContent = 'Descuento debe ser entre 1 y 99.';
+        $err.style.display = 'block'; $desc.focus(); return;
+      }
+      if (!Number.isFinite(hrs) || hrs < 1 || hrs > 168) {
+        $err.textContent = 'Horas debe ser entre 1 y 168.';
+        $err.style.display = 'block'; $hrs.focus(); return;
+      }
+      cleanup();
+      resolve({ codigo: cod, descuento: desc, horas: hrs });
+    }
+    $cb.addEventListener('change', onToggle);
+    $okBtn.addEventListener('click', onOk);
+    $cancel.addEventListener('click', onCancel);
+    $closeX.addEventListener('click', onCancel);
+    modal.addEventListener('click', onBackdrop);
+    document.addEventListener('keydown', onKey);
+
+    modal.classList.add('open');
+  });
+}
+
+// ═══════════════════════════════════════════════
+// ROL · ANALYTICS — dashboard de uso anónimo de /rol
+// ═══════════════════════════════════════════════
+var _rolanRange = 'month';
+var _rolanRefreshId = null;
+var _rolanLastRows = [];
+
+function initRolAnalyticsTab(){
+  // Gate de seguridad: solo maestro_roshi/bulma. El dropdown ya está oculto
+  // para otros roles, pero protegemos por si entran por URL/devtools.
+  if (!['maestro_roshi','bulma'].includes(currentUser?.rol)) {
+    const page = document.getElementById('page-rol-analytics');
+    if (page) page.innerHTML = '<div style="padding:40px;text-align:center;color:var(--ts)">Acceso restringido</div>';
+    return;
+  }
+  // Wire range selector (idempotente)
+  const rangeWrap = document.getElementById('rolan-range');
+  if (rangeWrap && !rangeWrap.dataset.wired) {
+    rangeWrap.dataset.wired = '1';
+    rangeWrap.querySelectorAll('button[data-r]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        rangeWrap.querySelectorAll('button').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        _rolanRange = btn.dataset.r;
+        loadRolAnalytics();
+      });
+    });
+  }
+  loadRolAnalytics();
+  startRolAnalyticsAutoRefresh();
+}
+
+function startRolAnalyticsAutoRefresh(){
+  stopRolAnalyticsAutoRefresh();
+  _rolanRefreshId = setInterval(() => {
+    // Solo refrescar si la pestaña sigue activa
+    const page = document.getElementById('page-rol-analytics');
+    if (page && page.classList.contains('active')) loadRolAnalytics(true);
+  }, 60000);
+}
+function stopRolAnalyticsAutoRefresh(){
+  if (_rolanRefreshId) { clearInterval(_rolanRefreshId); _rolanRefreshId = null; }
+}
+
+function _rolanSinceISO(){
+  // Legacy helper — ahora /Rol usa el rango global del Radar (_radarRange) para
+  // que las pills compartidas filtren todas las sub-pestañas por igual.
+  return _radarSinceISO();
+}
+
+async function loadRolAnalytics(silent){
+  try {
+    // KPIs, tops, paquetes, embudo y métodos de compartir salen del RPC (cacheado por rango).
+    const data = await _radarGetMetricas(_radarRange);
+    // Sparklines (7d) y actividad por hora (24h) siguen de un fetch liviano de 7 días.
+    const since7d = new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString();
+    const select = 'select=session_id,accion,created_at';
+    const rows7 = await _radarFetch('rol_eventos_uso?' + select, since7d).catch(() => []);
+    renderRolAnalytics(data, rows7 || []);
+  } catch (e) {
+    console.error('[rolan]', e);
+  }
+}
+
+function renderRolAnalytics(data, rows7){
+  rows7 = rows7 || [];
+  const rAct  = (data && data.rol && data.rol.act)  || {};
+  const rPrev = (data && data.rol && data.rol.prev) || {};
+  const num = v => Number(v) || 0;
+
+  // ── KPI counters (desde el RPC) ──
+  const sesiones       = num(rAct.sesiones);
+  const sesionesP      = num(rPrev.sesiones);
+  const planes         = num(rAct.planes);
+  const planesP        = num(rPrev.planes);
+  const sesionesConPlan = num(rAct.sesiones_con_plan);
+  const sesionesQueVisitan = num(rAct.sesiones_visitan);
+  const baseConv  = sesionesQueVisitan || sesiones;
+  const conv      = baseConv > 0 ? (sesionesConPlan / baseConv * 100) : 0;
+  const sesConPlanP = num(rPrev.sesiones_con_plan);
+  const sesVisitanP = num(rPrev.sesiones_visitan);
+  const baseConvP = sesVisitanP || sesionesP;
+  const convP     = baseConvP > 0 ? (sesConPlanP / baseConvP * 100) : 0;
+  const recordatorios  = num(rAct.recordatorios);
+  const recordatoriosP = num(rPrev.recordatorios);
+  const comprobantes   = num(rAct.comprobantes);
+  const comprobantesP  = num(rPrev.comprobantes);
+  const toursGuardados  = num(rAct.tours);
+  const toursGuardadosP = num(rPrev.tours);
+  const icsDescargas = num(rAct.ics);
+  const pngDescargas = num(rAct.png);
+  const sharedCount  = num(rAct.shared);
+
+  // ── Set KPI helper con trend ──
+  const setKpi = (id, val, prev, isPercent) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = isPercent ? (typeof val === 'number' ? val.toFixed(1) + '%' : String(val))
+                                        : (typeof val === 'number' ? val.toLocaleString('es-MX') : String(val));
+    const tr = document.getElementById(id + '-tr');
+    if (tr) {
+      const t = _trendArrow(typeof val === 'number' ? val : parseFloat(val) || 0, prev || 0);
+      tr.textContent = t.html;
+      tr.className = 'rdr-kpi-trend ' + t.cls;
+    }
+  };
+  setKpi('rro-sesiones',      sesiones,       sesionesP);
+  setKpi('rro-planes',        planes,         planesP);
+  setKpi('rro-conv',          conv,           convP, true);
+  setKpi('rro-recordatorios', recordatorios,  recordatoriosP);
+  setKpi('rro-comprobantes',  comprobantes,   comprobantesP);
+  setKpi('rro-tours',         toursGuardados, toursGuardadosP);
+
+  // Extras (sin trend)
+  const extras = [['rro-ics', icsDescargas], ['rro-png', pngDescargas], ['rro-shared', sharedCount]];
+  extras.forEach(([id, n]) => { const e = document.getElementById(id); if (e) e.textContent = n.toLocaleString('es-MX'); });
+
+  // ── Sparklines (últimos 7 días) ──
+  _rdrPaintSpark(document.getElementById('rro-sesiones-spark'),
+    _rdrSeries7d(rows7, () => true).map((_, i, arr) => {
+      // sesiones únicas por día
+      const today0 = new Date(new Date().setHours(0,0,0,0));
+      const dayStart = new Date(today0); dayStart.setDate(dayStart.getDate() - (arr.length - 1 - i));
+      const dayEnd = new Date(dayStart); dayEnd.setDate(dayEnd.getDate() + 1);
+      return new Set(rows7.filter(r => {
+        const t = new Date(r.created_at);
+        return t >= dayStart && t < dayEnd;
+      }).map(r => r.session_id)).size;
+    }));
+  _rdrPaintSpark(document.getElementById('rro-planes-spark'),
+    _rdrSeries7d(rows7, r => r.accion === 'rol_plan_generado'));
+  // Conv: planes únicos / visitas únicas por día
+  const sparkConv = (() => {
+    const today0 = new Date(new Date().setHours(0,0,0,0));
+    const days = 7;
+    const out = [];
+    for (let i = 0; i < days; i++) {
+      const dayStart = new Date(today0); dayStart.setDate(dayStart.getDate() - (days - 1 - i));
+      const dayEnd   = new Date(dayStart); dayEnd.setDate(dayEnd.getDate() + 1);
+      const inDay = rows7.filter(r => { const t = new Date(r.created_at); return t >= dayStart && t < dayEnd; });
+      const v = new Set(inDay.filter(r => r.accion === 'rol_visita').map(r => r.session_id)).size;
+      const p = new Set(inDay.filter(r => r.accion === 'rol_plan_generado').map(r => r.session_id)).size;
+      out.push(v > 0 ? (p / v * 100) : 0);
+    }
+    return out;
+  })();
+  _rdrPaintSpark(document.getElementById('rro-conv-spark'), sparkConv);
+  _rdrPaintSpark(document.getElementById('rro-recordatorios-spark'),
+    _rdrSeries7d(rows7, r => r.accion === 'rol_recordatorios_activados'));
+  _rdrPaintSpark(document.getElementById('rro-comprobantes-spark'),
+    _rdrSeries7d(rows7, r => r.accion === 'rol_comprobante_subido'));
+  _rdrPaintSpark(document.getElementById('rro-tours-spark'),
+    _rdrSeries7d(rows7, r => r.accion === 'rol_tour_guardado'));
+
+  // ── Eventos más consultados (por planes generados) — del RPC ──
+  const evTop = (rAct.top_eventos || []).map(e => ({ nombre: e.nombre || e.evento_id, n: num(e.planes) }));
+  const olEv = document.getElementById('rro-eventos-top');
+  const metaEv = document.getElementById('rro-eventos-meta');
+  if (metaEv) metaEv.textContent = `${evTop.length} ${evTop.length===1?'evento':'eventos'}`;
+  const maxEv = Math.max(1, ...evTop.map(x => x.n));
+  if (olEv) {
+    olEv.innerHTML = evTop.length === 0
+      ? '<li class="rdr-empty">Aún no hay planes generados en este rango</li>'
+      : evTop.map((x, i) => {
+          const nm = _radarEsc(x.nombre);
+          const n = x.n;
+          const pct = (n / maxEv * 100).toFixed(0);
+          return `<li>
+            <span class="rk-pos">#${i+1}</span>
+            <span class="rk-name">${nm}<span class="rk-bar" style="width:${pct}%;animation-delay:${(0.04*i).toFixed(2)}s"></span></span>
+            <span class="rk-val">${n}<span class="unit">${n===1?'plan':'planes'}</span></span>
+          </li>`;
+        }).join('');
+  }
+
+  // ── Paquetes más elegidos (última elección por sesión) → donut (del RPC) ──
+  const pkgSrc = rAct.paquetes || {};
+  const pkgCount = { PLUS:num(pkgSrc.PLUS), RIDE:num(pkgSrc.RIDE), STAY:num(pkgSrc.STAY), CHEAP:num(pkgSrc.CHEAP) };
+  const pkgTotal = Object.values(pkgCount).reduce((a,b) => a+b, 0);
+  const pkgItems = Object.entries(pkgCount)
+    .filter(([,n]) => n > 0)
+    .sort((a,b) => b[1]-a[1])
+    .map(([k,n]) => ({ label:k, value:n }));
+  const pkgPalette = ['#e8ff4c', '#0000cd', '#88ea4e', '#ff283b'];
+  const metaPk = document.getElementById('rro-paquetes-meta');
+  if (metaPk) metaPk.textContent = pkgTotal === 0 ? 'Sin datos' : `${pkgTotal} ${pkgTotal===1?'elección':'elecciones'}`;
+  const donutCenter = document.getElementById('rro-donut-center');
+  const donutLegend = document.getElementById('rro-donut-legend');
+  if (pkgTotal === 0) {
+    const segs = document.getElementById('rro-donut-segs');
+    if (segs) segs.innerHTML = '';
+    if (donutCenter) donutCenter.textContent = '—';
+    if (donutLegend) donutLegend.innerHTML = '<div class="rdr-empty">Aún no hay paquetes elegidos</div>';
+  } else {
+    _rdrPaintDonut('rro-donut-segs', pkgItems, pkgPalette);
+    if (donutCenter) donutCenter.textContent = pkgTotal.toLocaleString('es-MX');
+    if (donutLegend) donutLegend.innerHTML = pkgItems.map((it, i) => {
+      const pct = (it.value / pkgTotal * 100).toFixed(1);
+      return `<div class="lg">
+        <span class="dot" style="background:${pkgPalette[i % pkgPalette.length]}"></span>
+        <span class="lbl">${it.label}</span>
+        <span class="pct">${pct}%</span>
+      </div>`;
+    }).join('');
+  }
+
+  // ── Embudo de conversión (sesiones únicas por cada paso) — del RPC ──
+  const emb = rAct.embudo || {};
+  const visitas      = num(emb.visitas) || sesiones;
+  const ev           = num(emb.evento);
+  const pkg          = num(emb.paquete);
+  const zona         = num(emb.zona);
+  const planGen      = num(emb.plan);
+  const recordOk     = num(emb.recordatorios);
+  const pasos = [
+    ['Visitas', visitas],
+    ['Eligen evento', ev],
+    ['Eligen paquete', pkg],
+    ['Eligen zona', zona],
+    ['Generan plan', planGen],
+    ['Activan recordatorios', recordOk]
+  ];
+  const olEmb = document.getElementById('rro-embudo');
+  if (olEmb) {
+    if (visitas === 0) {
+      olEmb.innerHTML = '<li class="rdr-empty">Sin actividad en este rango</li>';
+    } else {
+      olEmb.innerHTML = pasos.map(([k, n]) => {
+        const pct = (n / visitas * 100);
+        const fillStyle = `background:linear-gradient(90deg, rgba(232,255,76,.16) ${pct.toFixed(1)}%, rgba(255,255,255,.02) ${pct.toFixed(1)}%)`;
+        return `<li style="${fillStyle}">
+          <span class="step">${k}</span>
+          <span class="count">${n.toLocaleString('es-MX')}</span>
+          <span class="pct">${pct.toFixed(0)}%</span>
+        </li>`;
+      }).join('');
+    }
+  }
+
+  // ── Métodos de compartir (del RPC: share_metodos) ──
+  const shareSrc = rAct.share_metodos || {};
+  const shareCount = { copy:num(shareSrc.copy), whatsapp:num(shareSrc.whatsapp), email:num(shareSrc.email), otro:num(shareSrc.otro) };
+  const shareTotal = Object.values(shareCount).reduce((a,b) => a+b, 0);
+  const shareWrap = document.getElementById('rro-share');
+  if (shareWrap) {
+    shareWrap.innerHTML = shareTotal === 0
+      ? '<div class="rdr-empty">Sin compartidos en el rango</div>'
+      : Object.entries(shareCount).filter(([,n]) => n > 0)
+          .sort((a,b) => b[1]-a[1])
+          .map(([k,n]) => {
+            const pct = (n / shareTotal * 100).toFixed(1);
+            const lbl = { copy:'Link copiado', whatsapp:'WhatsApp', email:'Email', otro:'Otro' }[k] || k;
+            return `<div class="row">
+              <span class="k">${lbl}</span>
+              <div class="t"><div class="f" style="width:${pct}%"></div></div>
+              <span class="p">${pct}%</span>
+            </div>`;
+          }).join('');
+  }
+
+  // ── Actividad por hora (últimas 24h) ──
+  const now = Date.now();
+  const dayAgo = now - 24*60*60*1000;
+  const buckets = new Array(24).fill(0);
+  rows7.forEach(r => {
+    const t = new Date(r.created_at).getTime();
+    if (t < dayAgo || t > now) return;
+    const hoursAgo = Math.floor((now - t) / (60*60*1000));
+    if (hoursAgo >= 0 && hoursAgo < 24) buckets[23 - hoursAgo]++;
+  });
+  const maxBucket = Math.max(1, ...buckets);
+  const wrapH = document.getElementById('rro-actividad');
+  const baseHour = new Date(now - 23*60*60*1000);
+  const fmtH = (i) => {
+    const d = new Date(baseHour.getTime() + i*60*60*1000);
+    return d.toLocaleTimeString('es-MX', { hour: '2-digit', minute:'2-digit', hour12: false });
+  };
+  if (wrapH) {
+    if (buckets.every(b => b === 0)) {
+      wrapH.innerHTML = '<div class="rdr-empty">Sin actividad en las últimas 24h</div>';
+    } else {
+      wrapH.innerHTML = buckets.map((n, i) => {
+        const pct = (n / maxBucket * 100);
+        return `<div class="hr">
+          <span class="h">${fmtH(i)}</span>
+          <div class="track"><div class="fill" style="width:${pct.toFixed(1)}%"></div></div>
+          <span class="n">${n}</span>
+        </div>`;
+      }).join('');
+    }
+  }
+}
+
+async function exportRolAnalyticsCSV(){
+  // On-demand: trae las filas crudas del rango solo al exportar (ya no se cachean).
+  const select = 'select=session_id,accion,evento_id,evento_nombre,paquete,zona,precio_total,created_at';
+  let rows = [];
+  try { rows = await _radarFetch('rol_eventos_uso?' + select, _radarSinceISO()) || []; }
+  catch (e){ alert('Error al exportar: ' + e.message); return; }
+  if (!rows.length){ alert('No hay datos en el rango actual.'); return; }
+  const cols = ['created_at','session_id','accion','evento_id','evento_nombre','paquete','zona','precio_total'];
+  const esc = v => v == null ? '' : '"' + String(v).replace(/"/g,'""') + '"';
+  const csv = [cols.join(',')].concat(rows.map(r => cols.map(c => esc(r[c])).join(','))).join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `rol-analytics-${_rolanRange}-${new Date().toISOString().slice(0,10)}.csv`;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+
+// ═══════════════════════════════════════════════
+// RADAR DEL DRAGÓN — analytics cross-source
+// ═══════════════════════════════════════════════
+var _radarRange = 'month';     // 'today' | 'week' | 'month' | '3months' | 'all'
+var _radarSub   = 'resumen';
+var _radarRefreshId = null;
+var _radarCache = { main: [], pagos: [], rol: [], waitlist: [], alertas: [] };
+var _radarEvCache = { count: null, ts: 0 }; // eventos activos: 5 min TTL
+
+// Cache del RPC radar_metricas, indexado por rango ('today'|'week'|...). Evita
+// re-pedir el agregado al cambiar de sub-pestaña con el mismo rango. Se invalida
+// al cambiar de rango y en cada auto-refresh (ver loadRadar / handler de rango).
+var _radarRpcCache = {};
+async function _radarGetMetricas(rango){
+  if (_radarRpcCache[rango]) return _radarRpcCache[rango];
+  // [sec-radar-wl] antes db.rpc('radar_metricas') con anon. Ahora admin-radar
+  // ejecuta el RPC con service_role y reenvía la respuesta TAL CUAL.
+  const data = await khRadar.metricas(rango);
+  _radarRpcCache[rango] = data;
+  return data;
+}
+
+// Cuenta cuántos eventos del array EV en producción están "activos"
+// (no agotados, no próximamente). Hace fetch a /index.html y extrae el array
+// con el mismo truco que rol.html (regex + balanceo de llaves).
+async function _radarContarEventosActivos(){
+  const TTL_MS = 5 * 60 * 1000;
+  if (_radarEvCache.count != null && (Date.now() - _radarEvCache.ts) < TTL_MS) {
+    return _radarEvCache.count;
+  }
+  try {
+    const r = await fetch('https://conectareynosa.mx/index.html?nc=' + Date.now(), { cache: 'no-store' });
+    if (!r.ok) return null;
+    const html = await r.text();
+    const start = html.indexOf("var EV=[");
+    if (start < 0) return null;
+    // Balanceo de [ ] empezando en el '[' que sigue al '=' (ignorando strings).
+    let i = html.indexOf('[', start);
+    let depth = 0, end = -1, inStr = false, strCh = '';
+    for (; i < html.length; i++) {
+      const c = html[i], prev = html[i-1];
+      if (inStr) { if (c === strCh && prev !== '\\') inStr = false; continue; }
+      if (c === "'" || c === '"') { inStr = true; strCh = c; continue; }
+      if (c === '[' || c === '{') depth++;
+      else if (c === ']' || c === '}') { depth--; if (depth === 0 && c === ']') { end = i; break; } }
+    }
+    if (end < 0) return null;
+    // Para cada objeto top-level, mira su campo st:
+    const arr = html.slice(html.indexOf('[', start), end + 1);
+    const objRe = /\{[^{}]*?id:\s*'[^']+'[^{}]*?\}/g;
+    // El regex anterior NO permite llaves anidadas (eventos con zonas:[{...}]
+    // no caben). Solo capta objetos planos — esos son los placeholders agotado
+    // o proximamente. Para los demás, recurrimos a parser balanceado:
+    let count = 0;
+    let depth2 = 0, oStart = -1, ins = false, sc = '';
+    for (let j = 0; j < arr.length; j++) {
+      const c = arr[j], prev = arr[j-1];
+      if (ins) { if (c === sc && prev !== '\\') ins = false; continue; }
+      if (c === "'" || c === '"') { ins = true; sc = c; continue; }
+      if (c === '{') { if (depth2 === 0) oStart = j; depth2++; }
+      else if (c === '}') {
+        depth2--;
+        if (depth2 === 0 && oStart >= 0) {
+          const blob = arr.slice(oStart, j + 1);
+          const stM = blob.match(/(?:^|[,{])\s*st\s*:\s*'([^']*)'/);
+          const st = stM ? stM[1] : '';
+          // Activo = no agotado y no próximamente. Eventos con st:'' o
+          // st:'ultimos' / st:'proceso' cuentan como activos.
+          if (st !== 'agotado' && st !== 'proximamente' && st !== 'por-confirmar') count++;
+          oStart = -1;
+        }
+      }
+    }
+    _radarEvCache.count = count;
+    _radarEvCache.ts = Date.now();
+    return count;
+  } catch (e) {
+    console.warn('[radar] contarEventos falló', e.message);
+    return null;
+  }
+}
+
+function _radarSinceISO(r){
+  r = r || _radarRange;
+  const now = new Date();
+  if (r === 'today')   { const d=new Date(now.getFullYear(),now.getMonth(),now.getDate()); return d.toISOString(); }
+  if (r === 'week')    { const d=new Date(now); d.setDate(d.getDate()-7);   return d.toISOString(); }
+  if (r === 'month')   { const d=new Date(now); d.setDate(d.getDate()-30);  return d.toISOString(); }
+  if (r === '3months') { const d=new Date(now); d.setDate(d.getDate()-90);  return d.toISOString(); }
+  return '1970-01-01T00:00:00Z';
+}
+function _radarPrevSinceISO(r){
+  // El periodo anterior del mismo tamaño, para calcular tendencias.
+  r = r || _radarRange;
+  const now = new Date();
+  if (r === 'today')   { const d=new Date(now); d.setDate(d.getDate()-1); d.setHours(0,0,0,0); return d.toISOString(); }
+  if (r === 'week')    { const d=new Date(now); d.setDate(d.getDate()-14); return d.toISOString(); }
+  if (r === 'month')   { const d=new Date(now); d.setDate(d.getDate()-60); return d.toISOString(); }
+  if (r === '3months') { const d=new Date(now); d.setDate(d.getDate()-180); return d.toISOString(); }
+  return '1970-01-01T00:00:00Z';
+}
+function _trendArrow(actual, anterior){
+  if (!anterior || anterior === 0) return { html: '', cls: 'flat' };
+  const diff = ((actual - anterior) / anterior) * 100;
+  if (Math.abs(diff) < 1) return { html: '→ 0%', cls: 'flat' };
+  const arrow = diff > 0 ? '↑' : '↓';
+  const cls = diff > 0 ? 'up' : 'down';
+  return { html: `${arrow} ${Math.abs(diff).toFixed(0)}%`, cls };
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Textos de ayuda para botones "?" del Radar del Dragón
+// Clave: ID del elemento `.rdr-kpi-val` (para KPIs) o texto exacto del
+// `.rdr-card-title` (para cards). Sin entrada = sin botón.
+// ═══════════════════════════════════════════════════════════════
+const RADAR_HELP_KPIS = {
+  // Resumen general
+  'rgr-visitas':     'Número de sesiones únicas que entraron al sitio en el rango seleccionado. Una sesión es una visita continua hasta que el usuario cierra el navegador o pasa 30 minutos sin actividad.',
+  'rgr-cotizaciones':'Cuántas veces los usuarios llegaron al paso final del wizard y generaron una cotización completa. Incluye paquete + zona + (hotel si aplica) + (transporte si aplica).',
+  'rgr-modal':       'Cuántos usuarios llegaron a ver el modal con datos bancarios. Es un indicador fuerte de intención de compra real.',
+  'rgr-comprobante': 'Cuántos clicaron el botón "Enviar comprobante por Messenger/WhatsApp". NO confirma que efectivamente reservaron — solo que dieron clic.',
+  'rgr-conv':        'Porcentaje calculado como (comprobantes enviados / visitas totales) × 100. Indica qué tan eficiente es el sitio para convertir visitas en intenciones de reserva.',
+  'rgr-eventos-act': 'Total de eventos con st: "" o st: "ultimos". Excluye agotados, próximamente y placeholders.',
+  'rgr-waitlist':    'Total de personas registradas en eventos con st: "proximamente". Esto es histórico — incluye registros de todos los eventos.',
+  'rgr-planes':      'Cuántos planes de pago se generaron en total — un mismo usuario puede crear varios planes diferentes.',
+  // /Rol
+  'rro-sesiones':    'Visitas únicas a la página /rol. Cada sesión cuenta una vez, sin importar cuántos planes haga el mismo usuario.',
+  'rro-planes':      'Cuántos planes de pago completos se crearon. Un usuario puede generar varios planes diferentes.',
+  'rro-recordatorios':'Cuántos clientes activaron los recordatorios automáticos por email (un correo el día de cada pago).',
+  // /Pagos
+  'rpa-sesiones':    'Visitas a la página /pagos donde están los datos bancarios.',
+  'rpa-copias':      'Cuáles cuentas bancarias se copiaron al portapapeles más veces. Indica qué paquete está vendiendo más.',
+  'rpa-wa':          'Cuántos clicaron el botón de dudas por WhatsApp. Si es alto, podría haber confusión en la información.',
+};
+const RADAR_HELP_CARDS = {
+  // Match por substring del title (case-insensitive). Primer match gana.
+  'Top eventos cotizados': 'Lista de los eventos con más cotizaciones completas. Útil para saber dónde está la demanda real.',
+  'Origen de tráfico':     'De dónde llegan los visitantes — Direct (escribieron la URL directo o vienen de WhatsApp/SMS), Facebook, Instagram, Google, etc.',
+  'Embudo del wizard':     'Indica en qué paso del wizard el usuario abandona más. Si muchos se caen en "Hotel", revisar si las opciones son confusas o caras.',
+  'Embudo de conversión':  'Cada paso muestra cuántos llegaron hasta ahí. Las pérdidas grandes entre pasos indican fricción en la UX.',
+  'Paquetes más elegidos': 'Distribución porcentual de la última elección de paquete por sesión. Si un usuario cambia de PLUS a RIDE, cuenta solo como RIDE.',
+  'Códigos: válidos vs no válidos': 'Códigos intentados con qué frecuencia y cuántos fueron válidos. Si un código tiene muchos intentos fallidos, revisar el flashPromo.',
+  'Cuentas más copiadas':  'Cuáles cuentas bancarias se copiaron al portapapeles más veces. Indica qué paquete está vendiendo más.',
+  'De dónde llegan':       'De dónde llegan los visitantes a /pagos — útil para entender qué canales mandan tráfico cerca del cierre.',
+  'Métodos de compartir':  'Cómo comparten los clientes su plan — WhatsApp, copy link, email. WhatsApp suele dominar.',
+};
+// Cada sub-pestaña sin cards/kpis puede tener un tooltip "de sección".
+const RADAR_HELP_SECTIONS = {
+  alertas:      'Tipos de alertas: pico de tráfico (visitas +50% vs ayer), caídas (-30%), hitos de lista de espera (50/100/250 personas), records históricos, anomalías en códigos.',
+  comparativas: 'Compara dos rangos de tiempo. Útil para ver tendencias: ¿este mes vendimos más que el pasado?',
+};
+
+function _radarInjectHelpBtn(host, text){
+  if (!host || !text || host.querySelector(':scope > .rdr-help-btn')) return;
+  // Asegurar contenedor relativo
+  const cs = getComputedStyle(host);
+  if (cs.position === 'static') host.style.position = 'relative';
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'rdr-help-btn';
+  btn.setAttribute('aria-label', 'Explicar esta métrica');
+  btn.setAttribute('aria-expanded', 'false');
+  btn.textContent = '?';
+  const tip = document.createElement('div');
+  tip.className = 'rdr-tooltip';
+  tip.setAttribute('role', 'tooltip');
+  tip.textContent = text;
+  host.appendChild(btn);
+  host.appendChild(tip);
+
+  function close(){
+    tip.classList.remove('visible','tip-above');
+    btn.classList.remove('active');
+    btn.setAttribute('aria-expanded','false');
+  }
+  function open(){
+    // Cerrar otros tooltips abiertos
+    document.querySelectorAll('.rdr-tooltip.visible').forEach(t => {
+      if (t !== tip) {
+        t.classList.remove('visible','tip-above');
+        const pb = t.parentElement && t.parentElement.querySelector('.rdr-help-btn');
+        if (pb) { pb.classList.remove('active'); pb.setAttribute('aria-expanded','false'); }
+      }
+    });
+    tip.classList.add('visible');
+    btn.classList.add('active');
+    btn.setAttribute('aria-expanded','true');
+    // Voltear arriba si no hay espacio abajo
+    const rect = tip.getBoundingClientRect();
+    if (rect.bottom > window.innerHeight - 8) tip.classList.add('tip-above');
+  }
+
+  // Desktop: hover
+  btn.addEventListener('mouseenter', open);
+  host.addEventListener('mouseleave', e => {
+    if (!host.contains(e.relatedTarget)) close();
+  });
+  // Mobile/keyboard: toggle on click + tap-outside-to-close
+  btn.addEventListener('click', e => {
+    e.stopPropagation();
+    if (tip.classList.contains('visible')) close(); else open();
+  });
+  btn.addEventListener('focus', open);
+  btn.addEventListener('blur', () => setTimeout(close, 150));
+}
+
+function initRadarHelpButtons(){
+  const page = document.getElementById('page-radar');
+  if (!page) return;
+  // KPIs — clave por id de .rdr-kpi-val
+  page.querySelectorAll('.rdr-kpi').forEach(kpi => {
+    const val = kpi.querySelector('.rdr-kpi-val');
+    const id = val && val.id;
+    const text = id && RADAR_HELP_KPIS[id];
+    if (text) _radarInjectHelpBtn(kpi, text);
+  });
+  // Cards — clave por texto del title
+  page.querySelectorAll('.rdr-card').forEach(card => {
+    const titleEl = card.querySelector('.rdr-card-title');
+    if (!titleEl) return;
+    const titleText = (titleEl.textContent || '').trim();
+    for (const key in RADAR_HELP_CARDS) {
+      if (titleText.toLowerCase().includes(key.toLowerCase())) {
+        _radarInjectHelpBtn(card, RADAR_HELP_CARDS[key]);
+        break;
+      }
+    }
+  });
+  // Sub-pestañas sin KPIs/cards visibles (Alertas, Comparativas) — botón a nivel sección
+  for (const sub in RADAR_HELP_SECTIONS) {
+    const sec = page.querySelector('.radar-sub[data-sub="' + sub + '"]');
+    if (sec) _radarInjectHelpBtn(sec, RADAR_HELP_SECTIONS[sub]);
+  }
+  // Cerrar tooltips al tap fuera (idempotente — solo registrar una vez)
+  if (!page.dataset.helpClickBound) {
+    page.dataset.helpClickBound = '1';
+    document.addEventListener('click', e => {
+      if (e.target.closest('.rdr-help-btn, .rdr-tooltip')) return;
+      document.querySelectorAll('#page-radar .rdr-tooltip.visible').forEach(t => {
+        t.classList.remove('visible','tip-above');
+        const pb = t.parentElement && t.parentElement.querySelector('.rdr-help-btn');
+        if (pb) { pb.classList.remove('active'); pb.setAttribute('aria-expanded','false'); }
+      });
+    });
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape') {
+        document.querySelectorAll('#page-radar .rdr-tooltip.visible').forEach(t => {
+          t.classList.remove('visible','tip-above');
+          const pb = t.parentElement && t.parentElement.querySelector('.rdr-help-btn');
+          if (pb) { pb.classList.remove('active'); pb.setAttribute('aria-expanded','false'); }
+        });
+      }
+    });
+  }
+}
+
+function initRadarTab(){
+  // Gate por rol (también está protegido por allTabs)
+  if (!['maestro_roshi'].includes(currentUser?.rol)) {
+    const page = document.getElementById('page-radar');
+    if (page) page.innerHTML = '<div style="padding:40px;text-align:center;color:var(--ts)">Acceso restringido</div>';
+    return;
+  }
+  // Wire sub-tabs (idempotente)
+  const subs = document.getElementById('radar-subs');
+  if (subs && !subs.dataset.wired) {
+    subs.dataset.wired = '1';
+    subs.querySelectorAll('button[data-sub]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        subs.querySelectorAll('button').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        _radarSub = btn.dataset.sub;
+        document.querySelectorAll('#page-radar .radar-sub').forEach(s => {
+          s.style.display = (s.dataset.sub === _radarSub) ? 'block' : 'none';
+        });
+        loadRadar();
+      });
+    });
+  }
+  const range = document.getElementById('radar-range');
+  if (range && !range.dataset.wired) {
+    range.dataset.wired = '1';
+    range.querySelectorAll('button[data-r]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        range.querySelectorAll('button').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        _radarRange = btn.dataset.r;
+        _radarRpcCache = {};   // rango nuevo → datos frescos
+        loadRadar();
+      });
+    });
+  }
+  // Filtros de alertas
+  const af = document.querySelector('#page-radar .radar-sub[data-sub="alertas"] .radar-range');
+  if (af && !af.dataset.wired) {
+    af.dataset.wired = '1';
+    af.querySelectorAll('button[data-af]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        af.querySelectorAll('button').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        renderAlertasFiltered(btn.dataset.af);
+      });
+    });
+  }
+  // Selector de comparativas (modo + mes para 'month_yoy')
+  const sel = document.getElementById('rcm-modo');
+  if (sel && !sel.dataset.wired) {
+    sel.dataset.wired = '1';
+    sel.addEventListener('change', loadRadarComparativas);
+  }
+  const selMes = document.getElementById('rcm-mes-yoy');
+  if (selMes && !selMes.dataset.wired) {
+    selMes.dataset.wired = '1';
+    selMes.addEventListener('change', loadRadarComparativas);
+    // Preset al mes anterior (más útil que el actual incompleto)
+    const m = new Date().getMonth();
+    selMes.value = String(((m - 1) + 12) % 12);
+  }
+  initRadarHelpButtons();
+  loadRadar();
+  // Auto-refresh cada 60s mientras estemos en la pestaña
+  if (_radarRefreshId) clearInterval(_radarRefreshId);
+  _radarRefreshId = setInterval(() => {
+    const p = document.getElementById('page-radar');
+    if (p && p.classList.contains('active')) loadRadar(true);
+    else { clearInterval(_radarRefreshId); _radarRefreshId = null; }
+  }, 60000);
+  // El conteo de alertas no leídas se actualiza siempre (no depende de la sub-tab)
+  refreshAlertasBadge();
+}
+
+async function loadRadar(silent){
+  // El auto-refresh (silent=true) invalida el cache del RPC para traer datos frescos.
+  if (silent) _radarRpcCache = {};
+  const status = document.getElementById('radar-status');
+  if (status && !silent) status.textContent = 'Cargando…';
+  try {
+    if (_radarSub === 'resumen')      await loadRadarResumen();
+    if (_radarSub === 'sitio')        await loadRadarSitio();
+    if (_radarSub === 'rol')          { loadRolAnalytics(); }
+    if (_radarSub === 'pagos')        await loadRadarPagos();
+    if (_radarSub === 'alertas')      await loadRadarAlertas();
+    if (_radarSub === 'comparativas') await loadRadarComparativas();
+    if (status) {
+      const hora = new Date().toLocaleTimeString('es-MX', { hour:'2-digit', minute:'2-digit' });
+      status.textContent = `Última act: ${hora}`;
+    }
+  } catch (e) {
+    console.error('[radar]', e);
+    if (status) status.textContent = 'Error: ' + e.message;
+  }
+}
+
+async function _radarFetch(table, sinceISO, untilISO){
+  // [sec-radar-wl] Antes leía /rest/v1 con la anon key + paginación Range/Content-Range
+  // aquí en el cliente. Ahora delega en admin-radar (service_role), que reproduce
+  // EXACTAMENTE los mismos filtros (created_at gte/lt), order y paginación, y devuelve
+  // el array completo. Conservamos la firma (table, sinceISO, untilISO) para no tocar
+  // los 6 call sites. `table` puede traer '?select=...'.
+  const qi = table.indexOf('?');
+  const tbl = qi >= 0 ? table.slice(0, qi) : table;
+  let select;
+  if (qi >= 0) {
+    const params = new URLSearchParams(table.slice(qi + 1));
+    select = params.get('select') || undefined;
+  }
+  return khRadar.fetch({ table: tbl, select, since: sinceISO, until: untilISO || undefined });
+}
+
+
+// ── Helpers visuales del Radar ────────────────────────────
+// Bucketing por día: devuelve array de N valores (uno por día) terminando en HOY.
+function _rdrSeries7d(rows, predicate, days){
+  days = days || 7;
+  const now = new Date();
+  const today0 = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const buckets = new Array(days).fill(0);
+  for (const r of rows || []) {
+    if (predicate && !predicate(r)) continue;
+    const t = new Date(r.created_at);
+    const d = new Date(t.getFullYear(), t.getMonth(), t.getDate());
+    const diff = Math.round((today0 - d) / (24 * 3600 * 1000));
+    if (diff >= 0 && diff < days) buckets[days - 1 - diff]++;
+  }
+  return buckets;
+}
+// Genera el path SVG de un sparkline + área debajo, dado un array de valores.
+// viewBox fijo 240x32 (matchea el HTML).
+function _rdrSparkPath(values, w, h){
+  w = w || 240; h = h || 32;
+  if (!values || values.length < 2) {
+    return { line: `M0 ${h-2} L${w} ${h-2}`, area: '', dot: { cx:w, cy:h-2 } };
+  }
+  const max = Math.max(1, ...values);
+  const min = Math.min(...values);
+  const range = Math.max(1, max - min);
+  const stepX = w / (values.length - 1);
+  const points = values.map((v, i) => {
+    const x = i * stepX;
+    const y = h - 4 - ((v - min) / range) * (h - 8);
+    return [x, y];
+  });
+  const line = 'M ' + points.map(p => p[0].toFixed(1) + ' ' + p[1].toFixed(1)).join(' L ');
+  const last = points[points.length - 1];
+  const area = line + ` L ${w} ${h} L 0 ${h} Z`;
+  return { line, area, dot: { cx: last[0], cy: last[1] } };
+}
+function _rdrPaintSpark(svgEl, values){
+  if (!svgEl) return;
+  const { line, area, dot } = _rdrSparkPath(values);
+  // Limpiar y dibujar de nuevo
+  svgEl.innerHTML =
+    `<path class="spark-area" d="${area}"/>` +
+    `<path class="spark-path" d="${line}"/>` +
+    `<circle class="spark-dot" cx="${dot.cx.toFixed(1)}" cy="${dot.cy.toFixed(1)}" r="2.5"/>`;
+}
+// Donut: genera segmentos <path> con stroke-dasharray (animados).
+function _rdrPaintDonut(svgGroupId, items, palette){
+  const g = document.getElementById(svgGroupId);
+  if (!g) return;
+  const total = items.reduce((a, it) => a + it.value, 0);
+  if (total === 0) { g.innerHTML = ''; return; }
+  const r = 46, c = 2 * Math.PI * r;
+  let acc = 0;
+  g.innerHTML = items.map((it, i) => {
+    const portion = it.value / total;
+    const dash = (portion * c).toFixed(2);
+    const gap  = (c - portion * c).toFixed(2);
+    const offset = (-acc * c).toFixed(2);
+    acc += portion;
+    const color = palette[i % palette.length];
+    return `<circle cx="60" cy="60" r="${r}" fill="none"
+      stroke="${color}" stroke-width="14"
+      stroke-dasharray="${dash} ${gap}"
+      stroke-dashoffset="${offset}"
+      style="transition:stroke-dasharray .9s cubic-bezier(.2,.85,.3,1)"/>`;
+  }).join('');
+  // Texto central: muestra el total
+  const t = document.getElementById('rgr-donut-center');
+  if (t) t.textContent = total.toLocaleString('es-MX');
+}
+
+// ── RESUMEN GENERAL ────────────────────────────────────────
+async function loadRadarResumen(){
+  // KPIs, top de eventos y donut de orígenes salen del RPC agregado (cacheado por rango).
+  // Esto reemplaza la descarga de ~52k filas + conteo client-side que hacía timeout.
+  const data  = await _radarGetMetricas(_radarRange);
+  const mAct  = (data.main || {}).act  || {};
+  const mPrev = (data.main || {}).prev || {};
+  const rAct  = (data.rol  || {}).act  || {};
+  const rPrev = (data.rol  || {}).prev || {};
+
+  // Sparklines (7 días) y actividad por hora (24h) son series temporales: siguen
+  // saliendo de un fetch liviano de los últimos 7 días (nunca fue el cuello de botella).
+  const since7d = new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString();
+  const [waitlist, main7, rol7] = await Promise.all([
+    _radarFetch('eventos_waitlist?select=evento_id,evento_nombre,created_at', '1970-01-01T00:00:00Z').catch(() => []),
+    _radarFetch('main_eventos_uso', since7d).catch(() => []),
+    _radarFetch('rol_eventos_uso',  since7d).catch(() => [])
+  ]);
+
+  // ── KPIs (desde el RPC) ──
+  const num = v => Number(v) || 0;
+  const visitas    = num(mAct.visitas),      visitasP   = num(mPrev.visitas);
+  const cot        = num(mAct.cotizaciones), cotP       = num(mPrev.cotizaciones);
+  const modal      = num(mAct.modal),        modalP     = num(mPrev.modal);
+  const compro     = num(mAct.comprobante),  comproP    = num(mPrev.comprobante);
+  // Conversión global = comprobantes / visitas × 100 (misma fórmula que antes).
+  const conv       = visitas  ? (compro  / visitas  * 100) : 0;
+  const convP      = visitasP ? (comproP / visitasP * 100) : 0;
+  const planes     = num(rAct.planes),       planesP    = num(rPrev.planes);
+  const codigosOk  = num(mAct.codigos_ok),   codigosOkP = num(mPrev.codigos_ok);
+  const wlTotal    = num(data.waitlist_total);
+
+  // Set KPI val + trend pill
+  const setKpi = (id, val, prev, isPercent) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = isPercent ? (typeof val === 'number' ? val.toFixed(1)+'%' : String(val))
+                                       : (typeof val === 'number' ? val.toLocaleString('es-MX') : String(val));
+    const tr = document.getElementById(id+'-tr');
+    if (tr) {
+      const t = _trendArrow(typeof val === 'number' ? val : parseFloat(val) || 0, prev || 0);
+      tr.textContent = t.html;
+      tr.className = 'rdr-kpi-trend ' + t.cls;
+    }
+  };
+  setKpi('rgr-visitas',     visitas, visitasP);
+  setKpi('rgr-cotizaciones', cot,    cotP);
+  setKpi('rgr-modal',       modal,   modalP);
+  setKpi('rgr-comprobante', compro,  comproP);
+  setKpi('rgr-conv',        conv,    convP, true);
+  setKpi('rgr-planes',      planes,  planesP);
+  setKpi('rgr-codigos',     codigosOk, codigosOkP);
+  // Eventos activos: fetch async desde /index.html (cache 5 min interno)
+  _radarContarEventosActivos().then(n => {
+    const el = document.getElementById('rgr-eventos-act');
+    if (el) el.textContent = (n == null ? '—' : n.toLocaleString('es-MX'));
+  });
+  document.getElementById('rgr-waitlist').textContent = wlTotal.toLocaleString('es-MX');
+
+  // ── Sparklines (7 días móviles) ──
+  _rdrPaintSpark(document.getElementById('rgr-visitas-spark'),     _rdrSeries7d(main7, r => r.accion==='main_visita'));
+  _rdrPaintSpark(document.getElementById('rgr-cotizaciones-spark'),_rdrSeries7d(main7, r => r.accion==='main_cotizacion_generada'));
+  _rdrPaintSpark(document.getElementById('rgr-modal-spark'),       _rdrSeries7d(main7, r => r.accion==='main_modal_pago_abierto'));
+  _rdrPaintSpark(document.getElementById('rgr-comprobante-spark'), _rdrSeries7d(main7, r => r.accion==='main_comprobante_enviado'));
+  _rdrPaintSpark(document.getElementById('rgr-codigos-spark'),     _rdrSeries7d(main7, r => r.accion==='main_codigo_intentado' && r.codigo_valido));
+  _rdrPaintSpark(document.getElementById('rgr-planes-spark'),      _rdrSeries7d(rol7, r => r.accion==='rol_plan_generado'));
+  // Conv como % por día — eviata división por cero si no hay visitas ese día.
+  // Misma fórmula que el KPI: comprobantes / visitas, NO modal_pago_abierto.
+  const sparkConv = (() => {
+    const v = _rdrSeries7d(main7, r => r.accion==='main_visita');
+    const c = _rdrSeries7d(main7, r => r.accion==='main_comprobante_enviado');
+    return v.map((vi, i) => vi > 0 ? (c[i] / vi * 100) : 0);
+  })();
+  _rdrPaintSpark(document.getElementById('rgr-conv-spark'), sparkConv);
+  _rdrPaintSpark(document.getElementById('rgr-waitlist-spark'),
+    _rdrSeries7d(waitlist, () => true));
+
+  // ── Top eventos cotizados (con barras inline) — por sesiones únicas (del RPC) ──
+  const olTop = document.getElementById('rgr-top-cot');
+  const arr = (mAct.top_cotizados || []).map(e => ({ nombre: e.nombre || e.evento_id, n: num(e.sesiones) }));
+  const metaTop = document.getElementById('rgr-top-cot-meta');
+  if (metaTop) metaTop.textContent = `${arr.length} ${arr.length===1?'evento':'eventos'}`;
+  const maxCot = Math.max(1, ...arr.map(x => x.n));
+  olTop.innerHTML = arr.length === 0
+    ? '<li class="rdr-empty">Sin cotizaciones en el rango</li>'
+    : arr.map((x, i) => {
+        const n = x.n;
+        const pct = (n / maxCot * 100).toFixed(0);
+        const delay = (0.05 + i*0.04).toFixed(2);
+        return `<li>
+          <span class="rk-pos">#${i+1}</span>
+          <span class="rk-name">${_radarEsc(x.nombre)}<span class="rk-bar" style="width:${pct}%;animation-delay:${delay}s"></span></span>
+          <span class="rk-val">${n}<span class="unit">${n===1?'sesión':'sesiones'}</span></span>
+        </li>`;
+      }).join('');
+
+  // ── Donut: orígenes de tráfico (del RPC) ──
+  const orig = mAct.origenes || {};
+  const origArr = Object.entries(orig).sort((a,b) => b[1]-a[1]).map(([k,n]) => ({ label:k, value:num(n) }));
+  const origTotal = origArr.reduce((a,b) => a+b.value, 0);
+  const palette = ['#e8ff4c', '#ff283b', '#0000cd', '#88ea4e', '#ff4bd1', '#7be0ff', '#a4ff7b'];
+  _rdrPaintDonut('rgr-donut-segs', origArr, palette);
+  const metaOrig = document.getElementById('rgr-origenes-meta');
+  if (metaOrig) metaOrig.textContent = origTotal === 0 ? '—' : `${origTotal} sesiones`;
+  const legend = document.getElementById('rgr-donut-legend');
+  legend.innerHTML = origTotal === 0
+    ? '<div class="rdr-empty">Sin sesiones</div>'
+    : origArr.map((it, i) => {
+        const pct = (it.value / origTotal * 100).toFixed(1);
+        return `<div class="lg">
+          <span class="dot" style="background:${palette[i % palette.length]}"></span>
+          <span class="lbl">${_radarEsc(it.label)}</span>
+          <span class="pct">${pct}%</span>
+        </div>`;
+      }).join('');
+
+  // ── Actividad por hora (últimas 24h sobre main7) ──
+  const nowMs = Date.now(), dayAgoMs = nowMs - 24 * 3600 * 1000;
+  const buckets = new Array(24).fill(0);
+  for (const r of (main7 || [])) {
+    const t = new Date(r.created_at).getTime();
+    if (t < dayAgoMs || t > nowMs) continue;
+    const hoursAgo = Math.floor((nowMs - t) / (3600 * 1000));
+    if (hoursAgo >= 0 && hoursAgo < 24) buckets[23 - hoursAgo]++;
+  }
+  const maxBucket = Math.max(1, ...buckets);
+  const baseHour = new Date(nowMs - 23 * 3600 * 1000);
+  const fmtH = (i) => {
+    const d = new Date(baseHour.getTime() + i * 3600 * 1000);
+    return d.toLocaleTimeString('es-MX', { hour: '2-digit', minute:'2-digit', hour12: false });
+  };
+  const actWrap = document.getElementById('rgr-actividad');
+  if (buckets.every(b => b === 0)) {
+    actWrap.innerHTML = '<div class="rdr-empty">Sin actividad en las últimas 24h</div>';
+  } else {
+    actWrap.innerHTML = buckets.map((n, i) => {
+      const pct = (n / maxBucket * 100).toFixed(1);
+      const delay = (i * 0.015).toFixed(2);
+      return `<div class="hr">
+        <span class="h">${fmtH(i)}</span>
+        <div class="track"><div class="fill" style="width:${pct}%;animation-delay:${delay}s"></div></div>
+        <span class="n">${n}</span>
+      </div>`;
+    }).join('');
+  }
+}
+
+// ── SITIO PRINCIPAL ────────────────────────────────────────
+async function loadRadarSitio(){
+  // Todo el panel sale del RPC agregado (cacheado por rango). Sin tendencias aquí.
+  const data = await _radarGetMetricas(_radarRange);
+  const mAct = (data.main || {}).act || {};
+  const num = v => Number(v) || 0;
+  // KPIs por sesión única (del RPC).
+  const visitas       = num(mAct.visitas);
+  const eventosVistos = num(mAct.eventos_vistos);
+  const cot           = num(mAct.cotizaciones);
+  const codigos       = num(mAct.codigos);
+  const musica        = num(mAct.musica);
+  const devs = mAct.devices || {};
+  const devTotal = num(mAct.total_rows) || 1;
+  const devStr = Object.entries(devs).map(([k,n])=>`${k.charAt(0).toUpperCase()+k.slice(1)} ${Math.round(num(n)/devTotal*100)}%`).join(' · ') || '—';
+  document.getElementById('rsi-sesiones').textContent = visitas.toLocaleString('es-MX');
+  document.getElementById('rsi-eventos-vistos').textContent = eventosVistos.toLocaleString('es-MX');
+  document.getElementById('rsi-cotizaciones').textContent = cot.toLocaleString('es-MX');
+  document.getElementById('rsi-codigos').textContent = codigos.toLocaleString('es-MX');
+  document.getElementById('rsi-devices').textContent = devStr;
+  document.getElementById('rsi-musica').textContent = musica.toLocaleString('es-MX');
+
+  // Top eventos vistos — por sesiones únicas (del RPC).
+  const arr = (mAct.top_vistos || []).map(e => ({ nombre: e.nombre || e.evento_id, n: num(e.sesiones) }));
+  const maxClicks = Math.max(1, ...arr.map(x => x.n));
+  document.getElementById('rsi-eventos-top').innerHTML = arr.length === 0
+    ? '<li class="rdr-empty">Sin eventos vistos en el rango</li>'
+    : arr.map((x, i) => {
+        const n = x.n;
+        const pct = (n / maxClicks * 100).toFixed(0);
+        return `<li>
+          <span class="rk-pos">#${i+1}</span>
+          <span class="rk-name">${_radarEsc(x.nombre)}<span class="rk-bar" style="width:${pct}%;animation-delay:${(0.04*i).toFixed(2)}s"></span></span>
+          <span class="rk-val">${n}<span class="unit">${n===1?'sesión':'sesiones'}</span></span>
+        </li>`;
+      }).join('');
+
+  // Paquetes (última elección por sesión) — del RPC.
+  const pkgSrc = mAct.paquetes || {};
+  const pkgCount = { PLUS:num(pkgSrc.PLUS), RIDE:num(pkgSrc.RIDE), STAY:num(pkgSrc.STAY), CHEAP:num(pkgSrc.CHEAP) };
+  const pkgTotal = Object.values(pkgCount).reduce((a,b) => a+b, 0);
+  document.getElementById('rsi-paquetes').innerHTML = pkgTotal === 0
+    ? '<div class="rdr-empty">Sin paquetes elegidos</div>'
+    : Object.entries(pkgCount).sort((a,b)=>b[1]-a[1]).map(([k,n]) => {
+        const pct = n/pkgTotal*100;
+        return `<div class="row"><span class="k">${k}</span><div class="t"><div class="f" style="width:${pct.toFixed(1)}%"></div></div><span class="p">${pct.toFixed(1)}%</span></div>`;
+      }).join('');
+
+  // Embudo (del RPC).
+  const emb = mAct.embudo || {};
+  const pasos = [
+    ['Visitas',          num(emb.visitas) || visitas],
+    ['Vieron evento',    num(emb.evento_visto)],
+    ['Eligen paquete',   num(emb.paquete)],
+    ['Eligen zona',      num(emb.zona)],
+    ['Generan cotización', num(emb.cotizacion)],
+    ['Abren modal pago', num(emb.modal)],
+    ['Envían comprobante', num(emb.comprobante)]
+  ];
+  const base = pasos[0][1] || 1;
+  document.getElementById('rsi-embudo').innerHTML = pasos.map(([k,n]) => {
+    const pct = n/base*100;
+    const fill = `background:linear-gradient(90deg, rgba(232,255,76,.16) ${pct.toFixed(1)}%, rgba(255,255,255,.02) ${pct.toFixed(1)}%)`;
+    return `<li style="${fill}"><span class="step">${k}</span><span class="count">${n.toLocaleString('es-MX')}</span><span class="pct">${pct.toFixed(0)}%</span></li>`;
+  }).join('');
+
+  // Filtros (del RPC, top 10).
+  const farr = (mAct.filtros || []).map(e => [e.filtro, num(e.n)]);
+  const maxFiltro = Math.max(1, ...farr.map(([,n]) => n));
+  document.getElementById('rsi-filtros').innerHTML = farr.length === 0
+    ? '<li class="rdr-empty">Sin filtros usados</li>'
+    : farr.map(([k,n], i) => {
+        const pct = (n / maxFiltro * 100).toFixed(0);
+        return `<li>
+          <span class="rk-pos">#${i+1}</span>
+          <span class="rk-name">${_radarEsc(k)}<span class="rk-bar" style="width:${pct}%;animation-delay:${(0.04*i).toFixed(2)}s"></span></span>
+          <span class="rk-val">${n}</span>
+        </li>`;
+      }).join('');
+
+  // Códigos validos vs no (del RPC).
+  const cod = { validos: num(mAct.codigos_ok_n), invalidos: num(mAct.codigos_no_n) };
+  const codTotal = cod.validos + cod.invalidos;
+  document.getElementById('rsi-codigos-detalle').innerHTML = codTotal === 0
+    ? '<div class="rdr-empty">Sin intentos de código</div>'
+    : `<div class="row"><span class="k">Válidos</span><div class="t"><div class="f" style="width:${(cod.validos/codTotal*100).toFixed(1)}%"></div></div><span class="p">${cod.validos}</span></div>
+       <div class="row"><span class="k">No vál.</span><div class="t"><div class="f alt" style="width:${(cod.invalidos/codTotal*100).toFixed(1)}%"></div></div><span class="p" style="color:var(--rdr-red)">${cod.invalidos}</span></div>`;
+
+  // Origen tráfico (del RPC).
+  const orig = mAct.origenes || {};
+  const oTotal = Object.values(orig).reduce((a,b)=>a+Number(b),0);
+  document.getElementById('rsi-origenes').innerHTML = oTotal === 0
+    ? '<div class="rdr-empty">Sin sesiones</div>'
+    : Object.entries(orig).sort((a,b)=>b[1]-a[1]).map(([k,n]) => {
+        const pct = n/oTotal*100;
+        return `<div class="row"><span class="k">${_radarEsc(k)}</span><div class="t"><div class="f" style="width:${pct.toFixed(1)}%"></div></div><span class="p">${pct.toFixed(1)}%</span></div>`;
+      }).join('');
+
+  // Ventas vs tráfico — cruce KH visitas × Portal ventas por evento. Mismo
+  // since/until (rango) que el resto de la pestaña. Falla suave (su propia card).
+  const vtEl = document.getElementById('rsi-ventas-trafico');
+  if (vtEl) {
+    try {
+      const vt = await khRadar.ventasTrafico({ since: _radarSinceISO() });
+      vtEl.innerHTML = (!vt.length)
+        ? '<div class="rdr-empty">Sin datos en el rango</div>'
+        : `<table style="width:100%;border-collapse:collapse;font-size:12px;min-width:420px">
+             <thead><tr style="text-align:left;color:var(--ts);font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.1em;text-transform:uppercase">
+               <th style="padding:6px 8px">Evento</th>
+               <th style="padding:6px 8px;text-align:right">Visitas</th>
+               <th style="padding:6px 8px;text-align:right">Ventas</th>
+               <th style="padding:6px 8px;text-align:right">Conversión</th>
+             </tr></thead>
+             <tbody>${vt.map(r => {
+               const visitas = Number(r.visitas) || 0;
+               const ventas  = Number(r.ventas) || 0;
+               const convPct = (r.conv == null) ? '—' : (r.conv * 100).toFixed(1) + '%';
+               const alerta  = (visitas >= 50 && ventas === 0);   // mucho ojo: tráfico sin venta
+               const buena   = (r.conv != null && r.conv >= 0.03); // conversión sana
+               const convColor = buena ? 'var(--gold)' : (alerta ? 'var(--red)' : 'inherit');
+               return `<tr style="border-top:1px solid var(--rdr-border)${alerta ? ';color:var(--red)' : ''}">
+                 <td style="padding:6px 8px">${_esfEsc(r.evento_nombre)}</td>
+                 <td style="padding:6px 8px;text-align:right">${visitas.toLocaleString('es-MX')}</td>
+                 <td style="padding:6px 8px;text-align:right">${ventas.toLocaleString('es-MX')}</td>
+                 <td style="padding:6px 8px;text-align:right;font-weight:700;color:${convColor}">${_esfEsc(convPct)}</td>
+               </tr>`;
+             }).join('')}</tbody>
+           </table>`;
+    } catch (e) {
+      vtEl.innerHTML = `<div class="rdr-empty">No se pudo cargar: ${_esfEsc(e.message)}</div>`;
+    }
+  }
+}
+
+// ── /PAGOS ─────────────────────────────────────────────────
+async function loadRadarPagos(){
+  // Todo el panel sale del RPC agregado (cacheado por rango). Sin tendencias aquí.
+  const data = await _radarGetMetricas(_radarRange);
+  const p = (data.pagos || {}).act || {};
+  const num = v => Number(v) || 0;
+  const visitas = num(p.visitas);
+  const copias  = num(p.copias);
+  const wa      = num(p.wa);
+  document.getElementById('rpa-sesiones').textContent = visitas.toLocaleString('es-MX');
+  document.getElementById('rpa-copias').textContent = copias.toLocaleString('es-MX');
+  document.getElementById('rpa-wa').textContent = wa.toLocaleString('es-MX');
+  // Cuentas más copiadas (top 10, del RPC): [{cuenta, n}]
+  const carr = (p.cuentas || []).map(e => [e.cuenta, num(e.n)]);
+  const maxCuenta = Math.max(1, ...carr.map(([,n]) => n));
+  document.getElementById('rpa-cuentas').innerHTML = carr.length === 0
+    ? '<li class="rdr-empty">Sin copias registradas</li>'
+    : carr.map(([k,n], i) => {
+        const pct = (n / maxCuenta * 100).toFixed(0);
+        return `<li>
+          <span class="rk-pos">#${i+1}</span>
+          <span class="rk-name">${_radarEsc(k)}<span class="rk-bar" style="width:${pct}%;animation-delay:${(0.04*i).toFixed(2)}s"></span></span>
+          <span class="rk-val">${n}</span>
+        </li>`;
+      }).join('');
+  // Orígenes (bucket por referrer, del RPC): {bucket: n}
+  const orig = p.origenes || {};
+  const oTotal = Object.values(orig).reduce((a,b)=>a+Number(b),0);
+  document.getElementById('rpa-origenes').innerHTML = oTotal === 0
+    ? '<div class="rdr-empty">Sin sesiones</div>'
+    : Object.entries(orig).sort((a,b)=>b[1]-a[1]).map(([k,n]) => {
+        const pct = n/oTotal*100;
+        return `<div class="row"><span class="k">${_radarEsc(k)}</span><div class="t"><div class="f" style="width:${pct.toFixed(1)}%"></div></div><span class="p">${pct.toFixed(1)}%</span></div>`;
+      }).join('');
+}
+
+// ── ALERTAS ────────────────────────────────────────────────
+async function loadRadarAlertas(){
+  _radarCache.alertas = await khRadar.alertasListar(); // [sec-radar-wl]
+  renderAlertasFiltered('all');
+  refreshAlertasBadge();
+}
+
+function renderAlertasFiltered(filtro){
+  const arr = (_radarCache.alertas || []).filter(a => {
+    if (filtro === 'unread') return !a.vista;
+    if (filtro === 'critical') return a.severidad === 'alta';
+    return true;
+  });
+  const list = document.getElementById('ral-list');
+  if (!list) return;
+  if (arr.length === 0) { list.innerHTML = '<div class="rdr-empty">Sin alertas en este filtro</div>'; return; }
+  list.innerHTML = arr.map(a => {
+    const fecha = new Date(a.created_at).toLocaleString('es-MX', { dateStyle:'medium', timeStyle:'short' });
+    return `<div class="rdr-alert sev-${a.severidad} ${a.vista?'vista':'no-vista'}" data-id="${a.id}">
+      <div class="dot"></div>
+      <div class="body">
+        <div class="titulo">${_radarEsc(a.titulo)}</div>
+        <div class="mensaje">${_radarEsc(a.mensaje)}</div>
+      </div>
+      <div class="meta">${fecha}<br><span class="tipo">${_radarEsc(a.tipo)}</span></div>
+    </div>`;
+  }).join('');
+  // Marcar como vista al click
+  list.querySelectorAll('.rdr-alert.no-vista').forEach(item => {
+    item.addEventListener('click', async () => {
+      const id = item.dataset.id;
+      await khRadar.alertaVista(id).catch(() => {}); // [sec-radar-wl]
+      const a = _radarCache.alertas.find(x => x.id === id); if (a) a.vista = true;
+      item.classList.remove('no-vista'); item.classList.add('vista');
+      refreshAlertasBadge();
+    });
+  });
+}
+
+async function refreshAlertasBadge(){
+  try {
+    const rows = await khRadar.alertasNoVistas(); // [sec-radar-wl]
+    const badge = document.getElementById('radar-alertas-badge');
+    if (!badge) return;
+    if (rows.length > 0) { badge.style.display = 'inline-flex'; badge.textContent = rows.length; }
+    else badge.style.display = 'none';
+  } catch (e) {}
+}
+
+async function markAllAlertsRead(){
+  if (!confirm('¿Marcar TODAS las alertas como leídas?')) return;
+  try {
+    await khRadar.alertasVistaTodas(); // [sec-radar-wl]
+    (_radarCache.alertas || []).forEach(a => a.vista = true);
+    renderAlertasFiltered('all');
+    refreshAlertasBadge();
+  } catch (e) { alert('Error: ' + e.message); }
+}
+
+// ── COMPARATIVAS ───────────────────────────────────────────
+const _RCM_MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+
+function _rcmRangosPara(modo, opts){
+  // Devuelve { actSince, actUntil, prevSince, prevUntil, leyenda }
+  // actUntil/prevUntil pueden ser null (= ahora / abierto al final).
+  const now = new Date();
+  if (modo === 'week') {
+    const actSince = new Date(now); actSince.setDate(now.getDate()-7);
+    const prevSince = new Date(actSince); prevSince.setDate(actSince.getDate()-7);
+    return { actSince, actUntil: now, prevSince, prevUntil: actSince,
+             leyenda: 'Últimos 7 días vs los 7 anteriores' };
+  }
+  if (modo === 'year') {
+    const actSince = new Date(now.getFullYear(), 0, 1);
+    const prevSince = new Date(now.getFullYear()-1, 0, 1);
+    const prevUntil = new Date(now.getFullYear()-1, now.getMonth(), now.getDate(), now.getHours(), now.getMinutes());
+    return { actSince, actUntil: now, prevSince, prevUntil,
+             leyenda: `${now.getFullYear()} (a la fecha) vs ${now.getFullYear()-1} (mismo periodo)` };
+  }
+  if (modo === 'month_yoy') {
+    const mes = opts?.mesIdx != null ? opts.mesIdx : now.getMonth();
+    const actSince  = new Date(now.getFullYear(),     mes, 1);
+    const actUntil  = new Date(now.getFullYear(),     mes + 1, 1);
+    const prevSince = new Date(now.getFullYear() - 1, mes, 1);
+    const prevUntil = new Date(now.getFullYear() - 1, mes + 1, 1);
+    return { actSince, actUntil, prevSince, prevUntil,
+             leyenda: `${_RCM_MESES[mes]} ${now.getFullYear()} vs ${_RCM_MESES[mes]} ${now.getFullYear()-1}` };
+  }
+  // Default: 'month' — últimos 30 días vs los 30 anteriores
+  const actSince  = new Date(now); actSince.setDate(now.getDate()-30);
+  const prevSince = new Date(actSince); prevSince.setDate(actSince.getDate()-30);
+  return { actSince, actUntil: now, prevSince, prevUntil: actSince,
+           leyenda: 'Últimos 30 días vs los 30 anteriores' };
+}
+
+async function loadRadarComparativas(){
+  const modo = document.getElementById('rcm-modo')?.value || 'month';
+  const mesIdx = parseInt(document.getElementById('rcm-mes-yoy')?.value, 10);
+  // Mostrar/ocultar el dropdown de mes según el modo
+  const mesSel = document.getElementById('rcm-mes-yoy');
+  if (mesSel) mesSel.style.display = (modo === 'month_yoy') ? '' : 'none';
+
+  const r = _rcmRangosPara(modo, { mesIdx: Number.isFinite(mesIdx) ? mesIdx : (new Date()).getMonth() });
+  const ley = document.getElementById('rcm-leyenda');
+  if (ley) ley.textContent = r.leyenda;
+
+  // Comparativas usa ventanas propias (no los 5 rangos fijos), así que llama al
+  // helper radar_main_metrics con fechas explícitas — sin pasar por _radarRpcCache.
+  // OJO: usa los campos _n (COUNT de filas), NO los DISTINCT, para igualar el histórico.
+  const [act, prev] = await Promise.all([ // [sec-radar-wl] antes db.rpc anon → admin-radar service_role
+    khRadar.mainMetrics(r.actSince.toISOString(),  r.actUntil  ? r.actUntil.toISOString()  : null),
+    khRadar.mainMetrics(r.prevSince.toISOString(), r.prevUntil ? r.prevUntil.toISOString() : null)
+  ]);
+  const num = v => Number(v) || 0;
+  const items = [
+    { lbl:'Visitas',         a:num(act.visitas),        p:num(prev.visitas) },
+    { lbl:'Cotizaciones',    a:num(act.cotizaciones_n), p:num(prev.cotizaciones_n) },
+    { lbl:'Modal pago',      a:num(act.modal_n),        p:num(prev.modal_n) },
+    { lbl:'Comprobante',     a:num(act.comprobante_n),  p:num(prev.comprobante_n) },
+    { lbl:'Códigos válidos', a:num(act.codigos_ok_n),   p:num(prev.codigos_ok_n) },
+  ];
+  const wrap = document.getElementById('rcm-kpis');
+  wrap.innerHTML = items.map((it, i) => {
+    const dir = it.a > it.p ? 'up' : it.a < it.p ? 'down' : 'flat';
+    const arrow = dir === 'up' ? '↑' : dir === 'down' ? '↓' : '→';
+    const delta = it.p === 0 ? (it.a === 0 ? '0%' : '+∞') :
+                  ((it.a - it.p) / it.p * 100).toFixed(0) + '%';
+    return `<div class="rdr-cmp-row" style="animation-delay:${(0.05*i).toFixed(2)}s">
+      <div class="rdr-cmp-side">
+        <span class="lbl">${it.lbl} · Actual</span>
+        <span class="val">${it.a.toLocaleString('es-MX')}</span>
+      </div>
+      <div class="rdr-cmp-arrow ${dir}">${arrow}<br>${delta}</div>
+      <div class="rdr-cmp-side right">
+        <span class="lbl">Anterior</span>
+        <span class="val">${it.p.toLocaleString('es-MX')}</span>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function _radarEsc(s){
+  return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+async function exportRadarCSV(tipo){
+  const since = _radarSinceISO();
+  const table = tipo === 'main' ? 'main_eventos_uso' : 'pagos_eventos_uso';
+  const rows = await _radarFetch(table, since);
+  if (!rows || rows.length === 0) { alert('Sin datos en el rango'); return; }
+  const cols = Object.keys(rows[0]);
+  const esc = v => v == null ? '' : '"' + String(v).replace(/"/g,'""') + '"';
+  const csv = [cols.join(',')].concat(rows.map(r => cols.map(c => esc(r[c])).join(','))).join('\n');
+  const blob = new Blob([csv], { type:'text/csv;charset=utf-8;' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `radar-${tipo}-${_radarRange}-${new Date().toISOString().slice(0,10)}.csv`;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+

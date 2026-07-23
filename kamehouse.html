@@ -2494,6 +2494,20 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
  </tbody>
  </table>
  </div>
+
+ <!-- TORRE v2 F3: bandeja del cuidador (solo popo/roshi/bulma; el backend manda) -->
+ <div class="card" id="torre-bandeja-card" style="display:none;margin-top:16px">
+  <div style="font-family:'Rajdhani',sans-serif;font-weight:700;font-size:16px;margin-bottom:4px"><svg class="ic"><use href="#ic-campana"/></svg> Salidas por autorizar</div>
+  <div style="font-size:11px;color:var(--ts);margin-bottom:14px">Permiso previo: corrobora la lista y DA SALIDA — hasta entonces el stock baja y el material sale. Rechaza con motivo si algo no cuadra.</div>
+  <div id="torre-bandeja"><div class="loading-state"><div class="spinner"></div>Cargando…</div></div>
+ </div>
+
+ <!-- TORRE v2 F3: prestado ahorita (retornables de salidas autorizadas no cerradas) -->
+ <div class="card" id="torre-prestado-card" style="display:none;margin-top:16px">
+  <div style="font-family:'Rajdhani',sans-serif;font-weight:700;font-size:16px;margin-bottom:4px"><svg class="ic"><use href="#ic-inventario"/></svg> Prestado ahorita</div>
+  <div style="font-size:11px;color:var(--ts);margin-bottom:14px">Piezas retornables que andan fuera: quién las trae, para qué evento y desde cuándo. Regresan SIEMPRE (la comparación del regreso las exige).</div>
+  <div id="torre-prestado"></div>
+ </div>
  </div>
 
  <!-- ─── REPORTES POST-EVENTO ─── -->
@@ -2507,8 +2521,14 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
    <div id="reportes-header-btns" style="display:flex;gap:8px;flex-wrap:wrap"></div>
   </div>
 
+  <!-- TORRE v2 F3: la zona de reportes gana la sub-pestaña de salidas de bodega -->
+  <div class="contratos-tabs" style="display:inline-flex;border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:16px">
+   <button id="rep-tab-reportes" class="ctr-tab" onclick="repVista('reportes')" style="background:rgba(255,107,0,.12);border:0;color:var(--orange);padding:8px 16px;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;font-family:inherit">Reportes</button>
+   <button id="rep-tab-salidas" class="ctr-tab" onclick="repVista('salidas')" style="background:transparent;border:0;color:var(--ts);padding:8px 16px;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;font-family:inherit;border-left:1px solid var(--border)">Salida de bodega</button>
+  </div>
+
   <!-- Tabs de estado (Memo/Popo ven todos; coordi ve los suyos) -->
-  <div style="display:flex;gap:6px;margin-bottom:18px;flex-wrap:wrap;border-bottom:1px solid var(--border);padding-bottom:12px">
+  <div id="rep-filtros" style="display:flex;gap:6px;margin-bottom:18px;flex-wrap:wrap;border-bottom:1px solid var(--border);padding-bottom:12px">
    <button class="gz-filter active" id="rfil-todos" onclick="filtrarReportes('todos',this)">// todos</button>
    <button class="gz-filter" id="rfil-pendiente" onclick="filtrarReportes('enviado',this)">// pendientes</button>
    <button class="gz-filter" id="rfil-rechazado" onclick="filtrarReportes('rechazado',this)">// rechazados</button>
@@ -2518,6 +2538,39 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
 
   <div id="reportes-list">
    <div class="loading-state"><div class="spinner"></div>Cargando reportes…</div>
+  </div>
+
+  <!-- TORRE v2 F3: solicitar salida ANTES del viaje (permiso previo, D1) -->
+  <div id="salidas-zona" style="display:none">
+   <div class="card" style="max-width:760px">
+    <div style="font-family:'Rajdhani',sans-serif;font-weight:700;font-size:16px;margin-bottom:4px"><svg class="ic"><use href="#ic-inventario"/></svg> Solicitar salida de bodega</div>
+    <div style="font-size:11px;color:var(--ts);margin-bottom:14px">ANTES del viaje: pide el material, el cuidador corrobora y da salida. El stock baja hasta que él autorice. Una salida enviada no se edita — cancélala y crea otra.</div>
+    <div id="sal-alert"></div>
+    <div class="form-row">
+     <div class="form-group">
+      <label>Evento *</label>
+      <select id="sal-evento"><option value="">— Elige un evento —</option></select>
+     </div>
+    </div>
+    <div class="form-group" style="margin-bottom:12px">
+     <label>Piezas (deja en 0 lo que no llevas)</label>
+     <div id="sal-piezas" style="display:grid;gap:6px"><div class="loading-state"><div class="spinner"></div>Cargando…</div></div>
+    </div>
+    <div class="form-row">
+     <div class="form-group">
+      <label>Notas</label>
+      <input type="text" id="sal-notas" maxlength="1000" placeholder="Opcional — contexto para el cuidador">
+     </div>
+    </div>
+    <button class="btn btn-primary" id="sal-btn-crear" onclick="crearSalidaBodega()"><svg class="ic"><use href="#ic-correo"/></svg> Solicitar salida</button>
+   </div>
+   <div class="card" style="margin-top:16px">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px">
+     <div style="font-family:'Rajdhani',sans-serif;font-weight:700;font-size:16px">Mis salidas</div>
+     <button class="btn btn-ghost btn-sm" onclick="loadMisSalidas()">↻ Refrescar</button>
+    </div>
+    <div id="sal-mis"><div class="loading-state"><div class="spinner"></div>Cargando…</div></div>
+   </div>
   </div>
  </div>
 
@@ -5370,6 +5423,28 @@ const khContratos = {
   listar(opts) { return this._call(Object.assign({ accion: 'listar' }, opts || {})).then(j => j.contratos || []); },
   // obtener(id) → un contrato (objeto) o null
   obtener(id) { return this._call({ accion: 'obtener', id }).then(j => j.contrato || null); },
+};
+
+// [TORRE v2 F3] Salidas de bodega vía admin-salidas (service_role en el backend).
+// El error conserva j (e.data) para pintar los 409 del backend tal cual (sin_stock).
+const khSalidas = {
+  async _call(payload) {
+    const r = await khAdminFetch('/.netlify/functions/admin-salidas', {
+      method: 'POST', body: JSON.stringify(payload),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || j.ok === false) {
+      const e = new Error(j.error || ('admin-salidas ' + r.status));
+      e.data = j; e.status = r.status;
+      throw e;
+    }
+    return j;
+  },
+  crear(evento_id, detalle, notas) { return this._call({ accion: 'crear', evento_id, detalle, notas }); },
+  listar(opts) { return this._call(Object.assign({ accion: 'listar' }, opts || {})).then(j => j.salidas || []); },
+  darSalida(id) { return this._call({ accion: 'dar_salida', id }); },
+  rechazar(id, motivo) { return this._call({ accion: 'rechazar', id, motivo }); },
+  cancelar(id) { return this._call({ accion: 'cancelar', id }); },
 };
 
 // [sec-reportes] Acceso a reportes_evento vía Netlify Function con service_role
@@ -9638,6 +9713,7 @@ async function loadInventario() {
  } catch(e) {
  tbody.innerHTML = `<tr><td colspan="7"><div class="alert alert-error">${e.message}</div></td></tr>`;
  }
+ loadTorreSalidas(); // [TORRE v2 F3] bandeja + prestado (fails-soft, solo cuidador/admins)
 }
 
 async function guardarKit() {
@@ -9693,6 +9769,218 @@ async function eliminarKit(id) {
  if (!confirm('¿Eliminar esta pieza del inventario?')) return;
  try { await khKits.eliminar(id); loadInventario(); } // [sec-kits]
  catch(e) { alert(e.message); }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// TORRE v2 F3 — SALIDAS DE BODEGA (permiso previo, D1)
+// La zona de Reportes pide; la Torre autoriza. El backend (admin-salidas F2)
+// es quien manda: aquí solo se pinta y los 409 se muestran tal cual.
+// ═══════════════════════════════════════════════════════════════
+function _salEsc(s) { return _esfEsc(s); }
+function _salChipEstado(e) {
+  const map = {
+    solicitada: { txt: 'solicitada', c: '#ffb020', bg: 'rgba(255,176,32,.14)', bd: 'rgba(255,176,32,.4)' },
+    autorizada: { txt: 'autorizada', c: '#3ddc84', bg: 'rgba(61,220,132,.14)', bd: 'rgba(61,220,132,.4)' },
+    rechazada:  { txt: 'rechazada',  c: '#ff6666', bg: 'rgba(255,68,68,.14)',  bd: 'rgba(255,68,68,.4)' },
+    cancelada:  { txt: 'cancelada',  c: 'var(--ts)', bg: 'rgba(255,255,255,.05)', bd: 'var(--border)' },
+    cerrada:    { txt: 'cerrada',    c: '#7cc4ff', bg: 'rgba(124,196,255,.14)', bd: 'rgba(124,196,255,.4)' },
+  };
+  const x = map[e] || map.solicitada;
+  return `<span style="display:inline-block;font-size:9px;letter-spacing:.08em;text-transform:uppercase;font-weight:800;padding:2px 7px;border-radius:4px;color:${x.c};background:${x.bg};border:1px solid ${x.bd}">${x.txt}</span>`;
+}
+function _salResumenDetalle(detalle) {
+  return (Array.isArray(detalle) ? detalle : [])
+    .map(d => `${Number(d.cantidad) || 0}× ${_salEsc(d.pieza)}${d.retornable ? ' <span style="color:#7cc4ff;font-weight:700">↻</span>' : ''}`)
+    .join(' · ');
+}
+
+// Vista de la zona de Reportes: 'reportes' (default) o 'salidas'.
+function repVista(v) {
+  const rep = v === 'reportes';
+  const f = document.getElementById('rep-filtros'); if (f) f.style.display = rep ? 'flex' : 'none';
+  const l = document.getElementById('reportes-list'); if (l) l.style.display = rep ? '' : 'none';
+  const hb = document.getElementById('reportes-header-btns'); if (hb) hb.style.display = rep ? 'flex' : 'none';
+  const z = document.getElementById('salidas-zona'); if (z) z.style.display = rep ? 'none' : '';
+  const tr = document.getElementById('rep-tab-reportes'), ts = document.getElementById('rep-tab-salidas');
+  [[tr, rep], [ts, !rep]].forEach(([b, on]) => { if (b) { b.style.background = on ? 'rgba(255,107,0,.12)' : 'transparent'; b.style.color = on ? 'var(--orange)' : 'var(--ts)'; } });
+  if (!rep) loadSalidasZona();
+}
+
+let _salPiezas = [];
+async function loadSalidasZona() {
+  // Evento del catálogo (vivos, patrón _fetchEVFromIndex).
+  const sel = document.getElementById('sal-evento');
+  if (sel && sel.options.length <= 1) {
+    try {
+      const ev = await _fetchEVFromIndex();
+      const hoy = new Date().toISOString().slice(0, 10);
+      const vivos = (ev || []).filter(e => e && e.id && e.a && (!e.ds || e.ds >= hoy)).sort((a, b) => String(a.ds || '9999').localeCompare(String(b.ds || '9999')));
+      vivos.forEach(e => { const o = document.createElement('option'); o.value = e.id; o.textContent = e.a + (e.f ? ' · ' + e.f : ''); sel.appendChild(o); });
+    } catch (e) { /* select vacío: sin catálogo */ }
+  }
+  await loadSalPiezas();
+  loadMisSalidas();
+}
+
+async function loadSalPiezas() {
+  const box = document.getElementById('sal-piezas');
+  if (!box) return;
+  try {
+    _salPiezas = await khKits.listar(); // [sec-kits] el backend omite costos a no-admins
+    if (!_salPiezas.length) { box.innerHTML = '<div style="font-size:12px;color:var(--ts)">Sin piezas en el inventario</div>'; return; }
+    box.innerHTML = _salPiezas.map((p, i) => `
+      <div style="display:flex;align-items:center;gap:10px">
+        <input type="number" id="sal-cant-${i}" min="0" value="0" class="cot-input" style="width:80px">
+        <div style="flex:1;font-size:13px">${_salEsc(p.pieza)}${p.retornable ? ' <span style="font-size:9px;letter-spacing:.06em;text-transform:uppercase;font-weight:800;padding:1px 6px;border-radius:4px;color:#7cc4ff;background:rgba(124,196,255,.12);border:1px solid rgba(124,196,255,.35)">↻ siempre vuelve</span>' : ''}</div>
+        <div style="font-size:11px;color:var(--ts)">${Number(p.cantidad) || 0} disp.</div>
+      </div>`).join('');
+  } catch (e) { box.innerHTML = `<div class="alert alert-error">${_salEsc(e.message)}</div>`; }
+}
+
+function _salAlert(m, err) {
+  const a = document.getElementById('sal-alert');
+  if (a) a.innerHTML = m ? `<div class="alert ${err ? 'alert-error' : 'alert-success'}">${_salEsc(m)}</div>` : '';
+}
+
+async function crearSalidaBodega() {
+  const eid = (document.getElementById('sal-evento') || {}).value || '';
+  if (!eid) return _salAlert('Elige un evento', true);
+  const detalle = [];
+  _salPiezas.forEach((p, i) => {
+    const n = parseInt((document.getElementById('sal-cant-' + i) || {}).value, 10) || 0;
+    if (n > 0) detalle.push({ pieza_id: p.id, cantidad: n });
+  });
+  if (!detalle.length) return _salAlert('Pon cantidad a al menos una pieza', true);
+  const notas = ((document.getElementById('sal-notas') || {}).value || '').trim() || null;
+  const btn = document.getElementById('sal-btn-crear');
+  if (btn) btn.disabled = true;
+  try {
+    const j = await khSalidas.crear(eid, detalle, notas);
+    _salAlert('Salida solicitada — el cuidador ya tiene tu lista' + (j.correo_enviado === false ? ' (el correo no salió; avísale tú)' : ''), false);
+    _salPiezas.forEach((p, i) => { const el = document.getElementById('sal-cant-' + i); if (el) el.value = '0'; });
+    const nt = document.getElementById('sal-notas'); if (nt) nt.value = '';
+    loadMisSalidas();
+  } catch (e) {
+    const extra = (e.data && e.data.sin_stock)
+      ? ' — ' + e.data.sin_stock.map(x => `${x.pieza}: ${x.disponible} disp.`).join(', ')
+      : '';
+    _salAlert(e.message + extra, true);
+  } finally { if (btn) btn.disabled = false; }
+}
+
+async function loadMisSalidas() {
+  const box = document.getElementById('sal-mis');
+  if (!box) return;
+  try {
+    const salidas = await khSalidas.listar({ limit: 50 }); // el backend acota: el viajero SOLO ve lo suyo
+    if (!salidas.length) { box.innerHTML = '<div style="font-size:12px;color:var(--ts);letter-spacing:.08em;text-transform:uppercase;text-align:center;padding:18px">Sin salidas todavía</div>'; return; }
+    box.innerHTML = salidas.map(s => `
+      <div style="border:1px solid var(--border);border-radius:8px;padding:10px 14px;margin-bottom:8px">
+        <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap">
+          <div style="font-size:13px"><b>${_salEsc(s.evento_id)}</b> ${_salChipEstado(s.estado)}</div>
+          <div style="font-size:11px;color:var(--ts)">${_salEsc(String(s.creado_en || '').slice(0, 10))}</div>
+        </div>
+        <div style="font-size:12px;color:var(--ts);margin-top:6px">${_salResumenDetalle(s.detalle)}</div>
+        ${s.estado === 'rechazada' ? '<div style="font-size:11px;color:#ff6666;margin-top:4px">Rechazada — el motivo te llegó por correo</div>' : ''}
+        ${s.estado === 'solicitada' ? `<div style="margin-top:8px"><button class="btn btn-ghost btn-sm" style="color:#ff6666;border-color:rgba(255,68,68,.3)" onclick="cancelarSalidaBodega('${_salEsc(s.id)}')">Cancelar</button></div>` : ''}
+      </div>`).join('');
+  } catch (e) { box.innerHTML = `<div class="alert alert-error">${_salEsc(e.message)}</div>`; }
+}
+
+async function cancelarSalidaBodega(id) {
+  if (!confirm('¿Cancelar esta salida? Una salida enviada no se edita — cancela y crea otra.')) return;
+  try { await khSalidas.cancelar(id); showToast('Salida cancelada', 'success'); loadMisSalidas(); }
+  catch (e) { showToast(e.message, 'error'); }
+}
+
+// ── Torre: bandeja del cuidador + prestado ahorita ─────────────────────
+let _torreBandeja = [];
+async function loadTorreSalidas() {
+  const esCuidador = ['mister_popo', 'maestro_roshi', 'bulma'].includes(currentUser?.rol);
+  const bc = document.getElementById('torre-bandeja-card'), pc = document.getElementById('torre-prestado-card');
+  if (!esCuidador) { if (bc) bc.style.display = 'none'; if (pc) pc.style.display = 'none'; return; }
+  if (bc) bc.style.display = '';
+  if (pc) pc.style.display = '';
+  const bb = document.getElementById('torre-bandeja'), pp = document.getElementById('torre-prestado');
+  try {
+    const [pendientes, autorizadas] = await Promise.all([
+      khSalidas.listar({ estado: 'solicitada' }),
+      khSalidas.listar({ estado: 'autorizada' }),
+    ]);
+    _torreBandeja = pendientes;
+    // Nombres de solicitantes (best-effort: sin nombres, cae al rol).
+    let uMap = {};
+    try {
+      const ids = [...new Set(pendientes.concat(autorizadas).map(s => s.solicitante_id).filter(Boolean))];
+      if (ids.length) (await khUsuarios.listar({ ids })).forEach(u => { uMap[u.id] = u; }); // [sec-usuarios]
+    } catch (e) { uMap = {}; }
+    const quien = s => { const u = uMap[s.solicitante_id]; return u && u.nombre ? u.nombre : (s.solicitante_rol || '?'); };
+
+    if (bb) {
+      bb.innerHTML = !pendientes.length
+        ? '<div style="font-size:12px;color:var(--ts);letter-spacing:.08em;text-transform:uppercase;text-align:center;padding:18px">Nada por autorizar</div>'
+        : pendientes.map(s => `
+          <div style="border:1px solid var(--border);border-radius:8px;padding:10px 14px;margin-bottom:8px">
+            <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap">
+              <div style="font-size:13px"><b>${_salEsc(quien(s))}</b> · ${_salEsc(s.evento_id)}</div>
+              <div style="font-size:11px;color:var(--ts)">${_salEsc(String(s.creado_en || '').slice(0, 10))}</div>
+            </div>
+            <div style="font-size:12px;color:var(--ts);margin-top:6px">${_salResumenDetalle(s.detalle)}</div>
+            ${s.notas ? `<div style="font-size:11px;color:var(--ts);margin-top:4px">Notas: ${_salEsc(s.notas)}</div>` : ''}
+            <div style="display:flex;gap:8px;margin-top:10px">
+              <button class="btn btn-primary btn-sm" onclick="darSalidaUI('${_salEsc(s.id)}')">Dar salida</button>
+              <button class="btn btn-ghost btn-sm" style="color:#ff6666;border-color:rgba(255,68,68,.3)" onclick="rechazarSalidaUI('${_salEsc(s.id)}')">Rechazar</button>
+            </div>
+          </div>`).join('');
+    }
+
+    if (pp) {
+      const filas = [];
+      autorizadas.forEach(s => (Array.isArray(s.detalle) ? s.detalle : []).forEach(d => {
+        if (d.retornable) filas.push({ pieza: d.pieza, cantidad: d.cantidad, quien: quien(s), evento: s.evento_id, desde: String(s.autorizada_en || '').slice(0, 10) });
+      }));
+      pp.innerHTML = !filas.length
+        ? '<div style="font-size:12px;color:var(--ts);letter-spacing:.08em;text-transform:uppercase;text-align:center;padding:18px">Nada prestado ahorita</div>'
+        : `<div class="table-wrap"><table><thead><tr>
+            <th>Pieza</th><th>Cant.</th><th>Quién la trae</th><th>Evento</th><th>Desde</th>
+          </tr></thead><tbody>${filas.map(f => `<tr>
+            <td style="font-weight:600">${_salEsc(f.pieza)}</td>
+            <td>${Number(f.cantidad) || 0}</td>
+            <td>${_salEsc(f.quien)}</td>
+            <td style="font-size:12px;color:var(--ts)">${_salEsc(f.evento)}</td>
+            <td style="font-size:12px;color:var(--ts)">${_salEsc(f.desde)}</td>
+          </tr>`).join('')}</tbody></table></div>`;
+    }
+  } catch (e) {
+    if (bb) bb.innerHTML = `<div class="alert alert-error">${_salEsc(e.message)}</div>`;
+    if (pp) pp.innerHTML = '';
+  }
+}
+
+async function darSalidaUI(id) {
+  const s = _torreBandeja.find(x => x.id === id);
+  const detalleTxt = s ? (Array.isArray(s.detalle) ? s.detalle : []).map(d => `${d.cantidad}× ${d.pieza}`).join(', ') : '';
+  if (!confirm(`¿Dar salida?${detalleTxt ? '\n\n' + detalleTxt : ''}\n\nEl stock se descuenta en automático y Maestro Roshi recibe el FYI.`)) return;
+  try {
+    const j = await khSalidas.darSalida(id);
+    showToast('Salida autorizada — stock descontado' + (j.correo_solicitante === false ? ' (el correo al solicitante no salió)' : ''), 'success');
+    loadInventario(); // stock cambió: refresca tabla + bandeja + prestado
+  } catch (e) {
+    const extra = (e.data && e.data.sin_stock)
+      ? ' — ' + e.data.sin_stock.map(x => `${x.pieza}: ${x.disponible} disp.`).join(', ')
+      : '';
+    showToast(e.message + extra, 'error'); // los 409 del backend, tal cual
+  }
+}
+
+async function rechazarSalidaUI(id) {
+  const motivo = prompt('Motivo del rechazo (le llega por correo al solicitante):');
+  if (motivo === null) return;
+  try {
+    await khSalidas.rechazar(id, motivo.trim() || null);
+    showToast('Salida rechazada', 'success');
+    loadTorreSalidas();
+  } catch (e) { showToast(e.message, 'error'); }
 }
 
 // ═══════════════════════════════════════════════════════════════

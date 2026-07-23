@@ -5230,9 +5230,17 @@ function enterApp() {
   aplicarPermisosUI();
   aplicarTemaCoordi();
   applyTema(currentUser.tema_acento);
-  _cargarNotificaciones(); // fails-soft: pinta el badge si hay no leídas
-  _spContarPendientes();   // [Bandeja-T2] pinta el badge de pendientes en el nav (fails-soft)
+  // [PERF v1] Boot mínimo: el CRITICAL PATH carga solo sesión/permisos (arriba,
+  // sin fetch) + la pestaña visible (bootApp → loadResumen). Los badges de
+  // chrome (notificaciones, pendientes) NO bloquean el primer render: se
+  // difieren a idle para que la vista aparezca antes. Siguen fails-soft.
   bootApp();
+  const _idle = window.requestIdleCallback || (fn => setTimeout(fn, 200));
+  _idle(() => {
+    _cargarNotificaciones(); // badge de no leídas
+    _spContarPendientes();   // [Bandeja-T2] badge de pendientes en el nav
+    checkMensajeDia();       // banner mensaje del día (chrome)
+  });
 }
 
 
@@ -7915,25 +7923,25 @@ async function radioMuroVisible(id, visible) {
 // BOOT — Arranca todo
 // ═══════════════════════════════════════════════════════════════
 async function bootApp() {
- // Cargar eventos en cache y poblar todos los selectores
- try {
- _eventosCache = await khEventos.listar(); // [sec-eventos]
- populateEventoSelects();
- } catch(e) {
- console.error('Error cargando eventos:', e);
- }
+ // [PERF v1] Se eliminó del boot la carga de TODOS los eventos
+ // (khEventos.listar + populateEventoSelects): populateEventoSelects es un
+ // no-op —su único destino, el <select id="pago-evento">, ya no existe en el
+ // DOM— y _eventosCache no lo lee nadie más en el arranque (el flujo de
+ // guardar evento re-carga por su cuenta). Era un fetch de tabla completa
+ // puro desperdicio en cada entrada.
  // Establecer fecha de hoy en formularios
  const today = new Date().toISOString().split('T')[0];
  ['pago-fecha','gasto-fecha','ev-fecha'].forEach(id => {
  const el = document.getElementById(id);
  if (el) el.value = today;
  });
- // Cargar resumen
+ // Cargar resumen (la pestaña visible — único contenido del critical path)
  loadResumen();
- // Manejar links de aceptar/declinar tour desde correo
+ // Manejar links de aceptar/declinar tour desde correo (barato + intención
+ // directa del usuario: se queda en el critical path).
  manejarAccionAsignacion();
- // Mensaje del día
- checkMensajeDia();
+ // [PERF v1] checkMensajeDia (banner de chrome, no la vista) se difirió a idle
+ // en enterApp, junto con los badges — fuera del critical path del arranque.
 }
 
 function populateEventoSelects() {

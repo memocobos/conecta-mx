@@ -59,5 +59,5 @@ window.STATIC_IMGS={
   'wwemexico':'imgs/wwemexico.jpg',
   'wweraw':'imgs/wweraw.jpg',
   'wwesmackdown':'imgs/perfilsmack.jpg',
-  'soyluna':'imgs/soylunaperfil.jpg'
+  'soyluna':'imgs/soylunaperfil.webp'
 };

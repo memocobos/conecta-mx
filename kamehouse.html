@@ -2508,6 +2508,13 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
   <div style="font-size:11px;color:var(--ts);margin-bottom:14px">Piezas retornables que andan fuera: quién las trae, para qué evento y desde cuándo. Regresan SIEMPRE (la comparación del regreso las exige).</div>
   <div id="torre-prestado"></div>
  </div>
+
+ <!-- TORRE v2 F4b: faltantes cobrados (regla D-1 de Memo) -->
+ <div class="card" id="torre-faltantes-card" style="display:none;margin-top:16px">
+  <div style="font-family:'Rajdhani',sans-serif;font-weight:700;font-size:16px;margin-bottom:4px"><svg class="ic"><use href="#ic-dinero"/></svg> Faltantes por cobrar</div>
+  <div style="font-size:11px;color:var(--ts);margin-bottom:14px">Piezas que no regresaron, cobradas al costo de reposición. 15 días naturales desde la aprobación final de Memo; vencido sin pagar = strike + congelado (no puede levantar salidas). "Marcar pagado" es SOLO de Memo y descongela.</div>
+  <div id="torre-faltantes"></div>
+ </div>
  </div>
 
  <!-- ─── REPORTES POST-EVENTO ─── -->
@@ -5441,10 +5448,14 @@ const khSalidas = {
     return j;
   },
   crear(evento_id, detalle, notas) { return this._call({ accion: 'crear', evento_id, detalle, notas }); },
-  listar(opts) { return this._call(Object.assign({ accion: 'listar' }, opts || {})).then(j => j.salidas || []); },
+  // [F4b] listar guarda la cuenta de LA EMPRESA (si el backend la mandó) para
+  // pintarla junto a los faltantes pendientes del viajero.
+  listar(opts) { return this._call(Object.assign({ accion: 'listar' }, opts || {})).then(j => { khSalidas.ultimaCuentaEmpresa = j.cuenta_empresa || null; return j.salidas || []; }); },
   darSalida(id) { return this._call({ accion: 'dar_salida', id }); },
   rechazar(id, motivo) { return this._call({ accion: 'rechazar', id, motivo }); },
   cancelar(id) { return this._call({ accion: 'cancelar', id }); },
+  faltantesPagado(id) { return this._call({ accion: 'faltantes_pagado', id }); }, // [F4b] SOLO Memo
+  ultimaCuentaEmpresa: null,
 };
 
 // [sec-reportes] Acceso a reportes_evento vía Netlify Function con service_role
@@ -5457,7 +5468,12 @@ const khReportes = {
       method: 'POST', body: JSON.stringify(payload),
     });
     const j = await r.json().catch(() => ({}));
-    if (!r.ok || j.ok === false) throw new Error(j.error || ('admin-reportes ' + r.status));
+    if (!r.ok || j.ok === false) {
+      // [TORRE v2 F4b] e.data conserva el JSON del 409 (diferencias/cobrable)
+      const e = new Error(j.error || ('admin-reportes ' + r.status));
+      e.data = j; e.status = r.status;
+      throw e;
+    }
     return j;
   },
   // listar({ estado?, evento_id?, coordi_id?, limit? }) → array de reportes
@@ -5469,6 +5485,8 @@ const khReportes = {
   enviarMio(id) { return this._call({ accion: 'enviar_mio', id }); },
   // moderación
   aprobarPopo(id) { return this._call({ accion: 'aprobar_popo', id }); },
+  // [F4b] destranca el 409 de comparación COBRANDO los faltantes (queda registro)
+  aprobarPopoCobrando(id) { return this._call({ accion: 'aprobar_popo', id, cobrar_faltantes: true }); },
   aprobarFinal(id) { return this._call({ accion: 'aprobar_final', id }); },
   rechazar(id, motivo) { return this._call({ accion: 'rechazar', id, motivo }); },
   marcarKitsRecibidos(id, kits_detalle) { return this._call({ accion: 'marcar_kits_recibidos', id, kits_detalle }); },
@@ -9881,10 +9899,26 @@ async function loadMisSalidas() {
           <div style="font-size:11px;color:var(--ts)">${_salEsc(String(s.creado_en || '').slice(0, 10))}</div>
         </div>
         <div style="font-size:12px;color:var(--ts);margin-top:6px">${_salResumenDetalle(s.detalle)}</div>
+        ${Number(s.faltantes_monto) > 0 ? _salFaltantesHtml(s) : ''}
         ${s.estado === 'rechazada' ? '<div style="font-size:11px;color:#ff6666;margin-top:4px">Rechazada — el motivo te llegó por correo</div>' : ''}
         ${s.estado === 'solicitada' ? `<div style="margin-top:8px"><button class="btn btn-ghost btn-sm" style="color:#ff6666;border-color:rgba(255,68,68,.3)" onclick="cancelarSalidaBodega('${_salEsc(s.id)}')">Cancelar</button></div>` : ''}
       </div>`).join('');
   } catch (e) { box.innerHTML = `<div class="alert alert-error">${_salEsc(e.message)}</div>`; }
+}
+
+// [TORRE v2 F4b] Faltantes cobrados del viajero: monto, vence y la cuenta de
+// LA EMPRESA para liquidar (viene del backend; sin cuenta → pide el dato).
+function _salFaltantesHtml(s) {
+  const pagado = !!s.faltantes_pagado_at;
+  const vence = String(s.faltantes_vence || '').slice(0, 10);
+  const c = khSalidas.ultimaCuentaEmpresa;
+  const cuentaTxt = pagado ? '' : c
+    ? `Paga a: <b>${_salEsc(c.nombre || 'BBVA')}</b>${c.tarjeta ? ' · tarjeta ' + _salEsc(c.tarjeta) : ''}${c.clabe ? ' · CLABE ' + _salEsc(c.clabe) : ''}${c.titular ? ' · ' + _salEsc(c.titular) : ''} — y manda tu comprobante a Conecta`
+    : 'Pide a Conecta la cuenta para depositar';
+  return `<div style="margin-top:6px;padding:8px 10px;border:1px solid ${pagado ? 'rgba(61,220,132,.35)' : 'rgba(255,176,32,.35)'};border-radius:6px;background:${pagado ? 'rgba(61,220,132,.06)' : 'rgba(255,176,32,.06)'}">
+    <div style="font-size:12px;font-weight:700;color:${pagado ? 'var(--green)' : '#ffb020'}">Faltantes cobrados: ${formatMXN(Number(s.faltantes_monto) || 0)}${pagado ? ' — PAGADO' : vence ? ' · vence el ' + _salEsc(vence) : ''}</div>
+    ${cuentaTxt ? `<div style="font-size:11px;color:var(--ts);margin-top:3px">${cuentaTxt}</div>` : ''}
+  </div>`;
 }
 
 async function cancelarSalidaBodega(id) {
@@ -9897,21 +9931,24 @@ async function cancelarSalidaBodega(id) {
 let _torreBandeja = [];
 async function loadTorreSalidas() {
   const esCuidador = ['mister_popo', 'maestro_roshi', 'bulma'].includes(currentUser?.rol);
-  const bc = document.getElementById('torre-bandeja-card'), pc = document.getElementById('torre-prestado-card');
-  if (!esCuidador) { if (bc) bc.style.display = 'none'; if (pc) pc.style.display = 'none'; return; }
+  const bc = document.getElementById('torre-bandeja-card'), pc = document.getElementById('torre-prestado-card'), fc = document.getElementById('torre-faltantes-card');
+  if (!esCuidador) { if (bc) bc.style.display = 'none'; if (pc) pc.style.display = 'none'; if (fc) fc.style.display = 'none'; return; }
   if (bc) bc.style.display = '';
   if (pc) pc.style.display = '';
+  if (fc) fc.style.display = '';
   const bb = document.getElementById('torre-bandeja'), pp = document.getElementById('torre-prestado');
   try {
-    const [pendientes, autorizadas] = await Promise.all([
+    const [pendientes, autorizadas, todas] = await Promise.all([
       khSalidas.listar({ estado: 'solicitada' }),
       khSalidas.listar({ estado: 'autorizada' }),
+      khSalidas.listar({ limit: 200 }), // [F4b] faltantes viven en autorizadas Y cerradas
     ]);
     _torreBandeja = pendientes;
+    const conFaltantes = (todas || []).filter(x => Number(x.faltantes_monto) > 0);
     // Nombres de solicitantes (best-effort: sin nombres, cae al rol).
     let uMap = {};
     try {
-      const ids = [...new Set(pendientes.concat(autorizadas).map(s => s.solicitante_id).filter(Boolean))];
+      const ids = [...new Set(pendientes.concat(autorizadas).concat(conFaltantes).map(s => s.solicitante_id).filter(Boolean))];
       if (ids.length) (await khUsuarios.listar({ ids })).forEach(u => { uMap[u.id] = u; }); // [sec-usuarios]
     } catch (e) { uMap = {}; }
     const quien = s => { const u = uMap[s.solicitante_id]; return u && u.nombre ? u.nombre : (s.solicitante_rol || '?'); };
@@ -9951,6 +9988,37 @@ async function loadTorreSalidas() {
             <td style="font-size:12px;color:var(--ts)">${_salEsc(f.desde)}</td>
           </tr>`).join('')}</tbody></table></div>`;
     }
+
+    // [TORRE v2 F4b] Faltantes por cobrar: monto, quién, vence, estado, y el
+    // botón "Marcar pagado" SOLO para Memo (descongela al instante).
+    const ff = document.getElementById('torre-faltantes');
+    if (ff) {
+      const hoyMX = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Monterrey' });
+      const esRoshi = currentUser?.rol === 'maestro_roshi';
+      ff.innerHTML = !conFaltantes.length
+        ? '<div style="font-size:12px;color:var(--ts);letter-spacing:.08em;text-transform:uppercase;text-align:center;padding:18px">Sin faltantes cobrados</div>'
+        : conFaltantes.map(x => {
+            const pagado = !!x.faltantes_pagado_at;
+            const vence = String(x.faltantes_vence || '').slice(0, 10);
+            const vencido = !pagado && vence && vence < hoyMX;
+            const chip = pagado
+              ? '<span style="font-size:9px;letter-spacing:.08em;text-transform:uppercase;font-weight:800;padding:2px 7px;border-radius:4px;color:#3ddc84;background:rgba(61,220,132,.14);border:1px solid rgba(61,220,132,.4)">pagado</span>'
+              : vencido
+                ? '<span style="font-size:9px;letter-spacing:.08em;text-transform:uppercase;font-weight:800;padding:2px 7px;border-radius:4px;color:#ff6666;background:rgba(255,68,68,.14);border:1px solid rgba(255,68,68,.4)">vencido — congelado</span>'
+                : '<span style="font-size:9px;letter-spacing:.08em;text-transform:uppercase;font-weight:800;padding:2px 7px;border-radius:4px;color:#ffb020;background:rgba(255,176,32,.14);border:1px solid rgba(255,176,32,.4)">por cobrar</span>';
+            const piezasTxt = (Array.isArray(x.faltantes) ? x.faltantes : []).map(f => `${f.cantidad}× ${_salEsc(f.pieza)}`).join(' · ');
+            return `
+          <div style="border:1px solid var(--border);border-radius:8px;padding:10px 14px;margin-bottom:8px">
+            <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap">
+              <div style="font-size:13px"><b>${_salEsc(quien(x))}</b> · ${_salEsc(x.evento_id)} ${chip}</div>
+              <div style="font-family:'Zen Dots',sans-serif;font-size:15px;color:${pagado ? 'var(--green)' : vencido ? 'var(--red)' : 'var(--gold)'}">${formatMXN(Number(x.faltantes_monto) || 0)}</div>
+            </div>
+            ${piezasTxt ? `<div style="font-size:12px;color:var(--ts);margin-top:6px">${piezasTxt}</div>` : ''}
+            <div style="font-size:11px;color:var(--ts);margin-top:4px">${pagado ? 'Pagado el ' + _salEsc(String(x.faltantes_pagado_at).slice(0, 10)) : vence ? 'Vence el ' + _salEsc(vence) : 'El plazo de 15 días arranca con la aprobación final de Memo'}</div>
+            ${(!pagado && esRoshi) ? `<div style="margin-top:8px"><button class="btn btn-primary btn-sm" onclick="marcarFaltantesPagadoUI('${_salEsc(x.id)}')">Marcar pagado</button></div>` : ''}
+          </div>`;
+          }).join('');
+    }
   } catch (e) {
     if (bb) bb.innerHTML = `<div class="alert alert-error">${_salEsc(e.message)}</div>`;
     if (pp) pp.innerHTML = '';
@@ -9979,6 +10047,17 @@ async function rechazarSalidaUI(id) {
   try {
     await khSalidas.rechazar(id, motivo.trim() || null);
     showToast('Salida rechazada', 'success');
+    loadTorreSalidas();
+  } catch (e) { showToast(e.message, 'error'); }
+}
+
+// [TORRE v2 F4b] "Marcar pagado" — SOLO Memo. Sella el pago y DESCONGELA
+// (el candado de crear salidas se calcula en vivo, así que basta con esto).
+async function marcarFaltantesPagadoUI(id) {
+  if (!confirm('¿Marcar estos faltantes como PAGADOS? Se descongela al instante y el cron ya no aplicará strike por este cobro.')) return;
+  try {
+    await khSalidas.faltantesPagado(id);
+    showToast('Faltantes pagados ✓ — descongelado', 'success');
     loadTorreSalidas();
   } catch (e) { showToast(e.message, 'error'); }
 }
@@ -19536,12 +19615,43 @@ async function enviarReporte(id) {
   } catch(e) { alert(e.message); }
 }
 
+// [F4b] línea legible por diferencia de la comparación salida↔reporte.
+function _difTxt(d) {
+  if (d.tipo === 'retornable_incompleto') return `• ${d.pieza}: retornable — llevó ${d.llevado}, devolvió ${d.devuelto} (regresan SIEMPRE completas)`;
+  if (d.tipo === 'declarado_vs_llevado') return `• ${d.pieza}: llevó ${d.llevado}, declaró ${d.declarado}`;
+  if (d.tipo === 'sobrante_mayor_que_sacado') return `• ${d.pieza}: sobrante ${d.sobrante} > sacado ${d.sacado} (error de captura)`;
+  if (d.tipo === 'sin_salida_autorizada') return `• ${d.pieza}: declarado ${d.declarado} SIN salida autorizada`;
+  return `• ${d.pieza}: diferencia`;
+}
+
 async function aprobarReportePopo(id) {
   if (!confirm('¿Aprobar este reporte y enviarlo a Memo para revisión final?')) return;
   try {
     await khReportes.aprobarPopo(id); // [sec-reportes]
     loadReportes();
-  } catch(e) { alert(e.message); }
+  } catch(e) {
+    const d = e.data || {};
+    // [TORRE v2 F4b] descuadre de bodega: si es COBRABLE, el cuidador puede
+    // aprobar con FALTANTES COBRADOS (al costo de reposición, queda registro;
+    // los 15 días arrancan cuando Memo dé la autorización final).
+    if (Array.isArray(d.diferencias) && d.diferencias.length) {
+      const det = d.diferencias.map(_difTxt).join('\n');
+      if (d.cobrable) {
+        const monto = (d.faltantes_monto_estimado != null) ? formatMXN(d.faltantes_monto_estimado) : 'el costo de reposición';
+        if (confirm(`La salida de bodega y el reporte NO cuadran:\n\n${det}\n\n¿Aprobar con FALTANTES COBRADOS?\nSe le cobrará ${monto} (costo de reposición). Tendrá 15 días naturales para liquidar desde la aprobación final de Memo.`)) {
+          try {
+            const j = await khReportes.aprobarPopoCobrando(id); // [sec-reportes]
+            alert(`✓ Aprobado con faltantes cobrados: ${formatMXN(j.faltantes_monto || 0)}.\nEl registro quedó en la salida de bodega.`);
+            loadReportes();
+          } catch(e2) { alert(e2.message); }
+        }
+        return;
+      }
+      alert(`La salida y el reporte NO cuadran y hay errores de captura (no cobrables) — corrige el reporte:\n\n${det}`);
+      return;
+    }
+    alert(e.message);
+  }
 }
 
 // Función compartida — aprueba reporte y descuenta stock

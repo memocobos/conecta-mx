@@ -43,6 +43,11 @@
 
 const { verifyAdminAuth, corsCheck } = require('./_lib/verify-admin');
 const { aplicarModoPrueba } = require('./_lib/correo-guard');
+// F4b: cuenta de LA EMPRESA para pagar faltantes (verdad única de #289 —
+// paquete 'plus' → ev.banco || BBVA default). Best-effort: sin catálogo → null.
+const { resolverCuentaDeCatalogo } = require('./_lib/cuenta-deposito');
+let fetchCatalogo = null;
+try { ({ fetchCatalogo } = require('./_lib/catalogo-index')); } catch (_) { fetchCatalogo = null; }
 
 const UUID_RE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
 const EVENTO_RE = /^[A-Za-z0-9_.#-]+$/;
@@ -61,9 +66,10 @@ const ACCIONES = {
   dar_salida: ROLES_CUIDADOR,
   rechazar: ROLES_CUIDADOR,
   cancelar: ROLES_VIAJAN,
+  faltantes_pagado: ['maestro_roshi'], // F4b: "marcar pagado" — SOLO Memo descongela
 };
 
-const COLS = 'id,evento_id,solicitante_id,solicitante_rol,detalle,notas,estado,creado_en,autorizada_en,autorizada_por,cerrada_en,reporte_id';
+const COLS = 'id,evento_id,solicitante_id,solicitante_rol,detalle,notas,estado,creado_en,autorizada_en,autorizada_por,cerrada_en,reporte_id,faltantes,faltantes_monto,faltantes_vence,faltantes_pagado_at,faltantes_pagado_por';
 
 exports.handler = async (event) => {
   const __origin = corsCheck(event);
@@ -106,6 +112,21 @@ exports.handler = async (event) => {
       const evento_id = String(body.evento_id || '').trim();
       if (!evento_id || evento_id.length > 120 || !EVENTO_RE.test(evento_id)) return json(400, { error: 'evento_id inválido' });
       const notas = (body.notas != null && String(body.notas).trim() !== '') ? String(body.notas).trim().slice(0, 1000) : null;
+
+      // 🗼 F4b — CONGELAMIENTO calculado EN VIVO (estilo F6 vendedores, cero
+      // crons escribiendo estados): faltantes VENCIDOS sin pagar → la puerta
+      // de nuevas salidas se cierra hasta que Memo marque pagado. Best-effort
+      // estricto: si la consulta falla, NO se congela (jamás dejar fuera a
+      // alguien por un error de red). Los admins no se congelan a sí mismos.
+      if (rol === 'coordinador' || rol === 'cc' || rol === 'mister_popo') {
+        const cong = await congeladoPorFaltantes(env, kh, uid);
+        if (cong) {
+          return json(403, {
+            error: `Tienes faltantes de bodega vencidos sin liquidar (${_fmtMXN(cong.monto)}, vencieron el ${cong.vence}) — paga el monto y pide a Conecta que te reactive`,
+            codigo: 'bodega_congelada', faltantes_monto: cong.monto, faltantes_vence: cong.vence,
+          });
+        }
+      }
 
       const items = Array.isArray(body.detalle) ? body.detalle : [];
       if (!items.length) return json(400, { error: 'Agrega al menos una pieza' });
@@ -174,7 +195,18 @@ exports.handler = async (event) => {
       const r = await fetch(`${baseSalidas}?${sp.toString()}`, { headers: kh });
       if (!r.ok) return json(502, { error: 'KH rechazó la consulta', detail: await r.text() });
       const salidas = await r.json();
-      return json(200, { ok: true, salidas, ve_todo: veTodo });
+      // 🗼 F4b: si hay faltantes SIN pagar, la respuesta trae la cuenta de LA
+      // EMPRESA para liquidarlos (verdad única #289: 'plus' → banco del evento
+      // || BBVA). Best-effort: sin catálogo → sin cuenta (jamás una equivocada).
+      let cuenta_empresa;
+      try {
+        const pend = (Array.isArray(salidas) ? salidas : []).find(x => Number(x.faltantes_monto) > 0 && !x.faltantes_pagado_at);
+        if (pend && fetchCatalogo) {
+          const cat = await fetchCatalogo();
+          cuenta_empresa = resolverCuentaDeCatalogo(cat, pend.evento_id, 'plus') || undefined;
+        }
+      } catch (e) { cuenta_empresa = undefined; }
+      return json(200, { ok: true, salidas, ve_todo: veTodo, ...(cuenta_empresa ? { cuenta_empresa } : {}) });
     }
 
     // ── dar_salida (el permiso: descuenta stock UNA SOLA VEZ) ──────────────
@@ -280,11 +312,51 @@ exports.handler = async (event) => {
       return json(200, { ok: true });
     }
 
+    // ── faltantes_pagado (SOLO Memo): "marcar pagado" descongela ───────────
+    if (accion === 'faltantes_pagado') {
+      const id = String(body.id || '').trim();
+      if (!UUID_RE.test(id)) return json(400, { error: 'id inválido' });
+      const salida = await leerSalida(baseSalidas, kh, id);
+      if (!salida) return json(404, { error: 'Salida no encontrada' });
+      if (!(Number(salida.faltantes_monto) > 0)) return json(400, { error: 'Esta salida no tiene faltantes cobrados' });
+      if (salida.faltantes_pagado_at) return json(409, { error: 'Estos faltantes ya están marcados como pagados' });
+      const ahora = new Date().toISOString();
+      const pR = await fetch(`${baseSalidas}?id=eq.${enc(id)}&faltantes_pagado_at=is.null`, {
+        method: 'PATCH',
+        headers: { ...kh, Prefer: 'return=representation' },
+        body: JSON.stringify({ faltantes_pagado_at: ahora, faltantes_pagado_por: auth.user.correo || rol }),
+      });
+      const marcadas = pR.ok ? ((await pR.json().catch(() => [])) || []) : [];
+      if (!pR.ok || !marcadas.length) return json(pR.ok ? 409 : 502, { error: 'No se pudo marcar pagado', detail: pR.ok ? 'ya estaba pagado' : await pR.text() });
+      return json(200, { ok: true, faltantes_pagado_at: ahora });
+    }
+
     return json(400, { error: 'accion inválida' });
   } catch (e) {
     return json(502, { error: 'Error en admin-salidas', detail: e.message });
   }
 };
+
+// F4b: ¿el solicitante tiene faltantes VENCIDOS sin pagar? → {monto, vence} o
+// null. Best-effort: cualquier error → null (NO congela).
+async function congeladoPorFaltantes(env, kh, uid) {
+  try {
+    const hoyMX = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Monterrey' });
+    const r = await fetch(
+      `${env.KH_URL}/rest/v1/salidas_bodega?solicitante_id=eq.${encodeURIComponent(uid)}` +
+      `&faltantes_monto=gt.0&faltantes_pagado_at=is.null&faltantes_vence=lt.${hoyMX}` +
+      `&select=faltantes_monto,faltantes_vence&limit=1`,
+      { headers: kh }
+    );
+    if (!r.ok) return null;
+    const [row] = (await r.json().catch(() => [])) || [];
+    return row ? { monto: Number(row.faltantes_monto) || 0, vence: String(row.faltantes_vence || '').slice(0, 10) } : null;
+  } catch (e) { return null; }
+}
+
+function _fmtMXN(n) {
+  return '$' + (Math.round((Number(n) || 0) * 100) / 100).toLocaleString('es-MX');
+}
 
 // ----- helpers -----
 

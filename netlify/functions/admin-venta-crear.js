@@ -26,6 +26,7 @@ const { verifyAdminAuth, corsCheck } = require('./_lib/verify-admin');
 const { resolverPrecioVenta, hoyMx } = require('./_lib/precio-zona');
 const { fetchCatalogo } = require('./_lib/catalogo-index');
 const { cargarDisponibilidad, evaluarZona } = require('./_lib/disponibilidad');
+const { verificarVendedorActivo, AVISO_INACTIVO } = require('./_lib/vendedor-activo');
 
 const ROLES = ['vendedor', 'maestro_roshi', 'bulma'];
 const PAQUETES = ['plus', 'ride', 'stay', 'cheap'];
@@ -100,6 +101,13 @@ exports.handler = async (event) => {
   const auth = verifyAdminAuth(event, ROLES);
   if (!auth.valid) return _bad(headers, auth.status, auth.error);
   const vendedorId = auth.user && auth.user.id ? String(auth.user.id) : null;
+
+  // 💤 F6: candado de inactividad — vendedor con 3+ meses y CERO ventas queda
+  // bloqueado EN LA PUERTA (evaluado en vivo, best-effort: en error entra).
+  if (auth.user.rol === 'vendedor') {
+    const chk = await verificarVendedorActivo(auth.user);
+    if (!chk.activo) return { statusCode: 403, headers, body: JSON.stringify({ error: AVISO_INACTIVO, codigo: 'vendedor_inactivo' }) };
+  }
 
   const env = readEnv();
   if (env.error) return _bad(headers, 500, env.error);

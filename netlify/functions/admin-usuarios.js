@@ -129,6 +129,20 @@ exports.handler = async (event) => {
       const orden = body.orden === 'strikes' ? 'strikes.desc' : 'nombre.asc';
       sp.set('order', orden);
 
+      // [PERF v1] Límite de seguridad para el listar global. Antes traía la
+      // tabla completa sin tope (causa del "a veces no cargan los usuarios" en
+      // red lenta). El equipo real son decenas, así que 500 muestra lo mismo
+      // que hoy con margen de sobra. Reglas:
+      //   · Si viene `ids`, NO se topa por debajo de la cantidad pedida — los
+      //     mapas de nombres por id nunca se truncan (in.(...) ya acota).
+      //   · `body.limit` explícito manda (cap duro 2000) para callers que
+      //     necesiten más de forma consciente.
+      let limit = parseInt(body.limit, 10);
+      if (!Number.isInteger(limit) || limit < 1) limit = 500;
+      if (limit > 2000) limit = 2000;
+      if (Array.isArray(body.ids) && body.ids.length > limit) limit = Math.min(body.ids.length, 2000);
+      sp.set('limit', String(limit));
+
       const r = await fetch(`${base}?${sp.toString()}`, { headers: sbHeaders });
       if (!r.ok) {
         const detail = await r.text();

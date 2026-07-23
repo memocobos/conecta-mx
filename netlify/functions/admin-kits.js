@@ -11,7 +11,10 @@
 //        la pestaña Inventario + el form de Reportes). ⚠️ costo_unitario es SENSIBLE:
 //        se OMITE para no-admins (popo/coordi) — espejo del `verCostos` del front.
 //   - 'obtener' { id } → una pieza CON costo (form de edición). Roles: write.
-//   - 'crear'  { pieza, cantidad, costo_unitario, stock_minimo?, proveedor? } → write.
+//   - 'crear'  { pieza, cantidad, costo_unitario, stock_minimo?, proveedor?,
+//        retornable? } → write. (TORRE v2 F1: `retornable` = "siempre vuelve" —
+//        bocinas, hieleras… En F2+ las salidas la usan para marcar PRESTADO y la
+//        comparación del regreso las exige de vuelta siempre. NO es sensible.)
 //   - 'actualizar' { id, patch:{...} } → write. (cubre editar pieza y la baja de
 //        stock al aprobar un reporte: patch={cantidad}.)
 //   - 'eliminar' { id } → write.
@@ -45,11 +48,13 @@ const ACCIONES = {
 };
 
 // Columnas. costo_unitario es SENSIBLE (se omite a no-admins en listar).
-const COLS_FULL   = 'id,pieza,cantidad,costo_unitario,stock_minimo,proveedor';
-const COLS_NOCOST = 'id,pieza,cantidad,stock_minimo,proveedor';
+// `retornable` NO es sensible: la ven todos los roles read (la necesitan el
+// form de salidas y la vista de prestado de las fases F2+).
+const COLS_FULL   = 'id,pieza,cantidad,costo_unitario,stock_minimo,proveedor,retornable';
+const COLS_NOCOST = 'id,pieza,cantidad,stock_minimo,proveedor,retornable';
 
 // Campos que el cliente puede setear (crear/actualizar).
-const KIT_FIELDS = ['pieza', 'cantidad', 'costo_unitario', 'stock_minimo', 'proveedor'];
+const KIT_FIELDS = ['pieza', 'cantidad', 'costo_unitario', 'stock_minimo', 'proveedor', 'retornable'];
 
 exports.handler = async (event) => {
   const __origin = corsCheck(event);
@@ -211,6 +216,9 @@ function buildFila(src) {
       const n = Number(v);
       if (!Number.isFinite(n) || n < 0) return { error: 'costo_unitario debe ser número >= 0' };
       out.costo_unitario = n;
+    } else if (k === 'retornable') {
+      // Coerción tolerante (checkbox del front manda boolean; JSON raro no truena).
+      out.retornable = v === true || v === 'true' || v === 1;
     }
   }
   return { value: out };

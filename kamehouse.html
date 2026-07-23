@@ -4709,6 +4709,14 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
  <input type="text" id="kit-proveedor" placeholder="Ej: Texti Mty">
  </div>
  </div>
+ <div class="form-row">
+ <div class="form-group">
+ <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+ <input type="checkbox" id="kit-retornable" style="width:auto;margin:0">
+ <span>Siempre vuelve (retornable) — bocinas, hieleras, equipo que se presta y regresa</span>
+ </label>
+ </div>
+ </div>
  <div class="form-row cols-3">
  <div class="form-group">
  <label>Cantidad *</label>
@@ -9616,7 +9624,7 @@ async function loadInventario() {
  const valor = i.cantidad * i.costo_unitario;
  const alerta = i.cantidad <= i.stock_minimo;
  return `<tr>
- <td style="font-weight:600">${i.pieza}${alerta ? ' <span style="color:var(--red)"><svg class="ic"><use href="#ic-alerta"/></svg></span>' : ''}</td>
+ <td style="font-weight:600">${i.pieza}${i.retornable ? ' <span style="font-size:9px;letter-spacing:.06em;text-transform:uppercase;font-weight:800;padding:1px 6px;border-radius:4px;color:#7cc4ff;background:rgba(124,196,255,.12);border:1px solid rgba(124,196,255,.35)" title="Retornable: en las salidas queda como PRESTADA y la comparación del regreso la exige de vuelta siempre">↻ siempre vuelve</span>' : ''}${alerta ? ' <span style="color:var(--red)"><svg class="ic"><use href="#ic-alerta"/></svg></span>' : ''}</td>
  <td style="color:${alerta ? 'var(--red)' : 'var(--text)'};font-weight:600">${i.cantidad}</td>
  ${verCostos ? `<td>${formatMXN(i.costo_unitario)}</td><td style="font-weight:600">${formatMXN(valor)}</td>` : ''}
  <td style="color:var(--ts)">${i.stock_minimo}</td>
@@ -9639,6 +9647,7 @@ async function guardarKit() {
  const costo = parseFloat(document.getElementById('kit-costo').value);
  const minimo = parseInt(document.getElementById('kit-minimo').value) || 0;
  const proveedor= document.getElementById('kit-proveedor').value.trim();
+ const retornable = !!document.getElementById('kit-retornable')?.checked;
  const alerta = document.getElementById('kit-alert');
 
  if (!pieza || isNaN(cantidad) || isNaN(costo)) {
@@ -9646,7 +9655,7 @@ async function guardarKit() {
  return;
  }
  try {
- const body = { pieza, cantidad, costo_unitario: costo, stock_minimo: minimo, proveedor: proveedor || null };
+ const body = { pieza, cantidad, costo_unitario: costo, stock_minimo: minimo, proveedor: proveedor || null, retornable };
  if (id) await khKits.actualizar(id, body); // [sec-kits]
  else await khKits.crear(body); // [sec-kits]
  alerta.innerHTML = '<div class="alert alert-success"> Guardado</div>';
@@ -9664,6 +9673,7 @@ async function editarKit(id) {
   document.getElementById('kit-costo').value = '';
   document.getElementById('kit-minimo').value = '';
   document.getElementById('kit-proveedor').value = '';
+  const retChk = document.getElementById('kit-retornable'); if (retChk) retChk.checked = false;
   openModal('modal-kit');
   try {
     const item = await khKits.obtener(id); // [sec-kits]
@@ -9675,6 +9685,7 @@ async function editarKit(id) {
     document.getElementById('kit-costo').value = item.costo_unitario;
     document.getElementById('kit-minimo').value = item.stock_minimo || 0;
     document.getElementById('kit-proveedor').value = item.proveedor || '';
+    const retChk2 = document.getElementById('kit-retornable'); if (retChk2) retChk2.checked = !!item.retornable;
   } catch(e) { closeModal('modal-kit'); showToast(e.message); }
 }
 

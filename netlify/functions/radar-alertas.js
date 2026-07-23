@@ -20,6 +20,9 @@
 //   - ⏳ Contratos por vencer: coordinador/creadora_team firmados cuya vigencia
 //     cruza un HITO (30/15/7 días exactos o vencido ≤7 días). Ver
 //     detectarContratosPorVencer.
+//   - 📦 Stock bajo mínimo (Torre v2 O1): piezas de kits_inventario con
+//     cantidad < stock_minimo (solo si stock_minimo > 0). Ver
+//     detectarStockBajoMinimo.
 //
 // Deduplicación: cada tipo+contexto solo se inserta una vez por día.
 //
@@ -580,6 +583,67 @@ async function detectarContratosPorVencer(resumen) {
   });
 }
 
+// 📦 Stock bajo mínimo — chismoso de la Torre de Karin (v2 O1, aprobada por
+// Memo). Piezas de kits_inventario con cantidad < stock_minimo — SOLO cuando
+// stock_minimo > 0 (mínimo en 0 = pieza sin umbral, no molesta). Orden por
+// GRAVEDAD: la más vacía primero (cantidad/mínimo ascendente). Costos NO
+// viajan (siguen siendo sensibles; aquí solo pieza/cantidad/mínimo).
+//
+// SOLO NOTIFICA: cero escrituras. Reponer stock sigue siendo manual en la
+// Torre (admin-kits). Sin piezas bajas → ni correo ni rastro en el resumen.
+async function detectarStockBajoMinimo(resumen) {
+  const kits = await sb('kits_inventario?stock_minimo=gt.0&select=pieza,cantidad,stock_minimo&limit=2000');
+  const bajas = (kits || [])
+    .map(k => ({
+      pieza: String(k.pieza || '?'),
+      cantidad: Number(k.cantidad) || 0,
+      minimo: Number(k.stock_minimo) || 0,
+    }))
+    .filter(k => k.minimo > 0 && k.cantidad < k.minimo)
+    .sort((a, b) => (a.cantidad / a.minimo) - (b.cantidad / b.minimo) || a.pieza.localeCompare(b.pieza));
+  if (!bajas.length) return; // sin piezas bajas → sección ausente, radar intacto
+
+  resumen.stock_bajo_minimo = bajas.length;
+  if (!RESEND_KEY) return;
+
+  const filas = bajas.map(k => `
+    <tr>
+      <td style="padding:8px 10px;border-bottom:1px solid rgba(255,255,255,.12);font-size:13px;color:#fff">${escapeHtml(k.pieza)}</td>
+      <td style="padding:8px 10px;border-bottom:1px solid rgba(255,255,255,.12);font-size:13px;font-weight:700;color:${k.cantidad === 0 ? '#ff283b' : '#e8ff4c'};text-align:right">${k.cantidad}</td>
+      <td style="padding:8px 10px;border-bottom:1px solid rgba(255,255,255,.12);font-size:13px;color:rgba(255,255,255,.7);text-align:right">${k.minimo}</td>
+    </tr>`).join('');
+  const html = `
+<div style="font-family:Arial,sans-serif;max-width:600px;background:#0a0a0a;color:#fff;padding:0">
+  <div style="background:#e8ff4c;color:#000;padding:18px;border-bottom:4px solid #ff283b">
+    <div style="font-size:11px;font-weight:700;letter-spacing:.18em;text-transform:uppercase">Radar del Dragón · Torre de Karin</div>
+    <div style="font-size:20px;font-weight:900;margin-top:4px">📦 Stock bajo mínimo (${bajas.length})</div>
+  </div>
+  <div style="padding:22px">
+    <p style="font-size:14px;line-height:1.55;color:#fff;margin:0 0 14px 0">
+      Estas piezas del inventario están <b>por debajo de su mínimo</b> (la más vacía primero;
+      en rojo las que ya están en CERO). Reponer es manual en la Torre.
+    </p>
+    <table style="border-collapse:collapse;width:100%">
+      <tr>
+        <th style="text-align:left;padding:8px 10px;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.5);border-bottom:2px solid rgba(255,255,255,.25)">Pieza</th>
+        <th style="text-align:right;padding:8px 10px;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.5);border-bottom:2px solid rgba(255,255,255,.25)">Quedan</th>
+        <th style="text-align:right;padding:8px 10px;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.5);border-bottom:2px solid rgba(255,255,255,.25)">Mínimo</th>
+      </tr>
+      ${filas}
+    </table>
+    <p style="margin-top:18px;font-size:12px;color:rgba(255,255,255,.7)">
+      Repón en <a href="https://conectareynosa.mx/kamehouse" style="color:#e8ff4c;text-decoration:none;font-weight:700">Kamehouse → Torre de Karin</a>.
+    </p>
+  </div>
+</div>`;
+  const __mp = aplicarModoPrueba({ to: [ADMIN_TO], subject: `[Radar] 📦 ${bajas.length} pieza${bajas.length === 1 ? '' : 's'} bajo mínimo en la Torre` });
+  await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${RESEND_KEY}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ from: `Radar del Dragón <${ADMIN_EMAIL}>`, to: __mp.to, subject: __mp.subject, html }),
+  });
+}
+
 // =============================================================================
 // Handler
 // =============================================================================
@@ -595,5 +659,6 @@ exports.handler = async (event) => {
   try { await detectarReembolsosPorVencer(resumen); } catch (e) { resumen.errores.push('reembolsos: ' + e.message); }
   try { await detectarVendedoresInactivosNuevos(resumen); } catch (e) { resumen.errores.push('vendedores: ' + e.message); }
   try { await detectarContratosPorVencer(resumen); }        catch (e) { resumen.errores.push('vigencias: ' + e.message); }
+  try { await detectarStockBajoMinimo(resumen); }           catch (e) { resumen.errores.push('stock: ' + e.message); }
   return { statusCode: 200, body: JSON.stringify(resumen) };
 };

@@ -333,16 +333,20 @@ const _KM_SEARCH = [
   ['sp-table',         'tbody tr',    'Buscar solicitud, cliente, evento…'],
 ];
 
+// Normaliza para búsqueda insensible a acentos/mayúsculas: "Julión"→"julion",
+// "PEÑA"→"pena". Así la gente teclea sin acentos y encuentra igual.
+function _kmNorm(s) { return String(s == null ? '' : s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, ''); }
+
 // Filtra por texto visible las filas/tarjetas del contenedor (itemSel vacío =
 // hijos directos). Solo cambia display → no dispara el observer de childList.
 function _kmBuscar(contId, itemSel) {
   const cont = document.getElementById(contId);
   if (!cont) return;
   const inp = document.getElementById('kmb-' + contId);
-  const q = (inp ? inp.value : '').trim().toLowerCase();
+  const q = _kmNorm((inp ? inp.value : '').trim());
   const items = itemSel ? cont.querySelectorAll(itemSel) : cont.children;
   Array.prototype.forEach.call(items, (node) => {
-    const hit = !q || (node.textContent || '').toLowerCase().includes(q);
+    const hit = !q || _kmNorm(node.textContent).includes(q);
     node.style.display = hit ? '' : 'none';
   });
 }

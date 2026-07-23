@@ -59,7 +59,7 @@ exports.handler = async function (event) {
   // Cargar contrato actual para validar estado.
   let actual;
   try {
-    const r = await fetch(`${SB_URL}/rest/v1/contratos_creadores?token=eq.${encodeURIComponent(token)}&select=id,estado&limit=1`, {
+    const r = await fetch(`${SB_URL}/rest/v1/contratos_creadores?token=eq.${encodeURIComponent(token)}&select=id,estado,plantilla,datos&limit=1`, {
       headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` },
     });
     if (!r.ok) return bad(500, "Error consultando contrato");
@@ -117,6 +117,14 @@ exports.handler = async function (event) {
     const v = Math.round(Number(data.vigencia_meses));
     if (![3, 6, 9, 12].includes(v)) return bad(400, "Vigencia inválida (3, 6, 9 o 12 meses)");
     patch.vigencia_meses = v;
+  }
+
+  // 🗼 ANEXO DE CUSTODIA: editar el flag en pendientes (el 409 de arriba protege
+  // lo firmado). Merge sobre el datos existente para no pisar fnac/emergencia
+  // ya capturados; solo aplica a coordinador. Ausente → no se toca.
+  if (data.cuidador_bodega !== undefined && actual.plantilla === "coordinador") {
+    const baseDatos = (actual.datos && typeof actual.datos === "object") ? actual.datos : {};
+    patch.datos = { ...baseDatos, cuidador_bodega: data.cuidador_bodega === true };
   }
 
   if (!Object.keys(patch).length) return bad(400, "Nada que actualizar");

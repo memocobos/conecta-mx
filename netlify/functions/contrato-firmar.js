@@ -4,6 +4,7 @@
 // notificaciones a admin@conectareynosa.mx y a la creadora.
 
 const { aplicarModoPrueba } = require('./_lib/correo-guard');
+const { consultarPerfilGiveaway, fusionarPerfilGiveaway } = require('./_lib/perfil-giveaway');
 
 const SB_URL = "https://npgnhsmwpcipxgvfxrho.supabase.co";
 const SB_KEY = process.env.SUPABASE_SERVICE_KEY_KAMEHOUSE;
@@ -256,6 +257,32 @@ exports.handler = async function (event) {
     };
   }
 
+  // 🎁 TUERCA C: candado de PERFIL DEL PORTAL para GIVEAWAY — el candado REAL
+  // es este (la UI solo lo pinta amable). La llave es el CORREO del contrato
+  // (debe ser el real del ganador). Se valida ANTES de subir el INE:
+  //   · sin cuenta en el Portal → 409 accionable (crea tu cuenta con este correo)
+  //   · cuenta sin fnac/emergencia → 400 accionable (completa tu perfil)
+  //   · perfil completo → snapshot congelado en datos al firmar (manual gana)
+  //   · Portal caído ('no_verificado') → la firma PROCEDE con líneas en blanco
+  //     como el giveaway de hoy + datos.perfil_no_verificado:true para que Memo
+  //     lo vea en admin. Jamás dejar a un ganador atorado por un 502 ajeno.
+  const esGiveaway = contrato.plantilla === "giveaway";
+  let datosGiveaway = null;
+  if (esGiveaway) {
+    const chk = await consultarPerfilGiveaway(contrato.creador_email);
+    if (chk.estado === "sin_cuenta") {
+      return bad(409, `Para firmar tu contrato, crea primero tu cuenta en el Portal Conecta con este mismo correo (${contrato.creador_email}) y vuelve a abrir este link.`);
+    }
+    if (chk.estado === "incompleto") {
+      return bad(400, "Completa tu perfil en el Portal Conecta (fecha de nacimiento y contacto de emergencia) y vuelve a abrir este link.");
+    }
+    if (chk.estado === "completo") {
+      datosGiveaway = fusionarPerfilGiveaway(contrato.datos, chk.perfil);
+    } else { // 'no_verificado'
+      datosGiveaway = { ...(contrato.datos || {}), perfil_no_verificado: true };
+    }
+  }
+
   // Subir INE frente + reverso. Path: <token>/frente.<ext>, <token>/reverso.<ext>.
   const frentePath = `${token}/frente.${frente.ext}`;
   const reversoPath = `${token}/reverso.${reverso.ext}`;
@@ -306,6 +333,8 @@ exports.handler = async function (event) {
   // Captura de la creadora / team → congelada en datos jsonb SOBRE lo que ya
   // haya (incluido el snapshot del perfil de arriba; lo capturado gana).
   if (datosFirma) patch.datos = { ...(contrato.datos || {}), ...(patch.datos || {}), ...datosFirma };
+  // 🎁 Giveaway: snapshot del perfil del Portal (o la marca de no-verificado).
+  if (esGiveaway && datosGiveaway) patch.datos = datosGiveaway;
 
   // Actualizar registro.
   try {

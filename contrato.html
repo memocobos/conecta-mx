@@ -910,6 +910,34 @@ function renderDocTeam(c, opts) {
   `;
 }
 
+// 🎁 TUERCA C: paso previo del GIVEAWAY — antes de firmar, el ganador necesita
+// su cuenta del Portal (mismo correo del contrato) con perfil completo. El
+// estado viene del backend (contrato-obtener.perfil_portal); el candado REAL
+// vive en contrato-firmar. Estados que pintan paso previo: 'sin_cuenta' e
+// 'incompleto'. 'completo'/'no_verificado'/ausente → firma normal (byte-igual
+// al giveaway de hoy). Solo aplica a giveaway PENDIENTE.
+function _pasoPrevioPortal(c) {
+  if (!c || c.plantilla !== 'giveaway' || !c.perfil_portal) return null;
+  const estado = c.perfil_portal.estado;
+  if (estado !== 'sin_cuenta' && estado !== 'incompleto') return null;
+  const correo = escapeHtml(c.creador_email || '');
+  const titulo = estado === 'sin_cuenta' ? 'Un paso antes de firmar' : 'Completa tu perfil para firmar';
+  const cuerpo = estado === 'sin_cuenta'
+    ? `Para firmar tu contrato, crea primero tu cuenta en el <b>Portal Conecta</b> con este mismo correo (<b>${correo}</b>). Ahí también vas a poder ver los demás eventos y todo lo que trae tu experiencia Conecta.`
+    : `Ya tienes tu cuenta del Portal — solo falta completar tu perfil con tu <b>fecha de nacimiento</b> y tu <b>contacto de emergencia</b>. Con eso, tu contrato se llena solo.`;
+  const btnTxt = estado === 'sin_cuenta' ? 'Crear mi cuenta en el Portal' : 'Completar mi perfil en el Portal';
+  return `
+      <section class="firma-section">
+        <div class="panel-title">Firmas</div>
+        <div class="firma-acept">${titulo}</div>
+        <p class="panel-sub" style="font-size:14px;line-height:1.6">${cuerpo}</p>
+        <div class="submit-area">
+          <a class="btn-submit" style="display:block;text-align:center;text-decoration:none;box-sizing:border-box" href="/portal.html">${btnTxt}</a>
+        </div>
+        <p class="panel-sub" style="margin-top:14px">Cuando termines, vuelve a abrir este mismo link y firma como siempre.</p>
+      </section>`;
+}
+
 // Sección de firma para VÍA B — MISMOS ids que creadoras (flujo reutilizado).
 function _firmaViaB(c, opts, rol) {
   if (opts.estado === 'pendiente') {
@@ -1036,6 +1064,10 @@ function renderDocViaB(c, opts) {
         <span class="print-tip">Elige "Guardar como PDF" como destino.</span>
       </div>` : '';
 
+  // 🎁 Giveaway pendiente sin cuenta/perfil del Portal → paso previo en lugar
+  // de la firma. En cualquier otro caso, la firma de siempre (byte-igual).
+  const firmaHtml = (opts.estado === 'pendiente' && _pasoPrevioPortal(c)) || _firmaViaB(c, opts, rol);
+
   return `
     <div class="container">
       ${printBar}
@@ -1044,7 +1076,7 @@ function renderDocViaB(c, opts) {
         ${meta}
         ${intro}
         ${clausulasHtml}
-        ${_firmaViaB(c, opts, rol)}
+        ${firmaHtml}
       </article>
     </div>
     ${FOOTER}
@@ -1842,6 +1874,9 @@ async function loadContrato() {
   renderItemList(root.querySelector(".item-list-expectativas"), c.expectativas);
 
   if (c.estado === "pendiente") {
+    // 🎁 Giveaway con paso previo (sin cuenta/perfil del Portal): no hay flujo
+    // de firma que conectar — la sección trae solo el link al portal.
+    if (!document.getElementById("btnFirmar")) return;
     firma = setupFirmaCanvas();
     ineFrenteState = setupFileInput("frente");
     ineReversoState = setupFileInput("reverso");

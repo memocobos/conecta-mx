@@ -2,8 +2,13 @@
 // admin-ventas-resumen.js — Lecturas server-side de ventas (KH + Portal)
 //
 // Dos acciones:
-//  · 'listar'     → vista `resumen_eventos` (KH), finanzas por evento. SOLO admin
-//                   (maestro_roshi/bulma). Whitelist COLS. Sin cambios de conducta.
+//  · 'listar'     → finanzas REALES por evento (CAJA), desde `_lib/utilidad-evento`
+//                   (Portal: cobrado + ingresos − gastos por slug). SOLO admin
+//                   (maestro_roshi/bulma). Antes leía la vista MUERTA `resumen_eventos`
+//                   (calculaba de reservaciones/costos_evento, tablas con CERO filas
+//                   → SIEMPRE $0). Nombre/fecha/ciudad se enriquecen del catálogo.
+//                   ⚠️ NOTA: este panel duplica el de Caja/Proyectado/Falta del Palacio
+//                   (admin-utilidad-evento); ahora ambos muestran la MISMA caja real.
 //  · 'mis_ventas' → (VENDEDORES F3) ventas del Portal `solicitudes_tour` con
 //                   vendedor_id. Rol VENDEDOR → SOLO sus ventas (vendedor_id =
 //                   su usuarios.id del JWT, forzado server-side; jamás ve ajenas
@@ -13,22 +18,20 @@
 // Seguridad: Authorization Bearer <JWT> (verifyAdminAuth) + corsCheck. service_role
 // nunca se expone. El filtro por vendedor sale del JWT, NUNCA del request.
 //
-// Env: SUPABASE_URL_KAMEHOUSE/SERVICE_KEY_KAMEHOUSE (resumen_eventos + usuarios),
-//      PORTAL_SUPABASE_URL/SERVICE_KEY (solicitudes_tour, solo para mis_ventas),
+// Env: SUPABASE_URL_KAMEHOUSE/SERVICE_KEY_KAMEHOUSE (usuarios),
+//      PORTAL_SUPABASE_URL/SERVICE_KEY (solicitudes_tour + caja real por evento),
 //      JWT_SECRET (verifyAdminAuth).
 // =============================================================================
 
 const { verifyAdminAuth, corsCheck } = require('./_lib/verify-admin');
 const { verificarVendedorActivo, AVISO_INACTIVO } = require('./_lib/vendedor-activo');
+const { calcularUtilidadPorEvento, baseSlug } = require('./_lib/utilidad-evento');
+let fetchCatalogo = null;
+try { ({ fetchCatalogo } = require('./_lib/catalogo-index')); } catch (_) { fetchCatalogo = null; }
 
 const ROLES_ADMIN = ['maestro_roshi', 'bulma'];
 const ROLES_VENTAS = ['vendedor', 'maestro_roshi', 'bulma'];
-
-// Whitelist de la vista resumen_eventos (finanzas por evento). NO select=*.
-const COLS = [
-  'id', 'nombre', 'artista', 'fecha', 'ciudad', 'status', 'total_viajeros',
-  'total_cobrar', 'total_cobrado', 'total_pendiente', 'total_costos', 'utilidad_actual',
-].join(',');
+const ESTADOS_CUENTAN = ['pendiente', 'en_pagos', 'pagado'];   // viajeros no cancelados
 
 // Columnas de una venta (solicitudes_tour) que viajan a "Mis Ventas".
 const VENTA_COLS = [
@@ -76,12 +79,36 @@ exports.handler = async (event) => {
   const khHeaders = { apikey: env.KH_SB_SERVICE, Authorization: 'Bearer ' + env.KH_SB_SERVICE, 'Content-Type': 'application/json' };
 
   try {
-    // ── listar (finanzas por evento) — INTACTO ────────────────────────────
+    // ── listar (finanzas REALES por evento — CAJA, desde el lib) ───────────
     if (accion === 'listar') {
-      const r = await fetch(`${env.KH_SB_URL}/rest/v1/resumen_eventos?select=${COLS}&order=fecha.desc&limit=50`, { headers: khHeaders });
-      if (!r.ok) return json(502, { error: 'KH rechazó la consulta', detail: await r.text() });
-      const eventos = await r.json();
-      return json(200, { ok: true, eventos: Array.isArray(eventos) ? eventos : [] });
+      if (!env.PORTAL_SB_URL || !env.PORTAL_SB_SERVICE) return json(500, { error: 'Faltan env vars Portal (PORTAL_SUPABASE_URL/SERVICE_KEY)' });
+      const util = await calcularUtilidadPorEvento({ portalUrl: env.PORTAL_SB_URL, portalService: env.PORTAL_SB_SERVICE });
+      if (util.error) return json(502, { error: util.error, detail: util.detail });
+
+      // Metadata (nombre/fecha/ciudad) del catálogo + viajeros reales por slug (best-effort).
+      let cat = null;
+      if (fetchCatalogo) { try { cat = await fetchCatalogo(); } catch (_) { cat = null; } }
+      const viajeros = await contarViajeros(env);   // { slug: nº viajeros no cancelados }
+
+      const eventos = Object.keys(util.eventos || {}).map(slug => {
+        const f = util.eventos[slug];
+        const c = (cat && cat[slug]) || {};
+        return {
+          id: slug,
+          nombre: c.nombre || slug,
+          artista: c.nombre || slug,
+          fecha: c.ds || null,          // ISO (fmtFecha lo entiende); humano vive en c.fecha
+          ciudad: c.ciudad || null,
+          status: null,                 // la vista muerta lo daba; ya no hay fuente real
+          total_viajeros: viajeros[slug] || 0,
+          total_cobrar: f.vendido,          // Facturado
+          total_cobrado: f.cobrado,         // Cobrado
+          total_pendiente: f.falta_por_cobrar,   // Pendiente (= vendido − cobrado)
+          total_costos: f.gastos,           // Costos
+          utilidad_actual: f.caja,          // Utilidad = CAJA REAL
+        };
+      }).sort((a, b) => String(b.fecha || '').localeCompare(String(a.fecha || '')));
+      return json(200, { ok: true, eventos });
     }
 
     // ── mis_ventas (VENDEDORES F3) ────────────────────────────────────────
@@ -141,6 +168,25 @@ exports.handler = async (event) => {
 };
 
 // ----- helpers -----
+
+// Viajeros (num_personas) NO cancelados por slug base, de todos los canales. Best-
+// effort: si falla, devuelve {} (el panel muestra 0, no rompe). No es dinero.
+async function contarViajeros(env) {
+  try {
+    const portalHeaders = { apikey: env.PORTAL_SB_SERVICE, Authorization: 'Bearer ' + env.PORTAL_SB_SERVICE };
+    const r = await fetch(`${env.PORTAL_SB_URL}/rest/v1/solicitudes_tour?estado=in.(${ESTADOS_CUENTAN.join(',')})&select=evento_id,num_personas&limit=20000`, { headers: portalHeaders });
+    if (!r.ok) return {};
+    const rows = (await r.json().catch(() => [])) || [];
+    const out = {};
+    for (const s of rows) {
+      const base = baseSlug(s.evento_id);
+      if (!base) continue;
+      const n = parseInt(s.num_personas, 10);
+      out[base] = (out[base] || 0) + (Number.isInteger(n) && n > 0 ? n : 0);
+    }
+    return out;
+  } catch (_) { return {}; }
+}
 
 function readEnv() {
   const KH_SB_URL = process.env.SUPABASE_URL_KAMEHOUSE || process.env.SUPABASE_URL;

@@ -274,6 +274,26 @@ exports.handler = async (event) => {
     if (accion === 'aprobar_popo') {
       const id = validId(body.id);
       if (!id) return badId();
+      // 🗼 TORRE v2 F4a — CANDADO DE COMPARACIÓN (D2): si el (evento, coordi)
+      // tiene salidas AUTORIZADAS, el reporte debe cuadrar contra lo llevado
+      // ANTES de seguir la cadena: sacada == llevado por pieza, retornables
+      // devueltos COMPLETOS SIEMPRE (D3), y nada sacado sin salida autorizada.
+      // No cuadra → 409 con el detalle (la cadena se detiene y se revisa; la
+      // comparación JAMÁS aplica strikes — eso sigue siendo del cron). Sin
+      // salidas (legacy pre-v2) → aprueba byte-igual a hoy. La resolución de
+      // faltantes cobrados llega en F4b — aquí un faltante simplemente no cuadra.
+      const rep = await leerReporte(id);
+      if (!rep) return { statusCode: 404, headers, body: JSON.stringify({ error: 'Reporte no encontrado' }) };
+      const salidas = await salidasAutorizadasDe(rep.evento_id, rep.coordi_id);
+      if (salidas.length) {
+        const diferencias = compararSalidaVsReporte(salidas, rep.kits_detalle);
+        if (diferencias.length) {
+          return {
+            statusCode: 409, headers,
+            body: JSON.stringify({ error: 'La salida de bodega y el reporte no cuadran — revisa antes de aprobar', diferencias }),
+          };
+        }
+      }
       return await patchStatus(id, { status: 'aprobado_popo' });
     }
 
@@ -281,7 +301,18 @@ exports.handler = async (event) => {
     if (accion === 'aprobar_final') {
       const id = validId(body.id);
       if (!id) return badId();
-      return await patchStatus(id, { status: 'aprobado_memo', fecha_aprobado: new Date().toISOString() });
+      const res = await patchStatus(id, { status: 'aprobado_memo', fecha_aprobado: new Date().toISOString() });
+      if (res.statusCode !== 200) return res;
+      // 🗼 F4a: avisa al cliente si este reporte viene de una salida v2 — en ese
+      // caso el stock YA se descontó al dar salida y el descuento legacy del
+      // front NO debe correr (doble descuento). Best-effort: si no se puede
+      // determinar → false (comportamiento de hoy).
+      let salida_v2 = false;
+      try {
+        const rep = await leerReporte(id);
+        if (rep) salida_v2 = (await salidasAutorizadasDe(rep.evento_id, rep.coordi_id)).length > 0;
+      } catch (e) { salida_v2 = false; }
+      return { statusCode: 200, headers, body: JSON.stringify({ ok: true, salida_v2 }) };
     }
 
     // ── rechazar (mister_popo / admin) ────────────────────────────────────────
@@ -302,7 +333,27 @@ exports.handler = async (event) => {
       if (body.kits_detalle == null) {
         return { statusCode: 400, headers, body: JSON.stringify({ error: 'kits_detalle requerido' }) };
       }
-      return await patchStatus(id, { kits_detalle: body.kits_detalle, updated_at: new Date().toISOString() });
+      const res = await patchStatus(id, { kits_detalle: body.kits_detalle, updated_at: new Date().toISOString() });
+      if (res.statusCode !== 200) return res;
+
+      // 🗼 TORRE v2 F4a — STOCK DE REGRESO (D2/D3): al palomear recibido, las
+      // devoluciones declaradas (sobrantes de consumibles + retornables) SUMAN
+      // de regreso a kits_inventario (read-then-write, jamás on_conflict) y la
+      // salida se CIERRA (estado→cerrada + reporte_id + cerrada_en).
+      // IDEMPOTENCIA DURA: el cierre es un PATCH CONDICIONADO a
+      // estado=eq.autorizada — solo el primer palomeo gana; re-palomear
+      // encuentra la salida cerrada y JAMÁS re-suma. Legacy sin salida →
+      // byte-igual a hoy (solo el PATCH del kits_detalle de arriba).
+      let regreso;
+      try {
+        regreso = await sumarRegresoYCerrar(id, body.kits_detalle);
+      } catch (e) {
+        regreso = { error: 'No se pudo procesar el regreso de stock: ' + e.message };
+      }
+      // Si algo del regreso falló, se reporta FUERTE (ajuste manual en la
+      // Torre) pero el palomeo de recibido queda — el cron de strikes depende
+      // del flag `recibido` ya guardado.
+      return { statusCode: 200, headers, body: JSON.stringify({ ok: true, ...(regreso || {}) }) };
     }
 
     // ── eliminar (admin) ──────────────────────────────────────────────────────
@@ -340,7 +391,143 @@ exports.handler = async (event) => {
     }
     return { statusCode: 200, headers, body: JSON.stringify({ ok: true }) };
   }
+
+  // ── 🗼 TORRE v2 F4a: helpers del cruce salida ↔ reporte ──────────────────
+  async function leerReporte(id) {
+    const r = await fetch(`${base}?id=eq.${id}&select=id,evento_id,coordi_id,kits_detalle,status&limit=1`, { headers: sbHeaders });
+    if (!r.ok) return null;
+    const rows = await r.json().catch(() => []);
+    return (rows && rows[0]) || null;
+  }
+
+  // Salidas AUTORIZADAS del (evento, coordi) — el puente entre bodega y reporte.
+  async function salidasAutorizadasDe(eventoId, coordiId) {
+    if (!eventoId || !coordiId) return [];
+    const r = await fetch(
+      `${env.KH_SB_URL}/rest/v1/salidas_bodega?evento_id=eq.${encodeURIComponent(String(eventoId))}` +
+      `&solicitante_id=eq.${encodeURIComponent(String(coordiId))}&estado=eq.autorizada` +
+      `&select=id,detalle,estado&limit=100`,
+      { headers: sbHeaders }
+    );
+    if (!r.ok) throw new Error('salidas_bodega no respondió');
+    const rows = await r.json().catch(() => []);
+    return Array.isArray(rows) ? rows : [];
+  }
+
+  // Devoluciones declaradas SUMAN al stock y las salidas se CIERRAN. El cierre
+  // condicionado (estado=eq.autorizada) es el gate: re-palomear jamás re-suma.
+  async function sumarRegresoYCerrar(reporteId, kitsDetalle) {
+    const rep = await leerReporte(reporteId);
+    if (!rep) return {};
+    const salidas = await salidasAutorizadasDe(rep.evento_id, rep.coordi_id);
+    if (!salidas.length) return {}; // legacy sin salida → byte-igual a hoy
+    const baseSalidas = `${env.KH_SB_URL}/rest/v1/salidas_bodega`;
+    const baseKits = `${env.KH_SB_URL}/rest/v1/kits_inventario`;
+
+    // 1) CERRAR condicionado — solo lo que ESTA llamada cierra cuenta para sumar.
+    const cerradas = [];
+    for (const s of salidas) {
+      const r = await fetch(`${baseSalidas}?id=eq.${encodeURIComponent(String(s.id))}&estado=eq.autorizada`, {
+        method: 'PATCH',
+        headers: { ...sbHeaders, Prefer: 'return=representation' },
+        body: JSON.stringify({ estado: 'cerrada', reporte_id: reporteId, cerrada_en: new Date().toISOString() }),
+      });
+      if (r.ok) {
+        const rows = await r.json().catch(() => []);
+        if (Array.isArray(rows) && rows.length) cerradas.push(s);
+      }
+    }
+    if (!cerradas.length) return { regreso: 'ya_cerrado' }; // re-palomeo
+
+    // 2) SUMAR devoluciones declaradas (sobrante clampado a lo llevado; los
+    //    retornables ya pasaron el candado de popo = vienen completos).
+    const llevado = {};
+    cerradas.forEach(s => (Array.isArray(s.detalle) ? s.detalle : []).forEach(d => {
+      const k = String(d.pieza_id);
+      if (!llevado[k]) llevado[k] = { pieza: d.pieza, cantidad: 0 };
+      llevado[k].cantidad += Number(d.cantidad) || 0;
+    }));
+    const kits = parseKitsDetalle(kitsDetalle);
+    const stock_sumado = [];
+    const regreso_errores = [];
+    for (const [pid, l] of Object.entries(llevado)) {
+      const fila = kits.find(k => String(k.pieza_id || '') === pid);
+      const declarado = fila ? Number(fila.cantidad_sobrante) || 0 : 0;
+      const devuelto = Math.min(Math.max(declarado, 0), l.cantidad);
+      if (!devuelto) continue;
+      try {
+        const g = await fetch(`${baseKits}?id=eq.${encodeURIComponent(pid)}&select=id,cantidad&limit=1`, { headers: sbHeaders });
+        const [p] = g.ok ? ((await g.json().catch(() => [])) || []) : [];
+        if (!p) { regreso_errores.push({ pieza: l.pieza, devuelto, error: 'pieza no encontrada' }); continue; }
+        const pR = await fetch(`${baseKits}?id=eq.${encodeURIComponent(pid)}`, {
+          method: 'PATCH',
+          headers: { ...sbHeaders, Prefer: 'return=minimal' },
+          body: JSON.stringify({ cantidad: (Number(p.cantidad) || 0) + devuelto }),
+        });
+        if (!pR.ok) { regreso_errores.push({ pieza: l.pieza, devuelto, error: 'no se pudo sumar' }); continue; }
+        stock_sumado.push({ pieza: l.pieza, devuelto });
+      } catch (e) { regreso_errores.push({ pieza: l.pieza, devuelto, error: e.message }); }
+    }
+    return {
+      salidas_cerradas: cerradas.length,
+      stock_sumado,
+      ...(regreso_errores.length ? { regreso_errores } : {}),
+    };
+  }
 };
+
+// ── 🗼 TORRE v2 F4a: comparación PURA salida ↔ reporte (D2/D3) ───────────────
+function parseKitsDetalle(kd) {
+  try {
+    const v = typeof kd === 'string' ? JSON.parse(kd) : kd;
+    return Array.isArray(v) ? v : [];
+  } catch (e) { return []; }
+}
+
+// llevado (salidas autorizadas) vs declarado (cantidad_sacada) vs devuelto
+// (cantidad_sobrante). Retornables: devueltos COMPLETOS SIEMPRE (D3). Devuelve
+// la lista de diferencias ([] = cuadra).
+function compararSalidaVsReporte(salidas, kitsDetalle) {
+  const llevado = {};
+  (salidas || []).forEach(s => (Array.isArray(s.detalle) ? s.detalle : []).forEach(d => {
+    const k = String(d.pieza_id);
+    if (!llevado[k]) llevado[k] = { pieza: d.pieza, cantidad: 0, retornable: false };
+    llevado[k].cantidad += Number(d.cantidad) || 0;
+    if (d.retornable) llevado[k].retornable = true;
+  }));
+  const declarado = {};
+  parseKitsDetalle(kitsDetalle).forEach(k => {
+    const kk = String(k.pieza_id || '');
+    if (!kk) return;
+    declarado[kk] = {
+      sacada: Number(k.cantidad_sacada) || 0,
+      sobrante: Number(k.cantidad_sobrante) || 0,
+      nombre: k.pieza_nombre || k.nombre || kk,
+    };
+  });
+  const dif = [];
+  for (const [pid, l] of Object.entries(llevado)) {
+    const d = declarado[pid] || { sacada: 0, sobrante: 0, nombre: l.pieza };
+    if (d.sacada !== l.cantidad) {
+      dif.push({ pieza: l.pieza, tipo: 'declarado_vs_llevado', llevado: l.cantidad, declarado: d.sacada });
+    }
+    if (l.retornable && d.sobrante !== l.cantidad) {
+      dif.push({ pieza: l.pieza, tipo: 'retornable_incompleto', llevado: l.cantidad, devuelto: d.sobrante });
+    }
+    if (!l.retornable && d.sobrante > d.sacada) {
+      dif.push({ pieza: l.pieza, tipo: 'sobrante_mayor_que_sacado', sacado: d.sacada, sobrante: d.sobrante });
+    }
+  }
+  for (const [pid, d] of Object.entries(declarado)) {
+    if (d.sacada > 0 && !llevado[pid]) {
+      dif.push({ pieza: d.nombre, tipo: 'sin_salida_autorizada', declarado: d.sacada });
+    }
+  }
+  return dif;
+}
+
+// Helper puro exportado para el arnés (patrón de la casa).
+exports._compararSalidaVsReporte = compararSalidaVsReporte;
 
 // ----- helpers -----
 

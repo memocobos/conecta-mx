@@ -19546,7 +19546,20 @@ async function aprobarReportePopo(id) {
 
 // Función compartida — aprueba reporte y descuenta stock
 async function ejecutarAprobacionFinal(id, reporte) {
-  await khReportes.aprobarFinal(id); // [sec-reportes]
+  const jf = await khReportes.aprobarFinal(id); // [sec-reportes]
+  // 🗼 TORRE v2 F4a: si el reporte viene de una SALIDA v2 (lo dice el backend),
+  // el stock YA se descontó al dar salida y las devoluciones las suma el
+  // palomeo de recibido — el descuento legacy de abajo NO corre (evita el
+  // DOBLE descuento). Legacy sin salida → flujo de hoy, byte-igual.
+  if (jf && jf.salida_v2) {
+    const difV2 = reporte?.diferencia || 0;
+    const clabeV2 = reporte?.cuenta_bancaria_coordi || 'no registrada';
+    let msgV2 = '✓ Aprobado. El stock se movió con la salida de bodega; las devoluciones suman cuando palomees "kits recibidos".';
+    if (difV2 > 0) msgV2 += `\n\nSobró ${formatMXN(difV2)}.\nEl coordi debe regresar ese dinero a tu cuenta.`;
+    else if (difV2 < 0) msgV2 += `\n\nEl coordi gastó ${formatMXN(Math.abs(difV2))} de más.\nDepositar a: ${clabeV2}`;
+    alert(msgV2);
+    return;
+  }
   // Descontar kits del inventario
   const kits = reporte?.kits_detalle
     ? (typeof reporte.kits_detalle==='string' ? JSON.parse(reporte.kits_detalle) : reporte.kits_detalle)

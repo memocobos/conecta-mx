@@ -3,6 +3,8 @@
 // (signed URLs, 1h) de los archivos INE para que admin/creadora puedan verlos.
 // No expone IP ni metadatos sensibles más allá de lo necesario para renderizar.
 
+const { consultarPerfilGiveaway, fusionarPerfilGiveaway } = require("./_lib/perfil-giveaway");
+
 const SB_URL = "https://npgnhsmwpcipxgvfxrho.supabase.co";
 const SB_KEY = process.env.SUPABASE_SERVICE_KEY_KAMEHOUSE;
 const BUCKET = "ine-creadores";
@@ -109,6 +111,20 @@ exports.handler = async function (event) {
     }
   }
 
+  // 🎁 TUERCA C: candado de PERFIL DEL PORTAL para GIVEAWAY pendiente. La llave
+  // es el CORREO del contrato (debe ser el real del ganador). La página usa
+  // perfil_portal.estado para pintar el paso previo; el candado REAL vive en
+  // contrato-firmar. Portal caído → 'no_verificado' y la firma procede como el
+  // giveaway de hoy. Firmados NO se tocan (render como siempre).
+  let perfil_portal;
+  if (row.plantilla === "giveaway" && row.estado !== "firmado") {
+    const chk = await consultarPerfilGiveaway(row.creador_email);
+    perfil_portal = { estado: chk.estado };
+    if (chk.estado === "completo") {
+      datos = fusionarPerfilGiveaway(datos, chk.perfil); // pre-firma; lo manual gana
+    }
+  }
+
   // 🔒 ANEXO C (Declaración Discreta) es CONFIDENCIAL: JAMÁS viaja por este
   // endpoint público (por token). Solo admin-contratos (JWT admin) lo sirve.
   if (datos && typeof datos === "object" && "anexo_c" in datos) {
@@ -155,6 +171,8 @@ exports.handler = async function (event) {
         domicilio_empresa: row.plantilla === 'creadora_team'
           ? (process.env.CONTRATO_DOMICILIO_EMPRESA || null)
           : undefined,
+        // 🎁 Solo giveaway PENDIENTE (undefined en el resto → byte-igual).
+        perfil_portal,
         estado: row.estado,
         firma_data: row.estado === "firmado" ? row.firma_data : null,
         firmado_at: row.firmado_at,

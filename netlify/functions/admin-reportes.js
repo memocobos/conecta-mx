@@ -288,10 +288,55 @@ exports.handler = async (event) => {
       if (salidas.length) {
         const diferencias = compararSalidaVsReporte(salidas, rep.kits_detalle);
         if (diferencias.length) {
-          return {
-            statusCode: 409, headers,
-            body: JSON.stringify({ error: 'La salida de bodega y el reporte no cuadran — revisa antes de aprobar', diferencias }),
-          };
+          // 🗼 F4b — FALTANTES COBRADOS (regla D-1): las diferencias por piezas
+          // que NO regresan son COBRABLES al costo de reposición. Errores de
+          // captura (declaró de más, sobrante>sacado, pieza sin salida) NO son
+          // cobrables: se corrige el reporte, 409 duro siempre.
+          const noCobrables = diferencias.filter(d =>
+            d.tipo === 'sin_salida_autorizada' ||
+            d.tipo === 'sobrante_mayor_que_sacado' ||
+            (d.tipo === 'declarado_vs_llevado' && d.declarado > d.llevado));
+          const cobrable = noCobrables.length === 0;
+
+          if (!body.cobrar_faltantes || !cobrable) {
+            // Estimación del cobro para el confirm del cuidador (best-effort:
+            // sin costos, el confirm sale sin monto — jamás bloquea el 409).
+            let faltantes_estimados, faltantes_monto_estimado;
+            if (cobrable) {
+              try {
+                const est = await valuarFaltantes(salidas, rep.kits_detalle);
+                faltantes_estimados = est.faltantes;
+                faltantes_monto_estimado = est.monto;
+              } catch (e) { /* sin estimación */ }
+            }
+            return {
+              statusCode: 409, headers,
+              body: JSON.stringify({
+                error: 'La salida de bodega y el reporte no cuadran — revisa antes de aprobar',
+                diferencias, cobrable,
+                ...(faltantes_estimados ? { faltantes_estimados, faltantes_monto_estimado } : {}),
+              }),
+            };
+          }
+
+          // "Aprobar con faltantes cobrados": valúa al costo de reposición,
+          // deja el REGISTRO en la salida (faltantes + monto) y destranca la
+          // cadena. El reloj de 15 días lo sella aprobar_final de Memo (D-1c).
+          const { faltantes, monto } = await valuarFaltantes(salidas, rep.kits_detalle);
+          if (!faltantes.length) {
+            return { statusCode: 409, headers, body: JSON.stringify({ error: 'No hay faltantes que cobrar — corrige el reporte', diferencias, cobrable }) };
+          }
+          const reg = await fetch(`${env.KH_SB_URL}/rest/v1/salidas_bodega?id=eq.${encodeURIComponent(String(salidas[0].id))}`, {
+            method: 'PATCH',
+            headers: { ...sbHeaders, Prefer: 'return=minimal' },
+            body: JSON.stringify({ faltantes, faltantes_monto: monto }),
+          });
+          if (!reg.ok) {
+            return { statusCode: 502, headers, body: JSON.stringify({ error: 'No se pudo registrar el cobro de faltantes — no se aprobó', detail: await reg.text() }) };
+          }
+          const okRes = await patchStatus(id, { status: 'aprobado_popo' });
+          if (okRes.statusCode !== 200) return okRes;
+          return { statusCode: 200, headers, body: JSON.stringify({ ok: true, cobrado: true, faltantes, faltantes_monto: monto }) };
         }
       }
       return await patchStatus(id, { status: 'aprobado_popo' });
@@ -308,11 +353,32 @@ exports.handler = async (event) => {
       // front NO debe correr (doble descuento). Best-effort: si no se puede
       // determinar → false (comportamiento de hoy).
       let salida_v2 = false;
+      let faltantes_vence = null;
       try {
         const rep = await leerReporte(id);
-        if (rep) salida_v2 = (await salidasAutorizadasDe(rep.evento_id, rep.coordi_id)).length > 0;
-      } catch (e) { salida_v2 = false; }
-      return { statusCode: 200, headers, body: JSON.stringify({ ok: true, salida_v2 }) };
+        if (rep) {
+          const sals = await salidasAutorizadasDe(rep.evento_id, rep.coordi_id);
+          salida_v2 = sals.length > 0;
+          // 🗼 F4b (D-1c): la autorización final de Memo ARRANCA el reloj — 15
+          // días naturales para liquidar faltantes. Solo se sella una vez
+          // (vence null) y solo donde hay cobro registrado. Best-effort: si
+          // falla, el cron simplemente no verá vence y no habrá strike (jamás
+          // un strike con reloj mal sellado).
+          const conCobro = sals.filter(s => Number(s.faltantes_monto) > 0 && !s.faltantes_vence);
+          if (conCobro.length) {
+            const hoyMX = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Monterrey' });
+            faltantes_vence = _masDiasISO(hoyMX, 15);
+            for (const s of conCobro) {
+              await fetch(`${env.KH_SB_URL}/rest/v1/salidas_bodega?id=eq.${encodeURIComponent(String(s.id))}&faltantes_vence=is.null`, {
+                method: 'PATCH',
+                headers: { ...sbHeaders, Prefer: 'return=minimal' },
+                body: JSON.stringify({ faltantes_vence }),
+              });
+            }
+          }
+        }
+      } catch (e) { salida_v2 = salida_v2 || false; }
+      return { statusCode: 200, headers, body: JSON.stringify({ ok: true, salida_v2, ...(faltantes_vence ? { faltantes_vence } : {}) }) };
     }
 
     // ── rechazar (mister_popo / admin) ────────────────────────────────────────
@@ -406,12 +472,34 @@ exports.handler = async (event) => {
     const r = await fetch(
       `${env.KH_SB_URL}/rest/v1/salidas_bodega?evento_id=eq.${encodeURIComponent(String(eventoId))}` +
       `&solicitante_id=eq.${encodeURIComponent(String(coordiId))}&estado=eq.autorizada` +
-      `&select=id,detalle,estado&limit=100`,
+      `&select=id,detalle,estado,faltantes_monto,faltantes_vence&limit=100`,
       { headers: sbHeaders }
     );
     if (!r.ok) throw new Error('salidas_bodega no respondió');
     const rows = await r.json().catch(() => []);
     return Array.isArray(rows) ? rows : [];
+  }
+
+  // 🗼 F4b: valúa los faltantes AL COSTO DE REPOSICIÓN (kits_inventario.
+  // costo_unitario — sensible, pero esto es server-side service_role y al
+  // registro solo viaja el desglose del cobro). Lanza si los costos no se
+  // pueden leer (el caller decide: estimación best-effort o 502 en el cobro).
+  async function valuarFaltantes(salidas, kitsDetalle) {
+    const faltantesBase = calcularFaltantes(salidas, kitsDetalle);
+    if (!faltantesBase.length) return { faltantes: [], monto: 0 };
+    const ids = faltantesBase.map(f => encodeURIComponent(String(f.pieza_id))).join(',');
+    const r = await fetch(`${env.KH_SB_URL}/rest/v1/kits_inventario?id=in.(${ids})&select=id,costo_unitario`, { headers: sbHeaders });
+    if (!r.ok) throw new Error('no se pudieron leer los costos de reposición');
+    const costoPor = {};
+    ((await r.json().catch(() => [])) || []).forEach(k => { costoPor[String(k.id)] = Number(k.costo_unitario) || 0; });
+    let monto = 0;
+    const faltantes = faltantesBase.map(f => {
+      const costo_unit = costoPor[String(f.pieza_id)] || 0;
+      const importe = Math.round(costo_unit * f.cantidad * 100) / 100;
+      monto += importe;
+      return { ...f, costo_unit, importe };
+    });
+    return { faltantes, monto: Math.round(monto * 100) / 100 };
   }
 
   // Devoluciones declaradas SUMAN al stock y las salidas se CIERRAN. El cierre
@@ -526,8 +614,45 @@ function compararSalidaVsReporte(salidas, kitsDetalle) {
   return dif;
 }
 
-// Helper puro exportado para el arnés (patrón de la casa).
+// 🗼 F4b: qué piezas NO van a regresar (se cobran). Retornables: llevado −
+// devuelto (regresan SIEMPRE completas o se cobran). Consumibles: llevado −
+// sacada declarada (lo que "no sabe dónde quedó"); lo usado legítimo NO se
+// cobra. Solo cantidades > 0.
+function calcularFaltantes(salidas, kitsDetalle) {
+  const llevado = {};
+  (salidas || []).forEach(s => (Array.isArray(s.detalle) ? s.detalle : []).forEach(d => {
+    const k = String(d.pieza_id);
+    if (!llevado[k]) llevado[k] = { pieza: d.pieza, cantidad: 0, retornable: false };
+    llevado[k].cantidad += Number(d.cantidad) || 0;
+    if (d.retornable) llevado[k].retornable = true;
+  }));
+  const decl = {};
+  parseKitsDetalle(kitsDetalle).forEach(k => {
+    const kk = String(k.pieza_id || '');
+    if (kk) decl[kk] = { sacada: Number(k.cantidad_sacada) || 0, sobrante: Number(k.cantidad_sobrante) || 0 };
+  });
+  const out = [];
+  for (const [pid, l] of Object.entries(llevado)) {
+    const d = decl[pid] || { sacada: 0, sobrante: 0 };
+    const falta = l.retornable
+      ? l.cantidad - Math.min(d.sobrante, l.cantidad)
+      : Math.max(0, l.cantidad - d.sacada);
+    if (falta > 0) out.push({ pieza_id: pid, pieza: l.pieza, cantidad: falta, retornable: l.retornable });
+  }
+  return out;
+}
+
+// 'YYYY-MM-DD' + N días naturales.
+function _masDiasISO(iso, dias) {
+  const d = new Date(String(iso).slice(0, 10) + 'T00:00:00Z');
+  d.setUTCDate(d.getUTCDate() + dias);
+  return d.toISOString().slice(0, 10);
+}
+
+// Helpers puros exportados para el arnés (patrón de la casa).
 exports._compararSalidaVsReporte = compararSalidaVsReporte;
+exports._calcularFaltantes = calcularFaltantes;
+exports._masDiasISO = _masDiasISO;
 
 // ----- helpers -----
 

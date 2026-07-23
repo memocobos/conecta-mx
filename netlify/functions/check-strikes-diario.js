@@ -300,6 +300,52 @@ exports.handler = async function(event) {
     console.error("[check-strikes] Error:", e.message);
   }
 
-  console.log(`[check-strikes] Fin${dryRun ? ' (DRY RUN)' : ''}. Strikes reporte:${sr} devolución:${sd}`);
-  return { statusCode: 200, body: JSON.stringify({ ok: true, dry_run: dryRun, sr, sd }) };
+  // 3) 🗼 TORRE v2 F4b — STRIKE POR FALTANTES DE BODEGA NO PAGADOS.
+  // ÚNICA extensión permitida al cron: MISMO molde (aplicarStrike +
+  // _debeAplicarStrike + guardia FECHA_CORTE), dedup PROPIO
+  // (salidas_bodega.strike_faltante_aplicado). Los bloques 1 y 2 NI SE ROZAN.
+  // Regla D-1: 15 días naturales desde la autorización final de Memo
+  // (faltantes_vence, sellado por admin-reportes); vencido sin pagar → strike.
+  // El CONGELAMIENTO no es de este cron: se calcula EN VIVO en admin-salidas.
+  let sf = 0;
+  try {
+    const hoyMX = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Monterrey' });
+    const vencidas = await sb(
+      `salidas_bodega?faltantes_monto=gt.0&faltantes_pagado_at=is.null` +
+      `&strike_faltante_aplicado=eq.false&faltantes_vence=lt.${hoyMX}` +
+      `&select=id,solicitante_id,evento_id,faltantes_monto,faltantes_vence`
+    ).catch(() => []);
+
+    for (const sal of vencidas) {
+      try {
+        // Guardia retroactiva: mismo espíritu que _antesDelCorte — un
+        // vencimiento anterior a la fecha de corte jamás genera strike.
+        if (String(sal.faltantes_vence || '').slice(0, 10) < FECHA_CORTE_STRIKES) continue;
+
+        const usuariosRow = await sb(`usuarios?id=eq.${sal.solicitante_id}&select=id,nombre,rol`).catch(() => []);
+        const u = usuariosRow && usuariosRow[0];
+        if (!_debeAplicarStrike(u)) continue;
+
+        if (!dryRun) {
+          const monto = Math.round((Number(sal.faltantes_monto) || 0) * 100) / 100;
+          await aplicarStrike(
+            sal.solicitante_id,
+            `Faltantes de bodega no pagados en 15 días ($${monto.toLocaleString('es-MX')} — ${sal.evento_id})`,
+            "strike_faltante_bodega",
+            sal.evento_id
+          );
+          // Dedup propio: el flag vive en la salida, jamás se toca dos veces.
+          await sb(`salidas_bodega?id=eq.${sal.id}`, { method: "PATCH", body: JSON.stringify({ strike_faltante_aplicado: true }) });
+        }
+        sf++;
+      } catch (e) {
+        console.error(`[check-strikes] salida ${sal && sal.id}:`, e.message);
+      }
+    }
+  } catch (e) {
+    console.error("[check-strikes] Error faltantes:", e.message);
+  }
+
+  console.log(`[check-strikes] Fin${dryRun ? ' (DRY RUN)' : ''}. Strikes reporte:${sr} devolución:${sd} faltantes:${sf}`);
+  return { statusCode: 200, body: JSON.stringify({ ok: true, dry_run: dryRun, sr, sd, sf }) };
 };

@@ -50,6 +50,10 @@ const COLS = [
   // listado no lo usa y mantiene la whitelist mínima) — SOLO viaja en 'obtener'
   // (detalle admin: ahí vive el Anexo C confidencial de creadora_team).
   'plantilla', 'vigencia_inicio', 'vigencia_fin', 'vigencia_meses',
+  // 🗼 SOLO el sub-campo booleano del anexo de custodia (para el chip
+  // "cuidador"). PostgREST proyecta datos->cuidador_bodega SIN exponer el resto
+  // del jsonb — el Anexo C confidencial del team NO viaja en el listado.
+  'cuidador_bodega:datos->cuidador_bodega',
 ].join(',');
 // Detalle (accion 'obtener'): whitelist + datos jsonb. Solo admins llegan aquí.
 const COLS_DETALLE = COLS + ',datos';

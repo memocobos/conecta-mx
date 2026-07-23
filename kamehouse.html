@@ -3872,6 +3872,16 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
          </div>
          <div class="form-group" id="ctr-plantilla-hint" style="align-self:end;opacity:.6"><div style="font-size:11px;color:var(--ts);letter-spacing:.08em;text-transform:uppercase">Creadora = flujo de siempre</div></div>
        </div>
+       <div class="form-row" id="ctr-cuidador-wrap" style="display:none">
+         <div class="form-group">
+           <label style="display:flex;align-items:center;gap:8px;cursor:pointer;text-transform:none;letter-spacing:0">
+             <input type="checkbox" id="ctr-cuidador" style="width:auto;margin:0">
+             <svg class="ic" style="width:15px;height:15px"><use href="#ic-inventario"/></svg>
+             <span>También cuidador de bodega (Torre de Karin)</span>
+           </label>
+           <div style="font-size:11px;color:var(--ts);margin-top:6px;line-height:1.5">Suma el Anexo de Custodia al contrato de coordinador. Un solo contrato, una sola firma — el anexo se acepta con la misma firma.</div>
+         </div>
+       </div>
        <div class="form-row cols-2">
          <div class="form-group">
            <label>Nombre de la creadora *</label>
@@ -20930,6 +20940,10 @@ function onCtrPlantillaChange() {
   if (vw) vw.style.display = conVigencia ? '' : 'none';
   if (hint) hint.style.display = conVigencia ? 'none' : '';
   if (vs && conVigencia) vs.value = (p === 'coordinador') ? '12' : '3';
+  // 🗼 Anexo de custodia: la casilla solo existe para coordinador.
+  const cw = document.getElementById('ctr-cuidador-wrap');
+  if (cw) cw.style.display = (p === 'coordinador') ? '' : 'none';
+  if (p !== 'coordinador') { const cc = document.getElementById('ctr-cuidador'); if (cc) cc.checked = false; }
 }
 
 function _ctrFormData() {
@@ -20950,6 +20964,11 @@ function _ctrFormData() {
   if (plantilla === 'coordinador' || plantilla === 'creadora_team') {
     vigencia_meses = Math.round(Number((document.getElementById('ctr-vigencia') || {}).value)) || (plantilla === 'coordinador' ? 12 : 3);
   }
+  // 🗼 Anexo de custodia: flag en datos, solo coordinador (el backend valida).
+  let datosExtra = datos;
+  if (plantilla === 'coordinador' && (document.getElementById('ctr-cuidador') || {}).checked) {
+    datosExtra = Object.assign({}, datos, { cuidador_bodega: true });
+  }
   return {
     plantilla,
     creador_nombre: (document.getElementById('ctr-nombre').value || '').trim(),
@@ -20959,7 +20978,8 @@ function _ctrFormData() {
     contrato_fecha: (document.getElementById('ctr-contrato-fecha').value || '').trim() || new Date().toISOString().slice(0,10),
     ofrecimiento: _splitLineas(document.getElementById('ctr-ofrecimiento').value),
     expectativas: _splitLineas(document.getElementById('ctr-expectativas').value),
-    datos,
+    datos: datosExtra,
+    cuidador_bodega: (plantilla === 'coordinador') ? !!(document.getElementById('ctr-cuidador') || {}).checked : undefined,
     vigencia_meses,
   };
 }
@@ -21088,6 +21108,8 @@ function _resetFormUI() {
   if (cancelBtn) cancelBtn.style.display = 'none';
   const banner = document.getElementById('ctr-banner-edit');
   if (banner) banner.style.display = 'none';
+  const _ccReset = document.getElementById('ctr-cuidador');
+  if (_ccReset && !_contratosEditingToken) _ccReset.checked = false; // 🗼 anexo
   if (typeof onCtrPlantillaChange === 'function') onCtrPlantillaChange();
 }
 
@@ -21104,6 +21126,10 @@ function _loadContratoEnForm(c) {
     const vs = document.getElementById('ctr-vigencia');
     if (vs) vs.value = String(c.vigencia_meses);
   }
+  // 🗼 Anexo de custodia: marca la casilla si el contrato ya lo trae. El flag
+  // viaja como c.cuidador_bodega (listar) o c.datos.cuidador_bodega (obtener).
+  const _cc = document.getElementById('ctr-cuidador');
+  if (_cc) _cc.checked = (c.cuidador_bodega === true) || !!(c.datos && c.datos.cuidador_bodega === true);
   document.getElementById('ctr-nombre').value = c.creador_nombre || '';
   document.getElementById('ctr-email').value = c.creador_email || '';
   document.getElementById('ctr-evento-nombre').value = c.evento_nombre || '';
@@ -21138,6 +21164,12 @@ function _ctrPlantillaChip(p) {
   };
   const s = map[p] || map.creadora;
   return `<span style="display:inline-block;font-size:9px;letter-spacing:.1em;text-transform:uppercase;font-weight:800;padding:2px 7px;border-radius:4px;color:${s.c};background:${s.bg};border:1px solid ${s.bd}">${s.txt}</span>`;
+}
+// 🗼 Chip "cuidador" para coordinadores con el anexo de custodia (flag en
+// datos.cuidador_bodega, expuesto como booleano por admin-contratos listar).
+function _ctrCuidadorChip(c) {
+  if (!c || c.plantilla !== 'coordinador' || c.cuidador_bodega !== true) return '';
+  return `<span style="display:inline-flex;align-items:center;gap:4px;margin-left:6px;font-size:9px;letter-spacing:.1em;text-transform:uppercase;font-weight:800;padding:2px 7px;border-radius:4px;color:#e8ff4c;background:rgba(232,255,76,.14);border:1px solid rgba(232,255,76,.4)" title="También cuidador de bodega — el contrato lleva el Anexo de Custodia (Torre de Karin)"><svg class="ic" style="width:11px;height:11px"><use href="#ic-inventario"/></svg> cuidador</span>`;
 }
 // Contador de STRIKES (solo lectura) para creadora_team firmada. Reusa los
 // puntitos .gz-strike-dot existentes. El dato viene de admin-contratos
@@ -21195,7 +21227,7 @@ async function loadContratosList() {
           <button class="btn btn-ghost" style="padding:5px 10px;font-size:11px" onclick="copiarLinkContrato('${tokenSafe}',this)">Copiar link</button>
           <button class="btn btn-ghost" style="padding:5px 10px;font-size:11px;color:#ff6666;border-color:rgba(255,68,68,.3)" onclick="eliminarContrato('${tokenSafe}','${nombreSafe}',this)">Eliminar</button>`;
       return `<tr>
-        <td><b>${nombreSafe}</b> ${_ctrPlantillaChip(c.plantilla)}<br><span style="color:var(--ts);font-size:11px">${_escCtr(c.creador_email)}</span></td>
+        <td><b>${nombreSafe}</b> ${_ctrPlantillaChip(c.plantilla)}${_ctrCuidadorChip(c)}<br><span style="color:var(--ts);font-size:11px">${_escCtr(c.creador_email)}</span></td>
         <td>${_escCtr(c.evento_nombre)}<br><span style="color:var(--ts);font-size:11px">${_fmtFechaCortaCtr(c.evento_fecha)}</span></td>
         <td>${fechaEnviado}</td>
         <td>${badge}${_ctrVigenciaAviso(c)}${_ctrStrikesChip(c)}</td>

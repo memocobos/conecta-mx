@@ -1056,7 +1056,13 @@ function renderDocViaB(c, opts) {
     : `<section class="clausula"><p>Entre <b>CONECTA MX · REYNOSA</b>, con domicilio en Vía Centauro 5070, Condocasas Cumbres, Monterrey, N.L. ("LA AGENCIA"), y <b>${x.nombre}</b> ("EL GANADOR"), para formalizar la entrega y condiciones del premio del giveaway.</p></section>`;
 
   const set = esCoord ? CLAUSULAS_COORDINADOR : CLAUSULAS_GIVEAWAY;
-  const clausulasHtml = set.map(cl => _clausulaViaB(cl, x)).join('');
+  // 🗼 ANEXO DE CUSTODIA (Torre de Karin): opcional del contrato de COORDINADOR
+  // (decisión B — un solo contrato, una sola firma). Se concatena a las 12
+  // cláusulas (queda ANTES de las firmas), SOLO si datos.cuidador_bodega ===
+  // true. Se suma DENTRO de clausulasHtml (no como línea aparte del template)
+  // para que sin flag el render sea byte-igual a hoy.
+  const anexoHtml = (esCoord && c.datos && c.datos.cuidador_bodega === true) ? _anexoCuidadorHtml() : '';
+  const clausulasHtml = set.map(cl => _clausulaViaB(cl, x)).join('') + anexoHtml;
 
   const printBar = opts.estado === 'firmado' ? `
       <div class="print-bar">
@@ -1081,6 +1087,44 @@ function renderDocViaB(c, opts) {
     </div>
     ${FOOTER}
   `;
+}
+
+// 🗼 Anexo de Custodia — texto FIEL de contrato-anexo-cuidador-v1-TEXTO-OFICIAL.md
+// (A1-A6). Estático (cero interpolación de datos del usuario). Se rinde entre las
+// cláusulas del coordinador y las firmas; la línea final ("acepta con la misma
+// firma") deja claro que NO hay pasos nuevos de firma.
+function _anexoCuidadorHtml() {
+  return `
+    <section class="clausula">
+      <h2><span class="num">ANEXO</span>Anexo de custodia de bodega ("Torre de Karin")</h2>
+      <p>Además de las obligaciones de su contrato de coordinador, EL COORDINADOR asume el puesto de <b>CUIDADOR DE LA BODEGA</b> de LA EMPRESA (conocida internamente como la "<b>TORRE DE KARIN</b>"), que resguarda los materiales promocionales y operativos (kits, playeras, vasos, tote bags, bocinas, hieleras y demás artículos, "EL INVENTARIO"), bajo las siguientes reglas:</p>
+
+      <p><b>A1. FUNCIONES DEL CUIDADOR.</b></p>
+      <ol style="list-style:lower-alpha">
+        <li>Recibir y verificar las solicitudes de salida de material, corroborando físicamente lo que sale contra lo declarado ANTES de dar salida en el sistema. La salida registrada en el sistema es la única válida.</li>
+        <li>Recibir las devoluciones y sobrantes, contarlos físicamente y registrar su recepción en el sistema dentro de los plazos establecidos.</li>
+        <li>Vigilar los artículos <b>RETORNABLES</b> (los marcados como "siempre vuelven"), llevando control de quién los tiene y exigiendo su devolución.</li>
+        <li>Mantener la bodega ordenada, el inventario cuadrado, y reportar de inmediato cualquier faltante, daño, merma o irregularidad.</li>
+        <li>Participar en los conteos físicos periódicos que LA EMPRESA determine.</li>
+      </ol>
+
+      <p><b>A2. ACCESO Y LLAVES.</b> El CUIDADOR es responsable del acceso físico a la bodega y de las llaves/códigos que LA EMPRESA le confíe. No podrá prestarlos ni duplicarlos sin autorización escrita, y los devolverá de inmediato al terminar el encargo.</p>
+
+      <p><b>A3. RESPONSABILIDAD SOBRE EL INVENTARIO.</b></p>
+      <ol style="list-style:lower-alpha">
+        <li>El CUIDADOR responde por los faltantes o daños derivados de su negligencia, descuido o incumplimiento de este anexo, cubriendo el <b>costo de reposición</b> registrado en el sistema.</li>
+        <li>No responde por mermas normales, defectos de origen, caso fortuito o fuerza mayor debidamente reportados, ni por material cuya salida fue autorizada conforme al proceso (esa responsabilidad viaja con quien se lo llevó).</li>
+        <li>Toda diferencia detectada en conteos se revisará junto con LA EMPRESA antes de determinar responsabilidad.</li>
+      </ol>
+
+      <p><b>A4. MOVIMIENTOS SOLO EN SISTEMA.</b> Todo movimiento de EL INVENTARIO (salidas, devoluciones, ajustes) deberá quedar registrado en el sistema de LA EMPRESA. Los movimientos fuera de sistema están prohibidos; su repetición se considera incumplimiento grave.</p>
+
+      <p><b>A5. SIN AUTOAPROBACIÓN (DOBLE ROL).</b> Cuando el CUIDADOR viaje como coordinador y requiera material, levantará su propio reporte de salida como cualquier otro; la validación de esa salida corresponderá a LA EMPRESA (la Dirección o quien ésta designe), nunca a sí mismo.</p>
+
+      <p><b>A6. RÉGIMEN COMÚN.</b> Los incumplimientos de este anexo se clasifican y sancionan conforme al esquema de su contrato de coordinador (incluido el sistema de strikes, mismo contador). La confidencialidad, vigencia, terminación y jurisdicción del contrato principal aplican íntegramente a este anexo. A la terminación del encargo se realizará conteo físico de entrega-recepción.</p>
+
+      <p style="margin-top:14px"><b>EL COORDINADOR acepta este anexo con la misma firma de su contrato.</b></p>
+    </section>`;
 }
 
 // ── Render principal ──────────────────────────────────────────────────

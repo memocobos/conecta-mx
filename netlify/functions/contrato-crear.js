@@ -171,6 +171,14 @@ exports.handler = async function (event) {
     if (desglose_premio.length < 3) return bad(400, "Falta el desglose del premio");
     if (!Number.isFinite(valor_premio) || valor_premio <= 0) return bad(400, "Valor del premio inválido");
     datos = { desglose_premio, valor_premio };
+  } else if (plantilla === "coordinador") {
+    // 🗼 ANEXO DE CUSTODIA (Torre de Karin): flag OPCIONAL en datos jsonb. Un
+    // solo contrato, una sola firma — el anexo se rinde en el contrato si el
+    // flag está. Solo se guarda cuando viene true (ausencia = coordinador de
+    // hoy, byte-igual).
+    if (data.datos && data.datos.cuidador_bodega === true) {
+      datos = { cuidador_bodega: true };
+    }
   }
 
   const token = crypto.randomBytes(20).toString("hex");

@@ -17,6 +17,9 @@
 //     cancelación (el contrato promete 15-20). Ver detectarReembolsosPorVencer.
 //   - 💤 Vendedores recién inactivos (F6): cruzaron 3 meses sin ventas en los
 //     últimos 7 días. Ver detectarVendedoresInactivosNuevos.
+//   - ⏳ Contratos por vencer: coordinador/creadora_team firmados cuya vigencia
+//     cruza un HITO (30/15/7 días exactos o vencido ≤7 días). Ver
+//     detectarContratosPorVencer.
 //
 // Deduplicación: cada tipo+contexto solo se inserta una vez por día.
 //
@@ -487,6 +490,96 @@ async function detectarVendedoresInactivosNuevos(resumen) {
   });
 }
 
+// ⏳ Contratos por vencer — chismoso para Memo (último gancho de contratos).
+// Contratos FIRMADOS de coordinador/creadora_team cuya vigencia_fin cruza un
+// HITO: faltan exactamente 30, 15 o 7 días, o VENCIÓ en los últimos 7 días.
+// Hitos, no rango continuo (patrón de la casa): el radar corre diario, así que
+// cada hito suena una vez y el ruido se acota solo. Para team se cuelga el
+// contador de strikes (usuarios.strikes por correo, best-effort).
+//
+// SOLO NOTIFICA: cero escrituras. Renovar/rotar sigue siendo decisión manual
+// de Memo (crea contrato nuevo con la vigencia que elija). Sin hitos → ni
+// correo ni rastro en el resumen.
+const HITOS_VIGENCIA = [30, 15, 7];
+async function detectarContratosPorVencer(resumen) {
+  const dayMs = 24 * 3600 * 1000;
+  const hoy = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Monterrey' });
+  const hoyT = new Date(hoy + 'T00:00:00Z').getTime();
+
+  const contratos = await sb(
+    `contratos_creadores?estado=eq.firmado&plantilla=in.(coordinador,creadora_team)` +
+    `&select=creador_nombre,creador_email,plantilla,vigencia_fin&limit=1000`
+  );
+  const enHito = (contratos || []).map(c => {
+    const fin = String(c.vigencia_fin || '').slice(0, 10);
+    if (!fin) return null;
+    const dias = Math.round((new Date(fin + 'T00:00:00Z').getTime() - hoyT) / dayMs);
+    return { ...c, fin, dias };
+  }).filter(c => c && (HITOS_VIGENCIA.includes(c.dias) || (c.dias < 0 && c.dias >= -7)))
+    .sort((a, b) => a.dias - b.dias); // vencidos primero, luego el hito más cercano
+  if (!enHito.length) return; // sin hitos → sección ausente, radar intacto
+
+  // Strikes de las team (best-effort — sin dato, la fila sale sin contador).
+  const strikesPor = {};
+  try {
+    const correosTeam = [...new Set(enHito.filter(c => c.plantilla === 'creadora_team' && c.creador_email)
+      .map(c => String(c.creador_email).toLowerCase()))];
+    if (correosTeam.length) {
+      const inList = correosTeam.map(x => `"${x.replace(/"/g, '')}"`).join(',');
+      const us = await sb(`usuarios?correo=in.(${encodeURIComponent(inList)})&select=correo,strikes`);
+      (us || []).forEach(u => { if (u && u.correo) strikesPor[String(u.correo).toLowerCase()] = Number(u.strikes) || 0; });
+    }
+  } catch (e) { /* best-effort */ }
+
+  resumen.contratos_por_vencer = enHito.length;
+  if (!RESEND_KEY) return;
+
+  const filas = enHito.map(c => {
+    const vencido = c.dias < 0;
+    const diasTxt = vencido
+      ? `VENCIDO hace ${-c.dias} día${c.dias === -1 ? '' : 's'}`
+      : `faltan ${c.dias} días`;
+    const s = c.plantilla === 'creadora_team' ? strikesPor[String(c.creador_email || '').toLowerCase()] : undefined;
+    const plantillaTxt = c.plantilla === 'creadora_team' ? 'Team' : 'Coordinador';
+    return `
+    <tr>
+      <td style="padding:8px 10px;border-bottom:1px solid rgba(255,255,255,.12);font-size:13px;color:#fff">${escapeHtml(c.creador_nombre || '?')}</td>
+      <td style="padding:8px 10px;border-bottom:1px solid rgba(255,255,255,.12);font-size:12px;color:rgba(255,255,255,.7)">${escapeHtml(plantillaTxt)}${s !== undefined ? ` · ${escapeHtml(String(s))}/3 strikes` : ''}</td>
+      <td style="padding:8px 10px;border-bottom:1px solid rgba(255,255,255,.12);font-size:12px;color:rgba(255,255,255,.85)">${escapeHtml(c.fin)}</td>
+      <td style="padding:8px 10px;border-bottom:1px solid rgba(255,255,255,.12);font-size:12px;font-weight:700;color:${vencido ? '#ff283b' : '#e8ff4c'}">${escapeHtml(diasTxt)}</td>
+    </tr>`;
+  }).join('');
+  const html = `
+<div style="font-family:Arial,sans-serif;max-width:640px;background:#0a0a0a;color:#fff;padding:0">
+  <div style="background:#e8ff4c;color:#000;padding:18px;border-bottom:4px solid #ff283b">
+    <div style="font-size:11px;font-weight:700;letter-spacing:.18em;text-transform:uppercase">Radar del Dragón · Contratos</div>
+    <div style="font-size:20px;font-weight:900;margin-top:4px">⏳ Contratos por vencer (${enHito.length})</div>
+  </div>
+  <div style="padding:22px">
+    <p style="font-size:14px;line-height:1.55;color:#fff;margin:0 0 14px 0">
+      Estas vigencias de <b>coordinadores y team</b> cruzaron un hito (30/15/7 días o recién vencidas).
+      Renovar es manual: crea el contrato nuevo con la vigencia que quieras en
+      <b>Kamehouse → Herramientas → Contratos</b>.
+    </p>
+    <table style="border-collapse:collapse;width:100%">
+      <tr>
+        <th style="text-align:left;padding:8px 10px;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.5);border-bottom:2px solid rgba(255,255,255,.25)">Quién</th>
+        <th style="text-align:left;padding:8px 10px;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.5);border-bottom:2px solid rgba(255,255,255,.25)">Plantilla</th>
+        <th style="text-align:left;padding:8px 10px;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.5);border-bottom:2px solid rgba(255,255,255,.25)">Vence</th>
+        <th style="text-align:left;padding:8px 10px;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.5);border-bottom:2px solid rgba(255,255,255,.25)">Días</th>
+      </tr>
+      ${filas}
+    </table>
+  </div>
+</div>`;
+  const __mp = aplicarModoPrueba({ to: [ADMIN_TO], subject: `[Radar] ⏳ ${enHito.length} contrato${enHito.length === 1 ? '' : 's'} por vencer` });
+  await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${RESEND_KEY}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ from: `Radar del Dragón <${ADMIN_EMAIL}>`, to: __mp.to, subject: __mp.subject, html }),
+  });
+}
+
 // =============================================================================
 // Handler
 // =============================================================================
@@ -501,5 +594,6 @@ exports.handler = async (event) => {
   try { await detectarCodigoFalla(resumen); }        catch (e) { resumen.errores.push('cod: ' + e.message); }
   try { await detectarReembolsosPorVencer(resumen); } catch (e) { resumen.errores.push('reembolsos: ' + e.message); }
   try { await detectarVendedoresInactivosNuevos(resumen); } catch (e) { resumen.errores.push('vendedores: ' + e.message); }
+  try { await detectarContratosPorVencer(resumen); }        catch (e) { resumen.errores.push('vigencias: ' + e.message); }
   return { statusCode: 200, body: JSON.stringify(resumen) };
 };

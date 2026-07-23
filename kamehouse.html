@@ -11023,6 +11023,57 @@ async function gzReactivarVendedor(userId, nombre) {
   } catch (e) { showToast(e.message, 'error'); }
 }
 
+// ⏳ Vigencias de contratos en Guerreros Z (solo admin, best-effort). Reusa
+// khContratos.listar (patrón #288/#309 — jamás service_role al navegador):
+// correo → contrato VIVO firmado de coordinador/creadora_team (el de
+// vigencia_fin más lejana). Fails-soft: si contratos no responde, _gzContratos
+// queda null y las cards salen como hoy (sin chip, ni siquiera "sin contrato").
+let _gzContratos = null;
+async function _gzCargarContratos() {
+  if (!currentUser || (currentUser.rol !== 'maestro_roshi' && currentUser.rol !== 'bulma')) return;
+  try {
+    const rows = await khContratos.listar({ estado: 'firmado', limit: 500 });
+    const mapa = {};
+    (rows || []).forEach(c => {
+      if (!c || (c.plantilla !== 'coordinador' && c.plantilla !== 'creadora_team') || !c.creador_email) return;
+      const k = String(c.creador_email).toLowerCase();
+      const prev = mapa[k];
+      if (!prev || String(c.vigencia_fin || '') > String(prev.vigencia_fin || '')) mapa[k] = c;
+    });
+    _gzContratos = mapa;
+  } catch (e) { /* fails-soft: cards como hoy */ }
+}
+
+// 'YYYY-MM-DD' → '15-oct-2026' para el chip.
+function _gzFmtVig(iso) {
+  const [y, m, d] = String(iso || '').slice(0, 10).split('-');
+  if (!y || !m || !d) return iso || '?';
+  const meses = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+  return `${parseInt(d, 10)}-${meses[parseInt(m, 10) - 1] || '?'}-${y}`;
+}
+
+// Chip de vigencia del contrato para roles que firman vía B (coordinador/cc).
+// Normal si falta lejos, ámbar ≤30 días, rojo vencido; sin contrato → discreto.
+function _gzChipContrato(u) {
+  if (!u || (u.rol !== 'coordinador' && u.rol !== 'cc') || !_gzContratos) return '';
+  const ICO = '<svg class="ic" style="width:11px;height:11px"><use href="#ic-contratos"/></svg>';
+  const base = 'display:inline-flex;align-items:center;gap:4px;margin-top:8px;font-size:9px;letter-spacing:.06em;text-transform:uppercase;font-weight:800;padding:2px 8px;border-radius:4px;';
+  const c = _gzContratos[String(u.correo || '').toLowerCase()];
+  if (!c || !c.vigencia_fin) {
+    return `<span style="${base}color:var(--ts);background:rgba(255,255,255,.05);border:1px solid var(--border)">${ICO} sin contrato</span>`;
+  }
+  const hoy = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Monterrey' });
+  const dias = Math.round((new Date(String(c.vigencia_fin).slice(0, 10) + 'T00:00:00Z') - new Date(hoy + 'T00:00:00Z')) / 86400000);
+  const fecha = _esfEsc(_gzFmtVig(c.vigencia_fin));
+  if (dias < 0) {
+    return `<span style="${base}color:#ff6666;background:rgba(255,68,68,.14);border:1px solid rgba(255,68,68,.4)">${ICO} venció ${fecha}</span>`;
+  }
+  if (dias <= 30) {
+    return `<span style="${base}color:#ffb020;background:rgba(255,176,32,.14);border:1px solid rgba(255,176,32,.4)">${ICO} vence ${fecha}</span>`;
+  }
+  return `<span style="${base}color:var(--ts);background:rgba(255,255,255,.05);border:1px solid var(--border)">${ICO} vence ${fecha}</span>`;
+}
+
 function _gzChipInactivo(u) {
   if (!u || u.rol !== 'vendedor' || !_gzInactividad) return '';
   const info = _gzInactividad[u.id];
@@ -11037,6 +11088,7 @@ async function renderGZ() {
   const grid = document.getElementById('gz-grid');
   if (!grid) return;
   if (_gzInactividad === null) await _gzCargarInactividad();
+  if (_gzContratos === null) await _gzCargarContratos();
   let lista = _gzCache;
   if (_gzFilter !== 'todos') lista = lista.filter(u => u.rol === _gzFilter);
   if (!lista.length) {
@@ -11088,7 +11140,7 @@ async function renderGZ() {
             <div class="gz-stat-label">strikes</div>
           </div>
         </div>
-        ${_gzChipInactivo(u)}
+        ${_gzChipContrato(u)}${_gzChipInactivo(u)}
       </div>
     </div>`;
   }).join('');

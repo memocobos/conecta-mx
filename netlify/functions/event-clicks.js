@@ -1,5 +1,11 @@
-const SUPABASE_URL = process.env.SUPABASE_URL;
-const SUPABASE_KEY = process.env.SUPABASE_KEY;
+// Migrado al proyecto KameHouse (npgnhsmwpcipxgvfxrho): event_clicks y la RPC
+// increment_event_click ya viven ahi con firmas identicas y datos migrados.
+// Patron de la casa: env KAMEHOUSE primero, fallback a las variables viejas.
+const SUPABASE_URL = process.env.SUPABASE_URL_KAMEHOUSE || process.env.SUPABASE_URL;
+const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY_KAMEHOUSE
+  || process.env.SUPABASE_SERVICE_KEY
+  || process.env.SUPABASE_SERVICE_ROLE_KEY
+  || process.env.SUPABASE_KEY;
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',

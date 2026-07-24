@@ -39,7 +39,7 @@ window.MAPAS={
   'babymetal':'mapas/babymetal.jpg',
   'miloj':'mapas/miloj.jpg',
   'melanie':'mapas/melanie.jpg',
-  'edsheeran':'mapas/edsheeran.jpg',
+  'edsheeran':'mapas/edsheeran.webp',
   'karolg':'mapas/karolg.webp',
   'edenmunoz':'mapas/edenmunoz.webp',
   'beele':'mapas/beele.webp',

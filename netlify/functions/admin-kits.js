@@ -34,9 +34,9 @@ const { verifyAdminAuth, corsCheck } = require('./_lib/verify-admin');
 
 const UUID_RE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
 
-const ROLES_ADMIN = ['maestro_roshi', 'bulma'];                          // ven costos
-const ROLES_READ  = ['maestro_roshi', 'bulma', 'mister_popo', 'coordinador'];
-const ROLES_WRITE = ['maestro_roshi', 'bulma', 'mister_popo'];           // CRUD inventario
+const ROLES_ADMIN = ['maestro_roshi', 'bulma', 'milk'];                          // ven costos
+const ROLES_READ  = ['maestro_roshi', 'bulma', 'mister_popo', 'coordinador', 'milk'];
+const ROLES_WRITE = ['maestro_roshi', 'bulma', 'mister_popo', 'milk'];           // CRUD inventario
 
 // Acciones válidas → roles permitidos.
 const ACCIONES = {

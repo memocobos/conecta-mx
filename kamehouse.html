@@ -161,10 +161,12 @@
  <!-- CONTENIDO -->
  <div class="content">
 
+ <!-- 🎬 Saludo del día "de cine" — TODOS los roles, arriba de su panel de inicio.
+      Se pinta al instante en enterApp (sin fetch). window.FRASES_CINE. -->
+ <div id="kh-saludo"></div>
+
  <!-- ─── RESUMEN ─── -->
  <div class="page active" id="page-resumen">
-  <!-- 🌅 Saludo matutino (banner de bienvenida, se pinta al instante sin fetch) -->
-  <div id="resumen-saludo"></div>
   <div class="page-hero">
    <div>
     <div class="page-title">RESUMEN</div>
@@ -2727,6 +2729,23 @@
 
 
 <!-- Modal: Vista previa del contrato (pre-envío) -->
+<div class="modal-overlay" id="modal-checkin">
+  <div class="modal" style="max-width:400px;width:92%">
+    <div class="modal-header">
+      <div class="modal-title" id="_checkinQ">¿Cómo pinta tu día?</div>
+      <button class="modal-close" onclick="_checkinDismiss()"></button>
+    </div>
+    <div class="modal-body">
+      <div style="font-size:12px;color:var(--ts);line-height:1.5">Elige y te dejo una frase para hoy. Es un detalle tuyo — no se guarda en ningún lado más que en tu navegador.</div>
+      <div class="kh-checkin-btns">
+        <button class="kh-checkin-btn" onclick="_checkinResponder('poder')"><span class="emo">🔥</span>A tope</button>
+        <button class="kh-checkin-btn" onclick="_checkinResponder('foco')"><span class="emo">🙂</span>Normal</button>
+        <button class="kh-checkin-btn" onclick="_checkinResponder('animo')"><span class="emo">😮‍💨</span>Pesado</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="modal-conex-hist">
   <div class="modal" style="max-width:460px;width:94%">
     <div class="modal-header">
@@ -2843,4 +2862,5 @@
 </div>
 
 <script src="kamehouse-recibos.js"></script>
+<script src="frases-cine.js"></script>
 <script src="kamehouse.js"></script>

@@ -7757,18 +7757,14 @@ async function completarRegistro(userId, token) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// INIT
+// INIT — MOVIDO AL FINAL DEL ARCHIVO (hotfix 24-jul-2026).
+// El arranque vivía aquí (mitad del archivo) porque era el final del PRIMER
+// <script> inline; al unificar los bloques en kamehouse.js (V2 #326), un boot
+// con sesión ejecutaba rutas síncronas que tocaban `let`/`const` declarados
+// MÁS ABAJO → TDZ ("Cannot access '_contratosEVCache' before initialization")
+// y la evaluación moría a media página. El boot SIEMPRE debe correr después
+// de que TODO el archivo declaró. Ver el bloque INIT al final.
 // ═══════════════════════════════════════════════════════════════
-// Detectar si viene de invitación
-const _urlParams = new URLSearchParams(window.location.search);
-const _inviteToken = _urlParams.get('token');
-if (_inviteToken) {
-  mostrarRegistroInvitado(_inviteToken);
-} else if (checkSession()) {
-  enterApp();
-  // Alerta primer login
-  if (currentUser && !currentUser.perfil_completo) { enviarAlertaMemo('nuevo_usuario', { nombre: currentUser.nombre, rol: currentUser.rol }); }
-}
 
 // ── DROPDOWN HERRAMIENTAS ──
 function toggleDropdown(e) {
@@ -18322,3 +18318,17 @@ async function exportRadarCSV(tipo){
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 }
 
+
+// ═══════════════════════════════════════════════════════════════
+// INIT (hotfix 24-jul-2026: movido desde la línea ~7760 al FINAL del archivo
+// para que el boot corra cuando TODO ya está declarado — nunca más un TDZ).
+// ═══════════════════════════════════════════════════════════════
+const _urlParams = new URLSearchParams(window.location.search);
+const _inviteToken = _urlParams.get('token');
+if (_inviteToken) {
+  mostrarRegistroInvitado(_inviteToken);
+} else if (checkSession()) {
+  enterApp();
+  // Alerta primer login
+  if (currentUser && !currentUser.perfil_completo) { enviarAlertaMemo('nuevo_usuario', { nombre: currentUser.nombre, rol: currentUser.rol }); }
+}

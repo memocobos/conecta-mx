@@ -2148,3 +2148,16 @@ html, body { background: var(--bg); color: var(--text); padding: 0; }
 .kh-checkin-btn{flex:1 1 100px;display:flex;flex-direction:column;align-items:center;gap:7px;padding:16px 10px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);cursor:pointer;font-size:13px;font-weight:700;transition:border-color .15s,transform .1s}
 .kh-checkin-btn:hover{border-color:var(--gold);transform:translateY(-2px)}
 .kh-checkin-btn .emo{font-size:26px;line-height:1}
+
+/* 📻 Reproductor de Radio Conecta en la topbar (tema oscuro, compacto) */
+.tb-radio{display:flex;align-items:center;gap:8px;max-width:240px;background:var(--bg3);border:1px solid var(--border);border-radius:999px;padding:3px 12px 3px 3px}
+.tb-radio.is-playing{border-color:var(--gold)}
+.tb-radio audio{display:none}
+.tb-radio-btn{flex:0 0 auto;width:30px;height:30px;border-radius:50%;border:none;background:var(--gold);color:#000;font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1;transition:transform .1s}
+.tb-radio-btn:hover{transform:scale(1.06)}
+.tb-radio-info{min-width:0;line-height:1.2}
+.tb-radio-label{font-size:9px;font-weight:800;letter-spacing:.08em;color:var(--ts);white-space:nowrap}
+.tb-radio-live{color:var(--red)}
+.tb-radio.is-playing .tb-radio-live{color:var(--green)}
+.tb-radio-song{font-size:11px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:180px}
+@media(max-width:720px){.tb-radio-info{display:none}.tb-radio{padding:3px;background:transparent;border:none}}

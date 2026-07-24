@@ -30,7 +30,10 @@ const PERMISOS_TABS = {
   cc:            ['equipo'],
   // Vendedor: su sección de Ventas (Cotizar/Vender + Mis Ventas) + Guerreros Z.
   // (Antes tenía 'ventas' —el dashboard de finanzas admin— que le devolvía 403.)
-  vendedor:      ['cotizar','equipo']
+  vendedor:      ['cotizar','equipo'],
+  // Milk (2ª auxiliar administrativa): F1 solo registra el rol → únicamente su
+  // perfil (equipo). La paridad operativa con Bulma se abre en F2/F4.
+  milk:          ['equipo']
 };
 
 // Qué tabs de Guerreros Z puede ver cada rol
@@ -41,6 +44,7 @@ const GZ_TABS_PERMITIDAS = {
   coordinador:   ['lista','miperfil'],
   cc:            ['lista','miperfil'],
   vendedor:      ['lista','miperfil'],
+  milk:          ['lista','miperfil'],   // ve el equipo y su perfil; NO 'invitar' (crear cuentas vetado)
 };
 
 // ── TOAST ──
@@ -310,7 +314,7 @@ function checkSession() {
 function enterApp() {
   document.getElementById('login-screen').style.display = 'none';
   document.getElementById('app').classList.add('visible');
-  const roleLabels = { maestro_roshi:'Maestro Roshi', bulma:'Bulma', mister_popo:'Maestro Karin', coordinador:'Coordinador', cc:'CC', vendedor:'Vendedor' };
+  const roleLabels = { maestro_roshi:'Maestro Roshi', bulma:'Bulma', mister_popo:'Maestro Karin', coordinador:'Coordinador', cc:'CC', vendedor:'Vendedor', milk:'Milk' };
   document.getElementById('topbar-user-info').textContent = `${currentUser.nombre} · ${roleLabels[currentUser.rol] || currentUser.rol}`;
   aplicarPermisosUI();
   aplicarTemaCoordi();

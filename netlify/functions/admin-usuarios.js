@@ -36,7 +36,7 @@ const crypto = require('crypto');
 
 const BCRYPT_COST = 10;
 const UUID_RE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
-const ROLES_VALIDOS = ['maestro_roshi', 'bulma', 'mister_popo', 'coordinador', 'cc', 'vendedor'];
+const ROLES_VALIDOS = ['maestro_roshi', 'bulma', 'mister_popo', 'coordinador', 'cc', 'vendedor', 'milk'];
 const ROLES_ADMIN = ['maestro_roshi', 'bulma'];
 
 // Whitelist de columnas que SÍ pueden viajar al navegador. password_hash,
@@ -266,6 +266,18 @@ exports.handler = async (event) => {
       // Validaciones de campos sensibles.
       if (Object.prototype.hasOwnProperty.call(update, 'rol') && !ROLES_VALIDOS.includes(update.rol)) {
         return { statusCode: 400, headers, body: JSON.stringify({ error: 'rol inválido' }) };
+      }
+      // Guard de jerarquía (server-side, defensa en profundidad): SOLO maestro_roshi
+      // puede otorgar/cambiar un rol ADMIN (maestro_roshi/bulma), y NADIE salvo
+      // maestro_roshi cambia su PROPIO rol. Blinda contra escalada aunque a un rol
+      // no-admin (p.ej. milk) se le abriera algún permiso por error.
+      if (Object.prototype.hasOwnProperty.call(update, 'rol')) {
+        if (esSelf && jwtRol !== 'maestro_roshi') {
+          return { statusCode: 403, headers, body: JSON.stringify({ error: 'No puedes cambiar tu propio rol' }) };
+        }
+        if (ROLES_ADMIN.includes(update.rol) && jwtRol !== 'maestro_roshi') {
+          return { statusCode: 403, headers, body: JSON.stringify({ error: 'Solo maestro_roshi puede otorgar el rol de maestro_roshi/bulma' }) };
+        }
       }
       if (Object.prototype.hasOwnProperty.call(update, 'strikes')) {
         const s = Number(update.strikes);

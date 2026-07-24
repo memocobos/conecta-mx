@@ -1127,17 +1127,92 @@ function _anexoCuidadorHtml() {
     </section>`;
 }
 
+// ── AUXILIAR_ADMIN: contrato LABORAL, texto FIEL de contrato-auxiliar-admin-v1-
+// TEXTO-OFICIAL.md (transcrito del que firmó Ximena, revisado por abogados — el
+// texto NO se altera). 11 cláusulas + proemio + rúbrica. Variables: {{NOMBRE}}
+// → x.nombre · {{SUELDO_SEMANAL}} → x.sueldo · {{FECHA_FIRMA_TEXTO}} → x.firmaTexto
+// · {{FECHA_ANIVERSARIO}} → x.aniversario. Sin evento, sin vigencia (indefinido).
+const CLAUSULAS_AUXILIAR = [
+  { ord:'PRIMERA', t:'Puesto y funciones', cuerpo:()=>`<p>LA TRABAJADORA desempeñará el puesto de AUXILIAR ADMINISTRATIVO, realizando atención a clientes por WhatsApp, llamadas y medios digitales; manejo de listas de viajeros, pagos, bases de datos, reportes administrativos, coordinación operativa de viajes y eventos, así como cualquier actividad relacionada con la naturaleza del puesto.</p>` },
+  { ord:'SEGUNDA', t:'Periodo de prueba', cuerpo:()=>`<p>Las partes acuerdan un periodo de prueba de noventa (90) días naturales para evaluar desempeño, responsabilidad, manejo de información sensible, organización, atención al cliente y adaptación al puesto. Durante dicho periodo LA TRABAJADORA gozará de salario y prestaciones de ley. Concluido satisfactoriamente, la relación continuará por tiempo indeterminado.</p>` },
+  { ord:'TERCERA', t:'Jornada laboral y modalidad', cuerpo:()=>`<p>La jornada será presencial de lunes a viernes de 09:00 a 19:00 horas, con una hora y treinta minutos para alimentos. Cuando la carga laboral lo permita, LA EMPRESA podrá autorizar la salida a las 18:00 horas, sin constituir un derecho adquirido. Los sábados se laborarán cuatro (4) horas en el horario acordado con el área administrativa, pudiendo cubrirse en la mañana o en la tarde, concluyendo a más tardar a las 19:00 horas. Los domingos serán de descanso, salvo que un evento o viaje requiera la presencia de LA TRABAJADORA, en cuyo caso se otorgará descanso compensatorio el lunes inmediato siguiente.</p>` },
+  { ord:'CUARTA', t:'Sueldo y prestaciones', cuerpo:x=>`<p>LA EMPRESA pagará un sueldo neto semanal de <b>${x.sueldo} MXN</b> mediante transferencia bancaria cada viernes. LA TRABAJADORA gozará de las prestaciones de ley, incluyendo aguinaldo, vacaciones, prima vacacional y días festivos pagados.</p>` },
+  { ord:'QUINTA', t:'Vacaciones', cuerpo:x=>`<p>Las vacaciones serán otorgadas al cumplir un año de labores, es decir, a partir del <b>${x.aniversario}</b>. Corresponderán doce (12) días en el primer año, incrementándose conforme a la legislación vigente. Deberán solicitarse con al menos una semana de anticipación.</p>` },
+  { ord:'SEXTA', t:'Bonos por desempeño', cuerpo:()=>`<p>LA EMPRESA podrá otorgar bonos por desempeño de manera discrecional, especialmente después de eventos de alta demanda. El otorgamiento y monto de cualquier bono dependerá de la complejidad del evento, desempeño de LA TRABAJADORA y utilidad o ganancia obtenida por LA EMPRESA. Los bonos no constituyen una prestación fija ni un derecho adquirido.</p>` },
+  { ord:'SÉPTIMA', t:'Confidencialidad', cuerpo:()=>`<p>Toda la información de clientes, proveedores, listas de viajeros, grupos de WhatsApp, bases de datos, contraseñas, estrategias comerciales y documentos internos será considerada estrictamente confidencial. Queda prohibida su divulgación o uso para fines distintos a los de LA EMPRESA.</p>` },
+  { ord:'OCTAVA', t:'Uso y cuidado del equipo', cuerpo:()=>`<p>Todo teléfono, computadora, cuenta, acceso o herramienta entregada por LA EMPRESA es propiedad exclusiva de ésta y deberá ser devuelta al finalizar la relación laboral.</p>` },
+  { ord:'NOVENA', t:'Entrega de puesto', cuerpo:()=>`<p>En caso de renuncia o terminación, LA TRABAJADORA se obliga a entregar contraseñas, archivos, listas de viajeros, reportes, equipos y cualquier información pendiente antes de su separación definitiva.</p>` },
+  { ord:'DÉCIMA', t:'Terminación del contrato', cuerpo:()=>`<p>El contrato podrá darse por terminado por mutuo acuerdo, renuncia voluntaria con aviso previo de siete días naturales o por las causas de rescisión previstas en la Ley Federal del Trabajo.</p>` },
+  { ord:'DÉCIMA PRIMERA', t:'Jurisdicción', cuerpo:()=>`<p>Para la interpretación y cumplimiento del presente contrato, las partes se someten a las leyes y tribunales competentes de Monterrey, Nuevo León.</p>` },
+];
+// Número en español 0–99 (para día y unidades del año). Estilo notarial.
+function _numEsp(n){ const u=['cero','uno','dos','tres','cuatro','cinco','seis','siete','ocho','nueve','diez','once','doce','trece','catorce','quince','dieciséis','diecisiete','dieciocho','diecinueve','veinte','veintiuno','veintidós','veintitrés','veinticuatro','veinticinco','veintiséis','veintisiete','veintiocho','veintinueve']; if(n<30) return u[n]||String(n); const t={30:'treinta',40:'cuarenta',50:'cincuenta',60:'sesenta',70:'setenta',80:'ochenta',90:'noventa'}; const d=Math.floor(n/10)*10, r=n%10; return r===0 ? (t[d]||String(n)) : (t[d]||'')+' y '+u[r]; }
+function _anioEsp(y){ const yy=y%100; return 'dos mil'+(yy===0?'':' '+_numEsp(yy)); }
+// Fecha en estilo NOTARIAL del contrato de los abogados: "a los quince (15) días
+// del mes de junio de dos mil veintiséis (2026)"; día 1 → "al primer (1) día…".
+// Incluye el "a los"/"al" (el proemio NO lo antepone, para no duplicarlo).
+function _fechaTextoDias(iso){ const p=String(iso||'').split('-'); if(p.length<3) return '—'; const y=parseInt(p[0],10), m=parseInt(p[1],10), d=parseInt(p[2],10); const meses=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre']; const mes=meses[m-1]||''; const anio=`${_anioEsp(y)} (${y})`; return d===1 ? `al primer (1) día del mes de ${mes} de ${anio}` : `a los ${_numEsp(d)} (${d}) días del mes de ${mes} de ${anio}`; }
+function _masUnAnio(iso){ const p=String(iso||'').split('-'); if(p.length<3) return iso; return `${parseInt(p[0],10)+1}-${p[1]}-${p[2]}`; }
+function renderDocAuxiliar(c, opts) {
+  opts = opts || {};
+  const sueldoN = (c.datos && Number(c.datos.sueldo_semanal)) || 0;
+  const x = {
+    nombre: escapeHtml(c.creador_nombre || ''),
+    sueldo: sueldoN ? '$' + sueldoN.toLocaleString('es-MX') : '__________',
+    firmaTexto: _fechaTextoDias(c.contrato_fecha),
+    aniversario: fmtFechaLarga(_masUnAnio(c.contrato_fecha)),
+  };
+  const header = `
+    <div class="doc-header">
+      <img class="logo" src="${LOGO_SRC}" alt="Conecta Reynosa">
+      <h1>Contrato Individual de Trabajo por Tiempo Indefinido</h1>
+      <p class="subtitle">Conecta Reynosa · Monterrey, N.L.</p>
+    </div>`;
+  const meta = `
+    <div class="doc-meta">
+      <div class="meta-row"><span class="lbl">Trabajadora:</span><span class="val">${x.nombre}</span></div>
+      <div class="meta-row"><span class="lbl">Puesto:</span><span class="val">Auxiliar administrativo</span></div>
+      <div class="meta-row"><span class="lbl">Fecha del contrato:</span><span class="val">${escapeHtml(fmtFechaLarga(c.contrato_fecha))}</span></div>
+    </div>`;
+  const intro = `<section class="clausula"><p>En la ciudad de Monterrey, Nuevo León, ${x.firmaTexto}, comparecen por una parte <b>CONECTA REYNOSA</b>, representada por el C. Guillermo Alexander Cobos Vizcarra, en su calidad de responsable operativo, a quien en lo sucesivo se le denominará "LA EMPRESA", y por la otra parte la C. <b>${x.nombre}</b>, a quien en lo sucesivo se le denominará "LA TRABAJADORA", quienes celebran el presente Contrato Individual de Trabajo por Tiempo Indefinido.</p></section>`;
+  const clausulasHtml = CLAUSULAS_AUXILIAR.map(cl => _clausulaViaB(cl, x)).join('');
+  const rubrica = `<section class="clausula"><p style="font-style:italic;color:#555">Cada una de las hojas del presente contrato deberá ser rubricada por ambas partes.</p></section>`;
+  const printBar = opts.estado === 'firmado' ? `
+      <div class="print-bar">
+        <button type="button" class="print-btn" onclick="window.print()">⬇️ Descargar PDF</button>
+        <span class="print-tip">Elige "Guardar como PDF" como destino.</span>
+      </div>` : '';
+  const firmaHtml = _firmaViaB(c, opts, 'Trabajadora');
+  return `
+    <div class="container">
+      ${printBar}
+      <article class="doc">
+        ${header}
+        ${meta}
+        ${intro}
+        ${clausulasHtml}
+        ${rubrica}
+        ${firmaHtml}
+      </article>
+    </div>
+    ${FOOTER}
+  `;
+}
+
 // ── Render principal ──────────────────────────────────────────────────
 function renderDoc(c, opts) {
   opts = opts || {};
   // VÍA B (F5): coordinador/giveaway van por su propio render; creadora_team
-  // por el suyo (texto oficial v1.1); 'creadora' (default) sigue EXACTAMENTE
-  // el flujo de abajo, sin un solo cambio.
+  // por el suyo (texto oficial v1.1); auxiliar_admin por el laboral; 'creadora'
+  // (default) sigue EXACTAMENTE el flujo de abajo, sin un solo cambio.
   if (c && (c.plantilla === 'coordinador' || c.plantilla === 'giveaway')) {
     return renderDocViaB(c, opts);
   }
   if (c && c.plantilla === 'creadora_team') {
     return renderDocTeam(c, opts);
+  }
+  if (c && c.plantilla === 'auxiliar_admin') {
+    return renderDocAuxiliar(c, opts);
   }
   // Datos capturados al firmar (fnac + emergencia): solo se pintan SI EXISTEN
   // en datos jsonb — los contratos viejos sin datos rinden EXACTO como siempre.

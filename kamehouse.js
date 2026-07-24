@@ -16066,6 +16066,9 @@ function onCtrPlantillaChange() {
   const cw = document.getElementById('ctr-cuidador-wrap');
   if (cw) cw.style.display = (p === 'coordinador') ? '' : 'none';
   if (p !== 'coordinador') { const cc = document.getElementById('ctr-cuidador'); if (cc) cc.checked = false; }
+  // 💼 Auxiliar administrativo (laboral): pide el sueldo neto semanal.
+  const sw = document.getElementById('ctr-sueldo-wrap');
+  if (sw) sw.style.display = (p === 'auxiliar_admin') ? '' : 'none';
 }
 
 function _ctrFormData() {
@@ -16091,13 +16094,24 @@ function _ctrFormData() {
   if (plantilla === 'coordinador' && (document.getElementById('ctr-cuidador') || {}).checked) {
     datosExtra = Object.assign({}, datos, { cuidador_bodega: true });
   }
+  // 💼 Auxiliar administrativo (laboral): el único dato variable es el sueldo
+  // semanal. No cuelga de un evento → placeholder neutro en evento_* (columnas
+  // NOT NULL que el texto legal no usa).
+  const _contratoFecha = (document.getElementById('ctr-contrato-fecha').value || '').trim() || new Date().toISOString().slice(0,10);
+  let _evNombre = evento_nombre;
+  let _evFecha = (document.getElementById('ctr-evento-fecha').value || '').trim();
+  if (plantilla === 'auxiliar_admin') {
+    datosExtra = { sueldo_semanal: Math.round(Number((document.getElementById('ctr-sueldo') || {}).value || '0')) || 0 };
+    _evNombre = 'Auxiliar administrativo';
+    _evFecha = _contratoFecha;
+  }
   return {
     plantilla,
     creador_nombre: (document.getElementById('ctr-nombre').value || '').trim(),
     creador_email: (document.getElementById('ctr-email').value || '').trim().toLowerCase(),
-    evento_nombre,
-    evento_fecha: (document.getElementById('ctr-evento-fecha').value || '').trim(),
-    contrato_fecha: (document.getElementById('ctr-contrato-fecha').value || '').trim() || new Date().toISOString().slice(0,10),
+    evento_nombre: _evNombre,
+    evento_fecha: _evFecha,
+    contrato_fecha: _contratoFecha,
     ofrecimiento: _splitLineas(document.getElementById('ctr-ofrecimiento').value),
     expectativas: _splitLineas(document.getElementById('ctr-expectativas').value),
     datos: datosExtra,
@@ -16117,13 +16131,75 @@ function _validateCtrForm(d) {
   } else if (d.plantilla === 'giveaway') {
     if (!d.datos || !d.datos.desglose_premio || d.datos.desglose_premio.length < 3) return 'Falta el desglose del premio';
     if (!d.datos || !(d.datos.valor_premio > 0)) return 'Valor del premio inválido';
+  } else if (d.plantilla === 'auxiliar_admin') {
+    if (!d.datos || !(d.datos.sueldo_semanal > 0)) return 'Falta el sueldo neto semanal';
   }
   return null;
 }
 
+// 💼 AUXILIAR_ADMIN (vista previa admin) — MISMO texto oficial laboral que
+// contrato.html (el documento firmable). Fuente: contrato-auxiliar-admin-v1-
+// TEXTO-OFICIAL.md. Variables: {{SUELDO_SEMANAL}}→x.sueldo · {{FECHA_ANIVERSARIO}}
+// →x.aniversario · {{FECHA_FIRMA_TEXTO}}→x.firmaTexto · {{NOMBRE}}→x.nombre.
+const _CTR_CLAUSULAS_AUX = [
+  { num:'PRIMERA', t:'Puesto y funciones', body:()=>`<p>LA TRABAJADORA desempeñará el puesto de AUXILIAR ADMINISTRATIVO, realizando atención a clientes por WhatsApp, llamadas y medios digitales; manejo de listas de viajeros, pagos, bases de datos, reportes administrativos, coordinación operativa de viajes y eventos, así como cualquier actividad relacionada con la naturaleza del puesto.</p>` },
+  { num:'SEGUNDA', t:'Periodo de prueba', body:()=>`<p>Las partes acuerdan un periodo de prueba de noventa (90) días naturales para evaluar desempeño, responsabilidad, manejo de información sensible, organización, atención al cliente y adaptación al puesto. Durante dicho periodo LA TRABAJADORA gozará de salario y prestaciones de ley. Concluido satisfactoriamente, la relación continuará por tiempo indeterminado.</p>` },
+  { num:'TERCERA', t:'Jornada laboral y modalidad', body:()=>`<p>La jornada será presencial de lunes a viernes de 09:00 a 19:00 horas, con una hora y treinta minutos para alimentos. Cuando la carga laboral lo permita, LA EMPRESA podrá autorizar la salida a las 18:00 horas, sin constituir un derecho adquirido. Los sábados se laborarán cuatro (4) horas en el horario acordado con el área administrativa, pudiendo cubrirse en la mañana o en la tarde, concluyendo a más tardar a las 19:00 horas. Los domingos serán de descanso, salvo que un evento o viaje requiera la presencia de LA TRABAJADORA, en cuyo caso se otorgará descanso compensatorio el lunes inmediato siguiente.</p>` },
+  { num:'CUARTA', t:'Sueldo y prestaciones', body:x=>`<p>LA EMPRESA pagará un sueldo neto semanal de <b>${x.sueldo} MXN</b> mediante transferencia bancaria cada viernes. LA TRABAJADORA gozará de las prestaciones de ley, incluyendo aguinaldo, vacaciones, prima vacacional y días festivos pagados.</p>` },
+  { num:'QUINTA', t:'Vacaciones', body:x=>`<p>Las vacaciones serán otorgadas al cumplir un año de labores, es decir, a partir del <b>${x.aniversario}</b>. Corresponderán doce (12) días en el primer año, incrementándose conforme a la legislación vigente. Deberán solicitarse con al menos una semana de anticipación.</p>` },
+  { num:'SEXTA', t:'Bonos por desempeño', body:()=>`<p>LA EMPRESA podrá otorgar bonos por desempeño de manera discrecional, especialmente después de eventos de alta demanda. El otorgamiento y monto de cualquier bono dependerá de la complejidad del evento, desempeño de LA TRABAJADORA y utilidad o ganancia obtenida por LA EMPRESA. Los bonos no constituyen una prestación fija ni un derecho adquirido.</p>` },
+  { num:'SÉPTIMA', t:'Confidencialidad', body:()=>`<p>Toda la información de clientes, proveedores, listas de viajeros, grupos de WhatsApp, bases de datos, contraseñas, estrategias comerciales y documentos internos será considerada estrictamente confidencial. Queda prohibida su divulgación o uso para fines distintos a los de LA EMPRESA.</p>` },
+  { num:'OCTAVA', t:'Uso y cuidado del equipo', body:()=>`<p>Todo teléfono, computadora, cuenta, acceso o herramienta entregada por LA EMPRESA es propiedad exclusiva de ésta y deberá ser devuelta al finalizar la relación laboral.</p>` },
+  { num:'NOVENA', t:'Entrega de puesto', body:()=>`<p>En caso de renuncia o terminación, LA TRABAJADORA se obliga a entregar contraseñas, archivos, listas de viajeros, reportes, equipos y cualquier información pendiente antes de su separación definitiva.</p>` },
+  { num:'DÉCIMA', t:'Terminación del contrato', body:()=>`<p>El contrato podrá darse por terminado por mutuo acuerdo, renuncia voluntaria con aviso previo de siete días naturales o por las causas de rescisión previstas en la Ley Federal del Trabajo.</p>` },
+  { num:'DÉCIMA PRIMERA', t:'Jurisdicción', body:()=>`<p>Para la interpretación y cumplimiento del presente contrato, las partes se someten a las leyes y tribunales competentes de Monterrey, Nuevo León.</p>` },
+];
+function _numEspKh(n){ const u=['cero','uno','dos','tres','cuatro','cinco','seis','siete','ocho','nueve','diez','once','doce','trece','catorce','quince','dieciséis','diecisiete','dieciocho','diecinueve','veinte','veintiuno','veintidós','veintitrés','veinticuatro','veinticinco','veintiséis','veintisiete','veintiocho','veintinueve']; if(n<30) return u[n]||String(n); const t={30:'treinta',40:'cuarenta',50:'cincuenta',60:'sesenta',70:'setenta',80:'ochenta',90:'noventa'}; const d=Math.floor(n/10)*10, r=n%10; return r===0 ? (t[d]||String(n)) : (t[d]||'')+' y '+u[r]; }
+function _anioEspKh(y){ const yy=y%100; return 'dos mil'+(yy===0?'':' '+_numEspKh(yy)); }
+// Estilo NOTARIAL, idéntico a contrato.html: "a los quince (15) días del mes de
+// junio de dos mil veintiséis (2026)"; día 1 → "al primer (1) día…". Incluye el
+// "a los"/"al" (el proemio no lo antepone).
+function _fechaTextoDiasKh(iso){ const p=String(iso||'').split('-'); if(p.length<3) return '—'; const y=parseInt(p[0],10), m=parseInt(p[1],10), d=parseInt(p[2],10); const meses=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre']; const mes=meses[m-1]||''; const anio=`${_anioEspKh(y)} (${y})`; return d===1 ? `al primer (1) día del mes de ${mes} de ${anio}` : `a los ${_numEspKh(d)} (${d}) días del mes de ${mes} de ${anio}`; }
+function _masUnAnioKh(iso){ const p=String(iso||'').split('-'); if(p.length<3) return iso; return `${parseInt(p[0],10)+1}-${p[1]}-${p[2]}`; }
+function _renderContratoAuxiliarHTML(c) {
+  const sueldoN = (c.datos && Number(c.datos.sueldo_semanal)) || 0;
+  const x = {
+    nombre: _escCtr(c.creador_nombre || ''),
+    sueldo: sueldoN ? '$' + sueldoN.toLocaleString('es-MX') : '__________',
+    aniversario: _escCtr(_fmtFechaLargaCtr(_masUnAnioKh(c.contrato_fecha))),
+    firmaTexto: _escCtr(_fechaTextoDiasKh(c.contrato_fecha)),
+  };
+  const meta = `
+    <div style="display:flex;flex-wrap:wrap;gap:18px 28px;font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:#666;font-weight:700">
+      <span><b style="color:#000">Trabajadora:</b> ${x.nombre}</span>
+      <span><b style="color:#000">Puesto:</b> Auxiliar administrativo</span>
+      <span><b style="color:#000">Fecha del contrato:</b> ${_escCtr(_fmtFechaLargaCtr(c.contrato_fecha))}</span>
+    </div>`;
+  const intro = `
+    <div style="border-top:3px solid #000;border-bottom:1px solid #ddd;padding:18px 0;margin:20px 0;font-size:14px;line-height:1.6">
+      En la ciudad de Monterrey, Nuevo León, ${x.firmaTexto}, comparecen por una parte <b>CONECTA REYNOSA</b>, representada por el C. Guillermo Alexander Cobos Vizcarra, en su calidad de responsable operativo ("LA EMPRESA"), y por la otra parte la C. <b>${x.nombre}</b> ("LA TRABAJADORA"), quienes celebran el presente Contrato Individual de Trabajo por Tiempo Indefinido.
+    </div>`;
+  const clausulas = _CTR_CLAUSULAS_AUX.map(cl => `
+    <div style="margin-top:22px">
+      <h3 style="font-family:'Barlow Condensed','Montserrat',sans-serif;text-transform:uppercase;font-size:20px;letter-spacing:.04em;margin:0 0 10px;border-left:5px solid #e8ff4c;background:linear-gradient(90deg,rgba(232,255,76,.2),transparent 60%);padding:6px 0 6px 12px;color:#000">
+        <span style="color:#ff283b;font-weight:900;font-size:24px;margin-right:10px">${cl.num}.</span>${_escCtr(cl.t)}
+      </h3>
+      <div style="font-size:13.5px;line-height:1.65;color:#222">${cl.body(x)}</div>
+    </div>`).join('');
+  return `
+    ${meta}
+    <h2 style="font-family:'Barlow Condensed','Montserrat',sans-serif;font-size:34px;line-height:.92;text-transform:uppercase;margin:14px 0 0;color:#000">Contrato Individual de Trabajo<small style="display:block;font-size:13px;color:#ff283b;font-weight:800;letter-spacing:.18em;margin-top:6px">Por Tiempo Indefinido · Auxiliar administrativo</small></h2>
+    ${intro}
+    ${clausulas}
+    <p style="font-style:italic;color:#666;font-size:12px;margin-top:22px">Cada una de las hojas del presente contrato deberá ser rubricada por ambas partes. La firma se captura en el enlace que se envía a la trabajadora.</p>
+  `;
+}
+
 function _renderContratoHTML(c) {
   // VÍA B (F5): coordinador/giveaway/creadora_team van por su propia vista
-  // previa; 'creadora' (default) sigue EXACTAMENTE igual que siempre.
+  // previa; auxiliar_admin por la laboral; 'creadora' (default) sigue EXACTAMENTE
+  // igual que siempre.
+  if (c && c.plantilla === 'auxiliar_admin') return _renderContratoAuxiliarHTML(c);
   if (c && (c.plantilla === 'coordinador' || c.plantilla === 'giveaway' || c.plantilla === 'creadora_team')) return _renderContratoViaBHTML(c);
   const partes = `
     <div style="border-top:3px solid #000;border-bottom:1px solid #ddd;padding:18px 0;margin:20px 0">

@@ -330,6 +330,8 @@ function enterApp() {
   // chrome (notificaciones, pendientes) NO bloquean el primer render: se
   // difieren a idle para que la vista aparezca antes. Siguen fails-soft.
   bootApp();
+  _renderSaludo();   // 🎬 saludo del día "de cine" — TODOS los roles, instantáneo
+  _maybeCheckin();   // 😮‍💨 check-in de ánimo (solo admins, 1 vez/día, localStorage)
   const _idle = window.requestIdleCallback || (fn => setTimeout(fn, 200));
   _idle(() => {
     _cargarNotificaciones(); // badge de no leídas
@@ -3265,58 +3267,6 @@ function _renderUtilidadEvento(evBase) {
 // determinística por día+usuario (misma frase todo el día, cambia mañana).
 // Cero backend, cero fetch → aparece al instante.
 // ═══════════════════════════════════════════════════════════════
-const _MOTIV_FRASES = [
-  'Hoy no se trata de pegar más fuerte, sino de aguantar el golpe y seguir avanzando. Ojo del tigre encendido. 🥊',
-  'Súbele al ki: cada pendiente que cierras te acerca a tu propia transformación. 🐉',
-  'Modo Super Saiyajin activado — los pendientes no saben con quién se metieron.',
-  'Reúne tus esferas del día: cada tarea cumplida es una que se enciende. 🐉',
-  'Te queda un último Genkidama de energía guardado. Hoy es buen día para soltarlo.',
-  'El futuro se construye hoy. No necesitas 88 millas por hora, solo arrancar. ⚡',
-  '¿Pendientes? A donde vamos hoy… los vamos a dejar en el pasado. 🚗💨',
-  'Da cera, pule cera: los básicos bien hechos hoy ganan el torneo mañana. 🥋',
-  'El equilibrio empieza con el primer movimiento. Respira y arranca.',
-  'Que la caja real esté contigo hoy. ✨',
-  'Hazlo o no lo hagas, pero hoy… hazlo. Sin intentos a medias. 🌌',
-  'Confía en la Fuerza de tu equipo: juntos nada los detiene.',
-  'A los pendientes de hoy: sayonara, baby. 🤖',
-  '¡Volveré! —dijo la flojera. No la dejes. Hoy la cierras tú.',
-  'Sé implacable con tu lista, compasivo con tu gente. Modo imparable ON.',
-  'Elige la pastilla del café y despierta: hoy tú controlas la Matrix. ☕',
-  'No hay cuchara… pero sí hay una meta clarita. A ella. 🥄',
-  'Dobla la realidad de hoy a tu favor, un pendiente a la vez.',
-  'Hasta el infinito y más allá con la meta de hoy. 🚀',
-  'Hay un amigo en ti para cada reto que traiga el día. Confía.',
-  'Saca tu Jordan interior: hoy el marcador lo pones tú. 🏀',
-  'Arma tu jam: junta al equipo, junta el ánimo, y a ganar el día.',
-  'Hazte con todos… los pendientes de hoy. ¡Los atrapas todos! ⚡',
-  'Eres el mejor, como ninguno más: hoy evolucionas un nivel. 🔥',
-  'Un día más, una insignia más. Ve por la de hoy, campeón.',
-  'Agarra la estrella: por un rato hoy eres invencible. Aprovéchala. ⭐',
-  'Otro nivel, otra moneda — sigue saltando, que la meta está cerca. 🍄',
-  'A toda velocidad, pero sin soltar los anillos. Rapidez con cabeza. 💍',
-  'Los Goonies nunca se rinden… y tú tampoco, no hoy. 🗺️',
-  '¿A quién vas a llamar cuando salga un pendiente? A ti, que puedes. 👻',
-  '¡Tú tienes el poder! Y hoy lo vas a usar. ⚔️',
-  'Necesito velocidad… y un buen café. Despega, piloto. ✈️',
-  'La vida siempre se abre camino — y hoy tú también lo abres. 🦖',
-  'El tesoro de hoy está en tu lista. Ve por él, aventurero. 🏺',
-  'Hadouken a la flojera. Concéntrate y lanza tu mejor golpe. 🔥',
-  'Wax on, wax off: la disciplina de hoy es la victoria de mañana.',
-  'Con un gran café viene una gran responsabilidad. Tú puedes con ella. ☕',
-  'Rocky no ganó el primer round; ganó por no rendirse. Sigue de pie. 🥊',
-  'Hoy tu misión, si decides aceptarla, es comerte el día. Y la aceptas. 🎬',
-  'Junta al equipo, arma el plan y a la aventura del día. 🎒',
-  'Modo Kamehameha: concentra toda tu energía en lo que importa hoy. 🌊',
-  'El pasado no se cambia, pero el día de hoy sí lo escribes tú. 📼',
-  'Nunca le digas nunca a lo que te propusiste esta mañana.',
-  'Insertar moneda… continuar. Otra vida, otro intento, hoy ganas. 🕹️',
-  'Que la puntería del día esté contigo: apunta a lo importante primero. 🎯',
-  'El héroe no es el que no cae; es el que se levanta con café en mano. ☕',
-  'Hoy es tu arena y tu momento. Suena la campana: ¡a darle! 🔔',
-  'Cinturón puesto, foco puesto: hoy pones tu mejor kata. 🥋',
-  'Sigue nadando entre los pendientes: uno tras otro y ya. 🐠',
-  'La fuerza de hoy no está en el músculo, está en volver a intentarlo.',
-];
 
 function _kmHash(s) { let h = 2166136261 >>> 0; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; } return h >>> 0; }
 function _mxHoraNum() { return parseInt(new Date().toLocaleString('en-US', { timeZone: 'America/Monterrey', hour: 'numeric', hour12: false }), 10) || 0; }
@@ -3324,22 +3274,63 @@ function _mxFechaStr() { return new Date().toLocaleDateString('en-CA', { timeZon
 // Saludo por hora MX: 05:00–11:59 días · 12:00–18:59 tardes · 19:00–04:59 noches.
 function _saludoHora() { const h = _mxHoraNum(); return (h >= 19 || h < 5) ? 'Buenas noches' : (h < 12 ? 'Buenos días' : 'Buenas tardes'); }
 
-function _renderSaludoResumen() {
-  const el = document.getElementById('resumen-saludo');
+// El banco de 200 frases del cine vive en frases-cine.js (window.FRASES_CINE),
+// cargado ANTES de kamehouse.js. Campos: f=frase · p=película · c=personaje · t=tono.
+// Check-in de ánimo (solo admins) elige el bucket de tono; sin check-in = banco completo.
+const _ADMIN_CHECKIN = ['maestro_roshi', 'bulma', 'milk', 'mister_popo']; // roshi/bulma/milk + cuidador de bodega (Karin), por ROL no por nombre
+function _esAdminCheckin() { return !!(currentUser && _ADMIN_CHECKIN.includes(currentUser.rol)); }
+function _moodKey() { return 'kh_animo_' + ((currentUser && currentUser.id) || 'x'); }
+function _moodRaw() { try { return JSON.parse(localStorage.getItem(_moodKey()) || 'null'); } catch (_) { return null; } }
+function _moodDeHoy() { const r = _moodRaw(); return (r && r.fecha === _mxFechaStr() && ['poder', 'foco', 'animo'].includes(r.mood)) ? r.mood : null; }
+function _moodGuardar(mood) { try { localStorage.setItem(_moodKey(), JSON.stringify({ fecha: _mxFechaStr(), mood: mood })); } catch (_) {} } // solo local, NUNCA al servidor
+
+// 🎬 Saludo del día "de cine" — TODOS los roles, en el shell (arriba de su panel
+// de inicio). Determinista por día+usuario (fija todo el día). Con check-in de
+// ánimo, la frase sale del bucket del tono; sin él, del banco completo.
+function _renderSaludo() {
+  const el = document.getElementById('kh-saludo');
   if (!el || !currentUser) return;
+  const banco = (typeof window !== 'undefined' && Array.isArray(window.FRASES_CINE)) ? window.FRASES_CINE : [];
+  if (!banco.length) { el.innerHTML = ''; return; }   // fails-soft: sin banco, sin saludo
   const nombre = _esfEsc((String(currentUser.nombre || '').trim().split(/\s+/)[0]) || 'crack');
   const dia = _mxFechaStr();
-  const frase = _MOTIV_FRASES[_kmHash(dia + '|' + (currentUser.id || '')) % _MOTIV_FRASES.length];
+  const mood = _moodDeHoy();   // 'poder'|'foco'|'animo' o null
+  const pool = mood ? banco.filter((x) => x && x.t === mood) : banco;
+  const lista = pool.length ? pool : banco;
+  const item = lista[_kmHash(dia + '|' + (currentUser.id || '')) % lista.length] || banco[0];
   el.innerHTML = `
-    <div class="card" style="margin-bottom:16px;border-left:4px solid var(--gold)">
-      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
-        <svg class="ic" style="width:26px;height:26px;color:var(--gold)"><use href="#ic-resumen"/></svg>
-        <div>
-          <div style="font-family:'Barlow Condensed','Montserrat',sans-serif;font-weight:900;font-size:22px;line-height:1;text-transform:uppercase;color:var(--text)">${_saludoHora()}, ${nombre}</div>
-          <div style="font-size:13.5px;color:var(--text);opacity:.82;margin-top:5px;line-height:1.5">${_esfEsc(frase)}</div>
-        </div>
+    <div class="kh-saludo">
+      <svg class="ic kh-saludo-ic"><use href="#ic-resumen"/></svg>
+      <div class="kh-saludo-body">
+        <div class="kh-saludo-head">${_saludoHora()}, ${nombre}</div>
+        <div class="kh-saludo-frase">${_esfEsc(item.f || '')}</div>
+        <div class="kh-saludo-cred">${_esfEsc(item.c || '')} · <i>${_esfEsc(item.p || '')}</i></div>
       </div>
     </div>`;
+}
+
+// Check-in de ánimo: solo admins, UNA vez por día. La respuesta se guarda en
+// localStorage (con la fecha) — jamás al servidor. Cerrar sin contestar = banco
+// completo, sin insistir. La pregunta se pinta con textContent (a prueba de XSS).
+function _maybeCheckin() {
+  if (!_esAdminCheckin()) return;
+  const r = _moodRaw();
+  if (r && r.fecha === _mxFechaStr()) return;   // ya contestó o cerró hoy → no insistir
+  const nombre = (String(currentUser.nombre || '').trim().split(/\s+/)[0]) || '';
+  const q = document.getElementById('_checkinQ');
+  if (q) q.textContent = `¿Cómo pinta tu día, ${nombre}?`;
+  _moodGuardar('dismissed');   // marca el día AL ABRIR → cualquier cierre (X/backdrop/Esc) = no insistir hoy
+  openModal('modal-checkin');
+}
+function _checkinResponder(mood) {
+  if (!['poder', 'foco', 'animo'].includes(mood)) mood = 'foco';
+  _moodGuardar(mood);
+  closeModal('modal-checkin');
+  _renderSaludo();   // re-pinta con la frase del bucket elegido
+}
+function _checkinDismiss() {
+  _moodGuardar('dismissed');   // marca el día para no insistir; el saludo usa el banco completo
+  closeModal('modal-checkin');
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -3429,7 +3420,6 @@ async function _conexHistorial(uid, nombre) {
 }
 
 async function loadResumen() {
-  _renderSaludoResumen();   // 🌅 banner de bienvenida: instantáneo, sin fetch
   _loadConexiones();        // 🕘 tablero de conexiones (solo Memo; fails-soft)
   const proxEl = document.getElementById('proximos-eventos');
   const atrEl  = document.getElementById('atrasados-lista');

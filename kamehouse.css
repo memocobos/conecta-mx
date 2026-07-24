@@ -2134,3 +2134,17 @@ body{font-family:Arial,sans-serif;padding:24px}h2{margin-bottom:4px}p{color:#666
    de impresión llevan su propio <style> aparte, no dependen de estas reglas. */
 html, body { background: var(--bg); color: var(--text); padding: 0; }
 #app table th { background: transparent; }
+
+/* 🎬 Saludo del día "de cine" — banner en el shell (todos los roles), tema oscuro */
+.kh-saludo{display:flex;align-items:center;gap:14px;background:var(--bg2);border:1px solid var(--border);border-left:4px solid var(--gold);border-radius:var(--radius);padding:14px 18px;margin-bottom:16px}
+.kh-saludo-ic{width:26px;height:26px;color:var(--gold);flex:0 0 auto}
+.kh-saludo-body{min-width:0}
+.kh-saludo-head{font-family:'Barlow Condensed','Montserrat',sans-serif;font-weight:900;font-size:22px;line-height:1;text-transform:uppercase;color:var(--text)}
+.kh-saludo-frase{font-size:14px;color:var(--text);opacity:.9;margin-top:6px;line-height:1.5}
+.kh-saludo-cred{font-size:11px;color:var(--ts);margin-top:5px;letter-spacing:.02em}
+.kh-saludo-cred i{color:var(--gold);font-style:italic}
+/* Check-in de ánimo (modal, solo admins) */
+.kh-checkin-btns{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}
+.kh-checkin-btn{flex:1 1 100px;display:flex;flex-direction:column;align-items:center;gap:7px;padding:16px 10px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);cursor:pointer;font-size:13px;font-weight:700;transition:border-color .15s,transform .1s}
+.kh-checkin-btn:hover{border-color:var(--gold);transform:translateY(-2px)}
+.kh-checkin-btn .emo{font-size:26px;line-height:1}

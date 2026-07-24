@@ -3331,12 +3331,12 @@ function _renderSaludoResumen() {
   const dia = _mxFechaStr();
   const frase = _MOTIV_FRASES[_kmHash(dia + '|' + (currentUser.id || '')) % _MOTIV_FRASES.length];
   el.innerHTML = `
-    <div class="card" style="margin-bottom:16px;background:linear-gradient(120deg,rgba(0,0,205,.14),rgba(232,255,76,.08) 70%);border:1px solid var(--border);border-left:5px solid var(--brand,#0000cd)">
+    <div class="card" style="margin-bottom:16px;border-left:4px solid var(--gold)">
       <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
-        <svg class="ic" style="width:26px;height:26px;color:var(--brand,#0000cd)"><use href="#ic-resumen"/></svg>
+        <svg class="ic" style="width:26px;height:26px;color:var(--gold)"><use href="#ic-resumen"/></svg>
         <div>
-          <div style="font-family:'Barlow Condensed','Montserrat',sans-serif;font-weight:900;font-size:22px;line-height:1;text-transform:uppercase">${_saludoHora()}, ${nombre}</div>
-          <div style="font-size:13.5px;color:var(--ts);margin-top:5px;line-height:1.5">${_esfEsc(frase)}</div>
+          <div style="font-family:'Barlow Condensed','Montserrat',sans-serif;font-weight:900;font-size:22px;line-height:1;text-transform:uppercase;color:var(--text)">${_saludoHora()}, ${nombre}</div>
+          <div style="font-size:13.5px;color:var(--text);opacity:.82;margin-top:5px;line-height:1.5">${_esfEsc(frase)}</div>
         </div>
       </div>
     </div>`;
@@ -3384,20 +3384,20 @@ function _renderConexiones(j) {
     const idS = _esfEsc(u.id);
     const chip = _conexChip(u, tol);
     return `<tr style="border-top:1px solid var(--border);cursor:pointer" onclick="_conexHistorial('${idS}','${_esfEsc(u.nombre)}')" title="Ver últimos 14 días">
-      <td style="padding:7px 4px;font-size:13px">${_esfEsc(u.nombre)}${_CONEX_AUX.includes(u.rol) ? ' <span style="font-size:9px;color:var(--ts);text-transform:uppercase;letter-spacing:.06em">aux</span>' : ''}</td>
-      <td style="padding:7px 4px;text-align:center;font-size:13px">${u.primera ? _esfEsc(u.primera) : '<span style="color:var(--ts)">—</span>'}</td>
-      <td style="padding:7px 4px;text-align:center;font-size:13px">${u.ultima ? _esfEsc(u.ultima) : '<span style="color:var(--ts)">—</span>'}</td>
-      <td style="padding:7px 4px;text-align:right">${chip}</td>
+      <td style="padding:7px 4px;font-size:13px;color:var(--text);border:none">${_esfEsc(u.nombre)}${_CONEX_AUX.includes(u.rol) ? ' <span style="font-size:9px;color:var(--ts);text-transform:uppercase;letter-spacing:.06em">aux</span>' : ''}</td>
+      <td style="padding:7px 4px;text-align:center;font-size:13px;color:var(--text);border:none">${u.primera ? _esfEsc(u.primera) : '<span style="color:var(--ts)">—</span>'}</td>
+      <td style="padding:7px 4px;text-align:center;font-size:13px;color:var(--text);border:none">${u.ultima ? _esfEsc(u.ultima) : '<span style="color:var(--ts)">—</span>'}</td>
+      <td style="padding:7px 4px;text-align:right;border:none">${chip}</td>
     </tr>`;
   }).join('');
   return `<div class="card">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px">
-      <div style="font-family:'Barlow Condensed','Montserrat',sans-serif;font-weight:800;font-size:16px;text-transform:uppercase">🕘 Conexiones de hoy</div>
+      <div style="font-family:'Barlow Condensed','Montserrat',sans-serif;font-weight:800;font-size:16px;text-transform:uppercase;color:var(--text)">🕘 Conexiones de hoy</div>
       <div style="font-size:10px;color:var(--ts)">Hora Monterrey · entrada aux 09:00 (tolerancia ${tol} min) · privado</div>
     </div>
-    <table style="width:100%;border-collapse:collapse">
+    <table style="width:100%;border-collapse:collapse;background:transparent">
       <thead><tr style="font-size:10px;color:var(--ts);text-transform:uppercase;letter-spacing:.08em">
-        <th style="text-align:left;padding:4px">Usuario</th><th style="padding:4px">Primera</th><th style="padding:4px">Última</th><th style="text-align:right;padding:4px">Puntualidad</th>
+        <th style="text-align:left;padding:4px;background:transparent;border:none;color:var(--ts)">Usuario</th><th style="padding:4px;background:transparent;border:none;color:var(--ts)">Primera</th><th style="padding:4px;background:transparent;border:none;color:var(--ts)">Última</th><th style="text-align:right;padding:4px;background:transparent;border:none;color:var(--ts)">Puntualidad</th>
       </tr></thead>
       <tbody>${filas || '<tr><td colspan="4" style="padding:12px;text-align:center;color:var(--ts);font-size:12px">Sin conexiones registradas aún</td></tr>'}</tbody>
     </table>

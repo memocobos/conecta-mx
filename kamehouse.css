@@ -2126,3 +2126,11 @@ body{font-family:Arial,sans-serif;padding:24px}h2{margin-bottom:16px}table{width
 body{font-family:Arial,sans-serif;padding:24px}h2{margin-bottom:16px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ccc;padding:8px 12px;font-size:13px;vertical-align:top}th{background:#f5f5f5}
 body{font-family:Arial,sans-serif;padding:24px}h2{margin-bottom:4px}p{color:#666;margin-bottom:20px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ccc;padding:8px 12px;font-size:13px}th{background:#f5f5f5}
 body{font-family:Arial,sans-serif;padding:24px}h2{margin-bottom:4px}p{color:#666;margin-bottom:20px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ccc;padding:8px 12px;font-size:13px;vertical-align:top}th{background:#f5f5f5}
+
+/* 🎨 Hotfix 24-jul-2026: plantillas de impresión (recibos/reportes) dejaron reglas
+   GLOBALES `body{background:#fff;padding:24px}` + `th{background:#f5f5f5}` en la
+   extracción V2 (#326), que asomaban un MARCO BLANCO alrededor de la app y ponían
+   los thead claros. El root SIEMPRE oscuro del tema, sin padding. Los documentos
+   de impresión llevan su propio <style> aparte, no dependen de estas reglas. */
+html, body { background: var(--bg); color: var(--text); padding: 0; }
+#app table th { background: transparent; }

@@ -242,7 +242,7 @@ exports.handler = async function (event) {
     // sin Authorization) y NO pasa por aquí — este guard no lo afecta.
     const __origin = corsCheck(event);
     if (!__origin) return bad(403, "Origen no permitido");
-    const auth = verifyAdminAuth(event, ['maestro_roshi','bulma']);
+    const auth = verifyAdminAuth(event, ['maestro_roshi','bulma','milk']);
     if (!auth.valid) return bad(auth.status, auth.error);
 
     // Necesitamos el nombre/fecha/venue. Los traemos del primer registro

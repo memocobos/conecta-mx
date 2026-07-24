@@ -37,14 +37,16 @@ const UUID_RE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0
 // Slugs del EV (evento_id), p.ej. 'karolg#2', 'emblema-2026'. Charset acotado.
 const SLUG_RE = /^[a-zA-Z0-9_#.-]+$/;
 const ROLES_ADMIN = ['maestro_roshi', 'bulma'];
+// Milk (auxiliar): crea/edita eventos como Bulma, pero NO los ELIMINA (destructivo).
+const ROLES_ADMIN_MILK = ['maestro_roshi', 'bulma', 'milk'];
 
 // Acciones válidas → roles permitidos (null = cualquier rol logueado).
 const ACCIONES = {
   listar: null,
   obtener: null,
-  crear: ROLES_ADMIN,
-  actualizar: ROLES_ADMIN,
-  eliminar: ROLES_ADMIN,
+  crear: ROLES_ADMIN_MILK,
+  actualizar: ROLES_ADMIN_MILK,
+  eliminar: ROLES_ADMIN,          // eliminar evento = destructivo → milk NO
   meta_por_slug: null,
   meta_por_slugs: null,
 };

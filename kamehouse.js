@@ -31,9 +31,10 @@ const PERMISOS_TABS = {
   // Vendedor: su sección de Ventas (Cotizar/Vender + Mis Ventas) + Guerreros Z.
   // (Antes tenía 'ventas' —el dashboard de finanzas admin— que le devolvía 403.)
   vendedor:      ['cotizar','equipo'],
-  // Milk (2ª auxiliar administrativa): F1 solo registra el rol → únicamente su
-  // perfil (equipo). La paridad operativa con Bulma se abre en F2/F4.
-  milk:          ['equipo']
+  // Milk (2ª auxiliar administrativa): paridad operativa con Bulma (F2) + finanzas
+  // operativas (gastos/ingresos/saldos). SIN: 'ventas' (utilidad maestra), 'inventario'
+  // (Torre → F3), ni kamisama/radar/montana/yamcha/radio (vetados / roshi-only).
+  milk:          ['resumen','pagos','eventos','gastos','ingresos','saldos','cotizar','reportes','capsule','solicitudes_portal','equipo','herramientas']
 };
 
 // Qué tabs de Guerreros Z puede ver cada rol
@@ -482,7 +483,7 @@ function aplicarPermisosUI() {
     if (btn) btn.style.display = tabsPermitidos.includes(tab) ? '' : 'none';
   });
   const dropdownHerr = document.getElementById('nav-dropdown-herramientas');
-  if (dropdownHerr) dropdownHerr.style.display = ['maestro_roshi','bulma'].includes(rol) ? '' : 'none';
+  if (dropdownHerr) dropdownHerr.style.display = ['maestro_roshi','bulma','milk'].includes(rol) ? '' : 'none';
   const karinAdminBtns = document.getElementById('karin-admin-btns');
   if (karinAdminBtns) karinAdminBtns.style.display = ['maestro_roshi','mister_popo'].includes(rol) ? 'flex' : 'none';
 

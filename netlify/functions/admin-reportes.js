@@ -49,8 +49,10 @@ const UUID_RE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0
 const SLUG_RE = /^[a-zA-Z0-9_-]{1,80}$/;
 
 const ROLES_ADMIN = ['maestro_roshi', 'bulma'];
-const ROLES_READ  = ['maestro_roshi', 'bulma', 'mister_popo', 'coordinador'];
-const ROLES_MOD   = ['maestro_roshi', 'bulma', 'mister_popo']; // aprobar_popo / rechazar / marcar_kits
+// Milk (auxiliar): ve, aprueba y gestiona reportes como Bulma, pero NO los ELIMINA.
+const ROLES_ADMIN_MILK = ['maestro_roshi', 'bulma', 'milk'];
+const ROLES_READ  = ['maestro_roshi', 'bulma', 'mister_popo', 'coordinador', 'milk'];
+const ROLES_MOD   = ['maestro_roshi', 'bulma', 'mister_popo', 'milk']; // aprobar_popo / rechazar / marcar_kits
 
 const ESTADOS_VALIDOS = ['borrador', 'enviado', 'rechazado', 'aprobado_popo', 'aprobado_memo'];
 const COORDI_STATUS   = ['borrador', 'enviado']; // lo único que el coordi puede setear
@@ -99,10 +101,10 @@ exports.handler = async (event) => {
     guardar_mio: ['coordinador'],
     enviar_mio: ['coordinador'],
     aprobar_popo: ROLES_MOD,
-    aprobar_final: ROLES_ADMIN,
+    aprobar_final: ROLES_ADMIN_MILK,
     rechazar: ROLES_MOD,
     marcar_kits_recibidos: ROLES_MOD,
-    eliminar: ROLES_ADMIN,
+    eliminar: ROLES_ADMIN,          // eliminar reporte = destructivo → milk NO
   };
   const rolesPermitidos = rolesPorAccion[accion];
   if (!rolesPermitidos) {

@@ -22,7 +22,7 @@ const { verifyAdminAuth, corsCheck } = require('./_lib/verify-admin');
 
 const UUID_RE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
 const SLUG_RE = /^[a-zA-Z0-9_-]{1,80}$/;
-const ROLES = ['maestro_roshi', 'bulma'];
+const ROLES = ['maestro_roshi', 'bulma', 'milk'];
 
 const ACCIONES = { listar: ROLES, crear: ROLES, actualizar: ROLES, eliminar: ROLES };
 

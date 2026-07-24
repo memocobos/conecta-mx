@@ -42,7 +42,7 @@ const { verifyAdminAuth, corsCheck } = require('./_lib/verify-admin');
 
 const UUID_RE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
 const SLUG_RE = /^[A-Za-z0-9_#.\-]+$/; // evento_id (slug del EV, p.ej. 'karolg#2')
-const ROLES_ADMIN = ['maestro_roshi', 'bulma'];
+const ROLES_ADMIN = ['maestro_roshi', 'bulma', 'milk'];
 
 // Acciones válidas → roles permitidos (null = cualquier rol logueado; la
 // anti-escalación fina se hace en código por coordi_id===jwt).

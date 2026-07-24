@@ -23,7 +23,7 @@ const { verifyAdminAuth, corsCheck } = require('./_lib/verify-admin');
 const { aplicarModoPrueba } = require('./_lib/correo-guard');
 
 const UUID_RE = /^[0-9a-f-]{36}$/i;
-const ROLES = ['maestro_roshi', 'bulma'];
+const ROLES = ['maestro_roshi', 'bulma', 'milk'];
 const MAX_MOTIVO = 500;
 const ESTADO_ANULADO = 'cancelado'; // valor de anulación en `pagos` (ver cabecera)
 const TOLERANCIA_MXN = 1; // absorbe centavos del reparto (igual que admin-marcar-pago)

@@ -31,7 +31,7 @@ const UUID_RE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 // Contratos son sensibles: solo los dos roles admin del panel alcanzan estas
 // lecturas (Herramientas → Contratos y Capsule). mister_popo/coordi/cc NO.
-const ROLES_ADMIN = ['maestro_roshi', 'bulma'];
+const ROLES_ADMIN = ['maestro_roshi', 'bulma', 'milk'];
 const ESTADOS_VALIDOS = ['pendiente', 'firmado'];
 
 // Whitelist de columnas que SÍ pueden viajar al navegador.

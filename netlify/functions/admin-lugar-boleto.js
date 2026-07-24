@@ -36,7 +36,7 @@ exports.handler = async (event) => {
   if (event.httpMethod !== 'POST') return { statusCode: 405, headers, body: JSON.stringify({ error: 'Method not allowed' }) };
   if (!__origin) return { statusCode: 403, headers, body: JSON.stringify({ error: 'Origen no permitido' }) };
 
-  const auth = verifyAdminAuth(event, ['maestro_roshi', 'bulma']);
+  const auth = verifyAdminAuth(event, ['maestro_roshi', 'bulma', 'milk']);
   if (!auth.valid) return { statusCode: auth.status, headers, body: JSON.stringify({ error: auth.error }) };
 
   const PORTAL_URL = process.env.PORTAL_SUPABASE_URL;

@@ -24,7 +24,7 @@ const { verifyAdminAuth, corsCheck } = require('./_lib/verify-admin');
 
 // La pantalla de Waitlist la operan maestro_roshi y bulma (espejo del gate de
 // wlEliminarEvento en el front). El Radar, en cambio, es solo maestro_roshi.
-const ROLES_ADMIN = ['maestro_roshi', 'bulma'];
+const ROLES_ADMIN = ['maestro_roshi', 'bulma', 'milk'];
 const SLUG_RE = /^[a-zA-Z0-9_-]{1,80}$/;
 
 // Whitelist de columnas de la waitlist (incluye PII porque el panel la necesita;

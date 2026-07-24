@@ -1704,6 +1704,7 @@ $('#form-profile').addEventListener('submit', async (e) => {
   renderDashboard(perfilExistente);
   showView('dashboard');
   _procesarInvitacionPendiente(); // [invitacion] acepta si el nuevo usuario llegó por un link
+  _procesarReservaPendiente();    // [puente A1] precarga el wizard si llegó por deep-link de reserva
 });
 
 $('#btn-cancel-profile').addEventListener('click', () => {
@@ -1832,6 +1833,7 @@ async function cargarClienteYRutear(session){
           renderMisViajesAcomp(); // [acompanante] viajes donde es acompañante (fails-soft)
           loadContratosEstado();  // [F3a] alerta + chips de contratos (fails-soft)
           _procesarInvitacionPendiente(session); // [invitacion] acepta si hay token pendiente
+          _procesarReservaPendiente();           // [puente A1] precarga el wizard si hay reserva pendiente
         }
         return;
       }
@@ -1862,6 +1864,7 @@ async function cargarClienteYRutear(session){
   renderMisViajesAcomp(); // [acompanante] viajes donde es acompañante (fails-soft)
   loadContratosEstado();  // [F3a] alerta + chips de contratos (fails-soft)
   _procesarInvitacionPendiente(session); // [invitacion] acepta si hay token pendiente
+  _procesarReservaPendiente();           // [puente A1] precarga el wizard si hay reserva pendiente
 }
 
 // =====================================================================
@@ -1954,6 +1957,163 @@ async function _procesarInvitacionPendiente(session){
     console.warn('[portal] aceptar invitación falló', e); // red: conservar y reintentar
   } finally {
     _invEnProceso = false;
+  }
+}
+
+// =====================================================================
+// [puente A1] Prefill de reserva desde deep-link del index (index→portal)
+// =====================================================================
+// El index (detrás de interruptor) puede mandar a este portal:
+//   ?reserva=1&ev=<slug>&pkg=<plus|ride|stay|cheap>&zona=<nombre>&n=<1-9>&hab=<k>&fecha=<idx>
+// SOLO identificadores — el PRECIO JAMÁS viaja en la URL; lo recalcula
+// calcularPrecio() con el catálogo propio. Todo lo de la URL es NO CONFIABLE.
+// Se captura ANTES de auth (para sobrevivir el redirect de Google OAuth), se
+// guarda en localStorage, se reproduce al llegar al dashboard y se limpia (one-shot).
+const RESERVA_KEY = 'conecta_reserva_pendiente';
+let _reservaEnProceso = false;
+
+// Captura los params al cargar y los limpia de la URL (igual que _capturarInvitacion).
+(function _capturarReserva(){
+  try {
+    const q = new URLSearchParams(location.search);
+    if (q.get('reserva') !== '1') return;
+    const blob = {
+      ev:    q.get('ev')    || '',
+      pkg:   q.get('pkg')   || '',
+      zona:  q.get('zona')  || '',
+      n:     q.get('n')     || '',
+      hab:   q.get('hab')   || '',
+      fecha: q.get('fecha') || ''
+    };
+    localStorage.setItem(RESERVA_KEY, JSON.stringify(blob));
+    const url = new URL(location.href);
+    ['reserva','ev','pkg','zona','n','hab','fecha'].forEach(k => url.searchParams.delete(k));
+    history.replaceState(null, '', url.pathname + url.search + url.hash);
+  } catch (e) { /* no-op */ }
+})();
+
+function _reservaPendiente(){
+  try { const s = localStorage.getItem(RESERVA_KEY); return s ? JSON.parse(s) : null; }
+  catch { return null; }
+}
+function _limpiarReservaPendiente(){ try { localStorage.removeItem(RESERVA_KEY); } catch {} }
+
+// Con sesión + perfil listos: si hay reserva pendiente, precarga el wizard.
+async function _procesarReservaPendiente(){
+  if (_reservaEnProceso) return;
+  const p = _reservaPendiente();
+  if (!p) return;
+  _reservaEnProceso = true;
+  // One-shot: se limpia SIEMPRE tras intentar (éxito o degradación amable), para
+  // no re-disparar en cada carga del dashboard.
+  _limpiarReservaPendiente();
+  try {
+    if (!EV) await loadEV();
+    _prefillReservaDesdeParams(p);
+  } catch (e) {
+    console.warn('[portal] prefill de reserva falló', e); // nunca truena la UI
+  } finally {
+    _reservaEnProceso = false;
+  }
+}
+
+// Precarga el wizard desde params NO CONFIABLES. Ante cualquier dato inválido o
+// manoseado DEGRADA con aviso amable (nunca lanza): abre el wizard del evento (o
+// la lista si ni el evento vale) en el paso donde el usuario completa lo que falta.
+// El precio SIEMPRE lo calcula el portal (calcularPrecio) — la URL nunca lo toca.
+function _prefillReservaDesdeParams(p){
+  const ev = _evBySlug(p.ev);
+  if (!ev || !eventoAgendable(ev)){
+    openWizard(); // lista normal del wizard
+    _invToast('Ese evento ya no está disponible, elige otro.', true);
+    return;
+  }
+  // Entrar al wizard para ESTE evento.
+  resetWizard();
+  showView('wizard');
+  wizState.ev = ev;
+
+  const PKG = String(p.pkg || '').toUpperCase();
+  if (!pkgAvailable(PKG, ev)){
+    poblarPaquetes(); // paso 2 del evento (auto-avanza si solo hay 1 paquete)
+    _invToast('Ese paquete no aplica a este evento, elige uno.', true);
+    return;
+  }
+  wizState.pkg = PKG;
+
+  let aviso = ''; // primer problema no fatal → un solo toast
+
+  // Multifecha (si aplica): idx entero dentro del rango.
+  if (ev.multifecha && ev.multifecha.length){
+    const idx = parseInt(p.fecha, 10);
+    if (Number.isInteger(idx) && idx >= 0 && idx < ev.multifecha.length){
+      wizState.multifechaIdx = idx;
+    } else {
+      wizState.multifechaIdx = null;
+      aviso = aviso || 'Elige la fecha del evento para continuar.';
+    }
+  }
+
+  // Personas: entero 1..9. Fuera de rango (manoseo) → degrada, no cierra.
+  let N = parseInt(p.n, 10);
+  if (!Number.isInteger(N) || N < 1 || N > 9){ N = 1; aviso = aviso || 'Revisa el número de personas.'; }
+  wizState.personas = N;
+  const persEl = $('#wiz-personas');
+  if (persEl && persEl.querySelector('option[value="' + N + '"]')) persEl.value = String(N);
+
+  // Render del paso 3 (multifecha/zonas/habitaciones) con el estado actual.
+  poblarDetalles();
+
+  const fechaFaltante = !!(ev.multifecha && ev.multifecha.length && wizState.multifechaIdx == null);
+
+  // Zona por NOMBRE (salvo RIDE, que no lleva zona). Debe existir y NO estar agotada.
+  if (PKG !== 'RIDE' && !fechaFaltante){
+    const zonas = getZonas(ev, PKG, wizState.multifechaIdx);
+    const idxZ = zonas.findIndex(z => z && String(z.n) === String(p.zona));
+    const z = idxZ >= 0 ? zonas[idxZ] : null;
+    if (!z){
+      aviso = aviso || 'Esa zona no está disponible, elige otra.';
+    } else if (z.ag || !(z.p > 0)){
+      aviso = aviso || 'Esa zona se agotó, elige otra.';
+    } else {
+      wizState.zona = z;
+      const zEl = $('#wiz-zona');
+      if (zEl) zEl.value = String(idxZ);
+    }
+  }
+
+  // Habitación: si el paquete la requiere. N>4 → SOLO compartida (regla de la casa).
+  const habRequerida = (PKG === 'PLUS' || PKG === 'RIDE' || PKG === 'STAY')
+    && (ev.hotel || HOTEL_STD_FALLBACK).length && !ev.noHotel;
+  if (habRequerida){
+    const habs = getHabs(ev, wizState.multifechaIdx);
+    let idxH = -1;
+    if (N > 4){
+      idxH = habs.findIndex(esCompartida);
+    } else {
+      const key = String(p.hab || '').toLowerCase();
+      idxH = habs.findIndex(h => derivarTipoHab(h) === key && habAplicaN(h, N));
+    }
+    if (idxH >= 0){
+      wizState.hab = habs[idxH];
+      const hEl = $('#wiz-hab');
+      if (hEl) hEl.value = String(idxH);
+    } else {
+      aviso = aviso || 'Elige tu habitación para continuar.';
+    }
+  }
+
+  // Cierre: SOLO saltamos al RESUMEN si TODO validó limpio (espejo de wiz-to-summary).
+  const fechaOk = !fechaFaltante;
+  const zonaOk  = (PKG === 'RIDE') || !!wizState.zona;
+  const habOk   = !habRequerida || !!wizState.hab;
+  if (!aviso && fechaOk && zonaOk && habOk){
+    poblarResumen();
+    setWizStep(4);
+    _invToast('Tu cotización quedó lista ✓ — revisa y confirma.');
+  } else {
+    // Ya estamos en el paso 3 (poblarDetalles) con lo que sí validó; el usuario completa.
+    if (aviso) _invToast(aviso, true);
   }
 }
 

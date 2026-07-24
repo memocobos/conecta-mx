@@ -1145,7 +1145,13 @@ const CLAUSULAS_AUXILIAR = [
   { ord:'DÉCIMA', t:'Terminación del contrato', cuerpo:()=>`<p>El contrato podrá darse por terminado por mutuo acuerdo, renuncia voluntaria con aviso previo de siete días naturales o por las causas de rescisión previstas en la Ley Federal del Trabajo.</p>` },
   { ord:'DÉCIMA PRIMERA', t:'Jurisdicción', cuerpo:()=>`<p>Para la interpretación y cumplimiento del presente contrato, las partes se someten a las leyes y tribunales competentes de Monterrey, Nuevo León.</p>` },
 ];
-function _fechaTextoDias(iso){ const p=String(iso||'').split('-'); if(p.length<3) return '—'; const meses=["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"]; return `${parseInt(p[2],10)} días del mes de ${meses[parseInt(p[1],10)-1]||''} del ${p[0]}`; }
+// Número en español 0–99 (para día y unidades del año). Estilo notarial.
+function _numEsp(n){ const u=['cero','uno','dos','tres','cuatro','cinco','seis','siete','ocho','nueve','diez','once','doce','trece','catorce','quince','dieciséis','diecisiete','dieciocho','diecinueve','veinte','veintiuno','veintidós','veintitrés','veinticuatro','veinticinco','veintiséis','veintisiete','veintiocho','veintinueve']; if(n<30) return u[n]||String(n); const t={30:'treinta',40:'cuarenta',50:'cincuenta',60:'sesenta',70:'setenta',80:'ochenta',90:'noventa'}; const d=Math.floor(n/10)*10, r=n%10; return r===0 ? (t[d]||String(n)) : (t[d]||'')+' y '+u[r]; }
+function _anioEsp(y){ const yy=y%100; return 'dos mil'+(yy===0?'':' '+_numEsp(yy)); }
+// Fecha en estilo NOTARIAL del contrato de los abogados: "a los quince (15) días
+// del mes de junio de dos mil veintiséis (2026)"; día 1 → "al primer (1) día…".
+// Incluye el "a los"/"al" (el proemio NO lo antepone, para no duplicarlo).
+function _fechaTextoDias(iso){ const p=String(iso||'').split('-'); if(p.length<3) return '—'; const y=parseInt(p[0],10), m=parseInt(p[1],10), d=parseInt(p[2],10); const meses=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre']; const mes=meses[m-1]||''; const anio=`${_anioEsp(y)} (${y})`; return d===1 ? `al primer (1) día del mes de ${mes} de ${anio}` : `a los ${_numEsp(d)} (${d}) días del mes de ${mes} de ${anio}`; }
 function _masUnAnio(iso){ const p=String(iso||'').split('-'); if(p.length<3) return iso; return `${parseInt(p[0],10)+1}-${p[1]}-${p[2]}`; }
 function renderDocAuxiliar(c, opts) {
   opts = opts || {};
@@ -1168,7 +1174,7 @@ function renderDocAuxiliar(c, opts) {
       <div class="meta-row"><span class="lbl">Puesto:</span><span class="val">Auxiliar administrativo</span></div>
       <div class="meta-row"><span class="lbl">Fecha del contrato:</span><span class="val">${escapeHtml(fmtFechaLarga(c.contrato_fecha))}</span></div>
     </div>`;
-  const intro = `<section class="clausula"><p>En la ciudad de Monterrey, Nuevo León, a los ${x.firmaTexto}, comparecen por una parte <b>CONECTA REYNOSA</b>, representada por el C. Guillermo Alexander Cobos Vizcarra, en su calidad de responsable operativo, a quien en lo sucesivo se le denominará "LA EMPRESA", y por la otra parte la C. <b>${x.nombre}</b>, a quien en lo sucesivo se le denominará "LA TRABAJADORA", quienes celebran el presente Contrato Individual de Trabajo por Tiempo Indefinido.</p></section>`;
+  const intro = `<section class="clausula"><p>En la ciudad de Monterrey, Nuevo León, ${x.firmaTexto}, comparecen por una parte <b>CONECTA REYNOSA</b>, representada por el C. Guillermo Alexander Cobos Vizcarra, en su calidad de responsable operativo, a quien en lo sucesivo se le denominará "LA EMPRESA", y por la otra parte la C. <b>${x.nombre}</b>, a quien en lo sucesivo se le denominará "LA TRABAJADORA", quienes celebran el presente Contrato Individual de Trabajo por Tiempo Indefinido.</p></section>`;
   const clausulasHtml = CLAUSULAS_AUXILIAR.map(cl => _clausulaViaB(cl, x)).join('');
   const rubrica = `<section class="clausula"><p style="font-style:italic;color:#555">Cada una de las hojas del presente contrato deberá ser rubricada por ambas partes.</p></section>`;
   const printBar = opts.estado === 'firmado' ? `

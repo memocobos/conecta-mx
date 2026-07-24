@@ -16154,7 +16154,12 @@ const _CTR_CLAUSULAS_AUX = [
   { num:'DÉCIMA', t:'Terminación del contrato', body:()=>`<p>El contrato podrá darse por terminado por mutuo acuerdo, renuncia voluntaria con aviso previo de siete días naturales o por las causas de rescisión previstas en la Ley Federal del Trabajo.</p>` },
   { num:'DÉCIMA PRIMERA', t:'Jurisdicción', body:()=>`<p>Para la interpretación y cumplimiento del presente contrato, las partes se someten a las leyes y tribunales competentes de Monterrey, Nuevo León.</p>` },
 ];
-function _fechaTextoDiasKh(iso){ const p=String(iso||'').split('-'); if(p.length<3) return '—'; const meses=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre']; return `${parseInt(p[2],10)} días del mes de ${meses[parseInt(p[1],10)-1]||''} del ${p[0]}`; }
+function _numEspKh(n){ const u=['cero','uno','dos','tres','cuatro','cinco','seis','siete','ocho','nueve','diez','once','doce','trece','catorce','quince','dieciséis','diecisiete','dieciocho','diecinueve','veinte','veintiuno','veintidós','veintitrés','veinticuatro','veinticinco','veintiséis','veintisiete','veintiocho','veintinueve']; if(n<30) return u[n]||String(n); const t={30:'treinta',40:'cuarenta',50:'cincuenta',60:'sesenta',70:'setenta',80:'ochenta',90:'noventa'}; const d=Math.floor(n/10)*10, r=n%10; return r===0 ? (t[d]||String(n)) : (t[d]||'')+' y '+u[r]; }
+function _anioEspKh(y){ const yy=y%100; return 'dos mil'+(yy===0?'':' '+_numEspKh(yy)); }
+// Estilo NOTARIAL, idéntico a contrato.html: "a los quince (15) días del mes de
+// junio de dos mil veintiséis (2026)"; día 1 → "al primer (1) día…". Incluye el
+// "a los"/"al" (el proemio no lo antepone).
+function _fechaTextoDiasKh(iso){ const p=String(iso||'').split('-'); if(p.length<3) return '—'; const y=parseInt(p[0],10), m=parseInt(p[1],10), d=parseInt(p[2],10); const meses=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre']; const mes=meses[m-1]||''; const anio=`${_anioEspKh(y)} (${y})`; return d===1 ? `al primer (1) día del mes de ${mes} de ${anio}` : `a los ${_numEspKh(d)} (${d}) días del mes de ${mes} de ${anio}`; }
 function _masUnAnioKh(iso){ const p=String(iso||'').split('-'); if(p.length<3) return iso; return `${parseInt(p[0],10)+1}-${p[1]}-${p[2]}`; }
 function _renderContratoAuxiliarHTML(c) {
   const sueldoN = (c.datos && Number(c.datos.sueldo_semanal)) || 0;
@@ -16172,7 +16177,7 @@ function _renderContratoAuxiliarHTML(c) {
     </div>`;
   const intro = `
     <div style="border-top:3px solid #000;border-bottom:1px solid #ddd;padding:18px 0;margin:20px 0;font-size:14px;line-height:1.6">
-      En la ciudad de Monterrey, Nuevo León, a los ${x.firmaTexto}, comparecen por una parte <b>CONECTA REYNOSA</b>, representada por el C. Guillermo Alexander Cobos Vizcarra, en su calidad de responsable operativo ("LA EMPRESA"), y por la otra parte la C. <b>${x.nombre}</b> ("LA TRABAJADORA"), quienes celebran el presente Contrato Individual de Trabajo por Tiempo Indefinido.
+      En la ciudad de Monterrey, Nuevo León, ${x.firmaTexto}, comparecen por una parte <b>CONECTA REYNOSA</b>, representada por el C. Guillermo Alexander Cobos Vizcarra, en su calidad de responsable operativo ("LA EMPRESA"), y por la otra parte la C. <b>${x.nombre}</b> ("LA TRABAJADORA"), quienes celebran el presente Contrato Individual de Trabajo por Tiempo Indefinido.
     </div>`;
   const clausulas = _CTR_CLAUSULAS_AUX.map(cl => `
     <div style="margin-top:22px">

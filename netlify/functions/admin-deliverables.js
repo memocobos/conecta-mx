@@ -36,7 +36,7 @@ const { verifyAdminAuth, corsCheck } = require('./_lib/verify-admin');
 
 const UUID_RE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
 
-const ROLES_ALL = ['cc', 'maestro_roshi', 'bulma'];
+const ROLES_ALL = ['cc', 'maestro_roshi', 'bulma', 'milk'];
 const ROLES_ADMIN = ['maestro_roshi', 'bulma'];
 
 const ESTADOS = ['pendiente', 'completado'];

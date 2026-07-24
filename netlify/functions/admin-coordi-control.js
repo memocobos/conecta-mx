@@ -33,7 +33,7 @@ const { aplicarModoPrueba } = require('./_lib/correo-guard');
 const UUID_RE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
 const SLUG_RE = /^[a-zA-Z0-9_-]{1,80}$/;
 
-const ROLES_DEUDAS = ['maestro_roshi', 'bulma'];
+const ROLES_DEUDAS = ['maestro_roshi', 'bulma', 'milk'];
 const ROLES_MAESTRO = ['maestro_roshi'];
 const STRIKE_ACCIONES = ['asignado', 'quitado', 'strike_manual'];
 

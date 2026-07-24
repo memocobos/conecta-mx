@@ -27,7 +27,7 @@ exports.handler = async function (event) {
   if (!__origin) return bad(403, "Origen no permitido");
 
   // DELETE destructivo (eventos_waitlist + snapshot) con service_role — solo admin.
-  const auth = verifyAdminAuth(event, ['maestro_roshi','bulma']);
+  const auth = verifyAdminAuth(event, ['maestro_roshi','bulma','milk']);
   if (!auth.valid) return bad(auth.status, auth.error);
 
   if (!SB_KEY) return bad(500, "SUPABASE_SERVICE_KEY_KAMEHOUSE no configurado");

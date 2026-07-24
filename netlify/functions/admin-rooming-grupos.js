@@ -28,7 +28,7 @@ const { verifyAdminAuth, corsCheck } = require('./_lib/verify-admin');
 
 const UUID_RE = /^[0-9a-f-]{36}$/i;
 const SLUG_RE = /^[a-zA-Z0-9_#-]{1,80}$/; // evento_id = slug (o slug#idx multifecha)
-const ROLES = ['maestro_roshi', 'bulma'];
+const ROLES = ['maestro_roshi', 'bulma', 'milk'];
 
 // Tipos de cuarto FIJOS: la capacidad la fija el SERVIDOR según el tipo (calca #235).
 const TIPOS = { Individual: 1, Doble: 2, Triple: 3, Compartida: 4 };

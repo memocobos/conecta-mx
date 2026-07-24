@@ -28,7 +28,7 @@ const CARGO_TRASPASO_MXN = 350;
 const CARGO_TRASPASO_UMBRAL_DIAS = 5;
 
 const UUID_RE = /^[0-9a-f-]{36}$/i;
-const ROLES = ['maestro_roshi', 'bulma'];
+const ROLES = ['maestro_roshi', 'bulma', 'milk'];
 const MAX_NOMBRE = 120;
 const MAX_CORREO = 200;
 const MAX_MOTIVO = 500;

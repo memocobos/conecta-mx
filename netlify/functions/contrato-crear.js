@@ -114,7 +114,7 @@ exports.handler = async function (event) {
   }
   if (event.httpMethod !== "POST") return bad(405, "Método no permitido");
   if (!__origin) return bad(403, "Origen no permitido");
-  const __auth = verifyAdminAuth(event, ['maestro_roshi','bulma','oolong']);
+  const __auth = verifyAdminAuth(event, ['maestro_roshi','bulma','oolong','milk']);
   if (!__auth.valid) return bad(__auth.status, __auth.error);
   if (!SB_KEY) return bad(500, "SUPABASE_SERVICE_KEY_KAMEHOUSE no configurado");
 

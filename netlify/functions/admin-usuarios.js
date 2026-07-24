@@ -38,6 +38,12 @@ const BCRYPT_COST = 10;
 const UUID_RE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
 const ROLES_VALIDOS = ['maestro_roshi', 'bulma', 'mister_popo', 'coordinador', 'cc', 'vendedor', 'milk'];
 const ROLES_ADMIN = ['maestro_roshi', 'bulma'];
+// Roles de alto privilegio cuya CREACIÓN (invitación) queda reservada a
+// maestro_roshi (anti escalación). Incluye `milk` aunque NO sea ROLES_ADMIN:
+// milk vive justo debajo de bulma y un bulma no debe poder crear ni un bulma ni
+// un milk. Ojo: se usa SOLO para gatear 'crear' — NO cambia la semántica de
+// ROLES_ADMIN (editar/borrar a terceros), que milk sigue sin tener.
+const ROLES_INVITA_SOLO_ROSHI = ['maestro_roshi', 'bulma', 'milk'];
 
 // Whitelist de columnas que SÍ pueden viajar al navegador. password_hash,
 // invite_token, invite_usado e invite_expires_at quedan EXCLUIDOS a propósito.
@@ -202,9 +208,10 @@ exports.handler = async (event) => {
       if (!ROLES_VALIDOS.includes(rol)) {
         return { statusCode: 400, headers, body: JSON.stringify({ error: 'rol inválido' }) };
       }
-      // Solo maestro_roshi puede invitar a otro admin (anti escalación).
-      if (ROLES_ADMIN.includes(rol) && jwtRol !== 'maestro_roshi') {
-        return { statusCode: 403, headers, body: JSON.stringify({ error: 'Solo maestro_roshi puede crear admins' }) };
+      // Solo maestro_roshi puede invitar roles de alto privilegio (bulma/milk).
+      // Anti escalación: un bulma no puede crear otro bulma ni un milk.
+      if (ROLES_INVITA_SOLO_ROSHI.includes(rol) && jwtRol !== 'maestro_roshi') {
+        return { statusCode: 403, headers, body: JSON.stringify({ error: 'Solo maestro_roshi puede crear ese rol' }) };
       }
       const invite_token = crypto.randomUUID();
       const invite_expires_at = new Date(Date.now() + 48 * 3600000).toISOString();

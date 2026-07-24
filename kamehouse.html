@@ -47,6 +47,14 @@
  <div class="topbar">
  <div class="topbar-logo">KAME<span>·</span>HOUSE</div>
  <div class="topbar-right">
+ <!-- 📻 Reproductor compacto de Radio Conecta (todos los roles; NUNCA autoplay). -->
+ <div class="tb-radio" id="tb-radio">
+   <button class="tb-radio-btn" id="tb-radio-btn" type="button" onclick="_tbRadioToggle()" aria-label="Reproducir Radio Conecta" title="Radio Conecta — en vivo">▶</button>
+   <div class="tb-radio-info">
+     <div class="tb-radio-label">RADIO CONECTA · <span class="tb-radio-live">EN VIVO</span></div>
+     <div class="tb-radio-song" id="tb-radio-song">Dale play para escuchar</div>
+   </div>
+ </div>
  <div class="topbar-dot"></div>
  <div class="topbar-user" id="topbar-user-info">—</div>
  <div class="notif-wrap" id="notif-wrap">

@@ -1791,6 +1791,61 @@ function loadPage(name) {
 let _radioPeticiones = [], _radioMuro = [], _radioSoloPend = true;
 const RADIO_NOWPLAYING = 'https://radio.conectareynosa.mx/api/nowplaying/radioconecta';
 const RADIO_STREAM_URL = 'https://radio.conectareynosa.mx/listen/radioconecta/radio.mp3';
+
+// ═══════════════════════════════════════════════════════════════
+// 📻 Reproductor compacto de Radio Conecta en la topbar (todos los roles).
+// El <audio> se crea al PRIMER play (NUNCA autoplay) y vive en la barra superior
+// → sigue sonando al cambiar de panel. El "ahora suena" reusa RADIO_NOWPLAYING
+// (misma API que la página de radio); sondea cada 30s SOLO mientras reproduce y
+// se detiene al pausar. Fails-soft: si el stream/API falla, no rompe la app.
+// ═══════════════════════════════════════════════════════════════
+let _tbAudio = null, _tbRadioTimer = null, _tbPlaying = false;
+
+function _tbSetBtn(playing) {
+  _tbPlaying = playing;
+  const b = document.getElementById('tb-radio-btn');
+  if (b) { b.textContent = playing ? '⏸' : '▶'; b.setAttribute('aria-label', playing ? 'Pausar Radio Conecta' : 'Reproducir Radio Conecta'); }
+  const r = document.getElementById('tb-radio');
+  if (r) r.classList.toggle('is-playing', playing);
+}
+
+async function _tbRadioNow() {
+  try {
+    const r = await fetch(RADIO_NOWPLAYING, { cache: 'no-store' });
+    if (!r.ok) return;
+    const d = await r.json();
+    const s = (d && d.now_playing && d.now_playing.song) || {};
+    const txt = [s.title, s.artist].filter(Boolean).join(' · ') || 'En vivo';
+    const el = document.getElementById('tb-radio-song');
+    if (el) el.textContent = txt;   // textContent → a prueba de XSS (títulos de terceros)
+  } catch (_) { /* fails-soft: conserva el último título */ }
+}
+
+function _tbRadioPausar() {
+  if (_tbAudio) { try { _tbAudio.pause(); } catch (_) {} }
+  _tbSetBtn(false);
+  if (_tbRadioTimer) { clearInterval(_tbRadioTimer); _tbRadioTimer = null; }   // detén el sondeo al pausar
+}
+
+function _tbRadioTocar() {
+  if (!_tbAudio) {
+    // Se crea SOLO en el primer play (jamás autoplay). Vive en la topbar.
+    _tbAudio = new Audio(RADIO_STREAM_URL);
+    _tbAudio.preload = 'none';
+    _tbAudio.addEventListener('pause', () => { if (_tbPlaying) _tbRadioPausar(); });
+    _tbAudio.addEventListener('error', _tbRadioPausar);
+    const host = document.getElementById('tb-radio');
+    if (host) host.appendChild(_tbAudio);
+  }
+  const p = _tbAudio.play();
+  if (p && p.catch) p.catch(() => _tbRadioPausar());   // si el navegador bloquea, revierte la UI
+  _tbSetBtn(true);
+  _tbRadioNow();                                        // título inmediato
+  if (!_tbRadioTimer) _tbRadioTimer = setInterval(_tbRadioNow, 30000);   // sondea SOLO mientras suena
+}
+
+function _tbRadioToggle() { if (_tbPlaying) _tbRadioPausar(); else _tbRadioTocar(); }
+
 let _radioHeroTimer = null;
 // Snapshot en memoria (sesión) para la tendencia de las tarjetas de Números.
 let _radioNumPrev = { oyentes: null, likes: null, peticiones: null };

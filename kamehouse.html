@@ -163,12 +163,17 @@
 
  <!-- ─── RESUMEN ─── -->
  <div class="page active" id="page-resumen">
+  <!-- 🌅 Saludo matutino (banner de bienvenida, se pinta al instante sin fetch) -->
+  <div id="resumen-saludo"></div>
   <div class="page-hero">
    <div>
     <div class="page-title">RESUMEN</div>
     <div class="page-sub">// vista general · tiempo real</div>
    </div>
   </div>
+
+ <!-- 🕘 Tablero de conexiones de hoy (SOLO maestro_roshi; fails-soft) -->
+ <div id="resumen-conexiones" style="display:none;margin-bottom:16px"></div>
 
  <!-- Franja 1 del dashboard: el dinero (caja total + cuentas + por cobrar) -->
  <div id="resumen-dinero" style="display:none;margin-bottom:16px"></div>
@@ -2722,6 +2727,18 @@
 
 
 <!-- Modal: Vista previa del contrato (pre-envío) -->
+<div class="modal-overlay" id="modal-conex-hist">
+  <div class="modal" style="max-width:460px;width:94%">
+    <div class="modal-header">
+      <div class="modal-title" id="_conexHistTitulo">Conexiones</div>
+      <button class="modal-close" onclick="closeModal('modal-conex-hist')"></button>
+    </div>
+    <div class="modal-body" style="max-height:70vh;overflow-y:auto">
+      <div id="_conexHistBody"></div>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="modal-contrato-preview">
   <div class="modal" style="max-width:820px;width:96%">
     <div class="modal-header">

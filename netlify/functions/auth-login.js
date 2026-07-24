@@ -138,6 +138,21 @@ exports.handler = async (event) => {
     body: JSON.stringify({ ultimo_acceso: new Date().toISOString() }),
   }).catch(() => {});
 
+  // ── Registrar la conexión (append-only) para el tablero de conexiones del
+  //    Resumen (solo Memo lo ve). ultimo_acceso se sobrescribe; esta tabla
+  //    conserva CADA login → permite "primera del día" + historial. Fire-and-
+  //    forget: JAMÁS bloquea ni rompe el login si la tabla no existe/falla. ──
+  fetch(`${SB_URL}/rest/v1/kh_conexiones`, {
+    method: 'POST',
+    headers: {
+      apikey: SB_KEY,
+      Authorization: 'Bearer ' + SB_KEY,
+      'Content-Type': 'application/json',
+      Prefer: 'return=minimal',
+    },
+    body: JSON.stringify({ usuario_id: user.id, ts: new Date().toISOString() }),
+  }).catch(() => {});
+
   // ── Reset rate limit del IP en login exitoso ──
   resetRateLimit(ip).catch(() => {});
 

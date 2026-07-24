@@ -3259,7 +3259,178 @@ function _renderUtilidadEvento(evBase) {
   if (cajaStats) cajaStats.style.display = '';
 }
 
+// ═══════════════════════════════════════════════════════════════
+// 🌅 SALUDO MATUTINO — banner de bienvenida cultura pop 80s/90s/2000s.
+// Frases ORIGINALES inspiradas (guiños, no citas largas). Rotación
+// determinística por día+usuario (misma frase todo el día, cambia mañana).
+// Cero backend, cero fetch → aparece al instante.
+// ═══════════════════════════════════════════════════════════════
+const _MOTIV_FRASES = [
+  'Hoy no se trata de pegar más fuerte, sino de aguantar el golpe y seguir avanzando. Ojo del tigre encendido. 🥊',
+  'Súbele al ki: cada pendiente que cierras te acerca a tu propia transformación. 🐉',
+  'Modo Super Saiyajin activado — los pendientes no saben con quién se metieron.',
+  'Reúne tus esferas del día: cada tarea cumplida es una que se enciende. 🐉',
+  'Te queda un último Genkidama de energía guardado. Hoy es buen día para soltarlo.',
+  'El futuro se construye hoy. No necesitas 88 millas por hora, solo arrancar. ⚡',
+  '¿Pendientes? A donde vamos hoy… los vamos a dejar en el pasado. 🚗💨',
+  'Da cera, pule cera: los básicos bien hechos hoy ganan el torneo mañana. 🥋',
+  'El equilibrio empieza con el primer movimiento. Respira y arranca.',
+  'Que la caja real esté contigo hoy. ✨',
+  'Hazlo o no lo hagas, pero hoy… hazlo. Sin intentos a medias. 🌌',
+  'Confía en la Fuerza de tu equipo: juntos nada los detiene.',
+  'A los pendientes de hoy: sayonara, baby. 🤖',
+  '¡Volveré! —dijo la flojera. No la dejes. Hoy la cierras tú.',
+  'Sé implacable con tu lista, compasivo con tu gente. Modo imparable ON.',
+  'Elige la pastilla del café y despierta: hoy tú controlas la Matrix. ☕',
+  'No hay cuchara… pero sí hay una meta clarita. A ella. 🥄',
+  'Dobla la realidad de hoy a tu favor, un pendiente a la vez.',
+  'Hasta el infinito y más allá con la meta de hoy. 🚀',
+  'Hay un amigo en ti para cada reto que traiga el día. Confía.',
+  'Saca tu Jordan interior: hoy el marcador lo pones tú. 🏀',
+  'Arma tu jam: junta al equipo, junta el ánimo, y a ganar el día.',
+  'Hazte con todos… los pendientes de hoy. ¡Los atrapas todos! ⚡',
+  'Eres el mejor, como ninguno más: hoy evolucionas un nivel. 🔥',
+  'Un día más, una insignia más. Ve por la de hoy, campeón.',
+  'Agarra la estrella: por un rato hoy eres invencible. Aprovéchala. ⭐',
+  'Otro nivel, otra moneda — sigue saltando, que la meta está cerca. 🍄',
+  'A toda velocidad, pero sin soltar los anillos. Rapidez con cabeza. 💍',
+  'Los Goonies nunca se rinden… y tú tampoco, no hoy. 🗺️',
+  '¿A quién vas a llamar cuando salga un pendiente? A ti, que puedes. 👻',
+  '¡Tú tienes el poder! Y hoy lo vas a usar. ⚔️',
+  'Necesito velocidad… y un buen café. Despega, piloto. ✈️',
+  'La vida siempre se abre camino — y hoy tú también lo abres. 🦖',
+  'El tesoro de hoy está en tu lista. Ve por él, aventurero. 🏺',
+  'Hadouken a la flojera. Concéntrate y lanza tu mejor golpe. 🔥',
+  'Wax on, wax off: la disciplina de hoy es la victoria de mañana.',
+  'Con un gran café viene una gran responsabilidad. Tú puedes con ella. ☕',
+  'Rocky no ganó el primer round; ganó por no rendirse. Sigue de pie. 🥊',
+  'Hoy tu misión, si decides aceptarla, es comerte el día. Y la aceptas. 🎬',
+  'Junta al equipo, arma el plan y a la aventura del día. 🎒',
+  'Modo Kamehameha: concentra toda tu energía en lo que importa hoy. 🌊',
+  'El pasado no se cambia, pero el día de hoy sí lo escribes tú. 📼',
+  'Nunca le digas nunca a lo que te propusiste esta mañana.',
+  'Insertar moneda… continuar. Otra vida, otro intento, hoy ganas. 🕹️',
+  'Que la puntería del día esté contigo: apunta a lo importante primero. 🎯',
+  'El héroe no es el que no cae; es el que se levanta con café en mano. ☕',
+  'Hoy es tu arena y tu momento. Suena la campana: ¡a darle! 🔔',
+  'Cinturón puesto, foco puesto: hoy pones tu mejor kata. 🥋',
+  'Sigue nadando entre los pendientes: uno tras otro y ya. 🐠',
+  'La fuerza de hoy no está en el músculo, está en volver a intentarlo.',
+];
+
+function _kmHash(s) { let h = 2166136261 >>> 0; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; } return h >>> 0; }
+function _mxHoraNum() { return parseInt(new Date().toLocaleString('en-US', { timeZone: 'America/Monterrey', hour: 'numeric', hour12: false }), 10) || 0; }
+function _mxFechaStr() { return new Date().toLocaleDateString('en-CA', { timeZone: 'America/Monterrey' }); }
+// Saludo por hora MX: 05:00–11:59 días · 12:00–18:59 tardes · 19:00–04:59 noches.
+function _saludoHora() { const h = _mxHoraNum(); return (h >= 19 || h < 5) ? 'Buenas noches' : (h < 12 ? 'Buenos días' : 'Buenas tardes'); }
+
+function _renderSaludoResumen() {
+  const el = document.getElementById('resumen-saludo');
+  if (!el || !currentUser) return;
+  const nombre = _esfEsc((String(currentUser.nombre || '').trim().split(/\s+/)[0]) || 'crack');
+  const dia = _mxFechaStr();
+  const frase = _MOTIV_FRASES[_kmHash(dia + '|' + (currentUser.id || '')) % _MOTIV_FRASES.length];
+  el.innerHTML = `
+    <div class="card" style="margin-bottom:16px;background:linear-gradient(120deg,rgba(0,0,205,.14),rgba(232,255,76,.08) 70%);border:1px solid var(--border);border-left:5px solid var(--brand,#0000cd)">
+      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+        <svg class="ic" style="width:26px;height:26px;color:var(--brand,#0000cd)"><use href="#ic-resumen"/></svg>
+        <div>
+          <div style="font-family:'Barlow Condensed','Montserrat',sans-serif;font-weight:900;font-size:22px;line-height:1;text-transform:uppercase">${_saludoHora()}, ${nombre}</div>
+          <div style="font-size:13.5px;color:var(--ts);margin-top:5px;line-height:1.5">${_esfEsc(frase)}</div>
+        </div>
+      </div>
+    </div>`;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 🕘 TABLERO DE CONEXIONES DE HOY — SOLO maestro_roshi. Fails-soft total.
+// Auxiliares (bulma/milk) con chip de puntualidad vs 09:00 MX (tolerancia 15 min):
+//   ≤ 09:15 → verde "✓" · > 09:15 → ámbar · sin conexión hoy → gris.
+// Los demás roles: sin juicio de horario (no tienen entrada contractual).
+// ═══════════════════════════════════════════════════════════════
+const _CONEX_AUX = ['bulma', 'milk'];   // roles con horario contractual de entrada
+
+async function _loadConexiones() {
+  const el = document.getElementById('resumen-conexiones');
+  if (!el) return;
+  if (!currentUser || currentUser.rol !== 'maestro_roshi') { el.style.display = 'none'; return; }
+  try {
+    const r = await khAdminFetch('/.netlify/functions/admin-conexiones', { method: 'POST', body: JSON.stringify({ accion: 'hoy' }) });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || !j.ok) { el.style.display = 'none'; return; }   // fails-soft: sin panel
+    el.style.display = '';
+    el.innerHTML = _renderConexiones(j);
+  } catch (_) { el.style.display = 'none'; }
+}
+
+function _conexChip(u, tol) {
+  const esAux = _CONEX_AUX.includes(u.rol);
+  if (!esAux) return '';   // sin juicio de horario para roles sin entrada contractual
+  const chip = (txt, color) => `<span style="display:inline-block;font-size:10px;font-weight:800;padding:2px 8px;border-radius:10px;color:${color};border:1px solid ${color}66;white-space:nowrap">${txt}</span>`;
+  if (u.primera_min == null) return chip('sin conexión aún', 'var(--ts)');
+  const puntual = u.primera_min <= (9 * 60 + (tol || 15));
+  return chip(_esfEsc(u.primera) + (puntual ? ' ✓' : ''), puntual ? 'var(--green)' : 'var(--orange)');
+}
+
+function _renderConexiones(j) {
+  const tol = j.tolerancia_min || 15;
+  const us = Array.isArray(j.usuarios) ? j.usuarios : [];
+  // Auxiliares primero (las que Memo vigila), luego el resto por nombre.
+  const orden = us.slice().sort((a, b) => {
+    const aa = _CONEX_AUX.includes(a.rol) ? 0 : 1, bb = _CONEX_AUX.includes(b.rol) ? 0 : 1;
+    return aa !== bb ? aa - bb : String(a.nombre).localeCompare(String(b.nombre));
+  });
+  const filas = orden.map((u) => {
+    const idS = _esfEsc(u.id);
+    const chip = _conexChip(u, tol);
+    return `<tr style="border-top:1px solid var(--border);cursor:pointer" onclick="_conexHistorial('${idS}','${_esfEsc(u.nombre)}')" title="Ver últimos 14 días">
+      <td style="padding:7px 4px;font-size:13px">${_esfEsc(u.nombre)}${_CONEX_AUX.includes(u.rol) ? ' <span style="font-size:9px;color:var(--ts);text-transform:uppercase;letter-spacing:.06em">aux</span>' : ''}</td>
+      <td style="padding:7px 4px;text-align:center;font-size:13px">${u.primera ? _esfEsc(u.primera) : '<span style="color:var(--ts)">—</span>'}</td>
+      <td style="padding:7px 4px;text-align:center;font-size:13px">${u.ultima ? _esfEsc(u.ultima) : '<span style="color:var(--ts)">—</span>'}</td>
+      <td style="padding:7px 4px;text-align:right">${chip}</td>
+    </tr>`;
+  }).join('');
+  return `<div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px">
+      <div style="font-family:'Barlow Condensed','Montserrat',sans-serif;font-weight:800;font-size:16px;text-transform:uppercase">🕘 Conexiones de hoy</div>
+      <div style="font-size:10px;color:var(--ts)">Hora Monterrey · entrada aux 09:00 (tolerancia ${tol} min) · privado</div>
+    </div>
+    <table style="width:100%;border-collapse:collapse">
+      <thead><tr style="font-size:10px;color:var(--ts);text-transform:uppercase;letter-spacing:.08em">
+        <th style="text-align:left;padding:4px">Usuario</th><th style="padding:4px">Primera</th><th style="padding:4px">Última</th><th style="text-align:right;padding:4px">Puntualidad</th>
+      </tr></thead>
+      <tbody>${filas || '<tr><td colspan="4" style="padding:12px;text-align:center;color:var(--ts);font-size:12px">Sin conexiones registradas aún</td></tr>'}</tbody>
+    </table>
+  </div>`;
+}
+
+async function _conexHistorial(uid, nombre) {
+  try {
+    const r = await khAdminFetch('/.netlify/functions/admin-conexiones', { method: 'POST', body: JSON.stringify({ accion: 'historial', usuario_id: uid }) });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || !j.ok) { showToast('No se pudo cargar el historial', 'error'); return; }
+    const tol = j.tolerancia_min || 15;
+    const dias = Array.isArray(j.dias) ? j.dias : [];
+    const filas = dias.length ? dias.map((d) => {
+      const puntual = d.primera_min != null && d.primera_min <= (9 * 60 + tol);
+      const dow = new Date(d.fecha + 'T12:00:00').toLocaleDateString('es-MX', { weekday: 'short' });
+      return `<tr style="border-top:1px solid var(--border)">
+        <td style="padding:6px 4px;font-size:12px">${_esfEsc(d.fecha)} <span style="color:var(--ts);font-size:10px;text-transform:capitalize">${_esfEsc(dow)}</span></td>
+        <td style="padding:6px 4px;text-align:right;font-size:13px;color:${puntual ? 'var(--green)' : 'var(--orange)'};font-weight:700">${_esfEsc(d.primera)}${puntual ? ' ✓' : ''}</td>
+      </tr>`;
+    }).join('') : '<tr><td colspan="2" style="padding:12px;text-align:center;color:var(--ts);font-size:12px">Sin conexiones en los últimos 14 días</td></tr>';
+    const cont = document.getElementById('_conexHistBody');
+    const titEl = document.getElementById('_conexHistTitulo');
+    if (titEl) titEl.textContent = 'Conexiones · ' + (nombre || '');
+    if (cont) cont.innerHTML = `<div style="font-size:10px;color:var(--ts);margin-bottom:8px">Primera conexión por día (hora Monterrey) · últimos 14 días · entrada 09:00 (tol. ${tol} min)</div>
+      <table style="width:100%;border-collapse:collapse"><tbody>${filas}</tbody></table>`;
+    openModal('modal-conex-hist');
+  } catch (e) { showToast(e.message || 'Error', 'error'); }
+}
+
 async function loadResumen() {
+  _renderSaludoResumen();   // 🌅 banner de bienvenida: instantáneo, sin fetch
+  _loadConexiones();        // 🕘 tablero de conexiones (solo Memo; fails-soft)
   const proxEl = document.getElementById('proximos-eventos');
   const atrEl  = document.getElementById('atrasados-lista');
   if (proxEl) proxEl.innerHTML = '<div class="loading-state"><div class="spinner"></div>Cargando…</div>';

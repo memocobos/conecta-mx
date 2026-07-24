@@ -505,6 +505,28 @@ function aplicarPermisosUI() {
   if (btnLista)   btnLista.style.display   = gzPermitidas.includes('lista')    ? '' : 'none';
   if (btnInvitar) btnInvitar.style.display = gzPermitidas.includes('invitar')  ? '' : 'none';
   if (btnPerfil)  btnPerfil.style.display  = gzPermitidas.includes('miperfil') ? '' : 'none';
+
+  // [fix/invitar-milk] El select de invitación ofrece los dos roles de más alto
+  // privilegio (bulma y milk — milk va justo debajo de bulma) SOLO a maestro_roshi.
+  // El backend (admin-usuarios 'crear') ya rechaza con 403 que un bulma los cree;
+  // esto es el candado visual espejo. Para no-roshi: ocultar+deshabilitar esas dos
+  // opciones y, si alguna quedó seleccionada, saltar a la primera opción visible.
+  const selInv = document.getElementById('inv-rol');
+  if (selInv) {
+    const soloRoshi = rol === 'maestro_roshi';
+    Array.from(selInv.options).forEach(opt => {
+      if (opt.value === 'bulma' || opt.value === 'milk') {
+        opt.hidden = !soloRoshi;
+        opt.disabled = !soloRoshi;
+      }
+    });
+    const actual = selInv.options[selInv.selectedIndex];
+    if (actual && (actual.hidden || actual.disabled)) {
+      const primeraVisible = Array.from(selInv.options).find(o => !o.hidden && !o.disabled);
+      if (primeraVisible) selInv.value = primeraVisible.value;
+    }
+  }
+
   // Ranking: todos los que llegan a GZ lo pueden ver
   const btnRanking = document.querySelector('[onclick*=\'abrirRanking\']');
   if (btnRanking) btnRanking.style.display = '';
@@ -6652,6 +6674,7 @@ let _gzFilter = 'todos';
 const ROL_LABELS = {
   maestro_roshi: 'Maestro Roshi',
   bulma: 'Bulma',
+  milk: 'Milk',
   mister_popo: 'Maestro Karin',
   coordinador: 'Coordinador',
   cc: 'Creador de Contenido',

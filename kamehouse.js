@@ -34,7 +34,7 @@ const PERMISOS_TABS = {
   // Milk (2ª auxiliar administrativa): paridad operativa con Bulma (F2) + finanzas
   // operativas (gastos/ingresos/saldos). SIN: 'ventas' (utilidad maestra), 'inventario'
   // (Torre → F3), ni kamisama/radar/montana/yamcha/radio (vetados / roshi-only).
-  milk:          ['resumen','pagos','eventos','gastos','ingresos','saldos','cotizar','reportes','capsule','solicitudes_portal','equipo','herramientas']
+  milk:          ['resumen','pagos','eventos','gastos','ingresos','saldos','cotizar','inventario','reportes','capsule','solicitudes_portal','equipo','herramientas']
 };
 
 // Qué tabs de Guerreros Z puede ver cada rol
@@ -4954,7 +4954,7 @@ async function loadInventario() {
  tbody.innerHTML = `<tr><td colspan="${verCostos ? 7 : 5}"><div class="empty-state"><div class="empty-icon"></div>Sin items en inventario</div></td></tr>`;
  return;
  }
- const puedeEditarKarin = ['maestro_roshi','bulma','mister_popo'].includes(currentUser?.rol);
+ const puedeEditarKarin = ['maestro_roshi','bulma','mister_popo','milk'].includes(currentUser?.rol);
  tbody.innerHTML = items.map(i => {
  const valor = i.cantidad * i.costo_unitario;
  const alerta = i.cantidad <= i.stock_minimo;
@@ -5172,7 +5172,7 @@ async function cancelarSalidaBodega(id) {
 // ── Torre: bandeja del cuidador + prestado ahorita ─────────────────────
 let _torreBandeja = [];
 async function loadTorreSalidas() {
-  const esCuidador = ['mister_popo', 'maestro_roshi', 'bulma'].includes(currentUser?.rol);
+  const esCuidador = ['mister_popo', 'maestro_roshi', 'bulma', 'milk'].includes(currentUser?.rol);
   const bc = document.getElementById('torre-bandeja-card'), pc = document.getElementById('torre-prestado-card'), fc = document.getElementById('torre-faltantes-card');
   if (!esCuidador) { if (bc) bc.style.display = 'none'; if (pc) pc.style.display = 'none'; if (fc) fc.style.display = 'none'; return; }
   if (bc) bc.style.display = '';

@@ -56,8 +56,8 @@ const ADMIN_EMAIL = 'admin@conectareynosa.mx';
 const SITE = process.env.URL || 'https://conectareynosa.mx';
 
 // D-4: vendedores FUERA de salidas de bodega.
-const ROLES_VIAJAN = ['coordinador', 'cc', 'mister_popo', 'maestro_roshi', 'bulma'];
-const ROLES_CUIDADOR = ['mister_popo', 'maestro_roshi', 'bulma'];
+const ROLES_VIAJAN = ['coordinador', 'cc', 'mister_popo', 'maestro_roshi', 'bulma', 'milk'];
+const ROLES_CUIDADOR = ['mister_popo', 'maestro_roshi', 'bulma', 'milk'];
 const ROLES_VE_TODO = ROLES_CUIDADOR;
 
 const ACCIONES = {

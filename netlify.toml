@@ -1,3 +1,27 @@
+# =============================================================================
+# LLAVES CANÓNICAS DE SUPABASE (env vars en Netlify) — documentación, NO config.
+# Netlify NO lee estas líneas; son la fuente de verdad de cómo se nombran las vars.
+#
+#   KameHouse (proyecto npgnhsmwpcipxgvfxrho):
+#     SUPABASE_URL_KAMEHOUSE
+#     SUPABASE_SERVICE_KEY_KAMEHOUSE
+#     (las viejas KH_SUPABASE_* quedaron RETIRADAS — no usar)
+#
+#   Portal (proyecto muvvrstnkxsxfpkhbntq):
+#     PORTAL_SUPABASE_URL
+#     PORTAL_SUPABASE_ANON_KEY
+#     PORTAL_SUPABASE_SERVICE_KEY
+#
+# ⚠️ Las SUPABASE_URL / SUPABASE_KEY / SUPABASE_SERVICE_KEY "a secas" fueron
+# BORRADAS del Netlify de Conecta el 24-jul-2026: apuntaban a "Cuarto Piso", un
+# proyecto INDEPENDIENTE de Memo que NADA tiene que ver con Conecta (y que NO se
+# tocó). Se quitaron para que Conecta jamás pueda escribirle por accidente.
+# Consecuencia: los fallbacks `|| process.env.SUPABASE_URL` de las functions
+# ahora resuelven a `undefined` → si algún día falta la var buena, la función
+# truena avisando (comportamiento correcto, falla ruidosa). Unificar/podar esos
+# fallbacks es una tuerca futura opcional.
+# =============================================================================
+
 # Redirects
 [[redirects]]
   from = "/admin"

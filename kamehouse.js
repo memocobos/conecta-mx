@@ -48,6 +48,11 @@ const GZ_TABS_PERMITIDAS = {
   milk:          ['lista','miperfil'],   // ve el equipo y su perfil; NO 'invitar' (crear cuentas vetado)
 };
 
+// F5 Milk: gate de UI para botones DESTRUCTIVOS que milk tiene VETADOS en el
+// backend (eliminar gastos/ingresos/eventos/contratos). Solo roshi/bulma → para
+// ellos el render es byte-igual (siempre pudieron borrar); para milk se ocultan.
+function _puedeBorrarAdmin() { return ['maestro_roshi', 'bulma'].includes(currentUser && currentUser.rol); }
+
 // ── TOAST ──
 function showToast(msg, tipo) {
   tipo = tipo || 'error';
@@ -484,6 +489,9 @@ function aplicarPermisosUI() {
   });
   const dropdownHerr = document.getElementById('nav-dropdown-herramientas');
   if (dropdownHerr) dropdownHerr.style.display = ['maestro_roshi','bulma','milk'].includes(rol) ? '' : 'none';
+  // F5 Milk: "Diseño" (esferas) es solo de maestro_roshi → inerte para milk, se oculta.
+  const navDiseno = document.getElementById('nav-diseno');
+  if (navDiseno) navDiseno.style.display = (rol === 'milk') ? 'none' : '';
   const karinAdminBtns = document.getElementById('karin-admin-btns');
   if (karinAdminBtns) karinAdminBtns.style.display = ['maestro_roshi','mister_popo'].includes(rol) ? 'flex' : 'none';
 
@@ -4403,7 +4411,7 @@ async function loadGastos() {
  <td style="font-size:12px">${_spEscape(g.metodo_pago||'—')}</td>
  <td style="white-space:nowrap">
  <button class="btn btn-ghost btn-sm" onclick="editarGasto('${g.id}')"><svg class="ic"><use href="#ic-lapiz"/></svg> Editar</button>
- <button class="btn btn-red btn-sm" onclick="eliminarGasto('${g.id}')"></button>
+ ${_puedeBorrarAdmin() ? `<button class="btn btn-red btn-sm" onclick="eliminarGasto('${g.id}')"></button>` : ''}
  </td>
  </tr>`).join('');
  } catch(e) {
@@ -4646,7 +4654,7 @@ async function loadIngresos() {
  <td style="font-size:12px">${_spEscape(g.metodo_pago||'—')}</td>
  <td style="white-space:nowrap">
  <button class="btn btn-ghost btn-sm" onclick="editarIngreso('${g.id}')"><svg class="ic"><use href="#ic-lapiz"/></svg> Editar</button>
- <button class="btn btn-red btn-sm" onclick="eliminarIngreso('${g.id}')"></button>
+ ${_puedeBorrarAdmin() ? `<button class="btn btn-red btn-sm" onclick="eliminarIngreso('${g.id}')"></button>` : ''}
  </td>
  </tr>`).join('');
  } catch(e) {
@@ -5359,7 +5367,7 @@ function renderCapsule() {
  <td style="font-weight:600">${ev.total_viajeros || 0}</td>
  <td style="white-space:nowrap">
  <button class="btn btn-ghost btn-sm" onclick="editarEvento('${ev.id}')">Editar</button>
- <button class="btn btn-red btn-sm" onclick="eliminarEvento('${ev.id}')">Borrar</button>
+ ${_puedeBorrarAdmin() ? `<button class="btn btn-red btn-sm" onclick="eliminarEvento('${ev.id}')">Borrar</button>` : ''}
  </td>
  </tr>`;
  }).join('');
@@ -8112,7 +8120,7 @@ function renderCCEventos(lista, filtro) {
                vieja 'eventos'), estos botones apuntan al sistema viejo. Editar eventos =
                Palacio de Kamisama. Código conservado por si se reusa.
           <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();abrirModalEditarEvento('${e.id}')" style="font-size:11px">⎘</button>
-          <button class="btn btn-red btn-sm" onclick="event.stopPropagation();eliminarEventoCC('${e.id}')" style="font-size:11px">✕</button>
+          ${_puedeBorrarAdmin() ? `<button class="btn btn-red btn-sm" onclick="event.stopPropagation();eliminarEventoCC('${e.id}')" style="font-size:11px">✕</button>` : ''}
           -->
           <button class="btn btn-primary btn-sm" onclick="event.stopPropagation();abrirDetalleEvento('${e.id}')" style="font-size:11px">Ver →</button>
         </div>
@@ -16418,12 +16426,12 @@ async function loadContratosList() {
         ? `
           <button class="btn btn-ghost" style="padding:5px 10px;font-size:11px" onclick="verContratoFirmado('${tokenSafe}','${nombreSafe}')">Ver</button>
           ${c.plantilla === 'creadora_team' ? `<button class="btn btn-ghost" style="padding:5px 10px;font-size:11px;color:#c9a2ff;border-color:rgba(201,162,255,.3)" onclick="verAnexoC('${_escCtr(c.id)}','${nombreSafe}')">Anexo C</button>` : ''}
-          <button class="btn btn-ghost" style="padding:5px 10px;font-size:11px;color:#ff6666;border-color:rgba(255,68,68,.3)" onclick="eliminarContrato('${tokenSafe}','${nombreSafe}',this)">Eliminar</button>`
+          ${_puedeBorrarAdmin() ? `<button class="btn btn-ghost" style="padding:5px 10px;font-size:11px;color:#ff6666;border-color:rgba(255,68,68,.3)" onclick="eliminarContrato('${tokenSafe}','${nombreSafe}',this)">Eliminar</button>` : ''}`
         : `
           <button class="btn btn-ghost" style="padding:5px 10px;font-size:11px" onclick="editarContrato('${tokenSafe}')">Editar</button>
           <button class="btn btn-ghost" style="padding:5px 10px;font-size:11px" onclick="reenviarContratoEmail('${tokenSafe}',this)">Reenviar</button>
           <button class="btn btn-ghost" style="padding:5px 10px;font-size:11px" onclick="copiarLinkContrato('${tokenSafe}',this)">Copiar link</button>
-          <button class="btn btn-ghost" style="padding:5px 10px;font-size:11px;color:#ff6666;border-color:rgba(255,68,68,.3)" onclick="eliminarContrato('${tokenSafe}','${nombreSafe}',this)">Eliminar</button>`;
+          ${_puedeBorrarAdmin() ? `<button class="btn btn-ghost" style="padding:5px 10px;font-size:11px;color:#ff6666;border-color:rgba(255,68,68,.3)" onclick="eliminarContrato('${tokenSafe}','${nombreSafe}',this)">Eliminar</button>` : ''}`;
       return `<tr>
         <td><b>${nombreSafe}</b> ${_ctrPlantillaChip(c.plantilla)}${_ctrCuidadorChip(c)}<br><span style="color:var(--ts);font-size:11px">${_escCtr(c.creador_email)}</span></td>
         <td>${_escCtr(c.evento_nombre)}<br><span style="color:var(--ts);font-size:11px">${_fmtFechaCortaCtr(c.evento_fecha)}</span></td>

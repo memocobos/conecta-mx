@@ -124,7 +124,7 @@ exports.handler = async function (event) {
 
   // VÍA B (F5): plantilla decide qué se pide. Default 'creadora' = comportamiento
   // idéntico al de siempre (ofrecimiento/expectativas obligatorios).
-  const PLANTILLAS = ["creadora", "coordinador", "giveaway", "creadora_team"];
+  const PLANTILLAS = ["creadora", "coordinador", "giveaway", "creadora_team", "auxiliar_admin"];
   const plantilla = PLANTILLAS.includes(String(data.plantilla || "").trim())
     ? String(data.plantilla).trim()
     : "creadora";
@@ -179,6 +179,15 @@ exports.handler = async function (event) {
     if (data.datos && data.datos.cuidador_bodega === true) {
       datos = { cuidador_bodega: true };
     }
+  } else if (plantilla === "auxiliar_admin") {
+    // Contrato LABORAL (texto oficial revisado por abogados). Único dato
+    // variable capturado al crear: el sueldo neto semanal (por auxiliar). El
+    // resto del texto es fijo; NOMBRE y fechas salen de las columnas normales.
+    // No cuelga de un evento: el frontend manda un placeholder neutro en
+    // evento_nombre/evento_fecha (columnas NOT NULL) que el texto legal no usa.
+    const sueldo_semanal = Math.round(Number((data.datos && data.datos.sueldo_semanal) || 0));
+    if (!Number.isFinite(sueldo_semanal) || sueldo_semanal <= 0) return bad(400, "Falta el sueldo semanal");
+    datos = { sueldo_semanal };
   }
 
   const token = crypto.randomBytes(20).toString("hex");

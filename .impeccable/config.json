@@ -11,6 +11,15 @@
         ],
         "createdAt": "2026-07-25T01:08:08.352Z",
         "reason": "L268 es HTML de correo transaccional (notificacion al admin), no UI de app; el borde de acento es patron estandar de email"
+      },
+      {
+        "rule": "overused-font",
+        "value": "*",
+        "files": [
+          "netlify/functions/apartados-vencidos-diario.js"
+        ],
+        "createdAt": "2026-07-25T02:12:50.726Z",
+        "reason": "L57 es HTML de correo transaccional; Helvetica/Arial es la fuente web-safe estandar de email (igual que vence-hoy-diario y demas crons), no UI de app"
       }
     ]
   }

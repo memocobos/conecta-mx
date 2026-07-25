@@ -15516,7 +15516,12 @@ function _vtaCalc(ev, opts) {
   }
   let selH = null;
   const requiereHotel = hasHotel && !opts.hotel_nombre;
-  if (hasHotel && opts.hotel_nombre) { selH = (ev.hotel || []).filter(h => h && h.n === opts.hotel_nombre)[0] || null; if (!selH) return { ok: false, motivo: 'hotel no encontrado' }; }
+  if (hasHotel && opts.hotel_nombre) {
+    selH = (ev.hotel || []).filter(h => h && h.n === opts.hotel_nombre)[0] || null;
+    if (!selH) return { ok: false, motivo: 'hotel no encontrado' };
+    // Grupo grande (N>4): SOLO compartida (espejo de precio-zona / index).
+    if (selViaj > 4 && !(selH.k === 'compartida' || /^compartida/i.test(selH.n || ''))) return { ok: false, motivo: 'grupo grande: solo habitación compartida' };
+  }
   const requiereTransporte = cdmx && paquete !== 'cheap' && (opts.transporte_cost == null);
   const zonaP = selZ ? (Number(selZ.p) || 0) : 0;
   const hotelRaw = selH ? (Number(selH.e) || 0) : 0;

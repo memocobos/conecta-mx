@@ -9,17 +9,20 @@
         "files": [
           "netlify/functions/portal-nueva-solicitud.js"
         ],
-        "createdAt": "2026-07-25T01:08:08.352Z",
+        "createdAt": "2026-07-25T22:16:50.688Z",
         "reason": "L268 es HTML de correo transaccional (notificacion al admin), no UI de app; el borde de acento es patron estandar de email"
       },
       {
         "rule": "overused-font",
-        "value": "*",
-        "files": [
-          "netlify/functions/apartados-vencidos-diario.js"
-        ],
-        "createdAt": "2026-07-25T02:12:50.726Z",
-        "reason": "L57 es HTML de correo transaccional; Helvetica/Arial es la fuente web-safe estandar de email (igual que vence-hoy-diario y demas crons), no UI de app"
+        "value": "arial",
+        "createdAt": "2026-07-25T22:16:50.715Z",
+        "reason": "Arial en HTML de correo transaccional es intencional (estandar de email); la UI real usa Rajdhani/Zen Dots/JetBrains Mono"
+      },
+      {
+        "rule": "overused-font",
+        "value": "helvetica",
+        "createdAt": "2026-07-25T22:18:22.033Z",
+        "reason": "Mismo caso que Arial: Helvetica solo aparece en HTML de correo transaccional (font-family:Helvetica,Arial,sans-serif, estandar de email); cero apariciones en la UI real"
       }
     ]
   }

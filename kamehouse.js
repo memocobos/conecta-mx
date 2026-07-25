@@ -6403,28 +6403,25 @@ async function _kamComprasLoad() {
     const ev = (Array.isArray(evArr) ? evArr : []).find((e) => e && e.id === evId);
     const zonasEV = (ev && Array.isArray(ev.zonas)) ? ev.zonas : [];
 
-    const [cRes, pRes, vRes] = await Promise.all([
+    const [cRes, pRes, sRes] = await Promise.all([
       khAdminFetch('/.netlify/functions/admin-compras', { method: 'POST', body: JSON.stringify({ accion: 'listar', evento_id: evId }) }),
       khAdminFetch('/.netlify/functions/admin-proveedores', { method: 'POST', body: JSON.stringify({ accion: 'listar' }) }),
-      khAdminFetch('/.netlify/functions/admin-vendidos-evento', { method: 'POST', body: JSON.stringify({ evento_id: evId }) }),
+      khAdminFetch('/.netlify/functions/admin-compras', { method: 'POST', body: JSON.stringify({ accion: 'semaforo', evento_id: evId }) }),
     ]);
     const cData = await cRes.json().catch(() => ({}));
     const pData = await pRes.json().catch(() => ({}));
-    const vData = await vRes.json().catch(() => ({}));
+    const sData = await sRes.json().catch(() => ({}));
     if (!cRes.ok || !cData.ok) throw new Error(cData.error || 'No se pudieron cargar las compras');
     if (!pRes.ok || !pData.ok) throw new Error(pData.error || 'No se pudieron cargar los proveedores');
     const compras = cData.compras || [];
     _kamProvCache = pData.proveedores || [];
 
-    // Vendidos por zona (Portal, vía 2a; ya filtrado por estados que cuentan). Si
-    // la lectura falla, se degrada a {} (no rompe el inventario). Claves con trim.
-    const vendidosMap = {};
-    if (vRes.ok && vData.ok && vData.vendidos) {
-      Object.keys(vData.vendidos).forEach((k) => {
-        const key = String(k).trim();
-        vendidosMap[key] = (vendidosMap[key] || 0) + (parseInt(vData.vendidos[k], 10) || 0);
-      });
-    }
+    // [FASE B t3] Semáforo por zona (desglose real: compradas/fuera/seguras/apartadas/
+    // disponibles + color). Si el endpoint falla (p.ej. Portal caído), se degrada a
+    // null → se muestra el inventario sin la película, sin romper el Palacio.
+    const semMap = {};
+    const semOk = sRes.ok && sData.ok && Array.isArray(sData.zonas);
+    if (semOk) sData.zonas.forEach((z) => { semMap[String(z.zona).trim()] = z; });
 
     // Deuda agrupada POR PROVEEDOR (cantidad × costo_unitario de sus compras).
     const deudaPorProveedor = {};
@@ -6455,9 +6452,7 @@ async function _kamComprasLoad() {
       const stock = cz.reduce((s, c) => s + (parseInt(c.cantidad, 10) || 0), 0);
       const deuda = cz.reduce((s, c) => s + (parseInt(c.cantidad, 10) || 0) * (Number(c.costo_unitario) || 0), 0);
       totalEvento += deuda;
-      const vendidos = vendidosMap[String(zona).trim()] || 0;
-      const disponible = stock - vendidos;
-      const dispColor = disponible > 0 ? 'var(--green)' : 'var(--red)';
+      const sem = semMap[String(zona).trim()] || null;
       const filas = cz.length
         ? cz.map((c) => {
             const sub = (parseInt(c.cantidad, 10) || 0) * (Number(c.costo_unitario) || 0);
@@ -6474,8 +6469,9 @@ async function _kamComprasLoad() {
       html += `<div style="border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:12px">
         <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:8px">
           <div style="font-family:'Rajdhani',sans-serif;font-weight:700;font-size:15px">${_esfEsc(zona)}</div>
-          <div style="font-size:12px;color:var(--ts)">Stock: <b style="color:var(--fg)">${stock}</b> · Vendidos: <b style="color:var(--fg)">${vendidos}</b> · Disponible: <b style="color:${dispColor};font-size:13px">${disponible}</b> · Deuda: <b style="color:var(--fg)">${_kamMoney(deuda)}</b></div>
+          <div style="font-size:12px;color:var(--ts)">Deuda: <b style="color:var(--fg)">${_kamMoney(deuda)}</b></div>
         </div>
+        ${_kamSemaforoHtml(sem, zi)}
         <table style="width:100%;border-collapse:collapse;margin-bottom:8px"><tbody>${filas}</tbody></table>
         <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
           <input class="cot-input" id="kam-c-cant-${zi}" type="number" min="0" placeholder="Cantidad" style="width:90px">
@@ -6644,6 +6640,63 @@ async function _kamCompraEliminar(id) {
     const d = await r.json().catch(() => ({}));
     if (!r.ok || !d.ok) throw new Error(d.error || 'No se pudo eliminar la compra');
     _kamComprasLoad();
+  } catch (e) { _kamComprasAlert(e.message); }
+}
+
+// [FASE B t3] ¿Puede editar el offset "vendidos fuera"? roshi/bulma.
+function _kamPuedeStock() { return ['maestro_roshi', 'bulma'].includes(currentUser && currentUser.rol); }
+
+// [FASE B t3] Película de stock de una zona (semáforo) + casilla editable de
+// "vendidos fuera" (solo roshi/bulma). `sem` es el desglose del servidor o null
+// (sin compras / semáforo no disponible) → en ese caso solo la casilla.
+function _kamSemaforoHtml(sem, zi) {
+  let film = '';
+  if (sem) {
+    const est = sem.estado; // verde | amarillo | rojo | negativo
+    const alerta = est === 'negativo'
+      ? '<span class="kam-sem-alerta">⚠ SOBREVENTA — revisa ya</span>' : '';
+    film = `<div class="kam-sem kam-sem-${_esfEsc(est)}">
+      <span class="kam-sem-i">Compradas <b>${sem.compradas}</b></span>
+      <span class="kam-sem-i">Vendidas fuera <b>${sem.fuera}</b></span>
+      <span class="kam-sem-i">Seguras <b>${sem.seguras}</b></span>
+      <span class="kam-sem-i">Apartadas <span class="kam-sem-clk">⏱</span> <b>${sem.apartadas}</b></span>
+      <span class="kam-sem-i kam-sem-disp">Disponibles <b>${sem.disponibles}</b></span>
+      ${alerta}
+    </div>`;
+  }
+  if (!_kamPuedeStock()) return film; // el resto solo ve la película, sin casilla de captura
+  const fuera = sem ? sem.fuera : 0;
+  const nota = (sem && sem.ajuste && sem.ajuste.nota) ? sem.ajuste.nota : '';
+  const meta = (sem && sem.ajuste && sem.ajuste.updated_por)
+    ? `<span class="kam-sem-meta">último ajuste: ${_esfEsc(sem.ajuste.updated_por)}</span>` : '';
+  const box = `<div class="kam-ajuste">
+    <span class="kam-ajuste-lbl">Vendidos fuera del sistema</span>
+    <input class="cot-input kam-ajuste-num" id="kam-fuera-${zi}" type="number" min="0" value="${fuera}">
+    <input class="cot-input kam-ajuste-nota" id="kam-fuera-nota-${zi}" placeholder="Nota (ej. corte Excel 24-jul)" maxlength="500" value="${_esfEsc(nota)}">
+    <button class="btn btn-ghost btn-sm" type="button" onclick="_kamAjusteGuardar(${zi})">Guardar</button>
+    ${meta}
+  </div>`;
+  return film + box;
+}
+
+// [FASE B t3] Guarda el offset "vendidos fuera" (stock_ajustes) por zona.
+async function _kamAjusteGuardar(zi) {
+  const sel = document.getElementById('kam-evt-sel');
+  const evId = sel ? sel.value : '';
+  const zona = _kamZonasMap[zi];
+  if (!evId || zona == null) return;
+  _kamComprasAlert('');
+  const v = parseInt(document.getElementById('kam-fuera-' + zi)?.value, 10);
+  if (!Number.isInteger(v) || v < 0) { _kamComprasAlert('Vendidos fuera: entero >= 0.'); return; }
+  const nota = (document.getElementById('kam-fuera-nota-' + zi)?.value || '').trim();
+  try {
+    const r = await khAdminFetch('/.netlify/functions/admin-compras', {
+      method: 'POST',
+      body: JSON.stringify({ accion: 'ajuste_guardar', evento_id: evId, zona, vendidos_fuera: v, nota: nota || null }),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok || !d.ok) throw new Error(d.error || 'No se pudo guardar el ajuste');
+    _kamComprasLoad(); // recarga con el semáforo recalculado
   } catch (e) { _kamComprasAlert(e.message); }
 }
 

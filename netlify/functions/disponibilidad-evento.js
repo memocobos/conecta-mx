@@ -12,17 +12,27 @@
 // stock − vendidos <= 0.
 //
 // SEGURIDAD (es pública): la respuesta expone SOLO nombres de zonas (gestionadas
-// y agotadas). NUNCA stock, vendidos, costos ni totales. Forma exacta:
+// y agotadas) y, para urgencia, cuántas quedan cuando son POCAS (≤5). NUNCA el
+// stock total, vendidos, costos ni totales. Forma exacta:
 //   { ok:true, evento_id, gestionado:<bool>,
-//     zonas_gestionadas:[ "<nombre>", ... ], zonas_agotadas:[ "<nombre>", ... ] }
+//     zonas_gestionadas:[ "<nombre>", ... ], zonas_agotadas:[ "<nombre>", ... ],
+//     zonas_pocas:{ "<nombre>": <restante 1..5> } }
 //   gestionado          = el evento tiene al menos una compra registrada.
 //   zonas_gestionadas   = zonas con stock registrado (cualquier compra, aunque
 //                         el disponible siga > 0). Las que el Palacio controla.
 //   zonas_agotadas      = subconjunto de zonas_gestionadas con disponible <= 0.
+//   zonas_pocas         = subconjunto con 0 < restante ≤ 5 (para "¡quedan N!").
+//                         Solo se exponen números chicos (urgencia), nunca el total.
+//
+// FASE B: usa _lib/disponibilidad (fuente única) → resta vendidos_fuera del
+// stock_ajustes y aplica la regla de conteo con reloj de 15 min. Extiende, no
+// duplica: la lib es la misma que usan el candado y Vendedores F2.
 //
 // Sin auth (NO verifyAdminAuth). Env vars: SUPABASE_*_KAMEHOUSE (KH) +
 // PORTAL_SUPABASE_* (Portal). Read-only en ambos proyectos.
 // =============================================================================
+
+const { cargarDisponibilidad, evaluarZona } = require('./_lib/disponibilidad');
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -31,7 +41,7 @@ const CORS = {
 };
 
 const EVENTO_RE = /^[A-Za-z0-9_.#-]+$/;                       // slug del EV
-const ESTADOS_CUENTAN = ['pendiente', 'en_pagos', 'pagado']; // cancelado libera
+const POCAS_UMBRAL = 5;                                       // "¡quedan N!" si restante ≤ 5
 
 function jsonRes(statusCode, body) {
   return { statusCode, headers: { ...CORS, 'Content-Type': 'application/json' }, body: JSON.stringify(body) };
@@ -54,64 +64,32 @@ exports.handler = async (event) => {
   }
 
   try {
-    // stock (KH legacy) + vendidos (Portal) en paralelo.
-    const khHeaders = { apikey: env.KH_SB_SERVICE, Authorization: `Bearer ${env.KH_SB_SERVICE}` };
-    const portalHeaders = { apikey: env.PORTAL_SB_SERVICE, Authorization: `Bearer ${env.PORTAL_SB_SERVICE}` };
-
-    const compraParams = new URLSearchParams();
-    compraParams.set('select', 'zona,cantidad');
-    compraParams.append('evento_id', `eq.${evento_id}`);
-    compraParams.set('limit', '10000');
-
-    const ventaParams = new URLSearchParams();
-    ventaParams.set('select', 'zona,num_personas,estado');
-    ventaParams.append('evento_id', `eq.${evento_id}`);
-    ventaParams.append('estado', `in.(${ESTADOS_CUENTAN.join(',')})`);
-    ventaParams.set('limit', '10000');
-
-    const [cRes, vRes] = await Promise.all([
-      fetch(`${env.KH_SB_URL}/rest/v1/compras?${compraParams.toString()}`, { headers: khHeaders }),
-      fetch(`${env.PORTAL_SB_URL}/rest/v1/solicitudes_tour?${ventaParams.toString()}`, { headers: portalHeaders }),
-    ]);
-
-    // Conservador: si CUALQUIERA falla, no devolvemos un resultado parcial (un
-    // parcial podría sub-reportar "agotado" y causar sobreventa). 502 → el index
-    // cae a sus flags manuales.
-    if (!cRes.ok || !vRes.ok) return jsonRes(502, { ok: false, error: 'No se pudo calcular la disponibilidad' });
-
-    const compras = await cRes.json();
-    const ventas = await vRes.json();
-
-    // stock por zona (KH). gestionado = hay al menos una compra registrada.
-    const stockPorZona = {};
-    (Array.isArray(compras) ? compras : []).forEach((c) => {
-      const zona = (c && c.zona != null) ? String(c.zona).trim() : '';
-      if (!zona) return;
-      stockPorZona[zona] = (stockPorZona[zona] || 0) + (parseInt(c.cantidad, 10) || 0);
+    // Fuente única: _lib/disponibilidad (compras + stock_ajustes en KH, ventas en
+    // Portal, con la regla de conteo de reloj de 15 min).
+    const disp = await cargarDisponibilidad({
+      khUrl: env.KH_SB_URL, khKey: env.KH_SB_SERVICE,
+      portalUrl: env.PORTAL_SB_URL, portalKey: env.PORTAL_SB_SERVICE,
+      evento_id,
     });
-    const gestionado = Array.isArray(compras) && compras.length > 0;
+    // Conservador: si no se pudo calcular (cualquier fetch falló), NO devolvemos un
+    // parcial (sub-reportaría "agotado" → sobreventa). 502 → el index cae a sus
+    // flags manuales.
+    if (disp.error) return jsonRes(502, { ok: false, error: 'No se pudo calcular la disponibilidad' });
 
-    // vendidos por zona (Portal), claves con trim.
-    const vendidosPorZona = {};
-    (Array.isArray(ventas) ? ventas : []).forEach((s) => {
-      const zona = (s && s.zona != null) ? String(s.zona).trim() : '';
-      if (!zona) return;
-      const n = parseInt(s.num_personas, 10);
-      if (!Number.isInteger(n) || n <= 0) return;
-      vendidosPorZona[zona] = (vendidosPorZona[zona] || 0) + n;
+    // Gestionadas: zonas con stock registrado (las que el Palacio controla).
+    const zonas_gestionadas = Object.keys(disp.stockPorZona || {});
+    const zonas_agotadas = [];
+    const zonas_pocas = {};
+    zonas_gestionadas.forEach((zona) => {
+      const ev = evaluarZona(disp, zona, 1);
+      if (ev.restante <= 0) zonas_agotadas.push(zona);
+      else if (ev.restante <= POCAS_UMBRAL) zonas_pocas[zona] = ev.restante; // urgencia: solo números chicos
     });
 
-    // Gestionadas: zonas con stock registrado (las que el Palacio controla). Solo
-    // nombres, nunca cantidades.
-    const zonas_gestionadas = Object.keys(stockPorZona);
-
-    // Agotada: zona gestionada con stock − vendidos <= 0. zonas_agotadas ⊆
-    // zonas_gestionadas (se filtra sobre las mismas llaves). Solo nombres.
-    const zonas_agotadas = zonas_gestionadas.filter(
-      (zona) => (stockPorZona[zona] - (vendidosPorZona[zona] || 0)) <= 0
-    );
-
-    return jsonRes(200, { ok: true, evento_id, gestionado, zonas_gestionadas, zonas_agotadas });
+    return jsonRes(200, {
+      ok: true, evento_id, gestionado: !!disp.gestionado,
+      zonas_gestionadas, zonas_agotadas, zonas_pocas,
+    });
   } catch (e) {
     return jsonRes(502, { ok: false, error: 'No se pudo calcular la disponibilidad' });
   }

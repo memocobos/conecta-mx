@@ -1210,6 +1210,8 @@ main{
       <div class="eyebrow">Paso 5</div>
       <h2 class="h-display">Sube tu <span class="accent">comprobante</span></h2>
       <p class="subtitle">Opcional pero acelera tu aprobación.</p>
+      <!-- [FASE B] Reloj del apartado: solo aparece si la solicitud nació con hold. -->
+      <div id="wiz-hold-timer" style="display:none;margin:0 0 16px;padding:14px 16px;border-radius:12px;background:rgba(255,183,3,.12);border:1px solid rgba(255,183,3,.5);color:#ffdf8a;font-size:14px;font-weight:700;line-height:1.5"></div>
       <div class="card">
         <label class="wiz-upload" id="wiz-upload">
           <input type="file" id="wiz-file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif,application/pdf">
@@ -3610,6 +3612,7 @@ const wizState = {
   codigoDescuento: '',
   notas: '',
   solicitudId: null,
+  holdExpiraAt: null, // [FASE B] ISO del reloj de apartado que devuelve el servidor
   file: null
 };
 
@@ -3624,6 +3627,7 @@ function resetWizard(){
   wizState.codigoDescuento = '';
   wizState.notas = '';
   wizState.solicitudId = null;
+  wizState.holdExpiraAt = null;
   wizState.file = null;
   $('#wiz-event-search').value = '';
   $('#wiz-personas').value = '1';
@@ -3644,7 +3648,39 @@ function setWizStep(n){
   $('#wiz-step-cur').textContent = display;
   $('#wiz-bar-fill').style.width = ((display / total) * 100) + '%';
   $('#wiz-back').disabled = (n <= 1 || n >= 6);
+  // [FASE B] El reloj del apartado solo vive en el paso 5 (comprobante).
+  if (n === 5) _startHoldTimer(); else _stopHoldTimer();
   window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// [FASE B] Contador vivo del apartado (reloj de 15 min). Usa el hold_expira_at
+// REAL que devolvió el servidor (wizState.holdExpiraAt). Si la solicitud no nació
+// con reloj (RIDE / zona no gestionada / ya con comprobante), no se muestra nada.
+let _holdInterval = null;
+function _stopHoldTimer(){ if (_holdInterval){ clearInterval(_holdInterval); _holdInterval = null; } }
+function _renderHoldTimer(){
+  const el = $('#wiz-hold-timer');
+  if (!el) return;
+  const iso = wizState.holdExpiraAt;
+  if (!iso){ el.style.display = 'none'; return; }
+  const fin = Date.parse(iso);
+  if (!Number.isFinite(fin)){ el.style.display = 'none'; return; }
+  const restanteMs = fin - Date.now();
+  const hhmm = new Date(fin).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' });
+  el.style.display = '';
+  if (restanteMs <= 0){
+    _stopHoldTimer();
+    el.textContent = '⏱️ Tu apartado venció, pero aún puedes subir tu comprobante para retomar tu lugar mientras haya cupo.';
+    return;
+  }
+  const mm = Math.floor(restanteMs / 60000);
+  const ss = Math.floor((restanteMs % 60000) / 1000);
+  el.textContent = `⏱️ Tu lugar está apartado — sube tu comprobante antes de las ${hhmm} (${mm}:${String(ss).padStart(2,'0')}) o se libera.`;
+}
+function _startHoldTimer(){
+  _stopHoldTimer();
+  _renderHoldTimer();
+  if (wizState.holdExpiraAt) _holdInterval = setInterval(_renderHoldTimer, 1000);
 }
 
 function openWizard(){
@@ -3858,12 +3894,49 @@ function poblarZonas(){
     sel.innerHTML = '<option value="">— Sin zonas disponibles —</option>';
     return;
   }
+  // Pinta ya desde el catálogo (rápido), y encima aplica la disponibilidad REAL
+  // (agotada / "¡quedan N!") de forma asíncrona. Best-effort: si falla, queda el
+  // catálogo. Evento no gestionado → intacto.
+  _pintarZonas(zonas, null);
+  const token = ++_zonaReqToken;
+  const eventoId = ev.id + (wizState.multifechaIdx != null ? ('#' + wizState.multifechaIdx) : '');
+  _consultarDisponibilidad(eventoId).then((disp) => {
+    if (token !== _zonaReqToken) return;                 // el usuario cambió fecha/pkg → descartar
+    if (!disp || !disp.ok || !disp.gestionado) return;   // no gestionado → catálogo intacto
+    _pintarZonas(getZonas(wizState.ev, wizState.pkg, wizState.multifechaIdx), disp);
+  }).catch(() => {});
+}
+
+// [FASE B] Pinta el <select> de zonas. Con `disp` (respuesta de disponibilidad-evento)
+// sobrepone la realidad del inventario: zona en zonas_agotadas → deshabilitada; zona
+// en zonas_pocas → "¡quedan N!" (urgencia). Sin `disp`, usa solo el catálogo.
+let _zonaReqToken = 0;
+function _pintarZonas(zonas, disp){
+  const sel = $('#wiz-zona');
+  const prev = sel.value;
+  const agSet = disp ? new Set((disp.zonas_agotadas || []).map((s) => String(s).trim())) : null;
+  const pocas = disp ? (disp.zonas_pocas || {}) : null;
   sel.innerHTML = '<option value="">— Elige una zona —</option>' +
     zonas.map((z, i) => {
-      const agotada = !!z.ag || !(z.p > 0);
-      const lbl = z.n + (z.p > 0 ? ' — ' + fmtMxn(z.p) : ' (agotada)');
+      const nom = String(z.n).trim();
+      const agotada = !!z.ag || !(z.p > 0) || (agSet && agSet.has(nom));
+      let lbl = z.n + (z.p > 0 ? ' — ' + fmtMxn(z.p) : '');
+      if (agotada) lbl += ' (agotada)';
+      else if (pocas && pocas[nom] != null) lbl += ` · ¡quedan ${pocas[nom]}!`;
       return `<option value="${i}" ${agotada ? 'disabled' : ''}>${escapeHtml(lbl)}</option>`;
     }).join('');
+  if (prev) sel.value = prev; // conserva la selección si sigue válida (disabled → cae a "")
+}
+
+async function _consultarDisponibilidad(eventoId){
+  try {
+    const r = await fetch('/.netlify/functions/disponibilidad-evento', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ evento_id: eventoId }),
+    });
+    if (!r.ok) return null;
+    return await r.json();
+  } catch (e) { return null; }
 }
 
 $('#wiz-zona').addEventListener('change', (e) => {
@@ -4035,41 +4108,45 @@ document.body.addEventListener('click', async (e) => {
     estado: 'pendiente'
   };
 
-  const { data, error } = await supabase
-    .from('solicitudes_tour')
-    .insert(payload)
-    .select()
-    .single();
-
-  setLoading(t, false);
-
-  if (error){
-    console.error('[portal] insert solicitud', error);
-    showAlert($('#wiz-alert'), 'error', traducirError(error));
-    return;
-  }
-  wizState.solicitudId = data.id;
-
-  // Notificar al admin (async, sin bloquear el flow del cliente)
-  notificarAdminNuevaSolicitud(data.id);
-
-  setWizStep(5);
-});
-
-async function notificarAdminNuevaSolicitud(solicitudId){
+  // [FASE B] El servidor OWNS el insert (candado anti-sobreventa): verifica cupo,
+  // pone el reloj de 15 min y re-verifica la carrera del último boleto. 409 = no
+  // hay cupo / se agotó → aviso amable y de vuelta a elegir zona (paso 3).
+  let resp, out;
   try {
     const { data: { session } } = await supabase.auth.getSession();
     const jwt = session && session.access_token;
-    if (!jwt) return;
-    await fetch('/.netlify/functions/portal-nueva-solicitud', {
+    if (!jwt){ setLoading(t, false); showAlert($('#wiz-alert'), 'error', 'Tu sesión expiró. Vuelve a iniciar sesión.'); return; }
+    resp = await fetch('/.netlify/functions/portal-nueva-solicitud', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + jwt },
-      body: JSON.stringify({ solicitud_id: solicitudId })
+      body: JSON.stringify({ solicitud: payload })
     });
+    out = await resp.json().catch(() => ({}));
   } catch (e) {
-    console.warn('[portal] notif admin falló', e);
+    setLoading(t, false);
+    showAlert($('#wiz-alert'), 'error', 'No hay conexión. Intenta de nuevo.');
+    return;
   }
-}
+  setLoading(t, false);
+
+  if (!resp.ok || !out.ok){
+    const msg = out && out.error ? out.error : 'No se pudo crear la solicitud. Intenta de nuevo.';
+    // 409 = sin cupo / agotada mientras confirmaba → regresa a elegir zona.
+    if (resp.status === 409){
+      setWizStep(3);
+      if (typeof poblarZonas === 'function') poblarZonas(); // refresca disponibilidad de la zona
+      showAlert($('#wiz-alert'), 'error', msg);
+    } else {
+      showAlert($('#wiz-alert'), 'error', msg);
+    }
+    return;
+  }
+
+  wizState.solicitudId = out.solicitud_id;
+  wizState.holdExpiraAt = out.hold_expira_at || null; // ISO del reloj (null si no aplica)
+
+  setWizStep(5);
+});
 
 // ---------- Paso 5: Comprobante ----------
 // Compresión en navegador ANTES de subir (calca _esfMapaResize de kamehouse):
@@ -4194,10 +4271,12 @@ document.body.addEventListener('click', async (e) => {
     return;
   }
 
-  // Guardar referencia del path en la solicitud
+  // Guardar referencia del path en la solicitud. [FASE B] Subir comprobante DETIENE
+  // el reloj: hold_expira_at = NULL → el lugar queda seguro (deja de vencerse) y el
+  // contador desaparece. (El propio dueño puede actualizar su fila por RLS.)
   const { error: updErr } = await supabase
     .from('solicitudes_tour')
-    .update({ comprobante_separo_url: path })
+    .update({ comprobante_separo_url: path, hold_expira_at: null })
     .eq('id', wizState.solicitudId);
 
   setLoading(upload, false);
@@ -4206,6 +4285,8 @@ document.body.addEventListener('click', async (e) => {
     console.warn('[portal] no se pudo guardar el path del comprobante', updErr);
     // No bloqueamos el flow — el archivo ya está subido, el admin puede asociarlo manualmente
   }
+  wizState.holdExpiraAt = null; // se acabó el reloj: el contador ya no debe reaparecer
+  _stopHoldTimer();
   setWizStep(6);
 });
 

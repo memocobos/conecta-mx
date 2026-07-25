@@ -1,11 +1,8 @@
 // Migrado al proyecto KameHouse (npgnhsmwpcipxgvfxrho): event_clicks y la RPC
 // increment_event_click ya viven ahi con firmas identicas y datos migrados.
-// Patron de la casa: env KAMEHOUSE primero, fallback a las variables viejas.
-const SUPABASE_URL = process.env.SUPABASE_URL_KAMEHOUSE || process.env.SUPABASE_URL;
-const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY_KAMEHOUSE
-  || process.env.SUPABASE_SERVICE_KEY
-  || process.env.SUPABASE_SERVICE_ROLE_KEY
-  || process.env.SUPABASE_KEY;
+// Patron de la casa: llaves canonicas KAMEHOUSE (sin fallbacks).
+const KH_SB_URL = process.env.SUPABASE_URL_KAMEHOUSE;
+const KH_SB_KEY = process.env.SUPABASE_SERVICE_KEY_KAMEHOUSE;
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -24,14 +21,14 @@ function jsonRes(statusCode, body) {
 exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return { statusCode: 204, headers: CORS, body: '' };
 
-  if (!SUPABASE_URL || !SUPABASE_KEY) {
-    console.error('Missing SUPABASE_URL or SUPABASE_KEY env vars');
+  if (!KH_SB_URL || !KH_SB_KEY) {
+    console.error('Missing SUPABASE_URL_KAMEHOUSE or SUPABASE_SERVICE_KEY_KAMEHOUSE env vars');
     return jsonRes(500, { error: 'Server not configured' });
   }
 
   const headers = {
-    apikey: SUPABASE_KEY,
-    Authorization: `Bearer ${SUPABASE_KEY}`,
+    apikey: KH_SB_KEY,
+    Authorization: `Bearer ${KH_SB_KEY}`,
     'Content-Type': 'application/json'
   };
 
@@ -40,7 +37,7 @@ exports.handler = async (event) => {
       const { eventId, eventName } = JSON.parse(event.body || '{}');
       if (!eventId) return jsonRes(400, { error: 'Missing eventId' });
 
-      const rpcRes = await fetch(`${SUPABASE_URL}/rest/v1/rpc/increment_event_click`, {
+      const rpcRes = await fetch(`${KH_SB_URL}/rest/v1/rpc/increment_event_click`, {
         method: 'POST',
         headers,
         body: JSON.stringify({ p_event_id: eventId, p_event_name: eventName || eventId })
@@ -56,7 +53,7 @@ exports.handler = async (event) => {
     }
 
     if (event.httpMethod === 'GET') {
-      const url = `${SUPABASE_URL}/rest/v1/event_clicks?select=event_id,event_name,clicks,updated_at&order=clicks.desc&limit=10`;
+      const url = `${KH_SB_URL}/rest/v1/event_clicks?select=event_id,event_name,clicks,updated_at&order=clicks.desc&limit=10`;
       const listRes = await fetch(url, { headers });
       if (!listRes.ok) {
         const details = await listRes.text();

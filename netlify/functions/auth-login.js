@@ -17,18 +17,16 @@
 //   rechazado). El fallback temporal de texto plano ya fue eliminado.
 //
 // Env vars requeridas:
-//   - SUPABASE_URL_KAMEHOUSE  (fallback SUPABASE_URL)
-//   - SUPABASE_SERVICE_KEY_KAMEHOUSE  (fallback SUPABASE_SERVICE_KEY / _ROLE_KEY)
+//   - SUPABASE_URL_KAMEHOUSE
+//   - SUPABASE_SERVICE_KEY_KAMEHOUSE
 //   - JWT_SECRET  (generar con: openssl rand -hex 32)
 // =============================================================================
 
 const { jwtSign, corsCheck, corsHeaders, jsonError, ALLOWED_ORIGINS } = require('./_lib/verify-admin');
 const bcrypt = require('bcryptjs');
 
-const SB_URL = process.env.SUPABASE_URL_KAMEHOUSE || process.env.SUPABASE_URL;
-const SB_KEY = process.env.SUPABASE_SERVICE_KEY_KAMEHOUSE
-            || process.env.SUPABASE_SERVICE_KEY
-            || process.env.SUPABASE_SERVICE_ROLE_KEY;
+const SB_URL = process.env.SUPABASE_URL_KAMEHOUSE;
+const SB_KEY = process.env.SUPABASE_SERVICE_KEY_KAMEHOUSE;
 const JWT_SECRET = process.env.JWT_SECRET;
 
 const JWT_TTL_SECONDS = 8 * 60 * 60;          // 8 horas

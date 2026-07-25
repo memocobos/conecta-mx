@@ -475,8 +475,8 @@ async function correoSolicitante(env, kh, salida, resultado, motivo) {
 }
 
 function readEnv() {
-  const KH_URL = process.env.SUPABASE_URL_KAMEHOUSE || process.env.SUPABASE_URL;
-  const KH_KEY = process.env.SUPABASE_SERVICE_KEY_KAMEHOUSE || process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const KH_URL = process.env.SUPABASE_URL_KAMEHOUSE;
+  const KH_KEY = process.env.SUPABASE_SERVICE_KEY_KAMEHOUSE;
   if (!KH_URL || !KH_KEY) return { error: 'Faltan env vars KH (SUPABASE_URL_KAMEHOUSE/SERVICE_KEY_KAMEHOUSE)' };
   const RESEND_KEY = process.env.RESEND_KEY || process.env.RESEND_API_KEY || '';
   return { KH_URL, KH_KEY, RESEND_KEY };

@@ -33,10 +33,8 @@
 const { aplicarModoPrueba } = require('./_lib/correo-guard');
 const { MESES_LIMITE, _masMesesFecha, _inicioVendedor } = require('./_lib/vendedor-activo');
 
-const SB_URL = process.env.SUPABASE_URL_KAMEHOUSE || process.env.SUPABASE_URL;
-const SB_KEY = process.env.SUPABASE_SERVICE_KEY_KAMEHOUSE
-            || process.env.SUPABASE_SERVICE_KEY
-            || process.env.SUPABASE_SERVICE_ROLE_KEY;
+const SB_URL = process.env.SUPABASE_URL_KAMEHOUSE;
+const SB_KEY = process.env.SUPABASE_SERVICE_KEY_KAMEHOUSE;
 const RESEND_KEY = process.env.RESEND_KEY || process.env.RESEND_API_KEY;
 const ADMIN_EMAIL = 'admin@conectareynosa.mx';
 const ADMIN_TO = 'admin@conectareynosa.mx';

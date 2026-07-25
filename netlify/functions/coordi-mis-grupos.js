@@ -23,7 +23,7 @@
 // Body JSON: {}  (no se acepta coordi_id/evento_id del body para el filtro).
 //
 // Env vars (reusa las existentes, sin vars nuevas):
-//   - SUPABASE_URL_KAMEHOUSE (|| SUPABASE_URL), SUPABASE_SERVICE_KEY_KAMEHOUSE
+//   - SUPABASE_URL_KAMEHOUSE, SUPABASE_SERVICE_KEY_KAMEHOUSE
 //   - PORTAL_SUPABASE_URL, PORTAL_SUPABASE_SERVICE_KEY
 //   - JWT_SECRET (lo lee verifyAdminAuth)
 // =============================================================================
@@ -190,7 +190,7 @@ exports.handler = async (event) => {
 // ----- helpers -----
 
 function readEnv() {
-  const KH_SB_URL      = process.env.SUPABASE_URL_KAMEHOUSE || process.env.SUPABASE_URL;
+  const KH_SB_URL      = process.env.SUPABASE_URL_KAMEHOUSE;
   const KH_SB_SERVICE  = process.env.SUPABASE_SERVICE_KEY_KAMEHOUSE;
   const PORTAL_SB_URL     = process.env.PORTAL_SUPABASE_URL;
   const PORTAL_SB_SERVICE = process.env.PORTAL_SUPABASE_SERVICE_KEY;

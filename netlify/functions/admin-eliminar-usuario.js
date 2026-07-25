@@ -26,10 +26,8 @@
 
 const { verifyAdminAuth, corsCheck, corsHeaders } = require('./_lib/verify-admin');
 
-const SB_URL = process.env.SUPABASE_URL_KAMEHOUSE || process.env.SUPABASE_URL;
-const SB_KEY = process.env.SUPABASE_SERVICE_KEY_KAMEHOUSE
-            || process.env.SUPABASE_SERVICE_KEY
-            || process.env.SUPABASE_SERVICE_ROLE_KEY;
+const SB_URL = process.env.SUPABASE_URL_KAMEHOUSE;
+const SB_KEY = process.env.SUPABASE_SERVICE_KEY_KAMEHOUSE;
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 

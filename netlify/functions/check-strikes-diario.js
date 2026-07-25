@@ -4,10 +4,8 @@
 
 const { aplicarModoPrueba } = require('./_lib/correo-guard');
 
-const SB_URL = process.env.SUPABASE_URL_KAMEHOUSE || process.env.SUPABASE_URL;
-const SB_KEY = process.env.SUPABASE_SERVICE_KEY_KAMEHOUSE
-            || process.env.SUPABASE_SERVICE_KEY
-            || process.env.SUPABASE_SERVICE_ROLE_KEY;
+const SB_URL = process.env.SUPABASE_URL_KAMEHOUSE;
+const SB_KEY = process.env.SUPABASE_SERVICE_KEY_KAMEHOUSE;
 const MEMO_EMAIL = "reynosa@conectamexico.mx";
 const HEADERS = {
   apikey: SB_KEY,

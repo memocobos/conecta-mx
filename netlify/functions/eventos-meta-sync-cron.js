@@ -20,7 +20,7 @@
 // service_role. NUNCA expone la service key. Mismo estilo que check-strikes-diario.
 //
 // Env vars (reusa las existentes):
-//   - SUPABASE_URL_KAMEHOUSE (|| SUPABASE_URL), SUPABASE_SERVICE_KEY_KAMEHOUSE
+//   - SUPABASE_URL_KAMEHOUSE, SUPABASE_SERVICE_KEY_KAMEHOUSE
 //   - URL (Netlify la setea al dominio del sitio; fallback a producción)
 // =============================================================================
 
@@ -282,7 +282,7 @@ function limpiaFecha(v) {
 }
 
 function readEnv() {
-  const KH_SB_URL = process.env.SUPABASE_URL_KAMEHOUSE || process.env.SUPABASE_URL;
+  const KH_SB_URL = process.env.SUPABASE_URL_KAMEHOUSE;
   const KH_SB_SERVICE = process.env.SUPABASE_SERVICE_KEY_KAMEHOUSE;
   if (!KH_SB_URL || !KH_SB_SERVICE) {
     return { error: 'Faltan env vars KH (SUPABASE_URL_KAMEHOUSE/SERVICE_KEY_KAMEHOUSE)' };

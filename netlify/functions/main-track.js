@@ -15,10 +15,8 @@ exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return { statusCode: 200, headers, body: '' };
   if (event.httpMethod !== 'POST') return { statusCode: 405, headers, body: JSON.stringify({ error: 'Method not allowed' }) };
 
-  const SB_URL = process.env.SUPABASE_URL_KAMEHOUSE || process.env.SUPABASE_URL;
-  const SB_KEY = process.env.SUPABASE_SERVICE_KEY_KAMEHOUSE
-              || process.env.SUPABASE_SERVICE_KEY
-              || process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const SB_URL = process.env.SUPABASE_URL_KAMEHOUSE;
+  const SB_KEY = process.env.SUPABASE_SERVICE_KEY_KAMEHOUSE;
   if (!SB_URL || !SB_KEY) {
     return { statusCode: 500, headers, body: JSON.stringify({ error: 'env vars no configuradas' }) };
   }

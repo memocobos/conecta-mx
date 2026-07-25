@@ -19,7 +19,7 @@
 //   - list/marcar SIEMPRE scopeados por el usuario del JWT (no del body).
 //
 // Env vars (reusa las existentes):
-//   - SUPABASE_URL_KAMEHOUSE (|| SUPABASE_URL), SUPABASE_SERVICE_KEY_KAMEHOUSE
+//   - SUPABASE_URL_KAMEHOUSE, SUPABASE_SERVICE_KEY_KAMEHOUSE
 //   - JWT_SECRET (lo lee verifyAdminAuth)
 // =============================================================================
 
@@ -188,7 +188,7 @@ exports.handler = async (event) => {
 // ----- helpers -----
 
 function readEnv() {
-  const KH_SB_URL     = process.env.SUPABASE_URL_KAMEHOUSE || process.env.SUPABASE_URL;
+  const KH_SB_URL     = process.env.SUPABASE_URL_KAMEHOUSE;
   const KH_SB_SERVICE = process.env.SUPABASE_SERVICE_KEY_KAMEHOUSE;
   if (!KH_SB_URL || !KH_SB_SERVICE) {
     return { error: 'Faltan env vars KH (SUPABASE_URL_KAMEHOUSE/SERVICE_KEY_KAMEHOUSE)' };

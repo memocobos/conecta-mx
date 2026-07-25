@@ -7,8 +7,8 @@ const { aplicarModoPrueba } = require('./_lib/correo-guard');
 
 // Migrado al proyecto KameHouse (npgnhsmwpcipxgvfxrho): rol_recordatorios ya
 // vive ahi con firma identica y datos migrados. Env KAMEHOUSE primero.
-const SB_URL      = process.env.SUPABASE_URL_KAMEHOUSE || process.env.SUPABASE_URL;
-const SB_KEY      = process.env.SUPABASE_SERVICE_KEY_KAMEHOUSE || process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
+const SB_URL      = process.env.SUPABASE_URL_KAMEHOUSE;
+const SB_KEY      = process.env.SUPABASE_SERVICE_KEY_KAMEHOUSE;
 const RESEND_KEY  = process.env.RESEND_API_KEY || process.env.RESEND_KEY;
 const FROM = process.env.RESEND_FROM_ROL || "Conecta Reynosa <admin@conectareynosa.mx>";
 const SITE        = process.env.URL || "https://conectareynosa.mx";

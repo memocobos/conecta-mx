@@ -16,7 +16,7 @@
 // catálogo: sin catálogo o evento no hallado → { ok:false, indeterminado:true }.
 // =============================================================================
 
-const { fetchEventosRaw } = require('./catalogo-index');
+const { fetchEventosRaw, fetchHotelesGlobales } = require('./catalogo-index');
 
 const PAQUETES = ['plus', 'ride', 'stay', 'cheap'];
 
@@ -54,6 +54,33 @@ function _zonaLista(ev, paquete, fechaIdx) {
   return (mf && mf.zonas) || ev.zonas || [];
 }
 
+// 🔒 AUD-2 — CASCADA DE HOTEL, espejo EXACTO del index.html:
+//   var hl = (cur.hotelOverride && cur.hotel && cur.hotel.length) ? cur.hotel
+//                                                                : hotelList(cur);
+//   function hotelList(ev){ mf.hotel de la fecha elegida → isCDMX ? HOTEL_CDM : HOTEL_MTY }
+// Antes esta lib solo miraba `ev.hotel`, que además venía undefined porque los
+// HOTEL_* se stubbeaban al parsear el EV: ninguna venta con hotel se podía
+// resolver en los eventos que usan las listas globales.
+function _hotelLista(ev, fechaIdx, cdmx, globales) {
+  if (ev.hotelOverride && Array.isArray(ev.hotel) && ev.hotel.length) return ev.hotel;
+  const mf = ev.multifecha && ev.multifecha[fechaIdx];
+  if (mf && Array.isArray(mf.hotel) && mf.hotel.length) return mf.hotel;
+  const g = globales || {};
+  const glob = cdmx ? g.cdm : g.mty;
+  if (Array.isArray(glob) && glob.length) return glob;
+  // Último recurso: lo que el evento declare (si el catálogo pudo materializarlo).
+  return Array.isArray(ev.hotel) ? ev.hotel : [];
+}
+
+// Fecha efectiva del evento para la fecha elegida (multifecha → su ds).
+function _fechaEvento(ev, fechaIdx) {
+  const mf = ev.multifecha && ev.multifecha[fechaIdx];
+  return (mf && mf.ds) || ev.ds || null;
+}
+
+// Estados de catálogo en los que NO se vende.
+const ST_NO_VENDIBLE = ['agotado', 'por-confirmar', 'proceso', 'proximamente', 'pronto'];
+
 // ── Cálculo PURO (sin IO) — FIEL a calcular() del index. Recibe el evento CRUDO ──
 // del EV + las selecciones. Devuelve { ok, ... } | { ok:false, motivo }.
 function _calcularPrecio(ev, opts) {
@@ -68,6 +95,29 @@ function _calcularPrecio(ev, opts) {
   const hoyISO = (opts && opts.hoyISO) || hoyMx();
   const cdmx = esCDMX(ev);
 
+  // 🔒 AUD-2 — fecha_idx fuera de rango. Antes, un slug#99 caía a las listas
+  // top-level del evento y VENDÍA a un precio que no corresponde a ninguna fecha.
+  if (Array.isArray(ev.multifecha) && ev.multifecha.length) {
+    if (!Number.isInteger(fechaIdx) || fechaIdx < 0 || fechaIdx >= ev.multifecha.length) {
+      return { ok: false, motivo: 'fecha del evento fuera de rango' };
+    }
+  } else if (fechaIdx !== 0) {
+    return { ok: false, motivo: 'el evento no tiene multifecha' };
+  }
+
+  // 🔒 AUD-2 — el catálogo manda: no se vende lo que no está a la venta.
+  const st = String(ev.st || '').toLowerCase();
+  if (ST_NO_VENDIBLE.includes(st)) {
+    return { ok: false, motivo: `el evento está "${st}" en el catálogo — no se vende` };
+  }
+
+  // 🔒 AUD-2 — evento ya pasado (de la fecha elegida si es multifecha).
+  const dsEvento = _fechaEvento(ev, fechaIdx);
+  const diasAlEvento = _diasEvento(dsEvento, hoyISO);
+  if (diasAlEvento != null && diasAlEvento < 0) {
+    return { ok: false, motivo: 'la fecha del evento ya pasó' };
+  }
+
   const hasZona = (paquete === 'plus' || paquete === 'stay' || paquete === 'cheap') || (paquete === 'ride' && ev.forceZona);
   const hasHotel = (paquete === 'plus' || paquete === 'ride' || paquete === 'stay') && !ev.noHotel;
 
@@ -77,6 +127,11 @@ function _calcularPrecio(ev, opts) {
     const zonaNombre = String((opts && opts.zona) || '');
     selZ = _zonaLista(ev, paquete, fechaIdx).find(z => z && z.n === zonaNombre) || null;
     if (!selZ) return { ok: false, motivo: 'zona no encontrada en el catálogo' };
+    // 🔒 AUD-2: las banderas del catálogo mandan. `ag` = agotada, `prox` = aún no
+    // sale a la venta. Antes solo se miraba el precio, así que una zona marcada
+    // agotada pero con precio se podía vender.
+    if (selZ.ag) return { ok: false, motivo: 'zona agotada' };
+    if (selZ.prox) return { ok: false, motivo: 'zona aún no disponible (próximamente)' };
     if (!(Number(selZ.p) > 0)) return { ok: false, motivo: 'zona agotada / sin precio (p=0)' };
   }
 
@@ -84,7 +139,8 @@ function _calcularPrecio(ev, opts) {
   let selH = null;
   const requiereHotel = hasHotel && !(opts && opts.hotel_nombre);
   if (hasHotel && opts && opts.hotel_nombre) {
-    selH = (ev.hotel || []).find(h => h && h.n === opts.hotel_nombre) || null;
+    const lista = _hotelLista(ev, fechaIdx, cdmx, opts && opts.hoteles);
+    selH = lista.find(h => h && h.n === opts.hotel_nombre) || null;
     if (!selH) return { ok: false, motivo: 'hotel no encontrado en el catálogo' };
     // Grupo grande (N>4): SOLO habitación compartida (el reparto fino se afina al
     // reservar). Espejo de la regla del index (buildHotelButtons) y de _vtaCalc.
@@ -117,7 +173,16 @@ function _calcularPrecio(ev, opts) {
   }
 
   // Transporte CDMX (costo por persona; el caller lo provee).
-  const transportCost = Number(opts && opts.transporte_cost) || 0;
+  // 🔒 AUD-2 — BUG DE DINERO: no había validación. Un costo NEGATIVO restaba del
+  // total (venta por debajo del precio real) y un costo en un evento que NO es
+  // CDMX sumaba un concepto que el sitio jamás cobra. Ambos se rechazan fuerte:
+  // ningún flujo legítimo los manda, así que callar sería tapar un error.
+  const tcRaw = (opts && opts.transporte_cost != null) ? Number(opts.transporte_cost) : 0;
+  if (!Number.isFinite(tcRaw)) return { ok: false, motivo: 'transporte_cost inválido' };
+  if (tcRaw < 0) return { ok: false, motivo: 'transporte_cost no puede ser negativo' };
+  if (tcRaw > 0 && !cdmx) return { ok: false, motivo: 'transporte_cost solo aplica a eventos de CDMX' };
+  if (tcRaw > 0 && paquete === 'cheap') return { ok: false, motivo: 'el paquete CHEAP no lleva transporte' };
+  const transportCost = tcRaw;
   total += transportCost * selViaj;
   costoXPersona += transportCost;
 
@@ -149,6 +214,17 @@ function _calcularPrecio(ev, opts) {
     return { ok: false, motivo: 'precio no disponible (total/costo 0)' };
   }
 
+  // 🔒 AUD-2 — el separo ES la ganancia de Memo (regla D1 del módulo). Si para
+  // plus/ride/stay saliera 0 (evento sin `sep` en el catálogo), la venta se
+  // registraría SIN ganancia y sin que nadie lo note. Mejor indeterminado: que
+  // se capture el separo en el catálogo antes de vender.
+  if (paquete !== 'cheap' && !(separo > 0)) {
+    return {
+      ok: false, indeterminado: true,
+      motivo: 'el evento no tiene separo definido en el catálogo — captúralo antes de vender',
+    };
+  }
+
   return {
     ok: true,
     paquete,
@@ -178,7 +254,12 @@ async function resolverPrecioVenta(opts) {
   const e = ev.find(x => x && x.id === slug) || null;
   if (!e) return { ok: false, motivo: 'evento no encontrado en el catálogo' };
 
+  // Listas de hotel globales del index para la cascada (best-effort: {}).
+  let hoteles = {};
+  try { hoteles = await fetchHotelesGlobales(); } catch (_) { hoteles = {}; }
+
   return _calcularPrecio(e, {
+    hoteles,
     paquete: opts.paquete,
     zona: opts.zona,
     num_personas: opts.num_personas,

@@ -15652,6 +15652,37 @@ function _vtaDias(evISO, hoyISO) {
   return Math.round((Date.UTC(+m1[1], +m1[2] - 1, +m1[3]) - Date.UTC(+m2[1], +m2[2] - 1, +m2[3])) / 86400000);
 }
 function _vtaHoyMx() { return new Date().toLocaleDateString('en-CA', { timeZone: 'America/Monterrey' }); }
+// [AUD-2] Listas de hotel globales del index (las llena _fetchEVFromIndex).
+let _vtaHoteles = {};
+// Texto crudo de `var HOTEL_*=[...]` del index, por balanceo de corchetes.
+function _vtaDeclaracionesHotel(html) {
+  const out = [];
+  for (const nombre of ['HOTEL_STD', 'HOTEL_MTY', 'HOTEL_CDM']) {
+    const m = String(html).match(new RegExp('var\\s+' + nombre + '\\s*=\\s*\\['));
+    if (!m) continue;
+    const start = m.index + m[0].length - 1;
+    let depth = 0, inStr = false, sc = '', esc = false, end = -1;
+    for (let i = start; i < html.length; i++) {
+      const ch = html[i];
+      if (esc) { esc = false; continue; }
+      if (inStr) { if (ch === '\\') { esc = true; continue; } if (ch === sc) inStr = false; continue; }
+      if (ch === '"' || ch === "'") { inStr = true; sc = ch; continue; }
+      if (ch === '[') depth++;
+      else if (ch === ']') { depth--; if (!depth) { end = i + 1; break; } }
+    }
+    if (end > 0) out.push('var ' + nombre + '=' + html.slice(start, end) + ';');
+  }
+  return out.join('');
+}
+// [AUD-2] Cascada de hotel — espejo EXACTO del index y de _lib/precio-zona.
+function _vtaHotelLista(ev, fi, cdmx) {
+  if (ev.hotelOverride && Array.isArray(ev.hotel) && ev.hotel.length) return ev.hotel;
+  const mf = ev.multifecha && ev.multifecha[fi];
+  if (mf && Array.isArray(mf.hotel) && mf.hotel.length) return mf.hotel;
+  const glob = cdmx ? _vtaHoteles.cdm : _vtaHoteles.mty;
+  if (Array.isArray(glob) && glob.length) return glob;
+  return Array.isArray(ev.hotel) ? ev.hotel : [];
+}
 function _vtaEsCDMX(ev) { const v = ev && ev.v ? String(ev.v).toUpperCase() : ''; return v.includes('CDMX') || v.includes('CIUDAD DE MEXICO'); }
 function _vtaZonaLista(ev, paquete, fi) { const mf = ev.multifecha && ev.multifecha[fi]; if (paquete === 'cheap') return (mf && mf.cheapZonas) || ev.cheapZonas || []; return (mf && mf.zonas) || ev.zonas || []; }
 
@@ -15665,18 +15696,29 @@ function _vtaCalc(ev, opts) {
   const fi = Number.isFinite(Number(opts.fecha_idx)) ? Number(opts.fecha_idx) : 0;
   const hoyISO = opts.hoyISO || _vtaHoyMx();
   const cdmx = _vtaEsCDMX(ev);
+  // [AUD-2] Mismos candados que _lib/precio-zona (las 3 copias van a la par).
+  if (Array.isArray(ev.multifecha) && ev.multifecha.length) {
+    if (!Number.isInteger(fi) || fi < 0 || fi >= ev.multifecha.length) return { ok: false, motivo: 'fecha del evento fuera de rango' };
+  } else if (fi !== 0) return { ok: false, motivo: 'el evento no tiene multifecha' };
+  const _st = String(ev.st || '').toLowerCase();
+  if (['agotado', 'por-confirmar', 'proceso', 'proximamente', 'pronto'].indexOf(_st) >= 0) return { ok: false, motivo: `el evento está "${_st}" en el catálogo — no se vende` };
+  const _mfDs = (ev.multifecha && ev.multifecha[fi] && ev.multifecha[fi].ds) || ev.ds || null;
+  const _diasEv = _vtaDias(_mfDs, hoyISO);
+  if (_diasEv != null && _diasEv < 0) return { ok: false, motivo: 'la fecha del evento ya pasó' };
   const hasZona = (paquete === 'plus' || paquete === 'stay' || paquete === 'cheap') || (paquete === 'ride' && ev.forceZona);
   const hasHotel = (paquete === 'plus' || paquete === 'ride' || paquete === 'stay') && !ev.noHotel;
   let selZ = null;
   if (hasZona) {
     selZ = _vtaZonaLista(ev, paquete, fi).filter(z => z && z.n === String(opts.zona || ''))[0] || null;
     if (!selZ) return { ok: false, motivo: 'zona no encontrada' };
+    if (selZ.ag) return { ok: false, motivo: 'zona agotada' };                       // [AUD-2]
+    if (selZ.prox) return { ok: false, motivo: 'zona aún no disponible (próximamente)' }; // [AUD-2]
     if (!(Number(selZ.p) > 0)) return { ok: false, motivo: 'zona agotada / sin precio' };
   }
   let selH = null;
   const requiereHotel = hasHotel && !opts.hotel_nombre;
   if (hasHotel && opts.hotel_nombre) {
-    selH = (ev.hotel || []).filter(h => h && h.n === opts.hotel_nombre)[0] || null;
+    selH = _vtaHotelLista(ev, fi, cdmx).filter(h => h && h.n === opts.hotel_nombre)[0] || null;
     if (!selH) return { ok: false, motivo: 'hotel no encontrado' };
     // Grupo grande (N>4): SOLO compartida (espejo de precio-zona / index).
     if (selViaj > 4 && !(selH.k === 'compartida' || /^compartida/i.test(selH.n || ''))) return { ok: false, motivo: 'grupo grande: solo habitación compartida' };
@@ -15694,7 +15736,13 @@ function _vtaCalc(ev, opts) {
   else if (paquete === 'ride') { const r = (ev.rideOnly && zonaP > 0) ? zonaP : rideBase; total = r * selViaj + hotelTotal; cxp = r + hotelPP; }
   else if (paquete === 'stay') { cxp = zonaP - stayDiscount + hotelPP; if (cxp < 0) cxp = zonaP + hotelPP; total = cxp * selViaj; }
   else { if (ev.diaFirst) { total = zonaP; cxp = Math.ceil(zonaP / selViaj); } else { total = zonaP * selViaj; cxp = zonaP; } }
-  const tCost = Number(opts.transporte_cost) || 0;
+  // [AUD-2] transporte: nunca negativo, solo CDMX, nunca en CHEAP.
+  const _tcRaw = (opts.transporte_cost != null) ? Number(opts.transporte_cost) : 0;
+  if (!Number.isFinite(_tcRaw)) return { ok: false, motivo: 'transporte_cost inválido' };
+  if (_tcRaw < 0) return { ok: false, motivo: 'transporte_cost no puede ser negativo' };
+  if (_tcRaw > 0 && !cdmx) return { ok: false, motivo: 'transporte_cost solo aplica a eventos de CDMX' };
+  if (_tcRaw > 0 && paquete === 'cheap') return { ok: false, motivo: 'el paquete CHEAP no lleva transporte' };
+  const tCost = _tcRaw;
   total += tCost * selViaj; cxp += tCost;
   let separo;
   if (paquete === 'cheap') {
@@ -15707,6 +15755,8 @@ function _vtaCalc(ev, opts) {
     else { let s = ev.sep; if (paquete === 'ride' && ev.sepRide !== undefined) s = ev.sepRide; if (ev.sepZonas && selZ && ev.sepZonas[selZ.n] !== undefined) s = ev.sepZonas[selZ.n]; separo = (Number(s) || 0) * selViaj; }
   }
   if (!(total > 0) || !(cxp > 0)) return { ok: false, motivo: 'precio no disponible' };
+  // [AUD-2] el separo ES la ganancia: 0 en plus/ride/stay = catálogo incompleto.
+  if (paquete !== 'cheap' && !(separo > 0)) return { ok: false, indeterminado: true, motivo: 'el evento no tiene separo definido en el catálogo — captúralo antes de vender' };
   return { ok: true, paquete, zona: selZ ? selZ.n : null, num_personas: selViaj, precio_unit: cxp, total, separo, resto: total - separo, requiere_hotel: requiereHotel, requiere_transporte: requiereTransporte };
 }
 
@@ -16377,10 +16427,18 @@ async function _fetchEVFromIndex() {
     }
     if (end < 0) throw new Error('Array EV sin cerrar');
     const arrText = html.slice(start, end);
-    // Stubs para los globals que el array referencia (BANCO_*, HOTEL_*).
-    const stubs = 'var BANCO_DEFAULT={},BANCO_HEY={},HOTEL_CDM=[],HOTEL_STD=[];';
+    // 🔒 AUD-2: los HOTEL_* ya NO se stubbean a []. Se toma su declaración REAL
+    // del mismo index.html, porque los eventos que escriben `hotel:HOTEL_CDM`
+    // (la mayoría de CDMX) quedaban con ev.hotel vacío y el cotizador del
+    // vendedor no podía resolver ningún hotel. Se guardan aparte para la
+    // cascada de _vtaCalc (eventos sin `hotel:` propio).
+    const decls = _vtaDeclaracionesHotel(html);
+    const stubs = 'var BANCO_DEFAULT={},BANCO_HEY={};' + decls;
     const ev = new Function(stubs + 'return ' + arrText + ';')();
     if (!Array.isArray(ev)) throw new Error('EV no es array');
+    try {
+      _vtaHoteles = new Function(decls + 'return {std:typeof HOTEL_STD!=="undefined"?HOTEL_STD:null,mty:typeof HOTEL_MTY!=="undefined"?HOTEL_MTY:null,cdm:typeof HOTEL_CDM!=="undefined"?HOTEL_CDM:null};')();
+    } catch (e) { _vtaHoteles = {}; }
     _contratosEVCache = ev;
     return ev;
   } catch (e) {

@@ -24,7 +24,13 @@ function resolverCuentaDeCatalogo(catalogo, evento_id, paquete) {
   const slug = String(evento_id || '').split('#')[0];
   const ce = catalogo[slug];
   if (!ce) return null;
-  const c = cuentaParaPaquete(ce, paquete);
+  // cuentaParaPaquete es FAIL-LOUD ante un paquete desconocido (AUD-2): aquí se
+  // degrada a null en vez de propagar, porque esta función alimenta correos y
+  // listados que deben salir igual aunque una fila traiga un paquete raro. Sin
+  // cuenta se omite la caja; JAMÁS se pinta una cuenta equivocada.
+  let c = null;
+  try { c = cuentaParaPaquete(ce, paquete); }
+  catch (e) { console.warn('[cuenta-deposito] paquete no reconocido:', e.message); return null; }
   // Exigimos al menos CLABE o tarjeta reales para no pintar una caja vacía.
   return (c && (c.clabe || c.tarjeta)) ? c : null;
 }

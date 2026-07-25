@@ -138,6 +138,16 @@
 [functions."ventas-limite-cron"]
   schedule = "0 14 * * *"
 
+# 🗼 Torre de Karin O3 — RECORDATORIO 48H de retornables. DIARIO. Cruza el catálogo
+# (eventos cuya PRIMERA fecha cae a ≤2 días) contra las salidas de bodega que siguen
+# 'autorizada' (= salieron y no han regresado; solo el palomeo del cuidador las pasa
+# a 'cerrada') y que traen piezas RETORNABLES. Manda UN resumen al admin y a cada
+# cuidador: pieza, quién se la llevó, evento y días fuera. SOLO NOTIFICA — no cambia
+# estados, no cobra, no aplica strikes; la única escritura es la marca de idempotencia
+# aviso_48h_at. 15:00 UTC = 9:00 AM hora México (después de la ola de las 8).
+[functions."bodega-retornables-48h"]
+  schedule = "0 15 * * *"
+
 # Stock FASE B — aviso de APARTADO VENCIDO. DIARIO. Busca solicitudes pendiente SIN
 # comprobante cuyo hold_expira_at venció en las últimas 24h y aún no fueron avisadas;
 # manda UN correo al cliente ("venció pero puedes retomarlo subiendo tu comprobante")

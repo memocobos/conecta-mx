@@ -33,6 +33,10 @@
 //        El motivo viaja en el correo al solicitante (no se persiste).
 //   · 'cancelar'   { id } — el solicitante dueño (o admins), solo 'solicitada'.
 //        D-2: una salida enviada NO se edita — se cancela y se crea otra.
+//   · 'prestado_equipo' {} — 🗼 O4: quién trae retornables SIN REGRESAR,
+//        agrupado por persona, para el chip de Guerreros Z. Roles: los MISMOS
+//        que ya ven "Prestado ahorita" en la Torre (ROLES_CUIDADOR) — no abre
+//        información nueva, solo la acerca. Solo lectura y SIN COSTOS.
 //
 // Encaje: strikes y cadena de aprobación de reportes NI SE TOCAN (eso es F4).
 // El congelamiento por faltantes vencidos llega en F4b (candado en 'crear').
@@ -67,6 +71,10 @@ const ACCIONES = {
   rechazar: ROLES_CUIDADOR,
   cancelar: ROLES_VIAJAN,
   faltantes_pagado: ['maestro_roshi'], // F4b: "marcar pagado" — SOLO Memo descongela
+  // O4: quién trae retornables sin regresar, agrupado por persona. MISMOS roles
+  // que hoy ven el panel "Prestado ahorita" de la Torre — no abre información
+  // nueva a nadie, solo la lleva a Guerreros Z. Solo lectura, sin costos.
+  prestado_equipo: ROLES_CUIDADOR,
 };
 
 const COLS = 'id,evento_id,solicitante_id,solicitante_rol,detalle,notas,estado,creado_en,autorizada_en,autorizada_por,cerrada_en,reporte_id,faltantes,faltantes_monto,faltantes_vence,faltantes_pagado_at,faltantes_pagado_por';
@@ -207,6 +215,17 @@ exports.handler = async (event) => {
         }
       } catch (e) { cuenta_empresa = undefined; }
       return json(200, { ok: true, salidas, ve_todo: veTodo, ...(cuenta_empresa ? { cuenta_empresa } : {}) });
+    }
+
+    // ── 🗼 O4 prestado_equipo: quién trae retornables (SOLO LECTURA) ───────
+    if (accion === 'prestado_equipo') {
+      const r = await fetch(
+        `${baseSalidas}?estado=eq.autorizada&select=id,evento_id,solicitante_id,solicitante_rol,detalle,autorizada_en&limit=500`,
+        { headers: kh }
+      );
+      if (!r.ok) return json(502, { error: 'KH rechazó la consulta de prestados', detail: await r.text() });
+      const salidas = (await r.json().catch(() => [])) || [];
+      return json(200, { ok: true, prestado: agruparPrestadoPorPersona(salidas) });
     }
 
     // ── dar_salida (el permiso: descuenta stock UNA SOLA VEZ) ──────────────
@@ -358,6 +377,39 @@ function _fmtMXN(n) {
   return '$' + (Math.round((Number(n) || 0) * 100) / 100).toLocaleString('es-MX');
 }
 
+// ── 🗼 O4: agrupado PURO "quién trae qué" (sin red — el arnés lo prueba) ─────
+//
+// Entra la lista de salidas AUTORIZADAS (= salieron y no han regresado: solo el
+// palomeo del cuidador las pasa a 'cerrada'); sale un mapa
+// { [solicitante_id]: { piezas:[{pieza,cantidad,evento_id,desde}], total } }
+// contando SOLO piezas retornables. JAMÁS incluye costos ni montos: esto se
+// pinta en Guerreros Z, que no es una pantalla de dinero.
+function agruparPrestadoPorPersona(salidas) {
+  const out = {};
+  for (const s of (Array.isArray(salidas) ? salidas : [])) {
+    const uid = String((s && s.solicitante_id) || '');
+    if (!uid) continue;
+    for (const d of (Array.isArray(s.detalle) ? s.detalle : [])) {
+      if (!d || !d.retornable) continue;
+      const cant = Number(d.cantidad) || 0;
+      if (cant <= 0) continue;
+      if (!out[uid]) out[uid] = { piezas: [], total: 0 };
+      out[uid].piezas.push({
+        pieza: d.pieza,
+        cantidad: cant,
+        evento_id: s.evento_id,
+        desde: s.autorizada_en || null,
+      });
+      out[uid].total += cant;
+    }
+  }
+  // Dentro de cada persona, lo que lleva más tiempo fuera primero.
+  for (const v of Object.values(out)) {
+    v.piezas.sort((a, b) => String(a.desde || '').localeCompare(String(b.desde || '')));
+  }
+  return out;
+}
+
 // ----- helpers -----
 
 async function leerSalida(baseSalidas, kh, id) {
@@ -473,6 +525,9 @@ async function correoSolicitante(env, kh, salida, resultado, motivo) {
     ${tablaPiezas(salida.detalle)}`);
   return enviarCorreo(env, [to], ok ? `Salida autorizada · ${salida.evento_id}` : `Salida rechazada · ${salida.evento_id}`, html);
 }
+
+// Helper puro exportado para el arnés (patrón de la casa).
+exports._agruparPrestadoPorPersona = agruparPrestadoPorPersona;
 
 function readEnv() {
   const KH_URL = process.env.SUPABASE_URL_KAMEHOUSE;

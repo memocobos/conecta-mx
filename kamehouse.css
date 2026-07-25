@@ -2180,3 +2180,18 @@ html, body { background: var(--bg); color: var(--text); padding: 0; }
 .kam-ajuste-num{width:90px}
 .kam-ajuste-nota{flex:1;min-width:140px}
 .kam-sem-meta{font-size:10px;color:var(--ts)}
+/* 🧊 [TORRE O4] Chip "trae prestado" en Guerreros Z ─────────────────────── */
+.gz-prestado{display:inline-flex;align-items:center;gap:4px;margin:4px 0 2px;font:inherit;
+  font-size:9px;letter-spacing:.06em;text-transform:uppercase;font-weight:800;
+  padding:2px 8px;border-radius:4px;cursor:pointer;
+  color:#fff;background:var(--red);border:1px solid var(--red)}
+.gz-prestado:hover{filter:brightness(1.12)}
+.gzp-head{font-size:14px;line-height:1.6;color:var(--text);padding-bottom:12px;margin-bottom:12px;border-bottom:1px solid var(--border)}
+.gzp-lista{display:flex;flex-direction:column;gap:8px;max-height:52vh;overflow-y:auto}
+.gzp-item{border:1px solid var(--border);border-radius:8px;padding:10px 14px;background:var(--card)}
+.gzp-item-top{display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap}
+.gzp-pieza{font-size:13px;color:var(--text)}
+.gzp-item-f{font-size:11px;color:var(--ts);margin-top:4px}
+.gzp-chip{font-size:9px;letter-spacing:.08em;text-transform:uppercase;font-weight:800;padding:2px 7px;border-radius:4px;white-space:nowrap;
+  color:var(--gold);background:rgba(232,255,76,.14);border:1px solid var(--border2)}
+.gzp-pie{font-size:11px;color:var(--ts);margin-top:14px;line-height:1.5}

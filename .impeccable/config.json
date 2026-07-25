@@ -1,0 +1,17 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "side-tab",
+        "value": "*",
+        "files": [
+          "netlify/functions/portal-nueva-solicitud.js"
+        ],
+        "createdAt": "2026-07-25T01:08:08.352Z",
+        "reason": "L268 es HTML de correo transaccional (notificacion al admin), no UI de app; el borde de acento es patron estandar de email"
+      }
+    ]
+  }
+}

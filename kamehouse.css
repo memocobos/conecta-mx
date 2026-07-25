@@ -2180,3 +2180,38 @@ html, body { background: var(--bg); color: var(--text); padding: 0; }
 .kam-ajuste-num{width:90px}
 .kam-ajuste-nota{flex:1;min-width:140px}
 .kam-sem-meta{font-size:10px;color:var(--ts)}
+/* 🗼 [TORRE O2] Expediente de la pieza (kardex) ──────────────────────────── */
+.kdx-link{background:none;border:0;padding:0;font:inherit;font-weight:600;color:var(--text);cursor:pointer;text-align:left;
+  border-bottom:1px dashed var(--border2);transition:color .15s}
+.kdx-link:hover{color:var(--gold)}
+.kdx-head{padding-bottom:12px;margin-bottom:12px;border-bottom:1px solid var(--border)}
+.kdx-nombre{font-family:'Rajdhani',sans-serif;font-weight:700;font-size:17px;color:var(--text);display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.kdx-tag-ret,.kdx-tag-con,.kdx-tag-del{font-size:9px;letter-spacing:.06em;text-transform:uppercase;font-weight:800;padding:2px 7px;border-radius:4px}
+.kdx-tag-ret{color:#7cc4ff;background:rgba(124,196,255,.12);border:1px solid rgba(124,196,255,.35)}
+.kdx-tag-con{color:var(--ts);background:rgba(255,255,255,.05);border:1px solid var(--border)}
+.kdx-tag-del{color:var(--red);background:rgba(255,90,77,.12);border:1px solid rgba(255,90,77,.35)}
+.kdx-resumen{display:flex;flex-wrap:wrap;gap:18px;margin-top:12px}
+.kdx-r{display:flex;flex-direction:column;gap:2px}
+.kdx-r-n{font-family:'Zen Dots',sans-serif;font-size:20px;line-height:1;color:var(--text)}
+.kdx-r-l{font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--ts)}
+.kdx-ok{color:var(--green)}
+.kdx-mal{color:var(--red)}
+.kdx-fuera{color:var(--gold)}
+.kdx-lista{display:flex;flex-direction:column;gap:8px;max-height:52vh;overflow-y:auto}
+.kdx-item{border:1px solid var(--border);border-radius:8px;padding:10px 14px;background:var(--card)}
+.kdx-item-top{display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap}
+.kdx-item-ev{font-size:13px;font-weight:700;color:var(--text)}
+.kdx-item-l{font-size:12px;color:var(--ts);margin-top:6px}
+.kdx-item-l b{color:var(--text)}
+.kdx-item-f{font-size:11px;color:var(--ts);margin-top:3px}
+.kdx-item-falta{font-size:11px;font-weight:700;color:var(--red);margin-top:6px}
+.kdx-chip{font-size:9px;letter-spacing:.08em;text-transform:uppercase;font-weight:800;padding:2px 7px;border-radius:4px;white-space:nowrap}
+.kdx-chip-ok{color:var(--green);background:rgba(87,227,137,.14);border:1px solid rgba(87,227,137,.4)}
+.kdx-chip-falto{color:var(--red);background:rgba(255,90,77,.14);border:1px solid rgba(255,90,77,.4)}
+.kdx-chip-fuera{color:var(--gold);background:rgba(232,255,76,.14);border:1px solid var(--border2)}
+.kdx-chip-espera{color:#7cc4ff;background:rgba(124,196,255,.12);border:1px solid rgba(124,196,255,.35)}
+.kdx-chip-nula{color:var(--ts);background:rgba(255,255,255,.05);border:1px solid var(--border)}
+.kdx-vacio{text-align:center;padding:26px 10px}
+.kdx-vacio-t{font-family:'Rajdhani',sans-serif;font-weight:700;font-size:15px;color:var(--text)}
+.kdx-vacio-s{font-size:12px;color:var(--ts);margin-top:6px;line-height:1.5}
+@media(max-width:600px){.kdx-resumen{gap:12px}.kdx-r-n{font-size:17px}.kdx-lista{max-height:60vh}}

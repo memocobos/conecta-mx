@@ -673,6 +673,8 @@ const khSalidas = {
   rechazar(id, motivo) { return this._call({ accion: 'rechazar', id, motivo }); },
   cancelar(id) { return this._call({ accion: 'cancelar', id }); },
   faltantesPagado(id) { return this._call({ accion: 'faltantes_pagado', id }); }, // [F4b] SOLO Memo
+  // [O2] expediente de una pieza → { pieza, resumen, historial, ve_costos }
+  kardex(pieza_id) { return this._call({ accion: 'kardex', pieza_id }); },
   ultimaCuentaEmpresa: null,
 };
 
@@ -5205,7 +5207,7 @@ async function loadInventario() {
  const valor = i.cantidad * i.costo_unitario;
  const alerta = i.cantidad <= i.stock_minimo;
  return `<tr>
- <td style="font-weight:600">${i.pieza}${i.retornable ? ' <span style="font-size:9px;letter-spacing:.06em;text-transform:uppercase;font-weight:800;padding:1px 6px;border-radius:4px;color:#7cc4ff;background:rgba(124,196,255,.12);border:1px solid rgba(124,196,255,.35)" title="Retornable: en las salidas queda como PRESTADA y la comparación del regreso la exige de vuelta siempre">↻ siempre vuelve</span>' : ''}${alerta ? ' <span style="color:var(--red)"><svg class="ic"><use href="#ic-alerta"/></svg></span>' : ''}</td>
+ <td style="font-weight:600"><button type="button" class="kdx-link" onclick="abrirKardex('${_salEsc(i.id)}')" title="Ver el expediente de esta pieza: cada salida, quién se la llevó y si regresó">${i.pieza}</button>${i.retornable ? ' <span style="font-size:9px;letter-spacing:.06em;text-transform:uppercase;font-weight:800;padding:1px 6px;border-radius:4px;color:#7cc4ff;background:rgba(124,196,255,.12);border:1px solid rgba(124,196,255,.35)" title="Retornable: en las salidas queda como PRESTADA y la comparación del regreso la exige de vuelta siempre">↻ siempre vuelve</span>' : ''}${alerta ? ' <span style="color:var(--red)"><svg class="ic"><use href="#ic-alerta"/></svg></span>' : ''}</td>
  <td style="color:${alerta ? 'var(--red)' : 'var(--text)'};font-weight:600">${i.cantidad}</td>
  ${verCostos ? `<td>${formatMXN(i.costo_unitario)}</td><td style="font-weight:600">${formatMXN(valor)}</td>` : ''}
  <td style="color:var(--ts)">${i.stock_minimo}</td>
@@ -5510,6 +5512,93 @@ async function loadTorreSalidas() {
   } catch (e) {
     if (bb) bb.innerHTML = `<div class="alert alert-error">${_salEsc(e.message)}</div>`;
     if (pp) pp.innerHTML = '';
+  }
+}
+
+// ── 🗼 O2: EXPEDIENTE DE LA PIEZA (kardex) ─────────────────────────────────
+// Click en el nombre de cualquier pieza de la Torre → modal con su historia
+// completa: cada salida, quién se la llevó, para qué evento, si regresó y si
+// faltó (y si ya se cobró). Solo lectura. Los importes los pinta el backend
+// SOLO a quien ve costos; aquí no se inventa dinero.
+function _kdxFecha(iso) {
+  const s = String(iso || '').slice(0, 10);
+  return s || '—';
+}
+function _kdxDias(desdeISO) {
+  const t = Date.parse(desdeISO || '');
+  if (!Number.isFinite(t)) return null;
+  return Math.max(0, Math.floor((Date.now() - t) / 86400000));
+}
+function _kdxChip(h) {
+  if (h.faltante) {
+    const txt = h.faltante.pagado ? 'faltó · pagado' : (h.faltante.cobrado ? 'faltó · cobrado' : 'faltó');
+    return `<span class="kdx-chip kdx-chip-falto">${txt}</span>`;
+  }
+  if (h.regreso) return '<span class="kdx-chip kdx-chip-ok">regresó</span>';
+  if (h.fuera) {
+    const d = _kdxDias(h.salio_en);
+    return `<span class="kdx-chip kdx-chip-fuera">anda fuera${d != null ? ` · ${d}d` : ''}</span>`;
+  }
+  if (h.estado === 'solicitada') return '<span class="kdx-chip kdx-chip-espera">por autorizar</span>';
+  return `<span class="kdx-chip kdx-chip-nula">${_salEsc(h.estado)}</span>`;
+}
+
+async function abrirKardex(piezaId) {
+  const cuerpo = document.getElementById('kardex-cuerpo');
+  const titulo = document.getElementById('kardex-titulo');
+  if (titulo) titulo.textContent = 'Expediente de la pieza';
+  if (cuerpo) cuerpo.innerHTML = '<div class="loading-state"><div class="spinner"></div>Cargando expediente…</div>';
+  openModal('modal-kardex');
+  try {
+    const j = await khSalidas.kardex(piezaId);
+    const p = j.pieza || {};
+    const r = j.resumen || { salio: 0, regreso: 0, falto: 0, fuera: 0, veces: 0 };
+    const hist = Array.isArray(j.historial) ? j.historial : [];
+    if (titulo) titulo.textContent = p.pieza || 'Expediente de la pieza';
+
+    const cabecera = `
+      <div class="kdx-head">
+        <div class="kdx-nombre">${_salEsc(p.pieza || '—')}
+          ${p.retornable ? '<span class="kdx-tag-ret">↻ retornable</span>' : '<span class="kdx-tag-con">consumible</span>'}
+          ${p.borrada ? '<span class="kdx-tag-del">ya no está en el inventario</span>' : ''}
+        </div>
+        ${p.retornable ? `
+        <div class="kdx-resumen">
+          <div class="kdx-r"><span class="kdx-r-n">${r.salio}</span><span class="kdx-r-l">salió</span></div>
+          <div class="kdx-r"><span class="kdx-r-n kdx-ok">${r.regreso}</span><span class="kdx-r-l">regresó</span></div>
+          <div class="kdx-r"><span class="kdx-r-n kdx-mal">${r.falto}</span><span class="kdx-r-l">faltó</span></div>
+          ${r.fuera ? `<div class="kdx-r"><span class="kdx-r-n kdx-fuera">${r.fuera}</span><span class="kdx-r-l">anda fuera</span></div>` : ''}
+        </div>` : ''}
+      </div>`;
+
+    if (!hist.length) {
+      cuerpo.innerHTML = cabecera + `
+        <div class="kdx-vacio">
+          <div class="kdx-vacio-t">Esta pieza nunca ha salido de la bodega</div>
+          <div class="kdx-vacio-s">Cuando alguien levante una salida que la incluya, aquí va a quedar su historia completa.</div>
+        </div>`;
+      return;
+    }
+
+    cuerpo.innerHTML = cabecera + `
+      <div class="kdx-lista">
+        ${hist.map(h => `
+          <div class="kdx-item">
+            <div class="kdx-item-top">
+              <div class="kdx-item-ev">${_salEsc(h.evento_id)}</div>
+              ${_kdxChip(h)}
+            </div>
+            <div class="kdx-item-l">
+              <b>${Number(h.cantidad) || 0}×</b> · se la llevó <b>${_salEsc(h.responsable)}</b>
+            </div>
+            <div class="kdx-item-f">
+              ${h.salio_en ? `Salió el ${_kdxFecha(h.salio_en)}` : `Solicitada el ${_kdxFecha(h.solicitado_en)}`}${h.cerrada_en ? ` · regresó el ${_kdxFecha(h.cerrada_en)}` : ''}
+            </div>
+            ${h.faltante ? `<div class="kdx-item-falta">Faltaron ${Number(h.faltante.cantidad) || 0}${h.faltante.importe ? ` · ${formatMXN(h.faltante.importe)}` : ''}${h.faltante.pagado ? ' · ya pagado' : (h.faltante.cobrado ? ' · cobrado, pendiente de pago' : '')}</div>` : ''}
+          </div>`).join('')}
+      </div>`;
+  } catch (e) {
+    if (cuerpo) cuerpo.innerHTML = `<div class="alert alert-error">${_salEsc(e.message)}</div>`;
   }
 }
 

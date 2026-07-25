@@ -14,18 +14,16 @@
 // Respuesta : { ok: true }  (NUNCA devuelve el hash ni la password)
 //
 // Env vars:
-//   - SUPABASE_URL_KAMEHOUSE  (fallback SUPABASE_URL)
-//   - SUPABASE_SERVICE_KEY_KAMEHOUSE  (fallback SUPABASE_SERVICE_KEY / _ROLE_KEY)
+//   - SUPABASE_URL_KAMEHOUSE
+//   - SUPABASE_SERVICE_KEY_KAMEHOUSE
 //   - JWT_SECRET
 // =============================================================================
 
 const { verifyAdminAuth, corsCheck, corsHeaders } = require('./_lib/verify-admin');
 const bcrypt = require('bcryptjs');
 
-const SB_URL = process.env.SUPABASE_URL_KAMEHOUSE || process.env.SUPABASE_URL;
-const SB_KEY = process.env.SUPABASE_SERVICE_KEY_KAMEHOUSE
-            || process.env.SUPABASE_SERVICE_KEY
-            || process.env.SUPABASE_SERVICE_ROLE_KEY;
+const SB_URL = process.env.SUPABASE_URL_KAMEHOUSE;
+const SB_KEY = process.env.SUPABASE_SERVICE_KEY_KAMEHOUSE;
 
 const BCRYPT_COST = 10;
 

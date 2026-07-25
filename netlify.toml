@@ -12,14 +12,14 @@
 #     PORTAL_SUPABASE_ANON_KEY
 #     PORTAL_SUPABASE_SERVICE_KEY
 #
-# ⚠️ Las SUPABASE_URL / SUPABASE_KEY / SUPABASE_SERVICE_KEY "a secas" fueron
-# BORRADAS del Netlify de Conecta el 24-jul-2026: apuntaban a "Cuarto Piso", un
-# proyecto INDEPENDIENTE de Memo que NADA tiene que ver con Conecta (y que NO se
-# tocó). Se quitaron para que Conecta jamás pueda escribirle por accidente.
-# Consecuencia: los fallbacks `|| process.env.SUPABASE_URL` de las functions
-# ahora resuelven a `undefined` → si algún día falta la var buena, la función
-# truena avisando (comportamiento correcto, falla ruidosa). Unificar/podar esos
-# fallbacks es una tuerca futura opcional.
+# ⚠️ Las SUPABASE_URL / SUPABASE_KEY / SUPABASE_SERVICE_KEY / SUPABASE_SERVICE_ROLE_KEY
+# "a secas" fueron BORRADAS del Netlify de Conecta el 24-jul-2026: apuntaban a
+# "Cuarto Piso", un proyecto INDEPENDIENTE de Memo que NADA tiene que ver con
+# Conecta (y que NO se tocó). Se quitaron para que Conecta jamás pueda escribirle
+# por accidente. El 25-jul-2026 se PODARON del código todos los fallbacks
+# `|| process.env.SUPABASE_*` que quedaban: hoy las functions leen ÚNICAMENTE las
+# llaves canónicas de arriba. Si falta una, la función truena avisando (falla
+# ruidosa, comportamiento correcto). NO revivir las vars a secas.
 # =============================================================================
 
 # Redirects

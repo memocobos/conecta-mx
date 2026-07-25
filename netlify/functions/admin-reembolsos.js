@@ -318,10 +318,8 @@ function upstream(headers, detail, op) {
   return { statusCode: 502, headers, body: JSON.stringify({ error: `KH rechazó el ${op}`, detail }) };
 }
 function readEnv() {
-  const KH_SB_URL = process.env.SUPABASE_URL_KAMEHOUSE || process.env.SUPABASE_URL;
-  const KH_SB_SERVICE = process.env.SUPABASE_SERVICE_KEY_KAMEHOUSE
-    || process.env.SUPABASE_SERVICE_KEY
-    || process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const KH_SB_URL = process.env.SUPABASE_URL_KAMEHOUSE;
+  const KH_SB_SERVICE = process.env.SUPABASE_SERVICE_KEY_KAMEHOUSE;
   const PORTAL_SB_URL = process.env.PORTAL_SUPABASE_URL;
   const PORTAL_SB_SERVICE = process.env.PORTAL_SUPABASE_SERVICE_KEY;
   if (!KH_SB_URL || !KH_SB_SERVICE) {

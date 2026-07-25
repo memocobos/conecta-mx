@@ -71,8 +71,8 @@ async function verificarVendedorActivo(user) {
   const hit = _cache.get(uid);
   if (hit && hit.expira > Date.now()) return { activo: hit.activo, aviso: hit.activo ? undefined : AVISO_INACTIVO };
 
-  const KH_URL = process.env.SUPABASE_URL_KAMEHOUSE || process.env.SUPABASE_URL;
-  const KH_KEY = process.env.SUPABASE_SERVICE_KEY_KAMEHOUSE || process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const KH_URL = process.env.SUPABASE_URL_KAMEHOUSE;
+  const KH_KEY = process.env.SUPABASE_SERVICE_KEY_KAMEHOUSE;
   const P_URL = process.env.PORTAL_SUPABASE_URL;
   const P_KEY = process.env.PORTAL_SUPABASE_SERVICE_KEY;
   if (!KH_URL || !KH_KEY) return { activo: true }; // best-effort: sin env no se bloquea

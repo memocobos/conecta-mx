@@ -50,8 +50,8 @@ exports.handler = async (event) => {
   const SB_URL     = process.env.PORTAL_SUPABASE_URL;
   const SB_ANON    = process.env.PORTAL_SUPABASE_ANON_KEY;
   const SB_SERVICE = process.env.PORTAL_SUPABASE_SERVICE_KEY;
-  const KH_URL     = process.env.SUPABASE_URL_KAMEHOUSE || process.env.SUPABASE_URL;
-  const KH_SERVICE = process.env.SUPABASE_SERVICE_KEY_KAMEHOUSE || process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const KH_URL     = process.env.SUPABASE_URL_KAMEHOUSE;
+  const KH_SERVICE = process.env.SUPABASE_SERVICE_KEY_KAMEHOUSE;
   const RESEND_KEY = process.env.RESEND_KEY || process.env.RESEND_API_KEY;
 
   if (!SB_URL || !SB_ANON || !SB_SERVICE || !RESEND_KEY) {

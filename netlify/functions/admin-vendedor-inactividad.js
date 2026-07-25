@@ -125,8 +125,8 @@ exports.handler = async (event) => {
 };
 
 function readEnv() {
-  const KH_URL = process.env.SUPABASE_URL_KAMEHOUSE || process.env.SUPABASE_URL;
-  const KH_KEY = process.env.SUPABASE_SERVICE_KEY_KAMEHOUSE || process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const KH_URL = process.env.SUPABASE_URL_KAMEHOUSE;
+  const KH_KEY = process.env.SUPABASE_SERVICE_KEY_KAMEHOUSE;
   if (!KH_URL || !KH_KEY) return { error: 'Faltan env vars KH (SUPABASE_URL_KAMEHOUSE/SERVICE_KEY_KAMEHOUSE)' };
   return { KH_URL, KH_KEY, P_URL: process.env.PORTAL_SUPABASE_URL, P_KEY: process.env.PORTAL_SUPABASE_SERVICE_KEY };
 }

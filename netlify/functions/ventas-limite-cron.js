@@ -28,8 +28,8 @@ const { aplicarModoPrueba } = require('./_lib/correo-guard');
 
 const SB_URL = process.env.PORTAL_SUPABASE_URL;
 const SB_KEY = process.env.PORTAL_SUPABASE_SERVICE_KEY;
-const KH_URL = process.env.SUPABASE_URL_KAMEHOUSE || process.env.SUPABASE_URL;
-const KH_KEY = process.env.SUPABASE_SERVICE_KEY_KAMEHOUSE || process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
+const KH_URL = process.env.SUPABASE_URL_KAMEHOUSE;
+const KH_KEY = process.env.SUPABASE_SERVICE_KEY_KAMEHOUSE;
 
 const FROM_ADMIN = 'Ventas Conecta <admin@conectareynosa.mx>';
 const ADMIN_TO   = 'admin@conectareynosa.mx';

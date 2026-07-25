@@ -59,8 +59,8 @@ exports.handler = async (event) => {
   const auth = verifyAdminAuth(event, ROLES);
   if (!auth.valid) return json(auth.status, { error: auth.error });
 
-  const KH_URL = process.env.SUPABASE_URL_KAMEHOUSE || process.env.SUPABASE_URL;
-  const KH_KEY = process.env.SUPABASE_SERVICE_KEY_KAMEHOUSE || process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const KH_URL = process.env.SUPABASE_URL_KAMEHOUSE;
+  const KH_KEY = process.env.SUPABASE_SERVICE_KEY_KAMEHOUSE;
   if (!KH_URL || !KH_KEY) return json(500, { error: 'Faltan env vars KH' });
   const kh = { apikey: KH_KEY, Authorization: 'Bearer ' + KH_KEY };
   const enc = encodeURIComponent;

@@ -103,7 +103,12 @@ exports.handler = async (event) => {
       venue:  ce ? ce.venue : null,
       ciudad: ce ? ce.ciudad : null,
     };
-    const cuenta = cuentaParaPaquete(ce, lugar.paquete);
+    // AUD-2: cuentaParaPaquete truena ante un paquete desconocido. Aquí se
+    // degrada a null: el contrato se debe poder ver aunque el lugar traiga un
+    // paquete raro (mejor sin caja de depósito que un 500 en la cara del cliente).
+    let cuenta = null;
+    try { cuenta = cuentaParaPaquete(ce, lugar.paquete); }
+    catch (e) { console.warn('[contrato-viajero-obtener] paquete no reconocido:', e.message); }
 
     const contrato = {
       estado: c.estado,

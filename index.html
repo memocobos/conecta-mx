@@ -4063,7 +4063,9 @@ function selHotel(btn,e,n){
 function buildTransporteButtons(){
   var stepN=parseInt($$('w-hotel-n').textContent)+1;
   $$('w-transport-n').textContent=stepN;
-  var diasRestantes=Math.ceil((new Date(cur.ds+'T12:00:00')-new Date())/(1000*60*60*24));
+  // AUD-2: misma frontera de 15 dias que el separo (fechas puras, hora MX).
+  var diasRestantes=_diasEventoMx(cur.ds);
+  if(diasRestantes==null)diasRestantes=999;
   // Eventos con noBus:true o 'arre' ocultan el autobús: sólo Avión + Sin transporte.
   var hideBus=(cur&&(cur.noBus||cur.id==='arre'));
   var h='';
@@ -4454,6 +4456,18 @@ function aplicarPromo(){
   }
 }
 
+// AUD-2 — FUENTE UNICA de la frontera de 15 dias, igual en las TRES copias
+// (este index, _lib/precio-zona._diasEvento y _vtaCalc de kamehouse):
+// se comparan FECHAS PURAS (no instantes) y "hoy" se toma en hora de Mexico,
+// no en la del navegador. Asi el separo que ve el cliente es el mismo que
+// sella el servidor, sin importar desde donde se cotice ni a que hora.
+function _hoyMx(){return new Date().toLocaleDateString('en-CA',{timeZone:'America/Monterrey'});}
+function _diasEventoMx(evISO,hoyISO){
+  var m1=/^(\d{4})-(\d{2})-(\d{2})/.exec(String(evISO||''));
+  var m2=/^(\d{4})-(\d{2})-(\d{2})/.exec(String(hoyISO||_hoyMx()));
+  if(!m1||!m2)return null;
+  return Math.round((Date.UTC(+m1[1],+m1[2]-1,+m1[3])-Date.UTC(+m2[1],+m2[2]-1,+m2[3]))/86400000);
+}
 function calcular(){
   if(!cur||!selPkg)return;
   var hasZona=(selPkg==='plus'||selPkg==='stay'||selPkg==='cheap')||(selPkg==='ride'&&cur.forceZona);
@@ -4524,8 +4538,13 @@ function calcular(){
     }
     sepActualCalc=cheapSep*selViaj;
   } else {
-    var diasEv=Math.ceil((new Date(cur.ds+'T12:00:00')-new Date())/(1000*60*60*24));
-    if(diasEv<=15){
+    // AUD-2: frontera de 15 dias con FECHAS PURAS EN HORA MX, identica a
+    // _lib/precio-zona (_diasEvento) y a _vtaCalc de kamehouse. Antes se usaba
+    // el reloj del navegador con hora local, asi que el mismo dia podia caer de
+    // un lado u otro de la frontera segun la zona horaria y la hora del cliente
+    // -> el separo mostrado divergia del que sella el servidor. Es dinero real.
+    var diasEv=_diasEventoMx(cur.ds);
+    if(diasEv!=null&&diasEv<=15){
       sepActualCalc=Math.ceil(costoXPersona*0.5)*selViaj;
     } else {
       var evSep=cur.sep;

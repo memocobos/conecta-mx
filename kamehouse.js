@@ -675,6 +675,8 @@ const khSalidas = {
   faltantesPagado(id) { return this._call({ accion: 'faltantes_pagado', id }); }, // [F4b] SOLO Memo
   // [O2] expediente de una pieza → { pieza, resumen, historial, ve_costos }
   kardex(pieza_id) { return this._call({ accion: 'kardex', pieza_id }); },
+  // [O4] quién trae retornables sin regresar → { [usuario_id]: {piezas,total} }
+  prestadoEquipo() { return this._call({ accion: 'prestado_equipo' }).then(j => j.prestado || {}); },
   ultimaCuentaEmpresa: null,
 };
 
@@ -7042,6 +7044,72 @@ function _gzChipContrato(u) {
   return `<span style="${base}color:var(--ts);background:rgba(255,255,255,.05);border:1px solid var(--border)">${ICO} vence ${fecha}</span>`;
 }
 
+// 🧊 [TORRE O4] "Trae prestado": quién anda con piezas RETORNABLES que aún no
+// regresan. Mismo molde que _gzCargarInactividad/_gzCargarContratos — cómputo
+// server-side (admin-salidas prestado_equipo, roles del cuidador) y fails-soft
+// ESTRICTO: si el cálculo truena, _gzPrestado se queda en {} y Guerreros Z
+// carga exactamente como hoy, sin un solo chip. Nunca viajan costos.
+let _gzPrestado = null;
+async function _gzCargarPrestado() {
+  if (!currentUser || !['maestro_roshi', 'bulma', 'milk', 'mister_popo'].includes(currentUser.rol)) {
+    _gzPrestado = {};
+    return;
+  }
+  try {
+    _gzPrestado = await khSalidas.prestadoEquipo() || {};
+  } catch (e) { _gzPrestado = {}; /* fails-soft: GZ sin chips */ }
+}
+
+// Chip rojo compacto junto al nombre + detalle al hacer click (no navega: el
+// click del chip NO debe abrir el perfil de la card).
+function _gzChipPrestado(u) {
+  if (!u || !_gzPrestado) return '';
+  const info = _gzPrestado[u.id];
+  if (!info || !(info.total > 0)) return '';
+  const piezas = Array.isArray(info.piezas) ? info.piezas : [];
+  const tip = piezas.map(p => `${p.cantidad}× ${p.pieza} (${p.evento_id})`).join(' · ');
+  const n = piezas.reduce((s, p) => s + (Number(p.cantidad) || 0), 0);
+  return `<button type="button" class="gz-prestado" title="${_salEsc(tip)}"
+    onclick="event.stopPropagation();gzVerPrestado('${_salEsc(u.id)}')">🧊 debe ${n} pieza${n === 1 ? '' : 's'}</button>`;
+}
+
+// Días que lleva fuera una pieza (autosuficiente: O4 no depende de O2).
+function _gzpDias(desdeISO) {
+  const t = Date.parse(desdeISO || '');
+  if (!Number.isFinite(t)) return null;
+  return Math.max(0, Math.floor((Date.now() - t) / 86400000));
+}
+
+// Detalle del chip: qué trae, de qué evento y desde cuándo. Modal PROPIO
+// (#modal-prestado), sin hidden inputs y poblado DESPUÉS de openModal.
+function gzVerPrestado(userId) {
+  const info = _gzPrestado && _gzPrestado[userId];
+  if (!info) return;
+  const u = (_gzCache || []).find(x => x.id === userId);
+  const piezas = Array.isArray(info.piezas) ? info.piezas : [];
+  const total = piezas.reduce((s, p) => s + (Number(p.cantidad) || 0), 0);
+  const cuerpo = document.getElementById('prestado-cuerpo');
+  const titulo = document.getElementById('prestado-titulo');
+  if (!cuerpo) return;
+  if (titulo) titulo.textContent = `${u ? u.nombre : 'Trae prestado'} · sin regresar`;
+  openModal('modal-prestado');
+  cuerpo.innerHTML = `
+    <div class="gzp-head">🧊 <b>${_salEsc(u ? u.nombre : 'Esta persona')}</b> trae ${total} pieza${total === 1 ? '' : 's'} retornable${total === 1 ? '' : 's'} que aún no regresan.</div>
+    <div class="gzp-lista">
+      ${piezas.map(p => {
+        const d = _gzpDias(p.desde);
+        return `<div class="gzp-item">
+          <div class="gzp-item-top">
+            <div class="gzp-pieza"><b>${Number(p.cantidad) || 0}×</b> ${_salEsc(p.pieza)}</div>
+            <span class="gzp-chip">${d != null ? `${d} d fuera` : 'fuera'}</span>
+          </div>
+          <div class="gzp-item-f">${_salEsc(p.evento_id)}${p.desde ? ` · salió el ${_salEsc(String(p.desde).slice(0, 10))}` : ''}</div>
+        </div>`;
+      }).join('')}
+    </div>
+    <div class="gzp-pie">Solo informativo. El regreso se palomea en la Torre de Karin, al recibir los kits.</div>`;
+}
+
 function _gzChipInactivo(u) {
   if (!u || u.rol !== 'vendedor' || !_gzInactividad) return '';
   const info = _gzInactividad[u.id];
@@ -7057,6 +7125,7 @@ async function renderGZ() {
   if (!grid) return;
   if (_gzInactividad === null) await _gzCargarInactividad();
   if (_gzContratos === null) await _gzCargarContratos();
+  if (_gzPrestado === null) await _gzCargarPrestado(); // [O4] fails-soft: {} = sin chips
   let lista = _gzCache;
   if (_gzFilter !== 'todos') lista = lista.filter(u => u.rol === _gzFilter);
   if (!lista.length) {
@@ -7093,6 +7162,7 @@ async function renderGZ() {
           ${u.foto_url ? `<img src="${u.foto_url}" alt="${u.nombre}">` : iniciales}
         </div>
         <div class="gz-name">${nombreCorto}</div>
+        ${_gzChipPrestado(u)}
         <div class="gz-rol">${ROL_LABELS[u.rol] || u.rol}</div>
         <div class="gz-stats">
           <div class="gz-stat">

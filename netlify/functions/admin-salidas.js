@@ -33,6 +33,16 @@
 //        El motivo viaja en el correo al solicitante (no se persiste).
 //   · 'cancelar'   { id } — el solicitante dueño (o admins), solo 'solicitada'.
 //        D-2: una salida enviada NO se edita — se cancela y se crea otra.
+//   · 'kardex'     { pieza_id } — 🗼 O2: EXPEDIENTE DE LA PIEZA. Historial
+//        completo de una pieza del inventario a través de las salidas que la
+//        incluyeron (busca dentro del jsonb `detalle`), en orden cronológico
+//        DESCENDENTE, con resumen para retornables (salió/regresó/faltó/fuera).
+//        Roles: los mismos que ven la Torre (= ROLES_READ de admin-kits, ojo:
+//        SIN 'cc', que no tiene pestaña de inventario). Anti-escalación igual
+//        que 'listar': coordinador SOLO ve las salidas que él pidió. Los costos
+//        de los faltantes (costo_unit/importe/monto) viajan SOLO a quien ya ve
+//        costos hoy en la Torre (roshi/bulma/milk) — popo/coordi ven cantidades.
+//        SOLO LEE: no escribe absolutamente nada.
 //
 // Encaje: strikes y cadena de aprobación de reportes NI SE TOCAN (eso es F4).
 // El congelamiento por faltantes vencidos llega en F4b (candado en 'crear').
@@ -59,6 +69,11 @@ const SITE = process.env.URL || 'https://conectareynosa.mx';
 const ROLES_VIAJAN = ['coordinador', 'cc', 'mister_popo', 'maestro_roshi', 'bulma', 'milk'];
 const ROLES_CUIDADOR = ['mister_popo', 'maestro_roshi', 'bulma', 'milk'];
 const ROLES_VE_TODO = ROLES_CUIDADOR;
+// O2: quién puede abrir el expediente de una pieza = quién ve la Torre hoy
+// (espejo EXACTO de ROLES_READ en admin-kits; 'cc' no tiene pestaña inventario).
+const ROLES_TORRE = ['maestro_roshi', 'bulma', 'mister_popo', 'coordinador', 'milk'];
+// O2: quién ve dinero en la Torre hoy (espejo del `verCostos` de loadInventario).
+const ROLES_VE_COSTOS = ['maestro_roshi', 'bulma', 'milk'];
 
 const ACCIONES = {
   crear: ROLES_VIAJAN,
@@ -67,6 +82,7 @@ const ACCIONES = {
   rechazar: ROLES_CUIDADOR,
   cancelar: ROLES_VIAJAN,
   faltantes_pagado: ['maestro_roshi'], // F4b: "marcar pagado" — SOLO Memo descongela
+  kardex: ROLES_TORRE,                 // O2: expediente de la pieza (solo lectura)
 };
 
 const COLS = 'id,evento_id,solicitante_id,solicitante_rol,detalle,notas,estado,creado_en,autorizada_en,autorizada_por,cerrada_en,reporte_id,faltantes,faltantes_monto,faltantes_vence,faltantes_pagado_at,faltantes_pagado_por';
@@ -207,6 +223,77 @@ exports.handler = async (event) => {
         }
       } catch (e) { cuenta_empresa = undefined; }
       return json(200, { ok: true, salidas, ve_todo: veTodo, ...(cuenta_empresa ? { cuenta_empresa } : {}) });
+    }
+
+    // ── 🗼 O2 kardex: expediente de UNA pieza (SOLO LECTURA) ───────────────
+    if (accion === 'kardex') {
+      const pieza_id = String(body.pieza_id || '').trim();
+      if (!UUID_RE.test(pieza_id)) return json(400, { error: 'pieza_id inválido' });
+
+      // Ficha de la pieza (nombre + retornable). Si ya no existe en el
+      // inventario, el expediente igual se arma con lo que digan las salidas
+      // (el snapshot congelado sobrevive al borrado de la pieza).
+      let pieza = null;
+      try {
+        const pR = await fetch(`${baseKits}?id=eq.${enc(pieza_id)}&select=id,pieza,retornable&limit=1`, { headers: kh });
+        if (pR.ok) pieza = ((await pR.json().catch(() => [])) || [])[0] || null;
+      } catch (e) { pieza = null; }
+
+      // Salidas que incluyeron la pieza: contención sobre el jsonb `detalle`.
+      // Si PostgREST rechaza el `cs` (versión/índice), caemos a traer las
+      // últimas salidas y filtrar aquí — el expediente JAMÁS se queda vacío
+      // por un detalle de sintaxis del filtro.
+      const sp = new URLSearchParams();
+      sp.set('select', COLS);
+      sp.set('order', 'creado_en.desc');
+      sp.set('limit', '300');
+      sp.append('detalle', `cs.[{"pieza_id":"${pieza_id}"}]`);
+      if (!veTodo) sp.append('solicitante_id', `eq.${uid}`);
+      let salidas = null;
+      const r = await fetch(`${baseSalidas}?${sp.toString()}`, { headers: kh });
+      if (r.ok) {
+        salidas = (await r.json().catch(() => [])) || [];
+      } else {
+        const sp2 = new URLSearchParams();
+        sp2.set('select', COLS);
+        sp2.set('order', 'creado_en.desc');
+        sp2.set('limit', '500');
+        if (!veTodo) sp2.append('solicitante_id', `eq.${uid}`);
+        const r2 = await fetch(`${baseSalidas}?${sp2.toString()}`, { headers: kh });
+        if (!r2.ok) return json(502, { error: 'KH rechazó la consulta del expediente', detail: await r2.text() });
+        const todas = (await r2.json().catch(() => [])) || [];
+        salidas = todas.filter(s => (Array.isArray(s.detalle) ? s.detalle : []).some(d => String(d.pieza_id) === pieza_id));
+      }
+
+      // Nombres de los responsables (best-effort: sin nombres cae al rol).
+      let uMap = {};
+      try {
+        const ids = [...new Set(salidas.map(s => String(s.solicitante_id || '')).filter(Boolean))];
+        if (ids.length) {
+          const uR = await fetch(`${env.KH_URL}/rest/v1/usuarios?id=in.(${ids.map(enc).join(',')})&select=id,nombre,rol&limit=100`, { headers: kh });
+          if (uR.ok) ((await uR.json().catch(() => [])) || []).forEach(u => { uMap[String(u.id)] = u; });
+        }
+      } catch (e) { uMap = {}; }
+
+      const { historial, resumen } = armarKardex(salidas, pieza_id, uMap);
+      // Privacidad de dinero: popo/coordi ven cantidades, nunca importes.
+      const veCostos = ROLES_VE_COSTOS.includes(rol);
+      const historialSeguro = veCostos ? historial : historial.map(h => {
+        if (!h.faltante) return h;
+        const { importe, costo_unit, ...resto } = h.faltante;
+        return { ...h, faltante: resto };
+      });
+
+      return json(200, {
+        ok: true,
+        pieza: pieza
+          ? { id: pieza.id, pieza: pieza.pieza, retornable: !!pieza.retornable }
+          : { id: pieza_id, pieza: nombreDesdeHistorial(salidas, pieza_id) || 'Pieza eliminada del inventario', retornable: retornableDesdeHistorial(salidas, pieza_id), borrada: true },
+        resumen,
+        historial: historialSeguro,
+        ve_todo: veTodo,
+        ve_costos: veCostos,
+      });
     }
 
     // ── dar_salida (el permiso: descuenta stock UNA SOLA VEZ) ──────────────
@@ -358,6 +445,83 @@ function _fmtMXN(n) {
   return '$' + (Math.round((Number(n) || 0) * 100) / 100).toLocaleString('es-MX');
 }
 
+// ── 🗼 O2: armado PURO del expediente (sin red — el arnés lo prueba directo) ──
+//
+// Semántica honesta, atada al flujo real de la Torre v2:
+//   · una salida SOLICITADA/RECHAZADA/CANCELADA nunca salió de la bodega;
+//   · 'autorizada' = la pieza SALIÓ y sigue FUERA (el stock ya se descontó);
+//   · 'cerrada'    = el cuidador palomeó el regreso (F4a la cierra al sumar
+//                    stock de vuelta) → la pieza REGRESÓ, salvo que aparezca
+//                    en `faltantes` (esas no volvieron: se cobraron).
+function armarKardex(salidas, piezaId, uMap) {
+  const pid = String(piezaId);
+  const historial = [];
+  let salio = 0, regreso = 0, falto = 0, fuera = 0;
+
+  for (const s of (Array.isArray(salidas) ? salidas : [])) {
+    const linea = (Array.isArray(s.detalle) ? s.detalle : []).find(d => String(d.pieza_id) === pid);
+    if (!linea) continue;
+    const estado = String(s.estado || '');
+    const u = uMap ? uMap[String(s.solicitante_id || '')] : null;
+    const fal = (Array.isArray(s.faltantes) ? s.faltantes : []).find(f => String(f.pieza_id) === pid);
+
+    const salioDeVerdad = estado === 'autorizada' || estado === 'cerrada';
+    const faltoAqui = !!fal && Number(fal.cantidad) > 0;
+    if (salioDeVerdad) salio++;
+    if (estado === 'autorizada') fuera++;
+    if (faltoAqui) falto++;
+    if (estado === 'cerrada' && !faltoAqui) regreso++;
+
+    historial.push({
+      salida_id: s.id,
+      evento_id: s.evento_id,
+      estado,
+      cantidad: Number(linea.cantidad) || 0,
+      retornable: !!linea.retornable,
+      responsable: (u && u.nombre) ? u.nombre : (s.solicitante_rol || '—'),
+      responsable_rol: s.solicitante_rol || null,
+      solicitado_en: s.creado_en || null,
+      salio_en: s.autorizada_en || null,
+      cerrada_en: s.cerrada_en || null,
+      // Estado de vuelta, ya masticado para la UI.
+      regreso: estado === 'cerrada' && !faltoAqui,
+      fuera: estado === 'autorizada',
+      ...(faltoAqui ? {
+        faltante: {
+          cantidad: Number(fal.cantidad) || 0,
+          costo_unit: Number(fal.costo_unit) || 0,
+          importe: Number(fal.importe) || 0,
+          cobrado: Number(s.faltantes_monto) > 0,
+          pagado: !!s.faltantes_pagado_at,
+          vence: s.faltantes_vence || null,
+        },
+      } : {}),
+    });
+  }
+
+  // Ya vienen ordenadas por creado_en.desc; re-ordenamos por la fecha que de
+  // verdad le importa al expediente (cuándo salió) sin perder el desempate.
+  historial.sort((a, b) => String(b.salio_en || b.solicitado_en || '').localeCompare(String(a.salio_en || a.solicitado_en || '')));
+
+  return { historial, resumen: { salio, regreso, falto, fuera, veces: historial.length } };
+}
+
+// Nombre/retornable de respaldo desde el snapshot congelado (pieza borrada).
+function nombreDesdeHistorial(salidas, piezaId) {
+  for (const s of (salidas || [])) {
+    const d = (Array.isArray(s.detalle) ? s.detalle : []).find(x => String(x.pieza_id) === String(piezaId));
+    if (d && d.pieza) return d.pieza;
+  }
+  return null;
+}
+function retornableDesdeHistorial(salidas, piezaId) {
+  for (const s of (salidas || [])) {
+    const d = (Array.isArray(s.detalle) ? s.detalle : []).find(x => String(x.pieza_id) === String(piezaId));
+    if (d) return !!d.retornable;
+  }
+  return false;
+}
+
 // ----- helpers -----
 
 async function leerSalida(baseSalidas, kh, id) {
@@ -473,6 +637,10 @@ async function correoSolicitante(env, kh, salida, resultado, motivo) {
     ${tablaPiezas(salida.detalle)}`);
   return enviarCorreo(env, [to], ok ? `Salida autorizada · ${salida.evento_id}` : `Salida rechazada · ${salida.evento_id}`, html);
 }
+
+// Helpers puros exportados para el arnés (patrón de la casa, igual que
+// admin-reportes._compararSalidaVsReporte).
+exports._armarKardex = armarKardex;
 
 function readEnv() {
   const KH_URL = process.env.SUPABASE_URL_KAMEHOUSE;

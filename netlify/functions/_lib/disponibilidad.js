@@ -21,24 +21,31 @@ const HOLD_MINUTOS = 15; // reloj del apartado (una sola fuente de verdad)
 
 // PURO: ¿esta fila de `solicitudes_tour` consume cupo AHORA? (regla FASE B).
 // nowMs = Date.now() del momento de evaluación (se inyecta para testeo).
-function filaCuenta(row, nowMs) {
-  if (!row) return false;
+// PURO: clasifica una fila para el DESGLOSE del semáforo (FASE B t3):
+//   'segura'    → cuenta y NO depende del reloj: en_pagos, pagado, o pendiente
+//                 con comprobante / con hold NULL (fila vieja o lugar respaldado).
+//   'apartada'  → cuenta pero con reloj CORRIENDO: pendiente con hold vigente.
+//   'no-cuenta' → no consume cupo: cancelado, RIDE, o pendiente con hold VENCIDO.
+// filaCuenta = (clase !== 'no-cuenta'), así los llamadores de siempre no cambian.
+function claseFila(row, nowMs) {
+  if (!row) return 'no-cuenta';
   const estado = row.estado;
-  if (estado === 'cancelado') return false;
+  if (estado === 'cancelado') return 'no-cuenta';
   // RIDE no consume boleto: queda fuera del control de stock.
-  if (String(row.paquete || '').toUpperCase() === 'RIDE') return false;
-  if (estado === 'en_pagos' || estado === 'pagado') return true;
+  if (String(row.paquete || '').toUpperCase() === 'RIDE') return 'no-cuenta';
+  if (estado === 'en_pagos' || estado === 'pagado') return 'segura';
   if (estado === 'pendiente') {
     const comp = row.comprobante_separo_url;
-    if (comp != null && String(comp).trim() !== '') return true; // lugar ya respaldado
+    if (comp != null && String(comp).trim() !== '') return 'segura'; // lugar ya respaldado
     const h = row.hold_expira_at;
-    if (h == null || String(h).trim() === '') return true;       // fila vieja sin reloj → conservador
+    if (h == null || String(h).trim() === '') return 'segura';       // fila vieja sin reloj → conservador
     const t = Date.parse(h);
-    if (!Number.isFinite(t)) return true;                        // fecha corrupta → conservador
-    return t > nowMs;                                            // hold vigente cuenta; vencido NO
+    if (!Number.isFinite(t)) return 'segura';                        // fecha corrupta → conservador
+    return t > nowMs ? 'apartada' : 'no-cuenta';                     // vigente=apartada; vencido no cuenta
   }
-  return false;
+  return 'no-cuenta';
 }
+function filaCuenta(row, nowMs) { return claseFila(row, nowMs) !== 'no-cuenta'; }
 
 // IO: consulta KH (compras + stock_ajustes) y Portal (solicitudes_tour), read-only.
 // Devuelve { gestionado, stockPorZona, vendidosPorZona, ajustesPorZona } o { error }
@@ -54,7 +61,7 @@ async function cargarDisponibilidad({ khUrl, khKey, portalUrl, portalKey, evento
   cp.set('limit', '10000');
 
   const ap = new URLSearchParams();
-  ap.set('select', 'zona,vendidos_fuera');
+  ap.set('select', 'zona,vendidos_fuera,nota,updated_por,updated_at');
   ap.append('evento_id', `eq.${evento_id}`);
   ap.set('limit', '10000');
 
@@ -83,27 +90,59 @@ async function cargarDisponibilidad({ khUrl, khKey, portalUrl, portalKey, evento
   });
 
   // vendidos_fuera (KH stock_ajustes): ventas registradas fuera del sistema.
+  // ajustesMetaPorZona lleva nota/updated_por/updated_at para la casilla del Palacio.
   const ajustesPorZona = {};
+  const ajustesMetaPorZona = {};
   (Array.isArray(ajustes) ? ajustes : []).forEach((a) => {
     const z = (a && a.zona != null) ? String(a.zona).trim() : '';
     if (!z) return;
     ajustesPorZona[z] = (ajustesPorZona[z] || 0) + (parseInt(a.vendidos_fuera, 10) || 0);
+    ajustesMetaPorZona[z] = { nota: a.nota || null, updated_por: a.updated_por || null, updated_at: a.updated_at || null };
   });
 
-  const vendidosPorZona = {};
+  // Desglose FASE B t3: seguras (sin reloj) y apartadas (reloj vigente). El total
+  // vendido = seguras + apartadas, idéntico a lo que contaban los llamadores previos.
+  const segurasPorZona = {};
+  const apartadasPorZona = {};
   (Array.isArray(ventas) ? ventas : []).forEach((s) => {
-    if (!filaCuenta(s, nowMs)) return; // regla FASE B (comprobante/hold/estado/RIDE)
+    const clase = claseFila(s, nowMs); // 'segura' | 'apartada' | 'no-cuenta'
+    if (clase === 'no-cuenta') return;
     const z = (s && s.zona != null) ? String(s.zona).trim() : '';
     if (!z) return;
     const n = parseInt(s.num_personas, 10);
     if (!Number.isInteger(n) || n <= 0) return;
-    vendidosPorZona[z] = (vendidosPorZona[z] || 0) + n;
+    if (clase === 'apartada') apartadasPorZona[z] = (apartadasPorZona[z] || 0) + n;
+    else segurasPorZona[z] = (segurasPorZona[z] || 0) + n;
   });
+
+  const vendidosPorZona = {};
+  Object.keys(stockPorZona).concat(Object.keys(segurasPorZona), Object.keys(apartadasPorZona))
+    .forEach((z) => { vendidosPorZona[z] = (segurasPorZona[z] || 0) + (apartadasPorZona[z] || 0); });
 
   return {
     gestionado: Array.isArray(compras) && compras.length > 0,
     stockPorZona, vendidosPorZona, ajustesPorZona,
+    segurasPorZona, apartadasPorZona, ajustesMetaPorZona,
   };
+}
+
+// PURO: película completa de una zona para el semáforo del Palacio. Devuelve los
+// números crudos (endpoint ADMIN, no público) + un estado de color:
+//   verde (sobra) · amarillo (≤5) · rojo (0) · negativo (sobreventa → que grite).
+function desgloseZona(disp, zona) {
+  const z = String(zona || '').trim();
+  const compradas = (disp.stockPorZona && disp.stockPorZona[z]) || 0;
+  const fuera = (disp.ajustesPorZona && disp.ajustesPorZona[z]) || 0;
+  const seguras = (disp.segurasPorZona && disp.segurasPorZona[z]) || 0;
+  const apartadas = (disp.apartadasPorZona && disp.apartadasPorZona[z]) || 0;
+  const disponibles = compradas - fuera - seguras - apartadas;
+  let estado;
+  if (disponibles < 0) estado = 'negativo';
+  else if (disponibles === 0) estado = 'rojo';
+  else if (disponibles <= 5) estado = 'amarillo';
+  else estado = 'verde';
+  const meta = (disp.ajustesMetaPorZona && disp.ajustesMetaPorZona[z]) || null;
+  return { zona: z, compradas, fuera, seguras, apartadas, disponibles, estado, ajuste: meta };
 }
 
 // PURO: evalúa una zona para un cupo `num`. Si la zona NO está gestionada (sin
@@ -122,4 +161,4 @@ function evaluarZona(disp, zona, num) {
   return { gestionada: true, restante, agotada: restante <= 0, sinCupo: restante < n };
 }
 
-module.exports = { cargarDisponibilidad, evaluarZona, filaCuenta, ESTADOS_CUENTAN, HOLD_MINUTOS };
+module.exports = { cargarDisponibilidad, evaluarZona, desgloseZona, filaCuenta, claseFila, ESTADOS_CUENTAN, HOLD_MINUTOS };

@@ -2161,3 +2161,22 @@ html, body { background: var(--bg); color: var(--text); padding: 0; }
 .tb-radio.is-playing .tb-radio-live{color:var(--green)}
 .tb-radio-song{font-size:11px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:180px}
 @media(max-width:720px){.tb-radio-info{display:none}.tb-radio{padding:3px;background:transparent;border:none}}
+/* [FASE B t3] Semáforo de stock del Palacio de Kamisama ─────────────────── */
+.kam-sem{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center;padding:8px 10px;margin-bottom:8px;border:1px solid var(--border);border-radius:8px;background:var(--bg3);font-size:12px;color:var(--ts)}
+.kam-sem-i b{color:var(--text);font-weight:700}
+.kam-sem-disp{margin-left:auto;font-weight:700}
+.kam-sem-disp b{font-size:15px}
+.kam-sem-verde .kam-sem-disp b{color:var(--green)}
+.kam-sem-amarillo .kam-sem-disp b{color:var(--gold)}
+.kam-sem-rojo .kam-sem-disp b{color:var(--red)}
+.kam-sem-negativo{border-color:var(--red);background:rgba(255,90,77,.08)}
+.kam-sem-negativo .kam-sem-disp b{color:var(--red)}
+.kam-sem-clk{opacity:.7}
+.kam-sem-alerta{font-weight:900;letter-spacing:.04em;color:#fff;background:var(--red);padding:2px 8px;border-radius:5px;animation:kamSemBlink 1s steps(1,end) infinite}
+@keyframes kamSemBlink{50%{opacity:.3}}
+@media (prefers-reduced-motion:reduce){.kam-sem-alerta{animation:none}}
+.kam-ajuste{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:8px}
+.kam-ajuste-lbl{font-size:11px;color:var(--ts);text-transform:uppercase;letter-spacing:.06em}
+.kam-ajuste-num{width:90px}
+.kam-ajuste-nota{flex:1;min-width:140px}
+.kam-sem-meta{font-size:10px;color:var(--ts)}

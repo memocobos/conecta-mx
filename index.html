@@ -4092,9 +4092,19 @@ function cerrarMapa(){
 // Portal con la cotización precargada. Override secreto por navegador:
 // ?portal=1 en la URL enciende el flujo nuevo SOLO en esa pestaña (pruebas).
 var RESERVA_PORTAL = false;
+// [hotfix A1] El index reescribe la URL al navegar (pushState '/morat'), así que
+// ?portal=1 se perdía antes de llegar al botón. La llave se captura UNA vez al
+// cargar y vive en sessionStorage (esta pestaña). ?portal=0 la apaga.
+(function(){
+  try{
+    var v=new URLSearchParams(location.search).get('portal');
+    if(v==='1')sessionStorage.setItem('conecta_portal_preview','1');
+    else if(v==='0')sessionStorage.removeItem('conecta_portal_preview');
+  }catch(e){}
+})();
 function _reservaPortalActivo(){
   if(RESERVA_PORTAL)return true;
-  try{ return new URLSearchParams(location.search).get('portal')==='1'; }catch(e){ return false; }
+  try{ return sessionStorage.getItem('conecta_portal_preview')==='1'; }catch(e){ return false; }
 }
 // La habitación en el cotizador se guarda por NOMBRE (selH.n), no por clave.
 // El Portal espera la clave canónica (compartida/doble/triple/individual);

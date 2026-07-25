@@ -4086,9 +4086,51 @@ function abrirMapa(){
 function cerrarMapa(){
   document.getElementById('mapa-modal').style.display='none';
 }
+// ── PUENTE INDEX→PORTAL · FASE A, tuerca 1 ─────────────────────────────
+// Interruptor GLOBAL de la Fase A. Apagado = comportamiento de siempre
+// (modal de cuentas). Encendido = "Reservar mi lugar" hace deep-link al
+// Portal con la cotización precargada. Override secreto por navegador:
+// ?portal=1 en la URL enciende el flujo nuevo SOLO en esa pestaña (pruebas).
+var RESERVA_PORTAL = false;
+function _reservaPortalActivo(){
+  if(RESERVA_PORTAL)return true;
+  try{ return new URLSearchParams(location.search).get('portal')==='1'; }catch(e){ return false; }
+}
+// La habitación en el cotizador se guarda por NOMBRE (selH.n), no por clave.
+// El Portal espera la clave canónica (compartida/doble/triple/individual);
+// la derivamos del nombre. Sin hospedaje (ride/cheap) → '' (se omite el param).
+function _habKeyDesdeNombre(n){
+  n=(''+(n||'')).toLowerCase();
+  if(n.indexOf('compartida')>=0)return 'compartida';
+  if(n.indexOf('doble')>=0)return 'doble';
+  if(n.indexOf('triple')>=0)return 'triple';
+  if(n.indexOf('individual')>=0)return 'individual';
+  return '';
+}
+// Construye el deep-link SOLO con identificadores. El PRECIO JAMÁS viaja en
+// la URL — el Portal lo recalcula. URLSearchParams urlencodea la zona sola.
+function _irAlPortalReserva(){
+  var p=new URLSearchParams();
+  p.set('reserva','1');
+  p.set('ev', cur.id);
+  if(selPkg) p.set('pkg', selPkg);
+  if(selZ&&selZ.n) p.set('zona', selZ.n);
+  if(selViaj) p.set('n', String(selViaj));
+  var hk=_habKeyDesdeNombre(selH&&selH.n);
+  if(hk) p.set('hab', hk);
+  if(cur.multifecha&&cur.multifecha.length) p.set('fecha', String(selFechaIdx||0));
+  location.href='/portal.html?'+p.toString();
+}
 function abrirModalPago(){
   if(!cur||!_lastCotizacion)return;
   try{window.trackInitiateCheckout&&window.trackInitiateCheckout(cur.a,selPkg,total);}catch(e){}
+  // PUENTE A1: detrás de interruptor. Si activo, deep-link al Portal en vez
+  // del modal. El tracking de checkout (arriba) se conserva en AMBOS caminos.
+  if(_reservaPortalActivo()){
+    try{ trackMainEvent('main_reserva_portal_redirect', {}); }catch(e){}
+    _irAlPortalReserva();
+    return;
+  }
   try{ trackMainEvent('main_modal_pago_abierto', {}); }catch(e){}
   $$('pago-subtitulo').textContent='Separa tu lugar en '+cur.a+' — '+cur.f;
   $$('pago-monto').textContent=''+fmt(sepActualCalc);

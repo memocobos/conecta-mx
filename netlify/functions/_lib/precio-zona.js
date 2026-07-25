@@ -31,6 +31,12 @@ function esCDMX(ev) {
   return v.includes('CDMX') || v.includes('CIUDAD DE MEXICO');
 }
 
+// ¿Habitación compartida? (por clave canónica o nombre) — misma prueba que el index
+// y el Portal. Usada por la regla de grupo grande (N>4 → solo compartida).
+function _esCompartida(h) {
+  return !!h && (h.k === 'compartida' || /^compartida/i.test(h.n || ''));
+}
+
 // Días naturales entre hoy y la fecha del evento (evento − hoy), a mediodía UTC.
 function _diasEvento(evISO, hoyISO) {
   const m1 = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(evISO || ''));
@@ -80,6 +86,9 @@ function _calcularPrecio(ev, opts) {
   if (hasHotel && opts && opts.hotel_nombre) {
     selH = (ev.hotel || []).find(h => h && h.n === opts.hotel_nombre) || null;
     if (!selH) return { ok: false, motivo: 'hotel no encontrado en el catálogo' };
+    // Grupo grande (N>4): SOLO habitación compartida (el reparto fino se afina al
+    // reservar). Espejo de la regla del index (buildHotelButtons) y de _vtaCalc.
+    if (selViaj > 4 && !_esCompartida(selH)) return { ok: false, motivo: 'grupo grande: solo habitación compartida' };
   }
   const requiereTransporte = cdmx && paquete !== 'cheap' && !(opts && opts.transporte_cost != null);
 

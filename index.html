@@ -375,6 +375,8 @@ body.wizard-open{overscroll-behavior:none}
 .wiz-lbl{font-size:10px;font-weight:900;color:#e8ff4c;text-transform:uppercase;letter-spacing:.13em;margin-bottom:14px;display:flex;align-items:center;gap:10px}
 .wiz-num-badge{background:#ff283b;color:#fff;font-size:11px;font-weight:900;width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0}
 .wiz-grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.wiz-gridn{display:grid;grid-template-columns:repeat(auto-fit,minmax(60px,1fr));gap:8px}
+.wiz-nota-grupo{margin-top:10px;font-size:12px;line-height:1.5;color:#e8ff4c;background:rgba(232,255,76,.08);border:1px solid rgba(232,255,76,.3);border-radius:8px;padding:10px 12px}
 .wiz-btn{background:rgba(255,255,255,.04);border:2px solid rgba(255,255,255,.09);padding:14px 8px;cursor:pointer;text-align:center;font-family:Montserrat,sans-serif;transition:all .15s;color:#fff}
 .wiz-btn:hover{border-color:rgba(232,255,76,.4);background:rgba(232,255,76,.05)}
 .wiz-btn.active{border-color:#e8ff4c;background:rgba(232,255,76,.1)}
@@ -1145,11 +1147,16 @@ src="https://www.facebook.com/tr?id=1685907946147007&ev=PageView&noscript=1"
   <!-- PASO 1: VIAJEROS -->
   <div class="wiz-card" id="w-viajeros-card">
     <div class="wiz-lbl"><span class="wiz-num-badge">1</span>¿Cuántos viajeros?</div>
-    <div class="wiz-grid4" id="w-viajeros">
+    <div class="wiz-gridn" id="w-viajeros">
       <button class="wiz-btn" onclick="selViajeros(this,1)"><div class="wiz-big">1</div><div class="wiz-sub">persona</div></button>
       <button class="wiz-btn" onclick="selViajeros(this,2)"><div class="wiz-big">2</div><div class="wiz-sub">personas</div></button>
       <button class="wiz-btn" onclick="selViajeros(this,3)"><div class="wiz-big">3</div><div class="wiz-sub">personas</div></button>
       <button class="wiz-btn" onclick="selViajeros(this,4)"><div class="wiz-big">4</div><div class="wiz-sub">personas</div></button>
+      <button class="wiz-btn" onclick="selViajeros(this,5)"><div class="wiz-big">5</div><div class="wiz-sub">personas</div></button>
+      <button class="wiz-btn" onclick="selViajeros(this,6)"><div class="wiz-big">6</div><div class="wiz-sub">personas</div></button>
+      <button class="wiz-btn" onclick="selViajeros(this,7)"><div class="wiz-big">7</div><div class="wiz-sub">personas</div></button>
+      <button class="wiz-btn" onclick="selViajeros(this,8)"><div class="wiz-big">8</div><div class="wiz-sub">personas</div></button>
+      <button class="wiz-btn" onclick="selViajeros(this,9)"><div class="wiz-big">9</div><div class="wiz-sub">personas</div></button>
     </div>
   </div>
 
@@ -3459,9 +3466,10 @@ function updatePkgCards(){
   // Get min hotel cost for n viajeros. Compartida es shared housing — siempre
   // cuenta como válida sin importar n, igual que en buildHotelButtons.
   function minHotel(n){
+    var grupoGrande=n>4; // N>4 → solo compartida (igual que buildHotelButtons)
     var valid=hl.filter(function(h){
       var isComp=(h.k==='compartida'||/^compartida/i.test(h.n||''));
-      return isComp||(h.viaj?h.viaj.indexOf(n)>=0:true);
+      return grupoGrande?isComp:(isComp||(h.viaj?h.viaj.indexOf(n)>=0:true));
     });
     if(!valid.length)return 0;
     var costs=valid.map(function(h){return h.e;});
@@ -3887,6 +3895,9 @@ function buildZonaButtons(zonas){
 
 function buildHotelButtons(){
   var hl=(cur.hotelOverride&&cur.hotel&&cur.hotel.length)?cur.hotel:hotelList(cur);
+  // Grupo grande (N>4): SOLO habitación compartida. El reparto fino de cuartos no
+  // se cotiza — se afina al reservar/registrar acompañantes (misma regla del Portal).
+  var grupoGrande=selViaj>4;
   var h='';
   for(var i=0;i<hl.length;i++){
     var hh=hl[i];
@@ -3894,7 +3905,7 @@ function buildHotelButtons(){
     // Defensa contra datos con viaj restrictivo (ej. viaj:[4] cuando debería ser
     // [1,2,3,4]). El filtro viaj se respeta para Triple/Doble/Individual.
     var isCompartida=(hh.k==='compartida'||/^compartida/i.test(hh.n||''));
-    var valid=isCompartida||(hh.viaj?hh.viaj.indexOf(selViaj)>=0:true);
+    var valid=grupoGrande?isCompartida:(isCompartida||(hh.viaj?hh.viaj.indexOf(selViaj)>=0:true));
     var cost=hh.e;
     var costPP=cur.hotelPP?cost:(selViaj>0?Math.ceil(cost/selViaj):cost);
     var costLbl=cost===0?'Sin costo extra':'+'+fmt(costPP)+' por persona';
@@ -3909,6 +3920,9 @@ function buildHotelButtons(){
         '<div class="h-na">No disponible para '+selViaj+(selViaj===1?' persona':' personas')+'</div>'+
         '</div>';
     }
+  }
+  if(grupoGrande){
+    h+='<div class="wiz-nota-grupo">Grupo de '+selViaj+': por ahora va en habitación compartida. El acomodo de cuartos se afina al reservar/registrar acompañantes.</div>';
   }
   $$('d-hotel').innerHTML=h;
   selH=null;
@@ -4413,6 +4427,9 @@ function calcular(){
   var hasHotel=(selPkg==='plus'||selPkg==='ride'||selPkg==='stay')&&!cur.noHotel;
   if(hasZona&&!selZ)return;
   if(hasHotel&&!selH)return;
+  // Grupo grande (N>4): solo habitación compartida (la UI ya solo la ofrece; este
+  // guard es el espejo de la regla en _lib/precio-zona y _vtaCalc — paridad 3 copias).
+  if(hasHotel&&selViaj>4&&selH&&!(selH.k==='compartida'||/^compartida/i.test(selH.n||'')))return;
   var cdmx=isCDMX(cur);
   // CDMX events need transport selection before calculating — CHEAP no pasa por hotel, no tiene paso de transporte: default "Sin transporte"
   if(cdmx&&selPkg==='cheap'&&!selTransporte)selTransporte={n:'Sin transporte',cost:0};

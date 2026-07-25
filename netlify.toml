@@ -137,3 +137,12 @@
 # NOTIFICA — jamás cancela (la cancelación es manual en KameHouse). 14:00 UTC = 8 AM MX.
 [functions."ventas-limite-cron"]
   schedule = "0 14 * * *"
+
+# Stock FASE B — aviso de APARTADO VENCIDO. DIARIO. Busca solicitudes pendiente SIN
+# comprobante cuyo hold_expira_at venció en las últimas 24h y aún no fueron avisadas;
+# manda UN correo al cliente ("venció pero puedes retomarlo subiendo tu comprobante")
+# y UN resumen al admin. SOLO NOTIFICA — NO cambia estados; la única escritura es la
+# marca de idempotencia hold_avisado_at (bitácora de aviso). 14:30 UTC = 8:30 AM MX,
+# DESPUÉS de la ola de correos de las 8 (vence-hoy/morosidad/recordatorios).
+[functions."apartados-vencidos-diario"]
+  schedule = "30 14 * * *"

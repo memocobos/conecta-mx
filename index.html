@@ -375,7 +375,7 @@ body.wizard-open{overscroll-behavior:none}
 .wiz-lbl{font-size:10px;font-weight:900;color:#e8ff4c;text-transform:uppercase;letter-spacing:.13em;margin-bottom:14px;display:flex;align-items:center;gap:10px}
 .wiz-num-badge{background:#ff283b;color:#fff;font-size:11px;font-weight:900;width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0}
 .wiz-grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
-.wiz-gridn{display:grid;grid-template-columns:repeat(auto-fit,minmax(60px,1fr));gap:8px}
+.wiz-grid5{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
 .wiz-nota-grupo{margin-top:10px;font-size:12px;line-height:1.5;color:#e8ff4c;background:rgba(232,255,76,.08);border:1px solid rgba(232,255,76,.3);border-radius:8px;padding:10px 12px}
 .wiz-btn{background:rgba(255,255,255,.04);border:2px solid rgba(255,255,255,.09);padding:14px 8px;cursor:pointer;text-align:center;font-family:Montserrat,sans-serif;transition:all .15s;color:#fff}
 .wiz-btn:hover{border-color:rgba(232,255,76,.4);background:rgba(232,255,76,.05)}
@@ -1147,16 +1147,19 @@ src="https://www.facebook.com/tr?id=1685907946147007&ev=PageView&noscript=1"
   <!-- PASO 1: VIAJEROS -->
   <div class="wiz-card" id="w-viajeros-card">
     <div class="wiz-lbl"><span class="wiz-num-badge">1</span>¿Cuántos viajeros?</div>
-    <div class="wiz-gridn" id="w-viajeros">
-      <button class="wiz-btn" onclick="selViajeros(this,1)"><div class="wiz-big">1</div><div class="wiz-sub">persona</div></button>
-      <button class="wiz-btn" onclick="selViajeros(this,2)"><div class="wiz-big">2</div><div class="wiz-sub">personas</div></button>
-      <button class="wiz-btn" onclick="selViajeros(this,3)"><div class="wiz-big">3</div><div class="wiz-sub">personas</div></button>
-      <button class="wiz-btn" onclick="selViajeros(this,4)"><div class="wiz-big">4</div><div class="wiz-sub">personas</div></button>
-      <button class="wiz-btn" onclick="selViajeros(this,5)"><div class="wiz-big">5</div><div class="wiz-sub">personas</div></button>
-      <button class="wiz-btn" onclick="selViajeros(this,6)"><div class="wiz-big">6</div><div class="wiz-sub">personas</div></button>
-      <button class="wiz-btn" onclick="selViajeros(this,7)"><div class="wiz-big">7</div><div class="wiz-sub">personas</div></button>
-      <button class="wiz-btn" onclick="selViajeros(this,8)"><div class="wiz-big">8</div><div class="wiz-sub">personas</div></button>
-      <button class="wiz-btn" onclick="selViajeros(this,9)"><div class="wiz-big">9</div><div class="wiz-sub">personas</div></button>
+    <div class="wiz-grid5" id="w-viajeros">
+      <button class="wiz-btn" onclick="_selViaj(this,1)"><div class="wiz-big">1</div><div class="wiz-sub">persona</div></button>
+      <button class="wiz-btn" onclick="_selViaj(this,2)"><div class="wiz-big">2</div><div class="wiz-sub">personas</div></button>
+      <button class="wiz-btn" onclick="_selViaj(this,3)"><div class="wiz-big">3</div><div class="wiz-sub">personas</div></button>
+      <button class="wiz-btn" onclick="_selViaj(this,4)"><div class="wiz-big">4</div><div class="wiz-sub">personas</div></button>
+      <button class="wiz-btn" id="w-viaj-mas" onclick="_viajMasToggle()"><div class="wiz-big">5+</div><div class="wiz-sub">o más</div></button>
+    </div>
+    <div class="wiz-grid5" id="w-viajeros-mas" style="display:none;margin-top:8px">
+      <button class="wiz-btn" onclick="_selViaj(this,5)"><div class="wiz-big">5</div><div class="wiz-sub">personas</div></button>
+      <button class="wiz-btn" onclick="_selViaj(this,6)"><div class="wiz-big">6</div><div class="wiz-sub">personas</div></button>
+      <button class="wiz-btn" onclick="_selViaj(this,7)"><div class="wiz-big">7</div><div class="wiz-sub">personas</div></button>
+      <button class="wiz-btn" onclick="_selViaj(this,8)"><div class="wiz-big">8</div><div class="wiz-sub">personas</div></button>
+      <button class="wiz-btn" onclick="_selViaj(this,9)"><div class="wiz-big">9</div><div class="wiz-sub">personas</div></button>
     </div>
   </div>
 
@@ -3345,6 +3348,8 @@ function resetWizard(){
   // Reset step 1 buttons
   var btns=$$('w-viajeros').querySelectorAll('.wiz-btn');
   for(var i=0;i<btns.length;i++)btns[i].classList.remove('active');
+  // UX 5-o-más: pliega la fila 5..9 al abrir un evento (selViaj vuelve a 0).
+  if(typeof _syncViajerosMas==='function')_syncViajerosMas();
   // Hide steps 2-6
   $$('w-dia-card').style.display='none';
   $$('w-boleto-card').style.display='none';
@@ -3426,6 +3431,33 @@ function scrollToTotal(){
   },150);
 }
 
+// ── UX 5-o-más: la fila 5..9 vive plegada bajo el cuadrito "5+" ────────────
+// SOLO chrome de UI. selViajeros() (precios/pasos) queda intacto: _selViaj lo llama
+// y luego sincroniza el desplegable. La regla N>4→compartida y los precios no cambian.
+function _selViaj(btn,n){ selViajeros(btn,n); _syncViajerosMas(); }
+// Sincroniza el desplegable con la selección actual (selViaj): grande (>4) → fila
+// abierta + "5+" activo + marca el número; 1-4 → fila plegada.
+function _syncViajerosMas(){
+  var mas=document.getElementById('w-viajeros-mas');
+  var tog=document.getElementById('w-viaj-mas');
+  if(!mas||!tog)return;
+  var grande=selViaj>4;
+  mas.style.display=grande?'':'none';
+  tog.classList.toggle('active',grande);
+  var r2=mas.querySelectorAll('.wiz-btn');
+  for(var i=0;i<r2.length;i++)r2[i].classList.toggle('active',(i+5)===selViaj);
+}
+// Click en "5 o más": despliega la fila (o la pliega si estaba abierta SIN selección).
+// Si ya hay un 5-9 elegido, la mantiene abierta (no esconde la selección).
+function _viajMasToggle(){
+  var mas=document.getElementById('w-viajeros-mas');
+  var tog=document.getElementById('w-viaj-mas');
+  if(!mas||!tog)return;
+  if(selViaj>4){ mas.style.display=''; tog.classList.add('active'); return; }
+  var abierto=mas.style.display!=='none';
+  mas.style.display=abierto?'none':'';
+  tog.classList.toggle('active',!abierto);
+}
 function selViajeros(btn,n){
   selViaj=n;selZ=null;selH=null;selPkg=null;selFechaIdx=0;selBoleto=null;selTransporte=null;
   if(cur)cur._fechaIdx=0;
@@ -3992,6 +4024,7 @@ function selZona(btn,p,n){
     selViaj=reqViaj;
     var vbtns=$$('w-viajeros').querySelectorAll('.wiz-btn');
     for(var vi=0;vi<vbtns.length;vi++)vbtns[vi].classList.toggle('active',(vi+1)===reqViaj);
+    if(typeof _syncViajerosMas==='function')_syncViajerosMas(); // reqViaj≤4 → pliega la fila
     var hasHotel=(selPkg==='plus'||selPkg==='ride'||selPkg==='stay')&&cur&&!cur.noHotel;
     if(hasHotel)buildHotelButtons();
     showToast('Las '+n+' solo se venden por grupos de '+reqViaj+' personas. Ajustamos tu reserva a '+reqViaj+' viajeros.','info');

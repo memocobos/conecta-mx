@@ -1,23 +1,38 @@
 // =============================================================================
-// portal-nueva-solicitud
+// portal-nueva-solicitud  —  CANDADO DEL SERVIDOR (FASE B, stock con reloj)
 //
-// Se dispara desde el frontend del portal después de un INSERT exitoso a
-// public.solicitudes_tour. Manda un email al admin con el resumen.
+// Antes: el cliente insertaba en solicitudes_tour y esta función solo mandaba
+// correos. Ahora la función OWNS el insert para poder blindar la sobreventa:
+//   (a) ANTES de insertar: si la zona está GESTIONADA (tiene compras) verifica
+//       disponibilidad ≥ num_personas — si no alcanza, 409 amable.
+//   (b) Al insertar sin comprobante en zona gestionada: hold_expira_at = now()+15
+//       min (const HOLD_MINUTOS en _lib/disponibilidad). Con comprobante → NULL.
+//   (c) DESPUÉS de insertar: re-verifica; si quedó sobrevendido (carrera del
+//       último boleto) cancela SU PROPIA solicitud y responde 409 honesto.
+//   Fails-loud: si la disponibilidad no se puede calcular (y el paquete lleva
+//   boleto), NO inserta (mejor no vender que sobrevender). RIDE queda fuera.
+//   Luego manda los correos (admin + cliente) como siempre.
 //
-// Seguridad:
-//   - Valida el JWT del cliente con Supabase Auth (GET /auth/v1/user).
-//   - Lee la solicitud con service_role key.
-//   - Verifica que solicitud.auth_user_id === jwt.user.id.
-//   Sin esto, cualquiera con curl puede spammear al admin con cualquier UUID.
+// Seguridad: valida el JWT del cliente (GET /auth/v1/user); fuerza
+// auth_user_id = jwt.user.id y estado = 'pendiente'; solo inserta columnas de
+// una whitelist. El precio NO se recalcula aquí (vive en el portal); solo se
+// marcan valores absurdos para el correo del admin.
 //
 // Variables de entorno requeridas (Netlify):
-//   - PORTAL_SUPABASE_URL
-//   - PORTAL_SUPABASE_ANON_KEY
-//   - PORTAL_SUPABASE_SERVICE_KEY
+//   - PORTAL_SUPABASE_URL / _ANON_KEY / _SERVICE_KEY
+//   - SUPABASE_URL_KAMEHOUSE / SUPABASE_SERVICE_KEY_KAMEHOUSE (para el candado)
 //   - RESEND_KEY (o RESEND_API_KEY como fallback)
 // =============================================================================
 
 const { aplicarModoPrueba } = require('./_lib/correo-guard');
+const { cargarDisponibilidad, evaluarZona, HOLD_MINUTOS } = require('./_lib/disponibilidad');
+
+// Columnas que el cliente puede aportar al insert (whitelist anti-inyección).
+const CAMPOS_INSERT = [
+  'cliente_id', 'evento_id', 'evento_nombre', 'paquete', 'zona', 'num_personas',
+  'tipo_habitacion', 'lleva_vuelo', 'codigo_vuelo', 'codigo_descuento',
+  'precio_total', 'monto_separo', 'notas_cliente', 'comprobante_separo_url',
+];
 
 exports.handler = async (event) => {
   const headers = {
@@ -35,15 +50,18 @@ exports.handler = async (event) => {
   const SB_URL     = process.env.PORTAL_SUPABASE_URL;
   const SB_ANON    = process.env.PORTAL_SUPABASE_ANON_KEY;
   const SB_SERVICE = process.env.PORTAL_SUPABASE_SERVICE_KEY;
+  const KH_URL     = process.env.SUPABASE_URL_KAMEHOUSE || process.env.SUPABASE_URL;
+  const KH_SERVICE = process.env.SUPABASE_SERVICE_KEY_KAMEHOUSE || process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
   const RESEND_KEY = process.env.RESEND_KEY || process.env.RESEND_API_KEY;
 
   if (!SB_URL || !SB_ANON || !SB_SERVICE || !RESEND_KEY) {
-    return {
-      statusCode: 500,
-      headers,
-      body: JSON.stringify({ error: 'Faltan env vars (PORTAL_SUPABASE_*, RESEND_KEY)' }),
-    };
+    return { statusCode: 500, headers, body: JSON.stringify({ error: 'Faltan env vars (PORTAL_SUPABASE_*, RESEND_KEY)' }) };
   }
+  if (!KH_URL || !KH_SERVICE) {
+    return { statusCode: 500, headers, body: JSON.stringify({ error: 'Faltan env vars KH (SUPABASE_URL_KAMEHOUSE/SERVICE_KEY_KAMEHOUSE)' }) };
+  }
+
+  const svc = { apikey: SB_SERVICE, Authorization: `Bearer ${SB_SERVICE}` };
 
   // ---- 1. Validar JWT ----
   const authHeader = event.headers.authorization || event.headers.Authorization || '';
@@ -72,41 +90,122 @@ exports.handler = async (event) => {
   } catch (e) {
     return { statusCode: 400, headers, body: JSON.stringify({ error: 'JSON inválido' }) };
   }
-  const solicitudId = body.solicitud_id;
-  if (!solicitudId || !/^[0-9a-f-]{36}$/i.test(solicitudId)) {
-    return { statusCode: 400, headers, body: JSON.stringify({ error: 'solicitud_id inválido' }) };
+  const entrada = (body && typeof body.solicitud === 'object' && body.solicitud) ? body.solicitud : body;
+
+  // Whitelist + validación mínima.
+  const fila = {};
+  CAMPOS_INSERT.forEach((k) => { if (entrada[k] !== undefined) fila[k] = entrada[k]; });
+  fila.auth_user_id = user.id;   // autoridad: SIEMPRE del JWT, jamás del cliente
+  fila.estado = 'pendiente';     // el estado inicial no es negociable
+
+  const numPersonas = parseInt(fila.num_personas, 10);
+  if (!fila.cliente_id || !/^[0-9a-f-]{36}$/i.test(String(fila.cliente_id))) {
+    return { statusCode: 400, headers, body: JSON.stringify({ error: 'cliente_id inválido' }) };
+  }
+  if (!fila.evento_id || !fila.paquete) {
+    return { statusCode: 400, headers, body: JSON.stringify({ error: 'Faltan evento_id o paquete' }) };
+  }
+  if (!Number.isInteger(numPersonas) || numPersonas < 1 || numPersonas > 9) {
+    return { statusCode: 400, headers, body: JSON.stringify({ error: 'num_personas fuera de 1–9' }) };
+  }
+  fila.num_personas = numPersonas;
+
+  const paquete = String(fila.paquete).toUpperCase();
+  const zona = String(fila.zona || '').trim();
+  const eventoIdSolicitud = String(fila.evento_id); // clave verbatim (incluye #idx multifecha)
+  const tieneComprobante = fila.comprobante_separo_url != null && String(fila.comprobante_separo_url).trim() !== '';
+
+  // ---- 3. CANDADO (a): pre-check de disponibilidad para zonas con boleto ----
+  // RIDE no consume boleto → fuera del control. Para el resto, si no se puede
+  // calcular la disponibilidad, NO insertamos (fail-loud anti-sobreventa).
+  let gestionadaBoleto = false;
+  let holdISO = null;
+  if (paquete !== 'RIDE') {
+    const disp = await cargarDisponibilidad({
+      khUrl: KH_URL, khKey: KH_SERVICE, portalUrl: SB_URL, portalKey: SB_SERVICE,
+      evento_id: eventoIdSolicitud,
+    });
+    if (disp.error) {
+      return { statusCode: 503, headers, body: JSON.stringify({ error: 'No pudimos confirmar la disponibilidad ahora mismo. Intenta de nuevo en un momento.' }) };
+    }
+    const evz = evaluarZona(disp, zona, numPersonas);
+    if (evz.gestionada) {
+      gestionadaBoleto = true;
+      if (evz.sinCupo) {
+        const msg = evz.agotada
+          ? `¡Ay! La zona "${zona}" se acaba de agotar. Elige otra zona, por favor.`
+          : `La zona "${zona}" ya solo tiene ${Math.max(0, evz.restante)} lugar(es) y pediste ${numPersonas}. Ajusta la cantidad o elige otra zona.`;
+        return { statusCode: 409, headers, body: JSON.stringify({ error: msg, restante: evz.restante }) };
+      }
+      // (b) reloj de 15 min solo si es gestionada y aún sin comprobante.
+      if (!tieneComprobante) {
+        holdISO = new Date(Date.now() + HOLD_MINUTOS * 60000).toISOString();
+      }
+    }
+  }
+  fila.hold_expira_at = holdISO; // null cuando no aplica (RIDE, no gestionada, o con comprobante)
+
+  // ---- 4. INSERT con service_role ----
+  let solicitud;
+  try {
+    const insResp = await fetch(`${SB_URL}/rest/v1/solicitudes_tour`, {
+      method: 'POST',
+      headers: { ...svc, 'Content-Type': 'application/json', Prefer: 'return=representation' },
+      body: JSON.stringify(fila),
+    });
+    const insArr = await insResp.json().catch(() => null);
+    if (!insResp.ok) {
+      return { statusCode: 502, headers, body: JSON.stringify({ error: 'No se pudo crear la solicitud', detail: insArr }) };
+    }
+    solicitud = Array.isArray(insArr) ? insArr[0] : insArr;
+    if (!solicitud || !solicitud.id) {
+      return { statusCode: 502, headers, body: JSON.stringify({ error: 'Insert sin fila de respuesta' }) };
+    }
+  } catch (e) {
+    return { statusCode: 502, headers, body: JSON.stringify({ error: 'Error creando la solicitud', detail: e.message }) };
   }
 
-  // ---- 3. Leer solicitud + cliente con service_role ----
-  let solicitud, cliente;
+  // ---- 5. CANDADO (c): re-verifica; si quedó sobrevendida (carrera del último
+  //       boleto), cancela SU PROPIA solicitud recién creada y responde 409 honesto.
+  if (gestionadaBoleto) {
+    const disp2 = await cargarDisponibilidad({
+      khUrl: KH_URL, khKey: KH_SERVICE, portalUrl: SB_URL, portalKey: SB_SERVICE,
+      evento_id: eventoIdSolicitud,
+    });
+    // Si el re-cálculo falla (transitorio), NO cancelamos una venta válida: el
+    // pre-check ya pasó. Solo cancelamos cuando confirmamos sobreventa real.
+    if (!disp2.error) {
+      const evz2 = evaluarZona(disp2, zona, 1);
+      if (evz2.gestionada && evz2.restante < 0) {
+        try {
+          await fetch(`${SB_URL}/rest/v1/solicitudes_tour?id=eq.${solicitud.id}`, {
+            method: 'PATCH',
+            headers: { ...svc, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+            body: JSON.stringify({ estado: 'cancelado', hold_expira_at: null }),
+          });
+        } catch (e) { /* si falla el cancel, el admin lo verá; no dejamos de avisar al cliente */ }
+        return { statusCode: 409, headers, body: JSON.stringify({ error: `¡Uy! La zona "${zona}" se agotó mientras confirmabas. No se te cobró nada; elige otra zona, por favor.` }) };
+      }
+    }
+  }
+
+  // ---- 6. Leer cliente para los correos ----
+  let cliente;
   try {
-    const sResp = await fetch(
-      `${SB_URL}/rest/v1/solicitudes_tour?id=eq.${solicitudId}&select=*`,
-      { headers: { apikey: SB_SERVICE, Authorization: `Bearer ${SB_SERVICE}` } }
-    );
-    const sArr = await sResp.json();
-    solicitud = Array.isArray(sArr) ? sArr[0] : null;
-    if (!solicitud) {
-      return { statusCode: 404, headers, body: JSON.stringify({ error: 'Solicitud no encontrada' }) };
-    }
-
-    // ---- 4. Autorización: la solicitud debe ser del usuario del JWT ----
-    if (solicitud.auth_user_id !== user.id) {
-      return { statusCode: 403, headers, body: JSON.stringify({ error: 'Esta solicitud no te pertenece' }) };
-    }
-
     const cResp = await fetch(
       `${SB_URL}/rest/v1/clientes?id=eq.${solicitud.cliente_id}&select=numero_cliente,nombre_completo,correo,celular`,
-      { headers: { apikey: SB_SERVICE, Authorization: `Bearer ${SB_SERVICE}` } }
+      { headers: svc }
     );
     const cArr = await cResp.json();
     cliente = Array.isArray(cArr) ? cArr[0] : null;
   } catch (e) {
-    return { statusCode: 502, headers, body: JSON.stringify({ error: 'Error consultando Supabase', detail: e.message }) };
+    // El cliente ya quedó creado; si falla la lectura para el correo, devolvemos
+    // OK con la solicitud (el correo es best-effort) para no bloquear al usuario.
+    return { statusCode: 200, headers, body: JSON.stringify({ ok: true, solicitud_id: solicitud.id, hold_expira_at: solicitud.hold_expira_at, hold_minutos: HOLD_MINUTOS, aviso: 'correo omitido' }) };
   }
 
   if (!cliente) {
-    return { statusCode: 404, headers, body: JSON.stringify({ error: 'Cliente no encontrado' }) };
+    return { statusCode: 200, headers, body: JSON.stringify({ ok: true, solicitud_id: solicitud.id, hold_expira_at: solicitud.hold_expira_at, hold_minutos: HOLD_MINUTOS, aviso: 'cliente no encontrado para correo' }) };
   }
 
   // ---- 5. Armar y enviar email ----
@@ -234,13 +333,15 @@ exports.handler = async (event) => {
         html,
       }),
     });
-    const data = await resp.json();
-    if (!resp.ok) {
-      return { statusCode: resp.status, headers, body: JSON.stringify({ error: 'Resend rechazó', detail: data }) };
-    }
-    return { statusCode: 200, headers, body: JSON.stringify({ ok: true, email_id: data.id }) };
+    const data = await resp.json().catch(() => ({}));
+    // El correo al admin es best-effort: la solicitud YA se creó (candado pasado).
+    // Un fallo de Resend NO debe hacer creer al cliente que su reserva falló (evita
+    // reintentos → duplicados). Se loguea y se responde OK igual.
+    if (!resp.ok) console.error('[nueva-solicitud] correo admin no OK:', resp.status, JSON.stringify(data));
+    return { statusCode: 200, headers, body: JSON.stringify({ ok: true, solicitud_id: solicitud.id, hold_expira_at: solicitud.hold_expira_at, hold_minutos: HOLD_MINUTOS, email_id: data && data.id }) };
   } catch (e) {
-    return { statusCode: 502, headers, body: JSON.stringify({ error: 'Error mandando email', detail: e.message }) };
+    console.error('[nueva-solicitud] correo admin falló (no crítico):', e.message);
+    return { statusCode: 200, headers, body: JSON.stringify({ ok: true, solicitud_id: solicitud.id, hold_expira_at: solicitud.hold_expira_at, hold_minutos: HOLD_MINUTOS }) };
   }
 };
 

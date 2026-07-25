@@ -28,10 +28,29 @@ const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'o
 
 // ── Generador del objeto-evento ───────────────────────────────────────────────
 
-// ESCAPE OBLIGATORIO: '\' → '\\' y "'" → "\'" antes de interpolar en comillas
-// simples. Un nombre tipo "Guns N' Roses" NO debe romper el array.
+// ESCAPE OBLIGATORIO antes de interpolar en comillas simples. El texto viaja a
+// index.html DENTRO de un <script>, así que hay que sobrevivir a DOS capas:
+//
+//   1) JS   — '\' → '\\' y "'" → "\'"  ("Guns N' Roses" no rompe el array).
+//   2) HTML — '</' → '<\/'. 🔒 AUD-1: sin esto, un nombre con "</script>" CIERRA
+//      el <script> de index.html y rompe el sitio… y PASA la validación, porque
+//      los dos validadores parsean el JS extraído, no el HTML. La secuencia
+//      '<\/' es idéntica a '</' para JS y ya no cierra la etiqueta para el
+//      navegador. Se escapa TODO '</', no solo '</script>' (también '</style>',
+//      '</textarea>', etc.).
+//   3) Saltos de línea y separadores — \n \r U+2028 U+2029 terminan un literal
+//      de comillas simples. Se emiten como escapes.
+//
+// El orden importa: la barra invertida SIEMPRE primero.
 function escStr(s) {
-  return String(s == null ? '' : s).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+  return String(s == null ? '' : s)
+    .replace(/\\/g, '\\\\')
+    .replace(/'/g, "\\'")
+    .replace(/\r/g, '\\r')
+    .replace(/\n/g, '\\n')
+    .replace(/\u2028/g, '\\u2028')
+    .replace(/\u2029/g, '\\u2029')
+    .replace(/<\//g, '<\\/');
 }
 
 // 'YYYY-MM-DD' → 'D mes YYYY' (día sin cero a la izquierda). null → 'Por confirmar'.
@@ -80,9 +99,21 @@ function parseInc(raw) {
   return out;
 }
 
+// ¿El valor es "vacío" (no capturado)? null/undefined/'' → sí. Se usa para
+// distinguir "no puso precio cheap" de "puso una basura".
+function _vacio(v) {
+  return v == null || (typeof v === 'string' && v.trim() === '');
+}
+
 // B1 — `zonas` (texto JSON desde la DB, o array) → filas normalizadas en el
-// ORDEN capturado: {n, p, pc, ag}. Basura → []. Descarta filas sin nombre.
-// (VIP eliminado: ya no se captura ni se emite.)
+// ORDEN capturado: {n, p, pc, ag}. Basura estructural → []. Descarta filas sin
+// nombre. (VIP eliminado: ya no se captura ni se emite.)
+//
+// 🔒 AUD-1 — ERROR DE CAPTURA, no silencio: antes, un precio no numérico (el
+// clásico "2,700" con coma, que Number() vuelve NaN) se normalizaba a 0 y la
+// zona se publicaba DISPONIBLE A $0. Ahora una zona NO agotada con precio
+// inválido o ≤0 LANZA, y el error sube al dryrun/publicar para que se corrija
+// la captura. Una zona agotada (ag) sí puede ir en 0: no se vende.
 function parseZonas(raw) {
   let arr = raw;
   if (typeof raw === 'string') {
@@ -94,13 +125,28 @@ function parseZonas(raw) {
     if (!z || typeof z !== 'object') continue;
     const n = (typeof z.n === 'string' ? z.n : '').trim();
     if (!n) continue;
+    const ag = (z.ag === 1 || z.ag === true || z.ag === '1') ? 1 : 0;
     const p = Number(z.p);
-    const pc = Number(z.pc);
+    if (!ag && !(Number.isFinite(p) && p > 0)) {
+      throw new Error(
+        `Zona "${n}": el precio "${z.p}" no es un número válido. ` +
+        'Escríbelo sin comas ni símbolos (ej. 2700), o marca la zona como agotada.'
+      );
+    }
+    // El precio cheap es opcional; si se capturó algo, tiene que ser un número.
+    const pcRaw = z.pc;
+    const pc = Number(pcRaw);
+    if (!_vacio(pcRaw) && !Number.isFinite(pc)) {
+      throw new Error(
+        `Zona "${n}": el precio cheap "${pcRaw}" no es un número válido. ` +
+        'Escríbelo sin comas ni símbolos (ej. 1800) o déjalo vacío.'
+      );
+    }
     out.push({
       n,
       p: (Number.isFinite(p) && p > 0) ? Math.round(p) : 0,
       pc: (Number.isFinite(pc) && pc > 0) ? Math.round(pc) : 0,
-      ag: (z.ag === 1 || z.ag === true || z.ag === '1') ? 1 : 0,
+      ag,
     });
   }
   return out;
@@ -251,13 +297,31 @@ function _festHotelDesc(k, noches) {
   return base + (noches > 1 ? (' · ' + noches + ' noches') : '');
 }
 // Normaliza las zonas de un paquete → [{n,p,pc}] con n no vacío.
-function _festZonaRows(zonas) {
+// 🔒 AUD-1: mismo candado de captura que parseZonas — un precio no numérico en
+// un paquete de festival también publicaba una zona a $0. Aquí no hay `ag` por
+// paquete, así que todo precio de zona debe ser un número > 0.
+function _festZonaRows(zonas, lblPaquete) {
+  const donde = lblPaquete ? ` del paquete "${lblPaquete}"` : '';
   return (Array.isArray(zonas) ? zonas : [])
-    .map((z) => ({
-      n: (z && typeof z.n === 'string') ? z.n.trim() : '',
-      p: Number(z && z.p) || 0,
-      pc: Number(z && z.pc) || 0,
-    }))
+    .map((z) => {
+      const n = (z && typeof z.n === 'string') ? z.n.trim() : '';
+      if (!n) return { n: '', p: 0, pc: 0 };
+      const p = Number(z && z.p);
+      if (!(Number.isFinite(p) && p > 0)) {
+        throw new Error(
+          `Zona "${n}"${donde}: el precio "${z && z.p}" no es un número válido. ` +
+          'Escríbelo sin comas ni símbolos (ej. 2700).'
+        );
+      }
+      const pcRaw = z && z.pc;
+      const pc = Number(pcRaw);
+      if (!_vacio(pcRaw) && !Number.isFinite(pc)) {
+        throw new Error(
+          `Zona "${n}"${donde}: el precio cheap "${pcRaw}" no es un número válido.`
+        );
+      }
+      return { n, p, pc: Number.isFinite(pc) ? pc : 0 };
+    })
     .filter((z) => z.n);
 }
 
@@ -309,7 +373,7 @@ function generarObjFestival(esfera, fest, hoy) {
 
   // multifecha: una entrada por paquete.
   const mfStr = fest.paquetes.map((p) => {
-    const rows = _festZonaRows(p.zonas);
+    const rows = _festZonaRows(p.zonas, p.lbl);
     const noches = Number(p.noches) || 0;
     let mf = "{lbl:'" + escStr(p.lbl || '') + "'";
     const pds = (typeof p.ds === 'string' && FECHA_RE.test(String(p.ds).slice(0, 10))) ? String(p.ds).slice(0, 10) : '';
@@ -337,7 +401,7 @@ function generarObjFestival(esfera, fest, hoy) {
   }).join(',');
 
   // Zonas top-level (fallback que el index espera) = del PRIMER paquete.
-  const firstRows = _festZonaRows(fest.paquetes[0] && fest.paquetes[0].zonas);
+  const firstRows = _festZonaRows(fest.paquetes[0] && fest.paquetes[0].zonas, fest.paquetes[0] && fest.paquetes[0].lbl);
   let topZonas = 'zonas:[' + firstRows.map((z) => "{n:'" + escStr(z.n) + "',p:" + Math.round(z.p) + '}').join(',') + ']';
   if (cheapOn && firstRows.some((z) => z.pc > 0)) {
     topZonas += ',cheapZonas:[' + firstRows.filter((z) => z.pc > 0).map((z) => "{n:'" + escStr(z.n) + "',p:" + Math.round(z.pc) + '}').join(',') + ']';
@@ -439,6 +503,14 @@ function generarObj(esfera, hoy) {
 
 // ── Parsers de validación (idénticos a los consumidores) ──────────────────────
 
+// ⚠️ NOTA SOBRE LOS BALANCEADORES (extraerEVKamehouse y _localizarObjeto):
+// solo reconocen strings de comillas simples y dobles. NO entienden template
+// literals (`backticks`) ni comentarios. Hoy es seguro porque el EV se escribe
+// SIEMPRE con comillas simples (lo garantiza este compilador y así está el
+// index.html a mano). Si algún día alguien mete un backtick — o un '[' / '{'
+// dentro de un comentario — dentro del array EV, el balanceo se descuadra y la
+// extracción falla o corta donde no debe. Regla: dentro de `var EV=[…]`, solo
+// comillas simples.
 // estilo-kamehouse: regex + balanceo de corchetes ignorando strings + new Function.
 function extraerEVKamehouse(content) {
   const m = content.match(/var\s+EV\s*=\s*\[/);
@@ -455,7 +527,9 @@ function extraerEVKamehouse(content) {
   }
   if (end < 0) throw new Error('Array EV sin cerrar');
   const arrText = content.slice(start, end);
-  const stubs = 'var BANCO_DEFAULT={},BANCO_HEY={},HOTEL_CDM=[],HOTEL_STD=[];';
+  // HOTEL_MTY incluida: un evento del EV puede referenciarla y sin el stub la
+  // validación entera reventaría con ReferenceError.
+  const stubs = 'var BANCO_DEFAULT={},BANCO_HEY={},HOTEL_CDM=[],HOTEL_STD=[],HOTEL_MTY=[];';
   const ev = new Function(stubs + 'return ' + arrText + ';')();
   if (!Array.isArray(ev)) throw new Error('EV no es array');
   return ev;
@@ -486,6 +560,153 @@ function extraerEVPortal(content) {
   return ev;
 }
 
+// ── 🔒 AUD-1: fusión al ACTUALIZAR (no perder lo que el compilador no maneja) ──
+//
+// El compilador emite un subconjunto del EV. Un evento que ya vive en index.html
+// puede traer campos que NADIE captura en las Esferas (ride, rideOnly, cheapOnly,
+// diaFirst, waChannel, noBus…) y, sobre todo, `banco:BANCO_HEY`. Antes, re-publicar
+// SUSTITUÍA el objeto entero → esos campos DESAPARECÍAN y el banco se volvía
+// BANCO_DEFAULT: un evento de Banamex se quedaba con la cuenta EQUIVOCADA y nadie
+// se enteraba (la validación solo mira que el id exista).
+//
+// Ahora se fusiona: lo que el compilador maneja MANDA (es lo recién capturado) y
+// todo lo demás del objeto viejo SE CONSERVA tal cual. Si un campo perdido no se
+// puede re-emitir con seguridad (arrays/objetos que no sabemos serializar), se
+// LANZA con un mensaje claro en vez de tragárselo.
+const IDENT_RE = /^[A-Za-z_$][A-Za-z0-9_$]*$/;
+
+// Campos que el compilador ADMINISTRA. Ojo con la distinción, que es el corazón
+// de la fusión: administrar ≠ emitir siempre. `cheapZonas` se emite solo si hay
+// precio cheap; `mapa` solo si se subió mapa; `dsList` solo si hay multifecha.
+// Cuando el compilador administra un campo y NO lo emite, eso SIGNIFICA "este
+// evento ya no lo tiene" → se deja ir. Lo que se preserva es únicamente lo que
+// el capturador de Esferas ni siquiera conoce (ride, rideOnly, cheapOnly,
+// diaFirst, waChannel, _past…).
+const CAMPOS_DEL_COMPILADOR = new Set([
+  // base concierto
+  'id', 'added', 'music', 'c', 'staticImg', 'img', 'a', 'f', 'ds', 'dsList',
+  'v', 'st', 'cdmx', 'mapa', 'inc', 'sep', 'sepCheap', 'nota', 'banco',
+  'zonas', 'cheapZonas', 'hotel', 'hotelOverride', 'hotelPP', 'pagos',
+  // extras del formato festival
+  'musicList', 'noBus', 'noStay', 'noCheap', 'cheapSoon', 'lineup', 'multifecha',
+]);
+
+// Serializa un valor primitivo al formato del EV. null si no es serializable.
+function _serializarValor(v) {
+  if (typeof v === 'string') return "'" + escStr(v) + "'";
+  if (typeof v === 'number') return Number.isFinite(v) ? String(v) : null;
+  if (typeof v === 'boolean') return String(v);
+  return null;
+}
+
+// Texto CRUDO del valor de una propiedad de primer nivel dentro del objeto, tal
+// como está escrito en index.html. null si no la encuentra.
+//
+// Se preserva el TEXTO y no el valor parseado a propósito: un campo puede
+// referirse a variables del index (BANCO_HEY, HOTEL_STD, PROMOS…) y al parsear
+// con stubs esas referencias se vuelven {} — re-serializar el valor las
+// destruiría. Copiar el texto conserva la referencia intacta.
+function _valorCrudoDe(objText, key) {
+  const s = String(objText);
+  let inStr = false, sc = '', esc = false, brace = 0, bracket = 0;
+  for (let i = 0; i < s.length; i++) {
+    const ch = s[i];
+    if (esc) { esc = false; continue; }
+    if (inStr) { if (ch === '\\') { esc = true; continue; } if (ch === sc) inStr = false; continue; }
+    if (ch === '"' || ch === "'") { inStr = true; sc = ch; continue; }
+    if (ch === '{') { brace++; continue; }
+    if (ch === '}') { brace--; continue; }
+    if (ch === '[') { bracket++; continue; }
+    if (ch === ']') { bracket--; continue; }
+    // Nivel 1 = propiedades directas del objeto-evento.
+    if (brace === 1 && bracket === 0 && ch === ':') {
+      let j = i - 1;
+      while (j >= 0 && /\s/.test(s[j])) j--;
+      let fin = j + 1;
+      while (j >= 0 && /[A-Za-z0-9_$]/.test(s[j])) j--;
+      const nombre = s.slice(j + 1, fin);
+      if (nombre !== key) continue;
+      // Valor: desde aquí hasta la coma de nivel 1 o el cierre del objeto.
+      let k = i + 1;
+      let b2 = 0, br2 = 0, inS2 = false, sc2 = '', esc2 = false;
+      for (; k < s.length; k++) {
+        const c = s[k];
+        if (esc2) { esc2 = false; continue; }
+        if (inS2) { if (c === '\\') { esc2 = true; continue; } if (c === sc2) inS2 = false; continue; }
+        if (c === '"' || c === "'") { inS2 = true; sc2 = c; continue; }
+        if (c === '{') { b2++; continue; }
+        if (c === '[') { br2++; continue; }
+        if (c === '}') { if (b2 === 0) break; b2--; continue; }
+        if (c === ']') { br2--; continue; }
+        if (c === ',' && b2 === 0 && br2 === 0) break;
+      }
+      return s.slice(i + 1, k).trim();
+    }
+  }
+  return null;
+}
+
+// Referencia de banco del objeto VIEJO tal como está escrita (BANCO_DEFAULT /
+// BANCO_HEY / la que sea). Se lee del TEXTO porque al parsear con stubs todos
+// los bancos valen {} y son indistinguibles. null si no hay o si es un literal.
+function _bancoIdentificador(objText) {
+  const m = String(objText).match(/[,{]\s*banco\s*:\s*([A-Za-z_$][A-Za-z0-9_$]*)/);
+  return m ? m[1] : null;
+}
+
+// fusionarConViejo(objTextViejo, objNuevo) → objNuevo enriquecido.
+// Lanza si hay un campo que se perdería y no se puede re-emitir.
+function fusionarConViejo(objTextViejo, objNuevo, slug) {
+  let viejo, nuevo;
+  try { viejo = _parseObjeto(objTextViejo); } catch (e) {
+    throw new Error(`No pude leer el evento "${slug}" que ya está en index.html (${e.message}). No se actualiza a ciegas.`);
+  }
+  try { nuevo = _parseObjeto(objNuevo); } catch (e) {
+    throw new Error(`El objeto generado para "${slug}" no parsea (${e.message}).`);
+  }
+  if (!viejo || typeof viejo !== 'object') return objNuevo;
+
+  const extras = [];
+  for (const k of Object.keys(viejo)) {
+    // El compilador manda sobre todo lo que administra: si lo emitió, gana su
+    // versión; si NO lo emitió, es que el evento dejó de tenerlo.
+    if (CAMPOS_DEL_COMPILADOR.has(k)) continue;
+    if (Object.prototype.hasOwnProperty.call(nuevo, k)) continue;
+    if (!IDENT_RE.test(k)) {
+      throw new Error(`El evento "${slug}" trae la propiedad "${k}", que no puedo re-emitir. Edita index.html a mano.`);
+    }
+    // Preferimos SIEMPRE el texto original (conserva referencias a variables
+    // como BANCO_HEY o PROMOS). Solo si no se puede localizar, se re-serializa
+    // el valor primitivo. Si ninguna vía funciona, se rehúsa el update: jamás
+    // publicar perdiendo un campo en silencio.
+    const crudo = _valorCrudoDe(objTextViejo, k);
+    const ser = (crudo != null && crudo !== '') ? crudo : _serializarValor(viejo[k]);
+    if (ser == null) {
+      throw new Error(
+        `No puedo actualizar "${slug}" sin perder el campo "${k}" (${Array.isArray(viejo[k]) ? 'lista' : typeof viejo[k]}), ` +
+        'que el capturador de Esferas no maneja. Quítalo de index.html o edita ese evento a mano.'
+      );
+    }
+    extras.push(k + ':' + ser);
+  }
+
+  // Banco: si el viejo apuntaba a otra referencia, se respeta.
+  const bancoViejo = _bancoIdentificador(objTextViejo);
+  let salida = objNuevo;
+  if (bancoViejo && bancoViejo !== 'BANCO_DEFAULT') {
+    const antes = salida;
+    salida = salida.replace(/([,{])banco:BANCO_DEFAULT/, '$1banco:' + bancoViejo);
+    if (salida === antes) {
+      throw new Error(`No pude conservar el banco (${bancoViejo}) de "${slug}". No se actualiza a ciegas.`);
+    }
+  }
+
+  if (!extras.length) return salida;
+  // Se inyectan antes de la llave de cierre (el objeto generado SIEMPRE cierra en '}').
+  if (!salida.endsWith('}')) throw new Error(`Objeto generado con forma inesperada para "${slug}".`);
+  return salida.slice(0, -1) + ',' + extras.join(',') + '}';
+}
+
 // ── API pública ───────────────────────────────────────────────────────────────
 
 // compilarEV({ esferas, indexHtml }) → { contenidoNuevo, aInsertar, yaEnEv, validacion }
@@ -503,11 +724,28 @@ function compilarEV({ esferas, indexHtml }) {
   const hoy = todayMx();
   const aInsertar = [];
   const aActualizar = [];
+  const slugsVistos = new Set(); // 🔒 AUD-1: un slug repetido en el lote se
+                                 // insertaría/actualizaría dos veces.
   for (const esf of (Array.isArray(esferas) ? esferas : [])) {
     if (!esf || !esf.slug) continue;
-    const obj = generarObj(esf, hoy);
-    if (idsAntes.has(esf.slug)) aActualizar.push({ slug: esf.slug, obj });
-    else aInsertar.push({ slug: esf.slug, obj });
+    const slug = String(esf.slug);
+    if (slugsVistos.has(slug)) {
+      throw new Error(`El slug "${slug}" viene repetido en el lote — cada evento se publica una sola vez.`);
+    }
+    slugsVistos.add(slug);
+    let obj = generarObj(esf, hoy);
+    if (idsAntes.has(slug)) {
+      // 🔒 AUD-1: fusionar con lo que ya vive en index.html (banco, ride,
+      // rideOnly, waChannel… que el capturador no maneja) en vez de sustituir.
+      const loc = _localizarObjeto(content, slug);
+      if (!loc) {
+        throw new Error(`El evento "${slug}" aparece en el EV pero no pude localizar su objeto para actualizarlo.`);
+      }
+      obj = fusionarConViejo(content.slice(loc.start, loc.end), obj, slug);
+      aActualizar.push({ slug, obj });
+    } else {
+      aInsertar.push({ slug, obj });
+    }
   }
 
   // Primero reemplaza los existentes EN SU LUGAR (balanceo, sin tocar comas
@@ -518,7 +756,25 @@ function compilarEV({ esferas, indexHtml }) {
   }
   if (aInsertar.length > 0) {
     const bloque = aInsertar.map(x => x.obj).join(',\n  ');
-    contenidoNuevo = contenidoNuevo.replace('var EV=[', 'var EV=[\n  ' + bloque + ',');
+    // 🔒 AUD-1: reemplazo por FUNCIÓN. Con un string, '$&' y '$$' dentro del
+    // texto capturado (un nombre de evento, una nota) se interpretan como
+    // patrones de sustitución y el HTML sale distinto de lo que se capturó.
+    contenidoNuevo = contenidoNuevo.replace('var EV=[', () => 'var EV=[\n  ' + bloque + ',');
+  }
+
+  // 🔒 AUD-1: el update NO puede fallar en silencio. reemplazarEnEV devuelve el
+  // contenido intacto si no localizó el objeto; antes eso pasaba como éxito
+  // porque la validación solo comprobaba que el slug existiera (y existía: el
+  // viejo). Ahora se exige que el objeto que quedó en el archivo sea EXACTAMENTE
+  // el que compilamos.
+  for (const it of aActualizar) {
+    const loc = _localizarObjeto(contenidoNuevo, it.slug);
+    if (!loc) {
+      throw new Error(`Actualización fallida: "${it.slug}" ya no se localiza en el EV tras el reemplazo.`);
+    }
+    if (contenidoNuevo.slice(loc.start, loc.end) !== it.obj) {
+      throw new Error(`Actualización fallida: el evento "${it.slug}" quedó con el contenido VIEJO — no se aplicó el reemplazo.`);
+    }
   }
 
   // GUARDA: si nada cambió, avisar para evitar un PUT redundante.
@@ -569,7 +825,9 @@ function compilarEV({ esferas, indexHtml }) {
 // Parsea un único objeto-evento aislado (con los mismos stubs que el parser
 // kamehouse). Devuelve el objeto o lanza.
 function _parseObjeto(objText) {
-  const stubs = 'var BANCO_DEFAULT={},BANCO_HEY={},HOTEL_CDM=[],HOTEL_STD=[];';
+  // HOTEL_MTY incluida: un evento del EV puede referenciarla y sin el stub la
+  // validación entera reventaría con ReferenceError.
+  const stubs = 'var BANCO_DEFAULT={},BANCO_HEY={},HOTEL_CDM=[],HOTEL_STD=[],HOTEL_MTY=[];';
   return new Function(stubs + 'return (' + objText + ');')();
 }
 
@@ -679,4 +937,13 @@ function quitarDelEV({ indexHtml, slug }) {
   return { contenidoNuevo, encontrado: true, validacion: _validarSlugFuera(contenidoNuevo, target, evAntes.length) };
 }
 
-module.exports = { compilarEV, quitarDelEV, reemplazarEnEV, todayMx };
+module.exports = {
+  compilarEV, quitarDelEV, reemplazarEnEV, todayMx,
+  // Helpers puros expuestos para el arnés (patrón de la casa).
+  _escStr: escStr,
+  _parseZonas: parseZonas,
+  _generarObj: generarObj,
+  _fusionarConViejo: fusionarConViejo,
+  _extraerEVKamehouse: extraerEVKamehouse,
+  _extraerEVPortal: extraerEVPortal,
+};

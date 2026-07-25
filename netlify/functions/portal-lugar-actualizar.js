@@ -19,6 +19,9 @@
 //                       PORTAL_SUPABASE_SERVICE_KEY. (Sin env vars nuevas.)
 // =============================================================================
 
+// AUD-3: re-evalúa el tipo del contrato (adulto/menor) cuando llega la fecha real.
+const { sincronizarTipoContrato } = require('./_lib/contratos-viajeros');
+
 const UUID_RE = /^[0-9a-f-]{36}$/i;
 const FECHA_RE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -164,7 +167,22 @@ exports.handler = async (event) => {
     }
     const upArr = await upR.json();
     const actualizado = Array.isArray(upArr) ? upArr[0] : null;
-    return { statusCode: 200, headers, body: JSON.stringify({ ok: true, lugar: actualizado }) };
+
+    // 🔒 AUD-3 — HUECO LEGAL DE MENORES. Este endpoint es el ÚNICO punto donde un
+    // lugar recibe su fecha de nacimiento real (los acompañantes nacen sin ella y
+    // su contrato se crea como 'adulto'). Si la fecha revela que es MENOR, el
+    // contrato PENDIENTE se corrige aquí; uno ya firmado NO se toca y se marca
+    // para revisión manual. Best-effort: nunca tumba la actualización del lugar.
+    let contrato_tipo;
+    if (patch.fecha_nacimiento) {
+      const sync = await sincronizarTipoContrato({
+        portalUrl: SB_URL, portalHeaders: sbHeaders,
+        lugarId, fechaNacimiento: patch.fecha_nacimiento,
+      });
+      if (sync && (sync.cambiado || sync.revision_manual)) contrato_tipo = sync;
+    }
+
+    return { statusCode: 200, headers, body: JSON.stringify({ ok: true, lugar: actualizado, ...(contrato_tipo ? { contrato_tipo } : {}) }) };
   } catch (e) {
     return { statusCode: 502, headers, body: JSON.stringify({ error: 'Error actualizando el lugar', detail: e.message }) };
   }

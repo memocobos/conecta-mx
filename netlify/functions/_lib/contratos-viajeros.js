@@ -49,8 +49,13 @@ async function crearContratoParaLugar({ portalUrl, portalHeaders, lugar, solicit
     return { created: true, id: c && c.id, token: c && c.token, tipo };
   }
   const detail = await r.text().catch(() => '');
-  // 23505 unique_violation (índice parcial lugar_uq) → ya existía un contrato vivo.
-  if (r.status === 409 || /23505|duplicate key|contratos_viajeros_lugar_uq/i.test(detail)) {
+  // 🔒 AUD-3 — "ya existía" SOLO si el detalle CONFIRMA la violación de unicidad
+  // (23505 / índice parcial lugar_uq). Antes bastaba un 409 genérico, y PostgREST
+  // también devuelve 409 en violaciones de LLAVE FORÁNEA (23503): un lugar o una
+  // solicitud inexistente se disfrazaba de idempotencia y el viajero se quedaba
+  // SIN CONTRATO en silencio — con la regla "sin firma no hay servicio", eso se
+  // descubría el día del viaje.
+  if (/23505|duplicate key|contratos_viajeros_lugar_uq/i.test(detail)) {
     return { created: false, existed: true };
   }
   throw new Error('contrato insert falló (' + r.status + '): ' + detail.slice(0, 200));
@@ -96,4 +101,59 @@ async function generarContratosDeSolicitud({ portalUrl, portalHeaders, solicitud
   return { creados, total: Array.isArray(lugares) ? lugares.length : 0, titularToken };
 }
 
-module.exports = { esMenor, crearContratoParaLugar, tokenContratoLugar, generarContratosDeSolicitud };
+// ── 🔒 AUD-3 — HUECO LEGAL DE MENORES ────────────────────────────────────────
+//
+// Los acompañantes nacen SIN fecha de nacimiento, así que su contrato se crea
+// como 'adulto'. Cuando el titular captura la fecha real y resulta que es un
+// MENOR, nadie re-evaluaba: contrato-viajero-firmar tampoco lo hace. Resultado:
+// un menor de edad firmando un contrato de adulto, sin el dato del padre/tutor
+// que exige la plantilla de menor.
+//
+// Esta función re-sincroniza el tipo del contrato VIVO de un lugar contra su
+// fecha de nacimiento. Reglas:
+//   · contrato 'pendiente' (sin firmar) → se corrige el tipo (adulto↔menor).
+//   · contrato YA FIRMADO → NO se toca. Se reporta revision_manual para que
+//     alguien lo mire: un contrato firmado es un documento, no un estado.
+//   · sin contrato, sin fecha o cualquier error → no pasa nada (best-effort).
+//
+// Devuelve { cambiado, de, a, revision_manual } — nunca lanza.
+async function sincronizarTipoContrato({ portalUrl, portalHeaders, lugarId, fechaNacimiento }) {
+  const salida = { cambiado: false };
+  try {
+    if (!lugarId || !fechaNacimiento) return salida;
+    const tipoCorrecto = esMenor(fechaNacimiento) ? 'menor' : 'adulto';
+    const r = await fetch(
+      `${portalUrl}/rest/v1/contratos_viajeros?lugar_id=eq.${encodeURIComponent(lugarId)}`
+      + `&estado=neq.anulado&select=id,tipo,estado&limit=1`,
+      { headers: portalHeaders }
+    );
+    if (!r.ok) return salida;
+    const [c] = (await r.json().catch(() => [])) || [];
+    if (!c || c.tipo === tipoCorrecto) return salida;
+
+    if (c.estado !== 'pendiente') {
+      // Firmado: se avisa, no se modifica.
+      console.warn(`[contratos-viajeros] lugar ${lugarId}: el contrato ya está "${c.estado}" como "${c.tipo}" pero la fecha de nacimiento dice "${tipoCorrecto}" — REVISIÓN MANUAL`);
+      return { cambiado: false, de: c.tipo, a: tipoCorrecto, revision_manual: true };
+    }
+
+    const up = await fetch(
+      `${portalUrl}/rest/v1/contratos_viajeros?id=eq.${encodeURIComponent(c.id)}&estado=eq.pendiente`,
+      {
+        method: 'PATCH',
+        headers: { ...portalHeaders, Prefer: 'return=minimal' },
+        body: JSON.stringify({ tipo: tipoCorrecto }),
+      }
+    );
+    if (!up.ok) return salida;
+    return { cambiado: true, de: c.tipo, a: tipoCorrecto };
+  } catch (e) {
+    console.warn('[contratos-viajeros] sincronizarTipoContrato:', e.message);
+    return salida;
+  }
+}
+
+module.exports = {
+  esMenor, crearContratoParaLugar, tokenContratoLugar, generarContratosDeSolicitud,
+  sincronizarTipoContrato,
+};

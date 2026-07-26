@@ -22,7 +22,7 @@
 //      SERVICE_KEY_KAMEHOUSE (compras/stock) + JWT_SECRET.
 // =============================================================================
 
-const { verifyAdminAuth, corsCheck } = require('./_lib/verify-admin');
+const { verifyAdminAuthLive, corsCheck } = require('./_lib/verify-admin');
 const { resolverPrecioVenta, hoyMx } = require('./_lib/precio-zona');
 const { fetchCatalogo } = require('./_lib/catalogo-index');
 const { cargarDisponibilidad, evaluarZona } = require('./_lib/disponibilidad');
@@ -98,7 +98,7 @@ exports.handler = async (event) => {
   if (event.httpMethod !== 'POST') return _bad(headers, 405, 'Method not allowed');
   if (!__origin) return _bad(headers, 403, 'Origen no permitido');
 
-  const auth = verifyAdminAuth(event, ROLES);
+  const auth = await verifyAdminAuthLive(event, ROLES);
   if (!auth.valid) return _bad(headers, auth.status, auth.error);
   const vendedorId = auth.user && auth.user.id ? String(auth.user.id) : null;
 

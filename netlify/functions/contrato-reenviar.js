@@ -3,7 +3,7 @@
 // que sigue en estado 'pendiente'. Usa el mismo template y `from:` que
 // contrato-crear.js para mantener consistencia.
 
-const { verifyAdminAuth, corsCheck } = require('./_lib/verify-admin');
+const { verifyAdminAuthLive, corsCheck } = require('./_lib/verify-admin');
 const { aplicarModoPrueba } = require('./_lib/correo-guard');
 
 const SB_URL = "https://npgnhsmwpcipxgvfxrho.supabase.co";
@@ -80,7 +80,7 @@ exports.handler = async function (event) {
   }
   if (event.httpMethod !== "POST") return bad(405, "Método no permitido");
   if (!__origin) return bad(403, "Origen no permitido");
-  const __auth = verifyAdminAuth(event, ['maestro_roshi','bulma','oolong','milk']);
+  const __auth = await verifyAdminAuthLive(event, ['maestro_roshi','bulma','oolong','milk']);
   if (!__auth.valid) return bad(__auth.status, __auth.error);
   if (!SB_KEY) return bad(500, "SUPABASE_SERVICE_KEY_KAMEHOUSE no configurado");
   if (!RESEND_KEY) return bad(500, "RESEND_API_KEY no configurado");

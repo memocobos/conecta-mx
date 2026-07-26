@@ -27,10 +27,10 @@
 //     el cierre RLS no lo rompe.
 //
 // Env vars (reusa las de KH): SUPABASE_URL_KAMEHOUSE, SUPABASE_SERVICE_KEY_KAMEHOUSE,
-//   JWT_SECRET (lo lee verifyAdminAuth).
+//   JWT_SECRET (lo lee verifyAdminAuthLive).
 // =============================================================================
 
-const { verifyAdminAuth, corsCheck } = require('./_lib/verify-admin');
+const { verifyAdminAuthLive, corsCheck } = require('./_lib/verify-admin');
 
 const UUID_RE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
 
@@ -81,7 +81,7 @@ exports.handler = async (event) => {
     return { statusCode: 400, headers, body: JSON.stringify({ error: 'accion inválida' }) };
   }
 
-  const auth = verifyAdminAuth(event, ACCIONES[accion]);
+  const auth = await verifyAdminAuthLive(event, ACCIONES[accion]);
   if (!auth.valid) return { statusCode: auth.status, headers, body: JSON.stringify({ error: auth.error }) };
 
   const jwtRol = auth.user && auth.user.rol;

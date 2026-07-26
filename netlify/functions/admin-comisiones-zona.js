@@ -25,7 +25,7 @@
 //      PORTAL_SUPABASE_URL/SERVICE_KEY (solo 'costo_vendedor', para el stock).
 // =============================================================================
 
-const { verifyAdminAuth, corsCheck } = require('./_lib/verify-admin');
+const { verifyAdminAuthLive, corsCheck } = require('./_lib/verify-admin');
 const { cargarDisponibilidad, evaluarZona } = require('./_lib/disponibilidad');
 const { verificarVendedorActivo, AVISO_INACTIVO } = require('./_lib/vendedor-activo');
 
@@ -57,7 +57,7 @@ exports.handler = async (event) => {
   const accion = body.accion;
   if (!(accion in ACCIONES)) return json(400, { error: 'accion inválida' });
 
-  const auth = verifyAdminAuth(event, ACCIONES[accion]);
+  const auth = await verifyAdminAuthLive(event, ACCIONES[accion]);
   if (!auth.valid) return json(auth.status, { error: auth.error });
 
   // 💤 F6: candado de inactividad — vendedor con 3+ meses y CERO ventas queda

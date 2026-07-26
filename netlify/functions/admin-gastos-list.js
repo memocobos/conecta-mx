@@ -21,7 +21,7 @@
 // service_role SOLO aquí. Reusa PORTAL_SUPABASE_* — sin env vars nuevas.
 // =============================================================================
 
-const { verifyAdminAuth, corsCheck } = require('./_lib/verify-admin');
+const { verifyAdminAuthLive, corsCheck } = require('./_lib/verify-admin');
 
 exports.handler = async (event) => {
   const __origin = corsCheck(event);
@@ -39,7 +39,7 @@ exports.handler = async (event) => {
   }
   if (!__origin) return { statusCode: 403, headers, body: JSON.stringify({ error: 'Origen no permitido' }) };
 
-  const auth = verifyAdminAuth(event, ['maestro_roshi', 'bulma', 'milk']);
+  const auth = await verifyAdminAuthLive(event, ['maestro_roshi', 'bulma', 'milk']);
   if (!auth.valid) return { statusCode: auth.status, headers, body: JSON.stringify({ error: auth.error }) };
 
   const env = readEnv();

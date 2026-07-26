@@ -14,7 +14,7 @@
 //      PORTAL_SUPABASE_URL/PORTAL_SUPABASE_SERVICE_KEY (conteo de ventas).
 // =============================================================================
 
-const { verifyAdminAuth, corsCheck } = require('./_lib/verify-admin');
+const { verifyAdminAuthLive, corsCheck } = require('./_lib/verify-admin');
 const { MESES_LIMITE, _masMesesFecha, _inicioVendedor } = require('./_lib/vendedor-activo');
 
 const ACCIONES = {
@@ -45,7 +45,7 @@ exports.handler = async (event) => {
   const accion = body.accion;
   if (!(accion in ACCIONES)) return json(400, { error: 'accion inválida' });
 
-  const auth = verifyAdminAuth(event, ACCIONES[accion]);
+  const auth = await verifyAdminAuthLive(event, ACCIONES[accion]);
   if (!auth.valid) return json(auth.status, { error: auth.error });
 
   const env = readEnv();

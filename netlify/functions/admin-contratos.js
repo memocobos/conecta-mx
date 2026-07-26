@@ -22,10 +22,10 @@
 // Env vars (reusa las existentes de KH):
 //   - SUPABASE_URL_KAMEHOUSE
 //   - SUPABASE_SERVICE_KEY_KAMEHOUSE
-//   - JWT_SECRET (lo lee verifyAdminAuth)
+//   - JWT_SECRET (lo lee verifyAdminAuthLive)
 // =============================================================================
 
-const { verifyAdminAuth, corsCheck } = require('./_lib/verify-admin');
+const { verifyAdminAuthLive, corsCheck } = require('./_lib/verify-admin');
 
 const UUID_RE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -79,7 +79,7 @@ exports.handler = async (event) => {
   catch { return { statusCode: 400, headers, body: JSON.stringify({ error: 'JSON inválido' }) }; }
 
   // Auth: ambas acciones exigen rol admin (maestro_roshi/bulma).
-  const auth = verifyAdminAuth(event, ROLES_ADMIN);
+  const auth = await verifyAdminAuthLive(event, ROLES_ADMIN);
   if (!auth.valid) return { statusCode: auth.status, headers, body: JSON.stringify({ error: auth.error }) };
 
   const accion = body.accion;

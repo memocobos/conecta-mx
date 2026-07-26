@@ -17,7 +17,7 @@
 // Env: SUPABASE_URL_KAMEHOUSE/SERVICE_KEY_KAMEHOUSE + JWT_SECRET.
 // =============================================================================
 
-const { verifyAdminAuth, corsCheck } = require('./_lib/verify-admin');
+const { verifyAdminAuthLive, corsCheck } = require('./_lib/verify-admin');
 
 const ROLES = ['maestro_roshi'];
 const TZ = 'America/Monterrey';
@@ -56,7 +56,7 @@ exports.handler = async (event) => {
   try { body = JSON.parse(event.body || '{}'); } catch { return json(400, { error: 'JSON inválido' }); }
 
   // 🔒 Privacidad: SOLO Memo (aquí, no solo en la UI).
-  const auth = verifyAdminAuth(event, ROLES);
+  const auth = await verifyAdminAuthLive(event, ROLES);
   if (!auth.valid) return json(auth.status, { error: auth.error });
 
   const KH_URL = process.env.SUPABASE_URL_KAMEHOUSE;

@@ -38,7 +38,7 @@
 // (reportes AzuraCast), JWT_SECRET.
 // =============================================================================
 
-const { verifyAdminAuth, corsCheck } = require('./_lib/verify-admin');
+const { verifyAdminAuthLive, corsCheck } = require('./_lib/verify-admin');
 
 const AZ_BASE = 'https://radio.conectareynosa.mx';
 const STATION = '1';
@@ -71,7 +71,7 @@ exports.handler = async (event) => {
   if (event.httpMethod !== 'GET') return json(405, { error: 'Method not allowed' });
   if (__rawOrigin && !__origin) return json(403, { error: 'Origen no permitido' });
 
-  const auth = verifyAdminAuth(event, ['maestro_roshi']);
+  const auth = await verifyAdminAuthLive(event, ['maestro_roshi']);
   if (!auth.valid) return json(auth.status, { error: auth.error });
 
   const accion = (event.queryStringParameters && event.queryStringParameters.accion) || '';

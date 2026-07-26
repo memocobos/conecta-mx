@@ -14,10 +14,10 @@
 //
 // Env vars (reusa las existentes):
 //   - SUPABASE_URL_KAMEHOUSE, SUPABASE_SERVICE_KEY_KAMEHOUSE
-//   - JWT_SECRET (lo lee verifyAdminAuth)
+//   - JWT_SECRET (lo lee verifyAdminAuthLive)
 // =============================================================================
 
-const { verifyAdminAuth, corsCheck } = require('./_lib/verify-admin');
+const { verifyAdminAuthLive, corsCheck } = require('./_lib/verify-admin');
 
 const SLUG_RE = /^[A-Za-z0-9_.\-]+$/;
 const TIPOS_VALIDOS = ['concierto', 'festival'];
@@ -39,7 +39,7 @@ exports.handler = async (event) => {
   }
   if (!__origin) return { statusCode: 403, headers, body: JSON.stringify({ error: 'Origen no permitido' }) };
 
-  const auth = verifyAdminAuth(event, ['maestro_roshi', 'bulma']);
+  const auth = await verifyAdminAuthLive(event, ['maestro_roshi', 'bulma']);
   if (!auth.valid) return { statusCode: auth.status, headers, body: JSON.stringify({ error: auth.error }) };
 
   let body;

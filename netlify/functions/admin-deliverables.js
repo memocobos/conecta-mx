@@ -29,10 +29,10 @@
 //     las acciones (no se confía en el front). admin (maestro_roshi/bulma): todo.
 //
 // Env vars (KH): SUPABASE_URL_KAMEHOUSE, SUPABASE_SERVICE_KEY_KAMEHOUSE,
-//   JWT_SECRET (lo lee verifyAdminAuth).
+//   JWT_SECRET (lo lee verifyAdminAuthLive).
 // =============================================================================
 
-const { verifyAdminAuth, corsCheck } = require('./_lib/verify-admin');
+const { verifyAdminAuthLive, corsCheck } = require('./_lib/verify-admin');
 
 const UUID_RE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
 
@@ -77,7 +77,7 @@ exports.handler = async (event) => {
 
   // Todas las acciones permiten los mismos roles; el candado fino (cc solo lo
   // suyo) se aplica por código más abajo.
-  const auth = verifyAdminAuth(event, ROLES_ALL);
+  const auth = await verifyAdminAuthLive(event, ROLES_ALL);
   if (!auth.valid) return { statusCode: auth.status, headers, body: JSON.stringify({ error: auth.error }) };
 
   const jwtUserId = auth.user && (auth.user.id || auth.user.sub);

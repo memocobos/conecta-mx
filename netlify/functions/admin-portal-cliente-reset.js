@@ -18,10 +18,10 @@
 // / DELETE auth user en total). Fail-soft en Storage (404 no rompe); errores de
 // filas se reportan.
 //
-// Seguridad: verifyAdminAuth + corsCheck. service_role NUNCA sale al navegador.
+// Seguridad: verifyAdminAuthLive + corsCheck. service_role NUNCA sale al navegador.
 // =============================================================================
 
-const { verifyAdminAuth, corsCheck } = require('./_lib/verify-admin');
+const { verifyAdminAuthLive, corsCheck } = require('./_lib/verify-admin');
 
 const UUID_RE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
 const ROLES_ADMIN = ['maestro_roshi', 'bulma'];
@@ -43,7 +43,7 @@ exports.handler = async (event) => {
   if (!__origin) return { statusCode: 403, headers, body: JSON.stringify({ error: 'Origen no permitido' }) };
 
   // Mínimo: admin logueado. El gate fino por modo se aplica abajo.
-  const auth = verifyAdminAuth(event, ROLES_ADMIN);
+  const auth = await verifyAdminAuthLive(event, ROLES_ADMIN);
   if (!auth.valid) return { statusCode: auth.status, headers, body: JSON.stringify({ error: auth.error }) };
   const rol = auth.user && auth.user.rol;
   const ejecutor = (auth.user && (auth.user.correo || auth.user.id)) || 'desconocido';

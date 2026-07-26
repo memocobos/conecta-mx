@@ -24,7 +24,7 @@
 // Env vars: PORTAL_SUPABASE_URL, PORTAL_SUPABASE_SERVICE_KEY, JWT_SECRET.
 // =============================================================================
 
-const { verifyAdminAuth, corsCheck } = require('./_lib/verify-admin');
+const { verifyAdminAuthLive, corsCheck } = require('./_lib/verify-admin');
 
 const UUID_RE = /^[0-9a-f-]{36}$/i;
 const SLUG_RE = /^[a-zA-Z0-9_#-]{1,80}$/; // evento_id = slug (o slug#idx multifecha)
@@ -66,7 +66,7 @@ exports.handler = async (event) => {
   const accion = body.accion;
   if (!(accion in ACCIONES)) return json(400, { error: 'accion inválida' });
 
-  const auth = verifyAdminAuth(event, ACCIONES[accion]);
+  const auth = await verifyAdminAuthLive(event, ACCIONES[accion]);
   if (!auth.valid) return json(auth.status, { error: auth.error });
 
   if (!PORTAL_URL || !PORTAL_KEY) {

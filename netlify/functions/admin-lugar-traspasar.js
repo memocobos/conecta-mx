@@ -19,7 +19,7 @@
 
 const crypto = require('crypto');
 const { aplicarModoPrueba } = require('./_lib/correo-guard');
-const { verifyAdminAuth, corsCheck } = require('./_lib/verify-admin');
+const { verifyAdminAuthLive, corsCheck } = require('./_lib/verify-admin');
 const { fetchCatalogo } = require('./_lib/catalogo-index');
 
 // Gancho 1 del machote: traspaso gratis a 6+ días del evento; $350 dentro de los
@@ -53,7 +53,7 @@ exports.handler = async (event) => {
   if (event.httpMethod !== 'POST') return json(405, { error: 'Method not allowed' });
   if (!__origin) return json(403, { error: 'Origen no permitido' });
 
-  const auth = verifyAdminAuth(event, ROLES);
+  const auth = await verifyAdminAuthLive(event, ROLES);
   if (!auth.valid) return json(auth.status, { error: auth.error });
 
   if (!PORTAL_URL || !PORTAL_KEY) {

@@ -15,10 +15,10 @@
 //   - corsCheck + verifyAdminAuth(['maestro_roshi'])
 //   - service_role (bypass RLS) para leer/escribir esferas_eventos y la bitácora.
 //
-// Env vars: SUPABASE_SERVICE_KEY_KAMEHOUSE, JWT_SECRET (lo lee verifyAdminAuth).
+// Env vars: SUPABASE_SERVICE_KEY_KAMEHOUSE, JWT_SECRET (lo lee verifyAdminAuthLive).
 // =============================================================================
 
-const { verifyAdminAuth, corsCheck } = require('./_lib/verify-admin');
+const { verifyAdminAuthLive, corsCheck } = require('./_lib/verify-admin');
 const { aplicarModoPrueba } = require('./_lib/correo-guard');
 
 const SB_URL = 'https://npgnhsmwpcipxgvfxrho.supabase.co';
@@ -50,7 +50,7 @@ exports.handler = async (event) => {
   }
   if (!__origin) return { statusCode: 403, headers, body: JSON.stringify({ error: 'Origen no permitido' }) };
 
-  const auth = verifyAdminAuth(event, ['maestro_roshi']);
+  const auth = await verifyAdminAuthLive(event, ['maestro_roshi']);
   if (!auth.valid) return { statusCode: auth.status, headers, body: JSON.stringify({ error: auth.error }) };
 
   if (!SB_KEY) return { statusCode: 500, headers, body: JSON.stringify({ error: 'SUPABASE_SERVICE_KEY_KAMEHOUSE no configurado' }) };

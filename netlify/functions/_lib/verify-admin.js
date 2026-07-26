@@ -15,6 +15,7 @@
 // =============================================================================
 
 const crypto = require('crypto');
+const { verificarSesionViva } = require('./sesion-viva');
 
 const JWT_SECRET = process.env.JWT_SECRET;
 
@@ -148,12 +149,69 @@ function verifyAdminAuth(event, allowedRoles) {
   return { valid: true, user: payload };
 }
 
+// ── 🔐 CAP2-3: verificación de SESIÓN VIVA ───────────────────────────────────
+//
+// POR QUÉ UNA FUNCIÓN NUEVA Y NO `verifyAdminAuth` ASYNC (decisión de forma):
+// hay 92 llamadas a verifyAdminAuth, todas con la misma forma
+// `const auth = verifyAdminAuth(event, roles); if (!auth.valid) return 401`.
+// Si la volviera async, un call site al que se me olvide el `await` recibe una
+// Promise: `auth.valid` es undefined → ese endpoint responde 401 SIEMPRE, o sea
+// queda MUERTO. Con una función nueva, olvidar un call site significa que ese
+// endpoint sigue comportándose EXACTAMENTE como hoy (sin revocación) — degrada
+// al status quo en vez de romperse. Mismo número de ediciones, muchísimo mejor
+// modo de falla. Por eso `verifyAdminAuth` queda intacta y firmada igual.
+//
+// Qué hace de más:
+//   1. valida la firma del token (reusa verifyAdminAuth SIN chequear roles);
+//   2. pregunta por el estado VIVO del usuario (_lib/sesion-viva, caché 60 s);
+//   3. si está inactivo o su sesión fue revocada → 401 "Tu sesión terminó";
+//   4. el ROL VIVO manda: se usa para el chequeo de allowedRoles y se escribe en
+//      auth.user.rol. Así una degradación (bulma→vendedor) surte efecto de
+//      inmediato, y una promoción también, sin esperar a que expire el token.
+async function verifyAdminAuthLive(event, allowedRoles) {
+  // 1) Firma primero, SIN roles: el rol se evalúa más abajo contra el vivo.
+  const base = verifyAdminAuth(event, null);
+  if (!base.valid) return base;
+
+  const payload = base.user || {};
+  const userId = payload.id || payload.sub;
+
+  // 2) Estado vivo (fail-open estricto dentro de la lib).
+  let viva;
+  try {
+    viva = await verificarSesionViva({ userId, jwtIat: payload.iat, jwtRol: payload.rol });
+  } catch (e) {
+    console.warn('[verify-admin] FAIL-OPEN: sesion-viva lanzó —', e.message);
+    viva = { ok: true, rolVivo: payload.rol };
+  }
+
+  if (!viva.ok) {
+    return {
+      valid: false,
+      status: 401,
+      error: 'Tu sesión terminó, vuelve a entrar',
+      motivo: viva.motivo,
+    };
+  }
+
+  // 3) El rol VIVO manda para el permiso y para el resto del handler.
+  const rolVivo = viva.rolVivo || payload.rol;
+  if (Array.isArray(allowedRoles) && allowedRoles.length > 0) {
+    if (!allowedRoles.includes(rolVivo)) {
+      return { valid: false, status: 403, error: `Rol '${rolVivo}' sin permiso para este endpoint` };
+    }
+  }
+  return { valid: true, user: { ...payload, rol: rolVivo } };
+}
+
 module.exports = {
   jwtSign,
   jwtVerify,
   verifyAdminAuth,
+  verifyAdminAuthLive,
   corsCheck,
   corsHeaders,
   jsonError,
   ALLOWED_ORIGINS,
 };
+

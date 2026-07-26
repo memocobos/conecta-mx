@@ -15,13 +15,13 @@
 //
 // Seguridad: MISMO patrón que admin-radio-peticiones (corregido en #253) —
 // distingue "cross-origin real" (Origin presente y no permitido → 403) de
-// "same-origin sin header Origin" (GET de kamehouse); el JWT (verifyAdminAuth,
+// "same-origin sin header Origin" (GET de kamehouse); el JWT (verifyAdminAuthLive,
 // solo maestro_roshi) es el candado real.
 //
 // Variables de entorno: AZURACAST_API_KEY, JWT_SECRET.
 // =============================================================================
 
-const { verifyAdminAuth, corsCheck } = require('./_lib/verify-admin');
+const { verifyAdminAuthLive, corsCheck } = require('./_lib/verify-admin');
 
 const AZ_BASE   = 'https://radio.conectareynosa.mx';
 const STATION   = '1';
@@ -53,7 +53,7 @@ exports.handler = async (event) => {
   // Bloquear SOLO cuando vino un Origin y no está permitido (cross-origin real).
   if (__rawOrigin && !__origin) return { statusCode: 403, headers, body: JSON.stringify({ error: 'Origen no permitido' }) };
 
-  const auth = verifyAdminAuth(event, ['maestro_roshi']);
+  const auth = await verifyAdminAuthLive(event, ['maestro_roshi']);
   if (!auth.valid) return { statusCode: auth.status, headers, body: JSON.stringify({ error: auth.error }) };
 
   const API_KEY = process.env.AZURACAST_API_KEY;

@@ -14,6 +14,9 @@
 //        { username, excludeId? } → { ok, disponible:bool }
 //   - accion='crear'    : SOLO maestro_roshi/bulma. { correo, rol }
 //        El server genera invite_token + expiración. → { ok, usuario:{id,invite_token,...} }
+//   - accion='cerrar_sesiones' : SOLO maestro_roshi/bulma (contra otro admin,
+//        solo maestro_roshi). { id } → marca sesiones_invalidas_antes = ahora:
+//        todos sus tokens vigentes dejan de servir en ≤60 s. 🔐 CAP2-3.
 //   - accion='actualizar' : { id, patch:{...} }
 //        · Si id === <jwt.id> (auto-edición): cualquier rol, SOLO campos self.
 //        · Si id de otro: SOLO maestro_roshi/bulma, incluye rol/activo/strikes.
@@ -27,10 +30,10 @@
 // Env vars (reusa las existentes de KH):
 //   - SUPABASE_URL_KAMEHOUSE
 //   - SUPABASE_SERVICE_KEY_KAMEHOUSE
-//   - JWT_SECRET (lo lee verifyAdminAuth)
+//   - JWT_SECRET (lo lee verifyAdminAuthLive)
 // =============================================================================
 
-const { verifyAdminAuth, corsCheck } = require('./_lib/verify-admin');
+const { verifyAdminAuthLive, corsCheck } = require('./_lib/verify-admin');
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 
@@ -154,7 +157,7 @@ exports.handler = async (event) => {
   // fina de admin-vs-self para 'actualizar' se hace abajo (depende del id).
   const rolesPermitidos = accion === 'crear' ? ROLES_ADMIN : undefined;
 
-  const auth = verifyAdminAuth(event, rolesPermitidos);
+  const auth = await verifyAdminAuthLive(event, rolesPermitidos);
   if (!auth.valid) return { statusCode: auth.status, headers, body: JSON.stringify({ error: auth.error }) };
 
   const jwtUserId = auth.user && (auth.user.id || auth.user.sub);
@@ -411,6 +414,12 @@ exports.handler = async (event) => {
         update.password_hash = await bcrypt.hash(plain, BCRYPT_COST);
       }
 
+      // 🔐 CAP2-3: desactivar a alguien DEBE sacarlo de sus sesiones abiertas. Sin
+      // esto, activo:false no surtía efecto hasta que expirara su token (8 h).
+      if (Object.prototype.hasOwnProperty.call(update, 'activo') && update.activo === false) {
+        update.sesiones_invalidas_antes = new Date().toISOString();
+      }
+
       if (!Object.keys(update).length) {
         return { statusCode: 400, headers, body: JSON.stringify({ error: 'Nada que actualizar' }) };
       }
@@ -425,6 +434,43 @@ exports.handler = async (event) => {
         return { statusCode: 502, headers, body: JSON.stringify({ error: 'KH rechazó el update', detail }) };
       }
       return { statusCode: 200, headers, body: JSON.stringify({ ok: true }) };
+    }
+
+    // ── 🔐 CAP2-3 cerrar_sesiones: el botón de "sácalo de todos lados" ──────
+    // Marca sesiones_invalidas_antes = ahora SIN desactivar la cuenta: todo token
+    // emitido antes de este instante deja de servir en ≤60 s (la caché de
+    // _lib/sesion-viva). Para un celular perdido, una salida en malos términos o
+    // una contraseña comprometida.
+    if (accion === 'cerrar_sesiones') {
+      const id = String(body.id || '').trim();
+      if (!UUID_RE.test(id)) {
+        return { statusCode: 400, headers, body: JSON.stringify({ error: 'id inválido' }) };
+      }
+      if (!ROLES_ADMIN.includes(jwtRol)) {
+        return { statusCode: 403, headers, body: JSON.stringify({ error: 'Sin permiso para cerrar sesiones' }) };
+      }
+      // MISMA jerarquía que editar a otro: contra otro admin, solo maestro_roshi.
+      if (id !== jwtUserId) {
+        const tr = await fetch(`${base}?id=eq.${id}&select=rol&limit=1`, { headers: sbHeaders });
+        if (tr.ok) {
+          const trows = await tr.json().catch(() => []);
+          const targetRol = trows[0] && trows[0].rol;
+          if (ROLES_ADMIN.includes(targetRol) && jwtRol !== 'maestro_roshi') {
+            return { statusCode: 403, headers, body: JSON.stringify({ error: 'Solo maestro_roshi puede cerrar las sesiones de otro admin' }) };
+          }
+        }
+      }
+      const ahora = new Date().toISOString();
+      const r = await fetch(`${base}?id=eq.${id}`, {
+        method: 'PATCH',
+        headers: { ...sbHeaders, Prefer: 'return=minimal' },
+        body: JSON.stringify({ sesiones_invalidas_antes: ahora }),
+      });
+      if (!r.ok) {
+        const detail = await r.text();
+        return { statusCode: 502, headers, body: JSON.stringify({ error: 'No se pudieron cerrar las sesiones', detail }) };
+      }
+      return { statusCode: 200, headers, body: JSON.stringify({ ok: true, sesiones_invalidas_antes: ahora }) };
     }
 
     return { statusCode: 400, headers, body: JSON.stringify({ error: 'accion inválida' }) };

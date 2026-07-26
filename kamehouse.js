@@ -630,6 +630,8 @@ const khUsuarios = {
   crear(correo, rol) { return this._call({ accion: 'crear', correo, rol }).then(j => j.usuario); },
   // actualizar(id, patch) → ok (password en patch.password se hashea server-side)
   actualizar(id, patch) { return this._call({ accion: 'actualizar', id, patch }); },
+  // [CAP2-3] cerrarSesiones(id) → invalida TODOS sus tokens vigentes (≤60 s)
+  cerrarSesiones(id) { return this._call({ accion: 'cerrar_sesiones', id }); },
 };
 
 // [sec-contratos] Acceso a contratos_creadores vía Netlify Function con
@@ -7384,12 +7386,40 @@ async function abrirPerfil(userId) {
     </div>
   ` : '';
 
-  const perfilHtml = renderPerfilCompleto(usuario, toursPasados, evAsignados, iniciales, edad, cumple, ptsTotal, ptsAnio, esYo, _detalleAutoPerfil) + adminSection;
+  // 🔐 CAP2-3: "cerrar todas sus sesiones". Visible para roshi y bulma (la
+  // jerarquía real la impone el backend: contra otro admin, solo roshi). No
+  // aparece sobre uno mismo — cerrarte tus propias sesiones te sacaría del
+  // sistema en el acto y no es lo que nadie busca desde esta pantalla.
+  const puedeCerrarSesiones = ['maestro_roshi', 'bulma'].includes(currentUser?.rol) && !esYo;
+  const sesionSection = puedeCerrarSesiones ? `
+    <div class="perfil-section-v2" style="border-left-color:var(--gold)">
+      <div class="perfil-section-title-v2" style="color:var(--gold)">// sesión</div>
+      <div style="font-size:11px;color:var(--ts);margin-bottom:10px;line-height:1.5">
+        Si perdió el celular, se fue del equipo o su contraseña anda por ahí: esto invalida
+        todas sus sesiones abiertas. Tendrá que volver a entrar (surte efecto en menos de un minuto).
+      </div>
+      <button class="btn btn-ghost btn-sm" style="font-family:'JetBrains Mono',monospace;font-size:10px"
+        onclick="cerrarSesionesUI('${userId}','${usuario.nombre.replace(/'/g, "\\'")}')">▸ cerrar todas sus sesiones</button>
+    </div>
+  ` : '';
+
+  const perfilHtml = renderPerfilCompleto(usuario, toursPasados, evAsignados, iniciales, edad, cumple, ptsTotal, ptsAnio, esYo, _detalleAutoPerfil) + sesionSection + adminSection;
 
   crearModal('ver-perfil', '', perfilHtml);
 }
 
 
+
+// 🔐 CAP2-3: cierra todas las sesiones de una persona (invalida sus tokens).
+async function cerrarSesionesUI(userId, nombre) {
+  if (!confirm(`¿Cerrar todas las sesiones de ${nombre}?\n\nTendrá que volver a entrar.`)) return;
+  try {
+    await khUsuarios.cerrarSesiones(userId); // [sec-usuarios]
+    showToast('Sesiones cerradas ✓ — tendrá que volver a entrar', 'success');
+  } catch (e) {
+    showToast(e.message, 'error');
+  }
+}
 
 function abrirAgregarTour(userId) {
   crearModal('add-tour', 'Agregar Tour', `

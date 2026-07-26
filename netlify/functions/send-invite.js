@@ -1,4 +1,4 @@
-const { verifyAdminAuth, corsCheck } = require('./_lib/verify-admin');
+const { verifyAdminAuthLive, corsCheck } = require('./_lib/verify-admin');
 const { aplicarModoPrueba } = require('./_lib/correo-guard');
 
 exports.handler = async (event) => {
@@ -17,7 +17,7 @@ exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return { statusCode: 204, headers, body: '' };
   if (event.httpMethod !== 'POST') return { statusCode: 405, headers, body: '{"error":"Method not allowed"}' };
   if (!__origin) return { statusCode: 403, headers, body: '{"error":"Origen no permitido"}' };
-  const __auth = verifyAdminAuth(event, ['maestro_roshi','bulma']);
+  const __auth = await verifyAdminAuthLive(event, ['maestro_roshi','bulma']);
   if (!__auth.valid) return { statusCode: __auth.status, headers, body: JSON.stringify({ error: __auth.error }) };
 
   const RESEND_KEY = process.env.RESEND_KEY || process.env.RESEND_API_KEY;

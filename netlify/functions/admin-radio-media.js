@@ -21,7 +21,7 @@
 // Variables de entorno: AZURACAST_API_KEY, RADIO_EDITOR_KEY, JWT_SECRET.
 // =============================================================================
 
-const { verifyAdminAuth, corsCheck } = require('./_lib/verify-admin');
+const { verifyAdminAuthLive, corsCheck } = require('./_lib/verify-admin');
 
 const AZ_BASE     = 'https://radio.conectareynosa.mx';
 const EDITOR_BASE = 'https://editor.conectareynosa.mx';
@@ -49,7 +49,7 @@ exports.handler = async (event) => {
   }
   if (__rawOrigin && !__origin) return { statusCode: 403, headers, body: JSON.stringify({ error: 'Origen no permitido' }) };
 
-  const auth = verifyAdminAuth(event, ['maestro_roshi']);
+  const auth = await verifyAdminAuthLive(event, ['maestro_roshi']);
   if (!auth.valid) return { statusCode: auth.status, headers, body: JSON.stringify({ error: auth.error }) };
 
   const AZ_KEY = process.env.AZURACAST_API_KEY;

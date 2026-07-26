@@ -3,19 +3,28 @@
 //
 // La contraparte ADMIN del candado de inactividad (_lib/vendedor-activo):
 //   · 'estado'    → maestro_roshi/bulma. Lista de vendedores con su reloj y
-//        conteo de ventas: { id, nombre, correo, inicio, reactivado, ventas,
-//        inactivo }. inactivo = pasó los 3 meses Y cero ventas. Best-effort:
-//        si Portal falla, ventas:null e inactivo:false (jamás marcar sin datos).
+//        sus ventas: { id, nombre, correo, inicio, reactivado, ultima_venta,
+//        limite, ventas, inactivo, bloqueado, bloqueado_at }.
+//        🔄 REGLA RODANTE: el reloj corre desde la ÚLTIMA VENTA (no desde el
+//        registro), así que `limite` sale de la referencia rodante — el panel
+//        dice EXACTAMENTE lo mismo que la puerta (_lib/vendedor-activo).
+//        `bloqueado` = ya tiene el sello puesto (puerta cerrada).
+//        Best-effort: si Portal falla, ventas:null e inactivo:false (jamás
+//        marcar sin datos); el sello sí se muestra porque vive en KH.
 //   · 'reactivar' {usuario_id} → SOLO maestro_roshi ("Dar otra oportunidad").
-//        PATCH usuarios.vendedor_reactivado_at = ahora → el reloj cuenta desde
-//        la reactivación. NO destructivo: ni borra ni cambia rol. Jamás on_conflict.
+//        PATCH vendedor_reactivado_at = ahora Y vendedor_bloqueado_at = NULL.
+//        Las DOS cosas: limpiar el sello sin reiniciar el reloj no serviría de
+//        nada (la puerta lo volvería a sellar en el siguiente request).
+//        NO destructivo: ni borra ni cambia rol. Jamás on_conflict.
 //
 // Env: SUPABASE_URL_KAMEHOUSE/SERVICE_KEY_KAMEHOUSE (usuarios) +
-//      PORTAL_SUPABASE_URL/PORTAL_SUPABASE_SERVICE_KEY (conteo de ventas).
+//      PORTAL_SUPABASE_URL/PORTAL_SUPABASE_SERVICE_KEY (ventas).
 // =============================================================================
 
 const { verifyAdminAuthLive, corsCheck } = require('./_lib/verify-admin');
-const { MESES_LIMITE, _masMesesFecha, _inicioVendedor } = require('./_lib/vendedor-activo');
+const {
+  MESES_LIMITE, ESTADOS_CUENTAN, _masMesesFecha, _inicioVendedor, _referenciaRodante,
+} = require('./_lib/vendedor-activo');
 
 const ACCIONES = {
   estado: ['maestro_roshi', 'bulma'],
@@ -56,25 +65,31 @@ exports.handler = async (event) => {
     // ── estado: reloj + ventas de TODOS los vendedores ─────────────────────
     if (accion === 'estado') {
       const uR = await fetch(
-        `${env.KH_URL}/rest/v1/usuarios?rol=eq.vendedor&select=id,nombre,correo,creado_en,vendedor_reactivado_at&limit=2000`,
+        `${env.KH_URL}/rest/v1/usuarios?rol=eq.vendedor&select=id,nombre,correo,creado_en,vendedor_reactivado_at,vendedor_bloqueado_at&limit=2000`,
         { headers: kh }
       );
       if (!uR.ok) return json(502, { error: 'KH rechazó usuarios', detail: await uR.text() });
       const vendedores = (await uR.json().catch(() => [])) || [];
 
-      // Ventas por vendedor (Portal, best-effort — cualquier estado cuenta).
+      // Ventas por vendedor (Portal, best-effort). Solo estados NO cancelados:
+      // misma definición que la puerta — una cancelada no sostiene el acceso.
+      // Se guarda el conteo Y la fecha de la más reciente (regla rodante).
       let ventasPor = null;
       if (env.P_URL && env.P_KEY) {
         try {
           const vR = await fetch(
-            `${env.P_URL}/rest/v1/solicitudes_tour?vendedor_id=not.is.null&select=vendedor_id&limit=10000`,
+            `${env.P_URL}/rest/v1/solicitudes_tour?vendedor_id=not.is.null` +
+            `&estado=in.(${ESTADOS_CUENTAN.join(',')})&select=vendedor_id,created_at&limit=10000`,
             { headers: { apikey: env.P_KEY, Authorization: 'Bearer ' + env.P_KEY } }
           );
           if (vR.ok) {
             ventasPor = {};
             ((await vR.json().catch(() => [])) || []).forEach(s => {
               const v = s && s.vendedor_id != null ? String(s.vendedor_id) : '';
-              if (v) ventasPor[v] = (ventasPor[v] || 0) + 1;
+              if (!v) return;
+              const prev = ventasPor[v] || { n: 0, ultima: '' };
+              const f = String(s.created_at || '').slice(0, 10);
+              ventasPor[v] = { n: prev.n + 1, ultima: f > prev.ultima ? f : prev.ultima };
             });
           }
         } catch (_) { ventasPor = null; }
@@ -83,14 +98,20 @@ exports.handler = async (event) => {
       const hoy = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Monterrey' });
       const out = vendedores.map(u => {
         const inicio = _inicioVendedor(u);
-        const limite = inicio ? _masMesesFecha(inicio, MESES_LIMITE) : null;
-        const ventas = ventasPor ? (ventasPor[String(u.id)] || 0) : null;
+        const info = ventasPor ? (ventasPor[String(u.id)] || { n: 0, ultima: '' }) : null;
+        const ventas = info ? info.n : null;
+        const ultima = info ? (info.ultima || null) : null;
+        // El límite se mide desde la referencia RODANTE (última venta || inicio).
+        const ref = info ? _referenciaRodante(inicio, ultima) : inicio;
+        const limite = ref ? _masMesesFecha(ref, MESES_LIMITE) : null;
         // Sin datos de ventas (Portal caído) → NO se marca inactivo (best-effort).
-        const inactivo = !!(limite && hoy > limite && ventas === 0);
+        const inactivo = !!(info && limite && hoy > limite);
         return {
           id: u.id, nombre: u.nombre, correo: u.correo,
           inicio, reactivado: u.vendedor_reactivado_at || null,
-          limite, ventas, inactivo,
+          ultima_venta: ultima, limite, ventas, inactivo,
+          bloqueado: !!u.vendedor_bloqueado_at,
+          bloqueado_at: u.vendedor_bloqueado_at || null,
         };
       });
       return json(200, { ok: true, vendedores: out, ventas_ok: ventasPor !== null });
@@ -108,14 +129,17 @@ exports.handler = async (event) => {
       if (!u) return json(404, { error: 'Usuario no encontrado' });
       if (u.rol !== 'vendedor') return json(400, { error: 'Ese usuario no es vendedor' });
 
+      // Las DOS cosas juntas: limpiar el sello Y reiniciar el reloj. Solo
+      // limpiar el sello sería un no-op — la puerta re-evaluaría la regla
+      // rodante (sin ventas recientes) y lo volvería a sellar de inmediato.
       const ahora = new Date().toISOString();
       const pR = await fetch(`${env.KH_URL}/rest/v1/usuarios?id=eq.${encodeURIComponent(id)}`, {
         method: 'PATCH',
         headers: { ...kh, Prefer: 'return=minimal' },
-        body: JSON.stringify({ vendedor_reactivado_at: ahora }),
+        body: JSON.stringify({ vendedor_reactivado_at: ahora, vendedor_bloqueado_at: null }),
       });
       if (!pR.ok) return json(502, { error: 'No se pudo reactivar', detail: await pR.text() });
-      return json(200, { ok: true, usuario_id: id, vendedor_reactivado_at: ahora });
+      return json(200, { ok: true, usuario_id: id, vendedor_reactivado_at: ahora, desbloqueado: true });
     }
 
     return json(400, { error: 'accion inválida' });

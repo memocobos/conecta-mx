@@ -340,11 +340,13 @@ exports.handler = async (event) => {
       }
 
       // Si el objetivo es un admin distinto, solo maestro_roshi puede tocarlo.
+      let targetRol = null, targetActivo = null;
       if (!esSelf) {
-        const tr = await fetch(`${base}?id=eq.${id}&select=rol&limit=1`, { headers: sbHeaders });
+        const tr = await fetch(`${base}?id=eq.${id}&select=rol,activo&limit=1`, { headers: sbHeaders });
         if (tr.ok) {
           const trows = await tr.json();
-          const targetRol = trows[0] && trows[0].rol;
+          targetRol = (trows[0] && trows[0].rol) || null;
+          targetActivo = trows[0] ? !!trows[0].activo : null;
           if (ROLES_ADMIN.includes(targetRol) && jwtRol !== 'maestro_roshi') {
             return { statusCode: 403, headers, body: JSON.stringify({ error: 'Solo maestro_roshi puede editar a otro admin' }) };
           }
@@ -418,6 +420,26 @@ exports.handler = async (event) => {
       // esto, activo:false no surtía efecto hasta que expirara su token (8 h).
       if (Object.prototype.hasOwnProperty.call(update, 'activo') && update.activo === false) {
         update.sesiones_invalidas_antes = new Date().toISOString();
+      }
+
+      // 🚪 Candado de inactividad de vendedores: REACTIVAR la cuenta desde
+      // Guerreros Z es el otro camino de vuelta (el primero es el botón "Dar
+      // otra oportunidad"). Sin esto, un vendedor re-onboardeado entraría a
+      // KameHouse pero la puerta de ventas seguiría cerrada por el sello.
+      // Se limpia el sello Y se reinicia el reloj: limpiar solo el sello sería
+      // un no-op, porque la regla rodante (sin ventas recientes) lo re-sella.
+      // `activo` solo existe en ADMIN_FIELDS, así que esto nunca es auto-edición.
+      // ⚠️ Se exige la TRANSICIÓN real false→true. Si la pantalla manda
+      // activo:true en cada guardado (editar el celular, cambiar la foto), un
+      // simple `update.activo === true` reiniciaría el reloj siempre y el
+      // candado no se dispararía JAMÁS. Si no se pudo leer el estado previo,
+      // no se toca nada: queda el botón "Dar otra oportunidad".
+      if (targetActivo === false && update.activo === true) {
+        const rolFinal = Object.prototype.hasOwnProperty.call(update, 'rol') ? update.rol : targetRol;
+        if (rolFinal === 'vendedor') {
+          update.vendedor_bloqueado_at = null;
+          update.vendedor_reactivado_at = new Date().toISOString();
+        }
       }
 
       if (!Object.keys(update).length) {

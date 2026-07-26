@@ -939,9 +939,13 @@ body[data-ev="laura"] #d-hero-bg{object-position:center 18% !important}
 @keyframes fadeInCatalog{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
 
 @media(prefers-reduced-motion:reduce){
-  *{animation:none !important}
+  /* El apagado global vive ahora en el bloque PF-1 (al final de las hojas de
+     estilo): acorta a .01ms en vez de anular, para que los rellenos `both` /
+     `backwards` sigan resolviendo y nada quede escondido. Aquí solo se
+     conservan los casos que quieren quedarse quietos de plano. */
   .marquee-red-track{animation:none}
   .hh-title .line,.hh-sub,.hh-ctas{opacity:1;transform:none}
+  .promo-modal-sparkle{opacity:1;transform:none}
 }
 </style>
 <!-- Meta Pixel Code -->
@@ -1860,6 +1864,136 @@ body.wizard-open .rcp{display:none}
 /* ===================================================================
    FIN REFINAMIENTO v2
    =================================================================== */
+</style>
+
+<!-- ===================================================================
+     TUERCA PF-1 · PULIDO FINO (solo presentación)
+     Va AL FINAL de las hojas de estilo a propósito: así gana los
+     empates de cascada sin tocar los bloques anteriores.
+     No cambia markup, textos ni la regla de precios.
+     Para revertir: borrar este <style> y el <script> "PF-1" del final.
+     =================================================================== -->
+<style>
+
+/* ── 1 · TARJETAS DE EVENTO ─────────────────────────────────────────────
+   El hover ya existía (elevación + borde rojo). Aquí se le agrega el zoom
+   lento de la portada y — lo importante — se ENCIERRA en (hover:hover)
+   para que en celular no quede pegado después del tap. */
+.ev-img{transition:transform .6s cubic-bezier(.22,1,.36,1),filter .3s ease}
+
+@media (hover:hover){
+  .ev-card:hover{will-change:transform}
+  .ev-card:hover .ev-img{transform:scale(1.05)}
+  /* La portada de los estados apagados no hace zoom: no son clickeables */
+  .ev-card.agotado:hover .ev-img,
+  .ev-card.pasado:hover .ev-img,
+  .ev-card.pronto:hover .ev-img{transform:none}
+}
+
+/* En touch el :hover se queda pegado tras el tap (iOS/Android). Se apaga y
+   se cambia por presión real con :active — el :active va DESPUÉS para ganar
+   el empate de especificidad. */
+@media (hover:none){
+  .ev-card:hover,
+  .ev-card.visible:hover,
+  .ev-card.proxi:hover{
+    transform:none !important;
+    box-shadow:none !important;
+    border-color:rgba(255,255,255,.08) !important;
+  }
+  .ev-card:hover .ev-img{transform:none !important}
+  .ev-card:active{
+    transform:scale(.98) !important;
+    border-color:var(--c-rojo) !important;
+    transition-duration:.12s !important;
+  }
+}
+/* Presión también con mouse (mousedown), sin pisar el hover */
+.ev-card:active{transform:scale(.98);transition-duration:.12s}
+
+/* Foco visible para quien navega con teclado: la tarjeta y los botones del
+   cotizador no tenían un anillo propio. Solo :focus-visible, así el mouse no
+   lo dispara. */
+.ev-card:focus-visible,
+.wiz-btn:focus-visible,.z-btn:focus-visible,.mapa-btn:focus-visible,
+.wa-btn:focus-visible,.share-btn:focus-visible,.ev-play:focus-visible{
+  outline:2px solid var(--c-amarillo);
+  outline-offset:3px;
+}
+
+/* ── 2 · CASCADA DE ENTRADA ─────────────────────────────────────────────
+   Las tarjetas ya entran con IntersectionObserver (.visible). Aquí solo se
+   escalona con --evi, que el bloque PF-1 de JS estampa por LOTE (reinicia en
+   cada mes del catálogo y topa en 6 — la cadena máxima de la receta de la
+   casa), así la tarjeta 40 nunca espera 2.4s: máximo 360ms.
+   El keyframe NO declara `to`: el 100% implícito toma el valor propio del
+   elemento, así .pasado conserva su opacity .55 y el hover no queda
+   congelado por un fill `forwards`. */
+@keyframes evCardIn{from{opacity:0;transform:translateY(18px)}}
+.ev-card.visible{
+  animation:evCardIn .45s cubic-bezier(.22,1,.36,1) backwards;
+  animation-delay:calc(var(--evi,0) * 60ms);
+}
+
+/* ── 3a · COTIZADOR · botones con feedback de tap ───────────────────────
+   Los .wiz-btn ya tenían transition:all; a .z-btn le faltaba. */
+.z-btn{transition:border-color .2s ease,background .2s ease,color .2s ease}
+.wiz-btn:active,.z-btn:active,.mapa-btn:active,.wa-btn:active,.share-btn:active{
+  transform:scale(.97);
+  transition-duration:.1s;
+}
+.wiz-btn.disabled:active,.z-btn.ag:active{transform:none}
+
+/* En touch, el tinte de :hover de los botones se confunde con el estado
+   .active (elegido). En celular solo manda .active. */
+@media (hover:none){
+  .wiz-btn:hover:not(.active){
+    border-color:rgba(255,255,255,.1);
+    background:rgba(255,255,255,.03);
+  }
+  .z-btn:hover:not(.active){border-color:rgba(255,255,255,.09)}
+}
+
+/* ── 3c · COTIZADOR · pasos que entran en vez de saltar ─────────────────
+   Cada paso es un .wiz-card que se muestra con display. Al pasar de
+   display:none a visible, la animación arranca sola — sin JS. */
+@keyframes wizStepIn{from{opacity:0;transform:translateY(12px)}}
+.wiz-card,#d-result{animation:wizStepIn .25s cubic-bezier(.22,1,.36,1) backwards}
+
+/* El número del paso activo NO lleva rebote a propósito: ya cambia de fondo y
+   color con sus propias transiciones, y el único momento animado de esta
+   pantalla es el precio. Un efecto más aquí le competiría. */
+
+/* ── 4 · RENDIMIENTO EN CELULAR ─────────────────────────────────────────
+   will-change SOLO en lo que anima sin parar (animation:...infinite), para
+   que el compositor le dé su propia capa y no repinte a su alrededor.
+   Nada de regarlo por todo el CSS: son 11 selectores contados. */
+.tu::before,.tpc::before,.tpoca::before,
+.ftr-v2-dot,.rcp-dot,
+.ev-play.ev-play-active,.d-play.ev-play-active{will-change:box-shadow}
+.cd-live,.ev-flash-badge{will-change:opacity}
+.marquee-red-track,.rcp.rcp-playing .rcp-eq i,
+.ev-play.ev-play-loading .ev-play-ico,.d-play.ev-play-loading .ev-play-ico{will-change:transform}
+.ev-preventa-badge{will-change:background-color,box-shadow}
+
+/* ── 5 · ACCESIBILIDAD DE MOVIMIENTO ───────────────────────────────────
+   Se acortan a un instante (no se anulan): así los rellenos `both` /
+   `backwards` siguen resolviendo y NINGÚN contenido se queda escondido.
+   Los cambios de estado ocurren igual, nomás sin recorrido. */
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{
+    animation-duration:.01ms !important;
+    animation-delay:0s !important;
+    animation-iteration-count:1 !important;
+    transition-duration:.01ms !important;
+    transition-delay:0s !important;
+    scroll-behavior:auto !important;
+    will-change:auto !important;
+  }
+  /* Lo que dependía del recorrido para verse, se ve directo */
+  .hh-title .line,.hh-sub,.hh-ctas{opacity:1;transform:none}
+  .ev-card.visible{opacity:1;transform:none}
+}
 </style>
 
 <script src="imgs.js"></script>
@@ -4927,6 +5061,112 @@ function skipOnboarding(){
   try{localStorage.setItem(_tutorialKey(_onboardingEvId),'1');}catch(e){}
   var bg=document.getElementById('onboard-bg');if(bg)bg.style.display='none';
 }
+</script>
+
+<!-- ===================================================================
+     TUERCA PF-1 · JS COSMÉTICO (aislado)
+     Dos cosas, las dos de pura presentación:
+       a) estampa --evi en las tarjetas para la cascada de entrada;
+       b) anima el precio con un count-up.
+     NO toca calcular(), ni EV, ni el wizard, ni ninguna función existente:
+     el count-up MIRA el texto ya pintado (MutationObserver) y cierra
+     escribiendo la MISMA cadena que puso calcular(), byte por byte.
+     Para revertir: borrar este <script> y el <style> "PF-1".
+     =================================================================== -->
+<script>
+(function(){
+  var _reduce=function(){
+    try{return window.matchMedia('(prefers-reduced-motion:reduce)').matches;}catch(e){return false;}
+  };
+  var _tieneRaf=!!(window.requestAnimationFrame&&window.cancelAnimationFrame);
+
+  /* ── a) CASCADA: --evi por lote ──────────────────────────────────────
+     El lote es el mes del catálogo: el contador reinicia en cada .mes-label
+     y topa en 7 (7 × 60ms = 420ms). Así ninguna tarjeta espera de más,
+     aunque el catálogo traiga 40. Solo escribe una variable CSS. */
+  function stampCascada(){
+    var lista=document.getElementById('ev-list');
+    if(!lista)return;
+    var n=0;
+    var hijos=lista.children;
+    for(var i=0;i<hijos.length;i++){
+      var el=hijos[i];
+      if(el.classList.contains('mes-label')||el.classList.contains('pc-section-label')){n=0;continue;}
+      if(!el.classList.contains('ev-card'))continue;
+      el.style.setProperty('--evi',String(n<6?n:6));
+      n++;
+    }
+  }
+  stampCascada();
+
+  /* ── b) COUNT-UP del precio ─────────────────────────────────────────
+     Cosmética pura: recibe (elemento, valorAnterior, valorNuevo) y solo
+     pinta texto. El último fotograma es `textoFinal` — la cadena tal cual
+     la dejó calcular() — así el número que queda en pantalla es siempre
+     el real, con el mismo formato de moneda ($ y separadores es-MX). */
+  var IDS=['r-q','r-total'];
+  var DUR=420;
+  var mostrado={},esperado={},raf={};   // mostrado = último número pintado (nuestro o de calcular)
+
+  function aNumero(t){
+    var s=String(t==null?'':t).replace(/[^0-9.,-]/g,'').replace(/,/g,'');
+    if(!s)return null;
+    var n=parseFloat(s);
+    return isFinite(n)?n:null;
+  }
+  // Mismo formato que fmt(): entero con separadores, o 2 decimales si los trae.
+  function pinta(n,conDecimales){
+    if(conDecimales)return '$'+n.toLocaleString('es-MX',{minimumFractionDigits:2,maximumFractionDigits:2});
+    return '$'+Math.round(n).toLocaleString('es-MX');
+  }
+  function escribe(id,el,txt,valor){
+    esperado[id]=txt;          // marca propia: así el observer ignora este cambio
+    mostrado[id]=valor;
+    el.textContent=txt;
+  }
+
+  function countUp(el,valorAnterior,valorNuevo,textoFinal){
+    var id=el.id;
+    if(raf[id]){cancelAnimationFrame(raf[id]);raf[id]=0;}
+    if(_reduce()||!_tieneRaf||valorAnterior===valorNuevo){
+      escribe(id,el,textoFinal,valorNuevo);
+      return;
+    }
+    var dec=/[.,]\d{2}$/.test(textoFinal);
+    var t0=0;
+    function paso(ts){
+      if(!t0)t0=ts;
+      var p=(ts-t0)/DUR;
+      if(p>=1){
+        raf[id]=0;
+        escribe(id,el,textoFinal,valorNuevo);   // cierra con la cadena real, intacta
+        return;
+      }
+      var e=1-Math.pow(1-p,3);   // ease-out
+      var v=valorAnterior+(valorNuevo-valorAnterior)*e;
+      escribe(id,el,pinta(v,dec),v);
+      raf[id]=requestAnimationFrame(paso);
+    }
+    raf[id]=requestAnimationFrame(paso);
+  }
+
+  IDS.forEach(function(id){
+    var el=document.getElementById(id);
+    if(!el||typeof MutationObserver!=='function')return;
+    mostrado[id]=aNumero(el.textContent);
+    new MutationObserver(function(){
+      var txt=el.textContent;
+      if(txt===esperado[id])return;          // fotograma nuestro, no un recálculo
+      var nuevo=aNumero(txt);
+      if(nuevo===null){                       // texto sin número: se deja tal cual
+        mostrado[id]=null;esperado[id]=txt;return;
+      }
+      var anterior=mostrado[id];
+      if(anterior===null||anterior===undefined)anterior=0;  // primera aparición: sube desde 0
+      countUp(el,anterior,nuevo,txt);
+    }).observe(el,{childList:true,characterData:true,subtree:true});
+  });
+})();
 </script>
 </body>
 </html>

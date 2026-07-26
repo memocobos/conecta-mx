@@ -4717,9 +4717,23 @@ async function editarGasto(id) {
  openModal('modal-gasto');
 }
 
+// 💰 CAP3-1 — ESPEJO del tope del servidor (_lib/monto-limites, $500,000 por
+// partida). El servidor sigue siendo la autoridad; esto solo evita que el
+// usuario reciba un error crudo del backend después de teclear todo el formulario.
+// Si algún día cambia el tope, se cambia en los DOS lados.
+const MONTO_MAX_MXN = 500000;
+function _montoFueraDeRango(monto) {
+  if (!Number.isFinite(monto) || monto <= MONTO_MAX_MXN) return null;
+  const f = (n) => '$' + Number(n).toLocaleString('es-MX', { maximumFractionDigits: 2 });
+  return `${f(monto)} se ve fuera de rango (máximo ${f(MONTO_MAX_MXN)} por partida). `
+       + 'Revisa el monto — si de verdad es correcto, captúralo en dos partidas.';
+}
+
 async function guardarGasto() {
  const concepto = document.getElementById('gasto-concepto').value.trim();
  const monto = parseFloat(document.getElementById('gasto-monto').value);
+ const _fdr = _montoFueraDeRango(monto);
+ if (_fdr) { showToast(_fdr, 'error'); return; }   // [CAP3-1] espejo del servidor
  const fecha = document.getElementById('gasto-fecha').value;
  const categoria = document.getElementById('gasto-categoria').value;
  const evId = document.getElementById('gasto-evento').value;
@@ -4965,6 +4979,8 @@ async function editarIngreso(id) {
 async function guardarIngreso() {
  const concepto = document.getElementById('ingreso-concepto').value.trim();
  const monto = parseFloat(document.getElementById('ingreso-monto').value);
+ const _fdr = _montoFueraDeRango(monto);
+ if (_fdr) { showToast(_fdr, 'error'); return; }   // [CAP3-1] espejo del servidor
  const fecha = document.getElementById('ingreso-fecha').value;
  const categoria = document.getElementById('ingreso-categoria').value;
  const evId = document.getElementById('ingreso-evento').value;
@@ -6678,6 +6694,8 @@ async function _kamAbonoCrear(slug) {
   const nota = (document.getElementById('kam-abono-nota')?.value || '').trim();
   if (!prov) { _kamAbonosAlert('Elige un proveedor.'); return; }
   if (!Number.isFinite(montoN) || montoN <= 0) { _kamAbonosAlert('El monto debe ser mayor a 0.'); return; }
+  const _fdrAb = _montoFueraDeRango(montoN);   // [CAP3-1] espejo del servidor
+  if (_fdrAb) { _kamAbonosAlert(_fdrAb); return; }
   if (fecha && !/^\d{4}-\d{2}-\d{2}$/.test(fecha)) { _kamAbonosAlert('Fecha inválida.'); return; }
   try {
     const r = await khAdminFetch('/.netlify/functions/admin-abonos', {

@@ -29,6 +29,7 @@
 // =============================================================================
 
 const { verifyAdminAuthLive, corsCheck } = require('./_lib/verify-admin');
+const { validarMonto } = require('./_lib/monto-limites');
 const { aplicarModoPrueba } = require('./_lib/correo-guard');
 
 // `metodo` = CÓMO pagó (solo formas de pago; ya no incluye bancos). La BD aún
@@ -102,10 +103,13 @@ exports.handler = async (event) => {
     if (montoPagado == null || montoPagado === '') {
       montoPagado = null;
     } else {
-      montoPagado = Number(montoPagado);
-      if (!Number.isFinite(montoPagado) || montoPagado < 0) {
-        return { statusCode: 400, headers, body: JSON.stringify({ error: 'monto_pagado debe ser un número >= 0' }) };
+      // 💰 CAP3-1: tope de cordura. Un monto_pagado inflado por un dedazo hace
+      // que la reconciliación dé el tour por 'pagado' ANTES de tiempo.
+      const _vm = validarMonto(montoPagado, { etiqueta: 'monto_pagado' });
+      if (!_vm.ok) {
+        return { statusCode: 400, headers, body: JSON.stringify({ error: _vm.error }) };
       }
+      montoPagado = _vm.monto;
     }
     // cuenta opcional: a qué cuenta entró el dinero. Si viene, debe ser válida.
     let cuenta = body.cuenta;

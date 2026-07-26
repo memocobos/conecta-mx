@@ -23,6 +23,7 @@
 // =============================================================================
 
 const { verifyAdminAuthLive, corsCheck } = require('./_lib/verify-admin');
+const { validarMonto } = require('./_lib/monto-limites');
 const { aplicarModoPrueba } = require('./_lib/correo-guard');
 
 const UUID_RE = /^[0-9a-f-]{36}$/i;
@@ -84,10 +85,13 @@ exports.handler = async (event) => {
 
 // ── MODO 1: PROPONER (no escribe) ──────────────────────────────────────────
 async function proponer(env, sbHeaders, headers, solicitudId, body) {
-  let monto = Number(body.monto);
-  if (!Number.isFinite(monto) || monto <= 0) {
-    return { statusCode: 400, headers, body: JSON.stringify({ error: 'monto debe ser un número > 0' }) };
+  // 💰 CAP3-1: tope de cordura. Aquí el 0 NO se permite (era la regla de hoy):
+  // repartir cero entre las cuotas de un grupo no significa nada.
+  const _vm = validarMonto(body.monto, { permitirCero: false });
+  if (!_vm.ok) {
+    return { statusCode: 400, headers, body: JSON.stringify({ error: _vm.error }) };
   }
+  let monto = _vm.monto;
 
   // Cuotas NO pagadas del plan POR LUGAR (lugar_id no null). Sin filas → esta
   // solicitud no tiene plan por lugar → se usa marcar-pago de siempre.

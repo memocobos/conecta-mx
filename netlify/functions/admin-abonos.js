@@ -16,6 +16,7 @@
 // =============================================================================
 
 const { verifyAdminAuthLive, corsCheck } = require('./_lib/verify-admin');
+const { validarMonto } = require('./_lib/monto-limites');
 
 const ROLES_PALACIO = ['maestro_roshi']; // el Palacio es solo de maestro_roshi
 
@@ -106,8 +107,11 @@ exports.handler = async (event) => {
       const proveedor_id = String(body.proveedor_id || '').trim();
       if (!UUID_RE.test(proveedor_id)) return bad(headers, 'proveedor_id inválido');
 
-      const monto = Number(body.monto);
-      if (!Number.isFinite(monto) || monto < 0) return bad(headers, 'El monto debe ser un número >= 0');
+      // 💰 CAP3-1: tope de cordura por partida (los abonos a proveedor alimentan
+      // la misma caja que las comisiones del 30%).
+      const _vm = validarMonto(body.monto);
+      if (!_vm.ok) return bad(headers, _vm.error);
+      const monto = _vm.monto;
 
       let fecha = (body.fecha == null || body.fecha === '') ? null : String(body.fecha).trim();
       if (fecha != null && !FECHA_RE.test(fecha)) return bad(headers, 'La fecha debe ser YYYY-MM-DD');

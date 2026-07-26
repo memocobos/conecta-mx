@@ -17,6 +17,7 @@
 // =============================================================================
 
 const { verifyAdminAuthLive, corsCheck } = require('./_lib/verify-admin');
+const { validarMonto } = require('./_lib/monto-limites');
 
 const CUENTAS = ['BBVA', 'Banamex', 'Efectivo', 'Otro'];
 const UUID_RE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
@@ -58,7 +59,9 @@ exports.handler = async (event) => {
   const monto    = Number(body.monto);
 
   if (!concepto)                       return { statusCode: 400, headers, body: JSON.stringify({ error: 'El concepto es obligatorio' }) };
-  if (!Number.isFinite(monto) || monto < 0) return { statusCode: 400, headers, body: JSON.stringify({ error: 'El monto debe ser un número mayor o igual a 0' }) };
+  // 💰 CAP3-1: mismo tope al editar.
+  const _vm = validarMonto(monto);
+  if (!_vm.ok) return { statusCode: 400, headers, body: JSON.stringify({ error: _vm.error }) };
   if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha)) return { statusCode: 400, headers, body: JSON.stringify({ error: 'La fecha es obligatoria (YYYY-MM-DD)' }) };
 
   const clienteId = (typeof body.cliente_id === 'string' && body.cliente_id.trim()) ? body.cliente_id.trim() : null;

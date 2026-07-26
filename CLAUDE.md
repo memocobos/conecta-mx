@@ -59,7 +59,60 @@
 - Manual: Manual_De_Marca.pdf en el repo
 
 ## Pendientes
-- Fase 2 (Portal Clientes): en construcción sobre Supabase
+_Última revisión: 25-jul-2026._
+
+### 🔴 La semana que entra — el encendido
+- **Apagar `CORREOS_MODO='prueba'` en Netlify.** Mientras siga en 'prueba', TODO
+  el correo automático (cobranza, contratos, vendedores) llega al buzón de
+  calibración y NO al cliente. Es el interruptor que estrena todo junto.
+  Excepción a propósito: el vigilante de radio manda sus emergencias directo,
+  sin pasar por `aplicarModoPrueba`.
+- **Re-onboarding de 6 personas** (primeros 5: Alan, Axel, Reginna, Laura,
+  Sofía). Camino: reactivar en Guerreros Z → rol → contratos → firmas → activo.
+- **Revisar env vars en Netlify** antes del primer disparo real.
+- **Blast de arranque de contratos**: lo manda Memo, no un cron.
+
+### 🟡 Vivos
+- **Fase 2 (Portal Clientes)**: en construcción sobre Supabase.
+- **Respaldos del NAS** (UGREEN): sesión pendiente. Radio Conecta vive ahí.
+- **Cobros OXXO / MSI**: ver `REPORTE-COBROS-OXXO-MSI.md`.
+- **Puente index→Portal**: Fase A en prod pero DETRÁS DE INTERRUPTOR
+  (`RESERVA_PORTAL` / `?portal=1`). Falta decidir el encendido.
+- **Contrato de cuidador de bodega**: borrador esperando a Memo.
+- **Wizard de comisiones CHEAP (F5a)**: falta que Memo capture las primeras.
+- **PRs viejas ABIERTAS sin aprobar**: #53 (ranking DC2d, jun) y #215
+  (cancelar-despublica, 1-jul). NO mergear sin revisión explícita de Memo.
+- **Doc `kamehouse.md`**: bloqueado por permisos de macOS/TCC.
+- Retirar el panel `ventas-resumen` cuando ya no se use.
+
+### ⚪ Anotados sin urgencia (decisiones ya tomadas)
+- **Caché de 5 min del candado de vendedores**: tras reactivar a alguien puede
+  tardar hasta 5 min en poder vender. No es bug — va al manual.
+- **Resumen al admin de `contratos-alerta-cron`**: se queda SIN bitácora a
+  propósito (correo interno). El arnés assertea ese comportamiento: si alguien
+  lo cubre, la prueba truena y hay que actualizarla.
+- **ALTER `lugar_id` en `avisos_cobranza`**: descartado por ahora. La referencia
+  vive en `pago_id` (uuid libre sin FK) con `tipo` en la llave.
+- **Cumpleaños 29-feb** en `cumple_hoy`: renglón futuro.
+- Los `.md` sueltos de la raíz (borradores, checklists, reportes de auditoría)
+  siguen SIN commitear a propósito.
+
+### ⚠️ Reglas que cuestan caro olvidar
+- **Nunca `gh pr merge`.** Flujo: `pull main` → `merge --no-ff` → `push`.
+- **Jamás `on_conflict` / `merge-duplicates`.** INSERT directo; un 23505 es
+  idempotencia, pero hay que CONFIRMAR la causa, no adivinarla.
+- **`NULL` en una llave de unicidad no une nada** (`NULL != NULL`). Revisar el
+  `COALESCE` del índice real antes de confiar en un candado.
+- **La regla de precios vive en 3 copias**: `calcular()` en index.html,
+  `_lib/precio-zona` y `_vtaCalc` en kamehouse.js. Tocar las 3 + correr el arnés
+  de equivalencia.
+- **El CSS/JS de KameHouse vive en `kamehouse.css/js/recibos.js`**, no inline en
+  el HTML.
+- **Llaves de Supabase**: `SUPABASE_URL_KAMEHOUSE`/`SUPABASE_SERVICE_KEY_KAMEHOUSE`
+  y `PORTAL_SUPABASE_URL`/`ANON`/`SERVICE`. Las `SUPABASE_*` a secas están
+  BORRADAS y podadas del código — no revivirlas ni agregar fallbacks.
+- **`eventos`/`resumen_eventos` del Palacio llavean por UUID, no por slug.**
+- `mundial_*`/`quiniela_*`/`amigos_*` = web desechable del Mundial. NO tocar.
 
 ## Datos Bancarios
 - BBVA Bancomer / Tarjeta: 4152 3139 7573 0487

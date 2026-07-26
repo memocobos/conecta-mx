@@ -5158,7 +5158,7 @@ async function loadVentas() {
  <div style="font-family:\'Barlow Condensed\',sans-serif;font-size:18px;font-weight:800">
  ${_esfEsc(ev.artista || ev.nombre)}
  </div>
- <div style="font-size:11px;color:var(--ts)">${fmtFecha(ev.fecha)} · ${ev.ciudad}</div>
+ <div style="font-size:11px;color:var(--ts)">${fmtFecha(ev.fecha)} · ${_esfEsc(ev.ciudad)}</div>
  </div>
  <div style="text-align:right">
  ${badgeStatus(ev.status)}
@@ -5706,7 +5706,7 @@ function renderCapsule() {
  </td>
  <td style="font-size:12px;white-space:nowrap">${fmtFecha(ev.fecha)}</td>
  <td>
- <div style="font-size:12px;font-weight:600">${ev.ciudad}</div>
+ <div style="font-size:12px;font-weight:600">${_esfEsc(ev.ciudad)}</div>
  <div style="font-size:10px;color:var(--ts)">${_esfEsc(ev.venue || '')}</div>
  </td>
  <td style="font-size:11px">${paquetes.map(p => `<span class="badge ${p==='PLUS'?'badge-orange':p==='RIDE'?'badge-gold':'badge-gray'}">${p}</span>`).join(' ')}</td>
@@ -7660,9 +7660,9 @@ function renderPerfilCompleto(u, toursPasados, evAsignados, iniciales, edad, cum
             <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;flex-wrap:wrap">
               <div>
                 <div class="tour-item-name" style="font-size:16px">${_esfEsc(ev.nombre || ev.artista || '—')}</div>
-                <div class="tour-item-meta">${ev.artista?_esfEsc(ev.artista)+' · ':''}${ev.ciudad||''} ${fechaEv?'· '+fechaEv.toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric'}):''}</div>
-                ${u.rol !== 'cc' && e.indicaciones ? `<div style="font-size:11px;color:var(--ts);margin-top:5px;font-style:italic">${e.indicaciones}</div>` : ''}
-                ${ev.notas_internas ? `<div style="font-size:11px;color:var(--ts);margin-top:4px"><span class="k-mono-sm" style="margin-right:6px">EQUIPO</span>${ev.notas_internas}</div>` : ''}
+                <div class="tour-item-meta">${ev.artista?_esfEsc(ev.artista)+' · ':''}${_esfEsc(ev.ciudad||'')} ${fechaEv?'· '+fechaEv.toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric'}):''}</div>
+                ${u.rol !== 'cc' && e.indicaciones ? `<div style="font-size:11px;color:var(--ts);margin-top:5px;font-style:italic">${_esfEsc(e.indicaciones)}</div>` : ''}
+                ${ev.notas_internas ? `<div style="font-size:11px;color:var(--ts);margin-top:4px"><span class="k-mono-sm" style="margin-right:6px">EQUIPO</span>${_esfEsc(ev.notas_internas)}</div>` : ''}
               </div>
               <span style="font-size:10px;white-space:nowrap;color:${stColor[e.status]||'var(--ts)'}">
                 ${stLabel[e.status]||e.status||''}
@@ -7691,7 +7691,7 @@ function renderPerfilCompleto(u, toursPasados, evAsignados, iniciales, edad, cum
                 <span class="tour-item-pts">+${d.pts}</span>
               </div>
             </div>
-            <div class="tour-item-meta">${TIPO_TOUR_LABEL[d.tipo_tour]||'Tour'} ${d.fecha ? '· ' + fmtFecha(d.fecha.toISOString().slice(0,10)) : ''}</div>
+            <div class="tour-item-meta">${_esfEsc(TIPO_TOUR_LABEL[d.tipo_tour]||'Tour')} ${d.fecha ? '· ' + fmtFecha(d.fecha.toISOString().slice(0,10)) : ''}</div>
           </div>`).join('')}
         ${toursPasados.map(t => {
           const año = t.fecha_aprox ? new Date(t.fecha_aprox).getFullYear() : null;
@@ -7706,7 +7706,7 @@ function renderPerfilCompleto(u, toursPasados, evAsignados, iniciales, edad, cum
                 <button onclick="event.stopPropagation();eliminarTourPasado('${t.id}','${u.id}')" style="background:none;border:none;color:var(--ts);cursor:pointer;font-size:18px;padding:0 4px">×</button>
               </div>
             </div>
-            <div class="tour-item-meta">${TIPO_TOUR_LABEL[t.tipo_tour]||'Tour'} · ${t.ciudad || ''} ${t.fecha_aprox ? '· ' + fmtFecha(t.fecha_aprox) : ''}</div>
+            <div class="tour-item-meta">${_esfEsc(TIPO_TOUR_LABEL[t.tipo_tour]||'Tour')} · ${_esfEsc(t.ciudad || '')} ${t.fecha_aprox ? '· ' + fmtFecha(t.fecha_aprox) : ''}</div>
             ${t.notas ? `<div style="font-size:11px;color:var(--ts);margin-top:6px;font-style:italic">${_esfEsc(t.notas)}</div>` : ''}
           </div>`;
         }).join('')}
@@ -8622,7 +8622,7 @@ function renderCCEventos(lista, filtro) {
         <div>
           <div style="font-family:'Rajdhani',sans-serif;font-weight:700;font-size:20px;margin-bottom:2px">${_esfEsc(e.nombre)}</div>
           <div style="font-size:11px;font-family:'JetBrains Mono',monospace;color:var(--ts)">
-            ${e.artista ? _esfEsc(e.artista) + ' · ' : ''}${e.ciudad||''} · ${fecha.toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric'})}
+            ${e.artista ? _esfEsc(e.artista) + ' · ' : ''}${_esfEsc(e.ciudad||'')} · ${fecha.toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric'})}
           </div>
           <div style="margin-top:6px">
             <span style="font-size:10px;padding:2px 8px;background:rgba(255,107,0,.12);border:1px solid rgba(255,107,0,.25);border-radius:4px;color:var(--orange);font-family:'JetBrains Mono',monospace">${tipoLabel}</span>
@@ -8639,7 +8639,7 @@ function renderCCEventos(lista, filtro) {
           <button class="btn btn-primary btn-sm" onclick="event.stopPropagation();abrirDetalleEvento('${e.id}')" style="font-size:11px">Ver →</button>
         </div>
       </div>
-      ${e.notas_internas ? `<div style="margin-top:10px;font-size:11px;color:var(--ts);padding:8px 12px;background:rgba(255,255,255,.03);border-radius:6px;border-left:2px solid var(--border)">${e.notas_internas}</div>` : ''}
+      ${e.notas_internas ? `<div style="margin-top:10px;font-size:11px;color:var(--ts);padding:8px 12px;background:rgba(255,255,255,.03);border-radius:6px;border-left:2px solid var(--border)">${_esfEsc(e.notas_internas)}</div>` : ''}
     </div>`;
   }).join('');
 }
@@ -8669,7 +8669,7 @@ function abrirModalEvento(id) {
           </div>
           <div class="form-group">
             <label>Ciudad *</label>
-            <input class="cot-input" id="ccev-ciudad" value="${e?.ciudad||''}" placeholder="CDMX, MTY…">
+            <input class="cot-input" id="ccev-ciudad" value="${_esfEsc(e?.ciudad||'')}" placeholder="CDMX, MTY…">
           </div>
           <div class="form-group">
             <label>Fecha *</label>
@@ -8692,7 +8692,7 @@ function abrirModalEvento(id) {
           </div>
           <div class="form-group" style="grid-column:1/-1">
             <label>Notas internas para el equipo</label>
-            <textarea class="cot-input" id="ccev-notas" rows="3" placeholder="Punto de encuentro, indicaciones generales, dress code…" style="width:100%;resize:vertical">${e?.notas_internas||''}</textarea>
+            <textarea class="cot-input" id="ccev-notas" rows="3" placeholder="Punto de encuentro, indicaciones generales, dress code…" style="width:100%;resize:vertical">${_esfEsc(e?.notas_internas||'')}</textarea>
           </div>
         </div>
         <div id="ccev-alert"></div>
@@ -8762,9 +8762,9 @@ async function abrirDetalleEvento(id) {
         <div>
           <div style="font-family:'Rajdhani',sans-serif;font-weight:700;font-size:22px">${_esfEsc(ev.nombre)}</div>
           <div style="font-size:11px;font-family:'JetBrains Mono',monospace;color:var(--ts);margin-top:2px">
-            ${ev.artista?_esfEsc(ev.artista)+' · ':''}${ev.ciudad||''} · ${fecha.toLocaleDateString('es-MX',{weekday:'long',day:'numeric',month:'long',year:'numeric'})} · ${TIPOS_EVENTO[ev.tipo_evento]||'Concierto'}
+            ${ev.artista?_esfEsc(ev.artista)+' · ':''}${_esfEsc(ev.ciudad||'')} · ${fecha.toLocaleDateString('es-MX',{weekday:'long',day:'numeric',month:'long',year:'numeric'})} · ${_esfEsc(TIPOS_EVENTO[ev.tipo_evento]||'Concierto')}
           </div>
-          ${ev.notas_internas?`<div style="margin-top:8px;font-size:11px;color:var(--ts);padding:6px 10px;background:rgba(255,255,255,.03);border-left:2px solid var(--border)">${ev.notas_internas}</div>`:''}
+          ${ev.notas_internas?`<div style="margin-top:8px;font-size:11px;color:var(--ts);padding:6px 10px;background:rgba(255,255,255,.03);border-left:2px solid var(--border)">${_esfEsc(ev.notas_internas)}</div>`:''}
         </div>
         <button class="btn btn-ghost btn-sm" onclick="showCCTab('lista', document.getElementById('cc-tab-btn-lista'))" style="font-size:10px">← Todos los eventos</button>
       </div>`;
@@ -8868,7 +8868,7 @@ async function loadCCEquipo() {
       // CC: no mostrar el bloque de expectativas (la descripción larga del
       // contrato vive en su perfil → panel "Material Entregado").
       const indicacionesHtml = (!esCC && a.indicaciones)
-        ? `<div style="font-size:11px;color:var(--ts);margin-top:3px;font-style:italic">${a.indicaciones}</div>`
+        ? `<div style="font-size:11px;color:var(--ts);margin-top:3px;font-style:italic">${_esfEsc(a.indicaciones)}</div>`
         : '';
       return `<div style="background:var(--bg2);border:1px solid var(--border);border-left:3px solid ${statusCol[st]||'var(--ts)'};border-radius:var(--radius);padding:14px 18px;margin-bottom:10px">
         <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
@@ -8881,7 +8881,7 @@ async function loadCCEquipo() {
               <div style="font-family:'Rajdhani',sans-serif;font-weight:700;font-size:16px">${_esfEsc(u.nombre||'—')}</div>
               <div style="font-size:10px;font-family:'JetBrains Mono',monospace;color:var(--ts)">${u.rol||''} · <span style="color:${statusCol[st]||'var(--ts)'}">${statusLabel[st]||st}</span></div>
               ${indicacionesHtml}
-              ${a.motivo_declinacion ? `<div style="font-size:11px;color:var(--red);margin-top:3px">Motivo: ${a.motivo_declinacion}</div>` : ''}
+              ${a.motivo_declinacion ? `<div style="font-size:11px;color:var(--red);margin-top:3px">Motivo: ${_esfEsc(a.motivo_declinacion)}</div>` : ''}
             </div>
           </div>
           <div style="display:flex;gap:6px;flex-wrap:wrap">
@@ -8999,10 +8999,10 @@ async function guardarAsignacionCoordi() {
             <p>Se te ha asignado el siguiente tour:</p>
             <div style="background:#1a1a24;border-left:3px solid #FF6B00;padding:16px 20px;border-radius:8px;margin:20px 0">
               <div style="font-size:20px;font-weight:700">${_esfEsc(ev?.nombre||'')}</div>
-              <div style="color:#888899;font-size:13px">${ev?.artista?_esfEsc(ev.artista)+' · ':''}${ev?.ciudad||''}</div>
+              <div style="color:#888899;font-size:13px">${ev?.artista?_esfEsc(ev.artista)+' · ':''}${_esfEsc(ev?.ciudad||'')}</div>
               <div style="color:#888899;font-size:13px">${ev?.fecha?new Date(ev.fecha+'T12:00:00').toLocaleDateString('es-MX',{weekday:'long',day:'numeric',month:'long',year:'numeric'}):''}</div>
             </div>
-            ${indicaciones?`<p><strong>Indicaciones:</strong><br><span style="color:#888899">${indicaciones}</span></p>`:''}
+            ${indicaciones?`<p><strong>Indicaciones:</strong><br><span style="color:#888899">${_esfEsc(indicaciones)}</span></p>`:''}
             <div style="margin-top:28px;display:flex;gap:12px;flex-wrap:wrap">
               <a href="${linkAceptar}" style="background:#FF6B00;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:700">✅ Aceptar tour</a>
               <a href="${linkDeclinar}" style="background:#1a1a24;color:#f0f0f5;padding:12px 24px;border-radius:8px;text-decoration:none;border:1px solid #333">❌ Declinar</a>
@@ -9050,7 +9050,7 @@ async function reenviarNotificacion(asigId) {
             <p>Hola <strong>${_esfEsc(usuario.nombre)}</strong>, aún no has respondido a tu asignación:</p>
             <div style="background:#1a1a24;border-left:3px solid #FF6B00;padding:16px 20px;border-radius:8px;margin:20px 0">
               <div style="font-size:18px;font-weight:700">${_esfEsc(ev?.nombre||'')}</div>
-              <div style="color:#888899">${ev?.ciudad||''} · ${ev?.fecha?new Date(ev.fecha+'T12:00:00').toLocaleDateString('es-MX',{day:'numeric',month:'long',year:'numeric'}):''}</div>
+              <div style="color:#888899">${_esfEsc(ev?.ciudad||'')} · ${ev?.fecha?new Date(ev.fecha+'T12:00:00').toLocaleDateString('es-MX',{day:'numeric',month:'long',year:'numeric'}):''}</div>
             </div>
             <div style="margin-top:24px;display:flex;gap:12px;flex-wrap:wrap">
               <a href="${linkAceptar}" style="background:#FF6B00;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:700">✅ Aceptar</a>
@@ -9929,7 +9929,7 @@ function renderHotelInfo() {
   el.innerHTML = `<div style="display:flex;gap:20px;flex-wrap:wrap;align-items:center">
     <div>
       <div style="font-family:'Rajdhani',sans-serif;font-weight:700;font-size:18px">${_esfEsc(_ccHotelInfo.nombre)}</div>
-      ${_ccHotelInfo.direccion?`<div style="font-size:12px;color:var(--ts);margin-top:2px">${_ccHotelInfo.direccion}</div>`:''}
+      ${_ccHotelInfo.direccion?`<div style="font-size:12px;color:var(--ts);margin-top:2px">${_esfEsc(_ccHotelInfo.direccion)}</div>`:''}
     </div>
     <div style="font-size:11px;padding:4px 12px;border-radius:20px;border:1px solid ${_ccHotelInfo.incluye_desayuno?'rgba(61,220,132,.3)':'var(--border)'};color:${_ccHotelInfo.incluye_desayuno?'var(--green)':'var(--ts)'}">
       ${_ccHotelInfo.incluye_desayuno?'✓ Con desayuno':'✗ Sin desayuno'}
@@ -9952,7 +9952,7 @@ function abrirModalHotel() {
         </div>
         <div class="form-group">
           <label>Dirección</label>
-          <input class="cot-input" id="hot-dir" value="${h.direccion||''}" placeholder="Calle, colonia, ciudad…" style="width:100%">
+          <input class="cot-input" id="hot-dir" value="${_esfEsc(h.direccion||'')}" placeholder="Calle, colonia, ciudad…" style="width:100%">
         </div>
         <label style="display:flex;align-items:center;gap:10px;padding:12px 16px;background:var(--bg3);border-radius:8px;cursor:pointer;border:1px solid var(--border)">
           <input type="checkbox" id="hot-desayuno" ${h.incluye_desayuno?'checked':''} style="accent-color:var(--green);width:16px;height:16px;cursor:pointer">
@@ -10143,7 +10143,7 @@ async function exportarRooming(formato) {
     <table><thead><tr><th>Habitación</th><th>Tipo</th><th>Ocupantes</th></tr></thead>
     <tbody>${_ccHabitaciones.map(h=>{
       const ocp = filtrarOcp(h.ocupantes?(typeof h.ocupantes==='string'?JSON.parse(h.ocupantes):h.ocupantes):[]);
-      return `<tr><td>${h.numero_hab||'—'}</td><td>${tipoLabel[h.tipo]||h.tipo}</td><td>${ocp.join('<br>')||'—'}</td></tr>`;
+      return `<tr><td>${_esfEsc(h.numero_hab||'—')}</td><td>${tipoLabel[h.tipo]||h.tipo}</td><td>${ocp.join('<br>')||'—'}</td></tr>`;
     }).join('')}</tbody></table></body></html>`;
     _descargarHTML(`rooming-${ev?.nombre||'evento'}${sufijoFile}.html`, html);
   } else {
@@ -10173,9 +10173,9 @@ async function descargarListaViajeros(eventoId) {
     const titulo = `Viajeros — ${ev.nombre||'Evento'}`;
     const html = `<html><head><meta charset="utf-8"><title>${_esfEsc(titulo)}</title>
     <style>body{font-family:Arial,sans-serif;padding:24px}h2{margin-bottom:4px}p{color:#666;margin-bottom:20px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ccc;padding:8px 12px;font-size:13px}th{background:#f5f5f5}</style></head><body>
-    <h2>${_esfEsc(titulo)}</h2><p>${ev.artista?_esfEsc(ev.artista)+' · ':''}${ev.ciudad||''} ${ev.fecha?'· '+new Date(ev.fecha+'T12:00:00').toLocaleDateString('es-MX',{day:'numeric',month:'long',year:'numeric'}):''}</p>
+    <h2>${_esfEsc(titulo)}</h2><p>${ev.artista?_esfEsc(ev.artista)+' · ':''}${_esfEsc(ev.ciudad||'')} ${ev.fecha?'· '+new Date(ev.fecha+'T12:00:00').toLocaleDateString('es-MX',{day:'numeric',month:'long',year:'numeric'}):''}</p>
     <table><thead><tr><th>#</th><th>Nombre</th><th>Paquete</th><th>Zona</th><th>Talla</th><th>Celular</th><th>Emergencia</th><th>Notas</th></tr></thead>
-    <tbody>${viajeros.map((v,i)=>`<tr><td>${i+1}</td><td><strong>${_esfEsc(v.nombre)}</strong></td><td>${v.tipo_paquete||'—'}</td><td>${v.zona_boleto||'—'}</td><td>${_esfEsc(v.talla_playera||'—')}</td><td>${_esfEsc(v.celular||'—')}</td><td>${v.num_emergencia||'—'}</td><td>${_esfEsc(v.notas||'—')}</td></tr>`).join('')}</tbody>
+    <tbody>${viajeros.map((v,i)=>`<tr><td>${i+1}</td><td><strong>${_esfEsc(v.nombre)}</strong></td><td>${_esfEsc(v.tipo_paquete||'—')}</td><td>${_esfEsc(v.zona_boleto||'—')}</td><td>${_esfEsc(v.talla_playera||'—')}</td><td>${_esfEsc(v.celular||'—')}</td><td>${_esfEsc(v.num_emergencia||'—')}</td><td>${_esfEsc(v.notas||'—')}</td></tr>`).join('')}</tbody>
     </table></body></html>`;
     _descargarHTML(`viajeros-${(ev.nombre||'evento').replace(/[^a-zA-Z0-9-_]+/g,'_')}.html`, html);
   } catch(e) { alert('Error: ' + e.message); }
@@ -10193,7 +10193,7 @@ async function descargarRoomingList(eventoId) {
     const html = `<html><head><meta charset="utf-8"><title>${_esfEsc(titulo)}</title>
     <style>body{font-family:Arial,sans-serif;padding:24px}h2{margin-bottom:4px}p{color:#666;margin-bottom:20px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ccc;padding:8px 12px;font-size:13px;vertical-align:top}th{background:#f5f5f5}</style></head><body>
     <h2>${_esfEsc(titulo)}</h2>
-    <p>${habs[0]?.hotel_nombre||''}${habs[0]?.hotel_direccion?' · '+habs[0].hotel_direccion:''}${habs[0]?.incluye_desayuno?' · ✓ Incluye desayuno':''}</p>
+    <p>${_esfEsc(habs[0]?.hotel_nombre||'')}${habs[0]?.hotel_direccion?' · '+_esfEsc(habs[0].hotel_direccion):''}${habs[0]?.incluye_desayuno?' · ✓ Incluye desayuno':''}</p>
     <table><thead><tr><th>Habitación</th><th>Tipo</th><th>Ocupantes</th></tr></thead>
     <tbody>${habs.map((h,i)=>{
       const ocp = h.ocupantes?(typeof h.ocupantes==='string'?JSON.parse(h.ocupantes):h.ocupantes):[];
@@ -11917,13 +11917,13 @@ function mtVerDetalleReporte(id) {
             <div style="font-size:11px;color:var(--ts)">${_esfEsc(coo.celular||'')}</div>
           </div>
         </div>
-        ${r.cuenta_bancaria_coordi?`<div style="margin-top:10px;font-size:11px;padding:6px 10px;background:rgba(255,68,68,.06);border-left:2px solid var(--red);border-radius:4px">Cuenta: <strong>${r.cuenta_bancaria_coordi}</strong></div>`:''}
+        ${r.cuenta_bancaria_coordi?`<div style="margin-top:10px;font-size:11px;padding:6px 10px;background:rgba(255,68,68,.06);border-left:2px solid var(--red);border-radius:4px">Cuenta: <strong>${_esfEsc(r.cuenta_bancaria_coordi)}</strong></div>`:''}
       </div>
       <!-- Info evento -->
       <div>
         <div class="k-mono" style="margin-bottom:10px">// EVENTO</div>
         <div style="font-weight:700;font-size:15px">${_esfEsc(ev.nombre||'—')}</div>
-        <div style="font-size:12px;color:var(--ts)">${ev.artista?_esfEsc(ev.artista)+' · ':''}${ev.ciudad||''}</div>
+        <div style="font-size:12px;color:var(--ts)">${ev.artista?_esfEsc(ev.artista)+' · ':''}${_esfEsc(ev.ciudad||'')}</div>
         <div style="font-size:12px;color:var(--ts)">${ev.fecha?new Date(ev.fecha+'T12:00:00').toLocaleDateString('es-MX',{weekday:'long',day:'numeric',month:'long',year:'numeric'}):''}</div>
       </div>
     </div>
@@ -11936,7 +11936,7 @@ function mtVerDetalleReporte(id) {
         <table>
           <thead><tr><th>Pieza</th><th>Sacados</th><th>Sobran</th><th>Recibido</th></tr></thead>
           <tbody>${kits.map(k=>`<tr>
-            <td style="font-weight:600">${k.pieza_nombre||k.pieza_id||'—'}</td>
+            <td style="font-weight:600">${_esfEsc(k.pieza_nombre||k.pieza_id||'—')}</td>
             <td>${k.cantidad_sacada||0}</td>
             <td>${k.cantidad_sobrante||0}</td>
             <td style="color:${k.recibido?'var(--green)':'var(--ts)'}">${k.recibido?'✓ Recibido':'Pendiente'}</td>
@@ -12085,7 +12085,7 @@ async function loadMTPendientes() {
               </div>
               <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:${col};font-weight:700">${lbl}</div>
             </div>
-            <div style="margin-top:8px;font-size:11px;color:var(--ts)">Pendiente: ${d.sobrantes.map(s=>`${s.pieza_nombre||'kit'} ×${s.cantidad_sobrante}`).join(', ')}</div>
+            <div style="margin-top:8px;font-size:11px;color:var(--ts)">Pendiente: ${d.sobrantes.map(s=>`${_esfEsc(s.pieza_nombre||'kit')} ×${Number(s.cantidad_sobrante)||0}`).join(', ')}</div>
           </div>`;
         }).join('') : '<div style="font-size:12px;color:var(--green)">✓ Sin devoluciones pendientes</div>'}
       </div>`;
@@ -14835,7 +14835,7 @@ async function enviarAlertaMemo(tipo, datos = {}) {
       case 'reporte_rechazado':
         mensaje = `Maestro Karin rechazó el reporte de ${datos.coordi||'un coordi'}${datos.motivo?': '+datos.motivo:''}`;
         emailSubject = `Reporte rechazado por Maestro Karin`;
-        emailBody = `<p>Maestro Karin rechazó el reporte post-evento de <strong>${datos.coordi}</strong>.</p>${datos.motivo?`<p><strong>Motivo:</strong> ${_esfEsc(datos.motivo)}</p>`:''}`;
+        emailBody = `<p>Maestro Karin rechazó el reporte post-evento de <strong>${_esfEsc(datos.coordi)}</strong>.</p>${datos.motivo?`<p><strong>Motivo:</strong> ${_esfEsc(datos.motivo)}</p>`:''}`;
         break;
       case 'nuevo_usuario':
         mensaje = `Nuevo usuario registrado: ${datos.nombre||''}`;
@@ -14890,7 +14890,7 @@ async function checkMensajeDia() {
       }
       banner.innerHTML = `
         <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--orange);margin-bottom:8px;letter-spacing:.1em">// MENSAJE DEL DÍA</div>
-        <div style="font-size:13px;color:var(--text);line-height:1.5">${cfg.mensaje_dia}</div>
+        <div style="font-size:13px;color:var(--text);line-height:1.5">${_esfEsc(cfg.mensaje_dia)}</div>
         <button onclick="document.getElementById('msg-dia-banner').remove()" style="margin-top:12px;background:none;border:1px solid var(--border);border-radius:6px;padding:4px 12px;color:var(--ts);cursor:pointer;font-size:11px;width:100%">Cerrar</button>`;
     }
   } catch(e) {}
@@ -15186,7 +15186,7 @@ async function abrirModalReporte(reporteId) {
             <div style="font-size:11px;color:var(--red);margin-bottom:8px"><svg class="ic"><use href="#ic-alerta"/></svg> Gastaste más de lo recibido. Ingresa tu cuenta para que Memo te reembolse.</div>
             <div class="form-group" style="margin:0">
               <label>CLABE / Cuenta bancaria</label>
-              <input type="text" class="cot-input" id="rep-clabe" placeholder="18 dígitos o datos bancarios" value="${reporte?.cuenta_bancaria_coordi||''}" style="width:100%">
+              <input type="text" class="cot-input" id="rep-clabe" placeholder="18 dígitos o datos bancarios" value="${_esfEsc(reporte?.cuenta_bancaria_coordi||'')}" style="width:100%">
             </div>
           </div>
         </div>
@@ -15501,7 +15501,7 @@ function verDetalleReporte(id) {
 
   const kitsHtml = kits.length ? kits.map(k =>
     `<tr>
-      <td style="font-weight:600">${k.pieza_nombre || k.pieza_id}</td>
+      <td style="font-weight:600">${_esfEsc(k.pieza_nombre || k.pieza_id)}</td>
       <td>${k.cantidad_sacada || 0}</td>
       <td>${k.cantidad_sobrante || 0}</td>
       <td style="color:${k.recibido ? 'var(--green)' : 'var(--ts)'}">${k.recibido ? '✓ Recibido' : '—'}</td>
@@ -15541,7 +15541,7 @@ function verDetalleReporte(id) {
           <div><div style="font-size:10px;color:var(--ts)">GASTADO</div><div style="font-family:'Zen Dots',sans-serif;font-size:18px">${formatMXN(r.total_gastado||0)}</div></div>
           <div><div style="font-size:10px;color:var(--ts)">DIFERENCIA</div><div style="font-family:'Zen Dots',sans-serif;font-size:18px;color:${difColor}">${formatMXN(Math.abs(dif))}</div></div>
         </div>
-        ${r.cuenta_bancaria_coordi ? `<div style="padding:10px 14px;background:rgba(255,68,68,.06);border-left:2px solid var(--red);margin-bottom:12px;font-size:12px">Cuenta coordi: <strong>${r.cuenta_bancaria_coordi}</strong></div>` : ''}
+        ${r.cuenta_bancaria_coordi ? `<div style="padding:10px 14px;background:rgba(255,68,68,.06);border-left:2px solid var(--red);margin-bottom:12px;font-size:12px">Cuenta coordi: <strong>${_esfEsc(r.cuenta_bancaria_coordi)}</strong></div>` : ''}
         ${r.notas ? `<div style="padding:10px 14px;background:var(--bg3);border-left:2px solid var(--border2);font-size:12px;color:var(--ts)">Notas: ${_esfEsc(r.notas)}</div>` : ''}
       </div>
       <div class="modal-footer"><button class="btn btn-ghost" onclick="closeModal('modal-reporte')">Cerrar</button></div>
@@ -16413,7 +16413,7 @@ const _CTR_COORDINADOR = [
 Cualquiera de estas conductas termina el contrato de inmediato, sin indemnización, con pérdida de beneficios del viaje en curso y sin perjuicio de las acciones legales que procedan.` },
   { ord:'NOVENA', t:'Respeto, confidencialidad y exclusividad', body:()=>`Trato respetuoso y cordial con viajeros, choferes y compañeros en todo momento — el acoso, la discriminación y la violencia son falta grave. Toda la información interna (estrategias, precios, bases de datos, logística, listas de viajeros, documentación) es <b>CONFIDENCIAL</b> y no puede divulgarse ni usarse para fines ajenos, obligación que SOBREVIVE a la terminación del contrato. Durante la vigencia, el coordinador no colaborará con agencias competidoras sin autorización escrita; si no puede asistir a un evento confirmado, propondrá suplente sujeto a aprobación previa.` },
   { ord:'DÉCIMA', t:'Faltas graves y terminación', body:()=>`Son causa de terminación inmediata y pérdida de derechos: no presentarse a un viaje confirmado; abandonar un tour sin autorización; faltar al respeto a viajeros o compañeros; afectar la imagen o reputación de Conecta; y cualquiera de las conductas de la cláusula Octava. La terminación no genera indemnización ni pago adicional. En las fiestas y eventos internos aplica la misma conducta profesional que en los viajes oficiales.` },
-  { ord:'DÉCIMA PRIMERA', t:'Emergencia e identidad', body:x=>`El coordinador designa contacto de emergencia: <b>${x.emNom}</b> (${x.emTel}, ${x.emPar}), asume los riesgos del viaje en los términos de la cláusula Décima del contrato de viajero, autoriza primeros auxilios y atención médica de ser necesario, y anexa su INE como evidencia de identidad.` },
+  { ord:'DÉCIMA PRIMERA', t:'Emergencia e identidad', body:x=>`El coordinador designa contacto de emergencia: <b>${_esfEsc(x.emNom)}</b> (${_esfEsc(x.emTel)}, ${_esfEsc(x.emPar)}), asume los riesgos del viaje en los términos de la cláusula Décima del contrato de viajero, autoriza primeros auxilios y atención médica de ser necesario, y anexa su INE como evidencia de identidad.` },
   { ord:'DÉCIMA SEGUNDA', t:'Vigencia y formalidades', body:x=>`Este contrato dura <b>${x.vigDura}</b> desde su firma (${x.firmaTxt} → ${x.finTxt}); su renovación requiere nueva firma. Cualquiera de las partes puede terminarlo antes con aviso escrito de 15 días naturales. Las modificaciones solo valen por escrito; los acuerdos verbales no tienen validez. Las notificaciones por los canales oficiales (correo institucional o WhatsApp autorizado) son legalmente válidas. Jurisdicción: Monterrey, Nuevo León. La firma digital tiene la misma validez que la autógrafa.` },
 ];
 const _CTR_GIVE = [
@@ -16425,7 +16425,7 @@ const _CTR_GIVE = [
 <li>A cambio, LA AGENCIA se obliga a entregar el viaje completo tal como se especifica, con todos los servicios incluidos.</li>
 </ol>` },
   { ord:'TERCERA', t:'Responsabilidad, conducta y reglas del viaje', body:()=>`El viaje se realiza bajo las condiciones operativas normales del tour. LA AGENCIA no responde por factores externos (retrasos ajenos, clima, eventualidades fuera de su control). EL GANADOR se compromete a comportarse con respeto y seguir las indicaciones del personal durante todo el tour, y queda sujeto a las políticas de terceros, las multas de hotel y el deslinde de responsabilidad en los mismos términos de las cláusulas Novena y Décima del contrato de viajero, que declara conocer (incluido: seguro de viajero DENTRO del autobús; DENTRO del evento la responsabilidad es de los organizadores).` },
-  { ord:'CUARTA', t:'Emergencia e identidad', body:x=>`Contacto de emergencia: <b>${x.emNom}</b> (${x.emTel}, ${x.emPar}); INE anexa como evidencia de identidad.` },
+  { ord:'CUARTA', t:'Emergencia e identidad', body:x=>`Contacto de emergencia: <b>${_esfEsc(x.emNom)}</b> (${_esfEsc(x.emTel)}, ${_esfEsc(x.emPar)}); INE anexa como evidencia de identidad.` },
   { ord:'QUINTA', t:'Imagen', body:()=>`EL GANADOR autoriza el uso de su nombre e imagen en las publicaciones de la dinámica y del viaje en los canales oficiales de LA AGENCIA, sin pago adicional — es parte natural de ganar una dinámica pública.` },
   { ord:'SEXTA', t:'Aceptación', body:()=>`EL GANADOR firma de conformidad, reconociendo que recibe el premio completo bajo estas condiciones: casilla de términos + firma electrónica + INE anexa.` },
 ];

@@ -17,6 +17,7 @@
 // Envío vía Resend con remitente de cara al cliente (RESEND_FROM_COBRANZA).
 
 const { aplicarModoPrueba } = require('./_lib/correo-guard');
+const { apartarAviso, liberarAviso } = require('./_lib/avisos-cobranza');
 const { fetchCatalogo } = require('./_lib/catalogo-index');
 const { resolverCuentaDeCatalogo, cajaCuentaHtml } = require('./_lib/cuenta-deposito');
 
@@ -117,7 +118,7 @@ async function leerPagos(solIds) {
   for (let i = 0; i < solIds.length; i += LOTE) {
     const chunk = solIds.slice(i, i + LOTE);
     const rows = await sb(
-      `pagos?solicitud_id=in.(${chunk.join(',')})&select=solicitud_id,cliente_id,estado,monto,monto_pagado&limit=5000`
+      `pagos?solicitud_id=in.(${chunk.join(',')})&select=id,solicitud_id,cliente_id,estado,monto,monto_pagado&limit=5000`
     );
     if (Array.isArray(rows)) out.push(...rows);
   }
@@ -173,6 +174,7 @@ exports.handler = async function () {
   const vencidosSC = {}; // "solId|cid" → conteo vencidas de esa persona
   const totalSC = {};    // "solId|cid" → suma de SUS cuotas (monto)
   const abonadoSC = {};  // "solId|cid" → suma real pagada por esa persona
+  const vencidosIds = {}; // [CAP4-1] "solId|cid" → ids de sus cuotas vencidas
   for (const p of pagos) {
     const sol = solMap[p.solicitud_id];
     if (!sol) continue;
@@ -182,6 +184,7 @@ exports.handler = async function () {
     totalSC[key] = (totalSC[key] || 0) + Number(p.monto || 0);
     if (p.estado === 'vencido') {
       vencidosSC[key] = (vencidosSC[key] || 0) + 1;
+      if (p.id) (vencidosIds[key] = vencidosIds[key] || []).push(String(p.id));  // [CAP4-1]
     } else if (p.estado === 'pagado') {
       const real = (p.monto_pagado == null) ? p.monto : p.monto_pagado;
       abonadoSC[key] = (abonadoSC[key] || 0) + Number(real || 0);
@@ -196,6 +199,8 @@ exports.handler = async function () {
 
   // 4) Para cada PERSONA con vencidas >= 1, mandarle SU correo del nivel con SU deuda.
   let n1 = 0, n2 = 0, n3 = 0, sinCorreo = 0, fallidos = 0;
+  let saltados_por_duplicado = 0, sin_bitacora = 0;                       // [CAP4-1]
+  const hoyMX = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Monterrey' });
   for (const key of Object.keys(vencidosSC)) {
     const vencidos = vencidosSC[key] || 0;
     if (vencidos < 1) continue;
@@ -220,11 +225,28 @@ exports.handler = async function () {
 
     const { asunto, cuerpo } = correoNivel(nivel, evento, fmtMxn(restante));
     const cajaCuenta = cajaCuentaHtml(resolverCuentaDeCatalogo(catalogo, sol.evento_id, sol.paquete));
+
+    // ⏰ CAP4-1: cupo del día antes de mandar. ⚠️ El UNIQUE es
+    // (tipo,pago_id,dia) SIN nivel: si alguien sube de nivel el mismo día, el
+    // segundo aviso se toma como duplicado y no sale. El nivel SÍ se guarda para
+    // auditar; meterlo en la llave necesita un ALTER (pedido a Memo).
+    const pagoMarca = (vencidosIds[key] || []).slice().sort()[0] || null;
+    const marca = await apartarAviso({
+      portalUrl: SB_URL, portalHeaders: HEADERS, tipo: 'morosidad',
+      pagoId: pagoMarca, solicitudId: solId, correo, dia: hoyMX, nivel,
+    });
+    if (!marca.enviar) { saltados_por_duplicado++; continue; }
+    if (marca.sinBitacora) sin_bitacora++;
+
     const ok = await enviarCorreo(correo, asunto, wrapHtml(nombre, cuerpo + cajaCuenta));
-    if (!ok) { fallidos++; continue; }
+    if (!ok) {
+      fallidos++;
+      if (!marca.sinBitacora) await liberarAviso({ portalUrl: SB_URL, portalHeaders: HEADERS, tipo: 'morosidad', pagoId: pagoMarca, dia: hoyMX });
+      continue;
+    }
     if (nivel === 1) n1++; else if (nivel === 2) n2++; else n3++;
   }
 
-  console.log(`[morosidad] Fin. nivel1:${n1} nivel2:${n2} nivel3:${n3} sinCorreo:${sinCorreo} fallidos:${fallidos}`);
-  return { statusCode: 200, body: JSON.stringify({ ok: true, n1, n2, n3, sinCorreo, fallidos }) };
+  console.log(`[morosidad] Fin. nivel1:${n1} nivel2:${n2} nivel3:${n3} sinCorreo:${sinCorreo} fallidos:${fallidos} saltados_por_duplicado:${saltados_por_duplicado} sin_bitacora:${sin_bitacora}`);
+  return { statusCode: 200, body: JSON.stringify({ ok: true, n1, n2, n3, sinCorreo, fallidos, saltados_por_duplicado, sin_bitacora }) };
 };

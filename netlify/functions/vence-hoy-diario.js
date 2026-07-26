@@ -21,6 +21,7 @@
 // portal-recordatorios-diario). Reusa PORTAL_SUPABASE_URL / PORTAL_SUPABASE_SERVICE_KEY.
 
 const { aplicarModoPrueba } = require('./_lib/correo-guard');
+const { apartarAviso, liberarAviso } = require('./_lib/avisos-cobranza');
 const { fetchCatalogo } = require('./_lib/catalogo-index');
 const { resolverCuentaDeCatalogo, cajaCuentaHtml } = require('./_lib/cuenta-deposito');
 
@@ -138,7 +139,7 @@ exports.handler = async function () {
 
   // 2) Pagos PENDIENTES que vencen HOY (por fecha_esperada exacta → cualquier calendario).
   const pagosHoy = await sb(
-    `pagos?estado=eq.pendiente&fecha_esperada=eq.${hoy}&select=solicitud_id,cliente_id,monto,numero_pago,concepto&limit=5000`
+    `pagos?estado=eq.pendiente&fecha_esperada=eq.${hoy}&select=id,solicitud_id,cliente_id,monto,numero_pago,concepto&limit=5000`
   );
   if (!Array.isArray(pagosHoy) || !pagosHoy.length) {
     console.log(`[vence-hoy] Fin. hoy=${hoy} pagos que vencen hoy:0`);
@@ -177,8 +178,9 @@ exports.handler = async function () {
     if (!cid) continue;
     if ((vencidosPorCliente[cid] || 0) >= 1) continue;         // esa persona ya está en morosidad
     let acc = porCliente[cid];
-    if (!acc) { acc = { montoSum: 0, conceptos: [], evento_nombre: sol.evento_nombre || 'tu evento', cuentaKey: undefined, cuenta: null }; porCliente[cid] = acc; }
+    if (!acc) { acc = { montoSum: 0, conceptos: [], pagoIds: [], solId: p.solicitud_id, evento_nombre: sol.evento_nombre || 'tu evento', cuentaKey: undefined, cuenta: null }; porCliente[cid] = acc; }
     acc.montoSum += Number(p.monto) || 0;
+    if (p.id) acc.pagoIds.push(String(p.id));   // [CAP4-1] para la bitácora
     acc.conceptos.push(p.concepto || ('Abono ' + p.numero_pago));
     // Cuenta bancaria del paquete de ESTA cuota. Si las cuotas de hoy de un mismo
     // cliente resuelven a bancos distintos → conflicto → NO se pinta caja (jamás
@@ -208,9 +210,10 @@ exports.handler = async function () {
     const acc = porCliente[cid];
     const nombre = String(c.nombre_completo || 'cliente').trim().split(/\s+/)[0] || 'cliente';
     let d = destinatarios[correo];
-    if (!d) { d = { nombre, montoSum: 0, conceptos: [], evento_nombre: acc.evento_nombre, cuentaKey: undefined, cuenta: null }; destinatarios[correo] = d; }
+    if (!d) { d = { nombre, montoSum: 0, conceptos: [], pagoIds: [], solId: acc.solId, evento_nombre: acc.evento_nombre, cuentaKey: undefined, cuenta: null }; destinatarios[correo] = d; }
     d.montoSum += acc.montoSum;
     d.conceptos.push(...acc.conceptos);
+    d.pagoIds.push(...(acc.pagoIds || []));   // [CAP4-1] para la bitácora
     // Fusión de cuenta al deduplicar por correo: si difiere entre cid's → conflicto.
     const accCk = acc.cuentaConflict ? '__conflict__' : acc.cuentaKey;
     const accCta = acc.cuentaConflict ? null : acc.cuenta;
@@ -219,9 +222,19 @@ exports.handler = async function () {
   }
 
   // 7) Enviar el aviso "vence hoy".
+  // ⏰ CAP4-1: cada destinatario aparta su cupo del día ANTES de que salga el
+  // correo; si ya se avisó hoy (doble disparo del cron o "Run now"), se salta.
+  let saltados_por_duplicado = 0, sin_bitacora = 0;
   const correos = Object.keys(destinatarios);
-  const resultados = await Promise.allSettled(correos.map((correo) => {
+  const resultados = await Promise.allSettled(correos.map(async (correo) => {
     const d = destinatarios[correo];
+    const pagoMarca = (d.pagoIds || []).slice().sort()[0] || null;
+    const marca = await apartarAviso({
+      portalUrl: SB_URL, portalHeaders: HEADERS, tipo: 'vence_hoy',
+      pagoId: pagoMarca, solicitudId: d.solId, correo, dia: hoy,
+    });
+    if (!marca.enviar) { saltados_por_duplicado++; return 'duplicado'; }
+    if (marca.sinBitacora) sin_bitacora++;
     const evento = d.evento_nombre;
     const monto = fmtMxn(d.montoSum);
     const concepto = d.conceptos.join(' + ');
@@ -229,15 +242,21 @@ exports.handler = async function () {
     const cuerpo = `<p style="margin:0 0 14px 0">Hoy es el <strong>último día</strong> para cubrir tu abono de <strong>${escapeHtml(monto)}</strong> (${escapeHtml(concepto)}) de tu viaje a <strong>${escapeHtml(evento)}</strong>.</p>
     <p style="margin:0 0 14px 0">Después de hoy el pago queda <strong>vencido</strong> y tu lugar entra en riesgo.</p>${cajaCuentaHtml(d.cuenta)}
     <p style="margin:0">Manda tu comprobante por WhatsApp hoy mismo. — Conecta Reynosa</p>`;
-    return enviarCorreo(correo, asunto, wrapHtml(d.nombre, cuerpo));
+    const ok = await enviarCorreo(correo, asunto, wrapHtml(d.nombre, cuerpo));
+    if (!ok && !marca.sinBitacora) {
+      // No salió: se libera el cupo para que el reintento pueda mandarlo.
+      await liberarAviso({ portalUrl: SB_URL, portalHeaders: HEADERS, tipo: 'vence_hoy', pagoId: pagoMarca, dia: hoy });
+    }
+    return ok;
   }));
 
   let enviados = 0, fallidos = 0;
   for (const r of resultados) {
+    if (r.status === 'fulfilled' && r.value === 'duplicado') continue;   // ya contado
     if (r.status === 'fulfilled' && r.value === true) enviados++;
     else fallidos++;
   }
 
-  console.log(`[vence-hoy] Fin. hoy=${hoy} enviados:${enviados} fallidos:${fallidos} sinCorreo:${sinCorreo}`);
-  return { statusCode: 200, body: JSON.stringify({ ok: true, hoy, enviados, fallidos, sinCorreo }) };
+  console.log(`[vence-hoy] Fin. hoy=${hoy} enviados:${enviados} fallidos:${fallidos} sinCorreo:${sinCorreo} saltados_por_duplicado:${saltados_por_duplicado} sin_bitacora:${sin_bitacora}`);
+  return { statusCode: 200, body: JSON.stringify({ ok: true, hoy, enviados, fallidos, sinCorreo, saltados_por_duplicado, sin_bitacora }) };
 };

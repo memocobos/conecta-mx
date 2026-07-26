@@ -7153,7 +7153,11 @@ async function renderGZ() {
     // una mentira. El pastelito de cumpleaños simplemente no aparece (ausencia,
     // no dato falso). Para admins y para la fila PROPIA todo sigue igual.
     const strikes = u.strikes || 0;
-    const cumple = u.fecha_nacimiento ? esCumple(u.fecha_nacimiento) : false;
+    // 🎂 CAP2-1: si la fecha viaja (admins / fila propia) se calcula aquí como
+    // siempre; si no, se usa el booleano `cumple_hoy` que manda el servidor ya
+    // resuelto en hora de Monterrey. El pastelito sale igual para todos sin que
+    // la fecha de nacimiento salga de la base.
+    const cumple = u.fecha_nacimiento ? esCumple(u.fecha_nacimiento) : !!u.cumple_hoy;
     const esYo = currentUser && u.id === currentUser.id;
     const partes = u.nombre.split(' ');
     const nombreCorto = partes[0] + (partes[1] ? ' ' + partes[1][0] + '.' : '');
@@ -7335,7 +7339,8 @@ async function abrirPerfil(userId) {
   const puedeEditar = esYo || currentUser?.rol === 'maestro_roshi';
   const iniciales = usuario.nombre.split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase();
   const edad = usuario.fecha_nacimiento ? calcularEdad(usuario.fecha_nacimiento) : null;
-  const cumple = usuario.fecha_nacimiento ? esCumple(usuario.fecha_nacimiento) : false;
+  // 🎂 CAP2-1: mismo criterio que la tarjeta (fecha propia/admin o cumple_hoy).
+  const cumple = usuario.fecha_nacimiento ? esCumple(usuario.fecha_nacimiento) : !!usuario.cumple_hoy;
 
   let toursPasados = [];
   let evAsignados = [];
@@ -7487,7 +7492,11 @@ async function renderMiPerfil(modoEdicion = false) {
 
     const iniciales = u.nombre.split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase();
     const edad = u.fecha_nacimiento ? calcularEdad(u.fecha_nacimiento) : null;
-    const cumple = u.fecha_nacimiento ? esCumple(u.fecha_nacimiento) : false;
+    // 🎂 CAP2-1: si la fecha viaja (admins / fila propia) se calcula aquí como
+    // siempre; si no, se usa el booleano `cumple_hoy` que manda el servidor ya
+    // resuelto en hora de Monterrey. El pastelito sale igual para todos sin que
+    // la fecha de nacimiento salga de la base.
+    const cumple = u.fecha_nacimiento ? esCumple(u.fecha_nacimiento) : !!u.cumple_hoy;
     // Puntos combinados: manuales + auto (asignaciones por slug, DC2d).
     const _evArrMP = await _fetchEVFromIndex();
     const _evMapMP = {};

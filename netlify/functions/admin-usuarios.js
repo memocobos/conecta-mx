@@ -77,21 +77,43 @@ const COLS_BASICO = new Set(COLS_BASICO_ARR);
 // material de bodega).
 const ROLES_VE_DIRECTORIO = [...ROLES_ADMIN, 'milk', 'mister_popo'];
 
+// 🎂 CAP2-1 (decisión de Memo) — el pastelito de cumpleaños sobrevive para
+// TODOS, pero la fecha de nacimiento NO viaja. En vez del dato crudo, la
+// proyección básica lleva un BOOLEANO calculado aquí, en hora de Monterrey.
+//
+// Se manda SOLO `cumple_hoy` a propósito: es lo único que la UI pregunta (¿pinto
+// el 🎂?). Mandar también mes/día permitiría reconstruir la fecha completa
+// juntando respuestas de días distintos — justo lo que se quiere evitar.
+function _hoyMesDiaMx() {
+  // 'YYYY-MM-DD' en Monterrey → 'MM-DD'.
+  return new Date().toLocaleDateString('en-CA', { timeZone: 'America/Monterrey' }).slice(5);
+}
+function esCumpleHoyMx(fechaNac, hoyMesDia) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(fechaNac || ''));
+  if (!m) return false;
+  return `${m[2]}-${m[3]}` === (hoyMesDia || _hoyMesDiaMx());
+}
+
 // Recorta una fila a COLS_BASICO. La fila del PROPIO usuario pasa completa.
-function proyectarUsuario(u, jwtUserId) {
+function proyectarUsuario(u, jwtUserId, hoyMesDia) {
   if (!u || typeof u !== 'object') return u;
   if (jwtUserId && String(u.id) === String(jwtUserId)) return u;
   const out = {};
   for (const k of COLS_BASICO_ARR) {
     if (Object.prototype.hasOwnProperty.call(u, k)) out[k] = u[k];
   }
+  // Derivado NO sensible: sustituye a fecha_nacimiento para el 🎂.
+  out.cumple_hoy = esCumpleHoyMx(u.fecha_nacimiento, hoyMesDia);
   return out;
 }
 
 // Proyecta una lista según el rol del JWT.
 function proyectarLista(filas, jwtRol, jwtUserId) {
   if (ROLES_VE_DIRECTORIO.includes(jwtRol)) return filas;
-  return (Array.isArray(filas) ? filas : []).map((u) => proyectarUsuario(u, jwtUserId));
+  // El 'MM-DD' de hoy se calcula UNA sola vez por request (no por fila) para que
+  // toda la lista sea coherente aunque la corrida cruce la medianoche.
+  const hoyMesDia = _hoyMesDiaMx();
+  return (Array.isArray(filas) ? filas : []).map((u) => proyectarUsuario(u, jwtUserId, hoyMesDia));
 }
 
 // Formato de correo razonable para el filtro de `listar` (higiene: no mandar
@@ -424,3 +446,4 @@ module.exports.__COLS_ADMIN = COLS_ADMIN_ARR;
 module.exports.__COLS_BASICO = COLS_BASICO_ARR;
 module.exports.__ROLES_VE_DIRECTORIO = ROLES_VE_DIRECTORIO;
 module.exports.__proyectarUsuario = proyectarUsuario;
+module.exports.__esCumpleHoyMx = esCumpleHoyMx;

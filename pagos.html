@@ -544,6 +544,24 @@ button:focus-visible,a:focus-visible{
 #hot-sale-banner .hsb-countdown{background:#000;color:#e8ff4c;padding:7px 14px;border-radius:8px;font-family:'Barlow Condensed',monospace;font-size:22px;font-weight:900;min-width:120px;letter-spacing:1px}
 @media(max-width:640px){#hot-sale-banner .hsb-text{font-size:11px}#hot-sale-banner .hsb-text strong{font-size:13px}#hot-sale-banner .hsb-countdown{font-size:17px;padding:5px 11px;min-width:96px}}
 body.hsale-on .nav{top:var(--hsb-h,0px)}
+
+/* ===================================================================
+   TUERCA PF-4 · los CTAs del flujo de comprobante toman el sistema
+   Memo los nombró explícitamente ("ENVIAR COMPROBANTE POR MESSENGER" y
+   sus CTAs hermanos). pagos.html NO comparte hoja de estilo con
+   index.html, así que los tokens se declaran aquí con los MISMOS
+   valores que en index — no son tokens nuevos, es la misma escala.
+   El resto de pagos.html (tarjetas de banco, políticas, badges) lo
+   encontró el barrido y queda REPORTADO en la PR, sin tocar: portar el
+   sistema completo a las 5 páginas hermanas es otra tuerca.
+   =================================================================== */
+:root{
+  --r-card:16px;
+  --r-btn:12px;
+  --r-chip:999px;
+  --r-sm:8px;
+}
+.send-btn,.choose-btn,.copy-btn{border-radius:var(--r-btn)}
 </style>
 <div id="hot-sale-banner" title="Copiar código HOTSALE">
   <div class="hsb-content">
@@ -783,7 +801,7 @@ body.hsale-on .nav{top:var(--hsb-h,0px)}
   </div>
   <div class="ft-meta">
     <a href="https://conectareynosa.mx">conectareynosa.mx</a>
-    <a href="https://www.instagram.com/conectareynosa" target="_blank" rel="noopener">@conectareynosa</a>
+    <a href="https://www.instagram.com/conectarey" target="_blank" rel="noopener">@conectarey</a>
   </div>
 </footer>
 

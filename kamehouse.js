@@ -6997,17 +6997,20 @@ async function _gzCargarInactividad() {
   } catch (e) { /* best-effort: sin chip */ }
 }
 
-// "Dar otra oportunidad": reinicia el reloj (vendedor_reactivado_at = ahora).
+// "Dar otra oportunidad": quita el sello (vendedor_bloqueado_at = NULL) Y
+// reinicia el reloj (vendedor_reactivado_at = ahora). Es el ÚNICO camino de
+// vuelta junto con reactivar la cuenta en Guerreros Z — la regla es rodante y
+// de puerta cerrada: quien se bloquea no se auto-desbloquea aunque venda.
 // NO destructivo — el usuario no se borra ni cambia de rol.
 async function gzReactivarVendedor(userId, nombre) {
-  if (!confirm(`¿Dar otra oportunidad a ${nombre}? El reloj de inactividad se reinicia desde hoy (3 meses).`)) return;
+  if (!confirm(`¿Dar otra oportunidad a ${nombre}? Se le quita la pausa y el reloj de inactividad se reinicia desde hoy (3 meses).`)) return;
   try {
     const r = await khAdminFetch('/.netlify/functions/admin-vendedor-inactividad', {
       method: 'POST', body: JSON.stringify({ accion: 'reactivar', usuario_id: userId }),
     });
     const j = await r.json().catch(() => ({}));
     if (!r.ok || !j.ok) throw new Error(j.error || ('Error ' + r.status));
-    showToast('Reactivado ✓ — el reloj cuenta desde hoy', 'success');
+    showToast('Reactivado ✓ — pausa levantada, el reloj cuenta desde hoy', 'success');
     _gzInactividad = null;
     await _gzCargarInactividad();
     renderGZ();
@@ -7131,12 +7134,25 @@ function gzVerPrestado(userId) {
     <div class="gzp-pie">Solo informativo. El regreso se palomea en la Torre de Karin, al recibir los kits.</div>`;
 }
 
+// Chip del candado de inactividad. Dos estados distintos:
+//   · bloqueado = ya tiene el SELLO puesto → la puerta está cerrada AHORA y no
+//     se abre sola aunque venda (solo Memo la abre).
+//   · inactivo  = pasó los 3 meses desde su última venta pero todavía no ha
+//     tocado la puerta, así que aún no hay sello. Es el aviso anticipado.
 function _gzChipInactivo(u) {
   if (!u || u.rol !== 'vendedor' || !_gzInactividad) return '';
   const info = _gzInactividad[u.id];
-  if (!info || !info.inactivo) return '';
+  if (!info || (!info.inactivo && !info.bloqueado)) return '';
+  const sellado = !!info.bloqueado;
+  const etiqueta = sellado
+    ? '🚪 acceso pausado por inactividad'
+    : '💤 sin ventas en 3 meses';
+  const detalle = info.ultima_venta
+    ? `última venta: ${_salEsc(String(info.ultima_venta).slice(0, 10))}`
+    : 'nunca ha vendido';
   return `<div style="margin-top:8px;display:flex;flex-direction:column;gap:6px;align-items:center">
-    <span style="font-size:9px;letter-spacing:.08em;text-transform:uppercase;font-weight:800;padding:2px 8px;border-radius:4px;color:#ff6666;background:rgba(255,68,68,.14);border:1px solid rgba(255,68,68,.4)">💤 inactivo (sin ventas en 3 meses)</span>
+    <span style="font-size:9px;letter-spacing:.08em;text-transform:uppercase;font-weight:800;padding:2px 8px;border-radius:4px;color:#ff6666;background:rgba(255,68,68,.14);border:1px solid rgba(255,68,68,.4)">${_salEsc(etiqueta)}</span>
+    <span style="font-size:9px;color:var(--ts);opacity:.75">${detalle}</span>
     <button class="btn btn-ghost btn-sm" style="font-size:10px;padding:3px 10px" onclick="event.stopPropagation();gzReactivarVendedor('${_attrJs(u.id)}','${_attrJs(u.nombre)}')">Dar otra oportunidad</button>
   </div>`;
 }
@@ -15877,8 +15893,8 @@ async function _vtaGateInactivo() {
     }
     av.innerHTML = `<div style="max-width:560px;margin:40px auto;text-align:center;padding:32px 24px;border:1px solid rgba(255,68,68,.4);border-radius:12px;background:rgba(255,68,68,.06)">
       <div style="font-size:34px;margin-bottom:10px">💤</div>
-      <div style="font-family:'Rajdhani',sans-serif;font-weight:700;font-size:18px;margin-bottom:10px;color:#ff6666">Cuenta de vendedor inactiva</div>
-      <div style="font-size:13px;line-height:1.6;color:var(--ts)">${_esfEsc(j.error || 'Tu cuenta de vendedor está inactiva por no registrar ventas en 3 meses — contacta a Conecta para reactivarla')}</div>
+      <div style="font-family:'Rajdhani',sans-serif;font-weight:700;font-size:18px;margin-bottom:10px;color:#ff6666">Acceso de vendedor en pausa</div>
+      <div style="font-size:13px;line-height:1.6;color:var(--ts)">${_esfEsc(j.error || 'Tu acceso de vendedor está pausado por inactividad (3 meses sin ventas) — contacta a Conecta para reactivarlo')}</div>
     </div>`;
     return true;
   } catch (e) { return false; }

@@ -30,8 +30,32 @@ const SB_KEY = process.env.SUPABASE_SERVICE_KEY_KAMEHOUSE;
 const JWT_SECRET = process.env.JWT_SECRET;
 
 const JWT_TTL_SECONDS = 8 * 60 * 60;          // 8 horas
-const RATE_LIMIT_MAX = 5;                      // 5 intentos
 const RATE_LIMIT_WINDOW_SEC = 15 * 60;         // ventana de 15 minutos
+
+// 🔐 CAP2-2 — RATE LIMIT DOBLE.
+// Antes solo se contaba por IP, con el mismo tope de 5 para todo. Dos problemas:
+//   · un ataque contra UNA cuenta desde muchas IPs (botnet, VPN rotativa) no
+//     tocaba el contador: 5 intentos por IP × N IPs = intentos ilimitados;
+//   · una oficina con NAT compartido se bloqueaba sola: 5 personas
+//     equivocándose una vez cada una tumbaban el login de todas.
+// Ahora se cuenta por IP **y** por USUARIO OBJETIVO, con topes distintos:
+// el de IP sube (la IP es un identificador burdo y compartido), el de usuario
+// se queda apretado (identifica a UNA cuenta). Bloquea si CUALQUIERA excede.
+const RATE_LIMIT_MAX_IP   = 20;                // 20 intentos / 15 min por IP
+const RATE_LIMIT_MAX_USER = 5;                 // 5 intentos / 15 min por cuenta
+
+// Config de cada contador: tabla, columna llave y tope.
+const RL_IP   = { tabla: 'kh_auth_attempts',      col: 'ip',   max: RATE_LIMIT_MAX_IP };
+const RL_USER = { tabla: 'kh_auth_attempts_user', col: 'cred', max: RATE_LIMIT_MAX_USER };
+
+// 🔐 CAP2-2 — HASH SEÑUELO contra la ENUMERACIÓN DE USUARIOS.
+// Antes, si el usuario no existía se respondía SIN ejecutar bcrypt: la respuesta
+// volvía en milisegundos contra las ~60-80 ms de un compare real, así que
+// cronometrando se podía averiguar qué cuentas existen. Ahora el camino
+// "usuario inexistente" gasta el MISMO trabajo: compara contra este hash, que es
+// un bcrypt cost 10 real de una contraseña aleatoria que nadie conoce. El
+// resultado se descarta; el mensaje es siempre el mismo.
+const HASH_SENUELO = '$2b$10$.K6FKLZ86q2HK9L9ibF88eIswBKBnJU4T2pBQgehj8LKoRmCNo94a';
 
 function badRequest(event, status, error) {
   return {
@@ -79,18 +103,24 @@ exports.handler = async (event) => {
           || (event.headers['x-forwarded-for'] || '').split(',')[0].trim()
           || 'unknown';
 
-  // ── Rate limit check: 5 intentos en ventana de 15 min ──
-  // La tabla kh_auth_attempts (ver supabase-stop-the-bleed.sql) tiene
-  // (ip PRIMARY KEY, attempts int, window_start timestamptz).
-  // Si attempts >= MAX y la ventana no ha vencido → bloquear.
-  const rl = await checkAndIncrementRateLimit(ip);
-  if (rl.blocked) {
+  // ── Rate limit DOBLE: por IP y por usuario objetivo ──
+  // Los dos contadores se evalúan SIEMPRE (no se corta en el primero) para que
+  // el intento quede registrado en ambos lados. Si cualquiera excede su tope,
+  // se responde 429. La respuesta es IDÉNTICA en los dos casos —mismo status,
+  // mismo cuerpo, mismo Retry-After— para no revelar cuál disparó: decir "te
+  // bloqueé por usuario" ya confirmaría que la cuenta existe.
+  const [rlIp, rlUser] = await Promise.all([
+    checkAndIncrementRateLimit(RL_IP, ip),
+    checkAndIncrementRateLimit(RL_USER, credentials),
+  ]);
+  if (rlIp.blocked || rlUser.blocked) {
+    const retryAfterSec = Math.max(rlIp.retryAfterSec || 0, rlUser.retryAfterSec || 0) || 60;
     return {
       statusCode: 429,
-      headers: { ...corsHeaders(event), 'Retry-After': String(rl.retryAfterSec) },
+      headers: { ...corsHeaders(event), 'Retry-After': String(retryAfterSec) },
       body: JSON.stringify({
         ok: false,
-        error: 'Demasiados intentos. Intenta de nuevo en ' + Math.ceil(rl.retryAfterSec / 60) + ' minutos.',
+        error: 'Demasiados intentos. Intenta de nuevo en ' + Math.ceil(retryAfterSec / 60) + ' minutos.',
       }),
     };
   }
@@ -121,7 +151,16 @@ exports.handler = async (event) => {
   // ── Compare password ──
   // Solo bcrypt: si password_hash empieza con '$2' → bcrypt.compare.
   // Cualquier otro valor = no match (login rechazado).
-  if (!user || !(await passwordMatches(password, user.password_hash || ''))) {
+  //
+  // 🔐 CAP2-2: si el usuario NO existe se compara igual contra el hash señuelo y
+  // se tira el resultado. Cuesta lo mismo que un compare real, así que el
+  // atacante ya no puede distinguir "cuenta inexistente" de "contraseña mala"
+  // cronometrando la respuesta. Mismo mensaje en ambos casos.
+  if (!user) {
+    try { await bcrypt.compare(password, HASH_SENUELO); } catch (_) { /* se descarta */ }
+    return badRequest(event, 401, 'Credenciales inválidas');
+  }
+  if (!(await passwordMatches(password, user.password_hash || ''))) {
     return badRequest(event, 401, 'Credenciales inválidas');
   }
 
@@ -151,8 +190,11 @@ exports.handler = async (event) => {
     body: JSON.stringify({ usuario_id: user.id, ts: new Date().toISOString() }),
   }).catch(() => {});
 
-  // ── Reset rate limit del IP en login exitoso ──
-  resetRateLimit(ip).catch(() => {});
+  // ── Reset de AMBOS contadores en login exitoso ──
+  // Quien entra bien limpia su cuenta Y la IP desde la que entró: un tecleo
+  // torpe no debe dejar castigada ni a la persona ni a la oficina.
+  resetRateLimit(RL_IP, ip).catch(() => {});
+  resetRateLimit(RL_USER, credentials).catch(() => {});
 
   // ── Firmar JWT ──
   const tokenPayload = {
@@ -197,85 +239,104 @@ async function passwordMatches(plain, stored) {
   catch (_) { return false; }
 }
 
-// Incrementa el contador. Si excede MAX dentro de la ventana, devuelve blocked.
-async function checkAndIncrementRateLimit(ip) {
-  if (ip === 'unknown') return { blocked: false }; // no rate-limitamos sin IP
+// Incrementa el contador de UN eje (IP o usuario). Si excede su tope dentro de
+// la ventana, devuelve { blocked:true, retryAfterSec }.
+//
+// FAIL-OPEN a propósito (igual que antes): si la tabla no existe o la consulta
+// falla, se permite el intento. Un rate-limit roto NO debe dejar a nadie fuera
+// de su propio sistema; el candado real es la contraseña.
+//
+// 🔐 CAP2-2 — SIN UPSERT ENCUBIERTO. El insert usaba
+// `Prefer: resolution=merge-duplicates`, que ES un upsert (on_conflict) con otro
+// nombre: exactamente el patrón que la casa prohíbe porque tapa carreras y
+// muerde con 42P10 cuando el índice no es el que PostgREST supone. Ahora:
+// INSERT directo → si choca (409/23505) es que otro request ganó la carrera →
+// se relee y se hace PATCH. Lo mismo en las DOS tablas.
+async function checkAndIncrementRateLimit(cfg, clave) {
+  const key = String(clave || '');
+  if (!key || key === 'unknown') return { blocked: false }; // sin llave no se cuenta
   const now = Date.now();
   const windowStartMs = now - RATE_LIMIT_WINDOW_SEC * 1000;
   const nowIso = new Date(now).toISOString();
+  const base = `${SB_URL}/rest/v1/${cfg.tabla}`;
+  const filtro = `${cfg.col}=eq.${encodeURIComponent(key)}`;
+  const h = { apikey: SB_KEY, Authorization: 'Bearer ' + SB_KEY };
+  const hJson = { ...h, 'Content-Type': 'application/json' };
 
   try {
-    // Lee el registro actual
-    const r = await fetch(
-      `${SB_URL}/rest/v1/kh_auth_attempts?ip=eq.${encodeURIComponent(ip)}&select=*&limit=1`,
-      { headers: { apikey: SB_KEY, Authorization: 'Bearer ' + SB_KEY } }
-    );
-    if (!r.ok) {
-      // Si la tabla no existe (404) o falla, permitimos el login pero logueamos.
-      // Stop the Bleed: no quiero que rate-limit roto bloquee logins legítimos.
-      console.warn('[auth-login] rate-limit table lookup', r.status);
-      return { blocked: false };
-    }
-    const rows = await r.json();
-    const existing = rows[0];
+    const existing = await leerFila(base, filtro, h);
+    if (existing === undefined) return { blocked: false };   // tabla caída → fail-open
 
     if (!existing) {
-      // Primer intento — insert
-      await fetch(`${SB_URL}/rest/v1/kh_auth_attempts`, {
+      // Primer intento en la ventana → INSERT DIRECTO (jamás merge-duplicates).
+      const ins = await fetch(base, {
         method: 'POST',
-        headers: {
-          apikey: SB_KEY,
-          Authorization: 'Bearer ' + SB_KEY,
-          'Content-Type': 'application/json',
-          Prefer: 'resolution=merge-duplicates',
-        },
-        body: JSON.stringify({ ip, attempts: 1, window_start: nowIso }),
+        headers: { ...hJson, Prefer: 'return=minimal' },
+        body: JSON.stringify({ [cfg.col]: key, attempts: 1, window_start: nowIso, last_attempt: nowIso }),
       });
+      if (!ins.ok) {
+        const detail = await ins.text().catch(() => '');
+        // Carrera: otro request insertó primero. Se relee y se incrementa.
+        if (ins.status === 409 || /23505|duplicate key/i.test(detail)) {
+          const fila = await leerFila(base, filtro, h);
+          if (fila) await patchFila(base, filtro, hJson, { attempts: (fila.attempts || 0) + 1, last_attempt: nowIso });
+        } else {
+          console.warn(`[auth-login] rate-limit insert ${cfg.tabla}`, ins.status);
+        }
+      }
       return { blocked: false };
     }
 
     const windowStart = new Date(existing.window_start).getTime();
-    if (windowStart < windowStartMs) {
-      // Ventana expirada — reiniciar contador
-      await fetch(`${SB_URL}/rest/v1/kh_auth_attempts?ip=eq.${encodeURIComponent(ip)}`, {
-        method: 'PATCH',
-        headers: {
-          apikey: SB_KEY,
-          Authorization: 'Bearer ' + SB_KEY,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ attempts: 1, window_start: nowIso }),
-      });
+    if (!Number.isFinite(windowStart) || windowStart < windowStartMs) {
+      // Ventana vencida → arranca uno nuevo.
+      await patchFila(base, filtro, hJson, { attempts: 1, window_start: nowIso, last_attempt: nowIso });
       return { blocked: false };
     }
 
-    if (existing.attempts >= RATE_LIMIT_MAX) {
+    if ((existing.attempts || 0) >= cfg.max) {
       const retryAfterSec = Math.max(1, Math.ceil((windowStart + RATE_LIMIT_WINDOW_SEC * 1000 - now) / 1000));
       return { blocked: true, retryAfterSec };
     }
 
-    // Incrementar
-    await fetch(`${SB_URL}/rest/v1/kh_auth_attempts?ip=eq.${encodeURIComponent(ip)}`, {
-      method: 'PATCH',
-      headers: {
-        apikey: SB_KEY,
-        Authorization: 'Bearer ' + SB_KEY,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ attempts: existing.attempts + 1 }),
-    });
+    await patchFila(base, filtro, hJson, { attempts: (existing.attempts || 0) + 1, last_attempt: nowIso });
     return { blocked: false };
   } catch (e) {
-    console.warn('[auth-login] rate-limit exception', e.message);
+    console.warn(`[auth-login] rate-limit exception ${cfg.tabla}`, e.message);
     return { blocked: false }; // fail-open
   }
 }
 
-// Resetea contador tras login exitoso.
-async function resetRateLimit(ip) {
-  if (ip === 'unknown') return;
-  await fetch(`${SB_URL}/rest/v1/kh_auth_attempts?ip=eq.${encodeURIComponent(ip)}`, {
+// Fila actual o null si no hay. `undefined` = no se pudo leer (fail-open).
+async function leerFila(base, filtro, h) {
+  const r = await fetch(`${base}?${filtro}&select=*&limit=1`, { headers: h });
+  if (!r.ok) {
+    console.warn('[auth-login] rate-limit lookup', r.status);
+    return undefined;
+  }
+  const rows = await r.json().catch(() => []);
+  return (Array.isArray(rows) && rows[0]) || null;
+}
+
+async function patchFila(base, filtro, hJson, patch) {
+  return fetch(`${base}?${filtro}`, {
+    method: 'PATCH',
+    headers: { ...hJson, Prefer: 'return=minimal' },
+    body: JSON.stringify(patch),
+  });
+}
+
+// Resetea un contador tras login exitoso.
+async function resetRateLimit(cfg, clave) {
+  const key = String(clave || '');
+  if (!key || key === 'unknown') return;
+  await fetch(`${SB_URL}/rest/v1/${cfg.tabla}?${cfg.col}=eq.${encodeURIComponent(key)}`, {
     method: 'DELETE',
     headers: { apikey: SB_KEY, Authorization: 'Bearer ' + SB_KEY },
   });
 }
+
+// Expuestos para el arnés (patrón de la casa).
+module.exports.__RL_IP = RL_IP;
+module.exports.__RL_USER = RL_USER;
+module.exports.__HASH_SENUELO = HASH_SENUELO;

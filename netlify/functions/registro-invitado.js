@@ -113,8 +113,11 @@ exports.handler = async (event) => {
       if (!username) {
         return { statusCode: 400, headers, body: JSON.stringify({ ok: false, error: 'Elige un nombre de usuario' }) };
       }
-      if (password.length < 6 || password.length > 200) {
-        return { statusCode: 400, headers, body: JSON.stringify({ ok: false, error: 'La contraseña debe tener mínimo 6 caracteres' }) };
+      // 🔐 CAP2-2: mínimo unificado a 8 en TODO el sistema (reset-password ya
+      // exigía 8; aquí y en admin-usuarios se pedían 6, así que una cuenta nueva
+      // podía nacer más débil de lo que el propio sistema permite al cambiarla).
+      if (password.length < 8 || password.length > 200) {
+        return { statusCode: 400, headers, body: JSON.stringify({ ok: false, error: 'La contraseña debe tener mínimo 8 caracteres' }) };
       }
 
       // Unicidad de username (excluyendo al propio invitado).

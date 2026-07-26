@@ -26,6 +26,7 @@
 // =============================================================================
 
 const { verifyAdminAuthLive, corsCheck } = require('./_lib/verify-admin');
+const { validarMonto } = require('./_lib/monto-limites');
 const { aplicarModoPrueba } = require('./_lib/correo-guard');
 const { ensureLugares } = require('./_lib/portal-lugares');
 
@@ -96,8 +97,13 @@ exports.handler = async (event) => {
     if (p.concepto.length > 200) {
       return { statusCode: 400, headers, body: JSON.stringify({ error: 'concepto demasiado largo (máx 200)' }) };
     }
-    if (typeof p.monto !== 'number' || !isFinite(p.monto) || p.monto < 0) {
+    // 💰 CAP3-1: cada CUOTA del plan es una partida y lleva el mismo tope.
+    if (typeof p.monto !== 'number') {
       return { statusCode: 400, headers, body: JSON.stringify({ error: 'monto debe ser número >= 0' }) };
+    }
+    const _vm = validarMonto(p.monto);
+    if (!_vm.ok) {
+      return { statusCode: 400, headers, body: JSON.stringify({ error: _vm.error }) };
     }
     if (typeof p.fecha_esperada !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(p.fecha_esperada)) {
       return { statusCode: 400, headers, body: JSON.stringify({ error: 'fecha_esperada debe ser YYYY-MM-DD' }) };

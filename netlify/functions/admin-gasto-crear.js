@@ -15,6 +15,7 @@
 // =============================================================================
 
 const { verifyAdminAuthLive, corsCheck } = require('./_lib/verify-admin');
+const { validarMonto } = require('./_lib/monto-limites');
 
 const CUENTAS = ['BBVA', 'Banamex', 'Efectivo', 'Otro'];
 
@@ -50,7 +51,10 @@ exports.handler = async (event) => {
   const monto    = Number(body.monto);
 
   if (!concepto)                       return { statusCode: 400, headers, body: JSON.stringify({ error: 'El concepto es obligatorio' }) };
-  if (!Number.isFinite(monto) || monto < 0) return { statusCode: 400, headers, body: JSON.stringify({ error: 'El monto debe ser un número mayor o igual a 0' }) };
+  // 💰 CAP3-1: tope de cordura (un dedazo de 3 ceros distorsiona la caja real
+  // y de ahí las comisiones del 30%).
+  const _vm = validarMonto(monto);
+  if (!_vm.ok) return { statusCode: 400, headers, body: JSON.stringify({ error: _vm.error }) };
   if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha)) return { statusCode: 400, headers, body: JSON.stringify({ error: 'La fecha es obligatoria (YYYY-MM-DD)' }) };
 
   const eventoId = (typeof body.evento_id === 'string' && body.evento_id.trim()) ? body.evento_id.trim() : null;

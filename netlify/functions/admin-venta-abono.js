@@ -26,6 +26,7 @@
 // =============================================================================
 
 const { verifyAdminAuthLive, corsCheck } = require('./_lib/verify-admin');
+const { validarMonto } = require('./_lib/monto-limites');
 const { verificarVendedorActivo, AVISO_INACTIVO } = require('./_lib/vendedor-activo');
 
 const ROLES = ['vendedor', 'maestro_roshi', 'bulma'];
@@ -33,7 +34,6 @@ const ROLES_ADMIN = ['maestro_roshi', 'bulma'];
 const UUID_RE = /^[0-9a-f-]{36}$/i;
 const MIME_EXT = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'application/pdf': 'pdf' };
 const MAX_BYTES = 4 * 1024 * 1024;   // ~4 MB (igual que admin-subir-comprobante-pago)
-const MONTO_MAX = 1000000;           // tope sano; Bulma valida el monto real
 
 exports.handler = async (event) => {
   const __origin = corsCheck(event);
@@ -134,11 +134,16 @@ exports.handler = async (event) => {
     }
 
     // ── registrar: INSERT DIRECTO de un abono 'pendiente' (no validado) ───────
-    let monto = Number(body.monto);
-    if (!Number.isFinite(monto)) return json(400, { error: 'monto inválido' });
-    monto = Math.round(monto * 100) / 100;
-    if (monto <= 0) return json(400, { error: 'El monto debe ser mayor a 0' });
-    if (monto > MONTO_MAX) return json(400, { error: 'El monto es demasiado alto' });
+    // 💰 CAP3-1: alineado a la constante COMPARTIDA (_lib/monto-limites, 500k).
+    // Antes tenía su propio tope local de 1,000,000. Es exactamente el mismo tipo
+    // de dato que el monto_pagado de admin-marcar-pago —un abono de un cliente a
+    // su tour— y tener dos techos distintos para el mismo concepto es la clase de
+    // incoherencia que genera bugs: el mismo abono pasaría por una puerta y no
+    // por la otra. Se redondea a centavos ANTES de validar (comportamiento de hoy).
+    let monto = Math.round(Number(body.monto) * 100) / 100;
+    const _vm = validarMonto(monto, { permitirCero: false });
+    if (!_vm.ok) return json(400, { error: _vm.error });
+    monto = _vm.monto;
 
     // numero_pago = max de la venta + 1 (READ-THEN-WRITE; 23505 → recomputa y reintenta).
     const numExistentes = (Array.isArray(pagos) ? pagos : []).map(p => Number(p.numero_pago) || 0);

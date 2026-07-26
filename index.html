@@ -1511,9 +1511,15 @@ body.wizard-open .rcp{display:none}
   .wiz-progress-step.active .wiz-progress-lbl{display:inline;font-size:12px}
   .wiz-progress-step.active .wiz-progress-num{width:30px;height:30px;font-size:13px}
   .wiz-progress-sep{min-width:6px}
-  /* Compensate for the now out-of-flow bar so wizard content isn't shoved
-     under it once the user scrolls past the hero. +48px extra por el botón Volver. */
-  .d-body{padding-top:102px}
+  /* [PF-2 · FIX A] Antes: padding-top:102px "para compensar" el Volver (48px) y
+     la wiz-progress. La compensación no compensaba nada: las dos barras son
+     position:fixed, o sea que NO ocupan lugar en el flujo — el contenido de
+     abajo nunca se corrió por ellas. Lo único que hacía ese padding era abrir
+     ~100px de hueco negro entre el hero y el paso 1 (se ve en la captura de
+     Memo). Quien sí evita que un paso quede debajo de las barras es
+     scroll-margin-top en los .wiz-card (bloque PF-2), que es la herramienta
+     correcta porque solo actúa cuando algo hace scroll hasta ese paso. */
+  .d-body{padding-top:14px}
 }
 .promo-modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:9997;align-items:center;justify-content:center}
 .promo-modal-box{border-radius:16px;padding:36px 28px;text-align:center;max-width:400px;width:90%;position:relative;box-shadow:0 20px 60px rgba(0,0,0,.5);max-height:85vh;overflow-y:auto;border:1.5px solid rgba(232,255,76,.2)}
@@ -1993,6 +1999,110 @@ body.wizard-open .rcp{display:none}
   /* Lo que dependía del recorrido para verse, se ve directo */
   .hh-title .line,.hh-sub,.hh-ctas{opacity:1;transform:none}
   .ev-card.visible{opacity:1;transform:none}
+}
+</style>
+
+<!-- ===================================================================
+     TUERCA PF-2 · PUNCH + ARREGLOS MÓVILES DEL WIZARD (solo presentación)
+     Sube el volumen de PF-1, arregla los 2 defectos que salieron en la
+     captura de Memo y agrega la barra de total siempre visible.
+     Sigue sin tocar la regla de precios: el número de la barra es ESPEJO
+     del que ya pintó calcular().
+     Para revertir: borrar este <style>, el <script> "PF-2" del final, y
+     regresar .d-body a padding-top:102px (fix A, comentado arriba).
+     =================================================================== -->
+<style>
+
+/* ── B · FIX MÓVIL · que los 5 cuadritos de viajeros quepan enteros ─────
+   .wiz-grid5 era repeat(5,1fr) sin breakpoint: a 390px el "5+ / O MÁS"
+   se salía de su borde. minmax(0,1fr) impide que el contenido imponga un
+   ancho mínimo mayor que la columna, y el resto es aire recortado. */
+@media (max-width:640px){
+  .wiz-grid5{grid-template-columns:repeat(5,minmax(0,1fr));gap:5px}
+  .wiz-grid5 .wiz-btn{padding:12px 2px;min-width:0;overflow:hidden}
+  .wiz-grid5 .wiz-big{font-size:24px}
+  .wiz-grid5 .wiz-sub{font-size:8px;letter-spacing:.02em;margin-top:3px;white-space:nowrap}
+}
+@media (max-width:360px){
+  /* Teléfonos angostos (iPhone SE): 3 + 2 en dos filas antes que apretar más */
+  .wiz-grid5{grid-template-columns:repeat(3,minmax(0,1fr))}
+}
+
+/* ── C · MÁS PUNCH ──────────────────────────────────────────────────────
+   Mismo gesto de PF-1, subido de volumen: la tarjeta sube más, la portada
+   acerca más y la sombra cae más profundo. */
+@media (hover:hover){
+  .ev-card:hover,.ev-card.visible:hover{
+    transform:translateY(-8px);
+    box-shadow:0 30px 60px rgba(0,0,0,.7),0 0 34px rgba(255,40,59,.38);
+  }
+  .ev-card:hover .ev-img{transform:scale(1.08)}
+}
+
+/* La cascada respira más: 90ms entre tarjetas y entrada desde 24px.
+   El tope sigue en 6 (540ms el último), la cadena máxima de la receta. */
+@keyframes evCardIn{from{opacity:0;transform:translateY(24px)}}
+.ev-card.visible{animation-delay:calc(var(--evi,0) * 90ms)}
+
+/* Latido único al elegir una opción: confirma el tap sin quedarse en loop */
+@keyframes pfLatido{0%{transform:scale(1)}45%{transform:scale(1.05)}100%{transform:scale(1)}}
+.wiz-btn.active,.z-btn.active{animation:pfLatido .25s ease-out}
+
+/* ── E · MOVIMIENTO ENTRE OPCIONES ──────────────────────────────────────
+   El autoscroll ya existía (scrollToStep/scrollToTotal). Lo que faltaba era
+   decirle al navegador cuánto respeto le debe a las barras fijas: sin esto,
+   un scroll a un paso le mete el título debajo del Volver. */
+.wiz-card,#d-result,#w-viajeros-mas{scroll-margin-top:96px;scroll-margin-bottom:96px}
+@media (max-width:640px){
+  /* Volver (48px) + wiz-progress (~50px) + aire */
+  .wiz-card,#d-result,#w-viajeros-mas{scroll-margin-top:112px}
+}
+
+/* ── D · BARRA DE TOTAL SIEMPRE VISIBLE ─────────────────────────────────
+   El markup lo crea el bloque PF-2 de JS: así el HTML del archivo no
+   cambia y la tuerca entera se revierte borrando dos bloques.
+   z-index 900: encima del wizard móvil (#page-detail va en 150) pero
+   debajo del botón de WhatsApp (999), que sigue tocable. */
+.pf-bar{
+  position:fixed;left:0;right:0;bottom:0;z-index:900;
+  display:none;align-items:center;gap:12px;
+  width:100%;margin:0;text-align:left;cursor:pointer;
+  padding:12px 16px;
+  padding-bottom:calc(12px + env(safe-area-inset-bottom,0px));
+  background:#000;
+  border:0;border-top:2px solid var(--c-amarillo);
+  box-shadow:0 -12px 34px rgba(0,0,0,.7);
+  font-family:'Montserrat',sans-serif;color:#fff;
+  transform:translateY(100%);
+  transition:transform .25s cubic-bezier(.22,1,.36,1);
+}
+.pf-bar.pf-vivo{display:flex}
+.pf-bar.pf-vivo.pf-arriba{transform:translateY(0)}
+.pf-bar-txt{display:flex;flex-direction:column;gap:2px;min-width:0;flex:1}
+.pf-bar-lbl{
+  font-size:9px;font-weight:900;letter-spacing:.14em;text-transform:uppercase;
+  color:rgba(255,255,255,.5);
+}
+.pf-bar-val{
+  font-family:'Barlow Condensed','Montserrat',sans-serif;
+  font-size:30px;font-weight:900;line-height:1;letter-spacing:-.01em;
+  color:var(--c-amarillo);font-variant-numeric:tabular-nums;
+}
+.pf-bar-cta{
+  flex-shrink:0;background:var(--c-amarillo);color:#000;
+  font-size:10px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;
+  padding:10px 14px;border-radius:10px;
+  transition:transform .15s ease-out;
+}
+@media (hover:hover){
+  .pf-bar:hover .pf-bar-cta{transform:translateY(-2px)}
+}
+.pf-bar:active .pf-bar-cta{transform:scale(.96);transition-duration:.1s}
+.pf-bar:focus-visible{outline:2px solid var(--c-amarillo);outline-offset:-4px}
+/* El botón de WhatsApp se hace a un lado mientras la barra está arriba */
+body.pf-barra-viva .wa-float{bottom:104px}
+@media (max-width:768px){
+  body.pf-barra-viva .wa-float{bottom:120px !important}
 }
 </style>
 
@@ -5107,6 +5217,7 @@ function skipOnboarding(){
   var IDS=['r-q','r-total'];
   var DUR=420;
   var mostrado={},esperado={},raf={};   // mostrado = último número pintado (nuestro o de calcular)
+  var suscriptores=[];                  // avisos a PF-2 (barra de total)
 
   function aNumero(t){
     var s=String(t==null?'':t).replace(/[^0-9.,-]/g,'').replace(/,/g,'');
@@ -5164,8 +5275,176 @@ function skipOnboarding(){
       var anterior=mostrado[id];
       if(anterior===null||anterior===undefined)anterior=0;  // primera aparición: sube desde 0
       countUp(el,anterior,nuevo,txt);
+      for(var s=0;s<suscriptores.length;s++){
+        try{suscriptores[s](id,nuevo,txt);}catch(e){}
+      }
     }).observe(el,{childList:true,characterData:true,subtree:true});
   });
+
+  /* Motor expuesto para que PF-2 (barra de total) lo REUSE en vez de
+     duplicarlo. Sigue siendo cosmético: `espejo` solo pinta el texto que se
+     le pasa, no calcula nada. */
+  window._pfPrecio={
+    // Pinta `textoFinal` en `el` con count-up desde lo último que ESE elemento
+    // mostró (0 la primera vez). Requiere que `el` tenga id.
+    espejo:function(el,valorNuevo,textoFinal){
+      if(!el||!el.id)return;
+      var anterior=mostrado[el.id];
+      if(anterior===null||anterior===undefined)anterior=0;
+      countUp(el,anterior,valorNuevo,textoFinal);
+    },
+    // Avisa cuando calcular() repinta uno de los precios observados.
+    alCambiar:function(fn){ if(typeof fn==='function')suscriptores.push(fn); },
+    reducido:_reduce,
+  };
+})();
+</script>
+
+<!-- ===================================================================
+     TUERCA PF-2 · JS COSMÉTICO (aislado)
+       D) barra de total siempre visible — ESPEJO de lo que pintó
+          calcular(), con el count-up de PF-1 reutilizado;
+       E) el autoscroll entre pasos ya no mueve la pantalla si el paso ya
+          se ve, y respeta reduced-motion.
+     Igual que PF-1: no toca calcular(), ni EV, ni el wizard. La barra crea
+     su propio markup, así el HTML del archivo queda intacto.
+     Para revertir: borrar este <script> y el <style> "PF-2".
+     =================================================================== -->
+<script>
+(function(){
+  var reducido=function(){
+    try{return window.matchMedia('(prefers-reduced-motion:reduce)').matches;}catch(e){return false;}
+  };
+
+  /* ── D · BARRA DE TOTAL ────────────────────────────────────────────── */
+  var barra=document.createElement('button');
+  barra.className='pf-bar';
+  barra.id='pf-bar';
+  barra.type='button';
+  barra.setAttribute('aria-label','Ver el desglose de tu cotización');
+  barra.innerHTML='<span class="pf-bar-txt">'
+    + '<span class="pf-bar-lbl">Total por persona</span>'
+    + '<span class="pf-bar-val" id="pf-bar-val"></span>'
+    + '</span>'
+    + '<span class="pf-bar-cta">Ver desglose</span>';
+  document.body.appendChild(barra);
+  var valEl=document.getElementById('pf-bar-val');
+
+  var viva=false,timerOcultar=null;
+  function mostrarBarra(){
+    if(timerOcultar){clearTimeout(timerOcultar);timerOcultar=null;}
+    if(viva)return;
+    viva=true;
+    barra.classList.add('pf-vivo');
+    document.body.classList.add('pf-barra-viva');
+    // Un frame de aire: sin esto el display:flex y el transform ocurren en el
+    // mismo golpe y el navegador no tiene de dónde animar.
+    if(window.requestAnimationFrame)requestAnimationFrame(function(){barra.classList.add('pf-arriba');});
+    else barra.classList.add('pf-arriba');
+  }
+  function ocultarBarra(){
+    if(!viva)return;
+    viva=false;
+    barra.classList.remove('pf-arriba');
+    document.body.classList.remove('pf-barra-viva');
+    var espera=reducido()?0:260;
+    timerOcultar=setTimeout(function(){
+      if(!viva)barra.classList.remove('pf-vivo');
+      timerOcultar=null;
+    },espera);
+  }
+
+  // ¿Hay cotización en pantalla? offsetParent===null cubre de una sola vez que
+  // #d-result esté oculto Y que el wizard esté cerrado (padre display:none).
+  function hayCotizacion(){
+    var rq=document.getElementById('r-q');
+    var rt=document.getElementById('r-total');
+    if(!rq||!rt)return false;
+    if(rq.offsetParent===null)return false;
+    return /\d/.test(rt.textContent)&&/\d/.test(rq.textContent);
+  }
+  function revisar(){ if(hayCotizacion())mostrarBarra(); else ocultarBarra(); }
+
+  // El valor: espejo de #r-q. El count-up es el de PF-1 y cierra con la MISMA
+  // cadena que dejó calcular(), así la barra nunca muestra un número inventado.
+  if(window._pfPrecio&&window._pfPrecio.alCambiar){
+    window._pfPrecio.alCambiar(function(id,valorNuevo,textoFinal){
+      if(id!=='r-q')return;
+      window._pfPrecio.espejo(valEl,valorNuevo,textoFinal);
+      revisar();
+    });
+  }
+
+  // Cerrar el wizard o limpiar el resultado no repinta texto: hay que vigilar
+  // los cambios de display/clase de los contenedores.
+  if(typeof MutationObserver==='function'){
+    var obs=new MutationObserver(function(){revisar();});
+    ['d-result','page-detail','page-catalog'].forEach(function(id){
+      var el=document.getElementById(id);
+      if(el)obs.observe(el,{attributes:true,attributeFilter:['style','class']});
+    });
+    var rt=document.getElementById('r-total');
+    if(rt)obs.observe(rt,{childList:true,characterData:true,subtree:true});
+  }
+
+  // Tap en la barra → al desglose
+  barra.addEventListener('click',function(){
+    var destino=document.querySelector('#d-result .big-pago')||document.getElementById('d-result');
+    if(!destino)return;
+    try{destino.scrollIntoView({behavior:reducido()?'auto':'smooth',block:'center'});}
+    catch(e){destino.scrollIntoView();}
+  });
+
+  /* ── E · AUTOSCROLL QUE NO MAREA ───────────────────────────────────────
+     scrollToStep/scrollToTotal ya existían y se llaman desde el wizard; NO se
+     editan. Aquí se envuelven (siguen siendo globales, así que todos los
+     llamados existentes pasan por esta capa) para agregar dos cortesías:
+       · si el paso ya se ve completo, no mover la pantalla;
+       · con reduced-motion el brinco es instantáneo, nunca se suprime.
+     El retardo de 150ms y el "no scrollees lo que está display:none" son los
+     mismos que tenían las funciones originales. */
+  // Cuánto de la parte de arriba de la pantalla está tapado ahora mismo por
+  // barras fijas o pegadas: nav (sticky, escritorio), Volver y wiz-progress
+  // (fixed en móvil, sticky en escritorio). Se mide en vivo porque cuál manda
+  // depende del ancho y de si el wizard está abierto.
+  function topeFijo(){
+    var t=0;
+    ['.nav','#wiz-volver','#wiz-progress'].forEach(function(sel){
+      var el=document.querySelector(sel);
+      if(!el)return;
+      var cs=getComputedStyle(el);
+      if(cs.display==='none'||cs.visibility==='hidden')return;
+      if(cs.position!=='fixed'&&cs.position!=='sticky')return;
+      var r=el.getBoundingClientRect();
+      // Solo cuenta si está pegada arriba (si ya se fue con el scroll, no tapa)
+      if(r.top<=150&&r.bottom>t)t=r.bottom;
+    });
+    return t;
+  }
+  function yaSeVe(el){
+    var r=el.getBoundingClientRect();
+    var arriba=topeFijo();
+    var abajo=(window.innerHeight||0)-(viva?barra.getBoundingClientRect().height:0);
+    return r.top>=arriba&&r.bottom<=abajo;
+  }
+  function llevarA(el){
+    if(!el)return;
+    if(getComputedStyle(el).display==='none')return;
+    if(yaSeVe(el))return;
+    try{el.scrollIntoView({behavior:reducido()?'auto':'smooth',block:'center'});}
+    catch(e){el.scrollIntoView();}
+  }
+  window.scrollToStep=function(id){
+    setTimeout(function(){llevarA(document.getElementById(id));},150);
+  };
+  window.scrollToTotal=function(){
+    setTimeout(function(){
+      var sel=(typeof TOTAL_SELECTOR!=='undefined'&&TOTAL_SELECTOR)||'#d-result .big-pago';
+      llevarA(document.querySelector(sel));
+    },150);
+  };
+
+  revisar();
 })();
 </script>
 </body>

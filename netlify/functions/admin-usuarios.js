@@ -47,12 +47,56 @@ const ROLES_INVITA_SOLO_ROSHI = ['maestro_roshi', 'bulma', 'milk'];
 
 // Whitelist de columnas que SÍ pueden viajar al navegador. password_hash,
 // invite_token, invite_usado e invite_expires_at quedan EXCLUIDOS a propósito.
-const COLS = [
+const COLS_ADMIN_ARR = [
   'id', 'nombre', 'username', 'correo', 'correo_notif', 'celular', 'rol',
   'activo', 'strikes', 'foto_url', 'talla_playera', 'fecha_nacimiento',
   'num_emergencia', 'nombre_emergencia', 'template_sugerido', 'tema_acento',
   'perfil_completo', 'permisos_extra', 'creado_en', 'ultimo_acceso',
-].join(',');
+];
+const COLS = COLS_ADMIN_ARR.join(',');   // (nombre histórico; sigue siendo la query)
+
+// 🔐 CAP2-1 — PRIVACIDAD DEL DIRECTORIO.
+// `listar`/`obtener` NO exigen rol admin a propósito: los usan los mapas de
+// nombres de medio KameHouse (Torre, reportes, asignaciones, Guerreros Z…). El
+// efecto colateral era que CUALQUIER usuario logueado recibía correo, celular,
+// fecha_nacimiento, num_emergencia, nombre_emergencia y strikes de TODO el
+// equipo. No es escalada ni fuga externa: es privacidad interna.
+//
+// Ahora la respuesta se PROYECTA POR ROL en el servidor (nunca en el cliente):
+//   · rol administrativo → todas las columnas de la whitelist;
+//   · cualquier otro rol → solo lo mínimo para pintar nombres y vistas de
+//     equipo… salvo SU PROPIA fila, que llega completa (cada quien ve lo suyo).
+const COLS_BASICO_ARR = [
+  'id', 'nombre', 'username', 'rol', 'activo', 'foto_url', 'tema_acento',
+  'perfil_completo', 'template_sugerido',
+];
+const COLS_BASICO = new Set(COLS_BASICO_ARR);
+
+// Quién ve el directorio completo: los admins de verdad + milk (paridad
+// operativa con bulma) + mister_popo (cuidador: necesita contactar a quien trae
+// material de bodega).
+const ROLES_VE_DIRECTORIO = [...ROLES_ADMIN, 'milk', 'mister_popo'];
+
+// Recorta una fila a COLS_BASICO. La fila del PROPIO usuario pasa completa.
+function proyectarUsuario(u, jwtUserId) {
+  if (!u || typeof u !== 'object') return u;
+  if (jwtUserId && String(u.id) === String(jwtUserId)) return u;
+  const out = {};
+  for (const k of COLS_BASICO_ARR) {
+    if (Object.prototype.hasOwnProperty.call(u, k)) out[k] = u[k];
+  }
+  return out;
+}
+
+// Proyecta una lista según el rol del JWT.
+function proyectarLista(filas, jwtRol, jwtUserId) {
+  if (ROLES_VE_DIRECTORIO.includes(jwtRol)) return filas;
+  return (Array.isArray(filas) ? filas : []).map((u) => proyectarUsuario(u, jwtUserId));
+}
+
+// Formato de correo razonable para el filtro de `listar` (higiene: no mandar
+// basura al operador eq. de PostgREST).
+const CORREO_RE = /^[^\s@,()<>]+@[^\s@,()<>]+\.[a-z]{2,}$/i;
 
 // Campos que un usuario puede editar de SU PROPIO perfil.
 const SELF_FIELDS = [
@@ -129,6 +173,10 @@ exports.handler = async (event) => {
       }
       if (typeof body.correo === 'string' && body.correo.trim()) {
         const correo = body.correo.trim().toLowerCase().slice(0, 160);
+        // 🔐 CAP2-1 (higiene): formato razonable ANTES de mandarlo a PostgREST.
+        if (!CORREO_RE.test(correo)) {
+          return { statusCode: 400, headers, body: JSON.stringify({ error: 'correo inválido' }) };
+        }
         sp.append('correo', `eq.${correo}`);
       }
 
@@ -155,7 +203,13 @@ exports.handler = async (event) => {
         return { statusCode: 502, headers, body: JSON.stringify({ error: 'KH rechazó la consulta', detail }) };
       }
       const usuarios = await r.json();
-      return { statusCode: 200, headers, body: JSON.stringify({ ok: true, usuarios }) };
+      // 🔐 CAP2-1: una sola query (COLS_ADMIN) y RECORTE aquí según el rol del
+      // JWT. Se eligió una query en vez de dos porque el viaje a la BD es el
+      // mismo con o sin columnas sensibles, y así la regla de privacidad vive
+      // en UN solo lugar auditable en vez de repartida en dos SELECTs que
+      // podrían desincronizarse. La fila propia nunca se recorta.
+      const proyectados = proyectarLista(usuarios, jwtRol, jwtUserId);
+      return { statusCode: 200, headers, body: JSON.stringify({ ok: true, usuarios: proyectados }) };
     }
 
     // ── obtener ───────────────────────────────────────────────────────────
@@ -174,7 +228,15 @@ exports.handler = async (event) => {
         return { statusCode: 502, headers, body: JSON.stringify({ error: 'KH rechazó la consulta', detail }) };
       }
       const rows = await r.json();
-      return { statusCode: 200, headers, body: JSON.stringify({ ok: true, usuario: rows[0] || null }) };
+      // 🔐 CAP2-1: `obtener` tenía EXACTAMENTE el mismo hueco que `listar`
+      // (cualquier rol logueado podía pedir la ficha completa de cualquier id,
+      // de uno en uno). Mismo criterio: admins ven todo, el resto solo lo
+      // básico, y la ficha propia siempre completa.
+      const uno = rows[0] || null;
+      const unoProyectado = (uno && !ROLES_VE_DIRECTORIO.includes(jwtRol))
+        ? proyectarUsuario(uno, jwtUserId)
+        : uno;
+      return { statusCode: 200, headers, body: JSON.stringify({ ok: true, usuario: unoProyectado }) };
     }
 
     // ── verificar_username ────────────────────────────────────────────────
@@ -356,3 +418,9 @@ function readEnv() {
   }
   return { KH_SB_URL, KH_SB_SERVICE };
 }
+
+// Expuestos para el arnés (patrón de la casa).
+module.exports.__COLS_ADMIN = COLS_ADMIN_ARR;
+module.exports.__COLS_BASICO = COLS_BASICO_ARR;
+module.exports.__ROLES_VE_DIRECTORIO = ROLES_VE_DIRECTORIO;
+module.exports.__proyectarUsuario = proyectarUsuario;

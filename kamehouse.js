@@ -7147,6 +7147,11 @@ async function renderGZ() {
   const anioActual = new Date().getFullYear();
   grid.innerHTML = lista.map(u => {
     const iniciales = u.nombre.split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase();
+    // 🔐 CAP2-1: a los roles no-administrativos el backend ya NO les manda
+    // `strikes` ni `fecha_nacimiento` de OTRAS personas. En ese caso NO se
+    // pintan los puntitos: mostrarlos vacíos afirmaría "cero strikes", que es
+    // una mentira. El pastelito de cumpleaños simplemente no aparece (ausencia,
+    // no dato falso). Para admins y para la fila PROPIA todo sigue igual.
     const strikes = u.strikes || 0;
     const cumple = u.fecha_nacimiento ? esCumple(u.fecha_nacimiento) : false;
     const esYo = currentUser && u.id === currentUser.id;
@@ -7169,6 +7174,7 @@ async function renderGZ() {
             <div class="gz-stat-value" style="color:var(--gold)">${pts}</div>
             <div class="gz-stat-label">pts ${new Date().getFullYear()}</div>
           </div>
+          ${u.strikes === undefined ? '' : `
           <div class="gz-stat">
             <div class="gz-strike-dots">
               <div class="gz-strike-dot ${strikes >= 1 ? 'active' : ''}"></div>
@@ -7176,7 +7182,7 @@ async function renderGZ() {
               <div class="gz-strike-dot ${strikes >= 3 ? 'active' : ''}"></div>
             </div>
             <div class="gz-stat-label">strikes</div>
-          </div>
+          </div>`}
         </div>
         ${_gzChipContrato(u)}${_gzChipInactivo(u)}
       </div>

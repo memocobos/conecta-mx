@@ -157,7 +157,8 @@ function _renderNotifPanel() {
   const panel = document.getElementById('notif-panel');
   if (!panel) return;
   const items = _notifCache.length ? _notifCache.map(n => {
-    const linkArg = n.link ? `'${String(n.link).replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'` : 'null';
+    // [CAP5-1] doble capa (JS + HTML): el valor entra en un onclick.
+    const linkArg = n.link ? `'${_attrJs(n.link)}'` : 'null';
     return `
     <div class="notif-item ${n.leida ? '' : 'unread'}" onclick="_marcarNotifLeida('${n.id}', ${linkArg})">
       <div class="notif-dot ${n.leida ? 'read' : ''}"></div>
@@ -390,7 +391,7 @@ function _kmSearchMount(contId, itemSel, placeholder) {
   if (!anchor.parentNode) return;   // contenedor sin padre en el DOM → no monta
   const wrap = document.createElement('div');
   wrap.style.cssText = 'margin:0 0 10px';
-  const esc = String(itemSel || '').replace(/'/g, "\\'");
+  const esc = _attrJs(itemSel || '');   // [CAP5-1] doble capa (va dentro de oninput)
   wrap.innerHTML = `<input type="text" id="kmb-${contId}" class="cot-input" autocomplete="off" placeholder="${_esfEsc(placeholder)}" oninput="_kmBuscar('${contId}','${esc}')" style="width:100%;max-width:340px;box-sizing:border-box">`;
   anchor.parentNode.insertBefore(wrap, anchor);
   new MutationObserver(() => _kmBuscar(contId, itemSel)).observe(cont, { childList: true });
@@ -1275,7 +1276,7 @@ function _trUnidadHtml(u) {
   return `
     <button type="button" ${cabe ? `data-tr-destino="${idSafe}"` : 'disabled'}
       style="display:block;width:100%;text-align:left;background:var(--bg2);border:1px solid ${cabe ? 'var(--border2)' : 'var(--border)'};border-radius:var(--radius);padding:12px 16px;margin-bottom:10px;color:var(--text);cursor:${cabe ? 'pointer' : 'not-allowed'};opacity:${cabe ? '1' : '.5'};font:inherit">
-      ${cabecera}${motivo}
+      ${cabecera}${_esfEsc(motivo)}
     </button>`;
 }
 
@@ -1343,7 +1344,7 @@ function _trCoberturaChip(eventoId) {
 function _trLadrillosHtml(uni, pend) {
   const bloque = (titulo, ayuda, cuerpo) => `
     <div style="margin-top:20px">
-      <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.12em;color:var(--ts);margin-bottom:4px">// ${titulo}</div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.12em;color:var(--ts);margin-bottom:4px">// ${_esfEsc(titulo)}</div>
       <div style="font-size:11px;color:var(--ts);margin-bottom:10px">${ayuda}</div>
       ${cuerpo}
     </div>`;
@@ -3385,7 +3386,7 @@ function _renderSaludo() {
     <div class="kh-saludo">
       <svg class="ic kh-saludo-ic"><use href="#ic-resumen"/></svg>
       <div class="kh-saludo-body">
-        <div class="kh-saludo-head">${_saludoHora()}, ${nombre}</div>
+        <div class="kh-saludo-head">${_saludoHora()}, ${_esfEsc(nombre)}</div>
         <div class="kh-saludo-frase">${_esfEsc(item.f || '')}</div>
         <div class="kh-saludo-cred">${_esfEsc(item.c || '')} · <i>${_esfEsc(item.p || '')}</i></div>
       </div>
@@ -3457,7 +3458,7 @@ function _renderConexiones(j) {
   const filas = orden.map((u) => {
     const idS = _esfEsc(u.id);
     const chip = _conexChip(u, tol);
-    return `<tr style="border-top:1px solid var(--border);cursor:pointer" onclick="_conexHistorial('${idS}','${_esfEsc(u.nombre)}')" title="Ver últimos 14 días">
+    return `<tr style="border-top:1px solid var(--border);cursor:pointer" onclick="_conexHistorial('${idS}','${_attrJs(u.nombre)}')" title="Ver últimos 14 días">
       <td style="padding:7px 4px;font-size:13px;color:var(--text);border:none">${_esfEsc(u.nombre)}${_CONEX_AUX.includes(u.rol) ? ' <span style="font-size:9px;color:var(--ts);text-transform:uppercase;letter-spacing:.06em">aux</span>' : ''}</td>
       <td style="padding:7px 4px;text-align:center;font-size:13px;color:var(--text);border:none">${u.primera ? _esfEsc(u.primera) : '<span style="color:var(--ts)">—</span>'}</td>
       <td style="padding:7px 4px;text-align:center;font-size:13px;color:var(--text);border:none">${u.ultima ? _esfEsc(u.ultima) : '<span style="color:var(--ts)">—</span>'}</td>
@@ -3795,7 +3796,7 @@ function _resumenUtilPintar() {
   const cardEsp = (titulo, dashed, k, p, f, c, i, v, g) => {
     const pct = v > 0 ? Math.round(c / v * 100) : 0;
     return `<div style="background:var(--bg2);border:${dashed ? '1px dashed' : '2px solid'} var(--border);border-radius:var(--radius);padding:12px 14px;margin-bottom:10px">
-      <div style="text-transform:uppercase;font-size:11px;letter-spacing:.06em;font-weight:800;color:var(--ts);margin-bottom:10px">${titulo}</div>
+      <div style="text-transform:uppercase;font-size:11px;letter-spacing:.06em;font-weight:800;color:var(--ts);margin-bottom:10px">${_esfEsc(titulo)}</div>
       <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px">
         <div style="flex:1 1 92px"><div style="font-size:10px;text-transform:uppercase;color:var(--ts)">Caja</div><div style="font-family:'Zen Dots',sans-serif;font-size:18px;color:${k < 0 ? 'var(--red)' : 'var(--green)'}">${_spFmtMxn(k)}</div></div>
         <div style="flex:1 1 92px"><div style="font-size:10px;text-transform:uppercase;color:var(--ts)">Proyectado</div><div style="font-size:15px;font-weight:700;color:${p < 0 ? 'var(--red)' : ''}">${_spFmtMxn(p)}</div></div>
@@ -5074,7 +5075,7 @@ function _renderSaldos(d) {
    const saldoColor = (Number(c.saldo) >= 0) ? 'var(--green)' : 'var(--red)';
    return `<div class="card saldo-card" style="cursor:pointer" onclick="_toggleSaldoDetalle('${nombre}')">
      <div style="display:flex;justify-content:space-between;align-items:center">
-       <div style="font-weight:700;letter-spacing:.04em">${nombre}</div>
+       <div style="font-weight:700;letter-spacing:.04em">${_esfEsc(nombre)}</div>
        <span style="font-size:11px;color:var(--ts)">ver detalle ▾</span>
      </div>
      <div style="font-size:28px;font-weight:800;color:${saldoColor};margin:10px 0 6px">${_spFmtMxn(c.saldo)}</div>
@@ -5104,7 +5105,7 @@ function _toggleSaldoDetalle(nombre) {
  const c = (_saldosData.cuentas || {})[nombre];
  if (!c) return;
  _saldoDetalleActivo = nombre;
- panel.innerHTML = `<div style="font-weight:700;margin-bottom:12px">Detalle · ${nombre}</div>` + _renderSaldoDetalle(c);
+ panel.innerHTML = `<div style="font-weight:700;margin-bottom:12px">Detalle · ${_esfEsc(nombre)}</div>` + _renderSaldoDetalle(c);
  panel.style.display = '';
 }
 
@@ -5116,7 +5117,7 @@ function _renderSaldoDetalle(c) {
  const seccion = (titulo, subtotal, color, filas) =>
    `<div style="margin-bottom:14px">
       <div style="display:flex;justify-content:space-between;font-weight:600;font-size:13px;margin-bottom:4px">
-        <span>${titulo}</span><span style="color:${color}">${subtotal}</span>
+        <span>${_esfEsc(titulo)}</span><span style="color:${color}">${subtotal}</span>
       </div>${filas}
     </div>`;
 
@@ -5155,7 +5156,7 @@ async function loadVentas() {
  <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px">
  <div>
  <div style="font-family:\'Barlow Condensed\',sans-serif;font-size:18px;font-weight:800">
- ${ev.artista || ev.nombre}
+ ${_esfEsc(ev.artista || ev.nombre)}
  </div>
  <div style="font-size:11px;color:var(--ts)">${fmtFecha(ev.fecha)} · ${ev.ciudad}</div>
  </div>
@@ -5227,11 +5228,11 @@ async function loadInventario() {
  const valor = i.cantidad * i.costo_unitario;
  const alerta = i.cantidad <= i.stock_minimo;
  return `<tr>
- <td style="font-weight:600"><button type="button" class="kdx-link" onclick="abrirKardex('${_salEsc(i.id)}')" title="Ver el expediente de esta pieza: cada salida, quién se la llevó y si regresó">${i.pieza}</button>${i.retornable ? ' <span style="font-size:9px;letter-spacing:.06em;text-transform:uppercase;font-weight:800;padding:1px 6px;border-radius:4px;color:#7cc4ff;background:rgba(124,196,255,.12);border:1px solid rgba(124,196,255,.35)" title="Retornable: en las salidas queda como PRESTADA y la comparación del regreso la exige de vuelta siempre">↻ siempre vuelve</span>' : ''}${alerta ? ' <span style="color:var(--red)"><svg class="ic"><use href="#ic-alerta"/></svg></span>' : ''}</td>
+ <td style="font-weight:600"><button type="button" class="kdx-link" onclick="abrirKardex('${_salEsc(i.id)}')" title="Ver el expediente de esta pieza: cada salida, quién se la llevó y si regresó">${_esfEsc(i.pieza)}</button>${i.retornable ? ' <span style="font-size:9px;letter-spacing:.06em;text-transform:uppercase;font-weight:800;padding:1px 6px;border-radius:4px;color:#7cc4ff;background:rgba(124,196,255,.12);border:1px solid rgba(124,196,255,.35)" title="Retornable: en las salidas queda como PRESTADA y la comparación del regreso la exige de vuelta siempre">↻ siempre vuelve</span>' : ''}${alerta ? ' <span style="color:var(--red)"><svg class="ic"><use href="#ic-alerta"/></svg></span>' : ''}</td>
  <td style="color:${alerta ? 'var(--red)' : 'var(--text)'};font-weight:600">${i.cantidad}</td>
  ${verCostos ? `<td>${formatMXN(i.costo_unitario)}</td><td style="font-weight:600">${formatMXN(valor)}</td>` : ''}
  <td style="color:var(--ts)">${i.stock_minimo}</td>
- <td style="font-size:12px;color:var(--ts)">${i.proveedor||'—'}</td>
+ <td style="font-size:12px;color:var(--ts)">${_esfEsc(i.proveedor||'—')}</td>
  <td>${puedeEditarKarin ? `
  <button class="btn btn-ghost btn-sm" onclick="editarKit('${i.id}')">⎘</button>
  <button class="btn btn-red btn-sm" onclick="eliminarKit('${i.id}')">✕</button>
@@ -5700,13 +5701,13 @@ function renderCapsule() {
 
  return `<tr style="${esPasado ? 'opacity:.55' : ''}">
  <td>
- <div style="font-weight:700;font-size:13px">${ev.artista || ev.nombre}</div>
+ <div style="font-weight:700;font-size:13px">${_esfEsc(ev.artista || ev.nombre)}</div>
  <div style="font-size:10px;color:var(--ts)">${ev.tour || ev.tipo || 'Concierto'}</div>
  </td>
  <td style="font-size:12px;white-space:nowrap">${fmtFecha(ev.fecha)}</td>
  <td>
  <div style="font-size:12px;font-weight:600">${ev.ciudad}</div>
- <div style="font-size:10px;color:var(--ts)">${ev.venue || ''}</div>
+ <div style="font-size:10px;color:var(--ts)">${_esfEsc(ev.venue || '')}</div>
  </td>
  <td style="font-size:11px">${paquetes.map(p => `<span class="badge ${p==='PLUS'?'badge-orange':p==='RIDE'?'badge-gold':'badge-gray'}">${p}</span>`).join(' ')}</td>
  <td style="font-size:11px;max-width:140px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${zonasStr}</td>
@@ -7136,7 +7137,7 @@ function _gzChipInactivo(u) {
   if (!info || !info.inactivo) return '';
   return `<div style="margin-top:8px;display:flex;flex-direction:column;gap:6px;align-items:center">
     <span style="font-size:9px;letter-spacing:.08em;text-transform:uppercase;font-weight:800;padding:2px 8px;border-radius:4px;color:#ff6666;background:rgba(255,68,68,.14);border:1px solid rgba(255,68,68,.4)">💤 inactivo (sin ventas en 3 meses)</span>
-    <button class="btn btn-ghost btn-sm" style="font-size:10px;padding:3px 10px" onclick="event.stopPropagation();gzReactivarVendedor('${_esfEsc(u.id)}','${_esfEsc(u.nombre).replace(/'/g, '&#39;')}')">Dar otra oportunidad</button>
+    <button class="btn btn-ghost btn-sm" style="font-size:10px;padding:3px 10px" onclick="event.stopPropagation();gzReactivarVendedor('${_attrJs(u.id)}','${_attrJs(u.nombre)}')">Dar otra oportunidad</button>
   </div>`;
 }
 
@@ -7188,7 +7189,7 @@ async function renderGZ() {
       ${cumple ? '<div class="gz-badge-cumple"><svg class="ic"><use href="#ic-pastel"/></svg></div>' : ''}
       <div class="gz-card-inner">
         <div class="gz-avatar">
-          ${u.foto_url ? `<img src="${u.foto_url}" alt="${u.nombre}">` : iniciales}
+          ${u.foto_url ? `<img src="${_urlSegura(u.foto_url)}" alt="${_esfEsc(u.nombre)}">` : iniciales}
         </div>
         <div class="gz-name">${nombreCorto}</div>
         ${_gzChipPrestado(u)}
@@ -7301,7 +7302,7 @@ async function gestionarStrikes(userId, nombre, strikesActuales) {
         await sendEmail(
           usuario.correo_notif || usuario.correo,
           '⚠️ Has acumulado 3 strikes',
-          `<div style="font-family:Arial;padding:32px;background:#06060A;color:#EEEEF5"><h2 style="color:#E63946">Aviso importante</h2><p>Has acumulado 3 strikes en el sistema.</p><p>Motivo: <strong>${motivo}</strong></p></div>`
+          `<div style="font-family:Arial;padding:32px;background:#06060A;color:#EEEEF5"><h2 style="color:#E63946">Aviso importante</h2><p>Has acumulado 3 strikes en el sistema.</p><p>Motivo: <strong>${_esfEsc(motivo)}</strong></p></div>`
         ).catch(() => {});
       }
     }
@@ -7396,10 +7397,10 @@ async function abrirPerfil(userId) {
     <div class="perfil-section-v2" style="border-left-color:var(--red)">
       <div class="perfil-section-title-v2" style="color:var(--red)">// admin · maestro roshi</div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
-        <button class="btn btn-ghost btn-sm" onclick="resetearPassword('${userId}','${usuario.nombre.replace(/'/g,"\\'")}')" style="font-family:'JetBrains Mono',monospace;font-size:10px">▸ resetear pass</button>
+        <button class="btn btn-ghost btn-sm" onclick="resetearPassword('${userId}','${_attrJs(usuario.nombre)}')" style="font-family:'JetBrains Mono',monospace;font-size:10px">▸ resetear pass</button>
         <button class="btn btn-ghost btn-sm" onclick="cambiarRol('${userId}','${usuario.rol}')" style="font-family:'JetBrains Mono',monospace;font-size:10px">▸ cambiar rol</button>
-        <button class="btn btn-ghost btn-sm" onclick="gestionarStrikes('${userId}','${usuario.nombre.replace(/'/g,"\\'")}',${usuario.strikes||0})" style="font-family:'JetBrains Mono',monospace;font-size:10px">▸ strikes</button>
-        <button class="btn btn-ghost btn-sm" style="color:var(--red);border-color:rgba(230,57,70,.3);font-family:'JetBrains Mono',monospace;font-size:10px" onclick="cerrarModal('ver-perfil');confirmarEliminar('${userId}','${usuario.nombre.replace(/'/g,"\\'")}')">▸ dar de baja</button>
+        <button class="btn btn-ghost btn-sm" onclick="gestionarStrikes('${userId}','${_attrJs(usuario.nombre)}',${usuario.strikes||0})" style="font-family:'JetBrains Mono',monospace;font-size:10px">▸ strikes</button>
+        <button class="btn btn-ghost btn-sm" style="color:var(--red);border-color:rgba(230,57,70,.3);font-family:'JetBrains Mono',monospace;font-size:10px" onclick="cerrarModal('ver-perfil');confirmarEliminar('${userId}','${_attrJs(usuario.nombre)}')">▸ dar de baja</button>
       </div>
     </div>
   ` : '';
@@ -7417,7 +7418,7 @@ async function abrirPerfil(userId) {
         todas sus sesiones abiertas. Tendrá que volver a entrar (surte efecto en menos de un minuto).
       </div>
       <button class="btn btn-ghost btn-sm" style="font-family:'JetBrains Mono',monospace;font-size:10px"
-        onclick="cerrarSesionesUI('${userId}','${usuario.nombre.replace(/'/g, "\\'")}')">▸ cerrar todas sus sesiones</button>
+        onclick="cerrarSesionesUI('${userId}','${_attrJs(usuario.nombre)}')">▸ cerrar todas sus sesiones</button>
     </div>
   ` : '';
 
@@ -7570,12 +7571,12 @@ function renderPerfilCompleto(u, toursPasados, evAsignados, iniciales, edad, cum
       <div class="perfil-card-header">
         <div style="display:flex;gap:24px;align-items:center;flex-wrap:wrap">
           <div class="perfil-avatar-large" ${esMiPerfil ? `onclick="subirFoto('${u.id}')"` : ''}>
-            ${u.foto_url ? `<img src="${u.foto_url}" alt="${u.nombre}">` : iniciales}
+            ${u.foto_url ? `<img src="${_urlSegura(u.foto_url)}" alt="${_esfEsc(u.nombre)}">` : iniciales}
             ${esMiPerfil ? '<div class="upload-hint">Cambiar<br>foto</div>' : ''}
           </div>
           <div style="flex:1;min-width:200px">
             <div style="font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.18em;color:var(--ts);margin-bottom:6px">// id_${u.id.slice(0,8)}</div>
-            <div style="font-family:'Rajdhani',sans-serif;font-size:30px;font-weight:700;line-height:1;margin-bottom:8px;letter-spacing:-.01em">${u.nombre}${cumple ? ' <span style="font-size:24px"><svg class="ic"><use href="#ic-pastel"/></svg></span>' : ''}</div>
+            <div style="font-family:'Rajdhani',sans-serif;font-size:30px;font-weight:700;line-height:1;margin-bottom:8px;letter-spacing:-.01em">${_esfEsc(u.nombre)}${cumple ? ' <span style="font-size:24px"><svg class="ic"><use href="#ic-pastel"/></svg></span>' : ''}</div>
             <div style="display:inline-block;font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--gold);border:1px solid rgba(255,183,3,.3);padding:4px 10px;margin-bottom:6px">${ROL_LABELS[u.rol] || u.rol}</div>
             ${edad ? `<div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--ts);margin-top:4px">${edad} años</div>` : ''}
           </div>
@@ -7658,8 +7659,8 @@ function renderPerfilCompleto(u, toursPasados, evAsignados, iniciales, edad, cum
           return `<div class="tour-item" style="border-left-color:${esPasado?'var(--ts)':'var(--orange)'}">
             <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;flex-wrap:wrap">
               <div>
-                <div class="tour-item-name" style="font-size:16px">${ev.nombre || ev.artista || '—'}</div>
-                <div class="tour-item-meta">${ev.artista?ev.artista+' · ':''}${ev.ciudad||''} ${fechaEv?'· '+fechaEv.toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric'}):''}</div>
+                <div class="tour-item-name" style="font-size:16px">${_esfEsc(ev.nombre || ev.artista || '—')}</div>
+                <div class="tour-item-meta">${ev.artista?_esfEsc(ev.artista)+' · ':''}${ev.ciudad||''} ${fechaEv?'· '+fechaEv.toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric'}):''}</div>
                 ${u.rol !== 'cc' && e.indicaciones ? `<div style="font-size:11px;color:var(--ts);margin-top:5px;font-style:italic">${e.indicaciones}</div>` : ''}
                 ${ev.notas_internas ? `<div style="font-size:11px;color:var(--ts);margin-top:4px"><span class="k-mono-sm" style="margin-right:6px">EQUIPO</span>${ev.notas_internas}</div>` : ''}
               </div>
@@ -7685,7 +7686,7 @@ function renderPerfilCompleto(u, toursPasados, evAsignados, iniciales, edad, cum
         ${detalleAuto.map(d => `
           <div class="tour-item" style="border-left-color:var(--green)">
             <div class="tour-item-head">
-              <div class="tour-item-name">${d.nombre} <span style="font-family:JetBrains Mono,monospace;font-size:9px;color:var(--green);letter-spacing:.1em">(asignado)</span></div>
+              <div class="tour-item-name">${_esfEsc(d.nombre)} <span style="font-family:JetBrains Mono,monospace;font-size:9px;color:var(--green);letter-spacing:.1em">(asignado)</span></div>
               <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
                 <span class="tour-item-pts">+${d.pts}</span>
               </div>
@@ -7699,14 +7700,14 @@ function renderPerfilCompleto(u, toursPasados, evAsignados, iniciales, edad, cum
           return `
           <div class="tour-item">
             <div class="tour-item-head">
-              <div class="tour-item-name">${t.artista}</div>
+              <div class="tour-item-name">${_esfEsc(t.artista)}</div>
               <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
                 ${sumaPuntos ? `<span class="tour-item-pts">+${ptsTour}</span>` : '<span style="font-family:JetBrains Mono,monospace;font-size:9px;color:var(--ts);letter-spacing:.1em">PRE-2026</span>'}
                 <button onclick="event.stopPropagation();eliminarTourPasado('${t.id}','${u.id}')" style="background:none;border:none;color:var(--ts);cursor:pointer;font-size:18px;padding:0 4px">×</button>
               </div>
             </div>
             <div class="tour-item-meta">${TIPO_TOUR_LABEL[t.tipo_tour]||'Tour'} · ${t.ciudad || ''} ${t.fecha_aprox ? '· ' + fmtFecha(t.fecha_aprox) : ''}</div>
-            ${t.notas ? `<div style="font-size:11px;color:var(--ts);margin-top:6px;font-style:italic">${t.notas}</div>` : ''}
+            ${t.notas ? `<div style="font-size:11px;color:var(--ts);margin-top:6px;font-style:italic">${_esfEsc(t.notas)}</div>` : ''}
           </div>`;
         }).join('')}
         ${(toursPasados.length + detalleAuto.length) === 0 ? '<div style="font-family:JetBrains Mono,monospace;font-size:11px;color:var(--ts);letter-spacing:.05em">// sin historial. Agrega tus tours pre-sistema para construir tu perfil.</div>' : ''}
@@ -7718,14 +7719,14 @@ function renderPerfilCompleto(u, toursPasados, evAsignados, iniciales, edad, cum
 function perfilCampo(label, valor) {
   return `<div class="perfil-field">
     <div class="perfil-field-label">${label}</div>
-    <div class="perfil-field-value ${valor ? '' : 'perfil-field-empty'}">${valor || '— sin info'}</div>
+    <div class="perfil-field-value ${valor ? '' : 'perfil-field-empty'}">${valor ? _esfEsc(valor) : '— sin info'}</div>
   </div>`;
 }
 
 function renderFormPerfil() {
   const temaActual = (currentUser.tema_acento || '#e8ff4c').toLowerCase();
   const temaDots = TEMA_PRESETS.map(t =>
-    `<button type="button" class="tema-dot${t.hex.toLowerCase() === temaActual ? ' sel' : ''}" style="--c:${t.hex}" data-hex="${t.hex.toLowerCase()}" title="${t.nombre}" aria-label="${t.nombre}" onclick="seleccionarTema('${t.hex}', this)"></button>`
+    `<button type="button" class="tema-dot${t.hex.toLowerCase() === temaActual ? ' sel' : ''}" style="--c:${t.hex}" data-hex="${t.hex.toLowerCase()}" title="${_esfEsc(t.nombre)}" aria-label="${_esfEsc(t.nombre)}" onclick="seleccionarTema('${t.hex}', this)"></button>`
   ).join('');
   return `
     <div class="perfil-card" style="max-width:920px">
@@ -7955,8 +7956,8 @@ async function abrirRanking() {
             const posDisplay = i < 3 ? medallaEmoji[i] : `#${i+1}`;
             return `<div class="rank-row ${top} ${esYo}">
               <div class="rank-pos">${posDisplay}</div>
-              <div class="gz-avatar" style="width:44px;height:44px;font-size:14px;flex-shrink:0">${u.foto_url ? `<img src="${u.foto_url}">` : u.iniciales}</div>
-              <div style="flex:1;min-width:0"><div style="font-family:Rajdhani;font-weight:700;font-size:14px">${u.nombre}${esYo ? ' <span style="font-family:JetBrains Mono;font-size:9px;color:var(--orange);letter-spacing:.1em">// TÚ</span>' : ''}</div><div class="gz-rol" style="font-size:9px;margin-bottom:0">${ROL_LABELS[u.rol] || u.rol} · ${u.numTours} tours</div></div>
+              <div class="gz-avatar" style="width:44px;height:44px;font-size:14px;flex-shrink:0">${u.foto_url ? `<img src="${_urlSegura(u.foto_url)}">` : u.iniciales}</div>
+              <div style="flex:1;min-width:0"><div style="font-family:Rajdhani;font-weight:700;font-size:14px">${_esfEsc(u.nombre)}${esYo ? ' <span style="font-family:JetBrains Mono;font-size:9px;color:var(--orange);letter-spacing:.1em">// TÚ</span>' : ''}</div><div class="gz-rol" style="font-size:9px;margin-bottom:0">${ROL_LABELS[u.rol] || u.rol} · ${u.numTours} tours</div></div>
               <div style="text-align:right"><div class="rank-pts">${u.ptsAnio}</div><div style="font-family:'JetBrains Mono',monospace;font-size:8px;letter-spacing:.18em;color:var(--ts);text-transform:uppercase">PTS</div></div>
             </div>`;
           }).join('')}
@@ -8619,9 +8620,9 @@ function renderCCEventos(lista, filtro) {
     return `<div style="background:var(--bg2);border:1px solid var(--border);border-left:3px solid ${pasado?'var(--border)':'var(--orange)'};border-radius:var(--radius);padding:16px 20px;margin-bottom:10px;cursor:pointer;transition:border-color .2s" onclick="abrirDetalleEvento('${e.id}')" onmouseenter="this.style.borderColor='var(--orange)'" onmouseleave="this.style.borderColor='${pasado?'var(--border)':'var(--orange)'}'"">
       <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap">
         <div>
-          <div style="font-family:'Rajdhani',sans-serif;font-weight:700;font-size:20px;margin-bottom:2px">${e.nombre}</div>
+          <div style="font-family:'Rajdhani',sans-serif;font-weight:700;font-size:20px;margin-bottom:2px">${_esfEsc(e.nombre)}</div>
           <div style="font-size:11px;font-family:'JetBrains Mono',monospace;color:var(--ts)">
-            ${e.artista ? e.artista + ' · ' : ''}${e.ciudad||''} · ${fecha.toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric'})}
+            ${e.artista ? _esfEsc(e.artista) + ' · ' : ''}${e.ciudad||''} · ${fecha.toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric'})}
           </div>
           <div style="margin-top:6px">
             <span style="font-size:10px;padding:2px 8px;background:rgba(255,107,0,.12);border:1px solid rgba(255,107,0,.25);border-radius:4px;color:var(--orange);font-family:'JetBrains Mono',monospace">${tipoLabel}</span>
@@ -8660,11 +8661,11 @@ function abrirModalEvento(id) {
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
           <div class="form-group" style="grid-column:1/-1">
             <label>Nombre del tour *</label>
-            <input class="cot-input" id="ccev-nombre" value="${e?.nombre||''}" placeholder="Ej: RAMMSTEIN CDMX…" style="width:100%">
+            <input class="cot-input" id="ccev-nombre" value="${_esfEsc(e?.nombre||'')}" placeholder="Ej: RAMMSTEIN CDMX…" style="width:100%">
           </div>
           <div class="form-group" style="grid-column:1/-1">
             <label>Artista</label>
-            <input class="cot-input" id="ccev-artista" value="${e?.artista||''}" placeholder="Nombre del artista…" style="width:100%">
+            <input class="cot-input" id="ccev-artista" value="${_esfEsc(e?.artista||'')}" placeholder="Nombre del artista…" style="width:100%">
           </div>
           <div class="form-group">
             <label>Ciudad *</label>
@@ -8759,9 +8760,9 @@ async function abrirDetalleEvento(id) {
     header.innerHTML = `
       <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap">
         <div>
-          <div style="font-family:'Rajdhani',sans-serif;font-weight:700;font-size:22px">${ev.nombre}</div>
+          <div style="font-family:'Rajdhani',sans-serif;font-weight:700;font-size:22px">${_esfEsc(ev.nombre)}</div>
           <div style="font-size:11px;font-family:'JetBrains Mono',monospace;color:var(--ts);margin-top:2px">
-            ${ev.artista?ev.artista+' · ':''}${ev.ciudad||''} · ${fecha.toLocaleDateString('es-MX',{weekday:'long',day:'numeric',month:'long',year:'numeric'})} · ${TIPOS_EVENTO[ev.tipo_evento]||'Concierto'}
+            ${ev.artista?_esfEsc(ev.artista)+' · ':''}${ev.ciudad||''} · ${fecha.toLocaleDateString('es-MX',{weekday:'long',day:'numeric',month:'long',year:'numeric'})} · ${TIPOS_EVENTO[ev.tipo_evento]||'Concierto'}
           </div>
           ${ev.notas_internas?`<div style="margin-top:8px;font-size:11px;color:var(--ts);padding:6px 10px;background:rgba(255,255,255,.03);border-left:2px solid var(--border)">${ev.notas_internas}</div>`:''}
         </div>
@@ -8873,11 +8874,11 @@ async function loadCCEquipo() {
         <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
           <div style="display:flex;align-items:center;gap:12px">
             <div style="width:40px;height:40px;border-radius:50%;background:var(--bg3);overflow:hidden;flex-shrink:0;display:flex;align-items:center;justify-content:center">
-              ${u.foto_url ? `<img src="${u.foto_url}" style="width:100%;height:100%;object-fit:cover">` :
-              `<span style="font-family:'Zen Dots',sans-serif;font-size:15px;color:var(--orange)">${(u.nombre||'?')[0]}</span>`}
+              ${u.foto_url ? `<img src="${_urlSegura(u.foto_url)}" style="width:100%;height:100%;object-fit:cover">` :
+              `<span style="font-family:'Zen Dots',sans-serif;font-size:15px;color:var(--orange)">${_esfEsc((u.nombre||'?')[0])}</span>`}
             </div>
             <div>
-              <div style="font-family:'Rajdhani',sans-serif;font-weight:700;font-size:16px">${u.nombre||'—'}</div>
+              <div style="font-family:'Rajdhani',sans-serif;font-weight:700;font-size:16px">${_esfEsc(u.nombre||'—')}</div>
               <div style="font-size:10px;font-family:'JetBrains Mono',monospace;color:var(--ts)">${u.rol||''} · <span style="color:${statusCol[st]||'var(--ts)'}">${statusLabel[st]||st}</span></div>
               ${indicacionesHtml}
               ${a.motivo_declinacion ? `<div style="font-size:11px;color:var(--red);margin-top:3px">Motivo: ${a.motivo_declinacion}</div>` : ''}
@@ -8899,11 +8900,11 @@ async function loadCCEquipo() {
         <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
           <div style="display:flex;align-items:center;gap:12px">
             <div style="width:40px;height:40px;border-radius:50%;background:var(--bg3);overflow:hidden;flex-shrink:0;display:flex;align-items:center;justify-content:center">
-              ${u.foto_url ? `<img src="${u.foto_url}" style="width:100%;height:100%;object-fit:cover">` :
-              `<span style="font-family:'Zen Dots',sans-serif;font-size:15px;color:${COLOR_PEND_FIRMA}">${(nombre||'?')[0]}</span>`}
+              ${u.foto_url ? `<img src="${_urlSegura(u.foto_url)}" style="width:100%;height:100%;object-fit:cover">` :
+              `<span style="font-family:'Zen Dots',sans-serif;font-size:15px;color:${COLOR_PEND_FIRMA}">${_esfEsc((nombre||'?')[0])}</span>`}
             </div>
             <div>
-              <div style="font-family:'Rajdhani',sans-serif;font-weight:700;font-size:16px">${nombre}</div>
+              <div style="font-family:'Rajdhani',sans-serif;font-weight:700;font-size:16px">${_esfEsc(nombre)}</div>
               <div style="font-size:10px;font-family:'JetBrains Mono',monospace;color:var(--ts)">cc · <span style="color:${COLOR_PEND_FIRMA};font-weight:700"><svg class="ic"><use href="#ic-lapiz"/></svg> PENDIENTE DE FIRMA</span></div>
             </div>
           </div>
@@ -8935,7 +8936,7 @@ async function abrirModalAsignarCoordi() {
     const deuda = deudasPorUser[u.id]||0;
     const warn = deuda > 0 ? ` <svg class="ic"><use href="#ic-alerta"/></svg> debe ${formatMXN(deuda)}` : '';
     const strike = u.strikes >= 2 ? ` <svg class="ic"><use href="#ic-alerta"/></svg> ${u.strikes} strikes` : '';
-    return `<option value="${u.id}">${u.nombre} · ${u.rol}${warn}${strike}</option>`;
+    return `<option value="${u.id}">${_esfEsc(u.nombre)} · ${u.rol}${warn}${strike}</option>`;
   }).join('');
   document.getElementById('modal-asignar-coordi').innerHTML = `
     <div class="modal" style="max-width:480px">
@@ -8994,11 +8995,11 @@ async function guardarAsignacionCoordi() {
           subject: `Tour asignado: ${ev?.nombre||'Evento'}`,
           html: `<div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;background:#0a0a0f;color:#f0f0f5;padding:32px;border-radius:12px">
             <h2 style="color:#FF6B00;margin-bottom:8px">Tour Asignado</h2>
-            <p>Hola <strong>${usuario.nombre}</strong>,</p>
+            <p>Hola <strong>${_esfEsc(usuario.nombre)}</strong>,</p>
             <p>Se te ha asignado el siguiente tour:</p>
             <div style="background:#1a1a24;border-left:3px solid #FF6B00;padding:16px 20px;border-radius:8px;margin:20px 0">
-              <div style="font-size:20px;font-weight:700">${ev?.nombre||''}</div>
-              <div style="color:#888899;font-size:13px">${ev?.artista?ev.artista+' · ':''}${ev?.ciudad||''}</div>
+              <div style="font-size:20px;font-weight:700">${_esfEsc(ev?.nombre||'')}</div>
+              <div style="color:#888899;font-size:13px">${ev?.artista?_esfEsc(ev.artista)+' · ':''}${ev?.ciudad||''}</div>
               <div style="color:#888899;font-size:13px">${ev?.fecha?new Date(ev.fecha+'T12:00:00').toLocaleDateString('es-MX',{weekday:'long',day:'numeric',month:'long',year:'numeric'}):''}</div>
             </div>
             ${indicaciones?`<p><strong>Indicaciones:</strong><br><span style="color:#888899">${indicaciones}</span></p>`:''}
@@ -9046,9 +9047,9 @@ async function reenviarNotificacion(asigId) {
           subject: `Recordatorio — Tour asignado: ${ev?.nombre||''}`,
           html: `<div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;background:#0a0a0f;color:#f0f0f5;padding:32px;border-radius:12px">
             <h2 style="color:#FFB703">Recordatorio de asignación</h2>
-            <p>Hola <strong>${usuario.nombre}</strong>, aún no has respondido a tu asignación:</p>
+            <p>Hola <strong>${_esfEsc(usuario.nombre)}</strong>, aún no has respondido a tu asignación:</p>
             <div style="background:#1a1a24;border-left:3px solid #FF6B00;padding:16px 20px;border-radius:8px;margin:20px 0">
-              <div style="font-size:18px;font-weight:700">${ev?.nombre||''}</div>
+              <div style="font-size:18px;font-weight:700">${_esfEsc(ev?.nombre||'')}</div>
               <div style="color:#888899">${ev?.ciudad||''} · ${ev?.fecha?new Date(ev.fecha+'T12:00:00').toLocaleDateString('es-MX',{day:'numeric',month:'long',year:'numeric'}):''}</div>
             </div>
             <div style="margin-top:24px;display:flex;gap:12px;flex-wrap:wrap">
@@ -9138,8 +9139,8 @@ async function notificarEquipoListas() {
         subject: `Listas listas: ${ev?.nombre||'Evento'}`,
         html: `<div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;background:#0a0a0f;color:#f0f0f5;padding:32px;border-radius:12px">
           <h2 style="color:#FF6B00">Listas actualizadas</h2>
-          <p>Hola <strong>${u.nombre}</strong>,</p>
-          <p>Las listas del evento <strong>${ev?.nombre||''}</strong> ya están listas.</p>
+          <p>Hola <strong>${_esfEsc(u.nombre)}</strong>,</p>
+          <p>Las listas del evento <strong>${_esfEsc(ev?.nombre||'')}</strong> ya están listas.</p>
           <ul style="color:#888899;line-height:2">
             <li>Lista de viajeros</li>
             <li>Rooming list</li>
@@ -9248,10 +9249,10 @@ function _renderViajerosTabla() {
         ? `<br><button class="btn btn-ghost btn-sm" style="font-size:10px;margin-top:5px" onclick="invitarWalkin('${_spEscape(c.id)}', this)"><svg class="ic"><use href="#ic-correo"/></svg> Invitar al portal</button>`
         : '';
       return `<tr>
-      <td style="font-weight:600">${c.nombre_completo || '—'} ${_badgeCliente(c)}${c.correo ? `<br><span style="color:var(--ts);font-size:11px;font-weight:400">${c.correo}</span>` : ''}${botonInvitar}</td>
-      <td style="font-family:'JetBrains Mono',monospace;font-size:12px">${c.celular || '—'}</td>
+      <td style="font-weight:600">${_esfEsc(c.nombre_completo || '—')} ${_badgeCliente(c)}${c.correo ? `<br><span style="color:var(--ts);font-size:11px;font-weight:400">${_esfEsc(c.correo)}</span>` : ''}${botonInvitar}</td>
+      <td style="font-family:'JetBrains Mono',monospace;font-size:12px">${_esfEsc(c.celular || '—')}</td>
       <td>${paq ? `<span style="font-size:10px;font-weight:700;padding:2px 10px;border-radius:4px;background:${paqCol[paq]||'rgba(255,255,255,.06)'};color:${paqFg[paq]||'var(--ts)'}">${paq}</span>` : '—'}</td>
-      <td style="font-size:11px;color:var(--orange);white-space:nowrap">${v.zona || '—'}</td>
+      <td style="font-size:11px;color:var(--orange);white-space:nowrap">${_esfEsc(v.zona || '—')}</td>
       <td style="text-align:center">${v.num_personas || 1}</td>
       <td style="text-align:right;font-family:'JetBrains Mono',monospace;font-size:12px">${_spFmtMxn(pago.total)}</td>
       <td style="text-align:right;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--green)">${_spFmtMxn(pago.abonado)}</td>
@@ -9597,11 +9598,11 @@ async function exportarViajeros(formato) {
   const _vPago   = v => v.pago || {};
   if (formato === 'pdf') {
     const sufijoFile = excluirStaff ? '-sin-staff' : '';
-    const html = `<html><head><meta charset="utf-8"><title>${titulo}</title>
+    const html = `<html><head><meta charset="utf-8"><title>${_esfEsc(titulo)}</title>
     <style>body{font-family:Arial,sans-serif;padding:24px}h2{margin-bottom:16px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ccc;padding:8px 12px;font-size:13px}th{background:#f5f5f5}td.num{text-align:right}</style></head><body>
-    <h2>${titulo}</h2>
+    <h2>${_esfEsc(titulo)}</h2>
     <table><thead><tr><th>#</th><th>Nombre</th><th>Celular</th><th>Correo</th><th>Paquete</th><th>Zona</th><th>Pers.</th><th>Total</th><th>Abonado</th><th>Restante</th><th>Estado</th></tr></thead>
-    <tbody>${lista.map((v,i)=>`<tr><td>${i+1}</td><td>${_vNombre(v)}</td><td>${_vCel(v)}</td><td>${_vCorreo(v)}</td><td>${v.paquete||''}</td><td>${v.zona||''}</td><td>${v.num_personas||1}</td><td class="num">${_spFmtMxn(_vPago(v).total)}</td><td class="num">${_spFmtMxn(_vPago(v).abonado)}</td><td class="num">${_spFmtMxn(_vPago(v).restante)}</td><td>${v.estado||''}</td></tr>`).join('')}</tbody>
+    <tbody>${lista.map((v,i)=>`<tr><td>${i+1}</td><td>${_vNombre(v)}</td><td>${_vCel(v)}</td><td>${_vCorreo(v)}</td><td>${v.paquete||''}</td><td>${_esfEsc(v.zona||'')}</td><td>${v.num_personas||1}</td><td class="num">${_spFmtMxn(_vPago(v).total)}</td><td class="num">${_spFmtMxn(_vPago(v).abonado)}</td><td class="num">${_spFmtMxn(_vPago(v).restante)}</td><td>${v.estado||''}</td></tr>`).join('')}</tbody>
     </table></body></html>`;
     _descargarHTML(`viajeros-${ev?.nombre||'evento'}${sufijoFile}.html`, html);
   } else {
@@ -9676,7 +9677,7 @@ async function loadRooming() {
       const c = v.clientes || {};
       const meta = [v.paquete, v.zona, (v.num_personas && v.num_personas > 1) ? (v.num_personas + ' pers.') : null].filter(Boolean).join(' · ');
       return `<div style="background:rgba(255,255,255,.07);border:1px solid var(--border);border-radius:6px;padding:6px 14px;font-size:13px">
-        <span style="font-weight:600">${c.nombre_completo || '—'}</span>
+        <span style="font-weight:600">${_esfEsc(c.nombre_completo || '—')}</span>
         ${meta ? `<span style="font-size:10px;color:var(--ts);margin-left:8px;font-family:'JetBrains Mono',monospace">${meta}</span>` : ''}
       </div>`;
     }).join('');
@@ -9927,7 +9928,7 @@ function renderHotelInfo() {
   }
   el.innerHTML = `<div style="display:flex;gap:20px;flex-wrap:wrap;align-items:center">
     <div>
-      <div style="font-family:'Rajdhani',sans-serif;font-weight:700;font-size:18px">${_ccHotelInfo.nombre}</div>
+      <div style="font-family:'Rajdhani',sans-serif;font-weight:700;font-size:18px">${_esfEsc(_ccHotelInfo.nombre)}</div>
       ${_ccHotelInfo.direccion?`<div style="font-size:12px;color:var(--ts);margin-top:2px">${_ccHotelInfo.direccion}</div>`:''}
     </div>
     <div style="font-size:11px;padding:4px 12px;border-radius:20px;border:1px solid ${_ccHotelInfo.incluye_desayuno?'rgba(61,220,132,.3)':'var(--border)'};color:${_ccHotelInfo.incluye_desayuno?'var(--green)':'var(--ts)'}">
@@ -9947,7 +9948,7 @@ function abrirModalHotel() {
       <div class="modal-body" style="display:flex;flex-direction:column;gap:14px">
         <div class="form-group">
           <label>Nombre del hotel *</label>
-          <input class="cot-input" id="hot-nombre" value="${h.nombre||''}" placeholder="Hotel Camino Real…" style="width:100%">
+          <input class="cot-input" id="hot-nombre" value="${_esfEsc(h.nombre||'')}" placeholder="Hotel Camino Real…" style="width:100%">
         </div>
         <div class="form-group">
           <label>Dirección</label>
@@ -10136,9 +10137,9 @@ async function exportarRooming(formato) {
   const tipoLabel = {individual:'Individual',doble:'Doble',triple:'Triple',cuadruple:'Cuádruple'};
   if (formato === 'pdf') {
     const sufijoFile = excluirStaff ? '-sin-staff' : '';
-    const html = `<html><head><meta charset="utf-8"><title>${titulo}</title>
+    const html = `<html><head><meta charset="utf-8"><title>${_esfEsc(titulo)}</title>
     <style>body{font-family:Arial,sans-serif;padding:24px}h2{margin-bottom:16px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ccc;padding:8px 12px;font-size:13px;vertical-align:top}th{background:#f5f5f5}</style></head><body>
-    <h2>${titulo}</h2>
+    <h2>${_esfEsc(titulo)}</h2>
     <table><thead><tr><th>Habitación</th><th>Tipo</th><th>Ocupantes</th></tr></thead>
     <tbody>${_ccHabitaciones.map(h=>{
       const ocp = filtrarOcp(h.ocupantes?(typeof h.ocupantes==='string'?JSON.parse(h.ocupantes):h.ocupantes):[]);
@@ -10170,11 +10171,11 @@ async function descargarListaViajeros(eventoId) {
     ]);
     if (!viajeros.length) { alert('No hay viajeros registrados para este evento'); return; }
     const titulo = `Viajeros — ${ev.nombre||'Evento'}`;
-    const html = `<html><head><meta charset="utf-8"><title>${titulo}</title>
+    const html = `<html><head><meta charset="utf-8"><title>${_esfEsc(titulo)}</title>
     <style>body{font-family:Arial,sans-serif;padding:24px}h2{margin-bottom:4px}p{color:#666;margin-bottom:20px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ccc;padding:8px 12px;font-size:13px}th{background:#f5f5f5}</style></head><body>
-    <h2>${titulo}</h2><p>${ev.artista?ev.artista+' · ':''}${ev.ciudad||''} ${ev.fecha?'· '+new Date(ev.fecha+'T12:00:00').toLocaleDateString('es-MX',{day:'numeric',month:'long',year:'numeric'}):''}</p>
+    <h2>${_esfEsc(titulo)}</h2><p>${ev.artista?_esfEsc(ev.artista)+' · ':''}${ev.ciudad||''} ${ev.fecha?'· '+new Date(ev.fecha+'T12:00:00').toLocaleDateString('es-MX',{day:'numeric',month:'long',year:'numeric'}):''}</p>
     <table><thead><tr><th>#</th><th>Nombre</th><th>Paquete</th><th>Zona</th><th>Talla</th><th>Celular</th><th>Emergencia</th><th>Notas</th></tr></thead>
-    <tbody>${viajeros.map((v,i)=>`<tr><td>${i+1}</td><td><strong>${v.nombre}</strong></td><td>${v.tipo_paquete||'—'}</td><td>${v.zona_boleto||'—'}</td><td>${v.talla_playera||'—'}</td><td>${v.celular||'—'}</td><td>${v.num_emergencia||'—'}</td><td>${v.notas||'—'}</td></tr>`).join('')}</tbody>
+    <tbody>${viajeros.map((v,i)=>`<tr><td>${i+1}</td><td><strong>${_esfEsc(v.nombre)}</strong></td><td>${v.tipo_paquete||'—'}</td><td>${v.zona_boleto||'—'}</td><td>${_esfEsc(v.talla_playera||'—')}</td><td>${_esfEsc(v.celular||'—')}</td><td>${v.num_emergencia||'—'}</td><td>${_esfEsc(v.notas||'—')}</td></tr>`).join('')}</tbody>
     </table></body></html>`;
     _descargarHTML(`viajeros-${(ev.nombre||'evento').replace(/[^a-zA-Z0-9-_]+/g,'_')}.html`, html);
   } catch(e) { alert('Error: ' + e.message); }
@@ -10189,9 +10190,9 @@ async function descargarRoomingList(eventoId) {
     if (!habs.length) { alert('No hay rooming list para este evento'); return; }
     const tipoLabels = {individual:'Individual',doble:'Doble',triple:'Triple',cuadruple:'Cuádruple'};
     const titulo = `Rooming List — ${ev.nombre||'Evento'}`;
-    const html = `<html><head><meta charset="utf-8"><title>${titulo}</title>
+    const html = `<html><head><meta charset="utf-8"><title>${_esfEsc(titulo)}</title>
     <style>body{font-family:Arial,sans-serif;padding:24px}h2{margin-bottom:4px}p{color:#666;margin-bottom:20px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ccc;padding:8px 12px;font-size:13px;vertical-align:top}th{background:#f5f5f5}</style></head><body>
-    <h2>${titulo}</h2>
+    <h2>${_esfEsc(titulo)}</h2>
     <p>${habs[0]?.hotel_nombre||''}${habs[0]?.hotel_direccion?' · '+habs[0].hotel_direccion:''}${habs[0]?.incluye_desayuno?' · ✓ Incluye desayuno':''}</p>
     <table><thead><tr><th>Habitación</th><th>Tipo</th><th>Ocupantes</th></tr></thead>
     <tbody>${habs.map((h,i)=>{
@@ -10449,7 +10450,7 @@ async function verSolicitudPortal(id) {
 
   const seccion = (titulo, html) => `
     <div style="margin-top:18px;padding-top:14px;border-top:1px solid var(--border)">
-      <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.14em;color:var(--orange);text-transform:uppercase;margin-bottom:10px">// ${titulo}</div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.14em;color:var(--orange);text-transform:uppercase;margin-bottom:10px">// ${_esfEsc(titulo)}</div>
       ${html}
     </div>`;
 
@@ -11866,12 +11867,12 @@ function renderMTReportes(lista, filtro) {
     return `<div style="background:var(--bg2);border:1px solid var(--border);border-left:3px solid ${s.color};border-radius:var(--radius);padding:16px 20px;margin-bottom:10px">
       <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:10px">
         <div>
-          <div style="font-family:'Rajdhani',sans-serif;font-size:18px;font-weight:700">${ev?ev.nombre:(r.evento_id||'—')}</div>
+          <div style="font-family:'Rajdhani',sans-serif;font-size:18px;font-weight:700">${_esfEsc(ev?ev.nombre:(r.evento_id||'—'))}</div>
           <div style="font-size:11px;font-family:'JetBrains Mono',monospace;color:var(--ts);margin-top:2px">
-            ${coo?coo.nombre+' · ':''}<span style="color:${s.color}">${s.icon} ${s.label}</span>
+            ${coo?_esfEsc(coo.nombre)+' · ':''}<span style="color:${s.color}">${s.icon} ${s.label}</span>
             ${ev?' · '+new Date(ev.fecha+'T12:00:00').toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric'}):''}
           </div>
-          ${r.rechazo_motivo?`<div style="margin-top:6px;font-size:11px;padding:5px 10px;background:rgba(255,68,68,.08);border-left:2px solid var(--red);color:var(--red)">Motivo rechazo: ${r.rechazo_motivo}</div>`:''}
+          ${r.rechazo_motivo?`<div style="margin-top:6px;font-size:11px;padding:5px 10px;background:rgba(255,68,68,.08);border-left:2px solid var(--red);color:var(--red)">Motivo rechazo: ${_esfEsc(r.rechazo_motivo)}</div>`:''}
         </div>
         <div style="display:flex;gap:12px;text-align:right">
           <div><div style="font-size:10px;color:var(--ts)">ENTREGADO</div><div style="font-family:'Zen Dots',sans-serif;font-size:16px;color:var(--gold)">${formatMXN(r.dinero_recibido||0)}</div></div>
@@ -11908,12 +11909,12 @@ function mtVerDetalleReporte(id) {
         <div class="k-mono" style="margin-bottom:10px">// COORDINADOR</div>
         <div style="display:flex;align-items:center;gap:10px">
           <div style="width:36px;height:36px;border-radius:50%;background:var(--bg3);overflow:hidden;flex-shrink:0;display:flex;align-items:center;justify-content:center">
-            ${coo.foto_url?`<img src="${coo.foto_url}" style="width:100%;height:100%;object-fit:cover">`:`<span style="font-family:'Zen Dots',sans-serif;font-size:13px;color:var(--orange)">${(coo.nombre||'?')[0]}</span>`}
+            ${coo.foto_url?`<img src="${_urlSegura(coo.foto_url)}" style="width:100%;height:100%;object-fit:cover">`:`<span style="font-family:'Zen Dots',sans-serif;font-size:13px;color:var(--orange)">${_esfEsc((coo.nombre||'?')[0])}</span>`}
           </div>
           <div>
-            <div style="font-weight:700;font-size:15px">${coo.nombre||'—'}</div>
-            <div style="font-size:11px;color:var(--ts)">${coo.correo||coo.username||''}</div>
-            <div style="font-size:11px;color:var(--ts)">${coo.celular||''}</div>
+            <div style="font-weight:700;font-size:15px">${_esfEsc(coo.nombre||'—')}</div>
+            <div style="font-size:11px;color:var(--ts)">${_esfEsc(coo.correo||coo.username||'')}</div>
+            <div style="font-size:11px;color:var(--ts)">${_esfEsc(coo.celular||'')}</div>
           </div>
         </div>
         ${r.cuenta_bancaria_coordi?`<div style="margin-top:10px;font-size:11px;padding:6px 10px;background:rgba(255,68,68,.06);border-left:2px solid var(--red);border-radius:4px">Cuenta: <strong>${r.cuenta_bancaria_coordi}</strong></div>`:''}
@@ -11921,8 +11922,8 @@ function mtVerDetalleReporte(id) {
       <!-- Info evento -->
       <div>
         <div class="k-mono" style="margin-bottom:10px">// EVENTO</div>
-        <div style="font-weight:700;font-size:15px">${ev.nombre||'—'}</div>
-        <div style="font-size:12px;color:var(--ts)">${ev.artista?ev.artista+' · ':''}${ev.ciudad||''}</div>
+        <div style="font-weight:700;font-size:15px">${_esfEsc(ev.nombre||'—')}</div>
+        <div style="font-size:12px;color:var(--ts)">${ev.artista?_esfEsc(ev.artista)+' · ':''}${ev.ciudad||''}</div>
         <div style="font-size:12px;color:var(--ts)">${ev.fecha?new Date(ev.fecha+'T12:00:00').toLocaleDateString('es-MX',{weekday:'long',day:'numeric',month:'long',year:'numeric'}):''}</div>
       </div>
     </div>
@@ -11951,14 +11952,14 @@ function mtVerDetalleReporte(id) {
       <div class="table-wrap">
         <table>
           <thead><tr><th>Concepto</th><th style="text-align:right">Monto</th></tr></thead>
-          <tbody>${gastos.map(g=>`<tr><td>${g.concepto||'—'}</td><td style="text-align:right;font-weight:600">${formatMXN(g.monto||0)}</td></tr>`).join('')}
+          <tbody>${gastos.map(g=>`<tr><td>${_esfEsc(g.concepto||'—')}</td><td style="text-align:right;font-weight:600">${formatMXN(g.monto||0)}</td></tr>`).join('')}
           <tr style="border-top:2px solid var(--border)"><td style="font-weight:700">TOTAL</td><td style="text-align:right;font-weight:700;font-family:'Zen Dots',sans-serif">${formatMXN(r.total_gastado||0)}</td></tr>
           </tbody>
         </table>
       </div>
     </div>` : '<div style="margin-top:12px;font-size:11px;color:var(--ts);font-family:JetBrains Mono,monospace">// sin gastos registrados</div>'}
 
-    ${r.notas?`<div style="margin-top:12px;padding:10px 14px;background:var(--bg3);border-left:2px solid var(--border2);font-size:12px;color:var(--ts)">${r.notas}</div>`:''}
+    ${r.notas?`<div style="margin-top:12px;padding:10px 14px;background:var(--bg3);border-left:2px solid var(--border2);font-size:12px;color:var(--ts)">${_esfEsc(r.notas)}</div>`:''}
   `;
   el.style.display = 'block';
 }
@@ -12063,8 +12064,8 @@ async function loadMTPendientes() {
           const lbl = p.vencido ? `<svg class="ic"><use href="#ic-alerta"/></svg> VENCIDO HACE ${Math.floor(Math.abs(p.horasRestantes))}h` : `${Math.floor(p.horasRestantes)}h restantes`;
           return `<div style="background:var(--bg2);border:1px solid var(--border);border-left:3px solid ${col};border-radius:var(--radius);padding:12px 18px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
             <div>
-              <div style="font-weight:700;font-size:14px">${p.coordi?.nombre||'—'}</div>
-              <div style="font-size:11px;color:var(--ts);font-family:'JetBrains Mono',monospace">${p.evento?.nombre||''} · ${p.evento?.fecha?new Date(p.evento.fecha+'T12:00:00').toLocaleDateString('es-MX',{day:'2-digit',month:'short'}):''}</div>
+              <div style="font-weight:700;font-size:14px">${_esfEsc(p.coordi?.nombre||'—')}</div>
+              <div style="font-size:11px;color:var(--ts);font-family:'JetBrains Mono',monospace">${_esfEsc(p.evento?.nombre||'')} · ${p.evento?.fecha?new Date(p.evento.fecha+'T12:00:00').toLocaleDateString('es-MX',{day:'2-digit',month:'short'}):''}</div>
             </div>
             <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:${col};font-weight:700">${lbl}</div>
           </div>`;
@@ -12079,8 +12080,8 @@ async function loadMTPendientes() {
           return `<div style="background:var(--bg2);border:1px solid var(--border);border-left:3px solid ${col};border-radius:var(--radius);padding:12px 18px;margin-bottom:8px">
             <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
               <div>
-                <div style="font-weight:700;font-size:14px">${d.coordi?.nombre||'—'}</div>
-                <div style="font-size:11px;color:var(--ts);font-family:'JetBrains Mono',monospace">${d.evento?.nombre||''}</div>
+                <div style="font-weight:700;font-size:14px">${_esfEsc(d.coordi?.nombre||'—')}</div>
+                <div style="font-size:11px;color:var(--ts);font-family:'JetBrains Mono',monospace">${_esfEsc(d.evento?.nombre||'')}</div>
               </div>
               <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:${col};font-weight:700">${lbl}</div>
             </div>
@@ -12150,16 +12151,16 @@ function renderMTDeudas(lista, filtro) {
       <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:14px 18px;margin-bottom:10px">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:10px">
           <div>
-            <div style="font-family:'Rajdhani',sans-serif;font-weight:700;font-size:16px">${g.coordi?.nombre||'—'}</div>
-            <div style="font-size:11px;color:var(--ts);font-family:'JetBrains Mono',monospace">${g.coordi?.correo||''}</div>
+            <div style="font-family:'Rajdhani',sans-serif;font-weight:700;font-size:16px">${_esfEsc(g.coordi?.nombre||'—')}</div>
+            <div style="font-size:11px;color:var(--ts);font-family:'JetBrains Mono',monospace">${_esfEsc(g.coordi?.correo||'')}</div>
           </div>
           <div style="font-family:'Zen Dots',sans-serif;font-size:18px;color:var(--red)">${formatMXN(g.total)}</div>
         </div>
         ${g.deudas.map(d => `
           <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-top:1px solid var(--border);flex-wrap:wrap;gap:8px">
             <div style="flex:1;min-width:200px">
-              <div style="font-size:13px">${d.concepto}</div>
-              <div style="font-size:10px;color:var(--ts);font-family:'JetBrains Mono',monospace">${d._evento?.nombre||''} · ${_tsToDate(d.created_at)?.toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric',timeZone:'America/Monterrey'})||'—'}</div>
+              <div style="font-size:13px">${_esfEsc(d.concepto)}</div>
+              <div style="font-size:10px;color:var(--ts);font-family:'JetBrains Mono',monospace">${_esfEsc(d._evento?.nombre||'')} · ${_tsToDate(d.created_at)?.toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric',timeZone:'America/Monterrey'})||'—'}</div>
             </div>
             <div style="font-family:'Zen Dots',sans-serif;font-size:14px;color:${d.pagado?'var(--green)':'var(--red)'}">${formatMXN(d.monto)}</div>
             <div style="display:flex;gap:6px">
@@ -12261,7 +12262,7 @@ async function loadMTResumen() {
           const hoy = new Date(); hoy.setHours(0,0,0,0);
           const dias = Math.ceil((f-hoy)/(1000*60*60*24));
           return `<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)">
-            <div style="font-weight:600;font-size:14px">${e.nombre}</div>
+            <div style="font-weight:600;font-size:14px">${_esfEsc(e.nombre)}</div>
             <div style="font-size:11px;font-family:'JetBrains Mono',monospace;color:${dias<=7?'var(--orange)':'var(--ts)'}">
               ${dias > 0 ? `en ${dias} día${dias!==1?'s':''}` : dias===0 ? '¡HOY!' : 'pasado'}
             </div>
@@ -12299,19 +12300,19 @@ function renderMTUsuarios(lista) {
   list.innerHTML = lista.map(u => `
     <div style="background:var(--bg2);border:1px solid ${u.activo?'var(--border)':'rgba(255,68,68,.2)'};border-radius:var(--radius);padding:14px 18px;margin-bottom:8px;display:flex;align-items:center;gap:14px;flex-wrap:wrap">
       <div style="width:36px;height:36px;border-radius:50%;background:var(--bg3);overflow:hidden;flex-shrink:0;display:flex;align-items:center;justify-content:center">
-        ${u.foto_url ? `<img src="${u.foto_url}" style="width:100%;height:100%;object-fit:cover">` :
-        `<span style="font-family:'Zen Dots',sans-serif;font-size:13px;color:var(--orange)">${(u.nombre||'?')[0]}</span>`}
+        ${u.foto_url ? `<img src="${_urlSegura(u.foto_url)}" style="width:100%;height:100%;object-fit:cover">` :
+        `<span style="font-family:'Zen Dots',sans-serif;font-size:13px;color:var(--orange)">${_esfEsc((u.nombre||'?')[0])}</span>`}
       </div>
       <div style="flex:1;min-width:140px">
-        <div style="font-family:'Rajdhani',sans-serif;font-weight:700;font-size:15px">${u.nombre||'—'} ${u.activo?'':'<span style="font-size:10px;color:var(--red)">[INACTIVO]</span>'}</div>
-        <div style="font-size:10px;font-family:'JetBrains Mono',monospace;color:var(--ts)">${rolLabels[u.rol]||u.rol} · ${u.correo||u.username||''}</div>
+        <div style="font-family:'Rajdhani',sans-serif;font-weight:700;font-size:15px">${_esfEsc(u.nombre||'—')} ${u.activo?'':'<span style="font-size:10px;color:var(--red)">[INACTIVO]</span>'}</div>
+        <div style="font-size:10px;font-family:'JetBrains Mono',monospace;color:var(--ts)">${rolLabels[u.rol]||u.rol} · ${_esfEsc(u.correo||u.username||'')}</div>
         ${u.strikes ? `<div style="font-size:10px;color:var(--red);margin-top:2px"><svg class="ic"><use href="#ic-alerta"/></svg> ${u.strikes} strike${u.strikes!==1?'s':''}</div>` : ''}
       </div>
       <div style="display:flex;gap:6px;flex-wrap:wrap">
         <button class="btn btn-ghost btn-sm" onclick="abrirVerComo('${u.id}','${u.rol}')" style="font-size:10px;font-family:'JetBrains Mono',monospace"><svg class="ic"><use href="#ic-ojo"/></svg> Ver como</button>
         <button class="btn btn-ghost btn-sm" onclick="abrirEditarUsuarioMT('${u.id}')" style="font-size:10px">⎘ Editar</button>
         <button class="btn ${u.activo?'btn-red':'btn-green'} btn-sm" onclick="toggleActivoUsuario('${u.id}',${u.activo})" style="font-size:10px">${u.activo?'Desactivar':'Activar'}</button>
-        <button class="btn btn-red btn-sm" onclick="eliminarUsuarioMT('${u.id}','${u.nombre.replace(/'/g,"\\'")}','${u.rol}')" style="font-size:10px;opacity:.7" title="Eliminar permanentemente">✕</button>
+        <button class="btn btn-red btn-sm" onclick="eliminarUsuarioMT('${u.id}','${_attrJs(u.nombre)}','${u.rol}')" style="font-size:10px;opacity:.7" title="Eliminar permanentemente">✕</button>
       </div>
     </div>`).join('');
 }
@@ -12397,7 +12398,7 @@ async function abrirEditarUsuarioMT(id) {
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
           <div class="form-group">
             <label>Nombre</label>
-            <input class="cot-input" id="mtu-nombre" value="${u.nombre||''}" style="width:100%">
+            <input class="cot-input" id="mtu-nombre" value="${_esfEsc(u.nombre||'')}" style="width:100%">
           </div>
           <div class="form-group">
             <label>Rol</label>
@@ -12407,7 +12408,7 @@ async function abrirEditarUsuarioMT(id) {
           </div>
           <div class="form-group">
             <label>Username</label>
-            <input class="cot-input" id="mtu-username" value="${u.username||''}" style="width:100%">
+            <input class="cot-input" id="mtu-username" value="${_esfEsc(u.username||'')}" style="width:100%">
           </div>
           <div class="form-group">
             <label>Nueva contraseña</label>
@@ -12476,18 +12477,18 @@ function abrirVerComo(userId, rol) {
   document.getElementById('modal-mt-vercomo').innerHTML = `
     <div class="modal" style="max-width:400px">
       <div class="modal-header">
-        <div class="modal-title" style="font-family:'Zen Dots',sans-serif;font-size:15px">Ver como: ${u.nombre}</div>
+        <div class="modal-title" style="font-family:'Zen Dots',sans-serif;font-size:15px">Ver como: ${_esfEsc(u.nombre)}</div>
         <button class="modal-close" onclick="closeModal('modal-mt-vercomo')">×</button>
       </div>
       <div class="modal-body">
-        <p style="font-size:13px;color:var(--ts);margin-bottom:16px">Vas a simular la vista del sistema como si fueras <strong style="color:var(--text)">${u.nombre}</strong> (${u.rol}). Tu sesión de Maestro Roshi se restaura al salir.</p>
+        <p style="font-size:13px;color:var(--ts);margin-bottom:16px">Vas a simular la vista del sistema como si fueras <strong style="color:var(--text)">${_esfEsc(u.nombre)}</strong> (${u.rol}). Tu sesión de Maestro Roshi se restaura al salir.</p>
         <div style="background:rgba(255,183,3,.06);border:1px solid rgba(255,183,3,.2);border-radius:8px;padding:12px;font-size:11px;color:var(--gold)">
-          <svg class="ic"><use href="#ic-alerta"/></svg> Solo es una vista — no puedes hacer cambios que afecten a ${u.nombre}
+          <svg class="ic"><use href="#ic-alerta"/></svg> Solo es una vista — no puedes hacer cambios que afecten a ${_esfEsc(u.nombre)}
         </div>
       </div>
       <div class="modal-footer">
         <button class="btn btn-ghost" onclick="closeModal('modal-mt-vercomo')">Cancelar</button>
-        <button class="btn btn-primary" onclick="activarVerComo('${userId}')">Entrar como ${u.nombre} →</button>
+        <button class="btn btn-primary" onclick="activarVerComo('${userId}')">Entrar como ${_esfEsc(u.nombre)} →</button>
       </div>
     </div>`;
   openModal('modal-mt-vercomo');
@@ -12516,7 +12517,7 @@ function mostrarBannerVerComo(nombre) {
     banner.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:9999;background:rgba(255,183,3,.95);color:#0a0a0f;padding:10px 20px;font-family:JetBrains Mono,monospace;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:space-between;letter-spacing:.05em';
     document.body.appendChild(banner);
   }
-  banner.innerHTML = `<span><svg class="ic"><use href="#ic-ojo"/></svg> MODO VISTA — viendo como: ${nombre.toUpperCase()}</span>
+  banner.innerHTML = `<span><svg class="ic"><use href="#ic-ojo"/></svg> MODO VISTA — viendo como: ${_esfEsc(nombre.toUpperCase())}</span>
     <button onclick="salirVerComo()" style="background:var(--bg);border:none;padding:6px 14px;border-radius:6px;cursor:pointer;font-family:JetBrains Mono,monospace;font-size:11px;font-weight:700">✕ Salir y volver a Roshi</button>`;
 }
 
@@ -12552,14 +12553,14 @@ async function loadMTStrikes() {
           const col = u.strikes >= 3 ? 'var(--red)' : u.strikes >= 2 ? 'var(--orange)' : 'var(--gold)';
           return `<div style="background:var(--bg2);border:1px solid var(--border);border-left:3px solid ${col};border-radius:var(--radius);padding:14px 18px;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
             <div>
-              <div style="font-family:'Rajdhani',sans-serif;font-weight:700;font-size:16px">${u.nombre}</div>
+              <div style="font-family:'Rajdhani',sans-serif;font-weight:700;font-size:16px">${_esfEsc(u.nombre)}</div>
               <div style="font-size:10px;font-family:'JetBrains Mono',monospace;color:var(--ts)">${rolLabels[u.rol]||u.rol}</div>
             </div>
             <div style="display:flex;align-items:center;gap:12px">
               <div style="font-family:'Zen Dots',sans-serif;font-size:28px;color:${col}">${u.strikes}</div>
               <div style="display:flex;gap:6px">
-                <button class="btn btn-primary btn-sm" onclick="ponerStrikeManual('${u.id}','${u.nombre.replace(/'/g,"\\'")}',${u.strikes})" style="font-size:10px">+ Strike</button>
-                <button class="btn btn-ghost btn-sm" onclick="quitarStrike('${u.id}','${u.nombre.replace(/'/g,"\\'")}',${u.strikes})" style="font-size:10px">− Quitar</button>
+                <button class="btn btn-primary btn-sm" onclick="ponerStrikeManual('${u.id}','${_attrJs(u.nombre)}',${u.strikes})" style="font-size:10px">+ Strike</button>
+                <button class="btn btn-ghost btn-sm" onclick="quitarStrike('${u.id}','${_attrJs(u.nombre)}',${u.strikes})" style="font-size:10px">− Quitar</button>
               </div>
             </div>
           </div>`;
@@ -12572,7 +12573,7 @@ async function loadMTStrikes() {
             <label>Usuario</label>
             <select class="cot-input" id="mt-strike-user" style="min-width:200px">
               <option value="">— Selecciona —</option>
-              ${usuarios.filter(u=>u.activo).map(u=>`<option value="${u.id}">${u.nombre} (${u.strikes||0} strikes)</option>`).join('')}
+              ${usuarios.filter(u=>u.activo).map(u=>`<option value="${u.id}">${_esfEsc(u.nombre)} (${u.strikes||0} strikes)</option>`).join('')}
             </select>
           </div>
           <div class="form-group" style="margin:0;flex:1;min-width:160px">
@@ -12615,9 +12616,9 @@ async function aplicarStrike(userId, nombre, strikesActuales, motivo) {
     const email = u?.correo_notif || u?.correo;
     if (email) {
       await enviarEmailSistema(email, `⚠️ Strike registrado — Kamehouse`,
-        `<p>Hola <strong>${nombre}</strong>,</p>
+        `<p>Hola <strong>${_esfEsc(nombre)}</strong>,</p>
          <p>Se ha registrado un strike en tu cuenta.</p>
-         <p><strong>Motivo:</strong> ${motivo}</p>
+         <p><strong>Motivo:</strong> ${_esfEsc(motivo)}</p>
          <p><strong>Strikes acumulados:</strong> ${nuevos}/3</p>
          ${nuevos >= 2 ? `<p style="color:#FF4444"><strong>⚠️ Advertencia:</strong> Al llegar a 3 strikes tu cuenta será suspendida.</p>` : ''}
          ${nuevos >= 3 ? `<p style="color:#FF4444"><strong>Tu cuenta ha sido suspendida.</strong></p>` : ''}`
@@ -12676,7 +12677,7 @@ async function loadMTAlertas() {
       return `<div style="background:var(--bg2);border:1px solid var(--border);border-left:3px solid ${ti.color};border-radius:var(--radius);padding:12px 18px;margin-bottom:8px;${a.leida?'opacity:.5':''}">
         <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;flex-wrap:wrap">
           <div>
-            <div style="font-size:13px;font-weight:600">${ti.icon} ${a.mensaje||ti.label}</div>
+            <div style="font-size:13px;font-weight:600">${ti.icon} ${_esfEsc(a.mensaje||ti.label)}</div>
             <div style="font-size:10px;font-family:'JetBrains Mono',monospace;color:var(--ts);margin-top:3px">
               ${fecha.toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric',timeZone:'America/Monterrey'})} ${fecha.toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit',hour12:true,timeZone:'America/Monterrey'})}
             </div>
@@ -12757,6 +12758,34 @@ async function guardarConfigCuenta() {
 // Aditivo puro: alta y listado en la tabla nueva esferas_eventos vía Functions
 // propias (esferas-crear / esferas-listar). No toca EV, eventos_meta, portal ni
 // ninguna otra página. Mismo patrón khAdminFetch + alerts que guardarConfigCuenta.
+// 🖥️ CAP5-1 — escape para TEXTO dentro de un MANEJADOR EN LÍNEA (onclick="f('…')").
+// Ahí conviven DOS parsers y hay que sobrevivir a los dos, en orden:
+//   1) el navegador lee el atributo y DECODIFICA las entidades HTML;
+//   2) lo que queda se lo pasa al motor de JS.
+// Por eso `_esfEsc` SOLO no sirve: convierte ' en &#39;, el parser lo devuelve a
+// ' y el JS ve la comilla que cierra su propia cadena. Y `replace(/'/g,"\\'")`
+// tampoco: no toca la comilla DOBLE, que cierra el atributo entero.
+// La secuencia correcta es escapar primero para JS y DESPUÉS para HTML.
+function _attrJs(s) {
+  const js = String(s == null ? '' : s)
+    .replace(/\\/g, '\\\\')
+    .replace(/'/g, "\\'")
+    .replace(/"/g, '\\"')
+    .replace(/\r/g, '\\r')
+    .replace(/\n/g, '\\n');
+  return _esfEsc(js);
+}
+
+// 🖥️ CAP5-1 — URL segura para src/href. Una URL `javascript:` en un atributo es
+// ejecución directa, así que solo se aceptan https:// y rutas del propio sitio;
+// cualquier otra cosa devuelve '' y el atributo NO se pinta.
+function _urlSegura(u) {
+  const s = String(u == null ? '' : u).trim();
+  if (!s) return '';
+  if (/^https:\/\//i.test(s) || /^\//.test(s) || /^data:image\//i.test(s)) return _esfEsc(s);
+  return '';
+}
+
 function _esfEsc(s) {
   return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
 }
@@ -14801,12 +14830,12 @@ async function enviarAlertaMemo(tipo, datos = {}) {
       case 'tour_declinado':
         mensaje = `${datos.nombre||'Un coordi'} declinó el tour: ${datos.evento||''}${datos.motivo?' — Motivo: '+datos.motivo:''}`;
         emailSubject = `❌ Tour declinado — ${datos.evento||''}`;
-        emailBody = `<p>${datos.nombre} declinó el tour <strong>${datos.evento}</strong>.</p>${datos.motivo?`<p><strong>Motivo:</strong> ${datos.motivo}</p>`:''}`;
+        emailBody = `<p>${_esfEsc(datos.nombre)} declinó el tour <strong>${datos.evento}</strong>.</p>${datos.motivo?`<p><strong>Motivo:</strong> ${_esfEsc(datos.motivo)}</p>`:''}`;
         break;
       case 'reporte_rechazado':
         mensaje = `Maestro Karin rechazó el reporte de ${datos.coordi||'un coordi'}${datos.motivo?': '+datos.motivo:''}`;
         emailSubject = `Reporte rechazado por Maestro Karin`;
-        emailBody = `<p>Maestro Karin rechazó el reporte post-evento de <strong>${datos.coordi}</strong>.</p>${datos.motivo?`<p><strong>Motivo:</strong> ${datos.motivo}</p>`:''}`;
+        emailBody = `<p>Maestro Karin rechazó el reporte post-evento de <strong>${datos.coordi}</strong>.</p>${datos.motivo?`<p><strong>Motivo:</strong> ${_esfEsc(datos.motivo)}</p>`:''}`;
         break;
       case 'nuevo_usuario':
         mensaje = `Nuevo usuario registrado: ${datos.nombre||''}`;
@@ -14814,12 +14843,12 @@ async function enviarAlertaMemo(tipo, datos = {}) {
         // en admin@conectareynosa.mx. La alerta in-app (sistema_alertas) sigue activa.
         // Si se necesita reactivar, descomentar estas 2 líneas.
         // emailSubject = `👤 Nuevo guerrero Z: ${datos.nombre||''}`;
-        // emailBody = `<p>Se registró un nuevo usuario: <strong>${datos.nombre}</strong> (${datos.rol||''}).</p>`;
+        // emailBody = `<p>Se registró un nuevo usuario: <strong>${_esfEsc(datos.nombre)}</strong> (${datos.rol||''}).</p>`;
         break;
       case 'strikes':
         mensaje = `${datos.nombre} acumuló ${datos.strikes} strike${datos.strikes!==1?'s':''}${datos.motivo?' — '+datos.motivo:''}`;
         emailSubject = `⚠️ ${datos.strikes >= 3 ? 'SUSPENSIÓN' : 'Advertencia'} — ${datos.nombre}`;
-        emailBody = `<p><strong>${datos.nombre}</strong> tiene ahora ${datos.strikes} strike${datos.strikes!==1?'s':''}.</p>${datos.motivo?`<p>Motivo: ${datos.motivo}</p>`:''}${datos.strikes>=3?'<p style="color:#FF4444"><strong>Cuenta suspendida automáticamente.</strong></p>':''}`;
+        emailBody = `<p><strong>${_esfEsc(datos.nombre)}</strong> tiene ahora ${datos.strikes} strike${datos.strikes!==1?'s':''}.</p>${datos.motivo?`<p>Motivo: ${_esfEsc(datos.motivo)}</p>`:''}${datos.strikes>=3?'<p style="color:#FF4444"><strong>Cuenta suspendida automáticamente.</strong></p>':''}`;
         break;
       case 'usuario_desactivado':
         mensaje = `Usuario desactivado desde el panel`;
@@ -14829,7 +14858,7 @@ async function enviarAlertaMemo(tipo, datos = {}) {
       default:
         mensaje = JSON.stringify(datos);
         emailSubject = `Alerta Kamehouse: ${tipo}`;
-        emailBody = `<p>${mensaje}</p>`;
+        emailBody = `<p>${_esfEsc(mensaje)}</p>`;
     }
     // INSERT vía Netlify Function con service_role: la tabla tiene RLS que
     // bloquea INSERT desde el cliente anon (daba 401). Mantiene .catch para
@@ -14978,17 +15007,17 @@ function renderReportes(lista, filtro) {
     // Kits sobrantes resumen
     const kitsSob = kits.filter(k => (k.cantidad_sobrante||0) > 0);
     const kitsHtml = kitsSob.length ? `<div style="margin-top:8px;font-size:11px;color:var(--ts);font-family:'JetBrains Mono',monospace">
-      SOBRANTES: ${kitsSob.map(k => `${k.nombre||k.pieza_nombre||k.pieza_id} ×${k.cantidad_sobrante}`).join(' · ')}
+      SOBRANTES: ${kitsSob.map(k => `${_esfEsc(k.nombre||k.pieza_nombre||k.pieza_id)} ×${Number(k.cantidad_sobrante)||0}`).join(' · ')}
     </div>` : '';
 
     return `<div style="background:var(--bg2);border:1px solid var(--border);border-left:3px solid ${s.color};border-radius:var(--radius);padding:16px 20px;margin-bottom:12px">
       <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap">
         <div>
-          <div style="font-family:'Rajdhani',sans-serif;font-size:18px;font-weight:700;margin-bottom:2px">${ev ? ev.nombre : (r.evento_id || '—')}</div>
+          <div style="font-family:'Rajdhani',sans-serif;font-size:18px;font-weight:700;margin-bottom:2px">${_esfEsc(ev ? ev.nombre : (r.evento_id || '—'))}</div>
           ${r.status === 'rechazado' ? '<span style="display:inline-block;background:var(--red);color:#fff;font-size:9px;font-weight:900;letter-spacing:.05em;padding:2px 8px;border-radius:4px;margin-bottom:6px;font-family:\'JetBrains Mono\',monospace">RECHAZADO · CORREGIR</span>' : ''}
           <div style="font-size:11px;font-family:'JetBrains Mono',monospace;color:var(--ts);margin-bottom:8px">
             ${ev ? new Date(ev.fecha+'T12:00:00').toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric'}) : ''}
-            ${coo ? ` · ${coo.nombre}` : ''} · <span style="color:${s.color}">${s.icon} ${s.label}</span>
+            ${coo ? ` · ${_esfEsc(coo.nombre)}` : ''} · <span style="color:${s.color}">${s.icon} ${s.label}</span>
           </div>
           <div style="display:flex;gap:20px;flex-wrap:wrap">
             <div><div style="font-size:10px;letter-spacing:.12em;color:var(--ts)">ENTREGADO</div><div style="font-family:'Zen Dots',sans-serif;font-size:16px">${formatMXN(r.dinero_recibido||0)}</div></div>
@@ -14996,7 +15025,7 @@ function renderReportes(lista, filtro) {
             <div><div style="font-size:10px;letter-spacing:.12em;color:var(--ts)">DIFERENCIA</div><div style="font-family:'Zen Dots',sans-serif;font-size:16px;color:${difColor}">${difLabel}</div></div>
           </div>
           ${kitsHtml}
-          ${r.rechazo_motivo ? `<div style="margin-top:8px;font-size:11px;padding:6px 10px;background:rgba(255,68,68,.08);border-left:2px solid var(--red);color:var(--red)">Motivo rechazo: ${r.rechazo_motivo}</div>` : ''}
+          ${r.rechazo_motivo ? `<div style="margin-top:8px;font-size:11px;padding:6px 10px;background:rgba(255,68,68,.08);border-left:2px solid var(--red);color:var(--red)">Motivo rechazo: ${_esfEsc(r.rechazo_motivo)}</div>` : ''}
         </div>
         <div style="display:flex;align-items:center;gap:8px">
           <button class="btn btn-ghost btn-sm" onclick="verDetalleReporte('${r.id}')" style="font-family:'JetBrains Mono',monospace;font-size:10px">VER DETALLE</button>
@@ -15053,12 +15082,12 @@ async function abrirModalReporte(reporteId) {
 
   // Opciones select piezas
   const piezasOptions = piezas.map(p =>
-    `<option value="${p.id}">${p.nombre || p.pieza}</option>`
+    `<option value="${p.id}">${_esfEsc(p.nombre || p.pieza)}</option>`
   ).join('');
 
   // Render kits rows
   function kitRow(k, idx) {
-    const sel = piezas.map(p => `<option value="${p.id}" ${p.id===k.pieza_id?'selected':''}>${p.nombre||p.pieza}</option>`).join('');
+    const sel = piezas.map(p => `<option value="${p.id}" ${p.id===k.pieza_id?'selected':''}>${_esfEsc(p.nombre||p.pieza)}</option>`).join('');
     return `<div class="kit-row" data-idx="${idx}" style="display:grid;grid-template-columns:1fr 100px 100px 28px;gap:8px;align-items:center;margin-bottom:8px">
       <select class="cot-input kit-pieza-sel" style="font-size:12px;padding:7px 10px"><option value="">— Pieza —</option>${sel}</select>
       <input type="number" class="cot-input kit-sacada" placeholder="Sacada" min="0" value="${k.cantidad_sacada||''}" style="font-size:12px;padding:7px 10px">
@@ -15068,7 +15097,7 @@ async function abrirModalReporte(reporteId) {
   }
   function gastoRow(g, idx) {
     return `<div class="gasto-row" style="display:grid;grid-template-columns:1fr 130px 28px;gap:8px;align-items:center;margin-bottom:8px">
-      <input type="text" class="cot-input gasto-concepto" placeholder="Concepto" value="${g.concepto||''}" style="font-size:12px;padding:7px 10px">
+      <input type="text" class="cot-input gasto-concepto" placeholder="Concepto" value="${_esfEsc(g.concepto||'')}" style="font-size:12px;padding:7px 10px">
       <input type="number" class="cot-input gasto-monto" placeholder="Monto" min="0" value="${g.monto||''}" style="font-size:12px;padding:7px 10px" oninput="recalcReporte()">
       <button onclick="this.closest('.gasto-row').remove();recalcReporte()" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:16px;padding:0">×</button>
     </div>`;
@@ -15080,7 +15109,7 @@ async function abrirModalReporte(reporteId) {
   const evOptions = evAsig.map(e => {
     const f = e.fecha ? new Date(e.fecha + 'T12:00:00') : null;
     const fTxt = (f && !isNaN(f)) ? ' · ' + f.toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric'}) : '';
-    return `<option value="${e.id}" ${e.id===reporte?.evento_id?'selected':''}>${e.nombre}${fTxt}</option>`;
+    return `<option value="${e.id}" ${e.id===reporte?.evento_id?'selected':''}>${_esfEsc(e.nombre)}${fTxt}</option>`;
   }).join('');
 
   // CAMBIO 4: aviso de rechazo visible al reabrir un reporte rechazado
@@ -15164,7 +15193,7 @@ async function abrirModalReporte(reporteId) {
 
         <div class="form-group">
           <label>Notas adicionales</label>
-          <textarea class="cot-input" id="rep-notas" rows="3" placeholder="Algo importante que Memo deba saber…" style="width:100%;resize:vertical">${reporte?.notas||''}</textarea>
+          <textarea class="cot-input" id="rep-notas" rows="3" placeholder="Algo importante que Memo deba saber…" style="width:100%;resize:vertical">${_esfEsc(reporte?.notas||'')}</textarea>
         </div>
 
         <div id="rep-alert"></div>
@@ -15183,7 +15212,7 @@ async function abrirModalReporte(reporteId) {
 function agregarKitRow() {
   const container = document.getElementById('kits-rows');
   const piezas = _bodegaPiezasCache;
-  const sel = piezas.map(p => `<option value="${p.id}">${p.nombre||p.pieza}</option>`).join('');
+  const sel = piezas.map(p => `<option value="${p.id}">${_esfEsc(p.nombre||p.pieza)}</option>`).join('');
   const div = document.createElement('div');
   div.className = 'kit-row';
   div.style.cssText = 'display:grid;grid-template-columns:1fr 100px 100px 28px;gap:8px;align-items:center;margin-bottom:8px';
@@ -15480,7 +15509,7 @@ function verDetalleReporte(id) {
   ).join('') : '<tr><td colspan="4" style="color:var(--ts)">Sin kits registrados</td></tr>';
 
   const gastosHtml = gastos.length ? gastos.map(g =>
-    `<tr><td>${g.concepto}</td><td style="text-align:right;font-weight:600">${formatMXN(g.monto)}</td></tr>`
+    `<tr><td>${_esfEsc(g.concepto)}</td><td style="text-align:right;font-weight:600">${formatMXN(g.monto)}</td></tr>`
   ).join('') : '<tr><td colspan="2" style="color:var(--ts)">Sin gastos</td></tr>';
 
   document.getElementById('modal-reporte').innerHTML = `
@@ -15488,7 +15517,7 @@ function verDetalleReporte(id) {
       <div class="modal-header">
         <div>
           <div class="modal-title" style="font-family:'Zen Dots',sans-serif;font-size:15px">DETALLE REPORTE</div>
-          <div style="font-size:11px;font-family:'JetBrains Mono',monospace;color:var(--ts)">${r._evento?.nombre || r.evento_id} · ${r._coordi?.nombre || ''}</div>
+          <div style="font-size:11px;font-family:'JetBrains Mono',monospace;color:var(--ts)">${_esfEsc(r._evento?.nombre || r.evento_id)} · ${_esfEsc(r._coordi?.nombre || '')}</div>
         </div>
         <button class="modal-close" onclick="closeModal('modal-reporte')">×</button>
       </div>
@@ -15513,7 +15542,7 @@ function verDetalleReporte(id) {
           <div><div style="font-size:10px;color:var(--ts)">DIFERENCIA</div><div style="font-family:'Zen Dots',sans-serif;font-size:18px;color:${difColor}">${formatMXN(Math.abs(dif))}</div></div>
         </div>
         ${r.cuenta_bancaria_coordi ? `<div style="padding:10px 14px;background:rgba(255,68,68,.06);border-left:2px solid var(--red);margin-bottom:12px;font-size:12px">Cuenta coordi: <strong>${r.cuenta_bancaria_coordi}</strong></div>` : ''}
-        ${r.notas ? `<div style="padding:10px 14px;background:var(--bg3);border-left:2px solid var(--border2);font-size:12px;color:var(--ts)">Notas: ${r.notas}</div>` : ''}
+        ${r.notas ? `<div style="padding:10px 14px;background:var(--bg3);border-left:2px solid var(--border2);font-size:12px;color:var(--ts)">Notas: ${_esfEsc(r.notas)}</div>` : ''}
       </div>
       <div class="modal-footer"><button class="btn btn-ghost" onclick="closeModal('modal-reporte')">Cerrar</button></div>
     </div>`;
@@ -16424,9 +16453,9 @@ function _renderContratoTeamKh(c) {
       <span style="color:#ff283b;font-weight:900;margin-right:8px">${_escCtr(ord)}</span><b>${_escCtr(t)}</b>
     </div>`).join('');
   return `
-    <div style="display:flex;flex-wrap:wrap;gap:18px 28px;font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:#666;font-weight:700"><span><b style="color:#000">Creadora (Imagen Oficial):</b> ${x.nombre}</span><span><b style="color:#000">Vigencia:</b> ${x.vigLetra} meses</span></div>
+    <div style="display:flex;flex-wrap:wrap;gap:18px 28px;font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:#666;font-weight:700"><span><b style="color:#000">Creadora (Imagen Oficial):</b> ${_esfEsc(x.nombre)}</span><span><b style="color:#000">Vigencia:</b> ${x.vigLetra} meses</span></div>
     <h2 style="font-family:'Barlow Condensed','Montserrat',sans-serif;font-size:34px;line-height:.92;text-transform:uppercase;margin:14px 0 0;color:#000">Contrato marco · Creadora TEAM<small style="display:block;font-size:13px;color:#ff283b;font-weight:800;letter-spacing:.18em;margin-top:6px">Imagen Oficial · periodo de prueba</small></h2>
-    <p style="font-size:13.5px;line-height:1.6;color:#222;margin-top:14px">Entre <b>CONECTA REYNOSA</b> (Guillermo Cobos Vizcarra, Director General) y <b>${x.nombre}</b> ("LA CREADORA"), con vigencia de <b>${x.vigLetra} meses</b> a partir de la firma. Al firmar, la creadora completa sus datos del proemio y el <b>Anexo C (Declaración Discreta, confidencial)</b>.</p>
+    <p style="font-size:13.5px;line-height:1.6;color:#222;margin-top:14px">Entre <b>CONECTA REYNOSA</b> (Guillermo Cobos Vizcarra, Director General) y <b>${_esfEsc(x.nombre)}</b> ("LA CREADORA"), con vigencia de <b>${x.vigLetra} meses</b> a partir de la firma. Al firmar, la creadora completa sus datos del proemio y el <b>Anexo C (Declaración Discreta, confidencial)</b>.</p>
     <div style="margin-top:16px;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:#666;font-weight:800">18 cláusulas — texto oficial v1.1</div>
     ${titulos}
     <p style="margin-top:16px;font-size:12px;color:#666">El texto completo (fiel a contrato-team-v1-TEXTO-OFICIAL.md) se muestra en la página de firma /contrato — esta vista previa solo resume.</p>`;
@@ -16438,8 +16467,8 @@ function _renderContratoViaBHTML(c) {
   const set = esCoord ? _CTR_COORDINADOR : _CTR_GIVE;
   const tituloDoc = esCoord ? 'Contrato de colaboración · Coordinadores' : 'Contrato de aceptación de premio · Giveaway';
   const meta = esCoord
-    ? `<div style="display:flex;flex-wrap:wrap;gap:18px 28px;font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:#666;font-weight:700"><span><b style="color:#000">Coordinador(a):</b> ${x.nombre}</span><span><b style="color:#000">Nacimiento:</b> ${x.fnac}</span><span><b style="color:#000">Vigencia:</b> ${x.vigResumen}</span></div>`
-    : `<div style="display:flex;flex-wrap:wrap;gap:18px 28px;font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:#666;font-weight:700"><span><b style="color:#000">Ganador(a):</b> ${x.nombre}</span><span><b style="color:#000">Evento:</b> ${x.evento}</span><span><b style="color:#000">Fecha:</b> ${x.fechaEvento}</span></div>`;
+    ? `<div style="display:flex;flex-wrap:wrap;gap:18px 28px;font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:#666;font-weight:700"><span><b style="color:#000">Coordinador(a):</b> ${_esfEsc(x.nombre)}</span><span><b style="color:#000">Nacimiento:</b> ${x.fnac}</span><span><b style="color:#000">Vigencia:</b> ${x.vigResumen}</span></div>`
+    : `<div style="display:flex;flex-wrap:wrap;gap:18px 28px;font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:#666;font-weight:700"><span><b style="color:#000">Ganador(a):</b> ${_esfEsc(x.nombre)}</span><span><b style="color:#000">Evento:</b> ${x.evento}</span><span><b style="color:#000">Fecha:</b> ${x.fechaEvento}</span></div>`;
   const clausulas = set.map(cl => `
     <div style="margin-top:22px">
       <h3 style="font-family:'Barlow Condensed','Montserrat',sans-serif;text-transform:uppercase;font-size:20px;letter-spacing:.04em;margin:0 0 10px;border-left:5px solid #e8ff4c;background:linear-gradient(90deg,rgba(232,255,76,.2),transparent 60%);padding:6px 0 6px 12px;color:#000">
@@ -16755,13 +16784,13 @@ function _renderContratoAuxiliarHTML(c) {
   };
   const meta = `
     <div style="display:flex;flex-wrap:wrap;gap:18px 28px;font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:#666;font-weight:700">
-      <span><b style="color:#000">Trabajadora:</b> ${x.nombre}</span>
+      <span><b style="color:#000">Trabajadora:</b> ${_esfEsc(x.nombre)}</span>
       <span><b style="color:#000">Puesto:</b> Auxiliar administrativo</span>
       <span><b style="color:#000">Fecha del contrato:</b> ${_escCtr(_fmtFechaLargaCtr(c.contrato_fecha))}</span>
     </div>`;
   const intro = `
     <div style="border-top:3px solid #000;border-bottom:1px solid #ddd;padding:18px 0;margin:20px 0;font-size:14px;line-height:1.6">
-      En la ciudad de Monterrey, Nuevo León, ${x.firmaTexto}, comparecen por una parte <b>CONECTA REYNOSA</b>, representada por el C. Guillermo Alexander Cobos Vizcarra, en su calidad de responsable operativo ("LA EMPRESA"), y por la otra parte la C. <b>${x.nombre}</b> ("LA TRABAJADORA"), quienes celebran el presente Contrato Individual de Trabajo por Tiempo Indefinido.
+      En la ciudad de Monterrey, Nuevo León, ${x.firmaTexto}, comparecen por una parte <b>CONECTA REYNOSA</b>, representada por el C. Guillermo Alexander Cobos Vizcarra, en su calidad de responsable operativo ("LA EMPRESA"), y por la otra parte la C. <b>${_esfEsc(x.nombre)}</b> ("LA TRABAJADORA"), quienes celebran el presente Contrato Individual de Trabajo por Tiempo Indefinido.
     </div>`;
   const clausulas = _CTR_CLAUSULAS_AUX.map(cl => `
     <div style="margin-top:22px">
@@ -16997,7 +17026,7 @@ async function loadContratosList() {
         ? _tsToDate(c.enviado_at).toLocaleDateString('es-MX',{day:'2-digit',month:'short',timeZone:'America/Monterrey'})
         : '—';
       const tokenSafe = _escCtr(c.token);
-      const nombreSafe = _escCtr(c.creador_nombre);
+      const nombreSafe = _attrJs(c.creador_nombre);   // [CAP5-1] va dentro de onclick
       const acciones = firmado
         ? `
           <button class="btn btn-ghost" style="padding:5px 10px;font-size:11px" onclick="verContratoFirmado('${tokenSafe}','${nombreSafe}')">Ver</button>

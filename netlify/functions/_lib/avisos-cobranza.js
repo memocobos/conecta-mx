@@ -39,19 +39,35 @@
 // `nivel` a secas dejaría pasar TODOS los duplicados de esos dos tipos.
 // =============================================================================
 
-const TIPOS = ['recordatorio', 'vence_hoy', 'morosidad'];
+// 📜 CAP4-3: 'contrato_sin_firmar' es el cuarto tipo. Los tres primeros llavean
+// por PAGO; éste llavea por LUGAR (un contrato por lugar). Ver la nota de
+// `refId` más abajo: el nombre de la columna es `pago_id`, pero lo que guarda es
+// "el identificador de la cosa que se avisa", y `tipo` va en la llave, así que
+// dos mundos distintos no pueden colisionar aunque compartieran un uuid.
+const TIPOS = ['recordatorio', 'vence_hoy', 'morosidad', 'contrato_sin_firmar'];
 
 // Intenta APARTAR el aviso. Devuelve:
 //   { enviar:true }                    → cupo apartado, manda el correo
 //   { enviar:false, duplicado:true }   → ya se avisó hoy, salta
 //   { enviar:true, sinBitacora:true }  → no se pudo registrar; manda igual
-async function apartarAviso({ portalUrl, portalHeaders, tipo, pagoId, solicitudId, correo, dia, nivel }) {
+//
+// `pagoId` es el IDENTIFICADOR DE LA COSA QUE SE AVISA (alias `refId`): la cuota
+// para los tres tipos de cobranza, el LUGAR para 'contrato_sin_firmar'. Va a la
+// columna `pago_id` porque es un uuid libre (sin FK) y porque `tipo` también
+// está en la llave, así que los mundos no se pisan.
+//
+// ⚠️ NUNCA se puede pasar en NULL: en un índice único de Postgres NULL != NULL,
+// así que una referencia nula NO daría protección alguna — pasarían TODOS los
+// duplicados en silencio. Por eso, sin referencia, se manda sin bitácora y se
+// avisa: mejor un duplicado ruidoso que una idempotencia de mentiras.
+async function apartarAviso({ portalUrl, portalHeaders, tipo, pagoId, refId, solicitudId, correo, dia, nivel }) {
+  const ref = (pagoId != null ? pagoId : refId);
   if (!TIPOS.includes(tipo)) {
     console.warn('[avisos-cobranza] tipo desconocido:', tipo, '— se manda sin bitácora');
     return { enviar: true, sinBitacora: true };
   }
-  if (!pagoId || !dia) {
-    console.warn('[avisos-cobranza] falta pago_id o dia — se manda sin bitácora');
+  if (!ref || !dia) {
+    console.warn('[avisos-cobranza] falta la referencia (pago/lugar) o el dia — se manda sin bitácora');
     return { enviar: true, sinBitacora: true };
   }
   try {
@@ -60,7 +76,7 @@ async function apartarAviso({ portalUrl, portalHeaders, tipo, pagoId, solicitudI
       headers: { ...portalHeaders, Prefer: 'return=minimal' },
       body: JSON.stringify({
         tipo,
-        pago_id: pagoId,
+        pago_id: ref,
         solicitud_id: solicitudId || null,
         cliente_correo: correo || null,
         dia,
@@ -92,8 +108,9 @@ async function apartarAviso({ portalUrl, portalHeaders, tipo, pagoId, solicitudI
 // Libera el cupo cuando el correo NO salió, para que el siguiente intento pueda
 // reenviar. Best-effort: si falla, se loguea (el peor caso es un aviso perdido
 // hasta mañana, no un error visible).
-async function liberarAviso({ portalUrl, portalHeaders, tipo, pagoId, dia, nivel }) {
-  if (!pagoId || !dia) return;
+async function liberarAviso({ portalUrl, portalHeaders, tipo, pagoId, refId, dia, nivel }) {
+  const ref = (pagoId != null ? pagoId : refId);
+  if (!ref || !dia) return;
   try {
     // ⚠️ CAP4-2: el filtro DEBE incluir el nivel. Sin él, si el correo de
     // nivel 2 falla, este DELETE se llevaría también la marca del nivel 1 que
@@ -104,11 +121,11 @@ async function liberarAviso({ portalUrl, portalHeaders, tipo, pagoId, dia, nivel
       : `&nivel=eq.${Number(nivel)}`;
     const r = await fetch(
       `${portalUrl}/rest/v1/avisos_cobranza?tipo=eq.${encodeURIComponent(tipo)}`
-      + `&pago_id=eq.${encodeURIComponent(pagoId)}&dia=eq.${encodeURIComponent(dia)}`
+      + `&pago_id=eq.${encodeURIComponent(ref)}&dia=eq.${encodeURIComponent(dia)}`
       + filtroNivel,
       { method: 'DELETE', headers: portalHeaders }
     );
-    if (!r.ok) console.warn('[avisos-cobranza] no se pudo liberar la marca', tipo, pagoId, r.status);
+    if (!r.ok) console.warn('[avisos-cobranza] no se pudo liberar la marca', tipo, ref, r.status);
   } catch (e) {
     console.warn('[avisos-cobranza] excepción liberando la marca:', e.message);
   }

@@ -9,29 +9,34 @@
 // Tabla `avisos_cobranza` (Portal; SQL ya corrido):
 //   id uuid PK · tipo text · pago_id uuid · solicitud_id uuid · cliente_correo
 //   text · dia date · nivel int · enviado_at timestamptz
-//   UNIQUE (tipo, pago_id, dia)   ← el candado
+//   UNIQUE INDEX avisos_cobranza_uq (tipo, pago_id, dia, COALESCE(nivel,0))
 //
 // PATRÓN (el de la casa): INSERT DIRECTO, JAMÁS on_conflict. Si choca con
 // 23505/409 significa que ese aviso YA salió hoy → se salta sin mandar correo.
 // La marca se pone ANTES de enviar: entre "mandar dos veces" y "marcar de más",
 // lo segundo es recuperable — y si el envío falla, la marca se BORRA.
 //
-// POR QUÉ BORRAR Y NO MARCAR 'fallido': el UNIQUE es (tipo,pago_id,dia). Una
-// fila marcada como fallida seguiría OCUPANDO ese cupo, así que el siguiente
-// intento chocaría igual y el cliente se quedaría sin su aviso. Borrar libera el
-// cupo y el reintento sale limpio. El riesgo al revés (borrar una marca cuyo
-// correo sí salió, porque la API reportó error) es un duplicado ocasional —
-// mucho mejor que un cliente que nunca se entera de que debe.
+// POR QUÉ BORRAR Y NO MARCAR 'fallido': una fila marcada como fallida seguiría
+// OCUPANDO ese cupo, así que el siguiente intento chocaría igual y el cliente se
+// quedaría sin su aviso. Borrar libera el cupo y el reintento sale limpio. El
+// riesgo al revés (borrar una marca cuyo correo sí salió, porque la API reportó
+// error) es un duplicado ocasional — mucho mejor que un cliente que nunca se
+// entera de que debe.
 //
 // FAIL-OPEN: si la tabla no existe o la consulta falla, se manda el correo
 // igual + console.warn. Mejor un duplicado que un cliente sin aviso.
 //
-// ⚠️ LIMITACIÓN CONOCIDA (morosidad): el UNIQUE no incluye `nivel`, así que si
-// alguien CAMBIA de nivel el mismo día (le marcan otra cuota vencida y pasa de
-// nivel 1 a 2 entre dos corridas), el segundo aviso se considera duplicado y no
-// sale. El `nivel` sí se guarda en la fila, para poder auditarlo. Para que un
-// cambio de nivel pueda re-avisar el mismo día hace falta un ALTER que meta
-// `nivel` en la llave — está pedido a Memo, no se improvisa aquí.
+// 🔢 CAP4-2 — EL NIVEL ENTRA EN LA LLAVE. Antes el UNIQUE era (tipo,pago_id,dia)
+// y un cliente que SUBÍA de nivel el mismo día (le marcan otra cuota vencida y
+// pasa de nivel 1 a 2 entre dos corridas) se quedaba sin el aviso más grave: el
+// segundo correo se veía como duplicado. Con COALESCE(nivel,0) en la llave:
+//   · mismo nivel dos veces el mismo día → sigue siendo duplicado (no se manda);
+//   · nivel 1 y luego nivel 2 el mismo día → son cupos distintos, SÍ se manda;
+//   · 'recordatorio' y 'vence_hoy' no llevan nivel → siempre NULL → COALESCE lo
+//     vuelve 0, una constante, así que su protección diaria queda IDÉNTICA.
+//
+// El COALESCE es indispensable: en SQL NULL != NULL, así que un UNIQUE con
+// `nivel` a secas dejaría pasar TODOS los duplicados de esos dos tipos.
 // =============================================================================
 
 const TIPOS = ['recordatorio', 'vence_hoy', 'morosidad'];
@@ -71,7 +76,9 @@ async function apartarAviso({ portalUrl, portalHeaders, tipo, pagoId, solicitudI
     // tabla —"relation avisos_cobranza does not exist", por ejemplo— se
     // disfrazara de duplicado y se tragara el correo. Mismo error que el 409
     // genérico de contratos-viajeros (AUD-3): confirmar la causa, no adivinarla.
-    if (/23505|duplicate key|_tipo_pago_id_dia/i.test(detail)) {
+    // `avisos_cobranza_uq` es el nombre del ÍNDICE, no el de la tabla: un
+    // "relation avisos_cobranza does not exist" NO lo matchea (le falta _uq).
+    if (/23505|duplicate key|avisos_cobranza_uq/i.test(detail)) {
       return { enviar: false, duplicado: true };
     }
     console.warn(`[avisos-cobranza] FAIL-OPEN: la bitácora respondió ${r.status} — se manda el correo igual`);
@@ -85,12 +92,20 @@ async function apartarAviso({ portalUrl, portalHeaders, tipo, pagoId, solicitudI
 // Libera el cupo cuando el correo NO salió, para que el siguiente intento pueda
 // reenviar. Best-effort: si falla, se loguea (el peor caso es un aviso perdido
 // hasta mañana, no un error visible).
-async function liberarAviso({ portalUrl, portalHeaders, tipo, pagoId, dia }) {
+async function liberarAviso({ portalUrl, portalHeaders, tipo, pagoId, dia, nivel }) {
   if (!pagoId || !dia) return;
   try {
+    // ⚠️ CAP4-2: el filtro DEBE incluir el nivel. Sin él, si el correo de
+    // nivel 2 falla, este DELETE se llevaría también la marca del nivel 1 que
+    // YA se mandó bien — y ese aviso saldría duplicado en la siguiente corrida.
+    // Se borra EXACTAMENTE el cupo que se apartó, ni uno más.
+    const filtroNivel = (nivel == null || !Number.isFinite(Number(nivel)))
+      ? '&nivel=is.null'
+      : `&nivel=eq.${Number(nivel)}`;
     const r = await fetch(
       `${portalUrl}/rest/v1/avisos_cobranza?tipo=eq.${encodeURIComponent(tipo)}`
-      + `&pago_id=eq.${encodeURIComponent(pagoId)}&dia=eq.${encodeURIComponent(dia)}`,
+      + `&pago_id=eq.${encodeURIComponent(pagoId)}&dia=eq.${encodeURIComponent(dia)}`
+      + filtroNivel,
       { method: 'DELETE', headers: portalHeaders }
     );
     if (!r.ok) console.warn('[avisos-cobranza] no se pudo liberar la marca', tipo, pagoId, r.status);

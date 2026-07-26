@@ -19,7 +19,23 @@
 //
 // Pieza AISLADA: solo NOTIFICA. No crea contratos, no cambia estados, no toca el
 // motor ni las UIs. Todo el correo pasa por aplicarModoPrueba (en modo prueba
-// llega [PRUEBA→...] al buzón de calibración). Corre 14:00 UTC = 8:00 AM hora MX,
+// llega [PRUEBA→...] al buzón de calibración).
+//
+// 📜 CAP4-3 — BITÁCORA. De los 4 crons que quedaban sin marca, éste era el único
+// que le escribe a CLIENTES: un doble disparo (reintento de Netlify o un "Run
+// now" a mano) le mandaba el recordatorio de firma DOS VECES a cada persona.
+// Ahora cada correo de cliente aparta su cupo en `avisos_cobranza` con tipo
+// 'contrato_sin_firmar' antes de salir, y lo libera si el envío falla.
+//
+// La unicidad es POR LUGAR (un contrato por lugar), no por solicitud: si alguien
+// trae 3 lugares, le tocan 3 correos —uno por contrato— y cada uno lleva su
+// propio cupo. La referencia va en la columna `pago_id` (uuid libre, sin FK) y
+// `solicitud_id` guarda la solicitud, como columna de auditoría.
+// ⚠️ NO se puede dejar la referencia en NULL: en un índice único NULL != NULL,
+// así que no filtraría NI UN duplicado. Ver la nota en _lib/avisos-cobranza.
+//
+// Los días de la ventana (7/3/2/1) se distinguen solos porque `dia` es la fecha
+// de HOY: cada aviso de la ventana cae en un día distinto y todos salen. Corre 14:00 UTC = 8:00 AM hora MX,
 // mismo slot que los crons de cobranza (para que Bulma lo lea con su café).
 //
 // Env vars: PORTAL_SUPABASE_URL, PORTAL_SUPABASE_SERVICE_KEY, RESEND_KEY,
@@ -28,6 +44,7 @@
 
 const { aplicarModoPrueba } = require('./_lib/correo-guard');
 const { fetchCatalogo } = require('./_lib/catalogo-index');
+const { apartarAviso, liberarAviso } = require('./_lib/avisos-cobranza');   // 📜 CAP4-3
 
 const SB_URL = process.env.PORTAL_SUPABASE_URL;
 const SB_KEY = process.env.PORTAL_SUPABASE_SERVICE_KEY;
@@ -142,7 +159,8 @@ function _construirPlan({
           if (correo) {
             correosCliente.push(_correoCliente({
               to: correo, nombreDest, evento: evNombre, dias, token: ct.token,
-              tipo: (lugar.cliente_id != null) ? 'dueño' : 'titular', lugarId: lugar.id,
+              tipo: (lugar.cliente_id != null) ? 'dueño' : 'titular',
+              lugarId: lugar.id, solicitudId: sol.id,
             }));
           } else {
             // Sin correo del destinatario: cae en el resumen admin igual (fila
@@ -183,7 +201,7 @@ function _construirPlan({
 
 // ── Correos (cadenas puras; aplicarModoPrueba se aplica al ENVIAR) ──
 
-function _correoCliente({ to, nombreDest, evento, dias, token, tipo, lugarId }) {
+function _correoCliente({ to, nombreDest, evento, dias, token, tipo, lugarId, solicitudId }) {
   const link = `${SITE_URL}/contrato-viajero.html?token=${encodeURIComponent(token)}`;
   const cuandoTxt = dias === 1 ? 'mañana mismo' : `en ${dias} días`;
   const subject = `📜 Falta tu firma — ${evento} sale en ${dias} ${dias === 1 ? 'día' : 'días'}`;
@@ -198,7 +216,7 @@ function _correoCliente({ to, nombreDest, evento, dias, token, tipo, lugarId }) 
       <p style="font-size:12px;color:#888;word-break:break-all">Si el botón no abre: ${link}</p>
       <p style="font-size:12px;color:#888">— Conecta Reynosa</p>
     </div>`;
-  return { to, subject, html, tipo, lugarId };
+  return { to, subject, html, tipo, lugarId, solicitudId };
 }
 
 function _correoAdmin(secciones) {
@@ -364,19 +382,40 @@ exports.handler = async function () {
   if (plan.adminEmail) {
     adminEnviado = await enviar(FROM_ADMIN, plan.adminEmail.to, plan.adminEmail.subject, plan.adminEmail.html);
   }
+  // 📜 CAP4-3: cada correo aparta su cupo del día ANTES de salir. Si el envío
+  // falla, se libera para que el siguiente intento pueda reenviar.
+  let cliDuplicados = 0, cliSinBitacora = 0;
   const resCli = await Promise.allSettled(
-    plan.correosCliente.map(c => enviar(FROM_CLIENTE, c.to, c.subject, c.html))
+    plan.correosCliente.map(async (c) => {
+      const marca = await apartarAviso({
+        portalUrl: SB_URL, portalHeaders: HEADERS, tipo: 'contrato_sin_firmar',
+        refId: c.lugarId, solicitudId: c.solicitudId, correo: c.to, dia: hoyISO,
+      });
+      if (!marca.enviar) { cliDuplicados++; return 'duplicado'; }
+      if (marca.sinBitacora) cliSinBitacora++;
+
+      const ok = await enviar(FROM_CLIENTE, c.to, c.subject, c.html);
+      if (!ok && !marca.sinBitacora) {
+        await liberarAviso({
+          portalUrl: SB_URL, portalHeaders: HEADERS, tipo: 'contrato_sin_firmar',
+          refId: c.lugarId, dia: hoyISO,
+        });
+      }
+      return ok;
+    })
   );
   let cliEnviados = 0, cliFallidos = 0;
   for (const r of resCli) {
     if (r.status === 'fulfilled' && r.value === true) cliEnviados++;
+    else if (r.status === 'fulfilled' && r.value === 'duplicado') { /* ya contado */ }
     else cliFallidos++;
   }
 
   console.log(
     `[contratos-alerta] Fin. hoy=${hoyISO} eventosEnVentana=${plan.stats.eventosEnVentana} ` +
     `pendientes=${plan.stats.pendientes} sinContrato=${plan.stats.sinContrato} ` +
-    `adminEnviado=${adminEnviado} clienteEnviados=${cliEnviados} clienteFallidos=${cliFallidos} sinFecha=${sinFecha}`
+    `adminEnviado=${adminEnviado} clienteEnviados=${cliEnviados} clienteFallidos=${cliFallidos} ` +
+    `clienteDuplicados=${cliDuplicados} clienteSinBitacora=${cliSinBitacora} sinFecha=${sinFecha}`
   );
   return {
     statusCode: 200,
@@ -386,6 +425,7 @@ exports.handler = async function () {
       pendientes: plan.stats.pendientes,
       sinContrato: plan.stats.sinContrato,
       adminEnviado, clienteEnviados: cliEnviados, clienteFallidos: cliFallidos,
+      clienteDuplicados: cliDuplicados, clienteSinBitacora: cliSinBitacora,
     }),
   };
 };

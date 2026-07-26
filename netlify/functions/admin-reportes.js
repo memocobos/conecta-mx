@@ -40,10 +40,10 @@
 //   - check-strikes-diario.js (cron) usa service_role aparte; este endpoint no lo toca.
 //
 // Env vars (reusa las de KH): SUPABASE_URL_KAMEHOUSE, SUPABASE_SERVICE_KEY_KAMEHOUSE,
-//   JWT_SECRET (lo lee verifyAdminAuth).
+//   JWT_SECRET (lo lee verifyAdminAuthLive).
 // =============================================================================
 
-const { verifyAdminAuth, corsCheck } = require('./_lib/verify-admin');
+const { verifyAdminAuthLive, corsCheck } = require('./_lib/verify-admin');
 
 const UUID_RE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
 const SLUG_RE = /^[a-zA-Z0-9_-]{1,80}$/;
@@ -111,7 +111,7 @@ exports.handler = async (event) => {
     return { statusCode: 400, headers, body: JSON.stringify({ error: 'accion inválida' }) };
   }
 
-  const auth = verifyAdminAuth(event, rolesPermitidos);
+  const auth = await verifyAdminAuthLive(event, rolesPermitidos);
   if (!auth.valid) return { statusCode: auth.status, headers, body: JSON.stringify({ error: auth.error }) };
 
   const jwtUserId = auth.user && (auth.user.id || auth.user.sub);

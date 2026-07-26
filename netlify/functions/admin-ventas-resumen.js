@@ -20,10 +20,10 @@
 //
 // Env: SUPABASE_URL_KAMEHOUSE/SERVICE_KEY_KAMEHOUSE (usuarios),
 //      PORTAL_SUPABASE_URL/SERVICE_KEY (solicitudes_tour + caja real por evento),
-//      JWT_SECRET (verifyAdminAuth).
+//      JWT_SECRET (verifyAdminAuthLive).
 // =============================================================================
 
-const { verifyAdminAuth, corsCheck } = require('./_lib/verify-admin');
+const { verifyAdminAuthLive, corsCheck } = require('./_lib/verify-admin');
 const { verificarVendedorActivo, AVISO_INACTIVO } = require('./_lib/vendedor-activo');
 const { calcularUtilidadPorEvento, baseSlug } = require('./_lib/utilidad-evento');
 let fetchCatalogo = null;
@@ -63,7 +63,7 @@ exports.handler = async (event) => {
   if (accion !== 'listar' && accion !== 'mis_ventas') return json(400, { error: 'accion inválida' });
 
   // Gate por acción: listar = admin; mis_ventas = vendedor + admin.
-  const auth = verifyAdminAuth(event, accion === 'mis_ventas' ? ROLES_VENTAS : ROLES_ADMIN);
+  const auth = await verifyAdminAuthLive(event, accion === 'mis_ventas' ? ROLES_VENTAS : ROLES_ADMIN);
   if (!auth.valid) return json(auth.status, { error: auth.error });
 
   // 💤 F6: candado de inactividad — vendedor con 3+ meses y CERO ventas queda

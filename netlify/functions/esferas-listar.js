@@ -10,10 +10,10 @@
 //
 // Env vars:
 //   - SUPABASE_SERVICE_KEY_KAMEHOUSE
-//   - JWT_SECRET (lo lee verifyAdminAuth)
+//   - JWT_SECRET (lo lee verifyAdminAuthLive)
 // =============================================================================
 
-const { verifyAdminAuth, corsCheck } = require('./_lib/verify-admin');
+const { verifyAdminAuthLive, corsCheck } = require('./_lib/verify-admin');
 
 const SB_URL = 'https://npgnhsmwpcipxgvfxrho.supabase.co';
 const SB_KEY = process.env.SUPABASE_SERVICE_KEY_KAMEHOUSE;
@@ -34,7 +34,7 @@ exports.handler = async (event) => {
   }
   if (!__origin) return { statusCode: 403, headers, body: JSON.stringify({ error: 'Origen no permitido' }) };
 
-  const auth = verifyAdminAuth(event);
+  const auth = await verifyAdminAuthLive(event);
   if (!auth.valid) return { statusCode: auth.status, headers, body: JSON.stringify({ error: auth.error }) };
 
   if (!SB_KEY) {

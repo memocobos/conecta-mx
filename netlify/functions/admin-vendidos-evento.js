@@ -16,7 +16,7 @@
 // Env vars (Portal): PORTAL_SUPABASE_URL, PORTAL_SUPABASE_SERVICE_KEY. + JWT_SECRET.
 // =============================================================================
 
-const { verifyAdminAuth, corsCheck } = require('./_lib/verify-admin');
+const { verifyAdminAuthLive, corsCheck } = require('./_lib/verify-admin');
 
 const EVENTO_RE = /^[A-Za-z0-9_.#-]+$/;            // slug del EV (id del array)
 const ESTADOS_CUENTAN = ['pendiente', 'en_pagos', 'pagado']; // cancelado libera
@@ -37,7 +37,7 @@ exports.handler = async (event) => {
   }
   if (!__origin) return { statusCode: 403, headers, body: JSON.stringify({ error: 'Origen no permitido' }) };
 
-  const auth = verifyAdminAuth(event, ['maestro_roshi']);
+  const auth = await verifyAdminAuthLive(event, ['maestro_roshi']);
   if (!auth.valid) return { statusCode: auth.status, headers, body: JSON.stringify({ error: auth.error }) };
 
   const env = readEnv();

@@ -25,7 +25,7 @@
 // nunca se expone. Env: PORTAL_SUPABASE_URL/SERVICE_KEY + JWT_SECRET.
 // =============================================================================
 
-const { verifyAdminAuth, corsCheck } = require('./_lib/verify-admin');
+const { verifyAdminAuthLive, corsCheck } = require('./_lib/verify-admin');
 const { verificarVendedorActivo, AVISO_INACTIVO } = require('./_lib/vendedor-activo');
 
 const ROLES = ['vendedor', 'maestro_roshi', 'bulma'];
@@ -50,7 +50,7 @@ exports.handler = async (event) => {
   if (event.httpMethod !== 'POST') return json(405, { error: 'Method not allowed' });
   if (!__origin) return json(403, { error: 'Origen no permitido' });
 
-  const auth = verifyAdminAuth(event, ROLES);
+  const auth = await verifyAdminAuthLive(event, ROLES);
   if (!auth.valid) return json(auth.status, { error: auth.error });
 
   // 💤 F6: candado de inactividad — vendedor con 3+ meses y CERO ventas queda

@@ -36,7 +36,7 @@
 // misma respuesta de siempre.
 // =============================================================================
 
-const { verifyAdminAuth, corsCheck } = require('./_lib/verify-admin');
+const { verifyAdminAuthLive, corsCheck } = require('./_lib/verify-admin');
 const { calcularUtilidadPorEvento } = require('./_lib/utilidad-evento');
 
 exports.handler = async (event) => {
@@ -55,7 +55,7 @@ exports.handler = async (event) => {
   }
   if (!__origin) return { statusCode: 403, headers, body: JSON.stringify({ error: 'Origen no permitido' }) };
 
-  const auth = verifyAdminAuth(event, ['maestro_roshi', 'bulma']);
+  const auth = await verifyAdminAuthLive(event, ['maestro_roshi', 'bulma']);
   if (!auth.valid) return { statusCode: auth.status, headers, body: JSON.stringify({ error: auth.error }) };
 
   const env = readEnv();

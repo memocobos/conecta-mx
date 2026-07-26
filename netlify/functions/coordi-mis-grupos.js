@@ -25,10 +25,10 @@
 // Env vars (reusa las existentes, sin vars nuevas):
 //   - SUPABASE_URL_KAMEHOUSE, SUPABASE_SERVICE_KEY_KAMEHOUSE
 //   - PORTAL_SUPABASE_URL, PORTAL_SUPABASE_SERVICE_KEY
-//   - JWT_SECRET (lo lee verifyAdminAuth)
+//   - JWT_SECRET (lo lee verifyAdminAuthLive)
 // =============================================================================
 
-const { verifyAdminAuth, corsCheck } = require('./_lib/verify-admin');
+const { verifyAdminAuthLive, corsCheck } = require('./_lib/verify-admin');
 
 // Solo viajeros aprobados (igual que admin-viajeros-evento). 'pendiente' aún no
 // está aprobado; 'cancelado' fuera.
@@ -51,7 +51,7 @@ exports.handler = async (event) => {
   if (!__origin) return { statusCode: 403, headers, body: JSON.stringify({ error: 'Origen no permitido' }) };
 
   // Rol operativo: coordinador. maestro_roshi/bulma solo para previsualizar.
-  const auth = verifyAdminAuth(event, ['coordinador', 'maestro_roshi', 'bulma']);
+  const auth = await verifyAdminAuthLive(event, ['coordinador', 'maestro_roshi', 'bulma']);
   if (!auth.valid) return { statusCode: auth.status, headers, body: JSON.stringify({ error: auth.error }) };
 
   // SEGURIDAD: el coordi_id sale del JWT, no del body. El servidor decide la

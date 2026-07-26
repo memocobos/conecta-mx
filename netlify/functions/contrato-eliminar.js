@@ -3,7 +3,7 @@
 // privado `ine-creadores` antes de borrar el registro. Idempotente: si el INE
 // ya no existe en Storage el borrado del row sigue adelante.
 
-const { verifyAdminAuth, corsCheck } = require('./_lib/verify-admin');
+const { verifyAdminAuthLive, corsCheck } = require('./_lib/verify-admin');
 
 const SB_URL = "https://npgnhsmwpcipxgvfxrho.supabase.co";
 const SB_KEY = process.env.SUPABASE_SERVICE_KEY_KAMEHOUSE;
@@ -56,7 +56,7 @@ exports.handler = async function (event) {
   }
   if (event.httpMethod !== "POST") return bad(405, "Método no permitido");
   if (!__origin) return bad(403, "Origen no permitido");
-  const __auth = verifyAdminAuth(event, ['maestro_roshi']);
+  const __auth = await verifyAdminAuthLive(event, ['maestro_roshi']);
   if (!__auth.valid) return bad(__auth.status, __auth.error);
   if (!SB_KEY) return bad(500, "SUPABASE_SERVICE_KEY_KAMEHOUSE no configurado");
 

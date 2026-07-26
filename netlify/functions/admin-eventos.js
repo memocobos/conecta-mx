@@ -28,10 +28,10 @@
 //   - service_role NUNCA se expone al navegador.
 //
 // Env vars (reusa KH): SUPABASE_URL_KAMEHOUSE, SUPABASE_SERVICE_KEY_KAMEHOUSE,
-//   JWT_SECRET (lo lee verifyAdminAuth).
+//   JWT_SECRET (lo lee verifyAdminAuthLive).
 // =============================================================================
 
-const { verifyAdminAuth, corsCheck } = require('./_lib/verify-admin');
+const { verifyAdminAuthLive, corsCheck } = require('./_lib/verify-admin');
 
 const UUID_RE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
 // Slugs del EV (evento_id), p.ej. 'karolg#2', 'emblema-2026'. Charset acotado.
@@ -96,7 +96,7 @@ exports.handler = async (event) => {
     return { statusCode: 400, headers, body: JSON.stringify({ error: 'accion inválida' }) };
   }
 
-  const auth = verifyAdminAuth(event, ACCIONES[accion] || undefined);
+  const auth = await verifyAdminAuthLive(event, ACCIONES[accion] || undefined);
   if (!auth.valid) return { statusCode: auth.status, headers, body: JSON.stringify({ error: auth.error }) };
 
   const env = readEnv();

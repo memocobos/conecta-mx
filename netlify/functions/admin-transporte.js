@@ -46,7 +46,7 @@
 //           PORTAL_SUPABASE_URL, PORTAL_SUPABASE_SERVICE_KEY.
 // =============================================================================
 
-const { verifyAdminAuth, corsCheck } = require('./_lib/verify-admin');
+const { verifyAdminAuthLive, corsCheck } = require('./_lib/verify-admin');
 const { aplicarModoPrueba } = require('./_lib/correo-guard'); // [F4] OBLIGATORIO en todo envío
 const { fetchCatalogo } = require('./_lib/catalogo-index');   // [v2] forma temporal del evento
 
@@ -103,7 +103,7 @@ exports.handler = async (event) => {
   const accion = body.accion;
   if (!(accion in ACCIONES)) return json(400, { error: 'accion inválida' });
 
-  const auth = verifyAdminAuth(event, ACCIONES[accion]);
+  const auth = await verifyAdminAuthLive(event, ACCIONES[accion]);
   if (!auth.valid) return json(auth.status, { error: auth.error });
 
   const env = readEnvKH();

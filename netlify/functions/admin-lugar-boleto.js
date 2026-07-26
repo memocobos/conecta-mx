@@ -17,7 +17,7 @@
 // Env vars: PORTAL_SUPABASE_URL, PORTAL_SUPABASE_SERVICE_KEY, JWT_SECRET.
 // =============================================================================
 
-const { verifyAdminAuth, corsCheck } = require('./_lib/verify-admin');
+const { verifyAdminAuthLive, corsCheck } = require('./_lib/verify-admin');
 
 const MSG_SIN_FIRMA = '⛔ Sin contrato firmado no se entrega boleto.';
 // [F5b] Ventas de vendedor: 2ª condición de entrega (separo cubierto con validados).
@@ -36,7 +36,7 @@ exports.handler = async (event) => {
   if (event.httpMethod !== 'POST') return { statusCode: 405, headers, body: JSON.stringify({ error: 'Method not allowed' }) };
   if (!__origin) return { statusCode: 403, headers, body: JSON.stringify({ error: 'Origen no permitido' }) };
 
-  const auth = verifyAdminAuth(event, ['maestro_roshi', 'bulma', 'milk']);
+  const auth = await verifyAdminAuthLive(event, ['maestro_roshi', 'bulma', 'milk']);
   if (!auth.valid) return { statusCode: auth.status, headers, body: JSON.stringify({ error: auth.error }) };
 
   const PORTAL_URL = process.env.PORTAL_SUPABASE_URL;

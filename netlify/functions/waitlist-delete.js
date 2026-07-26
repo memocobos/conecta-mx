@@ -5,7 +5,7 @@
 // Necesario porque RLS de eventos_waitlist solo expone INSERT y SELECT al
 // anon key — los DELETE deben hacerse con service key desde el server.
 
-const { verifyAdminAuth, corsCheck } = require('./_lib/verify-admin');
+const { verifyAdminAuthLive, corsCheck } = require('./_lib/verify-admin');
 
 const SB_URL = "https://npgnhsmwpcipxgvfxrho.supabase.co";
 const SB_KEY = process.env.SUPABASE_SERVICE_KEY_KAMEHOUSE;
@@ -27,7 +27,7 @@ exports.handler = async function (event) {
   if (!__origin) return bad(403, "Origen no permitido");
 
   // DELETE destructivo (eventos_waitlist + snapshot) con service_role — solo admin.
-  const auth = verifyAdminAuth(event, ['maestro_roshi','bulma','milk']);
+  const auth = await verifyAdminAuthLive(event, ['maestro_roshi','bulma','milk']);
   if (!auth.valid) return bad(auth.status, auth.error);
 
   if (!SB_KEY) return bad(500, "SUPABASE_SERVICE_KEY_KAMEHOUSE no configurado");

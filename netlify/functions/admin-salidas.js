@@ -55,7 +55,7 @@
 //   JWT_SECRET, RESEND_KEY (|| RESEND_API_KEY, opcional — best-effort).
 // =============================================================================
 
-const { verifyAdminAuth, corsCheck } = require('./_lib/verify-admin');
+const { verifyAdminAuthLive, corsCheck } = require('./_lib/verify-admin');
 const { aplicarModoPrueba } = require('./_lib/correo-guard');
 // F4b: cuenta de LA EMPRESA para pagar faltantes (verdad única de #289 —
 // paquete 'plus' → ev.banco || BBVA default). Best-effort: sin catálogo → null.
@@ -117,7 +117,7 @@ exports.handler = async (event) => {
   const accion = body.accion;
   if (!(accion in ACCIONES)) return json(400, { error: 'accion inválida' });
 
-  const auth = verifyAdminAuth(event, ACCIONES[accion]);
+  const auth = await verifyAdminAuthLive(event, ACCIONES[accion]);
   if (!auth.valid) return json(auth.status, { error: auth.error });
   const rol = auth.user.rol;
   const uid = String(auth.user.id || '');

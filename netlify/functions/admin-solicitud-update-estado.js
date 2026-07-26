@@ -17,7 +17,7 @@
 //                       JWT_SECRET.
 // =============================================================================
 
-const { verifyAdminAuth, corsCheck } = require('./_lib/verify-admin');
+const { verifyAdminAuthLive, corsCheck } = require('./_lib/verify-admin');
 const { ensureLugares } = require('./_lib/portal-lugares');
 const { generarContratosDeSolicitud } = require('./_lib/contratos-viajeros');
 const { aplicarModoPrueba } = require('./_lib/correo-guard');
@@ -43,7 +43,7 @@ exports.handler = async (event) => {
   }
   if (!__origin) return { statusCode: 403, headers, body: JSON.stringify({ error: 'Origen no permitido' }) };
 
-  const auth = verifyAdminAuth(event, ['maestro_roshi','bulma','milk']);
+  const auth = await verifyAdminAuthLive(event, ['maestro_roshi','bulma','milk']);
   if (!auth.valid) return { statusCode: auth.status, headers, body: JSON.stringify({ error: auth.error }) };
 
   const env = readEnv();

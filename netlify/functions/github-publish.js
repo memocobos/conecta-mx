@@ -1,4 +1,4 @@
-const { verifyAdminAuth, corsCheck } = require('./_lib/verify-admin');
+const { verifyAdminAuthLive, corsCheck } = require('./_lib/verify-admin');
 
 exports.handler = async (event) => {
   // ─── Origin + Admin auth (Stop the Bleed) ───
@@ -20,7 +20,7 @@ exports.handler = async (event) => {
   }
   if (event.httpMethod !== 'POST') return { statusCode: 405, body: 'Method not allowed' };
   if (!__origin) return { statusCode: 403, body: JSON.stringify({ ok: false, error: 'Origen no permitido' }) };
-  const __auth = verifyAdminAuth(event, ['maestro_roshi']);
+  const __auth = await verifyAdminAuthLive(event, ['maestro_roshi']);
   if (!__auth.valid) return { statusCode: __auth.status, body: JSON.stringify({ ok: false, error: __auth.error }) };
 
   const GITHUB_TOKEN = process.env.GITHUB_TOKEN;

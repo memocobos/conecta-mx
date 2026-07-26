@@ -24,7 +24,7 @@
 // Body JSON: { userId: <uuid> }
 // =============================================================================
 
-const { verifyAdminAuth, corsCheck, corsHeaders } = require('./_lib/verify-admin');
+const { verifyAdminAuthLive, corsCheck, corsHeaders } = require('./_lib/verify-admin');
 
 const SB_URL = process.env.SUPABASE_URL_KAMEHOUSE;
 const SB_KEY = process.env.SUPABASE_SERVICE_KEY_KAMEHOUSE;
@@ -52,7 +52,7 @@ exports.handler = async (event) => {
     return badRequest(event, 500, 'Supabase no configurado');
   }
 
-  const auth = verifyAdminAuth(event, ['maestro_roshi']);
+  const auth = await verifyAdminAuthLive(event, ['maestro_roshi']);
   if (!auth.valid) {
     return badRequest(event, auth.status || 401, auth.error);
   }

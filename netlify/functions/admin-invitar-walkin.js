@@ -17,7 +17,7 @@
 //                       RESEND_KEY (o RESEND_API_KEY). JWT_SECRET (verifyAdmin).
 // =============================================================================
 
-const { verifyAdminAuth, corsCheck } = require('./_lib/verify-admin');
+const { verifyAdminAuthLive, corsCheck } = require('./_lib/verify-admin');
 const { aplicarModoPrueba } = require('./_lib/correo-guard');
 
 const PORTAL_URL = 'https://conectareynosa.mx/portal';
@@ -38,7 +38,7 @@ exports.handler = async (event) => {
   }
   if (!__origin) return { statusCode: 403, headers, body: JSON.stringify({ error: 'Origen no permitido' }) };
 
-  const auth = verifyAdminAuth(event, ['maestro_roshi','bulma','milk']);
+  const auth = await verifyAdminAuthLive(event, ['maestro_roshi','bulma','milk']);
   if (!auth.valid) return { statusCode: auth.status, headers, body: JSON.stringify({ error: auth.error }) };
 
   const SB_URL     = process.env.PORTAL_SUPABASE_URL;

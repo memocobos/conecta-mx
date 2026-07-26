@@ -20,10 +20,10 @@
 //
 // Env vars (reusa las existentes):
 //   - SUPABASE_URL_KAMEHOUSE, SUPABASE_SERVICE_KEY_KAMEHOUSE
-//   - JWT_SECRET (lo lee verifyAdminAuth)
+//   - JWT_SECRET (lo lee verifyAdminAuthLive)
 // =============================================================================
 
-const { verifyAdminAuth, corsCheck } = require('./_lib/verify-admin');
+const { verifyAdminAuthLive, corsCheck } = require('./_lib/verify-admin');
 
 const TIPOS_VALIDOS = ['asignacion', 'listas', 'strike'];
 const ROLES_CREAR = ['maestro_roshi', 'bulma', 'mister_popo'];
@@ -54,7 +54,7 @@ exports.handler = async (event) => {
   // hacer cualquier usuario logueado (sobre SUS propias notificaciones).
   const rolesPermitidos = accion === 'crear' ? ROLES_CREAR : undefined;
 
-  const auth = verifyAdminAuth(event, rolesPermitidos);
+  const auth = await verifyAdminAuthLive(event, rolesPermitidos);
   if (!auth.valid) return { statusCode: auth.status, headers, body: JSON.stringify({ error: auth.error }) };
 
   const jwtUserId = auth.user && auth.user.id;

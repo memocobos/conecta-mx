@@ -19,7 +19,7 @@
 //   - JWT_SECRET
 // =============================================================================
 
-const { verifyAdminAuth, corsCheck, corsHeaders } = require('./_lib/verify-admin');
+const { verifyAdminAuthLive, corsCheck, corsHeaders } = require('./_lib/verify-admin');
 const bcrypt = require('bcryptjs');
 
 const SB_URL = process.env.SUPABASE_URL_KAMEHOUSE;
@@ -49,7 +49,7 @@ exports.handler = async (event) => {
     return badRequest(event, 500, 'Supabase no configurado');
   }
 
-  const auth = verifyAdminAuth(event, ['maestro_roshi', 'bulma']);
+  const auth = await verifyAdminAuthLive(event, ['maestro_roshi', 'bulma']);
   if (!auth.valid) {
     return badRequest(event, auth.status || 401, auth.error);
   }

@@ -402,8 +402,11 @@ exports.handler = async (event) => {
       // Cualquier password_hash que mande el cliente se ignora (anti texto-plano).
       if (patch.password) {
         const plain = String(patch.password);
-        if (plain.length < 6 || plain.length > 200) {
-          return { statusCode: 400, headers, body: JSON.stringify({ error: 'La contraseña debe tener 6-200 caracteres' }) };
+        // 🔐 CAP2-2: mínimo unificado a 8 (igual que reset-password y
+        // registro-invitado). Este es el tercer punto de cambio de contraseña:
+        // auto-edición de perfil y edición de un admin sobre otra persona.
+        if (plain.length < 8 || plain.length > 200) {
+          return { statusCode: 400, headers, body: JSON.stringify({ error: 'La contraseña debe tener 8-200 caracteres' }) };
         }
         update.password_hash = await bcrypt.hash(plain, BCRYPT_COST);
       }

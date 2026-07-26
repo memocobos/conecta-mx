@@ -7725,7 +7725,7 @@ function renderFormPerfil() {
           <div>
             <div class="perfil-field-label" style="margin-bottom:4px">Nueva contraseña</div>
             <div style="font-family:JetBrains Mono;font-size:10px;color:var(--ts);margin-bottom:6px;letter-spacing:.04em">// dejar vacío para no cambiarla</div>
-            <input class="cot-input" id="mp-pass-nueva" type="password" placeholder="Mínimo 6 caracteres" autocomplete="new-password">
+            <input class="cot-input" id="mp-pass-nueva" type="password" placeholder="Mínimo 8 caracteres" autocomplete="new-password">
           </div>
           <div>
             <div class="perfil-field-label" style="margin-bottom:4px">Confirmar contraseña</div>
@@ -7990,7 +7990,7 @@ async function mostrarRegistroInvitado(token) {
       </div>
       <div class="login-field">
         <label>Contraseña *</label>
-        <input type="password" id="reg-pass" placeholder="Mínimo 6 caracteres" autocomplete="new-password">
+        <input type="password" id="reg-pass" placeholder="Mínimo 8 caracteres" autocomplete="new-password">
       </div>
       <div class="login-field">
         <label>Confirmar contraseña *</label>
@@ -8022,7 +8022,10 @@ async function completarRegistro(userId, token) {
 
   if (!nombre)    { errEl.textContent = 'El nombre es obligatorio'; return; }
   if (!username)  { errEl.textContent = 'Elige un nombre de usuario'; return; }
-  if (pass.length < 6) { errEl.textContent = 'La contraseña debe tener mínimo 6 caracteres'; return; }
+  // 🔐 CAP2-2: espejo del mínimo del servidor (8). Si el cliente pidiera 6, el
+  // usuario teclearía una de 7 y recibiría un error crudo del backend en vez de
+  // este aviso amable.
+  if (pass.length < 8) { errEl.textContent = 'La contraseña debe tener mínimo 8 caracteres'; return; }
   if (pass !== pass2)  { errEl.textContent = 'Las contraseñas no coinciden'; return; }
 
   btn.textContent = 'Creando cuenta…'; btn.disabled = true;

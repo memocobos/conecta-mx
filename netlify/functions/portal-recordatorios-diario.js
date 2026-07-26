@@ -15,6 +15,7 @@
 // portal-morosidad-diario). Reusa PORTAL_SUPABASE_URL / PORTAL_SUPABASE_SERVICE_KEY.
 
 const { aplicarModoPrueba } = require('./_lib/correo-guard');
+const { apartarAviso, liberarAviso } = require('./_lib/avisos-cobranza');
 const { fetchCatalogo } = require('./_lib/catalogo-index');
 const { resolverCuentaDeCatalogo, cajaCuentaHtml } = require('./_lib/cuenta-deposito');
 
@@ -87,7 +88,7 @@ async function leerPagos(solIds) {
   for (let i = 0; i < solIds.length; i += LOTE) {
     const chunk = solIds.slice(i, i + LOTE);
     const rows = await sb(
-      `pagos?solicitud_id=in.(${chunk.join(',')})&select=solicitud_id,cliente_id,estado,monto,fecha_esperada,lugar_id&limit=5000`
+      `pagos?solicitud_id=in.(${chunk.join(',')})&select=id,solicitud_id,cliente_id,estado,monto,fecha_esperada,lugar_id&limit=5000`
     );
     if (Array.isArray(rows)) out.push(...rows);
   }
@@ -152,7 +153,9 @@ exports.handler = async function () {
     if (p.estado === 'vencido') {
       vencidosSC[key] = (vencidosSC[key] || 0) + 1;
     } else if (p.estado === 'pendiente') {
-      (pendientesSC[key] = pendientesSC[key] || []).push({ monto: Number(p.monto || 0), fecha: p.fecha_esperada });
+      // [CAP4-1] se conserva el id de la cuota: la bitácora necesita un pago_id
+      // DETERMINISTA por destinatario (se usa el menor de sus cuotas).
+      (pendientesSC[key] = pendientesSC[key] || []).push({ id: p.id, monto: Number(p.monto || 0), fecha: p.fecha_esperada });
     }
   }
 
@@ -166,6 +169,8 @@ exports.handler = async function () {
   //    pendiente. Su abono "de ahora" = sus cuota(s) en la fecha pendiente más
   //    temprana (suma si 2+, p.ej. el titular con lugares sin conectar).
   let mandados = 0, sinCorreo = 0, conVencidos = 0, sinPendientes = 0, fallidos = 0;
+  let saltados_por_duplicado = 0, sin_bitacora = 0;
+  const hoyMX = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Monterrey' });
   for (const key of Object.keys(pendientesSC)) {
     if ((vencidosSC[key] || 0) >= 1) { conVencidos++; continue; } // a esa persona la regaña morosidad
     const solId = key.slice(0, key.indexOf(SEP));
@@ -202,11 +207,26 @@ exports.handler = async function () {
     const cuerpo = `<p style="margin:0 0 14px 0">Ya abrió tu ventana de pago para tu viaje a <strong>${escapeHtml(evento)}</strong>. Tu abono de esta quincena es de <strong>${montoAbono}</strong>.</p>
     ${notaGrupo}<p style="margin:0 0 14px 0">Realízalo antes de que cierre para mantener tu lugar al corriente, y envíanos tu comprobante.</p>${cajaCuenta}
     <p style="margin:0">¡Gracias por viajar con Conecta!</p>`;
+    // ⏰ CAP4-1: aparta el cupo del día ANTES de mandar. Si ya se avisó hoy
+    // (doble disparo del cron o "Run now" manual), se salta sin correo.
+    const pagoMarca = pend.map(q => String(q.id || '')).filter(Boolean).sort()[0] || null;
+    const marca = await apartarAviso({
+      portalUrl: SB_URL, portalHeaders: HEADERS, tipo: 'recordatorio',
+      pagoId: pagoMarca, solicitudId: solId, correo, dia: hoyMX,
+    });
+    if (!marca.enviar) { saltados_por_duplicado++; continue; }
+    if (marca.sinBitacora) sin_bitacora++;
+
     const ok = await enviarCorreo(correo, asunto, wrapHtml(nombre, cuerpo));
-    if (!ok) { fallidos++; continue; }
+    if (!ok) {
+      fallidos++;
+      // El correo no salió: se libera el cupo para que el reintento pueda mandarlo.
+      if (!marca.sinBitacora) await liberarAviso({ portalUrl: SB_URL, portalHeaders: HEADERS, tipo: 'recordatorio', pagoId: pagoMarca, dia: hoyMX });
+      continue;
+    }
     mandados++;
   }
 
-  console.log(`[recordatorios] Fin. mandados:${mandados} sinCorreo:${sinCorreo} conVencidos:${conVencidos} sinPendientes:${sinPendientes} fallidos:${fallidos}`);
-  return { statusCode: 200, body: JSON.stringify({ ok: true, mandados, sinCorreo, conVencidos, sinPendientes, fallidos }) };
+  console.log(`[recordatorios] Fin. mandados:${mandados} sinCorreo:${sinCorreo} conVencidos:${conVencidos} sinPendientes:${sinPendientes} fallidos:${fallidos} saltados_por_duplicado:${saltados_por_duplicado} sin_bitacora:${sin_bitacora}`);
+  return { statusCode: 200, body: JSON.stringify({ ok: true, mandados, sinCorreo, conVencidos, sinPendientes, fallidos, saltados_por_duplicado, sin_bitacora }) };
 };

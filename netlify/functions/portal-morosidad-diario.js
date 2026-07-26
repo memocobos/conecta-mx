@@ -226,10 +226,13 @@ exports.handler = async function () {
     const { asunto, cuerpo } = correoNivel(nivel, evento, fmtMxn(restante));
     const cajaCuenta = cajaCuentaHtml(resolverCuentaDeCatalogo(catalogo, sol.evento_id, sol.paquete));
 
-    // ⏰ CAP4-1: cupo del día antes de mandar. ⚠️ El UNIQUE es
-    // (tipo,pago_id,dia) SIN nivel: si alguien sube de nivel el mismo día, el
-    // segundo aviso se toma como duplicado y no sale. El nivel SÍ se guarda para
-    // auditar; meterlo en la llave necesita un ALTER (pedido a Memo).
+    // ⏰ CAP4-1 + 🔢 CAP4-2: cupo del día antes de mandar, AHORA POR NIVEL.
+    // La llave es (tipo, pago_id, dia, COALESCE(nivel,0)), así que:
+    //   · el mismo nivel dos veces el mismo día → duplicado, no sale;
+    //   · subir de nivel 1 a 2 el mismo día → cupo distinto, SÍ sale el grave.
+    // El pago que llaveamos es el menor de sus cuotas vencidas: determinista
+    // dentro de una corrida, y aunque cambiara al subir de nivel el aviso más
+    // grave saldría igual (sería otro cupo por partida doble).
     const pagoMarca = (vencidosIds[key] || []).slice().sort()[0] || null;
     const marca = await apartarAviso({
       portalUrl: SB_URL, portalHeaders: HEADERS, tipo: 'morosidad',
@@ -241,7 +244,9 @@ exports.handler = async function () {
     const ok = await enviarCorreo(correo, asunto, wrapHtml(nombre, cuerpo + cajaCuenta));
     if (!ok) {
       fallidos++;
-      if (!marca.sinBitacora) await liberarAviso({ portalUrl: SB_URL, portalHeaders: HEADERS, tipo: 'morosidad', pagoId: pagoMarca, dia: hoyMX });
+      // El nivel viaja también al liberar: se borra EXACTAMENTE el cupo que se
+      // apartó, sin llevarse por delante la marca de otro nivel del mismo día.
+      if (!marca.sinBitacora) await liberarAviso({ portalUrl: SB_URL, portalHeaders: HEADERS, tipo: 'morosidad', pagoId: pagoMarca, dia: hoyMX, nivel });
       continue;
     }
     if (nivel === 1) n1++; else if (nivel === 2) n2++; else n3++;

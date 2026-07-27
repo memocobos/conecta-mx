@@ -81,20 +81,20 @@ main{
 /* ============================ Card ============================ */
 .card{
   background:var(--card);border:1px solid var(--line);
-  border-radius:14px;padding:22px 20px;margin-top:22px;
+  border-radius:var(--r-card,16px);padding:22px 20px;margin-top:22px;
 }
 
 /* ============================ Tabs ============================ */
 .tabs{
   display:grid;grid-template-columns:1fr 1fr;gap:0;
-  background:var(--field-bg);border:1px solid var(--line);border-radius:10px;
+  background:var(--field-bg);border:1px solid var(--line);border-radius:var(--r-sm,8px);
   padding:4px;margin-bottom:20px;
 }
 .tab-btn{
   background:transparent;color:var(--ink-soft);
   border:none;padding:12px 8px;font-family:'Montserrat',sans-serif;
   font-weight:700;font-size:12px;letter-spacing:.08em;text-transform:uppercase;
-  cursor:pointer;border-radius:8px;transition:background .15s,color .15s;
+  cursor:pointer;border-radius:var(--r-sm,8px);transition:background .15s,color .15s;
   min-height:44px;
 }
 .tab-btn.is-active{background:var(--yel);color:#000;font-weight:900}
@@ -103,7 +103,7 @@ main{
 .btn-google{
   display:flex;align-items:center;justify-content:center;gap:12px;
   width:100%;background:#fff;color:#1f1f1f;border:none;
-  padding:0 16px;min-height:50px;border-radius:10px;
+  padding:0 16px;min-height:50px;border-radius:var(--r-btn,12px);
   font-family:'Montserrat',sans-serif;font-weight:700;font-size:14px;
   cursor:pointer;transition:transform .12s,box-shadow .12s,filter .12s;
 }
@@ -129,7 +129,7 @@ main{
 .field input,.field select{
   width:100%;min-height:50px;
   background:var(--field-bg);color:#fff;
-  border:1.5px solid var(--line-strong);border-radius:10px;
+  border:1.5px solid var(--line-strong);border-radius:var(--r-sm,8px);
   padding:12px 14px;font-size:15px;font-family:'Montserrat',sans-serif;font-weight:600;
   transition:border-color .15s,background .15s;
 }
@@ -147,7 +147,7 @@ main{
 .btn{
   display:flex;align-items:center;justify-content:center;gap:8px;
   width:100%;min-height:52px;
-  border:none;border-radius:10px;cursor:pointer;
+  border:none;border-radius:var(--r-btn,12px);cursor:pointer;
   font-family:'Montserrat',sans-serif;font-weight:900;font-size:13px;
   letter-spacing:.1em;text-transform:uppercase;
   padding:0 16px;transition:transform .12s,filter .12s,background .15s,color .15s;
@@ -173,7 +173,7 @@ main{
 
 /* ============================ Alerts ============================ */
 .alert{
-  border-radius:10px;padding:12px 14px;font-size:13px;font-weight:600;line-height:1.4;
+  border-radius:var(--r-sm,8px);padding:12px 14px;font-size:13px;font-weight:600;line-height:1.4;
   margin-bottom:14px;display:none;
 }
 .alert.is-visible{display:block}
@@ -201,10 +201,10 @@ main{
 .tile{
   display:flex;align-items:center;gap:16px;
   background:var(--field-bg);border:1px solid var(--line);
-  border-radius:12px;padding:18px 16px;
+  border-radius:var(--r-btn,12px);padding:18px 16px;
 }
 .tile-icon{
-  width:48px;height:48px;flex-shrink:0;border-radius:10px;
+  width:48px;height:48px;flex-shrink:0;border-radius:var(--r-sm,8px);
   background:rgba(232,255,76,.08);border:1.5px solid rgba(232,255,76,.25);
   display:flex;align-items:center;justify-content:center;color:var(--yel);
 }
@@ -239,7 +239,7 @@ main{
 /* ============================ Tours list (Vista C) ============================ */
 .tours-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}
 .btn-pill{
-  background:var(--yel);color:#000;border:none;border-radius:999px;
+  background:var(--yel);color:#000;border:none;border-radius:var(--r-chip,999px);
   padding:8px 14px;font-family:'Montserrat',sans-serif;font-weight:900;font-size:11px;
   letter-spacing:.1em;text-transform:uppercase;cursor:pointer;transition:transform .12s,filter .12s;
   min-height:36px;
@@ -248,20 +248,20 @@ main{
 .tours-list{display:flex;flex-direction:column;gap:10px}
 .tours-loading{display:flex;justify-content:center;padding:18px}
 /* [F3a] Alerta + chips de contrato */
-.contrato-banner-alert{display:flex;align-items:center;gap:12px;margin-bottom:14px;padding:14px 16px;border-radius:12px;background:rgba(255,184,76,.12);border:1px solid rgba(255,184,76,.5);color:var(--ink)}
+.contrato-banner-alert{display:flex;align-items:center;gap:12px;margin-bottom:14px;padding:14px 16px;border-radius:var(--r-btn,12px);background:rgba(255,184,76,.12);border:1px solid rgba(255,184,76,.5);color:var(--ink)}
 .contrato-banner-alert .ic{width:22px;height:22px;color:#ffb84c;flex-shrink:0}
-.cbn-btn{flex-shrink:0;padding:9px 16px;border-radius:999px;border:none;background:var(--yel);color:#000;font-weight:900;font-size:13px;cursor:pointer;text-decoration:none;white-space:nowrap}
-.ctr-chip{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:999px;font-size:10px;font-weight:900;letter-spacing:.04em;white-space:nowrap}
+.cbn-btn{flex-shrink:0;padding:9px 16px;border-radius:var(--r-chip,999px);border:none;background:var(--yel);color:#000;font-weight:900;font-size:13px;cursor:pointer;text-decoration:none;white-space:nowrap}
+.ctr-chip{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:var(--r-chip,999px);font-size:10px;font-weight:900;letter-spacing:.04em;white-space:nowrap}
 .ctr-chip .ic{width:13px;height:13px}
 .ctr-chip-ok{background:rgba(136,234,78,.14);border:1px solid rgba(136,234,78,.4);color:var(--green)}
 .ctr-chip-pend{background:rgba(255,184,76,.12);border:1px solid rgba(255,184,76,.5);color:#ffb84c}
-.ctr-firmar-btn{display:inline-block;padding:5px 14px;border-radius:999px;background:var(--yel);color:#000;font-size:11px;font-weight:900;text-decoration:none;white-space:nowrap}
+.ctr-firmar-btn{display:inline-block;padding:5px 14px;border-radius:var(--r-chip,999px);background:var(--yel);color:#000;font-size:11px;font-weight:900;text-decoration:none;white-space:nowrap}
 .tour-empty{
   text-align:center;padding:18px 8px;color:var(--ink-soft);font-size:13px;line-height:1.5;
 }
 .tour-empty b{display:block;font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:20px;color:#fff;text-transform:uppercase;margin-bottom:6px}
 .tour-card{
-  background:#000;border:1px solid var(--line);border-radius:12px;padding:14px 14px 13px;
+  background:#000;border:1px solid var(--line);border-radius:var(--r-btn,12px);padding:14px 14px 13px;
   display:flex;flex-direction:column;gap:8px;position:relative;
 }
 .tour-card .tc-top{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
@@ -284,7 +284,7 @@ main{
 }
 .badge{
   display:inline-flex;align-items:center;gap:6px;
-  padding:5px 10px;border-radius:999px;
+  padding:5px 10px;border-radius:var(--r-chip,999px);
   font-size:10px;font-weight:900;letter-spacing:.12em;text-transform:uppercase;
   white-space:nowrap;flex-shrink:0;font-family:'Montserrat',sans-serif;
 }
@@ -308,7 +308,7 @@ main{
    fade inferior a negro (no overlay uniforme). Oculto por defecto; se muestra al cargar. */
 .tour-photo-box{
   position:relative;width:100%;height:280px;margin-top:14px;
-  border-radius:14px;overflow:hidden;border:1px solid var(--line);
+  border-radius:var(--r-card,16px);overflow:hidden;border:1px solid var(--line);
   background:linear-gradient(135deg,#0a0a1a 0%,#0000cd 50%,#000050 100%);
 }
 .tour-photo-bg{
@@ -332,8 +332,8 @@ main{
 .res-val{font-family:'JetBrains Mono',monospace;font-weight:700;font-size:16px;color:#fff}
 .res-val.ok{color:var(--green)}
 .res-val.yel{color:var(--yel)}
-.prog-bar{height:8px;border-radius:999px;background:var(--field-bg);border:1px solid var(--line);overflow:hidden;margin-top:16px}
-.prog-fill{height:100%;background:var(--green);border-radius:999px;transition:width .4s ease}
+.prog-bar{height:8px;border-radius:var(--r-chip,999px);background:var(--field-bg);border:1px solid var(--line);overflow:hidden;margin-top:16px}
+.prog-fill{height:100%;background:var(--green);border-radius:var(--r-chip,999px);transition:width .4s ease}
 .prog-cap{font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-mute);text-align:right;margin-top:6px}
 
 .prox-pago{text-align:center;padding:4px 0}
@@ -373,7 +373,7 @@ main{
 .fab{
   position:fixed;bottom:20px;right:20px;z-index:50;
   display:none;align-items:center;justify-content:center;gap:8px;
-  background:var(--yel);color:#000;border:none;border-radius:999px;
+  background:var(--yel);color:#000;border:none;border-radius:var(--r-chip,999px);
   padding:14px 20px;font-family:'Montserrat',sans-serif;font-weight:900;font-size:13px;
   letter-spacing:.08em;text-transform:uppercase;cursor:pointer;
   box-shadow:0 8px 28px rgba(232,255,76,.35),0 2px 6px rgba(0,0,0,.4);
@@ -389,7 +389,7 @@ main{
 }
 .wiz-back{
   background:transparent;border:1.5px solid var(--line-strong);color:#fff;
-  border-radius:999px;width:40px;height:40px;font-size:18px;cursor:pointer;
+  border-radius:var(--r-chip,999px);width:40px;height:40px;font-size:18px;cursor:pointer;
   display:flex;align-items:center;justify-content:center;flex-shrink:0;
   transition:border-color .15s,background .15s;
 }
@@ -402,7 +402,7 @@ main{
 }
 .wiz-cancel:hover{color:var(--red)}
 .wiz-progress{display:flex;align-items:center;gap:10px;margin-bottom:22px}
-.wiz-bar{flex:1;height:4px;background:var(--field-bg);border-radius:2px;overflow:hidden}
+.wiz-bar{flex:1;height:4px;background:var(--field-bg);border-radius:var(--r-hilo,2px);overflow:hidden}
 .wiz-bar-fill{height:100%;background:var(--yel);transition:width .35s ease;width:20%}
 .wiz-step-num{
   font-family:'JetBrains Mono',monospace;font-weight:700;font-size:11px;
@@ -417,13 +417,13 @@ main{
 /* Búsqueda y lista de eventos */
 .wiz-search{
   width:100%;background:var(--field-bg);color:#fff;border:1.5px solid var(--line-strong);
-  border-radius:10px;padding:14px 16px;font-size:15px;font-family:'Montserrat',sans-serif;
+  border-radius:var(--r-sm,8px);padding:14px 16px;font-size:15px;font-family:'Montserrat',sans-serif;
   font-weight:600;outline:none;transition:border-color .15s;min-height:50px;
 }
 .wiz-search:focus{border-color:var(--yel)}
 .wiz-event-list{
   margin-top:12px;max-height:48vh;overflow-y:auto;
-  border:1px solid var(--line);border-radius:10px;background:#000;
+  border:1px solid var(--line);border-radius:var(--r-sm,8px);background:#000;
 }
 .wiz-event-list:empty::before{
   content:'No hay eventos que coincidan';
@@ -449,7 +449,7 @@ main{
 /* Paquetes */
 .wiz-pkgs{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .wiz-pkg{
-  background:#000;border:1.5px solid var(--line-strong);border-radius:10px;
+  background:#000;border:1.5px solid var(--line-strong);border-radius:var(--r-btn,12px);
   padding:16px 14px;cursor:pointer;text-align:left;
   font-family:inherit;color:#fff;transition:all .15s;
 }
@@ -464,13 +464,13 @@ main{
 .wiz-toggle{
   display:flex;align-items:center;justify-content:space-between;gap:12px;
   padding:12px 14px;background:var(--field-bg);border:1.5px solid var(--line-strong);
-  border-radius:10px;cursor:pointer;
+  border-radius:var(--r-btn,12px);cursor:pointer;
 }
 .wiz-toggle.on{border-color:var(--yel);background:rgba(232,255,76,.06)}
 .wiz-toggle .tg-label{font-size:13px;font-weight:700}
 .wiz-toggle .tg-switch{
   width:42px;height:24px;background:var(--field-bg);border:1.5px solid var(--line-strong);
-  border-radius:12px;position:relative;flex-shrink:0;transition:background .15s,border-color .15s;
+  border-radius:var(--r-btn,12px);position:relative;flex-shrink:0;transition:background .15s,border-color .15s;
 }
 .wiz-toggle .tg-switch::after{
   content:'';position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;
@@ -482,7 +482,7 @@ main{
 .wiz-textarea{
   width:100%;min-height:80px;
   background:var(--field-bg);color:#fff;border:1.5px solid var(--line-strong);
-  border-radius:10px;padding:12px 14px;font-size:14px;font-family:'Montserrat',sans-serif;
+  border-radius:var(--r-sm,8px);padding:12px 14px;font-size:14px;font-family:'Montserrat',sans-serif;
   font-weight:500;resize:vertical;outline:none;transition:border-color .15s;
 }
 .wiz-textarea:focus{border-color:var(--yel)}
@@ -511,7 +511,7 @@ main{
 
 /* Comprobante / upload */
 .wiz-upload{
-  border:2px dashed var(--line-strong);border-radius:12px;
+  border:2px dashed var(--line-strong);border-radius:var(--r-btn,12px);
   padding:24px 18px;text-align:center;cursor:pointer;
   transition:border-color .15s,background .15s;
 }
@@ -523,7 +523,7 @@ main{
 .wiz-upload .up-text{font-size:13px;color:var(--ink-soft);line-height:1.4}
 .wiz-upload .up-hint{font-size:11px;color:var(--ink-mute);margin-top:6px;letter-spacing:.06em;text-transform:uppercase}
 .wiz-upload.has-file{border-style:solid;border-color:var(--green);background:rgba(136,234,78,.04)}
-.wiz-upload .up-preview{max-width:100%;max-height:220px;margin-top:12px;border-radius:8px;display:none}
+.wiz-upload .up-preview{max-width:100%;max-height:220px;margin-top:12px;border-radius:var(--r-sm,8px);display:none}
 .wiz-upload.has-file .up-preview{display:inline-block}
 .wiz-upload .up-name{display:none;margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--green);font-weight:700;word-break:break-all}
 .wiz-upload.has-file .up-name{display:block}
@@ -591,7 +591,7 @@ main{
 .tc-countdown{
   position:absolute;top:10px;left:10px;z-index:2;
   display:inline-flex;align-items:center;gap:6px;
-  background:rgba(232,255,76,.92);color:#000;border-radius:999px;padding:4px 10px;
+  background:rgba(232,255,76,.92);color:#000;border-radius:var(--r-chip,999px);padding:4px 10px;
   font-family:'JetBrains Mono',monospace;font-weight:700;font-size:10px;letter-spacing:.04em;
 }
 .tc-countdown.is-soon{background:var(--red);color:#fff;animation:pv-glow 1.8s ease-in-out infinite}
@@ -620,17 +620,19 @@ main{
 }
 .tc-cta:hover{filter:brightness(1.15)}
 @media(prefers-reduced-motion:reduce){
-  .tc-body{transition:none}
-  .tc-chevron{transition:none}
+  /* [PP-4] armonizado: acortar, no anular (el bloque global de abajo ya lo hace
+     para todo; esto se queda por si alguien borra aquél). */
+  .tc-body{transition-duration:.01ms}
+  .tc-chevron{transition-duration:.01ms}
 }
 
 /* --- Pestañas Próximos / Pasados del dashboard --- */
 .dash-tabs{
   display:flex;gap:6px;background:var(--field-bg);border:1px solid var(--line);
-  border-radius:10px;padding:4px;margin-bottom:14px;
+  border-radius:var(--r-sm,8px);padding:4px;margin-bottom:14px;
 }
 .dash-tab{
-  flex:1;background:transparent;color:var(--ink-soft);border:none;border-radius:8px;
+  flex:1;background:transparent;color:var(--ink-soft);border:none;border-radius:var(--r-sm,8px);
   padding:9px 6px;font-family:'Montserrat',sans-serif;font-weight:800;font-size:11px;
   letter-spacing:.08em;text-transform:uppercase;cursor:pointer;min-height:40px;
   transition:background .15s,color .15s;display:flex;align-items:center;justify-content:center;gap:6px;
@@ -641,7 +643,7 @@ main{
 /* --- Fila de stats (total / próximos / pasados) --- */
 .dash-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:2px 0 4px}
 .stat{
-  background:var(--field-bg);border:1px solid var(--line);border-radius:12px;
+  background:var(--field-bg);border:1px solid var(--line);border-radius:var(--r-btn,12px);
   padding:14px 10px;text-align:center;animation:pv-pop .5s cubic-bezier(.2,.7,.2,1) both;
 }
 .dash-stats .stat:nth-child(2){animation-delay:.06s}
@@ -673,7 +675,7 @@ main{
 }
 .portal-link{
   display:flex;flex-direction:column;align-items:center;gap:6px;
-  background:var(--field-bg);border:1px solid var(--line);border-radius:12px;
+  background:var(--field-bg);border:1px solid var(--line);border-radius:var(--r-btn,12px);
   padding:13px 6px;text-decoration:none;color:var(--ink-soft);
   transition:transform .12s,border-color .15s,color .15s,background .15s;
 }
@@ -685,10 +687,32 @@ main{
 /* --- Barra de progreso animada (amplifica la existente) --- */
 .prog-fill{background:linear-gradient(90deg,var(--green),var(--yel));box-shadow:0 0 12px rgba(136,234,78,.4);animation:pv-rise .4s both}
 
-/* --- Respeta prefers-reduced-motion: desactiva TODO lo animado --- */
+/* --- prefers-reduced-motion, patrón de la casa (PF-1) ---------------------
+   ANTES decía `animation:none;transition:none`. El problema de anular en vez de
+   acortar es que una animación con relleno `both`/`forwards` deja de aplicar su
+   estado final: cualquier elemento que nazca en opacity:0 y solo se vuelva
+   visible por el keyframe se queda INVISIBLE para quien pidió menos
+   movimiento. Acortando a .01ms el estado final sí se aplica.
+   iteration-count:1 es para las infinitas (el pulso del punto, el barrido de
+   carga): sin eso seguirían corriendo, solo muy rápido. */
 @media(prefers-reduced-motion:reduce){
-  *,*::before,*::after{animation:none!important;transition:none!important}
-  .tc-hero.is-loading{background:#0c0c0c}
+  *,*::before,*::after{
+    animation-duration:.01ms !important;
+    /* EL RETARDO TAMBIÉN VA A CERO, y no es un detalle: este portal tiene
+       animaciones `both` con delay (.dash-actions espera .22s). Acortando solo
+       la duración, el elemento se queda 220ms en su relleno `backwards`, que es
+       opacity:0 — o sea, invisible justo para quien pidió menos movimiento.
+       Lo cachó el arnés midiendo opacidad en las 5 vistas. */
+    animation-delay:0s !important;
+    animation-iteration-count:1 !important;
+    transition-duration:.01ms !important;
+    transition-delay:0s !important;
+    scroll-behavior:auto !important;
+  }
+  /* el barrido de carga sí se apaga: es puro movimiento, sin estado final */
+  .tc-hero.is-loading,.mq-pic.is-loading,.wiz-ev-pic.is-loading,.px-hero.is-loading{
+    background-image:none;background-color:#0c0c0c;
+  }
 }
 
 /* ===================================================================== */
@@ -715,7 +739,7 @@ main{
 @keyframes mq-scroll{from{transform:translateX(0)}to{transform:translateX(-50%)}}
 .mq-chip{
   display:flex;align-items:center;gap:8px;flex-shrink:0;
-  background:var(--field-bg);border:1px solid var(--line);border-radius:999px;padding:4px 13px 4px 4px;
+  background:var(--field-bg);border:1px solid var(--line);border-radius:var(--r-chip,999px);padding:4px 13px 4px 4px;
 }
 .mq-pic{
   width:30px;height:30px;border-radius:50%;flex-shrink:0;overflow:hidden;
@@ -749,14 +773,14 @@ main{
 .dash-bell.has-avisos{color:var(--yel);border-color:rgba(232,255,76,.45);box-shadow:0 0 14px rgba(232,255,76,.15)}
 .dash-bell-badge{
   position:absolute;top:-3px;right:-3px;min-width:18px;height:18px;padding:0 4px;
-  border-radius:999px;background:var(--red);color:#fff;border:2px solid #000;
+  border-radius:var(--r-chip,999px);background:var(--red);color:#fff;border:2px solid #000;
   font-family:'JetBrains Mono',monospace;font-weight:700;font-size:10px;
   display:flex;align-items:center;justify-content:center;
 }
 .avisos-panel{
   position:absolute;top:52px;right:0;width:300px;max-width:84vw;z-index:200;
-  background:var(--card);border:1px solid var(--line-strong);border-radius:14px;
-  box-shadow:0 14px 44px rgba(0,0,0,.6);overflow:hidden;
+  background:var(--card);border:1px solid var(--line-strong);border-radius:var(--r-card,16px);
+  box-shadow:var(--sombra-alta,0 24px 50px rgba(0,0,0,.65));overflow:hidden;
   animation:pv-rise .22s cubic-bezier(.2,.7,.2,1) both;
 }
 .avisos-head{
@@ -766,12 +790,12 @@ main{
 .avisos-list{max-height:60vh;overflow-y:auto;padding:6px}
 .avisos-empty{padding:22px 16px;text-align:center;color:var(--ink-mute);font-size:13px;font-weight:600}
 .aviso{
-  display:flex;gap:11px;padding:11px 12px;border-radius:10px;margin:4px 2px;
+  display:flex;gap:11px;padding:11px 12px;border-radius:var(--r-sm,8px);margin:4px 2px;
   background:var(--field-bg);border:1px solid var(--line);border-left:3px solid var(--ink-mute);
 }
 .aviso.sev-alta{border-left-color:var(--red);background:rgba(255,40,59,.06)}
 .aviso.sev-media{border-left-color:var(--yel);background:rgba(232,255,76,.05)}
-.aviso-ico{width:26px;height:26px;flex-shrink:0;border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:14px}
+.aviso-ico{width:26px;height:26px;flex-shrink:0;border-radius:var(--r-sm,8px);display:flex;align-items:center;justify-content:center;font-weight:900;font-size:14px}
 .aviso.sev-alta .aviso-ico{background:rgba(255,40,59,.14);color:#ffb0b8}
 .aviso.sev-media .aviso-ico{background:rgba(232,255,76,.14);color:var(--yel)}
 .aviso-body{flex:1;min-width:0}
@@ -780,7 +804,7 @@ main{
 .aviso-accion{
   margin-top:8px;display:inline-flex;align-items:center;gap:5px;
   background:transparent;border:1px solid var(--line-strong);color:var(--yel);
-  border-radius:999px;padding:5px 11px;font-family:'Montserrat',sans-serif;
+  border-radius:var(--r-chip,999px);padding:5px 11px;font-family:'Montserrat',sans-serif;
   font-weight:800;font-size:10px;letter-spacing:.06em;text-transform:uppercase;cursor:pointer;
 }
 .aviso-accion:hover{border-color:var(--yel);background:rgba(232,255,76,.08)}
@@ -829,7 +853,7 @@ main{
   display:none;align-items:center;gap:10px;
   padding:8px 10px;background:var(--yel);
   border-radius:var(--r-chip,999px);
-  box-shadow:0 8px 28px rgba(0,0,0,.55);
+  box-shadow:var(--sombra-reposo,0 4px 16px rgba(0,0,0,.35));
 }
 .rcp.is-visible{display:flex}
 .rcp.rcp-oculto{display:none}
@@ -1111,6 +1135,86 @@ body.rcp-alto .pf{ padding-bottom:calc(var(--rcp-zona-fab) + env(safe-area-inset
   .pp2-confeti{display:none}
   .px-hero.is-loading{animation:none}
 }
+
+/* ===================================================================
+   TUERCA PP-4 · el sistema de redondeo y sombras de index, en el Portal
+   Los MISMOS valores que index.html (PF-3, PR #363) y que las 4 páginas
+   hermanas (PF-5, PR #370). El bloque de los 4 radios es BYTE-IDÉNTICO
+   al de las hermanas y el arnés lo compara: si alguien desincroniza uno,
+   truena.
+   Todo var() lleva valor de respaldo, así que borrar este bloque degrada
+   al valor de hoy, no a esquinas cuadradas.
+   =================================================================== */
+:root{
+  --r-card:16px;    /* contenedores y tarjetas */
+  --r-btn:12px;     /* botones */
+  --r-chip:999px;   /* chips y badges */
+  --r-sm:8px;       /* detalles chicos: notas, avisos, inputs */
+}
+/* EXCEPCIÓN DECLARADA, no un valor suelto: la barrita de progreso del wizard
+   mide 4px de alto. Con --r-sm (8px) el radio sería mayor que la mitad del alto
+   y la barra se volvería una cápsula; con 0 se ve como un corte. 2px es media
+   altura exacta. Se le pone nombre para que sea una decisión, no un número
+   olvidado — el mismo criterio que --r-modal en index.html. */
+:root{ --r-hilo:2px; }
+/* Las 2 sombras del index (PF-3). Se absorben SOLO las de elevación: el panel de
+   avisos y el pill de la radio. Las demás sombras del portal son DESTELLOS DE
+   COLOR de marca —el FAB amarillo, el pulso del punto, la campana con avisos, la
+   barra de progreso verde— y meterlas en un token neutro les borraría el brillo,
+   que es justo lo que las hace de Conecta. Se quedan como están, a propósito. */
+:root{
+  --sombra-reposo:0 4px 16px rgba(0,0,0,.35);
+  --sombra-alta:0 24px 50px rgba(0,0,0,.65);
+}
+
+/* ── [PP-4] ESCRITORIO VESTIDO ────────────────────────────────────────────
+   En ≥900px el shell de 480px flotaba en un mar negro. Se le pone detrás una
+   foto de tour MUY velada, con el mismo tratamiento que el hero de las
+   hermanas: se percibe como textura, no compite. En móvil no se pinta nada
+   (ahí el shell ES la pantalla y una foto de fondo sería peso sin beneficio).
+   La opacidad se eligió MIDIENDO el contraste del shell encima, no a ojo. */
+@media(min-width:900px){
+  body{position:relative}
+  body::before{
+    content:'';position:fixed;inset:0;z-index:-2;
+    background-image:url('/img/tours/tour-convoy-noche.webp');
+    background-size:cover;background-position:center 42%;
+    opacity:.14;
+    /* el gris la aparta del amarillo de marca: la foto viste, no colorea */
+    filter:grayscale(.6);
+  }
+  /* Velo encima de la foto. La primera versión era un radial CLARO en el centro
+     y negro en los bordes: exactamente al revés de lo que hace falta. El shell
+     vive en el centro y ya tiene su propio negro opaco, así que ahí el velo no
+     sirve de nada; los bordes son el único lugar donde la foto puede verse, y
+     ahí el radial la apagaba a cero. Lo cachó el arnés midiendo la luminancia
+     del render a los lados: cambiaba 0.0003, o sea nada.
+     Ahora oscurece la BANDA CENTRAL —para enmarcar el shell— y deja respirar
+     los costados. */
+  body::after{
+    content:'';position:fixed;inset:0;z-index:-1;pointer-events:none;
+    background:linear-gradient(90deg,
+      rgba(0,0,0,.55) 0%, rgba(0,0,0,.86) 28%,
+      rgba(0,0,0,.86) 72%, rgba(0,0,0,.55) 100%);
+  }
+  /* El shell se separa del fondo con su propio negro, no con una caja: la
+     columna sigue midiendo 480px y nada del layout se mueve. */
+  /* main Y el footer: el footer vive FUERA de main, y sin esto quedaría
+     flotando sobre la foto mientras la columna de arriba sí tiene fondo. */
+  main,.pf{background:#000}
+  main{box-shadow:var(--sombra-alta,0 24px 50px rgba(0,0,0,.65))}
+  .pf{max-width:var(--shell-max);margin:0 auto}
+}
+
+/* ── [PP-4] PANTALLA DE CARGA CON MARCA ───────────────────────────────────
+   Era un spinner genérico. Ahora es el logo de la casa con un pulso; el
+   spinner se queda como respaldo por si el logo no alcanza a pintar. */
+.boot-logo{display:flex;align-items:stretch;animation:bootPulso 1.5s ease-in-out infinite}
+.boot-logo .logo-box{background:var(--red);padding:7px 14px;display:flex;align-items:center}
+.boot-logo .logo-txt{font-weight:900;font-size:16px;color:#000;letter-spacing:.04em;text-transform:uppercase;font-family:'Montserrat',sans-serif}
+.boot-logo .logo-mx{font-weight:900;font-style:italic;font-size:18px;color:#fff;margin-left:7px;align-self:center;font-family:'Montserrat',sans-serif}
+@keyframes bootPulso{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.62;transform:scale(.97)}}
+.boot .b-txt{margin-top:2px}
 </style>
 <style>.ic{width:1em;height:1em;vertical-align:-0.12em;flex-shrink:0;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}</style>
 </head>
@@ -1130,8 +1234,13 @@ body.rcp-alto .pf{ padding-bottom:calc(var(--rcp-zona-fab) + env(safe-area-inset
 
 <!-- Bootstrap loader -->
 <div class="boot" id="boot">
-  <div class="b-spin"></div>
-  <div class="b-txt">Cargando portal…</div>
+  <!-- [PP-4] El logo de la casa con un pulso, en vez del spinner genérico. Es
+       lo primero que ve el cliente y hasta ahora no decía de quién era. -->
+  <div class="boot-logo" aria-hidden="true">
+    <span class="logo-box"><span class="logo-txt">Conecta</span></span>
+    <span class="logo-mx">MX</span>
+  </div>
+  <div class="b-txt">Cargando tu portal…</div>
 </div>
 
 <nav class="nav">
@@ -1161,7 +1270,7 @@ body.rcp-alto .pf{ padding-bottom:calc(var(--rcp-zona-fab) + env(safe-area-inset
     <div class="auth-marquee" id="auth-marquee" aria-hidden="true" style="display:none"></div>
 
     <!-- [invitacion] Aviso si el visitante llegó con un link de invitación pendiente -->
-    <div id="inv-banner" style="display:none;margin:0 0 14px 0;padding:12px 14px;border-radius:12px;background:rgba(232,255,76,.08);border:1px solid rgba(232,255,76,.35);color:var(--ink);font-size:13px;font-weight:600;line-height:1.45"><svg class="ic"><use href="#ic-boleto"/></svg> Tienes una invitación a un viaje — entra o crea tu cuenta para aceptarla.</div>
+    <div id="inv-banner" style="display:none;margin:0 0 14px 0;padding:12px 14px;border-radius:var(--r-btn,12px);background:rgba(232,255,76,.08);border:1px solid rgba(232,255,76,.35);color:var(--ink);font-size:13px;font-weight:600;line-height:1.45"><svg class="ic"><use href="#ic-boleto"/></svg> Tienes una invitación a un viaje — entra o crea tu cuenta para aceptarla.</div>
 
     <div class="card">
       <button type="button" class="btn-google" id="btn-google" data-action="google">
@@ -1530,7 +1639,7 @@ body.rcp-alto .pf{ padding-bottom:calc(var(--rcp-zona-fab) + env(safe-area-inset
       <h2 class="h-display">Sube tu <span class="accent">comprobante</span></h2>
       <p class="subtitle">Opcional pero acelera tu aprobación.</p>
       <!-- [FASE B] Reloj del apartado: solo aparece si la solicitud nació con hold. -->
-      <div id="wiz-hold-timer" style="display:none;margin:0 0 16px;padding:14px 16px;border-radius:12px;background:rgba(255,183,3,.12);border:1px solid rgba(255,183,3,.5);color:#ffdf8a;font-size:14px;font-weight:700;line-height:1.5"></div>
+      <div id="wiz-hold-timer" style="display:none;margin:0 0 16px;padding:14px 16px;border-radius:var(--r-btn,12px);background:rgba(255,183,3,.12);border:1px solid rgba(255,183,3,.5);color:#ffdf8a;font-size:14px;font-weight:700;line-height:1.5"></div>
       <div class="card">
         <label class="wiz-upload" id="wiz-upload">
           <input type="file" id="wiz-file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif,application/pdf">
@@ -2314,7 +2423,7 @@ function _invToast(msg, isError){
   if (!el){
     el = document.createElement('div');
     el.id = 'inv-toast';
-    el.style.cssText = 'position:fixed;left:50%;bottom:24px;transform:translateX(-50%);max-width:min(92vw,440px);z-index:9999;padding:13px 18px;border-radius:12px;font-size:14px;font-weight:700;line-height:1.4;box-shadow:0 8px 30px rgba(0,0,0,.5);text-align:center';
+    el.style.cssText = 'position:fixed;left:50%;bottom:24px;transform:translateX(-50%);max-width:min(92vw,440px);z-index:9999;padding:13px 18px;border-radius:var(--r-btn,12px);font-size:14px;font-weight:700;line-height:1.4;box-shadow:0 8px 30px rgba(0,0,0,.5);text-align:center';
     document.body.appendChild(el);
   }
   el.style.background = isError ? 'rgba(255,40,59,.14)' : 'rgba(136,234,78,.14)';
@@ -2918,7 +3027,7 @@ async function renderMisViajesAcomp(){
     } catch (e) { return []; }
   }));
 
-  const chip = (txt) => `<span style="display:inline-block;padding:2px 8px;margin:2px 4px 0 0;border-radius:999px;background:var(--field-bg);border:1px solid var(--line);font-size:10px;font-weight:700;letter-spacing:.04em;color:var(--ink-soft)">${escapeHtml(txt)}</span>`;
+  const chip = (txt) => `<span style="display:inline-block;padding:2px 8px;margin:2px 4px 0 0;border-radius:var(--r-chip,999px);background:var(--field-bg);border:1px solid var(--line);font-size:10px;font-weight:700;letter-spacing:.04em;color:var(--ink-soft)">${escapeHtml(txt)}</span>`;
 
   const bloques = lugares.map((l, i) => {
     const chips = [l.paquete, l.zona, l.tipo_habitacion]
@@ -2929,9 +3038,9 @@ async function renderMisViajesAcomp(){
     let etiqueta = '', tachado = '';
     if (l.estado === 'baja'){
       tachado = 'text-decoration:line-through;opacity:.6;';
-      etiqueta = `<span style="display:inline-block;margin-left:6px;padding:1px 7px;border-radius:999px;font-size:9px;font-weight:900;letter-spacing:.1em;color:var(--red);border:1px solid rgba(255,40,59,.5);background:rgba(255,40,59,.12)">BAJA</span>`;
+      etiqueta = `<span style="display:inline-block;margin-left:6px;padding:1px 7px;border-radius:var(--r-chip,999px);font-size:9px;font-weight:900;letter-spacing:.1em;color:var(--red);border:1px solid rgba(255,40,59,.5);background:rgba(255,40,59,.12)">BAJA</span>`;
     } else if (l.estado === 'traspasado'){
-      etiqueta = `<span style="display:inline-block;margin-left:6px;padding:1px 7px;border-radius:999px;font-size:9px;font-weight:900;letter-spacing:.1em;color:#ffb84c;border:1px solid rgba(255,184,76,.5);background:rgba(255,184,76,.12)">TRASPASADO</span>`;
+      etiqueta = `<span style="display:inline-block;margin-left:6px;padding:1px 7px;border-radius:var(--r-chip,999px);font-size:9px;font-weight:900;letter-spacing:.1em;color:#ffb84c;border:1px solid rgba(255,184,76,.5);background:rgba(255,184,76,.12)">TRASPASADO</span>`;
     }
 
     const pagos = planes[i] || [];
@@ -3373,7 +3482,7 @@ async function renderPlanPagos(t, head){
     <div class="card como-pagar">
       <div class="eyebrow" style="margin-bottom:8px">¿Cómo pago?</div>
       <p style="margin:0 0 12px">Haz tu depósito a la cuenta de <b>tu paquete</b> y manda el comprobante por WhatsApp.</p>
-      <div style="border:1px solid var(--line,#e5e5e5);border-radius:10px;padding:12px 14px;display:grid;gap:6px">
+      <div style="border:1px solid var(--line,#e5e5e5);border-radius:var(--r-sm,8px);padding:12px 14px;display:grid;gap:6px">
         ${_cuentaTour.banco   ? `<div style="display:flex;justify-content:space-between;gap:12px;font-size:14px"><span style="color:var(--ink-mute)">Banco</span><b>${escapeHtml(_cuentaTour.banco)}</b></div>` : ''}
         ${_cuentaTour.tarjeta ? `<div style="display:flex;justify-content:space-between;gap:12px;font-size:14px"><span style="color:var(--ink-mute)">Tarjeta</span><b>${escapeHtml(_cuentaTour.tarjeta)}</b></div>` : ''}
         ${_cuentaTour.clabe   ? `<div style="display:flex;justify-content:space-between;gap:12px;font-size:14px"><span style="color:var(--ink-mute)">CLABE</span><b>${escapeHtml(_cuentaTour.clabe)}</b></div>` : ''}
@@ -3421,10 +3530,10 @@ async function renderAcompanantes(t){
   const registrados = data.filter(esRegistrado).length;
   const N = data.length;
 
-  const chip = (txt) => `<span style="display:inline-block;padding:2px 8px;margin:2px 4px 0 0;border-radius:999px;background:var(--field-bg);border:1px solid var(--line);font-size:10px;font-weight:700;letter-spacing:.04em;color:var(--ink-soft)">${escapeHtml(txt)}</span>`;
-  const chipMenor = `<span style="display:inline-block;padding:2px 8px;margin:2px 4px 0 0;border-radius:999px;background:rgba(255,184,76,.12);border:1px solid rgba(255,184,76,.5);font-size:10px;font-weight:900;letter-spacing:.06em;color:#ffb84c">MENOR</span>`;
-  const chipInvitado  = `<span style="display:inline-block;padding:2px 8px;margin:2px 4px 0 0;border-radius:999px;background:rgba(0,0,205,.22);border:1px solid rgba(0,0,205,.6);font-size:10px;font-weight:900;letter-spacing:.06em;color:#9aa5ff">INVITADO</span>`;
-  const chipConectado = `<span style="display:inline-block;padding:2px 8px;margin:2px 4px 0 0;border-radius:999px;background:rgba(136,234,78,.14);border:1px solid rgba(136,234,78,.4);font-size:10px;font-weight:900;letter-spacing:.06em;color:var(--green)">CONECTADO ✓</span>`;
+  const chip = (txt) => `<span style="display:inline-block;padding:2px 8px;margin:2px 4px 0 0;border-radius:var(--r-chip,999px);background:var(--field-bg);border:1px solid var(--line);font-size:10px;font-weight:700;letter-spacing:.04em;color:var(--ink-soft)">${escapeHtml(txt)}</span>`;
+  const chipMenor = `<span style="display:inline-block;padding:2px 8px;margin:2px 4px 0 0;border-radius:var(--r-chip,999px);background:rgba(255,184,76,.12);border:1px solid rgba(255,184,76,.5);font-size:10px;font-weight:900;letter-spacing:.06em;color:#ffb84c">MENOR</span>`;
+  const chipInvitado  = `<span style="display:inline-block;padding:2px 8px;margin:2px 4px 0 0;border-radius:var(--r-chip,999px);background:rgba(0,0,205,.22);border:1px solid rgba(0,0,205,.6);font-size:10px;font-weight:900;letter-spacing:.06em;color:#9aa5ff">INVITADO</span>`;
+  const chipConectado = `<span style="display:inline-block;padding:2px 8px;margin:2px 4px 0 0;border-radius:var(--r-chip,999px);background:rgba(136,234,78,.14);border:1px solid rgba(136,234,78,.4);font-size:10px;font-weight:900;letter-spacing:.06em;color:var(--green)">CONECTADO ✓</span>`;
 
   const filas = data.map((l) => {
     const editable = l.estado === 'activo' && Number(l.numero) >= 2; // el #1 = titular (su perfil)
@@ -3440,8 +3549,8 @@ async function renderAcompanantes(t){
           <div class="field" style="margin-bottom:8px"><label>Fecha de nacimiento (opcional)</label><input class="lug-fnac" type="date" value="${escapeHtml((l.fecha_nacimiento || '').slice(0, 10))}"></div>
           <div class="lug-err" style="color:var(--red);font-size:12px;font-weight:700;margin-bottom:8px;display:none"></div>
           <div style="display:flex;gap:8px;justify-content:flex-end">
-            <button type="button" data-lugar-cancel style="padding:7px 14px;border-radius:999px;border:1px solid var(--line-strong);background:transparent;color:var(--ink-soft);font-size:12px;font-weight:700;cursor:pointer">Cancelar</button>
-            <button type="button" data-lugar-save="${escapeHtml(l.id)}" style="padding:7px 16px;border-radius:999px;border:none;background:var(--yel);color:#000;font-size:12px;font-weight:900;cursor:pointer">Guardar</button>
+            <button type="button" data-lugar-cancel style="padding:7px 14px;border-radius:var(--r-chip,999px);border:1px solid var(--line-strong);background:transparent;color:var(--ink-soft);font-size:12px;font-weight:700;cursor:pointer">Cancelar</button>
+            <button type="button" data-lugar-save="${escapeHtml(l.id)}" style="padding:7px 16px;border-radius:var(--r-chip,999px);border:none;background:var(--yel);color:#000;font-size:12px;font-weight:900;cursor:pointer">Guardar</button>
           </div>
         </div>`;
     }
@@ -3469,17 +3578,17 @@ async function renderAcompanantes(t){
     let tachado = '';
     if (l.estado === 'baja'){
       tachado = 'text-decoration:line-through;opacity:.6;';
-      etiqueta = `<span style="display:inline-block;margin-left:6px;padding:1px 7px;border-radius:999px;font-size:9px;font-weight:900;letter-spacing:.1em;color:var(--red);border:1px solid rgba(255,40,59,.5);background:rgba(255,40,59,.12)">BAJA</span>`;
+      etiqueta = `<span style="display:inline-block;margin-left:6px;padding:1px 7px;border-radius:var(--r-chip,999px);font-size:9px;font-weight:900;letter-spacing:.1em;color:var(--red);border:1px solid rgba(255,40,59,.5);background:rgba(255,40,59,.12)">BAJA</span>`;
     } else if (l.estado === 'traspasado'){
-      etiqueta = `<span style="display:inline-block;margin-left:6px;padding:1px 7px;border-radius:999px;font-size:9px;font-weight:900;letter-spacing:.1em;color:#ffb84c;border:1px solid rgba(255,184,76,.5);background:rgba(255,184,76,.12)">TRASPASADO</span>`;
+      etiqueta = `<span style="display:inline-block;margin-left:6px;padding:1px 7px;border-radius:var(--r-chip,999px);font-size:9px;font-weight:900;letter-spacing:.1em;color:#ffb84c;border:1px solid rgba(255,184,76,.5);background:rgba(255,184,76,.12)">TRASPASADO</span>`;
     }
 
     const btnEditar = editable
-      ? `<button type="button" data-lugar-edit="${escapeHtml(l.id)}" style="padding:4px 12px;border-radius:999px;border:1px solid var(--line-strong);background:var(--field-bg);color:var(--ink);font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap">${tieneNombre ? 'Editar' : 'Registrar'}</button>`
+      ? `<button type="button" data-lugar-edit="${escapeHtml(l.id)}" style="padding:4px 12px;border-radius:var(--r-chip,999px);border:1px solid var(--line-strong);background:var(--field-bg);color:var(--ink);font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap">${tieneNombre ? 'Editar' : 'Registrar'}</button>`
       : '';
     // Invitar: solo si es editable, ya tiene nombre + correo, y aún no acepta.
     const btnInvitar = (editable && tieneNombre && tieneCorreo && !aceptada)
-      ? `<button type="button" data-lugar-invite="${escapeHtml(l.id)}" style="padding:4px 12px;border-radius:999px;border:1px solid var(--line-strong);background:var(--field-bg);color:var(--ink);font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap">${l.invitacion_enviada_at ? 'Reenviar' : '<svg class="ic"><use href="#ic-correo"/></svg> Invitar'}</button>`
+      ? `<button type="button" data-lugar-invite="${escapeHtml(l.id)}" style="padding:4px 12px;border-radius:var(--r-chip,999px);border:1px solid var(--line-strong);background:var(--field-bg);color:var(--ink);font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap">${l.invitacion_enviada_at ? 'Reenviar' : '<svg class="ic"><use href="#ic-correo"/></svg> Invitar'}</button>`
       : '';
 
     return `
@@ -3664,26 +3773,26 @@ async function renderPuzzle(t){
   // Picker de lugares sin cuarto (para "+ Asignar"). Toca uno → asignar.
   const pickerHtml = (habId) => sinCuarto.length
     ? `<div style="display:flex;flex-wrap:wrap;gap:6px">${sinCuarto.map(l => `
-        <button type="button" data-puz-asignar="${escapeHtml(l.id)}" data-puz-hab="${escapeHtml(habId)}" style="padding:5px 12px;border-radius:999px;border:1px solid var(--line-strong);background:var(--field-bg);color:var(--ink);font-size:12px;font-weight:700;cursor:pointer">${escapeHtml(nombreDe(l))}</button>`).join('')}</div>`
+        <button type="button" data-puz-asignar="${escapeHtml(l.id)}" data-puz-hab="${escapeHtml(habId)}" style="padding:5px 12px;border-radius:var(--r-chip,999px);border:1px solid var(--line-strong);background:var(--field-bg);color:var(--ink);font-size:12px;font-weight:700;cursor:pointer">${escapeHtml(nombreDe(l))}</button>`).join('')}</div>`
     : `<div style="font-size:12px;color:var(--ink-mute)">Ya no hay personas sin cuarto.</div>`;
 
   const cuartosHtml = habs.map(h => {
     const ocup = ocupPorHab[h.id] || [];
     const lleno = ocup.length >= Number(h.capacidad || 0);
     const chips = ocup.map(l => `
-      <span style="display:inline-flex;align-items:center;gap:6px;padding:3px 6px 3px 10px;margin:2px 4px 0 0;border-radius:999px;background:var(--field-bg);border:1px solid var(--line);font-size:12px;color:var(--ink)">
+      <span style="display:inline-flex;align-items:center;gap:6px;padding:3px 6px 3px 10px;margin:2px 4px 0 0;border-radius:var(--r-chip,999px);background:var(--field-bg);border:1px solid var(--line);font-size:12px;color:var(--ink)">
         ${escapeHtml(nombreDe(l))}
         <button type="button" data-puz-quitar="${escapeHtml(l.id)}" title="Quitar del cuarto" style="border:none;background:transparent;color:var(--ink-mute);font-size:14px;line-height:1;cursor:pointer;padding:0 2px">×</button>
       </span>`).join('');
     return `
-      <div style="border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-bottom:10px">
+      <div style="border:1px solid var(--line);border-radius:var(--r-btn,12px);padding:10px 12px;margin-bottom:10px">
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
           <b style="font-size:13px">Cuarto ${escapeHtml(h.orden)} · ${escapeHtml(h.tipo)}</b>
           <span style="font-size:12px;color:${lleno ? 'var(--green)' : 'var(--ink-mute)'}">(${ocup.length}/${escapeHtml(h.capacidad)})</span>
           <button type="button" data-puz-del="${escapeHtml(h.id)}" title="Eliminar cuarto" style="margin-left:auto;border:none;background:transparent;font-size:15px;cursor:pointer"><svg class="ic"><use href="#ic-basura"/></svg></button>
         </div>
         <div style="margin-top:8px">${chips || '<span style="font-size:12px;color:var(--ink-mute)">Cuarto vacío</span>'}</div>
-        ${(!lleno && sinCuarto.length) ? `<div style="margin-top:8px"><button type="button" data-puz-add="${escapeHtml(h.id)}" style="padding:5px 12px;border-radius:999px;border:1px dashed var(--line-strong);background:transparent;color:var(--ink-soft);font-size:12px;font-weight:700;cursor:pointer">+ Asignar</button></div>` : ''}
+        ${(!lleno && sinCuarto.length) ? `<div style="margin-top:8px"><button type="button" data-puz-add="${escapeHtml(h.id)}" style="padding:5px 12px;border-radius:var(--r-chip,999px);border:1px dashed var(--line-strong);background:transparent;color:var(--ink-soft);font-size:12px;font-weight:700;cursor:pointer">+ Asignar</button></div>` : ''}
         <div id="puz-picker-${escapeHtml(h.id)}" style="display:none;margin-top:8px">${pickerHtml(h.id)}</div>
       </div>`;
   }).join('');
@@ -3695,12 +3804,12 @@ async function renderPuzzle(t){
     : '';
 
   const agregarHtml = cubreTodos
-    ? `<button type="button" disabled style="width:100%;padding:11px;border-radius:12px;border:1px solid var(--line);background:transparent;color:var(--ink-mute);font-size:13px;font-weight:700;cursor:not-allowed">Tus cuartos ya cubren a todo el grupo</button>`
+    ? `<button type="button" disabled style="width:100%;padding:11px;border-radius:var(--r-btn,12px);border:1px solid var(--line);background:transparent;color:var(--ink-mute);font-size:13px;font-weight:700;cursor:not-allowed">Tus cuartos ya cubren a todo el grupo</button>`
     : `
-      <button type="button" data-puz-addroom style="width:100%;padding:11px;border-radius:12px;border:1px dashed var(--line-strong);background:transparent;color:var(--ink);font-size:13px;font-weight:800;cursor:pointer">＋ Agregar cuarto</button>
+      <button type="button" data-puz-addroom style="width:100%;padding:11px;border-radius:var(--r-btn,12px);border:1px dashed var(--line-strong);background:transparent;color:var(--ink);font-size:13px;font-weight:800;cursor:pointer">＋ Agregar cuarto</button>
       <div id="puz-tipos" style="display:none;margin-top:8px">
         <div style="display:flex;flex-wrap:wrap;gap:6px">
-          ${_PUZ_TIPOS.map(x => `<button type="button" data-puz-crear="${x.tipo}" style="padding:7px 14px;border-radius:999px;border:1px solid var(--line-strong);background:var(--field-bg);color:var(--ink);font-size:12px;font-weight:700;cursor:pointer">${x.tipo} (${x.cap})</button>`).join('')}
+          ${_PUZ_TIPOS.map(x => `<button type="button" data-puz-crear="${x.tipo}" style="padding:7px 14px;border-radius:var(--r-chip,999px);border:1px solid var(--line-strong);background:var(--field-bg);color:var(--ink);font-size:12px;font-weight:700;cursor:pointer">${x.tipo} (${x.cap})</button>`).join('')}
         </div>
       </div>`;
 

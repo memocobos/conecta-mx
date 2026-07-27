@@ -287,6 +287,149 @@ main{padding:0}
      · .steps y .alert-cuenta-foot (pagos)
    Y .warn de pagos se queda igual porque su border-left de 3px es el side-tab
    que Memo decidió conservar. */
+
+/* ═══════════════════════════════════════════════════════════════════════
+   TUERCA PF-6a · fotos reales como protagonistas
+   Layout de dos columnas en escritorio (texto ↔ foto alternados), galería
+   del paso 05 y sección de cierre. Usa los tokens de PF-3/PF-5 y las
+   micro-transiciones de PF-1. Todo respeta prefers-reduced-motion.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* ── HERO con foto real de fondo ────────────────────────────────────── */
+.hero{position:relative;isolation:isolate}
+.hero-bg{
+  position:absolute;inset:0;z-index:-1;overflow:hidden;
+}
+.hero-bg img{width:100%;height:100%;object-fit:cover;object-position:center 35%}
+/* Velo oscuro: el hero ya vive sobre un degradado azul/negro y el texto
+   necesita contraste de lectura, no una foto compitiendo con él. */
+.hero-bg::after{
+  content:'';position:absolute;inset:0;
+  background:linear-gradient(180deg,rgba(0,0,0,.72) 0%,rgba(0,0,0,.82) 55%,rgba(0,0,0,.95) 100%);
+}
+/* 4 cifras en vez de 3: en móvil van 2x2 y NINGUNA se esconde. */
+.hero-stats{grid-template-columns:repeat(4,1fr)}
+@media(max-width:640px){
+  .hero-stats{grid-template-columns:1fr 1fr}
+  .hero-stats .hero-stat:last-child{display:block}
+}
+
+/* ── PASOS EN DOS COLUMNAS (escritorio) ─────────────────────────────── */
+.step-foto{margin-top:clamp(20px,3vw,28px)}
+.step-foto figure{margin:0}
+.step-foto img{
+  width:100%;height:auto;display:block;
+  border-radius:var(--r-card,16px);
+  border:1px solid rgba(255,255,255,.08);
+}
+.step-foto figcaption{
+  margin-top:10px;font-size:11px;font-weight:700;letter-spacing:.06em;
+  text-transform:uppercase;color:var(--muted);
+}
+@media(min-width:900px){
+  .step-section.con-foto{
+    display:grid;grid-template-columns:1fr 1fr;
+    column-gap:clamp(32px,4vw,64px);align-items:start;
+  }
+  .step-section.con-foto .step-head{grid-area:1/1}
+  .step-section.con-foto .step-body{grid-area:2/1}
+  .step-section.con-foto .step-foto{grid-area:1/2/3/3;align-self:center;margin-top:0}
+  /* alternado: los pares llevan la foto a la izquierda */
+  .step-section.con-foto.invertido .step-head{grid-area:1/2}
+  .step-section.con-foto.invertido .step-body{grid-area:2/2}
+  .step-section.con-foto.invertido .step-foto{grid-area:1/1/3/2}
+}
+
+/* ── PAQUETES DEL PASO 02, como lista legible ───────────────────────── */
+.pkg-lista{list-style:none;margin:18px 0 0;padding:0;display:grid;gap:10px}
+.pkg-lista li{
+  padding:12px 14px;background:rgba(255,255,255,.03);
+  border:1px solid rgba(255,255,255,.08);border-radius:var(--r-sm,8px);
+  font-size:13px;line-height:1.55;color:var(--muted);
+}
+.pkg-lista b{color:var(--tp,#fff);font-weight:900;letter-spacing:.04em}
+.pkg-nota{margin-top:14px;font-size:12px;color:var(--amarillo)}
+
+/* ── GALERÍA DEL PASO 05 ────────────────────────────────────────────── */
+.galeria{
+  margin-top:clamp(22px,3vw,32px);
+  display:grid;grid-template-columns:1fr 1fr;gap:10px;
+}
+@media(min-width:900px){.galeria{grid-template-columns:repeat(3,1fr);gap:14px}}
+.galeria figure{margin:0;position:relative;overflow:hidden;border-radius:var(--r-card,16px);border:1px solid rgba(255,255,255,.08)}
+.galeria img{
+  /* height:auto NO es adorno: los atributos width/height del HTML (que van para
+     que no salte el layout) son hints de presentación, y le ganan a una regla
+     que no declare height. Con ancho Y alto definidos, aspect-ratio se ignora y
+     el tile crece a los 1200px del atributo. */
+  width:100%;height:auto;aspect-ratio:1/1;object-fit:cover;display:block;
+  transition:transform .6s cubic-bezier(.22,1,.36,1);
+}
+.galeria figcaption{
+  position:absolute;left:0;right:0;bottom:0;
+  padding:22px 12px 10px;
+  background:linear-gradient(transparent,rgba(0,0,0,.85));
+  font-size:10px;font-weight:900;letter-spacing:.1em;text-transform:uppercase;color:#fff;
+}
+@media (hover:hover){
+  .galeria figure:hover img{transform:scale(1.06)}
+}
+
+/* ── CIERRE · "esto no es promesa, es historial" ────────────────────── */
+.historial{
+  padding:clamp(56px,8vw,96px) clamp(20px,5vw,64px);
+  border-top:1px solid var(--line);
+}
+.historial-kicker{
+  font-size:10px;font-weight:900;letter-spacing:.2em;text-transform:uppercase;
+  color:var(--amarillo);margin-bottom:14px;
+}
+.historial-title{
+  font-family:var(--font-display);font-weight:900;text-transform:uppercase;
+  font-size:clamp(30px,6vw,60px);line-height:.95;letter-spacing:-.01em;margin:0 0 10px;
+}
+.historial-sub{font-size:14px;color:var(--muted);max-width:56ch;line-height:1.6;margin:0}
+.historial-banda{
+  margin-top:clamp(26px,4vw,38px);
+  display:grid;grid-template-columns:1fr;gap:10px;
+}
+@media(min-width:720px){.historial-banda{grid-template-columns:repeat(3,1fr);gap:14px}}
+.historial-banda img{
+  width:100%;height:auto;aspect-ratio:4/3;object-fit:cover;display:block;
+  border-radius:var(--r-card,16px);border:1px solid rgba(255,255,255,.08);
+}
+.historial-cifras{
+  margin-top:clamp(26px,4vw,38px);
+  display:grid;grid-template-columns:1fr 1fr;gap:clamp(14px,2vw,24px);
+}
+@media(min-width:720px){.historial-cifras{grid-template-columns:repeat(4,1fr)}}
+.historial-cifra{padding:14px 0;border-top:2px solid var(--ink)}
+.historial-cifra-n{
+  font-family:var(--font-display);font-weight:900;
+  font-size:clamp(26px,4.5vw,40px);line-height:1;color:var(--amarillo);
+}
+.historial-cifra-l{
+  font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;
+  color:var(--muted);margin-top:6px;
+}
+.historial-ctas{margin-top:clamp(28px,4vw,40px);display:flex;flex-wrap:wrap;gap:12px}
+.historial-wa{
+  display:inline-flex;align-items:center;gap:8px;
+  padding:16px 22px;border-radius:var(--r-btn,12px);
+  border:1.5px solid rgba(255,255,255,.18);color:var(--tp,#fff);
+  font-size:12px;font-weight:900;letter-spacing:.1em;text-transform:uppercase;
+  text-decoration:none;transition:border-color .2s ease,transform .18s ease;
+}
+@media (hover:hover){
+  .historial-wa:hover{border-color:var(--amarillo);transform:translateY(-2px)}
+}
+.historial-wa:active{transform:scale(.98);transition-duration:.1s}
+
+/* ── ACCESIBILIDAD DE MOVIMIENTO ────────────────────────────────────── */
+@media (prefers-reduced-motion:reduce){
+  .galeria img,.historial-wa{transition-duration:.01ms !important}
+  .galeria figure:hover img{transform:none}
+}
 </style>
 </head>
 <body>
@@ -320,16 +463,22 @@ main{padding:0}
 
 <!-- HERO -->
 <section class="hero">
+  <!-- [PF-6a] Foto real de fondo en vez de puro degradado. Es la única imagen
+       de la página que carga eager: es lo primero que se ve. -->
+  <div class="hero-bg" aria-hidden="true">
+    <img src="img/tours/tour-hero-arena-noche.webp" alt="" width="1200" height="1199" fetchpriority="high" decoding="async">
+  </div>
   <div class="hero-kicker">Conecta Reynosa · Guía 2026</div>
   <h1 class="hero-title">
     <span class="line">Cómo</span>
     <span class="line"><span class="mark">funciona</span></span>
   </h1>
-  <p class="hero-sub">Todo el proceso en cinco pasos claros. De elegir tu evento a subirte al autobús — sin letra chica, sin enganches absurdos, sin estrés.</p>
+  <p class="hero-sub">De "vi el anuncio" a estar cantando en la fila de enfrente. Cinco pasos, cero letra chica — llevamos 13 años puliéndolos.</p>
   <div class="hero-stats">
     <div class="hero-stat"><div class="hero-stat-n">05</div><div class="hero-stat-l">Pasos</div></div>
     <div class="hero-stat"><div class="hero-stat-n">0%</div><div class="hero-stat-l">Interés</div></div>
     <div class="hero-stat"><div class="hero-stat-n">13+</div><div class="hero-stat-l">Años</div></div>
+    <div class="hero-stat"><div class="hero-stat-n">40+</div><div class="hero-stat-l">Eventos al año</div></div>
   </div>
 </section>
 
@@ -346,7 +495,7 @@ main{padding:0}
       </div>
     </div>
     <div class="step-body">
-      <p class="step-lede">Más de 40 conciertos y festivales en todo México durante 2026. De pop latino a metal, de festivales masivos en CDMX a auditorios en Monterrey — hay algo para cada gusto musical. Entra al catálogo, filtra por mes o ciudad, abre la ficha del evento y revisa zonas, fechas y disponibilidad.</p>
+      <p class="step-lede">Más de 40 conciertos y festivales al año en todo México: pop, corridos, rock, metal, K-pop y los festivales grandes. Cada evento trae su cuenta regresiva, sus zonas y su disponibilidad al momento. ¿No está el artista que buscas? Apúntate en la lista de espera y eres de los primeros en saberlo.</p>
       <div class="step-pills">
         <span class="step-pill">Arena MTY</span>
         <span class="step-pill">Foro Sol CDMX</span>
@@ -356,9 +505,10 @@ main{padding:0}
     </div>
   </section>
 
-  <!-- VISUAL 1 -->
+  <!-- VISUAL 1 · [PF-6a] era una foto de STOCK de Unsplash con alt vacío en una
+       página cuyo argumento es que los tours son reales. Ahora es un tour real. -->
   <div class="visual">
-    <img src="https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=1400&q=75" alt="" loading="lazy">
+    <img src="img/tours/tour-grupo-festejo.webp" alt="Grupo del tour festejando con los brazos arriba frente a los camiones" width="1200" height="900" loading="lazy" decoding="async">
     <div class="visual-text">
       <div class="kicker">Desde 2013</div>
       <div class="big">Más de <em>40</em><br>eventos</div>
@@ -366,7 +516,7 @@ main{padding:0}
   </div>
 
   <!-- 02 -->
-  <section class="step-section" data-step="02">
+  <section class="step-section con-foto" data-step="02">
     <div class="step-head">
       <div class="step-num">02</div>
       <div class="step-meta">
@@ -375,18 +525,25 @@ main{padding:0}
       </div>
     </div>
     <div class="step-body">
-      <p class="step-lede">Elige el paquete que mejor encaje con tu plan. Desde el todo-incluido PLUS con transporte, hospedaje y boleto hasta el CHEAP que es solo el boleto oficial. Todos incluyen el Kit Conecta — pulsera, porta-gafete y recuerdo del tour.</p>
-      <div class="step-pills">
-        <span class="step-pill">PLUS · Todo incluido</span>
-        <span class="step-pill">RIDE · Sin boleto</span>
-        <span class="step-pill">STAY · Sin transporte</span>
-        <span class="step-pill">CHEAP · Solo boleto</span>
-      </div>
+      <p class="step-lede">Cuatro formas de viajar, tú decides cuánto resolver:</p>
+      <ul class="pkg-lista">
+        <li><b>PLUS</b> — todo incluido: camión, hotel, boleto y kit. Tú nomás te subes.</li>
+        <li><b>RIDE</b> — ya tienes boleto, nosotros te llevamos (camión + hotel + kit).</li>
+        <li><b>STAY</b> — vas por tu cuenta al viaje, nosotros ponemos hotel y boleto (solo MTY).</li>
+        <li><b>CHEAP</b> — solo el boleto oficial, al mejor precio.</li>
+      </ul>
+      <p class="pkg-nota">Todos los paquetes con viaje incluyen el Kit Conecta a bordo.</p>
+    </div>
+    <div class="step-foto">
+      <figure>
+        <img src="img/tours/tour-tematica-sombreros.webp" alt="Grupo del tour con sombreros vaqueros antes del concierto" width="1200" height="1200" loading="lazy" decoding="async">
+        <figcaption>Cada tour tiene su personalidad.</figcaption>
+      </figure>
     </div>
   </section>
 
   <!-- 03 -->
-  <section class="step-section" data-step="03">
+  <section class="step-section con-foto invertido" data-step="03">
     <div class="step-head">
       <div class="step-num">03</div>
       <div class="step-meta">
@@ -395,18 +552,24 @@ main{padding:0}
       </div>
     </div>
     <div class="step-body">
-      <p class="step-lede">El separo arranca desde $300 MXN según el evento. Haces tu depósito, envías comprobante por WhatsApp o Messenger y tu lugar queda reservado. Sin tarjeta de crédito, sin buró de crédito, sin enganches ridículos.</p>
+      <p class="step-lede">El separo arranca desde $300 según el evento. Depositas, mandas tu comprobante por WhatsApp o Messenger, y tu lugar queda amarrado. Sin tarjeta de crédito, sin buró, sin enganches raros.</p>
       <div class="step-pills">
         <span class="step-pill">Desde $300</span>
         <span class="step-pill">Sin tarjeta</span>
         <span class="step-pill">Sin buró</span>
       </div>
     </div>
+    <div class="step-foto">
+      <figure>
+        <img src="img/tours/tour-kit-manos-bus.webp" alt="Dos viajeras mostrando su Kit Conecta dentro del camión" width="1200" height="1200" loading="lazy" decoding="async">
+        <figcaption>Tu lugar amarrado, tu kit esperándote.</figcaption>
+      </figure>
+    </div>
   </section>
 
-  <!-- VISUAL 2 -->
+  <!-- VISUAL 2 · [PF-6a] el otro stock de Unsplash, ahora un tour real. -->
   <div class="visual">
-    <img src="https://images.unsplash.com/photo-1459749411175-04bf5292ceea?w=1400&q=75" alt="" loading="lazy">
+    <img src="img/tours/tour-bus-interior-kits.webp" alt="Interior del camión lleno, viajeros levantando su kit del evento" width="1200" height="1600" loading="lazy" decoding="async">
     <div class="visual-text">
       <div class="kicker">Sin deudas</div>
       <div class="big">Paga en <em>quincenas</em></div>
@@ -423,7 +586,7 @@ main{padding:0}
       </div>
     </div>
     <div class="step-body">
-      <p class="step-lede">Nuestra web calcula tu plan de pagos automáticamente según los días que falten para el evento. Pagas 2-3 veces al mes cantidades pequeñas. Llegas al día del concierto sin deudas, sin sobresaltos, sin la tarjeta al tope.</p>
+      <p class="step-lede">La web arma tu plan de pagos según los días que falten para el evento: pagos chicos, 2-3 veces al mes, 0% de interés. El día del concierto llegas ya pagado y sin la tarjeta al tope.</p>
       <div class="step-pills">
         <span class="step-pill">0% interés</span>
         <span class="step-pill">Transferencia</span>
@@ -442,17 +605,51 @@ main{padding:0}
       </div>
     </div>
     <div class="step-body">
-      <p class="step-lede">El día del evento solo preocúpate por tu mejor outfit. Transporte redondo desde Reynosa, hotel 4-5 estrellas, boleto en mano y Kit Conecta. Cero estrés, viaje acompañado con otros fans, vibra de caravana.</p>
+      <p class="step-lede">El día del tour, tú nomás llegas. Camión de turismo con chofer, coordinadores resolviendo todo, tu kit en tu asiento y el grupo de WhatsApp del tour echando porras. Concierto, hotel y de regreso a Reynosa — tú solo preocúpate por la playlist.</p>
       <div class="step-pills">
         <span class="step-pill">Transporte redondo</span>
         <span class="step-pill">Hotel 4-5★</span>
         <span class="step-pill">Boleto oficial</span>
         <span class="step-pill">Kit Conecta</span>
       </div>
+      <!-- [PF-6a] LA GALERÍA: el paso 05 era el más flaco de la página y es el
+           que vende. Seis fotos de tours reales, todas lazy. -->
+      <div class="galeria">
+        <figure><img src="img/tours/tour-grupo-bus-dia.webp" alt="Grupo completo del tour posando frente al camión de turismo" width="1200" height="1200" loading="lazy" decoding="async"><figcaption>Salida de Reynosa</figcaption></figure>
+        <figure><img src="img/tours/tour-bus-interior-kits.webp" alt="Interior del camión lleno de viajeros con su kit" width="1200" height="1600" loading="lazy" decoding="async"><figcaption>El camión</figcaption></figure>
+        <figure><img src="img/tours/tour-kit-manos-asiento.webp" alt="Viajeras con su kit del evento en su asiento" width="1200" height="1200" loading="lazy" decoding="async"><figcaption>Tu kit a bordo</figcaption></figure>
+        <figure><img src="img/tours/tour-hotel-llegada.webp" alt="Grupo del tour a la llegada al hotel" width="1200" height="900" loading="lazy" decoding="async"><figcaption>Llegada al hotel</figcaption></figure>
+        <figure><img src="img/tours/tour-vip-badbunny.webp" alt="Viajeros en el acceso VIP del concierto" width="1200" height="1598" loading="lazy" decoding="async"><figcaption>Acceso al concierto</figcaption></figure>
+        <figure><img src="img/tours/tour-convoy-noche.webp" alt="Convoy de camiones de Conecta y el grupo del tour de noche" width="1200" height="900" loading="lazy" decoding="async"><figcaption>De vuelta a casa</figcaption></figure>
+      </div>
     </div>
   </section>
 
 </main>
+
+<!-- [PF-6a] CIERRE: la prueba de que esto ya pasó, con fotos de tours reales.
+     Las cifras son SOLO las que el sitio ya sostiene (13 años / desde 2013,
+     más de 40 eventos al año, 0% de interés, boletos oficiales). -->
+<section class="historial">
+  <div class="historial-kicker">Trece años de tours</div>
+  <h2 class="historial-title">Esto no es promesa,<br>es <span class="mark">historial</span></h2>
+  <p class="historial-sub">Cada foto de esta página es de un tour que ya salió de Reynosa. No son renders ni fotos de banco de imágenes: son los camiones, los kits y la gente de los viajes que llevamos haciendo desde 2013.</p>
+  <div class="historial-banda">
+    <img src="img/tours/tour-grupo-bus-dia.webp" alt="Grupo completo del tour frente al camión de turismo" width="1200" height="1200" loading="lazy" decoding="async">
+    <img src="img/tours/tour-festival-glitter.webp" alt="Viajeras listas para el festival" width="1200" height="1598" loading="lazy" decoding="async">
+    <img src="img/tours/tour-van-grupo.webp" alt="Grupo chico del tour viajando en van" width="1200" height="900" loading="lazy" decoding="async">
+  </div>
+  <div class="historial-cifras">
+    <div class="historial-cifra"><div class="historial-cifra-n">13+</div><div class="historial-cifra-l">Años operando</div></div>
+    <div class="historial-cifra"><div class="historial-cifra-n">40+</div><div class="historial-cifra-l">Eventos al año</div></div>
+    <div class="historial-cifra"><div class="historial-cifra-n">0%</div><div class="historial-cifra-l">De interés</div></div>
+    <div class="historial-cifra"><div class="historial-cifra-n">100%</div><div class="historial-cifra-l">Boletos oficiales</div></div>
+  </div>
+  <div class="historial-ctas">
+    <a href="https://conectareynosa.mx/#catalog-anchor" class="cta-btn">Ver eventos <span aria-hidden="true">→</span></a>
+    <a href="https://wa.me/528119771072" class="historial-wa" target="_blank" rel="noopener">¿Dudas? WhatsApp directo</a>
+  </div>
+</section>
 
 <!-- CTA -->
 <section class="cta">
@@ -516,7 +713,7 @@ main{padding:0}
 
 // Fade-in reveal
 (function(){
-  var revealables=document.querySelectorAll('.step-section, .visual, .cta-title');
+  var revealables=document.querySelectorAll('.step-section, .visual, .cta-title, .historial-banda, .historial-cifras');
   var rObs=new IntersectionObserver(function(entries){
     entries.forEach(function(entry){
       if(entry.isIntersecting){

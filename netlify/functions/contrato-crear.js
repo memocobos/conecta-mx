@@ -176,8 +176,13 @@ exports.handler = async function (event) {
     // solo contrato, una sola firma — el anexo se rinde en el contrato si el
     // flag está. Solo se guarda cuando viene true (ausencia = coordinador de
     // hoy, byte-igual).
+    // [T1] EXCLUSIVIDAD DURA: se sella en la fila al crearla, del lado del
+    // servidor y sin preguntarle al cliente (no se puede apagar desde el
+    // frontend). Los contratos que YA existen no traen el flag y siguen
+    // pintando su texto original, firmados o pendientes.
+    datos = { exclusividad_dura: true };
     if (data.datos && data.datos.cuidador_bodega === true) {
-      datos = { cuidador_bodega: true };
+      datos.cuidador_bodega = true;
     }
   } else if (plantilla === "auxiliar_admin") {
     // Contrato LABORAL (texto oficial revisado por abogados). Único dato

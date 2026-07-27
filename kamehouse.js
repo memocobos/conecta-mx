@@ -16393,7 +16393,11 @@ function _viaBCtxKh(c) {
   const em = (d.emergencia && typeof d.emergencia === 'object') ? d.emergencia : {};
   const _fb = v => (v == null || String(v).trim() === '') ? '__________' : _escCtr(String(v));
   const vigMeses = Math.round(Number(c.vigencia_meses)) || (c.plantilla === 'creadora_team' ? 3 : 12);
+  // [T1] Mismo gate que contrato.html: la vista previa muestra el texto que el
+  // backend va a sellar, no uno distinto.
+  const exclusivaDura = d.exclusividad_dura === true;
   return {
+    exclusivaDura,
     nombre: _escCtr(c.creador_nombre || ''), fnac: _fb(d.fecha_nacimiento),
     vigMeses,
     vigDura: _vigenciaLetraKh(vigMeses).toUpperCase() + ' MESES',
@@ -16427,7 +16431,7 @@ const _CTR_COORDINADOR = [
 <li>los <b>ESCÁNDALOS PÚBLICOS ("funas")</b>: protagonizar o provocar conflictos públicos, en persona o en redes, que dañen la reputación de la agencia.</li>
 </ol>
 Cualquiera de estas conductas termina el contrato de inmediato, sin indemnización, con pérdida de beneficios del viaje en curso y sin perjuicio de las acciones legales que procedan.` },
-  { ord:'NOVENA', t:'Respeto, confidencialidad y exclusividad', body:()=>`Trato respetuoso y cordial con viajeros, choferes y compañeros en todo momento — el acoso, la discriminación y la violencia son falta grave. Toda la información interna (estrategias, precios, bases de datos, logística, listas de viajeros, documentación) es <b>CONFIDENCIAL</b> y no puede divulgarse ni usarse para fines ajenos, obligación que SOBREVIVE a la terminación del contrato. Durante la vigencia, el coordinador no colaborará con agencias competidoras sin autorización escrita; si no puede asistir a un evento confirmado, propondrá suplente sujeto a aprobación previa.` },
+  { ord:'NOVENA', t:'Respeto, confidencialidad y exclusividad', body:x=>`Trato respetuoso y cordial con viajeros, choferes y compañeros en todo momento — el acoso, la discriminación y la violencia son falta grave. Toda la información interna (estrategias, precios, bases de datos, logística, listas de viajeros, documentación) es <b>CONFIDENCIAL</b> y no puede divulgarse ni usarse para fines ajenos, obligación que SOBREVIVE a la terminación del contrato. ${x.exclusivaDura ? `Durante la vigencia de este contrato, la colaboración del coordinador con la agencia es <b>EXCLUSIVA</b>: el coordinador no podrá trabajar, colaborar ni prestar servicios, directa o indirectamente, de forma pagada o no pagada, con ninguna otra agencia de viajes ni negocio competidor. El incumplimiento de esta exclusividad constituye falta grave y es causa de <b>BAJA INMEDIATA</b> del equipo y de terminación del presente contrato sin necesidad de aviso previo. Si el coordinador no puede asistir a un evento confirmado, propondrá suplente sujeto a aprobación previa.` : `Durante la vigencia, el coordinador no colaborará con agencias competidoras sin autorización escrita; si no puede asistir a un evento confirmado, propondrá suplente sujeto a aprobación previa.`}` },
   { ord:'DÉCIMA', t:'Faltas graves y terminación', body:()=>`Son causa de terminación inmediata y pérdida de derechos: no presentarse a un viaje confirmado; abandonar un tour sin autorización; faltar al respeto a viajeros o compañeros; afectar la imagen o reputación de Conecta; y cualquiera de las conductas de la cláusula Octava. La terminación no genera indemnización ni pago adicional. En las fiestas y eventos internos aplica la misma conducta profesional que en los viajes oficiales.` },
   { ord:'DÉCIMA PRIMERA', t:'Emergencia e identidad', body:x=>`El coordinador designa contacto de emergencia: <b>${_esfEsc(x.emNom)}</b> (${_esfEsc(x.emTel)}, ${_esfEsc(x.emPar)}), asume los riesgos del viaje en los términos de la cláusula Décima del contrato de viajero, autoriza primeros auxilios y atención médica de ser necesario, y anexa su INE como evidencia de identidad.` },
   { ord:'DÉCIMA SEGUNDA', t:'Vigencia y formalidades', body:x=>`Este contrato dura <b>${x.vigDura}</b> desde su firma (${x.firmaTxt} → ${x.finTxt}); su renovación requiere nueva firma. Cualquiera de las partes puede terminarlo antes con aviso escrito de 15 días naturales. Las modificaciones solo valen por escrito; los acuerdos verbales no tienen validez. Las notificaciones por los canales oficiales (correo institucional o WhatsApp autorizado) son legalmente válidas. Jurisdicción: Monterrey, Nuevo León. La firma digital tiene la misma validez que la autógrafa.` },
@@ -16720,8 +16724,12 @@ function _ctrFormData() {
   }
   // 🗼 Anexo de custodia: flag en datos, solo coordinador (el backend valida).
   let datosExtra = datos;
-  if (plantilla === 'coordinador' && (document.getElementById('ctr-cuidador') || {}).checked) {
-    datosExtra = Object.assign({}, datos, { cuidador_bodega: true });
+  // [T1] Todo contrato NUEVO de coordinador nace con exclusividad dura. Va
+  // aquí solo para que la vista previa diga la verdad: la autoridad es
+  // contrato-crear, que lo sella del lado del servidor sin preguntar.
+  if (plantilla === 'coordinador') {
+    datosExtra = Object.assign({}, datos, { exclusividad_dura: true });
+    if ((document.getElementById('ctr-cuidador') || {}).checked) datosExtra.cuidador_bodega = true;
   }
   // 💼 Auxiliar administrativo (laboral): el único dato variable es el sueldo
   // semanal. No cuelga de un evento → placeholder neutro en evento_* (columnas

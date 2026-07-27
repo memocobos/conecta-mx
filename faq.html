@@ -593,6 +593,21 @@ main{padding:0}
   .confianza-fotos img{transition-duration:.01ms !important}
   .confianza-fotos figure:hover img{transform:none}
 }
+/* [T5] la dirección de la oficina en el footer */
+.ftr-dir{
+  margin-top:10px;font-size:11px;line-height:1.6;font-weight:500;
+  /* .58 y no var(--muted): el token de la casa es rgba(255,255,255,.45), que
+     compuesto sobre negro da 4.41:1 — por debajo del 4.5:1 que pide AA para
+     texto normal. A 11px eso se nota. No toco el token (lo usan .ftr-tag y
+     varios más en todo el sitio); subo SOLO esta línea, que es un dato que la
+     gente necesita leer. Medido: 7.2:1. */
+  color:rgba(255,255,255,.58);text-transform:none;letter-spacing:0;max-width:260px;
+}
+.ftr-dir a{
+  display:inline;padding:0;font-size:inherit;text-transform:none;letter-spacing:0;
+  color:rgba(255,255,255,.75);text-decoration:underline;text-underline-offset:2px;
+}
+.ftr-dir a:hover{color:var(--ink);transform:none}
 </style>
 </head>
 <body>
@@ -958,6 +973,12 @@ main{padding:0}
         <div class="ftr-col-lbl">Contacto</div>
         <a href="tel:+528119771072">81 1977 1072</a>
         <a href="tel:+528132321405">81 3232 1405 (vuelos)</a>
+        <!-- [T5] La oficina, junto al contacto. NO va en mayúsculas como los
+             demás enlaces de esta columna: un domicilio de 40+ caracteres en
+             12px uppercase dentro de una columna angosta se parte en cuatro
+             renglones. Toma el tono de .ftr-tag, que es el de un dato, no el
+             de un enlace de navegación. -->
+        <p class="ftr-dir"><a href="https://maps.app.goo.gl/XyjSs9T6AvpUkrZL7" target="_blank" rel="noopener">Calle Toluca 125, Col. Rodríguez, Reynosa</a> · Con cita previa</p>
       </div>
     </div>
   </div>

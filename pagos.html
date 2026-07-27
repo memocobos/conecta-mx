@@ -582,6 +582,16 @@ body.hsale-on .nav{top:var(--hsb-h,0px)}
    que Memo decidió conservar. */
 /* el 4px suelto del banner de hot sale entra al token más cercano */
 #hot-sale-banner .hsb-text code{border-radius:var(--r-sm,8px)}
+
+/* [T5] la dirección de la oficina en el footer */
+.ft-dir{
+  margin-top:12px;font-size:11px;line-height:1.6;font-weight:500;
+  /* .58 y no .45: compuesto sobre negro, .45 da 4.41:1 y AA pide 4.5:1 para
+     texto normal. Medido a .58: 7.2:1. */
+  color:rgba(255,255,255,.58);
+}
+.ft-dir a{color:rgba(255,255,255,.75);text-decoration:underline;text-underline-offset:2px}
+.ft-dir a:hover{color:#fff}
 </style>
 <div id="hot-sale-banner" title="Copiar código HOTSALE">
   <div class="hsb-content">
@@ -823,6 +833,9 @@ body.hsale-on .nav{top:var(--hsb-h,0px)}
     <a href="https://conectareynosa.mx">conectareynosa.mx</a>
     <a href="https://www.instagram.com/conectarey" target="_blank" rel="noopener">@conectarey</a>
   </div>
+  <!-- [T5] El footer de esta página es mínimo y centrado (no tiene columnas),
+       así que la línea va debajo del .ft-meta, centrada como el resto. -->
+  <p class="ft-dir"><a href="https://maps.app.goo.gl/XyjSs9T6AvpUkrZL7" target="_blank" rel="noopener">Calle Toluca 125, Col. Rodríguez, Reynosa</a> · Con cita previa</p>
 </footer>
 
 <div class="toast" id="toast" role="status" aria-live="polite">¡Copiado! ✓</div>

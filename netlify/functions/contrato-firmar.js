@@ -376,9 +376,43 @@ exports.handler = async function (event) {
     try {
       // `contrato.datos` es el de ANTES de firmar; la emergencia que la
       // creadora acaba de capturar vive en patch.datos. Se pasa el efectivo.
-      creadoraViaje = await _asignarCreadoraExterna(contrato, patch.datos || contrato.datos);
+      creadoraViaje = await _asignarViajeroDeContrato(contrato, patch.datos || contrato.datos, {
+        tipo: "creadora_externa",
+        etiqueta: "creadora-viaje",
+        notas: "Creadora externa que toma el viaje (contrato firmado)",
+      });
     } catch (e) {
       console.error("[contrato-firmar] Creadora externa al evento falló:", e.message);
+    }
+  }
+
+  // [T3] GANADOR DE GIVEAWAY cuyo premio incluye el viaje
+  // (datos.premio_incluye_viaje) → a las listas del evento, con los datos del
+  // perfil del Portal que la firma acaba de congelar. Mismo trato fail-soft.
+  //
+  // Si el perfil venía NO verificado se mete igual con lo que haya y se avisa en
+  // `notas`: es mejor que Memo lo vea en la lista con un pendiente que que no
+  // aparezca. Los correos y el candado de la firma no cambian.
+  //
+  // Lo que esto NO hace, a propósito: no crea solicitud ni plan de pagos en el
+  // Portal. Un lugar de $0 inventado ensuciaría caja y Ventas y podría despertar
+  // cobranza. El ganador entra a las listas OPERATIVAS, no al mundo del dinero.
+  let ganadorViaje = null;
+  if (esGiveaway) {
+    const dEfec = patch.datos || contrato.datos || {};
+    if (dEfec.premio_incluye_viaje === true) {
+      const sinVerificar = dEfec.perfil_no_verificado === true;
+      try {
+        ganadorViaje = await _asignarViajeroDeContrato(contrato, dEfec, {
+          tipo: "ganador_giveaway",
+          etiqueta: "ganador-giveaway",
+          notas: sinVerificar
+            ? "Ganador de giveaway (premio con viaje) — PERFIL DEL PORTAL SIN VERIFICAR: faltan datos por confirmar"
+            : "Ganador de giveaway (premio con viaje)",
+        });
+      } catch (e) {
+        console.error("[contrato-firmar] Ganador de giveaway al evento falló:", e.message);
+      }
     }
   }
 
@@ -467,9 +501,12 @@ async function _resolverEventoPorFecha(fecha, etiqueta) {
   return { slug: candidatos[0].slug, nombre: candidatos[0].nombre || candidatos[0].slug };
 }
 
-// [T2] Creadora EXTERNA que TOMA EL VIAJE (datos.toma_viaje): entra a las listas
-// del evento como PASAJERA en viajeros_evento, con tipo_viajero
-// 'creadora_externa' para que se distinga de un coordi a simple vista.
+// [T2 · T3] Mete a alguien de un CONTRATO a las listas del evento como PASAJERO
+// en viajeros_evento. La usan dos flujos y por eso está parametrizada: la
+// creadora externa que toma el viaje (T2, tipo 'creadora_externa') y el ganador
+// de un giveaway cuyo premio incluye el viaje (T3, tipo 'ganador_giveaway').
+// Una sola función = una sola idempotencia, una sola normalización de correo y
+// una sola resolución de evento; no pueden desviarse entre sí.
 //
 // Por qué viajeros_evento y NO eventos_coordi: coordi_id es NOT NULL con FK a
 // usuarios, así que una fila ahí obligaría a crearle cuenta de login — y todos
@@ -483,7 +520,8 @@ async function _resolverEventoPorFecha(fecha, etiqueta) {
 // on_conflict. La llave es más amplia que solo las filas 'creadora_externa' a
 // propósito: si ya está en la lista por cualquier vía (p.ej. el upsert de staff
 // cuando además es 'cc'), meterla otra vez la duplicaría en pantalla.
-async function _asignarCreadoraExterna(contrato, datosEfectivos) {
+async function _asignarViajeroDeContrato(contrato, datosEfectivos, cfg) {
+  const { tipo, etiqueta, notas } = cfg;
   // [T2 · remate] Normalizado a minúsculas: el candado de idempotencia compara
   // con eq. (sensible a mayúsculas), así que dos contratos del MISMO correo
   // escrito distinto la duplicarían en la lista. `contrato-crear` ya lo baja a
@@ -491,11 +529,11 @@ async function _asignarCreadoraExterna(contrato, datosEfectivos) {
   // búsqueda y el insert de un jalón.
   const correo = String(contrato.creador_email || "").trim().toLowerCase();
   if (!correo) {
-    console.log("[creadora-viaje] contrato sin correo → no asigno");
+    console.log(`[${etiqueta}] contrato sin correo → no asigno`);
     return { skipped: true, reason: "sin_correo" };
   }
 
-  const ev = await _resolverEventoPorFecha(contrato.evento_fecha, "creadora-viaje");
+  const ev = await _resolverEventoPorFecha(contrato.evento_fecha, etiqueta);
   if (ev.skipped) return ev;
   const slug = ev.slug;
 
@@ -505,18 +543,18 @@ async function _asignarCreadoraExterna(contrato, datosEfectivos) {
     { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` } }
   );
   if (!dupResp.ok) {
-    console.warn("[creadora-viaje] lookup duplicado falló:", dupResp.status);
+    console.warn(`[${etiqueta}] lookup duplicado falló:`, dupResp.status);
     return { skipped: true, reason: "lookup_dup_error" };
   }
   const dupes = await dupResp.json();
   if (dupes.length) {
-    console.log("[creadora-viaje] ya está en la lista id=", dupes[0].id, "tipo=", dupes[0].tipo_viajero);
+    console.log(`[${etiqueta}] ya está en la lista id=`, dupes[0].id, "tipo=", dupes[0].tipo_viajero);
     return { id: dupes[0].id, evento_id: slug, existing: true };
   }
 
-  // Los datos salen del contrato y de lo que la creadora capturó AL FIRMAR
-  // (fecha de nacimiento y contacto de emergencia). El celular no se pide en
-  // este flujo, y la columna lo permite nulo.
+  // Los datos salen del contrato y del snapshot que la firma congela en datos
+  // (fecha de nacimiento y contacto de emergencia). Ninguno de los dos flujos
+  // pide celular, y la columna lo permite nulo.
   const d = (datosEfectivos && typeof datosEfectivos === "object") ? datosEfectivos : {};
   const em = (d.emergencia && typeof d.emergencia === "object") ? d.emergencia : {};
   const insResp = await fetch(`${SB_URL}/rest/v1/viajeros_evento`, {
@@ -534,17 +572,17 @@ async function _asignarCreadoraExterna(contrato, datosEfectivos) {
       celular: null,
       emergencia_nombre: em.nombre || null,
       num_emergencia: em.telefono || null,
-      tipo_viajero: "creadora_externa",
-      notas: "Creadora externa que toma el viaje (contrato firmado)",
+      tipo_viajero: tipo,
+      notas,
     }),
   });
   if (!insResp.ok) {
     const err = await insResp.text();
-    console.error("[creadora-viaje] insert falló:", insResp.status, err);
+    console.error(`[${etiqueta}] insert falló:`, insResp.status, err);
     return { skipped: true, reason: "insert_error" };
   }
   const [creado] = await insResp.json();
-  console.log("[creadora-viaje] agregada a la lista id=", creado.id, "evento=", slug, "nombre=", contrato.creador_nombre);
+  console.log(`[${etiqueta}] agregado a la lista id=`, creado.id, "evento=", slug, "nombre=", contrato.creador_nombre);
   return { id: creado.id, evento_id: slug, created: true };
 }
 

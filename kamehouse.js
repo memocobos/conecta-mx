@@ -1357,15 +1357,16 @@ function _trLadrillosHtml(uni, pend) {
       const total = (c.ocupantes || []).length;
       const yaN = total - n;
       const nombres = c._pend.map(p => _trCorto(p.nombre)).join(' · ');
-      // [T2] Si en el cuarto va una creadora externa, se avisa en el lote.
-      const hayExterna = c._pend.some(p => p.tipo_viajero === 'creadora_externa');
+      // [T2 · T3] Si en el cuarto va alguien etiquetado (creadora externa o
+      // ganador de giveaway), se avisa en el lote.
+      const tipoEtiquetado = (c._pend.find(p => _trTipoChip(p.tipo_viajero)) || {}).tipo_viajero || null;
       const etiqueta = c._mundo === 'kh'
         ? `Cuarto ${_esfEsc(c.numero_hab || c.orden || '')}${c.hotel_nombre ? ' · ' + _esfEsc(c.hotel_nombre) : ''}`
         : `Cuarto ${_esfEsc(c.orden || (i + 1))} · ${_esfEsc(c.tipo || '')}`;
       return `
         <button type="button" data-tr-lote="cuarto:${i}" style="text-align:left;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:10px 14px;margin:0 8px 8px 0;color:var(--text);cursor:pointer;font:inherit;min-width:220px;max-width:100%">
           <div style="display:flex;align-items:center;flex-wrap:wrap">
-            <b style="font-size:13px">${etiqueta}</b>${_trFechaChip(c.evento_id)}${hayExterna ? _trTipoChip('creadora_externa') : ''}
+            <b style="font-size:13px">${etiqueta}</b>${_trFechaChip(c.evento_id)}${_trTipoChip(tipoEtiquetado)}
           </div>
           <div style="font-size:11px;color:var(--ts);margin-top:3px">${n} persona${n === 1 ? '' : 's'}${yaN ? ` · (${yaN} de ${total} ya asignados)` : ''}</div>
           <div style="font-size:12px;margin-top:4px">${_esfEsc(nombres)}</div>
@@ -1394,8 +1395,13 @@ function _trLadrillosHtml(uni, pend) {
 // viajeros de siempre (tipo_viajero null), así que la lista no cambia en nada
 // salvo cuando hay una externa.
 function _trTipoChip(tipo) {
-  if (tipo !== 'creadora_externa') return '';
-  return `<span title="Creadora externa que toma el viaje — no es coordinadora" style="font-size:9px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;color:#000;background:var(--yellow,#e8ff4c);border-radius:20px;padding:1px 7px;margin-left:6px">creadora ext.</span>`;
+  const TIPOS = {
+    creadora_externa: { txt: 'creadora ext.', bg: 'var(--yellow,#e8ff4c)', tip: 'Creadora externa que toma el viaje — no es coordinadora' },
+    ganador_giveaway: { txt: 'premio', bg: 'var(--blue,#0000cd)', fg: '#fff', tip: 'Ganador de giveaway — el premio incluye el viaje' },
+  };
+  const t = TIPOS[tipo];
+  if (!t) return '';
+  return `<span title="${t.tip}" style="font-size:9px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;color:${t.fg || '#000'};background:${t.bg};border-radius:20px;padding:1px 7px;margin-left:6px">${t.txt}</span>`;
 }
 // Los pasajeros YA asignados vienen de la tabla de asignaciones (nombre_cache),
 // sin tipo_viajero. Se busca su tipo en el universo KH que ya trajo el listar.
@@ -16715,6 +16721,10 @@ function onCtrPlantillaChange() {
   if (vw) vw.style.display = conVigencia ? '' : 'none';
   if (hint) hint.style.display = conVigencia ? 'none' : '';
   if (vs && conVigencia) vs.value = (p === 'coordinador') ? '12' : '3';
+  // [T3] "¿El premio incluye el viaje?": la casilla solo existe para giveaway.
+  const pw = document.getElementById('ctr-premio-viaje-wrap');
+  if (pw) pw.style.display = (p === 'giveaway') ? '' : 'none';
+  if (p !== 'giveaway') { const pv = document.getElementById('ctr-premio-viaje'); if (pv) pv.checked = false; }
   // [T2] "¿Toma el viaje?": la casilla solo existe para creadora EXTERNA.
   const tw = document.getElementById('ctr-viaje-wrap');
   if (tw) tw.style.display = (p === 'creadora') ? '' : 'none';
@@ -16751,6 +16761,11 @@ function _ctrFormData() {
   // [T1] Todo contrato NUEVO de coordinador nace con exclusividad dura. Va
   // aquí solo para que la vista previa diga la verdad: la autoridad es
   // contrato-crear, que lo sella del lado del servidor sin preguntar.
+  // [T3] "¿El premio incluye el viaje?" — solo giveaway. Se suma al datos del
+  // premio que ya armó el bloque de arriba.
+  if (plantilla === 'giveaway' && (document.getElementById('ctr-premio-viaje') || {}).checked) {
+    datosExtra = Object.assign({}, datosExtra || datos, { premio_incluye_viaje: true });
+  }
   // [T2] "¿Toma el viaje?" — solo creadora. El backend decide; esto es para que
   // el payload lleve la intención de Memo.
   if (plantilla === 'creadora' && (document.getElementById('ctr-viaje') || {}).checked) {
@@ -16972,6 +16987,8 @@ function _resetFormUI() {
   if (cancelBtn) cancelBtn.style.display = 'none';
   const banner = document.getElementById('ctr-banner-edit');
   if (banner) banner.style.display = 'none';
+  const _pvReset = document.getElementById('ctr-premio-viaje');
+  if (_pvReset) _pvReset.checked = false;
   const _tvReset = document.getElementById('ctr-viaje');
   if (_tvReset) _tvReset.checked = false;
   const _ccReset = document.getElementById('ctr-cuidador');

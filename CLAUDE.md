@@ -59,7 +59,7 @@
 - Manual: Manual_De_Marca.pdf en el repo
 
 ## Pendientes
-_Última revisión: 25-jul-2026._
+_Última revisión: 27-jul-2026._
 
 ### 🔴 La semana que entra — el encendido
 - **Apagar `CORREOS_MODO='prueba'` en Netlify.** Mientras siga en 'prueba', TODO
@@ -73,6 +73,10 @@ _Última revisión: 25-jul-2026._
 - **Blast de arranque de contratos**: lo manda Memo, no un cron.
 
 ### 🟡 Vivos
+- **Capturar la primera noticia del banner** (N1, en prod): el banner azul del
+  index ya lo escribe Memo en *Esferas del Dragón → Noticias del banner*, pero
+  está VACÍO, así que la marquesina sigue mostrando el lema estático. Nada que
+  configurar: `GITHUB_TOKEN` ya existe.
 - **Fase 2 (Portal Clientes)**: en construcción sobre Supabase.
 - **Respaldos del NAS** (UGREEN): sesión pendiente. Radio Conecta vive ahí.
 - **Cobros OXXO / MSI**: ver `REPORTE-COBROS-OXXO-MSI.md`.
@@ -86,6 +90,11 @@ _Última revisión: 25-jul-2026._
 - Retirar el panel `ventas-resumen` cuando ya no se use.
 
 ### ⚪ Anotados sin urgencia (decisiones ya tomadas)
+- **19 reglas del sitio siguen bajo el 4.5:1 de AA y NO son el token `--muted`**
+  (ése ya subió a .46 en T6): blanco sobre botones de marca ~1.98:1, `.ftr-copy`
+  a `.25` = 2.08:1, la familia `.3/.35/.4` de `pagos.html`, y `.cca` en
+  `#0000cd` sobre negro = 1.88:1. Son **decisiones estéticas de Memo, no bugs**.
+  El bloque [F] del arnés de T6 las imprime con su ratio en cada corrida.
 - **Caché de 5 min del candado de vendedores**: tras reactivar a alguien puede
   tardar hasta 5 min en poder vender. No es bug — va al manual.
 - **Resumen al admin de `contratos-alerta-cron`**: se queda SIN bitácora a
@@ -108,6 +117,13 @@ _Última revisión: 25-jul-2026._
   de equivalencia.
 - **El CSS/JS de KameHouse vive en `kamehouse.css/js/recibos.js`**, no inline en
   el HTML.
+- **Los arneses miden lo de una tuerca ENTRE DOS COMMITS**, no contra el árbol de
+  trabajo: si no, la aserción caduca al mergear y la siguiente tuerca revienta
+  aserciones ajenas. El padre correcto es el merge anterior, no el commit donde
+  nació la rama.
+- **Una aserción que puede pasar con el conjunto vacío no es una aserción.**
+  Candado de cardinalidad siempre; y al medir algo (contraste, peso) validar el
+  instrumento antes de creerle el resultado.
 - **Llaves de Supabase**: `SUPABASE_URL_KAMEHOUSE`/`SUPABASE_SERVICE_KEY_KAMEHOUSE`
   y `PORTAL_SUPABASE_URL`/`ANON`/`SERVICE`. Las `SUPABASE_*` a secas están
   BORRADAS y podadas del código — no revivirlas ni agregar fallbacks.

@@ -495,6 +495,15 @@ function aplicarPermisosUI() {
   // F5 Milk: "Diseño" (esferas) es solo de maestro_roshi → inerte para milk, se oculta.
   const navDiseno = document.getElementById('nav-diseno');
   if (navDiseno) navDiseno.style.display = (rol === 'milk') ? 'none' : '';
+  // [T7] Esferas del Dragón: el botón se veía para TODOS los roles porque
+  // 'esferas' nunca estuvo en allTabs ni en PERMISOS_TABS, así que el forEach de
+  // arriba no lo tocaba. No era un agujero —esferas-publicar, esferas-compilar y
+  // noticias-publicar exigen maestro_roshi en el servidor—, pero cualquier rol
+  // entraba a un panel donde todo le responde 403. Se oculta con el mismo patrón
+  // que el de arriba; _khNavSync espeja este display a la barra móvil y esconde
+  // el encabezado del grupo si queda vacío, así que no hace falta tocarlos.
+  const navEsferas = document.getElementById('nav-esferas');
+  if (navEsferas) navEsferas.style.display = (rol === 'maestro_roshi') ? '' : 'none';
   const karinAdminBtns = document.getElementById('karin-admin-btns');
   if (karinAdminBtns) karinAdminBtns.style.display = ['maestro_roshi','mister_popo'].includes(rol) ? 'flex' : 'none';
 

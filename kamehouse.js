@@ -10793,6 +10793,214 @@ function renderPlanPagosSP(solicitudId, estadoSolicitud) {
 }
 
 // ═══════════════════════════════════════════════════════════════
+// [T4] "¿YA MANDÓ SU SEPARO?" — paso opcional justo después de aprobar
+//
+// El flujo real: el cliente paga por transferencia y manda su ticket ANTES de
+// que Memo apruebe. Antes de esta tuerca, aprobar no preguntaba nada y había que
+// irse a Pagos a buscar al cliente para marcar el primer abono.
+//
+// UNA FILA POR LUGAR (decisión de Memo): el plan sale POR LUGAR, así que un
+// grupo de 3 tiene TRES cuotas 1, cada una con su monto. Se listan con casilla y
+// se marcan solo las palomeadas — así aguanta que solo 2 de 4 hayan mandado su
+// separo, y jamás reparte dinero por su cuenta.
+//
+// MAQUINARIA REUSADA, NO IMITADA: cada lugar se marca con admin-marcar-pago, el
+// MISMO endpoint del botón de Pagos, que ya trae la bitácora pagos_auditoria, la
+// reconciliación con tolerancia de $1, la exclusión de bajas, el correo
+// fail-soft, el modo prueba y validarMonto (el tope de cordura del monto ya vive
+// dentro; aquí no se valida aparte).
+//
+// Por qué NO admin-aplicar-pago-grupo, que parecería el reuso obvio: ese modo
+// 'aplicar' es atómico pero NO acepta monto editable ("sin partials") ni cuenta,
+// y las dos cosas se piden aquí. El precio de usar marcar-pago es que N llamadas
+// no son atómicas — de ahí que el resultado diga lugar por lugar qué sí quedó y
+// qué no, en vez de un "listo" que mienta.
+// ═══════════════════════════════════════════════════════════════
+
+// Lo que el paso está preguntando ahora mismo: { solicitudId, separos }.
+let _spSeparoPend = null;
+
+// Devuelve true si abrió el paso (y entonces él cierra/refresca), false si no
+// había nada que preguntar y el caller sigue con su camino de siempre.
+async function _spAbrirSeparoAlAceptar(solicitudId, s) {
+  let pagos = [], lugares = [];
+  try {
+    const r = await fetch('/.netlify/functions/admin-pagos-list', {
+      method: 'POST', headers: _spAdminHeaders(),
+      body: JSON.stringify({ solicitud_id: solicitudId }),
+    });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || 'no se pudo leer el plan');
+    pagos = Array.isArray(data.pagos) ? data.pagos : [];
+    lugares = Array.isArray(data.lugares) ? data.lugares : [];
+  } catch (e) {
+    // Sin plan a la vista no hay nada que preguntar: se sigue como hoy.
+    console.warn('[T4] no se pudo leer el plan para el paso de separo:', e.message);
+    return false;
+  }
+  // Cachés que el resto del módulo ya usa (así el modal de detalle no re-pide).
+  _spPlanCache[solicitudId] = pagos;
+  _spLugaresCache[solicitudId] = lugares;
+  if (s && s.paquete != null) _spPaqueteCache[solicitudId] = s.paquete;
+
+  // La cuota 1 de cada lugar, solo las que siguen pendientes.
+  const separos = pagos
+    .filter(p => Number(p.numero_pago) === 1 && p.estado === 'pendiente')
+    .sort((a, b) => {
+      const na = _spNumLugar(solicitudId, a.lugar_id), nb = _spNumLugar(solicitudId, b.lugar_id);
+      return na - nb;
+    });
+  if (!separos.length) return false;   // ya pagados o plan sin cuota 1 → nada que preguntar
+
+  _spSeparoPend = { solicitudId, separos };
+  const hoy = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Monterrey' });
+  const bancoDefault = _spCuentaDefault(_spPaqueteCache[solicitudId]);
+  const filas = separos.map((p, i) => {
+    const etiqueta = _spEtiquetaLugar(solicitudId, p.lugar_id);
+    return `
+      <label style="display:flex;align-items:center;gap:10px;padding:9px 10px;border:1px solid var(--border);border-radius:var(--radius);margin-bottom:6px;cursor:pointer">
+        <input type="checkbox" id="t4-chk-${i}" checked style="width:auto;margin:0">
+        <span style="flex:1;min-width:0;font-size:13px">${_spEscape(etiqueta)}</span>
+        <span style="color:var(--ts);font-size:11px">$</span>
+        <input type="number" id="t4-monto-${i}" value="${Number(p.monto || 0)}" min="0" step="1"
+               style="width:110px;padding:6px 8px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--tp);font-size:13px;text-align:right">
+      </label>`;
+  }).join('');
+
+  const contenido = `
+    <div style="font-size:12px;color:var(--ts);line-height:1.6;margin-bottom:12px">
+      La solicitud <b style="color:var(--tp)">ya quedó aprobada</b>. Si el cliente ya mandó su comprobante, marca aquí su separo y te ahorras la vuelta a Pagos.
+      ${separos.length > 1 ? '<br>Palomea solo los lugares cuyo separo ya llegó.' : ''}
+    </div>
+    ${filas}
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px">
+      <div>
+        <label style="display:block;font-size:10px;letter-spacing:.12em;color:var(--ts);text-transform:uppercase;margin-bottom:4px">Método</label>
+        <select id="t4-metodo" onchange="_spSeparoToggleBanco()" style="width:100%;padding:8px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--tp)">
+          ${_SP_METODOS_UI.map(m => `<option value="${m}">${_SP_METODO_LBL[m]}</option>`).join('')}
+        </select>
+      </div>
+      <div id="t4-banco-wrap">
+        <label style="display:block;font-size:10px;letter-spacing:.12em;color:var(--ts);text-transform:uppercase;margin-bottom:4px">Cuenta</label>
+        <select id="t4-banco" style="width:100%;padding:8px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--tp)">
+          ${_SP_BANCOS.map(b => `<option value="${b}"${b === bancoDefault ? ' selected' : ''}>${b}</option>`).join('')}
+        </select>
+      </div>
+    </div>
+    <div style="margin-top:10px">
+      <label style="display:block;font-size:10px;letter-spacing:.12em;color:var(--ts);text-transform:uppercase;margin-bottom:4px">Fecha del pago</label>
+      <input type="date" id="t4-fecha" value="${hoy}" style="width:100%;padding:8px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--tp)">
+    </div>
+    <div style="margin-top:10px">
+      <label style="display:block;font-size:10px;letter-spacing:.12em;color:var(--ts);text-transform:uppercase;margin-bottom:4px">Referencia (opcional)</label>
+      <input type="text" id="t4-ref" maxlength="120" placeholder="Folio, últimos 4 dígitos, nota…" style="width:100%;padding:8px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--tp)">
+    </div>
+    <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:16px">
+      <button class="btn btn-ghost" onclick="_spSeparoDespues()">Después</button>
+      <button class="btn btn-primary" id="t4-btn" onclick="_spSeparoMarcar()">Marcar separo pagado</button>
+    </div>`;
+  crearModal('sp-separo', '¿Ya mandó su separo?', contenido);
+  const m = document.getElementById('modal-sp-separo');
+  if (m) m.querySelector('.modal').style.maxWidth = '520px';
+  return true;
+}
+
+function _spNumLugar(solicitudId, lugarId) {
+  const lg = (_spLugaresCache[solicitudId] || []).find(x => x.id === lugarId);
+  return (lg && lg.numero != null) ? Number(lg.numero) : 9999;
+}
+// Mismo lenguaje que el plan por lugar: nombre real, o "Titular" para el #1.
+function _spEtiquetaLugar(solicitudId, lugarId) {
+  if (!lugarId) return 'Separo del grupo';
+  const lg = (_spLugaresCache[solicitudId] || []).find(x => x.id === lugarId) || {};
+  const num = lg.numero != null ? lg.numero : '?';
+  const nombre = (lg.nombre && String(lg.nombre).trim())
+    ? lg.nombre
+    : (Number(num) === 1 ? 'Titular' : 'Por registrar');
+  return 'Lugar ' + num + ' · ' + nombre;
+}
+function _spSeparoToggleBanco() {
+  const met = (document.getElementById('t4-metodo') || {}).value;
+  const wrap = document.getElementById('t4-banco-wrap');
+  if (wrap) wrap.style.visibility = (met === 'efectivo') ? 'hidden' : 'visible';
+}
+// "Después" = el camino de hoy, tal cual.
+function _spSeparoDespues() {
+  _spSeparoPend = null;
+  cerrarModal('sp-separo');
+  cerrarModal('sp-detalle');
+  _spRefrescarLista();
+}
+
+async function _spSeparoMarcar() {
+  if (!_spSeparoPend) return;
+  const { solicitudId, separos } = _spSeparoPend;
+  const btn = document.getElementById('t4-btn');
+  const metodo = (document.getElementById('t4-metodo') || {}).value || '';
+  const cuenta = (metodo === 'efectivo') ? 'Efectivo' : ((document.getElementById('t4-banco') || {}).value || '');
+  const fecha  = (document.getElementById('t4-fecha') || {}).value || '';
+  const ref    = ((document.getElementById('t4-ref') || {}).value || '').trim();
+  if (!metodo) { showToast('Elige un método de pago', 'error'); return; }
+
+  // Qué lugares se marcan y con cuánto. El monto va tal cual al backend, que es
+  // quien lo valida (validarMonto vive dentro de admin-marcar-pago).
+  const elegidos = [];
+  for (let i = 0; i < separos.length; i++) {
+    if (!(document.getElementById('t4-chk-' + i) || {}).checked) continue;
+    const raw = ((document.getElementById('t4-monto-' + i) || {}).value || '').trim();
+    let monto;
+    if (raw !== '') {
+      monto = Number(raw);
+      if (!Number.isFinite(monto) || monto < 0) {
+        showToast('El monto de ' + _spEtiquetaLugar(solicitudId, separos[i].lugar_id) + ' no es un número válido', 'error');
+        return;
+      }
+    }
+    elegidos.push({ pago: separos[i], monto });
+  }
+  if (!elegidos.length) { showToast('Palomea al menos un lugar, o dale "Después"', 'error'); return; }
+
+  if (btn) { btn.disabled = true; btn.textContent = 'Marcando…'; }
+  const ok = [], fallo = [];
+  for (const e of elegidos) {
+    try {
+      const r = await fetch('/.netlify/functions/admin-marcar-pago', {
+        method: 'POST', headers: _spAdminHeaders(),
+        body: JSON.stringify({
+          pago_id: e.pago.id,
+          accion: 'pagar',
+          fecha_pagada: fecha || undefined,
+          metodo,
+          cuenta: cuenta || undefined,
+          referencia: ref || undefined,
+          monto_pagado: e.monto,
+        }),
+      });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error || 'no se pudo marcar');
+      ok.push(_spEtiquetaLugar(solicitudId, e.pago.lugar_id));
+    } catch (err) {
+      fallo.push(_spEtiquetaLugar(solicitudId, e.pago.lugar_id) + ' (' + err.message + ')');
+    }
+  }
+
+  // Mensaje HONESTO: la solicitud ya quedó aprobada pase lo que pase aquí, y si
+  // algún lugar no se marcó se dice cuál y a dónde ir. Nada de "listo" a medias.
+  if (fallo.length && !ok.length) {
+    showToast('La solicitud quedó APROBADA, pero el pago no se marcó — márcalo en Pagos. ' + fallo.join(' · '), 'error');
+  } else if (fallo.length) {
+    showToast('Separo marcado en ' + ok.length + ' de ' + elegidos.length + '. La solicitud quedó aprobada; falta marcar en Pagos: ' + fallo.join(' · '), 'error');
+  } else {
+    showToast('Separo marcado' + (ok.length > 1 ? ' en ' + ok.length + ' lugares' : '') + ' ✓', 'success');
+  }
+  _spSeparoPend = null;
+  if (btn) { btn.disabled = false; btn.textContent = 'Marcar separo pagado'; }
+  cerrarModal('sp-separo');
+  cerrarModal('sp-detalle');
+  _spRefrescarLista();
+}
+
+// ═══════════════════════════════════════════════════════════════
 // PLAN POR LUGAR + PAGO GRUPAL (Acompañantes F3-t4b)
 // Agrupa las cuotas por lugar y ofrece el flujo grupal (backend #231:
 // admin-aplicar-pago-grupo, modos proponer/aplicar). NO toca marcarPagoSP/
@@ -11804,6 +12012,13 @@ async function guardarCambioEstadoSP(solicitudId) {
       showToast('Solicitud actualizada', 'success');
     }
     cerrarModal('sp-cambiar-estado');
+    // [T4] La aprobación YA ESTÁ HECHA aquí. Lo que sigue es el paso opcional
+    // "¿Ya mandó su separo?": si truena o el admin le da "Después", la solicitud
+    // se queda aprobada igual y el flujo termina como el de siempre.
+    if (estado === 'en_pagos') {
+      const abrio = await _spAbrirSeparoAlAceptar(solicitudId, s);
+      if (abrio) return;        // el paso se encarga de cerrar y refrescar
+    }
     cerrarModal('sp-detalle');
     _spRefrescarLista();
   } catch (e) {

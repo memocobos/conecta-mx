@@ -592,6 +592,204 @@ body.hsale-on .nav{top:var(--hsb-h,0px)}
 }
 .ft-dir a{color:rgba(255,255,255,.75);text-decoration:underline;text-underline-offset:2px}
 .ft-dir a:hover{color:#fff}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   TUERCA PG-1 · LA PÁGINA DEL DINERO
+   Va al final de las hojas de estilo a propósito (idioma PF-1): gana los
+   empates de cascada sin tocar los bloques anteriores.
+
+   Lo que NO toca, por decisión sellada de Memo:
+     · los DATOS BANCARIOS, dígito por dígito (el arnés los compara con main);
+     · el side-tab de .warn (border-left rojo) y el glow del .toast;
+     · el CTA de Messenger y sus textos de advertencia.
+
+   ── PREPARADO PARA LA FASE C (métodos de pago: tarjeta / OXXO / MSI) ──
+   El menú de métodos entra como una sección .sec más, entre el
+   selector y las tarjetas de banco, SIN reacomodar nada: cada sección es
+   autónoma (su .sec-head + su cuerpo) y el selector no sabe cuántas
+   secciones hay — solo pliega las que traen data-cuenta. Un método nuevo
+   que no sea transferencia se marca con data-cuenta="ambas" y queda
+   siempre visible. Nada de UI nueva aquí todavía.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* ── 1 · EL SELECTOR DE PAQUETE ─────────────────────────────────────────
+   Primero la pregunta, luego el dinero: es el orden que evita el error de
+   $350. Sin elegir, la página se ve completa como siempre. */
+.pick{
+  margin:0 auto 26px;max-width:920px;
+  background:#0a0a0a;
+  border:1px solid rgba(255,255,255,.08);
+  border-radius:var(--r-card,16px);
+  padding:22px 20px 20px;
+  font-family:'Montserrat',sans-serif;
+}
+.pick-q{
+  font-family:'Barlow Condensed','Montserrat',sans-serif;
+  font-size:clamp(26px,6.5vw,34px);font-weight:900;
+  text-transform:uppercase;letter-spacing:.01em;line-height:.95;
+  color:#fff;margin-bottom:6px;
+}
+.pick-hint{
+  /* .58 y no .4: es instrucción de pago, y a .4 mide 3.77:1 sobre #0a0a0a.
+     Medido a .58: 6.86:1 (bisección en el arnés, bloque [D]). */
+  font-size:12px;font-weight:600;line-height:1.45;
+  color:rgba(255,255,255,.58);
+  margin-bottom:16px;
+}
+.pick-btns{display:grid;grid-template-columns:1fr;gap:10px}
+@media(min-width:640px){.pick-btns{grid-template-columns:1fr 1fr;gap:12px}}
+.pick-btn{
+  display:flex;flex-direction:column;align-items:flex-start;gap:5px;
+  text-align:left;width:100%;
+  padding:16px 18px;min-height:82px;
+  border:2px solid;border-radius:var(--r-btn,12px);
+  background:#000;cursor:pointer;
+  font-family:'Montserrat',sans-serif;
+  /* La lista de transiciones nombra solo lo que este botón anima de verdad: no
+     lleva sombra, así que no se declara. (Y el comentario tampoco escribe el
+     nombre de esa propiedad: el arnés de PF-5 cuenta sus apariciones para
+     vigilar las sombras selladas, y mencionarla en prosa le miente.) */
+  transition:transform .18s ease,background .18s ease,border-color .18s ease;
+}
+.pick-btn-k{
+  font-size:14px;font-weight:900;line-height:1.15;
+  text-transform:uppercase;letter-spacing:.06em;
+}
+.pick-btn-s{font-size:11px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;line-height:1.3}
+/* PLUS·STAY·RIDE = amarillo (el badge de esas secciones ya es amarillo) */
+.pick-btn.plus{border-color:#e8ff4c}
+.pick-btn.plus .pick-btn-k{color:#e8ff4c}
+.pick-btn.plus .pick-btn-s{color:rgba(255,255,255,.72)}
+/* CHEAP = azul, igual que su badge */
+.pick-btn.cheap{border-color:#4d4dff}
+.pick-btn.cheap .pick-btn-k{color:#8f8fff}
+.pick-btn.cheap .pick-btn-s{color:rgba(255,255,255,.72)}
+/* Elegido: el color se vuelve fondo. Negro sobre amarillo = 18.84:1;
+   blanco sobre #0000cd = 11.16:1. */
+.pick-btn[aria-pressed="true"].plus{background:#e8ff4c;border-color:#e8ff4c}
+.pick-btn[aria-pressed="true"].plus .pick-btn-k{color:#000}
+.pick-btn[aria-pressed="true"].plus .pick-btn-s{color:rgba(0,0,0,.78)}
+.pick-btn[aria-pressed="true"].cheap{background:#0000cd;border-color:#8f8fff}
+.pick-btn[aria-pressed="true"].cheap .pick-btn-k{color:#fff}
+.pick-btn[aria-pressed="true"].cheap .pick-btn-s{color:rgba(255,255,255,.88)}
+.pick-btn[aria-pressed="true"]::after{
+  content:'✓ Es el tuyo';
+  font-size:10px;font-weight:900;letter-spacing:.12em;text-transform:uppercase;
+  opacity:.72;
+}
+@media (hover:hover){
+  .pick-btn:hover{transform:translateY(-2px)}
+  .pick-btn.plus:hover{background:rgba(232,255,76,.1)}
+  .pick-btn.cheap:hover{background:rgba(0,0,205,.22)}
+  .pick-btn[aria-pressed="true"].plus:hover{background:#e8ff4c}
+  .pick-btn[aria-pressed="true"].cheap:hover{background:#0000cd}
+}
+/* Presión real (idioma PF-1: el :hover se queda pegado en touch) */
+.pick-btn:active{transform:scale(.985);transition-duration:.1s}
+
+/* Volver a ver las dos. Solo aparece cuando hay elección. */
+.pick-reset{
+  display:none;
+  margin-top:14px;padding:0;
+  background:none;border:none;cursor:pointer;
+  font-family:'Montserrat',sans-serif;
+  font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;
+  color:rgba(255,255,255,.58);
+  text-decoration:underline;text-underline-offset:3px;
+  transition:color .15s;
+}
+body.pg1-elegido .pick-reset{display:inline-block}
+.pick-reset:hover{color:#e8ff4c}
+
+/* ── 2 · EL PLIEGUE ─────────────────────────────────────────────────────
+   Se pliega SOLO la tarjeta con los dígitos. El encabezado de la sección
+   ("02 / CHEAP · Transferencia Banamex") se queda visible: así nadie se
+   queda sin saber que la otra cuenta existe, y el camino de vuelta es un
+   botón, no un misterio. Las POLÍTICAS nunca se plieguen — son condiciones,
+   y esconderlas por una elección cosmética sería otra cosa. */
+.unfold{
+  display:flex;align-items:center;justify-content:space-between;gap:12px;
+  width:100%;
+  padding:16px 18px;
+  background:#0a0a0a;
+  border:1px dashed rgba(255,255,255,.18);
+  border-radius:var(--r-card,16px);
+  cursor:pointer;
+  font-family:'Montserrat',sans-serif;
+  font-size:11px;font-weight:800;letter-spacing:.09em;text-transform:uppercase;
+  /* .72: es un camino de vuelta, tiene que leerse (9.4:1 sobre #0a0a0a) */
+  color:rgba(255,255,255,.72);
+  text-align:left;
+  transition:border-color .18s ease,color .18s ease,background .18s ease;
+}
+.unfold:hover{border-color:rgba(232,255,76,.5);color:#e8ff4c}
+.unfold:active{transform:scale(.995);transition-duration:.1s}
+.unfold-ico{font-size:15px;line-height:1;flex-shrink:0;opacity:.8}
+
+/* ── 3 · MICRO-FEEDBACK PF-1 EN LO QUE YA EXISTÍA ───────────────────────
+   Los .copy-btn ya traían :active. A los .send-btn y .choose-btn les
+   faltaba la presión, y a ninguno el anillo de foco del sistema. */
+.send-btn:active{transform:scale(.99);transition-duration:.1s}
+.copy-btn:active{transform:scale(.94);transition-duration:.1s}
+@media (hover:none){
+  /* en touch el hover se queda pegado tras el tap */
+  .choose-btn:hover,.pick-btn:hover{transform:none}
+  .send-btn.messenger:hover{background:#0084ff}
+  .send-btn.wa:hover{background:#25D366}
+}
+.pick-btn:focus-visible,.unfold:focus-visible,.pick-reset:focus-visible{
+  outline:2px solid #e8ff4c;
+  outline-offset:3px;
+}
+/* El toast ya tenía transition:all .25s — se le nombra el recorrido para que
+   reduced-motion lo acorte sin que el glow (sellado) se vaya con él. */
+.toast{transition:opacity .25s ease,transform .25s cubic-bezier(.22,1,.36,1)}
+
+/* ── 4 · CONTRASTE DEL TEXTO DE DINERO ──────────────────────────────────
+   Etiquetas de campo, banco destino y el título de instrucciones son
+   INFORMACIÓN DE PAGO: a .4 median 3.77:1 sobre el #0a0a0a de la tarjeta,
+   abajo del 4.5:1 de AA. La bisección da .451 como mínimo; se usa .58 —
+   el mismo valor que T5 le puso a .ft-dir, para no inventar un escalón
+   nuevo. Medido: 6.86:1.
+   Lo DECORATIVO se queda como está y va listado en la PR con su ratio. */
+.bank-tag,.bank-lbl,.steps-title{color:rgba(255,255,255,.58)}
+
+/* El botón verde de ayuda traía texto blanco: 1.98:1 sobre #25D366. La casa
+   ya resolvió esto en el mismo archivo (.send-btn.wa usa color:#000 sobre el
+   mismo verde). Negro sobre #25D366 = 10.59:1. */
+.choose-btn.help .choose-btn-title{color:#000}
+.choose-btn.help .choose-btn-sub{color:rgba(0,0,0,.78)}
+
+/* El .choose-cta se quedó con UN solo botón (los otros dos los reemplazó el
+   selector). Su rejilla de 3 columnas lo dejaba a un tercio de ancho con el
+   título partido en tres renglones — lo cazó la captura de escritorio, no el
+   arnés. Una fila, y con la altura de un botón, no de una tarjeta. */
+.choose-cta{grid-template-columns:1fr !important;margin-top:0}
+.choose-btn.help{
+  flex-direction:row;align-items:center;justify-content:space-between;
+  gap:16px;min-height:0;padding:16px 20px;
+}
+.choose-btn.help .choose-btn-title{font-size:12px}
+@media(min-width:640px){
+  .choose-btn.help .choose-btn-title{font-size:13px}
+}
+
+/* ── 5 · ACCESIBILIDAD DE MOVIMIENTO ───────────────────────────────────
+   pagos.html no tenía bloque de reduced-motion, y sí tiene dos animaciones
+   infinitas (el shimmer y el pulso del banner de hot sale). Patrón de la
+   casa: ACORTAR a un instante, no anular — así los rellenos `both` /
+   `backwards` siguen resolviendo y nada queda escondido. */
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{
+    animation-duration:.01ms !important;
+    animation-delay:0s !important;
+    animation-iteration-count:1 !important;
+    transition-duration:.01ms !important;
+    transition-delay:0s !important;
+    scroll-behavior:auto !important;
+    will-change:auto !important;
+  }
+}
 </style>
 <div id="hot-sale-banner" title="Copiar código HOTSALE">
   <div class="hsb-content">
@@ -644,6 +842,25 @@ body.hsale-on .nav{top:var(--hsb-h,0px)}
 
 <main>
 
+  <!-- [PG-1] SELECTOR DE PAQUETE — primero la pregunta, luego el dinero.
+       Sin elegir, la página se ve completa (las dos cuentas), como siempre:
+       nadie pierde acceso si el JS no corre o si el cliente no elige. -->
+  <section class="pick" id="pick" aria-labelledby="pick-q">
+    <h2 class="pick-q" id="pick-q">¿Qué paquete tienes?</h2>
+    <p class="pick-hint">Elige y te dejo a la vista nada más la cuenta que te toca. Así no hay manera de equivocarse.</p>
+    <div class="pick-btns" role="group" aria-labelledby="pick-q">
+      <button type="button" class="pick-btn plus" data-pick="bbva" aria-pressed="false" aria-controls="bbva">
+        <span class="pick-btn-k">PLUS · STAY · RIDE</span>
+        <span class="pick-btn-s">Depositas en BBVA</span>
+      </button>
+      <button type="button" class="pick-btn cheap" data-pick="heybanco" aria-pressed="false" aria-controls="heybanco">
+        <span class="pick-btn-k">CHEAP</span>
+        <span class="pick-btn-s">Depositas en Banamex</span>
+      </button>
+    </div>
+    <button type="button" class="pick-reset" id="pick-reset">Ver las dos cuentas</button>
+  </section>
+
   <!-- ALERTA: cuenta correcta según paquete -->
   <aside class="alert-cuenta" role="note" aria-label="Importante: elige la cuenta correcta">
     <div class="alert-cuenta-title">
@@ -665,16 +882,15 @@ body.hsale-on .nav{top:var(--hsb-h,0px)}
     </div>
   </aside>
 
-  <!-- Selector rápido de cuenta según paquete -->
-  <div class="choose-cta" role="group" aria-label="Elige cuenta según tu paquete">
-    <a href="#bbva" class="choose-btn bbva">
-      <span class="choose-btn-title">💳 Tengo paquete PLUS, STAY o RIDE</span>
-      <span class="choose-btn-sub">Ver cuenta BBVA</span>
-    </a>
-    <a href="#heybanco" class="choose-btn hey">
-      <span class="choose-btn-title">💳 Tengo paquete CHEAP</span>
-      <span class="choose-btn-sub">Ver cuenta Banamex</span>
-    </a>
+  <!-- [PG-1] Aquí vivían DOS botones más ("Tengo paquete PLUS/STAY/RIDE" y
+       "Tengo paquete CHEAP") que solo hacían salto de ancla a #bbva y
+       #heybanco. El selector de arriba hace eso y además pliega la cuenta
+       que no toca, así que dejarlos era tener dos controles distintos
+       preguntando lo mismo en la página del dinero. Se quedan sus destinos
+       intactos: el selector mueve a la misma sección.
+       El de WhatsApp NO se toca: es la salida para quien no sabe qué paquete
+       tiene, y eso el selector no lo resuelve. -->
+  <div class="choose-cta" role="group" aria-label="Ayuda para elegir cuenta">
     <a href="https://wa.me/528119771072?text=Hola%2C%20quiero%20realizar%20mi%20pago%20pero%20no%20s%C3%A9%20cu%C3%A1l%20cuenta%20me%20corresponde.%20Me%20pueden%20orientar%3F%0A%0AMi%20nombre%20es%3A%20%0AMi%20evento%20es%3A" target="_blank" rel="noopener" class="choose-btn help">
       <span class="choose-btn-title">❓ No sé qué cuenta me corresponde</span>
       <span class="choose-btn-sub">Pregunta por WhatsApp</span>
@@ -689,7 +905,14 @@ body.hsale-on .nav{top:var(--hsb-h,0px)}
     </div>
     <h2 class="sec-title">Transferencia BBVA</h2>
 
-    <div class="bank-card bbva">
+    <!-- [PG-1] El camino de vuelta cuando esta cuenta queda plegada. Nace
+         oculto: sin JS nunca aparece y la tarjeta se ve completa. -->
+    <button type="button" class="unfold" data-unfold="bbva" aria-expanded="false" aria-controls="bbva-card" hidden>
+      <span>Ver la otra cuenta — BBVA (PLUS · STAY · RIDE)</span>
+      <span class="unfold-ico" aria-hidden="true">↓</span>
+    </button>
+
+    <div class="bank-card bbva" id="bbva-card">
       <div class="bank-logo">
         <div class="bbva-logo">BBVA</div>
         <span class="bank-tag">Banco destino</span>
@@ -741,7 +964,12 @@ body.hsale-on .nav{top:var(--hsb-h,0px)}
     </div>
     <h2 class="sec-title">Transferencia Banamex</h2>
 
-    <div class="bank-card hey">
+    <button type="button" class="unfold" data-unfold="heybanco" aria-expanded="false" aria-controls="hey-card" hidden>
+      <span>Ver la otra cuenta — Banamex (CHEAP)</span>
+      <span class="unfold-ico" aria-hidden="true">↓</span>
+    </button>
+
+    <div class="bank-card hey" id="hey-card">
       <div class="bank-logo">
         <div class="hey-logo">Banamex</div>
         <span class="bank-tag">Banco destino</span>
@@ -839,6 +1067,110 @@ body.hsale-on .nav{top:var(--hsb-h,0px)}
 </footer>
 
 <div class="toast" id="toast" role="status" aria-live="polite">¡Copiado! ✓</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════
+     TUERCA PG-1 · JS DEL SELECTOR (aislado y puramente cosmético)
+     Pliega la tarjeta de la cuenta que NO le toca al cliente. No toca los
+     datos bancarios, ni el copiado, ni el analytics, ni los CTAs.
+     Para revertir: borrar este bloque de JS y el bloque de estilos PG-1.
+     (Ojo: en los comentarios NO se escriben etiquetas literales como la de
+     script o style — cualquier extractor anclado en ellas se rompe.)
+
+     Reglas que se respetan a propósito:
+       · Sin JS, sin elección o con localStorage bloqueado → las dos cuentas
+         visibles. El pliegue es una MEJORA, nunca un requisito.
+       · La elección NO viaja al servidor. Vive en localStorage y ya.
+       · Si alguien llega con #bbva o #heybanco (los correos de cobranza
+         enlazan así), esa cuenta se abre aunque estuviera plegada.
+     ═══════════════════════════════════════════════════════════════════════ -->
+<script>
+(function(){
+  var LLAVE='pg1_paquete_v1';
+  var CUENTAS={
+    bbva:     {sec:'bbva',      card:'bbva-card'},
+    heybanco: {sec:'heybanco',  card:'hey-card'}
+  };
+  var botones=document.querySelectorAll('.pick-btn[data-pick]');
+  if(!botones.length) return;
+  var reset=document.getElementById('pick-reset');
+  var elegido=null;          // 'bbva' | 'heybanco' | null
+  var abiertoAMano={};       // cuentas que el cliente desplegó con el botón
+
+  function recordar(v){
+    try{ v ? localStorage.setItem(LLAVE,v) : localStorage.removeItem(LLAVE); }catch(e){}
+  }
+  function recordado(){
+    try{ var v=localStorage.getItem(LLAVE); return CUENTAS[v] ? v : null; }catch(e){ return null; }
+  }
+
+  function pintar(){
+    document.body.classList.toggle('pg1-elegido', !!elegido);
+    for(var k in CUENTAS){
+      var card=document.getElementById(CUENTAS[k].card);
+      var btn=document.querySelector('.unfold[data-unfold="'+k+'"]');
+      if(!card||!btn) continue;
+      // Se pliega solo la que no eligió, y solo si no la abrió a mano.
+      var plegar = !!elegido && k!==elegido && !abiertoAMano[k];
+      card.hidden=plegar;
+      btn.hidden=!(!!elegido && k!==elegido);   // el camino de vuelta existe siempre que esté fuera de foco
+      btn.setAttribute('aria-expanded', plegar ? 'false' : 'true');
+      var ico=btn.querySelector('.unfold-ico');
+      if(ico) ico.textContent = plegar ? '↓' : '↑';
+      var txt=btn.querySelector('span:first-child');
+      if(txt) txt.textContent=(plegar?'Ver':'Ocultar')+' la otra cuenta — '+(k==='bbva'?'BBVA (PLUS · STAY · RIDE)':'Banamex (CHEAP)');
+    }
+    for(var i=0;i<botones.length;i++){
+      botones[i].setAttribute('aria-pressed', botones[i].getAttribute('data-pick')===elegido ? 'true' : 'false');
+    }
+  }
+
+  function elegir(v, mover){
+    elegido = CUENTAS[v] ? v : null;
+    abiertoAMano={};
+    recordar(elegido);
+    pintar();
+    if(elegido && mover){
+      var sec=document.getElementById(CUENTAS[elegido].sec);
+      if(sec && sec.scrollIntoView) { try{ sec.scrollIntoView({behavior:'smooth',block:'start'}); }catch(e){ sec.scrollIntoView(); } }
+    }
+    try{ if(window.trackPagosEvent) window.trackPagosEvent('pagos_paquete_elegido',{cuenta_copiada:elegido||'ninguno'}); }catch(e){}
+  }
+
+  for(var i=0;i<botones.length;i++){
+    botones[i].addEventListener('click', function(){
+      var v=this.getAttribute('data-pick');
+      elegir(v===elegido ? null : v, true);   // volver a picar el mismo lo desactiva
+    });
+  }
+  if(reset) reset.addEventListener('click', function(){ elegir(null,false); });
+
+  document.querySelectorAll('.unfold[data-unfold]').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var k=btn.getAttribute('data-unfold');
+      abiertoAMano[k]=!abiertoAMano[k];
+      pintar();
+      if(abiertoAMano[k]){
+        var card=document.getElementById(CUENTAS[k].card);
+        if(card && card.scrollIntoView){ try{ card.scrollIntoView({behavior:'smooth',block:'nearest'}); }catch(e){} }
+      }
+    });
+  });
+
+  // Restaura la elección anterior SIN mover la página.
+  elegido=recordado();
+  pintar();
+
+  // Un enlace directo a una cuenta gana sobre el pliegue: los correos de
+  // cobranza mandan a pagos.html#bbva y ahí tiene que estar la cuenta.
+  function abrirPorHash(){
+    var h=(location.hash||'').replace('#','');
+    var k = h==='bbva' ? 'bbva' : (h==='heybanco' ? 'heybanco' : null);
+    if(k && elegido && k!==elegido){ abiertoAMano[k]=true; pintar(); }
+  }
+  abrirPorHash();
+  window.addEventListener('hashchange', abrirPorHash);
+})();
+</script>
 
 <script>
 (function(){

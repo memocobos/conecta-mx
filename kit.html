@@ -147,6 +147,32 @@ main{padding:0}
 @keyframes pulseDot{0%,100%{box-shadow:0 0 0 0 rgba(136,234,78,.6)}50%{box-shadow:0 0 0 8px rgba(136,234,78,0)}}
 
 @media(prefers-reduced-motion:reduce){*{animation:none !important;transition:none !important}.marquee-track{animation:none}.hero-title .line,.hero-sub,.hero-note{opacity:1;transform:none}}
+
+/* ===================================================================
+   TUERCA PF-5 · el sistema de redondeo de index, en esta página
+   Los MISMOS valores que index.html (PF-3, PR #363). Van declarados en
+   cada página hermana porque ninguna comparte hoja de estilo con el
+   index y la tuerca no toca markup (un <link> compartido sería markup).
+   Los bloques de las 4 hermanas son BYTE-IDÉNTICOS entre sí y el arnés
+   lo assertea: si alguien desincroniza uno, truena.
+   Todo var() lleva valor de respaldo, así que borrar este bloque
+   degrada al valor de hoy, no a esquinas cuadradas.
+   =================================================================== */
+:root{
+  --r-card:16px;    /* contenedores y tarjetas */
+  --r-btn:12px;     /* botones */
+  --r-chip:999px;   /* chips y badges */
+  --r-sm:8px;       /* detalles chicos: notas, avisos, inputs */
+}
+
+/* botones */
+.hdr-cta,.cta-btn{border-radius:var(--r-btn,12px)}
+/* chips del kit */
+.item-tag,.item-pill,.item-photo-tag{border-radius:var(--r-chip,999px)}
+/* la foto de cada pieza es una tarjeta */
+.item-photo{border-radius:var(--r-card,16px)}
+/* la nota del hero es un detalle, no una tarjeta */
+.hero-note{border-radius:var(--r-sm,8px)}
 </style>
 </head>
 <body>

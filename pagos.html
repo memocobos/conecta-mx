@@ -551,17 +551,37 @@ body.hsale-on .nav{top:var(--hsb-h,0px)}
    sus CTAs hermanos). pagos.html NO comparte hoja de estilo con
    index.html, así que los tokens se declaran aquí con los MISMOS
    valores que en index — no son tokens nuevos, es la misma escala.
+   [PF-5] El bloque quedó UNIFICADO, byte-idéntico al de kit/funciona/faq,
+   y el arnés compara los cuatro entre sí para que no se desvíen.
    El resto de pagos.html (tarjetas de banco, políticas, badges) lo
    encontró el barrido y queda REPORTADO en la PR, sin tocar: portar el
    sistema completo a las 5 páginas hermanas es otra tuerca.
    =================================================================== */
 :root{
-  --r-card:16px;
-  --r-btn:12px;
-  --r-chip:999px;
-  --r-sm:8px;
+  --r-card:16px;    /* contenedores y tarjetas */
+  --r-btn:12px;     /* botones */
+  --r-chip:999px;   /* chips y badges */
+  --r-sm:8px;       /* detalles chicos: notas, avisos, inputs */
 }
-.send-btn,.choose-btn,.copy-btn{border-radius:var(--r-btn)}
+.send-btn,.choose-btn,.copy-btn{border-radius:var(--r-btn,12px)}
+
+/* [PF-5] tokens ya declarados arriba por PF-4 (PR #364).
+   Las reglas de abajo son la parte nueva de PF-5. */
+
+/* tarjetas de verdad: bancos y políticas (fondo + borde completo) */
+.bank-card,.pol-sec{border-radius:var(--r-card,16px)}
+/* chips de paquete */
+.badge{border-radius:var(--r-chip,999px)}
+
+/* NO llevan radio, y es a propósito: son LÍNEAS, no superficies — su único
+   borde es un border-top, así que redondearlas curva la línea y se lee como
+   una caja rota. Lo cachó la revisión de capturas:
+     · .hero-stat (funciona, faq) · .fq (faq)
+     · .steps y .alert-cuenta-foot (pagos)
+   Y .warn de pagos se queda igual porque su border-left de 3px es el side-tab
+   que Memo decidió conservar. */
+/* el 4px suelto del banner de hot sale entra al token más cercano */
+#hot-sale-banner .hsb-text code{border-radius:var(--r-sm,8px)}
 </style>
 <div id="hot-sale-banner" title="Copiar código HOTSALE">
   <div class="hsb-content">

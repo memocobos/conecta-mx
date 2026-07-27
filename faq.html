@@ -465,6 +465,36 @@ main{padding:0}
   .marquee-track{animation:none}
   .hero-title .line,.hero-sub,.hero-stats,.hero-scroll{opacity:1;transform:none}
 }
+
+/* ===================================================================
+   TUERCA PF-5 · el sistema de redondeo de index, en esta página
+   Los MISMOS valores que index.html (PF-3, PR #363). Van declarados en
+   cada página hermana porque ninguna comparte hoja de estilo con el
+   index y la tuerca no toca markup (un <link> compartido sería markup).
+   Los bloques de las 4 hermanas son BYTE-IDÉNTICOS entre sí y el arnés
+   lo assertea: si alguien desincroniza uno, truena.
+   Todo var() lleva valor de respaldo, así que borrar este bloque
+   degrada al valor de hoy, no a esquinas cuadradas.
+   =================================================================== */
+:root{
+  --r-card:16px;    /* contenedores y tarjetas */
+  --r-btn:12px;     /* botones */
+  --r-chip:999px;   /* chips y badges */
+  --r-sm:8px;       /* detalles chicos: notas, avisos, inputs */
+}
+
+/* botones */
+.hdr-cta,.cta-btn{border-radius:var(--r-btn,12px)}
+/* chips de los encabezados de sección */
+.fq-head-tag{border-radius:var(--r-chip,999px)}
+
+/* NO llevan radio, y es a propósito: son LÍNEAS, no superficies — su único
+   borde es un border-top, así que redondearlas curva la línea y se lee como
+   una caja rota. Lo cachó la revisión de capturas:
+     · .hero-stat (funciona, faq) · .fq (faq)
+     · .steps y .alert-cuenta-foot (pagos)
+   Y .warn de pagos se queda igual porque su border-left de 3px es el side-tab
+   que Memo decidió conservar. */
 </style>
 </head>
 <body>

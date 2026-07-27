@@ -1368,6 +1368,33 @@
     <div id="esf-dryrun-panel" style="margin-top:14px"></div>
    </div>
   </div>
+
+  <!-- ─── [N1] NOTICIAS DEL BANNER ────────────────────────────────────────
+       El banner azul del index deja de armarse solo desde el catálogo: lo
+       escribe Memo aquí. Publicar reescribe el arreglo NOTICIAS de index.html
+       vía noticias-publicar (mismo candado maestro_roshi que las esferas) y
+       Netlify deploya solo. Vive en esta página porque es la que ya hace
+       editar → previsualizar → publicar al index. -->
+  <div class="n1-caja">
+   <div class="n1-head">
+    <div>
+     <div class="n1-titulo">NOTICIAS DEL BANNER</div>
+     <div class="n1-sub">// la marquesina azul del index · texto plano · máx 10 · 120 caracteres c/u</div>
+    </div>
+    <button class="btn" onclick="n1Agregar()">+ Agregar noticia</button>
+   </div>
+
+   <div id="n1-lista" class="n1-lista"></div>
+   <div id="n1-vacio" class="n1-vacio">Sin noticias: la marquesina se queda con el lema de siempre.</div>
+
+   <div class="n1-previa-lbl">Vista previa</div>
+   <div class="n1-previa"><div class="n1-previa-track" id="n1-previa-track"></div></div>
+
+   <div class="n1-pie">
+    <button class="btn btn-primary" id="n1-publicar" onclick="n1Publicar()">Publicar al sitio</button>
+    <span class="n1-estado" id="n1-estado"></span>
+   </div>
+  </div>
  </div>
 
  <div class="page" id="page-kamisama">

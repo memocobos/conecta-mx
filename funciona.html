@@ -18,7 +18,7 @@
   --amarillo:#e8ff4c;
   --verde:#88ea4e;
   --rosa:#ff4bd1;
-  --muted:rgba(255,255,255,.45);
+  --muted:rgba(255,255,255,.46);
   --dim:rgba(255,255,255,.12);
   --line:rgba(255,255,255,.08);
   --font-display:'Barlow Condensed','Montserrat',sans-serif;
@@ -62,7 +62,7 @@ a{color:inherit;text-decoration:none}
 .hdr-logo-mx{font-weight:900;font-style:italic;font-size:17px;color:#fff;margin-left:7px;align-self:center;padding-right:14px}
 .hdr-right{display:flex;align-items:stretch;gap:0}
 .hdr-socials{display:flex;align-items:stretch}
-.hdr-social{display:flex;align-items:center;justify-content:center;width:38px;color:rgba(255,255,255,.45);text-decoration:none;transition:color .2s ease,background .2s ease}
+.hdr-social{display:flex;align-items:center;justify-content:center;width:38px;color:rgba(255,255,255,.46);text-decoration:none;transition:color .2s ease,background .2s ease}
 .hdr-social svg{width:15px;height:15px}
 .hdr-social:hover{color:#fff}
 .hdr-social.wa:hover{color:#25D366;background:rgba(37,211,102,.1)}
@@ -438,11 +438,11 @@ main{padding:0}
 /* [T5] la dirección de la oficina en el footer */
 .ftr-dir{
   margin-top:10px;font-size:11px;line-height:1.6;font-weight:500;
-  /* .58 y no var(--muted): el token de la casa es rgba(255,255,255,.45), que
-     compuesto sobre negro da 4.41:1 — por debajo del 4.5:1 que pide AA para
-     texto normal. A 11px eso se nota. No toco el token (lo usan .ftr-tag y
-     varios más en todo el sitio); subo SOLO esta línea, que es un dato que la
-     gente necesita leer. Medido: 7.2:1. */
+  /* .58 y no var(--muted): cuando se escribió esto el token era rgba(255,255,255,.45), que
+     daba 4.41:1 y no llegaba al 4.5:1 de AA. [T6] ya subió el token a .46
+     (4.58:1), así que la excepción ya no es imprescindible — se queda en .58
+     igual: es un dato que la gente necesita leer de un vistazo, y 6.9:1 le da
+     aire de sobra sobre el mínimo. */
   color:rgba(255,255,255,.58);text-transform:none;letter-spacing:0;max-width:260px;
 }
 .ftr-dir a{

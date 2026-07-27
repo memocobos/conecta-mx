@@ -190,6 +190,13 @@ main{
   font-family:'Barlow Condensed',sans-serif;font-weight:900;
   font-size:clamp(28px,7vw,38px);text-transform:uppercase;letter-spacing:.01em;line-height:1;
 }
+/* [PP-2b] La frase viva. Se lee como voz de la casa, no como título: peso
+   normal y en el gris fuerte, para que el nombre siga siendo lo que resalta. */
+.dash-frase{
+  margin:0;font-size:13px;line-height:1.45;font-weight:500;
+  color:rgba(255,255,255,.72);max-width:34ch;
+}
+.dash-frase:empty{display:none}
 .dash-cliente{
   display:inline-flex;align-items:center;gap:8px;
   font-family:'JetBrains Mono',monospace;font-weight:700;font-size:12px;
@@ -1434,6 +1441,9 @@ body.rcp-alto .pf{ padding-bottom:calc(var(--rcp-zona-fab) + env(safe-area-inset
       <div class="dash-avatar" id="dash-avatar" aria-hidden="true">C</div>
       <div class="dash-header">
         <h1 class="dash-hola" id="dash-title"><span id="dash-saludo">Hola, </span><span id="dash-nombre" class="accent" style="color:var(--yel)">Cliente</span></h1>
+        <!-- [PP-2b] La frase del pool, debajo del nombre. Se llena con
+             textContent desde _pintarFrase(); vacía si algo falla. -->
+        <p class="dash-frase" id="dash-frase"></p>
         <span class="dash-cliente">CLIENTE <span id="dash-numero" class="mono">#0000</span></span>
       </div>
       <!-- [avisos] Campanita interactiva: badge = nº de avisos activos + panel -->
@@ -2228,14 +2238,11 @@ $('#btn-cancel-profile').addEventListener('click', () => {
 function renderDashboard(c){
   const primerNombre = (c.nombre_completo || 'Cliente').split(' ')[0];
   $('#dash-nombre').textContent = primerNombre;
-  // [PP-2] El saludo deja de ser siempre "Hola": rota entre 2-3 variantes según
-  // la hora. El NOMBRE no se toca (sigue en su propio span, con textContent);
-  // esto solo cambia la palabra de antes.
+  // [PP-2b] El "Hola, {nombre}" vuelve a ser fijo —es la identidad, no el
+  // mensaje— y la voz viva pasa al renglón de abajo: una de 140 frases.
   const _sal = document.getElementById('dash-saludo');
-  if (_sal){
-    const ops = _saludoDelDia();
-    _sal.textContent = ops[new Date().getDay() % ops.length] + ', ';
-  }
+  if (_sal) _sal.textContent = 'Hola, ';
+  _pintarFrase(primerNombre);
   $('#dash-numero').textContent = '#' + (c.numero_cliente || '0000');
   // [avatar] pinta foto si existe (avatar_url), si no la inicial (fails-soft 404→inicial)
   pintarAvatar(c);
@@ -4417,13 +4424,230 @@ async function _upgradeArtHero(el, t){
   el.classList.remove('is-loading');
 }
 
-// [PP-2] Saludo con algo de calor, por hora del día. Sin cursilería y sin
-// inventar datos: solo cambia la palabra que acompaña al nombre real.
-function _saludoDelDia(){
-  const h = new Date().getHours();
-  if (h < 12)  return ['Buenos días', 'Qué bueno verte', 'Hola'];
-  if (h < 19)  return ['Qué tal', 'Hola', 'Buenas tardes'];
-  return ['Buenas noches', 'Hola', 'Qué gusto'];
+// ═══════════════════════════════════════════════════════════════════════════
+// [PP-2b] LAS 140 FRASES DEL SALUDO
+//
+// Sustituye al saludo por hora de PP-2: cada entrada al portal trae una frase
+// distinta, elegida al azar sin repetir las últimas 10.
+//
+// Los buckets NO son decoración: filtran lo que sería MENTIRA para ese cliente.
+//   PRE → presupone un viaje próximo
+//   SIN → presupone que no hay nada agendado
+//   HOY → afirma que el evento es HOY (ver la nota de abajo)
+//   N   → neutra, siempre elegible
+//
+// NOTA sobre HOY: el brief marca el bloque "Día del evento / muy cerca" como
+// [PRE], junto al de hype. Pero esas 10 frases no dicen "ya falta poco": dicen
+// "¡Es hoy, es hoy, ES HOY!" y "Última llamada: nos vemos en el camión". A 40
+// días del viaje eso es informarle mal al cliente sobre su propio tour, así que
+// llevan bucket propio y solo salen cuando el viaje más cercano es hoy o mañana.
+const _FRASES = [
+  // ── Hype de viaje [PRE] · PRE ──
+  ['PRE', "¿Ya tienes tu outfit listo?"],
+  ['PRE', "¿Listos para el próximo viaje?"],
+  ['PRE', "Cada día falta menos. Aguanta."],
+  ['PRE', "Tu asiento ya tiene tu nombre."],
+  ['PRE', "El camión ya huele a aventura."],
+  ['PRE', "Falta poco para cantar a gritos."],
+  ['PRE', "Ve apartando tu mejor pose para las fotos."],
+  ['PRE', "La playlist del camino se arma sola."],
+  ['PRE', "Tu kit ya se está imprimiendo."],
+  ['PRE', "El countdown no perdona: ahí viene."],
+  ['PRE', "¿Ya avisaste en el trabajo que ese día no existes?"],
+  ['PRE', "Las mejores historias empiezan en un camión."],
+  ['PRE', "Tu boleto está más cerca de lo que crees."],
+  ['PRE', "Se acerca el día de gritar hasta quedarte sin voz."],
+  ['PRE', "¿Ya elegiste con quién te vas a sentar?"],
+  ['PRE', "El hotel ya casi tiende tu cama."],
+  ['PRE', "Ese evento no se va a cantar solo."],
+  ['PRE', "Prepara garganta: se viene el show."],
+  ['PRE', "Tu futura foto de perfil está a un viaje de distancia."],
+  ['PRE', "Los nervios bonitos ya se sienten, ¿verdad?"],
+  ['PRE', "Checa tu plan: cada abono te acerca una rola más."],
+  ['PRE', "El día del evento vas a agradecer cada quincena."],
+  ['PRE', "¿Ya viste quién abre el show?"],
+  ['PRE', "Va a ser un buen día para estar en primera fila."],
+  ['PRE', "Dicen que ya están probando el sonido."],
+  ['PRE', "Tu lugar en el camión ya te extraña."],
+  ['PRE', "Guarda pila para ese día: la vas a necesitar toda."],
+  ['PRE', "Ya casi es hora de perder la voz con estilo."],
+  ['PRE', "Advertencia: este viaje causa recuerdos permanentes."],
+  ['PRE', "Lo que sigue: tú, el show y cero preocupaciones."],
+  // ── Comunidad / cariño (neutras) · N ──
+  ['N', "Qué gusto verte por aquí, {nombre}."],
+  ['N', "Tu portal, tus viajes, tu música."],
+  ['N', "Aquí siempre hay un lugar para ti."],
+  ['N', "De Reynosa para los escenarios del país."],
+  ['N', "Ya eres parte de la familia Conecta."],
+  ['N', "Trece años llevando gente a cantar."],
+  ['N', "Miles de viajeros, y tú eres de los nuestros."],
+  ['N', "Esto no es una página, es tu puerta al show."],
+  ['N', "Lo tuyo está en buenas manos."],
+  ['N', "Un gusto tenerte de vuelta."],
+  ['N', "¿Todo bien? Tu WhatsApp de confianza sigue abierto."],
+  ['N', "Aquí no hay letra chica, solo buena música."],
+  ['N', "Viajar en bola siempre es mejor."],
+  ['N', "Tus pagos, tus fechas, todo a la mano."],
+  ['N', "La ruta es larga pero la banda es buena."],
+  ['N', "Bienvenido a tu rincón conectero."],
+  ['N', "Otro día perfecto para planear un concierto."],
+  ['N', "Tu próxima gran noche se cocina aquí."],
+  ['N', "Nos gusta verte por aquí seguido."],
+  ['N', "Todo en orden por acá. Tú tranquilo."],
+  ['N', "Las mejores noches de tu año pasan por aquí."],
+  ['N', "Este portal late al ritmo de tu música."],
+  ['N', "Reynosa presente en cada arena del país."],
+  ['N', "Ya nada más de vernos aquí, sentimos bonito."],
+  ['N', "Como en casa, pero con mejor cartelera."],
+  ['N', "Tu música favorita queda a un camión de distancia."],
+  ['N', "Y pensar que todo empieza con un separo."],
+  ['N', "Lo bueno se paga en quincenas y se vive en segundos."],
+  ['N', "Cada visita tuya nos hace el día."],
+  ['N', "Qué bonito es tener planes."],
+  ['N', "Tú pones las ganas, nosotros el camino."],
+  ['N', "La familia conectera crece cada semana."],
+  ['N', "Se te ve bien ese entusiasmo, {nombre}."],
+  ['N', "Los kilómetros no pesan cuando vas cantando."],
+  ['N', "Nadie se arrepiente de un buen concierto."],
+  ['N', "Hay quien colecciona cosas; tú coleccionas noches épicas."],
+  ['N', "Un concierto al año no hace daño. Dos, tampoco."],
+  ['N', "Las quincenas pasan, los recuerdos se quedan."],
+  ['N', "Tu yo del futuro te agradece este plan."],
+  ['N', "Si la vida se pone seria, agenda un concierto."],
+  // ── ¿A dónde vamos? (invitan a explorar, neutras) · N ──
+  ['N', "¿A dónde vamos ahora?"],
+  ['N', "¿Ya viste los eventos nuevos?"],
+  ['N', "Tu próximo destino te anda buscando."],
+  ['N', "El catálogo anda que arde. Échale un ojo."],
+  ['N', "Hay fechas nuevas esperándote."],
+  ['N', "¿Monterrey o CDMX? Tú decides."],
+  ['N', "Siempre hay un show que te queda perfecto."],
+  ['N', "Dale una vuelta al catálogo, algo te va a gustar."],
+  ['N', "¿Se antoja otro viaje? Aquí andamos."],
+  ['N', "Tu siguiente historia está en la cartelera."],
+  ['N', "Hay boletos que se están dejando querer."],
+  ['N', "Un tour nuevo nunca cae mal."],
+  ['N', "¿Ya apartaste el que tanto presumes?"],
+  ['N', "La lista de espera también cuenta como plan."],
+  ['N', "Alguien tiene que ir a ese concierto. ¿Por qué no tú?"],
+  ['N', "Los mejores planes empiezan con \"¿y si vamos?\"."],
+  ['N', "Ese artista que tanto oyes ya tiene fecha."],
+  ['N', "De ver el anuncio a estar ahí: cinco pasos."],
+  ['N', "Un viaje se antoja más cuando ya conoces el camino."],
+  ['N', "El separo de hoy es el grito de mañana."],
+  ['N', "Va de nuevo la pregunta de siempre: ¿a dónde vamos?"],
+  ['N', "Tu bucket list musical no se va a tachar sola."],
+  ['N', "Se vale soñar; mejor si es con boleto en mano."],
+  ['N', "Checa las fechas: el año todavía da para más."],
+  ['N', "Los planes con música siempre salen bien."],
+  ['N', "Hoy es buen día para apartar un lugar."],
+  ['N', "Hay un camión que sale pronto. Nomás digo."],
+  ['N', "Las noches épicas se agendan con tiempo."],
+  ['N', "Tu próximo \"no lo puedo creer\" ya está en catálogo."],
+  ['N', "Vuelve a soñar en grande: hay cartelera nueva."],
+  // ── Sin tours activos [SIN] · SIN ──
+  ['SIN', "Te extrañamos en los camiones, {nombre}."],
+  ['SIN', "Tu asiento sigue disponible. Solo dilo."],
+  ['SIN', "El catálogo te espera cuando quieras volver."],
+  ['SIN', "Hace falta tu voz en el coro del camión."],
+  ['SIN', "Un viaje nuevo lo arregla casi todo."],
+  ['SIN', "La familia conectera pregunta por ti."],
+  ['SIN', "¿Volvemos a la carretera?"],
+  ['SIN', "Ese antojo de concierto no se va solo."],
+  ['SIN', "Tu próxima aventura está a un click."],
+  ['SIN', "Cuando estés listo, aquí seguimos."],
+  // ── Día del evento / muy cerca [PRE] · HOY ──
+  ['HOY', "¡Es hoy, es hoy, ES HOY!"],
+  ['HOY', "Hoy los nervios son de los buenos."],
+  ['HOY', "Carga tu pila y tu voz: nos vamos."],
+  ['HOY', "Hoy se canta hasta el desvelo."],
+  ['HOY', "El outfit, el ánimo y las ganas: listos."],
+  ['HOY', "Última llamada: nos vemos en el camión."],
+  ['HOY', "Hoy no hay pendientes, hay conciertos."],
+  ['HOY', "Que hoy tu única preocupación sea el setlist."],
+  ['HOY', "Este es el día que tanto pagaste en quincenas."],
+  ['HOY', "Hoy se hace historia, conectero."],
+  // ── Guiños de la casa (neutras) · N ──
+  ['N', "Ponte la del evento: hoy combinamos."],
+  ['N', "La radio Conecta suena mejor con volumen arriba."],
+  ['N', "Dale play a la radio mientras revisas tus pagos."],
+  ['N', "Un vasito del kit y tu música: la oficina perfecta."],
+  ['N', "El kit de tu próximo tour ya quiere conocerte."],
+  ['N', "Se dice pronto: trece años de puros conciertos."],
+  ['N', "Somos de Reynosa y llegamos a donde sea."],
+  ['N', "Aquí hasta los pagos suenan a música."],
+  ['N', "Nuestra oficina es un camión a 100 por la carretera."],
+  ['N', "Detrás de este portal hay gente que ama la música tanto como tú."],
+  ['N', "El separo es chiquito; el recuerdo, gigante."],
+  ['N', "Cada boleto tiene su historia. La tuya sigue."],
+  ['N', "Presume tu tote del kit: ya sabes de dónde es."],
+  ['N', "Ya sabes cómo funciona: tú cantas, nosotros manejamos."],
+  ['N', "La mejor agencia es la que te lleva de regreso a casa cantando."],
+  ['N', "Toda gran noche merece buen transporte."],
+  ['N', "Si suena bien, seguro salió de nuestra cartelera."],
+  ['N', "Nuestro GPS solo conoce rutas a conciertos."],
+  ['N', "Reynosa → tu artista favorito, sin escalas."],
+  ['N', "Gracias por viajar con nosotros. Siempre."],
+];
+
+// Memoria de las últimas 10, en localStorage. Cosmética: si el navegador la
+// bloquea, se degrada a "sin memoria" y sigue funcionando (solo puede repetir).
+const _FRASES_VISTAS = 'pp2b_frases_v1';
+function _frasesVistas(){
+  try { const l = JSON.parse(localStorage.getItem(_FRASES_VISTAS) || '[]'); return Array.isArray(l) ? l : []; }
+  catch (e) { return []; }
+}
+function _recordarFrase(i){
+  try {
+    const l = _frasesVistas();
+    l.push(i);
+    localStorage.setItem(_FRASES_VISTAS, JSON.stringify(l.slice(-10)));
+  } catch (e) { /* sin memoria: puede repetir, no es grave */ }
+}
+
+/** ¿Cuál es el viaje más cercano? Devuelve los días que faltan, o null.
+ *  Usa EXACTAMENTE la misma fuente que el hero de PP-2: el EV cacheado. */
+function _diasAlProximo(){
+  const proximos = (_toursCache || [])
+    .filter(t => t.estado !== 'cancelado')
+    .map(t => (_evBySlug(t.evento_id) || {}).ds)
+    .filter(Boolean)
+    .map(ds => _diasFaltan(ds))
+    .filter(d => d != null && d >= 0)
+    .sort((a, b) => a - b);
+  return proximos.length ? proximos[0] : null;
+}
+
+/** Elige una frase elegible para este cliente, evitando las últimas 10. */
+function _elegirFrase(){
+  const dias = _diasAlProximo();
+  const tieneProximo = dias != null;
+  const esHoy = dias != null && dias <= 1;
+  const elegible = (tag) => tag === 'N'
+    || (tag === 'PRE' && tieneProximo)
+    || (tag === 'SIN' && !tieneProximo)
+    || (tag === 'HOY' && esHoy);
+
+  const candidatas = _FRASES.map((f, i) => i).filter(i => elegible(_FRASES[i][0]));
+  if (!candidatas.length) return null;
+  const vistas = _frasesVistas();
+  // Si el filtro deja pocas, las vistas se ignoran antes que repetir vacío.
+  let frescas = candidatas.filter(i => !vistas.includes(i));
+  if (!frescas.length) frescas = candidatas;
+  const i = frescas[Math.floor(Math.random() * frescas.length)];
+  _recordarFrase(i);
+  return { i, texto: _FRASES[i][1], tag: _FRASES[i][0] };
+}
+
+/** Pinta la frase. {nombre} se sustituye con el nombre REAL y todo va por
+ *  textContent: una frase nunca puede meter markup, aunque el nombre traiga
+ *  caracteres raros. */
+function _pintarFrase(nombre){
+  const el = document.getElementById('dash-frase');
+  if (!el) return;
+  const f = _elegirFrase();
+  if (!f){ el.textContent = ''; return; }
+  el.textContent = f.texto.replace('{nombre}', String(nombre || '').trim() || 'conectero');
 }
 
 // [PP-2] Celebración al liquidar, UNA sola vez por tour. La marca vive en

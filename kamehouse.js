@@ -1834,7 +1834,7 @@ function loadPage(name) {
  if (name === 'kamisama') loadKamisama();
  if (name === 'montana') loadMontana();
  if (name === 'radar') initRadarTab();
- if (name === 'esferas') loadEsferasEventos();
+ if (name === 'esferas') { loadEsferasEventos(); n1Cargar(); }
  if (name === 'yamcha') loadYamcha();
  if (name === 'radio') loadRadio();
 }
@@ -19056,4 +19056,192 @@ if (_inviteToken) {
   enterApp();
   // Alerta primer login
   if (currentUser && !currentUser.perfil_completo) { enviarAlertaMemo('nuevo_usuario', { nombre: currentUser.nombre, rol: currentUser.rol }); }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// [N1] NOTICIAS DEL BANNER · editor en Esferas del Dragón
+//
+// El banner azul del index deja de armarse solo desde el catálogo: lo escribe
+// Memo aquí. "Publicar" llama a noticias-publicar, que reescribe SOLO el
+// arreglo NOTICIAS de index.html (mismo candado maestro_roshi que las esferas)
+// y Netlify deploya solo.
+//
+// Los topes se avisan aquí Y se validan en el servidor. La UI no es defensa:
+// es cortesía.
+// ═══════════════════════════════════════════════════════════════════════════
+const N1_MAX = 10;
+const N1_LARGO = 120;
+let n1Noticias = [];
+
+/** Motivo por el que una noticia no se puede publicar, o '' si está bien. */
+function n1Problema(t) {
+  const s = String(t == null ? '' : t).trim();
+  if (!s) return '';                                  // vacía: se ignora al publicar
+  if (s.length > N1_LARGO) return `pasa de ${N1_LARGO} caracteres`;
+  if (/[<>]/.test(s)) return 'no puede llevar < ni >';
+  if (/&#|&[a-z]+;/i.test(s)) return 'no puede llevar entidades HTML';
+  if (s.includes('\\')) return 'no puede llevar diagonal invertida';
+  return '';
+}
+
+function n1Limpias() {
+  return n1Noticias.map(t => String(t || '').trim()).filter(Boolean);
+}
+
+function n1Agregar() {
+  if (n1Noticias.length >= N1_MAX) { n1Estado(`Máximo ${N1_MAX} noticias`, 'error'); return; }
+  n1Noticias.push('');
+  n1Pintar();
+  const inputs = document.querySelectorAll('#n1-lista .n1-input');
+  if (inputs.length) inputs[inputs.length - 1].focus();
+}
+
+function n1Borrar(i) { n1Noticias.splice(i, 1); n1Pintar(); }
+
+function n1Mover(i, delta) {
+  const j = i + delta;
+  if (j < 0 || j >= n1Noticias.length) return;
+  const t = n1Noticias[i]; n1Noticias[i] = n1Noticias[j]; n1Noticias[j] = t;
+  n1Pintar();
+}
+
+function n1Editar(i, valor) {
+  n1Noticias[i] = valor;
+  // Solo se repinta la previa y el contador: repintar la lista entera le
+  // quitaría el foco al input en cada tecla.
+  const fila = document.querySelectorAll('#n1-lista .n1-fila')[i];
+  if (fila) {
+    const problema = n1Problema(valor);
+    const cuenta = fila.querySelector('.n1-cuenta');
+    const input = fila.querySelector('.n1-input');
+    if (cuenta) { cuenta.textContent = `${String(valor || '').trim().length}/${N1_LARGO}`; cuenta.classList.toggle('n1-mal', !!problema); }
+    if (input) { input.classList.toggle('n1-mal', !!problema); input.title = problema; }
+  }
+  n1Previa();
+}
+
+function n1Pintar() {
+  const cont = document.getElementById('n1-lista');
+  const vacio = document.getElementById('n1-vacio');
+  if (!cont) return;
+  cont.textContent = '';
+  n1Noticias.forEach((t, i) => {
+    const problema = n1Problema(t);
+    const fila = document.createElement('div');
+    fila.className = 'n1-fila';
+
+    const orden = document.createElement('div');
+    orden.className = 'n1-orden';
+    [['▲', -1, i === 0], ['▼', 1, i === n1Noticias.length - 1]].forEach(([txt, d, off]) => {
+      const b = document.createElement('button');
+      b.className = 'n1-mini'; b.textContent = txt; b.disabled = !!off;
+      b.title = d < 0 ? 'Subir' : 'Bajar';
+      b.onclick = () => n1Mover(i, d);
+      orden.appendChild(b);
+    });
+
+    const input = document.createElement('input');
+    input.className = 'n1-input' + (problema ? ' n1-mal' : '');
+    input.value = String(t || '');
+    input.placeholder = 'Ej: Preventa Bad Bunny este viernes 10am';
+    input.maxLength = N1_LARGO + 20;   // deja escribir de más para que VEA el aviso
+    input.title = problema;
+    input.oninput = (e) => n1Editar(i, e.target.value);
+
+    const der = document.createElement('div');
+    der.style.cssText = 'display:flex;align-items:center;gap:8px';
+    const cuenta = document.createElement('span');
+    cuenta.className = 'n1-cuenta' + (problema ? ' n1-mal' : '');
+    cuenta.textContent = `${String(t || '').trim().length}/${N1_LARGO}`;
+    const borrar = document.createElement('button');
+    borrar.className = 'n1-borrar'; borrar.textContent = '✕'; borrar.title = 'Borrar';
+    borrar.onclick = () => n1Borrar(i);
+    der.appendChild(cuenta); der.appendChild(borrar);
+
+    fila.appendChild(orden); fila.appendChild(input); fila.appendChild(der);
+    cont.appendChild(fila);
+  });
+  if (vacio) vacio.style.display = n1Limpias().length ? 'none' : '';
+  n1Previa();
+}
+
+/** La vista previa espeja lo que se publicaría: mismas noticias, duplicadas
+ *  para el loop sin costura, con textContent igual que el index. */
+function n1Previa() {
+  const track = document.getElementById('n1-previa-track');
+  if (!track) return;
+  track.textContent = '';
+  const lista = n1Limpias();
+  const pintar = lista.length ? lista : ['Conecta Reynosa · 13 años de experiencia · Tours a conciertos'];
+  for (let vuelta = 0; vuelta < 2; vuelta++) {
+    pintar.forEach(t => {
+      const sp = document.createElement('span');
+      sp.textContent = t;                       // nunca innerHTML
+      track.appendChild(sp);
+    });
+  }
+  track.style.animationDuration = Math.min(90, Math.max(26, pintar.length * 5)) + 's';
+}
+
+/** Lee las noticias que HOY están publicadas, del index.html en vivo.
+ *  Sin esto el editor abriría vacío y el primer "Publicar" borraría el banner
+ *  sin que Memo se entere: el peor error posible de esta tuerca. Si la lectura
+ *  falla, se dice y NO se finge una lista vacía. */
+async function n1Cargar() {
+  n1Estado('Leyendo el banner publicado…');
+  try {
+    const r = await fetch('/index.html?n1=' + Date.now(), { cache: 'no-store' });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const html = await r.text();
+    const m = html.match(/ {2}var NOTICIAS = \[([\s\S]*?)\n {2}\];/);
+    if (!m) throw new Error('no encontré el bloque NOTICIAS en el index');
+    // Una cadena entre comillas simples por renglón; se desescapan las \'
+    n1Noticias = [...m[1].matchAll(/'((?:[^'\\]|\\.)*)'/g)].map(x => x[1].replace(/\\'/g, "'"));
+    n1Pintar();
+    n1Estado(n1Noticias.length ? `${n1Noticias.length} noticia(s) publicadas hoy.` : 'El banner está vacío: se ve el lema de siempre.');
+  } catch (e) {
+    // Se deja la lista intacta y se BLOQUEA publicar: escribir a ciegas sobre
+    // algo que no pudiste leer es cómo se pierden las noticias de alguien.
+    const btn = document.getElementById('n1-publicar');
+    if (btn) btn.disabled = true;
+    n1Estado('No pude leer el banner publicado (' + (e && e.message || e) + '). No publiques hasta recargar.', 'error');
+  }
+}
+
+function n1Estado(msg, clase) {
+  const el = document.getElementById('n1-estado');
+  if (!el) return;
+  el.textContent = msg || '';
+  el.className = 'n1-estado' + (clase ? ' n1-' + clase : '');
+}
+
+async function n1Publicar() {
+  const lista = n1Limpias();
+  const malas = n1Noticias.map((t, i) => ({ i, p: n1Problema(t) })).filter(x => x.p);
+  if (malas.length) { n1Estado(`La noticia ${malas[0].i + 1} ${malas[0].p}`, 'error'); return; }
+  if (lista.length > N1_MAX) { n1Estado(`Máximo ${N1_MAX} noticias`, 'error'); return; }
+  const aviso = lista.length
+    ? `¿Publicar ${lista.length} noticia(s) al banner del sitio?`
+    : '¿Publicar el banner VACÍO? La marquesina volverá al lema de siempre.';
+  if (!confirm(aviso)) return;
+
+  const btn = document.getElementById('n1-publicar');
+  if (btn) btn.disabled = true;
+  n1Estado('Publicando…');
+  try {
+    const r = await khAdminFetch('/.netlify/functions/noticias-publicar', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ noticias: lista }),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok || !d.ok) { n1Estado(d.error || `Error ${r.status}`, 'error'); return; }
+    n1Estado(d.sin_cambios
+      ? 'Sin cambios: el banner ya decía eso.'
+      : `Publicado (${d.commit}). Netlify deploya en ~1 minuto.`, 'ok');
+  } catch (e) {
+    n1Estado('No se pudo publicar: ' + (e && e.message || e), 'error');
+  } finally {
+    if (btn) btn.disabled = false;
+  }
 }

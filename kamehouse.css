@@ -2234,3 +2234,39 @@ html, body { background: var(--bg); color: var(--text); padding: 0; }
 .gzp-chip{font-size:9px;letter-spacing:.08em;text-transform:uppercase;font-weight:800;padding:2px 7px;border-radius:4px;white-space:nowrap;
   color:var(--gold);background:rgba(232,255,76,.14);border:1px solid var(--border2)}
 .gzp-pie{font-size:11px;color:var(--ts);margin-top:14px;line-height:1.5}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   [N1] NOTICIAS DEL BANNER · editor en Esferas del Dragón
+   La vista previa imita la marquesina real del index (amarilla, texto
+   negro, mayúsculas, corriendo) para que Memo vea lo que va a publicar,
+   no una lista abstracta.
+   ═══════════════════════════════════════════════════════════════════════ */
+.n1-caja{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:20px;margin-top:18px}
+.n1-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:16px}
+.n1-titulo{font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.15em;color:var(--amarillo,#e8ff4c);font-weight:700}
+.n1-sub{font-size:11px;color:var(--text3,#888);margin-top:4px}
+.n1-lista{display:flex;flex-direction:column;gap:8px}
+.n1-fila{display:grid;grid-template-columns:auto 1fr auto;gap:8px;align-items:center}
+.n1-orden{display:flex;flex-direction:column;gap:2px}
+.n1-mini{background:var(--bg3,#1a1a1a);border:1px solid var(--border);color:var(--text2,#aaa);border-radius:4px;width:24px;height:16px;line-height:1;font-size:10px;cursor:pointer;padding:0}
+.n1-mini:hover:not(:disabled){background:var(--border);color:#fff}
+.n1-mini:disabled{opacity:.3;cursor:default}
+.n1-input{width:100%;background:var(--bg3,#1a1a1a);border:1px solid var(--border);border-radius:var(--radius-sm,6px);color:var(--text1,#fff);padding:9px 11px;font-size:13px;font-family:inherit}
+.n1-input:focus{outline:none;border-color:var(--amarillo,#e8ff4c)}
+.n1-input.n1-mal{border-color:var(--rojo,#ff283b)}
+.n1-cuenta{font-size:10px;color:var(--text3,#888);min-width:52px;text-align:right;font-family:'JetBrains Mono',monospace}
+.n1-cuenta.n1-mal{color:var(--rojo,#ff283b)}
+.n1-borrar{background:none;border:1px solid var(--border);color:var(--text3,#888);border-radius:var(--radius-sm,6px);width:28px;height:28px;cursor:pointer;font-size:14px;line-height:1}
+.n1-borrar:hover{border-color:var(--rojo,#ff283b);color:var(--rojo,#ff283b)}
+.n1-vacio{font-size:12px;color:var(--text3,#888);padding:14px 0}
+.n1-previa-lbl{font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.15em;color:var(--text3,#888);margin:18px 0 8px}
+.n1-previa{background:#e8ff4c;overflow:hidden;border-radius:var(--radius-sm,6px);padding:9px 0}
+.n1-previa-track{display:flex;gap:44px;white-space:nowrap;width:max-content;color:#000;font-weight:900;font-size:14px;letter-spacing:.08em;text-transform:uppercase;animation:n1Corre 26s linear infinite}
+.n1-previa-track span{display:inline-flex;align-items:center;gap:44px}
+.n1-previa-track span::after{content:'●';color:#ff283b;font-size:11px}
+@keyframes n1Corre{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+.n1-pie{display:flex;align-items:center;gap:14px;margin-top:18px;flex-wrap:wrap}
+.n1-estado{font-size:12px;color:var(--text3,#888)}
+.n1-estado.n1-ok{color:var(--verde,#88ea4e)}
+.n1-estado.n1-error{color:var(--rojo,#ff283b)}
+@media(prefers-reduced-motion:reduce){.n1-previa-track{animation-duration:.01ms !important;animation-iteration-count:1 !important}}

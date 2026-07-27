@@ -5627,11 +5627,18 @@ function skipOnboarding(){
 <script>
 (function(){
 
-  // ── Noticias manuales de Memo: agrega strings aquí y salen PRIMERO ──────
-  //    Ej: 'Preventa Bad Bunny este viernes 10am'
-  //    Déjalo vacío y la marquesina se arma sola con el catálogo.
+  // ── [N1] LAS NOTICIAS SON DE MEMO ───────────────────────────────────────
+  //    Este arreglo lo escribe el editor del Palacio (Esferas → Noticias del
+  //    banner) vía noticias-publicar, que reescribe SOLO este bloque. El
+  //    formato de cada renglón importa: una cadena entre comillas simples por
+  //    línea, con la sangría de abajo. Si lo editas a mano, respétalo.
   var NOTICIAS = [
   ];
+
+  //    El armado automático desde el catálogo (lo que hacía PF-4) sigue aquí
+  //    completo, pero APAGADO: Memo decidió el 26-jul-2026 que el banner es
+  //    suyo. Poner esto en true lo revive tal cual, sin tocar nada más.
+  var AUTO_DESDE_CATALOGO = false;
 
   var MAX_VENTA = 6;                      // tope de "ya a la venta"
   var SEG_POR_NOTICIA = 5;                // hoy: 6 spans / 30s
@@ -5640,7 +5647,9 @@ function skipOnboarding(){
   try{
     var track = document.querySelector('.marquee-red-track');
     if(!track) return;
-    if(typeof EV === 'undefined' || !Array.isArray(EV) || !EV.length) return;
+    // [N1] El guard de EV se movió DENTRO del armado automático: antes cortaba
+    // aquí y, con el catálogo caído, se llevaba también las noticias de Memo.
+    var hayEV = (typeof EV !== 'undefined') && Array.isArray(EV) && EV.length > 0;
 
     var hoy = new Date(); hoy.setHours(0,0,0,0);
 
@@ -5673,18 +5682,21 @@ function skipOnboarding(){
     var PROXIMOS = {'por-confirmar':1,'pronto':1,'proximamente':1};
     var CERRADOS = {'agotado':1,'proceso':1,'nueva-fecha':1,'solo-viaje':1};
 
-    var vivos = EV.filter(futuro).sort(function(a,b){
-      return String(a.ds).localeCompare(String(b.ds));
-    });
-
     var usados = {};
     var noticias = [];
 
-    // 1 · lo que Memo escribió a mano
+    // 1 · lo que Memo escribió (hoy, la ÚNICA fuente)
     for(var n=0;n<NOTICIAS.length;n++){
       var t = String(NOTICIAS[n]||'').trim();
       if(t) noticias.push(t);
     }
+
+    // [N1] Todo el armado automático de PF-4 vive dentro de este if. Apagado
+    // por decisión de Memo; encenderlo lo devuelve completo.
+    if(AUTO_DESDE_CATALOGO && hayEV){
+    var vivos = EV.filter(futuro).sort(function(a,b){
+      return String(a.ds).localeCompare(String(b.ds));
+    });
 
     // 2 · ya a la venta (los más próximos primero, tope MAX_VENTA)
     var venta = 0;
@@ -5712,10 +5724,12 @@ function skipOnboarding(){
       noticias.push('Próximamente: ' + ev.a);
       usados[ev.id] = 1;
     });
+    }  // fin del armado automático
 
-    // Piso de seguridad: con menos de 3 noticias no vale la pena y se deja el
-    // lema estático que ya está en el HTML.
-    if(noticias.length < 3) return;
+    // [N1] Sin noticias, el lema estático del HTML se queda. El piso de 3 de
+    // PF-4 tenía sentido cuando el catálogo llenaba solo la marquesina; con
+    // noticias escritas a mano, UNA sola ya vale la pena mostrarla.
+    if(!noticias.length) return;
 
     // Pintado: un <span> por noticia, DUPLICADO igual que el HTML de hoy —
     // de ahí sale el loop sin costura (el keyframe corre a translateX(-50%)).

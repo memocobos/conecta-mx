@@ -59,7 +59,7 @@
 - Manual: Manual_De_Marca.pdf en el repo
 
 ## Pendientes
-_Última revisión: 27-jul-2026._
+_Última revisión: 27-jul-2026 (serie PP cerrada)._
 
 ### 🔴 La semana que entra — el encendido
 - **Apagar `CORREOS_MODO='prueba'` en Netlify.** Mientras siga en 'prueba', TODO
@@ -77,7 +77,14 @@ _Última revisión: 27-jul-2026._
   index ya lo escribe Memo en *Esferas del Dragón → Noticias del banner*, pero
   está VACÍO, así que la marquesina sigue mostrando el lema estático. Nada que
   configurar: `GITHUB_TOKEN` ya existe.
-- **Fase 2 (Portal Clientes)**: en construcción sobre Supabase.
+- **Fase 2 (Portal Clientes)**: en construcción sobre Supabase. La **serie PP
+  (el portal con vida) ya cerró completa** en prod: footer + radio (#379),
+  fotos de artistas en el wizard (#380), dashboard con hero/countdown/
+  celebración (#381), familia visual (#382) y el pool de 140 saludos (#383).
+- **Fase C del Portal — la barra de % de pagos**: hoy el dashboard NO baja los
+  montos pagados, así que la barra no existe **a propósito** (inferirla sería
+  inventar una cifra de dinero). Entra cuando la Fase C amplíe los datos de
+  pagos. No re-proponerla antes.
 - **Respaldos del NAS** (UGREEN): sesión pendiente. Radio Conecta vive ahí.
 - **Cobros OXXO / MSI**: ver `REPORTE-COBROS-OXXO-MSI.md`.
 - **Puente index→Portal**: Fase A en prod pero DETRÁS DE INTERRUPTOR
@@ -102,6 +109,12 @@ _Última revisión: 27-jul-2026._
   lo cubre, la prueba truena y hay que actualizarla.
 - **ALTER `lugar_id` en `avisos_cobranza`**: descartado por ahora. La referencia
   vive en `pago_id` (uuid libre sin FK) con `tipo` en la llave.
+- **`--ink-mute` del Portal en 2.67:1**: viene de antes de PP-4, es decisión
+  estética. Por eso `.dash-frase` usa `rgba(255,255,255,.72)` a pelo (≈10:1) —
+  pasarla al token le TIRARÍA el contraste.
+- **El bucket `HOY` del pool de saludos** (PP-2b): las 10 frases de "¡es hoy!"
+  solo salen cuando el viaje más cercano es hoy o mañana, aunque el brief las
+  marcaba como `[PRE]`. **Aprobado por Memo**, no re-litigar.
 - **Cumpleaños 29-feb** en `cumple_hoy`: renglón futuro.
 - Los `.md` sueltos de la raíz (borradores, checklists, reportes de auditoría)
   siguen SIN commitear a propósito.
@@ -121,6 +134,13 @@ _Última revisión: 27-jul-2026._
   trabajo: si no, la aserción caduca al mergear y la siguiente tuerca revienta
   aserciones ajenas. El padre correcto es el merge anterior, no el commit donde
   nació la rama.
+- **Un arnés que truena porque la tuerca siguiente retiró lo que medía NO es un
+  bug: es el arnés podrido.** Se actualiza a la verdad nueva, no se silencia ni
+  se deja tronando (le pasó al bloque [F] de PP-2 cuando PP-2b quitó
+  `_saludoDelDia`). Y al comparar una función entre dos commits, cortar la
+  rebanada en "la siguiente declaración" es frágil: si la tuerca metió código en
+  medio, la comparación falla sin que la función haya cambiado. Cortar por
+  **balance de llaves**.
 - **Una aserción que puede pasar con el conjunto vacío no es una aserción.**
   Candado de cardinalidad siempre; y al medir algo (contraste, peso) validar el
   instrumento antes de creerle el resultado.

@@ -2,6 +2,25 @@
 > Fuente: machote v3.1 aprobado por Memo. Transcribir FIEL — este texto ES cada contrato.
 > {{CAMPOS}} los inyecta el sistema. La vigencia de coordis = 1 año desde la fecha de firma.
 
+> ## ⚠️ DOS TEXTOS VIVOS — exclusividad de la NOVENA (tuerca T1)
+> La parte de **exclusividad** de la NOVENA se endureció. En producción coexisten
+> dos redacciones y la fila decide cuál se pinta, no la fecha ni el deploy:
+>
+> - **Contratos con `datos.exclusividad_dura === true`** (todos los creados a
+>   partir de T1): la NOVENA que está más abajo en este archivo, con exclusividad
+>   total y baja inmediata.
+> - **Contratos SIN ese flag** (todos los que ya existían, firmados o pendientes):
+>   siguen pintando el fragmento anterior, palabra por palabra:
+>
+>   > «Durante la vigencia, el coordinador no colaborará con agencias competidoras
+>   > sin autorización escrita; si no puede asistir a un evento confirmado,
+>   > propondrá suplente sujeto a aprobación previa.»
+>
+> El flag lo sella `contrato-crear` del lado del servidor al crear la fila, y
+> `contrato-obtener`, `contrato-actualizar` y `contrato-firmar` lo conservan. Un
+> contrato firmado sigue mostrando EXACTAMENTE el texto con el que se firmó.
+> El resto de la NOVENA (respeto, confidencialidad, suplente) no cambió.
+
 ## CONTRATO DE COLABORACIÓN — COORDINADORES (VERSIÓN ENDURECIDA)
 Campos de cabecera: Coordinador(a): {{NOMBRE}} · nacimiento {{FECHA_NACIMIENTO}} · INE anexa · Vigencia: 1 (un) año a partir de la fecha de firma: del {{FECHA_FIRMA}} al {{FECHA_FIN}}
 
@@ -21,7 +40,7 @@ Campos de cabecera: Coordinador(a): {{NOMBRE}} · nacimiento {{FECHA_NACIMIENTO}
 
 **OCTAVA — CONDUCTA — tolerancia cero, sin ambigüedades.** Durante viajes, eventos y actividades internas queda ESTRICTAMENTE PROHIBIDO, y constituye FALTA GRAVE con terminación inmediata: a) el ACOSO SEXUAL u hostigamiento en cualquier forma hacia viajeros, compañeros, choferes o terceros; b) la EMBRIAGUEZ: el consumo de alcohol solo se permite de manera moderada y NUNCA al grado de afectar la operación, la seguridad o la imagen del grupo — estar ebrio en funciones es falta grave; c) el consumo, posesión o distribución de DROGAS o sustancias ilegales; d) las RELACIONES ROMÁNTICAS O SEXUALES CON VIAJEROS durante los tours: el coordinador está en función de servicio y de autoridad, y esa línea no se cruza; e) VINCULAR LA MARCA A CONTENIDO PARA ADULTOS: la agencia respeta la vida privada y las actividades lícitas de cada quien, pero queda prohibido usar uniformes, gafetes, materiales, instalaciones, viajes o el nombre de Conecta en contenido para adultos o plataformas de contenido erótico (OnlyFans u otras), o aprovechar el rol de coordinador para promoverlo; f) los ESCÁNDALOS PÚBLICOS ("funas"): protagonizar o provocar conflictos públicos, en persona o en redes, que dañen la reputación de la agencia. Cualquiera de estas conductas termina el contrato de inmediato, sin indemnización, con pérdida de beneficios del viaje en curso y sin perjuicio de las acciones legales que procedan.
 
-**NOVENA — Respeto, confidencialidad y exclusividad.** Trato respetuoso y cordial con viajeros, choferes y compañeros en todo momento — el acoso, la discriminación y la violencia son falta grave. Toda la información interna (estrategias, precios, bases de datos, logística, listas de viajeros, documentación) es CONFIDENCIAL y no puede divulgarse ni usarse para fines ajenos, obligación que SOBREVIVE a la terminación del contrato. Durante la vigencia, el coordinador no colaborará con agencias competidoras sin autorización escrita; si no puede asistir a un evento confirmado, propondrá suplente sujeto a aprobación previa.
+**NOVENA — Respeto, confidencialidad y exclusividad.** Trato respetuoso y cordial con viajeros, choferes y compañeros en todo momento — el acoso, la discriminación y la violencia son falta grave. Toda la información interna (estrategias, precios, bases de datos, logística, listas de viajeros, documentación) es CONFIDENCIAL y no puede divulgarse ni usarse para fines ajenos, obligación que SOBREVIVE a la terminación del contrato. Durante la vigencia de este contrato, la colaboración del coordinador con la agencia es EXCLUSIVA: el coordinador no podrá trabajar, colaborar ni prestar servicios, directa o indirectamente, de forma pagada o no pagada, con ninguna otra agencia de viajes ni negocio competidor. El incumplimiento de esta exclusividad constituye falta grave y es causa de BAJA INMEDIATA del equipo y de terminación del presente contrato sin necesidad de aviso previo. Si el coordinador no puede asistir a un evento confirmado, propondrá suplente sujeto a aprobación previa.
 
 **DÉCIMA — Faltas graves y terminación.** Son causa de terminación inmediata y pérdida de derechos: no presentarse a un viaje confirmado; abandonar un tour sin autorización; faltar al respeto a viajeros o compañeros; afectar la imagen o reputación de Conecta; y cualquiera de las conductas de la cláusula Octava. La terminación no genera indemnización ni pago adicional. En las fiestas y eventos internos aplica la misma conducta profesional que en los viajes oficiales.
 

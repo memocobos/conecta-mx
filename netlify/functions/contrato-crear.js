@@ -178,6 +178,13 @@ exports.handler = async function (event) {
     if (desglose_premio.length < 3) return bad(400, "Falta el desglose del premio");
     if (!Number.isFinite(valor_premio) || valor_premio <= 0) return bad(400, "Valor del premio inválido");
     datos = { desglose_premio, valor_premio };
+    // [T3] "¿El premio incluye el viaje?": flag OPCIONAL, sellado del lado del
+    // SERVIDOR. Se AGREGA al objeto del premio, no lo sustituye. Hay giveaways
+    // de solo boletos y ésos NO deben caer a las listas del viaje, así que la
+    // ausencia del flag es el comportamiento de hoy, byte-igual.
+    if (data.datos && data.datos.premio_incluye_viaje === true) {
+      datos.premio_incluye_viaje = true;
+    }
   } else if (plantilla === "coordinador") {
     // 🗼 ANEXO DE CUSTODIA (Torre de Karin): flag OPCIONAL en datos jsonb. Un
     // solo contrato, una sola firma — el anexo se rinde en el contrato si el

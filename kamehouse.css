@@ -1926,7 +1926,11 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
     #esf-preview-card .ev-bottom{display:flex;align-items:center;justify-content:space-between;padding-top:8px;border-top:1px solid rgba(255,255,255,.07);flex-wrap:wrap;gap:6px}
     #esf-preview-card .ev-card.proxi .ev-bottom{justify-content:center;border-top:none;padding-top:0}
     #esf-preview-card .ev-prox-badge{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;background:#e8ff4c;color:#000;padding:14px 12px;font-size:13px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;font-family:'Montserrat',sans-serif;border-radius:8px;text-align:center;line-height:1.1}
-    #esf-preview-card .ev-prox-badge::before{content:'<svg class="ic"><use href="#ic-campana"/></svg>'}
+    /* [B1] Iba con el <svg> del sprite METIDO como texto de content, y CSS pinta
+       esa cadena literal: el botón amarillo del preview enseñaba el código en vez
+       del ícono. El index real no lleva ícono en este badge — su regla es
+       content:'' (index.html:117) — así que el preview la espeja tal cual. */
+    #esf-preview-card .ev-prox-badge::before{content:''}
     #esf-preview-card .ev-prox-sub{display:block;font-size:9px;letter-spacing:.18em;color:rgba(0,0,0,.55);margin-top:3px;font-weight:800}
     #esf-preview-card .ev-price-lbl{font-size:8.5px;color:rgba(255,255,255,.3);font-weight:700;text-transform:uppercase;letter-spacing:.07em}
     #esf-preview-card .ev-price-wa{font-size:12px;font-weight:900;color:#88ea4e}

@@ -173,6 +173,91 @@ main{padding:0}
 .item-photo{border-radius:var(--r-card,16px)}
 /* la nota del hero es un detalle, no una tarjeta */
 .hero-note{border-radius:var(--r-sm,8px)}
+
+/* ===================================================================
+   TUERCA PF-6b · el kit VIVO, no solo el producto
+   Bloque contiguo y revertible: borrarlo deja la página de PF-5 intacta
+   (los tokens viven arriba, en su propio bloque).
+   Tres cosas: el hero pasa de portada de producto a foto real del camión,
+   cada pieza puede llevar su foto EN RUTA junto a la de producto, y el
+   cierre gana una banda a todo el ancho.
+   =================================================================== */
+
+/* ── HERO: la foto real debajo del azul de marca ─────────────────────── */
+/* El tratamiento de .hero-portada (brightness .35 + luminosity + opacity
+   .55) estaba calibrado para una portada de producto: sobre una foto con
+   caras las apaga por completo. Estos valores son los mismos que
+   funciona.html usa para su hero fotográfico: se ve la gente, y el título
+   sigue legible encima. */
+/* BUG PREEXISTENTE que este bloque destapa: .hero-portada nunca se vio en
+   producción. Declara position:absolute;inset:0;z-index:0 en la línea 69, pero
+   .hero > *{position:relative;z-index:1} de la línea 72 tiene la MISMA
+   especificidad (0,1,0) y va después, así que gana: el contenedor quedaba
+   relative con alto automático = 0, y la <img> de dentro (height:100%) medía 0.
+   La foto se descargaba y no pintaba nada. No toco la regla vieja — este
+   selector (0,2,0) le gana limpio y el arreglo viaja con el bloque. */
+.hero-portada.pf6b{position:absolute;inset:0;z-index:0}
+.hero-portada.pf6b img{
+  filter:brightness(.78) contrast(1.06) saturate(.95);
+  mix-blend-mode:normal;opacity:1;
+  object-position:center 45%;
+}
+/* El velo se calibró MIRANDO la captura: la foto es un interior en penumbra,
+   así que apilar brightness bajo + velo alto la mataba. Fuerte solo abajo,
+   donde van la bajada y la nota; transparente arriba, donde se ve la gente. */
+.hero-portada.pf6b::after{
+  background:linear-gradient(180deg,rgba(0,0,40,.30) 0%,rgba(0,0,70,.26) 38%,rgba(0,0,0,.80) 100%),
+             linear-gradient(100deg,rgba(0,0,205,.34) 0%,transparent 62%);
+}
+
+/* ── LA PIEZA EN RUTA: segunda foto bajo la de producto ──────────────── */
+.item-fotos{display:grid;gap:12px}
+.item-ruta{position:relative;overflow:hidden;background:#0a0a0a;border:1px solid var(--line);border-radius:var(--r-card,16px)}
+.item-ruta img{
+  width:100%;height:auto;aspect-ratio:16/10;object-fit:cover;display:block;
+  transition:transform .6s cubic-bezier(.22,1,.36,1);
+}
+.item-ruta figcaption{
+  position:absolute;left:0;right:0;bottom:0;
+  padding:20px 12px 9px;
+  background:linear-gradient(transparent,rgba(0,0,0,.85));
+  font-size:10px;font-weight:900;letter-spacing:.1em;text-transform:uppercase;color:#fff;
+}
+@media (hover:hover){
+  .item-ruta:hover img{transform:scale(1.05)}
+}
+
+/* ── LÍNEA CONCRETA DE CADA PIEZA ────────────────────────────────────── */
+.item-remate{
+  margin:calc(-1 * clamp(8px,1.4vw,12px)) 0 clamp(16px,2.5vw,22px);
+  font-size:clamp(13px,1.5vw,15px);line-height:1.55;font-weight:600;
+  color:var(--c);
+}
+
+/* ── CIERRE: la banda a todo el ancho ────────────────────────────────── */
+.cierre{position:relative;overflow:hidden;border-top:1px solid var(--line)}
+.cierre img{
+  width:100%;height:auto;aspect-ratio:16/9;object-fit:cover;display:block;
+  filter:brightness(.62) saturate(.95);
+}
+@media(max-width:640px){.cierre img{aspect-ratio:4/5}}
+.cierre-txt{
+  position:absolute;inset:auto 0 0 0;
+  padding:clamp(28px,6vw,64px) clamp(20px,5vw,80px);
+  background:linear-gradient(transparent,rgba(0,0,0,.82) 60%);
+  display:flex;flex-direction:column;align-items:flex-start;gap:clamp(14px,2.5vw,20px);
+}
+.cierre-frase{
+  font-family:var(--font-display);font-weight:900;text-transform:uppercase;
+  font-size:clamp(26px,5.5vw,56px);line-height:.98;letter-spacing:-.01em;
+  max-width:22ch;
+}
+.cierre-frase em{font-style:normal;color:var(--amarillo)}
+
+@media(prefers-reduced-motion:reduce){
+  .item-ruta img{transition-duration:.01ms !important}
+  .item-ruta:hover img{transform:none}
+}
 </style>
 </head>
 <body>
@@ -206,13 +291,16 @@ main{padding:0}
 
 <!-- HERO -->
 <section class="hero">
-  <div class="hero-portada"><img data-img="kit_portada" alt="Kit Conecta"></div>
+  <!-- [PF-6b] Era la portada de PRODUCTO (kit_portada, vía imgs.js). Ahora es
+       el kit vivo: el camión lleno con los totes en alto. Única imagen eager de
+       la página. La entrada de imgs.js se queda intacta, sin consumidor aquí. -->
+  <div class="hero-portada pf6b"><img src="img/tours/tour-kit-hero-camion.webp" alt="Viajeros del tour levantando sus tote bags del Kit Conecta dentro del camión" width="1200" height="1200" fetchpriority="high" decoding="async"></div>
   <div class="hero-kicker">Conecta Reynosa · Kit 2026</div>
   <h1 class="hero-title">
     <span class="line">Kit</span>
     <span class="line"><span class="mark">Conecta</span></span>
   </h1>
-  <p class="hero-sub">Te consentimos viajando con nosotros. Cada tour incluye detalles pensados para la ruta — vasos, morrales, tote bags, cangureras y foodcard.</p>
+  <p class="hero-sub">El detalle que ninguna otra agencia da: cada tour trae su kit con diseño exclusivo del evento. Si no fuiste, no lo tienes.</p>
   <span class="hero-note">El contenido varía por evento y sucursal</span>
 </section>
 
@@ -225,6 +313,7 @@ main{padding:0}
       <span class="item-tag">Vasos</span>
       <h2 class="item-title">Para el camino<br>y el show</h2>
       <p class="item-body">Vasos coleccionables del tour — perfectos para el viaje en autobús, el hotel y llevar de recuerdo a casa. Diseño exclusivo por evento.</p>
+      <p class="item-remate">El que te sirve en el camión y el que presumes en la oficina el lunes.</p>
       <div class="item-pills">
         <span class="item-pill">Incluido</span>
         <span class="item-pill">Edición tour</span>
@@ -242,14 +331,21 @@ main{padding:0}
       <span class="item-tag">Tote bags</span>
       <h2 class="item-title">Lleva todo<br>con estilo</h2>
       <p class="item-body">Tote bags de tela reforzada con el branding del evento. Para tu merch, tus snacks, tus cosas del hotel — todo organizado.</p>
+      <p class="item-remate">Aguanta el merch, los snacks y las compras del Airbnb.</p>
       <div class="item-pills">
         <span class="item-pill">Incluido</span>
         <span class="item-pill">Tela reforzada</span>
       </div>
     </div>
-    <div class="item-photo">
-      <span class="item-photo-tag">Tote bag</span>
-      <img data-img="kit_totebags" alt="Tote bags Kit Conecta" loading="lazy">
+    <div class="item-fotos">
+      <div class="item-photo">
+        <span class="item-photo-tag">Tote bag</span>
+        <img data-img="kit_totebags" alt="Tote bags Kit Conecta" loading="lazy">
+      </div>
+      <figure class="item-ruta">
+        <img src="img/tours/tour-kit-totes-camion.webp" alt="Viajeros mostrando sus tote bags del evento dentro del camión de turismo" width="1200" height="1200" loading="lazy" decoding="async">
+        <figcaption>El mismo tote, en la ruta</figcaption>
+      </figure>
     </div>
   </section>
 
@@ -259,14 +355,21 @@ main{padding:0}
       <span class="item-tag">Morrales</span>
       <h2 class="item-title">Tu equipaje<br>de mano</h2>
       <p class="item-body">Morrales cómodos para el evento — compactos, prácticos, con espacio para celular, cartera, y lo esencial. Diseño Conecta.</p>
+      <p class="item-remate">Se cuelga y se olvida: cabe lo necesario y nada te estorba en la fila.</p>
       <div class="item-pills">
         <span class="item-pill">Algunos eventos</span>
         <span class="item-pill">Manos libres</span>
       </div>
     </div>
-    <div class="item-photo">
-      <span class="item-photo-tag">Morral</span>
-      <img data-img="kit_morrales" alt="Morrales Kit Conecta" loading="lazy">
+    <div class="item-fotos">
+      <div class="item-photo">
+        <span class="item-photo-tag">Morral</span>
+        <img data-img="kit_morrales" alt="Morrales Kit Conecta" loading="lazy">
+      </div>
+      <figure class="item-ruta">
+        <img src="img/tours/tour-kit-morrales-van.webp" alt="Viajeros con los morrales de cordón del kit dentro de la van del tour" width="901" height="1200" loading="lazy" decoding="async">
+        <figcaption>Camino al evento</figcaption>
+      </figure>
     </div>
   </section>
 
@@ -276,6 +379,7 @@ main{padding:0}
       <span class="item-tag">Cangureras</span>
       <h2 class="item-title">Sin manos<br>ocupadas</h2>
       <p class="item-body">Cangureras compactas para festivales y conciertos de pie. Suficiente espacio para lo indispensable sin cargar mochila pesada.</p>
+      <p class="item-remate">Para el festival de ocho horas de pie: celular, cartera y las manos libres.</p>
       <div class="item-pills">
         <span class="item-pill">Algunos eventos</span>
         <span class="item-pill">Compacto</span>
@@ -293,6 +397,7 @@ main{padding:0}
       <span class="item-tag">Foodcard</span>
       <h2 class="item-title">Come en<br>la ruta</h2>
       <p class="item-body">Foodcard con créditos para comida en el viaje — úsala en paradas seleccionadas durante el trayecto. Disponible en tours de larga distancia.</p>
+      <p class="item-remate">Créditos de comida para las paradas de la ruta: en tours largos, nadie viaja con hambre.</p>
       <div class="item-pills">
         <span class="item-pill">Tours largos</span>
         <span class="item-pill">Incluye comida</span>
@@ -305,6 +410,16 @@ main{padding:0}
   </section>
 
 </main>
+
+<!-- CIERRE · [PF-6b] banda a todo el ancho. Va ANTES del CTA que ya existía,
+     sin reemplazarlo: el CTA de "Viaja y disfruta todo el kit" se queda igual. -->
+<section class="cierre">
+  <img src="img/tours/tour-kit-bolsas-amarillas.webp" alt="Camión del tour lleno de viajeros con las bolsas amarillas del Kit Conecta" width="900" height="1200" loading="lazy" decoding="async">
+  <div class="cierre-txt">
+    <p class="cierre-frase">Todo esto ya <em>viene incluido</em></p>
+    <a href="https://conectareynosa.mx/#catalog-anchor" class="cta-btn">Ver eventos <span aria-hidden="true">&rarr;</span></a>
+  </div>
+</section>
 
 <!-- CTA -->
 <section class="cta">

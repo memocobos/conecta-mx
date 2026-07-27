@@ -29,7 +29,7 @@ window.STATIC_IMGS={
   'knotfest':'imgs/knotfest.jpg',
   'fanfest':'imgs/fanfest.webp',
   'kit_portada':'imgs/kit_portada.webp',
-  'kit_vasos':'imgs/kit_vasos.png',
+  'kit_vasos':'imgs/kit_vasos.webp',
   'kit_totebags':'imgs/kit_totebags.webp',
   'kit_morrales':'imgs/kit_morrales.webp',
   'kit_cangureras':'imgs/kit_cangureras.webp',

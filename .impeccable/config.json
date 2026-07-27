@@ -23,6 +23,12 @@
         "value": "helvetica",
         "createdAt": "2026-07-25T22:18:22.033Z",
         "reason": "Mismo caso que Arial: Helvetica solo aparece en HTML de correo transaccional (font-family:Helvetica,Arial,sans-serif, estandar de email); cero apariciones en la UI real"
+      },
+      {
+        "rule": "overused-font",
+        "value": "montserrat",
+        "createdAt": "2026-07-27T00:39:33.577Z",
+        "reason": "Montserrat es tipografía de marca (PRODUCT.md)"
       }
     ]
   }

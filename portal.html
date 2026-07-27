@@ -1001,6 +1001,116 @@ body.rcp-alto .pf{ padding-bottom:calc(var(--rcp-zona-fab) + env(safe-area-inset
   .wiz-ev-pic img,.tour-empty-inv .inv-cta{transition-duration:.01ms}
   .wiz-ev-pic.is-loading{animation:none}
 }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   [PP-2] DASHBOARD CON VIDA
+   Hero del próximo viaje, saludo con calor, celebración al liquidar y el
+   micro-feedback de PF-1/PF-2. Todo presentación: ni un cálculo de dinero
+   nuevo, ni una llamada nueva al backend.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* ── HERO DEL PRÓXIMO VIAJE ──────────────────────────────────────────── */
+.px-hero{
+  position:relative;overflow:hidden;
+  border-radius:var(--r-card,16px);
+  margin-bottom:18px;min-height:190px;
+  display:flex;align-items:flex-end;
+  background:#0c0c0c;
+  cursor:pointer;border:none;width:100%;text-align:left;font:inherit;color:inherit;padding:0;
+  transition:transform .16s ease;
+}
+.px-hero:active{transform:scale(.985)}
+.px-hero:focus-visible{outline:2px solid var(--yel);outline-offset:2px}
+.px-hero.is-loading{
+  background-image:linear-gradient(100deg,#0c0c0c 30%,#161616 50%,#0c0c0c 70%);
+  background-size:300% 100%;animation:mqShine 1.1s linear infinite;
+}
+.px-hero-img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+/* Velo fuerte abajo, que es donde vive todo el texto. Medido, no a ojo. */
+.px-hero::after{
+  content:'';position:absolute;inset:0;
+  background:linear-gradient(180deg,rgba(0,0,0,.24) 0%,rgba(0,0,0,.58) 42%,rgba(0,0,0,.92) 100%);
+}
+.px-hero-txt{position:relative;z-index:1;padding:16px;width:100%}
+.px-hero-eyebrow{
+  font-size:9px;font-weight:900;letter-spacing:.2em;text-transform:uppercase;
+  color:var(--yel);margin-bottom:6px;
+}
+.px-hero-nom{
+  font-family:'Barlow Condensed',sans-serif;font-weight:900;
+  font-size:26px;line-height:1;text-transform:uppercase;color:#fff;margin-bottom:10px;
+}
+/* Countdown protagonista, patrón del index: cifra grande + etiqueta chica. */
+.px-cuenta{display:flex;gap:14px;align-items:flex-end;margin-bottom:10px}
+.px-cuenta-b{display:flex;flex-direction:column;align-items:center;min-width:44px}
+.px-cuenta-n{
+  font-family:'Barlow Condensed',sans-serif;font-weight:900;
+  font-size:30px;line-height:1;color:var(--yel);
+  font-variant-numeric:tabular-nums;
+}
+.px-cuenta-l{font-size:8px;font-weight:900;letter-spacing:.14em;text-transform:uppercase;color:rgba(255,255,255,.78);margin-top:3px}
+.px-cuenta-sep{font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:24px;color:rgba(255,255,255,.35);line-height:1.1}
+.px-hero-hoy{
+  font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:26px;
+  color:var(--yel);text-transform:uppercase;margin-bottom:10px;
+}
+.px-hero-pagos{
+  display:inline-flex;align-items:center;gap:7px;
+  padding:6px 12px;border-radius:var(--r-chip,999px);
+  background:rgba(0,0,0,.55);border:1px solid rgba(255,255,255,.22);
+  font-size:11px;font-weight:700;color:rgba(255,255,255,.92);
+}
+.px-hero-pagos.is-liquidado{border-color:rgba(136,234,78,.5);color:var(--green)}
+
+/* ── CELEBRACIÓN AL LIQUIDAR ─────────────────────────────────────────── */
+.tc-liquidado{
+  position:absolute;top:10px;left:10px;z-index:3;
+  /* nota: si la card TAMBIÉN trae countdown, el badge baja (regla de abajo) */
+  display:inline-flex;align-items:center;gap:5px;
+  padding:5px 10px;border-radius:var(--r-chip,999px);
+  background:var(--yel);color:#000;
+  font-size:9px;font-weight:900;letter-spacing:.12em;text-transform:uppercase;
+}
+/* El countdown vive en top:10px/left:10px — el mismo lugar. Cuando los dos
+   están, el badge se apila debajo. Lo cachó la revisión de capturas: se leía
+   "✓ LIQUIDADO días", las dos píldoras encimadas. */
+.tc-countdown ~ .tc-liquidado{top:40px}
+.tc-liquidado.celebra{animation:pp2Pop .62s cubic-bezier(.22,1,.36,1) both}
+@keyframes pp2Pop{
+  0%{transform:scale(.6) rotate(-6deg);opacity:0}
+  60%{transform:scale(1.12) rotate(2deg);opacity:1}
+  100%{transform:scale(1) rotate(0);opacity:1}
+}
+/* Confeti sobrio: solo amarillo y blanco de marca, 14 piezas, una vez. */
+.pp2-confeti{position:absolute;inset:0;overflow:hidden;pointer-events:none;z-index:2}
+.pp2-confeti i{
+  position:absolute;top:-12px;width:6px;height:10px;opacity:0;
+  animation:pp2Cae 1.5s cubic-bezier(.3,.7,.5,1) forwards;
+}
+@keyframes pp2Cae{
+  0%{opacity:0;transform:translateY(-10px) rotate(0)}
+  12%{opacity:1}
+  100%{opacity:0;transform:translateY(230px) rotate(420deg)}
+}
+
+/* ── MICRO-FEEDBACK PF-1/PF-2 ────────────────────────────────────────── */
+.tour-card{transition:transform .16s ease}
+.tour-card:active{transform:scale(.99)}
+.btn:active,.tc-cta:active,.wiz-pkg:active,.inv-cta:active{transform:scale(.97)}
+.wiz-event{transition:background .12s,transform .14s ease}
+.wiz-event:active{transform:scale(.99)}
+/* Transición entre vistas: la vista que entra se asienta, no aparece de golpe. */
+.view.is-active{animation:pp2Entra .28s cubic-bezier(.22,1,.36,1) both}
+@keyframes pp2Entra{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+
+/* Patrón de la casa: acortar, no anular (así los `both` no se rompen). */
+@media(prefers-reduced-motion:reduce){
+  .px-hero,.tour-card,.wiz-event{transition-duration:.01ms}
+  .view.is-active{animation-duration:.01ms}
+  .tc-liquidado.celebra{animation-duration:.01ms}
+  .pp2-confeti{display:none}
+  .px-hero.is-loading{animation:none}
+}
 </style>
 <style>.ic{width:1em;height:1em;vertical-align:-0.12em;flex-shrink:0;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}</style>
 </head>
@@ -1214,7 +1324,7 @@ body.rcp-alto .pf{ padding-bottom:calc(var(--rcp-zona-fab) + env(safe-area-inset
     <div class="dash-top">
       <div class="dash-avatar" id="dash-avatar" aria-hidden="true">C</div>
       <div class="dash-header">
-        <h1 class="dash-hola" id="dash-title">Hola, <span id="dash-nombre" class="accent" style="color:var(--yel)">Cliente</span></h1>
+        <h1 class="dash-hola" id="dash-title"><span id="dash-saludo">Hola, </span><span id="dash-nombre" class="accent" style="color:var(--yel)">Cliente</span></h1>
         <span class="dash-cliente">CLIENTE <span id="dash-numero" class="mono">#0000</span></span>
       </div>
       <!-- [avisos] Campanita interactiva: badge = nº de avisos activos + panel -->
@@ -1229,6 +1339,10 @@ body.rcp-alto .pf{ padding-bottom:calc(var(--rcp-zona-fab) + env(safe-area-inset
         </div>
       </div>
     </div>
+
+    <!-- [PP-2] Hero del próximo viaje. Vacío = sin tours próximos, y entonces
+         no se pinta nada: el estado vacío de PP-1 ya invita. -->
+    <div id="px-hero-wrap"></div>
 
     <!-- [portal-v1] Stats calculadas (total/próximos/pasados) — solo presentación -->
     <div class="dash-stats">
@@ -2005,6 +2119,14 @@ $('#btn-cancel-profile').addEventListener('click', () => {
 function renderDashboard(c){
   const primerNombre = (c.nombre_completo || 'Cliente').split(' ')[0];
   $('#dash-nombre').textContent = primerNombre;
+  // [PP-2] El saludo deja de ser siempre "Hola": rota entre 2-3 variantes según
+  // la hora. El NOMBRE no se toca (sigue en su propio span, con textContent);
+  // esto solo cambia la palabra de antes.
+  const _sal = document.getElementById('dash-saludo');
+  if (_sal){
+    const ops = _saludoDelDia();
+    _sal.textContent = ops[new Date().getDay() % ops.length] + ', ';
+  }
   $('#dash-numero').textContent = '#' + (c.numero_cliente || '0000');
   // [avatar] pinta foto si existe (avatar_url), si no la inicial (fails-soft 404→inicial)
   pintarAvatar(c);
@@ -2612,6 +2734,7 @@ async function renderToursList(){
 
   _toursCache = data || [];
   _renderToursUI();
+  _celebrarLiquidados();   // [PP-2] badge + confeti, una sola vez por tour
   cargarAvisos(_toursCache); // [avisos] deriva avisos del cliente (fails-soft, no bloquea)
 }
 
@@ -2889,6 +3012,7 @@ document.body.addEventListener('click', (e) => {
 // (proyecto PORTAL). Sin tabla nueva, solo lectura. RLS ya scopea por cliente.
 // =====================================================================
 let _avisosCache = [];
+let _pagosPendientesCache = [];   // [PP-2] los pendientes/vencidos que ya bajó cargarAvisos
 
 async function cargarAvisos(solicitudes){
   if (!perfilExistente) return;
@@ -2908,7 +3032,12 @@ async function cargarAvisos(solicitudes){
   } catch (e) { /* fails-soft: sin pagos, igual derivamos cancelados */ }
 
   _avisosCache = derivarAvisos(sols, pagos, solById);
+  // [PP-2] Se guardan los MISMOS pagos que esta query ya trajo, para que el hero
+  // pueda decir cuántos faltan sin pedir nada de nuevo. No se toca ni la query
+  // ni derivarAvisos: solo se conserva lo que ya estaba en memoria.
+  _pagosPendientesCache = pagos;
   renderAvisos();
+  _pintarHeroProximo();
 }
 
 function _nombreEvento(s){
@@ -3651,6 +3780,16 @@ document.body.addEventListener('click', (e) => {
   }
   if (e.target.closest('[data-tc-header]')) _toggleTourCard(card); // la cabecera TOGGLEA
 });
+// [PP-2] El hero del próximo viaje abre el plan de ese tour, reusando abrirTour
+// tal cual. Vive aquí, con los demás handlers de tarjetas, y no junto a los del
+// wizard: ahí no pinta nada y además el arnés de PP-1 vigila esa región.
+document.body.addEventListener('click', (e) => {
+  const h = e.target.closest && e.target.closest('[data-px-tour]');
+  if (!h) return;
+  const t = (_toursCache || []).find(x => String(x.id) === h.dataset.pxTour);
+  if (t) abrirTour(t);
+});
+
 // Teclado: el <button> de la cabecera y el del CTA disparan 'click' nativo (Enter/Espacio),
 // así que el handler de click de arriba ya los cubre — sin keydown extra.
 
@@ -4069,6 +4208,161 @@ function pintarEventos(filtro){
     `;
   }).join('');
   _observarFotosLista();
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// [PP-2] HERO DEL PRÓXIMO VIAJE
+//
+// Lo que se pinta sale SOLO de datos que el dashboard ya bajó:
+//   · la fecha, del EV (igual que el countdown de las cards);
+//   · la foto, de los helpers de arte de siempre;
+//   · "faltan N pagos" y el monto, de los avisos que cargarAvisos YA descargó
+//     (pagos vencidos/pendientes del cliente). Cero llamadas nuevas.
+// Lo que NO se pinta: un porcentaje de "pagado". Para eso haría falta el monto
+// abonado, que el dashboard no baja; calcularlo asumiendo que las cuotas suman
+// precio_total sería inventarle un número al cliente sobre su propio dinero.
+// ═══════════════════════════════════════════════════════════════════════════
+let _pxHeroTimer = null;
+
+// Cuotas pendientes/vencidas de una solicitud, tal como vinieron. EXACTO.
+function _pendientesDe(solicitudId){
+  const p = (_pagosPendientesCache || []).filter(x => x.solicitud_id === solicitudId);
+  return { n: p.length, monto: p.reduce((s, x) => s + (Number(x.monto) || 0), 0) };
+}
+
+function _pintarHeroProximo(){
+  const wrap = document.getElementById('px-hero-wrap');
+  if (!wrap) return;
+  if (_pxHeroTimer){ clearInterval(_pxHeroTimer); _pxHeroTimer = null; }
+
+  // el más cercano de los próximos, con la misma regla de "próximo" de la UI
+  const proximos = (_toursCache || [])
+    .filter(t => t.estado !== 'cancelado')
+    .map(t => ({ t, iso: (_evBySlug(t.evento_id) || {}).ds }))
+    .filter(x => x.iso && _diasFaltan(x.iso) != null && _diasFaltan(x.iso) >= 0)
+    .sort((a, b) => String(a.iso).localeCompare(String(b.iso)));
+  if (!proximos.length){ wrap.innerHTML = ''; return; }
+
+  const { t, iso } = proximos[0];
+  const est = _artStaticUrl(t);
+  const pend = _pendientesDe(t.id);
+  const liquidado = t.estado === 'pagado';
+  const chip = liquidado
+    ? '<span class="px-hero-pagos is-liquidado">Liquidado · todo pagado</span>'
+    : (pend.n > 0
+        ? `<span class="px-hero-pagos">${pend.n === 1 ? 'Falta 1 pago' : 'Faltan ' + pend.n + ' pagos'} · ${escapeHtml(fmtMxn(pend.monto))}</span>`
+        : '<span class="px-hero-pagos">Sin pagos pendientes</span>');
+
+  wrap.innerHTML = `
+    <button type="button" class="px-hero${est ? '' : ' is-loading'}" data-px-tour="${escapeHtml(t.id)}" aria-label="Ver el plan de pagos de ${escapeHtml(t.evento_nombre)}">
+      ${est ? `<img class="px-hero-img" src="${escapeHtml(est)}" alt="" decoding="async">` : ''}
+      <span class="px-hero-txt">
+        <span class="px-hero-eyebrow">Tu próximo viaje</span>
+        <span class="px-hero-nom">${escapeHtml(t.evento_nombre)}</span>
+        <span class="px-cuenta" id="px-cuenta"></span>
+        ${chip}
+      </span>
+    </button>`;
+
+  if (!est) _upgradeArtHero(wrap.querySelector('.px-hero'), t);
+  _tickHero(iso);
+  _pxHeroTimer = setInterval(() => _tickHero(iso), 30000);
+}
+
+// Cuenta regresiva a la medianoche del día del evento, en días/horas/minutos.
+function _tickHero(iso){
+  const cont = document.getElementById('px-cuenta');
+  if (!cont) return;
+  const destino = new Date(iso + 'T00:00:00').getTime();
+  let ms = destino - Date.now();
+  if (ms <= 0){
+    cont.outerHTML = '<span class="px-hero-hoy" id="px-cuenta">¡Es hoy!</span>';
+    if (_pxHeroTimer){ clearInterval(_pxHeroTimer); _pxHeroTimer = null; }
+    return;
+  }
+  const dias = Math.floor(ms / 86400000); ms -= dias * 86400000;
+  const hrs  = Math.floor(ms / 3600000);  ms -= hrs * 3600000;
+  const mins = Math.floor(ms / 60000);
+  const b = (n, l) => `<span class="px-cuenta-b"><span class="px-cuenta-n">${String(n).padStart(2,'0')}</span><span class="px-cuenta-l">${l}</span></span>`;
+  cont.innerHTML = b(dias, 'días') + '<span class="px-cuenta-sep">:</span>'
+                 + b(hrs, 'hrs')  + '<span class="px-cuenta-sep">:</span>'
+                 + b(mins, 'min');
+}
+
+// Deezer para el hero, mismo patrón que las cards (fail-soft al gradiente).
+async function _upgradeArtHero(el, t){
+  const ev = _evBySlug(t.evento_id);
+  const q = ev && (ev.img || ev.a);
+  if (!el || !q){ el && el.classList.remove('is-loading'); return; }
+  try {
+    const r = await fetch('/.netlify/functions/deezer?q=' + encodeURIComponent(q));
+    const d = await r.json();
+    const pic = d && d.data && d.data[0] && d.data[0].picture_xl;
+    if (pic && pic.indexOf('d41d8cd98f00b204e9800998ecf8427e') === -1){
+      const img = document.createElement('img');
+      img.className = 'px-hero-img'; img.alt = ''; img.decoding = 'async';
+      img.src = pic;
+      el.insertBefore(img, el.firstChild);
+    }
+  } catch (e) { /* se queda el gradiente */ }
+  el.classList.remove('is-loading');
+}
+
+// [PP-2] Saludo con algo de calor, por hora del día. Sin cursilería y sin
+// inventar datos: solo cambia la palabra que acompaña al nombre real.
+function _saludoDelDia(){
+  const h = new Date().getHours();
+  if (h < 12)  return ['Buenos días', 'Qué bueno verte', 'Hola'];
+  if (h < 19)  return ['Qué tal', 'Hola', 'Buenas tardes'];
+  return ['Buenas noches', 'Hola', 'Qué gusto'];
+}
+
+// [PP-2] Celebración al liquidar, UNA sola vez por tour. La marca vive en
+// localStorage porque es puramente cosmética: si el cliente entra desde otro
+// teléfono y la vuelve a ver, no pasa nada grave; si se perdiera del backend,
+// sí sería un problema. Respeta prefers-reduced-motion.
+const _PP2_CELEBRADOS = 'pp2_liquidados_v1';
+function _yaCelebrado(id){
+  try { return (JSON.parse(localStorage.getItem(_PP2_CELEBRADOS) || '[]') || []).includes(id); }
+  catch (e) { return true; }   // si localStorage falla, NO se celebra (mejor callado que repetitivo)
+}
+function _marcarCelebrado(id){
+  try {
+    const l = JSON.parse(localStorage.getItem(_PP2_CELEBRADOS) || '[]') || [];
+    if (!l.includes(id)){ l.push(id); localStorage.setItem(_PP2_CELEBRADOS, JSON.stringify(l.slice(-50))); }
+  } catch (e) { /* sin marca: se celebrará otra vez, no es grave */ }
+}
+function _celebrarLiquidados(){
+  const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  (_toursCache || []).filter(t => t.estado === 'pagado').forEach(t => {
+    const card = document.querySelector(`.tour-card[data-tour-id="${CSS.escape(String(t.id))}"]`);
+    if (!card) return;
+    const hero = card.querySelector('.tc-hero');
+    if (!hero || hero.querySelector('.tc-liquidado')) return;
+    const nuevo = !_yaCelebrado(String(t.id));
+    const badge = document.createElement('span');
+    badge.className = 'tc-liquidado' + (nuevo && !reduce ? ' celebra' : '');
+    badge.textContent = '✓ Liquidado';
+    hero.appendChild(badge);
+    if (nuevo){
+      if (!reduce) _confeti(hero);
+      _marcarCelebrado(String(t.id));
+    }
+  });
+}
+function _confeti(host){
+  const capa = document.createElement('span');
+  capa.className = 'pp2-confeti';
+  capa.setAttribute('aria-hidden', 'true');
+  for (let i = 0; i < 14; i++){
+    const p = document.createElement('i');
+    p.style.left = (6 + Math.random() * 88) + '%';
+    p.style.background = i % 2 ? '#e8ff4c' : '#fff';
+    p.style.animationDelay = (Math.random() * .35).toFixed(2) + 's';
+    capa.appendChild(p);
+  }
+  host.appendChild(capa);
+  setTimeout(() => capa.remove(), 2200);
 }
 
 // [PP-1] Hero del paso 2: la foto del evento elegido de fondo. Igual que en la

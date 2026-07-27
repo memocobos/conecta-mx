@@ -300,13 +300,25 @@ main{padding:0}
 .hero-bg{
   position:absolute;inset:0;z-index:-1;overflow:hidden;
 }
-.hero-bg img{width:100%;height:100%;object-fit:cover;object-position:center 35%}
-/* Velo oscuro: el hero ya vive sobre un degradado azul/negro y el texto
-   necesita contraste de lectura, no una foto compitiendo con él. */
+.hero-bg img{width:100%;height:100%;object-fit:cover;object-position:center 42%}
+/* [PF-6a-bis] Velo RECALIBRADO para foto de día. La de la Arena de noche ya
+   venía oscura y un velo parejo alcanzaba; a plena luz eso deja el título
+   peleado con la foto. Ahora el peso va abajo —donde viven la bajada y las
+   cifras, que son el texto chico— y arriba queda aire para que se vea la gente.
+   Calibrado MIRANDO la captura y midiendo el contraste del texto, no a ojo. */
 .hero-bg::after{
   content:'';position:absolute;inset:0;
-  background:linear-gradient(180deg,rgba(0,0,0,.72) 0%,rgba(0,0,0,.82) 55%,rgba(0,0,0,.95) 100%);
+  background:linear-gradient(180deg,rgba(0,0,0,.52) 0%,rgba(0,0,0,.66) 35%,rgba(0,0,0,.90) 68%,rgba(0,0,0,.96) 100%);
 }
+/* [PF-6a-bis] El texto CHICO del hero sube de var(--muted) a .72, y ésta es la
+   razón: sobre negro plano el token cumple AA, pero sobre una foto de día no —
+   medido, la bajada caía a 2.69:1 en móvil. La alternativa era apagar la foto
+   con un velo casi opaco (probé cuatro: solo el más oscuro alcanzaba, y a costa
+   de no ver nada). Se sube el TEXTO, no se destruye la imagen. Con esto el peor
+   caso queda en 4.94:1 en escritorio y 5.62:1 en móvil, medido pixel por pixel
+   detrás de cada línea. El token global NO se toca. */
+.hero .hero-sub,
+.hero .hero-stat-l{color:rgba(255,255,255,.72)}
 /* 4 cifras en vez de 3: en móvil van 2x2 y NINGUNA se esconde. */
 .hero-stats{grid-template-columns:repeat(4,1fr)}
 @media(max-width:640px){
@@ -486,7 +498,7 @@ main{padding:0}
   <!-- [PF-6a] Foto real de fondo en vez de puro degradado. Es la única imagen
        de la página que carga eager: es lo primero que se ve. -->
   <div class="hero-bg" aria-hidden="true">
-    <img src="img/tours/tour-hero-arena-noche.webp" alt="" width="1200" height="1199" fetchpriority="high" decoding="async">
+    <img src="img/tours/tour-grupo-bus-dia.webp" alt="" width="1200" height="1200" fetchpriority="high" decoding="async">
   </div>
   <div class="hero-kicker">Conecta Reynosa · Guía 2026</div>
   <h1 class="hero-title">
@@ -590,7 +602,11 @@ main{padding:0}
 
   <!-- VISUAL 2 · [PF-6a] el otro stock de Unsplash, ahora un tour real. -->
   <div class="visual">
-    <img src="img/tours/tour-bus-interior-kits.webp" alt="Interior del camión lleno, viajeros levantando su kit del evento" width="1200" height="1600" loading="lazy" decoding="async">
+    <!-- [PF-6a-bis] Esta banda usaba tour-bus-interior-kits, que TAMBIÉN vive en
+         la galería del paso 05: la misma foto dos veces en la misma página. Lo
+         destapó la aserción de duplicadas que agregué en esta tuerca; venía así
+         desde PF-6a. Ahora lleva una propia. -->
+    <img src="img/tours/tour-grupo-calle.webp" alt="Grupo completo del tour reunido antes de salir al concierto" width="1200" height="1200" loading="lazy" decoding="async">
     <div class="visual-text">
       <div class="kicker">Sin deudas</div>
       <div class="big">Paga en <em>quincenas</em></div>
@@ -636,10 +652,14 @@ main{padding:0}
       <!-- [PF-6a] LA GALERÍA: el paso 05 era el más flaco de la página y es el
            que vende. Seis fotos de tours reales, todas lazy. -->
       <div class="galeria">
-        <figure><img src="img/tours/tour-grupo-bus-dia.webp" alt="Grupo completo del tour posando frente al camión de turismo" width="1200" height="1200" loading="lazy" decoding="async"><figcaption>Salida de Reynosa</figcaption></figure>
         <figure><img src="img/tours/tour-bus-interior-kits.webp" alt="Interior del camión lleno de viajeros con su kit" width="1200" height="1600" loading="lazy" decoding="async"><figcaption>El camión</figcaption></figure>
         <figure><img src="img/tours/tour-kit-manos-asiento.webp" alt="Viajeras con su kit del evento en su asiento" width="1200" height="1200" loading="lazy" decoding="async"><figcaption>Tu kit a bordo</figcaption></figure>
         <figure><img src="img/tours/tour-hotel-llegada.webp" alt="Grupo del tour a la llegada al hotel" width="1200" height="900" loading="lazy" decoding="async"><figcaption>Llegada al hotel</figcaption></figure>
+        <!-- [PF-6a-bis] La foto de la Arena sale del hero y entra AQUÍ, no en el
+             primer hueco: la galería es un recorrido cronológico y el pie que
+             quedó libre era "Salida de Reynosa". Ponerle ese pie a una foto
+             nocturna afuera del venue sería mentir; éste es su beat real. -->
+        <figure><img src="img/tours/tour-arena-noche.webp" alt="Grupo del tour afuera de la Arena Monterrey de noche" width="1200" height="1199" loading="lazy" decoding="async"><figcaption>Llegamos al venue</figcaption></figure>
         <figure><img src="img/tours/tour-vip-badbunny.webp" alt="Viajeros en el acceso VIP del concierto" width="1200" height="1598" loading="lazy" decoding="async"><figcaption>Acceso al concierto</figcaption></figure>
         <figure><img src="img/tours/tour-convoy-noche.webp" alt="Convoy de camiones de Conecta y el grupo del tour de noche" width="1200" height="900" loading="lazy" decoding="async"><figcaption>De vuelta a casa</figcaption></figure>
       </div>
@@ -656,7 +676,9 @@ main{padding:0}
   <h2 class="historial-title">Esto no es promesa,<br>es <span class="mark">historial</span></h2>
   <p class="historial-sub">Cada foto de esta página es de un tour que ya salió de Reynosa. No son renders ni fotos de banco de imágenes: son los camiones, los kits y la gente de los viajes que llevamos haciendo desde 2013.</p>
   <div class="historial-banda">
-    <img src="img/tours/tour-grupo-bus-dia.webp" alt="Grupo completo del tour frente al camión de turismo" width="1200" height="1200" loading="lazy" decoding="async">
+    <!-- [PF-6a-bis] Esta banda usaba tour-grupo-bus-dia, que ahora es el fondo
+         del hero: habrían quedado la misma foto arriba y a media página. -->
+    <img src="img/tours/tour-camion-pasillo.webp" alt="Pasillo del camión de turismo lleno de viajeros del tour" width="1200" height="1200" loading="lazy" decoding="async">
     <img src="img/tours/tour-festival-glitter.webp" alt="Viajeras listas para el festival" width="1200" height="1598" loading="lazy" decoding="async">
     <img src="img/tours/tour-van-grupo.webp" alt="Grupo chico del tour viajando en van" width="1200" height="900" loading="lazy" decoding="async">
   </div>

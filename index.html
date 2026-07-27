@@ -1388,7 +1388,7 @@ src="https://www.facebook.com/tr?id=1685907946147007&ev=PageView&noscript=1"
 </div>
 <style>
 /* Arriba-derecha, justo debajo del nav sticky (56px + 8px). Compacto, una línea. */
-.rcp{position:fixed;top:64px;right:16px;z-index:998;display:flex;align-items:center;gap:8px;height:44px;background:#e8ff4c;color:#000;padding:0 6px 0 12px;border-radius:var(--r-chip,999px);box-shadow:var(--sombra-reposo);max-width:min(420px,calc(100vw - 32px));font-family:'Barlow Condensed','Montserrat',sans-serif}
+.rcp{position:fixed;top:114px;right:16px;z-index:998;display:flex;align-items:center;gap:8px;height:44px;background:#e8ff4c;color:#000;padding:0 6px 0 12px;border-radius:var(--r-chip,999px);box-shadow:var(--sombra-reposo);max-width:min(420px,calc(100vw - 32px));font-family:'Barlow Condensed','Montserrat',sans-serif}
 .rcp-eq{flex-shrink:0;display:flex;align-items:flex-end;gap:2px;width:14px;height:13px}
 .rcp-eq i{flex:1;background:#000;border-radius:var(--r-sm,8px);transform-origin:bottom;transform:scaleY(.32)}
 .rcp.rcp-playing .rcp-eq i{animation:rcpEq .9s ease-in-out infinite}
@@ -1408,7 +1408,13 @@ src="https://www.facebook.com/tr?id=1685907946147007&ev=PageView&noscript=1"
 .rcp.rcp-playing .rcp-ic-play{display:none}
 .rcp.rcp-playing .rcp-ic-pause{display:block}
 @keyframes rcpPulse{0%{box-shadow:0 0 0 0 rgba(255,40,59,.6)}70%{box-shadow:0 0 0 6px rgba(255,40,59,0)}100%{box-shadow:0 0 0 0 rgba(255,40,59,0)}}
-@media(max-width:768px){.rcp{top:64px;right:12px;max-width:70vw}}
+/* [PF-4] La pill de radio baja para NO tapar la marquesina. Antes iba en
+   top:64px, pegada bajo el nav, y cubría 34px de los 38 que mide la
+   marquesina en móvil (41 de 45 en escritorio). Eso no importaba cuando la
+   marquesina repetía el lema; ahora trae información de venta ("ya a la
+   venta", "últimos lugares"), así que taparla cuesta. Ajusta la posición
+   que se decidió en la PR #300 porque cambió la razón, no el gusto. */
+@media(max-width:768px){.rcp{right:12px;max-width:70vw}}
 /* El wizard esconde el nav y pone sus barras fijas arriba — el reproductor se quita para no encimarse. */
 body.wizard-open .rcp{display:none}
 @media(prefers-reduced-motion:reduce){.rcp-eq i,.rcp-dot{animation:none!important}}

@@ -164,6 +164,13 @@ exports.handler = async function (event) {
   if (plantilla === "creadora") {
     if (!ofrecimiento) return bad(400, "Falta lista de ofrecimiento");
     if (!expectativas) return bad(400, "Faltan expectativas del creador");
+    // [T2] "¿Toma el viaje?": flag OPCIONAL en datos jsonb, sellado del lado del
+    // SERVIDOR y SOLO para 'creadora'. Ausencia = comportamiento de hoy
+    // (datos null, byte-igual). Si viene en otra plantilla, se ignora: cada
+    // plantilla arma su propio `datos` en su propio brazo.
+    if (data.datos && data.datos.toma_viaje === true) {
+      datos = { toma_viaje: true };
+    }
   } else if (plantilla === "giveaway") {
     // Giveaway pide: desglose del premio (texto) + valor del premio (MXN).
     const desglose_premio = String((data.datos && data.datos.desglose_premio) || "").trim();

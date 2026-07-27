@@ -1242,7 +1242,7 @@ function _trUnidadHtml(u) {
 
   const chips = (u.pasajeros || []).map(p => `
     <span style="display:inline-flex;align-items:center;gap:6px;padding:3px 6px 3px 10px;margin:2px 4px 0 0;border-radius:20px;background:var(--bg3);border:1px solid var(--border);font-size:12px">
-      ${_esfEsc(p.nombre_cache || 'Sin nombre')}
+      ${_esfEsc(p.nombre_cache || 'Sin nombre')}${p.pasajero_tipo === 'viajero' ? _trTipoChip(_trTipoDeRef(p.pasajero_ref)) : ''}
       <button type="button" data-tr-quitar="${_esfEsc(p.pasajero_ref)}" data-tr-ptipo="${_esfEsc(p.pasajero_tipo)}" data-tr-unidad="${idSafe}" title="Quitar de la unidad" style="border:none;background:transparent;color:var(--ts);font-size:14px;line-height:1;cursor:pointer;padding:0 2px">×</button>
     </span>`).join('');
 
@@ -1357,13 +1357,15 @@ function _trLadrillosHtml(uni, pend) {
       const total = (c.ocupantes || []).length;
       const yaN = total - n;
       const nombres = c._pend.map(p => _trCorto(p.nombre)).join(' · ');
+      // [T2] Si en el cuarto va una creadora externa, se avisa en el lote.
+      const hayExterna = c._pend.some(p => p.tipo_viajero === 'creadora_externa');
       const etiqueta = c._mundo === 'kh'
         ? `Cuarto ${_esfEsc(c.numero_hab || c.orden || '')}${c.hotel_nombre ? ' · ' + _esfEsc(c.hotel_nombre) : ''}`
         : `Cuarto ${_esfEsc(c.orden || (i + 1))} · ${_esfEsc(c.tipo || '')}`;
       return `
         <button type="button" data-tr-lote="cuarto:${i}" style="text-align:left;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:10px 14px;margin:0 8px 8px 0;color:var(--text);cursor:pointer;font:inherit;min-width:220px;max-width:100%">
           <div style="display:flex;align-items:center;flex-wrap:wrap">
-            <b style="font-size:13px">${etiqueta}</b>${_trFechaChip(c.evento_id)}
+            <b style="font-size:13px">${etiqueta}</b>${_trFechaChip(c.evento_id)}${hayExterna ? _trTipoChip('creadora_externa') : ''}
           </div>
           <div style="font-size:11px;color:var(--ts);margin-top:3px">${n} persona${n === 1 ? '' : 's'}${yaN ? ` · (${yaN} de ${total} ya asignados)` : ''}</div>
           <div style="font-size:12px;margin-top:4px">${_esfEsc(nombres)}</div>
@@ -1373,7 +1375,7 @@ function _trLadrillosHtml(uni, pend) {
   }
 
   if (pend.sueltos.length) {
-    const chips = pend.sueltos.map((p, i) => _trChipPersona(`suelto:${i}`, p.nombre, _trFechaChip(p.evento_id))).join('');
+    const chips = pend.sueltos.map((p, i) => _trChipPersona(`suelto:${i}`, p.nombre, _trFechaChip(p.evento_id) + _trTipoChip(p.tipo_viajero))).join('');
     out.push(bloque('<svg class="ic"><use href="#ic-persona"/></svg> SUELTOS', 'Personas sin cuarto asignado.', `<div style="display:flex;flex-wrap:wrap;gap:6px">${chips}</div>`));
   }
 
@@ -1386,6 +1388,24 @@ function _trLadrillosHtml(uni, pend) {
   }
 
   return out.join('');
+}
+
+// [T2] Etiqueta de creadora externa que toma el viaje. Vacío para todos los
+// viajeros de siempre (tipo_viajero null), así que la lista no cambia en nada
+// salvo cuando hay una externa.
+function _trTipoChip(tipo) {
+  if (tipo !== 'creadora_externa') return '';
+  return `<span title="Creadora externa que toma el viaje — no es coordinadora" style="font-size:9px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;color:#000;background:var(--yellow,#e8ff4c);border-radius:20px;padding:1px 7px;margin-left:6px">creadora ext.</span>`;
+}
+// Los pasajeros YA asignados vienen de la tabla de asignaciones (nombre_cache),
+// sin tipo_viajero. Se busca su tipo en el universo KH que ya trajo el listar.
+function _trTipoDeRef(ref) {
+  const u = _trData && _trData.universo;
+  if (!u) return null;
+  const pools = [...(u.viajeros_sueltos || [])];
+  (u.cuartos_kh || []).forEach(c => pools.push(...(c.ocupantes || [])));
+  const hit = pools.find(p => p && p.ref === ref);
+  return hit ? (hit.tipo_viajero || null) : null;
 }
 
 function _trChipPersona(key, nombre, extra) {
@@ -16695,6 +16715,10 @@ function onCtrPlantillaChange() {
   if (vw) vw.style.display = conVigencia ? '' : 'none';
   if (hint) hint.style.display = conVigencia ? 'none' : '';
   if (vs && conVigencia) vs.value = (p === 'coordinador') ? '12' : '3';
+  // [T2] "¿Toma el viaje?": la casilla solo existe para creadora EXTERNA.
+  const tw = document.getElementById('ctr-viaje-wrap');
+  if (tw) tw.style.display = (p === 'creadora') ? '' : 'none';
+  if (p !== 'creadora') { const tv = document.getElementById('ctr-viaje'); if (tv) tv.checked = false; }
   // 🗼 Anexo de custodia: la casilla solo existe para coordinador.
   const cw = document.getElementById('ctr-cuidador-wrap');
   if (cw) cw.style.display = (p === 'coordinador') ? '' : 'none';
@@ -16727,6 +16751,11 @@ function _ctrFormData() {
   // [T1] Todo contrato NUEVO de coordinador nace con exclusividad dura. Va
   // aquí solo para que la vista previa diga la verdad: la autoridad es
   // contrato-crear, que lo sella del lado del servidor sin preguntar.
+  // [T2] "¿Toma el viaje?" — solo creadora. El backend decide; esto es para que
+  // el payload lleve la intención de Memo.
+  if (plantilla === 'creadora' && (document.getElementById('ctr-viaje') || {}).checked) {
+    datosExtra = Object.assign({}, datos, { toma_viaje: true });
+  }
   if (plantilla === 'coordinador') {
     datosExtra = Object.assign({}, datos, { exclusividad_dura: true });
     if ((document.getElementById('ctr-cuidador') || {}).checked) datosExtra.cuidador_bodega = true;
@@ -16943,6 +16972,8 @@ function _resetFormUI() {
   if (cancelBtn) cancelBtn.style.display = 'none';
   const banner = document.getElementById('ctr-banner-edit');
   if (banner) banner.style.display = 'none';
+  const _tvReset = document.getElementById('ctr-viaje');
+  if (_tvReset) _tvReset.checked = false;
   const _ccReset = document.getElementById('ctr-cuidador');
   if (_ccReset && !_contratosEditingToken) _ccReset.checked = false; // 🗼 anexo
   if (typeof onCtrPlantillaChange === 'function') onCtrPlantillaChange();

@@ -1325,7 +1325,6 @@ body.rcp-alto .pf{ padding-bottom:calc(var(--rcp-zona-fab) + env(safe-area-inset
       <!-- [PP-1] La foto del evento elegido, para que el cliente VEA a dónde va
            mientras decide el paquete. Sin foto, el bloque se oculta entero. -->
       <div class="wiz-pkg-hero sin-foto" id="wiz-pkg-hero" aria-hidden="true">
-        <img id="wiz-pkg-hero-img" alt="" decoding="async">
         <div class="wiz-pkg-hero-txt">
           <div class="wiz-pkg-hero-nom" id="wiz-pkg-hero-nom"></div>
           <div class="wiz-pkg-hero-sub" id="wiz-pkg-hero-sub"></div>
@@ -4077,8 +4076,18 @@ function pintarEventos(filtro){
 // el bloque se queda oculto — nunca un recuadro gris vacío.
 async function _pintarHeroPaquete(ev){
   const box = document.getElementById('wiz-pkg-hero');
-  const img = document.getElementById('wiz-pkg-hero-img');
-  if (!box || !img || !ev) return;
+  if (!box || !ev) return;
+  // La imagen se CREA aquí en vez de vivir vacía en el markup: una etiqueta sin
+  // src es un hueco esperando a JS, y así se crea también la miniatura de la
+  // lista. (El comentario evita escribir la etiqueta literal: mencionarla en
+  // prosa hace que los barridos la cuenten como markup — ya pasó con script y
+  // con style en este repo.)
+  let img = box.querySelector('img');
+  if (!img){
+    img = document.createElement('img');
+    img.alt = ''; img.decoding = 'async';
+    box.insertBefore(img, box.firstChild);
+  }
   document.getElementById('wiz-pkg-hero-nom').textContent = ev.a || '';
   document.getElementById('wiz-pkg-hero-sub').textContent = [ev.v, ev.f].filter(Boolean).join(' · ');
   const poner = (url) => {
@@ -4088,6 +4097,7 @@ async function _pintarHeroPaquete(ev){
     img.src = url;
   };
   box.classList.add('sin-foto');
+  box.setAttribute('aria-hidden', 'true');
   img.removeAttribute('src');
   const est = _artStaticDeEv(ev);
   if (est){ poner(est); return; }

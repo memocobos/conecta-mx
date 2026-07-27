@@ -495,6 +495,104 @@ main{padding:0}
      · .steps y .alert-cuenta-foot (pagos)
    Y .warn de pagos se queda igual porque su border-left de 3px es el side-tab
    que Memo decidió conservar. */
+
+/* ===================================================================
+   TUERCA PF-6c · el FAQ con fotos reales + la oficina física
+   Bloque contiguo y revertible. Los HECHOS de las 16 respuestas no se
+   tocan: solo se afila el tono del hero y se SUMA una respuesta nueva
+   (la oficina). Lo visual: banda de confianza tras el hero, una foto de
+   ambiente en el header de cada categoría, y las 2 fotos de stock fuera.
+   =================================================================== */
+
+/* ── BANDA DE CONFIANZA (tras el hero) ──────────────────────────────── */
+.confianza{
+  padding:clamp(28px,5vw,48px) clamp(20px,5vw,80px) clamp(32px,5vw,56px);
+  border-bottom:1px solid var(--line);
+}
+.confianza-fotos{
+  display:grid;grid-template-columns:1fr;gap:10px;
+  margin-bottom:clamp(24px,4vw,36px);
+}
+@media(min-width:720px){.confianza-fotos{grid-template-columns:repeat(3,1fr);gap:14px}}
+.confianza-fotos figure{margin:0;position:relative;overflow:hidden;border-radius:var(--r-card,16px);border:1px solid rgba(255,255,255,.08)}
+.confianza-fotos img{
+  width:100%;height:auto;aspect-ratio:4/3;object-fit:cover;display:block;
+  transition:transform .6s cubic-bezier(.22,1,.36,1);
+}
+.confianza-fotos figcaption{
+  position:absolute;left:0;right:0;bottom:0;
+  padding:20px 12px 9px;
+  background:linear-gradient(transparent,rgba(0,0,0,.85));
+  font-size:10px;font-weight:900;letter-spacing:.1em;text-transform:uppercase;color:#fff;
+}
+@media (hover:hover){
+  .confianza-fotos figure:hover img{transform:scale(1.05)}
+}
+/* los stats existentes se mudan aquí desde el hero, con el mismo look */
+.confianza .hero-stats{margin-top:0;max-width:820px}
+/* En móvil la página escondía la 3ª cifra (regla de la línea 450:
+   .hero-stat:last-child{display:none}). Tenía sentido con un grid 2x2 y tres
+   elementos — el tercero quedaba solo —, pero la banda de confianza existe para
+   mostrar las TRES. Van en 3 columnas: los números son cortos y caben a 390.
+   Mismo arreglo que PF-6a le hizo a funciona.html en su momento. */
+@media(max-width:640px){
+  .confianza .hero-stats{grid-template-columns:repeat(3,1fr);gap:10px}
+  .confianza .hero-stats .hero-stat:last-child{display:block}
+}
+.confianza-oficina{
+  margin-top:clamp(20px,3vw,28px);
+  display:inline-flex;align-items:center;gap:10px;flex-wrap:wrap;
+  padding:9px 14px;border:1px solid var(--dim);border-radius:var(--r-chip,999px);
+  font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);
+}
+.confianza-oficina b{color:var(--amarillo);font-weight:900}
+.confianza-oficina a{color:inherit;text-decoration:underline;text-underline-offset:3px}
+.confianza-oficina a:hover{color:var(--ink)}
+
+/* ── FOTO DE AMBIENTE EN EL HEADER DE CADA CATEGORÍA ─────────────────── */
+/* El header es un grid auto|1fr (número | meta). La foto entra como TERCERA
+   columna en escritorio; en móvil el grid sigue de 2 columnas y la foto se
+   va a un renglón propio a todo el ancho, chiquita. */
+.fq-head-foto{margin:0;overflow:hidden;border-radius:var(--r-sm,8px);border:1px solid rgba(255,255,255,.10)}
+.fq-head-foto img{
+  width:100%;height:auto;aspect-ratio:16/10;object-fit:cover;display:block;
+  filter:saturate(.85) brightness(.9);
+}
+.fq-head{align-items:end}
+@media(min-width:900px){
+  .fq-head{grid-template-columns:auto 1fr clamp(150px,16vw,220px)}
+  .fq-head-foto{align-self:end;margin-bottom:clamp(8px,2vw,20px)}
+}
+@media(max-width:899px){
+  .fq-head-foto{grid-column:1 / -1;margin-top:14px;max-width:320px}
+}
+
+/* ── LA RESPUESTA DE LA OFICINA ──────────────────────────────────────── */
+.fq-oficina{
+  display:grid;gap:6px;margin-top:14px;
+  padding:14px 16px;background:rgba(255,255,255,.03);
+  border:1px solid var(--line);border-radius:var(--r-sm,8px);
+  font-size:13px;line-height:1.5;
+}
+.fq-oficina dt{font-size:9px;font-weight:900;letter-spacing:.16em;text-transform:uppercase;color:var(--muted)}
+.fq-oficina dd{margin:0 0 6px;color:rgba(255,255,255,.85);font-weight:600}
+.fq-oficina dd:last-child{margin-bottom:0}
+
+/* ── EL CIERRE DE WHATSAPP (se SUMA al CTA que ya existía) ───────────── */
+.cta-wa{
+  margin-top:clamp(20px,3vw,28px);
+  font-size:clamp(13px,1.5vw,15px);color:var(--muted);line-height:1.6;
+}
+.cta-wa a{
+  color:var(--amarillo);font-weight:900;text-decoration:underline;
+  text-underline-offset:3px;text-decoration-thickness:2px;
+}
+.cta-wa a:hover{color:var(--ink)}
+
+@media(prefers-reduced-motion:reduce){
+  .confianza-fotos img{transition-duration:.01ms !important}
+  .confianza-fotos figure:hover img{transform:none}
+}
 </style>
 </head>
 <body>
@@ -533,13 +631,26 @@ main{padding:0}
     <span class="line">Preguntas</span>
     <span class="line"><span class="mark">Frecuentes</span></span>
   </h1>
-  <p class="hero-sub">Todo lo que necesitas saber antes de sumarte al próximo tour. Respuestas claras, sin letra chica, directo al grano — como los conciertos a los que te vamos a llevar.</p>
+  <p class="hero-sub">Todo lo que preguntarías por WhatsApp, ya respondido. Claro y sin letra chica — y si algo falta, el WhatsApp sigue abierto.</p>
+  <div class="hero-scroll">Scroll</div>
+</section>
+
+<!-- BANDA DE CONFIANZA · [PF-6c] Los stats se MUDAN aquí desde el hero (son los
+     mismos tres, con las mismas cifras salvo el conteo de respuestas, que sube
+     a 17 porque esta tuerca agrega la de la oficina). Tres fotos reales y la
+     mención de la oficina física, que es la señal de confianza que faltaba. -->
+<section class="confianza">
+  <div class="confianza-fotos">
+    <figure><img src="img/tours/tour-faq-grupo-bus.webp" alt="Grupo completo del tour posando frente a los camiones antes de salir" width="1200" height="900" loading="lazy" decoding="async"><figcaption>Salida de Reynosa</figcaption></figure>
+    <figure><img src="img/tours/tour-faq-bus-feliz.webp" alt="Pasillo del camión lleno de viajeros del tour" width="1200" height="1200" loading="lazy" decoding="async"><figcaption>El camión, lleno</figcaption></figure>
+    <figure><img src="img/tours/tour-faq-hotel-lobby.webp" alt="Grupo del tour reunido en el lobby del hotel antes del concierto" width="1200" height="900" loading="lazy" decoding="async"><figcaption>En el hotel</figcaption></figure>
+  </div>
   <div class="hero-stats">
     <div class="hero-stat"><div class="hero-stat-n">13+</div><div class="hero-stat-l">Años operando</div></div>
-    <div class="hero-stat"><div class="hero-stat-n">16</div><div class="hero-stat-l">Respuestas</div></div>
+    <div class="hero-stat"><div class="hero-stat-n">17</div><div class="hero-stat-l">Respuestas</div></div>
     <div class="hero-stat"><div class="hero-stat-n">5</div><div class="hero-stat-l">Categorías</div></div>
   </div>
-  <div class="hero-scroll">Scroll</div>
+  <p class="confianza-oficina"><b>Oficina en Reynosa</b> · Atención con cita previa · <a href="#sec-garantia">Dirección y horario</a></p>
 </section>
 
 <!-- TABS -->
@@ -563,8 +674,11 @@ main{padding:0}
       <div class="fq-head-meta">
         <span class="fq-head-tag">Garantía</span>
         <h2 class="fq-head-title">Nuestra confianza<br>es tu respaldo</h2>
-        <div class="fq-head-count">4 respuestas · Oficial · Verificable</div>
+        <div class="fq-head-count">5 respuestas · Oficial · Verificable</div>
       </div>
+      <figure class="fq-head-foto">
+        <img src="img/tours/tour-faq-cat-garantia.webp" alt="Grupo del tour junto al camión antes de la salida" width="700" height="406" loading="lazy" decoding="async">
+      </figure>
     </div>
     <div class="fq-list">
       <div class="fq">
@@ -599,12 +713,33 @@ main{padding:0}
         </button>
         <div class="fq-ans"><div class="fq-ans-inner"><div class="fq-ans-body">Sí. Todos los boletos son adquiridos directamente con el promotor y canales oficiales del evento, garantizando su autenticidad.</div></div></div>
       </div>
+      <!-- [PF-6c] RESPUESTA NUEVA (la 17 del sitio): la oficina física. Dato
+           confirmado por Memo el 26-jul-2026 — es el mismo texto que manda por
+           WhatsApp. Sube el conteo de Garantía a 5 y el del hero a 17. -->
+      <div class="fq">
+        <button class="fq-btn" aria-expanded="false">
+          <span class="fq-n">05</span>
+          <span class="fq-q">¿Tienen oficina física?</span>
+          <span class="fq-ico" aria-hidden="true"></span>
+        </button>
+        <div class="fq-ans"><div class="fq-ans-inner"><div class="fq-ans-body">Sí, en Reynosa. Trabajamos principalmente <b>con cita previa</b> y para entrega de boletos cuando aplica, porque la mayoría de los procesos ya se resuelven en línea. Si vienes, te entregamos tu <b>recibo de pago, tu contrato y la documentación</b> de tu compra.
+          <dl class="fq-oficina">
+            <dt>Dirección</dt>
+            <dd>Calle Toluca 125, Col. Rodríguez, Reynosa, Tamaulipas · <a href="https://maps.app.goo.gl/XyjSs9T6AvpUkrZL7" target="_blank" rel="noopener">Ver en el mapa</a></dd>
+            <dt>Horario</dt>
+            <dd>Lunes a jueves, 2:00 a 7:30 pm</dd>
+            <dt>Antes de venir</dt>
+            <dd>Agenda por <a href="https://wa.me/528119771072" target="_blank" rel="noopener">WhatsApp</a> al 81 1977 1072.</dd>
+          </dl>
+        </div></div></div>
+      </div>
     </div>
   </section>
 
   <!-- VISUAL 1 -->
   <div class="visual">
-    <img src="https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=1400&q=75" alt="" loading="lazy">
+    <!-- [PF-6c] era foto de STOCK de Unsplash con alt vacío -->
+    <img src="img/tours/tour-faq-visual-brindis.webp" alt="Pasillo del camión lleno de viajeros del tour brindando" width="1200" height="1200" loading="lazy" decoding="async">
     <div class="visual-text">
       <div class="kicker">Desde 2013</div>
       <div class="big">13 años<br><em>en la ruta</em></div>
@@ -620,11 +755,14 @@ main{padding:0}
         <h2 class="fq-head-title">Cómo armamos<br>tu experiencia</h2>
         <div class="fq-head-count">3 respuestas · Transporte · Hotel</div>
       </div>
+      <figure class="fq-head-foto">
+        <img src="img/tours/tour-faq-cat-servicios.webp" alt="Interior del camión de turismo con el grupo a bordo" width="700" height="700" loading="lazy" decoding="async">
+      </figure>
     </div>
     <div class="fq-list">
       <div class="fq">
         <button class="fq-btn" aria-expanded="false">
-          <span class="fq-n">05</span>
+          <span class="fq-n">06</span>
           <span class="fq-q">¿Qué eventos manejan?</span>
           <span class="fq-ico" aria-hidden="true"></span>
         </button>
@@ -632,7 +770,7 @@ main{padding:0}
       </div>
       <div class="fq">
         <button class="fq-btn" aria-expanded="false">
-          <span class="fq-n">06</span>
+          <span class="fq-n">07</span>
           <span class="fq-q">¿Qué tipo de camiones usan?</span>
           <span class="fq-ico" aria-hidden="true"></span>
         </button>
@@ -640,7 +778,7 @@ main{padding:0}
       </div>
       <div class="fq">
         <button class="fq-btn" aria-expanded="false">
-          <span class="fq-n">07</span>
+          <span class="fq-n">08</span>
           <span class="fq-q">¿Qué tipo de hoteles manejan?</span>
           <span class="fq-ico" aria-hidden="true"></span>
         </button>
@@ -658,11 +796,14 @@ main{padding:0}
         <h2 class="fq-head-title">Ruta, salida<br>y equipaje</h2>
         <div class="fq-head-count">4 respuestas · Redondo · Con seguro</div>
       </div>
+      <figure class="fq-head-foto">
+        <img src="img/tours/tour-faq-cat-logistica.webp" alt="El camión del tour y el grupo al anochecer" width="700" height="394" loading="lazy" decoding="async">
+      </figure>
     </div>
     <div class="fq-list">
       <div class="fq">
         <button class="fq-btn" aria-expanded="false">
-          <span class="fq-n">08</span>
+          <span class="fq-n">09</span>
           <span class="fq-q">¿El transporte es redondo?</span>
           <span class="fq-ico" aria-hidden="true"></span>
         </button>
@@ -670,7 +811,7 @@ main{padding:0}
       </div>
       <div class="fq">
         <button class="fq-btn" aria-expanded="false">
-          <span class="fq-n">09</span>
+          <span class="fq-n">10</span>
           <span class="fq-q">¿Cuándo confirman la hora de salida?</span>
           <span class="fq-ico" aria-hidden="true"></span>
         </button>
@@ -678,7 +819,7 @@ main{padding:0}
       </div>
       <div class="fq">
         <button class="fq-btn" aria-expanded="false">
-          <span class="fq-n">10</span>
+          <span class="fq-n">11</span>
           <span class="fq-q">¿Puedo llevar equipaje?</span>
           <span class="fq-ico" aria-hidden="true"></span>
         </button>
@@ -686,7 +827,7 @@ main{padding:0}
       </div>
       <div class="fq">
         <button class="fq-btn" aria-expanded="false">
-          <span class="fq-n">11</span>
+          <span class="fq-n">12</span>
           <span class="fq-q">¿Incluyen seguro de viajero?</span>
           <span class="fq-ico" aria-hidden="true"></span>
         </button>
@@ -697,7 +838,8 @@ main{padding:0}
 
   <!-- VISUAL 2 -->
   <div class="visual">
-    <img src="https://images.unsplash.com/photo-1459749411175-04bf5292ceea?w=1400&q=75" alt="" loading="lazy">
+    <!-- [PF-6c] la otra de stock, ahora un tour real -->
+    <img src="img/tours/tour-faq-visual-festival.webp" alt="Grupo del tour con sus outfits de festival a la llegada al evento" width="901" height="1200" loading="lazy" decoding="async">
     <div class="visual-text">
       <div class="kicker">Tu seguridad es primero</div>
       <div class="big">Viaja <em>sin</em><br>preocupaciones</div>
@@ -713,11 +855,14 @@ main{padding:0}
         <h2 class="fq-head-title">Zona, pago<br>y cancelaciones</h2>
         <div class="fq-head-count">4 respuestas · Quincenas · Sin letra chica</div>
       </div>
+      <figure class="fq-head-foto">
+        <img src="img/tours/tour-faq-cat-boletos.webp" alt="Viajeros mostrando sus accesos VIP del concierto" width="526" height="700" loading="lazy" decoding="async">
+      </figure>
     </div>
     <div class="fq-list">
       <div class="fq">
         <button class="fq-btn" aria-expanded="false">
-          <span class="fq-n">12</span>
+          <span class="fq-n">13</span>
           <span class="fq-q">¿Puedo elegir la zona de mi boleto?</span>
           <span class="fq-ico" aria-hidden="true"></span>
         </button>
@@ -725,7 +870,7 @@ main{padding:0}
       </div>
       <div class="fq">
         <button class="fq-btn" aria-expanded="false">
-          <span class="fq-n">13</span>
+          <span class="fq-n">14</span>
           <span class="fq-q">¿Qué formas de pago aceptan?</span>
           <span class="fq-ico" aria-hidden="true"></span>
         </button>
@@ -733,7 +878,7 @@ main{padding:0}
       </div>
       <div class="fq">
         <button class="fq-btn" aria-expanded="false">
-          <span class="fq-n">14</span>
+          <span class="fq-n">15</span>
           <span class="fq-q">¿Cuentan con facilidades de pago?</span>
           <span class="fq-ico" aria-hidden="true"></span>
         </button>
@@ -741,7 +886,7 @@ main{padding:0}
       </div>
       <div class="fq">
         <button class="fq-btn" aria-expanded="false">
-          <span class="fq-n">15</span>
+          <span class="fq-n">16</span>
           <span class="fq-q">¿Qué pasa si ya no puedo viajar?</span>
           <span class="fq-ico" aria-hidden="true"></span>
         </button>
@@ -759,11 +904,14 @@ main{padding:0}
         <h2 class="fq-head-title">Casos fuera<br>de lo común</h2>
         <div class="fq-head-count">1 respuesta · ¿Otra duda? Escríbenos</div>
       </div>
+      <figure class="fq-head-foto">
+        <img src="img/tours/tour-faq-cat-especiales.webp" alt="Grupo del tour con la temática del evento" width="700" height="553" loading="lazy" decoding="async">
+      </figure>
     </div>
     <div class="fq-list">
       <div class="fq">
         <button class="fq-btn" aria-expanded="false">
-          <span class="fq-n">16</span>
+          <span class="fq-n">17</span>
           <span class="fq-q">¿Pueden viajar menores de edad?</span>
           <span class="fq-ico" aria-hidden="true"></span>
         </button>
@@ -779,6 +927,8 @@ main{padding:0}
   <div class="cta-kicker">Listo para ir</div>
   <h2 class="cta-title">Elige tu<br>próximo <em>concierto</em></h2>
   <a href="https://conectareynosa.mx/#catalog-anchor" class="cta-btn">Ver eventos y cotizar <span aria-hidden="true">→</span></a>
+  <!-- [PF-6c] ADITIVO: el CTA de "Elige tu próximo concierto" se queda igual. -->
+  <p class="cta-wa">¿Tu duda no está aquí? <a href="https://wa.me/528119771072" target="_blank" rel="noopener">Mándanos WhatsApp</a> — respondemos rápido.</p>
 </section>
 
 <!-- FOOTER -->

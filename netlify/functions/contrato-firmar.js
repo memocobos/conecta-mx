@@ -368,6 +368,20 @@ exports.handler = async function (event) {
     console.error("[contrato-firmar] Auto-asign falló:", e.message);
   }
 
+  // [T2] Creadora EXTERNA que toma el viaje → a las listas del evento. Mismo
+  // trato fail-soft que la auto-asignación: si algo truena se loguea y la firma
+  // sigue su curso. Solo 'creadora'; las demás plantillas ignoran el flag.
+  let creadoraViaje = null;
+  if (esCreadora && contrato.datos && contrato.datos.toma_viaje === true) {
+    try {
+      // `contrato.datos` es el de ANTES de firmar; la emergencia que la
+      // creadora acaba de capturar vive en patch.datos. Se pasa el efectivo.
+      creadoraViaje = await _asignarCreadoraExterna(contrato, patch.datos || contrato.datos);
+    } catch (e) {
+      console.error("[contrato-firmar] Creadora externa al evento falló:", e.message);
+    }
+  }
+
   // Emails best-effort (no rompen el endpoint si fallan).
   const link = `${SITE}/contrato?t=${token}`;
   try {
@@ -424,6 +438,116 @@ async function _perfilCoordinadorEnDatos(datos, correo) {
 // Busca el usuario rol='cc' por correo y, si encuentra evento por fecha/nombre,
 // inserta la asignación en eventos_coordi con status='aceptado'. Idempotente:
 // si ya existe (coordi_id, evento_id) lo devuelve sin duplicar.
+// [T2] Resolución contrato → SLUG del evento, compartida por la asignación de
+// coordinadores (eventos_coordi) y por la de creadoras externas
+// (viajeros_evento). Devuelve {slug,nombre} o {skipped,reason}.
+//
+// Llavea por eventos_meta.fecha y NO adivina: si dos eventos caen el mismo día
+// se sale con 'evento_ambiguo'. Devuelve SIEMPRE el slug BASE, sin '#idx' — el
+// sufijo de multifecha vive en el mundo Portal (solicitudes_tour), mientras que
+// las tablas de KH (viajeros_evento, eventos_coordi) llavean por slug base.
+async function _resolverEventoPorFecha(fecha, etiqueta) {
+  const r = await fetch(
+    `${SB_URL}/rest/v1/eventos_meta?fecha=eq.${encodeURIComponent(fecha)}&select=slug,nombre`,
+    { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` } }
+  );
+  if (!r.ok) {
+    console.warn(`[${etiqueta}] lookup eventos_meta falló:`, r.status);
+    return { skipped: true, reason: "lookup_evento_error" };
+  }
+  const candidatos = await r.json();
+  if (!candidatos.length) {
+    console.log(`[${etiqueta}] sin eventos_meta en fecha`, fecha);
+    return { skipped: true, reason: "no_evento_en_fecha" };
+  }
+  if (candidatos.length > 1) {
+    console.warn(`[${etiqueta}] varias filas en eventos_meta para fecha`, fecha, "→ no autoasigno (ambiguo)");
+    return { skipped: true, reason: "evento_ambiguo" };
+  }
+  return { slug: candidatos[0].slug, nombre: candidatos[0].nombre || candidatos[0].slug };
+}
+
+// [T2] Creadora EXTERNA que TOMA EL VIAJE (datos.toma_viaje): entra a las listas
+// del evento como PASAJERA en viajeros_evento, con tipo_viajero
+// 'creadora_externa' para que se distinga de un coordi a simple vista.
+//
+// Por qué viajeros_evento y NO eventos_coordi: coordi_id es NOT NULL con FK a
+// usuarios, así que una fila ahí obligaría a crearle cuenta de login — y todos
+// los consumidores de esa tabla (mis-grupos, strikes, deliverables,
+// recordatorios) asumen un usuario con sesión. Además el propio transporte ya
+// separa los dos mundos: viajeros_evento son PASAJEROS, y de eventos_coordi
+// salen los "PERSONAJES" que por definición "nunca cuentan como pasajeros".
+// Una creadora que toma el viaje es una pasajera.
+//
+// IDEMPOTENTE por (evento_id, correo) leyendo ANTES de escribir — nada de
+// on_conflict. La llave es más amplia que solo las filas 'creadora_externa' a
+// propósito: si ya está en la lista por cualquier vía (p.ej. el upsert de staff
+// cuando además es 'cc'), meterla otra vez la duplicaría en pantalla.
+async function _asignarCreadoraExterna(contrato, datosEfectivos) {
+  // [T2 · remate] Normalizado a minúsculas: el candado de idempotencia compara
+  // con eq. (sensible a mayúsculas), así que dos contratos del MISMO correo
+  // escrito distinto la duplicarían en la lista. `contrato-crear` ya lo baja a
+  // minúsculas al crear, esto es el cinturón. Una sola variable → cubre la
+  // búsqueda y el insert de un jalón.
+  const correo = String(contrato.creador_email || "").trim().toLowerCase();
+  if (!correo) {
+    console.log("[creadora-viaje] contrato sin correo → no asigno");
+    return { skipped: true, reason: "sin_correo" };
+  }
+
+  const ev = await _resolverEventoPorFecha(contrato.evento_fecha, "creadora-viaje");
+  if (ev.skipped) return ev;
+  const slug = ev.slug;
+
+  // Idempotencia: ¿ya está en la lista de este evento?
+  const dupResp = await fetch(
+    `${SB_URL}/rest/v1/viajeros_evento?evento_id=eq.${encodeURIComponent(slug)}&correo=eq.${encodeURIComponent(correo)}&select=id,tipo_viajero&limit=1`,
+    { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` } }
+  );
+  if (!dupResp.ok) {
+    console.warn("[creadora-viaje] lookup duplicado falló:", dupResp.status);
+    return { skipped: true, reason: "lookup_dup_error" };
+  }
+  const dupes = await dupResp.json();
+  if (dupes.length) {
+    console.log("[creadora-viaje] ya está en la lista id=", dupes[0].id, "tipo=", dupes[0].tipo_viajero);
+    return { id: dupes[0].id, evento_id: slug, existing: true };
+  }
+
+  // Los datos salen del contrato y de lo que la creadora capturó AL FIRMAR
+  // (fecha de nacimiento y contacto de emergencia). El celular no se pide en
+  // este flujo, y la columna lo permite nulo.
+  const d = (datosEfectivos && typeof datosEfectivos === "object") ? datosEfectivos : {};
+  const em = (d.emergencia && typeof d.emergencia === "object") ? d.emergencia : {};
+  const insResp = await fetch(`${SB_URL}/rest/v1/viajeros_evento`, {
+    method: "POST",
+    headers: {
+      apikey: SB_KEY,
+      Authorization: `Bearer ${SB_KEY}`,
+      "Content-Type": "application/json",
+      Prefer: "return=representation",
+    },
+    body: JSON.stringify({
+      evento_id: slug,
+      nombre: contrato.creador_nombre,
+      correo,
+      celular: null,
+      emergencia_nombre: em.nombre || null,
+      num_emergencia: em.telefono || null,
+      tipo_viajero: "creadora_externa",
+      notas: "Creadora externa que toma el viaje (contrato firmado)",
+    }),
+  });
+  if (!insResp.ok) {
+    const err = await insResp.text();
+    console.error("[creadora-viaje] insert falló:", insResp.status, err);
+    return { skipped: true, reason: "insert_error" };
+  }
+  const [creado] = await insResp.json();
+  console.log("[creadora-viaje] agregada a la lista id=", creado.id, "evento=", slug, "nombre=", contrato.creador_nombre);
+  return { id: creado.id, evento_id: slug, created: true };
+}
+
 async function _autoAsignarEvento(contrato) {
   // 1. Buscar usuario rol='cc' con el correo del contrato (con todos los
   //    campos que vamos a necesitar para auto-poblar viajeros_evento).
@@ -442,31 +566,13 @@ async function _autoAsignarEvento(contrato) {
     return { skipped: true, reason: "no_cc_profile" };
   }
 
-  // 2. Resolver el SLUG del evento vía eventos_meta (proyección por slug),
-  //    matcheando por fecha. ANTES usaba la tabla `eventos` (UUID) e insertaba
-  //    ese UUID en eventos_coordi; ahora todo opera por slug (EV/portal).
-  //    Si hay varias filas en la misma fecha NO adivinamos: no asignamos y
-  //    logueamos un warn (fails-soft) — la firma del contrato no se rompe.
-  const evResp = await fetch(
-    `${SB_URL}/rest/v1/eventos_meta?fecha=eq.${encodeURIComponent(contrato.evento_fecha)}&select=slug,nombre`,
-    { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` } }
-  );
-  if (!evResp.ok) {
-    console.warn("[auto-asign] lookup eventos_meta falló:", evResp.status);
-    return { skipped: true, reason: "lookup_evento_error" };
-  }
-  const candidatos = await evResp.json();
-  if (!candidatos.length) {
-    console.log("[auto-asign] sin eventos_meta en fecha", contrato.evento_fecha);
-    return { skipped: true, reason: "no_evento_en_fecha" };
-  }
-  if (candidatos.length > 1) {
-    console.warn("[auto-asign] varias filas en eventos_meta para fecha", contrato.evento_fecha, "→ no autoasigno (ambiguo)");
-    return { skipped: true, reason: "evento_ambiguo" };
-  }
-
-  const slug = candidatos[0].slug;
-  const eventoNombre = candidatos[0].nombre || slug;
+  // 2. Resolver el SLUG del evento. [T2] La resolución vive en
+  //    _resolverEventoPorFecha para que la asignación de coordis y la de
+  //    creadoras externas usen EXACTAMENTE la misma y no puedan desviarse.
+  const ev = await _resolverEventoPorFecha(contrato.evento_fecha, "auto-asign");
+  if (ev.skipped) return ev;
+  const slug = ev.slug;
+  const eventoNombre = ev.nombre;
 
   // 3. Idempotencia: ¿ya existe la asignación? (por slug)
   const dupResp = await fetch(

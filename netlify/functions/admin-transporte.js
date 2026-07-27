@@ -697,7 +697,7 @@ async function cargarMundoPortal(portal, eventoId, asignadoPor) {
 // `rooming_habitaciones` es un uuid de la tabla legacy `eventos` (ver cabecera).
 async function cargarMundoKH(kh, eventoId, asignadoPor) {
   const viajeros = await kh.get(
-    `viajeros_evento?evento_id=eq.${enc(eventoId)}&select=id,nombre,habitacion_id,evento_id&order=nombre.asc`
+    `viajeros_evento?evento_id=eq.${enc(eventoId)}&select=id,nombre,habitacion_id,evento_id,tipo_viajero&order=nombre.asc`
   );
   if (!viajeros.length) return { cuartos: [], sueltos: [], total_clientes: 0 };
 
@@ -710,6 +710,9 @@ async function cargarMundoKH(kh, eventoId, asignadoPor) {
     nombre: nombreDe(v) || 'Viajero',
     unidad_id: asignadoPor[`viajero:${v.id}`] || null,
     evento_id: v.evento_id || null,
+    // [T2] Para que la lista distinga de un vistazo a una creadora externa que
+    // toma el viaje. Null en todos los viajeros de siempre → la UI no pinta nada.
+    tipo_viajero: v.tipo_viajero || null,
   });
 
   const habIds = [...new Set(viajeros.map(v => v.habitacion_id).filter(Boolean))];

@@ -484,7 +484,12 @@ async function _resolverEventoPorFecha(fecha, etiqueta) {
 // propósito: si ya está en la lista por cualquier vía (p.ej. el upsert de staff
 // cuando además es 'cc'), meterla otra vez la duplicaría en pantalla.
 async function _asignarCreadoraExterna(contrato, datosEfectivos) {
-  const correo = String(contrato.creador_email || "").trim();
+  // [T2 · remate] Normalizado a minúsculas: el candado de idempotencia compara
+  // con eq. (sensible a mayúsculas), así que dos contratos del MISMO correo
+  // escrito distinto la duplicarían en la lista. `contrato-crear` ya lo baja a
+  // minúsculas al crear, esto es el cinturón. Una sola variable → cubre la
+  // búsqueda y el insert de un jalón.
+  const correo = String(contrato.creador_email || "").trim().toLowerCase();
   if (!correo) {
     console.log("[creadora-viaje] contrato sin correo → no asigno");
     return { skipped: true, reason: "sin_correo" };

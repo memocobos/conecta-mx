@@ -114,7 +114,7 @@ exports.handler = async (event) => {
         method: 'POST', headers: { ...sb, Prefer: 'return=minimal' },
         body: JSON.stringify({
           event_id: eventId, tipo, session_id: sesion.id || null,
-          pago_id: pagoId, resultado,
+          pago_id: pagoId, solicitud_id: (sesion.metadata && sesion.metadata.solicitud_id) || null, resultado,
           detalle: [detalle, 'carga=' + estiloCarga].filter(Boolean).join(' · '),
         }),
       });
@@ -135,6 +135,56 @@ exports.handler = async (event) => {
     await registrar('ignorado', `tipo=${tipo} payment_status=${sesion.payment_status || '-'}`);
     return { statusCode: 200, headers, body: JSON.stringify({ ok: true, ignorado: true, tipo }) };
   }
+  // ── [C2-2] ¿SEPARO o CUOTA? ────────────────────────────────────────────────
+  // Un separo pre-aceptación no tiene cuota: se anota en la SOLICITUD y queda
+  // "en espera de aplicarse". Quien lo aplica a la cuota 1 es la aceptación de
+  // Memo (C2-3), por la vía auditada — aquí NO se toca ningún plan de pagos,
+  // porque todavía no existe.
+  const solicitudId = meta.solicitud_id || null;
+  const esSeparo = String(meta.tipo || '').toLowerCase() === 'separo'
+    || (!pagoId && !!solicitudId);
+  if (esSeparo) {
+    if (!solicitudId || !/^[0-9a-f-]{36}$/i.test(solicitudId)) {
+      await registrar('error', 'separo sin solicitud_id válido en metadata');
+      return { statusCode: 200, headers, body: JSON.stringify({ ok: true, sin_solicitud_id: true }) };
+    }
+    const marcaS = await registrar('aplicado', 'separo');
+    if (marcaS.duplicado) {
+      return { statusCode: 200, headers, body: JSON.stringify({ ok: true, duplicado: true, event_id: eventId }) };
+    }
+    // READ-THEN-WRITE: si ya tiene separo_pagado_at, otro evento ganó. No se
+    // pisa la marca original — la primera confirmación es la buena.
+    try {
+      const yaR = await fetch(`${SB_URL}/rest/v1/solicitudes_tour?id=eq.${encodeURIComponent(solicitudId)}&select=id,separo_pagado_at`, { headers: sb });
+      const ya = yaR.ok ? await yaR.json() : [];
+      if (Array.isArray(ya) && ya[0] && ya[0].separo_pagado_at) {
+        return { statusCode: 200, headers, body: JSON.stringify({ ok: true, separo_ya_marcado: true }) };
+      }
+      await fetch(`${SB_URL}/rest/v1/solicitudes_tour?id=eq.${encodeURIComponent(solicitudId)}`, {
+        method: 'PATCH', headers: { ...sb, Prefer: 'return=minimal' },
+        body: JSON.stringify({
+          separo_pagado_at: new Date().toISOString(),
+          separo_session_id: sesion.id || null,
+          // separo_aplicado_pago_id se queda NULL a propósito: el separo está
+          // pagado pero AÚN NO aplicado. Ese null es el candado que impide que
+          // se aplique dos veces cuando Memo acepte.
+        }),
+      });
+    } catch (e) {
+      console.error('[stripe-webhook] no se pudo marcar el separo:', e.message);
+    }
+    // La sesión se cierra igual que en el flujo de cuotas.
+    try {
+      if (sesion.id) {
+        await fetch(`${SB_URL}/rest/v1/stripe_checkout_sesiones?session_id=eq.${encodeURIComponent(sesion.id)}`, {
+          method: 'PATCH', headers: { ...sb, Prefer: 'return=minimal' },
+          body: JSON.stringify({ estado: 'pagada', payment_intent_id: sesion.payment_intent || null, cerrada_en: new Date().toISOString() }),
+        });
+      }
+    } catch (e) { /* cosmético */ }
+    return { statusCode: 200, headers, body: JSON.stringify({ ok: true, event_id: eventId, separo: true, solicitud_id: solicitudId, carga: estiloCarga }) };
+  }
+
   if (!pagoId || !/^[0-9a-f-]{36}$/i.test(pagoId)) {
     await registrar('error', 'evento de pago sin pago_id válido en metadata');
     return { statusCode: 200, headers, body: JSON.stringify({ ok: true, sin_pago_id: true }) };

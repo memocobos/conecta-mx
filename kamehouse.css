@@ -2495,3 +2495,88 @@ select:focus-visible,textarea:focus-visible,[tabindex]:focus-visible{
   padding:6px 14px;
 }
 .gz-filter:active{transform:scale(.97);transition-duration:.1s}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   TUERCA KH-3 · LAS MESAS DE TRABAJO
+   Resumen · Pagos · Por Evento · Solicitudes Portal. Son las pantallas que
+   Memo mira 8 horas: el trabajo aquí es JERARQUÍA y RITMO, no adorno.
+   Presentación pura: ni un número, ni un monto, ni un flujo.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* ── 1 · LA CIFRA MANDA ─────────────────────────────────────────────────
+   Una tarjeta de métrica tenía la etiqueta y el número casi al mismo
+   volumen (10px vs 22px, con la etiqueta en mayúsculas y espaciada, que
+   pesa más de lo que mide). El número sube y la etiqueta se hace notita:
+   así la mesa se lee de un vistazo desde lejos, que es como se leen las
+   cifras cuando llevas horas. */
+.metric{padding:18px 18px 16px}
+.metric-value{
+  font-size:clamp(30px,4.4vw,40px);
+  letter-spacing:-.01em;
+}
+.metric-label{margin-bottom:6px;font-size:9.5px}
+.metric-sub{margin-top:8px}
+/* Un hilo del color del dato: verde/rojo ya viven en .metric-value, así que
+   la tarjeta hereda ese acento sin repetir el color en otro lado. */
+.metric::after{
+  content:'';position:absolute;left:0;right:0;bottom:0;height:2px;
+  background:currentColor;opacity:.16;
+}
+/* El color base va en .metric, no en un :not(:has(...)): si un navegador no
+   entiende :has(), las dos reglas de abajo se caen y el hilo se queda dorado
+   —correcto— en vez de heredar un color cualquiera. Las tres hijas declaran
+   su propio color, así que poner `color` aquí no le cambia el tono a ningún
+   texto: solo alimenta al currentColor del hilo. */
+.metric{color:var(--gold)}
+.metric:has(.metric-value.green){color:var(--green)}
+.metric:has(.metric-value.red){color:var(--red)}
+
+/* Las tarjetas de cobranza son la misma criatura: mismo tratamiento. */
+.cob-stat{padding:14px 16px 12px;position:relative;overflow:hidden}
+.cob-stat-val{font-size:26px;line-height:1.1}
+
+/* ── 2 · RITMO EN LAS FILAS ─────────────────────────────────────────────
+   Zebra MUY sutil (2.5%): suficiente para que el ojo no se pierda de
+   renglón en una tabla de 40 filas, invisible como "diseño". El hover ya
+   existía y se conserva: gana al zebra porque va después. */
+tbody tr:nth-child(even) td{background:rgba(255,255,255,.025)}
+tr:hover td{background:var(--bg3)}
+/* (Aquí había dos reglas de .table-wrap que se contradecían entre sí y no
+   cambiaban nada respecto de lo que ya hacía el archivo. Fuera.) */
+
+/* Encabezado que no se pierde. Es barato SOLO donde el contenedor tiene
+   altura propia; donde no la tiene es un no-op inofensivo. No se le impone
+   max-height a las tablas: eso cambiaría cómo se usan hoy, y esta tuerca no
+   cambia comportamiento.
+
+   OJO — el fondo NO es decoración, es lo que hace que sticky funcione: sin él
+   el contenido se ve pasar POR DEBAJO del encabezado. Y hacía falta escribirlo
+   porque el hotfix del 24-jul puso `#app table th{background:transparent}`
+   para neutralizar una regla de las plantillas de impresión que se coló en la
+   extracción V2 y ponía los thead CLAROS. Aquí se cumple el mismo propósito
+   —que no se vean claros— pero con el gris oscuro del tema en vez de con
+   transparencia, que es lo único que sticky no tolera. */
+th{position:sticky;top:0;z-index:2}
+#app table th{background:var(--bg3)}
+
+/* ── 3 · LOS CHIPS DE ESTADO, UNA SOLA FAMILIA ──────────────────────────
+   .k-tag ya es el chip del Palacio (KH-1 lo llevó a --r-chip). Aquí solo se
+   le da aire y se asegura que no se deforme dentro de una celda. */
+.k-tag{padding:4px 11px;white-space:nowrap;vertical-align:middle}
+
+/* ── 4 · EL RESUMEN MATUTINO, CON AIRE ──────────────────────────────────
+   El saludo es lo primero que ve Memo cada mañana: se le da respiro y el
+   mismo radio de tarjeta que el resto de la mesa. */
+.kh-saludo{
+  border-radius:var(--r-card,16px);
+  padding:18px 22px;
+  gap:16px;
+}
+
+/* ── 5 · ARMONIZAR, NO REDISEÑAR ────────────────────────────────────────
+   El paso de separo (T4) y los buscadores se quedan EXACTAMENTE con su
+   flujo; solo entran al sistema de radios y al tap de la casa. */
+.sp-nav-badge{border-radius:var(--r-chip,999px)}
+input[type="search"],.kh-buscar,.buscador{border-radius:var(--r-sm,8px)}
+.metric:active,.cob-stat:active{transform:scale(.995);transition-duration:.12s}
+@media (hover:none){ .metric:hover,.cob-stat:hover{border-color:var(--border)} }

@@ -2377,3 +2377,121 @@ select:focus-visible,textarea:focus-visible,[tabindex]:focus-visible{
     will-change:auto !important;
   }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   TUERCA KH-2 · GUERREROS Z
+   La cara que ve el equipo esta semana. Presentación: entra la familia
+   visual de la casa sobre las tarjetas, el perfil y los chips.
+   Textos, permisos y candados INTACTOS (T7 y la jerarquía de invitación
+   siguen exactamente donde estaban).
+
+   NOTA SOBRE TIPOGRAFÍA: el brief señala a Guerreros Z como "de otra
+   época", y lo es en ESTRUCTURA — pero NO en tipografía. Rajdhani y Zen
+   Dots no son marcadores locales de GZ: viven en notificaciones, kardex,
+   cobranza y ranking, y se cargan como webfont del Palacio. Cambiarlas es
+   una decisión tipográfica de TODO el Palacio, no de esta tuerca. Aquí no
+   se toca ni una familia.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* ── 1 · LA TARJETA DEL EQUIPO ──────────────────────────────────────────
+   Se retira el clip-path de esquinas cortadas. No es capricho: era la
+   razón por la que KH-1 no pudo alcanzarla (un clip-path ignora el
+   border-radius), así que la tarjeta se quedaba fuera del sistema mientras
+   todo a su alrededor entraba. Ahora es una tarjeta de la casa. */
+.gz-card{
+  clip-path:none;
+  border-radius:var(--r-card,16px);
+  transition:border-color .2s ease,transform .2s ease,box-shadow .2s ease;
+}
+/* La rejilla decorativa de fondo (dos gradientes de 1px cada 20px) sale:
+   es ruido sobre la foto de una persona, y es el patrón que delata a las
+   interfaces generadas. La identidad de GZ no vivía ahí — vive en el
+   naranja→dorado del avatar y del acento de arriba. */
+.gz-card::before{
+  background:none;
+  height:3px;inset:0 0 auto 0;
+  background-image:linear-gradient(90deg,var(--orange),var(--gold));
+  opacity:0;transition:opacity .2s ease;
+}
+.gz-card:hover::before,.gz-card:focus-within::before{opacity:1}
+/* El triangulito de esquina se va con el clip-path (ya no hay esquina que
+   acompañar); el acento de arriba lo reemplaza. */
+.gz-card::after{content:none}
+.gz-card:hover{
+  border-color:rgba(255,183,3,.35);
+  transform:translateY(-2px);
+  box-shadow:var(--sh-card,0 8px 32px rgba(0,0,0,.5));
+}
+@media (hover:none){ .gz-card:hover{transform:none;box-shadow:none} }
+
+/* ── 2 · JERARQUÍA: AVATAR → NOMBRE → ROL → DATOS ───────────────────────
+   El avatar manda (es una tarjeta de una PERSONA): crece y se vuelve
+   círculo, como el del Portal. El nombre sube de tamaño y el rol baja a
+   chip, para que se lean en ese orden y no todos al mismo volumen. */
+.gz-avatar{
+  width:84px;height:84px;
+  clip-path:none;
+  border-radius:50%;
+  border:2px solid rgba(255,255,255,.08);
+  font-size:28px;
+}
+.gz-card:hover .gz-avatar{border-color:rgba(255,183,3,.45)}
+.gz-name{
+  font-size:16px;
+  margin-top:14px;margin-bottom:6px;
+}
+.gz-rol{
+  display:inline-block;
+  margin-bottom:12px;opacity:1;
+  padding:3px 10px;
+  border-radius:var(--r-chip,999px);
+  background:rgba(232,255,76,.1);
+  border:1px solid rgba(232,255,76,.22);
+  /* el --gold sobre ese fondo mide 12.4:1 — el rol se lee de verdad */
+  color:var(--gold);
+}
+.gz-badge-yo{border-radius:var(--r-chip,999px) 0 var(--r-chip,999px) 0}
+
+/* ── 3 · LOS CHIPS DE ESTADO, TODOS DEL MISMO IDIOMA ────────────────────
+   🚪 pausado y 💤 sin ventas se pintaban con estilo EN LÍNEA desde el JS,
+   con su propio radio de 4px. Ahora son una clase con --r-chip, como el
+   resto. (El JS solo cambia el atributo style por una clase — cosmético.) */
+.gz-chip-inactivo{
+  font-size:9px;letter-spacing:.08em;text-transform:uppercase;font-weight:800;
+  padding:3px 10px;
+  border-radius:var(--r-chip,999px);
+  color:#ff8f8f;background:rgba(255,68,68,.14);border:1px solid rgba(255,68,68,.4);
+}
+.gz-chip-nota{font-size:9px;color:var(--ts);opacity:.75}
+.gz-badge-cumple{font-size:15px;top:8px;right:10px}
+
+/* ── 4 · ENTRADA EN CASCADA ─────────────────────────────────────────────
+   Idioma PF-1: 45ms de escalón con TOPE en 6 (270ms). Sin tope, el guerrero
+   número 20 esperaría casi un segundo y se leería como bug, no como estilo.
+   El keyframe no declara `to`: el 100% implícito toma el valor propio del
+   elemento, así el hover no queda congelado por un relleno forwards. */
+@keyframes gzCardIn{from{opacity:0;transform:translateY(14px)}}
+.gz-card{
+  animation:gzCardIn .38s cubic-bezier(.22,1,.36,1) backwards;
+  animation-delay:calc(var(--gzi,0) * 45ms);
+}
+
+/* ── 5 · MI PERFIL, LA MISMA FAMILIA ────────────────────────────────────
+   La tarjeta de perfil tenía el mismo clip-path de esquinas cortadas.
+   Entra al sistema junto con las de la lista. */
+.perfil-card{
+  clip-path:none;
+  border-radius:var(--r-card,16px);
+  overflow:hidden;   /* para que el header respete la esquina */
+}
+.perfil-avatar-large{border-radius:50%}
+.perfil-section-title::before{border-radius:50%}
+
+/* ── 6 · LOS FILTROS DE LA LISTA ────────────────────────────────────────
+   Estaban en border-radius:0 mientras todo lo demás entraba al sistema.
+   Son chips de filtro: se comportan como chips. */
+.gz-filter{
+  border-radius:var(--r-chip,999px);
+  padding:6px 14px;
+}
+.gz-filter:active{transform:scale(.97);transition-duration:.1s}

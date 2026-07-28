@@ -3639,9 +3639,15 @@ async function renderPlanPagos(t, head){
 // ═══════════════════════════════════════════════════════════════════════════
 
 // Los textos, en un solo lugar para que se puedan leer de corrido y juzgar.
+// [C2-4 remate] DÉBITO Y CRÉDITO VAN SEPARADOS, cada uno con SU total. Antes
+// había una sola "Tarjeta" clavada a crédito, y eso le cobraba el 5% del
+// crédito a alguien que iba a pagar con débito. Un peso de más por una
+// simplificación nuestra es un peso de más.
 const _C24_TARJETAS = [
-  { k: 'tarjeta', metodo: 'credito', ic: '💳', t: 'Tarjeta',
-    d: 'Pagas ahora mismo con tu tarjeta y tu lugar queda confirmado al instante.' },
+  { k: 'debito', metodo: 'debito', ic: '💳', t: 'Tarjeta de débito',
+    d: 'Pagas ahora mismo con tu tarjeta del banco y tu lugar queda confirmado al instante.' },
+  { k: 'credito', metodo: 'credito', ic: '💳', t: 'Tarjeta de crédito',
+    d: 'Pagas ahora mismo con tu tarjeta de crédito y tu lugar queda confirmado al instante.' },
   { k: 'oxxo', metodo: 'oxxo', ic: '🏪', t: 'OXXO',
     d: 'Te damos tu ficha y tienes 24 horas para pagarla en la tienda. Te avisamos en cuanto nos confirmen.' },
   { k: 'transferencia', metodo: null, ic: '🏦', t: 'Transferencia',

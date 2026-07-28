@@ -66,7 +66,7 @@ exports.handler = async (event) => {
   let pago;
   try {
     const q = `${SB_URL}/rest/v1/pagos?id=eq.${encodeURIComponent(pagoId)}` +
-      `&select=id,concepto,monto,estado,solicitudes_tour(paquete,estado,clientes(auth_user_id))`;
+      `&select=id,concepto,monto,estado,solicitudes_tour(paquete,estado,precio_total,clientes(auth_user_id))`;
     const r = await fetch(q, { headers: sb });
     if (!r.ok) return apagado;
     const arr = await r.json();
@@ -86,7 +86,11 @@ exports.handler = async (event) => {
   if (!tarifas.cuotaElegible(pago.concepto)) return apagado;
 
   const opciones = [];
+  // [C2-4 remate] Los MSI solo si esta cuota llega al umbral del total del tour.
+  // Una cuota de $500 sobre $9,000 no se difiere a 6 meses.
+  const permitidos = tarifas.metodosPara(pago.monto, sol && sol.precio_total);
   for (const m of ORDEN) {
+    if (!permitidos.includes(m)) continue;
     const t = tarifas.calcularTotal(pago.monto, m);
     if (t.error) continue;
     opciones.push({

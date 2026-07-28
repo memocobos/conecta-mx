@@ -141,6 +141,13 @@ exports.handler = async (event) => {
   // reporta la diferencia para que quede en la bitácora del Palacio.
   const difiere = Number(sol.monto_separo) > 0 && Math.abs(Number(sol.monto_separo) - separoPesos) > 1;
 
+  // [C2-4 remate] CANDADO DEL UMBRAL MSI, también aquí: un separo nunca llega
+  // a la mitad del tour, así que los MSI quedan fuera por regla, no por olvido.
+  if (!tarifas.metodosPara(separoPesos, Number(pv.total)).includes(metodo)) {
+    return { statusCode: 409, headers, body: JSON.stringify({
+      error: 'Los meses sin intereses son para pagos grandes (al menos la mitad de tu viaje)' }) };
+  }
+
   const t = tarifas.calcularTotal(separoPesos, metodo);
   if (t.error) return { statusCode: 400, headers, body: JSON.stringify({ error: t.error }) };
 

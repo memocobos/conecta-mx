@@ -30,6 +30,9 @@ const ETIQUETAS = {
   msi3:    { label: '3 meses sin intereses',  nota: 'Con tarjeta de crédito participante' },
   msi6:    { label: '6 meses sin intereses',  nota: 'Con tarjeta de crédito participante' },
 };
+// [C2-4 remate] El orden que ve el cliente. Los MSI se filtran por el umbral
+// (metodosPara): en un separo nunca aplican, pero la regla se pregunta igual —
+// no se asume, se calcula.
 const ORDEN = ['oxxo', 'debito', 'credito', 'msi3', 'msi6'];
 
 exports.handler = async (event) => {
@@ -98,7 +101,9 @@ exports.handler = async (event) => {
   const separoPesos = Number(pv.separo);
 
   const opciones = [];
+  const permitidos = tarifas.metodosPara(separoPesos, Number(pv.total));
   for (const m of ORDEN) {
+    if (!permitidos.includes(m)) continue;   // MSI fuera si el pago no llega al umbral
     const t = tarifas.calcularTotal(separoPesos, m);
     if (t.error) continue;
     opciones.push({

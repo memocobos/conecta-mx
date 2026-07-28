@@ -14248,6 +14248,9 @@ function _esfFotoShow(url) {
   const clr  = document.getElementById('esf-foto-clear');
   if (_esfFotoUrl) { if (img) img.src = _esfFotoUrl; if (prev) prev.style.display = ''; if (clr) clr.style.display = ''; }
   else { if (img) img.src = ''; if (prev) prev.style.display = 'none'; if (clr) clr.style.display = 'none'; }
+  // [E2] Subir o QUITAR la portada repinta la vista previa al instante: sin
+  // esto había que tocar otro campo para que se enterara.
+  try { if (typeof renderEsferaPreview === 'function') renderEsferaPreview(); } catch (e) {}
 }
 function _esfFotoClear() {
   _esfFotoShow('');
@@ -14610,6 +14613,18 @@ function _esfPreviewBottom(status, desde) {
   return '<div class="ev-bottom"><div><div class="ev-price-lbl">Informes</div><div class="ev-price-wa">Cotiza por WA</div></div>' + cta + '</div>';
 }
 
+// [E2] El pie decía SIEMPRE "Foto vía Deezer", aunque hubiera portada manual.
+// Ahora dice cuál se está viendo. Solo texto: no toca la tubería.
+function _esfPreviewPie(hayManual, hayDeezer) {
+  const el = document.getElementById('esf-preview-pie');
+  if (!el) return;
+  el.textContent = hayManual
+    ? 'Portada manual (la que subiste). Solo vista previa — no crea ni publica.'
+    : (hayDeezer
+        ? 'Foto vía Deezer (búsqueda por nombre). Solo vista previa — no crea ni publica.'
+        : 'Sin portada todavía. Solo vista previa — no crea ni publica.');
+}
+
 function renderEsferaPreview() {
   const cont = document.getElementById('esf-preview-card');
   if (!cont) return;
@@ -14622,10 +14637,18 @@ function renderEsferaPreview() {
   const venue  = (document.getElementById('esf-venue')?.value || '').trim();
   const st = _esfPreviewStatus(status);
   const initials = (nombre || '··').substring(0, 2).toUpperCase();
+  // [E2] La vista previa arma su imagen con la MISMA prioridad que el sitio:
+  // la portada manual (columna `foto` → staticImg del compilador, TUERCA A)
+  // GANA sobre Deezer, que queda de respaldo. Antes el preview solo miraba el
+  // caché de Deezer, así que subías portada, decía "Subida ✓" y la tarjeta
+  // seguía enseñando la foto del artista.
+  const manual = (typeof _esfGetFoto === 'function') ? _esfGetFoto() : '';
   const cached = _esfPreviewImgCache[nombre];
-  const imgHTML = cached
-    ? `<div class="ev-img-wrap"><img class="ev-img" src="${_esfEsc(cached)}" alt=""></div>`
+  const src = manual || cached;      // manual primero, Deezer de respaldo
+  const imgHTML = src
+    ? `<div class="ev-img-wrap"><img class="ev-img" src="${_esfEsc(src)}" alt=""></div>`
     : `<div class="ev-img-placeholder"><span class="ev-img-initials">${_esfEsc(initials)}</span></div>`;
+  _esfPreviewPie(!!manual, !!cached);
   cont.innerHTML =
     `<div class="ev-card ${st.cardCls}">` +
       imgHTML +

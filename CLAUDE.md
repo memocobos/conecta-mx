@@ -135,6 +135,11 @@ _Última revisión: 28-jul-2026 (series PP, PG, E1 y KH cerradas)._
 
 ### ⚠️ Reglas que cuestan caro olvidar
 - **Nunca `gh pr merge`.** Flujo: `pull main` → `merge --no-ff` → `push`.
+- **El código de salida de un pipe es el del ÚLTIMO comando**: `git push | tail`
+  SIEMPRE sale en éxito, aunque el push haya sido rechazado. Verificar el push
+  leyendo el resultado real (o con `set -o pipefail`), y **JAMÁS borrar la rama
+  antes de confirmar el push**. Ya costó dos PRs que quedaron CLOSED en vez de
+  MERGED (#388 y #395): el código sí llegó a main, pero el registro miente.
 - **Jamás `on_conflict` / `merge-duplicates`.** INSERT directo; un 23505 es
   idempotencia, pero hay que CONFIRMAR la causa, no adivinarla.
 - **`NULL` en una llave de unicidad no une nada** (`NULL != NULL`). Revisar el

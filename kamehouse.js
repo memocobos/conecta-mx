@@ -7185,9 +7185,12 @@ function _gzChipInactivo(u) {
   const detalle = info.ultima_venta
     ? `última venta: ${_salEsc(String(info.ultima_venta).slice(0, 10))}`
     : 'nunca ha vendido';
+  // [KH-2] El chip se pintaba con estilo EN LÍNEA y su propio radio de 4px.
+  // Ahora es una clase de kamehouse.css con --r-chip, como los demás chips.
+  // El texto y la lógica no cambian: solo dónde vive la apariencia.
   return `<div style="margin-top:8px;display:flex;flex-direction:column;gap:6px;align-items:center">
-    <span style="font-size:9px;letter-spacing:.08em;text-transform:uppercase;font-weight:800;padding:2px 8px;border-radius:4px;color:#ff6666;background:rgba(255,68,68,.14);border:1px solid rgba(255,68,68,.4)">${_salEsc(etiqueta)}</span>
-    <span style="font-size:9px;color:var(--ts);opacity:.75">${detalle}</span>
+    <span class="gz-chip-inactivo">${_salEsc(etiqueta)}</span>
+    <span class="gz-chip-nota">${detalle}</span>
     <button class="btn btn-ghost btn-sm" style="font-size:10px;padding:3px 10px" onclick="event.stopPropagation();gzReactivarVendedor('${_attrJs(u.id)}','${_attrJs(u.nombre)}')">Dar otra oportunidad</button>
   </div>`;
 }
@@ -7217,7 +7220,7 @@ async function renderGZ() {
     asignaciones.forEach(a => { (asignacionesDe[a.coordi_id] = asignacionesDe[a.coordi_id] || []).push(a); });
   } catch(e){ asignacionesDe = {}; evMap = {}; }
   const anioActual = new Date().getFullYear();
-  grid.innerHTML = lista.map(u => {
+  grid.innerHTML = lista.map((u, _i) => {
     const iniciales = u.nombre.split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase();
     // 🔐 CAP2-1: a los roles no-administrativos el backend ya NO les manda
     // `strikes` ni `fecha_nacimiento` de OTRAS personas. En ese caso NO se
@@ -7235,7 +7238,10 @@ async function renderGZ() {
     const nombreCorto = partes[0] + (partes[1] ? ' ' + partes[1][0] + '.' : '');
     const misToures = allTours.filter(t => t.usuario_id === u.id);
     const pts = calcularPuntosCombinados(misToures, asignacionesDe[u.id] || [], evMap, anioActual).total;
-    return `<div class="gz-card" onclick="abrirPerfil('${u.id}')">
+    // [KH-2] --gzi = el escalón de la cascada de entrada (idioma PF-1). TOPE en
+    // 6: sin él, el guerrero 20 esperaría casi un segundo y se leería como bug.
+    // Solo escribe una variable CSS; la animación vive en kamehouse.css.
+    return `<div class="gz-card" style="--gzi:${Math.min(_i, 6)}" onclick="abrirPerfil('${u.id}')">
       ${esYo ? '<div class="gz-badge-yo">TÚ</div>' : ''}
       ${cumple ? '<div class="gz-badge-cumple"><svg class="ic"><use href="#ic-pastel"/></svg></div>' : ''}
       <div class="gz-card-inner">

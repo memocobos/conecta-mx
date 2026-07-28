@@ -14029,6 +14029,20 @@ async function _esfAutoGuardarLibreta(venue, zonasObjs) {
   await _esfLoadVenuesCat();
 }
 
+// [E1] Con PRÓXIMAMENTE marcada los precios pueden quedar vacíos sin queja —
+// es su caso de uso, no un descuido. Se atenúan para que se lea de un vistazo
+// que esa zona todavía no cotiza. Solo apariencia: NO se deshabilitan, para que
+// Memo pueda ir escribiendo el costo y desmarcar la casilla cuando lo tenga.
+function _esfProxPintaFila(row) {
+  const prox = !!row.querySelector('.esf-zona-prox')?.checked;
+  row.querySelectorAll('.esf-zona-p,.esf-zona-pc').forEach((inp) => {
+    inp.style.opacity = prox ? '.45' : '';
+    inp.placeholder = prox
+      ? (inp.classList.contains('esf-zona-p') ? 'sin costo aún' : 'sin costo aún')
+      : (inp.classList.contains('esf-zona-p') ? '$ PLUS' : '$ CHEAP');
+  });
+}
+
 function _esfAddZona(data) {
   const cont = document.getElementById('esf-zonas');
   if (!cont) return;
@@ -14044,15 +14058,30 @@ function _esfAddZona(data) {
     '<input class="cot-input esf-zona-p" type="number" min="0" placeholder="$ PLUS" style="flex:1;min-width:78px">' +
     '<input class="cot-input esf-zona-pc" type="number" min="0" placeholder="$ CHEAP" style="flex:1;min-width:78px">' +
     '<label style="font-size:11px;display:flex;align-items:center;gap:3px;white-space:nowrap"><input type="checkbox" class="esf-zona-ag">Agotada</label>' +
+    // [E1] PRÓXIMAMENTE: la zona se anuncia sin costo todavía. El index ya la
+    // pinta deshabilitada en cursiva y minP la ignora, así que "desde $X" no la
+    // toma. Excluyente con Agotada (abajo), porque son estados distintos: una
+    // nunca estuvo a la venta, la otra se acabó.
+    '<label style="font-size:11px;display:flex;align-items:center;gap:3px;white-space:nowrap" title="Se anuncia sin precio: el sitio la muestra como Próximamente"><input type="checkbox" class="esf-zona-prox">Próx.</label>' +
     '<button type="button" class="btn btn-ghost esf-zona-del" title="Quitar zona">✕</button>';
   row.querySelector('.esf-zona-n').value = (typeof d.n === 'string') ? d.n : '';
   if (d.p) row.querySelector('.esf-zona-p').value = d.p;
   if (d.pc) row.querySelector('.esf-zona-pc').value = d.pc;
   if (d.ag) row.querySelector('.esf-zona-ag').checked = true;
+  if (d.prox) row.querySelector('.esf-zona-prox').checked = true;
   row.querySelectorAll('input').forEach((el) => {
     el.addEventListener('input', renderEsferaPreview);
     el.addEventListener('change', renderEsferaPreview);
   });
+  // [E1] Agotada y Próximamente son excluyentes: marcar una desmarca la otra.
+  // Se hace aquí y no con un radio porque las dos tienen que poder quedar en
+  // blanco (una zona normal, a la venta, no es ninguna de las dos).
+  const _cbAg = row.querySelector('.esf-zona-ag');
+  const _cbProx = row.querySelector('.esf-zona-prox');
+  _cbAg.addEventListener('change', () => { if (_cbAg.checked) _cbProx.checked = false; _esfProxPintaFila(row); renderEsferaPreview(); });
+  _cbProx.addEventListener('change', () => { if (_cbProx.checked) _cbAg.checked = false; _esfProxPintaFila(row); renderEsferaPreview(); });
+  if (d.prox && d.ag) _cbAg.checked = false;   // por si llegara basura de la DB
+  _esfProxPintaFila(row);
   // Dropdown de la libreta en el campo de nombre (sin romper renderEsferaPreview).
   const _nInp = row.querySelector('.esf-zona-n');
   _nInp.addEventListener('focus', () => _esfZonaSugg(_nInp));
@@ -14068,8 +14097,11 @@ function _esfGetZonas() {
     const n = (row.querySelector('.esf-zona-n')?.value || '').trim();
     const p = parseInt(row.querySelector('.esf-zona-p')?.value || '0', 10) || 0;
     const pc = parseInt(row.querySelector('.esf-zona-pc')?.value || '0', 10) || 0;
-    const ag = row.querySelector('.esf-zona-ag')?.checked ? 1 : 0;
-    return { n, p, pc, ag };
+    const prox = row.querySelector('.esf-zona-prox')?.checked ? 1 : 0;
+    // prox manda: nunca se guardan las dos (la UI ya lo impide, esto es el
+    // cinturón por si alguien llega con datos viejos).
+    const ag = (!prox && row.querySelector('.esf-zona-ag')?.checked) ? 1 : 0;
+    return { n, p, pc, ag, prox };
   }).filter((z) => z.n);
 }
 
@@ -14355,7 +14387,9 @@ async function _esfMapaPick(event) {
 // minP del preview = espeja la card real del index: menor precio PLUS (p>0,
 // no agotada). 0 si no hay zonas vendibles.
 function _esfPreviewMinP() {
-  const avail = _esfGetZonas().filter((z) => !z.ag && z.p > 0);
+  // [E1] !z.prox espeja a minP() de index.html: una zona sin costo todavía no
+  // puede ser el "desde $X" de la tarjeta.
+  const avail = _esfGetZonas().filter((z) => !z.ag && !z.prox && z.p > 0);
   if (!avail.length) return 0;
   return Math.min.apply(null, avail.map((z) => z.p));
 }

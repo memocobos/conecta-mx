@@ -106,7 +106,7 @@ function _vacio(v) {
 }
 
 // B1 — `zonas` (texto JSON desde la DB, o array) → filas normalizadas en el
-// ORDEN capturado: {n, p, pc, ag}. Basura estructural → []. Descarta filas sin
+// ORDEN capturado: {n, p, pc, ag, prox}. Basura estructural → []. Descarta filas sin
 // nombre. (VIP eliminado: ya no se captura ni se emite.)
 //
 // 🔒 AUD-1 — ERROR DE CAPTURA, no silencio: antes, un precio no numérico (el
@@ -126,8 +126,17 @@ function parseZonas(raw) {
     const n = (typeof z.n === 'string' ? z.n : '').trim();
     if (!n) continue;
     const ag = (z.ag === 1 || z.ag === true || z.ag === '1') ? 1 : 0;
+    // [E1] PRÓXIMAMENTE: la zona existe pero todavía no tiene costo. El index ya
+    // sabe pintarla (botón deshabilitado en cursiva) y minP la ignora; lo único
+    // que faltaba era que el campo sobreviviera el viaje editor → EV.
+    // PROX MANDA sobre AGOTADA: si por lo que sea llegaran las dos, se publica
+    // prox (una zona sin precio anunciada como "agotada" le miente al cliente
+    // sobre algo que nunca estuvo a la venta).
+    const prox = (z.prox === 1 || z.prox === true || z.prox === '1') ? 1 : 0;
     const p = Number(z.p);
-    if (!ag && !(Number.isFinite(p) && p > 0)) {
+    // El candado AUD-1 no aplica a una zona prox: no tener precio todavía es
+    // EXACTAMENTE su caso de uso, no un error de captura.
+    if (!ag && !prox && !(Number.isFinite(p) && p > 0)) {
       throw new Error(
         `Zona "${n}": el precio "${z.p}" no es un número válido. ` +
         'Escríbelo sin comas ni símbolos (ej. 2700), o marca la zona como agotada.'
@@ -146,7 +155,9 @@ function parseZonas(raw) {
       n,
       p: (Number.isFinite(p) && p > 0) ? Math.round(p) : 0,
       pc: (Number.isFinite(pc) && pc > 0) ? Math.round(pc) : 0,
-      ag,
+      // prox manda: si vinieran las dos, la zona se publica como próximamente
+      ag: prox ? 0 : ag,
+      prox,
     });
   }
   return out;
@@ -158,14 +169,20 @@ function parseZonas(raw) {
 function zonasSegmento(esfera) {
   const rows = parseZonas(esfera.zonas);
   if (!rows.length) return 'zonas:[]';
+  // [E1] El orden de las llaves espeja el de los EV que ya viven en el index
+  // (p.ej. coronacapital: {n:'General',p:0,prox:1}), para que el compilado siga
+  // siendo byte-exacto contra lo capturado a mano.
   const plus = rows.map((z) =>
-    "{n:'" + escStr(z.n) + "',p:" + z.p + (z.ag ? ',ag:1' : '') + '}'
+    "{n:'" + escStr(z.n) + "',p:" + z.p + (z.prox ? ',prox:1' : (z.ag ? ',ag:1' : '')) + '}'
   ).join(',');
   let seg = 'zonas:[' + plus + ']';
   // cheapZonas SOLO si alguna zona tiene precio cheap. Espeja TODAS las zonas:
   // disponible (no ag y pc>0) → p:pc; el resto → p:0,ag:1 (patrón legacy).
+  // [E1] Una zona prox se espeja como prox también en cheap: si todavía no hay
+  // costo PLUS, tampoco lo hay CHEAP — anunciarla "agotada" mentiría igual.
   if (rows.some((z) => z.pc > 0)) {
     const cheap = rows.map((z) => {
+      if (z.prox) return "{n:'" + escStr(z.n) + "',p:0,prox:1}";
       const avail = !z.ag && z.pc > 0;
       return "{n:'" + escStr(z.n) + "',p:" + (avail ? z.pc : 0) +
         (avail ? '' : ',ag:1') + '}';

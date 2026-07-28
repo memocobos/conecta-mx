@@ -85,7 +85,7 @@ function saneHotel(v) {
   return JSON.stringify({ custom: true, total: (Number.isFinite(total) && total > 0) ? Math.round(total) : 0, items });
 }
 
-// zonas (B1): JSON array de objetos {n,p,pc?,ag}. Acepta array o string
+// zonas (B1): JSON array de objetos {n,p,pc?,ag?,prox?}. Acepta array o string
 // JSON. Saneo: descarta filas sin nombre, normaliza números/flags. Basura o
 // sin filas → null (limpia / cae a evento sin zonas). Devuelve string JSON o null.
 // (VIP ignorado si llega: ya no se usa.)
@@ -102,7 +102,14 @@ function saneZonas(v) {
     const pc = Number(z.pc);
     const row = { n, p: (Number.isFinite(p) && p > 0) ? Math.round(p) : 0 };
     if (Number.isFinite(pc) && pc > 0) row.pc = Math.round(pc);
-    if (z.ag === 1 || z.ag === true || z.ag === '1') row.ag = 1;
+    // [E1] PRÓXIMAMENTE. Sin esta línea el campo moría AQUÍ: saneZonas
+    // reconstruye la fila campo por campo, así que lo que no se nombra se
+    // pierde en silencio entre el editor y la base.
+    // Excluyente con ag, y prox manda (una zona sin precio anunciada como
+    // "agotada" le miente al cliente sobre algo que nunca estuvo a la venta).
+    const prox = (z.prox === 1 || z.prox === true || z.prox === '1') ? 1 : 0;
+    if (prox) row.prox = 1;
+    else if (z.ag === 1 || z.ag === true || z.ag === '1') row.ag = 1;
     out.push(row);
   }
   if (!out.length) return null;

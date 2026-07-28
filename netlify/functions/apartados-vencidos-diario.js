@@ -8,7 +8,7 @@
 // aviso, no cambio de estado) para no repetir el correo del mismo apartado.
 //
 // Busca solicitudes `pendiente` SIN comprobante cuyo hold_expira_at venció en las
-// últimas 24h y aún no fueron avisadas; por cada una manda UN correo al cliente
+// últimas 48h (C2-1) y aún no fueron avisadas; por cada una manda UN correo al cliente
 // ("venció pero puedes retomarlo subiendo tu comprobante", con link al portal) y
 // marca hold_avisado_at. Al final, si hubo vencidos, UN resumen al admin.
 //
@@ -25,7 +25,12 @@ const FROM = process.env.RESEND_FROM_COBRANZA || 'Conecta Reynosa <admin@conecta
 const FROM_ADMIN = 'Portal Conecta <admin@conectareynosa.mx>';
 const ADMIN_TO = 'admin@conectareynosa.mx';
 const PORTAL_URL = 'https://conectareynosa.mx/portal';
-const VENTANA_MS = 24 * 60 * 60 * 1000; // "últimas 24h"
+// [C2-1] La ventana de barrido pasa de 24 a 48 h. Con holds de OXXO de 24 h y un
+// cron que corre UNA vez al día, un apartado podía vencer justo después del
+// barrido y quedar fuera del siguiente por 24 horas exactas — nunca se avisaba.
+// 48 h cubre el peor caso (vence 1 minuto después de la corrida) sin repetir
+// correos: la idempotencia la da hold_avisado_at, no la ventana.
+const VENTANA_MS = 48 * 60 * 60 * 1000;
 
 async function sb(path, opts = {}) {
   const res = await fetch(`${SB_URL}/rest/v1/${path}`, { ...opts, headers: { ...HEADERS, ...(opts.headers || {}) } });
@@ -67,20 +72,27 @@ function wrapHtml(nombre, cuerpoHtml) {
 }
 
 // PURO (defensa en profundidad + testeable): ¿esta fila es un apartado vencido que
-// aún NO se ha avisado, dentro de la ventana de 24h? Refleja EXACTAMENTE el filtro
+// aún NO se ha avisado, dentro de la ventana de barrido? Refleja EXACTAMENTE el filtro
 // del query. No depende de la BD.
 function esApartadoVencido(row, nowMs) {
   if (!row) return false;
   if (row.estado !== 'pendiente') return false;                                   // cancelado/en_pagos/pagado → no
   const comp = row.comprobante_separo_url;
   if (comp != null && String(comp).trim() !== '') return false;                   // con comprobante → no
+  // [C2-1] SEPARO YA PAGADO → NO. Un OXXO pagado en la hora 22 conserva su
+  // hold_expira_at (nadie muta la fila: regla de Fase B) y su
+  // comprobante_separo_url en NULL, porque no hubo comprobante que subir. Sin
+  // esta línea, el barrido del día siguiente le mandaría "tu apartado venció"
+  // a un cliente QUE YA PAGÓ. Es el peor correo que podemos mandar.
+  const pag = row.separo_pagado_at;
+  if (pag != null && String(pag).trim() !== '') return false;
   const avis = row.hold_avisado_at;
   if (avis != null && String(avis).trim() !== '') return false;                   // ya avisado → no
   const h = row.hold_expira_at;
   if (h == null || String(h).trim() === '') return false;                         // hold NULL → no
   const t = Date.parse(h);
   if (!Number.isFinite(t)) return false;
-  return t <= nowMs && t >= (nowMs - VENTANA_MS);                                  // venció en las últimas 24h
+  return t <= nowMs && t >= (nowMs - VENTANA_MS);                                  // venció dentro de la ventana
 }
 
 // Query PostgREST con el mismo criterio (el guard PURO lo re-verifica).
@@ -88,9 +100,10 @@ function pathVencidos(nowMs) {
   const nowISO = new Date(nowMs).toISOString();
   const desdeISO = new Date(nowMs - VENTANA_MS).toISOString();
   const sp = new URLSearchParams();
-  sp.set('select', 'id,cliente_id,evento_nombre,evento_id,zona,estado,comprobante_separo_url,hold_expira_at,hold_avisado_at');
+  sp.set('select', 'id,cliente_id,evento_nombre,evento_id,zona,estado,comprobante_separo_url,hold_expira_at,hold_avisado_at,separo_pagado_at,metodo_separo');
   sp.append('estado', 'eq.pendiente');
   sp.append('comprobante_separo_url', 'is.null');
+  sp.append('separo_pagado_at', 'is.null');   // [C2-1] el que ya pagó no "vence"
   sp.append('hold_avisado_at', 'is.null');
   sp.append('hold_expira_at', 'not.is.null');
   sp.append('hold_expira_at', `gte.${desdeISO}`);
@@ -110,7 +123,7 @@ async function leerClientes(cliIds) {
 }
 
 // Marca de idempotencia (bitácora de aviso). Fails-soft: si truena, se re-intentará
-// en la próxima corrida mientras siga dentro de la ventana de 24h.
+// en la próxima corrida mientras siga dentro de la ventana de barrido.
 async function marcarAvisado(id, nowISO) {
   try {
     await fetch(`${SB_URL}/rest/v1/solicitudes_tour?id=eq.${id}`, {
@@ -132,7 +145,7 @@ exports.handler = async function () {
   const nowMs = Date.now();
   const nowISO = new Date(nowMs).toISOString();
 
-  // 1) Apartados vencidos en las últimas 24h, pendientes, sin comprobante, no avisados.
+  // 1) Apartados vencidos en la ventana, pendientes, sin comprobante, SIN separo pagado, no avisados.
   let filas;
   try { filas = await sb(pathVencidos(nowMs)); }
   catch (e) { console.error('[apartados-vencidos] query falló:', e.message); return { statusCode: 502, body: 'query falló' }; }

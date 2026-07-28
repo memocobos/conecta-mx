@@ -82,7 +82,7 @@ exports.handler = async (event) => {
   let pago;
   try {
     const q = `${SB_URL}/rest/v1/pagos?id=eq.${encodeURIComponent(pagoId)}` +
-      `&select=id,solicitud_id,concepto,monto,estado,solicitudes_tour(id,paquete,estado,evento_nombre,clientes(auth_user_id,correo,nombre_completo))`;
+      `&select=id,solicitud_id,concepto,monto,estado,solicitudes_tour(id,paquete,estado,precio_total,evento_nombre,clientes(auth_user_id,correo,nombre_completo))`;
     const r = await fetch(q, { headers: sb });
     if (!r.ok) return { statusCode: 502, headers, body: JSON.stringify({ error: 'No se pudo leer la cuota' }) };
     const arr = await r.json();
@@ -113,6 +113,13 @@ exports.handler = async (event) => {
   }
   if (!tarifas.cuotaElegible(pago.concepto)) {
     return { statusCode: 409, headers, body: JSON.stringify({ error: 'Esa cuota no acepta pago con tarjeta' }) };
+  }
+
+  // [C2-4 remate] CANDADO DEL UMBRAL MSI, server-side. El menú ya no los
+  // ofrece, pero un POST a mano se lo saltaría si la regla viviera solo en la UI.
+  if (!tarifas.metodosPara(pago.monto, sol && sol.precio_total).includes(metodo)) {
+    return { statusCode: 409, headers, body: JSON.stringify({
+      error: 'Los meses sin intereses son para pagos grandes (al menos la mitad de tu viaje)' }) };
   }
 
   // 6. EL TOTAL, del servidor.

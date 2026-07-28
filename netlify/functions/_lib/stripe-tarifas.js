@@ -40,6 +40,38 @@ function num(v, porDefecto) {
   return (Number.isFinite(n) && n >= 0 && n < 1) ? n : porDefecto;
 }
 
+// ── [C2-4 remate] MSI SOLO EN PAGOS GRANDES ──────────────────────────────────
+// Regla de Memo: los meses sin intereses solo se ofrecen cuando el pago vale la
+// pena diferirlo — al menos la MITAD del total del tour, o el total completo
+// (liquidaciones). En un separo de $1,500 sobre un tour de $9,000 no tienen
+// sentido: le cuestan 8% al cliente por diferir una entrada.
+//
+// La regla vive AQUÍ, en la fuente única, y la aplican los cuatro caminos:
+// separo (menú y cobro) y cuotas (menú y cobro). Si viviera en la UI, un POST
+// a mano se la saltaría.
+const MSI_UMBRAL_PCT = (() => {
+  const n = Number(process.env.STRIPE_MSI_UMBRAL_PCT);
+  return (Number.isFinite(n) && n > 0 && n <= 1) ? n : 0.5;   // 50% por defecto
+})();
+
+const METODOS_MSI = ['msi3', 'msi6'];
+
+// ¿Este pago admite MSI? Sin total del tour se responde NO: mejor no ofrecer
+// una opción que no podemos justificar que ofrecerla a ciegas.
+function msiElegible(montoPesos, totalTourPesos) {
+  const m = Number(montoPesos), t = Number(totalTourPesos);
+  if (!Number.isFinite(m) || m <= 0) return false;
+  if (!Number.isFinite(t) || t <= 0) return false;
+  return m >= t * MSI_UMBRAL_PCT;
+}
+
+// Los métodos ofrecibles para un pago concreto. `totalTourPesos` opcional:
+// sin él, los MSI quedan fuera.
+function metodosPara(montoPesos, totalTourPesos) {
+  const conMsi = msiElegible(montoPesos, totalTourPesos);
+  return METODOS.filter((m) => conMsi || !METODOS_MSI.includes(m));
+}
+
 // ¿Quién absorbe el cargo? 'cliente' (normal) o 'conecta' (promo).
 function quienAbsorbe() {
   return String(process.env.STRIPE_ABSORBE_CARGO || 'cliente').toLowerCase() === 'conecta'
@@ -78,4 +110,7 @@ function calcularTotal(montoPesos, metodo) {
   };
 }
 
-module.exports = { PCT, METODOS, METODO_BD, MSI_MESES, calcularTotal, quienAbsorbe, cuotaElegible };
+module.exports = {
+  PCT, METODOS, METODO_BD, MSI_MESES, METODOS_MSI, MSI_UMBRAL_PCT,
+  calcularTotal, quienAbsorbe, cuotaElegible, msiElegible, metodosPara,
+};

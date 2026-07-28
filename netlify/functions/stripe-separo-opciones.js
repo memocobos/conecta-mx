@@ -1,9 +1,13 @@
 // =============================================================================
 // stripe-opciones — el MENÚ de una cuota, con sus totales (Fase C · ST-2)
 //
-// El Portal pregunta "¿qué opciones tiene esta cuota y cuánto cuesta cada una?"
-// y el SERVIDOR contesta con los totales ya calculados. El cliente nunca hace
+// El wizard pregunta "¿cuánto cuesta apartar por cada forma de pago?" y el
+// SERVIDOR contesta con los totales ya calculados. El cliente nunca hace
 // aritmética de dinero: solo pinta lo que le dan.
+//
+// El monto sale de resolverPrecioVenta (el catálogo), NUNCA de la fila: la
+// escribió el navegador. Mismas puertas que stripe-separo-crear, para no
+// enseñarle una opción que el servidor va a rechazar.
 //
 // Devuelve SIEMPRE 200 con { activo: bool }. Cuando activo=false el Portal se
 // dibuja exactamente como siempre (transferencia y ya). Un 404 aquí obligaría
@@ -16,6 +20,8 @@
 
 const stripe = require('./_lib/stripe');
 const tarifas = require('./_lib/stripe-tarifas');
+const { resolverPrecioVenta } = require('./_lib/precio-zona');
+const { etiquetaHold } = require('./_lib/disponibilidad');
 
 const ETIQUETAS = {
   oxxo:    { label: 'OXXO',                   nota: 'Pagas en efectivo · se confirma en unas horas' },
@@ -24,6 +30,9 @@ const ETIQUETAS = {
   msi3:    { label: '3 meses sin intereses',  nota: 'Con tarjeta de crédito participante' },
   msi6:    { label: '6 meses sin intereses',  nota: 'Con tarjeta de crédito participante' },
 };
+// [C2-4 remate] El orden que ve el cliente. Los MSI se filtran por el umbral
+// (metodosPara): en un separo nunca aplican, pero la regla se pregunta igual —
+// no se asume, se calcula.
 const ORDEN = ['oxxo', 'debito', 'credito', 'msi3', 'msi6'];
 
 exports.handler = async (event) => {
@@ -48,8 +57,8 @@ exports.handler = async (event) => {
 
   let body;
   try { body = JSON.parse(event.body || '{}'); } catch { return apagado; }
-  const pagoId = body.pago_id;
-  if (!pagoId || !/^[0-9a-f-]{36}$/i.test(pagoId)) return apagado;
+  const solicitudId = body.solicitud_id;
+  if (!solicitudId || !/^[0-9a-f-]{36}$/i.test(solicitudId)) return apagado;
 
   const authHeader = event.headers.authorization || event.headers.Authorization || '';
   const jwt = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
@@ -63,35 +72,39 @@ exports.handler = async (event) => {
   if (!authUserId) return { statusCode: 401, headers, body: JSON.stringify({ error: 'Sesión inválida' }) };
 
   const sb = { apikey: SB_SERVICE, Authorization: 'Bearer ' + SB_SERVICE, 'Content-Type': 'application/json' };
-  let pago;
+  let sol;
   try {
-    const q = `${SB_URL}/rest/v1/pagos?id=eq.${encodeURIComponent(pagoId)}` +
-      `&select=id,concepto,monto,estado,solicitudes_tour(paquete,estado,precio_total,clientes(auth_user_id))`;
+    const q = `${SB_URL}/rest/v1/solicitudes_tour?id=eq.${encodeURIComponent(solicitudId)}` +
+      `&select=id,estado,paquete,zona,num_personas,evento_id,tipo_habitacion,hold_expira_at,` +
+      `separo_pagado_at,comprobante_separo_url,metodo_separo,clientes(auth_user_id)`;
     const r = await fetch(q, { headers: sb });
     if (!r.ok) return apagado;
     const arr = await r.json();
-    pago = Array.isArray(arr) ? arr[0] : null;
+    sol = Array.isArray(arr) ? arr[0] : null;
   } catch (e) { return apagado; }
-  if (!pago) return apagado;
+  if (!sol) return apagado;
+  const cli = Array.isArray(sol.clientes) ? sol.clientes[0] : sol.clientes;
 
-  const sol = Array.isArray(pago.solicitudes_tour) ? pago.solicitudes_tour[0] : pago.solicitudes_tour;
-  const cli = sol && (Array.isArray(sol.clientes) ? sol.clientes[0] : sol.clientes);
-
-  // Las MISMAS puertas que el checkout. Cualquiera que falle → menú apagado:
-  // al cliente no se le enseña una opción que el servidor va a rechazar.
+  // LAS MISMAS PUERTAS que stripe-separo-crear. Cualquiera que falle → apagado.
   if (!cli || cli.auth_user_id !== authUserId) return apagado;
-  if (pago.estado !== 'pendiente') return apagado;
-  if (!sol || sol.estado === 'cancelado') return apagado;
+  if (sol.estado !== 'pendiente') return apagado;
+  if (sol.separo_pagado_at) return apagado;                       // ya pagó
+  if (etiquetaHold(sol, Date.now()).etiqueta === 'vencida') return apagado;
   if (String(sol.paquete || '').toLowerCase() === 'cheap') return apagado;   // CHEAP ni ve el menú
-  if (!tarifas.cuotaElegible(pago.concepto)) return apagado;
+
+  // EL MONTO, del catálogo.
+  const pv = await resolverPrecioVenta({
+    evento_id: sol.evento_id, paquete: sol.paquete, zona: sol.zona,
+    num_personas: sol.num_personas, tipo_habitacion: sol.tipo_habitacion,
+  });
+  if (!pv || !pv.ok || !(Number(pv.separo) > 0)) return apagado;   // sin precio, sin menú
+  const separoPesos = Number(pv.separo);
 
   const opciones = [];
-  // [C2-4 remate] Los MSI solo si esta cuota llega al umbral del total del tour.
-  // Una cuota de $500 sobre $9,000 no se difiere a 6 meses.
-  const permitidos = tarifas.metodosPara(pago.monto, sol && sol.precio_total);
+  const permitidos = tarifas.metodosPara(separoPesos, Number(pv.total));
   for (const m of ORDEN) {
-    if (!permitidos.includes(m)) continue;
-    const t = tarifas.calcularTotal(pago.monto, m);
+    if (!permitidos.includes(m)) continue;   // MSI fuera si el pago no llega al umbral
+    const t = tarifas.calcularTotal(separoPesos, m);
     if (t.error) continue;
     opciones.push({
       metodo: m, label: ETIQUETAS[m].label, nota: ETIQUETAS[m].nota,
@@ -104,10 +117,10 @@ exports.handler = async (event) => {
   return {
     statusCode: 200, headers,
     body: JSON.stringify({
-      ok: true, activo: true, pago_id: pago.id,
+      ok: true, activo: true, solicitud_id: sol.id, hold_expira_at: sol.hold_expira_at,
       // La transferencia va SIEMPRE primero y sin cargo: es el flujo de la casa
       // y no deja de existir porque haya tarjeta.
-      transferencia: { label: 'Transferencia o depósito', nota: 'Sin cargo · manda tu comprobante', total_cent: Math.round(Number(pago.monto) * 100) },
+      transferencia: { label: 'Transferencia o depósito', nota: 'Sin cargo · sube tu comprobante', total_cent: Math.round(separoPesos * 100) },
       opciones,
     }),
   };

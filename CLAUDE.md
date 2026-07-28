@@ -81,6 +81,11 @@ _Última revisión: 27-jul-2026 (serie PP cerrada)._
   (el portal con vida) ya cerró completa** en prod: footer + radio (#379),
   fotos de artistas en el wizard (#380), dashboard con hero/countdown/
   celebración (#381), familia visual (#382) y el pool de 140 saludos (#383).
+- **`pagos.html` ya es "a prueba de error"** (PG-1, en prod): el selector de
+  paquete pliega la cuenta que no toca. Tres candados que NO se pueden romper —
+  sin JS se ven las dos cuentas, con `localStorage` bloqueado sigue
+  funcionando, y `pagos.html#bbva` / `#heybanco` abren esa cuenta aunque esté
+  plegada (los correos de cobranza enlazan así). Las políticas nunca se pliegan.
 - **Fase C del Portal — la barra de % de pagos**: hoy el dashboard NO baja los
   montos pagados, así que la barra no existe **a propósito** (inferirla sería
   inventar una cifra de dinero). Entra cuando la Fase C amplíe los datos de

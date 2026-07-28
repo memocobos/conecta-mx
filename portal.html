@@ -1135,6 +1135,59 @@ body.rcp-alto .pf{ padding-bottom:calc(var(--rcp-zona-fab) + env(safe-area-inset
 @keyframes pp2Entra{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 
 /* Patrón de la casa: acortar, no anular (así los `both` no se rompen). */
+/* ═══════════════════════════════════════════════════════════════════════
+   TUERCA ST-2 · EL MENÚ DE PAGO
+   Estas reglas solo pintan algo cuando el backend dice activo:true — con el
+   interruptor apagado el markup ni se crea, así que el Portal se ve
+   EXACTAMENTE como siempre. El arnés lo compara.
+   ═══════════════════════════════════════════════════════════════════════ */
+.pay-menu{display:grid;gap:10px;margin-top:14px}
+.pay-opt{
+  display:flex;align-items:center;justify-content:space-between;gap:14px;
+  width:100%;text-align:left;
+  padding:14px 16px;
+  border:1px solid var(--line);border-radius:var(--r-btn,12px);
+  background:var(--field-bg);color:var(--ink);
+  font-family:'Montserrat',sans-serif;cursor:pointer;
+  transition:border-color .18s ease,background .18s ease,transform .15s ease;
+  min-height:64px;
+}
+.pay-opt:hover{border-color:rgba(232,255,76,.45)}
+.pay-opt:active{transform:scale(.99);transition-duration:.1s}
+.pay-opt:focus-visible{outline:2px solid #e8ff4c;outline-offset:3px}
+.pay-opt[disabled]{opacity:.55;cursor:default;transform:none}
+/* display:block NO es adorno: sin él los <span> son inline y el título se pega
+   con su nota ("TransferenciaSin cargo"). Lo cazó la captura, no el arnés — que
+   medía contraste y ancho, y los dos estaban bien. */
+.pay-opt-l{min-width:0;display:block}
+.pay-opt-t,.pay-opt-n,.pay-opt-m,.pay-opt-c{display:block}
+.pay-opt-t{font-size:14px;font-weight:800;line-height:1.25}
+/* .78 sobre el fondo del campo: la nota se lee, no se adivina */
+.pay-opt-n{font-size:11.5px;font-weight:600;line-height:1.4;color:rgba(255,255,255,.78);margin-top:3px}
+.pay-opt-r{text-align:right;flex-shrink:0}
+.pay-opt-m{font-family:'Barlow Condensed','Montserrat',sans-serif;font-size:22px;font-weight:900;line-height:1;letter-spacing:-.01em}
+.pay-opt-c{font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.78);margin-top:3px}
+/* La transferencia manda: va primero y con el acento de la casa. */
+.pay-opt.es-transfer{border-color:rgba(232,255,76,.5);background:rgba(232,255,76,.06)}
+.pay-opt.es-transfer .pay-opt-m{color:#e8ff4c}
+.pay-opt.es-transfer .pay-opt-c{color:rgba(232,255,76,.9)}
+.pay-menu-nota{font-size:11.5px;line-height:1.5;color:rgba(255,255,255,.78);margin-top:10px}
+/* Estado de vuelta de Checkout */
+.pay-vuelta{
+  display:flex;gap:10px;align-items:flex-start;
+  padding:14px 16px;margin-bottom:14px;
+  border-radius:var(--r-btn,12px);
+  font-size:13.5px;line-height:1.5;font-weight:600;
+}
+.pay-vuelta.ok{background:rgba(136,234,78,.12);border:1px solid rgba(136,234,78,.45);color:#c8f7a8}
+.pay-vuelta.pend{background:rgba(255,183,3,.12);border:1px solid rgba(255,183,3,.5);color:#ffdf8a}
+.pay-vuelta.cancel{background:rgba(255,255,255,.05);border:1px solid var(--line);color:rgba(255,255,255,.82)}
+@media(max-width:420px){
+  .pay-opt{padding:13px 14px;gap:10px}
+  .pay-opt-m{font-size:19px}
+  .pay-opt-t{font-size:13px}
+}
+
 @media(prefers-reduced-motion:reduce){
   .px-hero,.tour-card,.wiz-event{transition-duration:.01ms}
   .view.is-active{animation-duration:.01ms}
@@ -3501,6 +3554,137 @@ async function renderPlanPagos(t, head){
       <div class="eyebrow" style="margin-bottom:8px">¿Cómo pago?</div>
       <p>Haz tu pago y manda el comprobante por WhatsApp. Consulta los datos bancarios en <a href="/pagos">la página de pagos →</a></p>
     </div>`}`;
+
+  // [ST-2] El menú de pago se cuelga DESPUÉS de pintar, y solo si el backend
+  // dice que está activo: con el interruptor apagado esto no toca el DOM y la
+  // vista queda idéntica a como estaba. El estado de vuelta de Checkout va
+  // ARRIBA del todo, que es donde el cliente lo busca.
+  try {
+    const vuelta = _payVuelta();
+    if (vuelta) cont.insertBefore(vuelta, cont.firstChild);
+    if (prox && prox.id) {
+      const caja = cont.querySelector('.como-pagar');
+      if (caja) _payMenu(prox.id, caja);
+    }
+  } catch (e) { /* el plan ya está pintado: el menú nunca lo rompe */ }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// TUERCA ST-2 · EL MENÚ DE PAGO
+//
+// Regla dura: con el interruptor apagado esto NO PINTA NADA. El backend
+// contesta { activo:false } y la función se retira sin tocar el DOM, así que el
+// Portal se ve exactamente como siempre. Ante cualquier error también se retira:
+// el flujo de transferencia nunca deja de funcionar.
+//
+// El cliente JAMÁS calcula un total: los pinta tal como se los da el servidor.
+// ═══════════════════════════════════════════════════════════════════════════
+
+// centavos → "$1,234.56" (solo formato; la aritmética ya vino hecha)
+function _payMoney(cent) {
+  const n = Number(cent);
+  if (!Number.isFinite(n)) return '';
+  return '$' + (n / 100).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+async function _payMenu(pagoId, contenedor) {
+  if (!pagoId || !contenedor) return;
+  let j;
+  try {
+    // El mismo camino que el resto del Portal: la sesión de supabase-js.
+    const { data: { session } } = await supabase.auth.getSession();
+    const tok = session && session.access_token;
+    if (!tok) return;
+    const r = await fetch('/.netlify/functions/stripe-opciones', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tok },
+      body: JSON.stringify({ pago_id: pagoId }),
+    });
+    j = await r.json();
+  } catch (e) { return; }             // fail-soft: sin menú, con transferencia
+  if (!j || !j.ok || !j.activo || !Array.isArray(j.opciones) || !j.opciones.length) return;
+
+  const wrap = document.createElement('div');
+  wrap.className = 'pay-menu';
+
+  // La transferencia SIEMPRE primero y siempre disponible: es el flujo de la
+  // casa y no deja de existir porque haya tarjeta.
+  const t = document.createElement('div');
+  t.className = 'pay-opt es-transfer';
+  t.innerHTML = '<span class="pay-opt-l"><span class="pay-opt-t"></span><span class="pay-opt-n"></span></span>'
+              + '<span class="pay-opt-r"><span class="pay-opt-m"></span><span class="pay-opt-c">Sin cargo</span></span>';
+  t.querySelector('.pay-opt-t').textContent = j.transferencia.label;
+  t.querySelector('.pay-opt-n').textContent = j.transferencia.nota;
+  t.querySelector('.pay-opt-m').textContent = _payMoney(j.transferencia.total_cent);
+  wrap.appendChild(t);
+
+  for (const op of j.opciones) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'pay-opt';
+    b.setAttribute('data-metodo', op.metodo);
+    b.innerHTML = '<span class="pay-opt-l"><span class="pay-opt-t"></span><span class="pay-opt-n"></span></span>'
+                + '<span class="pay-opt-r"><span class="pay-opt-m"></span><span class="pay-opt-c"></span></span>';
+    // textContent en todo: nada de estos textos viene de mí, vienen del servidor
+    b.querySelector('.pay-opt-t').textContent = op.label;
+    b.querySelector('.pay-opt-n').textContent = op.nota;
+    b.querySelector('.pay-opt-m').textContent = _payMoney(op.total_cent);
+    b.querySelector('.pay-opt-c').textContent = op.sin_cargo ? 'Sin cargo' : '+' + _payMoney(op.cargo_cent) + ' servicio';
+    b.addEventListener('click', () => _payIr(pagoId, op.metodo, b));
+    wrap.appendChild(b);
+  }
+
+  const nota = document.createElement('p');
+  nota.className = 'pay-menu-nota';
+  nota.textContent = 'El cargo por servicio es de la procesadora. Con transferencia no pagas nada extra.';
+  wrap.appendChild(nota);
+  contenedor.appendChild(wrap);
+}
+
+// Manda a Checkout. Deshabilita TODO el menú mientras tanto: un doble click no
+// puede abrir dos sesiones.
+async function _payIr(pagoId, metodo, boton) {
+  const menu = boton.closest('.pay-menu');
+  if (menu) menu.querySelectorAll('button').forEach((x) => { x.disabled = true; });
+  const etiqueta = boton.querySelector('.pay-opt-t');
+  const original = etiqueta ? etiqueta.textContent : '';
+  if (etiqueta) etiqueta.textContent = 'Preparando tu pago…';
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    const tok = session && session.access_token;
+    const r = await fetch('/.netlify/functions/stripe-checkout-crear', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tok },
+      body: JSON.stringify({ pago_id: pagoId, metodo }),
+    });
+    const j = await r.json();
+    if (!r.ok || !j.url) throw new Error(j.error || 'No se pudo abrir el pago');
+    window.location.href = j.url;
+  } catch (e) {
+    if (etiqueta) etiqueta.textContent = original;
+    if (menu) menu.querySelectorAll('button').forEach((x) => { x.disabled = false; });
+    if (typeof toast === 'function') toast(e.message || 'No se pudo abrir el pago', 'error');
+  }
+}
+
+// La vuelta de Checkout. OXXO no confirma al instante (el webhook async puede
+// tardar horas), así que el mensaje NO promete que ya quedó: dice la verdad.
+function _payVuelta() {
+  let q;
+  try { q = new URLSearchParams(window.location.search); } catch (e) { return null; }
+  const estado = q.get('pago');
+  if (!estado) return null;
+  const div = document.createElement('div');
+  if (estado === 'ok') {
+    div.className = 'pay-vuelta pend';
+    div.textContent = '⏳ Estamos confirmando tu pago. En cuanto la procesadora nos avise, tu cuota se marca sola y te llega el correo. Si pagaste en OXXO puede tardar unas horas.';
+  } else if (estado === 'cancelado') {
+    div.className = 'pay-vuelta cancel';
+    div.textContent = 'Cancelaste el pago. No se te cobró nada — puedes intentar de nuevo o pagar por transferencia.';
+  } else { return null; }
+  // La URL se limpia para que al recargar no reaparezca un mensaje viejo.
+  try { window.history.replaceState({}, '', window.location.pathname); } catch (e) {}
+  return div;
 }
 
 // [acompañantes F1-t2/t3] Card de los "lugares" de la solicitud, DEBAJO del plan

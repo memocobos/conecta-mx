@@ -10441,6 +10441,63 @@ function _spDateToIso(yyyyMmDd, endOfDay) {
   return `${yyyyMmDd}${t}-06:00`;
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// [C2-3] LA ETIQUETA DE LA COLA
+//
+// Espeja etiquetaHold() del backend (_lib/disponibilidad), que es la fuente de
+// verdad. Se re-implementa aquí porque el Palacio no importa módulos de Node —
+// y por eso el arnés compara las DOS contra la misma tabla de casos: si alguien
+// mueve una regla, la comparación truena.
+//
+// El reloj se DERIVA al pintar. Nadie muta la fila (regla de Fase B).
+// ═══════════════════════════════════════════════════════════════════════════
+const _C2_ETIQUETAS = {
+  separo_pagado:   { txt: 'PAGADA ✓',        cls: 'green' },
+  con_comprobante: { txt: 'CON COMPROBANTE', cls: 'blue'  },
+  oxxo_pendiente:  { txt: 'OXXO PENDIENTE',  cls: 'gold'  },
+  separado:        { txt: 'APARTADA',        cls: 'gold'  },
+  vencida:         { txt: 'VENCIDA',         cls: 'red'   },
+};
+
+function _c2Etiqueta(s, nowMs) {
+  const ahora = Number.isFinite(nowMs) ? nowMs : Date.now();
+  if (!s || s.estado !== 'pendiente') return null;
+  if (s.separo_pagado_at) return { k: 'separo_pagado', resta: null };
+  const comp = s.comprobante_separo_url;
+  if (comp != null && String(comp).trim() !== '') return { k: 'con_comprobante', resta: null };
+  const h = s.hold_expira_at;
+  if (h == null || String(h).trim() === '') return null;      // fila vieja: sin etiqueta
+  const t = Date.parse(h);
+  if (!Number.isFinite(t)) return null;
+  const resta = t - ahora;
+  if (resta <= 0) return { k: 'vencida', resta: 0 };
+  const esOxxo = String(s.metodo_separo || '').toLowerCase() === 'oxxo';
+  return { k: esOxxo ? 'oxxo_pendiente' : 'separado', resta };
+}
+
+// "14:59" para el reloj corto · "22 h" para la ficha de OXXO. El semáforo
+// distingue los dos: un apartado de 15 minutos y una ficha de 24 horas no se
+// leen igual aunque los dos ocupen el lugar.
+function _c2Reloj(restaMs) {
+  if (restaMs == null) return '';
+  if (restaMs <= 0) return '00:00';
+  if (restaMs >= 3600e3) {
+    const h = Math.floor(restaMs / 3600e3);
+    return h + ' h';
+  }
+  const m = Math.floor(restaMs / 60000), sg = Math.floor((restaMs % 60000) / 1000);
+  return m + ':' + String(sg).padStart(2, '0');
+}
+
+function _c2ChipHtml(s, nowMs) {
+  const e = _c2Etiqueta(s, nowMs);
+  if (!e) return '';
+  const def = _C2_ETIQUETAS[e.k];
+  const reloj = (e.k === 'oxxo_pendiente' || e.k === 'separado') ? _c2Reloj(e.resta) : '';
+  return '<span class="k-tag ' + def.cls + '" title="' + _salEsc(e.k) + '">' + _salEsc(def.txt)
+       + (reloj ? ' · ' + _salEsc(reloj) : '') + '</span>';
+}
+
 function renderSolicitudesPortal() {
   const tableEl = document.getElementById('sp-table');
   if (!tableEl) return;
@@ -10838,6 +10895,31 @@ let _spSeparoPend = null;
 // Devuelve true si abrió el paso (y entonces él cierra/refresca), false si no
 // había nada que preguntar y el caller sigue con su camino de siempre.
 async function _spAbrirSeparoAlAceptar(solicitudId, s) {
+  // [C2-3] Si el separo YA lo pagó el cliente por Stripe, no hay nada que
+  // preguntar: se aplica solo, por la vía auditada, y el paso solo INFORMA.
+  // Preguntarle a Memo "¿ya mandó su separo?" sobre un pago que el sistema
+  // confirmó sería hacerle dudar de su propio sistema.
+  if (s && s.separo_pagado_at) {
+    try {
+      const r = await fetch('/.netlify/functions/admin-separo-aplicar', {
+        method: 'POST', headers: _spAdminHeaders(),
+        body: JSON.stringify({ solicitud_id: solicitudId }),
+      });
+      const d = await r.json().catch(() => ({}));
+      if (r.ok && d.ya_aplicado) {
+        showToast('El separo pagado ya estaba aplicado a la cuota 1 ✓', 'success');
+      } else if (r.ok && d.aplicado) {
+        const metodo = String(d.metodo || '').replace('stripe_', '');
+        showToast('Separo pagado por ' + (metodo === 'oxxo' ? 'OXXO' : 'tarjeta') + ' ✓ — aplicado a la cuota 1', 'success');
+      } else if (!r.ok) {
+        showToast('El separo está pagado pero no se pudo aplicar: ' + (d.error || r.status), 'error');
+      }
+    } catch (e) {
+      showToast('El separo está pagado pero no se pudo aplicar: ' + e.message, 'error');
+    }
+    return false;   // NO se abre el paso de preguntar: ya está resuelto
+  }
+
   let pagos = [], lugares = [];
   try {
     const r = await fetch('/.netlify/functions/admin-pagos-list', {

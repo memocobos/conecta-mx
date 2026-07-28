@@ -81,6 +81,25 @@ async function apiPost(ruta, cuerpo, idempotencyKey) {
   return { ok: true, data: j };
 }
 
+// GET a la API de Stripe. Lo usa el webhook cuando el evento llega FLACO (el
+// flujo nuevo de "destinos de evento" puede mandar solo el id del objeto) y hay
+// que ir por el objeto completo. Lectura pura: no crea ni cobra nada.
+async function apiGet(ruta) {
+  const coh = llaveCoherente();
+  if (!coh.ok) return { ok: false, status: 500, error: coh.error };
+  let r, j;
+  try {
+    r = await fetch('https://api.stripe.com/v1/' + ruta, {
+      headers: { Authorization: 'Bearer ' + secreto() },
+    });
+    j = await r.json().catch(() => ({}));
+  } catch (e) {
+    return { ok: false, status: 502, error: 'No se pudo leer de Stripe: ' + e.message };
+  }
+  if (!r.ok) return { ok: false, status: r.status, error: (j && j.error && j.error.message) || 'Stripe rechazó la lectura' };
+  return { ok: true, data: j };
+}
+
 // ── VERIFICACIÓN DE FIRMA ────────────────────────────────────────────────────
 // Formato de Stripe-Signature: "t=<unix>,v1=<hmac>,v1=<otro>". El HMAC se
 // calcula sobre "<t>.<cuerpo crudo>" con el webhook secret.
@@ -132,4 +151,4 @@ function firmarParaPruebas(cuerpoCrudo, secretoWh, tSeg) {
   return `t=${t},v1=${v1}`;
 }
 
-module.exports = { modo, encendido, llaveCoherente, apiPost, verificarFirma, firmarParaPruebas, _aForm: aForm };
+module.exports = { modo, encendido, llaveCoherente, apiPost, apiGet, verificarFirma, firmarParaPruebas, _aForm: aForm };

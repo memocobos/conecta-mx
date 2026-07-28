@@ -71,7 +71,34 @@ exports.handler = async (event) => {
     console.error('[stripe-webhook] no pude consultar idempotencia:', e.message);
   }
 
-  const sesion = (evt.data && evt.data.object) || {};
+  // ── EL EVENTO PUEDE LLEGAR FLACO ───────────────────────────────────────────
+  // El flujo nuevo de Stripe ("destinos de evento") puede mandar solo un resumen
+  // —id del objeto y ya— en vez del objeto completo. Si el que llegó no trae lo
+  // que necesitamos (payment_status y metadata), se va por él a la API con la
+  // misma llave. Lectura pura: no crea ni cobra.
+  //
+  // Se distingue por AUSENCIA, no por el nombre del estilo: mañana Stripe puede
+  // llamarle de otra forma, pero un objeto sin payment_status seguirá siendo
+  // insuficiente. `estiloCarga` queda en la bitácora para saber cuál llegó.
+  let sesion = (evt.data && evt.data.object) || {};
+  let estiloCarga = 'completo';
+  const necesitaGordo = TIPOS_QUE_PAGAN.includes(tipo)
+    && (!sesion.payment_status || !sesion.metadata || !sesion.metadata.pago_id);
+  if (necesitaGordo) {
+    // El id puede venir en data.object.id o, en el estilo resumido, en
+    // related_object.id. Cualquiera de los dos sirve para pedir el objeto.
+    const idObj = sesion.id
+      || (evt.related_object && evt.related_object.id)
+      || (evt.data && evt.data.related_object && evt.data.related_object.id);
+    if (idObj && /^cs_/.test(String(idObj))) {
+      const g = await stripe.apiGet('checkout/sessions/' + encodeURIComponent(idObj));
+      if (g.ok && g.data) { sesion = g.data; estiloCarga = 'resumido→consultado'; }
+      else { estiloCarga = 'resumido→NO se pudo consultar'; }
+    } else {
+      estiloCarga = 'resumido→sin id de sesión';
+    }
+  }
+
   const meta = sesion.metadata || {};
   const pagoId = meta.pago_id || null;
   const metodo = String(meta.metodo || '').toLowerCase();
@@ -87,7 +114,8 @@ exports.handler = async (event) => {
         method: 'POST', headers: { ...sb, Prefer: 'return=minimal' },
         body: JSON.stringify({
           event_id: eventId, tipo, session_id: sesion.id || null,
-          pago_id: pagoId, resultado, detalle: detalle || null,
+          pago_id: pagoId, resultado,
+          detalle: [detalle, 'carga=' + estiloCarga].filter(Boolean).join(' · '),
         }),
       });
       // 23505 = otro proceso ganó la carrera. Eso NO es un error: es la
@@ -171,6 +199,6 @@ exports.handler = async (event) => {
   // registrado: un 5xx lo haría reintentar sobre algo ya asentado.
   return {
     statusCode: 200, headers,
-    body: JSON.stringify({ ok: true, event_id: eventId, marcado: r.statusCode === 200, detalle_status: r.statusCode }),
+    body: JSON.stringify({ ok: true, event_id: eventId, marcado: r.statusCode === 200, detalle_status: r.statusCode, carga: estiloCarga }),
   };
 };

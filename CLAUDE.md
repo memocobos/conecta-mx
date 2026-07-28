@@ -59,7 +59,7 @@
 - Manual: Manual_De_Marca.pdf en el repo
 
 ## Pendientes
-_Última revisión: 27-jul-2026 (serie PP cerrada)._
+_Última revisión: 28-jul-2026 (series PP, PG, E1 y KH cerradas)._
 
 ### 🔴 La semana que entra — el encendido
 - **Apagar `CORREOS_MODO='prueba'` en Netlify.** Mientras siga en 'prueba', TODO
@@ -73,10 +73,11 @@ _Última revisión: 27-jul-2026 (serie PP cerrada)._
 - **Blast de arranque de contratos**: lo manda Memo, no un cron.
 
 ### 🟡 Vivos
-- **Capturar la primera noticia del banner** (N1, en prod): el banner azul del
-  index ya lo escribe Memo en *Esferas del Dragón → Noticias del banner*, pero
-  está VACÍO, así que la marquesina sigue mostrando el lema estático. Nada que
-  configurar: `GITHUB_TOKEN` ya existe.
+- **El Palacio (KameHouse) ya está en el sistema visual de la casa**: serie KH
+  completa en prod (KH-1 cimientos · KH-2 Guerreros Z · KH-3 las mesas ·
+  KH-4 barrido). Lo que **NO se toca** y no hay que re-litigar: los 7 temas
+  personales (74 de los ~93 acentos de color son suyos) y la tipografía
+  (Rajdhani/Zen Dots viven en todo el Palacio, no solo en GZ).
 - **Fase 2 (Portal Clientes)**: en construcción sobre Supabase. La **serie PP
   (el portal con vida) ya cerró completa** en prod: footer + radio (#379),
   fotos de artistas en el wizard (#380), dashboard con hero/countdown/
@@ -92,6 +93,14 @@ _Última revisión: 27-jul-2026 (serie PP cerrada)._
   pagos. No re-proponerla antes.
 - **Respaldos del NAS** (UGREEN): sesión pendiente. Radio Conecta vive ahí.
 - **Cobros OXXO / MSI**: ver `REPORTE-COBROS-OXXO-MSI.md`.
+- **El COLOR en línea del Palacio** (medido y congelado por KH-4, sin resolver):
+  827 estilos con `color:` en `kamehouse.js` y 158 en el HTML, y **49 `<th>`
+  con su propio `color` que NINGUNA hoja de estilo alcanza**. Es la misma
+  trampa de los `border-radius` en otra propiedad. Merece su propia tuerca con
+  su propia medición; el arnés de KH-4 assertea que no crezca.
+- **La barrita de progreso de `funciona.html`** anima `width` (contra la regla
+  de la casa: solo `transform`/`opacity`). Es de abril; tuerca micro cuando Memo
+  la quiera.
 - **Puente index→Portal**: Fase A en prod pero DETRÁS DE INTERRUPTOR
   (`RESERVA_PORTAL` / `?portal=1`). Falta decidir el encendido.
 - **Contrato de cuidador de bodega**: borrador esperando a Memo.
@@ -146,6 +155,15 @@ _Última revisión: 27-jul-2026 (serie PP cerrada)._
   rebanada en "la siguiente declaración" es frágil: si la tuerca metió código en
   medio, la comparación falla sin que la función haya cambiado. Cortar por
   **balance de llaves**.
+- **Un arnés de tuerca YA MERGEADA debe leer sus archivos DEL COMMIT DE SU
+  MERGE, no del árbol vivo.** Si lee el árbol, la siguiente tuerca de la serie
+  lo revienta sin tener la culpa. Pasó con 4 arneses de golpe en KH-4.
+- **El estilo EN LÍNEA le gana a cualquier hoja.** Antes de dar por buena una
+  regla nueva, verificar en la página REAL que aplica: en aislamiento puede
+  funcionar y en producción estar muerta (le pasó al `th` del Palacio).
+- **Un selector puede no existir.** `.bottombar` nunca existió (es
+  `.kh-bottombar`): las reglas fueron letra muerta hasta que un barrido las
+  cazó. Si una regla nueva no cambia nada medible, sospechar del selector.
 - **Una aserción que puede pasar con el conjunto vacío no es una aserción.**
   Candado de cardinalidad siempre; y al medir algo (contraste, peso) validar el
   instrumento antes de creerle el resultado.

@@ -2330,7 +2330,9 @@ html, body { background: var(--bg); color: var(--text); padding: 0; }
    .97 en botones, .995 en tarjetas grandes (una tarjeta que se encoge como
    un botón se siente rota). */
 .btn:active,.nav-btn:active,.gz-filter:active,.k-tag:active,
-.bottombar button:active,.tools-sheet button:active,.chip:active{
+/* [KH-4] era `.bottombar`, que NO EXISTE: la clase real es `.kh-bottombar`.
+   La regla de KH-1 nunca aplicó — letra muerta que cazó el barrido. */
+.kh-bottombar button:active,.tools-sheet button:active,.chip:active{
   transform:scale(.97);
   transition-duration:.1s;
 }
@@ -2557,7 +2559,15 @@ tr:hover td{background:var(--bg3)}
    —que no se vean claros— pero con el gris oscuro del tema en vez de con
    transparencia, que es lo único que sticky no tolera. */
 th{position:sticky;top:0;z-index:2}
-#app table th{background:var(--bg3)}
+#app table th{
+  background:var(--bg3);
+  /* [KH-4] La tinta del encabezado estaba en --ts (.55). Medida contra el fondo
+     que de verdad gana en cada tabla daba por debajo de AA — y un encabezado de
+     tabla en las mesas del dinero es información, no adorno. A .86 mide 11.75:1
+     sobre #18181b y 10.9:1 sobre #121214: cumple con los DOS, así que ya no
+     depende de cuál fondo resuelva el navegador. */
+  color:rgba(240,240,245,.86);
+}
 
 /* ── 3 · LOS CHIPS DE ESTADO, UNA SOLA FAMILIA ──────────────────────────
    .k-tag ya es el chip del Palacio (KH-1 lo llevó a --r-chip). Aquí solo se
@@ -2580,3 +2590,50 @@ th{position:sticky;top:0;z-index:2}
 input[type="search"],.kh-buscar,.buscador{border-radius:var(--r-sm,8px)}
 .metric:active,.cob-stat:active{transform:scale(.995);transition-duration:.12s}
 @media (hover:none){ .metric:hover,.cob-stat:hover{border-color:var(--border)} }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   TUERCA KH-4 · CIERRE DE LA SERIE
+   Torre + Cotizar/Vender + Capsule + remates móviles, y el barrido final.
+   Cierra lo que las tres anteriores dejaron a la vista.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* ── 1 · LOS 226 RADIOS EN LÍNEA ────────────────────────────────────────
+   KH-1 los encontró y los congeló; aquí se absorben 128 (101 en el JS, 27
+   en el HTML). Los que NO se tocaron, y por qué:
+
+     · 26 dentro de funciones que arman CORREOS o DOCUMENTOS de impresión.
+       Ahí `var(--r-card)` NO EXISTE: el documento se abre en otra ventana o
+       viaja en un correo, sin la hoja del Palacio. Un token ahí es una
+       esquina cuadrada silenciosa. Se quedan literales A PROPÓSITO.
+     · 24 que ya eran `var(--radius)` (ya estaban en el sistema por el alias
+       que puso KH-1).
+     · 29 deliberados: 50% son círculos, y 3px/4px son LÍNEAS (barras,
+       tracks) — la misma razón documentada en KH-1.
+     · 2 con forma `0 0 var(--radius) var(--radius)`: media caja a propósito
+       (un dropdown pegado a su input).
+
+   El arnés vigila las tres cosas: que el Palacio no tenga radios fuera de
+   sistema, que los correos NO ganen ni un var(), y que el conteo no crezca.
+
+   ── 2 · TORRE, COTIZAR Y CAPSULE ───────────────────────────────────────
+   Estos módulos ya nacieron con la familia (son de la era Torre v2), así
+   que aquí no hay rediseño: solo se les da el tap y el foco de la casa, que
+   es lo único que les faltaba. */
+.cot-input:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+.cot-escenario{transition:border-color .2s ease,transform .15s ease}
+.cot-escenario:active{transform:scale(.995);transition-duration:.1s}
+
+/* ── 3 · REMATES MÓVILES ────────────────────────────────────────────────
+   La mitad del equipo abre el Palacio desde el celular. La bottombar y el
+   tools-sheet son su navegación principal y no tenían señal de toque. */
+.kh-bottombar button,.kh-bottombar a{transition:transform .12s ease,color .15s ease}
+.kh-bottombar button:active,.kh-bottombar a:active{transform:scale(.92)}
+.tools-sheet button:active,.tools-sheet a:active{transform:scale(.97);transition-duration:.1s}
+.tools-sheet-panel{border-radius:var(--r-card,16px) var(--r-card,16px) 0 0}
+/* El asa del sheet se queda en 2px: es una LÍNEA, no una caja (KH-1). */
+
+/* Área de toque mínima donde el dedo manda. 44px es el mínimo cómodo y ya
+   lo usan .ks-table .btn y .ks-folder: aquí se extiende a la navegación. */
+@media (hover:none){
+  .kh-bottombar button,.kh-bottombar a,.tools-sheet button,.tools-sheet a{min-height:44px}
+}

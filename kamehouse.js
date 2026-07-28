@@ -64,7 +64,7 @@ function showToast(msg, tipo) {
     t.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);z-index:9999;max-width:420px;width:90%;pointer-events:none;transition:opacity .3s';
     document.body.appendChild(t);
   }
-  t.innerHTML = '<div style="background:rgba(20,20,30,.95);border:1px solid '+col+';border-radius:10px;padding:12px 18px;font-size:13px;color:'+col+'">'+msg+'</div>';
+  t.innerHTML = '<div style="background:rgba(20,20,30,.95);border:1px solid '+col+';border-radius:var(--r-sm,8px);padding:12px 18px;font-size:13px;color:'+col+'">'+msg+'</div>';
   t.style.opacity = '1';
   clearTimeout(t._timer);
   t._timer = setTimeout(function(){ t.style.opacity = '0'; }, 3500);
@@ -925,7 +925,7 @@ function _rgGrupoHtml(g) {
   const abierto = !!_rgAbiertos[g.solicitud_id];
   // Multifecha: chip "Fecha N" junto al título (fecha única → sin chip).
   const _fi = _rgFechaIdx(g.evento_id);
-  const fechaChip = _fi === null ? '' : `<span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--ts);border:1px solid var(--border);border-radius:20px;padding:1px 8px;letter-spacing:.06em">Fecha ${_fi + 1}</span>`;
+  const fechaChip = _fi === null ? '' : `<span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--ts);border:1px solid var(--border);border-radius:var(--r-card,16px);padding:1px 8px;letter-spacing:.06em">Fecha ${_fi + 1}</span>`;
 
   const header = `
     <button type="button" data-rg-toggle="${solSafe}" style="width:100%;display:flex;align-items:center;gap:10px;background:transparent;border:none;color:var(--ink);cursor:pointer;text-align:left;padding:0">
@@ -939,30 +939,30 @@ function _rgGrupoHtml(g) {
   }
 
   const pickerHtml = (habId) => sinCuarto.length
-    ? `<div style="display:flex;flex-wrap:wrap;gap:6px">${sinCuarto.map(l => `<button type="button" data-rg-asignar="${_esfEsc(l.id)}" data-rg-hab="${_esfEsc(habId)}" style="padding:5px 12px;border-radius:20px;border:1px solid var(--border);background:var(--bg3);color:var(--ink);font-size:12px;cursor:pointer">${_esfEsc(nombreDe(l))}</button>`).join('')}</div>`
+    ? `<div style="display:flex;flex-wrap:wrap;gap:6px">${sinCuarto.map(l => `<button type="button" data-rg-asignar="${_esfEsc(l.id)}" data-rg-hab="${_esfEsc(habId)}" style="padding:5px 12px;border-radius:var(--r-card,16px);border:1px solid var(--border);background:var(--bg3);color:var(--ink);font-size:12px;cursor:pointer">${_esfEsc(nombreDe(l))}</button>`).join('')}</div>`
     : `<div style="font-size:12px;color:var(--ts)">Ya no hay personas sin cuarto.</div>`;
 
   const cuartos = (g.habitaciones || []).map(h => {
     const ocup = ocupPorHab[h.id] || [];
     const lleno = ocup.length >= Number(h.capacidad || 0);
-    const chips = ocup.map(l => `<span style="display:inline-flex;align-items:center;gap:6px;padding:3px 6px 3px 10px;margin:2px 4px 0 0;border-radius:20px;background:var(--bg3);border:1px solid var(--border);font-size:12px">${_esfEsc(nombreDe(l))}<button type="button" data-rg-quitar="${_esfEsc(l.id)}" title="Quitar" style="border:none;background:transparent;color:var(--ts);font-size:14px;line-height:1;cursor:pointer;padding:0 2px">×</button></span>`).join('');
+    const chips = ocup.map(l => `<span style="display:inline-flex;align-items:center;gap:6px;padding:3px 6px 3px 10px;margin:2px 4px 0 0;border-radius:var(--r-card,16px);background:var(--bg3);border:1px solid var(--border);font-size:12px">${_esfEsc(nombreDe(l))}<button type="button" data-rg-quitar="${_esfEsc(l.id)}" title="Quitar" style="border:none;background:transparent;color:var(--ts);font-size:14px;line-height:1;cursor:pointer;padding:0 2px">×</button></span>`).join('');
     return `
-      <div style="border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:8px">
+      <div style="border:1px solid var(--border);border-radius:var(--r-sm,8px);padding:10px 12px;margin-bottom:8px">
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
           <b style="font-size:13px">Cuarto ${_esfEsc(h.orden)} · ${_esfEsc(h.tipo)}</b>
           <span style="font-size:12px;color:${lleno ? 'var(--green)' : 'var(--ts)'}">(${ocup.length}/${_esfEsc(h.capacidad)})</span>
           <button type="button" data-rg-del="${_esfEsc(h.id)}" title="Eliminar cuarto" style="margin-left:auto;border:none;background:transparent;font-size:15px;cursor:pointer"><svg class="ic"><use href="#ic-basura"/></svg></button>
         </div>
         <div style="margin-top:8px">${chips || '<span style="font-size:12px;color:var(--ts)">Cuarto vacío</span>'}</div>
-        ${(!lleno && sinCuarto.length) ? `<div style="margin-top:8px"><button type="button" data-rg-add="${_esfEsc(h.id)}" style="padding:5px 12px;border-radius:20px;border:1px dashed var(--border);background:transparent;color:var(--ts);font-size:12px;cursor:pointer">+ Asignar</button></div>` : ''}
+        ${(!lleno && sinCuarto.length) ? `<div style="margin-top:8px"><button type="button" data-rg-add="${_esfEsc(h.id)}" style="padding:5px 12px;border-radius:var(--r-card,16px);border:1px dashed var(--border);background:transparent;color:var(--ts);font-size:12px;cursor:pointer">+ Asignar</button></div>` : ''}
         <div id="rg-picker-${_esfEsc(h.id)}" style="display:none;margin-top:8px">${pickerHtml(h.id)}</div>
       </div>`;
   }).join('');
 
   const agregar = cubre
-    ? `<button type="button" disabled style="width:100%;padding:10px;border-radius:10px;border:1px solid var(--border);background:transparent;color:var(--ts);font-size:12px;cursor:not-allowed">Los cuartos ya cubren a todo el grupo</button>`
-    : `<button type="button" data-rg-addroom="${solSafe}" style="width:100%;padding:10px;border-radius:10px;border:1px dashed var(--border);background:transparent;color:var(--ink);font-size:12px;font-weight:700;cursor:pointer">＋ Agregar cuarto</button>
-       <div id="rg-tipos-${solSafe}" style="display:none;margin-top:8px"><div style="display:flex;flex-wrap:wrap;gap:6px">${_RG_TIPOS.map(x => `<button type="button" data-rg-crear="${x.tipo}" data-rg-sol="${solSafe}" style="padding:6px 14px;border-radius:20px;border:1px solid var(--border);background:var(--bg3);color:var(--ink);font-size:12px;cursor:pointer">${x.tipo} (${x.cap})</button>`).join('')}</div></div>`;
+    ? `<button type="button" disabled style="width:100%;padding:10px;border-radius:var(--r-sm,8px);border:1px solid var(--border);background:transparent;color:var(--ts);font-size:12px;cursor:not-allowed">Los cuartos ya cubren a todo el grupo</button>`
+    : `<button type="button" data-rg-addroom="${solSafe}" style="width:100%;padding:10px;border-radius:var(--r-sm,8px);border:1px dashed var(--border);background:transparent;color:var(--ink);font-size:12px;font-weight:700;cursor:pointer">＋ Agregar cuarto</button>
+       <div id="rg-tipos-${solSafe}" style="display:none;margin-top:8px"><div style="display:flex;flex-wrap:wrap;gap:6px">${_RG_TIPOS.map(x => `<button type="button" data-rg-crear="${x.tipo}" data-rg-sol="${solSafe}" style="padding:6px 14px;border-radius:var(--r-card,16px);border:1px solid var(--border);background:var(--bg3);color:var(--ink);font-size:12px;cursor:pointer">${x.tipo} (${x.cap})</button>`).join('')}</div></div>`;
 
   return `
     <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:12px 16px;margin-bottom:10px">
@@ -1250,7 +1250,7 @@ function _trUnidadHtml(u) {
     </select>`;
 
   const chips = (u.pasajeros || []).map(p => `
-    <span style="display:inline-flex;align-items:center;gap:6px;padding:3px 6px 3px 10px;margin:2px 4px 0 0;border-radius:20px;background:var(--bg3);border:1px solid var(--border);font-size:12px">
+    <span style="display:inline-flex;align-items:center;gap:6px;padding:3px 6px 3px 10px;margin:2px 4px 0 0;border-radius:var(--r-card,16px);background:var(--bg3);border:1px solid var(--border);font-size:12px">
       ${_esfEsc(p.nombre_cache || 'Sin nombre')}${p.pasajero_tipo === 'viajero' ? _trTipoChip(_trTipoDeRef(p.pasajero_ref)) : ''}
       <button type="button" data-tr-quitar="${_esfEsc(p.pasajero_ref)}" data-tr-ptipo="${_esfEsc(p.pasajero_tipo)}" data-tr-unidad="${idSafe}" title="Quitar de la unidad" style="border:none;background:transparent;color:var(--ts);font-size:14px;line-height:1;cursor:pointer;padding:0 2px">×</button>
     </span>`).join('');
@@ -1258,7 +1258,7 @@ function _trUnidadHtml(u) {
   // [F4] El último envío no pudo mandar esta: se resalta hasta que tenga coordi.
   const faltaCoordi = _trSinCoordi.indexOf(u.orden) !== -1 && !u.coordi_id;
   const notaCoordi = faltaCoordi
-    ? '<span style="font-size:11px;color:var(--red);border:1px solid var(--red);border-radius:20px;padding:1px 8px">asigna coordinador</span>'
+    ? '<span style="font-size:11px;color:var(--red);border:1px solid var(--red);border-radius:var(--r-card,16px);padding:1px 8px">asigna coordinador</span>'
     : '';
 
   const cabecera = `
@@ -1338,7 +1338,7 @@ function _trFechaChip(eventoId) {
   if (_trEsPorDias()) return _trCoberturaChip(eventoId);
   const i = _rgFechaIdx(eventoId);
   if (i === null) return '';
-  return `<span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--ts);border:1px solid var(--border);border-radius:20px;padding:1px 8px;letter-spacing:.06em;margin-left:6px">Fecha ${i + 1}</span>`;
+  return `<span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--ts);border:1px solid var(--border);border-radius:var(--r-card,16px);padding:1px 8px;letter-spacing:.06em;margin-left:6px">Fecha ${i + 1}</span>`;
 }
 
 function _trCoberturaChip(eventoId) {
@@ -1347,7 +1347,7 @@ function _trCoberturaChip(eventoId) {
   const cob = _trCobertura[i];
   if (!cob || cob.dias.length <= 1) return ''; // solo este día → sin chip
   const txt = cob.lbl || (cob.dias.length + ' días');
-  return `<span title="También aparece en los otros días que cubre" style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--orange);border:1px solid var(--border2);border-radius:20px;padding:1px 8px;letter-spacing:.06em;margin-left:6px"><svg class="ic"><use href="#ic-boleto"/></svg> ${_esfEsc(txt)}</span>`;
+  return `<span title="También aparece en los otros días que cubre" style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--orange);border:1px solid var(--border2);border-radius:var(--r-card,16px);padding:1px 8px;letter-spacing:.06em;margin-left:6px"><svg class="ic"><use href="#ic-boleto"/></svg> ${_esfEsc(txt)}</span>`;
 }
 
 function _trLadrillosHtml(uni, pend) {
@@ -1410,7 +1410,7 @@ function _trTipoChip(tipo) {
   };
   const t = TIPOS[tipo];
   if (!t) return '';
-  return `<span title="${t.tip}" style="font-size:9px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;color:${t.fg || '#000'};background:${t.bg};border-radius:20px;padding:1px 7px;margin-left:6px">${t.txt}</span>`;
+  return `<span title="${t.tip}" style="font-size:9px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;color:${t.fg || '#000'};background:${t.bg};border-radius:var(--r-card,16px);padding:1px 7px;margin-left:6px">${t.txt}</span>`;
 }
 // Los pasajeros YA asignados vienen de la tabla de asignaciones (nombre_cache),
 // sin tipo_viajero. Se busca su tipo en el universo KH que ya trajo el listar.
@@ -1424,7 +1424,7 @@ function _trTipoDeRef(ref) {
 }
 
 function _trChipPersona(key, nombre, extra) {
-  return `<button type="button" data-tr-lote="${key}" style="display:inline-flex;align-items:center;padding:6px 12px;border-radius:20px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-size:12px;cursor:pointer;font-family:inherit">${_esfEsc(nombre)}${extra || ''}</button>`;
+  return `<button type="button" data-tr-lote="${key}" style="display:inline-flex;align-items:center;padding:6px 12px;border-radius:var(--r-card,16px);border:1px solid var(--border);background:var(--bg3);color:var(--text);font-size:12px;cursor:pointer;font-family:inherit">${_esfEsc(nombre)}${extra || ''}</button>`;
 }
 
 // ['Sáb 21','Dom 22'] → 'Sáb 21 y Dom 22'
@@ -2765,7 +2765,7 @@ function _radioMediaAlert(msg, isErr) {
   const style = isErr
     ? 'border:1px solid rgba(255,90,77,.4);color:var(--red);background:rgba(255,90,77,.1)'
     : 'border:1px solid var(--border);color:var(--ts);background:rgba(255,255,255,.03)';
-  el.innerHTML = `<div style="padding:9px 12px;border-radius:8px;font-size:12px;margin-bottom:14px;${style}">${_spEscape(msg)}</div>`;
+  el.innerHTML = `<div style="padding:9px 12px;border-radius:var(--r-sm,8px);font-size:12px;margin-bottom:14px;${style}">${_spEscape(msg)}</div>`;
 }
 
 // ── Eliminar canción (doble confirmación fuerte) ──────────────────────────
@@ -3476,7 +3476,7 @@ async function _loadConexiones() {
 function _conexChip(u, tol) {
   const esAux = _CONEX_AUX.includes(u.rol);
   if (!esAux) return '';   // sin juicio de horario para roles sin entrada contractual
-  const chip = (txt, color) => `<span style="display:inline-block;font-size:10px;font-weight:800;padding:2px 8px;border-radius:10px;color:${color};border:1px solid ${color}66;white-space:nowrap">${txt}</span>`;
+  const chip = (txt, color) => `<span style="display:inline-block;font-size:10px;font-weight:800;padding:2px 8px;border-radius:var(--r-sm,8px);color:${color};border:1px solid ${color}66;white-space:nowrap">${txt}</span>`;
   if (u.primera_min == null) return chip('sin conexión aún', 'var(--ts)');
   const puntual = u.primera_min <= (9 * 60 + (tol || 15));
   return chip(_esfEsc(u.primera) + (puntual ? ' ✓' : ''), puntual ? 'var(--green)' : 'var(--orange)');
@@ -3849,7 +3849,7 @@ function _resumenUtilPintar() {
   const selCol = (s.col === 'ds') ? 'fecha' : s.col;  // el default 'ds' equivale a 'fecha' en el selector
   const selectorHTML = `<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
     <label style="font-size:11px;color:var(--ts);white-space:nowrap">Ordenar por:</label>
-    <select onchange="_resumenUtilSortBy(this.value)" style="flex:1;background:var(--bg2);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:7px 9px;font-size:12px">
+    <select onchange="_resumenUtilSortBy(this.value)" style="flex:1;background:var(--bg2);border:1px solid var(--border);color:var(--text);border-radius:var(--r-sm,8px);padding:7px 9px;font-size:12px">
       ${SORT_OPTS.map(o => `<option value="${o.v}"${selCol === o.v ? ' selected' : ''}>${o.l}</option>`).join('')}
     </select>
   </div>`;
@@ -5439,7 +5439,7 @@ async function loadMisSalidas() {
     const salidas = await khSalidas.listar({ limit: 50 }); // el backend acota: el viajero SOLO ve lo suyo
     if (!salidas.length) { box.innerHTML = '<div style="font-size:12px;color:var(--ts);letter-spacing:.08em;text-transform:uppercase;text-align:center;padding:18px">Sin salidas todavía</div>'; return; }
     box.innerHTML = salidas.map(s => `
-      <div style="border:1px solid var(--border);border-radius:8px;padding:10px 14px;margin-bottom:8px">
+      <div style="border:1px solid var(--border);border-radius:var(--r-sm,8px);padding:10px 14px;margin-bottom:8px">
         <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap">
           <div style="font-size:13px"><b>${_salEsc(s.evento_id)}</b> ${_salChipEstado(s.estado)}</div>
           <div style="font-size:11px;color:var(--ts)">${_salEsc(String(s.creado_en || '').slice(0, 10))}</div>
@@ -5461,7 +5461,7 @@ function _salFaltantesHtml(s) {
   const cuentaTxt = pagado ? '' : c
     ? `Paga a: <b>${_salEsc(c.nombre || 'BBVA')}</b>${c.tarjeta ? ' · tarjeta ' + _salEsc(c.tarjeta) : ''}${c.clabe ? ' · CLABE ' + _salEsc(c.clabe) : ''}${c.titular ? ' · ' + _salEsc(c.titular) : ''} — y manda tu comprobante a Conecta`
     : 'Pide a Conecta la cuenta para depositar';
-  return `<div style="margin-top:6px;padding:8px 10px;border:1px solid ${pagado ? 'rgba(61,220,132,.35)' : 'rgba(255,176,32,.35)'};border-radius:6px;background:${pagado ? 'rgba(61,220,132,.06)' : 'rgba(255,176,32,.06)'}">
+  return `<div style="margin-top:6px;padding:8px 10px;border:1px solid ${pagado ? 'rgba(61,220,132,.35)' : 'rgba(255,176,32,.35)'};border-radius:var(--r-sm,8px);background:${pagado ? 'rgba(61,220,132,.06)' : 'rgba(255,176,32,.06)'}">
     <div style="font-size:12px;font-weight:700;color:${pagado ? 'var(--green)' : '#ffb020'}">Faltantes cobrados: ${formatMXN(Number(s.faltantes_monto) || 0)}${pagado ? ' — PAGADO' : vence ? ' · vence el ' + _salEsc(vence) : ''}</div>
     ${cuentaTxt ? `<div style="font-size:11px;color:var(--ts);margin-top:3px">${cuentaTxt}</div>` : ''}
   </div>`;
@@ -5503,7 +5503,7 @@ async function loadTorreSalidas() {
       bb.innerHTML = !pendientes.length
         ? '<div style="font-size:12px;color:var(--ts);letter-spacing:.08em;text-transform:uppercase;text-align:center;padding:18px">Nada por autorizar</div>'
         : pendientes.map(s => `
-          <div style="border:1px solid var(--border);border-radius:8px;padding:10px 14px;margin-bottom:8px">
+          <div style="border:1px solid var(--border);border-radius:var(--r-sm,8px);padding:10px 14px;margin-bottom:8px">
             <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap">
               <div style="font-size:13px"><b>${_salEsc(quien(s))}</b> · ${_salEsc(s.evento_id)}</div>
               <div style="font-size:11px;color:var(--ts)">${_salEsc(String(s.creado_en || '').slice(0, 10))}</div>
@@ -5554,7 +5554,7 @@ async function loadTorreSalidas() {
                 : '<span style="font-size:9px;letter-spacing:.08em;text-transform:uppercase;font-weight:800;padding:2px 7px;border-radius:4px;color:#ffb020;background:rgba(255,176,32,.14);border:1px solid rgba(255,176,32,.4)">por cobrar</span>';
             const piezasTxt = (Array.isArray(x.faltantes) ? x.faltantes : []).map(f => `${f.cantidad}× ${_salEsc(f.pieza)}`).join(' · ');
             return `
-          <div style="border:1px solid var(--border);border-radius:8px;padding:10px 14px;margin-bottom:8px">
+          <div style="border:1px solid var(--border);border-radius:var(--r-sm,8px);padding:10px 14px;margin-bottom:8px">
             <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap">
               <div style="font-size:13px"><b>${_salEsc(quien(x))}</b> · ${_salEsc(x.evento_id)} ${chip}</div>
               <div style="font-family:'Zen Dots',sans-serif;font-size:15px;color:${pagado ? 'var(--green)' : vencido ? 'var(--red)' : 'var(--gold)'}">${formatMXN(Number(x.faltantes_monto) || 0)}</div>
@@ -5941,7 +5941,7 @@ function agregarIncluyeItem(val) {
  const d = document.createElement('div');
  d.style.cssText = 'display:flex;gap:6px;margin-bottom:6px';
  d.innerHTML = `<input type="text" placeholder="Ej: Boleto zona elegida" value="${val}"
- style="flex:1;background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:7px;
+ style="flex:1;background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:var(--r-sm,8px);
  padding:8px 10px;color:var(--text);font-family:Montserrat,sans-serif;font-size:12px;outline:none">
  <button class="btn btn-red btn-sm" onclick="this.parentElement.remove()">X</button>`;
  c.appendChild(d);
@@ -5963,10 +5963,10 @@ function agregarZonaItem(tipo, z) {
  d.style.cssText = 'display:grid;grid-template-columns:2fr 1fr auto auto auto;gap:6px;margin-bottom:6px;align-items:center';
  d.innerHTML = `
  <input type="text" placeholder="Nombre zona" value="${z.n||''}"
- style="background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:7px;
+ style="background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:var(--r-sm,8px);
  padding:8px 10px;color:var(--text);font-family:Montserrat,sans-serif;font-size:12px;outline:none">
  <input type="number" placeholder="Precio" value="${z.p||''}" min="0"
- style="background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:7px;
+ style="background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:var(--r-sm,8px);
  padding:8px 10px;color:var(--text);font-family:Montserrat,sans-serif;font-size:12px;outline:none">
  <label style="display:flex;align-items:center;gap:4px;font-size:11px;cursor:pointer;white-space:nowrap">
  <input type="checkbox" ${z.vip?'checked':''}> VIP
@@ -6008,10 +6008,10 @@ function agregarHotelItem(h) {
  d.style.cssText = 'display:grid;grid-template-columns:2fr 1fr auto;gap:6px;margin-bottom:6px;align-items:center';
  d.innerHTML = `
  <input type="text" placeholder="Tipo habitación" value="${h.n||''}"
- style="background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:7px;
+ style="background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:var(--r-sm,8px);
  padding:8px 10px;color:var(--text);font-family:Montserrat,sans-serif;font-size:12px;outline:none">
  <input type="number" placeholder="Extra $" value="${h.e||0}" min="0"
- style="background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:7px;
+ style="background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:var(--r-sm,8px);
  padding:8px 10px;color:var(--text);font-family:Montserrat,sans-serif;font-size:12px;outline:none">
  <button class="btn btn-red btn-sm" onclick="this.parentElement.remove()">X</button>`;
  c.appendChild(d);
@@ -6040,10 +6040,10 @@ function agregarPagoItem(p) {
  d.style.cssText = 'display:grid;grid-template-columns:1fr 2fr auto;gap:6px;margin-bottom:6px;align-items:center';
  d.innerHTML = `
  <input type="text" placeholder="Label (Separo, Pago 1...)" value="${p.l||''}"
- style="background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:7px;
+ style="background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:var(--r-sm,8px);
  padding:8px 10px;color:var(--text);font-family:Montserrat,sans-serif;font-size:12px;outline:none">
  <input type="text" placeholder="Fechas (ej: 9-16 abr)" value="${p.d||''}"
- style="background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:7px;
+ style="background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:var(--r-sm,8px);
  padding:8px 10px;color:var(--text);font-family:Montserrat,sans-serif;font-size:12px;outline:none">
  <button class="btn btn-red btn-sm" onclick="this.parentElement.remove()">X</button>`;
  c.appendChild(d);
@@ -6478,7 +6478,7 @@ function _liqRender(j) {
   if (!body) return;
   const eidS = _esfEsc(j.evento_id);
   const cajaAviso = (Number(j.utilidad) <= 0) ? `<div class="alert alert-error" style="margin-bottom:10px">⚠️ La caja real del evento es ${_liqFmt(j.utilidad)} (≤ 0). No se puede liquidar el 30% sobre una caja no positiva — espera a cobrar más o revisa gastos/ingresos.</div>` : '';
-  const chip = (txt, color) => `<span style="display:inline-block;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;color:${color};border:1px solid ${color}55">${txt}</span>`;
+  const chip = (txt, color) => `<span style="display:inline-block;font-size:10px;font-weight:700;padding:2px 7px;border-radius:var(--r-sm,8px);color:${color};border:1px solid ${color}55">${txt}</span>`;
   const filas = (Array.isArray(j.vendedores) && j.vendedores.length)
     ? j.vendedores.map(v => {
         const est = v.liquidada ? (v.estado === 'pagada' ? chip('pagada', 'var(--green)') : chip('calculada', 'var(--orange)')) : chip('sin liquidar', 'var(--ts)');
@@ -6611,7 +6611,7 @@ async function _kamComprasLoad() {
           }).join('')
         : '<tr><td colspan="5" style="padding:6px 4px;font-size:12px;color:var(--ts)">Sin compras en esta zona</td></tr>';
       const provOpts = _kamProvCache.map((p) => `<option value="${_esfEsc(p.id)}">${_esfEsc(p.nombre)}</option>`).join('');
-      html += `<div style="border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:12px">
+      html += `<div style="border:1px solid var(--border);border-radius:var(--r-sm,8px);padding:12px;margin-bottom:12px">
         <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:8px">
           <div style="font-family:'Rajdhani',sans-serif;font-weight:700;font-size:15px">${_esfEsc(zona)}</div>
           <div style="font-size:12px;color:var(--ts)">Deuda: <b style="color:var(--fg)">${_kamMoney(deuda)}</b></div>
@@ -6709,7 +6709,7 @@ async function _kamAbonosLoad(slug, deudaPorProveedor) {
       : '<tr><td colspan="5" style="padding:6px 4px;font-size:12px;color:var(--ts)">Sin abonos registrados</td></tr>';
 
     const saldoTotal = deudaTotal - abonadoTotal;
-    cont.innerHTML = `<div style="border:1px solid var(--border);border-radius:8px;padding:12px">
+    cont.innerHTML = `<div style="border:1px solid var(--border);border-radius:var(--r-sm,8px);padding:12px">
       <div style="font-family:'Rajdhani',sans-serif;font-weight:700;font-size:15px;margin-bottom:8px">Abonos a proveedores</div>
       ${lineas || '<div style="font-size:12px;color:var(--ts)">Sin deuda ni abonos todavía.</div>'}
       ${form}
@@ -8519,7 +8519,7 @@ function _ccPagoEstadoPill(estado) {
     pagado:   { t: 'Pagado',   c: '#3DDC84', bg: 'rgba(61,220,132,.12)', bd: 'rgba(61,220,132,.35)' },
   };
   const m = map[estado] || { t: estado || '—', c: 'var(--ts)', bg: 'var(--bg3)', bd: 'var(--border)' };
-  return `<span style="font-family:'JetBrains Mono',monospace;font-size:10px;padding:2px 8px;border-radius:20px;color:${m.c};background:${m.bg};border:1px solid ${m.bd};white-space:nowrap">${m.t}</span>`;
+  return `<span style="font-family:'JetBrains Mono',monospace;font-size:10px;padding:2px 8px;border-radius:var(--r-card,16px);color:${m.c};background:${m.bg};border:1px solid ${m.bd};white-space:nowrap">${m.t}</span>`;
 }
 
 // [F3b] Contador compacto "N/M firmados" por solicitud (verde si todos firmados,
@@ -8530,7 +8530,7 @@ function _ccContratosPill(c) {
   const todos = firmados >= total;
   const col = todos ? { c: '#3DDC84', bg: 'rgba(61,220,132,.12)', bd: 'rgba(61,220,132,.35)' }
                     : { c: '#e8a800', bg: 'rgba(232,168,0,.12)', bd: 'rgba(232,168,0,.35)' };
-  return `<span title="Contratos firmados del grupo" style="display:inline-block;margin-left:6px;font-family:'JetBrains Mono',monospace;font-size:10px;padding:2px 8px;border-radius:20px;color:${col.c};background:${col.bg};border:1px solid ${col.bd};white-space:nowrap"><svg class="ic" style="width:11px;height:11px;vertical-align:-1px"><use href="#ic-boleto"/></svg> ${firmados}/${total} firmados</span>`;
+  return `<span title="Contratos firmados del grupo" style="display:inline-block;margin-left:6px;font-family:'JetBrains Mono',monospace;font-size:10px;padding:2px 8px;border-radius:var(--r-card,16px);color:${col.c};background:${col.bg};border:1px solid ${col.bd};white-space:nowrap"><svg class="ic" style="width:11px;height:11px;vertical-align:-1px"><use href="#ic-boleto"/></svg> ${firmados}/${total} firmados</span>`;
 }
 
 async function loadCCPagos(eventoId) {
@@ -8606,7 +8606,7 @@ function _renderCCPagos() {
     const barColor = s.estado === 'pagado' ? '#3DDC84' : 'var(--orange)';
     // Chip multifecha "Fecha N" (fecha única → sin chip). Reusa _rgFechaIdx.
     const fi = _rgFechaIdx(s.evento_id);
-    const chip = fi === null ? '' : `<span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--ts);border:1px solid var(--border);border-radius:20px;padding:1px 7px;letter-spacing:.06em;margin-left:6px">Fecha ${fi + 1}</span>`;
+    const chip = fi === null ? '' : `<span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--ts);border:1px solid var(--border);border-radius:var(--r-card,16px);padding:1px 7px;letter-spacing:.06em;margin-left:6px">Fecha ${fi + 1}</span>`;
     return `
       <tr style="border-top:1px solid var(--border)">
         <td style="padding:9px 8px;font-size:13px">${_spEscape(c.nombre_completo || '—')}<br><span style="font-family:'JetBrains Mono',monospace;color:var(--orange);font-size:11px">#${_spEscape(c.numero_cliente || '—')}</span></td>
@@ -8696,7 +8696,7 @@ function renderCCEventos(lista, filtro) {
           <button class="btn btn-primary btn-sm" onclick="event.stopPropagation();abrirDetalleEvento('${e.id}')" style="font-size:11px">Ver →</button>
         </div>
       </div>
-      ${e.notas_internas ? `<div style="margin-top:10px;font-size:11px;color:var(--ts);padding:8px 12px;background:rgba(255,255,255,.03);border-radius:6px;border-left:2px solid var(--border)">${_esfEsc(e.notas_internas)}</div>` : ''}
+      ${e.notas_internas ? `<div style="margin-top:10px;font-size:11px;color:var(--ts);padding:8px 12px;background:rgba(255,255,255,.03);border-radius:var(--r-sm,8px);border-left:2px solid var(--border)">${_esfEsc(e.notas_internas)}</div>` : ''}
     </div>`;
   }).join('');
 }
@@ -8736,7 +8736,7 @@ function abrirModalEvento(id) {
             <label>Tipo de evento</label>
             <div style="display:flex;gap:8px;flex-wrap:wrap">
               ${Object.entries(TIPOS_EVENTO).map(([k,v]) =>
-                `<label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;padding:6px 12px;border:1px solid var(--border);border-radius:6px;background:${(e?.tipo_evento||'concierto')===k?'rgba(255,107,0,.12)':'transparent'}">
+                `<label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;padding:6px 12px;border:1px solid var(--border);border-radius:var(--r-sm,8px);background:${(e?.tipo_evento||'concierto')===k?'rgba(255,107,0,.12)':'transparent'}">
                   <input type="radio" name="ccev-tipo" value="${k}" ${(e?.tipo_evento||'concierto')===k?'checked':''} style="accent-color:var(--orange)"> ${v}
                 </label>`
               ).join('')}
@@ -9012,7 +9012,7 @@ async function abrirModalAsignarCoordi() {
           <label>Indicaciones especiales</label>
           <textarea class="cot-input" id="ac-indicaciones" rows="3" placeholder="Punto de encuentro, responsabilidades, horario…" style="width:100%;resize:vertical"></textarea>
         </div>
-        <div style="background:rgba(255,183,3,.06);border:1px solid rgba(255,183,3,.15);border-radius:8px;padding:12px;font-size:11px;color:var(--gold);font-family:'JetBrains Mono',monospace">
+        <div style="background:rgba(255,183,3,.06);border:1px solid rgba(255,183,3,.15);border-radius:var(--r-sm,8px);padding:12px;font-size:11px;color:var(--gold);font-family:'JetBrains Mono',monospace">
           Se enviará un correo con link para aceptar o declinar
         </div>
         <div id="ac-alert" style="margin-top:8px"></div>
@@ -9428,7 +9428,7 @@ function _vjChequeoCorreoBlur() {
 
 function _vjMostrarCorreoError(msg) {
   const el = document.getElementById('vj-correo-hint');
-  if (el) el.innerHTML = `<div style="font-size:12px;color:var(--red);padding:6px 8px;border:1px solid rgba(255,68,68,.3);border-radius:6px;background:rgba(255,68,68,.08)">${_spEscape(msg)}</div>`;
+  if (el) el.innerHTML = `<div style="font-size:12px;color:var(--red);padding:6px 8px;border:1px solid rgba(255,68,68,.3);border-radius:var(--r-sm,8px);background:rgba(255,68,68,.08)">${_spEscape(msg)}</div>`;
 }
 
 // Aviso amable con la sugerencia y dos opciones: corregir / usarlo igual.
@@ -9436,7 +9436,7 @@ function _vjMostrarCorreoSugerencia(sug) {
   _vjSugActual = sug;
   const el = document.getElementById('vj-correo-hint');
   if (!el) return;
-  el.innerHTML = `<div style="font-size:12px;color:var(--text);padding:8px 10px;border:1px solid var(--border2);border-radius:6px;background:rgba(255,107,0,.06)">
+  el.innerHTML = `<div style="font-size:12px;color:var(--text);padding:8px 10px;border:1px solid var(--border2);border-radius:var(--r-sm,8px);background:rgba(255,107,0,.06)">
     ¿Quisiste decir <b style="color:var(--orange)">${_spEscape(sug)}</b>?
     <div style="display:flex;gap:8px;margin-top:8px">
       <button type="button" class="btn btn-primary btn-sm" style="font-size:11px" onclick="_vjAceptarSugerencia()">Sí, corregir</button>
@@ -9716,7 +9716,7 @@ async function loadRooming() {
 
   if (resumen) {
     resumen.innerHTML = GRUPOS.filter(g => porTipo[g.key].length).map(g =>
-      `<div style="background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:8px 14px;text-align:center;min-width:80px">
+      `<div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--r-sm,8px);padding:8px 14px;text-align:center;min-width:80px">
         <div style="font-family:'Zen Dots',sans-serif;font-size:22px;color:${g.col}">${porTipo[g.key].length}</div>
         <div style="font-size:10px;color:var(--ts)">${g.label}</div>
       </div>`).join('');
@@ -9733,7 +9733,7 @@ async function loadRooming() {
     const chips = miembros.map(v => {
       const c = v.clientes || {};
       const meta = [v.paquete, v.zona, (v.num_personas && v.num_personas > 1) ? (v.num_personas + ' pers.') : null].filter(Boolean).join(' · ');
-      return `<div style="background:rgba(255,255,255,.07);border:1px solid var(--border);border-radius:6px;padding:6px 14px;font-size:13px">
+      return `<div style="background:rgba(255,255,255,.07);border:1px solid var(--border);border-radius:var(--r-sm,8px);padding:6px 14px;font-size:13px">
         <span style="font-weight:600">${_esfEsc(c.nombre_completo || '—')}</span>
         ${meta ? `<span style="font-size:10px;color:var(--ts);margin-left:8px;font-family:'JetBrains Mono',monospace">${meta}</span>` : ''}
       </div>`;
@@ -9814,7 +9814,7 @@ async function imprimirListaHotel() {
     const titular = (g.titular_nombre && String(g.titular_nombre).trim()) || 'Titular';
     // Multifecha: chip "Fecha N" en la etiqueta del grupo (fecha única → '').
     const _fi = _rgFechaIdx(g.evento_id);
-    const fechaChip = _fi === null ? '' : ` <span style="font-size:11px;color:#555;border:1px solid #bbb;border-radius:10px;padding:0 6px">Fecha ${_fi + 1}</span>`;
+    const fechaChip = _fi === null ? '' : ` <span style="font-size:11px;color:#555;border:1px solid #bbb;border-radius:var(--r-sm,8px);padding:0 6px">Fecha ${_fi + 1}</span>`;
     const activos = (g.lugares || []).filter(l => l.estado === 'activo');
     personasGrupos += activos.length;
     const nombreDe = (l) => (l.nombre && String(l.nombre).trim()) ? l.nombre : ('Lugar #' + l.numero + ' — por confirmar');
@@ -9919,7 +9919,7 @@ async function imprimirListaCoordis() {
     const grupoLbl = esIndividual ? 'Individual' : ('Grupo de ' + (g.titular_nombre || 'Titular'));
     // Multifecha: chip "Fecha N" junto a la etiqueta del grupo (fecha única → '').
     const _fi = _rgFechaIdx(g.evento_id);
-    const fechaChip = _fi === null ? '' : ` <span style="font-size:11px;color:#555;border:1px solid #bbb;border-radius:10px;padding:0 6px">Fecha ${_fi + 1}</span>`;
+    const fechaChip = _fi === null ? '' : ` <span style="font-size:11px;color:#555;border:1px solid #bbb;border-radius:var(--r-sm,8px);padding:0 6px">Fecha ${_fi + 1}</span>`;
     const habById = {};
     (g.habitaciones || []).forEach(h => { habById[h.id] = h; });
     (g.lugares || []).filter(l => l.estado === 'activo').forEach(l => {
@@ -9988,7 +9988,7 @@ function renderHotelInfo() {
       <div style="font-family:'Rajdhani',sans-serif;font-weight:700;font-size:18px">${_esfEsc(_ccHotelInfo.nombre)}</div>
       ${_ccHotelInfo.direccion?`<div style="font-size:12px;color:var(--ts);margin-top:2px">${_esfEsc(_ccHotelInfo.direccion)}</div>`:''}
     </div>
-    <div style="font-size:11px;padding:4px 12px;border-radius:20px;border:1px solid ${_ccHotelInfo.incluye_desayuno?'rgba(61,220,132,.3)':'var(--border)'};color:${_ccHotelInfo.incluye_desayuno?'var(--green)':'var(--ts)'}">
+    <div style="font-size:11px;padding:4px 12px;border-radius:var(--r-card,16px);border:1px solid ${_ccHotelInfo.incluye_desayuno?'rgba(61,220,132,.3)':'var(--border)'};color:${_ccHotelInfo.incluye_desayuno?'var(--green)':'var(--ts)'}">
       ${_ccHotelInfo.incluye_desayuno?'✓ Con desayuno':'✗ Sin desayuno'}
     </div>
   </div>`;
@@ -10011,7 +10011,7 @@ function abrirModalHotel() {
           <label>Dirección</label>
           <input class="cot-input" id="hot-dir" value="${_esfEsc(h.direccion||'')}" placeholder="Calle, colonia, ciudad…" style="width:100%">
         </div>
-        <label style="display:flex;align-items:center;gap:10px;padding:12px 16px;background:var(--bg3);border-radius:8px;cursor:pointer;border:1px solid var(--border)">
+        <label style="display:flex;align-items:center;gap:10px;padding:12px 16px;background:var(--bg3);border-radius:var(--r-sm,8px);cursor:pointer;border:1px solid var(--border)">
           <input type="checkbox" id="hot-desayuno" ${h.incluye_desayuno?'checked':''} style="accent-color:var(--green);width:16px;height:16px;cursor:pointer">
           <span style="font-size:13px">Incluye desayuno</span>
         </label>
@@ -10333,7 +10333,7 @@ function _spBadgeEstado(estado) {
     cancelado:  { bg: '#f8d7da', fg: '#721c24', label: 'Cancelado' },
   };
   const e = map[estado] || { bg: '#eee', fg: '#333', label: estado || '—' };
-  return `<span style="display:inline-block;padding:3px 9px;border-radius:12px;background:${e.bg};color:${e.fg};font-size:11px;font-weight:700;letter-spacing:.04em">${e.label}</span>`;
+  return `<span style="display:inline-block;padding:3px 9px;border-radius:var(--r-btn,12px);background:${e.bg};color:${e.fg};font-size:11px;font-weight:700;letter-spacing:.04em">${e.label}</span>`;
 }
 
 function _spPoblarDropdownEventos() {
@@ -10586,7 +10586,7 @@ function abrirResetCliente(clienteId) {
   const esRoshi = currentUser && currentUser.rol === 'maestro_roshi';
 
   const modoTotal = esRoshi ? `
-      <label style="display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border:1px solid rgba(255,40,59,.4);border-radius:8px;cursor:pointer;background:rgba(255,40,59,.05)">
+      <label style="display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border:1px solid rgba(255,40,59,.4);border-radius:var(--r-sm,8px);cursor:pointer;background:rgba(255,40,59,.05)">
         <input type="radio" name="rc-modo" value="total" onchange="_rcSync()" style="margin-top:3px">
         <div><div style="font-weight:600;color:var(--red)">Eliminar TODO (borra la cuenta)</div><div style="font-size:11px;color:var(--ts)">Borra también su usuario de acceso. <b style="color:var(--red)">IRREVERSIBLE.</b></div></div>
       </label>` : '';
@@ -10596,7 +10596,7 @@ function abrirResetCliente(clienteId) {
     <div style="font-size:12px;color:var(--ts);margin-bottom:14px;line-height:1.5">Se borrarán <b style="color:var(--ink)">${nSol}</b> solicitud${nSol === 1 ? '' : 'es'} (con sus pagos), sus comprobantes y su foto de perfil.</div>
 
     <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:14px">
-      <label style="display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border:1px solid var(--border);border-radius:8px;cursor:pointer">
+      <label style="display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border:1px solid var(--border);border-radius:var(--r-sm,8px);cursor:pointer">
         <input type="radio" name="rc-modo" value="reset" checked onchange="_rcSync()" style="margin-top:3px">
         <div><div style="font-weight:600">Resetear (conserva la cuenta)</div><div style="font-size:11px;color:var(--ts)">Vacía tours/pagos/comprobantes/foto. El cliente conserva su login y empieza de cero.</div></div>
       </label>
@@ -10605,7 +10605,7 @@ function abrirResetCliente(clienteId) {
 
     <div id="rc-confirm-wrap" style="display:none;margin-bottom:14px">
       <div style="font-size:12px;color:var(--red);font-weight:600;margin-bottom:6px">Para confirmar el borrado TOTAL, escribe el nombre exacto del cliente:</div>
-      <input id="rc-nombre-input" type="text" oninput="_rcSync()" placeholder="${_spEscape(nombre)}" style="width:100%;padding:9px 11px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;color:var(--ink);font-size:13px">
+      <input id="rc-nombre-input" type="text" oninput="_rcSync()" placeholder="${_spEscape(nombre)}" style="width:100%;padding:9px 11px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--r-sm,8px);color:var(--ink);font-size:13px">
     </div>
 
     <div id="rc-alert" style="margin-bottom:10px"></div>
@@ -10683,8 +10683,8 @@ async function cargarComprobanteSP(solicitudId) {
     target.innerHTML = `
       <div style="margin-bottom:8px;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--ts);letter-spacing:.08em">// firma válida 1 hora — ${_spEscape(data.path)}</div>
       ${isPdf
-        ? `<iframe src="${_spEscape(safeUrl)}" style="width:100%;height:480px;border:1px solid var(--border);border-radius:8px"></iframe>`
-        : `<a href="${_spEscape(safeUrl)}" target="_blank" rel="noopener"><img src="${_spEscape(safeUrl)}" style="max-width:100%;max-height:480px;border:1px solid var(--border);border-radius:8px" alt="Comprobante"></a>`}
+        ? `<iframe src="${_spEscape(safeUrl)}" style="width:100%;height:480px;border:1px solid var(--border);border-radius:var(--r-sm,8px)"></iframe>`
+        : `<a href="${_spEscape(safeUrl)}" target="_blank" rel="noopener"><img src="${_spEscape(safeUrl)}" style="max-width:100%;max-height:480px;border:1px solid var(--border);border-radius:var(--r-sm,8px)" alt="Comprobante"></a>`}
       <div style="margin-top:10px;display:flex;gap:8px">
         <a href="${_spEscape(safeUrl)}" target="_blank" rel="noopener" class="btn btn-ghost btn-sm" style="font-size:11px">↗ Abrir en pestaña nueva</a>
         <a href="${_spEscape(safeUrl)}" download class="btn btn-primary btn-sm" style="font-size:11px">↓ Descargar</a>
@@ -10727,7 +10727,7 @@ function _spCuentaDefault(paquete) {
 // tabla pagos permite pero la solicitud no).
 function _spBadgePago(estado) {
   if (estado === 'vencido') {
-    return `<span style="display:inline-block;padding:3px 9px;border-radius:12px;background:#f8d7da;color:#721c24;font-size:11px;font-weight:700;letter-spacing:.04em">Vencido</span>`;
+    return `<span style="display:inline-block;padding:3px 9px;border-radius:var(--r-btn,12px);background:#f8d7da;color:#721c24;font-size:11px;font-weight:700;letter-spacing:.04em">Vencido</span>`;
   }
   return _spBadgeEstado(estado);
 }
@@ -10784,7 +10784,7 @@ function renderPlanPagosSP(solicitudId, estadoSolicitud) {
   const restante = total - abonado;
 
   const resumen = `
-    <div style="display:flex;gap:22px;flex-wrap:wrap;padding:10px 12px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;margin-bottom:12px">
+    <div style="display:flex;gap:22px;flex-wrap:wrap;padding:10px 12px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--r-sm,8px);margin-bottom:12px">
       <div><div style="color:var(--ts);text-transform:uppercase;letter-spacing:.08em;font-size:10px">Total</div><b style="font-size:14px">${_spFmtMxn(total)}</b></div>
       <div><div style="color:var(--ts);text-transform:uppercase;letter-spacing:.08em;font-size:10px">Abonado</div><b style="font-size:14px;color:#3DDC84">${_spFmtMxn(abonado)}</b></div>
       <div><div style="color:var(--ts);text-transform:uppercase;letter-spacing:.08em;font-size:10px">Restante</div><b style="font-size:14px;color:var(--orange)">${_spFmtMxn(restante)}</b></div>
@@ -10878,7 +10878,7 @@ async function _spAbrirSeparoAlAceptar(solicitudId, s) {
         <span style="flex:1;min-width:0;font-size:13px">${_spEscape(etiqueta)}</span>
         <span style="color:var(--ts);font-size:11px">$</span>
         <input type="number" id="t4-monto-${i}" value="${Number(p.monto || 0)}" min="0" step="1"
-               style="width:110px;padding:6px 8px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--tp);font-size:13px;text-align:right">
+               style="width:110px;padding:6px 8px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--r-sm,8px);color:var(--tp);font-size:13px;text-align:right">
       </label>`;
   }).join('');
 
@@ -10891,24 +10891,24 @@ async function _spAbrirSeparoAlAceptar(solicitudId, s) {
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px">
       <div>
         <label style="display:block;font-size:10px;letter-spacing:.12em;color:var(--ts);text-transform:uppercase;margin-bottom:4px">Método</label>
-        <select id="t4-metodo" onchange="_spSeparoToggleBanco()" style="width:100%;padding:8px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--tp)">
+        <select id="t4-metodo" onchange="_spSeparoToggleBanco()" style="width:100%;padding:8px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--r-sm,8px);color:var(--tp)">
           ${_SP_METODOS_UI.map(m => `<option value="${m}">${_SP_METODO_LBL[m]}</option>`).join('')}
         </select>
       </div>
       <div id="t4-banco-wrap">
         <label style="display:block;font-size:10px;letter-spacing:.12em;color:var(--ts);text-transform:uppercase;margin-bottom:4px">Cuenta</label>
-        <select id="t4-banco" style="width:100%;padding:8px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--tp)">
+        <select id="t4-banco" style="width:100%;padding:8px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--r-sm,8px);color:var(--tp)">
           ${_SP_BANCOS.map(b => `<option value="${b}"${b === bancoDefault ? ' selected' : ''}>${b}</option>`).join('')}
         </select>
       </div>
     </div>
     <div style="margin-top:10px">
       <label style="display:block;font-size:10px;letter-spacing:.12em;color:var(--ts);text-transform:uppercase;margin-bottom:4px">Fecha del pago</label>
-      <input type="date" id="t4-fecha" value="${hoy}" style="width:100%;padding:8px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--tp)">
+      <input type="date" id="t4-fecha" value="${hoy}" style="width:100%;padding:8px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--r-sm,8px);color:var(--tp)">
     </div>
     <div style="margin-top:10px">
       <label style="display:block;font-size:10px;letter-spacing:.12em;color:var(--ts);text-transform:uppercase;margin-bottom:4px">Referencia (opcional)</label>
-      <input type="text" id="t4-ref" maxlength="120" placeholder="Folio, últimos 4 dígitos, nota…" style="width:100%;padding:8px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--tp)">
+      <input type="text" id="t4-ref" maxlength="120" placeholder="Folio, últimos 4 dígitos, nota…" style="width:100%;padding:8px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--r-sm,8px);color:var(--tp)">
     </div>
     <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:16px">
       <button class="btn btn-ghost" onclick="_spSeparoDespues()">Después</button>
@@ -11023,15 +11023,15 @@ async function _spSeparoMarcar() {
 // ═══════════════════════════════════════════════════════════════
 
 // Chip verde "CONECTADO ✓" (el lugar ya tiene cliente_id: el acompañante aceptó).
-const _SP_CHIP_CONECTADO = `<span style="display:inline-block;padding:2px 8px;border-radius:999px;background:rgba(61,220,132,.15);border:1px solid rgba(61,220,132,.5);font-size:10px;font-weight:800;letter-spacing:.04em;color:#3DDC84">CONECTADO ✓</span>`;
+const _SP_CHIP_CONECTADO = `<span style="display:inline-block;padding:2px 8px;border-radius:var(--r-chip,999px);background:rgba(61,220,132,.15);border:1px solid rgba(61,220,132,.5);font-size:10px;font-weight:800;letter-spacing:.04em;color:#3DDC84">CONECTADO ✓</span>`;
 
 // [F3b] Chip de contrato del lugar (verde firmado / ámbar pendiente). '' si no hay
 // contrato vivo (solicitud vieja pre-módulo).
 function _spContratoChip(lg){
   const c = lg && lg.contrato; if (!c || !c.estado) return '';
   if (c.estado === 'firmado')
-    return `<span style="display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:999px;background:rgba(61,220,132,.15);border:1px solid rgba(61,220,132,.5);font-size:10px;font-weight:800;color:#3DDC84"><svg class="ic" style="width:12px;height:12px"><use href="#ic-boleto"/></svg> Contrato ✓</span>`;
-  return `<span style="display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:999px;background:rgba(232,168,0,.12);border:1px solid rgba(232,168,0,.4);font-size:10px;font-weight:800;color:#e8a800"><svg class="ic" style="width:12px;height:12px"><use href="#ic-alerta"/></svg> Contrato pendiente</span>`;
+    return `<span style="display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:var(--r-chip,999px);background:rgba(61,220,132,.15);border:1px solid rgba(61,220,132,.5);font-size:10px;font-weight:800;color:#3DDC84"><svg class="ic" style="width:12px;height:12px"><use href="#ic-boleto"/></svg> Contrato ✓</span>`;
+  return `<span style="display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:var(--r-chip,999px);background:rgba(232,168,0,.12);border:1px solid rgba(232,168,0,.4);font-size:10px;font-weight:800;color:#e8a800"><svg class="ic" style="width:12px;height:12px"><use href="#ic-alerta"/></svg> Contrato pendiente</span>`;
 }
 // [F3b] Botón discreto "copiar link de firma" (solo pendiente + token; Bulma es admin).
 function _spCopyLinkBtn(lg){
@@ -11318,9 +11318,9 @@ function abrirPagoGrupoSP(solicitudId) {
   const hoy = _spYmd(new Date());
   const opciones = _SP_METODOS_UI.map(k => `<option value="${k}">${_SP_METODO_LBL[k]}</option>`).join('');
   const lbl = 'display:block;font-size:9px;letter-spacing:.1em;color:var(--ts);text-transform:uppercase;margin-bottom:3px';
-  const inp = 'padding:7px 8px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;color:var(--ink);font-size:12px';
+  const inp = 'padding:7px 8px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--r-sm,8px);color:var(--ink);font-size:12px';
   box.innerHTML = `
-    <div style="padding:12px;background:var(--bg3);border:1px solid var(--border);border-radius:10px">
+    <div style="padding:12px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--r-sm,8px)">
       <div style="font-size:12px;font-weight:700;margin-bottom:4px"><svg class="ic"><use href="#ic-dinero"/></svg> Pago grupal</div>
       <div style="font-size:11px;color:var(--ts);margin-bottom:10px">Una transferencia del titular se reparte entre las cuotas de los lugares (cascada por fecha). El sistema propone; tú confirmas.</div>
       <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
@@ -11550,27 +11550,27 @@ function _spRenderFilaPago(solicitudId, p) {
       <div style="margin-top:8px">
         <button class="btn btn-primary btn-sm" style="font-size:11px" onclick="abrirFormPagarSP('${idSafe}')">Marcar pagado</button>
       </div>
-      <div id="sp-form-pago-${idSafe}" style="display:none;margin-top:10px;padding:10px 12px;background:var(--bg3);border:1px solid var(--border);border-radius:8px">
+      <div id="sp-form-pago-${idSafe}" style="display:none;margin-top:10px;padding:10px 12px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--r-sm,8px)">
         <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
           <div>
             <label style="display:block;font-size:9px;letter-spacing:.1em;color:var(--ts);text-transform:uppercase;margin-bottom:3px">Monto pagado</label>
-            <input type="number" id="sp-pago-monto-${idSafe}" min="0" step="0.01" value="${_spEscape(Number(p.monto || 0))}" style="width:120px;padding:7px 8px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;color:var(--ink);font-size:12px">
+            <input type="number" id="sp-pago-monto-${idSafe}" min="0" step="0.01" value="${_spEscape(Number(p.monto || 0))}" style="width:120px;padding:7px 8px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--r-sm,8px);color:var(--ink);font-size:12px">
           </div>
           <div>
             <label style="display:block;font-size:9px;letter-spacing:.1em;color:var(--ts);text-transform:uppercase;margin-bottom:3px">Fecha</label>
-            <input type="date" id="sp-pago-fecha-${idSafe}" value="${_spEscape(hoy)}" style="padding:7px 8px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;color:var(--ink);font-size:12px">
+            <input type="date" id="sp-pago-fecha-${idSafe}" value="${_spEscape(hoy)}" style="padding:7px 8px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--r-sm,8px);color:var(--ink);font-size:12px">
           </div>
           <div>
             <label style="display:block;font-size:9px;letter-spacing:.1em;color:var(--ts);text-transform:uppercase;margin-bottom:3px">Método</label>
-            <select id="sp-pago-metodo-${idSafe}" onchange="_spOnMetodoChange('${idSafe}')" style="padding:7px 8px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;color:var(--ink);font-size:12px">${opciones}</select>
+            <select id="sp-pago-metodo-${idSafe}" onchange="_spOnMetodoChange('${idSafe}')" style="padding:7px 8px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--r-sm,8px);color:var(--ink);font-size:12px">${opciones}</select>
           </div>
           <div id="sp-pago-banco-wrap-${idSafe}">
             <label style="display:block;font-size:9px;letter-spacing:.1em;color:var(--ts);text-transform:uppercase;margin-bottom:3px">Banco</label>
-            <select id="sp-pago-banco-${idSafe}" style="padding:7px 8px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;color:var(--ink);font-size:12px">${opcionesBanco}</select>
+            <select id="sp-pago-banco-${idSafe}" style="padding:7px 8px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--r-sm,8px);color:var(--ink);font-size:12px">${opcionesBanco}</select>
           </div>
           <div style="flex:1;min-width:150px">
             <label style="display:block;font-size:9px;letter-spacing:.1em;color:var(--ts);text-transform:uppercase;margin-bottom:3px">Referencia (opcional)</label>
-            <input type="text" id="sp-pago-ref-${idSafe}" maxlength="120" placeholder="folio, últimos 4 dígitos, etc." style="width:100%;padding:7px 8px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;color:var(--ink);font-size:12px">
+            <input type="text" id="sp-pago-ref-${idSafe}" maxlength="120" placeholder="folio, últimos 4 dígitos, etc." style="width:100%;padding:7px 8px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--r-sm,8px);color:var(--ink);font-size:12px">
           </div>
         </div>
         <div style="margin-top:6px;font-size:10px;color:var(--ts)">Por defecto el monto del plan — cámbialo si pagó distinto.</div>
@@ -11593,7 +11593,7 @@ function _spRenderFilaPago(solicitudId, p) {
     : '';
 
   return `
-    <div style="border:1px solid var(--border);border-radius:8px;padding:10px 12px">
+    <div style="border:1px solid var(--border);border-radius:var(--r-sm,8px);padding:10px 12px">
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
         <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--orange)">#${_spEscape(p.numero_pago)}</span>
         <span style="flex:1;font-size:13px">${_spEscape(p.concepto)}</span>
@@ -11913,7 +11913,7 @@ function abrirCambiarEstadoSP(solicitudId) {
     <div style="font-size:12px;color:var(--ts);margin-bottom:14px">Cliente <b style="color:var(--ink)">${_spEscape((s.clientes||{}).nombre_completo || '—')}</b> · ${_spEscape(s.evento_nombre || '')}</div>
 
     <label style="display:block;font-size:10px;letter-spacing:.12em;color:var(--ts);text-transform:uppercase;margin-bottom:4px">Nuevo estado</label>
-    <select id="sp-nuevo-estado" style="width:100%;padding:10px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;color:var(--ink);font-size:14px;margin-bottom:14px">
+    <select id="sp-nuevo-estado" style="width:100%;padding:10px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--r-sm,8px);color:var(--ink);font-size:14px;margin-bottom:14px">
       <option value="pendiente" ${s.estado==='pendiente'?'selected':''}>Pendiente</option>
       <option value="en_pagos" ${s.estado==='en_pagos'?'selected':''}>En pagos</option>
       <option value="pagado" ${s.estado==='pagado'?'selected':''}>Pagado</option>
@@ -11921,7 +11921,7 @@ function abrirCambiarEstadoSP(solicitudId) {
     </select>
 
     <label style="display:block;font-size:10px;letter-spacing:.12em;color:var(--ts);text-transform:uppercase;margin-bottom:4px">Notas internas (admin)</label>
-    <textarea id="sp-nuevas-notas" rows="3" placeholder="Opcional — solo lo ve el admin" style="width:100%;padding:10px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;color:var(--ink);font-size:13px;resize:vertical;margin-bottom:6px">${_spEscape(s.notas_admin || '')}</textarea>
+    <textarea id="sp-nuevas-notas" rows="3" placeholder="Opcional — solo lo ve el admin" style="width:100%;padding:10px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--r-sm,8px);color:var(--ink);font-size:13px;resize:vertical;margin-bottom:6px">${_spEscape(s.notas_admin || '')}</textarea>
     <div style="font-size:11px;color:var(--ts);margin-bottom:14px">El cliente nunca ve estas notas. Dejándolas vacías se conservan las anteriores.</div>
 
     <div style="display:flex;justify-content:flex-end;gap:8px">
@@ -12415,7 +12415,7 @@ function renderMTDeudas(lista, filtro) {
   });
 
   list.innerHTML = `
-    <div style="background:rgba(255,68,68,.06);border:1px solid rgba(255,68,68,.2);border-radius:8px;padding:14px 18px;margin-bottom:16px">
+    <div style="background:rgba(255,68,68,.06);border:1px solid rgba(255,68,68,.2);border-radius:var(--r-sm,8px);padding:14px 18px;margin-bottom:16px">
       <div style="font-size:11px;color:var(--ts);font-family:'JetBrains Mono',monospace;letter-spacing:.1em">// TOTAL PENDIENTE DE COBRO</div>
       <div style="font-family:'Zen Dots',sans-serif;font-size:24px;color:var(--red);margin-top:4px">${formatMXN(totalPend)}</div>
     </div>
@@ -12518,7 +12518,7 @@ async function loadMTResumen() {
         <div class="k-mono" style="margin-bottom:14px">// EQUIPO POR ROL</div>
         <div style="display:flex;gap:10px;flex-wrap:wrap">
           ${Object.entries(porRol).map(([rol,count]) =>
-            `<div style="text-align:center;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:10px 16px;min-width:90px">
+            `<div style="text-align:center;background:var(--bg3);border:1px solid var(--border);border-radius:var(--r-sm,8px);padding:10px 16px;min-width:90px">
               <div style="font-family:'Zen Dots',sans-serif;font-size:22px;color:var(--orange)">${count}</div>
               <div style="font-size:10px;color:var(--ts)">${rolLabels[rol]||rol}</div>
             </div>`
@@ -12692,13 +12692,13 @@ async function abrirEditarUsuarioMT(id) {
           <div class="k-mono" style="margin-bottom:10px">// PERMISOS EXTRA DE TABS</div>
           <div style="font-size:11px;color:var(--ts);margin-bottom:8px">Tabs adicionales que puede ver (además de las de su rol):</div>
           <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px">
-            ${todasTabs.map(t=>`<label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:12px;padding:5px 10px;border:1px solid var(--border);border-radius:5px;background:${tabsExtra.includes(t)?'rgba(255,107,0,.1)':'transparent'}">
+            ${todasTabs.map(t=>`<label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:12px;padding:5px 10px;border:1px solid var(--border);border-radius:var(--r-sm,8px);background:${tabsExtra.includes(t)?'rgba(255,107,0,.1)':'transparent'}">
               <input type="checkbox" class="mt-tab-extra" value="${t}" ${tabsExtra.includes(t)?'checked':''} style="accent-color:var(--orange)"> ${t}
             </label>`).join('')}
           </div>
           <div style="font-size:11px;color:var(--ts);margin-bottom:8px">Tabs bloqueadas (aunque su rol las tenga):</div>
           <div style="display:flex;flex-wrap:wrap;gap:6px">
-            ${todasTabs.map(t=>`<label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:12px;padding:5px 10px;border:1px solid var(--border);border-radius:5px;background:${tabsBloq.includes(t)?'rgba(255,68,68,.1)':'transparent'}">
+            ${todasTabs.map(t=>`<label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:12px;padding:5px 10px;border:1px solid var(--border);border-radius:var(--r-sm,8px);background:${tabsBloq.includes(t)?'rgba(255,68,68,.1)':'transparent'}">
               <input type="checkbox" class="mt-tab-bloq" value="${t}" ${tabsBloq.includes(t)?'checked':''} style="accent-color:var(--red)"> ${t}
             </label>`).join('')}
           </div>
@@ -12754,7 +12754,7 @@ function abrirVerComo(userId, rol) {
       </div>
       <div class="modal-body">
         <p style="font-size:13px;color:var(--ts);margin-bottom:16px">Vas a simular la vista del sistema como si fueras <strong style="color:var(--text)">${_esfEsc(u.nombre)}</strong> (${u.rol}). Tu sesión de Maestro Roshi se restaura al salir.</p>
-        <div style="background:rgba(255,183,3,.06);border:1px solid rgba(255,183,3,.2);border-radius:8px;padding:12px;font-size:11px;color:var(--gold)">
+        <div style="background:rgba(255,183,3,.06);border:1px solid rgba(255,183,3,.2);border-radius:var(--r-sm,8px);padding:12px;font-size:11px;color:var(--gold)">
           <svg class="ic"><use href="#ic-alerta"/></svg> Solo es una vista — no puedes hacer cambios que afecten a ${_esfEsc(u.nombre)}
         </div>
       </div>
@@ -12790,7 +12790,7 @@ function mostrarBannerVerComo(nombre) {
     document.body.appendChild(banner);
   }
   banner.innerHTML = `<span><svg class="ic"><use href="#ic-ojo"/></svg> MODO VISTA — viendo como: ${_esfEsc(nombre.toUpperCase())}</span>
-    <button onclick="salirVerComo()" style="background:var(--bg);border:none;padding:6px 14px;border-radius:6px;cursor:pointer;font-family:JetBrains Mono,monospace;font-size:11px;font-weight:700">✕ Salir y volver a Roshi</button>`;
+    <button onclick="salirVerComo()" style="background:var(--bg);border:none;padding:6px 14px;border-radius:var(--r-sm,8px);cursor:pointer;font-family:JetBrains Mono,monospace;font-size:11px;font-weight:700">✕ Salir y volver a Roshi</button>`;
 }
 
 function salirVerComo() {
@@ -13301,7 +13301,7 @@ function cancelarEventoCompleto(slug) {
         <button class="modal-close" onclick="closeModal('modal-cancelar-evento')">×</button>
       </div>
       <div class="modal-body">
-        <div style="border:1px solid var(--red);border-radius:8px;padding:12px 14px;margin-bottom:14px;font-size:13px;line-height:1.55;color:var(--red)">
+        <div style="border:1px solid var(--red);border-radius:var(--r-sm,8px);padding:12px 14px;margin-bottom:14px;font-size:13px;line-height:1.55;color:var(--red)">
           Vas a <b>CANCELAR</b> <b>${_esfEsc(ev.nombre)}</b>. Esto da de baja a TODOS los clientes activos y genera la lista de reembolsos por todo lo que pagaron. Es <b>IRREVERSIBLE</b>.
         </div>
         <div class="form-group">
@@ -13408,8 +13408,8 @@ async function loadYamcha() {
       const filasHtml = g.rows.map(rb => {
         const esPend = rb.estado === 'pendiente';
         const badge = esPend
-          ? '<span style="display:inline-block;padding:2px 8px;border-radius:10px;background:rgba(255,165,0,.15);color:var(--orange);font-size:11px;font-weight:700">pendiente</span>'
-          : '<span style="display:inline-block;padding:2px 8px;border-radius:10px;background:rgba(61,220,132,.15);color:#3DDC84;font-size:11px;font-weight:700">transferido</span>';
+          ? '<span style="display:inline-block;padding:2px 8px;border-radius:var(--r-sm,8px);background:rgba(255,165,0,.15);color:var(--orange);font-size:11px;font-weight:700">pendiente</span>'
+          : '<span style="display:inline-block;padding:2px 8px;border-radius:var(--r-sm,8px);background:rgba(61,220,132,.15);color:#3DDC84;font-size:11px;font-weight:700">transferido</span>';
         const accionEstado = esPend
           ? `<button class="btn btn-ghost btn-sm" style="font-size:10px" onclick="transferirReembolso('${_esfEsc(rb.id)}')">✓ Marcar transferido</button>`
           : `<button class="btn btn-ghost btn-sm" style="font-size:10px" onclick="desmarcarReembolso('${_esfEsc(rb.id)}')">↩️ Desmarcar</button>`;
@@ -14694,7 +14694,7 @@ async function _esfMusicBuscar(query, cont, onPick) {
     if (!items.length) { cont.innerHTML = '<div style="font-size:11px;color:var(--ts)">Sin resultados.</div>'; return; }
     items.forEach(t => {
       const row = document.createElement('div');
-      row.style.cssText = 'display:flex;align-items:center;gap:8px;padding:6px;border:1px solid var(--border);border-radius:8px;margin-bottom:6px';
+      row.style.cssText = 'display:flex;align-items:center;gap:8px;padding:6px;border:1px solid var(--border);border-radius:var(--r-sm,8px);margin-bottom:6px';
       const cover = document.createElement(t.cover ? 'img' : 'div');
       cover.style.cssText = 'width:36px;height:36px;border-radius:4px;flex-shrink:0;background:var(--bg);object-fit:cover';
       if (t.cover) cover.src = t.cover;
@@ -14760,7 +14760,7 @@ function _esfMusicaRender() {
   if (!el) return;
   if (!_esfMusicaLista.length) { el.innerHTML = '<div style="font-size:11px;color:var(--ts)">Sin canciones aún.</div>'; return; }
   el.innerHTML = _esfMusicaLista.map(m => `
-    <div style="display:inline-flex;align-items:center;gap:6px;padding:4px 8px;background:var(--bg3);border:1px solid var(--border);border-radius:14px;margin:0 6px 6px 0;font-size:12px">
+    <div style="display:inline-flex;align-items:center;gap:6px;padding:4px 8px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--r-card,16px);margin:0 6px 6px 0;font-size:12px">
       <span>${_esfEsc(m.label)}</span>
       <button type="button" class="btn btn-ghost btn-sm" style="font-size:10px;padding:0 5px" onclick="_esfMusicaRemove('${_esfEsc(m.id)}')">✕</button>
     </div>`).join('');
@@ -14786,7 +14786,7 @@ function _esfPaqRender() {
   const stayOn = !!document.getElementById('esf-fest-stay')?.checked;    // hoteles solo si el switch stay está encendido
   if (stayOn) _esfPaquetes.forEach((_, i) => _esfPaqHotelEnsure(i));     // asegura los 4 tipos fijos por paquete
   el.innerHTML = _esfPaquetes.map((p, i) => `
-    <div style="border:1px solid var(--border);border-radius:8px;padding:10px;margin-bottom:8px;background:var(--bg2)">
+    <div style="border:1px solid var(--border);border-radius:var(--r-sm,8px);padding:10px;margin-bottom:8px;background:var(--bg2)">
       <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px">
         <span style="font-size:11px;color:var(--ts)">Paquete ${i + 1}</span>
         <button type="button" class="btn btn-ghost btn-sm" style="font-size:10px" onclick="_esfPaqRemove(${i})">Quitar</button>
@@ -14910,7 +14910,7 @@ async function probarCompiladoDryRun() {
     const badge = (ok) => ok
       ? '<span class="badge badge-green">OK</span>'
       : '<span class="badge badge-red">FALLÓ</span>';
-    const preBox = (txt) => `<pre style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px;overflow:auto;font-size:11px;white-space:pre-wrap;word-break:break-all;margin:0 0 8px">${_esfEsc(txt)}</pre>`;
+    const preBox = (txt) => `<pre style="background:var(--bg);border:1px solid var(--border);border-radius:var(--r-sm,8px);padding:10px;overflow:auto;font-size:11px;white-space:pre-wrap;word-break:break-all;margin:0 0 8px">${_esfEsc(txt)}</pre>`;
     let html = '';
     html += `<div style="font-size:13px;margin-bottom:6px">Insertar: <b>${aIns.length}</b> · Actualizar: <b>${aAct.length}</b>${data.sin_cambios ? ' · <b>sin cambios</b>' : ''}</div>`;
     html += `<div style="font-size:13px;margin-bottom:6px">Validación portal: ${badge(v.portal_ok)} &nbsp; kamehouse: ${badge(v.kamehouse_ok)}</div>`;
@@ -15191,13 +15191,13 @@ async function checkMensajeDia() {
       if (!banner) {
         banner = document.createElement('div');
         banner.id = 'msg-dia-banner';
-        banner.style.cssText = 'position:fixed;bottom:20px;right:20px;z-index:9998;background:var(--bg2);border:1px solid var(--border2);border-radius:10px;padding:16px 20px;max-width:320px;box-shadow:0 8px 32px rgba(0,0,0,.5)';
+        banner.style.cssText = 'position:fixed;bottom:20px;right:20px;z-index:9998;background:var(--bg2);border:1px solid var(--border2);border-radius:var(--r-sm,8px);padding:16px 20px;max-width:320px;box-shadow:0 8px 32px rgba(0,0,0,.5)';
         document.body.appendChild(banner);
       }
       banner.innerHTML = `
         <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--orange);margin-bottom:8px;letter-spacing:.1em">// MENSAJE DEL DÍA</div>
         <div style="font-size:13px;color:var(--text);line-height:1.5">${_esfEsc(cfg.mensaje_dia)}</div>
-        <button onclick="document.getElementById('msg-dia-banner').remove()" style="margin-top:12px;background:none;border:1px solid var(--border);border-radius:6px;padding:4px 12px;color:var(--ts);cursor:pointer;font-size:11px;width:100%">Cerrar</button>`;
+        <button onclick="document.getElementById('msg-dia-banner').remove()" style="margin-top:12px;background:none;border:1px solid var(--border);border-radius:var(--r-sm,8px);padding:4px 12px;color:var(--ts);cursor:pointer;font-size:11px;width:100%">Cerrar</button>`;
     }
   } catch(e) {}
 }
@@ -15442,7 +15442,7 @@ async function abrirModalReporte(reporteId) {
         </div>
 
         <!-- Dinero recibido -->
-        <div style="background:rgba(255,183,3,.06);border:1px solid rgba(255,183,3,.2);border-radius:8px;padding:16px;margin-bottom:20px">
+        <div style="background:rgba(255,183,3,.06);border:1px solid rgba(255,183,3,.2);border-radius:var(--r-sm,8px);padding:16px;margin-bottom:20px">
           <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.15em;color:var(--gold);margin-bottom:10px">// DINERO RECIBIDO DE MEMO</div>
           <div class="form-group" style="margin:0">
             <label>Memo me entregó <span style="color:var(--ts);font-weight:400">(0 si no recibió efectivo)</span></label>
@@ -15480,7 +15480,7 @@ async function abrirModalReporte(reporteId) {
         </div>
 
         <!-- Resumen financiero -->
-        <div style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:16px;margin-bottom:16px">
+        <div style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--r-sm,8px);padding:16px;margin-bottom:16px">
           <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.15em;color:var(--ts);margin-bottom:12px">// RESUMEN</div>
           <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;text-align:center">
             <div><div style="font-size:10px;color:var(--ts)">ENTREGADO</div><div style="font-family:'Zen Dots',sans-serif;font-size:18px;color:var(--gold)" id="rep-total-entregado">$0</div></div>
@@ -15842,7 +15842,7 @@ function verDetalleReporte(id) {
             <tbody>${gastosHtml}</tbody>
           </table>
         </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;text-align:center;background:var(--bg3);padding:16px;border-radius:8px;margin-bottom:16px">
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;text-align:center;background:var(--bg3);padding:16px;border-radius:var(--r-sm,8px);margin-bottom:16px">
           <div><div style="font-size:10px;color:var(--ts)">ENTREGADO</div><div style="font-family:'Zen Dots',sans-serif;font-size:18px;color:var(--gold)">${formatMXN(r.dinero_recibido||0)}</div></div>
           <div><div style="font-size:10px;color:var(--ts)">GASTADO</div><div style="font-family:'Zen Dots',sans-serif;font-size:18px">${formatMXN(r.total_gastado||0)}</div></div>
           <div><div style="font-size:10px;color:var(--ts)">DIFERENCIA</div><div style="font-family:'Zen Dots',sans-serif;font-size:18px;color:${difColor}">${formatMXN(Math.abs(dif))}</div></div>
@@ -15928,7 +15928,7 @@ function _renderDeliverablesPanel(e, u) {
   const ok = dels.filter(d => d.estado === 'completado').length;
   const total = dels.length;
   return `
-    <div style="margin-top:14px;background:rgba(0,0,0,.18);border:1px solid rgba(255,255,255,.05);border-radius:6px;padding:12px 14px">
+    <div style="margin-top:14px;background:rgba(0,0,0,.18);border:1px solid rgba(255,255,255,.05);border-radius:var(--r-sm,8px);padding:12px 14px">
       <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:8px">
         <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--gold)">▸ Material entregado <span style="color:var(--ts);margin-left:4px">[${ok}/${total}]</span></div>
         <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();_delivAdd('${e.id}','${u.id}')" style="font-size:10px;font-family:'JetBrains Mono',monospace">+ deliverable</button>
@@ -16181,7 +16181,7 @@ async function _vtaGateInactivo() {
       const page = document.getElementById('page-cotizar');
       if (page) page.appendChild(av);
     }
-    av.innerHTML = `<div style="max-width:560px;margin:40px auto;text-align:center;padding:32px 24px;border:1px solid rgba(255,68,68,.4);border-radius:12px;background:rgba(255,68,68,.06)">
+    av.innerHTML = `<div style="max-width:560px;margin:40px auto;text-align:center;padding:32px 24px;border:1px solid rgba(255,68,68,.4);border-radius:var(--r-btn,12px);background:rgba(255,68,68,.06)">
       <div style="font-size:34px;margin-bottom:10px">💤</div>
       <div style="font-family:'Rajdhani',sans-serif;font-weight:700;font-size:18px;margin-bottom:10px;color:#ff6666">Acceso de vendedor en pausa</div>
       <div style="font-size:13px;line-height:1.6;color:var(--ts)">${_esfEsc(j.error || 'Tu acceso de vendedor está pausado por inactividad (3 meses sin ventas) — contacta a Conecta para reactivarlo')}</div>
@@ -16366,7 +16366,7 @@ function _vtaRecalc() {
 
 async function _vtaRegistrar() {
   const alert = document.getElementById('vta-alert');
-  const setErr = (m) => { alert.innerHTML = `<div style="padding:10px 14px;background:rgba(255,68,68,.12);border:1px solid rgba(255,68,68,.4);color:#ffb3b3;border-radius:6px;margin-bottom:14px;font-size:13px"><svg class="ic"><use href="#ic-alerta"/></svg> ${_vtaEsc(m)}</div>`; };
+  const setErr = (m) => { alert.innerHTML = `<div style="padding:10px 14px;background:rgba(255,68,68,.12);border:1px solid rgba(255,68,68,.4);color:#ffb3b3;border-radius:var(--r-sm,8px);margin-bottom:14px;font-size:13px"><svg class="ic"><use href="#ic-alerta"/></svg> ${_vtaEsc(m)}</div>`; };
   if (!_vtaEvento) return setErr('Elige un evento');
   const paquete = document.getElementById('vta-paquete').value;
   const zona = document.getElementById('vta-zona').value;
@@ -16459,11 +16459,11 @@ async function _vtaMisComisiones() {
     const j = await r.json().catch(() => ({}));
     const lista = (r.ok && j.ok && Array.isArray(j.comisiones)) ? j.comisiones : [];
     if (!lista.length) { box.innerHTML = ''; return; }
-    const chip = (txt, color) => `<span style="display:inline-block;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;color:${color};border:1px solid ${color}55">${txt}</span>`;
+    const chip = (txt, color) => `<span style="display:inline-block;font-size:10px;font-weight:700;padding:2px 7px;border-radius:var(--r-sm,8px);color:${color};border:1px solid ${color}55">${txt}</span>`;
     const filas = lista.map(c => `<div style="display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-top:1px solid var(--border);font-size:13px">
       <span>${_vtaEsc(c.evento_nombre || c.evento_id)}</span>
       <span><b>${_vtaFmt(c.monto)}</b> ${c.estado === 'pagada' ? chip('pagada', 'var(--green)') : chip('por pagar', 'var(--orange)')}</span></div>`).join('');
-    box.innerHTML = `<div style="border:1px solid var(--border);border-radius:8px;padding:12px 14px">
+    box.innerHTML = `<div style="border:1px solid var(--border);border-radius:var(--r-sm,8px);padding:12px 14px">
       <div style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--ts);margin-bottom:4px">Mis comisiones liquidadas</div>
       ${filas}</div>`;
   } catch (e) { box.innerHTML = ''; }
@@ -16497,7 +16497,7 @@ function _vtaAbonosRender(solicitudId, j) {
   const cell = document.getElementById('vta-ab-cell-' + solicitudId);
   if (!cell) return;
   const idS = _vtaEsc(solicitudId);
-  const chip = (txt, color) => `<span style="display:inline-block;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;color:${color};border:1px solid ${color}55">${txt}</span>`;
+  const chip = (txt, color) => `<span style="display:inline-block;font-size:10px;font-weight:700;padding:2px 7px;border-radius:var(--r-sm,8px);color:${color};border:1px solid ${color}55">${txt}</span>`;
   const sepChip = j.separo_cubierto ? chip('SEPARO CUBIERTO', 'var(--green)') : chip('SEPARO PENDIENTE', 'var(--orange)');
   const abonosHtml = (Array.isArray(j.abonos) && j.abonos.length)
     ? j.abonos.map(a => {
@@ -17179,7 +17179,7 @@ function previewContrato() {
   const err = _validateCtrForm(d);
   const alert = document.getElementById('ctr-alert');
   if (err) {
-    alert.innerHTML = `<div style="padding:10px 14px;background:rgba(255,68,68,.12);border:1px solid rgba(255,68,68,.4);color:#ffb3b3;border-radius:6px;margin-bottom:14px;font-size:13px"><svg class="ic"><use href="#ic-alerta"/></svg> ${err}</div>`;
+    alert.innerHTML = `<div style="padding:10px 14px;background:rgba(255,68,68,.12);border:1px solid rgba(255,68,68,.4);color:#ffb3b3;border-radius:var(--r-sm,8px);margin-bottom:14px;font-size:13px"><svg class="ic"><use href="#ic-alerta"/></svg> ${err}</div>`;
     return;
   }
   alert.innerHTML = '';
@@ -17416,7 +17416,7 @@ async function verAnexoC(id, nombre) {
     const anexo = !ax
       ? '<p style="font-size:13px;color:#666;margin-top:10px">Este contrato no tiene Anexo C capturado (se llena al firmar).</p>'
       : `
-      <details style="margin-top:14px;border:1px solid rgba(201,162,255,.5);border-radius:8px;padding:10px 14px;background:rgba(201,162,255,.06)">
+      <details style="margin-top:14px;border:1px solid rgba(201,162,255,.5);border-radius:var(--r-sm,8px);padding:10px 14px;background:rgba(201,162,255,.06)">
         <summary style="cursor:pointer;font-weight:800;font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:#7a4fc9">🔒 Anexo C — Declaración Discreta (confidencial)</summary>
         <div style="margin-top:10px">
           ${fila('¿Cuentas de contenido adulto?', CUENTAS[ax.cuentas_previas] || ax.cuentas_previas)}
@@ -17564,7 +17564,7 @@ async function loadWaitlist() {
   if (summary) summary.textContent = `Total: ${total} ${total === 1 ? 'persona' : 'personas'} en ${eventos.length} ${eventos.length === 1 ? 'evento' : 'eventos'}`;
 
   if (!eventos.length) {
-    groups.innerHTML = '<div class="empty-state" style="padding:40px;text-align:center;color:var(--ts);border:1px dashed var(--border);border-radius:10px"><div style="font-size:36px;margin-bottom:8px"><svg class="ic"><use href="#ic-campana"/></svg></div><div style="font-size:13px;letter-spacing:.06em">No hay registros todavía. Cuando alguien se registre en un evento &laquo;Próximamente&raquo;, aparecerá aquí.</div></div>';
+    groups.innerHTML = '<div class="empty-state" style="padding:40px;text-align:center;color:var(--ts);border:1px dashed var(--border);border-radius:var(--r-sm,8px)"><div style="font-size:36px;margin-bottom:8px"><svg class="ic"><use href="#ic-campana"/></svg></div><div style="font-size:13px;letter-spacing:.06em">No hay registros todavía. Cuando alguien se registre en un evento &laquo;Próximamente&raquo;, aparecerá aquí.</div></div>';
     return;
   }
 
@@ -17577,7 +17577,7 @@ async function loadWaitlist() {
     const tagColor = estadoSnap === 'proximamente' ? '#e8ff4c' : '#88ea4e';
     const tagText = estadoSnap === 'proximamente' ? 'PRÓXIMAMENTE' : (isActivo ? 'ACTIVO ✓' : (estadoSnap || '—').toUpperCase());
     const notifLabel = (pendientes > 0) ? `Notificar a ${pendientes} ahora` : 'Reenviar notificación';
-    return `<div style="background:var(--bg2,#0a0a0a);border:1px solid var(--border);border-left:4px solid #e8ff4c;border-radius:10px;padding:18px 20px">
+    return `<div style="background:var(--bg2,#0a0a0a);border:1px solid var(--border);border-left:4px solid #e8ff4c;border-radius:var(--r-sm,8px);padding:18px 20px">
       <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:6px">
         <div style="font-size:15px;font-weight:800;color:#fff;flex:1 1 auto"><svg class="ic"><use href="#ic-eventos"/></svg> ${_wlEsc(g.evento_nombre)}</div>
         <span style="font-size:10px;letter-spacing:.14em;padding:4px 10px;border-radius:4px;background:${tagBg};border:1px solid ${tagBorder};color:${tagColor};font-weight:800">${tagText}</span>

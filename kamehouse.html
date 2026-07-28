@@ -229,7 +229,7 @@
  </div>
  </div>
 
- <div id="resumen-cap-aviso" style="display:none;margin-bottom:16px;padding:10px 14px;border:1px solid var(--border2);border-radius:8px;background:rgba(255,107,0,.06);color:var(--orange);font-size:12px"></div>
+ <div id="resumen-cap-aviso" style="display:none;margin-bottom:16px;padding:10px 14px;border:1px solid var(--border2);border-radius:var(--r-sm,8px);background:rgba(255,107,0,.06);color:var(--orange);font-size:12px"></div>
 
  <!-- Utilidad por evento (Capa 3 / Franja 2 del dashboard) -->
  <div class="card" id="resumen-utilidad-card" style="margin-bottom:16px">
@@ -660,7 +660,7 @@
   </div>
 
   <!-- TORRE v2 F3: la zona de reportes gana la sub-pestaña de salidas de bodega -->
-  <div class="contratos-tabs" style="display:inline-flex;border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:16px">
+  <div class="contratos-tabs" style="display:inline-flex;border:1px solid var(--border);border-radius:var(--r-sm,8px);overflow:hidden;margin-bottom:16px">
    <button id="rep-tab-reportes" class="ctr-tab" onclick="repVista('reportes')" style="background:rgba(255,107,0,.12);border:0;color:var(--orange);padding:8px 16px;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;font-family:inherit">Reportes</button>
    <button id="rep-tab-salidas" class="ctr-tab" onclick="repVista('salidas')" style="background:transparent;border:0;color:var(--ts);padding:8px 16px;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;font-family:inherit;border-left:1px solid var(--border)">Salida de bodega</button>
   </div>
@@ -732,7 +732,7 @@
       <!-- TAB: Lista -->
       <div id="gz-tab-lista">
        <!-- Label solo lectura para roles no-admin -->
-       <div id="gz-solo-lectura-label" style="display:none;align-items:center;gap:8px;margin-bottom:14px;padding:8px 14px;background:rgba(255,183,3,.06);border:1px solid rgba(255,183,3,.15);border-radius:8px">
+       <div id="gz-solo-lectura-label" style="display:none;align-items:center;gap:8px;margin-bottom:14px;padding:8px 14px;background:rgba(255,183,3,.06);border:1px solid rgba(255,183,3,.15);border-radius:var(--r-sm,8px)">
          <span style="font-size:14px"><svg class="ic"><use href="#ic-ojo"/></svg></span>
          <span style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.1em;color:var(--gold)">SOLO LECTURA — puedes ver los perfiles de tu equipo, no editarlos</span>
        </div>
@@ -810,7 +810,7 @@
         <button class="gz-filter" id="ccf-proximos" onclick="filtrarCCEventos('proximo',this)">// próximos</button>
         <button class="gz-filter" id="ccf-pasados" onclick="filtrarCCEventos('pasado',this)">// pasados</button>
        </div>
-       <input type="text" id="cc-buscar" placeholder="Buscar evento por nombre…" autocomplete="off" oninput="filtrarCapsule()" style="width:100%;padding:8px 10px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;color:var(--ink);font-size:13px;margin-bottom:10px">
+       <input type="text" id="cc-buscar" placeholder="Buscar evento por nombre…" autocomplete="off" oninput="filtrarCapsule()" style="width:100%;padding:8px 10px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--r-sm,8px);color:var(--ink);font-size:13px;margin-bottom:10px">
        <div id="cc-eventos-grid"></div>
       </div>
 
@@ -951,29 +951,29 @@
       <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;margin-bottom:16px;display:grid;grid-template-columns:1fr 200px 200px 160px 160px;gap:10px;align-items:end">
        <div>
         <label style="display:block;font-size:10px;letter-spacing:.12em;color:var(--ts);text-transform:uppercase;margin-bottom:4px">Buscar</label>
-        <input type="text" id="sp-q" placeholder="Nombre, correo, evento o # cliente" oninput="renderSolicitudesPortal()" style="width:100%;padding:8px 10px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;color:var(--ink);font-size:13px">
+        <input type="text" id="sp-q" placeholder="Nombre, correo, evento o # cliente" oninput="renderSolicitudesPortal()" style="width:100%;padding:8px 10px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--r-sm,8px);color:var(--ink);font-size:13px">
        </div>
        <div>
         <label style="display:block;font-size:10px;letter-spacing:.12em;color:var(--ts);text-transform:uppercase;margin-bottom:4px">Estado</label>
         <!-- [Bandeja-T2] Solo pendientes + canceladas. en_pagos/pagado viven en Capsule → Pagos. -->
-        <select id="sp-filtro-estado" onchange="loadSolicitudesPortal()" style="width:100%;padding:8px 10px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;color:var(--ink);font-size:13px">
+        <select id="sp-filtro-estado" onchange="loadSolicitudesPortal()" style="width:100%;padding:8px 10px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--r-sm,8px);color:var(--ink);font-size:13px">
          <option value="pendiente" selected>Pendientes</option>
          <option value="cancelado">Canceladas</option>
         </select>
        </div>
        <div>
         <label style="display:block;font-size:10px;letter-spacing:.12em;color:var(--ts);text-transform:uppercase;margin-bottom:4px">Evento</label>
-        <select id="sp-filtro-evento" onchange="loadSolicitudesPortal()" style="width:100%;padding:8px 10px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;color:var(--ink);font-size:13px">
+        <select id="sp-filtro-evento" onchange="loadSolicitudesPortal()" style="width:100%;padding:8px 10px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--r-sm,8px);color:var(--ink);font-size:13px">
          <option value="">Todos</option>
         </select>
        </div>
        <div>
         <label style="display:block;font-size:10px;letter-spacing:.12em;color:var(--ts);text-transform:uppercase;margin-bottom:4px">Desde</label>
-        <input type="date" id="sp-filtro-desde" onchange="loadSolicitudesPortal()" style="width:100%;padding:8px 10px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;color:var(--ink);font-size:13px">
+        <input type="date" id="sp-filtro-desde" onchange="loadSolicitudesPortal()" style="width:100%;padding:8px 10px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--r-sm,8px);color:var(--ink);font-size:13px">
        </div>
        <div>
         <label style="display:block;font-size:10px;letter-spacing:.12em;color:var(--ts);text-transform:uppercase;margin-bottom:4px">Hasta</label>
-        <input type="date" id="sp-filtro-hasta" onchange="loadSolicitudesPortal()" style="width:100%;padding:8px 10px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;color:var(--ink);font-size:13px">
+        <input type="date" id="sp-filtro-hasta" onchange="loadSolicitudesPortal()" style="width:100%;padding:8px 10px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--r-sm,8px);color:var(--ink);font-size:13px">
        </div>
       </div>
 
@@ -1193,7 +1193,7 @@
      </select>
     </div>
     <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.15em;color:var(--ts);margin:24px 0 16px">// FESTIVAL</div>
-    <div id="esf-festival-box" style="display:none;margin-top:8px;padding:12px;border:1px dashed var(--border);border-radius:8px">
+    <div id="esf-festival-box" style="display:none;margin-top:8px;padding:12px;border:1px dashed var(--border);border-radius:var(--r-sm,8px)">
       <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ts);font-weight:700;margin:18px 0 8px">Apariencia</div>
       <!-- 2c: portada + lineup -->
       <div style="margin-bottom:10px">
@@ -1204,7 +1204,7 @@
         <button class="btn btn-ghost" type="button" id="esf-fest-portada-clear" style="display:none" onclick="_esfFestPortadaClear()">Quitar</button>
         <span id="esf-fest-portada-status" style="font-size:11px;color:var(--ts)"></span>
        </div>
-       <div id="esf-fest-portada-preview" style="margin-top:8px;display:none"><img id="esf-fest-portada-img" src="" alt="Portada del festival" style="max-width:240px;max-height:180px;border:1px solid var(--border);border-radius:6px"></div>
+       <div id="esf-fest-portada-preview" style="margin-top:8px;display:none"><img id="esf-fest-portada-img" src="" alt="Portada del festival" style="max-width:240px;max-height:180px;border:1px solid var(--border);border-radius:var(--r-sm,8px)"></div>
       </div>
       <div style="margin-bottom:10px">
        <label style="font-size:12px">Lineup del festival</label>
@@ -1214,7 +1214,7 @@
         <button class="btn btn-ghost" type="button" id="esf-fest-lineup-clear" style="display:none" onclick="_esfFestLineupClear()">Quitar</button>
         <span id="esf-fest-lineup-status" style="font-size:11px;color:var(--ts)"></span>
        </div>
-       <div id="esf-fest-lineup-preview" style="margin-top:8px;display:none"><img id="esf-fest-lineup-img" src="" alt="Lineup del festival" style="max-width:240px;max-height:180px;border:1px solid var(--border);border-radius:6px"></div>
+       <div id="esf-fest-lineup-preview" style="margin-top:8px;display:none"><img id="esf-fest-lineup-img" src="" alt="Lineup del festival" style="max-width:240px;max-height:180px;border:1px solid var(--border);border-radius:var(--r-sm,8px)"></div>
        <label style="display:flex;align-items:center;gap:8px;font-size:12px;cursor:pointer;margin-top:6px">
         <input type="checkbox" id="esf-fest-lineup-show" checked> Mostrar lineup en el sitio
        </label>
@@ -1299,7 +1299,7 @@
       <button class="btn btn-ghost" type="button" id="esf-foto-clear" style="display:none" onclick="_esfFotoClear()">Quitar</button>
       <span id="esf-foto-status" style="font-size:11px;color:var(--ts)"></span>
      </div>
-     <div id="esf-foto-preview" style="margin-top:8px;display:none"><img id="esf-foto-img" src="" alt="Foto de portada" style="max-width:240px;max-height:180px;border:1px solid var(--border);border-radius:6px"></div>
+     <div id="esf-foto-preview" style="margin-top:8px;display:none"><img id="esf-foto-img" src="" alt="Foto de portada" style="max-width:240px;max-height:180px;border:1px solid var(--border);border-radius:var(--r-sm,8px)"></div>
      <div style="font-size:11px;color:var(--ts);margin-top:4px">Portada manual del concierto (reemplaza la foto de Deezer). Los festivales usan su propia portada en el panel de festival.</div>
     </div>
     <div class="form-group">
@@ -1310,7 +1310,7 @@
       <button class="btn btn-ghost" type="button" id="esf-mapa-clear" style="display:none" onclick="_esfMapaClear()">Quitar mapa</button>
       <span id="esf-mapa-status" style="font-size:11px;color:var(--ts)"></span>
      </div>
-     <div id="esf-mapa-preview" style="margin-top:8px;display:none"><img id="esf-mapa-img" src="" alt="Mapa del venue" style="max-width:240px;max-height:180px;border:1px solid var(--border);border-radius:6px"></div>
+     <div id="esf-mapa-preview" style="margin-top:8px;display:none"><img id="esf-mapa-img" src="" alt="Mapa del venue" style="max-width:240px;max-height:180px;border:1px solid var(--border);border-radius:var(--r-sm,8px)"></div>
      <div style="font-size:11px;color:var(--ts);margin-top:4px">Imagen del mapa de zonas (conciertos). Sin mapa → el sitio muestra "Mapa próximamente".</div>
     </div>
     <div class="form-group">
@@ -1696,7 +1696,7 @@
  <div class="page" id="page-cotizar">
    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px;flex-wrap:wrap">
      <h2 style="margin:0;font-family:'Zen Dots',sans-serif;font-size:22px;letter-spacing:.02em"><svg class="ic"><use href="#ic-boleto"/></svg> Ventas</h2>
-     <div class="contratos-tabs" style="display:inline-flex;border:1px solid var(--border);border-radius:8px;overflow:hidden">
+     <div class="contratos-tabs" style="display:inline-flex;border:1px solid var(--border);border-radius:var(--r-sm,8px);overflow:hidden">
        <button id="vta-tab-vender" class="ctr-tab active" onclick="_vtaSwitch('vender')" style="background:rgba(255,107,0,.12);border:0;color:var(--orange);padding:8px 16px;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;font-family:inherit">Cotizar / Vender</button>
        <button id="vta-tab-mis" class="ctr-tab" onclick="_vtaSwitch('mis')" style="background:transparent;border:0;color:var(--ts);padding:8px 16px;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;font-family:inherit;border-left:1px solid var(--border)">Mis Ventas</button>
      </div>
@@ -1721,7 +1721,7 @@
          <div class="form-group" id="vta-hotel-wrap" style="display:none"><label>Hotel</label><select id="vta-hotel" onchange="_vtaRecalc()"></select></div>
        </div>
 
-       <div id="vta-resumen" style="display:none;margin:6px 0 16px;padding:14px 16px;background:var(--bg3);border:1px solid var(--border);border-radius:10px"></div>
+       <div id="vta-resumen" style="display:none;margin:6px 0 16px;padding:14px 16px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--r-sm,8px)"></div>
 
        <div style="font-size:11px;color:var(--ts);letter-spacing:.1em;text-transform:uppercase;margin:14px 0 8px;border-top:1px solid var(--border);padding-top:12px">Datos del cliente</div>
        <div class="form-row cols-2">
@@ -1753,7 +1753,7 @@
  <div class="page" id="page-contratos">
    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px;flex-wrap:wrap">
      <h2 style="margin:0;font-family:'Zen Dots',sans-serif;font-size:22px;letter-spacing:.02em"><svg class="ic"><use href="#ic-lapiz"/></svg> Contratos creadoras</h2>
-     <div class="contratos-tabs" style="display:inline-flex;gap:0;border:1px solid var(--border);border-radius:8px;overflow:hidden">
+     <div class="contratos-tabs" style="display:inline-flex;gap:0;border:1px solid var(--border);border-radius:var(--r-sm,8px);overflow:hidden">
        <button id="ctr-tab-listado" class="ctr-tab active" onclick="switchContratoView('listado')" style="background:transparent;border:0;color:var(--ts);padding:8px 16px;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;font-family:inherit">Listado</button>
        <button id="ctr-tab-nuevo" class="ctr-tab" onclick="switchContratoView('nuevo')" style="background:transparent;border:0;color:var(--ts);padding:8px 16px;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;font-family:inherit;border-left:1px solid var(--border)">+ Nuevo</button>
      </div>
@@ -1782,7 +1782,7 @@
    <!-- ── Vista A: Formulario ── -->
    <div id="ctr-view-nuevo" class="contratos-view" style="display:none">
      <div style="max-width:760px">
-       <div id="ctr-banner-edit" style="display:none;padding:10px 14px;background:rgba(255,107,0,.12);border:1px solid rgba(255,107,0,.4);color:#ffb47a;border-radius:6px;margin-bottom:14px;font-size:12px;letter-spacing:.04em"></div>
+       <div id="ctr-banner-edit" style="display:none;padding:10px 14px;background:rgba(255,107,0,.12);border:1px solid rgba(255,107,0,.4);color:#ffb47a;border-radius:var(--r-sm,8px);margin-bottom:14px;font-size:12px;letter-spacing:.04em"></div>
        <div id="ctr-alert"></div>
        <div class="form-row cols-2">
          <div class="form-group">
@@ -2134,7 +2134,7 @@
        <div class="rdr-kpi"><div class="rdr-kpi-lbl">Música reproducida</div><div class="rdr-kpi-num"><span class="rdr-kpi-val" id="rsi-musica">—</span></div></div>
      </div>
      <div style="margin-bottom:18px;text-align:right">
-       <button class="rdr-status-line" style="border:1px solid var(--rdr-border);background:transparent;color:var(--rdr-yel);padding:8px 16px;border-radius:6px;cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:900;letter-spacing:.14em;text-transform:uppercase" onclick="exportRadarCSV('main')"><svg class="ic"><use href="#ic-descargar"/></svg> Export CSV</button>
+       <button class="rdr-status-line" style="border:1px solid var(--rdr-border);background:transparent;color:var(--rdr-yel);padding:8px 16px;border-radius:var(--r-sm,8px);cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:900;letter-spacing:.14em;text-transform:uppercase" onclick="exportRadarCSV('main')"><svg class="ic"><use href="#ic-descargar"/></svg> Export CSV</button>
      </div>
      <div class="rdr-grid-2">
        <div class="rdr-card">
@@ -2244,7 +2244,7 @@
 
      <!-- Export CSV bar -->
      <div style="margin:18px 0;text-align:right">
-       <button style="border:1px solid var(--rdr-border);background:transparent;color:var(--rdr-yel);padding:8px 16px;border-radius:6px;cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:900;letter-spacing:.14em;text-transform:uppercase" onclick="exportRolAnalyticsCSV()"><svg class="ic"><use href="#ic-descargar"/></svg> Export CSV</button>
+       <button style="border:1px solid var(--rdr-border);background:transparent;color:var(--rdr-yel);padding:8px 16px;border-radius:var(--r-sm,8px);cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:900;letter-spacing:.14em;text-transform:uppercase" onclick="exportRolAnalyticsCSV()"><svg class="ic"><use href="#ic-descargar"/></svg> Export CSV</button>
      </div>
 
      <!-- Top eventos + Donut paquetes -->
@@ -2309,7 +2309,7 @@
        <div class="rdr-kpi"><div class="rdr-kpi-lbl">Clicks a WhatsApp</div><div class="rdr-kpi-num"><span class="rdr-kpi-val" id="rpa-wa">—</span></div></div>
      </div>
      <div style="margin-bottom:18px;text-align:right">
-       <button style="border:1px solid var(--rdr-border);background:transparent;color:var(--rdr-yel);padding:8px 16px;border-radius:6px;cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:900;letter-spacing:.14em;text-transform:uppercase" onclick="exportRadarCSV('pagos')"><svg class="ic"><use href="#ic-descargar"/></svg> Export CSV</button>
+       <button style="border:1px solid var(--rdr-border);background:transparent;color:var(--rdr-yel);padding:8px 16px;border-radius:var(--r-sm,8px);cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:900;letter-spacing:.14em;text-transform:uppercase" onclick="exportRadarCSV('pagos')"><svg class="ic"><use href="#ic-descargar"/></svg> Export CSV</button>
      </div>
      <div class="rdr-grid-2">
        <div class="rdr-card">
@@ -2331,7 +2331,7 @@
          <button data-af="unread" type="button">Sin leer</button>
          <button data-af="critical" type="button">Críticas</button>
        </div>
-       <button onclick="markAllAlertsRead()" style="border:1px solid var(--rdr-border);background:transparent;color:var(--rdr-yel);padding:8px 16px;border-radius:6px;cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:900;letter-spacing:.14em;text-transform:uppercase">✓ Marcar todas como leídas</button>
+       <button onclick="markAllAlertsRead()" style="border:1px solid var(--rdr-border);background:transparent;color:var(--rdr-yel);padding:8px 16px;border-radius:var(--r-sm,8px);cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:900;letter-spacing:.14em;text-transform:uppercase">✓ Marcar todas como leídas</button>
      </div>
      <div class="rdr-alerts" id="ral-list">
        <div class="rdr-empty">Cargando alertas…</div>
@@ -2881,7 +2881,7 @@
       <div id="wl-notif-evento" style="font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:18px;color:#fff;margin-bottom:6px">—</div>
       <div id="wl-notif-target" style="font-size:12px;color:var(--ts);margin-bottom:22px">—</div>
 
-      <label style="display:flex;align-items:flex-start;gap:10px;padding:14px;background:rgba(232,255,76,.06);border:1px solid rgba(232,255,76,.2);border-radius:8px;cursor:pointer">
+      <label style="display:flex;align-items:flex-start;gap:10px;padding:14px;background:rgba(232,255,76,.06);border:1px solid rgba(232,255,76,.2);border-radius:var(--r-sm,8px);cursor:pointer">
         <input type="checkbox" id="wl-notif-usar-codigo" style="width:18px;height:18px;margin-top:2px;accent-color:#e8ff4c;cursor:pointer">
         <div>
           <div style="font-size:13px;font-weight:700;color:#e8ff4c;line-height:1.3">Incluir código de descuento exclusivo en el correo</div>
@@ -2889,22 +2889,22 @@
         </div>
       </label>
 
-      <div id="wl-notif-codigo-fields" style="display:none;margin-top:14px;padding:14px;border:1px dashed var(--border2);border-radius:8px">
+      <div id="wl-notif-codigo-fields" style="display:none;margin-top:14px;padding:14px;border:1px dashed var(--border2);border-radius:var(--r-sm,8px)">
         <div style="margin-bottom:12px">
           <label style="display:block;font-size:10px;letter-spacing:.14em;color:var(--ts);text-transform:uppercase;font-weight:700;margin-bottom:6px">Código (ej. KENIA24)</label>
           <input type="text" id="wl-notif-codigo" maxlength="24" placeholder="LETRAS Y NÚMEROS"
-            style="width:100%;padding:11px 13px;background:#000;border:1.5px solid var(--border2);border-radius:6px;color:#fff;font-family:'JetBrains Mono',monospace;font-weight:700;font-size:14px;letter-spacing:.1em;text-transform:uppercase;outline:none">
+            style="width:100%;padding:11px 13px;background:#000;border:1.5px solid var(--border2);border-radius:var(--r-sm,8px);color:#fff;font-family:'JetBrains Mono',monospace;font-weight:700;font-size:14px;letter-spacing:.1em;text-transform:uppercase;outline:none">
         </div>
         <div style="display:flex;gap:10px">
           <div style="flex:1">
             <label style="display:block;font-size:10px;letter-spacing:.14em;color:var(--ts);text-transform:uppercase;font-weight:700;margin-bottom:6px">% de descuento</label>
             <input type="number" id="wl-notif-descuento" min="1" max="99" step="1" placeholder="10"
-              style="width:100%;padding:11px 13px;background:#000;border:1.5px solid var(--border2);border-radius:6px;color:#fff;font-family:'JetBrains Mono',monospace;font-weight:700;font-size:14px;outline:none">
+              style="width:100%;padding:11px 13px;background:#000;border:1.5px solid var(--border2);border-radius:var(--r-sm,8px);color:#fff;font-family:'JetBrains Mono',monospace;font-weight:700;font-size:14px;outline:none">
           </div>
           <div style="flex:1">
             <label style="display:block;font-size:10px;letter-spacing:.14em;color:var(--ts);text-transform:uppercase;font-weight:700;margin-bottom:6px">Válido por (horas)</label>
             <input type="number" id="wl-notif-horas" min="1" max="168" step="1" value="24"
-              style="width:100%;padding:11px 13px;background:#000;border:1.5px solid var(--border2);border-radius:6px;color:#fff;font-family:'JetBrains Mono',monospace;font-weight:700;font-size:14px;outline:none">
+              style="width:100%;padding:11px 13px;background:#000;border:1.5px solid var(--border2);border-radius:var(--r-sm,8px);color:#fff;font-family:'JetBrains Mono',monospace;font-weight:700;font-size:14px;outline:none">
           </div>
         </div>
         <div id="wl-notif-error" style="display:none;margin-top:10px;font-size:12px;color:#ff6666;font-weight:600">—</div>

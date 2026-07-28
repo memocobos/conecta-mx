@@ -1136,6 +1136,65 @@ body.rcp-alto .pf{ padding-bottom:calc(var(--rcp-zona-fab) + env(safe-area-inset
 
 /* Patrón de la casa: acortar, no anular (así los `both` no se rompen). */
 /* ═══════════════════════════════════════════════════════════════════════
+   TUERCA C2-4 · EL PASO DE PAGO DEL WIZARD
+   La cara sencilla. Tarjetas GRANDES, español llano, y el reloj SIEMPRE
+   visible. Con el interruptor apagado nada de esto se crea.
+   ═══════════════════════════════════════════════════════════════════════ */
+.pay-q{
+  font-family:'Barlow Condensed','Montserrat',sans-serif;
+  font-size:clamp(24px,6vw,30px);font-weight:900;line-height:1.05;
+  text-transform:uppercase;color:var(--ink);margin:0 0 6px;
+}
+.pay-q-sub{font-size:13px;line-height:1.5;color:rgba(255,255,255,.78);margin:0 0 16px}
+/* El reloj. Va ARRIBA y se queda pegado: es lo que el cliente necesita ver
+   mientras decide, no algo que tenga que ir a buscar. */
+.pay-reloj{
+  position:sticky;top:8px;z-index:3;
+  display:flex;align-items:center;gap:10px;
+  padding:13px 16px;margin:0 0 16px;
+  border-radius:var(--r-btn,12px);
+  background:rgba(255,183,3,.14);border:1px solid rgba(255,183,3,.55);
+  color:#ffdf8a;font-size:14px;font-weight:800;line-height:1.35;
+}
+.pay-reloj-n{font-family:'JetBrains Mono',monospace;font-size:17px;font-weight:700}
+.pay-reloj.urge{background:rgba(255,90,77,.16);border-color:rgba(255,90,77,.6);color:#ffb3ac}
+/* Las 3 tarjetas: grandes de verdad, para un dedo y para una pantalla chica. */
+.pay-cards{display:grid;gap:12px}
+.pay-card{
+  display:block;width:100%;text-align:left;
+  padding:18px 18px 16px;
+  border:2px solid var(--line);border-radius:var(--r-card,16px);
+  background:var(--field-bg);color:var(--ink);
+  font-family:'Montserrat',sans-serif;cursor:pointer;
+  transition:border-color .18s ease,background .18s ease,transform .15s ease;
+  min-height:104px;
+}
+.pay-card:hover{border-color:rgba(232,255,76,.5)}
+.pay-card:active{transform:scale(.99);transition-duration:.1s}
+.pay-card:focus-visible{outline:2px solid #e8ff4c;outline-offset:3px}
+.pay-card[disabled]{opacity:.55;cursor:default;transform:none}
+.pay-card-top{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:8px}
+.pay-card-t{font-size:17px;font-weight:900;line-height:1.15;display:flex;align-items:center;gap:9px}
+.pay-card-ic{font-size:22px;line-height:1}
+.pay-card-m{font-family:'Barlow Condensed','Montserrat',sans-serif;font-size:24px;font-weight:900;line-height:1;white-space:nowrap}
+/* .82 sobre el fondo del campo: la línea del "qué pasa después" es lo que hace
+   que el cliente entienda a la primera. Tiene que leerse, no adivinarse. */
+/* display:block — la misma trampa que en ST-2: los <span> son inline y la
+   descripción se pega con el cargo ("…al instante.INCLUYE $75.00"). Lo cazó la
+   captura, no el arnés, que medía contraste y alto y los dos estaban bien. */
+.pay-card-d{font-size:13px;line-height:1.45;color:rgba(255,255,255,.82);display:block}
+.pay-card-top,.pay-card-t,.pay-card-c{display:flex}
+.pay-card-c{display:block}
+.pay-card-c{font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:rgba(255,255,255,.78);margin-top:6px}
+.pay-card.es-transfer{border-color:rgba(232,255,76,.55);background:rgba(232,255,76,.07)}
+.pay-card.es-transfer .pay-card-m{color:#e8ff4c}
+@media(max-width:420px){
+  .pay-card{padding:16px 15px 14px;min-height:96px}
+  .pay-card-t{font-size:15px}
+  .pay-card-m{font-size:21px}
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
    TUERCA ST-2 · EL MENÚ DE PAGO
    Estas reglas solo pintan algo cuando el backend dice activo:true — con el
    interruptor apagado el markup ni se crea, así que el Portal se ve
@@ -3570,6 +3629,170 @@ async function renderPlanPagos(t, head){
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
+// TUERCA C2-4 · EL PASO DE PAGO DEL WIZARD
+//
+// PRINCIPIO REY: sencillez para Reynosa. Cada tarjeta dice QUÉ PASA DESPUÉS en
+// una línea, en español de todos los días. Ni "checkout", ni "sesión", ni
+// "procesando": un cliente que no es de tecnología lo lee UNA vez y entiende.
+//
+// Con el interruptor apagado esto NO PINTA NADA y el wizard queda idéntico.
+// ═══════════════════════════════════════════════════════════════════════════
+
+// Los textos, en un solo lugar para que se puedan leer de corrido y juzgar.
+const _C24_TARJETAS = [
+  { k: 'tarjeta', metodo: 'credito', ic: '💳', t: 'Tarjeta',
+    d: 'Pagas ahora mismo con tu tarjeta y tu lugar queda confirmado al instante.' },
+  { k: 'oxxo', metodo: 'oxxo', ic: '🏪', t: 'OXXO',
+    d: 'Te damos tu ficha y tienes 24 horas para pagarla en la tienda. Te avisamos en cuanto nos confirmen.' },
+  { k: 'transferencia', metodo: null, ic: '🏦', t: 'Transferencia',
+    d: 'Haces tu depósito y subes tu comprobante aquí mismo. Lo revisamos y te confirmamos.' },
+];
+
+let _c24Timer = null;
+
+function _c24Reloj(restaMs) {
+  if (restaMs == null || restaMs <= 0) return '00:00';
+  if (restaMs >= 3600e3) {
+    const h = Math.floor(restaMs / 3600e3), m = Math.floor((restaMs % 3600e3) / 60000);
+    return h + ' h ' + String(m).padStart(2, '0') + ' min';
+  }
+  const m = Math.floor(restaMs / 60000), sg = Math.floor((restaMs % 60000) / 1000);
+  return m + ':' + String(sg).padStart(2, '0');
+}
+
+// Pinta el paso. `solicitudId` y `holdISO` vienen de la solicitud recién creada.
+async function _c24Paso(solicitudId, holdISO, contenedor) {
+  if (!solicitudId || !contenedor) return;
+  let j;
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    const tok = session && session.access_token;
+    if (!tok) return;
+    const r = await fetch('/.netlify/functions/stripe-separo-opciones', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tok },
+      body: JSON.stringify({ solicitud_id: solicitudId }),
+    });
+    j = await r.json();
+  } catch (e) { return; }            // fail-soft: queda el flujo de comprobante
+  if (!j || !j.ok || !j.activo) return;
+
+  const wrap = document.createElement('div');
+
+  // EL RELOJ, arriba y pegado.
+  const reloj = document.createElement('div');
+  reloj.className = 'pay-reloj';
+  reloj.innerHTML = '<span>⏱️</span><span>Tu lugar está apartado por <span class="pay-reloj-n"></span></span>';
+  const num = reloj.querySelector('.pay-reloj-n');
+  const fin = holdISO ? Date.parse(holdISO) : NaN;
+  const tic = () => {
+    if (!Number.isFinite(fin)) { reloj.style.display = 'none'; return; }
+    const resta = fin - Date.now();
+    num.textContent = _c24Reloj(resta);
+    reloj.classList.toggle('urge', resta > 0 && resta < 5 * 60000);
+    if (resta <= 0) {
+      reloj.classList.add('urge');
+      reloj.innerHTML = '<span>⏱️</span><span>Se acabó tu tiempo. Puedes volver a intentarlo y te damos otro rato.</span>';
+      clearInterval(_c24Timer);
+    }
+  };
+  tic();
+  clearInterval(_c24Timer);
+  _c24Timer = setInterval(tic, 1000);
+  wrap.appendChild(reloj);
+
+  const q = document.createElement('h3');
+  q.className = 'pay-q';
+  q.textContent = '¿Cómo quieres pagar tu apartado?';
+  wrap.appendChild(q);
+  const sub = document.createElement('p');
+  sub.className = 'pay-q-sub';
+  sub.textContent = 'Elige la forma que más te acomode. Tu lugar te espera mientras decides.';
+  wrap.appendChild(sub);
+
+  const cards = document.createElement('div');
+  cards.className = 'pay-cards';
+  const porMetodo = {};
+  (j.opciones || []).forEach((o) => { porMetodo[o.metodo] = o; });
+
+  for (const def of _C24_TARJETAS) {
+    const op = def.metodo ? porMetodo[def.metodo] : null;
+    if (def.metodo && !op) continue;             // el servidor no la ofrece
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'pay-card' + (def.k === 'transferencia' ? ' es-transfer' : '');
+    b.setAttribute('data-forma', def.k);
+    b.innerHTML = '<span class="pay-card-top"><span class="pay-card-t">'
+      + '<span class="pay-card-ic" aria-hidden="true"></span><span class="pay-card-n"></span></span>'
+      + '<span class="pay-card-m"></span></span>'
+      + '<span class="pay-card-d"></span><span class="pay-card-c"></span>';
+    b.querySelector('.pay-card-ic').textContent = def.ic;
+    b.querySelector('.pay-card-n').textContent = def.t;
+    b.querySelector('.pay-card-d').textContent = def.d;
+    b.querySelector('.pay-card-m').textContent = op
+      ? _payMoney(op.total_cent)
+      : _payMoney(j.transferencia ? j.transferencia.total_cent : 0);
+    b.querySelector('.pay-card-c').textContent = op
+      ? (op.sin_cargo ? 'Sin cargo extra' : 'Incluye ' + _payMoney(op.cargo_cent) + ' de servicio')
+      : 'Sin cargo extra';
+    b.addEventListener('click', () => _c24Elegir(solicitudId, def, b));
+    cards.appendChild(b);
+  }
+  wrap.appendChild(cards);
+  contenedor.insertBefore(wrap, contenedor.firstChild);
+}
+
+// Al elegir. La transferencia se queda en el wizard (sube su comprobante); las
+// otras dos van a la pantalla de pago de Stripe.
+async function _c24Elegir(solicitudId, def, boton) {
+  if (def.k === 'transferencia') {
+    // El flujo de siempre: ya está debajo, solo se le lleva.
+    const up = document.getElementById('wiz-upload');
+    if (up && up.scrollIntoView) up.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    return;
+  }
+  const cont = boton.closest('.pay-cards');
+  if (cont) cont.querySelectorAll('button').forEach((x) => { x.disabled = true; });
+  const nom = boton.querySelector('.pay-card-n');
+  const original = nom ? nom.textContent : '';
+  if (nom) nom.textContent = 'Un momento…';
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    const r = await fetch('/.netlify/functions/stripe-separo-crear', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + (session && session.access_token) },
+      body: JSON.stringify({ solicitud_id: solicitudId, metodo: def.metodo }),
+    });
+    const j = await r.json();
+    if (!r.ok || !j.url) throw new Error(j.error || 'No se pudo abrir el pago');
+    window.location.href = j.url;
+  } catch (e) {
+    if (nom) nom.textContent = original;
+    if (cont) cont.querySelectorAll('button').forEach((x) => { x.disabled = false; });
+    if (typeof toast === 'function') toast(e.message || 'No se pudo abrir el pago', 'error');
+  }
+}
+
+// La vuelta del apartado. Honesta por método: la tarjeta confirma al momento,
+// OXXO no — y decirlo es lo que evita la llamada de "¿ya quedó?".
+function _c24Vuelta() {
+  let q;
+  try { q = new URLSearchParams(window.location.search); } catch (e) { return null; }
+  const estado = q.get('apartado');
+  if (!estado) return null;
+  const div = document.createElement('div');
+  if (estado === 'ok') {
+    div.className = 'pay-vuelta pend';
+    div.textContent = '⏳ Ya recibimos tu pago y estamos confirmándolo. Si pagaste en OXXO, te avisamos en cuanto la tienda nos confirme — puede tardar unas horas. Tu lugar está guardado mientras tanto.';
+  } else if (estado === 'cancelado') {
+    div.className = 'pay-vuelta cancel';
+    div.textContent = 'No se completó el pago y no se te cobró nada. Tu lugar sigue apartado el tiempo que te queda: puedes intentar de nuevo o pagar por transferencia.';
+  } else { return null; }
+  try { window.history.replaceState({}, '', window.location.pathname); } catch (e) {}
+  return div;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 // TUERCA ST-2 · EL MENÚ DE PAGO
 //
 // Regla dura: con el interruptor apagado esto NO PINTA NADA. El backend
@@ -4371,6 +4594,16 @@ function setWizStep(n){
   $('#wiz-back').disabled = (n <= 1 || n >= 6);
   // [FASE B] El reloj del apartado solo vive en el paso 5 (comprobante).
   if (n === 5) _startHoldTimer(); else _stopHoldTimer();
+  // [C2-4] Y ahí mismo entra el paso de pago, ARRIBA del comprobante. Solo si
+  // el backend dice que está activo: apagado, el wizard queda idéntico a hoy.
+  if (n === 5) {
+    try {
+      const paso = document.getElementById('wiz-step-5');
+      if (paso && !paso.querySelector('.pay-cards') && wizState && wizState.solicitudId) {
+        _c24Paso(wizState.solicitudId, wizState.holdExpiraAt, paso);
+      }
+    } catch (e) { /* el wizard nunca se rompe por el paso de pago */ }
+  } else if (typeof _c24Timer !== 'undefined' && _c24Timer) { clearInterval(_c24Timer); _c24Timer = null; }
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 

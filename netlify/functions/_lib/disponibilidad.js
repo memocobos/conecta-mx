@@ -19,6 +19,68 @@ const ESTADOS_CUENTAN = ['pendiente', 'en_pagos', 'pagado']; // cancelado exclui
 
 const HOLD_MINUTOS = 15; // reloj del apartado (una sola fuente de verdad)
 
+// ── [C2-1] DURACIONES POR MÉTODO ─────────────────────────────────────────────
+// El reloj NO se duplica: sigue viviendo en `hold_expira_at`, que es un instante
+// absoluto. Lo único que cambia por método es CUÁNTOS minutos se suman al
+// crearlo, así que esto es una tabla de minutos, no un mecanismo nuevo.
+//
+// Tarjeta y transferencia: 15 min (el de siempre, HOLD_MINUTOS).
+// OXXO: 24 h — la ficha de Stripe vive un día y el lugar tiene que aguantarle.
+const HOLD_MINUTOS_POR_METODO = {
+  tarjeta:       HOLD_MINUTOS,
+  transferencia: HOLD_MINUTOS,
+  oxxo:          24 * 60,
+};
+
+// Minutos de hold para un método. Un método desconocido o ausente cae al de
+// siempre: conservador, nunca regala tiempo que nadie pidió.
+function holdMinutos(metodo) {
+  const m = String(metodo || '').toLowerCase();
+  return HOLD_MINUTOS_POR_METODO[m] || HOLD_MINUTOS;
+}
+
+// ── [C2-1] LA ETIQUETA DE LA COLA, DERIVADA ──────────────────────────────────
+// Los cinco "estados" del brief NO son estados: son ETIQUETAS. `estado` se
+// queda en 'pendiente' y esto las deriva al leer, igual que claseFila deriva si
+// la fila consume cupo. Meterlas en `estado` habría roto claseFila, la
+// reconciliación del núcleo auditado y el cron.
+//
+// Devuelve { etiqueta, vence_en_ms, vigente } donde etiqueta es una de:
+//   'separo_pagado'   — Stripe confirmó (separo_pagado_at). Manda sobre todo.
+//   'con_comprobante' — subió su comprobante: el lugar ya está respaldado.
+//   'oxxo_pendiente'  — ficha emitida, esperando el pago, con reloj vivo.
+//   'separado'        — reloj corriendo (tarjeta/transferencia).
+//   'vencida'         — se le acabó el tiempo y no pagó ni comprobó.
+//   'sin_hold'        — flujo viejo o fila sin reloj (conservador: no vence).
+//   'cerrada'         — cancelado / en_pagos / pagado: ya no es cola.
+//
+// El ORDEN importa: pagado gana a comprobante, y comprobante gana al reloj —
+// un lugar respaldado no "vence" aunque el reloj haya pasado (misma regla que
+// ya usaba claseFila para no soltar un lugar que el cliente sí pagó).
+function etiquetaHold(row, nowMs) {
+  const ahora = Number.isFinite(nowMs) ? nowMs : Date.now();
+  const nada = { etiqueta: 'cerrada', vence_en_ms: null, vigente: false };
+  if (!row) return nada;
+  if (row.estado !== 'pendiente') return nada;
+
+  if (row.separo_pagado_at) return { etiqueta: 'separo_pagado', vence_en_ms: null, vigente: true };
+
+  const comp = row.comprobante_separo_url;
+  if (comp != null && String(comp).trim() !== '') {
+    return { etiqueta: 'con_comprobante', vence_en_ms: null, vigente: true };
+  }
+
+  const h = row.hold_expira_at;
+  if (h == null || String(h).trim() === '') return { etiqueta: 'sin_hold', vence_en_ms: null, vigente: true };
+  const t = Date.parse(h);
+  if (!Number.isFinite(t)) return { etiqueta: 'sin_hold', vence_en_ms: null, vigente: true };
+
+  const resta = t - ahora;
+  if (resta <= 0) return { etiqueta: 'vencida', vence_en_ms: 0, vigente: false };
+  const esOxxo = String(row.metodo_separo || '').toLowerCase() === 'oxxo';
+  return { etiqueta: esOxxo ? 'oxxo_pendiente' : 'separado', vence_en_ms: resta, vigente: true };
+}
+
 // PURO: ¿esta fila de `solicitudes_tour` consume cupo AHORA? (regla FASE B).
 // nowMs = Date.now() del momento de evaluación (se inyecta para testeo).
 // PURO: clasifica una fila para el DESGLOSE del semáforo (FASE B t3):
@@ -161,4 +223,7 @@ function evaluarZona(disp, zona, num) {
   return { gestionada: true, restante, agotada: restante <= 0, sinCupo: restante < n };
 }
 
-module.exports = { cargarDisponibilidad, evaluarZona, desgloseZona, filaCuenta, claseFila, ESTADOS_CUENTAN, HOLD_MINUTOS };
+module.exports = {
+  cargarDisponibilidad, evaluarZona, desgloseZona, filaCuenta, claseFila, ESTADOS_CUENTAN,
+  HOLD_MINUTOS, HOLD_MINUTOS_POR_METODO, holdMinutos, etiquetaHold,
+};

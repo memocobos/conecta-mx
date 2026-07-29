@@ -3687,6 +3687,15 @@ const _C24_TARJETAS = [
     d: 'Pagas ahora mismo con tu tarjeta del banco y tu lugar queda confirmado al instante.' },
   { k: 'credito', metodo: 'credito', ic: '💳', t: 'Tarjeta de crédito',
     d: 'Pagas ahora mismo con tu tarjeta de crédito y tu lugar queda confirmado al instante.' },
+  // [C2-5] LOS MESES TAMBIÉN EN EL SEPARO (decisión de Memo). La regla es "si el
+  // pago es la mitad o más del viaje, merece meses", y un separo SÍ llega a la
+  // mitad: en los últimos 15 días vale el 50% del total. El servidor ya los
+  // ofrecía en ese caso; era la pantalla la que no sabía pintarlos, así que el
+  // cliente de Melanie tuvo derecho a meses y nunca los vio.
+  { k: 'msi3', metodo: 'msi3', meses: 3, ic: '💳', t: '3 meses sin intereses',
+    d: 'Pagas con tu tarjeta de crédito y el banco te lo cobra en 3 partes iguales, sin intereses.' },
+  { k: 'msi6', metodo: 'msi6', meses: 6, ic: '💳', t: '6 meses sin intereses',
+    d: 'Pagas con tu tarjeta de crédito y el banco te lo cobra en 6 partes iguales, sin intereses.' },
   { k: 'oxxo', metodo: 'oxxo', ic: '🏪', t: 'OXXO',
     d: 'Te damos tu ficha y tienes 24 horas para pagarla en la tienda. Te avisamos en cuanto nos confirmen.' },
   { k: 'transferencia', metodo: null, ic: '🏦', t: 'Transferencia',
@@ -3854,7 +3863,12 @@ async function _c24Paso(solicitudId, holdISO, contenedor) {
       + '<span class="pay-card-d"></span><span class="pay-card-c"></span>';
     b.querySelector('.pay-card-ic').textContent = def.ic;
     b.querySelector('.pay-card-n').textContent = def.t;
-    b.querySelector('.pay-card-d').textContent = def.d;
+    // En meses, lo que el cliente de verdad quiere saber es cuánto le cae al
+    // mes. Sin intereses el reparto es exacto, así que se puede decir sin "más
+    // o menos": es una división, no una estimación.
+    b.querySelector('.pay-card-d').textContent = (def.meses && op)
+      ? def.d + ' Son ' + _payMoney(Math.round(op.total_cent / def.meses)) + ' al mes.'
+      : def.d;
     b.querySelector('.pay-card-m').textContent = op
       ? _payMoney(op.total_cent)
       : _payMoney(j.transferencia ? j.transferencia.total_cent : 0);
@@ -3864,6 +3878,34 @@ async function _c24Paso(solicitudId, holdISO, contenedor) {
     b.addEventListener('click', () => _c24Elegir(solicitudId, def, b));
     cards.appendChild(b);
   }
+  // [C2-5] CANDADO CONTRA LA DIVERGENCIA. La lista de arriba está escrita a
+  // mano para cuidar el orden y el español; el precio de eso es que un método
+  // nuevo del servidor queda INVISIBLE, que es justo lo que pasó con los meses.
+  // Si el servidor ofrece algo que la lista no cubre, se pinta igual con las
+  // palabras que él mismo manda: mejor un texto menos pulido que una opción
+  // que el cliente tenía derecho a ver y nadie le enseñó.
+  const cubiertos = _C24_TARJETAS.map((d) => d.metodo).filter(Boolean);
+  for (const o of (j.opciones || [])) {
+    if (cubiertos.includes(o.metodo)) continue;
+    console.warn('[C2-4] el servidor ofrece "' + o.metodo + '" y la lista no lo cubre: se pinta con su texto');
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'pay-card';
+    b.setAttribute('data-forma', o.metodo);
+    b.innerHTML = '<span class="pay-card-top"><span class="pay-card-t">'
+      + '<span class="pay-card-ic" aria-hidden="true"></span><span class="pay-card-n"></span></span>'
+      + '<span class="pay-card-m"></span></span>'
+      + '<span class="pay-card-d"></span><span class="pay-card-c"></span>';
+    b.querySelector('.pay-card-ic').textContent = '💳';
+    b.querySelector('.pay-card-n').textContent = o.label || o.metodo;
+    b.querySelector('.pay-card-d').textContent = o.nota || '';
+    b.querySelector('.pay-card-m').textContent = _payMoney(o.total_cent);
+    b.querySelector('.pay-card-c').textContent = o.sin_cargo
+      ? 'Sin cargo extra' : 'Incluye ' + _payMoney(o.cargo_cent) + ' de servicio';
+    b.addEventListener('click', () => _c24Elegir(solicitudId, { k: o.metodo, metodo: o.metodo }, b));
+    cards.appendChild(b);
+  }
+
   wrap.appendChild(cards);
   contenedor.insertBefore(wrap, contenedor.firstChild);
 }

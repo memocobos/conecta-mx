@@ -3266,6 +3266,18 @@ async function cargarAvisos(solicitudes){
   _pagosPendientesCache = pagos;
   renderAvisos();
   _pintarHeroProximo();
+  // [C2-5] El aviso de vuelta del apartado. Estaba ESCRITO pero NADIE LO
+  // LLAMABA: al volver de pagar, ?apartado=ok no pintaba nada y el cliente
+  // aterrizaba en el dashboard sin saber si su pago quedó. Mi arnés lo probaba
+  // llamando a la función directo — el mismo error que con el gate del paso 5:
+  // probar la función en vez del camino.
+  try {
+    const av = _c24Vuelta();
+    if (av) {
+      const dest = document.getElementById('dash-avisos') || document.querySelector('#view-dashboard .card') || document.querySelector('#view-dashboard');
+      if (dest) dest.insertBefore(av, dest.firstChild);
+    }
+  } catch (e) { console.error('[C2-4] no se pudo pintar el aviso de vuelta:', e && e.message); }
 }
 
 function _nombreEvento(s){

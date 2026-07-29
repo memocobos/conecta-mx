@@ -173,6 +173,16 @@ _Última revisión: 28-jul-2026 (series PP, PG, E1 y KH cerradas)._
   todo lo que está en `display:none`. El reloj del paso de pago llevaba una
   aserción en verde mientras el cliente no veía nada. Medir `display`,
   `visibility`, `offsetParent` y el alto real.
+- **En Playwright manda la ÚLTIMA ruta registrada: la específica va AL FINAL.**
+  Si la genérica (`**/.netlify/**`) se registra después, se come al mock y el
+  arnés mide una mentira. Y **todo mock exige conteo de llamadas**: un
+  `fetch=0` no es resultado, es que nunca se ejecutó. Tres mordidas: E2, ST-2
+  y el diagnóstico del rebote mudo, donde casi manda a cazar un candado
+  inexistente.
+- **"Existe" no es "se ve".** Preguntar por el elemento en el DOM deja pasar
+  todo lo que está en `display:none`. El reloj del paso de pago llevaba una
+  aserción en verde mientras el cliente no veía nada. Medir `display`,
+  `visibility`, `offsetParent` y el alto real.
 - **Una aserción que puede pasar con el conjunto vacío no es una aserción.**
   Candado de cardinalidad siempre; y al medir algo (contraste, peso) validar el
   instrumento antes de creerle el resultado.

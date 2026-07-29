@@ -2756,8 +2756,35 @@ function _prefillReservaDesdeParams(p){
   await cargarClienteYRutear(session);
 })();
 
+// [C2-5] Flujos que el cliente PIERDE si se le mueve la vista: el wizard
+// guarda su avance en memoria (wizState) y el perfil, en el formulario. Sacarlo
+// de ahí no es una molestia: le borra lo que llevaba escrito.
+const _VISTAS_A_MEDIAS = ['view-wizard', 'view-profile'];
+function _enFlujoAMedias() {
+  return _VISTAS_A_MEDIAS.some((id) => {
+    const v = document.getElementById(id);
+    return !!(v && v.classList.contains('is-active'));
+  });
+}
+
 supabase.auth.onAuthStateChange((event, session) => {
   // SIGNED_IN, SIGNED_OUT, TOKEN_REFRESHED, USER_UPDATED, PASSWORD_RECOVERY
+  //
+  // [C2-5] RENOVAR EL TOKEN NO ES MOTIVO PARA MOVER LA VISTA.
+  //
+  // Supabase renueva el JWT sola —cada rato y al volver el foco a la pestaña— y
+  // eso disparaba esta línea, que termina en un showView('dashboard')
+  // incondicional. A media solicitud, el cliente aterrizaba en el dashboard con
+  // su avance borrado, sin fila creada y SIN UN SOLO MENSAJE. Tumbó la 4ª
+  // solicitud de prueba y en producción le habría tumbado la suya a un cliente
+  // de verdad, que no tiene forma de saber qué pasó ni a quién reclamarle.
+  //
+  // La sesión se renueva igual: de eso se encarga Supabase, no este listener.
+  // Lo único que se salta es el RUTEO, y solo cuando nada cambió de dueño.
+  if (event === 'SIGNED_OUT' || !session) { cargarClienteYRutear(session); return; }
+  const mismoDueño = !!(perfilExistente && session.user
+    && perfilExistente.auth_user_id === session.user.id);
+  if (mismoDueño && _enFlujoAMedias()) return;   // token al día, vista quieta
   cargarClienteYRutear(session);
 });
 

@@ -3666,6 +3666,35 @@ function _c24Reloj(restaMs) {
   return m + ':' + String(sg).padStart(2, '0');
 }
 
+// [C2-5] Enciende el paso de pago con REPORTE y REINTENTO.
+//
+// El reintento no es paranoia: el gate depende de wizState.solicitudId, que lo
+// escribe el submit justo antes de cambiar de paso. Si alguna vez llegara tarde
+// —o llegara vacío— el cliente se quedaba con el flujo viejo y nadie se
+// enteraba. Ahora se reintenta 3 veces en 1.5s y, si no, se dice en consola.
+function _c24Intentar(intento) {
+  const paso = document.getElementById('wiz-step-5');
+  if (!paso) { console.warn('[C2-4] no encontré el paso 5'); return; }
+  if (paso.querySelector('.pay-cards')) return;              // ya está pintado
+  const id = (typeof wizState !== 'undefined' && wizState) ? wizState.solicitudId : null;
+  if (!id) {
+    if (intento < 3) { setTimeout(() => _c24Intentar(intento + 1), 500); return; }
+    console.warn('[C2-4] sin solicitud_id tras 3 intentos: se queda el flujo de comprobante');
+    return;
+  }
+  try {
+    _c24Paso(id, wizState.holdExpiraAt, paso);
+  } catch (e) {
+    // Se reporta FUERTE. El wizard sigue funcionando (queda el comprobante),
+    // pero el fallo deja de ser invisible.
+    console.error('[C2-4] el paso de pago no se pudo pintar:', e && e.message, e);
+  }
+}
+
+function _c24Apagar() {
+  if (typeof _c24Timer !== 'undefined' && _c24Timer) { clearInterval(_c24Timer); _c24Timer = null; }
+}
+
 // Pinta el paso. `solicitudId` y `holdISO` vienen de la solicitud recién creada.
 async function _c24Paso(solicitudId, holdISO, contenedor) {
   if (!solicitudId || !contenedor) return;
@@ -3673,15 +3702,22 @@ async function _c24Paso(solicitudId, holdISO, contenedor) {
   try {
     const { data: { session } } = await supabase.auth.getSession();
     const tok = session && session.access_token;
-    if (!tok) return;
+    if (!tok) { console.warn('[C2-4] sin sesión al pintar el paso de pago'); return; }
     const r = await fetch('/.netlify/functions/stripe-separo-opciones', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tok },
       body: JSON.stringify({ solicitud_id: solicitudId }),
     });
     j = await r.json();
-  } catch (e) { return; }            // fail-soft: queda el flujo de comprobante
-  if (!j || !j.ok || !j.activo) return;
+  } catch (e) {
+    console.warn('[C2-4] no se pudo preguntar por las formas de pago:', e && e.message);
+    return;                          // fail-soft: queda el flujo de comprobante
+  }
+  if (!j || !j.ok || !j.activo) {
+    // Apagado NO es un error — pero saberlo distingue "está off" de "se rompió".
+    console.info('[C2-4] formas de pago no disponibles (activo=' + (j && j.activo) + ')');
+    return;
+  }
 
   const wrap = document.createElement('div');
 
@@ -4602,14 +4638,13 @@ function setWizStep(n){
   if (n === 5) _startHoldTimer(); else _stopHoldTimer();
   // [C2-4] Y ahí mismo entra el paso de pago, ARRIBA del comprobante. Solo si
   // el backend dice que está activo: apagado, el wizard queda idéntico a hoy.
-  if (n === 5) {
-    try {
-      const paso = document.getElementById('wiz-step-5');
-      if (paso && !paso.querySelector('.pay-cards') && wizState && wizState.solicitudId) {
-        _c24Paso(wizState.solicitudId, wizState.holdExpiraAt, paso);
-      }
-    } catch (e) { /* el wizard nunca se rompe por el paso de pago */ }
-  } else if (typeof _c24Timer !== 'undefined' && _c24Timer) { clearInterval(_c24Timer); _c24Timer = null; }
+  //
+  // [C2-5 caso 1] Este gate falló en el navegador real de una forma que NO se
+  // pudo diagnosticar: no pintó, no llamó al servidor, y no dejó ni un rastro
+  // en consola — porque el catch se tragaba todo y el gate no reportaba por qué
+  // se saltaba. Ahora DICE lo que hace, siempre. Un gate que falla callado es
+  // un gate que no se puede arreglar.
+  if (n === 5) _c24Intentar(0); else _c24Apagar();
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 

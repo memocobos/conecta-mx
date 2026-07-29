@@ -3668,6 +3668,27 @@ const _C24_TARJETAS = [
 
 let _c24Timer = null;
 
+// [C2-5] La duración de la PROMESA cuando no hay candado real detrás.
+// 15 minutos: lo mismo que promete Fase B cuando el hold sí existe, para que
+// el cliente viva el mismo trato en los dos casos.
+const C24_PROMESA_MIN = 15;
+
+// Ancla la promesa por solicitud. Sin esto, recargar la página regalaría otros
+// 15 minutos cada vez: el reloj se volvería decorado. Si el navegador no deja
+// escribir (modo privado, storage bloqueado), arranca de cero — peor que el
+// ancla, pero el cliente NUNCA se queda sin reloj, que es lo que se protege.
+function _c24AnclaPromesa(solicitudId, minutos) {
+  const dur = minutos * 60000;
+  let ini = 0;
+  try {
+    const k = 'c24_promesa_' + solicitudId;
+    const v = parseInt(sessionStorage.getItem(k) || '', 10);
+    if (Number.isFinite(v) && v > 0) ini = v;
+    else { ini = Date.now(); sessionStorage.setItem(k, String(ini)); }
+  } catch (e) { ini = Date.now(); }
+  return ini + dur;
+}
+
 function _c24Reloj(restaMs) {
   if (restaMs == null || restaMs <= 0) return '00:00';
   if (restaMs >= 3600e3) {
@@ -3738,9 +3759,26 @@ async function _c24Paso(solicitudId, holdISO, contenedor) {
   reloj.className = 'pay-reloj';
   reloj.innerHTML = '<span>⏱️</span><span>Tu lugar está apartado por <span class="pay-reloj-n"></span></span>';
   const num = reloj.querySelector('.pay-reloj-n');
-  const fin = holdISO ? Date.parse(holdISO) : NaN;
+
+  // [C2-5] EL RELOJ SIEMPRE SE VE (decisión de Memo).
+  //
+  // Donde el evento tiene stock encendido, el servidor manda un hold_expira_at
+  // REAL y ése es el que se pinta: detrás hay un candado de verdad.
+  // Donde no lo hay, el reloj NO desaparece — se pinta la promesa con la misma
+  // duración. El brief de C2 lo sella: "donde no, el reloj es la promesa de UX
+  // (mismo componente)". Un cliente que no ve reloj no siente por qué decidir
+  // hoy, y el paso de pago pierde justo lo que lo hace funcionar.
+  //
+  // Antes, sin hold, el reloj se escondía: el evento de la prueba real (zona
+  // sin stock) dejó al cliente sin reloj y nadie lo notó, porque el arnés
+  // preguntaba si el elemento EXISTÍA, no si SE VEÍA.
+  let fin = holdISO ? Date.parse(holdISO) : NaN;
+  const origen = Number.isFinite(fin) ? 'servidor' : 'promesa';
+  if (!Number.isFinite(fin)) fin = _c24AnclaPromesa(solicitudId, C24_PROMESA_MIN);
+  if (!Number.isFinite(fin)) fin = Date.now() + C24_PROMESA_MIN * 60000;
+  reloj.dataset.origen = origen;   // para el arnés y para quien lea el DOM
+
   const tic = () => {
-    if (!Number.isFinite(fin)) { reloj.style.display = 'none'; return; }
     const resta = fin - Date.now();
     num.textContent = _c24Reloj(resta);
     reloj.classList.toggle('urge', resta > 0 && resta < 5 * 60000);
@@ -3748,6 +3786,13 @@ async function _c24Paso(solicitudId, holdISO, contenedor) {
       reloj.classList.add('urge');
       reloj.innerHTML = '<span>⏱️</span><span>Se acabó tu tiempo. Puedes volver a intentarlo y te damos otro rato.</span>';
       clearInterval(_c24Timer);
+      // El texto promete "otro rato" — hay que cumplirlo. Si el reloj era la
+      // promesa, se suelta el ancla para que al reintentar arranque de nuevo;
+      // si no, el cliente quedaría en 00:00 para siempre y el mensaje mentiría.
+      // Con hold REAL no se toca nada: el rato nuevo lo da el servidor.
+      if (origen === 'promesa') {
+        try { sessionStorage.removeItem('c24_promesa_' + solicitudId); } catch (e) {}
+      }
     }
   };
   tic();

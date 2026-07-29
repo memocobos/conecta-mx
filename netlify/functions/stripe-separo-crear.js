@@ -32,6 +32,10 @@ const { etiquetaHold, holdMinutos } = require('./_lib/disponibilidad');
 // comprobante por el flujo de siempre.
 const METODOS_SEPARO = ['oxxo', 'debito', 'credito', 'msi3', 'msi6'];
 
+// Días naturales que vive la ficha de OXXO. 1 = el piso de Stripe, para que la
+// ficha no sobreviva al apartado (ver el bloque de vigencia más abajo).
+const OXXO_FICHA_DIAS = 1;
+
 exports.handler = async (event) => {
   const headers = {
     'Access-Control-Allow-Origin': '*',
@@ -187,6 +191,25 @@ exports.handler = async (event) => {
   };
   if (cli.correo) payload.customer_email = cli.correo;
   if (t.msi_meses) payload.payment_method_options = { card: { installments: { enabled: true } } };
+
+  // ── VIGENCIA DE LA FICHA DE OXXO ───────────────────────────────────────────
+  // `expires_at` cierra la PANTALLA de pago, no la ficha: una vez emitida, el
+  // voucher vive lo que diga expires_after_days, y Stripe pone 3 DÍAS por
+  // omisión. Nuestra tarjeta le promete al cliente "tienes 24 horas para
+  // pagarla" y el hold dura eso: la ficha estaba durando el triple que la
+  // promesa, así que un pago del día 3 llegaba con el apartado ya soltado.
+  //
+  // 1 es el PISO que permite Stripe y la unidad es el día natural: la ficha
+  // muere a las 23:59 hora de México del día siguiente. Con eso NO se logra
+  // paridad exacta con las 24 h — un voucher emitido de madrugada puede vivir
+  // hasta ~48 h. Se deja anotado a propósito: no hay ajuste más fino en Stripe,
+  // y un pago tardío cae en la rama manual del brief (Memo contacta al
+  // cliente), no en un cobro por un lugar que ya no existe.
+  if (metodo === 'oxxo') {
+    payload.payment_method_options = Object.assign({}, payload.payment_method_options, {
+      oxxo: { expires_after_days: OXXO_FICHA_DIAS },
+    });
+  }
 
   const r = await stripe.apiPost('checkout/sessions', payload, `separo_${sol.id}_${metodo}`);
   if (!r.ok) return { statusCode: r.status === 400 ? 502 : r.status, headers, body: JSON.stringify({ error: r.error }) };

@@ -10498,6 +10498,33 @@ function _c2ChipHtml(s, nowMs) {
        + (reloj ? ' · ' + _salEsc(reloj) : '') + '</span>';
 }
 
+// [C2-5] EL DINERO, DICHO ANTES DE DECIDIR.
+//
+// Memo aceptó una solicitud con el separo YA PAGADO por OXXO y la pantalla no
+// se lo dijo en ningún lado: la fila decía "Pendiente", la columna del clip
+// decía "—" y el modal decía "Sin comprobante subido por el cliente". Aceptó
+// por contexto, no porque la pantalla se lo enseñara. Con la bandeja llena eso
+// es una decisión de dinero tomada a ciegas.
+//
+// El MONTO que se muestra es el SEPARO de la fila, no lo que se cobró en la
+// tarjeta: el cargo de servicio vive en stripe_checkout_sesiones y esta pantalla
+// no lo baja. Se dice cuál es cuál en vez de mostrar una cifra ambigua — un
+// número de dinero sin apellido es peor que ninguno.
+function _c2SeparoPagadoHtml(s) {
+  if (!s || !s.separo_pagado_at) return '';
+  const metodo = String(s.metodo_separo || '').toLowerCase() === 'oxxo' ? 'OXXO' : 'tarjeta';
+  const cuando = (typeof _spFmtFechaAbs === 'function') ? _spFmtFechaAbs(s.separo_pagado_at) : '';
+  const aplicado = s.separo_aplicado_pago_id
+    ? 'Ya está aplicado a la cuota 1.'
+    : 'Todavía NO se aplica: se aplica solo cuando aceptes.';
+  return '<div class="alert alert-success" style="margin:0 0 10px;font-size:12px;line-height:1.5">'
+    + '<b>Separo de ' + _salEsc(_spFmtMxn(s.monto_separo)) + ' pagado por ' + _salEsc(metodo) + ' ✓</b>'
+    + (cuando ? ' — ' + _salEsc(cuando) : '')
+    + '<br>' + _salEsc(aplicado)
+    + ' El cargo por usar ' + _salEsc(metodo) + ' lo cobró la pasarela aparte; no es dinero del viaje.'
+    + '</div>';
+}
+
 function renderSolicitudesPortal() {
   const tableEl = document.getElementById('sp-table');
   if (!tableEl) return;
@@ -10548,7 +10575,7 @@ function renderSolicitudesPortal() {
         <td style="padding:10px 8px;font-size:12px">${_spEscape(s.zona || '')}</td>
         <td style="padding:10px 8px;font-size:12px;text-align:right;white-space:nowrap">${_spFmtMxn(s.monto_separo)}</td>
         <td style="padding:10px 8px;font-size:12px;text-align:right;white-space:nowrap"><b>${_spFmtMxn(s.precio_total)}</b></td>
-        <td style="padding:10px 8px">${_spBadgeEstado(s.estado)}</td>
+        <td style="padding:10px 8px;white-space:nowrap">${_spBadgeEstado(s.estado)}${_c2ChipHtml(s) ? ' ' + _c2ChipHtml(s) : ''}</td>
         <td style="padding:10px 8px;text-align:center;font-size:14px">${tieneComprob ? '<svg class="ic"><use href="#ic-clip"/></svg>' : '<span style="color:var(--ts)">—</span>'}</td>
         <td style="padding:10px 8px;text-align:right;white-space:nowrap"><button class="btn btn-ghost btn-sm" onclick="verSolicitudPortal('${_spEscape(s.id)}')" style="font-size:11px">Ver detalles</button></td>
       </tr>`;
@@ -10562,9 +10589,14 @@ async function verSolicitudPortal(id) {
   if (!s) { showToast('Solicitud no encontrada en cache, refresca la lista', 'error'); return; }
   const c = s.clientes || {};
 
-  const seccion = (titulo, html) => `
+  // [C2-5] El título se sigue ESCAPANDO (regla de CAP5-1): por eso el encabezado
+  // de la zona de peligro mostraba su <svg> como texto literal. En vez de dejar
+  // pasar HTML libre —que sería abrir la puerta que CAP5-1 cerró— el icono va
+  // por su propio parámetro, contra una lista de iconos conocidos.
+  const ICONOS_OK = { alerta: '#ic-alerta' };
+  const seccion = (titulo, html, icono) => `
     <div style="margin-top:18px;padding-top:14px;border-top:1px solid var(--border)">
-      <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.14em;color:var(--orange);text-transform:uppercase;margin-bottom:10px">// ${_esfEsc(titulo)}</div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.14em;color:var(--orange);text-transform:uppercase;margin-bottom:10px">// ${ICONOS_OK[icono] ? '<svg class="ic"><use href="' + ICONOS_OK[icono] + '"/></svg> ' : ''}${_esfEsc(titulo)}</div>
       ${html}
     </div>`;
 
@@ -10572,7 +10604,7 @@ async function verSolicitudPortal(id) {
 
   const contenido = `
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px">
-      ${_spBadgeEstado(s.estado)}
+      ${_spBadgeEstado(s.estado)}${_c2ChipHtml(s)}
       <button class="btn btn-primary btn-sm" onclick="abrirCambiarEstadoSP('${_spEscape(s.id)}')" style="font-size:11px">Cambiar estado</button>
       <span style="margin-left:auto;color:var(--ts);font-size:11px;font-family:'JetBrains Mono',monospace">${_spEscape(_spFmtFechaAbs(s.created_at))}</span>
     </div>
@@ -10610,15 +10642,20 @@ async function verSolicitudPortal(id) {
     `)}
 
     ${seccion('Comprobante de separo', `
+      ${_c2SeparoPagadoHtml(s)}
       <div id="sp-comprobante-${_spEscape(s.id)}" style="font-size:13px;color:var(--ts)">
-        ${s.comprobante_separo_url ? 'Cargando vista previa…' : '<span style="color:var(--ts)">Sin comprobante subido por el cliente</span>'}
+        ${s.comprobante_separo_url
+          ? 'Cargando vista previa…'
+          : (s.separo_pagado_at
+            ? '<span style="color:var(--ts)">Pagó en línea: no hay comprobante que subir.</span>'
+            : '<span style="color:var(--ts)">Sin comprobante subido por el cliente</span>')}
       </div>
     `)}
 
-    ${seccion('<svg class="ic"><use href="#ic-alerta"/></svg> Zona de peligro', `
+    ${seccion('Zona de peligro', `
       <div style="font-size:12px;color:var(--ts);margin-bottom:10px;line-height:1.5">Resetea o elimina a <b style="color:var(--ink)">${_spEscape(c.nombre_completo || '—')}</b> del Portal para que pueda empezar de cero (borra tours, pagos, comprobantes y foto).</div>
       <button class="btn btn-red btn-sm" onclick="abrirResetCliente('${_spEscape(s.cliente_id)}')" style="font-size:11px">Resetear / Eliminar cliente</button>
-    `)}
+    `, 'alerta')}
   `;
 
   crearModal('sp-detalle', `Solicitud · ${s.evento_nombre || ''}`, contenido);

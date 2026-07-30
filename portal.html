@@ -387,7 +387,7 @@ main{
   transition:transform .15s,box-shadow .15s;
 }
 .fab.is-visible{display:inline-flex}
-.fab:hover{transform:translateY(-2px);box-shadow:0 12px 32px rgba(232,255,76,.45),0 3px 8px rgba(0,0,0,.4)}
+.fab:hover{transform:translateY(-2px);box-shadow:0 12px 32px rgba(0,0,0,.5),0 3px 8px rgba(0,0,0,.4)}
 .fab .plus{font-size:18px;line-height:1;font-weight:900}
 
 /* ============================ Wizard (Vista D) ============================ */
@@ -692,7 +692,9 @@ main{
 .portal-link.wa:hover{border-color:var(--green);color:var(--green)}
 
 /* --- Barra de progreso animada (amplifica la existente) --- */
-.prog-fill{background:linear-gradient(90deg,var(--green),var(--yel));box-shadow:0 0 12px rgba(136,234,78,.4);animation:pv-rise .4s both}
+/* [A3 g2] Fuera el halo verde: la barra ya se distingue por su gradiente y su
+   contraste contra el riel. El pv-rise se queda — es la animación, no el glow. */
+.prog-fill{background:linear-gradient(90deg,var(--green),var(--yel));animation:pv-rise .4s both}
 
 /* --- prefers-reduced-motion, patrón de la casa (PF-1) ---------------------
    ANTES decía `animation:none;transition:none`. El problema de anular en vez de

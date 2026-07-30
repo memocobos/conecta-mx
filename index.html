@@ -2520,18 +2520,14 @@ function showInitials(imgEl,name){
   if(wrap)wrap.innerHTML='<div class="ev-img-placeholder"><span class="ev-img-initials">'+name.substring(0,2).toUpperCase()+'</span></div>';
 }
 
-function renderZonas(zonas){
-  var h='';
-  for(var i=0;i<zonas.length;i++){
-    var z=zonas[i];
-    if(z.ag){h+='<button class="z-btn ag" disabled><div class="z-name">'+z.n+'</div><div class="z-ag">Agotado</div></button>';}
-    else{h+='<button class="z-btn'+(z.vip?' vip':'')+'" onclick="selZona(this,'+z.p+',\''+z.n+'\')"><div class="z-name">'+z.n+'</div><div class="z-price">'+fmt(z.p)+'</div></button>';}
-  }
-  $$('d-zonas').innerHTML=h;
-  selZ=null;
-  $$('d-placeholder').style.display='block';
-  $$('d-result').style.display='none';
-}
+// [A9] Aquí vivía `renderZonas`, un constructor de chips de zona de una versión
+// anterior del cotizador. NADIE la llamaba: 0 referencias como palabra completa
+// en todo el repo, ninguna por cadena, ninguna dinámica, ninguna en atributos.
+// La que pinta el cotizador es `buildZonaButtons` (4 llamadas), que es donde
+// A5 arregló el "$0" y el texto pegado.
+// OJO al leer un grep: `rerenderZonasDisp` CONTIENE su nombre y es otra función,
+// viva y en uso. Por eso la exhumación se hizo con fronteras de palabra.
+
 
 function renderCatalog(){
   var list=$$('ev-list');

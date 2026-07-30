@@ -173,6 +173,19 @@ _Última revisión: 28-jul-2026 (series PP, PG, E1 y KH cerradas)._
   todo lo que está en `display:none`. El reloj del paso de pago llevaba una
   aserción en verde mientras el cliente no veía nada. Medir `display`,
   `visibility`, `offsetParent` y el alto real.
+- **UN ARNÉS TIENE DOS LADOS, Y LOS DOS TIENEN QUE SER COMMITS.** Anclar solo el
+  "antes" no sirve de nada: el "después" leído del ÁRBOL VIVO convierte a
+  cualquier tuerca posterior en culpable. Es la mitad que faltaba de "los arneses
+  miden entre dos commits", y casi ninguno la cumplía — 11 de 13 leían `main` o
+  el árbol de un lado. `kh4` acusaba a KH-4 de un color en línea que puso el chip
+  de C2-5 con permiso; `t1` habría culpado a T1 de cualquier edición posterior de
+  contrato-crear.js. **Y si un arnés vigila MÁS DE UN RANGO, cada rango lleva su
+  propia ancla**: `pf5` usaba una sola constante para su rango y para una guarda
+  cruzada sobre PG-1 — al corregir uno se rompía el otro.
+  Corolario: la vigilancia VIVA (un contador que no debe crecer nunca) es OTRA
+  cosa y va en su propio bloque, contra el árbol de hoy y con su línea base
+  movida cuando se aprueba un aumento — si no, re-acusa un permiso viejo en cada
+  corrida.
 - **Un arnés cuyo resultado cambia por merges AJENOS no mide su tuerca: mide el
   árbol. EL VERDE TAMBIÉN CADUCA, y un verde caducado no avisa.** En el barrido
   de A6b, `pf2` (37/39) y `pf3` (23/24) se pusieron en VERDE solos porque otras

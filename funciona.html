@@ -44,8 +44,15 @@ a{color:inherit;text-decoration:none}
 ::-webkit-scrollbar-track{background:#000}
 ::-webkit-scrollbar-thumb{background:var(--rojo)}
 
-/* Scroll progress bar */
-.progress{position:fixed;top:0;left:0;height:3px;background:var(--amarillo);z-index:1000;width:0;transition:width .1s linear;box-shadow:0 0 12px rgba(232,255,76,.5)}
+/* Scroll progress bar.
+   [T7] Animaba WIDTH, que obliga a recalcular layout en CADA píxel de scroll
+   —contra la regla de la casa: solo transform y opacity—. Ahora la barra mide
+   el 100% siempre y se ESCALA desde la izquierda: mismo dibujo, en la GPU.
+   [T7] Y fuera el box-shadow: era un halo amarillo de 12px SIN desplazamiento
+   sobre una barra de 3px de alto. El resplandor medía cuatro veces la barra,
+   así que lo que se veía era una mancha, no un progreso. (El dark-glow del
+   toast de pagos.html es otra cosa y sigue intocable.) */
+.progress{position:fixed;top:0;left:0;height:3px;background:var(--amarillo);z-index:1000;width:100%;transform:scaleX(0);transform-origin:left center;transition:transform .1s linear}
 
 /* Header */
 .hdr{
@@ -115,14 +122,10 @@ a{color:inherit;text-decoration:none}
              #000;
   border-bottom:1px solid var(--line);
 }
-.hero::after{
-  content:'';position:absolute;inset:0;pointer-events:none;
-  background:
-    linear-gradient(90deg,transparent 0,transparent calc(100% - 1px),rgba(255,255,255,.04) 100%) repeat-x,
-    linear-gradient(transparent calc(100% - 1px),rgba(255,255,255,.04) 100%) repeat-y;
-  background-size:60px 100%,100% 60px;
-  mix-blend-mode:screen;opacity:.3;
-}
+/* [T7] Aquí vivía una rejilla decorativa de hairlines a rgba(255,255,255,.04)
+   con opacity .3 encima: a ese alfa efectivo (~1%) no se distinguía, y el hero ya
+   tiene dos radial-gradient de marca haciendo el trabajo. Una rejilla se justifica
+   sobre un plano, un mapa o algo que se mida — no sobre un hero. Fuera. */
 .hero-kicker{
   display:inline-flex;align-items:center;gap:12px;
   font-size:10px;font-weight:900;letter-spacing:.2em;text-transform:uppercase;
@@ -253,8 +256,27 @@ main{padding:0}
   .step-num{font-size:clamp(64px,22vw,120px)}
 }
 @media(prefers-reduced-motion:reduce){
-  *{animation:none !important;transition:none !important}
-  .marquee-track{animation:none}
+  /* [T7] Idioma de la casa: ACORTAR a .01ms, nunca `animation:none` ni
+     `transition:none`, y poner los retardos en cero.
+     LO QUE DE VERDAD ARREGLA (medido, no supuesto): el `transition:none` de la
+     regla vieja mataba TODAS las transiciones, así que con movimiento reducido el
+     sitio se quedaba sin respuesta al toque — hover, focus y estados de botón
+     dejaban de acusar recibo. Con .01ms el aviso sigue llegando, solo instantáneo.
+     Al listón NO le cambia nada visible: con `none` ya se paraba en translateX(0),
+     que es el inicio legible. Lo comprobé con capturas en los dos estados y son
+     idénticas — le había dicho a Memo que quedaba congelado a media frase y era
+     falso. Se corrige por regla de la casa y por el hover, no por el listón.
+     Y ojo con el orden: la regla del `*` lleva !important, así que le gana a
+     cualquier regla por clase. Cambiar solo .marquee-track habría sido letra
+     muerta; hay que corregir el `*`, que es quien manda. */
+  *,*::before,*::after{
+    animation-duration:.01ms !important;
+    animation-delay:0s !important;
+    animation-iteration-count:1 !important;
+    transition-duration:.01ms !important;
+    transition-delay:0s !important;
+    scroll-behavior:auto !important;
+  }
   .hero-title .line,.hero-sub,.hero-stats{opacity:1;transform:none}
 }
 
@@ -757,7 +779,8 @@ main{padding:0}
   function update(){
     var h=document.documentElement;
     var total=h.scrollHeight-h.clientHeight;
-    bar.style.width=(total>0?(h.scrollTop/total*100):0)+'%';
+    var pct=(total>0?(h.scrollTop/total):0);
+    bar.style.transform='scaleX('+pct+')';
   }
   window.addEventListener('scroll',update,{passive:true});
   window.addEventListener('resize',update);

@@ -28,7 +28,7 @@
         "rule": "overused-font",
         "value": "montserrat",
         "createdAt": "2026-07-27T00:39:33.577Z",
-        "reason": "Montserrat es tipografía de marca (PRODUCT.md)"
+        "reason": "Montserrat es la tipografia de marca (Manual_De_Marca.pdf) y la usa todo el sitio: index, pagos, funciona, kit, faq. Cambiarla en una pagina rompe la familia visual cerrada en PF-6. Decision de Memo, 30-jul-2026."
       }
     ]
   }

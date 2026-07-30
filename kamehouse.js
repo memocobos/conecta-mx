@@ -16276,16 +16276,20 @@ function _vtaCalc(ev, opts) {
   let selZ = null;
   if (hasZona) {
     selZ = _vtaZonaLista(ev, paquete, fi).filter(z => z && z.n === String(opts.zona || ''))[0] || null;
-    if (!selZ) return { ok: false, motivo: 'zona no encontrada' };
+    // [A6] El texto se alinea al de _lib/precio-zona: la lib es la FUENTE y el
+    // Palacio es el ESPEJO, no al revés. Era el único diff que quedaba entre las
+    // dos copias (3 combos: vaiven cheap sin zonas) y era de palabras, no de
+    // dinero — pero una ley nueva debe amanecer en CERO diffs totales.
+    if (!selZ) return { ok: false, motivo: 'zona no encontrada en el catálogo' };
     if (selZ.ag) return { ok: false, motivo: 'zona agotada' };                       // [AUD-2]
     if (selZ.prox) return { ok: false, motivo: 'zona aún no disponible (próximamente)' }; // [AUD-2]
-    if (!(Number(selZ.p) > 0)) return { ok: false, motivo: 'zona agotada / sin precio' };
+    if (!(Number(selZ.p) > 0)) return { ok: false, motivo: 'zona agotada / sin precio (p=0)' };
   }
   let selH = null;
   const requiereHotel = hasHotel && !opts.hotel_nombre;
   if (hasHotel && opts.hotel_nombre) {
     selH = _vtaHotelLista(ev, fi, cdmx).filter(h => h && h.n === opts.hotel_nombre)[0] || null;
-    if (!selH) return { ok: false, motivo: 'hotel no encontrado' };
+    if (!selH) return { ok: false, motivo: 'hotel no encontrado en el catálogo' };
     // Grupo grande (N>4): SOLO compartida (espejo de precio-zona / index).
     if (selViaj > 4 && !(selH.k === 'compartida' || /^compartida/i.test(selH.n || ''))) return { ok: false, motivo: 'grupo grande: solo habitación compartida' };
   }
@@ -16320,7 +16324,7 @@ function _vtaCalc(ev, opts) {
     if (dias != null && dias <= 15) separo = Math.ceil(cxp * 0.5) * selViaj;
     else { let s = ev.sep; if (paquete === 'ride' && ev.sepRide !== undefined) s = ev.sepRide; if (ev.sepZonas && selZ && ev.sepZonas[selZ.n] !== undefined) s = ev.sepZonas[selZ.n]; separo = (Number(s) || 0) * selViaj; }
   }
-  if (!(total > 0) || !(cxp > 0)) return { ok: false, motivo: 'precio no disponible' };
+  if (!(total > 0) || !(cxp > 0)) return { ok: false, motivo: 'precio no disponible (total/costo 0)' };
   // [AUD-2] el separo ES la ganancia: 0 en plus/ride/stay = catálogo incompleto.
   if (paquete !== 'cheap' && !(separo > 0)) return { ok: false, indeterminado: true, motivo: 'el evento no tiene separo definido en el catálogo — captúralo antes de vender' };
   return { ok: true, paquete, zona: selZ ? selZ.n : null, num_personas: selViaj, precio_unit: cxp, total, separo, resto: total - separo, requiere_hotel: requiereHotel, requiere_transporte: requiereTransporte };

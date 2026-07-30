@@ -186,9 +186,31 @@ async function enviarCorreoAceptacion(env, portalHeaders, solicitud, token) {
 
     const evento = solicitud.evento_nombre || 'tu evento';
     const link = `${SITE_URL}/contrato-viajero.html?token=${encodeURIComponent(token)}`;
-    const subject = '🎫 Tu lugar quedó apartado — tu plan de pagos y tu contrato';
+    // [C2-7 remate] El EVENTO va en el asunto: un cliente con dos viajes no sabe
+    // de cuál le hablan hasta abrir. Se sacrifica el "plan de pagos y contrato"
+    // del asunto —que el cuerpo dice completo en su primera línea— porque el
+    // dato que distingue un correo de otro en la bandeja es el evento.
+    const subject = '🎫 Tu lugar quedó apartado — ' + evento;
 
     const fmt = (n) => '$' + Number(n || 0).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+    // [C2-7 remate] "16 ago 2026", no "2026-08-16". Es la columna que el cliente
+    // lee con el dedo, y una fecha ISO en un correo se lee como error de sistema.
+    //
+    // Se arma A MANO desde el texto 'YYYY-MM-DD' por dos razones, las dos reales:
+    //   · new Date('2026-08-16') se parsea como MEDIANOCHE UTC, que en México es
+    //     el 15 — la fecha se correría un día hacia atrás en TODAS las cuotas.
+    //   · toLocaleDateString('es-MX') depende del ICU del runtime; si Netlify
+    //     corre con ICU recortado, devuelve los meses en inglés sin avisar.
+    // Una tabla de doce entradas no tiene ninguno de los dos problemas.
+    const MESES_CORTOS = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+    const fmtFecha = (iso) => {
+      const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso || ''));
+      if (!m) return '';
+      const mes = MESES_CORTOS[Number(m[2]) - 1];
+      if (!mes) return '';
+      return Number(m[3]) + ' ' + mes + ' ' + m[1];
+    };
     const total = cuotas.reduce((a, p) => a + (Number(p.monto) || 0), 0);
     const filas = cuotas.map((p) => {
       const pagada = String(p.estado || '') === 'pagado';
@@ -196,7 +218,7 @@ async function enviarCorreoAceptacion(env, portalHeaders, solicitud, token) {
         <td style="padding:8px 10px;border-bottom:1px solid #e5e5e5">${escHtml(p.concepto || ('Abono ' + p.numero_pago))}`
         + (pagada ? ' <b style="color:#127c2b">· ya pagado</b>' : '') + `</td>
         <td style="padding:8px 10px;border-bottom:1px solid #e5e5e5;text-align:right;white-space:nowrap">${escHtml(fmt(p.monto))}</td>
-        <td style="padding:8px 10px;border-bottom:1px solid #e5e5e5;text-align:right;white-space:nowrap">${escHtml(String(p.fecha_esperada || '').slice(0, 10))}</td>
+        <td style="padding:8px 10px;border-bottom:1px solid #e5e5e5;text-align:right;white-space:nowrap">${escHtml(fmtFecha(p.fecha_esperada))}</td>
       </tr>`;
     }).join('');
 

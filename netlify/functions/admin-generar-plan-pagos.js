@@ -293,7 +293,20 @@ exports.handler = async (event) => {
     //    primera generación — ya_existia:false). Best-effort: un fallo aquí NO
     //    revierte el plan, solo se reporta.
     const correoInfo = {};
-    if (!RESEND_KEY) {
+    // [C2-7] SIN_CORREO — el que acepta manda UN SOLO correo.
+    //
+    // Al aceptar salían DOS correos en el mismo minuto: éste (el plan) y el del
+    // contrato, desde funciones distintas. No era un descuido de plantilla, era
+    // de SECUENCIA: cuando esta función corre, el contrato todavía no existe y
+    // no hay token de firma que meterle. Quien tiene las dos mitades es la
+    // aceptación, así que ahí se junta la historia y aquí nos callamos.
+    //
+    // Esto NO apaga el correo del plan: sigue saliendo cuando Bulma genera un
+    // plan por su cuenta (alta manual de viajero, botón de recuperación), que
+    // son los casos donde el cliente sí necesita enterarse por separado.
+    if (body.sin_correo === true) {
+      correoInfo.correo_omitido = 'lo manda la aceptación (un solo correo)';
+    } else if (!RESEND_KEY) {
       correoInfo.correo_error = 'Resend no configurado';
     } else {
       try {

@@ -117,8 +117,8 @@ exports.handler = async (event) => {
         const cg = await generarContratosDeSolicitud({ portalUrl: env.PORTAL_SB_URL, portalHeaders, solicitud: actualizada });
         lugaresInfo.contratos_creados = cg.creados;
         if (cg.titularToken) {
-          const mail = await enviarCorreoContratoTitular(env, portalHeaders, actualizada, cg.titularToken);
-          lugaresInfo.contrato_correo = mail;
+          const mail = await enviarCorreoAceptacion(env, portalHeaders, actualizada, cg.titularToken);
+          lugaresInfo.correo_aceptacion = mail;
         }
       } catch (e) {
         lugaresInfo.contratos_error = e.message;
@@ -137,37 +137,102 @@ exports.handler = async (event) => {
 
 // ----- helpers -----
 
-// Correo al TITULAR con el link para firmar su contrato. Best-effort: NUNCA
-// lanza (devuelve un string de estado). Pasa por aplicarModoPrueba (en modo
-// prueba desvía el destino y prefija el asunto). El link usa el token del
-// contrato del lugar #1; los acompañantes firman el suyo desde su portal.
-async function enviarCorreoContratoTitular(env, portalHeaders, solicitud, token) {
+// [C2-7] EL CORREO ÚNICO DE LA ACEPTACIÓN.
+//
+// Antes salían DOS en el mismo minuto —el plan desde admin-generar-plan-pagos y
+// éste con el link de firma— y desde el buzón del cliente eso se lee como error,
+// no como servicio. La causa era de SECUENCIA, no de plantilla: el plan se
+// escribe ANTES de que exista el contrato, así que esa función nunca tiene el
+// token. Quien tiene las dos mitades es esta: el plan ya está en la base y el
+// token acaba de nacer. Así que aquí se cuenta UNA sola historia.
+//
+// El recordatorio de firma NO se toca: vive en contratos-alerta-cron con su
+// propia plantilla ("📜 Falta tu firma — …"), y ése es el que le llega a quien
+// pierde su link o firma a medias.
+//
+// Best-effort: NUNCA lanza (devuelve un string de estado). Pasa por
+// aplicarModoPrueba, como todo correo de la casa.
+async function enviarCorreoAceptacion(env, portalHeaders, solicitud, token) {
   try {
     if (!RESEND_KEY) return 'sin RESEND_KEY';
-    // correo del titular: del cliente de la solicitud.
-    let correo = '';
+    let correo = '', nombre = 'cliente';
     if (solicitud.cliente_id) {
       const cr = await fetch(
         `${env.PORTAL_SB_URL}/rest/v1/clientes?id=eq.${encodeURIComponent(solicitud.cliente_id)}&select=correo,nombre_completo&limit=1`,
         { headers: portalHeaders }
       );
-      if (cr.ok) { const a = await cr.json().catch(() => []); correo = (a[0] && a[0].correo) || ''; }
+      if (cr.ok) {
+        const a = await cr.json().catch(() => []);
+        correo = (a[0] && a[0].correo) || '';
+        nombre = String((a[0] && a[0].nombre_completo) || 'cliente').trim().split(/\s+/)[0] || 'cliente';
+      }
     }
     if (!correo) return 'sin correo del titular';
 
+    // El plan que la aceptación acabó de escribir. Si no está —porque su
+    // generación falló—, el correo SALE IGUAL con el contrato y sin tabla: es
+    // mejor que el cliente sepa que su lugar quedó y que hay algo que firmar,
+    // que quedarse sin nada. El botón de recuperación del Palacio le manda el
+    // plan después, con su propio correo.
+    let cuotas = [];
+    try {
+      const pr = await fetch(
+        `${env.PORTAL_SB_URL}/rest/v1/pagos?solicitud_id=eq.${encodeURIComponent(solicitud.id)}`
+        + '&select=numero_pago,concepto,monto,fecha_esperada,estado&order=numero_pago.asc',
+        { headers: portalHeaders }
+      );
+      if (pr.ok) cuotas = await pr.json().catch(() => []);
+    } catch (e) { /* sin plan: sigue el correo */ }
+
     const evento = solicitud.evento_nombre || 'tu evento';
     const link = `${SITE_URL}/contrato-viajero.html?token=${encodeURIComponent(token)}`;
-    const subject = '📜 Firma tu contrato — ' + evento;
+    const subject = '🎫 Tu lugar quedó apartado — tu plan de pagos y tu contrato';
+
+    const fmt = (n) => '$' + Number(n || 0).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const total = cuotas.reduce((a, p) => a + (Number(p.monto) || 0), 0);
+    const filas = cuotas.map((p) => {
+      const pagada = String(p.estado || '') === 'pagado';
+      return `<tr>
+        <td style="padding:8px 10px;border-bottom:1px solid #e5e5e5">${escHtml(p.concepto || ('Abono ' + p.numero_pago))}`
+        + (pagada ? ' <b style="color:#127c2b">· ya pagado</b>' : '') + `</td>
+        <td style="padding:8px 10px;border-bottom:1px solid #e5e5e5;text-align:right;white-space:nowrap">${escHtml(fmt(p.monto))}</td>
+        <td style="padding:8px 10px;border-bottom:1px solid #e5e5e5;text-align:right;white-space:nowrap">${escHtml(String(p.fecha_esperada || '').slice(0, 10))}</td>
+      </tr>`;
+    }).join('');
+
+    const tabla = cuotas.length ? `
+      <h3 style="margin:22px 0 8px;font-size:15px">Tu plan de pagos</h3>
+      <table style="width:100%;border-collapse:collapse;font-size:14px">
+        <thead><tr style="color:#666;font-size:12px;text-transform:uppercase;letter-spacing:.06em">
+          <th style="padding:8px 10px;text-align:left;border-bottom:2px solid #111">Abono</th>
+          <th style="padding:8px 10px;text-align:right;border-bottom:2px solid #111">Monto</th>
+          <th style="padding:8px 10px;text-align:right;border-bottom:2px solid #111">Fecha límite</th>
+        </tr></thead>
+        <tbody>${filas}</tbody>
+        <tfoot><tr>
+          <td style="padding:10px;font-weight:800">Total</td>
+          <td style="padding:10px;text-align:right;font-weight:800;white-space:nowrap">${escHtml(fmt(total))}</td>
+          <td></td>
+        </tr></tfoot>
+      </table>
+      <p style="font-size:13px;color:#555;margin:10px 0 0">Cada abono se cubre a más tardar en su fecha límite. Puedes verlos y pagarlos desde tu portal.</p>`
+      : `<p style="font-size:13px;color:#555;margin:18px 0 0">Tu plan de pagos aparecerá en tu portal en un momento. Si no lo ves, escríbenos por WhatsApp y lo revisamos.</p>`;
+
     const html = `
-      <div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;color:#111">
-        <h2 style="margin:0 0 12px">Firma tu contrato de viaje</h2>
-        <p>¡Tu lugar para <b>${escHtml(evento)}</b> quedó aprobado! Antes de tu viaje necesitamos tu contrato firmado.</p>
-        <p style="margin:20px 0">
-          <a href="${link}" style="background:#e8ff4c;color:#0a0a0a;padding:12px 22px;border-radius:8px;text-decoration:none;font-weight:800">Firmar mi contrato</a>
+      <div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;color:#111">
+        <h2 style="margin:0 0 12px">¡Tu lugar quedó apartado, ${escHtml(nombre)}!</h2>
+        <p style="margin:0 0 14px">Ya eres parte de <b>${escHtml(evento)}</b>. Aquí tienes las dos cosas que necesitas: tu plan de pagos y tu contrato.</p>
+        ${tabla}
+        <h3 style="margin:26px 0 8px;font-size:15px">Falta tu firma</h3>
+        <p style="margin:0 0 14px">Antes del viaje necesitamos tu contrato firmado. Se firma en un minuto, desde el celular.</p>
+        <p style="margin:0 0 18px">
+          <a href="${link}" style="background:#e8ff4c;color:#0a0a0a;padding:13px 24px;border-radius:8px;text-decoration:none;font-weight:800;display:inline-block">Firmar mi contrato</a>
         </p>
-        <p style="font-size:13px;color:#555">Cada acompañante firmará el suyo desde su propio portal al conectarse — no necesitas firmar por ellos.</p>
+        <p style="font-size:13px;color:#555">Cada acompañante firma el suyo desde su propio portal — no necesitas firmar por ellos.</p>
         <p style="font-size:12px;color:#888;word-break:break-all">Si el botón no abre: ${link}</p>
+        <p style="margin:18px 0 0">Cualquier duda, respóndenos por WhatsApp. — Conecta Reynosa</p>
       </div>`;
+
     const mp = aplicarModoPrueba({ to: [correo], subject });
     const resp = await fetch('https://api.resend.com/emails', {
       method: 'POST',

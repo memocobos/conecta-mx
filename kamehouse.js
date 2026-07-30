@@ -12056,13 +12056,18 @@ function abrirCambiarEstadoSP(solicitudId) {
 // plan y lo POSTea al backend idempotente; devuelve la respuesta parseada (dataP)
 // o lanza con el mensaje de error. Lo usan el aprobar (generar-primero) y el
 // botón de recuperación del modal. Cada caller hace su propio toast de éxito.
-async function _spGenerarPlanPagosBackend(s, solicitudId) {
+// [C2-7] `sinCorreo` lo pide SOLO el aprobar: ahí el correo del plan viaja
+// dentro del correo único de la aceptación (que además lleva el link de firma).
+// El botón de recuperación NO lo pide, y con razón: ese camino existe porque el
+// plan falló al aprobar, así que el cliente se quedó sin la tabla y este correo
+// es el que se la entrega.
+async function _spGenerarPlanPagosBackend(s, solicitudId, sinCorreo) {
   const plan = await _spCalcularPlanPagos(s);
   if (!plan.ok) throw new Error(plan.error || 'No se pudo calcular el plan de pagos');
   const rp = await fetch('/.netlify/functions/admin-generar-plan-pagos', {
     method: 'POST',
     headers: _spAdminHeaders(),
-    body: JSON.stringify({ solicitud_id: solicitudId, pagos: plan.pagos }),
+    body: JSON.stringify({ solicitud_id: solicitudId, pagos: plan.pagos, sin_correo: sinCorreo === true }),
   });
   const dataP = await rp.json();
   if (!rp.ok) {
@@ -12119,14 +12124,14 @@ async function guardarCambioEstadoSP(solicitudId) {
     // función backend es idempotente, así que re-aprobar NO duplica.
     if (estado === 'en_pagos') {
       if (btn) btn.textContent = 'Generando plan…';
-      const dataP = await _spGenerarPlanPagosBackend(s, solicitudId);
+      const dataP = await _spGenerarPlanPagosBackend(s, solicitudId, true);
       if (dataP.ya_existia) {
         showToast('El plan de pagos ya existía — no se duplicó', 'success');
       } else {
-        let extraCorreo = '';
-        if (dataP.correo_enviado) extraCorreo = ' <svg class="ic"><use href="#ic-correo"/></svg> Plan enviado al cliente por correo.';
-        else if (dataP.correo_error || dataP.correo_enviado === false) extraCorreo = ' <svg class="ic"><use href="#ic-alerta"/></svg> El plan se creó pero el correo no salió.';
-        showToast('Plan de pagos generado (' + (dataP.pagos || []).length + ' pagos).' + extraCorreo, 'success');
+        // El correo ya no sale de aquí: lo manda la aceptación, con el plan y el
+        // link de firma juntos. Se avisa así para que nadie busque un correo que
+        // esta llamada no mandó a propósito.
+        showToast('Plan de pagos generado (' + (dataP.pagos || []).length + ' pagos). El correo con el plan y el contrato sale al aprobar.', 'success');
       }
       if (btn) btn.textContent = 'Guardando…';
     }

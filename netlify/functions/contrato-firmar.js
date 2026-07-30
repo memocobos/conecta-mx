@@ -476,11 +476,36 @@ async function _perfilCoordinadorEnDatos(datos, correo) {
 // coordinadores (eventos_coordi) y por la de creadoras externas
 // (viajeros_evento). Devuelve {slug,nombre} o {skipped,reason}.
 //
-// Llavea por eventos_meta.fecha y NO adivina: si dos eventos caen el mismo día
-// se sale con 'evento_ambiguo'. Devuelve SIEMPRE el slug BASE, sin '#idx' — el
-// sufijo de multifecha vive en el mundo Portal (solicitudes_tour), mientras que
-// las tablas de KH (viajeros_evento, eventos_coordi) llavean por slug base.
-async function _resolverEventoPorFecha(fecha, etiqueta) {
+// Llavea por eventos_meta.fecha y, cuando la fecha no alcanza, POR NOMBRE.
+// Devuelve SIEMPRE el slug BASE, sin '#idx' — el sufijo de multifecha vive en el
+// mundo Portal (solicitudes_tour), mientras que las tablas de KH
+// (viajeros_evento, eventos_coordi) llavean por slug base.
+//
+// [T2b] POR QUÉ EL NOMBRE. 15 fechas del catálogo tienen dos eventos o más, y
+// cuatro tienen TRES (30-may, 2-oct, 3-oct, 5-dic): 34 eventos viven en un día
+// compartido. Ahí la fecha sola no distinguía nada y NADIE se auto-asignaba —
+// ni coordinadores ni creadoras. El desambiguador ya existía y ya venía lleno:
+// contratos_creadores.evento_nombre.
+//
+// LA CONTENCIÓN SOLO DECIDE CUANDO DECIDE SOLA. Si el nombre empata con dos
+// candidatos o más, se queda ambiguo. Y si no empata con NINGUNO, también:
+// asignar "al primero" está PROHIBIDO. Una auto-asignación equivocada es peor
+// que una sin hacer — la que falta se ve en la lista de pendientes, la
+// equivocada se esconde hasta que truena en el viaje.
+const T2B_PISO = 3;   // ver nota abajo
+
+// Normaliza para comparar: minúsculas, sin acentos, sin los separadores que la
+// gente escribe distinto ('-', '·', ':', '&'), espacios colapsados.
+function _t2bNorm(s) {
+  return String(s == null ? '' : s)
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[-·:&,.]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+async function _resolverEventoPorFecha(fecha, etiqueta, nombreContrato) {
   const r = await fetch(
     `${SB_URL}/rest/v1/eventos_meta?fecha=eq.${encodeURIComponent(fecha)}&select=slug,nombre`,
     { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` } }
@@ -494,11 +519,40 @@ async function _resolverEventoPorFecha(fecha, etiqueta) {
     console.log(`[${etiqueta}] sin eventos_meta en fecha`, fecha);
     return { skipped: true, reason: "no_evento_en_fecha" };
   }
-  if (candidatos.length > 1) {
-    console.warn(`[${etiqueta}] varias filas en eventos_meta para fecha`, fecha, "→ no autoasigno (ambiguo)");
+  if (candidatos.length === 1) {
+    return { slug: candidatos[0].slug, nombre: candidatos[0].nombre || candidatos[0].slug };
+  }
+
+  // ── Varios el mismo día: decide el NOMBRE ────────────────────────────────
+  //
+  // EL PISO ES 3 CARACTERES, y sale del catálogo, no del gusto: en fechas
+  // ambiguas viven "BTS" (7-may), "AAA" de la WWE (30-may) y "T3R" (22-may).
+  // Con un piso de 4 se habrían quedado fuera justo los nombres cortos
+  // legítimos. Con 2 empezarían a disparar fragmentos degenerados.
+  const nc = _t2bNorm(nombreContrato);
+  if (nc.length < T2B_PISO) {
+    console.warn(`[${etiqueta}] ${candidatos.length} eventos en`, fecha,
+      '→ ambiguo: el nombre del contrato es muy corto para decidir', JSON.stringify(nc));
     return { skipped: true, reason: "evento_ambiguo" };
   }
-  return { slug: candidatos[0].slug, nombre: candidatos[0].nombre || candidatos[0].slug };
+  const empatan = candidatos.filter((c) => {
+    const cm = _t2bNorm(c.nombre);
+    if (!cm) return false;
+    const corto = nc.length <= cm.length ? nc : cm;
+    if (corto.length < T2B_PISO) return false;
+    return cm === nc || cm.includes(nc) || nc.includes(cm);
+  });
+  if (empatan.length !== 1) {
+    console.warn(`[${etiqueta}] ${candidatos.length} eventos en`, fecha,
+      `→ ambiguo: el nombre empató con ${empatan.length}`,
+      JSON.stringify(nombreContrato || ''));
+    return { skipped: true, reason: "evento_ambiguo" };
+  }
+  const g = empatan[0];
+  // Marca distinta a propósito: si algún día asigna mal, el log dice por qué vía.
+  console.log(`[${etiqueta}] resuelto_por_nombre slug=${g.slug} fecha=${fecha}`,
+    `de ${candidatos.length} candidatos`);
+  return { slug: g.slug, nombre: g.nombre || g.slug, resuelto_por_nombre: true };
 }
 
 // [T2 · T3] Mete a alguien de un CONTRATO a las listas del evento como PASAJERO
@@ -533,7 +587,7 @@ async function _asignarViajeroDeContrato(contrato, datosEfectivos, cfg) {
     return { skipped: true, reason: "sin_correo" };
   }
 
-  const ev = await _resolverEventoPorFecha(contrato.evento_fecha, etiqueta);
+  const ev = await _resolverEventoPorFecha(contrato.evento_fecha, etiqueta, contrato.evento_nombre);
   if (ev.skipped) return ev;
   const slug = ev.slug;
 
@@ -607,7 +661,7 @@ async function _autoAsignarEvento(contrato) {
   // 2. Resolver el SLUG del evento. [T2] La resolución vive en
   //    _resolverEventoPorFecha para que la asignación de coordis y la de
   //    creadoras externas usen EXACTAMENTE la misma y no puedan desviarse.
-  const ev = await _resolverEventoPorFecha(contrato.evento_fecha, "auto-asign");
+  const ev = await _resolverEventoPorFecha(contrato.evento_fecha, "auto-asign", contrato.evento_nombre);
   if (ev.skipped) return ev;
   const slug = ev.slug;
   const eventoNombre = ev.nombre;

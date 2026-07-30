@@ -900,7 +900,7 @@ body.wizard-open{overscroll-behavior:none}
   margin:-4px 0 8px;
 }
 .hh-btn-rojo{background:#e8ff4c;color:#000;border:none}
-.hh-btn-rojo:hover{background:#e8ff4c;color:#000;transform:translateY(-2px);box-shadow:0 14px 36px rgba(232,255,76,.5)}
+.hh-btn-rojo:hover{background:#e8ff4c;color:#000;transform:translateY(-2px);box-shadow:0 14px 36px rgba(0,0,0,.55)}
 /* CTA full width, padding vertical generoso */
 .hh-btn-full{
   width:100%;max-width:none;
@@ -1459,7 +1459,7 @@ body.wizard-open .rcp{display:none}
 </script>
 <style>
 .wa-float{position:fixed;bottom:20px;right:20px;width:56px;height:56px;background:#25D366;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;text-decoration:none;z-index:999;box-shadow:0 4px 16px rgba(37,211,102,.4);transition:transform .2s,box-shadow .2s}
-.wa-float:hover{transform:scale(1.1);box-shadow:0 6px 20px rgba(37,211,102,.6)}
+.wa-float:hover{transform:scale(1.1);box-shadow:0 6px 20px rgba(0,0,0,.6)}
 @media(max-width:768px){
   .wa-float{bottom:90px !important}
 }
@@ -1778,7 +1778,7 @@ body.wizard-open .rcp{display:none}
   -webkit-backdrop-filter:blur(14px) saturate(150%);
   backdrop-filter:blur(14px) saturate(150%);
   border-bottom:3px solid var(--c-rojo) !important;
-  box-shadow:0 0 24px rgba(255,40,59,.30),0 10px 30px rgba(0,0,0,.55);
+  box-shadow:0 10px 30px rgba(0,0,0,.55);  /* [A3 g2] el halo de color sale; la elevación neutra se queda. */
   height:60px;
 }
 .nav::after{
@@ -1817,7 +1817,7 @@ body.wizard-open .rcp{display:none}
 }
 .hh-btn-rojo:hover{
   transform:translateY(-3px) scale(1.02);
-  box-shadow:0 0 0 4px rgba(255,40,59,.25),0 18px 44px rgba(255,40,59,.55);
+  box-shadow:0 0 0 4px rgba(255,40,59,.25),0 18px 44px rgba(0,0,0,.6);
 }
 
 /* ---- TARJETAS DE EVENTO: redondez + elevación + halo rojo neón ---- */
@@ -1830,14 +1830,16 @@ body.wizard-open .rcp{display:none}
 .ev-card:hover{
   transform:translateY(-6px);
   border-color:var(--c-rojo) !important;
-  box-shadow:var(--sombra-alta),0 0 26px rgba(255,40,59,.32);
+  box-shadow:var(--sombra-alta);  /* [A3 g2] el halo de color sale; la elevación neutra se queda. */
 }
 /* La animación de entrada (.visible) sigue funcionando: solo afina el hover */
 .ev-card.visible:hover{transform:translateY(-6px)}
 .ev-img-wrap{border-radius:var(--r-card,16px) var(--r-card,16px) 0 0;overflow:hidden}
-.ev-card .ev-price-val,.ev-card .ev-precio,.cpr{text-shadow:0 0 22px rgba(232,255,76,.30)}
-/* El precio: glow tenue sin cambiar tu markup */
-.ev-bottom [class*="price"],.ev-bottom [class*="precio"]{text-shadow:0 0 18px rgba(232,255,76,.28)}
+/* [A3 g2] El precio llevaba un resplandor amarillo de 22px. El precio ya es
+   el elemento más grande y más brillante de la tarjeta: el glow no lo hacía
+   más legible, lo hacía más borroso en pantallas chicas. Fuera. */
+.ev-card .ev-price-val,.ev-card .ev-precio,.cpr{}
+/* [A3 g2] Mismo caso que el de arriba: el resplandor del precio, fuera. */
 
 /* tag de estado: pastilla redonda con punto "live" */
 .ev-tag{border-radius:var(--r-chip,999px);border:1px solid rgba(255,255,255,.12);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
@@ -1871,7 +1873,7 @@ body.wizard-open .rcp{display:none}
 /* ---- FOOTER: acento superior ---- */
 .ftr-v2{border-top:3px solid var(--c-rojo) !important;position:relative}
 .ftr-v2-cta-rojo{border-radius:var(--r-btn,12px);box-shadow:0 8px 24px rgba(255,40,59,.3);transition:transform .2s,box-shadow .2s}
-.ftr-v2-cta-rojo:hover{transform:translateY(-2px);box-shadow:0 14px 32px rgba(255,40,59,.45)}
+.ftr-v2-cta-rojo:hover{transform:translateY(-2px);box-shadow:0 14px 32px rgba(0,0,0,.5)}
 .ftr-v2-cta-verde{border-radius:var(--r-btn,12px);transition:transform .2s}
 .ftr-v2-cta-verde:hover{transform:translateY(-2px)}
 
@@ -2042,7 +2044,7 @@ body.wizard-open .rcp{display:none}
 @media (hover:hover){
   .ev-card:hover,.ev-card.visible:hover{
     transform:translateY(-8px);
-    box-shadow:var(--sombra-alta),0 0 34px rgba(255,40,59,.38);
+    box-shadow:var(--sombra-alta);  /* [A3 g2] el halo de color sale; la elevación neutra se queda. */
   }
   .ev-card:hover .ev-img{transform:scale(1.08)}
 }

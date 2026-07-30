@@ -446,7 +446,9 @@ button:focus-visible,a:focus-visible{
   border:2px solid #e8ff4c;
   padding:22px 22px 20px;
   position:relative;
-  box-shadow:0 0 28px rgba(232,255,76,.18);
+  /* [A3 g2] El aviso ya trae un borde amarillo de 2px que lo separa del fondo:
+     el halo de 28px encima era decoración sobre una señal que ya funcionaba.
+     (El toast de esta misma página NO se toca: decisión sellada en PG-1.) */
   font-family:'Montserrat',sans-serif;
 }
 .alert-cuenta-title{

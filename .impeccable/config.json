@@ -29,6 +29,15 @@
         "value": "montserrat",
         "createdAt": "2026-07-27T00:39:33.577Z",
         "reason": "Montserrat es la tipografia de marca (Manual_De_Marca.pdf) y la usa todo el sitio: index, pagos, funciona, kit, faq. Cambiarla en una pagina rompe la familia visual cerrada en PF-6. Decision de Memo, 30-jul-2026."
+      },
+      {
+        "rule": "broken-image",
+        "value": "*",
+        "files": [
+          "portal.html"
+        ],
+        "createdAt": "2026-07-30T05:54:10.905Z",
+        "reason": "Los 3 hallazgos son la palabra <img> dentro de COMENTARIOS de JavaScript (lineas 2214, 2364, 5795), no etiquetas. Falso positivo mecanico del lector de texto. Verificado uno por uno el 30-jul-2026."
       }
     ]
   }

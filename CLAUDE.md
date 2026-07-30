@@ -173,6 +173,13 @@ _Última revisión: 28-jul-2026 (series PP, PG, E1 y KH cerradas)._
   todo lo que está en `display:none`. El reloj del paso de pago llevaba una
   aserción en verde mientras el cliente no veía nada. Medir `display`,
   `visibility`, `offsetParent` y el alto real.
+- **Probar TU idea del dato en vez del dato que el código mira.** El fixture se
+  clasifica con la CONDICIÓN EXACTA del código, copiada, no parafraseada. Un
+  arnés que clasifica con criterio propio puede dar VERDE midiendo el caso
+  equivocado: en A2 clasifiqué "eventos sin foto" con `SI[staticImg] || img` y el
+  código evalúa otra cosa — el bloque contra el padre pasó comparando dos eventos
+  que AMBOS tenían foto, y me hizo afirmar un bug que no existía (0 de 94 eventos
+  alcanzan esa rama). Es la hermana fina de "probar el camino, no la función".
 - **En Playwright manda la ÚLTIMA ruta registrada: la específica va AL FINAL.**
   Si la genérica (`**/.netlify/**`) se registra después, se come al mock y el
   arnés mide una mentira. Y **todo mock exige conteo de llamadas**: un

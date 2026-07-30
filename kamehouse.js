@@ -10451,6 +10451,10 @@ function _spDateToIso(yyyyMmDd, endOfDay) {
 //
 // El reloj se DERIVA al pintar. Nadie muta la fila (regla de Fase B).
 // ═══════════════════════════════════════════════════════════════════════════
+// [C2-8] Mismo número que OXXO_SIN_HOLD_MS del backend. Si uno se mueve y el
+// otro no, la cola y el servidor dejan de contar la misma historia.
+const C2_OXXO_SIN_HOLD_MS = 48 * 60 * 60 * 1000;
+
 const _C2_ETIQUETAS = {
   separo_pagado:   { txt: 'PAGADA ✓',        cls: 'green' },
   con_comprobante: { txt: 'CON COMPROBANTE', cls: 'blue'  },
@@ -10466,9 +10470,23 @@ function _c2Etiqueta(s, nowMs) {
   const comp = s.comprobante_separo_url;
   if (comp != null && String(comp).trim() !== '') return { k: 'con_comprobante', resta: null };
   const h = s.hold_expira_at;
-  if (h == null || String(h).trim() === '') return null;      // fila vieja: sin etiqueta
+  const sinHold = (h == null || String(h).trim() === '' || !Number.isFinite(Date.parse(h)));
+  if (sinHold) {
+    // [C2-8] ESPEJO de etiquetaHold: una ficha de OXXO sin candado real se
+    // anuncia SIN RELOJ hasta 48 h después de nacer. Sin esto, el cliente que
+    // tiene su voucher en la mano no aparecía en la cola. Si esta regla cambia
+    // aquí, cambia TAMBIÉN en _lib/disponibilidad — el arnés compara las dos
+    // contra la misma tabla de casos y truena si se separan.
+    const esOxxoSH = String(s.metodo_separo || '').toLowerCase() === 'oxxo';
+    if (esOxxoSH) {
+      const nac = Date.parse(s.created_at || '');
+      if (Number.isFinite(nac) && (ahora - nac) < C2_OXXO_SIN_HOLD_MS) {
+        return { k: 'oxxo_pendiente', resta: null };
+      }
+    }
+    return null;                                              // fila vieja: sin etiqueta
+  }
   const t = Date.parse(h);
-  if (!Number.isFinite(t)) return null;
   const resta = t - ahora;
   if (resta <= 0) return { k: 'vencida', resta: 0 };
   const esOxxo = String(s.metodo_separo || '').toLowerCase() === 'oxxo';

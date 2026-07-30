@@ -26,6 +26,10 @@ const HOLD_MINUTOS = 15; // reloj del apartado (una sola fuente de verdad)
 //
 // Tarjeta y transferencia: 15 min (el de siempre, HOLD_MINUTOS).
 // OXXO: 24 h — la ficha de Stripe vive un día y el lugar tiene que aguantarle.
+// [C2-8] Cuánto se anuncia una ficha de OXXO que no tiene hold detrás. Es el
+// límite del ANUNCIO, no de la ficha: la ficha la mata Stripe.
+const OXXO_SIN_HOLD_MS = 48 * 60 * 60 * 1000;
+
 const HOLD_MINUTOS_POR_METODO = {
   tarjeta:       HOLD_MINUTOS,
   transferencia: HOLD_MINUTOS,
@@ -71,9 +75,32 @@ function etiquetaHold(row, nowMs) {
   }
 
   const h = row.hold_expira_at;
-  if (h == null || String(h).trim() === '') return { etiqueta: 'sin_hold', vence_en_ms: null, vigente: true };
+  const sinHold = (h == null || String(h).trim() === '' || !Number.isFinite(Date.parse(h)));
+  if (sinHold) {
+    // [C2-8] FICHA DE OXXO SIN CANDADO REAL.
+    //
+    // Donde el evento no tiene stock cargado no nace hold, y una ficha de OXXO
+    // emitida y sin pagar quedaba INVISIBLE: la cola no la mencionaba y el
+    // cliente existía igual, con su voucher en la mano.
+    //
+    // SIN RELOJ a propósito: la vida de la ficha vive en Stripe y de este lado
+    // no se baja. Un contador aquí sería inventado — el mismo criterio del monto
+    // que la caja verde del modal no enseña porque no lo tiene.
+    //
+    // LÍMITE DE 48 h sobre created_at: sin él, una ficha muerta se anunciaría
+    // como pendiente para siempre y el aviso pasaría de informar a estorbar.
+    // 48 y no 24 porque el voucher puede sobrevivir al hold (día natural de
+    // Stripe); pasado eso, ya no hay nada que esperar.
+    const esOxxo = String(row.metodo_separo || '').toLowerCase() === 'oxxo';
+    if (esOxxo) {
+      const nac = Date.parse(row.created_at || '');
+      if (Number.isFinite(nac) && (ahora - nac) < OXXO_SIN_HOLD_MS) {
+        return { etiqueta: 'oxxo_pendiente', vence_en_ms: null, vigente: true };
+      }
+    }
+    return { etiqueta: 'sin_hold', vence_en_ms: null, vigente: true };
+  }
   const t = Date.parse(h);
-  if (!Number.isFinite(t)) return { etiqueta: 'sin_hold', vence_en_ms: null, vigente: true };
 
   const resta = t - ahora;
   if (resta <= 0) return { etiqueta: 'vencida', vence_en_ms: 0, vigente: false };

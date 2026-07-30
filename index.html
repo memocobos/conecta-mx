@@ -489,8 +489,14 @@ body.wizard-open{overscroll-behavior:none}
   --font-display:'Barlow Condensed','Montserrat',sans-serif;
 }
 
-/* Scroll progress bar */
-.progress{position:fixed;top:0;left:0;height:3px;background:var(--c-amarillo);z-index:1000;width:0;transition:width .1s linear;box-shadow:0 0 12px rgba(232,255,76,.5);pointer-events:none}
+/* Scroll progress bar.
+   [A1] Animaba WIDTH: recalcular layout en CADA píxel de scroll, contra la
+   regla de la casa (solo transform y opacity). Ahora mide 100% siempre y se
+   ESCALA desde la izquierda — mismo dibujo, en la GPU. Es el mismo arreglo ya
+   probado en funciona.html (T7).
+   [A1] Y fuera el halo: box-shadow de 12px SIN desplazamiento sobre una barra
+   de 3px de alto. El resplandor medía cuatro veces la barra. */
+.progress{position:fixed;top:0;left:0;height:3px;background:var(--c-amarillo);z-index:1000;width:100%;transform:scaleX(0);transform-origin:left center;transition:transform .1s linear}
 
 /* Header CTA (red button next to socials) */
 .hdr-cta{
@@ -3391,7 +3397,7 @@ var _countdownInterval = null;
   function update(){
     var h=document.documentElement;
     var total=h.scrollHeight-h.clientHeight;
-    bar.style.width=(total>0?(h.scrollTop/total*100):0)+'%';
+    bar.style.transform='scaleX('+(total>0?(h.scrollTop/total):0)+')';
   }
   window.addEventListener('scroll',update,{passive:true});
   window.addEventListener('resize',update);

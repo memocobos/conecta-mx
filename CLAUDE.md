@@ -173,6 +173,28 @@ _Última revisión: 28-jul-2026 (series PP, PG, E1 y KH cerradas)._
   todo lo que está en `display:none`. El reloj del paso de pago llevaba una
   aserción en verde mientras el cliente no veía nada. Medir `display`,
   `visibility`, `offsetParent` y el alto real.
+- **Antes de creerle una AUSENCIA a un instrumento, hazlo contestar algo que
+  SEPAS que existe.** Un instrumento roto no truena: CONTESTA, y su respuesta
+  favorita es la ausencia — cero hallazgos, cero halos, todo roto — que es
+  justo la que menos verificamos porque parece que no hay nada que verificar.
+  Cuatro en un día: `2>/dev/null` sobre un detector que escribe a stderr ("0
+  hallazgos" en 546) · `([\d.]+)px` sobre CSS que permite el cero sin unidad
+  ("G2=0" con 13 halos) · `timeout` que no existe en macOS ("52 arneses
+  podridos" con 38 en verde) · y un fixture clasificado con mi criterio en vez
+  del del código. Los cuatro dieron respuestas limpias y creíbles.
+  **La versión práctica:** correr el mismo instrumento contra un caso conocido
+  —un commit viejo, un precio calculado a mano, una fila que sabes que está—
+  ANTES de creerle el resultado. Es el candado de cardinalidad aplicado a la
+  herramienta, no a la aserción.
+- **Un arnés se compara contra el universo DE HOY, no contra la expectativa
+  congelada del día que se firmó.** El de equivalencia decía 5,565 diffs y los
+  precios estaban sanos: comparaba combos que hoy son `ok:false` (zona agotada
+  3,123 · evento agotado 2,157 · fecha pasada 789 · próximamente 78) contra
+  números, y `undefined` contra número siempre difiere. Su "15,156 combos / 0
+  diffs = ley" se firmó sobre un catálogo que ya no existe. Receta: comparar las
+  copias ENTRE SÍ sobre el universo vivo · casos conocidos a mano como
+  validación del instrumento antes de cada corrida · candado de cardinalidad
+  sobre los `ok:true` (si un día da 0, es el instrumento) · anclado a commits.
 - **Probar TU idea del dato en vez del dato que el código mira.** El fixture se
   clasifica con la CONDICIÓN EXACTA del código, copiada, no parafraseada. Un
   arnés que clasifica con criterio propio puede dar VERDE midiendo el caso

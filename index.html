@@ -4321,7 +4321,21 @@ function buildZonaButtons(zonas){
     } else if(effAg){
       var agP=z.p;
       if(selPkg==='stay'&&cur){agP=z.p-(cur.sep||500);if(agP<0)agP=z.p;}
-      h+='<button class="z-btn ag" disabled><span class="z-name">'+z.n+'</span><span class="z-precio">'+fmt(agP)+'</span><span class="z-ag-badge">AGOTADO</span></button>';
+      // [A5] DOS COSAS QUE VIO COWORK EN VIVO, y las dos estaban en esta línea:
+      //
+      // 1. "PLATINO$0 AGOTADO". Una zona sin precio capturado (p=0) enseñaba
+      //    "$0" al cliente. Un cero no es un precio: es un dato que falta. Ahora
+      //    la zona agotada sin precio solo dice su nombre y AGOTADO.
+      // 2. "EXPERIENCE$8,100" pegado. NO era la clase: `.z-precio` SÍ existe
+      //    (línea 237) y es la que TACHA el precio de la zona agotada, que es
+      //    justo lo que hay que conservar. El pegado venía de que el nombre y el
+      //    precio eran <span> —inline, uno tras otro— mientras la rama de zona
+      //    disponible usa <div>. Se pasan a <div> y quedan hermanas, con su
+      //    tachado intacto.
+      var mostrarP = agP > 0;
+      h+='<button class="z-btn ag" disabled><div class="z-name">'+z.n+'</div>'
+        +(mostrarP?'<div class="z-precio">'+fmt(agP)+'</div>':'')
+        +'<span class="z-ag-badge">AGOTADO</span></button>';
     } else if(z.free){
       h+='<button class="z-btn" data-p="0" data-n="'+z.n+'"><div class="z-name">'+z.n+'</div><div class="z-price" style="color:#9eff5d;font-weight:800;letter-spacing:.1em">GRATIS</div></button>';
     } else {

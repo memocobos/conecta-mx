@@ -173,6 +173,18 @@ _Última revisión: 28-jul-2026 (series PP, PG, E1 y KH cerradas)._
   todo lo que está en `display:none`. El reloj del paso de pago llevaba una
   aserción en verde mientras el cliente no veía nada. Medir `display`,
   `visibility`, `offsetParent` y el alto real.
+- **Cuando hay DOS objetos con el mismo papel, "el primero que aparece" no es
+  un criterio: es una moneda al aire.** `index.html` tiene dos constructores de
+  chips de zona —`renderZonas` y `buildZonaButtons`— y el arnés agarró el
+  primero del archivo: resultó ser el que NO LLAMA NADIE, así que midió una
+  función muerta y reportó que el bug no existía. Anclar por NOMBRE y exigir que
+  ALGUIEN LA LLAME (conteo de llamadas). Es la hermana de "probar el camino, no
+  la función": aquí se probó una función que no está en ningún camino.
+- **Un careo solo ve lo que el universo EJERCITA.** Para las divergencias
+  DORMIDAS —las que ningún dato de hoy alcanza— hay que LEER los dos códigos,
+  no correrlos. Tres textos de motivo estuvieron divergentes durante dos careos
+  de 9,498 combos que dieron 0 diffs. El candado es estático: todo lo que dice
+  el ESPEJO tiene que existir en la FUENTE.
 - **Antes de creerle una AUSENCIA a un instrumento, hazlo contestar algo que
   SEPAS que existe.** Un instrumento roto no truena: CONTESTA, y su respuesta
   favorita es la ausencia — cero hallazgos, cero halos, todo roto — que es

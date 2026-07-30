@@ -173,6 +173,18 @@ _Última revisión: 28-jul-2026 (series PP, PG, E1 y KH cerradas)._
   todo lo que está en `display:none`. El reloj del paso de pago llevaba una
   aserción en verde mientras el cliente no veía nada. Medir `display`,
   `visibility`, `offsetParent` y el alto real.
+- **Un arnés cuyo resultado cambia por merges AJENOS no mide su tuerca: mide el
+  árbol. EL VERDE TAMBIÉN CADUCA, y un verde caducado no avisa.** En el barrido
+  de A6b, `pf2` (37/39) y `pf3` (23/24) se pusieron en VERDE solos porque otras
+  tuercas movieron index.html y pagos.html. Siguen igual de podridos que cuando
+  estaban en rojo — solo que ahora no se nota. Se anclan a su commit de merge
+  aunque estén pasando.
+- **Un arnés podrido tiene dos caras, y la peligrosa no es la que grita.** Unos
+  simplemente CADUCARON (miden un pasado que ya no existe: molestan). Otros
+  PIDEN QUE SE REVIERTA UNA DECISIÓN aprobada — `t2` exigía "fecha ambigua nunca
+  asigna" después de que T2b lo cambió a propósito, y `pf3-navegador` pide el
+  glow rojo que A3 quitó con permiso. Si alguien "arregla" esos haciendo que
+  pasen, deshace la tuerca sin enterarse. Al triar, separar las dos clases.
 - **Cuando hay DOS objetos con el mismo papel, "el primero que aparece" no es
   un criterio: es una moneda al aire.** `index.html` tiene dos constructores de
   chips de zona —`renderZonas` y `buildZonaButtons`— y el arnés agarró el

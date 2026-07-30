@@ -678,10 +678,21 @@ async function _autoAsignarEvento(contrato) {
 // el INSERT sin esos campos y deja un marker [STAFF:<rol>] en `notas` para que
 // el cliente detecte la fila como staff vía _esStaff().
 async function _upsertViajeroStaffServer(eventoId, user) {
-  // Idempotencia por correo (siempre existe en viajeros_evento).
-  if (user.correo) {
+  // [T4] Idempotencia por correo — COMPARADA EN MINÚSCULAS.
+  //
+  // `correo=eq.` de PostgREST distingue mayúsculas: "Alan@x.mx" y "alan@x.mx"
+  // son dos correos distintos para la consulta, aunque sean la misma persona.
+  // El candado no encontraba al duplicado y CREABA otra fila de staff — con el
+  // prellenado de contratos del equipo a la vuelta de la esquina, ahí es donde
+  // habría empezado a duplicar gente de carne y hueso.
+  //
+  // Se normaliza la BÚSQUEDA y también lo que se GUARDA: si solo se arreglara
+  // la búsqueda, la primera fila seguiría entrando con mayúsculas y la próxima
+  // consulta volvería a fallar contra ella.
+  const correoNorm = user.correo ? String(user.correo).trim().toLowerCase() : '';
+  if (correoNorm) {
     const dupResp = await fetch(
-      `${SB_URL}/rest/v1/viajeros_evento?evento_id=eq.${eventoId}&correo=eq.${encodeURIComponent(user.correo)}&select=id&limit=1`,
+      `${SB_URL}/rest/v1/viajeros_evento?evento_id=eq.${eventoId}&correo=eq.${encodeURIComponent(correoNorm)}&select=id&limit=1`,
       { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` } }
     );
     if (dupResp.ok) {
@@ -697,7 +708,7 @@ async function _upsertViajeroStaffServer(eventoId, user) {
     evento_id: eventoId,
     nombre: user.nombre,
     celular: user.celular || null,
-    correo: user.correo || null,
+    correo: correoNorm || null,
     talla_playera: user.talla_playera || null,
     num_emergencia: user.num_emergencia || null,
     emergencia_nombre: user.nombre_emergencia || null,

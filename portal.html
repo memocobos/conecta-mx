@@ -1146,6 +1146,7 @@ body.rcp-alto .pf{ padding-bottom:calc(var(--rcp-zona-fab) + env(safe-area-inset
   text-transform:uppercase;color:var(--ink);margin:0 0 6px;
 }
 .pay-q-sub{font-size:13px;line-height:1.5;color:rgba(255,255,255,.78);margin:0 0 16px}
+    .pay-politica{margin:14px 0 0;font-size:11.5px;line-height:1.5;color:rgba(255,255,255,.62)}
 /* El reloj. Va ARRIBA y se queda pegado: es lo que el cliente necesita ver
    mientras decide, no algo que tenga que ir a buscar. */
 .pay-reloj{
@@ -3906,7 +3907,18 @@ async function _c24Paso(solicitudId, holdISO, contenedor) {
     cards.appendChild(b);
   }
 
+  // [T6] LA POLÍTICA, DONDE SE COBRA.
+  //
+  // El sitio ya la trae en sus políticas, pero el cliente que está a punto de
+  // pagar no va a irse a leerlas: la lee AQUÍ o no la lee. Es la misma
+  // redacción que index.html y pagos.html, palabra por palabra — el arnés
+  // compara las tres y truena si alguna se separa. Si este texto cambia,
+  // cambia en los tres.
+  const pol = document.createElement('p');
+  pol.className = 'pay-politica';
+  pol.textContent = 'El cargo por pagar con tarjeta u OXXO no es reembolsable. Cuando pagas en línea se suma 4% con débito u OXXO y 5% con crédito: ese cobro es de la empresa que procesa el pago, no de Conecta, y no regresa en ningún caso. Si el evento se cancela oficialmente te devolvemos todo lo que pagaste del viaje — separo y abonos completos — pero no ese cargo, porque nunca fue nuestro.';
   wrap.appendChild(cards);
+  wrap.appendChild(pol);
   contenedor.insertBefore(wrap, contenedor.firstChild);
 }
 

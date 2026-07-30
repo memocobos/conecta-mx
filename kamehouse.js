@@ -16276,7 +16276,11 @@ function _vtaCalc(ev, opts) {
   let selZ = null;
   if (hasZona) {
     selZ = _vtaZonaLista(ev, paquete, fi).filter(z => z && z.n === String(opts.zona || ''))[0] || null;
-    if (!selZ) return { ok: false, motivo: 'zona no encontrada' };
+    // [A6] El texto se alinea al de _lib/precio-zona: la lib es la FUENTE y el
+    // Palacio es el ESPEJO, no al revés. Era el único diff que quedaba entre las
+    // dos copias (3 combos: vaiven cheap sin zonas) y era de palabras, no de
+    // dinero — pero una ley nueva debe amanecer en CERO diffs totales.
+    if (!selZ) return { ok: false, motivo: 'zona no encontrada en el catálogo' };
     if (selZ.ag) return { ok: false, motivo: 'zona agotada' };                       // [AUD-2]
     if (selZ.prox) return { ok: false, motivo: 'zona aún no disponible (próximamente)' }; // [AUD-2]
     if (!(Number(selZ.p) > 0)) return { ok: false, motivo: 'zona agotada / sin precio' };

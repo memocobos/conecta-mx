@@ -887,6 +887,15 @@ body.wizard-open{overscroll-behavior:none}
 .cd-timer{display:flex;align-items:flex-end;gap:clamp(4px,1vw,10px)}
 .cd-cell{display:flex;flex-direction:column;align-items:center;min-width:44px}
 .cd-n{font-family:'Barlow Condensed','Montserrat',sans-serif;font-weight:900;font-size:clamp(26px,6vw,40px);line-height:1;color:var(--c-amarillo);letter-spacing:-.01em;font-variant-numeric:tabular-nums}
+/* [A4 · SELLADO POR MEMO, 30-jul-2026] Estas etiquetas del contador (DÍAS, HRS,
+   MIN, SEG) se quedan en 8px. El piso de 10px del barrido es para texto que se
+   LEE; éstas se RECONOCEN POR POSICIÓN, debajo de su número. Nadie lee 'DÍAS':
+   sabe qué es por dónde está.
+   Medido antes de sellar: subirlas a 10px NO rompe nada (24→30px de ancho,
+   10→13px de alto, sin desbordes ni encimados) — así que no se sellan por
+   miedo a romper, se sellan porque el contador es pieza de venta y su balance
+   es el que Memo eligió. Para re-litigarlo hay que volver a MEDIR y volver a
+   verlo, no volver a opinar. */
 .cd-l{font-size:8px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.5);margin-top:4px}
 .cd-sep{font-family:'Barlow Condensed','Montserrat',sans-serif;font-weight:900;font-size:clamp(20px,5vw,32px);color:rgba(255,255,255,.25);line-height:1;padding-bottom:14px}
 @media(max-width:380px){.cd-cell{min-width:38px}.cd-sep{display:none}.cd-timer{gap:10px}}

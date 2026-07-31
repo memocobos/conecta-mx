@@ -542,8 +542,14 @@ button:focus-visible,a:focus-visible{
 @keyframes hsbPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.2)}}
 #hot-sale-banner .hsb-text{display:flex;flex-direction:column;text-align:left;line-height:1.25}
 #hot-sale-banner .hsb-text strong{font-size:15px;letter-spacing:.5px}
+/* [A7] Este 4px se queda FUERA DE LA RAMPA a propósito. El chip del código mide
+   ~18px de alto (padding 1px 7px): con el 8px de --r-sm el arco sería casi la
+   mitad de su altura y el chip pasaría de 'cuadrito' a píldora. La rampa es
+   para cajas, no para etiquetas diminutas — y el criterio del día aplica
+   también a 4 píxeles: aquí el cambio SÍ se percibe, así que no es limpieza,
+   es un cambio de aspecto que nadie pidió. */
 #hot-sale-banner .hsb-text code{background:#000;color:#e8ff4c;padding:1px 7px;border-radius:4px;font-family:'Barlow Condensed',monospace;font-weight:900;letter-spacing:2px}
-#hot-sale-banner .hsb-countdown{background:#000;color:#e8ff4c;padding:7px 14px;border-radius:8px;font-family:'Barlow Condensed',monospace;font-size:22px;font-weight:900;min-width:120px;letter-spacing:1px}
+#hot-sale-banner .hsb-countdown{background:#000;color:#e8ff4c;padding:7px 14px;border-radius:var(--r-sm,8px);font-family:'Barlow Condensed',monospace;font-size:22px;font-weight:900;min-width:120px;letter-spacing:1px}
 @media(max-width:640px){#hot-sale-banner .hsb-text{font-size:11px}#hot-sale-banner .hsb-text strong{font-size:13px}#hot-sale-banner .hsb-countdown{font-size:17px;padding:5px 11px;min-width:96px}}
 body.hsale-on .nav{top:var(--hsb-h,0px)}
 

@@ -405,6 +405,14 @@ main{padding:0}
   background:linear-gradient(135deg,transparent 40%,rgba(255,255,255,.2) 50%,transparent 60%);
   transform:translateX(-100%);transition:transform .8s ease;
 }
+/* [A7 · SELLADO POR MEMO con medición, 30-jul-2026] Esta sombra NO se unifica
+   con --sombra-alta del index. Misma familia visual, valor propio.
+   Se midió píxel a píxel el cambio a los tokens (0 24px 50px rgba(0,0,0,.65)):
+     kit .cta-btn 0.00%  ·  funciona .cta-btn 0.00%  ·  faq .cta-btn 2.36%
+     funciona .hdr-cta 32.34%
+   En dos no se percibe (movimiento, no mejora) y en el header, además, la
+   sombra actual es la que A3 fijó el MISMO día prometiendo geometría intacta.
+   Para re-litigarlo hay que volver a MEDIR, no volver a opinar. */
 .cta-btn:hover{background:#0000a8;transform:translateY(-3px);box-shadow:0 16px 48px rgba(0,0,0,.55)}
 .cta-btn:hover::after{transform:translateX(100%)}
 

@@ -1,7 +1,9 @@
 {
   "detector": {
     "ignoreRules": [],
-    "ignoreFiles": [],
+    "ignoreFiles": [
+      "**/scratchpad/**"
+    ],
     "ignoreValues": [
       {
         "rule": "side-tab",

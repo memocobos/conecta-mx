@@ -410,6 +410,13 @@ main{
 .wiz-cancel:hover{color:var(--red)}
 .wiz-progress{display:flex;align-items:center;gap:10px;margin-bottom:22px}
 .wiz-bar{flex:1;height:4px;background:var(--field-bg);border-radius:var(--r-hilo,2px);overflow:hidden}
+/* [A8 · SELLADA POR ANÁLISIS] Anima `width`, y NO se convierte a scaleX. Misma
+   sentencia que sus tres hermanas con radio: se pinta UNA VEZ POR PASO del
+   wizard, no por frame de scroll. La regla de la casa —solo transform y
+   opacity— existe por el REFLOW POR FRAME; aquí ese costo no ocurre, y el
+   'arreglo' pediría tocar el markup a días del encendido para cumplir la letra
+   de una regla cuyo espíritu no aplica. Si algún día esta barra se animara de
+   forma continua, la sentencia cambia. */
 .wiz-bar-fill{height:100%;background:var(--yel);transition:width .35s ease;width:20%}
 .wiz-step-num{
   font-family:'JetBrains Mono',monospace;font-weight:700;font-size:11px;

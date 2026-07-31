@@ -93,7 +93,27 @@ a{color:inherit;text-decoration:none}
 }
 .hdr-cta:hover{background:#0000a8;transform:translateY(-1px);box-shadow:0 8px 24px rgba(0,0,205,.4)}
 .hdr-cta:active{transform:translateY(0)}
-@media(max-width:420px){.hdr-cta{padding:9px 12px;font-size:9px}}
+/* [URGENTE · CTA cortado] En 390px el botón se salía 29px de la pantalla: la
+   flecha no se veía y "VER EVENTOS" quedaba mutilado. Estaba así EN PRODUCCIÓN
+   en funciona, kit y faq — el botón principal de las tres.
+   Ningún arnés lo cazó porque ninguno miraba la página al ancho de un teléfono.
+
+   El arreglo hace las DOS cosas de un jalón (decisión de Memo):
+   1. En móvil el botón dice "Eventos →" — se esconde el "Ver". El espacio que
+      libera esa palabra es lo que permite lo segundo.
+   2. Con ese espacio, la letra sube de 9px a 11px y el área de toque crece:
+      el mismo cambio resuelve el desborde Y el botoncito ilegible que A4 venía
+      a arreglar. */
+@media(max-width:420px){
+  .hdr-cta{padding:11px 14px;font-size:11px}
+  .hdr-cta-ver{display:none}
+  /* [URGENTE · los 34px que faltaban] Se esconde el icono de WhatsApp EN MÓVIL.
+     Decisión de Memo: era el REPETIDO — el botón verde flotante ya cubre WhatsApp
+     en todas las páginas. En escritorio siguen los cuatro.
+     Se sacrifica el icono y NO las áreas de toque: la otra salida era achicar los
+     cuatro iconos de 32 a 24px, que contradice lo que A4 vino a arreglar. */
+  .hdr-social.wa{display:none}
+}
 
 /* Marquee */
 .marquee{
@@ -465,7 +485,8 @@ main{padding:0}
   .fq-head{grid-template-columns:1fr;gap:8px}
   .fq-head-num{font-size:clamp(56px,22vw,120px)}
   .fq-btn{grid-template-columns:auto 1fr auto;padding-right:0}
-  .tab{padding:16px 14px 14px;font-size:10px;letter-spacing:.08em}
+  /* [A4] 10px → 11px: son NAVEGACIÓN, se tocan con el dedo en móvil. */
+  .tab{padding:16px 14px 14px;font-size:11px;letter-spacing:.08em}
   .tab .tab-n{font-size:11px;margin-right:5px}
   .hero-scroll{display:none}
 }
@@ -641,7 +662,7 @@ main{padding:0}
       <a href="https://facebook.com/ConectaRey" target="_blank" rel="noopener" class="hdr-social fb" aria-label="Facebook"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg></a>
       <a href="https://tiktok.com/@conectareynosa" target="_blank" rel="noopener" class="hdr-social tt" aria-label="TikTok"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z"/></svg></a>
     </div>
-    <a href="https://conectareynosa.mx/#catalog-anchor" class="hdr-cta">Ver eventos <span aria-hidden="true">→</span></a>
+    <a href="https://conectareynosa.mx/#catalog-anchor" class="hdr-cta"><span class="hdr-cta-ver">Ver </span>eventos <span aria-hidden="true">→</span></a>
   </div>
 </header>
 

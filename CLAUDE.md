@@ -173,6 +173,14 @@ _Última revisión: 28-jul-2026 (series PP, PG, E1 y KH cerradas)._
   todo lo que está en `display:none`. El reloj del paso de pago llevaba una
   aserción en verde mientras el cliente no veía nada. Medir `display`,
   `visibility`, `offsetParent` y el alto real.
+- **"Solo `transform` y `opacity`" aplica a lo que anima POR FRAME.** Lo que se
+  pinta una vez por evento —una barra que se llena al cambiar de paso, un acento
+  que crece al pasar el mouse, un relleno que se dibuja al renderizar— se SELLA
+  con su análisis escrito, no se convierte. La regla existe por el reflow por
+  frame; donde ese costo no ocurre, convertir es cumplir la letra y perder el
+  espíritu — y a veces pide cambiar el markup para no ganar nada. Selladas así:
+  las 3 barras con radio (portal ×2, rol) y los hovers de faq. Si alguna se
+  volviera de animación continua, la sentencia cambia.
 - **UN ARNÉS TIENE DOS LADOS, Y LOS DOS TIENEN QUE SER COMMITS.** Anclar solo el
   "antes" no sirve de nada: el "después" leído del ÁRBOL VIVO convierte a
   cualquier tuerca posterior en culpable. Es la mitad que faltaba de "los arneses

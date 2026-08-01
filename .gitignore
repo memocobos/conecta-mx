@@ -9,3 +9,34 @@ node_modules/
 !.claude/skills/
 .agents/
 skills-lock.json
+
+# ── EL CAJÓN PRIVADO ────────────────────────────────────────────────────────
+# El repo SE PUBLICA en conectareynosa.mx: todo lo versionado queda descargable
+# desde la web. Estos archivos viven en la raíz a propósito y NO se commitean
+# (varios lo dicen en su encabezado). Un `git add -A` distraído se llevó los 63
+# de un jaque en la rama de EQ-2 — la revisión lo atajó antes de main, y esta
+# lista existe para que no dependa de que alguien lo note la próxima vez.
+# Si algún día uno de estos DEBE publicarse, se agrega con `git add -f` a
+# sabiendas, no por accidente.
+BORRADOR-*
+BRIEF-*
+REPORTE-*
+CHECKLIST-*
+PENDIENTES-*
+SQL-*
+CAREO-*
+HANDOFF-*
+PRODUCT.md
+DESIGN.md
+fotos-tours/
+
+# Fotos sueltas EN LA RAÍZ (descargas de redes, capturas). Se acotan a la raíz
+# a propósito: `mapas/`, `imgs/`, `lineups/` y `kamehouse.jpg` SÍ son del sitio
+# y están versionadas — un `*.jpg` a secas dejaría de versionar la siguiente
+# foto legítima SIN AVISAR, que es peor que el problema que resuelve.
+/*.jpg
+/*.jpeg
+/*.heic
+/*.png
+!/icon-*.png
+!/kamehouse.jpg

@@ -543,6 +543,11 @@ function aplicarPermisosUI() {
   // Filtros de Guerreros Z: solo admins
   const gzFiltros = document.getElementById('gz-filtros-admin');
   if (gzFiltros) gzFiltros.style.display = ['maestro_roshi','bulma'].includes(rol) ? 'flex' : 'none';
+  // [EQ-2] Activos | Pausados: mismo candado. Que alguien esté pausado es un
+  // asunto de personal — el resto del equipo no lo ve, y renderGZ además fuerza
+  // la vista de activos para no-admins (el botón oculto no es un candado).
+  const gzVistaEl = document.getElementById('gz-vista-admin');
+  if (gzVistaEl) gzVistaEl.style.display = ['maestro_roshi','bulma'].includes(rol) ? 'flex' : 'none';
   // Etiqueta de solo lectura para roles no-admin en la lista
   const soloLecturaLabel = document.getElementById('gz-solo-lectura-label');
   const esAdmin = ['maestro_roshi','bulma'].includes(rol);
@@ -7002,7 +7007,14 @@ async function loadEquipo() {
   const grid = document.getElementById('gz-grid');
   if (!grid) return;
   try {
-    _gzCache = await khUsuarios.listar({ activos: true, orden: 'nombre' }); // [sec-usuarios]
+    // [EQ-2] SIN `activos:true`: los pausados también bajan. Antes eran
+    // literalmente invisibles —no había pantalla en todo el Palacio donde
+    // aparecieran— y para volver a activar a alguien había que adivinar. Quién
+    // se ve en la rejilla lo decide renderGZ (por defecto, los activos: la
+    // conducta de siempre). Los cuatro `.find(id)` que leen _gzCache (abrir el
+    // perfil, generar contrato) GANAN con esto: antes el perfil de un pausado
+    // no abría.
+    _gzCache = await khUsuarios.listar({ orden: 'nombre' }); // [sec-usuarios]
     renderGZ();
   } catch(e) {
     grid.innerHTML = `<div class="alert alert-error">${e.message}</div>`;
@@ -7274,6 +7286,11 @@ function gzVerPrestado(userId) {
 //   · inactivo  = pasó los 3 meses desde su última venta pero todavía no ha
 //     tocado la puerta, así que aún no hay sello. Es el aviso anticipado.
 function _gzChipInactivo(u) {
+  // [EQ-2] Si la cuenta está PAUSADA, el sello de ventas sobra: la puerta ya
+  // está cerrada por arriba, y reactivar lo limpia solo (admin-usuarios). Sin
+  // esta línea la tarjeta salía con DOS botones que hacen casi lo mismo
+  // ("Reactivar" y "Dar otra oportunidad") y el de abajo no alcanzaba.
+  if (u && u.activo === false) return '';
   if (!u || u.rol !== 'vendedor' || !_gzInactividad) return '';
   const info = _gzInactividad[u.id];
   if (!info || (!info.inactivo && !info.bloqueado)) return '';
@@ -7300,12 +7317,18 @@ async function renderGZ() {
   if (_gzInactividad === null) await _gzCargarInactividad();
   if (_gzContratos === null) await _gzCargarContratos();
   if (_gzPrestado === null) await _gzCargarPrestado(); // [O4] fails-soft: {} = sin chips
-  let lista = _gzCache;
+  // [EQ-2] La vista de pausados es solo de admins. El botón escondido no es un
+  // candado: si no es admin, aquí se fuerza la vista de activos aunque _gzVista
+  // dijera otra cosa.
+  const esAdminGZ = ['maestro_roshi', 'bulma'].includes(currentUser && currentUser.rol);
+  const vista = esAdminGZ ? _gzVista : 'activos';
+  const activos = _gzCache.filter(u => u.activo !== false);
+  const pausados = _gzCache.filter(u => u.activo === false);
+  _gzPintarContadores(activos.length, pausados.length);
+
+  let lista = vista === 'pausados' ? pausados : activos;
   if (_gzFilter !== 'todos') lista = lista.filter(u => u.rol === _gzFilter);
-  if (!lista.length) {
-    grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:48px;color:var(--ts);font-family:JetBrains Mono,monospace;font-size:11px;letter-spacing:.1em">// sin miembros en esta categoria</div>';
-    return;
-  }
+  if (!lista.length) { grid.innerHTML = _gzVacio(vista, pausados.length, activos.length); return; }
   // Cargar puntos para todos: manuales (tours_pasados) + auto (tours asignados por
   // slug, DC2d). Fails-soft: si fallan asignaciones o EV, cae a solo manuales.
   let allTours = [];
@@ -7340,7 +7363,11 @@ async function renderGZ() {
     // [KH-2] --gzi = el escalón de la cascada de entrada (idioma PF-1). TOPE en
     // 6: sin él, el guerrero 20 esperaría casi un segundo y se leería como bug.
     // Solo escribe una variable CSS; la animación vive en kamehouse.css.
-    return `<div class="gz-card" style="--gzi:${Math.min(_i, 6)}" onclick="abrirPerfil('${u.id}')">
+    // [EQ-2] La tarjeta pausada se ve APAGADA, no rota: sigue siendo la misma
+    // persona con su historial. El estilo vive en kamehouse.css (regla de la
+    // casa), aquí solo va la clase.
+    const _pausado = u.activo === false;
+    return `<div class="gz-card${_pausado ? ' gz-card-pausado' : ''}" style="--gzi:${Math.min(_i, 6)}" onclick="abrirPerfil('${_attrJs(u.id)}')">
       ${esYo ? '<div class="gz-badge-yo">TÚ</div>' : ''}
       ${cumple ? '<div class="gz-badge-cumple"><svg class="ic"><use href="#ic-pastel"/></svg></div>' : ''}
       <div class="gz-card-inner">
@@ -7365,10 +7392,93 @@ async function renderGZ() {
             <div class="gz-stat-label">strikes</div>
           </div>`}
         </div>
-        ${_gzChipContrato(u)}${_gzChipInactivo(u)}
+        ${_gzChipContrato(u)}${_gzBloquePausado(u)}${_gzChipInactivo(u)}
       </div>
     </div>`;
   }).join('');
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// [EQ-2] LOS PAUSADOS EXISTEN.
+//
+// Dar de baja a alguien lo borraba de la pantalla: `loadEquipo` pedía solo
+// activos y no había NINGÚN lugar en el Palacio donde volver a verlo. El
+// historial seguía ahí, la cuenta seguía ahí — pero para la vista, la persona
+// dejaba de existir. Reactivar a los cinco del re-onboarding fue eso.
+// ═══════════════════════════════════════════════════════════════════════════
+let _gzVista = 'activos';
+
+function gzVista(vista, btn) {
+  _gzVista = vista;
+  ['activos', 'pausados'].forEach(v => {
+    const b = document.getElementById('gz-vista-' + v);
+    if (b) b.classList.toggle('active', v === vista);
+  });
+  if (btn) btn.classList.add('active');
+  renderGZ();
+}
+
+// Los contadores de las pestañas. Sin ellos "pausados" es una pestaña muda y
+// nadie la abre: el número ES el aviso de que ahí hay gente esperando.
+function _gzPintarContadores(nActivos, nPausados) {
+  const a = document.getElementById('gz-cnt-activos');
+  const p = document.getElementById('gz-cnt-pausados');
+  if (a) a.textContent = nActivos ? '(' + nActivos + ')' : '';
+  if (p) p.textContent = nPausados ? '(' + nPausados + ')' : '';
+}
+
+// El vacío que EXPLICA. Un "// sin miembros en esta categoria" en una pantalla
+// donde acabas de pausar a alguien se lee como "se perdieron".
+function _gzVacio(vista, nPausados, nActivos) {
+  const caja = (txt, extra) => `<div style="grid-column:1/-1;text-align:center;padding:48px 24px;color:var(--ts);font-size:12px;line-height:1.6;max-width:420px;margin:0 auto">${txt}${extra || ''}</div>`;
+  const irA = (v, rotulo) => `<div style="margin-top:14px"><button class="btn btn-ghost btn-sm" style="font-family:'JetBrains Mono',monospace;font-size:10px" onclick="gzVista('${v}',document.getElementById('gz-vista-${v}'))">${rotulo}</button></div>`;
+
+  if (vista === 'pausados') {
+    if (_gzFilter !== 'todos') return caja('Nadie pausado con ese rol.', irA('activos', '▸ ver los activos'));
+    return caja('<strong style="color:var(--text)">Nadie pausado.</strong><br>Cuando das de baja a alguien aparece aquí — con su historial intacto y un botón para reactivarlo.', irA('activos', '▸ ver los activos'));
+  }
+  // vista de activos y vacía: el caso que asustaba
+  if (!nActivos && nPausados) {
+    return caja(`<strong style="color:var(--text)">Todo tu equipo está pausado.</strong><br>No se perdió nadie: ${nPausados === 1 ? 'hay 1 persona' : 'hay ' + nPausados + ' personas'} en la pestaña Pausados, con su historial completo.`, irA('pausados', '▸ ver los pausados'));
+  }
+  if (_gzFilter !== 'todos') {
+    return caja(`Nadie activo con ese rol.${nPausados ? ' Puede que esté pausado.' : ''}`, nPausados ? irA('pausados', '▸ buscar en pausados') : '');
+  }
+  return caja('Todavía no hay nadie en el equipo. Invita a alguien desde la pestaña <strong style="color:var(--text)">Invitar</strong>.');
+}
+
+// El bloque de la tarjeta pausada: el sello y la vuelta, con el aviso de los 5
+// minutos ESCRITO AHÍ. Es la pregunta que se hace justo después de reactivar
+// ("ya está, ¿por qué no puede vender?"), y su respuesta no puede vivir solo en
+// el manual.
+function _gzBloquePausado(u) {
+  if (!u || u.activo !== false) return '';
+  const aviso = u.rol === 'vendedor'
+    ? 'Se le abre la puerta de ventas otra vez; el sistema tarda hasta 5 minutos en dejarlo vender.'
+    : 'Su acceso vuelve enseguida; si algo se ve viejo, tarda hasta 5 minutos.';
+  return `<div style="margin-top:8px;display:flex;flex-direction:column;gap:6px;align-items:center">
+    <span class="gz-chip-inactivo">pausado</span>
+    <span class="gz-chip-nota">${_salEsc(aviso)}</span>
+    <button class="btn btn-ghost btn-sm" style="font-size:10px;padding:3px 10px"
+      onclick="event.stopPropagation();gzReactivar('${_attrJs(u.id)}','${_attrJs(u.nombre)}')">Reactivar</button>
+  </div>`;
+}
+
+// La vuelta. El backend ya sabe hacerlo bien: la transición false→true limpia
+// el sello del candado de vendedores y reinicia su reloj (admin-usuarios).
+// Aquí solo se pide, se avisa y se repinta.
+async function gzReactivar(userId, nombre) {
+  if (!confirm(`¿Reactivar a ${nombre}?\n\nRecupera su acceso y su historial sigue intacto.`)) return;
+  try {
+    await khUsuarios.actualizar(userId, { activo: true }); // [sec-usuarios]
+    showToast(`${String(nombre).split(' ')[0]} está de vuelta — puede tardar hasta 5 min en poder vender`, 'success');
+    _gzVista = 'activos';
+    ['activos', 'pausados'].forEach(v => {
+      const b = document.getElementById('gz-vista-' + v);
+      if (b) b.classList.toggle('active', v === 'activos');
+    });
+    await loadEquipo();
+  } catch (e) { showToast(e.message, 'error'); }
 }
 
 function filtrarGZ(filtro, btn) {
@@ -7556,7 +7666,9 @@ async function abrirPerfil(userId) {
         <button class="btn btn-ghost btn-sm" onclick="resetearPassword('${userId}','${_attrJs(usuario.nombre)}')" style="font-family:'JetBrains Mono',monospace;font-size:10px">▸ resetear pass</button>
         <button class="btn btn-ghost btn-sm" onclick="cambiarRol('${userId}','${usuario.rol}')" style="font-family:'JetBrains Mono',monospace;font-size:10px">▸ cambiar rol</button>
         <button class="btn btn-ghost btn-sm" onclick="gestionarStrikes('${userId}','${_attrJs(usuario.nombre)}',${usuario.strikes||0})" style="font-family:'JetBrains Mono',monospace;font-size:10px">▸ strikes</button>
-        <button class="btn btn-ghost btn-sm" style="color:var(--red);border-color:rgba(230,57,70,.3);font-family:'JetBrains Mono',monospace;font-size:10px" onclick="cerrarModal('ver-perfil');confirmarEliminar('${userId}','${_attrJs(usuario.nombre)}')">▸ dar de baja</button>
+        ${usuario.activo === false
+          ? `<button class="btn btn-ghost btn-sm" style="color:var(--green);border-color:rgba(87,227,137,.3);font-family:'JetBrains Mono',monospace;font-size:10px" onclick="cerrarModal('ver-perfil');gzReactivar('${_attrJs(userId)}','${_attrJs(usuario.nombre)}')">▸ reactivar</button>`
+          : `<button class="btn btn-ghost btn-sm" style="color:var(--red);border-color:rgba(230,57,70,.3);font-family:'JetBrains Mono',monospace;font-size:10px" onclick="cerrarModal('ver-perfil');confirmarEliminar('${_attrJs(userId)}','${_attrJs(usuario.nombre)}')">▸ dar de baja</button>`}
       </div>
     </div>
   ` : '';

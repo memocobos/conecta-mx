@@ -17453,6 +17453,15 @@ function onCtrPlantillaChange() {
   const conVigencia = (p === 'coordinador' || p === 'creadora_team');
   if (vw) vw.style.display = conVigencia ? '' : 'none';
   if (hint) hint.style.display = conVigencia ? 'none' : '';
+  // [EQ-3] El apunte decía "Creadora = flujo de siempre" con CUALQUIER
+  // plantilla sin vigencia — o sea, también mientras armabas un contrato
+  // laboral. Ahora dice lo de la plantilla que está puesta.
+  const hintTxt = hint && hint.firstElementChild;
+  if (hintTxt) hintTxt.textContent = ({
+    creadora: 'Creadora = flujo de siempre',
+    giveaway: 'Premio de concurso — no crea cuenta',
+    auxiliar_admin: 'Laboral — no cuelga de un evento',
+  })[p] || '';
   if (vs && conVigencia) vs.value = (p === 'coordinador') ? '12' : '3';
   // [T3] "¿El premio incluye el viaje?": la casilla solo existe para giveaway.
   const pw = document.getElementById('ctr-premio-viaje-wrap');
@@ -17469,6 +17478,47 @@ function onCtrPlantillaChange() {
   // 💼 Auxiliar administrativo (laboral): pide el sueldo neto semanal.
   const sw = document.getElementById('ctr-sueldo-wrap');
   if (sw) sw.style.display = (p === 'auxiliar_admin') ? '' : 'none';
+  // [EQ-3] Y ESCONDE los campos de evento. El contrato laboral no cuelga de
+  // ningún evento: _ctrFormData PISA lo que se escriba ahí (evento_nombre pasa
+  // a 'Auxiliar administrativo' y evento_fecha a la fecha del contrato). El
+  // asterisco de "obligatorio" era mentira y el trabajo de llenarlos, tirado.
+  const er = document.getElementById('ctr-evento-row');
+  if (er) er.style.display = (p === 'auxiliar_admin') ? 'none' : '';
+  onCtrSueldoInput();
+}
+
+// [EQ-3] LA GUARDIA ANTI-DEDAZO DEL SUELDO.
+//
+// El campo pide SEMANAL y la cabeza piensa en MENSUAL. Un cero de más no se
+// caza leyendo "13000" — se caza leyendo "$56,333 al mes". Así que la
+// traducción va enfrente, en vivo, mientras se teclea.
+//
+// 52 semanas ÷ 12 meses: es la conversión legal (4.333 semanas al mes), no
+// "×4". Con ×4 el número mostrado sería más bajo que el real y la guardia
+// tranquilizaría cuando debería alarmar.
+const SUELDO_SEM_A_MES = 52 / 12;
+// La línea de "levanta la ceja". No es un tope —Memo puede pagar lo que quiera—
+// es el punto donde vale la pena preguntar una vez antes de mandar un contrato
+// laboral firmable. Si algún día el equipo gana más, se sube el número; la
+// prueba NO assertea este valor, solo que la guardia existe y distingue lados.
+const SUELDO_MENSUAL_OJO = 40000;
+
+function _sueldoMensual(semanal) {
+  const n = Number(semanal);
+  if (!(n > 0)) return 0;
+  return Math.round(n * SUELDO_SEM_A_MES);
+}
+
+function onCtrSueldoInput() {
+  const el = document.getElementById('ctr-sueldo-mes');
+  if (!el) return;
+  const p = (document.getElementById('ctr-plantilla') || {}).value || 'creadora';
+  const v = Number((document.getElementById('ctr-sueldo') || {}).value || '0');
+  if (p !== 'auxiliar_admin' || !(v > 0)) { el.textContent = ''; el.style.color = 'var(--ts)'; return; }
+  const mes = _sueldoMensual(v);
+  const fmt = x => '$' + x.toLocaleString('es-MX');
+  el.textContent = `${fmt(Math.round(v))} a la semana = ${fmt(mes)} al mes (52 semanas ÷ 12).`;
+  el.style.color = mes >= SUELDO_MENSUAL_OJO ? '#ffb020' : 'var(--ts)';
 }
 
 function _ctrFormData() {
@@ -17511,7 +17561,10 @@ function _ctrFormData() {
   // 💼 Auxiliar administrativo (laboral): el único dato variable es el sueldo
   // semanal. No cuelga de un evento → placeholder neutro en evento_* (columnas
   // NOT NULL que el texto legal no usa).
-  const _contratoFecha = (document.getElementById('ctr-contrato-fecha').value || '').trim() || new Date().toISOString().slice(0,10);
+  // [EQ-3] Hoy en MONTERREY, no en UTC. `toISOString()` da la fecha de
+  // Greenwich: después de las 6 de la tarde de acá ya es el día siguiente
+  // allá, y el contrato salía FECHADO MAÑANA. Memo trabaja de noche.
+  const _contratoFecha = (document.getElementById('ctr-contrato-fecha').value || '').trim() || _mxFechaStr();
   let _evNombre = evento_nombre;
   let _evFecha = (document.getElementById('ctr-evento-fecha').value || '').trim();
   if (plantilla === 'auxiliar_admin') {
@@ -17666,6 +17719,17 @@ async function enviarContrato() {
     alert.innerHTML = `<div style="padding:10px 14px;background:rgba(255,68,68,.12);border:1px solid rgba(255,68,68,.4);color:#ffb3b3;border-radius:6px;margin-bottom:14px;font-size:13px"><svg class="ic"><use href="#ic-alerta"/></svg> ${err}</div>`;
     return;
   }
+  // [EQ-3] La segunda mitad de la guardia anti-dedazo: pasada la línea de la
+  // ceja se pregunta UNA vez, con el número mensual enfrente. Va DESPUÉS de la
+  // validación (no tiene caso preguntar por un formulario que ni se va a
+  // mandar) y ANTES de deshabilitar el botón: si dice que no, el formulario
+  // queda exactamente como estaba, listo para corregir.
+  if (d.plantilla === 'auxiliar_admin' && d.datos && _sueldoMensual(d.datos.sueldo_semanal) >= SUELDO_MENSUAL_OJO) {
+    const sem = '$' + Math.round(d.datos.sueldo_semanal).toLocaleString('es-MX');
+    const mes = '$' + _sueldoMensual(d.datos.sueldo_semanal).toLocaleString('es-MX');
+    if (!confirm(`El sueldo dice ${sem} A LA SEMANA — son ${mes} al mes.\n\n¿Es correcto? El campo pide semanal, no mensual.`)) return;
+  }
+
   alert.innerHTML = '';
   const original = btn.textContent;
   btn.disabled = true;
@@ -17711,7 +17775,7 @@ function _resetFormUI() {
   if (ofr && !_contratosEditingToken) ofr.value = '1 boleto en zona general\n1 Kit Conecta\n1 comida gratis dentro del festival';
   if (exp && !_contratosEditingToken) exp.value = '1 Video en formato Reel o video vertical para redes sociales (1080 x 1920 píxeles) sobre el evento al que ha sido invitado y de la experiencia del concierto / festival con Conecta Reynosa (modo collab).\n\n3 o 4 menciones en historias de ig el día del evento a Conecta Reynosa, disfrutando del concierto o festival asignado y la experiencia de Conecta utilizando el hashtag #viajaconexpertos o #Seguimosconectando (SÉ CREATIV@ no grabes solo el artista, graba el ambiente, como te la estas pasando, haznos sentir la experiencia desde tu perspectiva)\n\n1 Post dentro del evento (Fotos donde aparezcas) en las redes del creador agradeciendo a Conecta Reynosa por la experiencia y la invitación al evento (Modo Collab)';
   const fc = document.getElementById('ctr-contrato-fecha');
-  if (fc) fc.value = new Date().toISOString().slice(0,10);
+  if (fc) fc.value = _mxFechaStr(); // [EQ-3] hoy en MX, no en UTC (ver _ctrFormData)
   // Botón principal
   const btn = document.getElementById('ctr-btn-enviar');
   if (btn) btn.textContent = 'Enviar por correo';

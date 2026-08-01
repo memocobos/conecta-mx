@@ -1761,7 +1761,7 @@
  <!-- ─── CONTRATOS ─── -->
  <div class="page" id="page-contratos">
    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px;flex-wrap:wrap">
-     <h2 style="margin:0;font-family:'Zen Dots',sans-serif;font-size:22px;letter-spacing:.02em"><svg class="ic"><use href="#ic-lapiz"/></svg> Contratos creadoras</h2>
+     <h2 style="margin:0;font-family:'Zen Dots',sans-serif;font-size:22px;letter-spacing:.02em"><svg class="ic"><use href="#ic-lapiz"/></svg> Contratos del equipo</h2>
      <div class="contratos-tabs" style="display:inline-flex;gap:0;border:1px solid var(--border);border-radius:var(--r-sm,8px);overflow:hidden">
        <button id="ctr-tab-listado" class="ctr-tab active" onclick="switchContratoView('listado')" style="background:transparent;border:0;color:var(--ts);padding:8px 16px;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;font-family:inherit">Listado</button>
        <button id="ctr-tab-nuevo" class="ctr-tab" onclick="switchContratoView('nuevo')" style="background:transparent;border:0;color:var(--ts);padding:8px 16px;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;font-family:inherit;border-left:1px solid var(--border)">+ Nuevo</button>
@@ -1815,7 +1815,11 @@
          </div>
          <div class="form-group" id="ctr-sueldo-wrap" style="display:none">
            <label>Sueldo neto semanal (MXN) *</label>
-           <input type="number" id="ctr-sueldo" min="1" step="1" placeholder="Ej: 2500" autocomplete="off">
+           <input type="number" id="ctr-sueldo" min="1" step="1" placeholder="Ej: 2500" autocomplete="off" oninput="onCtrSueldoInput()">
+           <!-- [EQ-3] La traducción a mensual, enfrente y en vivo. Un cero de
+                más en un contrato laboral no lo caza nadie leyendo "13000";
+                se caza leyendo "$56,333 al mes". -->
+           <div id="ctr-sueldo-mes" style="font-size:11px;color:var(--ts);margin-top:6px;line-height:1.5;min-height:16px"></div>
          </div>
          <div class="form-group" id="ctr-plantilla-hint" style="align-self:end;opacity:.6"><div style="font-size:11px;color:var(--ts);letter-spacing:.08em;text-transform:uppercase">Creadora = flujo de siempre</div></div>
        </div>
@@ -1851,18 +1855,22 @@
        </div>
        <div class="form-row cols-2">
          <div class="form-group">
-           <label>Nombre de la creadora *</label>
+           <label>Nombre completo *</label>
            <input type="text" id="ctr-nombre" placeholder="Ej: Dayanna Pérez" autocomplete="off" list="ctr-datalist-nombres" oninput="onCtrNombreInput()">
            <datalist id="ctr-datalist-nombres"></datalist>
          </div>
          <div class="form-group">
            <label>Email *</label>
-           <input type="email" id="ctr-email" placeholder="creadora@ejemplo.com" autocomplete="off" list="ctr-datalist-emails" oninput="onCtrEmailInput()">
+           <input type="email" id="ctr-email" placeholder="persona@ejemplo.com" autocomplete="off" list="ctr-datalist-emails" oninput="onCtrEmailInput()">
            <datalist id="ctr-datalist-emails"></datalist>
          </div>
        </div>
 
-       <div class="form-row cols-2">
+       <!-- [EQ-3] id para esconderlo entero en el contrato laboral: ahí el
+            código IGNORA lo que se escriba (lo pisa con "Auxiliar
+            administrativo" y la fecha del contrato), así que el asterisco
+            de obligatorio era mentira. -->
+       <div class="form-row cols-2" id="ctr-evento-row">
          <div class="form-group">
            <label>Evento *</label>
            <select id="ctr-evento-select" onchange="onContratoEventoChange()">

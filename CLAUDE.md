@@ -260,6 +260,46 @@ _Última revisión: 28-jul-2026 (series PP, PG, E1 y KH cerradas)._
 - **Una aserción que puede pasar con el conjunto vacío no es una aserción.**
   Candado de cardinalidad siempre; y al medir algo (contraste, peso) validar el
   instrumento antes de creerle el resultado.
+- **`toISOString()` NUNCA es "hoy" en México.** Da la fecha de Greenwich: pasadas
+  las 6 de la tarde de acá, ya es el día siguiente allá. Y en esta casa se
+  trabaja de noche. Tres mordidas: `_cobHoyISO` (la cobranza), el `fmtFecha` del
+  correo de aceptación (`new Date('2026-08-16')` es medianoche UTC = día 15 en
+  MX) y la fecha del formulario de contratos, que salía **fechada mañana en un
+  documento firmable**. El helper de la casa es `_mxFechaStr()` /
+  `toLocaleDateString('en-CA', { timeZone: 'America/Monterrey' })`.
+- **Anclar una función por nombre EXIGE el paréntesis.** `indexOf('async
+  function gzReactivar')` se comió a `gzReactivarVendedor`, que vive antes en el
+  archivo: el arnés midió otra función con nombre parecido y dio verde. Y la
+  misma mordida disfrazada en el otro lado: `/gzReactivar|.../.test(padre)`
+  afirmaba que el padre ya tenía la función nueva porque contenía el prefijo.
+  Es la hermana de `renderZonas` vs `buildZonaButtons`: **un prefijo no es un
+  ancla.** Al corregirlo, dejar un candado que assertee que el parecido SIGUE
+  ahí, para que nadie lo "limpie" sin entender por qué existe.
+- **Un arnés que lee comentarios no mide código.** La prueba de "ya no se filtra
+  `activos:true`" la tumbó MI PROPIO comentario, que decía «SIN `activos:true`»
+  explicando el cambio. Antes de asertar sobre texto del archivo, quitar
+  comentarios (`/\*…\*/` y `//…`). Vale también al revés: un literal que
+  sobrevive solo dentro de un comentario NO es código vivo.
+- **`git check-ignore` MIENTE sobre archivos ya versionados.** A un archivo
+  trackeado le contesta "no ignorado" aunque el patrón lo cace; hay que pasarle
+  `--no-index` para preguntarle por el patrón de verdad. Casi deja pasar un
+  `/*.jpg` que se comía `kamehouse.jpg`. Otra vez el instrumento contestando la
+  ausencia cómoda.
+- **NUNCA `git add -A` en este repo.** La raíz es un cajón privado (briefs,
+  borradores de contratos, `PENDIENTES-MEMO.md`, fotos) y **el repo se publica
+  en conectareynosa.mx**: lo versionado queda descargable. Un `add -A` se llevó
+  63 archivos privados a una rama; lo atajó la revisión, no una herramienta. Hoy
+  hay `.gitignore` para el cajón, pero **los archivos se nombran uno por uno** y
+  `git diff main..rama --stat` se lee ANTES de abrir la PR. Las imágenes se
+  ignoran solo en la RAÍZ (`/*.jpg`): `mapas/`, `imgs/`, `lineups/` y
+  `kamehouse.jpg` son del sitio, y un `*.jpg` a secas dejaría de versionar la
+  siguiente foto legítima **sin avisar**.
+- **Copiar un patrón exige leer la plantilla de DESTINO.** El paquete de EQ-4
+  rellenaba `evento_nombre` con un texto neutro, copiando lo que `_ctrFormData`
+  hace con el contrato laboral. Pero el laboral puede: su plantilla no imprime
+  esa fila. La de **coordinador SÍ la imprime** (`renderDocViaB`), así que el
+  relleno habría acabado dentro de un **documento firmado**. El patrón era
+  correcto; el destino, otro.
 - **Llaves de Supabase**: `SUPABASE_URL_KAMEHOUSE`/`SUPABASE_SERVICE_KEY_KAMEHOUSE`
   y `PORTAL_SUPABASE_URL`/`ANON`/`SERVICE`. Las `SUPABASE_*` a secas están
   BORRADAS y podadas del código — no revivirlas ni agregar fallbacks.

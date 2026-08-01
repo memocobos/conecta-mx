@@ -7052,25 +7052,97 @@ async function gzReactivarVendedor(userId, nombre) {
   } catch (e) { showToast(e.message, 'error'); }
 }
 
-// ⏳ Vigencias de contratos en Guerreros Z (solo admin, best-effort). Reusa
-// khContratos.listar (patrón #288/#309 — jamás service_role al navegador):
-// correo → contrato VIVO firmado de coordinador/creadora_team (el de
-// vigencia_fin más lejana). Fails-soft: si contratos no responde, _gzContratos
-// queda null y las cards salen como hoy (sin chip, ni siquiera "sin contrato").
+// ═══════════════════════════════════════════════════════════════════════════
+// [EQ-1] EL MAPA rol → contratos. SELLADO POR MEMO el 31-jul-2026.
+//
+// Nace del re-onboarding en vivo: para saber qué le tocaba firmar a cada
+// persona había que acordarse. Aquí queda escrito UNA vez y lo leen la tarjeta,
+// el perfil y el botón que prellena el formulario.
+//
+// Las dos listas VACÍAS son decisiones, no huecos, y por eso llevan nota propia
+// abajo: maestro_roshi es Memo (no se firma a sí mismo) y vendedor es
+// COMISIONISTA — no hay vínculo laboral que firmar. Si algún día alguien ve la
+// tarjeta de un vendedor sin contratos y "corrige" el mapa, deshace una
+// decisión sin enterarse.
+//
+// La custodia de bodega NO aparece como plantilla porque NO ES UNA: es la
+// casilla `datos.cuidador_bodega` DENTRO del contrato de coordinador. Un solo
+// contrato con casilla, no dos contratos.
+// ═══════════════════════════════════════════════════════════════════════════
+const ROL_CONTRATOS = {
+  maestro_roshi: [],
+  bulma:         ['auxiliar_admin', 'coordinador'], // Sofía también coordina
+  milk:          ['auxiliar_admin'],
+  mister_popo:   ['auxiliar_admin'], // el anexo de cuidador es borrador aparte
+  coordinador:   ['coordinador'],
+  cc:            ['creadora_team'],
+  vendedor:      [], // INTENCIONAL — ver nota abajo
+};
+// Por qué un rol NO firma. Vacío = el rol sí firma (o no aplica el aviso).
+const ROL_SIN_CONTRATO = {
+  maestro_roshi: 'no aplica: es la dirección',
+  vendedor:      'sin contrato: comisionista',
+};
+const PLANTILLA_LABELS = {
+  creadora:       'Creadora de contenido',
+  coordinador:    'Coordinador(a)',
+  giveaway:       'Giveaway (premio)',
+  creadora_team:  'Creadora del team',
+  auxiliar_admin: 'Auxiliar administrativo',
+};
+
+// ⏳ Contratos de Guerreros Z (solo admin, best-effort). Reusa khContratos.listar
+// (patrón #288/#309 — jamás service_role al navegador).
+//
+// [EQ-1] ANTES guardaba UN contrato por correo (el firmado de vigencia más
+// lejana, solo coordinador/creadora_team). Ahora guarda TODOS —cualquier
+// plantilla, firmados Y pendientes— porque la tarjeta ya no responde "¿cuándo
+// vence?" sino "¿qué le falta?", y un contrato mandado sin firmar NO es un
+// hueco: es un pendiente del otro lado, y se ve distinto.
+//
+// Fails-soft: si contratos no responde, _gzContratos queda null y las cards
+// salen como antes (sin chip, ni siquiera "sin contrato") — mejor mudo que
+// mintiendo "le falta todo" por una llamada caída.
 let _gzContratos = null;
 async function _gzCargarContratos() {
   if (!currentUser || (currentUser.rol !== 'maestro_roshi' && currentUser.rol !== 'bulma')) return;
   try {
-    const rows = await khContratos.listar({ estado: 'firmado', limit: 500 });
+    const rows = await khContratos.listar({ limit: 500 }); // sin filtro: firmados + pendientes
     const mapa = {};
     (rows || []).forEach(c => {
-      if (!c || (c.plantilla !== 'coordinador' && c.plantilla !== 'creadora_team') || !c.creador_email) return;
-      const k = String(c.creador_email).toLowerCase();
-      const prev = mapa[k];
-      if (!prev || String(c.vigencia_fin || '') > String(prev.vigencia_fin || '')) mapa[k] = c;
+      if (!c || !c.creador_email || !c.plantilla) return;
+      const k = String(c.creador_email).trim().toLowerCase();
+      (mapa[k] = mapa[k] || []).push(c);
     });
     _gzContratos = mapa;
   } catch (e) { /* fails-soft: cards como hoy */ }
+}
+
+// [EQ-1] El estado de contratos de UNA persona contra el mapa de su rol.
+// Devuelve null si todavía no cargaron (fails-soft) — quien pinta decide.
+//
+// Un contrato FIRMADO tapa al pendiente de la misma plantilla: si mandaste dos
+// veces el de auxiliar y firmó uno, no le falta nada. Y "de más" son los que
+// tiene fuera de su mapa (una creadora que ascendió a coordinadora conserva su
+// contrato viejo): se muestran, no se regañan.
+function _gzEstadoContratos(u) {
+  if (!u || !_gzContratos) return null;
+  const esperados = ROL_CONTRATOS[u.rol] || [];
+  const mios = _gzContratos[String(u.correo || '').trim().toLowerCase()] || [];
+  const porPlantilla = {};
+  mios.forEach(c => {
+    const p = c.plantilla;
+    const prev = porPlantilla[p];
+    // gana el firmado; entre dos del mismo estado, el de vigencia más lejana
+    if (!prev) { porPlantilla[p] = c; return; }
+    if (prev.estado !== 'firmado' && c.estado === 'firmado') { porPlantilla[p] = c; return; }
+    if (prev.estado === c.estado && String(c.vigencia_fin || '') > String(prev.vigencia_fin || '')) porPlantilla[p] = c;
+  });
+  const firmados = esperados.filter(p => porPlantilla[p] && porPlantilla[p].estado === 'firmado');
+  const enviados = esperados.filter(p => porPlantilla[p] && porPlantilla[p].estado !== 'firmado');
+  const faltan   = esperados.filter(p => !porPlantilla[p]);
+  const extras   = Object.keys(porPlantilla).filter(p => !esperados.includes(p));
+  return { esperados, porPlantilla, firmados, enviados, faltan, extras, nota: ROL_SIN_CONTRATO[u.rol] || '' };
 }
 
 // 'YYYY-MM-DD' → '15-oct-2026' para el chip.
@@ -7081,26 +7153,53 @@ function _gzFmtVig(iso) {
   return `${parseInt(d, 10)}-${meses[parseInt(m, 10) - 1] || '?'}-${y}`;
 }
 
-// Chip de vigencia del contrato para roles que firman vía B (coordinador/cc).
-// Normal si falta lejos, ámbar ≤30 días, rojo vencido; sin contrato → discreto.
+// Días de aquí a una fecha ISO, en calendario de Monterrey. Negativo = pasada.
+function _gzDiasA(iso) {
+  const hoy = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Monterrey' });
+  return Math.round((new Date(String(iso).slice(0, 10) + 'T00:00:00Z') - new Date(hoy + 'T00:00:00Z')) / 86400000);
+}
+
+// [EQ-1] Chip de contratos de la tarjeta. ANTES solo hablaba de coordinador/cc
+// y solo de vigencias: las tarjetas de bulma, milk y mister_popo callaban aunque
+// les faltara su contrato laboral. Ahora contesta la pregunta que se hace quien
+// mira la pantalla —"¿a esta persona le falta algo?"— para TODOS los roles.
+//
+// Prioridad: lo que FALTA grita, lo enviado avisa, lo firmado informa. Y cuando
+// todo está firmado el chip vuelve a ser el de vigencias de antes, con una
+// diferencia: mira la que vence PRIMERO, no la más lejana. Con dos contratos
+// (bulma) la lejana esconde a la que está por caducar, que es justo la que
+// importa.
 function _gzChipContrato(u) {
-  if (!u || (u.rol !== 'coordinador' && u.rol !== 'cc') || !_gzContratos) return '';
+  const st = _gzEstadoContratos(u);
+  if (!st) return ''; // fails-soft: sin datos, mudo (no "le falta todo")
   const ICO = '<svg class="ic" style="width:11px;height:11px"><use href="#ic-contratos"/></svg>';
   const base = 'display:inline-flex;align-items:center;gap:4px;margin-top:8px;font-size:9px;letter-spacing:.06em;text-transform:uppercase;font-weight:800;padding:2px 8px;border-radius:4px;';
-  const c = _gzContratos[String(u.correo || '').toLowerCase()];
-  if (!c || !c.vigencia_fin) {
-    return `<span style="${base}color:var(--ts);background:rgba(255,255,255,.05);border:1px solid var(--border)">${ICO} sin contrato</span>`;
+  const DISCRETO = `${base}color:var(--ts);background:rgba(255,255,255,.05);border:1px solid var(--border)`;
+  const AMBAR    = `${base}color:#ffb020;background:rgba(255,176,32,.14);border:1px solid rgba(255,176,32,.4)`;
+  const ROJO     = `${base}color:#ff6666;background:rgba(255,68,68,.14);border:1px solid rgba(255,68,68,.4)`;
+
+  // Roles que NO firman: se dice POR QUÉ, para que nadie lo lea como hueco.
+  if (st.nota) return `<span style="${DISCRETO}">${ICO} ${_esfEsc(st.nota)}</span>`;
+  if (!st.esperados.length) return '';
+
+  if (st.faltan.length) {
+    const txt = st.faltan.length === 1 ? 'falta 1 contrato' : `faltan ${st.faltan.length} contratos`;
+    return `<span style="${ROJO}">${ICO} ${txt}</span>`;
   }
-  const hoy = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Monterrey' });
-  const dias = Math.round((new Date(String(c.vigencia_fin).slice(0, 10) + 'T00:00:00Z') - new Date(hoy + 'T00:00:00Z')) / 86400000);
-  const fecha = _esfEsc(_gzFmtVig(c.vigencia_fin));
-  if (dias < 0) {
-    return `<span style="${base}color:#ff6666;background:rgba(255,68,68,.14);border:1px solid rgba(255,68,68,.4)">${ICO} venció ${fecha}</span>`;
+  if (st.enviados.length) {
+    const txt = st.enviados.length === 1 ? '1 sin firmar' : `${st.enviados.length} sin firmar`;
+    return `<span style="${AMBAR}">${ICO} ${txt}</span>`;
   }
-  if (dias <= 30) {
-    return `<span style="${base}color:#ffb020;background:rgba(255,176,32,.14);border:1px solid rgba(255,176,32,.4)">${ICO} vence ${fecha}</span>`;
-  }
-  return `<span style="${base}color:var(--ts);background:rgba(255,255,255,.05);border:1px solid var(--border)">${ICO} vence ${fecha}</span>`;
+  // Todo firmado → la vigencia que vence PRIMERO (si alguna la tiene).
+  const vig = st.firmados
+    .map(p => st.porPlantilla[p] && st.porPlantilla[p].vigencia_fin)
+    .filter(Boolean)
+    .sort()[0];
+  if (!vig) return `<span style="${DISCRETO}">${ICO} contratos ✓</span>`;
+  const dias = _gzDiasA(vig), fecha = _esfEsc(_gzFmtVig(vig));
+  if (dias < 0)   return `<span style="${ROJO}">${ICO} venció ${fecha}</span>`;
+  if (dias <= 30) return `<span style="${AMBAR}">${ICO} vence ${fecha}</span>`;
+  return `<span style="${DISCRETO}">${ICO} vence ${fecha}</span>`;
 }
 
 // 🧊 [TORRE O4] "Trae prestado": quién anda con piezas RETORNABLES que aún no
@@ -7479,12 +7578,101 @@ async function abrirPerfil(userId) {
     </div>
   ` : '';
 
-  const perfilHtml = renderPerfilCompleto(usuario, toursPasados, evAsignados, iniciales, edad, cumple, ptsTotal, ptsAnio, esYo, _detalleAutoPerfil) + sesionSection + adminSection;
+  const perfilHtml = renderPerfilCompleto(usuario, toursPasados, evAsignados, iniciales, edad, cumple, ptsTotal, ptsAnio, esYo, _detalleAutoPerfil) + _gzSeccionContratos(usuario) + sesionSection + adminSection;
 
   crearModal('ver-perfil', '', perfilHtml);
 }
 
 
+
+// ═══════════════════════════════════════════════════════════════════════════
+// [EQ-1] El bloque de contratos del perfil: qué tiene firmado, qué le falta
+// según su rol, y el botón que abre el formulario YA PRELLENADO.
+//
+// Vive en el perfil y no en la tarjeta chica a propósito: en la rejilla caben
+// veinte personas y ahí solo cabe el veredicto (el chip). El detalle —y el
+// botón, que no puede compartir superficie con el onclick de la tarjeta— vive
+// donde uno ya fue a ver a ESA persona.
+// ═══════════════════════════════════════════════════════════════════════════
+function _gzSeccionContratos(u) {
+  const st = _gzEstadoContratos(u);
+  if (!st) return ''; // no cargaron / no es admin: nada, como siempre
+  const L = p => _esfEsc(PLANTILLA_LABELS[p] || p);
+  const fila = (txt, color, extra) => `
+    <div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border);font-size:12px">
+      <span style="color:${color};font-weight:800;width:14px;text-align:center;flex:none">${extra}</span>
+      <span style="flex:1;min-width:0">${txt}</span>
+    </div>`;
+
+  // Roles sin contrato: se dice por qué, y NO se ofrece generar nada.
+  if (st.nota) {
+    return `
+    <div class="perfil-section-v2" style="border-left-color:var(--ts)">
+      <div class="perfil-section-title-v2" style="color:var(--ts)">// contratos</div>
+      <div style="font-size:12px;color:var(--ts);line-height:1.5">${_esfEsc(st.nota[0].toUpperCase() + st.nota.slice(1))}.
+        No es un pendiente: este rol no firma contrato.</div>
+    </div>`;
+  }
+  if (!st.esperados.length) return '';
+
+  const filas = st.esperados.map(p => {
+    const c = st.porPlantilla[p];
+    if (!c) return fila(`${L(p)} <span style="color:var(--red)">— falta</span>`, 'var(--red)', '✗');
+    if (c.estado !== 'firmado') {
+      return fila(`${L(p)} <span style="color:#ffb020">— enviado, sin firmar</span>`, '#ffb020', '⏳');
+    }
+    const vig = c.vigencia_fin ? ` <span style="color:var(--ts)">— vence ${_esfEsc(_gzFmtVig(c.vigencia_fin))}</span>` : '';
+    const cuid = c.cuidador_bodega ? ' <span style="color:var(--gold);font-size:10px;font-weight:800">+ CUSTODIA</span>' : '';
+    return fila(`${L(p)}${vig}${cuid}`, 'var(--green)', '✓');
+  }).join('');
+
+  const extras = st.extras.length ? `
+    <div style="font-size:11px;color:var(--ts);margin-top:8px;line-height:1.5">
+      Además tiene de antes: ${st.extras.map(p => _esfEsc(PLANTILLA_LABELS[p] || p)).join(', ')}.
+      No estorban — quedaron de un rol anterior.</div>` : '';
+
+  // El botón lleva la PRIMERA que falte; si no falta ninguna, deja generar de
+  // todos modos (renovación) sin plantilla forzada.
+  const objetivo = st.faltan[0] || '';
+  const rotulo = st.faltan.length
+    ? (st.faltan.length === 1 ? `▸ generar el de ${PLANTILLA_LABELS[objetivo] || objetivo}` : '▸ generar contratos')
+    : '▸ generar otro contrato';
+  const pendiente = st.enviados.length ? `
+    <div style="font-size:11px;color:#ffb020;margin-top:10px;line-height:1.5">
+      Ya se le mandó ${st.enviados.length === 1 ? 'uno' : st.enviados.length} y no lo ha firmado.
+      Generar otro no cancela el anterior.</div>` : '';
+
+  return `
+    <div class="perfil-section-v2" style="border-left-color:var(--orange)">
+      <div class="perfil-section-title-v2" style="color:var(--orange)">// contratos</div>
+      ${filas}
+      ${extras}${pendiente}
+      <button class="btn btn-ghost btn-sm" style="margin-top:12px;font-family:'JetBrains Mono',monospace;font-size:10px"
+        onclick="_gzGenerarContrato('${u.id}','${_attrJs(objetivo)}')">${_esfEsc(rotulo)}</button>
+    </div>`;
+}
+
+// [EQ-1] Abre el formulario de contratos con nombre, correo y plantilla YA
+// puestos desde la cuenta. Cero re-tecleo: el correo mal escrito a mano es
+// justo lo que manda un contrato a un buzón que no existe.
+function _gzGenerarContrato(userId, plantilla) {
+  const u = (_gzCache || []).find(x => x.id === userId);
+  if (!u) return;
+  cerrarModal('ver-perfil');
+  showHerramienta('contratos');
+  _contratosEditingToken = null;      // por si venía de una edición
+  switchContratoView('nuevo');        // llama _resetFormUI: prellenar DESPUÉS
+  const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = v; };
+  set('ctr-nombre', u.nombre || '');
+  set('ctr-email', String(u.correo || '').trim().toLowerCase());
+  if (plantilla) {
+    set('ctr-plantilla', plantilla);
+    onCtrPlantillaChange();           // abre/cierra los campos de esa plantilla
+  }
+  const el = document.getElementById('ctr-nombre');
+  if (el) el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  showToast(`Formulario listo para ${u.nombre.split(' ')[0]} — revisa y envía`, 'success');
+}
 
 // 🔐 CAP2-3: cierra todas las sesiones de una persona (invalida sus tokens).
 async function cerrarSesionesUI(userId, nombre) {

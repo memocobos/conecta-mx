@@ -736,6 +736,14 @@
          <span style="font-size:14px"><svg class="ic"><use href="#ic-ojo"/></svg></span>
          <span style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.1em;color:var(--gold)">SOLO LECTURA — puedes ver los perfiles de tu equipo, no editarlos</span>
        </div>
+       <!-- [EQ-2] Activos | Pausados. Es OTRO eje que el filtro de rol (se
+            combinan: "pausados + coordinadores"), por eso va en su propia fila
+            y no revuelto con los roles. Los contadores existen para que
+            "pausados" no sea una pestaña muda: si dice 6, se ve que hay 6. -->
+       <div id="gz-vista-admin" style="display:none;gap:6px;flex-wrap:wrap;margin-bottom:10px">
+        <button class="gz-filter active" id="gz-vista-activos" onclick="gzVista('activos',this)">// activos <span id="gz-cnt-activos" style="color:var(--ts);margin-left:4px"></span></button>
+        <button class="gz-filter" id="gz-vista-pausados" onclick="gzVista('pausados',this)">// pausados <span id="gz-cnt-pausados" style="color:var(--ts);margin-left:4px"></span></button>
+       </div>
        <div style="display:flex;gap:8px;margin-bottom:18px;flex-wrap:wrap">
         <div id="gz-filtros-admin" style="display:none;gap:6px;flex-wrap:wrap">
          <button class="gz-filter active" onclick="filtrarGZ('todos',this)">// todos</button>

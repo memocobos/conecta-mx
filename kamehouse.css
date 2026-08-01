@@ -2478,6 +2478,20 @@ select:focus-visible,textarea:focus-visible,[tabindex]:focus-visible{
   animation-delay:calc(var(--gzi,0) * 45ms);
 }
 
+/* [EQ-2] La tarjeta de alguien pausado: APAGADA, no rota. Sigue siendo la
+   misma persona con su mismo historial — solo que ahorita no entra. Se atenúa
+   el contenido (no la tarjeta entera) para que el botón "Reactivar" y su aviso
+   se lean con todo el contraste: son justo lo que se viene a hacer aquí. */
+.gz-card-pausado{ border-style:dashed; }
+.gz-card-pausado .gz-avatar,
+.gz-card-pausado .gz-name,
+.gz-card-pausado .gz-rol,
+.gz-card-pausado .gz-stats{ opacity:.5; filter:grayscale(.5); }
+.gz-card-pausado:hover .gz-avatar,
+.gz-card-pausado:hover .gz-name,
+.gz-card-pausado:hover .gz-rol,
+.gz-card-pausado:hover .gz-stats{ opacity:.72; }
+
 /* ── 5 · MI PERFIL, LA MISMA FAMILIA ────────────────────────────────────
    La tarjeta de perfil tenía el mismo clip-path de esquinas cortadas.
    Entra al sistema junto con las de la lista. */

@@ -7648,7 +7648,7 @@ function _gzSeccionContratos(u) {
       ${filas}
       ${extras}${pendiente}
       <button class="btn btn-ghost btn-sm" style="margin-top:12px;font-family:'JetBrains Mono',monospace;font-size:10px"
-        onclick="_gzGenerarContrato('${u.id}','${_attrJs(objetivo)}')">${_esfEsc(rotulo)}</button>
+        onclick="_gzGenerarContrato('${_attrJs(u.id)}','${_attrJs(objetivo)}')">${_esfEsc(rotulo)}</button>
     </div>`;
 }
 

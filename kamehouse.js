@@ -7072,7 +7072,7 @@ async function gzReactivarVendedor(userId, nombre) {
 const ROL_CONTRATOS = {
   maestro_roshi: [],
   bulma:         ['auxiliar_admin', 'coordinador'], // Sofía también coordina
-  milk:          ['auxiliar_admin'],
+  milk:          ['auxiliar_admin', 'coordinador'], // Ximena igual: auxiliar Y coordinadora
   mister_popo:   ['auxiliar_admin'], // el anexo de cuidador es borrador aparte
   coordinador:   ['coordinador'],
   cc:            ['creadora_team'],

@@ -7749,6 +7749,12 @@ function _gzSeccionContratos(u) {
   const rotulo = st.faltan.length
     ? (st.faltan.length === 1 ? `▸ generar el de ${PLANTILLA_LABELS[objetivo] || objetivo}` : '▸ generar contratos')
     : '▸ generar otro contrato';
+  // [EQ-4] Con DOS o más faltantes, el camino corto es el paquete: se llenan
+  // los datos una vez y salen los dos. El botón de uno-por-uno se queda al
+  // lado, más discreto, para el caso de "solo quiero este".
+  const paquete = st.faltan.length >= 2 ? `
+      <button class="btn btn-primary btn-sm" style="margin-top:12px;margin-right:8px;font-family:'JetBrains Mono',monospace;font-size:10px"
+        onclick="_gzPaquete('${_attrJs(u.id)}')">▸ generar los ${st.faltan.length} de un jalón</button>` : '';
   const pendiente = st.enviados.length ? `
     <div style="font-size:11px;color:#ffb020;margin-top:10px;line-height:1.5">
       Ya se le mandó ${st.enviados.length === 1 ? 'uno' : st.enviados.length} y no lo ha firmado.
@@ -7759,9 +7765,209 @@ function _gzSeccionContratos(u) {
       <div class="perfil-section-title-v2" style="color:var(--orange)">// contratos</div>
       ${filas}
       ${extras}${pendiente}
-      <button class="btn btn-ghost btn-sm" style="margin-top:12px;font-family:'JetBrains Mono',monospace;font-size:10px"
+      ${paquete}<button class="btn btn-ghost btn-sm" style="margin-top:12px;font-family:'JetBrains Mono',monospace;font-size:10px"
         onclick="_gzGenerarContrato('${_attrJs(u.id)}','${_attrJs(objetivo)}')">${_esfEsc(rotulo)}</button>
     </div>`;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// [EQ-4] EL PAQUETE POR ROL.
+//
+// bulma y milk firman DOS contratos (auxiliar_admin + coordinador). Con EQ-1 el
+// botón prellenaba UNO; el segundo era volver a la tarjeta, volver a abrir el
+// formulario, volver a elegir. "Dos contratos" no debería significar "llena el
+// formulario dos veces".
+//
+// LO QUE ESTA PANTALLA NO HACE: adivinar. El sueldo semanal y la vigencia se
+// preguntan aquí porque son datos que solo Memo tiene — el paquete ahorra el
+// tecleo repetido (nombre, correo, plantilla, fechas), no la decisión.
+//
+// Y MANDA DOS CORREOS DE VERDAD. Por eso se envían UNO POR UNO y en orden: si
+// el segundo truena, el primero YA SE FUE y el reporte lo dice con esas
+// palabras. Un "error al generar el paquete" a secas dejaría a Memo creyendo
+// que no se mandó nada, y volvería a darle al botón.
+// ═══════════════════════════════════════════════════════════════════════════
+function _gzPaquete(userId) {
+  const u = (_gzCache || []).find(x => x.id === userId);
+  if (!u) return;
+  const st = _gzEstadoContratos(u);
+  if (!st || !st.faltan.length) return;
+  const L = p => _esfEsc(PLANTILLA_LABELS[p] || p);
+  const campo = (lbl, html, nota) => `
+    <div style="margin-bottom:14px">
+      <div class="perfil-field-label" style="margin-bottom:6px">${lbl}</div>
+      ${html}
+      ${nota ? `<div style="font-size:11px;color:var(--ts);margin-top:6px;line-height:1.5">${nota}</div>` : ''}
+    </div>`;
+
+  const filas = st.faltan.map((p, i) => `
+    <div style="display:flex;align-items:center;gap:8px;padding:6px 0;font-size:12px">
+      <span style="color:var(--orange);font-weight:800;width:16px;flex:none">${i + 1}</span>
+      <span>${L(p)}</span>
+    </div>`).join('');
+
+  const pideSueldo = st.faltan.includes('auxiliar_admin');
+  const pideVigencia = st.faltan.includes('coordinador');
+
+  crearModal('gz-paquete', `Paquete de ${ROL_LABELS[u.rol] || u.rol}`, `
+    <div style="font-size:12px;color:var(--ts);line-height:1.6;margin-bottom:14px">
+      Se le generan y <strong style="color:var(--text)">se le mandan por correo</strong> a
+      ${_esfEsc(u.nombre)} los ${st.faltan.length} contratos que le faltan, en un solo paso:
+    </div>
+    ${filas}
+    <div style="height:1px;background:var(--border);margin:14px 0"></div>
+    ${pideSueldo ? campo('Sueldo neto semanal (MXN) *',
+      `<input class="cot-input" type="number" id="pq-sueldo" min="1" step="1" placeholder="Ej: 2500" oninput="_gzPaqueteSueldo()">
+       <div id="pq-sueldo-mes" style="font-size:11px;color:var(--ts);margin-top:6px;min-height:16px"></div>`,
+      'Semanal, no mensual — abajo lo ves traducido.') : ''}
+    ${pideVigencia ? campo('Evento del contrato de coordinador *',
+      `<select class="cot-input" id="pq-evento"><option value="">Cargando eventos…</option></select>`,
+      'Este contrato IMPRIME el evento y su fecha en el documento firmado — por eso se pregunta y no se rellena solo.') : ''}
+    ${pideVigencia ? campo('Vigencia del contrato de coordinador',
+      `<select class="cot-input" id="pq-vigencia">
+         <option value="3">3 meses</option><option value="6">6 meses</option>
+         <option value="9">9 meses</option><option value="12" selected>12 meses</option>
+       </select>`) : ''}
+    ${pideVigencia ? campo('',
+      `<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px">
+         <input type="checkbox" id="pq-cuidador" style="width:auto;margin:0">
+         <span>También cuidador de bodega (Torre de Karin)</span>
+       </label>`,
+      'Suma el Anexo de Custodia al de coordinador. Un solo contrato, una sola firma.') : ''}
+    <div id="pq-alert"></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
+      <button class="btn btn-ghost" onclick="cerrarModal('gz-paquete')">Cancelar</button>
+      <button class="btn btn-primary" id="pq-btn" onclick="_gzPaqueteEnviar('${_attrJs(userId)}')">Generar y enviar los ${st.faltan.length}</button>
+    </div>
+  `);
+  if (pideVigencia) _gzPaquetePoblarEventos();
+}
+
+// El contrato de coordinador IMPRIME "Evento:" y "Fecha del evento:" en el
+// documento (renderDocViaB en contrato.html). Un relleno como "Contrato de
+// coordinación" acabaría dentro de un papel firmado — así que se pregunta, con
+// la misma lista del formulario. El laboral NO lo necesita: su plantilla no
+// tiene esa fila, por eso ahí sí se rellena solo.
+async function _gzPaquetePoblarEventos() {
+  const sel = document.getElementById('pq-evento');
+  if (!sel) return;
+  try {
+    const ev = await _fetchEVFromIndex();
+    const hoy = _mxFechaStr();
+    const vivos = (ev || [])
+      .filter(e => e && e.id && e.a && (!e.ds || String(e.ds).slice(0, 10) >= hoy))
+      .sort((a, b) => String(a.ds || '9999').localeCompare(String(b.ds || '9999')));
+    sel.innerHTML = '<option value="">— Selecciona un evento —</option>';
+    vivos.forEach(e => {
+      const o = document.createElement('option');
+      o.value = e.id;
+      o.dataset.nombre = e.a;
+      o.dataset.fecha = String(e.ds || '').slice(0, 10);
+      o.textContent = e.a;
+      sel.appendChild(o);
+    });
+    if (!vivos.length) sel.innerHTML = '<option value="">No hay eventos vigentes</option>';
+  } catch (e) {
+    sel.innerHTML = '<option value="">No se pudo cargar la lista</option>';
+  }
+}
+
+// La misma traducción de EQ-3, aquí también: el campo pide semanal y la cabeza
+// piensa mensual sin importar en qué pantalla esté.
+function _gzPaqueteSueldo() {
+  const el = document.getElementById('pq-sueldo-mes');
+  if (!el) return;
+  const v = Number((document.getElementById('pq-sueldo') || {}).value || '0');
+  if (!(v > 0)) { el.textContent = ''; el.style.color = 'var(--ts)'; return; }
+  const mes = _sueldoMensual(v);
+  const fmt = x => '$' + x.toLocaleString('es-MX');
+  el.textContent = `${fmt(Math.round(v))} a la semana = ${fmt(mes)} al mes (52 semanas ÷ 12).`;
+  el.style.color = mes >= SUELDO_MENSUAL_OJO ? '#ffb020' : 'var(--ts)';
+}
+
+async function _gzPaqueteEnviar(userId) {
+  const u = (_gzCache || []).find(x => x.id === userId);
+  if (!u) return;
+  const st = _gzEstadoContratos(u);
+  if (!st || !st.faltan.length) return;
+  const alert = document.getElementById('pq-alert');
+  const btn = document.getElementById('pq-btn');
+  const err = m => { if (alert) alert.innerHTML = `<div style="margin-top:12px;padding:10px 14px;background:rgba(255,68,68,.12);border:1px solid rgba(255,68,68,.4);color:#ffb3b3;border-radius:var(--r-sm,8px);font-size:12px;line-height:1.5">${m}</div>`; };
+
+  const sueldo = Math.round(Number((document.getElementById('pq-sueldo') || {}).value || '0')) || 0;
+  if (st.faltan.includes('auxiliar_admin') && !(sueldo > 0)) { err('Falta el sueldo neto semanal.'); return; }
+  // La misma guardia de EQ-3: pasada la línea, se pregunta una vez.
+  if (sueldo > 0 && _sueldoMensual(sueldo) >= SUELDO_MENSUAL_OJO) {
+    const s = '$' + sueldo.toLocaleString('es-MX'), m = '$' + _sueldoMensual(sueldo).toLocaleString('es-MX');
+    if (!confirm(`El sueldo dice ${s} A LA SEMANA — son ${m} al mes.\n\n¿Es correcto? El campo pide semanal, no mensual.`)) return;
+  }
+  const vigencia = Math.round(Number((document.getElementById('pq-vigencia') || {}).value)) || 12;
+  const custodia = !!(document.getElementById('pq-cuidador') || {}).checked;
+  const hoy = _mxFechaStr(); // [EQ-3] hoy en Monterrey, no en UTC
+  // El evento del contrato de coordinador: obligatorio porque SALE IMPRESO.
+  const selEv = document.getElementById('pq-evento');
+  const optEv = selEv && selEv.selectedOptions && selEv.selectedOptions[0];
+  const evNombre = (optEv && optEv.dataset && optEv.dataset.nombre) || '';
+  const evFecha = (optEv && optEv.dataset && optEv.dataset.fecha) || '';
+  if (st.faltan.includes('coordinador') && (!evNombre || !/^\d{4}-\d{2}-\d{2}$/.test(evFecha))) {
+    err('Falta el evento del contrato de coordinador (sale impreso en el documento).');
+    return;
+  }
+
+  if (alert) alert.innerHTML = '';
+  if (btn) { btn.disabled = true; btn.textContent = 'Enviando…'; }
+  const hechos = [], fallo = { plantilla: null, msg: '' };
+  for (const p of st.faltan) {
+    const body = {
+      plantilla: p,
+      creador_nombre: u.nombre || '',
+      creador_email: String(u.correo || '').trim().toLowerCase(),
+      // El laboral no cuelga de un evento: MISMO relleno que _ctrFormData (su
+      // plantilla no imprime esa fila). El de coordinador SÍ la imprime, así
+      // que lleva el evento de verdad que se eligió arriba.
+      evento_nombre: p === 'auxiliar_admin' ? 'Auxiliar administrativo' : evNombre,
+      evento_fecha: p === 'auxiliar_admin' ? hoy : evFecha,
+      contrato_fecha: hoy,
+      ofrecimiento: [],
+      expectativas: [],
+      datos: p === 'auxiliar_admin'
+        ? { sueldo_semanal: sueldo }
+        : Object.assign({ exclusividad_dura: true }, custodia ? { cuidador_bodega: true } : {}),
+      cuidador_bodega: p === 'coordinador' ? custodia : undefined,
+      vigencia_meses: p === 'coordinador' ? vigencia : undefined,
+    };
+    try {
+      const r = await khAdminFetch('/.netlify/functions/contrato-crear', { method: 'POST', body: JSON.stringify(body) });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok || !j.ok) throw new Error(j.error || ('contrato-crear ' + r.status));
+      hechos.push(p);
+    } catch (e) {
+      fallo.plantilla = p; fallo.msg = e.message;
+      break; // no se sigue: si el primero falló, el segundo probablemente igual
+    }
+  }
+
+  if (btn) { btn.disabled = false; btn.textContent = `Generar y enviar los ${st.faltan.length}`; }
+  const nom = p => PLANTILLA_LABELS[p] || p;
+
+  if (!fallo.plantilla) {
+    cerrarModal('gz-paquete');
+    showToast(`${hechos.length} contratos enviados a ${String(u.nombre).split(' ')[0]} ✓`, 'success');
+    _gzContratos = null;      // que la tarjeta vuelva a preguntar
+    await loadEquipo();
+    return;
+  }
+  // FALLÓ ALGO. Se dice EXACTAMENTE qué se fue y qué no: los que ya salieron
+  // están mandados de verdad, y volver a darle al botón los duplicaría.
+  if (hechos.length) {
+    err(`Se envió <strong>${_esfEsc(nom(hechos[0]))}</strong> — ese ya está mandado.<br>
+         Falló <strong>${_esfEsc(nom(fallo.plantilla))}</strong>: ${_esfEsc(fallo.msg)}<br><br>
+         Cierra esta ventana y genera solo el que falta desde la tarjeta: si vuelves a darle aquí, el primero se manda dos veces.`);
+    _gzContratos = null;
+    loadEquipo();
+  } else {
+    err(`No se envió ninguno. Falló <strong>${_esfEsc(nom(fallo.plantilla))}</strong>: ${_esfEsc(fallo.msg)}`);
+  }
 }
 
 // [EQ-1] Abre el formulario de contratos con nombre, correo y plantilla YA

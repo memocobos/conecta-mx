@@ -95,7 +95,12 @@ async function _insertStrikeLog(coordiId, accion, motivo, eventoId) {
     accion,
     motivo,
     por_quien: null,
-    created_at: new Date().toISOString(),
+    // [GR-2] `fecha`, NO `created_at`: strikes_log no tiene esa columna. El
+    // INSERT venía fallando SIEMPRE con 400 — y en silencio absoluto, porque
+    // el .catch(() => null) de abajo se lo tragaba y el retry mandaba el mismo
+    // cuerpo malo. Resultado medido: la bitácora tiene CERO filas. Los strikes
+    // automáticos se aplicaban sin dejar rastro de por qué.
+    fecha: new Date().toISOString(),
   };
   const tryRow = eventoId ? { ...baseRow, evento_id: eventoId } : baseRow;
   let r = await fetch(`${SB_URL}/rest/v1/strikes_log`, {
@@ -106,11 +111,20 @@ async function _insertStrikeLog(coordiId, accion, motivo, eventoId) {
   if (r && r.ok) return;
   if (!eventoId) return; // no había evento_id, ya falló por otra razón
   // Retry sin evento_id por si la columna no existe todavía
-  await fetch(`${SB_URL}/rest/v1/strikes_log`, {
+  const r2 = await fetch(`${SB_URL}/rest/v1/strikes_log`, {
     method: "POST",
     headers: { ...HEADERS, Prefer: "return=minimal" },
     body: JSON.stringify(baseRow),
-  }).catch(() => {});
+  }).catch(() => null);
+  // [GR-2] Y SI TAMPOCO PASA, QUE SE OIGA. El silencio de este bloque es lo
+  // que dejó vivir el bug tres meses: los dos intentos fallaban con 400 y los
+  // dos .catch se lo tragaban, así que la bitácora quedaba en cero sin que
+  // nadie tuviera de dónde enterarse. Un fallo callado no es fail-soft: es un
+  // fallo que nadie va a arreglar.
+  if (!r2 || !r2.ok) {
+    const detalle = r2 ? await r2.text().catch(() => '') : 'sin respuesta';
+    console.error('[strikes] no se pudo escribir la bitácora:', r2 && r2.status, String(detalle).slice(0, 200));
+  }
 }
 
 async function _yaExisteStrikeReporte(coordiId, ev) {

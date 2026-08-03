@@ -26,6 +26,14 @@
 
 const { aplicarModoPrueba } = require('./_lib/correo-guard');
 const { cargarDisponibilidad, evaluarZona, HOLD_MINUTOS } = require('./_lib/disponibilidad');
+// [GR-5] La AUTORIDAD del precio y del separo. Best-effort en el require para
+// no tumbar la solicitud si el módulo faltara: sin él se sigue como antes, y
+// se deja dicho en la bitácora.
+let resolverPrecioVenta = null;
+try { ({ resolverPrecioVenta } = require('./_lib/precio-zona')); } catch (_) { resolverPrecioVenta = null; }
+// Diferencia que se tolera sin bitácora: un peso. Por debajo es redondeo de
+// centavos entre dos motores; por encima es que uno de los dos está mal.
+const TOLERANCIA_PESOS = 1;
 
 // Columnas que el cliente puede aportar al insert (whitelist anti-inyección).
 const CAMPOS_INSERT = [
@@ -114,6 +122,62 @@ exports.handler = async (event) => {
   const zona = String(fila.zona || '').trim();
   const eventoIdSolicitud = String(fila.evento_id); // clave verbatim (incluye #idx multifecha)
   const tieneComprobante = fila.comprobante_separo_url != null && String(fila.comprobante_separo_url).trim() !== '';
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // [GR-5] EL SERVIDOR NO LE CREE AL NAVEGADOR.
+  //
+  // `precio_total` y `monto_separo` venían del cliente y se insertaban tal
+  // cual. Cualquiera con la consola abierta podía apartar un viaje de $14,400
+  // por el separo que quisiera — y sin necesidad de mala fe: bastaba una
+  // pantalla vieja en caché con la regla anterior.
+  //
+  // Ahora se RECALCULA aquí con _lib/precio-zona (la misma autoridad que usa
+  // el Palacio) y se SELLA lo recalculado. Lo que mandó el cliente solo sirve
+  // para compararlo: si difieren por más de un peso, queda escrito en la
+  // bitácora con LOS DOS montos, porque una divergencia es la señal de que
+  // una de las tres copias de la regla se quedó atrás.
+  //
+  // FAIL-SOFT A PROPÓSITO: si el catálogo no responde, NO se rechaza la
+  // solicitud —el cliente no tiene la culpa de que un fetch falle— y se sigue
+  // con lo que mandó, dejándolo dicho. Rechazar aquí sería perder ventas por
+  // una caída ajena; lo que NO se hace nunca es sellar en silencio.
+  // ═══════════════════════════════════════════════════════════════════════
+  const _delCliente = { precio_total: Number(fila.precio_total), monto_separo: Number(fila.monto_separo) };
+  let _selloPrecio = { estado: 'no_evaluado', motivo: 'sin _lib/precio-zona' };
+  if (resolverPrecioVenta) {
+    try {
+      const r = await resolverPrecioVenta({
+        evento_id: eventoIdSolicitud,
+        paquete: paquete.toLowerCase(),
+        zona: zona || undefined,
+        num_personas: numPersonas,
+        hotel_nombre: fila.tipo_habitacion,
+        transporte_cost: 0,
+      });
+      if (r && r.ok) {
+        const dTotal = Math.abs(Number(r.total) - _delCliente.precio_total);
+        const dSep = Math.abs(Number(r.separo) - _delCliente.monto_separo);
+        // El sello: manda el recalculado, pase lo que pase con el del cliente.
+        fila.precio_total = r.total;
+        fila.monto_separo = r.separo;
+        if (dTotal > TOLERANCIA_PESOS || dSep > TOLERANCIA_PESOS) {
+          _selloPrecio = { estado: 'DIVERGENCIA', cliente: _delCliente,
+            servidor: { precio_total: r.total, monto_separo: r.separo },
+            dif: { total: dTotal, separo: dSep } };
+          console.error('[GR-5] SEPARO/PRECIO DIVERGENTE — se sella el del servidor:',
+            JSON.stringify({ evento: eventoIdSolicitud, paquete, zona, personas: numPersonas, ..._selloPrecio }));
+        } else {
+          _selloPrecio = { estado: 'coincide' };
+        }
+      } else {
+        _selloPrecio = { estado: 'no_evaluado', motivo: (r && r.motivo) || 'sin precio' };
+        console.warn('[GR-5] no se pudo recalcular el precio, se sigue con el del cliente:', _selloPrecio.motivo);
+      }
+    } catch (e) {
+      _selloPrecio = { estado: 'no_evaluado', motivo: e.message };
+      console.warn('[GR-5] excepción al recalcular el precio, se sigue con el del cliente:', e.message);
+    }
+  }
 
   // ---- 3. CANDADO (a): pre-check de disponibilidad para zonas con boleto ----
   // RIDE no consume boleto → fuera del control. Para el resto, si no se puede

@@ -4685,6 +4685,19 @@ function eventoAgendable(ev){
 // =====================================================================
 // Cálculo de precio y separo (mismo modelo que rol.html)
 // =====================================================================
+// ═══════════════════════════════════════════════════════════════════════════
+// [GR-5] LA FECHA, EN HORA DE MONTERREY. Copia literal de index.html:4904-4909.
+// Fechas PURAS (Date.UTC de los tres números), no restas de timestamps: así la
+// frontera de 15 días cae el mismo día acá y en el servidor.
+// ═══════════════════════════════════════════════════════════════════════════
+function _hoyMx(){ return new Date().toLocaleDateString('en-CA', { timeZone: 'America/Monterrey' }); }
+function _diasEventoMx(evISO, hoyISO){
+  var m1 = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(evISO || ''));
+  var m2 = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(hoyISO || _hoyMx()));
+  if (!m1 || !m2) return null;
+  return Math.round((Date.UTC(+m1[1], +m1[2]-1, +m1[3]) - Date.UTC(+m2[1], +m2[2]-1, +m2[3])) / 86400000);
+}
+
 function calcularPrecio(){
   const { ev, pkg, multifechaIdx, zona, hab, personas } = wizState;
   if (!ev || !pkg) return null;
@@ -4706,14 +4719,41 @@ function calcularPrecio(){
   }
   if (pkg === 'CHEAP') perP = zonaP;
 
-  // Separo por defecto
+  // ═══════════════════════════════════════════════════════════════════════
+  // [GR-5] EL SEPARO — espejo de _lib/precio-zona (líneas 188-210), que a su
+  // vez es réplica de la regla del index. Aquí NO se interpreta nada: se copia.
+  //
+  // LO QUE FALTABA Y CUÁNTO COSTABA (medido sobre el catálogo vivo, 1106
+  // combos vendibles): 30 combos cobraban de menos, TODOS por la frontera de
+  // los 15 días. En Melanie el Portal pedía $500 donde tocan $2,950 — $2,450
+  // menos por persona, y el cliente ya había visto el número.
+  //
+  // Las otras dos piezas (sepZonas y sepEspecial) hoy no las usa ningún evento
+  // vendible, así que el careo no las marca. Van igual: la regla es la regla,
+  // y el día que Memo capture un sepZonas el Portal no se puede quedar atrás
+  // otra vez.
+  // ═══════════════════════════════════════════════════════════════════════
   let sep;
   if (pkg === 'CHEAP'){
     sep = (ev.sepCheap != null) ? ev.sepCheap : 1000;
-  } else if (pkg === 'RIDE' && ev.sepRide != null){
-    sep = ev.sepRide;
+    // sepEspecial: separo propio de una zona CHEAP (gana sobre sepCheap).
+    const czList = (ev.multifecha && multifechaIdx != null && ev.multifecha[multifechaIdx] && ev.multifecha[multifechaIdx].cheapZonas) || ev.cheapZonas;
+    if (zona && Array.isArray(czList)){
+      const cz = czList.find(z => z && z.n === zona.n);
+      if (cz && cz.sepEspecial !== undefined) sep = cz.sepEspecial;
+    }
   } else {
-    sep = ev.sep || 500;
+    const dias = _diasEventoMx(ev.ds);
+    if (dias != null && dias <= 15){
+      // A 15 días o menos, el separo es la MITAD del viaje. Es la regla del
+      // negocio, no un ajuste: quien aparta tarde deja más asegurado.
+      sep = Math.ceil(perP * 0.5);
+    } else {
+      sep = ev.sep || 500;
+      if (pkg === 'RIDE' && ev.sepRide !== undefined) sep = ev.sepRide;
+      // sepZonas: separo propio por nombre de zona (gana sobre sep y sepRide).
+      if (ev.sepZonas && zona && ev.sepZonas[zona.n] !== undefined) sep = ev.sepZonas[zona.n];
+    }
   }
   if (sep > perP) sep = perP;
 

@@ -58,11 +58,25 @@ async function sendEmail(to, subject, html) {
   return true;
 }
 
-function invitationEmail({ creador_nombre, evento_nombre, evento_fecha, link }) {
+// [EQ-6] Plantillas que NO cuelgan de un evento (espejo de SIN_EVENTO en
+// kamehouse.js). El laboral ya era una; el de coordinador se suma al volverse
+// ANUAL.
+const SIN_EVENTO = ["auxiliar_admin", "coordinador"];
+
+function invitationEmail({ creador_nombre, evento_nombre, evento_fecha, link, plantilla }) {
   const firstName = (creador_nombre || "").split(" ")[0];
   const fechaTxt = evento_fecha
     ? new Date(evento_fecha + "T12:00:00").toLocaleDateString("es-MX", { day: "numeric", month: "long", year: "numeric" })
     : "";
+  // [EQ-6] El correo decía "para el evento X" SIEMPRE. Con el relleno neutro
+  // eso sale como "para el evento Auxiliar administrativo" —ya pasaba hoy con
+  // el laboral— y a partir de ahora "para el evento Coordinación anual". No es
+  // el texto legal (el documento no cambia), es la invitación: se le quita la
+  // frase del evento a quien no tiene uno.
+  const sinEvento = SIN_EVENTO.includes(plantilla);
+  const fraseEvento = sinEvento
+    ? ""
+    : ` para el evento <strong style="color:#e8ff4c">${escapeHtml(evento_nombre)}</strong>${fechaTxt ? ` (${escapeHtml(fechaTxt)})` : ""}`;
   return `<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Tu contrato Conecta Reynosa</title></head>
 <body style="margin:0;padding:0;background:#000;font-family:Helvetica,Arial,sans-serif;color:#fff;-webkit-font-smoothing:antialiased">
 <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#000">
@@ -77,7 +91,7 @@ function invitationEmail({ creador_nombre, evento_nombre, evento_fecha, link }) 
       <tr><td style="padding:32px 26px 6px 26px">
         <div style="font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:rgba(255,255,255,.55);margin-bottom:10px">📝 Contrato de colaboración</div>
         <h1 style="font-family:Arial Black,Arial,sans-serif;font-size:36px;line-height:.95;letter-spacing:-.01em;color:#e8ff4c;text-transform:uppercase;margin:0 0 14px 0">¡Hola, ${escapeHtml(firstName)}!</h1>
-        <p style="font-size:15px;line-height:1.55;color:rgba(255,255,255,.85);margin:0 0 14px 0">Te mandamos tu contrato de colaboración con <strong style="color:#e8ff4c">Conecta Reynosa</strong> para el evento <strong style="color:#e8ff4c">${escapeHtml(evento_nombre)}</strong>${fechaTxt ? ` (${escapeHtml(fechaTxt)})` : ""}.</p>
+        <p style="font-size:15px;line-height:1.55;color:rgba(255,255,255,.85);margin:0 0 14px 0">Te mandamos tu contrato de colaboración con <strong style="color:#e8ff4c">Conecta Reynosa</strong>${fraseEvento}.</p>
         <p style="font-size:14px;line-height:1.55;color:rgba(255,255,255,.7);margin:0 0 24px 0">Necesitamos que lo revises, firmes con tu dedo desde el celular y subas una foto de tu INE (frente y reverso). Toma menos de 2 minutos.</p>
       </td></tr>
       <tr><td style="padding:8px 26px 28px 26px">
@@ -209,14 +223,34 @@ exports.handler = async function (event) {
     datos = { sueldo_semanal };
   }
 
+  // [EQ-6] EL CONTRATO DE COORDINADOR ES ANUAL — decisión de negocio de Memo.
+  // Cubre los eventos que le toquen durante su vigencia, no uno solo. Igual que
+  // el laboral, no cuelga de un evento: relleno neutro en las columnas NOT NULL.
+  //
+  // Se SELLA AQUÍ, del lado del servidor (patrón de T1, igual que la
+  // exclusividad dura): aunque alguien mande un evento de verdad desde
+  // cualquier pantalla, el contrato anual no se queda amarrado a él.
+  //
+  // NO TOCA UNA LETRA DE LO YA FIRMADO — y no por un flag de compatibilidad,
+  // sino porque el documento de coordinador NUNCA imprimió el evento: ni el
+  // bloque meta (lleva Coordinador / Fecha de nacimiento / Vigencia), ni la
+  // intro, ni las 12 cláusulas, ni el anexo de custodia. El render ni siquiera
+  // mira estas dos columnas. Verificado por las cuatro vías.
+  let evento_nombre_final = evento_nombre;
+  let evento_fecha_final = evento_fecha;
+  if (plantilla === "coordinador") {
+    evento_nombre_final = "Coordinación anual";
+    evento_fecha_final = contrato_fecha || evento_fecha;
+  }
+
   const token = crypto.randomBytes(20).toString("hex");
 
   const row = {
     token,
     creador_nombre,
     creador_email,
-    evento_nombre,
-    evento_fecha,
+    evento_nombre: evento_nombre_final,
+    evento_fecha: evento_fecha_final,
     contrato_fecha: contrato_fecha || new Date().toISOString().slice(0, 10),
     // Non-creadora no manda listas: se guardan vacías (no rompen NOT NULL ni el render).
     ofrecimiento: plantilla === "creadora" ? ofrecimiento : [],
@@ -256,7 +290,7 @@ exports.handler = async function (event) {
     emailSent = await sendEmail(
       creador_email,
       `Tu contrato de colaboración con Conecta Reynosa - ${evento_nombre}`,
-      invitationEmail({ creador_nombre, evento_nombre, evento_fecha, link })
+      invitationEmail({ creador_nombre, evento_nombre: evento_nombre_final, evento_fecha: evento_fecha_final, link, plantilla })
     );
   } catch (e) {
     console.error("[contrato-crear] Email error:", e.message);

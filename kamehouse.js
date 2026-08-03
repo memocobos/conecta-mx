@@ -7095,6 +7095,16 @@ const ROL_SIN_CONTRATO = {
   maestro_roshi: 'no aplica: es la dirección',
   vendedor:      'sin contrato: comisionista',
 };
+// [EQ-6] Las plantillas que NO cuelgan de un evento. Decisión de negocio de
+// Memo: el contrato de coordinador es ANUAL (cubre los eventos que le toquen
+// durante su vigencia), igual que el laboral. Por evento quedan tres:
+// creadora externa, creadora_team y giveaway.
+//
+// Una sola lista para que el formulario, el paquete y el relleno de columnas
+// no puedan opinar distinto — que fue justo lo que pasó cuando el laboral era
+// el único caso y cada quien lo escribía a mano.
+const SIN_EVENTO = ['auxiliar_admin', 'coordinador'];
+
 const PLANTILLA_LABELS = {
   creadora:       'Creadora de contenido',
   coordinador:    'Coordinador(a)',
@@ -7820,9 +7830,6 @@ function _gzPaquete(userId) {
       `<input class="cot-input" type="number" id="pq-sueldo" min="1" step="1" placeholder="Ej: 2500" oninput="_gzPaqueteSueldo()">
        <div id="pq-sueldo-mes" style="font-size:11px;color:var(--ts);margin-top:6px;min-height:16px"></div>`,
       'Semanal, no mensual — abajo lo ves traducido.') : ''}
-    ${pideVigencia ? campo('Evento del contrato de coordinador *',
-      `<select class="cot-input" id="pq-evento"><option value="">Cargando eventos…</option></select>`,
-      'Este contrato IMPRIME el evento y su fecha en el documento firmado — por eso se pregunta y no se rellena solo.') : ''}
     ${pideVigencia ? campo('Vigencia del contrato de coordinador',
       `<select class="cot-input" id="pq-vigencia">
          <option value="3">3 meses</option><option value="6">6 meses</option>
@@ -7840,50 +7847,12 @@ function _gzPaquete(userId) {
       <button class="btn btn-primary" id="pq-btn" onclick="_gzPaqueteEnviar('${_attrJs(userId)}')">Generar y enviar los ${st.faltan.length}</button>
     </div>
   `);
-  if (pideVigencia) _gzPaquetePoblarEventos();
 }
 
-// El contrato de coordinador IMPRIME "Evento:" y "Fecha del evento:" en el
-// documento (renderDocViaB en contrato.html). Un relleno como "Contrato de
-// coordinación" acabaría dentro de un papel firmado — así que se pregunta, con
-// la misma lista del formulario. El laboral NO lo necesita: su plantilla no
-// tiene esa fila, por eso ahí sí se rellena solo.
-async function _gzPaquetePoblarEventos() {
-  const sel = document.getElementById('pq-evento');
-  if (!sel) return;
-  try {
-    const ev = await _fetchEVFromIndex();
-    const hoy = _mxFechaStr();
-    const vivos = (ev || [])
-      .filter(e => e && e.id && e.a && (!e.ds || String(e.ds).slice(0, 10) >= hoy))
-      .sort((a, b) => String(a.ds || '9999').localeCompare(String(b.ds || '9999')));
-    sel.innerHTML = '<option value="">— Selecciona un evento —</option>';
-    vivos.forEach(e => {
-      const o = document.createElement('option');
-      o.value = e.id;
-      o.dataset.nombre = e.a;
-      o.dataset.fecha = String(e.ds || '').slice(0, 10);
-      o.textContent = e.a;
-      sel.appendChild(o);
-    });
-    if (!vivos.length) sel.innerHTML = '<option value="">No hay eventos vigentes</option>';
-  } catch (e) {
-    sel.innerHTML = '<option value="">No se pudo cargar la lista</option>';
-  }
-}
-
-// La misma traducción de EQ-3, aquí también: el campo pide semanal y la cabeza
-// piensa mensual sin importar en qué pantalla esté.
-function _gzPaqueteSueldo() {
-  const el = document.getElementById('pq-sueldo-mes');
-  if (!el) return;
-  const v = Number((document.getElementById('pq-sueldo') || {}).value || '0');
-  if (!(v > 0)) { el.textContent = ''; el.style.color = 'var(--ts)'; return; }
-  const mes = _sueldoMensual(v);
-  const fmt = x => '$' + x.toLocaleString('es-MX');
-  el.textContent = `${fmt(Math.round(v))} a la semana = ${fmt(mes)} al mes (52 semanas ÷ 12).`;
-  el.style.color = mes >= SUELDO_MENSUAL_OJO ? '#ffb020' : 'var(--ts)';
-}
+// [EQ-6] Aquí vivía _gzPaquetePoblarEventos, que llenaba un selector de eventos
+// para el contrato de coordinador. Se va entero con el campo: el contrato es
+// ANUAL y ya no cuelga de un evento. Se borra en vez de dejarlo sin llamar —
+// una función que nadie llama es la que un arnés acaba midiendo por error.
 
 async function _gzPaqueteEnviar(userId) {
   const u = (_gzCache || []).find(x => x.id === userId);
@@ -7904,15 +7873,6 @@ async function _gzPaqueteEnviar(userId) {
   const vigencia = Math.round(Number((document.getElementById('pq-vigencia') || {}).value)) || 12;
   const custodia = !!(document.getElementById('pq-cuidador') || {}).checked;
   const hoy = _mxFechaStr(); // [EQ-3] hoy en Monterrey, no en UTC
-  // El evento del contrato de coordinador: obligatorio porque SALE IMPRESO.
-  const selEv = document.getElementById('pq-evento');
-  const optEv = selEv && selEv.selectedOptions && selEv.selectedOptions[0];
-  const evNombre = (optEv && optEv.dataset && optEv.dataset.nombre) || '';
-  const evFecha = (optEv && optEv.dataset && optEv.dataset.fecha) || '';
-  if (st.faltan.includes('coordinador') && (!evNombre || !/^\d{4}-\d{2}-\d{2}$/.test(evFecha))) {
-    err('Falta el evento del contrato de coordinador (sale impreso en el documento).');
-    return;
-  }
 
   if (alert) alert.innerHTML = '';
   if (btn) { btn.disabled = true; btn.textContent = 'Enviando…'; }
@@ -7922,11 +7882,11 @@ async function _gzPaqueteEnviar(userId) {
       plantilla: p,
       creador_nombre: u.nombre || '',
       creador_email: String(u.correo || '').trim().toLowerCase(),
-      // El laboral no cuelga de un evento: MISMO relleno que _ctrFormData (su
-      // plantilla no imprime esa fila). El de coordinador SÍ la imprime, así
-      // que lleva el evento de verdad que se eligió arriba.
-      evento_nombre: p === 'auxiliar_admin' ? 'Auxiliar administrativo' : evNombre,
-      evento_fecha: p === 'auxiliar_admin' ? hoy : evFecha,
+      // [EQ-6] Ninguna de las dos plantillas del paquete cuelga de un evento:
+      // el laboral nunca colgó y el de coordinador ahora es ANUAL. Mismo
+      // relleno neutro que _ctrFormData, de la misma lista SIN_EVENTO.
+      evento_nombre: p === 'auxiliar_admin' ? 'Auxiliar administrativo' : 'Coordinación anual',
+      evento_fecha: hoy,
       contrato_fecha: hoy,
       ofrecimiento: [],
       expectativas: [],
@@ -17688,8 +17648,10 @@ function onCtrPlantillaChange() {
   // ningún evento: _ctrFormData PISA lo que se escriba ahí (evento_nombre pasa
   // a 'Auxiliar administrativo' y evento_fecha a la fecha del contrato). El
   // asterisco de "obligatorio" era mentira y el trabajo de llenarlos, tirado.
+  // [EQ-6] coordinador se suma al laboral: su contrato es ANUAL, no de un
+  // evento. Por evento quedan solo creadora, creadora_team y giveaway.
   const er = document.getElementById('ctr-evento-row');
-  if (er) er.style.display = (p === 'auxiliar_admin') ? 'none' : '';
+  if (er) er.style.display = SIN_EVENTO.includes(p) ? 'none' : '';
   onCtrSueldoInput();
 }
 
@@ -17776,6 +17738,18 @@ function _ctrFormData() {
   if (plantilla === 'auxiliar_admin') {
     datosExtra = { sueldo_semanal: Math.round(Number((document.getElementById('ctr-sueldo') || {}).value || '0')) || 0 };
     _evNombre = 'Auxiliar administrativo';
+    _evFecha = _contratoFecha;
+  }
+  // [EQ-6] El contrato de coordinador es ANUAL: cubre los eventos que le
+  // toquen durante su vigencia, no uno. Mismo tratamiento que el laboral —
+  // relleno neutro en las columnas NOT NULL que el texto legal no usa.
+  //
+  // Y NO usa el evento de verdad: verificado que el documento de coordinador
+  // no lo imprime por ninguna vía (ni el bloque meta, ni la intro, ni las 12
+  // cláusulas, ni el anexo de custodia). Por eso esto NO cambia una sola letra
+  // de lo ya firmado: el render ni siquiera mira estas dos columnas.
+  if (plantilla === 'coordinador') {
+    _evNombre = 'Coordinación anual';
     _evFecha = _contratoFecha;
   }
   return {

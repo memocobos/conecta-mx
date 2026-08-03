@@ -135,12 +135,44 @@ function _calcularPrecio(ev, opts) {
     if (!(Number(selZ.p) > 0)) return { ok: false, motivo: 'zona agotada / sin precio (p=0)' };
   }
 
-  // Hotel (opcional en F1; si el paquete lo requiere y no se dio, se marca).
+  // [GR-5b] BUSCAR EL HOTEL SIN EXIGIR EL NOMBRE EXACTO.
+//
+// El catálogo los llama 'Compartida (4 personas)', 'Doble', 'Triple',
+// 'Individual'. El Portal guarda su `tipo_habitacion` en minúsculas y sin
+// paréntesis: 'compartida', 'doble', 'triple', 'individual' (es lo que exige
+// su CHECK). Con un === estricto NINGUNO empataba, así que el recálculo del
+// servidor devolvía 'hotel no encontrado' y GR-5 se caía por su camino
+// fail-soft: no sellaba NADA en plus/ride/stay. Letra muerta para todo lo que
+// lleva hotel — justo lo que la tuerca venía a blindar.
+//
+// El EXACTO SE INTENTA PRIMERO: para quien ya manda el nombre del catálogo
+// (el Palacio), el resultado es byte-idéntico. La tolerancia es solo la red
+// de abajo, y compara por la PRIMERA PALABRA normalizada, que es lo que
+// distingue a los cuatro tipos entre sí.
+function _normHotel(v) {
+  return String(v == null ? '' : v)
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase().trim().split(/[\s(]/)[0];
+}
+function _buscarHotel(lista, nombre) {
+  if (!Array.isArray(lista) || !nombre) return null;
+  const exacto = lista.find(h => h && h.n === nombre);
+  if (exacto) return exacto;
+  const clave = _normHotel(nombre);
+  if (!clave) return null;
+  const flojos = lista.filter(h => h && _normHotel(h.n) === clave);
+  // Si la primera palabra empata con DOS hoteles distintos, no se adivina:
+  // devolver null hace que el llamador diga 'hotel no encontrado', que es
+  // honesto. Asignar "el primero" es como se cuelan los precios equivocados.
+  return flojos.length === 1 ? flojos[0] : null;
+}
+
+// Hotel (opcional en F1; si el paquete lo requiere y no se dio, se marca).
   let selH = null;
   const requiereHotel = hasHotel && !(opts && opts.hotel_nombre);
   if (hasHotel && opts && opts.hotel_nombre) {
     const lista = _hotelLista(ev, fechaIdx, cdmx, opts && opts.hoteles);
-    selH = lista.find(h => h && h.n === opts.hotel_nombre) || null;
+    selH = _buscarHotel(lista, opts.hotel_nombre);
     if (!selH) return { ok: false, motivo: 'hotel no encontrado en el catálogo' };
     // Grupo grande (N>4): SOLO habitación compartida (el reparto fino se afina al
     // reservar). Espejo de la regla del index (buildHotelButtons) y de _vtaCalc.

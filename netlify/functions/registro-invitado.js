@@ -35,7 +35,7 @@ const UUID_RE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0
 const COLS = [
   'id', 'nombre', 'username', 'correo', 'correo_notif', 'celular', 'rol',
   'activo', 'strikes', 'foto_url', 'talla_playera', 'fecha_nacimiento',
-  'num_emergencia', 'nombre_emergencia', 'template_sugerido', 'tema_acento',
+  'num_emergencia', 'nombre_emergencia', 'parentesco_emergencia', 'template_sugerido', 'tema_acento',
   'perfil_completo', 'permisos_extra',
 ].join(',');
 
@@ -88,7 +88,16 @@ exports.handler = async (event) => {
     const invitado = rows[0];
 
     if (!invitado) {
-      return { statusCode: 200, headers, body: JSON.stringify({ ok: false, reason: 'invalido' }) };
+      // [EQ-7b] "Inválido" no distinguía tres cosas muy distintas: el link YA
+      // SE USÓ (la cuenta existe, hay que entrar normal), el link fue
+      // REEMPLAZADO (Memo re-invitó y el token viejo murió) o de plano nunca
+      // existió. La pantalla decía lo mismo para las tres, y quien recibe dos
+      // invitaciones seguidas —lo normal en un re-onboarding— abre la vieja y
+      // se topa con un muro sin salida.
+      const us = await fetch(`${base}?invite_token=eq.${token}&select=id,invite_usado&limit=1`, { headers: sbHeaders });
+      const usados = us.ok ? await us.json() : [];
+      const razon = (usados[0] && usados[0].invite_usado) ? 'usado' : 'invalido';
+      return { statusCode: 200, headers, body: JSON.stringify({ ok: false, reason: razon }) };
     }
     if (invitado.invite_expires_at && new Date(invitado.invite_expires_at) < new Date()) {
       return { statusCode: 200, headers, body: JSON.stringify({ ok: false, reason: 'expirado' }) };
@@ -160,12 +169,19 @@ exports.handler = async (event) => {
       if (num_emergencia.replace(/\D/g, '').length < 10) {
         return { statusCode: 400, headers, body: JSON.stringify({ ok: false, error: 'El teléfono de emergencia va a 10 dígitos' }) };
       }
+      // [EQ-7b] El parentesco va IMPRESO aparte en el contrato:
+      // "NOMBRE (PARENTESCO) · TEL". Sin campo propio la gente lo mete dentro
+      // del nombre y el documento sale con el paréntesis vacío al lado.
+      const parentesco_emergencia = String(body.parentesco_emergencia || '').trim();
+      if (!parentesco_emergencia) {
+        return { statusCode: 400, headers, body: JSON.stringify({ ok: false, error: '¿Qué es tuyo tu contacto de emergencia? (mamá, esposo, hermana…)' }) };
+      }
 
       const password_hash = await bcrypt.hash(password, BCRYPT_COST);
       const update = {
         nombre, username, password_hash,
         activo: true, invite_usado: true, invite_token: null,
-        fecha_nacimiento, nombre_emergencia, num_emergencia,
+        fecha_nacimiento, nombre_emergencia, num_emergencia, parentesco_emergencia,
         perfil_completo: true,
       };
       const cel = String(body.celular || '').trim();

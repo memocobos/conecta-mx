@@ -488,7 +488,7 @@ async function _faltanDatosSeguridad(datos, correo) {
   const mail = String(correo || "").trim();
   if (!mail) throw new Error("contrato sin correo");
   const r = await fetch(
-    `${SB_URL}/rest/v1/usuarios?correo=eq.${encodeURIComponent(mail)}&select=fecha_nacimiento,nombre_emergencia,num_emergencia&limit=1`,
+    `${SB_URL}/rest/v1/usuarios?correo=eq.${encodeURIComponent(mail)}&select=fecha_nacimiento,nombre_emergencia,num_emergencia,parentesco_emergencia&limit=1`,
     { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` } }
   );
   if (!r.ok) throw new Error("lookup usuarios " + r.status);
@@ -501,6 +501,9 @@ async function _faltanDatosSeguridad(datos, correo) {
   if (vacio(d.fecha_nacimiento) && vacio(p.fecha_nacimiento)) faltan.push("tu fecha de nacimiento");
   if (vacio(em.nombre) && vacio(p.nombre_emergencia)) faltan.push("el nombre de tu contacto de emergencia");
   if (vacio(em.telefono) && vacio(p.num_emergencia)) faltan.push("su teléfono");
+  // [EQ-7b] El parentesco sale IMPRESO entre paréntesis al lado del nombre.
+  // Sin él, el documento firmado lleva "Memo Cobos (__________)".
+  if (vacio(em.parentesco) && vacio(p.parentesco_emergencia)) faltan.push("qué es tuyo (mamá, esposo…)");
   return faltan.length ? faltan.join(" · ") : null;
 }
 
@@ -508,7 +511,7 @@ async function _perfilCoordinadorEnDatos(datos, correo) {
   const mail = String(correo || "").trim();
   if (!mail) return null;
   const r = await fetch(
-    `${SB_URL}/rest/v1/usuarios?correo=eq.${encodeURIComponent(mail)}&select=fecha_nacimiento,nombre_emergencia,num_emergencia&limit=1`,
+    `${SB_URL}/rest/v1/usuarios?correo=eq.${encodeURIComponent(mail)}&select=fecha_nacimiento,nombre_emergencia,num_emergencia,parentesco_emergencia&limit=1`,
     { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` } }
   );
   if (!r.ok) return null;
@@ -520,6 +523,7 @@ async function _perfilCoordinadorEnDatos(datos, correo) {
   if (!d.fecha_nacimiento && perfil.fecha_nacimiento) { d.fecha_nacimiento = perfil.fecha_nacimiento; sumo = true; }
   if (!em.nombre && perfil.nombre_emergencia) { em.nombre = perfil.nombre_emergencia; sumo = true; }
   if (!em.telefono && perfil.num_emergencia) { em.telefono = perfil.num_emergencia; sumo = true; }
+  if (!em.parentesco && perfil.parentesco_emergencia) { em.parentesco = perfil.parentesco_emergencia; sumo = true; }
   if (Object.keys(em).length) d.emergencia = em;
   return sumo ? d : null;
 }

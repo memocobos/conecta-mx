@@ -29,7 +29,7 @@ async function _fusionarPerfilCoordinador(datos, correo) {
   const mail = String(correo || "").trim();
   if (!mail) return datos;
   const r = await fetch(
-    `${SB_URL}/rest/v1/usuarios?correo=eq.${encodeURIComponent(mail)}&select=fecha_nacimiento,nombre_emergencia,num_emergencia&limit=1`,
+    `${SB_URL}/rest/v1/usuarios?correo=eq.${encodeURIComponent(mail)}&select=fecha_nacimiento,nombre_emergencia,num_emergencia,parentesco_emergencia&limit=1`,
     { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` } }
   );
   if (!r.ok) return datos;
@@ -40,6 +40,12 @@ async function _fusionarPerfilCoordinador(datos, correo) {
   if (!d.fecha_nacimiento && perfil.fecha_nacimiento) d.fecha_nacimiento = perfil.fecha_nacimiento;
   if (!em.nombre && perfil.nombre_emergencia) em.nombre = perfil.nombre_emergencia;
   if (!em.telefono && perfil.num_emergencia) em.telefono = perfil.num_emergencia;
+  // [GR-6] El parentesco: la misma línea que contrato-firmar ya tenía desde
+  // EQ-7b. Sin ella, la VISTA PREVIA imprimía "__________" donde la base decía
+  // "Hermana" — y el firmado sí lo ponía. Dos pantallas del mismo contrato
+  // contando cosas distintas es peor que las dos vacías: la que se revisa
+  // antes de mandar es justo esta.
+  if (!em.parentesco && perfil.parentesco_emergencia) em.parentesco = perfil.parentesco_emergencia;
   if (Object.keys(em).length) d.emergencia = em;
   return Object.keys(d).length ? d : datos;
 }

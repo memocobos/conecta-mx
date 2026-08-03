@@ -7498,14 +7498,20 @@ function filtrarGZ(filtro, btn) {
   renderGZ();
 }
 
-function showGZTab(tab, btn) {
+// [EQ-7b] `modoEdicion` viaja hasta aquí a propósito. Sin él había una CARRERA
+// que cazó el arnés: irAEditarMiPerfil llamaba a showGZTab —que dispara
+// renderMiPerfil() en modo LECTURA, asíncrono— y enseguida a renderMiPerfil(true).
+// El formulario se pintaba primero y la lectura, más lenta, LO BORRABA al
+// terminar. El botón "funcionaba" y el formulario aparecía y se iba. Una sola
+// llamada, con el modo correcto desde el principio.
+function showGZTab(tab, btn, modoEdicion) {
   ['lista','invitar','miperfil'].forEach(t => {
     const el = document.getElementById('gz-tab-' + t);
     if (el) el.style.display = t === tab ? '' : 'none';
   });
   document.querySelectorAll('.gz-tab-btn').forEach(b => b.classList.remove('active'));
   if (btn) btn.classList.add('active');
-  if (tab === 'miperfil') renderMiPerfil();
+  if (tab === 'miperfil') renderMiPerfil(!!modoEdicion);
   if (tab === 'lista') renderGZ();
 }
 
@@ -8038,8 +8044,7 @@ async function eliminarTourPasado(tourId, userId) {
 function irAEditarMiPerfil() {
   cerrarModal('ver-perfil');
   const btn = document.querySelector('.gz-tab-btn[onclick*="miperfil"]');
-  showGZTab('miperfil', btn);
-  renderMiPerfil(true);
+  showGZTab('miperfil', btn, /*modoEdicion*/ true);
 }
 
 // ─── MI PERFIL ───

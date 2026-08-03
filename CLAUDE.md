@@ -294,6 +294,17 @@ _Última revisión: 28-jul-2026 (series PP, PG, E1 y KH cerradas)._
   ignoran solo en la RAÍZ (`/*.jpg`): `mapas/`, `imgs/`, `lineups/` y
   `kamehouse.jpg` son del sitio, y un `*.jpg` a secas dejaría de versionar la
   siguiente foto legítima **sin avisar**.
+- **Anclar a la FUNCIÓN no es anclar a la RAMA.** Una función que atiende dos
+  casos con un ternario tiene DOS textos adentro, y una aserción sobre el
+  cuerpo entero encuentra el del otro. `renderDocViaB` pinta coordinador Y
+  giveaway: afirmé "el contrato de coordinador imprime el evento" midiendo el
+  bloque de la función… y lo que encontré era la rama del **giveaway**. La rama
+  del coordinador lleva otra cosa. **Costó pedirle a Memo un campo que el
+  documento nunca usó, y el arnés se quedó VERDE afirmándolo.** Es la prima de
+  "dos objetos con el mismo papel": ahí eran dos funciones y agarré la muerta,
+  aquí es una función con dos caras y agarré la ajena. Al medir texto de una
+  plantilla, **cortar la rama** (el trozo entre el `?` y el `:`) o —mejor—
+  **ejecutar el render** y mirar la salida, que es la única que no tiene ramas.
 - **Copiar un patrón exige leer la plantilla de DESTINO.** El paquete de EQ-4
   rellenaba `evento_nombre` con un texto neutro, copiando lo que `_ctrFormData`
   hace con el contrato laboral. Pero el laboral puede: su plantilla no imprime

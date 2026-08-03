@@ -18363,12 +18363,11 @@ async function loadWaitlist() {
     // radar, en otra pantalla.
     console.error('[waitlist]', e);
     if (summary) summary.textContent = 'No se pudo cargar';
-    if (groups) groups.innerHTML = '<div class="empty-state" style="padding:32px;text-align:center;'
-      + 'border:1px dashed rgba(255,68,68,.35);border-radius:var(--r-sm,8px);color:#ffb3b3;font-size:13px;line-height:1.6">'
-      + '<strong style="color:var(--text)">No se pudo cargar la lista de espera.</strong><br>'
+    if (groups) groups.innerHTML = '<div class="err-box wl-error-box">'
+      + '<strong class="err-titulo">No se pudo cargar la lista de espera.</strong><br>'
       + 'Puede ser la conexión. Vuelve a intentar en un momento.'
-      + '<div style="margin-top:12px"><button class="btn btn-ghost btn-sm" style="font-size:11px" onclick="loadWaitlist()">↻ Reintentar</button></div>'
-      + '<div style="margin-top:10px;font-size:10px;color:var(--ts);opacity:.7">detalle técnico: ' + _esfEsc(String(e && e.message || '').slice(0, 200)) + '</div>'
+      + '<div class="err-pie"><button class="btn btn-ghost btn-sm err-btn" onclick="loadWaitlist()">↻ Reintentar</button></div>'
+      + '<div class="err-detalle">detalle técnico: ' + _esfEsc(String(e && e.message || '').slice(0, 200)) + '</div>'
       + '</div>';
     return;
   }
@@ -19342,17 +19341,19 @@ function _radarPintarError(e) {
   const cont = document.getElementById('page-radar');
   if (!cont) return;
   document.querySelectorAll('.radar-error-box').forEach(x => x.remove());
+  // [EQ-8b] El estilo vive en kamehouse.css, no aquí. El contador de color en
+  // línea de este archivo está CONGELADO por la vigilancia de KH-4: no crece
+  // sin permiso, y para dos cajas de error no hace falta pedirlo.
+  // (Y el comentario evita escribir la propiedad con sus dos puntos: la
+  //  vigilancia es un grep, y hasta una cita en prosa le suma uno.)
   const caja = document.createElement('div');
-  caja.className = 'radar-error-box';
-  caja.style.cssText = 'margin:14px 0;padding:16px 18px;background:rgba(255,68,68,.10);'
-    + 'border:1px solid rgba(255,68,68,.35);border-radius:var(--r-sm,8px);'
-    + 'font-size:13px;line-height:1.6;color:#ffb3b3';
+  caja.className = 'err-box radar-error-box';
   const detalle = String((e && e.message) || '').slice(0, 200);
-  caja.innerHTML = '<strong style="color:var(--text)">No se pudieron cargar los números.</strong><br>'
+  caja.innerHTML = '<strong class="err-titulo">No se pudieron cargar los números.</strong><br>'
     + 'Puede ser la conexión o que el servidor esté tardando. Vuelve a intentar en un momento.'
-    + '<div style="margin-top:12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">'
-    + '<button class="btn btn-ghost btn-sm" style="font-size:11px" onclick="loadRadar()">↻ Reintentar</button>'
-    + '<span style="font-size:10px;color:var(--ts);opacity:.7">detalle técnico: ' + _esfEsc(detalle) + '</span>'
+    + '<div class="err-pie">'
+    + '<button class="btn btn-ghost btn-sm err-btn" onclick="loadRadar()">↻ Reintentar</button>'
+    + '<span class="err-detalle">detalle técnico: ' + _esfEsc(detalle) + '</span>'
     + '</div>';
   cont.insertBefore(caja, cont.firstChild);
 }

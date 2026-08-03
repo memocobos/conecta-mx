@@ -2651,3 +2651,49 @@ input[type="search"],.kh-buscar,.buscador{border-radius:var(--r-sm,8px)}
 @media (hover:none){
   .kh-bottombar button,.kh-bottombar a,.tools-sheet button,.tools-sheet a{min-height:44px}
 }
+
+/* ── [EQ-8] LAS CAJAS DE ERROR QUE SE PUEDEN LEER ──────────────────────────
+   El radar y la lista de espera pegaban `e.message` crudo en la pantalla: el
+   Palacio le enseñaba "Cannot read properties of undefined" a quien solo
+   quería ver sus números. Ahora el detalle técnico va a la consola y aquí
+   vive el aviso que sí se puede leer y accionar.
+
+   [EQ-8b] El estilo vive AQUÍ y no en kamehouse.js a propósito: el contador de
+   estilo en línea del archivo JS está congelado por la vigilancia de KH-4 y no
+   crece sin permiso. Dos cajas de error no ameritan pedirlo. */
+.err-box{
+  padding:16px 18px;
+  background:rgba(255,68,68,.10);
+  border:1px solid rgba(255,68,68,.35);
+  border-radius:var(--r-sm,8px);
+  font-size:13px;
+  line-height:1.6;
+  color:#ffb3b3;
+}
+/* El título en el color de texto normal: es la frase que hay que leer, y el
+   rojo de todo el bloque ya dice que algo salió mal. */
+.err-titulo{ color:var(--text); }
+/* El detalle técnico existe para quien sepa leerlo, pero NO es el mensaje:
+   chiquito, atenuado y debajo del botón que sí sirve. */
+.err-detalle{
+  display:block;
+  margin-top:10px;
+  font-size:10px;
+  color:var(--ts);
+  opacity:.7;
+  word-break:break-word;
+}
+.err-pie{
+  margin-top:12px;
+  display:flex;
+  gap:8px;
+  align-items:center;
+  flex-wrap:wrap;
+}
+.err-pie .err-detalle{ margin-top:0; }
+.err-btn{ font-size:11px; }
+
+/* El aviso del radar se inserta arriba del panel; el de la lista de espera
+   ocupa el lugar del listado. La diferencia es solo de margen. */
+.radar-error-box{ margin:14px 0; }
+.wl-error-box{ text-align:center; padding:32px; border-style:dashed; }

@@ -294,6 +294,21 @@ _Última revisión: 28-jul-2026 (series PP, PG, E1 y KH cerradas)._
   ignoran solo en la RAÍZ (`/*.jpg`): `mapas/`, `imgs/`, `lineups/` y
   `kamehouse.jpg` son del sitio, y un `*.jpg` a secas dejaría de versionar la
   siguiente foto legítima **sin avisar**.
+- **"VISIBLE" EN EL DOM ES UNA CADENA, NO UNA PROPIEDAD.** `display` del propio
+  elemento, `offsetParent` (toda la cadena de ancestros) y el contenido de un
+  `<iframe>` son TRES PREGUNTAS DISTINTAS, y contestar la fácil por la correcta
+  **inventa hallazgos**. En un solo recorrido: un botón dentro de un dropdown
+  oculto se declaró visible (**7 fugas de permisos que no existían**), un
+  `loading-state` en una sub-pestaña cerrada se declaró colgado (**9 spinners
+  falsos**), y dos páginas-iframe se declararon en blanco. **De 49 "hallazgos",
+  36 eran del instrumento.** Es la hermana mayor de "existe" no es "se ve" —
+  pero al revés: aquí el instrumento decía **"se ve"** de lo que nadie ve.
+  Corolario del mismo recorrido: **abrir una pantalla por la puerta equivocada
+  la deja a medio armar.** `showPage('recibos')` no carga su iframe; el usuario
+  entra por `showHerramienta('recibos')`, que sí. Medí la pantalla por una
+  puerta que ningún humano usa y reporté rota una pantalla sana — y estuvo a
+  punto de construirse un arreglo para un problema inexistente. Antes de
+  reportar una pantalla vacía: **abrirla como la abre la gente.**
 - **Anclar a la FUNCIÓN no es anclar a la RAMA.** Una función que atiende dos
   casos con un ternario tiene DOS textos adentro, y una aserción sobre el
   cuerpo entero encuentra el del otro. `renderDocViaB` pinta coordinador Y

@@ -18358,7 +18358,18 @@ async function loadWaitlist() {
       khWaitlist.snapshot(), // [sec-radar-wl]
     ]);
   } catch (e) {
-    if (summary) summary.textContent = 'Error cargando: ' + e.message;
+    // [EQ-8] El mensaje técnico a la consola; a la pantalla, algo que se pueda
+    // hacer. Antes pegaba `e.message` crudo en el resumen — mismo mal que el
+    // radar, en otra pantalla.
+    console.error('[waitlist]', e);
+    if (summary) summary.textContent = 'No se pudo cargar';
+    if (groups) groups.innerHTML = '<div class="empty-state" style="padding:32px;text-align:center;'
+      + 'border:1px dashed rgba(255,68,68,.35);border-radius:var(--r-sm,8px);color:#ffb3b3;font-size:13px;line-height:1.6">'
+      + '<strong style="color:var(--text)">No se pudo cargar la lista de espera.</strong><br>'
+      + 'Puede ser la conexión. Vuelve a intentar en un momento.'
+      + '<div style="margin-top:12px"><button class="btn btn-ghost btn-sm" style="font-size:11px" onclick="loadWaitlist()">↻ Reintentar</button></div>'
+      + '<div style="margin-top:10px;font-size:10px;color:var(--ts);opacity:.7">detalle técnico: ' + _esfEsc(String(e && e.message || '').slice(0, 200)) + '</div>'
+      + '</div>';
     return;
   }
   _waitlistCache = rows || [];
@@ -19302,14 +19313,48 @@ async function loadRadar(silent){
     if (_radarSub === 'pagos')        await loadRadarPagos();
     if (_radarSub === 'alertas')      await loadRadarAlertas();
     if (_radarSub === 'comparativas') await loadRadarComparativas();
+    // Cargó bien: si había un aviso de error de antes, se va. Un error que se
+    // queda pegado después de que la cosa ya funciona miente igual que uno que
+    // no aparece.
+    document.querySelectorAll('.radar-error-box').forEach(x => x.remove());
     if (status) {
       const hora = new Date().toLocaleTimeString('es-MX', { hour:'2-digit', minute:'2-digit' });
       status.textContent = `Última act: ${hora}`;
     }
   } catch (e) {
+    // [EQ-8] El mensaje técnico va a la CONSOLA; a la pantalla va algo que se
+    // pueda leer y hacer. Antes se pintaba `e.message` tal cual, así que el
+    // Palacio le enseñaba "Cannot read properties of undefined (reading
+    // 'main')" a quien solo quería ver sus números. Un stack no es un aviso:
+    // es una confesión que no le sirve a quien la lee.
     console.error('[radar]', e);
-    if (status) status.textContent = 'Error: ' + e.message;
+    if (status) status.textContent = 'No se pudo cargar';
+    _radarPintarError(e);
   }
+}
+
+// [EQ-8] El aviso legible del radar, con su salida. Se pinta ARRIBA del panel
+// activo y se quita solo en la siguiente carga buena.
+function _radarPintarError(e) {
+  // Los sub-paneles del radar no llevan id propio (se cambian con data-sub),
+  // así que el aviso vive arriba de la página entera. Verificado en el HTML:
+  // el único contenedor con id es #page-radar.
+  const cont = document.getElementById('page-radar');
+  if (!cont) return;
+  document.querySelectorAll('.radar-error-box').forEach(x => x.remove());
+  const caja = document.createElement('div');
+  caja.className = 'radar-error-box';
+  caja.style.cssText = 'margin:14px 0;padding:16px 18px;background:rgba(255,68,68,.10);'
+    + 'border:1px solid rgba(255,68,68,.35);border-radius:var(--r-sm,8px);'
+    + 'font-size:13px;line-height:1.6;color:#ffb3b3';
+  const detalle = String((e && e.message) || '').slice(0, 200);
+  caja.innerHTML = '<strong style="color:var(--text)">No se pudieron cargar los números.</strong><br>'
+    + 'Puede ser la conexión o que el servidor esté tardando. Vuelve a intentar en un momento.'
+    + '<div style="margin-top:12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">'
+    + '<button class="btn btn-ghost btn-sm" style="font-size:11px" onclick="loadRadar()">↻ Reintentar</button>'
+    + '<span style="font-size:10px;color:var(--ts);opacity:.7">detalle técnico: ' + _esfEsc(detalle) + '</span>'
+    + '</div>';
+  cont.insertBefore(caja, cont.firstChild);
 }
 
 async function _radarFetch(table, sinceISO, untilISO){

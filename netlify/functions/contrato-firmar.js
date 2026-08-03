@@ -323,6 +323,31 @@ exports.handler = async function (event) {
     // todo lo sellado). Best-effort: correo que no casa o perfil incompleto →
     // datos como estaban (líneas en blanco), la firma jamás se rompe. Lo ya
     // presente en datos (capturado a mano) SIEMPRE gana sobre el perfil.
+    // ═══════════════════════════════════════════════════════════════════════
+    // [EQ-7] EL CANDADO DE LA FIRMA. Mismo trato que YA tiene el giveaway
+    // arriba: si el perfil no trae los datos de seguridad, no se firma.
+    //
+    // Antes esto era best-effort: el perfil vacío hacía que la fusión
+    // devolviera null, el catch se lo tragaba, y la firma seguía de largo
+    // dejando "__________" en la fecha de nacimiento y en el contacto de
+    // emergencia DE UN DOCUMENTO FIRMADO. Un contrato con líneas en blanco no
+    // es un contrato a medias: es uno que ya nadie va a volver a llenar.
+    //
+    // El error es ACCIONABLE y dice a dónde ir. La captura de esos datos vive
+    // en el propio KameHouse (Mi Perfil), y desde EQ-7 el registro los exige,
+    // así que esto solo puede saltar en cuentas nacidas ANTES de la tuerca.
+    try {
+      const faltan = await _faltanDatosSeguridad(contrato.datos, contrato.creador_email);
+      if (faltan) {
+        return bad(400, `Antes de firmar, completa en KameHouse → Mi Perfil: ${faltan}. Son los datos que van impresos en tu contrato y a quién avisamos si algo pasa en el viaje.`);
+      }
+    } catch (e) {
+      // El candado NO es best-effort, pero un fallo de RED tampoco puede
+      // dejar a alguien sin poder firmar: si no se pudo consultar, se sigue
+      // (y el snapshot de abajo hará lo que pueda). Se distingue "el perfil
+      // está incompleto" —que sí bloquea— de "no pude preguntar".
+      console.warn("[contrato-firmar] no se pudo verificar el perfil (se sigue):", e.message);
+    }
     try {
       const congelado = await _perfilCoordinadorEnDatos(contrato.datos, contrato.creador_email);
       if (congelado) patch.datos = congelado;
@@ -448,11 +473,45 @@ exports._masMeses = _masMeses;
 // sobre `datos` SIN pisar lo existente. Devuelve el objeto fusionado o null si
 // no hay nada que congelar (correo sin perfil / perfil vacío). Misma fusión que
 // contrato-obtener — aquí queda SELLADA en la fila al firmar.
+// [EQ-7] ¿Le falta algún dato de seguridad para firmar? Devuelve la lista EN
+// PALABRAS (para el mensaje) o null si está completo.
+//
+// Mira los DOS lados igual que la fusión: lo que ya trae el contrato en `datos`
+// (capturado a mano por Memo) GANA sobre el perfil. Si el dato está en
+// cualquiera de los dos, no falta — si no, el documento saldría con la línea
+// en blanco.
+//
+// Lanza si no puede consultar (el llamador distingue "incompleto" de "no pude
+// preguntar"); devolver "completo" ante un error de red sería el fail-open que
+// esta tuerca vino a cerrar.
+async function _faltanDatosSeguridad(datos, correo) {
+  const mail = String(correo || "").trim();
+  if (!mail) throw new Error("contrato sin correo");
+  const r = await fetch(
+    `${SB_URL}/rest/v1/usuarios?correo=eq.${encodeURIComponent(mail)}&select=fecha_nacimiento,nombre_emergencia,num_emergencia,parentesco_emergencia&limit=1`,
+    { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` } }
+  );
+  if (!r.ok) throw new Error("lookup usuarios " + r.status);
+  const [perfil] = await r.json();
+  const d = datos || {};
+  const em = (d.emergencia && typeof d.emergencia === "object") ? d.emergencia : {};
+  const p = perfil || {};
+  const vacio = v => v == null || String(v).trim() === "";
+  const faltan = [];
+  if (vacio(d.fecha_nacimiento) && vacio(p.fecha_nacimiento)) faltan.push("tu fecha de nacimiento");
+  if (vacio(em.nombre) && vacio(p.nombre_emergencia)) faltan.push("el nombre de tu contacto de emergencia");
+  if (vacio(em.telefono) && vacio(p.num_emergencia)) faltan.push("su teléfono");
+  // [EQ-7b] El parentesco sale IMPRESO entre paréntesis al lado del nombre.
+  // Sin él, el documento firmado lleva "Memo Cobos (__________)".
+  if (vacio(em.parentesco) && vacio(p.parentesco_emergencia)) faltan.push("qué es tuyo (mamá, esposo…)");
+  return faltan.length ? faltan.join(" · ") : null;
+}
+
 async function _perfilCoordinadorEnDatos(datos, correo) {
   const mail = String(correo || "").trim();
   if (!mail) return null;
   const r = await fetch(
-    `${SB_URL}/rest/v1/usuarios?correo=eq.${encodeURIComponent(mail)}&select=fecha_nacimiento,nombre_emergencia,num_emergencia&limit=1`,
+    `${SB_URL}/rest/v1/usuarios?correo=eq.${encodeURIComponent(mail)}&select=fecha_nacimiento,nombre_emergencia,num_emergencia,parentesco_emergencia&limit=1`,
     { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` } }
   );
   if (!r.ok) return null;
@@ -464,6 +523,7 @@ async function _perfilCoordinadorEnDatos(datos, correo) {
   if (!d.fecha_nacimiento && perfil.fecha_nacimiento) { d.fecha_nacimiento = perfil.fecha_nacimiento; sumo = true; }
   if (!em.nombre && perfil.nombre_emergencia) { em.nombre = perfil.nombre_emergencia; sumo = true; }
   if (!em.telefono && perfil.num_emergencia) { em.telefono = perfil.num_emergencia; sumo = true; }
+  if (!em.parentesco && perfil.parentesco_emergencia) { em.parentesco = perfil.parentesco_emergencia; sumo = true; }
   if (Object.keys(em).length) d.emergencia = em;
   return sumo ? d : null;
 }

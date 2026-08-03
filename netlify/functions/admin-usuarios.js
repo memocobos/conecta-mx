@@ -53,7 +53,7 @@ const ROLES_INVITA_SOLO_ROSHI = ['maestro_roshi', 'bulma', 'milk'];
 const COLS_ADMIN_ARR = [
   'id', 'nombre', 'username', 'correo', 'correo_notif', 'celular', 'rol',
   'activo', 'strikes', 'foto_url', 'talla_playera', 'fecha_nacimiento',
-  'num_emergencia', 'nombre_emergencia', 'template_sugerido', 'tema_acento',
+  'num_emergencia', 'nombre_emergencia', 'parentesco_emergencia', 'template_sugerido', 'tema_acento',
   'perfil_completo', 'permisos_extra', 'creado_en', 'ultimo_acceso',
 ];
 const COLS = COLS_ADMIN_ARR.join(',');   // (nombre histórico; sigue siendo la query)
@@ -126,7 +126,7 @@ const CORREO_RE = /^[^\s@,()<>]+@[^\s@,()<>]+\.[a-z]{2,}$/i;
 // Campos que un usuario puede editar de SU PROPIO perfil.
 const SELF_FIELDS = [
   'nombre', 'username', 'celular', 'talla_playera', 'fecha_nacimiento',
-  'correo_notif', 'nombre_emergencia', 'num_emergencia', 'template_sugerido',
+  'correo_notif', 'nombre_emergencia', 'num_emergencia', 'parentesco_emergencia', 'template_sugerido',
   'tema_acento', 'foto_url', 'perfil_completo',
 ];
 // Campos extra que SOLO un admin (maestro_roshi/bulma) puede tocar de otros.

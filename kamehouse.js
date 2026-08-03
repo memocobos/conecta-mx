@@ -7498,14 +7498,20 @@ function filtrarGZ(filtro, btn) {
   renderGZ();
 }
 
-function showGZTab(tab, btn) {
+// [EQ-7b] `modoEdicion` viaja hasta aquí a propósito. Sin él había una CARRERA
+// que cazó el arnés: irAEditarMiPerfil llamaba a showGZTab —que dispara
+// renderMiPerfil() en modo LECTURA, asíncrono— y enseguida a renderMiPerfil(true).
+// El formulario se pintaba primero y la lectura, más lenta, LO BORRABA al
+// terminar. El botón "funcionaba" y el formulario aparecía y se iba. Una sola
+// llamada, con el modo correcto desde el principio.
+function showGZTab(tab, btn, modoEdicion) {
   ['lista','invitar','miperfil'].forEach(t => {
     const el = document.getElementById('gz-tab-' + t);
     if (el) el.style.display = t === tab ? '' : 'none';
   });
   document.querySelectorAll('.gz-tab-btn').forEach(b => b.classList.remove('active'));
   if (btn) btn.classList.add('active');
-  if (tab === 'miperfil') renderMiPerfil();
+  if (tab === 'miperfil') renderMiPerfil(!!modoEdicion);
   if (tab === 'lista') renderGZ();
 }
 
@@ -8018,6 +8024,29 @@ async function eliminarTourPasado(tourId, userId) {
   } catch(e) { alert(e.message); }
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// [EQ-7b] EL TAPÓN DE HOY: "Mi perfil no me deja editar".
+//
+// No era de permisos ni de rol. Quien abre SU PROPIA tarjeta en Guerreros Z
+// —la del badge TÚ, que está ahí a la vista— ve el botón EDITAR y lo pulsa. El
+// botón llamaba a renderMiPerfil(true), que escribe el formulario dentro de
+// #gz-miperfil-content… que vive en la pestaña Mi Perfil, en display:none, y
+// además detrás del modal. El formulario SÍ se generaba: se generaba en un
+// cajón cerrado. Clic y nada — sin error, sin aviso, sin formulario.
+//
+// Le pasaba a CUALQUIER rol. No lo cazamos porque quien ya conoce el Palacio
+// va directo a la pestaña, donde el mismo botón sí funciona.
+//
+// La cura es una sola puerta: se cierra el modal, se salta a la pestaña y ahí
+// se abre la edición. Un solo formulario y un solo guardado — duplicarlos en
+// el modal era la receta de los "asteriscos mentirosos" de EQ-3.
+// ═══════════════════════════════════════════════════════════════════════════
+function irAEditarMiPerfil() {
+  cerrarModal('ver-perfil');
+  const btn = document.querySelector('.gz-tab-btn[onclick*="miperfil"]');
+  showGZTab('miperfil', btn, /*modoEdicion*/ true);
+}
+
 // ─── MI PERFIL ───
 async function renderMiPerfil(modoEdicion = false) {
   if (!currentUser) return;
@@ -8030,7 +8059,7 @@ async function renderMiPerfil(modoEdicion = false) {
     try {
       const uFresh = await khUsuarios.obtener(currentUser.id); // [sec-usuarios]
       const u = uFresh || currentUser;
-      ['nombre','correo_notif','celular','num_emergencia','nombre_emergencia','talla_playera','fecha_nacimiento','template_sugerido','username'].forEach(campo => {
+      ['nombre','correo_notif','celular','num_emergencia','nombre_emergencia','parentesco_emergencia','talla_playera','fecha_nacimiento','template_sugerido','username'].forEach(campo => {
         const inp = document.getElementById('mp-' + campo);
         if (inp && u[campo]) inp.value = u[campo];
       });
@@ -8041,7 +8070,7 @@ async function renderMiPerfil(modoEdicion = false) {
       }
     } catch(e) {
       const u = currentUser;
-      ['nombre','correo_notif','celular','num_emergencia','nombre_emergencia','talla_playera','fecha_nacimiento','template_sugerido','username'].forEach(campo => {
+      ['nombre','correo_notif','celular','num_emergencia','nombre_emergencia','parentesco_emergencia','talla_playera','fecha_nacimiento','template_sugerido','username'].forEach(campo => {
         const inp = document.getElementById('mp-' + campo);
         if (inp && u[campo]) inp.value = u[campo];
       });
@@ -8142,7 +8171,7 @@ function renderPerfilCompleto(u, toursPasados, evAsignados, iniciales, edad, cum
 
       ${esMiPerfil ? `
         <div class="perfil-section" style="display:flex;gap:8px;flex-wrap:wrap">
-          <button class="btn btn-primary" onclick="renderMiPerfil(true)" style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.1em">▸ EDITAR PERFIL</button>
+          <button class="btn btn-primary" onclick="irAEditarMiPerfil()" style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.1em">▸ EDITAR PERFIL</button>
         </div>
       ` : ''}
 
@@ -8278,6 +8307,10 @@ function renderFormPerfil() {
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
           <div><div class="perfil-field-label" style="margin-bottom:6px">Nombre</div><input class="cot-input" id="mp-nombre_emergencia"></div>
           <div><div class="perfil-field-label" style="margin-bottom:6px">Número</div><input class="cot-input" id="mp-num_emergencia" type="tel"></div>
+          <div><div class="perfil-field-label" style="margin-bottom:6px">¿Qué es tuyo?</div><input class="cot-input" id="mp-parentesco_emergencia" placeholder="Mamá, esposo, hermana…"></div>
+        </div>
+        <div style="font-size:11px;color:var(--ts);margin-top:8px;line-height:1.5">
+          Van impresos en tu contrato y es a quien le hablamos si algo pasa en el viaje.
         </div>
       </div>
       <div class="perfil-section">
@@ -8346,8 +8379,16 @@ async function guardarMiPerfil() {
     num_emergencia: document.getElementById('mp-num_emergencia')?.value.trim() || null,
     template_sugerido: document.getElementById('mp-template_sugerido')?.value.trim() || null,
     tema_acento: document.getElementById('mp-tema_acento')?.value || null,
-    perfil_completo: true,
   };
+  // [EQ-7] LA TERCERA PUERTA DEL MISMO SELLO. Mi Perfil también estampaba
+  // perfil_completo=true a ciegas: guardar con los campos de seguridad vacíos
+  // dejaba el sello puesto y la mentira intacta. Ahora el sello es un
+  // VEREDICTO, no un adorno — se pone si los tres datos están, y se quita si
+  // alguien los borra. Así "perfil completo" significa lo mismo en las tres
+  // puertas (registro, Mi Perfil, y el candado de la firma).
+  body.parentesco_emergencia = document.getElementById('mp-parentesco_emergencia')?.value.trim() || null;
+  body.perfil_completo = !!(body.fecha_nacimiento && body.nombre_emergencia
+    && body.num_emergencia && body.parentesco_emergencia);
   if (usernameNuevo) body.username = usernameNuevo;
   if (passNueva) body.password = passNueva; // [sec-usuarios] texto plano; el server lo hashea (bcrypt)
   try {
@@ -8505,6 +8546,18 @@ setInterval(pingSupabase, 518400000);
 // ═══════════════════════════════════════════════════════════════
 // REGISTRO POR INVITACIÓN
 // ═══════════════════════════════════════════════════════════════
+// [EQ-7b] LA SALIDA DE LOS TRES LETREROS DE LINK MUERTO. Antes los tres decían
+// "pídele a Memo que te mande uno nuevo" y ahí acababa la pantalla: ninguno
+// daba POR DÓNDE pedírselo. Quien recibe dos invitaciones seguidas —lo normal
+// en un re-onboarding— abre la vieja y se queda parado.
+function _regBotonWA(asunto) {
+  const url = 'https://wa.me/528119771072?text=' + encodeURIComponent('Hola, ' + asunto);
+  return `<a href="${url}" target="_blank" rel="noopener"
+    style="display:block;margin-top:18px;padding:13px 18px;background:var(--green,#57e389);color:#000;
+           text-align:center;font-weight:800;font-size:13px;letter-spacing:.04em;text-decoration:none;
+           border-radius:var(--r-btn,12px)">Escríbenos por WhatsApp →</a>`;
+}
+
 async function mostrarRegistroInvitado(token) {
   const screen = document.getElementById('login-screen');
   screen.style.display = 'flex';
@@ -8523,9 +8576,10 @@ async function mostrarRegistroInvitado(token) {
       <div class="login-card">
         <div class="login-logo">KAME<span>·</span>HOUSE</div>
         <div class="login-sub" style="color:var(--red)">Link expirado</div>
-        <p style="color:var(--ts);font-size:13px;text-align:center;margin-top:12px">
-          Este link expiró (48 horas). Pídele a Memo que te mande uno nuevo.
+        <p style="color:var(--ts);font-size:13px;text-align:center;margin-top:12px;line-height:1.6">
+          Este link venció (duran 48 horas).<br>Pídenos el nuevo y entras en un minuto.
         </p>
+        ${_regBotonWA('Mi link de KameHouse expiró')}
       </div>`;
     return;
   }
@@ -8535,10 +8589,13 @@ async function mostrarRegistroInvitado(token) {
       <div class="login-bg"></div>
       <div class="login-card">
         <div class="login-logo">KAME<span>·</span>HOUSE</div>
-        <div class="login-sub" style="color:var(--red)">Link inválido o ya usado</div>
-        <p style="color:var(--ts);font-size:13px;text-align:center;margin-top:12px">
-          Este link de invitación ya fue usado o no existe.<br>Pídele a Memo que te mande uno nuevo.
+        <div class="login-sub" style="color:var(--red)">${_regReason === 'usado' ? 'Este link ya se usó' : 'Este link ya no sirve'}</div>
+        <p style="color:var(--ts);font-size:13px;text-align:center;margin-top:12px;line-height:1.6">
+          ${_regReason === 'usado'
+            ? 'Con este link ya creaste tu cuenta. Entra normal con tu usuario y contraseña.<br>Si no te acuerdas de la contraseña, escríbenos y te la reponemos.'
+            : 'Seguramente te mandamos uno más nuevo y este quedó muerto.<br>Pídenos el vigente y entras en un minuto.'}
         </p>
+        ${_regBotonWA(_regReason === 'usado' ? 'No puedo entrar a KameHouse' : 'Necesito mi link nuevo de KameHouse')}
       </div>`;
     return;
   }
@@ -8572,6 +8629,35 @@ async function mostrarRegistroInvitado(token) {
         <label>Celular</label>
         <input type="tel" id="reg-cel" placeholder="81 1234 5678">
       </div>
+
+      <!-- [EQ-7] LOS DATOS DE SEGURIDAD EN VIAJE. No son "datos de perfil":
+           son a quién le hablamos si algo pasa en la carretera, y la fecha que
+           va impresa en el contrato de coordinador. La cuenta se estampaba
+           perfil_completo=true sin ellos, así que nadie los volvía a pedir. -->
+      <div style="border-top:1px solid var(--border);margin:18px 0 14px 0;padding-top:14px">
+        <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.12em;color:var(--gold);text-transform:uppercase;margin-bottom:4px">Datos de seguridad</div>
+        <div style="font-size:11px;color:var(--ts);line-height:1.5">Viajas con nosotros: necesitamos saber a quién avisarle si algo pasa. Tu fecha de nacimiento también va en tu contrato.</div>
+      </div>
+      <div class="login-field">
+        <label>Fecha de nacimiento *</label>
+        <input type="date" id="reg-fnac" max="${_mxFechaStr()}">
+      </div>
+      <div class="login-field">
+        <label>Contacto de emergencia — nombre *</label>
+        <input type="text" id="reg-em-nombre" placeholder="Mamá, pareja, hermano…" autocomplete="off">
+      </div>
+      <div class="login-field">
+        <label>Contacto de emergencia — teléfono *</label>
+        <input type="tel" id="reg-em-tel" placeholder="81 1234 5678" autocomplete="off">
+      </div>
+      <!-- [EQ-7b] El parentesco tiene su propio campo porque el documento lo
+           imprime aparte: "NOMBRE (PARENTESCO) · TEL". Sin él la gente lo
+           escribe DENTRO del nombre —"Memo Cobos (Esposo)"— y el contrato sale
+           con "Memo Cobos (Esposo) (__________)". Pasó de verdad. -->
+      <div class="login-field">
+        <label>¿Qué es tuyo? *</label>
+        <input type="text" id="reg-em-par" placeholder="Mamá, esposo, hermana…" autocomplete="off">
+      </div>
       <div class="login-field">
         <label>Talla playera</label>
         <select id="reg-talla" style="background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:10px 12px;font-size:14px;width:100%">
@@ -8599,6 +8685,17 @@ async function completarRegistro(userId, token) {
   // este aviso amable.
   if (pass.length < 8) { errEl.textContent = 'La contraseña debe tener mínimo 8 caracteres'; return; }
   if (pass !== pass2)  { errEl.textContent = 'Las contraseñas no coinciden'; return; }
+  // [EQ-7] Los datos de seguridad son OBLIGATORIOS. Espejo del candado del
+  // servidor: si solo estuviera allá, el aviso llegaría crudo y hasta el final.
+  const fnac  = (document.getElementById('reg-fnac').value || '').trim();
+  const emNom = (document.getElementById('reg-em-nombre').value || '').trim();
+  const emTel = (document.getElementById('reg-em-tel').value || '').trim();
+  if (!fnac) { errEl.textContent = 'Falta tu fecha de nacimiento'; return; }
+  if (!emNom) { errEl.textContent = 'Falta el nombre de tu contacto de emergencia'; return; }
+  if (emTel.replace(/\D/g, '').length < 10) { errEl.textContent = 'El teléfono de emergencia va a 10 dígitos'; return; }
+  const emPar = (document.getElementById('reg-em-par').value || '').trim();
+  if (!emPar) { errEl.textContent = '¿Qué es tuyo esa persona? (mamá, esposo, hermana…)'; return; }
+  if (fnac >= _mxFechaStr()) { errEl.textContent = 'Revisa tu fecha de nacimiento'; return; }
 
   btn.textContent = 'Creando cuenta…'; btn.disabled = true;
 
@@ -8610,6 +8707,9 @@ async function completarRegistro(userId, token) {
     const res = await khRegistroInvitado({
       accion: 'completar', token, nombre, username, password: pass,
       celular: cel || undefined, talla_playera: talla || undefined,
+      // [EQ-7] sin estos tres el servidor rechaza: no hay sello sin seguridad
+      fecha_nacimiento: fnac, nombre_emergencia: emNom, num_emergencia: emTel,
+      parentesco_emergencia: emPar,
     });
     if (!res.ok) {
       errEl.textContent = res.error || 'Error al crear la cuenta';

@@ -129,10 +129,43 @@ exports.handler = async (event) => {
         }
       }
 
+      // ═══════════════════════════════════════════════════════════════════
+      // [EQ-7] SIN DATOS DE SEGURIDAD NO HAY SELLO.
+      //
+      // Esta puerta estampaba perfil_completo=true con nombre, usuario y
+      // contraseña. Fecha de nacimiento y contacto de emergencia ni se pedían
+      // — y como el perfil ya decía "completo", NADIE los volvía a pedir
+      // nunca. Caso real del estreno: una cuenta nueva con los tres en null y
+      // el sello puesto.
+      //
+      // No son datos de perfil: son a quién le hablamos si algo pasa en la
+      // carretera, y la fecha que va IMPRESA en el contrato de coordinador.
+      // El sello miente si no están, así que el sello no se pone sin ellos.
+      // ═══════════════════════════════════════════════════════════════════
+      const fecha_nacimiento = String(body.fecha_nacimiento || '').trim();
+      const nombre_emergencia = String(body.nombre_emergencia || '').trim();
+      const num_emergencia = String(body.num_emergencia || '').trim();
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha_nacimiento)) {
+        return { statusCode: 400, headers, body: JSON.stringify({ ok: false, error: 'Falta tu fecha de nacimiento' }) };
+      }
+      // Hoy en Monterrey, no en UTC: después de las 6pm de acá, toISOString ya
+      // es mañana allá y una fecha de hoy pasaría por futura.
+      const hoyMx = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Monterrey' });
+      if (fecha_nacimiento >= hoyMx) {
+        return { statusCode: 400, headers, body: JSON.stringify({ ok: false, error: 'Revisa tu fecha de nacimiento' }) };
+      }
+      if (!nombre_emergencia) {
+        return { statusCode: 400, headers, body: JSON.stringify({ ok: false, error: 'Falta el nombre de tu contacto de emergencia' }) };
+      }
+      if (num_emergencia.replace(/\D/g, '').length < 10) {
+        return { statusCode: 400, headers, body: JSON.stringify({ ok: false, error: 'El teléfono de emergencia va a 10 dígitos' }) };
+      }
+
       const password_hash = await bcrypt.hash(password, BCRYPT_COST);
       const update = {
         nombre, username, password_hash,
         activo: true, invite_usado: true, invite_token: null,
+        fecha_nacimiento, nombre_emergencia, num_emergencia,
         perfil_completo: true,
       };
       const cel = String(body.celular || '').trim();

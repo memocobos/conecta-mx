@@ -8346,8 +8346,14 @@ async function guardarMiPerfil() {
     num_emergencia: document.getElementById('mp-num_emergencia')?.value.trim() || null,
     template_sugerido: document.getElementById('mp-template_sugerido')?.value.trim() || null,
     tema_acento: document.getElementById('mp-tema_acento')?.value || null,
-    perfil_completo: true,
   };
+  // [EQ-7] LA TERCERA PUERTA DEL MISMO SELLO. Mi Perfil también estampaba
+  // perfil_completo=true a ciegas: guardar con los campos de seguridad vacíos
+  // dejaba el sello puesto y la mentira intacta. Ahora el sello es un
+  // VEREDICTO, no un adorno — se pone si los tres datos están, y se quita si
+  // alguien los borra. Así "perfil completo" significa lo mismo en las tres
+  // puertas (registro, Mi Perfil, y el candado de la firma).
+  body.perfil_completo = !!(body.fecha_nacimiento && body.nombre_emergencia && body.num_emergencia);
   if (usernameNuevo) body.username = usernameNuevo;
   if (passNueva) body.password = passNueva; // [sec-usuarios] texto plano; el server lo hashea (bcrypt)
   try {
@@ -8572,6 +8578,27 @@ async function mostrarRegistroInvitado(token) {
         <label>Celular</label>
         <input type="tel" id="reg-cel" placeholder="81 1234 5678">
       </div>
+
+      <!-- [EQ-7] LOS DATOS DE SEGURIDAD EN VIAJE. No son "datos de perfil":
+           son a quién le hablamos si algo pasa en la carretera, y la fecha que
+           va impresa en el contrato de coordinador. La cuenta se estampaba
+           perfil_completo=true sin ellos, así que nadie los volvía a pedir. -->
+      <div style="border-top:1px solid var(--border);margin:18px 0 14px 0;padding-top:14px">
+        <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.12em;color:var(--gold);text-transform:uppercase;margin-bottom:4px">Datos de seguridad</div>
+        <div style="font-size:11px;color:var(--ts);line-height:1.5">Viajas con nosotros: necesitamos saber a quién avisarle si algo pasa. Tu fecha de nacimiento también va en tu contrato.</div>
+      </div>
+      <div class="login-field">
+        <label>Fecha de nacimiento *</label>
+        <input type="date" id="reg-fnac" max="${_mxFechaStr()}">
+      </div>
+      <div class="login-field">
+        <label>Contacto de emergencia — nombre *</label>
+        <input type="text" id="reg-em-nombre" placeholder="Mamá, pareja, hermano…" autocomplete="off">
+      </div>
+      <div class="login-field">
+        <label>Contacto de emergencia — teléfono *</label>
+        <input type="tel" id="reg-em-tel" placeholder="81 1234 5678" autocomplete="off">
+      </div>
       <div class="login-field">
         <label>Talla playera</label>
         <select id="reg-talla" style="background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:10px 12px;font-size:14px;width:100%">
@@ -8599,6 +8626,15 @@ async function completarRegistro(userId, token) {
   // este aviso amable.
   if (pass.length < 8) { errEl.textContent = 'La contraseña debe tener mínimo 8 caracteres'; return; }
   if (pass !== pass2)  { errEl.textContent = 'Las contraseñas no coinciden'; return; }
+  // [EQ-7] Los datos de seguridad son OBLIGATORIOS. Espejo del candado del
+  // servidor: si solo estuviera allá, el aviso llegaría crudo y hasta el final.
+  const fnac  = (document.getElementById('reg-fnac').value || '').trim();
+  const emNom = (document.getElementById('reg-em-nombre').value || '').trim();
+  const emTel = (document.getElementById('reg-em-tel').value || '').trim();
+  if (!fnac) { errEl.textContent = 'Falta tu fecha de nacimiento'; return; }
+  if (!emNom) { errEl.textContent = 'Falta el nombre de tu contacto de emergencia'; return; }
+  if (emTel.replace(/\D/g, '').length < 10) { errEl.textContent = 'El teléfono de emergencia va a 10 dígitos'; return; }
+  if (fnac >= _mxFechaStr()) { errEl.textContent = 'Revisa tu fecha de nacimiento'; return; }
 
   btn.textContent = 'Creando cuenta…'; btn.disabled = true;
 
@@ -8610,6 +8646,8 @@ async function completarRegistro(userId, token) {
     const res = await khRegistroInvitado({
       accion: 'completar', token, nombre, username, password: pass,
       celular: cel || undefined, talla_playera: talla || undefined,
+      // [EQ-7] sin estos tres el servidor rechaza: no hay sello sin seguridad
+      fecha_nacimiento: fnac, nombre_emergencia: emNom, num_emergencia: emTel,
     });
     if (!res.ok) {
       errEl.textContent = res.error || 'Error al crear la cuenta';

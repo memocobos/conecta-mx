@@ -39,7 +39,11 @@ const ACCIONES = { listar: null, crear: null, eliminar: null };
 // Whitelist de columnas que SÍ viajan al navegador / se pueden setear.
 const COLS = [
   'id', 'usuario_id', 'artista', 'ciudad', 'fecha_aprox',
-  'tipo_tour', 'rol_en_tour', 'notas', 'created_at',
+  // [GR-1] `creado_en`, NO `created_at`: así se llama la columna en
+  // tours_pasados. PostgREST responde 400 a un select con una columna que no
+  // existe, así que la lista de tours moría ENTERA — y con ella Mi Perfil y el
+  // Ranking, para TODO el equipo. Una palabra.
+  'tipo_tour', 'rol_en_tour', 'notas', 'creado_en',
 ].join(',');
 
 // Campos que el cliente puede setear al crear (usuario_id se valida aparte).

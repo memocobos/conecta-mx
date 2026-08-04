@@ -26,6 +26,9 @@
 
 const { aplicarModoPrueba } = require('./_lib/correo-guard');
 const { cargarDisponibilidad, evaluarZona, HOLD_MINUTOS } = require('./_lib/disponibilidad');
+// [GR-8b] Para derivar evento_nombre del catálogo en vez de creerle al cliente.
+// Misma autoridad que usa _lib/precio-zona para sellar el precio (GR-5).
+const { fetchCatalogo } = require('./_lib/catalogo-index');
 // [GR-5] La AUTORIDAD del precio y del separo. Best-effort en el require para
 // no tumbar la solicitud si el módulo faltara: sin él se sigue como antes, y
 // se deja dicho en la bitácora.
@@ -118,10 +121,62 @@ exports.handler = async (event) => {
   }
   fila.num_personas = numPersonas;
 
+
   const paquete = String(fila.paquete).toUpperCase();
   const zona = String(fila.zona || '').trim();
   const eventoIdSolicitud = String(fila.evento_id); // clave verbatim (incluye #idx multifecha)
   const tieneComprobante = fila.comprobante_separo_url != null && String(fila.comprobante_separo_url).trim() !== '';
+  // ═══════════════════════════════════════════════════════════════════════
+  // [GR-8b] EL NOMBRE DEL EVENTO TAMBIÉN SALE DEL SERVIDOR.
+  //
+  // Mismo principio que GR-5 con el precio: el servidor no le cree al
+  // navegador. `evento_nombre` era whitelist pura — se insertaba tal cual y de
+  // ahí lo tomaban los DOS correos. Si el cliente lo omitía, al cliente le
+  // llegaba: "✅ Recibimos tu solicitud para undefined".
+  //
+  // Se distinguen DOS fallas que no son la misma:
+  //
+  //   · catálogo ILEGIBLE (Netlify caído, index no responde) → fail-soft, igual
+  //     que GR-5: no se tumba una venta por una falla de infraestructura. Se
+  //     usa lo que mandó el cliente, y si tampoco trae nada, ahí sí se rechaza
+  //     — insertar una solicitud sin nombre solo mueve el "undefined" al correo.
+  //
+  //   · catálogo LEGIBLE pero el evento NO está → se rechaza. No es un fallo
+  //     de red: es un evento que no existe, y ninguna solicitud debería
+  //     nacer apuntando a la nada.
+  //
+  // La llave lleva #idx en multifecha (`slug#0`), así que se parte por '#'
+  // para buscar en el catálogo y se vuelve a pegar la etiqueta de la fecha.
+  const _idBase = eventoIdSolicitud.split('#')[0];
+  const _idxFecha = eventoIdSolicitud.includes('#')
+    ? parseInt(eventoIdSolicitud.split('#')[1], 10) : null;
+  let _catalogo = null;
+  try { _catalogo = await fetchCatalogo(); } catch (_) { _catalogo = null; }
+
+  if (_catalogo) {
+    const evCat = _catalogo[_idBase];
+    if (!evCat) {
+      return { statusCode: 400, headers, body: JSON.stringify({
+        error: `El evento "${_idBase}" no está en el catálogo. Refresca la página y vuelve a intentarlo.` }) };
+    }
+    let nombre = evCat.nombre || _idBase;
+    // Multifecha: se conserva la etiqueta de la fecha elegida, si no el correo
+    // de un evento de 3 días diría lo mismo para los tres.
+    if (Number.isInteger(_idxFecha) && Array.isArray(evCat.multifecha)) {
+      const f = evCat.multifecha.find(m => m.idx === _idxFecha);
+      if (f && f.lbl) nombre += ' · ' + f.lbl;
+    }
+    fila.evento_nombre = nombre;
+  } else {
+    // Catálogo ilegible: se degrada a lo del cliente, pero nunca a undefined.
+    const delCliente = fila.evento_nombre != null ? String(fila.evento_nombre).trim() : '';
+    if (!delCliente) {
+      return { statusCode: 503, headers, body: JSON.stringify({
+        error: 'No se pudo leer el catálogo para confirmar el evento. Intenta de nuevo en un momento.' }) };
+    }
+    fila.evento_nombre = delCliente;
+    console.warn('[GR-8b] catálogo ilegible, se usa el evento_nombre del cliente:', delCliente);
+  }
 
   // ═══════════════════════════════════════════════════════════════════════
   // [GR-5] EL SERVIDOR NO LE CREE AL NAVEGADOR.

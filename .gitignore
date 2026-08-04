@@ -40,3 +40,6 @@ fotos-tours/
 /*.png
 !/icon-*.png
 !/kamehouse.jpg
+
+# Local Netlify folder
+.netlify

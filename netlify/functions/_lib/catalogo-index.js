@@ -80,6 +80,11 @@ async function fetchCatalogo() {
         nombre: (e.a != null) ? String(e.a) : null,
         fecha:  (e.f != null) ? String(e.f) : null,   // display humano ("13 dic 2026")
         venue:  (e.v != null) ? String(e.v) : null,
+        // [GR-8] ADITIVO para waitlist-notify: el estado de venta del evento.
+        // Cadena vacía = A LA VENTA; 'proximamente' | 'agotado' | 'ultimos' si no.
+        // Se normaliza a '' (nunca null) porque la comparación de la lista de
+        // espera es `ev.st === ""` y un null la volvería falsa para siempre.
+        st: (e.st != null) ? String(e.st) : '',
         ciudad: _ciudadDeVenue(e.v),
         banco:      _cuenta(e.banco),                 // objeto o null (BANCO_* ya sembrado)
         ds: e.ds || null,

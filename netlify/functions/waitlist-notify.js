@@ -2,11 +2,13 @@
 //
 // 2 modos:
 //
-//  (1) AUTO (cron diario): hace fetch del index.html en producción, extrae el
-//      array EV con regex, compara cada evento contra eventos_estado_snapshot.
-//      Si el snapshot dice 'proximamente' y el actual es '' (vacío = activo),
-//      dispara emails a todos los registros notificado=false de ese evento.
-//      Finalmente actualiza el snapshot con los estados actuales.
+//  (1) AUTO (cron diario): lee el catálogo con _lib/catalogo-index y compara
+//      cada evento contra eventos_estado_snapshot. Si el snapshot dice
+//      'proximamente' y el actual es '' (vacío = a la venta), dispara emails a
+//      todos los registros notificado=false de ese evento. Finalmente
+//      actualiza el snapshot con los estados actuales.
+//      [GR-8] Un evento que el snapshot NO conocía se SIEMBRA sin avisar: no
+//      es una transición, es la primera vez que lo vemos.
 //
 //  (2) FORCE (botón "Notificar a todos" en kamehouse):
 //      ?force=true&evento_id=X — manda emails a la lista de espera de ese
@@ -16,6 +18,8 @@
 
 const { verifyAdminAuthLive, corsCheck } = require('./_lib/verify-admin');
 const { aplicarModoPrueba } = require('./_lib/correo-guard');
+// [GR-8] La única fuente del catálogo. Ver la nota donde vivía extractEventos.
+const { fetchCatalogo } = require('./_lib/catalogo-index');
 
 const SB_URL      = "https://npgnhsmwpcipxgvfxrho.supabase.co";
 const SB_KEY      = process.env.SUPABASE_SERVICE_KEY_KAMEHOUSE;
@@ -58,46 +62,15 @@ function escapeHtml(s) {
   }[c]));
 }
 
-// Extrae { id, st, a, f, v } de cada objeto del array EV en el HTML.
-// Regex tolerante: lee cada `{...}` que contenga id:'xxx'.
-function extractEventos(html) {
-  // Recorta a partir de `var EV=[` (o `EV =[`) para no escanear archivo completo.
-  const startMatch = html.match(/var\s+EV\s*=\s*\[/);
-  if (!startMatch) return [];
-  const start = startMatch.index + startMatch[0].length - 1; // posición del '['
-  // Encuentra el ']' de cierre balanceando corchetes.
-  let depth = 0, end = -1, inStr = false, strCh = '';
-  for (let i = start; i < html.length; i++) {
-    const c = html[i], prev = html[i-1];
-    if (inStr) { if (c === strCh && prev !== '\\') inStr = false; continue; }
-    if (c === "'" || c === '"') { inStr = true; strCh = c; continue; }
-    if (c === '[' || c === '{') depth++;
-    else if (c === ']' || c === '}') { depth--; if (depth === 0 && c === ']') { end = i; break; } }
-  }
-  if (end < 0) return [];
-  const arr = html.slice(start, end + 1);
-
-  const out = [];
-  // Por cada objeto: id:'x', st:'y' (st puede estar vacío: st:'')
-  const objRe = /\{[^{}]*id:\s*'([^']+)'[^{}]*\}/g;
-  let m;
-  while ((m = objRe.exec(arr))) {
-    const blob = m[0];
-    const id = m[1];
-    const stM = blob.match(/(?:^|,)\s*st\s*:\s*'([^']*)'/);
-    const aM  = blob.match(/(?:^|,)\s*a\s*:\s*'([^']*)'/);
-    const fM  = blob.match(/(?:^|,)\s*f\s*:\s*'([^']*)'/);
-    const vM  = blob.match(/(?:^|,)\s*v\s*:\s*'([^']*)'/);
-    out.push({
-      id,
-      st: stM ? stM[1] : '',
-      a:  aM  ? aM[1]  : id,
-      f:  fM  ? fM[1]  : '',
-      v:  vM  ? vM[1]  : '',
-    });
-  }
-  return out;
-}
+// [GR-8] Aquí vivía extractEventos(): un extractor de regex PROPIO de esta
+// función, que leía el array EV del HTML. Se eliminó entero. Su patrón
+// /\{[^{}]*id:...[^{}]*\}/ no admitía llaves anidadas, y casi todo evento trae
+// zonas:[{...}] o flashPromo:{...}: veía 18 de 94 eventos y CERO de los 54 que
+// están a la venta, así que la transición que dispara los avisos —proximamente
+// a la venta— era inalcanzable y la lista de espera no avisaba nunca.
+// Ahora el catálogo sale de _lib/catalogo-index (fetchCatalogo), la MISMA
+// fuente que ya usan bodega, contratos, cobranza y transporte: una sola
+// autoridad y cero copias del parser.
 
 function emailTemplate({ nombre, evento_nombre, fecha, venue, link, promo }) {
   const dudasUrl = "https://wa.me/528119771072";
@@ -267,18 +240,24 @@ exports.handler = async function (event) {
   }
 
   // ── AUTO MODE (cron): scrape index.html y detecta transiciones ──
-  let html = "";
-  try {
-    const r = await fetch(SITE + "/index.html", { headers: { "Cache-Control": "no-cache" } });
-    html = await r.text();
-  } catch (e) {
-    console.error("[waitlist-notify] fetch index.html falló:", e.message);
-    return bad(502, "No se pudo leer index.html");
-  }
-
-  const eventos = extractEventos(html);
-  if (!eventos.length) return bad(500, "No se pudieron extraer eventos del HTML");
-  console.log(`[waitlist-notify] eventos extraídos: ${eventos.length}`);
+  // [GR-8] El catálogo sale de _lib/catalogo-index — la MISMA autoridad que ya
+  // usan bodega, contratos, cobranza y transporte. Antes esta función tenía su
+  // propio extractor de regex y veía 18 de 94 eventos: su patrón
+  // /\{[^{}]*id:'…'[^{}]*\}/ prohíbe llaves anidadas, y casi todo evento trae
+  // zonas:[{…}] o flashPromo:{…}. Resultado medido: de los 54 eventos A LA
+  // VENTA no veía NINGUNO, y como la transición que dispara es
+  // "proximamente → a la venta", la lista de espera no podía avisar jamás.
+  const catalogo = await fetchCatalogo();
+  if (!catalogo) return bad(502, "No se pudo leer el catálogo");
+  const eventos = Object.keys(catalogo).map(id => ({
+    id,
+    st: catalogo[id].st || "",
+    a:  catalogo[id].nombre || id,
+    f:  catalogo[id].fecha  || "",
+    v:  catalogo[id].venue  || "",
+  }));
+  if (!eventos.length) return bad(500, "El catálogo vino vacío");
+  console.log(`[waitlist-notify] eventos del catálogo: ${eventos.length}`);
 
   let snapshot = [];
   try { snapshot = await sb(`eventos_estado_snapshot?select=evento_id,estado`); }
@@ -286,10 +265,26 @@ exports.handler = async function (event) {
   const prev = {};
   for (const s of snapshot) prev[s.evento_id] = s.estado;
 
+  // ═══ LA SIEMBRA ══════════════════════════════════════════════════════════
+  // El snapshot se escribió durante meses con la lista CIEGA de 18 eventos, así
+  // que los ~76 que entran hoy son desconocidos para él. Un evento desconocido
+  // NO es una transición: lleva a saber cuánto a la venta, y avisarle hoy a su
+  // lista de espera sería mandar "¡ya está disponible!" por algo que abrió hace
+  // meses — a toda la lista, de golpe.
+  //
+  // Regla: solo se compara contra un estado que el snapshot YA conocía. Lo
+  // desconocido se SIEMBRA callado (lo escribe upsertSnapshot al final, como
+  // siempre) y queda listo para comparar en la siguiente corrida.
+  //
+  // Es por evento, no por corrida: un evento nuevo del catálogo se siembra sin
+  // ruido sin bloquear la transición real de otro que sí venía observado.
+  let sembrados = 0;
   let totalSent = 0, totalNotif = 0, eventosDisparados = 0;
   for (const ev of eventos) {
+    const conocido = Object.prototype.hasOwnProperty.call(prev, ev.id);
+    if (!conocido) { sembrados++; continue; }   // primera vez que lo vemos → solo se siembra
     const before = prev[ev.id];
-    // Transición proximamente -> activo (st vacío). Solo si tenemos snapshot previo.
+    // Transición proximamente -> a la venta (st vacío).
     if (before === "proximamente" && ev.st === "") {
       eventosDisparados++;
       try {
@@ -299,10 +294,12 @@ exports.handler = async function (event) {
       } catch (e) { console.error(`[waitlist-notify] ${ev.id} falló:`, e.message); }
     }
   }
+  if (sembrados) console.log(`[waitlist-notify] sembrados sin avisar: ${sembrados}`);
 
   // Actualiza snapshot con los estados actuales (insert + update).
   try { await upsertSnapshot(eventos); }
   catch (e) { console.error("[waitlist-notify] upsert snapshot:", e.message); }
 
-  return ok({ ok: true, mode: "auto", eventos: eventos.length, disparados: eventosDisparados, encolados: totalNotif, enviados: totalSent });
+  return ok({ ok: true, mode: "auto", eventos: eventos.length, sembrados,
+    disparados: eventosDisparados, encolados: totalNotif, enviados: totalSent });
 };

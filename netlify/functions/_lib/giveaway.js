@@ -34,8 +34,30 @@ const ALLOWED_ORIGINS_DEV = ['http://localhost:8888', 'http://localhost:3999', '
 // sufijo malicioso (evil--conectareynosa.netlify.app.attacker.com) no pase.
 const NETLIFY_PREVIEW_RE = /^https:\/\/[a-z0-9-]+--conectareynosa\.netlify\.app$/;
 
+// ═══════════════════════════════════════════════════════════════════════════
+// ORIGIN AUSENTE ≠ ORIGIN AJENO.
+//
+// El navegador manda `Origin` en los POST del mismo sitio, pero LO OMITE en
+// los GET del mismo sitio. Tratar la ausencia como prohibición dejaba a
+// giveaway-lista (la única GET de las tres) contestando 403 "origen no
+// permitido" a una petición legítima de /sorteo — y el síntoma engañaba,
+// porque /giveaway (POST) funcionaba desde el mismo dominio.
+//
+// Para una petición del mismo sitio, AUSENTE no es AJENO. Y lo que se afloja
+// es poco: sin `Origin` no hay página cruzada que esté leyendo la respuesta —
+// ese header lo pone el navegador y no se puede falsificar desde JS. Lo que
+// esta comprobación frena —otro sitio llamando a la function— SIGUE frenado,
+// porque ahí el navegador SÍ manda su Origin y cae en el rechazo de abajo.
+//
+// El valor de retorno cambia de forma a propósito: '' significa "permitido,
+// sin origen que reflejar" y null sigue significando "rechazado". Por eso
+// `cabeceras()` ya escribía `origin || 'null'` — el caso vacío estaba previsto.
 function corsCheck(event) {
-  const origin = (event.headers && (event.headers.origin || event.headers.Origin)) || '';
+  const h = (event && event.headers) || {};
+  const crudo = h.origin || h.Origin;
+  // Sin header: misma-origen (o un curl, que no es lo que esto protege).
+  if (crudo == null || crudo === '') return '';
+  const origin = crudo;
   if (ALLOWED_ORIGINS.includes(origin)) return origin;
   if (NETLIFY_PREVIEW_RE.test(origin)) return origin;
   if (process.env.NETLIFY_DEV === 'true' && ALLOWED_ORIGINS_DEV.includes(origin)) return origin;

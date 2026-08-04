@@ -13,7 +13,12 @@ exports.handler = async (event) => {
 
   if (event.httpMethod === 'OPTIONS') return { statusCode: 204, headers, body: '' };
   if (event.httpMethod !== 'GET') return G.json(405, headers, { ok: false, error: 'Método no permitido' });
-  if (!origin) return G.json(403, headers, { ok: false, error: 'Origen no permitido' });
+  // `=== null` y no `!origin`: corsCheck devuelve '' cuando NO vino el header
+  // (petición del mismo sitio, legítima) y null cuando el origen es AJENO.
+  // Con `!origin` las dos caían en el mismo 403 y el arreglo de _lib no servía
+  // de nada — medido: el cambio en la librería solo, no movió una sola línea
+  // del resultado.
+  if (origin === null) return G.json(403, headers, { ok: false, error: 'Origen no permitido' });
   if (!G.tokenAdminValido(event)) return G.json(401, headers, { ok: false, error: 'Token inválido' });
 
   const falta = G.faltaEnv();

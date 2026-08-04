@@ -144,7 +144,6 @@ input:focus-visible{outline:2px solid var(--c-amarillo);outline-offset:2px;borde
 .bases{margin-top:40px;padding-top:22px;border-top:1px solid var(--c-line)}
 .bases h3{font-family:var(--font-display);font-size:15px;letter-spacing:.16em;text-transform:uppercase;color:var(--c-muted);margin:0 0 12px}
 .bases ol{margin:0;padding-left:20px;font-size:13px;line-height:1.75;color:rgba(255,255,255,.68)}
-.ftr{margin-top:34px;text-align:center;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:rgba(255,255,255,.3)}
 
 .ir-form{
   position:fixed;left:50%;bottom:14px;transform:translateX(-50%) translateY(0);
@@ -155,6 +154,151 @@ input:focus-visible{outline:2px solid var(--c-amarillo);outline-offset:2px;borde
 .ir-form[hidden]{display:none}
 .ir-form.entra{opacity:0;transform:translateX(-50%) translateY(14px)}
 @media (min-width:640px){ .ir-form{bottom:22px} }
+
+
+/* ═══ IDENTIDAD DE LA CASA ═══════════════════════════════════════════════
+   La barra y el pie NO están reinterpretados: son los del index.html.
+   En el index estos valores llegan en DOS capas —la hoja base y el bloque de
+   rediseño de más abajo que la pisa con !important—. Aquí van ya fundidos en
+   una sola, que es lo que el navegador acaba pintando allá: 60px de alto,
+   vidrio, borde rojo con la línea que corre y la caja amarilla del logo.
+
+   Lo que NO se copió, y por qué:
+   · .nav-back  → su onclick llama goBack(), que solo existe en el index. Un
+                  botón que revienta la consola al tocarlo no es identidad.
+   · .nav-sede  → cuelga del catálogo; aquí no hay evento seleccionado.       */
+.nav{background:rgba(6,6,6,.82);-webkit-backdrop-filter:blur(14px) saturate(150%);
+  backdrop-filter:blur(14px) saturate(150%);border-bottom:3px solid var(--c-rojo);
+  box-shadow:0 10px 30px rgba(0,0,0,.55);height:60px;padding:0;
+  display:flex;align-items:stretch;justify-content:space-between;
+  position:sticky;top:0;z-index:200;overflow:hidden}
+.nav::after{content:'';position:absolute;bottom:-3px;left:0;right:0;height:3px;
+  background:linear-gradient(90deg,var(--c-rojo),var(--c-rosa),var(--c-rojo));
+  background-size:200% 100%;animation:cmxSlide 3s linear infinite}
+@keyframes cmxSlide{to{background-position:200% 0}}
+.nav-left,.nav-right{display:flex;align-items:stretch;gap:0}
+.nav-right{min-width:0;overflow:hidden}
+.nav .logo{display:flex;align-items:stretch;text-decoration:none;margin:0;font-size:inherit;letter-spacing:normal;text-transform:none}
+.nav .logo-box{background:linear-gradient(135deg,#f4ff6b,#dcff2e);padding:0 14px;
+  display:flex;align-items:center;clip-path:polygon(0 0,100% 0,92% 100%,0 100%)}
+.nav .logo-txt{font-weight:900;font-size:15px;color:#000;letter-spacing:.04em;text-transform:uppercase;font-family:'Montserrat',sans-serif}
+.nav .logo-mx{font-weight:900;font-style:italic;font-size:17px;color:#fff;margin-left:7px;align-self:center;font-family:'Montserrat',sans-serif}
+.nav-cli-links{display:flex;align-items:center;border-right:1px solid rgba(255,255,255,.1);padding:0 4px}
+.nav-cli-link{display:flex;align-items:center;padding:0 10px;color:#fff;text-decoration:none;
+  font-weight:900;font-size:11px;letter-spacing:.06em;text-transform:uppercase;
+  font-family:'Montserrat',sans-serif;border-radius:12px;transition:color .15s,background .15s}
+.nav-cli-link:hover{color:#000;background:var(--c-amarillo)}
+.nav-cli-link .nlt{display:inline}
+.nav-cli-link .nli{display:none;font-size:18px;line-height:1}
+.nav-cli-sep{color:rgba(255,255,255,.25);font-weight:700;align-self:center}
+.nav-socials{display:flex;align-items:stretch}
+.nav-social{display:flex;align-items:center;justify-content:center;width:44px;
+  color:rgba(255,255,255,.4);text-decoration:none;transition:color .15s,background .15s}
+.nav-social svg{width:18px;height:18px}
+.nav-social:hover{color:#fff}
+.nav-social.wa:hover{color:#25D366;background:rgba(37,211,102,.1)}
+.nav-social.ig:hover{color:#ff4bd1;background:rgba(255,75,209,.1)}
+.nav-social.fb:hover{color:#1877F2;background:rgba(24,119,242,.1)}
+.nav-social.tt:hover{color:#fff;background:rgba(255,255,255,.08)}
+@media(max-width:720px){
+  .nav-cli-link{padding:0 8px}
+  .nav-cli-link .nlt{display:none}
+  .nav-cli-link .nli{display:inline-block}
+  .nav-cli-sep{display:none}
+}
+@media(max-width:420px){ .nav-social{width:36px} .nav-social svg{width:15px;height:15px} }
+@media(min-width:768px){ .nav{padding:0 24px} }
+
+/* El pie del index, con su columna de Redes. Las ligas salen de ahí tal cual:
+   ninguna URL de este archivo se inventó. */
+.ftr-v2{background:#050505;border-top:3px solid var(--c-rojo);position:relative;
+  padding:clamp(40px,6vw,72px) clamp(20px,5vw,80px) clamp(28px,4vw,40px);margin-top:0}
+.ftr-v2-grid{display:grid;grid-template-columns:1fr;gap:32px;max-width:1280px;margin:0 auto;align-items:start}
+@media(min-width:800px){ .ftr-v2-grid{grid-template-columns:1fr 2fr;gap:60px} }
+.ftr-v2-brand{display:flex;align-items:center;gap:10px;margin-bottom:14px}
+.ftr-v2-brand-box{background:var(--c-rojo);padding:4px 12px}
+.ftr-v2-brand-txt{font-weight:900;color:#000;letter-spacing:.04em;text-transform:uppercase;font-size:14px;font-family:'Montserrat',sans-serif}
+.ftr-v2-brand-mx{font-weight:900;font-style:italic;font-size:16px;color:#fff}
+.ftr-v2-tag{font-size:11px;color:var(--c-muted);line-height:1.6;font-weight:500;max-width:320px;margin-bottom:18px}
+.ftr-v2-ctas{display:flex;flex-direction:column;gap:8px;max-width:260px}
+/* La fila de botones de redes: NO existe en el index —allá las redes son texto
+   en su columna—. Es lo único que este pie añade, y usa las mismas clases
+   .nav-social de la barra para que los dos sitios de la página no se
+   contradigan entre sí. 40px de alto: blanco de toque cómodo con el pulgar. */
+.ftr-v2-redes{display:flex;gap:4px;margin-top:16px}
+.ftr-v2-redes .nav-social{height:40px;border-radius:10px}
+.ftr-v2-cta{display:inline-flex;align-items:center;justify-content:center;gap:8px;
+  padding:12px 20px;font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.1em;
+  text-decoration:none;font-family:'Montserrat',sans-serif;border-radius:12px;
+  transition:transform .2s ease,background .2s ease,box-shadow .2s ease}
+/* Azul, no rojo: el index pisa este CTA con #0000cd más abajo en su hoja.
+   El halo ROJO bajo un botón AZUL viene heredado tal cual del index (su línea
+   1928): es un resto de cuando el CTA era rojo. Se copia con todo y resto a
+   propósito —la paridad es el encargo—. Si algún día se corrige, se corrige
+   allá y bajan las tres páginas juntas; corregirlo aquí las separaría. */
+.ftr-v2-cta-rojo{background:#0000cd;color:#fff;box-shadow:0 8px 24px rgba(255,40,59,.3)}
+.ftr-v2-cta-rojo:hover{background:#0000a8;transform:translateY(-2px);box-shadow:0 14px 32px rgba(0,0,0,.5)}
+.ftr-v2-cta-verde{background:#25D366;color:#fff}
+.ftr-v2-cta-verde:hover{background:#1fba57;transform:translateY(-2px)}
+.ftr-v2-cols{display:grid;grid-template-columns:repeat(2,1fr);gap:32px}
+@media(min-width:560px){ .ftr-v2-cols{grid-template-columns:repeat(3,1fr)} }
+.ftr-v2-col-lbl{font-size:9px;font-weight:900;color:var(--c-amarillo);text-transform:uppercase;letter-spacing:.2em;margin-bottom:14px}
+.ftr-v2-col a{display:block;font-size:12px;font-weight:600;color:rgba(255,255,255,.6);
+  padding:5px 0;text-transform:uppercase;letter-spacing:.04em;text-decoration:none;
+  transition:color .2s ease,transform .2s ease}
+.ftr-v2-col a:hover{color:var(--c-ink);transform:translateX(3px)}
+.ftr-v2-dir{margin-top:10px;font-size:11px;line-height:1.6;font-weight:500;
+  color:rgba(255,255,255,.58);text-transform:none;letter-spacing:0;max-width:260px}
+.ftr-v2-dir a{display:inline;padding:0;font-size:inherit;text-transform:none;letter-spacing:0;
+  color:rgba(255,255,255,.75);text-decoration:underline;text-underline-offset:2px}
+.ftr-v2-dir a:hover{color:var(--c-ink);transform:none}
+.ftr-v2-bottom{max-width:1280px;margin:28px auto 0;display:flex;flex-direction:column;gap:8px;
+  align-items:flex-start;padding-top:20px;border-top:1px solid var(--c-line)}
+@media(min-width:600px){ .ftr-v2-bottom{flex-direction:row;justify-content:space-between;align-items:center} }
+.ftr-v2-copy{font-size:10px;color:rgba(255,255,255,.25);font-weight:600;text-transform:uppercase;letter-spacing:.1em;font-family:'Montserrat',sans-serif}
+.ftr-v2-mini{display:inline-flex;align-items:center;gap:8px;font-size:10px;color:var(--c-muted);font-weight:700;text-transform:uppercase;letter-spacing:.1em;font-family:'Montserrat',sans-serif}
+.ftr-v2-dot{width:6px;height:6px;border-radius:50%;background:var(--c-verde);animation:pulseDotMain 1.6s ease-in-out infinite}
+@keyframes pulseDotMain{0%,100%{box-shadow:0 0 0 0 rgba(136,234,78,.6)}50%{box-shadow:0 0 0 8px rgba(136,234,78,0)}}
+
+/* ═══ IR Y VENIR ════════════════════════════════════════════════════════
+   Tres destinos, un solo patrón: al inicio, a la otra página del sorteo y al
+   evento en el catálogo. Botones de verdad —no ligas sueltas en un renglón—
+   porque en un celular sostenido con una mano el blanco de toque manda.  */
+.navegar{display:flex;flex-wrap:wrap;gap:10px;margin:0}
+.nav-btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;
+  padding:13px 18px;min-height:44px;border-radius:12px;text-decoration:none;
+  font-family:var(--font-display);font-size:15px;letter-spacing:.07em;text-transform:uppercase;
+  border:1px solid var(--c-line);background:rgba(255,255,255,.05);color:#fff;
+  transition:transform .16s ease-out,background .16s ease-out,border-color .16s ease-out}
+.nav-btn .ic{width:16px;height:16px}
+.nav-btn:focus-visible{outline:2px solid var(--c-amarillo);outline-offset:3px}
+@media (hover:hover){ .nav-btn:hover{background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.22);transform:translateY(-2px)} }
+.nav-btn:active{transform:translateY(0);transition-duration:80ms}
+/* El de mayor peso de los tres se pinta lleno: entre "ver el sorteo" y
+   "volver al inicio" no hay empate, y dos botones idénticos obligan a leer. */
+.nav-btn.fuerte{background:var(--c-amarillo);color:#000;border-color:transparent;font-weight:700}
+@media (hover:hover){ .nav-btn.fuerte:hover{background:#f2ff7a;border-color:transparent} }
+
+/* ═══ EL BLOQUE DE LOS QUE NO GANARON ═══════════════════════════════════
+   No es un consuelo: es la única razón comercial de todo esto. Va en verde de
+   WhatsApp porque a eso lleva, y con el número y el formato de liga del index
+   —mismo 81 1977 1072, mismo ?text= codificado— para que la conversación
+   llegue con contexto y nadie tenga que preguntar "¿de qué evento?".      */
+.rescate{margin-top:26px;padding:22px 20px;border-radius:16px;
+  background:linear-gradient(160deg,rgba(37,211,102,.14),rgba(37,211,102,.05));
+  border:1px solid rgba(37,211,102,.28);text-align:center}
+.rescate h3{font-family:var(--font-display);font-size:clamp(24px,4.4vw,32px);line-height:1.02;
+  margin:0 0 8px;text-transform:uppercase;letter-spacing:-.01em;text-wrap:balance}
+.rescate p{font-size:13.5px;line-height:1.6;color:rgba(255,255,255,.78);margin:0 0 18px}
+.rescate .btn-rescate{display:inline-flex;align-items:center;justify-content:center;gap:10px;
+  width:100%;max-width:340px;padding:16px 22px;min-height:52px;border-radius:12px;
+  background:#25D366;color:#fff;text-decoration:none;font-family:var(--font-display);
+  font-size:18px;letter-spacing:.07em;text-transform:uppercase;
+  transition:transform .16s ease-out,background .16s ease-out}
+.rescate .btn-rescate .ic{width:20px;height:20px}
+.rescate .btn-rescate:focus-visible{outline:2px solid #fff;outline-offset:3px}
+@media (hover:hover){ .rescate .btn-rescate:hover{background:#1fba57;transform:translateY(-2px)} }
+.rescate .btn-rescate:active{transform:translateY(0);transition-duration:80ms}
 
 @media (prefers-reduced-motion:reduce){
   *,*::before,*::after{animation-duration:.01ms !important;animation-iteration-count:1 !important;transition-duration:.01ms !important}
@@ -174,7 +318,52 @@ input:focus-visible{outline:2px solid var(--c-amarillo);outline-offset:2px;borde
   <symbol id="ic-auto" viewBox="0 0 24 24"><path d="M4 17v-3.4l1.8-4A2 2 0 0 1 7.6 8.4h8.8a2 2 0 0 1 1.8 1.2l1.8 4V17"/><path d="M4 17h16"/><circle cx="7.5" cy="17" r="1.6"/><circle cx="16.5" cy="17" r="1.6"/></symbol>
   <symbol id="ic-cama" viewBox="0 0 24 24"><path d="M3 18v-7"/><path d="M3 13h18v5"/><path d="M21 18v-3"/><path d="M6.5 11V8.5h4V11"/><path d="M3 18h18"/></symbol>
   <symbol id="ic-boleto" viewBox="0 0 24 24"><path d="M4 8.5A1.5 1.5 0 0 1 5.5 7h13A1.5 1.5 0 0 1 20 8.5v2a1.75 1.75 0 0 0 0 3.5v2A1.5 1.5 0 0 1 18.5 17h-13A1.5 1.5 0 0 1 4 15.5v-2a1.75 1.75 0 0 0 0-3.5v-2Z"/><path d="M14 7v2m0 3v2m0 3v-2"/></symbol>
+  <!-- Los dos de la barra del index, copiados de su sprite tal cual. -->
+  <symbol id="ic-portapapeles" viewBox="0 0 24 24"><rect x="5" y="4" width="14" height="17" rx="2"/><rect x="9" y="2" width="6" height="4" rx="1"/><path d="M9 11h6M9 15h4"/></symbol>
+  <symbol id="ic-pagos" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></symbol>
+  <!-- Los de ir y venir. -->
+  <symbol id="ic-casa" viewBox="0 0 24 24"><path d="M4 10.5 12 4l8 6.5"/><path d="M6 9.6V20h12V9.6"/></symbol>
+  <symbol id="ic-vivo" viewBox="0 0 24 24"><circle cx="12" cy="12" r="2.4"/><path d="M7.9 7.9a5.8 5.8 0 0 0 0 8.2"/><path d="M16.1 16.1a5.8 5.8 0 0 0 0-8.2"/><path d="M5.1 5.1a9.8 9.8 0 0 0 0 13.8"/><path d="M18.9 18.9a9.8 9.8 0 0 0 0-13.8"/></symbol>
 </defs></svg>
+
+<!-- ═══ LA BARRA DEL INDEX ═══════════════════════════════════════════════
+     Copiada, no reinterpretada. Único cambio deliberado: allá el logo es un
+     <div> porque ya estás en el inicio; aquí es una liga a "/", que además
+     cubre el "botón para volver al inicio" desde cualquier punto de la página.
+     No se trajo .nav-back: su onclick llama goBack(), que no existe aquí. -->
+<nav class="nav">
+  <div class="nav-left">
+    <a class="logo" href="/" title="Ir al inicio de Conecta Reynosa">
+      <span class="logo-box"><span class="logo-txt">CONECTA</span></span>
+      <span class="logo-mx">MX.</span>
+    </a>
+  </div>
+  <div class="nav-right">
+    <div class="nav-cli-links">
+      <a href="/rol" class="nav-cli-link" title="Mi plan de pagos">
+        <span class="nli"><svg class="ic"><use href="#ic-portapapeles"/></svg></span><span class="nlt">Mi Plan de Pagos</span>
+      </a>
+      <span class="nav-cli-sep">•</span>
+      <a href="/pagos" class="nav-cli-link" title="Datos bancarios">
+        <span class="nli"><svg class="ic"><use href="#ic-pagos"/></svg></span><span class="nlt">Datos Bancarios</span>
+      </a>
+    </div>
+    <div class="nav-socials">
+      <a href="https://wa.me/528119771072" target="_blank" rel="noopener" class="nav-social wa" title="WhatsApp">
+        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+      </a>
+      <a href="https://www.instagram.com/conectarey?igsh=MXhxcXJnc2VzaTVrdg==" target="_blank" rel="noopener" class="nav-social ig" title="Instagram">
+        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z"/></svg>
+      </a>
+      <a href="https://www.facebook.com/ConectaRey" target="_blank" rel="noopener" class="nav-social fb" title="Facebook">
+        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
+      </a>
+      <a href="https://www.tiktok.com/@conectareynosa" target="_blank" rel="noopener" class="nav-social tt" title="TikTok">
+        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z"/></svg>
+      </a>
+    </div>
+  </div>
+</nav>
 
 <div class="pagina">
   <div class="foto-col">
@@ -183,7 +372,6 @@ input:focus-visible{outline:2px solid var(--c-amarillo);outline-offset:2px;borde
   </div>
 
   <div class="hero-txt">
-    <div class="logo"><b>Conecta</b> Reynosa</div>
     <div class="kicker"><svg class="ic"><use href="#ic-regalo"/></svg> Giveaway</div>
     <h1>Gánate un<br>paquete <em>PLUS</em></h1>
     <ul class="incluye">
@@ -237,6 +425,11 @@ input:focus-visible{outline:2px solid var(--c-amarillo);outline-offset:2px;borde
     <a class="btn btn-wa" id="ok-share" href="#" target="_blank" rel="noopener">
       <svg class="ic" style="width:20px;height:20px"><use href="#ic-wa"/></svg> Invitar a alguien
     </a>
+    <!-- El sorteo también aquí, y no solo al pie: acabar de registrarte es el
+         único momento en que "¿y ahora qué?" tiene una respuesta exacta. -->
+    <nav class="navegar" style="justify-content:center;margin-top:14px" aria-label="Después de registrarte">
+      <a class="nav-btn" href="/sorteo"><svg class="ic"><use href="#ic-vivo"/></svg> Ver el sorteo en vivo</a>
+    </nav>
   </div>
 
   <div class="cerrado" id="cerrado">
@@ -259,9 +452,89 @@ input:focus-visible{outline:2px solid var(--c-amarillo);outline-offset:2px;borde
     </ol>
   </div>
 
-  <div class="ftr">Conecta Reynosa · conectareynosa.mx</div>
+  <!-- El bloque de rescate. Va desde ya, antes de que se gire: aquí también
+       entra gente que llega tarde, que no quiere participar o que prefiere
+       apartar de una vez en lugar de jugársela. Número, formato de liga y
+       ?text= codificado son los del index. -->
+  <div class="rescate">
+    <h3>¿No ganaste? Todavía hay lugares para Melanie Martinez</h3>
+    <p>Todavía quedan lugares para el 6 de agosto en Arena Monterrey. Escríbenos y te armamos tu paquete.</p>
+    <a class="btn-rescate" target="_blank" rel="noopener"
+       href="https://wa.me/528119771072?text=Hola!%20Quiero%20apartar%20mi%20lugar%20para%20Melanie%20Martinez%20-%20Hades%3A%20The%20Sacrifice%20Tour%20(6%20ago%202026)">
+      <svg class="ic"><use href="#ic-wa"/></svg> Apartar mi lugar
+    </a>
+  </div>
+
+  <nav class="navegar" aria-label="Ir a otras páginas">
+    <a class="nav-btn fuerte" href="/sorteo"><svg class="ic"><use href="#ic-vivo"/></svg> Ver el sorteo en vivo</a>
+    <a class="nav-btn" href="/?evento=melanie"><svg class="ic"><use href="#ic-boleto"/></svg> Ver el evento</a>
+    <a class="nav-btn" href="/"><svg class="ic"><use href="#ic-casa"/></svg> Volver al inicio</a>
+  </nav>
+
   </div><!-- /pie -->
 </div><!-- /pagina -->
+
+<!-- ═══ EL PIE DEL INDEX ═════════════════════════════════════════════════
+     Estructura, textos y ligas copiados del index.html. Ninguna URL de aquí
+     se inventó: salieron de su pie y de su barra.
+     Añadido respecto al index: la fila de botones de redes. Allá las redes son
+     solo texto en la columna; el encargo pedía botones, así que se traen los
+     MISMOS glifos de marca de su barra —los oficiales, no un trazo dibujado a
+     mano: un TikTok o un Facebook "de línea" ya no es el logo de nadie—. -->
+<footer class="ftr-v2">
+  <div class="ftr-v2-grid">
+    <div>
+      <div class="ftr-v2-brand">
+        <div class="ftr-v2-brand-box"><span class="ftr-v2-brand-txt">CONECTA</span></div>
+        <span class="ftr-v2-brand-mx">MX.</span>
+      </div>
+      <p class="ftr-v2-tag">Agencia de viajes a conciertos desde Reynosa, Tamaulipas. Transporte · Hospedaje · Boletos · Kit Conecta.</p>
+      <div class="ftr-v2-ctas">
+        <a href="https://wa.me/528119771072" target="_blank" rel="noopener" class="ftr-v2-cta ftr-v2-cta-rojo">¡Reserva ya! <span aria-hidden="true">→</span></a>
+        <a href="https://wa.me/528119771072" target="_blank" rel="noopener" class="ftr-v2-cta ftr-v2-cta-verde">WhatsApp directo <span aria-hidden="true">↗</span></a>
+      </div>
+      <div class="ftr-v2-redes">
+        <a href="https://wa.me/528119771072" target="_blank" rel="noopener" class="nav-social wa" title="WhatsApp" aria-label="WhatsApp">
+          <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+        </a>
+        <a href="https://www.instagram.com/conectarey?igsh=MXhxcXJnc2VzaTVrdg==" target="_blank" rel="noopener" class="nav-social ig" title="Instagram" aria-label="Instagram">
+          <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z"/></svg>
+        </a>
+        <a href="https://www.facebook.com/ConectaRey" target="_blank" rel="noopener" class="nav-social fb" title="Facebook" aria-label="Facebook">
+          <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
+        </a>
+        <a href="https://www.tiktok.com/@conectareynosa" target="_blank" rel="noopener" class="nav-social tt" title="TikTok" aria-label="TikTok">
+          <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z"/></svg>
+        </a>
+      </div>
+    </div>
+    <div class="ftr-v2-cols">
+      <div class="ftr-v2-col">
+        <div class="ftr-v2-col-lbl">Web</div>
+        <a href="/">Eventos</a>
+        <a href="/faq">FAQ</a>
+      </div>
+      <div class="ftr-v2-col">
+        <div class="ftr-v2-col-lbl">Redes</div>
+        <a href="https://wa.me/528119771072" target="_blank" rel="noopener">WhatsApp</a>
+        <a href="https://www.instagram.com/conectarey" target="_blank" rel="noopener">Instagram</a>
+        <a href="https://www.facebook.com/ConectaRey" target="_blank" rel="noopener">Facebook</a>
+        <a href="https://www.tiktok.com/@conectareynosa" target="_blank" rel="noopener">TikTok</a>
+      </div>
+      <div class="ftr-v2-col">
+        <div class="ftr-v2-col-lbl">Contacto</div>
+        <a href="tel:+528119771072">81 1977 1072</a>
+        <a href="tel:+528132321405">81 3232 1405 (vuelos)</a>
+        <a href="https://whatsapp.com/channel/0029Vb7JuO1IN9ipDaGVV92f" target="_blank" rel="noopener">Canal WA</a>
+        <p class="ftr-v2-dir"><a href="https://maps.app.goo.gl/XyjSs9T6AvpUkrZL7" target="_blank" rel="noopener">Calle Toluca 125, Col. Rodríguez, Reynosa</a> · Con cita previa</p>
+      </div>
+    </div>
+  </div>
+  <div class="ftr-v2-bottom">
+    <div class="ftr-v2-copy">Conecta Reynosa © 2026 · Todos los derechos reservados</div>
+    <div class="ftr-v2-mini"><span class="ftr-v2-dot" aria-hidden="true"></span>Operando desde 2013</div>
+  </div>
+</footer>
 
 <!-- El atajo al formulario. Aparece solo cuando el formulario NO se ve, y se
      va en cuanto entra en pantalla: un botón fijo encima del propio campo que

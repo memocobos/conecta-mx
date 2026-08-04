@@ -991,6 +991,30 @@ src="https://www.facebook.com/tr?id=1685907946147007&ev=PageView&noscript=1"
 </head>
 <body>
 
+<!-- ═══ BANNER GIVEAWAY · TEMPORAL ═══════════════════════════════════════════
+     Se quita borrando este bloque entero (del comentario al </a>) y nada más:
+     no depende de ningún estilo ni script del resto del archivo, a propósito.
+     Vence solo el 5-ago: pasada esa fecha el JS de abajo lo esconde, para que
+     no se quede vivo si nadie se acuerda de venir a borrarlo.
+     ═══════════════════════════════════════════════════════════════════════ -->
+<a id="gw-banner" href="/giveaway"
+   style="display:flex;align-items:center;justify-content:center;gap:10px;padding:11px 16px;
+          background:#e8ff4c;color:#000;text-decoration:none;font-weight:900;font-size:13px;
+          letter-spacing:.04em;text-align:center;line-height:1.35">
+  <span>Gánate el viaje a <b>Melanie Martinez</b> — viaje + Cancha VIP</span>
+  <span aria-hidden="true">&rarr;</span>
+</a>
+<script>
+(function(){
+  // Mismo instante que el CIERRE de _lib/giveaway.js.
+  if (Date.now() >= new Date('2026-08-05T11:00:00-06:00').getTime()){
+    var b = document.getElementById('gw-banner');
+    if (b) b.style.display = 'none';
+  }
+})();
+</script>
+<!-- ═══ FIN BANNER GIVEAWAY ═══════════════════════════════════════════════ -->
+
 <!-- [Barrida 2/3] Mini-sprite de iconos (SOLO los que usa index) + helper .ic.
      Mismo trazo 24x24 que kamehouse; el icono hereda color y tamaño del texto. -->
 <style>.ic{width:1em;height:1em;vertical-align:-0.12em;flex-shrink:0;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}</style>

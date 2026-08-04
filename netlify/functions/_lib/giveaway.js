@@ -1,0 +1,90 @@
+// _lib/giveaway.js — lo compartido por las tres functions del giveaway.
+// Vive aparte para que el CIERRE y el slug tengan UNA sola definición: si la
+// fecha viviera copiada en tres archivos, un cambio de última hora dejaría una
+// puerta abierta mientras las otras dos ya cerraron.
+
+// Regla de la casa: nunca on_conflict/upsert de PostgREST — con índices únicos
+// revienta con 42P10. Insert directo y el 23505 se trata como caso ESPERADO.
+
+const SB_URL = process.env.PORTAL_SUPABASE_URL;
+const SB_KEY = process.env.PORTAL_SUPABASE_SERVICE_KEY || process.env.PORTAL_SUPABASE_SERVICE;
+
+// El único giveaway de esta versión. Se valida contra la entrada para que la
+// function no sea un buzón abierto a cualquier slug inventado.
+const SLUG = 'melanie-hades-2026';
+
+// Cierre del registro. Con offset explícito de Monterrey (-06:00) para que no
+// dependa de la zona horaria del servidor de Netlify.
+const CIERRE = '2026-08-05T11:00:00-06:00';
+
+const ALLOWED_ORIGINS = ['https://conectareynosa.mx', 'https://www.conectareynosa.mx'];
+const ALLOWED_ORIGINS_DEV = ['http://localhost:8888', 'http://localhost:3999', 'http://127.0.0.1:8888'];
+// Mismo regex que _lib/verify-admin: anclado a inicio y fin para que un
+// sufijo malicioso (evil--conectareynosa.netlify.app.attacker.com) no pase.
+const NETLIFY_PREVIEW_RE = /^https:\/\/[a-z0-9-]+--conectareynosa\.netlify\.app$/;
+
+function corsCheck(event) {
+  const origin = (event.headers && (event.headers.origin || event.headers.Origin)) || '';
+  if (ALLOWED_ORIGINS.includes(origin)) return origin;
+  if (NETLIFY_PREVIEW_RE.test(origin)) return origin;
+  if (process.env.NETLIFY_DEV === 'true' && ALLOWED_ORIGINS_DEV.includes(origin)) return origin;
+  return null;
+}
+
+function cabeceras(origin, metodos) {
+  return {
+    'Content-Type': 'application/json',
+    'Access-Control-Allow-Origin': origin || 'null',
+    'Access-Control-Allow-Headers': 'Content-Type, x-admin-token',
+    'Access-Control-Allow-Methods': metodos,
+    'Vary': 'Origin',
+  };
+}
+
+function json(status, headers, cuerpo) {
+  return { statusCode: status, headers, body: JSON.stringify(cuerpo) };
+}
+
+function faltaEnv() {
+  if (!SB_URL || !SB_KEY) return 'Faltan env vars del Portal (PORTAL_SUPABASE_URL / _SERVICE_KEY)';
+  return null;
+}
+
+const sbHeaders = () => ({
+  apikey: SB_KEY,
+  Authorization: 'Bearer ' + SB_KEY,
+  'Content-Type': 'application/json',
+});
+
+// El registro cerró? Se compara en milisegundos absolutos: `CIERRE` trae su
+// offset, así que no hay ambigüedad de zona horaria.
+function registroCerrado(ahoraMs) {
+  const t = Date.parse(CIERRE);
+  if (!Number.isFinite(t)) return false;   // fecha mal escrita: mejor abierto que cerrado por error
+  return (ahoraMs != null ? ahoraMs : Date.now()) >= t;
+}
+
+// El token de admin, comparado en tiempo constante para no filtrar su largo
+// ni sus primeros caracteres a base de medir respuestas.
+function tokenAdminValido(event) {
+  const esperado = process.env.GIVEAWAY_ADMIN_TOKEN || '';
+  if (!esperado) return false;             // sin token configurado NADA es válido
+  const h = (event.headers && (event.headers['x-admin-token'] || event.headers['X-Admin-Token'])) || '';
+  if (h.length !== esperado.length) return false;
+  let dif = 0;
+  for (let i = 0; i < esperado.length; i++) dif |= h.charCodeAt(i) ^ esperado.charCodeAt(i);
+  return dif === 0;
+}
+
+// La IP real detrás de los proxies de Netlify.
+function ipDe(event) {
+  const h = event.headers || {};
+  const xff = h['x-nf-client-connection-ip'] || h['x-forwarded-for'] || '';
+  return String(xff).split(',')[0].trim() || 'desconocida';
+}
+
+module.exports = {
+  SB_URL, SB_KEY, SLUG, CIERRE,
+  corsCheck, cabeceras, json, faltaEnv, sbHeaders,
+  registroCerrado, tokenAdminValido, ipDe,
+};

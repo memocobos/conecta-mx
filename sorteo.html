@@ -1,0 +1,288 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Sorteo en vivo · Conecta Reynosa</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@900&family=Montserrat:wght@400;600;700;900&display=swap" rel="stylesheet">
+<style>
+:root{
+  --c-bg:#000;--c-ink:#fff;--c-rojo:#ff283b;--c-amarillo:#e8ff4c;--c-verde:#88ea4e;
+  --c-muted:rgba(255,255,255,.46);--c-line:rgba(255,255,255,.08);
+  --font-display:'Barlow Condensed','Montserrat',sans-serif;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--c-bg);color:var(--c-ink);font-family:'Montserrat',sans-serif;-webkit-font-smoothing:antialiased}
+.wrap{max-width:860px;margin:0 auto;padding:26px 20px 60px}
+.ic{width:1em;height:1em;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+
+.puerta{max-width:400px;margin:16vh auto;text-align:center}
+.puerta h1{font-family:var(--font-display);font-size:34px;text-transform:uppercase;margin:0 0 18px}
+input[type=password]{width:100%;padding:15px;background:rgba(255,255,255,.05);border:1px solid var(--c-line);
+  border-radius:10px;color:var(--c-ink);font-size:16px;font-family:inherit;text-align:center;letter-spacing:.1em}
+.btn{padding:15px 26px;background:var(--c-amarillo);color:#000;border:0;border-radius:11px;cursor:pointer;
+  font-family:var(--font-display);font-size:19px;letter-spacing:.08em;text-transform:uppercase}
+.btn[disabled]{opacity:.45;cursor:not-allowed}
+.btn-si{background:var(--c-verde)}
+.btn-no{background:transparent;color:var(--c-ink);border:1px solid rgba(255,255,255,.28)}
+.err{color:#ffb3b3;font-size:13px;min-height:20px;margin-top:12px}
+
+.panel{display:none}
+.total{text-align:center;margin-bottom:26px}
+.total-n{font-family:var(--font-display);font-size:clamp(72px,18vw,132px);line-height:.9;color:var(--c-amarillo)}
+.total-l{font-size:12px;letter-spacing:.24em;text-transform:uppercase;color:var(--c-muted);margin-top:6px}
+
+/* EL CARRUSEL — vertical, no rueda: con cientos de nombres una rueda de
+   rebanadas no se lee en cámara. Una ventana con una lista que corre sí. */
+.carril{position:relative;height:190px;overflow:hidden;border:1px solid var(--c-line);
+  border-radius:14px;background:rgba(255,255,255,.03);margin-bottom:20px}
+.carril::before,.carril::after{content:'';position:absolute;left:0;right:0;height:62px;z-index:2;pointer-events:none}
+.carril::before{top:0;background:linear-gradient(#000,transparent)}
+.carril::after{bottom:0;background:linear-gradient(transparent,#000)}
+.marca{position:absolute;top:50%;left:0;right:0;height:64px;transform:translateY(-50%);
+  border-top:2px solid var(--c-amarillo);border-bottom:2px solid var(--c-amarillo);z-index:1;pointer-events:none}
+.tira{position:absolute;left:0;right:0;top:0;will-change:transform}
+.tira div{height:64px;display:flex;align-items:center;justify-content:center;
+  font-family:var(--font-display);font-size:34px;text-transform:uppercase;letter-spacing:.01em;white-space:nowrap;padding:0 14px}
+
+.ganador{display:none;text-align:center;padding:26px 18px;border:1px solid rgba(232,255,76,.4);
+  border-radius:14px;background:rgba(232,255,76,.07);margin-bottom:20px}
+.ganador-l{font-size:11px;letter-spacing:.24em;text-transform:uppercase;color:var(--c-muted)}
+.ganador-n{font-family:var(--font-display);font-size:clamp(36px,9vw,62px);line-height:1;margin:10px 0 14px;text-transform:uppercase}
+.tel{display:inline-flex;align-items:center;gap:10px;font-family:'JetBrains Mono',ui-monospace,monospace;
+  font-size:21px;letter-spacing:.08em;background:rgba(0,0,0,.45);padding:9px 15px;border-radius:9px}
+.tel button{background:none;border:1px solid rgba(255,255,255,.28);color:var(--c-ink);border-radius:7px;
+  padding:4px 10px;font-size:11px;letter-spacing:.1em;text-transform:uppercase;cursor:pointer;font-family:inherit}
+.acciones{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-top:20px}
+
+.hist{margin-top:34px;border-top:1px solid var(--c-line);padding-top:18px}
+.hist h3{font-family:var(--font-display);font-size:14px;letter-spacing:.18em;text-transform:uppercase;color:var(--c-muted);margin:0 0 12px}
+.hist ol{margin:0;padding-left:22px;font-size:14px;line-height:1.9;color:rgba(255,255,255,.72)}
+.hist .r-si{color:var(--c-verde);font-weight:700}
+.hist .r-no{color:var(--c-rojo);font-weight:700}
+.hist .r-pd{color:var(--c-amarillo);font-weight:700}
+.vacio{font-size:13px;color:var(--c-muted)}
+
+@media (prefers-reduced-motion:reduce){
+  .tira{transition-duration:.01ms !important}
+}
+</style>
+</head>
+<body>
+
+<svg aria-hidden="true" focusable="false" style="position:absolute;width:0;height:0;overflow:hidden"><defs>
+  <symbol id="ic-ojo" viewBox="0 0 24 24"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></symbol>
+</defs></svg>
+
+<div class="wrap">
+
+  <div class="puerta" id="puerta">
+    <h1>Sorteo en vivo</h1>
+    <input type="password" id="tok" placeholder="Token de admin" autocomplete="off">
+    <div class="err" id="err-tok"></div>
+    <button class="btn" id="entrar" style="width:100%">Entrar</button>
+  </div>
+
+  <div class="panel" id="panel">
+    <div class="total">
+      <div class="total-n" id="total">—</div>
+      <div class="total-l">participantes</div>
+    </div>
+
+    <div class="carril" id="carril">
+      <div class="marca"></div>
+      <div class="tira" id="tira"></div>
+    </div>
+
+    <div style="text-align:center">
+      <button class="btn" id="girar">Girar</button>
+    </div>
+
+    <div class="ganador" id="ganador">
+      <div class="ganador-l">Ganador</div>
+      <div class="ganador-n" id="g-nombre">—</div>
+      <div class="tel">
+        <span id="g-tel">—</span>
+        <button id="g-ver"><svg class="ic" style="width:12px;height:12px"><use href="#ic-ojo"/></svg> Ver</button>
+      </div>
+      <div class="acciones">
+        <button class="btn btn-si" id="si">Sí contestó</button>
+        <button class="btn btn-no" id="no">No contestó — volver a girar</button>
+      </div>
+    </div>
+
+    <div class="err" id="err"></div>
+
+    <div class="hist">
+      <h3>Giros de esta sesión</h3>
+      <ol id="hist"></ol>
+      <div class="vacio" id="hist-vacio">Todavía no se ha girado.</div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  'use strict';
+  var $ = function(id){ return document.getElementById(id); };
+
+  // El token vive SOLO en memoria: nada de localStorage. Si se recarga la
+  // página se vuelve a pedir, que es lo correcto para una pantalla que se abre
+  // una vez y se proyecta.
+  var TOKEN = null;
+  var nombres = [];        // solo NOMBRES: la lista nunca trae teléfonos
+  var sorteoActual = null; // {sorteo_id, nombre, whatsapp}
+  var girando = false;
+
+  function api(ruta, opts){
+    opts = opts || {};
+    opts.headers = Object.assign({ 'Content-Type': 'application/json', 'x-admin-token': TOKEN }, opts.headers || {});
+    return fetch('/.netlify/functions/' + ruta, opts).then(function(r){
+      return r.json().catch(function(){ return {}; }).then(function(j){ return { status: r.status, j: j }; });
+    });
+  }
+
+  // ── Puerta ──────────────────────────────────────────────────────────────
+  function entrar(){
+    var t = $('tok').value.trim();
+    if (!t) return;
+    TOKEN = t;
+    $('err-tok').textContent = 'Verificando…';
+    api('giveaway-lista', { method: 'GET' }).then(function(res){
+      if (res.status === 401){ TOKEN = null; $('err-tok').textContent = 'Token incorrecto'; return; }
+      if (!res.j || res.j.ok !== true){ TOKEN = null; $('err-tok').textContent = (res.j && res.j.error) || 'No se pudo entrar'; return; }
+      $('tok').value = '';                       // que no quede en el DOM
+      $('puerta').style.display = 'none';
+      $('panel').style.display = 'block';
+      cargarLista(res.j);
+    });
+  }
+  $('entrar').addEventListener('click', entrar);
+  $('tok').addEventListener('keydown', function(e){ if (e.key === 'Enter') entrar(); });
+
+  function cargarLista(j){
+    nombres = (j.participantes || []).map(function(p){ return p.nombre; });
+    $('total').textContent = j.total != null ? j.total : nombres.length;
+    pintarTira(nombres.length ? nombres : ['—']);
+  }
+
+  // ── El carrusel ─────────────────────────────────────────────────────────
+  var ALTO = 64;
+  function pintarTira(lista){
+    $('tira').innerHTML = lista.map(function(n){
+      return '<div>' + String(n).replace(/[&<>"]/g, function(c){
+        return ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' })[c];
+      }) + '</div>';
+    }).join('');
+  }
+  function posicionar(i, conAnimacion, ms){
+    var t = $('tira');
+    var destino = -(i * ALTO) + (t.parentElement.clientHeight / 2) - (ALTO / 2);
+    t.style.transition = conAnimacion ? ('transform ' + ms + 'ms cubic-bezier(.12,.72,.16,1)') : 'none';
+    t.style.transform = 'translateY(' + destino + 'px)';
+  }
+
+  // El servidor ya decidió. Esto SOLO construye un camino que termina en él:
+  // se arma una tira larga de nombres al azar y se le pega el ganador al final.
+  // Nada de esto elige nada — si la animación fallara, el ganador es el mismo.
+  function animarHacia(nombreGanador, alTerminar){
+    var VUELTAS = 34;
+    var relleno = [];
+    var fuente = nombres.length ? nombres : [nombreGanador];
+    for (var i = 0; i < VUELTAS; i++) relleno.push(fuente[Math.floor(Math.random() * fuente.length)]);
+    relleno.push(nombreGanador);
+    pintarTira(relleno);
+    posicionar(0, false);
+    // doble rAF: que el navegador pinte la posición inicial antes de animar,
+    // si no la transición no arranca y el nombre aparece de golpe.
+    requestAnimationFrame(function(){ requestAnimationFrame(function(){
+      posicionar(relleno.length - 1, true, 6000);
+      setTimeout(alTerminar, 6100);
+    }); });
+  }
+
+  // ── Girar ───────────────────────────────────────────────────────────────
+  $('girar').addEventListener('click', function(){
+    if (girando) return;
+    girando = true;
+    $('err').textContent = '';
+    $('ganador').style.display = 'none';
+    $('girar').disabled = true;
+    $('girar').textContent = 'Girando…';
+
+    api('giveaway-sortear', { method: 'POST', body: JSON.stringify({ accion: 'girar' }) }).then(function(res){
+      if (!res.j || res.j.ok !== true){
+        girando = false; $('girar').disabled = false; $('girar').textContent = 'Girar';
+        $('err').textContent = (res.j && res.j.error) || 'No se pudo girar';
+        return;
+      }
+      sorteoActual = res.j;
+      if (res.j.total_participantes != null) $('total').textContent = res.j.total_participantes;
+      animarHacia(res.j.nombre, function(){
+        girando = false;
+        $('girar').disabled = false;
+        $('girar').textContent = 'Girar otra vez';
+        $('g-nombre').textContent = res.j.nombre;
+        mostrarTel(false);
+        $('ganador').style.display = 'block';
+        agregarHist(res.j.intento, res.j.nombre, 'pendiente');
+      });
+    }).catch(function(){
+      girando = false; $('girar').disabled = false; $('girar').textContent = 'Girar';
+      $('err').textContent = 'Se cayó la conexión';
+    });
+  });
+
+  // ── El teléfono, tapado por defecto ─────────────────────────────────────
+  var telVisible = false;
+  function mostrarTel(ver){
+    telVisible = ver;
+    var w = (sorteoActual && sorteoActual.whatsapp) || '';
+    $('g-tel').textContent = ver ? w : (w.slice(0, 6) + '••••');
+    $('g-ver').innerHTML = '<svg class="ic" style="width:12px;height:12px"><use href="#ic-ojo"/></svg> ' + (ver ? 'Ocultar' : 'Ver');
+  }
+  $('g-ver').addEventListener('click', function(){ mostrarTel(!telVisible); });
+
+  // ── Resolver ────────────────────────────────────────────────────────────
+  function resolver(resultado){
+    if (!sorteoActual || !sorteoActual.sorteo_id) return;
+    $('si').disabled = $('no').disabled = true;
+    api('giveaway-sortear', {
+      method: 'POST',
+      body: JSON.stringify({ accion: 'resolver', sorteo_id: sorteoActual.sorteo_id, resultado: resultado })
+    }).then(function(res){
+      $('si').disabled = $('no').disabled = false;
+      if (!res.j || res.j.ok !== true){ $('err').textContent = (res.j && res.j.error) || 'No se pudo guardar'; return; }
+      marcarHist(sorteoActual.intento, resultado);
+      if (resultado === 'acepto'){
+        $('girar').style.display = 'none';
+        $('ganador').style.borderColor = 'rgba(136,234,78,.6)';
+      } else {
+        $('ganador').style.display = 'none';
+        sorteoActual = null;
+      }
+    });
+  }
+  $('si').addEventListener('click', function(){ resolver('acepto'); });
+  $('no').addEventListener('click', function(){ resolver('no_contesto'); });
+
+  // ── Historial de la sesión ──────────────────────────────────────────────
+  function agregarHist(intento, nombre, estado){
+    $('hist-vacio').style.display = 'none';
+    var li = document.createElement('li');
+    li.id = 'h-' + intento;
+    li.innerHTML = '<b>' + String(nombre).replace(/</g, '&lt;') + '</b> — <span class="r-pd">pendiente</span>';
+    $('hist').appendChild(li);
+  }
+  function marcarHist(intento, resultado){
+    var li = $('h-' + intento);
+    if (!li) return;
+    var txt = resultado === 'acepto' ? '<span class="r-si">sí contestó</span>' : '<span class="r-no">no contestó</span>';
+    li.innerHTML = li.innerHTML.replace(/<span class="r-pd">pendiente<\/span>/, txt);
+  }
+})();
+</script>
+</body>
+</html>

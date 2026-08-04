@@ -4,10 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Gánate el viaje a Melanie Martinez · Conecta Reynosa</title>
-<meta name="description" content="Regístrate y participa por un viaje redondo desde Reynosa + zona Cancha VIP para Melanie Martinez en Arena Monterrey. Sorteo en vivo el 5 de agosto.">
+<meta name="description" content="Regístrate y participa por un viaje redondo desde Reynosa + zona Cancha VIP para Melanie Martinez en Arena Monterrey. Sorteo en vivo el 5 de agosto, 12:00 PM hora de Reynosa.">
 <meta name="robots" content="index,follow">
 <meta property="og:title" content="Gánate el viaje a Melanie Martinez">
-<meta property="og:description" content="Viaje redondo desde Reynosa + Cancha VIP. Sorteo en vivo el 5 de agosto a mediodía.">
+<meta property="og:description" content="Viaje redondo desde Reynosa + Cancha VIP. Sorteo en vivo el 5 de agosto, 12:00 PM hora de Reynosa.">
 <meta property="og:image" content="https://conectareynosa.mx/imgs/giveaways/melanie-hades.jpg">
 <meta property="og:type" content="website">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -105,7 +105,7 @@ input:focus-visible{outline:2px solid var(--c-amarillo);outline-offset:2px;borde
     <div class="cd-c"><div class="cd-n" id="cd-m">--</div><div class="cd-l">min</div></div>
     <div class="cd-c"><div class="cd-n" id="cd-s">--</div><div class="cd-l">seg</div></div>
   </div>
-  <p class="cd-pie"><svg class="ic"><use href="#ic-reloj"/></svg> Se gira <b>en vivo</b> el 5 de agosto a las 12:00 PM</p>
+  <p class="cd-pie"><svg class="ic"><use href="#ic-reloj"/></svg> Sorteo en vivo · <b>12:00 PM hora de Reynosa</b> (11:00 AM en Monterrey)</p>
 
   <form id="form" novalidate>
     <div class="campo">
@@ -132,7 +132,7 @@ input:focus-visible{outline:2px solid var(--c-amarillo);outline-offset:2px;borde
     <h2>¡Ya estás dentro!</h2>
     <div class="ok-num" id="ok-num">—</div>
     <div class="ok-num-l">tu número de participante</div>
-    <p>El sorteo es <b>en vivo el 5 de agosto a las 12:00 PM</b>. Ten tu WhatsApp a la mano: si sales, tienes 10 minutos para contestar.</p>
+    <p>Sorteo en vivo el 5 de agosto · <b>12:00 PM hora de Reynosa</b> (11:00 AM en Monterrey). Ten tu WhatsApp a la mano: si sales, tienes 10 minutos para contestar.</p>
     <a class="btn btn-wa" id="ok-share" href="#" target="_blank" rel="noopener">
       <svg class="ic" style="width:20px;height:20px"><use href="#ic-wa"/></svg> Invitar a alguien
     </a>
@@ -140,7 +140,7 @@ input:focus-visible{outline:2px solid var(--c-amarillo);outline-offset:2px;borde
 
   <div class="cerrado" id="cerrado">
     <h2>El registro cerró</h2>
-    <p>El sorteo es <b>en vivo el 5 de agosto a mediodía</b>. Síguenos para verlo.</p>
+    <p>Sorteo en vivo el 5 de agosto · <b>12:00 PM hora de Reynosa</b> (11:00 AM en Monterrey). Síguenos para verlo.</p>
   </div>
 
   <div class="bases">
@@ -148,7 +148,7 @@ input:focus-visible{outline:2px solid var(--c-amarillo);outline-offset:2px;borde
     <ol>
       <li>Mayores de 18 años.</li>
       <li>Un registro por persona; WhatsApp repetido se anula.</li>
-      <li>El sorteo es en vivo el 5 de agosto a las 12:00 PM.</li>
+      <li>El sorteo es en vivo el 5 de agosto a las 12:00 PM hora de Reynosa (11:00 AM en Monterrey).</li>
       <li>El ganador tiene 10 minutos para contestar su WhatsApp durante la transmisión. Si no contesta, se vuelve a girar.</li>
       <li>El ganador firma contrato antes de recibir el premio.</li>
     </ol>
@@ -161,9 +161,14 @@ input:focus-visible{outline:2px solid var(--c-amarillo);outline-offset:2px;borde
 <script>
 (function(){
   'use strict';
-  // MISMA constante que _lib/giveaway.js. El servidor es la autoridad: esto
+  // MISMAS constantes que _lib/giveaway.js. El servidor es la autoridad: esto
   // solo evita que alguien llene un formulario que ya no se va a aceptar.
-  var CIERRE = new Date('2026-08-05T11:00:00-06:00').getTime();
+  //
+  // ⚠️ Offset -05:00: Reynosa (America/Matamoros) SÍ trae horario de verano;
+  // Monterrey no. En agosto son una hora distintas.
+  // Y son DOS momentos: el registro cierra a las 11, se gira a las 12.
+  var CIERRE = new Date('2026-08-05T11:00:00-05:00').getTime();
+  var SORTEO = new Date('2026-08-05T12:00:00-05:00').getTime();
 
   var $ = function(id){ return document.getElementById(id); };
   var form = $('form'), aviso = $('aviso'), btn = $('btn');
@@ -171,8 +176,14 @@ input:focus-visible{outline:2px solid var(--c-amarillo);outline-offset:2px;borde
   // ── Cuenta regresiva ──────────────────────────────────────────────────
   function dos(n){ return n < 10 ? '0' + n : String(n); }
   function tic(){
-    var falta = CIERRE - Date.now();
-    if (falta <= 0){ cerrar(); $('cd-d').textContent = $('cd-h').textContent = $('cd-m').textContent = $('cd-s').textContent = '00'; return; }
+    var ahora = Date.now();
+    // El formulario se cierra en CIERRE…
+    if (ahora >= CIERRE) cerrar();
+    // …pero la cuenta regresiva apunta al SORTEO, que es una hora después.
+    // Entre las 11 y las 12 sigue corriendo, con el formulario ya reemplazado:
+    // es justo la hora en que la gente está esperando la transmisión.
+    var falta = SORTEO - ahora;
+    if (falta <= 0){ $('cd-d').textContent = $('cd-h').textContent = $('cd-m').textContent = $('cd-s').textContent = '00'; return; }
     var s = Math.floor(falta / 1000);
     $('cd-d').textContent = dos(Math.floor(s / 86400));
     $('cd-h').textContent = dos(Math.floor(s / 3600) % 24);
@@ -181,7 +192,6 @@ input:focus-visible{outline:2px solid var(--c-amarillo);outline-offset:2px;borde
   }
   function cerrar(){ form.style.display = 'none'; $('ok').style.display = 'none'; $('cerrado').style.display = 'block'; }
   tic(); setInterval(tic, 1000);
-  if (Date.now() >= CIERRE) cerrar();
 
   function mal(msg){ aviso.className = 'aviso mal'; aviso.textContent = msg; }
 
@@ -218,7 +228,7 @@ input:focus-visible{outline:2px solid var(--c-amarillo);outline-offset:2px;borde
       $('ok-num').textContent = res.j.posicion != null ? ('#' + res.j.posicion) : '✓';
       $('ok-share').href = 'https://wa.me/?text=' + encodeURIComponent(
         'Me registré para ganarme el viaje a Melanie Martinez con Conecta Reynosa ' +
-        '(viaje redondo + Cancha VIP). El sorteo es en vivo el 5 de agosto. Participa: ' +
+        '(viaje redondo + Cancha VIP). El sorteo es en vivo el 5 de agosto a las 12 PM. Participa: ' +
         'https://conectareynosa.mx/giveaway'
       );
       // Pixel: Lead al CONFIRMARSE el registro, no al enviar el formulario.

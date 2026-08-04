@@ -1007,7 +1007,10 @@ src="https://www.facebook.com/tr?id=1685907946147007&ev=PageView&noscript=1"
 <script>
 (function(){
   // Mismo instante que el CIERRE de _lib/giveaway.js.
-  if (Date.now() >= new Date('2026-08-05T11:00:00-06:00').getTime()){
+  // -05:00 y no -06:00: Reynosa (America/Matamoros) trae horario de verano en
+  // agosto; Monterrey no. Se esconde cuando cierra el REGISTRO, no cuando se
+  // gira: después de las 11 ya no se puede ganar, y el banner dice "gánate".
+  if (Date.now() >= new Date('2026-08-05T11:00:00-05:00').getTime()){
     var b = document.getElementById('gw-banner');
     if (b) b.style.display = 'none';
   }

@@ -13,9 +13,20 @@ const SB_KEY = process.env.PORTAL_SUPABASE_SERVICE_KEY || process.env.PORTAL_SUP
 // function no sea un buzón abierto a cualquier slug inventado.
 const SLUG = 'melanie-hades-2026';
 
-// Cierre del registro. Con offset explícito de Monterrey (-06:00) para que no
-// dependa de la zona horaria del servidor de Netlify.
-const CIERRE = '2026-08-05T11:00:00-06:00';
+// ⚠️ REYNOSA NO ES MONTERREY. Reynosa vive en America/Matamoros, que SÍ trae
+// horario de verano (es zona fronteriza, se alinea con Texas); Monterrey vive
+// en America/Monterrey, que dejó el horario de verano en 2022. En agosto de
+// 2026 eso son -05:00 y -06:00: UNA HORA de diferencia entre dos ciudades a
+// dos horas de camino. Escribir '-06:00' aquí habría corrido todo 60 minutos.
+//
+// Los offsets van EXPLÍCITOS y no se calculan: así el instante es el mismo
+// aunque el servidor de Netlify viva en otro continente.
+//
+// Y son DOS momentos distintos, no uno:
+//   CIERRE — deja de aceptarse el registro. 11:00 AM de Reynosa.
+//   SORTEO — se gira en vivo, una hora después. 12:00 PM de Reynosa.
+const CIERRE = '2026-08-05T11:00:00-05:00';   // 10:00 AM en Monterrey
+const SORTEO = '2026-08-05T12:00:00-05:00';   // 11:00 AM en Monterrey
 
 const ALLOWED_ORIGINS = ['https://conectareynosa.mx', 'https://www.conectareynosa.mx'];
 const ALLOWED_ORIGINS_DEV = ['http://localhost:8888', 'http://localhost:3999', 'http://127.0.0.1:8888'];
@@ -84,7 +95,7 @@ function ipDe(event) {
 }
 
 module.exports = {
-  SB_URL, SB_KEY, SLUG, CIERRE,
+  SB_URL, SB_KEY, SLUG, CIERRE, SORTEO,
   corsCheck, cabeceras, json, faltaEnv, sbHeaders,
   registroCerrado, tokenAdminValido, ipDe,
 };

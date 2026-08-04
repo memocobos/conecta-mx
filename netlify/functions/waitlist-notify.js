@@ -41,7 +41,22 @@ async function sb(path, opts = {}) {
     },
   });
   if (!res.ok) throw new Error(`SB ${res.status}: ${await res.text()}`);
-  return res.status === 204 ? null : res.json();
+  // [GR-9] Un ÉXITO puede venir con el cuerpo vacío. `Prefer: return=minimal`
+  // hace que PostgREST conteste 201 Created SIN cuerpo, y res.json() sobre una
+  // cadena vacía revienta con "Unexpected end of JSON input". El escritor del
+  // snapshot lo llamaba así: la escritura aterrizaba bien y el log gritaba
+  // ERROR encima del éxito. Un ayudante que grita sobre lo que salió bien es
+  // peor que uno callado — manda a buscar un problema que no existe y tapa los
+  // de verdad.
+  //
+  // No se traga cualquier basura: vacío → null; cuerpo con algo que no es JSON
+  // → se lanza CON el cuerpo recortado, para no cambiar un error ruidoso por
+  // uno mudo.
+  if (res.status === 204) return null;
+  const texto = (await res.text()).trim();
+  if (!texto) return null;
+  try { return JSON.parse(texto); }
+  catch (e) { throw new Error(`SB ${res.status}: respuesta no-JSON: ${texto.slice(0, 120)}`); }
 }
 
 async function sendEmail(to, subject, html) {
@@ -181,13 +196,53 @@ async function notifyEvento({ id, a, f, v, promo }) {
   return { sent, total: rows.length };
 }
 
+// [GR-9] READ-THEN-WRITE, el patrón de la casa. Antes iba con
+// `Prefer: resolution=merge-duplicates`, que es el upsert de PostgREST — la
+// misma familia del on_conflict que la casa tiene prohibida por reventar con
+// 42P10 cuando el índice no es el que PostgREST infiere.
+//
+// Se lee lo que hay, se compara, y se escribe SOLO lo que cambió:
+//   · eventos que el snapshot no tiene  → un INSERT, todos de un jalón
+//   · eventos cuyo estado CAMBIÓ        → un PATCH cada uno
+//   · eventos iguales                   → NO SE TOCAN
+//
+// Esa tercera línea no es ahorro: es corrección. Antes cada corrida reescribía
+// las filas enteras y movía su `updated_at` aunque nada hubiera cambiado, así
+// que la columna no decía "cuándo cambió este evento" sino "cuándo corrió el
+// cron". En régimen normal esto hace 0 PATCH y 0 INSERT.
 async function upsertSnapshot(rows) {
-  if (!rows.length) return;
-  await sb(`eventos_estado_snapshot`, {
-    method: "POST",
-    headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
-    body: JSON.stringify(rows.map(e => ({ evento_id: e.id, estado: e.st, updated_at: new Date().toISOString() }))),
-  });
+  if (!rows.length) return { insertadas: 0, actualizadas: 0, sin_cambio: 0 };
+
+  let previos = [];
+  try { previos = await sb(`eventos_estado_snapshot?select=evento_id,estado`) || []; }
+  catch (e) {
+    // Sin la foto previa no se puede comparar, y escribir a ciegas volvería a
+    // pisar los updated_at de todos. Se avisa y no se escribe.
+    console.error("[waitlist-notify] no se pudo leer el snapshot previo:", e.message);
+    throw e;
+  }
+  const antes = new Map(previos.map(r => [r.evento_id, r.estado == null ? "" : r.estado]));
+
+  const ahora = new Date().toISOString();
+  const nuevas = rows.filter(e => !antes.has(e.id));
+  const cambiadas = rows.filter(e => antes.has(e.id) && antes.get(e.id) !== (e.st || ""));
+
+  if (nuevas.length) {
+    await sb(`eventos_estado_snapshot`, {
+      method: "POST",
+      headers: { Prefer: "return=minimal" },
+      body: JSON.stringify(nuevas.map(e => ({ evento_id: e.id, estado: e.st || "", updated_at: ahora }))),
+    });
+  }
+  for (const e of cambiadas) {
+    await sb(`eventos_estado_snapshot?evento_id=eq.${encodeURIComponent(e.id)}`, {
+      method: "PATCH",
+      headers: { Prefer: "return=minimal" },
+      body: JSON.stringify({ estado: e.st || "", updated_at: ahora }),
+    });
+  }
+  return { insertadas: nuevas.length, actualizadas: cambiadas.length,
+           sin_cambio: rows.length - nuevas.length - cambiadas.length };
 }
 
 exports.handler = async function (event) {
@@ -230,11 +285,8 @@ exports.handler = async function (event) {
     const summary = await notifyEvento({ id: forceId, a: row.evento_nombre, f: "", v: "", promo });
     // Marca el evento como activo en snapshot para que el cron no vuelva a disparar.
     try {
-      await sb(`eventos_estado_snapshot`, {
-        method: "POST",
-        headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
-        body: JSON.stringify([{ evento_id: forceId, estado: "", updated_at: new Date().toISOString() }]),
-      });
+      // [GR-9] Mismo patrón de la casa que upsertSnapshot: sin merge-duplicates.
+      await upsertSnapshot([{ id: forceId, st: "" }]);
     } catch {}
     return ok({ ok: true, mode: "force", evento_id: forceId, ...summary });
   }
@@ -297,9 +349,13 @@ exports.handler = async function (event) {
   if (sembrados) console.log(`[waitlist-notify] sembrados sin avisar: ${sembrados}`);
 
   // Actualiza snapshot con los estados actuales (insert + update).
-  try { await upsertSnapshot(eventos); }
-  catch (e) { console.error("[waitlist-notify] upsert snapshot:", e.message); }
+  let escritura = null;
+  try {
+    escritura = await upsertSnapshot(eventos);
+    console.log(`[waitlist-notify] snapshot: +${escritura.insertadas} nuevas, `
+      + `~${escritura.actualizadas} cambiadas, ${escritura.sin_cambio} sin tocar`);
+  } catch (e) { console.error("[waitlist-notify] upsert snapshot:", e.message); }
 
-  return ok({ ok: true, mode: "auto", eventos: eventos.length, sembrados,
+  return ok({ ok: true, mode: "auto", eventos: eventos.length, sembrados, snapshot: escritura,
     disparados: eventosDisparados, encolados: totalNotif, enviados: totalSent });
 };

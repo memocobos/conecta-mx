@@ -21,21 +21,54 @@
 }
 *{box-sizing:border-box}
 body{margin:0;background:var(--c-bg);color:var(--c-ink);font-family:'Montserrat',sans-serif;-webkit-font-smoothing:antialiased}
-.wrap{max-width:520px;margin:0 auto;padding:0 20px 96px}
-.ic{width:1em;height:1em;vertical-align:-0.12em;flex-shrink:0;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+/* La regla base de los iconos. Sin ella un <svg> no mide 1em: mide los 300x150
+   que trae por defecto —empuja el texto de su renglón— y sin `stroke` se pinta
+   como un relleno negro sobre negro, o sea invisible. La borré al reescribir la
+   hoja y dio TRES síntomas de un solo origen: iconos que no se ven, el kicker
+   corrido y la lista indentada. */
+.ic{width:1em;height:1em;vertical-align:-0.12em;flex-shrink:0;stroke:currentColor;
+  fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+
+/* ═══ LA REJILLA DE LA PÁGINA ════════════════════════════════════════════
+   1100px, el MISMO ancho que .catalog del index.html: las tres páginas del
+   sitio se alinean en el mismo eje y no parecen tres sitios distintos.
+
+   Móvil: una columna. La foto y el texto del héroe comparten CELDA (grid-row 1)
+   para que el texto quede encima sin position:absolute ni cálculos de alto —
+   así el bloque crece con su contenido y nunca se desborda.
+   Escritorio (≥900px): dos columnas. Foto de un lado; premio, contador y
+   formulario del otro. Las bases y el pie cruzan las dos.               */
+.pagina{display:grid;grid-template-columns:minmax(0,1fr);max-width:1100px;margin:0 auto}
+
+.foto-col{grid-column:1;grid-row:1;position:relative;height:74svh;overflow:hidden;z-index:0}
+@supports not (height:1svh){ .foto-col{height:74vh} }
+.hero-txt{grid-column:1;grid-row:1;align-self:end;z-index:2;padding:0 20px 26px}
+.cuerpo{grid-row:2;padding:0 20px}
+.pie{grid-row:3;padding:0 20px 96px}
+
+@media (min-width:900px){
+  .pagina{grid-template-columns:minmax(0,.92fr) minmax(0,1fr);
+    column-gap:52px;align-items:start;padding:40px 24px 0}
+  /* La foto recupera su proporción y se queda quieta mientras se llena el
+     formulario: en escritorio hay alto de sobra y el artista es el argumento. */
+  .foto-col{grid-column:1;grid-row:1 / span 2;height:auto;aspect-ratio:1080/1349;
+    max-height:78svh;border-radius:16px;position:sticky;top:32px}
+  .hero-txt{grid-column:2;grid-row:1;align-self:start;padding:0 0 22px}
+  .cuerpo{grid-column:2;grid-row:2;padding:0}
+  .pie{grid-column:1 / -1;grid-row:3;padding:44px 0 90px;max-width:640px;margin:0 auto}
+}
 
 /* ═══ EL HÉROE ══════════════════════════════════════════════════════════
-   La foto a sangre y el texto encima. El velo NO es decoración: medí la foto
-   por bandas y su punto más claro deja al texto blanco en 1.1:1 — invisible.
-   Para que el blanco llegue a 4.5:1 sobre el peor píxel hace falta α≥0.42, así
-   que el velo arranca en .48 donde empieza el texto y baja a negro sólido.
-   Si algún día entra otra foto más clara, se sube la opacidad — nunca se mueve
-   el texto. */
-.hero{position:relative;isolation:isolate;min-height:74svh;display:flex;align-items:flex-end;overflow:hidden}
-@supports not (min-height:1svh){ .hero{min-height:74vh} }
-.hero-media{position:absolute;inset:0;z-index:0}
-.hero-foto{width:100%;height:100%;object-fit:cover;object-position:50% 20%;display:block;background:#0d0d10}
-.hero-velo{position:absolute;inset:0;z-index:1;background:linear-gradient(
+   La foto SIEMPRE con object-fit:cover y proporción fija: nunca se deforma,
+   y en escritorio se recorta lo mínimo porque la columna guarda su 1080/1349.
+
+   El velo NO es decoración. Medí la foto por bandas: su punto más claro deja
+   al texto blanco en 1.1:1 —invisible—. Para que el blanco llegue a 4.5:1
+   sobre el PEOR píxel hace falta α≥0.42. Si algún día entra otra foto más
+   clara, se sube la opacidad; nunca se mueve el texto.                    */
+.hero-foto{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;
+  object-position:50% 20%;display:block;background:#0d0d10}
+.hero-velo{position:absolute;inset:0;z-index:1;pointer-events:none;background:linear-gradient(
   to top,
   #000 0%,
   rgba(0,0,0,.95) 20%,
@@ -44,47 +77,38 @@ body{margin:0;background:var(--c-bg);color:var(--c-ink);font-family:'Montserrat'
   rgba(0,0,0,.40) 57%,
   rgba(0,0,0,.12) 64%,
   transparent 70%)}
-.hero-txt{position:relative;z-index:2;width:100%;max-width:520px;margin:0 auto;padding:0 20px 26px}
 
-/* ═══ ESCRITORIO ════════════════════════════════════════════════════════
-   Una foto VERTICAL en una pantalla horizontal se recorta a una banda: a
-   1440px sólo se veía el fleco, la cara quedaba fuera y el 60% derecho vacío.
-   Aquí la foto recupera su proporción y se pone al lado del texto. El velo
-   deja de ser de abajo-arriba y pasa a ser de izquierda: su trabajo ya no es
-   tapar la foto para leer encima, sino fundir su borde con el negro. */
-@media (min-width:820px){
-  .hero{min-height:0;align-items:stretch;padding:36px 24px 8px}
-  .hero-inner{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,.86fr);
-    gap:44px;align-items:center;max-width:1080px;margin:0 auto;width:100%}
-  .hero-media{position:relative;inset:auto;order:2;aspect-ratio:1080/1349;
-    max-height:74svh;border-radius:16px;overflow:hidden}
-  .hero-velo{background:linear-gradient(to right,
-    #000 0%, rgba(0,0,0,.62) 14%, rgba(0,0,0,.18) 32%, transparent 52%)}
-  .hero-txt{order:1;max-width:none;margin:0;padding:0}
-  h1{font-size:clamp(52px,4.6vw,68px)}
-  .incluye li{font-size:16.5px}
-  .incluye .ic{width:21px;height:21px}
-}
-
-.logo{font-family:var(--font-display);font-size:14px;letter-spacing:.16em;text-transform:uppercase;color:rgba(255,255,255,.72);margin-bottom:16px}
+.logo{font-family:var(--font-display);font-size:14px;letter-spacing:.16em;
+  text-transform:uppercase;color:rgba(255,255,255,.72);margin-bottom:16px}
 .logo b{color:var(--c-rojo)}
-
-.kicker{font-family:var(--font-display);font-size:12px;letter-spacing:.24em;text-transform:uppercase;color:var(--c-amarillo);margin:0 0 6px}
-h1{font-family:var(--font-display);font-size:clamp(40px,13vw,64px);line-height:.9;margin:0 0 18px;text-transform:uppercase;letter-spacing:-.015em}
+.kicker{font-family:var(--font-display);font-size:12px;letter-spacing:.24em;
+  text-transform:uppercase;color:var(--c-amarillo);margin:0 0 6px}
+h1{font-family:var(--font-display);font-size:clamp(40px,8.5vw,62px);line-height:.9;
+  margin:0 0 18px;text-transform:uppercase;letter-spacing:-.015em;text-wrap:balance}
 h1 em{font-style:normal;color:var(--c-amarillo)}
 
 /* Lista, no párrafo: cinco cosas se cuentan, y contarlas es el argumento. */
 .incluye{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:9px}
-.incluye li{display:flex;align-items:center;gap:11px;font-size:15px;font-weight:600;line-height:1.25;color:#fff}
+.incluye li{display:flex;align-items:center;gap:11px;font-size:clamp(15px,1.4vw,17px);
+  font-weight:600;line-height:1.28;color:#fff}
 .incluye .ic{width:19px;height:19px;color:var(--c-amarillo);flex:none;stroke-width:1.9}
 
-/* Cuenta regresiva */
+/* En escritorio el velo deja de tapar para leer encima —el texto ya vive en
+   su propia columna— y solo redondea el borde de la foto. */
+@media (min-width:900px){
+  .hero-velo{background:linear-gradient(to top,rgba(0,0,0,.55) 0%,transparent 34%)}
+  .incluye .ic{width:21px;height:21px}
+}
+
+/* ═══ CUÁNDO ════════════════════════════════════════════════════════════ */
 .cuando{padding-top:26px}
 .cd{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:0 0 8px}
 .cd-c{background:rgba(255,255,255,.04);border:1px solid var(--c-line);border-radius:10px;padding:12px 4px;text-align:center}
-.cd-n{font-family:var(--font-display);font-size:30px;line-height:1;color:var(--c-amarillo)}
+.cd-n{font-family:var(--font-display);font-size:clamp(28px,3.4vw,38px);line-height:1;color:var(--c-amarillo)}
 .cd-l{font-size:8px;letter-spacing:.12em;text-transform:uppercase;color:var(--c-muted);margin-top:5px}
-.cd-pie{font-size:12px;color:var(--c-muted);text-align:center;margin:0 0 26px}
+.cd-pie{font-size:12px;color:var(--c-muted);text-align:center;margin:0 0 26px;line-height:1.55}
+.ok-premio{font-size:14px;line-height:1.6;color:rgba(255,255,255,.82);margin:18px 0 0}
+@media (min-width:900px){ .cuando{padding-top:6px} }
 
 /* Formulario */
 .campo{margin-bottom:14px}
@@ -152,12 +176,12 @@ input:focus-visible{outline:2px solid var(--c-amarillo);outline-offset:2px;borde
   <symbol id="ic-boleto" viewBox="0 0 24 24"><path d="M4 8.5A1.5 1.5 0 0 1 5.5 7h13A1.5 1.5 0 0 1 20 8.5v2a1.75 1.75 0 0 0 0 3.5v2A1.5 1.5 0 0 1 18.5 17h-13A1.5 1.5 0 0 1 4 15.5v-2a1.75 1.75 0 0 0 0-3.5v-2Z"/><path d="M14 7v2m0 3v2m0 3v-2"/></symbol>
 </defs></svg>
 
-<header class="hero">
-  <div class="hero-inner">
-  <div class="hero-media">
+<div class="pagina">
+  <div class="foto-col">
     <img class="hero-foto" src="imgs/giveaways/melanie-hades.jpg" alt="Melanie Martinez en Arena Monterrey" width="1080" height="1349">
     <div class="hero-velo" aria-hidden="true"></div>
   </div>
+
   <div class="hero-txt">
     <div class="logo"><b>Conecta</b> Reynosa</div>
     <div class="kicker"><svg class="ic"><use href="#ic-regalo"/></svg> Giveaway</div>
@@ -170,10 +194,8 @@ input:focus-visible{outline:2px solid var(--c-amarillo);outline-offset:2px;borde
       <li><svg class="ic"><use href="#ic-regalo"/></svg>Kit Conecta</li>
     </ul>
   </div>
-  </div>
-</header>
 
-<div class="wrap">
+  <div class="cuerpo">
 
   <div class="cuando">
   <div class="cd" id="cd" aria-live="polite">
@@ -222,6 +244,9 @@ input:focus-visible{outline:2px solid var(--c-amarillo);outline-offset:2px;borde
     <p>Gánate un paquete PLUS que contiene transporte ida y vuelta, traslados, hospedaje, boleto en zona VIP y Kit Conecta.<br><br>Sorteo en vivo el 5 de agosto · <b>12:00 PM hora de Reynosa</b> (11:00 AM en Monterrey). Síguenos para verlo.</p>
   </div>
 
+  </div><!-- /cuerpo -->
+
+  <div class="pie">
   <div class="bases">
     <h3>Bases</h3>
     <ol>
@@ -235,7 +260,8 @@ input:focus-visible{outline:2px solid var(--c-amarillo);outline-offset:2px;borde
   </div>
 
   <div class="ftr">Conecta Reynosa · conectareynosa.mx</div>
-</div>
+  </div><!-- /pie -->
+</div><!-- /pagina -->
 
 <!-- El atajo al formulario. Aparece solo cuando el formulario NO se ve, y se
      va en cuanto entra en pantalla: un botón fijo encima del propio campo que

@@ -15,7 +15,12 @@
 }
 *{box-sizing:border-box}
 body{margin:0;background:var(--c-bg);color:var(--c-ink);font-family:'Montserrat',sans-serif;-webkit-font-smoothing:antialiased}
-.wrap{max-width:640px;margin:0 auto;padding:22px 20px 70px}
+/* 1100px como .catalog del index: las tres páginas del sitio comparten eje.
+   La barra de arriba y el pie usan ese ancho; lo que se MIRA —el carrusel y el
+   panel del ganador— se queda en una columna angosta y centrada, porque un
+   nombre estirado a 1100px se lee peor, no mejor. */
+.wrap{max-width:1100px;margin:0 auto;padding:22px 20px 70px}
+.centro{max-width:560px;margin:0 auto}
 .ic{width:1em;height:1em;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 
 .top{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:26px}
@@ -33,13 +38,14 @@ body{margin:0;background:var(--c-bg);color:var(--c-ink);font-family:'Montserrat'
 @keyframes late{0%,100%{opacity:1}50%{opacity:.25}}
 
 .total{text-align:center;margin-bottom:24px}
-.total-n{font-family:var(--font-display);font-size:clamp(64px,17vw,116px);line-height:.9;color:var(--c-amarillo)}
+.total-n{font-family:var(--font-display);font-size:clamp(64px,12vw,124px);line-height:.9;color:var(--c-amarillo)}
 .total-l{font-size:11px;letter-spacing:.24em;text-transform:uppercase;color:var(--c-muted);margin-top:6px}
 
 /* EL CARRUSEL — vertical, no rueda: con cientos de nombres una rueda de
    rebanadas no se lee en una pantalla de celular ni en cámara. */
 .carril{position:relative;height:190px;overflow:hidden;border:1px solid var(--c-line);
   border-radius:14px;background:rgba(255,255,255,.03);margin-bottom:18px}
+@media (min-width:900px){ .carril{height:230px} }
 .carril::before,.carril::after{content:'';position:absolute;left:0;right:0;height:62px;z-index:2;pointer-events:none}
 .carril::before{top:0;background:linear-gradient(#000,transparent)}
 .carril::after{bottom:0;background:linear-gradient(transparent,#000)}
@@ -51,20 +57,21 @@ body{margin:0;background:var(--c-bg);color:var(--c-ink);font-family:'Montserrat'
    quien no lo es, y el padrón no puede ser público. */
 .tira div.relleno{color:rgba(255,255,255,.30)}
 .tira div{height:64px;display:flex;align-items:center;justify-content:center;
-  font-family:var(--font-display);font-size:clamp(26px,7vw,36px);text-transform:uppercase;
+  font-family:var(--font-display);font-size:clamp(26px,4.4vw,38px);text-transform:uppercase;
   white-space:nowrap;padding:0 14px;overflow:hidden;text-overflow:ellipsis}
 
 .panel{display:none;text-align:center;padding:24px 18px;border:1px solid rgba(232,255,76,.4);
   border-radius:14px;background:rgba(232,255,76,.07);margin-bottom:18px}
 .panel.no{border-color:rgba(255,40,59,.45);background:rgba(255,40,59,.08)}
 .panel-l{font-size:11px;letter-spacing:.24em;text-transform:uppercase;color:var(--c-muted)}
-.panel-n{font-family:var(--font-display);font-size:clamp(34px,9vw,60px);line-height:1;margin:10px 0 12px;text-transform:uppercase}
+.panel-n{font-family:var(--font-display);font-size:clamp(34px,6vw,64px);line-height:1;
+  margin:10px 0 12px;text-transform:uppercase;text-wrap:balance}
 .cuando-giro{font-size:12.5px;color:rgba(255,255,255,.66);line-height:1.6}
 .repeticion{display:inline-block;margin-top:10px;padding:4px 11px;border:1px solid var(--c-line);
   border-radius:999px;font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--c-muted)}
 
 .reloj{margin-top:16px;padding-top:14px;border-top:1px solid rgba(255,255,255,.12)}
-.reloj-n{font-family:var(--font-display);font-size:40px;line-height:1;color:var(--c-amarillo)}
+.reloj-n{font-family:var(--font-display);font-size:clamp(38px,5vw,52px);line-height:1;color:var(--c-amarillo)}
 .reloj.agotado .reloj-n{color:var(--c-muted)}
 .reloj-l{font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--c-muted);margin-top:5px}
 
@@ -87,7 +94,7 @@ body{margin:0;background:var(--c-bg);color:var(--c-ink);font-family:'Montserrat'
 .espera{text-align:center;padding:30px 18px;color:var(--c-muted);font-size:14px;line-height:1.6}
 .espera b{color:var(--c-ink)}
 
-.hist{margin-top:30px;border-top:1px solid var(--c-line);padding-top:16px}
+.hist{margin-top:30px;border-top:1px solid var(--c-line);padding-top:16px;max-width:560px;margin-left:auto;margin-right:auto}
 .hist h3{font-family:var(--font-display);font-size:14px;letter-spacing:.18em;text-transform:uppercase;color:var(--c-muted);margin:0 0 12px}
 .hist ol{margin:0;padding-left:22px;font-size:14px;line-height:1.95;color:rgba(255,255,255,.72)}
 .r-si{color:var(--c-verde);font-weight:700}
@@ -131,6 +138,7 @@ body{margin:0;background:var(--c-bg);color:var(--c-ink);font-family:'Montserrat'
 
   <div style="text-align:center"><span class="vivo"><span class="punto"></span> Sorteo en vivo</span></div>
 
+  <div class="centro">
   <div class="total">
     <div class="total-n" id="total">—</div>
     <div class="total-l">participantes</div>
@@ -176,6 +184,8 @@ body{margin:0;background:var(--c-bg);color:var(--c-ink);font-family:'Montserrat'
     <div class="admin-l">Controles</div>
     <button class="btn" id="girar">Girar</button>
   </div>
+
+  </div><!-- /centro -->
 
   <div class="err" id="err"></div>
 

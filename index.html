@@ -991,6 +991,50 @@ src="https://www.facebook.com/tr?id=1685907946147007&ev=PageView&noscript=1"
 </head>
 <body>
 
+<!-- ═══ BANNER GIVEAWAY · TEMPORAL ═══════════════════════════════════════════
+     Se quita borrando este bloque entero (del comentario al </a>) y nada más:
+     no depende de ningún estilo ni script del resto del archivo, a propósito.
+     Vence solo el 5-ago: pasado el SORTEO el JS de abajo lo esconde, para que
+     no se quede vivo si nadie se acuerda de venir a borrarlo.
+     ═══════════════════════════════════════════════════════════════════════ -->
+<a id="gw-banner" href="/giveaway"
+   style="display:flex;align-items:center;justify-content:center;gap:10px;padding:11px 16px;
+          background:#e8ff4c;color:#000;text-decoration:none;font-weight:900;font-size:13px;
+          letter-spacing:.04em;text-align:center;line-height:1.35">
+  <span id="gw-txt">Gánate el viaje a <b>Melanie Martinez</b> — viaje + Cancha VIP</span>
+  <span aria-hidden="true">&rarr;</span>
+</a>
+<script>
+(function(){
+  // Mismos dos instantes que _lib/giveaway.js.
+  // -05:00 y no -06:00: Reynosa (America/Matamoros) trae horario de verano en
+  // agosto; Monterrey no. Una hora de diferencia entre las dos ciudades.
+  var CIERRE = new Date('2026-08-05T11:00:00-05:00').getTime();
+  var SORTEO = new Date('2026-08-05T12:00:00-05:00').getTime();
+
+  // TRES estados, no dos:
+  //   antes de las 11  → "gánate el viaje" (todavía se puede entrar)
+  //   entre 11 y 12    → ya no se puede entrar, pero SÍ se puede ver: el
+  //                      banner deja de invitar y empieza a avisar
+  //   después de las 12 → se esconde
+  function pintar(){
+    var b = document.getElementById('gw-banner');
+    if (!b) return;
+    var ahora = Date.now();
+    if (ahora >= SORTEO){ b.style.display = 'none'; return; }
+    if (ahora >= CIERRE){
+      var t = document.getElementById('gw-txt');
+      if (t) t.textContent = 'Sorteo en vivo hoy a las 12:00 PM · hora de Reynosa';
+    }
+  }
+  pintar();
+  // Y se revisa cada medio minuto: una pestaña abierta desde las 10:59 no se
+  // puede quedar diciendo "gánate el viaje" cuando el registro ya cerró.
+  setInterval(pintar, 30000);
+})();
+</script>
+<!-- ═══ FIN BANNER GIVEAWAY ═══════════════════════════════════════════════ -->
+
 <!-- [Barrida 2/3] Mini-sprite de iconos (SOLO los que usa index) + helper .ic.
      Mismo trazo 24x24 que kamehouse; el icono hereda color y tamaño del texto. -->
 <style>.ic{width:1em;height:1em;vertical-align:-0.12em;flex-shrink:0;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}</style>

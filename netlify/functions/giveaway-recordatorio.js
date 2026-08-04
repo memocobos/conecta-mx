@@ -1,5 +1,7 @@
-// giveaway-recordatorio.js — cron. Un correo corto a TODOS los registrados
-// quince minutos antes del sorteo, con la liga a /sorteo.
+// giveaway-recordatorio.js — cron. Un correo corto a los registrados que NO
+// han sido avisados, quince minutos antes del sorteo, con la liga a /sorteo.
+// [GVW-1] IDEMPOTENTE: `recordatorio_at` marca a quien ya recibió. Correr dos
+// veces dentro de la ventana NO duplica.
 //
 // EL CRON CORRE DIARIO Y LA FUNCIÓN DECIDE. Netlify agenda en UTC y no entiende
 // "solo el 5 de agosto", así que la guarda de fecha vive aquí: cualquier otro
@@ -90,10 +92,17 @@ exports.handler = async () => {
   const falta = G.faltaEnv();
   if (falta) { console.error('[giveaway-recordatorio]', falta); return { statusCode: 500, body: falta }; }
 
+  // [GVW-1] Solo los que NO han sido avisados. `recordatorio_at` es la marca de
+  // idempotencia: mientras esté en NULL, esa persona no ha recibido el correo.
+  // Sin este filtro, una segunda corrida dentro de la ventana de 30 minutos le
+  // mandaba el recordatorio OTRA VEZ a todo el padrón — medido: 90 correos para
+  // 45 personas. Y no era hipotético: el botón "Run now" del panel de Netlify
+  // dispara la función a mano, y la ventana dura media hora.
   let filas = [];
   try {
     const r = await fetch(
-      `${G.SB_URL}/rest/v1/giveaway_registros?slug=eq.${encodeURIComponent(G.SLUG)}&select=nombre,correo`,
+      `${G.SB_URL}/rest/v1/giveaway_registros?slug=eq.${encodeURIComponent(G.SLUG)}`
+      + `&recordatorio_at=is.null&select=id,nombre,correo`,
       { headers: G.sbHeaders() }
     );
     if (!r.ok) throw new Error('lectura ' + r.status);
@@ -104,16 +113,44 @@ exports.handler = async () => {
   }
 
   const link = SITE + '/sorteo';
-  let enviados = 0, fallidos = 0, sinCorreo = 0;
+  let enviados = 0, fallidos = 0, sinCorreo = 0, sinMarcar = 0;
   // Uno por uno y en serie: un buzón malo no puede tumbar al resto, y un
   // padrón de cientos no debe abrir cientos de conexiones a la vez.
   for (const f of (Array.isArray(filas) ? filas : [])) {
     const correo = String((f && f.correo) || '').trim();
+    // [GVW-1] Sin correo: NO se marca —no recibió nada— pero tampoco traba el
+    // reintento, porque el select de arriba lo va a volver a traer y este
+    // `continue` lo va a volver a saltar. Se cuenta, no se toca.
     if (!correo) { sinCorreo++; continue; }
+
     const ok = await enviar(correo, 'El sorteo es en 15 minutos — Conecta Reynosa', correoHtml(f.nombre, link));
-    if (ok) enviados++; else fallidos++;
+    if (!ok) { fallidos++; continue; }
+    enviados++;
+
+    // [GVW-1] Se marca AQUÍ, fila por fila, inmediatamente después del envío —
+    // no en lote al final. Si la corrida se muere a la mitad (timeout de la
+    // lambda, deploy encima, lo que sea), los que ya recibieron quedan
+    // marcados y el reintento arranca justo donde se quedó. Un lote al final
+    // perdería la marca de TODOS los ya enviados y el reintento duplicaría.
+    try {
+      const p = await fetch(
+        `${G.SB_URL}/rest/v1/giveaway_registros?id=eq.${encodeURIComponent(f.id)}`,
+        { method: 'PATCH',
+          headers: { ...G.sbHeaders(), Prefer: 'return=minimal' },
+          body: JSON.stringify({ recordatorio_at: new Date().toISOString() }) }
+      );
+      if (!p.ok) throw new Error('PATCH ' + p.status);
+    } catch (e) {
+      // El correo YA salió y la marca no. Esta persona es la única que puede
+      // recibir doble si alguien vuelve a correr. Se grita con su id para
+      // poder marcarla a mano.
+      sinMarcar++;
+      console.error(`[giveaway-recordatorio] ENVIADO PERO SIN MARCAR id=${f && f.id}: ${e.message}`);
+    }
   }
 
-  console.log(`[giveaway-recordatorio] padrón ${filas.length} · enviados ${enviados} · fallidos ${fallidos} · sin correo ${sinCorreo}`);
-  return { statusCode: 200, body: JSON.stringify({ ok: true, enviados, fallidos, sin_correo: sinCorreo }) };
+  console.log(`[giveaway-recordatorio] pendientes ${filas.length} · enviados ${enviados}`
+    + ` · fallidos ${fallidos} · sin correo ${sinCorreo} · sin marcar ${sinMarcar}`);
+  return { statusCode: 200, body: JSON.stringify({ ok: true, enviados, fallidos,
+    sin_correo: sinCorreo, sin_marcar: sinMarcar }) };
 };

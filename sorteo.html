@@ -15,58 +15,95 @@
 }
 *{box-sizing:border-box}
 body{margin:0;background:var(--c-bg);color:var(--c-ink);font-family:'Montserrat',sans-serif;-webkit-font-smoothing:antialiased}
-.wrap{max-width:860px;margin:0 auto;padding:26px 20px 60px}
+.wrap{max-width:640px;margin:0 auto;padding:22px 20px 70px}
 .ic{width:1em;height:1em;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 
-.puerta{max-width:400px;margin:16vh auto;text-align:center}
-.puerta h1{font-family:var(--font-display);font-size:34px;text-transform:uppercase;margin:0 0 18px}
-input[type=password]{width:100%;padding:15px;background:rgba(255,255,255,.05);border:1px solid var(--c-line);
-  border-radius:10px;color:var(--c-ink);font-size:16px;font-family:inherit;text-align:center;letter-spacing:.1em}
-.btn{padding:15px 26px;background:var(--c-amarillo);color:#000;border:0;border-radius:11px;cursor:pointer;
-  font-family:var(--font-display);font-size:19px;letter-spacing:.08em;text-transform:uppercase}
-.btn[disabled]{opacity:.45;cursor:not-allowed}
-.btn-si{background:var(--c-verde)}
-.btn-no{background:transparent;color:var(--c-ink);border:1px solid rgba(255,255,255,.28)}
-.err{color:#ffb3b3;font-size:13px;min-height:20px;margin-top:12px}
+.top{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:26px}
+.logo{font-family:var(--font-display);font-size:14px;letter-spacing:.16em;text-transform:uppercase;color:rgba(255,255,255,.72)}
+.logo b{color:var(--c-rojo)}
+/* La llave: discreta a propósito. No es un botón de la página, es una puerta
+   para una sola persona — si llamara la atención, invitaría a tocarla. */
+.llave{background:none;border:0;color:rgba(255,255,255,.22);cursor:pointer;padding:8px;line-height:0;border-radius:8px}
+.llave:hover,.llave:focus-visible{color:rgba(255,255,255,.55)}
+.llave.abierta{color:var(--c-amarillo)}
 
-.panel{display:none}
-.total{text-align:center;margin-bottom:26px}
-.total-n{font-family:var(--font-display);font-size:clamp(72px,18vw,132px);line-height:.9;color:var(--c-amarillo)}
-.total-l{font-size:12px;letter-spacing:.24em;text-transform:uppercase;color:var(--c-muted);margin-top:6px}
+.vivo{display:inline-flex;align-items:center;gap:7px;font-size:11px;letter-spacing:.18em;
+  text-transform:uppercase;color:var(--c-muted);margin-bottom:8px}
+.punto{width:7px;height:7px;border-radius:50%;background:var(--c-rojo);animation:late 2s ease-in-out infinite}
+@keyframes late{0%,100%{opacity:1}50%{opacity:.25}}
+
+.total{text-align:center;margin-bottom:24px}
+.total-n{font-family:var(--font-display);font-size:clamp(64px,17vw,116px);line-height:.9;color:var(--c-amarillo)}
+.total-l{font-size:11px;letter-spacing:.24em;text-transform:uppercase;color:var(--c-muted);margin-top:6px}
 
 /* EL CARRUSEL — vertical, no rueda: con cientos de nombres una rueda de
-   rebanadas no se lee en cámara. Una ventana con una lista que corre sí. */
+   rebanadas no se lee en una pantalla de celular ni en cámara. */
 .carril{position:relative;height:190px;overflow:hidden;border:1px solid var(--c-line);
-  border-radius:14px;background:rgba(255,255,255,.03);margin-bottom:20px}
+  border-radius:14px;background:rgba(255,255,255,.03);margin-bottom:18px}
 .carril::before,.carril::after{content:'';position:absolute;left:0;right:0;height:62px;z-index:2;pointer-events:none}
 .carril::before{top:0;background:linear-gradient(#000,transparent)}
 .carril::after{bottom:0;background:linear-gradient(transparent,#000)}
 .marca{position:absolute;top:50%;left:0;right:0;height:64px;transform:translateY(-50%);
   border-top:2px solid var(--c-amarillo);border-bottom:2px solid var(--c-amarillo);z-index:1;pointer-events:none}
 .tira{position:absolute;left:0;right:0;top:0;will-change:transform}
+/* El relleno se ve ATENUADO a propósito. No son candidatos: son movimiento.
+   Poner nombres inventados en un sorteo real sería enseñar como participante a
+   quien no lo es, y el padrón no puede ser público. */
+.tira div.relleno{color:rgba(255,255,255,.30)}
 .tira div{height:64px;display:flex;align-items:center;justify-content:center;
-  font-family:var(--font-display);font-size:34px;text-transform:uppercase;letter-spacing:.01em;white-space:nowrap;padding:0 14px}
+  font-family:var(--font-display);font-size:clamp(26px,7vw,36px);text-transform:uppercase;
+  white-space:nowrap;padding:0 14px;overflow:hidden;text-overflow:ellipsis}
 
-.ganador{display:none;text-align:center;padding:26px 18px;border:1px solid rgba(232,255,76,.4);
-  border-radius:14px;background:rgba(232,255,76,.07);margin-bottom:20px}
-.ganador-l{font-size:11px;letter-spacing:.24em;text-transform:uppercase;color:var(--c-muted)}
-.ganador-n{font-family:var(--font-display);font-size:clamp(36px,9vw,62px);line-height:1;margin:10px 0 14px;text-transform:uppercase}
-.tel{display:inline-flex;align-items:center;gap:10px;font-family:'JetBrains Mono',ui-monospace,monospace;
-  font-size:21px;letter-spacing:.08em;background:rgba(0,0,0,.45);padding:9px 15px;border-radius:9px}
-.tel button{background:none;border:1px solid rgba(255,255,255,.28);color:var(--c-ink);border-radius:7px;
-  padding:4px 10px;font-size:11px;letter-spacing:.1em;text-transform:uppercase;cursor:pointer;font-family:inherit}
-.acciones{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-top:20px}
+.panel{display:none;text-align:center;padding:24px 18px;border:1px solid rgba(232,255,76,.4);
+  border-radius:14px;background:rgba(232,255,76,.07);margin-bottom:18px}
+.panel.no{border-color:rgba(255,40,59,.45);background:rgba(255,40,59,.08)}
+.panel-l{font-size:11px;letter-spacing:.24em;text-transform:uppercase;color:var(--c-muted)}
+.panel-n{font-family:var(--font-display);font-size:clamp(34px,9vw,60px);line-height:1;margin:10px 0 12px;text-transform:uppercase}
+.cuando-giro{font-size:12.5px;color:rgba(255,255,255,.66);line-height:1.6}
+.repeticion{display:inline-block;margin-top:10px;padding:4px 11px;border:1px solid var(--c-line);
+  border-radius:999px;font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--c-muted)}
 
-.hist{margin-top:34px;border-top:1px solid var(--c-line);padding-top:18px}
+.reloj{margin-top:16px;padding-top:14px;border-top:1px solid rgba(255,255,255,.12)}
+.reloj-n{font-family:var(--font-display);font-size:40px;line-height:1;color:var(--c-amarillo)}
+.reloj.agotado .reloj-n{color:var(--c-muted)}
+.reloj-l{font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--c-muted);margin-top:5px}
+
+.tel{display:none;align-items:center;justify-content:center;gap:10px;margin-top:16px;
+  font-family:'JetBrains Mono',ui-monospace,monospace;font-size:19px;letter-spacing:.06em;
+  background:rgba(0,0,0,.45);padding:9px 14px;border-radius:9px}
+.tel button,.mini{background:none;border:1px solid rgba(255,255,255,.26);color:var(--c-ink);border-radius:8px;
+  padding:6px 12px;font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;cursor:pointer;font-family:inherit}
+.mini:hover{border-color:rgba(255,255,255,.5)}
+
+.btn{padding:15px 26px;background:var(--c-amarillo);color:#000;border:0;border-radius:11px;cursor:pointer;
+  font-family:var(--font-display);font-size:19px;letter-spacing:.08em;text-transform:uppercase}
+.btn[disabled]{opacity:.45;cursor:not-allowed}
+.btn-si{background:var(--c-verde)}
+.btn-no{background:transparent;color:var(--c-ink);border:1px solid rgba(255,255,255,.28)}
+.acciones{display:none;gap:10px;flex-wrap:wrap;justify-content:center;margin-top:18px}
+.admin{display:none;margin-top:22px;padding-top:18px;border-top:1px dashed rgba(232,255,76,.28);text-align:center}
+.admin-l{font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:var(--c-amarillo);margin-bottom:12px}
+
+.espera{text-align:center;padding:30px 18px;color:var(--c-muted);font-size:14px;line-height:1.6}
+.espera b{color:var(--c-ink)}
+
+.hist{margin-top:30px;border-top:1px solid var(--c-line);padding-top:16px}
 .hist h3{font-family:var(--font-display);font-size:14px;letter-spacing:.18em;text-transform:uppercase;color:var(--c-muted);margin:0 0 12px}
-.hist ol{margin:0;padding-left:22px;font-size:14px;line-height:1.9;color:rgba(255,255,255,.72)}
-.hist .r-si{color:var(--c-verde);font-weight:700}
-.hist .r-no{color:var(--c-rojo);font-weight:700}
-.hist .r-pd{color:var(--c-amarillo);font-weight:700}
-.vacio{font-size:13px;color:var(--c-muted)}
+.hist ol{margin:0;padding-left:22px;font-size:14px;line-height:1.95;color:rgba(255,255,255,.72)}
+.r-si{color:var(--c-verde);font-weight:700}
+.r-no{color:var(--c-rojo);font-weight:700}
+.r-pd{color:var(--c-amarillo);font-weight:700}
+.hist-hora{color:var(--c-muted);font-size:12px}
+
+.puerta{display:none;max-width:340px;margin:22px auto 0;text-align:center}
+.puerta input{width:100%;padding:13px;background:rgba(255,255,255,.05);border:1px solid var(--c-line);
+  border-radius:10px;color:var(--c-ink);font-size:16px;font-family:inherit;text-align:center;letter-spacing:.1em}
+.err{color:#ffb3b3;font-size:13px;min-height:20px;margin-top:10px}
+.ftr{margin-top:34px;text-align:center;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:rgba(255,255,255,.3)}
 
 @media (prefers-reduced-motion:reduce){
   .tira{transition-duration:.01ms !important}
+  .punto{animation:none;opacity:1}
 }
 </style>
 </head>
@@ -74,53 +111,80 @@ input[type=password]{width:100%;padding:15px;background:rgba(255,255,255,.05);bo
 
 <svg aria-hidden="true" focusable="false" style="position:absolute;width:0;height:0;overflow:hidden"><defs>
   <symbol id="ic-ojo" viewBox="0 0 24 24"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></symbol>
+  <symbol id="ic-llave" viewBox="0 0 24 24"><circle cx="8" cy="15" r="4"/><path d="M10.9 12.1 20 3"/><path d="M17 6l2.5 2.5"/><path d="M14.5 8.5 17 11"/></symbol>
+  <symbol id="ic-repetir" viewBox="0 0 24 24"><path d="M3 12a9 9 0 0 1 15.3-6.4L21 8"/><path d="M21 4v4h-4"/><path d="M21 12a9 9 0 0 1-15.3 6.4L3 16"/><path d="M3 20v-4h4"/></symbol>
 </defs></svg>
 
 <div class="wrap">
 
+  <div class="top">
+    <div class="logo"><b>Conecta</b> Reynosa</div>
+    <button class="llave" id="llave" title="Acceso" aria-label="Acceso de administrador">
+      <svg class="ic" style="width:18px;height:18px"><use href="#ic-llave"/></svg>
+    </button>
+  </div>
+
   <div class="puerta" id="puerta">
-    <h1>Sorteo en vivo</h1>
-    <input type="password" id="tok" placeholder="Token de admin" autocomplete="off">
+    <input type="password" id="tok" placeholder="Token" autocomplete="off">
     <div class="err" id="err-tok"></div>
-    <button class="btn" id="entrar" style="width:100%">Entrar</button>
+  </div>
+
+  <div style="text-align:center"><span class="vivo"><span class="punto"></span> Sorteo en vivo</span></div>
+
+  <div class="total">
+    <div class="total-n" id="total">—</div>
+    <div class="total-l">participantes</div>
+  </div>
+
+  <div class="carril" id="carril">
+    <div class="marca"></div>
+    <div class="tira" id="tira"></div>
+  </div>
+
+  <div class="espera" id="espera">
+    Todavía no se gira.<br>El sorteo es a las <b>12:00 PM hora de Reynosa</b> (11:00 AM en Monterrey).<br>
+    Deja esta página abierta: se actualiza sola.
   </div>
 
   <div class="panel" id="panel">
-    <div class="total">
-      <div class="total-n" id="total">—</div>
-      <div class="total-l">participantes</div>
+    <div class="panel-l" id="panel-l">Ganador</div>
+    <div class="panel-n" id="p-nombre">—</div>
+    <div class="cuando-giro" id="p-cuando">—</div>
+    <div id="p-repeticion"></div>
+
+    <div class="reloj" id="reloj">
+      <div class="reloj-n" id="reloj-n">10:00</div>
+      <div class="reloj-l" id="reloj-l">para contestar su WhatsApp</div>
     </div>
 
-    <div class="carril" id="carril">
-      <div class="marca"></div>
-      <div class="tira" id="tira"></div>
+    <div class="tel" id="tel">
+      <span id="g-tel">—</span>
+      <button id="g-ver"><svg class="ic" style="width:12px;height:12px"><use href="#ic-ojo"/></svg> Ver</button>
     </div>
 
-    <div style="text-align:center">
-      <button class="btn" id="girar">Girar</button>
+    <div class="acciones" id="acciones">
+      <button class="btn btn-si" id="si">Sí contestó</button>
+      <button class="btn btn-no" id="no">No contestó — volver a girar</button>
     </div>
 
-    <div class="ganador" id="ganador">
-      <div class="ganador-l">Ganador</div>
-      <div class="ganador-n" id="g-nombre">—</div>
-      <div class="tel">
-        <span id="g-tel">—</span>
-        <button id="g-ver"><svg class="ic" style="width:12px;height:12px"><use href="#ic-ojo"/></svg> Ver</button>
-      </div>
-      <div class="acciones">
-        <button class="btn btn-si" id="si">Sí contestó</button>
-        <button class="btn btn-no" id="no">No contestó — volver a girar</button>
-      </div>
-    </div>
-
-    <div class="err" id="err"></div>
-
-    <div class="hist">
-      <h3>Giros de esta sesión</h3>
-      <ol id="hist"></ol>
-      <div class="vacio" id="hist-vacio">Todavía no se ha girado.</div>
+    <div style="margin-top:16px">
+      <button class="mini" id="repetir"><svg class="ic" style="width:11px;height:11px"><use href="#ic-repetir"/></svg> Ver de nuevo</button>
     </div>
   </div>
+
+  <div class="admin" id="admin">
+    <div class="admin-l">Controles</div>
+    <button class="btn" id="girar">Girar</button>
+  </div>
+
+  <div class="err" id="err"></div>
+
+  <div class="hist" id="hist-caja" style="display:none">
+    <h3>Giros anteriores</h3>
+    <ol id="hist"></ol>
+  </div>
+
+  <div class="ftr">Conecta Reynosa · conectareynosa.mx</div>
 </div>
 
 <script>
@@ -128,160 +192,234 @@ input[type=password]{width:100%;padding:15px;background:rgba(255,255,255,.05);bo
   'use strict';
   var $ = function(id){ return document.getElementById(id); };
 
-  // El token vive SOLO en memoria: nada de localStorage. Si se recarga la
-  // página se vuelve a pedir, que es lo correcto para una pantalla que se abre
-  // una vez y se proyecta.
-  var TOKEN = null;
-  var nombres = [];        // solo NOMBRES: la lista nunca trae teléfonos
-  var sorteoActual = null; // {sorteo_id, nombre, whatsapp}
+  // ═══════════════════════════════════════════════════════════════════════
+  // La página es PÚBLICA y de solo lectura. Pregunta el estado cada 4s y, en
+  // cuanto aparece un giro que no había animado, corre el carrusel — sin
+  // importar hace cuánto ocurrió. El que llega tarde también ve el show.
+  //
+  // EL GANADOR SIGUE SIENDO DEL SERVIDOR. Esto solo ANIMA hacia un nombre que
+  // ya vino decidido; si el navegador escogiera, escogería quien tenga la
+  // consola abierta.
+  // ═══════════════════════════════════════════════════════════════════════
+  var CADA_MS = 4000;
+  var MINUTOS_PARA_CONTESTAR = 10;
+  var RECIENTE_MS = 60 * 1000;
+
+  var TOKEN = null;       // SOLO en memoria. Nunca localStorage.
+  var estado = null;
+  var animado = null;     // id del giro que YA se animó en esta visita
   var girando = false;
+  var telVisible = false;
+  var telAdmin = null;
+  var desfaseMs = 0;
+
+  // El reloj es el del SERVIDOR: el contador de 10 minutos y el rótulo de
+  // "repetición" no pueden depender del reloj del celular de quien mira. Un
+  // teléfono con la hora corrida diría "quedan 3 minutos" cuando quedan diez.
+  function ahora(){ return Date.now() + desfaseMs; }
 
   function api(ruta, opts){
     opts = opts || {};
-    opts.headers = Object.assign({ 'Content-Type': 'application/json', 'x-admin-token': TOKEN }, opts.headers || {});
+    opts.headers = Object.assign({ 'Content-Type': 'application/json' },
+      TOKEN ? { 'x-admin-token': TOKEN } : {}, opts.headers || {});
     return fetch('/.netlify/functions/' + ruta, opts).then(function(r){
       return r.json().catch(function(){ return {}; }).then(function(j){ return { status: r.status, j: j }; });
     });
   }
+  function esc(t){ return String(t == null ? '' : t).replace(/[&<>"]/g, function(c){
+    return ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' })[c]; }); }
 
-  // ── Puerta ──────────────────────────────────────────────────────────────
-  function entrar(){
-    var t = $('tok').value.trim();
-    if (!t) return;
-    TOKEN = t;
-    $('err-tok').textContent = 'Verificando…';
-    api('giveaway-lista', { method: 'GET' }).then(function(res){
-      if (res.status === 401){ TOKEN = null; $('err-tok').textContent = 'Token incorrecto'; return; }
-      if (!res.j || res.j.ok !== true){ TOKEN = null; $('err-tok').textContent = (res.j && res.j.error) || 'No se pudo entrar'; return; }
-      $('tok').value = '';                       // que no quede en el DOM
-      $('puerta').style.display = 'none';
-      $('panel').style.display = 'block';
-      cargarLista(res.j);
-    });
+  // Siempre con su etiqueta de huso: la ve gente de dos husos y "12:00" a
+  // secas no dice cuál de los dos.
+  function horaReynosa(iso){
+    try { return new Date(iso).toLocaleTimeString('es-MX', { timeZone: 'America/Matamoros',
+      hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true }); }
+    catch (e) { return ''; }
   }
-  $('entrar').addEventListener('click', entrar);
-  $('tok').addEventListener('keydown', function(e){ if (e.key === 'Enter') entrar(); });
+  function dos(n){ return n < 10 ? '0' + n : String(n); }
 
-  function cargarLista(j){
-    nombres = (j.participantes || []).map(function(p){ return p.nombre; });
-    $('total').textContent = j.total != null ? j.total : nombres.length;
-    pintarTira(nombres.length ? nombres : ['—']);
-  }
-
-  // ── El carrusel ─────────────────────────────────────────────────────────
   var ALTO = 64;
+  // El último de la lista es el ganador; todo lo anterior es relleno.
   function pintarTira(lista){
-    $('tira').innerHTML = lista.map(function(n){
-      return '<div>' + String(n).replace(/[&<>"]/g, function(c){
-        return ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' })[c];
-      }) + '</div>';
+    var ult = lista.length - 1;
+    $('tira').innerHTML = lista.map(function(n, i){
+      return '<div' + (i < ult ? ' class="relleno"' : '') + '>' + esc(n) + '</div>';
     }).join('');
   }
-  function posicionar(i, conAnimacion, ms){
+  function posicionar(i, animar, ms){
     var t = $('tira');
-    var destino = -(i * ALTO) + (t.parentElement.clientHeight / 2) - (ALTO / 2);
-    t.style.transition = conAnimacion ? ('transform ' + ms + 'ms cubic-bezier(.12,.72,.16,1)') : 'none';
-    t.style.transform = 'translateY(' + destino + 'px)';
+    t.style.transition = animar ? ('transform ' + ms + 'ms cubic-bezier(.12,.72,.16,1)') : 'none';
+    t.style.transform = 'translateY(' + (-(i * ALTO) + (t.parentElement.clientHeight / 2) - (ALTO / 2)) + 'px)';
   }
-
-  // El servidor ya decidió. Esto SOLO construye un camino que termina en él:
-  // se arma una tira larga de nombres al azar y se le pega el ganador al final.
-  // Nada de esto elige nada — si la animación fallara, el ganador es el mismo.
-  function animarHacia(nombreGanador, alTerminar){
-    var VUELTAS = 34;
-    var relleno = [];
-    var fuente = nombres.length ? nombres : [nombreGanador];
-    for (var i = 0; i < VUELTAS; i++) relleno.push(fuente[Math.floor(Math.random() * fuente.length)]);
-    relleno.push(nombreGanador);
+  // Sin lista de participantes (es privada), el relleno sale de los nombres que
+  // ya salieron. La ilusión de movimiento no necesita el padrón, y el padrón no
+  // puede ser público.
+  function nombresDelRelleno(){
+    var n = ((estado && estado.giros) || []).map(function(g){ return g.nombre; }).filter(Boolean);
+    // En el PRIMER giro no hay nombres previos: el carril rueda con marcas y
+    // aterriza en el ganador. Es el giro que más se mira, y no puede verse roto.
+    while (n.length < 8) n.push('· · · · ·');
+    return n;
+  }
+  function animarHacia(nombre, alTerminar){
+    var relleno = [], fuente = nombresDelRelleno();
+    for (var i = 0; i < 34; i++) relleno.push(fuente[Math.floor(Math.random() * fuente.length)]);
+    relleno.push(nombre);
     pintarTira(relleno);
     posicionar(0, false);
-    // doble rAF: que el navegador pinte la posición inicial antes de animar,
-    // si no la transición no arranca y el nombre aparece de golpe.
     requestAnimationFrame(function(){ requestAnimationFrame(function(){
       posicionar(relleno.length - 1, true, 6000);
       setTimeout(alTerminar, 6100);
     }); });
   }
 
-  // ── Girar ───────────────────────────────────────────────────────────────
-  $('girar').addEventListener('click', function(){
-    if (girando) return;
-    girando = true;
-    $('err').textContent = '';
-    $('ganador').style.display = 'none';
-    $('girar').disabled = true;
-    $('girar').textContent = 'Girando…';
-
-    api('giveaway-sortear', { method: 'POST', body: JSON.stringify({ accion: 'girar' }) }).then(function(res){
-      if (!res.j || res.j.ok !== true){
-        girando = false; $('girar').disabled = false; $('girar').textContent = 'Girar';
-        $('err').textContent = (res.j && res.j.error) || 'No se pudo girar';
+  var tickReloj = null;
+  function arrancarReloj(desdeISO, resultado){
+    if (tickReloj){ clearInterval(tickReloj); tickReloj = null; }
+    if (resultado !== 'pendiente'){ $('reloj').style.display = 'none'; return; }
+    var fin = Date.parse(desdeISO) + MINUTOS_PARA_CONTESTAR * 60000;
+    function pinta(){
+      $('reloj').style.display = '';
+      var falta = fin - ahora();
+      if (falta <= 0){
+        $('reloj').classList.add('agotado');
+        $('reloj-n').textContent = '00:00';
+        $('reloj-l').textContent = 'esperando confirmación';
+        if (tickReloj){ clearInterval(tickReloj); tickReloj = null; }
         return;
       }
-      sorteoActual = res.j;
-      if (res.j.total_participantes != null) $('total').textContent = res.j.total_participantes;
-      animarHacia(res.j.nombre, function(){
-        girando = false;
-        $('girar').disabled = false;
-        $('girar').textContent = 'Girar otra vez';
-        $('g-nombre').textContent = res.j.nombre;
-        mostrarTel(false);
-        $('ganador').style.display = 'block';
-        agregarHist(res.j.intento, res.j.nombre, 'pendiente');
-      });
-    }).catch(function(){
-      girando = false; $('girar').disabled = false; $('girar').textContent = 'Girar';
-      $('err').textContent = 'Se cayó la conexión';
-    });
+      $('reloj').classList.remove('agotado');
+      var s = Math.floor(falta / 1000);
+      $('reloj-n').textContent = dos(Math.floor(s / 60)) + ':' + dos(s % 60);
+      $('reloj-l').textContent = 'para contestar su WhatsApp';
+    }
+    pinta(); tickReloj = setInterval(pinta, 1000);
+  }
+
+  function pintarPanel(g){
+    $('espera').style.display = 'none';
+    $('panel').style.display = 'block';
+    $('panel').classList.toggle('no', g.resultado === 'no_contesto');
+    $('p-nombre').textContent = g.nombre;
+    $('panel-l').textContent = g.resultado === 'no_contesto' ? 'No contestó' : 'Ganador';
+
+    var linea = 'Girado a las ' + horaReynosa(g.creado_at) + ', hora de Reynosa';
+    if (g.total_participantes != null) linea += ' · ' + g.total_participantes + ' participantes';
+    if (g.resultado === 'no_contesto') linea += ' · Se vuelve a girar.';
+    $('p-cuando').textContent = linea;
+
+    var viejo = (ahora() - Date.parse(g.creado_at)) > RECIENTE_MS;
+    $('p-repeticion').innerHTML = viejo ? '<span class="repeticion">Repetición</span>' : '';
+
+    arrancarReloj(g.creado_at, g.resultado);
+    $('acciones').style.display = (TOKEN && g.resultado === 'pendiente') ? 'flex' : 'none';
+    $('tel').style.display = (TOKEN && telAdmin) ? 'flex' : 'none';
+    if (TOKEN && telAdmin) mostrarTel(telVisible);
+  }
+
+  function pintarHistorial(giros){
+    var ultimoId = estado && estado.ultimo ? estado.ultimo.id : null;
+    var previos = giros.filter(function(g){ return g.id !== ultimoId; });
+    if (!previos.length){ $('hist-caja').style.display = 'none'; return; }
+    $('hist-caja').style.display = '';
+    $('hist').innerHTML = previos.map(function(g){
+      var r = g.resultado === 'acepto' ? '<span class="r-si">sí contestó</span>'
+            : g.resultado === 'no_contesto' ? '<span class="r-no">no contestó</span>'
+            : '<span class="r-pd">pendiente</span>';
+      return '<li><b>' + esc(g.nombre) + '</b> — ' + r +
+        ' <span class="hist-hora">· ' + horaReynosa(g.creado_at) + '</span></li>';
+    }).join('');
+  }
+
+  function refrescar(){
+    return api('giveaway-estado', { method: 'GET' }).then(function(res){
+      if (!res.j || res.j.ok !== true) return;
+      estado = res.j;
+      if (res.j.ahora) desfaseMs = Date.parse(res.j.ahora) - Date.now();
+      $('total').textContent = res.j.total != null ? res.j.total : '—';
+
+      var u = res.j.ultimo;
+      if (!u){ $('espera').style.display = ''; $('panel').style.display = 'none'; return; }
+      pintarHistorial(res.j.giros || []);
+      if (animado === u.id){ pintarPanel(u); return; }
+      if (girando) return;
+      girando = true;
+      $('espera').style.display = 'none';
+      animarHacia(u.nombre, function(){ girando = false; animado = u.id; pintarPanel(u); });
+    }).catch(function(){ /* silencioso: vuelve a intentar en 4s */ });
+  }
+  refrescar();
+  setInterval(refrescar, CADA_MS);
+
+  $('repetir').addEventListener('click', function(){
+    if (girando || !estado || !estado.ultimo) return;
+    girando = true;
+    $('panel').style.display = 'none';
+    animarHacia(estado.ultimo.nombre, function(){ girando = false; pintarPanel(estado.ultimo); });
   });
 
-  // ── El teléfono, tapado por defecto ─────────────────────────────────────
-  var telVisible = false;
+  $('llave').addEventListener('click', function(){
+    if (TOKEN) return;
+    var p = $('puerta');
+    p.style.display = (p.style.display === 'block') ? 'none' : 'block';
+    if (p.style.display === 'block') $('tok').focus();
+  });
+  function entrar(){
+    var t = $('tok').value.trim();
+    if (!t) return;
+    $('err-tok').textContent = 'Verificando…';
+    TOKEN = t;
+    api('giveaway-sortear', { method: 'POST', body: JSON.stringify({ accion: 'estado_admin' }) }).then(function(res){
+      if (res.status === 401 || !res.j || res.j.ok !== true){
+        TOKEN = null; $('err-tok').textContent = 'Token incorrecto'; return;
+      }
+      $('tok').value = '';
+      $('puerta').style.display = 'none';
+      $('err-tok').textContent = '';
+      $('llave').classList.add('abierta');
+      $('admin').style.display = 'block';
+      if (res.j.ultimo) telAdmin = res.j.ultimo.whatsapp;
+      if (estado && estado.ultimo && animado === estado.ultimo.id) pintarPanel(estado.ultimo);
+    });
+  }
+  $('tok').addEventListener('keydown', function(e){ if (e.key === 'Enter') entrar(); });
+
   function mostrarTel(ver){
     telVisible = ver;
-    var w = (sorteoActual && sorteoActual.whatsapp) || '';
+    var w = telAdmin || '';
     $('g-tel').textContent = ver ? w : (w.slice(0, 6) + '••••');
     $('g-ver').innerHTML = '<svg class="ic" style="width:12px;height:12px"><use href="#ic-ojo"/></svg> ' + (ver ? 'Ocultar' : 'Ver');
   }
   $('g-ver').addEventListener('click', function(){ mostrarTel(!telVisible); });
 
-  // ── Resolver ────────────────────────────────────────────────────────────
+  $('girar').addEventListener('click', function(){
+    if (girando || !TOKEN) return;
+    $('err').textContent = '';
+    $('girar').disabled = true; $('girar').textContent = 'Girando…';
+    api('giveaway-sortear', { method: 'POST', body: JSON.stringify({ accion: 'girar' }) }).then(function(res){
+      $('girar').disabled = false; $('girar').textContent = 'Girar otra vez';
+      if (!res.j || res.j.ok !== true){ $('err').textContent = (res.j && res.j.error) || 'No se pudo girar'; return; }
+      telAdmin = res.j.whatsapp;
+      refrescar();   // el latido lo anima; no se duplica la animación aquí
+    }).catch(function(){
+      $('girar').disabled = false; $('girar').textContent = 'Girar';
+      $('err').textContent = 'Se cayó la conexión';
+    });
+  });
+
   function resolver(resultado){
-    if (!sorteoActual || !sorteoActual.sorteo_id) return;
+    if (!TOKEN || !estado || !estado.ultimo) return;
     $('si').disabled = $('no').disabled = true;
-    api('giveaway-sortear', {
-      method: 'POST',
-      body: JSON.stringify({ accion: 'resolver', sorteo_id: sorteoActual.sorteo_id, resultado: resultado })
+    api('giveaway-sortear', { method: 'POST',
+      body: JSON.stringify({ accion: 'resolver', sorteo_id: estado.ultimo.id, resultado: resultado })
     }).then(function(res){
       $('si').disabled = $('no').disabled = false;
       if (!res.j || res.j.ok !== true){ $('err').textContent = (res.j && res.j.error) || 'No se pudo guardar'; return; }
-      marcarHist(sorteoActual.intento, resultado);
-      if (resultado === 'acepto'){
-        $('girar').style.display = 'none';
-        $('ganador').style.borderColor = 'rgba(136,234,78,.6)';
-      } else {
-        $('ganador').style.display = 'none';
-        sorteoActual = null;
-      }
+      refrescar();
     });
   }
   $('si').addEventListener('click', function(){ resolver('acepto'); });
   $('no').addEventListener('click', function(){ resolver('no_contesto'); });
-
-  // ── Historial de la sesión ──────────────────────────────────────────────
-  function agregarHist(intento, nombre, estado){
-    $('hist-vacio').style.display = 'none';
-    var li = document.createElement('li');
-    li.id = 'h-' + intento;
-    li.innerHTML = '<b>' + String(nombre).replace(/</g, '&lt;') + '</b> — <span class="r-pd">pendiente</span>';
-    $('hist').appendChild(li);
-  }
-  function marcarHist(intento, resultado){
-    var li = $('h-' + intento);
-    if (!li) return;
-    var txt = resultado === 'acepto' ? '<span class="r-si">sí contestó</span>' : '<span class="r-no">no contestó</span>';
-    li.innerHTML = li.innerHTML.replace(/<span class="r-pd">pendiente<\/span>/, txt);
-  }
 })();
 </script>
 </body>

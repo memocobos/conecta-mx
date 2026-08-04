@@ -145,5 +145,32 @@ exports.handler = async (event) => {
     }
   }
 
-  return G.json(400, headers, { ok: false, error: "accion debe ser 'girar' o 'resolver'" });
+  // ── ESTADO ADMIN ─────────────────────────────────────────────────────────
+  // Lo mismo que giveaway-estado, MÁS el teléfono. Existe porque /sorteo ahora
+  // es público: al recargar con token, el admin tiene que recuperar el
+  // teléfono del ganador vivo, y ese dato no puede salir por la puerta
+  // pública. Aquí sí, porque aquí se exige token.
+  if (body.accion === 'estado_admin') {
+    try {
+      const r = await fetch(
+        `${sorBase}?slug=eq.${slugQ}&select=id,intento,resultado,ganador_nombre,ganador_whatsapp,creado_at&order=intento.desc&limit=1`,
+        { headers: G.sbHeaders() }
+      );
+      if (!r.ok) throw new Error('lectura ' + r.status);
+      const filas = await r.json().catch(() => []);
+      const u = Array.isArray(filas) ? filas[0] : null;
+      return G.json(200, headers, {
+        ok: true,
+        ultimo: u ? {
+          sorteo_id: u.id, intento: u.intento, resultado: u.resultado,
+          nombre: u.ganador_nombre, whatsapp: u.ganador_whatsapp, creado_at: u.creado_at,
+        } : null,
+      });
+    } catch (e) {
+      console.error('[giveaway-sortear] estado_admin:', e.message);
+      return G.json(502, headers, { ok: false, error: 'No se pudo leer el estado' });
+    }
+  }
+
+  return G.json(400, headers, { ok: false, error: "accion debe ser 'girar', 'resolver' o 'estado_admin'" });
 };

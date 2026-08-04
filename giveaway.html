@@ -37,25 +37,40 @@ body{margin:0;background:var(--c-bg);color:var(--c-ink);font-family:'Montserrat'
    para que el texto quede encima sin position:absolute ni cálculos de alto —
    así el bloque crece con su contenido y nunca se desborda.
    Escritorio (≥900px): dos columnas. Foto de un lado; premio, contador y
-   formulario del otro. Las bases y el pie cruzan las dos.               */
+   formulario del otro. Y ahí se ACABA la rejilla: el cierre —bases, rescate y
+   navegación— vive fuera, en su propia sección. Ver el porqué más abajo.  */
 .pagina{display:grid;grid-template-columns:minmax(0,1fr);max-width:1100px;margin:0 auto}
 
 .foto-col{grid-column:1;grid-row:1;position:relative;height:74svh;overflow:hidden;z-index:0}
 @supports not (height:1svh){ .foto-col{height:74vh} }
 .hero-txt{grid-column:1;grid-row:1;align-self:end;z-index:2;padding:0 20px 26px}
 .cuerpo{grid-row:2;padding:0 20px}
-.pie{grid-row:3;padding:0 20px 96px}
+
+/* ═══ EL CIERRE, FUERA DE LA REJILLA ═════════════════════════════════════
+   Bases, rescate y navegación vivían en la fila 3 del MISMO grid que la foto.
+   Parecía seguro —la foto ocupa las filas 1-2, ellos la 3— pero no lo era: el
+   bloque de contención de un `position:sticky` NO es su celda del grid, es el
+   contenedor entero. Al bajar, la foto se deslizaba fuera de sus filas y caía
+   encima de las bases: 235px de texto tapado, medidos igual a 1440 y a 1920.
+
+   La cura no es empujar la foto ni subirle el z-index a las bases: es que no
+   compartan rejilla. Fuera del grid no hay forma de que se toquen, se cambie
+   lo que se cambie arriba. Y la foto pierde el sticky —era lo que la dejaba
+   salirse de su celda—, así que ahora reserva su espacio siempre.
+
+   Mismo eje que el resto de la página: 1100px centrados. El texto por dentro
+   se queda en 640px porque un renglón de bases a 1100px se lee peor.        */
+.pie{max-width:1100px;margin:0 auto;padding:0 20px 96px}
 
 @media (min-width:900px){
   .pagina{grid-template-columns:minmax(0,.92fr) minmax(0,1fr);
     column-gap:52px;align-items:start;padding:40px 24px 0}
-  /* La foto recupera su proporción y se queda quieta mientras se llena el
-     formulario: en escritorio hay alto de sobra y el artista es el argumento. */
   .foto-col{grid-column:1;grid-row:1 / span 2;height:auto;aspect-ratio:1080/1349;
-    max-height:78svh;border-radius:16px;position:sticky;top:32px}
+    max-height:78svh;border-radius:16px}
   .hero-txt{grid-column:2;grid-row:1;align-self:start;padding:0 0 22px}
   .cuerpo{grid-column:2;grid-row:2;padding:0}
-  .pie{grid-column:1 / -1;grid-row:3;padding:44px 0 90px;max-width:640px;margin:0 auto}
+  .pie{padding:44px 24px 90px}
+  .pie > *{max-width:640px;margin-left:auto;margin-right:auto}
 }
 
 /* ═══ EL HÉROE ══════════════════════════════════════════════════════════
@@ -439,6 +454,10 @@ input:focus-visible{outline:2px solid var(--c-amarillo);outline-offset:2px;borde
 
   </div><!-- /cuerpo -->
 
+</div><!-- /pagina -->
+
+<!-- Fuera de .pagina a propósito: mientras estas bases compartieran rejilla
+     con la foto, cualquier ajuste de arriba podía volver a encimarlas. -->
   <div class="pie">
   <div class="bases">
     <h3>Bases</h3>
@@ -472,7 +491,6 @@ input:focus-visible{outline:2px solid var(--c-amarillo);outline-offset:2px;borde
   </nav>
 
   </div><!-- /pie -->
-</div><!-- /pagina -->
 
 <!-- ═══ EL PIE DEL INDEX ═════════════════════════════════════════════════
      Estructura, textos y ligas copiados del index.html. Ninguna URL de aquí

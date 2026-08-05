@@ -221,6 +221,13 @@ exports.handler = async function (event) {
     const sueldo_semanal = Math.round(Number((data.datos && data.datos.sueldo_semanal) || 0));
     if (!Number.isFinite(sueldo_semanal) || sueldo_semanal <= 0) return bad(400, "Falta el sueldo semanal");
     datos = { sueldo_semanal };
+    // 🗼 [KAR-1] ANEXO DE CUSTODIA también en el laboral: el Maestro Karin
+    // cuida la Torre y su contrato es éste, no el de coordinador. Misma casilla,
+    // mismo flag, un solo contrato y una sola firma. Solo se guarda cuando
+    // viene true → sin flag, el laboral es byte-igual al de hoy.
+    if (data.datos && data.datos.cuidador_bodega === true) {
+      datos.cuidador_bodega = true;
+    }
   }
 
   // [EQ-6] EL CONTRATO DE COORDINADOR ES ANUAL — decisión de negocio de Memo.

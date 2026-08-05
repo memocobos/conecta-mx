@@ -7824,6 +7824,10 @@ function _gzPaquete(userId) {
 
   const pideSueldo = st.faltan.includes('auxiliar_admin');
   const pideVigencia = st.faltan.includes('coordinador');
+  // 🗼 [KAR-1] La custodia se ofrece cuando hay contrato de coordinador (como
+  // hasta hoy) o cuando el paquete lleva el LABORAL y la persona es el Maestro
+  // Karin. Aquí el rol es de fiar: viene de la cuenta, no de un campo tecleado.
+  const pideCustodia = pideVigencia || (pideSueldo && u.rol === 'mister_popo');
 
   crearModal('gz-paquete', `Paquete de ${ROL_LABELS[u.rol] || u.rol}`, `
     <div style="font-size:12px;color:var(--ts);line-height:1.6;margin-bottom:14px">
@@ -7841,12 +7845,12 @@ function _gzPaquete(userId) {
          <option value="3">3 meses</option><option value="6">6 meses</option>
          <option value="9">9 meses</option><option value="12" selected>12 meses</option>
        </select>`) : ''}
-    ${pideVigencia ? campo('',
+    ${pideCustodia ? campo('',
       `<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px">
          <input type="checkbox" id="pq-cuidador" style="width:auto;margin:0">
          <span>También cuidador de bodega (Torre de Karin)</span>
        </label>`,
-      'Suma el Anexo de Custodia al de coordinador. Un solo contrato, una sola firma.') : ''}
+      `Suma el Anexo de Custodia al contrato de ${pideVigencia ? 'coordinador' : 'auxiliar administrativo'}. Un solo contrato, una sola firma.`) : ''}
     <div id="pq-alert"></div>
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
       <button class="btn btn-ghost" onclick="cerrarModal('gz-paquete')">Cancelar</button>
@@ -7878,6 +7882,10 @@ async function _gzPaqueteEnviar(userId) {
   }
   const vigencia = Math.round(Number((document.getElementById('pq-vigencia') || {}).value)) || 12;
   const custodia = !!(document.getElementById('pq-cuidador') || {}).checked;
+  // 🗼 [KAR-1] Se recalcula AQUÍ y no se toma de la función del modal: aquélla
+  // es otro alcance, y leer de allá habría reventado con ReferenceError justo
+  // al enviar el paquete. Decide a cuál de los dos contratos se pega el anexo.
+  const llevaCoordinador = st.faltan.includes('coordinador');
   const hoy = _mxFechaStr(); // [EQ-3] hoy en Monterrey, no en UTC
 
   if (alert) alert.innerHTML = '';
@@ -7896,10 +7904,16 @@ async function _gzPaqueteEnviar(userId) {
       contrato_fecha: hoy,
       ofrecimiento: [],
       expectativas: [],
+      // 🗼 [KAR-1] La custodia cuelga del contrato que la persona de verdad
+      // firma: si el paquete trae coordinador, va ahí (como hasta hoy); si el
+      // paquete es SOLO el laboral (el caso del Maestro Karin), va en el
+      // laboral. Nunca en los dos: sería el mismo anexo firmado dos veces.
       datos: p === 'auxiliar_admin'
-        ? { sueldo_semanal: sueldo }
+        ? Object.assign({ sueldo_semanal: sueldo },
+            (custodia && !llevaCoordinador) ? { cuidador_bodega: true } : {})
         : Object.assign({ exclusividad_dura: true }, custodia ? { cuidador_bodega: true } : {}),
-      cuidador_bodega: p === 'coordinador' ? custodia : undefined,
+      cuidador_bodega: p === 'coordinador' ? custodia
+        : (p === 'auxiliar_admin' ? (custodia && !llevaCoordinador) : undefined),
       vigencia_meses: p === 'coordinador' ? vigencia : undefined,
     };
     try {
@@ -7949,6 +7963,10 @@ function _gzGenerarContrato(userId, plantilla) {
   const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = v; };
   set('ctr-nombre', u.nombre || '');
   set('ctr-email', String(u.correo || '').trim().toLowerCase());
+  // 🗼 [KAR-1] El rol viaja con el prellenado: es lo que decide si el laboral
+  // puede llevar el anexo de custodia. Se pone DESPUÉS de switchContratoView
+  // (que lo limpia) y ANTES de onCtrPlantillaChange (que lo lee).
+  _ctrRolPersona = u.rol || null;
   if (plantilla) {
     set('ctr-plantilla', plantilla);
     onCtrPlantillaChange();           // abre/cierra los campos de esa plantilla
@@ -17717,6 +17735,14 @@ function onCtrEmailInput() {
     const nombreEl = document.getElementById('ctr-nombre');
     if (nombreEl && !nombreEl.value) nombreEl.value = match.nombre;
   }
+  // 🗼 [KAR-1] El correo es lo que identifica a la persona, así que al
+  // cambiarlo hay que reevaluar si le toca la casilla de custodia. Sin esto,
+  // escribir el correo DESPUÉS de elegir "auxiliar administrativo" dejaba la
+  // casilla escondida para siempre: el único momento en que se decidía era al
+  // cambiar de plantilla, y esa ya no iba a cambiar.
+  // Al teclear a mano el rol prellenado ya no manda — es otra persona.
+  _ctrRolPersona = null;
+  if (typeof onCtrPlantillaChange === 'function') onCtrPlantillaChange();
 }
 
 // — Boot principal de la pestaña ——————————————————————
@@ -17766,6 +17792,29 @@ function onContratoEventoChange() {
 // VÍA B (F5): muestra/oculta los campos según la plantilla elegida.
 // VIGENCIA CONFIGURABLE: el selector 3/6/9/12 solo aplica a coordinador y
 // creadora_team; al cambiar de plantilla se pone su default (coord 12, team 3).
+// 🗼 [KAR-1] ¿La persona del formulario es el Maestro Karin (mister_popo)?
+// El anexo de custodia NO se ofrece a cualquier auxiliar administrativo: se
+// ofrece a quien cuida la Torre. Dos fuentes, en orden:
+//   1. El rol que dejó el prellenado desde el perfil (autoritativo: viene de
+//      la cuenta, no de lo que alguien teclee).
+//   2. Si se tecleó a mano, se resuelve por CORREO contra el padrón de
+//      Guerreros Z. Sin padrón cargado no se adivina: la casilla no aparece y
+//      el camino documentado (Guerreros Z → paquete) sigue funcionando.
+// Nunca por NOMBRE: dos personas pueden llamarse igual, el correo es la llave.
+// `var` a propósito, no `let`: esta variable se lee desde onCtrEmailInput, que
+// vive ANTES en el archivo. Hoy nadie la toca durante la evaluación del script
+// —todo es por evento— pero este archivo ya reventó una vez por un TDZ de un
+// `let` declarado más abajo, y `var` cierra la puerta: se iza, arranca en
+// undefined (falsy, que es justo lo que _ctrEsKarin espera) y no hay zona muerta.
+var _ctrRolPersona = null;
+function _ctrEsKarin() {
+  if (_ctrRolPersona) return _ctrRolPersona === 'mister_popo';
+  const mail = String((document.getElementById('ctr-email') || {}).value || '').trim().toLowerCase();
+  if (!mail) return false;
+  const u = (_gzCache || []).find(x => String(x.correo || '').trim().toLowerCase() === mail);
+  return !!u && u.rol === 'mister_popo';
+}
+
 function onCtrPlantillaChange() {
   const p = (document.getElementById('ctr-plantilla') || {}).value || 'creadora';
   const fc = document.getElementById('ctr-fields-creadora');
@@ -17796,10 +17845,16 @@ function onCtrPlantillaChange() {
   const tw = document.getElementById('ctr-viaje-wrap');
   if (tw) tw.style.display = (p === 'creadora') ? '' : 'none';
   if (p !== 'creadora') { const tv = document.getElementById('ctr-viaje'); if (tv) tv.checked = false; }
-  // 🗼 Anexo de custodia: la casilla solo existe para coordinador.
+  // 🗼 Anexo de custodia: coordinador SIEMPRE (como hasta hoy) y, desde KAR-1,
+  // también el LABORAL cuando la persona es Maestro Karin (mister_popo) — que
+  // es quien de verdad cuida la Torre. No es una plantilla nueva: es la misma
+  // casilla sumando el anexo dentro del contrato que ya se firma.
   const cw = document.getElementById('ctr-cuidador-wrap');
-  if (cw) cw.style.display = (p === 'coordinador') ? '' : 'none';
-  if (p !== 'coordinador') { const cc = document.getElementById('ctr-cuidador'); if (cc) cc.checked = false; }
+  const _custodiaAplica = (p === 'coordinador') || (p === 'auxiliar_admin' && _ctrEsKarin());
+  if (cw) cw.style.display = _custodiaAplica ? '' : 'none';
+  // Al dejar de aplicar se DESMARCA: una casilla marcada y escondida mandaría
+  // un anexo que nadie vio al elegir.
+  if (!_custodiaAplica) { const cc = document.getElementById('ctr-cuidador'); if (cc) cc.checked = false; }
   // 💼 Auxiliar administrativo (laboral): pide el sueldo neto semanal.
   const sw = document.getElementById('ctr-sueldo-wrap');
   if (sw) sw.style.display = (p === 'auxiliar_admin') ? '' : 'none';
@@ -17896,6 +17951,12 @@ function _ctrFormData() {
   let _evFecha = (document.getElementById('ctr-evento-fecha').value || '').trim();
   if (plantilla === 'auxiliar_admin') {
     datosExtra = { sueldo_semanal: Math.round(Number((document.getElementById('ctr-sueldo') || {}).value || '0')) || 0 };
+    // 🗼 [KAR-1] El anexo de custodia también en el laboral, con el MISMO
+    // candado de rol que decidió mostrar la casilla: si alguien la dejara
+    // marcada y cambiara de persona, _ctrEsKarin la vuelve a evaluar aquí.
+    if ((document.getElementById('ctr-cuidador') || {}).checked && _ctrEsKarin()) {
+      datosExtra.cuidador_bodega = true;
+    }
     _evNombre = 'Auxiliar administrativo';
     _evFecha = _contratoFecha;
   }
@@ -17921,7 +17982,14 @@ function _ctrFormData() {
     ofrecimiento: _splitLineas(document.getElementById('ctr-ofrecimiento').value),
     expectativas: _splitLineas(document.getElementById('ctr-expectativas').value),
     datos: datosExtra,
-    cuidador_bodega: (plantilla === 'coordinador') ? !!(document.getElementById('ctr-cuidador') || {}).checked : undefined,
+    // 🗼 [KAR-1] El espejo de nivel superior que lee admin-contratos para el
+    // chip. Vale para las DOS plantillas que pueden llevar el anexo; en el
+    // laboral con el mismo candado de rol que en `datos`.
+    cuidador_bodega: (plantilla === 'coordinador')
+      ? !!(document.getElementById('ctr-cuidador') || {}).checked
+      : (plantilla === 'auxiliar_admin')
+        ? (!!(document.getElementById('ctr-cuidador') || {}).checked && _ctrEsKarin())
+        : undefined,
     vigencia_meses,
   };
 }
@@ -18129,6 +18197,11 @@ function _resetFormUI() {
   if (_tvReset) _tvReset.checked = false;
   const _ccReset = document.getElementById('ctr-cuidador');
   if (_ccReset && !_contratosEditingToken) _ccReset.checked = false; // 🗼 anexo
+  // 🗼 [KAR-1] El rol de la persona muere con el formulario: si sobreviviera,
+  // el siguiente contrato heredaría el "es Karin" del anterior y le ofrecería
+  // el anexo de custodia a quien no le toca. En edición NO se borra: ahí el
+  // formulario se está repoblando desde el contrato que ya existe.
+  if (!_contratosEditingToken) _ctrRolPersona = null;
   if (typeof onCtrPlantillaChange === 'function') onCtrPlantillaChange();
 }
 
@@ -18184,10 +18257,15 @@ function _ctrPlantillaChip(p) {
   const s = map[p] || map.creadora;
   return `<span style="display:inline-block;font-size:9px;letter-spacing:.1em;text-transform:uppercase;font-weight:800;padding:2px 7px;border-radius:4px;color:${s.c};background:${s.bg};border:1px solid ${s.bd}">${s.txt}</span>`;
 }
-// 🗼 Chip "cuidador" para coordinadores con el anexo de custodia (flag en
-// datos.cuidador_bodega, expuesto como booleano por admin-contratos listar).
+// 🗼 Chip "cuidador" para los contratos que llevan el anexo de custodia (flag
+// en datos.cuidador_bodega, expuesto como booleano por admin-contratos listar).
+// [KAR-1] Dos plantillas pueden llevarlo: coordinador y el LABORAL del Maestro
+// Karin. Si esta lista se quedara solo con 'coordinador', el contrato de Karin
+// llevaría el anexo y la pantalla no lo diría — el chip existe justo para que
+// se vea de un vistazo quién tiene la Torre a su cargo.
+const _CTR_CON_CUSTODIA = ['coordinador', 'auxiliar_admin'];
 function _ctrCuidadorChip(c) {
-  if (!c || c.plantilla !== 'coordinador' || c.cuidador_bodega !== true) return '';
+  if (!c || !_CTR_CON_CUSTODIA.includes(c.plantilla) || c.cuidador_bodega !== true) return '';
   return `<span style="display:inline-flex;align-items:center;gap:4px;margin-left:6px;font-size:9px;letter-spacing:.1em;text-transform:uppercase;font-weight:800;padding:2px 7px;border-radius:4px;color:#e8ff4c;background:rgba(232,255,76,.14);border:1px solid rgba(232,255,76,.4)" title="También cuidador de bodega — el contrato lleva el Anexo de Custodia (Torre de Karin)"><svg class="ic" style="width:11px;height:11px"><use href="#ic-inventario"/></svg> cuidador</span>`;
 }
 // Contador de STRIKES (solo lectura) para creadora_team firmada. Reusa los

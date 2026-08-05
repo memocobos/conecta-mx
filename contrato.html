@@ -1102,7 +1102,7 @@ function _anexoCuidadorHtml() {
   return `
     <section class="clausula">
       <h2><span class="num">ANEXO</span>Anexo de custodia de bodega ("Torre de Karin")</h2>
-      <p>Además de las obligaciones de su contrato de coordinador, EL COORDINADOR asume el puesto de <b>CUIDADOR DE LA BODEGA</b> de LA EMPRESA (conocida internamente como la "<b>TORRE DE KARIN</b>"), que resguarda los materiales promocionales y operativos (kits, playeras, vasos, tote bags, bocinas, hieleras y demás artículos, "EL INVENTARIO"), bajo las siguientes reglas:</p>
+      <p>Además de las obligaciones de su contrato de coordinador, EL COORDINADOR asume el puesto de <b>CUIDADOR DE LA BODEGA</b> de LA EMPRESA (conocida internamente como la "<b>Torre de Karin</b>"), que resguarda los materiales promocionales y operativos (kits, playeras, vasos, tote bags, bocinas, hieleras y demás artículos, "EL INVENTARIO"), bajo las siguientes reglas:</p>
 
       <p><b>A1. FUNCIONES DEL CUIDADOR.</b></p>
       <ol style="list-style:lower-alpha">
@@ -1180,7 +1180,15 @@ function renderDocAuxiliar(c, opts) {
       <div class="meta-row"><span class="lbl">Fecha del contrato:</span><span class="val">${escapeHtml(fmtFechaLarga(c.contrato_fecha))}</span></div>
     </div>`;
   const intro = `<section class="clausula"><p>En la ciudad de Monterrey, Nuevo León, ${x.firmaTexto}, comparecen por una parte <b>CONECTA REYNOSA</b>, representada por el C. Guillermo Alexander Cobos Vizcarra, en su calidad de responsable operativo, a quien en lo sucesivo se le denominará "LA EMPRESA", y por la otra parte la C. <b>${x.nombre}</b>, a quien en lo sucesivo se le denominará "LA TRABAJADORA", quienes celebran el presente Contrato Individual de Trabajo por Tiempo Indefinido.</p></section>`;
-  const clausulasHtml = CLAUSULAS_AUXILIAR.map(cl => _clausulaViaB(cl, x)).join('');
+  // 🗼 [KAR-1] ANEXO DE CUSTODIA en el contrato LABORAL. Mismo mecanismo que el
+  // de coordinador (una casilla, un contrato, una firma) y la MISMA función de
+  // texto: si hubiera dos copias del anexo, un cambio legal tocaría una y
+  // dejaría la otra mintiendo. Va DESPUÉS de las 11 cláusulas y ANTES de la
+  // rúbrica y las firmas — la rúbrica habla de "cada una de las hojas", así que
+  // tiene que quedar al final, con el anexo ya dentro.
+  // Sin el flag, el render es byte-igual al de hoy.
+  const anexoHtml = (c.datos && c.datos.cuidador_bodega === true) ? _anexoCuidadorHtml() : '';
+  const clausulasHtml = CLAUSULAS_AUXILIAR.map(cl => _clausulaViaB(cl, x)).join('') + anexoHtml;
   const rubrica = `<section class="clausula"><p style="font-style:italic;color:#555">Cada una de las hojas del presente contrato deberá ser rubricada por ambas partes.</p></section>`;
   const printBar = opts.estado === 'firmado' ? `
       <div class="print-bar">

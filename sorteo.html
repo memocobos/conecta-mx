@@ -38,28 +38,162 @@ body{margin:0;background:var(--c-bg);color:var(--c-ink);font-family:'Montserrat'
 .punto{width:7px;height:7px;border-radius:50%;background:var(--c-rojo);animation:late 2s ease-in-out infinite}
 @keyframes late{0%,100%{opacity:1}50%{opacity:.25}}
 
-.total{text-align:center;margin-bottom:24px}
-.total-n{font-family:var(--font-display);font-size:clamp(64px,12vw,124px);line-height:.9;color:var(--c-amarillo)}
-.total-l{font-size:11px;letter-spacing:.24em;text-transform:uppercase;color:var(--c-muted);margin-top:6px}
+/* ═══ EL GABINETE ════════════════════════════════════════════════════════
+   Una máquina, no un div con borde. Tres capas de verdad:
+   · el MUEBLE: gradiente diagonal + borde claro arriba y oscuro abajo, que es
+     lo que lee el ojo como volumen sin recurrir a una sombra de neón.
+   · las LUCES: puntos perimetrales que laten desfasados. En espera van lentas
+     y ámbar; girando, rápidas y amarillas.
+   · el CRISTAL: un brillo diagonal encima de los rodillos, para que se vea
+     que hay vidrio entre el nombre y quien mira.
+   Todo con los colores de la casa: rojo #ff283b, amarillo #e8ff4c, negro. */
+.maquina{position:relative;max-width:560px;margin:0 auto 20px;
+  border-radius:22px;padding:14px 14px 18px;
+  background:linear-gradient(150deg,#1a1a1f 0%,#0d0d10 42%,#151519 100%);
+  border-top:1px solid rgba(255,255,255,.16);
+  border-left:1px solid rgba(255,255,255,.08);
+  border-right:1px solid rgba(0,0,0,.6);
+  border-bottom:2px solid rgba(0,0,0,.75);
+  box-shadow:0 18px 40px rgba(0,0,0,.55), inset 0 1px 0 rgba(255,255,255,.06)}
 
-/* EL CARRUSEL — vertical, no rueda: con cientos de nombres una rueda de
-   rebanadas no se lee en una pantalla de celular ni en cámara. */
-.carril{position:relative;height:190px;overflow:hidden;border:1px solid var(--c-line);
-  border-radius:14px;background:rgba(255,255,255,.03);margin-bottom:18px}
-@media (min-width:900px){ .carril{height:230px} }
-.carril::before,.carril::after{content:'';position:absolute;left:0;right:0;height:62px;z-index:2;pointer-events:none}
-.carril::before{top:0;background:linear-gradient(#000,transparent)}
-.carril::after{bottom:0;background:linear-gradient(transparent,#000)}
-.marca{position:absolute;top:50%;left:0;right:0;height:64px;transform:translateY(-50%);
-  border-top:2px solid var(--c-amarillo);border-bottom:2px solid var(--c-amarillo);z-index:1;pointer-events:none}
-.tira{position:absolute;left:0;right:0;top:0;will-change:transform}
-/* El relleno se ve ATENUADO a propósito. No son candidatos: son movimiento.
-   Poner nombres inventados en un sorteo real sería enseñar como participante a
-   quien no lo es, y el padrón no puede ser público. */
-.tira div.relleno{color:rgba(255,255,255,.30)}
-.tira div{height:64px;display:flex;align-items:center;justify-content:center;
-  font-family:var(--font-display);font-size:clamp(26px,4.4vw,38px);text-transform:uppercase;
-  white-space:nowrap;padding:0 14px;overflow:hidden;text-overflow:ellipsis}
+/* La placa del logo, arriba. Va montada sobre el mueble, medio saliendo. */
+.placa{position:relative;margin:-26px auto 14px;width:max-content;
+  display:flex;align-items:stretch;border-radius:9px;overflow:hidden;
+  box-shadow:0 6px 16px rgba(0,0,0,.6)}
+.placa-c{background:linear-gradient(135deg,#f4ff6b,#dcff2e);padding:7px 13px;
+  display:flex;align-items:center;clip-path:polygon(0 0,100% 0,92% 100%,0 100%)}
+.placa-c span{font-weight:900;font-size:13px;color:#000;letter-spacing:.05em;
+  text-transform:uppercase;font-family:'Montserrat',sans-serif}
+.placa-mx{background:#111;padding:7px 13px 7px 9px;display:flex;align-items:center;
+  font-weight:900;font-style:italic;font-size:15px;color:#fff}
+.placa-sub{text-align:center;font-family:var(--font-display);font-size:11px;
+  letter-spacing:.3em;text-transform:uppercase;color:rgba(255,255,255,.42);margin:-8px 0 14px}
+
+/* Las luces perimetrales. Son 14 puntos absolutos con --i para desfasarlas. */
+.luces{position:absolute;inset:6px;pointer-events:none;border-radius:18px}
+.luz{position:absolute;width:7px;height:7px;border-radius:50%;
+  background:#5a4a12;box-shadow:0 0 5px rgba(232,255,76,.25);
+  animation:latir 2.4s ease-in-out infinite;animation-delay:calc(var(--i) * .16s)}
+@keyframes latir{0%,100%{background:#5a4a12;box-shadow:0 0 4px rgba(232,255,76,.2)}
+  50%{background:#e8ff4c;box-shadow:0 0 12px rgba(232,255,76,.85)}}
+/* Girando: más rápidas y con el rojo de la casa entrando en la mezcla. */
+.maquina.girando .luz{animation-duration:.55s}
+.maquina.girando .luz:nth-child(odd){animation-name:latirRojo}
+@keyframes latirRojo{0%,100%{background:#5a1218;box-shadow:0 0 4px rgba(255,40,59,.25)}
+  50%{background:#ff283b;box-shadow:0 0 14px rgba(255,40,59,.9)}}
+
+/* ═══ LOS RODILLOS ══════════════════════════════════════════════════════ */
+.rodillos{display:grid;grid-template-columns:1.15fr 1.15fr .7fr;gap:8px;
+  background:#000;border-radius:12px;padding:8px;
+  border:1px solid rgba(255,255,255,.09);
+  box-shadow:inset 0 3px 14px rgba(0,0,0,.9)}
+.rod{position:relative;height:150px;overflow:hidden;border-radius:8px;
+  background:linear-gradient(180deg,#0b0b0d,#141418 50%,#0b0b0d)}
+@media (min-width:600px){ .rod{height:186px} }
+/* Sombra interior arriba y abajo: el rodillo se ve cilíndrico, no plano. */
+.rod::before{content:'';position:absolute;inset:0;z-index:3;pointer-events:none;
+  background:linear-gradient(180deg,rgba(0,0,0,.92) 0%,rgba(0,0,0,.35) 22%,
+    transparent 42%,transparent 58%,rgba(0,0,0,.35) 78%,rgba(0,0,0,.92) 100%)}
+/* El cristal: un brillo diagonal, discreto. */
+.rod::after{content:'';position:absolute;inset:0;z-index:4;pointer-events:none;
+  background:linear-gradient(115deg,rgba(255,255,255,.07) 0%,transparent 38%)}
+.rod-tira{position:absolute;left:0;right:0;top:0;will-change:transform}
+.rod-tira div{height:50px;display:flex;align-items:center;justify-content:center;
+  font-family:var(--font-display);font-size:clamp(17px,3.6vw,26px);text-transform:uppercase;
+  color:rgba(255,255,255,.55);white-space:nowrap;padding:0 8px;
+  overflow:hidden;text-overflow:ellipsis;letter-spacing:.01em}
+@media (min-width:600px){ .rod-tira div{height:62px} }
+.rod-tira div.folio{font-size:clamp(20px,4.2vw,30px);color:rgba(232,255,76,.55)}
+/* La ventana: dos líneas amarillas marcan dónde frena. */
+.rod-win{position:absolute;top:50%;left:0;right:0;height:50px;transform:translateY(-50%);
+  border-top:2px solid rgba(232,255,76,.55);border-bottom:2px solid rgba(232,255,76,.55);
+  z-index:2;pointer-events:none}
+@media (min-width:600px){ .rod-win{height:62px} }
+/* Cuando el rodillo YA frenó, su casilla se enciende. */
+.rod.frenado .rod-win{border-color:var(--c-amarillo);
+  background:linear-gradient(90deg,rgba(232,255,76,.10),rgba(232,255,76,.03))}
+.rod.frenado .rod-tira div.centro{color:#fff}
+.rod.frenado .rod-tira div.centro.folio{color:var(--c-amarillo)}
+/* El golpe al frenar: un tirón corto, no un rebote de juguete. */
+@keyframes golpe{0%{transform:translateY(0)}35%{transform:translateY(5px)}100%{transform:translateY(0)}}
+.rod.golpe{animation:golpe .17s ease-out}
+.rod-lbl{text-align:center;font-size:9px;letter-spacing:.2em;text-transform:uppercase;
+  color:rgba(255,255,255,.34);margin-top:7px}
+
+/* La placa de abajo: el nombre COMPLETO, para que quede claro que es una
+   persona y no la suma de tres rodillos. */
+.placa-ganador{margin-top:14px;text-align:center;padding:14px 12px;border-radius:12px;
+  background:rgba(232,255,76,.07);border:1px solid rgba(232,255,76,.3);
+  opacity:0;transform:scale(.94);transition:opacity .4s ease-out,transform .4s cubic-bezier(.16,1,.3,1)}
+.placa-ganador.on{opacity:1;transform:none}
+.placa-ganador.no{background:rgba(255,40,59,.08);border-color:rgba(255,40,59,.42)}
+.placa-ganador.no .pg-f{color:var(--c-rojo)}
+.placa-ganador .pg-l{font-size:9.5px;letter-spacing:.26em;text-transform:uppercase;color:var(--c-muted)}
+.placa-ganador .pg-n{font-family:var(--font-display);font-size:clamp(24px,5.2vw,40px);
+  line-height:1.04;margin-top:5px;text-transform:uppercase;text-wrap:balance}
+.placa-ganador .pg-f{font-size:11px;color:var(--c-amarillo);margin-top:5px;letter-spacing:.14em}
+
+/* ═══ EL MARCADOR DIGITAL ═══════════════════════════════════════════════ */
+.marcador{display:flex;justify-content:center;gap:5px;margin-bottom:6px}
+.marcador span{font-family:'JetBrains Mono',ui-monospace,monospace;font-weight:700;
+  font-size:clamp(26px,6vw,42px);line-height:1;color:var(--c-amarillo);
+  background:#0a0a0c;border:1px solid rgba(232,255,76,.22);border-radius:6px;
+  padding:6px 9px;min-width:1ch;text-align:center;
+  /* Solo la sombra INTERIOR: hunde el dígito en el panel, que es lo que hace
+     que se lea como display. El halo amarillo que traía era decoración —no hay
+     ninguna luz ahí— y a .10 de alpha ni se veía. Las bombillas del gabinete
+     sí conservan el suyo: esas son focos de verdad. */
+  box-shadow:inset 0 2px 8px rgba(0,0,0,.9)}
+.total-l{font-size:10.5px;letter-spacing:.24em;text-transform:uppercase;color:var(--c-muted);
+  text-align:center;margin-bottom:20px}
+
+/* ═══ LA CUENTA REGRESIVA AL GIRO ═══════════════════════════════════════ */
+.cuenta{text-align:center;margin:0 auto 18px;max-width:560px}
+.cuenta-l{font-size:10px;letter-spacing:.26em;text-transform:uppercase;color:var(--c-muted);margin-bottom:8px}
+.cuenta-n{font-family:var(--font-display);font-size:clamp(44px,11vw,88px);line-height:.92;
+  color:#fff;letter-spacing:.01em}
+.cuenta-n b{color:var(--c-amarillo);font-weight:inherit}
+.cuenta.ya .cuenta-n{color:var(--c-amarillo)}
+
+/* ═══ 3 · 2 · 1 ═════════════════════════════════════════════════════════ */
+.tres21{position:fixed;inset:0;z-index:400;display:none;align-items:center;justify-content:center;
+  background:rgba(0,0,0,.93);backdrop-filter:blur(3px)}
+.tres21.on{display:flex}
+.tres21 span{font-family:var(--font-display);font-size:min(46vw,340px);line-height:1;
+  color:var(--c-amarillo);animation:zumba .9s cubic-bezier(.16,1,.3,1)}
+@keyframes zumba{0%{transform:scale(.35);opacity:0}55%{transform:scale(1.06);opacity:1}100%{transform:scale(1);opacity:1}}
+
+/* ═══ EL DESTELLO DE LA REVELACIÓN ══════════════════════════════════════ */
+.destello{position:fixed;inset:0;z-index:390;background:#fff;opacity:0;pointer-events:none}
+.destello.on{animation:flash .5s ease-out}
+@keyframes flash{0%{opacity:.85}100%{opacity:0}}
+
+/* ═══ CONFETI ═══════════════════════════════════════════════════════════ */
+#confeti{position:fixed;inset:0;z-index:380;pointer-events:none;display:none}
+#confeti.on{display:block}
+
+/* ═══ EL BOTÓN DEL SONIDO ═══════════════════════════════════════════════ */
+.son{position:fixed;left:12px;bottom:12px;z-index:300;display:inline-flex;align-items:center;
+  gap:7px;padding:10px 14px;min-height:44px;border-radius:999px;cursor:pointer;
+  background:rgba(10,10,12,.92);border:1px solid rgba(255,255,255,.18);color:#fff;
+  font-family:var(--font-display);font-size:13px;letter-spacing:.08em;text-transform:uppercase;
+  -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
+.son .ic{width:15px;height:15px}
+.son.on{border-color:var(--c-amarillo);color:var(--c-amarillo)}
+.son:focus-visible{outline:2px solid var(--c-amarillo);outline-offset:3px}
+
+/* ═══ REDUCED MOTION ════════════════════════════════════════════════════
+   No es "menos animación": es SIN animación. Los rodillos siguen frenando en
+   secuencia porque eso es la información —quién ganó, en qué orden se revela—
+   pero saltan a su lugar en vez de correr. */
+@media (prefers-reduced-motion:reduce){
+  .luz{animation:none;background:#e8ff4c;box-shadow:0 0 6px rgba(232,255,76,.5)}
+  .rod.golpe{animation:none}
+  .tres21 span{animation:none}
+  .destello.on{animation:none;opacity:0}
+  #confeti{display:none !important}
+  .placa-ganador{transition:none}
+}
 
 .panel{display:none;text-align:center;padding:24px 18px;border:1px solid rgba(232,255,76,.4);
   border-radius:14px;background:rgba(232,255,76,.07);margin-bottom:18px}
@@ -72,7 +206,14 @@ body{margin:0;background:var(--c-bg);color:var(--c-ink);font-family:'Montserrat'
   border-radius:999px;font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--c-muted)}
 
 .reloj{margin-top:16px;padding-top:14px;border-top:1px solid rgba(255,255,255,.12)}
-.reloj-n{font-family:var(--font-display);font-size:clamp(38px,5vw,52px);line-height:1;color:var(--c-amarillo)}
+.reloj-n{font-family:var(--font-display);font-size:clamp(56px,13vw,104px);line-height:1;
+  color:var(--c-amarillo);letter-spacing:.01em}
+/* El último minuto se pone rojo y late: es el minuto en el que alguien puede
+   perder el premio por no contestar, y tiene que verse desde la otra punta
+   del cuarto. */
+.reloj.urgente .reloj-n{color:var(--c-rojo);animation:latePrisa 1s ease-in-out infinite}
+@keyframes latePrisa{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.06);opacity:.82}}
+@media (prefers-reduced-motion:reduce){ .reloj.urgente .reloj-n{animation:none} }
 .reloj.agotado .reloj-n{color:var(--c-muted)}
 .reloj-l{font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--c-muted);margin-top:5px}
 
@@ -273,6 +414,7 @@ body{margin:0;background:var(--c-bg);color:var(--c-ink);font-family:'Montserrat'
   <symbol id="ic-casa" viewBox="0 0 24 24"><path d="M4 10.5 12 4l8 6.5"/><path d="M6 9.6V20h12V9.6"/></symbol>
   <symbol id="ic-boleto" viewBox="0 0 24 24"><path d="M4 8.5A1.5 1.5 0 0 1 5.5 7h13A1.5 1.5 0 0 1 20 8.5v2a1.75 1.75 0 0 0 0 3.5v2A1.5 1.5 0 0 1 18.5 17h-13A1.5 1.5 0 0 1 4 15.5v-2a1.75 1.75 0 0 0 0-3.5v-2Z"/><path d="M14 7v2m0 3v2m0 3v-2"/></symbol>
   <symbol id="ic-wa" viewBox="0 0 24 24"><path d="M21 11.5a8.5 8.5 0 0 1-12.6 7.4L3 21l2.2-5.2A8.5 8.5 0 1 1 21 11.5Z"/></symbol>
+  <symbol id="ic-son" viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9H4Z"/><path d="M16.5 8.5a5 5 0 0 1 0 7"/><path d="M19 6a8.5 8.5 0 0 1 0 12"/></symbol>
   <symbol id="ic-lapiz" viewBox="0 0 24 24"><path d="M4 20h4L18.5 9.5l-4-4L4 16v4Z"/><path d="M14.5 5.5 18.5 9.5"/></symbol>
 </defs></svg>
 
@@ -333,14 +475,46 @@ body{margin:0;background:var(--c-bg);color:var(--c-ink);font-family:'Montserrat'
   <div style="text-align:center"><span class="vivo"><span class="punto"></span> Sorteo en vivo</span></div>
 
   <div class="centro">
-  <div class="total">
-    <div class="total-n" id="total">—</div>
-    <div class="total-l">participantes</div>
+  <!-- El marcador de participantes: dígitos sueltos, como un display. Lo
+       llena contarHasta() con conteo animado, no de un jalón. -->
+  <div class="marcador" id="marcador" aria-live="polite"><span>—</span></div>
+  <div class="total-l">participantes</div>
+
+  <!-- La cuenta regresiva al giro. Se esconde sola cuando el sorteo arranca. -->
+  <div class="cuenta" id="cuenta">
+    <div class="cuenta-l">El sorteo es a las 12:00 PM hora de Reynosa</div>
+    <div class="cuenta-n" id="cuenta-n">—</div>
   </div>
 
-  <div class="carril" id="carril">
-    <div class="marca"></div>
-    <div class="tira" id="tira"></div>
+  <!-- ═══ LA MÁQUINA ═══════════════════════════════════════════════════
+       Tres rodillos: nombre, apellido y folio. Frenan uno por uno con dos
+       segundos entre cada uno; el tercero remata. La placa de abajo dice el
+       nombre COMPLETO, para que nadie lea los tres rodillos como si fueran
+       una combinación de tres personas distintas. -->
+  <div class="maquina" id="maquina">
+    <div class="placa">
+      <div class="placa-c"><span>Conecta</span></div>
+      <div class="placa-mx">MX.</div>
+    </div>
+    <div class="placa-sub">Sorteo en vivo</div>
+    <div class="luces" aria-hidden="true"><i class="luz" style="--i:0;top:0;left:8%"></i><i class="luz" style="--i:1;top:0;left:26%"></i><i class="luz" style="--i:2;top:0;left:44%"></i><i class="luz" style="--i:3;top:0;left:62%"></i><i class="luz" style="--i:4;top:0;left:80%"></i><i class="luz" style="--i:5;top:50%;right:0;margin-top:-3px"></i><i class="luz" style="--i:6;bottom:0;right:8%"></i><i class="luz" style="--i:7;bottom:0;left:80%"></i><i class="luz" style="--i:8;bottom:0;left:62%"></i><i class="luz" style="--i:9;bottom:0;left:44%"></i><i class="luz" style="--i:10;bottom:0;left:26%"></i><i class="luz" style="--i:11;bottom:0;left:8%"></i><i class="luz" style="--i:12;top:50%;left:0;margin-top:-3px"></i><i class="luz" style="--i:13;top:0;right:0"></i></div>
+
+    <div class="rodillos">
+      <div class="rod" id="rod-0"><div class="rod-win"></div><div class="rod-tira" id="tira-0"></div></div>
+      <div class="rod" id="rod-1"><div class="rod-win"></div><div class="rod-tira" id="tira-1"></div></div>
+      <div class="rod" id="rod-2"><div class="rod-win"></div><div class="rod-tira" id="tira-2"></div></div>
+    </div>
+    <div class="rodillos" style="background:none;border:0;box-shadow:none;padding:0 8px">
+      <div class="rod-lbl">Nombre</div>
+      <div class="rod-lbl">Apellido</div>
+      <div class="rod-lbl">Folio</div>
+    </div>
+
+    <div class="placa-ganador" id="placa-ganador">
+      <div class="pg-l" id="pg-l">Ganador</div>
+      <div class="pg-n" id="pg-n">—</div>
+      <div class="pg-f" id="pg-f"></div>
+    </div>
   </div>
 
   <div class="espera" id="espera">
@@ -421,6 +595,16 @@ body{margin:0;background:var(--c-bg);color:var(--c-ink);font-family:'Montserrat'
      solo texto en la columna; el encargo pedía botones, así que se traen los
      MISMOS glifos de marca de su barra —los oficiales, no un trazo dibujado a
      mano: un TikTok o un Facebook "de línea" ya no es el logo de nadie—. -->
+<!-- Capas de la revelación. Fuera de .wrap para que cubran la pantalla. -->
+<div class="tres21" id="tres21" aria-hidden="true"></div>
+<div class="destello" id="destello" aria-hidden="true"></div>
+<canvas id="confeti" aria-hidden="true"></canvas>
+<!-- El sonido arranca APAGADO: los navegadores bloquean el audio automático,
+     así que el contexto se crea dentro del click. -->
+<button class="son" id="son" type="button" aria-pressed="false">
+  <svg class="ic"><use href="#ic-son"/></svg><span id="son-txt">Activar sonido</span>
+</button>
+
 <footer class="ftr-v2">
   <div class="ftr-v2-grid">
     <div>
@@ -532,39 +716,338 @@ body{margin:0;background:var(--c-bg);color:var(--c-ink);font-family:'Montserrat'
   }
   function dos(n){ return n < 10 ? '0' + n : String(n); }
 
-  var ALTO = 64;
-  // El último de la lista es el ganador; todo lo anterior es relleno.
-  function pintarTira(lista){
-    var ult = lista.length - 1;
-    $('tira').innerHTML = lista.map(function(n, i){
-      return '<div' + (i < ult ? ' class="relleno"' : '') + '>' + esc(n) + '</div>';
+  // ═══════════════════════════════════════════════════════════════════════
+  // SONIDO — apagado hasta que alguien lo pida.
+  // Los navegadores bloquean el audio que arranca solo, así que el contexto se
+  // crea DENTRO del click del botón. Si nadie lo toca, todo lo demás funciona
+  // igual: son.tic/golpe/fanfarria no hacen nada y no truenan.
+  // ═══════════════════════════════════════════════════════════════════════
+  var son = (function(){
+    var ctx = null, encendido = false, ultimoTic = 0;
+    function nota(freq, dur, tipo, vol, cuando){
+      if (!ctx) return;
+      var o = ctx.createOscillator(), g = ctx.createGain();
+      var t = ctx.currentTime + (cuando || 0);
+      o.type = tipo || 'square';
+      o.frequency.setValueAtTime(freq, t);
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(vol || 0.08, t + 0.008);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      o.connect(g); g.connect(ctx.destination);
+      o.start(t); o.stop(t + dur + 0.02);
+    }
+    return {
+      get on(){ return encendido; },
+      alternar: function(){
+        if (!ctx){
+          var AC = window.AudioContext || window.webkitAudioContext;
+          if (!AC) return false;
+          ctx = new AC();
+        }
+        if (ctx.state === 'suspended') ctx.resume();
+        encendido = !encendido;
+        if (encendido) nota(880, .08, 'sine', .05);
+        return encendido;
+      },
+      tic: function(){
+        if (!encendido) return;
+        // Tope de 22 tics por segundo: sin esto, al principio del giro el
+        // rodillo cruza casillas más rápido de lo que el oído distingue y se
+        // oye como ruido blanco, no como una máquina.
+        var ahoraMs = (ctx ? ctx.currentTime * 1000 : 0);
+        if (ahoraMs - ultimoTic < 45) return;
+        ultimoTic = ahoraMs;
+        nota(1250, .022, 'square', .035);
+      },
+      golpe: function(){ if (encendido){ nota(150, .13, 'triangle', .16); nota(74, .19, 'sine', .13); } },
+      arranque: function(){ if (encendido) nota(320, .1, 'sawtooth', .06); },
+      fanfarria: function(){
+        if (!encendido) return;
+        [[523,0],[659,.11],[784,.22],[1047,.34]].forEach(function(p){
+          nota(p[0], .30, 'square', .11, p[1]);
+        });
+      },
+    };
+  })();
+
+  // ═══ LA REVELACIÓN ═════════════════════════════════════════════════════
+  function revelar(){
+    son.fanfarria();
+    if (navigator.vibrate) { try { navigator.vibrate([90, 60, 90, 60, 180]); } catch (e) {} }
+    if (reducido) return;
+    var d = $('destello');
+    d.classList.remove('on'); void d.offsetWidth; d.classList.add('on');
+    confeti();
+  }
+
+  // Confeti en canvas: sin librería, sin red, y se apaga solo a los 4s.
+  function confeti(){
+    var c = $('confeti'), ctx2 = c.getContext('2d');
+    var W = c.width = window.innerWidth, H = c.height = window.innerHeight;
+    c.classList.add('on');
+    var COL = ['#e8ff4c', '#ff283b', '#ffffff', '#0000cd'];
+    var piezas = [];
+    for (var i = 0; i < 130; i++){
+      piezas.push({ x: Math.random() * W, y: -20 - Math.random() * H * .5,
+        w: 5 + Math.random() * 7, h: 8 + Math.random() * 10,
+        vy: 2.2 + Math.random() * 3.4, vx: -1.4 + Math.random() * 2.8,
+        rot: Math.random() * 6.28, vr: -.14 + Math.random() * .28,
+        col: COL[Math.floor(Math.random() * COL.length)] });
+    }
+    var fin = Date.now() + 4200;
+    (function pinta(){
+      ctx2.clearRect(0, 0, W, H);
+      piezas.forEach(function(p){
+        p.x += p.vx; p.y += p.vy; p.rot += p.vr; p.vy += .035;
+        ctx2.save(); ctx2.translate(p.x, p.y); ctx2.rotate(p.rot);
+        ctx2.fillStyle = p.col; ctx2.fillRect(-p.w / 2, -p.h / 2, p.w, p.h); ctx2.restore();
+      });
+      if (Date.now() < fin) requestAnimationFrame(pinta);
+      else { ctx2.clearRect(0, 0, W, H); c.classList.remove('on'); }
+    })();
+  }
+
+  // ═══ 3 · 2 · 1 ═════════════════════════════════════════════════════════
+  function tresDosUno(alTerminar){
+    if (reducido) { alTerminar(); return; }
+    var caja = $('tres21'), n = 3;
+    caja.classList.add('on');
+    (function paso(){
+      caja.innerHTML = '<span>' + n + '</span>';
+      son.golpe();
+      n--;
+      if (n >= 1) setTimeout(paso, 900);
+      else setTimeout(function(){ caja.classList.remove('on'); alTerminar(); }, 900);
+    })();
+  }
+
+  // ═══ EL MARCADOR, CON CONTEO ANIMADO ═══════════════════════════════════
+  var totalMostrado = 0;
+  function contarHasta(n){
+    n = Number(n) || 0;
+    if (reducido || n === totalMostrado){ totalMostrado = n; pintaMarcador(n); return; }
+    var desde = totalMostrado, t0 = null, dur = Math.min(900, 120 + Math.abs(n - desde) * 45);
+    // Se ARRANCA con requestAnimationFrame, no llamando a paso() a pelo: sin
+    // timestamp, (ts - t0) da NaN, k sale NaN, `k < 1` es falso y el conteo se
+    // queda clavado en el primer cuadro. Pasó.
+    function paso(ts){
+      if (t0 == null) t0 = ts;
+      var k = Math.min(1, (ts - t0) / dur);
+      pintaMarcador(Math.round(desde + (n - desde) * suave(k)));
+      if (k < 1) requestAnimationFrame(paso); else { totalMostrado = n; pintaMarcador(n); }
+    }
+    requestAnimationFrame(paso);
+  }
+  function pintaMarcador(v){
+    $('marcador').innerHTML = String(v).split('').map(function(d){
+      return '<span>' + d + '</span>';
     }).join('');
   }
-  function posicionar(i, animar, ms){
-    var t = $('tira');
-    t.style.transition = animar ? ('transform ' + ms + 'ms cubic-bezier(.12,.72,.16,1)') : 'none';
-    t.style.transform = 'translateY(' + (-(i * ALTO) + (t.parentElement.clientHeight / 2) - (ALTO / 2)) + 'px)';
+
+  // ═══ LA CUENTA REGRESIVA AL GIRO ═══════════════════════════════════════
+  var SORTEO_TS = Date.parse('2026-08-05T12:00:00-05:00');
+  function pintarCuenta(){
+    var caja = $('cuenta');
+    // Con un giro ya en pantalla la cuenta sobra.
+    if (estado && estado.ultimo){ caja.style.display = 'none'; return; }
+    caja.style.display = '';
+    var falta = SORTEO_TS - ahora();
+    if (falta <= 0){
+      caja.classList.add('ya');
+      $('cuenta-n').textContent = 'Va a girar';
+      return;
+    }
+    var s = Math.floor(falta / 1000);
+    var h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sg = s % 60;
+    $('cuenta-n').innerHTML = (h > 0 ? h + '<b>h</b> ' : '') + dos(m) + '<b>m</b> ' + dos(sg) + '<b>s</b>';
   }
-  // Sin lista de participantes (es privada), el relleno sale de los nombres que
-  // ya salieron. La ilusión de movimiento no necesita el padrón, y el padrón no
-  // puede ser público.
-  function nombresDelRelleno(){
-    var n = ((estado && estado.giros) || []).map(function(g){ return g.nombre; }).filter(Boolean);
-    // En el PRIMER giro no hay nombres previos: el carril rueda con marcas y
-    // aterriza en el ganador. Es el giro que más se mira, y no puede verse roto.
-    while (n.length < 8) n.push('· · · · ·');
-    return n;
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // LOS TRES RODILLOS
+  //
+  // EL GANADOR SIGUE SIENDO DEL SERVIDOR. Esto solo ANIMA hacia un nombre y un
+  // folio que ya vinieron decididos: el nombre completo llega en g.nombre y el
+  // folio en g.folio. Los rodillos se parten para el show, pero la placa de
+  // abajo dice el nombre COMPLETO tal como lo mandó el servidor — nunca la
+  // suma de lo que quedó en las tres ventanas.
+  //
+  // El movimiento va por requestAnimationFrame y no por transiciones de CSS,
+  // porque hace falta saber la VELOCIDAD en cada cuadro: de ahí salen el tic
+  // que sigue al rodillo y los frenados falsos del tercero.
+  // ═══════════════════════════════════════════════════════════════════════
+  var LARGO = 30;                 // casillas por rodillo
+  var reducido = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  function altoCasilla(){
+    var d = document.querySelector('#tira-0 div');
+    return d ? d.getBoundingClientRect().height : 50;
   }
-  function animarHacia(nombre, alTerminar){
-    var relleno = [], fuente = nombresDelRelleno();
-    for (var i = 0; i < 34; i++) relleno.push(fuente[Math.floor(Math.random() * fuente.length)]);
-    relleno.push(nombre);
-    pintarTira(relleno);
-    posicionar(0, false);
-    requestAnimationFrame(function(){ requestAnimationFrame(function(){
-      posicionar(relleno.length - 1, true, 6000);
-      setTimeout(alTerminar, 6100);
-    }); });
+
+  // Relleno de un rodillo: la lista real, repetida y recortada, con el valor
+  // ganador al final. Si el padrón viene corto, se repite: más vale un rodillo
+  // que rueda con pocos nombres que uno que rueda con inventados.
+  function tiraDe(fuente, ganador, esFolio){
+    var base = (fuente && fuente.length) ? fuente.slice() : ['· · ·'];
+    var out = [];
+    for (var i = 0; i < LARGO - 1; i++) out.push(base[i % base.length]);
+    var idxGanador = out.length;
+    out.push(ganador);
+    // Dos casillas MÁS abajo del ganador: si la cinta termina justo en la
+    // ventana, el rodillo se ve como una lista que se acabó, no como un
+    // cilindro. Con relleno debajo, sigue pareciendo que hay máquina.
+    out.push(base[(LARGO + 1) % base.length]);
+    out.push(base[(LARGO + 2) % base.length]);
+    var html = out.map(function(v, i){
+      var cls = (esFolio ? 'folio' : '') + (i === idxGanador ? ' centro' : '');
+      return '<div class="' + cls + '">' + esc(v) + '</div>';
+    }).join('');
+    return { html: html, n: out.length, idx: idxGanador };
+  }
+
+  // Interpolación entre puntos de control {t, p}. Cada tramo va con suavizado
+  // de entrada y salida, así que una meseta (dos puntos con la misma p) se ve
+  // como un frenado de verdad y no como una pausa mecánica.
+  function suave(x){ return x * x * (3 - 2 * x); }
+  function pEn(puntos, t){
+    if (t <= puntos[0].t) return puntos[0].p;
+    for (var i = 1; i < puntos.length; i++){
+      if (t <= puntos[i].t){
+        var a = puntos[i - 1], b = puntos[i];
+        var u = (t - a.t) / (b.t - a.t || 1);
+        return a.p + (b.p - a.p) * suave(u);
+      }
+    }
+    return puntos[puntos.length - 1].p;
+  }
+
+  // Los tres perfiles. El tercero lleva DOS mesetas antes del definitivo: son
+  // los frenados falsos, y caen sobre casillas de relleno, no sobre el ganador.
+  function perfil(idx, n){
+    var casi1 = (n - 4) / (n - 1);
+    var casi2 = (n - 2) / (n - 1);
+    if (idx === 0) return { ms: 6400, pts: [{t:0,p:0},{t:.12,p:.03},{t:.62,p:.80},{t:1,p:1}] };
+    if (idx === 1) return { ms: 8400, pts: [{t:0,p:0},{t:.10,p:.02},{t:.66,p:.82},{t:1,p:1}] };
+    return { ms: 11000, pts: [
+      {t:0,p:0},{t:.08,p:.02},{t:.52,p:.74},
+      {t:.66,p:casi1},{t:.72,p:casi1},        // 1er frenado falso
+      {t:.82,p:casi2},{t:.88,p:casi2},        // 2º frenado falso
+      {t:1,p:1},
+    ] };
+  }
+
+  function girarUno(idx, fuente, ganador, esFolio, alFrenar){
+    var el = $('rod-' + idx), tira = $('tira-' + idx);
+    el.classList.remove('frenado');
+    var t = tiraDe(fuente, ganador, esFolio);
+    tira.innerHTML = t.html;
+    var alto = altoCasilla();
+    var total = t.idx * alto;   // hasta el GANADOR, no hasta el final de la cinta
+    // El centrado. Sin esto la casilla ganadora frena pegada al borde de
+    // arriba y la ventana amarilla queda vacía debajo: se ve roto. Es el mismo
+    // ajuste que traía el carrusel viejo y que se me fue al reescribirlo.
+    var centro = (el.clientHeight / 2) - (alto / 2);
+    var pf = perfil(idx, t.idx + 1);
+
+    if (reducido){
+      // Sin movimiento: el rodillo aparece ya frenado, respetando el ORDEN
+      // (que es la información) pero sin correr.
+      tira.style.transform = 'translateY(' + (centro - total) + 'px)';
+      setTimeout(function(){ el.classList.add('frenado'); alFrenar(); }, pf.ms);
+      return;
+    }
+
+    var t0 = null, ultimaCasilla = -1;
+    function cuadro(ts){
+      if (t0 == null) t0 = ts;
+      var k = Math.min(1, (ts - t0) / pf.ms);
+      var p = pEn(pf.pts, k);
+      var y = centro - p * total;
+      tira.style.transform = 'translateY(' + y + 'px)';
+      // Un tic por casilla cruzada: el ritmo sigue solo a la velocidad.
+      var casilla = Math.floor(p * t.idx);
+      if (casilla !== ultimaCasilla){ ultimaCasilla = casilla; son.tic(); }
+      if (k < 1) requestAnimationFrame(cuadro);
+      else {
+        el.classList.add('frenado');
+        el.classList.add('golpe');
+        setTimeout(function(){ el.classList.remove('golpe'); }, 200);
+        son.golpe();
+        if (navigator.vibrate) { try { navigator.vibrate(idx === 2 ? [60, 40, 90] : 45); } catch (e) {} }
+        alFrenar();
+      }
+    }
+    requestAnimationFrame(cuadro);
+  }
+
+  // Parte el nombre igual que el servidor: primera palabra / el resto.
+  function partir(completo){
+    var partes = String(completo || '').trim().split(/\s+/).filter(Boolean);
+    if (!partes.length) return { nombre: '—', apellido: '' };
+    if (partes.length === 1) return { nombre: partes[0], apellido: '' };
+    return { nombre: partes[0], apellido: partes.slice(1).join(' ') };
+  }
+
+  // En reposo los rodillos NO se dejan vacíos: una tragamonedas apagada sigue
+  // enseñando símbolos. Se plantan tres valores quietos, centrados en su
+  // ventana, para que la máquina se vea cargada y lista en vez de rota.
+  var enReposo = false;
+  function reposo(){
+    if (enReposo || girando) return;
+    var r = (estado && estado.rodillos) || {};
+    var nom = (r.nombres && r.nombres.length) ? r.nombres : ['· · ·'];
+    var ape = (r.apellidos && r.apellidos.length) ? r.apellidos : ['· · ·'];
+    var fol = [];
+    for (var i = 1; i <= Math.min(Number(r.folios) || 3, 12); i++) fol.push('#' + i);
+    if (!fol.length) fol = ['#—'];
+    [[0, nom, false], [1, ape, false], [2, fol, true]].forEach(function(par){
+      var idx = par[0], fuente = par[1], esFolio = par[2];
+      var tira = $('tira-' + idx), el = $('rod-' + idx);
+      var html = '';
+      for (var k = 0; k < 5; k++){
+        html += '<div class="' + (esFolio ? 'folio' : '') + (k === 2 ? ' centro' : '') + '">'
+             + esc(fuente[k % fuente.length]) + '</div>';
+      }
+      tira.innerHTML = html;
+      var d = tira.querySelector('div');
+      var alto = d ? d.getBoundingClientRect().height : 50;
+      tira.style.transform = 'translateY(' + ((el.clientHeight / 2) - (alto / 2) - 2 * alto) + 'px)';
+      el.classList.remove('frenado');
+    });
+    enReposo = true;
+  }
+
+  function animarHacia(g, alTerminar){
+    var nombreCompleto = (g && g.nombre) || '';
+    var partido = partir(nombreCompleto);
+    var r = (estado && estado.rodillos) || {};
+    var folios = [];
+    var nF = Number(r.folios) || 0;
+    for (var i = 1; i <= Math.min(nF, 60); i++) folios.push('#' + i);
+    if (!folios.length) folios = ['#—'];
+    var folioGanador = (g && g.folio) ? ('#' + g.folio) : '#—';
+
+    $('placa-ganador').classList.remove('on');
+    enReposo = false;
+    $('maquina').classList.add('girando');
+    son.arranque();
+
+    var frenados = 0;
+    function unoMenos(){
+      frenados++;
+      if (frenados === 3){
+        $('maquina').classList.remove('girando');
+        // La placa dice el nombre COMPLETO del servidor, no lo que quedó en
+        // las ventanas: los rodillos son el show, esto es el dato.
+        $('pg-n').textContent = nombreCompleto;
+        $('pg-f').textContent = (g && g.folio) ? ('Folio ' + folioGanador) : '';
+        $('placa-ganador').classList.add('on');
+        revelar();
+        alTerminar();
+      }
+    }
+    girarUno(0, r.nombres,   partido.nombre,   false, unoMenos);
+    girarUno(1, r.apellidos, partido.apellido || '—', false, unoMenos);
+    girarUno(2, folios,      folioGanador,     true,  unoMenos);
   }
 
   var tickReloj = null;
@@ -584,6 +1067,8 @@ body{margin:0;background:var(--c-bg);color:var(--c-ink);font-family:'Montserrat'
       }
       $('reloj').classList.remove('agotado');
       var s = Math.floor(falta / 1000);
+      // El último minuto se pinta de rojo y late.
+      $('reloj').classList.toggle('urgente', s <= 60);
       $('reloj-n').textContent = dos(Math.floor(s / 60)) + ':' + dos(s % 60);
       $('reloj-l').textContent = 'para contestar su WhatsApp';
     }
@@ -594,8 +1079,14 @@ body{margin:0;background:var(--c-bg);color:var(--c-ink);font-family:'Montserrat'
     $('espera').style.display = 'none';
     $('panel').style.display = 'block';
     $('panel').classList.toggle('no', g.resultado === 'no_contesto');
-    $('p-nombre').textContent = g.nombre;
-    $('panel-l').textContent = g.resultado === 'no_contesto' ? 'No contestó' : 'Ganador';
+    // El nombre lo dice la PLACA de la máquina; aquí sería la segunda vez
+    // seguida y el ojo lee dos ganadores. El panel se queda con lo que la
+    // placa no dice: la hora, el reloj de 10 minutos y los controles.
+    $('p-nombre').style.display = 'none';
+    $('panel-l').style.display = 'none';
+    // La placa cambia de rótulo si no contestó.
+    $('pg-l').textContent = g.resultado === 'no_contesto' ? 'No contestó' : 'Ganador';
+    $('placa-ganador').classList.toggle('no', g.resultado === 'no_contesto');
 
     var linea = 'Girado a las ' + horaReynosa(g.creado_at) + ', hora de Reynosa';
     if (g.total_participantes != null) linea += ' · ' + g.total_participantes + ' participantes';
@@ -647,26 +1138,43 @@ body{margin:0;background:var(--c-bg);color:var(--c-ink);font-family:'Montserrat'
       estado = res.j;
       if (res.j.ahora) desfaseMs = Date.parse(res.j.ahora) - Date.now();
       puertaRegistro();
-      $('total').textContent = res.j.total != null ? res.j.total : '—';
+      contarHasta(res.j.total);
+      pintarCuenta();
 
       var u = res.j.ultimo;
-      if (!u){ $('espera').style.display = ''; $('panel').style.display = 'none'; return; }
+      if (!u){ $('espera').style.display = ''; $('panel').style.display = 'none'; reposo(); return; }
       pintarHistorial(res.j.giros || []);
       if (animado === u.id){ pintarPanel(u); return; }
       if (girando) return;
       girando = true;
       $('espera').style.display = 'none';
-      animarHacia(u.nombre, function(){ girando = false; animado = u.id; pintarPanel(u); });
+      $('cuenta').style.display = 'none';
+      // El 3·2·1 solo la PRIMERA vez que se descubre un giro nuevo. En una
+      // repetición no va: ya se sabe qué pasó y volver a contar sería mentir
+      // sobre que está por ocurrir.
+      tresDosUno(function(){
+        animarHacia(u, function(){ girando = false; animado = u.id; pintarPanel(u); });
+      });
     }).catch(function(){ /* silencioso: vuelve a intentar en 4s */ });
   }
   refrescar();
   setInterval(refrescar, CADA_MS);
+  // La cuenta regresiva late cada segundo por su cuenta: esperar a la
+  // consulta de cada 4s haría que los segundos brincaran de 4 en 4.
+  setInterval(pintarCuenta, 1000);
 
   $('repetir').addEventListener('click', function(){
     if (girando || !estado || !estado.ultimo) return;
     girando = true;
     $('panel').style.display = 'none';
-    animarHacia(estado.ultimo.nombre, function(){ girando = false; pintarPanel(estado.ultimo); });
+    animarHacia(estado.ultimo, function(){ girando = false; pintarPanel(estado.ultimo); });
+  });
+
+  $('son').addEventListener('click', function(){
+    var on = son.alternar();
+    this.classList.toggle('on', on);
+    this.setAttribute('aria-pressed', on ? 'true' : 'false');
+    $('son-txt').textContent = on ? 'Sonido activado' : 'Activar sonido';
   });
 
   $('llave').addEventListener('click', function(){

@@ -1,5 +1,5 @@
 // giveaway-recordatorio.js — cron. Un correo corto a los registrados que NO
-// han sido avisados, quince minutos antes del sorteo, con la liga a /sorteo.
+// han sido avisados, CINCO minutos antes del sorteo, con la liga a /sorteo.
 // [GVW-1] IDEMPOTENTE: `recordatorio_at` marca a quien ya recibió. Correr dos
 // veces dentro de la ventana NO duplica.
 //
@@ -8,8 +8,8 @@
 // día se sale sin mandar nada y lo dice en el log. Es el patrón del resto de
 // los crons de la casa.
 //
-// 11:45 AM de Reynosa = 16:45 UTC (America/Matamoros trae horario de verano en
-// agosto). El cron va a las 16:45 UTC y se permite una ventana, porque Netlify
+// 11:55 AM de Reynosa = 16:55 UTC (America/Matamoros trae horario de verano en
+// agosto). El cron va a las 16:55 UTC y se permite una ventana, porque Netlify
 // no dispara al segundo exacto.
 
 const G = require('./_lib/giveaway');
@@ -36,7 +36,7 @@ function escapeHtml(s) {
 
 function correoHtml(nombre, link) {
   const primero = String(nombre || '').trim().split(/\s+/)[0] || 'Hola';
-  return `<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>El sorteo es en 15 minutos</title></head>
+  return `<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>El sorteo es en 5 minutos</title></head>
 <body style="margin:0;padding:0;background:#000;font-family:Helvetica,Arial,sans-serif;color:#fff;-webkit-font-smoothing:antialiased">
 <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#000">
   <tr><td align="center" style="padding:24px 12px">
@@ -50,7 +50,7 @@ function correoHtml(nombre, link) {
       <tr><td style="padding:32px 26px 6px 26px">
         <div style="font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:rgba(255,255,255,.55);margin-bottom:10px">Falta poco</div>
         <h1 style="font-family:Arial Black,Arial,sans-serif;font-size:34px;line-height:1;color:#e8ff4c;text-transform:uppercase;margin:0 0 14px 0">${escapeHtml(primero)}, el sorteo es a las 12</h1>
-        <p style="font-size:15px;line-height:1.55;color:rgba(255,255,255,.85);margin:0 0 14px 0">Giramos <strong style="color:#e8ff4c">en 15 minutos</strong>, a las 12:00 PM hora de Reynosa (11:00 AM en Monterrey). Se ve en vivo desde esta página:</p>
+        <p style="font-size:15px;line-height:1.55;color:rgba(255,255,255,.85);margin:0 0 14px 0">Giramos <strong style="color:#e8ff4c">en 5 minutos</strong>, a las 12:00 PM hora de Reynosa (11:00 AM en Monterrey). Se ve en vivo desde esta página:</p>
         <p style="font-size:14px;line-height:1.55;color:rgba(255,255,255,.7);margin:0 0 24px 0">Si sales, tienes <strong>10 minutos</strong> para contestar tu WhatsApp. Tenlo a la mano.</p>
       </td></tr>
       <tr><td style="padding:8px 26px 28px 26px">
@@ -123,7 +123,7 @@ exports.handler = async () => {
     // `continue` lo va a volver a saltar. Se cuenta, no se toca.
     if (!correo) { sinCorreo++; continue; }
 
-    const ok = await enviar(correo, 'El sorteo es en 15 minutos — Conecta Reynosa', correoHtml(f.nombre, link));
+    const ok = await enviar(correo, 'El sorteo es en 5 minutos — Conecta Reynosa', correoHtml(f.nombre, link));
     if (!ok) { fallidos++; continue; }
     enviados++;
 

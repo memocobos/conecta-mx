@@ -64,7 +64,7 @@
 # con horario de verano en agosto). Corre DIARIO porque Netlify no agenda "solo
 # el 5 de agosto"; la función se sale sola cualquier otro día y lo dice en el log.
 [functions."giveaway-recordatorio"]
-  schedule = "45 16 * * *"
+  schedule = "55 16 * * *"
 
 [functions."check-strikes-diario"]
   schedule = "0 0 * * *"

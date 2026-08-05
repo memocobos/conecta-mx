@@ -70,14 +70,39 @@ exports.handler = async (event) => {
     const eventoNombre = (reembolsos[0] && reembolsos[0].evento_nombre) || slug;
 
     // 2. Correos válidos, dedup por correo.
-    const vistos = new Set();
-    const destinatarios = [];
+    // [GR-11] El dedup SUMA, no descarta.
+    //
+    // Antes: `if (vistos.has(correo)) continue` — el primer reembolso de cada
+    // buzón se quedaba con el correo y los demás se perdían enteros. A un
+    // cliente con dos reembolsos pendientes del mismo evento (dos solicitudes,
+    // o una baja de lugar más la cancelación) le llegaba:
+    //
+    //     "Te reembolsaremos íntegramente lo que pagaste: $2,550.00"
+    //
+    // cuando se le debían $3,400. No era un dato incompleto: era una
+    // afirmación FALSA sobre dinero, firmada por la agencia, y quien la recibe
+    // no tiene cómo saber que falta.
+    //
+    // Ahora se agrupa por buzón y se suman los montos. Un correo por persona,
+    // con el total de lo que se le debe.
+    const porCorreo = new Map();
     for (const r of reembolsos) {
       const correo = (r && typeof r.cliente_correo === 'string') ? r.cliente_correo.trim().toLowerCase() : '';
       if (!correo || !correo.includes('@')) continue;
-      if (vistos.has(correo)) continue;
-      vistos.add(correo);
-      destinatarios.push({ correo, nombre: r.cliente_nombre, monto: r.monto, evento: r.evento_nombre || eventoNombre });
+      const monto = Number(r.monto) || 0;
+      const previo = porCorreo.get(correo);
+      if (previo) {
+        previo.monto += monto;
+        previo.piezas++;
+        continue;
+      }
+      porCorreo.set(correo, { correo, nombre: r.cliente_nombre, monto,
+        evento: r.evento_nombre || eventoNombre, piezas: 1 });
+    }
+    const destinatarios = [...porCorreo.values()];
+    const conVarios = destinatarios.filter(d => d.piezas > 1).length;
+    if (conVarios) {
+      console.log(`[avisar-cancelacion] ${conVarios} destinatario(s) con más de un reembolso: se suman`);
     }
     if (!destinatarios.length) {
       return { statusCode: 200, headers, body: JSON.stringify({ ok: true, evento_nombre: eventoNombre, total: 0, enviados: 0, mensaje: 'No hay reembolsos pendientes con correo' }) };

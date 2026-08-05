@@ -7066,6 +7066,12 @@ async function gzReactivarVendedor(userId, nombre) {
 
 // ═══════════════════════════════════════════════════════════════════════════
 // [EQ-1] EL MAPA rol → contratos. SELLADO POR MEMO el 31-jul-2026.
+// [KAR-1] RE-SELLADO POR MEMO el 5-ago-2026: mister_popo pasa a llevar los DOS
+// contratos. El Maestro Karin también coordina, así que su paquete es el mismo
+// de bulma/milk. Eso reencuadró la custodia de bodega: no hacía falta llevar la
+// casilla al contrato laboral —se intentó y se retiró— porque el anexo viaja en
+// el de coordinador, que es justo donde su texto oficial ("EL COORDINADOR", el
+// régimen de strikes) dice la verdad. El texto v1 se queda como está.
 //
 // Nace del re-onboarding en vivo: para saber qué le tocaba firmar a cada
 // persona había que acordarse. Aquí queda escrito UNA vez y lo leen la tarjeta,
@@ -7085,7 +7091,7 @@ const ROL_CONTRATOS = {
   maestro_roshi: [],
   bulma:         ['auxiliar_admin', 'coordinador'], // Sofía también coordina
   milk:          ['auxiliar_admin', 'coordinador'], // Ximena igual: auxiliar Y coordinadora
-  mister_popo:   ['auxiliar_admin'], // el anexo de cuidador es borrador aparte
+  mister_popo:   ['auxiliar_admin', 'coordinador'], // Maestro Karin: auxiliar Y coordinador; la custodia va como casilla en su contrato de coordinador
   coordinador:   ['coordinador'],
   cc:            ['creadora_team'],
   vendedor:      [], // INTENCIONAL — ver nota abajo

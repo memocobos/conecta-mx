@@ -2,7 +2,8 @@
   "detector": {
     "ignoreRules": [],
     "ignoreFiles": [
-      "**/scratchpad/**"
+      "**/scratchpad/**",
+      "contrato.html"
     ],
     "ignoreValues": [
       {

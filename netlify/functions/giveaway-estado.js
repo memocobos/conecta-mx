@@ -30,23 +30,31 @@ const COLS_PUBLICAS = 'id,intento,resultado,ganador_nombre,total_participantes,c
 // El orden alfabético hace el trabajo de un shuffle SIN aleatoriedad: nada de
 // Math.random en este archivo, para que el candado de "el navegador no escoge"
 // siga siendo trivial de auditar.
-// En México los apellidos son DOS y van al final. Se toman los dos últimos
-// como apellido y todo lo anterior como nombre:
-//   "María de los Angeles Izaguirre Cruz" → "María de los Angeles" / "Izaguirre Cruz"
-//   "José de Jesús Hernández González"    → "José de Jesús" / "Hernández González"
-//   "Ana Martínez Cobos"                  → "Ana" / "Martínez Cobos"
-// Tomar las dos PRIMERAS como nombre —lo que intenté antes— parte los nombres
-// con partícula: dejaba "María de" / "los Angeles Izaguirre Cruz". Lo delató el
-// padrón real, no un ejemplo inventado.
+// PARTIR EL NOMBRE. En México los apellidos son DOS y van al final, pero hay
+// dos casos que una regla simple parte mal — los dos salieron del padrón real,
+// no de ejemplos inventados:
+//
+//   · dos palabras: "Juan Pérez" → "Juan" / "Pérez" (15 de las 70 colas)
+//   · partículas:   "Juan Del Ángel Pérez" → "Juan" / "Del Ángel Pérez"
+//                   "Jorge Monserrath Lopez de Leon" → "… Monserrath" / "Lopez de Leon"
+//                   "María de los Angeles Izaguirre Cruz" → "María de los Angeles" / "Izaguirre Cruz"
+//
+// (a) Si los dos últimos EMPIEZAN con partícula, en realidad son UN apellido
+//     ("de Leon"), así que hace falta una palabra más para el otro.
+// (b) Si lo que queda justo antes es partícula, es parte del apellido.
+//
 // El servidor y la página parten IGUAL: si difieren, el rodillo del apellido
 // gira con valores que nunca contienen al ganador.
+const PARTICULAS = /^(de|del|la|las|los|y|da|di)$/i;
 function partirNombre(completo) {
-  const partes = String(completo || '').trim().split(/\s+/).filter(Boolean);
-  if (!partes.length) return null;
-  if (partes.length === 1) return { nombre: partes[0], apellido: '' };
-  const nApe = partes.length >= 3 ? 2 : 1;
-  return { nombre: partes.slice(0, partes.length - nApe).join(' '),
-           apellido: partes.slice(partes.length - nApe).join(' ') };
+  const p = String(completo || '').trim().split(/\s+/).filter(Boolean);
+  if (!p.length) return null;
+  if (p.length === 1) return { nombre: p[0], apellido: '' };
+  if (p.length === 2) return { nombre: p[0], apellido: p[1] };
+  let corte = p.length - 2;
+  if (corte > 1 && PARTICULAS.test(p[corte])) corte--;
+  while (corte > 1 && PARTICULAS.test(p[corte - 1])) corte--;
+  return { nombre: p.slice(0, corte).join(' '), apellido: p.slice(corte).join(' ') };
 }
 
 exports.handler = async (event) => {

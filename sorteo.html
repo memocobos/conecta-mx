@@ -1012,16 +1012,20 @@ body{margin:0;background:var(--c-bg);color:var(--c-ink);font-family:'Montserrat'
     requestAnimationFrame(cuadro);
   }
 
-  // CALCA del partirNombre del servidor: los DOS ÚLTIMOS son el apellido.
+  // CALCA del partirNombre del servidor: dos apellidos al final, con las dos
+  // excepciones que salieron del padrón real (dos palabras, y partículas).
   // Si los dos no parten igual, el rodillo del apellido gira con valores que
   // nunca contienen al ganador.
+  var PARTICULAS = /^(de|del|la|las|los|y|da|di)$/i;
   function partir(completo){
-    var partes = String(completo || '').trim().split(/\s+/).filter(Boolean);
-    if (!partes.length) return { nombre: '—', apellido: '' };
-    if (partes.length === 1) return { nombre: partes[0], apellido: '' };
-    var nApe = partes.length >= 3 ? 2 : 1;
-    return { nombre: partes.slice(0, partes.length - nApe).join(' '),
-             apellido: partes.slice(partes.length - nApe).join(' ') };
+    var p = String(completo || '').trim().split(/\s+/).filter(Boolean);
+    if (!p.length) return { nombre: '—', apellido: '' };
+    if (p.length === 1) return { nombre: p[0], apellido: '' };
+    if (p.length === 2) return { nombre: p[0], apellido: p[1] };
+    var corte = p.length - 2;
+    if (corte > 1 && PARTICULAS.test(p[corte])) corte--;
+    while (corte > 1 && PARTICULAS.test(p[corte - 1])) corte--;
+    return { nombre: p.slice(0, corte).join(' '), apellido: p.slice(corte).join(' ') };
   }
 
   // En reposo los rodillos NO se dejan vacíos: una tragamonedas apagada sigue

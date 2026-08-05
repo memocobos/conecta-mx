@@ -223,13 +223,36 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Montse
 /* ═══════════════════════════════════════════════
  PANTALLA DE LOGIN
 ═══════════════════════════════════════════════ */
+/* [GR-12] ESTA PANTALLA NO SE PODÍA DESPLAZAR.
+   Medido: la tarjeta de registro son 1196px de alto y este contenedor es
+   `fixed` sin desplazamiento, así que la tarjeta sobraba por ARRIBA y por
+   ABAJO y NADA de los extremos se podía alcanzar — ni el aviso de error, ni
+   el botón "Crear mi cuenta", ni el campo del nombre. No cabía en NINGÚN
+   viewport probado, escritorio incluido (1440×900 → botón en y=924).
+   Dos piezas, y las dos hacen falta:
+   · `overflow-y:auto` — sin esto no hay a dónde desplazarse, y el
+     scrollIntoView del aviso es una instrucción que no mueve nada.
+   · `margin:auto` en la tarjeta EN LUGAR DE `align-items:center` — centrar
+     por alineación RECORTA el lado de arriba cuando el hijo desborda (por eso
+     el campo del nombre nacía en y=-176); las márgenes automáticas centran
+     igual cuando sí cabe y no recortan cuando no. */
 #login-screen{
  position:fixed;inset:0;z-index:1000;
- display:flex;align-items:center;justify-content:center;
+ display:flex;justify-content:center;
+ overflow-y:auto;-webkit-overflow-scrolling:touch;
+ /* Solo vertical: da aire arriba y abajo cuando la tarjeta alta se desplaza.
+    Horizontal se queda en 0 a propósito — 16px de lado estrechaban la tarjeta
+    de 380 a 358 en un teléfono de 390 (tope `max-width`), y el texto del login
+    normal reflowaba 14px más alto. El arreglo del registro no tiene por qué
+    reacomodar la pantalla por la que entra todo el mundo todos los días. */
+ padding:24px 0;
  background:var(--bg);
 }
 .login-bg{
- position:absolute;inset:0;
+ /* fixed, no absolute: dentro de un contenedor que ya se desplaza, `absolute`
+    se dimensiona a la caja visible y el degradado dejaría sin pintar todo lo
+    que queda por debajo del primer viewport. */
+ position:fixed;inset:0;
  background:
  radial-gradient(ellipse 60% 50% at 20% 50%, rgba(255,107,0,.08) 0%, transparent 70%),
  radial-gradient(ellipse 40% 60% at 80% 30%, rgba(255,215,0,.05) 0%, transparent 70%);
@@ -237,6 +260,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Montse
 .login-card{
  position:relative;z-index:1;
  width:100%;max-width:380px;
+ margin:auto;            /* [GR-12] centra sin recortar — ver #login-screen */
  background:var(--bg2);
  border:1px solid var(--border2);
  border-radius:var(--r-card,16px);
@@ -268,6 +292,17 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Montse
  transition:border-color .2s;
 }
 .login-field input:focus{border-color:var(--orange)}
+/* [GR-12] El campo culpable del registro.
+   #reg-error vive DEBAJO del botón, al fondo de una tarjeta de diez campos: sin
+   esta marca el usuario lee "falta el nombre" sin saber CUÁL de los diez es.
+   Va DESPUÉS de :focus a propósito — misma especificidad, gana la última regla,
+   y el campo culpable SIEMPRE está enfocado: sin este orden el borde naranja
+   del foco le comería el rojo justo en el campo que hay que señalar. */
+.login-field input.reg-culpable,
+.login-field input.reg-culpable:focus{
+ border-color:var(--red);
+ box-shadow:0 0 0 3px rgba(255,90,77,.18);
+}
 .login-btn{
  width:100%;margin-top:8px;
  background:linear-gradient(135deg,var(--orange),var(--orange2));

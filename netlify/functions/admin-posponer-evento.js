@@ -275,6 +275,18 @@ exports.handler = async (event) => {
 
 // ----- helpers -----
 
+// "2026-04-20" → "20 de abril de 2026". Si no parsea, devuelve el original.
+// Copiado TAL CUAL de admin-avisar-posposicion (revisado y aprobado): ancla a
+// mediodía y huso explícito. Sin el mediodía, un runtime en huso negativo
+// correría la fecha un día; sin el timeZone, la correría el servidor.
+function fmtFecha(ds) {
+  if (!ds) return '';
+  const s = String(ds).slice(0, 10);
+  const d = new Date(s + 'T12:00:00');
+  if (isNaN(d.getTime())) return s;
+  return d.toLocaleDateString('es-MX', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'America/Monterrey' });
+}
+
 function escapeHtml(s) {
   return String(s == null ? '' : s)
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -285,8 +297,8 @@ function escapeHtml(s) {
 function posponerHtml(nombre, eventoNombre, fechaAnterior, fechaNueva, pagosRecorridos) {
   const nom = escapeHtml(nombre || 'viajero');
   const ev = escapeHtml(eventoNombre);
-  const fa = escapeHtml(fechaAnterior);
-  const fn = escapeHtml(fechaNueva);
+  const fa = escapeHtml(fmtFecha(fechaAnterior));
+  const fn = escapeHtml(fmtFecha(fechaNueva));
   const pagosLinea = pagosRecorridos
     ? `<p style="margin:0 0 14px 0">Tus fechas de pago pendientes se recorrieron los mismos días; las verás actualizadas en tu portal.</p>`
     : '';

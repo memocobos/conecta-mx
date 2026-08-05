@@ -45,6 +45,18 @@ const DIAS_AVISO = 2; // "48 horas": hoy (0), mañana (1) y pasado (2)
 // ── helpers PUROS (los prueba el arnés sin red) ──────────────────────────────
 
 // 'slug#2' → 'slug'. El catálogo se llavea SIEMPRE por el slug base.
+// "2026-04-20" → "20 de abril de 2026". Si no parsea, devuelve el original.
+// Copiado TAL CUAL de admin-avisar-posposicion (revisado y aprobado): ancla a
+// mediodía y huso explícito. Sin el mediodía, un runtime en huso negativo
+// correría la fecha un día; sin el timeZone, la correría el servidor.
+function fmtFecha(ds) {
+  if (!ds) return '';
+  const s = String(ds).slice(0, 10);
+  const d = new Date(s + 'T12:00:00');
+  if (isNaN(d.getTime())) return s;
+  return d.toLocaleDateString('es-MX', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'America/Monterrey' });
+}
+
 function slugBase(eventoId) {
   return String(eventoId || '').split('#')[0].trim();
 }
@@ -156,7 +168,7 @@ function cuerpoHtml(filas, hoyISO) {
       </td>
       <td style="padding:7px 10px;border-bottom:1px solid rgba(255,255,255,.12);font-size:13px;color:#fff">${escapeHtml(f.quien)}</td>
       <td style="padding:7px 10px;border-bottom:1px solid rgba(255,255,255,.12);font-size:12px;color:rgba(255,255,255,.75)">
-        ${escapeHtml(f.evento_nombre)}${f.evento_ds ? `<br><span style="font-size:11px;color:#e8ff4c">${escapeHtml(f.evento_ds)} · ${f.dias_para_evento === 0 ? 'HOY' : f.dias_para_evento === 1 ? 'mañana' : `en ${f.dias_para_evento} días`}</span>` : ''}
+        ${escapeHtml(f.evento_nombre)}${f.evento_ds ? `<br><span style="font-size:11px;color:#e8ff4c">${escapeHtml(fmtFecha(f.evento_ds))} · ${f.dias_para_evento === 0 ? 'HOY' : f.dias_para_evento === 1 ? 'mañana' : `en ${f.dias_para_evento} días`}</span>` : ''}
       </td>
       <td style="padding:7px 10px;border-bottom:1px solid rgba(255,255,255,.12);font-size:13px;text-align:right;color:${(f.dias_fuera || 0) >= 7 ? '#ff283b' : '#e8ff4c'};font-weight:700">
         ${f.dias_fuera == null ? '—' : `${f.dias_fuera} d`}
@@ -169,7 +181,7 @@ function cuerpoHtml(filas, hoyISO) {
   </div>
   <div style="padding:22px">
     <p style="font-size:14px;line-height:1.6;margin:0 0 16px 0">
-      Corrida del ${escapeHtml(hoyISO)}. Estas piezas <b>retornables</b> salieron de la bodega y todavía
+      Corrida del ${escapeHtml(fmtFecha(hoyISO))}. Estas piezas <b>retornables</b> salieron de la bodega y todavía
       no regresan, y su evento arranca en 48 horas o menos.
     </p>
     <table style="border-collapse:collapse;width:100%">

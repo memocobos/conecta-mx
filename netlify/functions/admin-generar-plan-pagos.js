@@ -358,6 +358,18 @@ exports.handler = async (event) => {
 
 // ----- helpers -----
 
+// "2026-04-20" → "20 de abril de 2026". Si no parsea, devuelve el original.
+// Copiado TAL CUAL de admin-avisar-posposicion (revisado y aprobado): ancla a
+// mediodía y huso explícito. Sin el mediodía, un runtime en huso negativo
+// correría la fecha un día; sin el timeZone, la correría el servidor.
+function fmtFecha(ds) {
+  if (!ds) return '';
+  const s = String(ds).slice(0, 10);
+  const d = new Date(s + 'T12:00:00');
+  if (isNaN(d.getTime())) return s;
+  return d.toLocaleDateString('es-MX', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'America/Monterrey' });
+}
+
 function readEnv() {
   const PORTAL_SB_URL     = process.env.PORTAL_SUPABASE_URL;
   const PORTAL_SB_SERVICE = process.env.PORTAL_SUPABASE_SERVICE_KEY;
@@ -406,7 +418,7 @@ function planHtml(nombre, eventoNombre, pagos, grupoNota) {
   const filas = rows.map((p) => {
     const abono = escapeHtml(p.concepto || ('Abono ' + p.numero_pago));
     const monto = escapeHtml(fmtMxn(p.monto));
-    const fecha = escapeHtml(String(p.fecha_esperada || '').slice(0, 10));
+    const fecha = escapeHtml(fmtFecha(p.fecha_esperada));
     return `<tr>
       <td style="padding:8px 10px;border-bottom:1px solid rgba(255,255,255,.1)">${abono}</td>
       <td style="padding:8px 10px;border-bottom:1px solid rgba(255,255,255,.1);text-align:right;white-space:nowrap">${monto}</td>

@@ -160,6 +160,38 @@ _Última revisión: 28-jul-2026 (series PP, PG, E1 y KH cerradas)._
   rebanada en "la siguiente declaración" es frágil: si la tuerca metió código en
   medio, la comparación falla sin que la función haya cambiado. Cortar por
   **balance de llaves**.
+- **La base de mentira miente de un modo que la de verdad no puede.** Un mock
+  que no comparte reglas de FILTRO y de ESTADO con la base real no simplifica:
+  falsifica, y hacia el lado peligroso — hace que funciones sanas parezcan
+  rotas. Once veces en un solo inventario de correos. Las cuatro formas:
+  (1) **ignora los filtros al leer** — devolver la tabla entera a `?id=eq.X`
+  hace que quien pide una fila reciba la primera (`admin-lugar-baja` pidió el
+  lugar 2, recibió el 1 y contestó "la baja del titular es la cancelación");
+  (2) **escribe de más** — si el PATCH solo entiende `id=eq.` y la función
+  filtra por `lugar_id`, la escritura cae sobre todas las filas. **Lectura y
+  escritura comparten el MISMO filtro, o no comparten nada**;
+  (3) **no tiene estado** — muchas funciones escriben y luego RELEEN para
+  decidir; con filas inmutables la rama que manda el correo no se alcanza
+  jamás; (4) **inventa nombres** — `stock` por `cantidad`, `fecha_limite` por
+  `fecha_esperada`, `unidades_transporte` por `transporte_unidades`, `accion`
+  por `tipo_accion`. Y los **valores centinela cuentan como nombre**:
+  `monto_pagado: 0` donde el código espera `null` cambia el resultado
+  (`(p.monto_pagado == null) ? monto : monto_pagado` cuenta cero en vez de la
+  cuota entera). Antes de declarar que una función "no manda correo", el
+  fixture se carea contra el código que lo consume: nombres de tabla, de
+  columna, valores válidos y centinelas **leídos, no recordados**.
+- **Los montos se leen del HTML impreso, no de las variables propias.** Un
+  careo que compara el fixture consigo mismo siempre cuadra. Para verificar
+  dinero en un correo: extraer los montos del HTML que salió y compararlos
+  contra la suma de las filas de la tabla, centavo por centavo. Ese careo del
+  total caza lo que el caso de una sola persona no ve — si un dedup se comiera
+  a alguien entero, los montos individuales cuadrarían y el total no (así se
+  cazó GR-11: $7,650 impresos contra $8,500 en la tabla). Con candado: ambos
+  lados > 0, para que el careo no pase sobre arreglos vacíos.
+- **Un render que no se regeneró no prueba nada.** Antes de creerle a un
+  archivo de salida, mirar su hora: si es de antes del cambio, está midiendo el
+  pasado. Y si hay dos renderizadores, verificar cuál corrió — el de la tanda 1
+  y el corregido tienen fixtures distintos.
 - **Un arnés de tuerca YA MERGEADA debe leer sus archivos DEL COMMIT DE SU
   MERGE, no del árbol vivo.** Si lee el árbol, la siguiente tuerca de la serie
   lo revienta sin tener la culpa. Pasó con 4 arneses de golpe en KH-4.

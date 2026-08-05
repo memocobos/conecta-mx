@@ -83,7 +83,10 @@ body{margin:0;background:var(--c-bg);color:var(--c-ink);font-family:'Montserrat'
   50%{background:#ff283b;box-shadow:0 0 14px rgba(255,40,59,.9)}}
 
 /* ═══ LOS RODILLOS ══════════════════════════════════════════════════════ */
-.rodillos{display:grid;grid-template-columns:1.15fr 1.15fr .7fr;gap:8px;
+/* El apellido lleva SIEMPRE más texto que el nombre —en México suelen ser dos—
+   así que se lleva más columna. Con las tres iguales, el rodillo del apellido
+   era el único que tocaba el piso de tamaño y se recortaba. */
+.rodillos{display:grid;grid-template-columns:1.2fr 1.2fr .6fr;gap:6px;
   background:#000;border-radius:12px;padding:8px;
   border:1px solid rgba(255,255,255,.09);
   box-shadow:inset 0 3px 14px rgba(0,0,0,.9)}
@@ -878,6 +881,35 @@ body{margin:0;background:var(--c-bg);color:var(--c-ink);font-family:'Montserrat'
   var LARGO = 30;                 // casillas por rodillo
   var reducido = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
+  // Un apellido largo pide 183px en una ventana de 110: con overflow:hidden se
+  // corta con puntos suspensivos, y eso en la casilla del ganador se ve como
+  // un error. Se encoge el texto para que quepa ENTERO.
+  //
+  // De un solo paso: el factor sale de la razón entre lo que mide y lo que
+  // cabe, no probando tamaños uno por uno — son ~100 casillas y esto corre
+  // justo antes de girar.
+  var TAM_MIN = 10;
+  function ajustarTexto(tira){
+    var divs = tira.querySelectorAll('div');
+    for (var i = 0; i < divs.length; i++){
+      var d = divs[i];
+      d.style.fontSize = '';
+      if (d.scrollWidth <= d.clientWidth + 1) continue;
+      var base = parseFloat(getComputedStyle(d).fontSize) || 20;
+      // El primer tanteo sale de la razón; después se COMPRUEBA y se baja de
+      // uno en uno hasta que quepa. Un solo cálculo no basta: la razón entre
+      // scrollWidth y clientWidth no es lineal con el tamaño de letra y dejaba
+      // casillas 4% por fuera, que es justo lo que se ve como texto cortado.
+      var tam = Math.max(TAM_MIN, Math.floor(base * (d.clientWidth / d.scrollWidth)));
+      d.style.fontSize = tam + 'px';
+      var vueltas = 0;
+      while (d.scrollWidth > d.clientWidth + 1 && tam > TAM_MIN && vueltas < 14){
+        tam--; vueltas++;
+        d.style.fontSize = tam + 'px';
+      }
+    }
+  }
+
   function altoCasilla(){
     var d = document.querySelector('#tira-0 div');
     return d ? d.getBoundingClientRect().height : 50;
@@ -940,6 +972,7 @@ body{margin:0;background:var(--c-bg);color:var(--c-ink);font-family:'Montserrat'
     el.classList.remove('frenado');
     var t = tiraDe(fuente, ganador, esFolio);
     tira.innerHTML = t.html;
+    ajustarTexto(tira);
     var alto = altoCasilla();
     var total = t.idx * alto;   // hasta el GANADOR, no hasta el final de la cinta
     // El centrado. Sin esto la casilla ganadora frena pegada al borde de
@@ -979,12 +1012,20 @@ body{margin:0;background:var(--c-bg);color:var(--c-ink);font-family:'Montserrat'
     requestAnimationFrame(cuadro);
   }
 
-  // Parte el nombre igual que el servidor: primera palabra / el resto.
+  // CALCA del partirNombre del servidor: dos apellidos al final, con las dos
+  // excepciones que salieron del padrón real (dos palabras, y partículas).
+  // Si los dos no parten igual, el rodillo del apellido gira con valores que
+  // nunca contienen al ganador.
+  var PARTICULAS = /^(de|del|la|las|los|y|da|di)$/i;
   function partir(completo){
-    var partes = String(completo || '').trim().split(/\s+/).filter(Boolean);
-    if (!partes.length) return { nombre: '—', apellido: '' };
-    if (partes.length === 1) return { nombre: partes[0], apellido: '' };
-    return { nombre: partes[0], apellido: partes.slice(1).join(' ') };
+    var p = String(completo || '').trim().split(/\s+/).filter(Boolean);
+    if (!p.length) return { nombre: '—', apellido: '' };
+    if (p.length === 1) return { nombre: p[0], apellido: '' };
+    if (p.length === 2) return { nombre: p[0], apellido: p[1] };
+    var corte = p.length - 2;
+    if (corte > 1 && PARTICULAS.test(p[corte])) corte--;
+    while (corte > 1 && PARTICULAS.test(p[corte - 1])) corte--;
+    return { nombre: p.slice(0, corte).join(' '), apellido: p.slice(corte).join(' ') };
   }
 
   // En reposo los rodillos NO se dejan vacíos: una tragamonedas apagada sigue
@@ -1008,6 +1049,7 @@ body{margin:0;background:var(--c-bg);color:var(--c-ink);font-family:'Montserrat'
              + esc(fuente[k % fuente.length]) + '</div>';
       }
       tira.innerHTML = html;
+      ajustarTexto(tira);
       var d = tira.querySelector('div');
       var alto = d ? d.getBoundingClientRect().height : 50;
       tira.style.transform = 'translateY(' + ((el.clientHeight / 2) - (alto / 2) - 2 * alto) + 'px)';
@@ -1132,10 +1174,29 @@ body{margin:0;background:var(--c-bg);color:var(--c-ink);font-family:'Montserrat'
   }
   puertaRegistro();
 
+  // Los nombres de los rodillos se piden APARTE de la consulta de cada 4s:
+  // esa solo pregunta si ya hubo giro. Pedir los 72 nombres cada 4 segundos
+  // significa leer las 72 filas de la base 900 veces por hora por visitante,
+  // justo cuando más gente está mirando. Se piden al cargar y, si acaso, una
+  // vez por minuto — un padrón que crece de a poco no necesita más.
+  var RODILLOS_CADA_MS = 60000;
+  var rodillosAl = 0;
+  function tocaPedirRodillos(){
+    return !(estado && estado.rodillos) || (Date.now() - rodillosAl) > RODILLOS_CADA_MS;
+  }
+
   function refrescar(){
-    return api('giveaway-estado', { method: 'GET' }).then(function(res){
+    // Girando NO se piden: la lista ya está en memoria y el giro no puede
+    // quedarse esperando una consulta.
+    var conRodillos = !girando && tocaPedirRodillos();
+    return api('giveaway-estado' + (conRodillos ? '?rodillos=1' : ''), { method: 'GET' }).then(function(res){
       if (!res.j || res.j.ok !== true) return;
+      // La respuesta sin rodillos NO trae la lista: se conserva la que ya
+      // teníamos en vez de dejarla en undefined y vaciar la máquina.
+      var rodillosPrevios = (estado && estado.rodillos) || null;
       estado = res.j;
+      if (res.j.rodillos) rodillosAl = Date.now();
+      else if (rodillosPrevios) estado.rodillos = rodillosPrevios;
       if (res.j.ahora) desfaseMs = Date.parse(res.j.ahora) - Date.now();
       puertaRegistro();
       contarHasta(res.j.total);

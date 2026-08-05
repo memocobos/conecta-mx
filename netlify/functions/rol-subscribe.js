@@ -230,6 +230,93 @@ exports.handler = async function (event) {
 
   if (!pagos.length) return bad(400, "Ningún pago válido");
 
+  // ═══════════════════════════════════════════════════════════════════════
+  // [GR-10] EL PRECIO SALE DEL SERVIDOR, NO DEL NAVEGADOR.
+  //
+  // Antes: `precio: Math.round(Number(data.precio) || 0)`. Sin compuerta y con
+  // un `|| 0` que convierte cualquier ausencia en cero silencioso. Si el
+  // cliente lo omitía, al CLIENTE le llegaba su plan de pagos con el precio
+  // del viaje en $0.
+  //
+  // Y ese cero es peor que un `undefined`: un undefined se ve roto y nadie se
+  // lo cree; un $0 se ve como oferta.
+  //
+  // Se deriva con _lib/precio-zona —la misma autoridad de GR-5 y GR-8b— usando
+  // evento_id/paquete/zona, que las cinco compuertas de arriba ya validaron.
+  //
+  // num_personas: 1 y sin hotel_nombre: /rol cotiza POR PERSONA en habitación
+  // compartida. Medido contra el catálogo: el precio por persona es invariante
+  // al número de viajeros (x1, x2 y x4 dan lo mismo); lo único que lo mueve es
+  // un cuarto privado.
+  //
+  // ⚠️ LÍMITE CONOCIDO: el payload de /rol NO manda la habitación, así que el
+  // servidor no puede ver el suplemento de un cuarto privado. Si el cliente
+  // manda un precio MAYOR al derivado, se conserva el suyo y se grita en la
+  // bitácora: sellar el más bajo cobraría de menos, que es el riesgo opuesto al
+  // que GR-5 vino a cerrar. Si el suyo es MENOR o falta, manda el derivado.
+  let _precioSellado = { estado: "no_evaluado" };
+  const _precioCliente = (data.precio != null && data.precio !== "")
+    ? Math.round(Number(data.precio)) : null;
+
+  let _rp = null;
+  try { ({ resolverPrecioVenta: _rp } = require("./_lib/precio-zona")); } catch (_) { _rp = null; }
+
+  let precioFinal = null;
+  if (_rp) {
+    let r = null;
+    try {
+      r = await _rp({ evento_id: String(data.evento_id), paquete: String(data.paquete).toLowerCase(),
+        zona: String(data.zona), num_personas: 1, hotel_nombre: undefined, transporte_cost: 0 });
+    } catch (e) { r = null; }
+
+    if (r && r.ok && Number(r.total) > 0) {
+      const derivado = Math.round(Number(r.total));
+      if (_precioCliente != null && _precioCliente > derivado) {
+        precioFinal = _precioCliente;
+        _precioSellado = { estado: "cliente_mayor", derivado, cliente: _precioCliente };
+        console.warn("[GR-10] el cliente manda MÁS que el derivado (¿cuarto privado?): "
+          + JSON.stringify(_precioSellado));
+      } else {
+        precioFinal = derivado;
+        _precioSellado = (_precioCliente === derivado)
+          ? { estado: "coincide", precio: derivado }
+          : { estado: "sellado_por_servidor", derivado, cliente: _precioCliente };
+      }
+    } else {
+      // No se pudo resolver. Hay que separar DOS causas que resolverPrecioVenta
+      // devuelve igual ({ok:false}) y que NO son la misma:
+      //
+      //   · el catálogo NO SE PUDO LEER (Netlify caído) → falla de red, y se
+      //     degrada abajo con lo que mandó el cliente.
+      //   · el catálogo SÍ se leyó y la combinación no está → el plan apunta a
+      //     algo que no se vende, y eso sí se rechaza.
+      //
+      // La sonda es la misma de GR-8b: fetchCatalogo() devuelve null solo
+      // cuando no pudo leer. Es best-effort y cacheada, así que no cuesta.
+      let _catLegible = false;
+      try {
+        const { fetchCatalogo } = require("./_lib/catalogo-index");
+        _catLegible = !!(await fetchCatalogo());
+      } catch (_) { _catLegible = false; }
+
+      if (_catLegible) {
+        return bad(400, `No pudimos calcular el precio de "${String(data.zona)}" para ese evento. `
+          + `Refresca la página y vuelve a generar tu plan.`);
+      }
+      // catálogo ilegible → cae al fail-soft de abajo
+    }
+  }
+
+  if (precioFinal == null) {
+    // Catálogo ILEGIBLE (o sin la lib): fail-soft como GR-8b, pero NUNCA a cero.
+    if (_precioCliente == null || !(_precioCliente > 0)) {
+      return bad(503, "No pudimos confirmar el precio en este momento. Intenta de nuevo en un minuto.");
+    }
+    precioFinal = _precioCliente;
+    _precioSellado = { estado: "catalogo_ilegible", cliente: _precioCliente };
+    console.warn("[GR-10] catálogo ilegible, se usa el precio del cliente:", _precioCliente);
+  }
+
   const row = {
     email,
     nombre,
@@ -237,7 +324,9 @@ exports.handler = async function (event) {
     evento_nombre: String(data.evento_nombre || data.evento_id).slice(0, 200),
     paquete:       String(data.paquete).slice(0, 30),
     zona:          String(data.zona).slice(0, 120),
-    precio:        Math.round(Number(data.precio) || 0),
+    // [GR-10] Ya no es `Number(data.precio) || 0`: viene resuelto arriba y
+    // nunca puede ser cero — si no se pudo resolver, la petición ya se rechazó.
+    precio:        precioFinal,
     separo_fecha:  data.separo_fecha,
     separo_monto:  Math.round(Number(data.separo_monto) || 0),
     pagos,

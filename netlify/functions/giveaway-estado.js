@@ -30,11 +30,23 @@ const COLS_PUBLICAS = 'id,intento,resultado,ganador_nombre,total_participantes,c
 // El orden alfabético hace el trabajo de un shuffle SIN aleatoriedad: nada de
 // Math.random en este archivo, para que el candado de "el navegador no escoge"
 // siga siendo trivial de auditar.
+// En México los apellidos son DOS y van al final. Se toman los dos últimos
+// como apellido y todo lo anterior como nombre:
+//   "María de los Angeles Izaguirre Cruz" → "María de los Angeles" / "Izaguirre Cruz"
+//   "José de Jesús Hernández González"    → "José de Jesús" / "Hernández González"
+//   "Ana Martínez Cobos"                  → "Ana" / "Martínez Cobos"
+// Tomar las dos PRIMERAS como nombre —lo que intenté antes— parte los nombres
+// con partícula: dejaba "María de" / "los Angeles Izaguirre Cruz". Lo delató el
+// padrón real, no un ejemplo inventado.
+// El servidor y la página parten IGUAL: si difieren, el rodillo del apellido
+// gira con valores que nunca contienen al ganador.
 function partirNombre(completo) {
   const partes = String(completo || '').trim().split(/\s+/).filter(Boolean);
   if (!partes.length) return null;
   if (partes.length === 1) return { nombre: partes[0], apellido: '' };
-  return { nombre: partes[0], apellido: partes.slice(1).join(' ') };
+  const nApe = partes.length >= 3 ? 2 : 1;
+  return { nombre: partes.slice(0, partes.length - nApe).join(' '),
+           apellido: partes.slice(partes.length - nApe).join(' ') };
 }
 
 exports.handler = async (event) => {
@@ -48,15 +60,27 @@ exports.handler = async (event) => {
   const falta = G.faltaEnv();
   if (falta) return G.json(500, headers, { ok: false, error: falta });
 
+  // ── ?rodillos=1 ────────────────────────────────────────────────────────
+  // La lista de nombres NO viaja en cada consulta. La página pregunta cada 4
+  // segundos para ver si ya hubo giro; mandarle los 72 nombres cada vez
+  // significa leer las 72 filas de la base 900 veces por hora POR VISITANTE, y
+  // justo en el momento en que más gente está mirando. Los nombres se piden
+  // aparte: una vez al cargar y, cuando mucho, una vez por minuto.
+  const q = (event && event.queryStringParameters) || {};
+  const quiereRodillos = String(q.rodillos || '') === '1';
+
   const slugQ = encodeURIComponent(G.SLUG);
   let registros = [], sorteos = [];
   try {
     const [rr, rs] = await Promise.all([
-      // `nombre` entra al select para poder alimentar los rodillos. Ni
+      // `nombre` entra al select SOLO cuando se piden los rodillos. Ni
       // `whatsapp` ni `correo` se nombran: la whitelist sigue siendo explícita.
-      // El orden de registro define el FOLIO (el 1º en inscribirse es el #1).
+      // El orden de registro define el FOLIO (el 1º en inscribirse es el #1),
+      // y se necesita el orden aunque no se pidan nombres para poder ubicar al
+      // ganador.
       fetch(`${G.SB_URL}/rest/v1/giveaway_registros?slug=eq.${slugQ}`
-        + `&select=id,nombre&order=creado_at.asc`, { headers: G.sbHeaders() }),
+        + `&select=id${quiereRodillos ? ',nombre' : ''}&order=creado_at.asc`,
+        { headers: G.sbHeaders() }),
       fetch(`${G.SB_URL}/rest/v1/giveaway_sorteos?slug=eq.${slugQ}&select=${COLS_PUBLICAS}&order=intento.asc`,
         { headers: G.sbHeaders() }),
     ]);
@@ -89,7 +113,8 @@ exports.handler = async (event) => {
   // Las dos listas de los rodillos, cada una ordenada por su cuenta: quien lea
   // la respuesta ve los nombres y los apellidos inscritos, pero no puede
   // reconstruir quién es quién.
-  const partidos = filas.map(r => partirNombre(r && r.nombre)).filter(Boolean);
+  const partidos = quiereRodillos
+    ? filas.map(r => partirNombre(r && r.nombre)).filter(Boolean) : [];
   const nombresRodillo   = [...new Set(partidos.map(p => p.nombre).filter(Boolean))].sort();
   const apellidosRodillo = [...new Set(partidos.map(p => p.apellido).filter(Boolean))].sort();
 
@@ -104,7 +129,10 @@ exports.handler = async (event) => {
     ok: true,
     total: filas.length,
     // Para los rodillos. Listas SEPARADAS y ordenadas: nunca el padrón.
-    rodillos: { nombres: nombresRodillo, apellidos: apellidosRodillo, folios: filas.length },
+    // Solo cuando se piden con ?rodillos=1.
+    rodillos: quiereRodillos
+      ? { nombres: nombresRodillo, apellidos: apellidosRodillo, folios: filas.length }
+      : undefined,
     // `ahora` viaja para que la página no dependa del reloj del visitante:
     // el contador de 10 minutos y el rótulo de "repetición" se calculan contra
     // ESTE instante, no contra el del celular de quien mira.

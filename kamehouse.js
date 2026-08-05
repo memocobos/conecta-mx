@@ -8666,8 +8666,66 @@ async function mostrarRegistroInvitado(token) {
         </select>
       </div>
       <button class="login-btn" id="reg-btn" onclick="completarRegistro('${usuario.id}','${token}')">Crear mi cuenta →</button>
-      <div id="reg-error" style="color:var(--red);font-size:13px;text-align:center;min-height:20px;margin-top:8px"></div>
+      <!-- [GR-12] role=alert: el que no ve la pantalla tampoco veía el aviso. -->
+      <div id="reg-error" role="alert" aria-live="assertive" style="color:var(--red);font-size:13px;text-align:center;min-height:20px;margin-top:8px"></div>
     </div>`;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// [GR-12] EL AVISO DEL REGISTRO SE ESCONDÍA DE QUIEN LO NECESITA.
+// `#reg-error` se pinta DEBAJO del botón, al fondo de una tarjeta de diez
+// campos. Reproducido con el token real de Milk en móvil (390×844): el mensaje
+// caía en y≈867 con 692 de viewport — fuera de pantalla, sin scroll ni marca.
+// El usuario picaba "Crear mi cuenta" y veía que NO PASABA NADA.
+// Cada `return` de validación ya sabía cuál campo falló; solo no lo decía.
+// Esta es la pantalla por la que entra todo el equipo, así que el aviso ahora
+// se trae a la vista y el campo culpable se marca y se enfoca.
+// ═══════════════════════════════════════════════════════════════
+function _regReducido() {
+  try { return window.matchMedia('(prefers-reduced-motion:reduce)').matches; }
+  catch (e) { return false; }
+}
+
+function _regLimpiarCulpable() {
+  document.querySelectorAll('.reg-culpable').forEach(el => {
+    el.classList.remove('reg-culpable');
+    el.removeAttribute('aria-invalid');
+  });
+}
+
+// Devuelve false SIEMPRE: cada validación es `return _regFalla(msg, campoId)`,
+// así ningún return puede olvidarse de marcar el campo.
+// campoId null = error del servidor, que no apunta a ningún campo.
+function _regFalla(msg, campoId) {
+  const errEl = document.getElementById('reg-error');
+  if (errEl) errEl.textContent = msg;
+
+  _regLimpiarCulpable();
+  const campo = campoId ? document.getElementById(campoId) : null;
+  if (campo) {
+    campo.classList.add('reg-culpable');
+    campo.setAttribute('aria-invalid', 'true');
+    // preventScroll: enfocar arrastra el scroll por su cuenta, y ese arrastre
+    // se llevaría de pantalla justo el aviso que vamos a centrar abajo.
+    try { campo.focus({ preventScroll: true }); } catch (e) { campo.focus(); }
+    // Al corregir, el rojo se va solo: dejarlo puesto convierte la marca en
+    // ruido y el siguiente error ya no se distingue.
+    const limpiar = () => {
+      campo.classList.remove('reg-culpable');
+      campo.removeAttribute('aria-invalid');
+    };
+    campo.addEventListener('input',  limpiar, { once: true });
+    campo.addEventListener('change', limpiar, { once: true });
+  }
+
+  // El aviso se mueve AL FINAL, en el frame siguiente: si un navegador ignora
+  // preventScroll (Safari viejo) y arrastra el scroll al enfocar, este scroll
+  // corre después y gana. El mensaje es lo último que se posiciona.
+  if (errEl) requestAnimationFrame(() => {
+    try { errEl.scrollIntoView({ block: 'center', behavior: _regReducido() ? 'auto' : 'smooth' }); }
+    catch (e) { errEl.scrollIntoView(); }
+  });
+  return false;
 }
 
 async function completarRegistro(userId, token) {
@@ -8675,27 +8733,27 @@ async function completarRegistro(userId, token) {
   const username = (document.getElementById('reg-username').value || '').trim().toLowerCase().replace(/\s+/g,'');
   const pass     = document.getElementById('reg-pass').value;
   const pass2    = document.getElementById('reg-pass2').value;
-  const errEl    = document.getElementById('reg-error');
   const btn      = document.getElementById('reg-btn');
 
-  if (!nombre)    { errEl.textContent = 'El nombre es obligatorio'; return; }
-  if (!username)  { errEl.textContent = 'Elige un nombre de usuario'; return; }
+  // [GR-12] cada return nombra su campo culpable — ver _regFalla.
+  if (!nombre)    { _regFalla('El nombre es obligatorio', 'reg-nombre'); return; }
+  if (!username)  { _regFalla('Elige un nombre de usuario', 'reg-username'); return; }
   // 🔐 CAP2-2: espejo del mínimo del servidor (8). Si el cliente pidiera 6, el
   // usuario teclearía una de 7 y recibiría un error crudo del backend en vez de
   // este aviso amable.
-  if (pass.length < 8) { errEl.textContent = 'La contraseña debe tener mínimo 8 caracteres'; return; }
-  if (pass !== pass2)  { errEl.textContent = 'Las contraseñas no coinciden'; return; }
+  if (pass.length < 8) { _regFalla('La contraseña debe tener mínimo 8 caracteres', 'reg-pass'); return; }
+  if (pass !== pass2)  { _regFalla('Las contraseñas no coinciden', 'reg-pass2'); return; }
   // [EQ-7] Los datos de seguridad son OBLIGATORIOS. Espejo del candado del
   // servidor: si solo estuviera allá, el aviso llegaría crudo y hasta el final.
   const fnac  = (document.getElementById('reg-fnac').value || '').trim();
   const emNom = (document.getElementById('reg-em-nombre').value || '').trim();
   const emTel = (document.getElementById('reg-em-tel').value || '').trim();
-  if (!fnac) { errEl.textContent = 'Falta tu fecha de nacimiento'; return; }
-  if (!emNom) { errEl.textContent = 'Falta el nombre de tu contacto de emergencia'; return; }
-  if (emTel.replace(/\D/g, '').length < 10) { errEl.textContent = 'El teléfono de emergencia va a 10 dígitos'; return; }
+  if (!fnac) { _regFalla('Falta tu fecha de nacimiento', 'reg-fnac'); return; }
+  if (!emNom) { _regFalla('Falta el nombre de tu contacto de emergencia', 'reg-em-nombre'); return; }
+  if (emTel.replace(/\D/g, '').length < 10) { _regFalla('El teléfono de emergencia va a 10 dígitos', 'reg-em-tel'); return; }
   const emPar = (document.getElementById('reg-em-par').value || '').trim();
-  if (!emPar) { errEl.textContent = '¿Qué es tuyo esa persona? (mamá, esposo, hermana…)'; return; }
-  if (fnac >= _mxFechaStr()) { errEl.textContent = 'Revisa tu fecha de nacimiento'; return; }
+  if (!emPar) { _regFalla('¿Qué es tuyo esa persona? (mamá, esposo, hermana…)', 'reg-em-par'); return; }
+  if (fnac >= _mxFechaStr()) { _regFalla('Revisa tu fecha de nacimiento', 'reg-fnac'); return; }
 
   btn.textContent = 'Creando cuenta…'; btn.disabled = true;
 
@@ -8712,7 +8770,8 @@ async function completarRegistro(userId, token) {
       parentesco_emergencia: emPar,
     });
     if (!res.ok) {
-      errEl.textContent = res.error || 'Error al crear la cuenta';
+      // Sin campo culpable: el servidor manda el motivo, no el renglón.
+      _regFalla(res.error || 'Error al crear la cuenta', null);
       btn.textContent = 'Crear mi cuenta →'; btn.disabled = false;
       return;
     }
@@ -8721,7 +8780,7 @@ async function completarRegistro(userId, token) {
     window.history.replaceState({}, '', window.location.pathname);
     enterApp();
   } catch(e) {
-    errEl.textContent = e.message || 'Error al crear la cuenta';
+    _regFalla(e.message || 'Error al crear la cuenta', null);
     btn.textContent = 'Crear mi cuenta →'; btn.disabled = false;
   }
 }

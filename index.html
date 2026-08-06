@@ -2824,6 +2824,20 @@ var PROMOS={
   // las 8:00 PM de Reynosa. Con -06:00 moriría a las 7:00 PM de Reynosa, una
   // hora antes de lo prometido en el correo.
   'MELANIE': {pct:30, expiresTs:Date.parse('2026-08-05T20:00:00-05:00'), maxUsos:9999, usos:0, desc:'30% de descuento con código MELANIE', onlyEvent:'melanie', excludePkg:['ride']},
+  // [AIT-1] PROMO DE PAREJA — el primer código de tipo `segundoPax`.
+  // La persona 1 paga su paquete completo; la 2 paga lo que diga este mapa,
+  // FIJO y sin importar la zona: $2,000 en PLUS y $0 en CHEAP (o sea, 2x1 de
+  // boletos). STAY y RIDE quedan fuera por decisión de Memo — el 2x1 es de
+  // boletos, RIDE no lleva boleto y STAY no entra.
+  // `exactPersonas:2` es la regla dura: con 1, 3 o 4+ el código se rechaza con
+  // su motivo. Se comprueba al aplicar Y en cada cálculo, porque el número de
+  // viajeros se puede mover después.
+  // SIN expiresTs A PROPÓSITO: lo retira MEMO cuando lo decida. Si alguien ve
+  // que "le falta" la fecha y se la inventa, mata la promo antes de tiempo —
+  // no es un olvido, es el trato.
+  // `customMsg` porque el aviso de éxito arma "<desc> aplicado", y con este
+  // desc salía "…y $0 en CHEAP aplicado". El cliente lee esa línea.
+  'AITANA': {segundoPax:{plus:2000, cheap:0}, exactPersonas:2, maxUsos:9999, usos:0, desc:'Promo de pareja: la segunda persona paga $2,000 en PLUS y $0 en CHEAP', customMsg:'Promo de pareja aplicada — la 2ª persona paga $2,000 en PLUS o $0 en CHEAP', onlyEvent:'aitana', excludePkg:['ride','stay']},
 };
 var _promoActivo=null;
 
@@ -2863,7 +2877,19 @@ function validarPromo(code){
   } else if(!p.allEvents){
     if(cur&&!cur.promo)return {ok:false,msg:'Este código no aplica para este evento'};
   }
+  // [AIT-1] PROMOS DE GRUPO EXACTO (pareja, trío…). Se comprueba aquí y OTRA VEZ
+  // en calcular(), porque el número de viajeros se puede cambiar DESPUÉS de
+  // aplicar el código: esconder no es impedir, y aquí es dinero.
+  if(p.exactPersonas&&selViaj!==p.exactPersonas){
+    return {ok:false,msg:c+' aplica solo para viajes de '+p.exactPersonas+' personas'};
+  }
   if(p.excludePkg&&selPkg&&p.excludePkg.indexOf(selPkg)>=0){
+    return {ok:false,msg:'Código no aplicable al paquete '+selPkg.toUpperCase()};
+  }
+  // [AIT-1] Un `segundoPax` que no cubre el paquete elegido no aplica. Sin esto,
+  // un paquete fuera del mapa caería al descuento cero y el código diría "sí"
+  // sin mover un peso — peor que decir "no".
+  if(p.segundoPax&&selPkg&&p.segundoPax[selPkg]===undefined){
     return {ok:false,msg:'Código no aplicable al paquete '+selPkg.toUpperCase()};
   }
   if(p.onlyZones&&p.onlyZones.length){
@@ -2878,7 +2904,7 @@ function validarPromo(code){
       return {ok:false,msg:'El código '+c+' no aplica en la zona '+selZ.n+'. Disponible en otras zonas de '+_evn+'.'};
     }
   }
-  return {ok:true,pct:p.pct||0,pctCheap:p.pctCheap||0,amount:p.amount||0,desc:p.desc,customMsg:p.customMsg||null,code:c,excludePkg:p.excludePkg||null,onlyZones:p.onlyZones||null,excludeZones:p.excludeZones||null,hideAmount:p.hideAmount||false};
+  return {ok:true,pct:p.pct||0,pctCheap:p.pctCheap||0,amount:p.amount||0,desc:p.desc,customMsg:p.customMsg||null,code:c,excludePkg:p.excludePkg||null,onlyZones:p.onlyZones||null,excludeZones:p.excludeZones||null,hideAmount:p.hideAmount||false,segundoPax:p.segundoPax||null,exactPersonas:p.exactPersonas||0};
 }
 var PC_EVENTS=["Justin Bieber", "Bad Bunny", "Sabrina Carpenter", "U2", "Festival Trópico", "Bahidora 2027", "Coldplay", "The Rolling Stones", "Tool", "Slipknot", "Luis Miguel", "Metallica", "Feid / Ferxxo", "Evanescence", "Marilyn Manson"];
 
@@ -5017,6 +5043,26 @@ function calcular(){
   total+=transportCost*selViaj;
   costoXPersona+=transportCost;
 
+  // ═══════════════════════════════════════════════════════════════════════
+  // EL SEPARO IGNORA LAS PROMOS **A PROPÓSITO** — SELLADO POR MEMO (5-ago-2026).
+  //
+  // Este bloque corre ANTES del bloque de promo y NO se recalcula después; lo
+  // único que se rehace con el descuento es `resto`. Vale para TODOS los tipos
+  // de código, parejo: `pct`, `amount` y `segundoPax`.
+  //
+  // Razón de negocio: el descuento le pega al SALDO, no al enganche. Un
+  // apartado más firme le conviene a la casa, y está medido que el separo nunca
+  // rebasa el total ya con promo.
+  //
+  // NO es un olvido ni un hueco: si alguien "arregla" esto moviendo el cálculo
+  // debajo del bloque de promo, le baja el enganche a TODOS los códigos que ya
+  // existen de un plumazo.
+  //
+  // ÚNICO escenario que ameritaría re-abrirlo: que una promo VIVA cruce la
+  // frontera de los 15 días, donde el separo deja de ser plano y pasa a ser el
+  // 50% del precio (y ahí sí, del precio SIN promo). Hoy no existe: aitana es
+  // 28-oct y su separo es plano.
+  // ═══════════════════════════════════════════════════════════════════════
   if(selPkg==='cheap'){
     var cheapSep=cur.sepCheap!==undefined?cur.sepCheap:1000;
     // Separo especial por zona en CHEAP (ej. Box Oro = $4,000): si la cheapZona
@@ -5055,10 +5101,29 @@ function calcular(){
   // (.big-pago), nunca al #d-result completo que arrastra el plan de pagos.
   var promoCard=document.getElementById('w-promo-card');if(promoCard)promoCard.style.display='block';
   var shareBtn=document.getElementById('btn-share');if(shareBtn)shareBtn.style.display='block';
+  // [AIT-1] EL NÚMERO DE VIAJEROS SE PUEDE CAMBIAR DESPUÉS DE APLICAR EL CÓDIGO.
+  // Va PRIMERO que los demás candados: si alguien aplica la promo de pareja con
+  // 2 y luego se mueve a 3, lo que dejó de cumplirse es el tamaño del grupo, y
+  // ése es el motivo que hay que decirle. Sin esto, la promo se quedaba puesta
+  // y le regalaba a un tercero el precio de la segunda persona.
+  if(_promoActivo&&_promoActivo.exactPersonas&&selViaj!==_promoActivo.exactPersonas){
+    var _pcod=_promoActivo.code, _pexn=_promoActivo.exactPersonas;
+    _promoActivo=null;
+    var pmsg0=document.getElementById('promo-msg');
+    if(pmsg0){pmsg0.style.color='#ff283b';pmsg0.textContent='✗ '+_pcod+' aplica solo para viajes de '+_pexn+' personas';}
+  }
   if(_promoActivo&&_promoActivo.excludePkg&&_promoActivo.excludePkg.indexOf(selPkg)>=0){
     _promoActivo=null;
     var pmsg=document.getElementById('promo-msg');
     if(pmsg){pmsg.style.color='#ff283b';pmsg.textContent='✗ Código no aplicable al paquete '+selPkg.toUpperCase();}
+  }
+  // [AIT-1] Espejo del candado de validarPromo: paquete fuera del mapa de
+  // segundoPax = no aplica. Si faltara, cambiar de paquete con la promo puesta
+  // la dejaría viva sobre un paquete que no tiene precio de segunda persona.
+  if(_promoActivo&&_promoActivo.segundoPax&&_promoActivo.segundoPax[selPkg]===undefined){
+    _promoActivo=null;
+    var pmsgS=document.getElementById('promo-msg');
+    if(pmsgS){pmsgS.style.color='#ff283b';pmsgS.textContent='✗ Código no aplicable al paquete '+selPkg.toUpperCase();}
   }
   if(_promoActivo&&_promoActivo.onlyZones&&(!selZ||_promoActivo.onlyZones.indexOf(selZ.n)<0)){
     _promoActivo=null;
@@ -5073,8 +5138,28 @@ function calcular(){
       if(pmsg3){pmsg3.style.color='#ff283b';pmsg3.textContent='✗ El código no aplica en la zona '+selZ.n;}
     }
   }
+  // [AIT-1] ¿La promo activa es de "segunda persona a precio fijo"? Se recuerda
+  // para el rótulo de abajo: con esta promo las dos personas NO pagan lo mismo,
+  // así que decir "por viajero" sobre una cifra que solo paga una sería mentir
+  // con dinero. Se reinicia en cada corrida de calcular().
+  var _promoSegundoPax=false;
   if(_promoActivo){
-    if(_promoActivo.amount){
+    if(_promoActivo.segundoPax&&_promoActivo.segundoPax[selPkg]!==undefined){
+      // LA REGLA: la persona 1 paga su paquete completo (costoXPersona, que ya
+      // trae zona + hotel + transporte) y la persona 2 paga una cifra FIJA que
+      // no depende de la zona. Genérico a propósito: el mapa es paquete→precio
+      // de la segunda persona, así que el siguiente 2x1 solo agrega su entrada
+      // (cheap:0 ES un 2x1; plus:2000 es "la segunda a dos mil").
+      // Se escribe el TOTAL directo en vez de restar un descuento: restar
+      // obligaría a calcular el descuento a partir del total, y ahí es donde se
+      // cuelan los pesos perdidos por redondeo.
+      var _seg=Number(_promoActivo.segundoPax[selPkg])||0;
+      total=costoXPersona+_seg;
+      // El "por viajero" pasa a ser el PROMEDIO, para que el cuadro cuadre:
+      // 2 personas × lo que se muestra tiene que dar el total que se cobra.
+      costoXPersona=Math.round(total/selViaj);
+      _promoSegundoPax=true;
+    } else if(_promoActivo.amount){
       costoXPersona=Math.max(0,costoXPersona-_promoActivo.amount);
       total=Math.max(0,total-_promoActivo.amount*selViaj);
     } else if(_promoActivo.pct||_promoActivo.pctCheap){
@@ -5086,7 +5171,9 @@ function calcular(){
     resto=total-sepActualCalc;
   }
   $$('r-q').textContent=fmt(costoXPersona);
-  $$('r-np').textContent='por viajero';
+  // [AIT-1] Con la promo de pareja las dos personas pagan distinto: el rótulo
+  // dice PROMEDIO para no vender como "por viajero" una cifra que nadie paga.
+  $$('r-np').textContent=_promoSegundoPax?'promedio por viajero':'por viajero';
   $$('r-pkg-lbl').textContent={plus:'PLUS — Todo incluido',ride:cur.noHotel?'RIDE — Sin hotel':'RIDE — Sin boleto',stay:'STAY — Sin transporte',cheap:'CHEAP — Solo boleto'}[selPkg];
   actualizarBankInfo();
   actualizarIncluye();
@@ -5178,7 +5265,16 @@ function buildCotizacionMsg(quincenas,pagoQ){
   else if(selH) msg+='\n🏨 *Habitación:* '+selH.n+' (incluida)';
   if(selTransporte&&selTransporte.cost>0) msg+='\n🚌 *Transporte:* '+selTransporte.n+' (+'+fmt(selTransporte.cost)+'/persona)';
   msg+='\n\n💰 *Costo por persona:* '+fmt(costoXPersona);
-  if(_promoActivo) msg+='\n🏷️ *Código aplicado:* '+_promoActivo.code+(_promoActivo.hideAmount?'':(_promoActivo.amount?' (-'+fmt(_promoActivo.amount)+'/persona)':' (-'+_promoActivo.pct+'%)'));
+  // [AIT-1] El tipo "segunda persona a precio fijo" no tiene pct ni amount: sin
+  // esta rama el mensaje al vendedor salía con "(-0%)" — un descuento de cero
+  // sobre una promo que sí descuenta, escrito en el WhatsApp del cliente.
+  if(_promoActivo) msg+='\n🏷️ *Código aplicado:* '+_promoActivo.code+(
+    _promoActivo.hideAmount?'':
+    (_promoActivo.segundoPax&&_promoActivo.segundoPax[selPkg]!==undefined
+      ? (Number(_promoActivo.segundoPax[selPkg])>0
+          ? ' (2ª persona '+fmt(Number(_promoActivo.segundoPax[selPkg]))+')'
+          : ' (2x1 — 2ª persona gratis)')
+      : (_promoActivo.amount?' (-'+fmt(_promoActivo.amount)+'/persona)':' (-'+_promoActivo.pct+'%)')));
   if(selViaj>1) msg+='\n💵 *Total del grupo:* '+fmt(total);
   msg+='\n💳 *Separo hoy:* '+fmt(sepActualCalc);
   msg+='\n💸 *Resto a cubrir:* '+fmt(resto);
@@ -5577,6 +5673,18 @@ function skipOnboarding(){
     + '<span class="pf-bar-cta">Ver desglose</span>';
   document.body.appendChild(barra);
   var valEl=document.getElementById('pf-bar-val');
+  var lblEl=barra.querySelector('.pf-bar-lbl');
+  // [AIT-1] El rótulo de la barra también espeja el del cuadro (#r-np) en vez
+  // de estar escrito a mano. Con la promo de pareja las dos personas pagan
+  // distinto y #r-q pasa a ser un PROMEDIO: la barra decía "Total por persona"
+  // sobre una cifra que nadie paga, y es el número más visible de la pantalla.
+  // Sin promo devuelve exactamente el texto de siempre.
+  function _pfRotulo(){
+    if(!lblEl)return;
+    var np=document.getElementById('r-np');
+    var t=np?String(np.textContent||'').trim():'';
+    lblEl.textContent=/promedio/i.test(t)?'Promedio por viajero':'Total por persona';
+  }
 
   var viva=false,timerOcultar=null;
   function mostrarBarra(){
@@ -5611,7 +5719,7 @@ function skipOnboarding(){
     if(rq.offsetParent===null)return false;
     return /\d/.test(rt.textContent)&&/\d/.test(rq.textContent);
   }
-  function revisar(){ if(hayCotizacion())mostrarBarra(); else ocultarBarra(); }
+  function revisar(){ _pfRotulo(); if(hayCotizacion())mostrarBarra(); else ocultarBarra(); }
 
   // El valor: espejo de #r-q. El count-up es el de PF-1 y cierra con la MISMA
   // cadena que dejó calcular(), así la barra nunca muestra un número inventado.

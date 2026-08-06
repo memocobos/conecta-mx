@@ -2417,6 +2417,44 @@ html, body { background: var(--bg); color: var(--text); padding: 0; }
  .kms-zrow:active{transform:none}
 }
 
+/* ═══ [VJ-2] El segundo mundo de viajeros (KH viajeros_evento) ════════════
+   Aparte del Portal a propósito: dos orígenes con reglas distintas. Sin
+   columna de dinero — la contabilidad de éstos vive en el Excel.            */
+.vj2-h{
+ display:flex;justify-content:space-between;align-items:flex-start;
+ gap:12px;flex-wrap:wrap;margin-bottom:12px;
+ padding-top:16px;border-top:1px solid var(--border);
+}
+.vj2-t{font-family:'Rajdhani',sans-serif;font-weight:700;font-size:16px;color:var(--text)}
+.vj2-d{font-size:11px;color:var(--ts);margin-top:3px;line-height:1.5;max-width:60ch}
+.vj2-cnt{
+ font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.12em;
+ text-transform:uppercase;color:var(--gold);white-space:nowrap;
+}
+/* La tabla se desplaza DENTRO de su caja: el body nunca de lado. */
+.vj2-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.vj2-tabla{width:100%;border-collapse:collapse;min-width:640px}
+.vj2-tabla th{
+ font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.1em;
+ text-transform:uppercase;color:var(--ts);text-align:left;font-weight:700;
+ padding:7px 10px;border-bottom:1px solid var(--border);
+}
+.vj2-tabla td{
+ padding:9px 10px;font-size:12px;color:var(--text);
+ border-bottom:1px solid var(--border);vertical-align:top;
+}
+.vj2-tabla tbody tr:last-child td{border-bottom:0}
+.vj2-tag{
+ display:inline-block;margin-left:6px;padding:1px 6px;border-radius:4px;
+ font-family:'JetBrains Mono',monospace;font-size:8px;letter-spacing:.1em;
+ text-transform:uppercase;font-weight:700;
+ color:var(--gold);background:rgba(232,255,76,.12);border:1px solid rgba(232,255,76,.35);
+}
+.vj2-tag-staff{color:var(--green);background:rgba(136,234,78,.12);border-color:rgba(136,234,78,.35)}
+.vj2-emerg{font-size:10px;color:var(--ts);margin-top:3px}
+.vj2-notas{max-width:32ch}
+.vj2-vacio{color:var(--ts)}
+
 /* ═══ [VJ-1] Capturar datos del viajero desde la alerta ═══════════════════ */
 .vj-btn{white-space:nowrap}
 .vj-fila{

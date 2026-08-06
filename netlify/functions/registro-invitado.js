@@ -201,6 +201,25 @@ exports.handler = async (event) => {
       }
       const urows = await r.json();
       const full = urows[0] || {};
+
+      // [KMS-5] LA ALERTA DE "NUEVO USUARIO" NACE AQUÍ, que es donde de verdad
+      // se registra alguien. Antes la disparaba el navegador en cada carga de
+      // página con sesión viva, y decía el nombre de QUIEN ESTABA MIRANDO —
+      // por eso 51 alertas seguidas decían "Memo Cobos". Aquí el nombre es el
+      // del que acaba de registrarse, por construcción: no hay otro.
+      // Best-effort: si falla, el alta NO se cae por una notificación.
+      try {
+        await fetch(`${env.KH_SB_URL}/rest/v1/sistema_alertas`, {
+          method: 'POST',
+          headers: { ...sbHeaders, Prefer: 'return=minimal' },
+          body: JSON.stringify({
+            tipo: 'nuevo_usuario',
+            mensaje: `Nuevo usuario registrado: ${nombre}${invitado.rol ? ' (' + invitado.rol + ')' : ''}`,
+            leida: false,
+          }),
+        });
+      } catch (_) { /* la notificación no bloquea el registro */ }
+
       // Reproyectar a la whitelist (la PATCH con return=representation trae todo).
       const user = {};
       COLS.split(',').forEach(c => { if (c in full) user[c] = full[c]; });

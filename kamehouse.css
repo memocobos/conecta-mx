@@ -3079,3 +3079,33 @@ input[type="search"],.kh-buscar,.buscador{border-radius:var(--r-sm,8px)}
  color:var(--gold);border:1px solid var(--gold);border-radius:var(--r-card,16px);padding:1px 7px;
 }
 .cap-cuarto-vacio{font-size:12px;color:var(--ts)}
+
+/* ═══ [KMS-5] Alarmas del Palacio — lo que no cuadra ══════════════════════
+   Se llama "alarmas" y NO "radar": el radar de sesiones (.rdr-*) ya existe.  */
+.kms-alm{padding:12px 16px;margin-bottom:14px}
+.kms-alm-h{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:8px}
+.kms-alm-lbl{font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.12em;color:var(--ts)}
+.kms-alm-n{font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.06em;color:var(--ts)}
+.kms-alm-hay{border-color:var(--red)}
+.kms-alm-hay .kms-alm-lbl{color:var(--red)}
+.kms-alm-list{display:flex;flex-direction:column;gap:6px}
+.kms-alm-i{
+ display:flex;align-items:baseline;gap:10px;width:100%;text-align:left;
+ background:var(--bg3);border:1px solid var(--border);border-left-width:3px;
+ border-radius:var(--r-sm,8px);padding:8px 12px;color:var(--text);
+ font:inherit;font-size:13px;cursor:pointer;
+}
+.kms-alm-i:hover{border-color:var(--border2)}
+.kms-alm-roja{border-left-color:var(--red)}
+.kms-alm-ambar{border-left-color:var(--gold)}
+.kms-alm-t{font-weight:700}
+.kms-alm-p{font-size:11px;color:var(--ts);flex:1;min-width:0}
+.kms-alm-ch{color:var(--ts);font-size:15px}
+.kms-alm-ok{display:flex;align-items:center;gap:8px;border-color:rgba(61,220,132,.35)}
+.kms-alm-ico{color:var(--green);font-weight:900}
+.kms-alm-oktxt{font-size:13px;color:var(--green)}
+.kms-alm-parcial{color:var(--ts)}
+@media (max-width:640px){
+ .kms-alm-i{flex-direction:column;gap:2px}
+ .kms-alm-ch{display:none}
+}

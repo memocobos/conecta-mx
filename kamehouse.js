@@ -6384,7 +6384,162 @@ function _kmsPaso(paso) {
 // compras primero, el abonado cuando terminan los abonos) y cada quien pinta
 // lo que tiene.
 let _kmsDatos = null;
-function _kmsTableroLimpiar() { _kmsDatos = null; const c = document.getElementById('kms-tablero'); if (c) c.innerHTML = ''; }
+function _kmsTableroLimpiar() {
+  _kmsDatos = null;
+  const c = document.getElementById('kms-tablero'); if (c) c.innerHTML = '';
+  _kmsAlertasViajero = null;  // [KMS-5] del evento anterior: no sobreviven al cambio
+  const a = document.getElementById('kms-alarmas'); if (a) a.innerHTML = '';
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// [KMS-5] LAS ALARMAS DEL PALACIO — lo que no cuadra, arriba de todo.
+//
+// Memo: "siento que falta un sistema de alarmas: cosas que no cuadren, datos
+// faltantes, etc.". El principio es que ninguna de estas líneas se calcula con
+// datos nuevos: TODAS salen de lo que el tablero ya tiene (`_kmsDatos`) más las
+// alertas de datos faltantes, que se piden con la acción que ya existía.
+//
+// SE LLAMA "ALARMAS" Y NO "RADAR" a propósito: en este archivo ya vive un radar
+// —`khRadar`/`_radarCache`/`.rdr-*`, el de sesiones y seguridad— y dos cosas con
+// el mismo nombre en el mismo archivo es la receta de agarrar la equivocada.
+//
+// Lo que NO se puede saber hoy, y por eso NO se inventa: "compras de hoy sin
+// abono si el proveedor exige pago". La tabla `proveedores` tiene tres columnas
+// —id, nombre, created_at— y ninguna dice si exige pago inmediato. Pintarlo
+// sería adivinar quién cobra al contado.
+// ═══════════════════════════════════════════════════════════════════════════
+
+let _kmsAlertasViajero = null;  // alertas datos_viajero del evento (null = aún no llegan)
+
+// PURO: recibe el tablero y las alertas, devuelve la lista de hallazgos. Sin
+// DOM, sin fetch — para que el arnés pueda interrogarlo directo.
+function _kmsAlarmasCalc(d, alertas) {
+  const out = [];
+  if (!d) return out;
+
+  (d.zonas || []).forEach((z) => {
+    // El semáforo no llegó para esta zona: no sabemos nada de ella. Callar es
+    // correcto; inventar un cero sería afirmar que no hay nada raro.
+    if (z.fuera == null && z.disponibles == null) return;
+
+    // (1) Vendiste lo que no has comprado. Ojo: esta zona SOLO aparece desde el
+    // arreglo del semáforo de esta misma tuerca — antes ni siquiera existía.
+    if ((z.fuera || 0) > 0 && !(z.compradas > 0)) {
+      out.push({
+        clase: 'roja', tipo: 'zona_sin_compra', zona: z.zona,
+        txt: `${z.zona}: vendiste ${z.fuera} que no has comprado`,
+        pista: 'hay ventas fuera del sistema y cero boletos comprados en esta zona',
+      });
+      return; // no se acusa dos veces a la misma zona por lo mismo
+    }
+    // (2) Sobreventa de verdad: compraste, y aun así debes más de lo que tienes.
+    if (z.disponibles != null && z.disponibles < 0 && z.compradas > 0) {
+      out.push({
+        clase: 'roja', tipo: 'sobreventa', zona: z.zona,
+        txt: `${z.zona}: sobreventa de ${Math.abs(z.disponibles)}`,
+        pista: `${z.compradas} compradas y ${z.compradas - z.disponibles} comprometidas`,
+      });
+    }
+  });
+
+  // (3) Saldo con proveedores. SOLO cuando los abonos ya llegaron: antes, un
+  // saldo calculado con abonado=0 acusaría de deber todo a quien ya pagó.
+  if (d.abonado != null && d.provs) {
+    Object.keys(d.provs).forEach((pid) => {
+      const p = d.provs[pid] || {};
+      const abonado = (d.abonadoProv && d.abonadoProv[pid]) || 0;
+      const saldo = (Number(p.deuda) || 0) - abonado;
+      if (saldo > 0.5) {  // centavos de redondeo no son una deuda
+        out.push({
+          clase: 'ambar', tipo: 'saldo_proveedor', pid,
+          txt: `Le debes ${_kamMoney(saldo)} a ${p.nombre || '—'}`,
+          pista: abonado > 0 ? `de ${_kamMoney(p.deuda)}, ya abonaste ${_kamMoney(abonado)}` : 'sin ningún abono todavía',
+        });
+      }
+    });
+  }
+
+  // (4) Viajeros con datos faltantes (las alertas datos_viajero de ESTE evento).
+  (alertas || []).forEach((a) => {
+    out.push({
+      clase: 'ambar', tipo: 'datos_viajero', id: a.id,
+      txt: `Faltan datos de ${(a.ref && a.ref.nombre) || 'un viajero'}`,
+      pista: 'sin correo ni celular no se le puede mandar nada',
+    });
+  });
+
+  return out;
+}
+
+function _kmsAlarmasPintar() {
+  const cont = document.getElementById('kms-alarmas');
+  if (!cont) return;
+  if (!_kmsDatos) { cont.innerHTML = ''; return; }
+  const items = _kmsAlarmasCalc(_kmsDatos, _kmsAlertasViajero);
+
+  // Sin hallazgos NO se deja el hueco vacío: un panel en blanco se lee como
+  // "todavía no reviso", que es justo lo contrario de lo que pasó.
+  if (!items.length) {
+    const esperando = (_kmsDatos.abonado == null) || (_kmsAlertasViajero == null);
+    cont.innerHTML = `<div class="card kms-alm kms-alm-ok">
+      <span class="kms-alm-ico" aria-hidden="true">✓</span>
+      <span class="kms-alm-oktxt">Todo cuadra${esperando ? ' <span class="kms-alm-parcial">— falta terminar de revisar</span>' : ''}</span>
+    </div>`;
+    return;
+  }
+
+  const rojas = items.filter((i) => i.clase === 'roja').length;
+  const linea = (i) => {
+    const acc = i.tipo === 'zona_sin_compra' || i.tipo === 'sobreventa'
+      ? `_kmsIrAZona('${_attrJs(i.zona)}')`
+      : (i.tipo === 'saldo_proveedor' ? '_kmsIrAAbonos()' : `_kmsIrAViajero('${_attrJs(i.id)}')`);
+    return `<button type="button" class="kms-alm-i kms-alm-${i.clase}" onclick="${acc}"
+        title="Ir a donde se resuelve">
+      <span class="kms-alm-t">${_esfEsc(i.txt)}</span>
+      <span class="kms-alm-p">${_esfEsc(i.pista)}</span>
+      <span class="kms-alm-ch" aria-hidden="true">›</span>
+    </button>`;
+  };
+
+  cont.innerHTML = `<div class="card kms-alm ${rojas ? 'kms-alm-hay' : ''}">
+    <div class="kms-alm-h">
+      <span class="kms-alm-lbl">// NO CUADRA</span>
+      <span class="kms-alm-n">${items.length} ${items.length === 1 ? 'cosa' : 'cosas'}${rojas ? ` · ${rojas} urgente${rojas === 1 ? '' : 's'}` : ''}</span>
+    </div>
+    <div class="kms-alm-list">${items.map(linea).join('')}</div>
+  </div>`;
+}
+
+// Llevar al lugar donde se resuelve (patrón de [alertas clickeables]).
+function _kmsIrAAbonos() {
+  _kmsPaso('compras');
+  const el = document.getElementById('kam-abonos');
+  if (el) el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+}
+
+// El viajero se captura con el MISMO modal de VJ-1. No se duplica: se alimenta
+// su caché con las alertas que ya trajimos y se le pasa el id.
+function _kmsIrAViajero(alertaId) {
+  const a = (_kmsAlertasViajero || []).find((x) => String(x.id) === String(alertaId));
+  if (!a) return;
+  _vjAlertasCache = (_vjAlertasCache || []).concat(
+    (_vjAlertasCache || []).some((x) => String(x.id) === String(a.id)) ? [] : [a]
+  );
+  _vjAbrir(alertaId);
+}
+
+// Las alertas de datos faltantes DE ESTE EVENTO. Acción que ya existía
+// (sistema_alertas_listar); fails-soft: si truena, las otras alarmas siguen.
+async function _kmsAlertasViajeroLoad(evId) {
+  try {
+    const todas = await khCoordi.alertasListar();   // [sec-sensibles]
+    _kmsAlertasViajero = (todas || []).filter((a) =>
+      a && a.tipo === 'datos_viajero' && !a.leida && _vjAccionable(a) && a.ref.evento_id === evId);
+  } catch (e) {
+    _kmsAlertasViajero = [];   // [] = "revisado, no hay"; null = "no sé todavía"
+  }
+  _kmsAlarmasPintar();
+}
 
 // ═══════════════════════════════════════════════════════════════════════════
 // [KMS-2] MINI-WIZARD DE COMPRA — ver el efecto ANTES de guardar.
@@ -6719,6 +6874,11 @@ function _kmsTableroPintar(parcial) {
       <tbody>${filas || '<tr><td colspan="5" class="kms-z-cero">Sin compras registradas</td></tr>'}</tbody>
     </table></div>
   </div>`;
+
+  // [KMS-5] Las alarmas salen de lo MISMO que acaba de pintarse. Se repinta en
+  // los dos tiempos porque el saldo de proveedores solo existe cuando llegan
+  // los abonos.
+  _kmsAlarmasPintar();
 }
 
 async function _kamProveedoresLoad() {
@@ -7199,6 +7359,13 @@ async function _kamComprasLoad() {
     const zonaNames = [];
     zonasEV.forEach((z) => { const n = (z && z.n != null) ? String(z.n) : ''; if (n && !zonaNames.includes(n)) zonaNames.push(n); });
     compras.forEach((c) => { const n = String(c.zona || ''); if (n && !zonaNames.includes(n)) zonaNames.push(n); });
+    // [KMS-5] …y las zonas que SOLO tiene el semáforo (las que tienen ajuste y
+    // ninguna compra). Arreglar el endpoint no bastaba: si la zona no está en
+    // el catálogo del evento ni en las compras, esta lista la dejaba fuera y el
+    // número seguía sin verse. En melanie la Barrera SÍ estaba en el catálogo —
+    // por eso el síntoma fue un "—" y no una fila ausente— pero una zona
+    // inventada al vuelo en un ajuste no tendría dónde aparecer.
+    Object.keys(semMap).forEach((n) => { if (n && !zonaNames.includes(n)) zonaNames.push(n); });
 
     _kamZonasMap = {};
     let totalEvento = 0;
@@ -7319,6 +7486,9 @@ async function _kamComprasLoad() {
     cont.innerHTML = lista + zonaWrap + '<div id="kam-compras-alert" style="margin-top:10px"></div>';
     _kmsZonasVolver();
     _kamAbonosLoad(evId, deudaPorProveedor);
+    // [KMS-5] Las alertas de datos faltantes, en paralelo y fails-soft: si
+    // tardan o truenan, el resto de las alarmas ya se pintó.
+    _kmsAlertasViajeroLoad(evId);
   } catch (e) {
     cont.innerHTML = `<div class="alert alert-error">${_esfEsc(e.message)}</div>`;
   }
@@ -21253,8 +21423,20 @@ if (_inviteToken) {
   mostrarRegistroInvitado(_inviteToken);
 } else if (checkSession()) {
   enterApp();
-  // Alerta primer login
-  if (currentUser && !currentUser.perfil_completo) { enviarAlertaMemo('nuevo_usuario', { nombre: currentUser.nombre, rol: currentUser.rol }); }
+  // [KMS-5] AQUÍ VIVÍA LA ALERTA DE "NUEVO USUARIO", y estaba mal por dos lados.
+  //
+  // Decía el nombre de `currentUser` — o sea, de QUIEN ESTÁ MIRANDO, no de
+  // ningún registrado. Y su condición nunca podía ser falsa: `auth-login` NO
+  // devuelve `perfil_completo`, así que en el cliente siempre es `undefined` y
+  // `!undefined` es true. Resultado: una alerta por CADA carga de página con
+  // sesión viva. 51 en la tabla, todas sin leer, y las 14 de la madrugada del
+  // 6-ago son recargas de Memo — la de "Lesly Gutierrez Medellin" de las 02:59
+  // tampoco fue un registro: es su propio login (ultimo_acceso 02:59:01, alerta
+  // 02:59:56, y su perfil_completo en la base dice true).
+  //
+  // La alerta de verdad ahora nace en registro-invitado.js, que es el único
+  // lugar donde alguien se registra — ahí el nombre del nuevo es el único que
+  // hay, y suena UNA vez porque el registro ocurre una vez.
 }
 
 // ═══════════════════════════════════════════════════════════════════════════

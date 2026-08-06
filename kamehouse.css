@@ -2384,6 +2384,39 @@ html, body { background: var(--bg); color: var(--text); padding: 0; }
 .kms-prev-v b{color:var(--text);font-weight:700}
 .kms-prev-btns{display:flex;gap:8px;justify-content:flex-end;margin-top:12px;flex-wrap:wrap}
 
+/* ═══ [KMS-3] Elegir zona sin buscarla ════════════════════════════════════
+   Memo: "está muy larga la lista para buscar cada boleto". Lista clickeable
+   con lo justo para decidir, buscador cuando de verdad estorba, y las filas
+   del tablero llevan a su zona.                                              */
+.kms-zbusca{width:100%;margin-bottom:10px}
+.kms-zlista{display:flex;flex-direction:column;gap:6px}
+.kms-zrow{
+ display:flex;align-items:center;gap:10px;width:100%;text-align:left;cursor:pointer;
+ padding:10px 12px;
+ background:var(--bg2);border:1px solid var(--border);border-radius:var(--r-sm,8px);
+ color:var(--text);font-family:inherit;
+ /* Solo transform/opacity por frame — la regla de animación de la casa. */
+ transition:opacity .16s ease,transform .16s ease;
+}
+.kms-zrow:hover{opacity:.85}
+.kms-zrow:active{transform:scale(.995)}
+.kms-zrow:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+.kms-zrow-n{font-family:'Rajdhani',sans-serif;font-weight:700;font-size:15px;flex:1;min-width:0}
+.kms-zrow-d{display:flex;gap:10px;flex-wrap:wrap;align-items:baseline;font-size:11px;color:var(--ts)}
+.kms-zrow-disp{font-weight:700;color:var(--green)}
+.kms-zrow-neg{color:var(--red)}
+.kms-zrow-deu{font-family:'JetBrains Mono',monospace;font-size:10px}
+.kms-zrow-ch{color:var(--ts);font-size:16px;flex:0 0 auto}
+.kms-zvolver{margin-bottom:12px}
+/* Filas del tablero que llevan a su zona. */
+.kms-z-clic{cursor:pointer;transition:opacity .16s ease}
+.kms-z-clic:hover{opacity:.75}
+.kms-z-clic:focus-visible{outline:2px solid var(--gold);outline-offset:-2px}
+@media (prefers-reduced-motion:reduce){
+ .kms-zrow,.kms-z-clic{transition:none}
+ .kms-zrow:active{transform:none}
+}
+
 /* Campo señalado por la validación previa (patrón de GR-12). Va DESPUÉS de
    cualquier :focus de .cot-input: misma especificidad, gana la última, y el
    campo culpable siempre está enfocado. */

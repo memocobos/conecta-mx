@@ -6408,6 +6408,73 @@ function _kmsReducido() {
   try { return window.matchMedia('(prefers-reduced-motion:reduce)').matches; } catch (_) { return false; }
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// [KMS-3] ELEGIR ZONA SIN BUSCARLA
+//
+// Lista clickeable + buscador + filas del tablero clickeables. Todo client-side:
+// las zonas ya están pintadas, esto solo decide cuál se mira.
+//
+// EL ÍNDICE `zi` ES SAGRADO. El preview (KMS-2), la captura (_kamCompraCrear) y
+// el ajuste de "vendidos fuera" llavean por `kam-c-*-{zi}` y `_kamZonasMap[zi]`.
+// Por eso el filtro solo ESCONDE filas y jamás re-numera, y todo lo que entra
+// desde fuera —el tablero— resuelve el índice POR NOMBRE contra _kamZonasMap.
+// Es la mordida de renderZonas vs buildZonaButtons: agarrar "la primera que
+// aparece" es una moneda al aire, y aquí la moneda decide en qué zona se guarda
+// una compra.
+// ═══════════════════════════════════════════════════════════════════════════
+function _kmsZona(zi) {
+  const panel = document.getElementById('kam-z-panel-' + zi);
+  if (!panel) return;
+  const lista = document.getElementById('kms-lista-wrap');
+  const wrap = document.getElementById('kms-zona-wrap');
+  if (lista) lista.style.display = 'none';
+  if (wrap) wrap.style.display = '';
+  document.querySelectorAll('#kms-zona-wrap .kms-zpanel').forEach((p) => { p.style.display = 'none'; });
+  panel.style.display = '';
+  try { panel.scrollIntoView({ block: 'nearest', behavior: _kmsReducido() ? 'auto' : 'smooth' }); } catch (_) {}
+}
+
+function _kmsZonasVolver() {
+  const lista = document.getElementById('kms-lista-wrap');
+  const wrap = document.getElementById('kms-zona-wrap');
+  if (wrap) wrap.style.display = 'none';
+  if (lista) lista.style.display = '';
+  document.querySelectorAll('#kms-zona-wrap .kms-zpanel').forEach((p) => { p.style.display = 'none'; });
+}
+
+// Filtra la lista pintada. Cero red: compara contra el data-zona que ya viaja
+// en cada fila. Sin resultados NO deja la pantalla en blanco: lo dice.
+function _kmsZonaFiltrar() {
+  // `_kmNorm` es el normalizador de la casa (minúsculas + sin acentos), el
+  // mismo que usan los otros buscadores del Palacio: buscar "balcon" encuentra
+  // "Balcón". Se reusa en vez de repetir el regex de combinantes — dos copias
+  // de una normalización acaban divergiendo.
+  const q = _kmNorm(String((document.getElementById('kms-zbusca') || {}).value || '').trim());
+  let vivas = 0;
+  document.querySelectorAll('#kms-zlista .kms-zrow').forEach((r) => {
+    const n = String(r.dataset.zona || '');   // ya viene normalizado del render
+    const ok = !q || n.includes(q);
+    r.style.display = ok ? '' : 'none';
+    if (ok) vivas++;
+  });
+  const v = document.getElementById('kms-zvacio');
+  if (v) v.style.display = vivas === 0 ? '' : 'none';
+}
+
+// Entrada desde el TABLERO: llega un NOMBRE de zona y se resuelve su índice.
+// Por nombre y no por posición — el orden del tablero y el de la lista salen de
+// la misma fuente hoy, pero "hoy" no es una garantía sobre la que se guarde
+// dinero.
+function _kmsIrAZona(zona) {
+  _kmsPaso('compras');
+  const m = _kamZonasMap || {};
+  const zi = Object.keys(m).find((k) => m[k] === zona);
+  if (zi == null) return;
+  const b = document.getElementById('kms-zbusca');
+  if (b && b.value) { b.value = ''; _kmsZonaFiltrar(); }   // el filtro no debe esconder a la que vienes a ver
+  _kmsZona(zi);
+}
+
 // Confirmar = la MISMA llamada de siempre. _kamCompraCrear ya recarga todo al
 // terminar, y con ello el tablero de arriba.
 //
@@ -6460,7 +6527,13 @@ function _kmsTableroPintar(parcial) {
   const filas = d.zonas.map((z) => {
     const prom = z.compradas > 0 ? (z.inversion / z.compradas) : 0;
     const dispCls = (z.disponibles == null) ? 'kms-z-cero' : (z.disponibles < 0 ? 'kms-z-neg' : '');
-    return `<tr>
+    // [KMS-3] La fila lleva a su zona en el paso ②. Se manda el NOMBRE, no el
+    // índice: quien resuelve el índice es _kmsIrAZona contra _kamZonasMap.
+    // tabindex + Enter para que también se llegue con el teclado.
+    return `<tr class="kms-z-clic" tabindex="0" role="button"
+        title="Ver y capturar compras de ${_esfEsc(z.zona)}"
+        onclick="_kmsIrAZona('${_attrJs(z.zona)}')"
+        onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();_kmsIrAZona('${_attrJs(z.zona)}')}">
       <td class="kms-z-nom">${_esfEsc(z.zona)}</td>
       <td>${z.compradas || 0}</td>
       <td>${z.compradas > 0 ? _kamMoney(prom) : '<span class="kms-z-cero">—</span>'}</td>
@@ -6912,6 +6985,14 @@ async function _kamComprasLoad() {
     _kamZonasMap = {};
     let totalEvento = 0;
     let html = '';
+    // [KMS-3] Dos piezas: la LISTA clickeable (para elegir sin scroll) y los
+    // PANELES de cada zona (historial + captura), todos pintados pero ocultos.
+    // Se pintan todos a propósito en vez de generar el de la zona elegida al
+    // vuelo: así los ids `kam-c-*-{zi}` existen desde el principio y ni el
+    // preview de KMS-2 ni _kamCompraCrear ni _kamAjusteGuardar se enteran del
+    // cambio. El índice zi NUNCA se recalcula al filtrar — el buscador solo
+    // esconde filas, jamás re-numera.
+    let listaHtml = '';
     zonaNames.forEach((zona, zi) => {
       _kamZonasMap[zi] = zona;
       const cz = compras.filter((c) => String(c.zona) === zona);
@@ -6932,7 +7013,21 @@ async function _kamComprasLoad() {
           }).join('')
         : '<tr><td colspan="5" style="padding:6px 4px;font-size:12px;color:var(--ts)">Sin compras en esta zona</td></tr>';
       const provOpts = _kamProvCache.map((p) => `<option value="${_esfEsc(p.id)}">${_esfEsc(p.nombre)}</option>`).join('');
-      html += `<div style="border:1px solid var(--border);border-radius:var(--r-sm,8px);padding:12px;margin-bottom:12px">
+
+      // [KMS-3] Fila de la lista: lo justo para decidir de un vistazo.
+      // `data-zona` lleva el NOMBRE en minúsculas para que el buscador filtre
+      // sin volver a leer el DOM pintado, y `data-zi` el índice canónico.
+      listaHtml += `<button type="button" class="kms-zrow" data-zi="${zi}" data-zona="${_esfEsc(_kmNorm(zona))}" onclick="_kmsZona(${zi})">
+        <span class="kms-zrow-n">${_esfEsc(zona)}</span>
+        <span class="kms-zrow-d">
+          <span class="kms-zrow-c">${stock} compradas</span>
+          ${sem ? `<span class="kms-zrow-disp ${sem.disponibles < 0 ? 'kms-zrow-neg' : ''}">${sem.disponibles} disp.</span>` : ''}
+          ${deuda > 0 ? `<span class="kms-zrow-deu">${_kamMoney(deuda)}</span>` : ''}
+        </span>
+        <span class="kms-zrow-ch" aria-hidden="true">›</span>
+      </button>`;
+
+      html += `<div class="kms-zpanel" id="kam-z-panel-${zi}" style="display:none;border:1px solid var(--border);border-radius:var(--r-sm,8px);padding:12px;margin-bottom:12px">
         <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:8px">
           <div style="font-family:'Rajdhani',sans-serif;font-weight:700;font-size:15px">${_esfEsc(zona)}</div>
           <div style="font-size:12px;color:var(--ts)">Deuda: <b style="color:var(--fg)">${_kamMoney(deuda)}</b></div>
@@ -6973,10 +7068,34 @@ async function _kamComprasLoad() {
         };
       }),
     });
-    html += `<div style="text-align:right;font-size:14px;font-weight:700;margin-top:4px">Deuda del evento: ${_kamMoney(totalEvento)}</div>`;
-    html += '<div id="kam-compras-alert" style="margin-top:10px"></div>';
-    html += '<div id="kam-abonos" style="margin-top:16px"></div>';
-    cont.innerHTML = html;
+    // [KMS-3] MODO LISTA (el evento) y MODO ZONA (una sola zona).
+    // Memo: "está muy larga la lista para buscar cada boleto". Antes se pintaban
+    // TODAS las zonas apiladas con su historial y su formulario, y encontrar la
+    // que querías era puro scroll.
+    // El buscador solo aparece cuando de verdad estorba la lista: con cuatro
+    // zonas un campo de búsqueda es ruido, no ayuda.
+    const buscador = zonaNames.length >= 6
+      ? `<input class="cot-input kms-zbusca" id="kms-zbusca" type="search" placeholder="Buscar zona…" autocomplete="off" oninput="_kmsZonaFiltrar()" aria-label="Buscar zona">`
+      : '';
+    // La deuda del evento y los abonos viven en el MODO LISTA: son del evento,
+    // no de una zona. Al entrar a una zona se ven sus números; para lo del
+    // evento, un clic atrás. No desaparecen.
+    const lista = `<div id="kms-lista-wrap">
+      ${buscador}
+      <div id="kms-zlista" class="kms-zlista">${listaHtml}</div>
+      <div id="kms-zvacio" class="kms-vacio" style="display:none">Ninguna zona se llama así.</div>
+      <div style="text-align:right;font-size:14px;font-weight:700;margin-top:10px">Deuda del evento: ${_kamMoney(totalEvento)}</div>
+      <div id="kam-abonos" style="margin-top:16px"></div>
+    </div>`;
+    const zonaWrap = `<div id="kms-zona-wrap" style="display:none">
+      <button type="button" class="btn btn-ghost btn-sm kms-zvolver" onclick="_kmsZonasVolver()">‹ Todas las zonas</button>
+      ${html}
+    </div>`;
+    // La alerta queda FUERA de los dos modos y siempre montada: _kamCompraCrear
+    // escribe ahí, y KMS-2b decide si el botón revive mirando el DOM. Si la
+    // alerta viviera dentro de un modo, un fallo podría no verse.
+    cont.innerHTML = lista + zonaWrap + '<div id="kam-compras-alert" style="margin-top:10px"></div>';
+    _kmsZonasVolver();
     _kamAbonosLoad(evId, deudaPorProveedor);
   } catch (e) {
     cont.innerHTML = `<div class="alert alert-error">${_esfEsc(e.message)}</div>`;

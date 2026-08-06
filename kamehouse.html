@@ -1418,9 +1418,40 @@
     <div class="page-sub">// inventario de boletos · compras y abonos a proveedores</div>
    </div>
   </div>
-  <div class="card">
-   <div style="font-family:'Rajdhani',sans-serif;font-weight:700;font-size:16px;margin-bottom:4px">Proveedores</div>
-   <div style="font-size:11px;color:var(--ts);margin-bottom:14px">Catálogo de proveedores. Las compras y los abonos elegirán de aquí.</div>
+  <!-- ═══ [KMS-1] MANDO ÚNICO ═══════════════════════════════════════════════
+       Antes cada tarjeta traía su propio selector de evento y Memo elegía el
+       mismo evento TRES veces. Éste manda sobre las cuatro secciones: escribe
+       su valor en los tres selectores originales (que siguen existiendo,
+       ocultos, ver más abajo) y llama a los mismos cargadores de siempre.
+       Se hace así a propósito: las funciones de Comisiones CHEAP (F5a) y
+       Liquidaciones están SELLADAS, y cambiarles de qué elemento leen sería
+       reescribirlas. Espejar el valor las deja byte-idénticas. ═══════════ -->
+  <div class="card kms-mando">
+   <div class="kms-mando-lbl">Evento del Palacio</div>
+   <div class="kms-mando-row">
+    <select id="kms-evt" class="cot-input" onchange="_kmsOnEvento()" aria-label="Evento del Palacio">
+     <option value="">— Elige un evento —</option>
+    </select>
+    <select id="kms-fecha" class="cot-input" onchange="_kmsOnFecha()" style="display:none" aria-label="Fecha del evento"></select>
+   </div>
+   <div class="kms-mando-hint">Gobierna las cuatro secciones de abajo. Elígelo una vez.</div>
+  </div>
+
+  <!-- Tablero económico del evento elegido. Se pinta con datos que las
+       funciones YA traen (admin-compras listar + semáforo + admin-abonos):
+       cero endpoints nuevos, cero llamadas extra. -->
+  <div id="kms-tablero"></div>
+
+  <!-- Los cuatro pasos. La barra dice SIEMPRE dónde estás y qué sigue. -->
+  <nav class="kms-pasos" id="kms-pasos" aria-label="Pasos del Palacio">
+   <button type="button" class="kms-paso" data-paso="prov" onclick="_kmsPaso('prov')" aria-current="true"><span class="kms-paso-n">1</span><span class="kms-paso-t">Proveedores</span></button>
+   <button type="button" class="kms-paso" data-paso="compras" onclick="_kmsPaso('compras')"><span class="kms-paso-n">2</span><span class="kms-paso-t">Compras por zona</span></button>
+   <button type="button" class="kms-paso" data-paso="com" onclick="_kmsPaso('com')"><span class="kms-paso-n">3</span><span class="kms-paso-t">Comisiones CHEAP</span></button>
+   <button type="button" class="kms-paso" data-paso="liq" onclick="_kmsPaso('liq')"><span class="kms-paso-n">4</span><span class="kms-paso-t">Liquidaciones</span></button>
+  </nav>
+
+  <div class="card kms-panel" id="kms-panel-prov">
+   <div class="kms-panel-h"><span class="kms-panel-n">1</span><div><div class="kms-panel-t">Proveedores</div><div class="kms-panel-d">A quién le compras. Se llena una vez y sirve para todos los eventos.</div></div></div>
    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
     <input id="kam-prov-nombre" class="cot-input" placeholder="Nombre del proveedor" maxlength="80" style="flex:1;min-width:180px" onkeydown="if(event.key==='Enter')_kamProveedorCrear()">
     <button class="btn btn-primary" type="button" onclick="_kamProveedorCrear()">Agregar proveedor</button>
@@ -1428,31 +1459,40 @@
    <div id="kam-prov-alert" style="margin-bottom:10px"></div>
    <div id="kam-prov-list"><div class="loading-state"><div class="spinner"></div>Cargando…</div></div>
   </div>
-  <div class="card">
-   <div style="font-family:'Rajdhani',sans-serif;font-weight:700;font-size:16px;margin-bottom:4px">Inventario de boletos</div>
-   <div style="font-size:11px;color:var(--ts);margin-bottom:14px">Elige un evento y registra compras por zona. El stock y la deuda se calculan de las compras.</div>
-   <select id="kam-evt-sel" class="cot-input" style="width:100%;margin-bottom:12px" onchange="_kamComprasLoad()">
+  <div class="card kms-panel" id="kms-panel-compras" style="display:none">
+   <div class="kms-panel-h"><span class="kms-panel-n">2</span><div><div class="kms-panel-t">Compras de boletos por zona</div><div class="kms-panel-d">Cuántos boletos compraste, a qué costo y a quién. Incluye los abonos que le vas pagando al proveedor y los "vendidos fuera del sistema".</div></div></div>
+   <!-- [KMS-1] Selector ORIGINAL, oculto: lo escribe el mando único de arriba.
+        Sigue aquí porque _kamComprasLoad y _kamAjusteGuardar leen su .value —
+        borrarlo obligaría a tocarlas, y esto es una tuerca de UI. -->
+   <select id="kam-evt-sel" class="cot-input" style="display:none" onchange="_kamComprasLoad()">
     <option value="">— Elige un evento —</option>
    </select>
+   <div id="kms-vacio-compras" class="kms-vacio">Elige un evento arriba para ver y capturar sus compras.</div>
    <div id="kam-compras"></div>
   </div>
-  <div class="card">
-   <div style="font-family:'Rajdhani',sans-serif;font-weight:700;font-size:16px;margin-bottom:4px">Comisiones CHEAP (vendedores)</div>
-   <div style="font-size:11px;color:var(--ts);margin-bottom:14px">Elige el evento y ves TODAS sus zonas CHEAP en una tabla: stock, costo de Palacio (tu última compra, automático) y <b>TU GANANCIA</b> — lo único que escribes. El costo del vendedor se suma en vivo y con <b>💾 Guardar todo</b> queda. La matriz guardada <b>no se mueve sola</b>: si tu última compra difiere, la fila te avisa y tú decides. Sin ganancia asignada, la zona NO se vende en CHEAP. El vendedor jamás ve este desglose.</div>
-   <select id="kam-com-evt" class="cot-input" style="width:100%;margin-bottom:10px" onchange="_comOnEvento()">
+  <div class="card kms-panel" id="kms-panel-com" style="display:none">
+   <div class="kms-panel-h"><span class="kms-panel-n">3</span><div><div class="kms-panel-t">Comisiones CHEAP (vendedores)</div><div class="kms-panel-d">Cuánto ganas tú en cada zona CHEAP. Sin ganancia asignada, la zona no se vende.</div></div></div>
+   <div style="font-size:11px;color:var(--ts);margin-bottom:14px">Ves TODAS sus zonas CHEAP en una tabla: stock, costo de Palacio (tu última compra, automático) y <b>TU GANANCIA</b> — lo único que escribes. El costo del vendedor se suma en vivo y con <b>💾 Guardar todo</b> queda. La matriz guardada <b>no se mueve sola</b>: si tu última compra difiere, la fila te avisa y tú decides. Sin ganancia asignada, la zona NO se vende en CHEAP. El vendedor jamás ve este desglose.</div>
+   <!-- [KMS-1] Selectores ORIGINALES, ocultos: los escribe el mando único.
+        `kam-com-fecha` NO se toca ni se le quita el display:none inicial —
+        _comEventoId compone 'slug#idx' leyendo justo ese style.display, así
+        que sigue siendo _comOnEvento quien lo enciende. -->
+   <select id="kam-com-evt" class="cot-input" style="display:none" onchange="_comOnEvento()">
     <option value="">— Elige un evento —</option>
    </select>
    <select id="kam-com-fecha" class="cot-input" style="width:100%;margin-bottom:12px;display:none" onchange="_comLoad()"></select>
+   <div id="kms-vacio-com" class="kms-vacio">Elige un evento arriba para ver sus zonas CHEAP.</div>
    <div id="kam-com-alert" style="margin-bottom:10px"></div>
    <div id="kam-com-body"></div>
   </div>
-  <div class="card">
-   <div style="font-family:'Rajdhani',sans-serif;font-weight:700;font-size:16px;margin-bottom:4px">Liquidaciones de vendedores (30%)</div>
+  <div class="card kms-panel" id="kms-panel-liq" style="display:none">
+   <div class="kms-panel-h"><span class="kms-panel-n">4</span><div><div class="kms-panel-t">Liquidaciones de vendedores (30%)</div><div class="kms-panel-d">Al cerrar el evento: cuánto le toca a cada vendedor y marcarle pagado.</div></div></div>
    <div style="font-size:11px;color:var(--ts);margin-bottom:14px">Cierre <b>MANUAL</b> al terminar el evento. Comisión = <b>30% × (caja real del evento ÷ total de paquetes vendidos en todos los canales) × paquetes PLUS/STAY/RIDE de cada vendedor</b>. La <b>utilidad es la CAJA real</b> (cobrado + ingresos − gastos), la misma del Palacio. Los CHEAP del vendedor quedan <b>fuera</b> (ya pagaron su comisión-separo). Al liquidar, el cálculo se <b>congela</b> (no se recalcula solo si la caja cambia después).</div>
-   <label style="font-size:11px;color:var(--ts)">Evento del catálogo (paquetes, ventas de vendedor y caja real)</label>
-   <select id="kam-liq-evt" class="cot-input" style="width:100%;margin:4px 0 12px" onchange="_liqOnEvento()">
+   <!-- [KMS-1] Selector ORIGINAL, oculto: lo escribe el mando único. -->
+   <select id="kam-liq-evt" class="cot-input" style="display:none" onchange="_liqOnEvento()">
     <option value="">— Elige un evento —</option>
    </select>
+   <div id="kms-vacio-liq" class="kms-vacio">Elige un evento arriba para calcular sus liquidaciones.</div>
    <div id="kam-liq-alert" style="margin-bottom:10px"></div>
    <div id="kam-liq-body"></div>
   </div>

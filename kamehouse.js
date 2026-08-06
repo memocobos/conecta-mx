@@ -6161,9 +6161,181 @@ document.addEventListener('keydown', e => {
 // (admin-compras). loadKamisama() se invoca desde loadPage().
 function loadKamisama() {
   _kamProveedoresLoad();
+  // Los tres populate SIGUEN corriendo: llenan los selectores originales (hoy
+  // ocultos) y un <select> no acepta un .value que no exista entre sus
+  // <option>. Sin ellos, el espejo del mando único no pegaría.
   _kamPopulateEventos();
   _comPopulateEventos();
   _liqPopulateEventos();
+  _kmsPopulate();
+  _kmsPaso(_kmsPasoActivo);
+  _kmsVacios();
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// [KMS-1] EL MANDO ÚNICO DEL PALACIO
+//
+// Memo: "está muy confuso el Palacio de Kamisama". Eran cuatro tarjetas
+// apiladas y TRES selectores de evento — el mismo evento elegido tres veces, y
+// lo económico regado entre tarjetas.
+//
+// Este mando escribe su valor en los tres selectores originales (que siguen en
+// el DOM, ocultos) y llama a los mismos cargadores. NO se cambia de dónde leen
+// las funciones de Comisiones CHEAP (F5a) ni las de Liquidaciones: están
+// SELLADAS, y cambiarles el elemento del que leen sería reescribirlas. Espejar
+// el valor las deja byte-idénticas — el precio es un `select` oculto por
+// sección, que es barato y reversible.
+// ═══════════════════════════════════════════════════════════════════════════
+let _kmsEVCache = [];
+let _kmsPasoActivo = 'prov';
+
+async function _kmsPopulate() {
+  const sel = document.getElementById('kms-evt');
+  if (!sel) return;
+  try {
+    const ev = await _fetchEVFromIndex();
+    _kmsEVCache = Array.isArray(ev) ? ev : [];
+    sel.innerHTML = '<option value="">— Elige un evento —</option>' + _kmsEVCache
+      .filter((e) => e && e.id)
+      .slice()
+      .sort((a, b) => String(a.a || a.id).localeCompare(String(b.a || b.id)))
+      .map((e) => `<option value="${_esfEsc(e.id)}">${_esfEsc(e.a || e.id)}</option>`)
+      .join('');
+  } catch (_) { /* deja el placeholder */ }
+}
+
+// Espejo de _comOnEvento para la lista de fechas: la multifecha se lee del
+// MISMO EV, así que el índice que elige Memo aquí es el mismo que compone
+// 'slug#idx' allá. Si se poblara distinto, el evento_id del Palacio y el del
+// cotizador del vendedor dejarían de coincidir — y eso es dinero.
+function _kmsOnEvento() {
+  const id = (document.getElementById('kms-evt') || {}).value || '';
+  const fsel = document.getElementById('kms-fecha');
+  const ev = _kmsEVCache.find((e) => e && e.id === id);
+  if (fsel) {
+    fsel.innerHTML = '';
+    if (ev && Array.isArray(ev.multifecha) && ev.multifecha.length) {
+      ev.multifecha.forEach((m, i) => {
+        const o = document.createElement('option');
+        o.value = String(i);
+        o.textContent = (m && m.lbl) ? m.lbl : ('Fecha ' + (i + 1));
+        fsel.appendChild(o);
+      });
+      fsel.style.display = '';
+    } else {
+      fsel.style.display = 'none';
+    }
+  }
+  _kmsAplicar();
+}
+
+function _kmsOnFecha() { _kmsAplicar(); }
+
+// Escribe el evento en los tres selectores originales y dispara sus cargadores.
+function _kmsAplicar() {
+  const id = (document.getElementById('kms-evt') || {}).value || '';
+  const fsel = document.getElementById('kms-fecha');
+  const idx = (fsel && fsel.style.display !== 'none' && fsel.value !== '') ? fsel.value : '';
+
+  const poner = (elId, v) => { const e = document.getElementById(elId); if (e) e.value = v; };
+  poner('kam-evt-sel', id);
+  poner('kam-com-evt', id);
+  poner('kam-liq-evt', id);
+
+  _kmsVacios();
+  _kmsTableroLimpiar();
+  if (!id) {
+    // Sin evento: se limpian los cuerpos para que no quede el del anterior.
+    ['kam-compras', 'kam-com-body', 'kam-liq-body'].forEach((k) => { const e = document.getElementById(k); if (e) e.innerHTML = ''; });
+    return;
+  }
+
+  // ② compras (y con ellas el tablero) · ③ comisiones · ④ liquidaciones.
+  _kamComprasLoad();
+  // _comOnEvento arma la lista de fechas de la sección sellada y ya llama a
+  // _comLoad. Después se le espeja el índice: sin esto, un evento multifecha
+  // quedaba siempre en su primera fecha aunque arriba se eligiera otra.
+  _comOnEvento();
+  if (idx !== '') {
+    const cf = document.getElementById('kam-com-fecha');
+    if (cf && cf.style.display !== 'none') { cf.value = idx; _comLoad(); }
+  }
+  _liqOnEvento();
+}
+
+// Estado vacío de cada sección — claro y en su lugar.
+function _kmsVacios() {
+  const hay = !!((document.getElementById('kms-evt') || {}).value);
+  ['compras', 'com', 'liq'].forEach((k) => {
+    const e = document.getElementById('kms-vacio-' + k);
+    if (e) e.style.display = hay ? 'none' : '';
+  });
+}
+
+function _kmsPaso(paso) {
+  _kmsPasoActivo = paso;
+  document.querySelectorAll('#kms-pasos .kms-paso').forEach((b) => {
+    const act = b.dataset.paso === paso;
+    // aria-current es el estado REAL: el CSS pinta desde él, así que lo que se
+    // ve y lo que anuncia un lector de pantalla no pueden divergir.
+    if (act) b.setAttribute('aria-current', 'true'); else b.removeAttribute('aria-current');
+  });
+  ['prov', 'compras', 'com', 'liq'].forEach((k) => {
+    const p = document.getElementById('kms-panel-' + k);
+    if (p) p.style.display = (k === paso) ? '' : 'none';
+  });
+}
+
+// ── Tablero económico ────────────────────────────────────────────────────────
+// Se pinta con lo que _kamComprasLoad y _kamAbonosLoad YA calcularon: cero
+// endpoints nuevos y cero llamadas extra. Por eso llega en dos tiempos (las
+// compras primero, el abonado cuando terminan los abonos) y cada quien pinta
+// lo que tiene.
+let _kmsDatos = null;
+function _kmsTableroLimpiar() { _kmsDatos = null; const c = document.getElementById('kms-tablero'); if (c) c.innerHTML = ''; }
+
+function _kmsTableroPintar(parcial) {
+  const cont = document.getElementById('kms-tablero');
+  if (!cont) return;
+  _kmsDatos = Object.assign({ zonas: [], inversion: 0, abonado: null }, _kmsDatos || {}, parcial || {});
+  const d = _kmsDatos;
+  if (!d.zonas.length && !d.inversion) { cont.innerHTML = ''; return; }
+
+  // "Deuda a proveedores" = inversión − abonado, que es el mismo saldo que ya
+  // muestra la sección de abonos. Mientras los abonos no llegan se dice, en vez
+  // de pintar un cero que se leería como "no debes nada".
+  const abonado = d.abonado;
+  const deuda = (abonado == null) ? null : (d.inversion - abonado);
+
+  const tarjeta = (lbl, val, sub, cls) => `<div class="kms-tab-c ${cls || ''}">
+    <div class="kms-tab-c-lbl">${_esfEsc(lbl)}</div>
+    <div class="kms-tab-c-val">${val}</div>
+    ${sub ? `<div class="kms-tab-c-sub">${_esfEsc(sub)}</div>` : ''}
+  </div>`;
+
+  const filas = d.zonas.map((z) => {
+    const prom = z.compradas > 0 ? (z.inversion / z.compradas) : 0;
+    const dispCls = (z.disponibles == null) ? 'kms-z-cero' : (z.disponibles < 0 ? 'kms-z-neg' : '');
+    return `<tr>
+      <td class="kms-z-nom">${_esfEsc(z.zona)}</td>
+      <td>${z.compradas || 0}</td>
+      <td>${z.compradas > 0 ? _kamMoney(prom) : '<span class="kms-z-cero">—</span>'}</td>
+      <td>${z.fuera == null ? '<span class="kms-z-cero">—</span>' : z.fuera}</td>
+      <td class="${dispCls}">${z.disponibles == null ? '—' : z.disponibles}</td>
+    </tr>`;
+  }).join('');
+
+  cont.innerHTML = `<div class="card kms-tab">
+    <div class="kms-tab-tot">
+      ${tarjeta('Inversión en boletos', _kamMoney(d.inversion), 'lo que costaron las compras')}
+      ${tarjeta('Abonado', abonado == null ? '…' : _kamMoney(abonado), abonado == null ? 'cargando abonos' : 'ya le pagaste a proveedores', 'kms-abonado')}
+      ${tarjeta('Deuda a proveedores', deuda == null ? '…' : _kamMoney(deuda), deuda == null ? 'cargando abonos' : 'inversión − abonado', 'kms-deuda')}
+    </div>
+    <div class="kms-tab-wrap"><table class="kms-tab-z">
+      <thead><tr><th>Zona</th><th>Compradas</th><th>Costo prom.</th><th>Vend. fuera</th><th>Disponible</th></tr></thead>
+      <tbody>${filas || '<tr><td colspan="5" class="kms-z-cero">Sin compras registradas</td></tr>'}</tbody>
+    </table></div>
+  </div>`;
 }
 
 async function _kamProveedoresLoad() {
@@ -6633,6 +6805,24 @@ async function _kamComprasLoad() {
         </div>
       </div>`;
     });
+    // [KMS-1] El tablero de arriba se pinta con lo que ESTA función ya calculó
+    // (compras + semáforo). Ni un endpoint nuevo ni una llamada extra.
+    _kmsTableroPintar({
+      inversion: totalEvento,
+      zonas: zonaNames.map((zona) => {
+        const cz = compras.filter((c) => String(c.zona) === zona);
+        const sem = semMap[String(zona).trim()] || null;
+        return {
+          zona,
+          compradas: cz.reduce((s, c) => s + (parseInt(c.cantidad, 10) || 0), 0),
+          inversion: cz.reduce((s, c) => s + (parseInt(c.cantidad, 10) || 0) * (Number(c.costo_unitario) || 0), 0),
+          // null (no 0) cuando el semáforo no vino: un 0 se leería como
+          // "cero vendidos fuera", que es una afirmación que no tenemos.
+          fuera: sem ? sem.fuera : null,
+          disponibles: sem ? sem.disponibles : null,
+        };
+      }),
+    });
     html += `<div style="text-align:right;font-size:14px;font-weight:700;margin-top:4px">Deuda del evento: ${_kamMoney(totalEvento)}</div>`;
     html += '<div id="kam-compras-alert" style="margin-top:10px"></div>';
     html += '<div id="kam-abonos" style="margin-top:16px"></div>';
@@ -6714,6 +6904,8 @@ async function _kamAbonosLoad(slug, deudaPorProveedor) {
       : '<tr><td colspan="5" style="padding:6px 4px;font-size:12px;color:var(--ts)">Sin abonos registrados</td></tr>';
 
     const saldoTotal = deudaTotal - abonadoTotal;
+    // [KMS-1] El abonado llega en este segundo tiempo y completa el tablero.
+    _kmsTableroPintar({ abonado: abonadoTotal });
     cont.innerHTML = `<div style="border:1px solid var(--border);border-radius:var(--r-sm,8px);padding:12px">
       <div style="font-family:'Rajdhani',sans-serif;font-weight:700;font-size:15px;margin-bottom:8px">Abonos a proveedores</div>
       ${lineas || '<div style="font-size:12px;color:var(--ts)">Sin deuda ni abonos todavía.</div>'}

@@ -245,6 +245,33 @@ _Última revisión: 28-jul-2026 (series PP, PG, E1 y KH cerradas)._
   función muerta y reportó que el bug no existía. Anclar por NOMBRE y exigir que
   ALGUIEN LA LLAME (conteo de llamadas). Es la hermana de "probar el camino, no
   la función": aquí se probó una función que no está en ningún camino.
+- **CUANDO EL ARNÉS Y EL CÓDIGO TIENEN EL MISMO AUTOR, EL ARNÉS HEREDA LAS
+  CREENCIAS QUE PRODUJERON EL BUG.** No es un testigo independiente: si creo que
+  el campo se llama `habitacion`, lo creo en los DOS archivos, y el verde solo
+  prueba que soy consistente conmigo mismo. VJ-5 se mergeó en verde y llegó a
+  producción INSERVIBLE por dos creencias mías que el arnés compartía: llamaba
+  `abrirModalHabitacion()` a mano cuando el botón que la abre llevaba meses
+  `disabled` (cero llamadores), y su mock contestaba `{habitacion:{…}}` cuando
+  el endpoint devuelve `hab` — así que `habId` habría salido `null` SIEMPRE y el
+  migrado se habría quedado sin cuarto en silencio, sin error ni toast. Lo cazó
+  Memo usando la pantalla **59 minutos después del merge** (VJ-5 entró a las
+  00:56 del 6-ago; el arreglo se escribió a la 01:55 — fechas leídas de `git
+  log`, no recordadas, que es justo de lo que trata esta regla). El arnés no
+  aguantó ni una hora de uso real. Es la raíz común de "probar el camino,
+  no la función" y de "la base de mentira inventa nombres", y el remedio es
+  mecánico: **los hechos se toman del lado que yo no controlo en ese momento**.
+  Los nombres de campo se LEEN del código de la otra punta (el arnés de CAP-FIX-1
+  extrae con regex el campo de la respuesta de `admin-rooming` y assertea que el
+  front lea ÉSE); las claves del fixture se carean contra la función que las
+  produce (`persona()` de admin-transporte), no contra lo que recuerdo del
+  payload; y se entra por el botón, contando llamadores — si son 1, ese 1 es la
+  declaración y NADIE lo usa.
+- **`offsetParent` es `null` POR DEFINICIÓN en `position:fixed`.** Preguntárselo
+  a un modal abierto contesta "invisible" sobre algo que se ve perfecto: en
+  CAP-FIX-1 dio un rojo falso sobre un `.modal-overlay` desplegado. Para lo
+  fijo, medir la caja real del hijo (`getBoundingClientRect`) y `elementFromPoint`
+  en su centro, y validar el instrumento cerrándolo: si cerrado no dice que no,
+  la medición no sirve. Es la contracara de "existe no es se ve".
 - **Un careo solo ve lo que el universo EJERCITA.** Para las divergencias
   DORMIDAS —las que ningún dato de hoy alcanza— hay que LEER los dos códigos,
   no correrlos. Tres textos de motivo estuvieron divergentes durante dos careos

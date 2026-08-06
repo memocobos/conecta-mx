@@ -6568,6 +6568,10 @@ async function _kamProveedoresLoad() {
     const d = await r.json().catch(() => ({}));
     if (!r.ok || !d.ok) throw new Error(d.error || 'No se pudieron cargar los proveedores');
     const provs = d.proveedores || [];
+    // [PRV-1] Esta lista es la MISMA que necesitan los <select> del paso ②, así
+    // que se publica aquí en vez de volver a pedirla. Una sola fuente: si algún
+    // día divergieran, el paso ① mostraría un proveedor que el ② no ofrece.
+    _kamProvCache = provs;
     if (!provs.length) {
       cont.innerHTML = '<div class="empty-state"><div class="empty-icon"></div>Sin proveedores todavía</div>';
       return;
@@ -6600,10 +6604,41 @@ async function _kamProveedorCrear() {
     const d = await r.json().catch(() => ({}));
     if (!r.ok || !d.ok) throw new Error(d.error || 'No se pudo agregar el proveedor');
     if (inp) inp.value = '';
-    _kamProveedoresLoad();
+    // [PRV-1] El proveedor nuevo tiene que existir YA en el paso ②. Antes solo
+    // se recargaba la lista del paso ① y el select de las zonas se quedaba con
+    // el catálogo viejo: Memo daba de alta al proveedor, iba a capturar la
+    // compra y no estaba. Había que re-elegir el evento para que apareciera.
+    //
+    // Se ESPERA la recarga (antes no se esperaba) porque de ella sale el
+    // _kamProvCache con el que se repintan los selects.
+    await _kamProveedoresLoad();
+    _kamProvSelectsRefrescar((d.proveedor && d.proveedor.id) || null);
   } catch (e) {
     if (alertEl) alertEl.innerHTML = `<div class="alert alert-error">${_esfEsc(e.message)}</div>`;
   }
+}
+
+// [PRV-1] Repinta SOLO los <select> de proveedor de las zonas.
+//
+// Se repintan los selects en vez de recargar el paso ② entero: _kamComprasLoad
+// vuelve a construir todo el HTML, y con él se irían la cantidad y el costo que
+// Memo ya llevaba tecleados. Dar de alta un proveedor a media captura es
+// justamente el caso donde eso pasa — perder lo escrito para "arreglar" el
+// select sería cambiar un estorbo por otro peor.
+//
+// Cada select CONSERVA lo que tuviera elegido. Si no tenía nada (el caso de
+// "no había ningún proveedor todavía"), se queda con el recién creado, que es
+// lo que Memo venía a usar.
+function _kamProvSelectsRefrescar(nuevoId) {
+  const opts = (_kamProvCache || [])
+    .map((p) => `<option value="${_esfEsc(p.id)}">${_esfEsc(p.nombre)}</option>`).join('');
+  document.querySelectorAll('select[id^="kam-c-prov-"]').forEach((sel) => {
+    const antes = sel.value;
+    sel.innerHTML = opts;
+    // Si lo de antes sigue existiendo, se respeta; si no, el nuevo.
+    if (antes && (_kamProvCache || []).some((p) => String(p.id) === String(antes))) sel.value = antes;
+    else if (nuevoId) sel.value = String(nuevoId);
+  });
 }
 
 // ── Inventario de boletos (compras por evento/zona) ──────────────────────────

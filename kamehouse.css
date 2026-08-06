@@ -3026,3 +3026,16 @@ input[type="search"],.kh-buscar,.buscador{border-radius:var(--r-sm,8px)}
 }
 .vj3-form-g{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
 .vj3-form-b{display:flex;justify-content:flex-end;margin-top:10px}
+
+/* ═══ [PRV-2] Servicios de proveedor (lo que no son boletos) ══════════════ */
+.prv2-caja{margin-top:16px;padding:12px;border:1px solid var(--border);border-radius:var(--r-sm,8px);background:var(--bg3)}
+.prv2-t{font-family:'Rajdhani',sans-serif;font-weight:700;font-size:15px;color:var(--text)}
+.prv2-d{font-size:11px;color:var(--ts);margin:3px 0 10px;line-height:1.5;max-width:70ch}
+.prv2-lista{margin-bottom:10px}
+.prv2-fila{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;padding:5px 0;border-top:1px solid var(--border);font-size:12px}
+.prv2-f{font-family:'JetBrains Mono',monospace;color:var(--ts);white-space:nowrap}
+.prv2-p{font-weight:700}
+.prv2-c{color:var(--ts);flex:1;min-width:0}
+.prv2-m{font-weight:700;white-space:nowrap}
+.prv2-vacio{font-size:11px;color:var(--ts);padding:5px 0}
+.prv2-form{display:flex;gap:6px;flex-wrap:wrap;align-items:center}

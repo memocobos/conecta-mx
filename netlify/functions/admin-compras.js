@@ -29,11 +29,18 @@ const ACCIONES = {
   eliminar: ROLES_PALACIO,
   semaforo: ROLES_STOCK,        // FASE B t3: película de stock por zona (ADMIN, expone números)
   ajuste_guardar: ROLES_STOCK,  // FASE B t3: captura de vendidos_fuera (stock_ajustes)
+  // [PRV-2] Servicios que no son boletos (transporte, sonido…). Un transportista
+  // nunca va a tener una compra de boletos, así que nunca nacía su deuda y no
+  // aparecía en el selector de abonos: no se le podía pagar.
+  servicio_crear: ROLES_PALACIO,
+  servicios_listar: ROLES_PALACIO,
 };
 
 const UUID_RE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
 const EVENTO_RE = /^[A-Za-z0-9_.#-]+$/;   // slug del EV (id del array), p.ej. 'fanfest-imagine'
 const FECHA_RE = /^\d{4}-\d{2}-\d{2}$/;
+// [PRV-2] Whitelist de columnas del servicio que viajan al navegador.
+const SERVICIO_COLS = 'id,evento_id,proveedor_id,concepto,monto,fecha,nota,creado_por,created_at';
 const COMPRA_COLS = 'id,zona,cantidad,costo_unitario,proveedor_id,fecha,nota';
 const ZONA_MAX = 120;
 const NOTA_MAX = 500;
@@ -76,9 +83,74 @@ exports.handler = async (event) => {
   };
   const baseCompras = `${env.KH_SB_URL}/rest/v1/compras`;
   const baseProv = `${env.KH_SB_URL}/rest/v1/proveedores`;
+  const baseServ = `${env.KH_SB_URL}/rest/v1/servicios_proveedor`;   // [PRV-2]
 
   try {
     // ── compras: listar (por evento) ─────────────────────────────────────
+
+    // ── servicios_proveedor: listar ──────────────────────────────────────
+    // [PRV-2] Lo que se le debe a un proveedor por algo que NO son boletos.
+    if (accion === 'servicios_listar') {
+      const evento_id = String(body.evento_id || '').trim();
+      if (!evento_id || !EVENTO_RE.test(evento_id) || evento_id.length > 120) return bad(headers, 'evento_id inválido');
+      const sp = new URLSearchParams();
+      sp.set('select', SERVICIO_COLS);
+      sp.set('evento_id', `eq.${evento_id}`);
+      sp.set('order', 'fecha.asc');
+      sp.set('limit', '2000');
+      const r = await fetch(`${baseServ}?${sp.toString()}`, { headers: sbHeaders });
+      if (!r.ok) return upstream(headers, await r.text(), 'consulta');
+      const filas = await r.json();
+      // Mismo molde que `listar`: el nombre se mapea en código, sin depender del
+      // embedding de PostgREST.
+      const rp = await fetch(`${baseProv}?select=id,nombre`, { headers: sbHeaders });
+      const provs = rp.ok ? await rp.json() : [];
+      const nombrePorId = {};
+      if (Array.isArray(provs)) provs.forEach((p) => { nombrePorId[p.id] = p.nombre; });
+      const servicios = (Array.isArray(filas) ? filas : []).map((x) => ({
+        ...x, proveedor_nombre: nombrePorId[x.proveedor_id] || null,
+      }));
+      return ok(headers, { servicios });
+    }
+
+    // ── servicios_proveedor: crear ───────────────────────────────────────
+    if (accion === 'servicio_crear') {
+      const evento_id = String(body.evento_id || '').trim();
+      if (!evento_id || !EVENTO_RE.test(evento_id) || evento_id.length > 120) return bad(headers, 'evento_id inválido');
+      const proveedor_id = String(body.proveedor_id || '').trim();
+      if (!UUID_RE.test(proveedor_id)) return bad(headers, 'proveedor_id inválido');
+      // El concepto es OBLIGATORIO: un cargo sin concepto es un monto que nadie
+      // va a poder explicar en tres meses.
+      const concepto = String(body.concepto || '').trim();
+      if (!concepto) return bad(headers, 'Escribe el concepto del servicio');
+      if (concepto.length > 300) return bad(headers, 'El concepto es demasiado largo');
+      const monto = Number(body.monto);
+      if (!Number.isFinite(monto) || monto <= 0) return bad(headers, 'El monto tiene que ser mayor que cero');
+      if (monto > 10000000) return bad(headers, 'Monto fuera de rango');
+      const fecha = String(body.fecha || '').trim();
+      if (fecha && !FECHA_RE.test(fecha)) return bad(headers, 'Fecha inválida');
+      const nota = String(body.nota || '').trim().slice(0, 500) || null;
+
+      // El proveedor tiene que existir ANTES: la FK truena feo y el mensaje de
+      // Postgres no le dice nada a Memo.
+      const pre = await fetch(`${baseProv}?id=eq.${proveedor_id}&select=id&limit=1`, { headers: sbHeaders });
+      if (!pre.ok) return upstream(headers, await pre.text(), 'consulta');
+      if (!(await pre.json()).length) return bad(headers, 'ese proveedor no existe');
+
+      const fila = { evento_id, proveedor_id, concepto, monto, nota,
+        // Del JWT, nunca del cliente (mismo anti-spoofing que strikes_log).
+        creado_por: (auth.user && (auth.user.nombre || auth.user.username || auth.user.correo)) || null };
+      if (fecha) fila.fecha = fecha;
+
+      // INSERT directo, sin on_conflict (regla de la casa).
+      const r = await fetch(baseServ, {
+        method: 'POST', headers: { ...sbHeaders, Prefer: 'return=representation' },
+        body: JSON.stringify(fila),
+      });
+      if (!r.ok) return upstream(headers, await r.text(), 'insert');
+      return ok(headers, { servicio: (await r.json())[0] || null });
+    }
+
     if (accion === 'listar') {
       const evento_id = String(body.evento_id || '').trim();
       if (!evento_id || !EVENTO_RE.test(evento_id) || evento_id.length > 120) {

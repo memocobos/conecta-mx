@@ -4703,7 +4703,14 @@ function _renderPorEvento() {
   // Bloque aditivo, con visibilidad propia (independiente de tours.length).
   _renderUtilidadEvento(evBase);
 
-  if (stats) stats.style.display = tours.length ? '' : 'none';
+  // [CAP-FIX-2] Los totales se muestran si hay ALGO que contar — del Portal o
+  // del Excel. Atado solo a `tours.length`, un evento solo-KH calculaba bien sus
+  // cifras y las dejaba en un bloque `display:none`: existían y no se veían, que
+  // para Memo es exactamente lo mismo que no existir.
+  // El DESGLOSE por paquete/zona sigue atado al Portal a propósito: se arma de
+  // campos que las filas migradas no traen, y pintarlo vacío sería peor.
+  const hayQueContar = tours.length || !!_evtKH;
+  if (stats) stats.style.display = hayQueContar ? '' : 'none';
   if (desg)  desg.style.display  = tours.length ? '' : 'none';
 
   // Desglose por paquete (# viajeros + cobrado) y por zona (# viajeros).

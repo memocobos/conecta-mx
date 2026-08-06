@@ -48,6 +48,8 @@
 
 const { verifyAdminAuthLive, corsCheck } = require('./_lib/verify-admin');
 const { aplicarModoPrueba } = require('./_lib/correo-guard'); // [F4] OBLIGATORIO en todo envío
+// [VJ-4] La regla de quién viaja vive en _lib/paquete-viaje, no aquí.
+const { viaja, motivoNoViaja } = require('./_lib/paquete-viaje');
 const { fetchCatalogo } = require('./_lib/catalogo-index');   // [v2] forma temporal del evento
 
 const UUID_RE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
@@ -517,9 +519,23 @@ exports.handler = async (event) => {
         us.forEach(u => { coordiMap[u.id] = u; });
       }
 
+      // [VJ-4] El correo del coordi NO puede llevar a quien no viaja. Los
+      // pasajeros vienen de `transporte_pasajeros`, que no guarda el paquete:
+      // se resuelve de `viajeros_evento` por sus refs, en UNA consulta.
+      const refsViajero = [...new Set(pasajeros.filter(p => p.pasajero_tipo === 'viajero').map(p => p.pasajero_ref))];
+      const paqPorRef = {};
+      if (refsViajero.length) {
+        const vs = await kh.get(`viajeros_evento?id=in.(${refsViajero.map(enc).join(',')})&select=id,tipo_paquete`);
+        vs.forEach(v => { paqPorRef[v.id] = v.tipo_paquete; });
+      }
+      // Solo se filtra el mundo KH: de un 'lugar' (Portal) o un 'usuario'
+      // (personaje que sube a mano) no sabemos paquete aquí, y excluir por no
+      // saber sería peor que incluir — se quedan como siempre.
+      const subeAlCamion = (p) => p.pasajero_tipo !== 'viajero' || viaja(paqPorRef[p.pasajero_ref]);
+
       const sin_coordi = [], sin_correo = [], vacias = [], envios = [];
       for (const u of unidades) {
-        const pax = pasajeros.filter(p => p.unidad_id === u.id);
+        const pax = pasajeros.filter(p => p.unidad_id === u.id).filter(subeAlCamion);
         if (!pax.length) { vacias.push(u.orden); continue; }        // sin gente no hay lista que mandar
         if (!u.coordi_id) { sin_coordi.push(u.orden); continue; }
         const c = coordiMap[u.coordi_id];
@@ -696,9 +712,16 @@ async function cargarMundoPortal(portal, eventoId, asignadoPor) {
 // se traen POR ID desde los viajeros — NO por evento_id, que en
 // `rooming_habitaciones` es un uuid de la tabla legacy `eventos` (ver cabecera).
 async function cargarMundoKH(kh, eventoId, asignadoPor) {
-  const viajeros = await kh.get(
-    `viajeros_evento?evento_id=eq.${enc(eventoId)}&select=id,nombre,habitacion_id,evento_id,tipo_viajero&order=nombre.asc`
+  // [VJ-4] `tipo_paquete` NO se pedía — por eso los CHEAP salían ofrecidos para
+  // subirse a un camión. Se filtra EN LA FUENTE, no en el render.
+  const todos = await kh.get(
+    `viajeros_evento?evento_id=eq.${enc(eventoId)}&select=id,nombre,habitacion_id,evento_id,tipo_viajero,tipo_paquete&order=nombre.asc`
   );
+  // Quien NO viaja se va… salvo que YA esté asignado a una unidad. Esos se
+  // quedan MARCADOS: esconder una asignación que existe dejaría un fantasma
+  // ocupando un asiento que nadie ve. Quitarlo es decisión de Memo, con el
+  // botón de siempre — pero primero tiene que poder verlo.
+  const viajeros = todos.filter(v => viaja(v.tipo_paquete) || asignadoPor[`viajero:${v.id}`]);
   if (!viajeros.length) return { cuartos: [], sueltos: [], total_clientes: 0 };
 
   // [F3] `evento_id` viaja igual que en el mundo Portal, por simetría del payload.
@@ -713,6 +736,9 @@ async function cargarMundoKH(kh, eventoId, asignadoPor) {
     // [T2] Para que la lista distinga de un vistazo a una creadora externa que
     // toma el viaje. Null en todos los viajeros de siempre → la UI no pinta nada.
     tipo_viajero: v.tipo_viajero || null,
+    // [VJ-4] La marca viaja al front para que pinte el aviso. `null` en todos
+    // los que sí viajan → la UI no pinta nada y el payload de siempre no cambia.
+    no_viaja: viaja(v.tipo_paquete) ? null : motivoNoViaja(v.tipo_paquete),
   });
 
   const habIds = [...new Set(viajeros.map(v => v.habitacion_id).filter(Boolean))];
@@ -733,7 +759,10 @@ async function cargarMundoKH(kh, eventoId, asignadoPor) {
     };
   });
   const sueltos = viajeros.filter(v => !v.habitacion_id).map(persona);
-  return { cuartos, sueltos, total_clientes: viajeros.length };
+  // [VJ-4] El total cuenta a quien DEBE viajar, no a quien está asignado por
+  // error: es el número contra el que se mide el déficit de asientos, y meter
+  // ahí a un cheap pediría un camión para alguien que no sube.
+  return { cuartos, sueltos, total_clientes: viajeros.filter(v => viaja(v.tipo_paquete)).length };
 }
 
 // PERSONAJES: coordis ACEPTADOS del evento + TODAS las creadoras (rol 'cc').

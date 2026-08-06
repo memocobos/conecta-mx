@@ -10453,10 +10453,88 @@ async function loadViajeros() {
     const data = await r.json();
     if (!r.ok) throw new Error(data.error || 'No se pudieron cargar los viajeros');
     _ccViajeros = Array.isArray(data.viajeros) ? data.viajeros : [];
-    const countEl = document.getElementById('cc-viajeros-count');
-    if (countEl) countEl.textContent = `${_ccViajeros.length} viajero${_ccViajeros.length!==1?'s':''}`;
     _renderViajerosTabla();
+    // [VJ-2] El segundo mundo. Va DESPUÉS de pintar el Portal y en su propio
+    // try: si viajeros_evento fallara, la pestaña de siempre ya está en
+    // pantalla y no se cae por una lista que es un extra.
+    await _vj2Cargar();
   } catch(e) { list.innerHTML = `<div class="alert alert-error">${e.message}</div>`; }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// [VJ-2] LOS DOS MUNDOS DE VIAJEROS
+//
+// El Portal (solicitudes, con su dinero) y KH `viajeros_evento` (los que
+// migraron del Excel y el staff). Los segundos existían sin ninguna pantalla de
+// admin: Memo los buscó por todo KameHouse y no aparecían.
+//
+// Se pintan APARTE y sin montos. La contabilidad de los migrados vive en el
+// Excel, y poner una columna de dinero aquí obligaría a inventar una cifra —
+// que es exactamente lo que no se debe hacer en una pantalla de dinero.
+//
+// Lectura con `viajero_listar`, que ya existía y ya admite admin. Cero
+// endpoints nuevos.
+// ═══════════════════════════════════════════════════════════════════════════
+let _vj2Filas = [];
+
+async function _vj2Cargar() {
+  const wrap = document.getElementById('cc-kh-wrap');
+  const list = document.getElementById('cc-kh-list');
+  const cnt = document.getElementById('cc-kh-count');
+  const countEl = document.getElementById('cc-viajeros-count');
+  const nPortal = _ccViajeros.length;
+  // Texto de siempre, por si no hay migrados o la consulta falla.
+  const soloPortal = () => { if (countEl) countEl.textContent = `${nPortal} viajero${nPortal !== 1 ? 's' : ''}`; };
+
+  _vj2Filas = [];
+  if (wrap) wrap.style.display = 'none';
+  soloPortal();
+  if (!wrap || !list) return;
+
+  try {
+    _vj2Filas = await khViajeros.listar(_ccEventoActual) || [];   // [sec-coordi]
+  } catch (_) {
+    // Fails-soft a propósito: sin este bloque la pestaña es la de siempre.
+    return;
+  }
+  if (!_vj2Filas.length) return;   // sin migrados = idéntico a hoy
+
+  const n = _vj2Filas.length;
+  if (cnt) cnt.textContent = `${n} ${n === 1 ? 'viajero' : 'viajeros'}`;
+  // El total, DICHO: que nadie tenga que sumarlo de cabeza ni suponer si el
+  // número de arriba ya incluía a los de abajo.
+  if (countEl) countEl.textContent = `${nPortal} del Portal + ${n} migrados = ${nPortal + n}`;
+
+  list.innerHTML = `<div class="vj2-wrap"><table class="vj2-tabla">
+    <thead><tr>
+      <th>Nombre</th><th>Paquete</th><th>Zona</th><th>Talla</th><th>Contacto</th><th>Notas</th>
+    </tr></thead>
+    <tbody>${_vj2Filas.map((v) => {
+      // El origen, visible por fila: `tipo_viajero` lo pone el alta de staff;
+      // lo que viene del Excel no lo trae. Sin la etiqueta, las dos clases de
+      // fila se leerían igual y son cosas distintas.
+      const staff = v.tipo_viajero && String(v.tipo_viajero) !== 'cliente';
+      const contacto = [v.celular, v.correo].filter(Boolean).map(_esfEsc).join('<br>') || '<span class="vj2-vacio">—</span>';
+      const emerg = [v.emergencia_nombre, v.num_emergencia].filter(Boolean).join(' · ');
+      return `<tr>
+        <td><b>${_esfEsc(v.nombre || '—')}</b>
+            <span class="vj2-tag ${staff ? 'vj2-tag-staff' : ''}">${staff ? _esfEsc(v.tipo_viajero) : 'migrado'}</span></td>
+        <td>${_esfEsc(v.tipo_paquete || '—')}</td>
+        <td>${_esfEsc(v.zona_boleto || '—')}</td>
+        <td>${v.talla_playera ? _esfEsc(v.talla_playera) : '<span class="vj2-vacio">—</span>'}</td>
+        <td>${contacto}${emerg ? `<div class="vj2-emerg">SOS ${_esfEsc(emerg)}</div>` : ''}</td>
+        <td class="vj2-notas">${v.notas ? _esfEsc(v.notas) : '<span class="vj2-vacio">—</span>'}</td>
+      </tr>`;
+    }).join('')}</tbody>
+  </table></div>`;
+  wrap.style.display = '';
+}
+
+// Las descargas del coordi, reusadas tal cual con el evento que ya está abierto.
+function _vj2Descargar(cual) {
+  if (!_ccEventoActual) { alert('Elige un evento primero'); return; }
+  if (cual === 'rooming') return descargarRoomingList(_ccEventoActual);
+  return descargarListaViajeros(_ccEventoActual);
 }
 
 // Alta de walk-in (Fase 2a): captura un cliente de WhatsApp (sin cuenta de

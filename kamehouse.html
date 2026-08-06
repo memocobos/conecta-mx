@@ -864,6 +864,11 @@
           </label>
           <button class="btn btn-ghost btn-sm" onclick="exportarViajeros('excel')" style="font-size:10px">↓ CSV</button>
           <button class="btn btn-ghost btn-sm" onclick="exportarViajeros('pdf')" style="font-size:10px">↓ PDF</button>
+          <!-- [VJ-2] Las dos descargas del coordi, ahora también aquí. Son las
+               MISMAS funciones (toman evento_id): no se duplica nada, solo se
+               ponen al alcance de quien ya está mirando el evento. -->
+          <button class="btn btn-ghost btn-sm" id="cc-dl-lista" onclick="_vj2Descargar('lista')" style="font-size:10px">↓ Lista viajeros</button>
+          <button class="btn btn-ghost btn-sm" id="cc-dl-rooming" onclick="_vj2Descargar('rooming')" style="font-size:10px">↓ Rooming</button>
           <button class="btn btn-primary btn-sm" onclick="abrirModalViajero(null)">+ Viajero</button>
          </div>
         </div>
@@ -873,6 +878,25 @@
          <button class="gz-filter" id="cc-fil-viaj-staff" onclick="filtrarViajerosCC('staff',this)">// staff <span id="cc-cnt-staff" style="color:var(--ts);margin-left:4px"></span></button>
         </div>
         <div id="cc-viajeros-list"><div class="empty-state"><div class="empty-icon">·</div>Sin viajeros registrados</div></div>
+
+        <!-- [VJ-2] EL SEGUNDO MUNDO: viajeros_evento (KH). Son los que migraron
+             del Excel y el staff que entra al aceptar un tour. Vivían sin
+             ninguna pantalla de admin que los mostrara — Memo los buscó por todo
+             KameHouse y no aparecían.
+             Va DEBAJO y aparte del Portal a propósito: son dos orígenes con
+             reglas distintas, y mezclarlos en una sola tabla haría creer que
+             comparten contabilidad. Sin evento con migrados, este bloque no se
+             pinta y la pestaña queda idéntica a como estaba. -->
+        <div id="cc-kh-wrap" style="display:none;margin-top:22px">
+         <div class="vj2-h">
+          <div>
+           <div class="vj2-t">Viajeros migrados y de staff</div>
+           <div class="vj2-d">Vienen del Excel o de aceptar un tour. Su dinero NO se lleva aquí — la contabilidad de éstos vive en el Excel.</div>
+          </div>
+          <div class="vj2-cnt" id="cc-kh-count">0</div>
+         </div>
+         <div id="cc-kh-list"></div>
+        </div>
        </div>
 
        <!-- SUB: ROOMING -->

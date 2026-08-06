@@ -6410,10 +6410,32 @@ function _kmsReducido() {
 
 // Confirmar = la MISMA llamada de siempre. _kamCompraCrear ya recarga todo al
 // terminar, y con ello el tablero de arriba.
-function _kmsPreviewConfirmar(zi) {
+//
+// [KMS-2b] SI EL GUARDADO FALLA, EL BOTÓN TIENE QUE VOLVER. `_kamCompraCrear`
+// atrapa el error, pinta la alerta y NO recarga: sin esto, el preview se
+// quedaba con "Guardando…" para siempre — un fallo con cara de guardado eterno,
+// en una pantalla de dinero.
+//
+// "¿El preview sigue en el DOM?" es señal SUFICIENTE de fallo, y conviene saber
+// por qué: `_kamComprasLoad` escribe el spinner en `#kam-compras` ANTES de su
+// primer await, y el preview vive dentro de ese contenedor. O sea que en el
+// camino de ÉXITO el preview ya está destruido —de forma SÍNCRONA— para cuando
+// esta promesa resuelve, aunque la recarga apenas vaya en camino. Por eso no
+// hay ventana con el botón vivo sobre una compra ya guardada.
+//
+// Ese orden es el que sostiene la regla. Si algún día `_kamComprasLoad` dejara
+// de limpiar antes de esperar, esta condición se volvería falsa en éxito y
+// habría que cambiarla — el bloque [I] del arnés lo vigila.
+async function _kmsPreviewConfirmar(zi) {
   const ok = document.getElementById('kms-prev-ok-' + zi);
   if (ok) { ok.disabled = true; ok.textContent = 'Guardando…'; }
-  _kamCompraCrear(zi);
+  await _kamCompraCrear(zi);
+  // Sigue en pie = no hubo recarga = tronó. Se re-consulta el botón por si algo
+  // repintó en medio: el de antes ya no valdría.
+  if (document.getElementById('kms-prev-' + zi)) {
+    const b = document.getElementById('kms-prev-ok-' + zi);
+    if (b) { b.disabled = false; b.textContent = 'Confirmar compra'; }
+  }
 }
 
 function _kmsTableroPintar(parcial) {

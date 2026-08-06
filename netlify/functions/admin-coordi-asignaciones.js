@@ -39,6 +39,8 @@
 // =============================================================================
 
 const { verifyAdminAuthLive, corsCheck } = require('./_lib/verify-admin');
+// [VJ-5] La regla de quién duerme es la MISMA de VJ-4, importada — no copiada.
+const { duerme, motivoNoDuerme } = require('./_lib/paquete-viaje');
 
 const UUID_RE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
 const SLUG_RE = /^[A-Za-z0-9_#.\-]+$/; // evento_id (slug del EV, p.ej. 'karolg#2')
@@ -68,6 +70,8 @@ const ACCIONES = {
   // datos captura los abonos.
   abono_crear: ROLES_EDITA_VIAJERO,
   abonos_listar: ROLES_EDITA_VIAJERO,
+  // [VJ-5] Acomodar migrados en cuartos.
+  viajero_habitacion: ROLES_EDITA_VIAJERO,
 };
 
 // [VJ-3] Bucket PRIVADO de los comprobantes de abono. Mismo patrón que
@@ -491,6 +495,47 @@ exports.handler = async (event) => {
         });
       }
       return ok(headers, { abonos });
+    }
+
+
+    // ── viajeros_evento: poner/quitar cuarto (admin) ─────────────────────
+    // [VJ-5] Los migrados del Excel no se podían acomodar: `habitacion_id`
+    // existía y ningún picker lo escribía. Esta es esa escritura.
+    //
+    // Quien NO duerme no puede tener cuarto — y se rechaza AQUÍ, no solo en el
+    // picker: esconder la opción es UI, negarla es la regla. Un CHEAP es solo
+    // boleto y no tiene hospedaje que asignar.
+    if (accion === 'viajero_habitacion') {
+      if (!ROLES_EDITA_VIAJERO.includes(jwtRol)) {
+        return { statusCode: 403, headers, body: JSON.stringify({ error: 'No puedes acomodar viajeros' }) };
+      }
+      const id = String(body.id || '').trim();
+      if (!UUID_RE.test(id)) return bad(headers, 'id inválido');
+      // null = sacarlo del cuarto. Es una operación legítima, no un vacío.
+      const hab = body.habitacion_id == null || body.habitacion_id === ''
+        ? null : String(body.habitacion_id).trim();
+      if (hab !== null && !UUID_RE.test(hab)) return bad(headers, 'habitacion_id inválido');
+
+      // MISMO FILTRO que la escritura (id=eq): se lee la fila para saber su
+      // paquete antes de decidir, y se escribe sobre esa misma fila.
+      const pre = await fetch(`${baseVE}?id=eq.${id}&select=id,tipo_paquete&limit=1`, { headers: sbHeaders });
+      if (!pre.ok) return upstream(headers, await pre.text(), 'consulta');
+      const filaVE = (await pre.json())[0];
+      if (!filaVE) return bad(headers, 'ese viajero no existe');
+      // Sacar del cuarto SIEMPRE se permite: si un cheap quedó acomodado por un
+      // error viejo, hay que poder quitarlo aunque su paquete ya no lo admita.
+      if (hab !== null && !duerme(filaVE.tipo_paquete)) {
+        return bad(headers, motivoNoDuerme(filaVE.tipo_paquete));
+      }
+
+      const r = await fetch(`${baseVE}?id=eq.${id}`, {
+        method: 'PATCH',
+        headers: { ...sbHeaders, Prefer: 'return=representation' },
+        body: JSON.stringify({ habitacion_id: hab }),
+      });
+      if (!r.ok) return upstream(headers, await r.text(), 'update');
+      const filas = await r.json();
+      return ok(headers, { viajero: filas[0] || null, tocadas: filas.length });
     }
 
     // ── viajeros_evento: eliminar (admin) ────────────────────────────────

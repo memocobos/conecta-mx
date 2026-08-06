@@ -1778,6 +1778,8 @@ const khViajeros = {
   abonosDe(viajero_id) { return this._call({ accion: 'abonos_listar', viajero_id }).then(j => j.abonos || []); },
   abonosDeEvento(evento_id) { return this._call({ accion: 'abonos_listar', evento_id }).then(j => j.abonos || []); },
   abonoCrear(payload) { return this._call(Object.assign({ accion: 'abono_crear' }, payload)); },
+  // [VJ-5] poner/quitar cuarto a un migrado
+  habitacion(id, habitacion_id) { return this._call({ accion: 'viajero_habitacion', id, habitacion_id }); },
 };
 
 
@@ -9594,6 +9596,7 @@ function toggleNavGroup(titleEl) {
 let _ccEventoActual = null;
 let _ccViajeros = [];
 let _ccHabitaciones = [];
+let _vj5KH = [];   // [VJ-5] viajeros KH del evento (para acomodarlos en cuartos)
 let _ccEventosCache = [];
 let _ccAsignados = [];
 let _ccFiltroFecha = 'todos';   // filtro de fecha activo (todos/proximo/pasado); se combina con el buscador
@@ -11007,8 +11010,16 @@ const TIPO_COL      = { individual: 'var(--ts)', doble: 'var(--blue)', triple: '
 // tipo_habitacion. La asignación fina cuarto-por-cuarto es fase futura. Los
 // tipos válidos del portal son compartida|doble|triple|individual; los viajeros
 // sin habitación (paquetes sin hotel, p.ej. RIDE/CHEAP) caen en "Sin habitación".
+// [VJ-5] Trae los viajeros KH del evento. Fails-soft: sin ellos la pantalla de
+// rooming es exactamente la de antes de esta tuerca.
+async function _vj5Cargar() {
+  try { _vj5KH = await khViajeros.listar(_ccEventoActual) || []; }   // [sec-coordi]
+  catch (_) { _vj5KH = []; }
+}
+
 async function loadRooming() {
   if (!_ccEventoActual) return;
+  await _vj5Cargar();  // [VJ-5] los migrados, para poder acomodarlos
   loadGruposPortal(); // [F4-t4] cuartos del Portal (best-effort, fails-soft, no bloquea)
   const list    = document.getElementById('cc-rooming-list');
   const resumen = document.getElementById('cc-rooming-resumen');
@@ -11373,6 +11384,11 @@ function abrirModalHabitacion(id) {
     .filter(v => _vj4Duerme(v.paquete))
     .map(v => v.clientes?.nombre_completo).filter(Boolean);
 
+  // [VJ-5] Los MIGRADOS de KH, que hasta hoy no se podían acomodar. Van con su
+  // id en el value (`kh:<uuid>`) y no con el nombre: dos personas pueden
+  // llamarse igual, y aquí el id decide en qué fila se escribe el cuarto.
+  const khDuermen = (_vj5KH || []).filter(v => _vj4Duerme(v.tipo_paquete));
+
   // Combinar viajeros + equipo asignado
   const nombresEquipo = _ccAsignados.map(a => a._usuario?.nombre||'').filter(Boolean);
 
@@ -11401,6 +11417,19 @@ function abrirModalHabitacion(id) {
             ${dispViajeros.map(n=>`<option value="${n}" ${ocsActuales[i]===n?'selected':''}>${n}</option>`).join('')}
             ${ocsActuales[i] && !dispViajeros.includes(ocsActuales[i]) && nombresViajeros.includes(ocsActuales[i]) ? `<option value="${ocsActuales[i]}" selected>${ocsActuales[i]} ✓</option>` : ''}
           </optgroup>
+          ${(() => {
+            // [VJ-5] Los MIGRADOS del Excel. Las NOTAS ("Hab Doble - comparte
+            // con X") viajan junto al nombre: son la guía con la que Memo arma
+            // los cuartos, y perderlas convertiría el acomodo en adivinanza.
+            // El value lleva el ID y no el nombre — dos personas pueden
+            // llamarse igual, y aquí el id decide en qué fila se escribe.
+            const libres = khDuermen.filter(v => !v.habitacion_id || v.habitacion_id === (id || '__none__'));
+            if (!libres.length) return '';
+            return `<optgroup label="Migrados del Excel">${libres.map(v => {
+              const nota = v.notas ? ` — ${String(v.notas).slice(0, 70)}` : '';
+              return `<option value="kh:${_esfEsc(v.id)}" ${ocsActuales[i] === ('kh:' + v.id) ? 'selected' : ''}>${_esfEsc(v.nombre)}${_esfEsc(nota)}</option>`;
+            }).join('')}</optgroup>`;
+          })()}
           ${dispEquipo.length ? `<optgroup label="Equipo disponible">${dispEquipo.map(n=>`<option value="${n}" ${ocsActuales[i]===n?'selected':''}>${n}</option>`).join('')}</optgroup>` : ''}
           <optgroup label="Otros"><option value="Chofer" ${ocsActuales[i]==='Chofer'?'selected':''}>Chofer</option></optgroup>
         </select>
@@ -11463,7 +11492,17 @@ function actualizarOcupantesHab(tipo) {
 async function guardarHabitacion() {
   const id   = document.getElementById('hab-id')?.value;
   const tipo = document.getElementById('hab-tipo')?.value;
-  const ocupantes = Array.from(document.querySelectorAll('.ocp-select')).map(s=>s.value).filter(Boolean);
+  const crudos = Array.from(document.querySelectorAll('.ocp-select')).map(s=>s.value).filter(Boolean);
+  // [VJ-5] Los migrados vienen como `kh:<uuid>`. En `ocupantes` se guarda su
+  // NOMBRE, igual que siempre, para que la rooming list y su descarga sigan
+  // leyéndose sin cambiar de forma; el vínculo real se escribe aparte en
+  // viajeros_evento.habitacion_id.
+  const khIds = crudos.filter(v => v.startsWith('kh:')).map(v => v.slice(3));
+  const ocupantes = crudos.map(v => {
+    if (!v.startsWith('kh:')) return v;
+    const m = (_vj5KH || []).find(x => x.id === v.slice(3));
+    return m ? m.nombre : null;
+  }).filter(Boolean);
   const cap = CAPACIDAD_HAB[tipo] || 1;
   if (ocupantes.length > cap) {
     document.getElementById('hab-alert').innerHTML=`<div class="alert alert-error">Máximo ${cap} persona${cap>1?'s':''} en habitación ${TIPO_LABELS[tipo]}</div>`;
@@ -11480,8 +11519,25 @@ async function guardarHabitacion() {
     incluye_desayuno:_ccHotelInfo?.incluye_desayuno||false,
   };
   try {
+    let habId = id;
     if (id) await khRooming.actualizar(id, body); // [sec-sensibles]
-    else    await khRooming.crear(body); // [sec-sensibles]
+    else {
+      const creado = await khRooming.crear(body); // [sec-sensibles]
+      // El id del cuarto recién creado hace falta para escribirlo en las filas
+      // de los migrados: sin él quedarían acomodados "en ninguna parte".
+      habId = (creado && (creado.habitacion?.id || creado.id)) || null;
+    }
+    // [VJ-5] Sincroniza el cuarto de los migrados: los elegidos APUNTAN a este
+    // cuarto, y los que estaban aquí y ya no se eligieron se QUEDAN SIN cuarto.
+    // Sin esa segunda mitad, sacar a alguien de un cuarto lo dejaría marcado
+    // como si siguiera dentro.
+    if (habId) {
+      const antes = (_vj5KH || []).filter(v => v.habitacion_id === habId).map(v => v.id);
+      const quitar = antes.filter(x => !khIds.includes(x));
+      for (const vid of khIds) { try { await khViajeros.habitacion(vid, habId); } catch (e) { console.warn('[VJ-5]', e.message); } }
+      for (const vid of quitar) { try { await khViajeros.habitacion(vid, null); } catch (e) { console.warn('[VJ-5]', e.message); } }
+      await _vj5Cargar();
+    }
     closeModal('modal-habitacion');
     await loadRooming();
   } catch(e) { document.getElementById('hab-alert').innerHTML=`<div class="alert alert-error">${e.message}</div>`; }

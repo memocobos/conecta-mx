@@ -3039,3 +3039,43 @@ input[type="search"],.kh-buscar,.buscador{border-radius:var(--r-sm,8px)}
 .prv2-m{font-weight:700;white-space:nowrap}
 .prv2-vacio{font-size:11px;color:var(--ts);padding:5px 0}
 .prv2-form{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+
+/* ═══ [CAP-FIX-1] El que está asignado y no viaja ═════════════════════════
+   VJ-4 ya lo descontaba del total y el chip no lo decía: entre 29 chips
+   iguales, el aviso tiene que caerle al ojo SIN hover y sin leerlos todos.
+   Por eso van dos señales: el chip entero se marca y el motivo se escribe.  */
+.cap-noviaja{
+ font-size:9px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;
+ color:var(--red);border:1px solid var(--red);border-radius:var(--r-card,16px);
+ padding:1px 7px;margin-left:6px;white-space:nowrap;
+}
+.cap-chip-noviaja{border-color:var(--red)!important;background:rgba(255,40,59,.10)!important}
+
+/* ═══ [CAP-FIX-1] Cuartos KH del evento (los que crea Capsule) ════════════ */
+.cap-cuartos{margin-bottom:18px}
+.cap-cuartos-t{
+ font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.12em;
+ color:var(--ts);margin-bottom:4px;
+}
+.cap-cuartos-d{font-size:11px;color:var(--ts);margin-bottom:10px;max-width:80ch;line-height:1.5}
+.cap-cuarto{
+ background:var(--bg2);border:1px solid var(--border);border-radius:var(--r-sm,8px);
+ padding:10px 14px;margin-bottom:8px;
+}
+.cap-cuarto-h{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.cap-cuarto-n{font-size:13px;font-weight:700}
+.cap-cuarto-c{font-size:12px;color:var(--ts)}
+.cap-cuarto-lleno{color:var(--green)}
+.cap-cuarto-acc{margin-left:auto;display:flex;gap:6px}
+.cap-cuarto-acc button{border:none;background:transparent;font-size:15px;cursor:pointer;color:var(--ts);padding:0 2px}
+.cap-cuarto-ocp{margin-top:8px;display:flex;flex-wrap:wrap;gap:6px}
+.cap-ocp{
+ display:inline-flex;align-items:center;gap:6px;padding:3px 10px;
+ border-radius:var(--r-card,16px);background:var(--bg3);border:1px solid var(--border);font-size:12px;
+}
+.cap-ocp-mig{border-color:var(--gold)}
+.cap-mig{
+ font-size:9px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;
+ color:var(--gold);border:1px solid var(--gold);border-radius:var(--r-card,16px);padding:1px 7px;
+}
+.cap-cuarto-vacio{font-size:12px;color:var(--ts)}

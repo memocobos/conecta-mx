@@ -1254,11 +1254,25 @@ function _trUnidadHtml(u) {
       ${coordis.map(c => `<option value="${_esfEsc(c.ref)}"${u.coordi_id === c.ref ? ' selected' : ''}>${_esfEsc(c.nombre)}${c.rol ? ' · ' + _esfEsc(c.rol) : ''}</option>`).join('')}
     </select>`;
 
-  const chips = (u.pasajeros || []).map(p => `
-    <span style="display:inline-flex;align-items:center;gap:6px;padding:3px 6px 3px 10px;margin:2px 4px 0 0;border-radius:var(--r-card,16px);background:var(--bg3);border:1px solid var(--border);font-size:12px">
-      ${_esfEsc(p.nombre_cache || 'Sin nombre')}${p.pasajero_tipo === 'viajero' ? _trTipoChip(_trTipoDeRef(p.pasajero_ref)) : ''}
+  // [CAP-FIX-1] El chip de quien no viaja se marca ENTERO, no solo con una
+  // etiqueta al lado: entre 29 chips iguales, un borde rojo es lo que hace que
+  // el ojo caiga ahí sin leer los 29.
+  const chips = (u.pasajeros || []).map(p => {
+    const noViaja = p.pasajero_tipo === 'viajero' ? _trNoViajaDeRef(p.pasajero_ref) : null;
+    return `
+    <span class="${noViaja ? 'cap-chip-noviaja' : ''}" style="display:inline-flex;align-items:center;gap:6px;padding:3px 6px 3px 10px;margin:2px 4px 0 0;border-radius:var(--r-card,16px);background:var(--bg3);border:1px solid var(--border);font-size:12px">
+      ${_esfEsc(p.nombre_cache || 'Sin nombre')}${p.pasajero_tipo === 'viajero' ? _trTipoChip(_trTipoDeRef(p.pasajero_ref)) : ''}${_trNoViajaChip(noViaja)}
       <button type="button" data-tr-quitar="${_esfEsc(p.pasajero_ref)}" data-tr-ptipo="${_esfEsc(p.pasajero_tipo)}" data-tr-unidad="${idSafe}" title="Quitar de la unidad" style="border:none;background:transparent;color:var(--ts);font-size:14px;line-height:1;cursor:pointer;padding:0 2px">×</button>
-    </span>`).join('');
+    </span>`;
+  }).join('');
+
+  // [CAP-FIX-1] Cuántos de los que están aquí no deberían. El contador de la
+  // cabecera (29/37) cuenta ASIENTOS OCUPADOS, y ése no puede mentir; éste
+  // explica la diferencia con el total de arriba, que sí descuenta a los cheap.
+  const nNoViajan = (u.pasajeros || []).filter(p => p.pasajero_tipo === 'viajero' && _trNoViajaDeRef(p.pasajero_ref)).length;
+  const notaNoViajan = nNoViajan
+    ? `<span class="cap-noviaja" title="Ocupan asiento pero su paquete no incluye transporte">${nNoViajan} no ${nNoViajan === 1 ? 'viaja' : 'viajan'}</span>`
+    : '';
 
   // [F4] El último envío no pudo mandar esta: se resalta hasta que tenga coordi.
   const faltaCoordi = _trSinCoordi.indexOf(u.orden) !== -1 && !u.coordi_id;
@@ -1270,7 +1284,7 @@ function _trUnidadHtml(u) {
     <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
       <b style="font-size:14px">Unidad ${_esfEsc(u.orden)} · ${_esfEsc(u.tipo)}</b>
       <span style="font-size:12px;color:${lleno ? 'var(--green)' : 'var(--ts)'}">(${pax}/${neta})</span>
-      ${_trFechaChip(u.evento_id)}${notaCoordi}
+      ${_trFechaChip(u.evento_id)}${notaCoordi}${notaNoViajan}
       ${chofer}
       ${enSeleccion ? '' : `<span style="margin-left:auto;display:flex;gap:6px;align-items:center">
         ${selCoordi}
@@ -1418,14 +1432,35 @@ function _trTipoChip(tipo) {
   return `<span title="${t.tip}" style="font-size:9px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;color:${t.fg || '#000'};background:${t.bg};border-radius:var(--r-card,16px);padding:1px 7px;margin-left:6px">${t.txt}</span>`;
 }
 // Los pasajeros YA asignados vienen de la tabla de asignaciones (nombre_cache),
-// sin tipo_viajero. Se busca su tipo en el universo KH que ya trajo el listar.
-function _trTipoDeRef(ref) {
+// que NO guarda ni el paquete ni el tipo: lo único que viaja con ellos es el
+// nombre. Todo lo demás se busca por `ref` en el universo KH que trajo el listar.
+function _trPersonaDeRef(ref) {
   const u = _trData && _trData.universo;
   if (!u) return null;
   const pools = [...(u.viajeros_sueltos || [])];
   (u.cuartos_kh || []).forEach(c => pools.push(...(c.ocupantes || [])));
-  const hit = pools.find(p => p && p.ref === ref);
+  return pools.find(p => p && p.ref === ref) || null;
+}
+function _trTipoDeRef(ref) {
+  const hit = _trPersonaDeRef(ref);
   return hit ? (hit.tipo_viajero || null) : null;
+}
+// [CAP-FIX-1] VJ-4 dejó la marca a medio camino: el backend la manda en
+// `no_viaja` de cada persona del universo y NADIE la leía. El resultado en la
+// pantalla de Memo: los 5 cheap de melanie sentados entre los 29 chips de la
+// Unidad 1, idénticos a los demás, mientras el contador de arriba ya decía 24.
+// El descuento se veía; la razón, no.
+function _trNoViajaDeRef(ref) {
+  const hit = _trPersonaDeRef(ref);
+  return hit ? (hit.no_viaja || null) : null;
+}
+// El motivo lo redacta el backend ("no viaja: cheap"): dice el paquete, así que
+// además de avisar, enseña la regla. Con `title` para el porqué, pero el texto
+// se lee SIN pasar el mouse — quien tiene que verlo está mirando la lista, no
+// cazando tooltips.
+function _trNoViajaChip(motivo) {
+  if (!motivo) return '';
+  return `<span class="cap-noviaja" title="Su paquete no incluye transporte. Está asignado de todos modos — quítalo con la × si sobra.">${_esfEsc(motivo)}</span>`;
 }
 
 function _trChipPersona(key, nombre, extra) {
@@ -11120,8 +11155,31 @@ async function loadRooming() {
   const resumen = document.getElementById('cc-rooming-resumen');
   if (!list) return;
 
-  // Hotel queda como fase futura — mostramos el bloque vacío sin tocar datos viejos.
-  _ccHotelInfo = null;
+  // [CAP-FIX-1] LOS CUARTOS DEL EVENTO, que nunca se cargaban.
+  // `_ccHabitaciones` se declaraba y se leía en cinco lugares y NADIE la
+  // llenaba: por eso el rooming no mostraba cuartos, "↓ CSV/PDF" siempre decía
+  // "no hay habitaciones" y el modal de editar no encontraba nada. Fails-soft
+  // igual que los grupos del Portal: si esto truena, el resto de la pantalla
+  // sigue viva. El error se PINTA — un catch mudo fue lo que dejó este agujero
+  // invisible tanto tiempo.
+  let errCuartos = null;
+  try {
+    _ccHabitaciones = await khRooming.listar(_ccEventoActual); // [sec-sensibles]
+  } catch (e) {
+    _ccHabitaciones = [];
+    errCuartos = e.message || 'No se pudieron cargar los cuartos.';
+  }
+
+  // [CAP-FIX-1] El hotel se guarda EN CADA CUARTO (guardarHotel escribe
+  // hotel_nombre en todas las filas). Como los cuartos nunca se cargaban, esto
+  // ponía null a ciegas y lo capturado se perdía al volver a entrar. Se lee del
+  // primer cuarto que lo traiga; sin cuartos, sigue vacío como antes.
+  const conHotel = (_ccHabitaciones || []).find(h => h.hotel_nombre) || null;
+  _ccHotelInfo = conHotel ? {
+    nombre: conHotel.hotel_nombre,
+    direccion: conHotel.hotel_direccion || null,
+    incluye_desayuno: !!conHotel.incluye_desayuno,
+  } : null;
   renderHotelInfo();
 
   const GRUPOS = [
@@ -11147,13 +11205,18 @@ async function loadRooming() {
       </div>`).join('');
   }
 
+  // [CAP-FIX-1] Los cuartos REALES van primero: son lo que existe. Lo de abajo
+  // es el agrupado por el tipo de cuarto que PIDIÓ cada viajero del Portal —
+  // demanda, no cuartos— y se queda tal cual estaba.
+  const bloqueCuartos = _capCuartosHtml(errCuartos);
+
   const conData = GRUPOS.filter(g => porTipo[g.key].length);
   if (!conData.length) {
-    list.innerHTML = '<div class="empty-state"><div class="empty-icon">·</div>Sin viajeros aprobados para armar rooming</div>';
+    list.innerHTML = bloqueCuartos + '<div class="empty-state"><div class="empty-icon">·</div>Sin viajeros aprobados para armar rooming</div>';
     return;
   }
 
-  list.innerHTML = conData.map(g => {
+  list.innerHTML = bloqueCuartos + conData.map(g => {
     const miembros = porTipo[g.key];
     const chips = miembros.map(v => {
       const c = v.clientes || {};
@@ -11171,6 +11234,49 @@ async function loadRooming() {
       <div style="display:flex;flex-wrap:wrap;gap:6px">${chips}</div>
     </div>`;
   }).join('');
+}
+
+// [CAP-FIX-1] Los cuartos KH del evento, con sus ocupantes. Los migrados se
+// rotulan: en la lista conviven con los del Portal y su cuarto se escribe en
+// OTRA tabla (viajeros_evento.habitacion_id), así que saber cuál es cuál no es
+// decoración.
+function _capCuartosHtml(err) {
+  const cabecera = `
+    <div class="cap-cuartos-t">// CUARTOS DEL EVENTO</div>
+    <div class="cap-cuartos-d">Los armas aquí con el botón <b>+ Habitación</b>. Los <b>migrados</b> del Excel se marcan aparte: su cuarto se guarda en su propia ficha.</div>`;
+  if (err) {
+    return `<div class="cap-cuartos">${cabecera}<div class="alert alert-error" style="font-size:12px">${_esfEsc(err)}</div></div>`;
+  }
+  const habs = _ccHabitaciones || [];
+  if (!habs.length) {
+    return `<div class="cap-cuartos">${cabecera}<div class="cap-cuarto-vacio">Todavía no hay cuartos. Créalos con <b>+ Habitación</b>.</div></div>`;
+  }
+  // Nombre → migrado, para rotular sin adivinar por parecido de texto.
+  const migPorNombre = new Map();
+  (_vj5KH || []).forEach(v => { if (v.habitacion_id) migPorNombre.set(v.nombre, v.habitacion_id); });
+
+  const filas = habs.map((h) => {
+    const ocp = h.ocupantes ? (typeof h.ocupantes === 'string' ? JSON.parse(h.ocupantes) : h.ocupantes) : [];
+    const cap = CAPACIDAD_HAB[h.tipo] || 1;
+    const lleno = ocp.length >= cap;
+    const chips = ocp.map(n => {
+      const esMig = migPorNombre.get(n) === h.id;
+      return `<span class="cap-ocp${esMig ? ' cap-ocp-mig' : ''}">${_esfEsc(n)}${esMig ? '<span class="cap-mig">migrado</span>' : ''}</span>`;
+    }).join('');
+    return `
+      <div class="cap-cuarto">
+        <div class="cap-cuarto-h">
+          <span class="cap-cuarto-n">Habitación ${_esfEsc(h.numero_hab || h.orden || '')} · ${_esfEsc(TIPO_LABELS[h.tipo] || h.tipo || '')}</span>
+          <span class="cap-cuarto-c${lleno ? ' cap-cuarto-lleno' : ''}">(${ocp.length}/${cap})</span>
+          <span class="cap-cuarto-acc">
+            <button type="button" onclick="abrirModalHabitacion('${_esfEsc(h.id)}')" title="Editar habitación"><svg class="ic"><use href="#ic-lapiz"/></svg></button>
+            <button type="button" onclick="eliminarHabitacion('${_esfEsc(h.id)}')" title="Eliminar habitación"><svg class="ic"><use href="#ic-basura"/></svg></button>
+          </span>
+        </div>
+        <div class="cap-cuarto-ocp">${chips || '<span class="cap-cuarto-vacio">Cuarto vacío</span>'}</div>
+      </div>`;
+  }).join('');
+  return `<div class="cap-cuartos">${cabecera}${filas}</div>`;
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -11469,67 +11575,77 @@ async function guardarHotel() {
   closeModal('modal-habitacion');
 }
 
-function abrirModalHabitacion(id) {
-  const h = id ? (_ccHabitaciones.find(x => x.id === id) || {}) : {};
-  const ocupantes = h?.ocupantes ? (typeof h.ocupantes==='string'?JSON.parse(h.ocupantes):h.ocupantes) : [];
-  const tipoActual = h.tipo || 'doble';
-  // [VJ-4] Quien no duerme NO se ofrece para un cuarto. Se filtra EN LA FUENTE
-  // de la lista, no al pintar: un CHEAP es solo boleto y no tiene hospedaje.
-  const nombresViajeros = _ccViajeros
+// [CAP-FIX-1] UNA SOLA PLANTILLA DE OCUPANTES, y no dos.
+//
+// Esta función vivía DUPLICADA dentro de abrirModalHabitacion y otra vez en
+// actualizarOcupantesHab (la que corre al cambiar el tipo de cuarto). La copia
+// de allá nunca supo de VJ-4 ni de VJ-5: ofrecía cheap y BORRABA a los migrados
+// en cuanto Memo cambiaba "Doble" por "Triple". Es la misma mordida de las
+// funciones gemelas — la de abajo se quedó atrás sin que nadie lo viera porque
+// nadie podía abrir el modal.
+function _capSelectsHab(tipo, ocsActuales, habId) {
+  const cap = CAPACIDAD_HAB[tipo] || 1;
+  const idRef = habId || '__none__';
+
+  // [VJ-4] Quien no duerme NO se ofrece. Se filtra EN LA FUENTE de la lista, no
+  // al pintar: un CHEAP es solo boleto y no tiene hospedaje.
+  const nombresViajeros = (_ccViajeros || [])
     .filter(v => _vj4Duerme(v.paquete))
     .map(v => v.clientes?.nombre_completo).filter(Boolean);
-
-  // [VJ-5] Los MIGRADOS de KH, que hasta hoy no se podían acomodar. Van con su
-  // id en el value (`kh:<uuid>`) y no con el nombre: dos personas pueden
-  // llamarse igual, y aquí el id decide en qué fila se escribe el cuarto.
+  const nombresEquipo = (_ccAsignados || []).map(a => a._usuario?.nombre || '').filter(Boolean);
   const khDuermen = (_vj5KH || []).filter(v => _vj4Duerme(v.tipo_paquete));
 
-  // Combinar viajeros + equipo asignado
-  const nombresEquipo = _ccAsignados.map(a => a._usuario?.nombre||'').filter(Boolean);
-
-  // Personas ya asignadas en OTRAS habitaciones (excluir de disponibles)
+  // Personas ya asignadas en OTROS cuartos (no se vuelven a ofrecer).
   const yaAsignados = new Set(
-    _ccHabitaciones
-      .filter(h => h.id !== (id||'__none__'))
-      .flatMap(h => h.ocupantes ? (typeof h.ocupantes==='string'?JSON.parse(h.ocupantes):h.ocupantes) : [])
+    (_ccHabitaciones || [])
+      .filter(x => x.id !== idRef)
+      .flatMap(x => x.ocupantes ? (typeof x.ocupantes === 'string' ? JSON.parse(x.ocupantes) : x.ocupantes) : [])
       .filter(n => n && n !== 'Chofer')
   );
+  const disp = (lista) => lista.filter(n => !yaAsignados.has(n));
 
-  function disponibles(lista) {
-    return lista.filter(n => !yaAsignados.has(n));
-  }
-
-  function selects(tipo, ocsActuales) {
-    const c = CAPACIDAD_HAB[tipo] || 1;
-    const dispViajeros = disponibles(nombresViajeros);
-    const dispEquipo   = disponibles(nombresEquipo);
-    return Array.from({length: c}).map((_, i) => `
+  return Array.from({ length: cap }).map((_, i) => {
+    const dispViajeros = disp(nombresViajeros);
+    const dispEquipo = disp(nombresEquipo);
+    const actual = ocsActuales[i];
+    // [VJ-5] Los MIGRADOS del Excel. Las NOTAS ("Hab Doble - comparte con X")
+    // viajan junto al nombre: son la guía con la que Memo arma los cuartos, y
+    // perderlas convierte el acomodo en adivinanza. El value lleva el ID y no el
+    // nombre — dos personas pueden llamarse igual, y aquí el id decide en qué
+    // fila se escribe el cuarto.
+    const libres = khDuermen.filter(v => !v.habitacion_id || v.habitacion_id === idRef);
+    const grupoMigrados = libres.length
+      ? `<optgroup label="Migrados del Excel">${libres.map(v => {
+          const nota = v.notas ? ` — ${String(v.notas).slice(0, 70)}` : '';
+          return `<option value="kh:${_esfEsc(v.id)}" ${actual === ('kh:' + v.id) ? 'selected' : ''}>${_esfEsc(v.nombre)}${_esfEsc(nota)}</option>`;
+        }).join('')}</optgroup>`
+      : '';
+    return `
       <div style="margin-bottom:8px">
-        <div style="font-size:10px;color:var(--ts);margin-bottom:4px">Lugar ${i+1}</div>
+        <div style="font-size:10px;color:var(--ts);margin-bottom:4px">Lugar ${i + 1}</div>
         <select class="cot-input ocp-select" style="width:100%">
           <option value="">— Lugar libre —</option>
           <optgroup label="Viajeros disponibles">
-            ${dispViajeros.map(n=>`<option value="${n}" ${ocsActuales[i]===n?'selected':''}>${n}</option>`).join('')}
-            ${ocsActuales[i] && !dispViajeros.includes(ocsActuales[i]) && nombresViajeros.includes(ocsActuales[i]) ? `<option value="${ocsActuales[i]}" selected>${ocsActuales[i]} ✓</option>` : ''}
+            ${dispViajeros.map(n => `<option value="${n}" ${actual === n ? 'selected' : ''}>${n}</option>`).join('')}
+            ${actual && !dispViajeros.includes(actual) && nombresViajeros.includes(actual) ? `<option value="${actual}" selected>${actual} ✓</option>` : ''}
           </optgroup>
-          ${(() => {
-            // [VJ-5] Los MIGRADOS del Excel. Las NOTAS ("Hab Doble - comparte
-            // con X") viajan junto al nombre: son la guía con la que Memo arma
-            // los cuartos, y perderlas convertiría el acomodo en adivinanza.
-            // El value lleva el ID y no el nombre — dos personas pueden
-            // llamarse igual, y aquí el id decide en qué fila se escribe.
-            const libres = khDuermen.filter(v => !v.habitacion_id || v.habitacion_id === (id || '__none__'));
-            if (!libres.length) return '';
-            return `<optgroup label="Migrados del Excel">${libres.map(v => {
-              const nota = v.notas ? ` — ${String(v.notas).slice(0, 70)}` : '';
-              return `<option value="kh:${_esfEsc(v.id)}" ${ocsActuales[i] === ('kh:' + v.id) ? 'selected' : ''}>${_esfEsc(v.nombre)}${_esfEsc(nota)}</option>`;
-            }).join('')}</optgroup>`;
-          })()}
-          ${dispEquipo.length ? `<optgroup label="Equipo disponible">${dispEquipo.map(n=>`<option value="${n}" ${ocsActuales[i]===n?'selected':''}>${n}</option>`).join('')}</optgroup>` : ''}
-          <optgroup label="Otros"><option value="Chofer" ${ocsActuales[i]==='Chofer'?'selected':''}>Chofer</option></optgroup>
+          ${grupoMigrados}
+          ${dispEquipo.length ? `<optgroup label="Equipo disponible">${dispEquipo.map(n => `<option value="${n}" ${actual === n ? 'selected' : ''}>${n}</option>`).join('')}</optgroup>` : ''}
+          <optgroup label="Otros"><option value="Chofer" ${actual === 'Chofer' ? 'selected' : ''}>Chofer</option></optgroup>
         </select>
-      </div>`).join('');
-  }
+      </div>`;
+  }).join('');
+}
+
+function abrirModalHabitacion(id) {
+  const h = id ? (_ccHabitaciones.find(x => x.id === id) || {}) : {};
+  const ocupantes = h?.ocupantes ? (typeof h.ocupantes === 'string' ? JSON.parse(h.ocupantes) : h.ocupantes) : [];
+  const tipoActual = h.tipo || 'doble';
+  // Solo para el aviso de "no hay a quién asignar": la lista real la arma
+  // _capSelectsHab, que es la única plantilla.
+  const hayAQuienAsignar = (_ccViajeros || []).some(v => _vj4Duerme(v.paquete))
+    || (_vj5KH || []).some(v => _vj4Duerme(v.tipo_paquete))
+    || (_ccAsignados || []).length > 0;
 
   document.getElementById('modal-habitacion').innerHTML = `
     <div class="modal" style="max-width:460px">
@@ -11547,8 +11663,8 @@ function abrirModalHabitacion(id) {
         </div>
         <div class="form-group">
           <label>Asignar ocupantes</label>
-          <div id="hab-ocupantes-container">${selects(tipoActual, ocupantes)}</div>
-          ${!nombresViajeros.length?'<div style="font-size:11px;color:var(--ts);margin-top:4px"><svg class="ic"><use href="#ic-alerta"/></svg> Agrega viajeros primero para poder asignarlos</div>':''}
+          <div id="hab-ocupantes-container">${_capSelectsHab(tipoActual, ocupantes, id)}</div>
+          ${!hayAQuienAsignar?'<div style="font-size:11px;color:var(--ts);margin-top:4px"><svg class="ic"><use href="#ic-alerta"/></svg> Agrega viajeros primero para poder asignarlos</div>':''}
         </div>
         <div id="hab-alert"></div>
       </div>
@@ -11560,28 +11676,16 @@ function abrirModalHabitacion(id) {
   openModal('modal-habitacion');
 }
 
+// Cambiar el tipo de cuarto RE-PINTA los lugares. Antes tenía su propia copia de
+// la plantilla —sin migrados y sin el filtro de VJ-4—, así que pasar de Doble a
+// Triple borraba a los migrados ya elegidos. Ahora llama a la única que hay.
 function actualizarOcupantesHab(tipo) {
   const container = document.getElementById('hab-ocupantes-container');
   if (!container) return;
-  const cap = CAPACIDAD_HAB[tipo] || 1;
-  const habId = document.getElementById('hab-id')?.value || '__none__';
-  const yaAsig = new Set(
-    _ccHabitaciones.filter(h=>h.id!==habId)
-      .flatMap(h=>h.ocupantes?(typeof h.ocupantes==='string'?JSON.parse(h.ocupantes):h.ocupantes):[])
-      .filter(n=>n&&n!=='Chofer')
-  );
-  const dispViajeros = _ccViajeros.map(v=>v.clientes?.nombre_completo).filter(n=>n&&!yaAsig.has(n));
-  const dispEquipo   = _ccAsignados.map(a=>a._usuario?.nombre||'').filter(n=>n&&!yaAsig.has(n));
-  container.innerHTML = Array.from({length: cap}).map((_, i) => `
-    <div style="margin-bottom:8px">
-      <div style="font-size:10px;color:var(--ts);margin-bottom:4px">Lugar ${i+1}</div>
-      <select class="cot-input ocp-select" style="width:100%">
-        <option value="">— Lugar libre —</option>
-        <optgroup label="Viajeros disponibles">${dispViajeros.map(n=>`<option value="${n}">${n}</option>`).join('')}</optgroup>
-        ${dispEquipo.length ? `<optgroup label="Equipo disponible">${dispEquipo.map(n=>`<option value="${n}">${n}</option>`).join('')}</optgroup>` : ''}
-        <optgroup label="Otros"><option value="Chofer">Chofer</option></optgroup>
-      </select>
-    </div>`).join('');
+  const habId = document.getElementById('hab-id')?.value || '';
+  // Lo ya elegido se conserva al cambiar de tipo: los primeros `cap` lugares.
+  const elegidos = Array.from(document.querySelectorAll('.ocp-select')).map(x => x.value);
+  container.innerHTML = _capSelectsHab(tipo, elegidos, habId);
 }
 
 async function guardarHabitacion() {
@@ -11620,7 +11724,12 @@ async function guardarHabitacion() {
       const creado = await khRooming.crear(body); // [sec-sensibles]
       // El id del cuarto recién creado hace falta para escribirlo en las filas
       // de los migrados: sin él quedarían acomodados "en ninguna parte".
-      habId = (creado && (creado.habitacion?.id || creado.id)) || null;
+      // [CAP-FIX-1] El campo se llama `hab` — así lo devuelve admin-rooming
+      // ({ ok, hab }). VJ-5 leía `habitacion`, un nombre que solo existía en el
+      // mock de su arnés: en producción `habId` habría salido null SIEMPRE y el
+      // migrado se habría quedado sin cuarto en silencio. Se aceptan los tres
+      // por si algún día cambia, pero el bueno es el primero.
+      habId = (creado && (creado.hab?.id || creado.habitacion?.id || creado.id)) || null;
     }
     // [VJ-5] Sincroniza el cuarto de los migrados: los elegidos APUNTAN a este
     // cuarto, y los que estaban aquí y ya no se eligieron se QUEDAN SIN cuarto.

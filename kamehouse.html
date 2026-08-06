@@ -923,7 +923,10 @@
           <button class="btn btn-ghost btn-sm" onclick="imprimirListaCoordis()" style="font-size:10px"><svg class="ic"><use href="#ic-impresora"/></svg> Lista para coordis</button>
           <button class="btn btn-ghost btn-sm" onclick="exportarRooming('excel')" style="font-size:10px">↓ CSV</button>
           <button class="btn btn-ghost btn-sm" onclick="exportarRooming('pdf')" style="font-size:10px">↓ PDF</button>
-          <button class="btn btn-primary btn-sm" disabled title="Próximamente — la asignación fina de cuartos llega en una fase posterior" style="opacity:.5;cursor:not-allowed">+ Habitación</button>
+          <!-- [CAP-FIX-1] Estaba deshabilitado con un "próximamente" de otra época:
+               por eso al picarle no pasaba nada. El modal que crea el cuarto ya
+               existía completo y NADIE lo abría. -->
+          <button class="btn btn-primary btn-sm" onclick="abrirModalHabitacion(null)" title="Crear una habitación para este evento">+ Habitación</button>
          </div>
         </div>
         <div id="cc-rooming-list"><div class="empty-state"><div class="empty-icon">·</div>Sin habitaciones registradas</div></div>

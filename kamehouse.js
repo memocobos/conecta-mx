@@ -11212,7 +11212,13 @@ async function loadRooming() {
 
   const conData = GRUPOS.filter(g => porTipo[g.key].length);
   if (!conData.length) {
-    list.innerHTML = bloqueCuartos + '<div class="empty-state"><div class="empty-icon">·</div>Sin viajeros aprobados para armar rooming</div>';
+    // [CAP-FIX-1] En un evento SOLO-KH (melanie: cero solicitudes del Portal)
+    // este vacío ocupaba la pantalla entera y decía "sin viajeros" con los
+    // cuartos ya armados arriba. El vacío grande es correcto SOLO cuando no hay
+    // nada; con cuartos, se dice en una línea de qué está hablando.
+    list.innerHTML = bloqueCuartos + ((_ccHabitaciones || []).length
+      ? '<div class="cap-cuartos-d">Sin viajeros del Portal en este evento — el rooming se arma con los cuartos de arriba.</div>'
+      : '<div class="empty-state"><div class="empty-icon">·</div>Sin viajeros aprobados para armar rooming</div>');
     return;
   }
 

@@ -3193,3 +3193,15 @@ input[type="search"],.kh-buscar,.buscador{border-radius:var(--r-sm,8px)}
    te lleva a un sitio (una zona, los abonos, el tablero), el destino tiene que
    quedar por DEBAJO de la franja, no detrás de ella. */
 #kms-tablero,.kms-zpanel,#kam-abonos,.kms-zlista,#kms-alarmas{scroll-margin-top:64px}
+
+/* ═══ [CAP-FIX-2] De dónde sale cada número en "Por Evento" ═══════════════
+   Un total que mezcla dos mundos sin decirlo es peor que uno incompleto.     */
+.evt-origen{
+ display:flex;flex-wrap:wrap;gap:6px 16px;align-items:baseline;
+ background:var(--bg2);border:1px solid var(--border);border-radius:var(--r-sm,8px);
+ padding:8px 14px;margin:-6px 0 16px;font-size:12px;color:var(--ts);
+}
+.evt-org-t{font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.12em}
+.evt-org-i b{color:var(--text);font-weight:700}
+.evt-org-i b.evt-org-fav{color:var(--green)}
+.evt-org-i b.evt-org-ojo{color:var(--gold)}

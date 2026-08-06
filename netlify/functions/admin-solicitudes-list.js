@@ -52,7 +52,18 @@ exports.handler = async (event) => {
   // con_pagos (aditivo, ADITIVO/gated): embebe las cuotas del plan para calcular
   // abonado/total en la lista SIN una llamada por fila. Lo usa el sub-tab "Pagos"
   // de Capsule Corp (T1). Sin el flag, el shape es idéntico al de siempre.
-  const selectPagos = body.con_pagos ? ',pagos(monto,monto_pagado,estado)' : '';
+  // [CAP-FIX-2] EL EMBED VA CON SU FK NOMBRADO, y no es cosmético.
+  //
+  // Entre `solicitudes_tour` y `pagos` hay DOS relaciones:
+  //   · pagos.solicitud_id → solicitudes_tour.id            (la que queremos)
+  //   · solicitudes_tour.separo_aplicado_pago_id → pagos.id (la del separo, C2)
+  // Con dos caminos posibles PostgREST no adivina: contesta 300 / PGRST201
+  // ("Could not embed because more than one relationship was found") y la
+  // función devolvía "Supabase rechazó la query". Eso es lo que tronaba en la
+  // pestaña Pagos de Capsule — en TODOS los eventos, no solo en melanie, desde
+  // que existe la columna del separo.
+  // Verificado contra el Portal real: sin nombrar, HTTP 300; nombrado, HTTP 200.
+  const selectPagos = body.con_pagos ? ',pagos!pagos_solicitud_id_fkey(monto,monto_pagado,estado)' : '';
   params.set('select', `*,clientes(numero_cliente,nombre_completo,correo,celular,talla_playera,contacto_emergencia_nombre,contacto_emergencia_telefono,contacto_emergencia_relacion)${selectPagos}`);
   params.set('order', 'created_at.desc');
 

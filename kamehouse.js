@@ -4536,6 +4536,69 @@ async function _evtPoblarSelector() {
 }
 
 // Carga los tours ACTIVOS del evento elegido (filtra la cache de cobranza) y pinta.
+// ═══════════════════════════════════════════════════════════════════════════
+// [CAP-FIX-2] EL MUNDO MIGRADO EN "POR EVENTO".
+//
+// El análisis financiero leía SOLO el Portal (solicitudes/pagos), así que
+// melanie —cuyos 30 viajeros vienen del Excel— salía en $0. No era un cero: era
+// una pantalla mirando al mundo equivocado.
+//
+// Se suma con la MISMA regla de oro de VJ-3, que no se re-implementa aquí:
+//   resta = total_contrato − abonado_previo − suma(abonos_viajero)
+// y JAMÁS se recalcula de paquete+habitación+vuelo.
+//
+// CERO DINERO INVENTADO: una fila SIN total_contrato no suma nada — ni en
+// vendido ni en cobrado ni en el conteo de dinero. En melanie son 4 de 30, y
+// contarlas como cero diría "no deben nada", que es una afirmación que no
+// tenemos. El gate de rol es el de VJ-3 y vive en el SERVIDOR: si quien mira no
+// es admin, `viajero_listar` no manda total_contrato ni abonado_previo, aquí no
+// llega dinero y el bloque entero no se pinta.
+// ═══════════════════════════════════════════════════════════════════════════
+let _evtKH = null;   // null = no se ha consultado · {…} = ya se sabe
+
+// PURO: recibe viajeros KH + sus abonos y devuelve el agregado. Sin DOM ni
+// fetch, para que el arnés lo pueda interrogar directo.
+function _capfix2Agregado(viajeros, abonos) {
+  const porViajero = {};
+  (abonos || []).forEach((a) => {
+    const k = a && a.viajero_id;
+    if (!k) return;
+    porViajero[k] = (porViajero[k] || 0) + (Number(a.monto) || 0);
+  });
+  const out = { filas: 0, conDinero: 0, sinDinero: 0, vendido: 0, cobrado: 0, deben: 0, aFavor: 0 };
+  (viajeros || []).forEach((v) => {
+    out.filas++;
+    // La condición EXACTA de _vj3Saldo: sin total_contrato no hay saldo que sumar.
+    if (!v || v.total_contrato == null) { out.sinDinero++; return; }
+    const saldo = _vj3Saldo(v, (porViajero[v.id] ? [{ monto: porViajero[v.id] }] : []));
+    if (!saldo) { out.sinDinero++; return; }
+    out.conDinero++;
+    out.vendido += saldo.total;
+    out.cobrado += saldo.abonado;
+    if (saldo.resta > 0) out.deben += saldo.resta;
+    else out.aFavor += -saldo.resta;
+  });
+  return out;
+}
+
+// Carga el mundo KH del evento con las acciones que YA existen. Fails-soft: si
+// truena, `_evtKH` queda en null y la pantalla es la de antes de esta tuerca —
+// null NO es cero, y por eso no se pinta un total a medias.
+async function _capfix2CargarKH(evId) {
+  const base = String(evId || '').split('#')[0];
+  if (!base) { _evtKH = null; return; }
+  try {
+    const [viajeros, abonos] = await Promise.all([
+      khViajeros.listar(base),                       // [sec-coordi] ya existía
+      khViajeros.abonosDeEvento(base).catch(() => []), // [VJ-3] ya existía
+    ]);
+    const ag = _capfix2Agregado(viajeros || [], abonos || []);
+    // Sin una sola fila con dinero no hay nada que decir del mundo migrado —
+    // y puede ser porque el rol no lo puede ver, no porque no exista.
+    _evtKH = ag.conDinero > 0 ? ag : null;
+  } catch (_) { _evtKH = null; }
+}
+
 async function loadPorEvento() {
   const evId = document.getElementById('selector-evento').value;
   const tbody = document.getElementById('tabla-viajeros');
@@ -4559,7 +4622,8 @@ async function loadPorEvento() {
   try {
     const { activos } = await _cobCargarTodo();
     // Gastos (para _renderPorEvento) + utilidad por evento, en paralelo. Best-effort.
-    await Promise.all([_cobCargarGastos(), _utilCargar()]);
+    // [CAP-FIX-2] …y el mundo migrado de KH, que hasta hoy no se miraba.
+    await Promise.all([_cobCargarGastos(), _utilCargar(), _capfix2CargarKH(evId)]);
     _evtTours = (activos || []).filter(t => _cobTourMatchEvento(t, evId));
     _renderPorEvento();
   } catch (e) {
@@ -4567,6 +4631,28 @@ async function loadPorEvento() {
     if (desg)  desg.style.display = 'none';
     tbody.innerHTML = `<tr><td colspan="8"><div class="alert alert-error">${_spEscape(e.message)}</div></td></tr>`;
   }
+}
+
+// [CAP-FIX-2] La franja que dice DE DÓNDE viene cada número. Sin ella, un total
+// mezclado es peor que un total incompleto: se lee como si toda la información
+// viniera del mismo sitio.
+//
+// Y el "por cobrar" del mundo migrado es un NETO de obligaciones opuestas
+// (lección de VJ-3): en melanie hay quien debe y hay saldos A FAVOR reales. Un
+// solo número escondería las dos mitades, así que se imprimen las dos.
+function _capfix2Rotular(nPortal, kh) {
+  const cont = document.getElementById('evt-origen');
+  if (!cont) return;
+  if (!kh) { cont.style.display = 'none'; cont.innerHTML = ''; return; }
+  const trozo = (lbl, val, cls) => `<span class="evt-org-i"><b class="${cls || ''}">${_esfEsc(val)}</b> ${_esfEsc(lbl)}</span>`;
+  cont.style.display = '';
+  cont.innerHTML = `
+    <span class="evt-org-t">// de dónde sale</span>
+    ${trozo('del Portal', String(nPortal))}
+    ${trozo('migrados del Excel', String(kh.filas))}
+    ${kh.sinDinero ? trozo('migrados SIN contrato capturado (no suman)', String(kh.sinDinero), 'evt-org-ojo') : ''}
+    ${kh.deben ? trozo('deben los migrados', _spFmtMxn(kh.deben)) : ''}
+    ${kh.aFavor ? trozo('a favor de migrados', _spFmtMxn(kh.aFavor), 'evt-org-fav') : ''}`;
 }
 
 // Pinta resumen financiero (sobre TODO el evento), desglose por paquete/zona y la
@@ -4584,11 +4670,16 @@ function _renderPorEvento() {
   const porCobrar = tours.reduce((a, t) => a + Number((t.pago || {}).restante || 0), 0);
   const atrasados = tours.filter(_cobEsAtrasado).length;
   const setTxt = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
-  setTxt('evt-vendido',   _spFmtMxn(vendido));
-  setTxt('evt-cobrado',   _spFmtMxn(cobrado));
-  setTxt('evt-porcobrar', _spFmtMxn(porCobrar));
-  setTxt('evt-viajeros',  String(tours.length));
+  // [CAP-FIX-2] Los dos mundos, sumados y ROTULADOS. Sin migrados con dinero
+  // (`_evtKH` en null) todo queda exactamente como estaba: mismos números,
+  // mismo markup, ni una etiqueta de más.
+  const kh = _evtKH;
+  setTxt('evt-vendido',   _spFmtMxn(vendido   + (kh ? kh.vendido : 0)));
+  setTxt('evt-cobrado',   _spFmtMxn(cobrado   + (kh ? kh.cobrado : 0)));
+  setTxt('evt-porcobrar', _spFmtMxn(porCobrar + (kh ? kh.deben - kh.aFavor : 0)));
+  setTxt('evt-viajeros',  String(tours.length + (kh ? kh.filas : 0)));
   setTxt('evt-atrasados', String(atrasados));
+  _capfix2Rotular(tours.length, kh);
 
   // Gastos + Utilidad del evento (G2). Match por BASE del evento_id (cuenta aunque el
   // evento sea multifecha). Los "General" (evento_id null) NO se incluyen aquí. Usa la
@@ -10069,6 +10160,10 @@ async function loadCCPagos(eventoId) {
     const byId = new Map((_spCache || []).map(x => [x.id, x]));
     _ccPagos.forEach(s => byId.set(s.id, s));
     _spCache = Array.from(byId.values());
+    // [CAP-FIX-2] Si no hay nada del Portal, el vacío quiere decir cuántos
+    // viajeros SÍ tiene el evento — y eso vive en el mundo KH. Solo se pide
+    // cuando hace falta: con solicitudes del Portal, ni se consulta.
+    if (!_ccPagos.length) { await _vj5Cargar(); }
     _renderCCPagos();
   } catch (e) {
     if (listEl) listEl.innerHTML = `<div style="padding:20px;text-align:center;color:#FF6B6B">Error: ${_spEscape(e.message)}</div>`;
@@ -10086,7 +10181,19 @@ function _renderCCPagos() {
 
   if (!_ccPagos.length) {
     if (headEl) headEl.textContent = '';
-    listEl.innerHTML = '<div class="empty-state"><div class="empty-icon">·</div>Aún no hay solicitudes aprobadas en este evento.</div>';
+    // [CAP-FIX-2] Un evento SOLO-KH (melanie: cero solicitudes del Portal) no
+    // está vacío — es que esta pantalla mira al otro mundo. Decirlo en humano,
+    // y decir dónde SÍ está su dinero, en vez de dejar un vacío que parece un
+    // error. El conteo sale de lo que Capsule ya cargó; si no hay nada cargado,
+    // se usa el texto de siempre en vez de afirmar un número que no tenemos.
+    const nKH = (_vj5KH || []).length;
+    listEl.innerHTML = nKH
+      ? `<div class="empty-state"><div class="empty-icon">·</div>
+           Este evento no tiene solicitudes del Portal.<br>
+           Sus <b>${nKH}</b> viajeros vienen del Excel: su dinero se lleva en
+           <b>Detalle</b> (saldos y abonos) y el total del evento en <b>Por Evento</b>.
+         </div>`
+      : '<div class="empty-state"><div class="empty-icon">·</div>Aún no hay solicitudes aprobadas en este evento.</div>';
     return;
   }
 

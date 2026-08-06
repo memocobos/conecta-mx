@@ -398,6 +398,9 @@
    <div class="cob-stat"><div class="cob-stat-lbl">Gastos</div><div class="cob-stat-val red" id="evt-gastos">—</div></div>
    <div class="cob-stat"><div class="cob-stat-lbl">Utilidad facturada</div><div class="cob-stat-val green" id="evt-utilidad">—</div></div>
  </div>
+ <!-- [CAP-FIX-2] De dónde sale cada número: Portal vs migrados del Excel. Solo
+      aparece cuando hay mundo migrado con dinero; si no, ni existe. -->
+ <div id="evt-origen" class="evt-origen" style="display:none"></div>
 
  <!-- Caja / Proyectado / Falta por cobrar del evento (de admin-utilidad-evento). Visibilidad
       propia: existe aunque el evento tenga 0 viajeros (por ingresos/gastos sueltos). -->

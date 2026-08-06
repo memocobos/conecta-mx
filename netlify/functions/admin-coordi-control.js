@@ -46,7 +46,11 @@ const ACCIONES = {
 };
 
 const DEUDA_COLS = 'id,coordi_id,evento_id,tipo,concepto,monto,pagado,fecha_pago,reporte_id,notas,created_at';
-const ALERTA_COLS = 'id,tipo,mensaje,leida,created_at';
+// [VJ-1] `ref` (jsonb, nullable) viaja al front. Las alertas ACCIONABLES traen
+// {evento_id, nombre} y la pantalla les pinta un botón; las de siempre lo traen
+// en null y se pintan exactamente igual que antes. Es aditivo: agregar una
+// columna a la whitelist no cambia una sola fila existente.
+const ALERTA_COLS = 'id,tipo,mensaje,leida,created_at,ref';
 
 exports.handler = async (event) => {
   const __origin = corsCheck(event);

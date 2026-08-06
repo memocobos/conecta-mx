@@ -1772,6 +1772,8 @@ const khViajeros = {
   listar(eventoId) { return this._call({ accion: 'viajero_listar', evento_id: eventoId }).then(j => j.viajeros || []); },
   // eliminar(id) → { ok }
   eliminar(id) { return this._call({ accion: 'viajero_eliminar', id }); },
+  // [VJ-1] editar(id, campos) → { ok, viajero, tocadas } — whitelist server-side
+  editar(id, campos) { return this._call({ accion: 'viajero_editar', id, campos }); },
 };
 
 // [sec-sensibles] deudas_coordi + strikes_log + sistema_alertas vía Netlify Function
@@ -14157,6 +14159,166 @@ async function quitarStrike(userId, nombre, strikesActuales) {
   } catch(e) { alert(e.message); }
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// [VJ-1] DE LA ALERTA A CAPTURAR LOS DATOS
+//
+// La migración del Excel dejó viajeros CHEAP con nombre y zona nada más, y una
+// alerta por persona. Antes había que leer la alerta, acordarse del nombre, ir
+// a otra pantalla y buscarlo. Ahora la alerta trae el botón.
+//
+// La alerta es ACCIONABLE solo si su `ref` trae evento_id Y nombre. Sin los dos
+// no se pinta botón: abrir un modal que no sabe a quién buscar es peor que no
+// ofrecerlo. Las alertas de siempre traen `ref` en null y se pintan igual que
+// antes — el botón simplemente no existe para ellas.
+//
+// UNA PERSONA PUEDE TENER VARIAS FILAS: en el padrón real Humberto y Elizabeth
+// tienen 2 boletos cada uno. Se muestran TODAS con su mini-forma, y cada una se
+// guarda por su propio id.
+// ═══════════════════════════════════════════════════════════════════════════
+let _vjAlertasCache = [];
+let _vjFilas = [];        // filas de la persona, tal como vinieron del servidor
+let _vjAlertaId = null;
+
+const VJ_CAMPOS = [
+  { k: 'correo',            lbl: 'Correo',                 tipo: 'email', ph: 'nombre@correo.com' },
+  { k: 'celular',           lbl: 'Celular',                tipo: 'tel',   ph: '81 1234 5678' },
+  { k: 'talla_playera',     lbl: 'Talla',                  tipo: 'text',  ph: 'S · M · L · XL' },
+  { k: 'num_emergencia',    lbl: 'Tel. de emergencia',     tipo: 'tel',   ph: '81 1234 5678' },
+  { k: 'emergencia_nombre', lbl: 'Nombre de emergencia',   tipo: 'text',  ph: 'Mamá, pareja…' },
+  { k: 'notas',             lbl: 'Notas',                  tipo: 'text',  ph: 'Lo que haga falta' },
+];
+
+function _vjAccionable(a) {
+  const r = a && a.ref;
+  return !!(r && typeof r === 'object' && r.evento_id && r.nombre);
+}
+
+// Marca y enfoca el campo culpable — patrón _regFalla de GR-12.
+function _vjMal(msg, campoId) {
+  document.querySelectorAll('.vj-mal').forEach((e) => { e.classList.remove('vj-mal'); e.removeAttribute('aria-invalid'); });
+  _vjAlert(msg, true);
+  const c = campoId ? document.getElementById(campoId) : null;
+  if (c) {
+    c.classList.add('vj-mal');
+    c.setAttribute('aria-invalid', 'true');
+    try { c.focus({ preventScroll: true }); } catch (_) { try { c.focus(); } catch (__) {} }
+    const limpia = () => { c.classList.remove('vj-mal'); c.removeAttribute('aria-invalid'); };
+    c.addEventListener('input', limpia, { once: true });
+  }
+  return false;
+}
+
+function _vjAlert(msg, err) {
+  const a = document.getElementById('vj-alert');
+  if (a) a.innerHTML = msg ? `<div class="alert ${err ? 'alert-error' : 'alert-success'}">${_esfEsc(msg)}</div>` : '';
+}
+
+async function _vjAbrir(alertaId) {
+  const a = (_vjAlertasCache || []).find((x) => String(x.id) === String(alertaId));
+  if (!a || !_vjAccionable(a)) return;
+  _vjAlertaId = alertaId;
+  const { evento_id, nombre } = a.ref;
+
+  crearModal('vj-datos', 'Capturar datos del viajero', `
+    <div style="font-size:12px;color:var(--ts);line-height:1.6;margin-bottom:12px">
+      <b style="color:var(--text)">${_esfEsc(nombre)}</b> · evento <b style="color:var(--text)">${_esfEsc(evento_id)}</b>
+    </div>
+    <div id="vj-alert" style="margin-bottom:10px"></div>
+    <div id="vj-body"><div class="loading-state"><div class="spinner"></div>Buscando sus boletos…</div></div>
+  `);
+
+  const body = document.getElementById('vj-body');
+  try {
+    const todos = await khViajeros.listar(evento_id);   // [sec-coordi] ya existe
+    // Filtro CLIENT-SIDE por nombre, normalizado con el helper de la casa: el
+    // padrón viene del Excel y "Humberto  Puente" con doble espacio o con
+    // acento distinto no puede dejar a nadie fuera.
+    const meta = _kmNorm(String(nombre).replace(/\s+/g, ' ').trim());
+    _vjFilas = (todos || []).filter((v) => _kmNorm(String(v.nombre || '').replace(/\s+/g, ' ').trim()) === meta);
+
+    if (!_vjFilas.length) {
+      body.innerHTML = `<div class="empty-state"><div class="empty-icon">·</div>No se encontró a <b>${_esfEsc(nombre)}</b> en el padrón de ${_esfEsc(evento_id)}.<br><span style="font-size:11px">Quizá el nombre cambió después de la migración.</span></div>`;
+      return;
+    }
+
+    body.innerHTML = _vjFilas.map((v, i) => `
+      <div class="vj-fila">
+        <div class="vj-fila-h">
+          <span class="vj-fila-n">Boleto ${i + 1} de ${_vjFilas.length}</span>
+          <span class="vj-fila-z">${_esfEsc(v.zona_boleto || 'sin zona')}${v.tipo_paquete ? ' · ' + _esfEsc(v.tipo_paquete) : ''}</span>
+        </div>
+        <div class="vj-grid">
+          ${VJ_CAMPOS.map((c) => `
+            <label class="vj-campo">
+              <span>${_esfEsc(c.lbl)}</span>
+              <input class="cot-input" id="vj-${c.k}-${i}" type="${c.tipo}" placeholder="${_esfEsc(c.ph)}"
+                     value="${_esfEsc(v[c.k] == null ? '' : v[c.k])}" maxlength="500">
+            </label>`).join('')}
+        </div>
+      </div>`).join('') + `
+      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px;flex-wrap:wrap">
+        <button class="btn btn-ghost" type="button" onclick="cerrarModal('vj-datos')">Cancelar</button>
+        <button class="btn btn-primary" type="button" id="vj-guardar" onclick="_vjGuardar()">Guardar</button>
+      </div>`;
+  } catch (e) {
+    body.innerHTML = `<div class="alert alert-error">${_esfEsc(e.message)}</div>`;
+  }
+}
+
+// Lo que se escribió, por fila, solo si CAMBIÓ respecto a lo que vino.
+function _vjCambios() {
+  return _vjFilas.map((v, i) => {
+    const campos = {};
+    VJ_CAMPOS.forEach((c) => {
+      const el = document.getElementById(`vj-${c.k}-${i}`);
+      if (!el) return;
+      const nuevo = String(el.value || '').trim();
+      const viejo = v[c.k] == null ? '' : String(v[c.k]).trim();
+      // Solo lo que de verdad cambió: mandar todo haría un PATCH por fila
+      // aunque nadie tocara nada, y el conteo dejaría de significar algo.
+      if (nuevo !== viejo) campos[c.k] = nuevo;
+    });
+    return { id: v.id, i, campos };
+  }).filter((x) => Object.keys(x.campos).length);
+}
+
+async function _vjGuardar() {
+  _vjAlert('');
+  const cambios = _vjCambios();
+  if (!cambios.length) { _vjAlert('No cambiaste nada todavía.', true); return; }
+
+  // Validación ANTES de escribir: un correo con forma mala se rebota aquí, no
+  // después de haber guardado las otras filas.
+  for (const c of cambios) {
+    if (Object.prototype.hasOwnProperty.call(c.campos, 'correo')) {
+      const v = c.campos.correo;
+      if (v !== '' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) {
+        return _vjMal(`El correo del boleto ${c.i + 1} no tiene forma de correo.`, `vj-correo-${c.i}`);
+      }
+    }
+  }
+
+  const btn = document.getElementById('vj-guardar');
+  if (btn) { btn.disabled = true; btn.textContent = 'Guardando…'; }
+  let ok = 0; const fallos = [];
+  for (const c of cambios) {
+    try { await khViajeros.editar(c.id, c.campos); ok++; }      // [sec-coordi]
+    catch (e) { fallos.push(`boleto ${c.i + 1}: ${e.message}`); }
+  }
+
+  if (fallos.length) {
+    _vjAlert(`Se guardaron ${ok} de ${cambios.length}. ${fallos.join(' · ')}`, true);
+    if (btn) { btn.disabled = false; btn.textContent = 'Guardar'; }
+    return;
+  }
+
+  // Todo bien: la alerta ya no hace falta. Se marca leída con la escritura que
+  // ya existía y se repinta la lista.
+  try { await marcarAlertaLeida(_vjAlertaId); } catch (_) {}
+  cerrarModal('vj-datos');
+  showToast(`Datos guardados (${ok} ${ok === 1 ? 'boleto' : 'boletos'})`, 'success');
+}
+
 // ── ALERTAS ──────────────────────────────────────────────────
 async function loadMTAlertas() {
   const list = document.getElementById('mt-alertas-list');
@@ -14190,10 +14352,14 @@ async function loadMTAlertas() {
               ${fecha.toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric',timeZone:'America/Monterrey'})} ${fecha.toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit',hour12:true,timeZone:'America/Monterrey'})}
             </div>
           </div>
-          ${!a.leida ? `<button class="btn btn-ghost btn-sm" onclick="marcarAlertaLeida('${a.id}')" style="font-size:10px">✓ Leída</button>` : ''}
+          <div style="display:flex;gap:6px;flex-wrap:wrap">
+            ${_vjAccionable(a) ? `<button class="btn btn-primary btn-sm vj-btn" onclick="_vjAbrir('${_attrJs(a.id)}')" style="font-size:10px">Capturar datos</button>` : ''}
+            ${!a.leida ? `<button class="btn btn-ghost btn-sm" onclick="marcarAlertaLeida('${a.id}')" style="font-size:10px">✓ Leída</button>` : ''}
+          </div>
         </div>
       </div>`;
     }).join('');
+    _vjAlertasCache = alertas;
   } catch(e) { list.innerHTML = `<div class="alert alert-error">${e.message}</div>`; }
 }
 

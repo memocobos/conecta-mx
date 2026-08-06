@@ -254,7 +254,10 @@ _Última revisión: 28-jul-2026 (series PP, PG, E1 y KH cerradas)._
   `disabled` (cero llamadores), y su mock contestaba `{habitacion:{…}}` cuando
   el endpoint devuelve `hab` — así que `habId` habría salido `null` SIEMPRE y el
   migrado se habría quedado sin cuarto en silencio, sin error ni toast. Lo cazó
-  Memo usando la pantalla, un mes después. Es la raíz común de "probar el camino,
+  Memo usando la pantalla **59 minutos después del merge** (VJ-5 entró a las
+  00:56 del 6-ago; el arreglo se escribió a la 01:55 — fechas leídas de `git
+  log`, no recordadas, que es justo de lo que trata esta regla). El arnés no
+  aguantó ni una hora de uso real. Es la raíz común de "probar el camino,
   no la función" y de "la base de mentira inventa nombres", y el remedio es
   mecánico: **los hechos se toman del lado que yo no controlo en ese momento**.
   Los nombres de campo se LEEN del código de la otra punta (el arnés de CAP-FIX-1

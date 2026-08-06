@@ -2417,6 +2417,39 @@ html, body { background: var(--bg); color: var(--text); padding: 0; }
  .kms-zrow:active{transform:none}
 }
 
+/* ═══ [VJ-1] Capturar datos del viajero desde la alerta ═══════════════════ */
+.vj-btn{white-space:nowrap}
+.vj-fila{
+ border:1px solid var(--border);border-radius:var(--r-sm,8px);
+ padding:12px;margin-bottom:10px;background:var(--bg3);
+ /* Solo opacity/transform por frame — la regla de animación de la casa. */
+ animation:vjIn .18s ease both;
+}
+@keyframes vjIn{from{opacity:0;transform:translateY(-3px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.vj-fila{animation:none}}
+.vj-fila-h{
+ display:flex;justify-content:space-between;align-items:baseline;
+ gap:10px;flex-wrap:wrap;margin-bottom:10px;
+}
+.vj-fila-n{
+ font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.12em;
+ text-transform:uppercase;color:var(--gold);
+}
+.vj-fila-z{font-size:11px;color:var(--ts)}
+.vj-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px}
+.vj-campo{display:flex;flex-direction:column;gap:4px;min-width:0}
+.vj-campo>span{
+ font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.1em;
+ text-transform:uppercase;color:var(--ts);
+}
+/* Campo culpable (patrón de GR-12). Después de :focus a propósito: misma
+   especificidad, gana la última, y el culpable siempre está enfocado. */
+.cot-input.vj-mal,
+.cot-input.vj-mal:focus{
+ border-color:var(--red);
+ box-shadow:0 0 0 3px rgba(255,90,77,.18);
+}
+
 /* Campo señalado por la validación previa (patrón de GR-12). Va DESPUÉS de
    cualquier :focus de .cot-input: misma especificidad, gana la última, y el
    campo culpable siempre está enfocado. */

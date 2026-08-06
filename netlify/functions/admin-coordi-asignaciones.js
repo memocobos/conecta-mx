@@ -46,6 +46,15 @@ const ROLES_ADMIN = ['maestro_roshi', 'bulma', 'milk'];
 
 // Acciones válidas → roles permitidos (null = cualquier rol logueado; la
 // anti-escalación fina se hace en código por coordi_id===jwt).
+// [VJ-1] Editar datos del viajero. RESUELTO POR MEMO (6-ago-2026): milk TAMBIÉN
+// captura. La ficha pedía solo roshi y bulma, pero `viajero_eliminar` ya usa
+// ROLES_ADMIN —que incluye milk—, así que milk podía BORRAR la fila entera y no
+// habría podido editarle el correo. Impedir lo menor mientras se permite lo
+// mayor no es un candado, es una molestia con cara de candado.
+// Queda como constante propia y NO como ROLES_ADMIN a secas: si algún día
+// ROLES_ADMIN crece por otra razón, esta lista no se mueve sola.
+const ROLES_EDITA_VIAJERO = ['maestro_roshi', 'bulma', 'milk'];
+
 const ACCIONES = {
   listar: null,
   crear: ROLES_ADMIN,
@@ -54,7 +63,11 @@ const ACCIONES = {
   viajero_upsert_staff: null,
   viajero_listar: null,
   viajero_eliminar: ROLES_ADMIN,
+  viajero_editar: ROLES_EDITA_VIAJERO,
 };
+
+// Correo con forma de correo. Mismo criterio que el resto de la casa.
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 // Columnas que viajan al navegador al leer `eventos_coordi`.
 const EC_COLS = 'id,evento_id,coordi_id,indicaciones,status,motivo_declinacion';
@@ -286,6 +299,69 @@ exports.handler = async (event) => {
       if (!r.ok) return upstream(headers, await r.text(), 'consulta');
       const viajeros = await r.json();
       return ok(headers, { viajeros });
+    }
+
+    // ── viajeros_evento: editar datos de contacto (admin) ────────────────
+    // [VJ-1] La migración del Excel dejó viajeros CHEAP con nombre y zona nada
+    // más. Esto es la escritura que llena lo que falta desde la alerta.
+    //
+    // WHITELIST DURA de campos: lo que no esté en la lista NO se escribe y la
+    // petición se rechaza. Sin eso, un `campos` con `evento_id` o `tipo_paquete`
+    // movería a la persona de evento o de paquete desde una pantalla que dice
+    // "capturar correo y celular".
+    //
+    // LECTURA Y ESCRITURA CON EL MISMO FILTRO (`id=eq.`): es la regla de la casa
+    // — un PATCH cuyo filtro no empata con el de la lectura escribe sobre filas
+    // que nadie miró. Aquí importa doble porque hay personas con VARIAS filas
+    // (Humberto y Elizabeth tienen 2 boletos cada uno): tocar una no puede tocar
+    // la otra.
+    if (accion === 'viajero_editar') {
+      // Segundo cerrojo, no adorno: el de arriba (ACCIONES) lo aplica
+      // verifyAdminAuthLive; éste vuelve a mirar el rol del JWT ya resuelto por
+      // si alguien registra la acción con `null` al agregar la siguiente.
+      if (!ROLES_EDITA_VIAJERO.includes(jwtRol)) {
+        return { statusCode: 403, headers, body: JSON.stringify({ error: 'Solo un admin puede editar los datos del viajero' }) };
+      }
+      const id = String(body.id || '').trim();
+      if (!UUID_RE.test(id)) return bad(headers, 'id inválido');
+
+      const campos = (body.campos && typeof body.campos === 'object' && !Array.isArray(body.campos)) ? body.campos : null;
+      if (!campos) return bad(headers, 'campos inválido');
+
+      const PERMITIDOS = ['correo', 'celular', 'talla_playera', 'num_emergencia', 'emergencia_nombre', 'notas'];
+      const ajenos = Object.keys(campos).filter((k) => !PERMITIDOS.includes(k));
+      if (ajenos.length) return bad(headers, 'campo no editable: ' + ajenos.join(', '));
+
+      const patch = {};
+      for (const k of PERMITIDOS) {
+        if (!Object.prototype.hasOwnProperty.call(campos, k)) continue;
+        const v = campos[k] == null ? '' : String(campos[k]).trim();
+        // Vacío se guarda como NULL, no como cadena vacía: '' se cuela en los
+        // filtros de "sin correo" y en los correos salientes como destinatario
+        // en blanco. Ausente es ausente.
+        if (v === '') { patch[k] = null; continue; }
+        if (v.length > 500) return bad(headers, `${k} demasiado largo`);
+        if (k === 'correo' && !EMAIL_RE.test(v)) return bad(headers, 'correo inválido');
+        patch[k] = v;
+      }
+      if (!Object.keys(patch).length) return bad(headers, 'nada que actualizar');
+
+      // La fila tiene que existir ANTES de escribirle: un PATCH sobre un id que
+      // no está contesta 200 con cero filas y se leería como "guardado".
+      const pre = await fetch(`${baseVE}?id=eq.${id}&select=id&limit=1`, { headers: sbHeaders });
+      if (!pre.ok) return upstream(headers, await pre.text(), 'consulta');
+      if (!(await pre.json()).length) return bad(headers, 'ese viajero no existe');
+
+      const r = await fetch(`${baseVE}?id=eq.${id}`, {
+        method: 'PATCH',
+        headers: { ...sbHeaders, Prefer: 'return=representation' },
+        body: JSON.stringify(patch),
+      });
+      if (!r.ok) return upstream(headers, await r.text(), 'update');
+      const filas = await r.json();
+      // Se devuelve cuántas filas tocó: si algún día el filtro se aflojara, el
+      // número lo grita en vez de esconderlo.
+      return ok(headers, { viajero: filas[0] || null, tocadas: filas.length });
     }
 
     // ── viajeros_evento: eliminar (admin) ────────────────────────────────

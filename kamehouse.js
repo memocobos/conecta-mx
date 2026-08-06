@@ -7359,6 +7359,13 @@ async function _kamComprasLoad() {
     const zonaNames = [];
     zonasEV.forEach((z) => { const n = (z && z.n != null) ? String(z.n) : ''; if (n && !zonaNames.includes(n)) zonaNames.push(n); });
     compras.forEach((c) => { const n = String(c.zona || ''); if (n && !zonaNames.includes(n)) zonaNames.push(n); });
+    // [KMS-5] …y las zonas que SOLO tiene el semáforo (las que tienen ajuste y
+    // ninguna compra). Arreglar el endpoint no bastaba: si la zona no está en
+    // el catálogo del evento ni en las compras, esta lista la dejaba fuera y el
+    // número seguía sin verse. En melanie la Barrera SÍ estaba en el catálogo —
+    // por eso el síntoma fue un "—" y no una fila ausente— pero una zona
+    // inventada al vuelo en un ajuste no tendría dónde aparecer.
+    Object.keys(semMap).forEach((n) => { if (n && !zonaNames.includes(n)) zonaNames.push(n); });
 
     _kamZonasMap = {};
     let totalEvento = 0;

@@ -6465,6 +6465,75 @@ function _kmsReducido() {
   try { return window.matchMedia('(prefers-reduced-motion:reduce)').matches; } catch (_) { return false; }
 }
 
+
+// ═══════════════════════════════════════════════════════════════════════════
+// [PRV-2] SERVICIOS: pagarle a un proveedor que no vende boletos.
+//
+// Memo dio de alta a Transpais (transporte) y no aparecía para pagarle: el
+// selector de abonos solo ofrece proveedores CON DEUDA, y la deuda solo nacía
+// de compras de BOLETOS. Un transportista nunca va a tener una.
+//
+// Con esto su deuda nace de un servicio, y entonces aparece en el selector de
+// abonos DE SIEMPRE — no hubo que tocar esa pantalla.
+//
+// El catálogo aquí es COMPLETO (todos los proveedores), al revés que el de
+// abonos: para deberle a alguien primero hay que poder elegirlo.
+// ═══════════════════════════════════════════════════════════════════════════
+function _prv2FormaHtml() {
+  const opts = (_kamProvCache || []).map((p) => `<option value="${_esfEsc(p.id)}">${_esfEsc(p.nombre)}</option>`).join('');
+  const filas = (_kamServicios || []).length
+    ? _kamServicios.map((sv) => `<div class="prv2-fila">
+        <span class="prv2-f">${_esfEsc(String(sv.fecha || '').slice(0, 10))}</span>
+        <span class="prv2-p">${_esfEsc(sv.proveedor_nombre || '—')}</span>
+        <span class="prv2-c">${_esfEsc(sv.concepto || '')}</span>
+        <span class="prv2-m">${_kamMoney(sv.monto)}</span>
+      </div>`).join('')
+    : '<div class="prv2-vacio">Sin servicios registrados en este evento.</div>';
+  return `<div class="prv2-caja">
+    <div class="prv2-t">Servicios y deudas que no son boletos</div>
+    <div class="prv2-d">Transporte, sonido, lo que le debas a un proveedor sin comprarle boletos. Con esto aparece en el selector de abonos y le puedes registrar pagos.</div>
+    <div class="prv2-lista">${filas}</div>
+    <div class="prv2-form">
+      <select class="cot-input" id="prv2-prov" style="min-width:150px">${opts}</select>
+      <input class="cot-input" id="prv2-concepto" placeholder="Concepto (ej. transporte 2 camiones)" maxlength="300" style="flex:1;min-width:180px">
+      <input class="cot-input" id="prv2-monto" type="number" min="0" step="0.01" placeholder="Monto" style="width:120px">
+      <input class="cot-input" id="prv2-fecha" type="date" value="${_kamToday()}" style="width:150px">
+      <button class="btn btn-primary btn-sm" type="button" id="prv2-btn" onclick="_prv2Crear()">Registrar servicio</button>
+    </div>
+  </div>`;
+}
+
+async function _prv2Crear() {
+  const evId = (document.getElementById('kam-evt-sel') || {}).value || '';
+  if (!evId) return;
+  _kamComprasAlert('');
+  const prov = (document.getElementById('prv2-prov') || {}).value || '';
+  const concepto = String((document.getElementById('prv2-concepto') || {}).value || '').trim();
+  const monto = Number((document.getElementById('prv2-monto') || {}).value);
+  const fecha = String((document.getElementById('prv2-fecha') || {}).value || '').trim();
+
+  // Campo culpable marcado y enfocado — mismo patrón de siempre.
+  if (!prov) return _kmsMal(0, 'Elige a quién le debes.', 'prv2-prov');
+  if (!concepto) return _kmsMal(0, 'Escribe el concepto del servicio.', 'prv2-concepto');
+  if (!Number.isFinite(monto) || monto <= 0) return _kmsMal(0, 'El monto tiene que ser mayor que cero.', 'prv2-monto');
+
+  const btn = document.getElementById('prv2-btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Guardando…'; }
+  try {
+    const r = await khAdminFetch('/.netlify/functions/admin-compras', {
+      method: 'POST',
+      body: JSON.stringify({ accion: 'servicio_crear', evento_id: evId, proveedor_id: prov, concepto, monto, fecha: fecha || undefined }),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok || !d.ok) throw new Error(d.error || 'No se pudo registrar el servicio');
+    // Se recarga todo: así la deuda y el selector de abonos salen de los datos.
+    _kamComprasLoad();
+  } catch (e) {
+    _kamComprasAlert(e.message);
+    if (btn) { btn.disabled = false; btn.textContent = 'Registrar servicio'; }
+  }
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // [KMS-3] ELEGIR ZONA SIN BUSCARLA
 //
@@ -6573,7 +6642,11 @@ function _kmsTableroPintar(parcial) {
   // muestra la sección de abonos. Mientras los abonos no llegan se dice, en vez
   // de pintar un cero que se leería como "no debes nada".
   const abonado = d.abonado;
-  const deuda = (abonado == null) ? null : (d.inversion - abonado);
+  // [PRV-2] La deuda incluye los servicios; la INVERSIÓN no. Son dos cosas
+  // distintas y se rotulan distinto: la inversión dice cuánto costaron los
+  // boletos, la deuda dice cuánto le debes a tus proveedores por todo.
+  const servicios = Number(d.servicios) || 0;
+  const deuda = (abonado == null) ? null : (d.inversion + servicios - abonado);
 
   const tarjeta = (lbl, val, sub, cls) => `<div class="kms-tab-c ${cls || ''}">
     <div class="kms-tab-c-lbl">${_esfEsc(lbl)}</div>
@@ -6602,8 +6675,9 @@ function _kmsTableroPintar(parcial) {
   cont.innerHTML = `<div class="card kms-tab">
     <div class="kms-tab-tot">
       ${tarjeta('Inversión en boletos', _kamMoney(d.inversion), 'lo que costaron las compras')}
+      ${d.servicios ? tarjeta('Servicios', _kamMoney(d.servicios), 'transporte, sonido, etc.') : ''}
       ${tarjeta('Abonado', abonado == null ? '…' : _kamMoney(abonado), abonado == null ? 'cargando abonos' : 'ya le pagaste a proveedores', 'kms-abonado')}
-      ${tarjeta('Deuda a proveedores', deuda == null ? '…' : _kamMoney(deuda), deuda == null ? 'cargando abonos' : 'inversión − abonado', 'kms-deuda')}
+      ${tarjeta('Deuda a proveedores', deuda == null ? '…' : _kamMoney(deuda), deuda == null ? 'cargando abonos' : (servicios ? 'boletos + servicios − abonado' : 'inversión − abonado'), 'kms-deuda')}
     </div>
     <div class="kms-tab-wrap"><table class="kms-tab-z">
       <thead><tr><th>Zona</th><th>Compradas</th><th>Costo prom.</th><th>Vend. fuera</th><th>Disponible</th></tr></thead>
@@ -6698,6 +6772,7 @@ function _kamProvSelectsRefrescar(nuevoId) {
 
 // ── Inventario de boletos (compras por evento/zona) ──────────────────────────
 let _kamProvCache = [];   // proveedores para los <select> de las zonas
+let _kamServicios = [];   // [PRV-2] servicios del evento (lo que no son boletos)
 let _kamZonasMap = {};    // índice de zona (zi) -> nombre de zona (para el alta)
 
 function _kamMoney(n) { return '$' + (Number(n) || 0).toLocaleString('es-MX', { maximumFractionDigits: 2 }); }
@@ -7034,14 +7109,19 @@ async function _kamComprasLoad() {
     const ev = (Array.isArray(evArr) ? evArr : []).find((e) => e && e.id === evId);
     const zonasEV = (ev && Array.isArray(ev.zonas)) ? ev.zonas : [];
 
-    const [cRes, pRes, sRes] = await Promise.all([
+    const [cRes, pRes, sRes, svRes] = await Promise.all([
       khAdminFetch('/.netlify/functions/admin-compras', { method: 'POST', body: JSON.stringify({ accion: 'listar', evento_id: evId }) }),
       khAdminFetch('/.netlify/functions/admin-proveedores', { method: 'POST', body: JSON.stringify({ accion: 'listar' }) }),
       khAdminFetch('/.netlify/functions/admin-compras', { method: 'POST', body: JSON.stringify({ accion: 'semaforo', evento_id: evId }) }),
+      // [PRV-2] Los servicios que no son boletos (transporte, sonido…).
+      khAdminFetch('/.netlify/functions/admin-compras', { method: 'POST', body: JSON.stringify({ accion: 'servicios_listar', evento_id: evId }) }),
     ]);
     const cData = await cRes.json().catch(() => ({}));
     const pData = await pRes.json().catch(() => ({}));
     const sData = await sRes.json().catch(() => ({}));
+    const svData = await svRes.json().catch(() => ({}));
+    // Fails-soft: sin servicios el Palacio es el de antes de esta tuerca.
+    _kamServicios = (svRes.ok && svData.ok && Array.isArray(svData.servicios)) ? svData.servicios : [];
     if (!cRes.ok || !cData.ok) throw new Error(cData.error || 'No se pudieron cargar las compras');
     if (!pRes.ok || !pData.ok) throw new Error(pData.error || 'No se pudieron cargar los proveedores');
     const compras = cData.compras || [];
@@ -7064,7 +7144,18 @@ async function _kamComprasLoad() {
       deudaPorProveedor[pid].deuda += sub;
     });
 
-    if (!zonasEV.length && !compras.length) {
+    // [PRV-2] LA DEUDA DE UN PROVEEDOR = BOLETOS + SERVICIOS. Sin esta suma,
+    // un transportista jamás nacía con deuda y no aparecía en el selector de
+    // abonos: no se le podía registrar un pago. Se suma AQUÍ, en la misma
+    // estructura, para que el selector de abonos no tenga que enterarse.
+    _kamServicios.forEach((sv) => {
+      const pid = sv.proveedor_id;
+      if (!pid) return;
+      if (!deudaPorProveedor[pid]) deudaPorProveedor[pid] = { nombre: sv.proveedor_nombre || '—', deuda: 0 };
+      deudaPorProveedor[pid].deuda += Number(sv.monto) || 0;
+    });
+
+    if (!zonasEV.length && !compras.length && !_kamServicios.length) {
       cont.innerHTML = '<div class="empty-state"><div class="empty-icon"></div>Este evento aún no tiene zonas</div>';
       return;
     }
@@ -7146,6 +7237,9 @@ async function _kamComprasLoad() {
       // [KMS-2] La deuda POR PROVEEDOR, para el preview de compra. Ya estaba
       // calculada arriba; solo se publica.
       provs: deudaPorProveedor,
+      // [PRV-2] Los servicios van APARTE de la inversión: la inversión es de
+      // BOLETOS. Mezclarlos diría que compraste boletos que no compraste.
+      servicios: _kamServicios.reduce((a, sv) => a + (Number(sv.monto) || 0), 0),
       zonas: zonaNames.map((zona) => {
         const cz = compras.filter((c) => String(c.zona) === zona);
         const sem = semMap[String(zona).trim()] || null;
@@ -7176,7 +7270,8 @@ async function _kamComprasLoad() {
       ${buscador}
       <div id="kms-zlista" class="kms-zlista">${listaHtml}</div>
       <div id="kms-zvacio" class="kms-vacio" style="display:none">Ninguna zona se llama así.</div>
-      <div style="text-align:right;font-size:14px;font-weight:700;margin-top:10px">Deuda del evento: ${_kamMoney(totalEvento)}</div>
+      ${_prv2FormaHtml()}
+      <div style="text-align:right;font-size:14px;font-weight:700;margin-top:10px">Deuda del evento: ${_kamMoney(totalEvento + _kamServicios.reduce((a, x) => a + (Number(x.monto) || 0), 0))}</div>
       <div id="kam-abonos" style="margin-top:16px"></div>
     </div>`;
     const zonaWrap = `<div id="kms-zona-wrap" style="display:none">

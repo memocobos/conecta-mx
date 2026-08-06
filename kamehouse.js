@@ -1780,6 +1780,26 @@ const khViajeros = {
   abonoCrear(payload) { return this._call(Object.assign({ accion: 'abono_crear' }, payload)); },
 };
 
+
+// ═══════════════════════════════════════════════════════════════════════════
+// [VJ-4] ESPEJO de netlify/functions/_lib/paquete-viaje.js
+//
+// La regla de quién viaja y quién duerme es UNA, y su original vive en el lib
+// del backend. Aquí está su espejo porque el navegador no puede importar aquel
+// archivo — y el arnés CAREA los dos: si alguien cambia uno, truena.
+//
+//   viaja  → plus · ride · null        duerme → plus · ride · stay · null
+//   cheap  → ninguna de las dos        stay   → duerme sí, viaja no
+//
+// null = staff / intercambio / ganadora: DISPONIBLES, Memo decide.
+// Sin distinguir mayúsculas: los migrados traen 'plus' y el alta de staff 'PLUS'.
+// ═══════════════════════════════════════════════════════════════════════════
+const VJ4_VIAJAN = ['plus', 'ride'];
+const VJ4_DUERMEN = ['plus', 'ride', 'stay'];
+function _vj4Norm(tp) { const x = String(tp == null ? '' : tp).trim().toLowerCase(); return x || null; }
+function _vj4Viaja(tp) { const p = _vj4Norm(tp); return p === null || VJ4_VIAJAN.includes(p); }
+function _vj4Duerme(tp) { const p = _vj4Norm(tp); return p === null || VJ4_DUERMEN.includes(p); }
+
 // ═══════════════════════════════════════════════════════════════════════════
 // [VJ-3] LA REGLA DE ORO DEL SALDO DE UN MIGRADO
 //
@@ -11347,7 +11367,11 @@ function abrirModalHabitacion(id) {
   const h = id ? (_ccHabitaciones.find(x => x.id === id) || {}) : {};
   const ocupantes = h?.ocupantes ? (typeof h.ocupantes==='string'?JSON.parse(h.ocupantes):h.ocupantes) : [];
   const tipoActual = h.tipo || 'doble';
-  const nombresViajeros = _ccViajeros.map(v => v.clientes?.nombre_completo).filter(Boolean);
+  // [VJ-4] Quien no duerme NO se ofrece para un cuarto. Se filtra EN LA FUENTE
+  // de la lista, no al pintar: un CHEAP es solo boleto y no tiene hospedaje.
+  const nombresViajeros = _ccViajeros
+    .filter(v => _vj4Duerme(v.paquete))
+    .map(v => v.clientes?.nombre_completo).filter(Boolean);
 
   // Combinar viajeros + equipo asignado
   const nombresEquipo = _ccAsignados.map(a => a._usuario?.nombre||'').filter(Boolean);

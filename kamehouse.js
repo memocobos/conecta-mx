@@ -6294,6 +6294,150 @@ function _kmsPaso(paso) {
 let _kmsDatos = null;
 function _kmsTableroLimpiar() { _kmsDatos = null; const c = document.getElementById('kms-tablero'); if (c) c.innerHTML = ''; }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// [KMS-2] MINI-WIZARD DE COMPRA — ver el efecto ANTES de guardar.
+//
+// Memo capturaba a ciegas: llenaba cinco campos, picaba "Agregar compra" y el
+// efecto en su dinero aparecía DESPUÉS. Ahora el botón abre un preview que se
+// calcula con lo que la pantalla YA tiene (_kmsDatos), sin una sola llamada
+// nueva, y de ahí se confirma o se cancela.
+//
+// `_kamCompraCrear` NO se toca: confirmar la llama tal cual, así "es la misma
+// llamada de siempre" es cierto por construcción y no por promesa.
+// ═══════════════════════════════════════════════════════════════════════════
+
+// Marca y enfoca el campo culpable — mismo patrón que _regFalla de GR-12.
+function _kmsMal(zi, msg, campoId) {
+  document.querySelectorAll('.kms-mal').forEach((e) => { e.classList.remove('kms-mal'); e.removeAttribute('aria-invalid'); });
+  _kamComprasAlert(msg);
+  const c = campoId ? document.getElementById(campoId) : null;
+  if (c) {
+    c.classList.add('kms-mal');
+    c.setAttribute('aria-invalid', 'true');
+    try { c.focus({ preventScroll: true }); } catch (_) { try { c.focus(); } catch (__) {} }
+    const limpia = () => { c.classList.remove('kms-mal'); c.removeAttribute('aria-invalid'); };
+    c.addEventListener('input', limpia, { once: true });
+    c.addEventListener('change', limpia, { once: true });
+  }
+  return false;
+}
+
+function _kmsPreviewCerrar(zi) {
+  const p = document.getElementById('kms-prev-' + zi);
+  if (p) { p.style.display = 'none'; p.innerHTML = ''; }
+}
+
+// Abre el preview. Valida primero: números que no se pueden sumar no merecen
+// un preview, merecen un señalamiento.
+function _kmsPreview(zi) {
+  const zona = _kamZonasMap[zi];
+  if (zona == null) return;
+  _kamComprasAlert('');
+
+  const cant = parseInt((document.getElementById('kam-c-cant-' + zi) || {}).value, 10);
+  const costo = Number((document.getElementById('kam-c-costo-' + zi) || {}).value);
+  const provSel = document.getElementById('kam-c-prov-' + zi);
+  const prov = provSel ? provSel.value : '';
+
+  // Más estricto que el guardado (que acepta 0): una compra de cero boletos o
+  // de cero pesos no es una compra, es un dedo resbalado.
+  if (!Number.isInteger(cant) || cant <= 0) return _kmsMal(zi, 'La cantidad va en boletos enteros y mayor que cero.', 'kam-c-cant-' + zi);
+  if (!Number.isFinite(costo) || costo <= 0) return _kmsMal(zi, 'El costo unitario tiene que ser mayor que cero.', 'kam-c-costo-' + zi);
+  if (!prov) return _kmsMal(zi, 'Elige a quién le compraste.', 'kam-c-prov-' + zi);
+
+  const sub = cant * costo;
+  const d = _kmsDatos || {};
+  const provNom = (provSel && provSel.options[provSel.selectedIndex]) ? provSel.options[provSel.selectedIndex].textContent : '';
+
+  const linea = (lbl, antes, despues) => `<div class="kms-prev-l">
+    <span class="kms-prev-k">${_esfEsc(lbl)}</span>
+    <span class="kms-prev-v"><span class="kms-prev-a">${antes}</span><span class="kms-prev-fl" aria-hidden="true">→</span><b>${despues}</b></span>
+  </div>`;
+
+  let filas = `<div class="kms-prev-l kms-prev-head">
+    <span class="kms-prev-k">Esta compra</span>
+    <span class="kms-prev-v"><b>${cant} ${cant === 1 ? 'boleto' : 'boletos'} × ${_kamMoney(costo)} = ${_kamMoney(sub)}</b></span>
+  </div>`;
+
+  // Inversión del evento — siempre la sabemos si el tablero cargó.
+  if (typeof d.inversion === 'number') {
+    filas += linea('Inversión del evento', _kamMoney(d.inversion), _kamMoney(d.inversion + sub));
+  }
+
+  // Deuda con el proveedor = lo que le compraste menos lo que le has abonado.
+  // Si los abonos todavía no llegan, la línea NO se pinta: un saldo a medias
+  // sería un número con cara de verdad.
+  const pd = (d.provs && d.provs[prov]) ? (Number(d.provs[prov].deuda) || 0) : 0;
+  const pa = (d.abonadoProv && Object.prototype.hasOwnProperty.call(d.abonadoProv, prov)) ? (Number(d.abonadoProv[prov]) || 0) : null;
+  if (d.abonadoProv) {
+    const saldo = pd - (pa || 0);
+    filas += linea('Deuda con ' + provNom, _kamMoney(saldo), _kamMoney(saldo + sub));
+  }
+
+  // Stock de la zona — SOLO si el semáforo vino. null ≠ 0: pintar un cero aquí
+  // afirmaría "no hay disponibles", que no es lo que sabemos.
+  const z = (d.zonas || []).find((x) => x && x.zona === zona);
+  if (z && z.disponibles != null) {
+    filas += linea('Disponibles en ' + zona, String(z.disponibles), String(z.disponibles + cant));
+  }
+
+  const p = document.getElementById('kms-prev-' + zi);
+  if (!p) return;
+  p.innerHTML = `<div class="kms-prev-t">Antes de guardar — así queda tu dinero</div>
+    ${filas}
+    <div class="kms-prev-btns">
+      <button class="btn btn-ghost btn-sm" type="button" onclick="_kmsPreviewCerrar(${zi})">Cancelar</button>
+      <button class="btn btn-primary btn-sm" type="button" id="kms-prev-ok-${zi}" onclick="_kmsPreviewConfirmar(${zi})">Confirmar compra</button>
+    </div>`;
+  p.style.display = '';
+
+  // Si Memo cambia un campo, el preview deja de ser cierto: se cierra en vez de
+  // quedarse mintiendo con los números viejos.
+  ['cant', 'costo', 'prov', 'fecha', 'nota'].forEach((k) => {
+    const e = document.getElementById('kam-c-' + k + '-' + zi);
+    if (e) e.addEventListener('input', () => _kmsPreviewCerrar(zi), { once: true });
+  });
+
+  const ok = document.getElementById('kms-prev-ok-' + zi);
+  if (ok) { try { ok.focus({ preventScroll: true }); } catch (_) {} }
+  try { p.scrollIntoView({ block: 'nearest', behavior: _kmsReducido() ? 'auto' : 'smooth' }); } catch (_) {}
+  return true;
+}
+
+function _kmsReducido() {
+  try { return window.matchMedia('(prefers-reduced-motion:reduce)').matches; } catch (_) { return false; }
+}
+
+// Confirmar = la MISMA llamada de siempre. _kamCompraCrear ya recarga todo al
+// terminar, y con ello el tablero de arriba.
+//
+// [KMS-2b] SI EL GUARDADO FALLA, EL BOTÓN TIENE QUE VOLVER. `_kamCompraCrear`
+// atrapa el error, pinta la alerta y NO recarga: sin esto, el preview se
+// quedaba con "Guardando…" para siempre — un fallo con cara de guardado eterno,
+// en una pantalla de dinero.
+//
+// "¿El preview sigue en el DOM?" es señal SUFICIENTE de fallo, y conviene saber
+// por qué: `_kamComprasLoad` escribe el spinner en `#kam-compras` ANTES de su
+// primer await, y el preview vive dentro de ese contenedor. O sea que en el
+// camino de ÉXITO el preview ya está destruido —de forma SÍNCRONA— para cuando
+// esta promesa resuelve, aunque la recarga apenas vaya en camino. Por eso no
+// hay ventana con el botón vivo sobre una compra ya guardada.
+//
+// Ese orden es el que sostiene la regla. Si algún día `_kamComprasLoad` dejara
+// de limpiar antes de esperar, esta condición se volvería falsa en éxito y
+// habría que cambiarla — el bloque [I] del arnés lo vigila.
+async function _kmsPreviewConfirmar(zi) {
+  const ok = document.getElementById('kms-prev-ok-' + zi);
+  if (ok) { ok.disabled = true; ok.textContent = 'Guardando…'; }
+  await _kamCompraCrear(zi);
+  // Sigue en pie = no hubo recarga = tronó. Se re-consulta el botón por si algo
+  // repintó en medio: el de antes ya no valdría.
+  if (document.getElementById('kms-prev-' + zi)) {
+    const b = document.getElementById('kms-prev-ok-' + zi);
+    if (b) { b.disabled = false; b.textContent = 'Confirmar compra'; }
+  }
+}
+
 function _kmsTableroPintar(parcial) {
   const cont = document.getElementById('kms-tablero');
   if (!cont) return;
@@ -6801,14 +6945,20 @@ async function _kamComprasLoad() {
           <select class="cot-input" id="kam-c-prov-${zi}" style="min-width:130px">${provOpts}</select>
           <input class="cot-input" id="kam-c-fecha-${zi}" type="date" value="${_kamToday()}" style="width:150px">
           <input class="cot-input" id="kam-c-nota-${zi}" placeholder="Nota (opcional)" maxlength="500" style="flex:1;min-width:120px">
-          <button class="btn btn-primary btn-sm" type="button" onclick="_kamCompraCrear(${zi})">Agregar compra</button>
+          <button class="btn btn-primary btn-sm" type="button" onclick="_kmsPreview(${zi})">Agregar compra</button>
         </div>
+        <!-- [KMS-2] El preview vive aquí, pegado a su zona: el efecto en el
+             dinero se lee donde se capturó, no al otro lado de la pantalla. -->
+        <div class="kms-prev" id="kms-prev-${zi}" style="display:none"></div>
       </div>`;
     });
     // [KMS-1] El tablero de arriba se pinta con lo que ESTA función ya calculó
     // (compras + semáforo). Ni un endpoint nuevo ni una llamada extra.
     _kmsTableroPintar({
       inversion: totalEvento,
+      // [KMS-2] La deuda POR PROVEEDOR, para el preview de compra. Ya estaba
+      // calculada arriba; solo se publica.
+      provs: deudaPorProveedor,
       zonas: zonaNames.map((zona) => {
         const cz = compras.filter((c) => String(c.zona) === zona);
         const sem = semMap[String(zona).trim()] || null;
@@ -6905,7 +7055,9 @@ async function _kamAbonosLoad(slug, deudaPorProveedor) {
 
     const saldoTotal = deudaTotal - abonadoTotal;
     // [KMS-1] El abonado llega en este segundo tiempo y completa el tablero.
-    _kmsTableroPintar({ abonado: abonadoTotal });
+    // [KMS-2] …y con él lo abonado POR PROVEEDOR, que es lo que vuelve un
+    // "saldo" el número del preview de compra. Ya estaba calculado; se publica.
+    _kmsTableroPintar({ abonado: abonadoTotal, abonadoProv: abonadoPorProveedor });
     cont.innerHTML = `<div style="border:1px solid var(--border);border-radius:var(--r-sm,8px);padding:12px">
       <div style="font-family:'Rajdhani',sans-serif;font-weight:700;font-size:15px;margin-bottom:8px">Abonos a proveedores</div>
       ${lineas || '<div style="font-size:12px;color:var(--ts)">Sin deuda ni abonos todavía.</div>'}

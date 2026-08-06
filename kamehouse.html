@@ -1453,6 +1453,10 @@
        Se hace así a propósito: las funciones de Comisiones CHEAP (F5a) y
        Liquidaciones están SELLADAS, y cambiarles de qué elemento leen sería
        reescribirlas. Espejar el valor las deja byte-idénticas. ═══════════ -->
+  <!-- [KMS-6] Centinela del mando: cuando ESTE div sale de pantalla, el mando
+       pasa a su versión de una línea. Se vigila con IntersectionObserver, que
+       avisa al cruzar el umbral — no en cada frame de scroll. -->
+  <div id="kms-sentinela" aria-hidden="true" style="height:1px"></div>
   <div class="card kms-mando">
    <div class="kms-mando-lbl">Evento del Palacio</div>
    <div class="kms-mando-row">

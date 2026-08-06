@@ -3622,8 +3622,8 @@ async function _conexHistorial(uid, nombre) {
       const puntual = d.primera_min != null && d.primera_min <= (9 * 60 + tol);
       const dow = new Date(d.fecha + 'T12:00:00').toLocaleDateString('es-MX', { weekday: 'short' });
       return `<tr style="border-top:1px solid var(--border)">
-        <td style="padding:6px 4px;font-size:12px">${_esfEsc(d.fecha)} <span style="color:var(--ts);font-size:10px;text-transform:capitalize">${_esfEsc(dow)}</span></td>
-        <td style="padding:6px 4px;text-align:right;font-size:13px;color:${puntual ? 'var(--green)' : 'var(--orange)'};font-weight:700">${_esfEsc(d.primera)}${puntual ? ' ✓' : ''}</td>
+        <td style="padding:3px 4px;font-size:12px">${_esfEsc(d.fecha)} <span style="color:var(--ts);font-size:10px;text-transform:capitalize">${_esfEsc(dow)}</span></td>
+        <td style="padding:3px 4px;text-align:right;font-size:13px;color:${puntual ? 'var(--green)' : 'var(--orange)'};font-weight:700">${_esfEsc(d.primera)}${puntual ? ' ✓' : ''}</td>
       </tr>`;
     }).join('') : '<tr><td colspan="2" style="padding:12px;text-align:center;color:var(--ts);font-size:12px">Sin conexiones en los últimos 14 días</td></tr>';
     const cont = document.getElementById('_conexHistBody');
@@ -6262,6 +6262,7 @@ function loadKamisama() {
   _kmsPopulate();
   _kmsPaso(_kmsPasoActivo);
   _kmsVacios();
+  _kmsMandoSticky();   // [KMS-6] el mando de una línea al desplazarse
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -6376,6 +6377,30 @@ function _kmsPaso(paso) {
     const p = document.getElementById('kms-panel-' + k);
     if (p) p.style.display = (k === paso) ? '' : 'none';
   });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// [KMS-6] EL MANDO SE ENCOGE AL DESPLAZARSE.
+//
+// Pegado arriba, el mando era un tarjetón de 114 px tapando contenido todo el
+// rato. Ahora, en cuanto el centinela sale de pantalla, pasa a una sola línea.
+//
+// Se usa IntersectionObserver a propósito y NO un listener de scroll: avisa al
+// CRUZAR el umbral —dos veces por viaje— en vez de una vez por frame. Y la
+// clase solo cambia padding y tipografía: no anima nada, así que la regla de
+// "solo transform/opacity por frame" no aplica aquí — no hay frames.
+// ═══════════════════════════════════════════════════════════════════════════
+let _kmsMandoObs = null;
+function _kmsMandoSticky() {
+  const sent = document.getElementById('kms-sentinela');
+  const mando = document.querySelector('.kms-mando');
+  if (!sent || !mando || !('IntersectionObserver' in window)) return;
+  if (_kmsMandoObs) _kmsMandoObs.disconnect();   // idempotente: una sola instancia por visita
+  _kmsMandoObs = new IntersectionObserver(
+    ([e]) => { mando.classList.toggle('kms-mando-mini', !e.isIntersecting); },
+    { threshold: 0 }
+  );
+  _kmsMandoObs.observe(sent);
 }
 
 // ── Tablero económico ────────────────────────────────────────────────────────
@@ -7389,14 +7414,14 @@ async function _kamComprasLoad() {
         ? cz.map((c) => {
             const sub = (parseInt(c.cantidad, 10) || 0) * (Number(c.costo_unitario) || 0);
             return `<tr style="border-top:1px solid var(--border)">
-              <td style="padding:6px 4px;font-size:12px">${parseInt(c.cantidad, 10) || 0} × ${_kamMoney(c.costo_unitario)}</td>
-              <td style="padding:6px 4px;font-size:12px;color:var(--ts)">${_esfEsc(c.proveedor_nombre || '—')}</td>
-              <td style="padding:6px 4px;font-size:12px;color:var(--ts)">${_esfEsc(c.fecha || '')}</td>
-              <td style="padding:6px 4px;font-size:12px">${_kamMoney(sub)}</td>
-              <td style="padding:6px 4px;text-align:right"><button class="btn btn-ghost btn-sm" type="button" onclick="_kamCompraEliminar('${_esfEsc(c.id)}')" title="Eliminar compra">✕</button></td>
+              <td style="padding:3px 4px;font-size:12px">${parseInt(c.cantidad, 10) || 0} × ${_kamMoney(c.costo_unitario)}</td>
+              <td style="padding:3px 4px;font-size:12px;color:var(--ts)">${_esfEsc(c.proveedor_nombre || '—')}</td>
+              <td style="padding:3px 4px;font-size:12px;color:var(--ts)">${_esfEsc(c.fecha || '')}</td>
+              <td style="padding:3px 4px;font-size:12px">${_kamMoney(sub)}</td>
+              <td style="padding:3px 4px;text-align:right"><button class="btn btn-ghost btn-sm" type="button" onclick="_kamCompraEliminar('${_esfEsc(c.id)}')" title="Eliminar compra">✕</button></td>
             </tr>`;
           }).join('')
-        : '<tr><td colspan="5" style="padding:6px 4px;font-size:12px;color:var(--ts)">Sin compras en esta zona</td></tr>';
+        : '<tr><td colspan="5" style="padding:3px 4px;font-size:12px;color:var(--ts)">Sin compras en esta zona</td></tr>';
       const provOpts = _kamProvCache.map((p) => `<option value="${_esfEsc(p.id)}">${_esfEsc(p.nombre)}</option>`).join('');
 
       // [KMS-3] Fila de la lista: lo justo para decidir de un vistazo.
@@ -7474,7 +7499,7 @@ async function _kamComprasLoad() {
       <div id="kms-zvacio" class="kms-vacio" style="display:none">Ninguna zona se llama así.</div>
       ${_prv2FormaHtml()}
       <div style="text-align:right;font-size:14px;font-weight:700;margin-top:10px">Deuda del evento: ${_kamMoney(totalEvento + _kamServicios.reduce((a, x) => a + (Number(x.monto) || 0), 0))}</div>
-      <div id="kam-abonos" style="margin-top:16px"></div>
+      <div id="kam-abonos" style="margin-top:12px"></div>
     </div>`;
     const zonaWrap = `<div id="kms-zona-wrap" style="display:none">
       <button type="button" class="btn btn-ghost btn-sm kms-zvolver" onclick="_kmsZonasVolver()">‹ Todas las zonas</button>
@@ -7535,7 +7560,7 @@ async function _kamAbonosLoad(slug, deudaPorProveedor) {
       const abonado = abonadoPorProveedor[pid] || 0;
       deudaTotal += deuda; abonadoTotal += abonado;
       const saldo = deuda - abonado;
-      return `<div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;font-size:12px;padding:5px 0;border-top:1px solid var(--border)">
+      return `<div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;font-size:12px;padding:3px 0;border-top:1px solid var(--border)">
         <span style="font-weight:700">${_esfEsc(nombreDe(pid))}</span>
         <span style="color:var(--ts)">Deuda ${_kamMoney(deuda)} · Abonado ${_kamMoney(abonado)} · Saldo <b style="color:var(--fg)">${_kamMoney(saldo)}</b></span>
       </div>`;
@@ -7545,37 +7570,37 @@ async function _kamAbonosLoad(slug, deudaPorProveedor) {
     const conDeuda = Object.keys(deudaPorProveedor || {});
     const provOpts = conDeuda.map((pid) => `<option value="${_esfEsc(pid)}">${_esfEsc(deudaPorProveedor[pid].nombre)}</option>`).join('');
     const form = conDeuda.length
-      ? `<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:10px 0">
+      ? `<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:8px 0">
           <select class="cot-input" id="kam-abono-prov" style="min-width:130px">${provOpts}</select>
           <input class="cot-input" id="kam-abono-monto" type="number" min="0" step="0.01" placeholder="Monto" style="width:110px">
           <input class="cot-input" id="kam-abono-fecha" type="date" value="${_kamToday()}" style="width:150px">
           <input class="cot-input" id="kam-abono-nota" placeholder="Nota (opcional)" maxlength="500" style="flex:1;min-width:120px">
           <button class="btn btn-primary btn-sm" type="button" onclick="_kamAbonoCrear('${_esfEsc(slug)}')">REGISTRAR ABONO</button>
         </div>`
-      : '<div style="font-size:12px;color:var(--ts);margin:10px 0">Registra compras primero.</div>';
+      : '<div style="font-size:12px;color:var(--ts);margin:8px 0">Registra compras primero.</div>';
 
     const filasAbonos = abonos.length
       ? abonos.map((a) => `<tr style="border-top:1px solid var(--border)">
-          <td style="padding:6px 4px;font-size:12px;color:var(--ts)">${_esfEsc(a.fecha || '')}</td>
-          <td style="padding:6px 4px;font-size:12px">${_esfEsc(a.proveedor_nombre || '—')}</td>
-          <td style="padding:6px 4px;font-size:12px">${_kamMoney(a.monto)}</td>
-          <td style="padding:6px 4px;font-size:12px;color:var(--ts)">${_esfEsc(a.nota || '')}</td>
-          <td style="padding:6px 4px;text-align:right"><button class="btn btn-ghost btn-sm" type="button" onclick="_kamAbonoEliminar('${_esfEsc(a.id)}','${_esfEsc(slug)}')" title="Eliminar abono">✕</button></td>
+          <td style="padding:3px 4px;font-size:12px;color:var(--ts)">${_esfEsc(a.fecha || '')}</td>
+          <td style="padding:3px 4px;font-size:12px">${_esfEsc(a.proveedor_nombre || '—')}</td>
+          <td style="padding:3px 4px;font-size:12px">${_kamMoney(a.monto)}</td>
+          <td style="padding:3px 4px;font-size:12px;color:var(--ts)">${_esfEsc(a.nota || '')}</td>
+          <td style="padding:3px 4px;text-align:right"><button class="btn btn-ghost btn-sm" type="button" onclick="_kamAbonoEliminar('${_esfEsc(a.id)}','${_esfEsc(slug)}')" title="Eliminar abono">✕</button></td>
         </tr>`).join('')
-      : '<tr><td colspan="5" style="padding:6px 4px;font-size:12px;color:var(--ts)">Sin abonos registrados</td></tr>';
+      : '<tr><td colspan="5" style="padding:3px 4px;font-size:12px;color:var(--ts)">Sin abonos registrados</td></tr>';
 
     const saldoTotal = deudaTotal - abonadoTotal;
     // [KMS-1] El abonado llega en este segundo tiempo y completa el tablero.
     // [KMS-2] …y con él lo abonado POR PROVEEDOR, que es lo que vuelve un
     // "saldo" el número del preview de compra. Ya estaba calculado; se publica.
     _kmsTableroPintar({ abonado: abonadoTotal, abonadoProv: abonadoPorProveedor });
-    cont.innerHTML = `<div style="border:1px solid var(--border);border-radius:var(--r-sm,8px);padding:12px">
-      <div style="font-family:'Rajdhani',sans-serif;font-weight:700;font-size:15px;margin-bottom:8px">Abonos a proveedores</div>
+    cont.innerHTML = `<div style="border:1px solid var(--border);border-radius:var(--r-sm,8px);padding:9px 11px">
+      <div style="font-family:'Rajdhani',sans-serif;font-weight:700;font-size:14px;margin-bottom:6px">Abonos a proveedores</div>
       ${lineas || '<div style="font-size:12px;color:var(--ts)">Sin deuda ni abonos todavía.</div>'}
       ${form}
       <div id="kam-abonos-alert" style="margin-bottom:8px"></div>
       <table style="width:100%;border-collapse:collapse"><tbody>${filasAbonos}</tbody></table>
-      <div style="text-align:right;font-size:13px;font-weight:700;margin-top:10px">Deuda total ${_kamMoney(deudaTotal)} · Abonado total ${_kamMoney(abonadoTotal)} · Saldo total ${_kamMoney(saldoTotal)}</div>
+      <div style="text-align:right;font-size:13px;font-weight:700;margin-top:8px">Deuda total ${_kamMoney(deudaTotal)} · Abonado total ${_kamMoney(abonadoTotal)} · Saldo total ${_kamMoney(saldoTotal)}</div>
     </div>`;
   } catch (e) {
     cont.innerHTML = `<div class="alert alert-error">${_esfEsc(e.message)}</div>`;

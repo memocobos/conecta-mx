@@ -3109,3 +3109,87 @@ input[type="search"],.kh-buscar,.buscador{border-radius:var(--r-sm,8px)}
  .kms-alm-i{flex-direction:column;gap:2px}
  .kms-alm-ch{display:none}
 }
+
+/* ═══ [KMS-6] EL PALACIO COMPACTO ═════════════════════════════════════════
+   Memo: "lo siento muy grande o alargado y eso me confunde a la hora de ver
+   todo en conjunto". Medido antes de tocar nada: con melanie elegido la página
+   media 1758 px contra 820 de pantalla — dos pantallas y pico, así que "el
+   conjunto" no existia: solo se veian pedazos.
+
+   La regla de esta tuerca es que NO SE ESCONDE INFORMACIÓN para adelgazar. Lo
+   único que desaparece es la frase de instrucciones del mando, y solo mientras
+   estas desplazado (ya elegiste el evento: la instruccion ya se cumplio). Todo
+   lo demas sigue impreso, con menos aire alrededor.                          */
+
+/* ── El mando: de tarjetón sticky a franja de una línea ── */
+.kms-mando{padding:10px 14px}
+.kms-mando-lbl{margin-bottom:5px}
+.kms-mando-hint{margin-top:5px}
+/* Compacto al desplazarse. La clase la pone un IntersectionObserver sobre un
+   centinela — se conmuta UNA vez al cruzar el umbral, no por frame, así que no
+   choca con la regla de animación (que existe por el reflow por frame). */
+.kms-mando-mini{padding:5px 12px}
+.kms-mando-mini .kms-mando-lbl{
+ margin:0;flex:0 0 auto;align-self:center;
+ font-size:9px;letter-spacing:.1em;
+}
+.kms-mando-mini .kms-mando-hint{display:none}
+.kms-mando-mini > .kms-mando-row{margin:0}
+.kms-mando-mini{display:flex;align-items:center;gap:12px}
+.kms-mando-mini .kms-mando-row{flex:1;min-width:0}
+.kms-mando-mini .cot-input{padding-top:5px;padding-bottom:5px;font-size:12px}
+
+/* ── El tablero: los totales en UNA franja densa ── */
+.kms-tab{padding:12px;margin-bottom:10px}
+.kms-tab-tot{gap:8px;margin-bottom:9px}
+.kms-tab-c{padding:7px 12px;min-width:132px}
+.kms-tab-c-lbl{margin-bottom:2px}
+.kms-tab-c-val{font-size:17px;display:inline}
+/* El subtítulo deja de ser un renglón propio: va pegado a su cifra. Misma
+   frase, sin el renglón extra por tarjeta. */
+.kms-tab-c-sub{display:inline;margin:0 0 0 6px;font-size:10px}
+/* La tabla de zonas: menos aire y un punto menos de tipografía. */
+.kms-tab-z th{padding:4px 7px}
+.kms-tab-z td{padding:4px 7px;font-size:11px}
+
+/* ── Las alarmas de KMS-5, apretadas ── */
+.kms-alm{padding:9px 12px;margin-bottom:10px}
+.kms-alm-h{margin-bottom:6px}
+.kms-alm-list{gap:4px}
+.kms-alm-i{padding:5px 10px;font-size:12px}
+
+/* ── Pasos y lista de zonas ── */
+.kms-pasos{margin-bottom:10px;padding-bottom:2px}
+.kms-paso{padding:7px 12px;font-size:12px}
+.kms-zlista{gap:4px}
+.kms-zrow{padding:7px 11px}
+.kms-zrow-n{font-size:14px}
+
+/* En pantallas chicas el mando mini vuelve a dos renglones: apretarlo ahí
+   dejaría el select de 90 px. */
+@media (max-width:640px){
+ .kms-mando-mini{display:block}
+ .kms-mando-mini .kms-mando-lbl{margin-bottom:4px}
+}
+
+/* Los bloques de dentro del paso: mismo contenido, menos margen. */
+.kms-panel-h{margin-bottom:10px}
+.kms-panel-d{line-height:1.4}
+.prv2-caja{margin-top:12px;padding:9px 11px}
+.prv2-d{margin:2px 0 7px}
+.prv2-fila{padding:3px 0}
+.kms-zbusca{margin-bottom:7px}
+
+/* Último apretón, ya medido: cada regla de aquí quita alto sin quitar letra. */
+.kms-alm{padding:8px 12px}
+.kms-alm-i{padding:4px 10px}
+.kms-tab{padding:10px}
+.kms-tab-z td{padding:3px 7px}
+.kms-zlista{gap:3px}
+.kms-zrow{padding:6px 10px}
+
+/* El mando pegado tapa lo que pasa por debajo — es lo que hace un sticky. Lo
+   que NO puede pasar es que algo quede INALCANZABLE: cuando el propio Palacio
+   te lleva a un sitio (una zona, los abonos, el tablero), el destino tiene que
+   quedar por DEBAJO de la franja, no detrás de ella. */
+#kms-tablero,.kms-zpanel,#kam-abonos,.kms-zlista,#kms-alarmas{scroll-margin-top:64px}

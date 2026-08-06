@@ -1774,7 +1774,40 @@ const khViajeros = {
   eliminar(id) { return this._call({ accion: 'viajero_eliminar', id }); },
   // [VJ-1] editar(id, campos) → { ok, viajero, tocadas } — whitelist server-side
   editar(id, campos) { return this._call({ accion: 'viajero_editar', id, campos }); },
+  // [VJ-3] dinero de los migrados
+  abonosDe(viajero_id) { return this._call({ accion: 'abonos_listar', viajero_id }).then(j => j.abonos || []); },
+  abonosDeEvento(evento_id) { return this._call({ accion: 'abonos_listar', evento_id }).then(j => j.abonos || []); },
+  abonoCrear(payload) { return this._call(Object.assign({ accion: 'abono_crear' }, payload)); },
 };
+
+// ═══════════════════════════════════════════════════════════════════════════
+// [VJ-3] LA REGLA DE ORO DEL SALDO DE UN MIGRADO
+//
+//   resta = total_contrato − abonado_previo − suma(abonos_viajero)
+//
+// NUNCA se recalcula de paquete + habitación + vuelo: el total que vino del
+// Excel YA traía todo eso adentro, y volver a armarlo daría otro número.
+// `total_contrato` y `abonado_previo` están CONGELADOS.
+//
+// Vive en UNA sola función porque la usan dos pantallas (la ficha y la tabla).
+// Dos copias de una regla de dinero acaban divergiendo, y el síntoma sería que
+// la misma persona debe cosas distintas según dónde la mires.
+//
+// SALDOS A FAVOR: hay 15 personas reales con abonado > total (Laura, −$652.5).
+// NO son error y no se corrigen: se dicen "a favor".
+// ═══════════════════════════════════════════════════════════════════════════
+function _vj3Saldo(v, abonos) {
+  if (!v || v.total_contrato == null) return null;   // fila sin dinero
+  const total = Number(v.total_contrato) || 0;
+  const previo = Number(v.abonado_previo) || 0;
+  const extra = (abonos || []).reduce((s, a) => s + (Number(a.monto) || 0), 0);
+  const abonado = previo + extra;
+  return { total, abonado, resta: total - abonado, aFavor: (total - abonado) < 0 };
+}
+
+function _vj3Money(n) {
+  return '$' + Math.abs(Number(n) || 0).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
 
 // [sec-sensibles] deudas_coordi + strikes_log + sistema_alertas vía Netlify Function
 // con service_role. deudas: maestro_roshi+bulma · strikes/alertas: maestro_roshi.
@@ -10534,15 +10567,57 @@ async function _vj2Cargar() {
   }
   if (!_vj2Filas.length) return;   // sin migrados = idéntico a hoy
 
+  // [VJ-3] Los abonos de TODO el evento en UNA llamada: 29 filas no pueden
+  // hacer 29 consultas. Fails-soft — sin abonos el saldo sale del congelado.
+  let porViajero = {};
+  try {
+    (await khViajeros.abonosDeEvento(_ccEventoActual)).forEach((a) => {   // [sec-coordi]
+      (porViajero[a.viajero_id] = porViajero[a.viajero_id] || []).push(a);
+    });
+  } catch (_) { porViajero = {}; }
+
   const n = _vj2Filas.length;
   if (cnt) cnt.textContent = `${n} ${n === 1 ? 'viajero' : 'viajeros'}`;
   // El total, DICHO: que nadie tenga que sumarlo de cabeza ni suponer si el
   // número de arriba ya incluía a los de abajo.
   if (countEl) countEl.textContent = `${nPortal} del Portal + ${n} migrados = ${nPortal + n}`;
 
-  list.innerHTML = `<div class="vj2-wrap"><table class="vj2-tabla">
+  // [VJ-3] El dinero del evento, separado en sus dos naturalezas.
+  //
+  // OJO CON LA ETIQUETA: el neto NO es "lo que voy a cobrar". En melanie hoy
+  // son 2 personas que deben $6,800 y 15 que tienen $2,917 a favor; el neto de
+  // $3,883 sale de restarlas entre sí, y son obligaciones opuestas — el crédito
+  // de una no paga la deuda de otra. Decir solo "Por cobrar: $3,883" haría
+  // pensar que se van a cobrar 3,883 cuando lo cobrable son 6,800.
+  let deuda = 0, favor = 0, nDeben = 0, nFavor = 0, conDinero = 0;
+  _vj2Filas.forEach((v) => {
+    const s = _vj3Saldo(v, porViajero[v.id]);
+    if (!s) return;
+    conDinero++;
+    if (s.resta > 0) { deuda += s.resta; nDeben++; }
+    else if (s.resta < 0) { favor += -s.resta; nFavor++; }
+  });
+  // Total y abonado del evento, además del desglose: son las dos cifras que se
+  // carean contra el Excel, y sin ellas no hay contra qué cuadrar.
+  let totalEv = 0, abonadoEv = 0;
+  _vj2Filas.forEach((v) => {
+    const s = _vj3Saldo(v, porViajero[v.id]);
+    if (!s) return;
+    totalEv += s.total; abonadoEv += s.abonado;
+  });
+  const dineroHtml = conDinero ? `<div class="vj3-tot">
+      <span class="vj3-tot-i">Total <b>${_vj3Money(totalEv)}</b><i>${conDinero} con contrato</i></span>
+      <span class="vj3-tot-i">Abonado <b class="vj3-ok">${_vj3Money(abonadoEv)}</b><i>previo + abonos</i></span>
+      <span class="vj3-tot-i">Por cobrar <b class="vj3-debe">${_vj3Money(deuda)}</b><i>${nDeben} ${nDeben === 1 ? 'persona' : 'personas'}</i></span>
+      <span class="vj3-tot-i">A favor <b class="vj3-favor">${_vj3Money(favor)}</b><i>${nFavor} ${nFavor === 1 ? 'persona' : 'personas'}</i></span>
+      <span class="vj3-tot-i vj3-tot-neto">Neto <b>${_vj3Money(deuda - favor)}</b><i>cobrar − a favor</i></span>
+    </div>` : '';
+
+  list.innerHTML = dineroHtml + `<div class="vj2-wrap"><table class="vj2-tabla">
     <thead><tr>
-      <th>Nombre</th><th>Paquete</th><th>Zona</th><th>Talla</th><th>Contacto</th><th>Notas</th>
+      <th>Nombre</th><th>Paquete</th><th>Zona</th><th>Talla</th><th>Contacto</th>
+      ${conDinero ? '<th class="vj3-col">Total</th><th class="vj3-col">Abonado</th><th class="vj3-col">Resta</th>' : ''}
+      <th>Notas</th>
     </tr></thead>
     <tbody>${_vj2Filas.map((v) => {
       // El origen, visible por fila: `tipo_viajero` lo pone el alta de staff;
@@ -10558,6 +10633,21 @@ async function _vj2Cargar() {
         <td>${_esfEsc(v.zona_boleto || '—')}</td>
         <td>${v.talla_playera ? _esfEsc(v.talla_playera) : '<span class="vj2-vacio">—</span>'}</td>
         <td>${contacto}${emerg ? `<div class="vj2-emerg">SOS ${_esfEsc(emerg)}</div>` : ''}</td>
+        ${(() => {
+          // [VJ-3] Las columnas de dinero solo EXISTEN si el payload trae
+          // dinero. A un coordi el servidor no le manda total_contrato, así que
+          // ni siquiera ve los encabezados: sin esto la tabla le pintaba tres
+          // columnas de "—" y le contaba que hay un dinero que no puede ver.
+          if (!conDinero) return '';
+          // Y dentro de una tabla CON dinero, la fila sin contrato lleva "—":
+          // un "$0" diría "no debe nada" cuando lo cierto es que no aplica
+          // (staff, la ganadora del sorteo, intercambios).
+          const s = _vj3Saldo(v, porViajero[v.id]);
+          if (!s) return '<td class="vj3-col vj2-vacio">—</td><td class="vj3-col vj2-vacio">—</td><td class="vj3-col vj2-vacio">—</td>';
+          return `<td class="vj3-col">${_vj3Money(s.total)}</td>
+                  <td class="vj3-col vj3-ok">${_vj3Money(s.abonado)}</td>
+                  <td class="vj3-col ${s.aFavor ? 'vj3-favor' : (s.resta > 0 ? 'vj3-debe' : '')}">${_vj3Money(s.resta)}${s.aFavor ? '<i class="vj3-af"> a favor</i>' : ''}</td>`;
+        })()}
         <td class="vj2-notas">${v.notas ? _esfEsc(v.notas) : '<span class="vj2-vacio">—</span>'}</td>
       </tr>`;
     }).join('')}</tbody>
@@ -14291,6 +14381,7 @@ async function quitarStrike(userId, nombre, strikesActuales) {
 let _vjAlertasCache = [];
 let _vjFilas = [];        // filas de la persona, tal como vinieron del servidor
 let _vjAlertaId = null;
+let _vjAbonos = {};       // [VJ-3] viajero_id -> abonos, para el saldo de la ficha
 
 const VJ_CAMPOS = [
   { k: 'correo',            lbl: 'Correo',                 tipo: 'email', ph: 'nombre@correo.com' },
@@ -14354,6 +14445,17 @@ async function _vjAbrir(alertaId) {
       return;
     }
 
+    // [VJ-3] El dinero de cada fila que lo tenga. Se piden los abonos de todas
+    // las filas de la persona ANTES de pintar, para que el saldo salga completo
+    // de una vez y no aparezca un número que después se corrige solo.
+    const conDinero = _vjFilas.filter((v) => v.total_contrato != null);
+    _vjAbonos = {};
+    if (conDinero.length) {
+      const listas = await Promise.all(conDinero.map((v) =>
+        khViajeros.abonosDe(v.id).catch(() => [])));   // [sec-coordi]
+      conDinero.forEach((v, k) => { _vjAbonos[v.id] = listas[k]; });
+    }
+
     body.innerHTML = _vjFilas.map((v, i) => `
       <div class="vj-fila">
         <div class="vj-fila-h">
@@ -14368,6 +14470,7 @@ async function _vjAbrir(alertaId) {
                      value="${_esfEsc(v[c.k] == null ? '' : v[c.k])}" maxlength="500">
             </label>`).join('')}
         </div>
+        ${_vj3BloqueHtml(v, i)}
       </div>`).join('') + `
       <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px;flex-wrap:wrap">
         <button class="btn btn-ghost" type="button" onclick="cerrarModal('vj-datos')">Cancelar</button>
@@ -14375,6 +14478,97 @@ async function _vjAbrir(alertaId) {
       </div>`;
   } catch (e) {
     body.innerHTML = `<div class="alert alert-error">${_esfEsc(e.message)}</div>`;
+  }
+}
+
+// [VJ-3] El bloque de dinero de UNA fila. Si la fila no trae total_contrato
+// (staff, intercambio, la ganadora del sorteo) NO se pinta nada: la ficha se ve
+// como antes de esta tuerca. Inventarle un "$0" a quien no tiene contrato sería
+// afirmar que no debe nada, y lo cierto es que no aplica.
+function _vj3BloqueHtml(v, i) {
+  const s = _vj3Saldo(v, _vjAbonos[v.id]);
+  if (!s) return '';
+  const abonos = _vjAbonos[v.id] || [];
+  const filas = abonos.length ? abonos.map((a) => `
+    <div class="vj3-ab">
+      <span class="vj3-ab-f">${_esfEsc(String(a.fecha || '').slice(0, 10))}</span>
+      <span class="vj3-ab-m">${_vj3Money(a.monto)}</span>
+      <span class="vj3-ab-n">${a.nota ? _esfEsc(a.nota) : ''}${a.capturado_por ? `<span class="vj3-ab-q">· ${_esfEsc(a.capturado_por)}</span>` : ''}</span>
+      ${a.foto_url ? `<a class="vj3-ab-foto" href="${_esfEsc(a.foto_url)}" target="_blank" rel="noopener">ver foto</a>` : '<span class="vj3-ab-sf">sin foto</span>'}
+    </div>`).join('') : '<div class="vj3-ab-vacio">Sin abonos capturados aquí todavía.</div>';
+
+  return `<div class="vj3-caja">
+    <div class="vj3-nums">
+      <div class="vj3-n"><span>Total</span><b>${_vj3Money(s.total)}</b></div>
+      <div class="vj3-n"><span>Abonado</span><b class="vj3-ok">${_vj3Money(s.abonado)}</b></div>
+      <div class="vj3-n">
+        <span>${s.aFavor ? 'A favor' : 'Resta'}</span>
+        <b class="${s.aFavor ? 'vj3-favor' : 'vj3-debe'}">${_vj3Money(s.resta)}</b>
+      </div>
+    </div>
+    ${s.aFavor ? '<div class="vj3-nota-favor">Abonó de más. NO es un error — se le debe a la persona.</div>' : ''}
+    <div class="vj3-abs">${filas}</div>
+    <div class="vj3-form">
+      <div class="vj3-form-t">Registrar abono</div>
+      <div class="vj3-form-g">
+        <label class="vj-campo"><span>Monto *</span>
+          <input class="cot-input" id="vj3-monto-${i}" type="number" min="0" step="0.01" placeholder="0.00"></label>
+        <label class="vj-campo"><span>Fecha</span>
+          <input class="cot-input" id="vj3-fecha-${i}" type="date" value="${_kamToday()}"></label>
+        <label class="vj-campo"><span>Nota</span>
+          <input class="cot-input" id="vj3-nota-${i}" placeholder="Transferencia, OXXO…" maxlength="500"></label>
+        <label class="vj-campo"><span>Foto (opcional)</span>
+          <input class="cot-input" id="vj3-foto-${i}" type="file" accept="image/*"></label>
+      </div>
+      <div class="vj3-form-b">
+        <button class="btn btn-primary btn-sm" type="button" id="vj3-btn-${i}" onclick="_vj3Abonar(${i})">Registrar abono</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+// Lee un <input type=file> a data-URI. Sin archivo → null (la foto es opcional).
+function _vj3LeerFoto(input) {
+  return new Promise((res) => {
+    const f = input && input.files && input.files[0];
+    if (!f) return res(null);
+    const fr = new FileReader();
+    fr.onload = () => res(String(fr.result || '') || null);
+    fr.onerror = () => res(null);   // fails-soft: el abono vale sin la foto
+    fr.readAsDataURL(f);
+  });
+}
+
+async function _vj3Abonar(i) {
+  _vjAlert('');
+  const v = _vjFilas[i];
+  if (!v) return;
+  const mEl = document.getElementById(`vj3-monto-${i}`);
+  const monto = Number((mEl || {}).value);
+  // > 0 estricto, igual que el servidor: un abono de cero no es un abono.
+  if (!Number.isFinite(monto) || monto <= 0) {
+    return _vjMal('El monto del abono tiene que ser mayor que cero.', `vj3-monto-${i}`);
+  }
+  const fecha = String((document.getElementById(`vj3-fecha-${i}`) || {}).value || '').trim();
+  const nota = String((document.getElementById(`vj3-nota-${i}`) || {}).value || '').trim();
+  const foto = await _vj3LeerFoto(document.getElementById(`vj3-foto-${i}`));
+
+  const btn = document.getElementById(`vj3-btn-${i}`);
+  if (btn) { btn.disabled = true; btn.textContent = 'Guardando…'; }
+  try {
+    await khViajeros.abonoCrear({                      // [sec-coordi]
+      viajero_id: v.id, monto,
+      fecha: fecha || undefined,
+      nota: nota || undefined,
+      foto: foto || undefined,
+    });
+    // Se recarga la ficha entera: así el saldo que queda en pantalla sale de
+    // los datos, no de restar en el cliente y confiar.
+    await _vjAbrir(_vjAlertaId);
+    showToast(`Abono de ${_vj3Money(monto)} registrado`, 'success');
+  } catch (e) {
+    _vjAlert(e.message, true);
+    if (btn) { btn.disabled = false; btn.textContent = 'Registrar abono'; }
   }
 }
 

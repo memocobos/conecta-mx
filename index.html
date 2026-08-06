@@ -5043,6 +5043,26 @@ function calcular(){
   total+=transportCost*selViaj;
   costoXPersona+=transportCost;
 
+  // ═══════════════════════════════════════════════════════════════════════
+  // EL SEPARO IGNORA LAS PROMOS **A PROPÓSITO** — SELLADO POR MEMO (5-ago-2026).
+  //
+  // Este bloque corre ANTES del bloque de promo y NO se recalcula después; lo
+  // único que se rehace con el descuento es `resto`. Vale para TODOS los tipos
+  // de código, parejo: `pct`, `amount` y `segundoPax`.
+  //
+  // Razón de negocio: el descuento le pega al SALDO, no al enganche. Un
+  // apartado más firme le conviene a la casa, y está medido que el separo nunca
+  // rebasa el total ya con promo.
+  //
+  // NO es un olvido ni un hueco: si alguien "arregla" esto moviendo el cálculo
+  // debajo del bloque de promo, le baja el enganche a TODOS los códigos que ya
+  // existen de un plumazo.
+  //
+  // ÚNICO escenario que ameritaría re-abrirlo: que una promo VIVA cruce la
+  // frontera de los 15 días, donde el separo deja de ser plano y pasa a ser el
+  // 50% del precio (y ahí sí, del precio SIN promo). Hoy no existe: aitana es
+  // 28-oct y su separo es plano.
+  // ═══════════════════════════════════════════════════════════════════════
   if(selPkg==='cheap'){
     var cheapSep=cur.sepCheap!==undefined?cur.sepCheap:1000;
     // Separo especial por zona en CHEAP (ej. Box Oro = $4,000): si la cheapZona

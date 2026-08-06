@@ -46,12 +46,14 @@ const ROLES_ADMIN = ['maestro_roshi', 'bulma', 'milk'];
 
 // Acciones válidas → roles permitidos (null = cualquier rol logueado; la
 // anti-escalación fina se hace en código por coordi_id===jwt).
-// [VJ-1] Editar datos del viajero: roshi y bulma, según la ficha de la tuerca.
-// OJO, inconsistencia heredada que conviene mirar: `viajero_eliminar` usa
-// ROLES_ADMIN, que incluye `milk`. O sea que hoy milk puede BORRAR una fila de
-// viajero y con esto no podrá EDITARLE el correo. Se deja como se pidió; si la
-// intención es que milk también capture, se cambia esta constante y ya.
-const ROLES_EDITA_VIAJERO = ['maestro_roshi', 'bulma'];
+// [VJ-1] Editar datos del viajero. RESUELTO POR MEMO (6-ago-2026): milk TAMBIÉN
+// captura. La ficha pedía solo roshi y bulma, pero `viajero_eliminar` ya usa
+// ROLES_ADMIN —que incluye milk—, así que milk podía BORRAR la fila entera y no
+// habría podido editarle el correo. Impedir lo menor mientras se permite lo
+// mayor no es un candado, es una molestia con cara de candado.
+// Queda como constante propia y NO como ROLES_ADMIN a secas: si algún día
+// ROLES_ADMIN crece por otra razón, esta lista no se mueve sola.
+const ROLES_EDITA_VIAJERO = ['maestro_roshi', 'bulma', 'milk'];
 
 const ACCIONES = {
   listar: null,

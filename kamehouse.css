@@ -2968,3 +2968,61 @@ input[type="search"],.kh-buscar,.buscador{border-radius:var(--r-sm,8px)}
    ocupa el lugar del listado. La diferencia es solo de margen. */
 .radar-error-box{ margin:14px 0; }
 .wl-error-box{ text-align:center; padding:32px; border-style:dashed; }
+
+/* ═══ [VJ-3] Dinero de los migrados — saldos y abonos ═════════════════════
+   La regla de oro vive en _vj3Saldo (JS): total − abonado_previo − abonos.
+   Aquí solo se pinta. Los saldos A FAVOR son reales y se marcan distinto, no
+   se esconden ni se corrigen.                                              */
+.vj3-col{text-align:right;white-space:nowrap}
+.vj3-ok{color:var(--green)}
+.vj3-debe{color:var(--red)}
+.vj3-favor{color:var(--gold)}
+.vj3-af{font-style:normal;font-size:9px;color:var(--ts);margin-left:3px}
+
+/* Totales del evento: tres cifras con su naturaleza dicha. */
+.vj3-tot{
+ display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;
+}
+.vj3-tot-i{
+ display:flex;flex-direction:column;gap:2px;
+ padding:9px 14px;min-width:130px;
+ border:1px solid var(--border);border-radius:var(--r-sm,8px);background:var(--bg3);
+ font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.12em;
+ text-transform:uppercase;color:var(--ts);
+}
+.vj3-tot-i b{font-family:'Rajdhani',sans-serif;font-size:19px;letter-spacing:0;text-transform:none}
+.vj3-tot-i i{font-style:normal;font-size:9px;letter-spacing:.06em;color:var(--ts);opacity:.8}
+.vj3-tot-neto b{color:var(--text)}
+
+/* Bloque de dinero dentro de la ficha del viajero. */
+.vj3-caja{
+ margin-top:12px;padding-top:12px;border-top:1px dashed var(--border);
+}
+.vj3-nums{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+.vj3-n{
+ display:flex;flex-direction:column;gap:2px;min-width:104px;
+ font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.12em;
+ text-transform:uppercase;color:var(--ts);
+}
+.vj3-n b{font-family:'Rajdhani',sans-serif;font-size:18px;letter-spacing:0;text-transform:none;color:var(--text)}
+.vj3-nota-favor{
+ font-size:11px;color:var(--gold);margin-bottom:10px;line-height:1.5;
+}
+.vj3-abs{margin-bottom:12px}
+.vj3-ab{
+ display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;
+ padding:5px 0;border-top:1px solid var(--border);font-size:11px;
+}
+.vj3-ab-f{font-family:'JetBrains Mono',monospace;color:var(--ts);white-space:nowrap}
+.vj3-ab-m{font-weight:700;color:var(--green);white-space:nowrap}
+.vj3-ab-n{color:var(--ts);flex:1;min-width:0}
+.vj3-ab-q{margin-left:6px;opacity:.75}
+.vj3-ab-foto{color:var(--gold);text-decoration:underline;white-space:nowrap}
+.vj3-ab-sf{color:var(--ts);opacity:.6;white-space:nowrap}
+.vj3-ab-vacio{font-size:11px;color:var(--ts);padding:5px 0}
+.vj3-form-t{
+ font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.14em;
+ text-transform:uppercase;color:var(--gold);margin-bottom:8px;
+}
+.vj3-form-g{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.vj3-form-b{display:flex;justify-content:flex-end;margin-top:10px}

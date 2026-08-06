@@ -64,7 +64,17 @@ const ACCIONES = {
   viajero_listar: null,
   viajero_eliminar: ROLES_ADMIN,
   viajero_editar: ROLES_EDITA_VIAJERO,
+  // [VJ-3] Dinero de los migrados. Mismos roles que editar: quien captura los
+  // datos captura los abonos.
+  abono_crear: ROLES_EDITA_VIAJERO,
+  abonos_listar: ROLES_EDITA_VIAJERO,
 };
+
+// [VJ-3] Bucket PRIVADO de los comprobantes de abono. Mismo patrón que
+// ine-creadores: nada público, todo por URL firmada que caduca.
+const BUCKET_ABONOS = 'abonos-viajeros';
+const FOTO_TTL = 3600;                 // 1 hora
+const FOTO_MAX_BYTES = 6 * 1024 * 1024;
 
 // Correo con forma de correo. Mismo criterio que el resto de la casa.
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -290,8 +300,15 @@ exports.handler = async (event) => {
         }
       }
 
+      // [VJ-3] EL DINERO NO SE LE PIDE A LA BASE SI QUIEN PREGUNTA NO PUEDE
+      // VERLO. No se trae y se esconde en el render: no se trae. Un coordi
+      // recibe EXACTAMENTE las columnas de siempre, así que ni abriendo la
+      // consola ve el total de un cliente. Misma filosofía que el desglose de
+      // comisiones que el vendedor jamás recibe.
+      const puedeDinero = ROLES_EDITA_VIAJERO.includes(jwtRol);
+      const cols = puedeDinero ? `${VE_READ_COLS},total_contrato,abonado_previo` : VE_READ_COLS;
       const sp = new URLSearchParams();
-      sp.set('select', VE_READ_COLS);
+      sp.set('select', cols);
       sp.append('evento_id', `eq.${evento_id}`);
       sp.set('order', 'nombre.asc');
       sp.set('limit', '2000');
@@ -364,6 +381,118 @@ exports.handler = async (event) => {
       return ok(headers, { viajero: filas[0] || null, tocadas: filas.length });
     }
 
+    // ── abonos_viajero: registrar un abono (admin) ───────────────────────
+    // [VJ-3] El dinero de los migrados NO se recalcula de paquete + hotel +
+    // vuelo: el total del Excel ya traía todo eso adentro. Aquí solo se SUMAN
+    // abonos nuevos sobre un total y un abonado que están CONGELADOS.
+    if (accion === 'abono_crear') {
+      if (!ROLES_EDITA_VIAJERO.includes(jwtRol)) {
+        return { statusCode: 403, headers, body: JSON.stringify({ error: 'No puedes registrar abonos' }) };
+      }
+      const viajero_id = String(body.viajero_id || '').trim();
+      if (!UUID_RE.test(viajero_id)) return bad(headers, 'viajero_id inválido');
+
+      const monto = Number(body.monto);
+      // > 0 estricto: un abono de cero no es un abono, y uno negativo sería una
+      // devolución disfrazada que descuadraría el saldo sin dejar rastro de qué
+      // fue. Si algún día hay devoluciones, van con su propio concepto.
+      if (!Number.isFinite(monto) || monto <= 0) return bad(headers, 'El monto tiene que ser mayor que cero');
+      if (monto > 1000000) return bad(headers, 'Monto fuera de rango');
+
+      const fecha = String(body.fecha || '').trim();
+      if (fecha && !/^\d{4}-\d{2}-\d{2}$/.test(fecha)) return bad(headers, 'Fecha inválida');
+      const nota = String(body.nota || '').trim().slice(0, 500) || null;
+
+      // La fila tiene que existir ANTES: un INSERT con FK a un id fantasma
+      // truena feo, y el evento hace falta para armar el path de la foto.
+      const pre = await fetch(`${baseVE}?id=eq.${viajero_id}&select=id,evento_id&limit=1`, { headers: sbHeaders });
+      if (!pre.ok) return upstream(headers, await pre.text(), 'consulta');
+      const vRows = await pre.json();
+      if (!vRows.length) return bad(headers, 'ese viajero no existe');
+
+      // ── Foto OPCIONAL ──
+      let foto_path = null;
+      if (body.foto) {
+        const img = _decodeImagen(body.foto);
+        if (img.error) return bad(headers, 'Foto inválida: ' + img.error);
+        if (img.tooBig) return bad(headers, 'La foto pesa demasiado (máx 6 MB)');
+        // <evento>/<viajero_id>/<uuid>.<ext> — el evento adelante para poder
+        // barrer por evento sin abrir cada carpeta.
+        foto_path = `${String(vRows[0].evento_id || 'sin-evento')}/${viajero_id}/${_uuid()}.${img.ext}`;
+        try { await _subirAbono(env, foto_path, img.bytes, img.mime); }
+        catch (e) { return { statusCode: 502, headers, body: JSON.stringify({ error: 'No se pudo subir la foto', detail: e.message }) }; }
+      }
+
+      // capturado_por sale del JWT, NUNCA del cliente (mismo anti-spoofing que
+      // strikes_log.por_quien): quien registró el dinero no se puede inventar.
+      const fila = {
+        viajero_id, monto, nota, foto_path,
+        capturado_por: (auth.user && (auth.user.nombre || auth.user.username || auth.user.correo)) || jwtUserId,
+      };
+      if (fecha) fila.fecha = fecha;
+
+      // INSERT directo, sin on_conflict (regla de la casa).
+      const r = await fetch(`${env.KH_SB_URL}/rest/v1/abonos_viajero`, {
+        method: 'POST',
+        headers: { ...sbHeaders, Prefer: 'return=representation' },
+        body: JSON.stringify(fila),
+      });
+      if (!r.ok) return upstream(headers, await r.text(), 'insert');
+      const creado = (await r.json())[0] || null;
+      return ok(headers, { abono: creado });
+    }
+
+    // ── abonos_viajero: listar los de un viajero (admin) ─────────────────
+    if (accion === 'abonos_listar') {
+      if (!ROLES_EDITA_VIAJERO.includes(jwtRol)) {
+        return { statusCode: 403, headers, body: JSON.stringify({ error: 'No puedes ver los abonos' }) };
+      }
+      // Dos modos: UNO (la ficha) o TODO UN EVENTO (la tabla de migrados, que
+      // necesita el saldo de 29 filas y no puede hacer 29 llamadas). Se extiende
+      // esta acción en vez de inventar otra: es la misma lectura con otro filtro.
+      const viajero_id = String(body.viajero_id || '').trim();
+      const evento_id = String(body.evento_id || '').trim();
+      let filtro;
+      if (viajero_id) {
+        if (!UUID_RE.test(viajero_id)) return bad(headers, 'viajero_id inválido');
+        filtro = `viajero_id=eq.${viajero_id}`;
+      } else if (evento_id) {
+        if (!SLUG_RE.test(evento_id) || evento_id.length > 120) return bad(headers, 'evento_id inválido');
+        const vr = await fetch(`${baseVE}?evento_id=eq.${encodeURIComponent(evento_id)}&select=id&limit=2000`, { headers: sbHeaders });
+        if (!vr.ok) return upstream(headers, await vr.text(), 'consulta');
+        const ids = (await vr.json()).map((x) => x.id).filter(Boolean);
+        // Sin viajeros no hay abonos: se contesta vacío en vez de mandar un
+        // `in.()` vacío, que PostgREST rechaza.
+        if (!ids.length) return ok(headers, { abonos: [] });
+        filtro = `viajero_id=in.(${ids.join(',')})`;
+      } else {
+        return bad(headers, 'falta viajero_id o evento_id');
+      }
+
+      // Whitelist: `foto_path` NO viaja al navegador; lo que viaja es su URL
+      // firmada, que caduca. Mandar el path invitaría a construir URLs a mano.
+      const r = await fetch(
+        `${env.KH_SB_URL}/rest/v1/abonos_viajero?${filtro}` +
+        `&select=id,viajero_id,monto,fecha,nota,foto_path,capturado_por,created_at&order=fecha.desc,created_at.desc`,
+        { headers: sbHeaders });
+      if (!r.ok) return upstream(headers, await r.text(), 'consulta');
+      const filas = await r.json();
+
+      // Solo se firma la foto cuando se pidió UN viajero (la ficha, que las
+      // muestra). Para el barrido del evento firmar 29 URLs sería 29 llamadas a
+      // storage para miniaturas que nadie va a abrir; se manda si HAY foto y ya.
+      const abonos = [];
+      for (const a of filas) {
+        const { foto_path, ...resto } = a;
+        abonos.push({
+          ...resto,
+          tiene_foto: !!foto_path,
+          foto_url: (viajero_id && foto_path) ? await _firmarAbono(env, foto_path) : null,
+        });
+      }
+      return ok(headers, { abonos });
+    }
+
     // ── viajeros_evento: eliminar (admin) ────────────────────────────────
     if (accion === 'viajero_eliminar') {
       const id = String(body.id || '').trim();
@@ -380,6 +509,74 @@ exports.handler = async (event) => {
     return { statusCode: 502, headers, body: JSON.stringify({ error: 'Error en admin-coordi-asignaciones', detail: e.message }) };
   }
 };
+
+// ----- [VJ-3] helpers de la foto del abono -----
+// Copiados del molde de contrato-firmar/contrato-obtener (INE): decodificar
+// data-URI, subir con service_role y firmar para leer. El bucket es privado,
+// así que la URL firmada es la ÚNICA forma de ver el comprobante.
+
+function _uuid() {
+  try { return require('crypto').randomUUID(); }
+  catch (_) {
+    // Sin randomUUID (runtime viejo): un id único que igual sirve de nombre de
+    // archivo. No es criptográfico y no hace falta que lo sea — el bucket es
+    // privado y el path no se adivina desde fuera.
+    return 'a' + Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
+  }
+}
+
+function _decodeImagen(dataUri) {
+  const m = /^data:(image\/[a-zA-Z0-9.+-]+);base64,([\s\S]+)$/.exec(String(dataUri || ''));
+  if (!m) return { error: 'no es una imagen en base64' };
+  const mime = m[1].toLowerCase();
+  let bytes;
+  try { bytes = Buffer.from(m[2].replace(/\s+/g, ''), 'base64'); }
+  catch (_) { return { error: 'base64 corrupta' }; }
+  if (!bytes.length) return { error: 'bytes vacíos' };
+  if (bytes.length > FOTO_MAX_BYTES) return { tooBig: true };
+  const ext = mime === 'image/png' ? 'png'
+    : mime === 'image/webp' ? 'webp'
+    : mime === 'image/heic' ? 'heic'
+    : mime === 'image/heif' ? 'heif'
+    : 'jpg';
+  return { bytes, mime, ext };
+}
+
+async function _subirAbono(env, path, bytes, contentType) {
+  const r = await fetch(`${env.KH_SB_URL}/storage/v1/object/${BUCKET_ABONOS}/${encodeURI(path)}`, {
+    method: 'POST',
+    headers: {
+      apikey: env.KH_SB_SERVICE,
+      Authorization: 'Bearer ' + env.KH_SB_SERVICE,
+      'Content-Type': contentType,
+      // SIN x-upsert: cada abono estrena su uuid, así que un path repetido
+      // sería un error de verdad y conviene que truene en vez de pisar una
+      // foto que ya estaba.
+    },
+    body: bytes,
+  });
+  if (!r.ok) throw new Error(`Storage ${r.status}: ${await r.text()}`);
+  return path;
+}
+
+async function _firmarAbono(env, path) {
+  try {
+    const r = await fetch(`${env.KH_SB_URL}/storage/v1/object/sign/${BUCKET_ABONOS}/${encodeURI(path)}`, {
+      method: 'POST',
+      headers: {
+        apikey: env.KH_SB_SERVICE,
+        Authorization: 'Bearer ' + env.KH_SB_SERVICE,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ expiresIn: FOTO_TTL }),
+    });
+    if (!r.ok) { console.error('[abonos] sign', r.status, await r.text().catch(() => '')); return null; }
+    const j = await r.json();
+    // Fails-soft: sin URL, la fila del abono igual se muestra; lo que falta es
+    // la foto, no el dinero.
+    return (j && j.signedURL) ? `${env.KH_SB_URL}/storage/v1${j.signedURL}` : null;
+  } catch (e) { console.error('[abonos] sign exception:', e.message); return null; }
+}
 
 // ----- helpers -----
 

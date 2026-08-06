@@ -245,7 +245,21 @@ exports.handler = async (event) => {
       // Fail-loud: sin disponibilidad no mostramos un semáforo a medias (podría
       // ocultar una sobreventa). El Palacio verá el error y reintenta.
       if (disp.error) return { statusCode: 502, headers, body: JSON.stringify({ error: 'No se pudo calcular el stock; intenta de nuevo' }) };
-      const zonas = Object.keys(disp.stockPorZona || {}).sort().map((z) => desgloseZona(disp, z));
+      // [KMS-5] LA UNIÓN de zonas con compras Y zonas con ajustes.
+      //
+      // Antes se enumeraban solo las de `stockPorZona` (las que tienen compras),
+      // así que una zona con "vendidos fuera" y CERO compras desaparecía del
+      // semáforo. Dos consecuencias, las dos cazadas en vivo por Jane en la
+      // Barrera de melanie (1 vendido fuera, 0 compras):
+      //   (a) el tablero pintaba "—" en Vend. fuera, escondiendo un número real;
+      //   (b) la casilla de captura salía en 0 y guardar PISABA el 1 con un 0.
+      // La zona sin compras no está "gestionada" (evaluarZona sigue igual, y con
+      // ella el candado anti-sobreventa): esto solo cambia lo que el ADMIN VE.
+      const zonasSem = [...new Set([
+        ...Object.keys(disp.stockPorZona || {}),
+        ...Object.keys(disp.ajustesPorZona || {}),
+      ])].sort();
+      const zonas = zonasSem.map((z) => desgloseZona(disp, z));
       return ok(headers, { gestionado: !!disp.gestionado, zonas });
     }
 

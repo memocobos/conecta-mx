@@ -93,6 +93,10 @@ exports.handler = async (event) => {
           khUrl: envKH.KH_SB_URL, khService: envKH.KH_SB_SERVICE,
           rol: (auth.user || {}).rol,
           preciosPorEvento: leerPrecios(body),
+          // [MER-1] Y qué eventos YA PASARON, por la MISMA razón que los precios:
+          // la fecha vive en el catálogo de index.html y el servidor no lo tiene.
+          // Un reloj de este lado sería una segunda definición de "ya pasó".
+          eventosPasados: leerPasados(body),
         });
         if (c.error) cuentaError = c.error; else cuenta = c;
       }
@@ -136,6 +140,18 @@ function leerPrecios(body) {
     if (Object.keys(z).length) out[slug] = z;
   });
   return Object.keys(out).length ? out : null;
+}
+
+// [MER-1] Los slugs de eventos ya ocurridos que manda el navegador. Se sanea con
+// el MISMO patrón que los precios (viene del cliente): la misma expresión de
+// slug y un tope de cuántos se aceptan.
+function leerPasados(body) {
+  const p = body && body.eventos_pasados;
+  if (!Array.isArray(p)) return null;
+  const out = p.slice(0, 400)
+    .map((s) => String(s || '').trim())
+    .filter((s) => /^[A-Za-z0-9_.#-]{1,80}$/.test(s));
+  return out.length ? out : null;
 }
 
 function readEnvKH() {

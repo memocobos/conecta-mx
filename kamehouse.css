@@ -3287,6 +3287,21 @@ input[type="search"],.kh-buscar,.buscador{border-radius:var(--r-sm,8px)}
 .aud-bodega b.aud-pos{color:var(--green)}
 .aud-bodega b.aud-neg{color:var(--gold)}
 
+/* ═══ [MER-1] La merma — la bodega de un evento que ya pasó ═══════════════
+   El oro de la bodega dice "esto todavía se puede cobrar". Cuando el evento ya
+   ocurrió eso deja de ser cierto, así que la merma NO puede seguir en oro: va en
+   rojo, el mismo color con el que la casa dice "esto ya se perdió". Es la misma
+   distinción de color que separa la ganancia de la falta por recuperar.        */
+.mer1-merma{color:var(--red)}
+.fin1c-merma{border-left-color:var(--red)}
+.fin1c-merma .fin1c-bod-l b{color:var(--red)}
+.aud-merma{margin-top:2px}
+.aud-bodega-merma{border-left-color:var(--red)}
+/* `.aud-bodega b` pinta de --text a CUALQUIER <b> de adentro y le gana a una
+   sola clase. Se sube la especificidad a propósito para que el rojo de la merma
+   no dependa del orden del archivo. */
+.aud-bodega .mer1-merma{color:var(--red)}
+
 /* ═══ [AUD-1e] El letrero de las tarjetas retiradas ══════════════════════ */
 .aud1e-nota{
  background:var(--bg2);border:1px solid var(--border);border-left:3px solid var(--border2);

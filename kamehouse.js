@@ -3415,6 +3415,48 @@ let _utilG3Cache = null;  // { eventos, sin_evento, totales } | null
 // Trae la utilidad por evento (todos los eventos) una sola vez. Best-effort: si
 // falla devuelve null y NO cachea — la vista sigue pintando lo demás (igual
 // criterio que _cobCargarGastos).
+// ═══════════════════════════════════════════════════════════════════════════
+// [MER-1] ¿EL EVENTO YA PASÓ? — UNA sola respuesta para las cuatro pantallas
+//
+// Memo, del 7-ago sobre melanie (el concierto fue el 6): "se quedaron sin
+// vender". Y las pantallas seguían diciendo «7 boletos por vender ≈ $40,100 ·
+// si se vende todo: +$29,319». Eso no es una estimación optimista: es una
+// imposibilidad. Un boleto de un concierto que ya ocurrió no se vende nunca, y
+// una pantalla que ofrece una salida inexistente es peor que una que calla.
+//
+// MANDA LA ÚLTIMA FECHA, NO LA PRIMERA. `ds` de un evento multifecha es el
+// PRIMER día — harry trae `ds:'2026-08-01'` con funciones el 7 y el 8 de
+// agosto — así que compararlo contra hoy declararía merma sobre boletos que
+// todavía se pueden vender. Ése es el error caro de los dos: apagaría la bodega
+// de un evento VIVO y pintaría de rojo un semáforo que debía estar ámbar. Las
+// fechas extra viven en `dsList` en unos eventos y en `multifecha[].ds` en
+// otros (weeknd y straykids usan la primera; morat y caifanes la segunda): se
+// leen las dos y gana la mayor.
+//
+// HOY EN HORA MX, con `_mxFechaStr()`, el helper de la casa. Jamás
+// `toISOString()`: pasadas las 6 de la tarde de acá ya es el día siguiente en
+// Greenwich, y en esta casa se trabaja de noche — el evento de HOY se
+// declararía pasado a media jornada, con boletos todavía en venta.
+//
+// Y la frontera es estricta (`<`): el día del evento NO es pasado. Mientras el
+// concierto no ocurre hay taquilla.
+//
+// Sin fecha legible NO se afirma nada: `false`, y la bodega se queda con su cara
+// de siempre. Una merma inventada es peor que una esperanza vieja.
+function _mermaUltimaFecha(ev) {
+  const iso = (v) => (/^\d{4}-\d{2}-\d{2}/.test(String(v || '')) ? String(v).slice(0, 10) : '');
+  if (!ev || typeof ev !== 'object') return iso(ev);   // también acepta 'YYYY-MM-DD' pelado
+  const fechas = [iso(ev.ds)];
+  if (Array.isArray(ev.dsList)) ev.dsList.forEach((d) => fechas.push(iso(d)));
+  if (Array.isArray(ev.multifecha)) ev.multifecha.forEach((m) => fechas.push(iso(m && m.ds)));
+  const buenas = fechas.filter(Boolean).sort();
+  return buenas.length ? buenas[buenas.length - 1] : '';
+}
+function _mermaPasado(ev) {
+  const f = _mermaUltimaFecha(ev);
+  return !!f && f < _mxFechaStr();
+}
+
 // [AUD-1c] LA UTILIDAD, CON LA BODEGA AL LADO — el requisito que Memo firmó:
 // EL ROJO NUNCA SOLO. Una ganancia negativa con boletos sin vender no es una
 // pérdida: es dinero que todavía está en forma de boleto. Enseñar el rojo sin la
@@ -3435,26 +3477,55 @@ function _audUtilidadPintar(utilidad, cta, util) {
   const b = cta || {};
   const boletos = b.bodega_boletos;
   const valor = b.bodega_valor;
+  // [MER-1] Los dos montones llegan SEPARADOS del servidor y aquí no se vuelven
+  // a mezclar: lo de los eventos por venir se puede vender, lo de los pasados no.
+  const mBoletos = b.merma_boletos;
+  const mCosto = b.merma_costo;
   // Sin cuenta o sin inventario NO se pinta una bodega vacía: se calla o se
   // dice, pero no se afirma "0 boletos" que nadie midió.
-  if (!cta || boletos == null) {
+  if (!cta || (boletos == null && mBoletos == null)) {
     bod.style.display = 'none'; bod.innerHTML = '';
     if (util && util.cuenta_error) {
       bod.style.display = ''; bod.innerHTML = `<span class="aud-bod-mudo">No pude leer el inventario, así que no sé cuántos boletos quedan por vender.</span>`;
     }
     return;
   }
-  if (!boletos) {
+  if (!boletos && !mBoletos) {
     bod.style.display = ''; bod.innerHTML = '<span class="aud-bod-mudo">Sin boletos por vender: la cuenta de arriba ya es la final.</span>';
     return;
   }
-  const siTodo = (valor == null) ? null : Number(utilidad) + valor;
+  const partes = [];
+  // La ESPERANZA: solo de eventos por venir, y solo ahí vive el "si se vende
+  // todo". La utilidad de arriba ya trae el costo de TODO lo comprado dentro de
+  // gastos, así que sumarle el valor de venta de lo que aún se puede vender sigue
+  // siendo la cuenta correcta — pero únicamente con lo vendible.
+  // Va SIN envolver, exactamente el markup de AUD-1c: en un evento por venir esta
+  // pantalla tiene que quedar byte a byte como estaba. La merma que viene abajo
+  // es un <div> —bloque— así que cuando existen las dos se separan solas.
+  if (boletos) {
+    const siTodo = (valor == null) ? null : Number(utilidad) + valor;
+    partes.push(`<b>${boletos}</b> boleto${boletos === 1 ? '' : 's'} por vender`
+      + (valor == null
+          ? ' <span class="aud-bod-mudo">— sin precio en el catálogo, no se puede estimar</span>'
+          : ` ≈ <b>${_spFmtMxn(valor)}</b> <span class="aud-bod-est">a precio de hoy (estimado)</span>`
+            + ` · Si se vende todo: <b class="${siTodo < 0 ? 'aud-neg' : 'aud-pos'}">${_spFmtMxn(siTodo)}</b>`));
+  }
+  // La MERMA: eventos que ya ocurrieron. Se mide en lo que COSTARON, no en lo
+  // que se iban a vender, y NUNCA lleva "si se vende todo" — no hay a quién.
+  if (mBoletos) {
+    partes.push(`<div class="aud-merma"><b>Merma:</b> <b>${mBoletos}</b> boleto${mBoletos === 1 ? '' : 's'} sin vender`
+      + (mCosto == null
+          ? ' <span class="aud-bod-mudo">— sin costo capturado, no se puede valorar</span>'
+          : ` · <b class="mer1-merma">${_spFmtMxn(mCosto)}</b> de costo hundido`)
+      + ' <span class="aud-bod-est">de eventos que ya pasaron</span></div>');
+  }
+  // El acento del bloque es ORO, que en esta casa significa "esto todavía se
+  // puede cobrar". Cuando lo único que hay es merma, esa promesa es falsa hasta
+  // en el color: se pasa a rojo. Con bodega vendible presente el bloque se queda
+  // EXACTAMENTE como estaba, clase incluida.
+  bod.className = 'aud-bodega' + ((mBoletos && !boletos) ? ' aud-bodega-merma' : '');
   bod.style.display = '';
-  bod.innerHTML = `<b>${boletos}</b> boleto${boletos === 1 ? '' : 's'} por vender`
-    + (valor == null
-        ? ' <span class="aud-bod-mudo">— sin precio en el catálogo, no se puede estimar</span>'
-        : ` ≈ <b>${_spFmtMxn(valor)}</b> <span class="aud-bod-est">a precio de hoy (estimado)</span>`
-          + ` · Si se vende todo: <b class="${siTodo < 0 ? 'aud-neg' : 'aud-pos'}">${_spFmtMxn(siTodo)}</b>`);
+  bod.innerHTML = partes.join('');
 }
 
 // [AUD-1c] LOS PRECIOS SE INYECTAN DESDE AQUÍ (decisión de Jane).
@@ -3485,14 +3556,33 @@ async function _audPreciosPorEvento() {
   } catch (_) { return null; }
 }
 
+// [MER-1] Y QUÉ EVENTOS YA PASARON, por el MISMO camino y la misma razón: la
+// fecha vive en el catálogo de index.html, que el servidor no tiene. El reloj es
+// uno solo y es éste; el servidor solo recibe la clasificación ya hecha.
+// Sin catálogo se mandan `null` y NINGÚN evento se marca pasado: la bodega se
+// queda con su cara de siempre, que es el lado seguro de equivocarse.
+async function _audEventosPasados() {
+  try {
+    const ev = await _fetchEVFromIndex();
+    if (!Array.isArray(ev) || !ev.length) return null;
+    const out = ev.filter((e) => e && e.id && _mermaPasado(e)).map((e) => String(e.id));
+    return out.length ? out : null;
+  } catch (_) { return null; }
+}
+
 async function _utilCargar(force) {
   if (_utilG3Cache && !force) return _utilG3Cache;
   try {
-    const precios = await _audPreciosPorEvento();
+    // Los dos salen del MISMO catálogo cacheado (_fetchEVFromIndex): dos lecturas,
+    // una sola descarga.
+    const [precios, pasados] = await Promise.all([_audPreciosPorEvento(), _audEventosPasados()]);
+    const cuerpo = {};
+    if (precios) cuerpo.precios_por_evento = precios;
+    if (pasados) cuerpo.eventos_pasados = pasados;
     const r = await fetch('/.netlify/functions/admin-utilidad-evento', {
       method: 'POST',
       headers: _spAdminHeaders(),
-      body: JSON.stringify(precios ? { precios_por_evento: precios } : {}),
+      body: JSON.stringify(cuerpo),
     });
     const d = await r.json();
     if (!r.ok || d.ok === false) throw new Error(d.error || 'No se pudo cargar la utilidad');
@@ -3862,7 +3952,10 @@ async function _renderResumenUtilidad(ev) {
   }
   // baseSlug (e.id) -> { nombre, fecha, ds } desde EV (patrón _gastosEVMap).
   const evMap = {};
-  (ev || []).forEach(e => { if (e && e.id) evMap[e.id] = { nombre: e.a || e.id, fecha: e.f || '', ds: e.ds || '' }; });
+  // [MER-1] `pasado` se resuelve con el EVENTO ENTERO, no con `r.ds`: la fila
+  // solo guarda la primera fecha, y en un multifecha ésa miente (ver
+  // _mermaUltimaFecha). Se decide aquí, donde todavía se tiene el objeto.
+  (ev || []).forEach(e => { if (e && e.id) evMap[e.id] = { nombre: e.a || e.id, fecha: e.f || '', ds: e.ds || '', pasado: _mermaPasado(e) }; });
   const evs = util.eventos || {};
   // [AUD-1d] LAS FILAS SALEN DE LA CUENTA VERDADERA, no de la caja.
   //
@@ -3878,7 +3971,7 @@ async function _renderResumenUtilidad(ev) {
   _resumenUtilRows = Object.keys(fuente).map(slug => {
     const d = fuente[slug] || {};
     const meta = evMap[slug];
-    const m = meta || { nombre: slug, fecha: '', ds: '' };
+    const m = meta || { nombre: slug, fecha: '', ds: '', pasado: false };
     const ventas = Number((cta ? d.ventas : d.cobrado) || 0);
     const facturado = Number((cta ? d.facturado : d.vendido) || 0);
     const gastos = Number(d.gastos || 0);
@@ -3890,6 +3983,13 @@ async function _renderResumenUtilidad(ev) {
       ventas, facturado, gastos, ganancia,
       bodega_boletos: bod ? bod.boletos : null,
       bodega_valor: bod ? bod.valor_estimado : null,
+      // [MER-1] `pasado` sale del catálogo (evMap) y NO del servidor: es el mismo
+      // reloj que clasificó la lista que se le mandó, así que las dos puntas
+      // coinciden por construcción. Un evento que el catálogo no conoce
+      // (`desconocido`) NO se declara pasado: sin fecha no hay afirmación.
+      pasado: !!m.pasado,
+      merma_boletos: bod ? bod.boletos : null,
+      merma_costo: bod ? bod.costo_hundido : null,
       pct: facturado > 0 ? (ventas / facturado) : 0,
     };
   });
@@ -3906,11 +4006,25 @@ async function _renderResumenUtilidad(ev) {
 //   rojo   = ni vendiendo todo lo que queda
 // Sin bodega conocida no se puede afirmar el ámbar: una ganancia negativa sin
 // saber qué queda por vender es roja hasta que se demuestre lo contrario.
-function _resumenUtilSemaforo(ganancia, bodegaValor) {
+//
+// [MER-1] Y en un evento YA PASADO el ámbar deja de existir: el ámbar dice "la
+// bodega alcanza para darle la vuelta", y en un concierto que ya ocurrió no hay
+// bodega que dé vuelta a nada. Ganancia negativa + evento pasado = ROJO, sin
+// consultar la bodega. Positivo sigue verde, pasado o no: ganar ya se ganó.
+function _resumenUtilSemaforo(ganancia, bodegaValor, pasado) {
   if (Number(ganancia) >= 0) return 'var(--green)';
+  if (pasado) return 'var(--red)';
   const b = Number(bodegaValor);
   if (Number.isFinite(b) && (Number(ganancia) + b) >= 0) return 'var(--gold)';
   return 'var(--red)';
+}
+// El texto del semáforo, junto a su color para que no puedan divergir.
+function _resumenUtilSemaforoTitulo(r) {
+  if (Number(r.ganancia) >= 0) return 'Ya gana';
+  if (r.pasado) return 'El evento ya pasó: no queda nada por vender';
+  return (Number.isFinite(Number(r.bodega_valor)) && r.ganancia + Number(r.bodega_valor) >= 0)
+    ? 'Todavía no, pero la bodega alcanza para darle la vuelta'
+    : 'Ni vendiendo lo que queda';
 }
 function _resumenUtilMxnCell(v, align) {
   const col = (Number(v) < 0) ? 'var(--red)' : '';
@@ -3980,18 +4094,27 @@ function _resumenUtilPintar() {
   const marcaDesc = '<span style="color:var(--orange);font-size:10px;font-weight:700;white-space:nowrap"> <svg class="ic"><use href="#ic-alerta"/></svg> evento desconocido</span>';
 
   // La bodega: boletos ≈ valor. Sin valor conocido NO se pinta un cero.
+  // [MER-1] En un evento pasado la misma celda cambia de cara: deja de decir lo
+  // que se puede cobrar y dice lo que se perdió, en COSTO y rotulado "merma".
   const bodCell = (r) => {
+    if (r.pasado) {
+      if (r.merma_costo == null) {
+        return `<td style="text-align:right;color:var(--ts)" title="${r.merma_boletos == null ? 'No se pudo leer el inventario' : 'Sin costo capturado en las compras'}">${r.merma_boletos == null ? '—' : 'merma ' + r.merma_boletos + ' bol.'}</td>`;
+      }
+      // La palabra "merma" va IMPRESA, no solo en el `title`: una columna que
+      // cambia de significado por renglón tiene que decirlo donde se ve. El
+      // título de la columna sigue siendo "Bodega" porque para la mayoría de los
+      // renglones eso es lo que es.
+      return `<td class="mer1-merma" style="text-align:right;font-variant-numeric:tabular-nums" title="Merma: ${r.merma_boletos} boleto${r.merma_boletos === 1 ? '' : 's'} sin vender · el costo ya se pagó">merma ${_spFmtMxn(r.merma_costo)}</td>`;
+    }
     if (r.bodega_valor == null) {
       return `<td style="text-align:right;color:var(--ts)" title="${r.bodega_boletos == null ? 'No se pudo leer el inventario' : 'Sin precio en el catálogo'}">${r.bodega_boletos == null ? '—' : r.bodega_boletos + ' bol.'}</td>`;
     }
     return `<td style="text-align:right;font-variant-numeric:tabular-nums" title="${r.bodega_boletos} boletos por vender, a precio de hoy (estimado)">${_spFmtMxn(r.bodega_valor)}</td>`;
   };
   const fila = (r) => {
-    const sem = _resumenUtilSemaforo(r.ganancia, r.bodega_valor);
-    const semTitle = (r.ganancia >= 0) ? 'Ya gana'
-      : ((Number.isFinite(Number(r.bodega_valor)) && r.ganancia + Number(r.bodega_valor) >= 0)
-          ? 'Todavía no, pero la bodega alcanza para darle la vuelta'
-          : 'Ni vendiendo lo que queda');
+    const sem = _resumenUtilSemaforo(r.ganancia, r.bodega_valor, r.pasado);
+    const semTitle = _resumenUtilSemaforoTitulo(r);
     // Desconocido: NO clickable (no hay a dónde ir); conocidos siguen → Por evento.
     const rowAttrs = r.desconocido ? '' : ` class="dash-click" onclick="_evtIrA('${r.slug}')" title="Ver en Por evento"`;
     return `<tr${rowAttrs} style="border-bottom:1px solid var(--border)">
@@ -4007,10 +4130,19 @@ function _resumenUtilPintar() {
   // Fila "Sin evento" (dinero real sin evento_id), separada antes de totales.
   let sinFila = '';
   let totVentas = 0, totFact = 0, totGas = 0, totGan = 0, totBod = 0, totBodOk = false;
+  // [MER-1] Los dos montones se totalizan APARTE. Sumarlos daría un número que
+  // no significa nada: la mitad se puede cobrar y la otra mitad ya se perdió.
+  let totMerma = 0, totMermaOk = false;
   rows.forEach(r => {
     totFact += r.facturado; totVentas += r.ventas; totGas += r.gastos; totGan += r.ganancia;
+    if (r.pasado) { if (r.merma_costo != null) { totMerma += Number(r.merma_costo); totMermaOk = true; } return; }
     if (r.bodega_valor != null) { totBod += Number(r.bodega_valor); totBodOk = true; }
   });
+  // Sin merma, la celda es la de siempre — la misma llamada, no una copia: en un
+  // universo sin eventos pasados esta tabla queda byte a byte como estaba.
+  const totBodCell = totMermaOk
+    ? `<td style="text-align:right;font-variant-numeric:tabular-nums">${totBodOk ? _spFmtMxn(totBod) : '<span style="color:var(--ts)">—</span>'}<div class="mer1-merma" style="font-weight:400;font-size:10px">merma ${_spFmtMxn(totMerma)}</div></td>`
+    : (totBodOk ? _resumenUtilMxnCell(totBod) : '<td style="text-align:right;color:var(--ts)">—</td>');
   if (_resumenUtilSin) {
     // Sin evento: hoy solo GASTOS. No se le inventan ventas ni bodega — sus
     // celdas van vacías, no en cero.
@@ -4030,7 +4162,7 @@ function _resumenUtilPintar() {
     <td style="padding:8px;text-transform:uppercase;font-size:11px;letter-spacing:.06em">Total</td>
     <td></td>
     ${_resumenUtilMxnCell(totFact)}${_resumenUtilMxnCell(totVentas)}${_resumenUtilMxnCell(totGas)}${_resumenUtilMxnCell(totGan)}
-    ${totBodOk ? _resumenUtilMxnCell(totBod) : '<td style="text-align:right;color:var(--ts)">—</td>'}
+    ${totBodCell}
     <td style="text-align:right">${totPct}%</td>
     <td></td><td></td>
   </tr>`;
@@ -4043,8 +4175,16 @@ function _resumenUtilPintar() {
 
   // ── Vista de TARJETAS (móvil <640px) — MISMA data (rows/acum/totales), otra presentación ──
   const mny = _resumenUtilMxn;
+  // [MER-1] La misma casilla de la tarjeta, con la misma regla que la celda de la
+  // tabla: en evento pasado se rotula "Merma" y lleva el costo, no el precio.
+  const bodCard = (r) => {
+    if (r.pasado) {
+      return `<div style="flex:1 1 92px"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--ts)">Merma</div><div class="mer1-merma" style="font-size:16px;font-weight:700">${r.merma_costo == null ? (r.merma_boletos == null ? '—' : r.merma_boletos + ' bol.') : _spFmtMxn(r.merma_costo)}</div></div>`;
+    }
+    return `<div style="flex:1 1 92px"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--ts)">Bodega</div><div style="font-size:16px;font-weight:700;color:var(--gold)">${r.bodega_valor == null ? (r.bodega_boletos == null ? '—' : r.bodega_boletos + ' bol.') : _spFmtMxn(r.bodega_valor)}</div></div>`;
+  };
   const card = (r) => {
-    const sem = _resumenUtilSemaforo(r.ganancia, r.bodega_valor);
+    const sem = _resumenUtilSemaforo(r.ganancia, r.bodega_valor, r.pasado);
     const cardAttrs = r.desconocido ? '' : ` class="dash-click" onclick="_evtIrA('${r.slug}')" title="Ver en Por evento"`;
     return `<div${cardAttrs} style="background:var(--bg2);border:1px solid var(--border);border-left:4px solid ${sem};border-radius:var(--radius);padding:12px 14px;margin-bottom:10px">
       <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:10px">
@@ -4054,7 +4194,7 @@ function _resumenUtilPintar() {
       <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px">
         <div style="flex:1 1 92px"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--ts)">${r.ganancia < 0 ? 'Falta recuperar' : 'Ganancia'}</div><div style="font-family:'Zen Dots',sans-serif;font-size:19px;color:${r.ganancia < 0 ? 'var(--red)' : 'var(--green)'}">${_spFmtMxn(Math.abs(r.ganancia))}</div></div>
         <div style="flex:1 1 92px"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--ts)">Ventas</div><div style="font-size:16px;font-weight:700">${_spFmtMxn(r.ventas)}</div></div>
-        <div style="flex:1 1 92px"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--ts)">Bodega</div><div style="font-size:16px;font-weight:700;color:var(--gold)">${r.bodega_valor == null ? (r.bodega_boletos == null ? '—' : r.bodega_boletos + ' bol.') : _spFmtMxn(r.bodega_valor)}</div></div>
+        ${bodCard(r)}
       </div>
       <div style="display:flex;gap:6px 14px;flex-wrap:wrap;font-size:11px;color:var(--ts);border-top:1px solid var(--border);padding-top:8px">
         <span>Facturado ${mny(r.facturado)}</span><span>Gastos ${mny(r.gastos)}</span><span>% cob ${Math.round(r.pct * 100)}%</span><span>Ganancia acum ${(r.slug in acum) ? mny(acum[r.slug]) : '—'}</span>
@@ -4062,14 +4202,14 @@ function _resumenUtilPintar() {
     </div>`;
   };
   // Tarjeta especial (Sin evento / Total): sin borde-semáforo, estilo distinto.
-  const cardEsp = (titulo, dashed, gan, ventas, fact, gas, bod) => {
+  const cardEsp = (titulo, dashed, gan, ventas, fact, gas, bod, merma) => {
     const pct = fact > 0 ? Math.round(ventas / fact * 100) : 0;
     return `<div style="background:var(--bg2);border:${dashed ? '1px dashed' : '2px solid'} var(--border);border-radius:var(--radius);padding:12px 14px;margin-bottom:10px">
       <div style="text-transform:uppercase;font-size:11px;letter-spacing:.06em;font-weight:800;color:var(--ts);margin-bottom:10px">${_esfEsc(titulo)}</div>
       <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px">
         <div style="flex:1 1 92px"><div style="font-size:10px;text-transform:uppercase;color:var(--ts)">${gan < 0 ? 'Falta recuperar' : 'Ganancia'}</div><div style="font-family:'Zen Dots',sans-serif;font-size:18px;color:${gan < 0 ? 'var(--red)' : 'var(--green)'}">${_spFmtMxn(Math.abs(gan))}</div></div>
         <div style="flex:1 1 92px"><div style="font-size:10px;text-transform:uppercase;color:var(--ts)">Ventas</div><div style="font-size:15px;font-weight:700">${_spFmtMxn(ventas)}</div></div>
-        <div style="flex:1 1 92px"><div style="font-size:10px;text-transform:uppercase;color:var(--ts)">Bodega</div><div style="font-size:15px;font-weight:700;color:var(--gold)">${bod == null ? '—' : _spFmtMxn(bod)}</div></div>
+        <div style="flex:1 1 92px"><div style="font-size:10px;text-transform:uppercase;color:var(--ts)">Bodega</div><div style="font-size:15px;font-weight:700;color:var(--gold)">${bod == null ? '—' : _spFmtMxn(bod)}</div>${merma == null ? '' : `<div class="mer1-merma" style="font-size:11px;font-weight:700">merma ${_spFmtMxn(merma)}</div>`}</div>
       </div>
       <div style="display:flex;gap:6px 14px;flex-wrap:wrap;font-size:11px;color:var(--ts);border-top:1px solid var(--border);padding-top:8px">
         <span>Facturado ${mny(fact)}</span><span>Gastos ${mny(gas)}</span><span>% cob ${pct}%</span>
@@ -4090,7 +4230,7 @@ function _resumenUtilPintar() {
   </div>`;
   const sinG2 = _resumenUtilSin ? Number(_resumenUtilSin.gastos || 0) : 0;
   const sinCard = _resumenUtilSin ? cardEsp('Sin evento', true, -sinG2, 0, 0, sinG2, null) : '';
-  const totCard = cardEsp('Total', false, totGan, totVentas, totFact, totGas, totBodOk ? totBod : null);
+  const totCard = cardEsp('Total', false, totGan, totVentas, totFact, totGas, totBodOk ? totBod : null, totMermaOk ? totMerma : null);
   const cardsHTML = selectorHTML + rows.map(card).join('') + sinCard + totCard;
 
   cont.innerHTML = `<div class="util-table-view">${tableHTML}</div><div class="util-cards-view">${cardsHTML}</div>`;
@@ -4108,7 +4248,11 @@ function _resumenUtilCSV() {
   if (!_resumenUtilRows.length && !_resumenUtilSin) return;
   // [AUD-1d] Las columnas de la CUENTA. Memo confirmó que no usa este CSV, así
   // que no hay compatibilidad que cuidar: dice lo mismo que la tabla.
-  const head = ['Evento', 'Fecha', 'Facturado', 'Ventas', 'Gastos', 'Ganancia', 'Bodega_estimada', 'Bodega_boletos', 'Pct_cobrado'];
+  // [MER-1] La bodega y la merma llevan COLUMNAS PROPIAS. Compartir una sola las
+  // volvería a mezclar en la hoja de cálculo: quien sume esa columna estaría
+  // sumando dinero por cobrar con dinero ya perdido. Cada renglón llena una de
+  // las dos y deja la otra VACÍA (no en cero: un cero se suma, una celda vacía no).
+  const head = ['Evento', 'Fecha', 'Facturado', 'Ventas', 'Gastos', 'Ganancia', 'Bodega_estimada', 'Bodega_boletos', 'Merma_costo_hundido', 'Merma_boletos', 'Pct_cobrado'];
   const cell = (v) => {
     const s = String(v == null ? '' : v);
     return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
@@ -4119,24 +4263,27 @@ function _resumenUtilCSV() {
   const key = (r) => (s.col === 'fecha') ? r.ds : r[s.col];
   rows.sort((a, b) => { const da = a.desconocido ? 1 : 0, db = b.desconocido ? 1 : 0; if (da !== db) return da - db; const ka = key(a), kb = key(b); let c = (typeof ka === 'number' && typeof kb === 'number') ? ka - kb : String(ka).localeCompare(String(kb)); return s.dir === 'asc' ? c : -c; });
   const lines = [head.map(cell).join(',')];
-  let tf = 0, tv = 0, tg = 0, tgan = 0, tb = 0, tbOk = false;
+  let tf = 0, tv = 0, tg = 0, tgan = 0, tb = 0, tbOk = false, tm = 0, tmOk = false;
   rows.forEach(r => {
     tf += r.facturado; tv += r.ventas; tg += r.gastos; tgan += r.ganancia;
-    if (r.bodega_valor != null) { tb += Number(r.bodega_valor); tbOk = true; }
+    if (r.pasado) { if (r.merma_costo != null) { tm += Number(r.merma_costo); tmOk = true; } }
+    else if (r.bodega_valor != null) { tb += Number(r.bodega_valor); tbOk = true; }
     const nom = r.desconocido ? (r.nombre + ' (evento desconocido)') : r.nombre;
     // Celda vacía, NO cero, cuando la bodega no se pudo estimar: en una hoja de
     // cálculo un 0 se suma y una celda vacía no.
     lines.push([nom, r.fecha, r.facturado, r.ventas, r.gastos, r.ganancia,
-                r.bodega_valor == null ? '' : r.bodega_valor,
-                r.bodega_boletos == null ? '' : r.bodega_boletos,
+                (r.pasado || r.bodega_valor == null) ? '' : r.bodega_valor,
+                (r.pasado || r.bodega_boletos == null) ? '' : r.bodega_boletos,
+                (!r.pasado || r.merma_costo == null) ? '' : r.merma_costo,
+                (!r.pasado || r.merma_boletos == null) ? '' : r.merma_boletos,
                 Math.round(r.pct * 100) + '%'].map(cell).join(','));
   });
   if (_resumenUtilSin) {
     const xg = Number(_resumenUtilSin.gastos || 0);
     tg += xg; tgan -= xg;
-    lines.push(['Sin evento', '', '', '', xg, -xg, '', '', ''].map(cell).join(','));
+    lines.push(['Sin evento', '', '', '', xg, -xg, '', '', '', '', ''].map(cell).join(','));
   }
-  lines.push(['TOTAL', '', tf, tv, tg, tgan, tbOk ? tb : '', '', tf > 0 ? Math.round(tv / tf * 100) + '%' : '0%'].map(cell).join(','));
+  lines.push(['TOTAL', '', tf, tv, tg, tgan, tbOk ? tb : '', '', tmOk ? tm : '', '', tf > 0 ? Math.round(tv / tf * 100) + '%' : '0%'].map(cell).join(','));
   const csv = '\ufeff' + lines.join('\n');
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
   const a = document.createElement('a');
@@ -4757,6 +4904,7 @@ async function loadPorEvento() {
   if (!evId) {
     _evtTours = []; _evtFiltrados = [];
     _fin1cBodega = null;                                  // [FIN-1c] del evento anterior
+    _fin1cPasado = false;                                 // [MER-1d] y su fecha
     const _f1c = document.getElementById('fin1c-resumen');
     if (_f1c) { _f1c.style.display = 'none'; _f1c.innerHTML = ''; }
     if (stats) stats.style.display = 'none';
@@ -4812,12 +4960,21 @@ async function loadPorEvento() {
 // Meterla contaría dos veces lo mismo el día que se pague.
 // ═══════════════════════════════════════════════════════════════════════════
 let _fin1cBodega = null;   // null = no se ha podido saber · {…} = calculada
+// [MER-1d] ¿el evento de la pantalla ya pasó? Vive APARTE de la bodega a
+// propósito: si el inventario no carga, la bodega se queda en null pero la fecha
+// del evento se sigue sabiendo, y la etiqueta de la ganancia no tiene por qué
+// depender del stock para decir la verdad.
+let _fin1cPasado = false;
 
 // PURO: la bodega en dinero. `sem` = zonas del semáforo, `precios` = {zona: p}
 // del index de HOY. Una zona SIN precio no suma y se cuenta aparte: un cero
 // diría "no vale nada", que es una afirmación que no tenemos.
+// [MER-1] …y en COSTO además de en precio, porque un evento que ya pasó no tiene
+// bodega sino MERMA, y la merma se mide por lo que costó. El costo unitario sale
+// del MISMO renglón del semáforo (`costo_unit`, que _lib/disponibilidad deriva de
+// las compras): ni una consulta nueva ni una segunda idea de cuánto costó.
 function _fin1cBodegaCalc(sem, precios) {
-  const out = { boletos: 0, valor: 0, sinPrecio: 0, zonasSinPrecio: [] };
+  const out = { boletos: 0, valor: 0, sinPrecio: 0, zonasSinPrecio: [], costo: 0, sinCosto: 0, zonasSinCosto: [] };
   (sem || []).forEach((z) => {
     const disp = Number(z && z.disponibles);
     if (!Number.isFinite(disp) || disp <= 0) return;
@@ -4825,6 +4982,9 @@ function _fin1cBodegaCalc(sem, precios) {
     out.boletos += disp;
     if (Number.isFinite(p) && p > 0) out.valor += disp * p;
     else { out.sinPrecio += disp; out.zonasSinPrecio.push(String(z.zona)); }
+    const c = Number(z && z.costo_unit);
+    if (Number.isFinite(c) && c > 0) out.costo += disp * c;
+    else { out.sinCosto += disp; out.zonasSinCosto.push(String(z.zona)); }
   });
   return out;
 }
@@ -4833,6 +4993,7 @@ function _fin1cBodegaCalc(sem, precios) {
 // Palacio y el catálogo del index. Fails-soft — sin bodega, el bloque lo dice
 // en vez de sumar un cero.
 async function _fin1cCargarBodega(evBase) {
+  _fin1cPasado = false;
   try {
     const [rs, ev] = await Promise.all([
       khAdminFetch('/.netlify/functions/admin-compras', {
@@ -4840,11 +5001,17 @@ async function _fin1cCargarBodega(evBase) {
       }).then((r) => r.json()).catch(() => ({})),
       (typeof _fetchEVFromIndex === 'function' ? _fetchEVFromIndex() : Promise.resolve([])).catch(() => []),
     ]);
-    if (!rs || !rs.ok || !Array.isArray(rs.zonas)) { _fin1cBodega = null; return; }
+    // [MER-1] Del catálogo, con el evento completo (multifecha incluida). Si el
+    // evento no está en el catálogo NO se declara pasado: sin fecha no hay merma.
+    // [MER-1d] Se resuelve ANTES de mirar el semáforo: la fecha del evento no
+    // depende de que el inventario haya cargado.
     const evt = (ev || []).find((e) => e && e.id === evBase);
+    _fin1cPasado = _mermaPasado(evt);
+    if (!rs || !rs.ok || !Array.isArray(rs.zonas)) { _fin1cBodega = null; return; }
     const precios = {};
     ((evt && evt.zonas) || []).forEach((z) => { if (z && z.n != null) precios[String(z.n).trim()] = Number(z.p); });
     _fin1cBodega = _fin1cBodegaCalc(rs.zonas, precios);
+    _fin1cBodega.pasado = _fin1cPasado;
   } catch (_) { _fin1cBodega = null; }
 }
 
@@ -4876,8 +5043,15 @@ function _fin1cPintar(evBase) {
 
   // La ganancia negativa se dice con palabras (patrón CAP-FIX-2d): un "−10,781"
   // a secas se lee como pérdida, y con bodega llena no lo es.
-  const gLbl = ganancia < 0 ? 'Falta por recuperar' : 'Ganancia';
+  //
+  // [MER-1d] …pero cuando el evento YA PASÓ sí lo es. "Falta por recuperar —
+  // todavía no recuperas lo invertido" promete un futuro que ya no existe: no
+  // queda nada por vender que pueda recuperarlo. Ahí se llama PÉRDIDA, a secas,
+  // con el número en positivo (patrón de signos de la casa: el signo se dice con
+  // palabras, no con un menos). En un evento por venir no cambia una coma.
+  const gLbl = ganancia < 0 ? (_fin1cPasado ? 'Pérdida' : 'Falta por recuperar') : 'Ganancia';
   const gCls = ganancia < 0 ? 'fin1c-neg' : 'fin1c-pos';
+  const gSub = (ganancia < 0 && !_fin1cPasado) ? 'todavía no recuperas lo invertido' : 'ventas menos gastos';
 
   cont.style.display = '';
   cont.innerHTML = `
@@ -4887,7 +5061,7 @@ function _fin1cPintar(evBase) {
       : 'cobrado del Portal')}
     ${linea('− Gastos', money(gastos), '', 'boletos, hotel, transporte, kits…')}
     <div class="fin1c-sep"></div>
-    ${linea(`= ${gLbl}`, money(Math.abs(ganancia)), gCls, ganancia < 0 ? 'todavía no recuperas lo invertido' : 'ventas menos gastos')}
+    ${linea(`= ${gLbl}`, money(Math.abs(ganancia)), gCls, gSub)}
     ${_fin1cBodegaHtml(bod, siTodo, ganancia)}
     <div class="fin1c-sep"></div>
     ${linea('Deuda a proveedores', deudaProv == null ? '—' : money(deudaProv), 'fin1c-info',
@@ -4895,12 +5069,32 @@ function _fin1cPintar(evBase) {
 }
 
 // La bodega: lo que ya se pagó y todavía está en forma de boleto.
+//
+// [MER-1] …salvo que el evento YA HAYA PASADO, y entonces no es bodega: es
+// MERMA. Los mismos boletos, otra pregunta. Antes decía «7 boletos por vender ≈
+// $40,100 · Si se vende todo: +$29,319» sobre un concierto del día anterior:
+// una salida que no existe. Ahora dice lo que sí pasó — cuántos se quedaron y
+// cuánto costaron — y la línea de "si se vende todo" DESAPARECE, porque no hay
+// nadie a quien vendérselos.
 function _fin1cBodegaHtml(bod, siTodo, ganancia) {
   if (!bod) {
     return `<div class="fin1c-bod fin1c-bod-mudo">No pude leer el inventario, así que no sé cuántos boletos quedan por vender.</div>`;
   }
   if (!bod.boletos) {
-    return `<div class="fin1c-bod">Sin boletos por vender: la cuenta de arriba ya es la final.</div>`;
+    return bod.pasado
+      ? `<div class="fin1c-bod">Sin merma: no quedó ni un boleto sin vender.</div>`
+      : `<div class="fin1c-bod">Sin boletos por vender: la cuenta de arriba ya es la final.</div>`;
+  }
+  if (bod.pasado) {
+    const conCosto = bod.boletos - bod.sinCosto;
+    return `
+      <div class="fin1c-bod fin1c-merma">
+        <div class="fin1c-bod-l"><b>Merma:</b> <b>${bod.boletos}</b> boleto${bod.boletos === 1 ? '' : 's'} sin vender
+          ${conCosto > 0 ? `· <b>${_spFmtMxn(bod.costo)}</b> de costo hundido` : ''}
+        </div>
+        ${conCosto > 0 ? `<div class="fin1c-bod-tot"><span class="fin1c-est">el evento ya pasó: ese dinero ya se gastó y ya está dentro de los gastos de arriba</span></div>` : ''}
+        ${bod.sinCosto ? `<div class="fin1c-aviso">${bod.sinCosto} de ellos NO suman: su zona no tiene costo capturado en las compras (${_esfEsc(bod.zonasSinCosto.join(', '))}).</div>` : ''}
+      </div>`;
   }
   const conPrecio = bod.boletos - bod.sinPrecio;
   return `
@@ -7421,23 +7615,42 @@ function _kmsTableroPintar(parcial) {
   //     con ella: lo dice en su nota.
   //  3. Zona SIN precio en el catálogo → renglón sin estimados, NO ceros. Un
   //     cero diría "no vale nada", que es una afirmación que no tenemos.
+  //
+  // [MER-1] Y UNA CUARTA, la que llegó con melanie: si el evento YA PASÓ, "Resta
+  // $" deja de ser una promesa y pasa a ser una pérdida. La columna cambia de
+  // nombre a "Merma $" y de número: disponibles × COSTO, no × precio de venta.
+  // Nadie va a pagar el precio de venta de un boleto de un concierto que ya fue.
+  //
+  // El costo unitario se toma de `costo_unit` (el que deriva _lib/disponibilidad
+  // de las compras) y NO del promedio local `prom`: los dos casi siempre valen lo
+  // mismo, pero difieren en cuanto una compra viene sin `costo_unitario` —`prom`
+  // la cuenta como gratis y `costo_unit` la deja fuera del promedio. La merma que
+  // se enseña aquí tiene que ser la MISMA que la del Resumen y la de Por Evento,
+  // así que se lee de la misma fuente que ellas.
+  const pasado = !!d.pasado;
   const precios = d.precios || {};
-  const tot = { compradas: 0, costo: 0, vendidas: 0, vendido: 0, disp: 0, resta: 0, sinPrecio: 0 };
+  const tot = { compradas: 0, costo: 0, vendidas: 0, vendido: 0, disp: 0, resta: 0, sinPrecio: 0, sinCosto: 0 };
   const filas = d.zonas.map((z) => {
     const prom = z.compradas > 0 ? (z.inversion / z.compradas) : 0;
     const dispCls = (z.disponibles == null) ? 'kms-z-cero' : (z.disponibles < 0 ? 'kms-z-neg' : '');
     const precio = precios[String(z.zona).trim()];
     const hayPrecio = Number.isFinite(precio) && precio > 0;
+    const costoU = Number(z.costo_unit);
+    const hayCosto = Number.isFinite(costoU) && costoU > 0;
     const vendidas = z.vendidas;
     const vendidoD = (hayPrecio && vendidas != null) ? vendidas * precio : null;
-    const restaD = (hayPrecio && z.disponibles != null && z.disponibles > 0) ? z.disponibles * precio : null;
+    const quedan = (z.disponibles != null && z.disponibles > 0) ? z.disponibles : null;
+    const restaD = pasado
+      ? ((hayCosto && quedan != null) ? quedan * costoU : null)
+      : ((hayPrecio && quedan != null) ? quedan * precio : null);
     tot.compradas += z.compradas || 0;
     tot.costo += z.inversion || 0;
     if (vendidas != null) tot.vendidas += vendidas;
     if (vendidoD != null) tot.vendido += vendidoD;
-    if (z.disponibles != null && z.disponibles > 0) tot.disp += z.disponibles;
+    if (quedan != null) tot.disp += quedan;
     if (restaD != null) tot.resta += restaD;
     if (!hayPrecio) tot.sinPrecio++;
+    if (pasado && quedan != null && !hayCosto) tot.sinCosto++;
     const guion = '<span class="kms-z-cero">—</span>';
     // [KMS-3] La fila lleva a su zona en el paso ②. Se manda el NOMBRE, no el
     // índice: quien resuelve el índice es _kmsIrAZona contra _kamZonasMap.
@@ -7454,7 +7667,7 @@ function _kmsTableroPintar(parcial) {
       <td>${hayPrecio ? _kamMoney(precio) : guion}</td>
       <td>${vendidoD == null ? guion : _kamMoney(vendidoD)}</td>
       <td class="${dispCls}">${z.disponibles == null ? '—' : z.disponibles}</td>
-      <td class="kms-z-resta">${restaD == null ? guion : _kamMoney(restaD)}</td>
+      <td class="${pasado ? 'mer1-merma' : 'kms-z-resta'}">${restaD == null ? guion : _kamMoney(restaD)}</td>
     </tr>`;
   }).join('');
 
@@ -7469,7 +7682,7 @@ function _kmsTableroPintar(parcial) {
       <td></td>
       <td>${_kamMoney(tot.vendido)}</td>
       <td>${tot.disp}</td>
-      <td class="kms-z-resta">${_kamMoney(tot.resta)}</td>
+      <td class="${pasado ? 'mer1-merma' : 'kms-z-resta'}">${_kamMoney(tot.resta)}</td>
     </tr>` : '';
 
   cont.innerHTML = `<div class="card kms-tab">
@@ -7480,14 +7693,19 @@ function _kmsTableroPintar(parcial) {
       ${tarjeta('Deuda a proveedores', deuda == null ? '…' : _kamMoney(deuda), deuda == null ? 'cargando abonos' : (servicios ? 'boletos + servicios − abonado' : 'inversión − abonado'), 'kms-deuda')}
     </div>
     <div class="kms-tab-wrap"><table class="kms-tab-z">
-      <thead><tr><th>Zona</th><th>Compradas</th><th>Costo u.</th><th>Costo total</th><th>Vendidas</th><th>Precio hoy</th><th>Vendido $</th><th>Disp.</th><th>Resta $</th></tr></thead>
+      <thead><tr><th>Zona</th><th>Compradas</th><th>Costo u.</th><th>Costo total</th><th>Vendidas</th><th>Precio hoy</th><th>Vendido $</th><th>Disp.</th><th>${pasado ? 'Merma $' : 'Resta $'}</th></tr></thead>
       <tbody>${filas || '<tr><td colspan="9" class="kms-z-cero">Sin compras registradas</td></tr>'}${totalFila}</tbody>
     </table></div>
     ${d.zonas.length ? `<div class="kms-z-nota">
-      <b>Vendido $</b> y <b>Resta $</b> son <b>estimados</b>: vendidas o disponibles × el precio del catálogo de HOY.
-      El precio cambia y lo de la derecha nadie lo ha pagado todavía.
-      Lo <b>cobrado de verdad</b> son los contratos de los viajeros, y esa cifra vive en <b>Por Evento</b>.
-      ${tot.sinPrecio ? `<span class="kms-z-aviso">${tot.sinPrecio} zona${tot.sinPrecio === 1 ? '' : 's'} sin precio en el catálogo: su renglón va sin estimados.</span>` : ''}
+      ${pasado
+        ? `<b>Merma $</b> es lo que COSTARON los boletos que se quedaron sin vender: disponibles × su costo de compra.
+           <b>El evento ya pasó</b>, así que esa columna no es dinero por cobrar — es dinero que ya se gastó, y ya está contado en los gastos del evento.
+           <b>Vendido $</b> sigue siendo un estimado a precio de catálogo; lo <b>cobrado de verdad</b> son los contratos de los viajeros, en <b>Por Evento</b>.
+           ${tot.sinCosto ? `<span class="kms-z-aviso">${tot.sinCosto} zona${tot.sinCosto === 1 ? '' : 's'} con boletos sin vender y sin costo capturado: su renglón va sin merma.</span>` : ''}`
+        : `<b>Vendido $</b> y <b>Resta $</b> son <b>estimados</b>: vendidas o disponibles × el precio del catálogo de HOY.
+           El precio cambia y lo de la derecha nadie lo ha pagado todavía.
+           Lo <b>cobrado de verdad</b> son los contratos de los viajeros, y esa cifra vive en <b>Por Evento</b>.
+           ${tot.sinPrecio ? `<span class="kms-z-aviso">${tot.sinPrecio} zona${tot.sinPrecio === 1 ? '' : 's'} sin precio en el catálogo: su renglón va sin estimados.</span>` : ''}`}
     </div>` : ''}
   </div>`;
 
@@ -8065,11 +8283,18 @@ async function _kamComprasLoad() {
         zonasEV.forEach((z) => { if (z && z.n != null && Number.isFinite(Number(z.p))) m[String(z.n).trim()] = Number(z.p); });
         return m;
       })(),
+      // [MER-1] ¿ya pasó? Se decide con el EVENTO del catálogo (multifecha
+      // incluida), no con `ds` a secas, y con el reloj de la casa.
+      pasado: _mermaPasado(ev),
       zonas: zonaNames.map((zona) => {
         const cz = compras.filter((c) => String(c.zona) === zona);
         const sem = semMap[String(zona).trim()] || null;
         return {
           zona,
+          // [MER-1] El costo unitario de la MISMA fuente que usan las otras tres
+          // pantallas (_lib/disponibilidad), para que la merma no pueda divergir
+          // entre el Palacio y el Resumen.
+          costo_unit: sem ? sem.costo_unit : null,
           compradas: cz.reduce((s, c) => s + (parseInt(c.cantidad, 10) || 0), 0),
           inversion: cz.reduce((s, c) => s + (parseInt(c.cantidad, 10) || 0) * (Number(c.costo_unitario) || 0), 0),
           // null (no 0) cuando el semáforo no vino: un 0 se leería como

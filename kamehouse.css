@@ -3219,3 +3219,31 @@ input[type="search"],.kh-buscar,.buscador{border-radius:var(--r-sm,8px)}
 .fin1a-aviso{color:var(--gold);font-size:11px;margin-top:4px}
 .fin1a-chk{display:flex;align-items:center;gap:8px;margin-top:8px;font-size:13px;cursor:pointer}
 .fin1a-chk input{accent-color:var(--green);width:16px;height:16px;cursor:pointer}
+
+/* ═══ [FIN-1c] El evento en una cuenta ════════════════════════════════════ */
+.fin1c{
+ background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);
+ padding:14px 18px;margin-bottom:16px;
+}
+.fin1c-t{
+ font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.12em;
+ color:var(--ts);margin-bottom:10px;
+}
+.fin1c-l{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;padding:4px 0}
+.fin1c-lbl{font-size:13px;min-width:150px}
+.fin1c-val{font-family:'Rajdhani',sans-serif;font-weight:700;font-size:20px;color:var(--text)}
+.fin1c-sub{font-size:11px;color:var(--ts);flex:1;min-width:0}
+.fin1c-sep{border-top:1px solid var(--border);margin:6px 0}
+.fin1c-pos .fin1c-val,b.fin1c-pos{color:var(--green)}
+.fin1c-neg .fin1c-val,b.fin1c-neg{color:var(--gold)}
+.fin1c-info .fin1c-val{font-size:15px;color:var(--ts)}
+.fin1c-bod{
+ background:var(--bg3);border:1px solid var(--border);border-left:3px solid var(--gold);
+ border-radius:var(--r-sm,8px);padding:8px 12px;margin:8px 0 4px;font-size:13px;
+}
+.fin1c-bod-mudo{border-left-color:var(--border2);color:var(--ts);font-size:12px}
+.fin1c-bod-l b{color:var(--text)}
+.fin1c-est{font-size:11px;color:var(--ts)}
+.fin1c-bod-tot{margin-top:4px;font-size:13px}
+.fin1c-aviso{color:var(--gold);font-size:11px;margin-top:4px}
+.fin1c-nota{font-family:'Montserrat',sans-serif;font-size:10px;color:var(--ts);text-transform:none;letter-spacing:0}

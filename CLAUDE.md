@@ -147,6 +147,28 @@ _Última revisión: 28-jul-2026 (series PP, PG, E1 y KH cerradas)._
 - **La regla de precios vive en 3 copias**: `calcular()` en index.html,
   `_lib/precio-zona` y `_vtaCalc` en kamehouse.js. Tocar las 3 + correr el arnés
   de equivalencia.
+- **NINGUNA PANTALLA CALCULA SU PROPIA CUENTA DE EVENTO.** La cuenta vive en
+  `_lib/cuenta-evento` (ventas de los dos mundos − gastos = ganancia, con bodega
+  y deuda aparte) y las pantallas la PIDEN. **Cada `reduce` sobre pagos que
+  aparezca en una pantalla es la fórmula número doce esperando a divergir**: la
+  auditoría AUD-1 encontró ONCE fórmulas distintas de "cuánto dinero hay", y diez
+  leían un solo libro. No se notaba porque cada pantalla era coherente consigo
+  misma; se notó cuando Memo miró dos a la vez y una decía $0 y la otra $136,391.
+  Una cuenta que se calcula donde se pinta no es un atajo: es una fuente nueva.
+  El corolario incómodo: **un cero es una afirmación**. "Cobrado $0" con $136,391
+  cobrados no es un dato que falta, es un dato falso — y "Utilidad −$147,172", que
+  restaba los gastos de un mundo a las ventas de otro, no tenía media cuenta:
+  tenía dos mitades que no se corresponden.
+- **TODO CATÁLOGO VIVE EN UNA SOLA FUENTE — y "dos listas iguales" no existe, solo
+  "dos listas que todavía no divergen".** El de categorías de gasto estaba en dos
+  `<select>` del HTML y **ya había divergido en producción**: el del filtro no
+  tenía `Combustible` ni `Comida Staff`, así que un gasto capturado con esas
+  categorías **no se podía filtrar**, sin error ni aviso. Hoy vive en
+  `_lib/categorias-gasto`, el servidor RECHAZA lo que no esté ahí (en el alta **y
+  en la edición**: editar no puede ser la puerta trasera del alta) y el navegador
+  llena sus selects con lo que el servidor manda. Y la validación es **sensible a
+  mayúsculas a propósito**: aceptar `boletos` junto a `Boletos` vuelve a partir el
+  mismo concepto en dos.
 - **El CSS/JS de KameHouse vive en `kamehouse.css/js/recibos.js`**, no inline en
   el HTML.
 - **Los arneses miden lo de una tuerca ENTRE DOS COMMITS**, no contra el árbol de

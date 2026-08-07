@@ -215,12 +215,16 @@ async function mundoPortal(leerP) {
     cobrado[slug] = (cobrado[slug] || 0) + n(p.monto_pagado == null ? p.monto : p.monto_pagado);
   });
   const gastos = {};
+  // [AUD-1d] Los gastos "General" (sin evento) NO pertenecen a ningún evento,
+  // pero SON dinero que salió: se devuelven aparte para que la tabla los pueda
+  // enseñar en su renglón, en vez de que desaparezcan al cambiar de fuente.
+  let gastosSinEvento = 0;
   rg.data.forEach((g) => {
     const slug = baseSlug(g.evento_id);
-    if (!slug) return;   // los "General" no son de ningún evento
+    if (!slug) { gastosSinEvento += n(g.monto); return; }
     gastos[slug] = (gastos[slug] || 0) + n(g.monto);
   });
-  return { data: { cobrado, viajeros, gastos, facturado } };
+  return { data: { cobrado, viajeros, gastos, facturado, gastosSinEvento } };
 }
 
 // ── Deuda a proveedores por evento: compras + servicios − abonos (KH).
@@ -394,7 +398,14 @@ async function cuentasDeTodos(opts) {
   tot.pendiente = (tot.facturado == null || tot.ventas == null) ? null : tot.facturado - tot.ventas;
   // Los gastos "General" (sin evento) NO están en ningún evento: se dan aparte
   // para que quien quiera el total de la empresa los sume a sabiendas.
-  return { eventos, totales: tot, ve_migrados: veMigrados };
+  return {
+    eventos,
+    // [AUD-1d] El dinero que no cuelga de ningún evento. Hoy solo hay gastos:
+    // un ingreso o un pago sin evento no existe en estas tablas.
+    sin_evento: { gastos: n(p.data.gastosSinEvento) },
+    totales: tot,
+    ve_migrados: veMigrados,
+  };
 }
 
 module.exports = {

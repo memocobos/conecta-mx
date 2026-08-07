@@ -243,11 +243,11 @@
  <!-- Utilidad por evento (Capa 3 / Franja 2 del dashboard) -->
  <div class="card" id="resumen-utilidad-card" style="margin-bottom:16px">
   <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:14px">
-   <div style="font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--ts)">Utilidad por evento
-    <!-- [FIN-1c] Esta tabla sale de _lib/utilidad-evento, que lee SOLO Portal.
-         Un evento con viajeros migrados sale más bajo de lo real aquí. No se
-         rediseña de pasada: se dice, y se manda a donde está la cuenta completa. -->
-    <span class="fin1c-nota">— solo Portal, no incluye ventas migradas · la cuenta completa está en Por Evento</span></div>
+   <div style="font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--ts)">Ganancia por evento
+    <!-- [AUD-1d] El letrero de FIN-1c decía que esta tabla omitía las ventas
+         migradas. Ya no omite: sale de la fuente única, con los dos mundos. Se
+         retira porque un aviso que ya no es cierto es peor que ninguno. -->
+    <span class="fin1c-nota">— ventas de los dos mundos menos gastos, con lo que queda en bodega</span></div>
    <button class="btn btn-ghost btn-sm" onclick="_resumenUtilCSV()">Exportar CSV</button>
   </div>
   <div id="resumen-utilidad-tabla" style="overflow-x:auto">

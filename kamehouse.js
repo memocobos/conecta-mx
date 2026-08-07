@@ -3519,6 +3519,11 @@ function _audUtilidadPintar(utilidad, cta, util) {
           : ` · <b class="mer1-merma">${_spFmtMxn(mCosto)}</b> de costo hundido`)
       + ' <span class="aud-bod-est">de eventos que ya pasaron</span></div>');
   }
+  // El acento del bloque es ORO, que en esta casa significa "esto todavía se
+  // puede cobrar". Cuando lo único que hay es merma, esa promesa es falsa hasta
+  // en el color: se pasa a rojo. Con bodega vendible presente el bloque se queda
+  // EXACTAMENTE como estaba, clase incluida.
+  bod.className = 'aud-bodega' + ((mBoletos && !boletos) ? ' aud-bodega-merma' : '');
   bod.style.display = '';
   bod.innerHTML = partes.join('');
 }

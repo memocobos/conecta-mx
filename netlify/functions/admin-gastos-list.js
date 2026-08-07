@@ -22,6 +22,10 @@
 // =============================================================================
 
 const { verifyAdminAuthLive, corsCheck } = require('./_lib/verify-admin');
+// [AUD-1g] El catálogo viaja al navegador para que el <select> se llene de la
+// MISMA fuente que valida el servidor. Dos copias de un catálogo son dos
+// catálogos, y divergen el día que alguien agrega una categoría en un solo sitio.
+const { CATEGORIAS } = require('./_lib/categorias-gasto');
 
 exports.handler = async (event) => {
   const __origin = corsCheck(event);
@@ -92,7 +96,7 @@ exports.handler = async (event) => {
     return {
       statusCode: 200,
       headers,
-      body: JSON.stringify({ ok: true, count: gastos.length, gastos, total, total_mes: totalMes }),
+      body: JSON.stringify({ ok: true, count: gastos.length, gastos, total, total_mes: totalMes, categorias: CATEGORIAS }),
     };
   } catch (e) {
     return { statusCode: 502, headers, body: JSON.stringify({ error: 'Error consultando gastos', detail: e.message }) };

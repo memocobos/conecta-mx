@@ -3286,3 +3286,11 @@ input[type="search"],.kh-buscar,.buscador{border-radius:var(--r-sm,8px)}
 .aud-bod-mudo{font-size:12px}
 .aud-bodega b.aud-pos{color:var(--green)}
 .aud-bodega b.aud-neg{color:var(--gold)}
+
+/* ═══ [AUD-1e] El letrero de las tarjetas retiradas ══════════════════════ */
+.aud1e-nota{
+ background:var(--bg2);border:1px solid var(--border);border-left:3px solid var(--border2);
+ border-radius:var(--r-sm,8px);padding:8px 14px;margin-bottom:12px;
+ font-size:11px;color:var(--ts);line-height:1.6;
+}
+.aud1e-nota b{color:var(--text)}

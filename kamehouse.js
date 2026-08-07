@@ -7919,18 +7919,15 @@ async function _kamAbonosLoad(slug, deudaPorProveedor) {
       </div>`;
     }).join('');
 
-    // Proveedores con deuda → opciones del form de abono.
-    const conDeuda = Object.keys(deudaPorProveedor || {});
-    const provOpts = conDeuda.map((pid) => `<option value="${_esfEsc(pid)}">${_esfEsc(deudaPorProveedor[pid].nombre)}</option>`).join('');
-    const form = conDeuda.length
-      ? `<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:8px 0">
-          <select class="cot-input" id="kam-abono-prov" style="min-width:130px">${provOpts}</select>
-          <input class="cot-input" id="kam-abono-monto" type="number" min="0" step="0.01" placeholder="Monto" style="width:110px">
-          <input class="cot-input" id="kam-abono-fecha" type="date" value="${_kamToday()}" style="width:150px">
-          <input class="cot-input" id="kam-abono-nota" placeholder="Nota (opcional)" maxlength="500" style="flex:1;min-width:120px">
-          <button class="btn btn-primary btn-sm" type="button" onclick="_kamAbonoCrear('${_esfEsc(slug)}')">REGISTRAR ABONO</button>
-        </div>`
-      : '<div style="font-size:12px;color:var(--ts);margin:8px 0">Registra compras primero.</div>';
+    // [FIN-1e] AQUÍ VIVÍA EL FORMULARIO DE ABONO, y se retira del todo (decisión
+    // de Memo). El dinero que sale tiene UNA sola puerta: el gasto. Lo que queda
+    // no es un hueco: es el letrero que dice a dónde ir, con el brinco puesto.
+    const form = `<div class="fin1e-puerta">
+        <span class="fin1e-txt">Los pagos a proveedores se registran en <b>Gastos</b>, marcando
+          <b>"Abonar también a su deuda"</b>: así el pago queda en la caja del evento y en la
+          deuda del proveedor con una sola captura.</span>
+        <button class="btn btn-primary btn-sm" type="button" onclick="_fin1eIrAGastos('${_attrJs(slug)}')">Ir a Gastos ›</button>
+      </div>`;
 
     const filasAbonos = abonos.length
       ? abonos.map((a) => `<tr style="border-top:1px solid var(--border)">
@@ -7938,9 +7935,8 @@ async function _kamAbonosLoad(slug, deudaPorProveedor) {
           <td style="padding:3px 4px;font-size:12px">${_esfEsc(a.proveedor_nombre || '—')}</td>
           <td style="padding:3px 4px;font-size:12px">${_kamMoney(a.monto)}</td>
           <td style="padding:3px 4px;font-size:12px;color:var(--ts)">${_esfEsc(a.nota || '')}</td>
-          <td style="padding:3px 4px;text-align:right"><button class="btn btn-ghost btn-sm" type="button" onclick="_kamAbonoEliminar('${_esfEsc(a.id)}','${_esfEsc(slug)}')" title="Eliminar abono">✕</button></td>
         </tr>`).join('')
-      : '<tr><td colspan="5" style="padding:3px 4px;font-size:12px;color:var(--ts)">Sin abonos registrados</td></tr>';
+      : '<tr><td colspan="4" style="padding:3px 4px;font-size:12px;color:var(--ts)">Sin abonos registrados</td></tr>';
 
     const saldoTotal = deudaTotal - abonadoTotal;
     // [KMS-1] El abonado llega en este segundo tiempo y completa el tablero.
@@ -7960,36 +7956,24 @@ async function _kamAbonosLoad(slug, deudaPorProveedor) {
   }
 }
 
-async function _kamAbonoCrear(slug) {
-  _kamAbonosAlert('');
-  const prov = document.getElementById('kam-abono-prov')?.value || '';
-  const montoN = Number(document.getElementById('kam-abono-monto')?.value);
-  const fecha = document.getElementById('kam-abono-fecha')?.value || '';
-  const nota = (document.getElementById('kam-abono-nota')?.value || '').trim();
-  if (!prov) { _kamAbonosAlert('Elige un proveedor.'); return; }
-  if (!Number.isFinite(montoN) || montoN <= 0) { _kamAbonosAlert('El monto debe ser mayor a 0.'); return; }
-  const _fdrAb = _montoFueraDeRango(montoN);   // [CAP3-1] espejo del servidor
-  if (_fdrAb) { _kamAbonosAlert(_fdrAb); return; }
-  if (fecha && !/^\d{4}-\d{2}-\d{2}$/.test(fecha)) { _kamAbonosAlert('Fecha inválida.'); return; }
-  try {
-    const r = await khAdminFetch('/.netlify/functions/admin-abonos', {
-      method: 'POST',
-      body: JSON.stringify({ accion: 'crear', evento_id: slug, proveedor_id: prov, monto: montoN, fecha: fecha || null, nota: nota || null }),
-    });
-    const d = await r.json().catch(() => ({}));
-    if (!r.ok || !d.ok) throw new Error(d.error || 'No se pudo registrar el abono');
-    _kamComprasLoad();
-  } catch (e) { _kamAbonosAlert(e.message); }
-}
-
-async function _kamAbonoEliminar(id, slug) {
-  if (!confirm('¿Eliminar este abono?')) return;
-  try {
-    const r = await khAdminFetch('/.netlify/functions/admin-abonos', { method: 'POST', body: JSON.stringify({ accion: 'eliminar', id }) });
-    const d = await r.json().catch(() => ({}));
-    if (!r.ok || !d.ok) throw new Error(d.error || 'No se pudo eliminar el abono');
-    _kamComprasLoad();
-  } catch (e) { _kamAbonosAlert(e.message); }
+// [FIN-1e] AQUÍ VIVÍAN _kamAbonoCrear Y _kamAbonoEliminar. Se retiran enteras:
+// sus dos acciones del backend están cerradas, y dejar funciones que solo saben
+// pedir un 403 es plantarle una trampa al siguiente que las lea.
+//
+// El brinco a la puerta buena: lleva a Gastos CON EL EVENTO YA PUESTO y el modal
+// abierto. Sin el evento, el bloque de proveedor de FIN-1a no aparece —la deuda
+// es por evento— y el viaje no habría servido de nada.
+function _fin1eIrAGastos(slug) {
+  showPage('gastos');
+  const base = String(slug || '').split('#')[0];
+  // El modal limpia el evento al abrir, así que primero se abre y luego se pone.
+  if (typeof nuevoGasto === 'function') nuevoGasto();
+  const sel = document.getElementById('gasto-evento');
+  if (sel && base) {
+    // Si el select trae la fecha exacta (multifecha) se elige ésa; si no, la base.
+    const opt = [...sel.options].find((o) => o.value === slug) || [...sel.options].find((o) => String(o.value).split('#')[0] === base);
+    if (opt) { sel.value = opt.value; if (typeof _fin1aOnEvento === 'function') _fin1aOnEvento(); }
+  }
 }
 
 async function _kamCompraCrear(zi) {

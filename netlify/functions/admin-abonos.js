@@ -20,10 +20,35 @@ const { validarMonto } = require('./_lib/monto-limites');
 
 const ROLES_PALACIO = ['maestro_roshi']; // el Palacio es solo de maestro_roshi
 
+// [FIN-1e] UNA SOLA PUERTA PARA EL DINERO QUE SALE.
+//
+// `crear` y `eliminar` quedan CERRADAS. No es que se hayan quedado sin uso por
+// accidente: desde FIN-1a el abono nace dentro de admin-gasto-crear, que escribe
+// DIRECTO a la tabla `abonos` de KH con la service key — nunca pasó por aquí — y
+// admin-gasto-eliminar borra igual de directo. Verificado leyendo esas dos
+// funciones, no supuesto. Así que estas dos acciones no tienen un solo llamador
+// legítimo, y dejarlas abiertas sería una puerta trasera a la única regla que
+// esta serie vino a establecer: el dinero sale POR UN LADO.
+//
+// `listar` se queda: alimenta el saldo por proveedor del Palacio y la cajita de
+// deuda del gasto. Leer nunca fue el problema.
+//
+// Los casos raros (notas de crédito, ajustes que no son dinero saliendo) los
+// asienta Jane por SQL con careo — decisión de Memo.
 const ACCIONES = {
   listar: ROLES_PALACIO,
-  crear: ROLES_PALACIO,
-  eliminar: ROLES_PALACIO,
+  crear: ROLES_PALACIO,      // ← la valida el gate de abajo y muere en 403
+  eliminar: ROLES_PALACIO,   // ← igual
+};
+
+// La puerta cerrada contesta lo que hay que hacer, no un "no". Un 403 mudo
+// mandaría al siguiente a buscar el permiso que le falta, y no le falta ninguno.
+const PUERTA_CERRADA = {
+  crear: 'Los pagos a proveedores ya no se capturan aquí: se registran en Gastos, '
+       + 'marcando "Abonar también a su deuda". Así el pago queda en la caja del evento '
+       + 'y en la deuda del proveedor con una sola captura.',
+  eliminar: 'Un abono ya no se borra por su cuenta: se borra el GASTO que lo creó, '
+          + 'y su abono se va con él. Si este abono es viejo y no tiene gasto, lo quita Jane por SQL.',
 };
 
 const UUID_RE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
@@ -55,6 +80,13 @@ exports.handler = async (event) => {
   const accion = body.accion;
   if (!(accion in ACCIONES)) {
     return { statusCode: 400, headers, body: JSON.stringify({ error: 'accion inválida' }) };
+  }
+
+  // [FIN-1e] El gate va ANTES de la auth: la puerta está cerrada para todos, no
+  // es cosa de permisos. Contestar 403 solo a quien pasa el login haría creer
+  // que con otro rol se puede.
+  if (PUERTA_CERRADA[accion]) {
+    return { statusCode: 403, headers, body: JSON.stringify({ error: PUERTA_CERRADA[accion], puerta: 'gastos' }) };
   }
 
   const auth = await verifyAdminAuthLive(event, ACCIONES[accion]);

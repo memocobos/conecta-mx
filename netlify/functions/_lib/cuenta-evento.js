@@ -252,7 +252,7 @@ async function cuentaDeEvento(opts) {
   const disp = await cargarDisponibilidad({
     khUrl: o.khUrl, khKey: o.khService,
     portalUrl: o.portalUrl, portalKey: o.portalService,
-    evento_id,
+    evento_id, fetchImpl: o.fetchImpl,
   });
   if (!disp.error) {
     const zonas = [...new Set([

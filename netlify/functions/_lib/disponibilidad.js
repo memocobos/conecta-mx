@@ -139,7 +139,12 @@ function filaCuenta(row, nowMs) { return claseFila(row, nowMs) !== 'no-cuenta'; 
 // IO: consulta KH (compras + stock_ajustes) y Portal (solicitudes_tour), read-only.
 // Devuelve { gestionado, stockPorZona, vendidosPorZona, ajustesPorZona } o { error }
 // si CUALQUIERA falla (un parcial podría sub-reportar agotado → sobreventa → abortar).
-async function cargarDisponibilidad({ khUrl, khKey, portalUrl, portalKey, evento_id, now }) {
+async function cargarDisponibilidad({ khUrl, khKey, portalUrl, portalKey, evento_id, now, fetchImpl }) {
+  // [AUD-1a] `fetchImpl` opcional, MISMO patrón que _lib/utilidad-evento: sin él
+  // este lib no se puede ejercitar desde un arnés sin red, y la alternativa
+  // —que cuenta-evento duplicara la consulta de stock— sería justo lo que esta
+  // serie vino a eliminar. Sin el parámetro, se comporta EXACTAMENTE igual.
+  const _fetch = fetchImpl || fetch;
   const nowMs = Number.isFinite(now) ? now : Date.now();
   const khHeaders = { apikey: khKey, Authorization: 'Bearer ' + khKey };
   const portalHeaders = { apikey: portalKey, Authorization: 'Bearer ' + portalKey };
@@ -161,9 +166,9 @@ async function cargarDisponibilidad({ khUrl, khKey, portalUrl, portalKey, evento
   vp.set('limit', '10000');
 
   const [cRes, aRes, vRes] = await Promise.all([
-    fetch(`${khUrl}/rest/v1/compras?${cp.toString()}`, { headers: khHeaders }),
-    fetch(`${khUrl}/rest/v1/stock_ajustes?${ap.toString()}`, { headers: khHeaders }),
-    fetch(`${portalUrl}/rest/v1/solicitudes_tour?${vp.toString()}`, { headers: portalHeaders }),
+    _fetch(`${khUrl}/rest/v1/compras?${cp.toString()}`, { headers: khHeaders }),
+    _fetch(`${khUrl}/rest/v1/stock_ajustes?${ap.toString()}`, { headers: khHeaders }),
+    _fetch(`${portalUrl}/rest/v1/solicitudes_tour?${vp.toString()}`, { headers: portalHeaders }),
   ]);
   if (!cRes.ok || !aRes.ok || !vRes.ok) return { error: 'no se pudo calcular la disponibilidad' };
 

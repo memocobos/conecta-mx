@@ -4904,6 +4904,7 @@ async function loadPorEvento() {
   if (!evId) {
     _evtTours = []; _evtFiltrados = [];
     _fin1cBodega = null;                                  // [FIN-1c] del evento anterior
+    _fin1cPasado = false;                                 // [MER-1d] y su fecha
     const _f1c = document.getElementById('fin1c-resumen');
     if (_f1c) { _f1c.style.display = 'none'; _f1c.innerHTML = ''; }
     if (stats) stats.style.display = 'none';
@@ -4959,6 +4960,11 @@ async function loadPorEvento() {
 // Meterla contaría dos veces lo mismo el día que se pague.
 // ═══════════════════════════════════════════════════════════════════════════
 let _fin1cBodega = null;   // null = no se ha podido saber · {…} = calculada
+// [MER-1d] ¿el evento de la pantalla ya pasó? Vive APARTE de la bodega a
+// propósito: si el inventario no carga, la bodega se queda en null pero la fecha
+// del evento se sigue sabiendo, y la etiqueta de la ganancia no tiene por qué
+// depender del stock para decir la verdad.
+let _fin1cPasado = false;
 
 // PURO: la bodega en dinero. `sem` = zonas del semáforo, `precios` = {zona: p}
 // del index de HOY. Una zona SIN precio no suma y se cuenta aparte: un cero
@@ -4987,6 +4993,7 @@ function _fin1cBodegaCalc(sem, precios) {
 // Palacio y el catálogo del index. Fails-soft — sin bodega, el bloque lo dice
 // en vez de sumar un cero.
 async function _fin1cCargarBodega(evBase) {
+  _fin1cPasado = false;
   try {
     const [rs, ev] = await Promise.all([
       khAdminFetch('/.netlify/functions/admin-compras', {
@@ -4994,14 +5001,17 @@ async function _fin1cCargarBodega(evBase) {
       }).then((r) => r.json()).catch(() => ({})),
       (typeof _fetchEVFromIndex === 'function' ? _fetchEVFromIndex() : Promise.resolve([])).catch(() => []),
     ]);
-    if (!rs || !rs.ok || !Array.isArray(rs.zonas)) { _fin1cBodega = null; return; }
+    // [MER-1] Del catálogo, con el evento completo (multifecha incluida). Si el
+    // evento no está en el catálogo NO se declara pasado: sin fecha no hay merma.
+    // [MER-1d] Se resuelve ANTES de mirar el semáforo: la fecha del evento no
+    // depende de que el inventario haya cargado.
     const evt = (ev || []).find((e) => e && e.id === evBase);
+    _fin1cPasado = _mermaPasado(evt);
+    if (!rs || !rs.ok || !Array.isArray(rs.zonas)) { _fin1cBodega = null; return; }
     const precios = {};
     ((evt && evt.zonas) || []).forEach((z) => { if (z && z.n != null) precios[String(z.n).trim()] = Number(z.p); });
     _fin1cBodega = _fin1cBodegaCalc(rs.zonas, precios);
-    // [MER-1] Del catálogo, con el evento completo (multifecha incluida). Si el
-    // evento no está en el catálogo NO se declara pasado: sin fecha no hay merma.
-    _fin1cBodega.pasado = _mermaPasado(evt);
+    _fin1cBodega.pasado = _fin1cPasado;
   } catch (_) { _fin1cBodega = null; }
 }
 
@@ -5033,8 +5043,15 @@ function _fin1cPintar(evBase) {
 
   // La ganancia negativa se dice con palabras (patrón CAP-FIX-2d): un "−10,781"
   // a secas se lee como pérdida, y con bodega llena no lo es.
-  const gLbl = ganancia < 0 ? 'Falta por recuperar' : 'Ganancia';
+  //
+  // [MER-1d] …pero cuando el evento YA PASÓ sí lo es. "Falta por recuperar —
+  // todavía no recuperas lo invertido" promete un futuro que ya no existe: no
+  // queda nada por vender que pueda recuperarlo. Ahí se llama PÉRDIDA, a secas,
+  // con el número en positivo (patrón de signos de la casa: el signo se dice con
+  // palabras, no con un menos). En un evento por venir no cambia una coma.
+  const gLbl = ganancia < 0 ? (_fin1cPasado ? 'Pérdida' : 'Falta por recuperar') : 'Ganancia';
   const gCls = ganancia < 0 ? 'fin1c-neg' : 'fin1c-pos';
+  const gSub = (ganancia < 0 && !_fin1cPasado) ? 'todavía no recuperas lo invertido' : 'ventas menos gastos';
 
   cont.style.display = '';
   cont.innerHTML = `
@@ -5044,7 +5061,7 @@ function _fin1cPintar(evBase) {
       : 'cobrado del Portal')}
     ${linea('− Gastos', money(gastos), '', 'boletos, hotel, transporte, kits…')}
     <div class="fin1c-sep"></div>
-    ${linea(`= ${gLbl}`, money(Math.abs(ganancia)), gCls, ganancia < 0 ? 'todavía no recuperas lo invertido' : 'ventas menos gastos')}
+    ${linea(`= ${gLbl}`, money(Math.abs(ganancia)), gCls, gSub)}
     ${_fin1cBodegaHtml(bod, siTodo, ganancia)}
     <div class="fin1c-sep"></div>
     ${linea('Deuda a proveedores', deudaProv == null ? '—' : money(deudaProv), 'fin1c-info',

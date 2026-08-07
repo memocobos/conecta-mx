@@ -3860,6 +3860,7 @@ async function _renderResumenDinero(porCobrar) {
 // Best-effort: si la utilidad no carga, la card muestra un aviso y el resto del
 // Resumen queda intacto. Agrupa por BASE (el backend ya suma multifecha en base).
 let _resumenUtilRows = [];                       // filas de eventos (con datos)
+let _resumenUtilConCuenta = false;               // [AUD-1d] ¿las filas salen de la cuenta de los dos mundos?
 let _resumenUtilSin = null;                      // bloque sin_evento
 let _resumenUtilSort = { col: 'ds', dir: 'asc' }; // orden por defecto: fecha asc
 
@@ -3875,28 +3876,52 @@ async function _renderResumenUtilidad(ev) {
   const evMap = {};
   (ev || []).forEach(e => { if (e && e.id) evMap[e.id] = { nombre: e.a || e.id, fecha: e.f || '', ds: e.ds || '' }; });
   const evs = util.eventos || {};
-  _resumenUtilRows = Object.keys(evs).map(slug => {
-    const d = evs[slug] || {};
-    const meta = evMap[slug];                 // undefined = slug con movimientos pero NO en el EV
+  // [AUD-1d] LAS FILAS SALEN DE LA CUENTA VERDADERA, no de la caja.
+  //
+  // Esta tabla leía `util.eventos`, que es la caja Portal-pura: con melanie
+  // decía cobrado $0 y caja −$147,172, y por eso llevaba un letrero avisando de
+  // lo que omitía. Ya no omite, así que el letrero también se va.
+  //
+  // Si la cuenta no llegó (fails-soft del endpoint), se cae a la caja de antes
+  // ANTES que dejar la tabla vacía — pero las columnas lo dicen.
+  const cta = util.cuenta && util.cuenta.eventos ? util.cuenta.eventos : null;
+  const fuente = cta || evs;
+  _resumenUtilConCuenta = !!cta;
+  _resumenUtilRows = Object.keys(fuente).map(slug => {
+    const d = fuente[slug] || {};
+    const meta = evMap[slug];
     const m = meta || { nombre: slug, fecha: '', ds: '' };
-    const vendido = Number(d.vendido || 0), cobrado = Number(d.cobrado || 0);
+    const ventas = Number((cta ? d.ventas : d.cobrado) || 0);
+    const facturado = Number((cta ? d.facturado : d.vendido) || 0);
+    const gastos = Number(d.gastos || 0);
+    const ganancia = cta ? Number(d.ganancia || 0) : (Number(d.caja || 0));
+    const bod = (cta && d.bodega) ? d.bodega : null;
     return {
       slug, nombre: m.nombre, fecha: m.fecha, ds: m.ds || '',
       desconocido: !meta,                     // typo de captura: slug que no existe en el EV
-      cobrado, ingresos: Number(d.ingresos || 0), vendido,
-      gastos: Number(d.gastos || 0), caja: Number(d.caja || 0),
-      proyectado: Number(d.proyectado || 0), falta: Number(d.falta_por_cobrar || 0),
-      pct: vendido > 0 ? (cobrado / vendido) : 0,
+      ventas, facturado, gastos, ganancia,
+      bodega_boletos: bod ? bod.boletos : null,
+      bodega_valor: bod ? bod.valor_estimado : null,
+      pct: facturado > 0 ? (ventas / facturado) : 0,
     };
   });
-  _resumenUtilSin = util.sin_evento || null;
+  // [AUD-1d] Con la cuenta nueva, "sin evento" son solo los gastos General.
+  _resumenUtilSin = cta
+    ? ((util.cuenta.sin_evento && Number(util.cuenta.sin_evento.gastos)) ? { gastos: Number(util.cuenta.sin_evento.gastos) } : null)
+    : (util.sin_evento || null);
   _resumenUtilPintar();
 }
 
-// Semáforo de salud: caja≥0 / caja<0 pero proyectado≥0 / ambos<0.
-function _resumenUtilSemaforo(caja, proyectado) {
-  if (caja >= 0) return 'var(--green)';
-  if (proyectado >= 0) return 'var(--gold)';
+// [AUD-1d] Semáforo de salud, sobre la GANANCIA (no la caja):
+//   verde  = ya ganas
+//   ámbar  = todavía no, pero la bodega alcanza para darle la vuelta
+//   rojo   = ni vendiendo todo lo que queda
+// Sin bodega conocida no se puede afirmar el ámbar: una ganancia negativa sin
+// saber qué queda por vender es roja hasta que se demuestre lo contrario.
+function _resumenUtilSemaforo(ganancia, bodegaValor) {
+  if (Number(ganancia) >= 0) return 'var(--green)';
+  const b = Number(bodegaValor);
+  if (Number.isFinite(b) && (Number(ganancia) + b) >= 0) return 'var(--gold)';
   return 'var(--red)';
 }
 function _resumenUtilMxnCell(v, align) {
@@ -3918,11 +3943,13 @@ function _resumenUtilPintar() {
     return;
   }
 
-  // Caja acumulada: running-sum de caja en orden CRONOLÓGICO, SOLO sobre filas con
-  // fecha (ds). Los desconocidos / sin fecha NO entran al acumulado → su celda va "—".
+  // [AUD-1d] GANANCIA acumulada: running-sum de ganancia en orden CRONOLÓGICO,
+  // SOLO sobre filas con fecha (ds). Los desconocidos / sin fecha NO entran al
+  // acumulado → su celda va "—". (Antes acumulaba caja, y el encabezado se
+  // quedó diciendo "Caja acum." cuando la suma ya era otra: lo cazó el arnés.)
   const acum = {};
   let run = 0;
-  rows.filter(r => r.ds).sort((a, b) => String(a.ds).localeCompare(String(b.ds))).forEach(r => { run += r.caja; acum[r.slug] = run; });
+  rows.filter(r => r.ds).sort((a, b) => String(a.ds).localeCompare(String(b.ds))).forEach(r => { run += r.ganancia; acum[r.slug] = run; });
 
   // Orden de 2 niveles: primario los DESCONOCIDOS siempre al final; secundario la
   // columna elegida (la columna 'fecha' ordena por ds).
@@ -3938,16 +3965,17 @@ function _resumenUtilPintar() {
     return s.dir === 'asc' ? c : -c;
   });
 
+  // [AUD-1d] Las columnas de la CUENTA, no las de la caja. Memo no usa el CSV
+  // (lo confirmó), así que no hay compatibilidad que cuidar y las columnas
+  // dicen lo que de verdad importa.
   const COLS = [
     { k: 'nombre', lbl: 'Evento', num: false },
     { k: 'fecha',  lbl: 'Fecha',  num: false },
-    { k: 'cobrado', lbl: 'Cobrado', num: true },
-    { k: 'ingresos', lbl: 'Ingresos', num: true },
-    { k: 'vendido', lbl: 'Vendido', num: true },
+    { k: 'facturado', lbl: 'Facturado', num: true },
+    { k: 'ventas', lbl: 'Ventas', num: true },
     { k: 'gastos', lbl: 'Gastos', num: true },
-    { k: 'caja', lbl: 'Caja', num: true },
-    { k: 'proyectado', lbl: 'Proyectado', num: true },
-    { k: 'falta', lbl: 'Falta x cobrar', num: true },
+    { k: 'ganancia', lbl: 'Ganancia', num: true },
+    { k: 'bodega_valor', lbl: 'Bodega', num: true },
     { k: 'pct', lbl: '% cob', num: true },
   ];
   const arrow = (k) => (s.col === k || (k === 'fecha' && s.col === 'fecha')) ? (s.dir === 'asc' ? ' ▲' : ' ▼') : '';
@@ -3956,22 +3984,32 @@ function _resumenUtilPintar() {
     `<th style="${thStyle};text-align:${c.num ? 'right' : 'left'}" onclick="_resumenUtilSortBy('${c.k}')">${c.lbl}${arrow(c.k)}</th>`
   ).join('') +
     `<th style="${thStyle};text-align:center;cursor:default">Salud</th>` +
-    `<th style="${thStyle};text-align:right;cursor:default">Caja acum.</th>`;
+    `<th style="${thStyle};text-align:right;cursor:default">Ganancia acum.</th>`;
 
   const acumCell = (r) => (r.slug in acum)
     ? _resumenUtilMxnCell(acum[r.slug])
     : '<td style="text-align:right;color:var(--ts)">—</td>';
   const marcaDesc = '<span style="color:var(--orange);font-size:10px;font-weight:700;white-space:nowrap"> <svg class="ic"><use href="#ic-alerta"/></svg> evento desconocido</span>';
 
+  // La bodega: boletos ≈ valor. Sin valor conocido NO se pinta un cero.
+  const bodCell = (r) => {
+    if (r.bodega_valor == null) {
+      return `<td style="text-align:right;color:var(--ts)" title="${r.bodega_boletos == null ? 'No se pudo leer el inventario' : 'Sin precio en el catálogo'}">${r.bodega_boletos == null ? '—' : r.bodega_boletos + ' bol.'}</td>`;
+    }
+    return `<td style="text-align:right;font-variant-numeric:tabular-nums" title="${r.bodega_boletos} boletos por vender, a precio de hoy (estimado)">${_spFmtMxn(r.bodega_valor)}</td>`;
+  };
   const fila = (r) => {
-    const sem = _resumenUtilSemaforo(r.caja, r.proyectado);
-    const semTitle = (r.caja >= 0) ? 'Caja positiva' : (r.proyectado >= 0 ? 'Caja negativa, proyectado positivo' : 'Caja y proyectado negativos');
+    const sem = _resumenUtilSemaforo(r.ganancia, r.bodega_valor);
+    const semTitle = (r.ganancia >= 0) ? 'Ya gana'
+      : ((Number.isFinite(Number(r.bodega_valor)) && r.ganancia + Number(r.bodega_valor) >= 0)
+          ? 'Todavía no, pero la bodega alcanza para darle la vuelta'
+          : 'Ni vendiendo lo que queda');
     // Desconocido: NO clickable (no hay a dónde ir); conocidos siguen → Por evento.
     const rowAttrs = r.desconocido ? '' : ` class="dash-click" onclick="_evtIrA('${r.slug}')" title="Ver en Por evento"`;
     return `<tr${rowAttrs} style="border-bottom:1px solid var(--border)">
       <td style="padding:6px 8px;font-weight:600;white-space:nowrap">${_spEscape(r.nombre)}${r.desconocido ? marcaDesc : ''}</td>
       <td style="padding:6px 8px;font-size:11px;color:var(--ts);white-space:nowrap">${_spEscape(r.fecha || '—')}</td>
-      ${_resumenUtilMxnCell(r.cobrado)}${_resumenUtilMxnCell(r.ingresos)}${_resumenUtilMxnCell(r.vendido)}${_resumenUtilMxnCell(r.gastos)}${_resumenUtilMxnCell(r.caja)}${_resumenUtilMxnCell(r.proyectado)}${_resumenUtilMxnCell(r.falta)}
+      ${_resumenUtilMxnCell(r.facturado)}${_resumenUtilMxnCell(r.ventas)}${_resumenUtilMxnCell(r.gastos)}${_resumenUtilMxnCell(r.ganancia)}${bodCell(r)}
       <td style="text-align:right;font-variant-numeric:tabular-nums">${Math.round(r.pct * 100)}%</td>
       <td style="text-align:center"><span title="${semTitle}" style="display:inline-block;width:11px;height:11px;border-radius:50%;background:${sem}"></span></td>
       ${acumCell(r)}
@@ -3980,26 +4018,31 @@ function _resumenUtilPintar() {
 
   // Fila "Sin evento" (dinero real sin evento_id), separada antes de totales.
   let sinFila = '';
-  let totCaja = 0, totCob = 0, totIng = 0, totVen = 0, totGas = 0, totProy = 0, totFalta = 0;
-  rows.forEach(r => { totCob += r.cobrado; totIng += r.ingresos; totVen += r.vendido; totGas += r.gastos; totCaja += r.caja; totProy += r.proyectado; totFalta += r.falta; });
-  let sinC = 0, sinI = 0, sinV = 0, sinG = 0, sinK = 0, sinP = 0, sinF = 0;
+  let totVentas = 0, totFact = 0, totGas = 0, totGan = 0, totBod = 0, totBodOk = false;
+  rows.forEach(r => {
+    totFact += r.facturado; totVentas += r.ventas; totGas += r.gastos; totGan += r.ganancia;
+    if (r.bodega_valor != null) { totBod += Number(r.bodega_valor); totBodOk = true; }
+  });
   if (_resumenUtilSin) {
-    const x = _resumenUtilSin;
-    sinC = Number(x.cobrado || 0); sinI = Number(x.ingresos || 0); sinV = Number(x.vendido || 0); sinG = Number(x.gastos || 0); sinK = Number(x.caja || 0); sinP = Number(x.proyectado || 0); sinF = Number(x.falta_por_cobrar || 0);
-    totCob += sinC; totIng += sinI; totVen += sinV; totGas += sinG; totCaja += sinK; totProy += sinP; totFalta += sinF;
+    // Sin evento: hoy solo GASTOS. No se le inventan ventas ni bodega — sus
+    // celdas van vacías, no en cero.
+    const sinG = Number(_resumenUtilSin.gastos || 0);
+    totGas += sinG; totGan -= sinG;
     sinFila = `<tr style="border-bottom:1px solid var(--border);opacity:.85">
       <td style="padding:6px 8px;font-style:italic;color:var(--ts)">Sin evento</td>
       <td style="padding:6px 8px"></td>
-      ${_resumenUtilMxnCell(sinC)}${_resumenUtilMxnCell(sinI)}${_resumenUtilMxnCell(sinV)}${_resumenUtilMxnCell(sinG)}${_resumenUtilMxnCell(sinK)}${_resumenUtilMxnCell(sinP)}${_resumenUtilMxnCell(sinF)}
-      <td style="text-align:right">${sinV > 0 ? Math.round(sinC / sinV * 100) : 0}%</td>
       <td></td><td></td>
+      ${_resumenUtilMxnCell(sinG)}
+      ${_resumenUtilMxnCell(-sinG)}
+      <td></td><td></td><td></td><td></td>
     </tr>`;
   }
-  const totPct = totVen > 0 ? Math.round(totCob / totVen * 100) : 0;
+  const totPct = totFact > 0 ? Math.round(totVentas / totFact * 100) : 0;
   const totFila = `<tr style="border-top:2px solid var(--border);font-weight:800">
     <td style="padding:8px;text-transform:uppercase;font-size:11px;letter-spacing:.06em">Total</td>
     <td></td>
-    ${_resumenUtilMxnCell(totCob)}${_resumenUtilMxnCell(totIng)}${_resumenUtilMxnCell(totVen)}${_resumenUtilMxnCell(totGas)}${_resumenUtilMxnCell(totCaja)}${_resumenUtilMxnCell(totProy)}${_resumenUtilMxnCell(totFalta)}
+    ${_resumenUtilMxnCell(totFact)}${_resumenUtilMxnCell(totVentas)}${_resumenUtilMxnCell(totGas)}${_resumenUtilMxnCell(totGan)}
+    ${totBodOk ? _resumenUtilMxnCell(totBod) : '<td style="text-align:right;color:var(--ts)">—</td>'}
     <td style="text-align:right">${totPct}%</td>
     <td></td><td></td>
   </tr>`;
@@ -4013,7 +4056,7 @@ function _resumenUtilPintar() {
   // ── Vista de TARJETAS (móvil <640px) — MISMA data (rows/acum/totales), otra presentación ──
   const mny = _resumenUtilMxn;
   const card = (r) => {
-    const sem = _resumenUtilSemaforo(r.caja, r.proyectado);
+    const sem = _resumenUtilSemaforo(r.ganancia, r.bodega_valor);
     const cardAttrs = r.desconocido ? '' : ` class="dash-click" onclick="_evtIrA('${r.slug}')" title="Ver en Por evento"`;
     return `<div${cardAttrs} style="background:var(--bg2);border:1px solid var(--border);border-left:4px solid ${sem};border-radius:var(--radius);padding:12px 14px;margin-bottom:10px">
       <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:10px">
@@ -4021,33 +4064,34 @@ function _resumenUtilPintar() {
         <span style="display:inline-block;width:13px;height:13px;border-radius:50%;background:${sem};flex-shrink:0;margin-top:3px"></span>
       </div>
       <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px">
-        <div style="flex:1 1 92px"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--ts)">Caja</div><div style="font-family:'Zen Dots',sans-serif;font-size:19px;color:${r.caja < 0 ? 'var(--red)' : 'var(--green)'}">${_spFmtMxn(r.caja)}</div></div>
-        <div style="flex:1 1 92px"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--ts)">Proyectado</div><div style="font-size:16px;font-weight:700;color:${r.proyectado < 0 ? 'var(--red)' : ''}">${_spFmtMxn(r.proyectado)}</div></div>
-        <div style="flex:1 1 92px"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--ts)">Falta x cobrar</div><div style="font-size:16px;font-weight:700;color:${r.falta < 0 ? 'var(--red)' : 'var(--orange)'}">${_spFmtMxn(r.falta)}</div></div>
+        <div style="flex:1 1 92px"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--ts)">${r.ganancia < 0 ? 'Falta recuperar' : 'Ganancia'}</div><div style="font-family:'Zen Dots',sans-serif;font-size:19px;color:${r.ganancia < 0 ? 'var(--red)' : 'var(--green)'}">${_spFmtMxn(Math.abs(r.ganancia))}</div></div>
+        <div style="flex:1 1 92px"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--ts)">Ventas</div><div style="font-size:16px;font-weight:700">${_spFmtMxn(r.ventas)}</div></div>
+        <div style="flex:1 1 92px"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--ts)">Bodega</div><div style="font-size:16px;font-weight:700;color:var(--gold)">${r.bodega_valor == null ? (r.bodega_boletos == null ? '—' : r.bodega_boletos + ' bol.') : _spFmtMxn(r.bodega_valor)}</div></div>
       </div>
       <div style="display:flex;gap:6px 14px;flex-wrap:wrap;font-size:11px;color:var(--ts);border-top:1px solid var(--border);padding-top:8px">
-        <span>Cobrado ${mny(r.cobrado)}</span><span>Ingresos ${mny(r.ingresos)}</span><span>Vendido ${mny(r.vendido)}</span><span>Gastos ${mny(r.gastos)}</span><span>% cob ${Math.round(r.pct * 100)}%</span><span>Caja acum ${(r.slug in acum) ? mny(acum[r.slug]) : '—'}</span>
+        <span>Facturado ${mny(r.facturado)}</span><span>Gastos ${mny(r.gastos)}</span><span>% cob ${Math.round(r.pct * 100)}%</span><span>Ganancia acum ${(r.slug in acum) ? mny(acum[r.slug]) : '—'}</span>
       </div>
     </div>`;
   };
   // Tarjeta especial (Sin evento / Total): sin borde-semáforo, estilo distinto.
-  const cardEsp = (titulo, dashed, k, p, f, c, i, v, g) => {
-    const pct = v > 0 ? Math.round(c / v * 100) : 0;
+  const cardEsp = (titulo, dashed, gan, ventas, fact, gas, bod) => {
+    const pct = fact > 0 ? Math.round(ventas / fact * 100) : 0;
     return `<div style="background:var(--bg2);border:${dashed ? '1px dashed' : '2px solid'} var(--border);border-radius:var(--radius);padding:12px 14px;margin-bottom:10px">
       <div style="text-transform:uppercase;font-size:11px;letter-spacing:.06em;font-weight:800;color:var(--ts);margin-bottom:10px">${_esfEsc(titulo)}</div>
       <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px">
-        <div style="flex:1 1 92px"><div style="font-size:10px;text-transform:uppercase;color:var(--ts)">Caja</div><div style="font-family:'Zen Dots',sans-serif;font-size:18px;color:${k < 0 ? 'var(--red)' : 'var(--green)'}">${_spFmtMxn(k)}</div></div>
-        <div style="flex:1 1 92px"><div style="font-size:10px;text-transform:uppercase;color:var(--ts)">Proyectado</div><div style="font-size:15px;font-weight:700;color:${p < 0 ? 'var(--red)' : ''}">${_spFmtMxn(p)}</div></div>
-        <div style="flex:1 1 92px"><div style="font-size:10px;text-transform:uppercase;color:var(--ts)">Falta x cobrar</div><div style="font-size:15px;font-weight:700;color:${f < 0 ? 'var(--red)' : 'var(--orange)'}">${_spFmtMxn(f)}</div></div>
+        <div style="flex:1 1 92px"><div style="font-size:10px;text-transform:uppercase;color:var(--ts)">${gan < 0 ? 'Falta recuperar' : 'Ganancia'}</div><div style="font-family:'Zen Dots',sans-serif;font-size:18px;color:${gan < 0 ? 'var(--red)' : 'var(--green)'}">${_spFmtMxn(Math.abs(gan))}</div></div>
+        <div style="flex:1 1 92px"><div style="font-size:10px;text-transform:uppercase;color:var(--ts)">Ventas</div><div style="font-size:15px;font-weight:700">${_spFmtMxn(ventas)}</div></div>
+        <div style="flex:1 1 92px"><div style="font-size:10px;text-transform:uppercase;color:var(--ts)">Bodega</div><div style="font-size:15px;font-weight:700;color:var(--gold)">${bod == null ? '—' : _spFmtMxn(bod)}</div></div>
       </div>
       <div style="display:flex;gap:6px 14px;flex-wrap:wrap;font-size:11px;color:var(--ts);border-top:1px solid var(--border);padding-top:8px">
-        <span>Cobrado ${mny(c)}</span><span>Ingresos ${mny(i)}</span><span>Vendido ${mny(v)}</span><span>Gastos ${mny(g)}</span><span>% cob ${pct}%</span>
+        <span>Facturado ${mny(fact)}</span><span>Gastos ${mny(gas)}</span><span>% cob ${pct}%</span>
       </div>
     </div>`;
   };
   const SORT_OPTS = [
-    { v: 'fecha', l: 'Fecha' }, { v: 'caja', l: 'Caja' }, { v: 'falta', l: 'Falta x cobrar' },
-    { v: 'cobrado', l: 'Cobrado' }, { v: 'vendido', l: 'Vendido' }, { v: 'gastos', l: 'Gastos' }, { v: 'pct', l: '% cobrado' },
+    { v: 'fecha', l: 'Fecha' }, { v: 'ganancia', l: 'Ganancia' }, { v: 'ventas', l: 'Ventas' },
+    { v: 'facturado', l: 'Facturado' }, { v: 'gastos', l: 'Gastos' },
+    { v: 'bodega_valor', l: 'Bodega' }, { v: 'pct', l: '% cobrado' },
   ];
   const selCol = (s.col === 'ds') ? 'fecha' : s.col;  // el default 'ds' equivale a 'fecha' en el selector
   const selectorHTML = `<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
@@ -4056,8 +4100,9 @@ function _resumenUtilPintar() {
       ${SORT_OPTS.map(o => `<option value="${o.v}"${selCol === o.v ? ' selected' : ''}>${o.l}</option>`).join('')}
     </select>
   </div>`;
-  const sinCard = _resumenUtilSin ? cardEsp('Sin evento', true, sinK, sinP, sinF, sinC, sinI, sinV, sinG) : '';
-  const totCard = cardEsp('Total', false, totCaja, totProy, totFalta, totCob, totIng, totVen, totGas);
+  const sinG2 = _resumenUtilSin ? Number(_resumenUtilSin.gastos || 0) : 0;
+  const sinCard = _resumenUtilSin ? cardEsp('Sin evento', true, -sinG2, 0, 0, sinG2, null) : '';
+  const totCard = cardEsp('Total', false, totGan, totVentas, totFact, totGas, totBodOk ? totBod : null);
   const cardsHTML = selectorHTML + rows.map(card).join('') + sinCard + totCard;
 
   cont.innerHTML = `<div class="util-table-view">${tableHTML}</div><div class="util-cards-view">${cardsHTML}</div>`;
@@ -4073,7 +4118,9 @@ function _resumenUtilSortBy(col) {
 // Export CSV (orden actual + Sin evento + Total). Patrón vanilla del repo.
 function _resumenUtilCSV() {
   if (!_resumenUtilRows.length && !_resumenUtilSin) return;
-  const head = ['Evento', 'Fecha', 'Cobrado', 'Ingresos', 'Vendido', 'Gastos', 'Caja', 'Proyectado', 'Falta_por_cobrar', 'Pct_cobrado'];
+  // [AUD-1d] Las columnas de la CUENTA. Memo confirmó que no usa este CSV, así
+  // que no hay compatibilidad que cuidar: dice lo mismo que la tabla.
+  const head = ['Evento', 'Fecha', 'Facturado', 'Ventas', 'Gastos', 'Ganancia', 'Bodega_estimada', 'Bodega_boletos', 'Pct_cobrado'];
   const cell = (v) => {
     const s = String(v == null ? '' : v);
     return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
@@ -4084,24 +4131,31 @@ function _resumenUtilCSV() {
   const key = (r) => (s.col === 'fecha') ? r.ds : r[s.col];
   rows.sort((a, b) => { const da = a.desconocido ? 1 : 0, db = b.desconocido ? 1 : 0; if (da !== db) return da - db; const ka = key(a), kb = key(b); let c = (typeof ka === 'number' && typeof kb === 'number') ? ka - kb : String(ka).localeCompare(String(kb)); return s.dir === 'asc' ? c : -c; });
   const lines = [head.map(cell).join(',')];
-  let tc = 0, ti = 0, tv = 0, tg = 0, tk = 0, tp = 0, tf = 0;
+  let tf = 0, tv = 0, tg = 0, tgan = 0, tb = 0, tbOk = false;
   rows.forEach(r => {
-    tc += r.cobrado; ti += r.ingresos; tv += r.vendido; tg += r.gastos; tk += r.caja; tp += r.proyectado; tf += r.falta;
+    tf += r.facturado; tv += r.ventas; tg += r.gastos; tgan += r.ganancia;
+    if (r.bodega_valor != null) { tb += Number(r.bodega_valor); tbOk = true; }
     const nom = r.desconocido ? (r.nombre + ' (evento desconocido)') : r.nombre;
-    lines.push([nom, r.fecha, r.cobrado, r.ingresos, r.vendido, r.gastos, r.caja, r.proyectado, r.falta, Math.round(r.pct * 100) + '%'].map(cell).join(','));
+    // Celda vacía, NO cero, cuando la bodega no se pudo estimar: en una hoja de
+    // cálculo un 0 se suma y una celda vacía no.
+    lines.push([nom, r.fecha, r.facturado, r.ventas, r.gastos, r.ganancia,
+                r.bodega_valor == null ? '' : r.bodega_valor,
+                r.bodega_boletos == null ? '' : r.bodega_boletos,
+                Math.round(r.pct * 100) + '%'].map(cell).join(','));
   });
   if (_resumenUtilSin) {
-    const x = _resumenUtilSin;
-    const xc = Number(x.cobrado || 0), xi = Number(x.ingresos || 0), xv = Number(x.vendido || 0), xg = Number(x.gastos || 0), xk = Number(x.caja || 0), xp = Number(x.proyectado || 0), xf = Number(x.falta_por_cobrar || 0);
-    tc += xc; ti += xi; tv += xv; tg += xg; tk += xk; tp += xp; tf += xf;
-    lines.push(['Sin evento', '', xc, xi, xv, xg, xk, xp, xf, (xv > 0 ? Math.round(xc / xv * 100) : 0) + '%'].map(cell).join(','));
+    const xg = Number(_resumenUtilSin.gastos || 0);
+    tg += xg; tgan -= xg;
+    lines.push(['Sin evento', '', '', '', xg, -xg, '', '', ''].map(cell).join(','));
   }
-  lines.push(['Total', '', tc, ti, tv, tg, tk, tp, tf, (tv > 0 ? Math.round(tc / tv * 100) : 0) + '%'].map(cell).join(','));
-  const csv = lines.join('\n');
+  lines.push(['TOTAL', '', tf, tv, tg, tgan, tbOk ? tb : '', '', tf > 0 ? Math.round(tv / tf * 100) + '%' : '0%'].map(cell).join(','));
+  const csv = '\ufeff' + lines.join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
   const a = document.createElement('a');
-  a.href = 'data:text/csv;charset=utf-8,﻿' + encodeURIComponent(csv);
+  a.href = URL.createObjectURL(blob);
   a.download = 'utilidad-por-evento.csv';
-  a.click();
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(a.href);
 }
 
 // Próximos eventos: desde EV (index.html), fechas futuras, máx 10, con su dinero

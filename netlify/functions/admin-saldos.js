@@ -6,8 +6,14 @@
 //
 //   ENTRADAS = pagos COBRADOS (pagos.estado='pagado', monto real =
 //              COALESCE(monto_pagado, monto)) + ingresos sueltos (tabla ingresos)
+//              + [SAL-1] lo COBRADO A LOS MIGRADOS del Excel (KH), repartido por
+//                cuenta con la regla paquete→banco de `_lib/catalogo-index`
 //   SALIDAS  = gastos (tabla gastos)
 //   saldo por cuenta = entradas − salidas
+//
+// [SAL-1] Antes esto solo miraba el Portal, y con melanie eso dejaba a BBVA en
+// −$147,172: los gastos del evento sin una sola entrada, porque su dinero entró
+// por fuera del Portal. No era un cálculo equivocado, era media pregunta.
 //
 // Solo se muestran 3 cuentas: BBVA, Banamex, Efectivo. Filas con cuenta 'Otro' o
 // null se IGNORAN en las tarjetas pero su neto se acumula en `otros_total` para
@@ -26,6 +32,9 @@
 // =============================================================================
 
 const { verifyAdminAuthLive, corsCheck } = require('./_lib/verify-admin');
+// [SAL-1] El dinero migrado, repartido por cuenta en la fuente única.
+const { migradosPorCuenta } = require('./_lib/cuenta-evento');
+const { fetchCatalogo } = require('./_lib/catalogo-index');
 
 const CUENTAS = ['BBVA', 'Banamex', 'Efectivo'];
 
@@ -110,12 +119,43 @@ exports.handler = async (event) => {
       cliRes.data.forEach(c => { cliMap[c.id] = c.nombre_completo; });
     }
 
+    // [SAL-1] EL DINERO MIGRADO — la mitad que faltaba de la pregunta.
+    //
+    // Fails-soft a propósito (mismo criterio que la cuenta de AUD-1c en
+    // admin-utilidad-evento): si esto truena, Saldos sigue devolviendo lo del
+    // Portal y la pantalla lo DICE, en vez de quedarse en blanco. Lo que NO se
+    // hace es callarlo: un saldo incompleto que se presenta como completo es
+    // exactamente el bug que esta tuerca vino a arreglar.
+    let migrados = null, migradosError = null;
+    try {
+      const envKH = readEnvKH();
+      if (envKH.error) {
+        migradosError = envKH.error;
+      } else {
+        const catalogo = await fetchCatalogo();
+        const m = await migradosPorCuenta({
+          khUrl: envKH.KH_SB_URL, khService: envKH.KH_SB_SERVICE,
+          catalogo, rol: (auth.user || {}).rol,
+        });
+        if (m.error) migradosError = m.error; else migrados = m;
+      }
+    } catch (e) { migradosError = e.message; }
+
     // Acumuladores por cuenta (solo las 3 visibles).
     const acc = {};
     CUENTAS.forEach(c => {
-      acc[c] = { entradas_pagos: 0, entradas_ingresos: 0, salidas_gastos: 0, pagos: [], ingresos: [], gastos: [] };
+      acc[c] = { entradas_pagos: 0, entradas_ingresos: 0, entradas_migrados: 0, salidas_gastos: 0, pagos: [], ingresos: [], gastos: [] };
     });
     let otrosTotal = 0;
+
+    // Las entradas migradas por cuenta. Una cubeta que no sea de las 3 visibles
+    // NO se manda a `otros_total`: `migradosPorCuenta` solo devuelve cubetas
+    // conocidas, y lo que no pudo clasificar viaja aparte y rotulado.
+    if (migrados && migrados.por_cuenta) {
+      Object.keys(migrados.por_cuenta).forEach((c) => {
+        if (CUENTAS.includes(c)) acc[c].entradas_migrados += Number(migrados.por_cuenta[c] || 0);
+      });
+    }
 
     // Pagos: monto real = COALESCE(monto_pagado, monto).
     for (const p of pagos) {
@@ -174,11 +214,12 @@ exports.handler = async (event) => {
     const cuentas = {};
     CUENTAS.forEach(c => {
       const a = acc[c];
-      const entradas = a.entradas_pagos + a.entradas_ingresos;
+      const entradas = a.entradas_pagos + a.entradas_ingresos + a.entradas_migrados;
       const salidas = a.salidas_gastos;
       cuentas[c] = {
         entradas_pagos:    a.entradas_pagos,
         entradas_ingresos: a.entradas_ingresos,
+        entradas_migrados: a.entradas_migrados,
         salidas_gastos:    a.salidas_gastos,
         entradas,
         salidas,
@@ -197,6 +238,16 @@ exports.handler = async (event) => {
         generado_at: new Date().toISOString(),
         cuentas,
         otros_total: otrosTotal,
+        // [SAL-1] Lo migrado, con su desglose y lo que NO se pudo clasificar. Va
+        // aparte de `cuentas` para que la pantalla pueda decir de dónde salió
+        // cada peso — y para que `sin_clasificar` tenga dónde verse.
+        migrados: migrados ? {
+          total: migrados.total,
+          por_cuenta: migrados.por_cuenta,
+          sin_clasificar: migrados.sin_clasificar,
+          ve_migrados: migrados.ve_migrados,
+        } : null,
+        migrados_error: migradosError,
       }),
     };
   } catch (e) {
@@ -205,6 +256,15 @@ exports.handler = async (event) => {
 };
 
 // ----- helpers -----
+
+// [SAL-1] KH va aparte del Portal: si sus llaves faltan, Saldos sigue dando lo
+// del Portal y lo dice, en vez de tronar entero.
+function readEnvKH() {
+  const KH_SB_URL = process.env.SUPABASE_URL_KAMEHOUSE;
+  const KH_SB_SERVICE = process.env.SUPABASE_SERVICE_KEY_KAMEHOUSE;
+  if (!KH_SB_URL || !KH_SB_SERVICE) return { error: 'Faltan env vars KH' };
+  return { KH_SB_URL, KH_SB_SERVICE };
+}
 
 function readEnv() {
   const PORTAL_SB_URL     = process.env.PORTAL_SUPABASE_URL;

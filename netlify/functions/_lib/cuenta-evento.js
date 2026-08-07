@@ -57,6 +57,8 @@
 // =============================================================================
 
 const { cargarDisponibilidad, desgloseZona } = require('./disponibilidad');
+// [SAL-1] La regla paquete→cuenta NO se replica aquí: se consume la única que hay.
+const { cuentaParaPaquete } = require('./catalogo-index');
 
 // Los mismos roles que VJ-3 usa para dejar ver el dinero de un migrado.
 const ROLES_DINERO_MIGRADO = ['maestro_roshi', 'bulma', 'milk'];
@@ -187,12 +189,73 @@ function armarCuenta({ evento_id, ventasPortal, facturadoPortal, viajerosPortal,
   };
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// [SAL-1] DE QUÉ CUENTA BANCARIA ES CADA PESO MIGRADO
+//
+// Memo: "el dinero de los migrados entró así — PLUS/RIDE/STAY a BBVA · CHEAP a
+// Banamex". La regla YA EXISTE y no hace falta escribirla otra vez: vive en
+// `cuentaParaPaquete` de `_lib/catalogo-index` desde Gancho 2, es la misma que
+// usan los correos de cobranza y los contratos, y dice algo un poco más fino que
+// la frase de Memo:
+//
+//     cheap              → Banamex SIEMPRE
+//     plus / ride / stay → ev.banco || BBVA      ← el banco DEL EVENTO
+//
+// La diferencia importa: hay cuatro eventos con `banco:BANCO_HEY` (acdc, harry,
+// hilary, soad) donde el PLUS va a Banamex. Escribir "PLUS→BBVA" aquí habría
+// creado la segunda copia de la regla —y estaría mal en esos cuatro—.
+//
+// LA CUENTA SE IDENTIFICA POR SU CLABE, NO POR SU NOMBRE. El catálogo dice
+// "BBVA Bancomer" y las cubetas de `admin-saldos` se llaman "BBVA": comparar
+// nombres habría mandado todo el PLUS a "sin clasificar" sin avisar. La CLABE es
+// la identidad de la cuenta; el nombre es una etiqueta que alguien escribió.
+// Una CLABE que no esté en esta tabla NO se adivina: cae en `sin_clasificar`, que
+// es visible. El día que Memo abra una tercera cuenta, se nota en vez de aterrizar
+// en la cubeta equivocada.
+const CLABE_A_CUENTA = {
+  '012822004639334319': 'BBVA',      // BANCO_DEFAULT
+  '002580702305539377': 'Banamex',   // BANCO_HEY
+};
+
+// PURO: mete `monto` en la cubeta que le toca, o en `sinCuenta` con su motivo.
+// JAMÁS reparte a ciegas — cada peso que no se pudo clasificar queda contado y
+// rotulado, porque un peso mal asignado es peor que un peso sin asignar.
+function acumularEnCuenta(acc, slug, tipoPaquete, monto, catalogo) {
+  acc.porCuenta = acc.porCuenta || {};
+  const sinClasificar = (motivo) => {
+    acc.sinCuenta.monto += monto;
+    acc.sinCuenta.filas++;
+    if (motivo && !acc.sinCuenta.motivos.includes(motivo)) acc.sinCuenta.motivos.push(motivo);
+  };
+  const ce = catalogo[slug];
+  // Un evento que no está en el catálogo NO se resuelve por omisión: sin `ev`,
+  // `cuentaParaPaquete` devolvería el banco por defecto, que sería una suposición.
+  if (!ce) return sinClasificar(`el evento "${slug}" no está en el catálogo`);
+  let c = null;
+  try { c = cuentaParaPaquete(ce, tipoPaquete); }
+  catch (e) {
+    // FAIL-LOUD de AUD-2: paquete desconocido (incluye null, vacío y basura).
+    return sinClasificar(`paquete sin reconocer: "${tipoPaquete == null ? 'sin capturar' : tipoPaquete}"`);
+  }
+  const bucket = c && CLABE_A_CUENTA[String(c.clabe || '').replace(/\s/g, '')];
+  if (!bucket) return sinClasificar(`cuenta fuera de las conocidas: "${(c && c.nombre) || '—'}"`);
+  acc.porCuenta[bucket] = (acc.porCuenta[bucket] || 0) + monto;
+}
+
 // ── Reúne el mundo migrado de un evento (o de todos si evento_id es null).
-async function mundoKH(leerKH, evento_id) {
+//
+// [SAL-1] …y de paso lo REPARTE POR CUENTA BANCARIA, cuando el llamador manda el
+// catálogo. Va aquí y no en una función nueva a propósito: el reparto tiene que
+// sumar EXACTAMENTE lo mismo que `cobrado`, y la única manera de garantizarlo es
+// que salga de la misma pasada sobre las mismas filas con el mismo
+// `saldoMigrado`. Dos lecturas serían dos oportunidades de divergir.
+async function mundoKH(leerKH, evento_id, catalogo) {
   const filtroV = evento_id
     ? `evento_id=eq.${encodeURIComponent(evento_id)}&`
     : '';
-  const rv = await leerKH('viajeros_evento', `${filtroV}select=id,evento_id,total_contrato,abonado_previo&limit=20000`);
+  // [SAL-1] `tipo_paquete` viaja en la MISMA fila que ya se leía. Se llama así
+  // —leído del `information_schema`, no recordado—: NO es `paquete`.
+  const rv = await leerKH('viajeros_evento', `${filtroV}select=id,evento_id,total_contrato,abonado_previo,tipo_paquete&limit=20000`);
   if (rv.error) return rv;
   const ra = await leerKH('abonos_viajero', 'select=viajero_id,monto&limit=20000');
   if (ra.error) return ra;
@@ -208,7 +271,10 @@ async function mundoKH(leerKH, evento_id) {
   rv.data.forEach((v) => {
     const slug = baseSlug(v.evento_id);
     if (!slug) return;
-    const e = porEvento[slug] = porEvento[slug] || { filas: 0, conContrato: 0, sinContrato: 0, vendido: 0, cobrado: 0, deben: 0, aFavor: 0, debenMenosAFavor: 0 };
+    const e = porEvento[slug] = porEvento[slug] || {
+      filas: 0, conContrato: 0, sinContrato: 0, vendido: 0, cobrado: 0, deben: 0, aFavor: 0, debenMenosAFavor: 0,
+      porCuenta: null, sinCuenta: { monto: 0, filas: 0, motivos: [] },
+    };
     e.filas++;
     const s = saldoMigrado(v, abonosPorViajero[v.id]);
     if (!s) { e.sinContrato++; return; }
@@ -216,12 +282,13 @@ async function mundoKH(leerKH, evento_id) {
     e.vendido += s.total;
     e.cobrado += s.abonado;
     if (s.resta > 0) e.deben += s.resta; else e.aFavor += -s.resta;
+    if (catalogo) acumularEnCuenta(e, slug, v.tipo_paquete, s.abonado, catalogo);
   });
   Object.keys(porEvento).forEach((k) => { porEvento[k].debenMenosAFavor = porEvento[k].deben - porEvento[k].aFavor; });
   return { data: porEvento };
 }
 
-const KH_VACIO = { filas: 0, conContrato: 0, sinContrato: 0, vendido: 0, cobrado: 0, deben: 0, aFavor: 0, debenMenosAFavor: 0 };
+const KH_VACIO = { filas: 0, conContrato: 0, sinContrato: 0, vendido: 0, cobrado: 0, deben: 0, aFavor: 0, debenMenosAFavor: 0, porCuenta: null, sinCuenta: { monto: 0, filas: 0, motivos: [] } };
 
 // ── Reúne el mundo Portal (cobrado por evento + viajeros por evento + gastos).
 async function mundoPortal(leerP) {
@@ -470,14 +537,70 @@ async function cuentasDeTodos(opts) {
   };
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// [SAL-1] EL DINERO MIGRADO, REPARTIDO POR CUENTA BANCARIA — para `admin-saldos`.
+//
+// Saldos preguntaba solo al Portal, y con melanie eso significaba puras SALIDAS:
+// BBVA pintaba −$147,172 (los gastos del evento) sin una sola entrada, porque el
+// dinero de los migrados entró por fuera del Portal. No era un error de cálculo:
+// era media pregunta.
+//
+// ESTO NO ES UN DOBLE CONTEO CON `cuentasDeTodos`. Son dos cortes del MISMO
+// dinero, no dos sumas encadenadas: aquélla contesta "¿cuánto ganó este evento?"
+// y ésta "¿cuánto debería haber en esta cuenta?". Ninguna alimenta a la otra. Lo
+// que sí sería doble conteo es que un migrado se capturara ADEMÁS como `pago` del
+// Portal — por eso este camino lee SOLO `viajeros_evento`/`abonos_viajero`, nunca
+// la tabla `pagos`, y el arnés vigila que ningún pago del Portal caiga sobre un
+// viajero migrado.
+//
+// Pasa por el MISMO `mundoKH` que usa la ganancia: una lectura, un `saldoMigrado`,
+// y por construcción la suma de las cubetas es el mismo `cobrado`.
+//
+//   migradosPorCuenta({ khUrl, khService, catalogo, rol, fetchImpl? })
+//     → { por_cuenta: { BBVA: n, Banamex: n }, total, sin_clasificar: { monto,
+//         filas, motivos }, por_evento: { "<slug>": {…} }, ve_migrados }
+//     | { error, detail }
+async function migradosPorCuenta(opts) {
+  const o = opts || {};
+  const _fetch = o.fetchImpl || fetch;
+  // El MISMO gate de VJ-3: sin permiso no se ve el dinero migrado, y lo que se
+  // devuelve es `null` (no te toca verlo), no cero (no hay).
+  if (!puedeVerMigrados(o.rol)) {
+    return { por_cuenta: null, total: null, sin_clasificar: null, por_evento: null, ve_migrados: false };
+  }
+  if (!o.catalogo) return { error: 'sin catálogo no se puede saber a qué cuenta entró cada paquete' };
+  const leerKH = hacerLeer(_fetch, o.khUrl, o.khService);
+  const k = await mundoKH(leerKH, null, o.catalogo);
+  if (k.error) return k;
+
+  const por_cuenta = {};
+  const sin_clasificar = { monto: 0, filas: 0, motivos: [] };
+  let total = 0;
+  Object.keys(k.data).forEach((slug) => {
+    const e = k.data[slug];
+    Object.keys(e.porCuenta || {}).forEach((c) => {
+      por_cuenta[c] = (por_cuenta[c] || 0) + e.porCuenta[c];
+      total += e.porCuenta[c];
+    });
+    sin_clasificar.monto += e.sinCuenta.monto;
+    sin_clasificar.filas += e.sinCuenta.filas;
+    e.sinCuenta.motivos.forEach((m) => { if (!sin_clasificar.motivos.includes(m)) sin_clasificar.motivos.push(m); });
+    total += e.sinCuenta.monto;
+  });
+  return { por_cuenta, total, sin_clasificar, por_evento: k.data, ve_migrados: true };
+}
+
 module.exports = {
   cuentaDeEvento,
   cuentasDeTodos,
+  migradosPorCuenta,
   // exportados para el arnés (puros, sin BD):
   saldoMigrado,
   bodegaDeZonas,
   bodegaDesconocida,
   armarCuenta,
+  acumularEnCuenta,          // [SAL-1] puro
+  CLABE_A_CUENTA,
   ROLES_DINERO_MIGRADO,
   baseSlug,
 };

@@ -3302,6 +3302,17 @@ input[type="search"],.kh-buscar,.buscador{border-radius:var(--r-sm,8px)}
    no dependa del orden del archivo. */
 .aud-bodega .mer1-merma{color:var(--red)}
 
+/* ═══ [SAL-1] Lo que Saldos no puede callar ═══════════════════════════════
+   Un saldo incompleto, o dinero que no se pudo repartir a una cuenta. Va en
+   ámbar y no en rojo: no está roto, está DICIENDO lo que no sabe — que es
+   justo lo que antes se callaba.                                            */
+.sal1-aviso{
+ background:var(--bg3);border:1px solid var(--border);border-left:3px solid var(--gold);
+ border-radius:var(--r-sm,8px);padding:8px 12px;margin-top:12px;
+ font-size:12px;color:var(--ts);line-height:1.6;
+}
+.sal1-aviso b{color:var(--text)}
+
 /* ═══ [AUD-1e] El letrero de las tarjetas retiradas ══════════════════════ */
 .aud1e-nota{
  background:var(--bg2);border:1px solid var(--border);border-left:3px solid var(--border2);

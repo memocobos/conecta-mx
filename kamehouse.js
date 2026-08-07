@@ -4913,6 +4913,7 @@ function nuevoGasto() {
  // Método por default (Transferencia) con Banco (BBVA) visible.
  _gastoOnMetodoChange();
  const ev = document.getElementById('gasto-evento'); if (ev) ev.value = '';
+ _fin1aOnEvento();   // [FIN-1a] sin evento elegido, el bloque de proveedor no existe
  const tit = document.getElementById('gasto-modal-title'); if (tit) tit.textContent = 'Registrar Gasto';
  const btn = document.getElementById('gasto-save-btn');   if (btn) btn.textContent = 'Guardar Gasto';
  openModal('modal-gasto');
@@ -4966,6 +4967,105 @@ function _montoFueraDeRango(monto) {
        + 'Revisa el monto — si de verdad es correcto, captúralo en dos partidas.';
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// [FIN-1a] EL GASTO QUE ALIMENTA LOS DOS LIBROS
+//
+// Memo: "hoy el Palacio me pide meter el gasto del proveedor y luego su pago:
+// es trabajar el doble". Un movimiento de dinero real = una captura. Si el gasto
+// va dirigido a un proveedor con deuda, este mismo guardado la abona.
+//
+// La deuda se calcula con las acciones que YA existen (compras + servicios −
+// abonos, igual que el Palacio) y se cachea por evento: elegir proveedor no
+// dispara llamadas nuevas.
+// ═══════════════════════════════════════════════════════════════════════════
+let _fin1aProvs = null;          // catálogo KH (se pide una vez por sesión)
+let _fin1aDeuda = { ev: null };  // { ev, porProv:{pid:{nombre,deuda}} }
+
+function _fin1aPuede() { return (currentUser || {}).rol === 'maestro_roshi'; }
+
+// Elegir evento manda: sin evento no hay deuda que abonar (la deuda es POR
+// evento), así que el bloque entero desaparece en vez de ofrecer algo imposible.
+async function _fin1aOnEvento() {
+  const wrap = document.getElementById('fin1a-wrap');
+  const sel = document.getElementById('gasto-proveedor');
+  const caja = document.getElementById('fin1a-caja');
+  if (!wrap || !sel) return;
+  const ev = (document.getElementById('gasto-evento') || {}).value || '';
+  if (caja) { caja.style.display = 'none'; caja.innerHTML = ''; }
+  sel.value = '';
+  if (!ev || !_fin1aPuede()) { wrap.style.display = 'none'; return; }
+  wrap.style.display = '';
+  try {
+    if (!_fin1aProvs) {
+      // La MISMA llamada que usa el Palacio (no hay helper `khProveedores`:
+      // lo comprobé en vez de suponerlo).
+      const rp = await khAdminFetch('/.netlify/functions/admin-proveedores', {
+        method: 'POST', body: JSON.stringify({ accion: 'listar' }),
+      });
+      const dp = await rp.json().catch(() => ({}));
+      if (!rp.ok || !dp.ok) throw new Error(dp.error || 'No se pudo cargar el catálogo');
+      _fin1aProvs = dp.proveedores || [];
+    }
+    sel.innerHTML = '<option value="">— No va a ningún proveedor —</option>'
+      + (_fin1aProvs || []).map((p) => `<option value="${_esfEsc(p.id)}">${_esfEsc(p.nombre)}</option>`).join('');
+    await _fin1aCargarDeuda(ev.split('#')[0]);
+  } catch (e) {
+    sel.innerHTML = '<option value="">— No se pudo cargar el catálogo —</option>';
+  }
+}
+
+// Deuda por proveedor del evento: compras + servicios − abonos. MISMA aritmética
+// que el Palacio (PRV-2); si divergiera, el número de la cajita mentiría.
+async function _fin1aCargarDeuda(evBase) {
+  if (_fin1aDeuda.ev === evBase) return;
+  const post = (accion, extra) => khAdminFetch('/.netlify/functions/admin-compras', {
+    method: 'POST', body: JSON.stringify(Object.assign({ accion, evento_id: evBase }, extra || {})),
+  }).then((r) => r.json()).catch(() => ({}));
+  const [c, sv, ab] = await Promise.all([
+    post('listar'),
+    post('servicios_listar'),
+    khAdminFetch('/.netlify/functions/admin-abonos', {
+      method: 'POST', body: JSON.stringify({ accion: 'listar', evento_id: evBase }),
+    }).then((r) => r.json()).catch(() => ({})),
+  ]);
+  const porProv = {};
+  const suma = (pid, nombre, monto) => {
+    if (!pid) return;
+    if (!porProv[pid]) porProv[pid] = { nombre: nombre || '—', deuda: 0 };
+    porProv[pid].deuda += monto;
+  };
+  (c.compras || []).forEach((x) => suma(x.proveedor_id, x.proveedor_nombre, (parseInt(x.cantidad, 10) || 0) * (Number(x.costo_unitario) || 0)));
+  (sv.servicios || []).forEach((x) => suma(x.proveedor_id, x.proveedor_nombre, Number(x.monto) || 0));
+  (ab.abonos || []).forEach((x) => suma(x.proveedor_id, x.proveedor_nombre, -(Number(x.monto) || 0)));
+  _fin1aDeuda = { ev: evBase, porProv };
+}
+
+// La cajita de verdad. Se pinta con lo que YA se cargó: cero llamadas al elegir.
+function _fin1aOnProveedor() {
+  const caja = document.getElementById('fin1a-caja');
+  const pid = (document.getElementById('gasto-proveedor') || {}).value || '';
+  if (!caja) return;
+  if (!pid) { caja.style.display = 'none'; caja.innerHTML = ''; return; }
+  const info = (_fin1aDeuda.porProv || {})[pid] || null;
+  const monto = parseFloat((document.getElementById('gasto-monto') || {}).value);
+  const hayMonto = Number.isFinite(monto) && monto > 0;
+  caja.style.display = '';
+
+  // Sin dato de deuda NO se inventa un cero: se dice que no se pudo saber.
+  if (!info) {
+    caja.innerHTML = `<div class="fin1a-l">No pude leer la deuda de este proveedor en el evento.</div>
+      <label class="fin1a-chk"><input type="checkbox" id="gasto-abonar" checked> Abonar también a su deuda</label>`;
+    return;
+  }
+  const queda = info.deuda - (hayMonto ? monto : 0);
+  caja.innerHTML = `
+    <div class="fin1a-l"><b>${_esfEsc(info.nombre)}</b> tiene <b class="fin1a-n">${_kamMoney(info.deuda)}</b> de deuda en este evento.
+      ${hayMonto ? `Con este gasto quedaría en <b class="fin1a-n ${queda < 0 ? 'fin1a-neg' : ''}">${_kamMoney(queda)}</b>.` : '<span class="fin1a-op">Escribe el monto para ver cómo queda.</span>'}
+      ${queda < 0 ? '<div class="fin1a-aviso">Le estarías pagando más de lo que le debes en este evento.</div>' : ''}
+    </div>
+    <label class="fin1a-chk"><input type="checkbox" id="gasto-abonar" checked> Abonar también a su deuda</label>`;
+}
+
 async function guardarGasto() {
  const concepto = document.getElementById('gasto-concepto').value.trim();
  const monto = parseFloat(document.getElementById('gasto-monto').value);
@@ -4993,6 +5093,13 @@ async function guardarGasto() {
  cuenta: cuenta || undefined,
  evento_id: evId || undefined, notas: notas || undefined
  };
+ // [FIN-1a] El proveedor solo viaja si de verdad hay uno elegido: sin él, el
+ // cuerpo es byte-idéntico al de siempre y el servidor no toca KH.
+ const _f1Prov = (document.getElementById('gasto-proveedor') || {}).value || '';
+ if (_f1Prov && !editando) {
+   payload.proveedor_id = _f1Prov;
+   payload.abonar = !!(document.getElementById('gasto-abonar') || {}).checked;
+ }
  if (editando) payload.id = _gastoEditId;
 
  try {

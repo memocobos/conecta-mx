@@ -3205,3 +3205,17 @@ input[type="search"],.kh-buscar,.buscador{border-radius:var(--r-sm,8px)}
 .evt-org-i b{color:var(--text);font-weight:700}
 .evt-org-i b.evt-org-fav{color:var(--green)}
 .evt-org-i b.evt-org-ojo{color:var(--gold)}
+
+/* ═══ [FIN-1a] El gasto que abona: la cajita de verdad ════════════════════ */
+.fin1a-op{color:var(--ts);font-weight:400}
+.fin1a-caja{
+ border:1px solid var(--border2);border-radius:var(--r-sm,8px);
+ background:var(--bg3);padding:10px 12px;margin-top:-4px;
+}
+.fin1a-l{font-size:12px;color:var(--ts);line-height:1.6}
+.fin1a-l b{color:var(--text)}
+.fin1a-n{font-family:'JetBrains Mono',monospace}
+.fin1a-neg{color:var(--red)}
+.fin1a-aviso{color:var(--gold);font-size:11px;margin-top:4px}
+.fin1a-chk{display:flex;align-items:center;gap:8px;margin-top:8px;font-size:13px;cursor:pointer}
+.fin1a-chk input{accent-color:var(--green);width:16px;height:16px;cursor:pointer}

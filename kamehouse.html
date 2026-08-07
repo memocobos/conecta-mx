@@ -2523,7 +2523,7 @@
  <div class="form-row cols-2">
  <div class="form-group">
  <label>Evento (si aplica)</label>
- <select id="gasto-evento">
+ <select id="gasto-evento" onchange="_fin1aOnEvento()">
  <option value="">General (no ligado a evento)</option>
  </select>
  </div>
@@ -2548,6 +2548,18 @@
  <label>Notas</label>
  <input type="text" id="gasto-notas" placeholder="Detalles adicionales">
  </div>
+ </div>
+ <!-- [FIN-1a] Una captura, dos libros: si el gasto va a un proveedor, este
+      mismo guardado abona su deuda. Solo aparece con un evento elegido —
+      la deuda es POR evento. -->
+ <div id="fin1a-wrap" style="display:none">
+  <div class="form-group">
+   <label>¿Va a un proveedor? <span class="fin1a-op">(opcional)</span></label>
+   <select id="gasto-proveedor" onchange="_fin1aOnProveedor()">
+    <option value="">— No va a ningún proveedor —</option>
+   </select>
+  </div>
+  <div id="fin1a-caja" class="fin1a-caja" style="display:none"></div>
  </div>
  </div>
  <div class="modal-footer">

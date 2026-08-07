@@ -3943,8 +3943,10 @@ function _resumenUtilPintar() {
     return;
   }
 
-  // Caja acumulada: running-sum de caja en orden CRONOLÓGICO, SOLO sobre filas con
-  // fecha (ds). Los desconocidos / sin fecha NO entran al acumulado → su celda va "—".
+  // [AUD-1d] GANANCIA acumulada: running-sum de ganancia en orden CRONOLÓGICO,
+  // SOLO sobre filas con fecha (ds). Los desconocidos / sin fecha NO entran al
+  // acumulado → su celda va "—". (Antes acumulaba caja, y el encabezado se
+  // quedó diciendo "Caja acum." cuando la suma ya era otra: lo cazó el arnés.)
   const acum = {};
   let run = 0;
   rows.filter(r => r.ds).sort((a, b) => String(a.ds).localeCompare(String(b.ds))).forEach(r => { run += r.ganancia; acum[r.slug] = run; });
@@ -3982,7 +3984,7 @@ function _resumenUtilPintar() {
     `<th style="${thStyle};text-align:${c.num ? 'right' : 'left'}" onclick="_resumenUtilSortBy('${c.k}')">${c.lbl}${arrow(c.k)}</th>`
   ).join('') +
     `<th style="${thStyle};text-align:center;cursor:default">Salud</th>` +
-    `<th style="${thStyle};text-align:right;cursor:default">Caja acum.</th>`;
+    `<th style="${thStyle};text-align:right;cursor:default">Ganancia acum.</th>`;
 
   const acumCell = (r) => (r.slug in acum)
     ? _resumenUtilMxnCell(acum[r.slug])

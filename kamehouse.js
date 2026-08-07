@@ -3606,22 +3606,19 @@ async function _utilCargar(force) {
 // evento (por BASE del slug), desde el cache. Visibilidad propia (no depende de
 // tours.length). Si no hay datos, oculta los bloques nuevos.
 function _renderUtilidadEvento(evBase) {
-  const banner = document.getElementById('evt-caja-empresa');
+  // [SAL-1] El banner de caja se retiró (decisión de Jane): dos "caja total de
+  // la empresa" con dos fuentes se habrían separado en cuanto Saldos viera el
+  // dinero migrado. En su lugar queda el letrero que dice a dónde se fue.
+  // `_lib/utilidad-evento` NO se toca — de ahí comen las liquidaciones.
   const nota0  = document.getElementById('evt-caja-nota');
+  const nota1  = document.getElementById('evt-caja-nota-sal1');
   const cache = _utilG3Cache;
   if (!cache) {
-    if (nota0)  nota0.style.display = 'none';
-    if (banner) banner.style.display = 'none';
+    if (nota0) nota0.style.display = 'none';
+    if (nota1) nota1.style.display = 'none';
     return;
   }
-  // Caja total de la empresa (global; rojo si negativa).
-  const cajaEmp = Number((cache.totales || {}).caja_total_empresa || 0);
-  const bval = document.getElementById('evt-caja-empresa-val');
-  if (bval) {
-    bval.textContent = _spFmtMxn(cajaEmp);
-    bval.className = 'cob-stat-val ' + (cajaEmp < 0 ? 'red' : 'green');
-  }
-  if (banner) banner.style.display = 'flex';
+  if (nota1) nota1.style.display = '';
 
   // [AUD-1e] Caja / Proyectado / Falta del EVENTO se retiraron: sus tres
   // fórmulas restaban gastos de los DOS mundos a ingresos de UNO solo, y la
@@ -4909,10 +4906,10 @@ async function loadPorEvento() {
     if (_f1c) { _f1c.style.display = 'none'; _f1c.innerHTML = ''; }
     if (stats) stats.style.display = 'none';
     if (desg)  desg.style.display = 'none';
-    const cajaNota = document.getElementById('evt-caja-nota');   // [AUD-1e]
-    const cajaEmp  = document.getElementById('evt-caja-empresa');
+    const cajaNota = document.getElementById('evt-caja-nota');        // [AUD-1e]
+    const cajaSal1 = document.getElementById('evt-caja-nota-sal1');   // [SAL-1]
     if (cajaNota) cajaNota.style.display = 'none';
-    if (cajaEmp)  cajaEmp.style.display = 'none';
+    if (cajaSal1) cajaSal1.style.display = 'none';
     tbody.innerHTML = '<tr><td colspan="8"><div class="empty-state"><div class="empty-icon">·</div>Selecciona un evento para ver los viajeros</div></td></tr>';
     return;
   }
@@ -5954,6 +5951,29 @@ function _renderSaldos(d) {
  if (Number(d.otros_total || 0) !== 0) {
    pie = `<div style="font-size:12px;color:var(--ts);margin-top:12px">${_spFmtMxn(d.otros_total)} en Otro/sin cuenta (no mostrado en las tarjetas).</div>`;
  }
+
+ // [SAL-1] DOS LETREROS QUE NO SE PUEDEN CALLAR.
+ //
+ // (1) Si el dinero migrado no se pudo leer, estas tarjetas están incompletas —
+ //     y una tarjeta incompleta que se presenta como completa es exactamente el
+ //     bug de esta tuerca. Se dice.
+ // (2) Lo que no se pudo repartir a una cuenta NO se reparte a ciegas: se
+ //     imprime, con su monto, sus filas y el motivo. Si algún día deja de valer
+ //     $0, se ve — que es lo contrario de desaparecer.
+ const m = d.migrados;
+ if (d.migrados_error) {
+   pie += `<div class="sal1-aviso">No pude leer el dinero de los migrados del Excel, así que estos saldos están <b>incompletos</b> (solo el Portal).</div>`;
+ } else if (m && m.ve_migrados) {
+   const sc = m.sin_clasificar || {};
+   if (Number(sc.monto || 0) !== 0 || Number(sc.filas || 0) !== 0) {
+     pie += `<div class="sal1-aviso"><b>${_spFmtMxn(sc.monto || 0)}</b> de migrados sin cuenta identificada
+       (${sc.filas} ${sc.filas === 1 ? 'viajero' : 'viajeros'}) — <b>no</b> están repartidos en las tarjetas de arriba.
+       ${(sc.motivos || []).length ? 'Motivo: ' + _esfEsc(sc.motivos.join(' · ')) : ''}</div>`;
+   }
+   if (Number(m.total || 0) !== 0) {
+     pie += `<div style="font-size:12px;color:var(--ts);margin-top:8px">Incluye <b>${_spFmtMxn(m.total)}</b> cobrado a migrados del Excel, repartido por paquete (CHEAP a Banamex, los demás al banco del evento).</div>`;
+   }
+ }
  const stamp = d.generado_at ? `<div style="font-size:11px;color:var(--ts);margin-top:6px">Actualizado: ${_spFmtFechaAbs(d.generado_at)}</div>` : '';
  el.innerHTML = grid + pie + stamp;
 }
@@ -5997,8 +6017,20 @@ function _renderSaldoDetalle(c) {
    ? c.gastos.map(g => linea(`${fmtFecha(g.fecha)} · ${_spEscape(g.concepto || '—')}`, '−' + _spFmtMxn(g.monto), 'var(--red)')).join('')
    : '<div style="font-size:12px;color:var(--ts)">Sin gastos</div>';
 
+ // [SAL-1] Los migrados NO traen renglones: `abonos_viajero` no guarda la cuenta,
+ // así que el reparto se DEDUCE del paquete de cada viajero. Se dice de dónde
+ // sale en vez de inventar un detalle fila por fila que no existe. La sección
+ // solo aparece cuando hay dinero migrado en ESTA cuenta: sin migrados, el panel
+ // queda exactamente como estaba.
+ const mig = Number(c.entradas_migrados || 0);
+ const migSeccion = mig
+   ? seccion('+ Cobrado a migrados del Excel', _spFmtMxn(mig), 'var(--green)',
+       '<div style="font-size:12px;color:var(--ts)">Repartido por paquete: CHEAP a Banamex, los demás al banco del evento. El detalle por viajero vive en <b>Por evento</b>.</div>')
+   : '';
+
  return seccion('+ Pagos cobrados', _spFmtMxn(c.entradas_pagos), 'var(--green)', pagosFilas)
    + seccion('+ Ingresos sueltos', _spFmtMxn(c.entradas_ingresos), 'var(--green)', ingFilas)
+   + migSeccion
    + seccion('− Gastos', '−' + _spFmtMxn(c.salidas_gastos), 'var(--red)', gasFilas)
    + `<div style="display:flex;justify-content:space-between;font-weight:800;font-size:15px;border-top:1px solid var(--border);padding-top:10px;margin-top:4px">
         <span>= Saldo</span><span style="color:${Number(c.saldo) >= 0 ? 'var(--green)' : 'var(--red)'}">${_spFmtMxn(c.saldo)}</span>

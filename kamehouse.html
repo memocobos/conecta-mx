@@ -395,11 +395,18 @@
  </div>
  </div>
 
- <!-- Caja total de la empresa (dato global, suma de todos los eventos) -->
- <div id="evt-caja-empresa" style="display:none;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:10px 16px;margin-bottom:12px;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
-   <div class="cob-stat-lbl" style="margin-bottom:0">Caja total de la empresa
-     <span class="fin1c-nota">— solo Portal: el dinero que pasó por las cuentas. La ganancia de los dos mundos está arriba.</span></div>
-   <div class="cob-stat-val" id="evt-caja-empresa-val" style="font-size:18px">—</div>
+ <!-- [SAL-1] LA CAJA DE LA EMPRESA SE RETIRA DE AQUÍ (decisión de Jane).
+      Vivía en dos lugares con DOS fuentes distintas: ésta salía de
+      `_lib/utilidad-evento` y la del Resumen de `admin-saldos`. Coincidían solo
+      porque las dos eran Portal-puro; en cuanto SAL-1 le enseña a Saldos el
+      dinero migrado, se habrían separado a la vista. Se retira ésta y no la
+      otra porque `utilidad-evento` también alimenta las liquidaciones, que
+      están selladas. Una caja, una fuente. Patrón AUD-1e: se va, pero deja
+      dicho a dónde. -->
+ <div id="evt-caja-nota-sal1" class="aud1e-nota" style="display:none">
+   La <b>caja total de la empresa</b> ya no se pinta aquí: vive en el
+   <b>Resumen</b>, que desde SAL-1 ya cuenta también el dinero de los migrados
+   del Excel. Ésta solo veía el Portal, y por eso decía menos de lo que hay.
  </div>
 
  <!-- Resumen financiero del evento -->

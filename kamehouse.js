@@ -5049,6 +5049,12 @@ function nuevoGasto() {
  ['gasto-concepto', 'gasto-monto', 'gasto-fecha', 'gasto-notas'].forEach(id => {
    const el = document.getElementById(id); if (el) el.value = '';
  });
+ // [FIN-1e-c] La fecha es OBLIGATORIA y llegaba vacía: el primer guardado de
+ // cualquiera rebotaba. Default = HOY en hora de Monterrey con el helper de la
+ // casa. JAMÁS toISOString: da la fecha de Greenwich, y pasadas las 6 de la
+ // tarde de acá ya es mañana allá — en esta casa se trabaja de noche.
+ const _gf = document.getElementById('gasto-fecha');
+ if (_gf) _gf.value = _mxFechaStr();
  ['gasto-categoria', 'gasto-metodo', 'gasto-cuenta'].forEach(id => {
    const el = document.getElementById(id); if (el) el.selectedIndex = 0;
  });

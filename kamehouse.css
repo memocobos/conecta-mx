@@ -3274,3 +3274,15 @@ input[type="search"],.kh-buscar,.buscador{border-radius:var(--r-sm,8px)}
 }
 .kms-z-nota b{color:var(--text);font-weight:700}
 .kms-z-aviso{color:var(--gold);display:block;margin-top:2px}
+
+/* ═══ [AUD-1c] La bodega al lado de la utilidad — el rojo nunca solo ══════ */
+.aud-bodega{
+ background:var(--bg2);border:1px solid var(--border);border-left:3px solid var(--gold);
+ border-radius:var(--r-sm,8px);padding:8px 14px;margin:-4px 0 16px;
+ font-size:13px;color:var(--ts);line-height:1.6;
+}
+.aud-bodega b{color:var(--text)}
+.aud-bod-est{font-size:11px}
+.aud-bod-mudo{font-size:12px}
+.aud-bodega b.aud-pos{color:var(--green)}
+.aud-bodega b.aud-neg{color:var(--gold)}

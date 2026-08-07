@@ -3415,13 +3415,84 @@ let _utilG3Cache = null;  // { eventos, sin_evento, totales } | null
 // Trae la utilidad por evento (todos los eventos) una sola vez. Best-effort: si
 // falla devuelve null y NO cachea — la vista sigue pintando lo demás (igual
 // criterio que _cobCargarGastos).
+// [AUD-1c] LA UTILIDAD, CON LA BODEGA AL LADO — el requisito que Memo firmó:
+// EL ROJO NUNCA SOLO. Una ganancia negativa con boletos sin vender no es una
+// pérdida: es dinero que todavía está en forma de boleto. Enseñar el rojo sin la
+// bodega asusta sin razón, y con melanie el rojo es real (−$10,781 contra 7
+// boletos que valen ≈$40,100).
+function _audUtilidadPintar(utilidad, cta, util) {
+  const setTxt = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+  const neg = Number(utilidad) < 0;
+  // El signo, en palabras (patrón CAP-FIX-2d/AUD-1b).
+  setTxt('m-utilidad', _spFmtMxn(Math.abs(Number(utilidad) || 0)));
+  const lbl = document.getElementById('m-utilidad-lbl');
+  if (lbl) lbl.textContent = neg ? 'Falta por recuperar' : 'Utilidad';
+  const elUtil = document.getElementById('m-utilidad');
+  if (elUtil) elUtil.className = 'metric-value ' + (neg ? 'red' : 'green');
+
+  const bod = document.getElementById('m-bodega');
+  if (!bod) return;
+  const b = cta || {};
+  const boletos = b.bodega_boletos;
+  const valor = b.bodega_valor;
+  // Sin cuenta o sin inventario NO se pinta una bodega vacía: se calla o se
+  // dice, pero no se afirma "0 boletos" que nadie midió.
+  if (!cta || boletos == null) {
+    bod.style.display = 'none'; bod.innerHTML = '';
+    if (util && util.cuenta_error) {
+      bod.style.display = ''; bod.innerHTML = `<span class="aud-bod-mudo">No pude leer el inventario, así que no sé cuántos boletos quedan por vender.</span>`;
+    }
+    return;
+  }
+  if (!boletos) {
+    bod.style.display = ''; bod.innerHTML = '<span class="aud-bod-mudo">Sin boletos por vender: la cuenta de arriba ya es la final.</span>';
+    return;
+  }
+  const siTodo = (valor == null) ? null : Number(utilidad) + valor;
+  bod.style.display = '';
+  bod.innerHTML = `<b>${boletos}</b> boleto${boletos === 1 ? '' : 's'} por vender`
+    + (valor == null
+        ? ' <span class="aud-bod-mudo">— sin precio en el catálogo, no se puede estimar</span>'
+        : ` ≈ <b>${_spFmtMxn(valor)}</b> <span class="aud-bod-est">a precio de hoy (estimado)</span>`
+          + ` · Si se vende todo: <b class="${siTodo < 0 ? 'aud-neg' : 'aud-pos'}">${_spFmtMxn(siTodo)}</b>`);
+}
+
+// [AUD-1c] LOS PRECIOS SE INYECTAN DESDE AQUÍ (decisión de Jane).
+//
+// El catálogo de precios vive en `index.html` y el servidor NO lo tiene — se
+// verificó en AUD-1a: `eventos_meta` no guarda precios y la tabla legacy
+// `eventos` ni siquiera tiene a melanie. Darle al servidor una fuente propia
+// sería una divergencia más esperando nacer, así que se los manda el navegador,
+// que ya carga ese catálogo (el MISMO `_fetchEVFromIndex` que usa FIN-1d).
+//
+// Si el catálogo no cargó, se mandan `null` y la bodega se queda en su conteo
+// con `valor_estimado: null` — nunca un cero que diría "no vale nada".
+async function _audPreciosPorEvento() {
+  try {
+    const ev = await _fetchEVFromIndex();
+    if (!Array.isArray(ev) || !ev.length) return null;
+    const out = {};
+    ev.forEach((e) => {
+      if (!e || !e.id || !Array.isArray(e.zonas)) return;
+      const z = {};
+      e.zonas.forEach((x) => {
+        const p = Number(x && x.p);
+        if (x && x.n != null && Number.isFinite(p) && p > 0) z[String(x.n).trim()] = p;
+      });
+      if (Object.keys(z).length) out[e.id] = z;
+    });
+    return Object.keys(out).length ? out : null;
+  } catch (_) { return null; }
+}
+
 async function _utilCargar(force) {
   if (_utilG3Cache && !force) return _utilG3Cache;
   try {
+    const precios = await _audPreciosPorEvento();
     const r = await fetch('/.netlify/functions/admin-utilidad-evento', {
       method: 'POST',
       headers: _spAdminHeaders(),
-      body: JSON.stringify({}),
+      body: JSON.stringify(precios ? { precios_por_evento: precios } : {}),
     });
     const d = await r.json();
     if (!r.ok || d.ok === false) throw new Error(d.error || 'No se pudo cargar la utilidad');
@@ -3429,6 +3500,11 @@ async function _utilCargar(force) {
       eventos:    (d.eventos && typeof d.eventos === 'object') ? d.eventos : {},
       sin_evento: d.sin_evento || null,
       totales:    d.totales || {},
+      // [AUD-1c] La cuenta de los DOS mundos, aditiva. `null` si el servidor no
+      // la pudo calcular: quien la consuma tiene que distinguir "no hay" de
+      // "no sé", y por eso no se rellena con un objeto vacío.
+      cuenta:     d.cuenta || null,
+      cuenta_error: d.cuenta_error || null,
     };
     return _utilG3Cache;
   } catch (e) {
@@ -3645,26 +3721,48 @@ async function loadResumen() {
   try {
     const { activos, cancelados, capHit } = await _cobCargarTodo(true);  // siempre fresco al entrar
 
-    // 5 métricas — solo ACTIVOS (en_pagos, pagado). Cancelados no son ingreso ni venta.
-    const cobrado   = activos.reduce((a, t) => a + Number((t.pago || {}).abonado  || 0), 0);
-    const porCobrar = activos.reduce((a, t) => a + Number((t.pago || {}).restante || 0), 0);
-    const facturado = activos.reduce((a, t) => a + Number((t.pago || {}).total    || 0), 0);
-    const eventosActivos = new Set(activos.map(t => t.evento_id)).size;
+    // [AUD-1c] LAS 5 MÉTRICAS SALEN DE LA FUENTE ÚNICA, no de un reduce propio.
+    //
+    // Antes se calculaban aquí sobre `activos` —solo el Portal—, así que con
+    // melanie decían cobrado $0, facturado $0, 0 viajeros y 0 eventos, y la
+    // "utilidad" era facturado(Portal) − gastos(TODOS): los gastos de un mundo
+    // restados a las ventas de otro. Un cero es una afirmación, y ésa era falsa.
+    //
+    // Si la cuenta no llega (fails-soft del endpoint), se cae al cálculo viejo
+    // ANTES que dejar la pantalla en blanco — pero se DICE, con su aviso.
+    const util = await _utilCargar(true);
+    const cta = util && util.cuenta ? util.cuenta.totales : null;
     const setTxt = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
-    setTxt('m-cobrado',   _spFmtMxn(cobrado));
-    setTxt('m-porcobrar', _spFmtMxn(porCobrar));
-    setTxt('m-facturado', _spFmtMxn(facturado));
-    setTxt('m-viajeros',  String(activos.length));
-    setTxt('m-eventos',   String(eventosActivos));
-
-    // Gastos + Utilidad (G2). Suma de TODOS los gastos (incluye los "General").
-    // _cobCargarGastos devuelve 0 si la función falla, sin tronar el Resumen.
     const { total: totalGastos } = await _cobCargarGastos(true);
-    setTxt('m-gastos', _spFmtMxn(totalGastos));
-    const utilidad = facturado - totalGastos;
-    setTxt('m-utilidad', _spFmtMxn(utilidad));
-    const elUtil = document.getElementById('m-utilidad');
-    if (elUtil) elUtil.className = 'metric-value ' + (utilidad >= 0 ? 'green' : 'red');
+
+    let utilidad;
+    if (cta) {
+      setTxt('m-cobrado',   _spFmtMxn(cta.ventas));
+      setTxt('m-facturado', _spFmtMxn(cta.facturado));
+      setTxt('m-viajeros',  String(cta.viajeros == null ? '—' : cta.viajeros));
+      setTxt('m-eventos',   String(cta.eventos_con_movimiento));
+      // El signo, dicho con palabras (patrón CAP-FIX-2d): un "Por cobrar −$793"
+      // se lee al revés de lo que significa.
+      const pend = Number(cta.pendiente || 0);
+      setTxt('m-porcobrar', _spFmtMxn(Math.abs(pend)));
+      const lblPc = document.getElementById('m-porcobrar-lbl');
+      if (lblPc) lblPc.textContent = pend < 0 ? 'A favor' : 'Por cobrar';
+      setTxt('m-gastos', _spFmtMxn(cta.gastos));
+      utilidad = Number(cta.ganancia || 0);
+    } else {
+      // Cálculo viejo, Portal-puro, y se avisa de que lo es.
+      const cobrado   = activos.reduce((a, t) => a + Number((t.pago || {}).abonado  || 0), 0);
+      const porCobrar = activos.reduce((a, t) => a + Number((t.pago || {}).restante || 0), 0);
+      const facturado = activos.reduce((a, t) => a + Number((t.pago || {}).total    || 0), 0);
+      setTxt('m-cobrado',   _spFmtMxn(cobrado));
+      setTxt('m-porcobrar', _spFmtMxn(porCobrar));
+      setTxt('m-facturado', _spFmtMxn(facturado));
+      setTxt('m-viajeros',  String(activos.length));
+      setTxt('m-eventos',   String(new Set(activos.map(t => t.evento_id)).size));
+      setTxt('m-gastos', _spFmtMxn(totalGastos));
+      utilidad = facturado - totalGastos;
+    }
+    _audUtilidadPintar(utilidad, cta, util);
 
     const aviso = document.getElementById('resumen-cap-aviso');
     if (aviso) {

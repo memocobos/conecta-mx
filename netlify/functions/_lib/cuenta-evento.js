@@ -339,6 +339,35 @@ async function cuentasDeTodos(opts) {
     });
   });
 
+  // [AUD-1c] LA BODEGA, solo para los eventos cuyos PRECIOS mandó el llamador.
+  //
+  // El catálogo vive en index.html y el servidor no lo tiene (verificado en
+  // AUD-1a). Decisión de Jane: los precios se INYECTAN desde el navegador, que
+  // ya carga ese catálogo — una fuente más sería una divergencia más esperando
+  // nacer. Sin precios de un evento, su bodega no se calcula: el conteo de
+  // boletos se queda en null, que NO es cero.
+  //
+  // Se consulta el stock SOLO de los eventos con precios: la bodega cuesta una
+  // consulta por evento, y hacerla de todos convertiría este camino —el de los
+  // tableros— en el más caro de los dos.
+  const precios = o.preciosPorEvento || null;
+  if (precios) {
+    const conPrecio = Object.keys(precios).filter((s) => eventos[s]);
+    for (const slug of conPrecio) {
+      const disp = await cargarDisponibilidad({
+        khUrl: o.khUrl, khKey: o.khService,
+        portalUrl: o.portalUrl, portalKey: o.portalService,
+        evento_id: slug, fetchImpl: o.fetchImpl,
+      });
+      if (disp.error) continue;   // sin stock, la bodega de ESE evento sigue en null
+      const zonas = [...new Set([
+        ...Object.keys(disp.stockPorZona || {}),
+        ...Object.keys(disp.ajustesPorZona || {}),
+      ])].map((z) => desgloseZona(disp, z));
+      eventos[slug].bodega = bodegaDeZonas(zonas, precios[slug]);
+    }
+  }
+
   // Los agregados de empresa, definidos UNA vez (antes vivían en tres lugares).
   const tot = { ventas: 0, gastos: 0, ganancia: 0, viajeros: 0, eventos_con_movimiento: slugs.length, desconocido: false };
   slugs.forEach((s) => {
@@ -348,6 +377,21 @@ async function cuentasDeTodos(opts) {
   });
   tot.ganancia = tot.desconocido ? null : tot.ventas - tot.gastos;
   if (tot.desconocido) { tot.ventas = null; tot.viajeros = null; }
+  // [AUD-1c] La bodega de la empresa: solo suma lo que SE PUDO valorar. Si
+  // ningún evento trajo precios, el valor es null (desconocido), no 0.
+  let boletos = 0, valor = 0, algo = false, algoValor = false;
+  slugs.forEach((s) => {
+    const b = eventos[s].bodega || {};
+    if (b.boletos != null) { boletos += b.boletos; algo = true; }
+    if (b.valor_estimado != null) { valor += b.valor_estimado; algoValor = true; }
+  });
+  tot.bodega_boletos = algo ? boletos : null;
+  tot.bodega_valor = algoValor ? valor : null;
+  // Facturado de empresa, para la tarjeta del Resumen.
+  let fact = 0, factOk = true;
+  slugs.forEach((s) => { const f = eventos[s].facturado; if (f == null) factOk = false; else fact += f; });
+  tot.facturado = factOk ? fact : null;
+  tot.pendiente = (tot.facturado == null || tot.ventas == null) ? null : tot.facturado - tot.ventas;
   // Los gastos "General" (sin evento) NO están en ningún evento: se dan aparte
   // para que quien quiera el total de la empresa los sume a sabiendas.
   return { eventos, totales: tot, ve_migrados: veMigrados };

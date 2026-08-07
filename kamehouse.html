@@ -198,7 +198,9 @@
       #m-porcobrar se sigue llenando en loadResumen y la franja reusa esa variable;
       borrar la tarjeta rompería esa cadena. display:none evita el duplicado visual. -->
  <div class="metric" style="display:none">
- <div class="metric-label">Por Cobrar</div>
+ <!-- [AUD-1c] La etiqueta la escribe loadResumen: con neto negativo no es
+      "Por Cobrar", es dinero A FAVOR del viajero. -->
+ <div class="metric-label" id="m-porcobrar-lbl">Por Cobrar</div>
  <div class="metric-value" id="m-porcobrar">—</div>
  <div class="metric-sub">Saldo pendiente</div>
  </div>
@@ -223,11 +225,18 @@
  <div class="metric-sub">Total de egresos</div>
  </div>
  <div class="metric">
- <div class="metric-label">Utilidad</div>
+ <!-- [AUD-1c] Etiqueta dinámica: con ganancia negativa dice "Falta por
+      recuperar", que es lo que significa cuando hay bodega sin vender. -->
+ <div class="metric-label" id="m-utilidad-lbl">Utilidad</div>
  <div class="metric-value green" id="m-utilidad">—</div>
- <div class="metric-sub">Facturado − gastos</div>
+ <div class="metric-sub">Ventas − gastos</div>
  </div>
  </div>
+
+ <!-- [AUD-1c] LA BODEGA AL LADO DE LA UTILIDAD — el requisito que firmó Memo:
+      el rojo nunca solo. Una ganancia negativa con boletos sin vender no es una
+      pérdida: es dinero que sigue en forma de boleto. -->
+ <div id="m-bodega" class="aud-bodega" style="display:none"></div>
 
  <div id="resumen-cap-aviso" style="display:none;margin-bottom:16px;padding:10px 14px;border:1px solid var(--border2);border-radius:var(--r-sm,8px);background:rgba(255,107,0,.06);color:var(--orange);font-size:12px"></div>
 
@@ -389,7 +398,7 @@
  <!-- Caja total de la empresa (dato global, suma de todos los eventos) -->
  <div id="evt-caja-empresa" style="display:none;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:10px 16px;margin-bottom:12px;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
    <div class="cob-stat-lbl" style="margin-bottom:0">Caja total de la empresa
-     <span class="fin1c-nota">— solo Portal, no incluye ventas migradas</span></div>
+     <span class="fin1c-nota">— solo Portal: el dinero que pasó por las cuentas. La ganancia de los dos mundos está arriba.</span></div>
    <div class="cob-stat-val" id="evt-caja-empresa-val" style="font-size:18px">—</div>
  </div>
 

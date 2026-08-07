@@ -38,6 +38,8 @@
 
 const { verifyAdminAuthLive, corsCheck } = require('./_lib/verify-admin');
 const { calcularUtilidadPorEvento } = require('./_lib/utilidad-evento');
+// [AUD-1c] La cuenta de los dos mundos, de la fuente única.
+const { cuentasDeTodos } = require('./_lib/cuenta-evento');
 
 exports.handler = async (event) => {
   const __origin = corsCheck(event);
@@ -61,9 +63,41 @@ exports.handler = async (event) => {
   const env = readEnv();
   if (env.error) return { statusCode: 500, headers, body: JSON.stringify({ error: env.error }) };
 
+  let body = {};
+  try { body = JSON.parse(event.body || '{}'); } catch (_) { body = {}; }
+
   try {
     const r = await calcularUtilidadPorEvento({ portalUrl: env.PORTAL_SB_URL, portalService: env.PORTAL_SB_SERVICE });
     if (r.error) return { statusCode: 502, headers, body: JSON.stringify({ error: r.error, detail: r.detail }) };
+
+    // [AUD-1c] LA CUENTA DE LOS DOS MUNDOS, ADITIVA. Todo lo de arriba se
+    // devuelve IGUAL —la caja sigue siendo la caja, y la tabla "Utilidad por
+    // evento" que la consume es AUD-1d, no ésta—; lo que se suma es `cuenta`,
+    // que trae ventas/gastos/ganancia/viajeros de los DOS libros y la bodega.
+    //
+    // LOS PRECIOS LOS INYECTA EL NAVEGADOR (decisión de Jane): el front ya carga
+    // el catálogo de index.html, y darle al servidor una fuente propia sería una
+    // divergencia más esperando nacer. Sin precios, la bodega de ese evento se
+    // queda en null — no en cero.
+    //
+    // Fails-soft a propósito: si esta parte truena, la respuesta sigue trayendo
+    // la caja de siempre y el Resumen no se queda en blanco.
+    let cuenta = null, cuentaError = null;
+    try {
+      const envKH = readEnvKH();
+      if (envKH.error) {
+        cuentaError = envKH.error;
+      } else {
+        const c = await cuentasDeTodos({
+          portalUrl: env.PORTAL_SB_URL, portalService: env.PORTAL_SB_SERVICE,
+          khUrl: envKH.KH_SB_URL, khService: envKH.KH_SB_SERVICE,
+          rol: (auth.user || {}).rol,
+          preciosPorEvento: leerPrecios(body),
+        });
+        if (c.error) cuentaError = c.error; else cuenta = c;
+      }
+    } catch (e) { cuentaError = e.message; }
+
     return {
       statusCode: 200,
       headers,
@@ -73,6 +107,8 @@ exports.handler = async (event) => {
         eventos: r.eventos,
         sin_evento: r.sin_evento,
         totales: r.totales,
+        cuenta,
+        cuenta_error: cuentaError,
       }),
     };
   } catch (e) {
@@ -81,6 +117,33 @@ exports.handler = async (event) => {
 };
 
 // ----- helpers -----
+
+// Los precios que manda el navegador: { "<slug>": { "<zona>": <precio> } }.
+// Se sanea aquí porque viene del cliente: solo números finitos y positivos.
+function leerPrecios(body) {
+  const p = body && body.precios_por_evento;
+  if (!p || typeof p !== 'object') return null;
+  const out = {};
+  Object.keys(p).slice(0, 200).forEach((slug) => {
+    if (!/^[A-Za-z0-9_.#-]{1,80}$/.test(slug)) return;
+    const zonas = p[slug];
+    if (!zonas || typeof zonas !== 'object') return;
+    const z = {};
+    Object.keys(zonas).slice(0, 100).forEach((k) => {
+      const v = Number(zonas[k]);
+      if (Number.isFinite(v) && v > 0) z[String(k).slice(0, 120)] = v;
+    });
+    if (Object.keys(z).length) out[slug] = z;
+  });
+  return Object.keys(out).length ? out : null;
+}
+
+function readEnvKH() {
+  const KH_SB_URL = process.env.SUPABASE_URL_KAMEHOUSE;
+  const KH_SB_SERVICE = process.env.SUPABASE_SERVICE_KEY_KAMEHOUSE;
+  if (!KH_SB_URL || !KH_SB_SERVICE) return { error: 'Faltan env vars KH' };
+  return { KH_SB_URL, KH_SB_SERVICE };
+}
 
 function readEnv() {
   const PORTAL_SB_URL     = process.env.PORTAL_SUPABASE_URL;

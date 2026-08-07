@@ -3256,3 +3256,21 @@ input[type="search"],.kh-buscar,.buscador{border-radius:var(--r-sm,8px)}
 }
 .fin1e-txt{font-size:12px;color:var(--ts);line-height:1.6;flex:1;min-width:220px}
 .fin1e-txt b{color:var(--text)}
+
+/* ═══ [FIN-1d] La zona en dinero ══════════════════════════════════════════
+   La tabla se EXTIENDE, no se duplica. Con 9 columnas su ancho manda: la de
+   la casa ya se desplaza sola (.kms-tab-wrap), y aquí solo se aprieta lo justo
+   para no devolver los píxeles que ganó KMS-6.                              */
+.kms-tab-z{min-width:760px}
+.kms-tab-z th,.kms-tab-z td{padding:3px 6px;white-space:nowrap}
+.kms-z-resta{color:var(--gold)}
+.kms-z-tot td{
+ border-top:1px solid var(--border2);font-weight:700;
+ font-family:'JetBrains Mono',monospace;font-size:11px;
+}
+.kms-z-tot .kms-z-nom{font-family:'Rajdhani',sans-serif;font-size:12px;letter-spacing:.08em}
+.kms-z-nota{
+ font-size:10px;color:var(--ts);line-height:1.5;margin-top:6px;max-width:none;
+}
+.kms-z-nota b{color:var(--text);font-weight:700}
+.kms-z-aviso{color:var(--gold);display:block;margin-top:2px}

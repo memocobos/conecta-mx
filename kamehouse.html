@@ -422,12 +422,15 @@
       bodega al lado (requisito firmado por Memo) y la deuda APARTE. -->
  <div id="fin1c-resumen" class="fin1c" style="display:none"></div>
 
- <!-- Caja / Proyectado / Falta por cobrar del evento (de admin-utilidad-evento). Visibilidad
-      propia: existe aunque el evento tenga 0 viajeros (por ingresos/gastos sueltos). -->
- <div class="cob-stats" id="evt-caja-stats" style="display:none">
-   <div class="cob-stat"><div class="cob-stat-lbl">Caja <span class="fin1c-nota">— solo Portal</span></div><div class="cob-stat-val green" id="evt-caja">—</div></div>
-   <div class="cob-stat"><div class="cob-stat-lbl">Proyectado</div><div class="cob-stat-val" id="evt-proyectado">—</div></div>
-   <div class="cob-stat"><div class="cob-stat-lbl">Falta por cobrar</div><div class="cob-stat-val orange" id="evt-falta">—</div></div>
+ <!-- [AUD-1e] AQUÍ VIVÍAN Caja / Proyectado / Falta por cobrar del evento.
+      Se retiran porque la cuenta buena está ARRIBA desde FIN-1c, y porque sus
+      tres fórmulas restaban gastos de los DOS mundos a ingresos de UNO solo.
+      Antes de quitarlas verifiqué a dónde va cada una — está en el letrero. -->
+ <div id="evt-caja-nota" class="aud1e-nota" style="display:none">
+   <b>Caja</b>, <b>Proyectado</b> y <b>Falta por cobrar</b> de este evento ya no se pintan aquí.
+   La cuenta del evento —ventas de los dos mundos, gastos y ganancia— está arriba;
+   lo que faltaba por cobrar es la tarjeta <b>Por cobrar / A favor</b>; y la caja del Portal
+   (el dinero que pasó por las cuentas) es la de la empresa, aquí abajo.
  </div>
 
  <!-- Desglose por paquete / zona -->
@@ -503,11 +506,9 @@
  <div class="form-group">
  <label>Categoría</label>
  <select id="filtro-cat-gastos" onchange="loadGastos()">
+ <!-- [AUD-1g] Solo "Todas": el resto lo llena _gastoPoblarCategorias con el
+      catálogo del servidor, igual que el select del modal. -->
  <option value="">Todas</option>
- <option>Transporte</option><option>Hospedaje</option>
- <option>Kits</option><option>Boletos</option>
- <option>Marketing</option><option>Salarios</option>
- <option>Renta</option><option>Otros</option>
  </select>
  </div>
  </div>
@@ -2519,13 +2520,10 @@
  </div>
  <div class="form-group">
  <label>Categoría *</label>
- <select id="gasto-categoria">
- <option>Transporte</option><option>Hospedaje</option>
- <option>Kits</option><option>Boletos</option>
- <option>Marketing</option><option>Salarios</option>
- <option>Renta</option><option>Combustible</option>
- <option>Comida Staff</option><option>Otros</option>
- </select>
+ <!-- [AUD-1g] SIN opciones aquí: las llena _gastoPoblarCategorias con el
+      catálogo que manda el servidor (_lib/categorias-gasto). Tener la lista
+      también en el HTML sería la segunda copia que acaba divergiendo. -->
+ <select id="gasto-categoria"></select>
  </div>
  </div>
  <div class="form-row cols-2">

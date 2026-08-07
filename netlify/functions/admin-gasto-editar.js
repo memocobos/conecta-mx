@@ -17,6 +17,8 @@
 
 const { verifyAdminAuthLive, corsCheck } = require('./_lib/verify-admin');
 const { validarMonto } = require('./_lib/monto-limites');
+// [AUD-1g] El catálogo de categorías vive en UN solo lugar.
+const { esValida: esValidaCategoria, errorCategoria } = require('./_lib/categorias-gasto');
 
 const CUENTAS = ['BBVA', 'Banamex', 'Efectivo', 'Otro'];
 
@@ -67,6 +69,10 @@ exports.handler = async (event) => {
     return { statusCode: 400, headers, body: JSON.stringify({ error: 'evento_id inválido' }) };
   }
   const categoria  = (typeof body.categoria === 'string' && body.categoria.trim()) ? body.categoria.trim().slice(0, 60) : null;
+  // [AUD-1g] Mismo candado que en el alta: editar no es una puerta trasera.
+  if (!esValidaCategoria(categoria)) {
+    return { statusCode: 400, headers, body: JSON.stringify({ error: errorCategoria(categoria) }) };
+  }
   const metodoPago = (typeof body.metodo_pago === 'string' && body.metodo_pago.trim()) ? body.metodo_pago.trim().slice(0, 60) : null;
 
   // Cuenta de la que salió el gasto. Opcional, pero si viene debe ser uno de los 4.

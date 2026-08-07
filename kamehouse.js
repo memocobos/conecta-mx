@@ -3516,12 +3516,12 @@ async function _utilCargar(force) {
 // evento (por BASE del slug), desde el cache. Visibilidad propia (no depende de
 // tours.length). Si no hay datos, oculta los bloques nuevos.
 function _renderUtilidadEvento(evBase) {
-  const cajaStats = document.getElementById('evt-caja-stats');
-  const banner    = document.getElementById('evt-caja-empresa');
+  const banner = document.getElementById('evt-caja-empresa');
+  const nota0  = document.getElementById('evt-caja-nota');
   const cache = _utilG3Cache;
   if (!cache) {
-    if (cajaStats) cajaStats.style.display = 'none';
-    if (banner)    banner.style.display = 'none';
+    if (nota0)  nota0.style.display = 'none';
+    if (banner) banner.style.display = 'none';
     return;
   }
   // Caja total de la empresa (global; rojo si negativa).
@@ -3533,24 +3533,12 @@ function _renderUtilidadEvento(evBase) {
   }
   if (banner) banner.style.display = 'flex';
 
-  // Bloque del evento seleccionado (caja/proyectado verde-o-rojo; falta naranja).
-  if (!evBase) { if (cajaStats) cajaStats.style.display = 'none'; return; }
-  const e = (cache.eventos && cache.eventos[evBase]) || { caja: 0, proyectado: 0, falta_por_cobrar: 0 };
-  const setSemaforo = (id, v) => {
-    const el = document.getElementById(id);
-    if (!el) return;
-    el.textContent = _spFmtMxn(Number(v || 0));
-    el.className = 'cob-stat-val ' + (Number(v || 0) < 0 ? 'red' : 'green');
-  };
-  setSemaforo('evt-caja', e.caja);
-  setSemaforo('evt-proyectado', e.proyectado);
-  const elFalta = document.getElementById('evt-falta');
-  if (elFalta) {
-    const f = Number(e.falta_por_cobrar || 0);
-    elFalta.textContent = _spFmtMxn(f);
-    elFalta.className = 'cob-stat-val ' + (f < 0 ? 'red' : 'orange');
-  }
-  if (cajaStats) cajaStats.style.display = '';
+  // [AUD-1e] Caja / Proyectado / Falta del EVENTO se retiraron: sus tres
+  // fórmulas restaban gastos de los DOS mundos a ingresos de UNO solo, y la
+  // cuenta buena está arriba desde FIN-1c. En su lugar queda el letrero que
+  // dice a dónde se fue cada una.
+  const nota = document.getElementById('evt-caja-nota');
+  if (nota) nota.style.display = evBase ? '' : 'none';
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -4773,10 +4761,10 @@ async function loadPorEvento() {
     if (_f1c) { _f1c.style.display = 'none'; _f1c.innerHTML = ''; }
     if (stats) stats.style.display = 'none';
     if (desg)  desg.style.display = 'none';
-    const cajaStats = document.getElementById('evt-caja-stats');
-    const cajaEmp   = document.getElementById('evt-caja-empresa');
-    if (cajaStats) cajaStats.style.display = 'none';
-    if (cajaEmp)   cajaEmp.style.display = 'none';
+    const cajaNota = document.getElementById('evt-caja-nota');   // [AUD-1e]
+    const cajaEmp  = document.getElementById('evt-caja-empresa');
+    if (cajaNota) cajaNota.style.display = 'none';
+    if (cajaEmp)  cajaEmp.style.display = 'none';
     tbody.innerHTML = '<tr><td colspan="8"><div class="empty-state"><div class="empty-icon">·</div>Selecciona un evento para ver los viajeros</div></td></tr>';
     return;
   }
@@ -5173,6 +5161,9 @@ async function loadGastos() {
  });
  const d = await r.json();
  if (!r.ok) throw new Error(d.error || 'No se pudieron cargar los gastos');
+ // [AUD-1g] El catálogo llega del servidor, de la MISMA fuente que valida el
+ // alta. El <select> del modal está vacío en el HTML a propósito.
+ _gastoPoblarCategorias(d.categorias);
  const gastos = Array.isArray(d.gastos) ? d.gastos : [];
  _gastosListCache = gastos;   // para que editarGasto pre-llene desde memoria
 
@@ -5204,6 +5195,36 @@ async function loadGastos() {
 
 // Abre el modal en modo CREAR: limpia el id de edición, vacía el form y restablece
 // los textos del modal. Lo dispara el botón "+ Registrar Gasto".
+// [AUD-1g] EL CATÁLOGO DE CATEGORÍAS, DE UNA SOLA FUENTE.
+//
+// La migración de FIN-1b escribió `boletos`, `hotel` y `transporte` en
+// minúscula —y `hotel` ni siquiera existía en el catálogo—, así que los filtros
+// por categoría los dejaban fuera EN SILENCIO. El servidor ahora los rechaza, y
+// para que el select no pueda ofrecer algo que el servidor rechace, se llena con
+// lo que el servidor manda.
+//
+// Si el catálogo no llegó, el select se queda VACÍO: sin categoría el gasto se
+// guarda igual (es opcional), pero NO se puede elegir una inventada. Fail-closed.
+let _gastoCategorias = null;
+function _gastoPoblarCategorias(cats) {
+  if (Array.isArray(cats) && cats.length) _gastoCategorias = cats.slice();
+  const lista = _gastoCategorias || [];
+  const sel = document.getElementById('gasto-categoria');
+  if (sel) {
+    const antes = sel.value;
+    sel.innerHTML = lista.map((c) => `<option>${_esfEsc(c)}</option>`).join('');
+    if (antes && lista.includes(antes)) sel.value = antes;
+  }
+  // El filtro de la tabla conserva su primera opción ("Todas").
+  const filtro = document.getElementById('filtro-cat-gastos');
+  if (filtro) {
+    const antes = filtro.value;
+    while (filtro.options.length > 1) filtro.remove(1);
+    lista.forEach((c) => { const o = document.createElement('option'); o.value = c; o.textContent = c; filtro.appendChild(o); });
+    if (antes) filtro.value = antes;
+  }
+}
+
 function nuevoGasto() {
  _gastoEditId = null;
  ['gasto-concepto', 'gasto-monto', 'gasto-fecha', 'gasto-notas'].forEach(id => {

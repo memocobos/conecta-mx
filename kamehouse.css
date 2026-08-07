@@ -3247,3 +3247,12 @@ input[type="search"],.kh-buscar,.buscador{border-radius:var(--r-sm,8px)}
 .fin1c-bod-tot{margin-top:4px;font-size:13px}
 .fin1c-aviso{color:var(--gold);font-size:11px;margin-top:4px}
 .fin1c-nota{font-family:'Montserrat',sans-serif;font-size:10px;color:var(--ts);text-transform:none;letter-spacing:0}
+
+/* ═══ [FIN-1e] La puerta única: el letrero que reemplaza al formulario ════ */
+.fin1e-puerta{
+ display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+ background:var(--bg3);border:1px solid var(--border);border-left:3px solid var(--gold);
+ border-radius:var(--r-sm,8px);padding:9px 12px;margin:8px 0;
+}
+.fin1e-txt{font-size:12px;color:var(--ts);line-height:1.6;flex:1;min-width:220px}
+.fin1e-txt b{color:var(--text)}

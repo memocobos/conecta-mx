@@ -7228,9 +7228,36 @@ function _kmsTableroPintar(parcial) {
     ${sub ? `<div class="kms-tab-c-sub">${_esfEsc(sub)}</div>` : ''}
   </div>`;
 
+  // [FIN-1d] LA ZONA EN DINERO. Se EXTIENDE la tabla que ya existía en vez de
+  // poner otra: la misma información dos veces en la misma pantalla es cómo se
+  // llega a dos cifras que no cuadran.
+  //
+  // TRES REGLAS DE HONESTIDAD, del diseño:
+  //  1. "Resta $" es ESTIMADO: disponibles × precio de HOY. El precio cambia y
+  //     nadie ha pagado ese dinero todavía.
+  //  2. "Vendido $" TAMBIÉN es estimado. Lo cobrado de verdad son los contratos
+  //     de los viajeros, y esa cifra vive en Por Evento. Esta tabla no compite
+  //     con ella: lo dice en su nota.
+  //  3. Zona SIN precio en el catálogo → renglón sin estimados, NO ceros. Un
+  //     cero diría "no vale nada", que es una afirmación que no tenemos.
+  const precios = d.precios || {};
+  const tot = { compradas: 0, costo: 0, vendidas: 0, vendido: 0, disp: 0, resta: 0, sinPrecio: 0 };
   const filas = d.zonas.map((z) => {
     const prom = z.compradas > 0 ? (z.inversion / z.compradas) : 0;
     const dispCls = (z.disponibles == null) ? 'kms-z-cero' : (z.disponibles < 0 ? 'kms-z-neg' : '');
+    const precio = precios[String(z.zona).trim()];
+    const hayPrecio = Number.isFinite(precio) && precio > 0;
+    const vendidas = z.vendidas;
+    const vendidoD = (hayPrecio && vendidas != null) ? vendidas * precio : null;
+    const restaD = (hayPrecio && z.disponibles != null && z.disponibles > 0) ? z.disponibles * precio : null;
+    tot.compradas += z.compradas || 0;
+    tot.costo += z.inversion || 0;
+    if (vendidas != null) tot.vendidas += vendidas;
+    if (vendidoD != null) tot.vendido += vendidoD;
+    if (z.disponibles != null && z.disponibles > 0) tot.disp += z.disponibles;
+    if (restaD != null) tot.resta += restaD;
+    if (!hayPrecio) tot.sinPrecio++;
+    const guion = '<span class="kms-z-cero">—</span>';
     // [KMS-3] La fila lleva a su zona en el paso ②. Se manda el NOMBRE, no el
     // índice: quien resuelve el índice es _kmsIrAZona contra _kamZonasMap.
     // tabindex + Enter para que también se llegue con el teclado.
@@ -7240,11 +7267,29 @@ function _kmsTableroPintar(parcial) {
         onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();_kmsIrAZona('${_attrJs(z.zona)}')}">
       <td class="kms-z-nom">${_esfEsc(z.zona)}</td>
       <td>${z.compradas || 0}</td>
-      <td>${z.compradas > 0 ? _kamMoney(prom) : '<span class="kms-z-cero">—</span>'}</td>
-      <td>${z.fuera == null ? '<span class="kms-z-cero">—</span>' : z.fuera}</td>
+      <td>${z.compradas > 0 ? _kamMoney(prom) : guion}</td>
+      <td>${z.inversion > 0 ? _kamMoney(z.inversion) : guion}</td>
+      <td>${vendidas == null ? guion : vendidas}</td>
+      <td>${hayPrecio ? _kamMoney(precio) : guion}</td>
+      <td>${vendidoD == null ? guion : _kamMoney(vendidoD)}</td>
       <td class="${dispCls}">${z.disponibles == null ? '—' : z.disponibles}</td>
+      <td class="kms-z-resta">${restaD == null ? guion : _kamMoney(restaD)}</td>
     </tr>`;
   }).join('');
+
+  // El renglón TOTAL. Solo se pinta si hay algo que totalizar.
+  const totalFila = d.zonas.length ? `
+    <tr class="kms-z-tot">
+      <td class="kms-z-nom">TOTAL</td>
+      <td>${tot.compradas}</td>
+      <td></td>
+      <td>${_kamMoney(tot.costo)}</td>
+      <td>${tot.vendidas}</td>
+      <td></td>
+      <td>${_kamMoney(tot.vendido)}</td>
+      <td>${tot.disp}</td>
+      <td class="kms-z-resta">${_kamMoney(tot.resta)}</td>
+    </tr>` : '';
 
   cont.innerHTML = `<div class="card kms-tab">
     <div class="kms-tab-tot">
@@ -7254,9 +7299,15 @@ function _kmsTableroPintar(parcial) {
       ${tarjeta('Deuda a proveedores', deuda == null ? '…' : _kamMoney(deuda), deuda == null ? 'cargando abonos' : (servicios ? 'boletos + servicios − abonado' : 'inversión − abonado'), 'kms-deuda')}
     </div>
     <div class="kms-tab-wrap"><table class="kms-tab-z">
-      <thead><tr><th>Zona</th><th>Compradas</th><th>Costo prom.</th><th>Vend. fuera</th><th>Disponible</th></tr></thead>
-      <tbody>${filas || '<tr><td colspan="5" class="kms-z-cero">Sin compras registradas</td></tr>'}</tbody>
+      <thead><tr><th>Zona</th><th>Compradas</th><th>Costo u.</th><th>Costo total</th><th>Vendidas</th><th>Precio hoy</th><th>Vendido $</th><th>Disp.</th><th>Resta $</th></tr></thead>
+      <tbody>${filas || '<tr><td colspan="9" class="kms-z-cero">Sin compras registradas</td></tr>'}${totalFila}</tbody>
     </table></div>
+    ${d.zonas.length ? `<div class="kms-z-nota">
+      <b>Vendido $</b> y <b>Resta $</b> son <b>estimados</b>: vendidas o disponibles × el precio del catálogo de HOY.
+      El precio cambia y lo de la derecha nadie lo ha pagado todavía.
+      Lo <b>cobrado de verdad</b> son los contratos de los viajeros, y esa cifra vive en <b>Por Evento</b>.
+      ${tot.sinPrecio ? `<span class="kms-z-aviso">${tot.sinPrecio} zona${tot.sinPrecio === 1 ? '' : 's'} sin precio en el catálogo: su renglón va sin estimados.</span>` : ''}
+    </div>` : ''}
   </div>`;
 
   // [KMS-5] Las alarmas salen de lo MISMO que acaba de pintarse. Se repinta en
@@ -7826,6 +7877,13 @@ async function _kamComprasLoad() {
       // [PRV-2] Los servicios van APARTE de la inversión: la inversión es de
       // BOLETOS. Mezclarlos diría que compraste boletos que no compraste.
       servicios: _kamServicios.reduce((a, sv) => a + (Number(sv.monto) || 0), 0),
+      // [FIN-1d] El precio de venta de HOY sale del catálogo del index, que esta
+      // función YA tenía cargado (`zonasEV`). Cero endpoints nuevos.
+      precios: (() => {
+        const m = {};
+        zonasEV.forEach((z) => { if (z && z.n != null && Number.isFinite(Number(z.p))) m[String(z.n).trim()] = Number(z.p); });
+        return m;
+      })(),
       zonas: zonaNames.map((zona) => {
         const cz = compras.filter((c) => String(c.zona) === zona);
         const sem = semMap[String(zona).trim()] || null;
@@ -7837,6 +7895,11 @@ async function _kamComprasLoad() {
           // "cero vendidos fuera", que es una afirmación que no tenemos.
           fuera: sem ? sem.fuera : null,
           disponibles: sem ? sem.disponibles : null,
+          // [FIN-1d] VENDIDAS = todo lo que ya no está disponible, venga de donde
+          // venga: fuera del sistema + seguras + apartadas. Es la definición que
+          // usa el propio semáforo para restar (disponibles = compradas − las
+          // tres), así que cualquier otra cosa no cuadraría con su propia resta.
+          vendidas: sem ? (Number(sem.fuera || 0) + Number(sem.seguras || 0) + Number(sem.apartadas || 0)) : null,
         };
       }),
     });

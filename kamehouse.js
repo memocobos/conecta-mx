@@ -3735,7 +3735,12 @@ async function loadResumen() {
     const setTxt = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
     const { total: totalGastos } = await _cobCargarGastos(true);
 
-    let utilidad;
+    // `porCobrar` lo consume _renderResumenDinero más abajo (la franja del
+    // dinero). Al meter el cálculo viejo dentro del `else` lo dejé fuera de
+    // alcance y la franja tronaba con "porCobrar is not defined" — un error que
+    // la pantalla atrapaba y pintaba en rojo, sin llegar a `pageerror`. Se
+    // declara ARRIBA, con el valor de la fuente que toque.
+    let utilidad, porCobrar;
     if (cta) {
       setTxt('m-cobrado',   _spFmtMxn(cta.ventas));
       setTxt('m-facturado', _spFmtMxn(cta.facturado));
@@ -3744,6 +3749,7 @@ async function loadResumen() {
       // El signo, dicho con palabras (patrón CAP-FIX-2d): un "Por cobrar −$793"
       // se lee al revés de lo que significa.
       const pend = Number(cta.pendiente || 0);
+      porCobrar = pend;
       setTxt('m-porcobrar', _spFmtMxn(Math.abs(pend)));
       const lblPc = document.getElementById('m-porcobrar-lbl');
       if (lblPc) lblPc.textContent = pend < 0 ? 'A favor' : 'Por cobrar';
@@ -3752,7 +3758,7 @@ async function loadResumen() {
     } else {
       // Cálculo viejo, Portal-puro, y se avisa de que lo es.
       const cobrado   = activos.reduce((a, t) => a + Number((t.pago || {}).abonado  || 0), 0);
-      const porCobrar = activos.reduce((a, t) => a + Number((t.pago || {}).restante || 0), 0);
+      porCobrar       = activos.reduce((a, t) => a + Number((t.pago || {}).restante || 0), 0);
       const facturado = activos.reduce((a, t) => a + Number((t.pago || {}).total    || 0), 0);
       setTxt('m-cobrado',   _spFmtMxn(cobrado));
       setTxt('m-porcobrar', _spFmtMxn(porCobrar));
@@ -3834,7 +3840,9 @@ async function _renderResumenDinero(porCobrar) {
     return `<div class="cob-stat dash-click" onclick="showPage('saldos')" title="Ver Saldos"><div class="cob-stat-lbl">${lbl}</div><div class="cob-stat-val" style="${color ? 'color:' + color : ''}">${_spFmtMxn(Number(val || 0))}</div></div>`;
   };
   const cuentasHTML = orden.map(n => stat(n, (cuentas[n] || {}).saldo || 0)).join('') +
-    `<div class="cob-stat dash-click" onclick="showPage('pagos')" title="Ver cobranza"><div class="cob-stat-lbl">Por cobrar</div><div class="cob-stat-val" style="color:var(--orange)">${_spFmtMxn(Number(porCobrar || 0))}</div></div>` +
+    // [AUD-1c] El signo, en palabras también aquí: con el neto de los dos mundos
+    // este número puede salir negativo, y "Por cobrar −$793" se lee al revés.
+    `<div class="cob-stat dash-click" onclick="showPage('pagos')" title="Ver cobranza"><div class="cob-stat-lbl">${Number(porCobrar || 0) < 0 ? 'A favor' : 'Por cobrar'}</div><div class="cob-stat-val" style="color:var(--orange)">${_spFmtMxn(Math.abs(Number(porCobrar || 0)))}</div></div>` +
     (otros !== 0 ? stat('Otros (sin cuenta)', otros) : '');
 
   const heroColor = cajaTotal < 0 ? 'var(--red)' : 'var(--green)';

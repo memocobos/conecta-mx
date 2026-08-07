@@ -13,6 +13,10 @@
 //   GASTOS   = la tabla `gastos` del evento (desde FIN-1b trae boletos/hotel/bus)
 //   GANANCIA = VENTAS − GASTOS
 //   BODEGA   = lo que ya se pagó y sigue en forma de boleto
+//              [MER-1] …y que en un evento YA PASADO deja de ser bodega y pasa a
+//              ser MERMA: los mismos boletos, medidos en COSTO HUNDIDO en vez de
+//              en precio de venta. La ganancia NO cambia de fórmula (el costo ya
+//              está en `gastos` desde FIN-1b); cambia lo que la bodega DICE.
 //   DEUDA A PROVEEDORES = compras + servicios − abonos  → INFORMATIVA, jamás
 //                         dentro de la ganancia: es lo que FALTA por gastar, y
 //                         meterla contaría dos veces lo mismo el día que se pague.
@@ -37,14 +41,16 @@
 //
 // Uso:
 //   cuentaDeEvento({ portalUrl, portalService, khUrl, khService, evento_id,
-//                    rol, preciosPorZona?, fetchImpl? })
+//                    rol, preciosPorZona?, pasado?, fetchImpl? })
 //     → { evento_id, ventas_portal, ventas_kh, ventas, gastos, ganancia,
-//         bodega:{ boletos, valor_estimado, sin_precio, zonas_sin_precio },
+//         bodega:{ boletos, valor_estimado, sin_precio, zonas_sin_precio,
+//                  costo_hundido, sin_costo, zonas_sin_costo, pasado },
 //         deuda_proveedores, viajeros_portal, viajeros_kh, viajeros,
 //         por_cobrar, a_favor, ve_migrados }
 //     | { error, detail }
 //
-//   cuentasDeTodos({ portalUrl, portalService, khUrl, khService, rol, fetchImpl? })
+//   cuentasDeTodos({ portalUrl, portalService, khUrl, khService, rol,
+//                    preciosPorEvento?, eventosPasados?, fetchImpl? })
 //     → { eventos: { "<slug>": {…sin bodega…} }, totales: {…} } | { error, detail }
 //     (sin bodega: la bodega pide una consulta de stock POR evento, y este otro
 //      camino existe justo para los tableros que miran TODOS los eventos.)
@@ -92,9 +98,23 @@ function saldoMigrado(v, abonosDelViajero) {
 
 // ── PURO: la bodega en dinero. Sin precio de una zona, sus boletos se cuentan
 //    pero NO se valoran: un cero diría "no vale nada".
-function bodegaDeZonas(zonas, preciosPorZona) {
-  const out = { boletos: 0, valor_estimado: 0, sin_precio: 0, zonas_sin_precio: [] };
+//
+// [MER-1] Y con DOS cifras, no una, porque los mismos boletos valen cosas
+// distintas según si el evento ya pasó:
+//   valor_estimado = disponibles × PRECIO DE VENTA  → lo que se podría cobrar
+//   costo_hundido  = disponibles × COSTO UNITARIO   → lo que ya se pagó por ellos
+// Mientras el evento no llega, la cifra que importa es la primera (esperanza).
+// Cuando el evento pasó, la primera es una mentira —nadie va a comprar un boleto
+// de un concierto que ya ocurrió— y la única verdadera es la segunda: ese dinero
+// se perdió. `pasado` NO se decide aquí: se recibe. Este lib no sabe qué día es
+// hoy y no debe saberlo (ver la nota de `cuentasDeTodos`).
+function bodegaDeZonas(zonas, preciosPorZona, pasado) {
+  const out = {
+    boletos: 0, valor_estimado: 0, sin_precio: 0, zonas_sin_precio: [],
+    costo_hundido: 0, sin_costo: 0, zonas_sin_costo: [], pasado: !!pasado,
+  };
   let algunConPrecio = false;
+  let algunConCosto = false;
   (zonas || []).forEach((z) => {
     const disp = Number(z && z.disponibles);
     if (!Number.isFinite(disp) || disp <= 0) return;
@@ -102,10 +122,27 @@ function bodegaDeZonas(zonas, preciosPorZona) {
     const p = Number((preciosPorZona || {})[String(z.zona).trim()]);
     if (Number.isFinite(p) && p > 0) { out.valor_estimado += disp * p; algunConPrecio = true; }
     else { out.sin_precio += disp; out.zonas_sin_precio.push(String(z.zona)); }
+    // El costo viene del MISMO desglose de zona (_lib/disponibilidad lo deriva de
+    // las compras que ya leía). Sin costo, esos boletos se cuentan pero no se
+    // valoran — mismo criterio que el precio.
+    const c = Number(z && z.costo_unit);
+    if (Number.isFinite(c) && c > 0) { out.costo_hundido += disp * c; algunConCosto = true; }
+    else { out.sin_costo += disp; out.zonas_sin_costo.push(String(z.zona)); }
   });
   // Sin UN SOLO precio conocido, el valor no es cero: es desconocido.
   if (!algunConPrecio) out.valor_estimado = null;
+  if (!algunConCosto) out.costo_hundido = null;
   return out;
+}
+
+// [MER-1] La bodega que NO se pudo calcular. Vivía escrita a mano en tres sitios
+// y ahora son cinco campos: una sola declaración, para que agregar un campo no
+// deje a un llamador con la forma vieja.
+function bodegaDesconocida(pasado) {
+  return {
+    boletos: null, valor_estimado: null, sin_precio: 0, zonas_sin_precio: [],
+    costo_hundido: null, sin_costo: 0, zonas_sin_costo: [], pasado: !!pasado,
+  };
 }
 
 // ── PURO: arma la cuenta con los números ya reunidos. Aquí vive la regla del
@@ -269,7 +306,7 @@ async function cuentaDeEvento(opts) {
 
   // La bodega necesita el stock: se usa el MISMO lib que el semáforo del
   // Palacio, para que no haya dos ideas de "disponible".
-  let bodega = { boletos: 0, valor_estimado: null, sin_precio: 0, zonas_sin_precio: [] };
+  let bodega = bodegaDesconocida(o.pasado);
   const disp = await cargarDisponibilidad({
     khUrl: o.khUrl, khKey: o.khService,
     portalUrl: o.portalUrl, portalKey: o.portalService,
@@ -280,11 +317,9 @@ async function cuentaDeEvento(opts) {
       ...Object.keys(disp.stockPorZona || {}),
       ...Object.keys(disp.ajustesPorZona || {}),
     ])].map((z) => desgloseZona(disp, z));
-    bodega = bodegaDeZonas(zonas, o.preciosPorZona);
-  } else {
-    // Sin stock NO se afirma una bodega vacía.
-    bodega = { boletos: null, valor_estimado: null, sin_precio: 0, zonas_sin_precio: [] };
+    bodega = bodegaDeZonas(zonas, o.preciosPorZona, o.pasado);
   }
+  // Sin stock NO se afirma una bodega vacía: se queda la desconocida de arriba.
 
   return armarCuenta({
     evento_id,
@@ -328,6 +363,18 @@ async function cuentasDeTodos(opts) {
     ...Object.keys(d.data || {}),
   ])].filter(Boolean).sort();
 
+  // [MER-1] QUÉ EVENTOS YA PASARON — se RECIBE, no se calcula.
+  //
+  // Este lib no pregunta qué día es hoy, y es a propósito: la fecha de un evento
+  // vive en el catálogo de `index.html` (el mismo que ya inyecta los precios, y
+  // por la misma razón — el servidor no lo tiene), así que si aquí naciera un
+  // reloj habría DOS definiciones de "ya pasó": la del navegador y la de acá. Una
+  // divergencia más esperando nacer, y encima con zona horaria de por medio, que
+  // en esta casa es donde se cae todo (`toISOString` nunca es hoy en México).
+  // El navegador clasifica con el helper de la casa y manda la lista; aquí solo
+  // se marca. Sin lista, NINGÚN evento es pasado y todo se comporta como antes.
+  const pasados = new Set((Array.isArray(o.eventosPasados) ? o.eventosPasados : []).map(baseSlug).filter(Boolean));
+
   const eventos = {};
   slugs.forEach((slug) => {
     eventos[slug] = armarCuenta({
@@ -338,7 +385,7 @@ async function cuentasDeTodos(opts) {
       gastos: n((p.data.gastos || {})[slug]),
       kh: (k.data || {})[slug] || KH_VACIO,
       deuda: n((d.data || {})[slug]),
-      bodega: { boletos: null, valor_estimado: null, sin_precio: 0, zonas_sin_precio: [] },
+      bodega: bodegaDesconocida(pasados.has(slug)),
       veMigrados,
     });
   });
@@ -368,7 +415,7 @@ async function cuentasDeTodos(opts) {
         ...Object.keys(disp.stockPorZona || {}),
         ...Object.keys(disp.ajustesPorZona || {}),
       ])].map((z) => desgloseZona(disp, z));
-      eventos[slug].bodega = bodegaDeZonas(zonas, precios[slug]);
+      eventos[slug].bodega = bodegaDeZonas(zonas, precios[slug], pasados.has(slug));
     }
   }
 
@@ -383,14 +430,29 @@ async function cuentasDeTodos(opts) {
   if (tot.desconocido) { tot.ventas = null; tot.viajeros = null; }
   // [AUD-1c] La bodega de la empresa: solo suma lo que SE PUDO valorar. Si
   // ningún evento trajo precios, el valor es null (desconocido), no 0.
+  //
+  // [MER-1] Y en DOS montones que no se mezclan. Sumar los boletos de un evento
+  // que ya pasó a los de uno que viene sería volver a decir la mentira que esta
+  // tuerca vino a quitar, solo que a nivel empresa: el total diría "esto se
+  // puede vender" incluyendo lo que ya no se puede vender nunca.
+  //   bodega_* → SOLO eventos por venir. Es esperanza y se puede realizar.
+  //   merma_*  → SOLO eventos pasados. Es costo hundido y ya se perdió.
   let boletos = 0, valor = 0, algo = false, algoValor = false;
+  let mBoletos = 0, mCosto = 0, mAlgo = false, mAlgoCosto = false;
   slugs.forEach((s) => {
     const b = eventos[s].bodega || {};
+    if (b.pasado) {
+      if (b.boletos != null) { mBoletos += b.boletos; mAlgo = true; }
+      if (b.costo_hundido != null) { mCosto += b.costo_hundido; mAlgoCosto = true; }
+      return;
+    }
     if (b.boletos != null) { boletos += b.boletos; algo = true; }
     if (b.valor_estimado != null) { valor += b.valor_estimado; algoValor = true; }
   });
   tot.bodega_boletos = algo ? boletos : null;
   tot.bodega_valor = algoValor ? valor : null;
+  tot.merma_boletos = mAlgo ? mBoletos : null;
+  tot.merma_costo = mAlgoCosto ? mCosto : null;
   // Facturado de empresa, para la tarjeta del Resumen.
   let fact = 0, factOk = true;
   slugs.forEach((s) => { const f = eventos[s].facturado; if (f == null) factOk = false; else fact += f; });
@@ -414,6 +476,7 @@ module.exports = {
   // exportados para el arnés (puros, sin BD):
   saldoMigrado,
   bodegaDeZonas,
+  bodegaDesconocida,
   armarCuenta,
   ROLES_DINERO_MIGRADO,
   baseSlug,

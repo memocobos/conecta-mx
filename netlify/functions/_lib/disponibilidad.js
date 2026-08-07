@@ -149,8 +149,12 @@ async function cargarDisponibilidad({ khUrl, khKey, portalUrl, portalKey, evento
   const khHeaders = { apikey: khKey, Authorization: 'Bearer ' + khKey };
   const portalHeaders = { apikey: portalKey, Authorization: 'Bearer ' + portalKey };
 
+  // [MER-1] `costo_unitario` viaja con la cantidad porque la MERMA de un evento
+  // pasado se mide en COSTO, no en precio de venta: lo que quedó sin vender ya
+  // se pagó, y ese dinero es el que se perdió. Se lee de la MISMA fila que ya se
+  // leía —una consulta, una fuente— en vez de que cuenta-evento abriera la suya.
   const cp = new URLSearchParams();
-  cp.set('select', 'zona,cantidad');
+  cp.set('select', 'zona,cantidad,costo_unitario');
   cp.append('evento_id', `eq.${evento_id}`);
   cp.set('limit', '10000');
 
@@ -177,10 +181,24 @@ async function cargarDisponibilidad({ khUrl, khKey, portalUrl, portalKey, evento
   const ventas = await vRes.json();
 
   const stockPorZona = {};
+  // [MER-1] Lo invertido por zona y CUÁNTOS boletos respaldan ese número. Las dos
+  // cifras van juntas porque el costo unitario honesto es un PROMEDIO PONDERADO
+  // (una zona puede tener dos compras a precios distintos), y una fila sin
+  // `costo_unitario` NO puede entrar al promedio: contarla como 0 diría que esos
+  // boletos fueron gratis. Por eso `conCostoPorZona` cuenta solo las que sí lo
+  // traen, y si ninguna lo trae el costo queda en null — que no es cero.
+  const inversionPorZona = {};
+  const conCostoPorZona = {};
   (Array.isArray(compras) ? compras : []).forEach((c) => {
     const z = (c && c.zona != null) ? String(c.zona).trim() : '';
     if (!z) return;
-    stockPorZona[z] = (stockPorZona[z] || 0) + (parseInt(c.cantidad, 10) || 0);
+    const cant = parseInt(c.cantidad, 10) || 0;
+    stockPorZona[z] = (stockPorZona[z] || 0) + cant;
+    const cu = Number(c.costo_unitario);
+    if (Number.isFinite(cu) && cu > 0 && cant > 0) {
+      inversionPorZona[z] = (inversionPorZona[z] || 0) + cant * cu;
+      conCostoPorZona[z] = (conCostoPorZona[z] || 0) + cant;
+    }
   });
 
   // vendidos_fuera (KH stock_ajustes): ventas registradas fuera del sistema.
@@ -217,6 +235,7 @@ async function cargarDisponibilidad({ khUrl, khKey, portalUrl, portalKey, evento
     gestionado: Array.isArray(compras) && compras.length > 0,
     stockPorZona, vendidosPorZona, ajustesPorZona,
     segurasPorZona, apartadasPorZona, ajustesMetaPorZona,
+    inversionPorZona, conCostoPorZona,   // [MER-1]
   };
 }
 
@@ -236,7 +255,13 @@ function desgloseZona(disp, zona) {
   else if (disponibles <= 5) estado = 'amarillo';
   else estado = 'verde';
   const meta = (disp.ajustesMetaPorZona && disp.ajustesMetaPorZona[z]) || null;
-  return { zona: z, compradas, fuera, seguras, apartadas, disponibles, estado, ajuste: meta };
+  // [MER-1] Lo que COSTÓ esta zona, por si hay que valorar lo que no se vendió.
+  // `costo_unit` es null cuando ninguna compra trajo costo: sin él, quien pinte
+  // la merma tiene que decir que no la sabe, no pintar un cero.
+  const inv = (disp.inversionPorZona && disp.inversionPorZona[z]) || 0;
+  const conCosto = (disp.conCostoPorZona && disp.conCostoPorZona[z]) || 0;
+  const costo_unit = conCosto > 0 ? inv / conCosto : null;
+  return { zona: z, compradas, fuera, seguras, apartadas, disponibles, estado, ajuste: meta, inversion: inv, costo_unit };
 }
 
 // PURO: evalúa una zona para un cupo `num`. Si la zona NO está gestionada (sin

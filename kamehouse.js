@@ -7963,17 +7963,23 @@ async function _kamAbonosLoad(slug, deudaPorProveedor) {
 // El brinco a la puerta buena: lleva a Gastos CON EL EVENTO YA PUESTO y el modal
 // abierto. Sin el evento, el bloque de proveedor de FIN-1a no aparece —la deuda
 // es por evento— y el viaje no habría servido de nada.
-function _fin1eIrAGastos(slug) {
+async function _fin1eIrAGastos(slug) {
   showPage('gastos');
   const base = String(slug || '').split('#')[0];
   // El modal limpia el evento al abrir, así que primero se abre y luego se pone.
   if (typeof nuevoGasto === 'function') nuevoGasto();
   const sel = document.getElementById('gasto-evento');
-  if (sel && base) {
-    // Si el select trae la fecha exacta (multifecha) se elige ésa; si no, la base.
-    const opt = [...sel.options].find((o) => o.value === slug) || [...sel.options].find((o) => String(o.value).split('#')[0] === base);
-    if (opt) { sel.value = opt.value; if (typeof _fin1aOnEvento === 'function') _fin1aOnEvento(); }
-  }
+  if (!sel || !base) return;
+  // Las opciones de este select las puebla _poblarSelectsGastos, que es ASÍNCRONA
+  // y puede no haber corrido nunca (si Memo no ha entrado a Gastos en esta
+  // sesión). Poner el value antes de que existan las opciones no truena: se
+  // queda en '' y el viaje llega sin evento — que fue justo lo que cazó el
+  // arnés. Se espera a que estén.
+  if (typeof _poblarSelectsGastos === 'function') { try { await _poblarSelectsGastos(); } catch (_) {} }
+  // Si el select trae la fecha exacta (multifecha) se elige ésa; si no, la base.
+  const opt = [...sel.options].find((o) => o.value === slug)
+           || [...sel.options].find((o) => String(o.value).split('#')[0] === base);
+  if (opt) { sel.value = opt.value; if (typeof _fin1aOnEvento === 'function') _fin1aOnEvento(); }
 }
 
 async function _kamCompraCrear(zi) {

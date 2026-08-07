@@ -25,13 +25,20 @@
 
 const { verifyAdminAuthLive, corsCheck } = require('./_lib/verify-admin');
 const { verificarVendedorActivo, AVISO_INACTIVO } = require('./_lib/vendedor-activo');
-const { calcularUtilidadPorEvento, baseSlug } = require('./_lib/utilidad-evento');
+// [AUD-1b] La cuenta de un evento sale de UNA fuente: _lib/cuenta-evento.
+//
+// El import de `utilidad-evento` se retira porque esta función ya no lo usa:
+// `listar` pasó al lib nuevo y `mis_ventas` —la pantalla del vendedor, que NO
+// se toca en esta tuerca— nunca lo usó: consulta `solicitudes_tour` directo.
+// Lo VERIFIQUÉ leyendo su cuerpo, después de escribir un comentario que decía
+// lo contrario. El lib sigue vivo y lo usan admin-utilidad-evento y
+// admin-liquidacion; lo que se va de aquí es un import muerto.
+const { cuentasDeTodos } = require('./_lib/cuenta-evento');
 let fetchCatalogo = null;
 try { ({ fetchCatalogo } = require('./_lib/catalogo-index')); } catch (_) { fetchCatalogo = null; }
 
 const ROLES_ADMIN = ['maestro_roshi', 'bulma'];
 const ROLES_VENTAS = ['vendedor', 'maestro_roshi', 'bulma'];
-const ESTADOS_CUENTAN = ['pendiente', 'en_pagos', 'pagado'];   // viajeros no cancelados
 
 // Columnas de una venta (solicitudes_tour) que viajan a "Mis Ventas".
 const VENTA_COLS = [
@@ -82,13 +89,29 @@ exports.handler = async (event) => {
     // ── listar (finanzas REALES por evento — CAJA, desde el lib) ───────────
     if (accion === 'listar') {
       if (!env.PORTAL_SB_URL || !env.PORTAL_SB_SERVICE) return json(500, { error: 'Faltan env vars Portal (PORTAL_SUPABASE_URL/SERVICE_KEY)' });
-      const util = await calcularUtilidadPorEvento({ portalUrl: env.PORTAL_SB_URL, portalService: env.PORTAL_SB_SERVICE });
+      // [AUD-1b] LA CUENTA DE LOS DOS MUNDOS, de la fuente única.
+      //
+      // Antes esta pantalla leía SOLO el Portal, así que melanie —cuyos 30
+      // viajeros vienen del Excel— salía con 0 viajeros, $0 facturado, $0
+      // cobrado y una "utilidad" de −$147,172: los gastos de un mundo restados
+      // a las ventas de otro. No le faltaba la mitad; tenía dos mitades que no
+      // se corresponden.
+      //
+      // Y la Utilidad deja de ser la CAJA para ser la GANANCIA (ventas −
+      // gastos). La caja sigue existiendo en su lib, para quien pregunte por
+      // ella; aquí la pregunta es otra.
+      const util = await cuentasDeTodos({
+        portalUrl: env.PORTAL_SB_URL, portalService: env.PORTAL_SB_SERVICE,
+        khUrl: env.KH_SB_URL, khService: env.KH_SB_SERVICE,
+        rol: (auth.user || {}).rol,
+      });
       if (util.error) return json(502, { error: util.error, detail: util.detail });
 
-      // Metadata (nombre/fecha/ciudad) del catálogo + viajeros reales por slug (best-effort).
+      // Metadata (nombre/fecha/ciudad) del catálogo. Los viajeros ya NO se cuentan
+      // aparte: los da el lib, sumando los dos mundos.
       let cat = null;
       if (fetchCatalogo) { try { cat = await fetchCatalogo(); } catch (_) { cat = null; } }
-      const viajeros = await contarViajeros(env);   // { slug: nº viajeros no cancelados }
+
 
       const eventos = Object.keys(util.eventos || {}).map(slug => {
         const f = util.eventos[slug];
@@ -100,12 +123,17 @@ exports.handler = async (event) => {
           fecha: c.ds || null,          // ISO (fmtFecha lo entiende); humano vive en c.fecha
           ciudad: c.ciudad || null,
           status: null,                 // la vista muerta lo daba; ya no hay fuente real
-          total_viajeros: viajeros[slug] || 0,
-          total_cobrar: f.vendido,          // Facturado
-          total_cobrado: f.cobrado,         // Cobrado
-          total_pendiente: f.falta_por_cobrar,   // Pendiente (= vendido − cobrado)
+          total_viajeros: f.viajeros,       // los DOS mundos
+          total_cobrar: f.facturado,        // Facturado (contratado)
+          total_cobrado: f.ventas,          // Cobrado (dinero que existe)
+          total_pendiente: f.pendiente,     // facturado − cobrado (puede ser negativo)
           total_costos: f.gastos,           // Costos
-          utilidad_actual: f.caja,          // Utilidad = CAJA REAL
+          utilidad_actual: f.ganancia,      // Utilidad = GANANCIA (ventas − gastos)
+          // [AUD-1b] De dónde sale cada número, para que la pantalla lo pueda
+          // rotular sin volver a preguntar (y para que el arnés lo carée).
+          origen: { portal: f.ventas_portal, migrados: f.ventas_kh, ve_migrados: f.ve_migrados },
+          bodega_boletos: f.bodega ? f.bodega.boletos : null,
+          deuda_proveedores: f.deuda_proveedores,
         };
       }).sort((a, b) => String(b.fecha || '').localeCompare(String(a.fecha || '')));
       return json(200, { ok: true, eventos });
@@ -171,22 +199,11 @@ exports.handler = async (event) => {
 
 // Viajeros (num_personas) NO cancelados por slug base, de todos los canales. Best-
 // effort: si falla, devuelve {} (el panel muestra 0, no rompe). No es dinero.
-async function contarViajeros(env) {
-  try {
-    const portalHeaders = { apikey: env.PORTAL_SB_SERVICE, Authorization: 'Bearer ' + env.PORTAL_SB_SERVICE };
-    const r = await fetch(`${env.PORTAL_SB_URL}/rest/v1/solicitudes_tour?estado=in.(${ESTADOS_CUENTAN.join(',')})&select=evento_id,num_personas&limit=20000`, { headers: portalHeaders });
-    if (!r.ok) return {};
-    const rows = (await r.json().catch(() => [])) || [];
-    const out = {};
-    for (const s of rows) {
-      const base = baseSlug(s.evento_id);
-      if (!base) continue;
-      const n = parseInt(s.num_personas, 10);
-      out[base] = (out[base] || 0) + (Number.isInteger(n) && n > 0 ? n : 0);
-    }
-    return out;
-  } catch (_) { return {}; }
-}
+// [AUD-1b] AQUÍ VIVÍA `contarViajeros`, que contaba SOLO las solicitudes del
+// Portal. La cuenta de viajeros ahora la da _lib/cuenta-evento sumando los dos
+// mundos, así que ésta se quedó sin llamadores. Se retira entera: una función
+// que cuenta medio universo, viva y sin usar, es una trampa esperando a que
+// alguien la llame de nuevo.
 
 function readEnv() {
   const KH_SB_URL = process.env.SUPABASE_URL_KAMEHOUSE;

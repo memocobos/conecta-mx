@@ -5666,8 +5666,8 @@ async function loadVentas() {
  <div style="font-family:\'Barlow Condensed\',sans-serif;font-size:20px;font-weight:900;color:var(--green)">${formatMXN(ev.total_cobrado)}</div>
  </div>
  <div>
- <div style="font-size:9px;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:var(--ts);margin-bottom:4px">Pendiente</div>
- <div style="font-family:\'Barlow Condensed\',sans-serif;font-size:20px;font-weight:900;color:var(--red)">${formatMXN(ev.total_pendiente)}</div>
+ <div style="font-size:9px;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:var(--ts);margin-bottom:4px">${(ev.total_pendiente != null && ev.total_pendiente < 0) ? 'A favor' : 'Pendiente'}</div>
+ <div style="font-family:\'Barlow Condensed\',sans-serif;font-size:20px;font-weight:900;color:var(--red)">${formatMXN(ev.total_pendiente == null ? ev.total_pendiente : Math.abs(ev.total_pendiente))}</div>
  </div>
  <div>
  <div style="font-size:9px;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:var(--ts);margin-bottom:4px">Costos</div>

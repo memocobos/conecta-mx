@@ -110,8 +110,14 @@ function bodegaDeZonas(zonas, preciosPorZona) {
 
 // ── PURO: arma la cuenta con los números ya reunidos. Aquí vive la regla del
 //    gate: sin permiso, lo migrado es null y lo que dependa de él, también.
-function armarCuenta({ evento_id, ventasPortal, viajerosPortal, gastos, kh, deuda, bodega, veMigrados }) {
+function armarCuenta({ evento_id, ventasPortal, facturadoPortal, viajerosPortal, gastos, kh, deuda, bodega, veMigrados }) {
   const ventas_kh = veMigrados ? kh.cobrado : null;
+  // [AUD-1b] FACTURADO ≠ VENTAS. Facturado es lo contratado; ventas es lo
+  // cobrado. La ganancia se calcula sobre lo COBRADO —dinero que existe—, no
+  // sobre promesas.
+  const factPortal = n(facturadoPortal);
+  const facturado_kh = veMigrados ? kh.vendido : null;
+  const facturado = (facturado_kh == null) ? null : factPortal + facturado_kh;
   const viajeros_kh = veMigrados ? kh.filas : null;
   const ventas = (ventas_kh == null) ? null : ventasPortal + ventas_kh;
   const ganancia = (ventas == null) ? null : ventas - gastos;
@@ -121,6 +127,13 @@ function armarCuenta({ evento_id, ventasPortal, viajerosPortal, gastos, kh, deud
     ventas_portal: ventasPortal,
     ventas_kh,
     ventas,
+    facturado_portal: factPortal,
+    facturado_kh,
+    facturado,
+    // Pendiente = facturado − cobrado. Puede salir NEGATIVO (hay saldos a favor
+    // reales): quien lo pinte tiene que decir el signo con palabras, no con un
+    // menos (patrón CAP-FIX-2d).
+    pendiente: (facturado == null || ventas == null) ? null : facturado - ventas,
     gastos,
     ganancia,
     bodega,
@@ -175,20 +188,24 @@ const KH_VACIO = { filas: 0, conContrato: 0, sinContrato: 0, vendido: 0, cobrado
 
 // ── Reúne el mundo Portal (cobrado por evento + viajeros por evento + gastos).
 async function mundoPortal(leerP) {
-  const rs = await leerP('solicitudes_tour', `estado=in.(${ESTADOS_CUENTAN.join(',')})&select=id,evento_id,num_personas&limit=20000`);
+  // [AUD-1b] `precio_total` = lo FACTURADO (contratado), que no es lo mismo que
+  // lo cobrado. La pantalla de Ventas enseña las dos, y confundirlas haría que
+  // "Pendiente" saliera siempre en cero.
+  const rs = await leerP('solicitudes_tour', `estado=in.(${ESTADOS_CUENTAN.join(',')})&select=id,evento_id,num_personas,precio_total&limit=20000`);
   if (rs.error) return rs;
   const rp = await leerP('pagos', 'estado=eq.pagado&select=solicitud_id,monto,monto_pagado&limit=20000');
   if (rp.error) return rp;
   const rg = await leerP('gastos', 'select=evento_id,monto&limit=20000');
   if (rg.error) return rg;
 
-  const evPorSolicitud = {}; const viajeros = {};
+  const evPorSolicitud = {}; const viajeros = {}; const facturado = {};
   rs.data.forEach((s) => {
     const slug = baseSlug(s.evento_id);
     evPorSolicitud[s.id] = slug;
     if (!slug) return;
     const num = parseInt(s.num_personas, 10);
     viajeros[slug] = (viajeros[slug] || 0) + (Number.isInteger(num) && num > 0 ? num : 0);
+    facturado[slug] = (facturado[slug] || 0) + n(s.precio_total);
   });
   const cobrado = {};
   rp.data.forEach((p) => {
@@ -203,7 +220,7 @@ async function mundoPortal(leerP) {
     if (!slug) return;   // los "General" no son de ningún evento
     gastos[slug] = (gastos[slug] || 0) + n(g.monto);
   });
-  return { data: { cobrado, viajeros, gastos } };
+  return { data: { cobrado, viajeros, gastos, facturado } };
 }
 
 // ── Deuda a proveedores por evento: compras + servicios − abonos (KH).
@@ -268,6 +285,7 @@ async function cuentaDeEvento(opts) {
   return armarCuenta({
     evento_id,
     ventasPortal: n((p.data.cobrado || {})[evento_id]),
+    facturadoPortal: n((p.data.facturado || {})[evento_id]),
     viajerosPortal: n((p.data.viajeros || {})[evento_id]),
     gastos: n((p.data.gastos || {})[evento_id]),
     kh: (k.data || {})[evento_id] || KH_VACIO,
@@ -299,6 +317,7 @@ async function cuentasDeTodos(opts) {
 
   const slugs = [...new Set([
     ...Object.keys(p.data.cobrado || {}),
+    ...Object.keys(p.data.facturado || {}),
     ...Object.keys(p.data.viajeros || {}),
     ...Object.keys(p.data.gastos || {}),
     ...Object.keys(k.data || {}),
@@ -310,6 +329,7 @@ async function cuentasDeTodos(opts) {
     eventos[slug] = armarCuenta({
       evento_id: slug,
       ventasPortal: n((p.data.cobrado || {})[slug]),
+      facturadoPortal: n((p.data.facturado || {})[slug]),
       viajerosPortal: n((p.data.viajeros || {})[slug]),
       gastos: n((p.data.gastos || {})[slug]),
       kh: (k.data || {})[slug] || KH_VACIO,

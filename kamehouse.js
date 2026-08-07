@@ -4676,7 +4676,13 @@ function _renderPorEvento() {
   const kh = _evtKH;
   setTxt('evt-vendido',   _spFmtMxn(vendido   + (kh ? kh.vendido : 0)));
   setTxt('evt-cobrado',   _spFmtMxn(cobrado   + (kh ? kh.cobrado : 0)));
-  setTxt('evt-porcobrar', _spFmtMxn(porCobrar + (kh ? kh.deben - kh.aFavor : 0)));
+  // [CAP-FIX-2d] EL SIGNO, DICHO CON PALABRAS. Un "Por cobrar: $-793" se lee al
+  // revés de lo que significa: nadie debe nada, la agencia trae 793 a favor de
+  // los viajeros. Mismo número, misma verdad, etiqueta correcta — y vale para
+  // los dos mundos, porque el neto es uno solo.
+  const neto = porCobrar + (kh ? kh.deben - kh.aFavor : 0);
+  setTxt('evt-porcobrar', _spFmtMxn(Math.abs(neto)));
+  setTxt('evt-porcobrar-lbl', neto < 0 ? 'A favor' : 'Por cobrar');
   setTxt('evt-viajeros',  String(tours.length + (kh ? kh.filas : 0)));
   setTxt('evt-atrasados', String(atrasados));
   _capfix2Rotular(tours.length, kh);

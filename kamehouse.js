@@ -3499,14 +3499,16 @@ function _audUtilidadPintar(utilidad, cta, util) {
   // todo". La utilidad de arriba ya trae el costo de TODO lo comprado dentro de
   // gastos, así que sumarle el valor de venta de lo que aún se puede vender sigue
   // siendo la cuenta correcta — pero únicamente con lo vendible.
+  // Va SIN envolver, exactamente el markup de AUD-1c: en un evento por venir esta
+  // pantalla tiene que quedar byte a byte como estaba. La merma que viene abajo
+  // es un <div> —bloque— así que cuando existen las dos se separan solas.
   if (boletos) {
     const siTodo = (valor == null) ? null : Number(utilidad) + valor;
-    partes.push(`<div><b>${boletos}</b> boleto${boletos === 1 ? '' : 's'} por vender`
+    partes.push(`<b>${boletos}</b> boleto${boletos === 1 ? '' : 's'} por vender`
       + (valor == null
           ? ' <span class="aud-bod-mudo">— sin precio en el catálogo, no se puede estimar</span>'
           : ` ≈ <b>${_spFmtMxn(valor)}</b> <span class="aud-bod-est">a precio de hoy (estimado)</span>`
-            + ` · Si se vende todo: <b class="${siTodo < 0 ? 'aud-neg' : 'aud-pos'}">${_spFmtMxn(siTodo)}</b>`)
-      + '</div>');
+            + ` · Si se vende todo: <b class="${siTodo < 0 ? 'aud-neg' : 'aud-pos'}">${_spFmtMxn(siTodo)}</b>`));
   }
   // La MERMA: eventos que ya ocurrieron. Se mide en lo que COSTARON, no en lo
   // que se iban a vender, y NUNCA lleva "si se vende todo" — no hay a quién.
@@ -4131,9 +4133,11 @@ function _resumenUtilPintar() {
     if (r.pasado) { if (r.merma_costo != null) { totMerma += Number(r.merma_costo); totMermaOk = true; } return; }
     if (r.bodega_valor != null) { totBod += Number(r.bodega_valor); totBodOk = true; }
   });
-  const totBodCell = (totBodOk || totMermaOk)
-    ? `<td style="text-align:right;font-variant-numeric:tabular-nums">${totBodOk ? _spFmtMxn(totBod) : '<span style="color:var(--ts)">—</span>'}${totMermaOk ? `<div class="mer1-merma" style="font-weight:400;font-size:10px">merma ${_spFmtMxn(totMerma)}</div>` : ''}</td>`
-    : '<td style="text-align:right;color:var(--ts)">—</td>';
+  // Sin merma, la celda es la de siempre — la misma llamada, no una copia: en un
+  // universo sin eventos pasados esta tabla queda byte a byte como estaba.
+  const totBodCell = totMermaOk
+    ? `<td style="text-align:right;font-variant-numeric:tabular-nums">${totBodOk ? _spFmtMxn(totBod) : '<span style="color:var(--ts)">—</span>'}<div class="mer1-merma" style="font-weight:400;font-size:10px">merma ${_spFmtMxn(totMerma)}</div></td>`
+    : (totBodOk ? _resumenUtilMxnCell(totBod) : '<td style="text-align:right;color:var(--ts)">—</td>');
   if (_resumenUtilSin) {
     // Sin evento: hoy solo GASTOS. No se le inventan ventas ni bodega — sus
     // celdas van vacías, no en cero.
@@ -4180,7 +4184,7 @@ function _resumenUtilPintar() {
     return `<div${cardAttrs} style="background:var(--bg2);border:1px solid var(--border);border-left:4px solid ${sem};border-radius:var(--radius);padding:12px 14px;margin-bottom:10px">
       <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:10px">
         <div><div style="font-weight:700;font-size:14px">${_spEscape(r.nombre)}${r.desconocido ? marcaDesc : ''}</div><div style="font-size:11px;color:var(--ts)">${_spEscape(r.fecha || '—')}</div></div>
-        <span title="${_resumenUtilSemaforoTitulo(r)}" style="display:inline-block;width:13px;height:13px;border-radius:50%;background:${sem};flex-shrink:0;margin-top:3px"></span>
+        <span style="display:inline-block;width:13px;height:13px;border-radius:50%;background:${sem};flex-shrink:0;margin-top:3px"></span>
       </div>
       <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px">
         <div style="flex:1 1 92px"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--ts)">${r.ganancia < 0 ? 'Falta recuperar' : 'Ganancia'}</div><div style="font-family:'Zen Dots',sans-serif;font-size:19px;color:${r.ganancia < 0 ? 'var(--red)' : 'var(--green)'}">${_spFmtMxn(Math.abs(r.ganancia))}</div></div>

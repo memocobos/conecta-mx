@@ -4608,6 +4608,9 @@ async function loadPorEvento() {
 
   if (!evId) {
     _evtTours = []; _evtFiltrados = [];
+    _fin1cBodega = null;                                  // [FIN-1c] del evento anterior
+    const _f1c = document.getElementById('fin1c-resumen');
+    if (_f1c) { _f1c.style.display = 'none'; _f1c.innerHTML = ''; }
     if (stats) stats.style.display = 'none';
     if (desg)  desg.style.display = 'none';
     const cajaStats = document.getElementById('evt-caja-stats');
@@ -4623,7 +4626,15 @@ async function loadPorEvento() {
     const { activos } = await _cobCargarTodo();
     // Gastos (para _renderPorEvento) + utilidad por evento, en paralelo. Best-effort.
     // [CAP-FIX-2] …y el mundo migrado de KH, que hasta hoy no se miraba.
-    await Promise.all([_cobCargarGastos(), _utilCargar(), _capfix2CargarKH(evId)]);
+    // [FIN-1c] …y lo que hace falta para la cuenta completa: la bodega (semáforo
+    // + precios del catálogo) y la deuda a proveedores. Las dos con acciones que
+    // ya existían y las dos fails-soft.
+    const _evBase = String(evId).split('#')[0];
+    await Promise.all([
+      _cobCargarGastos(), _utilCargar(), _capfix2CargarKH(evId),
+      _fin1cCargarBodega(_evBase),
+      _fin1aCargarDeuda(_evBase).catch(() => {}),
+    ]);
     _evtTours = (activos || []).filter(t => _cobTourMatchEvento(t, evId));
     _renderPorEvento();
   } catch (e) {
@@ -4631,6 +4642,135 @@ async function loadPorEvento() {
     if (desg)  desg.style.display = 'none';
     tbody.innerHTML = `<tr><td colspan="8"><div class="alert alert-error">${_spEscape(e.message)}</div></td></tr>`;
   }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// [FIN-1c] EL RESUMEN QUE JUNTA TODO — Ventas − Gastos = Ganancia
+//
+// El modelo de Memo, en sus palabras: "sumar todo el dinero que entra de ventas;
+// sumar el dinero de los boletos que nos vende el proveedor (esa es nuestra
+// deuda); y yo solo voy marcando los gastos. Al final sabemos la ganancia".
+//
+//   VENTAS   = cobrado del Portal + abonado de migrados (regla _vj3Saldo)
+//   GASTOS   = la tabla `gastos` del evento (desde FIN-1b ya trae boletos/hotel/bus)
+//   GANANCIA = VENTAS − GASTOS
+//
+// Y AL LADO, LA BODEGA — el requisito que Memo firmó. Una ganancia negativa con
+// boletos sin vender NO es una pérdida: es dinero que todavía está en forma de
+// boleto. Enseñar la ganancia sin la bodega asusta sin razón, y es justo lo que
+// pasa desde que FIN-1b metió los $147,172 en gastos.
+//
+// LA DEUDA VA APARTE, nunca dentro de la ganancia: es lo que FALTA por gastar.
+// Meterla contaría dos veces lo mismo el día que se pague.
+// ═══════════════════════════════════════════════════════════════════════════
+let _fin1cBodega = null;   // null = no se ha podido saber · {…} = calculada
+
+// PURO: la bodega en dinero. `sem` = zonas del semáforo, `precios` = {zona: p}
+// del index de HOY. Una zona SIN precio no suma y se cuenta aparte: un cero
+// diría "no vale nada", que es una afirmación que no tenemos.
+function _fin1cBodegaCalc(sem, precios) {
+  const out = { boletos: 0, valor: 0, sinPrecio: 0, zonasSinPrecio: [] };
+  (sem || []).forEach((z) => {
+    const disp = Number(z && z.disponibles);
+    if (!Number.isFinite(disp) || disp <= 0) return;
+    const p = Number((precios || {})[String(z.zona).trim()]);
+    out.boletos += disp;
+    if (Number.isFinite(p) && p > 0) out.valor += disp * p;
+    else { out.sinPrecio += disp; out.zonasSinPrecio.push(String(z.zona)); }
+  });
+  return out;
+}
+
+// Carga la bodega del evento con acciones que YA existen: el semáforo del
+// Palacio y el catálogo del index. Fails-soft — sin bodega, el bloque lo dice
+// en vez de sumar un cero.
+async function _fin1cCargarBodega(evBase) {
+  try {
+    const [rs, ev] = await Promise.all([
+      khAdminFetch('/.netlify/functions/admin-compras', {
+        method: 'POST', body: JSON.stringify({ accion: 'semaforo', evento_id: evBase }),
+      }).then((r) => r.json()).catch(() => ({})),
+      (typeof _fetchEVFromIndex === 'function' ? _fetchEVFromIndex() : Promise.resolve([])).catch(() => []),
+    ]);
+    if (!rs || !rs.ok || !Array.isArray(rs.zonas)) { _fin1cBodega = null; return; }
+    const evt = (ev || []).find((e) => e && e.id === evBase);
+    const precios = {};
+    ((evt && evt.zonas) || []).forEach((z) => { if (z && z.n != null) precios[String(z.n).trim()] = Number(z.p); });
+    _fin1cBodega = _fin1cBodegaCalc(rs.zonas, precios);
+  } catch (_) { _fin1cBodega = null; }
+}
+
+function _fin1cPintar(evBase) {
+  const cont = document.getElementById('fin1c-resumen');
+  if (!cont) return;
+  const util = (_utilG3Cache && _utilG3Cache.eventos && _utilG3Cache.eventos[evBase]) || null;
+  const kh = _evtKH;
+  // Sin ninguno de los dos libros no hay resumen que pintar. Callar es correcto.
+  if (!util && !kh) { cont.style.display = 'none'; cont.innerHTML = ''; return; }
+
+  const ventasPortal = Number((util || {}).cobrado || 0);
+  const ventasKH = kh ? Number(kh.cobrado || 0) : 0;
+  const ventas = ventasPortal + ventasKH;
+  const gastos = Number((util || {}).gastos || 0);
+  const ganancia = ventas - gastos;
+
+  const bod = _fin1cBodega;
+  const siTodo = bod ? ganancia + bod.valor : null;
+  const deudaProv = _fin1cDeudaProveedores();
+
+  const money = (n) => _spFmtMxn(n);
+  const linea = (lbl, val, cls, sub) => `
+    <div class="fin1c-l ${cls || ''}">
+      <span class="fin1c-lbl">${_esfEsc(lbl)}</span>
+      <span class="fin1c-val">${val}</span>
+      ${sub ? `<span class="fin1c-sub">${sub}</span>` : ''}
+    </div>`;
+
+  // La ganancia negativa se dice con palabras (patrón CAP-FIX-2d): un "−10,781"
+  // a secas se lee como pérdida, y con bodega llena no lo es.
+  const gLbl = ganancia < 0 ? 'Falta por recuperar' : 'Ganancia';
+  const gCls = ganancia < 0 ? 'fin1c-neg' : 'fin1c-pos';
+
+  cont.style.display = '';
+  cont.innerHTML = `
+    <div class="fin1c-t">// el evento en una cuenta</div>
+    ${linea('Ventas', money(ventas), '', ventasKH
+      ? `${money(ventasPortal)} del Portal + ${money(ventasKH)} de migrados`
+      : 'cobrado del Portal')}
+    ${linea('− Gastos', money(gastos), '', 'boletos, hotel, transporte, kits…')}
+    <div class="fin1c-sep"></div>
+    ${linea(`= ${gLbl}`, money(Math.abs(ganancia)), gCls, ganancia < 0 ? 'todavía no recuperas lo invertido' : 'ventas menos gastos')}
+    ${_fin1cBodegaHtml(bod, siTodo, ganancia)}
+    <div class="fin1c-sep"></div>
+    ${linea('Deuda a proveedores', deudaProv == null ? '—' : money(deudaProv), 'fin1c-info',
+      deudaProv == null ? 'no se pudo calcular' : 'lo que FALTA por pagar — no entra en la ganancia')}`;
+}
+
+// La bodega: lo que ya se pagó y todavía está en forma de boleto.
+function _fin1cBodegaHtml(bod, siTodo, ganancia) {
+  if (!bod) {
+    return `<div class="fin1c-bod fin1c-bod-mudo">No pude leer el inventario, así que no sé cuántos boletos quedan por vender.</div>`;
+  }
+  if (!bod.boletos) {
+    return `<div class="fin1c-bod">Sin boletos por vender: la cuenta de arriba ya es la final.</div>`;
+  }
+  const conPrecio = bod.boletos - bod.sinPrecio;
+  return `
+    <div class="fin1c-bod">
+      <div class="fin1c-bod-l"><b>${bod.boletos}</b> boleto${bod.boletos === 1 ? '' : 's'} por vender
+        ${conPrecio > 0 ? `≈ <b>${_spFmtMxn(bod.valor)}</b> <span class="fin1c-est">a precio de hoy (estimado)</span>` : ''}
+      </div>
+      ${bod.sinPrecio ? `<div class="fin1c-aviso">${bod.sinPrecio} de ellos NO suman: su zona no tiene precio en el catálogo (${_esfEsc(bod.zonasSinPrecio.join(', '))}).</div>` : ''}
+      ${conPrecio > 0 ? `<div class="fin1c-bod-tot">Si se vende todo: <b class="${siTodo < 0 ? 'fin1c-neg' : 'fin1c-pos'}">${_spFmtMxn(siTodo)}</b></div>` : ''}
+    </div>`;
+}
+
+// La deuda con proveedores, de la caché que FIN-1a ya llena (compras + servicios
+// − abonos). null = todavía no se sabe; NO se pinta un cero.
+function _fin1cDeudaProveedores() {
+  const pp = (_fin1aDeuda || {}).porProv;
+  if (!pp) return null;
+  return Object.keys(pp).reduce((a, k) => a + (Number(pp[k].deuda) || 0), 0);
 }
 
 // [CAP-FIX-2] La franja que dice DE DÓNDE viene cada número. Sin ella, un total
@@ -4686,6 +4826,8 @@ function _renderPorEvento() {
   setTxt('evt-viajeros',  String(tours.length + (kh ? kh.filas : 0)));
   setTxt('evt-atrasados', String(atrasados));
   _capfix2Rotular(tours.length, kh);
+  // [FIN-1c] La cuenta completa, con el evento ya resuelto.
+  _fin1cPintar(String(((document.getElementById('selector-evento') || {}).value) || '').split('#')[0]);
 
   // Gastos + Utilidad del evento (G2). Match por BASE del evento_id (cuenta aunque el
   // evento sea multifecha). Los "General" (evento_id null) NO se incluyen aquí. Usa la

@@ -234,7 +234,11 @@
  <!-- Utilidad por evento (Capa 3 / Franja 2 del dashboard) -->
  <div class="card" id="resumen-utilidad-card" style="margin-bottom:16px">
   <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:14px">
-   <div style="font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--ts)">Utilidad por evento</div>
+   <div style="font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--ts)">Utilidad por evento
+    <!-- [FIN-1c] Esta tabla sale de _lib/utilidad-evento, que lee SOLO Portal.
+         Un evento con viajeros migrados sale más bajo de lo real aquí. No se
+         rediseña de pasada: se dice, y se manda a donde está la cuenta completa. -->
+    <span class="fin1c-nota">— solo Portal, no incluye ventas migradas · la cuenta completa está en Por Evento</span></div>
    <button class="btn btn-ghost btn-sm" onclick="_resumenUtilCSV()">Exportar CSV</button>
   </div>
   <div id="resumen-utilidad-tabla" style="overflow-x:auto">
@@ -384,7 +388,8 @@
 
  <!-- Caja total de la empresa (dato global, suma de todos los eventos) -->
  <div id="evt-caja-empresa" style="display:none;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:10px 16px;margin-bottom:12px;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
-   <div class="cob-stat-lbl" style="margin-bottom:0">Caja total de la empresa</div>
+   <div class="cob-stat-lbl" style="margin-bottom:0">Caja total de la empresa
+     <span class="fin1c-nota">— solo Portal, no incluye ventas migradas</span></div>
    <div class="cob-stat-val" id="evt-caja-empresa-val" style="font-size:18px">—</div>
  </div>
 
@@ -404,10 +409,14 @@
       aparece cuando hay mundo migrado con dinero; si no, ni existe. -->
  <div id="evt-origen" class="evt-origen" style="display:none"></div>
 
+ <!-- [FIN-1c] El resumen que junta todo: Ventas − Gastos = Ganancia, con la
+      bodega al lado (requisito firmado por Memo) y la deuda APARTE. -->
+ <div id="fin1c-resumen" class="fin1c" style="display:none"></div>
+
  <!-- Caja / Proyectado / Falta por cobrar del evento (de admin-utilidad-evento). Visibilidad
       propia: existe aunque el evento tenga 0 viajeros (por ingresos/gastos sueltos). -->
  <div class="cob-stats" id="evt-caja-stats" style="display:none">
-   <div class="cob-stat"><div class="cob-stat-lbl">Caja</div><div class="cob-stat-val green" id="evt-caja">—</div></div>
+   <div class="cob-stat"><div class="cob-stat-lbl">Caja <span class="fin1c-nota">— solo Portal</span></div><div class="cob-stat-val green" id="evt-caja">—</div></div>
    <div class="cob-stat"><div class="cob-stat-lbl">Proyectado</div><div class="cob-stat-val" id="evt-proyectado">—</div></div>
    <div class="cob-stat"><div class="cob-stat-lbl">Falta por cobrar</div><div class="cob-stat-val orange" id="evt-falta">—</div></div>
  </div>

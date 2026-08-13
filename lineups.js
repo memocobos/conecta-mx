@@ -6,6 +6,7 @@ window.LINEUPS={
   'machaca':'lineups/machaca.webp',
   'emblema':'lineups/emblema.jpg',
   'pulsolineup':'lineups/pulsolineup.jpg',
+  'comuna':'lineups/comuna.jpg',
   'arre':'lineups/arre.webp',
   'vaiven':'lineups/vaiven.webp',
   'warped':'lineups/warped.webp',

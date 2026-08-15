@@ -96,6 +96,33 @@ exports.handler = async (event) => {
       return { statusCode: 400, headers, body: JSON.stringify({ error: 'La fecha nueva es igual a la actual' }) };
     }
 
+    const deltaDias = Math.round(
+      (Date.parse(fechaNueva + 'T00:00:00Z') - Date.parse(String(fechaAnterior).slice(0, 10) + 'T00:00:00Z')) / MS_DIA
+    );
+
+    // 2b. SEG-1 · Modo preview: enseñar qué va a pasar y NO escribir nada.
+    //     Aditivo — nadie mandaba `preview` antes, así que ningún contrato se
+    //     rompe. Corta ANTES del INSERT de la bitácora, que es la primera
+    //     escritura del camino.
+    if (body.preview === true) {
+      const portalHeaders = { apikey: PORTAL_KEY, Authorization: `Bearer ${PORTAL_KEY}`, 'Content-Type': 'application/json' };
+      const u = await leerUniverso(slug, portalHeaders);
+      return {
+        statusCode: 200,
+        headers,
+        body: JSON.stringify({
+          ok: true,
+          preview: true,
+          evento_nombre: ev.nombre,
+          fecha_anterior: fechaAnterior,
+          fecha_nueva: fechaNueva,
+          delta_dias: deltaDias,
+          clientes: u.destinatarios.length,
+          cuotas: u.pagosPendientes.length,
+        }),
+      };
+    }
+
     // 3. Registrar la posposición ANTES de cambiar la fecha (la bitácora manda;
     //    si no se registra, no movemos nada).
     const insRes = await fetch(`${SB_URL}/rest/v1/eventos_posposiciones`, {
@@ -137,9 +164,6 @@ exports.handler = async (event) => {
     // 5. Recorrer las fechas de pago PENDIENTES el mismo número de días que se
     //    movió el evento (Opción A). Las pagadas NO se tocan. Best-effort: un
     //    fallo aquí NO revierte la posposición (ya quedó) — solo se reporta.
-    const deltaDias = Math.round(
-      (Date.parse(fechaNueva + 'T00:00:00Z') - Date.parse(String(fechaAnterior).slice(0, 10) + 'T00:00:00Z')) / MS_DIA
-    );
     const pagosInfo = { pagos_recorridos: 0, pagos_fallidos: 0, delta_dias: deltaDias };
     // Solicitudes no canceladas del evento; se consultan aquí (2a) y se reusan
     // en el bloque de correos (2b). null = todavía no se consultaron.
@@ -274,6 +298,53 @@ exports.handler = async (event) => {
 };
 
 // ----- helpers -----
+
+// SEG-1 · El universo de la posposición: los mismos clientes y las mismas
+// cuotas que se van a tocar. Fuente ÚNICA — el preview y la escritura llaman a
+// ESTA función, para que el número que se enseña y el que se escribe no puedan
+// divergir. (Los dos caminos del módulo filtran distinto: aquí, el que MUEVE.)
+async function leerUniverso(slug, portalHeaders) {
+  const solRes = await fetch(
+    `${PORTAL_URL}/rest/v1/solicitudes_tour?evento_id=eq.${encodeURIComponent(slug)}&estado=neq.cancelado&select=id,cliente_id`,
+    { headers: portalHeaders }
+  );
+  if (!solRes.ok) throw new Error('solicitudes: ' + await solRes.text());
+  const solRows = await solRes.json();
+  const solicitudRows = Array.isArray(solRows) ? solRows : [];
+  const solicitudIds = [...new Set(solicitudRows.map(s => s && s.id).filter(Boolean))];
+  const clienteIds   = [...new Set(solicitudRows.map(s => s && s.cliente_id).filter(Boolean))];
+
+  // Cuotas movibles: pendientes (todo lo no pagado) con fecha esperada.
+  let pagosPendientes = [];
+  if (solicitudIds.length) {
+    const pagRes = await fetch(
+      `${PORTAL_URL}/rest/v1/pagos?solicitud_id=in.(${solicitudIds.join(',')})&estado=neq.pagado&fecha_esperada=not.is.null&select=id,fecha_esperada`,
+      { headers: portalHeaders }
+    );
+    if (!pagRes.ok) throw new Error('pagos: ' + await pagRes.text());
+    const pagos = await pagRes.json();
+    pagosPendientes = Array.isArray(pagos) ? pagos : [];
+  }
+
+  // Destinatarios: MISMO dedup que usa el aviso (trim/lower, exigir '@').
+  const destinatarios = [];
+  if (clienteIds.length) {
+    const cliRes = await fetch(
+      `${PORTAL_URL}/rest/v1/clientes?id=in.(${clienteIds.join(',')})&select=id,nombre_completo,correo`,
+      { headers: portalHeaders }
+    );
+    if (!cliRes.ok) throw new Error('clientes: ' + await cliRes.text());
+    const cliRows = await cliRes.json();
+    const vistos = new Set();
+    for (const c of (Array.isArray(cliRows) ? cliRows : [])) {
+      const correo = (c && typeof c.correo === 'string') ? c.correo.trim().toLowerCase() : '';
+      if (!correo || !correo.includes('@') || vistos.has(correo)) continue;
+      vistos.add(correo);
+      destinatarios.push({ correo, nombre: c.nombre_completo });
+    }
+  }
+  return { solicitudRows, solicitudIds, clienteIds, destinatarios, pagosPendientes };
+}
 
 // "2026-04-20" → "20 de abril de 2026". Si no parsea, devuelve el original.
 // Copiado TAL CUAL de admin-avisar-posposicion (revisado y aprobado): ancla a

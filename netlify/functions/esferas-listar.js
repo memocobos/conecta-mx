@@ -54,7 +54,40 @@ exports.handler = async (event) => {
       return { statusCode: 502, headers, body: JSON.stringify({ error: 'Supabase rechazó la query', detail }) };
     }
     const rows = await r.json();
-    return { statusCode: 200, headers, body: JSON.stringify({ ok: true, eventos: Array.isArray(rows) ? rows : [] }) };
+    const eventos = Array.isArray(rows) ? rows : [];
+
+    // SEG-1 · Los pendientes de la ÚLTIMA posposición de cada evento, para que
+    // la fila los pueda enseñar: un pendiente que no se ve es un pendiente que
+    // no existe. Best-effort — si la bitácora no contesta, el listado sale
+    // igual con `pos:null`; Esferas no se cae por un badge.
+    try {
+      const posRes = await fetch(
+        `${SB_URL}/rest/v1/eventos_posposiciones?select=evento_slug,fecha_anterior,fecha_nueva,creado_en,aviso_enviado,pagos_fallidos_ids&order=creado_en.desc`,
+        { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` } }
+      );
+      if (posRes.ok) {
+        const posRows = await posRes.json();
+        // El orden es creado_en.desc → la PRIMERA de cada slug es la última.
+        const ultima = {};
+        for (const p of (Array.isArray(posRows) ? posRows : [])) {
+          if (p && p.evento_slug && !(p.evento_slug in ultima)) ultima[p.evento_slug] = p;
+        }
+        for (const e of eventos) {
+          const p = ultima[e.slug];
+          e.pos = p ? {
+            fecha_anterior: p.fecha_anterior,
+            fecha_nueva: p.fecha_nueva,
+            creado_en: p.creado_en,
+            aviso_pendiente: p.aviso_enviado == null,
+            pagos_fallidos_n: Array.isArray(p.pagos_fallidos_ids) ? p.pagos_fallidos_ids.length : 0,
+          } : null;
+        }
+      } else {
+        for (const e of eventos) e.pos = null;
+      }
+    } catch { for (const e of eventos) e.pos = null; }
+
+    return { statusCode: 200, headers, body: JSON.stringify({ ok: true, eventos }) };
   } catch (e) {
     return { statusCode: 502, headers, body: JSON.stringify({ error: 'Error consultando Supabase', detail: e.message }) };
   }

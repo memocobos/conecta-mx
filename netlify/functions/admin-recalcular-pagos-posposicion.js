@@ -6,6 +6,13 @@
 // no-vencidas-no-pagadas) de las solicitudes ACTIVAS del evento, sumándoles el
 // mismo offset de días que se movió el evento. NO toca pagados ni vencidos, NO
 // cambia montos. Idempotente vía el flag `pagos_recalculados` de la bitácora.
+//
+// SEG-1 · Hoy este endpoint es sobre todo el REINTENTO de lo que falló: cuando
+// la posposición ya viene sellada (`pagos_recalculados`), mueve ÚNICAMENTE los
+// ids de `pagos_fallidos_ids` y reescribe la lista con lo que siga fallando.
+// Volver a preguntar por "las pendientes" traería también las que YA se
+// movieron y las movería dos veces. El camino largo de abajo sigue vivo sólo
+// para posposiciones viejas, sin sellar.
 // Cruza KH (bitácora) + Portal (solicitudes/pagos). Solo escribe pagos.fecha_esperada
 // del Portal y el flag en KH.
 //
@@ -67,7 +74,7 @@ exports.handler = async (event) => {
     // 1. KH: última posposición del evento.
     const posRes = await fetch(
       `${env.KH_URL}/rest/v1/eventos_posposiciones?evento_slug=eq.${encodeURIComponent(slug)}`
-      + `&select=id,fecha_anterior,fecha_nueva,pagos_recalculados&order=creado_en.desc&limit=1`,
+      + `&select=id,fecha_anterior,fecha_nueva,pagos_recalculados,pagos_fallidos_ids&order=creado_en.desc&limit=1`,
       { headers: khHeaders }
     );
     if (!posRes.ok) {
@@ -80,8 +87,13 @@ exports.handler = async (event) => {
       return { statusCode: 404, headers, body: JSON.stringify({ error: 'No hay una posposición registrada para este evento (pospónlo primero)' }) };
     }
 
-    // 2. Idempotencia: si ya se recalculó, no repetir.
-    if (pos.pagos_recalculados != null) {
+    // 2. SEG-1 · Idempotencia con reintento fino. Si la posposición ya se
+    //    recalculó, lo ÚNICO que puede quedar por mover son las cuotas que
+    //    fallaron — nunca las que sí se movieron (eso sería moverlas dos veces,
+    //    que es dinero mal puesto sin error ni aviso).
+    const fallidosIds = Array.isArray(pos.pagos_fallidos_ids) ? pos.pagos_fallidos_ids.filter(Boolean) : [];
+    const esReintento = pos.pagos_recalculados != null;
+    if (esReintento && !fallidosIds.length) {
       return { statusCode: 409, headers, body: JSON.stringify({ error: 'Los pagos de esta posposición ya se recalcularon' }) };
     }
 
@@ -93,7 +105,53 @@ exports.handler = async (event) => {
       return { statusCode: 400, headers, body: JSON.stringify({ error: 'El offset de días es 0 (no hay nada que mover)' }) };
     }
 
-    // 4. Portal: solicitudes ACTIVAS del evento.
+    // 3b. SEG-1 · Reintento: mover SÓLO los ids que quedaron marcados como
+    //     fallidos. No se vuelve a preguntar por solicitudes ni por cuotas
+    //     pendientes: preguntar de nuevo traería también las que ya se movieron.
+    if (esReintento) {
+      const pagRes = await fetch(
+        `${env.PORTAL_URL}/rest/v1/pagos?id=in.(${fallidosIds.join(',')})&select=id,fecha_esperada`,
+        { headers: portalHeaders }
+      );
+      if (!pagRes.ok) {
+        const detail = await pagRes.text();
+        return { statusCode: 502, headers, body: JSON.stringify({ error: 'Portal rechazó la consulta de pagos', detail }) };
+      }
+      const lista = await pagRes.json();
+      const pendientes = Array.isArray(lista) ? lista : [];
+
+      const quedan = [];
+      let movidos = 0;
+      const resultados = await Promise.allSettled(pendientes.map(p => {
+        const nuevaFecha = sumarDias(p.fecha_esperada, offsetDias);
+        return fetch(`${env.PORTAL_URL}/rest/v1/pagos?id=eq.${encodeURIComponent(p.id)}`, {
+          method: 'PATCH',
+          headers: { ...portalHeaders, Prefer: 'return=minimal' },
+          body: JSON.stringify({ fecha_esperada: nuevaFecha }),
+        });
+      }));
+      resultados.forEach((r, i) => {
+        if (r.status === 'fulfilled' && r.value && r.value.ok) movidos++;
+        else quedan.push(pendientes[i].id);
+      });
+
+      // La lista se REESCRIBE con lo que siguió fallando: si queda vacía, el
+      // pendiente desaparece solo de la fila del evento en Esferas.
+      await fetch(`${env.KH_URL}/rest/v1/eventos_posposiciones?id=eq.${encodeURIComponent(pos.id)}`, {
+        method: 'PATCH',
+        headers: { ...khHeaders, Prefer: 'return=minimal' },
+        body: JSON.stringify({ pagos_fallidos_ids: quedan }),
+      }).catch(() => {});
+
+      return {
+        statusCode: 200,
+        headers,
+        body: JSON.stringify({ ok: true, reintento: true, offset_dias: offsetDias, movidos, fallidos: quedan.length }),
+      };
+    }
+
+    // 4. Portal: solicitudes ACTIVAS del evento (camino de siempre: posposiciones
+    //    que nunca se recalcularon, p.ej. las anteriores a SEG-1).
     const solRes = await fetch(
       `${env.PORTAL_URL}/rest/v1/solicitudes_tour?evento_id=eq.${encodeURIComponent(slug)}&estado=neq.cancelado&select=id`,
       { headers: portalHeaders }

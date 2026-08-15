@@ -16151,6 +16151,26 @@ function _esfEsc(s) {
   return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
 }
 
+// SEG-1 · Las acciones de la fila. Los pendientes de la última posposición se
+// pintan AQUÍ porque un pendiente que no se ve es un pendiente que no existe:
+// `pos` viene de la bitácora (esferas-listar), así que sobrevive a recargar y
+// se ve igual desde cualquier equipo.
+// El ↻ dejó de ser un botón de siempre: volver a mover cuotas ya movidas es un
+// error de dinero silencioso, así que sólo aparece como REINTENTO de lo que falló.
+function _esfAcciones(e) {
+  const s = _esfEsc(e.slug);
+  const pos = e.pos || null;
+  const faltaAvisar = !!(pos && pos.aviso_pendiente);
+  const atoradas = pos ? (pos.pagos_fallidos_n || 0) : 0;
+  return `
+    <button class="btn btn-ghost btn-sm" style="font-size:10px" onclick="editarEsfera('${s}')"><svg class="ic"><use href="#ic-lapiz"/></svg> Editar</button>
+    <button class="btn btn-ghost btn-sm" style="font-size:10px" onclick="posponerEsfera('${s}')"><svg class="ic"><use href="#ic-eventos"/></svg> Posponer</button>
+    <button class="btn btn-ghost btn-sm" style="font-size:10px" onclick="avisarPosposicion('${s}')"><svg class="ic"><use href="#ic-correo"/></svg> Avisar</button>
+    ${faltaAvisar ? `<span data-seg1="falta-avisar" style="display:inline-block;padding:2px 8px;border-radius:var(--r-sm,8px);background:rgba(255,165,0,.15);color:var(--orange);font-size:11px;font-weight:700" title="Se pospuso al ${_esfEsc(pos.fecha_nueva)} y todavía no se avisa a los clientes">⚠ falta avisar</span>` : ''}
+    ${atoradas > 0 ? `<button data-seg1="reintentar" class="btn btn-ghost btn-sm" style="font-size:10px;color:var(--orange)" onclick="recalcularPagosPosposicion('${s}')" title="${atoradas} cuota(s) no se pudieron recorrer al posponer">↻ Reintentar ${atoradas}</button>` : ''}
+    <button class="btn btn-ghost btn-sm" style="font-size:10px;color:var(--red)" onclick="cancelarEventoCompleto('${s}')"><svg class="ic"><use href="#ic-prohibido"/></svg> Cancelar</button>`;
+}
+
 async function loadEsferasEventos() {
   _esfPreviewInit();
   _esfLoadVenuesCat(); // best-effort, no bloquea el listado
@@ -16181,7 +16201,7 @@ async function loadEsferasEventos() {
         <td>${e.publicado
           ? `<span class="badge badge-green">publicado</span> <button class="btn btn-ghost btn-sm" style="font-size:10px" onclick="despublicarEsfera('${_esfEsc(e.slug)}')"><svg class="ic"><use href="#ic-basura"/></svg> Despublicar</button>`
           : `<span class="badge badge-gray">borrador</span> <button class="btn btn-ghost btn-sm" style="font-size:10px;color:var(--red)" onclick="eliminarEsfera('${_esfEsc(e.slug)}')"><svg class="ic"><use href="#ic-basura"/></svg> Eliminar</button>`}</td>
-        <td><button class="btn btn-ghost btn-sm" style="font-size:10px" onclick="editarEsfera('${_esfEsc(e.slug)}')"><svg class="ic"><use href="#ic-lapiz"/></svg> Editar</button> <button class="btn btn-ghost btn-sm" style="font-size:10px" onclick="posponerEsfera('${_esfEsc(e.slug)}')"><svg class="ic"><use href="#ic-eventos"/></svg> Posponer</button> <button class="btn btn-ghost btn-sm" style="font-size:10px" onclick="recalcularPagosPosposicion('${_esfEsc(e.slug)}')">↻ Recalcular</button> <button class="btn btn-ghost btn-sm" style="font-size:10px" onclick="avisarPosposicion('${_esfEsc(e.slug)}')"><svg class="ic"><use href="#ic-correo"/></svg> Avisar</button> <button class="btn btn-ghost btn-sm" style="font-size:10px;color:var(--red)" onclick="cancelarEventoCompleto('${_esfEsc(e.slug)}')"><svg class="ic"><use href="#ic-prohibido"/></svg> Cancelar</button></td>
+        <td>${_esfAcciones(e)}</td>
       </tr>`).join('')}</tbody>
     </table></div>`;
   } catch(e) {
@@ -16334,12 +16354,54 @@ async function confirmarPosponer(slug) {
     }
     const d = await r.json();
     window._ppPreview = null;
-    if (alertEl) alertEl.innerHTML = `<div class="alert alert-success">✓ Pospuesto de ${_esfEsc(d.fecha_anterior)} a ${_esfEsc(d.fecha_nueva)}. ${_esfEsc(d.recordatorio || '')}</div>`;
-    setTimeout(() => { closeModal('modal-posponer'); loadEsferasEventos(); }, 1800);
+    _ppExito(slug, d);
   } catch (e) {
     if (alertEl) alertEl.innerHTML = `<div class="alert alert-error">${_esfEsc(e.message)}</div>`;
     if (btn) { btn.disabled = false; btn.textContent = 'Posponer'; }
   }
+}
+
+// El final de la posposición. El correo ya NO sale solo (SEG-1, opción A): aquí
+// se OFRECE. Y si se dice "ahora no", el pendiente NO se pierde — vive en la
+// bitácora y se pinta en la fila del evento hasta que se avise.
+function _ppExito(slug, d) {
+  const alertEl = document.getElementById('pp-alert');
+  const resEl = document.getElementById('pp-resumen');
+  const conEl = document.getElementById('pp-confirmacion');
+  const verBtn = document.getElementById('pp-ver');
+  const btn = document.getElementById('pp-confirmar');
+  if (btn) btn.remove();
+  if (verBtn) verBtn.remove();
+  if (conEl) conEl.innerHTML = '';
+  if (alertEl) alertEl.innerHTML = '';
+  let extra = '';
+  if (d.pagos_recorridos > 0) {
+    const signo = (d.delta_dias > 0 ? '+' : '') + d.delta_dias;
+    extra += ` Se recorrieron ${d.pagos_recorridos} cuota${d.pagos_recorridos === 1 ? '' : 's'} pendiente${d.pagos_recorridos === 1 ? '' : 's'} (${signo} días).`;
+  }
+  const atoradas = d.pagos_fallidos > 0 || d.pagos_error;
+  const n = d.clientes || 0;
+  if (resEl) resEl.innerHTML = `
+    <div class="alert alert-success">✓ Pospuesto de ${_esfEsc(d.fecha_anterior)} a ${_esfEsc(d.fecha_nueva)}.${_esfEsc(extra)} ${_esfEsc(d.recordatorio || '')}</div>
+    ${atoradas ? `<div class="alert alert-error" style="margin-top:8px"><svg class="ic"><use href="#ic-alerta"/></svg> ${d.pagos_fallidos || ''} cuota(s) no se pudieron recorrer. Úsalo con <b>↻ Reintentar</b> en la fila del evento: sólo mueve las que faltaron.</div>` : ''}
+    <div style="border:1px solid var(--bd,rgba(255,255,255,.15));border-radius:var(--r-sm,8px);padding:12px 14px;margin-top:10px;font-size:13px;line-height:1.6">
+      <div style="margin-bottom:10px">Nadie ha recibido correo. <b>¿Aviso a ${n} cliente${n === 1 ? '' : 's'} ahora?</b><br>
+        <span style="font-size:12px;color:var(--ts)">Republica el evento en Esferas antes de avisar.</span></div>
+      <button class="btn btn-primary btn-sm" onclick="_ppAvisarAhora('${_esfEsc(slug)}')"><svg class="ic"><use href="#ic-correo"/></svg> Avisar ahora</button>
+      <button class="btn btn-ghost btn-sm" onclick="_ppAhoraNo()">Ahora no</button>
+    </div>`;
+}
+
+function _ppAvisarAhora(slug) {
+  closeModal('modal-posponer');
+  loadEsferasEventos();
+  avisarPosposicion(slug);          // el modal de siempre, que sí manda
+}
+
+function _ppAhoraNo() {
+  const resEl = document.getElementById('pp-resumen');
+  if (resEl) resEl.innerHTML = '<div class="alert alert-info">Listo. Te queda pendiente avisar: lo verás marcado <b>⚠ falta avisar</b> en la fila del evento hasta que lo hagas.</div>';
+  setTimeout(() => { closeModal('modal-posponer'); loadEsferasEventos(); }, 2200);
 }
 
 // ── Avisar a clientes de la posposición (Fase 2) ─────────────────────────────
@@ -16398,16 +16460,17 @@ async function confirmarAviso(slug) {
   }
 }
 
-// ── Recalcular fechas de pagos tras posponer (Fase 3) ────────────────────────
-// Dispara admin-recalcular-pagos-posposicion (mueve las cuotas pendientes el
-// mismo offset que el evento; idempotente, una vez por posposición).
+// ── Reintentar las cuotas que no se recorrieron (SEG-1) ──────────────────────
+// Dispara admin-recalcular-pagos-posposicion, que hoy mueve ÚNICAMENTE las
+// cuotas marcadas como fallidas en la bitácora. Ya no es un botón de siempre:
+// sólo se pinta en la fila cuando quedó algo atorado.
 function recalcularPagosPosposicion(slug) {
   const ev = (window._esfRows || []).find(e => e && e.slug === slug);
   if (!ev) { alert('No se encontró el evento en la lista. Recarga e intenta de nuevo.'); return; }
   document.getElementById('modal-recalcular').innerHTML = `
     <div class="modal" style="max-width:420px">
       <div class="modal-header">
-        <div class="modal-title" style="font-family:'Zen Dots',sans-serif;font-size:15px">↻ Recalcular pagos</div>
+        <div class="modal-title" style="font-family:'Zen Dots',sans-serif;font-size:15px">↻ Reintentar cuotas</div>
         <button class="modal-close" onclick="closeModal('modal-recalcular')">×</button>
       </div>
       <div class="modal-body">
@@ -16415,7 +16478,7 @@ function recalcularPagosPosposicion(slug) {
           <b>${_esfEsc(ev.nombre)}</b>
         </div>
         <div style="font-size:12px;color:var(--ts);line-height:1.55;margin-bottom:12px">
-          Se recorrerán las fechas de las cuotas <b>pendientes</b> (no las pagadas ni vencidas) de los clientes activos, el mismo número de días que se movió el evento. Los montos NO cambian. Hazlo <b>antes</b> de avisar a los clientes. Solo se puede una vez por posposición.
+          Se reintentarán <b>sólo</b> las cuotas que no se pudieron recorrer al posponer, el mismo número de días que se movió el evento. Las que ya se movieron <b>no se vuelven a mover</b> y los montos NO cambian.
         </div>
         <div id="rec-alert"></div>
       </div>
@@ -16448,7 +16511,7 @@ async function confirmarRecalculo(slug) {
       ? 'No había cuotas pendientes que mover.'
       : `✓ ${d.movidos} cuota(s) movida(s) · offset ${d.offset_dias} días${d.fallidos ? ` · ${d.fallidos} fallida(s)` : ''}`;
     if (alertEl) alertEl.innerHTML = `<div class="alert alert-success">${msg}</div>`;
-    setTimeout(() => closeModal('modal-recalcular'), 2500);
+    setTimeout(() => { closeModal('modal-recalcular'); loadEsferasEventos(); }, 2500);
   } catch (e) {
     if (alertEl) alertEl.innerHTML = `<div class="alert alert-error">${e.message}</div>`;
     if (btn) { btn.disabled = false; btn.textContent = 'Recalcular'; }

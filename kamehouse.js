@@ -16189,15 +16189,18 @@ async function loadEsferasEventos() {
   }
 }
 
-// ── Posponer evento (Fase 1: bitácora + cambio de fecha) ─────────────────────
-// Dispara admin-posponer-evento. NO republica (eso lo hace el admin desde Esferas).
+// ── Posponer evento (SEG-1: preview + confirmación con slug) ─────────────────
+// Dos pasos a propósito: primero se PREGUNTA qué va a pasar (sin escribir nada)
+// y sólo con ese resumen a la vista se puede confirmar tecleando el slug — el
+// mismo candado que ya usa Cancelar. NO republica ni avisa: eso va aparte.
 function posponerEsfera(slug) {
   const ev = (window._esfRows || []).find(e => e && e.slug === slug);
   if (!ev) { alert('No se encontró el evento en la lista. Recarga e intenta de nuevo.'); return; }
+  window._ppPreview = null;
   const fechaActual = ev.fecha_inicio || '';
   const hoyMx = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Monterrey' });
   document.getElementById('modal-posponer').innerHTML = `
-    <div class="modal" style="max-width:420px">
+    <div class="modal" style="max-width:440px">
       <div class="modal-header">
         <div class="modal-title" style="font-family:'Zen Dots',sans-serif;font-size:15px"><svg class="ic"><use href="#ic-eventos"/></svg> Posponer evento</div>
         <button class="modal-close" onclick="closeModal('modal-posponer')">×</button>
@@ -16209,30 +16212,115 @@ function posponerEsfera(slug) {
         </div>
         <div class="form-group">
           <label>Fecha nueva *</label>
-          <input type="date" class="cot-input" id="pp-fecha-nueva" value="${_esfEsc(fechaActual)}" min="${hoyMx}" style="width:100%">
+          <input type="date" class="cot-input" id="pp-fecha-nueva" value="${_esfEsc(fechaActual)}" min="${hoyMx}" style="width:100%" onchange="_ppInvalidar()" oninput="_ppInvalidar()">
         </div>
         <div class="form-group">
           <label>Motivo (opcional)</label>
           <input type="text" class="cot-input" id="pp-motivo" placeholder="Motivo (opcional)" maxlength="200" style="width:100%">
         </div>
+        <div id="pp-resumen"></div>
+        <div id="pp-confirmacion"></div>
         <div id="pp-alert"></div>
       </div>
       <div class="modal-footer">
-        <button class="btn btn-ghost" onclick="closeModal('modal-posponer')">Cancelar</button>
-        <button class="btn btn-primary" onclick="confirmarPosponer('${_esfEsc(slug)}')">Posponer</button>
+        <button class="btn btn-ghost" onclick="closeModal('modal-posponer')">Cerrar</button>
+        <button class="btn btn-primary" id="pp-ver" onclick="_ppVerPreview('${_esfEsc(slug)}')">Ver qué va a pasar</button>
       </div>
     </div>`;
   openModal('modal-posponer');
 }
 
-async function confirmarPosponer(slug) {
+// Cambiar la fecha después de ver el resumen tira el resumen: lo que se
+// confirma tiene que ser exactamente lo que se enseñó.
+function _ppInvalidar() {
+  window._ppPreview = null;
+  const res = document.getElementById('pp-resumen');
+  const con = document.getElementById('pp-confirmacion');
+  const btn = document.getElementById('pp-confirmar');
   const alertEl = document.getElementById('pp-alert');
+  if (res) res.innerHTML = '';
+  if (con) con.innerHTML = '';
+  if (alertEl) alertEl.innerHTML = '';
+  if (btn) btn.remove();
+}
+
+// Paso 1: preguntar. `preview:true` corta en el endpoint antes de la primera
+// escritura, así que esto no mueve ni una fecha de pago.
+async function _ppVerPreview(slug) {
+  const alertEl = document.getElementById('pp-alert');
+  const resEl = document.getElementById('pp-resumen');
   const fechaNueva = (document.getElementById('pp-fecha-nueva')?.value || '').trim();
-  const motivo = (document.getElementById('pp-motivo')?.value || '').trim();
+  if (alertEl) alertEl.innerHTML = '';
   if (!fechaNueva) {
     if (alertEl) alertEl.innerHTML = '<div class="alert alert-error">Elige la fecha nueva</div>';
     return;
   }
+  if (resEl) resEl.innerHTML = '<div class="alert alert-info">Consultando…</div>';
+  try {
+    const r = await khAdminFetch('/.netlify/functions/admin-posponer-evento', {
+      method: 'POST',
+      body: JSON.stringify({ slug, fecha_nueva: fechaNueva, preview: true }),
+    });
+    const d = await r.json().catch(() => ({ error: r.statusText }));
+    if (!r.ok) {
+      if (resEl) resEl.innerHTML = '';
+      if (alertEl) alertEl.innerHTML = `<div class="alert alert-error">${_esfEsc(d.error || 'No se pudo consultar')}</div>`;
+      return;
+    }
+    const motivo = (document.getElementById('pp-motivo')?.value || '').trim();
+    window._ppPreview = { slug, fecha_nueva: fechaNueva, motivo, clientes: d.clientes, cuotas: d.cuotas, delta_dias: d.delta_dias };
+    const signo = (d.delta_dias > 0 ? '+' : '') + d.delta_dias;
+    if (resEl) resEl.innerHTML = `
+      <div style="border:1px solid var(--bd,rgba(255,255,255,.15));border-radius:var(--r-sm,8px);padding:12px 14px;margin-bottom:12px;font-size:13px;line-height:1.6">
+        <div><b>${_esfEsc(d.fecha_anterior)}</b> → <b style="color:var(--yellow,#e8ff4c)">${_esfEsc(d.fecha_nueva)}</b> <span style="color:var(--ts)">(${_esfEsc(signo)} días)</span></div>
+        <div style="margin-top:6px">Afecta a <b>${d.clientes} cliente${d.clientes === 1 ? '' : 's'}</b> activo${d.clientes === 1 ? '' : 's'}.</div>
+        <div>Se recorrerán <b>${d.cuotas} cuota${d.cuotas === 1 ? '' : 's'}</b> pendiente${d.cuotas === 1 ? '' : 's'} los mismos días. Los montos NO cambian.</div>
+        <div style="margin-top:6px;color:var(--ts);font-size:12px">Nadie recibe correo todavía: al terminar te pregunto si aviso.</div>
+      </div>`;
+    const conEl = document.getElementById('pp-confirmacion');
+    if (conEl) conEl.innerHTML = `
+      <div class="form-group">
+        <label>Para confirmar, escribe el slug: <b>${_esfEsc(slug)}</b></label>
+        <input type="text" class="cot-input" id="pp-confirm" placeholder="Escribe: ${_esfEsc(slug)}" autocomplete="off" style="width:100%">
+      </div>`;
+    const pie = document.querySelector('#modal-posponer .modal-footer');
+    if (pie && !document.getElementById('pp-confirmar')) {
+      const b = document.createElement('button');
+      b.className = 'btn btn-primary';
+      b.id = 'pp-confirmar';
+      b.textContent = 'Posponer';
+      b.onclick = () => confirmarPosponer(slug);
+      pie.appendChild(b);
+    }
+  } catch (e) {
+    if (resEl) resEl.innerHTML = '';
+    if (alertEl) alertEl.innerHTML = `<div class="alert alert-error">${_esfEsc(e.message)}</div>`;
+  }
+}
+
+// Paso 2: escribir. Sin resumen aprobado y sin el slug tecleado, no se escribe
+// — ni llamando a esta función a mano desde la consola.
+async function confirmarPosponer(slug) {
+  const alertEl = document.getElementById('pp-alert');
+  const prev = window._ppPreview;
+  if (!prev || prev.slug !== slug) {
+    if (alertEl) alertEl.innerHTML = '<div class="alert alert-error">Primero pica "Ver qué va a pasar"</div>';
+    return;
+  }
+  const fechaNueva = (document.getElementById('pp-fecha-nueva')?.value || '').trim();
+  if (fechaNueva !== prev.fecha_nueva) {
+    if (alertEl) alertEl.innerHTML = '<div class="alert alert-error">La fecha cambió: vuelve a picar "Ver qué va a pasar"</div>';
+    return;
+  }
+  const tecleado = (document.getElementById('pp-confirm')?.value || '').trim();
+  if (tecleado !== slug) {
+    if (alertEl) alertEl.innerHTML = `<div class="alert alert-error">El slug no coincide; escribe '${_esfEsc(slug)}' para confirmar</div>`;
+    return;
+  }
+  const btn = document.getElementById('pp-confirmar');
+  const motivo = (document.getElementById('pp-motivo')?.value || '').trim();
+  if (btn) { btn.disabled = true; btn.textContent = 'Posponiendo…'; }
+  if (alertEl) alertEl.innerHTML = '<div class="alert alert-info">Posponiendo…</div>';
   try {
     const r = await khAdminFetch('/.netlify/functions/admin-posponer-evento', {
       method: 'POST',
@@ -16240,28 +16328,17 @@ async function confirmarPosponer(slug) {
     });
     if (!r.ok) {
       const d = await r.json().catch(() => ({ error: r.statusText }));
-      if (alertEl) alertEl.innerHTML = `<div class="alert alert-error">${d.error || 'No se pudo posponer'}</div>`;
+      if (alertEl) alertEl.innerHTML = `<div class="alert alert-error">${_esfEsc(d.error || 'No se pudo posponer')}</div>`;
+      if (btn) { btn.disabled = false; btn.textContent = 'Posponer'; }
       return;
     }
     const d = await r.json();
-    let extra = '';
-    if (d.pagos_recorridos > 0) {
-      const signo = (d.delta_dias > 0 ? '+' : '') + d.delta_dias;
-      extra += ` ✓ Se recorrieron ${d.pagos_recorridos} fecha${d.pagos_recorridos === 1 ? '' : 's'} de pago pendiente${d.pagos_recorridos === 1 ? '' : 's'} (${signo} días).`;
-    }
-    if (d.pagos_fallidos > 0 || d.pagos_error) {
-      extra += ' <svg class="ic"><use href="#ic-alerta"/></svg> Algunas fechas de pago no se pudieron recorrer — revísalas en el Portal.';
-    }
-    if (d.correos_enviados > 0) {
-      extra += ` <svg class="ic"><use href="#ic-correo"/></svg> Se avisó a ${d.correos_enviados} viajero${d.correos_enviados === 1 ? '' : 's'} por correo.`;
-    }
-    if (d.correos_fallidos > 0 || d.correos_error) {
-      extra += ' <svg class="ic"><use href="#ic-alerta"/></svg> Algunos correos no salieron.';
-    }
-    if (alertEl) alertEl.innerHTML = `<div class="alert alert-success">✓ Pospuesto de ${_esfEsc(d.fecha_anterior)} a ${_esfEsc(d.fecha_nueva)}. ${_esfEsc(d.recordatorio || '')}${_esfEsc(extra)}</div>`;
+    window._ppPreview = null;
+    if (alertEl) alertEl.innerHTML = `<div class="alert alert-success">✓ Pospuesto de ${_esfEsc(d.fecha_anterior)} a ${_esfEsc(d.fecha_nueva)}. ${_esfEsc(d.recordatorio || '')}</div>`;
     setTimeout(() => { closeModal('modal-posponer'); loadEsferasEventos(); }, 1800);
   } catch (e) {
-    if (alertEl) alertEl.innerHTML = `<div class="alert alert-error">${e.message}</div>`;
+    if (alertEl) alertEl.innerHTML = `<div class="alert alert-error">${_esfEsc(e.message)}</div>`;
+    if (btn) { btn.disabled = false; btn.textContent = 'Posponer'; }
   }
 }
 

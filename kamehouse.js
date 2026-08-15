@@ -22,8 +22,16 @@ let _karinPiezasCache = [];
 let recibosLoaded = false;
 let disenoLoaded = false;
 
+// [SEG-2] LAS HERRAMIENTAS Y ESFERAS ENTRAN A LA TABLA, no a parches aparte.
+// Antes vivían fuera: `aplicarPermisosUI` recorría una lista de 18 mientras el
+// HTML tenía 23 pantallas, así que contratos/waitlist/recibos/diseno/esferas
+// NUNCA pasaban por el barrido. A esferas se le puso candado propio en T7 —
+// después de descubrir que su botón se veía para TODOS los roles— y a diseno
+// otro para milk. Dos parches para el mismo hueco. Aquí se absorben los dos y
+// el hueco se cierra en la fuente: la lista del barrido se DERIVA de las
+// pantallas que existen, no se escribe a mano al lado.
 const PERMISOS_TABS = {
-  maestro_roshi: ['resumen','pagos','eventos','gastos','ingresos','saldos','ventas','cotizar','inventario','reportes','capsule','solicitudes_portal','equipo','kamisama','herramientas','radar','montana','yamcha','radio'],
+  maestro_roshi: ['resumen','pagos','eventos','gastos','ingresos','saldos','ventas','cotizar','inventario','reportes','capsule','solicitudes_portal','equipo','kamisama','herramientas','radar','montana','yamcha','radio','esferas','contratos','waitlist','recibos','diseno'],
   bulma:         ['resumen','pagos','eventos','gastos','ingresos','saldos','ventas','cotizar','inventario','reportes','capsule','solicitudes_portal','equipo','herramientas'],
   mister_popo:   ['inventario','reportes','equipo'],
   coordinador:   ['inventario','reportes','equipo'],
@@ -478,6 +486,17 @@ function seleccionarTema(hex, el) {
   if (el) el.classList.add('sel');
 }
 
+// [SEG-2] FUENTE ÚNICA del permiso de pantalla. La usan el barrido de la UI,
+// showPage y showHerramienta — para que "lo que se ve" y "a dónde se puede
+// entrar" no puedan separarse nunca. Sin sesión no se ve nada: el lado seguro.
+function _puedeVerTab(tab) {
+  if (!currentUser) return false;
+  const base = PERMISOS_TABS[currentUser.rol] || [];
+  const extras = currentUser.permisos_extra?.tabs_extra || [];
+  const bloqueados = currentUser.permisos_extra?.tabs_bloqueados || [];
+  return [...base, ...extras].includes(tab) && !bloqueados.includes(tab);
+}
+
 function aplicarPermisosUI() {
   if (!currentUser) return;
   const rol = currentUser.rol;
@@ -485,25 +504,24 @@ function aplicarPermisosUI() {
   const extras = currentUser.permisos_extra?.tabs_extra || [];
   const bloqueados = currentUser.permisos_extra?.tabs_bloqueados || [];
   const tabsPermitidos = [...new Set([...base, ...extras])].filter(t => !bloqueados.includes(t));
-  const allTabs = ['resumen','pagos','eventos','gastos','ingresos','saldos','ventas','cotizar','inventario','reportes','equipo','capsule','solicitudes_portal','kamisama','radar','montana','yamcha','radio'];
+  // [SEG-2] LA LISTA SE DERIVA DEL DOM, no se escribe al lado. Dos listas iguales
+  // no existen: solo listas que todavía no divergen, y ésta ya había divergido
+  // (18 contra 23). Si mañana nace una pantalla nueva, entra al barrido sola —
+  // y si nadie le da permiso a nadie, nace CERRADA, que es el lado correcto
+  // para fallar.
+  const allTabs = [...document.querySelectorAll('[id^="page-"]')]
+    .map(p => p.id.slice(5))
+    .filter(id => document.getElementById('nav-' + id));
   allTabs.forEach(tab => {
     const btn = document.getElementById('nav-' + tab);
     if (btn) btn.style.display = tabsPermitidos.includes(tab) ? '' : 'none';
   });
+  // El desplegable de Herramientas obedece la MISMA fuente: se ve si al rol le
+  // queda al menos una herramienta. Antes llevaba su propia lista de roles a
+  // mano, que es la tercera copia del mismo permiso.
+  const HERRAMIENTAS = ['recibos','contratos','waitlist','diseno'];
   const dropdownHerr = document.getElementById('nav-dropdown-herramientas');
-  if (dropdownHerr) dropdownHerr.style.display = ['maestro_roshi','bulma','milk'].includes(rol) ? '' : 'none';
-  // F5 Milk: "Diseño" (esferas) es solo de maestro_roshi → inerte para milk, se oculta.
-  const navDiseno = document.getElementById('nav-diseno');
-  if (navDiseno) navDiseno.style.display = (rol === 'milk') ? 'none' : '';
-  // [T7] Esferas del Dragón: el botón se veía para TODOS los roles porque
-  // 'esferas' nunca estuvo en allTabs ni en PERMISOS_TABS, así que el forEach de
-  // arriba no lo tocaba. No era un agujero —esferas-publicar, esferas-compilar y
-  // noticias-publicar exigen maestro_roshi en el servidor—, pero cualquier rol
-  // entraba a un panel donde todo le responde 403. Se oculta con el mismo patrón
-  // que el de arriba; _khNavSync espeja este display a la barra móvil y esconde
-  // el encabezado del grupo si queda vacío, así que no hace falta tocarlos.
-  const navEsferas = document.getElementById('nav-esferas');
-  if (navEsferas) navEsferas.style.display = (rol === 'maestro_roshi') ? '' : 'none';
+  if (dropdownHerr) dropdownHerr.style.display = HERRAMIENTAS.some(h => tabsPermitidos.includes(h)) ? '' : 'none';
   const karinAdminBtns = document.getElementById('karin-admin-btns');
   if (karinAdminBtns) karinAdminBtns.style.display = ['maestro_roshi','mister_popo'].includes(rol) ? 'flex' : 'none';
 
@@ -1904,6 +1922,13 @@ let _eventosCache = [];
 // NAVEGACIÓN
 // ═══════════════════════════════════════════════════════════════
 function showPage(name) {
+ // [SEG-2] Mismo candado que showHerramienta, misma fuente. Las pantallas sin
+ // botón de menú propio (las que se abren desde otra) no se filtran aquí: el
+ // barrido solo gobierna las que tienen entrada en el nav.
+ if (document.getElementById('nav-' + name) && !_puedeVerTab(name)) {
+   showToast('No tienes acceso a esta sección', 'error');
+   return;
+ }
  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
  document.getElementById(`page-${name}`).classList.add('active');
@@ -10620,6 +10645,10 @@ function closeToolsSheet() {
 
 
 function showHerramienta(name) {
+  // [SEG-2] ESCONDER NO ES IMPEDIR. El botón oculto solo tapa el camino del
+  // ratón; showHerramienta('recibos') desde la consola, un enlace viejo o el
+  // historial entraban igual. Aquí se rebota.
+  if (!_puedeVerTab(name)) { showToast('No tienes acceso a esta herramienta', 'error'); return; }
   // Cerrar dropdown
   document.getElementById('nav-dropdown-herramientas').classList.remove('open');
 

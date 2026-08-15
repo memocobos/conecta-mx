@@ -55,7 +55,7 @@ exports.handler = async (event) => {
     // 1. KH: última posposición registrada del evento.
     const posRes = await fetch(
       `${env.KH_URL}/rest/v1/eventos_posposiciones?evento_slug=eq.${encodeURIComponent(slug)}`
-      + `&select=evento_nombre,fecha_anterior,fecha_nueva,motivo&order=creado_en.desc&limit=1`,
+      + `&select=id,evento_nombre,fecha_anterior,fecha_nueva,motivo&order=creado_en.desc&limit=1`,
       { headers: khHeaders }
     );
     if (!posRes.ok) {
@@ -128,6 +128,18 @@ exports.handler = async (event) => {
     for (const r of resultados) {
       if (r.status === 'fulfilled' && r.value && r.value.ok) enviados++;
       else fallidos++;
+    }
+
+    // SEG-1 · Dejar constancia. Mientras esto sea NULL, la fila del evento en
+    // Esferas enseña el pendiente de avisar. Best-effort: si la marca falla los
+    // correos YA salieron y eso no se deshace — el pendiente se queda visible,
+    // que es el lado seguro del error.
+    if (enviados > 0) {
+      await fetch(`${env.KH_URL}/rest/v1/eventos_posposiciones?id=eq.${encodeURIComponent(pos.id)}`, {
+        method: 'PATCH',
+        headers: { ...khHeaders, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+        body: JSON.stringify({ aviso_enviado: new Date().toISOString() }),
+      }).catch(() => {});
     }
 
     return {

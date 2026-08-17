@@ -1,249 +1,39 @@
 // netlify/functions/waitlist-notify.js
 //
-// 2 modos:
+// El VIGILANTE de la lista de espera. Desde WL-1 no manda correos por su cuenta:
+// el correo, el ritmo y el marcado viven en `_lib/waitlist-core`, que comparte
+// con el botón de Kamehouse y con el publicar de Esferas. Aquí sólo se decide
+// A QUIÉN toca avisarle.
 //
-//  (1) AUTO (cron diario): lee el catálogo con _lib/catalogo-index y compara
-//      cada evento contra eventos_estado_snapshot. Si el snapshot dice
-//      'proximamente' y el actual es '' (vacío = a la venta), dispara emails a
-//      todos los registros notificado=false de ese evento. Finalmente
-//      actualiza el snapshot con los estados actuales.
-//      [GR-8] Un evento que el snapshot NO conocía se SIEMBRA sin avisar: no
-//      es una transición, es la primera vez que lo vemos.
+//  (1) AUTO (cron diario): lee el catálogo YA DESPLEGADO con _lib/catalogo-index
+//      y lo compara contra eventos_estado_snapshot. Dispara en la transición
+//      'proximamente' → a la venta. Lo que no conocía se SIEMBRA CALLADO
+//      (GR-8) — ver el bloque de abajo: eso no se toca.
+//      Además SANA HUÉRFANOS: filas que quedaron pendientes de un evento al que
+//      ya se le avisó (un corte por presupuesto al publicar, un 429 terco,
+//      alguien que se suscribió tarde). Un evento sembrado en silencio NUNCA
+//      es huérfano: no tiene ni una fila notificada.
 //
-//  (2) FORCE (botón "Notificar a todos" en kamehouse):
-//      ?force=true&evento_id=X — manda emails a la lista de espera de ese
-//      evento sin importar el snapshot, y marca el evento como activo.
+//  (2) FORCE (botón "Notificar a todos" en Kamehouse):
+//      ?force=true&evento_id=X — manda a la lista de ese evento sin mirar el
+//      snapshot, y lo deja sellado para que el cron no repita.
+//
+// El tercer disparo —AL PUBLICAR— no vive aquí: vive en esferas-publicar, que
+// es quien sabe que el dueño acaba de publicar y con qué datos. Usa el MISMO
+// núcleo. Ver la nota de WL-1 allá.
 //
 // Configurado como cron diario en netlify.toml a las 14:00 UTC (8 AM CDMX).
 
 const { verifyAdminAuthLive, corsCheck } = require('./_lib/verify-admin');
-const { aplicarModoPrueba } = require('./_lib/correo-guard');
-// [GR-8] La única fuente del catálogo. Ver la nota donde vivía extractEventos.
 const { fetchCatalogo } = require('./_lib/catalogo-index');
+const {
+  sb, notificarEvento, eventosHuerfanos, upsertSnapshot, PRESUPUESTO_CRON_MS,
+} = require('./_lib/waitlist-core');
 
-const SB_URL      = "https://npgnhsmwpcipxgvfxrho.supabase.co";
-const SB_KEY      = process.env.SUPABASE_SERVICE_KEY_KAMEHOUSE;
-const RESEND_KEY  = process.env.RESEND_API_KEY || process.env.RESEND_KEY;
-const FROM        = process.env.RESEND_FROM_ROL || "Conecta Reynosa <admin@conectareynosa.mx>";
-const SITE        = process.env.URL || "https://conectareynosa.mx";
+const SB_KEY = process.env.SUPABASE_SERVICE_KEY_KAMEHOUSE;
 
 function ok(b)  { return { statusCode: 200, headers: { "Content-Type": "application/json" }, body: JSON.stringify(b) }; }
 function bad(c,m){ return { statusCode: c, headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ok:false, error:m }) }; }
-
-async function sb(path, opts = {}) {
-  const res = await fetch(`${SB_URL}/rest/v1/${path}`, {
-    ...opts,
-    headers: {
-      apikey: SB_KEY,
-      Authorization: `Bearer ${SB_KEY}`,
-      "Content-Type": "application/json",
-      ...(opts.headers || {}),
-    },
-  });
-  if (!res.ok) throw new Error(`SB ${res.status}: ${await res.text()}`);
-  // [GR-9] Un ÉXITO puede venir con el cuerpo vacío. `Prefer: return=minimal`
-  // hace que PostgREST conteste 201 Created SIN cuerpo, y res.json() sobre una
-  // cadena vacía revienta con "Unexpected end of JSON input". El escritor del
-  // snapshot lo llamaba así: la escritura aterrizaba bien y el log gritaba
-  // ERROR encima del éxito. Un ayudante que grita sobre lo que salió bien es
-  // peor que uno callado — manda a buscar un problema que no existe y tapa los
-  // de verdad.
-  //
-  // No se traga cualquier basura: vacío → null; cuerpo con algo que no es JSON
-  // → se lanza CON el cuerpo recortado, para no cambiar un error ruidoso por
-  // uno mudo.
-  if (res.status === 204) return null;
-  const texto = (await res.text()).trim();
-  if (!texto) return null;
-  try { return JSON.parse(texto); }
-  catch (e) { throw new Error(`SB ${res.status}: respuesta no-JSON: ${texto.slice(0, 120)}`); }
-}
-
-async function sendEmail(to, subject, html) {
-  if (!RESEND_KEY) { console.warn("[waitlist-notify] RESEND_API_KEY no configurado, skip:", to); return false; }
-  ({ to, subject } = aplicarModoPrueba({ to, subject }));
-  const res = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${RESEND_KEY}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ from: FROM, to, subject, html }),
-  });
-  if (!res.ok) { console.error("[waitlist-notify] Resend error:", res.status, await res.text()); return false; }
-  return true;
-}
-
-function escapeHtml(s) {
-  return String(s == null ? "" : s).replace(/[&<>"']/g, c => ({
-    "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;",
-  }[c]));
-}
-
-// [GR-8] Aquí vivía extractEventos(): un extractor de regex PROPIO de esta
-// función, que leía el array EV del HTML. Se eliminó entero. Su patrón
-// /\{[^{}]*id:...[^{}]*\}/ no admitía llaves anidadas, y casi todo evento trae
-// zonas:[{...}] o flashPromo:{...}: veía 18 de 94 eventos y CERO de los 54 que
-// están a la venta, así que la transición que dispara los avisos —proximamente
-// a la venta— era inalcanzable y la lista de espera no avisaba nunca.
-// Ahora el catálogo sale de _lib/catalogo-index (fetchCatalogo), la MISMA
-// fuente que ya usan bodega, contratos, cobranza y transporte: una sola
-// autoridad y cero copias del parser.
-
-function emailTemplate({ nombre, evento_nombre, fecha, venue, link, promo }) {
-  const dudasUrl = "https://wa.me/528119771072";
-  const firstName = (nombre || "").split(" ")[0] || nombre;
-  // Bloque amarillo de código de descuento (opcional).
-  // Se inserta entre la "EVENT CARD" y el botón CTA cuando el admin lo activó
-  // en el modal de Kamehouse antes de mandar el correo.
-  const promoBlock = promo && promo.codigo ? `
-      <tr><td style="padding:18px 26px 0 26px">
-        <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#e8ff4c;border-radius:8px">
-          <tr><td style="padding:20px;text-align:center">
-            <p style="color:#000;font-size:13px;margin:0 0 8px 0;font-weight:700;letter-spacing:.16em;text-transform:uppercase;font-family:Arial,sans-serif">🎁 Código de descuento exclusivo</p>
-            <p style="color:#000;font-size:28px;font-weight:900;letter-spacing:4px;margin:0 0 8px 0;font-family:Arial Black,Arial,sans-serif">${escapeHtml(promo.codigo)}</p>
-            <p style="color:#000;font-size:13px;margin:0;font-weight:600">${promo.descuento}% de descuento · Aplícalo al cotizar en el sitio</p>
-            <p style="color:rgba(0,0,0,.65);font-size:11px;margin:8px 0 0 0;font-weight:700;letter-spacing:.08em;text-transform:uppercase">⏱ Válido por ${promo.horas} ${promo.horas === 1 ? 'hora' : 'horas'}</p>
-          </td></tr>
-        </table>
-      </td></tr>` : '';
-  return `<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>¡Ya está disponible!</title></head>
-<body style="margin:0;padding:0;background:#000;font-family:Helvetica,Arial,sans-serif;color:#ffffff;-webkit-font-smoothing:antialiased">
-<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#000">
-  <tr><td align="center" style="padding:24px 12px">
-    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="560" style="max-width:560px;width:100%;background:#0a0a0a;border:1px solid rgba(255,255,255,.1)">
-
-      <!-- HEADER -->
-      <tr><td style="background:#000;border-bottom:4px solid #e8ff4c;padding:0">
-        <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
-          <tr>
-            <td style="background:#ff283b;padding:14px 18px;width:1%;white-space:nowrap"><span style="color:#000;font-weight:900;font-size:14px;letter-spacing:.04em;text-transform:uppercase;font-family:Arial,sans-serif">Conecta</span> <span style="color:#fff;font-style:italic;font-weight:900;font-size:16px">MX</span></td>
-            <td style="padding:14px 18px;text-align:right;color:#e8ff4c;font-weight:900;font-size:13px;letter-spacing:.1em;text-transform:uppercase">Lista de espera</td>
-          </tr>
-        </table>
-      </td></tr>
-
-      <!-- HERO -->
-      <tr><td style="padding:36px 26px 8px 26px">
-        <div style="font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:rgba(255,255,255,.55);margin-bottom:12px">🔔 Te avisamos</div>
-        <h1 style="font-family:Arial Black,Arial,sans-serif;font-size:48px;line-height:.9;letter-spacing:-.01em;color:#e8ff4c;text-transform:uppercase;margin:0 0 18px 0">¡YA ESTÁ AQUÍ!</h1>
-        <p style="font-size:15px;line-height:1.55;color:rgba(255,255,255,.85);margin:0 0 22px 0">Hola <strong style="color:#e8ff4c">${escapeHtml(firstName)}</strong>, te anunciamos que <strong style="color:#fff">${escapeHtml(evento_nombre)}</strong> ya está disponible para reservar.</p>
-      </td></tr>
-
-      <!-- EVENT CARD -->
-      <tr><td style="padding:0 26px">
-        <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#000;border:1px solid rgba(255,255,255,.18);border-left:6px solid #e8ff4c">
-          <tr><td style="padding:22px 22px 18px 22px">
-            <div style="font-family:Arial Black,Arial,sans-serif;font-size:22px;color:#ffffff;line-height:1.15;letter-spacing:-.01em;margin-bottom:12px">${escapeHtml(evento_nombre)}</div>
-            ${fecha ? `<div style="font-size:13px;color:rgba(255,255,255,.7);font-weight:600;margin-bottom:6px">📅 ${escapeHtml(fecha)}</div>` : ""}
-            ${venue ? `<div style="font-size:13px;color:rgba(255,255,255,.7);font-weight:600">📍 ${escapeHtml(venue)}</div>` : ""}
-          </td></tr>
-        </table>
-      </td></tr>
-
-      ${promoBlock}
-
-      <!-- BUTTON -->
-      <tr><td style="padding:24px 26px 8px 26px">
-        <a href="${link}" style="display:block;width:100%;background:#e8ff4c;color:#000;padding:18px 20px;text-align:center;font-weight:900;font-size:15px;letter-spacing:.08em;text-transform:uppercase;text-decoration:none;font-family:Arial,sans-serif;box-sizing:border-box">→ Ver precios y reservar</a>
-      </td></tr>
-
-      <!-- HELP -->
-      <tr><td style="padding:24px 26px 14px 26px">
-        <div style="border-top:1px solid rgba(255,255,255,.1);padding-top:16px;font-size:12px;color:rgba(255,255,255,.55);line-height:1.6">
-          ¿Dudas? Manda WhatsApp al <a href="${dudasUrl}" style="color:#e8ff4c;text-decoration:none;font-weight:700">81 1977 1072</a>.
-        </div>
-      </td></tr>
-
-      <!-- NO-REPLY -->
-      <tr><td style="padding:0 26px 18px 26px">
-        <div style="border-top:1px solid rgba(255,255,255,.08);padding-top:14px;font-size:11px;color:rgba(255,255,255,.42);text-align:center;line-height:1.55;font-family:Arial,sans-serif">
-          ⚠ Este correo no puede ser contestado.<br>Si necesitas ayuda, contáctanos por <a href="${dudasUrl}" style="color:#e8ff4c;text-decoration:none;font-weight:700">WhatsApp</a> o <a href="https://m.me/conectareynosa" style="color:#e8ff4c;text-decoration:none;font-weight:700">Messenger</a>.
-        </div>
-      </td></tr>
-
-      <!-- FOOTER -->
-      <tr><td style="background:#000;padding:18px 26px;border-top:1px solid rgba(255,255,255,.1);text-align:center">
-        <a href="https://instagram.com/conectarey" style="color:rgba(255,255,255,.55);text-decoration:none;font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;margin:0 8px">Instagram</a>
-        <a href="https://facebook.com/conectareynosa" style="color:rgba(255,255,255,.55);text-decoration:none;font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;margin:0 8px">Facebook</a>
-        <a href="${dudasUrl}" style="color:rgba(255,255,255,.55);text-decoration:none;font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;margin:0 8px">WhatsApp</a>
-        <div style="font-size:10px;color:rgba(255,255,255,.32);letter-spacing:.18em;margin-top:10px;text-transform:uppercase">Conecta Reynosa · conectareynosa.mx</div>
-      </td></tr>
-
-    </table>
-  </td></tr>
-</table>
-</body></html>`;
-}
-
-async function notifyEvento({ id, a, f, v, promo }) {
-  const link = `${SITE}/${encodeURIComponent(id)}`;
-  // Pide solo registros pendientes.
-  const rows = await sb(`eventos_waitlist?evento_id=eq.${encodeURIComponent(id)}&notificado=eq.false&select=id,nombre,email`);
-  if (!rows.length) return { sent: 0, total: 0 };
-
-  let sent = 0;
-  for (const r of rows) {
-    const subject = `¡Ya está disponible ${a}!`;
-    const html = emailTemplate({ nombre: r.nombre, evento_nombre: a, fecha: f, venue: v, link, promo });
-    const okSend = await sendEmail(r.email, subject, html);
-    if (!okSend) continue;
-    sent++;
-    try {
-      await sb(`eventos_waitlist?id=eq.${r.id}`, {
-        method: "PATCH",
-        body: JSON.stringify({ notificado: true, notificado_at: new Date().toISOString() }),
-      });
-    } catch (e) { console.warn("[waitlist-notify] no se pudo marcar notificado:", r.id, e.message); }
-  }
-  return { sent, total: rows.length };
-}
-
-// [GR-9] READ-THEN-WRITE, el patrón de la casa. Antes iba con
-// `Prefer: resolution=merge-duplicates`, que es el upsert de PostgREST — la
-// misma familia del on_conflict que la casa tiene prohibida por reventar con
-// 42P10 cuando el índice no es el que PostgREST infiere.
-//
-// Se lee lo que hay, se compara, y se escribe SOLO lo que cambió:
-//   · eventos que el snapshot no tiene  → un INSERT, todos de un jalón
-//   · eventos cuyo estado CAMBIÓ        → un PATCH cada uno
-//   · eventos iguales                   → NO SE TOCAN
-//
-// Esa tercera línea no es ahorro: es corrección. Antes cada corrida reescribía
-// las filas enteras y movía su `updated_at` aunque nada hubiera cambiado, así
-// que la columna no decía "cuándo cambió este evento" sino "cuándo corrió el
-// cron". En régimen normal esto hace 0 PATCH y 0 INSERT.
-async function upsertSnapshot(rows) {
-  if (!rows.length) return { insertadas: 0, actualizadas: 0, sin_cambio: 0 };
-
-  let previos = [];
-  try { previos = await sb(`eventos_estado_snapshot?select=evento_id,estado`) || []; }
-  catch (e) {
-    // Sin la foto previa no se puede comparar, y escribir a ciegas volvería a
-    // pisar los updated_at de todos. Se avisa y no se escribe.
-    console.error("[waitlist-notify] no se pudo leer el snapshot previo:", e.message);
-    throw e;
-  }
-  const antes = new Map(previos.map(r => [r.evento_id, r.estado == null ? "" : r.estado]));
-
-  const ahora = new Date().toISOString();
-  const nuevas = rows.filter(e => !antes.has(e.id));
-  const cambiadas = rows.filter(e => antes.has(e.id) && antes.get(e.id) !== (e.st || ""));
-
-  if (nuevas.length) {
-    await sb(`eventos_estado_snapshot`, {
-      method: "POST",
-      headers: { Prefer: "return=minimal" },
-      body: JSON.stringify(nuevas.map(e => ({ evento_id: e.id, estado: e.st || "", updated_at: ahora }))),
-    });
-  }
-  for (const e of cambiadas) {
-    await sb(`eventos_estado_snapshot?evento_id=eq.${encodeURIComponent(e.id)}`, {
-      method: "PATCH",
-      headers: { Prefer: "return=minimal" },
-      body: JSON.stringify({ estado: e.st || "", updated_at: ahora }),
-    });
-  }
-  return { insertadas: nuevas.length, actualizadas: cambiadas.length,
-           sin_cambio: rows.length - nuevas.length - cambiadas.length };
-}
 
 exports.handler = async function (event) {
   if (!SB_KEY) return bad(500, "SUPABASE_SERVICE_KEY_KAMEHOUSE no configurado");
@@ -282,16 +72,21 @@ exports.handler = async function (event) {
     } catch (e) { return bad(500, "SB error: " + e.message); }
     if (!row) return ok({ ok: true, sent: 0, total: 0, note: "Lista vacía" });
 
-    const summary = await notifyEvento({ id: forceId, a: row.evento_nombre, f: "", v: "", promo });
+    const r = await notificarEvento({
+      evento_id: forceId, nombre: row.evento_nombre, fecha: "", venue: "", promo,
+      presupuestoMs: PRESUPUESTO_CRON_MS,
+    });
     // Marca el evento como activo en snapshot para que el cron no vuelva a disparar.
     try {
       // [GR-9] Mismo patrón de la casa que upsertSnapshot: sin merge-duplicates.
       await upsertSnapshot([{ id: forceId, st: "" }]);
     } catch {}
-    return ok({ ok: true, mode: "force", evento_id: forceId, ...summary });
+    // `sent`/`total` se conservan con su nombre viejo: los lee el modal de Kamehouse.
+    return ok({ ok: true, mode: "force", evento_id: forceId,
+      sent: r.enviados, total: r.total, fallidos: r.fallidos, restantes: r.restantes });
   }
 
-  // ── AUTO MODE (cron): scrape index.html y detecta transiciones ──
+  // ── AUTO MODE (cron): el catálogo desplegado + el snapshot ──
   // [GR-8] El catálogo sale de _lib/catalogo-index — la MISMA autoridad que ya
   // usan bodega, contratos, cobranza y transporte. Antes esta función tenía su
   // propio extractor de regex y veía 18 de 94 eventos: su patrón
@@ -315,7 +110,7 @@ exports.handler = async function (event) {
   try { snapshot = await sb(`eventos_estado_snapshot?select=evento_id,estado`); }
   catch (e) { console.error("[waitlist-notify] snapshot fetch:", e.message); }
   const prev = {};
-  for (const s of snapshot) prev[s.evento_id] = s.estado;
+  for (const s of (snapshot || [])) prev[s.evento_id] = s.estado;
 
   // ═══ LA SIEMBRA ══════════════════════════════════════════════════════════
   // El snapshot se escribió durante meses con la lista CIEGA de 18 eventos, así
@@ -330,8 +125,18 @@ exports.handler = async function (event) {
   //
   // Es por evento, no por corrida: un evento nuevo del catálogo se siembra sin
   // ruido sin bloquear la transición real de otro que sí venía observado.
+  //
+  // WL-1: esta regla sigue siendo SÓLO del vigilante. Cuando el dueño PUBLICA,
+  // el aviso sale aunque el evento nazca directo a la venta — publicar es un
+  // acto deliberado suyo, no un descubrimiento del vigilante. Lo que el cron
+  // encuentra por su cuenta se sigue sembrando callado, igual que hoy.
   let sembrados = 0;
   let totalSent = 0, totalNotif = 0, eventosDisparados = 0;
+  // Reloj de la corrida completa: cada evento gasta del mismo presupuesto, y lo
+  // que no alcance queda pendiente para la siguiente (nadie se pierde ni repite).
+  const finCorrida = Date.now() + PRESUPUESTO_CRON_MS;
+  const queda = () => Math.max(0, finCorrida - Date.now());
+
   for (const ev of eventos) {
     const conocido = Object.prototype.hasOwnProperty.call(prev, ev.id);
     if (!conocido) { sembrados++; continue; }   // primera vez que lo vemos → solo se siembra
@@ -340,13 +145,42 @@ exports.handler = async function (event) {
     if (before === "proximamente" && ev.st === "") {
       eventosDisparados++;
       try {
-        const r = await notifyEvento(ev);
-        totalSent += r.sent; totalNotif += r.total;
-        console.log(`[waitlist-notify] ${ev.id}: ${r.sent}/${r.total} enviados`);
+        const r = await notificarEvento({
+          evento_id: ev.id, nombre: ev.a, fecha: ev.f, venue: ev.v, presupuestoMs: queda(),
+        });
+        totalSent += r.enviados; totalNotif += r.total;
+        console.log(`[waitlist-notify] ${ev.id}: ${r.enviados}/${r.total} enviados`
+          + (r.restantes ? ` · ${r.restantes} quedan para la próxima` : ''));
       } catch (e) { console.error(`[waitlist-notify] ${ev.id} falló:`, e.message); }
     }
   }
   if (sembrados) console.log(`[waitlist-notify] sembrados sin avisar: ${sembrados}`);
+
+  // ═══ LOS HUÉRFANOS ═══════════════════════════════════════════════════════
+  // Filas pendientes de eventos a los que YA se les avisó: el resto de un corte
+  // por presupuesto (al publicar o en una corrida anterior), un 429 que ni con
+  // reintento salió, o alguien que se suscribió después del aviso. Se sanan con
+  // el mismo núcleo y el mismo ritmo. Un evento sembrado en silencio no tiene
+  // ninguna fila notificada, así que NO aparece aquí: GR-8 intacto.
+  let huerfanosSanados = 0, huerfanosEventos = 0;
+  try {
+    for (const h of await eventosHuerfanos()) {
+      if (queda() <= 0) break;
+      const cat = catalogo[h.evento_id] || {};
+      huerfanosEventos++;
+      const r = await notificarEvento({
+        evento_id: h.evento_id,
+        nombre: cat.nombre || h.evento_nombre,
+        fecha: cat.fecha || "", venue: cat.venue || "",
+        presupuestoMs: queda(),
+      });
+      huerfanosSanados += r.enviados;
+      if (r.enviados || r.restantes) {
+        console.log(`[waitlist-notify] huérfanos ${h.evento_id}: ${r.enviados} sanados`
+          + (r.restantes ? `, ${r.restantes} quedan` : ''));
+      }
+    }
+  } catch (e) { console.error("[waitlist-notify] huérfanos:", e.message); }
 
   // Actualiza snapshot con los estados actuales (insert + update).
   let escritura = null;
@@ -357,5 +191,6 @@ exports.handler = async function (event) {
   } catch (e) { console.error("[waitlist-notify] upsert snapshot:", e.message); }
 
   return ok({ ok: true, mode: "auto", eventos: eventos.length, sembrados, snapshot: escritura,
-    disparados: eventosDisparados, encolados: totalNotif, enviados: totalSent });
+    disparados: eventosDisparados, encolados: totalNotif, enviados: totalSent,
+    huerfanos_eventos: huerfanosEventos, huerfanos_sanados: huerfanosSanados });
 };

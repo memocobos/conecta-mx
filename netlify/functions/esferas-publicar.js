@@ -7,6 +7,11 @@
 // validación de AMBOS parsers pasa, hace PUT del index.html al repo (patrón
 // github-publish). Si la validación falla → 422 y NO escribe (candado duro).
 //
+// [WL-1] Al publicar en main, los eventos que quedan A LA VENTA avisan a su
+// lista de espera de inmediato (núcleo compartido `_lib/waitlist-core`), con los
+// datos de Supabase — NO del catálogo desplegado, que en este instante sigue
+// siendo el viejo. Best-effort: si el aviso falla, la publicación ya quedó.
+//
 // Body opcional: { branch?: string }  (default 'main'). Con un branch != 'main'
 // se puede verificar sin tocar main (si la rama no existe, se crea desde main).
 //
@@ -16,7 +21,10 @@
 // =============================================================================
 
 const { verifyAdminAuthLive, corsCheck } = require('./_lib/verify-admin');
-const { compilarEV } = require('./_lib/esferas-compile');
+const { compilarEV, fechaDisplayDeEsfera } = require('./_lib/esferas-compile');
+// [WL-1] El aviso a la lista de espera es del núcleo compartido: el mismo
+// correo, el mismo ritmo y el mismo marcado que usan el cron y el botón.
+const { notificarEvento, upsertSnapshot, esALaVenta, PRESUPUESTO_PUBLICAR_MS } = require('./_lib/waitlist-core');
 
 const SB_URL = 'https://npgnhsmwpcipxgvfxrho.supabase.co';
 const SB_KEY = process.env.SUPABASE_SERVICE_KEY_KAMEHOUSE;
@@ -171,10 +179,58 @@ exports.handler = async (event) => {
       } catch (_) { /* el commit ya quedó; el marcado es secundario */ }
     }
 
+    // 8. [WL-1] EL AVISO A LA LISTA DE ESPERA. Publicar es un acto deliberado
+    //    del dueño: si el evento queda A LA VENTA, su lista se entera AHORA y no
+    //    mañana a las 8. Vale también para el que NACE a la venta — decisión de
+    //    Memo: la siembra callada de GR-8 protege de lo que el vigilante
+    //    DESCUBRE solo, no de lo que el dueño publica a propósito.
+    //
+    //    Los datos salen de la fila de Supabase que se acaba de compilar, NO del
+    //    catálogo desplegado: el index del sitio todavía es el viejo (el deploy
+    //    va detrás de este commit), así que preguntarle diría "no existe" o
+    //    daría el estado anterior. La fecha se pide a la MISMA función que la
+    //    compila (fechaDisplayDeEsfera), para que el correo diga lo que el sitio.
+    //
+    //    Best-effort y con presupuesto corto: el admin está esperando esta
+    //    respuesta. Lo que no alcance a salir se queda pendiente y lo sana el
+    //    cron — nadie recibe dos veces (`notificado` se marca fila por fila).
+    let aviso = null;
+    if (branch === 'main') {
+      aviso = { eventos: 0, enviados: 0, restantes: 0 };
+      try {
+        const porSlug = new Map((esferas || []).map(e => [e.slug, e]));
+        const finAviso = Date.now() + PRESUPUESTO_PUBLICAR_MS;
+        for (const slug of slugs) {
+          const esfera = porSlug.get(slug);
+          if (!esfera || !esALaVenta(esfera.status)) continue;   // 'proximamente', agotado, etc. → nada
+          const queda = finAviso - Date.now();
+          if (queda <= 0) break;
+          const r = await notificarEvento({
+            evento_id: slug,
+            nombre: esfera.nombre || slug,
+            fecha: fechaDisplayDeEsfera(esfera),
+            venue: esfera.venue || '',
+            presupuestoMs: queda,
+          });
+          if (r.total > 0) aviso.eventos++;
+          aviso.enviados += r.enviados;
+          aviso.restantes += r.restantes;
+          // Sella el snapshot en el estado publicado: el cron no debe ver una
+          // transición por algo que este endpoint ya avisó.
+          try { await upsertSnapshot([{ id: slug, st: esfera.status || '' }]); } catch (_) {}
+        }
+      } catch (e) {
+        // El evento YA se publicó; un tropiezo del aviso no lo deshace. Queda
+        // pendiente en la lista y el cron lo sana.
+        aviso.error = e.message;
+        console.error('[esferas-publicar] aviso a lista de espera:', e.message);
+      }
+    }
+
     return {
       statusCode: 200,
       headers,
-      body: JSON.stringify({ ok: true, branch, publicados: slugs, commit, validacion }),
+      body: JSON.stringify({ ok: true, branch, publicados: slugs, commit, validacion, aviso }),
     };
   } catch (e) {
     return { statusCode: 500, headers, body: JSON.stringify({ ok: false, error: e.message }) };

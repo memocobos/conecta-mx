@@ -954,8 +954,28 @@ function quitarDelEV({ indexHtml, slug }) {
   return { contenidoNuevo, encontrado: true, validacion: _validarSlugFuera(contenidoNuevo, target, evAntes.length) };
 }
 
+// [WL-1] La fecha COMO SE VA A VER en el catálogo, para quien necesita
+// imprimirla SIN leer el index desplegado — que al publicar todavía es el
+// viejo. Es la misma cuenta que hacen generarObj y generarObjFestival para su
+// campo `f` (idéntica en las dos: dedupe de fecha_inicio + fechas_extra,
+// ordenar, y multi si son 2 o más). No se copia el resultado de nadie: el arnés
+// de WL-1 la carea contra el objeto REALMENTE compilado, evento por evento, así
+// que si algún día divergen, truena en vez de mentir en un correo.
+function fechaDisplayDeEsfera(esfera) {
+  const fi = (esfera && esfera.fecha_inicio) || null;
+  const ds = fi ? String(fi).slice(0, 10) : '';
+  const fechas = [];
+  const vistas = new Set();
+  for (const d of [ds].concat(parseFechasExtra(esfera && esfera.fechas_extra))) {
+    if (FECHA_RE.test(d) && !vistas.has(d)) { vistas.add(d); fechas.push(d); }
+  }
+  fechas.sort();
+  const dsFinal = fechas.length ? fechas[0] : ds;
+  return (fechas.length >= 2) ? fDisplayMulti(fechas) : fDisplay(dsFinal || fi);
+}
+
 module.exports = {
-  compilarEV, quitarDelEV, reemplazarEnEV, todayMx,
+  compilarEV, quitarDelEV, reemplazarEnEV, todayMx, fechaDisplayDeEsfera,
   // Helpers puros expuestos para el arnés (patrón de la casa).
   _escStr: escStr,
   _parseZonas: parseZonas,

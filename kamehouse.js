@@ -102,15 +102,44 @@ async function khAdminFetch(url, options) {
     jwt ? { 'Authorization': 'Bearer ' + jwt } : {}
   );
   const resp = await fetch(url, options);
-  // [sec-401] Sesión zombie: si el JWT expiró/inválido, ningún admin fetch sirve. En vez de
-  // fallar en silencio (todo 401), forzamos re-login UNA vez con aviso. Igual devolvemos resp
-  // para no romper al caller en vuelo.
-  if (resp.status === 401 && !_khSessionExpired) {
-    _khSessionExpired = true;
-    showToast('Tu sesión expiró. Vuelve a iniciar sesión.', 'error');
-    doLogout();
-  }
+  await _khGuardarSesion(resp);
   return resp;
+}
+
+// [ses-1] El servidor NO es ambiguo, y hay que leerlo tal cual en vez de
+// adivinar (verificado ejecutando el guardia real con un token vencido, con un
+// rol sin permiso y sin header):
+//   401 → SESIÓN: falta el token, está vencido/inválido, o la sesión se revocó.
+//   403 → PERMISO del rol, o una regla de negocio. NUNCA es la sesión.
+// Por eso el 401 expulsa al login con aviso —seguir picando botones con una
+// sesión muerta sólo produce errores secos— y el 403 JAMÁS expulsa: sacar a
+// alguien por un permiso lo deja creyendo que se le venció la sesión, vuelve a
+// entrar y se encuentra exactamente lo mismo.
+// Se devuelve la resp intacta en los dos casos, para no romper al caller en vuelo.
+async function _khGuardarSesion(resp) {
+  if (resp.status === 401) {
+    if (_khSessionExpired) return;          // guarda anti logout-storm
+    _khSessionExpired = true;
+    showToast('Tu sesión expiró. Vuelve a entrar.', 'error');
+    doLogout();
+    return;
+  }
+  if (resp.status === 403) await _khAvisarSinPermiso(resp);
+}
+
+// El 403 del guardia trae este texto EXACTO en sus dos ramas de rol
+// (`_lib/verify-admin.js`: "Rol 'X' sin permiso para este endpoint"). Se compara
+// contra ÉL para no confundirlo con los 403 de regla de negocio —puerta cerrada
+// de gastos, vendedor inactivo, origen no permitido—, que cada pantalla ya
+// explica a su manera. Se lee de un clon: el cuerpo original es del caller.
+const KH_403_PERMISO = 'sin permiso para este endpoint';
+async function _khAvisarSinPermiso(resp) {
+  try {
+    const d = await resp.clone().json();
+    if (d && typeof d.error === 'string' && d.error.includes(KH_403_PERMISO)) {
+      showToast('Tu rol no tiene permiso para esta acción.', 'error');
+    }
+  } catch (e) { /* cuerpo no-JSON: la pantalla mostrará lo suyo */ }
 }
 
 // ── NOTIFICACIONES IN-APP (DC2c-A) ──────────────────────────────────────────

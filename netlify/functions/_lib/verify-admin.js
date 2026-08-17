@@ -78,7 +78,12 @@ function jwtVerify(token, secret) {
   try {
     payload = JSON.parse(b64urlDecode(p).toString('utf8'));
   } catch (e) { return null; }
-  if (payload.exp && payload.exp < Math.floor(Date.now() / 1000)) return null;
+  // [ses-1] `exp` se EXIGE, no se consulta si viene: un token sin caducidad no
+  // es un token, es una llave eterna — y con `payload.exp &&` bastaba omitir el
+  // campo para saltarse la expiración. `auth-login` es el único firmante y
+  // siempre pasa TTL (8 h, constante en el código), así que ningún token
+  // legítimo pierde validez por esto.
+  if (!payload.exp || payload.exp < Math.floor(Date.now() / 1000)) return null;
   return payload;
 }
 

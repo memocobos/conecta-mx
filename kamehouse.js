@@ -3417,7 +3417,7 @@ async function _cobCargarTodo(force) {
   if (_cobTodoCache && !force) return _cobTodoCache;
   await _poblarFiltroEventoPagos();   // garantiza _cobEVMap (multifecha) poblado
   const hdrs = _spAdminHeaders();
-  const pedir = (estado) => fetch('/.netlify/functions/admin-cobranza-list', {
+  const pedir = (estado) => khAdminFetch('/.netlify/functions/admin-cobranza-list', {
     method: 'POST',
     headers: hdrs,
     body: JSON.stringify(estado ? { estado } : {}),
@@ -3447,7 +3447,7 @@ function _cobTourMatchEvento(t, evId) {
 async function _cobCargarGastos(force) {
   if (_gastosG2Cache && !force) return _gastosG2Cache;
   try {
-    const r = await fetch('/.netlify/functions/admin-gastos-list', {
+    const r = await khAdminFetch('/.netlify/functions/admin-gastos-list', {
       method: 'POST',
       headers: _spAdminHeaders(),
       body: JSON.stringify({}),
@@ -3633,7 +3633,7 @@ async function _utilCargar(force) {
     const cuerpo = {};
     if (precios) cuerpo.precios_por_evento = precios;
     if (pasados) cuerpo.eventos_pasados = pasados;
-    const r = await fetch('/.netlify/functions/admin-utilidad-evento', {
+    const r = await khAdminFetch('/.netlify/functions/admin-utilidad-evento', {
       method: 'POST',
       headers: _spAdminHeaders(),
       body: JSON.stringify(cuerpo),
@@ -3935,7 +3935,7 @@ let _resumenSaldosCache = null;  // respuesta de admin-saldos | null
 async function _saldosCargar(force) {
   if (_resumenSaldosCache && !force) return _resumenSaldosCache;
   try {
-    const r = await fetch('/.netlify/functions/admin-saldos', {
+    const r = await khAdminFetch('/.netlify/functions/admin-saldos', {
       method: 'POST', headers: _spAdminHeaders(), body: JSON.stringify({}),
     });
     const d = await r.json();
@@ -4587,7 +4587,7 @@ async function loadPagos() {
 
   try {
     const hdrs = _spAdminHeaders();
-    const pedir = (estado) => fetch('/.netlify/functions/admin-cobranza-list', {
+    const pedir = (estado) => khAdminFetch('/.netlify/functions/admin-cobranza-list', {
       method: 'POST',
       headers: hdrs,
       body: JSON.stringify(estado ? { estado } : {}),
@@ -5399,7 +5399,7 @@ async function loadGastos() {
  const cat = document.getElementById('filtro-cat-gastos').value;
 
  try {
- const r = await fetch('/.netlify/functions/admin-gastos-list', {
+ const r = await khAdminFetch('/.netlify/functions/admin-gastos-list', {
  method: 'POST',
  headers: _spAdminHeaders(),
  body: JSON.stringify({ evento_id: evId || undefined, categoria: cat || undefined }),
@@ -5695,7 +5695,7 @@ async function guardarGasto() {
 async function eliminarGasto(id) {
  if (!confirm('¿Eliminar este gasto?')) return;
  try {
- const r = await fetch('/.netlify/functions/admin-gasto-eliminar', {
+ const r = await khAdminFetch('/.netlify/functions/admin-gasto-eliminar', {
  method: 'POST',
  headers: _spAdminHeaders(),
  body: JSON.stringify({ id }),
@@ -5752,7 +5752,7 @@ async function _poblarSelectsIngresos() {
 
   // ── Clientes desde admin-clientes-min (solo para el select del modal) ──
   try {
-    const r = await fetch('/.netlify/functions/admin-clientes-min', {
+    const r = await khAdminFetch('/.netlify/functions/admin-clientes-min', {
       method: 'POST',
       headers: _spAdminHeaders(),
       body: JSON.stringify({}),
@@ -5801,7 +5801,7 @@ async function loadIngresos() {
  const cat = document.getElementById('filtro-cat-ingresos').value;
 
  try {
- const r = await fetch('/.netlify/functions/admin-ingresos-list', {
+ const r = await khAdminFetch('/.netlify/functions/admin-ingresos-list', {
  method: 'POST',
  headers: _spAdminHeaders(),
  body: JSON.stringify({ evento_id: evId || undefined, categoria: cat || undefined }),
@@ -5943,7 +5943,7 @@ async function guardarIngreso() {
 async function eliminarIngreso(id) {
  if (!confirm('¿Eliminar este ingreso?')) return;
  try {
- const r = await fetch('/.netlify/functions/admin-ingreso-eliminar', {
+ const r = await khAdminFetch('/.netlify/functions/admin-ingreso-eliminar', {
  method: 'POST',
  headers: _spAdminHeaders(),
  body: JSON.stringify({ id }),
@@ -5968,7 +5968,7 @@ async function loadSaldos() {
  if (panel) { panel.style.display = 'none'; panel.innerHTML = ''; }
  el.innerHTML = '<div class="loading-state"><div class="spinner"></div>Cargando…</div>';
  try {
- const r = await fetch('/.netlify/functions/admin-saldos', {
+ const r = await khAdminFetch('/.netlify/functions/admin-saldos', {
  method: 'POST',
  headers: _spAdminHeaders(),
  body: JSON.stringify({}),
@@ -10960,7 +10960,7 @@ async function loadCCPagos(eventoId) {
   const headEl = document.getElementById('cc-pagos-header');
   if (listEl) listEl.innerHTML = '<div style="padding:20px;text-align:center;color:var(--ts);font-family:\'JetBrains Mono\',monospace;font-size:11px">// cargando pagos…</div>';
   try {
-    const r = await fetch('/.netlify/functions/admin-solicitudes-list', {
+    const r = await khAdminFetch('/.netlify/functions/admin-solicitudes-list', {
       method: 'POST',
       headers: _spAdminHeaders(),
       // multifecha: trae el slug base + todas sus fechas (festival). con_pagos:
@@ -11762,7 +11762,7 @@ async function invitarWalkin(clienteId, btn) {
   if (!clienteId) return;
   if (btn) { btn.disabled = true; btn.textContent = 'Enviando…'; }
   try {
-    const r = await fetch('/.netlify/functions/admin-invitar-walkin', {
+    const r = await khAdminFetch('/.netlify/functions/admin-invitar-walkin', {
       method: 'POST',
       headers: _spAdminHeaders(),
       body: JSON.stringify({ cliente_id: clienteId }),
@@ -11785,7 +11785,7 @@ async function loadViajeros() {
   try {
     // Viajeros = solicitudes del portal (en_pagos/pagado) de este evento, con
     // su resumen de pago. service_role vive en la función; aquí va el JWT admin.
-    const r = await fetch('/.netlify/functions/admin-viajeros-evento', {
+    const r = await khAdminFetch('/.netlify/functions/admin-viajeros-evento', {
       method: 'POST',
       headers: _spAdminHeaders(),
       body: JSON.stringify({ evento_id: _ccEventoActual }),
@@ -12155,7 +12155,7 @@ async function guardarViajero() {
   try {
     // 1. Crear cliente + solicitud (en_pagos) en el modelo del portal.
     if (alertEl) alertEl.innerHTML = '<div class="alert" style="border-color:var(--border)">Creando viajero…</div>';
-    const r = await fetch('/.netlify/functions/admin-crear-viajero', {
+    const r = await khAdminFetch('/.netlify/functions/admin-crear-viajero', {
       method: 'POST',
       headers: _spAdminHeaders(),
       body: JSON.stringify({
@@ -12177,7 +12177,7 @@ async function guardarViajero() {
       precio_total: precioTotal, monto_separo: montoSeparo,
     });
     if (!plan.ok) throw new Error(plan.error || 'No se pudo calcular el plan de pagos');
-    const rp = await fetch('/.netlify/functions/admin-generar-plan-pagos', {
+    const rp = await khAdminFetch('/.netlify/functions/admin-generar-plan-pagos', {
       method: 'POST',
       headers: _spAdminHeaders(),
       body: JSON.stringify({ solicitud_id: solicitudId, pagos: plan.pagos }),
@@ -13081,7 +13081,7 @@ function _spPintarBadgePendientes(n) {
 // tocar backend). Fails-soft: si truena (p.ej. rol sin permiso), no pinta ni rompe.
 async function _spContarPendientes() {
   try {
-    const r = await fetch('/.netlify/functions/admin-solicitudes-list', {
+    const r = await khAdminFetch('/.netlify/functions/admin-solicitudes-list', {
       method: 'POST',
       headers: _spAdminHeaders(),
       body: JSON.stringify({ estado: 'pendiente', limit: 500 }),
@@ -13111,7 +13111,7 @@ async function loadSolicitudesPortal() {
   };
 
   try {
-    const r = await fetch('/.netlify/functions/admin-solicitudes-list', {
+    const r = await khAdminFetch('/.netlify/functions/admin-solicitudes-list', {
       method: 'POST',
       headers: _spAdminHeaders(),
       body: JSON.stringify(payload),
@@ -13467,7 +13467,7 @@ async function ejecutarResetCliente(clienteId) {
   const btn = document.getElementById('rc-confirm-btn');
   if (btn) { btn.disabled = true; btn.textContent = 'Ejecutando…'; }
   try {
-    const r = await fetch('/.netlify/functions/admin-portal-cliente-reset', {
+    const r = await khAdminFetch('/.netlify/functions/admin-portal-cliente-reset', {
       method: 'POST',
       headers: _spAdminHeaders(),
       body: JSON.stringify({ cliente_id: clienteId, modo, confirmacion }),
@@ -13491,7 +13491,7 @@ async function cargarComprobanteSP(solicitudId) {
   const target = document.getElementById(`sp-comprobante-${solicitudId}`);
   if (!target) return;
   try {
-    const r = await fetch('/.netlify/functions/admin-solicitud-comprobante', {
+    const r = await khAdminFetch('/.netlify/functions/admin-solicitud-comprobante', {
       method: 'POST',
       headers: _spAdminHeaders(),
       body: JSON.stringify({ solicitud_id: solicitudId }),
@@ -13560,7 +13560,7 @@ async function cargarPlanPagosSP(solicitudId, estadoSolicitud, paquete) {
   // lo pasa, así que lo cacheamos para el default de cuenta.
   if (paquete != null) _spPaqueteCache[solicitudId] = paquete;
   try {
-    const r = await fetch('/.netlify/functions/admin-pagos-list', {
+    const r = await khAdminFetch('/.netlify/functions/admin-pagos-list', {
       method: 'POST',
       headers: _spAdminHeaders(),
       body: JSON.stringify({ solicitud_id: solicitudId }),
@@ -13664,7 +13664,7 @@ async function _spAbrirSeparoAlAceptar(solicitudId, s) {
   // confirmó sería hacerle dudar de su propio sistema.
   if (s && s.separo_pagado_at) {
     try {
-      const r = await fetch('/.netlify/functions/admin-separo-aplicar', {
+      const r = await khAdminFetch('/.netlify/functions/admin-separo-aplicar', {
         method: 'POST', headers: _spAdminHeaders(),
         body: JSON.stringify({ solicitud_id: solicitudId }),
       });
@@ -13685,7 +13685,7 @@ async function _spAbrirSeparoAlAceptar(solicitudId, s) {
 
   let pagos = [], lugares = [];
   try {
-    const r = await fetch('/.netlify/functions/admin-pagos-list', {
+    const r = await khAdminFetch('/.netlify/functions/admin-pagos-list', {
       method: 'POST', headers: _spAdminHeaders(),
       body: JSON.stringify({ solicitud_id: solicitudId }),
     });
@@ -13824,7 +13824,7 @@ async function _spSeparoMarcar() {
   const ok = [], fallo = [];
   for (const e of elegidos) {
     try {
-      const r = await fetch('/.netlify/functions/admin-marcar-pago', {
+      const r = await khAdminFetch('/.netlify/functions/admin-marcar-pago', {
         method: 'POST', headers: _spAdminHeaders(),
         body: JSON.stringify({
           pago_id: e.pago.id,
@@ -13915,7 +13915,7 @@ async function spToggleBoleto(lugarId, solicitudId, cb){
   const entregar = !!cb.checked;
   cb.disabled = true;
   try {
-    const r = await fetch('/.netlify/functions/admin-lugar-boleto', {
+    const r = await khAdminFetch('/.netlify/functions/admin-lugar-boleto', {
       method: 'POST', headers: _spAdminHeaders(), body: JSON.stringify({ lugar_id: lugarId, entregado: entregar }),
     });
     const j = await r.json().catch(() => ({}));
@@ -14200,7 +14200,7 @@ async function proponerPagoGrupoSP(solicitudId) {
   const btn = document.getElementById('sp-grupo-btn-' + solicitudId);
   if (btn) { btn.disabled = true; btn.textContent = 'Calculando…'; }
   try {
-    const r = await fetch('/.netlify/functions/admin-aplicar-pago-grupo', {
+    const r = await khAdminFetch('/.netlify/functions/admin-aplicar-pago-grupo', {
       method: 'POST',
       headers: _spAdminHeaders(),
       body: JSON.stringify({ solicitud_id: solicitudId, modo: 'proponer', monto }),
@@ -14275,7 +14275,7 @@ async function aplicarPagoGrupoSP(solicitudId) {
   const btn = document.getElementById('sp-grupo-aplicar-' + solicitudId);
   if (btn) { btn.disabled = true; btn.textContent = 'Aplicando…'; }
   try {
-    const r = await fetch('/.netlify/functions/admin-aplicar-pago-grupo', {
+    const r = await khAdminFetch('/.netlify/functions/admin-aplicar-pago-grupo', {
       method: 'POST',
       headers: _spAdminHeaders(),
       body: JSON.stringify({
@@ -14324,7 +14324,7 @@ async function cargarBitacoraSP(solicitudId) {
   if (!div) return;
   div.innerHTML = `<span style="color:var(--ts);font-size:12px">Cargando movimientos…</span>`;
   try {
-    const r = await fetch('/.netlify/functions/admin-pagos-auditoria-list', {
+    const r = await khAdminFetch('/.netlify/functions/admin-pagos-auditoria-list', {
       method: 'POST',
       headers: _spAdminHeaders(),
       body: JSON.stringify({ solicitud_id: solicitudId }),
@@ -14495,7 +14495,7 @@ async function marcarPagoSP(solicitudId, pagoId) {
 
   if (btn) { btn.disabled = true; btn.textContent = 'Guardando…'; }
   try {
-    const r = await fetch('/.netlify/functions/admin-marcar-pago', {
+    const r = await khAdminFetch('/.netlify/functions/admin-marcar-pago', {
       method: 'POST',
       headers: _spAdminHeaders(),
       body: JSON.stringify({
@@ -14558,7 +14558,7 @@ async function _spSubirComprobantePago(pagoId, file) {
   if (file.size > MAX) throw new Error('El archivo es muy grande, súbelo más liviano (máx 4 MB)');
   const file_base64 = await _spLeerArchivoBase64(file);
   const ext = (file.name.split('.').pop() || '').toLowerCase();
-  const r = await fetch('/.netlify/functions/admin-subir-comprobante-pago', {
+  const r = await khAdminFetch('/.netlify/functions/admin-subir-comprobante-pago', {
     method: 'POST',
     headers: _spAdminHeaders(),
     body: JSON.stringify({ pago_id: pagoId, file_base64, mime: file.type, ext }),
@@ -14572,7 +14572,7 @@ async function _spSubirComprobantePago(pagoId, file) {
 // que el del separo). El bucket es privado: pedimos la firma cada vez.
 async function verComprobantePagoSP(pagoId) {
   try {
-    const r = await fetch('/.netlify/functions/admin-pago-comprobante', {
+    const r = await khAdminFetch('/.netlify/functions/admin-pago-comprobante', {
       method: 'POST',
       headers: _spAdminHeaders(),
       body: JSON.stringify({ pago_id: pagoId }),
@@ -14588,7 +14588,7 @@ async function verComprobantePagoSP(pagoId) {
 async function revertirPagoSP(solicitudId, pagoId) {
   if (!confirm('¿Revertir este pago? Volverá a "pendiente" y se borrarán método, referencia y fecha de pago.')) return;
   try {
-    const r = await fetch('/.netlify/functions/admin-marcar-pago', {
+    const r = await khAdminFetch('/.netlify/functions/admin-marcar-pago', {
       method: 'POST',
       headers: _spAdminHeaders(),
       body: JSON.stringify({ pago_id: pagoId, accion: 'revertir' }),
@@ -14790,7 +14790,7 @@ function abrirCambiarEstadoSP(solicitudId) {
 async function _spGenerarPlanPagosBackend(s, solicitudId, sinCorreo) {
   const plan = await _spCalcularPlanPagos(s);
   if (!plan.ok) throw new Error(plan.error || 'No se pudo calcular el plan de pagos');
-  const rp = await fetch('/.netlify/functions/admin-generar-plan-pagos', {
+  const rp = await khAdminFetch('/.netlify/functions/admin-generar-plan-pagos', {
     method: 'POST',
     headers: _spAdminHeaders(),
     body: JSON.stringify({ solicitud_id: solicitudId, pagos: plan.pagos, sin_correo: sinCorreo === true }),
@@ -14862,7 +14862,7 @@ async function guardarCambioEstadoSP(solicitudId) {
       if (btn) btn.textContent = 'Guardando…';
     }
 
-    const r = await fetch('/.netlify/functions/admin-solicitud-update-estado', {
+    const r = await khAdminFetch('/.netlify/functions/admin-solicitud-update-estado', {
       method: 'POST',
       headers: _spAdminHeaders(),
       body: JSON.stringify({ solicitud_id: solicitudId, nuevo_estado: estado, notas_admin: notasParaEnviar }),

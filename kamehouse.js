@@ -11735,6 +11735,14 @@ async function loadViajeros() {
 // ═══════════════════════════════════════════════════════════════════════════
 let _vj2Filas = [];
 
+// [ET3-b] Quién puede ver el botón de eliminar. Espeja ROLES_ADMIN de
+// `admin-coordi-asignaciones.js` (línea 47), leído de ahí y no de memoria: el
+// servidor es el candado, esto sólo evita ofrecer un botón que daría 403.
+const VJ_ROLES_ELIMINAR = ['maestro_roshi', 'bulma', 'milk'];
+function _vjPuedeEliminar() {
+  return !!(currentUser && VJ_ROLES_ELIMINAR.includes(currentUser.rol));
+}
+
 async function _vj2Cargar() {
   const wrap = document.getElementById('cc-kh-wrap');
   const list = document.getElementById('cc-kh-list');
@@ -11807,7 +11815,7 @@ async function _vj2Cargar() {
     <thead><tr>
       <th>Nombre</th><th>Paquete</th><th>Zona</th><th>Talla</th><th>Contacto</th>
       ${conDinero ? '<th class="vj3-col">Total</th><th class="vj3-col">Abonado</th><th class="vj3-col">Resta</th>' : ''}
-      <th>Notas</th>
+      <th>Notas</th>${_vjPuedeEliminar() ? '<th></th>' : ''}
     </tr></thead>
     <tbody>${_vj2Filas.map((v) => {
       // El origen, visible por fila: `tipo_viajero` lo pone el alta de staff;
@@ -11839,6 +11847,9 @@ async function _vj2Cargar() {
                   <td class="vj3-col ${s.aFavor ? 'vj3-favor' : (s.resta > 0 ? 'vj3-debe' : '')}">${_vj3Money(s.resta)}${s.aFavor ? '<i class="vj3-af"> a favor</i>' : ''}</td>`;
         })()}
         <td class="vj2-notas">${v.notas ? _esfEsc(v.notas) : '<span class="vj2-vacio">—</span>'}</td>
+        ${_vjPuedeEliminar() ? `<td><button class="btn btn-ghost btn-sm" data-et3b="eliminar" style="font-size:10px;color:var(--red)"
+          title="Eliminar a ${_esfEsc(v.nombre || '')} de este evento"
+          onclick="eliminarViajero('${_attrJs(v.id)}', '${_attrJs(v.nombre || '')}')">Eliminar</button></td>` : ''}
       </tr>`;
     }).join('')}</tbody>
   </table></div>`;
@@ -12124,10 +12135,53 @@ async function guardarViajero() {
   }
 }
 
-async function eliminarViajero(id) {
-  if (!confirm('¿Eliminar este viajero?')) return;
-  try { await khViajeros.eliminar(id); await loadViajeros(); } // [sec-coordi]
-  catch(e) { alert(e.message); }
+// [ET3-b] Borrar a una persona de un evento no puede costar un clic de reflejo.
+// Se retira el confirm() de una línea y entra el candado de la casa: TECLEAR EL
+// NOMBRE, el mismo patrón de Cancelar evento y de Posponer.
+//
+// OJO CON LA TABLA: esto borra de `viajeros_evento` (Supabase KH) vía la acción
+// `viajero_eliminar`, así que el botón vive en la tabla de MIGRADOS
+// (#cc-kh-list, la que llena `khViajeros.listar`) y NO en #cc-viajeros-list,
+// que muestra solicitudes_tour del PORTAL — otra tabla, en otra base, con otros
+// ids. Colgarlo allá habría mandado un id del Portal a un DELETE de KH: un
+// botón que no borra nada y un arnés en verde. Son los dos mundos de siempre.
+function eliminarViajero(id, nombre) {
+  const quien = String(nombre || '').trim();
+  crearModal('vj-eliminar', 'Eliminar viajero', `
+    <div style="border:1px solid var(--red);border-radius:var(--r-sm,8px);padding:12px 14px;margin-bottom:14px;font-size:13px;line-height:1.55;color:var(--red)">
+      Vas a <b>ELIMINAR</b> a <b>${_esfEsc(quien || 'este viajero')}</b> de este evento.
+      Se borra su registro y lo que traía capturado. Es <b>IRREVERSIBLE</b>.
+    </div>
+    <div class="form-group">
+      <label>Para confirmar, escribe el nombre: <b>${_esfEsc(quien)}</b></label>
+      <input type="text" class="cot-input" id="vjel-confirm" placeholder="Escribe: ${_esfEsc(quien)}" autocomplete="off" style="width:100%">
+    </div>
+    <div id="vjel-alert"></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
+      <button class="btn btn-ghost" onclick="cerrarModal('vj-eliminar')">Cerrar</button>
+      <button class="btn btn-primary" id="vjel-btn" style="background:var(--red);border-color:var(--red)"
+        onclick="_vjEliminarConfirmar('${_attrJs(id)}', '${_attrJs(quien)}')">Eliminar viajero</button>
+    </div>`);
+}
+
+async function _vjEliminarConfirmar(id, nombre) {
+  const alertEl = document.getElementById('vjel-alert');
+  const btn = document.getElementById('vjel-btn');
+  const tecleado = (document.getElementById('vjel-confirm')?.value || '').trim();
+  if (tecleado !== String(nombre || '').trim()) {
+    if (alertEl) alertEl.innerHTML = `<div class="alert alert-error">El nombre no coincide; escribe '${_esfEsc(nombre)}' para confirmar</div>`;
+    return;
+  }
+  if (btn) { btn.disabled = true; btn.textContent = 'Eliminando…'; }
+  try {
+    await khViajeros.eliminar(id);   // [sec-coordi] accion 'viajero_eliminar', el servidor exige rol admin
+    cerrarModal('vj-eliminar');
+    await loadViajeros();            // recarga las dos listas (adentro llama a _vj2Cargar)
+    showToast('Viajero eliminado', 'success');
+  } catch (e) {
+    if (alertEl) alertEl.innerHTML = `<div class="alert alert-error">${_esfEsc(e.message)}</div>`;
+    if (btn) { btn.disabled = false; btn.textContent = 'Eliminar viajero'; }
+  }
 }
 
 async function exportarViajeros(formato) {

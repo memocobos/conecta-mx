@@ -21137,18 +21137,23 @@ async function wlNotificar(eventoId, totalRegs, pendientes) {
     } catch (e) { alert('No se pudo resetear el flag: ' + e.message); return; }
   }
 
-  // Disparar la función. Si hay código, lo pasamos por query string.
-  const qs = new URLSearchParams({ force: 'true', evento_id: eventoId });
+  // Disparar la función. Si hay código, viaja en el body.
+  const payload = { evento_id: eventoId };
   if (params.codigo) {
-    qs.set('codigo', params.codigo);
-    qs.set('descuento', String(params.descuento));
-    qs.set('horas', String(params.horas));
+    payload.codigo = params.codigo;
+    payload.descuento = params.descuento;
+    payload.horas = params.horas;
   }
   try {
-    // POST (no GET) a propósito: un GET same-origin no manda header Origin y
-    // rompería el corsCheck del backend. khAdminFetch adjunta el JWT admin que
-    // verifyAdminAuth valida en la rama force. La querystring se conserva.
-    const r = await khAdminFetch(`/.netlify/functions/waitlist-notify?${qs.toString()}`, { method: 'POST' });
+    // [WL-2] Va a `admin-waitlist-notify`, NO a `waitlist-notify`: esa segunda
+    // es función PROGRAMADA y Netlify bloquea su HTTP antes de que el handler
+    // corra — el botón devolvía 403 de plataforma, no del código. La puerta real
+    // llama al MISMO núcleo (_lib/waitlist-core), así que el correo no cambia.
+    // POST con body JSON, familia admin-*: el header Origin viaja y corsCheck pasa.
+    const r = await khAdminFetch('/.netlify/functions/admin-waitlist-notify', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
     const d = await r.json().catch(() => ({}));
     if (!r.ok || !d.ok) { alert('Error: ' + (d.error || r.status)); return; }
     const suffix = params.codigo ? ` (con código ${params.codigo} · ${params.descuento}% · ${params.horas}h)` : '';

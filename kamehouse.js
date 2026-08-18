@@ -4032,6 +4032,7 @@ async function _renderResumenDinero(porCobrar) {
 // Resumen queda intacto. Agrupa por BASE (el backend ya suma multifecha en base).
 let _resumenUtilRows = [];                       // filas de eventos (con datos)
 let _resumenUtilConCuenta = false;               // [AUD-1d] ¿las filas salen de la cuenta de los dos mundos?
+let _resumenUtilDeudaTotal = null;   // [E5-3] lo manda el servidor; la pantalla no lo suma
 let _resumenUtilSin = null;                      // bloque sin_evento
 let _resumenUtilSort = { col: 'ds', dir: 'asc' }; // orden por defecto: fecha asc
 
@@ -4061,6 +4062,12 @@ async function _renderResumenUtilidad(ev) {
   const cta = util.cuenta && util.cuenta.eventos ? util.cuenta.eventos : null;
   const fuente = cta || evs;
   _resumenUtilConCuenta = !!cta;
+  // [E5-3] El total de deuda lo DICE la fuente (`totales.deuda_proveedores`,
+  // que agregó E5-2). No se acumula aquí: la fila Total suma las demás columnas
+  // porque esa aritmética de presentación ya existía, pero una suma de dinero
+  // NUEVA en pantalla es justo lo que esta etapa vino a no hacer.
+  _resumenUtilDeudaTotal = (util.cuenta && util.cuenta.totales && util.cuenta.totales.deuda_proveedores != null)
+    ? Number(util.cuenta.totales.deuda_proveedores) : null;
   _resumenUtilRows = Object.keys(fuente).map(slug => {
     const d = fuente[slug] || {};
     const meta = evMap[slug];
@@ -4074,6 +4081,11 @@ async function _renderResumenUtilidad(ev) {
       slug, nombre: m.nombre, fecha: m.fecha, ds: m.ds || '',
       desconocido: !meta,                     // typo de captura: slug que no existe en el EV
       ventas, facturado, gastos, ganancia,
+      // [E5-3] La deuda a proveedores de ESE evento, tal como la manda la lib.
+      // Va como una columna más, ROTULADA APARTE: no entra en `ganancia` ni se
+      // resta de nada. La caja vieja (`evs`) no la conoce, y ahí sale null —
+      // que se pinta como "—", no como cero: un cero diría "no debe nada".
+      deuda: cta ? Number(d.deuda_proveedores || 0) : null,
       bodega_boletos: bod ? bod.boletos : null,
       bodega_valor: bod ? bod.valor_estimado : null,
       // [MER-1] `pasado` sale del catálogo (evMap) y NO del servidor: es el mismo
@@ -4171,6 +4183,10 @@ function _resumenUtilPintar() {
     { k: 'gastos', lbl: 'Gastos', num: true },
     { k: 'ganancia', lbl: 'Ganancia', num: true },
     { k: 'bodega_valor', lbl: 'Bodega', num: true },
+    // [E5-3] La deuda, en su propia columna. Al lado de la ganancia, jamás
+    // dentro: es dinero comprometido con los proveedores, no una merma de lo
+    // ganado. Ver la nota de _renderResumenDeuda.
+    { k: 'deuda', lbl: 'Deuda prov.', num: true },
     { k: 'pct', lbl: '% cob', num: true },
   ];
   const arrow = (k) => (s.col === k || (k === 'fecha' && s.col === 'fecha')) ? (s.dir === 'asc' ? ' ▲' : ' ▼') : '';
@@ -4214,6 +4230,9 @@ function _resumenUtilPintar() {
       <td style="padding:6px 8px;font-weight:600;white-space:nowrap">${_spEscape(r.nombre)}${r.desconocido ? marcaDesc : ''}</td>
       <td style="padding:6px 8px;font-size:11px;color:var(--ts);white-space:nowrap">${_spEscape(r.fecha || '—')}</td>
       ${_resumenUtilMxnCell(r.facturado)}${_resumenUtilMxnCell(r.ventas)}${_resumenUtilMxnCell(r.gastos)}${_resumenUtilMxnCell(r.ganancia)}${bodCell(r)}
+      ${r.deuda == null
+        ? '<td style="text-align:right;color:var(--ts)" title="La caja Portal-pura no conoce la deuda">—</td>'
+        : `<td style="text-align:right;font-variant-numeric:tabular-nums;color:var(--orange)" title="Compras + servicios − abonos. No se resta de la ganancia.">${_spFmtMxn(r.deuda)}</td>`}
       <td style="text-align:right;font-variant-numeric:tabular-nums">${Math.round(r.pct * 100)}%</td>
       <td style="text-align:center"><span title="${semTitle}" style="display:inline-block;width:11px;height:11px;border-radius:50%;background:${sem}"></span></td>
       ${acumCell(r)}
@@ -4256,6 +4275,9 @@ function _resumenUtilPintar() {
     <td></td>
     ${_resumenUtilMxnCell(totFact)}${_resumenUtilMxnCell(totVentas)}${_resumenUtilMxnCell(totGas)}${_resumenUtilMxnCell(totGan)}
     ${totBodCell}
+    ${_resumenUtilDeudaTotal == null
+      ? '<td style="text-align:right;color:var(--ts)">—</td>'
+      : `<td style="text-align:right;font-variant-numeric:tabular-nums;color:var(--orange)" title="Deuda total a proveedores, según el servidor">${_spFmtMxn(_resumenUtilDeudaTotal)}</td>`}
     <td style="text-align:right">${totPct}%</td>
     <td></td><td></td>
   </tr>`;
@@ -4287,6 +4309,7 @@ function _resumenUtilPintar() {
       <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px">
         <div style="flex:1 1 92px"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--ts)">${r.ganancia < 0 ? 'Falta recuperar' : 'Ganancia'}</div><div style="font-family:'Zen Dots',sans-serif;font-size:19px;color:${r.ganancia < 0 ? 'var(--red)' : 'var(--green)'}">${_spFmtMxn(Math.abs(r.ganancia))}</div></div>
         <div style="flex:1 1 92px"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--ts)">Ventas</div><div style="font-size:16px;font-weight:700">${_spFmtMxn(r.ventas)}</div></div>
+        ${r.deuda == null ? '' : `<div style="flex:1 1 92px"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--ts)">Deuda prov.</div><div style="font-weight:700;color:var(--orange)">${_spFmtMxn(r.deuda)}</div></div>`}
         ${bodCard(r)}
       </div>
       <div style="display:flex;gap:6px 14px;flex-wrap:wrap;font-size:11px;color:var(--ts);border-top:1px solid var(--border);padding-top:8px">
@@ -4345,7 +4368,7 @@ function _resumenUtilCSV() {
   // volvería a mezclar en la hoja de cálculo: quien sume esa columna estaría
   // sumando dinero por cobrar con dinero ya perdido. Cada renglón llena una de
   // las dos y deja la otra VACÍA (no en cero: un cero se suma, una celda vacía no).
-  const head = ['Evento', 'Fecha', 'Facturado', 'Ventas', 'Gastos', 'Ganancia', 'Bodega_estimada', 'Bodega_boletos', 'Merma_costo_hundido', 'Merma_boletos', 'Pct_cobrado'];
+  const head = ['Evento', 'Fecha', 'Facturado', 'Ventas', 'Gastos', 'Ganancia', 'Deuda_proveedores', 'Bodega_estimada', 'Bodega_boletos', 'Merma_costo_hundido', 'Merma_boletos', 'Pct_cobrado'];
   const cell = (v) => {
     const s = String(v == null ? '' : v);
     return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
@@ -4365,6 +4388,9 @@ function _resumenUtilCSV() {
     // Celda vacía, NO cero, cuando la bodega no se pudo estimar: en una hoja de
     // cálculo un 0 se suma y una celda vacía no.
     lines.push([nom, r.fecha, r.facturado, r.ventas, r.gastos, r.ganancia,
+                // [E5-3] La deuda va en su columna. Vacía —no cero— cuando no se
+                // conoce: en una hoja de cálculo un 0 se suma y dice "no debe".
+                r.deuda == null ? '' : r.deuda,
                 (r.pasado || r.bodega_valor == null) ? '' : r.bodega_valor,
                 (r.pasado || r.bodega_boletos == null) ? '' : r.bodega_boletos,
                 (!r.pasado || r.merma_costo == null) ? '' : r.merma_costo,
@@ -4374,9 +4400,12 @@ function _resumenUtilCSV() {
   if (_resumenUtilSin) {
     const xg = Number(_resumenUtilSin.gastos || 0);
     tg += xg; tgan -= xg;
-    lines.push(['Sin evento', '', '', '', xg, -xg, '', '', '', '', ''].map(cell).join(','));
+    lines.push(['Sin evento', '', '', '', xg, -xg, '', '', '', '', '', ''].map(cell).join(','));
   }
-  lines.push(['TOTAL', '', tf, tv, tg, tgan, tbOk ? tb : '', '', tmOk ? tm : '', '', tf > 0 ? Math.round(tv / tf * 100) + '%' : '0%'].map(cell).join(','));
+  // [E5-3] El total de deuda sale del SERVIDOR (_resumenUtilDeudaTotal), no de
+  // sumar la columna: la misma regla que en la fila Total de la tabla.
+  lines.push(['TOTAL', '', tf, tv, tg, tgan, _resumenUtilDeudaTotal == null ? '' : _resumenUtilDeudaTotal,
+              tbOk ? tb : '', '', tmOk ? tm : '', '', tf > 0 ? Math.round(tv / tf * 100) + '%' : '0%'].map(cell).join(','));
   const csv = '\ufeff' + lines.join('\n');
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
   const a = document.createElement('a');

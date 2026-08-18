@@ -238,6 +238,18 @@ exports.handler = async (event) => {
         generado_at: new Date().toISOString(),
         cuentas,
         otros_total: otrosTotal,
+        // [E5-1] LA CAJA TOTAL LA DICE LA FUENTE. Antes la sumaba el navegador
+        // (un `reduce` sobre las tres cuentas + otros dentro del Resumen), que
+        // es exactamente la fórmula número doce esperando a divergir: el día
+        // que aquí entre una cuarta cuenta, la pantalla seguiría sumando tres.
+        // Se calcula donde viven los datos y se manda hecha.
+        //
+        // OJO — ESTA CAJA NO ES `caja_total_empresa` de `_lib/utilidad-evento`,
+        // aunque las dos se llamen "caja". Los universos son distintos: ésta
+        // incluye lo cobrado a los MIGRADOS de KH (SAL-1) y aquélla es sólo
+        // Portal. No se comparan ni se "emparejan": son dos respuestas a dos
+        // preguntas, y juntarlas repetiría el $0-contra-$136,391 de AUD-1.
+        caja_total: CUENTAS.reduce((a, n) => a + Number((cuentas[n] || {}).saldo || 0), 0) + otrosTotal,
         // [SAL-1] Lo migrado, con su desglose y lo que NO se pudo clasificar. Va
         // aparte de `cuentas` para que la pantalla pueda decir de dónde salió
         // cada peso — y para que `sin_clasificar` tenga dónde verse.

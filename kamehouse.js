@@ -3960,7 +3960,12 @@ async function _renderResumenDinero(porCobrar) {
   const cuentas = d.cuentas || {};
   const orden = ['BBVA', 'Banamex', 'Efectivo'];
   const otros = Number(d.otros_total || 0);
-  const cajaTotal = orden.reduce((a, n) => a + Number((cuentas[n] || {}).saldo || 0), 0) + otros;
+  // [E5-1] La caja total la DICE la fuente (`admin-saldos.caja_total`). Aquí
+  // vivía un `reduce` sobre las tres cuentas + otros: una fórmula de dinero
+  // naciendo en la pantalla, que es como empezaron las once de AUD-1. El día
+  // que el servidor reconozca una cuarta cuenta, esta línea no se entera —
+  // ahora sí, porque no cuenta nada: imprime lo que le mandan.
+  const cajaTotal = Number(d.caja_total || 0);
 
   // stat de cuenta → navega a Saldos (click-through).
   const stat = (lbl, val) => {

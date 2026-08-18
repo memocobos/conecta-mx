@@ -5902,7 +5902,13 @@ async function editarIngreso(id) {
  let _metodoSel = _metodosIngreso.includes(g.metodo_pago) ? g.metodo_pago : 'Transferencia';
  if (g.cuenta === 'Efectivo') _metodoSel = 'Efectivo';
  set('ingreso-metodo', _metodoSel);
- // Banco: pre-selecciona BBVA/Banamex si así estaba; si no, default (BBVA).
+ // [ET4] Banco: pre-selecciona BBVA/Banamex si así se guardó. Si no, cae en el
+ // MARCADOR VACÍO — porque desde ET4 la primera opción del select ya no es BBVA
+ // sino "— elige la cuenta —". El comentario viejo decía "default (BBVA)" y
+ // dejó de ser cierto en el momento en que se agregó el marcador: hoy un
+ // ingreso viejo sin cuenta reconocible NO cae a un banco en silencio, se queda
+ // sin elegir y el guardado lo exige. (El comentario gemelo de GASTOS sigue
+ // diciendo "default (BBVA)" y ahí SÍ es verdad: ese select no tiene marcador.)
  if (g.cuenta === 'BBVA' || g.cuenta === 'Banamex') set('ingreso-cuenta', g.cuenta);
  else document.getElementById('ingreso-cuenta').selectedIndex = 0;
  _ingresoOnMetodoChange();  // muestra/oculta el Banco según el método elegido

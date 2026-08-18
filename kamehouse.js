@@ -6997,14 +6997,6 @@ function badgeStatus(s) {
  return `<span class="badge ${map[s]||'badge-gray'}">${s||'—'}</span>`;
 }
 
-function wapp(tel, nombre) {
- if (!tel) return alert('Sin número registrado');
- const num = tel.toString().replace(/\D/g,'');
- const msg = encodeURIComponent(`Hola ${nombre}, te contactamos de Conecta Reynosa `);
- const num52 = num.startsWith('52') ? num : '52' + num;
- window.open(`https://wa.me/${num52}?text=${msg}`, '_blank');
-}
-
 function openModal(id) {
  // Limpiar alertas
  const alerta = document.querySelector(`#${id} [id$="-alert"]`);

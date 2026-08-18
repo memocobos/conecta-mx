@@ -1881,7 +1881,6 @@ const khViajeros = {
 const VJ4_VIAJAN = ['plus', 'ride'];
 const VJ4_DUERMEN = ['plus', 'ride', 'stay'];
 function _vj4Norm(tp) { const x = String(tp == null ? '' : tp).trim().toLowerCase(); return x || null; }
-function _vj4Viaja(tp) { const p = _vj4Norm(tp); return p === null || VJ4_VIAJAN.includes(p); }
 function _vj4Duerme(tp) { const p = _vj4Norm(tp); return p === null || VJ4_DUERMEN.includes(p); }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -6673,44 +6672,6 @@ function renderCapsule() {
  }).join('');
 }
 
-function abrirNuevoEvento() {
- // Reset formulario
- document.getElementById('evento-id').value = '';
- document.getElementById('ev-artista').value = '';
- document.getElementById('ev-tour').value = '';
- document.getElementById('ev-fecha').value = '';
- document.getElementById('ev-fecha-fin').value = '';
- document.getElementById('ev-ciudad').value = '';
- document.getElementById('ev-venue').value = '';
- document.getElementById('ev-tipo').value = 'Concierto';
- document.getElementById('ev-color').value = 'azul';
- document.getElementById('ev-promotor').value = '';
- document.getElementById('ev-nota').value = '';
- document.getElementById('ev-status').value = '';
- document.getElementById('ev-banco').value = 'default';
- document.getElementById('ev-cdmx').checked = false;
- document.getElementById('ev-traslados').checked = false;
- document.getElementById('ev-transporte').checked = false;
- document.getElementById('ev-promo').checked = false;
- document.getElementById('ev-rideonly').checked = false;
- document.getElementById('ev-cheaponly').checked = false;
- document.getElementById('ev-listonly').checked = false;
- document.getElementById('ev-sep').value = '';
- document.getElementById('ev-ride').value = '';
- document.getElementById('ev-imagen').value = '';
- document.getElementById('ev-dsc-codigo').value = '';
- document.getElementById('ev-dsc-pct').value = '';
- document.getElementById('ev-dsc-exp').value = '';
- document.getElementById('ev-notas').value = '';
- document.getElementById('modal-evento-title').textContent = 'Nuevo Evento';
- // Reset listas dinámicas
- iniciarIncluye([]);
- iniciarZonas('plus', []);
- iniciarZonas('cheap', []);
- iniciarHotel([]);
- iniciarPagos([]);
- openModal('modal-evento');
-}
 
 async function guardarEvento() {
  const id = document.getElementById('evento-id').value;
@@ -8425,12 +8386,6 @@ async function _kamComprasLoad() {
   }
 }
 
-// ── Abonos a proveedores (pagos) ─────────────────────────────────────────────
-// deudaPorProveedor = { proveedor_id: { nombre, deuda } } calculado de las compras.
-function _kamAbonosAlert(msg) {
-  const a = document.getElementById('kam-abonos-alert');
-  if (a) a.innerHTML = `<div class="alert alert-error">${_esfEsc(msg)}</div>`;
-}
 
 async function _kamAbonosLoad(slug, deudaPorProveedor) {
   const cont = document.getElementById('kam-abonos');
@@ -8698,14 +8653,6 @@ function esCumple(fechaNac) {
   return hoy.getMonth() === nac.getMonth() && hoy.getDate() === nac.getDate();
 }
 
-function calcularPuntos(tours) {
-  return tours.reduce((total, t) => {
-    if (!t.fecha_aprox) return total;
-    const año = new Date(t.fecha_aprox).getFullYear();
-    if (año < 2026) return total;
-    return total + (PUNTOS_TOUR[t.tipo_tour] || 0);
-  }, 0);
-}
 
 function calcularPuntosAnio(tours, anio) {
   return tours.reduce((total, t) => {
@@ -10583,18 +10530,6 @@ async function completarRegistro(userId, token) {
 // de que TODO el archivo declaró. Ver el bloque INIT al final.
 // ═══════════════════════════════════════════════════════════════
 
-// ── DROPDOWN HERRAMIENTAS ──
-function toggleDropdown(e) {
-  if (e) { e.stopPropagation(); e.preventDefault(); }
-  // En móvil (≤768px) abrimos un bottom-sheet en lugar del dropdown inline,
-  // que tenía race conditions con el outside-click handler y items muy pequeños.
-  if (window.matchMedia('(max-width: 768px)').matches) {
-    openToolsSheet();
-    return;
-  }
-  const dd = document.getElementById('nav-dropdown-herramientas');
-  dd.classList.toggle('open');
-}
 // Cerrar dropdown desktop al hacer click fuera (no aplica al bottom-sheet)
 document.addEventListener('click', function(e) {
   const dd = document.getElementById('nav-dropdown-herramientas');
@@ -10724,14 +10659,6 @@ function showHerramienta(name) {
   stopRolAnalyticsAutoRefresh();
 }
 
-// ── NAV MOBILE HAMBURGUESA ──────────────────────────────────
-function toggleNavMobile() {
-  const wrapper = document.getElementById('nav-items-wrapper');
-  const btn = document.getElementById('nav-hamburger-btn');
-  if (!wrapper) return;
-  const open = wrapper.classList.toggle('open');
-  if (btn) btn.classList.toggle('open', open);
-}
 
 function cerrarNavMobile() {
   const wrapper = document.getElementById('nav-items-wrapper');
@@ -11682,13 +11609,6 @@ function _descargarHTML(filename, html) {
   setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 100);
 }
 
-// Extrae el rol de staff a partir de tipo_viajero o del marker en notas.
-function _staffRol(v) {
-  if (!v) return '';
-  if (v.tipo_viajero && v.tipo_viajero !== 'cliente') return v.tipo_viajero;
-  const m = typeof v.notas === 'string' ? v.notas.match(/\[STAFF:([^\]]+)\]/i) : null;
-  return m ? m[1] : '';
-}
 
 function filtrarViajerosCC(filtro, btn) {
   _ccViajerosFiltro = filtro;
@@ -17075,12 +16995,6 @@ function _esfSeedDefaults() {
   const nota = document.getElementById('esf-nota'); if (nota) nota.value = _esfIsCDMX() ? _ESF_NOTA_CDMX : '';
 }
 
-function _esfClearIncSepNota() {
-  _esfClearInc();
-  const sep = document.getElementById('esf-sep'); if (sep) sep.value = '';
-  const sepC = document.getElementById('esf-sep-cheap'); if (sepC) sepC.value = '';
-  const nota = document.getElementById('esf-nota'); if (nota) nota.value = '';
-}
 
 // Modo editar: re-poblar inc (array/JSON) + sep/sep_cheap + nota desde la fila.
 function _esfIncSepNotaPopulate(row) {
@@ -17585,10 +17499,8 @@ async function _esfFestImgPick(kind, event) {
   }
 }
 function _esfFestPortadaPick(event) { return _esfFestImgPick('portada', event); }
-function _esfFestPortadaShow(url) { _esfFestImgShow('portada', url); }
 function _esfFestPortadaClear() { _esfFestImgClear('portada'); }
 function _esfFestLineupPick(event) { return _esfFestImgPick('lineup', event); }
-function _esfFestLineupShow(url) { _esfFestImgShow('lineup', url); }
 function _esfFestLineupClear() { _esfFestImgClear('lineup'); }
 
 // Modo editar: re-poblar preview desde el `mapa` guardado (URL) o limpiar.
@@ -21214,30 +21126,6 @@ var _rolanRange = 'month';
 var _rolanRefreshId = null;
 var _rolanLastRows = [];
 
-function initRolAnalyticsTab(){
-  // Gate de seguridad: solo maestro_roshi/bulma. El dropdown ya está oculto
-  // para otros roles, pero protegemos por si entran por URL/devtools.
-  if (!['maestro_roshi','bulma'].includes(currentUser?.rol)) {
-    const page = document.getElementById('page-rol-analytics');
-    if (page) page.innerHTML = '<div style="padding:40px;text-align:center;color:var(--ts)">Acceso restringido</div>';
-    return;
-  }
-  // Wire range selector (idempotente)
-  const rangeWrap = document.getElementById('rolan-range');
-  if (rangeWrap && !rangeWrap.dataset.wired) {
-    rangeWrap.dataset.wired = '1';
-    rangeWrap.querySelectorAll('button[data-r]').forEach(btn => {
-      btn.addEventListener('click', () => {
-        rangeWrap.querySelectorAll('button').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        _rolanRange = btn.dataset.r;
-        loadRolAnalytics();
-      });
-    });
-  }
-  loadRolAnalytics();
-  startRolAnalyticsAutoRefresh();
-}
 
 function startRolAnalyticsAutoRefresh(){
   stopRolAnalyticsAutoRefresh();
@@ -21251,11 +21139,6 @@ function stopRolAnalyticsAutoRefresh(){
   if (_rolanRefreshId) { clearInterval(_rolanRefreshId); _rolanRefreshId = null; }
 }
 
-function _rolanSinceISO(){
-  // Legacy helper — ahora /Rol usa el rango global del Radar (_radarRange) para
-  // que las pills compartidas filtren todas las sub-pestañas por igual.
-  return _radarSinceISO();
-}
 
 async function loadRolAnalytics(silent){
   try {
@@ -21606,16 +21489,6 @@ function _radarSinceISO(r){
   if (r === 'week')    { const d=new Date(now); d.setDate(d.getDate()-7);   return d.toISOString(); }
   if (r === 'month')   { const d=new Date(now); d.setDate(d.getDate()-30);  return d.toISOString(); }
   if (r === '3months') { const d=new Date(now); d.setDate(d.getDate()-90);  return d.toISOString(); }
-  return '1970-01-01T00:00:00Z';
-}
-function _radarPrevSinceISO(r){
-  // El periodo anterior del mismo tamaño, para calcular tendencias.
-  r = r || _radarRange;
-  const now = new Date();
-  if (r === 'today')   { const d=new Date(now); d.setDate(d.getDate()-1); d.setHours(0,0,0,0); return d.toISOString(); }
-  if (r === 'week')    { const d=new Date(now); d.setDate(d.getDate()-14); return d.toISOString(); }
-  if (r === 'month')   { const d=new Date(now); d.setDate(d.getDate()-60); return d.toISOString(); }
-  if (r === '3months') { const d=new Date(now); d.setDate(d.getDate()-180); return d.toISOString(); }
   return '1970-01-01T00:00:00Z';
 }
 function _trendArrow(actual, anterior){

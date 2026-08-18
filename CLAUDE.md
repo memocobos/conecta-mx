@@ -59,20 +59,46 @@
 - Manual: Manual_De_Marca.pdf en el repo
 
 ## Pendientes
-_Última revisión: 28-jul-2026 (series PP, PG, E1 y KH cerradas)._
+_Última revisión: 17-ago-2026. El encendido ya ocurrió (ver abajo) y las
+series FIN-1, AUD-1, MER-1, SAL-1, KMS, CAT-1/2/3 y las de agosto
+(SEG-1/2, SES-1, WL-1) están en producción — 148 merges desde el 25-jul._
 
-### 🔴 La semana que entra — el encendido
-- **Apagar `CORREOS_MODO='prueba'` en Netlify.** Mientras siga en 'prueba', TODO
-  el correo automático (cobranza, contratos, vendedores) llega al buzón de
-  calibración y NO al cliente. Es el interruptor que estrena todo junto.
-  Excepción a propósito: el vigilante de radio manda sus emergencias directo,
-  sin pasar por `aplicarModoPrueba`.
-- **Re-onboarding de 6 personas** (primeros 5: Alan, Axel, Reginna, Laura,
-  Sofía). Camino: reactivar en Guerreros Z → rol → contratos → firmas → activo.
-- **Revisar env vars en Netlify** antes del primer disparo real.
-- **Blast de arranque de contratos**: lo manda Memo, no un cron.
+### ✅ El encendido YA OCURRIÓ (jul-ago 2026)
+_Esta sección era una lista de pendientes en rojo. Se conserva como acta —
+borrarla dejaría el libro sin explicar por qué el sistema pasó a mandar correo
+de verdad—, pero **ya no manda a nadie a hacer nada**._
+
+- **`CORREOS_MODO` está en `'real'` desde el 31-jul-2026 19:06 UTC** (leído del
+  panel de Netlify el 17-ago, no recordado; contexto `all`, con scope
+  `functions`). Todo el correo automático —cobranza, contratos, vendedores,
+  posposiciones, lista de espera— **llega al cliente**. `_lib/correo-guard`
+  sólo desvía si el valor es exactamente `'prueba'`, y **el modo real es el
+  default absoluto**: olvidar la variable NO desvía nada.
+  ⚠️ Corolario que sigue vivo: cualquier tuerca que mande correo **manda de
+  verdad desde el primer merge**. No hay red debajo.
+  Excepción a propósito, sin cambios: el vigilante de radio manda sus
+  emergencias directo, sin pasar por `aplicarModoPrueba`.
+- **Re-onboarding: hecho.** Medido en la base el 17-ago: **14 usuarios activos,
+  0 inactivos**, los 14 con invitación usada y perfil completo; 13 se crearon en
+  agosto y 12 entraron al Palacio en agosto. El camino que se siguió —reactivar
+  en Guerreros Z → rol → contratos → firmas → activo— queda documentado por si
+  entra alguien más.
+- **Env vars de Netlify**: revisadas. Lo único que sigue en modo de pruebas es
+  **`PAGOS_STRIPE_MODO='test'`** (con llaves `sk_test`/`pk_test`). Es OTRO
+  interruptor y OTRA decisión: no se toca sin que Memo lo pida.
+- **Blast de arranque de contratos**: lo manda Memo, no un cron. Sigue siendo
+  suyo, y sigue sin automatizarse a propósito.
 
 ### 🟡 Vivos
+
+- ✅ **CERRADO en esta época (jul-ago 2026), no volver a abrirlo:** el dinero del
+  Palacio (**FIN-1**, #473-#476) · la cuenta por evento en una sola fuente
+  (**AUD-1**, #477-#482) · la merma (**MER-1**, #483) · los saldos con migrados
+  (**SAL-1**, #484) · el candado de Posponer (**SEG-1**, #488) y las 4
+  herramientas con candado (**SEG-2**, #487) · la sesión vencida que manda al
+  login (**SES-1**, #489) · la lista de espera que avisa al publicar (**WL-1**,
+  #490) · el catálogo de agosto y la contraofensiva 2x1 (**CAT-1/2/2b/3/3c**,
+  #485, #486, #491, #492). Cada una tiene su arnés y su reporte en la PR.
 - **El Palacio (KameHouse) ya está en el sistema visual de la casa**: serie KH
   completa en prod (KH-1 cimientos · KH-2 Guerreros Z · KH-3 las mesas ·
   KH-4 barrido). Lo que **NO se toca** y no hay que re-litigar: los 7 temas
@@ -102,11 +128,14 @@ _Última revisión: 28-jul-2026 (series PP, PG, E1 y KH cerradas)._
   de la casa: solo `transform`/`opacity`). Es de abril; tuerca micro cuando Memo
   la quiera.
 - **Puente index→Portal**: Fase A en prod pero DETRÁS DE INTERRUPTOR
-  (`RESERVA_PORTAL` / `?portal=1`). Falta decidir el encendido.
+  (`RESERVA_PORTAL` / `?portal=1`). Falta decidir **su** encendido — que es
+  otro, no el del correo: ése ya ocurrió.
 - **Contrato de cuidador de bodega**: borrador esperando a Memo.
 - **Wizard de comisiones CHEAP (F5a)**: falta que Memo capture las primeras.
-- **PRs viejas ABIERTAS sin aprobar**: #53 (ranking DC2d, jun) y #215
-  (cancelar-despublica, 1-jul). NO mergear sin revisión explícita de Memo.
+- ⚰️ **PRs #53 (ranking DC2d) y #215 (cancelar-despublica): ABANDONADAS** por
+  Memo el 5-ago-2026. Siguen abiertas en GitHub, y eso NO significa pendiente:
+  no se mergean, no se retoman y no se re-proponen. Se dejan anotadas justamente
+  para que nadie las "rescate" creyendo que se olvidaron.
 - **Doc `kamehouse.md`**: bloqueado por permisos de macOS/TCC.
 - Retirar el panel `ventas-resumen` cuando ya no se use.
 

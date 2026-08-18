@@ -488,6 +488,15 @@ async function cuentasDeTodos(opts) {
 
   // Los agregados de empresa, definidos UNA vez (antes vivían en tres lugares).
   const tot = { ventas: 0, gastos: 0, ganancia: 0, viajeros: 0, eventos_con_movimiento: slugs.length, desconocido: false };
+  // [E5-1/E5-2] La deuda a proveedores de TODA la empresa. Se suma aquí, donde
+  // viven los datos, por la misma razón que la caja total: si la sumara la
+  // pantalla sería la fórmula número doce, y encima una que nadie más podría
+  // reusar. Va en su propio acumulador y NO toca `ganancia` — la deuda es
+  // INFORMATIVA (así está dicho arriba, en la cabecera de esta lib) y restarla
+  // convertiría "lo que debo" en "lo que gané de menos", que son dos cosas
+  // distintas y una de ellas es falsa.
+  tot.deuda_proveedores = 0;
+  slugs.forEach((s) => { tot.deuda_proveedores += n(eventos[s].deuda_proveedores); });
   slugs.forEach((s) => {
     const e = eventos[s];
     if (e.ventas == null) { tot.desconocido = true; return; }

@@ -3914,6 +3914,9 @@ async function loadResumen() {
     _renderResumenAtrasados(activos, cancelados);
     _renderResumenRiesgoBaja(activos);
     _renderResumenDinero(porCobrar);  // reusa el porCobrar ya calculado (= m-porcobrar)
+    // [E5-2] La deuda va con la cuenta que ya se cargó arriba (`cta` viene de
+    // _utilCargar). No dispara una llamada nueva: se pinta con lo que ya llegó.
+    _renderResumenDeuda(util && util.cuenta ? util.cuenta : null);
     // 2) Carga la utilidad UNA sola vez (compartida, fresca). Best-effort: si falla,
     //    _utilG3Cache queda null → salud neutra y lo de abajo igual pinta.
     await _utilCargar(true);
@@ -3948,6 +3951,41 @@ async function _saldosCargar(force) {
 
 // Pinta la franja: caja total (héroe, full-width) + fila de cuentas + por cobrar
 // (+ otros si != 0). `porCobrar` viene de loadResumen (mismo valor que m-porcobrar).
+// [E5-2] ¿CUÁNTO DEBO? — la segunda pregunta de la mañana.
+//
+// LA DEUDA VA AL LADO, JAMÁS RESTANDO. Es dinero comprometido con los
+// proveedores de boletos (compras + servicios − abonos, mundo KH), y la
+// ganancia se calcula con gastos, no con deuda: restarla convertiría "lo que
+// debo" en "lo que gané de menos", que es otra cosa y es falsa. El texto del
+// bloque lo dice en voz alta para que nadie lo "corrija" después.
+//
+// El total lo hace el SERVIDOR (`totales.deuda_proveedores`): aquí no se suma
+// nada. Si un día hay un evento más, esta función no se entera — y así debe ser.
+//
+// QUIÉN LO VE: los mismos roles que el endpoint deja pasar
+// (`admin-utilidad-evento` → ['maestro_roshi','bulma'], leído de ahí). A milk el
+// bloque NI SE LE OFRECE: no se pinta el hueco ni un aviso de permiso, porque
+// anunciar un dato que no va a llegar es peor que no anunciarlo.
+const RESUMEN_DEUDA_ROLES = ['maestro_roshi', 'bulma'];
+function _renderResumenDeuda(cuenta) {
+  const cont = document.getElementById('resumen-deuda');
+  if (!cont) return;
+  const puede = !!(currentUser && RESUMEN_DEUDA_ROLES.includes(currentUser.rol));
+  const tot = (cuenta && cuenta.totales) || null;
+  if (!puede || !tot || tot.deuda_proveedores == null) { cont.style.display = 'none'; cont.innerHTML = ''; return; }
+  const deuda = Number(tot.deuda_proveedores) || 0;
+  cont.style.display = '';
+  cont.innerHTML = `
+    <div class="dash-click" onclick="showPage('kamisama')" title="Ver el stock y las compras"
+         style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:16px 20px">
+      <div class="cob-stat-lbl" style="margin-bottom:6px">Deuda a proveedores de boletos</div>
+      <div style="font-family:'Zen Dots',sans-serif;font-size:28px;font-weight:800;color:var(--orange);line-height:1.1">${_spFmtMxn(deuda)}</div>
+      <div style="font-size:11px;color:var(--ts);margin-top:8px;line-height:1.5">
+        Compras + servicios − abonos. Es informativa: <b>no se resta</b> de la ganancia.
+      </div>
+    </div>`;
+}
+
 async function _renderResumenDinero(porCobrar) {
   const cont = document.getElementById('resumen-dinero');
   if (!cont) return;

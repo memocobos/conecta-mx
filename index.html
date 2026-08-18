@@ -2867,8 +2867,15 @@ var PROMOS={
   // La venta en línea sacó 2x1 en varios eventos. La respuesta es la MISMA promo
   // de pareja de AITANA y TINI —mismo `segundoPax`, mismo `exactPersonas:2`,
   // mismos paquetes excluidos— en cinco eventos a la vez. Lo único distinto es
-  // el monto: la segunda persona paga $2,700 en PLUS (el costo del transporte)
-  // y $0 en CHEAP, que es un 2x1 de boleto contra el 2x1 de ellos.
+  // el monto: la segunda persona paga $2,700 en PLUS (el costo del transporte).
+  //
+  // SOLO PLUS — decisión de Memo al corregir la espec. CHEAP queda FUERA por
+  // completo: nada de segundo boleto gratis. Y se cierra por PARTIDA DOBLE, que
+  // es como se cierra el dinero: 'cheap' entra en `excludePkg`, Y ADEMÁS
+  // `segundoPax` no tiene la llave `cheap`. El motor de AIT-1 es fail-closed
+  // ante un paquete ausente (lo comprueba el arnés, no la memoria): aunque
+  // alguien borrara 'cheap' del excludePkg, la promo seguiría sin aplicar en
+  // CHEAP en vez de regalar el boleto.
   //
   // ESTAS SÍ LLEVAN `expiresTs`, al revés que AITANA y TINI: allá el retiro lo
   // decidía Memo y poner fecha lo habría matado antes de tiempo; aquí el
@@ -2893,11 +2900,11 @@ var PROMOS={
   // vencido se coma la promo de pareja SIN ERROR NI AVISO. Se BORRARON las
   // viejas: no caben las dos, y el arnés cuenta que cada código aparezca UNA
   // sola vez en el literal.
-  'CALLE24': {segundoPax:{plus:2700, cheap:0}, exactPersonas:2, expiresTs:Date.parse('2026-08-25T00:00:00-05:00'), maxUsos:9999, usos:0, desc:'Promo de pareja: la segunda persona paga $2,700 en PLUS y $0 en CHEAP', customMsg:'Promo de pareja aplicada — la 2ª persona paga $2,700 en PLUS o $0 en CHEAP', onlyEvent:'calle24', excludePkg:['ride','stay']},
-  'SANZ': {segundoPax:{plus:2700, cheap:0}, exactPersonas:2, expiresTs:Date.parse('2026-08-25T00:00:00-05:00'), maxUsos:9999, usos:0, desc:'Promo de pareja: la segunda persona paga $2,700 en PLUS y $0 en CHEAP', customMsg:'Promo de pareja aplicada — la 2ª persona paga $2,700 en PLUS o $0 en CHEAP', onlyEvent:'alejandrosanz', excludePkg:['ride','stay']},
-  'ENJAMBRE': {segundoPax:{plus:2700, cheap:0}, exactPersonas:2, expiresTs:Date.parse('2026-08-25T00:00:00-05:00'), maxUsos:9999, usos:0, desc:'Promo de pareja: la segunda persona paga $2,700 en PLUS y $0 en CHEAP', customMsg:'Promo de pareja aplicada — la 2ª persona paga $2,700 en PLUS o $0 en CHEAP', onlyEvent:'enjambre', excludePkg:['ride','stay']},
-  'BADGYAL': {segundoPax:{plus:2700, cheap:0}, exactPersonas:2, expiresTs:Date.parse('2026-08-25T00:00:00-05:00'), maxUsos:9999, usos:0, desc:'Promo de pareja: la segunda persona paga $2,700 en PLUS y $0 en CHEAP', customMsg:'Promo de pareja aplicada — la 2ª persona paga $2,700 en PLUS o $0 en CHEAP', onlyEvent:'badgyal', excludePkg:['ride','stay']},
-  'SCORPIONS': {segundoPax:{plus:2700, cheap:0}, exactPersonas:2, expiresTs:Date.parse('2026-08-25T00:00:00-05:00'), maxUsos:9999, usos:0, desc:'Promo de pareja: la segunda persona paga $2,700 en PLUS y $0 en CHEAP', customMsg:'Promo de pareja aplicada — la 2ª persona paga $2,700 en PLUS o $0 en CHEAP', onlyEvent:'scorpions', excludePkg:['ride','stay']},
+  'CALLE24': {segundoPax:{plus:2700}, exactPersonas:2, expiresTs:Date.parse('2026-08-25T00:00:00-05:00'), maxUsos:9999, usos:0, desc:'Promo de pareja: la segunda persona paga $2,700 en el paquete PLUS', customMsg:'Promo de pareja aplicada — la 2ª persona paga $2,700 en PLUS', onlyEvent:'calle24', excludePkg:['ride','stay','cheap']},
+  'SANZ': {segundoPax:{plus:2700}, exactPersonas:2, expiresTs:Date.parse('2026-08-25T00:00:00-05:00'), maxUsos:9999, usos:0, desc:'Promo de pareja: la segunda persona paga $2,700 en el paquete PLUS', customMsg:'Promo de pareja aplicada — la 2ª persona paga $2,700 en PLUS', onlyEvent:'alejandrosanz', excludePkg:['ride','stay','cheap']},
+  'ENJAMBRE': {segundoPax:{plus:2700}, exactPersonas:2, expiresTs:Date.parse('2026-08-25T00:00:00-05:00'), maxUsos:9999, usos:0, desc:'Promo de pareja: la segunda persona paga $2,700 en el paquete PLUS', customMsg:'Promo de pareja aplicada — la 2ª persona paga $2,700 en PLUS', onlyEvent:'enjambre', excludePkg:['ride','stay','cheap']},
+  'BADGYAL': {segundoPax:{plus:2700}, exactPersonas:2, expiresTs:Date.parse('2026-08-25T00:00:00-05:00'), maxUsos:9999, usos:0, desc:'Promo de pareja: la segunda persona paga $2,700 en el paquete PLUS', customMsg:'Promo de pareja aplicada — la 2ª persona paga $2,700 en PLUS', onlyEvent:'badgyal', excludePkg:['ride','stay','cheap']},
+  'SCORPIONS': {segundoPax:{plus:2700}, exactPersonas:2, expiresTs:Date.parse('2026-08-25T00:00:00-05:00'), maxUsos:9999, usos:0, desc:'Promo de pareja: la segunda persona paga $2,700 en el paquete PLUS', customMsg:'Promo de pareja aplicada — la 2ª persona paga $2,700 en PLUS', onlyEvent:'scorpions', excludePkg:['ride','stay','cheap']},
 };
 var _promoActivo=null;
 

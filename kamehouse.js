@@ -9615,9 +9615,15 @@ function _gzPaquete(userId) {
     ${filas}
     <div style="height:1px;background:var(--border);margin:14px 0"></div>
     ${pideSueldo ? campo('Sueldo neto semanal (MXN) *',
-      `<input class="cot-input" type="number" id="pq-sueldo" min="1" step="1" placeholder="Ej: 2500" oninput="_gzPaqueteSueldo()">
-       <div id="pq-sueldo-mes" style="font-size:11px;color:var(--ts);margin-top:6px;min-height:16px"></div>`,
-      'Semanal, no mensual — abajo lo ves traducido.') : ''}
+      // [ET3-c] Aquí había un `oninput="_gzPaqueteSueldo()"` llamando a una
+      // función que NO EXISTE en ningún archivo: cada tecla en este campo
+      // lanzaba un ReferenceError. Debajo vivía un <div id="pq-sueldo-mes">
+      // que nunca se llenó, y la ayuda prometía "abajo lo ves traducido".
+      // Se retiran las TRES piezas juntas: quitar sólo el oninput dejaba la
+      // promesa escrita en pantalla, que es la mitad que de verdad molesta.
+      // NO se implementa la traducción a mensual — decisión de Memo.
+      `<input class="cot-input" type="number" id="pq-sueldo" min="1" step="1" placeholder="Ej: 2500">`,
+      'Semanal, no mensual.') : ''}
     ${pideVigencia ? campo('Vigencia del contrato de coordinador',
       `<select class="cot-input" id="pq-vigencia">
          <option value="3">3 meses</option><option value="6">6 meses</option>

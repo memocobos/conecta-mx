@@ -5839,21 +5839,42 @@ async function loadIngresos() {
 
 // Abre el modal en modo CREAR: limpia el id de edición, vacía el form y restablece
 // los textos del modal. Lo dispara el botón "+ Registrar Ingreso".
+// [ET4] La captura rápida de ingresos. Tres cambios, y los tres son de dinero:
+//
+//  1. ABRE AL INSTANTE. Antes la última línea era
+//     `_poblarSelectsIngresos().then(() => openModal(...))`: el modal esperaba a
+//     que bajaran el catálogo (index.html entero) y la lista de clientes.
+//     Medido con red lenta y picando el botón en cuanto aparece —que es como se
+//     captura cuando hay prisa— tardaba 740 ms en verse. Ahora se pinta PRIMERO
+//     y los catálogos llegan detrás, igual que el modal de gasto.
+//  2. FECHA = HOY en hora de México, con `_mxFechaStr()`. JAMÁS `toISOString`:
+//     da la de Greenwich y en esta casa se trabaja de noche. Queda editable.
+//  3. EVENTO y CUENTA SIN DEFAULT. Un default silencioso mete el dinero en el
+//     evento —o en el banco— equivocado sin que nadie lo note. Se eligen a mano.
 function nuevoIngreso() {
  _ingresoEditId = null;
- ['ingreso-concepto', 'ingreso-monto', 'ingreso-fecha', 'ingreso-notas'].forEach(id => {
+ ['ingreso-concepto', 'ingreso-monto', 'ingreso-notas'].forEach(id => {
    const el = document.getElementById(id); if (el) el.value = '';
  });
- ['ingreso-categoria', 'ingreso-metodo', 'ingreso-cuenta'].forEach(id => {
+ const _if = document.getElementById('ingreso-fecha');
+ if (_if) _if.value = _mxFechaStr();
+ ['ingreso-categoria', 'ingreso-metodo'].forEach(id => {
    const el = document.getElementById(id); if (el) el.selectedIndex = 0;
  });
- // Método por default (Transferencia) con Banco (BBVA) visible.
+ // Método por default (Transferencia) con el Banco visible… pero SIN banco
+ // elegido: la cuenta se escoge a mano (su primera opción es el marcador vacío).
+ const cta = document.getElementById('ingreso-cuenta'); if (cta) cta.value = '';
  _ingresoOnMetodoChange();
  const ev = document.getElementById('ingreso-evento'); if (ev) ev.value = '';
  const cli = document.getElementById('ingreso-cliente'); if (cli) cli.value = '';
+ const nw = document.getElementById('ingreso-notas-wrap'); if (nw) nw.open = false;
  const tit = document.getElementById('ingreso-modal-title'); if (tit) tit.textContent = 'Registrar Ingreso';
  const btn = document.getElementById('ingreso-save-btn');   if (btn) btn.textContent = 'Guardar Ingreso';
- _poblarSelectsIngresos().then(() => openModal('modal-ingreso'));
+ openModal('modal-ingreso');
+ // Los catálogos, DETRÁS del pintado. Si ya estaban poblados no cuesta nada; si
+ // no, las opciones aparecen solas en un parpadeo y el capturador ya está
+ // escribiendo el concepto. Fails-soft: un tropiezo aquí no cierra el modal.
+ _poblarSelectsIngresos().catch(() => {});
 }
 
 // Muestra/oculta el selector de Banco según el método (igual que gastos): Transferencia
@@ -5911,6 +5932,13 @@ async function guardarIngreso() {
 
  if (!concepto || !(monto >= 0) || !fecha) {
  alerta.innerHTML = '<div class="alert alert-error">Concepto, monto y fecha son obligatorios</div>';
+ return;
+ }
+ // [ET4] La cuenta ya no llega preseleccionada, así que ahora se EXIGE: sin
+ // esto, quitar el default habría dejado pasar ingresos sin banco — cambiar un
+ // default silencioso por un hueco silencioso no arregla nada.
+ if (metodo !== 'Efectivo' && !banco) {
+ alerta.innerHTML = '<div class="alert alert-error">Elige la cuenta donde entró el dinero</div>';
  return;
  }
 

@@ -14,17 +14,21 @@
 //      alguien que se suscribió tarde). Un evento sembrado en silencio NUNCA
 //      es huérfano: no tiene ni una fila notificada.
 //
-//  (2) FORCE (botón "Notificar a todos" en Kamehouse):
-//      ?force=true&evento_id=X — manda a la lista de ese evento sin mirar el
-//      snapshot, y lo deja sellado para que el cron no repita.
+// Los otros dos disparos NO viven aquí, y los tres usan el MISMO núcleo:
 //
-// El tercer disparo —AL PUBLICAR— no vive aquí: vive en esferas-publicar, que
-// es quien sabe que el dueño acaba de publicar y con qué datos. Usa el MISMO
-// núcleo. Ver la nota de WL-1 allá.
+//  (2) MANUAL (botón "Notificar ahora" de Kamehouse): vive en
+//      `admin-waitlist-notify`, que es una función NORMAL. Aquí tuvo una rama
+//      `?force=true` desde el 15-may-2026 (2396a2f) que WL-2 RETIRÓ: nació en el
+//      mismo commit que el `schedule` de abajo, y Netlify bloquea el HTTP de una
+//      función programada antes de que el handler corra. Era una puerta pintada
+//      sobre un muro — el botón devolvía 403 de plataforma. Si vuelve a hacer
+//      falta un disparo manual, va allá, no aquí.
+//
+//  (3) AL PUBLICAR: vive en esferas-publicar, que es quien sabe que el dueño
+//      acaba de publicar y con qué datos. Ver la nota de WL-1 allá.
 //
 // Configurado como cron diario en netlify.toml a las 14:00 UTC (8 AM CDMX).
 
-const { verifyAdminAuthLive, corsCheck } = require('./_lib/verify-admin');
 const { fetchCatalogo } = require('./_lib/catalogo-index');
 const {
   sb, notificarEvento, eventosHuerfanos, upsertSnapshot, PRESUPUESTO_CRON_MS,
@@ -37,54 +41,6 @@ function bad(c,m){ return { statusCode: c, headers: { "Content-Type": "applicati
 
 exports.handler = async function (event) {
   if (!SB_KEY) return bad(500, "SUPABASE_SERVICE_KEY_KAMEHOUSE no configurado");
-
-  const qs = event.queryStringParameters || {};
-  const force = qs.force === "true";
-  const forceId = qs.evento_id;
-
-  // Código de descuento opcional (force mode). El admin lo configura desde el
-  // modal de Kamehouse → Lista de espera → Notificar. Si llegan los 3 campos,
-  // el email incluye el bloque amarillo destacado; si no, va el correo normal.
-  const codigo = (qs.codigo || "").trim().toUpperCase().slice(0, 24);
-  const descuento = parseInt(qs.descuento, 10);
-  const horas = parseInt(qs.horas, 10);
-  const promo = (codigo && /^[A-Z0-9_-]{2,24}$/.test(codigo)
-                 && Number.isFinite(descuento) && descuento > 0 && descuento < 100
-                 && Number.isFinite(horas) && horas > 0 && horas <= 168)
-    ? { codigo, descuento, horas } : null;
-
-  // ── FORCE MODE: notificar a una lista específica desde kamehouse ──
-  if (force && forceId) {
-    // Candado: el modo force dispara emails masivos desde kamehouse, así que
-    // exige admin. El cron AUTO entra por el camino de abajo (sin querystring,
-    // sin Authorization) y NO pasa por aquí — este guard no lo afecta.
-    const __origin = corsCheck(event);
-    if (!__origin) return bad(403, "Origen no permitido");
-    const auth = await verifyAdminAuthLive(event, ['maestro_roshi','bulma','milk']);
-    if (!auth.valid) return bad(auth.status, auth.error);
-
-    // Necesitamos el nombre/fecha/venue. Los traemos del primer registro
-    // de la waitlist (evento_nombre quedó guardado al subscribirse).
-    let row;
-    try {
-      const rs = await sb(`eventos_waitlist?evento_id=eq.${encodeURIComponent(forceId)}&select=evento_nombre&limit=1`);
-      row = rs && rs[0];
-    } catch (e) { return bad(500, "SB error: " + e.message); }
-    if (!row) return ok({ ok: true, sent: 0, total: 0, note: "Lista vacía" });
-
-    const r = await notificarEvento({
-      evento_id: forceId, nombre: row.evento_nombre, fecha: "", venue: "", promo,
-      presupuestoMs: PRESUPUESTO_CRON_MS,
-    });
-    // Marca el evento como activo en snapshot para que el cron no vuelva a disparar.
-    try {
-      // [GR-9] Mismo patrón de la casa que upsertSnapshot: sin merge-duplicates.
-      await upsertSnapshot([{ id: forceId, st: "" }]);
-    } catch {}
-    // `sent`/`total` se conservan con su nombre viejo: los lee el modal de Kamehouse.
-    return ok({ ok: true, mode: "force", evento_id: forceId,
-      sent: r.enviados, total: r.total, fallidos: r.fallidos, restantes: r.restantes });
-  }
 
   // ── AUTO MODE (cron): el catálogo desplegado + el snapshot ──
   // [GR-8] El catálogo sale de _lib/catalogo-index — la MISMA autoridad que ya

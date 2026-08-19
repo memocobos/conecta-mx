@@ -579,11 +579,21 @@ const ATAJOS_HOME = {
     { tab: 'diseno',   etiqueta: 'Diseño',   herramienta: true },
   ],
   bulma: [
+    // [E5-6] 'solicitudes_portal' acaba de perder su entrada del menú: un atajo
+    // rescata un destino real, no repite uno que ya tiene puerta. Por eso NO
+    // hay atajo "Cobranza": aterrizaría en la misma pantalla que "Registrar
+    // pago", y dos botones al mismo sitio no son dos atajos.
+    { tab: 'solicitudes_portal', etiqueta: 'Por aprobar' },
     { tab: 'pagos',    etiqueta: 'Registrar pago' },
     { tab: 'ingresos', etiqueta: 'Registrar ingreso' },
     { tab: 'ventas',   etiqueta: 'Ventas' },
   ],
   milk: [
+    // [E5-6] 'solicitudes_portal' acaba de perder su entrada del menú: un atajo
+    // rescata un destino real, no repite uno que ya tiene puerta. Por eso NO
+    // hay atajo "Cobranza": aterrizaría en la misma pantalla que "Registrar
+    // pago", y dos botones al mismo sitio no son dos atajos.
+    { tab: 'solicitudes_portal', etiqueta: 'Por aprobar' },
     { tab: 'pagos',    etiqueta: 'Registrar pago' },
     { tab: 'ingresos', etiqueta: 'Registrar ingreso' },
     { tab: 'ventas',   etiqueta: 'Ventas' },   // milk NO tiene 'ventas': el filtro lo quita
@@ -4758,6 +4768,7 @@ async function _poblarFiltroEventoPagos() {
 // _cobranzaCache y delega todo el filtrado/orden a _renderCobranza (client-side,
 // instantáneo). El refresh tras marcar un pago vuelve a llamar a loadPagos.
 async function loadPagos() {
+  _pgSyncTabs('pagos');   // [E5-6] la franja de la puerta única
   const tbody = document.getElementById('tabla-pagos');
   if (!tbody) return;
   await _poblarFiltroEventoPagos();
@@ -11052,7 +11063,20 @@ function showCCSubTab(sub, btn) {
 // [Pagos-T1] Sub-tab "Pagos" de Capsule Corp — bandeja de separos.
 // La casa nueva de las solicitudes APROBADAS (en_pagos + pagado) de un evento.
 // Reusa admin-solicitudes-list (flags multifecha+con_pagos) y el MISMO modal
-// global de detalle de solicitud. Convive con "Solicitudes Portal" hasta la T2.
+// global de detalle de solicitud.
+//
+// [E5-6] LA T2 YA OCURRIÓ: "Solicitudes Portal" quedó en pendientes/canceladas
+// (su <select> no ofrece otra cosa) y las aprobadas viven AQUÍ. El comentario
+// viejo prometía una convivencia "hasta la T2" que ya terminó, y el próximo que
+// lo leyera creería que Solicitudes Portal está en camino de morir. No lo está:
+// desde E5-6 es la pestaña "Por aprobar" de la puerta única de Pagos.
+//
+// ⚠️ COLISIÓN DE NOMBRES, anotada a propósito donde se va a leer: hay DOS cosas
+// llamadas "Pagos" y no son la misma. Ésta es un SUB-TAB de Capsule, vive dentro
+// del contexto de UN evento y muestra separos aprobados. La otra es la PUERTA
+// del menú (page-pagos), que es cobranza de tours activos del portal. Si alguien
+// dice "está en Pagos", hay que preguntar en cuál. No es bloqueante — los
+// contextos son distintos — pero que nadie lo descubra depurando.
 // ═══════════════════════════════════════════════════════════════════════════
 let _ccPagos = [];              // filas aprobadas del evento actual (con pagos embebidos)
 let _ccPagosCtx = false;        // true = el modal de solicitud se abrió DESDE este sub-tab
@@ -13254,11 +13278,31 @@ function _spPoblarDropdownEventos() {
 }
 
 // [Bandeja-T2] Badge de pendientes en el nav. Pinta el número; 0 → sin badge.
+// [E5-6] El badge vivía DENTRO del botón de menú `nav-solicitudes_portal`. Al
+// salir esa entrada del menú, el contador se habría ido con ella en silencio —
+// y es justo el dato que hace útil la puerta. Ahora vive en la pestaña "Por
+// aprobar", que está duplicada en las dos páginas (cada una pinta su franja),
+// así que se escriben las dos: la que se vea, ya está al día.
 function _spPintarBadgePendientes(n) {
-  const b = document.getElementById('sp-nav-badge');
-  if (!b) return;
-  if (n > 0) { b.textContent = n > 99 ? '99+' : String(n); b.style.display = 'flex'; }
-  else { b.style.display = 'none'; }
+  const badges = ['sp-nav-badge', 'sp-nav-badge-pagos']
+    .map(id => document.getElementById(id)).filter(Boolean);
+  if (!badges.length) return;
+  for (const b of badges) {
+    if (n > 0) { b.textContent = n > 99 ? '99+' : String(n); b.style.display = 'flex'; }
+    else { b.style.display = 'none'; }
+  }
+}
+
+// [E5-6] La franja de pestañas obedece la MISMA fuente única que el menú. La
+// pestaña de una pantalla que este usuario no puede ver NO se pinta: no se
+// ofrece lo que daría 403 (decisión 1 de ETAPA 5, dicha en pestañas). El
+// permiso `solicitudes_portal` no cambió — solo dejó de tener botón de menú.
+function _pgSyncTabs(activa) {
+  document.querySelectorAll('.pg-tabs .pg-tab-btn').forEach(b => {
+    const tab = b.dataset.tab;
+    b.style.display = _puedeVerTab(tab) ? '' : 'none';
+    b.classList.toggle('active', tab === activa);
+  });
 }
 
 // Cuenta las solicitudes PENDIENTES (independiente del filtro activo, para que el
@@ -13278,6 +13322,7 @@ async function _spContarPendientes() {
 }
 
 async function loadSolicitudesPortal() {
+  _pgSyncTabs('solicitudes_portal');   // [E5-6] la franja de la puerta única
   if (_spLoading) return;
   _spLoading = true;
   _ccPagosCtx = false;   // [Pagos-T1] entrar a Solicitudes Portal = contexto SP autoritativo

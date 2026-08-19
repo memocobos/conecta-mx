@@ -157,11 +157,17 @@ está caduco antes de escribirse.
   (respaldos en `bkp_mel_*`, incluido el giveaway) y el frente público salió en
   **MEL-FRENTE-1** (#508): tarjeta del EV, códigos `HADES`/`MELANIE`, banner del
   sorteo con su script, la línea de `mapas.js` y el archivo `mapas/melanie.jpg`.
-  **Sus saldos quedaron en CERO a propósito**, con dos asientos de ajuste sin
-  evento (BBVA y Banamex) que dejaron las tres cuentas al centavo. ⚠️ **La nota
-  de "la caja de melanie es −$10,781, sellado" YA NO APLICA y se retira**: no
-  hay caja de melanie que defender. Si alguien la cita, está citando una época
-  anterior.
+  El diseño llevaba dos asientos de ajuste para sostener los saldos, **pero YA NO
+  EXISTEN**: Memo pidió "todo a ceros, nada de rastro" y Jane los retiró después
+  de crearlos.
+  **La verdad de hoy: el libro del Portal está VACÍO — 0 gastos, 0 ingresos y
+  saldos en $0 en las tres cuentas, A PROPÓSITO.** La plataforma arranca en
+  blanco el 1-sep. Si Memo quiere que "cuánto tengo" diga su banco real,
+  **capturará un ingreso de "saldo inicial" por cuenta al arrancar** — no es un
+  dato que falte, es el primer asiento de la época nueva.
+  ⚠️ **La nota de "la caja de melanie es −$10,781, sellado" YA NO APLICA y se
+  retira**: no hay caja de melanie que defender. Si alguien la cita, está
+  citando una época anterior.
   Dos cosas que dejó aprendidas y valen para el próximo borrado de evento:
   **las 15 tablas satélite llavean por SLUG** (el uuid solo vive en `eventos`), y
   **`compilarEV` es un UPSERT que nunca borra** — un evento ausente de

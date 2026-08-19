@@ -991,48 +991,6 @@ src="https://www.facebook.com/tr?id=1685907946147007&ev=PageView&noscript=1"
 </head>
 <body>
 
-<!-- ═══ BANNER GIVEAWAY · TEMPORAL ═══════════════════════════════════════════
-     Se quita borrando este bloque entero (del comentario al </a>) y nada más:
-     no depende de ningún estilo ni script del resto del archivo, a propósito.
-     Vence solo el 5-ago: pasado el SORTEO el JS de abajo lo esconde, para que
-     no se quede vivo si nadie se acuerda de venir a borrarlo.
-     ═══════════════════════════════════════════════════════════════════════ -->
-<a id="gw-banner" href="/giveaway"
-   style="display:flex;align-items:center;justify-content:center;gap:10px;padding:11px 16px;
-          background:#e8ff4c;color:#000;text-decoration:none;font-weight:900;font-size:13px;
-          letter-spacing:.04em;text-align:center;line-height:1.35">
-  <span id="gw-txt">Gánate el viaje a <b>Melanie Martinez</b> — viaje + Cancha VIP</span>
-  <span aria-hidden="true">&rarr;</span>
-</a>
-<script>
-(function(){
-  // Mismos dos instantes que _lib/giveaway.js.
-  // -05:00 y no -06:00: Reynosa (America/Matamoros) trae horario de verano en
-  // agosto; Monterrey no. Una hora de diferencia entre las dos ciudades.
-  var CIERRE = new Date('2026-08-05T11:00:00-05:00').getTime();
-  var SORTEO = new Date('2026-08-05T12:00:00-05:00').getTime();
-
-  // TRES estados, no dos:
-  //   antes de las 11  → "gánate el viaje" (todavía se puede entrar)
-  //   entre 11 y 12    → ya no se puede entrar, pero SÍ se puede ver: el
-  //                      banner deja de invitar y empieza a avisar
-  //   después de las 12 → se esconde
-  function pintar(){
-    var b = document.getElementById('gw-banner');
-    if (!b) return;
-    var ahora = Date.now();
-    if (ahora >= SORTEO){ b.style.display = 'none'; return; }
-    if (ahora >= CIERRE){
-      var t = document.getElementById('gw-txt');
-      if (t) t.textContent = 'Sorteo en vivo hoy a las 12:00 PM · hora de Reynosa';
-    }
-  }
-  pintar();
-  // Y se revisa cada medio minuto: una pestaña abierta desde las 10:59 no se
-  // puede quedar diciendo "gánate el viaje" cuando el registro ya cerró.
-  setInterval(pintar, 30000);
-})();
-</script>
 <!-- ═══ FIN BANNER GIVEAWAY ═══════════════════════════════════════════════ -->
 
 <!-- [Barrida 2/3] Mini-sprite de iconos (SOLO los que usa index) + helper .ic.
@@ -2401,7 +2359,6 @@ var EV=[
   {id:'enhypen',added:'2026-05-09',ride:2900,cdmx:true,c:'azul',img:'Enhypen',a:'Enhypen - Blood Saga Tour',f:'11 jul 2026',ds:'2026-07-11',v:'Arena Ciudad de México, CDMX',sep:800,st:'agotado',inc:['Boleto zona elegida','Traslados CDMX','Hospedaje compartido','Kit Conecta'],nota:'NO incluye transporte a CDMX.',banco:BANCO_DEFAULT,zonas:[{n:'Ultimate Package',p:17000,vip:1,ag:1},{n:'General A',p:9000,ag:1},{n:'Amarillo',p:7000,ag:1},{n:'Verde',p:6000,ag:1},{n:'Rosa',p:4000,ag:1},{n:'Deluxe Package',p:0,ag:1},{n:'Celeste',p:0,ag:1},{n:'Cap Diferentes',p:0,ag:1},{n:'Morado',p:0,ag:1},{n:'Aqua',p:0,ag:1},{n:'SP Oro',p:0,ag:1},{n:'SP Platino',p:0,ag:1},{n:'Café',p:0,ag:1},{n:'Gris',p:0,ag:1}],cheapZonas:[{n:'Ultimate Package',p:14000,vip:1,ag:1},{n:'General A',p:7000,ag:1},{n:'Amarillo',p:4500,ag:1},{n:'Verde',p:4000,ag:1},{n:'Rosa',p:2500,ag:1},{n:'Deluxe Package',p:0,ag:1},{n:'Celeste',p:0,ag:1},{n:'Cap Diferentes',p:0,ag:1},{n:'Morado',p:0,ag:1},{n:'Aqua',p:0,ag:1},{n:'SP Oro',p:0,ag:1},{n:'SP Platino',p:0,ag:1},{n:'Café',p:0,ag:1},{n:'Gris',p:0,ag:1}],hotel:[{n:'Compartida',e:0},{n:'Doble',e:725},{n:'Triple',e:250},{n:'Individual',e:2175}],pagos:[{l:'Separo',d:'Hoy',s:1},{l:'Pago 1',d:'24 abr-1 may',s:0},{l:'Pago 2',d:'9-16 may',s:0},{l:'Pago 3',d:'24 may-1 jun',s:0},{l:'Pago 4',d:'9-16 jun',s:0},{l:'Pago final',d:'24 jun-1 jul',s:0}]},
   {id:'pacoamoroso',added:'2026-05-09',mapa:'pacoamoroso',c:'azul',img:'Paco Amoroso',a:'Paco Amoroso & Ca7riel',f:'31 jul 2026',ds:'2026-07-31',v:'Auditorio Banamex, Mty',sep:500,ride:2700,st:'',inc:['Boleto zona elegida','Transporte Reynosa-Mty','Hospedaje compartido','Kit Conecta'],banco:BANCO_DEFAULT,zonas:[{n:'Beyond VIP Ultimate Experience',p:8100,vip:1,ag:1},{n:'Beyond',p:4900,vip:1},{n:'Platino',p:0,ag:1},{n:'Platino B',p:0,ag:1},{n:'Perfil',p:4500,ag:1},{n:'Perfil B',p:4200,ag:1},{n:'Perfil C',p:0,ag:1}],cheapZonas:[{n:'Beyond VIP Ultimate Experience',p:6300,vip:1,ag:1},{n:'Beyond',p:3100,vip:1},{n:'Platino',p:0,ag:1},{n:'Platino B',p:0,ag:1},{n:'Perfil',p:2700,ag:1},{n:'Perfil B',p:2400,ag:1},{n:'Perfil C',p:0,ag:1}],pagos:[{l:'Separo',d:'Hoy',s:1}]},
   {id:'harry',ride:2900,cdmx:true,mapa:'harry',c:'rosa',img:'Harry Styles',a:'Harry Styles - Together Together Tour',f:'1, 7 y 8 ago 2026',ds:'2026-08-01',v:'Estadio GNP Seguros, CDMX',sep:1000,st:'agotado',inc:['Boleto zona elegida','Traslados CDMX','Hospedaje compartido','Kit Conecta'],nota:'NO incluye vuelos. Vuelos y autobuses disponibles como extra.',banco:BANCO_HEY,multifecha:[{lbl:'1 Agosto',zonas:[{n:'Circle',p:0,vip:1,ag:1},{n:'Disco',p:0,vip:1,ag:1},{n:'Kiss Square',p:0,vip:1,ag:1},{n:'General A',p:0,ag:1},{n:'General B',p:0,ag:1},{n:'General C',p:6500},{n:'Zona GNP',p:0,ag:1},{n:'Verde B',p:0,ag:1},{n:'Naranja B',p:0,ag:1},{n:'Verde C',p:0,ag:1},{n:'Naranja C',p:4550},{n:'Box Oro',p:16000,vip:1}],cheapZonas:[{n:'General A',p:5000},{n:'Box Oro',p:13000,vip:1},{n:'General C',p:4500},{n:'Naranja C',p:2600},{n:'Circle',p:0,ag:1},{n:'Disco',p:0,ag:1},{n:'Kiss Square',p:0,ag:1},{n:'General B',p:0,ag:1},{n:'Zona GNP',p:0,ag:1},{n:'Verde B',p:0,ag:1},{n:'Naranja B',p:0,ag:1},{n:'Verde C',p:0,ag:1}]},{lbl:'7 Agosto',zonas:[{n:'Circle',p:0,vip:1,ag:1},{n:'Disco',p:0,vip:1,ag:1},{n:'Kiss Square',p:0,vip:1,ag:1},{n:'General A',p:7500,ag:1},{n:'General B',p:0,ag:1},{n:'Zona GNP',p:0,ag:1},{n:'Verde B',p:0,ag:1},{n:'Naranja B',p:0,ag:1},{n:'Verde C',p:0,ag:1},{n:'Naranja C',p:0,ag:1}],cheapZonas:[{n:'General A',p:5000,ag:1},{n:'Circle',p:0,ag:1},{n:'Disco',p:0,ag:1},{n:'Kiss Square',p:0,ag:1},{n:'General B',p:0,ag:1},{n:'Zona GNP',p:0,ag:1},{n:'Verde B',p:0,ag:1},{n:'Naranja B',p:0,ag:1},{n:'Verde C',p:0,ag:1},{n:'Naranja C',p:0,ag:1}]},{lbl:'8 Agosto',zonas:[{n:'Circle',p:0,vip:1,ag:1},{n:'Disco',p:0,vip:1,ag:1},{n:'Kiss Square',p:0,vip:1,ag:1},{n:'General A',p:7500,ag:1},{n:'General B',p:0,ag:1},{n:'Zona GNP',p:0,ag:1},{n:'Verde B',p:0,ag:1},{n:'Naranja B',p:0,ag:1},{n:'Verde C',p:0,ag:1},{n:'Naranja C',p:0,ag:1}],cheapZonas:[{n:'General A',p:5000,ag:1},{n:'Circle',p:0,ag:1},{n:'Disco',p:0,ag:1},{n:'Kiss Square',p:0,ag:1},{n:'General B',p:0,ag:1},{n:'Zona GNP',p:0,ag:1},{n:'Verde B',p:0,ag:1},{n:'Naranja B',p:0,ag:1},{n:'Verde C',p:0,ag:1},{n:'Naranja C',p:0,ag:1}]}],zonas:[{n:'Circle',p:0,vip:1,ag:1},{n:'Disco',p:0,vip:1,ag:1},{n:'Kiss Square',p:0,vip:1,ag:1},{n:'General A',p:7500},{n:'General B',p:0,ag:1},{n:'Zona GNP',p:0,ag:1},{n:'Verde B',p:0,ag:1},{n:'Naranja B',p:0,ag:1},{n:'Verde C',p:0,ag:1},{n:'Naranja C',p:0,ag:1}],cheapZonas:[{n:'General A',p:5000},{n:'Circle',p:0,ag:1},{n:'Disco',p:0,ag:1},{n:'Kiss Square',p:0,ag:1},{n:'General B',p:0,ag:1},{n:'Zona GNP',p:0,ag:1},{n:'Verde B',p:0,ag:1},{n:'Naranja B',p:0,ag:1},{n:'Verde C',p:0,ag:1},{n:'Naranja C',p:0,ag:1}],hotel:[{n:'Compartida',e:0},{n:'Doble',e:650},{n:'Triple',e:250},{n:'Individual',e:1960}],pagos:[{l:'Separo',d:'Hoy',s:1}]},
-  {id:'melanie',mapa:'melanie',flashPromo:{code:'MELANIE',pct:30,expiresTs:Date.parse('2026-08-05T20:00:00-05:00'),excludePkg:['ride'],onlyEvent:'melanie'},c:'rosa',img:'Melanie Martinez',a:'Melanie Martinez - Hades: The Sacrifice Tour',f:'6 ago 2026',ds:'2026-08-06',v:'Arena Monterrey, Mty',sep:500,ride:2700,st:'',inc:['Boleto zona elegida','Transporte Reynosa-Mty','Hospedaje compartido','Kit Conecta'],banco:BANCO_DEFAULT,zonas:[{n:'Early Entry VIP',p:12000,vip:1,ag:1},{n:'Cancha VIP',p:5100,vip:1},{n:'Platino',p:5900},{n:'Osel',p:5900,ag:1},{n:'Mc Cormick',p:5900,ag:1},{n:'Coke Studio',p:5900},{n:'Oro',p:5500},{n:'Megacable',p:5500,ag:1},{n:'Plus Ultra',p:5500,ag:1},{n:'Banco Azteca',p:5500,ag:1},{n:'Barrera',p:5100,ag:1},{n:'Butaca',p:4700},{n:'Preferente',p:4300,ag:1},{n:'Luneta',p:3900,ag:1},{n:'Balcón',p:3500,ag:1}],cheapZonas:[{n:'Early Entry VIP',p:10600,vip:1,ag:1},{n:'Cancha VIP',p:3600,vip:1},{n:'Platino',p:4400},{n:'Osel',p:4400,ag:1},{n:'Mc Cormick',p:4400,ag:1},{n:'Coke Studio',p:4400},{n:'Oro',p:4000},{n:'Megacable',p:4000,ag:1},{n:'Plus Ultra',p:4000,ag:1},{n:'Banco Azteca',p:4000,ag:1},{n:'Barrera',p:3600,ag:1},{n:'Butaca',p:3200},{n:'Preferente',p:2800,ag:1},{n:'Luneta',p:2500,ag:1},{n:'Balcón',p:2100,ag:1}],pagos:[{l:'Separo',d:'Hoy',s:1},{l:'Pago 1',d:'24 abr-1 may',s:0},{l:'Pago 2',d:'9-16 may',s:0},{l:'Pago 3',d:'24 may-1 jun',s:0},{l:'Pago 4',d:'9-16 jun',s:0},{l:'Pago 5',d:'24 jun-1 jul',s:0},{l:'Pago 6',d:'9-16 jul',s:0},{l:'Pago final',d:'24 jul-1 ago',s:0}]},
   {id:'dalemix',music:'828716362',lineup:'dalemix',sepZonas:{'General':300,'Comfort':500,'VIP':500},staticImg:'dalemixx',preventa:{expiresTs:Date.parse('2026-04-19T23:59:59-06:00')},promoModal:{emoji:'🍔',title:'¡ESTE EVENTO INCLUYE COMIDA GRATIS!',desc:'Paquete Plus — Come y disfruta dentro del evento sin gastar de más',colors:['#0a0a1a','#111']},c:'amarillo',a:'Dale Mixx',f:'15 ago 2026',ds:'2026-08-15',v:'Parque Fundidora, Mty',sep:300,ride:2700,st:'ultimos',inc:['Boleto zona elegida','Transporte Reynosa-Mty','Hospedaje compartido','Comida incluida','Kit Conecta'],banco:BANCO_DEFAULT,zonas:[{n:'General',p:4300},{n:'Comfort',p:5500,ag:1},{n:'VIP',p:6150,vip:1,ag:1}],cheapZonas:[{n:'General',p:2450},{n:'Comfort',p:3550,ag:1},{n:'VIP',p:4200,vip:1,ag:1}],pagos:[{l:'Separo',d:'Hoy',s:1}]},
   {id:'rosalia',mapa:'rosalia',c:'rojo',img:'Rosalia',a:'Rosalía - Lux Tour',f:'19 ago 2026',ds:'2026-08-19',v:'Arena Monterrey, Mty',sep:1000,ride:2700,st:'agotado',inc:['Boleto zona elegida','Transporte Reynosa-Mty','Hospedaje compartido','Kit Conecta'],banco:BANCO_DEFAULT,zonas:[{n:'Cancha VIP',p:7400,vip:1,ag:1},{n:'Platino',p:7200},{n:'Cancha General',p:5300,ag:1},{n:'Oro',p:0,ag:1},{n:'Barrera',p:0,ag:1},{n:'Butaca',p:0,ag:1},{n:'Preferente',p:0,ag:1},{n:'Luneta',p:0,ag:1},{n:'Balcón',p:0,ag:1}],cheapZonas:[{n:'Cancha VIP',p:5800,vip:1,ag:1},{n:'Platino',p:5500},{n:'Cancha General',p:3700,ag:1},{n:'Oro',p:0,ag:1},{n:'Barrera',p:0,ag:1},{n:'Butaca',p:0,ag:1},{n:'Preferente',p:0,ag:1},{n:'Luneta',p:0,ag:1},{n:'Balcón',p:0,ag:1}],hotel:[{n:'Compartida',e:0},{n:'Doble',e:650},{n:'Triple',e:250},{n:'Individual',e:1960}],pagos:[{l:'Separo',d:'Hoy',s:1}]},
   {id:'enjambre',promo:true,promoCode:'ENJAMBRE',promoLabel:'PROMO DE PAREJA · CÓDIGO: ENJAMBRE · HASTA EL 24 AGO',added:'2026-05-09',mapa:'enjambre',c:'azul',img:'Enjambre',a:'Enjambre',f:'16 oct 2026',ds:'2026-10-16',v:'Auditorio Banamex, Mty',sep:800,sepCheap:1000,ride:2700,st:'',inc:['Boleto zona elegida','Transporte Reynosa-Mty','Hospedaje compartido','Kit Conecta'],banco:BANCO_DEFAULT,zonas:[{n:'Beyond VIP',p:4800,vip:1,ag:1},{n:'Beyond Oro',p:4600,vip:1},{n:'Beyond Plata',p:4400,vip:1,ag:1},{n:'Beyond',p:4200,ag:1},{n:'Platino',p:4400},{n:'Platino B',p:4300,ag:1},{n:'Platino C',p:4000},{n:'Perfil A',p:3800},{n:'Perfil B',p:3800,ag:1},{n:'Perfil C',p:3700,ag:1},{n:'Perfil D',p:3600,ag:1},{n:'Perfil E',p:3600,ag:1},{n:'Perfil F',p:3500,ag:1},{n:'Perfil G',p:3400,ag:1}],cheapZonas:[{n:'Beyond VIP',p:3100,vip:1,ag:1},{n:'Beyond Oro',p:2900,vip:1},{n:'Beyond Plata',p:2700,vip:1,ag:1},{n:'Beyond',p:2500,ag:1},{n:'Platino',p:2700},{n:'Platino B',p:2600,ag:1},{n:'Platino C',p:2300},{n:'Perfil A',p:2100},{n:'Perfil B',p:2100,ag:1},{n:'Perfil C',p:2000,ag:1},{n:'Perfil D',p:1900,ag:1},{n:'Perfil E',p:1900,ag:1},{n:'Perfil F',p:1800,ag:1},{n:'Perfil G',p:1700,ag:1}],pagos:[{l:'Separo',d:'Hoy',s:1},{l:'Pago 1',d:'24 abr-1 may',s:0},{l:'Pago 2',d:'9-16 may',s:0},{l:'Pago 3',d:'24 may-1 jun',s:0},{l:'Pago 4',d:'9-16 jun',s:0},{l:'Pago 5',d:'24 jun-1 jul',s:0},{l:'Pago 6',d:'9-16 jul',s:0},{l:'Pago 7',d:'24 jul-1 ago',s:0},{l:'Pago 8',d:'9-16 ago',s:0},{l:'Pago 9',d:'24 ago-1 sep',s:0},{l:'Pago final',d:'9-16 oct',s:0}]},
@@ -2808,7 +2765,6 @@ function goBack(_skipHistory) {
 var PROMOS={
   'ARMADO': {pct:5, expiresTs:1780181504000, maxUsos:9999, usos:0, desc:'Eslabón Armado — 5% descuento 24h', onlyEvent:'eslabon'},
   'PULSOGNP': {pct:8, expiresTs:1776382739338, maxUsos:9999, usos:0, desc:'8% de descuento con código PULSOGNP', onlyEvent:'pulsoquetaro'},
-  'HADES': {pct:5, expiresTs:1776558384253, maxUsos:9999, usos:0, desc:'5% de descuento con código HADES', onlyEvent:'melanie', excludePkg:['ride']},
   'LOOP': {pct:5, expiresTs:1776617509451, maxUsos:9999, usos:0, desc:'5% de descuento con código LOOP', onlyEvent:'edsheeran', excludePkg:['ride']},
   'KAROLG': {pct:5, expiresTs:1776902004420, maxUsos:9999, usos:0, desc:'5% de descuento con código KAROLG', onlyEvents:['karolg','karolcdmx'], excludePkg:['ride','stay','cheap']},
   'KENIAOS': {amount:700, expiresTs:1778911199000, maxUsos:9999, usos:0, desc:'$700 de descuento con código KENIAOS', onlyEvent:'keniaos', onlyZones:['GNP A'], excludePkg:['ride','stay','cheap'], customMsg:'Código aplicado, disfruta tu descuento'},
@@ -2827,14 +2783,13 @@ var PROMOS={
   'TRUENO': {pct:5, expiresTs:Date.parse('2026-05-22T20:00:00-06:00'), maxUsos:9999, usos:0, desc:'5% de descuento con código TRUENO', onlyEvent:'trueno', excludePkg:['ride','stay','cheap']},
   'ULTRA': {pct:5, expiresTs:Date.parse('2026-05-26T20:00:00-06:00'), maxUsos:9999, usos:0, desc:'5% de descuento con código ULTRA', onlyEvent:'ultramexico', excludePkg:['ride','stay','cheap']},
   'GOL': {amount:500, allEvents:true, startTs:Date.parse('2026-06-30T23:00:00-06:00'), expiresTs:Date.parse('2026-07-01T23:00:00-06:00'), maxUsos:9999, usos:0, desc:'$500 de descuento con código GOL — ¡México a octavos! 24h', excludePkg:['ride','stay','cheap']},
-  // [MEL-1] Promo de consolación del sorteo de Melanie: 30% para los registrados
-  // que NO ganaron. Aplica en PLUS/STAY/CHEAP; RIDE fuera (es solo transporte).
-  // El desfase de zona horaria importa: Reynosa es zona fronteriza y sigue el
-  // horario de verano de EE.UU. (America/Matamoros = UTC-5 en agosto), NO el de
-  // Monterrey (UTC-6 todo el año). Por eso el literal va en -05:00: así muere a
-  // las 8:00 PM de Reynosa. Con -06:00 moriría a las 7:00 PM de Reynosa, una
-  // hora antes de lo prometido en el correo.
-  'MELANIE': {pct:30, expiresTs:Date.parse('2026-08-05T20:00:00-05:00'), maxUsos:9999, usos:0, desc:'30% de descuento con código MELANIE', onlyEvent:'melanie', excludePkg:['ride']},
+  // ⏰ POR QUÉ LOS LITERALES DE ESTA TABLA VAN EN -05:00 (regla de la casa).
+  // Reynosa es zona fronteriza y sigue el horario de verano de EE.UU.
+  // (America/Matamoros = UTC-5 en verano), NO el de Monterrey (UTC-6 todo el
+  // año). Un código escrito en -06:00 muere UNA HORA ANTES de lo prometido al
+  // cliente. Siete de los códigos de abajo dependen hoy de esta regla.
+  // (La regla se escribió para el código de consolación del sorteo de MEL-1;
+  //  ese código ya no existe, la regla sí.)
   // [AIT-1] PROMO DE PAREJA — el primer código de tipo `segundoPax`.
   // La persona 1 paga su paquete completo; la 2 paga lo que diga este mapa,
   // FIJO y sin importar la zona: $2,000 en PLUS y $0 en CHEAP (o sea, 2x1 de

@@ -124,7 +124,7 @@
 
   <div class="nav-group">
    <div class="nav-group-title" onclick="toggleNavGroup(this)">Operación</div>
-   <button class="nav-btn active" onclick="showPage('resumen')" id="nav-resumen"><svg class="nav-ic"><use href="#ic-resumen"/></svg><span>Resumen</span></button>
+   <button class="nav-btn" onclick="showPage('resumen')" id="nav-resumen"><svg class="nav-ic"><use href="#ic-resumen"/></svg><span>Resumen</span></button>
    <button class="nav-btn" onclick="showPage('pagos')" id="nav-pagos"><svg class="nav-ic"><use href="#ic-pagos"/></svg><span>Pagos</span></button>
    <button class="nav-btn" onclick="showPage('capsule')" id="nav-capsule"><svg class="nav-ic"><use href="#ic-capsule"/></svg><span>Capsule Corp</span></button>
    <button class="nav-btn" onclick="showPage('solicitudes_portal')" id="nav-solicitudes_portal"><svg class="nav-ic"><use href="#ic-solicitudes"/></svg><span>Solicitudes Portal</span><span class="sp-nav-badge" id="sp-nav-badge" style="display:none">0</span></button>
@@ -172,7 +172,22 @@
  <div id="kh-saludo"></div>
 
  <!-- ─── RESUMEN ─── -->
- <div class="page active" id="page-resumen">
+ <!-- [E5-5] Sin ninguna pantalla asignada (todo bloqueado por permisos_extra).
+      Ni blanco ni pantalla ajena: un estado dicho con palabras. -->
+ <div class="page" id="page-sin_acceso">
+  <div class="page-hero">
+   <div>
+    <div class="page-title">SIN ACCESO</div>
+    <div class="page-sub">// no hay ninguna pantalla asignada a tu usuario</div>
+   </div>
+  </div>
+  <div class="empty-state" style="padding:40px 20px;text-align:center">
+   <div style="font-size:15px;margin-bottom:8px">No tienes ninguna pantalla asignada.</div>
+   <div class="k-mono" style="opacity:.7">Habla con Memo para que te den acceso.</div>
+  </div>
+ </div>
+
+ <div class="page" id="page-resumen">
   <div class="page-hero">
    <div>
     <div class="page-title">RESUMEN</div>
@@ -185,6 +200,11 @@
 
  <!-- Franja 1 del dashboard: el dinero (caja total + cuentas + por cobrar) -->
  <div id="resumen-dinero" style="display:none;margin-bottom:16px"></div>
+
+ <!-- [E5-5] Atajos del home. Los pinta _renderAtajosHome() y cada uno se filtra
+      con _puedeVerTab: el rol propone cuáles son RELEVANTES, el candado dispone
+      cuáles están PERMITIDOS. Un atajo sin permiso no se pinta — sin hueco. -->
+ <div id="resumen-atajos" style="display:none;margin-bottom:16px"></div>
 
  <!-- [E5-2] Franja 2: ¿CUÁNTO DEBO? Deuda a proveedores de boletos. Arranca
       oculta y SOLO la pinta quien puede verla (roshi/bulma): a milk no se le

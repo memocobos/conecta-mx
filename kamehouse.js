@@ -531,6 +531,84 @@ function seleccionarTema(hex, el) {
 // PERMISOS_TABS quedaría sin candado, y eso tiene que tronar.
 const TABS_CON_PERMISO = new Set(Object.values(PERMISOS_TABS).flat());
 
+// [E5-5] EL ATERRIZAJE POR ROL — la preferencia PROPONE, _puedeVerTab DISPONE.
+//
+// Antes no había aterrizaje: `page-resumen` nacía con class="active" en el HTML
+// y bootApp llamaba loadResumen() sin preguntar. Medido contra PERMISOS_TABS,
+// eso dejaba a CUATRO de siete roles cayendo en una pantalla que no tienen —
+// mister_popo, coordinador, cc y vendedor no llevan 'resumen'— y loadResumen
+// arranca con _cobCargarTodo(true), o sea carga de cobranza de verdad.
+//
+// HOME_PREFERIDO no es un permiso y no amplía ninguno: solo elige ENTRE LO QUE
+// EL ROL YA PUEDE VER. Ejemplo firmado: milk SÍ tiene 'resumen', pero su
+// aterrizaje es su captura. Si la preferencia no pasa el candado —le bloquearon
+// esa pantalla— se cae sola a la siguiente permitida.
+const HOME_PREFERIDO = {
+  maestro_roshi: 'resumen',
+  bulma: 'pagos',
+  milk: 'pagos',
+};
+
+// Primera pantalla que este usuario SÍ puede ver: su preferencia, luego el
+// orden en que su rol trae sus tabs, luego sus tabs_extra. Todo pasa por
+// _puedeVerTab — la misma fuente única de SEG-2, sin lista nueva al lado.
+// Devuelve null si no le queda NINGUNA (todo bloqueado): ese caso se dice con
+// palabras en page-sin_acceso, ni en blanco ni en una pantalla ajena.
+function _homeDeRol() {
+  if (!currentUser) return null;
+  const candidatos = [
+    HOME_PREFERIDO[currentUser.rol],
+    ...(PERMISOS_TABS[currentUser.rol] || []),
+    ...(currentUser.permisos_extra?.tabs_extra || []),
+  ];
+  return candidatos.find(t => t && _puedeVerTab(t)) || null;
+}
+
+// Los atajos del home. El ROL decide qué es RELEVANTE (qué hace esa persona a
+// diario); _puedeVerTab decide qué está PERMITIDO. Son dos preguntas distintas
+// y se mantienen separadas: aquí NO se consulta ningún rol para permitir, solo
+// para ordenar la vitrina. Por eso milk no ve "Ventas" —no tiene 'ventas'— sin
+// que este catálogo tenga que saberlo.
+const ATAJOS_HOME = {
+  maestro_roshi: [
+    { tab: 'esferas',  etiqueta: 'Crear evento' },
+    { tab: 'kamisama', etiqueta: 'Pedido de boletos' },   // FIRMADO: el stock por evento
+    { tab: 'gastos',   etiqueta: 'Registrar gasto' },
+    { tab: 'radar',    etiqueta: 'Radar' },
+    { tab: 'recibos',  etiqueta: 'Recibos',  herramienta: true },
+    { tab: 'diseno',   etiqueta: 'Diseño',   herramienta: true },
+  ],
+  bulma: [
+    { tab: 'pagos',    etiqueta: 'Registrar pago' },
+    { tab: 'ingresos', etiqueta: 'Registrar ingreso' },
+    { tab: 'ventas',   etiqueta: 'Ventas' },
+  ],
+  milk: [
+    { tab: 'pagos',    etiqueta: 'Registrar pago' },
+    { tab: 'ingresos', etiqueta: 'Registrar ingreso' },
+    { tab: 'ventas',   etiqueta: 'Ventas' },   // milk NO tiene 'ventas': el filtro lo quita
+  ],
+};
+
+// Pinta los atajos que el usuario puede usar. Si no le queda ninguno, el bloque
+// se queda oculto: un contenedor vacío anuncia algo que no va a llegar.
+function _renderAtajosHome() {
+  const cont = document.getElementById('resumen-atajos');
+  if (!cont || !currentUser) return;
+  const visibles = (ATAJOS_HOME[currentUser.rol] || []).filter(a => _puedeVerTab(a.tab));
+  if (!visibles.length) { cont.style.display = 'none'; cont.innerHTML = ''; return; }
+  cont.innerHTML = '<div class="k-mono" style="margin-bottom:10px">// ACCIONES RÁPIDAS</div>'
+    + '<div style="display:flex;flex-wrap:wrap;gap:8px">'
+    + visibles.map(a => {
+        // Sin segundo parámetro: todos estos destinos SÍ tienen botón de menú, así
+        // que showPage saca el rótulo móvil de ahí. Pasarlo sería argumento muerto.
+        const abrir = a.herramienta ? `showHerramienta('${a.tab}')` : `showPage('${a.tab}')`;
+        return `<button class="btn btn-ghost btn-sm" onclick="${abrir}">${a.etiqueta}</button>`;
+      }).join('')
+    + '</div>';
+  cont.style.display = '';
+}
+
 // [SEG-2] FUENTE ÚNICA del permiso de pantalla. La usan el barrido de la UI,
 // showPage y showHerramienta — para que "lo que se ve" y "a dónde se puede
 // entrar" no puedan separarse nunca. Sin sesión no se ve nada: el lado seguro.
@@ -3390,8 +3468,12 @@ async function bootApp() {
  const el = document.getElementById(id);
  if (el) el.value = today;
  });
- // Cargar resumen (la pestaña visible — único contenido del critical path)
- loadResumen();
+ // [E5-5] El aterrizaje. Ya no es "siempre el Resumen": es la primera pantalla
+ // que este usuario PUEDE ver. showPage se encarga del candado y de llamar a su
+ // cargador, así que el critical path sigue siendo una sola pantalla.
+ const _home = _homeDeRol();
+ if (_home) showPage(_home);
+ else showPage('sin_acceso');   // todo bloqueado: se dice con palabras
  // Manejar links de aceptar/declinar tour desde correo (barato + intención
  // directa del usuario: se queda en el critical path).
  manejarAccionAsignacion();
@@ -3864,6 +3946,7 @@ async function _conexHistorial(uid, nombre) {
 }
 
 async function loadResumen() {
+  _renderAtajosHome();      // [E5-5] atajos del home, filtrados por _puedeVerTab
   _loadConexiones();        // 🕘 tablero de conexiones (solo Memo; fails-soft)
   const proxEl = document.getElementById('proximos-eventos');
   const atrEl  = document.getElementById('atrasados-lista');

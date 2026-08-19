@@ -515,6 +515,22 @@ function seleccionarTema(hex, el) {
   if (el) el.classList.add('sel');
 }
 
+// [E5-4] QUÉ PANTALLAS LLEVAN CANDADO. Se DERIVA de PERMISOS_TABS —la tabla que
+// ya existe— en vez de preguntarle al menú.
+//
+// Antes, showPage decidía "¿la filtro?" con `document.getElementById('nav-'+name)`:
+// o sea, una pantalla tenía candado sólo si tenía BOTÓN. Mientras el menú y los
+// permisos coincidieran no se notaba, pero ata la seguridad a la decoración —
+// y E5-4 saca dos pantallas del menú justamente. Borrar el botón de Saldos
+// habría apagado su chequeo de permiso de paso, en silencio: un vendedor
+// entrando a finanzas por un cambio cosmético.
+//
+// Medido al hacer el cambio: los 23 ids `nav-*` que son pantalla están dentro de
+// esta unión, así que nadie pierde candado al mudar la fuente. El arnés lo
+// assertea para que siga siendo cierto: una pantalla con botón pero fuera de
+// PERMISOS_TABS quedaría sin candado, y eso tiene que tronar.
+const TABS_CON_PERMISO = new Set(Object.values(PERMISOS_TABS).flat());
+
 // [SEG-2] FUENTE ÚNICA del permiso de pantalla. La usan el barrido de la UI,
 // showPage y showHerramienta — para que "lo que se ve" y "a dónde se puede
 // entrar" no puedan separarse nunca. Sin sesión no se ve nada: el lado seguro.
@@ -1949,11 +1965,18 @@ let _eventosCache = [];
 // ═══════════════════════════════════════════════════════════════
 // NAVEGACIÓN
 // ═══════════════════════════════════════════════════════════════
-function showPage(name) {
- // [SEG-2] Mismo candado que showHerramienta, misma fuente. Las pantallas sin
- // botón de menú propio (las que se abren desde otra) no se filtran aquí: el
- // barrido solo gobierna las que tienen entrada en el nav.
- if (document.getElementById('nav-' + name) && !_puedeVerTab(name)) {
+// `etiqueta`: nombre legible del destino, para las pantallas que YA NO tienen
+// botón de menú (Saldos y Por Evento, desde E5-4). Sin botón no hay de dónde
+// sacar el rótulo de la barra móvil, y no vamos a escribir una lista de nombres
+// al lado: lo pone quien navega, que es el único que sabe a dónde va.
+function showPage(name, etiqueta) {
+ // [SEG-2] Mismo candado que showHerramienta, misma fuente.
+ // [E5-4] La pregunta "¿esta pantalla lleva candado?" se le hace a
+ // PERMISOS_TABS, no al menú. Las pantallas que no aparecen en NINGÚN rol son
+ // las que se abren desde otra y no tienen permiso propio: ésas siguen sin
+ // filtrarse aquí, igual que antes. La diferencia es que ahora quitar un botón
+ // ya no puede quitar un candado.
+ if (TABS_CON_PERMISO.has(name) && !_puedeVerTab(name)) {
    showToast('No tienes acceso a esta sección', 'error');
    return;
  }
@@ -1961,6 +1984,7 @@ function showPage(name) {
  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
  document.getElementById(`page-${name}`).classList.add('active');
  const navBtn = document.getElementById(`nav-${name}`);
+ if (!navBtn && etiqueta) actualizarLabelNavMobile(etiqueta);
  if (navBtn) {
    navBtn.classList.add('active');
    actualizarLabelNavMobile(navBtn.textContent.trim());
@@ -4008,7 +4032,7 @@ async function _renderResumenDinero(porCobrar) {
   // stat de cuenta → navega a Saldos (click-through).
   const stat = (lbl, val) => {
     const color = Number(val) < 0 ? 'var(--red)' : '';
-    return `<div class="cob-stat dash-click" onclick="showPage('saldos')" title="Ver Saldos"><div class="cob-stat-lbl">${lbl}</div><div class="cob-stat-val" style="${color ? 'color:' + color : ''}">${_spFmtMxn(Number(val || 0))}</div></div>`;
+    return `<div class="cob-stat dash-click" onclick="showPage('saldos','Saldos')" title="Ver Saldos"><div class="cob-stat-lbl">${lbl}</div><div class="cob-stat-val" style="${color ? 'color:' + color : ''}">${_spFmtMxn(Number(val || 0))}</div></div>`;
   };
   const cuentasHTML = orden.map(n => stat(n, (cuentas[n] || {}).saldo || 0)).join('') +
     // [AUD-1c] El signo, en palabras también aquí: con el neto de los dos mundos
@@ -4019,7 +4043,7 @@ async function _renderResumenDinero(porCobrar) {
   const heroColor = cajaTotal < 0 ? 'var(--red)' : 'var(--green)';
   cont.style.display = '';
   cont.innerHTML = `
-    <div class="dash-click" onclick="showPage('saldos')" title="Ver Saldos" style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:16px 20px;margin-bottom:12px">
+    <div class="dash-click" onclick="showPage('saldos','Saldos')" title="Ver Saldos" style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:16px 20px;margin-bottom:12px">
       <div class="cob-stat-lbl" style="margin-bottom:6px">Caja total de la empresa</div>
       <div style="font-family:'Zen Dots',sans-serif;font-size:34px;font-weight:800;color:${heroColor};line-height:1.1">${_spFmtMxn(cajaTotal)}</div>
     </div>
@@ -4909,7 +4933,7 @@ let _evtSelectorPoblado = false;
 // Click-through → "Por evento": el click guarda el slug pendiente y navega; el
 // auto-select se aplica cuando el selector ya está poblado (sin setTimeout).
 let _evtPendingSelect = null;
-function _evtIrA(slug) { _evtPendingSelect = slug || null; showPage('eventos'); }
+function _evtIrA(slug) { _evtPendingSelect = slug || null; showPage('eventos', 'Por Evento'); }
 function _evtAplicarPendiente() {
   if (!_evtPendingSelect) return;
   const sel = document.getElementById('selector-evento');

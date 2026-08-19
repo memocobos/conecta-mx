@@ -27,6 +27,7 @@ const { resolverPrecioVenta, hoyMx } = require('./_lib/precio-zona');
 const { fetchCatalogo } = require('./_lib/catalogo-index');
 const { cargarDisponibilidad, evaluarZona } = require('./_lib/disponibilidad');
 const { verificarVendedorActivo, AVISO_INACTIVO } = require('./_lib/vendedor-activo');
+const { estaPausado, respuestaPausa } = require('./_lib/modulos-pausados');
 
 const ROLES = ['vendedor', 'maestro_roshi', 'bulma'];
 const PAQUETES = ['plus', 'ride', 'stay', 'cheap'];
@@ -86,6 +87,11 @@ function _bad(headers, status, error, extra) {
 }
 
 exports.handler = async (event) => {
+  // [VEN-PAUSA-1] El módulo está pausado: se rebota ANTES de cualquier trabajo
+  // (sin leer body, sin tocar la base, sin verificar sesión). Esconder no es
+  // impedir — el candado del navegador no alcanza a quien llama esto a mano.
+  if (estaPausado('vendedores')) return respuestaPausa('vendedores');
+
   const __origin = corsCheck(event);
   const headers = {
     'Access-Control-Allow-Origin': __origin || 'null',

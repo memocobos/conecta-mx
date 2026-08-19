@@ -28,6 +28,7 @@
 const { verifyAdminAuthLive, corsCheck } = require('./_lib/verify-admin');
 const { validarMonto } = require('./_lib/monto-limites');
 const { verificarVendedorActivo, AVISO_INACTIVO } = require('./_lib/vendedor-activo');
+const { estaPausado, respuestaPausa } = require('./_lib/modulos-pausados');
 
 const ROLES = ['vendedor', 'maestro_roshi', 'bulma'];
 const ROLES_ADMIN = ['maestro_roshi', 'bulma'];
@@ -36,6 +37,11 @@ const MIME_EXT = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp'
 const MAX_BYTES = 4 * 1024 * 1024;   // ~4 MB (igual que admin-subir-comprobante-pago)
 
 exports.handler = async (event) => {
+  // [VEN-PAUSA-1] El módulo está pausado: se rebota ANTES de cualquier trabajo
+  // (sin leer body, sin tocar la base, sin verificar sesión). Esconder no es
+  // impedir — el candado del navegador no alcanza a quien llama esto a mano.
+  if (estaPausado('vendedores')) return respuestaPausa('vendedores');
+
   const __origin = corsCheck(event);
   const headers = {
     'Access-Control-Allow-Origin': __origin || 'null',

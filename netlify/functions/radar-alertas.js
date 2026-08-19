@@ -32,6 +32,7 @@
 
 const { aplicarModoPrueba } = require('./_lib/correo-guard');
 const { MESES_LIMITE, _masMesesFecha, _inicioVendedor } = require('./_lib/vendedor-activo');
+const { estaPausado } = require('./_lib/modulos-pausados');
 
 const SB_URL = process.env.SUPABASE_URL_KAMEHOUSE;
 const SB_KEY = process.env.SUPABASE_SERVICE_KEY_KAMEHOUSE;
@@ -422,6 +423,12 @@ async function detectarReembolsosPorVencer(resumen) {
 // caídos → ni correo ni rastro en el resumen.
 async function detectarVendedoresInactivosNuevos(resumen) {
   const dayMs = 24 * 3600 * 1000;
+  // [VEN-PAUSA-1] Con el módulo pausado, este bloque NO corre. Un radar que
+  // sigue avisando de vendedores inactivos mientras nadie puede vender manda
+  // correo sobre algo que nadie puede atender — y el correo sí sale de la casa.
+  // El bloque NO se borra: revive solo al vaciar el Set de _lib/modulos-pausados.
+  if (estaPausado('vendedores')) return;
+
   const hoy = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Monterrey' });
   const hace7 = new Date(Date.now() - 7 * dayMs).toLocaleDateString('en-CA', { timeZone: 'America/Monterrey' });
 

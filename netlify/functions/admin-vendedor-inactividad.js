@@ -22,6 +22,7 @@
 // =============================================================================
 
 const { verifyAdminAuthLive, corsCheck } = require('./_lib/verify-admin');
+const { estaPausado, respuestaPausa } = require('./_lib/modulos-pausados');
 const {
   MESES_LIMITE, ESTADOS_CUENTAN, _masMesesFecha, _inicioVendedor, _referenciaRodante,
 } = require('./_lib/vendedor-activo');
@@ -33,6 +34,11 @@ const ACCIONES = {
 const UUID_RE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
 
 exports.handler = async (event) => {
+  // [VEN-PAUSA-1] El módulo está pausado: se rebota ANTES de cualquier trabajo
+  // (sin leer body, sin tocar la base, sin verificar sesión). Esconder no es
+  // impedir — el candado del navegador no alcanza a quien llama esto a mano.
+  if (estaPausado('vendedores')) return respuestaPausa('vendedores');
+
   const __origin = corsCheck(event);
   const headers = {
     'Access-Control-Allow-Origin': __origin || 'null',

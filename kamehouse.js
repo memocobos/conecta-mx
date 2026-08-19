@@ -531,6 +531,30 @@ function seleccionarTema(hex, el) {
 // PERMISOS_TABS quedaría sin candado, y eso tiene que tronar.
 const TABS_CON_PERMISO = new Set(Object.values(PERMISOS_TABS).flat());
 
+// [VEN-PAUSA-1] MÓDULOS EN PAUSA — un interruptor, no una amputación.
+//
+// El módulo de vendedores (vender, cotizar, comisiones y wizard CHEAP) se pausa
+// ESCONDIDO por decisión de Memo: se replantea después, no se borra. Las
+// pantallas, los endpoints, el candado de 3 meses y los datos siguen donde
+// estaban; lo único que cambia es que nadie puede llegar.
+//
+// ⚠️ POR QUÉ UN VETO Y NO UNA RESTA. El camino obvio sería vaciar 'cotizar' y
+// 'ventas' de PERMISOS_TABS. Eso REABRE el hoyo de E5-4: TABS_CON_PERMISO se
+// deriva de esa tabla, así que al restar el tab también sale de la unión — y
+// `showPage` deja de filtrarlo. El módulo "pausado" quedaría ABIERTO a
+// cualquiera que escriba showPage('cotizar'). Por eso la pausa se SUMA al
+// candado en _puedeVerTab y PERMISOS_TABS queda INTACTA.
+//
+// 🔌 CÓMO REVIVE (3 ediciones, cero arqueología):
+//   1. vaciar este Set,
+//   2. vaciar el Set gemelo de netlify/functions/_lib/modulos-pausados.js,
+//   3. descomentar [functions."ventas-limite-cron"] en netlify.toml.
+// El arnés carea los dos Sets: si divergen, truena.
+//
+// ⚰️ Muere con la pausa el pendiente "capturar las primeras comisiones CHEAP"
+//    (wizard F5a). Si algún día se replantea el módulo, se replantea también.
+const MODULOS_PAUSADOS = new Set(['cotizar', 'ventas']);
+
 // [E5-5] EL ATERRIZAJE POR ROL — la preferencia PROPONE, _puedeVerTab DISPONE.
 //
 // Antes no había aterrizaje: `page-resumen` nacía con class="active" en el HTML
@@ -623,6 +647,9 @@ function _renderAtajosHome() {
 // showPage y showHerramienta — para que "lo que se ve" y "a dónde se puede
 // entrar" no puedan separarse nunca. Sin sesión no se ve nada: el lado seguro.
 function _puedeVerTab(tab) {
+  // [VEN-PAUSA-1] La pausa manda sobre cualquier permiso: ni el rol, ni un
+  // tabs_extra, ni maestro_roshi entran a un módulo pausado.
+  if (MODULOS_PAUSADOS.has(tab)) return false;
   if (!currentUser) return false;
   const base = PERMISOS_TABS[currentUser.rol] || [];
   const extras = currentUser.permisos_extra?.tabs_extra || [];
@@ -635,8 +662,11 @@ function aplicarPermisosUI() {
   const rol = currentUser.rol;
   const base = PERMISOS_TABS[rol] || [];
   const extras = currentUser.permisos_extra?.tabs_extra || [];
-  const bloqueados = currentUser.permisos_extra?.tabs_bloqueados || [];
-  const tabsPermitidos = [...new Set([...base, ...extras])].filter(t => !bloqueados.includes(t));
+  // [VEN-PAUSA-1] El filtro pasa por _puedeVerTab en vez de re-derivar
+  // base+extras−bloqueados por su cuenta. Re-derivarlo era una SEGUNDA fuente
+  // del mismo permiso —justo lo que SEG-2 combate— y además se saltaría la
+  // pausa: los botones del módulo seguirían pintándose en el menú.
+  const tabsPermitidos = [...new Set([...base, ...extras])].filter(t => _puedeVerTab(t));
   // [SEG-2] LA LISTA SE DERIVA DEL DOM, no se escribe al lado. Dos listas iguales
   // no existen: solo listas que todavía no divergen, y ésta ya había divergido
   // (18 contra 23). Si mañana nace una pantalla nueva, entra al barrido sola —

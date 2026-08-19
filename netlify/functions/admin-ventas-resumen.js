@@ -34,6 +34,7 @@ const { verificarVendedorActivo, AVISO_INACTIVO } = require('./_lib/vendedor-act
 // lo contrario. El lib sigue vivo y lo usan admin-utilidad-evento y
 // admin-liquidacion; lo que se va de aquí es un import muerto.
 const { cuentasDeTodos } = require('./_lib/cuenta-evento');
+const { estaPausado, respuestaPausa } = require('./_lib/modulos-pausados');
 let fetchCatalogo = null;
 try { ({ fetchCatalogo } = require('./_lib/catalogo-index')); } catch (_) { fetchCatalogo = null; }
 
@@ -48,6 +49,11 @@ const VENTA_COLS = [
 ].join(',');
 
 exports.handler = async (event) => {
+  // [VEN-PAUSA-1] El módulo está pausado: se rebota ANTES de cualquier trabajo
+  // (sin leer body, sin tocar la base, sin verificar sesión). Esconder no es
+  // impedir — el candado del navegador no alcanza a quien llama esto a mano.
+  if (estaPausado('vendedores')) return respuestaPausa('vendedores');
+
   const __origin = corsCheck(event);
   const headers = {
     'Access-Control-Allow-Origin': __origin || 'null',

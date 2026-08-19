@@ -25,6 +25,7 @@
 //      RESEND_KEY, CORREOS_MODO/CORREOS_PRUEBA_DESTINO (correo-guard).
 
 const { aplicarModoPrueba } = require('./_lib/correo-guard');
+const { estaPausado, respuestaPausa } = require('./_lib/modulos-pausados');
 
 const SB_URL = process.env.PORTAL_SUPABASE_URL;
 const SB_KEY = process.env.PORTAL_SUPABASE_SERVICE_KEY;
@@ -165,6 +166,11 @@ async function enviar(to, subject, html) {
 }
 
 exports.handler = async function () {
+  // [VEN-PAUSA-1] El módulo está pausado: se rebota ANTES de cualquier trabajo
+  // (sin leer body, sin tocar la base, sin verificar sesión). Esconder no es
+  // impedir — el candado del navegador no alcanza a quien llama esto a mano.
+  if (estaPausado('vendedores')) return respuestaPausa('vendedores');
+
   console.log('[ventas-limite] Iniciando:', new Date().toISOString());
   if (!SB_URL || !SB_KEY) {
     console.error('[ventas-limite] Faltan PORTAL_SUPABASE_URL / PORTAL_SUPABASE_SERVICE_KEY');

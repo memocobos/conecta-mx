@@ -1,5 +1,18 @@
 # Conecta Reynosa — Contexto Completo para Claude Code
 
+> ## 🎯 EL RUMBO: la plataforma arranca el 1 de SEPTIEMBRE de 2026
+>
+> Con los **eventos de septiembre**. Todo lo que se haga de aquí al 1-sep se
+> mide contra esa fecha: lo que no sirva para que la plataforma abra ese día es
+> ruido, y lo que la ponga en riesgo no entra aunque esté bien hecho.
+>
+> Tres cosas que ya quedaron decididas rumbo a ese arranque, y que **no se
+> re-litigan**:
+> - **El cobro en línea va por Mercado Pago con 3D Secure obligatorio.**
+>   Stripe está DESCARTADO (ver el bloque 💳 más abajo).
+> - **El módulo de vendedores va en PAUSA**, no en el arranque (**VEN-PAUSA-1**).
+> - **melanie está borrada por completo**, bases y frente.
+
 ## El Negocio
 - Nombre: Conecta Reynosa (sucursal de la franquicia Conecta MX)
 - CEO: Memo Cobos (hcgcobos@gmail.com)
@@ -83,11 +96,33 @@ de verdad—, pero **ya no manda a nadie a hacer nada**._
   agosto y 12 entraron al Palacio en agosto. El camino que se siguió —reactivar
   en Guerreros Z → rol → contratos → firmas → activo— queda documentado por si
   entra alguien más.
-- **Env vars de Netlify**: revisadas. Lo único que sigue en modo de pruebas es
-  **`PAGOS_STRIPE_MODO='test'`** (con llaves `sk_test`/`pk_test`). Es OTRO
-  interruptor y OTRA decisión: no se toca sin que Memo lo pida.
+- **Env vars de Netlify**: revisadas. El único interruptor que sigue en modo de
+  pruebas es **`PAGOS_STRIPE_MODO='test'`** — y ya no va a salir de ahí: ver el
+  cobro en línea, abajo.
 - **Blast de arranque de contratos**: lo manda Memo, no un cron. Sigue siendo
   suyo, y sigue sin automatizarse a propósito.
+
+### 💳 EL COBRO EN LÍNEA: Mercado Pago. Stripe está DESCARTADO
+
+**Decisión de Memo, 19-ago-2026.** El cobro en línea de la plataforma va por
+**Mercado Pago**, con **3D Secure OBLIGATORIO** — no opcional, no "si el emisor
+lo pide": obligatorio, porque es lo que mueve la responsabilidad del contracargo
+al banco emisor y en este negocio el contracargo se cobra de una caja que ya
+está comprometida con proveedores.
+
+**Stripe queda descartado.** La serie **C2** (#391-#405, 14 tuercas) construyó el
+pago directo al solicitar sobre Stripe y **se queda como está, sin retomar**: no
+se re-propone, no se "rescata" y no se migra pieza por pieza. Lo que sobrevive de
+C2 es la forma —el cliente paga al solicitar, no después— no el proveedor.
+
+**Lo que sigue vivo y hay que podar cuando toque la tuerca del cobro:**
+`PAGOS_STRIPE_MODO='test'` y las llaves `sk_test`/`pk_test` en Netlify. **No se
+podan antes**: mientras el módulo nuevo no exista, quitarlas solo deja huecos.
+Se podan EN la tuerca que traiga Mercado Pago, no en una limpieza suelta.
+
+**Corolario que cuesta caro olvidar:** cualquier diseño de cobro que aparezca de
+aquí en adelante se dibuja contra Mercado Pago + 3DS. Un diseño que asuma Stripe
+está caduco antes de escribirse.
 
 ### 🟡 Vivos
 
@@ -117,8 +152,32 @@ de verdad—, pero **ya no manda a nadie a hacer nada**._
   montos pagados, así que la barra no existe **a propósito** (inferirla sería
   inventar una cifra de dinero). Entra cuando la Fase C amplíe los datos de
   pagos. No re-proponerla antes.
+- **melanie: BORRADA POR COMPLETO** (19-ago-2026). El evento `HADES: THE
+  SACRIFICE` ya no existe en ningún lado — las dos bases las vació Jane
+  (respaldos en `bkp_mel_*`, incluido el giveaway) y el frente público salió en
+  **MEL-FRENTE-1** (#508): tarjeta del EV, códigos `HADES`/`MELANIE`, banner del
+  sorteo con su script, la línea de `mapas.js` y el archivo `mapas/melanie.jpg`.
+  El diseño llevaba dos asientos de ajuste para sostener los saldos, **pero YA NO
+  EXISTEN**: Memo pidió "todo a ceros, nada de rastro" y Jane los retiró después
+  de crearlos.
+  **La verdad de hoy: el libro del Portal está VACÍO — 0 gastos, 0 ingresos y
+  saldos en $0 en las tres cuentas, A PROPÓSITO.** La plataforma arranca en
+  blanco el 1-sep. Si Memo quiere que "cuánto tengo" diga su banco real,
+  **capturará un ingreso de "saldo inicial" por cuenta al arrancar** — no es un
+  dato que falte, es el primer asiento de la época nueva.
+  ⚠️ **La nota de "la caja de melanie es −$10,781, sellado" YA NO APLICA y se
+  retira**: no hay caja de melanie que defender. Si alguien la cita, está
+  citando una época anterior.
+  Dos cosas que dejó aprendidas y valen para el próximo borrado de evento:
+  **las 15 tablas satélite llavean por SLUG** (el uuid solo vive en `eventos`), y
+  **`compilarEV` es un UPSERT que nunca borra** — un evento ausente de
+  `esferas_eventos` NO se puede despublicar publicando.
 - **Respaldos del NAS** (UGREEN): sesión pendiente. Radio Conecta vive ahí.
-- **Cobros OXXO / MSI**: ver `REPORTE-COBROS-OXXO-MSI.md`.
+- **Cobros OXXO / MSI**: pendiente, y **ahora depende de Mercado Pago** — se
+  replantea con el módulo de cobro nuevo, no sobre Stripe. ⚠️ El libro remitía
+  a `REPORTE-COBROS-OXXO-MSI.md`, que **NO existe en el repo** (es de los `.md`
+  sueltos sin commitear): un puntero a un archivo que nadie puede abrir vale
+  menos que decir dónde está la decisión.
 - **El COLOR en línea del Palacio** (medido y congelado por KH-4, sin resolver):
   827 estilos con `color:` en `kamehouse.js` y 158 en el HTML, y **49 `<th>`
   con su propio `color` que NINGUNA hoja de estilo alcanza**. Es la misma
@@ -145,8 +204,28 @@ de verdad—, pero **ya no manda a nadie a hacer nada**._
   a `.25` = 2.08:1, la familia `.3/.35/.4` de `pagos.html`, y `.cca` en
   `#0000cd` sobre negro = 1.88:1. Son **decisiones estéticas de Memo, no bugs**.
   El bloque [F] del arnés de T6 las imprime con su ratio en cada corrida.
-- **Caché de 5 min del candado de vendedores**: tras reactivar a alguien puede
-  tardar hasta 5 min en poder vender. No es bug — va al manual.
+- ⏸️ **MÓDULO DE VENDEDORES: EN PAUSA** (**VEN-PAUSA-1**, #507, 19-ago-2026).
+  Decisión de Memo: **se replantea después, no se borra**. Pantallas, los 6
+  endpoints, el candado rodante de 3 meses y los datos siguen donde estaban; lo
+  único que cambia es que nadie puede llegar. Al pausarlo había **cero usuarios
+  con rol `vendedor`**, así que nadie quedó fuera.
+  - El interruptor es **`MODULOS_PAUSADOS`**, y vive en DOS runtimes que no
+    pueden importarse entre sí: `kamehouse.js` (cliente) y
+    `_lib/modulos-pausados.js` (servidor, 503 en los 6 endpoints). El arnés los
+    **carea**; si divergen, truena.
+  - ⚠️ **La pausa es un VETO que se SUMA a `_puedeVerTab`, jamás una resta de
+    `PERMISOS_TABS`.** Restar los tabs los sacaría de `TABS_CON_PERMISO` y
+    `showPage` dejaría de filtrarlos: el módulo "pausado" quedaría ABIERTO a
+    cualquiera. Es el hoyo de E5-4 con otra cara.
+  - Apagados también el cron `ventas-limite-cron` (comentado en `netlify.toml`)
+    y el bloque de vendedores inactivos de `radar-alertas`: los dos **mandan
+    correo**, y un cron vivo sobre un módulo pausado avisa de algo que nadie
+    puede atender.
+  - 🔌 **Revive en 3 ediciones**: vaciar los dos Sets y descomentar el cron.
+  - ⚰️ **Muere con la pausa** el pendiente "capturar las primeras comisiones
+    CHEAP" (wizard F5a). No se re-propone mientras el módulo siga pausado.
+  - La vieja nota del **caché de 5 min** del candado de vendedores queda sin
+    efecto mientras dure la pausa (no hay a quién reactivar).
 - **Resumen al admin de `contratos-alerta-cron`**: se queda SIN bitácora a
   propósito (correo interno). El arnés assertea ese comportamiento: si alguien
   lo cubre, la prueba truena y hay que actualizarla.

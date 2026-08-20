@@ -14888,6 +14888,10 @@ async function _spRefrescarPlanYLista(solicitudId, estadoSolicitud) {
 // admin-generar-plan-pagos ANTES de flipear el estado (generar-primero).
 // ═══════════════════════════════════════════════════════════════
 
+// [COT-FIX-2] Gemelo con nombre del default de index.html/_lib/precio-zona/rol.
+// Cuatro runtimes que no pueden importarse entre sí; el arnés los carea.
+const SEPARO_CHEAP_DEFAULT = 1000;
+
 const _SP_MESES = {'01':'Enero','02':'Febrero','03':'Marzo','04':'Abril','05':'Mayo','06':'Junio','07':'Julio','08':'Agosto','09':'Septiembre','10':'Octubre','11':'Noviembre','12':'Diciembre'};
 
 // YYYY-MM-DD en hora local (sin desfase de zona horaria de toISOString).
@@ -14916,17 +14920,24 @@ function _spGetQuincenas(from, until, max, diasAntes) {
   var dias = (diasAntes != null && isFinite(diasAntes)) ? diasAntes : 14;
   var result = [];
   var capped = new Date(until.getTime() - dias * 24 * 3600 * 1000);
+  // [COT-FIX-2] EL BUFFER DE 5 DÍAS QUE FALTABA. Esta función se anunciaba como
+  // "COPIA fiel de rol.html" y no lo era: sin el buffer arrancaba una quincena
+  // ANTES y, con el tope de 4 en CHEAP, perdía la última. Resultado medido: le
+  // decía al vendedor un pago con fecha a 4 días que el cliente NUNCA vio en el
+  // index. 65% de las cotizaciones vivas discrepaban entre esta cara y /rol.
+  // Quien separa el 23 NO paga la del 24: su siguiente cobro es la del 9-16.
+  var cutoff = new Date(from.getTime() + 5 * 24 * 3600 * 1000);
   var d = new Date(from); d.setDate(1);
   while (d <= capped && result.length < max) {
     var mm = String(d.getMonth() + 1).padStart(2, '0');
     var q1s = new Date(d.getFullYear(), d.getMonth(), 9);
     var q1e = new Date(d.getFullYear(), d.getMonth(), 16);
-    if (q1s >= from && q1e <= capped) {
+    if (q1s > cutoff && q1e <= capped) {
       result.push({ lbl: '9 al 16 de ' + (_SP_MESES[mm] || ''), d: q1s, e: q1e });
     }
     var q2s = new Date(d.getFullYear(), d.getMonth(), 24);
     var q2e = new Date(d.getFullYear(), d.getMonth() + 1, 1);
-    if (q2s >= from && q2e <= capped) {
+    if (q2s > cutoff && q2e <= capped) {
       var mn = String((d.getMonth() + 2 > 12 ? 1 : d.getMonth() + 2)).padStart(2, '0');
       result.push({ lbl: '24 ' + (_SP_MESES[mm] || '') + ' al 1 de ' + (_SP_MESES[mn] || ''), d: q2s, e: q2e });
     }
@@ -19684,7 +19695,7 @@ function _vtaCalc(ev, opts) {
   total += tCost * selViaj; cxp += tCost;
   let separo;
   if (paquete === 'cheap') {
-    let cs = (ev.sepCheap !== undefined) ? ev.sepCheap : 1000;
+    let cs = (ev.sepCheap !== undefined) ? ev.sepCheap : SEPARO_CHEAP_DEFAULT;
     if (selZ) { const cz = ((ev.multifecha && ev.multifecha[fi] && ev.multifecha[fi].cheapZonas) || ev.cheapZonas || []).filter(z => z && z.n === selZ.n)[0]; if (cz && cz.sepEspecial !== undefined) cs = cz.sepEspecial; }
     separo = (Number(cs) || 0) * selViaj;
   } else {

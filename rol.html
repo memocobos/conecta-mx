@@ -1548,6 +1548,9 @@ body.hsale-on .nav{top:var(--hsb-h,0px)}
 window.STATIC_IMGS = window.STATIC_IMGS || {};
 window.MAPAS = window.MAPAS || {};
 window.LINEUPS = window.LINEUPS || {};
+// [COT-FIX-2] El default del separo CHEAP tenía DOS copias sueltas en este
+// mismo archivo. Una definición, dos usos.
+var SEPARO_CHEAP_DEFAULT=1000;
 var EV=[], BANCO_DEFAULT={}, BANCO_HEY={}, HOTEL_STD=[], HOTEL_CDM=[], HOTEL_MTY=[], MESES={}, WA='528119771072', PROMOS={};
 
 // ── Analytics anónimo de uso de /rol ─────────
@@ -2451,7 +2454,7 @@ function computeDefaultSep(){
   else if(pkg==='cheap')perP = state.precio;
   var sep;
   if(pkg==='cheap'){
-    sep = ev.sepCheap!==undefined ? ev.sepCheap : 1000;
+    sep = ev.sepCheap!==undefined ? ev.sepCheap : SEPARO_CHEAP_DEFAULT;
   } else {
     var eventDate = new Date(ev.ds+'T12:00:00');
     var days = Math.ceil((eventDate-state.sepDate)/(1000*60*60*24));
@@ -2998,7 +3001,7 @@ function buildPlanForTour(t){
   var sepD=new Date(t.sep+'T12:00:00');
   var sepActual;
   if(t.sepMonto!=null) sepActual=t.sepMonto;
-  else if(pkg==='cheap') sepActual=(ev.sepCheap!==undefined?ev.sepCheap:1000);
+  else if(pkg==='cheap') sepActual=(ev.sepCheap!==undefined?ev.sepCheap:SEPARO_CHEAP_DEFAULT);
   else{
     var eventDate0=new Date(ev.ds+'T12:00:00');
     var days=Math.ceil((eventDate0-sepD)/(1000*60*60*24));

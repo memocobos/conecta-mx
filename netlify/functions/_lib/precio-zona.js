@@ -16,6 +16,11 @@
 // catálogo: sin catálogo o evento no hallado → { ok:false, indeterminado:true }.
 // =============================================================================
 
+// [COT-FIX-2] El default del separo CHEAP, con nombre y exportado. Es la
+// definición del lado SERVIDOR; index.html, rol.html y kamehouse.js tienen la
+// suya porque no pueden importar de aquí. El arnés carea las cuatro.
+const SEPARO_CHEAP_DEFAULT = 1000;
+
 const { fetchEventosRaw, fetchHotelesGlobales } = require('./catalogo-index');
 
 const PAQUETES = ['plus', 'ride', 'stay', 'cheap'];
@@ -221,7 +226,7 @@ function _buscarHotel(lista, nombre) {
   // SEPARO = ganancia de Memo. Réplica FIEL de la regla del sitio.
   let separo;
   if (paquete === 'cheap') {
-    let cheapSep = (ev.sepCheap !== undefined) ? ev.sepCheap : 1000;
+    let cheapSep = (ev.sepCheap !== undefined) ? ev.sepCheap : SEPARO_CHEAP_DEFAULT;
     if (selZ) {
       const czList = (ev.multifecha && ev.multifecha[fechaIdx] && ev.multifecha[fechaIdx].cheapZonas) || ev.cheapZonas;
       if (Array.isArray(czList)) {
@@ -302,4 +307,4 @@ async function resolverPrecioVenta(opts) {
   });
 }
 
-module.exports = { resolverPrecioVenta, _calcularPrecio, esCDMX, _diasEvento, hoyMx, PAQUETES };
+module.exports = { SEPARO_CHEAP_DEFAULT, resolverPrecioVenta, _calcularPrecio, esCDMX, _diasEvento, hoyMx, PAQUETES };

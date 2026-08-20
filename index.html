@@ -1261,6 +1261,10 @@ src="https://www.facebook.com/tr?id=1685907946147007&ev=PageView&noscript=1"
   </div>
 
   <div id="d-result" style="display:none">
+    <!-- [COT-FIX-1] Estado imposible (separo > total). Arranca oculto y lo pinta
+         calcular(); va PRIMERO porque si algo está mal es lo primero que hay que
+         leer, antes que cualquier cifra. -->
+    <div id="d-error-imposible" style="display:none;background:rgba(255,40,59,.12);border:1px solid #ff283b;border-radius:12px;padding:14px 16px;margin-bottom:14px;color:#fff;font-size:13px;line-height:1.5"></div>
     <div class="big-pago">
       <div class="bp-lbl">Costo de tu paquete</div>
       <div class="bp-amount" id="r-q"></div>
@@ -1276,7 +1280,7 @@ src="https://www.facebook.com/tr?id=1685907946147007&ev=PageView&noscript=1"
       <div class="sum-row"><span class="sum-lbl">Total del grupo</span><span class="sum-val" id="r-total"></span></div>
       <div class="sum-row"><span class="sum-lbl">Resto a cubrir</span><span class="sum-val" id="r-resto"></span></div>
     </div>
-    <div class="card"><div class="card-lbl">Calendario de pagos</div><table class="pagos-tbl" id="r-tabla"></table></div>
+    <div class="card" id="d-plan-pagos"><div class="card-lbl">Calendario de pagos</div><table class="pagos-tbl" id="r-tabla"></table></div>
     <a class="wa-btn" id="r-wa" href="#" onclick="event.preventDefault();abrirModalPago()">Reservar mi lugar</a>
     <button class="share-btn" onclick="generarImagenCotizacion()" style="display:none" id="btn-share">
       ↓ Descargar cotización
@@ -4744,6 +4748,13 @@ function _irAlPortalReserva(){
 }
 function abrirModalPago(){
   if(!cur||!_lastCotizacion)return;
+  // [COT-FIX-1] Esconder no es impedir: el botón queda inerte arriba, pero
+  // abrirModalPago() se puede llamar desde la consola o desde un handler viejo.
+  // Un separo mayor que el total no abre el modal de pago por ningún camino.
+  if(typeof sepActualCalc==='number'&&typeof total==='number'&&sepActualCalc>total){
+    try{ console.error('[COT-FIX-1] modal de pago bloqueado: separo>total'); }catch(e){}
+    return;
+  }
   try{window.trackInitiateCheckout&&window.trackInitiateCheckout(cur.a,selPkg,total);}catch(e){}
   // PUENTE A1: detrás de interruptor. Si activo, deep-link al Portal en vez
   // del modal. El tracking de checkout (arriba) se conserva en AMBOS caminos.
@@ -5136,6 +5147,58 @@ function calcular(){
     }
   }
   resto=total-sepActualCalc;
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // [COT-FIX-1] UN RESTO NEGATIVO ES UN ESTADO IMPOSIBLE — TRUENA VISIBLE.
+  //
+  // El 20-ago-2026 yandel cotizó con `sepCheap:5300` contra una zona de
+  // $2,700: dos viajeros daban total $5,400, separo $10,600 y "resto a
+  // cubrir" de −$5,200, con un calendario de CINCO pagos de −$1,040 y el
+  // botón de RESERVAR vivo. Nadie se inmutó porque nadie miraba el signo.
+  //
+  // ⚠️ NADA DE Math.max(0, resto). Recortarlo escondería el dato malo y el
+  // cliente vería un separo mayor que su total como si fuera normal. Este
+  // bloque existe para que se VEA, no para que se disimule. (El mismo
+  // calcular() ya usa Math.max(0,…) en el bloque de promo — ahí es correcto,
+  // porque un descuento SÍ puede llevar el precio a cero; un separo por
+  // encima del total no puede pasar nunca.)
+  //
+  // Es la segunda línea: la primera es el 422 de Esferas al capturar
+  // (_lib/separo-techo). Ésta cubre lo que ya está en el catálogo y lo que
+  // llegue por cualquier otro camino.
+  // ═══════════════════════════════════════════════════════════════════════
+  var _cotImposible = (sepActualCalc > total);
+  var _btnReservar = $$('r-wa');
+  if(_cotImposible){
+    $$('d-placeholder').style.display='none';
+    $$('d-result').style.display='block';
+    var _err=$$('d-error-imposible');
+    if(_err){
+      _err.style.display='block';
+      _err.innerHTML='<strong>No podemos cotizar esto.</strong><br>'
+        +'El separo de este evento ('+fmt(sepActualCalc)+') es mayor que el total ('+fmt(total)+'). '
+        +'Es un error de nuestro catálogo, no tuyo. Escríbenos por WhatsApp y lo resolvemos al momento.';
+    }
+    var _plan=$$('d-plan-pagos'); if(_plan) _plan.style.display='none';
+    if(_btnReservar){
+      _btnReservar.style.pointerEvents='none';
+      _btnReservar.style.opacity='.4';
+      _btnReservar.setAttribute('aria-disabled','true');
+      _btnReservar.dataset.cotImposible='1';
+    }
+    try{ console.error('[COT-FIX-1] cotización imposible:', cur&&cur.id, selPkg,
+      'separo='+sepActualCalc, 'total='+total, 'resto='+resto); }catch(e){}
+    return;
+  }
+  // Estado sano: se limpia lo que el bloque de arriba pudo haber dejado puesto.
+  var _errOk=$$('d-error-imposible'); if(_errOk) _errOk.style.display='none';
+  var _planOk=$$('d-plan-pagos'); if(_planOk) _planOk.style.display='';
+  if(_btnReservar && _btnReservar.dataset.cotImposible){
+    _btnReservar.style.pointerEvents='';
+    _btnReservar.style.opacity='';
+    _btnReservar.removeAttribute('aria-disabled');
+    delete _btnReservar.dataset.cotImposible;
+  }
 
   $$('d-placeholder').style.display='none';
   $$('d-result').style.display='block';

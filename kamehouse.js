@@ -19695,6 +19695,11 @@ function _vtaCalc(ev, opts) {
   if (!(total > 0) || !(cxp > 0)) return { ok: false, motivo: 'precio no disponible (total/costo 0)' };
   // [AUD-2] el separo ES la ganancia: 0 en plus/ride/stay = catálogo incompleto.
   if (paquete !== 'cheap' && !(separo > 0)) return { ok: false, indeterminado: true, motivo: 'el evento no tiene separo definido en el catálogo — captúralo antes de vender' };
+  // [COT-FIX-1] Y un separo MAYOR que el total es el estado imposible del otro
+  // lado: devolver `resto` en negativo dejaba cerrar una venta con saldo en
+  // rojo. Va junto a sus tres hermanas de arriba, que ya rechazan transporte
+  // negativo, total en 0 y separo en 0: el hábito estaba, a este caso no le tocó.
+  if (separo > total) return { ok: false, motivo: `el separo (${separo}) supera el total (${total}) — catálogo mal capturado, corrige el separo o el precio de la zona` };
   return { ok: true, paquete, zona: selZ ? selZ.n : null, num_personas: selViaj, precio_unit: cxp, total, separo, resto: total - separo, requiere_hotel: requiereHotel, requiere_transporte: requiereTransporte };
 }
 

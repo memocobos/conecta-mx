@@ -43,9 +43,6 @@ create index if not exists mp_webhook_eventos_solicitud_idx
 --
 -- Mismo trato que stripe_webhook_eventos y stripe_checkout_sesiones, verificado
 -- en la base el 20-ago-2026: las dos con relrowsecurity = true y 0 políticas.
---
--- (El comentario anterior decía "Sin RLS a propósito" y la línea de abajo
---  ENCENDÍA RLS: decía justo lo contrario de lo que hace. Lo cazó Jane.)
 alter table public.mp_webhook_eventos enable row level security;
 
 -- Columna en solicitudes_tour para el rastro del pago de MP, espejo de

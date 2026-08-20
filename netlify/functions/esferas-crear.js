@@ -19,6 +19,8 @@
 // =============================================================================
 
 const { verifyAdminAuthLive, corsCheck } = require('./_lib/verify-admin');
+const { revisarSepCheap } = require('./_lib/separo-techo');
+const { _parseZonas: parseZonas } = require('./_lib/esferas-compile');
 
 const SB_URL = 'https://npgnhsmwpcipxgvfxrho.supabase.co';
 const SB_KEY = process.env.SUPABASE_SERVICE_KEY_KAMEHOUSE;
@@ -227,6 +229,14 @@ exports.handler = async (event) => {
 
   // nombre: requerido.
   if (!sane.nombre) return { statusCode: 400, headers, body: JSON.stringify({ error: 'El nombre es requerido' }) };
+
+  // [COT-FIX-1] El separo CHEAP no puede superar el precio de la zona cheap
+  // vendible más barata. Un dato bien formado que describe algo imposible es
+  // 422, no 400: el formato está bien, lo que no puede existir es el hecho.
+  // Solo CHEAP — en PLUS/RIDE/STAY el total suma hotel y transporte, así que
+  // este techo daría falsos positivos. Ver _lib/separo-techo.
+  const _techo = revisarSepCheap(sane.sep_cheap, parseZonas(sane.zonas));
+  if (_techo) return { statusCode: 422, headers, body: JSON.stringify(_techo) };
 
   // status: si no viene, default '' (A la venta). Si viene, debe estar permitido.
   if (sane.status === undefined || sane.status === null) sane.status = '';

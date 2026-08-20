@@ -16,6 +16,8 @@
 // =============================================================================
 
 const { verifyAdminAuthLive, corsCheck } = require('./_lib/verify-admin');
+const { revisarSepCheap } = require('./_lib/separo-techo');
+const { _parseZonas: parseZonas } = require('./_lib/esferas-compile');
 
 const SB_URL = 'https://npgnhsmwpcipxgvfxrho.supabase.co';
 const SB_KEY = process.env.SUPABASE_SERVICE_KEY_KAMEHOUSE;
@@ -223,7 +225,12 @@ exports.handler = async (event) => {
 
   try {
     // SALVAGUARDA: el slug debe existir en esferas_eventos.
-    const chkRes = await fetch(`${SB_URL}/rest/v1/esferas_eventos?slug=eq.${encodeURIComponent(slug)}&select=slug`, {
+    // [COT-FIX-1] Se piden también `zonas` y `sep_cheap` en el MISMO select que
+    // ya se hacía — sin consulta extra. Hacen falta porque esto es un PATCH:
+    // editar SOLO el separo (que es justo como nació el dedazo de yandel) no
+    // manda las zonas en el body, y sin la fila guardada el techo no tendría
+    // contra qué comparar y dejaría pasar el dato imposible.
+    const chkRes = await fetch(`${SB_URL}/rest/v1/esferas_eventos?slug=eq.${encodeURIComponent(slug)}&select=slug,zonas,sep_cheap`, {
       headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` },
     });
     if (!chkRes.ok) {
@@ -234,6 +241,17 @@ exports.handler = async (event) => {
     if (!Array.isArray(existentes) || existentes.length === 0) {
       return { statusCode: 404, headers, body: JSON.stringify({ error: `No existe un evento con slug '${slug}'` }) };
     }
+
+    // [COT-FIX-1] El techo del separo CHEAP, sobre el estado RESULTANTE: lo que
+    // trae el patch si viene, y lo guardado si no. Así se cubren los tres
+    // caminos — cambiar solo el separo, cambiar solo las zonas (que puede
+    // volver imposible un separo que ya estaba bien) y cambiar los dos.
+    // 422 y no 400: el formato está bien; lo que no puede existir es el hecho.
+    const _fila = existentes[0] || {};
+    const _sepFinal   = ('sep_cheap' in sane) ? sane.sep_cheap : _fila.sep_cheap;
+    const _zonasFinal = ('zonas' in sane) ? sane.zonas : _fila.zonas;
+    const _techo = revisarSepCheap(_sepFinal, parseZonas(_zonasFinal));
+    if (_techo) return { statusCode: 422, headers, body: JSON.stringify(_techo) };
 
     // PATCH por slug. return=representation para devolver la fila actualizada.
     const patchRes = await fetch(`${SB_URL}/rest/v1/esferas_eventos?slug=eq.${encodeURIComponent(slug)}`, {

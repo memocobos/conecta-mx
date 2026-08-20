@@ -36,8 +36,16 @@ create unique index if not exists mp_webhook_evento_uq
 create index if not exists mp_webhook_eventos_solicitud_idx
   on public.mp_webhook_eventos (solicitud_id);
 
--- Sin RLS a propósito: solo la escribe el webhook con service_role, y nadie
--- más la lee. Mismo trato que stripe_webhook_eventos.
+-- RLS ENCENDIDO **SIN POLÍTICAS**, a propósito: eso ES el candado. En Postgres,
+-- una tabla con RLS activo y cero políticas no deja pasar a nadie — salvo a
+-- service_role, que lo salta por definición. O sea: solo el webhook escribe y
+-- nadie más lee, sin necesidad de escribir una sola política.
+--
+-- Mismo trato que stripe_webhook_eventos y stripe_checkout_sesiones, verificado
+-- en la base el 20-ago-2026: las dos con relrowsecurity = true y 0 políticas.
+--
+-- (El comentario anterior decía "Sin RLS a propósito" y la línea de abajo
+--  ENCENDÍA RLS: decía justo lo contrario de lo que hace. Lo cazó Jane.)
 alter table public.mp_webhook_eventos enable row level security;
 
 -- Columna en solicitudes_tour para el rastro del pago de MP, espejo de

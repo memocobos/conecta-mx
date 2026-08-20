@@ -2306,7 +2306,19 @@ var BANCO_DEFAULT={nombre:'BBVA Bancomer',tarjeta:'4152 3139 7573 0487',clabe:'0
 // Ya NO se usa Hey Banco/Banregio. Nombre de variable conservado por compat.
 var BANCO_HEY={nombre:'Banamex',tarjeta:'5206 9403 0472 6407',clabe:'002580702305539377',titular:'Guillermo Cobos Vizcarra',link:''};
 var HOTEL_STD=[{n:'Compartida',e:0},{n:'Triple',e:250},{n:'Doble',e:650},{n:'Individual',e:1960}];
-var MESES={'04':'Abril','05':'Mayo','06':'Junio','07':'Julio','08':'Agosto','09':'Septiembre','10':'Octubre','11':'Noviembre','12':'Diciembre','01':'Enero','02':'Febrero'};
+// [COT-FIX-2] '03' FALTABA. Sin él, toda etiqueta de pago que cayera en marzo
+// salía sin mes: "9 al 16 de " y "24  al 1 de Abril". Estaba dormido —ninguna
+// cotización viva alcanzaba marzo-2027— y se encendía con el primer evento
+// publicado más allá de esa fecha. Ojo: rol.html NO tiene su propia tabla, la
+// LEE de aquí (MESES=out.MESES), así que el hueco era de las DOS caras.
+var MESES={'03':'Marzo','04':'Abril','05':'Mayo','06':'Junio','07':'Julio','08':'Agosto','09':'Septiembre','10':'Octubre','11':'Noviembre','12':'Diciembre','01':'Enero','02':'Febrero'};
+
+// [COT-FIX-2] El separo CHEAP cuando el evento no lo captura. Era un 1000 suelto
+// repetido en CINCO lugares (aquí, kamehouse._vtaCalc, _lib/precio-zona y DOS
+// veces en rol.html): el catálogo en dos <select> otra vez. Ahora cada runtime
+// tiene UNA definición con nombre y el arnés las carea — no pueden importarse
+// entre sí, así que la equivalencia se assertea en vez de suponerse.
+var SEPARO_CHEAP_DEFAULT=1000;
 
 var STATIC_IMGS=window.STATIC_IMGS||{};
 var MAPAS=window.MAPAS||{};
@@ -5120,7 +5132,7 @@ function calcular(){
   // 28-oct y su separo es plano.
   // ═══════════════════════════════════════════════════════════════════════
   if(selPkg==='cheap'){
-    var cheapSep=cur.sepCheap!==undefined?cur.sepCheap:1000;
+    var cheapSep=cur.sepCheap!==undefined?cur.sepCheap:SEPARO_CHEAP_DEFAULT;
     // Separo especial por zona en CHEAP (ej. Box Oro = $4,000): si la cheapZona
     // elegida define sepEspecial, úsalo; si no, cae al sepCheap del evento.
     if(selZ){
@@ -5320,7 +5332,7 @@ function calcular(){
   var today=new Date();
   var eventDate=new Date(cur.ds+'T12:00:00');
   var maxPagos=(selPkg==='cheap')?4:10;
-  var quincenas=getQuincenas(today, eventDate, maxPagos);
+  var quincenas=getQuincenas(today, eventDate, maxPagos, cur.diasAntes);
   var nPagos=quincenas.length;
   var pagoQ=nPagos>0?Math.ceil(resto/nPagos):resto;
   var tH='<tr><td><b>Separo</b></td><td>Hoy</td><td><b>'+fmt(sepActualCalc)+'</b></td></tr>';
@@ -5398,29 +5410,41 @@ function buildCotizacionMsg(quincenas,pagoQ){
   return msg;
 }
 
-function getQuincenas(from, until, max){
+function getQuincenas(from, until, max, diasAntes){
+    // [COT-FIX-2] EL CANON ES LA FIRMA DE rol.html. Antes esta copia no recibía
+    // `diasAntes` NI capaba la ventana, así que ofrecía un pago dentro de los 14
+    // días previos al evento — uno que /rol no tenía. Medido sobre el universo
+    // vivo: 85% de las cotizaciones daban FECHAS distintas según la cara, y
+    // `anuelaa`, `youngmiko`, `neighbourhood` y `straykids` —los de septiembre—
+    // mostraban 1 pago aquí y 0 en /rol.
+    //
+    // La regla viene de la de los 15 días: a 15 días se arma el viaje y el separo
+    // pasa a ser el 50%. Un pago programado dentro de esa ventana no tiene sentido
+    // — el viaje ya está armado. Por eso NINGUNO cae en los últimos `diasAntes`
+    // días (14 por defecto; algunos eventos lo overridean).
+    var dias=(diasAntes!=null&&isFinite(diasAntes))?diasAntes:14;
     var result=[];
+    var capped=new Date(until.getTime()-dias*24*3600*1000);
+    // Buffer: saltar la quincena que empieza dentro de los 5 días del separo
+    // (quien separa el 23 NO paga la del 24; su siguiente cobro es la del 9-16).
+    var cutoff=new Date(from.getTime()+5*24*3600*1000);
     var d=new Date(from);
     d.setDate(1);
-    // Buffer: skip quincena if it starts within 5 days from today
-    var buffer=5*24*60*60*1000;
-    var cutoff=new Date(from.getTime()+buffer);
 
-    while(d<=until && result.length<max){
-      // Quincena 1: 9-16 of month
+    while(d<=capped && result.length<max){
+      var mm=('0'+(d.getMonth()+1)).slice(-2);
+      // Quincena 1: 9-16 del mes
       var q1s=new Date(d.getFullYear(),d.getMonth(),9);
       var q1e=new Date(d.getFullYear(),d.getMonth(),16);
-      if(q1s>cutoff && q1e<=until && result.length<max){
-        var _m=('0'+(d.getMonth()+1)).slice(-2);
-        result.push({lbl:'9 al 16 de '+(MESES[_m]||''),d:q1s});
+      if(q1s>cutoff && q1e<=capped){
+        result.push({lbl:'9 al 16 de '+(MESES[mm]||''),d:q1s,e:q1e});
       }
-      // Quincena 2: 24 al 1 of next month
+      // Quincena 2: 24 al 1 del mes siguiente
       var q2s=new Date(d.getFullYear(),d.getMonth(),24);
       var q2e=new Date(d.getFullYear(),d.getMonth()+1,1);
-      if(q2s>cutoff && q2e<=until && result.length<max){
-        var _m2=('0'+(d.getMonth()+1)).slice(-2);
-        var _mn=('0'+(d.getMonth()+2>12?1:d.getMonth()+2)).slice(-2);
-        result.push({lbl:'24 '+(MESES[_m2]||'')+' al 1 de '+(MESES[_mn]||''),d:q2s});
+      if(q2s>cutoff && q2e<=capped){
+        var mn=('0'+(d.getMonth()+2>12?1:d.getMonth()+2)).slice(-2);
+        result.push({lbl:'24 '+(MESES[mm]||'')+' al 1 de '+(MESES[mn]||''),d:q2s,e:q2e});
       }
       d.setMonth(d.getMonth()+1);
     }

@@ -1347,6 +1347,12 @@ body.hsale-on .nav{top:var(--hsb-h,0px)}
 
   <section class="step locked" id="step5">
     <div class="step-hd"><span class="n">05</span><span class="t">Tu plan</span><span class="hint" id="plan-id">—</span></div>
+    <!-- [COT-FIX-5] El separo imposible se dice AQUÍ, arriba del plan. Arranca
+         oculto; lo pintan _rolSeparoImposible / _rolLimpiarImposible. Sin este
+         gancho, el `if(el)` del helper saltaría en silencio y el trueno sería
+         invisible — que es exactamente lo que pasó en COT-FIX-1 con
+         #d-error-imposible antes de crearlo. -->
+    <div id="plan-error-imposible" style="display:none;background:rgba(255,40,59,.12);border:1px solid #ff283b;border-radius:12px;padding:12px 14px;margin:10px 0;color:#fff;font-size:13px;line-height:1.5"></div>
 
     <!-- Disclaimer permanente: aclarar que esta vista es solo de control personal -->
     <div class="disclaimer-banner" role="note" aria-label="Aviso importante">
@@ -2571,6 +2577,38 @@ function _diasEventoRol(evISO, sepD){
   return Math.round((Date.UTC(+m1[1],+m1[2]-1,+m1[3])-Date.UTC(+m2[1],+m2[2]-1,+m2[3]))/86400000);
 }
 
+// [COT-FIX-5 · N10] EL SEPARO IMPOSIBLE TRUENA — POLÍTICA ÚNICA CON EL INDEX.
+//
+// Aquí había `if(sepActual>perP) sepActual=perP;` en DOS sitios: un recorte
+// SILENCIOSO. El index truena visible desde COT-FIX-1, así que las dos caras
+// hacían lo contrario ante el mismo dato imposible. Muere el recorte.
+//
+// Los dos sitios NO tienen el mismo origen, y el aviso lo dice:
+//   · computeStatePlan → el separo lo TECLEA Memo (state.sepMonto). Es un typo
+//     suyo, y verlo al instante es lo contrario de un estorbo.
+//   · el render del tour guardado → el separo sale del CATÁLOGO (regla del 50%,
+//     ev.sep, ev.sepRide). Ése es el caso yandel: dato mal capturado.
+//
+// No se recorta porque recortar esconde el dato malo: el plan se vería normal y
+// nadie sabría que el catálogo (o el dedo) está mal.
+function _rolSeparoImposible(sepActual, perP, origen){
+  var el=document.getElementById('plan-error-imposible');
+  if(el){
+    el.style.display='block';
+    el.innerHTML='<strong>No puedo armar el plan.</strong><br>El separo ('+fmt(sepActual)
+      +') es mayor que el paquete ('+fmt(perP)+'). '
+      +(origen==='manual'
+        ? 'Revisa el monto que capturaste.'
+        : 'Es el catálogo de este evento: corrige el separo o el precio de la zona.');
+  }
+  try{ console.error('[COT-FIX-5] separo imposible ('+origen+'): sep='+sepActual+' perP='+perP); }catch(e){}
+  return false;
+}
+function _rolLimpiarImposible(){
+  var el=document.getElementById('plan-error-imposible');
+  if(el){ el.style.display='none'; el.innerHTML=''; }
+}
+
 function getQuincenas(from, until, max, diasAntes){
   var dias = (diasAntes!=null && isFinite(diasAntes)) ? diasAntes : 14;
   var result=[];
@@ -2637,8 +2675,10 @@ function computeStatePlan(){
   else if(pkg==='cheap')perP=zonaP;
 
   var sepActual = (state.sepMonto!=null) ? state.sepMonto : 0;
-  if(sepActual>perP) sepActual=perP;
+  // [COT-FIX-5] Trueno, no recorte. El separo lo teclea Memo aquí.
+  if(sepActual>perP) return _rolSeparoImposible(sepActual, perP, 'manual');
   if(sepActual<0)    sepActual=0;
+  _rolLimpiarImposible();
   var resto=perP-sepActual;
 
   // Si el evento es multifecha y el cliente ya eligió una, el "evento" para
@@ -2659,9 +2699,13 @@ function computeStatePlan(){
   // Hoy no pasa en ningún evento vivo; el candado es para que siga sin pasar.
   if(quincenas.length>resto&&resto>0) quincenas=quincenas.slice(0,Math.max(1,Math.floor(resto)));
   var pagoQ=quincenas.length>0 ? Math.ceil(resto/quincenas.length) : resto;
-  // Banco: el paquete CHEAP puede tener su propia cuenta (`bancoCheap`).
-  // Para eventos sin override, todos los paquetes usan `ev.banco`.
-  var bank=(pkg==='cheap' && ev.bancoCheap) ? ev.bancoCheap : (ev.banco||BANCO_DEFAULT);
+  // [COT-FIX-5 · N12] `bancoCheap` BORRADO. Era una SEGUNDA fuente de a qué banco
+  // manda su dinero el cliente, que solo esta cara conocía y que contradecía
+  // `cuentaParaPaquete` — la fuente única que usan el Portal, los contratos y,
+  // desde MP-1b, el enrutamiento del cobro con tarjeta. CERO eventos del EV lo
+  // usaban, así que nadie pierde nada; lo que se cierra es la puerta a que
+  // alguien lo capture y /rol mande a un banco mientras el Portal manda a otro.
+  var bank=(ev.banco||BANCO_DEFAULT);
 
   state.plan={perP:perP, sepActual:sepActual, resto:resto, quincenas:quincenas, pagoQ:pagoQ, eventDate:eventDate, bank:bank};
   return true;
@@ -3046,7 +3090,10 @@ function buildPlanForTour(t){
       if(pkg==='ride' && ev.sepRide!==undefined) sepActual=ev.sepRide;
     }
   }
-  if(sepActual>perP) sepActual=perP;
+  // [COT-FIX-5] Trueno, no recorte. Aquí el separo sale del CATÁLOGO: es el caso
+  // yandel, y recortarlo dejaría un plan con cara de normal sobre un dato malo.
+  if(sepActual>perP){ _rolSeparoImposible(sepActual, perP, 'catalogo'); return null; }
+  _rolLimpiarImposible();
   var resto=perP-sepActual;
   // Multifecha-aware: usar la fecha de la subfecha guardada del tour si existe.
   var dsEffective = (ev.multifecha && t.fi!=null && ev.multifecha[t.fi] && ev.multifecha[t.fi].ds)

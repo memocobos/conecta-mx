@@ -5352,7 +5352,20 @@ function calcular(){
   // mal dicha aquí. Con hoyMx() al mediodía queda dicha bien, y las dos caras
   // arrancan del mismo sitio sin que ninguna cambie de norma.
   var today=new Date(_hoyMx()+'T12:00:00');
-  var eventDate=new Date(cur.ds+'T12:00:00');
+  // [COT-FIX-5 · N9] MULTIFECHA: el corte usa el `ds` de la SUBFECHA elegida, no
+  // el `ds` del evento (que es el PRIMER día del array). Es la expresión que
+  // /rol ya tenía —`dsEffective`— y que aquí faltaba: el cliente elegía la
+  // tercera fecha y el calendario se calculaba contra la primera.
+  //
+  // Hoy no cambia ninguna cotización: las 4 multifecha vigentes con `ds` por
+  // subfecha (morat, caifanes, coronacapital, flowfest) tienen sus fechas a
+  // +0/+1/+2 días, y eso no mueve una quincena. Se enciende con el primer
+  // multifecha cuyas fechas se separen lo suficiente — y entonces las dos caras
+  // ya dirán lo mismo.
+  var _dsEfectivo=(cur.multifecha && selFechaIdx!=null && cur.multifecha[selFechaIdx] && cur.multifecha[selFechaIdx].ds)
+    ? cur.multifecha[selFechaIdx].ds
+    : cur.ds;
+  var eventDate=new Date(_dsEfectivo+'T12:00:00');
   var maxPagos=(selPkg==='cheap')?4:10;
   var quincenas=getQuincenas(today, eventDate, maxPagos, cur.diasAntes);
   var nPagos=quincenas.length;

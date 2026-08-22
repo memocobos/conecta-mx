@@ -5329,7 +5329,18 @@ function calcular(){
   }
 
   // Payment calendar
-  var today=new Date();
+  // [COT-FIX-3 · N1+N2] EL ANCLA ES EL DÍA EN QUE EL CLIENTE SEPARA, y en el
+  // index —que cotiza para hoy— eso ES hoy… pero HOY EN MÉXICO.
+  //
+  // Antes decía `new Date()`: el reloj LOCAL DEL NAVEGADOR, con hora del día.
+  // Reynosa es UTC-5, así que un cliente en Madrid (UTC+2) va 7 h por delante y
+  // de las 17:00 a las 23:59 hora de Reynosa su navegador YA ESTÁ EN MAÑANA:
+  // 7 de cada 24 horas —el 29% del día— su calendario arrancaba un día tarde.
+  //
+  // `today` y el `sepD` de /rol NO eran dos reglas distintas: son LA MISMA cosa
+  // mal dicha aquí. Con hoyMx() al mediodía queda dicha bien, y las dos caras
+  // arrancan del mismo sitio sin que ninguna cambie de norma.
+  var today=new Date(_hoyMx()+'T12:00:00');
   var eventDate=new Date(cur.ds+'T12:00:00');
   var maxPagos=(selPkg==='cheap')?4:10;
   var quincenas=getQuincenas(today, eventDate, maxPagos, cur.diasAntes);

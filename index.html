@@ -2910,7 +2910,13 @@ function validarPromo(code){
   if(p.expiresTs){
     if(Date.now()>p.expiresTs)return {ok:false,msg:'Código expirado'};
   } else if(p.expires){
-    var hoy=new Date().toISOString().slice(0,10);
+    // [COT-FIX-3 · N2] HOY EN MÉXICO, no en UTC. toISOString() da la fecha UTC:
+    // entre las 18:00 y las 23:59 hora de Reynosa (UTC-5) ya es MAÑANA en UTC,
+    // así que un código que vence HOY se rechazaba SEIS HORAS ANTES de tiempo.
+    // Hoy la rama duerme —ninguno de los 27 códigos usa `expires` (string), todos
+    // usan `expiresTs`— pero se enciende con el primero que se capture así, y
+    // entonces es dinero: un descuento prometido que el cliente no puede usar.
+    var hoy=_hoyMx();
     if(hoy>p.expires)return {ok:false,msg:'Código expirado'};
   }
   if(p.usos>=p.maxUsos)return {ok:false,msg:'Código agotado'};
@@ -3224,7 +3230,10 @@ injectEventStructuredData();
 // Google usa MusicEvent schema para mostrar rich snippets en búsquedas.
 function injectEventStructuredData(){
   if(typeof EV==='undefined'||!Array.isArray(EV))return;
-  var today=new Date().toISOString().slice(0,10);
+  // [COT-FIX-3 · N2] También en hora de México: con UTC, un evento que ocurre
+  // HOY desaparecía de los datos estructurados desde las 18:00 hora de Reynosa.
+  // Es solo SEO, pero la norma dice hoyMx SIEMPRE y aquí cuesta una línea.
+  var today=_hoyMx();
   var BASE='https://conectareynosa.mx';
   var events=EV.filter(function(e){
     if(e.listOnly)return false;
@@ -3559,7 +3568,9 @@ var _countdownInterval = null;
 function buildMonthBar(){
   var meses={};
   var MLBL={'01':'Ene','02':'Feb','03':'Mar','04':'Abr','05':'May','06':'Jun','07':'Jul','08':'Ago','09':'Sep','10':'Oct','11':'Nov','12':'Dic'};
-  var today=new Date();
+  // [COT-FIX-3] Aquí había `var today=new Date();` DECLARADA Y NUNCA USADA. La
+  // cazó la aserción de "no queda new Date() a secas": buscando el ancla del
+  // calendario apareció una variable muerta que nadie leía.
   EV.forEach(function(e){
     if(e.listOnly||e._past)return;
     var m=e.ds.substring(5,7);var y=e.ds.substring(0,4);
@@ -5329,7 +5340,18 @@ function calcular(){
   }
 
   // Payment calendar
-  var today=new Date();
+  // [COT-FIX-3 · N1+N2] EL ANCLA ES EL DÍA EN QUE EL CLIENTE SEPARA, y en el
+  // index —que cotiza para hoy— eso ES hoy… pero HOY EN MÉXICO.
+  //
+  // Antes decía `new Date()`: el reloj LOCAL DEL NAVEGADOR, con hora del día.
+  // Reynosa es UTC-5, así que un cliente en Madrid (UTC+2) va 7 h por delante y
+  // de las 17:00 a las 23:59 hora de Reynosa su navegador YA ESTÁ EN MAÑANA:
+  // 7 de cada 24 horas —el 29% del día— su calendario arrancaba un día tarde.
+  //
+  // `today` y el `sepD` de /rol NO eran dos reglas distintas: son LA MISMA cosa
+  // mal dicha aquí. Con hoyMx() al mediodía queda dicha bien, y las dos caras
+  // arrancan del mismo sitio sin que ninguna cambie de norma.
+  var today=new Date(_hoyMx()+'T12:00:00');
   var eventDate=new Date(cur.ds+'T12:00:00');
   var maxPagos=(selPkg==='cheap')?4:10;
   var quincenas=getQuincenas(today, eventDate, maxPagos, cur.diasAntes);

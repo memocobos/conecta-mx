@@ -2457,8 +2457,8 @@ function computeDefaultSep(){
     sep = ev.sepCheap!==undefined ? ev.sepCheap : SEPARO_CHEAP_DEFAULT;
   } else {
     var eventDate = new Date(ev.ds+'T12:00:00');
-    var days = Math.ceil((eventDate-state.sepDate)/(1000*60*60*24));
-    if(days<=15) sep = Math.ceil(perP*0.5);
+    var days = _diasEventoRol(ev.ds, state.sepDate);   // [COT-FIX-3] calendario, no ms
+    if(days!=null && days<=15) sep = Math.ceil(perP*0.5);
     else {
       sep = ev.sep||0;
       if(pkg==='ride' && ev.sepRide!==undefined) sep = ev.sepRide;
@@ -2540,6 +2540,37 @@ function getPagosManuales(ev, fi, fromDate){
 // `diasAntes` (opcional): cuántos días antes del evento se corta el último pago.
 // Default 14 (regla general de Conecta). Algunos eventos lo overridean — ej.
 // Fan Fest MTY usa 5 porque las funciones son muy cercanas entre sí.
+// [COT-FIX-3 · N2+N3] LA FECHA, POR CALENDARIO Y EN MÉXICO.
+//
+// `/rol` contaba los días al evento con `Math.ceil((eventDate - sepD)/86400000)`:
+// milisegundos, arrastrando la HORA del separo. Las otras tres caras
+// (index/_diasEventoMx, kamehouse/_vtaDias, _lib/precio-zona/_diasEvento) usan
+// fechas de calendario.
+//
+// Y eso era DINERO, no estética: en un evento a 15 días exactos, quien apartaba
+// a las 00:30 obtenía 16 días → SEPARO PLANO, y quien apartaba a las 12:00
+// obtenía 15 → EL 50% DEL PAQUETE. El mismo cliente, el mismo día, el mismo
+// evento, distinta hora.
+function _hoyMxRol(){ return new Date().toLocaleDateString('en-CA',{timeZone:'America/Monterrey'}); }
+
+// 'YYYY-MM-DD' de un Date, por sus partes de calendario. sepDate se construye
+// siempre como new Date('YYYY-MM-DD'+'T12:00:00'), así que sus partes locales
+// SON el día que el cliente eligió — sin que la hora entre en la cuenta.
+function _ymdLocal(d){
+  if(!(d instanceof Date) || isNaN(d)) return null;
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+
+// Días entre una fecha de evento y el separo. Misma fórmula que _diasEventoMx
+// del index y que _diasEvento de _lib: UTC sobre las partes, sin horas.
+function _diasEventoRol(evISO, sepD){
+  var m1=/^(\d{4})-(\d{2})-(\d{2})/.exec(String(evISO||''));
+  var ymd=_ymdLocal(sepD) || _hoyMxRol();
+  var m2=/^(\d{4})-(\d{2})-(\d{2})/.exec(ymd);
+  if(!m1||!m2) return null;
+  return Math.round((Date.UTC(+m1[1],+m1[2]-1,+m1[3])-Date.UTC(+m2[1],+m2[2]-1,+m2[3]))/86400000);
+}
+
 function getQuincenas(from, until, max, diasAntes){
   var dias = (diasAntes!=null && isFinite(diasAntes)) ? diasAntes : 14;
   var result=[];
@@ -3004,8 +3035,8 @@ function buildPlanForTour(t){
   else if(pkg==='cheap') sepActual=(ev.sepCheap!==undefined?ev.sepCheap:SEPARO_CHEAP_DEFAULT);
   else{
     var eventDate0=new Date(ev.ds+'T12:00:00');
-    var days=Math.ceil((eventDate0-sepD)/(1000*60*60*24));
-    if(days<=15) sepActual=Math.ceil(perP*0.5);
+    var days=_diasEventoRol(ev.ds, sepD);   // [COT-FIX-3] calendario, no ms
+    if(days!=null && days<=15) sepActual=Math.ceil(perP*0.5);
     else{
       sepActual=ev.sep||0;
       if(pkg==='ride' && ev.sepRide!==undefined) sepActual=ev.sepRide;
@@ -3139,7 +3170,8 @@ function openTour(idx){
   state.hab = (t.pkg==='cheap') ? {k:'na',n:'No aplica',e:0} : findHabByKey(t.hab) || (getHabs()[0] || HABS_STD[0]);
   // Precio + separo
   state.precio = (t.precio!=null && t.precio>0) ? t.precio : (state.zona.p||0);
-  state.sepDate = t.sep ? new Date(t.sep+'T12:00:00') : new Date();
+  // [COT-FIX-3 · N2] sin fecha guardada, el separo es HOY EN MÉXICO.
+  state.sepDate = t.sep ? new Date(t.sep+'T12:00:00') : new Date(_hoyMxRol()+'T12:00:00');
   state.sepTouched = false;
   recomputeDefaultSepMonto();
   // If user saved a custom separo override, restore it

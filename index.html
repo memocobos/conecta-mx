@@ -5356,10 +5356,32 @@ function calcular(){
   var maxPagos=(selPkg==='cheap')?4:10;
   var quincenas=getQuincenas(today, eventDate, maxPagos, cur.diasAntes);
   var nPagos=quincenas.length;
+  // [COT-FIX-4 · N11] EL PLAN TIENE QUE SUMAR EXACTO EL RESTO.
+  //
+  // Antes se imprimía `pagoQ` en TODOS los renglones, y como pagoQ es
+  // Math.ceil(resto/n), la suma se pasaba: medido sobre los 54 vigentes, 24
+  // cotizaciones mostraban un plan que sumaba $1 o $2 MÁS de lo que el cliente
+  // debe. Poco dinero, pero un plan que no cuadra con su propio total es un
+  // plan en el que no se puede confiar.
+  //
+  // El último renglón absorbe el redondeo, igual que /rol hace en SUS DOS
+  // caminos de render (líneas 2690 y 3063). Aquí no se inventa una regla: se
+  // adopta la que ya existía del otro lado.
+  //
+  // NO PUEDE HABER MÁS PAGOS QUE PESOS. Si el resto fuera menor que el número
+  // de quincenas —resto $1 en 3 pagos— el último saldría NEGATIVO. Hoy no pasa
+  // en ningún evento vivo (medido: 0 casos), pero la fórmula lo permite, y un
+  // renglón en negativo es justo lo que COT-FIX-1 prohibió imprimir en silencio.
+  // Se recorta el plan a lo que el resto alcanza a pagar.
+  if(quincenas.length>resto&&resto>0) quincenas=quincenas.slice(0,Math.max(1,Math.floor(resto)));
+  nPagos=quincenas.length;
   var pagoQ=nPagos>0?Math.ceil(resto/nPagos):resto;
   var tH='<tr><td><b>Separo</b></td><td>Hoy</td><td><b>'+fmt(sepActualCalc)+'</b></td></tr>';
+  var acc=sepActualCalc;
   for(var i=0;i<quincenas.length;i++){
-    tH+='<tr><td>Pago '+(i+1)+'</td><td>'+quincenas[i].lbl+'</td><td>'+fmt(pagoQ)+'</td></tr>';
+    var mPago=(i===quincenas.length-1)?(total-acc):pagoQ;
+    acc+=mPago;
+    tH+='<tr><td>Pago '+(i+1)+'</td><td>'+quincenas[i].lbl+'</td><td>'+fmt(mPago)+'</td></tr>';
   }
   if(quincenas.length===0){
     tH+='<tr><td colspan="3" style="color:#ff283b;text-align:center">Evento próximo — contactar para plan de pago</td></tr>';

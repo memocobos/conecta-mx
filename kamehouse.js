@@ -4088,6 +4088,61 @@ function _renderUtilidadEvento(evBase) {
 function _kmHash(s) { let h = 2166136261 >>> 0; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; } return h >>> 0; }
 function _mxHoraNum() { return parseInt(new Date().toLocaleString('en-US', { timeZone: 'America/Monterrey', hour: 'numeric', hour12: false }), 10) || 0; }
 function _mxFechaStr() { return new Date().toLocaleDateString('en-CA', { timeZone: 'America/Monterrey' }); }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// [ORD-1] EL ORDEN DE LOS EVENTOS — UNA SOLA REGLA, UN SOLO LUGAR
+//
+// Medido antes de escribirla: había SIETE listas de eventos y CUATRO órdenes
+// distintos conviviendo.
+//   · cobranza, Por Evento y gastos ordenaban DESCENDENTE por fecha, o sea el
+//     más LEJANO primero — el próximo evento quedaba a media lista;
+//   · los tres selectores del Palacio (kam-evt-sel, kam-com-evt, kam-liq-evt)
+//     ordenaban POR NOMBRE;
+//   · y el mando de Kamisama que hice en KMS-SIMP-1 ordenaba ASCENDENTE a
+//     secas, que pone los PASADOS primero. Ése también estaba mal, y lo estaba
+//     yo: la aserción que escribí ("la primera es la más cercana") pasaba
+//     porque comparaba contra 2027, y un evento de abril también cumple eso.
+//
+// La regla de Memo es una: PRÓXIMOS PRIMERO (el más cercano arriba), los sin
+// fecha después, y los PASADOS al final. Vive aquí y solo aquí.
+//
+// `hoy` se pregunta en hora de MÉXICO: `new Date()` a secas pasadas las 6 de la
+// tarde ya es mañana en Greenwich, y un evento de hoy se iría a "pasados".
+
+// La fecha que ordena a un evento es la PRIMERA de dsList si es multifecha —
+// la misma convención que usa el resto de la casa.
+function _evFechaOrden(e) {
+  const l = (e && Array.isArray(e.dsList) && e.dsList.length) ? e.dsList : (e && e.ds ? [e.ds] : []);
+  // Capsule guarda su lista con la forma de la BD (`fecha`, `nombre`), no la
+  // del catálogo (`ds`, `a`). Se acepta aquí para que siga habiendo UNA regla:
+  // un segundo sort "casi igual" es justo lo que esta tuerca vino a quitar.
+  return l[0] || (e && e.fecha) || '';
+}
+
+// 0 = próximo · 1 = sin fecha (por confirmar) · 2 = pasado
+function _evGrupoOrden(e, hoy) {
+  const f = _evFechaOrden(e);
+  if (!f) return 1;
+  return f >= hoy ? 0 : 2;
+}
+
+// Devuelve una COPIA ordenada. No muta la lista que le pasan: varias pantallas
+// comparten el mismo array cacheado del catálogo, y ordenarlo en el sitio le
+// cambiaría el orden a quien no lo pidió.
+function _evOrdenarPorFecha(lista, hoyISO) {
+  const hoy = hoyISO || _mxFechaStr();
+  return (Array.isArray(lista) ? lista : []).slice().sort((a, b) => {
+    const ga = _evGrupoOrden(a, hoy), gb = _evGrupoOrden(b, hoy);
+    if (ga !== gb) return ga - gb;
+    const fa = _evFechaOrden(a), fb = _evFechaOrden(b);
+    // Próximos: el más cercano arriba. Pasados: el más reciente arriba (el de
+    // hace un mes se trabaja más que el del año pasado). Sin fecha: por nombre,
+    // que es lo único que los distingue.
+    if (ga === 0) return fa.localeCompare(fb);
+    if (ga === 2) return fb.localeCompare(fa);
+    return String(a.a || a.nombre || a.id).localeCompare(String(b.a || b.nombre || b.id), 'es', { sensitivity: 'base' });
+  });
+}
 // Saludo por hora MX: 05:00–11:59 días · 12:00–18:59 tardes · 19:00–04:59 noches.
 function _saludoHora() { const h = _mxHoraNum(); return (h >= 19 || h < 5) ? 'Buenas noches' : (h < 12 ? 'Buenos días' : 'Buenas tardes'); }
 
@@ -4833,10 +4888,11 @@ function _renderResumenProximos(ev, activos) {
   const el = document.getElementById('proximos-eventos');
   if (!el) return;
   const today = _cobHoyISO();
-  const futuros = (ev || [])
-    .filter(e => e && e.id && e.a && (!e.ds || e.ds >= today))
-    .slice()
-    .sort((a, b) => String(a.ds || '9999').localeCompare(String(b.ds || '9999')))
+  // [ORD-1] La regla compartida. Con la lista ya filtrada a futuros el
+  // resultado es el mismo; se usa igual para que UNA función gobierne el
+  // orden y un cambio futuro llegue aquí solo.
+  const futuros = _evOrdenarPorFecha((ev || [])
+    .filter(e => e && e.id && e.a && (!e.ds || e.ds >= today)))
     .slice(0, 10);
 
   if (!futuros.length) {
@@ -5017,8 +5073,9 @@ async function _poblarFiltroEventoPagos() {
   if (_cobranzaEventoSelectPoblado) return;
   const sel = document.getElementById('filtro-evento-pagos');
   const ev = await _fetchEVFromIndex();
-  const eventos = (ev || []).filter(e => e && e.id && e.a)
-    .slice().sort((a, b) => String(b.ds || '').localeCompare(String(a.ds || '')));
+  // [ORD-1] Antes: DESCENDENTE por ds — el más LEJANO primero y el próximo a
+  // media lista. Ahora la regla compartida: próximos · sin fecha · pasados.
+  const eventos = _evOrdenarPorFecha((ev || []).filter(e => e && e.id && e.a));
   const opciones = [];
   eventos.forEach(e => {
     if (Array.isArray(e.multifecha) && e.multifecha.length) {
@@ -5328,8 +5385,9 @@ async function _evtPoblarSelector() {
   const sel = document.getElementById('selector-evento');
   if (!sel) return;
   const ev = await _fetchEVFromIndex();
-  const eventos = (ev || []).filter(e => e && e.id && e.a)
-    .slice().sort((a, b) => String(b.ds || '').localeCompare(String(a.ds || '')));
+  // [ORD-1] Antes: DESCENDENTE por ds — el más LEJANO primero y el próximo a
+  // media lista. Ahora la regla compartida: próximos · sin fecha · pasados.
+  const eventos = _evOrdenarPorFecha((ev || []).filter(e => e && e.id && e.a));
   while (sel.options.length > 1) sel.remove(1);
   eventos.forEach(e => {
     if (Array.isArray(e.multifecha) && e.multifecha.length) {
@@ -5821,8 +5879,9 @@ let _gastoEditId = null;     // id del gasto en edición; null = modo crear
 async function _poblarSelectsGastos() {
   if (_gastosSelectsPoblado) return;
   const ev = await _fetchEVFromIndex();
-  const eventos = (ev || []).filter(e => e && e.id && e.a)
-    .slice().sort((a, b) => String(b.ds || '').localeCompare(String(a.ds || '')));
+  // [ORD-1] Antes: DESCENDENTE por ds — el más LEJANO primero y el próximo a
+  // media lista. Ahora la regla compartida: próximos · sin fecha · pasados.
+  const eventos = _evOrdenarPorFecha((ev || []).filter(e => e && e.id && e.a));
   const opciones = [];
   eventos.forEach(e => {
     if (Array.isArray(e.multifecha) && e.multifecha.length) {
@@ -6192,8 +6251,9 @@ async function _poblarSelectsIngresos() {
 
   // ── Eventos desde EV (igual que gastos) ──
   const ev = await _fetchEVFromIndex();
-  const eventos = (ev || []).filter(e => e && e.id && e.a)
-    .slice().sort((a, b) => String(b.ds || '').localeCompare(String(a.ds || '')));
+  // [ORD-1] Antes: DESCENDENTE por ds — el más LEJANO primero y el próximo a
+  // media lista. Ahora la regla compartida: próximos · sin fecha · pasados.
+  const eventos = _evOrdenarPorFecha((ev || []).filter(e => e && e.id && e.a));
   const opciones = [];
   eventos.forEach(e => {
     if (Array.isArray(e.multifecha) && e.multifecha.length) {
@@ -6798,8 +6858,12 @@ async function loadSalidasZona() {
   if (sel && sel.options.length <= 1) {
     try {
       const ev = await _fetchEVFromIndex();
-      const hoy = new Date().toISOString().slice(0, 10);
-      const vivos = (ev || []).filter(e => e && e.id && e.a && (!e.ds || e.ds >= hoy)).sort((a, b) => String(a.ds || '9999').localeCompare(String(b.ds || '9999')));
+      // ⚠️ [ORD-1] Aquí decía `new Date().toISOString()`, que es la fecha de
+      // GREENWICH: pasadas las 6 de la tarde de acá ya es MAÑANA allá, y el
+      // evento de HOY se caía de la lista por "pasado". El helper de la casa
+      // es `_mxFechaStr()`. No es un cambio de orden: es un bug de frontera.
+      const hoy = _mxFechaStr();
+      const vivos = _evOrdenarPorFecha((ev || []).filter(e => e && e.id && e.a && (!e.ds || e.ds >= hoy)));
       vivos.forEach(e => { const o = document.createElement('option'); o.value = e.id; o.textContent = e.a + (e.f ? ' · ' + e.f : ''); sel.appendChild(o); });
     } catch (e) { /* select vacío: sin catálogo */ }
   }
@@ -7592,11 +7656,11 @@ function _kmsPintaOpciones() {
   if (!sel) return;
   const elegido = sel.value;
   const q = _kmNorm(String((document.getElementById('kms-ebusca') || {}).value || '').trim());
-  const lista = _kmsEVCache
+  // [ORD-1] Antes era fecha ASCENDENTE a secas, que pone los PASADOS primero.
+  // Ahora la regla compartida: próximos · sin fecha · pasados.
+  const lista = _evOrdenarPorFecha(_kmsEVCache
     .filter((e) => e && e.id)
-    .filter((e) => !q || _kmNorm(String(e.a || e.id)).includes(q) || _kmNorm(String(e.v || '')).includes(q))
-    .slice()
-    .sort((a, b) => _kmsFechaDe(a).localeCompare(_kmsFechaDe(b)));
+    .filter((e) => !q || _kmNorm(String(e.a || e.id)).includes(q) || _kmNorm(String(e.v || '')).includes(q)));
   sel.innerHTML = '<option value="">— Elige un evento —</option>' + lista
     .map((e) => `<option value="${_esfEsc(e.id)}">${_esfEsc(e.a || e.id)}${e.f ? ' · ' + _esfEsc(e.f) : ''}</option>`)
     .join('');
@@ -8400,10 +8464,8 @@ async function _kamPopulateEventos() {
   if (!sel) return;
   try {
     const ev = await _fetchEVFromIndex();
-    const opts = (Array.isArray(ev) ? ev : [])
-      .filter((e) => e && e.id)
-      .slice()
-      .sort((a, b) => String(a.a || a.id).localeCompare(String(b.a || b.id)))
+      // [ORD-1] Por FECHA, con la regla compartida. Antes iba por NOMBRE.
+    const opts = _evOrdenarPorFecha((Array.isArray(ev) ? ev : []).filter((e) => e && e.id))
       .map((e) => `<option value="${_esfEsc(e.id)}">${_esfEsc(e.a || e.id)}</option>`)
       .join('');
     sel.innerHTML = '<option value="">— Elige un evento —</option>' + opts;
@@ -8426,10 +8488,8 @@ async function _comPopulateEventos() {
   try {
     const ev = await _fetchEVFromIndex();
     _comEVCache = Array.isArray(ev) ? ev : [];
-    const opts = _comEVCache
-      .filter((e) => e && e.id)
-      .slice()
-      .sort((a, b) => String(a.a || a.id).localeCompare(String(b.a || b.id)))
+      // [ORD-1] Por FECHA, con la regla compartida. Antes iba por NOMBRE.
+    const opts = _evOrdenarPorFecha(_comEVCache.filter((e) => e && e.id))
       .map((e) => `<option value="${_comEsc(e.id)}">${_comEsc(e.a || e.id)}</option>`)
       .join('');
     sel.innerHTML = '<option value="">— Elige un evento —</option>' + opts;
@@ -8612,10 +8672,8 @@ async function _liqPopulateEventos() {
   try {
     const ev = await _fetchEVFromIndex();
     _liqEVCache = Array.isArray(ev) ? ev : [];
-    const opts = _liqEVCache
-      .filter((e) => e && e.id)
-      .slice()
-      .sort((a, b) => String(a.a || a.id).localeCompare(String(b.a || b.id)))
+      // [ORD-1] Por FECHA, con la regla compartida. Antes iba por NOMBRE.
+    const opts = _evOrdenarPorFecha(_liqEVCache.filter((e) => e && e.id))
       .map((e) => `<option value="${_esfEsc(e.id)}">${_esfEsc(e.a || e.id)}</option>`)
       .join('');
     sel.innerHTML = '<option value="">— Elige un evento —</option>' + opts;
@@ -11686,8 +11744,11 @@ async function loadCapsule() {
     const ev = await _fetchEVFromIndex();
     _ccEventosCache = (ev || [])
       .filter(e => e && e.id && e.a)
-      .map(_ccEvFromEV)
-      .sort((a, b) => String(b.fecha || '').localeCompare(String(a.fecha || '')));
+      .map(_ccEvFromEV);
+    // [ORD-1] Ordenaba DESCENDENTE: el evento más lejano arriba y el próximo a
+    // media lista. Es la parrilla de eventos de Capsule, la misma regla que
+    // todo lo demás.
+    _ccEventosCache = _evOrdenarPorFecha(_ccEventosCache);
     renderCCEventos(_ccEventosCache, 'todos');
   } catch(e) {
     if (g) g.innerHTML = `<div class="alert alert-error">${e.message}</div>`;

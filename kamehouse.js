@@ -31,18 +31,15 @@ let disenoLoaded = false;
 // el hueco se cierra en la fuente: la lista del barrido se DERIVA de las
 // pantallas que existen, no se escribe a mano al lado.
 const PERMISOS_TABS = {
-  maestro_roshi: ['resumen','pagos','eventos','gastos','ingresos','saldos','ventas','cotizar','inventario','reportes','capsule','solicitudes_portal','equipo','kamisama','herramientas','radar','montana','yamcha','radio','esferas','contratos','waitlist','recibos','diseno'],
-  bulma:         ['resumen','pagos','eventos','gastos','ingresos','saldos','ventas','cotizar','inventario','reportes','capsule','solicitudes_portal','equipo','herramientas'],
+  maestro_roshi: ['resumen','pagos','eventos','gastos','ingresos','saldos','inventario','reportes','capsule','solicitudes_portal','equipo','kamisama','herramientas','radar','montana','yamcha','radio','esferas','contratos','waitlist','recibos','diseno'],
+  bulma:         ['resumen','pagos','eventos','gastos','ingresos','saldos','inventario','reportes','capsule','solicitudes_portal','equipo','herramientas'],
   mister_popo:   ['inventario','reportes','equipo'],
   coordinador:   ['inventario','reportes','equipo'],
   cc:            ['equipo'],
-  // Vendedor: su sección de Ventas (Cotizar/Vender + Mis Ventas) + Guerreros Z.
-  // (Antes tenía 'ventas' —el dashboard de finanzas admin— que le devolvía 403.)
-  vendedor:      ['cotizar','equipo'],
   // Milk (2ª auxiliar administrativa): paridad operativa con Bulma (F2) + finanzas
   // operativas (gastos/ingresos/saldos). SIN: 'ventas' (utilidad maestra), 'inventario'
   // (Torre → F3), ni kamisama/radar/montana/yamcha/radio (vetados / roshi-only).
-  milk:          ['resumen','pagos','eventos','gastos','ingresos','saldos','cotizar','inventario','reportes','capsule','solicitudes_portal','equipo','herramientas']
+  milk:          ['resumen','pagos','eventos','gastos','ingresos','saldos','inventario','reportes','capsule','solicitudes_portal','equipo','herramientas']
 };
 
 // Qué tabs de Guerreros Z puede ver cada rol
@@ -52,7 +49,6 @@ const GZ_TABS_PERMITIDAS = {
   mister_popo:   ['lista','miperfil'],
   coordinador:   ['lista','miperfil'],
   cc:            ['lista','miperfil'],
-  vendedor:      ['lista','miperfil'],
   milk:          ['lista','miperfil'],   // ve el equipo y su perfil; NO 'invitar' (crear cuentas vetado)
 };
 
@@ -358,7 +354,7 @@ function checkSession() {
 function enterApp() {
   document.getElementById('login-screen').style.display = 'none';
   document.getElementById('app').classList.add('visible');
-  const roleLabels = { maestro_roshi:'Maestro Roshi', bulma:'Bulma', mister_popo:'Maestro Karin', coordinador:'Coordinador', cc:'CC', vendedor:'Vendedor', milk:'Milk' };
+  const roleLabels = { maestro_roshi:'Maestro Roshi', bulma:'Bulma', mister_popo:'Maestro Karin', coordinador:'Coordinador', cc:'CC', milk:'Milk' };
   document.getElementById('topbar-user-info').textContent = `${currentUser.nombre} · ${roleLabels[currentUser.rol] || currentUser.rol}`;
   aplicarPermisosUI();
   aplicarTemaCoordi();
@@ -530,29 +526,6 @@ function seleccionarTema(hex, el) {
 // PERMISOS_TABS quedaría sin candado, y eso tiene que tronar.
 const TABS_CON_PERMISO = new Set(Object.values(PERMISOS_TABS).flat());
 
-// [VEN-PAUSA-1] MÓDULOS EN PAUSA — un interruptor, no una amputación.
-//
-// El módulo de vendedores (vender, cotizar, comisiones y wizard CHEAP) se pausa
-// ESCONDIDO por decisión de Memo: se replantea después, no se borra. Las
-// pantallas, los endpoints, el candado de 3 meses y los datos siguen donde
-// estaban; lo único que cambia es que nadie puede llegar.
-//
-// ⚠️ POR QUÉ UN VETO Y NO UNA RESTA. El camino obvio sería vaciar 'cotizar' y
-// 'ventas' de PERMISOS_TABS. Eso REABRE el hoyo de E5-4: TABS_CON_PERMISO se
-// deriva de esa tabla, así que al restar el tab también sale de la unión — y
-// `showPage` deja de filtrarlo. El módulo "pausado" quedaría ABIERTO a
-// cualquiera que escriba showPage('cotizar'). Por eso la pausa se SUMA al
-// candado en _puedeVerTab y PERMISOS_TABS queda INTACTA.
-//
-// 🔌 CÓMO REVIVE (3 ediciones, cero arqueología):
-//   1. vaciar este Set,
-//   2. vaciar el Set gemelo de netlify/functions/_lib/modulos-pausados.js,
-//   3. descomentar [functions."ventas-limite-cron"] en netlify.toml.
-// El arnés carea los dos Sets: si divergen, truena.
-//
-// ⚰️ Muere con la pausa el pendiente "capturar las primeras comisiones CHEAP"
-//    (wizard F5a). Si algún día se replantea el módulo, se replantea también.
-const MODULOS_PAUSADOS = new Set(['cotizar', 'ventas']);
 
 // [E5-5] EL ATERRIZAJE POR ROL — la preferencia PROPONE, _puedeVerTab DISPONE.
 //
@@ -646,9 +619,6 @@ function _renderAtajosHome() {
 // showPage y showHerramienta — para que "lo que se ve" y "a dónde se puede
 // entrar" no puedan separarse nunca. Sin sesión no se ve nada: el lado seguro.
 function _puedeVerTab(tab) {
-  // [VEN-PAUSA-1] La pausa manda sobre cualquier permiso: ni el rol, ni un
-  // tabs_extra, ni maestro_roshi entran a un módulo pausado.
-  if (MODULOS_PAUSADOS.has(tab)) return false;
   if (!currentUser) return false;
   const base = PERMISOS_TABS[currentUser.rol] || [];
   const extras = currentUser.permisos_extra?.tabs_extra || [];
@@ -911,23 +881,6 @@ const khReportes = {
   marcarKitsRecibidos(id, kits_detalle) { return this._call({ accion: 'marcar_kits_recibidos', id, kits_detalle }); },
   eliminar(id) { return this._call({ accion: 'eliminar', id }); },
 };
-
-// [sec-ventas] Acceso a la vista resumen_eventos vía Netlify Function con
-// service_role (cierra el último acceso anon de finanzas). Gateado a admin
-// (maestro_roshi, bulma) mientras el rol vendedor / "Mis Ventas" no exista.
-const khVentas = {
-  async _call(payload) {
-    const r = await khAdminFetch('/.netlify/functions/admin-ventas-resumen', {
-      method: 'POST', body: JSON.stringify(payload),
-    });
-    const j = await r.json().catch(() => ({}));
-    if (!r.ok || j.ok === false) throw new Error(j.error || ('admin-ventas-resumen ' + r.status));
-    return j;
-  },
-  // listar() → array de eventos de la vista resumen_eventos
-  listar() { return this._call({ accion: 'listar' }).then(j => j.eventos || []); },
-};
-
 // [sec-tours] Acceso a tours_pasados vía Netlify Function con service_role
 // (cerramos lectura/escritura anon). Lectura: cualquier logueado. Crear/eliminar:
 // el backend exige que el tour sea del propio usuario salvo admin (maestro_roshi/bulma).
@@ -2368,14 +2321,12 @@ function showPage(name, etiqueta) {
 }
 
 function loadPage(name) {
- if (name === 'cotizar') loadCotizar();
  if (name === 'resumen') loadResumen();
  if (name === 'pagos') loadPagos();
  if (name === 'eventos') _evtPoblarSelector();
  if (name === 'gastos') loadGastos();
  if (name === 'ingresos') loadIngresos();
  if (name === 'saldos') loadSaldos();
- if (name === 'ventas') loadVentas();
  if (name === 'inventario') loadInventario();
  if (name === 'reportes') loadReportes();
  if (name === 'capsule') loadCapsule();
@@ -6846,62 +6797,6 @@ function _renderSaldoDetalle(c) {
         <span>= Saldo</span><span style="color:${Number(c.saldo) >= 0 ? 'var(--green)' : 'var(--red)'}">${_spFmtMxn(c.saldo)}</span>
       </div>`;
 }
-
-// ═══════════════════════════════════════════════════════════════
-// MIS VENTAS
-// ═══════════════════════════════════════════════════════════════
-async function loadVentas() {
- const el = document.getElementById('ventas-content');
- el.innerHTML = '<div class="loading-state"><div class="spinner"></div>Cargando…</div>';
- try {
- const eventos = await khVentas.listar();
- if (!eventos.length) {
- el.innerHTML = '<div class="empty-state"><div class="empty-icon"></div>Sin datos aún</div>';
- return;
- }
- el.innerHTML = eventos.map(ev => `
- <div class="card" style="margin-bottom:12px">
- <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px">
- <div>
- <div style="font-family:\'Barlow Condensed\',sans-serif;font-size:18px;font-weight:800">
- ${_esfEsc(ev.artista || ev.nombre)}
- </div>
- <div style="font-size:11px;color:var(--ts)">${fmtFecha(ev.fecha)} · ${_esfEsc(ev.ciudad)}</div>
- </div>
- <div style="text-align:right">
- ${badgeStatus(ev.status)}
- <div style="font-size:11px;color:var(--ts);margin-top:4px">${ev.total_viajeros} viajeros</div>
- </div>
- </div>
- <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:12px">
- <div>
- <div style="font-size:9px;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:var(--ts);margin-bottom:4px">Facturado</div>
- <div style="font-family:\'Barlow Condensed\',sans-serif;font-size:20px;font-weight:900">${formatMXN(ev.total_cobrar)}</div>
- </div>
- <div>
- <div style="font-size:9px;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:var(--ts);margin-bottom:4px">Cobrado</div>
- <div style="font-family:\'Barlow Condensed\',sans-serif;font-size:20px;font-weight:900;color:var(--green)">${formatMXN(ev.total_cobrado)}</div>
- </div>
- <div>
- <div style="font-size:9px;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:var(--ts);margin-bottom:4px">${(ev.total_pendiente != null && ev.total_pendiente < 0) ? 'A favor' : 'Pendiente'}</div>
- <div style="font-family:\'Barlow Condensed\',sans-serif;font-size:20px;font-weight:900;color:var(--red)">${formatMXN(ev.total_pendiente == null ? ev.total_pendiente : Math.abs(ev.total_pendiente))}</div>
- </div>
- <div>
- <div style="font-size:9px;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:var(--ts);margin-bottom:4px">Costos</div>
- <div style="font-family:\'Barlow Condensed\',sans-serif;font-size:20px;font-weight:900;color:var(--ts)">${formatMXN(ev.total_costos)}</div>
- </div>
- <div>
- <div style="font-size:9px;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:var(--ts);margin-bottom:4px">Utilidad</div>
- <div style="font-family:\'Barlow Condensed\',sans-serif;font-size:20px;font-weight:900;color:${ev.utilidad_actual >= 0 ? 'var(--green)' : 'var(--red)'}">${formatMXN(ev.utilidad_actual)}</div>
- </div>
- </div>
- </div>
- `).join('');
- } catch(e) {
- el.innerHTML = `<div class="alert alert-error">${e.message}</div>`;
- }
-}
-
 // ═══════════════════════════════════════════════════════════════
 // INVENTARIO
 // ═══════════════════════════════════════════════════════════════
@@ -9689,7 +9584,6 @@ const ROL_LABELS = {
   mister_popo: 'Maestro Karin',
   coordinador: 'Coordinador',
   cc: 'Creador de Contenido',
-  vendedor: 'Vendedor'
 };
 
 const PUNTOS_TOUR = {
@@ -9825,42 +9719,6 @@ async function loadEquipo() {
   showGZTab(tabInicial, btnInicial);
 }
 
-// 💤 F6: inactividad de vendedores (solo admin, best-effort). id → info del
-// endpoint admin-vendedor-inactividad; si falla, nadie se marca.
-let _gzInactividad = null;
-async function _gzCargarInactividad() {
-  if (!currentUser || (currentUser.rol !== 'maestro_roshi' && currentUser.rol !== 'bulma')) return;
-  try {
-    const r = await khAdminFetch('/.netlify/functions/admin-vendedor-inactividad', {
-      method: 'POST', body: JSON.stringify({ accion: 'estado' }),
-    });
-    const j = await r.json().catch(() => ({}));
-    if (r.ok && j.ok && Array.isArray(j.vendedores)) {
-      _gzInactividad = {};
-      j.vendedores.forEach(v => { if (v && v.id) _gzInactividad[v.id] = v; });
-    }
-  } catch (e) { /* best-effort: sin chip */ }
-}
-
-// "Dar otra oportunidad": quita el sello (vendedor_bloqueado_at = NULL) Y
-// reinicia el reloj (vendedor_reactivado_at = ahora). Es el ÚNICO camino de
-// vuelta junto con reactivar la cuenta en Guerreros Z — la regla es rodante y
-// de puerta cerrada: quien se bloquea no se auto-desbloquea aunque venda.
-// NO destructivo — el usuario no se borra ni cambia de rol.
-async function gzReactivarVendedor(userId, nombre) {
-  if (!confirm(`¿Dar otra oportunidad a ${nombre}? Se le quita la pausa y el reloj de inactividad se reinicia desde hoy (3 meses).`)) return;
-  try {
-    const r = await khAdminFetch('/.netlify/functions/admin-vendedor-inactividad', {
-      method: 'POST', body: JSON.stringify({ accion: 'reactivar', usuario_id: userId }),
-    });
-    const j = await r.json().catch(() => ({}));
-    if (!r.ok || !j.ok) throw new Error(j.error || ('Error ' + r.status));
-    showToast('Reactivado ✓ — pausa levantada, el reloj cuenta desde hoy', 'success');
-    _gzInactividad = null;
-    await _gzCargarInactividad();
-    renderGZ();
-  } catch (e) { showToast(e.message, 'error'); }
-}
 
 // ═══════════════════════════════════════════════════════════════════════════
 // [EQ-1] EL MAPA rol → contratos. SELLADO POR MEMO el 31-jul-2026.
@@ -9892,12 +9750,10 @@ const ROL_CONTRATOS = {
   mister_popo:   ['auxiliar_admin', 'coordinador'], // Maestro Karin: auxiliar Y coordinador; la custodia va como casilla en su contrato de coordinador
   coordinador:   ['coordinador'],
   cc:            ['creadora_team'],
-  vendedor:      [], // INTENCIONAL — ver nota abajo
 };
 // Por qué un rol NO firma. Vacío = el rol sí firma (o no aplica el aviso).
 const ROL_SIN_CONTRATO = {
   maestro_roshi: 'no aplica: es la dirección',
-  vendedor:      'sin contrato: comisionista',
 };
 // [EQ-6] Las plantillas que NO cuelgan de un evento. Decisión de negocio de
 // Memo: el contrato de coordinador es ANUAL (cubre los eventos que le toquen
@@ -10029,7 +9885,7 @@ function _gzChipContrato(u) {
 }
 
 // 🧊 [TORRE O4] "Trae prestado": quién anda con piezas RETORNABLES que aún no
-// regresan. Mismo molde que _gzCargarInactividad/_gzCargarContratos — cómputo
+// regresan. Mismo molde que _gzCargarContratos — cómputo
 // server-side (admin-salidas prestado_equipo, roles del cuidador) y fails-soft
 // ESTRICTO: si el cálculo truena, _gzPrestado se queda en {} y Guerreros Z
 // carga exactamente como hoy, sin un solo chip. Nunca viajan costos.
@@ -10094,41 +9950,10 @@ function gzVerPrestado(userId) {
     <div class="gzp-pie">Solo informativo. El regreso se palomea en la Torre de Karin, al recibir los kits.</div>`;
 }
 
-// Chip del candado de inactividad. Dos estados distintos:
-//   · bloqueado = ya tiene el SELLO puesto → la puerta está cerrada AHORA y no
-//     se abre sola aunque venda (solo Memo la abre).
-//   · inactivo  = pasó los 3 meses desde su última venta pero todavía no ha
-//     tocado la puerta, así que aún no hay sello. Es el aviso anticipado.
-function _gzChipInactivo(u) {
-  // [EQ-2] Si la cuenta está PAUSADA, el sello de ventas sobra: la puerta ya
-  // está cerrada por arriba, y reactivar lo limpia solo (admin-usuarios). Sin
-  // esta línea la tarjeta salía con DOS botones que hacen casi lo mismo
-  // ("Reactivar" y "Dar otra oportunidad") y el de abajo no alcanzaba.
-  if (u && u.activo === false) return '';
-  if (!u || u.rol !== 'vendedor' || !_gzInactividad) return '';
-  const info = _gzInactividad[u.id];
-  if (!info || (!info.inactivo && !info.bloqueado)) return '';
-  const sellado = !!info.bloqueado;
-  const etiqueta = sellado
-    ? '🚪 acceso pausado por inactividad'
-    : '💤 sin ventas en 3 meses';
-  const detalle = info.ultima_venta
-    ? `última venta: ${_salEsc(String(info.ultima_venta).slice(0, 10))}`
-    : 'nunca ha vendido';
-  // [KH-2] El chip se pintaba con estilo EN LÍNEA y su propio radio de 4px.
-  // Ahora es una clase de kamehouse.css con --r-chip, como los demás chips.
-  // El texto y la lógica no cambian: solo dónde vive la apariencia.
-  return `<div style="margin-top:8px;display:flex;flex-direction:column;gap:6px;align-items:center">
-    <span class="gz-chip-inactivo">${_salEsc(etiqueta)}</span>
-    <span class="gz-chip-nota">${detalle}</span>
-    <button class="btn btn-ghost btn-sm" style="font-size:10px;padding:3px 10px" onclick="event.stopPropagation();gzReactivarVendedor('${_attrJs(u.id)}','${_attrJs(u.nombre)}')">Dar otra oportunidad</button>
-  </div>`;
-}
 
 async function renderGZ() {
   const grid = document.getElementById('gz-grid');
   if (!grid) return;
-  if (_gzInactividad === null) await _gzCargarInactividad();
   if (_gzContratos === null) await _gzCargarContratos();
   if (_gzPrestado === null) await _gzCargarPrestado(); // [O4] fails-soft: {} = sin chips
   // [EQ-2] La vista de pausados es solo de admins. El botón escondido no es un
@@ -10206,7 +10031,7 @@ async function renderGZ() {
             <div class="gz-stat-label">strikes</div>
           </div>`}
         </div>
-        ${_gzChipContrato(u)}${_gzBloquePausado(u)}${_gzChipInactivo(u)}
+        ${_gzChipContrato(u)}${_gzBloquePausado(u)}
       </div>
     </div>`;
   }).join('');
@@ -10267,9 +10092,10 @@ function _gzVacio(vista, nPausados, nActivos) {
 // el manual.
 function _gzBloquePausado(u) {
   if (!u || u.activo !== false) return '';
-  const aviso = u.rol === 'vendedor'
-    ? 'Se le abre la puerta de ventas otra vez; el sistema tarda hasta 5 minutos en dejarlo vender.'
-    : 'Su acceso vuelve enseguida; si algo se ve viejo, tarda hasta 5 minutos.';
+  // [VEN-BORRA-1b] Antes bifurcaba: el vendedor tenía su propio texto. Sin ese
+  // rol la rama era inalcanzable, y una rama muerta se lee como si algo pudiera
+  // pasar por ahí.
+  const aviso = 'Su acceso vuelve enseguida; si algo se ve viejo, tarda hasta 5 minutos.';
   return `<div style="margin-top:8px;display:flex;flex-direction:column;gap:6px;align-items:center">
     <span class="gz-chip-inactivo">pausado</span>
     <span class="gz-chip-nota">${_salEsc(aviso)}</span>
@@ -10427,7 +10253,7 @@ async function resetearPassword(userId, nombre) {
 }
 
 async function cambiarRol(userId, rolActual) {
-  const roles = ['coordinador','mister_popo','bulma','cc','vendedor'];
+  const roles = ['coordinador','mister_popo','bulma','cc'];
   const nuevoRol = prompt(`Rol actual: ${rolActual}\n\nEscribe el nuevo rol:\n${roles.join(', ')}`);
   if (!nuevoRol || !roles.includes(nuevoRol)) return;
   try {
@@ -16470,7 +16296,7 @@ async function loadMTResumen() {
     ]);
     const porRol = {};
     usuarios.forEach(u => { porRol[u.rol] = (porRol[u.rol]||0)+1; });
-    const rolLabels = { maestro_roshi:'Maestro Roshi', bulma:'Bulma', mister_popo:'Maestro Karin', coordinador:'Coordi', cc:'CC', vendedor:'Vendedor' };
+    const rolLabels = { maestro_roshi:'Maestro Roshi', bulma:'Bulma', mister_popo:'Maestro Karin', coordinador:'Coordi', cc:'CC' };
 
     el.innerHTML = `
       <!-- Métricas rápidas -->
@@ -16535,7 +16361,7 @@ function filtrarMTUsuarios() {
 function renderMTUsuarios(lista) {
   const list = document.getElementById('mt-usuarios-list');
   if (!lista.length) { list.innerHTML='<div class="empty-state">Sin resultados</div>'; return; }
-  const rolLabels = { maestro_roshi:'Maestro Roshi', bulma:'Bulma', mister_popo:'Maestro Karin', coordinador:'Coordinador', cc:'CC', vendedor:'Vendedor' };
+  const rolLabels = { maestro_roshi:'Maestro Roshi', bulma:'Bulma', mister_popo:'Maestro Karin', coordinador:'Coordinador', cc:'CC' };
   list.innerHTML = lista.map(u => `
     <div style="background:var(--bg2);border:1px solid ${u.activo?'var(--border)':'rgba(255,68,68,.2)'};border-radius:var(--radius);padding:14px 18px;margin-bottom:8px;display:flex;align-items:center;gap:14px;flex-wrap:wrap">
       <div style="width:36px;height:36px;border-radius:50%;background:var(--bg3);overflow:hidden;flex-shrink:0;display:flex;align-items:center;justify-content:center">
@@ -16619,8 +16445,8 @@ async function abrirEditarUsuarioMT(id) {
   }
   // Source of truth para guardarUsuarioMT — no dependemos de un input hidden.
   _mtEditandoUserId = u.id;
-  const rolOpts = ['maestro_roshi','bulma','mister_popo','coordinador','cc','vendedor'];
-  const rolLabels = { maestro_roshi:'Maestro Roshi', bulma:'Bulma', mister_popo:'Maestro Karin', coordinador:'Coordinador', cc:'CC', vendedor:'Vendedor' };
+  const rolOpts = ['maestro_roshi','bulma','mister_popo','coordinador','cc'];
+  const rolLabels = { maestro_roshi:'Maestro Roshi', bulma:'Bulma', mister_popo:'Maestro Karin', coordinador:'Coordinador', cc:'CC' };
   // Tabs extra / bloqueadas actuales
   const permisos = u.permisos_extra || {};
   const tabsExtra = permisos.tabs_extra || [];
@@ -16783,7 +16609,7 @@ async function loadMTStrikes() {
     const usuarios = await khUsuarios.listar({ orden: 'strikes' }); // [sec-usuarios]
     const conStrikes = usuarios.filter(u => (u.strikes||0) > 0);
     const sinStrikes = usuarios.filter(u => (u.strikes||0) === 0);
-    const rolLabels = { maestro_roshi:'Maestro Roshi', bulma:'Bulma', mister_popo:'Maestro Karin', coordinador:'Coordinador', cc:'CC', vendedor:'Vendedor' };
+    const rolLabels = { maestro_roshi:'Maestro Roshi', bulma:'Bulma', mister_popo:'Maestro Karin', coordinador:'Coordinador', cc:'CC' };
 
     list.innerHTML = `
       <div style="margin-bottom:20px">
@@ -20419,561 +20245,6 @@ function _delivRefreshProfile(userId) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// VENTAS · vendedores (F3) — Cotizar/Vender + Mis Ventas
-// El precio es SIEMPRE del catálogo (candado): el vendedor no teclea precios.
-// El display se calcula con _vtaCalc (port FIEL de _lib/precio-zona) y el backend
-// lo re-sella con resolverPrecioVenta al registrar → mismo snapshot.
-// ═══════════════════════════════════════════════════════════════
-let _vtaEV = null;         // catálogo EV (crudo) cacheado
-let _vtaEvento = null;     // evento seleccionado (objeto EV)
-let _vtaAgotadas = {};     // evento_id → Set de zonas agotadas (disponibilidad-evento)
-let _vtaVentasCache = [];  // última lista de Mis Ventas (para el botón de cancelar)
-// F5a — CHEAP de vendedor: costo por zona desde comisiones_zona (matriz+comisión).
-// evento_id(#idx) → { zona → {costo, stock, agotada} }. SOLO costo final (sin desglose).
-let _vtaCostoCheap = {};
-
-function _vtaEsc(s) { return _escCtr(s); }
-function _vtaFmt(n) { return '$' + Math.round(Number(n) || 0).toLocaleString('es-MX'); }
-
-// Días naturales evento−hoy (mediodía UTC) — igual que _lib/precio-zona.
-function _vtaDias(evISO, hoyISO) {
-  const m1 = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(evISO || ''));
-  const m2 = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(hoyISO || ''));
-  if (!m1 || !m2) return null;
-  return Math.round((Date.UTC(+m1[1], +m1[2] - 1, +m1[3]) - Date.UTC(+m2[1], +m2[2] - 1, +m2[3])) / 86400000);
-}
-function _vtaHoyMx() { return new Date().toLocaleDateString('en-CA', { timeZone: 'America/Monterrey' }); }
-// [AUD-2] Listas de hotel globales del index (las llena _fetchEVFromIndex).
-let _vtaHoteles = {};
-// Texto crudo de `var HOTEL_*=[...]` del index, por balanceo de corchetes.
-function _vtaDeclaracionesHotel(html) {
-  const out = [];
-  for (const nombre of ['HOTEL_STD', 'HOTEL_MTY', 'HOTEL_CDM']) {
-    const m = String(html).match(new RegExp('var\\s+' + nombre + '\\s*=\\s*\\['));
-    if (!m) continue;
-    const start = m.index + m[0].length - 1;
-    let depth = 0, inStr = false, sc = '', esc = false, end = -1;
-    for (let i = start; i < html.length; i++) {
-      const ch = html[i];
-      if (esc) { esc = false; continue; }
-      if (inStr) { if (ch === '\\') { esc = true; continue; } if (ch === sc) inStr = false; continue; }
-      if (ch === '"' || ch === "'") { inStr = true; sc = ch; continue; }
-      if (ch === '[') depth++;
-      else if (ch === ']') { depth--; if (!depth) { end = i + 1; break; } }
-    }
-    if (end > 0) out.push('var ' + nombre + '=' + html.slice(start, end) + ';');
-  }
-  return out.join('');
-}
-// [AUD-2] Cascada de hotel — espejo EXACTO del index y de _lib/precio-zona.
-function _vtaHotelLista(ev, fi, cdmx) {
-  if (ev.hotelOverride && Array.isArray(ev.hotel) && ev.hotel.length) return ev.hotel;
-  const mf = ev.multifecha && ev.multifecha[fi];
-  if (mf && Array.isArray(mf.hotel) && mf.hotel.length) return mf.hotel;
-  const glob = cdmx ? _vtaHoteles.cdm : _vtaHoteles.mty;
-  if (Array.isArray(glob) && glob.length) return glob;
-  return Array.isArray(ev.hotel) ? ev.hotel : [];
-}
-function _vtaEsCDMX(ev) { const v = ev && ev.v ? String(ev.v).toUpperCase() : ''; return v.includes('CDMX') || v.includes('CIUDAD DE MEXICO'); }
-function _vtaZonaLista(ev, paquete, fi) { const mf = ev.multifecha && ev.multifecha[fi]; if (paquete === 'cheap') return (mf && mf.cheapZonas) || ev.cheapZonas || []; return (mf && mf.zonas) || ev.zonas || []; }
-
-// PORT FIEL de _lib/precio-zona._calcularPrecio (display; el backend re-sella).
-function _vtaCalc(ev, opts) {
-  if (!ev) return { ok: false, motivo: 'evento no encontrado' };
-  const paquete = String(opts.paquete || '').toLowerCase();
-  if (['plus', 'ride', 'stay', 'cheap'].indexOf(paquete) < 0) return { ok: false, motivo: 'paquete inválido' };
-  const selViaj = Math.floor(Number(opts.num_personas) || 0);
-  if (selViaj < 1) return { ok: false, motivo: 'num_personas inválido' };
-  const fi = Number.isFinite(Number(opts.fecha_idx)) ? Number(opts.fecha_idx) : 0;
-  const hoyISO = opts.hoyISO || _vtaHoyMx();
-  const cdmx = _vtaEsCDMX(ev);
-  // [AUD-2] Mismos candados que _lib/precio-zona (las 3 copias van a la par).
-  if (Array.isArray(ev.multifecha) && ev.multifecha.length) {
-    if (!Number.isInteger(fi) || fi < 0 || fi >= ev.multifecha.length) return { ok: false, motivo: 'fecha del evento fuera de rango' };
-  } else if (fi !== 0) return { ok: false, motivo: 'el evento no tiene multifecha' };
-  const _st = String(ev.st || '').toLowerCase();
-  if (['agotado', 'por-confirmar', 'proceso', 'proximamente', 'pronto'].indexOf(_st) >= 0) return { ok: false, motivo: `el evento está "${_st}" en el catálogo — no se vende` };
-  const _mfDs = (ev.multifecha && ev.multifecha[fi] && ev.multifecha[fi].ds) || ev.ds || null;
-  const _diasEv = _vtaDias(_mfDs, hoyISO);
-  if (_diasEv != null && _diasEv < 0) return { ok: false, motivo: 'la fecha del evento ya pasó' };
-  const hasZona = (paquete === 'plus' || paquete === 'stay' || paquete === 'cheap') || (paquete === 'ride' && ev.forceZona);
-  const hasHotel = (paquete === 'plus' || paquete === 'ride' || paquete === 'stay') && !ev.noHotel;
-  let selZ = null;
-  if (hasZona) {
-    selZ = _vtaZonaLista(ev, paquete, fi).filter(z => z && z.n === String(opts.zona || ''))[0] || null;
-    // [A6] El texto se alinea al de _lib/precio-zona: la lib es la FUENTE y el
-    // Palacio es el ESPEJO, no al revés. Era el único diff que quedaba entre las
-    // dos copias (3 combos: vaiven cheap sin zonas) y era de palabras, no de
-    // dinero — pero una ley nueva debe amanecer en CERO diffs totales.
-    if (!selZ) return { ok: false, motivo: 'zona no encontrada en el catálogo' };
-    if (selZ.ag) return { ok: false, motivo: 'zona agotada' };                       // [AUD-2]
-    if (selZ.prox) return { ok: false, motivo: 'zona aún no disponible (próximamente)' }; // [AUD-2]
-    if (!(Number(selZ.p) > 0)) return { ok: false, motivo: 'zona agotada / sin precio (p=0)' };
-  }
-  let selH = null;
-  const requiereHotel = hasHotel && !opts.hotel_nombre;
-  if (hasHotel && opts.hotel_nombre) {
-    selH = _vtaHotelLista(ev, fi, cdmx).filter(h => h && h.n === opts.hotel_nombre)[0] || null;
-    if (!selH) return { ok: false, motivo: 'hotel no encontrado en el catálogo' };
-    // Grupo grande (N>4): SOLO compartida (espejo de precio-zona / index).
-    if (selViaj > 4 && !(selH.k === 'compartida' || /^compartida/i.test(selH.n || ''))) return { ok: false, motivo: 'grupo grande: solo habitación compartida' };
-  }
-  const requiereTransporte = cdmx && paquete !== 'cheap' && (opts.transporte_cost == null);
-  const zonaP = selZ ? (Number(selZ.p) || 0) : 0;
-  const hotelRaw = selH ? (Number(selH.e) || 0) : 0;
-  const hotelPP = ev.hotelPP ? hotelRaw : Math.ceil(hotelRaw / selViaj);
-  const hotelTotal = ev.hotelPP ? (hotelRaw * selViaj) : hotelRaw;
-  const _mfR = (ev.multifecha && ev.multifecha[fi] && ev.multifecha[fi].ride) || 0;
-  const rideBase = _mfR || ev.ride || (cdmx ? 2900 : 2700);
-  const stayDiscount = ev.sep || 500;
-  let total = 0, cxp = 0;
-  if (paquete === 'plus') { if (ev.diaFirst) { total = zonaP + hotelTotal; cxp = Math.ceil(zonaP / selViaj) + hotelPP; } else { total = zonaP * selViaj + hotelTotal; cxp = zonaP + hotelPP; } }
-  else if (paquete === 'ride') { const r = (ev.rideOnly && zonaP > 0) ? zonaP : rideBase; total = r * selViaj + hotelTotal; cxp = r + hotelPP; }
-  else if (paquete === 'stay') { cxp = zonaP - stayDiscount + hotelPP; if (cxp < 0) cxp = zonaP + hotelPP; total = cxp * selViaj; }
-  else { if (ev.diaFirst) { total = zonaP; cxp = Math.ceil(zonaP / selViaj); } else { total = zonaP * selViaj; cxp = zonaP; } }
-  // [AUD-2] transporte: nunca negativo, solo CDMX, nunca en CHEAP.
-  const _tcRaw = (opts.transporte_cost != null) ? Number(opts.transporte_cost) : 0;
-  if (!Number.isFinite(_tcRaw)) return { ok: false, motivo: 'transporte_cost inválido' };
-  if (_tcRaw < 0) return { ok: false, motivo: 'transporte_cost no puede ser negativo' };
-  if (_tcRaw > 0 && !cdmx) return { ok: false, motivo: 'transporte_cost solo aplica a eventos de CDMX' };
-  if (_tcRaw > 0 && paquete === 'cheap') return { ok: false, motivo: 'el paquete CHEAP no lleva transporte' };
-  const tCost = _tcRaw;
-  total += tCost * selViaj; cxp += tCost;
-  let separo;
-  if (paquete === 'cheap') {
-    let cs = (ev.sepCheap !== undefined) ? ev.sepCheap : SEPARO_CHEAP_DEFAULT;
-    if (selZ) { const cz = ((ev.multifecha && ev.multifecha[fi] && ev.multifecha[fi].cheapZonas) || ev.cheapZonas || []).filter(z => z && z.n === selZ.n)[0]; if (cz && cz.sepEspecial !== undefined) cs = cz.sepEspecial; }
-    separo = (Number(cs) || 0) * selViaj;
-  } else {
-    const dias = _vtaDias(ev.ds, hoyISO);
-    if (dias != null && dias <= 15) separo = Math.ceil(cxp * 0.5) * selViaj;
-    else { let s = ev.sep; if (paquete === 'ride' && ev.sepRide !== undefined) s = ev.sepRide; if (ev.sepZonas && selZ && ev.sepZonas[selZ.n] !== undefined) s = ev.sepZonas[selZ.n]; separo = (Number(s) || 0) * selViaj; }
-  }
-  if (!(total > 0) || !(cxp > 0)) return { ok: false, motivo: 'precio no disponible (total/costo 0)' };
-  // [AUD-2] el separo ES la ganancia: 0 en plus/ride/stay = catálogo incompleto.
-  if (paquete !== 'cheap' && !(separo > 0)) return { ok: false, indeterminado: true, motivo: 'el evento no tiene separo definido en el catálogo — captúralo antes de vender' };
-  // [COT-FIX-1] Y un separo MAYOR que el total es el estado imposible del otro
-  // lado: devolver `resto` en negativo dejaba cerrar una venta con saldo en
-  // rojo. Va junto a sus tres hermanas de arriba, que ya rechazan transporte
-  // negativo, total en 0 y separo en 0: el hábito estaba, a este caso no le tocó.
-  if (separo > total) return { ok: false, motivo: `el separo (${separo}) supera el total (${total}) — catálogo mal capturado, corrige el separo o el precio de la zona` };
-  return { ok: true, paquete, zona: selZ ? selZ.n : null, num_personas: selViaj, precio_unit: cxp, total, separo, resto: total - separo, requiere_hotel: requiereHotel, requiere_transporte: requiereTransporte };
-}
-
-// 💤 F6: puerta del cotizador para el VENDEDOR. Pregunta al backend (que es
-// quien manda: todas las functions de ventas ya bloquean) y si la cuenta está
-// inactiva pinta el aviso en lugar de la UI. Best-effort: cualquier otro error
-// → la página carga normal (jamás dejar fuera a un activo por red).
-async function _vtaGateInactivo() {
-  try {
-    const r = await khAdminFetch('/.netlify/functions/admin-ventas-resumen', { method: 'POST', body: JSON.stringify({ accion: 'mis_ventas' }) });
-    if (r.status !== 403) return false;
-    const j = await r.json().catch(() => ({}));
-    if (j.codigo !== 'vendedor_inactivo') return false;
-    const vv = document.getElementById('vta-view-vender'), vm = document.getElementById('vta-view-mis');
-    if (vv) vv.style.display = 'none';
-    if (vm) vm.style.display = 'none';
-    let av = document.getElementById('vta-inactivo-aviso');
-    if (!av) {
-      av = document.createElement('div');
-      av.id = 'vta-inactivo-aviso';
-      const page = document.getElementById('page-cotizar');
-      if (page) page.appendChild(av);
-    }
-    av.innerHTML = `<div style="max-width:560px;margin:40px auto;text-align:center;padding:32px 24px;border:1px solid rgba(255,68,68,.4);border-radius:var(--r-btn,12px);background:rgba(255,68,68,.06)">
-      <div style="font-size:34px;margin-bottom:10px">💤</div>
-      <div style="font-family:'Rajdhani',sans-serif;font-weight:700;font-size:18px;margin-bottom:10px;color:#ff6666">Acceso de vendedor en pausa</div>
-      <div style="font-size:13px;line-height:1.6;color:var(--ts)">${_esfEsc(j.error || 'Tu acceso de vendedor está pausado por inactividad (3 meses sin ventas) — contacta a Conecta para reactivarlo')}</div>
-    </div>`;
-    return true;
-  } catch (e) { return false; }
-}
-
-async function loadCotizar() {
-  // 💤 F6: candado de inactividad del vendedor — evaluado en vivo en la puerta.
-  if (currentUser && currentUser.rol === 'vendedor') {
-    if (await _vtaGateInactivo()) return;
-    const av = document.getElementById('vta-inactivo-aviso');
-    if (av) av.remove(); // reactivado → la página vuelve a la normalidad
-  }
-  _vtaSwitch('vender');
-  const sel = document.getElementById('vta-evento');
-  if (sel && sel.options.length <= 1) {
-    try {
-      _vtaEV = await _fetchEVFromIndex();
-      const hoy = _vtaHoyMx();
-      const vivos = (_vtaEV || []).filter(e => e && e.id && e.a && (!e.ds || e.ds >= hoy)).sort((a, b) => String(a.ds || '9999').localeCompare(String(b.ds || '9999')));
-      vivos.forEach(e => { const o = document.createElement('option'); o.value = e.id; o.textContent = e.a + (e.f ? ' · ' + e.f : ''); sel.appendChild(o); });
-    } catch (e) { /* sin catálogo: el select queda vacío */ }
-  }
-}
-
-function _vtaSwitch(view) {
-  const vender = view === 'vender';
-  document.getElementById('vta-view-vender').style.display = vender ? '' : 'none';
-  document.getElementById('vta-view-mis').style.display = vender ? 'none' : '';
-  const tv = document.getElementById('vta-tab-vender'), tm = document.getElementById('vta-tab-mis');
-  [[tv, vender], [tm, !vender]].forEach(([b, on]) => { if (b) { b.style.background = on ? 'rgba(255,107,0,.12)' : 'transparent'; b.style.color = on ? 'var(--orange)' : 'var(--ts)'; } });
-  if (!vender) _vtaMisVentas();
-}
-
-async function _vtaOnEvento() {
-  const id = document.getElementById('vta-evento').value;
-  _vtaEvento = (_vtaEV || []).filter(e => e && e.id === id)[0] || null;
-  // Fecha (multifecha)
-  const fw = document.getElementById('vta-fecha-wrap'), fsel = document.getElementById('vta-fecha');
-  fsel.innerHTML = '';
-  if (_vtaEvento && Array.isArray(_vtaEvento.multifecha) && _vtaEvento.multifecha.length) {
-    _vtaEvento.multifecha.forEach((m, i) => { const o = document.createElement('option'); o.value = String(i); o.textContent = (m && m.lbl) ? m.lbl : ('Fecha ' + (i + 1)); fsel.appendChild(o); });
-    fw.style.display = '';
-  } else { fw.style.display = 'none'; }
-  // Disponibilidad (apaga agotadas). Best-effort.
-  _vtaAgotadas[id] = new Set();
-  if (_vtaEvento) {
-    try {
-      const r = await fetch('/.netlify/functions/disponibilidad-evento', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ evento_id: _vtaEventoId() }) });
-      const j = await r.json().catch(() => ({}));
-      if (j && j.ok && Array.isArray(j.zonas_agotadas)) _vtaAgotadas[id] = new Set(j.zonas_agotadas.map(z => String(z).trim()));
-    } catch (e) { /* sin disponibilidad: no se apaga nada (el backend valida al registrar) */ }
-  }
-  await _vtaResync();
-}
-
-// Repuebla hotel + zonas según paquete/fecha (para CHEAP carga el costo del vendedor
-// desde comisiones_zona) y recalcula. Lo llaman evento/paquete/fecha (cambian la lista).
-async function _vtaResync() {
-  _vtaPoblarHotel();
-  const paquete = document.getElementById('vta-paquete').value;
-  if (paquete === 'cheap' && _vtaEvento) await _vtaCargarCostoCheap(_vtaEventoId());
-  _vtaPoblarZonas();
-  _vtaRecalc();
-}
-
-// Carga el costo CHEAP del vendedor por zona (matriz+comisión, SIN desglose) + stock.
-// Cachea por evento_id(#idx). Best-effort: si falla, deja mapa vacío (sin zonas CHEAP).
-async function _vtaCargarCostoCheap(eid) {
-  if (!eid || _vtaCostoCheap[eid]) return;
-  const map = {};
-  try {
-    const r = await khAdminFetch('/.netlify/functions/admin-comisiones-zona', { method: 'POST', body: JSON.stringify({ accion: 'costo_vendedor', evento_id: eid }) });
-    const j = await r.json().catch(() => ({}));
-    if (r.ok && j && j.ok && Array.isArray(j.zonas)) j.zonas.forEach(z => { if (z && z.zona != null) map[String(z.zona).trim()] = z; });
-  } catch (e) { /* sin costos: el select CHEAP quedará vacío y el backend validará al registrar */ }
-  _vtaCostoCheap[eid] = map;
-}
-
-// evento_id con multifecha → 'slug#idx'.
-function _vtaEventoId() {
-  if (!_vtaEvento) return '';
-  const fw = document.getElementById('vta-fecha-wrap');
-  if (fw && fw.style.display !== 'none') { const fi = document.getElementById('vta-fecha').value; if (fi !== '') return _vtaEvento.id + '#' + fi; }
-  return _vtaEvento.id;
-}
-
-function _vtaPoblarZonas() {
-  const zsel = document.getElementById('vta-zona');
-  zsel.innerHTML = '';
-  if (!_vtaEvento) { zsel.innerHTML = '<option value="">— Elige un evento primero —</option>'; return; }
-  const paquete = document.getElementById('vta-paquete').value;
-  const fi = (document.getElementById('vta-fecha-wrap').style.display !== 'none') ? (parseInt(document.getElementById('vta-fecha').value, 10) || 0) : 0;
-  // CHEAP de vendedor: zonas y costo vienen de comisiones_zona (no del EV). Solo se
-  // ofrecen zonas con comisión asignada; sin comisión → no se puede vender esa zona.
-  if (paquete === 'cheap') {
-    const mapa = _vtaCostoCheap[_vtaEventoId()] || {};
-    const zonas = Object.keys(mapa);
-    if (!zonas.length) { zsel.innerHTML = '<option value="">— sin zonas CHEAP configuradas (pídele a Memo la comisión) —</option>'; return; }
-    zsel.innerHTML = '<option value="">— Elige zona —</option>';
-    zonas.sort().forEach(z => {
-      const info = mapa[z] || {};
-      const o = document.createElement('option');
-      const off = !!info.agotada;
-      // Frescura del costo (actualizado_at de comisiones_zona) — SOLO la fecha;
-      // el vendedor sigue sin ver matriz/comisión/desglose jamás.
-      const frescura = info.actualizado_at ? ' · actualizado ' + _khHaceRel(info.actualizado_at) : '';
-      o.value = z;
-      o.textContent = z + ' · ' + _vtaFmt(info.costo) + (off ? ' — AGOTADA' : (info.stock != null ? ' (' + info.stock + ' disp.)' : '')) + frescura;
-      if (off) { o.disabled = true; o.style.color = '#888'; }
-      zsel.appendChild(o);
-    });
-    return;
-  }
-  const lista = _vtaZonaLista(_vtaEvento, paquete, fi);
-  const agot = _vtaAgotadas[_vtaEvento.id] || new Set();
-  const disp = lista.filter(z => z && Number(z.p) > 0);
-  if (!disp.length) { zsel.innerHTML = '<option value="">— sin zonas con precio —</option>'; return; }
-  zsel.innerHTML = '<option value="">— Elige zona —</option>';
-  disp.forEach(z => {
-    const o = document.createElement('option');
-    const off = agot.has(String(z.n).trim());
-    o.value = z.n;
-    o.textContent = z.n + ' · ' + _vtaFmt(z.p) + (off ? ' — AGOTADA' : '');
-    if (off) { o.disabled = true; o.style.color = '#888'; }
-    zsel.appendChild(o);
-  });
-}
-
-function _vtaPoblarHotel() {
-  const hw = document.getElementById('vta-hotel-wrap'), hsel = document.getElementById('vta-hotel');
-  const paquete = document.getElementById('vta-paquete').value;
-  const hasHotel = _vtaEvento && (paquete === 'plus' || paquete === 'ride' || paquete === 'stay') && !_vtaEvento.noHotel && Array.isArray(_vtaEvento.hotel) && _vtaEvento.hotel.length;
-  if (!hasHotel) { hw.style.display = 'none'; hsel.innerHTML = ''; return; }
-  hsel.innerHTML = '';
-  _vtaEvento.hotel.forEach(h => { if (!h || !h.n) return; const o = document.createElement('option'); o.value = h.n; o.textContent = h.n + (Number(h.e) > 0 ? ' (+' + _vtaFmt(h.e) + (_vtaEvento.hotelPP ? '/persona' : '') + ')' : ''); hsel.appendChild(o); });
-  hw.style.display = '';
-}
-
-function _vtaRecalc() {
-  const box = document.getElementById('vta-resumen');
-  if (!_vtaEvento) { box.style.display = 'none'; return; }
-  // Repoblar zonas/hotel si cambió paquete/fecha (precio depende de ellos).
-  _vtaPoblarHotel();
-  const zsel = document.getElementById('vta-zona');
-  const paquete = document.getElementById('vta-paquete').value;
-  const num = parseInt(document.getElementById('vta-num').value, 10) || 1;
-  const hotel = (document.getElementById('vta-hotel-wrap').style.display !== 'none') ? document.getElementById('vta-hotel').value : null;
-  const fi = (document.getElementById('vta-fecha-wrap').style.display !== 'none') ? (parseInt(document.getElementById('vta-fecha').value, 10) || 0) : 0;
-  const zona = zsel.value;
-  if (!zona) { box.style.display = 'none'; return; }
-  const limite = (() => { const d = new Date(_vtaHoyMx() + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() + 8); return d.toISOString().slice(0, 10); })();
-  // CHEAP de vendedor: el costo sale de comisiones_zona (matriz+comisión). El vendedor
-  // ve SOLO el costo final; el separo (=comisión de Memo) es privado y NO se muestra.
-  if (paquete === 'cheap') {
-    const info = (_vtaCostoCheap[_vtaEventoId()] || {})[zona];
-    if (!info || info.costo == null) { box.style.display = 'none'; return; }
-    const total = (Number(info.costo) || 0) * num;
-    box.style.display = '';
-    box.innerHTML = `
-      <div style="display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;font-size:14px">
-        <div><div style="font-size:10px;color:var(--ts);text-transform:uppercase;letter-spacing:.08em">Total</div><b style="font-size:18px">${_vtaFmt(total)}</b> <span style="font-size:11px;color:var(--ts)">(${num} pers. · ${_vtaFmt(info.costo)} c/u)</span></div>
-        <div><div style="font-size:10px;color:var(--ts);text-transform:uppercase;letter-spacing:.08em">Fecha límite</div><b style="font-size:14px">${limite}</b> <span style="font-size:11px;color:var(--ts)">(8 días)</span></div>
-      </div>
-      <div style="margin-top:6px;font-size:10px;color:var(--ts)"><svg class="ic" style="width:11px;height:11px;vertical-align:-1px"><use href="#ic-candado"/></svg> Costo CHEAP fijo — el sistema lo sella al registrar.</div>`;
-    return;
-  }
-  const pr = _vtaCalc(_vtaEvento, { paquete, zona, num_personas: num, hotel_nombre: hotel, fecha_idx: fi });
-  if (!pr.ok) { box.style.display = 'none'; return; }
-  box.style.display = '';
-  box.innerHTML = `
-    <div style="display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;font-size:14px">
-      <div><div style="font-size:10px;color:var(--ts);text-transform:uppercase;letter-spacing:.08em">Total</div><b style="font-size:18px">${_vtaFmt(pr.total)}</b> <span style="font-size:11px;color:var(--ts)">(${num} pers.)</span></div>
-      <div><div style="font-size:10px;color:var(--ts);text-transform:uppercase;letter-spacing:.08em">Separo</div><b style="font-size:18px;color:var(--orange)">${_vtaFmt(pr.separo)}</b></div>
-      <div><div style="font-size:10px;color:var(--ts);text-transform:uppercase;letter-spacing:.08em">Fecha límite</div><b style="font-size:14px">${limite}</b> <span style="font-size:11px;color:var(--ts)">(8 días)</span></div>
-    </div>
-    ${(pr.requiere_hotel || pr.requiere_transporte) ? `<div style="margin-top:8px;font-size:11px;color:#ffb020"><svg class="ic" style="width:12px;height:12px;vertical-align:-1px"><use href="#ic-alerta"/></svg> ${pr.requiere_transporte ? 'El transporte a CDMX se cotiza aparte con Bulma. ' : ''}${pr.requiere_hotel ? 'Falta elegir hotel.' : ''}</div>` : ''}
-    <div style="margin-top:6px;font-size:10px;color:var(--ts)"><svg class="ic" style="width:11px;height:11px;vertical-align:-1px"><use href="#ic-candado"/></svg> Precio fijo del catálogo — el sistema lo sella al registrar.</div>`;
-}
-
-async function _vtaRegistrar() {
-  const alert = document.getElementById('vta-alert');
-  const setErr = (m) => { alert.innerHTML = `<div style="padding:10px 14px;background:rgba(255,68,68,.12);border:1px solid rgba(255,68,68,.4);color:#ffb3b3;border-radius:var(--r-sm,8px);margin-bottom:14px;font-size:13px"><svg class="ic"><use href="#ic-alerta"/></svg> ${_vtaEsc(m)}</div>`; };
-  if (!_vtaEvento) return setErr('Elige un evento');
-  const paquete = document.getElementById('vta-paquete').value;
-  const zona = document.getElementById('vta-zona').value;
-  const num = parseInt(document.getElementById('vta-num').value, 10) || 0;
-  const hotel = (document.getElementById('vta-hotel-wrap').style.display !== 'none') ? document.getElementById('vta-hotel').value : null;
-  const fi = (document.getElementById('vta-fecha-wrap').style.display !== 'none') ? (parseInt(document.getElementById('vta-fecha').value, 10) || 0) : 0;
-  const nombre = (document.getElementById('vta-cli-nombre').value || '').trim();
-  const correo = (document.getElementById('vta-cli-correo').value || '').trim();
-  const telefono = (document.getElementById('vta-cli-tel').value || '').trim();
-  if (!zona) return setErr('Elige una zona');
-  if (num < 1 || num > 12) return setErr('Personas entre 1 y 12');
-  if (!nombre) return setErr('Escribe el nombre del cliente');
-  if (!correo || correo.indexOf('@') < 0) return setErr('Escribe un correo válido del cliente');
-  alert.innerHTML = '';
-  const btn = document.getElementById('vta-btn'); const orig = btn.textContent;
-  btn.disabled = true; btn.textContent = 'Registrando…';
-  try {
-    const r = await khAdminFetch('/.netlify/functions/admin-venta-crear', {
-      method: 'POST',
-      body: JSON.stringify({ evento_id: _vtaEventoId(), fecha_idx: fi, paquete, zona, hotel: hotel || undefined, num_personas: num, cliente: { nombre, correo, telefono: telefono || undefined } }),
-    });
-    const j = await r.json().catch(() => ({}));
-    if (!r.ok || j.ok === false) { setErr(j.error || ('Error ' + r.status)); return; }  // 409/502 tal cual
-    showToast('Venta registrada — folio ' + String(j.solicitud_id || '').slice(0, 8) + ' · límite ' + (j.vende_limite || '') + (j.cliente_reusado ? ' · cliente existente' : ''), 'success');
-    // Limpiar cliente + refrescar Mis Ventas
-    ['vta-cli-nombre', 'vta-cli-correo', 'vta-cli-tel'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
-    document.getElementById('vta-resumen').style.display = 'none';
-  } catch (e) { setErr(e.message || 'No se pudo registrar'); }
-  finally { btn.disabled = false; btn.textContent = orig; }
-}
-
-async function _vtaMisVentas() {
-  const tb = document.getElementById('vta-mis-tbody');
-  if (!tb) return;
-  _vtaMisComisiones();   // [F5c] panel de comisiones liquidadas del vendedor (solo lo suyo)
-  try {
-    const r = await khAdminFetch('/.netlify/functions/admin-ventas-resumen', { method: 'POST', body: JSON.stringify({ accion: 'mis_ventas' }) });
-    const j = await r.json().catch(() => ({}));
-    if (!r.ok || j.ok === false) { tb.innerHTML = `<tr><td colspan="8" style="text-align:center;color:var(--red);padding:24px">${_vtaEsc(j.error || ('Error ' + r.status))}</td></tr>`; return; }
-    const thV = document.getElementById('vta-th-vendedor');
-    if (thV) thV.style.display = j.es_admin ? '' : 'none';
-    const thA = document.getElementById('vta-th-acc');
-    if (thA) thA.style.display = j.es_admin ? '' : 'none'; // solo admin cancela
-    _vtaVentasCache = Array.isArray(j.ventas) ? j.ventas : [];
-    const ventas = _vtaVentasCache;
-    if (!ventas.length) { tb.innerHTML = `<tr><td colspan="8" style="text-align:center;color:var(--ts);padding:30px;font-size:12px;letter-spacing:.1em;text-transform:uppercase">Sin ventas todavía</td></tr>`; return; }
-    const hoy = _vtaHoyMx();
-    tb.innerHTML = ventas.map(v => {
-      const c = (v.clientes && (Array.isArray(v.clientes) ? v.clientes[0] : v.clientes)) || {};
-      const snap = v.precio_sellado || {};
-      const total = (snap.total != null) ? snap.total : v.precio_total;
-      // separo puede venir OMITIDO (privacidad CHEAP del vendedor) → no se muestra.
-      const separo = (snap.separo != null) ? snap.separo : v.monto_separo;
-      const separoHtml = (separo != null) ? `<br><span style="color:var(--orange);font-size:11px">sep ${_vtaFmt(separo)}</span>` : '';
-      const dias = _vtaDias(v.vende_limite, hoy);
-      let limCell = _vtaEsc(v.vende_limite || '—');
-      if (v.vende_limite && dias != null && v.estado === 'pendiente') {
-        if (dias < 0) limCell = `<span style="color:#ff6666;font-weight:700"><svg class="ic" style="width:11px;height:11px;vertical-align:-1px"><use href="#ic-alerta"/></svg> venció (${limCell})</span>`;
-        else if (dias <= 2) limCell = `<span style="color:#ffb020;font-weight:700"><svg class="ic" style="width:11px;height:11px;vertical-align:-1px"><use href="#ic-alerta"/></svg> vence en ${dias}d</span>`;
-      }
-      const vendedorCell = j.es_admin ? `<td style="font-size:12px;color:var(--ts)">${_vtaEsc(v.vendedor_nombre || (v.vendedor_id || '').slice(0, 8))}</td>` : '';
-      // Botón de cancelar SOLO admin y SOLO ventas VENCIDAS aún pendientes.
-      const vencida = (dias != null && dias < 0 && v.estado === 'pendiente');
-      const accCell = j.es_admin
-        ? `<td style="text-align:right;white-space:nowrap">${vencida ? `<button class="btn btn-ghost btn-sm" style="font-size:11px;color:#ff6666;border-color:rgba(255,68,68,.3)" onclick="_vtaCancelar('${_vtaEsc(v.id)}')">Cancelar vencida</button>` : ''}</td>`
-        : '';
-      return `<tr>
-        <td><b>${_vtaEsc(c.nombre_completo || '—')}</b><br><span style="color:var(--ts);font-size:11px">${_vtaEsc(c.correo || '')}</span></td>
-        ${vendedorCell}
-        <td>${_vtaEsc(v.evento_nombre || v.evento_id || '')}</td>
-        <td>${_vtaEsc(v.zona || '')}<br><span style="color:var(--ts);font-size:11px">${_vtaEsc(v.paquete || '')}</span></td>
-        <td style="text-align:right">${_vtaFmt(total)}${separoHtml}</td>
-        <td>${_vtaEsc(v.estado || '')}<br><button class="btn btn-ghost btn-sm" style="font-size:11px;margin-top:4px" onclick="_vtaAbonos('${_vtaEsc(v.id)}')"><svg class="ic" style="width:11px;height:11px;vertical-align:-1px"><use href="#ic-pagos"/></svg> Abonos</button></td>
-        <td>${limCell}</td>
-        ${accCell}
-      </tr>
-      <tr id="vta-ab-row-${_vtaEsc(v.id)}" style="display:none"><td colspan="8" id="vta-ab-cell-${_vtaEsc(v.id)}" style="background:rgba(255,255,255,.02);padding:14px 16px"></td></tr>`;
-    }).join('');
-  } catch (e) { tb.innerHTML = `<tr><td colspan="8" style="text-align:center;color:var(--red);padding:24px">${_vtaEsc(e.message || 'Error')}</td></tr>`; }
-}
-
-// [F5c] Comisiones liquidadas del vendedor (30% al cierre). SOLO lo suyo: monto +
-// estado (calculada/pagada). El backend NUNCA devuelve la utilidad del evento ni las
-// comisiones de otros vendedores (privacidad de siempre).
-async function _vtaMisComisiones() {
-  const box = document.getElementById('vta-mis-comisiones');
-  if (!box) return;
-  try {
-    const r = await khAdminFetch('/.netlify/functions/admin-liquidacion', { method: 'POST', body: JSON.stringify({ accion: 'mis_comisiones' }) });
-    const j = await r.json().catch(() => ({}));
-    const lista = (r.ok && j.ok && Array.isArray(j.comisiones)) ? j.comisiones : [];
-    if (!lista.length) { box.innerHTML = ''; return; }
-    const chip = (txt, color) => `<span style="display:inline-block;font-size:10px;font-weight:700;padding:2px 7px;border-radius:var(--r-sm,8px);color:${color};border:1px solid ${color}55">${txt}</span>`;
-    const filas = lista.map(c => `<div style="display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-top:1px solid var(--border);font-size:13px">
-      <span>${_vtaEsc(c.evento_nombre || c.evento_id)}</span>
-      <span><b>${_vtaFmt(c.monto)}</b> ${c.estado === 'pagada' ? chip('pagada', 'var(--green)') : chip('por pagar', 'var(--orange)')}</span></div>`).join('');
-    box.innerHTML = `<div style="border:1px solid var(--border);border-radius:var(--r-sm,8px);padding:12px 14px">
-      <div style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--ts);margin-bottom:4px">Mis comisiones liquidadas</div>
-      ${filas}</div>`;
-  } catch (e) { box.innerHTML = ''; }
-}
-
-// [F5b] Abonos del vendedor por venta. El abono es SU pago a Conecta; nace POR
-// VALIDAR (no suma) hasta que Bulma lo confirme en su flujo. Privacidad: el panel
-// muestra "separo a cubrir" (neutro) — nunca matriz/comisión/ganancia.
-async function _vtaAbonos(solicitudId) {
-  const row = document.getElementById('vta-ab-row-' + solicitudId);
-  const cell = document.getElementById('vta-ab-cell-' + solicitudId);
-  if (!row || !cell) return;
-  if (row.style.display !== 'none') { row.style.display = 'none'; return; }  // toggle cerrar
-  row.style.display = '';
-  cell.innerHTML = '<div class="loading-state"><div class="spinner"></div>Cargando…</div>';
-  await _vtaAbonosCargar(solicitudId);
-}
-
-async function _vtaAbonosCargar(solicitudId) {
-  const cell = document.getElementById('vta-ab-cell-' + solicitudId);
-  if (!cell) return;
-  try {
-    const r = await khAdminFetch('/.netlify/functions/admin-venta-abono', { method: 'POST', body: JSON.stringify({ accion: 'estado_venta', solicitud_id: solicitudId }) });
-    const j = await r.json().catch(() => ({}));
-    if (!r.ok || !j.ok) throw new Error(j.error || ('Error ' + r.status));
-    _vtaAbonosRender(solicitudId, j);
-  } catch (e) { cell.innerHTML = `<div style="color:var(--red);font-size:12px">${_vtaEsc(e.message || 'Error')}</div>`; }
-}
-
-function _vtaAbonosRender(solicitudId, j) {
-  const cell = document.getElementById('vta-ab-cell-' + solicitudId);
-  if (!cell) return;
-  const idS = _vtaEsc(solicitudId);
-  const chip = (txt, color) => `<span style="display:inline-block;font-size:10px;font-weight:700;padding:2px 7px;border-radius:var(--r-sm,8px);color:${color};border:1px solid ${color}55">${txt}</span>`;
-  const sepChip = j.separo_cubierto ? chip('SEPARO CUBIERTO', 'var(--green)') : chip('SEPARO PENDIENTE', 'var(--orange)');
-  const abonosHtml = (Array.isArray(j.abonos) && j.abonos.length)
-    ? j.abonos.map(a => {
-        const est = a.estado === 'pagado' ? chip('validado', 'var(--green)') : (a.estado === 'cancelado' ? chip('cancelado', 'var(--ts)') : chip('por validar', 'var(--orange)'));
-        const comp = a.tiene_comprobante ? ' · <span style="color:var(--ts)">comprobante ✓</span>' : '';
-        return `<div style="display:flex;justify-content:space-between;gap:10px;padding:5px 0;border-top:1px solid var(--border);font-size:12px"><span>${_vtaFmt(a.monto)}${comp}</span>${est}</div>`;
-      }).join('')
-    : '<div style="font-size:11px;color:var(--ts);padding:6px 0">Sin abonos todavía</div>';
-  cell.innerHTML = `
-    <div style="display:flex;gap:18px;flex-wrap:wrap;align-items:flex-end;margin-bottom:10px;font-size:13px">
-      <div><div style="font-size:10px;color:var(--ts);text-transform:uppercase;letter-spacing:.08em">Costo sellado</div><b style="font-size:16px">${_vtaFmt(j.total_sellado)}</b></div>
-      <div><div style="font-size:10px;color:var(--ts);text-transform:uppercase;letter-spacing:.08em">Separo a cubrir</div><b style="font-size:16px;color:var(--orange)">${_vtaFmt(j.separo_a_cubrir)}</b> ${sepChip}</div>
-      <div><div style="font-size:10px;color:var(--ts);text-transform:uppercase;letter-spacing:.08em">Validado</div><b style="font-size:16px;color:var(--green)">${_vtaFmt(j.validado)}</b></div>
-      <div><div style="font-size:10px;color:var(--ts);text-transform:uppercase;letter-spacing:.08em">Por validar</div><b style="font-size:16px">${_vtaFmt(j.pendiente_validar)}</b></div>
-      <div><div style="font-size:10px;color:var(--ts);text-transform:uppercase;letter-spacing:.08em">Falta</div><b style="font-size:16px">${_vtaFmt(j.falta_total)}</b></div>
-    </div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:4px">
-      <input type="number" id="vta-ab-monto-${idS}" min="1" placeholder="Monto del abono" class="cot-input" style="width:150px">
-      <input type="file" id="vta-ab-file-${idS}" accept="image/jpeg,image/png,image/webp,application/pdf" style="font-size:11px;color:var(--ts);max-width:220px">
-      <button class="btn btn-primary btn-sm" id="vta-ab-btn-${idS}" onclick="_vtaAbonoRegistrar('${idS}')">Registrar abono</button>
-    </div>
-    <div id="vta-ab-alert-${idS}" style="font-size:11px;margin:4px 0"></div>
-    <div style="font-size:10px;color:var(--ts);margin-bottom:6px">El abono queda <b>por validar</b> hasta que Bulma lo confirme; no suma hasta entonces. No puedes editar ni borrar abonos.</div>
-    <div style="margin-top:4px">${abonosHtml}</div>`;
-}
-
-async function _vtaAbonoRegistrar(solicitudId) {
-  const alert = document.getElementById('vta-ab-alert-' + solicitudId);
-  const set = (m, err) => { if (alert) alert.innerHTML = m ? `<span style="color:${err ? 'var(--red)' : 'var(--green)'}">${_vtaEsc(m)}</span>` : ''; };
-  const montoEl = document.getElementById('vta-ab-monto-' + solicitudId);
-  const fileEl = document.getElementById('vta-ab-file-' + solicitudId);
-  const btn = document.getElementById('vta-ab-btn-' + solicitudId);
-  const monto = Number(((montoEl && montoEl.value) || '').trim());
-  if (!Number.isFinite(monto) || monto <= 0) return set('Escribe un monto válido (> 0)', true);
-  const file = fileEl && fileEl.files && fileEl.files[0];
-  if (file) {
-    const OK = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
-    if (!OK.includes(file.type)) return set('Comprobante: usa JPG, PNG, WEBP o PDF', true);
-    if (file.size > 4 * 1024 * 1024) return set('Comprobante muy grande (máx 4 MB)', true);
-  }
-  if (btn) { btn.disabled = true; btn.textContent = 'Registrando…'; }
-  try {
-    let comprobante;
-    if (file) comprobante = { file_base64: await _spLeerArchivoBase64(file), mime: file.type };
-    const r = await khAdminFetch('/.netlify/functions/admin-venta-abono', { method: 'POST', body: JSON.stringify({ accion: 'registrar', solicitud_id: solicitudId, monto, comprobante }) });
-    const j = await r.json().catch(() => ({}));
-    if (!r.ok || !j.ok) throw new Error(j.error || ('Error ' + r.status));
-    if (file && !j.comprobante_subido) set('Abono registrado (por validar), pero el comprobante no se subió: ' + (j.comprobante_error || ''), true);
-    else set('Abono registrado — queda por validar', false);
-    if (montoEl) montoEl.value = '';
-    if (fileEl) fileEl.value = '';
-    await _vtaAbonosCargar(solicitudId);
-  } catch (e) { set(e.message || 'No se pudo registrar', true); }
-  finally { if (btn) { btn.disabled = false; btn.textContent = 'Registrar abono'; } }
-}
-
-// [F4] Cancelar una venta VENCIDA (solo admin). Reusa el flujo de cancelación
-// existente (admin-solicitud-update-estado → 'cancelado'), que libera inventario
-// (disponibilidad no cuenta las canceladas) y deja el rastro de siempre. El
-// vendedor no puede: la function gatea a maestro_roshi/bulma (403 si fuerza).
-async function _vtaCancelar(solicitudId) {
-  const v = (_vtaVentasCache || []).find(x => x && x.id === solicitudId) || {};
-  const c = (v.clientes && (Array.isArray(v.clientes) ? v.clientes[0] : v.clientes)) || {};
-  if (!confirm(`¿Cancelar la venta vencida de ${(c.nombre_completo || '—')} para ${(v.evento_nombre || v.evento_id || 'el evento')} (${v.zona || ''} · ${v.paquete || ''})?\n\nLibera el cupo de la zona. No se puede deshacer.`)) return;
-  try {
-    const r = await khAdminFetch('/.netlify/functions/admin-solicitud-update-estado', {
-      method: 'POST',
-      body: JSON.stringify({ solicitud_id: solicitudId, nuevo_estado: 'cancelado' }),
-    });
-    const j = await r.json().catch(() => ({}));
-    if (!r.ok || j.ok === false) { showToast(j.error || ('Error ' + r.status), 'error'); return; }
-    showToast('Venta cancelada — cupo liberado', 'success');
-    _vtaMisVentas();
-  } catch (e) { showToast(e.message || 'No se pudo cancelar', 'error'); }
-}
-
-// ═══════════════════════════════════════════════════════════════
 // CONTRATOS · creadores de contenido
 // ═══════════════════════════════════════════════════════════════
 let _contratosCache = [];
@@ -21211,6 +20482,32 @@ function _splitLineas(s) {
 }
 
 // — Cargar EV array desde /index.html (single source of truth) ———————
+// [VEN-BORRA-1b] Esta función NO era del vendedor aunque llevara su prefijo, y
+// por poco se va con el bloque: `_fetchEVFromIndex` la usa para armar los STUBS
+// con los que evalúa el arreglo EV. Los eventos que escriben `hotel: HOTEL_CDM`
+// —la mayoría de CDMX— hacen reventar ese `new Function` si las declaraciones
+// no están, y con el catálogo muerto se cae KameHouse entero. Renombrada a
+// `_ev*` porque pertenece al cargador del catálogo, no a Ventas.
+function _evDeclaracionesHotel(html) {
+  const out = [];
+  for (const nombre of ['HOTEL_STD', 'HOTEL_MTY', 'HOTEL_CDM']) {
+    const m = String(html).match(new RegExp('var\\s+' + nombre + '\\s*=\\s*\\['));
+    if (!m) continue;
+    const start = m.index + m[0].length - 1;
+    let depth = 0, inStr = false, sc = '', esc = false, end = -1;
+    for (let i = start; i < html.length; i++) {
+      const ch = html[i];
+      if (esc) { esc = false; continue; }
+      if (inStr) { if (ch === '\\') { esc = true; continue; } if (ch === sc) inStr = false; continue; }
+      if (ch === '"' || ch === "'") { inStr = true; sc = ch; continue; }
+      if (ch === '[') depth++;
+      else if (ch === ']') { depth--; if (!depth) { end = i + 1; break; } }
+    }
+    if (end > 0) out.push('var ' + nombre + '=' + html.slice(start, end) + ';');
+  }
+  return out.join('');
+}
+
 async function _fetchEVFromIndex() {
   if (_contratosEVCache) return _contratosEVCache;
   try {
@@ -21234,15 +20531,12 @@ async function _fetchEVFromIndex() {
     // 🔒 AUD-2: los HOTEL_* ya NO se stubbean a []. Se toma su declaración REAL
     // del mismo index.html, porque los eventos que escriben `hotel:HOTEL_CDM`
     // (la mayoría de CDMX) quedaban con ev.hotel vacío y el cotizador del
-    // vendedor no podía resolver ningún hotel. Se guardan aparte para la
-    // cascada de _vtaCalc (eventos sin `hotel:` propio).
-    const decls = _vtaDeclaracionesHotel(html);
+    // cotizador no podía resolver ningún hotel. Se siguen necesitando para
+    // que el propio `new Function` del EV no truene con `hotel: HOTEL_CDM`.
+    const decls = _evDeclaracionesHotel(html);
     const stubs = 'var BANCO_DEFAULT={},BANCO_HEY={};' + decls;
     const ev = new Function(stubs + 'return ' + arrText + ';')();
     if (!Array.isArray(ev)) throw new Error('EV no es array');
-    try {
-      _vtaHoteles = new Function(decls + 'return {std:typeof HOTEL_STD!=="undefined"?HOTEL_STD:null,mty:typeof HOTEL_MTY!=="undefined"?HOTEL_MTY:null,cdm:typeof HOTEL_CDM!=="undefined"?HOTEL_CDM:null};')();
-    } catch (e) { _vtaHoteles = {}; }
     _contratosEVCache = ev;
     return ev;
   } catch (e) {

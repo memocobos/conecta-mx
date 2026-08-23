@@ -7376,62 +7376,6 @@ async function marcarFaltantesPagadoUI(id) {
 // ═══════════════════════════════════════════════════════════════
 // CAPSULE CORP — EVENTOS
 // ═══════════════════════════════════════════════════════════════
-let _capsuleFilter = 'todos';
-let _capsuleCache = [];
-
-// loadCapsule → ver implementación completa abajo
-
-function filtrarCapsule(filtro, btn) {
- _capsuleFilter = filtro;
- document.querySelectorAll('.capsule-filter').forEach(b => b.classList.remove('active'));
- btn.classList.add('active');
- renderCapsule();
-}
-
-function renderCapsule() {
- const tbody = document.getElementById('tabla-eventos');
- const hoy = new Date().toISOString().split('T')[0];
- let rows = _capsuleCache;
-
- if (_capsuleFilter === 'futuro') rows = rows.filter(e => e.fecha >= hoy);
- if (_capsuleFilter === 'pasado') rows = rows.filter(e => e.fecha < hoy);
- if (_capsuleFilter === 'proceso') rows = rows.filter(e => e.status === 'En Proceso' || e.status === 'proceso');
-
- if (!rows.length) {
- tbody.innerHTML = '<tr><td colspan="8"><div class="empty-state"><div class="empty-icon"></div>Sin eventos con ese filtro</div></td></tr>';
- return;
- }
-
- tbody.innerHTML = rows.map(ev => {
- const esPasado = ev.fecha < hoy;
- const zonas = ev.zonas_plus ? JSON.parse(ev.zonas_plus) : [];
- const zonasStr = zonas.length ? zonas.filter(z => !z.ag).map(z => z.n).join(', ') : '—';
- const paquetes = [];
- if (ev.tiene_transporte_largo || ev.tiene_traslados_internos) paquetes.push('PLUS');
- if (ev.ride_precio > 0) paquetes.push('RIDE');
- paquetes.push('CHEAP');
-
- return `<tr style="${esPasado ? 'opacity:.55' : ''}">
- <td>
- <div style="font-weight:700;font-size:13px">${_esfEsc(ev.artista || ev.nombre)}</div>
- <div style="font-size:10px;color:var(--ts)">${ev.tour || ev.tipo || 'Concierto'}</div>
- </td>
- <td style="font-size:12px;white-space:nowrap">${fmtFecha(ev.fecha)}</td>
- <td>
- <div style="font-size:12px;font-weight:600">${_esfEsc(ev.ciudad)}</div>
- <div style="font-size:10px;color:var(--ts)">${_esfEsc(ev.venue || '')}</div>
- </td>
- <td style="font-size:11px">${paquetes.map(p => `<span class="badge ${p==='PLUS'?'badge-orange':p==='RIDE'?'badge-gold':'badge-gray'}">${p}</span>`).join(' ')}</td>
- <td style="font-size:11px;max-width:140px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${zonasStr}</td>
- <td>${badgeStatus(ev.status)}</td>
- <td style="font-weight:600">${ev.total_viajeros || 0}</td>
- <td style="white-space:nowrap">
- <button class="btn btn-ghost btn-sm" onclick="editarEvento('${ev.id}')">Editar</button>
- ${_puedeBorrarAdmin() ? `<button class="btn btn-red btn-sm" onclick="eliminarEvento('${ev.id}')">Borrar</button>` : ''}
- </td>
- </tr>`;
- }).join('');
-}
 
 
 async function guardarEvento() {

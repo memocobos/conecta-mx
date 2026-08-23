@@ -200,10 +200,20 @@
       `sistema_alertas` (el equipo: strikes, suspensiones, altas). Las dos
       puertas son SOLO maestro_roshi, así que la tira también. Fails-soft por
       fuente: si una truena, la otra se pinta igual. -->
- <div id="resumen-alertas" style="display:none;margin-bottom:16px"></div>
+ <!-- [RES-2] LA FILA DE MONITOREO. Las dos tarjetas de arriba comparten
+      renglón a partir de 1024px en vez de apilarse. Medido: apiladas sumaban
+      836px y empujaban el primer número de dinero a y=1067 con el pliegue en
+      900 — o sea, la caja quedaba DEBAJO del pliegue, en escritorio y en
+      teléfono. Lado a lado el renglón mide lo que la más alta, no la suma.
+      `auto-fit` + `minmax(min(420px,100%),1fr)`: con UNA sola tarjeta visible
+      la pista vacía se colapsa y ocupa el ancho entero (las dos arrancan en
+      `display:none`), y el `min()` evita que 420px desborde un teléfono. -->
+ <div class="res-monitor">
+  <div id="resumen-alertas" style="display:none"></div>
 
- <!-- 🕘 Tablero de conexiones de hoy (SOLO maestro_roshi; fails-soft) -->
- <div id="resumen-conexiones" style="display:none;margin-bottom:16px"></div>
+  <!-- 🕘 Tablero de conexiones de hoy (SOLO maestro_roshi; fails-soft) -->
+  <div id="resumen-conexiones" style="display:none"></div>
+ </div>
 
  <!-- Franja 1 del dashboard: el dinero (caja total + cuentas + por cobrar) -->
  <div id="resumen-dinero" style="display:none;margin-bottom:16px"></div>

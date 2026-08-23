@@ -3442,3 +3442,32 @@ input[type="search"],.kh-buscar,.buscador{border-radius:var(--r-sm,8px)}
   .rah-s { white-space: normal; }
   .rah-when { font-size: 9px; }
 }
+
+/* ── [RES-2] La fila de monitoreo: alertas y conexiones lado a lado ───────── */
+.res-monitor {
+  display: grid;
+  /* `auto-fit` colapsa la pista vacía cuando solo una tarjeta está visible, y
+     `min(420px,100%)` evita que el mínimo desborde un teléfono de 390px. */
+  grid-template-columns: repeat(auto-fit, minmax(min(420px, 100%), 1fr));
+  gap: 16px;
+  align-items: start;   /* que la corta no se estire al alto de la larga */
+}
+/* ⚠️ El margen inferior se queda en las TARJETAS, no en la fila. Mi primer
+   intento fue `.res-monitor:not(:empty)`, que nunca aplica lo que yo creía:
+   los dos hijos siguen en el DOM aunque estén en `display:none`, así que la
+   fila JAMÁS está vacía. Un margen en un hijo oculto sí desaparece con él. */
+.res-monitor > div { margin-bottom: 16px; }
+
+/* La lista de conexiones deja de ser una pared: 6 a la vista y el resto detrás
+   del mismo desplegable que usa la tira de alertas. Con 14 usuarios activos la
+   tabla medía 571px de alto. */
+.cnx-mas {
+  display: block; width: 100%; margin-top: 6px; cursor: pointer;
+  background: transparent; border: none; border-radius: var(--r-sm, 8px);
+  font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: .08em;
+  color: var(--ts); padding: 6px;
+}
+.cnx-mas::after { content: ' ▾'; }
+.cnx-mas[aria-expanded="true"]::after { content: ' ▴'; }
+.cnx-mas:hover { color: var(--orange); background: var(--bg2); }
+.cnx-mas:focus-visible { outline: 2px solid var(--orange); outline-offset: 2px; }

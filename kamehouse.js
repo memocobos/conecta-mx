@@ -4207,6 +4207,132 @@ function _checkinDismiss() {
 
 // ═══════════════════════════════════════════════════════════════
 // 🕘 TABLERO DE CONEXIONES DE HOY — SOLO maestro_roshi. Fails-soft total.
+// ═══════════════════════════════════════════════════════════════
+// [RES-1] LO QUE PIDE ATENCIÓN — la tira de alertas, arriba de todo
+//
+// Medido antes de escribirla: el Resumen NO tenía alertas. Vivían en dos
+// lugares distintos y ninguno es el Resumen:
+//   · `radar_alertas` (22 filas) — la señal del negocio: picos y caídas de
+//     tráfico, caída de cotizaciones, hitos de lista de espera. Viva: la
+//     última es del 19-ago.
+//   · `sistema_alertas` (54 filas) — el equipo: strikes, suspensiones,
+//     reportes rechazados, altas. 51 de las 54 son `nuevo_usuario` y la más
+//     reciente es del 6-ago.
+//
+// Memo firmó fundirlas por RECENCIA y mostrar las más recientes estén leídas
+// o no: "el Resumen es la computadora de la nave". Una tira que se vacía
+// cuando todo va bien no monitorea nada.
+//
+// Las DOS puertas son `maestro_roshi` a secas (ROLES_MAESTRO y ROLES_RADAR,
+// leídos de los endpoints), así que la tira entera lo es. Fails-soft POR
+// FUENTE: si una truena, la otra se pinta igual — no un panel en blanco.
+// ═══════════════════════════════════════════════════════════════
+const _RAH_VISIBLES = 3;    // las que Memo ve sin desplegar
+const _RAH_TOPE = 20;       // cuántas se guardan detrás del desplegable
+
+// El color dice la severidad. El Radar la trae en `severidad`; sistema_alertas
+// no tiene columna, así que sale del tipo (leído de `tipoInfo` en loadMTAlertas,
+// para que la misma alerta no cambie de color según dónde se mire).
+const _RAH_SEV_SISTEMA = {
+  strike_auto: 'media', strike_manual: 'media', strikes: 'media',
+  tour_declinado: 'alta', reporte_rechazado: 'alta', suspension: 'alta',
+  usuario_desactivado: 'alta', advertencia: 'media',
+  nuevo_usuario: 'info', datos_viajero: 'info',
+};
+const _RAH_COLOR = { alta: 'var(--red)', media: 'var(--gold)', info: 'var(--ts)' };
+
+// Normaliza las dos formas a UNA. Las columnas se leyeron de la base:
+// radar_alertas trae {tipo, severidad, titulo, mensaje, vista, created_at} y
+// sistema_alertas solo {tipo, mensaje, leida, created_at, ref} — sin título.
+function _rahNormalizar(radar, sistema) {
+  const uno = (a, fuente) => {
+    // `_tsToDate` existe porque algunos timestamps llegan SIN zona; se usa para
+    // no depender de que PostgREST siempre mande el offset.
+    const d = _tsToDate(a && a.created_at);
+    const sev = fuente === 'radar'
+      ? (a.severidad || 'info')
+      : (_RAH_SEV_SISTEMA[a.tipo] || 'info');
+    return {
+      fuente, tipo: a.tipo || '',
+      sev,
+      titulo: (fuente === 'radar' && a.titulo) ? a.titulo : '',
+      texto: a.mensaje || '',
+      // ⚠️ Cada tabla nombra distinto lo mismo: `vista` en el Radar, `leida`
+      // en sistema. Leerlas con el nombre de la otra daría siempre `undefined`,
+      // o sea "todo sin leer", que es una afirmación falsa pintada de urgente.
+      leida: fuente === 'radar' ? a.vista === true : a.leida === true,
+      ts: d ? d.getTime() : 0,
+      iso: d ? d.toISOString() : '',
+    };
+  };
+  return []
+    .concat((Array.isArray(radar) ? radar : []).map(a => uno(a, 'radar')))
+    .concat((Array.isArray(sistema) ? sistema : []).map(a => uno(a, 'sistema')))
+    .filter(a => a.texto || a.titulo)
+    .sort((x, y) => y.ts - x.ts)
+    .slice(0, _RAH_TOPE);
+}
+
+// A dónde lleva cada alerta. Las del Radar reusan `_radarAlertaDestino`, el
+// mapa que ya existía desde la tuerca de alertas clickeables — no se escribe
+// un segundo mapa que se despeine del primero.
+function _rahIr(fuente, tipo) {
+  if (fuente === 'radar') { _radarAlertaIr(tipo); return; }
+  showPage('maestro');
+  const b = document.getElementById('mt-tab-btn-alertas');
+  if (b) b.click();
+}
+
+function _rahFila(a) {
+  const col = _RAH_COLOR[a.sev] || _RAH_COLOR.info;
+  const dest = a.fuente === 'radar' ? _radarAlertaDestino(a.tipo) : { mt: true };
+  const txt = a.titulo || a.texto;
+  const sub = (a.titulo && a.texto && a.texto !== a.titulo) ? a.texto : '';
+  return `<button type="button" class="rah-row${a.leida ? '' : ' rah-nueva'}"
+      style="--rah-c:${col}" onclick="_rahIr('${_attrJs(a.fuente)}','${_attrJs(a.tipo)}')"
+      ${dest ? '' : 'disabled'} title="${dest ? 'Ir a donde se resuelve' : 'Informativa'}">
+    <span class="rah-dot" aria-hidden="true"></span>
+    <span class="rah-txt">
+      <span class="rah-t">${_esfEsc(txt)}</span>
+      ${sub ? `<span class="rah-s">${_esfEsc(sub)}</span>` : ''}
+    </span>
+    <span class="rah-when">${_esfEsc(_khHaceRel(a.iso))}</span>
+  </button>`;
+}
+
+function _rahRender(lista) {
+  const arriba = lista.slice(0, _RAH_VISIBLES);
+  const resto = lista.slice(_RAH_VISIBLES);
+  const sinLeer = lista.filter(a => !a.leida).length;
+  return `<div class="card rah-card">
+    <div class="rah-head">
+      <span class="rah-h">Lo que pide atención</span>
+      <span class="rah-n">${lista.length}${sinLeer ? ` · <b>${sinLeer} sin ver</b>` : ''}</span>
+    </div>
+    <div class="rah-list">${arriba.map(_rahFila).join('')}</div>
+    ${resto.length ? `<details class="rah-mas">
+      <summary>ver las ${lista.length}</summary>
+      <div class="rah-list">${resto.map(_rahFila).join('')}</div>
+    </details>` : ''}
+  </div>`;
+}
+
+async function _loadAlertasHome() {
+  const el = document.getElementById('resumen-alertas');
+  if (!el) return;
+  if (!currentUser || currentUser.rol !== 'maestro_roshi') { el.style.display = 'none'; return; }
+  // Fails-soft POR FUENTE, no en bloque: un `Promise.all` que rechaza dejaría
+  // el panel vacío aunque la otra fuente hubiera contestado bien.
+  const [radar, sistema] = await Promise.all([
+    khRadar.alertasListar().catch(() => []),
+    khCoordi.alertasListar().catch(() => []),
+  ]);
+  const lista = _rahNormalizar(radar, sistema);
+  if (!lista.length) { el.style.display = 'none'; return; }
+  el.style.display = '';
+  el.innerHTML = _rahRender(lista);
+}
+
 // Auxiliares (bulma/milk) con chip de puntualidad vs 09:00 MX (tolerancia 15 min):
 //   ≤ 09:15 → verde "✓" · > 09:15 → ámbar · sin conexión hoy → gris.
 // Los demás roles: sin juicio de horario (no tienen entrada contractual).
@@ -4292,6 +4418,7 @@ async function _conexHistorial(uid, nombre) {
 }
 
 async function loadResumen() {
+  _loadAlertasHome();       // [RES-1] lo que pide atención, arriba de todo (solo Memo; fails-soft)
   _renderAtajosHome();      // [E5-5] atajos del home, filtrados por _puedeVerTab
   _loadConexiones();        // 🕘 tablero de conexiones (solo Memo; fails-soft)
   const proxEl = document.getElementById('proximos-eventos');

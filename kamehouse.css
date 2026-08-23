@@ -3394,3 +3394,51 @@ input[type="search"],.kh-buscar,.buscador{border-radius:var(--r-sm,8px)}
  font-size:11px;color:var(--ts);line-height:1.6;
 }
 .aud1e-nota b{color:var(--text)}
+
+/* ── [RES-1] La tira de "lo que pide atención", arriba del Resumen ────────── */
+.rah-card { margin-bottom: 0; padding: 14px 16px; }
+.rah-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+.rah-h { font-family: 'Rajdhani', sans-serif; font-weight: 700; font-size: 15px; letter-spacing: .02em; }
+.rah-n { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--ts); }
+.rah-n b { color: var(--orange); }
+.rah-list { display: flex; flex-direction: column; gap: 6px; }
+
+.rah-row {
+  display: flex; align-items: center; gap: 10px; width: 100%; text-align: left;
+  background: var(--bg2); border: 1px solid var(--border);
+  border-left: 3px solid var(--rah-c, var(--ts));
+  border-radius: var(--r-sm, 8px); padding: 9px 12px; color: var(--text);
+  font: inherit; cursor: pointer; transition: border-color .15s, background .15s;
+}
+.rah-row:hover:not(:disabled) { background: var(--bg3); border-color: var(--rah-c, var(--border2)); }
+.rah-row:focus-visible { outline: 2px solid var(--orange); outline-offset: 2px; }
+/* Informativa: sin destino a dónde ir. Se ve igual de legible, solo no invita
+   al clic — un cursor de mano que no lleva a ningún lado miente. */
+.rah-row:disabled { cursor: default; opacity: .75; }
+
+.rah-dot { flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--rah-c, var(--ts)); opacity: .35; }
+.rah-nueva .rah-dot { opacity: 1; box-shadow: 0 0 0 3px color-mix(in srgb, var(--rah-c) 22%, transparent); }
+.rah-nueva .rah-t { font-weight: 700; }
+
+.rah-txt { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.rah-t { font-size: 13px; line-height: 1.3; }
+.rah-s { font-size: 11px; color: var(--ts); line-height: 1.35;
+         overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rah-when { flex: none; font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--ts); white-space: nowrap; }
+
+.rah-mas { margin-top: 8px; }
+.rah-mas > summary {
+  cursor: pointer; list-style: none; text-align: center;
+  font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: .08em;
+  color: var(--ts); padding: 6px; border-radius: var(--r-sm, 8px);
+}
+.rah-mas > summary::-webkit-details-marker { display: none; }
+.rah-mas > summary::after { content: ' ▾'; }
+.rah-mas[open] > summary::after { content: ' ▴'; }
+.rah-mas > summary:hover { color: var(--orange); background: var(--bg2); }
+.rah-mas[open] > .rah-list { margin-top: 6px; }
+
+@media (max-width: 640px) {
+  .rah-s { white-space: normal; }
+  .rah-when { font-size: 9px; }
+}

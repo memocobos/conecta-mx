@@ -438,11 +438,44 @@ body.wizard-open{overscroll-behavior:none}
 #ev-search::placeholder{color:rgba(255,255,255,.3)}
 #ev-search:focus{border-color:rgba(232,255,76,.5)}
 .fbtn{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:rgba(255,255,255,.5);font-size:9px;font-weight:900;padding:5px 12px;cursor:pointer;font-family:Montserrat,sans-serif;text-transform:uppercase;letter-spacing:.06em;transition:all .15s}
-.month-bar{display:flex;gap:6px;overflow-x:auto;padding:8px 16px;-webkit-overflow-scrolling:touch;scrollbar-width:none}
-.month-bar::-webkit-scrollbar{display:none}
-.mbtn{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);color:rgba(255,255,255,.4);font-size:9px;font-weight:700;padding:4px 12px;cursor:pointer;font-family:Montserrat,sans-serif;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap;transition:all .15s;border-radius:var(--r-btn,12px)}
-.mbtn:hover{border-color:rgba(232,255,76,.3);color:rgba(232,255,76,.6)}
-.mbtn.active{background:rgba(232,255,76,.1);border-color:#e8ff4c;color:#e8ff4c}
+/* [FIL-1] La fila de desplegables que sustituye a los 3 botones de ciudad y a
+   los 8 chips de mes. Una sola fila de 34px contra los 4 renglones (183px) que
+   ocupaban los 19 controles. */
+/* [FIL-1] Los 6 botones en UNA fila que se desliza, no envueltos en tres.
+   Medido: con flex-wrap ocupaban 3 renglones (160px con los desplegables), que
+   no es la simplificación que se prometió. Deslizar es el patrón que ya usaba
+   la barra de meses en este mismo catálogo, así que no se inventa nada — y con
+   6 elementos casi todos se ven de entrada. */
+#filter-btns{flex-wrap:nowrap!important;overflow-x:auto;-webkit-overflow-scrolling:touch;
+  scrollbar-width:none;padding-bottom:2px}
+#filter-btns::-webkit-scrollbar{display:none}
+#filter-btns .fbtn{flex:0 0 auto;white-space:nowrap}
+.fil-selects{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:0}
+.fil-sel{position:relative;display:inline-flex;align-items:center;gap:6px;
+  background:#1a1a1a;border:1.5px solid rgba(255,255,255,.15);border-radius:var(--r-btn,12px);
+  padding:0 10px;height:34px}
+.fil-sel-lbl{font-size:9px;font-weight:900;letter-spacing:.1em;text-transform:uppercase;
+  color:rgba(255,255,255,.42);white-space:nowrap;pointer-events:none}
+.fil-sel select{appearance:none;-webkit-appearance:none;background:transparent;border:0;outline:0;
+  color:#fff;font-family:Montserrat,sans-serif;font-size:11px;font-weight:700;
+  padding:0 16px 0 0;cursor:pointer;max-width:132px}
+.fil-sel select option{background:#111;color:#fff}
+.fil-sel::after{content:'';position:absolute;right:9px;top:50%;width:6px;height:6px;
+  border-right:1.5px solid rgba(255,255,255,.45);border-bottom:1.5px solid rgba(255,255,255,.45);
+  transform:translateY(-70%) rotate(45deg);pointer-events:none}
+/* Un desplegable con algo elegido se enciende: si no, el cliente no sabe por
+   qué el catálogo trae menos eventos. */
+.fil-sel.puesto{border-color:#e8ff4c}
+.fil-sel.puesto .fil-sel-lbl{color:#e8ff4c}
+/* "Pasados" es archivo, no compra: enlace discreto, no botón de primer nivel. */
+.fil-pasados{background:transparent;border:0;padding:0 4px;cursor:pointer;
+  font-family:Montserrat,sans-serif;font-size:10.5px;font-weight:700;
+  color:rgba(255,255,255,.42);text-decoration:underline;text-underline-offset:3px}
+.fil-pasados:hover{color:#e8ff4c}
+.fil-pasados.active{color:#e8ff4c}
+#filter-btns.topmode ~ .fil-selects{display:none}
+/* [FIL-1] Aquí vivían .month-bar y la familia .mbtn (los 8 chips de mes). Se
+   fueron con su dueño: el <select> los sustituye y nadie más los nombraba. */
 .how-section{padding:0;background:#0a0a0a}
 .how-toggle{display:block;width:100%;background:none;border:none;border-top:1px solid rgba(255,255,255,.06);border-bottom:1px solid rgba(255,255,255,.06);color:#e8ff4c;font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.1em;padding:14px 16px;cursor:pointer;font-family:'Montserrat',sans-serif;text-align:center;transition:background .2s}
 .how-toggle:hover{background:rgba(232,255,76,.03)}
@@ -767,8 +800,7 @@ body.wizard-open{overscroll-behavior:none}
 #ev-search:focus{border-color:var(--c-amarillo) !important;outline:none}
 .fbtn{background:#0a0a0a;border:1.5px solid rgba(255,255,255,.15);font-size:10px;padding:8px 14px;letter-spacing:.08em}
 .fbtn.active{background:var(--c-amarillo);border-color:var(--c-amarillo);color:#000}
-.mbtn{background:#0a0a0a;border:1.5px solid rgba(255,255,255,.15);padding:6px 14px}
-.mbtn.active{background:var(--c-amarillo);border-color:var(--c-amarillo);color:#000}
+/* [FIL-1] El remate de los chips de mes se va con los chips. */
 
 /* ==================================================================
    Wizard / Detail page branding refresh
@@ -1072,21 +1104,43 @@ src="https://www.facebook.com/tr?id=1685907946147007&ev=PageView&noscript=1"
       style="flex:1;background:#1a1a1a;border:2px solid rgba(255,255,255,.12);color:#fff;padding:10px 14px;font-size:13px;font-family:Montserrat,sans-serif;font-weight:600;outline:none"
     >
   </div>
-  <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px" id="filter-btns">
+  <!-- [FIL-1] De 19 controles en 4 renglones a 6 botones + 2 desplegables.
+       Lo que se fue y por qué está en la PR; el resumen:
+        · "Disponibles" devolvía 54 de 57 — un filtro que quita el 5% no es una
+          decisión, es un botón que casi nunca cambia nada.
+        · Monterrey / CDMX / Otras eran UNA pregunta ("¿dónde?") repartida en
+          tres botones que además SUSTITUÍAN al filtro activo. Ahora es un
+          desplegable que se COMBINA con el resto.
+        · Los 8 chips de mes ocupaban 41px permanentes; pasan al mismo patrón.
+        · "Pasados" es archivo, no compra: baja a enlace discreto.
+       Se conservan las clases fbtn-top10 / fbtn-proximos / fbtn-deportes /
+       fbtn-exit-top10: las nombran el CSS y los deep-links de /proximos y
+       /deportes, que siguen entrando por aquí. -->
+  <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px" id="filter-btns">
     <button class="fbtn active" onclick="setFilter(this,'all')">Todos</button>
-    <button class="fbtn" onclick="setFilter(this,'nuevos')">Nuevos</button>
     <button class="fbtn fbtn-top10" onclick="setFilter(this,'top10')">LOS MÁS BUSCADOS</button>
+    <button class="fbtn" onclick="setFilter(this,'nuevos')">Nuevos</button>
+    <button class="fbtn" onclick="setFilter(this,'ult')">Últimos lugares</button>
     <button class="fbtn fbtn-proximos" onclick="setFilter(this,'proximos')">Próximos</button>
     <button class="fbtn fbtn-deportes" onclick="setFilter(this,'deportes')">Deportes</button>
-    <button class="fbtn" onclick="setFilter(this,'disp')">Disponibles</button>
-    <button class="fbtn" onclick="setFilter(this,'ult')">Últimos</button>
-    <button class="fbtn" onclick="setFilter(this,'mty')">Monterrey</button>
-    <button class="fbtn" onclick="setFilter(this,'cdmx')">CDMX</button>
-    <button class="fbtn" onclick="setFilter(this,'otras')">Otras ciudades</button>
-    <button class="fbtn" onclick="setFilter(this,'pasados')">Pasados</button>
     <button class="fbtn fbtn-exit-top10" onclick="setFilter(this.parentNode.querySelector('.fbtn:nth-child(1)'),'all')">← Ver todo</button>
   </div>
-  <div class="month-bar" id="month-bar"></div>
+  <div class="fil-selects" id="fil-selects">
+    <label class="fil-sel">
+      <span class="fil-sel-lbl">Ciudad</span>
+      <select id="fil-ciudad" onchange="setCiudad(this.value)" aria-label="Filtrar por ciudad">
+        <option value="all">Todas</option>
+        <option value="mty">Monterrey</option>
+        <option value="cdmx">CDMX</option>
+        <option value="otras">Otras ciudades</option>
+      </select>
+    </label>
+    <label class="fil-sel">
+      <span class="fil-sel-lbl">Mes</span>
+      <select id="fil-mes" onchange="setMes(this.value)" aria-label="Filtrar por mes"></select>
+    </label>
+    <button type="button" class="fil-pasados" id="fil-pasados" onclick="togglePasados()"></button>
+  </div>
 </div>
 <div id="ev-list" class="ev-grid"></div>
   </div>
@@ -2952,27 +3006,17 @@ function renderCatalog(){
     }
     ev._past=isPast;
     var isAg=false,isSV=false,isProc=false,isPC2=false,hasZ=false;
+    // [FIL-1] La tarjeta ya NO deriva su estado: lo PIDE. La misma llamada la
+    // hace filterEvents, así que la etiqueta y el filtro no pueden divergir.
+    var _v=_evVeredicto(ev);
     if(isPast){
       // Past event: simple card, no semáforo
       var tagTxt='Evento pasado';
       var tagCls='tpast';
     } else {
-    var st=ev.st;
-    isAg=st==='agotado'||!!ev.agotado;
-    isSV=st==='solo-viaje';
-    isProc=st==='proceso';
-    isPC2=st==='por-confirmar';
-    var isNF=st==='nueva-fecha';
-    var isPronto=st==='pronto';
-    var isProxi=st==='proximamente';
-    // Auto-semáforo: calcula % de zonas disponibles
-    var _zonas=(ev.multifecha?ev.multifecha.reduce(function(a,mf){return a.concat(mf.zonas);},ev.zonas||[]):(ev.zonas||[]));
-    var _total=_zonas.length;
-    var _avail=_zonas.filter(function(z){return !z.ag;}).length;
-    var _pct=_total>0?(_avail/_total*100):100;
-    if(!isAg&&!isNF&&!isPronto&&!isProxi&&_total>0&&_avail===0)isAg=true;
-    var isUlt=st==='ultimos'||(!isAg&&!isSV&&!isPC2&&!isProc&&!isNF&&!isPronto&&!isProxi&&_pct<40&&_pct>0);
-    var isPoca=!isAg&&!isUlt&&!isSV&&!isPC2&&!isProc&&!isNF&&!isPronto&&!isProxi&&_pct>=40&&_pct<60;
+    isAg=_v.isAg; isSV=_v.isSV; isProc=_v.isProc; isPC2=_v.isPC2;
+    var isNF=_v.isNF, isPronto=_v.isPronto, isProxi=_v.isProxi;
+    var isUlt=_v.isUlt, isPoca=_v.isPoca;
     hasZ=ev.zonas.length>0;
     var tagTxt=isAg?'Agotado':isProxi?'Próximamente':isPronto?'Próximamente':isNF?'↻ Próximamente nueva fecha':isProc?'En Proceso':isUlt?'Últimos lugares':isPoca?'Poca disponibilidad':isSV?'Solo viaje':isPC2?'Por confirmar':'Disponible';
     var tagCls=isAg?'tag':isProxi?'tpronto':isPronto?'tpronto':isNF?'tnf':isProc?'tproc':isUlt?'tu':isPoca?'tpoca':isSV?'tsv':isPC2?'tpc':'td';
@@ -3479,9 +3523,11 @@ function setFilter(btn,f){
   try{ trackMainEvent('main_filtro_aplicado', { filtro_usado: f }); }catch(e){}
   document.querySelectorAll('.fbtn').forEach(function(b){b.classList.remove('active');});
   if(btn)btn.classList.add('active');
-  var mb=document.getElementById('month-bar');
-  if(mb)mb.style.display=(f==='top10')?'none':'';
-  if(f==='top10'){_activeMonth='all';document.querySelectorAll('.mbtn').forEach(function(b){b.classList.remove('active');});var tb=document.querySelector('.mbtn:first-child');if(tb)tb.classList.add('active');}
+  // [FIL-1] La barra de chips de mes ya no existe; los desplegables se
+  // esconden en modo top10 por CSS (#filter-btns.topmode ~ .fil-selects), que
+  // es una regla y no tres líneas de JS.
+  if(f==='top10'){ _activeMonth='all'; _activeCiudad='all'; }
+  if(typeof _filPinta==='function')_filPinta();
   var fb=document.getElementById('filter-btns');
   if(fb)fb.classList.toggle('topmode', f==='top10');
   // URL <-> filtro para deep-links compartibles (/proximos, /deportes).
@@ -3504,6 +3550,38 @@ function cerrarProximosBanner(){
 // Normaliza para búsqueda: minúsculas + quita acentos (Á->a, í->i) pero CONSERVA
 // espacios, para que "alvaro dias" encuentre "Álvaro Díaz".
 function _searchNorm(s){return(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim();}
+// ═══ [FIL-1] EL VEREDICTO DE UN EVENTO — UNA SOLA FUENTE ═══════════════════
+// Antes esto vivía en DOS lugares que ya habían divergido:
+//   · la TARJETA derivaba `isUlt` con el auto-semáforo (st==='ultimos' O menos
+//     del 40% de zonas libres) y pintaba "Últimos lugares";
+//   · el FILTRO preguntaba solo `ev.st==='ultimos'`.
+// Medido antes de tocar: 23 tarjetas decían "Últimos lugares" y el filtro
+// devolvía CERO, porque hoy no hay ni un evento marcado a mano. El cliente
+// veía la etiqueta y no podía filtrar por ella — sin error, sin aviso.
+//
+// Es el caso del libro: dos listas iguales no existen, solo dos listas que
+// todavía no divergen. Ahora el veredicto se calcula AQUÍ y las dos caras lo
+// PIDEN. Si alguien cambia la regla, cambia para las dos a la vez.
+function _evVeredicto(ev){
+  var isPast=false;
+  if(ev.ds&&ev.ds!=='2027-12-31'){ isPast=new Date(ev.ds+'T23:59:59')<new Date(); }
+  var st=ev.st;
+  var isAg=st==='agotado'||!!ev.agotado;
+  var isSV=st==='solo-viaje',isProc=st==='proceso',isPC2=st==='por-confirmar';
+  var isNF=st==='nueva-fecha',isPronto=st==='pronto',isProxi=st==='proximamente';
+  var _z=(ev.multifecha?ev.multifecha.reduce(function(a,mf){return a.concat(mf.zonas);},ev.zonas||[]):(ev.zonas||[]));
+  var _total=_z.length;
+  var _avail=_z.filter(function(z){return !z.ag;}).length;
+  var _pct=_total>0?(_avail/_total*100):100;
+  // Auto-semáforo: sin una sola zona libre, agotado aunque el st no lo diga.
+  if(!isAg&&!isNF&&!isPronto&&!isProxi&&_total>0&&_avail===0)isAg=true;
+  var libre=!isAg&&!isSV&&!isPC2&&!isProc&&!isNF&&!isPronto&&!isProxi;
+  var isUlt=st==='ultimos'||(libre&&_pct<40&&_pct>0);
+  var isPoca=libre&&!isUlt&&_pct>=40&&_pct<60;
+  return{isPast:isPast,isAg:isAg,isSV:isSV,isProc:isProc,isPC2:isPC2,isNF:isNF,
+    isPronto:isPronto,isProxi:isProxi,isUlt:isUlt,isPoca:isPoca,pct:_pct,total:_total};
+}
+
 function filterEvents(){
   var q=_searchNorm(document.getElementById('ev-search').value||'');
   var f=_activeFilter;
@@ -3516,7 +3594,12 @@ function filterEvents(){
     var card=cards[i];
     // Reset any top10 ordering from previous runs
     if(card.style.order)card.style.order='';
-    if(card.classList.contains('mes-label')||card.classList.contains('pc-section-label')||card.classList.contains('pc-block')){
+    // [FIL-1] La clase 'pc-block' salió de esta lista: IDX-1 borró el cuadrito
+    // de "Próximamente · Por confirmar" y con él la única clase de ese nombre.
+    // Preguntar por ella no tronaba —contestaba false siempre— pero era un
+    // selector que ya no alcanza nada, que es como empiezan los que engañan.
+    // 'pc-section-label' SÍ se queda: la usa la sección "Por confirmar" nueva.
+    if(card.classList.contains('mes-label')||card.classList.contains('pc-section-label')){
       card.style.display=(f==='top10')?'none':'';
       continue;
     }
@@ -3530,6 +3613,12 @@ function filterEvents(){
     var evPast=!!ev._past;
     // Location filter — past events only show in 'pasados' filter
     var isCdmx=ev.v&&(ev.v.toUpperCase().includes('CDMX')||ev.v.toUpperCase().includes('CIUDAD DE MEXICO'));
+    // [FIL-1] Subidos del else: ahora la ciudad se evalúa SIEMPRE, porque es
+    // un eje propio que se combina con cualquier filtro.
+    var _vU=ev.v?ev.v.toUpperCase():'';
+    var isMty=_vU.indexOf('MTY')>=0||_vU.indexOf('MONTERREY')>=0||_vU.indexOf('NL')>=0||_vU.indexOf('FUNDIDORA')>=0;
+    var isOtras=!isMty&&!isCdmx;
+    var _v=_evVeredicto(ev);
     var matchLoc;
     if(f==='pasados'){
       matchLoc=evPast;
@@ -3539,17 +3628,25 @@ function filterEvents(){
     } else {
       if(evPast){matchLoc=false;}
       else{
-        // Mty: venue contiene MTY/MONTERREY/NL/FUNDIDORA (mirror del helper de ciudad).
-        // Otras ciudades: cualquier venue que no sea MTY ni CDMX (ej. Querétaro).
-        var vU=ev.v?ev.v.toUpperCase():'';
-        var isMty=vU.indexOf('MTY')>=0||vU.indexOf('MONTERREY')>=0||vU.indexOf('NL')>=0||vU.indexOf('FUNDIDORA')>=0;
-        var isOtras=!isMty&&!isCdmx;
         // Nuevos: agregado en los últimos 30 días (campo ev.added 'YYYY-MM-DD').
         var addedTs=ev.added?Date.parse(ev.added+'T00:00:00'):0;
         var isNew=!!addedTs&&(Date.now()-addedTs)<30*24*60*60*1000;
-        matchLoc=(f==='all')||(f==='mty'&&isMty)||(f==='cdmx'&&isCdmx)||(f==='otras'&&isOtras)||(f==='nuevos'&&isNew)||(f==='disp'&&ev.st!=='agotado'&&!ev.agotado)||(f==='ult'&&ev.st==='ultimos')||(f==='proximos'&&ev.st==='proximamente')||(f==='deportes'&&!!ev.deporte);
+        // [FIL-1] "Últimos" ahora lee el MISMO veredicto que pinta la etiqueta.
+        // Antes preguntaba ev.st==='ultimos' y devolvía 0 mientras 23 tarjetas
+        // decían "Últimos lugares".
+        matchLoc=(f==='all')||(f==='nuevos'&&isNew)||(f==='ult'&&_v.isUlt)||
+                 (f==='proximos'&&_v.isProxi)||(f==='deportes'&&!!ev.deporte);
       }
     }
+    // [FIL-1] LA CIUDAD ES UN EJE APARTE, no un filtro más.
+    // Antes Monterrey/CDMX/Otras eran botones que SUSTITUÍAN al filtro activo:
+    // elegir "Monterrey" borraba "Nuevos". Son dos preguntas distintas —"¿qué
+    // tipo?" y "¿dónde?"— así que ahora se combinan. Medido: las tres
+    // particionan exacto (32+18+7 = 57 = todos), o sea que nunca fueron
+    // alternativas del resto, solo un reparto del mismo conjunto.
+    var matchCiudad=(_activeCiudad==='all')||(f==='top10')||
+      (_activeCiudad==='mty'&&isMty)||(_activeCiudad==='cdmx'&&isCdmx)||(_activeCiudad==='otras'&&isOtras);
+    matchLoc=matchLoc&&matchCiudad;
     var matchMonth=(f==='top10')||(_activeMonth==='all')||(ev.ds&&ev.ds.substring(0,7)===_activeMonth);
     card.style.display=(matchQ&&matchLoc&&matchMonth)?'':'none';
   }
@@ -3577,6 +3674,14 @@ function filterEvents(){
   }
 }
 var _activeMonth='all';
+// [FIL-1] ⚠️ ESTA LÍNEA VA AQUÍ, JUNTO A _activeMonth, Y NO ABAJO CON setCiudad.
+// La tuve un rato al lado de su función y el desplegable de Ciudad salía VACÍO
+// y encendido en amarillo: `var` se iza, pero la ASIGNACIÓN no. `buildMonthBar`
+// llama a `_filPinta()` antes de que aquella línea llegara a ejecutarse, así
+// que le asignaba `undefined` al <select> (selectedIndex -1, sin texto) y de
+// paso lo marcaba como "puesto", porque undefined !== 'all'.
+// No tronaba: pintaba mal y se quedaba así. Lo cazó la captura, no el arnés.
+var _activeCiudad='all';
 renderCatalog();
 filterEvents();
 buildMonthBar();
@@ -4091,17 +4196,53 @@ function buildMonthBar(){
     if(!meses[key])meses[key]=MLBL[m]+' '+y;
   });
   var keys=Object.keys(meses).sort();
-  var h='<button class="mbtn active" onclick="setMonth(this,\'all\')">Todos</button>';
-  keys.forEach(function(k){
-    h+='<button class="mbtn" onclick="setMonth(this,\''+k+'\')">'+meses[k]+'</button>';
-  });
-  $$('month-bar').innerHTML=h;
+  // [FIL-1] Los 8 chips pasaron a un <select>: mismos meses, misma fuente (el
+  // EV), 41px permanentes menos. Nada de escribir la lista a mano — se sigue
+  // contando de los eventos vivos, como siempre.
+  var sel=$$('fil-mes');
+  if(!sel)return;
+  var h='<option value="all">Todos</option>';
+  keys.forEach(function(k){ h+='<option value="'+k+'">'+meses[k]+'</option>'; });
+  sel.innerHTML=h;
+  sel.value=_activeMonth;
+  _filPinta();
 }
-function setMonth(btn,m){
+function setMes(m){
   _activeMonth=m;
-  document.querySelectorAll('.mbtn').forEach(function(b){b.classList.remove('active');});
-  btn.classList.add('active');
+  _filPinta();
   filterEvents();
+}
+// [FIL-1] La ciudad: eje propio que se COMBINA con el filtro, no lo sustituye.
+// ⚠️ Su valor inicial NO se declara aquí: ver la nota junto a _activeMonth.
+function setCiudad(c){
+  _activeCiudad=c;
+  try{ trackMainEvent('main_filtro_aplicado', { filtro_usado: 'ciudad:'+c }); }catch(e){}
+  _filPinta();
+  filterEvents();
+}
+// [FIL-1] "Pasados" es archivo: un enlace que enciende y apaga. Lleva su
+// CONTEO para que se sepa qué hay detrás antes de entrar — y el conteo se
+// cuenta del EV, no se escribe.
+function togglePasados(){
+  var yaEsta=_activeFilter==='pasados';
+  var primero=document.querySelector('#filter-btns .fbtn');
+  setFilter(yaEsta?primero:null,yaEsta?'all':'pasados');
+  _filPinta();
+}
+// Pinta el estado de los tres controles de abajo. Un desplegable con algo
+// elegido tiene que NOTARSE: si no, el catálogo trae menos eventos y nadie
+// sabe por qué.
+function _filPinta(){
+  var c=$$('fil-ciudad'), m=$$('fil-mes'), pas=$$('fil-pasados');
+  if(c){ c.value=_activeCiudad; var lc=c.closest('.fil-sel'); if(lc)lc.classList.toggle('puesto',_activeCiudad!=='all'); }
+  if(m){ m.value=_activeMonth;  var lm=m.closest('.fil-sel'); if(lm)lm.classList.toggle('puesto',_activeMonth!=='all'); }
+  if(pas){
+    var n=0;
+    for(var i=0;i<EV.length;i++){ if(!EV[i].listOnly&&_evVeredicto(EV[i]).isPast)n++; }
+    var activo=_activeFilter==='pasados';
+    pas.textContent=activo?('← Volver al catálogo'):('Ver eventos pasados ('+n+')');
+    pas.classList.toggle('active',activo);
+  }
 }
 
 // Flash promo countdown timer + Preventa countdown (Dale Mixx)

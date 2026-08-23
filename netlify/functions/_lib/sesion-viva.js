@@ -16,14 +16,14 @@
 // para cerrar una ventana de horas, NO para dejar a la gente fuera de su propio
 // sistema por un hipo de red. Cada fail-open deja un console.warn: un candado
 // que se apaga en silencio es peor que no tenerlo, porque nadie se entera de que
-// dejó de proteger (lección de _lib/vendedor-activo).
+// dejó de proteger (lección heredada del candado de vendedores, ya retirado).
 //
 // INTERRUPTOR DE EMERGENCIA: si `SESION_VIVA_MODO === 'off'` la verificación se
 // salta por completo (ni siquiera consulta). La variable NO existe en Netlify a
 // propósito: su ausencia = candado activo. Si algún día algo truena, se crea en
 // un minuto y el candado queda desactivado sin necesidad de un deploy.
 //
-// CACHÉ de 60 s por usuario (mismo patrón que _lib/vendedor-activo): una
+// CACHÉ de 60 s por usuario: una
 // desactivación surte efecto en ≤1 minuto y no se le pega a la BD en cada
 // request. Se cachea la FILA, no el veredicto: el veredicto depende del `iat`
 // del token que llega, que cambia por sesión.

@@ -2497,7 +2497,16 @@ body.pf-barra-viva .wa-float{bottom:104px}
 .hs-img{position:relative;z-index:1;width:100%;height:100%;object-fit:cover;display:block}
 .hs-ini{position:absolute;inset:0;z-index:0;display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-size:19px;font-weight:900;color:rgba(255,255,255,.12)}
 .hs-body{padding:5px 6px 6px}
-.hs-rank{display:inline-block;background:var(--c-amarillo);color:#000;font-size:8px;font-weight:900;letter-spacing:.06em;padding:1px 5px;border-radius:var(--r-chip,999px);margin-bottom:3px}
+/* [LAND-1d] EL RANGO, EN LÍNEA CON EL NOMBRE.
+   ⚠️ Iba suelto encima del nombre y ocupaba SU PROPIO RENGLÓN: la tira crecía
+   21px exactos. Y ese renglón está SIEMPRE en producción, porque el top de
+   event-clicks sí contesta — mis mediciones de LAND-1b y 1c se hicieron en
+   modo respaldo (sin top) y por eso el número del pliegue salía 21px optimista.
+   Medido con el top puesto: el 320×568 se salía 17px y el iPhone SE quedaba a
+   5px de margen. En línea, no cuesta alto. */
+.hs-rank{display:inline;background:var(--c-amarillo);color:#000;font-size:8px;font-weight:900;
+  letter-spacing:.06em;padding:1px 4px;border-radius:var(--r-chip,999px);margin-right:4px;
+  vertical-align:1px}
 .hs-name{font-size:9.5px;font-weight:900;line-height:1.15;text-transform:uppercase;color:#fff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .hs-fecha{font-size:9px;font-weight:700;color:rgba(255,255,255,.5);margin-top:2px;white-space:nowrap}
 .hs-mas{flex:0 0 58px;display:flex;flex-direction:column;align-items:center;justify-content:center;
@@ -4015,8 +4024,10 @@ var _landTick = null;
       var m=document.createElement('div'); m.className='hs-media';
       var b=document.createElement('div'); b.className='hs-body';
       var n=(typeof _top10Rank!=='undefined'&&_top10Rank&&_top10Rank[e.id])?_top10Rank[e.id]:0;
-      b.innerHTML=(n?'<span class="hs-rank">#'+n+'</span>':'')+
-                  '<div class="hs-name">'+esc(cleanName(e.a))+'</div>'+
+      // [LAND-1d] El rango va DENTRO del nombre, no encima. Suelto ocupaba su
+      // propio renglón y crecía la tira 21px — y en producción SIEMPRE está,
+      // porque el top sí llega. Ver la nota del CSS.
+      b.innerHTML='<div class="hs-name">'+(n?'<span class="hs-rank">#'+n+'</span>':'')+esc(cleanName(e.a))+'</div>'+
                   '<div class="hs-fecha">'+esc(fechaCorta(dsEfectivo(e)))+'</div>';
       it.appendChild(m); it.appendChild(b);
       pintarPortada(m,e,'hs-img','hs-ini');

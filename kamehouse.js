@@ -7994,88 +7994,6 @@ function _kmsMal(zi, msg, campoId) {
   return false;
 }
 
-function _kmsPreviewCerrar(zi) {
-  const p = document.getElementById('kms-prev-' + zi);
-  if (p) { p.style.display = 'none'; p.innerHTML = ''; }
-}
-
-// Abre el preview. Valida primero: números que no se pueden sumar no merecen
-// un preview, merecen un señalamiento.
-function _kmsPreview(zi) {
-  const zona = _kamZonasMap[zi];
-  if (zona == null) return;
-  _kamComprasAlert('');
-
-  const cant = parseInt((document.getElementById('kam-c-cant-' + zi) || {}).value, 10);
-  const costo = Number((document.getElementById('kam-c-costo-' + zi) || {}).value);
-  const provSel = document.getElementById('kam-c-prov-' + zi);
-  const prov = provSel ? provSel.value : '';
-
-  // Más estricto que el guardado (que acepta 0): una compra de cero boletos o
-  // de cero pesos no es una compra, es un dedo resbalado.
-  if (!Number.isInteger(cant) || cant <= 0) return _kmsMal(zi, 'La cantidad va en boletos enteros y mayor que cero.', 'kam-c-cant-' + zi);
-  if (!Number.isFinite(costo) || costo <= 0) return _kmsMal(zi, 'El costo unitario tiene que ser mayor que cero.', 'kam-c-costo-' + zi);
-  if (!prov) return _kmsMal(zi, 'Elige a quién le compraste.', 'kam-c-prov-' + zi);
-
-  const sub = cant * costo;
-  const d = _kmsDatos || {};
-  const provNom = (provSel && provSel.options[provSel.selectedIndex]) ? provSel.options[provSel.selectedIndex].textContent : '';
-
-  const linea = (lbl, antes, despues) => `<div class="kms-prev-l">
-    <span class="kms-prev-k">${_esfEsc(lbl)}</span>
-    <span class="kms-prev-v"><span class="kms-prev-a">${antes}</span><span class="kms-prev-fl" aria-hidden="true">→</span><b>${despues}</b></span>
-  </div>`;
-
-  let filas = `<div class="kms-prev-l kms-prev-head">
-    <span class="kms-prev-k">Esta compra</span>
-    <span class="kms-prev-v"><b>${cant} ${cant === 1 ? 'boleto' : 'boletos'} × ${_kamMoney(costo)} = ${_kamMoney(sub)}</b></span>
-  </div>`;
-
-  // Inversión del evento — siempre la sabemos si el tablero cargó.
-  if (typeof d.inversion === 'number') {
-    filas += linea('Inversión del evento', _kamMoney(d.inversion), _kamMoney(d.inversion + sub));
-  }
-
-  // Deuda con el proveedor = lo que le compraste menos lo que le has abonado.
-  // Si los abonos todavía no llegan, la línea NO se pinta: un saldo a medias
-  // sería un número con cara de verdad.
-  const pd = (d.provs && d.provs[prov]) ? (Number(d.provs[prov].deuda) || 0) : 0;
-  const pa = (d.abonadoProv && Object.prototype.hasOwnProperty.call(d.abonadoProv, prov)) ? (Number(d.abonadoProv[prov]) || 0) : null;
-  if (d.abonadoProv) {
-    const saldo = pd - (pa || 0);
-    filas += linea('Deuda con ' + provNom, _kamMoney(saldo), _kamMoney(saldo + sub));
-  }
-
-  // Stock de la zona — SOLO si el semáforo vino. null ≠ 0: pintar un cero aquí
-  // afirmaría "no hay disponibles", que no es lo que sabemos.
-  const z = (d.zonas || []).find((x) => x && x.zona === zona);
-  if (z && z.disponibles != null) {
-    filas += linea('Disponibles en ' + zona, String(z.disponibles), String(z.disponibles + cant));
-  }
-
-  const p = document.getElementById('kms-prev-' + zi);
-  if (!p) return;
-  p.innerHTML = `<div class="kms-prev-t">Antes de guardar — así queda tu dinero</div>
-    ${filas}
-    <div class="kms-prev-btns">
-      <button class="btn btn-ghost btn-sm" type="button" onclick="_kmsPreviewCerrar(${zi})">Cancelar</button>
-      <button class="btn btn-primary btn-sm" type="button" id="kms-prev-ok-${zi}" onclick="_kmsPreviewConfirmar(${zi})">Confirmar compra</button>
-    </div>`;
-  p.style.display = '';
-
-  // Si Memo cambia un campo, el preview deja de ser cierto: se cierra en vez de
-  // quedarse mintiendo con los números viejos.
-  ['cant', 'costo', 'prov', 'fecha', 'nota'].forEach((k) => {
-    const e = document.getElementById('kam-c-' + k + '-' + zi);
-    if (e) e.addEventListener('input', () => _kmsPreviewCerrar(zi), { once: true });
-  });
-
-  const ok = document.getElementById('kms-prev-ok-' + zi);
-  if (ok) { try { ok.focus({ preventScroll: true }); } catch (_) {} }
-  try { p.scrollIntoView({ block: 'nearest', behavior: _kmsReducido() ? 'auto' : 'smooth' }); } catch (_) {}
-  return true;
-}
-
 function _kmsReducido() {
   try { return window.matchMedia('(prefers-reduced-motion:reduce)').matches; } catch (_) { return false; }
 }
@@ -8214,36 +8132,6 @@ function _kmsIrAZona(zona) {
   const b = document.getElementById('kms-zbusca');
   if (b && b.value) { b.value = ''; _kmsZonaFiltrar(); }   // el filtro no debe esconder a la que vienes a ver
   _kmsZona(zi);
-}
-
-// Confirmar = la MISMA llamada de siempre. _kamCompraCrear ya recarga todo al
-// terminar, y con ello el tablero de arriba.
-//
-// [KMS-2b] SI EL GUARDADO FALLA, EL BOTÓN TIENE QUE VOLVER. `_kamCompraCrear`
-// atrapa el error, pinta la alerta y NO recarga: sin esto, el preview se
-// quedaba con "Guardando…" para siempre — un fallo con cara de guardado eterno,
-// en una pantalla de dinero.
-//
-// "¿El preview sigue en el DOM?" es señal SUFICIENTE de fallo, y conviene saber
-// por qué: `_kamComprasLoad` escribe el spinner en `#kam-compras` ANTES de su
-// primer await, y el preview vive dentro de ese contenedor. O sea que en el
-// camino de ÉXITO el preview ya está destruido —de forma SÍNCRONA— para cuando
-// esta promesa resuelve, aunque la recarga apenas vaya en camino. Por eso no
-// hay ventana con el botón vivo sobre una compra ya guardada.
-//
-// Ese orden es el que sostiene la regla. Si algún día `_kamComprasLoad` dejara
-// de limpiar antes de esperar, esta condición se volvería falsa en éxito y
-// habría que cambiarla — el bloque [I] del arnés lo vigila.
-async function _kmsPreviewConfirmar(zi) {
-  const ok = document.getElementById('kms-prev-ok-' + zi);
-  if (ok) { ok.disabled = true; ok.textContent = 'Guardando…'; }
-  await _kamCompraCrear(zi);
-  // Sigue en pie = no hubo recarga = tronó. Se re-consulta el botón por si algo
-  // repintó en medio: el de antes ya no valdría.
-  if (document.getElementById('kms-prev-' + zi)) {
-    const b = document.getElementById('kms-prev-ok-' + zi);
-    if (b) { b.disabled = false; b.textContent = 'Confirmar compra'; }
-  }
 }
 
 function _kmsTableroPintar(parcial) {
@@ -8456,10 +8344,13 @@ async function _kamProveedorCrear() {
 function _kamProvSelectsRefrescar(nuevoId) {
   const opts = (_kamProvCache || [])
     .map((p) => `<option value="${_esfEsc(p.id)}">${_esfEsc(p.nombre)}</option>`).join('');
-  // [KMS-SIMP-2] `kmt-prov` (el de la tanda) se suma al barrido. Medido: el
-  // selector solo alcanzaba `kam-c-prov-*`, así que un proveedor dado de alta
-  // desde la tabla no aparecía EN la tabla — justo donde se acababa de pedir.
-  document.querySelectorAll('select[id^="kam-c-prov-"], #kmt-prov').forEach((sel) => {
+  // [KMS-SIMP-2] `kmt-prov` es el de la tabla de tanda: un proveedor dado de
+  // alta desde ahí tiene que aparecer AHÍ, que es donde se acaba de pedir.
+  // [KMS-SIMP-3] Y ya es el único: el barrido también alcanzaba
+  // `select[id^="kam-c-prov-"]`, los del formulario por zona que murió. Un
+  // selector que apunta a lo que no existe no falla — no hace nada, que es
+  // peor: se lee como si siguiera cubriendo algo.
+  document.querySelectorAll('#kmt-prov').forEach((sel) => {
     const antes = sel.value;
     sel.innerHTML = opts;
     // Si lo de antes sigue existiendo, se respeta; si no, el nuevo.
@@ -8618,16 +8509,15 @@ async function _kamComprasLoad() {
       const filas = cz.length
         ? cz.map((c) => {
             const sub = (parseInt(c.cantidad, 10) || 0) * (Number(c.costo_unitario) || 0);
-            return `<tr style="border-top:1px solid var(--border)">
-              <td style="padding:3px 4px;font-size:12px">${parseInt(c.cantidad, 10) || 0} × ${_kamMoney(c.costo_unitario)}</td>
-              <td style="padding:3px 4px;font-size:12px;color:var(--ts)">${_esfEsc(c.proveedor_nombre || '—')}</td>
-              <td style="padding:3px 4px;font-size:12px;color:var(--ts)">${_esfEsc(c.fecha || '')}</td>
-              <td style="padding:3px 4px;font-size:12px">${_kamMoney(sub)}</td>
-              <td style="padding:3px 4px;text-align:right"><button class="btn btn-ghost btn-sm" type="button" onclick="_kamCompraEliminar('${_esfEsc(c.id)}')" title="Eliminar compra">✕</button></td>
+            return `<tr>
+              <td class="kzt-q">${parseInt(c.cantidad, 10) || 0} × ${_kamMoney(c.costo_unitario)}</td>
+              <td class="kzt-a">${_esfEsc(c.proveedor_nombre || '—')}</td>
+              <td class="kzt-a">${_esfEsc(c.fecha || '')}</td>
+              <td class="kzt-s">${_kamMoney(sub)}</td>
+              <td><button class="btn btn-ghost btn-sm" type="button" onclick="_kamCompraEliminar('${_attrJs(c.id)}')">×</button></td>
             </tr>`;
           }).join('')
-        : '<tr><td colspan="5" style="padding:3px 4px;font-size:12px;color:var(--ts)">Sin compras en esta zona</td></tr>';
-      const provOpts = _kamProvCache.map((p) => `<option value="${_esfEsc(p.id)}">${_esfEsc(p.nombre)}</option>`).join('');
+        : '<tr><td colspan="5" class="kzt-a">Sin compras en esta zona</td></tr>';
 
       // [KMS-3] Fila de la lista: lo justo para decidir de un vistazo.
       // `data-zona` lleva el NOMBRE en minúsculas para que el buscador filtre
@@ -8642,24 +8532,26 @@ async function _kamComprasLoad() {
         <span class="kms-zrow-ch" aria-hidden="true">›</span>
       </button>`;
 
-      html += `<div class="kms-zpanel" id="kam-z-panel-${zi}" style="display:none;border:1px solid var(--border);border-radius:var(--r-sm,8px);padding:12px;margin-bottom:12px">
-        <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:8px">
-          <div style="font-family:'Rajdhani',sans-serif;font-weight:700;font-size:15px">${_esfEsc(zona)}</div>
-          <div style="font-size:12px;color:var(--ts)">Deuda: <b style="color:var(--fg)">${_kamMoney(deuda)}</b></div>
+      // [KMS-SIMP-3] LA ZONA DEJA DE SER PUERTA DE CAPTURA.
+      //
+      // Memo cayó en esta pantalla y la sintió compleja, con razón: tenía ONCE
+      // controles y un formulario de seis campos a todo lo ancho —el select de
+      // proveedor solo ocupaba 1134px— para hacer lo que la tabla de tanda hace
+      // de golpe para las doce zonas.
+      //
+      // Aquí se quedan SOLO las dos cosas que no viven en ningún otro lado: el
+      // historial de compras DE ESTA ZONA y su semáforo. Los abonos y la deuda
+      // del evento NO se duplican: ya viven en el modo lista desde KMS-3.
+      html += `<div class="kms-zpanel" id="kam-z-panel-${zi}" style="display:none">
+        <div class="kms-zp-head">
+          <div class="kms-zp-nom">${_esfEsc(zona)}</div>
+          <div class="kms-zp-deu">Deuda: <b>${_kamMoney(deuda)}</b></div>
         </div>
-        ${_kamSemaforoHtml(sem, zi)}
-        <table style="width:100%;border-collapse:collapse;margin-bottom:8px"><tbody>${filas}</tbody></table>
-        <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
-          <input class="cot-input" id="kam-c-cant-${zi}" type="number" min="0" placeholder="Cantidad" style="width:90px">
-          <input class="cot-input" id="kam-c-costo-${zi}" type="number" min="0" step="0.01" placeholder="Costo unit." style="width:110px">
-          <select class="cot-input" id="kam-c-prov-${zi}" style="min-width:130px">${provOpts}</select>
-          <input class="cot-input" id="kam-c-fecha-${zi}" type="date" value="${_kamToday()}" style="width:150px">
-          <input class="cot-input" id="kam-c-nota-${zi}" placeholder="Nota (opcional)" maxlength="500" style="flex:1;min-width:120px">
-          <button class="btn btn-primary btn-sm" type="button" onclick="_kmsPreview(${zi})">Agregar compra</button>
-        </div>
-        <!-- [KMS-2] El preview vive aquí, pegado a su zona: el efecto en el
-             dinero se lee donde se capturó, no al otro lado de la pantalla. -->
-        <div class="kms-prev" id="kms-prev-${zi}" style="display:none"></div>
+        ${_kamSemaforoHtml(sem)}
+        <div class="kms-zp-h">Compras de esta zona</div>
+        <div class="kms-zp-tabla"><table><tbody>${filas}</tbody></table></div>
+        ${_kamAjusteHtml(sem, zi)}
+        <div class="kms-zp-pie">Para capturar boletos, usa <b>Cargar pedido en tanda</b> en la lista de zonas: las ${zonaNames.length} zonas en una sola pantalla.</div>
       </div>`;
     });
     // [KMS-SIMP-2] La cuenta se re-pinta DESPUÉS del tablero, porque el punto
@@ -8911,32 +8803,6 @@ async function _fin1eIrAGastos(slug) {
   const opt = [...sel.options].find((o) => o.value === slug)
            || [...sel.options].find((o) => String(o.value).split('#')[0] === base);
   if (opt) { sel.value = opt.value; if (typeof _fin1aOnEvento === 'function') _fin1aOnEvento(); }
-}
-
-async function _kamCompraCrear(zi) {
-  const sel = document.getElementById('kam-evt-sel');
-  const evId = sel ? sel.value : '';
-  const zona = _kamZonasMap[zi];
-  if (!evId || zona == null) return;
-  _kamComprasAlert('');
-  const cantN = parseInt(document.getElementById('kam-c-cant-' + zi)?.value, 10);
-  const costoN = Number(document.getElementById('kam-c-costo-' + zi)?.value);
-  const prov = document.getElementById('kam-c-prov-' + zi)?.value || '';
-  const fecha = document.getElementById('kam-c-fecha-' + zi)?.value || '';
-  const nota = (document.getElementById('kam-c-nota-' + zi)?.value || '').trim();
-  if (!Number.isInteger(cantN) || cantN < 0) { _kamComprasAlert('Cantidad inválida (entero >= 0).'); return; }
-  if (!Number.isFinite(costoN) || costoN < 0) { _kamComprasAlert('Costo unitario inválido (>= 0).'); return; }
-  if (!prov) { _kamComprasAlert('Elige un proveedor.'); return; }
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha)) { _kamComprasAlert('Fecha inválida.'); return; }
-  try {
-    const r = await khAdminFetch('/.netlify/functions/admin-compras', {
-      method: 'POST',
-      body: JSON.stringify({ accion: 'crear', evento_id: evId, zona, cantidad: cantN, costo_unitario: costoN, proveedor_id: prov, fecha, nota: nota || null }),
-    });
-    const d = await r.json().catch(() => ({}));
-    if (!r.ok || !d.ok) throw new Error(d.error || 'No se pudo registrar la compra');
-    _kamComprasLoad();
-  } catch (e) { _kamComprasAlert(e.message); }
 }
 
 // ═══ [KMS-SIMP-2] LA CUENTA DEL EVENTO, A LA VISTA ═════════════════════════
@@ -9218,10 +9084,11 @@ async function _kamCompraEliminar(id) {
 // [FASE B t3] ¿Puede editar el offset "vendidos fuera"? roshi/bulma.
 function _kamPuedeStock() { return ['maestro_roshi', 'bulma'].includes(currentUser && currentUser.rol); }
 
-// [FASE B t3] Película de stock de una zona (semáforo) + casilla editable de
-// "vendidos fuera" (solo roshi/bulma). `sem` es el desglose del servidor o null
-// (sin compras / semáforo no disponible) → en ese caso solo la casilla.
-function _kamSemaforoHtml(sem, zi) {
+// [FASE B t3 · KMS-SIMP-3] La PELÍCULA de stock de una zona. Antes esta función
+// devolvía la película Y la casilla de "vendidos fuera" pegadas. Se parten
+// porque ahora van a sitios distintos: la película arriba, a la vista, y la
+// casilla plegada abajo — es un puente de transición, no una cifra del día.
+function _kamSemaforoHtml(sem) {
   let film = '';
   if (sem) {
     const est = sem.estado; // verde | amarillo | rojo | negativo
@@ -9236,19 +9103,30 @@ function _kamSemaforoHtml(sem, zi) {
       ${alerta}
     </div>`;
   }
-  if (!_kamPuedeStock()) return film; // el resto solo ve la película, sin casilla de captura
+  return film;
+}
+
+// [KMS-SIMP-3] La casilla de "vendidos fuera", ahora PLEGADA y con su letrero.
+//
+// No se borra —y por eso el letrero lo dice en voz alta—: hoy es lo ÚNICO que
+// alimenta el semáforo con las ventas que no pasaron por el sistema. Cuando
+// MIG-1b sume `viajeros_evento` como cuarto término de la disponibilidad, este
+// puente sobra. Mientras tanto, pasa a segundo plano: se abre solo si lo buscas.
+function _kamAjusteHtml(sem, zi) {
+  if (!_kamPuedeStock()) return '';   // el resto solo ve la película
   const fuera = sem ? sem.fuera : 0;
   const nota = (sem && sem.ajuste && sem.ajuste.nota) ? sem.ajuste.nota : '';
   const meta = (sem && sem.ajuste && sem.ajuste.updated_por)
     ? `<span class="kam-sem-meta">último ajuste: ${_esfEsc(sem.ajuste.updated_por)}</span>` : '';
-  const box = `<div class="kam-ajuste">
-    <span class="kam-ajuste-lbl">Vendidos fuera del sistema</span>
-    <input class="cot-input kam-ajuste-num" id="kam-fuera-${zi}" type="number" min="0" value="${fuera}">
-    <input class="cot-input kam-ajuste-nota" id="kam-fuera-nota-${zi}" placeholder="Nota (ej. corte Excel 24-jul)" maxlength="500" value="${_esfEsc(nota)}">
-    <button class="btn btn-ghost btn-sm" type="button" onclick="_kamAjusteGuardar(${zi})">Guardar</button>
-    ${meta}
-  </div>`;
-  return film + box;
+  return `<details class="kam-ajuste-wrap">
+    <summary class="kam-ajuste-sum">Vendidos fuera del sistema${fuera > 0 ? ` <b>${fuera}</b>` : ''}</summary>
+    <div class="kam-ajuste">
+      <input class="cot-input kam-ajuste-num" id="kam-fuera-${zi}" type="number" min="0" value="${fuera}" aria-label="Vendidos fuera del sistema">
+      <input class="cot-input kam-ajuste-nota" id="kam-fuera-nota-${zi}" placeholder="Nota (ej. corte Excel 24-jul)" maxlength="500" value="${_esfEsc(nota)}">
+      <button class="btn btn-ghost btn-sm" type="button" onclick="_kamAjusteGuardar(${zi})">Guardar</button>
+    </div>
+    <div class="kam-ajuste-nota-pie">Puente de transición: es lo único que le cuenta al semáforo las ventas que no pasaron por el sistema. Se retira cuando MIG-1b sume los viajeros migrados a la disponibilidad.${meta ? ' · ' + meta : ''}</div>
+  </details>`;
 }
 
 // [FASE B t3] Guarda el offset "vendidos fuera" (stock_ajustes) por zona.

@@ -1593,9 +1593,16 @@
   <div class="card kms-mando">
    <div class="kms-mando-lbl">Evento del Palacio</div>
    <div class="kms-mando-row">
+    <!-- [KMS-SIMP-1] El buscador FILTRA las opciones del mismo <select>: el
+         elemento, su id y su onchange no cambian, así que los tres selectores
+         espejo de KMS-1 y `_kmsOnEvento` no se enteran. Medido antes: 101
+         opciones ordenadas por nombre y sin forma de buscar. -->
+    <input id="kms-ebusca" class="cot-input kms-ebusca" type="search" placeholder="Buscar evento…"
+           autocomplete="off" oninput="_kmsBuscarEvento()" aria-label="Buscar evento">
     <select id="kms-evt" class="cot-input" onchange="_kmsOnEvento()" aria-label="Evento del Palacio">
      <option value="">— Elige un evento —</option>
     </select>
+    <span id="kms-ebusca-vacio" class="kms-ebusca-vacio" style="display:none">Ningún evento se llama así.</span>
     <select id="kms-fecha" class="cot-input" onchange="_kmsOnFecha()" style="display:none" aria-label="Fecha del evento"></select>
    </div>
    <div class="kms-mando-hint">Gobierna las cuatro secciones de abajo. Elígelo una vez.</div>

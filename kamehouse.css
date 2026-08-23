@@ -766,6 +766,47 @@ tr.dash-click:hover{background:rgba(255,255,255,.04)}
    voz nueva para una pantalla de captura. */
 .mig-lbl{display:block;font-family:'JetBrains Mono',monospace;font-size:9px;
   letter-spacing:.12em;color:var(--ts);margin-bottom:4px;text-transform:uppercase}
+
+/* ═══ [KMS-SIMP-1] EL PEDIDO EN TANDA ══════════════════════════════════════
+   Las 12 zonas en una tabla, con lo que se repite capturado una sola vez.
+   Medido antes: cargar un evento costaba ≈48 clics y ≈60 campos, de los cuales
+   48 eran el mismo dato (proveedor/fecha/nota) escrito doce veces. */
+.kms-ebusca{max-width:190px}
+.kms-ebusca-vacio{font-size:11px;color:var(--ts)}
+.kmt-wrap{border:1px solid var(--orange);border-radius:var(--r-sm,8px);
+  background:rgba(255,138,0,.04);margin-bottom:14px}
+.kmt-sum{cursor:pointer;padding:11px 13px;font-family:'JetBrains Mono',monospace;
+  font-size:11px;letter-spacing:.1em;color:var(--orange);text-transform:uppercase;
+  list-style:none;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.kmt-sum::-webkit-details-marker{display:none}
+.kmt-sum::before{content:'▸';display:inline-block;transition:transform .18s}
+.kmt-wrap[open] .kmt-sum::before{transform:rotate(90deg)}
+.kmt-hint{color:var(--ts);letter-spacing:.02em;text-transform:none;font-size:11px}
+.kmt-body{padding:0 13px 13px}
+.kmt-comun{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px}
+.kmt-lbl{display:flex;flex-direction:column;gap:4px;font-family:'JetBrains Mono',monospace;
+  font-size:9px;letter-spacing:.12em;color:var(--ts)}
+.kmt-tabla-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:var(--r-sm,8px)}
+.kmt-tabla{width:100%;border-collapse:collapse;font-size:12px}
+.kmt-tabla th{text-align:left;padding:7px 9px;font-family:'JetBrains Mono',monospace;
+  font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--ts);
+  background:rgba(255,255,255,.03);white-space:nowrap}
+.kmt-tabla td{padding:5px 9px;border-top:1px solid var(--border);vertical-align:middle}
+.kmt-z{font-weight:600;white-space:nowrap}
+/* Lo que YA está cargado se MUESTRA, no se trae al campo: un campo pre-llenado
+   invita a corregirlo, y aquí corregir sería perder a qué precio compraste
+   antes. Agregar, nunca sobrescribir. */
+.kmt-ya{display:inline-block;margin-left:7px;font-family:'JetBrains Mono',monospace;
+  font-size:9px;letter-spacing:.06em;color:var(--ts);background:rgba(255,255,255,.06);
+  padding:1px 6px;border-radius:999px}
+.kmt-in{width:100%;min-width:82px}
+.kmt-sub{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--ts);white-space:nowrap}
+.kmt-mal{color:#ff5f56}
+.kmt-pie{display:flex;justify-content:space-between;align-items:center;gap:12px;
+  flex-wrap:wrap;margin-top:11px}
+.kmt-resumen{font-size:12px;color:var(--ts)}
+.kmt-resumen b{color:var(--fg)}
+.kmt-error{margin-top:9px;font-size:11.5px;color:#ff5f56}
 .cot-input[readonly]{color:var(--ts);cursor:not-allowed}
 .cot-desglose-row{
  display:flex;justify-content:space-between;align-items:center;

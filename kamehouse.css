@@ -760,6 +760,12 @@ tr.dash-click:hover{background:rgba(255,255,255,.04)}
  transition:border-color .2s;
 }
 .cot-input:focus{border-color:var(--orange)}
+
+/* [MIG-1a] La etiqueta de cada campo del wizard de migración. Calca el tono de
+   las etiquetas del Palacio (mono, espaciada, apagada) en vez de inventar una
+   voz nueva para una pantalla de captura. */
+.mig-lbl{display:block;font-family:'JetBrains Mono',monospace;font-size:9px;
+  letter-spacing:.12em;color:var(--ts);margin-bottom:4px;text-transform:uppercase}
 .cot-input[readonly]{color:var(--ts);cursor:not-allowed}
 .cot-desglose-row{
  display:flex;justify-content:space-between;align-items:center;

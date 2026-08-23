@@ -933,6 +933,10 @@
           <button class="btn btn-ghost btn-sm" id="cc-dl-lista" onclick="_vj2Descargar('lista')" style="font-size:10px">↓ Lista viajeros</button>
           <button class="btn btn-ghost btn-sm" id="cc-dl-rooming" onclick="_vj2Descargar('rooming')" style="font-size:10px">↓ Rooming</button>
           <button class="btn btn-primary btn-sm" onclick="abrirModalViajero(null)">+ Viajero</button>
+          <!-- [MIG-1a] El wizard de captura del Excel. Va AQUÍ y no dentro de
+               #cc-kh-wrap porque ese bloque está display:none mientras no haya
+               migrados — que es exactamente el estado en el que se estrena. -->
+          <button class="btn btn-ghost btn-sm" id="mig-abrir" onclick="migAbrir()" style="font-size:10px;border-color:var(--orange);color:var(--orange)">↥ Migrar del Excel</button>
          </div>
         </div>
         <div style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap">
@@ -940,6 +944,62 @@
          <button class="gz-filter" id="cc-fil-viaj-cliente" onclick="filtrarViajerosCC('cliente',this)">// clientes <span id="cc-cnt-cliente" style="color:var(--ts);margin-left:4px"></span></button>
          <button class="gz-filter" id="cc-fil-viaj-staff" onclick="filtrarViajerosCC('staff',this)">// staff <span id="cc-cnt-staff" style="color:var(--ts);margin-left:4px"></span></button>
         </div>
+        <!-- ═══ [MIG-1a] EL WIZARD DE CAPTURA ═══════════════════════════════
+             Uno tras otro sin salir de la pantalla: al guardar, la fila se suma
+             a la lista de abajo, el formulario se limpia y el foco vuelve al
+             nombre. Enter guarda. -->
+        <div id="mig-panel" style="display:none;margin-bottom:18px;border:1px solid var(--orange);border-radius:10px;padding:14px;background:rgba(255,138,0,.04)">
+         <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:12px">
+          <div>
+           <div style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.12em;color:var(--orange)">MIGRAR DEL EXCEL</div>
+           <div style="font-size:11px;color:var(--ts);margin-top:3px" id="mig-sub">Captura uno tras otro. El costo y lo abonado se guardan tal cual vienen del Excel.</div>
+          </div>
+          <div style="display:flex;gap:10px;align-items:center">
+           <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--orange)"><span id="mig-cnt">0</span> capturados</div>
+           <button class="btn btn-ghost btn-sm" onclick="migCerrar()" style="font-size:10px">Cerrar</button>
+          </div>
+         </div>
+
+         <!-- La fecha, una sola vez, solo si el evento es multifecha -->
+         <div id="mig-fecha-wrap" style="display:none;margin-bottom:12px;padding:10px;border:1px dashed var(--line);border-radius:8px">
+          <label style="display:block;font-size:10px;letter-spacing:.1em;color:var(--ts);margin-bottom:5px">FECHA DE ESTA TANDA</label>
+          <select class="cot-input" id="mig-fecha" style="width:100%;max-width:320px" onchange="migFechaElegida()"></select>
+          <div style="font-size:10px;color:var(--ts);margin-top:5px">Se elige una vez y se captura toda la tanda de esa fecha.</div>
+         </div>
+
+         <div id="mig-form">
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px">
+           <div><label class="mig-lbl">NOMBRE *</label><input class="cot-input" id="mig-nombre" placeholder="Como viene en el Excel" autocomplete="off"></div>
+           <div><label class="mig-lbl">CORREO</label><input class="cot-input" id="mig-correo" type="email" placeholder="opcional" autocomplete="off"></div>
+           <div><label class="mig-lbl">CELULAR</label><input class="cot-input" id="mig-celular" placeholder="opcional" autocomplete="off"></div>
+           <div><label class="mig-lbl">PAQUETE *</label><select class="cot-input" id="mig-paquete" onchange="migZonas()"><option value="">— elegir —</option><option value="plus">PLUS</option><option value="ride">RIDE</option><option value="stay">STAY</option><option value="cheap">CHEAP</option></select></div>
+           <div><label class="mig-lbl">ZONA DEL BOLETO *</label><select class="cot-input" id="mig-zona"><option value="">— elige paquete primero —</option></select></div>
+           <div><label class="mig-lbl">COSTO DEL PAQUETE *</label><input class="cot-input" id="mig-total" inputmode="decimal" placeholder="$"></div>
+           <div><label class="mig-lbl">ABONADO (total)</label><input class="cot-input" id="mig-abonado" inputmode="decimal" placeholder="$ 0"></div>
+           <div><label class="mig-lbl">TALLA</label><input class="cot-input" id="mig-talla" placeholder="opcional" autocomplete="off"></div>
+          </div>
+          <div style="margin-top:10px"><label class="mig-lbl">NOTAS</label><input class="cot-input" id="mig-notas" placeholder="opcional" autocomplete="off" style="width:100%"></div>
+          <div id="mig-cuenta" style="margin-top:8px;font-size:11px;color:var(--ts);min-height:16px"></div>
+          <div id="mig-error" style="margin-top:8px;font-size:11px;color:#ff5f56;display:none"></div>
+          <div style="display:flex;gap:8px;margin-top:12px;align-items:center;flex-wrap:wrap">
+           <button class="btn btn-primary btn-sm" id="mig-guardar" onclick="migGuardar()">Guardar y seguir →</button>
+           <span style="font-size:10px;color:var(--ts)">o presiona Enter</span>
+          </div>
+         </div>
+
+         <!-- El aviso de parecido: NO bloquea, confirma. -->
+         <div id="mig-parecido" style="display:none;margin-top:12px;padding:11px;border:1px solid var(--orange);border-radius:8px;background:rgba(255,138,0,.08)">
+          <div style="font-size:11px;font-weight:700;color:var(--orange);margin-bottom:6px">¿Ya lo habías capturado?</div>
+          <div id="mig-parecido-list" style="font-size:11px;color:var(--ts);margin-bottom:9px"></div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+           <button class="btn btn-primary btn-sm" onclick="migGuardarIgual()" style="font-size:10px">Sí, es otra persona — guardar</button>
+           <button class="btn btn-ghost btn-sm" onclick="migCancelarParecido()" style="font-size:10px">No, cancelar</button>
+          </div>
+         </div>
+
+         <div id="mig-capturados" style="margin-top:14px"></div>
+        </div>
+
         <div id="cc-viajeros-list"><div class="empty-state"><div class="empty-icon">·</div>Sin viajeros registrados</div></div>
 
         <!-- [VJ-2] EL SEGUNDO MUNDO: viajeros_evento (KH). Son los que migraron

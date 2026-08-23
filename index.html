@@ -40,8 +40,11 @@
 html{scroll-behavior:smooth}
 html,body{overflow-x:hidden;max-width:100vw}
 body{font-family:'Montserrat',sans-serif;font-weight:500;background:#000;color:#fff;min-height:100vh}
-body.scroll-lock,body.wizard-open{overflow:hidden;position:fixed;width:100%;top:0;left:0}
-body.wizard-open{overscroll-behavior:none}
+/* [SCROLL-2a] Aquí vivía el candado del detalle, GLOBAL, junto a un
+   `body.scroll-lock` que NADIE añadía nunca (medido en todo el repo: la clase
+   solo existía en este selector). El candado se mudó al @media de 640px, con
+   la regla que le da scroll al detalle — ver la nota de allá. El muerto se
+   podó. */
 /* Safety net: prevent children from spilling out horizontally on mobile */
 @media(max-width:640px){
   .catalog,.hero-strip,.ev-grid,.d-hero,.wiz{max-width:100vw;overflow-x:hidden}
@@ -82,7 +85,25 @@ body.wizard-open{overscroll-behavior:none}
   .nav-cli-sep{display:none}
 }
 .page{display:none}.page.active{display:block}
+/* ═══ [SCROLL-2a] EL DETALLE EN MÓVIL — LAS DOS MITADES, JUNTAS ═══════════
+   El detalle abierto en móvil son DOS reglas que TIENEN que ir de la mano:
+     · el BODY se congela (para que no scrollee el catálogo de atrás), y
+     · el DETALLE se vuelve su propio contenedor con scroll.
+   Estaban separadas y con jueces distintos: el body lo decidía el JS con
+   `matchMedia('(max-width:640px)')` AL ABRIR, y el detalle lo decidía este
+   @media EN TODO MOMENTO. Al girar el teléfono los dos dejaban de contarse el
+   mismo cuento:
+     de pie 393px → body congelado + detalle con scroll  → se lee bien
+     acostado 852px → body SEGUÍA congelado (nadie lo re-evaluaba) y el detalle
+                      perdía su scroll porque el @media ya no aplicaba
+                      → NADA scrolleaba. Medido: 863px inalcanzables, y el dedo
+                        no movía nada hasta girar de vuelta.
+   Ahora el corte de 640px vive UNA sola vez, aquí, y gobierna las dos mitades
+   a la vez. El JS ya no opina del ancho: solo dice "hay un detalle abierto".
+   ⚠️ Si alguien saca una de estas dos reglas de este bloque, vuelve el
+   congelamiento. Van juntas a propósito. */
 @media(max-width:640px){
+  body.wizard-open{overflow:hidden;position:fixed;width:100%;top:0;left:0;overscroll-behavior:none}
   #page-detail.active{position:fixed;inset:0;z-index:150;overflow-y:auto;overflow-x:hidden;background:#000;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
 }
 
@@ -1522,7 +1543,11 @@ src="https://www.facebook.com/tr?id=1685907946147007&ev=PageView&noscript=1"
 }
 @media(prefers-reduced-motion:reduce){.rcp.rcp-min::after{animation:none!important}}
 /* El wizard esconde el nav y pone sus barras fijas arriba — el reproductor se quita para no encimarse. */
-body.wizard-open .rcp{display:none}
+/* [SCROLL-2a] Detrás del corte de 640, como el resto de lo que gobierna
+   `wizard-open`: ahora la clase se pone en TODOS los anchos, así que sin este
+   @media el reproductor también desaparecería en escritorio, que no es como
+   se comportaba antes. */
+@media(max-width:640px){ body.wizard-open .rcp{display:none} }
 @media(prefers-reduced-motion:reduce){.rcp-eq i,.rcp-dot{animation:none!important}}
 </style>
 <script>
@@ -4532,7 +4557,11 @@ function showDetail(id, _skipHistory){
   $$('page-catalog').classList.remove('active');
   $$('page-detail').classList.add('active');
   $$('nav-back').style.display='flex';
-  if(window.matchMedia('(max-width:640px)').matches){document.body.classList.add('wizard-open');}
+  // [SCROLL-2a] Sin `matchMedia`. El JS solo declara el ESTADO ("hay un
+  // detalle abierto"); qué significa eso a cada ancho lo decide el CSS, que es
+  // quien se entera de que giraste. Con el juez repartido entre los dos, girar
+  // el teléfono congelaba la pantalla.
+  document.body.classList.add('wizard-open');
   window.scrollTo(0,0);  // Fix: scrollTo(0,0) una sola vez (antes se llamaba 2x en móvil)
   // Deep link: actualizar URL del navegador a /<id> sin recargar (skip si venimos de popstate)
   if(!_skipHistory && typeof history!=='undefined' && history.pushState){

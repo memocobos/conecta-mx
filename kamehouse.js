@@ -14916,8 +14916,28 @@ function _spGetPagosManuales(ev, fi, fromDate) {
 }
 
 // ── COPIA fiel de rol.html: getQuincenas (quincenas 9-16 y 24-1) ─────────
+// [COT-NORMA-2] El rótulo dice la ventana REAL, ya recortada al margen.
+function _spLblVentana(ini, fin, mesIni, mesFin) {
+  if (ini.getDate() === fin.getDate() && ini.getMonth() === fin.getMonth()) return 'el ' + ini.getDate() + ' de ' + mesIni;
+  if (ini.getMonth() === fin.getMonth()) return ini.getDate() + ' al ' + fin.getDate() + ' de ' + mesIni;
+  return ini.getDate() + ' ' + mesIni + ' al ' + fin.getDate() + ' de ' + mesFin;
+}
+
 function _spGetQuincenas(from, until, max, diasAntes) {
-  var dias = (diasAntes != null && isFinite(diasAntes)) ? diasAntes : 14;
+  // [COT-NORMA-2 · 22-ago-2026] EL MARGEN BAJA DE 14 A 5 DÍAS, para todos los
+  // eventos: "damos una fecha más de pago y ayuda a la venta" (Memo).
+  //
+  // ⚠️ Y CON ÉL CAMBIA QUÉ SE COMPARA. Antes el corte miraba el FIN de la
+  // ventana (`q1e<=capped`), así que bajar el número NO bastaba: la ventana
+  // "24 sep al 1 oct" termina el 1-oct y para natanael (2-oct) seguía fuera
+  // incluso con margen de 5 — medido. Ahora se mira el INICIO y la ventana se
+  // RECORTA al margen: natanael gana "24 al 27 de Septiembre".
+  //
+  // Recortar y no dejarla entera es lo que hace honesto el margen: con la
+  // ventana completa el rótulo diría "…al 1 de Octubre", un día antes del
+  // evento, violando justo los 5 días que se acaban de fijar. Medido sobre los
+  // 54 vigentes: ningún pago termina a menos de 5 días del evento.
+  var dias = (diasAntes != null && isFinite(diasAntes)) ? diasAntes : 5;
   var result = [];
   var capped = new Date(until.getTime() - dias * 24 * 3600 * 1000);
   // [COT-FIX-2] EL BUFFER DE 5 DÍAS QUE FALTABA. Esta función se anunciaba como
@@ -14932,14 +14952,16 @@ function _spGetQuincenas(from, until, max, diasAntes) {
     var mm = String(d.getMonth() + 1).padStart(2, '0');
     var q1s = new Date(d.getFullYear(), d.getMonth(), 9);
     var q1e = new Date(d.getFullYear(), d.getMonth(), 16);
-    if (q1s > cutoff && q1e <= capped) {
-      result.push({ lbl: '9 al 16 de ' + (_SP_MESES[mm] || ''), d: q1s, e: q1e });
+    if (q1s > cutoff && q1s <= capped) {
+      var q1f = (q1e > capped) ? capped : q1e;
+      result.push({ lbl: _spLblVentana(q1s, q1f, _SP_MESES[mm] || '', _SP_MESES[mm] || ''), d: q1s, e: q1f });
     }
     var q2s = new Date(d.getFullYear(), d.getMonth(), 24);
     var q2e = new Date(d.getFullYear(), d.getMonth() + 1, 1);
-    if (q2s > cutoff && q2e <= capped) {
+    if (q2s > cutoff && q2s <= capped) {
+      var q2f = (q2e > capped) ? capped : q2e;
       var mn = String((d.getMonth() + 2 > 12 ? 1 : d.getMonth() + 2)).padStart(2, '0');
-      result.push({ lbl: '24 ' + (_SP_MESES[mm] || '') + ' al 1 de ' + (_SP_MESES[mn] || ''), d: q2s, e: q2e });
+      result.push({ lbl: _spLblVentana(q2s, q2f, _SP_MESES[mm] || '', _SP_MESES[mn] || ''), d: q2s, e: q2f });
     }
     d.setMonth(d.getMonth() + 1);
   }

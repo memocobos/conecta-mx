@@ -861,53 +861,10 @@ body.wizard-open{overscroll-behavior:none}
 .hh-sub{color:rgba(255,255,255,.78)}
 .hh-ctas{margin-top:clamp(16px,3vw,28px);width:100%}
 
-/* Countdown al próximo evento */
-.hh-countdown{
-  margin-top:clamp(18px,3vw,28px);
-  padding:clamp(14px,2.5vw,20px) clamp(14px,3vw,22px);
-  background:rgba(0,0,0,.28);
-  border:1px solid rgba(255,255,255,.15);
-  display:flex;flex-direction:column;gap:6px;
-  animation:fadeInCountdown .6s cubic-bezier(.22,1,.36,1) both;
-}
-@keyframes fadeInCountdown{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
-.cd-cards{display:flex;flex-direction:column;gap:16px}
-.cd-card{display:flex;flex-direction:column}
-@media(min-width:720px){
-  .cd-cards.multi{flex-direction:row;flex-wrap:wrap;gap:clamp(16px,3vw,28px)}
-  .cd-cards.multi .cd-card{flex:1 1 240px;min-width:0;padding-left:18px;border-left:1px solid rgba(255,255,255,.15)}
-  .cd-cards.multi .cd-card:first-child{border-left:0;padding-left:0}
-}
-.cd-head{display:flex;align-items:center;gap:8px;margin-bottom:4px}
-.cd-label{font-size:10px;font-weight:900;letter-spacing:.18em;text-transform:uppercase;color:var(--c-amarillo)}
-.cd-live{width:7px;height:7px;border-radius:50%;background:var(--c-amarillo);box-shadow:0 0 10px rgba(232,255,76,.8);animation:cdPulse 1.3s ease-in-out infinite}
-@keyframes cdPulse{0%,100%{opacity:1}50%{opacity:.35}}
-.cd-artist{font-family:'Barlow Condensed','Montserrat',sans-serif;font-weight:900;font-size:clamp(22px,5vw,32px);line-height:1;letter-spacing:-.005em;color:#fff;text-transform:uppercase;margin-top:2px}
-.cd-venue{font-size:10px;font-weight:700;letter-spacing:.08em;color:rgba(255,255,255,.55);text-transform:uppercase;margin-bottom:10px}
-.cd-timer{display:flex;align-items:flex-end;gap:clamp(4px,1vw,10px)}
-.cd-cell{display:flex;flex-direction:column;align-items:center;min-width:44px}
-.cd-n{font-family:'Barlow Condensed','Montserrat',sans-serif;font-weight:900;font-size:clamp(26px,6vw,40px);line-height:1;color:var(--c-amarillo);letter-spacing:-.01em;font-variant-numeric:tabular-nums}
-/* [A4 · SELLADO POR MEMO, 30-jul-2026] Estas etiquetas del contador (DÍAS, HRS,
-   MIN, SEG) se quedan en 8px. El piso de 10px del barrido es para texto que se
-   LEE; éstas se RECONOCEN POR POSICIÓN, debajo de su número. Nadie lee 'DÍAS':
-   sabe qué es por dónde está.
-   Medido antes de sellar: subirlas a 10px NO rompe nada (24→30px de ancho,
-   10→13px de alto, sin desbordes ni encimados) — así que no se sellan por
-   miedo a romper, se sellan porque el contador es pieza de venta y su balance
-   es el que Memo eligió. Para re-litigarlo hay que volver a MEDIR y volver a
-   verlo, no volver a opinar. */
-.cd-l{font-size:8px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.5);margin-top:4px}
-.cd-sep{font-family:'Barlow Condensed','Montserrat',sans-serif;font-weight:900;font-size:clamp(20px,5vw,32px);color:rgba(255,255,255,.25);line-height:1;padding-bottom:14px}
-@media(max-width:380px){.cd-cell{min-width:38px}.cd-sep{display:none}.cd-timer{gap:10px}}
-.cd-pill-agotado{
-  display:inline-block;align-self:flex-start;
-  background:#ff283b;color:#fff;
-  font-family:'Montserrat',sans-serif;
-  font-size:10px;font-weight:900;letter-spacing:.14em;
-  text-transform:uppercase;
-  padding:4px 10px;border-radius:var(--r-chip,999px);
-  margin:-4px 0 8px;
-}
+/* [LAND-1] Aquí vivían las ~47 líneas del countdown regresivo (.hh-countdown
+   y toda la familia .cd-*). Se retiraron junto con su IIFE: eran suyas y de
+   nadie más. Lo que las reemplaza vive en el ÚLTIMO bloque <style>, donde
+   gana la cascada del hero. */
 .hh-btn-rojo{background:#e8ff4c;color:#000;border:none}
 .hh-btn-rojo:hover{background:#e8ff4c;color:#000;transform:translateY(-2px);box-shadow:0 14px 36px rgba(0,0,0,.55)}
 /* CTA full width, padding vertical generoso */
@@ -1063,15 +1020,26 @@ src="https://www.facebook.com/tr?id=1685907946147007&ev=PageView&noscript=1"
       <span class="line"><span class="mark">expertos</span></span>
     </h1>
     <p class="hh-sub">Agencia de viajes desde Reynosa. Transporte, hospedaje, boletos y kit Conecta — todo resuelto. Escoge tu evento, elige paquete y paga en quincenas sin estrés.</p>
-    <div class="hh-countdown" id="hh-countdown" style="display:none">
-      <div class="cd-head">
-        <span class="cd-label" id="cd-label">Próximo evento</span>
-        <span class="cd-live" aria-hidden="true"></span>
+    <!-- [LAND-1] La tarjeta del próximo evento A LA VENTA. Ocupa el lugar
+         que tenía el countdown d:h:m:s, con otra regla de selección: aquel
+         admitía agotados y últimos, ésta solo lo que se puede comprar. -->
+    <div class="hh-next-wrap" id="hh-next-wrap" style="display:none">
+      <div class="hn-head">
+        <span class="hn-live" aria-hidden="true"></span>
+        <span class="hn-label">Próximo evento</span>
       </div>
-      <div class="cd-cards" id="cd-cards"></div>
+      <div class="hh-next" id="hh-next" role="button" tabindex="0"></div>
     </div>
+    <p class="hh-proof"><b>58</b> tours realizados · <b>13</b> años de experiencia</p>
+    <div class="hh-strip" id="hh-strip" style="display:none"></div>
     <div class="hh-ctas">
       <a href="#catalog-anchor" class="hh-btn hh-btn-rojo hh-btn-full">Ver eventos <span aria-hidden="true">→</span></a>
+      <!-- [LAND-1] El href del markup existe para que el botón sirva con JS
+           apagado; al cargar, el JS lo reescribe desde la constante WA — la
+           misma que usan la tarjeta, el wizard y pagos.html. El arnés carea
+           que los dos números sean el mismo, así que no pueden divergir. -->
+      <a class="hh-btn hh-btn-wa hh-btn-full" id="hh-wa" target="_blank" rel="noopener"
+         href="https://wa.me/528119771072">Escríbenos por WhatsApp <span aria-hidden="true">→</span></a>
     </div>
   </section>
 
@@ -2002,7 +1970,8 @@ body.wizard-open .rcp{display:none}
 .tu::before,.tpc::before,.tpoca::before,
 .ftr-v2-dot,.rcp-dot,
 .ev-play.ev-play-active,.d-play.ev-play-active{will-change:box-shadow}
-.cd-live,.ev-flash-badge{will-change:opacity}
+/* [LAND-1] .cd-live se fue con el countdown; .hn-live es su relevo. */
+.hn-live,.ev-flash-badge{will-change:opacity}
 .marquee-red-track,.rcp.rcp-playing .rcp-eq i,
 .ev-play.ev-play-loading .ev-play-ico,.d-play.ev-play-loading .ev-play-ico{will-change:transform}
 .ev-preventa-badge{will-change:background-color,box-shadow}
@@ -2250,9 +2219,10 @@ body.pf-barra-viva .wa-float{bottom:104px}
    Lleva !important porque la regla original también lo lleva. */
 #ev-search{border-radius:var(--r-btn) !important}
 
-/* La tarjeta grande de countdowns. La .cd-card de adentro se queda SIN radio
-   a propósito: son tarjetas anidadas y redondear las dos se lee como error. */
-.hh-countdown{border-radius:var(--r-card)}
+/* [LAND-1] La tarjeta del próximo evento hereda el radio que tenía el
+   countdown al que reemplaza. Las piezas de adentro se quedan SIN radio a
+   propósito: son cajas anidadas y redondear las dos se lee como error. */
+.hh-next,.hh-next-wrap{border-radius:var(--r-card)}
 
 /* El chip amarillo del separo y el fallback de portada (cuando el evento no
    trae foto): el placeholder es el gemelo de .ev-img-wrap, así que redondea
@@ -2294,6 +2264,127 @@ body.pf-barra-viva .wa-float{bottom:104px}
   color:rgba(255,255,255,.75);text-decoration:underline;text-underline-offset:2px;
 }
 .ftr-v2-dir a:hover{color:var(--c-ink);transform:none}
+
+/* ═══ [LAND-1] EL HERO DE ARRANQUE ════════════════════════════════════════
+   Va en el ÚLTIMO bloque <style> A PROPÓSITO: .home-hero-v2 se pinta en tres
+   lugares que se pisan (≈537, ≈851, ≈1813) y manda el último en llegar.
+   Sustituye al countdown d:h:m:s; sus reglas .cd-* se retiraron con él —
+   vivían todas dentro de su IIFE y nadie más las consultaba.
+   ⚠️ giveaway.html también usa .cd-n/.cd-l, pero define las suyas EN SU
+   PROPIO archivo: este borrado no lo alcanza. */
+
+/* ── 1 · LA FRASE, COMPACTA ──
+   Misma identidad: var(--font-display) = Barlow Condensed 900, y el amarillo
+   #e8ff4c sigue viviendo en .hh-title .mark::before.
+   NO se cambia a Kaneda: el sitio solo carga Barlow Condensed + Montserrat,
+   así que pedir Kaneda caería a Montserrat y ROMPERÍA la identidad en vez de
+   conservarla. Medido: 1 sola aparición de Kaneda en todo el index
+   (.wiz-transmodo-name) y ya está cayendo a Montserrat en silencio. */
+@media(max-width:719px){
+  .home-hero-v2{padding:18px 16px 20px}
+  .hh-kicker{margin-bottom:9px;font-size:9px;letter-spacing:.16em;padding-top:5px;padding-bottom:5px}
+  .hh-title{font-size:38px;line-height:.86;margin-bottom:7px}
+  .hh-sub{font-size:11.5px;line-height:1.4}
+  .hh-ctas{margin-top:11px;gap:7px}
+  /* Los dos CTA venían en 26px de padding y 15px/.14em: "Escríbenos por
+     WhatsApp" se partía en DOS renglones y el botón medía 90px de alto, lo
+     que empujaba el cierre del primer pantallazo 21px por debajo del pliegue
+     (medido: fin 865 contra 844 de alto). Aquí se aprietan para que quepan. */
+  .hh-btn-full{padding:15px 18px;font-size:12.5px;letter-spacing:.09em}
+}
+
+/* ── PANTALLA BAJA (iPhone SE y compañía) ──
+   Medido: con los valores de arriba el WhatsApp cerraba en 794, que cabe en
+   los 844 de un iPhone 14 pero se salía 127px en los 667 de un SE. El brief
+   pide que el WhatsApp CIERRE el primer pantallazo, así que en pantallas
+   bajas todo se aprieta un escalón más. Se dispara por ALTO, no por ancho:
+   un SE y un 14 miden casi lo mismo de ancho y nada parecido de alto. */
+@media(max-height:760px){
+  .home-hero-v2{padding:12px 16px 14px}
+  .hh-kicker{margin-bottom:7px}
+  .hh-title{font-size:31px;margin-bottom:6px}
+  .hh-sub{font-size:11px;line-height:1.32}
+  .hh-next-wrap{margin-top:9px}
+  .hn-head{margin-bottom:5px}
+  .hn-media{height:84px}
+  .hn-body{padding:8px 10px 10px}
+  .hn-artist{font-size:23px}
+  .hn-faltan{margin-top:6px;padding:3px 9px}
+  .hn-cta{margin-top:8px;padding:9px}
+  .hh-proof{margin-top:8px}
+  .hh-strip{margin-top:8px}
+  .hs-media{height:42px}
+  .hh-ctas{margin-top:8px;gap:6px;flex-wrap:nowrap}
+  /* Los dos CTA se ponen LADO A LADO en vez de apilados: recupera el alto de
+     un botón entero sin quitarle una sola palabra al hero. */
+  .hh-btn-full{flex:1 1 0;min-width:0;padding:11px 10px;font-size:11px;letter-spacing:.06em;text-align:center}
+  .hh-btn-full span{display:none}   /* la flecha, que aquí solo roba ancho */
+}
+
+/* ── 2 · LA TARJETA DEL PRÓXIMO EVENTO ── */
+.hh-next-wrap{margin-top:13px;animation:lineInMain 1s .5s both}
+.hn-head{display:flex;align-items:center;gap:8px;margin-bottom:7px}
+.hn-live{width:7px;height:7px;border-radius:50%;background:var(--c-amarillo);box-shadow:0 0 10px rgba(232,255,76,.8);animation:hnPulse 1.3s ease-in-out infinite}
+@keyframes hnPulse{0%,100%{opacity:1}50%{opacity:.35}}
+.hn-label{font-size:10px;font-weight:900;letter-spacing:.18em;text-transform:uppercase;color:var(--c-amarillo)}
+.hh-next{
+  display:block;width:100%;padding:0;text-align:left;font:inherit;color:inherit;
+  background:rgba(0,0,0,.28);border:1px solid rgba(255,255,255,.15);
+  border-radius:var(--r-card,16px);overflow:hidden;cursor:pointer;
+  transition:transform .22s cubic-bezier(.22,1,.36,1),border-color .2s;
+}
+.hh-next:hover{transform:translateY(-3px);border-color:var(--c-amarillo)}
+.hn-media{position:relative;width:100%;height:118px;background:#1a1a1a;overflow:hidden}
+.hn-img{position:relative;z-index:1;width:100%;height:100%;object-fit:cover;object-position:center 25%;display:block}
+.hn-ini{position:absolute;inset:0;z-index:0;display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-size:44px;font-weight:900;color:rgba(255,255,255,.1)}
+.hn-body{padding:10px 12px 12px}
+.hn-artist{font-family:var(--font-display);font-weight:900;font-size:26px;line-height:1;text-transform:uppercase;color:#fff}
+.hn-venue{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.55);margin-top:3px}
+.hn-faltan{display:inline-block;margin-top:8px;background:var(--c-amarillo);color:#000;font-size:11px;font-weight:900;letter-spacing:.06em;text-transform:uppercase;padding:4px 11px;border-radius:var(--r-chip,999px)}
+.hn-cta{display:block;width:100%;margin-top:10px;padding:11px;cursor:pointer;
+  background:var(--c-rojo);color:#fff;border:0;border-radius:var(--r-btn,12px);
+  font-family:'Montserrat',sans-serif;font-size:13px;font-weight:900;letter-spacing:.1em;text-transform:uppercase}
+
+/* ── 3 · PRUEBA SOCIAL ── SOLO cifras que la casa ya sostiene: los 58 tours
+   los afirma Memo desde el Excel y los 13 años ya los dice el marquee de
+   arriba. El conteo de VIAJEROS no existe en ningún campo del sistema, así
+   que no aparece: entra el día que Memo dé el número. */
+.hh-proof{margin:11px 0 0;font-size:10.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:rgba(255,255,255,.62)}
+.hh-proof b{color:var(--c-amarillo);font-weight:900}
+
+/* ── 4 · LA TIRA ── */
+.hh-strip{display:flex;gap:6px;margin-top:11px}
+.hs-item{flex:1 1 0;min-width:0;padding:0;text-align:left;font:inherit;color:inherit;cursor:pointer;
+  background:rgba(0,0,0,.28);border:1px solid rgba(255,255,255,.12);
+  border-radius:var(--r-sm,8px);overflow:hidden;text-decoration:none;
+  transition:border-color .2s,transform .2s}
+.hs-item:hover{border-color:var(--c-amarillo);transform:translateY(-2px)}
+.hs-media{position:relative;width:100%;height:50px;background:#1a1a1a;overflow:hidden}
+.hs-img{position:relative;z-index:1;width:100%;height:100%;object-fit:cover;display:block}
+.hs-ini{position:absolute;inset:0;z-index:0;display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-size:19px;font-weight:900;color:rgba(255,255,255,.12)}
+.hs-body{padding:5px 6px 6px}
+.hs-name{font-size:9.5px;font-weight:900;line-height:1.15;text-transform:uppercase;color:#fff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hs-fecha{font-size:9px;font-weight:700;color:rgba(255,255,255,.5);margin-top:2px;white-space:nowrap}
+.hs-mas{flex:0 0 58px;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  background:rgba(232,255,76,.1);border-color:rgba(232,255,76,.35)}
+.hs-mas-n{font-family:var(--font-display);font-size:21px;font-weight:900;color:var(--c-amarillo);line-height:1}
+.hs-mas-l{font-size:8px;font-weight:900;letter-spacing:.1em;text-transform:uppercase;color:var(--c-amarillo);margin-top:2px}
+
+/* ── 5 · WHATSAPP ── Verde de MARCA (--c-verde #88ea4e), NO el verde propio
+   de WhatsApp (#25D366): ese color no está en el manual y el brief pidió no
+   romperlo. */
+.hh-btn-wa{background:var(--c-verde);color:#000;border:none}
+.hh-btn-wa:hover{background:var(--c-verde);color:#000;transform:translateY(-2px);box-shadow:0 14px 36px rgba(0,0,0,.55)}
+
+/* ── ESCRITORIO ── la frase respira (conserva su clamp hasta 156px) y las
+   piezas nuevas se acotan para no cruzar la pantalla entera. */
+@media(min-width:720px){
+  .hh-next-wrap,.hh-strip,.hh-proof{max-width:560px}
+  .hn-media{height:168px}
+  .hn-artist{font-size:34px}
+  .hs-media{height:64px}
+  .hh-ctas{max-width:560px}
+}
 </style>
 
 <script src="imgs.js"></script>
@@ -3334,125 +3425,168 @@ var _scrollObs=new IntersectionObserver(function(entries){
 },{threshold:0.1});
 document.querySelectorAll('.ev-card,.how-step').forEach(function(el){_scrollObs.observe(el);});
 
-// Countdown regresivo al próximo evento disponible.
-// ID del interval guardado a nivel módulo para que si la IIFE llegara a
-// re-ejecutarse (hot-reload, futura refactor), no quede un timer huérfano.
-var _countdownInterval = null;
+// [LAND-1] EL HERO DE ARRANQUE: tarjeta del próximo evento a la venta,
+// prueba social, tira de los siguientes 3 y "+N más".
+//
+// REEMPLAZA al countdown regresivo d:h:m:s que vivía aquí. Los dos ocupaban
+// el MISMO lugar semántico ("próximo evento") con DOS reglas de selección
+// distintas: el countdown admitía agotados y últimos, y esta tarjeta solo
+// admite lo que se puede comprar. Dejarlos juntos era la trampa del libro
+// —dos objetos con el mismo papel— con el agravante de que podían anunciar
+// eventos DIFERENTES el mismo día.
+//
+// Se fue con él: el cronómetro por segundos, su interval, el agrupado de 36h
+// para multifecha y el sellado de Memo de las etiquetas de 8px (30-jul-2026).
 (function(){
-  function pad(n){return (n<10?'0':'')+n;}
   function esc(s){return String(s||'').replace(/[&<>"']/g,function(m){return({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[m];});}
   function cleanName(a){return (a||'').replace(/ - .*/,'').replace(/ Tour.*/,'');}
-  function getEventHour(ev){
-    if(!ev)return '21:00';
-    var festivalIds=['machaca','emblema','warped','pulsoquetaro','dalemix','knotfest','edc','coronacap','flowfest','arre','comuna','nochegrandes'];
-    var festivalKeywords=['festival','fest','machaca','warped','edc','knotfest'];
-    var id=(ev.id||'').toLowerCase();
-    var nombre=(ev.a||'').toLowerCase();
-    var esFestival=festivalIds.indexOf(id)>=0 ||
-      festivalKeywords.some(function(k){return nombre.indexOf(k)>=0||id.indexOf(k)>=0;});
-    return esFestival?'14:00':'21:00';
-  }
-  // Devuelve todos los eventos cuyo timestamp cae dentro de las 36h a partir del primer evento próximo.
-  // Para eventos multifecha con dsList, cada fecha genera un candidate propio.
-  var GROUP_WINDOW_MS=36*60*60*1000;
-  function findNextGroup(){
-    if(typeof EV==='undefined')return [];
-    var now=Date.now();
-    var candidates=[];
-    for(var i=0;i<EV.length;i++){
-      var e=EV[i];
-      if(!e||e.listOnly)continue;
-      if(e.st!==''&&e.st!=='ultimos'&&e.st!=='agotado')continue;
-      var dsArr=e.dsList&&e.dsList.length?e.dsList:(e.ds?[e.ds]:[]);
-      for(var j=0;j<dsArr.length;j++){
-        var ds=dsArr[j];
-        if(!ds)continue;
-        var t=new Date(ds+'T'+getEventHour(e)+':00').getTime();
-        if(isNaN(t)||t<=now)continue;
-        candidates.push({ev:e,t:t,ds:ds});
-      }
-    }
-    if(!candidates.length)return [];
-    candidates.sort(function(a,b){return a.t-b.t;});
-    var firstT=candidates[0].t;
-    return candidates.filter(function(c){return c.t>=firstT&&c.t<=firstT+GROUP_WINDOW_MS;});
-  }
-  // Format ds como "21 abr" para distinguir cards cuando un evento multifecha tiene varias en la ventana.
-  var MES_SHORT=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
-  function dsShort(ds){
-    var p=ds.split('-');
-    return parseInt(p[2],10)+' '+MES_SHORT[parseInt(p[1],10)-1];
-  }
-  var root=document.getElementById('hh-countdown');
-  if(!root)return;
-  var cardsEl=document.getElementById('cd-cards');
-  var labelEl=document.getElementById('cd-label');
-  var group=findNextGroup();
-  if(!group.length){root.style.display='none';return;}
-  root.style.display='flex';
 
-  function renderGroup(){
-    labelEl.textContent=group.length>1?'Próximos eventos':'Próximo evento';
-    cardsEl.classList.toggle('multi',group.length>1);
-    var h='';
-    for(var i=0;i<group.length;i++){
-      var ev=group[i].ev;
-      var venueStr=ev.v||'';
-      if(ev.dsList&&ev.dsList.length>1&&group[i].ds) venueStr=(venueStr?venueStr+' · ':'')+dsShort(group[i].ds);
-      var pill=ev.st==='agotado'?'<span class="cd-pill-agotado">Agotado</span>':'';
-      h+='<div class="cd-card">'+
-           '<div class="cd-artist">'+esc(cleanName(ev.a))+'</div>'+
-           pill+
-           '<div class="cd-venue">'+esc(venueStr)+'</div>'+
-           '<div class="cd-timer">'+
-             '<div class="cd-cell"><span class="cd-n" data-i="'+i+'" data-u="d">00</span><span class="cd-l">días</span></div>'+
-             '<div class="cd-sep">:</div>'+
-             '<div class="cd-cell"><span class="cd-n" data-i="'+i+'" data-u="h">00</span><span class="cd-l">hrs</span></div>'+
-             '<div class="cd-sep">:</div>'+
-             '<div class="cd-cell"><span class="cd-n" data-i="'+i+'" data-u="m">00</span><span class="cd-l">min</span></div>'+
-             '<div class="cd-sep">:</div>'+
-             '<div class="cd-cell"><span class="cd-n" data-i="'+i+'" data-u="s">00</span><span class="cd-l">seg</span></div>'+
-           '</div>'+
-         '</div>';
-    }
-    cardsEl.innerHTML=h;
+  // ⚠️ "A LA VENTA" NO ES st===''. Esta condición está COPIADA de la tarjeta
+  // del catálogo (renderList, el bloque de banderas), no parafraseada:
+  //   · un evento PASADO conserva su st==='' — medido: 9 de 58 lo están;
+  //   · ev.agotado lo saca aunque el st esté vacío;
+  //   · y el auto-semáforo enciende isAg cuando NINGUNA zona queda libre.
+  // El brief prohíbe tocar el catálogo, así que en vez de una fuente
+  // compartida esta copia va con CANDADO: el arnés carea el veredicto del
+  // hero contra el estado REAL de cada tarjeta renderizada, evento por
+  // evento. Si divergen, truena — que es justo lo que "dos listas iguales no
+  // existe" pide cuando no se puede unificar.
+  function heroALaVenta(ev){
+    if(!ev||ev.listOnly)return false;
+    if(ev.ds&&ev.ds!=='2027-12-31'&&new Date(ev.ds+'T23:59:59')<new Date())return false;
+    var st=ev.st;
+    // 'ultimos' TAMBIÉN se vende. Excluirlo sería incoherente: un evento con
+    // 39% de zonas libres ya entra por el auto-semáforo con st==='', así que
+    // dejar fuera el marcado a mano adelantaría un evento más lejano
+    // mientras uno más cercano sigue comprándose. (Medido hoy: 0 eventos.)
+    if(st!==''&&st!=='ultimos')return false;
+    if(ev.agotado)return false;
+    var z=(ev.multifecha?ev.multifecha.reduce(function(a,mf){return a.concat(mf.zonas);},ev.zonas||[]):(ev.zonas||[]));
+    if(z.length>0&&z.filter(function(x){return !x.ag;}).length===0)return false;
+    return true;
   }
 
-  renderGroup();
-
-  function setCell(i,u,v){
-    var el=cardsEl.querySelector('.cd-n[data-i="'+i+'"][data-u="'+u+'"]');
-    if(el)el.textContent=pad(v);
+  // La fecha que manda es la PRIMERA de dsList si el evento es multifecha.
+  function dsEfectivo(ev){
+    var l=(ev.dsList&&ev.dsList.length)?ev.dsList:(ev.ds?[ev.ds]:[]);
+    return l[0]||'';
   }
 
-  function tick(){
-    var now=Date.now();
-    var anyActive=false;
-    for(var i=0;i<group.length;i++){
-      var diff=group[i].t-now;
-      if(diff<=0)continue;
-      anyActive=true;
-      var s=Math.floor(diff/1000);
-      var d=Math.floor(s/86400);s%=86400;
-      var h=Math.floor(s/3600);s%=3600;
-      var m=Math.floor(s/60);s%=60;
-      setCell(i,'d',d);setCell(i,'h',h);setCell(i,'m',m);setCell(i,'s',s);
-    }
-    if(!anyActive){
-      // Todos los eventos del grupo pasaron — recarga siguiente grupo
-      group=findNextGroup();
-      if(!group.length){
-        root.style.display='none';
-        if(_countdownInterval){clearInterval(_countdownInterval);_countdownInterval=null;}
-        return;
-      }
-      renderGroup();
+  // "Faltan N días" — SIEMPRE contra _hoyMx(), jamás new Date() a secas:
+  // pasadas las 6 de la tarde de acá, toISOString ya es el día siguiente.
+  // Los dos lados se anclan al MEDIODÍA para que un cambio de horario de
+  // verano no mueva la cuenta por una hora.
+  function faltanDias(ds){
+    var hoy=_hoyMx();
+    return Math.round((new Date(ds+'T12:00:00')-new Date(hoy+'T12:00:00'))/86400000);
+  }
+  function textoFaltan(n){
+    if(n<=0)return '¡Es hoy!';
+    if(n===1)return 'Falta 1 día';
+    return 'Faltan '+n+' días';
+  }
+
+  // La MISMA cadena de portada que usa la tarjeta del catálogo:
+  // STATIC_IMGS → loadArtistImg por API → iniciales. Medido: 21 de los 49
+  // eventos a la venta no tienen portada estática, y el próximo es uno.
+  function portadaEstatica(ev){
+    if(ev.staticImg&&(ev.staticImg.indexOf('http')===0||ev.staticImg.indexOf('data:')===0))return ev.staticImg;
+    return (typeof STATIC_IMGS!=='undefined')?(STATIC_IMGS[ev.id]||STATIC_IMGS[ev.staticImg]):null;
+  }
+  // Se calcula SIN mutar ev.img (la tarjeta sí lo muta; si el hero lo hiciera
+  // también, el orden de ejecución decidiría el resultado).
+  function consultaImg(ev){
+    if(ev.img)return ev.img;
+    if(ev.img===false)return '';
+    return (ev.a||'').replace(/ - .*/,'').replace(/ en .*/,'').replace(/ Mexico.*/,'');
+  }
+  function pintarPortada(cont,ev,claseImg,claseIni){
+    cont.innerHTML='<span class="'+claseIni+'">'+esc((ev.a||'?').substring(0,2).toUpperCase())+'</span>';
+    var img=document.createElement('img');
+    img.className=claseImg; img.alt=''; img.loading='eager'; img.decoding='async';
+    img.onerror=function(){this.remove();};   // se cae → quedan las iniciales
+    var est=portadaEstatica(ev);
+    if(est){img.src=est;cont.appendChild(img);return;}
+    var q=consultaImg(ev);
+    if(q&&typeof loadArtistImg==='function'){cont.appendChild(img);loadArtistImg(q,img,false);}
+  }
+
+  // El MISMO camino que la tarjeta del catálogo. Para un evento a la venta la
+  // tarjeta cae en su rama final: showDetail(id). No se inventa uno nuevo, y
+  // no se toca el catálogo para lograrlo.
+  function abrir(id){ if(typeof showDetail==='function') showDetail(id); }
+
+  function construir(){
+    if(typeof EV==='undefined')return;
+    var wrap=document.getElementById('hh-next-wrap');
+    var slot=document.getElementById('hh-next');
+    var strip=document.getElementById('hh-strip');
+    if(!wrap||!slot||!strip)return;
+
+    var venta=EV.filter(function(e){return heroALaVenta(e)&&dsEfectivo(e);})
+                .sort(function(a,b){return dsEfectivo(a).localeCompare(dsEfectivo(b));});
+    if(!venta.length){wrap.style.display='none';strip.style.display='none';return;}
+    wrap.style.display='';
+
+    // ── La tarjeta grande ──
+    var ev=venta[0];
+    var media=document.createElement('div'); media.className='hn-media';
+    var body=document.createElement('div'); body.className='hn-body';
+    body.innerHTML=
+      '<div class="hn-artist">'+esc(cleanName(ev.a))+'</div>'+
+      '<div class="hn-venue">'+esc(ev.v||'')+'</div>'+
+      '<div class="hn-faltan">'+esc(textoFaltan(faltanDias(dsEfectivo(ev))))+'</div>'+
+      '<button type="button" class="hn-cta">Cotizar</button>';
+    slot.innerHTML=''; slot.appendChild(media); slot.appendChild(body);
+    pintarPortada(media,ev,'hn-img','hn-ini');
+    slot.onclick=function(){abrir(ev.id);};
+    body.querySelector('.hn-cta').onclick=function(e){e.stopPropagation();abrir(ev.id);};
+
+    // ── La tira: los 3 siguientes + "+N más" ──
+    var sig=venta.slice(1,4);
+    strip.innerHTML='';
+    if(!sig.length){strip.style.display='none';return;}
+    strip.style.display='';
+    sig.forEach(function(e){
+      var it=document.createElement('button');
+      it.type='button'; it.className='hs-item';
+      var m=document.createElement('div'); m.className='hs-media';
+      var b=document.createElement('div'); b.className='hs-body';
+      b.innerHTML='<div class="hs-name">'+esc(cleanName(e.a))+'</div>'+
+                  '<div class="hs-fecha">'+esc(textoFaltan(faltanDias(dsEfectivo(e))))+'</div>';
+      it.appendChild(m); it.appendChild(b);
+      pintarPortada(m,e,'hs-img','hs-ini');
+      it.onclick=function(){abrir(e.id);};
+      strip.appendChild(it);
+    });
+    // N se CUENTA del EV, no se escribe: los que quedan a la venta después de
+    // los 4 que ya se ven.
+    var n=venta.length-1-sig.length;
+    if(n>0){
+      var mas=document.createElement('a');
+      mas.className='hs-item hs-mas';
+      mas.href='#catalog-anchor';
+      mas.innerHTML='<span class="hs-mas-n">+'+n+'</span><span class="hs-mas-l">más</span>';
+      // El catálogo arranca en display:none. El hook que revela al hacer clic
+      // se enganchó a los anchors QUE EXISTÍAN al cargar, y éste nace después:
+      // por eso se llama a la puerta a mano. Sin esto el enlace haría scroll a
+      // un contenedor invisible.
+      mas.onclick=function(){ if(typeof window.revealCatalog==='function') window.revealCatalog(); };
+      strip.appendChild(mas);
     }
   }
-  tick();
-  // Limpia cualquier interval previo antes de crear el nuevo.
-  if(_countdownInterval) clearInterval(_countdownInterval);
-  _countdownInterval = setInterval(tick, 1000);
+
+  // El botón de WhatsApp toma el número de la MISMA constante WA que ya usan
+  // la tarjeta, el wizard y la página de pagos. El href del markup existe solo
+  // para que el botón sirva con JS apagado; el arnés carea que sean el mismo.
+  function armarWA(){
+    var a=document.getElementById('hh-wa');
+    if(!a||typeof WA==='undefined')return;
+    a.href='https://wa.me/'+WA+'?text='+encodeURIComponent('Hola! Quiero informes de los tours de Conecta Reynosa.');
+  }
+
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',function(){construir();armarWA();});
+  else { construir(); armarWA(); }
 })();
 
 // Revelar catálogo al presionar VER EVENTOS o al llegar vía #catalog-anchor

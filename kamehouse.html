@@ -134,8 +134,6 @@
    <button class="nav-btn" onclick="showPage('inventario')" id="nav-inventario"><svg class="nav-ic"><use href="#ic-inventario"/></svg><span>Torre de Karin</span></button>
    <button class="nav-btn" onclick="showPage('gastos')" id="nav-gastos"><svg class="nav-ic"><use href="#ic-gastos"/></svg><span>Gastos</span></button>
    <button class="nav-btn" onclick="showPage('ingresos')" id="nav-ingresos"><svg class="nav-ic"><use href="#ic-ingresos"/></svg><span>Ingresos</span></button>
-   <button class="nav-btn" onclick="showPage('ventas')" id="nav-ventas"><svg class="nav-ic"><use href="#ic-ventas"/></svg><span>Mis Ventas</span></button>
-   <button class="nav-btn" onclick="showPage('cotizar')" id="nav-cotizar"><svg class="nav-ic"><use href="#ic-boleto"/></svg><span>Ventas</span></button>
    <button class="nav-btn" onclick="showPage('reportes')" id="nav-reportes"><svg class="nav-ic"><use href="#ic-reportes"/></svg><span>Reportes</span></button>
   </div>
 
@@ -672,19 +670,6 @@
  <div class="loading-state"><div class="spinner"></div>Cargando…</div>
  </div>
  <div id="saldo-detalle-panel" class="card" style="display:none;margin-top:16px"></div>
- </div>
-
- <!-- ─── MIS VENTAS ─── -->
- <div class="page" id="page-ventas">
- <div class="page-hero">
-   <div>
-    <div class="page-title">MIS VENTAS</div>
-    <div class="page-sub">// comisiones · ventas registradas</div>
-   </div>
-  </div>
- <div id="ventas-content">
- <div class="loading-state"><div class="spinner"></div>Cargando…</div>
- </div>
  </div>
 
  <!-- ─── INVENTARIO ─── -->
@@ -1958,64 +1943,6 @@
     <button class="btn btn-primary btn-sm" id="rm-guardar" onclick="radioMediaGuardar()" style="font-size:11px">Guardar</button>
    </div>
   </div>
- </div>
-
-
- <!-- ─── VENTAS (VENDEDORES F3) — Cotizar/Vender + Mis Ventas ─── -->
- <div class="page" id="page-cotizar">
-   <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px;flex-wrap:wrap">
-     <h2 style="margin:0;font-family:'Zen Dots',sans-serif;font-size:22px;letter-spacing:.02em"><svg class="ic"><use href="#ic-boleto"/></svg> Ventas</h2>
-     <div class="contratos-tabs" style="display:inline-flex;border:1px solid var(--border);border-radius:var(--r-sm,8px);overflow:hidden">
-       <button id="vta-tab-vender" class="ctr-tab active" onclick="_vtaSwitch('vender')" style="background:rgba(255,107,0,.12);border:0;color:var(--orange);padding:8px 16px;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;font-family:inherit">Cotizar / Vender</button>
-       <button id="vta-tab-mis" class="ctr-tab" onclick="_vtaSwitch('mis')" style="background:transparent;border:0;color:var(--ts);padding:8px 16px;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;font-family:inherit;border-left:1px solid var(--border)">Mis Ventas</button>
-     </div>
-   </div>
-
-   <div id="vta-view-vender" class="contratos-view">
-     <div id="vta-alert"></div>
-     <div style="max-width:720px">
-       <div class="form-row cols-2">
-         <div class="form-group"><label>Evento *</label><select id="vta-evento" onchange="_vtaOnEvento()"><option value="">— Elige un evento —</option></select></div>
-         <div class="form-group" id="vta-fecha-wrap" style="display:none"><label>Fecha *</label><select id="vta-fecha" onchange="_vtaResync()"></select></div>
-       </div>
-       <div class="form-row cols-2">
-         <div class="form-group"><label>Paquete *</label><select id="vta-paquete" onchange="_vtaResync()"><option value="plus">PLUS</option><option value="ride">RIDE</option><option value="stay">STAY</option><option value="cheap">CHEAP</option></select></div>
-         <div class="form-group"><label>Personas *</label><input type="number" id="vta-num" min="1" max="12" value="1" oninput="_vtaRecalc()"></div>
-       </div>
-       <div class="form-row cols-2">
-         <div class="form-group">
-           <label>Zona * <svg class="ic" style="width:12px;height:12px;opacity:.65;vertical-align:-1px"><use href="#ic-candado"/></svg> <span style="font-size:10px;color:var(--ts);text-transform:none;letter-spacing:0">precio fijo del catálogo</span></label>
-           <select id="vta-zona" onchange="_vtaRecalc()"><option value="">— Elige un evento primero —</option></select>
-         </div>
-         <div class="form-group" id="vta-hotel-wrap" style="display:none"><label>Hotel</label><select id="vta-hotel" onchange="_vtaRecalc()"></select></div>
-       </div>
-
-       <div id="vta-resumen" style="display:none;margin:6px 0 16px;padding:14px 16px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--r-sm,8px)"></div>
-
-       <div style="font-size:11px;color:var(--ts);letter-spacing:.1em;text-transform:uppercase;margin:14px 0 8px;border-top:1px solid var(--border);padding-top:12px">Datos del cliente</div>
-       <div class="form-row cols-2">
-         <div class="form-group"><label>Nombre *</label><input id="vta-cli-nombre" maxlength="200" placeholder="Nombre completo"></div>
-         <div class="form-group"><label>Correo *</label><input id="vta-cli-correo" type="email" maxlength="200" placeholder="cliente@correo.com"></div>
-       </div>
-       <div class="form-row cols-2">
-         <div class="form-group"><label>Teléfono</label><input id="vta-cli-tel" maxlength="40" placeholder="Opcional"></div>
-         <div class="form-group"></div>
-       </div>
-
-       <button class="btn btn-primary" id="vta-btn" onclick="_vtaRegistrar()"><svg class="ic"><use href="#ic-guardar"/></svg> Registrar venta</button>
-     </div>
-   </div>
-
-   <div id="vta-view-mis" class="contratos-view" style="display:none">
-     <div style="display:flex;justify-content:flex-end;margin-bottom:10px"><button class="btn btn-ghost btn-sm" onclick="_vtaMisVentas()">↻ Refrescar</button></div>
-     <div id="vta-mis-comisiones" style="margin-bottom:14px"></div>
-     <div class="table-wrap">
-       <table>
-         <thead><tr><th>Cliente</th><th id="vta-th-vendedor" style="display:none">Vendedor</th><th>Evento</th><th>Zona / Paquete</th><th style="text-align:right">Total / Separo</th><th>Estado</th><th>Límite</th><th id="vta-th-acc" style="display:none;text-align:right">Acciones</th></tr></thead>
-         <tbody id="vta-mis-tbody"><tr><td colspan="8" style="text-align:center;color:var(--ts);padding:30px;font-size:12px;letter-spacing:.1em;text-transform:uppercase">Cargando…</td></tr></tbody>
-       </table>
-     </div>
-   </div>
  </div>
 
  <!-- ─── CONTRATOS ─── -->

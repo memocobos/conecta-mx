@@ -571,10 +571,9 @@ body.wizard-open{overscroll-behavior:none}
 .hh-title .mark{position:relative;display:inline-block;padding:0 .12em;color:#000;z-index:1}
 .hh-title .mark::before{content:'';position:absolute;left:0;right:0;top:8%;bottom:8%;background:var(--c-amarillo);z-index:-1;transform:skewX(-6deg)}
 @keyframes lineInMain{to{opacity:1;transform:translateY(0)}}
-.hh-sub{
-  max-width:640px;font-size:clamp(13px,1.5vw,17px);font-weight:500;line-height:1.5;
-  color:var(--c-muted);animation:lineInMain 1s .55s both;
-}
+/* [LAND-1b] .hh-sub se retiró: el párrafo del hero se fue en TODAS las
+   pantallas por decisión de Memo. Sus reglas se van con él para no dejar
+   selectores que no alcanzan a nada. */
 .hh-ctas{display:flex;gap:10px;flex-wrap:wrap;margin-top:clamp(20px,3vw,32px);animation:lineInMain 1s .7s both}
 .hh-btn{
   display:inline-flex;align-items:center;gap:8px;
@@ -858,56 +857,12 @@ body.wizard-open{overscroll-behavior:none}
 .hh-kicker{color:#e8ff4c;margin-bottom:clamp(12px,2.5vw,22px)}
 .hh-title{margin-bottom:clamp(12px,2vw,20px)}
 .hh-title .mark::before{background:#e8ff4c}
-.hh-sub{color:rgba(255,255,255,.78)}
 .hh-ctas{margin-top:clamp(16px,3vw,28px);width:100%}
 
-/* Countdown al próximo evento */
-.hh-countdown{
-  margin-top:clamp(18px,3vw,28px);
-  padding:clamp(14px,2.5vw,20px) clamp(14px,3vw,22px);
-  background:rgba(0,0,0,.28);
-  border:1px solid rgba(255,255,255,.15);
-  display:flex;flex-direction:column;gap:6px;
-  animation:fadeInCountdown .6s cubic-bezier(.22,1,.36,1) both;
-}
-@keyframes fadeInCountdown{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
-.cd-cards{display:flex;flex-direction:column;gap:16px}
-.cd-card{display:flex;flex-direction:column}
-@media(min-width:720px){
-  .cd-cards.multi{flex-direction:row;flex-wrap:wrap;gap:clamp(16px,3vw,28px)}
-  .cd-cards.multi .cd-card{flex:1 1 240px;min-width:0;padding-left:18px;border-left:1px solid rgba(255,255,255,.15)}
-  .cd-cards.multi .cd-card:first-child{border-left:0;padding-left:0}
-}
-.cd-head{display:flex;align-items:center;gap:8px;margin-bottom:4px}
-.cd-label{font-size:10px;font-weight:900;letter-spacing:.18em;text-transform:uppercase;color:var(--c-amarillo)}
-.cd-live{width:7px;height:7px;border-radius:50%;background:var(--c-amarillo);box-shadow:0 0 10px rgba(232,255,76,.8);animation:cdPulse 1.3s ease-in-out infinite}
-@keyframes cdPulse{0%,100%{opacity:1}50%{opacity:.35}}
-.cd-artist{font-family:'Barlow Condensed','Montserrat',sans-serif;font-weight:900;font-size:clamp(22px,5vw,32px);line-height:1;letter-spacing:-.005em;color:#fff;text-transform:uppercase;margin-top:2px}
-.cd-venue{font-size:10px;font-weight:700;letter-spacing:.08em;color:rgba(255,255,255,.55);text-transform:uppercase;margin-bottom:10px}
-.cd-timer{display:flex;align-items:flex-end;gap:clamp(4px,1vw,10px)}
-.cd-cell{display:flex;flex-direction:column;align-items:center;min-width:44px}
-.cd-n{font-family:'Barlow Condensed','Montserrat',sans-serif;font-weight:900;font-size:clamp(26px,6vw,40px);line-height:1;color:var(--c-amarillo);letter-spacing:-.01em;font-variant-numeric:tabular-nums}
-/* [A4 · SELLADO POR MEMO, 30-jul-2026] Estas etiquetas del contador (DÍAS, HRS,
-   MIN, SEG) se quedan en 8px. El piso de 10px del barrido es para texto que se
-   LEE; éstas se RECONOCEN POR POSICIÓN, debajo de su número. Nadie lee 'DÍAS':
-   sabe qué es por dónde está.
-   Medido antes de sellar: subirlas a 10px NO rompe nada (24→30px de ancho,
-   10→13px de alto, sin desbordes ni encimados) — así que no se sellan por
-   miedo a romper, se sellan porque el contador es pieza de venta y su balance
-   es el que Memo eligió. Para re-litigarlo hay que volver a MEDIR y volver a
-   verlo, no volver a opinar. */
-.cd-l{font-size:8px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.5);margin-top:4px}
-.cd-sep{font-family:'Barlow Condensed','Montserrat',sans-serif;font-weight:900;font-size:clamp(20px,5vw,32px);color:rgba(255,255,255,.25);line-height:1;padding-bottom:14px}
-@media(max-width:380px){.cd-cell{min-width:38px}.cd-sep{display:none}.cd-timer{gap:10px}}
-.cd-pill-agotado{
-  display:inline-block;align-self:flex-start;
-  background:#ff283b;color:#fff;
-  font-family:'Montserrat',sans-serif;
-  font-size:10px;font-weight:900;letter-spacing:.14em;
-  text-transform:uppercase;
-  padding:4px 10px;border-radius:var(--r-chip,999px);
-  margin:-4px 0 8px;
-}
+/* [LAND-1] Aquí vivían las ~47 líneas del countdown regresivo (.hh-countdown
+   y toda la familia .cd-*). Se retiraron junto con su IIFE: eran suyas y de
+   nadie más. Lo que las reemplaza vive en el ÚLTIMO bloque <style>, donde
+   gana la cascada del hero. */
 .hh-btn-rojo{background:#e8ff4c;color:#000;border:none}
 .hh-btn-rojo:hover{background:#e8ff4c;color:#000;transform:translateY(-2px);box-shadow:0 14px 36px rgba(0,0,0,.55)}
 /* CTA full width, padding vertical generoso */
@@ -957,7 +912,7 @@ body[data-ev="laura"] #d-hero-bg{object-position:center 18% !important}
      `backwards` sigan resolviendo y nada quede escondido. Aquí solo se
      conservan los casos que quieren quedarse quietos de plano. */
   .marquee-red-track{animation:none}
-  .hh-title .line,.hh-sub,.hh-ctas{opacity:1;transform:none}
+  .hh-title .line,.hh-ctas{opacity:1;transform:none}
   .promo-modal-sparkle{opacity:1;transform:none}
 }
 </style>
@@ -1057,22 +1012,43 @@ src="https://www.facebook.com/tr?id=1685907946147007&ev=PageView&noscript=1"
 
   <!-- Hero v2 -->
   <section class="home-hero-v2">
+   <!-- [LAND-1b] Dos columnas EN ESCRITORIO (izquierda: la frase, la prueba y
+        los CTA · derecha: el evento). En móvil .hh-grid es un flujo normal en
+        una sola columna, así que el orden del DOM es el orden que se ve. -->
+   <div class="hh-grid">
     <div class="hh-kicker">Conecta Reynosa · Catálogo 2026</div>
     <h1 class="hh-title">
       <span class="line">Viaja con</span>
       <span class="line"><span class="mark">expertos</span></span>
     </h1>
-    <p class="hh-sub">Agencia de viajes desde Reynosa. Transporte, hospedaje, boletos y kit Conecta — todo resuelto. Escoge tu evento, elige paquete y paga en quincenas sin estrés.</p>
-    <div class="hh-countdown" id="hh-countdown" style="display:none">
-      <div class="cd-head">
-        <span class="cd-label" id="cd-label">Próximo evento</span>
-        <span class="cd-live" aria-hidden="true"></span>
+    <!-- [LAND-1] La tarjeta del próximo evento A LA VENTA. Ocupa el lugar
+         que tenía el countdown d:h:m:s, con otra regla de selección: aquel
+         admitía agotados y últimos, ésta solo lo que se puede comprar. -->
+    <div class="hh-next-wrap" id="hh-next-wrap" style="display:none">
+      <div class="hn-head">
+        <span class="hn-live" aria-hidden="true"></span>
+        <span class="hn-label">Próximo evento</span>
       </div>
-      <div class="cd-cards" id="cd-cards"></div>
+      <div class="hh-next" id="hh-next" role="button" tabindex="0"></div>
     </div>
+    <!-- [LAND-1b] SOLO los 13 años. El "58 tours" salió por decisión de Memo.
+         📌 ANOTADO, NO CONSTRUIDO: tours realizados y viajeros saldrán
+         AUTOMÁTICOS de KameHouse más adelante. Cuando exista ese dato entra
+         aquí; mientras tanto no se afirma un número que el sistema no lleva
+         (el EV cuenta 42 pasados y el Excel dice 58: dos cifras distintas,
+         ninguna consultable en vivo). -->
+    <p class="hh-proof"><b>13</b> años de experiencia</p>
+    <div class="hh-strip" id="hh-strip" style="display:none"></div>
     <div class="hh-ctas">
       <a href="#catalog-anchor" class="hh-btn hh-btn-rojo hh-btn-full">Ver eventos <span aria-hidden="true">→</span></a>
+      <!-- [LAND-1] El href del markup existe para que el botón sirva con JS
+           apagado; al cargar, el JS lo reescribe desde la constante WA — la
+           misma que usan la tarjeta, el wizard y pagos.html. El arnés carea
+           que los dos números sean el mismo, así que no pueden divergir. -->
+      <a class="hh-btn hh-btn-wa hh-btn-full" id="hh-wa" target="_blank" rel="noopener"
+         href="https://wa.me/528119771072">Escríbenos por WhatsApp <span aria-hidden="true">→</span></a>
     </div>
+   </div>
   </section>
 
   <!-- Links to sub-pages, same style -->
@@ -1408,6 +1384,9 @@ src="https://www.facebook.com/tr?id=1685907946147007&ev=PageView&noscript=1"
     <svg class="rcp-ic rcp-ic-play" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>
     <svg class="rcp-ic rcp-ic-pause" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5h4v14H6zM14 5h4v14h-4z"/></svg>
   </button>
+  <!-- [LAND-1c] Colapsar. Solo se ve en móvil (el CSS lo esconde arriba de
+       768px): en escritorio la píldora no estorba y Memo no la mencionó. -->
+  <button class="rcp-cerrar" id="rcp-cerrar" type="button" aria-label="Minimizar Radio Conecta">✕</button>
   <audio id="rcp-audio" preload="none"></audio>
 </div>
 <style>
@@ -1439,6 +1418,48 @@ src="https://www.facebook.com/tr?id=1685907946147007&ev=PageView&noscript=1"
    venta", "últimos lugares"), así que taparla cuesta. Ajusta la posición
    que se decidió en la PR #300 porque cambió la razón, no el gusto. */
 @media(max-width:768px){.rcp{right:12px;max-width:70vw}}
+
+/* ═══ [LAND-1c] LA RADIO, MINIMIZABLE EN MÓVIL ═══════════════════════════
+   Memo desde su iPhone: la píldora es invasiva — tapa el kicker y parte del
+   título. Arranca COLAPSADA como un botón redondo (el punto rojo + el play) y
+   se expande al tocarla; la ✕ la vuelve a colapsar.
+   ⚠️ NO SE TOCA LA POSICIÓN. El top:114px lo selló [PF-4] para no cubrir la
+   marquesina, que hoy lleva información de venta. Esto cambia el TAMAÑO, no
+   dónde vive.
+   ⚠️ Y es SOLO MÓVIL: arriba de 768px nada de esto aplica — en escritorio la
+   píldora no estorba y el mandato de Memo era móvil. */
+.rcp-cerrar{display:none}
+@media(max-width:768px){
+  .rcp-cerrar{
+    display:flex;align-items:center;justify-content:center;flex-shrink:0;
+    width:24px;height:24px;padding:0;margin-right:-2px;
+    border:none;border-radius:50%;background:rgba(0,0,0,.12);color:#000;
+    font-family:Montserrat,sans-serif;font-size:12px;font-weight:900;line-height:1;cursor:pointer;
+  }
+  /* COLAPSADA: un botón redondo de 44px — el mínimo táctil — con el punto rojo
+     encima del icono de play. Nada más. */
+  .rcp.rcp-min{
+    width:40px;height:40px;padding:0;gap:0;
+    justify-content:center;max-width:40px;overflow:visible;
+    /* SOLO EL BOTÓN COLAPSADO sube a 103; la píldora ABIERTA se queda en el
+       114 que selló [PF-4]. El sello es "no tapar la marquesina", y la
+       marquesina acaba en 99 (medido en 320, 375, 390 y 412): 103 la respeta
+       con 4px de aire. Sube para dejar libre el renglón del título, que en
+       375 y en 320 quedaba DEBAJO del botón. */
+    top:103px;
+  }
+  .rcp.rcp-min .rcp-text,.rcp.rcp-min .rcp-eq,.rcp.rcp-min .rcp-cerrar{display:none}
+  .rcp.rcp-min .rcp-play{width:36px;height:36px}
+  /* El punto rojo, que en la píldora vive junto a la marca, aquí se asoma como
+     insignia: es lo que dice "esto está en vivo" sin ocupar pantalla. */
+  .rcp.rcp-min::after{
+    content:'';position:absolute;top:2px;right:2px;width:9px;height:9px;
+    border-radius:50%;background:#ff283b;border:2px solid #e8ff4c;
+    animation:rcpPulse 1.4s ease-in-out infinite;pointer-events:none;
+  }
+  .rcp.rcp-min.rcp-playing::after{background:#88ea4e}
+}
+@media(prefers-reduced-motion:reduce){.rcp.rcp-min::after{animation:none!important}}
 /* El wizard esconde el nav y pone sus barras fijas arriba — el reproductor se quita para no encimarse. */
 body.wizard-open .rcp{display:none}
 @media(prefers-reduced-motion:reduce){.rcp-eq i,.rcp-dot{animation:none!important}}
@@ -1470,6 +1491,41 @@ body.wizard-open .rcp{display:none}
   audio.addEventListener('pause',function(){ el.classList.remove('rcp-playing'); playBtn.setAttribute('aria-pressed','false'); playBtn.setAttribute('aria-label','Reproducir Radio Conecta'); });
   audio.addEventListener('ended',function(){ el.classList.remove('rcp-playing'); });
   audio.addEventListener('error',function(){ el.classList.remove('rcp-playing'); playBtn.setAttribute('aria-pressed','false'); });
+
+  // ═══ [LAND-1c] COLAPSAR EN MÓVIL ═════════════════════════════════════════
+  // Arranca minimizada para que quien no quiera radio ni la note. La decisión
+  // se recuerda entre visitas, pero SIN depender de que localStorage exista:
+  // si está bloqueado (modo privado, permisos), todo sigue funcionando y
+  // simplemente arranca minimizada — es el mismo candado que usa pagos.html.
+  var MOVIL=function(){ return window.matchMedia('(max-width:768px)').matches; };
+  var LLAVE='rcpAbierta';
+  function recordar(v){ try{ localStorage.setItem(LLAVE,v?'1':'0'); }catch(e){} }
+  function recordada(){ try{ return localStorage.getItem(LLAVE)==='1'; }catch(e){ return false; } }
+  function minimizar(v){ el.classList.toggle('rcp-min',!!v); }
+
+  if(MOVIL() && !recordada()) minimizar(true);
+
+  var cerrar=document.getElementById('rcp-cerrar');
+  if(cerrar) cerrar.addEventListener('click',function(e){
+    e.preventDefault(); e.stopPropagation();
+    minimizar(true); recordar(false);
+  });
+
+  // Tocar la píldora colapsada la expande. Con UNA excepción: si está sonando,
+  // el botón sigue siendo pausa — si no, quien puso la radio no podría pararla
+  // sin abrirla primero, que es justo el estorbo que esto viene a quitar.
+  el.addEventListener('click',function(e){
+    if(!el.classList.contains('rcp-min'))return;
+    if(el.classList.contains('rcp-playing') && playBtn.contains(e.target))return;
+    e.preventDefault(); e.stopPropagation();
+    minimizar(false); recordar(true);
+  },true);
+
+  // Al girar el aparato o pasar a escritorio, el estado se recalcula: una
+  // píldora colapsada en una pantalla ancha sería un botón huérfano.
+  window.addEventListener('resize',function(){
+    if(!MOVIL()) minimizar(false);
+  });
 })();
 </script>
 <style>
@@ -2002,7 +2058,8 @@ body.wizard-open .rcp{display:none}
 .tu::before,.tpc::before,.tpoca::before,
 .ftr-v2-dot,.rcp-dot,
 .ev-play.ev-play-active,.d-play.ev-play-active{will-change:box-shadow}
-.cd-live,.ev-flash-badge{will-change:opacity}
+/* [LAND-1] .cd-live se fue con el countdown; .hn-live es su relevo. */
+.hn-live,.ev-flash-badge{will-change:opacity}
 .marquee-red-track,.rcp.rcp-playing .rcp-eq i,
 .ev-play.ev-play-loading .ev-play-ico,.d-play.ev-play-loading .ev-play-ico{will-change:transform}
 .ev-preventa-badge{will-change:background-color,box-shadow}
@@ -2022,7 +2079,7 @@ body.wizard-open .rcp{display:none}
     will-change:auto !important;
   }
   /* Lo que dependía del recorrido para verse, se ve directo */
-  .hh-title .line,.hh-sub,.hh-ctas{opacity:1;transform:none}
+  .hh-title .line,.hh-ctas{opacity:1;transform:none}
   .ev-card.visible{opacity:1;transform:none}
 }
 </style>
@@ -2250,9 +2307,10 @@ body.pf-barra-viva .wa-float{bottom:104px}
    Lleva !important porque la regla original también lo lleva. */
 #ev-search{border-radius:var(--r-btn) !important}
 
-/* La tarjeta grande de countdowns. La .cd-card de adentro se queda SIN radio
-   a propósito: son tarjetas anidadas y redondear las dos se lee como error. */
-.hh-countdown{border-radius:var(--r-card)}
+/* [LAND-1] La tarjeta del próximo evento hereda el radio que tenía el
+   countdown al que reemplaza. Las piezas de adentro se quedan SIN radio a
+   propósito: son cajas anidadas y redondear las dos se lee como error. */
+.hh-next,.hh-next-wrap{border-radius:var(--r-card)}
 
 /* El chip amarillo del separo y el fallback de portada (cuando el evento no
    trae foto): el placeholder es el gemelo de .ev-img-wrap, así que redondea
@@ -2294,6 +2352,303 @@ body.pf-barra-viva .wa-float{bottom:104px}
   color:rgba(255,255,255,.75);text-decoration:underline;text-underline-offset:2px;
 }
 .ftr-v2-dir a:hover{color:var(--c-ink);transform:none}
+
+/* ═══ [LAND-1] EL HERO DE ARRANQUE ════════════════════════════════════════
+   Va en el ÚLTIMO bloque <style> A PROPÓSITO: .home-hero-v2 se pinta en tres
+   lugares que se pisan (≈537, ≈851, ≈1813) y manda el último en llegar.
+   Sustituye al countdown d:h:m:s; sus reglas .cd-* se retiraron con él —
+   vivían todas dentro de su IIFE y nadie más las consultaba.
+   ⚠️ giveaway.html también usa .cd-n/.cd-l, pero define las suyas EN SU
+   PROPIO archivo: este borrado no lo alcanza. */
+
+
+
+
+
+/* ── 2 · LA TARJETA DEL PRÓXIMO EVENTO ── */
+.hh-next-wrap{margin-top:13px;animation:lineInMain 1s .5s both}
+.hn-head{display:flex;align-items:center;gap:8px;margin-bottom:7px}
+.hn-live{width:7px;height:7px;border-radius:50%;background:var(--c-amarillo);box-shadow:0 0 10px rgba(232,255,76,.8);animation:hnPulse 1.3s ease-in-out infinite}
+@keyframes hnPulse{0%,100%{opacity:1}50%{opacity:.35}}
+.hn-label{font-size:10px;font-weight:900;letter-spacing:.18em;text-transform:uppercase;color:var(--c-amarillo)}
+.hh-next{
+  display:block;width:100%;padding:0;text-align:left;font:inherit;color:inherit;
+  background:rgba(0,0,0,.28);border:1px solid rgba(255,255,255,.15);
+  border-radius:var(--r-card,16px);overflow:hidden;cursor:pointer;
+  transition:transform .22s cubic-bezier(.22,1,.36,1),border-color .2s;
+}
+.hh-next:hover{transform:translateY(-3px);border-color:var(--c-amarillo)}
+.hn-media{position:relative;width:100%;height:118px;background:#1a1a1a;overflow:hidden}
+.hn-img{position:relative;z-index:1;width:100%;height:100%;object-fit:cover;object-position:center 25%;display:block}
+/* El respaldo cuando el evento no trae portada. En la tarjeta del catálogo las
+   iniciales van al 10% y está bien: la caja mide 90px. Aquí mide 176px en
+   escritorio, y al 10% se ve un hueco negro, no un respaldo. Sube a .22 y se
+   apoya en el azul de marca — sin gradiente, un plano y ya.
+   ⚠️ Hoy lo alcanza el PRÓXIMO evento: `calle24` no está en STATIC_IMGS
+   (21 de los 49 a la venta tampoco). En producción `loadArtistImg` suele
+   llenarlo; esto es lo que se ve si el API no contesta. */
+.hn-ini{position:absolute;inset:0;z-index:0;display:flex;align-items:center;justify-content:center;
+  font-family:var(--font-display);font-size:clamp(44px,9vw,64px);font-weight:900;
+  color:rgba(255,255,255,.22);background:#0a0a2e;letter-spacing:.02em}
+/* ⚠️ [LAND-1c] EL RESPALDO QUE MANDA NO ES EL MÍO.
+   `loadArtistImg`, cuando el API no contesta, llama a `showInitials`, que hace
+   `imgEl.parentElement.innerHTML = …` — o sea REEMPLAZA el contenido de mi
+   .hn-media con el placeholder del catálogo y se lleva por delante .hn-ini.
+   Reusar la cadena de la tarjeta significa heredar también esto.
+   Y el placeholder del catálogo está pensado para una tarjeta chica: es 1:1 y
+   sus iniciales van al 10%, lo que en una caja de 152px se ve como un hueco
+   negro (así salió en la captura que revisó Memo). Se re-estila AQUÍ, dentro
+   del hero, sin tocar el del catálogo. */
+.hn-media .ev-img-placeholder,.hs-media .ev-img-placeholder{
+  position:absolute;inset:0;width:100%;height:100%;
+  aspect-ratio:auto;border-radius:0;background:#0a0a2e}
+.hn-media .ev-img-initials{font-family:var(--font-display);font-weight:900;
+  font-size:clamp(44px,9vw,64px);color:rgba(255,255,255,.22);letter-spacing:.02em}
+.hs-media .ev-img-initials{font-family:var(--font-display);font-weight:900;
+  font-size:19px;color:rgba(255,255,255,.2)}
+.hn-body{padding:10px 12px 12px}
+.hn-artist{font-family:var(--font-display);font-weight:900;font-size:26px;line-height:1;text-transform:uppercase;color:#fff}
+.hn-venue{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.55);margin-top:3px}
+/* [LAND-1b] EL CRONÓMETRO d:h:m:s — vuelve por decisión de Memo.
+   ⚠️ Las celdas llevan ANCHO MÍNIMO FIJO y cifras tabulares A PROPÓSITO: el
+   tick escribe un dígito por segundo, y sin ancho fijo cada cambio de "9" a
+   "10" remaquetearía la fila entera 60 veces por minuto. Con esto el tick solo
+   pinta texto dentro de una caja que ya no se mueve — que es la regla de la
+   casa (lo que se repite por frame no toca el layout) aplicada al segundero. */
+.hn-timer{display:flex;align-items:flex-end;gap:6px;margin-top:9px}
+.hn-cell{display:flex;flex-direction:column;align-items:center;min-width:40px}
+.hn-n{font-family:var(--font-display);font-weight:900;font-size:28px;line-height:1;
+  color:var(--c-amarillo);letter-spacing:-.01em;font-variant-numeric:tabular-nums;
+  font-feature-settings:'tnum' 1}
+/* [A4 · SELLADO POR MEMO, 30-jul-2026 — revalidado en LAND-1b]
+   Estas etiquetas (DÍAS, HRS, MIN, SEG) se quedan en 8px. El piso de 10px del
+   barrido es para texto que se LEE; éstas se RECONOCEN POR POSICIÓN, debajo de
+   su número. Nadie lee 'DÍAS': sabe qué es por dónde está. El sello venía del
+   contador anterior y viaja con el contador, no con el archivo. */
+.hn-l{font-size:8px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.5);margin-top:4px}
+.hn-sep{font-family:var(--font-display);font-weight:900;font-size:22px;color:rgba(255,255,255,.25);line-height:1;padding-bottom:13px}
+@media(max-width:380px){.hn-cell{min-width:34px}.hn-sep{display:none}.hn-timer{gap:9px}}
+.hn-cta{display:block;width:100%;margin-top:10px;padding:11px;cursor:pointer;
+  background:var(--c-rojo);color:#fff;border:0;border-radius:var(--r-btn,12px);
+  font-family:'Montserrat',sans-serif;font-size:13px;font-weight:900;letter-spacing:.1em;text-transform:uppercase}
+
+/* ── 3 · PRUEBA SOCIAL ── SOLO cifras que la casa ya sostiene: los 58 tours
+   los afirma Memo desde el Excel y los 13 años ya los dice el marquee de
+   arriba. El conteo de VIAJEROS no existe en ningún campo del sistema, así
+   que no aparece: entra el día que Memo dé el número. */
+.hh-proof{margin:11px 0 0;font-size:10.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:rgba(255,255,255,.62)}
+.hh-proof b{color:var(--c-amarillo);font-weight:900}
+
+/* ── 4 · LA TIRA ── */
+.hh-strip{display:flex;gap:6px;margin-top:11px}
+.hs-item{flex:1 1 0;min-width:0;padding:0;text-align:left;font:inherit;color:inherit;cursor:pointer;
+  background:rgba(0,0,0,.28);border:1px solid rgba(255,255,255,.12);
+  border-radius:var(--r-sm,8px);overflow:hidden;text-decoration:none;
+  transition:border-color .2s,transform .2s}
+.hs-item:hover{border-color:var(--c-amarillo);transform:translateY(-2px)}
+.hs-media{position:relative;width:100%;height:50px;background:#1a1a1a;overflow:hidden}
+.hs-img{position:relative;z-index:1;width:100%;height:100%;object-fit:cover;display:block}
+.hs-ini{position:absolute;inset:0;z-index:0;display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-size:19px;font-weight:900;color:rgba(255,255,255,.12)}
+.hs-body{padding:5px 6px 6px}
+.hs-rank{display:inline-block;background:var(--c-amarillo);color:#000;font-size:8px;font-weight:900;letter-spacing:.06em;padding:1px 5px;border-radius:var(--r-chip,999px);margin-bottom:3px}
+.hs-name{font-size:9.5px;font-weight:900;line-height:1.15;text-transform:uppercase;color:#fff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hs-fecha{font-size:9px;font-weight:700;color:rgba(255,255,255,.5);margin-top:2px;white-space:nowrap}
+.hs-mas{flex:0 0 58px;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  background:rgba(232,255,76,.1);border-color:rgba(232,255,76,.35)}
+.hs-mas-n{font-family:var(--font-display);font-size:21px;font-weight:900;color:var(--c-amarillo);line-height:1}
+.hs-mas-l{font-size:8px;font-weight:900;letter-spacing:.1em;text-transform:uppercase;color:var(--c-amarillo);margin-top:2px}
+
+/* ── 5 · WHATSAPP ── Verde de MARCA (--c-verde #88ea4e), NO el verde propio
+   de WhatsApp (#25D366): ese color no está en el manual y el brief pidió no
+   romperlo. */
+/* [LAND-1b] EL FLOTANTE Y EL BOTÓN GRANDE SON EL MISMO ACTO.
+   Al cerrar el hero el primer pantallazo, los dos quedaron encimados —medido a
+   390×844: el .wa-float ocupa 698-754 y el CTA 714-759—, o sea dos botones de
+   WhatsApp uno sobre otro justo en la vista que más importa. Mientras el botón
+   grande se ve, el flotante se retira; en cuanto el hero sube, vuelve.
+   Solo opacity y transform: nada que remaquete. */
+.wa-float{transition:transform .2s,box-shadow .2s,opacity .2s}
+.wa-float.wa-float-oculto{opacity:0;transform:scale(.8);pointer-events:none}
+.hh-btn-wa{background:var(--c-verde);color:#000;border:none}
+.hh-btn-wa:hover{background:var(--c-verde);color:#000;transform:translateY(-2px);box-shadow:0 14px 36px rgba(0,0,0,.55)}
+
+/* ── ESCRITORIO ── la frase respira (conserva su clamp hasta 156px) y las
+   piezas nuevas se acotan para no cruzar la pantalla entera. */
+/* ⚠️ [LAND-1b] ESTOS DOS ESCALONES VAN DESPUÉS DE LAS REGLAS DEL COMPONENTE,
+   NO ANTES. Estaban arriba y sus reglas sobre .hn-media / .hn-timer / .hn-n
+   eran LETRA MUERTA: misma especificidad que la base, y en CSS gana la última
+   en llegar. No tronaba nada — simplemente no hacía nada, y la medición del
+   iPhone SE salía idéntica antes y después de "apretar". Si alguien vuelve a
+   mover este bloque hacia arriba, revive el problema en silencio. */
+/* ── 1 · LA FRASE, COMPACTA ──
+   Misma identidad: var(--font-display) = Barlow Condensed 900, y el amarillo
+   #e8ff4c sigue viviendo en .hh-title .mark::before.
+   NO se cambia a Kaneda: el sitio solo carga Barlow Condensed + Montserrat,
+   así que pedir Kaneda caería a Montserrat y ROMPERÍA la identidad en vez de
+   conservarla. Medido: 1 sola aparición de Kaneda en todo el index
+   (.wiz-transmodo-name) y ya está cayendo a Montserrat en silencio. */
+@media(max-width:719px){
+  .home-hero-v2{padding:18px 14px 20px}
+  .hh-kicker{margin-bottom:9px;font-size:9px;letter-spacing:.16em;padding-top:5px;padding-bottom:5px}
+  /* [LAND-1c] UNA SOLA LÍNEA, al tamaño que el ancho dé.
+     El factor NO es de ojo: se midió el trazo real de "VIAJA CON EXPERTOS" en
+     Barlow Condensed 900 → 1179px a 100px de fuente, o sea 11.79px de ancho
+     por cada px de tamaño, MÁS .24em del padding lateral del .mark. De ahí
+     sale ancho_util / 12.03, y ancho_util es 100vw menos los 14px de padding
+     de cada lado. Con 4% de margen para el redondeo del navegador queda:
+       (100vw - 28px) / 11.83 * 0.97  ≈  8.20vw - 2.30px
+     El 11.83 es el trazo YA RENDERIZADO (medido en la página: 342px de trazo
+     con 28.9px de fuente a 390 de ancho), no el del canvas — se parecían, pero
+     el bueno es el que sale de la pantalla.
+     El 3% de margen NO es superstición: el arnés mide en Chromium y Memo mira
+     en Safari de iPhone. Las métricas de la misma webfont casi coinciden, pero
+     "casi" con white-space:nowrap significa un título recortado, así que el
+     colchón se queda hasta que alguien lo mida en un iPhone de verdad.
+     El tope de 46px es para que en una tablet angosta no se dispare.
+     ⚠️ Esto es una fórmula, no un número bonito: si alguien cambia el texto
+     del hero o el padding, HAY QUE VOLVER A MEDIR — el arnés comprueba que
+     no se parta en los cuatro anchos, así que avisaría. */
+  /* Los 10px de arriba son para el botón colapsado de la radio: sin ellos, en
+     375 y en 320 el botón caía encima de la última letra de "EXPERTOS"
+     (medido con elementFromPoint sobre el glifo, no de ojo). */
+  .hh-title{font-size:min(calc(8.20vw - 2.30px),48px);line-height:.9;margin-top:10px;margin-bottom:7px;white-space:nowrap}
+  .hh-title .line{display:inline}
+  .hh-ctas{margin-top:11px;gap:7px}
+  /* Los dos CTA venían en 26px de padding y 15px/.14em: "Escríbenos por
+     WhatsApp" se partía en DOS renglones y el botón medía 90px de alto, lo
+     que empujaba el cierre del primer pantallazo 21px por debajo del pliegue
+     (medido: fin 865 contra 844 de alto). Aquí se aprietan para que quepan. */
+  .hh-btn-full{padding:15px 18px;font-size:12.5px;letter-spacing:.09em}
+  /* [LAND-1c] La tarjeta crece con lo que soltó el título: pasar de dos
+     líneas a una liberó 39px de alto (65 → 26 medidos a 390). Se reparten
+     aquí, no se dejan en aire. */
+  .hn-media{height:152px}
+  .hn-body{padding:13px 14px 14px}
+  .hn-artist{font-size:30px}
+  .hn-venue{font-size:10.5px;margin-top:4px}
+  .hn-timer{margin-top:11px;gap:7px}
+  .hn-n{font-size:31px}
+  .hn-cell{min-width:44px}
+  .hn-sep{font-size:24px;padding-bottom:14px}
+  .hn-cta{margin-top:12px;padding:13px;font-size:13.5px}
+}
+
+/* ── PANTALLA BAJA (iPhone SE y compañía) ──
+   Medido: con los valores de arriba el WhatsApp cerraba en 794, que cabe en
+   los 844 de un iPhone 14 pero se salía 127px en los 667 de un SE. El brief
+   pide que el WhatsApp CIERRE el primer pantallazo, así que en pantallas
+   bajas todo se aprieta un escalón más. Se dispara por ALTO, no por ancho:
+   un SE y un 14 miden casi lo mismo de ancho y nada parecido de alto. */
+@media(max-height:760px){
+  .home-hero-v2{padding:12px 14px 14px}
+  .hh-kicker{margin-bottom:7px}
+  /* El tamaño del título ya NO se fija aquí: lo manda la fórmula de arriba,
+     que depende del ANCHO. Una pantalla baja no es una pantalla angosta, y
+     encogerlo por alto lo partiría del problema equivocado. */
+  .hh-title{margin-bottom:6px}
+  .hh-next-wrap{margin-top:9px}
+  .hn-head{margin-bottom:5px}
+  .hn-media{height:84px}
+  .hn-body{padding:8px 10px 10px}
+  .hn-artist{font-size:23px}
+  .hn-faltan{margin-top:6px;padding:3px 9px}
+  .hn-cta{margin-top:8px;padding:9px}
+  .hh-proof{margin-top:8px}
+  .hh-strip{margin-top:8px}
+  .hs-media{height:42px}
+  .hh-ctas{margin-top:8px;gap:6px;flex-wrap:nowrap}
+  /* Los dos CTA se ponen LADO A LADO en vez de apilados: recupera el alto de
+     un botón entero sin quitarle una sola palabra al hero. */
+  .hh-btn-full{flex:1 1 0;min-width:0;padding:11px 10px;font-size:11px;letter-spacing:.06em;text-align:center}
+  .hh-btn-full span{display:none}   /* la flecha, que aquí solo roba ancho */
+  /* [LAND-1b] El cronómetro pesa más alto que la pastilla "Faltan N días" que
+     sustituyó (≈40px contra 22), así que quitar el párrafo no alcanzó solo:
+     medido, el SE seguía saliéndose por 22px. Aquí se aprieta lo nuevo. */
+  /* [LAND-1c] Estos valores venían de cuando el título ocupaba DOS líneas y
+     el pliegue iba justo. Con una línea, el iPhone SE quedó con 99px de sobra
+     (WhatsApp cerraba en 568 de 667), así que la tarjeta también crece aquí:
+     una pantalla baja no tiene por qué llevar la tarjeta diminuta. */
+  .hn-media{height:112px}
+  .hn-timer{margin-top:8px;gap:6px}
+  .hn-n{font-size:27px}
+  .hn-cell{min-width:40px}
+  .hn-sep{font-size:21px;padding-bottom:12px}
+  .hn-cta{margin-top:9px;padding:10px}
+  .hn-artist{font-size:27px}
+  .hh-strip{margin-top:8px}
+  .hs-media{height:44px}
+}
+
+/* Pantalla MUY baja (iPhone 5/SE de 1ª generación, 568px). Quedaba a 26px de
+   cerrar el pliegue; con esto cierra. Va después del escalón de 760 para que
+   lo pise, no antes — la misma lección de arriba. */
+@media(max-height:610px){
+  .home-hero-v2{padding:9px 14px 11px}
+  .hh-title{margin-bottom:5px}
+  /* 78px se salía por 6 — medido, no supuesto. Y los 10px que bajó el título
+     para dejarle sitio al botón de la radio salen de aquí. */
+  .hn-media{height:58px}
+  .hn-n{font-size:23px}
+  .hn-cell{min-width:34px}
+  .hn-sep{font-size:18px;padding-bottom:10px}
+  .hn-artist{font-size:24px}
+  .hs-media{height:38px}
+  .hh-proof{margin-top:6px;font-size:10px}
+}
+
+/* ── ESCRITORIO: DOS COLUMNAS DE VERDAD ──
+   [LAND-1b] Memo dijo que el escritorio "quedó raro", y tenía razón: era el
+   móvil estirado — una sola columna angosta con muchísimo negro a los lados.
+   Ahora es una rejilla con ÁREAS NOMBRADAS, y por eso los 6 hijos cuelgan
+   PLANOS de .hh-grid en vez de ir envueltos en dos columnas: envolverlos
+   habría congelado el orden, y el orden de móvil (frase → evento → prueba →
+   tira → botones) NO es el de escritorio. Con áreas, el DOM conserva el orden
+   de móvil y el escritorio coloca cada pieza donde quiere. */
+/* El umbral son 1000px, no 900: a 900 la columna izquierda queda tan angosta
+   que "EXPERTOS" volvía a meterse debajo de la tarjeta (medido: se encimaban
+   37px). Por debajo de 1000 el hero se queda en una columna, que a ese ancho
+   se lee mejor que dos apretadas. */
+@media(min-width:1000px){
+  .hh-grid{
+    display:grid;
+    grid-template-columns:minmax(0,1fr) minmax(320px,420px);
+    grid-template-rows:auto auto auto 1fr;
+    grid-template-areas:
+      "kicker  evento"
+      "titulo  evento"
+      "prueba  evento"
+      "botones tira";
+    column-gap:clamp(32px,5vw,72px);
+    align-items:start;
+  }
+  .hh-kicker  {grid-area:kicker;justify-self:start}
+  /* El clamp global llega a 156px, y a ese tamaño "EXPERTOS" mide más que la
+     columna izquierda: la palabra se metía POR DEBAJO de la tarjeta del evento
+     (medido a 1440: el subrayado amarillo llegaba a x=975 y la tarjeta empieza
+     en 948). Aquí el tope baja a lo que la columna aguanta. */
+  .hh-title   {grid-area:titulo;margin-bottom:14px;font-size:clamp(52px,7.6vw,124px)}
+  .hh-next-wrap{grid-area:evento;margin-top:0}
+  .hh-proof   {grid-area:prueba;margin-top:0;font-size:12px}
+  .hh-strip   {grid-area:tira;margin-top:14px}
+  .hh-ctas    {grid-area:botones;margin-top:22px;align-self:start}
+  .hn-media{height:176px}
+  .hn-artist{font-size:32px}
+  .hn-n{font-size:34px}
+  .hn-cell{min-width:48px}
+  .hs-media{height:62px}
+  .hs-name{font-size:10.5px}
+  /* Los dos CTA caben lado a lado en la columna ancha. */
+  .hh-ctas{display:flex;flex-wrap:nowrap;gap:10px}
+  .hh-btn-full{flex:1 1 0;min-width:0;padding:17px 18px;font-size:12.5px}
+}
+/* Escalón intermedio (tablet): una columna, pero acotada para que no cruce la
+   pantalla entera. */
+@media(min-width:720px) and (max-width:999px){
+  .hh-next-wrap,.hh-strip,.hh-proof,.hh-ctas{max-width:560px}
+  .hn-media{height:168px}
+  .hn-artist{font-size:34px}
+  .hs-media{height:64px}
+}
 </style>
 
 <script src="imgs.js"></script>
@@ -3102,6 +3457,12 @@ function refreshTop10(){
     for(var i=0;i<_top10Ids.length;i++){_top10Rank[_top10Ids[i]]=i+1;}
     applyTop10Badges();
     if(_activeFilter==='top10')filterEvents();
+    // [LAND-1b] La tira del hero se alimenta de ESTE top. Una línea aditiva en
+    // vez de un segundo fetch al mismo endpoint: dos llamadas serían dos
+    // rankings que un día no coinciden. Si esta rama no se alcanza (endpoint
+    // caído, respuesta rara), la tira se queda con su respaldo por fecha, que
+    // es con lo que nació.
+    if(typeof window.__landHeroTop==='function')window.__landHeroTop();
   }).catch(function(){});
 }
 function applyTop10Badges(){
@@ -3334,125 +3695,281 @@ var _scrollObs=new IntersectionObserver(function(entries){
 },{threshold:0.1});
 document.querySelectorAll('.ev-card,.how-step').forEach(function(el){_scrollObs.observe(el);});
 
-// Countdown regresivo al próximo evento disponible.
-// ID del interval guardado a nivel módulo para que si la IIFE llegara a
-// re-ejecutarse (hot-reload, futura refactor), no quede un timer huérfano.
-var _countdownInterval = null;
+// [LAND-1] EL HERO DE ARRANQUE: tarjeta del próximo evento a la venta,
+// prueba social, tira de los más buscados y "+N más".
+//
+// REEMPLAZA al countdown regresivo que vivía aquí. Los dos ocupaban el MISMO
+// lugar semántico ("próximo evento") con DOS reglas de selección distintas: el
+// countdown admitía agotados y últimos, y esta tarjeta solo admite lo que se
+// puede comprar. Dejarlos juntos era la trampa del libro —dos objetos con el
+// mismo papel— con el agravante de que podían anunciar eventos DIFERENTES el
+// mismo día.
+//
+// [LAND-1b] El cronómetro d:h:m:s VOLVIÓ por decisión de Memo, con dos cosas
+// que el original no tenía: la hora del evento se ancla en zona de MÉXICO (ver
+// instanteEvento) y el tick por segundo SOLO escribe texto.
+var _landTick = null;
 (function(){
   function pad(n){return (n<10?'0':'')+n;}
   function esc(s){return String(s||'').replace(/[&<>"']/g,function(m){return({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[m];});}
   function cleanName(a){return (a||'').replace(/ - .*/,'').replace(/ Tour.*/,'');}
-  function getEventHour(ev){
+
+  // ⚠️ "A LA VENTA" NO ES st===''. Esta condición está COPIADA de la tarjeta
+  // del catálogo (renderList, el bloque de banderas), no parafraseada:
+  //   · un evento PASADO conserva su st==='' — medido: 9 de 58 lo están;
+  //   · ev.agotado lo saca aunque el st esté vacío;
+  //   · y el auto-semáforo enciende isAg cuando NINGUNA zona queda libre.
+  // El brief prohíbe tocar el catálogo, así que en vez de una fuente
+  // compartida esta copia va con CANDADO: el arnés carea el veredicto del
+  // hero contra el estado REAL de cada tarjeta renderizada, evento por
+  // evento. Si divergen, truena.
+  function heroALaVenta(ev){
+    if(!ev||ev.listOnly)return false;
+    if(ev.ds&&ev.ds!=='2027-12-31'&&new Date(ev.ds+'T23:59:59')<new Date())return false;
+    var st=ev.st;
+    // 'ultimos' TAMBIÉN se vende. Excluirlo sería incoherente: un evento con
+    // 39% de zonas libres ya entra por el auto-semáforo con st==='', así que
+    // dejar fuera el marcado a mano adelantaría un evento más lejano
+    // mientras uno más cercano sigue comprándose.
+    if(st!==''&&st!=='ultimos')return false;
+    if(ev.agotado)return false;
+    var z=(ev.multifecha?ev.multifecha.reduce(function(a,mf){return a.concat(mf.zonas);},ev.zonas||[]):(ev.zonas||[]));
+    if(z.length>0&&z.filter(function(x){return !x.ag;}).length===0)return false;
+    return true;
+  }
+
+  function dsEfectivo(ev){
+    var l=(ev.dsList&&ev.dsList.length)?ev.dsList:(ev.ds?[ev.ds]:[]);
+    return l[0]||'';
+  }
+
+  // La hora a la que arranca el evento, como la definía el countdown original:
+  // los festivales abren de día, los conciertos de noche.
+  function horaEvento(ev){
     if(!ev)return '21:00';
-    var festivalIds=['machaca','emblema','warped','pulsoquetaro','dalemix','knotfest','edc','coronacap','flowfest','arre','comuna','nochegrandes'];
-    var festivalKeywords=['festival','fest','machaca','warped','edc','knotfest'];
-    var id=(ev.id||'').toLowerCase();
-    var nombre=(ev.a||'').toLowerCase();
-    var esFestival=festivalIds.indexOf(id)>=0 ||
-      festivalKeywords.some(function(k){return nombre.indexOf(k)>=0||id.indexOf(k)>=0;});
+    var ids=['machaca','emblema','warped','pulsoquetaro','dalemix','knotfest','edc','coronacap','flowfest','arre','comuna','nochegrandes'];
+    var claves=['festival','fest','machaca','warped','edc','knotfest'];
+    var id=(ev.id||'').toLowerCase(), nom=(ev.a||'').toLowerCase();
+    var esFestival=ids.indexOf(id)>=0||claves.some(function(k){return nom.indexOf(k)>=0||id.indexOf(k)>=0;});
     return esFestival?'14:00':'21:00';
   }
-  // Devuelve todos los eventos cuyo timestamp cae dentro de las 36h a partir del primer evento próximo.
-  // Para eventos multifecha con dsList, cada fecha genera un candidate propio.
-  var GROUP_WINDOW_MS=36*60*60*1000;
-  function findNextGroup(){
-    if(typeof EV==='undefined')return [];
-    var now=Date.now();
-    var candidates=[];
-    for(var i=0;i<EV.length;i++){
-      var e=EV[i];
-      if(!e||e.listOnly)continue;
-      if(e.st!==''&&e.st!=='ultimos'&&e.st!=='agotado')continue;
-      var dsArr=e.dsList&&e.dsList.length?e.dsList:(e.ds?[e.ds]:[]);
-      for(var j=0;j<dsArr.length;j++){
-        var ds=dsArr[j];
-        if(!ds)continue;
-        var t=new Date(ds+'T'+getEventHour(e)+':00').getTime();
-        if(isNaN(t)||t<=now)continue;
-        candidates.push({ev:e,t:t,ds:ds});
-      }
-    }
-    if(!candidates.length)return [];
-    candidates.sort(function(a,b){return a.t-b.t;});
-    var firstT=candidates[0].t;
-    return candidates.filter(function(c){return c.t>=firstT&&c.t<=firstT+GROUP_WINDOW_MS;});
-  }
-  // Format ds como "21 abr" para distinguir cards cuando un evento multifecha tiene varias en la ventana.
-  var MES_SHORT=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
-  function dsShort(ds){
-    var p=ds.split('-');
-    return parseInt(p[2],10)+' '+MES_SHORT[parseInt(p[1],10)-1];
-  }
-  var root=document.getElementById('hh-countdown');
-  if(!root)return;
-  var cardsEl=document.getElementById('cd-cards');
-  var labelEl=document.getElementById('cd-label');
-  var group=findNextGroup();
-  if(!group.length){root.style.display='none';return;}
-  root.style.display='flex';
 
-  function renderGroup(){
-    labelEl.textContent=group.length>1?'Próximos eventos':'Próximo evento';
-    cardsEl.classList.toggle('multi',group.length>1);
-    var h='';
-    for(var i=0;i<group.length;i++){
-      var ev=group[i].ev;
-      var venueStr=ev.v||'';
-      if(ev.dsList&&ev.dsList.length>1&&group[i].ds) venueStr=(venueStr?venueStr+' · ':'')+dsShort(group[i].ds);
-      var pill=ev.st==='agotado'?'<span class="cd-pill-agotado">Agotado</span>':'';
-      h+='<div class="cd-card">'+
-           '<div class="cd-artist">'+esc(cleanName(ev.a))+'</div>'+
-           pill+
-           '<div class="cd-venue">'+esc(venueStr)+'</div>'+
-           '<div class="cd-timer">'+
-             '<div class="cd-cell"><span class="cd-n" data-i="'+i+'" data-u="d">00</span><span class="cd-l">días</span></div>'+
-             '<div class="cd-sep">:</div>'+
-             '<div class="cd-cell"><span class="cd-n" data-i="'+i+'" data-u="h">00</span><span class="cd-l">hrs</span></div>'+
-             '<div class="cd-sep">:</div>'+
-             '<div class="cd-cell"><span class="cd-n" data-i="'+i+'" data-u="m">00</span><span class="cd-l">min</span></div>'+
-             '<div class="cd-sep">:</div>'+
-             '<div class="cd-cell"><span class="cd-n" data-i="'+i+'" data-u="s">00</span><span class="cd-l">seg</span></div>'+
-           '</div>'+
-         '</div>';
-    }
-    cardsEl.innerHTML=h;
+  // ⚠️ EL INSTANTE SE ANCLA EN ZONA DE MÉXICO, no en la del navegador.
+  // El countdown original hacía new Date(ds+'T21:00:00'), que es la hora LOCAL
+  // DE QUIEN MIRA: a un cliente en Reynosa (UTC-5) le contaba una hora de
+  // menos que a uno en Monterrey, para el mismo concierto. Los venues del
+  // catálogo son MTY y CDMX, y México no cambia de horario desde 2022: los dos
+  // son UTC-6 todo el año. Por eso el offset va explícito y fijo.
+  var MX_OFFSET='-06:00';
+  function instanteEvento(ev,ds){
+    return new Date(ds+'T'+horaEvento(ev)+':00'+MX_OFFSET).getTime();
   }
 
-  renderGroup();
-
-  function setCell(i,u,v){
-    var el=cardsEl.querySelector('.cd-n[data-i="'+i+'"][data-u="'+u+'"]');
-    if(el)el.textContent=pad(v);
+  // La MISMA cadena de portada que usa la tarjeta del catálogo:
+  // STATIC_IMGS → loadArtistImg por API → iniciales. Medido: 21 de los 49
+  // eventos a la venta no tienen portada estática, y el próximo es uno.
+  function portadaEstatica(ev){
+    if(ev.staticImg&&(ev.staticImg.indexOf('http')===0||ev.staticImg.indexOf('data:')===0))return ev.staticImg;
+    return (typeof STATIC_IMGS!=='undefined')?(STATIC_IMGS[ev.id]||STATIC_IMGS[ev.staticImg]):null;
+  }
+  // Se calcula SIN mutar ev.img (la tarjeta sí lo muta; si el hero lo hiciera
+  // también, el orden de ejecución decidiría el resultado).
+  function consultaImg(ev){
+    if(ev.img)return ev.img;
+    if(ev.img===false)return '';
+    return (ev.a||'').replace(/ - .*/,'').replace(/ en .*/,'').replace(/ Mexico.*/,'');
+  }
+  function pintarPortada(cont,ev,claseImg,claseIni){
+    cont.innerHTML='<span class="'+claseIni+'">'+esc((ev.a||'?').substring(0,2).toUpperCase())+'</span>';
+    var img=document.createElement('img');
+    img.className=claseImg; img.alt=''; img.loading='eager'; img.decoding='async';
+    img.onerror=function(){this.remove();};   // se cae → quedan las iniciales
+    var est=portadaEstatica(ev);
+    if(est){img.src=est;cont.appendChild(img);return;}
+    var q=consultaImg(ev);
+    if(q&&typeof loadArtistImg==='function'){cont.appendChild(img);loadArtistImg(q,img,false);}
   }
 
+  // El MISMO camino que la tarjeta del catálogo. Para un evento a la venta la
+  // tarjeta cae en su rama final: showDetail(id). No se inventa uno nuevo, y
+  // no se toca el catálogo para lograrlo.
+  function abrir(id){ if(typeof showDetail==='function') showDetail(id); }
+
+  // ── El universo del hero, una sola vez ──
+  function aLaVentaPorFecha(){
+    return EV.filter(function(e){return heroALaVenta(e)&&dsEfectivo(e);})
+             .sort(function(a,b){return dsEfectivo(a).localeCompare(dsEfectivo(b));});
+  }
+
+  var _destino=0;   // el instante al que corre el cronómetro
+
+  // ═══ EL CRONÓMETRO ═══════════════════════════════════════════════════════
+  // El tick por segundo SOLO ESCRIBE TEXTO: nunca toca innerHTML, ni clases,
+  // ni estilos, ni el tamaño de nada. Las celdas tienen ancho fijo y cifras
+  // tabulares (ver .hn-cell/.hn-n en el CSS), así que cambiar un dígito no
+  // remaquetea: es la regla de la casa —lo que anima POR FRAME solo mueve
+  // transform/opacity— aplicada a lo que se repinta por segundo.
+  function escribir(u,v){
+    var el=document.querySelector('.hn-n[data-u="'+u+'"]');
+    var t=pad(v);
+    if(el&&el.textContent!==t)el.textContent=t;   // ni siquiera escribe si no cambió
+  }
   function tick(){
-    var now=Date.now();
-    var anyActive=false;
-    for(var i=0;i<group.length;i++){
-      var diff=group[i].t-now;
-      if(diff<=0)continue;
-      anyActive=true;
-      var s=Math.floor(diff/1000);
-      var d=Math.floor(s/86400);s%=86400;
-      var h=Math.floor(s/3600);s%=3600;
-      var m=Math.floor(s/60);s%=60;
-      setCell(i,'d',d);setCell(i,'h',h);setCell(i,'m',m);setCell(i,'s',s);
+    if(!_destino)return;
+    var dif=_destino-Date.now();
+    if(dif<=0){
+      // El evento arrancó: se recalcula el hero entero, que elegirá el
+      // siguiente. Sin esto el contador se quedaría en 00:00:00:00.
+      construir();
+      return;
     }
-    if(!anyActive){
-      // Todos los eventos del grupo pasaron — recarga siguiente grupo
-      group=findNextGroup();
-      if(!group.length){
-        root.style.display='none';
-        if(_countdownInterval){clearInterval(_countdownInterval);_countdownInterval=null;}
-        return;
-      }
-      renderGroup();
+    var s=Math.floor(dif/1000);
+    var d=Math.floor(s/86400); s%=86400;
+    var h=Math.floor(s/3600);  s%=3600;
+    var m=Math.floor(s/60);    s%=60;
+    escribir('d',d); escribir('h',h); escribir('m',m); escribir('s',s);
+  }
+
+  function timerHTML(){
+    return '<div class="hn-timer">'+
+      '<div class="hn-cell"><span class="hn-n" data-u="d">00</span><span class="hn-l">días</span></div>'+
+      '<div class="hn-sep">:</div>'+
+      '<div class="hn-cell"><span class="hn-n" data-u="h">00</span><span class="hn-l">hrs</span></div>'+
+      '<div class="hn-sep">:</div>'+
+      '<div class="hn-cell"><span class="hn-n" data-u="m">00</span><span class="hn-l">min</span></div>'+
+      '<div class="hn-sep">:</div>'+
+      '<div class="hn-cell"><span class="hn-n" data-u="s">00</span><span class="hn-l">seg</span></div>'+
+    '</div>';
+  }
+
+  // ═══ LA TIRA ═════════════════════════════════════════════════════════════
+  // Se alimenta de LOS MÁS BUSCADOS (event-clicks / CAT-4, ventana de 14 días)
+  // y muestra los 3 primeros DEL TOP QUE ESTÉN A LA VENTA — el top incluye
+  // pasados y agotados, así que se carea contra la misma regla sellada de la
+  // tarjeta, no contra una lista propia.
+  //
+  // FAILS-SOFT POR CONSTRUCCIÓN: la tira NACE con el respaldo (los 3 próximos
+  // por fecha) y el top solo la ASCIENDE cuando llega. Si el endpoint no
+  // contesta, si tarda, o si su top no deja ningún evento vendible, no hay
+  // nada que hacer: lo que ya está pintado se queda. Por eso no hay ninguna
+  // rama de error que mantener — la tira no puede quedar en blanco.
+  function idsDelTop(){
+    return (typeof _top10Ids!=='undefined'&&Array.isArray(_top10Ids))?_top10Ids:[];
+  }
+  function elegirTira(venta){
+    var porId={}; venta.forEach(function(e){porId[e.id]=e;});
+    var top=idsDelTop(), out=[];
+    for(var i=0;i<top.length&&out.length<3;i++){
+      var e=porId[top[i]];
+      if(e&&e.id!==venta[0].id)out.push(e);   // el que ya es la tarjeta grande no se repite
+    }
+    if(out.length===3)return {items:out,fuente:'top'};
+    // Respaldo: se completa por cercanía de fecha, sin repetir.
+    var vistos={}; out.forEach(function(e){vistos[e.id]=1;});
+    for(var j=1;j<venta.length&&out.length<3;j++){
+      if(!vistos[venta[j].id]){out.push(venta[j]);vistos[venta[j].id]=1;}
+    }
+    return {items:out,fuente:out.length&&idsDelTop().length?'mixta':'fecha'};
+  }
+
+  function construir(){
+    if(typeof EV==='undefined')return;
+    var wrap=document.getElementById('hh-next-wrap');
+    var slot=document.getElementById('hh-next');
+    var strip=document.getElementById('hh-strip');
+    if(!wrap||!slot||!strip)return;
+
+    var venta=aLaVentaPorFecha();
+    if(!venta.length){wrap.style.display='none';strip.style.display='none';_destino=0;return;}
+    wrap.style.display='';
+
+    // ── La tarjeta grande: el más cercano a la venta ──
+    var ev=venta[0], ds=dsEfectivo(ev);
+    var media=document.createElement('div'); media.className='hn-media';
+    var body=document.createElement('div'); body.className='hn-body';
+    body.innerHTML=
+      '<div class="hn-artist">'+esc(cleanName(ev.a))+'</div>'+
+      '<div class="hn-venue">'+esc(ev.v||'')+'</div>'+
+      timerHTML()+
+      '<button type="button" class="hn-cta">Cotizar</button>';
+    slot.innerHTML=''; slot.appendChild(media); slot.appendChild(body);
+    pintarPortada(media,ev,'hn-img','hn-ini');
+    slot.onclick=function(){abrir(ev.id);};
+    body.querySelector('.hn-cta').onclick=function(e){e.stopPropagation();abrir(ev.id);};
+
+    _destino=instanteEvento(ev,ds);
+    tick();
+    if(_landTick)clearInterval(_landTick);
+    _landTick=setInterval(tick,1000);
+
+    // ── La tira ──
+    var el=elegirTira(venta);
+    strip.innerHTML='';
+    strip.setAttribute('data-fuente',el.fuente);
+    if(!el.items.length){strip.style.display='none';return;}
+    strip.style.display='';
+    el.items.forEach(function(e){
+      var it=document.createElement('button');
+      it.type='button'; it.className='hs-item';
+      var m=document.createElement('div'); m.className='hs-media';
+      var b=document.createElement('div'); b.className='hs-body';
+      var n=(typeof _top10Rank!=='undefined'&&_top10Rank&&_top10Rank[e.id])?_top10Rank[e.id]:0;
+      b.innerHTML=(n?'<span class="hs-rank">#'+n+'</span>':'')+
+                  '<div class="hs-name">'+esc(cleanName(e.a))+'</div>'+
+                  '<div class="hs-fecha">'+esc(fechaCorta(dsEfectivo(e)))+'</div>';
+      it.appendChild(m); it.appendChild(b);
+      pintarPortada(m,e,'hs-img','hs-ini');
+      it.onclick=function(){abrir(e.id);};
+      strip.appendChild(it);
+    });
+    // N se CUENTA del EV, no se escribe: los que quedan a la venta después de
+    // los 4 que ya se ven.
+    var n=venta.length-1-el.items.length;
+    if(n>0){
+      var mas=document.createElement('a');
+      mas.className='hs-item hs-mas';
+      mas.href='#catalog-anchor';
+      mas.innerHTML='<span class="hs-mas-n">+'+n+'</span><span class="hs-mas-l">más</span>';
+      // El catálogo arranca en display:none. El hook que revela al hacer clic
+      // se enganchó a los anchors QUE EXISTÍAN al cargar, y éste nace después:
+      // por eso se llama a la puerta a mano. Sin esto el enlace haría scroll a
+      // un contenedor invisible.
+      mas.onclick=function(){ if(typeof window.revealCatalog==='function') window.revealCatalog(); };
+      strip.appendChild(mas);
     }
   }
-  tick();
-  // Limpia cualquier interval previo antes de crear el nuevo.
-  if(_countdownInterval) clearInterval(_countdownInterval);
-  _countdownInterval = setInterval(tick, 1000);
+
+  var MESC=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+  function fechaCorta(ds){
+    if(!ds)return '';
+    var p=ds.split('-');
+    return parseInt(p[2],10)+' '+MESC[parseInt(p[1],10)-1];
+  }
+
+  // El botón de WhatsApp toma el número de la MISMA constante WA que ya usan
+  // la tarjeta, el wizard y la página de pagos. El href del markup existe solo
+  // para que el botón sirva con JS apagado; el arnés carea que sean el mismo.
+  function armarWA(){
+    var a=document.getElementById('hh-wa');
+    if(!a||typeof WA==='undefined')return;
+    a.href='https://wa.me/'+WA+'?text='+encodeURIComponent('Hola! Quiero informes de los tours de Conecta Reynosa.');
+    // El botón flotante se retira mientras el grande esté a la vista: son el
+    // mismo acto y quedaban uno encima del otro (ver la nota del CSS).
+    var fab=document.querySelector('.wa-float');
+    if(!fab||typeof IntersectionObserver==='undefined')return;
+    new IntersectionObserver(function(e){
+      fab.classList.toggle('wa-float-oculto',e[0].isIntersecting);
+    },{threshold:.35}).observe(a);
+  }
+
+  // La puerta por la que refreshTop10 avisa que el top ya llegó. Es lo ÚNICO
+  // que el hero expone: no hace su propio fetch a event-clicks, porque el
+  // index ya lo pide y dos llamadas al mismo endpoint son dos rankings que un
+  // día no coinciden.
+  window.__landHeroTop=function(){ try{ construir(); }catch(e){} };
+
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',function(){construir();armarWA();});
+  else { construir(); armarWA(); }
 })();
 
 // Revelar catálogo al presionar VER EVENTOS o al llegar vía #catalog-anchor

@@ -39,7 +39,7 @@ const crypto = require('crypto');
 
 const BCRYPT_COST = 10;
 const UUID_RE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
-const ROLES_VALIDOS = ['maestro_roshi', 'bulma', 'mister_popo', 'coordinador', 'cc', 'vendedor', 'milk'];
+const ROLES_VALIDOS = ['maestro_roshi', 'bulma', 'mister_popo', 'coordinador', 'cc', 'milk'];
 const ROLES_ADMIN = ['maestro_roshi', 'bulma'];
 // Roles de alto privilegio cuya CREACIÓN (invitación) queda reservada a
 // maestro_roshi (anti escalación). Incluye `milk` aunque NO sea ROLES_ADMIN:
@@ -422,25 +422,11 @@ exports.handler = async (event) => {
         update.sesiones_invalidas_antes = new Date().toISOString();
       }
 
-      // 🚪 Candado de inactividad de vendedores: REACTIVAR la cuenta desde
-      // Guerreros Z es el otro camino de vuelta (el primero es el botón "Dar
-      // otra oportunidad"). Sin esto, un vendedor re-onboardeado entraría a
-      // KameHouse pero la puerta de ventas seguiría cerrada por el sello.
-      // Se limpia el sello Y se reinicia el reloj: limpiar solo el sello sería
-      // un no-op, porque la regla rodante (sin ventas recientes) lo re-sella.
-      // `activo` solo existe en ADMIN_FIELDS, así que esto nunca es auto-edición.
-      // ⚠️ Se exige la TRANSICIÓN real false→true. Si la pantalla manda
-      // activo:true en cada guardado (editar el celular, cambiar la foto), un
-      // simple `update.activo === true` reiniciaría el reloj siempre y el
-      // candado no se dispararía JAMÁS. Si no se pudo leer el estado previo,
-      // no se toca nada: queda el botón "Dar otra oportunidad".
-      if (targetActivo === false && update.activo === true) {
-        const rolFinal = Object.prototype.hasOwnProperty.call(update, 'rol') ? update.rol : targetRol;
-        if (rolFinal === 'vendedor') {
-          update.vendedor_bloqueado_at = null;
-          update.vendedor_reactivado_at = new Date().toISOString();
-        }
-      }
+      // [VEN-BORRA-1e] Aquí se limpiaba el sello de inactividad al reactivar a un
+      // vendedor, escribiendo `vendedor_bloqueado_at` y `vendedor_reactivado_at`.
+      // Esas DOS COLUMNAS las suelta VEN-BORRA-1d: dejar el escribo habría hecho
+      // fallar el PATCH entero —o sea, reactivar a CUALQUIER usuario— la primera
+      // vez que alguien reactivara una cuenta después de la migración.
 
       if (!Object.keys(update).length) {
         return { statusCode: 400, headers, body: JSON.stringify({ error: 'Nada que actualizar' }) };

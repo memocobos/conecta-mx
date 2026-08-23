@@ -27,7 +27,7 @@ const SB_URL = 'https://npgnhsmwpcipxgvfxrho.supabase.co';
 const SB_KEY = process.env.SUPABASE_SERVICE_KEY_KAMEHOUSE;
 
 // 'crear' lo puede disparar cualquier usuario logueado (lista completa de roles).
-const ROLES_CREAR = ['maestro_roshi', 'bulma', 'mister_popo', 'coordinador', 'cc', 'vendedor'];
+const ROLES_CREAR = ['maestro_roshi', 'bulma', 'mister_popo', 'coordinador', 'cc'];
 // Marcar leídas es exclusivo de Montaña Pai (maestro_roshi).
 const ROLES_MARCAR = ['maestro_roshi'];
 

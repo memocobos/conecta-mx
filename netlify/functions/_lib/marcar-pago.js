@@ -85,7 +85,7 @@ async function aplicarNucleo({ env, headers, pagoId, accion, patch, actorEtiquet
     const todos = await allR.json();
 
     // 3. Leer el estado actual de la solicitud y reconciliar si hace falta.
-    const solUrl = `${env.PORTAL_SB_URL}/rest/v1/solicitudes_tour?id=eq.${solicitudId}&select=id,estado,precio_total,evento_nombre,vendedor_id,clientes(nombre_completo,correo)`;
+    const solUrl = `${env.PORTAL_SB_URL}/rest/v1/solicitudes_tour?id=eq.${solicitudId}&select=id,estado,precio_total,evento_nombre,clientes(nombre_completo,correo)`;
     const solR = await fetch(solUrl, { headers: sbHeaders });
     if (!solR.ok) {
       const detail = await solR.text();
@@ -96,11 +96,12 @@ async function aplicarNucleo({ env, headers, pagoId, accion, patch, actorEtiquet
     const estadoPrevio = solicitud ? solicitud.estado : null;
     let estadoSolicitud = estadoPrevio;
 
-    // [F5b] Ventas de VENDEDOR (vendedor_id no nulo): su ciclo de estado NO lo maneja
-    // la cobranza del cliente — lo cierra el módulo Vendedores (Bulma a mano / F5c). Un
-    // abono del vendedor validado JAMÁS debe auto-flipear la venta a 'pagado' ni disparar
-    // el correo de "liquidado" al comprador. Cliente normal (vendedor_id null): SIN CAMBIO.
-    const esVentaVendedor = !!(solicitud && solicitud.vendedor_id);
+    // [VEN-BORRA-1e] Aquí había una rama para las ventas de VENDEDOR: su ciclo de
+    // estado no lo manejaba la cobranza del cliente. Sin ese módulo, todas las
+    // solicitudes son de cliente y el camino es el de siempre — que es el que
+    // esta rama dejaba intacto. Se retira TAMBIÉN porque leía
+    // `solicitudes_tour.vendedor_id`, la columna que VEN-BORRA-1d suelta: dejarla
+    // habría hecho fallar el `select` entero de PostgREST, y con él marcar un pago.
 
     // [F5] Reconciliación sobre CUOTAS VIVAS (estado !== 'cancelado'). Tras una baja
     // de lugar (#239) sus cuotas no pagadas quedan 'cancelado'; se EXCLUYEN para que
@@ -127,10 +128,7 @@ async function aplicarNucleo({ env, headers, pagoId, accion, patch, actorEtiquet
     // uno de sus pagos; no hay barrido masivo).
     const todosPagados = vivas.length > 0 && vivas.every(p => p.estado === 'pagado');
     let nuevoEstadoSol = null;
-    if (esVentaVendedor) {
-      // [F5b] no auto-gestionar el estado de una venta de vendedor (ver arriba).
-      nuevoEstadoSol = null;
-    } else if (todosPagados && dineroCuadra && estadoPrevio !== 'pagado') {
+    if (todosPagados && dineroCuadra && estadoPrevio !== 'pagado') {
       nuevoEstadoSol = 'pagado';
     } else if ((!todosPagados || !dineroCuadra) && estadoPrevio === 'pagado') {
       nuevoEstadoSol = 'en_pagos';

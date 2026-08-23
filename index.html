@@ -98,7 +98,6 @@ body.wizard-open{overscroll-behavior:none}
 .pc-section-label{font-size:10px;font-weight:900;color:rgba(255,255,255,.35);text-transform:uppercase;letter-spacing:.15em;padding:20px 0 10px;border-bottom:1px solid rgba(255,255,255,.1);grid-column:1/-1;margin-top:8px}
 .pc-row{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:#111;border:1px solid rgba(255,255,255,.07);grid-column:1/-1;cursor:default}
 .pc-name{font-size:13px;font-weight:700;color:rgba(255,255,255,.6);text-transform:uppercase;letter-spacing:.04em}
-.pc-tag{font-size:9px;font-weight:900;color:rgba(232,255,76,.4);background:rgba(232,255,76,.06);border:1px solid rgba(232,255,76,.12);padding:4px 10px;text-transform:uppercase;letter-spacing:.08em}
 .ev-card{background:#111;border:1px solid rgba(255,255,255,.08);margin-bottom:8px;cursor:pointer;overflow:hidden;position:relative;opacity:0;transform:translateY(20px);transition:opacity .4s ease,transform .4s ease}
 .ev-card.visible{opacity:1;transform:translateY(0)}
 .ev-card:hover{border-color:#ff283b}
@@ -2323,16 +2322,10 @@ body.pf-barra-viva .wa-float{bottom:104px}
 #promo-input{border-radius:var(--r-sm)}
 #w-promo-card button{border-radius:var(--r-btn) !important}
 
-/* Sección "Próximamente · Por confirmar": el contenedor y las etiquetas de
-   artista. Las dos clases (.pc-block y .pc-tag) las agrega renderCatalog —
-   el brief permite agregar clase cuando un chip la necesita, y es mucho más
-   sano que colgarse de selectores [style*=...].
-   Nota: filterEvents ya preguntaba por .pc-block y nunca la encontraba
-   (la consulta que la nombra quedó muerta, sobrescrita en la línea
-   siguiente). Agregarla no cambia el comportamiento: sin clase el bloque
-   caía en la rama "sin data-id", que hace exactamente lo mismo. */
-.pc-block{border-radius:var(--r-card)}
-.pc-tag{border-radius:var(--r-chip)}
+/* [IDX-1] Aquí vivían .pc-block y .pc-tag, del cuadrito de "Por confirmar" que
+   se borró. Sin elemento que las lleve, eran reglas sin dueño.
+   .pc-section-label SÍ sigue viva: es la etiqueta de la sección "Por confirmar"
+   que ahora cierra el listado con los eventos sin fecha. */
 
 
 /* [T5] la dirección de la oficina en el footer. Sin mayúsculas, a diferencia de
@@ -2778,10 +2771,10 @@ var EV=[
   // que NO vienen de Pulso: `noStay` (Pulso sí vende STAY) y `musicList` (Pulso
   // lleva un solo track). El evento llavea al 28 aunque el camión salga el 26.
   {id:'tecatecomuna',added:'2026-05-15',musicList:['2657834','13272449','2309096','10247032','134951614'],lineup:'comuna',promoModal:{emoji:'🗺️',title:'Tu itinerario de viaje',desc:'📅 26 DE NOVIEMBRE\n🚌 9:00 PM — Salida desde Reynosa\n\n📅 27 DE NOVIEMBRE\n🏙️ 12:00 PM — Llegada a Puebla\n🏨 12:30 PM — Llegada al hotel\n✨ 12:30-3:00 PM — Tiempo libre\n🔑 3:00-5:00 PM — Entrega de habitaciones\n✨ Resto del día libre\n\n📅 28 DE NOVIEMBRE\n🎵 12:00 PM — Foro Cholula\n🎶 ¡Disfruta el Festival Tecate Comuna!\n\n📅 29 DE NOVIEMBRE\n🚌 2:00-3:00 AM — Reunión, abordaje y salida\n🏠 3:00 PM — Llegada a Reynosa',colors:['#1a0a0d','#111'],btn:'¡YA QUIERO IR! 🎉'},c:'rojo',img:'Tecate Comuna',a:'Tecate Comuna',f:'28 nov 2026',ds:'2026-11-28',v:'Foro Cholula, Puebla',sep:300,sepCheap:300,sepRide:300,ride:4000,noStay:true,st:'',inc:['Boleto zona elegida','Transporte redondo Reynosa-Puebla','Hospedaje (1 noche)','Kit Conecta','Día libre para conocer Puebla'],banco:BANCO_DEFAULT,zonas:[{n:'General',p:5700},{n:'VIP',p:7100,vip:1}],cheapZonas:[{n:'General',p:2700},{n:'VIP',p:4100,vip:1}],hotelOverride:true,hotelPP:true,hotel:[{k:'compartida',n:'Compartida (4)',e:0,pp:0,viaj:[1,2,3,4],desc:'Compartes cuarto con otros viajeros'},{k:'triple',n:'Triple',e:250,pp:250,viaj:[3],desc:'Tu parte del cuarto triple'},{k:'doble',n:'Doble',e:725,pp:725,viaj:[2],desc:'Tu parte del cuarto doble'},{k:'individual',n:'Individual',e:2175,pp:2175,viaj:[1],desc:'Cuarto solo para ti'}],pagos:[{l:'Separo',d:'Hoy',s:1}]},
-  {id:'badbunny',added:'2026-05-15',music:'1741494317',c:'azul',img:'Bad Bunny',a:'Bad Bunny',f:'dic 2026',ds:'2026-12-01',v:'Estadio BBVA, Mty',st:'proximamente',inc:[],banco:BANCO_DEFAULT,zonas:[],hotel:[],pagos:[]},
+  {id:'badbunny',added:'2026-05-15',music:'1741494317',c:'azul',img:'Bad Bunny',a:'Bad Bunny',f:'Por confirmar',ds:'',v:'Estadio BBVA, Mty',st:'proximamente',inc:[],banco:BANCO_DEFAULT,zonas:[],hotel:[],pagos:[]},
   {id:'wwemexico',deporte:1,added:'2026-06-02',music:'94366080',c:'rojo',img:'WWE Mexico Live Tour',a:'WWE Mexico Live Tour',f:'10 sep 2026',ds:'2026-09-10',v:'Arena Monterrey, Mty',sep:500,sepCheap:1000,ride:2700,st:'',inc:['Boleto zona elegida','Transporte Reynosa-Mty','Hospedaje compartido','Kit Conecta'],banco:BANCO_DEFAULT,zonas:[{n:'VIP 1 - WWE Ultimate',p:32600,ag:1},{n:'VIP 2 - WWE 360 Superstar',p:27800,ag:1},{n:'VIP 3 - WWE Rampwalk',p:17500,ag:1},{n:'Platino',p:15400,ag:1},{n:'VIP 4 - WWE Superfan',p:14700,ag:1},{n:'VIP 5 - WWE Premium',p:12600,ag:1},{n:'Ring Side',p:11300,ag:1},{n:'Cancha',p:9900,ag:1},{n:'Retráctil Platino',p:8500,ag:1},{n:'Retráctil Oro',p:7800,ag:1},{n:'Barrera',p:7100,ag:1},{n:'Coke Studio',p:7100,ag:1},{n:'Doritos',p:7100,ag:1},{n:'McCormick',p:7100,ag:1},{n:'Osel',p:7100,ag:1},{n:'Superpalco',p:6400,ag:1},{n:'Banco Azteca',p:5700},{n:'Butaca',p:5700,ag:1},{n:'Megacable',p:5700,ag:1},{n:'Plus Ultra',p:5700,ag:1},{n:'Preferente',p:5000,ag:1},{n:'Luneta',p:4300},{n:'Balcón',p:3900,ag:1}],cheapZonas:[{n:'VIP 1 - WWE Ultimate',p:30800,ag:1},{n:'VIP 2 - WWE 360 Superstar',p:26000,ag:1},{n:'VIP 3 - WWE Rampwalk',p:15700,ag:1},{n:'Platino',p:13600,ag:1},{n:'VIP 4 - WWE Superfan',p:12900,ag:1},{n:'VIP 5 - WWE Premium',p:10800,ag:1},{n:'Ring Side',p:9500,ag:1},{n:'Cancha',p:8100,ag:1},{n:'Retráctil Platino',p:6700,ag:1},{n:'Retráctil Oro',p:6000,ag:1},{n:'Barrera',p:5300,ag:1},{n:'Coke Studio',p:5300,ag:1},{n:'Doritos',p:5300,ag:1},{n:'McCormick',p:5300,ag:1},{n:'Osel',p:5300,ag:1},{n:'Superpalco',p:4600,ag:1},{n:'Banco Azteca',p:3900},{n:'Butaca',p:3900,ag:1},{n:'Megacable',p:3900,ag:1},{n:'Plus Ultra',p:3900,ag:1},{n:'Preferente',p:3200,ag:1},{n:'Luneta',p:2500},{n:'Balcón',p:2100}],pagos:[{l:'Separo',d:'Hoy',s:1},{l:'Pago 1',d:'9-16 jun',s:0},{l:'Pago 2',d:'24 jun-1 jul',s:0},{l:'Pago 3',d:'9-16 jul',s:0},{l:'Pago 4',d:'24 jul-1 ago',s:0},{l:'Pago final',d:'24 ago-1 sep',s:0}]},
   {id:'alvarodiaz',added:'2026-06-08',music:'4036825081',c:'rosa',img:'Álvaro Díaz',a:'Álvaro Díaz - Omakase Tour',f:'3 y 4 oct 2026',ds:'2026-10-03',dsList:['2026-10-03','2026-10-04'],v:'Auditorio Banamex, Mty',mapa:'alvarodiaz',sep:300,sepCheap:500,ride:2700,st:'',inc:['Boleto zona elegida','Transporte Reynosa-Mty','Hospedaje compartido','Kit Conecta'],banco:BANCO_DEFAULT,multifecha:[{lbl:'3 Octubre',zonas:[{n:'Platinum',p:5700,vip:1},{n:'Platinum B',p:5300,vip:1,ag:1},{n:'Beyond',p:4900,ag:1},{n:'Perfiles',p:4600},{n:'Perfiles B',p:4100,ag:1},{n:'Perfiles C',p:3900,ag:1}],cheapZonas:[{n:'Platinum',p:4000,vip:1},{n:'Platinum B',p:3600,vip:1,ag:1},{n:'Beyond',p:3200,ag:1},{n:'Perfiles',p:2900},{n:'Perfiles B',p:2400,ag:1},{n:'Perfiles C',p:2200,ag:1}]},{lbl:'4 Octubre',zonas:[{n:'Platinum',p:5700,vip:1,ag:1},{n:'Platinum B',p:5300,vip:1,ag:1},{n:'Beyond',p:4900},{n:'Perfiles',p:4600,ag:1},{n:'Perfiles B',p:4100,ag:1},{n:'Perfiles C',p:3900,ag:1}],cheapZonas:[{n:'Platinum',p:4000,vip:1,ag:1},{n:'Platinum B',p:3600,vip:1,ag:1},{n:'Beyond',p:3200},{n:'Perfiles',p:2900,ag:1},{n:'Perfiles B',p:2400,ag:1},{n:'Perfiles C',p:2200,ag:1}]}],zonas:[{n:'Platinum',p:5700,vip:1},{n:'Platinum B',p:5300,vip:1,ag:1},{n:'Beyond',p:4900},{n:'Perfiles',p:4600},{n:'Perfiles B',p:4100,ag:1},{n:'Perfiles C',p:3900,ag:1}],cheapZonas:[{n:'Platinum',p:4000,vip:1},{n:'Platinum B',p:3600,vip:1,ag:1},{n:'Beyond',p:3200},{n:'Perfiles',p:2900},{n:'Perfiles B',p:2400,ag:1},{n:'Perfiles C',p:2200,ag:1}],pagos:[{l:'Separo',d:'Hoy',s:1}]},
-  {id:'bahidora2027',added:'2026-05-15',music:'103052662',c:'azul',img:'Bahidora',a:'Bahidora 2027',f:'feb 2027',ds:'2027-02-01',v:'Las Estacas, Morelos',st:'proximamente',inc:[],banco:BANCO_DEFAULT,zonas:[],hotel:[],pagos:[]},
+  {id:'bahidora2027',added:'2026-05-15',music:'103052662',c:'azul',img:'Bahidora',a:'Bahidora 2027',f:'Por confirmar',ds:'',v:'Las Estacas, Morelos',st:'proximamente',inc:[],banco:BANCO_DEFAULT,zonas:[],hotel:[],pagos:[]},
   {id:'juniorh',added:'2026-05-25',music:'2473525031',mapa:'juniorh',c:'rojo',img:'Junior H',a:'Junior H',f:'13 feb 2027',ds:'2027-02-13',v:'Estadio Walmart Park, MTY',sep:500,sepCheap:800,ride:2700,st:'',banco:BANCO_DEFAULT,zonas:[{n:'Mesas Rockstar',p:7600,vip:1,requiereViajeros:4},{n:'1er Nivel 1ra Base',p:5500,ag:1},{n:'1er Nivel 3ra Base',p:5500,ag:1},{n:'Sad Boyz Zone',p:5300,vip:1},{n:'1er Nivel Central',p:4900,ag:1},{n:'2do Nivel Central',p:4900,ag:1},{n:'2do Nivel 1ra Base',p:4600,ag:1},{n:'2do Nivel 3ra Base',p:4600,ag:1},{n:'General',p:4200,ag:1},{n:'3er Nivel 1ra Base',p:4100},{n:'3er Nivel 3ra Base',p:4100},{n:'Jardín Derecho',p:3900,ag:1},{n:'Jardín Izquierdo',p:3900,ag:1},{n:'3er Nivel Central',p:3800}],cheapZonas:[{n:'Mesas Rockstar',p:5900,vip:1,requiereViajeros:4},{n:'1er Nivel 1ra Base',p:3800,ag:1},{n:'1er Nivel 3ra Base',p:3800,ag:1},{n:'Sad Boyz Zone',p:3600,vip:1},{n:'1er Nivel Central',p:3300,ag:1},{n:'2do Nivel Central',p:3300,ag:1},{n:'2do Nivel 1ra Base',p:2900,ag:1},{n:'2do Nivel 3ra Base',p:2900,ag:1},{n:'General',p:2500,ag:1},{n:'3er Nivel 1ra Base',p:2400},{n:'3er Nivel 3ra Base',p:2400},{n:'Jardín Derecho',p:2200,ag:1},{n:'Jardín Izquierdo',p:2200,ag:1},{n:'3er Nivel Central',p:2100}],hotel:[{k:'compartida',n:'Compartida (4)',e:0,pp:0,viaj:[4],desc:'Compartes cuarto con otros viajeros'},{k:'triple',n:'Triple',e:250,pp:250,viaj:[3],desc:'Tu parte del cuarto triple'},{k:'doble',n:'Doble',e:650,pp:650,viaj:[2],desc:'Tu parte del cuarto doble'},{k:'individual',n:'Individual',e:1960,pp:1960,viaj:[1],desc:'Cuarto solo para ti'}],pagos:[{l:'Separo',d:'Hoy',s:1}]},
   {id:'louist',added:'2026-05-25',music:'3806386932',mapa:'louistomlinson',cdmx:true,c:'azul',img:'Louis Tomlinson',a:'Louis Tomlinson - How Did We Get Here? Tour',f:'10 abr 2027',ds:'2027-04-10',v:'Estadio GNP, CDMX',sep:1000,sepCheap:1000,ride:2900,noStay:true,st:'',banco:BANCO_DEFAULT,zonas:[{n:'Platino',p:0,vip:1,ag:1},{n:'Diamante',p:9000,vip:1,ag:1},{n:'Gold',p:8400,vip:1},{n:'Zona GNP',p:7600,ag:1},{n:'Silver',p:7600,ag:1},{n:'Bronce',p:6900},{n:'Verde B',p:6500},{n:'Naranja B',p:5800},{n:'Verde C',p:5100,ag:1},{n:'General B',p:4600},{n:'Naranja C',p:4500,ag:1}],cheapZonas:[{n:'Platino',p:0,vip:1,ag:1},{n:'Diamante',p:7100,vip:1,ag:1},{n:'Gold',p:6500,vip:1},{n:'Zona GNP',p:5700,ag:1},{n:'Silver',p:5700,ag:1},{n:'Bronce',p:5000},{n:'Verde B',p:4600},{n:'Naranja B',p:3900},{n:'Verde C',p:3200,ag:1},{n:'General B',p:2700},{n:'Naranja C',p:2600,ag:1}],hotel:[{k:'compartida',n:'Compartida (4)',e:0,pp:0,viaj:[4],desc:'Compartes cuarto con otros viajeros'},{k:'triple',n:'Triple',e:300,pp:300,viaj:[3],desc:'Tu parte del cuarto triple'},{k:'doble',n:'Doble',e:800,pp:800,viaj:[2],desc:'Tu parte del cuarto doble'},{k:'individual',n:'Individual',e:2400,pp:2400,viaj:[1],desc:'Cuarto solo para ti'}],pagos:[{l:'Separo',d:'Hoy',s:1}]},
   {id:'trueno',mapa:'trueno',c:'azul',img:'Trueno',a:'Trueno',f:'26 nov 2026',ds:'2026-11-26',v:'Auditorio Banamex, MTY',sep:300,ride:2700,st:'',inc:['Boleto zona elegida','Transporte Reynosa-Mty','Hospedaje compartido','Kit Conecta'],banco:BANCO_DEFAULT,flashPromo:{code:'TRUENO',pct:5,expiresHours:24,expiresTs:Date.parse('2026-05-22T20:00:00-06:00'),excludePkg:['ride','stay','cheap'],onlyEvent:'trueno'},zonas:[{n:'Beyond General',p:4450},{n:'Platino',p:5250,vip:1},{n:'Platino B',p:4700},{n:'Platino C',p:4150,ag:1},{n:'Perfil A',p:4050},{n:'Perfil B',p:3900,ag:1},{n:'Perfil C',p:3650,ag:1},{n:'Perfil D',p:3800,ag:1}],cheapZonas:[{n:'Beyond General',p:2650},{n:'Platino',p:3450,vip:1},{n:'Platino B',p:2900},{n:'Platino C',p:2350,ag:1},{n:'Perfil A',p:2250},{n:'Perfil B',p:2100,ag:1},{n:'Perfil C',p:1850,ag:1},{n:'Perfil D',p:2000,ag:1}],hotel:[{n:'Compartida',e:0},{n:'Doble',e:650},{n:'Triple',e:250},{n:'Individual',e:1960}],pagos:[{l:'Separo',d:'Hoy',s:1}]}];
@@ -2926,20 +2919,28 @@ function renderCatalog(){
   list.innerHTML='';
   var mesActual='';
   var _priorityCount=0;  // primeras 3 cards upcoming reciben fetchpriority="high"
-  var normalEvs=EV.filter(function(e){return!e.listOnly;}).sort(function(a,b){return(a.ds||'').localeCompare(b.ds||'');});
+  // [IDX-1] LOS SIN FECHA VAN AL FINAL. Antes el orden era localeCompare sobre
+  // (a.ds||''), y la cadena vacía ordena ANTES que cualquier fecha: los
+  // "Por confirmar" abrían el listado. Se les da una clave que ordena después de
+  // todo, sin tocar el orden interno de los que sí tienen fecha.
+  var _clave=function(e){return e.ds?e.ds:'9999-99-99';};
+  var normalEvs=EV.filter(function(e){return!e.listOnly;}).sort(function(a,b){return _clave(a).localeCompare(_clave(b));});
   var listOnlyEvs=EV.filter(function(e){return e.listOnly;});
   var allEvs=normalEvs.concat(listOnlyEvs);
   for(var i=0;i<allEvs.length;i++){
     var ev=allEvs[i];
     var mes=ev.ds.substring(5,7);
     var anio=ev.ds.substring(0,4);
-    var mk=anio+'-'+mes;
+    // [IDX-1] Los sin fecha son su PROPIA sección, al final y con nombre. Antes
+    // caían en el grupo '-' y su etiqueta salía EN BLANCO —(MESES['']||'')+' '+''—
+    // porque nadie había mirado qué texto producían.
+    var sinFecha=!ev.ds;
+    var mk=sinFecha?'__sin-fecha__':(anio+'-'+mes);
     if(mk!==mesActual){
       mesActual=mk;
       var lbl=document.createElement('div');
-      var isPC=(anio==='2027'&&mes==='12');
-      lbl.className=isPC?'pc-section-label':'mes-label';
-      lbl.textContent=(MESES[mes]||mes)+' '+anio;  // pc handled separately
+      lbl.className=sinFecha?'pc-section-label':'mes-label';
+      lbl.textContent=sinFecha?'Por confirmar':((MESES[mes]||mes)+' '+anio);
       list.appendChild(lbl);
     }
     if(ev.listOnly){continue;}  // handled separately below
@@ -3058,18 +3059,12 @@ function renderCatalog(){
       })(card,ev.img);
     }
   }
-  // ── Por confirmar single block ─────────────────────────────────────────
-  var pcBlock=document.createElement('div');
-  pcBlock.className='pc-block';  // [PF-4] clase para el redondeo (ver bloque PF-4)
-  pcBlock.style.cssText='grid-column:1/-1;background:#111;border:1px solid rgba(255,255,255,.09);padding:20px 20px 18px;margin-top:4px';
-  var pcHTML='<div style="font-size:9px;font-weight:900;color:rgba(255,255,255,.3);text-transform:uppercase;letter-spacing:.15em;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid rgba(255,255,255,.07)">Próximamente · Por confirmar</div>';
-  pcHTML+='<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px">';
-  for(var _pi=0;_pi<PC_EVENTS.length;_pi++){
-    pcHTML+='<span class="pc-tag" style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);color:rgba(255,255,255,.5);font-size:10px;font-weight:700;padding:4px 10px;text-transform:uppercase;letter-spacing:.04em;font-family:Montserrat,sans-serif">'+PC_EVENTS[_pi]+'</span>';
-  }
-  pcHTML+='</div><a href="https://whatsapp.com/channel/0029Vb7JuO1IN9ipDaGVV92f" target="_blank" style="display:inline-flex;align-items:center;gap:7px;background:#25D366;color:#fff;font-size:10px;font-weight:900;padding:9px 18px;text-decoration:none;text-transform:uppercase;letter-spacing:.08em;font-family:Montserrat,sans-serif;border-radius:2px"><svg class="ic"><use href="#ic-campana"/></svg> Recibir notificaciones</a>';
-  pcBlock.innerHTML=pcHTML;
-  list.appendChild(pcBlock);
+  // [IDX-1] El cuadrito de "Por confirmar" (15 artistas + enlace al canal) se
+  // BORRÓ, no se escondió. Medido antes de quitarlo: los .pc-tag eran <span>
+  // SIN enlace —ninguna waitlist que rescatar— y el canal de WhatsApp aparece
+  // otras 3 veces en el index, así que no era la única puerta.
+  // Y quitaba un duplicado: PC_EVENTS listaba "Bad Bunny" y "Bahidora 2027",
+  // que ahora tienen tarjeta propia en la sección Por confirmar de arriba.
 }
 
 
@@ -3314,7 +3309,6 @@ function validarPromo(code){
   }
   return {ok:true,pct:p.pct||0,pctCheap:p.pctCheap||0,amount:p.amount||0,desc:p.desc,customMsg:p.customMsg||null,code:c,excludePkg:p.excludePkg||null,onlyZones:p.onlyZones||null,excludeZones:p.excludeZones||null,hideAmount:p.hideAmount||false,segundoPax:p.segundoPax||null,exactPersonas:p.exactPersonas||0};
 }
-var PC_EVENTS=["Justin Bieber", "Bad Bunny", "Sabrina Carpenter", "U2", "Festival Trópico", "Bahidora 2027", "Coldplay", "The Rolling Stones", "Tool", "Slipknot", "Luis Miguel", "Metallica", "Feid / Ferxxo", "Evanescence", "Marilyn Manson"];
 
 var _activeFilter='all';
 var _top10Ids=[];
@@ -3513,8 +3507,10 @@ function _searchNorm(s){return(s||'').toLowerCase().normalize('NFD').replace(/[\
 function filterEvents(){
   var q=_searchNorm(document.getElementById('ev-search').value||'');
   var f=_activeFilter;
-  var cards=document.querySelectorAll('#ev-list .ev-card, #ev-list .mes-label, #ev-list .pc-block');
-  // We need to re-render filtered — easier to show/hide cards
+  // [IDX-1] Aquí había una `var cards` que consultaba '.ev-card, .mes-label,
+  // .pc-block' y quedaba SOBRESCRITA por la línea de abajo — ya estaba muerta
+  // antes de esta tuerca (lo decía el comentario del CSS), y ahora además
+  // nombraba una clase que ya no existe. Se va la declaración, no el barrido.
   var cards=document.querySelectorAll('#ev-list > *');
   for(var i=0;i<cards.length;i++){
     var card=cards[i];

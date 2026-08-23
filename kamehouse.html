@@ -1646,8 +1646,6 @@
   <nav class="kms-pasos" id="kms-pasos" aria-label="Pasos del Palacio">
    <button type="button" class="kms-paso" data-paso="prov" onclick="_kmsPaso('prov')" aria-current="true"><span class="kms-paso-n">1</span><span class="kms-paso-t">Proveedores</span></button>
    <button type="button" class="kms-paso" data-paso="compras" onclick="_kmsPaso('compras')"><span class="kms-paso-n">2</span><span class="kms-paso-t">Compras por zona</span></button>
-   <button type="button" class="kms-paso" data-paso="com" onclick="_kmsPaso('com')"><span class="kms-paso-n">3</span><span class="kms-paso-t">Comisiones CHEAP</span></button>
-   <button type="button" class="kms-paso" data-paso="liq" onclick="_kmsPaso('liq')"><span class="kms-paso-n">4</span><span class="kms-paso-t">Liquidaciones</span></button>
   </nav>
 
   <div class="card kms-panel" id="kms-panel-prov">
@@ -1669,32 +1667,6 @@
    </select>
    <div id="kms-vacio-compras" class="kms-vacio">Elige un evento arriba para ver y capturar sus compras.</div>
    <div id="kam-compras"></div>
-  </div>
-  <div class="card kms-panel" id="kms-panel-com" style="display:none">
-   <div class="kms-panel-h"><span class="kms-panel-n">3</span><div><div class="kms-panel-t">Comisiones CHEAP (vendedores)</div><div class="kms-panel-d">Cuánto ganas tú en cada zona CHEAP. Sin ganancia asignada, la zona no se vende.</div></div></div>
-   <div style="font-size:11px;color:var(--ts);margin-bottom:14px">Ves TODAS sus zonas CHEAP en una tabla: stock, costo de Palacio (tu última compra, automático) y <b>TU GANANCIA</b> — lo único que escribes. El costo del vendedor se suma en vivo y con <b>💾 Guardar todo</b> queda. La matriz guardada <b>no se mueve sola</b>: si tu última compra difiere, la fila te avisa y tú decides. Sin ganancia asignada, la zona NO se vende en CHEAP. El vendedor jamás ve este desglose.</div>
-   <!-- [KMS-1] Selectores ORIGINALES, ocultos: los escribe el mando único.
-        `kam-com-fecha` NO se toca ni se le quita el display:none inicial —
-        _comEventoId compone 'slug#idx' leyendo justo ese style.display, así
-        que sigue siendo _comOnEvento quien lo enciende. -->
-   <select id="kam-com-evt" class="cot-input" style="display:none" onchange="_comOnEvento()">
-    <option value="">— Elige un evento —</option>
-   </select>
-   <select id="kam-com-fecha" class="cot-input" style="width:100%;margin-bottom:12px;display:none" onchange="_comLoad()"></select>
-   <div id="kms-vacio-com" class="kms-vacio">Elige un evento arriba para ver sus zonas CHEAP.</div>
-   <div id="kam-com-alert" style="margin-bottom:10px"></div>
-   <div id="kam-com-body"></div>
-  </div>
-  <div class="card kms-panel" id="kms-panel-liq" style="display:none">
-   <div class="kms-panel-h"><span class="kms-panel-n">4</span><div><div class="kms-panel-t">Liquidaciones de vendedores (30%)</div><div class="kms-panel-d">Al cerrar el evento: cuánto le toca a cada vendedor y marcarle pagado.</div></div></div>
-   <div style="font-size:11px;color:var(--ts);margin-bottom:14px">Cierre <b>MANUAL</b> al terminar el evento. Comisión = <b>30% × (caja real del evento ÷ total de paquetes vendidos en todos los canales) × paquetes PLUS/STAY/RIDE de cada vendedor</b>. La <b>utilidad es la CAJA real</b> (cobrado + ingresos − gastos), la misma del Palacio. Los CHEAP del vendedor quedan <b>fuera</b> (ya pagaron su comisión-separo). Al liquidar, el cálculo se <b>congela</b> (no se recalcula solo si la caja cambia después).</div>
-   <!-- [KMS-1] Selector ORIGINAL, oculto: lo escribe el mando único. -->
-   <select id="kam-liq-evt" class="cot-input" style="display:none" onchange="_liqOnEvento()">
-    <option value="">— Elige un evento —</option>
-   </select>
-   <div id="kms-vacio-liq" class="kms-vacio">Elige un evento arriba para calcular sus liquidaciones.</div>
-   <div id="kam-liq-alert" style="margin-bottom:10px"></div>
-   <div id="kam-liq-body"></div>
   </div>
  </div><!-- /page-kamisama -->
 

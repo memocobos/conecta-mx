@@ -7626,12 +7626,10 @@ document.addEventListener('keydown', e => {
 // (admin-compras). loadKamisama() se invoca desde loadPage().
 function loadKamisama() {
   _kamProveedoresLoad();
-  // Los tres populate SIGUEN corriendo: llenan los selectores originales (hoy
-  // ocultos) y un <select> no acepta un .value que no exista entre sus
-  // <option>. Sin ellos, el espejo del mando único no pegaría.
+  // [VEN-BORRA-1c] Queda UN populate. Llena el selector original (hoy oculto),
+  // y un <select> no acepta un .value que no exista entre sus <option>: sin él
+  // el mando no pegaría. Los otros dos se fueron con Comisiones y Liquidaciones.
   _kamPopulateEventos();
-  _comPopulateEventos();
-  _liqPopulateEventos();
   _kmsPopulate();
   _kmsPaso(_kmsPasoActivo);
   _kmsVacios();
@@ -7703,10 +7701,10 @@ function _kmsPintaOpciones() {
 }
 function _kmsBuscarEvento() { _kmsPintaOpciones(); }
 
-// Espejo de _comOnEvento para la lista de fechas: la multifecha se lee del
-// MISMO EV, así que el índice que elige Memo aquí es el mismo que compone
-// 'slug#idx' allá. Si se poblara distinto, el evento_id del Palacio y el del
-// cotizador del vendedor dejarían de coincidir — y eso es dinero.
+// La lista de fechas se lee del MISMO EV que el resto del Palacio, así que el
+// 'slug#idx' que compone aquí es el mismo que compone Compras. Si se poblara
+// distinto, dos partes del Palacio hablarían de eventos distintos — y eso es
+// dinero.
 function _kmsOnEvento() {
   const id = (document.getElementById('kms-evt') || {}).value || '';
   const fsel = document.getElementById('kms-fecha');
@@ -7736,10 +7734,12 @@ function _kmsAplicar() {
   const fsel = document.getElementById('kms-fecha');
   const idx = (fsel && fsel.style.display !== 'none' && fsel.value !== '') ? fsel.value : '';
 
-  const poner = (elId, v) => { const e = document.getElementById(elId); if (e) e.value = v; };
-  poner('kam-evt-sel', id);
-  poner('kam-com-evt', id);
-  poner('kam-liq-evt', id);
+  // [VEN-BORRA-1c] El "espejo" de KMS-1 escribía en TRES selectores; quedan
+  // Compras y su selector. Un espejo de uno ya no es un espejo, pero se
+  // conserva la escritura POR VALOR: es lo que hace que el reorden de ORD-1 le
+  // dé igual, y lo que se rompería si alguien lo cambiara por selectedIndex.
+  const e = document.getElementById('kam-evt-sel');
+  if (e) e.value = id;
 
   _kmsVacios();
   _kmsTableroLimpiar();
@@ -7748,21 +7748,12 @@ function _kmsAplicar() {
   if (typeof _kmsCuentaCargar === 'function') { try { _kmsCuentaCargar(); } catch (_) {} }
   if (!id) {
     // Sin evento: se limpian los cuerpos para que no quede el del anterior.
-    ['kam-compras', 'kam-com-body', 'kam-liq-body'].forEach((k) => { const e = document.getElementById(k); if (e) e.innerHTML = ''; });
+    ['kam-compras'].forEach((k) => { const el = document.getElementById(k); if (el) el.innerHTML = ''; });
     return;
   }
 
-  // ② compras (y con ellas el tablero) · ③ comisiones · ④ liquidaciones.
+  // ② compras, y con ellas el tablero.
   _kamComprasLoad();
-  // _comOnEvento arma la lista de fechas de la sección sellada y ya llama a
-  // _comLoad. Después se le espeja el índice: sin esto, un evento multifecha
-  // quedaba siempre en su primera fecha aunque arriba se eligiera otra.
-  _comOnEvento();
-  if (idx !== '') {
-    const cf = document.getElementById('kam-com-fecha');
-    if (cf && cf.style.display !== 'none') { cf.value = idx; _comLoad(); }
-  }
-  _liqOnEvento();
 }
 
 // Estado vacío de cada sección — claro y en su lugar.
@@ -7782,7 +7773,7 @@ function _kmsPaso(paso) {
     // ve y lo que anuncia un lector de pantalla no pueden divergir.
     if (act) b.setAttribute('aria-current', 'true'); else b.removeAttribute('aria-current');
   });
-  ['prov', 'compras', 'com', 'liq'].forEach((k) => {
+  ['prov', 'compras'].forEach((k) => {
     const p = document.getElementById('kms-panel-' + k);
     if (p) p.style.display = (k === paso) ? '' : 'none';
   });
@@ -8507,46 +8498,6 @@ async function _kamPopulateEventos() {
 // El evento_id que se guarda/consulta DEBE ser idéntico al que usa el vendedor al
 // cotizar (_vtaEventoId): 'slug' o 'slug#idx' para multifecha. Por eso el selector
 // espeja esa lógica (evento + fecha).
-let _comEVCache = [];   // EV crudo del index (para leer multifecha)
-let _comZonas = [];     // último `listar` (index de fila → zona)
-function _comEsc(s) { return _esfEsc(s); }
-function _comFmt(n) { return '$' + Math.round(Number(n) || 0).toLocaleString('es-MX'); }
-function _comAlert(m, err) { const a = document.getElementById('kam-com-alert'); if (a) a.innerHTML = m ? `<div class="alert ${err ? 'alert-error' : 'alert-success'}">${_comEsc(m)}</div>` : ''; }
-
-async function _comPopulateEventos() {
-  const sel = document.getElementById('kam-com-evt');
-  if (!sel) return;
-  try {
-    const ev = await _fetchEVFromIndex();
-    _comEVCache = Array.isArray(ev) ? ev : [];
-      // [ORD-1] Por FECHA, con la regla compartida. Antes iba por NOMBRE.
-    const opts = _evOrdenarPorFecha(_comEVCache.filter((e) => e && e.id))
-      .map((e) => `<option value="${_comEsc(e.id)}">${_comEsc(e.a || e.id)}</option>`)
-      .join('');
-    sel.innerHTML = '<option value="">— Elige un evento —</option>' + opts;
-  } catch (_) { /* deja el placeholder */ }
-}
-
-function _comOnEvento() {
-  const ev = _comEVCache.find((e) => e && e.id === document.getElementById('kam-com-evt').value);
-  const fsel = document.getElementById('kam-com-fecha');
-  fsel.innerHTML = '';
-  if (ev && Array.isArray(ev.multifecha) && ev.multifecha.length) {
-    ev.multifecha.forEach((m, i) => { const o = document.createElement('option'); o.value = String(i); o.textContent = (m && m.lbl) ? m.lbl : ('Fecha ' + (i + 1)); fsel.appendChild(o); });
-    fsel.style.display = '';
-  } else { fsel.style.display = 'none'; }
-  _comLoad();
-}
-
-// evento_id compuesto — MISMO formato que _vtaEventoId del cotizador del vendedor.
-function _comEventoId() {
-  const id = document.getElementById('kam-com-evt').value;
-  if (!id) return '';
-  const fsel = document.getElementById('kam-com-fecha');
-  if (fsel && fsel.style.display !== 'none' && fsel.value !== '') return id + '#' + fsel.value;
-  return id;
-}
-
 // Fecha relativa corta para frescura ("hace 3 h", "hace 2 días"). '' si inválida.
 function _khHaceRel(iso) {
   const t = Date.parse(iso || '');
@@ -8559,243 +8510,11 @@ function _khHaceRel(iso) {
   return 'hace ' + d + (d === 1 ? ' día' : ' días');
 }
 
-// Tabla única WIZARD: veo todo → escribo MI GANANCIA → 💾 Guardar todo.
-// La matriz se pinta AUTO (última compra) en zonas nuevas y GUARDADA en las
-// configuradas — jamás se auto-mueve: si la última compra difiere, la fila
-// avisa con chip + botón "actualizar matriz" (pre-llena; Memo confirma al
-// guardar). La matriz sigue editable a mano ("editar").
-async function _comLoad() {
-  const body = document.getElementById('kam-com-body');
-  if (!body) return;
-  _comAlert('');
-  const eid = _comEventoId();
-  if (!eid) { body.innerHTML = ''; return; }
-  body.innerHTML = '<div class="loading-state"><div class="spinner"></div>Cargando…</div>';
-  try {
-    const r = await khAdminFetch('/.netlify/functions/admin-comisiones-zona', { method: 'POST', body: JSON.stringify({ accion: 'listar', evento_id: eid }) });
-    const j = await r.json().catch(() => ({}));
-    if (!r.ok || !j.ok) throw new Error(j.error || ('Error ' + r.status));
-    _comZonas = Array.isArray(j.zonas) ? j.zonas : [];
-    if (!_comZonas.length) { body.innerHTML = '<div class="empty-state"><div class="empty-icon"></div>Sin zonas CHEAP ni compras para este evento.</div>'; return; }
-    const rows = _comZonas.map((z, i) => {
-      // Matriz que se pinta: la GUARDADA si existe (no se auto-mueve); si no, AUTO = última compra.
-      const matrizVal = z.configurada ? (z.costo_matriz != null ? z.costo_matriz : '') : (z.sugerencia_matriz != null ? z.sugerencia_matriz : '');
-      const ganVal = (z.configurada && z.comision != null) ? z.comision : '';
-      z._origM = String(matrizVal); z._origG = String(ganVal); // baseline para "solo filas modificadas"
-      const stockTxt = z.agotada
-        ? '<span style="color:var(--red);font-weight:700">AGOTADA</span>'
-        : (z.stock != null ? z.stock + ' disp.' : '—');
-      const matrizNota = z.configurada ? 'matriz guardada' : (z.sugerencia_matriz != null ? 'AUTO · tu última compra' : 'sin compras');
-      // Control de mercado: la matriz guardada no se mueve sola. Divergencia → chip.
-      const diverge = z.configurada && z.sugerencia_matriz != null && Number(z.sugerencia_matriz) !== Number(z.costo_matriz);
-      const chip = diverge
-        ? `<div style="margin-top:4px;font-size:10px;color:var(--orange);font-weight:700">tu última compra: ${_comFmt(z.sugerencia_matriz)} ≠ matriz guardada ${_comFmt(z.costo_matriz)} <button class="btn btn-ghost btn-sm" type="button" style="font-size:10px;padding:1px 6px" onclick="_comUsarUltimaCompra(${i})">actualizar matriz</button></div>`
-        : '';
-      const badge = z.configurada
-        ? '<span style="font-size:10px;color:var(--green);font-weight:700">✓ configurada</span>'
-        : '<span style="font-size:10px;color:var(--orange);font-weight:700">pendiente</span>';
-      return `<tr style="border-top:1px solid var(--border)">
-        <td style="padding:8px 4px;font-size:13px"><b>${_comEsc(z.zona)}</b><br>${badge}</td>
-        <td style="padding:8px 4px;font-size:12px">${stockTxt}</td>
-        <td style="padding:8px 4px"><input type="number" min="0" id="com-m-${i}" class="cot-input" style="width:100px" value="${matrizVal}" readonly oninput="_comCalcFila(${i})"> <button class="btn btn-ghost btn-sm" type="button" style="font-size:10px;padding:1px 6px" onclick="_comEditarMatriz(${i})">editar</button><br><span style="font-size:10px;color:var(--ts)">${matrizNota}</span>${chip}</td>
-        <td style="padding:8px 4px"><input type="number" min="0" id="com-g-${i}" class="cot-input" style="width:100px" value="${ganVal}" placeholder="tu ganancia" oninput="_comCalcFila(${i})"></td>
-        <td style="padding:8px 4px;text-align:right;font-size:13px"><b><span id="com-t-${i}">—</span></b><br><span style="font-size:10px;color:var(--ts)">costo vendedor</span></td>
-      </tr>`;
-    }).join('');
-    body.innerHTML = `<table style="width:100%;border-collapse:collapse"><thead><tr style="font-size:10px;color:var(--ts);text-transform:uppercase;letter-spacing:.08em"><th style="text-align:left;padding:4px">Zona</th><th style="text-align:left;padding:4px">Stock</th><th style="text-align:left;padding:4px">Costo Palacio</th><th style="text-align:left;padding:4px">Tu ganancia</th><th style="text-align:right;padding:4px">Vendedor</th></tr></thead><tbody>${rows}</tbody></table>
-      <div style="display:flex;justify-content:flex-end;align-items:center;gap:10px;margin-top:12px">
-        <span id="com-mod-note" style="font-size:11px;color:var(--ts)"></span>
-        <button class="btn btn-primary" type="button" onclick="_comGuardarTodo()">💾 Guardar todo</button>
-      </div>`;
-    _comZonas.forEach((z, i) => _comCalcFila(i));
-  } catch (e) {
-    body.innerHTML = `<div class="alert alert-error">${_comEsc(e.message)}</div>`;
-  }
-}
-
-// ¿La fila i cambió respecto a lo que pintó el último listar?
-function _comFilaModificada(i) {
-  const z = _comZonas[i];
-  const m = document.getElementById('com-m-' + i), g = document.getElementById('com-g-' + i);
-  if (!z || !m || !g) return false;
-  return String(m.value) !== z._origM || String(g.value) !== z._origG;
-}
-
-// Recalcula el costo del vendedor (matriz+ganancia) EN VIVO para una fila y el
-// contador de filas por guardar. NO guarda nada.
-function _comCalcFila(i) {
-  const mEl = document.getElementById('com-m-' + i), gEl = document.getElementById('com-g-' + i);
-  const out = document.getElementById('com-t-' + i);
-  if (!out) return;
-  const m = Number(mEl?.value), g = Number(gEl?.value);
-  if (mEl && gEl && mEl.value !== '' && gEl.value !== '' && Number.isFinite(m) && Number.isFinite(g)) out.textContent = _comFmt(m + g);
-  else out.textContent = '—';
-  const note = document.getElementById('com-mod-note');
-  if (note) {
-    const n = _comZonas.reduce((acc, _, k) => acc + (_comFilaModificada(k) ? 1 : 0), 0);
-    note.textContent = n ? (n + (n === 1 ? ' fila por guardar' : ' filas por guardar')) : '';
-  }
-}
-
-// Habilita la edición manual de la matriz (Memo puede poner otro número).
-function _comEditarMatriz(i) {
-  const el = document.getElementById('com-m-' + i);
-  if (!el) return;
-  el.readOnly = false;
-  el.focus();
-}
-
-// Chip de divergencia → pre-llena la matriz con la última compra. NO guarda:
-// Memo confirma con 💾 Guardar todo.
-function _comUsarUltimaCompra(i) {
-  const z = _comZonas[i];
-  const el = document.getElementById('com-m-' + i);
-  if (!z || !el || z.sugerencia_matriz == null) return;
-  el.value = z.sugerencia_matriz;
-  _comCalcFila(i);
-}
-
-// 💾 Guarda EN LOTE solo las filas modificadas — cada una por el read-then-write
-// existente del backend (accion 'guardar', jamás on_conflict).
-async function _comGuardarTodo() {
-  const eid = _comEventoId();
-  if (!eid) return _comAlert('Elige un evento', true);
-  const mods = _comZonas.map((z, i) => i).filter(i => _comFilaModificada(i));
-  if (!mods.length) return _comAlert('Nada que guardar — no hay filas modificadas', true);
-  // Validación previa de TODAS las filas modificadas (no guarda a medias por datos malos).
-  for (const i of mods) {
-    const z = _comZonas[i];
-    const m = document.getElementById('com-m-' + i), g = document.getElementById('com-g-' + i);
-    if (!m || m.value === '' || !Number.isFinite(Number(m.value)) || Number(m.value) < 0) return _comAlert('Costo de Palacio inválido en ' + z.zona, true);
-    if (!g || g.value === '' || !Number.isFinite(Number(g.value)) || Number(g.value) < 0) return _comAlert('Ganancia inválida en ' + z.zona, true);
-  }
-  let okN = 0; const errores = [];
-  for (const i of mods) {
-    const z = _comZonas[i];
-    const costo_matriz = Math.round(Number(document.getElementById('com-m-' + i).value));
-    const comision = Math.round(Number(document.getElementById('com-g-' + i).value));
-    try {
-      const r = await khAdminFetch('/.netlify/functions/admin-comisiones-zona', { method: 'POST', body: JSON.stringify({ accion: 'guardar', evento_id: eid, zona: z.zona, costo_matriz, comision }) });
-      const j = await r.json().catch(() => ({}));
-      if (!r.ok || !j.ok) throw new Error(j.error || ('Error ' + r.status));
-      okN++;
-    } catch (e) { errores.push(z.zona + ': ' + e.message); }
-  }
-  // Recargar PRIMERO (refresca baseline/chips) y alertar DESPUÉS: _comLoad
-  // limpia la alerta al arrancar y se comería el resumen del guardado.
-  await _comLoad();
-  if (errores.length) _comAlert(okN + ' guardada(s); fallaron ' + errores.length + ' → ' + errores.join(' · '), true);
-  else _comAlert(okN + (okN === 1 ? ' zona guardada' : ' zonas guardadas') + ' ✓', false);
-}
-
 // ── Liquidaciones de vendedores (F5c — pantalla de Memo, solo maestro_roshi) ──
 // Cierre MANUAL. Todo vive en el mundo SLUG: el evento del catálogo da paquetes,
 // ventas de vendedor Y la caja real (cobrado + ingresos − gastos = utilidad). Se
 // eliminó el puente slug↔uuid del Palacio. Flujo: elegir evento → Previsualizar
 // (sin escribir) → "Cerrar y liquidar" (congela) → Marcar pagada.
-let _liqEVCache = [];        // EV del catálogo (slug + nombre/artista/fecha)
-function _liqFmt(n) { return '$' + Math.round(Number(n) || 0).toLocaleString('es-MX'); }
-function _liqAlert(m, err) { const a = document.getElementById('kam-liq-alert'); if (a) a.innerHTML = m ? `<div class="alert ${err ? 'alert-error' : 'alert-success'}">${_esfEsc(m)}</div>` : ''; }
-
-async function _liqPopulateEventos() {
-  const sel = document.getElementById('kam-liq-evt');
-  if (!sel) return;
-  try {
-    const ev = await _fetchEVFromIndex();
-    _liqEVCache = Array.isArray(ev) ? ev : [];
-      // [ORD-1] Por FECHA, con la regla compartida. Antes iba por NOMBRE.
-    const opts = _evOrdenarPorFecha(_liqEVCache.filter((e) => e && e.id))
-      .map((e) => `<option value="${_esfEsc(e.id)}">${_esfEsc(e.a || e.id)}</option>`)
-      .join('');
-    sel.innerHTML = '<option value="">— Elige un evento —</option>' + opts;
-  } catch (_) { /* deja el placeholder */ }
-}
-
-// Elegir evento → previsualizar directo (la caja real sale del mismo slug).
-function _liqOnEvento() {
-  _liqAlert('');
-  const body = document.getElementById('kam-liq-body');
-  const slug = document.getElementById('kam-liq-evt').value;
-  if (!slug) { if (body) body.innerHTML = ''; return; }
-  _liqPrevisualizar();
-}
-
-async function _liqPrevisualizar() {
-  const body = document.getElementById('kam-liq-body');
-  if (!body) return;
-  _liqAlert('');
-  const slug = document.getElementById('kam-liq-evt').value;
-  if (!slug) { body.innerHTML = ''; return; }
-  body.innerHTML = '<div class="loading-state"><div class="spinner"></div>Calculando…</div>';
-  try {
-    const r = await khAdminFetch('/.netlify/functions/admin-liquidacion', { method: 'POST', body: JSON.stringify({ accion: 'previsualizar', evento_id: slug }) });
-    const j = await r.json().catch(() => ({}));
-    if (!r.ok || !j.ok) throw new Error(j.error || ('Error ' + r.status));
-    _liqRender(j);
-  } catch (e) { body.innerHTML = `<div class="alert alert-error">${_esfEsc(e.message)}</div>`; }
-}
-
-function _liqRender(j) {
-  const body = document.getElementById('kam-liq-body');
-  if (!body) return;
-  const eidS = _esfEsc(j.evento_id);
-  const cajaAviso = (Number(j.utilidad) <= 0) ? `<div class="alert alert-error" style="margin-bottom:10px">⚠️ La caja real del evento es ${_liqFmt(j.utilidad)} (≤ 0). No se puede liquidar el 30% sobre una caja no positiva — espera a cobrar más o revisa gastos/ingresos.</div>` : '';
-  const chip = (txt, color) => `<span style="display:inline-block;font-size:10px;font-weight:700;padding:2px 7px;border-radius:var(--r-sm,8px);color:${color};border:1px solid ${color}55">${txt}</span>`;
-  const filas = (Array.isArray(j.vendedores) && j.vendedores.length)
-    ? j.vendedores.map(v => {
-        const est = v.liquidada ? (v.estado === 'pagada' ? chip('pagada', 'var(--green)') : chip('calculada', 'var(--orange)')) : chip('sin liquidar', 'var(--ts)');
-        const btn = (v.liquidada && v.estado !== 'pagada')
-          ? `<button class="btn btn-ghost btn-sm" style="font-size:11px" onclick="_liqMarcarPagada('${eidS}','${_esfEsc(v.vendedor_id)}')">Marcar pagada</button>` : '';
-        return `<tr style="border-top:1px solid var(--border)">
-          <td style="padding:7px 4px;font-size:13px">${_esfEsc(v.vendedor_nombre)}</td>
-          <td style="padding:7px 4px;text-align:right;font-size:13px">${v.paquetes}</td>
-          <td style="padding:7px 4px;text-align:right;font-size:13px"><b>${_liqFmt(v.comision)}</b></td>
-          <td style="padding:7px 4px;text-align:center">${est}</td>
-          <td style="padding:7px 4px;text-align:right">${btn}</td>
-        </tr>`;
-      }).join('')
-    : '<tr><td colspan="5" style="padding:12px;text-align:center;color:var(--ts);font-size:12px">Sin ventas PLUS/STAY/RIDE de vendedor en este evento</td></tr>';
-  const puedeLiquidar = !j.ya_liquidado && Number(j.utilidad) > 0 && Array.isArray(j.vendedores) && j.vendedores.length;
-  const accion = puedeLiquidar
-    ? `<button class="btn btn-primary" style="margin-top:12px" onclick="_liqLiquidar('${eidS}')">Cerrar y liquidar</button>`
-    : (j.ya_liquidado ? `<div style="margin-top:12px;font-size:11px;color:var(--green)">✓ Evento ya liquidado (cálculo congelado).</div>` : '');
-  // Desglose de la caja real (de dónde sale la utilidad).
-  const cajaBreak = `<div style="font-size:10px;color:var(--ts);margin-bottom:12px">Caja = cobrado ${_liqFmt(j.cobrado)} + ingresos ${_liqFmt(j.ingresos)} − gastos ${_liqFmt(j.gastos)}</div>`;
-  body.innerHTML = `${cajaAviso}
-    <div style="display:flex;gap:18px;flex-wrap:wrap;margin-bottom:6px;font-size:13px">
-      <div><div style="font-size:10px;color:var(--ts);text-transform:uppercase;letter-spacing:.08em">Caja real (utilidad)</div><b style="font-size:16px">${_liqFmt(j.utilidad)}</b></div>
-      <div><div style="font-size:10px;color:var(--ts);text-transform:uppercase;letter-spacing:.08em">Paquetes vendidos</div><b style="font-size:16px">${j.total_paquetes}</b></div>
-      <div><div style="font-size:10px;color:var(--ts);text-transform:uppercase;letter-spacing:.08em">Ganancia / paquete</div><b style="font-size:16px">${_liqFmt(j.ganancia_por_paquete)}</b></div>
-      <div><div style="font-size:10px;color:var(--ts);text-transform:uppercase;letter-spacing:.08em">% comisión</div><b style="font-size:16px">${Math.round((j.pct || 0) * 100)}%</b></div>
-    </div>
-    ${cajaBreak}
-    <table style="width:100%;border-collapse:collapse"><thead><tr style="font-size:10px;color:var(--ts);text-transform:uppercase;letter-spacing:.08em"><th style="text-align:left;padding:4px">Vendedor</th><th style="text-align:right;padding:4px">Paq. PSR</th><th style="text-align:right;padding:4px">Comisión</th><th style="text-align:center;padding:4px">Estado</th><th></th></tr></thead><tbody>${filas}</tbody></table>
-    ${accion}`;
-}
-
-async function _liqLiquidar(slug) {
-  if (!slug) { _liqAlert('Elige un evento.', true); return; }
-  if (!confirm('¿Cerrar y liquidar este evento? El cálculo se CONGELA (si la caja cambia después, NO se recalcula). Se registran las comisiones de los vendedores con la caja real de hoy.')) return;
-  _liqAlert('');
-  try {
-    const r = await khAdminFetch('/.netlify/functions/admin-liquidacion', { method: 'POST', body: JSON.stringify({ accion: 'liquidar', evento_id: slug }) });
-    const d = await r.json().catch(() => ({}));
-    if (!r.ok || !d.ok) throw new Error(d.error || ('Error ' + r.status));
-    _liqAlert('Liquidado: ' + (d.liquidadas || 0) + ' comisión(es) registradas y congeladas.', false);
-    _liqRender(d);
-  } catch (e) { _liqAlert(e.message, true); }
-}
-
-async function _liqMarcarPagada(slug, vendedorId) {
-  try {
-    const r = await khAdminFetch('/.netlify/functions/admin-liquidacion', { method: 'POST', body: JSON.stringify({ accion: 'marcar_pagada', evento_id: slug, vendedor_id: vendedorId }) });
-    const d = await r.json().catch(() => ({}));
-    if (!r.ok || !d.ok) throw new Error(d.error || ('Error ' + r.status));
-    _liqAlert('Comisión marcada como pagada.', false);
-    _liqPrevisualizar();
-  } catch (e) { _liqAlert(e.message, true); }
-}
-
 // Carga y pinta las compras del evento elegido, agrupadas por zona, con stock y
 // deuda por zona y total del evento. Recalcula en cada carga (alta/borrado).
 async function _kamComprasLoad() {

@@ -613,6 +613,14 @@ body.wizard-open{overscroll-behavior:none}
   text-transform:uppercase;letter-spacing:.1em;text-decoration:none;
   font-family:'Montserrat',sans-serif;
   transition:transform .2s ease,box-shadow .2s ease,background .2s ease;
+  /* [LAND-1e] EL RADIO VA EN LA FAMILIA, no en cada botón.
+     El de WhatsApp salió CUADRADO (radio 0 medido) mientras su hermano "Ver
+     eventos" llevaba 12px: dos botones del mismo tamaño, lado a lado, con
+     esquinas distintas. No se inventa un número — se toma --r-btn, el token
+     que la casa ya usa para "botones de interfaz, en todos lados".
+     Puesto aquí, el próximo hermano que se agregue tampoco nace cuadrado:
+     era eso lo que había fallado, no el botón. */
+  border-radius:var(--r-btn,12px);
 }
 .hh-btn-rojo{background:var(--c-rojo);color:#fff}
 .hh-btn-rojo:hover{background:#e01e30;transform:translateY(-2px);box-shadow:0 12px 32px rgba(255,40,59,.4)}
@@ -2525,6 +2533,8 @@ body.pf-barra-viva .wa-float{bottom:104px}
    Solo opacity y transform: nada que remaquete. */
 .wa-float{transition:transform .2s,box-shadow .2s,opacity .2s}
 .wa-float.wa-float-oculto{opacity:0;transform:scale(.8);pointer-events:none}
+/* El radio ya no se declara aquí: lo pone .hh-btn para los dos hermanos.
+   Ver la nota de [LAND-1e] en la familia. */
 .hh-btn-wa{background:var(--c-verde);color:#000;border:none}
 .hh-btn-wa:hover{background:var(--c-verde);color:#000;transform:translateY(-2px);box-shadow:0 14px 36px rgba(0,0,0,.55)}
 

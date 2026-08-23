@@ -3508,3 +3508,41 @@ input[type="search"],.kh-buscar,.buscador{border-radius:var(--r-sm,8px)}
 .res-big .aud-bodega { margin-top: 10px; }
 
 @media (max-width: 900px) { .res-big { padding: 16px; } }
+
+/* ── [RES-4] El Radar dentro del Resumen ──────────────────────────────────── */
+.rdh-card { margin-bottom: 0; padding: 16px 18px; }
+.rdh-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+.rdh-h { font-family: 'Barlow Condensed', sans-serif; font-size: 14px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--ts); }
+.rdh-win { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--ts); }
+.rdh-ver { background: none; border: none; padding: 0; font: inherit; color: var(--orange); cursor: pointer; }
+.rdh-ver:hover { text-decoration: underline; }
+
+.rdh-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(320px, 100%), 1fr)); gap: 18px; align-items: start; }
+.rdh-sub { font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: var(--ts); margin-bottom: 8px; }
+.rdh-vacio { font-size: 12px; color: var(--ts); padding: 10px 0; }
+
+.rdh-row {
+  display: flex; align-items: center; gap: 10px; width: 100%; text-align: left;
+  background: none; border: none; border-bottom: 1px solid var(--border);
+  padding: 8px 2px; color: var(--text); font: inherit; cursor: pointer;
+}
+.rdh-row:hover { background: var(--bg2); }
+.rdh-row:focus-visible { outline: 2px solid var(--orange); outline-offset: -2px; }
+.rdh-pos { flex: none; width: 16px; font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--ts); }
+.rdh-nom { flex: 1 1 auto; min-width: 0; position: relative; font-size: 13px;
+           overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-bottom: 5px; }
+/* La barra vive DEBAJO del nombre, no al lado: con nombres de 40 caracteres
+   una barra en su propia columna deja el nombre en tres letras. */
+.rdh-bar { position: absolute; left: 0; bottom: 0; height: 2px; background: var(--orange); opacity: .55; border-radius: 2px; }
+.rdh-n { flex: none; font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text); font-variant-numeric: tabular-nums; }
+
+.rdh-tabla { width: 100%; border-collapse: collapse; font-size: 12px; }
+.rdh-tabla th { font-family: 'JetBrains Mono', monospace; font-size: 9.5px; letter-spacing: .1em;
+                text-transform: uppercase; color: var(--ts); text-align: left; padding: 0 6px 6px;
+                background: transparent; border: none; font-weight: 600; }
+.rdh-tabla td { padding: 8px 6px; border: none; border-top: 1px solid var(--border); color: var(--text); }
+.rdh-der { text-align: right; font-variant-numeric: tabular-nums; }
+.rdh-nom2 { max-width: 0; width: 60%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rdh-conv { color: var(--green); font-weight: 700; }
+.rdh-clic { cursor: pointer; }
+.rdh-clic:hover td { background: var(--bg2); }

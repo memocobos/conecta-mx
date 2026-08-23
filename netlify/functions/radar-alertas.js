@@ -16,7 +16,6 @@
 //   - ⏰ Reembolsos por vencer: pendientes con +10 días naturales desde la
 //     cancelación (el contrato promete 15-20). Ver detectarReembolsosPorVencer.
 //   - 💤 Vendedores recién inactivos (F6): cruzaron 3 meses sin ventas en los
-//     últimos 7 días. Ver detectarVendedoresInactivosNuevos.
 //   - ⏳ Contratos por vencer: coordinador/creadora_team firmados cuya vigencia
 //     cruza un HITO (30/15/7 días exactos o vencido ≤7 días). Ver
 //     detectarContratosPorVencer.
@@ -31,8 +30,6 @@
 // =============================================================================
 
 const { aplicarModoPrueba } = require('./_lib/correo-guard');
-const { MESES_LIMITE, _masMesesFecha, _inicioVendedor } = require('./_lib/vendedor-activo');
-const { estaPausado } = require('./_lib/modulos-pausados');
 
 const SB_URL = process.env.SUPABASE_URL_KAMEHOUSE;
 const SB_KEY = process.env.SUPABASE_SERVICE_KEY_KAMEHOUSE;
@@ -414,101 +411,6 @@ async function detectarReembolsosPorVencer(resumen) {
     body: JSON.stringify({ from: `Radar del Dragón <${ADMIN_EMAIL}>`, to: __mp.to, subject: __mp.subject, html }),
   });
 }
-
-// 💤 Vendedores recién inactivos (F6) — chismoso para Memo. El candado de
-// inactividad vive en la puerta (_lib/vendedor-activo); esta sección SOLO
-// AVISA cuando un vendedor ACABA de caer: cruzó los 3 meses sin ventas en los
-// últimos 7 días. Cero escrituras (ni radar_alertas ni nada) — el cron sigue
-// sin escribir. La ventana de 7 días acota los avisos por sí sola; sin recién
-// caídos → ni correo ni rastro en el resumen.
-async function detectarVendedoresInactivosNuevos(resumen) {
-  const dayMs = 24 * 3600 * 1000;
-  // [VEN-PAUSA-1] Con el módulo pausado, este bloque NO corre. Un radar que
-  // sigue avisando de vendedores inactivos mientras nadie puede vender manda
-  // correo sobre algo que nadie puede atender — y el correo sí sale de la casa.
-  // El bloque NO se borra: revive solo al vaciar el Set de _lib/modulos-pausados.
-  if (estaPausado('vendedores')) return;
-
-  const hoy = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Monterrey' });
-  const hace7 = new Date(Date.now() - 7 * dayMs).toLocaleDateString('en-CA', { timeZone: 'America/Monterrey' });
-
-  const vendedores = await sb('usuarios?rol=eq.vendedor&select=id,nombre,correo,creado_en,vendedor_reactivado_at&limit=2000');
-  // Recién cruzados: su límite (inicio + 3 meses) cayó DENTRO de los últimos 7 días.
-  const candidatos = (vendedores || []).map(u => {
-    const inicio = _inicioVendedor(u);
-    const limite = inicio ? _masMesesFecha(inicio, MESES_LIMITE) : null;
-    return { ...u, inicio, limite };
-  }).filter(u => u.limite && u.limite <= hoy && u.limite > hace7);
-  if (!candidatos.length) return; // sin recién caídos → cero ruido
-
-  // Cero ventas (Portal). Sin env o con error → NO se reporta a nadie (evitar
-  // falsos positivos); queda nota en errores del resumen.
-  const P_URL = process.env.PORTAL_SUPABASE_URL;
-  const P_KEY = process.env.PORTAL_SUPABASE_SERVICE_KEY;
-  if (!P_URL || !P_KEY) { resumen.errores.push('vendedores: sin env Portal'); return; }
-  const ids = candidatos.map(u => encodeURIComponent(String(u.id))).join(',');
-  const vR = await fetch(`${P_URL}/rest/v1/solicitudes_tour?vendedor_id=in.(${ids})&select=vendedor_id&limit=10000`,
-    { headers: { apikey: P_KEY, Authorization: `Bearer ${P_KEY}` } });
-  if (!vR.ok) { resumen.errores.push('vendedores: Portal rechazó el conteo'); return; }
-  const conVentas = new Set(((await vR.json().catch(() => [])) || []).map(s => String(s.vendedor_id)));
-  const caidos = candidatos.filter(u => !conVentas.has(String(u.id)));
-  if (!caidos.length) return;
-
-  resumen.vendedores_inactivos_nuevos = caidos.length;
-  if (!RESEND_KEY) return;
-
-  const filas = caidos.map(u => `
-    <tr>
-      <td style="padding:8px 10px;border-bottom:1px solid rgba(255,255,255,.12);font-size:13px;color:#fff">${escapeHtml(u.nombre || '?')}</td>
-      <td style="padding:8px 10px;border-bottom:1px solid rgba(255,255,255,.12);font-size:13px;color:rgba(255,255,255,.85)">${escapeHtml(u.correo || '—')}</td>
-      <td style="padding:8px 10px;border-bottom:1px solid rgba(255,255,255,.12);font-size:12px;color:rgba(255,255,255,.7)">${escapeHtml(u.inicio || '?')}</td>
-      <td style="padding:8px 10px;border-bottom:1px solid rgba(255,255,255,.12);font-size:12px;font-weight:700;color:#e8ff4c">${escapeHtml(u.limite || '?')}</td>
-    </tr>`).join('');
-  const html = `
-<div style="font-family:Arial,sans-serif;max-width:640px;background:#0a0a0a;color:#fff;padding:0">
-  <div style="background:#e8ff4c;color:#000;padding:18px;border-bottom:4px solid #ff283b">
-    <div style="font-size:11px;font-weight:700;letter-spacing:.18em;text-transform:uppercase">Radar del Dragón · Vendedores</div>
-    <div style="font-size:20px;font-weight:900;margin-top:4px">💤 Vendedores recién inactivos (${caidos.length})</div>
-  </div>
-  <div style="padding:22px">
-    <p style="font-size:14px;line-height:1.55;color:#fff;margin:0 0 14px 0">
-      Estos vendedores cruzaron los <b>${MESES_LIMITE} meses sin registrar ventas</b> en los últimos 7 días:
-      el candado ya les cerró la puerta de cotizar/vender automáticamente. No se borró ni cambió nada —
-      si quieres darles otra oportunidad, el botón está en <b>Guerreros Z</b>.
-    </p>
-    <table style="border-collapse:collapse;width:100%">
-      <tr>
-        <th style="text-align:left;padding:8px 10px;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.5);border-bottom:2px solid rgba(255,255,255,.25)">Vendedor</th>
-        <th style="text-align:left;padding:8px 10px;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.5);border-bottom:2px solid rgba(255,255,255,.25)">Correo</th>
-        <th style="text-align:left;padding:8px 10px;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.5);border-bottom:2px solid rgba(255,255,255,.25)">Registro</th>
-        <th style="text-align:left;padding:8px 10px;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.5);border-bottom:2px solid rgba(255,255,255,.25)">Cayó el</th>
-      </tr>
-      ${filas}
-    </table>
-    <p style="margin-top:18px;font-size:12px;color:rgba(255,255,255,.7)">
-      Reactivar: <a href="https://conectareynosa.mx/kamehouse" style="color:#e8ff4c;text-decoration:none;font-weight:700">Kamehouse → Guerreros Z → vendedores</a> → "Dar otra oportunidad".
-    </p>
-  </div>
-</div>`;
-  const __mp = aplicarModoPrueba({ to: [ADMIN_TO], subject: `[Radar] 💤 ${caidos.length} vendedor${caidos.length === 1 ? '' : 'es'} recién inactivo${caidos.length === 1 ? '' : 's'}` });
-  await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${RESEND_KEY}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ from: `Radar del Dragón <${ADMIN_EMAIL}>`, to: __mp.to, subject: __mp.subject, html }),
-  });
-}
-
-// ⏳ Contratos por vencer — chismoso para Memo (último gancho de contratos).
-// Contratos FIRMADOS de coordinador/creadora_team cuya vigencia_fin cruza un
-// HITO: faltan exactamente 30, 15 o 7 días, o VENCIÓ en los últimos 7 días.
-// Hitos, no rango continuo (patrón de la casa): el radar corre diario, así que
-// cada hito suena una vez y el ruido se acota solo. Para team se cuelga el
-// contador de strikes (usuarios.strikes por correo, best-effort).
-//
-// SOLO NOTIFICA: cero escrituras. Renovar/rotar sigue siendo decisión manual
-// de Memo (crea contrato nuevo con la vigencia que elija). Sin hitos → ni
-// correo ni rastro en el resumen.
-const HITOS_VIGENCIA = [30, 15, 7];
 async function detectarContratosPorVencer(resumen) {
   const dayMs = 24 * 3600 * 1000;
   const hoy = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Monterrey' });
@@ -662,7 +564,6 @@ exports.handler = async (event) => {
   try { await detectarCotizacionesCaida(resumen); }  catch (e) { resumen.errores.push('cot: ' + e.message); }
   try { await detectarCodigoFalla(resumen); }        catch (e) { resumen.errores.push('cod: ' + e.message); }
   try { await detectarReembolsosPorVencer(resumen); } catch (e) { resumen.errores.push('reembolsos: ' + e.message); }
-  try { await detectarVendedoresInactivosNuevos(resumen); } catch (e) { resumen.errores.push('vendedores: ' + e.message); }
   try { await detectarContratosPorVencer(resumen); }        catch (e) { resumen.errores.push('vigencias: ' + e.message); }
   try { await detectarStockBajoMinimo(resumen); }           catch (e) { resumen.errores.push('stock: ' + e.message); }
   return { statusCode: 200, body: JSON.stringify(resumen) };

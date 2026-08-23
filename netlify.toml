@@ -137,17 +137,6 @@
 [functions."radio-vigilante"]
   schedule = "*/10 * * * *"
 
-# Vendedores F4 — expiración del límite de 8 días de las VENTAS de vendedor. DIARIO.
-# Barre solicitudes_tour con vendedor_id aún PENDIENTES cuyo vende_limite venció (o
-# vence hoy/mañana) y manda UN resumen al admin para que Bulma reaccione. SOLO
-# NOTIFICA — jamás cancela (la cancelación es manual en KameHouse). 14:00 UTC = 8 AM MX.
-# [VEN-PAUSA-1 · 19-ago-2026] APAGADO mientras el módulo de vendedores está en
-# pausa. Un cron vivo sobre un módulo pausado manda correo de algo que nadie
-# puede atender. La function NO se borró y ya rebota con 503 por su cuenta; esto
-# es solo el reloj. Para revivir: descomentar estas dos líneas y vaciar los dos
-# Sets de MODULOS_PAUSADOS (kamehouse.js y _lib/modulos-pausados.js).
-# [functions."ventas-limite-cron"]
-#   schedule = "0 14 * * *"
 
 # 🗼 Torre de Karin O3 — RECORDATORIO 48H de retornables. DIARIO. Cruza el catálogo
 # (eventos cuya PRIMERA fecha cae a ≤2 días) contra las salidas de bodega que siguen

@@ -571,10 +571,9 @@ body.wizard-open{overscroll-behavior:none}
 .hh-title .mark{position:relative;display:inline-block;padding:0 .12em;color:#000;z-index:1}
 .hh-title .mark::before{content:'';position:absolute;left:0;right:0;top:8%;bottom:8%;background:var(--c-amarillo);z-index:-1;transform:skewX(-6deg)}
 @keyframes lineInMain{to{opacity:1;transform:translateY(0)}}
-.hh-sub{
-  max-width:640px;font-size:clamp(13px,1.5vw,17px);font-weight:500;line-height:1.5;
-  color:var(--c-muted);animation:lineInMain 1s .55s both;
-}
+/* [LAND-1b] .hh-sub se retiró: el párrafo del hero se fue en TODAS las
+   pantallas por decisión de Memo. Sus reglas se van con él para no dejar
+   selectores que no alcanzan a nada. */
 .hh-ctas{display:flex;gap:10px;flex-wrap:wrap;margin-top:clamp(20px,3vw,32px);animation:lineInMain 1s .7s both}
 .hh-btn{
   display:inline-flex;align-items:center;gap:8px;
@@ -858,7 +857,6 @@ body.wizard-open{overscroll-behavior:none}
 .hh-kicker{color:#e8ff4c;margin-bottom:clamp(12px,2.5vw,22px)}
 .hh-title{margin-bottom:clamp(12px,2vw,20px)}
 .hh-title .mark::before{background:#e8ff4c}
-.hh-sub{color:rgba(255,255,255,.78)}
 .hh-ctas{margin-top:clamp(16px,3vw,28px);width:100%}
 
 /* [LAND-1] Aquí vivían las ~47 líneas del countdown regresivo (.hh-countdown
@@ -914,7 +912,7 @@ body[data-ev="laura"] #d-hero-bg{object-position:center 18% !important}
      `backwards` sigan resolviendo y nada quede escondido. Aquí solo se
      conservan los casos que quieren quedarse quietos de plano. */
   .marquee-red-track{animation:none}
-  .hh-title .line,.hh-sub,.hh-ctas{opacity:1;transform:none}
+  .hh-title .line,.hh-ctas{opacity:1;transform:none}
   .promo-modal-sparkle{opacity:1;transform:none}
 }
 </style>
@@ -1014,12 +1012,15 @@ src="https://www.facebook.com/tr?id=1685907946147007&ev=PageView&noscript=1"
 
   <!-- Hero v2 -->
   <section class="home-hero-v2">
+   <!-- [LAND-1b] Dos columnas EN ESCRITORIO (izquierda: la frase, la prueba y
+        los CTA · derecha: el evento). En móvil .hh-grid es un flujo normal en
+        una sola columna, así que el orden del DOM es el orden que se ve. -->
+   <div class="hh-grid">
     <div class="hh-kicker">Conecta Reynosa · Catálogo 2026</div>
     <h1 class="hh-title">
       <span class="line">Viaja con</span>
       <span class="line"><span class="mark">expertos</span></span>
     </h1>
-    <p class="hh-sub">Agencia de viajes desde Reynosa. Transporte, hospedaje, boletos y kit Conecta — todo resuelto. Escoge tu evento, elige paquete y paga en quincenas sin estrés.</p>
     <!-- [LAND-1] La tarjeta del próximo evento A LA VENTA. Ocupa el lugar
          que tenía el countdown d:h:m:s, con otra regla de selección: aquel
          admitía agotados y últimos, ésta solo lo que se puede comprar. -->
@@ -1030,7 +1031,13 @@ src="https://www.facebook.com/tr?id=1685907946147007&ev=PageView&noscript=1"
       </div>
       <div class="hh-next" id="hh-next" role="button" tabindex="0"></div>
     </div>
-    <p class="hh-proof"><b>58</b> tours realizados · <b>13</b> años de experiencia</p>
+    <!-- [LAND-1b] SOLO los 13 años. El "58 tours" salió por decisión de Memo.
+         📌 ANOTADO, NO CONSTRUIDO: tours realizados y viajeros saldrán
+         AUTOMÁTICOS de KameHouse más adelante. Cuando exista ese dato entra
+         aquí; mientras tanto no se afirma un número que el sistema no lleva
+         (el EV cuenta 42 pasados y el Excel dice 58: dos cifras distintas,
+         ninguna consultable en vivo). -->
+    <p class="hh-proof"><b>13</b> años de experiencia</p>
     <div class="hh-strip" id="hh-strip" style="display:none"></div>
     <div class="hh-ctas">
       <a href="#catalog-anchor" class="hh-btn hh-btn-rojo hh-btn-full">Ver eventos <span aria-hidden="true">→</span></a>
@@ -1041,6 +1048,7 @@ src="https://www.facebook.com/tr?id=1685907946147007&ev=PageView&noscript=1"
       <a class="hh-btn hh-btn-wa hh-btn-full" id="hh-wa" target="_blank" rel="noopener"
          href="https://wa.me/528119771072">Escríbenos por WhatsApp <span aria-hidden="true">→</span></a>
     </div>
+   </div>
   </section>
 
   <!-- Links to sub-pages, same style -->
@@ -1991,7 +1999,7 @@ body.wizard-open .rcp{display:none}
     will-change:auto !important;
   }
   /* Lo que dependía del recorrido para verse, se ve directo */
-  .hh-title .line,.hh-sub,.hh-ctas{opacity:1;transform:none}
+  .hh-title .line,.hh-ctas{opacity:1;transform:none}
   .ev-card.visible{opacity:1;transform:none}
 }
 </style>
@@ -2273,53 +2281,9 @@ body.pf-barra-viva .wa-float{bottom:104px}
    ⚠️ giveaway.html también usa .cd-n/.cd-l, pero define las suyas EN SU
    PROPIO archivo: este borrado no lo alcanza. */
 
-/* ── 1 · LA FRASE, COMPACTA ──
-   Misma identidad: var(--font-display) = Barlow Condensed 900, y el amarillo
-   #e8ff4c sigue viviendo en .hh-title .mark::before.
-   NO se cambia a Kaneda: el sitio solo carga Barlow Condensed + Montserrat,
-   así que pedir Kaneda caería a Montserrat y ROMPERÍA la identidad en vez de
-   conservarla. Medido: 1 sola aparición de Kaneda en todo el index
-   (.wiz-transmodo-name) y ya está cayendo a Montserrat en silencio. */
-@media(max-width:719px){
-  .home-hero-v2{padding:18px 16px 20px}
-  .hh-kicker{margin-bottom:9px;font-size:9px;letter-spacing:.16em;padding-top:5px;padding-bottom:5px}
-  .hh-title{font-size:38px;line-height:.86;margin-bottom:7px}
-  .hh-sub{font-size:11.5px;line-height:1.4}
-  .hh-ctas{margin-top:11px;gap:7px}
-  /* Los dos CTA venían en 26px de padding y 15px/.14em: "Escríbenos por
-     WhatsApp" se partía en DOS renglones y el botón medía 90px de alto, lo
-     que empujaba el cierre del primer pantallazo 21px por debajo del pliegue
-     (medido: fin 865 contra 844 de alto). Aquí se aprietan para que quepan. */
-  .hh-btn-full{padding:15px 18px;font-size:12.5px;letter-spacing:.09em}
-}
 
-/* ── PANTALLA BAJA (iPhone SE y compañía) ──
-   Medido: con los valores de arriba el WhatsApp cerraba en 794, que cabe en
-   los 844 de un iPhone 14 pero se salía 127px en los 667 de un SE. El brief
-   pide que el WhatsApp CIERRE el primer pantallazo, así que en pantallas
-   bajas todo se aprieta un escalón más. Se dispara por ALTO, no por ancho:
-   un SE y un 14 miden casi lo mismo de ancho y nada parecido de alto. */
-@media(max-height:760px){
-  .home-hero-v2{padding:12px 16px 14px}
-  .hh-kicker{margin-bottom:7px}
-  .hh-title{font-size:31px;margin-bottom:6px}
-  .hh-sub{font-size:11px;line-height:1.32}
-  .hh-next-wrap{margin-top:9px}
-  .hn-head{margin-bottom:5px}
-  .hn-media{height:84px}
-  .hn-body{padding:8px 10px 10px}
-  .hn-artist{font-size:23px}
-  .hn-faltan{margin-top:6px;padding:3px 9px}
-  .hn-cta{margin-top:8px;padding:9px}
-  .hh-proof{margin-top:8px}
-  .hh-strip{margin-top:8px}
-  .hs-media{height:42px}
-  .hh-ctas{margin-top:8px;gap:6px;flex-wrap:nowrap}
-  /* Los dos CTA se ponen LADO A LADO en vez de apilados: recupera el alto de
-     un botón entero sin quitarle una sola palabra al hero. */
-  .hh-btn-full{flex:1 1 0;min-width:0;padding:11px 10px;font-size:11px;letter-spacing:.06em;text-align:center}
-  .hh-btn-full span{display:none}   /* la flecha, que aquí solo roba ancho */
-}
+
+
 
 /* ── 2 · LA TARJETA DEL PRÓXIMO EVENTO ── */
 .hh-next-wrap{margin-top:13px;animation:lineInMain 1s .5s both}
@@ -2336,11 +2300,38 @@ body.pf-barra-viva .wa-float{bottom:104px}
 .hh-next:hover{transform:translateY(-3px);border-color:var(--c-amarillo)}
 .hn-media{position:relative;width:100%;height:118px;background:#1a1a1a;overflow:hidden}
 .hn-img{position:relative;z-index:1;width:100%;height:100%;object-fit:cover;object-position:center 25%;display:block}
-.hn-ini{position:absolute;inset:0;z-index:0;display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-size:44px;font-weight:900;color:rgba(255,255,255,.1)}
+/* El respaldo cuando el evento no trae portada. En la tarjeta del catálogo las
+   iniciales van al 10% y está bien: la caja mide 90px. Aquí mide 176px en
+   escritorio, y al 10% se ve un hueco negro, no un respaldo. Sube a .22 y se
+   apoya en el azul de marca — sin gradiente, un plano y ya.
+   ⚠️ Hoy lo alcanza el PRÓXIMO evento: `calle24` no está en STATIC_IMGS
+   (21 de los 49 a la venta tampoco). En producción `loadArtistImg` suele
+   llenarlo; esto es lo que se ve si el API no contesta. */
+.hn-ini{position:absolute;inset:0;z-index:0;display:flex;align-items:center;justify-content:center;
+  font-family:var(--font-display);font-size:clamp(44px,9vw,64px);font-weight:900;
+  color:rgba(255,255,255,.22);background:#0a0a2e;letter-spacing:.02em}
 .hn-body{padding:10px 12px 12px}
 .hn-artist{font-family:var(--font-display);font-weight:900;font-size:26px;line-height:1;text-transform:uppercase;color:#fff}
 .hn-venue{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.55);margin-top:3px}
-.hn-faltan{display:inline-block;margin-top:8px;background:var(--c-amarillo);color:#000;font-size:11px;font-weight:900;letter-spacing:.06em;text-transform:uppercase;padding:4px 11px;border-radius:var(--r-chip,999px)}
+/* [LAND-1b] EL CRONÓMETRO d:h:m:s — vuelve por decisión de Memo.
+   ⚠️ Las celdas llevan ANCHO MÍNIMO FIJO y cifras tabulares A PROPÓSITO: el
+   tick escribe un dígito por segundo, y sin ancho fijo cada cambio de "9" a
+   "10" remaquetearía la fila entera 60 veces por minuto. Con esto el tick solo
+   pinta texto dentro de una caja que ya no se mueve — que es la regla de la
+   casa (lo que se repite por frame no toca el layout) aplicada al segundero. */
+.hn-timer{display:flex;align-items:flex-end;gap:6px;margin-top:9px}
+.hn-cell{display:flex;flex-direction:column;align-items:center;min-width:40px}
+.hn-n{font-family:var(--font-display);font-weight:900;font-size:28px;line-height:1;
+  color:var(--c-amarillo);letter-spacing:-.01em;font-variant-numeric:tabular-nums;
+  font-feature-settings:'tnum' 1}
+/* [A4 · SELLADO POR MEMO, 30-jul-2026 — revalidado en LAND-1b]
+   Estas etiquetas (DÍAS, HRS, MIN, SEG) se quedan en 8px. El piso de 10px del
+   barrido es para texto que se LEE; éstas se RECONOCEN POR POSICIÓN, debajo de
+   su número. Nadie lee 'DÍAS': sabe qué es por dónde está. El sello venía del
+   contador anterior y viaja con el contador, no con el archivo. */
+.hn-l{font-size:8px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.5);margin-top:4px}
+.hn-sep{font-family:var(--font-display);font-weight:900;font-size:22px;color:rgba(255,255,255,.25);line-height:1;padding-bottom:13px}
+@media(max-width:380px){.hn-cell{min-width:34px}.hn-sep{display:none}.hn-timer{gap:9px}}
 .hn-cta{display:block;width:100%;margin-top:10px;padding:11px;cursor:pointer;
   background:var(--c-rojo);color:#fff;border:0;border-radius:var(--r-btn,12px);
   font-family:'Montserrat',sans-serif;font-size:13px;font-weight:900;letter-spacing:.1em;text-transform:uppercase}
@@ -2363,6 +2354,7 @@ body.pf-barra-viva .wa-float{bottom:104px}
 .hs-img{position:relative;z-index:1;width:100%;height:100%;object-fit:cover;display:block}
 .hs-ini{position:absolute;inset:0;z-index:0;display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-size:19px;font-weight:900;color:rgba(255,255,255,.12)}
 .hs-body{padding:5px 6px 6px}
+.hs-rank{display:inline-block;background:var(--c-amarillo);color:#000;font-size:8px;font-weight:900;letter-spacing:.06em;padding:1px 5px;border-radius:var(--r-chip,999px);margin-bottom:3px}
 .hs-name{font-size:9.5px;font-weight:900;line-height:1.15;text-transform:uppercase;color:#fff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .hs-fecha{font-size:9px;font-weight:700;color:rgba(255,255,255,.5);margin-top:2px;white-space:nowrap}
 .hs-mas{flex:0 0 58px;display:flex;flex-direction:column;align-items:center;justify-content:center;
@@ -2373,17 +2365,148 @@ body.pf-barra-viva .wa-float{bottom:104px}
 /* ── 5 · WHATSAPP ── Verde de MARCA (--c-verde #88ea4e), NO el verde propio
    de WhatsApp (#25D366): ese color no está en el manual y el brief pidió no
    romperlo. */
+/* [LAND-1b] EL FLOTANTE Y EL BOTÓN GRANDE SON EL MISMO ACTO.
+   Al cerrar el hero el primer pantallazo, los dos quedaron encimados —medido a
+   390×844: el .wa-float ocupa 698-754 y el CTA 714-759—, o sea dos botones de
+   WhatsApp uno sobre otro justo en la vista que más importa. Mientras el botón
+   grande se ve, el flotante se retira; en cuanto el hero sube, vuelve.
+   Solo opacity y transform: nada que remaquete. */
+.wa-float{transition:transform .2s,box-shadow .2s,opacity .2s}
+.wa-float.wa-float-oculto{opacity:0;transform:scale(.8);pointer-events:none}
 .hh-btn-wa{background:var(--c-verde);color:#000;border:none}
 .hh-btn-wa:hover{background:var(--c-verde);color:#000;transform:translateY(-2px);box-shadow:0 14px 36px rgba(0,0,0,.55)}
 
 /* ── ESCRITORIO ── la frase respira (conserva su clamp hasta 156px) y las
    piezas nuevas se acotan para no cruzar la pantalla entera. */
-@media(min-width:720px){
-  .hh-next-wrap,.hh-strip,.hh-proof{max-width:560px}
+/* ⚠️ [LAND-1b] ESTOS DOS ESCALONES VAN DESPUÉS DE LAS REGLAS DEL COMPONENTE,
+   NO ANTES. Estaban arriba y sus reglas sobre .hn-media / .hn-timer / .hn-n
+   eran LETRA MUERTA: misma especificidad que la base, y en CSS gana la última
+   en llegar. No tronaba nada — simplemente no hacía nada, y la medición del
+   iPhone SE salía idéntica antes y después de "apretar". Si alguien vuelve a
+   mover este bloque hacia arriba, revive el problema en silencio. */
+/* ── 1 · LA FRASE, COMPACTA ──
+   Misma identidad: var(--font-display) = Barlow Condensed 900, y el amarillo
+   #e8ff4c sigue viviendo en .hh-title .mark::before.
+   NO se cambia a Kaneda: el sitio solo carga Barlow Condensed + Montserrat,
+   así que pedir Kaneda caería a Montserrat y ROMPERÍA la identidad en vez de
+   conservarla. Medido: 1 sola aparición de Kaneda en todo el index
+   (.wiz-transmodo-name) y ya está cayendo a Montserrat en silencio. */
+@media(max-width:719px){
+  .home-hero-v2{padding:18px 16px 20px}
+  .hh-kicker{margin-bottom:9px;font-size:9px;letter-spacing:.16em;padding-top:5px;padding-bottom:5px}
+  .hh-title{font-size:38px;line-height:.86;margin-bottom:7px}
+  .hh-ctas{margin-top:11px;gap:7px}
+  /* Los dos CTA venían en 26px de padding y 15px/.14em: "Escríbenos por
+     WhatsApp" se partía en DOS renglones y el botón medía 90px de alto, lo
+     que empujaba el cierre del primer pantallazo 21px por debajo del pliegue
+     (medido: fin 865 contra 844 de alto). Aquí se aprietan para que quepan. */
+  .hh-btn-full{padding:15px 18px;font-size:12.5px;letter-spacing:.09em}
+}
+
+/* ── PANTALLA BAJA (iPhone SE y compañía) ──
+   Medido: con los valores de arriba el WhatsApp cerraba en 794, que cabe en
+   los 844 de un iPhone 14 pero se salía 127px en los 667 de un SE. El brief
+   pide que el WhatsApp CIERRE el primer pantallazo, así que en pantallas
+   bajas todo se aprieta un escalón más. Se dispara por ALTO, no por ancho:
+   un SE y un 14 miden casi lo mismo de ancho y nada parecido de alto. */
+@media(max-height:760px){
+  .home-hero-v2{padding:12px 16px 14px}
+  .hh-kicker{margin-bottom:7px}
+  .hh-title{font-size:31px;margin-bottom:6px}
+  .hh-next-wrap{margin-top:9px}
+  .hn-head{margin-bottom:5px}
+  .hn-media{height:84px}
+  .hn-body{padding:8px 10px 10px}
+  .hn-artist{font-size:23px}
+  .hn-faltan{margin-top:6px;padding:3px 9px}
+  .hn-cta{margin-top:8px;padding:9px}
+  .hh-proof{margin-top:8px}
+  .hh-strip{margin-top:8px}
+  .hs-media{height:42px}
+  .hh-ctas{margin-top:8px;gap:6px;flex-wrap:nowrap}
+  /* Los dos CTA se ponen LADO A LADO en vez de apilados: recupera el alto de
+     un botón entero sin quitarle una sola palabra al hero. */
+  .hh-btn-full{flex:1 1 0;min-width:0;padding:11px 10px;font-size:11px;letter-spacing:.06em;text-align:center}
+  .hh-btn-full span{display:none}   /* la flecha, que aquí solo roba ancho */
+  /* [LAND-1b] El cronómetro pesa más alto que la pastilla "Faltan N días" que
+     sustituyó (≈40px contra 22), así que quitar el párrafo no alcanzó solo:
+     medido, el SE seguía saliéndose por 22px. Aquí se aprieta lo nuevo. */
+  .hn-media{height:72px}
+  .hn-timer{margin-top:6px;gap:5px}
+  .hn-n{font-size:24px}
+  .hn-cell{min-width:36px}
+  .hn-sep{font-size:19px;padding-bottom:11px}
+  .hn-cta{margin-top:7px;padding:8px}
+  .hh-strip{margin-top:6px}
+  .hs-media{height:38px}
+}
+
+/* Pantalla MUY baja (iPhone 5/SE de 1ª generación, 568px). Quedaba a 26px de
+   cerrar el pliegue; con esto cierra. Va después del escalón de 760 para que
+   lo pise, no antes — la misma lección de arriba. */
+@media(max-height:610px){
+  .home-hero-v2{padding:9px 14px 11px}
+  .hh-title{font-size:27px;margin-bottom:5px}
+  .hn-media{height:56px}
+  .hn-n{font-size:21px}
+  .hn-cell{min-width:32px}
+  .hn-sep{font-size:16px;padding-bottom:10px}
+  .hs-media{height:34px}
+  .hh-proof{margin-top:6px;font-size:10px}
+}
+
+/* ── ESCRITORIO: DOS COLUMNAS DE VERDAD ──
+   [LAND-1b] Memo dijo que el escritorio "quedó raro", y tenía razón: era el
+   móvil estirado — una sola columna angosta con muchísimo negro a los lados.
+   Ahora es una rejilla con ÁREAS NOMBRADAS, y por eso los 6 hijos cuelgan
+   PLANOS de .hh-grid en vez de ir envueltos en dos columnas: envolverlos
+   habría congelado el orden, y el orden de móvil (frase → evento → prueba →
+   tira → botones) NO es el de escritorio. Con áreas, el DOM conserva el orden
+   de móvil y el escritorio coloca cada pieza donde quiere. */
+/* El umbral son 1000px, no 900: a 900 la columna izquierda queda tan angosta
+   que "EXPERTOS" volvía a meterse debajo de la tarjeta (medido: se encimaban
+   37px). Por debajo de 1000 el hero se queda en una columna, que a ese ancho
+   se lee mejor que dos apretadas. */
+@media(min-width:1000px){
+  .hh-grid{
+    display:grid;
+    grid-template-columns:minmax(0,1fr) minmax(320px,420px);
+    grid-template-rows:auto auto auto 1fr;
+    grid-template-areas:
+      "kicker  evento"
+      "titulo  evento"
+      "prueba  evento"
+      "botones tira";
+    column-gap:clamp(32px,5vw,72px);
+    align-items:start;
+  }
+  .hh-kicker  {grid-area:kicker;justify-self:start}
+  /* El clamp global llega a 156px, y a ese tamaño "EXPERTOS" mide más que la
+     columna izquierda: la palabra se metía POR DEBAJO de la tarjeta del evento
+     (medido a 1440: el subrayado amarillo llegaba a x=975 y la tarjeta empieza
+     en 948). Aquí el tope baja a lo que la columna aguanta. */
+  .hh-title   {grid-area:titulo;margin-bottom:14px;font-size:clamp(52px,7.6vw,124px)}
+  .hh-next-wrap{grid-area:evento;margin-top:0}
+  .hh-proof   {grid-area:prueba;margin-top:0;font-size:12px}
+  .hh-strip   {grid-area:tira;margin-top:14px}
+  .hh-ctas    {grid-area:botones;margin-top:22px;align-self:start}
+  .hn-media{height:176px}
+  .hn-artist{font-size:32px}
+  .hn-n{font-size:34px}
+  .hn-cell{min-width:48px}
+  .hs-media{height:62px}
+  .hs-name{font-size:10.5px}
+  /* Los dos CTA caben lado a lado en la columna ancha. */
+  .hh-ctas{display:flex;flex-wrap:nowrap;gap:10px}
+  .hh-btn-full{flex:1 1 0;min-width:0;padding:17px 18px;font-size:12.5px}
+}
+/* Escalón intermedio (tablet): una columna, pero acotada para que no cruce la
+   pantalla entera. */
+@media(min-width:720px) and (max-width:999px){
+  .hh-next-wrap,.hh-strip,.hh-proof,.hh-ctas{max-width:560px}
   .hn-media{height:168px}
   .hn-artist{font-size:34px}
   .hs-media{height:64px}
-  .hh-ctas{max-width:560px}
 }
 </style>
 
@@ -3193,6 +3316,12 @@ function refreshTop10(){
     for(var i=0;i<_top10Ids.length;i++){_top10Rank[_top10Ids[i]]=i+1;}
     applyTop10Badges();
     if(_activeFilter==='top10')filterEvents();
+    // [LAND-1b] La tira del hero se alimenta de ESTE top. Una línea aditiva en
+    // vez de un segundo fetch al mismo endpoint: dos llamadas serían dos
+    // rankings que un día no coinciden. Si esta rama no se alcanza (endpoint
+    // caído, respuesta rara), la tira se queda con su respaldo por fecha, que
+    // es con lo que nació.
+    if(typeof window.__landHeroTop==='function')window.__landHeroTop();
   }).catch(function(){});
 }
 function applyTop10Badges(){
@@ -3426,18 +3555,21 @@ var _scrollObs=new IntersectionObserver(function(entries){
 document.querySelectorAll('.ev-card,.how-step').forEach(function(el){_scrollObs.observe(el);});
 
 // [LAND-1] EL HERO DE ARRANQUE: tarjeta del próximo evento a la venta,
-// prueba social, tira de los siguientes 3 y "+N más".
+// prueba social, tira de los más buscados y "+N más".
 //
-// REEMPLAZA al countdown regresivo d:h:m:s que vivía aquí. Los dos ocupaban
-// el MISMO lugar semántico ("próximo evento") con DOS reglas de selección
-// distintas: el countdown admitía agotados y últimos, y esta tarjeta solo
-// admite lo que se puede comprar. Dejarlos juntos era la trampa del libro
-// —dos objetos con el mismo papel— con el agravante de que podían anunciar
-// eventos DIFERENTES el mismo día.
+// REEMPLAZA al countdown regresivo que vivía aquí. Los dos ocupaban el MISMO
+// lugar semántico ("próximo evento") con DOS reglas de selección distintas: el
+// countdown admitía agotados y últimos, y esta tarjeta solo admite lo que se
+// puede comprar. Dejarlos juntos era la trampa del libro —dos objetos con el
+// mismo papel— con el agravante de que podían anunciar eventos DIFERENTES el
+// mismo día.
 //
-// Se fue con él: el cronómetro por segundos, su interval, el agrupado de 36h
-// para multifecha y el sellado de Memo de las etiquetas de 8px (30-jul-2026).
+// [LAND-1b] El cronómetro d:h:m:s VOLVIÓ por decisión de Memo, con dos cosas
+// que el original no tenía: la hora del evento se ancla en zona de MÉXICO (ver
+// instanteEvento) y el tick por segundo SOLO escribe texto.
+var _landTick = null;
 (function(){
+  function pad(n){return (n<10?'0':'')+n;}
   function esc(s){return String(s||'').replace(/[&<>"']/g,function(m){return({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[m];});}
   function cleanName(a){return (a||'').replace(/ - .*/,'').replace(/ Tour.*/,'');}
 
@@ -3449,8 +3581,7 @@ document.querySelectorAll('.ev-card,.how-step').forEach(function(el){_scrollObs.
   // El brief prohíbe tocar el catálogo, así que en vez de una fuente
   // compartida esta copia va con CANDADO: el arnés carea el veredicto del
   // hero contra el estado REAL de cada tarjeta renderizada, evento por
-  // evento. Si divergen, truena — que es justo lo que "dos listas iguales no
-  // existe" pide cuando no se puede unificar.
+  // evento. Si divergen, truena.
   function heroALaVenta(ev){
     if(!ev||ev.listOnly)return false;
     if(ev.ds&&ev.ds!=='2027-12-31'&&new Date(ev.ds+'T23:59:59')<new Date())return false;
@@ -3458,7 +3589,7 @@ document.querySelectorAll('.ev-card,.how-step').forEach(function(el){_scrollObs.
     // 'ultimos' TAMBIÉN se vende. Excluirlo sería incoherente: un evento con
     // 39% de zonas libres ya entra por el auto-semáforo con st==='', así que
     // dejar fuera el marcado a mano adelantaría un evento más lejano
-    // mientras uno más cercano sigue comprándose. (Medido hoy: 0 eventos.)
+    // mientras uno más cercano sigue comprándose.
     if(st!==''&&st!=='ultimos')return false;
     if(ev.agotado)return false;
     var z=(ev.multifecha?ev.multifecha.reduce(function(a,mf){return a.concat(mf.zonas);},ev.zonas||[]):(ev.zonas||[]));
@@ -3466,24 +3597,31 @@ document.querySelectorAll('.ev-card,.how-step').forEach(function(el){_scrollObs.
     return true;
   }
 
-  // La fecha que manda es la PRIMERA de dsList si el evento es multifecha.
   function dsEfectivo(ev){
     var l=(ev.dsList&&ev.dsList.length)?ev.dsList:(ev.ds?[ev.ds]:[]);
     return l[0]||'';
   }
 
-  // "Faltan N días" — SIEMPRE contra _hoyMx(), jamás new Date() a secas:
-  // pasadas las 6 de la tarde de acá, toISOString ya es el día siguiente.
-  // Los dos lados se anclan al MEDIODÍA para que un cambio de horario de
-  // verano no mueva la cuenta por una hora.
-  function faltanDias(ds){
-    var hoy=_hoyMx();
-    return Math.round((new Date(ds+'T12:00:00')-new Date(hoy+'T12:00:00'))/86400000);
+  // La hora a la que arranca el evento, como la definía el countdown original:
+  // los festivales abren de día, los conciertos de noche.
+  function horaEvento(ev){
+    if(!ev)return '21:00';
+    var ids=['machaca','emblema','warped','pulsoquetaro','dalemix','knotfest','edc','coronacap','flowfest','arre','comuna','nochegrandes'];
+    var claves=['festival','fest','machaca','warped','edc','knotfest'];
+    var id=(ev.id||'').toLowerCase(), nom=(ev.a||'').toLowerCase();
+    var esFestival=ids.indexOf(id)>=0||claves.some(function(k){return nom.indexOf(k)>=0||id.indexOf(k)>=0;});
+    return esFestival?'14:00':'21:00';
   }
-  function textoFaltan(n){
-    if(n<=0)return '¡Es hoy!';
-    if(n===1)return 'Falta 1 día';
-    return 'Faltan '+n+' días';
+
+  // ⚠️ EL INSTANTE SE ANCLA EN ZONA DE MÉXICO, no en la del navegador.
+  // El countdown original hacía new Date(ds+'T21:00:00'), que es la hora LOCAL
+  // DE QUIEN MIRA: a un cliente en Reynosa (UTC-5) le contaba una hora de
+  // menos que a uno en Monterrey, para el mismo concierto. Los venues del
+  // catálogo son MTY y CDMX, y México no cambia de horario desde 2022: los dos
+  // son UTC-6 todo el año. Por eso el offset va explícito y fijo.
+  var MX_OFFSET='-06:00';
+  function instanteEvento(ev,ds){
+    return new Date(ds+'T'+horaEvento(ev)+':00'+MX_OFFSET).getTime();
   }
 
   // La MISMA cadena de portada que usa la tarjeta del catálogo:
@@ -3516,6 +3654,83 @@ document.querySelectorAll('.ev-card,.how-step').forEach(function(el){_scrollObs.
   // no se toca el catálogo para lograrlo.
   function abrir(id){ if(typeof showDetail==='function') showDetail(id); }
 
+  // ── El universo del hero, una sola vez ──
+  function aLaVentaPorFecha(){
+    return EV.filter(function(e){return heroALaVenta(e)&&dsEfectivo(e);})
+             .sort(function(a,b){return dsEfectivo(a).localeCompare(dsEfectivo(b));});
+  }
+
+  var _destino=0;   // el instante al que corre el cronómetro
+
+  // ═══ EL CRONÓMETRO ═══════════════════════════════════════════════════════
+  // El tick por segundo SOLO ESCRIBE TEXTO: nunca toca innerHTML, ni clases,
+  // ni estilos, ni el tamaño de nada. Las celdas tienen ancho fijo y cifras
+  // tabulares (ver .hn-cell/.hn-n en el CSS), así que cambiar un dígito no
+  // remaquetea: es la regla de la casa —lo que anima POR FRAME solo mueve
+  // transform/opacity— aplicada a lo que se repinta por segundo.
+  function escribir(u,v){
+    var el=document.querySelector('.hn-n[data-u="'+u+'"]');
+    var t=pad(v);
+    if(el&&el.textContent!==t)el.textContent=t;   // ni siquiera escribe si no cambió
+  }
+  function tick(){
+    if(!_destino)return;
+    var dif=_destino-Date.now();
+    if(dif<=0){
+      // El evento arrancó: se recalcula el hero entero, que elegirá el
+      // siguiente. Sin esto el contador se quedaría en 00:00:00:00.
+      construir();
+      return;
+    }
+    var s=Math.floor(dif/1000);
+    var d=Math.floor(s/86400); s%=86400;
+    var h=Math.floor(s/3600);  s%=3600;
+    var m=Math.floor(s/60);    s%=60;
+    escribir('d',d); escribir('h',h); escribir('m',m); escribir('s',s);
+  }
+
+  function timerHTML(){
+    return '<div class="hn-timer">'+
+      '<div class="hn-cell"><span class="hn-n" data-u="d">00</span><span class="hn-l">días</span></div>'+
+      '<div class="hn-sep">:</div>'+
+      '<div class="hn-cell"><span class="hn-n" data-u="h">00</span><span class="hn-l">hrs</span></div>'+
+      '<div class="hn-sep">:</div>'+
+      '<div class="hn-cell"><span class="hn-n" data-u="m">00</span><span class="hn-l">min</span></div>'+
+      '<div class="hn-sep">:</div>'+
+      '<div class="hn-cell"><span class="hn-n" data-u="s">00</span><span class="hn-l">seg</span></div>'+
+    '</div>';
+  }
+
+  // ═══ LA TIRA ═════════════════════════════════════════════════════════════
+  // Se alimenta de LOS MÁS BUSCADOS (event-clicks / CAT-4, ventana de 14 días)
+  // y muestra los 3 primeros DEL TOP QUE ESTÉN A LA VENTA — el top incluye
+  // pasados y agotados, así que se carea contra la misma regla sellada de la
+  // tarjeta, no contra una lista propia.
+  //
+  // FAILS-SOFT POR CONSTRUCCIÓN: la tira NACE con el respaldo (los 3 próximos
+  // por fecha) y el top solo la ASCIENDE cuando llega. Si el endpoint no
+  // contesta, si tarda, o si su top no deja ningún evento vendible, no hay
+  // nada que hacer: lo que ya está pintado se queda. Por eso no hay ninguna
+  // rama de error que mantener — la tira no puede quedar en blanco.
+  function idsDelTop(){
+    return (typeof _top10Ids!=='undefined'&&Array.isArray(_top10Ids))?_top10Ids:[];
+  }
+  function elegirTira(venta){
+    var porId={}; venta.forEach(function(e){porId[e.id]=e;});
+    var top=idsDelTop(), out=[];
+    for(var i=0;i<top.length&&out.length<3;i++){
+      var e=porId[top[i]];
+      if(e&&e.id!==venta[0].id)out.push(e);   // el que ya es la tarjeta grande no se repite
+    }
+    if(out.length===3)return {items:out,fuente:'top'};
+    // Respaldo: se completa por cercanía de fecha, sin repetir.
+    var vistos={}; out.forEach(function(e){vistos[e.id]=1;});
+    for(var j=1;j<venta.length&&out.length<3;j++){
+      if(!vistos[venta[j].id]){out.push(venta[j]);vistos[venta[j].id]=1;}
+    }
+    return {items:out,fuente:out.length&&idsDelTop().length?'mixta':'fecha'};
+  }
+
   function construir(){
     if(typeof EV==='undefined')return;
     var wrap=document.getElementById('hh-next-wrap');
@@ -3523,37 +3738,44 @@ document.querySelectorAll('.ev-card,.how-step').forEach(function(el){_scrollObs.
     var strip=document.getElementById('hh-strip');
     if(!wrap||!slot||!strip)return;
 
-    var venta=EV.filter(function(e){return heroALaVenta(e)&&dsEfectivo(e);})
-                .sort(function(a,b){return dsEfectivo(a).localeCompare(dsEfectivo(b));});
-    if(!venta.length){wrap.style.display='none';strip.style.display='none';return;}
+    var venta=aLaVentaPorFecha();
+    if(!venta.length){wrap.style.display='none';strip.style.display='none';_destino=0;return;}
     wrap.style.display='';
 
-    // ── La tarjeta grande ──
-    var ev=venta[0];
+    // ── La tarjeta grande: el más cercano a la venta ──
+    var ev=venta[0], ds=dsEfectivo(ev);
     var media=document.createElement('div'); media.className='hn-media';
     var body=document.createElement('div'); body.className='hn-body';
     body.innerHTML=
       '<div class="hn-artist">'+esc(cleanName(ev.a))+'</div>'+
       '<div class="hn-venue">'+esc(ev.v||'')+'</div>'+
-      '<div class="hn-faltan">'+esc(textoFaltan(faltanDias(dsEfectivo(ev))))+'</div>'+
+      timerHTML()+
       '<button type="button" class="hn-cta">Cotizar</button>';
     slot.innerHTML=''; slot.appendChild(media); slot.appendChild(body);
     pintarPortada(media,ev,'hn-img','hn-ini');
     slot.onclick=function(){abrir(ev.id);};
     body.querySelector('.hn-cta').onclick=function(e){e.stopPropagation();abrir(ev.id);};
 
-    // ── La tira: los 3 siguientes + "+N más" ──
-    var sig=venta.slice(1,4);
+    _destino=instanteEvento(ev,ds);
+    tick();
+    if(_landTick)clearInterval(_landTick);
+    _landTick=setInterval(tick,1000);
+
+    // ── La tira ──
+    var el=elegirTira(venta);
     strip.innerHTML='';
-    if(!sig.length){strip.style.display='none';return;}
+    strip.setAttribute('data-fuente',el.fuente);
+    if(!el.items.length){strip.style.display='none';return;}
     strip.style.display='';
-    sig.forEach(function(e){
+    el.items.forEach(function(e){
       var it=document.createElement('button');
       it.type='button'; it.className='hs-item';
       var m=document.createElement('div'); m.className='hs-media';
       var b=document.createElement('div'); b.className='hs-body';
-      b.innerHTML='<div class="hs-name">'+esc(cleanName(e.a))+'</div>'+
-                  '<div class="hs-fecha">'+esc(textoFaltan(faltanDias(dsEfectivo(e))))+'</div>';
+      var n=(typeof _top10Rank!=='undefined'&&_top10Rank&&_top10Rank[e.id])?_top10Rank[e.id]:0;
+      b.innerHTML=(n?'<span class="hs-rank">#'+n+'</span>':'')+
+                  '<div class="hs-name">'+esc(cleanName(e.a))+'</div>'+
+                  '<div class="hs-fecha">'+esc(fechaCorta(dsEfectivo(e)))+'</div>';
       it.appendChild(m); it.appendChild(b);
       pintarPortada(m,e,'hs-img','hs-ini');
       it.onclick=function(){abrir(e.id);};
@@ -3561,7 +3783,7 @@ document.querySelectorAll('.ev-card,.how-step').forEach(function(el){_scrollObs.
     });
     // N se CUENTA del EV, no se escribe: los que quedan a la venta después de
     // los 4 que ya se ven.
-    var n=venta.length-1-sig.length;
+    var n=venta.length-1-el.items.length;
     if(n>0){
       var mas=document.createElement('a');
       mas.className='hs-item hs-mas';
@@ -3576,6 +3798,13 @@ document.querySelectorAll('.ev-card,.how-step').forEach(function(el){_scrollObs.
     }
   }
 
+  var MESC=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+  function fechaCorta(ds){
+    if(!ds)return '';
+    var p=ds.split('-');
+    return parseInt(p[2],10)+' '+MESC[parseInt(p[1],10)-1];
+  }
+
   // El botón de WhatsApp toma el número de la MISMA constante WA que ya usan
   // la tarjeta, el wizard y la página de pagos. El href del markup existe solo
   // para que el botón sirva con JS apagado; el arnés carea que sean el mismo.
@@ -3583,7 +3812,20 @@ document.querySelectorAll('.ev-card,.how-step').forEach(function(el){_scrollObs.
     var a=document.getElementById('hh-wa');
     if(!a||typeof WA==='undefined')return;
     a.href='https://wa.me/'+WA+'?text='+encodeURIComponent('Hola! Quiero informes de los tours de Conecta Reynosa.');
+    // El botón flotante se retira mientras el grande esté a la vista: son el
+    // mismo acto y quedaban uno encima del otro (ver la nota del CSS).
+    var fab=document.querySelector('.wa-float');
+    if(!fab||typeof IntersectionObserver==='undefined')return;
+    new IntersectionObserver(function(e){
+      fab.classList.toggle('wa-float-oculto',e[0].isIntersecting);
+    },{threshold:.35}).observe(a);
   }
+
+  // La puerta por la que refreshTop10 avisa que el top ya llegó. Es lo ÚNICO
+  // que el hero expone: no hace su propio fetch a event-clicks, porque el
+  // index ya lo pide y dos llamadas al mismo endpoint son dos rankings que un
+  // día no coinciden.
+  window.__landHeroTop=function(){ try{ construir(); }catch(e){} };
 
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',function(){construir();armarWA();});
   else { construir(); armarWA(); }

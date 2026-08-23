@@ -1384,6 +1384,9 @@ src="https://www.facebook.com/tr?id=1685907946147007&ev=PageView&noscript=1"
     <svg class="rcp-ic rcp-ic-play" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>
     <svg class="rcp-ic rcp-ic-pause" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5h4v14H6zM14 5h4v14h-4z"/></svg>
   </button>
+  <!-- [LAND-1c] Colapsar. Solo se ve en móvil (el CSS lo esconde arriba de
+       768px): en escritorio la píldora no estorba y Memo no la mencionó. -->
+  <button class="rcp-cerrar" id="rcp-cerrar" type="button" aria-label="Minimizar Radio Conecta">✕</button>
   <audio id="rcp-audio" preload="none"></audio>
 </div>
 <style>
@@ -1415,6 +1418,48 @@ src="https://www.facebook.com/tr?id=1685907946147007&ev=PageView&noscript=1"
    venta", "últimos lugares"), así que taparla cuesta. Ajusta la posición
    que se decidió en la PR #300 porque cambió la razón, no el gusto. */
 @media(max-width:768px){.rcp{right:12px;max-width:70vw}}
+
+/* ═══ [LAND-1c] LA RADIO, MINIMIZABLE EN MÓVIL ═══════════════════════════
+   Memo desde su iPhone: la píldora es invasiva — tapa el kicker y parte del
+   título. Arranca COLAPSADA como un botón redondo (el punto rojo + el play) y
+   se expande al tocarla; la ✕ la vuelve a colapsar.
+   ⚠️ NO SE TOCA LA POSICIÓN. El top:114px lo selló [PF-4] para no cubrir la
+   marquesina, que hoy lleva información de venta. Esto cambia el TAMAÑO, no
+   dónde vive.
+   ⚠️ Y es SOLO MÓVIL: arriba de 768px nada de esto aplica — en escritorio la
+   píldora no estorba y el mandato de Memo era móvil. */
+.rcp-cerrar{display:none}
+@media(max-width:768px){
+  .rcp-cerrar{
+    display:flex;align-items:center;justify-content:center;flex-shrink:0;
+    width:24px;height:24px;padding:0;margin-right:-2px;
+    border:none;border-radius:50%;background:rgba(0,0,0,.12);color:#000;
+    font-family:Montserrat,sans-serif;font-size:12px;font-weight:900;line-height:1;cursor:pointer;
+  }
+  /* COLAPSADA: un botón redondo de 44px — el mínimo táctil — con el punto rojo
+     encima del icono de play. Nada más. */
+  .rcp.rcp-min{
+    width:40px;height:40px;padding:0;gap:0;
+    justify-content:center;max-width:40px;overflow:visible;
+    /* SOLO EL BOTÓN COLAPSADO sube a 103; la píldora ABIERTA se queda en el
+       114 que selló [PF-4]. El sello es "no tapar la marquesina", y la
+       marquesina acaba en 99 (medido en 320, 375, 390 y 412): 103 la respeta
+       con 4px de aire. Sube para dejar libre el renglón del título, que en
+       375 y en 320 quedaba DEBAJO del botón. */
+    top:103px;
+  }
+  .rcp.rcp-min .rcp-text,.rcp.rcp-min .rcp-eq,.rcp.rcp-min .rcp-cerrar{display:none}
+  .rcp.rcp-min .rcp-play{width:36px;height:36px}
+  /* El punto rojo, que en la píldora vive junto a la marca, aquí se asoma como
+     insignia: es lo que dice "esto está en vivo" sin ocupar pantalla. */
+  .rcp.rcp-min::after{
+    content:'';position:absolute;top:2px;right:2px;width:9px;height:9px;
+    border-radius:50%;background:#ff283b;border:2px solid #e8ff4c;
+    animation:rcpPulse 1.4s ease-in-out infinite;pointer-events:none;
+  }
+  .rcp.rcp-min.rcp-playing::after{background:#88ea4e}
+}
+@media(prefers-reduced-motion:reduce){.rcp.rcp-min::after{animation:none!important}}
 /* El wizard esconde el nav y pone sus barras fijas arriba — el reproductor se quita para no encimarse. */
 body.wizard-open .rcp{display:none}
 @media(prefers-reduced-motion:reduce){.rcp-eq i,.rcp-dot{animation:none!important}}
@@ -1446,6 +1491,41 @@ body.wizard-open .rcp{display:none}
   audio.addEventListener('pause',function(){ el.classList.remove('rcp-playing'); playBtn.setAttribute('aria-pressed','false'); playBtn.setAttribute('aria-label','Reproducir Radio Conecta'); });
   audio.addEventListener('ended',function(){ el.classList.remove('rcp-playing'); });
   audio.addEventListener('error',function(){ el.classList.remove('rcp-playing'); playBtn.setAttribute('aria-pressed','false'); });
+
+  // ═══ [LAND-1c] COLAPSAR EN MÓVIL ═════════════════════════════════════════
+  // Arranca minimizada para que quien no quiera radio ni la note. La decisión
+  // se recuerda entre visitas, pero SIN depender de que localStorage exista:
+  // si está bloqueado (modo privado, permisos), todo sigue funcionando y
+  // simplemente arranca minimizada — es el mismo candado que usa pagos.html.
+  var MOVIL=function(){ return window.matchMedia('(max-width:768px)').matches; };
+  var LLAVE='rcpAbierta';
+  function recordar(v){ try{ localStorage.setItem(LLAVE,v?'1':'0'); }catch(e){} }
+  function recordada(){ try{ return localStorage.getItem(LLAVE)==='1'; }catch(e){ return false; } }
+  function minimizar(v){ el.classList.toggle('rcp-min',!!v); }
+
+  if(MOVIL() && !recordada()) minimizar(true);
+
+  var cerrar=document.getElementById('rcp-cerrar');
+  if(cerrar) cerrar.addEventListener('click',function(e){
+    e.preventDefault(); e.stopPropagation();
+    minimizar(true); recordar(false);
+  });
+
+  // Tocar la píldora colapsada la expande. Con UNA excepción: si está sonando,
+  // el botón sigue siendo pausa — si no, quien puso la radio no podría pararla
+  // sin abrirla primero, que es justo el estorbo que esto viene a quitar.
+  el.addEventListener('click',function(e){
+    if(!el.classList.contains('rcp-min'))return;
+    if(el.classList.contains('rcp-playing') && playBtn.contains(e.target))return;
+    e.preventDefault(); e.stopPropagation();
+    minimizar(false); recordar(true);
+  },true);
+
+  // Al girar el aparato o pasar a escritorio, el estado se recalcula: una
+  // píldora colapsada en una pantalla ancha sería un botón huérfano.
+  window.addEventListener('resize',function(){
+    if(!MOVIL()) minimizar(false);
+  });
 })();
 </script>
 <style>
@@ -2310,6 +2390,22 @@ body.pf-barra-viva .wa-float{bottom:104px}
 .hn-ini{position:absolute;inset:0;z-index:0;display:flex;align-items:center;justify-content:center;
   font-family:var(--font-display);font-size:clamp(44px,9vw,64px);font-weight:900;
   color:rgba(255,255,255,.22);background:#0a0a2e;letter-spacing:.02em}
+/* ⚠️ [LAND-1c] EL RESPALDO QUE MANDA NO ES EL MÍO.
+   `loadArtistImg`, cuando el API no contesta, llama a `showInitials`, que hace
+   `imgEl.parentElement.innerHTML = …` — o sea REEMPLAZA el contenido de mi
+   .hn-media con el placeholder del catálogo y se lleva por delante .hn-ini.
+   Reusar la cadena de la tarjeta significa heredar también esto.
+   Y el placeholder del catálogo está pensado para una tarjeta chica: es 1:1 y
+   sus iniciales van al 10%, lo que en una caja de 152px se ve como un hueco
+   negro (así salió en la captura que revisó Memo). Se re-estila AQUÍ, dentro
+   del hero, sin tocar el del catálogo. */
+.hn-media .ev-img-placeholder,.hs-media .ev-img-placeholder{
+  position:absolute;inset:0;width:100%;height:100%;
+  aspect-ratio:auto;border-radius:0;background:#0a0a2e}
+.hn-media .ev-img-initials{font-family:var(--font-display);font-weight:900;
+  font-size:clamp(44px,9vw,64px);color:rgba(255,255,255,.22);letter-spacing:.02em}
+.hs-media .ev-img-initials{font-family:var(--font-display);font-weight:900;
+  font-size:19px;color:rgba(255,255,255,.2)}
 .hn-body{padding:10px 12px 12px}
 .hn-artist{font-family:var(--font-display);font-weight:900;font-size:26px;line-height:1;text-transform:uppercase;color:#fff}
 .hn-venue{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.55);margin-top:3px}
@@ -2392,15 +2488,49 @@ body.pf-barra-viva .wa-float{bottom:104px}
    conservarla. Medido: 1 sola aparición de Kaneda en todo el index
    (.wiz-transmodo-name) y ya está cayendo a Montserrat en silencio. */
 @media(max-width:719px){
-  .home-hero-v2{padding:18px 16px 20px}
+  .home-hero-v2{padding:18px 14px 20px}
   .hh-kicker{margin-bottom:9px;font-size:9px;letter-spacing:.16em;padding-top:5px;padding-bottom:5px}
-  .hh-title{font-size:38px;line-height:.86;margin-bottom:7px}
+  /* [LAND-1c] UNA SOLA LÍNEA, al tamaño que el ancho dé.
+     El factor NO es de ojo: se midió el trazo real de "VIAJA CON EXPERTOS" en
+     Barlow Condensed 900 → 1179px a 100px de fuente, o sea 11.79px de ancho
+     por cada px de tamaño, MÁS .24em del padding lateral del .mark. De ahí
+     sale ancho_util / 12.03, y ancho_util es 100vw menos los 14px de padding
+     de cada lado. Con 4% de margen para el redondeo del navegador queda:
+       (100vw - 28px) / 11.83 * 0.97  ≈  8.20vw - 2.30px
+     El 11.83 es el trazo YA RENDERIZADO (medido en la página: 342px de trazo
+     con 28.9px de fuente a 390 de ancho), no el del canvas — se parecían, pero
+     el bueno es el que sale de la pantalla.
+     El 3% de margen NO es superstición: el arnés mide en Chromium y Memo mira
+     en Safari de iPhone. Las métricas de la misma webfont casi coinciden, pero
+     "casi" con white-space:nowrap significa un título recortado, así que el
+     colchón se queda hasta que alguien lo mida en un iPhone de verdad.
+     El tope de 46px es para que en una tablet angosta no se dispare.
+     ⚠️ Esto es una fórmula, no un número bonito: si alguien cambia el texto
+     del hero o el padding, HAY QUE VOLVER A MEDIR — el arnés comprueba que
+     no se parta en los cuatro anchos, así que avisaría. */
+  /* Los 10px de arriba son para el botón colapsado de la radio: sin ellos, en
+     375 y en 320 el botón caía encima de la última letra de "EXPERTOS"
+     (medido con elementFromPoint sobre el glifo, no de ojo). */
+  .hh-title{font-size:min(calc(8.20vw - 2.30px),48px);line-height:.9;margin-top:10px;margin-bottom:7px;white-space:nowrap}
+  .hh-title .line{display:inline}
   .hh-ctas{margin-top:11px;gap:7px}
   /* Los dos CTA venían en 26px de padding y 15px/.14em: "Escríbenos por
      WhatsApp" se partía en DOS renglones y el botón medía 90px de alto, lo
      que empujaba el cierre del primer pantallazo 21px por debajo del pliegue
      (medido: fin 865 contra 844 de alto). Aquí se aprietan para que quepan. */
   .hh-btn-full{padding:15px 18px;font-size:12.5px;letter-spacing:.09em}
+  /* [LAND-1c] La tarjeta crece con lo que soltó el título: pasar de dos
+     líneas a una liberó 39px de alto (65 → 26 medidos a 390). Se reparten
+     aquí, no se dejan en aire. */
+  .hn-media{height:152px}
+  .hn-body{padding:13px 14px 14px}
+  .hn-artist{font-size:30px}
+  .hn-venue{font-size:10.5px;margin-top:4px}
+  .hn-timer{margin-top:11px;gap:7px}
+  .hn-n{font-size:31px}
+  .hn-cell{min-width:44px}
+  .hn-sep{font-size:24px;padding-bottom:14px}
+  .hn-cta{margin-top:12px;padding:13px;font-size:13.5px}
 }
 
 /* ── PANTALLA BAJA (iPhone SE y compañía) ──
@@ -2410,9 +2540,12 @@ body.pf-barra-viva .wa-float{bottom:104px}
    bajas todo se aprieta un escalón más. Se dispara por ALTO, no por ancho:
    un SE y un 14 miden casi lo mismo de ancho y nada parecido de alto. */
 @media(max-height:760px){
-  .home-hero-v2{padding:12px 16px 14px}
+  .home-hero-v2{padding:12px 14px 14px}
   .hh-kicker{margin-bottom:7px}
-  .hh-title{font-size:31px;margin-bottom:6px}
+  /* El tamaño del título ya NO se fija aquí: lo manda la fórmula de arriba,
+     que depende del ANCHO. Una pantalla baja no es una pantalla angosta, y
+     encogerlo por alto lo partiría del problema equivocado. */
+  .hh-title{margin-bottom:6px}
   .hh-next-wrap{margin-top:9px}
   .hn-head{margin-bottom:5px}
   .hn-media{height:84px}
@@ -2431,14 +2564,19 @@ body.pf-barra-viva .wa-float{bottom:104px}
   /* [LAND-1b] El cronómetro pesa más alto que la pastilla "Faltan N días" que
      sustituyó (≈40px contra 22), así que quitar el párrafo no alcanzó solo:
      medido, el SE seguía saliéndose por 22px. Aquí se aprieta lo nuevo. */
-  .hn-media{height:72px}
-  .hn-timer{margin-top:6px;gap:5px}
-  .hn-n{font-size:24px}
-  .hn-cell{min-width:36px}
-  .hn-sep{font-size:19px;padding-bottom:11px}
-  .hn-cta{margin-top:7px;padding:8px}
-  .hh-strip{margin-top:6px}
-  .hs-media{height:38px}
+  /* [LAND-1c] Estos valores venían de cuando el título ocupaba DOS líneas y
+     el pliegue iba justo. Con una línea, el iPhone SE quedó con 99px de sobra
+     (WhatsApp cerraba en 568 de 667), así que la tarjeta también crece aquí:
+     una pantalla baja no tiene por qué llevar la tarjeta diminuta. */
+  .hn-media{height:112px}
+  .hn-timer{margin-top:8px;gap:6px}
+  .hn-n{font-size:27px}
+  .hn-cell{min-width:40px}
+  .hn-sep{font-size:21px;padding-bottom:12px}
+  .hn-cta{margin-top:9px;padding:10px}
+  .hn-artist{font-size:27px}
+  .hh-strip{margin-top:8px}
+  .hs-media{height:44px}
 }
 
 /* Pantalla MUY baja (iPhone 5/SE de 1ª generación, 568px). Quedaba a 26px de
@@ -2446,12 +2584,15 @@ body.pf-barra-viva .wa-float{bottom:104px}
    lo pise, no antes — la misma lección de arriba. */
 @media(max-height:610px){
   .home-hero-v2{padding:9px 14px 11px}
-  .hh-title{font-size:27px;margin-bottom:5px}
-  .hn-media{height:56px}
-  .hn-n{font-size:21px}
-  .hn-cell{min-width:32px}
-  .hn-sep{font-size:16px;padding-bottom:10px}
-  .hs-media{height:34px}
+  .hh-title{margin-bottom:5px}
+  /* 78px se salía por 6 — medido, no supuesto. Y los 10px que bajó el título
+     para dejarle sitio al botón de la radio salen de aquí. */
+  .hn-media{height:58px}
+  .hn-n{font-size:23px}
+  .hn-cell{min-width:34px}
+  .hn-sep{font-size:18px;padding-bottom:10px}
+  .hn-artist{font-size:24px}
+  .hs-media{height:38px}
   .hh-proof{margin-top:6px;font-size:10px}
 }
 

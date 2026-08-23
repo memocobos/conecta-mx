@@ -301,15 +301,15 @@
   </div>
  </div>
 
- <!-- Próximos eventos -->
- <div class="card" style="margin-bottom:16px">
- <div style="font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--ts);margin-bottom:14px">
- Próximos Eventos
- </div>
- <div id="proximos-eventos">
- <div class="loading-state"><div class="spinner"></div>Cargando…</div>
- </div>
- </div>
+ <!-- [RES-4] EL RADAR, DENTRO DEL RESUMEN. Aquí vivía "Próximos Eventos" con
+      su buscador: una lista de hasta 10 con semáforo y % cobrado. Memo la
+      cambia por el monitoreo del sitio, que es lo que no se puede ver en
+      ninguna otra pantalla del Resumen. Lo que se retira NO se pierde: el
+      semáforo, el % cobrado y el monto por evento siguen en "Por Evento", que
+      es exactamente a donde llevaba el clic de cada renglón.
+      Solo maestro_roshi: `ROLES_RADAR` es ['maestro_roshi'], leído del
+      endpoint. Fails-soft por fuente, como la tira de alertas. -->
+ <div id="resumen-radar" style="display:none;margin-bottom:16px"></div>
 
  <!-- En riesgo de baja (Nivel 3 morosidad) -->
  <div class="card" id="riesgo-baja-card" style="display:none">

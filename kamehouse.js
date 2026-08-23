@@ -388,7 +388,6 @@ function enterApp() {
 // Guerreros Z, equipo, biblioteca, cobranza) NO se tocan.
 // ═══════════════════════════════════════════════════════════════
 const _KM_SEARCH = [
-  ['proximos-eventos', '.dash-click', 'Buscar evento…'],
   ['atrasados-lista',  '.dash-click', 'Buscar viajero atrasado…'],
   ['tabla-pagos',      'tr',          'Buscar viajero, evento, teléfono…'],
   ['tabla-viajeros',   'tr',          'Buscar viajero, zona, estado…'],
@@ -4421,9 +4420,8 @@ async function loadResumen() {
   _loadAlertasHome();       // [RES-1] lo que pide atención, arriba de todo (solo Memo; fails-soft)
   _renderAtajosHome();      // [E5-5] atajos del home, filtrados por _puedeVerTab
   _loadConexiones();        // 🕘 tablero de conexiones (solo Memo; fails-soft)
-  const proxEl = document.getElementById('proximos-eventos');
+  _loadRadarHome();         // [RES-4] el monitoreo del sitio (solo Memo; fails-soft)
   const atrEl  = document.getElementById('atrasados-lista');
-  if (proxEl) proxEl.innerHTML = '<div class="loading-state"><div class="spinner"></div>Cargando…</div>';
   if (atrEl)  atrEl.innerHTML  = '<div class="loading-state"><div class="spinner"></div>Cargando…</div>';
 
   try {
@@ -4500,11 +4498,9 @@ async function loadResumen() {
     // 2) Carga la utilidad UNA sola vez (compartida, fresca). Best-effort: si falla,
     //    _utilG3Cache queda null → salud neutra y lo de abajo igual pinta.
     await _utilCargar(true);
-    // 3) Ya con la cache lista: Franja 4 (próximos con salud) + Franja 2 (tabla).
-    _renderResumenProximos(ev, activos);
+    // 3) Ya con la cache lista: la tabla de ganancia por evento.
     _renderResumenUtilidad(ev);
   } catch (e) {
-    if (proxEl) proxEl.innerHTML = `<div class="alert alert-error">${_spEscape(e.message)}</div>`;
     if (atrEl)  atrEl.innerHTML  = '';
   }
 }
@@ -5007,78 +5003,105 @@ function _resumenUtilCSV() {
   URL.revokeObjectURL(a.href);
 }
 
-// Próximos eventos: desde EV (index.html), fechas futuras, máx 10, con su dinero
-// agregado de la cobranza ACTIVA (cobrado + # viajeros, casando base y base#idx).
-// Días hasta una fecha futura = fecha − hoy (ambos a mediodía, evita bordes DST).
-function _diasHasta(fechaISO) {
-  if (!fechaISO) return null;
-  const hoy = Date.parse(_cobHoyISO() + 'T12:00:00');
-  const f = Date.parse(String(fechaISO) + 'T12:00:00');
-  if (isNaN(hoy) || isNaN(f)) return null;
-  return Math.round((f - hoy) / 86400000);
+// ═══════════════════════════════════════════════════════════════
+// [RES-4] EL RADAR DENTRO DEL RESUMEN — qué se está mirando y qué se vende
+//
+// Dos preguntas que ninguna otra parte del Resumen contesta: QUÉ EVENTO ESTÁN
+// VIENDO y CUÁNTO DE ESAS VISITAS SE VUELVE VENTA. Las dos salen del Radar,
+// que ya las calcula: `mainMetrics().top_vistos` y `ventasTrafico()`. Aquí no
+// se cuenta nada — se pide y se pinta.
+//
+// LA VENTANA SON 14 DÍAS, la misma que "los más buscados" del sitio público
+// (CAT-4). ⚠️ Es una constante ESPEJO, no compartida: la original vive en
+// `netlify/functions/event-clicks.js` (`DIAS_VENTANA = 14`) y ese archivo es
+// del servidor, no lo puede leer el navegador. Si alguna cambia, la otra hay
+// que cambiarla a mano — por eso está dicho aquí en voz alta.
+//
+// QUIÉN LO VE: `ROLES_RADAR` es ['maestro_roshi'] a secas, leído del endpoint.
+// Fails-soft POR FUENTE: si una de las dos truena, la otra se pinta igual.
+// ═══════════════════════════════════════════════════════════════
+const RADAR_HOME_DIAS = 14;
+const RADAR_HOME_TOP = 5;
+
+function _radarHomeSince() {
+  const d = new Date();
+  d.setDate(d.getDate() - RADAR_HOME_DIAS);
+  return d.toISOString();
 }
 
-// Próximos eventos (Franja 4 del dashboard) CON SALUD: semáforo por evento + %
-// cobrado (de _utilG3Cache, mismo criterio que la tabla utilidad), monto/viajeros
-// de cobranza (sin cambiar), badge "¡pronto!" si <7 días, y fila clickable → Por
-// evento. Lee _utilG3Cache que loadResumen ya cargó (carga compartida y esperada);
-// gris/neutro si no hay datos. No toca _renderResumenUtilidad ni el resto del Resumen.
-function _renderResumenProximos(ev, activos) {
-  const el = document.getElementById('proximos-eventos');
+// Barra proporcional al mayor, como la del Radar. El divisor nunca es 0.
+function _rdhBarra(n, max) {
+  const pct = Math.max(2, Math.round((Number(n) || 0) / Math.max(1, max) * 100));
+  return `<span class="rdh-bar" style="width:${pct}%"></span>`;
+}
+
+function _rdhVistos(top) {
+  if (!top.length) return '<div class="rdh-vacio">Sin visitas registradas en estos ' + RADAR_HOME_DIAS + ' días</div>';
+  const max = Math.max(1, ...top.map(e => Number(e.sesiones) || 0));
+  return top.map((e, i) => `<button type="button" class="rdh-row" onclick="_evtIrA('${_attrJs(e.evento_id || '')}')"
+      title="Ver ${_esfEsc(e.nombre || e.evento_id || '')} en Por evento">
+    <span class="rdh-pos">${i + 1}</span>
+    <span class="rdh-nom">${_esfEsc(e.nombre || e.evento_id || '—')}${_rdhBarra(e.sesiones, max)}</span>
+    <span class="rdh-n">${(Number(e.sesiones) || 0).toLocaleString('es-MX')}</span>
+  </button>`).join('');
+}
+
+function _rdhVentas(vt) {
+  if (!vt.length) return '<div class="rdh-vacio">Sin datos de ventas en estos ' + RADAR_HOME_DIAS + ' días</div>';
+  return `<table class="rdh-tabla"><thead><tr>
+      <th>Evento</th><th class="rdh-der">Visitas</th><th class="rdh-der">Ventas</th><th class="rdh-der">Conv.</th>
+    </tr></thead><tbody>${vt.map(r => {
+      // ⚠️ La conversión la CALCULA el endpoint (`conv`). No se recalcula aquí:
+      // dos divisiones del mismo par en dos pantallas es como empezaron las
+      // once fórmulas de dinero que AUD-1 tuvo que recoger.
+      const conv = Number(r.conv);
+      return `<tr class="rdh-clic" onclick="_evtIrA('${_attrJs(r.evento_id || '')}')" title="Ver en Por evento">
+        <td class="rdh-nom2">${_esfEsc(r.evento_nombre || r.evento_id || '—')}</td>
+        <td class="rdh-der">${(Number(r.visitas) || 0).toLocaleString('es-MX')}</td>
+        <td class="rdh-der">${(Number(r.ventas) || 0).toLocaleString('es-MX')}</td>
+        <td class="rdh-der ${Number.isFinite(conv) && conv > 0 ? 'rdh-conv' : ''}">${Number.isFinite(conv) ? conv.toFixed(1) + '%' : '—'}</td>
+      </tr>`;
+    }).join('')}</tbody></table>`;
+}
+
+async function _loadRadarHome() {
+  const el = document.getElementById('resumen-radar');
   if (!el) return;
-  const today = _cobHoyISO();
-  // [ORD-1] La regla compartida. Con la lista ya filtrada a futuros el
-  // resultado es el mismo; se usa igual para que UNA función gobierne el
-  // orden y un cambio futuro llegue aquí solo.
-  const futuros = _evOrdenarPorFecha((ev || [])
-    .filter(e => e && e.id && e.a && (!e.ds || e.ds >= today)))
-    .slice(0, 10);
-
-  if (!futuros.length) {
-    el.innerHTML = '<div class="empty-state"><div class="empty-icon">·</div>Sin eventos próximos</div>';
-    return;
-  }
-
-  const utilEvs = (_utilG3Cache && _utilG3Cache.eventos) || {};
-
-  el.innerHTML = futuros.map(e => {
-    const tours   = (activos || []).filter(t => _cobTourMatchEvento(t, e.id));
-    const cobrado = tours.reduce((a, t) => a + Number((t.pago || {}).abonado || 0), 0);
-    const fecha   = e.f || e.ds || '';
-    const lugar   = e.v ? (' · ' + _spEscape(e.v)) : '';
-    const baseSlug = String(e.id).split('#')[0];
-
-    // Salud (de la cache de utilidad). Gris/neutro si el evento no está en la cache.
-    const u = utilEvs[baseSlug];
-    const sem = u ? _resumenUtilSemaforo(Number(u.caja || 0), Number(u.proyectado || 0)) : 'var(--ts)';
-    const semTitle = u ? 'Salud (caja/proyectado)' : 'Sin movimientos registrados';
-    const pctTxt = (u && Number(u.vendido || 0) > 0)
-      ? `${Math.round(Number(u.cobrado || 0) / Number(u.vendido) * 100)}% cobrado`
-      : '— cobrado';
-
-    // Badge "¡pronto!" si faltan menos de 7 días (y no es pasado).
-    const dias = _diasHasta(e.ds);
-    const pronto = (dias !== null && dias >= 0 && dias < 7)
-      ? ' <span style="font-size:9px;font-weight:800;color:#000;background:var(--orange);border-radius:4px;padding:1px 6px;letter-spacing:.03em">¡PRONTO!</span>'
-      : '';
-
-    return `
-    <div class="dash-click" onclick="_evtIrA('${baseSlug}')" title="Ver en Por evento" style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px solid var(--border)">
-      <div style="display:flex;align-items:center;gap:10px;min-width:0">
-        <span title="${semTitle}" style="display:inline-block;width:11px;height:11px;border-radius:50%;background:${sem};flex-shrink:0"></span>
-        <div style="min-width:0">
-          <div style="font-weight:600;font-size:14px">${_spEscape(e.a)}${pronto}</div>
-          <div style="font-size:11px;color:var(--ts)">${_spEscape(fecha)}${lugar} · ${pctTxt}</div>
-        </div>
+  if (!currentUser || currentUser.rol !== 'maestro_roshi') { el.style.display = 'none'; return; }
+  const since = _radarHomeSince();
+  // Fails-soft POR FUENTE, no en bloque: un `Promise.all` que rechaza dejaría
+  // el panel entero vacío aunque la otra mitad hubiera contestado bien.
+  const [met, vt] = await Promise.all([
+    khRadar.mainMetrics(since).catch(() => null),
+    khRadar.ventasTrafico({ since }).catch(() => []),
+  ]);
+  const top = ((met && met.top_vistos) || []).slice(0, RADAR_HOME_TOP);
+  const ventas = (Array.isArray(vt) ? vt : []).slice(0, RADAR_HOME_TOP);
+  if (!top.length && !ventas.length) { el.style.display = 'none'; return; }
+  el.style.display = '';
+  el.innerHTML = `<div class="card rdh-card">
+    <div class="rdh-head">
+      <span class="rdh-h">Radar · qué se está mirando</span>
+      <span class="rdh-win">últimos ${RADAR_HOME_DIAS} días · <button type="button" class="rdh-ver" onclick="showPage('radar')">ver el Radar completo →</button></span>
+    </div>
+    <div class="rdh-cols">
+      <div class="rdh-col">
+        <div class="rdh-sub">Más vistos</div>
+        ${_rdhVistos(top)}
       </div>
-      <div style="text-align:right;white-space:nowrap">
-        <div style="font-size:13px;color:var(--green)">${_spFmtMxn(cobrado)}</div>
-        <div style="font-size:11px;color:var(--ts)">${tours.length} viajero${tours.length === 1 ? '' : 's'}</div>
+      <div class="rdh-col">
+        <div class="rdh-sub">De visita a venta</div>
+        ${_rdhVentas(ventas)}
       </div>
-    </div>`;
-  }).join('');
+    </div>
+  </div>`;
 }
 
+// [RES-4] Aquí vivían `_diasHasta` y `_renderResumenProximos`, que pintaban
+// la tarjeta de "Próximos Eventos". Se van con ella: medido, `_diasHasta` no
+// tenía otro consumidor y `_renderResumenProximos` se llamaba desde un solo
+// sitio. Dejar código que ya no pinta nada es peor que borrarlo — pero se
+// borra DESPUÉS de contar los usos, no antes.
 // Días de atraso = hoy − fecha_esperada (ambos a mediodía para evitar bordes DST,
 // como "próximos"). >=0; nunca negativo (los atrasados ya filtran fecha < hoy).
 function _cobDiasAtraso(fechaISO) {

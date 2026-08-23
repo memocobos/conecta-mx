@@ -4338,6 +4338,12 @@ async function _loadAlertasHome() {
 // Los demás roles: sin juicio de horario (no tienen entrada contractual).
 // ═══════════════════════════════════════════════════════════════
 const _CONEX_AUX = ['bulma', 'milk'];   // roles con horario contractual de entrada
+// [RES-2] Renglones a la vista antes del desplegable. En teléfono son menos:
+// medido, con 6 el primer número de dinero caía en y=882 y el pliegue de un
+// 390×844 está en 844 — 38px de más. Con 4 entra. Se decide AL PINTAR; girar
+// el teléfono no lo recalcula hasta la siguiente carga, y eso es aceptable
+// para un tablero que se abre, se mira y se cierra.
+function _cnxVisibles() { return (window.innerWidth || 1200) <= 640 ? 4 : 6; }
 
 async function _loadConexiones() {
   const el = document.getElementById('resumen-conexiones');
@@ -4369,7 +4375,11 @@ function _renderConexiones(j) {
     const aa = _CONEX_AUX.includes(a.rol) ? 0 : 1, bb = _CONEX_AUX.includes(b.rol) ? 0 : 1;
     return aa !== bb ? aa - bb : String(a.nombre).localeCompare(String(b.nombre));
   });
-  const filas = orden.map((u) => {
+  // [RES-2] Con 14 usuarios activos la tabla medía 571px: media pantalla de
+  // alto. Se muestran los primeros — que por el orden de arriba son los AUX,
+  // los que Memo vigila — y el resto va detrás del mismo desplegable que usa
+  // la tira de alertas.
+  const fila = (u) => {
     const idS = _esfEsc(u.id);
     const chip = _conexChip(u, tol);
     return `<tr style="border-top:1px solid var(--border);cursor:pointer" onclick="_conexHistorial('${idS}','${_attrJs(u.nombre)}')" title="Ver últimos 14 días">
@@ -4378,7 +4388,11 @@ function _renderConexiones(j) {
       <td style="padding:7px 4px;text-align:center;font-size:13px;color:var(--text);border:none">${u.ultima ? _esfEsc(u.ultima) : '<span style="color:var(--ts)">—</span>'}</td>
       <td style="padding:7px 4px;text-align:right;border:none">${chip}</td>
     </tr>`;
-  }).join('');
+  };
+  const vis = _cnxVisibles();
+  const arriba = orden.slice(0, vis).map(fila).join('');
+  const resto = orden.slice(vis);
+  const filas = arriba;
   return `<div class="card">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px">
       <div style="font-family:'Barlow Condensed','Montserrat',sans-serif;font-weight:800;font-size:16px;text-transform:uppercase;color:var(--text)">🕘 Conexiones de hoy</div>
@@ -4389,8 +4403,24 @@ function _renderConexiones(j) {
         <th style="text-align:left;padding:4px;background:transparent;border:none;color:var(--ts)">Usuario</th><th style="padding:4px;background:transparent;border:none;color:var(--ts)">Primera</th><th style="padding:4px;background:transparent;border:none;color:var(--ts)">Última</th><th style="text-align:right;padding:4px;background:transparent;border:none;color:var(--ts)">Puntualidad</th>
       </tr></thead>
       <tbody>${filas || '<tr><td colspan="4" style="padding:12px;text-align:center;color:var(--ts);font-size:12px">Sin conexiones registradas aún</td></tr>'}</tbody>
+      ${resto.length ? `<tbody id="cnx-resto" data-vis="${vis}" hidden>${resto.map(fila).join('')}</tbody>` : ''}
     </table>
+    ${resto.length ? `<button type="button" class="cnx-mas" aria-expanded="false" aria-controls="cnx-resto"
+      onclick="_cnxMas(this)">ver los ${orden.length}</button>` : ''}
   </div>`;
+}
+
+// [RES-2] El resto de las conexiones va en un SEGUNDO <tbody>, no en un
+// <details>: un <details> no puede envolver <tr> sin romper la tabla, y dos
+// tablas apiladas pierden la alineación de columnas. Dos tbody en la misma
+// tabla la conservan.
+function _cnxMas(btn) {
+  const t = document.getElementById('cnx-resto');
+  if (!t) return;
+  const abrir = t.hidden;
+  t.hidden = !abrir;
+  btn.setAttribute('aria-expanded', String(abrir));
+  btn.textContent = abrir ? 'ver menos' : ('ver los ' + (t.rows.length + (parseInt(t.dataset.vis, 10) || 0)));
 }
 
 async function _conexHistorial(uid, nombre) {

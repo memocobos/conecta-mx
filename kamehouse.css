@@ -2428,35 +2428,6 @@ html, body { background: var(--bg); color: var(--text); padding: 0; }
 }
 
 /* ═══ [KMS-2] Preview de compra — ver el dinero ANTES de guardar ══════════ */
-.kms-prev{
- margin-top:10px;padding:12px 14px;
- border:1px solid var(--gold);border-radius:var(--r-sm,8px);background:var(--bg3);
- /* Solo opacity/transform por frame — la regla de animación de la casa. */
- animation:kmsPrevIn .18s ease both;
-}
-@keyframes kmsPrevIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
-@media (prefers-reduced-motion:reduce){.kms-prev{animation:none}}
-.kms-prev-t{
- font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.14em;
- text-transform:uppercase;color:var(--gold);margin-bottom:10px;
-}
-.kms-prev-l{
- display:flex;justify-content:space-between;align-items:baseline;gap:12px;
- flex-wrap:wrap;padding:5px 0;font-size:12px;
- border-top:1px solid var(--border);
-}
-.kms-prev-l:first-of-type{border-top:0}
-.kms-prev-head{padding-bottom:8px;margin-bottom:2px}
-.kms-prev-head b{font-size:14px;color:var(--gold)}
-.kms-prev-k{color:var(--ts)}
-.kms-prev-v{display:inline-flex;align-items:baseline;gap:7px;white-space:nowrap}
-/* Sin `line-through`: tachar funciona sobre "$86,000" pero sobre un solo
-   dígito —"7" de disponibles— deja un garabato que no se lee. El atenuado y la
-   flecha ya dicen "esto era antes", y valen igual para $86,000 que para 7. */
-.kms-prev-a{color:var(--ts)}
-.kms-prev-fl{color:var(--ts);font-size:11px}
-.kms-prev-v b{color:var(--text);font-weight:700}
-.kms-prev-btns{display:flex;gap:8px;justify-content:flex-end;margin-top:12px;flex-wrap:wrap}
 
 /* ═══ [KMS-3] Elegir zona sin buscarla ════════════════════════════════════
    Memo: "está muy larga la lista para buscar cada boleto". Lista clickeable
@@ -2571,7 +2542,6 @@ html, body { background: var(--bg); color: var(--text); padding: 0; }
  box-shadow:0 0 0 3px rgba(255,90,77,.18);
 }
 .kam-ajuste{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:8px}
-.kam-ajuste-lbl{font-size:11px;color:var(--ts);text-transform:uppercase;letter-spacing:.06em}
 .kam-ajuste-num{width:90px}
 .kam-ajuste-nota{flex:1;min-width:140px}
 .kam-sem-meta{font-size:10px;color:var(--ts)}
@@ -3546,3 +3516,76 @@ input[type="search"],.kh-buscar,.buscador{border-radius:var(--r-sm,8px)}
 .rdh-conv { color: var(--green); font-weight: 700; }
 .rdh-clic { cursor: pointer; }
 .rdh-clic:hover td { background: var(--bg2); }
+
+/* ── [KMS-SIMP-3] La zona, de formulario de gobierno a ficha de consulta ──────
+   Medido antes: el panel ocupaba 1134px de ancho con ONCE controles, y el
+   `<select>` de proveedor se estiraba a todo lo ancho para elegir entre dos.
+   Ahora la ficha se contiene y la tabla de tanda queda de protagonista. */
+.kms-zpanel {
+  max-width: 720px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm, 8px);
+  padding: 14px 16px;
+  margin-bottom: 12px;
+  background: var(--bg2);
+}
+.kms-zp-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+.kms-zp-nom { font-family: 'Rajdhani', sans-serif; font-weight: 700; font-size: 16px; }
+.kms-zp-deu { font-size: 12px; color: var(--ts); }
+.kms-zp-deu b { color: var(--text); }
+
+.kms-zp-h {
+  font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: .12em;
+  text-transform: uppercase; color: var(--ts); margin: 14px 0 6px;
+}
+/* La tabla ya no se estira: sus columnas miden lo que su contenido. La última
+   (el botón de borrar) se pega a la derecha para que no quede flotando. */
+.kms-zp-tabla { overflow-x: auto; }
+.kms-zp-tabla table { border-collapse: collapse; width: auto; min-width: 100%; font-size: 12px; }
+/* ⚠️ LA REJILLA GRIS NO ERA MÍA, Y NO ES DE ESTA TABLA. Se preguntó al
+   navegador en vez de adivinar: el `td` computaba `border 1px rgb(204,204,204)`
+   en top/right/left. Sale de CUATRO hojas de estilo de IMPRESIÓN que quedaron a
+   NIVEL RAÍZ en este archivo (líneas ~2268 y ~2285-2287, `th,td{border:1px
+   solid #ccc}`), residuo de la extracción V2 (#326). El hotfix del 24-jul cazó
+   su `body{background}` y sus `th`, pero no los bordes.
+   Contamina TODAS las tablas de la app, así que su poda es una tuerca aparte
+   con su barrido visual. Aquí solo se neutraliza en esta tabla. */
+.kms-zp-tabla td {
+  border: 0; border-bottom: 1px solid var(--border);
+  padding: 6px 12px 6px 0; white-space: nowrap;
+  font-size: 12px; font-weight: 400;
+}
+.kms-zp-tabla tr:last-child td { border-bottom: none; }
+.kms-zp-tabla tr:hover td { background: transparent; }   /* no es una lista para elegir */
+.kms-zp-tabla tbody tr:nth-child(even) td { background: transparent; }
+.kms-zp-tabla .kzt-a { color: var(--ts); }
+.kms-zp-tabla .kzt-q, .kms-zp-tabla .kzt-s { font-variant-numeric: tabular-nums; }
+.kms-zp-tabla td:last-child { padding-right: 0; text-align: right; width: 1%; }
+
+.kms-zp-pie {
+  margin-top: 14px; padding-top: 10px; border-top: 1px solid var(--border);
+  font-size: 11px; color: var(--ts); line-height: 1.5;
+}
+.kms-zp-pie b { color: var(--text); }
+
+/* "Vendidos fuera" en segundo plano: se abre solo si lo buscas. */
+.kam-ajuste-wrap { margin-top: 14px; }
+.kam-ajuste-sum {
+  cursor: pointer; list-style: none;
+  font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: .1em;
+  text-transform: uppercase; color: var(--ts); padding: 5px 0;
+}
+.kam-ajuste-sum::-webkit-details-marker { display: none; }
+.kam-ajuste-sum::before { content: '▸ '; }
+.kam-ajuste-wrap[open] > .kam-ajuste-sum::before { content: '▾ '; }
+.kam-ajuste-sum:hover { color: var(--orange); }
+.kam-ajuste-sum b { color: var(--text); }
+.kam-ajuste-wrap > .kam-ajuste { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 8px; }
+.kam-ajuste-wrap .kam-ajuste-num { width: 90px; }
+.kam-ajuste-wrap .kam-ajuste-nota { flex: 1 1 200px; min-width: 160px; }
+.kam-ajuste-nota-pie { margin-top: 8px; font-size: 10.5px; color: var(--ts); line-height: 1.5; }
+
+@media (max-width: 640px) {
+  .kms-zpanel { padding: 12px; }
+  .kam-ajuste-wrap .kam-ajuste-nota { flex-basis: 100%; }
+}

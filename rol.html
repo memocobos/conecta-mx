@@ -2683,9 +2683,12 @@ function computeStatePlan(){
 
   // Si el evento es multifecha y el cliente ya eligió una, el "evento" para
   // efectos del corte es esa fecha específica (no la primera del array).
-  var dsEffective = (ev.multifecha && state.fi!=null && ev.multifecha[state.fi] && ev.multifecha[state.fi].ds)
-    ? ev.multifecha[state.fi].ds
-    : ev.ds;
+  // [MULTIFECHA-DSLIST] dsList primero, multifecha[].ds después — misma
+  // precedencia que kamehouse.js:8948. Sin esto, los eventos que traen dsList
+  // calculaban contra su primer día.
+  var dsEffective = (ev.dsList && ev.dsList[state.fi])
+    || (ev.multifecha && state.fi!=null && ev.multifecha[state.fi] && ev.multifecha[state.fi].ds)
+    || ev.ds;
   var eventDate=new Date(dsEffective+'T12:00:00');
   var maxPagos=(pkg==='cheap')?4:10;
   // Override por subfecha: si la multifecha define `pagos:['YYYY-MM-DD',...]`
@@ -3096,9 +3099,10 @@ function buildPlanForTour(t){
   _rolLimpiarImposible();
   var resto=perP-sepActual;
   // Multifecha-aware: usar la fecha de la subfecha guardada del tour si existe.
-  var dsEffective = (ev.multifecha && t.fi!=null && ev.multifecha[t.fi] && ev.multifecha[t.fi].ds)
-    ? ev.multifecha[t.fi].ds
-    : ev.ds;
+  // [MULTIFECHA-DSLIST] misma precedencia que arriba y que kamehouse.js:8948.
+  var dsEffective = (ev.dsList && ev.dsList[t.fi])
+    || (ev.multifecha && t.fi!=null && ev.multifecha[t.fi] && ev.multifecha[t.fi].ds)
+    || ev.ds;
   var eventDate=new Date(dsEffective+'T12:00:00');
   var maxPagos=(pkg==='cheap')?4:10;
   // Override por subfecha (mismo patrón que computeStatePlan)

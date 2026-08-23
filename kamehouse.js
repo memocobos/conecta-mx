@@ -7648,6 +7648,9 @@ function _kmsAplicar() {
 
   _kmsVacios();
   _kmsTableroLimpiar();
+  // [KMS-SIMP-2] La cuenta del evento se pide aquí, donde ya se decide el
+  // evento para todo lo demás. Fails-soft: si truena, el Palacio es el de antes.
+  if (typeof _kmsCuentaCargar === 'function') { try { _kmsCuentaCargar(); } catch (_) {} }
   if (!id) {
     // Sin evento: se limpian los cuerpos para que no quede el del anterior.
     ['kam-compras', 'kam-com-body', 'kam-liq-body'].forEach((k) => { const e = document.getElementById(k); if (e) e.innerHTML = ''; });
@@ -8367,7 +8370,10 @@ async function _kamProveedorCrear() {
 function _kamProvSelectsRefrescar(nuevoId) {
   const opts = (_kamProvCache || [])
     .map((p) => `<option value="${_esfEsc(p.id)}">${_esfEsc(p.nombre)}</option>`).join('');
-  document.querySelectorAll('select[id^="kam-c-prov-"]').forEach((sel) => {
+  // [KMS-SIMP-2] `kmt-prov` (el de la tanda) se suma al barrido. Medido: el
+  // selector solo alcanzaba `kam-c-prov-*`, así que un proveedor dado de alta
+  // desde la tabla no aparecía EN la tabla — justo donde se acababa de pedir.
+  document.querySelectorAll('select[id^="kam-c-prov-"], #kmt-prov').forEach((sel) => {
     const antes = sel.value;
     sel.innerHTML = opts;
     // Si lo de antes sigue existiendo, se respeta; si no, el nuevo.
@@ -8848,6 +8854,11 @@ async function _kamComprasLoad() {
         <div class="kms-prev" id="kms-prev-${zi}" style="display:none"></div>
       </div>`;
     });
+    // [KMS-SIMP-2] La cuenta se re-pinta DESPUÉS del tablero, porque el punto
+    // de quiebre necesita la inversión y los disponibles que el tablero acaba
+    // de calcular. Si la cuenta aún no llegó del servidor, no pinta nada y se
+    // pintará sola cuando llegue.
+    setTimeout(() => { if (typeof _kmsCuentaPintar === 'function') _kmsCuentaPintar(); }, 0);
     // [KMS-1] El tablero de arriba se pinta con lo que ESTA función ya calculó
     // (compras + semáforo). Ni un endpoint nuevo ni una llamada extra.
     _kmsTableroPintar({
@@ -8937,7 +8948,16 @@ async function _kamComprasLoad() {
       <summary class="kmt-sum">↥ Cargar pedido en tanda <span class="kmt-hint">— las ${zonaNames.length} zonas en una sola pantalla</span></summary>
       <div class="kmt-body">
         <div class="kmt-comun">
-          <label class="kmt-lbl">PROVEEDOR<select class="cot-input" id="kmt-prov">${provOptsTanda}</select></label>
+          <label class="kmt-lbl">PROVEEDOR<span class="kmt-prov-fila">
+            <select class="cot-input" id="kmt-prov">${provOptsTanda}</select>
+            <!-- [KMS-SIMP-2] Agregar un proveedor SIN salir de la tabla. Reusa
+                 admin-proveedores accion crear (el mismo alta del paso 1), asi
+                 que queda guardado para siempre y aparece en todos lados. Antes
+                 habia que volver al paso 1, darlo de alta y regresar.
+                 Ojo: sin acentos ni comillas invertidas — este comentario vive
+                 DENTRO de un template literal, y un backtick lo cerraria. -->
+            <button type="button" class="btn btn-ghost btn-sm kmt-prov-mas" onclick="_kmtProvNuevo()" title="Agregar proveedor">+</button>
+          </span></label>
           <label class="kmt-lbl">FECHA<input class="cot-input" id="kmt-fecha" type="date" value="${_kamToday()}"></label>
           <label class="kmt-lbl" style="flex:1;min-width:180px">NOTA DE LA TANDA<input class="cot-input" id="kmt-nota" placeholder="opcional — ej. pedido inicial" maxlength="500"></label>
         </div>
@@ -9111,6 +9131,115 @@ async function _kamCompraCrear(zi) {
   } catch (e) { _kamComprasAlert(e.message); }
 }
 
+// ═══ [KMS-SIMP-2] LA CUENTA DEL EVENTO, A LA VISTA ═════════════════════════
+// Todo sale de `_lib/cuenta-evento` por su puerta nueva (`admin-cuenta-evento`).
+// AQUÍ NO SE CALCULA DINERO: se pinta lo que la cuenta ya sabe. La única cuenta
+// propia es el PUNTO DE QUIEBRE, y está declarada abajo con su fórmula a la
+// vista, porque es una PROYECCIÓN, no un saldo.
+let _kmsCuenta = null;
+
+async function _kmsCuentaCargar() {
+  const sel = document.getElementById('kam-evt-sel');   // la MISMA fuente que el resto
+  const evId = sel ? sel.value : '';
+  const cont = document.getElementById('kms-cuenta');
+  if (!cont) return;
+  _kmsCuenta = null;
+  if (!evId) { cont.innerHTML = ''; return; }
+  cont.innerHTML = '<div class="kmc-cargando">Sacando la cuenta del evento…</div>';
+  try {
+    const r = await khAdminFetch('/.netlify/functions/admin-cuenta-evento', {
+      method: 'POST', body: JSON.stringify({ evento_id: evId }),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok || !d.ok) throw new Error(d.error || 'No se pudo sacar la cuenta');
+    _kmsCuenta = d.cuenta || null;
+  } catch (e) {
+    // Fails-soft: sin la cuenta, el Palacio es el de antes. Se DICE que no se
+    // pudo, en vez de pintar ceros — un cero aquí se leería como "no vendiste".
+    cont.innerHTML = `<div class="kmc-cargando">No se pudo sacar la cuenta del evento (${_esfEsc(e.message)}). Lo demás del Palacio sigue funcionando.</div>`;
+    return;
+  }
+  _kmsCuentaPintar();
+}
+
+// El importe o, si no se puede saber, la palabra. Un `null` de la cuenta
+// significa "no se puede afirmar" (p.ej. sin permiso para ver migrados), y eso
+// NO es cero.
+function _kmcVal(v) { return v == null ? '<span class="kmc-nd">sin dato</span>' : _kamMoney(v); }
+
+function _kmsCuentaPintar() {
+  const cont = document.getElementById('kms-cuenta');
+  if (!cont) return;
+  const c = _kmsCuenta;
+  if (!c) { cont.innerHTML = ''; return; }
+  const d = _kmsDatos || {};
+  const inversion = Number(d.inversion) || 0;      // lo que costaron los boletos (KH)
+  const q = _kmsQuiebre(c, d);
+
+  cont.innerHTML = `
+    <div class="kmc-grid">
+      <div class="kmc-c"><div class="kmc-l">VENDIDO</div><div class="kmc-v">${_kmcVal(c.facturado)}</div>
+        <div class="kmc-s">cobrado ${_kmcVal(c.ventas)}</div></div>
+      <div class="kmc-c"><div class="kmc-l">GASTOS</div><div class="kmc-v">${_kmcVal(c.gastos)}</div>
+        <div class="kmc-s">del evento, sin boletos</div></div>
+      <div class="kmc-c"><div class="kmc-l">DEUDA A PROVEEDORES</div><div class="kmc-v">${_kmcVal(c.deuda_proveedores)}</div>
+        <div class="kmc-s">boletos y servicios por pagar</div></div>
+      <div class="kmc-c ${c.ganancia == null ? '' : (c.ganancia >= 0 ? 'kmc-ok' : 'kmc-mal')}">
+        <div class="kmc-l">UTILIDAD</div><div class="kmc-v">${_kmcVal(c.ganancia)}</div>
+        <div class="kmc-s">cobrado − gastos</div></div>
+    </div>
+    ${q.html}`;
+}
+
+// ═══ EL PUNTO DE QUIEBRE, EN PALABRAS ══════════════════════════════════════
+// Ésta SÍ es una cuenta propia, y por eso se declara entera:
+//
+//   falta por recuperar = (gastos + inversión en boletos) − cobrado
+//
+// ⚠️ Se suma la inversión en boletos A PROPÓSITO, y no es doble conteo:
+// `gastos` vive en el PORTAL y el mundo de proveedores vive en KH — ninguna
+// función de proveedores escribe en `gastos` (es la regla de "los dos mundos").
+// Sin sumarla, el punto de quiebre diría que ya estás en verdes cuando todavía
+// no has pagado los boletos.
+//
+// Y es una PROYECCIÓN, no un saldo: se dice con palabras y con el precio de
+// lista a la vista, para que nadie la lea como dinero que ya existe.
+function _kmsQuiebre(c, d) {
+  const gastos = Number(c.gastos) || 0;
+  const cobrado = c.ventas;
+  const inversion = Number(d.inversion) || 0;
+  if (cobrado == null) {
+    return { html: '<div class="kmc-q kmc-q-nd">No se puede calcular el punto de quiebre sin ver el dinero de los migrados.</div>' };
+  }
+  const falta = (gastos + inversion) - cobrado;
+  if (falta <= 0) {
+    return { html: `<div class="kmc-q kmc-q-ok">Ya recuperaste lo invertido. Cada boleto que vendas de aquí en adelante es ganancia.</div>` };
+  }
+  // Lo que QUEDA por vender, con su precio de lista. Las dos cosas ya las tiene
+  // la pantalla: los disponibles del semáforo y los precios del catálogo.
+  const precios = d.precios || {};
+  const zonas = (d.zonas || []).filter((z) => z && Number.isFinite(Number(z.disponibles)) && Number(z.disponibles) > 0);
+  const conPrecio = zonas
+    .map((z) => ({ n: z.zona, disp: Number(z.disponibles), p: Number(precios[String(z.zona).trim()]) }))
+    .filter((z) => Number.isFinite(z.p) && z.p > 0);
+  if (!conPrecio.length) {
+    return { html: `<div class="kmc-q kmc-q-nd">Falta recuperar <b>${_kamMoney(falta)}</b>, pero no hay zonas con lugares y precio para decir cuántos boletos son.</div>` };
+  }
+  // El techo: vender TODO lo que queda, a precio de lista.
+  const techo = conPrecio.reduce((a, z) => a + z.disp * z.p, 0);
+  if (techo < falta) {
+    return { html: `<div class="kmc-q kmc-q-mal">Ni vendiendo <b>todo</b> lo que queda (${_kamMoney(techo)}) recuperas los <b>${_kamMoney(falta)}</b> que faltan. Considera una promoción o revisar el precio.</div>` };
+  }
+  // La zona más cara con lugares es la que menos boletos pide.
+  const mejor = conPrecio.slice().sort((a, b) => b.p - a.p)[0];
+  const n = Math.ceil(falta / mejor.p);
+  const alcanza = n <= mejor.disp;
+  const detalle = alcanza
+    ? `<b>${n}</b> boleto${n !== 1 ? 's' : ''} más de <b>${_esfEsc(mejor.n)}</b> (${_kamMoney(mejor.p)} c/u) y estás en verdes.`
+    : `Con <b>${_esfEsc(mejor.n)}</b> no alcanza (quedan ${mejor.disp} y harían falta ${n}): hay que sumar varias zonas.`;
+  return { html: `<div class="kmc-q ${alcanza ? 'kmc-q-cerca' : 'kmc-q-nd'}">Falta recuperar <b>${_kamMoney(falta)}</b> — ${detalle}</div>` };
+}
+
 // ═══ [KMS-SIMP-1] LA TABLA DE TANDA ════════════════════════════════════════
 // Lee los renglones llenos, calcula a la vista y guarda una compra POR RENGLÓN.
 // No hay endpoint nuevo: usa `admin-compras` con accion 'crear', que es una
@@ -9157,6 +9286,36 @@ function _kmtCalc() {
   }
   return { filas, zonas, malas, boletos, dinero };
 }
+// [KMS-SIMP-2] Alta de proveedor desde la tabla. NO duplica el endpoint ni la
+// regla: llama al MISMO `admin-proveedores` accion 'crear' que el paso ①, y
+// después al MISMO `_kamProveedoresLoad` + `_kamProvSelectsRefrescar`, para que
+// el proveedor nuevo quede elegido aquí y exista en todas las demás pantallas.
+async function _kmtProvNuevo() {
+  const nombre = (window.prompt('Nombre del proveedor nuevo:') || '').trim();
+  if (!nombre) return;
+  _kmtError('');
+  try {
+    const r = await khAdminFetch('/.netlify/functions/admin-proveedores', {
+      method: 'POST', body: JSON.stringify({ accion: 'crear', nombre }),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok || !d.ok) throw new Error(d.error || 'No se pudo agregar el proveedor');
+    await _kamProveedoresLoad();
+    _kamProvSelectsRefrescar((d.proveedor && d.proveedor.id) || null);
+    // ⚠️ `_kamProvSelectsRefrescar` CONSERVA lo que ya estaba elegido si sigue
+    // existiendo — es la regla de PRV-1 y está bien para un refresco cualquiera.
+    // Pero aquí el proveedor se acaba de crear DESDE ESTE BOTÓN, y quien lo creó
+    // es porque lo va a usar. Se elige aquí, en local, sin tocar la función
+    // compartida (que otras pantallas siguen necesitando como está).
+    const nuevo = (d.proveedor && d.proveedor.id) || null;
+    const selT = document.getElementById('kmt-prov');
+    if (nuevo && selT && [...selT.options].some((o) => o.value === String(nuevo))) selT.value = String(nuevo);
+    if (typeof showToast === 'function') showToast('Proveedor agregado ✓', 'success');
+  } catch (e) {
+    _kmtError((e && e.message) || 'No se pudo agregar el proveedor.');
+  }
+}
+
 function _kmtError(msg) {
   const e = document.getElementById('kmt-error');
   if (!e) return;

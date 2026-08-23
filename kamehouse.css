@@ -807,6 +807,33 @@ tr.dash-click:hover{background:rgba(255,255,255,.04)}
 .kmt-resumen{font-size:12px;color:var(--ts)}
 .kmt-resumen b{color:var(--fg)}
 .kmt-error{margin-top:9px;font-size:11.5px;color:#ff5f56}
+.kmt-prov-fila{display:flex;gap:5px;align-items:center}
+.kmt-prov-mas{padding:0 9px;font-size:14px;line-height:1;min-height:34px}
+
+/* ═══ [KMS-SIMP-2] LA CUENTA DEL EVENTO ════════════════════════════════════
+   Cuatro cifras y una frase. Las cifras salen de _lib/cuenta-evento; la frase
+   es la única cuenta propia y va rotulada como proyección. */
+.kms-cuenta{margin:10px 0 4px}
+.kmc-cargando{font-size:11.5px;color:var(--ts);padding:8px 0}
+.kmc-grid{display:grid;gap:9px;grid-template-columns:repeat(auto-fit,minmax(158px,1fr))}
+.kmc-c{border:1px solid var(--border);border-radius:var(--r-sm,8px);padding:10px 12px;
+  background:rgba(255,255,255,.02)}
+.kmc-l{font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.12em;
+  text-transform:uppercase;color:var(--ts)}
+.kmc-v{font-family:'Rajdhani',sans-serif;font-weight:700;font-size:19px;margin-top:3px;line-height:1.1}
+.kmc-s{font-size:10px;color:var(--ts);margin-top:2px}
+.kmc-ok .kmc-v{color:var(--green)}
+.kmc-mal .kmc-v{color:#ff5f56}
+/* "sin dato" NO es cero, y se ve distinto a propósito: un cero afirmaría algo
+   que la cuenta no sabe. */
+.kmc-nd{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--ts);font-weight:400}
+.kmc-q{margin-top:10px;padding:10px 12px;border-radius:var(--r-sm,8px);font-size:12.5px;
+  line-height:1.5;border:1px solid var(--border)}
+.kmc-q b{font-weight:700}
+.kmc-q-ok{border-color:var(--green);background:rgba(136,234,78,.07);color:var(--fg)}
+.kmc-q-cerca{border-color:var(--orange);background:rgba(255,138,0,.07)}
+.kmc-q-mal{border-color:#ff5f56;background:rgba(255,95,86,.07)}
+.kmc-q-nd{color:var(--ts)}
 .cot-input[readonly]{color:var(--ts);cursor:not-allowed}
 .cot-desglose-row{
  display:flex;justify-content:space-between;align-items:center;

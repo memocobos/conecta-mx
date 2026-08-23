@@ -199,6 +199,26 @@ está caduco antes de escribirse.
 - Retirar el panel `ventas-resumen` cuando ya no se use.
 
 ### ⚪ Anotados sin urgencia (decisiones ya tomadas)
+- 🔒 **SELLADO (SCROLL-2, 23-ago-2026): las 5 animaciones infinitas que pintan
+  por frame en el index SE QUEDAN COMO ESTÁN.** Violan la letra de la regla de
+  la casa ("solo `transform` y `opacity` en lo que anima por frame") y aun así
+  no se convierten, **porque se midió y no cuestan**:
+  - `cmxSlide` en `.nav` (background-position) · `pulse-red` y `pulse-yellow`
+    en **31 `.ev-tag`** (box-shadow, una por tarjeta del catálogo) ·
+    `pulseDotMain` en `.ftr-v2-dot` · `rcpPulse` en el punto de la radio.
+  - **La medición:** scroll de 2.600px con la CPU frenada **4×**, viewport
+    390×844. Mediana **8.4ms** por fotograma, p95 **9.4ms**, **0 fotogramas
+    >32ms**. Con las cinco APAGADAS: mediana 8.3ms, p95 9.6ms, 0 largos —
+    **mejora del 1%**, dentro del ruido.
+  - **Por qué se sella y no se convierte:** la regla existe por el costo de
+    reflow/repintado POR FRAME; aquí ese costo no aparece. Convertirlas a
+    `transform`/`opacity` pediría cambiar el markup de las 31 pastillas del
+    semáforo (un halo con box-shadow no se replica con transform sin meter un
+    pseudo-elemento extra) para no ganar nada medible. Es cumplir la letra y
+    perder el espíritu, como las 3 barras con radio ya selladas.
+  - **Para re-litigarlo hay que volver a MEDIR, no volver a opinar** — y con
+    números de un teléfono de verdad, no de Chromium con la CPU frenada, que es
+    lo único que hubo aquí.
 - **19 reglas del sitio siguen bajo el 4.5:1 de AA y NO son el token `--muted`**
   (ése ya subió a .46 en T6): blanco sobre botones de marca ~1.98:1, `.ftr-copy`
   a `.25` = 2.08:1, la familia `.3/.35/.4` de `pagos.html`, y `.cca` en

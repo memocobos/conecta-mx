@@ -47,7 +47,22 @@ body{font-family:'Montserrat',sans-serif;font-weight:500;background:#000;color:#
    podó. */
 /* Safety net: prevent children from spilling out horizontally on mobile */
 @media(max-width:640px){
-  .catalog,.hero-strip,.ev-grid,.d-hero,.wiz{max-width:100vw;overflow-x:hidden}
+  /* ⚠️ [SCROLL-2c] `clip`, NO `hidden`. La red de seguridad se queda —recorta
+     igual lo que se desborde a lo ancho— pero `hidden` tenía un efecto que
+     nadie pidió: en CSS, si UN eje deja de ser `visible`, el OTRO pasa de
+     `visible` a `auto`. O sea que este `overflow-x:hidden` convertía a
+     `.ev-grid` en un CONTENEDOR CON SCROLL VERTICAL propio, con 12px de
+     desborde. Y ese scroller anidado se tragaba el gesto sin encadenarlo a la
+     página: medido con el dedo, un arrastre de 260px empezando sobre una
+     tarjeta movía la página 0px (movía los 12px de adentro y se acababa).
+     El catálogo es casi toda la página, así que era "el scroll no funciona".
+     `clip` recorta sin crear caja de scroll, y por eso el otro eje SÍ se queda
+     en `visible`. Con el mismo gesto la página se mueve 364px.
+     Nota de compatibilidad: `overflow:clip` es Safari 16+. Donde no exista, la
+     declaración se descarta y el eje queda en `visible` — el recorte de
+     `html,body{overflow-x:hidden}` sigue evitando el scroll horizontal de la
+     página, así que se degrada a lo de antes de la red, no a algo roto. */
+  .catalog,.hero-strip,.ev-grid,.d-hero,.wiz{max-width:100vw;overflow-x:clip}
   .detail{max-width:100vw}
   img,video,iframe{max-width:100%;height:auto}
 }

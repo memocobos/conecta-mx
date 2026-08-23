@@ -450,6 +450,33 @@ body.wizard-open{overscroll-behavior:none}
   scrollbar-width:none;padding-bottom:2px}
 #filter-btns::-webkit-scrollbar{display:none}
 #filter-btns .fbtn{flex:0 0 auto;white-space:nowrap}
+
+/* ═══ [SCROLL-2b] LA PISTA DE QUE HAY MÁS FILTROS ═══════════════════════════
+   Medido en el diagnóstico: de los 6 botones solo se ven 3 en un iPhone 15 y
+   **2** en un SE — "Últimos lugares", el filtro que FIL-1 acaba de arreglar,
+   nace fuera de la pantalla. La fila SÍ se desliza (probado con el dedo), pero
+   nada lo anunciaba.
+   Se usa `mask-image` y no un ::after: la máscara se aplica en la caja del
+   elemento y NO se desplaza con el contenido, así que el degradado se queda
+   pegado al borde mientras la fila corre por debajo. Un ::after dentro de un
+   contenedor con scroll se iría con el contenido. */
+#filter-btns{
+  -webkit-mask-image:var(--fil-mask,none);
+          mask-image:var(--fil-mask,none);
+}
+#filter-btns.hay-derecha{
+  --fil-mask:linear-gradient(90deg,#000 calc(100% - 38px),transparent 100%);
+}
+#filter-btns.hay-izquierda{
+  --fil-mask:linear-gradient(90deg,transparent 0,#000 38px);
+}
+#filter-btns.hay-izquierda.hay-derecha{
+  --fil-mask:linear-gradient(90deg,transparent 0,#000 38px,#000 calc(100% - 38px),transparent 100%);
+}
+/* El PEEK: se reserva un pelo de espacio a la derecha para que el botón
+   siguiente asome CORTADO en vez de quedar justo al filo. Un borde limpio se
+   lee como "aquí se acaba"; uno cortado se lee como "hay más". */
+#filter-btns.hay-derecha{padding-right:14px}
 .fil-selects{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:0}
 .fil-sel{position:relative;display:inline-flex;align-items:center;gap:6px;
   background:#1a1a1a;border:1.5px solid rgba(255,255,255,.15);border-radius:var(--r-btn,12px);
@@ -3547,6 +3574,7 @@ function setFilter(btn,f){
   // es una regla y no tres líneas de JS.
   if(f==='top10'){ _activeMonth='all'; _activeCiudad='all'; }
   if(typeof _filPinta==='function')_filPinta();
+  if(typeof _filPista==='function')setTimeout(_filPista,0);   // el ancho cambia con topmode
   var fb=document.getElementById('filter-btns');
   if(fb)fb.classList.toggle('topmode', f==='top10');
   // URL <-> filtro para deep-links compartibles (/proximos, /deportes).
@@ -4084,14 +4112,77 @@ var _landTick = null;
     },{threshold:.35}).observe(a);
   }
 
+  // ═══ [SCROLL-2b] EL UMBRAL DE INTENCIÓN ═════════════════════════════════
+  // Medido en el diagnóstico: un arrastre de 4, 8 o 12px sobre una tarjeta del
+  // catálogo, sobre la tarjeta del hero o sobre una miniatura ABRÍA el evento
+  // en vez de scrollear (a partir de 20px el navegador ya no lo considera tap).
+  // Es el umbral estándar del navegador, no un bug nuestro — pero el hero puso
+  // superficies pulsables JUSTO donde el pulgar aterriza para empezar a bajar,
+  // así que aquí se paga caro.
+  //
+  // Esto NO toca los manejadores de nadie: escucha en CAPTURA sobre dos raíces
+  // (el hero y la lista de eventos) y, si el dedo se movió más de la cuenta
+  // entre touchstart y click, se traga el click antes de que llegue al
+  // destino. Con el ratón no hay touchstart, así que la deriva se queda en 0 y
+  // el click pasa: en escritorio no cambia nada.
+  var TAP_DERIVA_MAX=10;   // px. Un tap de verdad se mueve 0-3; scrollear, más.
+  var _tapIni=null,_tapDeriva=0;
+
+  // ⚠️ LA DERIVA SE MIDE EN `touchend`, NO EN `touchmove`. Escribí esto primero
+  // con touchmove y era un CANDADO QUE PASABA EN VACÍO: medido, el navegador NO
+  // DISPARA NI UN SOLO touchmove por debajo de su propio umbral (~15px).
+  //     gesto de  4px → touchmove: 0   ·  gesto de 12px → touchmove: 0
+  //     gesto de 20px → touchmove: 2   ·  gesto de 40px → touchmove: 3
+  // O sea que el guardián solo veía el rango en el que el navegador YA no
+  // manda click: era ciego justo donde tenía que morder. `touchend` sí trae la
+  // posición final en `changedTouches`, siempre.
+  // touchmove se conserva igual, pero como REFUERZO: cuando sí llega, delata
+  // el recorrido de ida y vuelta (bajar y regresar al punto de partida deja
+  // touchend en 0 y no es un tap).
+  function _deriva(a,b){ var dx=b.x-a.x, dy=b.y-a.y; return Math.sqrt(dx*dx+dy*dy); }
+  function vigilarIntencion(raiz){
+    if(!raiz||raiz.__vigilada)return; raiz.__vigilada=1;
+    raiz.addEventListener('touchstart',function(e){
+      // Con dos dedos no se está tocando nada: se está haciendo zoom.
+      if(!e.touches||e.touches.length!==1){_tapIni=null;_tapDeriva=999;return;}
+      var t=e.touches[0]; _tapIni={x:t.clientX,y:t.clientY}; _tapDeriva=0;
+    },{passive:true,capture:true});
+    raiz.addEventListener('touchmove',function(e){
+      if(!_tapIni||!e.touches||!e.touches.length)return;
+      var t=e.touches[0];
+      var d=_deriva(_tapIni,{x:t.clientX,y:t.clientY});
+      if(d>_tapDeriva)_tapDeriva=d;
+    },{passive:true,capture:true});
+    raiz.addEventListener('touchend',function(e){
+      if(!_tapIni)return;
+      var t=e.changedTouches&&e.changedTouches[0];
+      if(!t)return;
+      var d=_deriva(_tapIni,{x:t.clientX,y:t.clientY});
+      if(d>_tapDeriva)_tapDeriva=d;
+    },{passive:true,capture:true});
+    raiz.addEventListener('click',function(e){
+      var derivo=_tapDeriva>TAP_DERIVA_MAX;
+      _tapDeriva=0; _tapIni=null;
+      if(derivo){ e.stopPropagation(); e.preventDefault(); }
+    },{capture:true});
+  }
+
   // La puerta por la que refreshTop10 avisa que el top ya llegó. Es lo ÚNICO
   // que el hero expone: no hace su propio fetch a event-clicks, porque el
   // index ya lo pide y dos llamadas al mismo endpoint son dos rankings que un
   // día no coinciden.
   window.__landHeroTop=function(){ try{ construir(); }catch(e){} };
 
-  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',function(){construir();armarWA();});
-  else { construir(); armarWA(); }
+  function arrancar(){
+    construir(); armarWA();
+    // Las dos raíces: el hero (tarjeta, miniaturas, "+N más", botones) y la
+    // lista de eventos. En CAPTURA sobre el contenedor, así que las tarjetas
+    // que nacen después también quedan cubiertas sin re-enganchar nada.
+    vigilarIntencion(document.querySelector('.home-hero-v2'));
+    vigilarIntencion(document.getElementById('ev-list'));
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',arrancar);
+  else arrancar();
 })();
 
 // Revelar catálogo al presionar VER EVENTOS o al llegar vía #catalog-anchor
@@ -4227,12 +4318,39 @@ function buildMonthBar(){
   sel.innerHTML=h;
   sel.value=_activeMonth;
   _filPinta();
+  if(typeof _filPista==='function')_filPista();
 }
 function setMes(m){
   _activeMonth=m;
   _filPinta();
   filterEvents();
 }
+// [SCROLL-2b] Enciende el degradado del lado donde QUEDA algo. Si la fila
+// cabe entera (tablet, escritorio), no se pinta ninguno: un degradado que
+// promete más cuando no hay más es peor que no ponerlo.
+function _filPista(){
+  var f=document.getElementById('filter-btns');
+  if(!f)return;
+  var sobra=f.scrollWidth-f.clientWidth;
+  var izq=f.scrollLeft>2;
+  var der=sobra>2 && f.scrollLeft < sobra-2;
+  f.classList.toggle('hay-izquierda',izq);
+  f.classList.toggle('hay-derecha',der);
+}
+(function(){
+  var f=document.getElementById('filter-btns');
+  if(!f)return;
+  f.addEventListener('scroll',_filPista,{passive:true});
+  window.addEventListener('resize',_filPista);
+  // ⚠️ Al arrancar, el catálogo está en display:none y la fila MIDE CERO: si
+  // solo se llama aquí, la pista nunca se enciende (medido: hay-derecha se
+  // quedaba en false en los tres teléfonos). El observador se entera cuando la
+  // fila nace de verdad —al revelar el catálogo— y también cuando cambia de
+  // ancho por el modo top10 o por girar.
+  if(typeof ResizeObserver!=='undefined'){ new ResizeObserver(_filPista).observe(f); }
+  _filPista();
+})();
+
 // [FIL-1] La ciudad: eje propio que se COMBINA con el filtro, no lo sustituye.
 // ⚠️ Su valor inicial NO se declara aquí: ver la nota junto a _activeMonth.
 function setCiudad(c){

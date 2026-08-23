@@ -1996,7 +1996,258 @@ const khViajeros = {
   abonoCrear(payload) { return this._call(Object.assign({ accion: 'abono_crear' }, payload)); },
   // [VJ-5] poner/quitar cuarto a un migrado
   habitacion(id, habitacion_id) { return this._call({ accion: 'viajero_habitacion', id, habitacion_id }); },
+  // [MIG-1a] alta de un viajero del Excel, y la búsqueda de parecidos previa
+  migrar(payload) { return this._call(Object.assign({ accion: 'viajero_migrar' }, payload)); },
+  buscarParecido(evento_id, nombre, correo) {
+    return this._call({ accion: 'viajero_buscar_parecido', evento_id, nombre, correo }).then(j => j.parecidos || []);
+  },
 };
+
+// ═══════════════════════════════════════════════════════════════════════════
+// [MIG-1a] EL WIZARD DE MIGRACIÓN — captura del Excel, uno tras otro.
+//
+// Llena el hueco que la medición encontró: `viajero_upsert_staff` crea filas
+// tomando la identidad de un COORDINADOR, así que no servía para capturar a una
+// persona del Excel. Esto es lo único que da de alta un viajero arbitrario.
+//
+// ⚠️ LA REGLA DE ORO DE VJ-3 NO SE TOCA. Aquí se capturan `total_contrato` y
+// `abonado_previo` TAL CUAL vienen del Excel y quedan CONGELADOS. El costo NO se
+// calcula del catálogo aunque el catálogo tenga el precio de la zona: el total
+// del Excel ya trae adentro hotel, transporte y lo que se haya negociado. Lo que
+// se cobre de aquí en adelante entra como ABONO, y el saldo lo resuelve
+// `_vj3Saldo`, que es la MISMA fórmula que el servidor.
+//
+// Decisión firmada por Memo (23-ago): el abonado entra como UNA SUMA. El Excel
+// se queda como archivo histórico de los pagos viejos; no se replica.
+// ═══════════════════════════════════════════════════════════════════════════
+let _migEV = null;          // el evento del catálogo (zonas, multifecha)
+let _migCapturados = [];    // lo capturado en ESTA sesión, para la lista de abajo
+let _migPendiente = null;   // payload esperando confirmación de parecido
+let _migFechaIdx = null;    // multifecha: la fecha se elige UNA vez
+
+function _migEl(id) { return document.getElementById(id); }
+function _migSlug() {
+  const base = _ccEventoActual;
+  if (!base) return null;
+  return (_migFechaIdx == null) ? base : `${base}#${_migFechaIdx}`;
+}
+
+async function migAbrir() {
+  const panel = _migEl('mig-panel');
+  if (!panel || !_ccEventoActual) return;
+  panel.style.display = '';
+  _migCapturados = [];
+  _migPendiente = null;
+  _migFechaIdx = null;
+  _migPintarCapturados();
+
+  // El catálogo del evento: de ahí salen las zonas REALES. Escribirlas a mano
+  // sería inventar una llave que después no casa con el stock ni con lo que el
+  // cliente eligió en el sitio.
+  _migEV = null;
+  try {
+    const ev = await _fetchEVFromIndex();
+    _migEV = (ev || []).find(e => e && e.id === _ccEventoActual) || null;
+  } catch (_) { /* fails-soft: se avisa abajo */ }
+
+  const fw = _migEl('mig-fecha-wrap');
+  const lista = _migEV && Array.isArray(_migEV.dsList) && _migEV.dsList.length > 1 ? _migEV.dsList : null;
+  if (lista) {
+    // Multifecha: la fecha se elige UNA vez y se captura la tanda (firmado).
+    const sel = _migEl('mig-fecha');
+    sel.innerHTML = lista.map((d, i) => `<option value="${i}">${_migFechaTxt(d)}</option>`).join('');
+    _migFechaIdx = 0;
+    if (fw) fw.style.display = '';
+  } else if (fw) { fw.style.display = 'none'; }
+
+  const sub = _migEl('mig-sub');
+  if (sub && !_migEV) {
+    sub.textContent = 'No se pudo leer el catálogo del evento: las zonas se escriben a mano y podrían no casar con el stock.';
+    sub.style.color = '#ff5f56';
+  }
+  migZonas();
+  _migEl('mig-nombre') && _migEl('mig-nombre').focus();
+}
+
+function _migFechaTxt(ds) {
+  if (!ds) return '(sin fecha)';
+  const M = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+  const p = String(ds).split('-');
+  return `${parseInt(p[2], 10)} ${M[parseInt(p[1], 10) - 1]} ${p[0]}`;
+}
+function migFechaElegida() {
+  const sel = _migEl('mig-fecha');
+  _migFechaIdx = sel ? parseInt(sel.value, 10) : null;
+}
+function migCerrar() {
+  const p = _migEl('mig-panel');
+  if (p) p.style.display = 'none';
+  // Al cerrar se recarga la lista de migrados: lo capturado ya vive en la base.
+  if (typeof _vj2Cargar === 'function') _vj2Cargar();
+}
+
+// Las zonas dependen del paquete: CHEAP tiene su propia lista de precios, y en
+// varios eventos son OTROS nombres. Tomarlas de la lista equivocada guardaría
+// una zona que el stock no reconoce.
+function migZonas() {
+  const paq = (_migEl('mig-paquete') || {}).value || '';
+  const sel = _migEl('mig-zona');
+  if (!sel) return;
+  if (!paq) { sel.innerHTML = '<option value="">— elige paquete primero —</option>'; _migCuenta(); return; }
+  const fuente = (paq === 'cheap')
+    ? ((_migEV && _migEV.cheapZonas) || [])
+    : ((_migEV && _migEV.zonas) || []);
+  if (!fuente.length) {
+    sel.innerHTML = '<option value="">— sin zonas en el catálogo —</option>';
+  } else {
+    sel.innerHTML = '<option value="">— elegir —</option>' + fuente.map(z =>
+      `<option value="${_esfEsc(z.n)}">${_esfEsc(z.n)}${z.p ? ' · $' + Number(z.p).toLocaleString('es-MX') : ''}${z.ag ? ' (agotada)' : ''}</option>`
+    ).join('');
+  }
+  _migCuenta();
+}
+
+// A qué cuenta va su dinero. NO se decide aquí: se muestra lo que decide la
+// regla del negocio, para que quien captura vea a dónde cae antes de guardar.
+// El espejo de `cuentaParaPaquete`: CHEAP → Banamex · el resto → el banco del
+// evento o BBVA.
+function _migCuenta() {
+  const el = _migEl('mig-cuenta');
+  if (!el) return;
+  const paq = (_migEl('mig-paquete') || {}).value || '';
+  if (!paq) { el.textContent = ''; return; }
+  const banco = (paq === 'cheap')
+    ? 'Banamex'
+    : ((_migEV && _migEV.banco && _migEV.banco.nombre) || 'BBVA Bancomer');
+  const viaja = (paq === 'plus' || paq === 'ride');
+  const duerme = (paq === 'plus' || paq === 'ride' || paq === 'stay');
+  el.innerHTML = `Su dinero se clasifica en <b style="color:var(--orange)">${_esfEsc(banco)}</b>` +
+    ` · ${viaja ? 'viaja' : 'no viaja'} · ${duerme ? 'duerme' : 'no duerme'}`;
+}
+
+function _migLeer() {
+  const g = id => ((_migEl(id) || {}).value || '').trim();
+  return {
+    evento_id: _migSlug(),
+    nombre: g('mig-nombre'),
+    correo: g('mig-correo'),
+    celular: g('mig-celular'),
+    tipo_paquete: g('mig-paquete'),
+    zona_boleto: g('mig-zona'),
+    total_contrato: g('mig-total'),
+    abonado_previo: g('mig-abonado'),
+    talla_playera: g('mig-talla'),
+    notas: g('mig-notas'),
+  };
+}
+function _migError(msg) {
+  const e = _migEl('mig-error');
+  if (!e) return;
+  if (!msg) { e.style.display = 'none'; e.textContent = ''; return; }
+  e.style.display = ''; e.textContent = msg;
+}
+
+async function migGuardar() {
+  _migError('');
+  _migEl('mig-parecido').style.display = 'none';
+  const d = _migLeer();
+  if (!d.evento_id) return _migError('No hay evento abierto.');
+  if (!d.nombre) return _migError('El nombre es obligatorio.');
+  if (!d.tipo_paquete) return _migError('Elige el paquete.');
+  if (!d.zona_boleto) return _migError('Elige la zona del boleto.');
+  if (d.total_contrato === '') return _migError('Falta el costo del paquete.');
+
+  // El deduplicado que Memo pidió proponer. NO cuelga del correo: muchos del
+  // Excel no lo traen, y en Postgres NULL != NULL deja pasar TODOS los
+  // duplicados sin decir nada. Se compara el nombre normalizado dentro del
+  // MISMO evento, y lo confirma un humano — dos personas con el mismo nombre
+  // existen; un duplicado silencioso también.
+  let parecidos = [];
+  try { parecidos = await khViajeros.buscarParecido(d.evento_id, d.nombre, d.correo); } catch (_) {}
+  if (parecidos.length) {
+    _migPendiente = d;
+    _migEl('mig-parecido-list').innerHTML = parecidos.map(v =>
+      `· <b>${_esfEsc(v.nombre)}</b>${v.correo ? ' · ' + _esfEsc(v.correo) : ''}` +
+      `${v.tipo_paquete ? ' · ' + _esfEsc(String(v.tipo_paquete).toUpperCase()) : ''}` +
+      `${v.zona_boleto ? ' · ' + _esfEsc(v.zona_boleto) : ''}` +
+      `${v.total_contrato != null ? ' · ' + _vj3Money(v.total_contrato) : ''}`
+    ).join('<br>');
+    _migEl('mig-parecido').style.display = '';
+    return;
+  }
+  await _migEnviar(d);
+}
+function migCancelarParecido() {
+  _migPendiente = null;
+  _migEl('mig-parecido').style.display = 'none';
+  _migEl('mig-nombre') && _migEl('mig-nombre').focus();
+}
+async function migGuardarIgual() {
+  const d = _migPendiente;
+  _migPendiente = null;
+  _migEl('mig-parecido').style.display = 'none';
+  if (d) await _migEnviar(d);
+}
+
+async function _migEnviar(d) {
+  const btn = _migEl('mig-guardar');
+  if (btn) { btn.disabled = true; btn.textContent = 'Guardando…'; }
+  try {
+    const r = await khViajeros.migrar(d);
+    const v = r && r.viajero;
+    if (!v) throw new Error('el servidor no devolvió el viajero');
+    _migCapturados.unshift(v);
+    _migPintarCapturados();
+    // Uno tras otro: se limpia lo de la persona y se CONSERVA paquete y zona,
+    // que en una tanda del Excel se repiten. El foco vuelve al nombre.
+    ['mig-nombre','mig-correo','mig-celular','mig-total','mig-abonado','mig-talla','mig-notas']
+      .forEach(id => { const el = _migEl(id); if (el) el.value = ''; });
+    _migEl('mig-nombre') && _migEl('mig-nombre').focus();
+    _migError('');
+  } catch (e) {
+    _migError((e && e.message) || 'No se pudo guardar.');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Guardar y seguir →'; }
+  }
+}
+
+function _migPintarCapturados() {
+  const cnt = _migEl('mig-cnt');
+  if (cnt) cnt.textContent = String(_migCapturados.length);
+  const box = _migEl('mig-capturados');
+  if (!box) return;
+  if (!_migCapturados.length) {
+    box.innerHTML = '<div style="font-size:11px;color:var(--ts)">Todavía no capturas a nadie en esta tanda.</div>';
+    return;
+  }
+  box.innerHTML = _migCapturados.map(v => {
+    // La MISMA fórmula sellada que usa el resto del Palacio y el servidor.
+    const s = _vj3Saldo(v, []);
+    const dinero = s
+      ? `${_vj3Money(s.total)} · abonó ${_vj3Money(s.abonado)} · ${s.aFavor ? 'a favor ' : 'resta '}${_vj3Money(s.resta)}`
+      : 'sin dinero';
+    return `<div style="display:flex;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid var(--line);font-size:11px">
+      <span style="color:var(--green)">✓</span>
+      <b style="min-width:150px">${_esfEsc(v.nombre)}</b>
+      <span style="color:var(--orange);font-family:'JetBrains Mono',monospace">${_esfEsc(String(v.tipo_paquete || '').toUpperCase())}</span>
+      <span style="color:var(--ts)">${_esfEsc(v.zona_boleto || '')}</span>
+      <span style="margin-left:auto;color:var(--ts);font-family:'JetBrains Mono',monospace">${dinero}</span>
+    </div>`;
+  }).join('');
+}
+
+// Enter guarda, sin salir de la pantalla. Se engancha al panel entero y no a
+// cada campo: los campos nacen y mueren, el panel no.
+document.addEventListener('keydown', function (e) {
+  if (e.key !== 'Enter') return;
+  const panel = _migEl('mig-panel');
+  if (!panel || panel.style.display === 'none') return;
+  if (!panel.contains(e.target)) return;
+  if (e.target && e.target.tagName === 'SELECT') return;   // Enter en un select lo cierra
+  e.preventDefault();
+  if (_migEl('mig-parecido').style.display !== 'none') return;  // hay que decidir el parecido
+  migGuardar();
+});
 
 
 // ═══════════════════════════════════════════════════════════════════════════

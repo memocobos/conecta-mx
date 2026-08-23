@@ -72,6 +72,10 @@ const ACCIONES = {
   abonos_listar: ROLES_EDITA_VIAJERO,
   // [VJ-5] Acomodar migrados en cuartos.
   viajero_habitacion: ROLES_EDITA_VIAJERO,
+  // [MIG-1a] El alta de un viajero ARBITRARIO (el del Excel). Mismos roles que
+  // editar y que los abonos: quien captura los datos captura el alta.
+  viajero_migrar: ROLES_EDITA_VIAJERO,
+  viajero_buscar_parecido: ROLES_EDITA_VIAJERO,
 };
 
 // [VJ-3] Bucket PRIVADO de los comprobantes de abono. Mismo patrón que
@@ -82,6 +86,34 @@ const FOTO_MAX_BYTES = 6 * 1024 * 1024;
 
 // Correo con forma de correo. Mismo criterio que el resto de la casa.
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+// [MIG-1a] Los cuatro paquetes que el negocio conoce. Se valida contra esta
+// lista y no contra "lo que venga" porque `cuentaParaPaquete` TRUENA con un
+// paquete desconocido (`throw`), y la regla de quién viaja y quién duerme
+// (`_lib/paquete-viaje`) también decide por este valor. Un typo aquí no daría
+// error hoy: daría un viajero que meses después no sube al camión y cuyo dinero
+// no se sabe a qué banco va.
+const PAQUETES_MIGRAR = ['plus', 'ride', 'stay', 'cheap'];
+
+// [MIG-1a] Dinero desde el formulario: acepta "8,500.50", "$8500", "8500".
+// Devuelve null si NO es un número — null es "no se pudo leer", que es distinto
+// de 0. Confundirlos capturaría un contrato de cero pesos sin avisar.
+function _numDinero(v) {
+  if (v == null) return null;
+  const s = String(v).replace(/[$\s,]/g, '').trim();
+  if (s === '') return null;
+  const n = Number(s);
+  if (!Number.isFinite(n)) return null;
+  return Math.round(n * 100) / 100;
+}
+
+// [MIG-1a] Nombre normalizado para buscar parecidos: sin acentos, sin dobles
+// espacios, minúsculas. NO se guarda así — solo se compara.
+function _normNombre(s) {
+  return String(s || '')
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase().replace(/\s+/g, ' ').trim();
+}
 
 // Columnas que viajan al navegador al leer `eventos_coordi`.
 const EC_COLS = 'id,evento_id,coordi_id,indicaciones,status,motivo_declinacion';
@@ -383,6 +415,137 @@ exports.handler = async (event) => {
       // Se devuelve cuántas filas tocó: si algún día el filtro se aflojara, el
       // número lo grita en vez de esconderlo.
       return ok(headers, { viajero: filas[0] || null, tocadas: filas.length });
+    }
+
+    // ── [MIG-1a] viajeros_evento: ALTA DE UN VIAJERO DEL EXCEL ─────────────
+    //
+    // El hueco que faltaba. `viajero_upsert_staff` crea filas tomando la
+    // identidad de un COORDINADOR desde `usuarios` (anti-spoofing), y eso está
+    // bien para el staff — pero no sirve para capturar a una persona del Excel,
+    // que no tiene usuario en el sistema. Esto es lo único que crea un viajero
+    // arbitrario, y por eso lleva su propia lista de roles y su propia
+    // validación de cada campo.
+    //
+    // ⚠️ LA REGLA DE ORO DE VJ-3, INTACTA: aquí se CONGELAN `total_contrato` y
+    // `abonado_previo` tal como vienen del Excel. NO se calculan de
+    // paquete+habitación+vuelo, ni ahora ni después: el total del Excel ya
+    // traía todo eso adentro. Lo que se cobre de aquí en adelante entra como
+    // ABONO (`abono_crear`), y el saldo lo resuelve la fórmula sellada:
+    //     resta = total_contrato − abonado_previo − Σ abonos
+    if (accion === 'viajero_migrar') {
+      if (!ROLES_EDITA_VIAJERO.includes(jwtRol)) {
+        return { statusCode: 403, headers, body: JSON.stringify({ error: 'Solo un admin puede dar de alta viajeros' }) };
+      }
+      const eventoId = String(body.evento_id || '').trim();
+      if (!eventoId || eventoId.length > 120 || !SLUG_RE.test(eventoId)) return bad(headers, 'evento_id inválido');
+
+      const nombre = String(body.nombre || '').trim();
+      if (!nombre) return bad(headers, 'el nombre es obligatorio');
+      if (nombre.length > 200) return bad(headers, 'nombre demasiado largo');
+
+      // Memo firmó que zona y paquete SIEMPRE vienen: son obligatorios, sin
+      // caso vacío. Un viajero sin zona no podría descontar de ningún stock
+      // (MIG-1b), y uno sin paquete rompe cuentaParaPaquete y la regla de quién
+      // viaja y quién duerme.
+      const paquete = String(body.tipo_paquete || '').trim().toLowerCase();
+      if (!PAQUETES_MIGRAR.includes(paquete)) {
+        return bad(headers, `tipo_paquete inválido: se espera uno de ${PAQUETES_MIGRAR.join(', ')}`);
+      }
+      const zona = String(body.zona_boleto || '').trim();
+      if (!zona) return bad(headers, 'la zona del boleto es obligatoria');
+      if (zona.length > 120) return bad(headers, 'zona demasiado larga');
+
+      // El dinero. `total_contrato` es obligatorio: una fila sin él NO SUMA en
+      // ninguna cuenta (lo dice saldoMigrado en _lib/cuenta-evento), así que
+      // capturar un viajero sin total sería capturarlo invisible para el dinero.
+      const total = _numDinero(body.total_contrato);
+      if (total === null) return bad(headers, 'el costo del paquete es obligatorio y debe ser un número');
+      if (total < 0) return bad(headers, 'el costo no puede ser negativo');
+      // El abonado sí puede faltar (nadie ha pagado todavía) → 0.
+      const abonado = body.abonado_previo == null || String(body.abonado_previo).trim() === ''
+        ? 0 : _numDinero(body.abonado_previo);
+      if (abonado === null) return bad(headers, 'el abonado debe ser un número');
+      if (abonado < 0) return bad(headers, 'el abonado no puede ser negativo');
+      // ⚠️ Un abonado MAYOR que el total NO es un error: VJ-3 selló que los
+      // saldos a favor son reales y no se corrigen. Se deja pasar a propósito.
+
+      const fila = {
+        evento_id: eventoId,
+        nombre,
+        tipo_paquete: paquete,
+        zona_boleto: zona,
+        total_contrato: total,
+        abonado_previo: abonado,
+        tipo_viajero: 'cliente',
+      };
+      // Los opcionales, con la misma regla que viajero_editar: vacío es NULL,
+      // nunca cadena vacía — '' se cuela en los filtros de "sin correo" y en
+      // los correos salientes como destinatario en blanco.
+      for (const k of ['correo', 'celular', 'talla_playera', 'num_emergencia', 'emergencia_nombre', 'notas']) {
+        const v = body[k] == null ? '' : String(body[k]).trim();
+        if (v === '') { fila[k] = null; continue; }
+        if (v.length > 500) return bad(headers, `${k} demasiado largo`);
+        if (k === 'correo' && !EMAIL_RE.test(v)) return bad(headers, 'correo inválido');
+        fila[k] = v;
+      }
+
+      // El evento tiene que existir. Sin esto, un slug con dedo gordo crea una
+      // población fantasma que no aparece en ninguna pantalla y que nadie
+      // vuelve a encontrar.
+      const em = await fetch(
+        `${env.KH_SB_URL}/rest/v1/eventos_meta?slug=eq.${encodeURIComponent(eventoId.split('#')[0])}&select=slug&limit=1`,
+        { headers: sbHeaders });
+      if (!em.ok) return upstream(headers, await em.text(), 'consulta');
+      if (!(await em.json()).length) return bad(headers, `el evento "${eventoId}" no existe`);
+
+      // INSERT directo, sin on_conflict (regla de la casa). El deduplicado NO
+      // se hace aquí: se hace ANTES, con `viajero_buscar_parecido`, y lo
+      // confirma un humano — porque la llave natural sería el correo y muchos
+      // del Excel no lo traen, y en Postgres NULL != NULL deja pasar TODOS los
+      // duplicados sin decir nada.
+      const r = await fetch(baseVE, {
+        method: 'POST',
+        headers: { ...sbHeaders, Prefer: 'return=representation' },
+        body: JSON.stringify(fila),
+      });
+      if (!r.ok) {
+        const t = await r.text();
+        // Un 23505 aquí sería idempotencia, pero hay que CONFIRMAR la causa
+        // antes de interpretarla, no adivinarla.
+        return upstream(headers, t, 'alta');
+      }
+      const creado = (await r.json())[0] || null;
+      return ok(headers, { viajero: creado });
+    }
+
+    // ── [MIG-1a] Buscar parecidos ANTES de dar de alta ─────────────────────
+    // El deduplicado que Memo pidió proponer. NO cuelga del correo:
+    //   · si hay correo, un choque exacto es casi seguro la misma persona;
+    //   · sin correo, se compara el NOMBRE NORMALIZADO dentro del MISMO evento.
+    // Y no bloquea nada: devuelve los parecidos para que un humano confirme.
+    // Dos personas con el mismo nombre existen; un duplicado silencioso también.
+    if (accion === 'viajero_buscar_parecido') {
+      if (!ROLES_EDITA_VIAJERO.includes(jwtRol)) {
+        return { statusCode: 403, headers, body: JSON.stringify({ error: 'No autorizado' }) };
+      }
+      const eventoId = String(body.evento_id || '').trim();
+      if (!eventoId || !SLUG_RE.test(eventoId)) return bad(headers, 'evento_id inválido');
+      const nombre = String(body.nombre || '').trim();
+      const correo = String(body.correo || '').trim();
+      if (!nombre && !correo) return ok(headers, { parecidos: [] });
+
+      const r = await fetch(
+        `${baseVE}?evento_id=eq.${encodeURIComponent(eventoId)}&select=id,nombre,correo,tipo_paquete,zona_boleto,total_contrato&limit=2000`,
+        { headers: sbHeaders });
+      if (!r.ok) return upstream(headers, await r.text(), 'consulta');
+      const filas = await r.json();
+      const nn = _normNombre(nombre);
+      const cc = correo.toLowerCase();
+      const parecidos = filas.filter((v) => {
+        if (cc && v.correo && String(v.correo).toLowerCase() === cc) return true;
+        return !!nn && _normNombre(v.nombre) === nn;
+      });
+      return ok(headers, { parecidos });
     }
 
     // ── abonos_viajero: registrar un abono (admin) ───────────────────────

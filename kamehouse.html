@@ -205,18 +205,46 @@
  <!-- 🕘 Tablero de conexiones de hoy (SOLO maestro_roshi; fails-soft) -->
  <div id="resumen-conexiones" style="display:none;margin-bottom:16px"></div>
 
- <!-- Franja 1 del dashboard: el dinero (caja total + cuentas + por cobrar) -->
+ <!-- [RES-3] LOS TRES NÚMEROS DE MEMO, primero y grandes. Ya existían, pero
+      repartidos en tres bloques distintos y a tres tamaños: la caja en la
+      franja del dinero (34px), la deuda en su propia franja (28px) y la
+      utilidad como una tarjeta más de la rejilla, a 22px, entre "Gastos" y
+      "Eventos activos".
+      Esta tuerca NO recalcula nada: cada uno sigue saliendo de su fuente única
+      (`admin-saldos.caja_total`, `totales.deuda_proveedores`, y la utilidad
+      que pinta `_audUtilidadPintar`). Solo cambian de sitio y de tamaño.
+      `auto-fit` otra vez: la deuda solo la ven roshi/bulma, así que cuando
+      falta, las otras dos ocupan el renglón sin dejar hueco. -->
+ <div class="res-tres">
+  <div id="resumen-caja" style="display:none"></div>
+
+  <!-- [E5-2] ¿CUÁNTO DEBO? Deuda a proveedores de boletos. Arranca oculta y
+       SOLO la pinta quien puede verla (roshi/bulma): a milk no se le deja el
+       hueco, porque un bloque vacío anuncia un dato que no va a llegar. -->
+  <div id="resumen-deuda" style="display:none"></div>
+
+  <!-- [AUD-1c] La utilidad conserva sus ids (`m-utilidad-lbl`, `m-utilidad`,
+       `m-bodega`) y su clase `metric-value`: `_audUtilidadPintar` REESCRIBE
+       ese className para pintar el rojo, así que renombrarla habría matado el
+       color en silencio. El tamaño grande lo pone el padre, no la clase.
+       Y la BODEGA se muda CON ella: el rojo nunca solo. -->
+  <div class="res-big" id="resumen-utilidad">
+   <div class="metric-label" id="m-utilidad-lbl">Utilidad</div>
+   <div class="metric-value green" id="m-utilidad">—</div>
+   <div class="metric-sub">Ventas − gastos · al momento</div>
+   <div id="m-bodega" class="aud-bodega" style="display:none"></div>
+  </div>
+ </div>
+
+ <!-- El resto, después. Las cuentas del banco y el "por cobrar" siguen
+      saliendo de `_renderResumenDinero`, que ahora reparte: el número grande
+      arriba, el desglose aquí. -->
  <div id="resumen-dinero" style="display:none;margin-bottom:16px"></div>
 
  <!-- [E5-5] Atajos del home. Los pinta _renderAtajosHome() y cada uno se filtra
       con _puedeVerTab: el rol propone cuáles son RELEVANTES, el candado dispone
       cuáles están PERMITIDOS. Un atajo sin permiso no se pinta — sin hueco. -->
  <div id="resumen-atajos" style="display:none;margin-bottom:16px"></div>
-
- <!-- [E5-2] Franja 2: ¿CUÁNTO DEBO? Deuda a proveedores de boletos. Arranca
-      oculta y SOLO la pinta quien puede verla (roshi/bulma): a milk no se le
-      deja el hueco, porque un bloque vacío anuncia un dato que no va a llegar. -->
- <div id="resumen-deuda" style="display:none;margin-bottom:16px"></div>
 
  <div class="metrics-grid" id="metrics-grid">
  <div class="metric">
@@ -254,19 +282,7 @@
  <div class="metric-value red" id="m-gastos">—</div>
  <div class="metric-sub">Total de egresos</div>
  </div>
- <div class="metric">
- <!-- [AUD-1c] Etiqueta dinámica: con ganancia negativa dice "Falta por
-      recuperar", que es lo que significa cuando hay bodega sin vender. -->
- <div class="metric-label" id="m-utilidad-lbl">Utilidad</div>
- <div class="metric-value green" id="m-utilidad">—</div>
- <div class="metric-sub">Ventas − gastos</div>
  </div>
- </div>
-
- <!-- [AUD-1c] LA BODEGA AL LADO DE LA UTILIDAD — el requisito que firmó Memo:
-      el rojo nunca solo. Una ganancia negativa con boletos sin vender no es una
-      pérdida: es dinero que sigue en forma de boleto. -->
- <div id="m-bodega" class="aud-bodega" style="display:none"></div>
 
  <div id="resumen-cap-aviso" style="display:none;margin-bottom:16px;padding:10px 14px;border:1px solid var(--border2);border-radius:var(--r-sm,8px);background:rgba(255,107,0,.06);color:var(--orange);font-size:12px"></div>
 

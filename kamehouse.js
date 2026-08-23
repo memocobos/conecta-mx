@@ -4555,22 +4555,29 @@ function _renderResumenDeuda(cuenta) {
   if (!puede || !tot || tot.deuda_proveedores == null) { cont.style.display = 'none'; cont.innerHTML = ''; return; }
   const deuda = Number(tot.deuda_proveedores) || 0;
   cont.style.display = '';
+  // [RES-3] Mismo tamaño que sus dos hermanas, y el TEXTO SELLADO se queda:
+  // es la frase que impide que alguien "corrija" la ganancia restándole la
+  // deuda, que es otra cosa y es falsa.
+  cont.className = 'res-big dash-click';
+  cont.setAttribute('onclick', "showPage('kamisama')");
+  cont.setAttribute('title', 'Ver el stock y las compras');
   cont.innerHTML = `
-    <div class="dash-click" onclick="showPage('kamisama')" title="Ver el stock y las compras"
-         style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:16px 20px">
-      <div class="cob-stat-lbl" style="margin-bottom:6px">Deuda a proveedores de boletos</div>
-      <div style="font-family:'Zen Dots',sans-serif;font-size:28px;font-weight:800;color:var(--orange);line-height:1.1">${_spFmtMxn(deuda)}</div>
-      <div style="font-size:11px;color:var(--ts);margin-top:8px;line-height:1.5">
-        Compras + servicios − abonos. Es informativa: <b>no se resta</b> de la ganancia.
-      </div>
-    </div>`;
+    <div class="metric-label">Deuda de boletos</div>
+    <div class="res-big-val" style="color:var(--orange)">${_spFmtMxn(deuda)}</div>
+    <div class="metric-sub">Compras + servicios − abonos · <b>no se resta</b> de la ganancia</div>`;
 }
 
+// [RES-3] Esta función pinta AHORA EN DOS SITIOS con UNA sola lectura: el
+// número grande de la caja va arriba, con los otros dos de Memo, y el desglose
+// por cuenta se queda abajo, en "el resto". No se pide `_saldosCargar` dos
+// veces ni se recalcula nada: es el mismo `d`, repartido.
 async function _renderResumenDinero(porCobrar) {
   const cont = document.getElementById('resumen-dinero');
+  const heroEl = document.getElementById('resumen-caja');
   if (!cont) return;
   const d = await _saldosCargar(true);  // fresco al entrar al Resumen
   if (!d) {
+    if (heroEl) { heroEl.style.display = 'none'; heroEl.innerHTML = ''; }
     cont.style.display = '';
     cont.innerHTML = '<div style="font-size:12px;color:var(--ts);padding:10px 0">No se pudo cargar el dinero (saldos).</div>';
     return;
@@ -4597,13 +4604,18 @@ async function _renderResumenDinero(porCobrar) {
     (otros !== 0 ? stat('Otros (sin cuenta)', otros) : '');
 
   const heroColor = cajaTotal < 0 ? 'var(--red)' : 'var(--green)';
+  if (heroEl) {
+    heroEl.style.display = '';
+    heroEl.className = 'res-big dash-click';
+    heroEl.setAttribute('onclick', "showPage('saldos','Saldos')");
+    heroEl.setAttribute('title', 'Ver Saldos');
+    heroEl.innerHTML = `
+      <div class="metric-label">Caja total de la empresa</div>
+      <div class="res-big-val" style="color:${heroColor}">${_spFmtMxn(cajaTotal)}</div>
+      <div class="metric-sub">Lo que hay hoy, sumando cuentas</div>`;
+  }
   cont.style.display = '';
-  cont.innerHTML = `
-    <div class="dash-click" onclick="showPage('saldos','Saldos')" title="Ver Saldos" style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:16px 20px;margin-bottom:12px">
-      <div class="cob-stat-lbl" style="margin-bottom:6px">Caja total de la empresa</div>
-      <div style="font-family:'Zen Dots',sans-serif;font-size:34px;font-weight:800;color:${heroColor};line-height:1.1">${_spFmtMxn(cajaTotal)}</div>
-    </div>
-    <div class="cob-stats" style="margin-bottom:0">${cuentasHTML}</div>`;
+  cont.innerHTML = `<div class="cob-stats" style="margin-bottom:0">${cuentasHTML}</div>`;
 }
 
 // ── Franja 2 del dashboard: tabla "Utilidad por evento" (web) ────────────────

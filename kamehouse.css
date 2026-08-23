@@ -3442,3 +3442,40 @@ input[type="search"],.kh-buscar,.buscador{border-radius:var(--r-sm,8px)}
   .rah-s { white-space: normal; }
   .rah-when { font-size: 9px; }
 }
+
+/* ── [RES-3] Los tres números de Memo: primero y grandes ──────────────────── */
+.res-tres {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.res-big {
+  background: var(--bg2); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 18px 20px;
+  transition: border-color .2s;
+}
+.res-big.dash-click { cursor: pointer; }
+.res-big:hover { border-color: var(--border2); }
+
+/* ⚠️ `.res-big-val` y `.res-big .metric-value` comparten tamaño A PROPÓSITO.
+   La utilidad la pinta `_audUtilidadPintar`, que REESCRIBE su className a
+   `metric-value green|red` en cada render: si el tamaño colgara de una clase
+   propia, ese reescribo la borraría y el número volvería a 22px en silencio.
+   Por eso el tamaño lo pone el PADRE. */
+/* ⚠️ El tamaño se midió, no se eligió. Un `30px` fijo ENCOGÍA la utilidad:
+   una regla posterior de la casa ya subía `.metric-value` a
+   `clamp(30px,4.4vw,40px)`, o sea 40px en escritorio. Estos tres son los
+   números más grandes de la página, así que su clamp va por encima de ése. */
+.res-big-val,
+.res-big .metric-value {
+  font-family: 'Zen Dots', 'Barlow Condensed', sans-serif;
+  font-size: clamp(32px, 4.8vw, 46px); font-weight: 800; line-height: 1.1;
+  letter-spacing: -.01em;
+}
+.res-big .metric-label { margin-bottom: 6px; }
+.res-big .metric-sub { margin-top: 8px; line-height: 1.5; }
+/* La bodega viaja CON la utilidad: el rojo nunca solo (AUD-1c). */
+.res-big .aud-bodega { margin-top: 10px; }
+
+@media (max-width: 900px) { .res-big { padding: 16px; } }

@@ -7566,14 +7566,47 @@ async function _kmsPopulate() {
   try {
     const ev = await _fetchEVFromIndex();
     _kmsEVCache = Array.isArray(ev) ? ev : [];
-    sel.innerHTML = '<option value="">— Elige un evento —</option>' + _kmsEVCache
-      .filter((e) => e && e.id)
-      .slice()
-      .sort((a, b) => String(a.a || a.id).localeCompare(String(b.a || b.id)))
-      .map((e) => `<option value="${_esfEsc(e.id)}">${_esfEsc(e.a || e.id)}</option>`)
-      .join('');
+    _kmsPintaOpciones();
   } catch (_) { /* deja el placeholder */ }
 }
+
+// ═══ [KMS-SIMP-1] EL SELECTOR: BUSCADOR + ORDEN POR FECHA ═══════════════════
+// Medido: 101 opciones ordenadas por NOMBRE y sin forma de buscar. Para cargar
+// el pedido de un evento de septiembre había que recorrer el alfabeto entero.
+//
+// Dos cambios, ninguno de mecanismo:
+//   · el orden pasa a ser POR FECHA (el más cercano primero) — trabajar el
+//     Palacio es trabajar lo que viene, no lo que empieza con A;
+//   · una caja de búsqueda FILTRA las opciones del mismo <select>.
+// El <select> sigue siendo el mismo elemento con el mismo id y el mismo
+// onchange: `_kmsOnEvento` y los tres selectores espejo de KMS-1 no se enteran.
+function _kmsFechaDe(e) {
+  // La fecha que ordena es la PRIMERA de dsList si el evento es multifecha,
+  // igual que en el resto de la casa. Sin fecha va al final, no al principio:
+  // un evento por confirmar no es lo más urgente.
+  const l = (e && Array.isArray(e.dsList) && e.dsList.length) ? e.dsList : (e && e.ds ? [e.ds] : []);
+  return l[0] || '9999-99-99';
+}
+function _kmsPintaOpciones() {
+  const sel = document.getElementById('kms-evt');
+  if (!sel) return;
+  const elegido = sel.value;
+  const q = _kmNorm(String((document.getElementById('kms-ebusca') || {}).value || '').trim());
+  const lista = _kmsEVCache
+    .filter((e) => e && e.id)
+    .filter((e) => !q || _kmNorm(String(e.a || e.id)).includes(q) || _kmNorm(String(e.v || '')).includes(q))
+    .slice()
+    .sort((a, b) => _kmsFechaDe(a).localeCompare(_kmsFechaDe(b)));
+  sel.innerHTML = '<option value="">— Elige un evento —</option>' + lista
+    .map((e) => `<option value="${_esfEsc(e.id)}">${_esfEsc(e.a || e.id)}${e.f ? ' · ' + _esfEsc(e.f) : ''}</option>`)
+    .join('');
+  // Se conserva lo elegido si el filtro no lo dejó fuera: filtrar no debe
+  // deshacer la selección de quien ya estaba trabajando un evento.
+  if (elegido && lista.some((e) => e.id === elegido)) sel.value = elegido;
+  const vacio = document.getElementById('kms-ebusca-vacio');
+  if (vacio) vacio.style.display = (q && !lista.length) ? '' : 'none';
+}
+function _kmsBuscarEvento() { _kmsPintaOpciones(); }
 
 // Espejo de _comOnEvento para la lista de fechas: la multifecha se lee del
 // MISMO EV, así que el índice que elige Memo aquí es el mismo que compone
@@ -8756,10 +8789,15 @@ async function _kamComprasLoad() {
     // cambio. El índice zi NUNCA se recalcula al filtrar — el buscador solo
     // esconde filas, jamás re-numera.
     let listaHtml = '';
+    // [KMS-SIMP-1] El stock ya cargado por zona, para el renglón de la tanda.
+    // NO se recalcula: se publica el MISMO número que el bucle usa para pintar
+    // "N compradas". Dos cuentas del mismo dato acabarían divergiendo.
+    const stockPorZi = {};
     zonaNames.forEach((zona, zi) => {
       _kamZonasMap[zi] = zona;
       const cz = compras.filter((c) => String(c.zona) === zona);
       const stock = cz.reduce((s, c) => s + (parseInt(c.cantidad, 10) || 0), 0);
+      stockPorZi[zi] = stock;
       const deuda = cz.reduce((s, c) => s + (parseInt(c.cantidad, 10) || 0) * (Number(c.costo_unitario) || 0), 0);
       totalEvento += deuda;
       const sem = semMap[String(zona).trim()] || null;
@@ -8865,7 +8903,59 @@ async function _kamComprasLoad() {
     // La deuda del evento y los abonos viven en el MODO LISTA: son del evento,
     // no de una zona. Al entrar a una zona se ven sus números; para lo del
     // evento, un clic atrás. No desaparecen.
+    // ═══ [KMS-SIMP-1] EL PEDIDO EN TANDA ══════════════════════════════════
+    // Medido antes de construirla: cargar calle24 completo costaba ≈48 clics y
+    // ≈60 campos — 12 zonas, y entrar y salir de cada una. De esos 60 campos,
+    // 48 eran EL MISMO DATO repetido: proveedor, fecha y nota no cambian entre
+    // zonas. Solo cantidad y costo sí.
+    //
+    // La tabla captura lo común UNA vez arriba y deja un renglón por zona con
+    // los dos campos que de verdad cambian. Un solo Guardar.
+    //
+    // ⚠️ AGREGAR, NUNCA SOBRESCRIBIR (firmado por Memo): cada renglón lleno
+    // crea UNA compra nueva con su propio precio. Por eso el renglón muestra lo
+    // que YA hay ("40 cargadas") en vez de traerlo al campo: un campo
+    // pre-llenado invita a corregirlo, y corregir aquí sería perder a qué
+    // precio compraste la vez pasada.
+    //
+    // Las zonas y los renglones salen de lo que esta misma función ya calculó
+    // (`zonaNames`, `_kamZonasMap`, el stock por zona): ni un endpoint nuevo.
+    const tandaFilas = zonaNames.map((zona, zi) => {
+      // zi es el índice del map, NO un indexOf: dos zonas con el mismo nombre
+      // apuntarían todas a la primera, y el buscador de KMS-3 ya advierte que
+      // el índice canónico no se recalcula nunca.
+      const yaHay = stockPorZi[zi] || 0;
+      return `<tr data-zi="${zi}">
+        <td class="kmt-z">${_esfEsc(zona)}${yaHay > 0 ? `<span class="kmt-ya">${yaHay} cargadas</span>` : ''}</td>
+        <td><input class="cot-input kmt-in" id="kmt-cant-${zi}" type="number" min="0" step="1" placeholder="—" oninput="_kmtCalc()" aria-label="Cantidad para ${_esfEsc(zona)}"></td>
+        <td><input class="cot-input kmt-in" id="kmt-costo-${zi}" type="number" min="0" step="0.01" placeholder="—" oninput="_kmtCalc()" aria-label="Costo unitario para ${_esfEsc(zona)}"></td>
+        <td class="kmt-sub" id="kmt-sub-${zi}">—</td>
+      </tr>`;
+    }).join('');
+    const provOptsTanda = _kamProvCache.map((pv) => `<option value="${_esfEsc(pv.id)}">${_esfEsc(pv.nombre)}</option>`).join('');
+    const tanda = `<details class="kmt-wrap" id="kmt-wrap">
+      <summary class="kmt-sum">↥ Cargar pedido en tanda <span class="kmt-hint">— las ${zonaNames.length} zonas en una sola pantalla</span></summary>
+      <div class="kmt-body">
+        <div class="kmt-comun">
+          <label class="kmt-lbl">PROVEEDOR<select class="cot-input" id="kmt-prov">${provOptsTanda}</select></label>
+          <label class="kmt-lbl">FECHA<input class="cot-input" id="kmt-fecha" type="date" value="${_kamToday()}"></label>
+          <label class="kmt-lbl" style="flex:1;min-width:180px">NOTA DE LA TANDA<input class="cot-input" id="kmt-nota" placeholder="opcional — ej. pedido inicial" maxlength="500"></label>
+        </div>
+        <div class="kmt-tabla-wrap">
+          <table class="kmt-tabla"><thead><tr>
+            <th>Zona</th><th style="width:110px">Cantidad</th><th style="width:130px">Costo unit.</th><th style="width:120px">Subtotal</th>
+          </tr></thead><tbody>${tandaFilas}</tbody></table>
+        </div>
+        <div class="kmt-pie">
+          <div id="kmt-resumen" class="kmt-resumen">Ninguna zona capturada todavía.</div>
+          <button class="btn btn-primary btn-sm" type="button" id="kmt-guardar" onclick="_kmtGuardar()">Guardar el pedido</button>
+        </div>
+        <div id="kmt-error" class="kmt-error" style="display:none"></div>
+      </div>
+    </details>`;
+
     const lista = `<div id="kms-lista-wrap">
+      ${tanda}
       ${buscador}
       <div id="kms-zlista" class="kms-zlista">${listaHtml}</div>
       <div id="kms-zvacio" class="kms-vacio" style="display:none">Ninguna zona se llama así.</div>
@@ -9019,6 +9109,133 @@ async function _kamCompraCrear(zi) {
     if (!r.ok || !d.ok) throw new Error(d.error || 'No se pudo registrar la compra');
     _kamComprasLoad();
   } catch (e) { _kamComprasAlert(e.message); }
+}
+
+// ═══ [KMS-SIMP-1] LA TABLA DE TANDA ════════════════════════════════════════
+// Lee los renglones llenos, calcula a la vista y guarda una compra POR RENGLÓN.
+// No hay endpoint nuevo: usa `admin-compras` con accion 'crear', que es una
+// fila por compra — por eso "agregar, nunca sobrescribir" ya es lo nativo.
+function _kmtFilas() {
+  const out = [];
+  document.querySelectorAll('#kmt-wrap tbody tr[data-zi]').forEach((tr) => {
+    const zi = parseInt(tr.getAttribute('data-zi'), 10);
+    const cant = (document.getElementById('kmt-cant-' + zi) || {}).value;
+    const costo = (document.getElementById('kmt-costo-' + zi) || {}).value;
+    const sc = String(cant == null ? '' : cant).trim();
+    const su = String(costo == null ? '' : costo).trim();
+    const c = parseInt(sc, 10);
+    // ⚠️ VACÍO NO ES CERO. `Number('')` da **0**, y con eso un renglón con
+    // cantidad y SIN costo pasaba como válido: habría creado una compra de $0
+    // en silencio. Se mira la CADENA antes de convertir. (La misma trampa que
+    // `_numDinero` evita en MIG-1a; aquí se me había colado.)
+    const u = su === '' ? NaN : Number(su);
+    // Un renglón vacío simplemente NO se guarda: no hay que borrarlo ni entrar
+    // a decir que no. Vacío en LOS DOS campos es "esta zona no va en la tanda".
+    const vacio = sc === '' && su === '';
+    out.push({ zi, zona: _kamZonasMap[zi], cant: c, costo: u, vacio,
+      valido: !vacio && Number.isInteger(c) && c > 0 && Number.isFinite(u) && u >= 0 });
+  });
+  return out;
+}
+function _kmtCalc() {
+  const filas = _kmtFilas();
+  let boletos = 0, dinero = 0, zonas = 0, malas = 0;
+  filas.forEach((f) => {
+    const el = document.getElementById('kmt-sub-' + f.zi);
+    if (f.vacio) { if (el) { el.textContent = '—'; el.classList.remove('kmt-mal'); } return; }
+    if (!f.valido) { if (el) { el.textContent = 'revisar'; el.classList.add('kmt-mal'); } malas++; return; }
+    const sub = f.cant * f.costo;
+    if (el) { el.textContent = _kamMoney(sub); el.classList.remove('kmt-mal'); }
+    boletos += f.cant; dinero += sub; zonas++;
+  });
+  const r = document.getElementById('kmt-resumen');
+  if (r) {
+    r.innerHTML = zonas
+      ? `<b>${zonas}</b> zona${zonas !== 1 ? 's' : ''} · <b>${boletos}</b> boleto${boletos !== 1 ? 's' : ''} · <b>${_kamMoney(dinero)}</b>` +
+        (malas ? ` <span class="kmt-mal">· ${malas} por revisar</span>` : '')
+      : (malas ? `<span class="kmt-mal">${malas} renglón${malas !== 1 ? 'es' : ''} por revisar</span>` : 'Ninguna zona capturada todavía.');
+  }
+  return { filas, zonas, malas, boletos, dinero };
+}
+function _kmtError(msg) {
+  const e = document.getElementById('kmt-error');
+  if (!e) return;
+  if (!msg) { e.style.display = 'none'; e.textContent = ''; return; }
+  e.style.display = ''; e.textContent = msg;
+}
+async function _kmtGuardar() {
+  _kmtError('');
+  // ⚠️ SE LEE `kam-evt-sel`, EL MISMO QUE `_kamCompraCrear`. Es el selector
+  // espejo que KMS-1 dejó oculto, y es de donde toma el evento el guardado que
+  // ya existía. Leer `kms-evt` (el mando visible) parecería más natural y sería
+  // una SEGUNDA fuente del mismo dato: el día que el espejo cambie de forma,
+  // la tabla y el alta de una zona guardarían en eventos distintos.
+  // (Mi primer intento llamaba a `_kmsEventoId()`, que NO EXISTE — y un
+  // identificador no declarado no da undefined: LANZA.)
+  const sel = document.getElementById('kam-evt-sel');
+  const evId = sel ? sel.value : '';
+  if (!evId) return _kmtError('Elige un evento primero.');
+  const prov = (document.getElementById('kmt-prov') || {}).value || '';
+  const fecha = (document.getElementById('kmt-fecha') || {}).value || '';
+  const nota = ((document.getElementById('kmt-nota') || {}).value || '').trim();
+  if (!prov) return _kmtError('Elige el proveedor de la tanda.');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha)) return _kmtError('La fecha de la tanda no es válida.');
+  const { filas, zonas, malas } = _kmtCalc();
+  if (malas) return _kmtError('Hay ' + malas + ' renglón(es) a medias: la cantidad va entera y mayor que cero, y el costo no puede ser negativo.');
+  if (!zonas) return _kmtError('No capturaste ninguna zona.');
+
+  const btn = document.getElementById('kmt-guardar');
+  if (btn) { btn.disabled = true; btn.textContent = 'Guardando…'; }
+  const buenas = filas.filter((f) => f.valido);
+  const fallaron = [];
+  let hechas = 0;
+  // Una a una y EN SERIE: si el servidor rechaza la quinta, las cuatro
+  // primeras ya quedaron guardadas y hay que poder decir CUÁLES. Un
+  // Promise.all escondería cuál falló detrás del primer error.
+  for (const f of buenas) {
+    try {
+      const r = await khAdminFetch('/.netlify/functions/admin-compras', {
+        method: 'POST',
+        body: JSON.stringify({ accion: 'crear', evento_id: evId, zona: f.zona,
+          cantidad: f.cant, costo_unitario: f.costo, proveedor_id: prov, fecha, nota: nota || null }),
+      });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok || !d.ok) throw new Error(d.error || 'no se pudo');
+      hechas++;
+      // Se limpia el renglón que YA quedó: si algo truena a medias, en la
+      // pantalla se queda exactamente lo que falta por guardar.
+      const a = document.getElementById('kmt-cant-' + f.zi); if (a) a.value = '';
+      const b2 = document.getElementById('kmt-costo-' + f.zi); if (b2) b2.value = '';
+    } catch (e) {
+      fallaron.push(f.zona + ' (' + ((e && e.message) || 'error') + ')');
+    }
+  }
+  if (btn) { btn.disabled = false; btn.textContent = 'Guardar el pedido'; }
+  _kmtCalc();
+  if (fallaron.length) {
+    _kmtError('Se guardaron ' + hechas + ' de ' + buenas.length + '. NO se guardaron: ' + fallaron.join(' · ') +
+      '. Lo que quedó en la tabla es lo que falta.');
+  } else {
+    if (typeof showToast === 'function') showToast(hechas + ' zona' + (hechas !== 1 ? 's' : '') + ' cargada' + (hechas !== 1 ? 's' : '') + ' ✓', 'success');
+  }
+  // ⚠️ `_kamComprasLoad` RE-PINTA la lista entera, y con ella la tabla: el
+  // <details> se cierra y los renglones que quedaban pendientes se pierden.
+  // Se guardan antes y se reponen después. Sin esto, un guardado parcial
+  // borraba de la pantalla justo lo que faltaba por capturar.
+  const pendientes = _kmtFilas()
+    .filter((f) => !f.vacio)
+    .map((f) => ({ zi: f.zi,
+      cant: (document.getElementById('kmt-cant-' + f.zi) || {}).value || '',
+      costo: (document.getElementById('kmt-costo-' + f.zi) || {}).value || '' }));
+  // Recargar SIEMPRE, aunque algo haya fallado: lo que sí entró tiene que verse.
+  await _kamComprasLoad();
+  const w = document.getElementById('kmt-wrap');
+  if (w) w.setAttribute('open', '');
+  pendientes.forEach((x) => {
+    const a = document.getElementById('kmt-cant-' + x.zi); if (a) a.value = x.cant;
+    const b3 = document.getElementById('kmt-costo-' + x.zi); if (b3) b3.value = x.costo;
+  });
+  _kmtCalc();
 }
 
 async function _kamCompraEliminar(id) {

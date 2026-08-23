@@ -17,7 +17,7 @@
 //              ser MERMA: los mismos boletos, medidos en COSTO HUNDIDO en vez de
 //              en precio de venta. La ganancia NO cambia de fórmula (el costo ya
 //              está en `gastos` desde FIN-1b); cambia lo que la bodega DICE.
-//   DEUDA A PROVEEDORES = compras + servicios − abonos  → INFORMATIVA, jamás
+//   DEUDA A PROVEEDORES = compras − abonos  → INFORMATIVA, jamás
 //                         dentro de la ganancia: es lo que FALTA por gastar, y
 //                         meterla contaría dos veces lo mismo el día que se pague.
 //
@@ -331,21 +331,29 @@ async function mundoPortal(leerP) {
   return { data: { cobrado, viajeros, gastos, facturado, gastosSinEvento } };
 }
 
-// ── Deuda a proveedores por evento: compras + servicios − abonos (KH).
+// ── Deuda a proveedores por evento: COMPRAS − ABONOS (KH).
+//
+// ⚠️ [KMS-SIMP-4] AQUÍ HABÍA UN TERCER TÉRMINO, `servicios_proveedor`, Y NO
+// DEBE VOLVER. Decisión de Memo, coherente con FIN-1 desde el origen: un
+// servicio (transporte, sonido) SE PAGA AL MOMENTO, así que es un GASTO y se
+// captura donde se capturan los gastos. La ÚNICA deuda del negocio es la de
+// BOLETOS a crédito. Sumar servicios aquí mezclaba "lo que ya pagué" con "lo
+// que debo", y hacía que un gasto se viera como pasivo.
+//
+// Si alguien lee esta función y piensa "falta el término de servicios": no
+// falta, se quitó a propósito. La tabla quedó vacía (0 filas al retirarlo) y
+// su alta ya no existe en ningún lado.
 async function deudaProveedores(leerKH, evento_id) {
   const f = evento_id ? `evento_id=eq.${encodeURIComponent(evento_id)}&` : '';
-  const [rc, rs, ra] = await Promise.all([
+  const [rc, ra] = await Promise.all([
     leerKH('compras', `${f}select=evento_id,cantidad,costo_unitario&limit=20000`),
-    leerKH('servicios_proveedor', `${f}select=evento_id,monto&limit=20000`),
     leerKH('abonos', `${f}select=evento_id,monto&limit=20000`),
   ]);
   if (rc.error) return rc;
-  if (rs.error) return rs;
   if (ra.error) return ra;
   const out = {};
   const suma = (slug, v) => { if (!slug) return; out[slug] = (out[slug] || 0) + v; };
   rc.data.forEach((c) => suma(baseSlug(c.evento_id), (parseInt(c.cantidad, 10) || 0) * n(c.costo_unitario)));
-  rs.data.forEach((s) => suma(baseSlug(s.evento_id), n(s.monto)));
   ra.data.forEach((a) => suma(baseSlug(a.evento_id), -n(a.monto)));
   return { data: out };
 }

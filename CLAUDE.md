@@ -275,6 +275,16 @@ está caduco antes de escribirse.
 - **La regla de precios vive en 3 copias**: `calcular()` en index.html,
   `_lib/precio-zona` y `_vtaCalc` en kamehouse.js. Tocar las 3 + correr el arnés
   de equivalencia.
+- **LA ÚNICA DEUDA DEL NEGOCIO ES LA DE BOLETOS A CRÉDITO**, y su fórmula es
+  `compras − abonos`. **NO lleva un término de servicios**, y si lees
+  `deudaProveedores` en `_lib/cuenta-evento` y sientes que falta: no falta, se
+  quitó a propósito (KMS-SIMP-4, decisión de Memo, coherente con FIN-1 desde el
+  origen). **Un servicio —transporte, sonido— se paga al momento, así que es un
+  GASTO** y se captura donde se capturan los gastos. Sumarlo a la deuda mezclaba
+  "lo que ya pagué" con "lo que debo" y hacía que un gasto se viera como pasivo.
+  La sección "Servicios y deudas que no son boletos" y las acciones
+  `servicios_listar` / `servicio_crear` **ya no existen**; la tabla
+  `servicios_proveedor` quedó vacía y sin escritor.
 - **NINGUNA PANTALLA CALCULA SU PROPIA CUENTA DE EVENTO.** La cuenta vive en
   `_lib/cuenta-evento` (ventas de los dos mundos − gastos = ganancia, con bodega
   y deuda aparte) y las pantallas la PIDEN. **Cada `reduce` sobre pagos que

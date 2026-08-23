@@ -3072,17 +3072,6 @@ input[type="search"],.kh-buscar,.buscador{border-radius:var(--r-sm,8px)}
 .vj3-form-b{display:flex;justify-content:flex-end;margin-top:10px}
 
 /* ═══ [PRV-2] Servicios de proveedor (lo que no son boletos) ══════════════ */
-.prv2-caja{margin-top:16px;padding:12px;border:1px solid var(--border);border-radius:var(--r-sm,8px);background:var(--bg3)}
-.prv2-t{font-family:'Rajdhani',sans-serif;font-weight:700;font-size:15px;color:var(--text)}
-.prv2-d{font-size:11px;color:var(--ts);margin:3px 0 10px;line-height:1.5;max-width:70ch}
-.prv2-lista{margin-bottom:10px}
-.prv2-fila{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;padding:5px 0;border-top:1px solid var(--border);font-size:12px}
-.prv2-f{font-family:'JetBrains Mono',monospace;color:var(--ts);white-space:nowrap}
-.prv2-p{font-weight:700}
-.prv2-c{color:var(--ts);flex:1;min-width:0}
-.prv2-m{font-weight:700;white-space:nowrap}
-.prv2-vacio{font-size:11px;color:var(--ts);padding:5px 0}
-.prv2-form{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
 
 /* ═══ [CAP-FIX-1] El que está asignado y no viaja ═════════════════════════
    VJ-4 ya lo descontaba del total y el chip no lo decía: entre 29 chips
@@ -3219,9 +3208,6 @@ input[type="search"],.kh-buscar,.buscador{border-radius:var(--r-sm,8px)}
 /* Los bloques de dentro del paso: mismo contenido, menos margen. */
 .kms-panel-h{margin-bottom:10px}
 .kms-panel-d{line-height:1.4}
-.prv2-caja{margin-top:12px;padding:9px 11px}
-.prv2-d{margin:2px 0 7px}
-.prv2-fila{padding:3px 0}
 .kms-zbusca{margin-bottom:7px}
 
 /* Último apretón, ya medido: cada regla de aquí quita alto sin quitar letra. */

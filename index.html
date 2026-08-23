@@ -3598,7 +3598,12 @@ function filterEvents(){
     var card=cards[i];
     // Reset any top10 ordering from previous runs
     if(card.style.order)card.style.order='';
-    if(card.classList.contains('mes-label')||card.classList.contains('pc-section-label')||card.classList.contains('pc-block')){
+    // [FIL-1] La clase 'pc-block' salió de esta lista: IDX-1 borró el cuadrito
+    // de "Próximamente · Por confirmar" y con él la única clase de ese nombre.
+    // Preguntar por ella no tronaba —contestaba false siempre— pero era un
+    // selector que ya no alcanza nada, que es como empiezan los que engañan.
+    // 'pc-section-label' SÍ se queda: la usa la sección "Por confirmar" nueva.
+    if(card.classList.contains('mes-label')||card.classList.contains('pc-section-label')){
       card.style.display=(f==='top10')?'none':'';
       continue;
     }

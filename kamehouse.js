@@ -14274,7 +14274,23 @@ function _spPintarBadgePendientes(n) {
 function _pgSyncTabs(activa) {
   document.querySelectorAll('.pg-tabs .pg-tab-btn').forEach(b => {
     const tab = b.dataset.tab;
-    b.style.display = _puedeVerTab(tab) ? '' : 'none';
+    // [COB-MIG-1b] EL PERMISO Y EL TOGGLE SON DOS COSAS DISTINTAS, y hasta hoy
+    // compartían la misma llave. `data-tab` sirve para saber cuál pestaña está
+    // activa; `data-permiso` dice de quién HEREDA el derecho a verse. Cuando no
+    // hay `data-permiso`, se cae a `data-tab` — así los dos botones de siempre
+    // se comportan byte a byte igual que antes.
+    //
+    // Sin esto, la CAJA de COB-MIG-1 fue INVISIBLE PARA TODOS en producción:
+    // su `data-tab="caja"` no es un permiso de `PERMISOS_TABS`, así que
+    // `_puedeVerTab` decía que no y esta línea la apagaba. El diseño decía "la
+    // caja hereda el permiso de pagos" y el código no tenía cómo expresarlo.
+    //
+    // ⚠️ La alternativa —agregar 'caja' a PERMISOS_TABS— es justo lo que la
+    // casa NO hace: sería un permiso nuevo para una pestaña que no es una
+    // pantalla aparte, y habría que mantenerlo en los 3 roles para siempre.
+    // Heredar no inventa listas.
+    const permiso = b.dataset.permiso || tab;
+    b.style.display = _puedeVerTab(permiso) ? '' : 'none';
     b.classList.toggle('active', tab === activa);
   });
 }

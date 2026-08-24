@@ -242,12 +242,17 @@ está caduco antes de escribirse.
     **sin `vendedor`**. Respaldos en `bkp_ven_*`. Había 0 usuarios con ese rol.
   - ⚠️ **`stock_ajustes.vendidos_fuera` NO es de vendedores** y se queda: es el
     contador de ventas sin registro. Casi se va en la barrida.
-  - ⏳ **Residuo medido, sin urgencia:** en el **Portal** (no en KH) sigue viva
-    `pagos.registrado_por_vendedor` — `text`, nullable, **0 filas y cero
-    archivos del repo la nombran**. No estaba en la lista de 1d porque aquélla
-    era de KH. Tuerca de Jane cuando toque.
-  - **La lección:** al borrar un módulo hay que barrer sus columnas contra TODO
-    el repo **y contra las DOS bases**, no solo la que tiene las tablas.
+  - 🏆 **RASTRO CERO EN LAS DOS BASES.** Quedaba `pagos.registrado_por_vendedor`
+    en el **Portal** —fuera de la lista de 1d, que era de KH—; Jane la verificó
+    (0 valores) y la soltó. Careo final del 24-ago leído de
+    `information_schema`: **ninguna** columna ni tabla viva con rastro de
+    vendedor en KH **ni** en el Portal, respaldos `bkp_ven_*` en pie, y
+    `usuarios_rol_check` sin `vendedor`.
+  - **La lección, y costó cinco días verla:** al borrar un módulo hay que barrer
+    sus columnas contra TODO el repo **y contra las DOS bases**. El diseño de 1d
+    listó las de KameHouse y la del Portal sobrevivió a la vista de todos —
+    vacía y sin lectores, pero ahí. **El inventario de un borrado se hace por
+    base, no por módulo.**
   - ⚰️ Muere con él el pendiente "capturar las primeras comisiones CHEAP"
     (wizard F5a). No se re-propone.
 - **Resumen al admin de `contratos-alerta-cron`**: se queda SIN bitácora a

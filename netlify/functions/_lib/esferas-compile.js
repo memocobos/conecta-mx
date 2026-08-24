@@ -197,7 +197,17 @@ function zonasSegmento(esfera) {
 // lo lee. Por eso SIEMPRE emitimos "pagos:[]" (byte-igual a un evento sin pagos).
 // No se captura ni se compila plan custom.
 function pagosSegmento() {
-  return 'pagos:[]';
+  // [ESF-E0] YA NO SE EMITE NADA. El campo `pagos` del EV era dato muerto —el
+  // plan real lo arma `getQuincenas` sola y ningún render lo lee, verificado
+  // con grep sobre index.html y todo el repo— y ESF-E0 lo podó de los 89
+  // objetos que lo traían. Si el compilador siguiera emitiendo `pagos:[]`,
+  // publicar cualquier evento se lo volvería a poner, y el careo byte a byte
+  // —que es el candado de toda esta serie— fallaría para siempre por un campo
+  // que nadie lee.
+  //
+  // Se conserva la función, vacía, en vez de borrar la llamada: así el punto
+  // donde se decidió queda a la vista y el diff de esta tuerca es de una línea.
+  return '';
 }
 
 // B2b — `hotel` (texto JSON o objeto). Solo si {custom:true, items:[...]} →
@@ -444,7 +454,7 @@ function generarObjFestival(esfera, fest, hoy) {
     "',v:'" + venue +
     "',st:'" + escStr(status) +
     "'," + incSeg + ',sep:' + sepN + notaSeg +
-    ',banco:BANCO_DEFAULT,multifecha:[' + mfStr + '],' + topZonas + ',' + pagosSegmento() + '}';
+    ',banco:BANCO_DEFAULT,multifecha:[' + mfStr + '],' + topZonas + pagosSegmento() + '}';
 }
 
 // Byte-exacto: comillas simples, sin espacios extra. banco:BANCO_DEFAULT SIN
@@ -515,7 +525,7 @@ function generarObj(esfera, hoy) {
     "',st:'" + escStr(status) +
     "'," + cdmx + mapa +
     incSeg + ",sep:" + sepN + sepCheapSeg + notaSeg +
-    ",banco:BANCO_DEFAULT," + zonasSegmento(esfera) + "," + hotelSegmento(esfera) + "," + pagosSegmento() + "}";
+    ",banco:BANCO_DEFAULT," + zonasSegmento(esfera) + "," + hotelSegmento(esfera) + pagosSegmento() + "}";
 }
 
 // ── Parsers de validación (idénticos a los consumidores) ──────────────────────

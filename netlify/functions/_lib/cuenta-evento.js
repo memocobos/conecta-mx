@@ -9,9 +9,11 @@
 // LA ARITMÉTICA ES LA DE FIN-1c, subida del navegador al servidor para que
 // también la puedan usar las funciones:
 //
-//   VENTAS   = cobrado del Portal  +  abonado de los migrados de KH
-//   GASTOS   = la tabla `gastos` del evento (desde FIN-1b trae boletos/hotel/bus)
-//   GANANCIA = VENTAS − GASTOS
+//   COBRADO  = cobrado del Portal  +  abonado de los migrados de KH
+//   GASTOS   = la tabla `gastos` del evento SIN la categoría `Boletos`
+//   GANANCIA = COBRADO − INVERSIÓN EN BOLETOS − GASTOS
+//   INVERSIÓN EN BOLETOS = TODOS los boletos comprados del evento
+//              (`compras`), vendidos o no, pagados o no.
 //   BODEGA   = lo que ya se pagó y sigue en forma de boleto
 //              [MER-1] …y que en un evento YA PASADO deja de ser bodega y pasa a
 //              ser MERMA: los mismos boletos, medidos en COSTO HUNDIDO en vez de
@@ -20,6 +22,29 @@
 //   DEUDA A PROVEEDORES = compras − abonos  → INFORMATIVA, jamás
 //                         dentro de la ganancia: es lo que FALTA por gastar, y
 //                         meterla contaría dos veces lo mismo el día que se pague.
+//
+// ⚠️ [UTIL-C] LA FÓRMULA CAMBIÓ DOS VECES EN AGOSTO Y ÉSTA ES LA FIRMADA. Vale
+// la pena dejar las tres escritas, porque las pantallas viejas y los reportes
+// guardados hablan de las anteriores y hay que poder reconocerlas:
+//   (A) FIN-1  · cobrado − gastos                       → era CAJA, no utilidad.
+//   (B) UTIL-B · vendido − costo de lo VENDIDO − gastos → margen contable.
+//   (C) UTIL-C · COBRADO − INVERSIÓN TOTAL − gastos     → la de hoy.
+// Con las cifras reales de `calle24` las tres dan números distintos —$23,600,
+// $20,678 y −$28,720— así que no hay forma de confundirlas por accidente.
+//
+// POR QUÉ (C), en las palabras de la decisión: **los boletos no tienen
+// devolución**. En el momento en que se compran son de Memo, se vendan o no, así
+// que la inversión entera pesa desde el día uno y no se va prorrateando conforme
+// se venden. Y el primer término es lo COBRADO, no lo vendido, porque un
+// contrato firmado no paga a un proveedor. La consecuencia incómoda es que un
+// evento recién cargado nace MUY en rojo y se va enderezando conforme cobra —
+// eso no es un error de la cuenta, es la forma real del negocio, y es justo lo
+// que la fórmula (B) escondía.
+//
+// COROLARIO: la BODEGA deja de ser un activo que compensa. Su costo ya está
+// dentro de la inversión, así que restarlo otra vez —o sumarlo como "lo que
+// vale lo que me queda"— contaría lo mismo dos veces. La bodega queda como
+// INFORMACIÓN ("me quedan N boletos por vender"), igual que la deuda.
 //
 // LO QUE ESTE LIB **NO** PUEDE SABER, y por eso no lo inventa:
 //   El PRECIO DE VENTA de una zona vive SOLO en el catálogo de `index.html`.
@@ -42,7 +67,9 @@
 // Uso:
 //   cuentaDeEvento({ portalUrl, portalService, khUrl, khService, evento_id,
 //                    rol, preciosPorZona?, pasado?, fetchImpl? })
-//     → { evento_id, ventas_portal, ventas_kh, ventas, gastos, ganancia,
+//     → { evento_id, ventas_portal, ventas_kh, ventas, en_mano, facturado,
+//         inversion_boletos, inversion_parcial, inversion_zonas_sin_costo,
+//         gastos, ganancia,
 //         bodega:{ boletos, valor_estimado, sin_precio, zonas_sin_precio,
 //                  costo_hundido, sin_costo, zonas_sin_costo, pasado },
 //         deuda_proveedores, viajeros_portal, viajeros_kh, viajeros,
@@ -56,10 +83,11 @@
 //      camino existe justo para los tableros que miran TODOS los eventos.)
 // =============================================================================
 
-const { cargarDisponibilidad, desgloseZona, claseFila } = require('./disponibilidad');
-// [UTIL-B] La regla de quién consume boleto se LEE de su dueño, igual que en
-// `_lib/disponibilidad`. Una tercera copia sería lo de siempre.
-const { consumeBoleto } = require('./paquete-viaje');
+// [UTIL-C] `claseFila` y `consumeBoleto` los importó UTIL-B-1 para costear lo
+// vendido POR ZONA. Bajo C la inversión no mira lo vendido, así que se podan
+// aquí y no en una limpieza suelta: un import que nadie usa hace creer que esta
+// lib clasifica viajeros, y no los clasifica.
+const { cargarDisponibilidad, desgloseZona } = require('./disponibilidad');
 // [SAL-1] La regla paquete→cuenta NO se replica aquí: se consume la única que hay.
 const { cuentaParaPaquete } = require('./catalogo-index');
 
@@ -152,7 +180,7 @@ function bodegaDesconocida(pasado) {
 
 // ── PURO: arma la cuenta con los números ya reunidos. Aquí vive la regla del
 //    gate: sin permiso, lo migrado es null y lo que dependa de él, también.
-function armarCuenta({ evento_id, ventasPortal, facturadoPortal, viajerosPortal, gastos, kh, deuda, bodega, costo, veMigrados }) {
+function armarCuenta({ evento_id, ventasPortal, facturadoPortal, viajerosPortal, gastos, kh, deuda, bodega, inversion, veMigrados }) {
   const ventas_kh = veMigrados ? kh.cobrado : null;
   // [AUD-1b · reescrita por UTIL-B] FACTURADO ≠ VENTAS, y las DOS se usan, cada
   // una para lo suyo:
@@ -176,17 +204,25 @@ function armarCuenta({ evento_id, ventasPortal, facturadoPortal, viajerosPortal,
   // además se publica con su nombre honesto para quien pinte la tarjeta.
   const en_mano = ventas;
 
-  // ═══ LA FÓRMULA B ═══════════════════════════════════════════════════════
-  //   UTILIDAD = VENDIDO − COSTO DE LO VENDIDO − GASTOS
+  // ═══ LA FÓRMULA C ═══════════════════════════════════════════════════════
+  //   UTILIDAD = COBRADO − INVERSIÓN TOTAL EN BOLETOS − GASTOS
+  //
+  // ⚠️ COBRADO, no facturado. UTIL-B usó el facturado (base de margen) y Memo
+  // firmó volver al dinero que EXISTE: la utilidad vuelve a hablar de plata en
+  // la mano, y lo que falta por cobrar se dice aparte, en los escenarios.
+  //
+  // ⚠️ INVERSIÓN **TOTAL**, no el costo de lo vendido: los boletos no tienen
+  // devolución, así que el compromiso entero pesa desde el día uno.
   //
   // `gastos` ya viene SIN los pagos de boletos (se excluyen por categoría en
-  // `mundoPortal`): su costo entra por el segundo término, y contarlo dos veces
-  // era justo la trampa que esta tuerca vino a cerrar.
+  // `mundoPortal`, desde UTIL-B-1, y ESA EXCLUSIÓN SE QUEDA): un pago a la
+  // matriz es la inversión pagándose, no un gasto nuevo. Sin excluirlo, el
+  // mismo dinero restaría dos veces — una por inversión y otra por gasto.
   //
   // Es null si falta cualquiera de sus partes — una suma con un sumando
-  // desconocido no se puede afirmar (misma regla que ya regía la ganancia).
-  const c = costo || costoVendidoDesconocido();
-  const ganancia = (facturado == null || c.total == null) ? null : facturado - c.total - gastos;
+  // desconocido no se puede afirmar.
+  const c = inversion || inversionDesconocida();
+  const ganancia = (ventas == null || c.total == null) ? null : ventas - c.total - gastos;
   return {
     evento_id,
     ve_migrados: veMigrados,
@@ -202,11 +238,12 @@ function armarCuenta({ evento_id, ventasPortal, facturadoPortal, viajerosPortal,
     pendiente: (facturado == null || ventas == null) ? null : facturado - ventas,
     gastos,
     ganancia,
-    // [UTIL-B] Las tres piezas de la fórmula, publicadas para que la pantalla
-    // pueda explicar el número en vez de solo enseñarlo.
-    costo_vendido: c.total,
-    costo_parcial: c.parcial,
-    costo_zonas_sin_costo: c.zonas_sin_costo,
+    // [UTIL-C] Las piezas de la fórmula, publicadas para que la pantalla pueda
+    // EXPLICAR el número en vez de solo enseñarlo — y para que el panel de
+    // escenarios no tenga que recalcular ninguna por su cuenta.
+    inversion_boletos: c.total,
+    inversion_parcial: c.parcial,
+    inversion_zonas_sin_costo: c.zonas_sin_costo,
     en_mano,
     bodega,
     deuda_proveedores: deuda,
@@ -288,10 +325,7 @@ async function mundoKH(leerKH, evento_id, catalogo) {
     : '';
   // [SAL-1] `tipo_paquete` viaja en la MISMA fila que ya se leía. Se llama así
   // —leído del `information_schema`, no recordado—: NO es `paquete`.
-  // [UTIL-B] `zona_boleto` y `tipo_viajero` se suman a la MISMA consulta: sin
-  // zona no se le puede poner costo a un migrado, y sin `tipo_viajero` el staff
-  // se contaría como cliente (`contrato-firmar` lo inserta con paquete PLUS).
-  const rv = await leerKH('viajeros_evento', `${filtroV}select=id,evento_id,total_contrato,abonado_previo,tipo_paquete,zona_boleto,tipo_viajero&limit=20000`);
+  const rv = await leerKH('viajeros_evento', `${filtroV}select=id,evento_id,total_contrato,abonado_previo,tipo_paquete&limit=20000`);
   if (rv.error) return rv;
   const ra = await leerKH('abonos_viajero', 'select=viajero_id,monto&limit=20000');
   if (ra.error) return ra;
@@ -321,8 +355,7 @@ async function mundoKH(leerKH, evento_id, catalogo) {
     if (catalogo) acumularEnCuenta(e, slug, v.tipo_paquete, s.abonado, catalogo);
   });
   Object.keys(porEvento).forEach((k) => { porEvento[k].debenMenosAFavor = porEvento[k].deben - porEvento[k].aFavor; });
-  // [UTIL-B] Igual que mundoPortal: las filas ya leídas viajan de vuelta.
-  return { data: porEvento, filas: rv.data };
+  return { data: porEvento };
 }
 
 const KH_VACIO = { filas: 0, conContrato: 0, sinContrato: 0, vendido: 0, cobrado: 0, deben: 0, aFavor: 0, debenMenosAFavor: 0, porCuenta: null, sinCuenta: { monto: 0, filas: 0, motivos: [] } };
@@ -332,10 +365,10 @@ async function mundoPortal(leerP) {
   // [AUD-1b] `precio_total` = lo FACTURADO (contratado), que no es lo mismo que
   // lo cobrado. La pantalla de Ventas enseña las dos, y confundirlas haría que
   // "Pendiente" saliera siempre en cero.
-  // [UTIL-B] `zona` y las tres columnas del reloj viajan para poder costear lo
-  // vendido por zona en el camino de TODOS los eventos. Es la MISMA consulta con
-  // más columnas, no una consulta nueva.
-  const rs = await leerP('solicitudes_tour', `estado=in.(${ESTADOS_CUENTAN.join(',')})&select=id,evento_id,num_personas,precio_total,zona,paquete,estado,comprobante_separo_url,hold_expira_at&limit=20000`);
+  // [UTIL-C] Vuelve a su forma original: las columnas extra las pidió UTIL-B
+  // para costear por zona, y bajo C la inversión no depende de lo vendido. Un
+  // `select` que trae lo que nadie lee se lee como si alguien lo leyera.
+  const rs = await leerP('solicitudes_tour', `estado=in.(${ESTADOS_CUENTAN.join(',')})&select=id,evento_id,num_personas,precio_total&limit=20000`);
   if (rs.error) return rs;
   const rp = await leerP('pagos', 'estado=eq.pagado&select=solicitud_id,monto,monto_pagado&limit=20000');
   if (rp.error) return rp;
@@ -384,9 +417,7 @@ async function mundoPortal(leerP) {
     if (!slug) { gastosSinEvento += n(g.monto); return; }
     gastos[slug] = (gastos[slug] || 0) + n(g.monto);
   });
-  // [UTIL-B] Las filas crudas viajan de vuelta para que el costo de TODOS se
-  // calcule sin releerlas. No es un dato nuevo: es el que esta función ya tenía.
-  return { data: { cobrado, viajeros, gastos, facturado, gastosSinEvento, gastosBoletos, filas: rs.data } };
+  return { data: { cobrado, viajeros, gastos, facturado, gastosSinEvento, gastosBoletos } };
 }
 
 // [UTIL-B] La señal de que un gasto es un pago de BOLETOS. Vive en UNA función
@@ -394,106 +425,61 @@ async function mundoPortal(leerP) {
 // un solo sitio donde cambiarla. `'Boletos'` es el valor EXACTO del catálogo de
 // `_lib/categorias-gasto`, que es sensible a mayúsculas a propósito.
 // ═══════════════════════════════════════════════════════════════════════════
-// [UTIL-B] EL COSTO DE LO VENDIDO
+// [UTIL-C] LA INVERSIÓN TOTAL EN BOLETOS
 //
-// Cada boleto vendido carga su costo DESDE QUE SE VENDE, se haya pagado a la
-// matriz o no. Es el corazón del cambio de A (caja) a B (margen).
+//   utilidad del evento = COBRADO − INVERSIÓN TOTAL EN BOLETOS − GASTOS
 //
-//   costo = Σ  (vendidas_con_ingreso_de_la_zona × costo_unit_de_la_zona)
-//          zonas
+// ⚠️ INVERSIÓN **TOTAL**, no "costo de lo vendido". Es el compromiso COMPLETO
+// del evento: lo comprado, pagado o no. La razón es de negocio y la firmó Memo:
+// **los boletos no tienen devolución**. En cuanto se compran son de Memo sí o
+// sí, así que la utilidad tiene que cargarlos enteros desde el primer día — y
+// no ir descubriéndolos conforme se venden.
 //
-// ⚠️ `costo_unit` es el PROMEDIO PONDERADO por zona, y ya existía: lo calcula
-// `_lib/disponibilidad` desde MER-1 (`inversion / conCosto`), con el cuidado de
-// que una compra SIN costo no entre como cero. No se reimplementa aquí.
+// Consecuencia que hay que decir: un evento arranca en ROJO por el monto de su
+// pedido, y ese rojo es correcto — todavía no ha recuperado lo que puso.
 //
-// ⚠️ LOS "VENDIDOS FUERA" NO CARGAN COSTO (decisión firmada de Memo). Son el
-// corte del Excel: un contador sin contrato detrás. Cargarles costo restaría
-// sin traer su venta, y la utilidad saldría peor de lo que es. Cuando MIG-1b
-// termine de absorberlos, este caso se disuelve solo.
-//
-// ⚠️ UNA ZONA SIN COSTO CAPTURADO NO PUEDE COSTEAR, y eso se DICE. `parcial`
-// queda en true y quien pinte tiene que enseñar la seña: un número limpio que
-// esconde un hueco es peor que un número que confiesa.
-function costoVendidoDesconocido() {
-  return { total: null, parcial: false, zonas_sin_costo: [], vendidas_costeadas: 0 };
+// ⚠️ AQUÍ VIVIÓ `costoDeLoVendido` (UTIL-B), que cargaba SOLO lo vendido. Era
+// contabilidad de margen; C es contabilidad de compromiso. Se retira porque
+// publicar un número que la fórmula ya no usa es dejarlo esperando a que
+// alguien lo lea como si mandara.
+function inversionDesconocida() {
+  return { total: null, parcial: false, zonas_sin_costo: [] };
 }
 
-function costoDeLoVendido(zonas) {
-  const out = { total: 0, parcial: false, zonas_sin_costo: [], vendidas_costeadas: 0 };
+// Del desglose por zona que `cuentaDeEvento` YA calculó para la bodega: cero
+// consultas nuevas. `z.inversion` es cantidad × costo_unitario, sumado por
+// `_lib/disponibilidad` desde MER-1 — y una compra SIN costo no entra, así que
+// se dice `parcial` en vez de fingir que fue gratis.
+function inversionTotalDeZonas(zonas) {
+  const out = { total: 0, parcial: false, zonas_sin_costo: [] };
   (Array.isArray(zonas) ? zonas : []).forEach((z) => {
     if (!z) return;
-    // Con ingreso = seguras + apartadas + migrados. `fuera` queda afuera.
-    const conIngreso = (Number(z.seguras) || 0) + (Number(z.apartadas) || 0) + (Number(z.migrados) || 0);
-    if (conIngreso <= 0) return;
-    const cu = Number(z.costo_unit);
-    if (!Number.isFinite(cu) || cu <= 0) {
+    out.total += Number(z.inversion) || 0;
+    // Compradas sin costo: la inversión queda incompleta y hay que decirlo.
+    if ((Number(z.compradas) || 0) > 0 && !(Number(z.costo_unit) > 0)) {
       out.parcial = true;
       if (z.zona && !out.zonas_sin_costo.includes(z.zona)) out.zonas_sin_costo.push(z.zona);
-      return;
     }
-    out.total += conIngreso * cu;
-    out.vendidas_costeadas += conIngreso;
   });
   return out;
 }
 
-// [UTIL-B] EL COSTO DE LO VENDIDO, DE TODOS LOS EVENTOS EN UNA PASADA.
-//
-// El camino de "todos" (la tabla del Resumen) no puede pedir el stock evento por
-// evento: serían N consultas. Se hace UNA lectura de `compras` sin filtro, y las
-// ventas salen de las filas que `mundoPortal` y `mundoKH` YA leyeron —por eso
-// sus `select` se ensancharon en vez de abrir consultas nuevas—.
-//
-// La aritmética es la MISMA que la de un evento: promedio ponderado por
-// (evento, zona), sin contar los "vendidos fuera", y una zona sin costo deja la
-// cuenta PARCIAL en vez de fingir un cero.
-async function costoVendidoDeTodos(leerKH, filasPortal, filasMigrados, nowMs) {
-  const rc = await leerKH('compras', 'select=evento_id,zona,cantidad,costo_unitario&limit=20000');
+// Y para TODOS los eventos, en UNA lectura de `compras`. Bajo C ya no hacen
+// falta las ventas por zona —la inversión no depende de lo vendido—, así que
+// esta pasada es más simple que la de UTIL-B y los `select` que se habían
+// ensanchado para aquello vuelven a su forma original.
+async function inversionDeTodos(leerKH) {
+  const rc = await leerKH('compras', 'select=evento_id,cantidad,costo_unitario&limit=20000');
   if (rc.error) return rc;
-
-  // (evento → zona → {inv, conCosto}) — el ponderado, igual que en disponibilidad.
-  const cst = {};
+  const out = {};
   rc.data.forEach((c) => {
-    const ev = baseSlug(c.evento_id); const z = String(c.zona || '').trim();
-    if (!ev || !z) return;
+    const ev = baseSlug(c.evento_id);
+    if (!ev) return;
     const cant = parseInt(c.cantidad, 10) || 0;
     const cu = Number(c.costo_unitario);
-    if (!(Number.isFinite(cu) && cu > 0 && cant > 0)) return;
-    cst[ev] = cst[ev] || {};
-    cst[ev][z] = cst[ev][z] || { inv: 0, con: 0 };
-    cst[ev][z].inv += cant * cu;
-    cst[ev][z].con += cant;
-  });
-
-  // (evento → zona → vendidas CON INGRESO). Los "vendidos fuera" no están aquí
-  // por construcción: viven en `stock_ajustes`, que este camino ni lee.
-  const vend = {};
-  const suma = (ev, z, n2) => {
-    if (!ev || !z || !(n2 > 0)) return;
-    vend[ev] = vend[ev] || {};
-    vend[ev][z] = (vend[ev][z] || 0) + n2;
-  };
-  (filasPortal || []).forEach((r) => {
-    if (claseFila(r, nowMs) === 'no-cuenta') return;
-    const num = parseInt(r.num_personas, 10);
-    suma(baseSlug(r.evento_id), String(r.zona || '').trim(), Number.isInteger(num) && num > 0 ? num : 0);
-  });
-  (filasMigrados || []).forEach((v) => {
-    if (!consumeBoleto(v.tipo_paquete, v.tipo_viajero)) return;
-    suma(baseSlug(v.evento_id), String(v.zona_boleto || '').trim(), 1);   // una fila = una persona
-  });
-
-  const out = {};
-  Object.keys(vend).forEach((ev) => {
-    const acc = { total: 0, parcial: false, zonas_sin_costo: [], vendidas_costeadas: 0 };
-    Object.keys(vend[ev]).forEach((z) => {
-      const c = (cst[ev] || {})[z];
-      const cu = (c && c.con > 0) ? c.inv / c.con : null;
-      if (cu == null) { acc.parcial = true; if (!acc.zonas_sin_costo.includes(z)) acc.zonas_sin_costo.push(z); return; }
-      acc.total += vend[ev][z] * cu;
-      acc.vendidas_costeadas += vend[ev][z];
-    });
-    out[ev] = acc;
+    out[ev] = out[ev] || { total: 0, parcial: false, zonas_sin_costo: [] };
+    if (Number.isFinite(cu) && cu > 0 && cant > 0) out[ev].total += cant * cu;
+    else if (cant > 0) out[ev].parcial = true;
   });
   return { data: out };
 }
@@ -559,22 +545,22 @@ async function cuentaDeEvento(opts) {
     portalUrl: o.portalUrl, portalKey: o.portalService,
     evento_id, fetchImpl: o.fetchImpl,
   });
-  let costo = costoVendidoDesconocido();
+  let inversion = inversionDesconocida();
   if (!disp.error) {
     const zonas = [...new Set([
       ...Object.keys(disp.stockPorZona || {}),
       ...Object.keys(disp.ajustesPorZona || {}),
     ])].map((z) => desgloseZona(disp, z));
     bodega = bodegaDeZonas(zonas, o.preciosPorZona, o.pasado);
-    // [UTIL-B] El costo sale de las MISMAS zonas que la bodega: cero consultas
-    // nuevas. Si no hubiera stock, se queda el desconocido de arriba — que NO
-    // es cero: un cero diría "esos boletos fueron gratis".
-    costo = costoDeLoVendido(zonas);
+    // [UTIL-C] La inversión sale de las MISMAS zonas que la bodega: cero
+    // consultas nuevas. Sin stock se queda la desconocida de arriba — que NO es
+    // cero: un cero diría "esos boletos fueron gratis".
+    inversion = inversionTotalDeZonas(zonas);
   }
   // Sin stock NO se afirma una bodega vacía: se queda la desconocida de arriba.
 
   return armarCuenta({
-    costo,
+    inversion,
     evento_id,
     ventasPortal: n((p.data.cobrado || {})[evento_id]),
     facturadoPortal: n((p.data.facturado || {})[evento_id]),
@@ -600,18 +586,18 @@ async function cuentasDeTodos(opts) {
 
   const [p, k, d] = await Promise.all([
     mundoPortal(leerP),
-    veMigrados ? mundoKH(leerKH, null) : Promise.resolve({ data: {}, filas: [] }),
+    veMigrados ? mundoKH(leerKH, null) : Promise.resolve({ data: {} }),
     deudaProveedores(leerKH, null),
   ]);
   if (p.error) return p;
   if (k.error) return k;
   if (d.error) return d;
 
-  // [UTIL-B] El costo de lo vendido de TODOS, en UNA lectura de `compras`. Las
-  // ventas salen de las filas que las dos funciones de arriba ya trajeron.
-  const cst = await costoVendidoDeTodos(leerKH, p.filas || [], k.filas || [],
-    Number.isFinite(o.now) ? o.now : Date.now());
-  if (cst.error) return cst;
+  // [UTIL-C] La inversión total de TODOS, en UNA lectura de `compras`. Más
+  // simple que la de UTIL-B: la inversión no depende de lo vendido, así que no
+  // hacen falta las ventas por zona.
+  const inv = await inversionDeTodos(leerKH);
+  if (inv.error) return inv;
 
   const slugs = [...new Set([
     ...Object.keys(p.data.cobrado || {}),
@@ -642,7 +628,7 @@ async function cuentasDeTodos(opts) {
       facturadoPortal: n((p.data.facturado || {})[slug]),
       viajerosPortal: n((p.data.viajeros || {})[slug]),
       gastos: n((p.data.gastos || {})[slug]),
-      costo: (cst.data || {})[slug] || { total: 0, parcial: false, zonas_sin_costo: [], vendidas_costeadas: 0 },
+      inversion: (inv.data || {})[slug] || { total: 0, parcial: false, zonas_sin_costo: [] },
       kh: (k.data || {})[slug] || KH_VACIO,
       deuda: n((d.data || {})[slug]),
       bodega: bodegaDesconocida(pasados.has(slug)),
@@ -681,8 +667,8 @@ async function cuentasDeTodos(opts) {
 
   // Los agregados de empresa, definidos UNA vez (antes vivían en tres lugares).
   const tot = { ventas: 0, gastos: 0, ganancia: 0, viajeros: 0, eventos_con_movimiento: slugs.length, desconocido: false,
-                // [UTIL-B] El TOTAL suma las mismas tres piezas que cada renglón.
-                facturado: 0, costo_vendido: 0, en_mano: 0, costo_parcial: false };
+                // [UTIL-C] El TOTAL suma las mismas tres piezas que cada renglón.
+                facturado: 0, inversion_boletos: 0, en_mano: 0, inversion_parcial: false };
   // [E5-1/E5-2] La deuda a proveedores de TODA la empresa. Se suma aquí, donde
   // viven los datos, por la misma razón que la caja total: si la sumara la
   // pantalla sería la fórmula número doce, y encima una que nadie más podría
@@ -696,16 +682,21 @@ async function cuentasDeTodos(opts) {
     const e = eventos[s];
     if (e.ventas == null) { tot.desconocido = true; return; }
     tot.ventas += e.ventas; tot.gastos += e.gastos; tot.viajeros += e.viajeros;
-    // [UTIL-B] El TOTAL se suma de las MISMAS piezas que el renglón, no de una
+    // [UTIL-C] El TOTAL se suma de las MISMAS piezas que el renglón, no de una
     // resta aparte: sumar `ganancia` por evento y sumar sus partes tienen que
     // dar lo mismo, y la única forma de garantizarlo es no tener dos caminos.
     tot.facturado += n(e.facturado);
-    tot.costo_vendido += n(e.costo_vendido);
+    tot.inversion_boletos += n(e.inversion_boletos);
     tot.en_mano += n(e.en_mano);
-    if (e.costo_parcial) tot.costo_parcial = true;
+    if (e.inversion_parcial) tot.inversion_parcial = true;
   });
-  tot.ganancia = tot.desconocido ? null : tot.facturado - tot.costo_vendido - tot.gastos;
-  if (tot.desconocido) { tot.ventas = null; tot.viajeros = null; tot.facturado = null; tot.costo_vendido = null; tot.en_mano = null; }
+  // [UTIL-C] La utilidad de la empresa es la MISMA fórmula que la del evento —
+  // COBRADO − INVERSIÓN − GASTOS — sumada sobre sus partes. Ojo con la pieza
+  // que cambió: bajo UTIL-B el primer término era lo FACTURADO (lo vendido,
+  // cobrado o no); hoy es lo que está EN MANO. `facturado` sigue publicándose
+  // porque las pantallas lo pintan aparte, pero ya no entra en la resta.
+  tot.ganancia = tot.desconocido ? null : tot.en_mano - tot.inversion_boletos - tot.gastos;
+  if (tot.desconocido) { tot.ventas = null; tot.viajeros = null; tot.facturado = null; tot.inversion_boletos = null; tot.en_mano = null; }
   // [AUD-1c] La bodega de la empresa: solo suma lo que SE PUDO valorar. Si
   // ningún evento trajo precios, el valor es null (desconocido), no 0.
   //
@@ -818,8 +809,8 @@ module.exports = {
   bodegaDesconocida,
   armarCuenta,
   acumularEnCuenta,          // [SAL-1] puro
-  // [UTIL-B] Se exportan para que el arnés ejercite la regla REAL, no una copia.
-  costoDeLoVendido, costoVendidoDesconocido, esGastoDeBoletos, CATEGORIA_BOLETOS,
+  // [UTIL-C] Se exportan para que el arnés ejercite la regla REAL, no una copia.
+  inversionTotalDeZonas, inversionDesconocida, esGastoDeBoletos, CATEGORIA_BOLETOS,
   CLABE_A_CUENTA,
   ROLES_DINERO_MIGRADO,
   baseSlug,

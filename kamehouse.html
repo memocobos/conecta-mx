@@ -856,6 +856,13 @@
           <div>
             <div class="perfil-field-label" style="margin-bottom:6px">Rol *</div>
             <select class="cot-input" id="inv-rol">
+              <!-- [DEFAULTS-1] La vacía va PRIMERO, y aquí es lo que más pesa:
+                   sin ella el rol heredado era "Bulma", el de casi-máximos
+                   permisos. Invitar sin mirar este campo repartía privilegios
+                   que nadie eligió. El servidor ya valida el rol contra
+                   ROLES_VALIDOS y reserva bulma/milk a maestro_roshi; esto
+                   evita que la elección la haga el orden del markup. -->
+              <option value="">— elige el rol —</option>
               <option value="bulma">Bulma</option>
               <option value="milk">Milk</option>
               <option value="mister_popo">Maestro Karin</option>
@@ -2686,6 +2693,9 @@
  <div class="form-group">
  <label>Categoría *</label>
  <select id="ingreso-categoria">
+ <!-- [DEFAULTS-1] La vacía va primero: sin ella el navegador elegía "Vuelo"
+      sola, y un ingreso capturado sin mirar nacía clasificado como vuelo. -->
+ <option value="">— elige categoría —</option>
  <option>Vuelo</option><option>Autobús</option>
  <option>Cargo administrativo</option><option>Boleto extra</option>
  <option>Otro</option>

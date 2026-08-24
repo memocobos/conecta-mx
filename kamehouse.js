@@ -4001,13 +4001,19 @@ function _mermaPasado(ev) {
 // boletos que valen ≈$40,100).
 function _audUtilidadPintar(utilidad, cta, util) {
   const setTxt = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
-  const neg = Number(utilidad) < 0;
+  // [UTIL-C-2] `null` = NO SE PUEDE SABER, y se dice. Antes esta función no
+  // distinguía el desconocido del cero: `Number(null) || 0` pinta $0 en verde
+  // con el rótulo "Utilidad", que es una afirmación —"este evento no gana ni
+  // pierde"— hecha justo cuando no hay con qué afirmarla. Es el mismo cero que
+  // AUD-1 encontró diciendo "Cobrado $0" sobre $136,391 cobrados.
+  const sinDato = (utilidad == null);
+  const neg = !sinDato && Number(utilidad) < 0;
   // El signo, en palabras (patrón CAP-FIX-2d/AUD-1b).
-  setTxt('m-utilidad', _spFmtMxn(Math.abs(Number(utilidad) || 0)));
+  setTxt('m-utilidad', sinDato ? '—' : _spFmtMxn(Math.abs(Number(utilidad) || 0)));
   const lbl = document.getElementById('m-utilidad-lbl');
-  if (lbl) lbl.textContent = neg ? 'Falta por recuperar' : 'Utilidad';
+  if (lbl) lbl.textContent = sinDato ? 'Sin dato' : (neg ? 'Falta por recuperar' : 'Utilidad');
   const elUtil = document.getElementById('m-utilidad');
-  if (elUtil) elUtil.className = 'metric-value ' + (neg ? 'red' : 'green');
+  if (elUtil) elUtil.className = 'metric-value ' + (sinDato ? '' : (neg ? 'red' : 'green'));
 
   // [UTIL-B-3] "En mano": la caja, subordinada al margen. Se pinta SIEMPRE que
   // se sepa; si no se sabe, se dice — un guion es una afirmación menos peligrosa
@@ -4069,7 +4075,15 @@ function _audUtilidadPintar(utilidad, cta, util) {
     const bCosto = b.bodega_costo;
     const conCosto = Number.isFinite(Number(bCosto));
     const margen = (valor == null) ? null : (valor - (conCosto ? Number(bCosto) : 0));
-    const siTodo = (valor == null) ? null : Number(utilidad) + margen;
+    // [UTIL-C-2] `utilidad` ya puede ser `null` (el respaldo dejó de inventar
+    // una fórmula propia), y `Number(null) + margen` daría el margen a secas:
+    // un número plausible construido sobre un dato que no existe. Se propaga el
+    // desconocido en vez de rellenarlo.
+    // ⚠️ Y ojo con lo que ESTA línea todavía hace mal bajo la fórmula C: resta
+    // el costo de la bodega que la INVERSIÓN TOTAL ya restó. Es doble conteo, y
+    // se corrige en UTIL-C-4 junto con el resto del papel de la bodega — no
+    // aquí, para que esa tuerca se pueda medir sola.
+    const siTodo = (valor == null || utilidad == null) ? null : Number(utilidad) + margen;
     partes.push(`<b>${boletos}</b> boleto${boletos === 1 ? '' : 's'} por vender`
       + (valor == null
           ? ' <span class="aud-bod-mudo">— sin precio en el catálogo, no se puede estimar</span>'
@@ -4077,7 +4091,9 @@ function _audUtilidadPintar(utilidad, cta, util) {
             + (conCosto
                 ? ` · costaron <b>${_spFmtMxn(Number(bCosto))}</b>`
                 : ' <span class="aud-bod-mudo">— sin costo capturado, el margen va sin restarlo</span>')
-            + ` · Si se vende todo: <b class="${siTodo < 0 ? 'aud-neg' : 'aud-pos'}">${_spFmtMxn(siTodo)}</b>`));
+            + (siTodo == null
+                ? ' <span class="aud-bod-mudo">— sin la utilidad no se puede decir en cuánto cerrarías</span>'
+                : ` · Si se vende todo: <b class="${siTodo < 0 ? 'aud-neg' : 'aud-pos'}">${_spFmtMxn(siTodo)}</b>`)));
   }
   // La MERMA: eventos que ya ocurrieron. Se mide en lo que COSTARON, no en lo
   // que se iban a vender, y NUNCA lleva "si se vende todo" — no hay a quién.
@@ -4622,7 +4638,17 @@ async function loadResumen() {
       setTxt('m-viajeros',  String(activos.length));
       setTxt('m-eventos',   String(new Set(activos.map(t => t.evento_id)).size));
       setTxt('m-gastos', _spFmtMxn(totalGastos));
-      utilidad = facturado - totalGastos;
+      // [UTIL-C-2] AQUÍ HABÍA UNA FÓRMULA PROPIA: `facturado − totalGastos`.
+      // Era el "cálculo viejo, Portal-puro" del que la pantalla avisaba, y bajo
+      // la fórmula A se parecía bastante al número bueno. Bajo C ya no se
+      // parece a nada: le falta la inversión en boletos (que vive en KH, no en
+      // el Portal) y encima arranca de lo VENDIDO en vez de lo cobrado. Con
+      // `calle24` habría pintado +$46,700 donde la verdad es −$28,720.
+      //
+      // Una pantalla que no puede saber la utilidad tiene que DECIR que no la
+      // sabe. `null` viaja hasta `_audUtilidadPintar`, que ya sabe pintar el
+      // desconocido — un cero, o peor, un número plausible, es una afirmación.
+      utilidad = null;
     }
     _audUtilidadPintar(utilidad, cta, util);
 
@@ -8954,99 +8980,158 @@ async function _kmsCuentaCargar() {
 // El importe o, si no se puede saber, la palabra. Un `null` de la cuenta
 // significa "no se puede afirmar" (p.ej. sin permiso para ver migrados), y eso
 // NO es cero.
-function _kmcVal(v) { return v == null ? '<span class="kmc-nd">sin dato</span>' : _kamMoney(v); }
+function _kmcVal(v) { return v == null ? '<span class="kmc-nd">sin dato</span>' : _kmcMoney(v); }
 
+// [UTIL-C-2] El signo VA AFUERA del peso. `_kamMoney` lo mete adentro y produce
+// "$-28,720", que se lee mal y en esta pantalla va a ser lo NORMAL: bajo la
+// fórmula C un evento recién cargado nace en rojo y se endereza cobrando. No se
+// toca `_kamMoney` —lo usan decenas de lugares que no he medido—: se formatea
+// aquí, donde el negativo es el caso de todos los días.
+function _kmcMoney(n) {
+  const v = Number(n) || 0;
+  return (v < 0 ? '−$' : '$') + Math.abs(v).toLocaleString('es-MX', { maximumFractionDigits: 2 });
+}
 function _kmsCuentaPintar() {
   const cont = document.getElementById('kms-cuenta');
   if (!cont) return;
   const c = _kmsCuenta;
   if (!c) { cont.innerHTML = ''; return; }
   const d = _kmsDatos || {};
-  const inversion = Number(d.inversion) || 0;      // lo que costaron los boletos (KH)
-  const q = _kmsQuiebre(c, d);
+  const esc = _kmsEscenarios(c, d);
+  const util = c.ganancia;
+  const cls = util == null ? '' : (util >= 0 ? 'kmc-hero-ok' : 'kmc-hero-mal');
 
   cont.innerHTML = `
+    <!-- [UTIL-C-2] LA UTILIDAD, GRANDE Y SOLA. Bajo UTIL-B la tarjeta tenía
+         cinco celdas del mismo tamaño y la utilidad era una de cinco: Memo
+         tenía que buscarla. Es EL número de la pantalla, así que se pinta como
+         tal, con su fórmula escrita debajo — el número cambió de significado
+         dos veces en agosto y una cifra grande sin fórmula se lee con la
+         definición que cada quien recuerde. -->
+    <div class="kmc-hero ${cls}">
+      <div class="kmc-hero-l">UTILIDAD DEL EVENTO</div>
+      <div class="kmc-hero-v">${_kmcVal(util)}</div>
+      <div class="kmc-hero-f">${_kmcVal(c.en_mano)} cobrado − ${_kmcVal(c.inversion_boletos)} de boletos − ${_kmcVal(c.gastos)} de gastos${c.inversion_parcial ? ' · <b>incompleta</b>' : ''}</div>
+    </div>
     <div class="kmc-grid">
       <div class="kmc-c"><div class="kmc-l">COBRADO</div><div class="kmc-v">${_kmcVal(c.en_mano)}</div>
-        <div class="kmc-s">vendido ${_kmcVal(c.facturado)}</div></div>
+        <div class="kmc-s">dinero que ya entró</div></div>
       <div class="kmc-c"><div class="kmc-l">INVERSIÓN EN BOLETOS</div><div class="kmc-v">${_kmcVal(c.inversion_boletos)}</div>
-        <div class="kmc-s">${c.inversion_parcial ? 'INCOMPLETA: hay compras sin costo capturado' : 'TODOS los boletos del evento, vendidos o no'}</div></div>
+        <div class="kmc-s">${c.inversion_parcial ? 'INCOMPLETA: hay compras sin costo capturado' : 'TODOS los del evento, vendidos o no'}</div></div>
       <div class="kmc-c"><div class="kmc-l">GASTOS</div><div class="kmc-v">${_kmcVal(c.gastos)}</div>
         <div class="kmc-s">del evento, sin boletos</div></div>
+      <div class="kmc-c"><div class="kmc-l">VENDIDO</div><div class="kmc-v">${_kmcVal(c.facturado)}</div>
+        <div class="kmc-s">contratado · ${_kmcVal(c.pendiente)} por cobrar</div></div>
       <div class="kmc-c"><div class="kmc-l">DEUDA A PROVEEDORES</div><div class="kmc-v">${_kmcVal(c.deuda_proveedores)}</div>
-        <div class="kmc-s">boletos y servicios por pagar</div></div>
-      <div class="kmc-c ${c.ganancia == null ? '' : (c.ganancia >= 0 ? 'kmc-ok' : 'kmc-mal')}">
-        <div class="kmc-l">UTILIDAD</div><div class="kmc-v">${_kmcVal(c.ganancia)}</div>
-        <!-- [UTIL-B-3] La fórmula, escrita: el número cambió de significado y la
-             pantalla lo dice, en vez de dejar que se deduzca. Y "en mano" debajo:
-             la caja no se pierde, se subordina — bajo B la utilidad puede ser
-             positiva sin un peso en la cuenta, y las dos juntas lo explican. -->
-        <div class="kmc-s">cobrado − inversión − gastos${c.inversion_parcial ? ' · <b>incompleta</b>' : ''}</div>
-        <div class="kmc-mano">vendido: ${_kmcVal(c.facturado)}</div></div>
+        <div class="kmc-s">boletos por pagar · no resta de la utilidad</div></div>
     </div>
-    ${q.html}`;
+    ${esc.html}`;
 }
 
-// ═══ EL PUNTO DE QUIEBRE, EN PALABRAS ══════════════════════════════════════
-// Ésta SÍ es una cuenta propia, y por eso se declara entera:
+// ═══ [UTIL-C-2] EL PANEL DE ESCENARIOS ═════════════════════════════════════
+// Reemplaza al PUNTO DE QUIEBRE de UTIL-B-3, y no por gusto: aquél era una
+// cuenta propia —`(gastos + inversión) − cobrado`— que bajo la fórmula C es
+// exactamente `−utilidad`. Mantenerlo sería tener la misma cifra calculada en
+// dos lugares, que es de lo que trata la mitad de este libro.
 //
-//   falta por COBRAR = (gastos + inversión en boletos) − cobrado
+// Aquí ya no se calcula una utilidad paralela: se PROYECTA la que la fuente
+// única ya dio, contestando las cuatro preguntas que Memo se hace frente a esta
+// pantalla:
 //
-// [UTIL-B-3] Es una cuenta de CAJA, no de margen. La utilidad de arriba
-// contesta "¿estoy ganando?"; ésta contesta "¿ya recuperé lo que saqué del
-// bolsillo?". Bajo la fórmula A las dos daban casi lo mismo y se confundían;
-// bajo B son claramente distintas y cada una dice cuál es.
+//   (a) para verdes, ¿cuánto falta?        → −utilidad
+//   (b) si todos los que ya compraron pagan → utilidad + por cobrar
+//   (c) y si con eso no basta, ¿cuántos boletos son?
+//   (d) si no vendo uno más, ¿en cuánto cierro?
 //
-// ⚠️ [UTIL-B-3] ESTE COMENTARIO YA NO ES CIERTO Y HAY QUE DECIRLO. Decía,
-// textual: "Se suma la inversión en boletos A PROPÓSITO, y no es doble conteo:
-// `gastos` vive en el PORTAL y el mundo de proveedores vive en KH". Era verdad
-// bajo la fórmula A.
+// ⚠️ (c) SE CUENTA DESDE (b), no desde (a). Cobrar lo ya vendido y vender de
+// nuevo son dos dineros distintos: pedirle a la venta nueva que cubra los
+// $28,720 completos cuando $23,100 ya están contratados haría que la pantalla
+// pidiera casi el doble de boletos de los que hacen falta.
 //
-// Bajo B el costo de los boletos VENDIDOS ya está dentro de la utilidad. Pero
-// este número NO es la utilidad: mide CAJA, y por eso sigue sumando la
-// inversión — lo que saliste a pagar salió de tu bolsillo, se haya vendido el
-// boleto o no. Lo que cambia es el RÓTULO: dejó de ser "cuánto falta para
-// ganar" (que ahora contesta la utilidad, arriba) y es "cuánto falta COBRAR
-// para haber recuperado lo que ya pagaste". Dos preguntas distintas que antes
-// se veían iguales, y ésta es la que de verdad se hace frente a esta pantalla.
-//
-// Y es una PROYECCIÓN, no un saldo: se dice con palabras y con el precio de
-// lista a la vista, para que nadie la lea como dinero que ya existe.
-function _kmsQuiebre(c, d) {
-  const gastos = Number(c.gastos) || 0;
-  const cobrado = c.ventas;
-  const inversion = Number(d.inversion) || 0;
-  if (cobrado == null) {
-    return { html: '<div class="kmc-q kmc-q-nd">No se puede calcular el punto de quiebre sin ver el dinero de los migrados.</div>' };
+// Y todo va con palabras, no solo con cifras: es una PROYECCIÓN, y una
+// proyección sin la condición escrita al lado se lee como dinero que ya existe.
+function _kmsEscenarios(c, d) {
+  const util = c.ganancia;
+  const nd = (t) => `<div class="kmc-esc"><div class="kmc-e kmc-e-nd">${t}</div></div>`;
+  if (util == null) return { html: nd('No se pueden calcular los escenarios sin ver el dinero de los migrados.') };
+
+  const porCobrar = Number(c.pendiente) || 0;
+  const filas = [];
+  const fila = (clase, txt, nota) => filas.push(
+    `<div class="kmc-e kmc-e-${clase}">${txt}${nota ? `<div class="kmc-e-nota">${nota}</div>` : ''}</div>`);
+
+  // ── (a) ¿cuánto falta para verdes?
+  if (util >= 0) {
+    fila('ok', `Este evento <b>ya gana</b>: ${_kmcMoney(util)}.`,
+      'De aquí en adelante, cada boleto que cobres completo suma completo.');
+  } else {
+    fila('mal', `Para verdes te faltan <b>${_kmcMoney(-util)}</b>.`,
+      'Entre cobrar lo que ya vendiste y vender lo que queda.');
   }
-  // Caja: lo que salió (gastos + inversión) contra lo que entró (cobrado).
-  const falta = (gastos + inversion) - cobrado;
-  if (falta <= 0) {
-    return { html: `<div class="kmc-q kmc-q-ok">Ya <b>cobraste</b> todo lo que saliste a pagar. De aquí en adelante, cada boleto que cobres es dinero libre.<div class="kmc-q-nota">Esto es CAJA: si quieres saber si el evento GANA, mira la utilidad de arriba.</div></div>` };
+
+  // ── (b) si todos los que ya compraron te pagan
+  const b = util + porCobrar;
+  if (porCobrar > 0) {
+    fila(b >= 0 ? 'ok' : 'cerca',
+      `Si <b>todos</b> los que ya compraron te pagan sus ${_kmcMoney(porCobrar)}: <b>${_kmcMoney(b)}</b>.`,
+      b >= 0 ? 'Con eso solo, el evento cierra en verde.' : 'Sigue faltando, pero ya es otra cifra.');
+  } else {
+    fila('nd', 'No hay nada por cobrar: quien compró, ya pagó.');
   }
-  // Lo que QUEDA por vender, con su precio de lista. Las dos cosas ya las tiene
-  // la pantalla: los disponibles del semáforo y los precios del catálogo.
-  const precios = d.precios || {};
-  const zonas = (d.zonas || []).filter((z) => z && Number.isFinite(Number(z.disponibles)) && Number(z.disponibles) > 0);
-  const conPrecio = zonas
-    .map((z) => ({ n: z.zona, disp: Number(z.disponibles), p: Number(precios[String(z.zona).trim()]) }))
-    .filter((z) => Number.isFinite(z.p) && z.p > 0);
-  if (!conPrecio.length) {
-    return { html: `<div class="kmc-q kmc-q-nd">Falta recuperar <b>${_kamMoney(falta)}</b>, pero no hay zonas con lugares y precio para decir cuántos boletos son.</div>` };
+
+  // ── (c) el mínimo de venta NUEVA — solo si con cobrar todo no basta
+  if (b < 0) {
+    const falta = -b;
+    const precios = d.precios || {};
+    const conPrecio = (d.zonas || [])
+      .filter((z) => z && Number(z.disponibles) > 0)
+      .map((z) => ({ n: z.zona, disp: Number(z.disponibles), p: Number(precios[String(z.zona).trim()]) }))
+      .filter((z) => Number.isFinite(z.p) && z.p > 0);
+
+    if (!conPrecio.length) {
+      fila('nd', `Faltarían <b>${_kmcMoney(falta)}</b> de venta nueva, pero no hay zonas con lugares y precio para decir cuántos boletos son.`);
+    } else {
+      const techo = conPrecio.reduce((a, z) => a + z.disp * z.p, 0);
+      if (techo < falta) {
+        fila('mal', `Ni vendiendo <b>todo</b> lo que queda (${_kmcMoney(techo)}) llegas a los <b>${_kmcMoney(falta)}</b> que faltarían.`,
+          'Aquí la salida no es vender más: es el precio, una promoción, o asumir el evento en rojo.');
+      } else {
+        // Las zonas que alcanzan SOLAS, de menos boletos a más. Se muestran
+        // hasta tres: Memo elige por lo que de verdad se está moviendo, y una
+        // sola opción impuesta se lee como una orden.
+        const solas = conPrecio
+          .filter((z) => z.disp * z.p >= falta)
+          .map((z) => Object.assign({}, z, { req: Math.ceil(falta / z.p) }))
+          .sort((a, b2) => a.req - b2.req || b2.p - a.p)
+          .slice(0, 3);
+        if (solas.length) {
+          const opts = solas.map((z) => `<b>${z.req}</b> de ${_esfEsc(z.n)} <span class="kmc-e-p">(${_kmcMoney(z.p)} c/u)</span>`).join(' · ');
+          fila('cerca', `Mínimo de venta nueva: <b>${_kmcMoney(falta)}</b> — ${opts}.`,
+            'Cobrados COMPLETOS: un boleto apartado todavía no es dinero.');
+        } else {
+          // Ninguna zona alcanza sola, pero el techo sí: se arma la combinación
+          // que pide menos boletos (de la más cara a la más barata).
+          let resto = falta;
+          const plan = [];
+          conPrecio.slice().sort((a, b2) => b2.p - a.p).forEach((z) => {
+            if (resto <= 0) return;
+            const cuantos = Math.min(z.disp, Math.ceil(resto / z.p));
+            if (cuantos > 0) { plan.push({ n: z.n, cuantos, p: z.p }); resto -= cuantos * z.p; }
+          });
+          const txt = plan.map((z) => `<b>${z.cuantos}</b> de ${_esfEsc(z.n)}`).join(' + ');
+          fila('cerca', `Mínimo de venta nueva: <b>${_kmcMoney(falta)}</b> — ninguna zona alcanza sola: ${txt}.`,
+            'Cobrados COMPLETOS: un boleto apartado todavía no es dinero.');
+        }
+      }
+    }
   }
-  // El techo: vender TODO lo que queda, a precio de lista.
-  const techo = conPrecio.reduce((a, z) => a + z.disp * z.p, 0);
-  if (techo < falta) {
-    return { html: `<div class="kmc-q kmc-q-mal">Ni vendiendo <b>todo</b> lo que queda (${_kamMoney(techo)}) recuperas los <b>${_kamMoney(falta)}</b> que faltan. Considera una promoción o revisar el precio.</div>` };
-  }
-  // La zona más cara con lugares es la que menos boletos pide.
-  const mejor = conPrecio.slice().sort((a, b) => b.p - a.p)[0];
-  const n = Math.ceil(falta / mejor.p);
-  const alcanza = n <= mejor.disp;
-  const detalle = alcanza
-    ? `<b>${n}</b> boleto${n !== 1 ? 's' : ''} más de <b>${_esfEsc(mejor.n)}</b> (${_kamMoney(mejor.p)} c/u) y estás en verdes.`
-    : `Con <b>${_esfEsc(mejor.n)}</b> no alcanza (quedan ${mejor.disp} y harían falta ${n}): hay que sumar varias zonas.`;
-  return { html: `<div class="kmc-q ${alcanza ? 'kmc-q-cerca' : 'kmc-q-nd'}">Falta recuperar <b>${_kamMoney(falta)}</b> — ${detalle}</div>` };
+
+  // ── (d) el cierre si no se vende un boleto más
+  fila(b >= 0 ? 'ok' : 'mal',
+    `Si <b>no vendes ni un boleto más</b> y todos los de hoy te pagan, cierras en <b>${_kmcMoney(b)}</b>.`,
+    'Menos lo que te falte por gastar: hotel, camión y lo que todavía no capturas no están en este número.');
+
+  return { html: `<div class="kmc-esc"><div class="kmc-esc-l">SI PASA ESTO, PASA ESTO OTRO</div>${filas.join('')}</div>` };
 }
 
 // ═══ [KMS-SIMP-1] LA TABLA DE TANDA ════════════════════════════════════════

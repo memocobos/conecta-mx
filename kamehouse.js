@@ -8622,7 +8622,12 @@ async function _kamProveedorCrear() {
 // "no había ningún proveedor todavía"), se queda con el recién creado, que es
 // lo que Memo venía a usar.
 function _kamProvSelectsRefrescar(nuevoId) {
-  const opts = (_kamProvCache || [])
+  // [KMS-SIMP-5] La vacía se re-pinta aquí también. Si solo estuviera en el
+  // markup inicial, el primer alta desde el botón "+" la habría borrado —esta
+  // función reescribe el `innerHTML` entero— y el default silencioso volvería
+  // en silencio, que es la forma más cara de arreglar algo.
+  const opts = '<option value="">— elige proveedor —</option>'
+    + (_kamProvCache || [])
     .map((p) => `<option value="${_esfEsc(p.id)}">${_esfEsc(p.nombre)}</option>`).join('');
   // [KMS-SIMP-2] `kmt-prov` es el de la tabla de tanda: un proveedor dado de
   // alta desde ahí tiene que aparecer AHÍ, que es donde se acaba de pedir.
@@ -8918,7 +8923,17 @@ async function _kamComprasLoad() {
         <td class="kmt-sub" id="kmt-sub-${zi}">—</td>
       </tr>`;
     }).join('');
-    const provOptsTanda = _kamProvCache.map((pv) => `<option value="${_esfEsc(pv.id)}">${_esfEsc(pv.nombre)}</option>`).join('');
+    // [KMS-SIMP-5] LA PRIMERA OPCIÓN VA VACÍA, y no es cosmética: sin ella el
+    // navegador elige sola la primera del catálogo, y el catálogo llega ordenado
+    // `nombre.asc` desde `admin-proveedores`. Con los 4 proveedores de hoy eso es
+    // **Hotel**, así que una tanda guardada sin mirar el selector nacía "comprada
+    // a Hotel". Le pasó a calle24: 3 compras de Matriz quedaron a nombre de Hotel
+    // (Jane ya corrigió el dato en la base).
+    // Es la lección de ETAPA 4 con la cuenta, otra vez: un default silencioso no
+    // ahorra un clic, INVENTA un dato — y encima uno que apunta a un TERCERO, así
+    // que la deuda a proveedores también salía mal.
+    const provOptsTanda = '<option value="">— elige proveedor —</option>'
+      + _kamProvCache.map((pv) => `<option value="${_esfEsc(pv.id)}">${_esfEsc(pv.nombre)}</option>`).join('');
     const tanda = `<details class="kmt-wrap" id="kmt-wrap">
       <summary class="kmt-sum">↥ Cargar pedido en tanda <span class="kmt-hint">— las ${zonaNames.length} zonas en una sola pantalla</span></summary>
       <div class="kmt-body">
@@ -9364,7 +9379,20 @@ async function _kmtGuardar() {
   const prov = (document.getElementById('kmt-prov') || {}).value || '';
   const fecha = (document.getElementById('kmt-fecha') || {}).value || '';
   const nota = ((document.getElementById('kmt-nota') || {}).value || '').trim();
-  if (!prov) return _kmtError('Elige el proveedor de la tanda.');
+  // [KMS-SIMP-5] ESTE CANDADO YA EXISTÍA Y ERA INALCANZABLE. Sin la opción
+  // vacía, `prov` NUNCA venía vacío: traía el primer proveedor del catálogo.
+  // Una guarda que no puede fallar se lee como protección y no protege nada —
+  // la misma trampa que la rama `force` bajo un `schedule` en WL-2.
+  //
+  // Y ojo con lo que el servidor SÍ hacía bien: `admin-compras` valida que el
+  // `proveedor_id` sea un UUID y que exista. No era el hoyo. El navegador le
+  // mandaba un id **válido pero equivocado**, y eso ningún servidor lo puede
+  // distinguir: a quién le compraste solo lo sabe quien capturó.
+  if (!prov) {
+    const selP = document.getElementById('kmt-prov');
+    if (selP) { try { selP.focus(); } catch (_) { /* sin foco, igual se ve el error */ } }
+    return _kmtError('Elige el proveedor de la tanda: sin él no se sabe a quién le compraste ni a quién le debes.');
+  }
   if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha)) return _kmtError('La fecha de la tanda no es válida.');
   const { filas, zonas, malas } = _kmtCalc();
   if (malas) return _kmtError('Hay ' + malas + ' renglón(es) a medias: la cantidad va entera y mayor que cero, y el costo no puede ser negativo.');

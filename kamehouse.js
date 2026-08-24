@@ -6491,8 +6491,20 @@ async function guardarGasto() {
  body: JSON.stringify(payload),
  });
  const d = await r.json();
- if (!r.ok) throw new Error(d.error || (editando ? 'No se pudo actualizar el gasto' : 'No se pudo registrar el gasto'));
- alerta.innerHTML = `<div class="alert alert-success">${editando ? 'Gasto actualizado' : 'Gasto registrado'}</div>`;
+ if (!r.ok) {
+   // [UTIL-B-2] El servidor puede decir CUÁL campo falta (el proveedor en un
+   // pago de boletos). Si lo dice, se enseña con su detalle en vez del error
+   // pelón: "falta algo" no le dice a nadie qué hacer.
+   const msg = d.detalle ? `${d.error} ${d.detalle}` : (d.error || (editando ? 'No se pudo actualizar el gasto' : 'No se pudo registrar el gasto'));
+   throw new Error(msg);
+ }
+ // [UTIL-B-2] Un pago de BOLETOS no deja fila en Gastos: se guarda como abono
+ // al proveedor. Memo lo capturó AQUÍ y no lo va a ver aquí, así que se le
+ // dice en el momento — un movimiento que desaparece de donde se capturó es
+ // indistinguible de uno que se perdió.
+ alerta.innerHTML = d.solo_abono
+   ? `<div class="alert alert-success">Pago registrado como <b>abono al proveedor</b>.<div style="font-size:11px;margin-top:5px;line-height:1.5">${_esfEsc(d.aviso || '')}</div></div>`
+   : `<div class="alert alert-success">${editando ? 'Gasto actualizado' : 'Gasto registrado'}</div>`;
  _gastoEditId = null;
  setTimeout(() => { closeModal('modal-gasto'); loadGastos(); }, 1000);
  } catch(e) {

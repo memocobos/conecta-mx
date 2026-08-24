@@ -363,7 +363,7 @@
         page-pagos y se enciende por JS, no como página nueva: así hereda los
         permisos de `pagos` tal cual. Restar tabs de PERMISOS_TABS para meter uno
         nuevo es como se abrió el hoyo de E5-4. -->
-   <button class="btn btn-ghost btn-sm pg-tab-btn" data-tab="caja" id="cob-tab-caja" onclick="_cobCajaMostrar(true)" style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.08em">CAJA<span class="sp-nav-badge" id="cob-caja-badge" style="display:none">0</span></button>
+   <button class="btn btn-ghost btn-sm pg-tab-btn" data-tab="caja" data-permiso="pagos" id="cob-tab-caja" onclick="_cobCajaMostrar(true)" style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.08em">CAJA<span class="sp-nav-badge" id="cob-caja-badge" style="display:none">0</span></button>
   </div>
 
  <!-- Contadores de la lista filtrada -->
@@ -1191,6 +1191,11 @@
   <div class="pg-tabs" style="display:flex;gap:8px;margin-bottom:16px" id="pg-tabs-sp">
    <button class="btn btn-ghost btn-sm pg-tab-btn active" data-tab="solicitudes_portal" onclick="showPage('solicitudes_portal')" style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.08em">POR APROBAR<span class="sp-nav-badge" id="sp-nav-badge" style="display:none">0</span></button>
    <button class="btn btn-ghost btn-sm pg-tab-btn" data-tab="pagos" onclick="showPage('pagos')" style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.08em">COBRANZA</button>
+   <!-- [COB-MIG-1b] La franja de la puerta única tiene que decir LO MISMO en las
+     dos páginas. Sin este botón, desde POR APROBAR la caja no existía: el
+     comentario de E5-6 la llama "puerta única" y era única solo de un lado.
+     Salta a Pagos y enciende la caja de una vez. -->
+   <button class="btn btn-ghost btn-sm pg-tab-btn" data-tab="caja" data-permiso="pagos" onclick="showPage('pagos'); _cobCajaMostrar(true)" style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.08em">CAJA</button>
   </div>
 
       <!-- Contadores -->

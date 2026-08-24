@@ -3575,3 +3575,17 @@ input[type="search"],.kh-buscar,.buscador{border-radius:var(--r-sm,8px)}
   .kms-zpanel { padding: 12px; }
   .kam-ajuste-wrap .kam-ajuste-nota { flex-basis: 100%; }
 }
+
+/* [MIG-1b] Zona sin compras cargadas: se DICE, no se pinta un número. */
+.kms-zrow-sinstock { color: var(--ts); font-style: italic; }
+.kam-sem-sin-stock .kam-sem-disp b { color: var(--ts); }
+
+/* [MIG-1b] El aviso del doble descuento: se ve, pero no grita como un error —
+   no es un fallo, es una decisión que solo Memo puede tomar. */
+.mig-doble {
+  border: 1px solid var(--gold); border-radius: var(--r-sm, 8px);
+  background: rgba(232, 255, 76, .06); padding: 11px 13px;
+}
+.mig-doble-t { font-size: 12px; font-weight: 700; color: var(--gold); margin-bottom: 5px; }
+.mig-doble-d { font-size: 11.5px; color: var(--text); line-height: 1.55; }
+.mig-doble-btns { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }

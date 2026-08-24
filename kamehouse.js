@@ -2150,6 +2150,11 @@ async function _migEnviar(d) {
     if (!v) throw new Error('el servidor no devolvió el viajero');
     _migCapturados.unshift(v);
     _migPintarCapturados();
+    // [MIG-1b] El aviso del DOBLE DESCUENTO. No se traga: si esta gente ya
+    // estaba en el corte del Excel que Memo capturó como "vendidos fuera",
+    // ahora se descuenta dos veces y el semáforo cierra zonas que sí tienen
+    // boletos. Se dice con el número exacto y el ajuste lo confirma él.
+    _migAvisoDoble(r && r.aviso_doble_descuento);
     // Uno tras otro: se limpia lo de la persona y se CONSERVA paquete y zona,
     // que en una tanda del Excel se repiten. El foco vuelve al nombre.
     ['mig-nombre','mig-correo','mig-celular','mig-total','mig-abonado','mig-talla','mig-notas']
@@ -2161,6 +2166,56 @@ async function _migEnviar(d) {
   } finally {
     if (btn) { btn.disabled = false; btn.textContent = 'Guardar y seguir →'; }
   }
+}
+
+// ═══ [MIG-1b] EL AVISO DEL DOBLE DESCUENTO ═════════════════════════════════
+//
+// `vendidos_fuera` fue el puente mientras la migración no existía: Memo escribía
+// ahí su corte del Excel para que el semáforo no sobrevendiera. Migrar a esa
+// misma gente la hace descontar POR SU CUENTA, como cuarto término — y los
+// mismos boletos se restan dos veces.
+//
+// ⚠️ NO SE AJUSTA SOLO. `vendidos_fuera` lo escribió Memo a mano, y bajarlo sin
+// permiso decide por él en el sentido peligroso: ABRE stock. Se dice, con el
+// número exacto y las dos salidas ("son los mismos" / "son distintos"), y el
+// ajuste lo confirma él. Lo único inaceptable es el silencio.
+let _migAvisoZona = null;
+
+function _migAvisoDoble(aviso) {
+  const box = _migEl('mig-aviso-doble');
+  if (!box) return;
+  if (!aviso || !aviso.zona) { box.style.display = 'none'; box.innerHTML = ''; _migAvisoZona = null; return; }
+  _migAvisoZona = aviso;
+  box.style.display = '';
+  box.innerHTML = `<div class="mig-doble">
+    <div class="mig-doble-t">⚠️ Cuidado: se podría descontar dos veces</div>
+    <div class="mig-doble-d">${_esfEsc(aviso.mensaje)}</div>
+    <div class="mig-doble-btns">
+      <button type="button" class="btn btn-primary btn-sm" onclick="_migAjustarFuera()">Bajar a ${aviso.sugerido}</button>
+      <button type="button" class="btn btn-ghost btn-sm" onclick="_migAvisoDoble(null)">Son personas distintas</button>
+    </div>
+  </div>`;
+}
+
+// El ajuste REUSA la misma puerta que la casilla del Palacio (`ajuste_guardar`
+// de admin-compras): no nace un segundo camino para escribir el mismo dato.
+async function _migAjustarFuera() {
+  const a = _migAvisoZona;
+  if (!a) return;
+  const evId = _migSlug();
+  if (!evId) { _migError('No hay evento abierto.'); return; }
+  if (!confirm(`¿Bajar "vendidos fuera" de ${a.zona} de ${a.vendidos_fuera} a ${a.sugerido}?\n\nHazlo SOLO si esa gente ya está migrada: baja el número, o sea ABRE stock.`)) return;
+  try {
+    const r = await khAdminFetch('/.netlify/functions/admin-compras', {
+      method: 'POST',
+      body: JSON.stringify({ accion: 'ajuste_guardar', evento_id: evId, zona: a.zona, vendidos_fuera: a.sugerido,
+                             nota: `ajustado al migrar ${a.migrados_en_zona} viajero(s) — MIG-1b` }),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || !j.ok) throw new Error(j.error || 'No se pudo ajustar');
+    _migAvisoDoble(null);
+    _migError('');
+  } catch (e) { _migError((e && e.message) || 'No se pudo ajustar.'); }
 }
 
 function _migPintarCapturados() {
@@ -8444,7 +8499,9 @@ async function _kamComprasLoad() {
         <span class="kms-zrow-n">${_esfEsc(zona)}</span>
         <span class="kms-zrow-d">
           <span class="kms-zrow-c">${stock} compradas</span>
-          ${sem ? `<span class="kms-zrow-disp ${sem.disponibles < 0 ? 'kms-zrow-neg' : ''}">${sem.disponibles} disp.</span>` : ''}
+          ${sem ? (sem.disponibles == null
+              ? '<span class="kms-zrow-disp kms-zrow-sinstock">sin stock cargado</span>'
+              : `<span class="kms-zrow-disp ${sem.disponibles < 0 ? 'kms-zrow-neg' : ''}">${sem.disponibles} disp.</span>`) : ''}
           ${deuda > 0 ? `<span class="kms-zrow-deu">${_kamMoney(deuda)}</span>` : ''}
         </span>
         <span class="kms-zrow-ch" aria-hidden="true">›</span>
@@ -9011,9 +9068,12 @@ function _kamSemaforoHtml(sem) {
     film = `<div class="kam-sem kam-sem-${_esfEsc(est)}">
       <span class="kam-sem-i">Compradas <b>${sem.compradas}</b></span>
       <span class="kam-sem-i">Vendidas fuera <b>${sem.fuera}</b></span>
+      ${sem.migrados ? `<span class="kam-sem-i">Migrados <b>${sem.migrados}</b></span>` : ''}
       <span class="kam-sem-i">Seguras <b>${sem.seguras}</b></span>
       <span class="kam-sem-i">Apartadas <span class="kam-sem-clk">⏱</span> <b>${sem.apartadas}</b></span>
-      <span class="kam-sem-i kam-sem-disp">Disponibles <b>${sem.disponibles}</b></span>
+      <span class="kam-sem-i kam-sem-disp">${sem.disponibles == null
+        ? 'Sin stock cargado <b>—</b>'
+        : `Disponibles <b>${sem.disponibles}</b>`}</span>
       ${alerta}
     </div>`;
   }

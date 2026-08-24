@@ -190,7 +190,7 @@ está caduco antes de escribirse.
   (`RESERVA_PORTAL` / `?portal=1`). Falta decidir **su** encendido — que es
   otro, no el del correo: ése ya ocurrió.
 - **Contrato de cuidador de bodega**: borrador esperando a Memo.
-- **Wizard de comisiones CHEAP (F5a)**: falta que Memo capture las primeras.
+- ⚰️ ~~Wizard de comisiones CHEAP (F5a)~~: **murió con el borrado de vendedores** (ver abajo). No se re-propone.
 - ⚰️ **PRs #53 (ranking DC2d) y #215 (cancelar-despublica): ABANDONADAS** por
   Memo el 5-ago-2026. Siguen abiertas en GitHub, y eso NO significa pendiente:
   no se mergean, no se retoman y no se re-proponen. Se dejan anotadas justamente
@@ -224,28 +224,32 @@ está caduco antes de escribirse.
   a `.25` = 2.08:1, la familia `.3/.35/.4` de `pagos.html`, y `.cca` en
   `#0000cd` sobre negro = 1.88:1. Son **decisiones estéticas de Memo, no bugs**.
   El bloque [F] del arnés de T6 las imprime con su ratio en cada corrida.
-- ⏸️ **MÓDULO DE VENDEDORES: EN PAUSA** (**VEN-PAUSA-1**, #507, 19-ago-2026).
-  Decisión de Memo: **se replantea después, no se borra**. Pantallas, los 6
-  endpoints, el candado rodante de 3 meses y los datos siguen donde estaban; lo
-  único que cambia es que nadie puede llegar. Al pausarlo había **cero usuarios
-  con rol `vendedor`**, así que nadie quedó fuera.
-  - El interruptor es **`MODULOS_PAUSADOS`**, y vive en DOS runtimes que no
-    pueden importarse entre sí: `kamehouse.js` (cliente) y
-    `_lib/modulos-pausados.js` (servidor, 503 en los 6 endpoints). El arnés los
-    **carea**; si divergen, truena.
-  - ⚠️ **La pausa es un VETO que se SUMA a `_puedeVerTab`, jamás una resta de
-    `PERMISOS_TABS`.** Restar los tabs los sacaría de `TABS_CON_PERMISO` y
-    `showPage` dejaría de filtrarlos: el módulo "pausado" quedaría ABIERTO a
-    cualquiera. Es el hoyo de E5-4 con otra cara.
-  - Apagados también el cron `ventas-limite-cron` (comentado en `netlify.toml`)
-    y el bloque de vendedores inactivos de `radar-alertas`: los dos **mandan
-    correo**, y un cron vivo sobre un módulo pausado avisa de algo que nadie
-    puede atender.
-  - 🔌 **Revive en 3 ediciones**: vaciar los dos Sets y descomentar el cron.
-  - ⚰️ **Muere con la pausa** el pendiente "capturar las primeras comisiones
-    CHEAP" (wizard F5a). No se re-propone mientras el módulo siga pausado.
-  - La vieja nota del **caché de 5 min** del candado de vendedores queda sin
-    efecto mientras dure la pausa (no hay a quién reactivar).
+- ⚰️ **MÓDULO DE VENDEDORES: BORRADO POR COMPLETO** (**VEN-BORRA-1**,
+  #539-#542 + el SQL de Jane, 23/24-ago-2026). Decisión de Memo: *"todo todo,
+  después lo intentamos de nuevo"*.
+  ⚠️ **Esta entrada REEMPLAZA a la de VEN-PAUSA-1 (#507), que decía "en pausa,
+  se replantea después, NO se borra".** Aquello duró cuatro días y ya no aplica:
+  si alguien la cita, está citando una época anterior. El interruptor
+  `MODULOS_PAUSADOS` y su careo de dos runtimes **ya no tienen a quién pausar**.
+  - **Fuera del código:** los 7 endpoints (incluido `admin-liquidacion`, que la
+    pausa nunca vio), las pantallas, el wizard del Palacio (que bajó a 2 pasos),
+    el cron `ventas-limite-cron` y el bloque de vendedores inactivos de
+    `radar-alertas`.
+  - **Fuera de la base** (verificado en `information_schema` el 24-ago, no
+    reportado): `comisiones_zona` y `comisiones_liquidadas` ya no existen; las 4
+    columnas de vendedor están fuera de las tablas vivas; `usuarios_rol_check`
+    quedó en `maestro_roshi · bulma · mister_popo · coordinador · cc · milk`,
+    **sin `vendedor`**. Respaldos en `bkp_ven_*`. Había 0 usuarios con ese rol.
+  - ⚠️ **`stock_ajustes.vendidos_fuera` NO es de vendedores** y se queda: es el
+    contador de ventas sin registro. Casi se va en la barrida.
+  - ⏳ **Residuo medido, sin urgencia:** en el **Portal** (no en KH) sigue viva
+    `pagos.registrado_por_vendedor` — `text`, nullable, **0 filas y cero
+    archivos del repo la nombran**. No estaba en la lista de 1d porque aquélla
+    era de KH. Tuerca de Jane cuando toque.
+  - **La lección:** al borrar un módulo hay que barrer sus columnas contra TODO
+    el repo **y contra las DOS bases**, no solo la que tiene las tablas.
+  - ⚰️ Muere con él el pendiente "capturar las primeras comisiones CHEAP"
+    (wizard F5a). No se re-propone.
 - **Resumen al admin de `contratos-alerta-cron`**: se queda SIN bitácora a
   propósito (correo interno). El arnés assertea ese comportamiento: si alguien
   lo cubre, la prueba truena y hay que actualizarla.
@@ -285,9 +289,40 @@ está caduco antes de escribirse.
   La sección "Servicios y deudas que no son boletos" y las acciones
   `servicios_listar` / `servicio_crear` **ya no existen**; la tabla
   `servicios_proveedor` quedó vacía y sin escritor.
+- 🔒 **LA FÓRMULA DE LA UTILIDAD, SELLADA (serie UTIL-C, #550-#554, 24-ago-2026):**
+
+      utilidad del evento    = COBRADO − INVERSIÓN TOTAL EN BOLETOS − GASTOS (sin categoría `Boletos`)
+      utilidad de la empresa = Σ utilidades por evento − GASTOS SIN EVENTO
+
+  Careo firmado con `calle24` real: `23,600 − 52,320 − 0 = −28,720`.
+  **Por qué:** los boletos NO tienen devolución — desde que se compran son de
+  Memo, se vendan o no, así que la inversión entera pesa desde el día uno en vez
+  de prorratearse. Y el primer término es lo **cobrado**, no lo vendido: un
+  contrato firmado no le paga a un proveedor.
+  ⚠️ **Corolario que hay que decir en voz alta antes de que alguien lo reporte
+  como bug: un evento recién cargado NACE MUY EN ROJO y se endereza cobrando.**
+  Eso no es un error de la cuenta, es la forma real del negocio.
+  **Han existido TRES fórmulas y las tres dan números distintos** con las mismas
+  filas, así que no se confunden por accidente — pero las pantallas viejas y los
+  reportes guardados hablan de las anteriores:
+  (A) FIN-1 `cobrado − gastos` = $23,600, que era **caja** ·
+  (B) UTIL-B `vendido − costo de lo VENDIDO − gastos` = $20,678 ·
+  **(C) UTIL-C = −$28,720, la de hoy.**
+  De la serie B **sobrevive**: la exclusión de la categoría `Boletos` de los
+  gastos, el proveedor obligatorio en gastos de esa categoría, el gasto de
+  boletos como fila de caja (los saldos SÍ lo restan) y el "en mano". Su regla de
+  MARGEN está **superada**.
+  Dos nombres que no se pueden mezclar: `totales.ganancia` es la **suma de los
+  eventos** (tiene que serlo: es el renglón "Total" de una tabla por evento) y
+  `totales.ganancia_empresa` es esa suma **menos los generales**.
+  **La bodega es INFORMACIÓN, no un contrapeso.** Nació como disculpa del rojo
+  (AUD-1c); bajo C ese rojo es la verdad, así que no tiene nada que defender.
+  Sumarla a la utilidad es doble conteo: su costo ya está dentro de la inversión.
+  **La cuenta bancaria es OBLIGATORIA solo en gastos SIN evento** (en el alta Y
+  en la edición, desde la MISMA función de `_lib/cuentas-dinero`). En gastos de
+  evento sigue opcional a propósito.
 - **NINGUNA PANTALLA CALCULA SU PROPIA CUENTA DE EVENTO.** La cuenta vive en
-  `_lib/cuenta-evento` (ventas de los dos mundos − gastos = ganancia, con bodega
-  y deuda aparte) y las pantallas la PIDEN. **Cada `reduce` sobre pagos que
+  `_lib/cuenta-evento` y las pantallas la PIDEN. **Cada `reduce` sobre pagos que
   aparezca en una pantalla es la fórmula número doce esperando a divergir**: la
   auditoría AUD-1 encontró ONCE fórmulas distintas de "cuánto dinero hay", y diez
   leían un solo libro. No se notaba porque cada pantalla era coherente consigo
@@ -297,6 +332,20 @@ está caduco antes de escribirse.
   cobrados no es un dato que falta, es un dato falso — y "Utilidad −$147,172", que
   restaba los gastos de un mundo a las ventas de otro, no tenía media cuenta:
   tenía dos mitades que no se corresponden.
+  ⚠️ **Y esto NO se arregló de una vez: UTIL-C encontró CINCO divergencias más,
+  todas DORMIDAS** —ningún dato de hoy las despertaba, así que ningún careo por
+  ejecución las veía; se cazaron **leyendo los dos códigos**. La inversión
+  calculada por dos caminos que diferían $32,500 con una `zona` vacía · la tabla
+  del Resumen restando los gastos generales mientras el panel de arriba no · el
+  CSV restándolos por su cuenta después de que la tabla dejó de hacerlo (**nadie
+  carea un CSV contra la pantalla de la que salió**) · el semáforo ignorando lo
+  vendido-sin-cobrar · y la pantalla del evento rotulando **"Ganancia $23,600"**
+  sobre `ventas − gastos` cuando la verdad era −$28,720: **$52,320 de error en la
+  palabra más importante del sistema**. Se arregló RENOMBRANDO ("En caja"), que
+  es más barato que calcular y aquí además era lo veraz.
+  Y dos ceros que afirmaban de más: `_audUtilidadPintar` pintaba **$0 en verde
+  con el rótulo "Utilidad"** ante un `null`, y el respaldo del Resumen calculaba
+  `facturado − totalGastos` (habría dicho **+$46,700**). Los dos dicen "sin dato".
 - **TODO CATÁLOGO VIVE EN UNA SOLA FUENTE — y "dos listas iguales" no existe, solo
   "dos listas que todavía no divergen".** El de categorías de gasto estaba en dos
   `<select>` del HTML y **ya había divergido en producción**: el del filtro no
@@ -307,6 +356,14 @@ está caduco antes de escribirse.
   llena sus selects con lo que el servidor manda. Y la validación es **sensible a
   mayúsculas a propósito**: aceptar `boletos` junto a `Boletos` vuelve a partir el
   mismo concepto en dos.
+  **Segundo caso, UTIL-C-3:** el catálogo de CUENTAS bancarias estaba en **6
+  declaraciones**. Hoy los cuatro escritores (gastos e ingresos, alta y edición)
+  lo piden a `_lib/cuentas-dinero`. ⚠️ **`admin-saldos` y `admin-reembolsos`
+  conservan su lista de TRES a propósito y NO se unifican sin volver a medir:**
+  para ellas son **las cubetas que se pintan**, no los valores que se aceptan.
+  Un gasto con cuenta `Otro` **sí entra** en su `caja_total` (por el acumulador
+  `otrosTotal`); lo que no tiene es cubeta propia. **No se pierde dinero, se
+  pierde el renglón.** Ya se midió: la nota vive en el encabezado del lib.
 - **El CSS/JS de KameHouse vive en `kamehouse.css/js/recibos.js`**, no inline en
   el HTML.
 - **Los arneses miden lo de una tuerca ENTRE DOS COMMITS**, no contra el árbol de
@@ -494,6 +551,20 @@ está caduco antes de escribirse.
   Es la hermana de `renderZonas` vs `buildZonaButtons`: **un prefijo no es un
   ancla.** Al corregirlo, dejar un candado que assertee que el parecido SIGUE
   ahí, para que nadie lo "limpie" sin entender por qué existe.
+- **CUANDO UN ARNÉS SE PONE ROJO, SOSPECHAR PRIMERO DE MI EXPECTATIVA.** En
+  UTIL-C hubo **cinco rojos y los cinco eran míos**, con el código sano: un
+  umbral inventado (exigir conservar el 90% de un archivo que es 19% comentario;
+  el control bueno es "no perdió NINGUNA de las 915 declaraciones") · un caso
+  cuya premisa no se alcanzaba (pedir $30,000 sobre un techo de $27,300, y leer
+  como fallo la respuesta correcta) · un fixture que no era el dato real (la
+  bodega de `calle24` en $0 cuando son $48,050) · un índice equivocado (buscar el
+  tercer renglón en el segundo) · y **un número recordado en vez de computado**
+  (reporté 7 copias de un catálogo; eran 6). Más un **falso negativo**: un
+  andamio que servía 4 archivos elegidos a mano en vez del árbol del commit, así
+  que la página no se pintaba y el arnés acusó a código sano. Recetas: los
+  umbrales se **miden**; antes de creerle a un caso se assertea que **su premisa
+  se alcanza**; los números del reporte los **imprime el arnés**; y el andamio
+  sale entero con `git archive <commit>`.
 - **Un arnés que lee comentarios no mide código.** La prueba de "ya no se filtra
   `activos:true`" la tumbó MI PROPIO comentario, que decía «SIN `activos:true`»
   explicando el cambio. Antes de asertar sobre texto del archivo, quitar

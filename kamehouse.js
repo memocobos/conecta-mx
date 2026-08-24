@@ -6530,13 +6530,11 @@ async function guardarGasto() {
    const msg = d.detalle ? `${d.error} ${d.detalle}` : (d.error || (editando ? 'No se pudo actualizar el gasto' : 'No se pudo registrar el gasto'));
    throw new Error(msg);
  }
- // [UTIL-B-2] Un pago de BOLETOS no deja fila en Gastos: se guarda como abono
- // al proveedor. Memo lo capturó AQUÍ y no lo va a ver aquí, así que se le
- // dice en el momento — un movimiento que desaparece de donde se capturó es
- // indistinguible de uno que se perdió.
- alerta.innerHTML = d.solo_abono
-   ? `<div class="alert alert-success">Pago registrado como <b>abono al proveedor</b>.<div style="font-size:11px;margin-top:5px;line-height:1.5">${_esfEsc(d.aviso || '')}</div></div>`
-   : `<div class="alert alert-success">${editando ? 'Gasto actualizado' : 'Gasto registrado'}</div>`;
+ // [UTIL-B-3] El aviso de "no aparecerá en Gastos" se retira con la supresión
+ // que lo motivaba: el pago de boletos SÍ vuelve a dejar su fila. Lo que se
+ // conserva es decir que ADEMÁS abonó, porque eso sigue siendo cierto y es la
+ // mitad que no se ve en esta pantalla.
+ alerta.innerHTML = `<div class="alert alert-success">${editando ? 'Gasto actualizado' : 'Gasto registrado'}${(!editando && d.abono_id) ? ' · <b>abonado</b> a la deuda del proveedor' : ''}</div>`;
  _gastoEditId = null;
  setTimeout(() => { closeModal('modal-gasto'); loadGastos(); }, 1000);
  } catch(e) {

@@ -4069,31 +4069,30 @@ function _audUtilidadPintar(utilidad, cta, util) {
   // pantalla tiene que quedar byte a byte como estaba. La merma que viene abajo
   // es un <div> —bloque— así que cuando existen las dos se separan solas.
   if (boletos) {
-    // [UTIL-B-3] margen = valor de venta − lo que costaron. Si el costo no se
-    // conoce NO se resta un cero (diría que fueron gratis): se dice que la
-    // estimación va sin costo.
+    // [UTIL-C-4] LA BODEGA ES INFORMACIÓN, NO UN CONTRAPESO. Aquí vivía
+    // «Si se vende todo: $X», y bajo la fórmula C esa línea era DOBLE CONTEO:
+    // hacía `utilidad + (valor − costo)`, pero el costo de esos boletos ya está
+    // restado dentro de la INVERSIÓN TOTAL. Los descontaba dos veces.
+    //
+    // Y arreglarle la aritmética tampoco era la respuesta. La bodega nació como
+    // disculpa del rojo (AUD-1c, "el rojo nunca solo"): bajo la fórmula A un
+    // boleto comprado y no vendido ensuciaba la ganancia sin ser una pérdida.
+    // Bajo C ese rojo es LA VERDAD —los boletos ya son de Memo, se vendan o
+    // no—, así que la bodega deja de tener que defenderlo. Lo que sí contesta,
+    // y por eso se queda, es "¿qué me queda por vender y cuánto vale?".
+    //
+    // El "¿en cuánto cerraría?" no se pierde: vive en el PANEL DE ESCENARIOS de
+    // Kamisama (UTIL-C-2), que además cuenta lo que falta por COBRAR — algo que
+    // esta línea nunca miró.
     const bCosto = b.bodega_costo;
     const conCosto = Number.isFinite(Number(bCosto));
-    const margen = (valor == null) ? null : (valor - (conCosto ? Number(bCosto) : 0));
-    // [UTIL-C-2] `utilidad` ya puede ser `null` (el respaldo dejó de inventar
-    // una fórmula propia), y `Number(null) + margen` daría el margen a secas:
-    // un número plausible construido sobre un dato que no existe. Se propaga el
-    // desconocido en vez de rellenarlo.
-    // ⚠️ Y ojo con lo que ESTA línea todavía hace mal bajo la fórmula C: resta
-    // el costo de la bodega que la INVERSIÓN TOTAL ya restó. Es doble conteo, y
-    // se corrige en UTIL-C-4 junto con el resto del papel de la bodega — no
-    // aquí, para que esa tuerca se pueda medir sola.
-    const siTodo = (valor == null || utilidad == null) ? null : Number(utilidad) + margen;
     partes.push(`<b>${boletos}</b> boleto${boletos === 1 ? '' : 's'} por vender`
       + (valor == null
           ? ' <span class="aud-bod-mudo">— sin precio en el catálogo, no se puede estimar</span>'
           : ` ≈ <b>${_spFmtMxn(valor)}</b> <span class="aud-bod-est">a precio de hoy (estimado)</span>`
             + (conCosto
-                ? ` · costaron <b>${_spFmtMxn(Number(bCosto))}</b>`
-                : ' <span class="aud-bod-mudo">— sin costo capturado, el margen va sin restarlo</span>')
-            + (siTodo == null
-                ? ' <span class="aud-bod-mudo">— sin la utilidad no se puede decir en cuánto cerrarías</span>'
-                : ` · Si se vende todo: <b class="${siTodo < 0 ? 'aud-neg' : 'aud-pos'}">${_spFmtMxn(siTodo)}</b>`)));
+                ? ` · costaron <b>${_spFmtMxn(Number(bCosto))}</b> <span class="aud-bod-mudo">— ya restados en la utilidad</span>`
+                : ' <span class="aud-bod-mudo">— sin costo capturado</span>')));
   }
   // La MERMA: eventos que ya ocurrieron. Se mide en lo que COSTARON, no en lo
   // que se iban a vender, y NUNCA lleva "si se vende todo" — no hay a quién.
@@ -4860,6 +4859,10 @@ async function _renderResumenUtilidad(ev) {
       // resta de nada. La caja vieja (`evs`) no la conoce, y ahí sale null —
       // que se pinta como "—", no como cero: un cero diría "no debe nada".
       deuda: cta ? Number(d.deuda_proveedores || 0) : null,
+      // [UTIL-C-4] Lo vendido que falta por cobrar, LEÍDO de la lib (`pendiente`)
+      // y no restado aquí de dos columnas: la pantalla no saca sus propias
+      // cuentas. La caja vieja no lo conoce y ahí va null — que no es cero.
+      por_cobrar: cta ? (d.pendiente == null ? null : Number(d.pendiente)) : null,
       bodega_boletos: bod ? bod.boletos : null,
       bodega_valor: bod ? bod.valor_estimado : null,
       // [MER-1] `pasado` sale del catálogo (evMap) y NO del servidor: es el mismo
@@ -4894,20 +4897,42 @@ async function _renderResumenUtilidad(ev) {
 // bodega alcanza para darle la vuelta", y en un concierto que ya ocurrió no hay
 // bodega que dé vuelta a nada. Ganancia negativa + evento pasado = ROJO, sin
 // consultar la bodega. Positivo sigue verde, pasado o no: ganar ya se ganó.
-function _resumenUtilSemaforo(ganancia, bodegaValor, pasado) {
+// [UTIL-C-4] EL ÁMBAR SE MIDE COMO EL PANEL DE ESCENARIOS, no de otra forma.
+//
+// Le faltaba un término entero: **lo que ya está vendido y no se ha cobrado**.
+// Preguntaba "¿alcanza con vender lo que queda?" e ignoraba los contratos
+// firmados sin pagar, así que pintaba ROJO eventos que solo tenían que cobrar.
+// Con calle24: −$28,720 + $0 de bodega = rojo… teniendo $23,100 contratados por
+// cobrar y apenas $5,620 de faltante real.
+//
+// Ahora usa las MISMAS dos palancas que los escenarios (b) y (c) de Kamisama
+// —cobrar lo vendido y vender lo que queda— para que las dos pantallas no
+// puedan decir cosas distintas del mismo evento.
+//
+// La bodega sigue apareciendo aquí y NO contradice a "la bodega es
+// información": esto es una PROYECCIÓN rotulada ("todavía puede"), no una cifra
+// que compense a la utilidad. Lo que se retiró en esta misma tuerca fue sumarla
+// A LA UTILIDAD; usarla para decir si el rojo tiene salida es su papel.
+function _resumenUtilSemaforo(ganancia, bodegaValor, pasado, porCobrar) {
   if (Number(ganancia) >= 0) return 'var(--green)';
+  const pc = Number(porCobrar) || 0;
+  // Un evento pasado ya no vende, pero SÍ puede cobrar: los contratos no se
+  // vencen porque el concierto haya ocurrido.
+  if (Number(ganancia) + pc >= 0) return 'var(--gold)';
   if (pasado) return 'var(--red)';
   const b = Number(bodegaValor);
-  if (Number.isFinite(b) && (Number(ganancia) + b) >= 0) return 'var(--gold)';
+  if (Number.isFinite(b) && (Number(ganancia) + pc + b) >= 0) return 'var(--gold)';
   return 'var(--red)';
 }
 // El texto del semáforo, junto a su color para que no puedan divergir.
 function _resumenUtilSemaforoTitulo(r) {
   if (Number(r.ganancia) >= 0) return 'Ya gana';
-  if (r.pasado) return 'El evento ya pasó: no queda nada por vender';
-  return (Number.isFinite(Number(r.bodega_valor)) && r.ganancia + Number(r.bodega_valor) >= 0)
-    ? 'Todavía no, pero la bodega alcanza para darle la vuelta'
-    : 'Ni vendiendo lo que queda';
+  const pc = Number(r.por_cobrar) || 0;
+  if (Number(r.ganancia) + pc >= 0) return 'Todavía no, pero con cobrar lo que ya vendiste alcanza';
+  if (r.pasado) return 'El evento ya pasó y ni cobrando todo alcanza: no queda nada por vender';
+  return (Number.isFinite(Number(r.bodega_valor)) && r.ganancia + pc + Number(r.bodega_valor) >= 0)
+    ? 'Todavía no: hay que cobrar lo vendido Y vender parte de lo que queda'
+    : 'Ni cobrando todo y vendiendo lo que queda';
 }
 function _resumenUtilMxnCell(v, align) {
   const col = (Number(v) < 0) ? 'var(--red)' : '';
@@ -5000,7 +5025,7 @@ function _resumenUtilPintar() {
     return `<td style="text-align:right;font-variant-numeric:tabular-nums" title="${r.bodega_boletos} boletos por vender, a precio de hoy (estimado)">${_spFmtMxn(r.bodega_valor)}</td>`;
   };
   const fila = (r) => {
-    const sem = _resumenUtilSemaforo(r.ganancia, r.bodega_valor, r.pasado);
+    const sem = _resumenUtilSemaforo(r.ganancia, r.bodega_valor, r.pasado, r.por_cobrar);
     const semTitle = _resumenUtilSemaforoTitulo(r);
     // Desconocido: NO clickable (no hay a dónde ir); conocidos siguen → Por evento.
     const rowAttrs = r.desconocido ? '' : ` class="dash-click" onclick="_evtIrA('${r.slug}')" title="Ver en Por evento"`;
@@ -5093,7 +5118,7 @@ function _resumenUtilPintar() {
     return `<div style="flex:1 1 92px"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--ts)">Bodega</div><div style="font-size:16px;font-weight:700;color:var(--gold)">${r.bodega_valor == null ? (r.bodega_boletos == null ? '—' : r.bodega_boletos + ' bol.') : _spFmtMxn(r.bodega_valor)}</div></div>`;
   };
   const card = (r) => {
-    const sem = _resumenUtilSemaforo(r.ganancia, r.bodega_valor, r.pasado);
+    const sem = _resumenUtilSemaforo(r.ganancia, r.bodega_valor, r.pasado, r.por_cobrar);
     const cardAttrs = r.desconocido ? '' : ` class="dash-click" onclick="_evtIrA('${r.slug}')" title="Ver en Por evento"`;
     return `<div${cardAttrs} style="background:var(--bg2);border:1px solid var(--border);border-left:4px solid ${sem};border-radius:var(--radius);padding:12px 14px;margin-bottom:10px">
       <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:10px">
@@ -5193,9 +5218,17 @@ function _resumenUtilCSV() {
   });
   if (_resumenUtilSin) {
     const xg = Number(_resumenUtilSin.gastos || 0);
-    tg += xg; tgan -= xg;
+    tg += xg;
     lines.push(['Sin evento', '', '', '', xg, -xg, '', '', '', '', '', ''].map(cell).join(','));
   }
+  // [UTIL-C-4] El CSV se quedó fuera del arreglo de UTIL-C-3: seguía restando
+  // los gastos generales POR SU CUENTA mientras la tabla ya los leía del
+  // servidor. Dos totales de utilidad para los mismos renglones — la tabla en
+  // pantalla y la hoja que se descarga— es exactamente la divergencia que la
+  // serie vino a cerrar, y encima la peor de detectar: nadie carea un CSV
+  // contra la pantalla de la que salió.
+  if (_resumenUtilGananciaEmpresa != null) tgan = _resumenUtilGananciaEmpresa;
+  else if (_resumenUtilSin) tgan -= Number(_resumenUtilSin.gastos || 0);
   // [E5-3] El total de deuda sale del SERVIDOR (_resumenUtilDeudaTotal), no de
   // sumar la columna: la misma regla que en la fila Total de la tabla.
   lines.push(['TOTAL', '', tf, tv, tg, tgan, _resumenUtilDeudaTotal == null ? '' : _resumenUtilDeudaTotal,
@@ -5977,7 +6010,6 @@ function _fin1cPintar(evBase) {
   const ganancia = ventas - gastos;
 
   const bod = _fin1cBodega;
-  const siTodo = bod ? ganancia + bod.valor : null;
   const deudaProv = _fin1cDeudaProveedores();
 
   const money = (n) => _spFmtMxn(n);
@@ -5996,9 +6028,19 @@ function _fin1cPintar(evBase) {
   // queda nada por vender que pueda recuperarlo. Ahí se llama PÉRDIDA, a secas,
   // con el número en positivo (patrón de signos de la casa: el signo se dice con
   // palabras, no con un menos). En un evento por venir no cambia una coma.
-  const gLbl = ganancia < 0 ? (_fin1cPasado ? 'Pérdida' : 'Falta por recuperar') : 'Ganancia';
+  // [UTIL-C-4] ESTE NÚMERO YA NO SE LLAMA GANANCIA. Lo que calcula esta
+  // pantalla es `ventas − gastos`: la CAJA (la fórmula A de FIN-1). Bajo la
+  // fórmula C la utilidad resta además la INVERSIÓN TOTAL EN BOLETOS, que esta
+  // pantalla no tiene y no puede inventar — con calle24 diría "Ganancia
+  // $23,600" al lado de la utilidad real de −$28,720, un error de $52,320 en la
+  // palabra más importante del sistema.
+  //
+  // No se le pone un endpoint nuevo: se le pone el NOMBRE CORRECTO. Es caja, se
+  // llama caja, y se dice dónde vive la utilidad. Renombrar es más barato que
+  // calcular, y aquí además es lo veraz.
+  const gLbl = ganancia < 0 ? 'Falta en caja' : 'En caja';
   const gCls = ganancia < 0 ? 'fin1c-neg' : 'fin1c-pos';
-  const gSub = (ganancia < 0 && !_fin1cPasado) ? 'todavía no recuperas lo invertido' : 'ventas menos gastos';
+  const gSub = 'ventas menos gastos · la UTILIDAD resta además los boletos, y vive en Kamisama';
 
   cont.style.display = '';
   cont.innerHTML = `
@@ -6009,7 +6051,7 @@ function _fin1cPintar(evBase) {
     ${linea('− Gastos', money(gastos), '', 'boletos, hotel, transporte, kits…')}
     <div class="fin1c-sep"></div>
     ${linea(`= ${gLbl}`, money(Math.abs(ganancia)), gCls, gSub)}
-    ${_fin1cBodegaHtml(bod, siTodo, ganancia)}
+    ${_fin1cBodegaHtml(bod)}
     <div class="fin1c-sep"></div>
     ${linea('Deuda a proveedores', deudaProv == null ? '—' : money(deudaProv), 'fin1c-info',
       deudaProv == null ? 'no se pudo calcular' : 'lo que FALTA por pagar — no entra en la ganancia')}`;
@@ -6023,7 +6065,11 @@ function _fin1cPintar(evBase) {
 // una salida que no existe. Ahora dice lo que sí pasó — cuántos se quedaron y
 // cuánto costaron — y la línea de "si se vende todo" DESAPARECE, porque no hay
 // nadie a quien vendérselos.
-function _fin1cBodegaHtml(bod, siTodo, ganancia) {
+// [UTIL-C-4] Y se le cae el "si se vende todo" también aquí, por la misma razón
+// que en el Resumen: sumarle a una caja el precio de lo que queda promete un
+// cierre que ni resta lo que falta por gastar ni suma lo que falta por cobrar.
+// La respuesta completa está en el panel de escenarios de Kamisama.
+function _fin1cBodegaHtml(bod) {
   if (!bod) {
     return `<div class="fin1c-bod fin1c-bod-mudo">No pude leer el inventario, así que no sé cuántos boletos quedan por vender.</div>`;
   }
@@ -6050,7 +6096,6 @@ function _fin1cBodegaHtml(bod, siTodo, ganancia) {
         ${conPrecio > 0 ? `≈ <b>${_spFmtMxn(bod.valor)}</b> <span class="fin1c-est">a precio de hoy (estimado)</span>` : ''}
       </div>
       ${bod.sinPrecio ? `<div class="fin1c-aviso">${bod.sinPrecio} de ellos NO suman: su zona no tiene precio en el catálogo (${_esfEsc(bod.zonasSinPrecio.join(', '))}).</div>` : ''}
-      ${conPrecio > 0 ? `<div class="fin1c-bod-tot">Si se vende todo: <b class="${siTodo < 0 ? 'fin1c-neg' : 'fin1c-pos'}">${_spFmtMxn(siTodo)}</b></div>` : ''}
     </div>`;
 }
 

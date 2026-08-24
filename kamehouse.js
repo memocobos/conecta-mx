@@ -6399,8 +6399,16 @@ function _gastoPoblarCategorias(cats) {
   const sel = document.getElementById('gasto-categoria');
   if (sel) {
     const antes = sel.value;
-    sel.innerHTML = lista.map((c) => `<option>${_esfEsc(c)}</option>`).join('');
-    if (antes && lista.includes(antes)) sel.value = antes;
+    // [DEFAULTS-1] La primera va vacía. Sin ella el navegador elegía sola la
+    // primera del catálogo —hoy **Transporte**— y un gasto capturado sin mirar
+    // nacía clasificado ahí. No es cosmético: bajo la fórmula UTIL-C la CATEGORÍA
+    // decide si el gasto entra en la utilidad (`Boletos` se excluye y se trata
+    // como salida de caja), así que un default silencioso puede mover el número
+    // más importante del sistema.
+    sel.innerHTML = '<option value="">— elige categoría —</option>'
+      + lista.map((c) => `<option>${_esfEsc(c)}</option>`).join('');
+    // Se conserva lo que hubiera; si no había nada, se queda en la vacía.
+    sel.value = (antes && lista.includes(antes)) ? antes : '';
   }
   // El filtro de la tabla conserva su primera opción ("Todas").
   const filtro = document.getElementById('filtro-cat-gastos');
@@ -6466,6 +6474,20 @@ function _gastoOnCuentaChange() {
   if (cta) cta.dataset.tocado = cta.value ? '1' : '';
 }
 
+// [DEFAULTS-1] `gasto-metodo` e `ingreso-metodo` SE QUEDAN con su default
+// («Transferencia»), y queda escrito por qué para que nadie los "arregle" por
+// parecido con los otros tres:
+//   · Un método de pago es una FORMA, no una atribución. Equivocarlo no le
+//     imputa dinero a un tercero (como el proveedor), ni cambia si el gasto
+//     entra en la utilidad (como la categoría), ni reparte permisos (el rol).
+//   · Transferencia es lo que se usa casi siempre, y el campo está a la vista
+//     con el selector de Banco colgando de él: si dijera Efectivo sin serlo, el
+//     Banco desaparecería de la pantalla y se notaría al momento.
+//   · `ev-banco` se queda por otra razón: su etiqueta DICE "BBVA (Default)". Un
+//     default anunciado no es un default silencioso — el problema nunca fue que
+//     hubiera un valor, sino que nadie supiera que lo había.
+// Si algún día se re-litiga, que sea midiendo capturas reales, no por simetría.
+//
 // Muestra/oculta el selector de Banco según el método (igual que pagos): Transferencia
 // y Depósito lo muestran (el dinero entra a un banco); Efectivo lo oculta (cuenta = 'Efectivo').
 function _gastoOnMetodoChange() {
@@ -6654,6 +6676,18 @@ async function guardarGasto() {
  // [UTIL-C-3] Espejo del servidor, palabra por palabra: un gasto sin evento
  // resta de la utilidad de toda la empresa, así que tiene que decir de qué caja
  // salió. El servidor rechaza igual; esto solo evita el viaje.
+ // [DEFAULTS-1] La categoría se elige. El servidor la acepta VACÍA a propósito
+ // (`_lib/categorias-gasto` dice "la categoría es opcional", decisión de AUD-1g
+ // que NO se toca: hay filas viejas sin ella). Esta guarda es del CAPTURISTA y
+ // puede ser más estricta que el servidor sin contradecirlo: no se prohíbe que
+ // EXISTA un gasto sin categoría, se prohíbe que nazca uno HOY sin que nadie
+ // haya elegido.
+ if (!categoria) {
+  alerta.innerHTML = '<div class="alert alert-error">Elige la categoría: es la que decide si este gasto entra en la utilidad del evento.</div>';
+  const _c = document.getElementById('gasto-categoria'); if (_c) { try { _c.focus(); } catch (_) { /* igual se ve el error */ } }
+  return;
+ }
+
  if (!evId && !cuenta) {
  alerta.innerHTML = '<div class="alert alert-error">Un gasto sin evento resta de la utilidad de toda la empresa: hay que decir de qué cuenta salió.</div>';
  return;
@@ -6951,6 +6985,16 @@ async function guardarIngreso() {
  alerta.innerHTML = '<div class="alert alert-error">Concepto, monto y fecha son obligatorios</div>';
  return;
  }
+ // [DEFAULTS-1] La categoría se elige. Aquí la guarda del navegador es la
+ // ÚNICA que hay: `admin-ingreso-crear` NO valida la categoría contra ningún
+ // catálogo —solo la recorta a 60— así que un vacío se guardaría como null sin
+ // avisar. Queda dicho en el reporte: el catálogo de ingresos no tiene lib.
+ if (!categoria) {
+  alerta.innerHTML = '<div class="alert alert-error">Elige la categoría del ingreso.</div>';
+  const _c = document.getElementById('ingreso-categoria'); if (_c) { try { _c.focus(); } catch (_) { /* igual se ve el error */ } }
+  return;
+ }
+
  // [ET4] La cuenta ya no llega preseleccionada, así que ahora se EXIGE: sin
  // esto, quitar el default habría dejado pasar ingresos sin banco — cambiar un
  // default silencioso por un hueco silencioso no arregla nada.
@@ -10136,6 +10180,18 @@ async function enviarInvitacion() {
     setTimeout(() => alertEl.innerHTML = '', 3000);
     return;
   }
+  // [DEFAULTS-1] El rol se elige. Antes se heredaba **Bulma** —el de
+  // casi-máximos permisos— por ser el primero del markup, así que invitar sin
+  // mirar este campo repartía privilegios que nadie eligió. El servidor ya lo
+  // valida (`ROLES_VALIDOS`, y bulma/milk reservados a maestro_roshi); lo que
+  // esta guarda impide es que la elección la haga el ORDEN DE LAS OPCIONES.
+  if (!rol) {
+    alertEl.innerHTML = '<div class="alert alert-error">Elige el rol: define a qué puede entrar esta persona.</div>';
+    const _r = document.getElementById('inv-rol'); if (_r) { try { _r.focus(); } catch (_) { /* igual se ve el error */ } }
+    setTimeout(() => alertEl.innerHTML = '', 4000);
+    return;
+  }
+
   let link = ''; // [sec-usuarios] el server genera el invite_token y lo devuelve
   try {
     alertEl.innerHTML = '<div class="alert" style="background:rgba(255,183,3,.1);color:var(--gold)">Enviando invitación…</div>';

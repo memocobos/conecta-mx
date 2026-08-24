@@ -45,7 +45,9 @@ const { validarMonto } = require('./_lib/monto-limites');
 // [AUD-1g] El catálogo de categorías vive en UN solo lugar.
 const { esValida: esValidaCategoria, errorCategoria } = require('./_lib/categorias-gasto');
 
-const CUENTAS = ['BBVA', 'Banamex', 'Efectivo', 'Otro'];
+// [UTIL-C-3] La lista y la regla, de su dueño. Estaba copiada en cuatro
+// archivos y hacía falta un quinto lugar para la regla nueva.
+const { normCuenta, errorCuentaDeGasto } = require('./_lib/cuentas-dinero');
 const UUID_RE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
 
 exports.handler = async (event) => {
@@ -98,11 +100,14 @@ exports.handler = async (event) => {
   }
   const metodoPago = (typeof body.metodo_pago === 'string' && body.metodo_pago.trim()) ? body.metodo_pago.trim().slice(0, 60) : null;
 
-  // Cuenta de la que salió el gasto (para el futuro visor de saldos). Opcional,
-  // pero si viene debe ser uno de los 4 valores permitidos.
-  const cuenta = (typeof body.cuenta === 'string' && body.cuenta.trim()) ? body.cuenta.trim() : null;
-  if (cuenta && !CUENTAS.includes(cuenta)) {
-    return { statusCode: 400, headers, body: JSON.stringify({ error: 'cuenta inválida' }) };
+  // [UTIL-C-3] La cuenta. En un gasto DE EVENTO sigue siendo opcional (así
+  // estaba, y exigirla rompería la captura de hoy). En uno SIN evento es
+  // obligatoria: ése resta de la utilidad de toda la empresa, y una salida que
+  // no dice de qué caja salió deja el "¿cuánto tengo?" sin poder cuadrar.
+  const cuenta = normCuenta(body.cuenta);
+  const errCuenta = errorCuentaDeGasto(cuenta, eventoId);
+  if (errCuenta) {
+    return { statusCode: 400, headers, body: JSON.stringify({ error: errCuenta }) };
   }
   const notas      = (typeof body.notas === 'string' && body.notas.trim()) ? body.notas.trim().slice(0, 1000) : null;
 

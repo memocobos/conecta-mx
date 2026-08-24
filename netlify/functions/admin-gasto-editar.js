@@ -20,7 +20,9 @@ const { validarMonto } = require('./_lib/monto-limites');
 // [AUD-1g] El catálogo de categorías vive en UN solo lugar.
 const { esValida: esValidaCategoria, errorCategoria } = require('./_lib/categorias-gasto');
 
-const CUENTAS = ['BBVA', 'Banamex', 'Efectivo', 'Otro'];
+// [UTIL-C-3] La misma lista y la MISMA regla que el alta: editar no puede ser
+// la puerta trasera del alta.
+const { normCuenta, errorCuentaDeGasto } = require('./_lib/cuentas-dinero');
 
 exports.handler = async (event) => {
   const __origin = corsCheck(event);
@@ -75,10 +77,13 @@ exports.handler = async (event) => {
   }
   const metodoPago = (typeof body.metodo_pago === 'string' && body.metodo_pago.trim()) ? body.metodo_pago.trim().slice(0, 60) : null;
 
-  // Cuenta de la que salió el gasto. Opcional, pero si viene debe ser uno de los 4.
-  const cuenta = (typeof body.cuenta === 'string' && body.cuenta.trim()) ? body.cuenta.trim() : null;
-  if (cuenta && !CUENTAS.includes(cuenta)) {
-    return { statusCode: 400, headers, body: JSON.stringify({ error: 'cuenta inválida' }) };
+  // [UTIL-C-3] Misma regla que el alta, leída del mismo lugar: un gasto sin
+  // evento exige cuenta. Si esto solo viviera en el alta, bastaría con editar
+  // un gasto de evento para dejarlo sin evento y sin cuenta.
+  const cuenta = normCuenta(body.cuenta);
+  const errCuenta = errorCuentaDeGasto(cuenta, eventoId);
+  if (errCuenta) {
+    return { statusCode: 400, headers, body: JSON.stringify({ error: errCuenta }) };
   }
   const notas = (typeof body.notas === 'string' && body.notas.trim()) ? body.notas.trim().slice(0, 1000) : null;
 

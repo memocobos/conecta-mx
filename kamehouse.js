@@ -4625,8 +4625,17 @@ async function loadResumen() {
       setTxt('m-porcobrar', _spFmtMxn(Math.abs(pend)));
       const lblPc = document.getElementById('m-porcobrar-lbl');
       if (lblPc) lblPc.textContent = pend < 0 ? 'A favor' : 'Por cobrar';
-      setTxt('m-gastos', _spFmtMxn(cta.gastos));
-      utilidad = Number(cta.ganancia || 0);
+      // [UTIL-C-3] Los gastos que se pintan son los de TODA la empresa: los de
+      // los eventos más los generales. Antes decían solo los de eventos, y la
+      // tabla de abajo sumaba los generales — dos cifras de "gastos" en la
+      // misma pantalla.
+      setTxt('m-gastos', _spFmtMxn(Number(cta.gastos || 0) + Number(cta.gastos_sin_evento || 0)));
+      // [UTIL-C-3] Y la utilidad es `ganancia_empresa`, LEÍDA del servidor:
+      // Σ utilidades por evento − gastos sin evento. Antes esta línea pintaba
+      // `cta.ganancia` (solo eventos) mientras la tabla de abajo restaba los
+      // generales por su cuenta. Con cero gastos generales daban igual; con el
+      // primero se habrían separado en silencio.
+      utilidad = (cta.ganancia_empresa === undefined) ? Number(cta.ganancia || 0) : cta.ganancia_empresa;
     } else {
       // Cálculo viejo, Portal-puro, y se avisa de que lo es.
       const cobrado   = activos.reduce((a, t) => a + Number((t.pago || {}).abonado  || 0), 0);
@@ -4798,6 +4807,7 @@ let _resumenUtilRows = [];                       // filas de eventos (con datos)
 let _resumenUtilConCuenta = false;               // [AUD-1d] ¿las filas salen de la cuenta de los dos mundos?
 let _resumenUtilDeudaTotal = null;   // [E5-3] lo manda el servidor; la pantalla no lo suma
 let _resumenUtilSin = null;                      // bloque sin_evento
+let _resumenUtilGananciaEmpresa = null;          // [UTIL-C-3] Σ eventos − generales, del servidor
 let _resumenUtilSort = { col: 'ds', dir: 'asc' }; // orden por defecto: fecha asc
 
 async function _renderResumenUtilidad(ev) {
@@ -4866,6 +4876,10 @@ async function _renderResumenUtilidad(ev) {
   _resumenUtilSin = cta
     ? ((util.cuenta.sin_evento && Number(util.cuenta.sin_evento.gastos)) ? { gastos: Number(util.cuenta.sin_evento.gastos) } : null)
     : (util.sin_evento || null);
+  // [UTIL-C-3] La utilidad de la empresa, del servidor. Sin la cuenta nueva
+  // (camino viejo) se queda en null y la tabla usa su respaldo local.
+  const _tt = cta && util.cuenta ? util.cuenta.totales : null;
+  _resumenUtilGananciaEmpresa = (_tt && _tt.ganancia_empresa != null) ? Number(_tt.ganancia_empresa) : null;
   _resumenUtilPintar();
 }
 
@@ -5022,8 +5036,11 @@ function _resumenUtilPintar() {
   if (_resumenUtilSin) {
     // Sin evento: hoy solo GASTOS. No se le inventan ventas ni bodega — sus
     // celdas van vacías, no en cero.
+    // [UTIL-C-3] La resta ya NO se hace aquí. `totGan` se toma del servidor
+    // (`ganancia_empresa`) unas líneas abajo: esta línea era la fórmula número
+    // doce, y encima la única de la pantalla que la hacía.
     const sinG = Number(_resumenUtilSin.gastos || 0);
-    totGas += sinG; totGan -= sinG;
+    totGas += sinG;
     sinFila = `<tr style="border-bottom:1px solid var(--border);opacity:.85">
       <td style="padding:6px 8px;font-style:italic;color:var(--ts)">Sin evento</td>
       <td style="padding:6px 8px"></td>
@@ -5032,6 +5049,19 @@ function _resumenUtilPintar() {
       ${_resumenUtilMxnCell(-sinG)}
       <td></td><td></td><td></td><td></td>
     </tr>`;
+  }
+  // [UTIL-C-3] El total de utilidad viene del servidor. La suma local se
+  // conserva como RESPALDO —si el servidor no la mandó, la pantalla sigue
+  // dando un número— y se CAREA: si las dos difieren, es que alguien volvió a
+  // sacar su propia cuenta y hay que enterarse, no promediarlas.
+  if (_resumenUtilGananciaEmpresa != null) {
+    const local = totGan - (_resumenUtilSin ? Number(_resumenUtilSin.gastos || 0) : 0);
+    if (Math.abs(local - _resumenUtilGananciaEmpresa) > 0.5) {
+      console.warn('[UTIL-C-3] la utilidad local y la del servidor NO coinciden:', local, 'vs', _resumenUtilGananciaEmpresa);
+    }
+    totGan = _resumenUtilGananciaEmpresa;
+  } else if (_resumenUtilSin) {
+    totGan -= Number(_resumenUtilSin.gastos || 0);
   }
   const totPct = totFact > 0 ? Math.round(totVentas / totFact * 100) : 0;
   const totFila = `<tr style="border-top:2px solid var(--border);font-weight:800">
@@ -6350,6 +6380,14 @@ function nuevoGasto() {
  if (_gf) _gf.value = _mxFechaStr();
  ['gasto-categoria', 'gasto-metodo', 'gasto-cuenta'].forEach(id => {
    const el = document.getElementById(id); if (el) el.selectedIndex = 0;
+ // [UTIL-C-3] Un alta nueva no hereda la opción extra ni la marca de "elegida
+ // a mano" que pudo dejar una edición anterior: si no se limpian, el siguiente
+ // gasto general nace con la cuenta del gasto que se editó hace un minuto.
+ const _ctaNueva = document.getElementById('gasto-cuenta');
+ if (_ctaNueva) {
+  const _ex = _ctaNueva.querySelector('option[data-extra]'); if (_ex) _ex.remove();
+  _ctaNueva.dataset.tocado = '';
+ }
  });
  // Método por default (Transferencia) con Banco (BBVA) visible.
  _gastoOnMetodoChange();
@@ -6358,6 +6396,29 @@ function nuevoGasto() {
  const tit = document.getElementById('gasto-modal-title'); if (tit) tit.textContent = 'Registrar Gasto';
  const btn = document.getElementById('gasto-save-btn');   if (btn) btn.textContent = 'Guardar Gasto';
  openModal('modal-gasto');
+}
+
+// [UTIL-C-3] La cuenta de un gasto SIN EVENTO se elige, no se hereda. Un
+// default silencioso cumple la letra de "cuenta obligatoria" y produce el dato
+// equivocado: todos los gastos generales saldrían de BBVA porque nadie miró el
+// selector. Es la lección de ETAPA 4 — quitar el default OBLIGÓ a exigirla.
+// Si el capturista YA eligió una a mano, no se le pisa.
+function _utilC3CuentaSegunEvento(ev) {
+  const cta = document.getElementById('gasto-cuenta');
+  const pista = document.getElementById('gasto-cuenta-pista');
+  if (!cta) return;
+  const sinEvento = !ev;
+  if (sinEvento) {
+    if (!cta.dataset.tocado) cta.value = '';
+  } else if (!cta.value) {
+    cta.value = 'BBVA';
+  }
+  if (pista) pista.style.display = sinEvento ? '' : 'none';
+}
+
+function _gastoOnCuentaChange() {
+  const cta = document.getElementById('gasto-cuenta');
+  if (cta) cta.dataset.tocado = cta.value ? '1' : '';
 }
 
 // Muestra/oculta el selector de Banco según el método (igual que pagos): Transferencia
@@ -6385,9 +6446,25 @@ async function editarGasto(id) {
  let _metodoSel = _metodosGasto.includes(g.metodo_pago) ? g.metodo_pago : 'Transferencia';
  if (g.cuenta === 'Efectivo') _metodoSel = 'Efectivo';
  set('gasto-metodo', _metodoSel);
- // Banco: pre-selecciona BBVA/Banamex si así estaba; si no, default (BBVA).
- if (g.cuenta === 'BBVA' || g.cuenta === 'Banamex') set('gasto-cuenta', g.cuenta);
- else document.getElementById('gasto-cuenta').selectedIndex = 0;
+ // Banco: pre-selecciona la cuenta que el gasto TIENE.
+ // [UTIL-C-3] Antes, una cuenta que el selector no podía representar (`Otro`)
+ // caía en `selectedIndex = 0` = BBVA, y al guardar el gasto SALÍA DE OTRO
+ // BANCO sin que nadie lo pidiera. Ahora se le hace lugar en la lista: la
+ // edición no puede cambiar un dato que nadie tocó.
+ const _ctaEl = document.getElementById('gasto-cuenta');
+ if (_ctaEl) {
+ const _prev = _ctaEl.querySelector('option[data-extra]');
+ if (_prev) _prev.remove();
+ const _c = (typeof g.cuenta === 'string') ? g.cuenta.trim() : '';
+ if (_c && !['BBVA', 'Banamex'].includes(_c) && _c !== 'Efectivo') {
+ const o = document.createElement('option');
+ o.value = _c; o.textContent = _c; o.setAttribute('data-extra', '1');
+ _ctaEl.appendChild(o);
+ }
+ _ctaEl.value = _c && _c !== 'Efectivo' ? _c : '';
+ // Se marca como elegida a mano para que abrir el modal no la vacíe.
+ _ctaEl.dataset.tocado = _ctaEl.value ? '1' : '';
+ }
  _gastoOnMetodoChange();  // muestra/oculta el Banco según el método elegido
  set('gasto-evento',   g.evento_id || '');
  set('gasto-notas',    g.notas);
@@ -6433,6 +6510,10 @@ async function _fin1aOnEvento() {
   if (!wrap || !sel) return;
   const ev = (document.getElementById('gasto-evento') || {}).value || '';
   if (caja) { caja.style.display = 'none'; caja.innerHTML = ''; }
+  // [UTIL-C-3] Sin evento, la cuenta se vacía para que se elija a mano; con
+  // evento vuelve el default de siempre. El servidor rechaza igual — esto solo
+  // hace que el rechazo no llegue por sorpresa.
+  _utilC3CuentaSegunEvento(ev);
   sel.value = '';
   if (!ev || !_fin1aPuede()) { wrap.style.display = 'none'; return; }
   wrap.style.display = '';
@@ -6523,6 +6604,13 @@ async function guardarGasto() {
 
  if (!concepto || !(monto >= 0) || !fecha) {
  alerta.innerHTML = '<div class="alert alert-error">Concepto, monto y fecha son obligatorios</div>';
+ return;
+ }
+ // [UTIL-C-3] Espejo del servidor, palabra por palabra: un gasto sin evento
+ // resta de la utilidad de toda la empresa, así que tiene que decir de qué caja
+ // salió. El servidor rechaza igual; esto solo evita el viaje.
+ if (!evId && !cuenta) {
+ alerta.innerHTML = '<div class="alert alert-error">Un gasto sin evento resta de la utilidad de toda la empresa: hay que decir de qué cuenta salió.</div>';
  return;
  }
 

@@ -2630,10 +2630,19 @@
  <div class="form-row cols-2">
  <div class="form-group" id="gasto-banco-wrap">
  <label>Banco</label>
- <select id="gasto-cuenta">
+ <select id="gasto-cuenta" onchange="_gastoOnCuentaChange()">
+ <!-- [UTIL-C-3] La opción vacía existe para que un gasto SIN EVENTO no herede
+      un banco que nadie eligió. En un gasto de evento la cuenta sigue siendo
+      opcional y BBVA sigue siendo el default; en uno sin evento, que resta de
+      la utilidad de toda la empresa, hay que decirlo. Es la misma lección de
+      ETAPA 4: quitar el default OBLIGÓ a exigirla al guardar. -->
+ <option value="">— elige la cuenta —</option>
  <option>BBVA</option>
  <option>Banamex</option>
  </select>
+ <div id="gasto-cuenta-pista" style="display:none;font-size:10.5px;color:var(--ts);margin-top:4px;line-height:1.45">
+ Este gasto no cuelga de ningún evento: resta de la utilidad de <b>toda la empresa</b>, así que hay que decir de qué caja salió.
+ </div>
  </div>
  <div class="form-group">
  <label>Notas</label>

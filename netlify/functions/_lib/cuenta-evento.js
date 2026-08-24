@@ -446,44 +446,12 @@ function inversionDesconocida() {
   return { total: null, parcial: false, zonas_sin_costo: [] };
 }
 
-// Del desglose por zona que `cuentaDeEvento` YA calculó para la bodega: cero
-// consultas nuevas. `z.inversion` es cantidad × costo_unitario, sumado por
-// `_lib/disponibilidad` desde MER-1 — y una compra SIN costo no entra, así que
-// se dice `parcial` en vez de fingir que fue gratis.
-function inversionTotalDeZonas(zonas) {
-  const out = { total: 0, parcial: false, zonas_sin_costo: [] };
-  (Array.isArray(zonas) ? zonas : []).forEach((z) => {
-    if (!z) return;
-    out.total += Number(z.inversion) || 0;
-    // Compradas sin costo: la inversión queda incompleta y hay que decirlo.
-    if ((Number(z.compradas) || 0) > 0 && !(Number(z.costo_unit) > 0)) {
-      out.parcial = true;
-      if (z.zona && !out.zonas_sin_costo.includes(z.zona)) out.zonas_sin_costo.push(z.zona);
-    }
-  });
-  return out;
-}
-
-// Y para TODOS los eventos, en UNA lectura de `compras`. Bajo C ya no hacen
-// falta las ventas por zona —la inversión no depende de lo vendido—, así que
-// esta pasada es más simple que la de UTIL-B y los `select` que se habían
-// ensanchado para aquello vuelven a su forma original.
-async function inversionDeTodos(leerKH) {
-  const rc = await leerKH('compras', 'select=evento_id,cantidad,costo_unitario&limit=20000');
-  if (rc.error) return rc;
-  const out = {};
-  rc.data.forEach((c) => {
-    const ev = baseSlug(c.evento_id);
-    if (!ev) return;
-    const cant = parseInt(c.cantidad, 10) || 0;
-    const cu = Number(c.costo_unitario);
-    out[ev] = out[ev] || { total: 0, parcial: false, zonas_sin_costo: [] };
-    if (Number.isFinite(cu) && cu > 0 && cant > 0) out[ev].total += cant * cu;
-    else if (cant > 0) out[ev].parcial = true;
-  });
-  return { data: out };
-}
-
+// ⚠️ [UTIL-C-1b] AQUÍ VIVIERON `inversionTotalDeZonas` (la del camino de UN
+// evento, que agrupaba por zona vía el semáforo) e `inversionDeTodos` (la del
+// camino de TODOS, que releía `compras`). Nacieron el mismo día y ya diferían:
+// una compra con `zona` vacía se cae del agrupado por zona y sí entra en la
+// lectura directa. Las dos se retiran y la cuenta se hace UNA vez, dentro de
+// `deudaProveedores`, sobre las filas que esa función ya tenía en la mano.
 const CATEGORIA_BOLETOS = 'Boletos';
 function esGastoDeBoletos(g) {
   return !!g && String(g.categoria || '').trim() === CATEGORIA_BOLETOS;
@@ -504,7 +472,7 @@ function esGastoDeBoletos(g) {
 async function deudaProveedores(leerKH, evento_id) {
   const f = evento_id ? `evento_id=eq.${encodeURIComponent(evento_id)}&` : '';
   const [rc, ra] = await Promise.all([
-    leerKH('compras', `${f}select=evento_id,cantidad,costo_unitario&limit=20000`),
+    leerKH('compras', `${f}select=evento_id,cantidad,costo_unitario,zona&limit=20000`),
     leerKH('abonos', `${f}select=evento_id,monto&limit=20000`),
   ]);
   if (rc.error) return rc;
@@ -513,7 +481,31 @@ async function deudaProveedores(leerKH, evento_id) {
   const suma = (slug, v) => { if (!slug) return; out[slug] = (out[slug] || 0) + v; };
   rc.data.forEach((c) => suma(baseSlug(c.evento_id), (parseInt(c.cantidad, 10) || 0) * n(c.costo_unitario)));
   ra.data.forEach((a) => suma(baseSlug(a.evento_id), -n(a.monto)));
-  return { data: out };
+  // [UTIL-C-1b] Y de LAS MISMAS FILAS sale la inversión. Antes cada camino la
+  // sacaba por su lado —el de un evento agrupando por ZONA (vía el semáforo) y
+  // el de todos leyendo `compras` otra vez—, y eso son dos definiciones de la
+  // misma cifra esperando a divergir. Ya divergían: una compra cuya `zona`
+  // fuera cadena vacía se cae del agrupado por zona (`_lib/disponibilidad` hace
+  // `if (!z) return`) y sí entra en la lectura directa. Hoy la columna es NOT
+  // NULL y no hay ninguna vacía —medido, 0 de 3—, así que nadie lo había visto:
+  // era una divergencia DORMIDA, de las que ningún dato de hoy despierta.
+  const inversion = {};
+  rc.data.forEach((c) => {
+    const slug = baseSlug(c.evento_id);
+    if (!slug) return;
+    const cant = parseInt(c.cantidad, 10) || 0;
+    const cu = Number(c.costo_unitario);
+    const inv = inversion[slug] || (inversion[slug] = { total: 0, parcial: false, zonas_sin_costo: [] });
+    if (Number.isFinite(cu) && cu > 0 && cant > 0) inv.total += cant * cu;
+    else if (cant > 0) {
+      // Una compra sin costo NO se cuenta como gratis: se cuenta como HUECO, y
+      // el hueco se dice. Es la misma regla del promedio ponderado de MER-1.
+      inv.parcial = true;
+      const z = (c.zona != null) ? String(c.zona).trim() : '';
+      if (z && !inv.zonas_sin_costo.includes(z)) inv.zonas_sin_costo.push(z);
+    }
+  });
+  return { data: out, inversion };
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -545,17 +537,16 @@ async function cuentaDeEvento(opts) {
     portalUrl: o.portalUrl, portalKey: o.portalService,
     evento_id, fetchImpl: o.fetchImpl,
   });
-  let inversion = inversionDesconocida();
+  // [UTIL-C-1b] La inversión ya NO sale de las zonas: sale de `compras`, que es
+  // de donde salía la del otro camino. `d` ya las trae leídas — cero consultas
+  // nuevas, y una sola definición.
+  const inversion = (d.inversion || {})[evento_id] || { total: 0, parcial: false, zonas_sin_costo: [] };
   if (!disp.error) {
     const zonas = [...new Set([
       ...Object.keys(disp.stockPorZona || {}),
       ...Object.keys(disp.ajustesPorZona || {}),
     ])].map((z) => desgloseZona(disp, z));
     bodega = bodegaDeZonas(zonas, o.preciosPorZona, o.pasado);
-    // [UTIL-C] La inversión sale de las MISMAS zonas que la bodega: cero
-    // consultas nuevas. Sin stock se queda la desconocida de arriba — que NO es
-    // cero: un cero diría "esos boletos fueron gratis".
-    inversion = inversionTotalDeZonas(zonas);
   }
   // Sin stock NO se afirma una bodega vacía: se queda la desconocida de arriba.
 
@@ -593,12 +584,6 @@ async function cuentasDeTodos(opts) {
   if (k.error) return k;
   if (d.error) return d;
 
-  // [UTIL-C] La inversión total de TODOS, en UNA lectura de `compras`. Más
-  // simple que la de UTIL-B: la inversión no depende de lo vendido, así que no
-  // hacen falta las ventas por zona.
-  const inv = await inversionDeTodos(leerKH);
-  if (inv.error) return inv;
-
   const slugs = [...new Set([
     ...Object.keys(p.data.cobrado || {}),
     ...Object.keys(p.data.facturado || {}),
@@ -628,7 +613,7 @@ async function cuentasDeTodos(opts) {
       facturadoPortal: n((p.data.facturado || {})[slug]),
       viajerosPortal: n((p.data.viajeros || {})[slug]),
       gastos: n((p.data.gastos || {})[slug]),
-      inversion: (inv.data || {})[slug] || { total: 0, parcial: false, zonas_sin_costo: [] },
+      inversion: (d.inversion || {})[slug] || { total: 0, parcial: false, zonas_sin_costo: [] },
       kh: (k.data || {})[slug] || KH_VACIO,
       deuda: n((d.data || {})[slug]),
       bodega: bodegaDesconocida(pasados.has(slug)),
@@ -810,7 +795,8 @@ module.exports = {
   armarCuenta,
   acumularEnCuenta,          // [SAL-1] puro
   // [UTIL-C] Se exportan para que el arnés ejercite la regla REAL, no una copia.
-  inversionTotalDeZonas, inversionDesconocida, esGastoDeBoletos, CATEGORIA_BOLETOS,
+  inversionDesconocida, esGastoDeBoletos, CATEGORIA_BOLETOS,
+  deudaProveedores,          // [UTIL-C-1b] la inversión vive aquí; el arnés la ejercita
   CLABE_A_CUENTA,
   ROLES_DINERO_MIGRADO,
   baseSlug,

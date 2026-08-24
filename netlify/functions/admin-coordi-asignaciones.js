@@ -42,6 +42,11 @@ const { verifyAdminAuthLive, corsCheck } = require('./_lib/verify-admin');
 const { resolverPrecioVenta } = require('./_lib/precio-zona');
 // [VJ-5] La regla de quién duerme es la MISMA de VJ-4, importada — no copiada.
 const { duerme, motivoNoDuerme } = require('./_lib/paquete-viaje');
+// [COB-MIG-1] La fórmula sellada de VJ-3, de su dueño. NO se re-escribe aquí:
+// `resta = total_contrato − abonado_previo − Σ abonos` ya vive en el lib del
+// dinero y la usan la cuenta del evento y los saldos. Una cuarta copia sería la
+// que diverja el día que alguien "mejore" una sola.
+const { saldoMigrado } = require('./_lib/cuenta-evento');
 
 const UUID_RE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
 const SLUG_RE = /^[A-Za-z0-9_#.\-]+$/; // evento_id (slug del EV, p.ej. 'karolg#2')
@@ -71,6 +76,7 @@ const ACCIONES = {
   // datos captura los abonos.
   abono_crear: ROLES_EDITA_VIAJERO,
   abonos_listar: ROLES_EDITA_VIAJERO,
+  deudores_migrados: ROLES_EDITA_VIAJERO,
   // [VJ-5] Acomodar migrados en cuartos.
   viajero_habitacion: ROLES_EDITA_VIAJERO,
   // [MIG-1a] El alta de un viajero ARBITRARIO (el del Excel). Mismos roles que
@@ -629,6 +635,75 @@ exports.handler = async (event) => {
     // [VJ-3] El dinero de los migrados NO se recalcula de paquete + hotel +
     // vuelo: el total del Excel ya traía todo eso adentro. Aquí solo se SUMAN
     // abonos nuevos sobre un total y un abonado que están CONGELADOS.
+    // ═══ [COB-MIG-1] LOS QUE DEBEN, DE UNA SOLA LECTURA ════════════════════════
+    // Memo: "la gente empieza a depositar y no hay dónde capturarlo". El formulario
+    // de abono existía desde VJ-3 y NADIE PODÍA LLEGARLE: colgaba de una alerta
+    // `datos_viajero`, y las únicas 3 que existen son de `melanie`, un evento
+    // borrado. Para `calle24` había cero alertas = cero puertas. Por eso
+    // `abonos_viajero` lleva 0 filas en toda su historia con 10 migrados vivos.
+    //
+    // Esta acción es la puerta que faltaba. Devuelve, en UNA lectura por tabla:
+    //   · los migrados que DEBEN, con su resta según la fórmula sellada
+    //   · los últimos abonos registrados, para el feed de actividad
+    //
+    // ⚠️ EL SALDO NO SE CALCULA AQUÍ: se le pide a `saldoMigrado` de
+    // `_lib/cuenta-evento`, la misma que usan la cuenta del evento y los saldos. La
+    // pantalla tampoco resta: recibe el número hecho. Es la regla de la casa —
+    // ninguna pantalla saca su propia cuenta.
+    //
+    // ⚠️ `limit` EXPLÍCITO en las dos consultas. El default de PostgREST son 1000
+    // filas y trunca EN SILENCIO: una caja de cobranza a la que le faltan deudores
+    // sin avisar es peor que una que no existe.
+    if (accion === 'deudores_migrados') {
+      if (!ROLES_EDITA_VIAJERO.includes(jwtRol)) {
+        return { statusCode: 403, headers, body: JSON.stringify({ error: 'No puedes ver el dinero de los viajeros' }) };
+      }
+      const [rv, ra] = await Promise.all([
+        fetch(`${baseVE}?total_contrato=not.is.null&select=id,evento_id,nombre,celular,zona_boleto,tipo_paquete,tipo_viajero,total_contrato,abonado_previo&limit=20000`, { headers: sbHeaders }),
+        fetch(`${env.KH_SB_URL}/rest/v1/abonos_viajero?select=id,viajero_id,monto,fecha,nota,foto_path,capturado_por,created_at&order=created_at.desc&limit=20000`, { headers: sbHeaders }),
+      ]);
+      if (!rv.ok) return upstream(headers, await rv.text(), 'consulta');
+      if (!ra.ok) return upstream(headers, await ra.text(), 'consulta');
+      const viajeros = await rv.json();
+      const abonos = await ra.json();
+
+      const porViajero = {};
+      abonos.forEach((a) => { (porViajero[a.viajero_id] = porViajero[a.viajero_id] || []).push(a); });
+
+      const deudores = [];
+      viajeros.forEach((v) => {
+        const s = saldoMigrado(v, porViajero[v.id]);
+        if (!s) return;                       // sin total_contrato no hay deuda que afirmar
+        deudores.push({
+          id: v.id, evento_id: v.evento_id, nombre: v.nombre, celular: v.celular || null,
+          zona_boleto: v.zona_boleto || null, tipo_paquete: v.tipo_paquete || null,
+          tipo_viajero: v.tipo_viajero || null,
+          total: s.total, abonado: s.abonado, resta: s.resta,
+      // ⚠️ `a_favor` se DERIVA aquí de un signo, no se le pide al lib: el
+      // `saldoMigrado` del SERVIDOR devuelve {total, abonado, resta} y NO trae
+      // `aFavor` — ése es el `_vj3Saldo` del navegador. Asumir que las dos
+      // funciones se espejan por tener el mismo papel es la trampa de siempre;
+      // se leyó el cuerpo del lib, no se recordó. Comparar no es recalcular.
+      a_favor: s.resta < 0,
+          abonos: (porViajero[v.id] || []).length,
+        });
+      });
+
+      // El feed: los últimos registrados, con el nombre de a quién. `abonos` ya
+      // viene ordenado por `created_at.desc` desde la consulta — no se re-ordena en
+      // el navegador, que es donde la regla de ORD-1 se pierde.
+      const nombrePorId = {};
+      viajeros.forEach((v) => { nombrePorId[v.id] = v.nombre; });
+      const ultimos = abonos.slice(0, 40).map((a) => ({
+        id: a.id, viajero_id: a.viajero_id,
+        nombre: nombrePorId[a.viajero_id] || null,
+        monto: Number(a.monto) || 0, fecha: a.fecha || null, nota: a.nota || null,
+        tiene_foto: !!a.foto_path, capturado_por: a.capturado_por || null,
+        created_at: a.created_at || null,
+      }));
+
+      return ok(headers, { deudores, ultimos, total_abonos: abonos.length });
+    }
     if (accion === 'abono_crear') {
       if (!ROLES_EDITA_VIAJERO.includes(jwtRol)) {
         return { statusCode: 403, headers, body: JSON.stringify({ error: 'No puedes registrar abonos' }) };

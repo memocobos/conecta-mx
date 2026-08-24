@@ -3592,3 +3592,16 @@ input[type="search"],.kh-buscar,.buscador{border-radius:var(--r-sm,8px)}
 
 /* [CAP-MIG-FIX] La seña de que ese dinero NO es estimado. */
 .kms-z-real { font-size: 9px; color: var(--green); letter-spacing: .06em; text-transform: uppercase; }
+
+/* [UTIL-B-3] "En mano" debajo de la utilidad: la caja no se pierde, se
+   subordina. Chiquita a propósito — bajo la fórmula B el número grande es el
+   margen, y la caja es el contexto que impide leerlo como liquidez. */
+.kmc-mano { margin-top: 6px; font-size: 10.5px; color: var(--ts); }
+.kmc-mano b { color: var(--text); }
+.res-big-mano {
+  margin-top: 8px; padding-top: 7px; border-top: 1px solid var(--border);
+  font-size: 11px; color: var(--ts);
+}
+.res-big-mano b { color: var(--text); font-variant-numeric: tabular-nums; }
+/* [UTIL-B-3] La nota que separa la pregunta de CAJA de la de MARGEN. */
+.kmc-q-nota { margin-top: 5px; font-size: 10.5px; color: var(--ts); line-height: 1.5; }

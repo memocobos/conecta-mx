@@ -123,8 +123,26 @@ exports.handler = async (event) => {
   // no un costo nuevo: si además se escribiera en `gastos`, el mismo dinero
   // aparecería dos veces en los libros.
   //
-  // UTIL-B-1 ya lo sacó de la SUMA (por categoría). Aquí se saca del LIBRO:
-  // deja de escribirse en `gastos` y se queda SOLO como abono a la deuda.
+  // ⚠️ [UTIL-B-3] AQUÍ ME EQUIVOQUÉ, Y LO CAZÓ JANE CON LA PREGUNTA DE MEMO.
+  //
+  // B-2 hizo que un pago de boletos dejara de escribirse en `gastos`. Con eso
+  // salía del libro de P&L… pero también del LIBRO DE CAJA, y `admin-saldos`
+  // calcula "cuánto tengo" restando `gastos`. Un pago post-B-2 habría sacado
+  // dinero del banco SIN que los saldos lo restaran: "cuánto tengo" mintiendo
+  // hacia arriba, que es la pregunta número uno de Memo.
+  //
+  // UN PAGO DE BOLETOS ES DOS COSAS, Y HAY QUE TRATARLAS APARTE:
+  //   · SALIDA DE CAJA  → SÍ. Pertenece a `gastos`, que es el libro de caja.
+  //   · GASTO DE P&L    → NO. Su costo entra al VENDERSE el boleto (fórmula B),
+  //                       y eso YA lo resuelve UTIL-B-1 excluyendo la categoría
+  //                       de la fórmula de la utilidad.
+  //
+  // O sea: B-1 bastaba. B-2 sacó el pago de un libro al que sí pertenecía.
+  // Se deshace esa parte y se conserva la que sí valía — el proveedor
+  // obligatorio, abajo.
+  //
+  // Y esto no es teórico: los $51,870 de calle24 SÍ restan hoy porque nacieron
+  // como gasto antes de B-2. El siguiente pago no lo habría hecho.
   const esPagoDeBoletos = categoria === 'Boletos';
 
   // El proveedor es OBLIGATORIO (firmado por Memo). Sin él, este dinero no
@@ -140,7 +158,8 @@ exports.handler = async (event) => {
   }
 
   // La casilla viene MARCADA por default (decisión de Memo, firmada en FIN-1).
-  // Un pago de boletos SIEMPRE abona: abonar es lo único que hace.
+  // Un pago de boletos SIEMPRE abona: baja la deuda del proveedor además de
+  // salir de la caja.
   const abonar = esPagoDeBoletos ? true : (proveedorId ? (body.abonar !== false) : false);
   // Un abono sin evento no se puede colgar de ninguna deuda: la deuda es POR evento.
   if (abonar && !eventoId) {
@@ -191,9 +210,9 @@ exports.handler = async (event) => {
           fecha,
           // La nota la genera el sistema: un abono huérfano tiene que poder
           // reconocerse a simple vista en el Palacio.
-          // [UTIL-B-2] Un pago de boletos NO deja fila en `gastos`, así que su
-          // nota no puede decir "desde gasto": diría que existe algo que no
-          // existe. Se rotula por lo que es.
+          // [UTIL-B-3] El rótulo se conserva: aunque el pago SÍ deja fila en
+          // `gastos`, decir "pago de boletos" en el Palacio es más útil que
+          // "desde gasto" — ahí lo que se está mirando es la deuda.
           nota: (esPagoDeBoletos ? `pago de boletos: ${concepto}` : `desde gasto: ${concepto}`).slice(0, 500),
         }),
       });
@@ -208,27 +227,6 @@ exports.handler = async (event) => {
     } catch (e) {
       return { statusCode: 502, headers, body: JSON.stringify({ error: 'Error abonando al proveedor; el gasto NO se registró', detail: e.message }) };
     }
-  }
-
-  // ═══ [UTIL-B-2] SALIDA TEMPRANA: el pago de boletos TERMINA AQUÍ ══════════
-  //
-  // No escribe en `gastos`. Y de paso este camino queda con UNA sola escritura,
-  // así que el baile de FIN-1a —abono primero, gasto después, compensación si
-  // el segundo falla— deja de aplicar: el estado prohibido se vuelve
-  // inalcanzable porque deja de haber un segundo paso.
-  //
-  // ⚠️ Se avisa en la RESPUESTA, y no es opcional: Memo capturó esto en la
-  // pantalla de Gastos y NO lo va a ver ahí. Un movimiento que se guarda y
-  // desaparece de donde se capturó es indistinguible de uno que se perdió.
-  if (esPagoDeBoletos) {
-    return { statusCode: 200, headers, body: JSON.stringify({
-      ok: true,
-      gasto: null,
-      abono_id: abonoId,
-      solo_abono: true,
-      aviso: 'Se registró como ABONO al proveedor, no como gasto: el costo de un boleto ya entra al venderse. '
-           + 'No aparecerá en la lista de Gastos — míralo en el Palacio, en los abonos del evento.',
-    }) };
   }
 
   // ── (2) EL GASTO EN PORTAL, con su abono_id DENTRO del mismo insert ────────

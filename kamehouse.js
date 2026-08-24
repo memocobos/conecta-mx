@@ -1950,6 +1950,8 @@ const khViajeros = {
   habitacion(id, habitacion_id) { return this._call({ accion: 'viajero_habitacion', id, habitacion_id }); },
   // [MIG-1a] alta de un viajero del Excel, y la búsqueda de parecidos previa
   migrar(payload) { return this._call(Object.assign({ accion: 'viajero_migrar' }, payload)); },
+  // [CAP-MIG-FIX] Solo SUGIERE: no escribe nada.
+  precioSugerido(p) { return this._call(Object.assign({ accion: 'precio_sugerido' }, p)); },
   buscarParecido(evento_id, nombre, correo) {
     return this._call({ accion: 'viajero_buscar_parecido', evento_id, nombre, correo }).then(j => j.parecidos || []);
   },
@@ -2007,7 +2009,7 @@ async function migAbrir() {
   if (lista) {
     // Multifecha: la fecha se elige UNA vez y se captura la tanda (firmado).
     const sel = _migEl('mig-fecha');
-    sel.innerHTML = lista.map((d, i) => `<option value="${i}">${_migFechaTxt(d)}</option>`).join('');
+    sel.innerHTML = lista.map((d, i) => `<option value="${i}">${_esfEsc(_migFechaTxt(d))}</option>`).join('');
     _migFechaIdx = 0;
     if (fw) fw.style.display = '';
   } else if (fw) { fw.style.display = 'none'; }
@@ -2089,8 +2091,88 @@ function _migLeer() {
     total_contrato: g('mig-total'),
     abonado_previo: g('mig-abonado'),
     talla_playera: g('mig-talla'),
-    notas: g('mig-notas'),
+    // [CAP-MIG-FIX] Las dos columnas ya existían en `viajeros_evento`; solo
+    // faltaba pedirlas en la pantalla.
+    emergencia_nombre: g('mig-emerg-nombre'),
+    num_emergencia: g('mig-emerg-num'),
+    // El DESCUENTO se guarda en la NOTA para no perder el dato: `viajeros_evento`
+    // no tiene columna propia, y añadir una migración de base por un renglón de
+    // texto de transición es caro. Va con su rótulo, no suelto.
+    notas: _migNotasConDescuento(g('mig-notas'), g('mig-desc')),
   };
+}
+
+// [CAP-MIG-FIX] El descuento no se pierde: si lo hay, se antepone a la nota con
+// su rótulo. Hay que DECIRLO porque el total ya viene descontado, y sin esto
+// nadie podría reconstruir de dónde salió el número.
+function _migNotasConDescuento(nota, desc) {
+  const d = Number(String(desc || '').replace(/[^0-9.-]/g, ''));
+  if (!Number.isFinite(d) || d <= 0) return nota;
+  const t = `descuento aplicado: $${d.toLocaleString('es-MX')}`;
+  return nota ? `${t} · ${nota}` : t;
+}
+
+// ═══ [CAP-MIG-FIX] EL COSTO SUGERIDO ═══════════════════════════════════════
+//
+// Al elegir paquete+zona se PRE-LLENA el costo desde el catálogo. La aritmética
+// NO vive aquí: se le pide al endpoint, que llama a `resolverPrecioVenta` —la
+// misma que sella el precio de una venta del Portal—. Una copia de la regla de
+// precios en el navegador sería la cuarta, y la casa lleva tres tuercas
+// evitando justo eso.
+//
+// ⚠️ ES SUGERENCIA, NO CANDADO. El campo queda EDITABLE y lo que se guarda es
+// lo que él diga: el total del Excel ya trae dentro hotel, transporte y lo
+// negociado. Si difieren, MANDA EL EXCEL (regla de oro de VJ-3).
+let _migSugBase = null;   // la sugerencia SIN descuento, para poder re-restar
+
+async function _migSugerirCosto(soloDescuento) {
+  const pista = _migEl('mig-sug');
+  const campo = _migEl('mig-total');
+  if (!campo) return;
+  if (soloDescuento) { _migPintaSugerencia(); return; }   // mover el descuento no re-pregunta
+
+  const evento_id = _migSlug();
+  const tipo_paquete = ((_migEl('mig-paquete') || {}).value || '').trim();
+  const zona = ((_migEl('mig-zona') || {}).value || '').trim();
+  _migSugBase = null;
+  if (!evento_id || !tipo_paquete) { _migPintaSugerencia(); return; }
+  if (pista) pista.textContent = 'calculando…';
+  try {
+    const j = await khViajeros.precioSugerido({ evento_id, tipo_paquete, zona });
+    _migSugBase = (j && Number.isFinite(Number(j.sugerido))) ? Number(j.sugerido) : null;
+    if (_migSugBase == null) {
+      // Honesto: se dice el motivo. Un cero se leería como "cuesta cero".
+      if (pista) pista.textContent = 'sin sugerencia: ' + ((j && j.motivo) || 'el catálogo no alcanza');
+      return;
+    }
+  } catch (_) {
+    _migSugBase = null;
+    if (pista) pista.textContent = 'sin sugerencia (no se pudo consultar)';
+    return;
+  }
+  _migPintaSugerencia(true);
+}
+
+function _migPintaSugerencia(rellenar) {
+  const pista = _migEl('mig-sug');
+  const campo = _migEl('mig-total');
+  if (!pista || !campo) return;
+  if (_migSugBase == null) { pista.textContent = ''; return; }
+  const d = Number(String(((_migEl('mig-desc') || {}).value || '')).replace(/[^0-9.-]/g, ''));
+  const desc = (Number.isFinite(d) && d > 0) ? d : 0;
+  const sug = Math.max(0, _migSugBase - desc);
+  pista.textContent = desc > 0
+    ? `sugerido del catálogo: $${_migSugBase.toLocaleString('es-MX')} − $${desc.toLocaleString('es-MX')} de descuento = $${sug.toLocaleString('es-MX')} · editable`
+    : `sugerido del catálogo: $${sug.toLocaleString('es-MX')} · editable`;
+  // ⚠️ Solo se rellena si el campo está VACÍO o si trae la sugerencia anterior.
+  // Pisar un número que Memo escribió a mano sería perder el dato del Excel —
+  // justo lo que la regla de oro de VJ-3 protege.
+  const actual = String(campo.value || '').trim();
+  const eraSug = actual === '' || actual === String(campo.dataset.sug || '');
+  if ((rellenar || desc > 0) && eraSug) {
+    campo.value = String(sug);
+    campo.dataset.sug = String(sug);
+  }
 }
 function _migError(msg) {
   const e = _migEl('mig-error');
@@ -8177,7 +8259,18 @@ function _kmsTableroPintar(parcial) {
     const costoU = Number(z.costo_unit);
     const hayCosto = Number.isFinite(costoU) && costoU > 0;
     const vendidas = z.vendidas;
-    const vendidoD = (hayPrecio && vendidas != null) ? vendidas * precio : null;
+    // [CAP-MIG-FIX] MENOS ESTIMACIÓN. La nota al pie ya confesaba que "Vendido $"
+    // era `vendidas × precio de hoy`. De los migrados SÍ sabemos el dinero real
+    // —su `total_contrato`, que viaja en la misma consulta del semáforo—, así
+    // que esa parte deja de estimarse: se estima solo lo que no se sabe.
+    //   vendido = (vendidas − migrados con dinero) × precio  +  dinero REAL
+    const migCon = Number(z.migrado_con_dinero) || 0;
+    const migDin = Number(z.migrado_dinero) || 0;
+    const estimadas = (vendidas == null) ? null : Math.max(0, vendidas - migCon);
+    const vendidoD = (vendidas == null) ? null
+      : (hayPrecio ? estimadas * precio + migDin : (migCon > 0 ? migDin : null));
+    // ¿Cuánto de este renglón es dinero REAL y cuánto sigue siendo estimación?
+    const todoReal = vendidas != null && vendidas > 0 && migCon === vendidas;
     const quedan = (z.disponibles != null && z.disponibles > 0) ? z.disponibles : null;
     const restaD = pasado
       ? ((hayCosto && quedan != null) ? quedan * costoU : null)
@@ -8204,7 +8297,8 @@ function _kmsTableroPintar(parcial) {
       <td>${z.inversion > 0 ? _kamMoney(z.inversion) : guion}</td>
       <td>${vendidas == null ? guion : vendidas}</td>
       <td>${hayPrecio ? _kamMoney(precio) : guion}</td>
-      <td>${vendidoD == null ? guion : _kamMoney(vendidoD)}</td>
+      <td>${vendidoD == null ? guion
+            : `${_kamMoney(vendidoD)}${todoReal ? '<span class="kms-z-real" title="dinero real de los contratos, no estimado"> real</span>' : ''}`}</td>
       <td class="${dispCls}">${z.disponibles == null ? '—' : z.disponibles}</td>
       <td class="${pasado ? 'mer1-merma' : 'kms-z-resta'}">${restaD == null ? guion : _kamMoney(restaD)}</td>
     </tr>`;
@@ -8231,7 +8325,7 @@ function _kmsTableroPintar(parcial) {
       ${tarjeta('Deuda a proveedores', deuda == null ? '…' : _kamMoney(deuda), deuda == null ? 'cargando abonos' : 'inversión − abonado', 'kms-deuda')}
     </div>
     <div class="kms-tab-wrap"><table class="kms-tab-z">
-      <thead><tr><th>Zona</th><th>Compradas</th><th>Costo u.</th><th>Costo total</th><th>Vendidas</th><th>Precio hoy</th><th>Vendido $</th><th>Disp.</th><th>${pasado ? 'Merma $' : 'Resta $'}</th></tr></thead>
+      <thead><tr><th>Zona</th><th>Compradas</th><th>Costo u.</th><th>Costo total</th><th>Vendidas</th><th title="Precio de venta del paquete PLUS de esa zona, tal como está HOY en el catálogo del sitio">Precio PLUS hoy</th><th>Vendido $</th><th>Disp.</th><th>${pasado ? 'Merma $' : 'Resta $'}</th></tr></thead>
       <tbody>${filas || '<tr><td colspan="9" class="kms-z-cero">Sin compras registradas</td></tr>'}${totalFila}</tbody>
     </table></div>
     ${d.zonas.length ? `<div class="kms-z-nota">
@@ -8240,7 +8334,8 @@ function _kmsTableroPintar(parcial) {
            <b>El evento ya pasó</b>, así que esa columna no es dinero por cobrar — es dinero que ya se gastó, y ya está contado en los gastos del evento.
            <b>Vendido $</b> sigue siendo un estimado a precio de catálogo; lo <b>cobrado de verdad</b> son los contratos de los viajeros, en <b>Por Evento</b>.
            ${tot.sinCosto ? `<span class="kms-z-aviso">${tot.sinCosto} zona${tot.sinCosto === 1 ? '' : 's'} con boletos sin vender y sin costo capturado: su renglón va sin merma.</span>` : ''}`
-        : `<b>Vendido $</b> y <b>Resta $</b> son <b>estimados</b>: vendidas o disponibles × el precio del catálogo de HOY.
+        : `<b>Precio PLUS hoy</b> es el precio de venta del paquete <b>PLUS</b> de esa zona en el catálogo — un CHEAP o un STAY de la misma zona cuestan otra cosa.
+           <b>Resta $</b> es <b>estimada</b>: disponibles × ese precio. <b>Vendido $</b> ya usa el dinero REAL de los contratos migrados y estima solo el resto; cuando todo el renglón es real lo dice.
            El precio cambia y lo de la derecha nadie lo ha pagado todavía.
            Lo <b>cobrado de verdad</b> son los contratos de los viajeros, y esa cifra vive en <b>Por Evento</b>.
            ${tot.sinPrecio ? `<span class="kms-z-aviso">${tot.sinPrecio} zona${tot.sinPrecio === 1 ? '' : 's'} sin precio en el catálogo: su renglón va sin estimados.</span>` : ''}`}
@@ -8570,7 +8665,14 @@ async function _kamComprasLoad() {
           // venga: fuera del sistema + seguras + apartadas. Es la definición que
           // usa el propio semáforo para restar (disponibles = compradas − las
           // tres), así que cualquier otra cosa no cuadraría con su propia resta.
-          vendidas: sem ? (Number(sem.fuera || 0) + Number(sem.seguras || 0) + Number(sem.apartadas || 0)) : null,
+          // [CAP-MIG-FIX] ⚠️ AQUÍ FALTABAN LOS MIGRADOS y la tabla se contradecía
+          // sola: "Disp." SÍ los restaba (10−1=9, porque sale del semáforo, que
+          // desde MIG-1b los cuenta) pero "Vendidas" decía 0. Un migrado ES una
+          // venta. La definición no cambia —VENDIDAS = todo lo que ya no está
+          // disponible— solo que ahora la resta y la suma miran lo mismo, y por
+          // eso `vendidas + disponibles = compradas` en todos los casos.
+          vendidas: sem ? (Number(sem.fuera || 0) + Number(sem.seguras || 0)
+                         + Number(sem.apartadas || 0) + Number(sem.migrados || 0)) : null,
         };
       }),
     });

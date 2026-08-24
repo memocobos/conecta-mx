@@ -8967,10 +8967,10 @@ function _kmsCuentaPintar() {
 
   cont.innerHTML = `
     <div class="kmc-grid">
-      <div class="kmc-c"><div class="kmc-l">VENDIDO</div><div class="kmc-v">${_kmcVal(c.facturado)}</div>
-        <div class="kmc-s">cobrado ${_kmcVal(c.ventas)}</div></div>
-      <div class="kmc-c"><div class="kmc-l">COSTO DE LO VENDIDO</div><div class="kmc-v">${_kmcVal(c.costo_vendido)}</div>
-        <div class="kmc-s">${c.costo_parcial ? 'INCOMPLETO: hay zonas sin costo capturado' : 'lo que costaron los boletos ya vendidos'}</div></div>
+      <div class="kmc-c"><div class="kmc-l">COBRADO</div><div class="kmc-v">${_kmcVal(c.en_mano)}</div>
+        <div class="kmc-s">vendido ${_kmcVal(c.facturado)}</div></div>
+      <div class="kmc-c"><div class="kmc-l">INVERSIÓN EN BOLETOS</div><div class="kmc-v">${_kmcVal(c.inversion_boletos)}</div>
+        <div class="kmc-s">${c.inversion_parcial ? 'INCOMPLETA: hay compras sin costo capturado' : 'TODOS los boletos del evento, vendidos o no'}</div></div>
       <div class="kmc-c"><div class="kmc-l">GASTOS</div><div class="kmc-v">${_kmcVal(c.gastos)}</div>
         <div class="kmc-s">del evento, sin boletos</div></div>
       <div class="kmc-c"><div class="kmc-l">DEUDA A PROVEEDORES</div><div class="kmc-v">${_kmcVal(c.deuda_proveedores)}</div>
@@ -8981,8 +8981,8 @@ function _kmsCuentaPintar() {
              pantalla lo dice, en vez de dejar que se deduzca. Y "en mano" debajo:
              la caja no se pierde, se subordina — bajo B la utilidad puede ser
              positiva sin un peso en la cuenta, y las dos juntas lo explican. -->
-        <div class="kmc-s">vendido − costo − gastos${c.costo_parcial ? ' · <b>incompleta</b>' : ''}</div>
-        <div class="kmc-mano">en mano: ${_kmcVal(c.en_mano)}</div></div>
+        <div class="kmc-s">cobrado − inversión − gastos${c.inversion_parcial ? ' · <b>incompleta</b>' : ''}</div>
+        <div class="kmc-mano">vendido: ${_kmcVal(c.facturado)}</div></div>
     </div>
     ${q.html}`;
 }

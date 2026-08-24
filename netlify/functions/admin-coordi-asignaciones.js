@@ -39,6 +39,7 @@
 // =============================================================================
 
 const { verifyAdminAuthLive, corsCheck } = require('./_lib/verify-admin');
+const { resolverPrecioVenta } = require('./_lib/precio-zona');
 // [VJ-5] La regla de quién duerme es la MISMA de VJ-4, importada — no copiada.
 const { duerme, motivoNoDuerme } = require('./_lib/paquete-viaje');
 
@@ -75,6 +76,7 @@ const ACCIONES = {
   // [MIG-1a] El alta de un viajero ARBITRARIO (el del Excel). Mismos roles que
   // editar y que los abonos: quien captura los datos captura el alta.
   viajero_migrar: ROLES_EDITA_VIAJERO,
+  precio_sugerido: ROLES_EDITA_VIAJERO,   // [CAP-MIG-FIX] solo sugiere; no escribe nada
   viajero_buscar_parecido: ROLES_EDITA_VIAJERO,
 };
 
@@ -432,6 +434,42 @@ exports.handler = async (event) => {
     // traía todo eso adentro. Lo que se cobre de aquí en adelante entra como
     // ABONO (`abono_crear`), y el saldo lo resuelve la fórmula sellada:
     //     resta = total_contrato − abonado_previo − Σ abonos
+    // ═══ [CAP-MIG-FIX] EL COSTO SUGERIDO, DE LA FUENTE ÚNICA ═══════════════
+    // Memo pidió que al elegir paquete+zona el costo se PRE-LLENE. La aritmética
+    // NO se copia al navegador: se le pregunta a `resolverPrecioVenta`, la misma
+    // que sella el precio de una venta del Portal. Una cuarta copia de la regla
+    // de precios sería exactamente lo que la casa lleva tres tuercas evitando.
+    //
+    // ⚠️ ES UNA SUGERENCIA, NO UN CANDADO. La regla de oro de VJ-3 no se toca:
+    // lo que se guarda es lo que diga el campo, porque el total del Excel ya
+    // trae dentro hotel, transporte y lo que se haya negociado. Si difieren,
+    // MANDA EL EXCEL.
+    if (accion === 'precio_sugerido') {
+      if (!ROLES_EDITA_VIAJERO.includes(jwtRol)) {
+        return { statusCode: 403, headers, body: JSON.stringify({ error: 'Solo un admin' }) };
+      }
+      const evId = String(body.evento_id || '').trim();
+      if (!evId || !SLUG_RE.test(evId)) return bad(headers, 'evento_id inválido');
+      const pq = String(body.tipo_paquete || '').trim().toLowerCase();
+      if (!PAQUETES_MIGRAR.includes(pq)) return bad(headers, `tipo_paquete inválido`);
+      const zn = String(body.zona || '').trim();
+      try {
+        const pv = await resolverPrecioVenta({
+          evento_id: evId,
+          paquete: pq,
+          zona: zn || undefined,
+          num_personas: 1,          // un migrado = una persona
+        });
+        // Fails-soft y HONESTO: si el catálogo no alcanza para calcularlo, se
+        // dice el motivo. Un cero aquí se leería como "cuesta cero".
+        return ok(headers, pv && pv.ok
+          ? { sugerido: pv.precio_unit, total: pv.total, separo: pv.separo, desglose: pv.desglose, zona: pv.zona }
+          : { sugerido: null, motivo: (pv && pv.motivo) || 'no se pudo calcular' });
+      } catch (e) {
+        return ok(headers, { sugerido: null, motivo: 'no se pudo calcular' });
+      }
+    }
+
     if (accion === 'viajero_migrar') {
       if (!ROLES_EDITA_VIAJERO.includes(jwtRol)) {
         return { statusCode: 403, headers, body: JSON.stringify({ error: 'Solo un admin puede dar de alta viajeros' }) };

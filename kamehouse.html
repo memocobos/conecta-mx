@@ -989,11 +989,27 @@
            <div><label class="mig-lbl">NOMBRE *</label><input class="cot-input" id="mig-nombre" placeholder="Como viene en el Excel" autocomplete="off"></div>
            <div><label class="mig-lbl">CORREO</label><input class="cot-input" id="mig-correo" type="email" placeholder="opcional" autocomplete="off"></div>
            <div><label class="mig-lbl">CELULAR</label><input class="cot-input" id="mig-celular" placeholder="opcional" autocomplete="off"></div>
-           <div><label class="mig-lbl">PAQUETE *</label><select class="cot-input" id="mig-paquete" onchange="migZonas()"><option value="">— elegir —</option><option value="plus">PLUS</option><option value="ride">RIDE</option><option value="stay">STAY</option><option value="cheap">CHEAP</option></select></div>
-           <div><label class="mig-lbl">ZONA DEL BOLETO *</label><select class="cot-input" id="mig-zona"><option value="">— elige paquete primero —</option></select></div>
-           <div><label class="mig-lbl">COSTO DEL PAQUETE *</label><input class="cot-input" id="mig-total" inputmode="decimal" placeholder="$"></div>
+           <div><label class="mig-lbl">PAQUETE *</label><select class="cot-input" id="mig-paquete" onchange="migZonas(); _migSugerirCosto()"><option value="">— elegir —</option><option value="plus">PLUS</option><option value="ride">RIDE</option><option value="stay">STAY</option><option value="cheap">CHEAP</option></select></div>
+           <div><label class="mig-lbl">ZONA DEL BOLETO *</label><select class="cot-input" id="mig-zona" onchange="_migSugerirCosto()"><option value="">— elige paquete primero —</option></select></div>
+           <div><label class="mig-lbl">COSTO DEL PAQUETE *</label><input class="cot-input" id="mig-total" inputmode="decimal" placeholder="$">
+            <!-- [CAP-MIG-FIX] La sugerencia se DICE, no se impone: lo que se
+                 guarda es lo que quede en el campo. Si el Excel difiere, manda
+                 el Excel (regla de oro de VJ-3). -->
+            <div id="mig-sug" style="font-size:10px;color:var(--ts);margin-top:3px;min-height:13px"></div></div>
+           <div><label class="mig-lbl">DESCUENTO</label><input class="cot-input" id="mig-desc" inputmode="decimal" placeholder="$ 0" oninput="_migSugerirCosto(true)"></div>
            <div><label class="mig-lbl">ABONADO (total)</label><input class="cot-input" id="mig-abonado" inputmode="decimal" placeholder="$ 0"></div>
-           <div><label class="mig-lbl">TALLA</label><input class="cot-input" id="mig-talla" placeholder="opcional" autocomplete="off"></div>
+           <!-- [CAP-MIG-FIX] Talla de CATÁLOGO, no texto libre: Memo tiene razón
+                en que un campo abierto ahí solo invita basura ("mediana", "m",
+                "M "). El set es el MISMO que ya usa el Portal en su registro
+                (portal.html #p-talla): XS·S·M·L·XL·XXL. Constante espejo — si
+                una cambia, la otra hay que cambiarla a mano. -->
+           <div><label class="mig-lbl">TALLA</label><select class="cot-input" id="mig-talla">
+             <option value="">— sin dato —</option>
+             <option value="XS">XS</option><option value="S">S</option><option value="M">M</option>
+             <option value="L">L</option><option value="XL">XL</option><option value="XXL">XXL</option>
+           </select></div>
+           <div><label class="mig-lbl">CONTACTO DE EMERGENCIA</label><input class="cot-input" id="mig-emerg-nombre" placeholder="nombre — opcional" autocomplete="off"></div>
+           <div><label class="mig-lbl">SU TELÉFONO</label><input class="cot-input" id="mig-emerg-num" placeholder="opcional" autocomplete="off"></div>
           </div>
           <div style="margin-top:10px"><label class="mig-lbl">NOTAS</label><input class="cot-input" id="mig-notas" placeholder="opcional" autocomplete="off" style="width:100%"></div>
           <div id="mig-cuenta" style="margin-top:8px;font-size:11px;color:var(--ts);min-height:16px"></div>

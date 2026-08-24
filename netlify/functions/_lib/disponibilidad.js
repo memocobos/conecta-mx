@@ -187,7 +187,11 @@ async function cargarDisponibilidad({ khUrl, khKey, portalUrl, portalKey, evento
   // staff NO consume de la bodega: `contrato-firmar` lo inserta con
   // `tipo_paquete:'PLUS'`, así que mirar solo el paquete lo contaría de más.
   const mp = new URLSearchParams();
-  mp.set('select', 'zona_boleto,tipo_paquete,tipo_viajero');
+  // [CAP-MIG-FIX] `total_contrato` viaja en la MISMA consulta —una columna más,
+  // no una fuente nueva—. Con él, el tablero puede decir el dinero REAL de un
+  // migrado en vez del estimado "vendidas × precio de hoy" que la propia nota
+  // al pie confiesa que es una estimación.
+  mp.set('select', 'zona_boleto,tipo_paquete,tipo_viajero,total_contrato');
   mp.append('evento_id', `eq.${evento_id}`);
   mp.set('limit', '10000');
 
@@ -255,12 +259,23 @@ async function cargarDisponibilidad({ khUrl, khKey, portalUrl, portalKey, evento
   // [MIG-1b] Migrados por zona. UNA FILA = UNA PERSONA = UN BOLETO: aquí no hay
   // `num_personas` que multiplicar, y suponerlo contaría de más.
   const migradosPorZona = {};
+  // [CAP-MIG-FIX] Dinero REAL de los migrados por zona, y CUÁNTOS lo traen.
+  // Las dos cifras van juntas por lo mismo que el costo unitario de MER-1: un
+  // migrado sin `total_contrato` no puede entrar como 0 —eso diría que fue
+  // gratis—, así que se cuenta aparte y quien pinte decide qué hacer con él.
+  const dineroMigradoPorZona = {};
+  const conDineroPorZona = {};
   (Array.isArray(migrados) ? migrados : []).forEach((m) => {
     if (!m) return;
     if (!consumeBoleto(m.tipo_paquete, m.tipo_viajero)) return;
     const z = (m.zona_boleto != null) ? String(m.zona_boleto).trim() : '';
     if (!z) return;   // sin zona no se le puede descontar a ninguna
     migradosPorZona[z] = (migradosPorZona[z] || 0) + 1;
+    const tc = Number(m.total_contrato);
+    if (Number.isFinite(tc) && tc > 0) {
+      dineroMigradoPorZona[z] = (dineroMigradoPorZona[z] || 0) + tc;
+      conDineroPorZona[z] = (conDineroPorZona[z] || 0) + 1;
+    }
   });
 
   // `vendidosPorZona` = lo que ocupa lugar por CUALQUIER camino. El cuarto
@@ -278,6 +293,7 @@ async function cargarDisponibilidad({ khUrl, khKey, portalUrl, portalKey, evento
     stockPorZona, vendidosPorZona, ajustesPorZona,
     segurasPorZona, apartadasPorZona, ajustesMetaPorZona,
     migradosPorZona,                     // [MIG-1b]
+    dineroMigradoPorZona, conDineroPorZona,   // [CAP-MIG-FIX] dinero REAL de los migrados
     inversionPorZona, conCostoPorZona,   // [MER-1]
   };
 }
@@ -305,6 +321,8 @@ function desgloseZona(disp, zona) {
   if (!gestionada) {
     return {
       zona: z, compradas: 0, fuera, seguras, apartadas, migrados,
+      migrado_dinero: (disp.dineroMigradoPorZona && disp.dineroMigradoPorZona[z]) || 0,
+      migrado_con_dinero: (disp.conDineroPorZona && disp.conDineroPorZona[z]) || 0,
       disponibles: null, estado: 'sin-stock', gestionada: false,
       ajuste: (disp.ajustesMetaPorZona && disp.ajustesMetaPorZona[z]) || null,
       inversion: 0, costo_unit: null,
@@ -324,7 +342,14 @@ function desgloseZona(disp, zona) {
   const inv = (disp.inversionPorZona && disp.inversionPorZona[z]) || 0;
   const conCosto = (disp.conCostoPorZona && disp.conCostoPorZona[z]) || 0;
   const costo_unit = conCosto > 0 ? inv / conCosto : null;
-  return { zona: z, compradas, fuera, seguras, apartadas, migrados, disponibles, estado, gestionada: true, ajuste: meta, inversion: inv, costo_unit };
+  return {
+    zona: z, compradas, fuera, seguras, apartadas, migrados,
+    // [CAP-MIG-FIX] Lo que esos migrados costaron DE VERDAD (sus contratos), y
+    // cuántos traen la cifra: el resto sigue siendo estimación.
+    migrado_dinero: (disp.dineroMigradoPorZona && disp.dineroMigradoPorZona[z]) || 0,
+    migrado_con_dinero: (disp.conDineroPorZona && disp.conDineroPorZona[z]) || 0,
+    disponibles, estado, gestionada: true, ajuste: meta, inversion: inv, costo_unit,
+  };
 }
 
 // PURO: evalúa una zona para un cupo `num`. Si la zona NO está gestionada (sin

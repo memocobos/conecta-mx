@@ -5507,6 +5507,11 @@ async function _poblarFiltroEventoPagos() {
 // _cobranzaCache y delega todo el filtrado/orden a _renderCobranza (client-side,
 // instantáneo). El refresh tras marcar un pago vuelve a llamar a loadPagos.
 async function loadPagos() {
+  // [COB-MIG-1] Volver a COBRANZA apaga la CAJA. El botón de esa pestaña llama
+  // a `showPage('pagos')` → `loadPagos()`, así que el interruptor vive aquí y
+  // no en el `onclick`: si mañana se entra a Pagos por otro camino (la barra
+  // móvil, un deep-link), la caja no se queda encendida encima.
+  if (typeof _cobCajaMostrar === 'function') _cobCajaMostrar(false);
   _pgSyncTabs('pagos');   // [E5-6] la franja de la puerta única
   const tbody = document.getElementById('tabla-pagos');
   if (!tbody) return;
@@ -9218,6 +9223,258 @@ function _kmsCuentaPintar() {
         <div class="kmc-s">boletos por pagar · no resta de la utilidad</div></div>
     </div>
     ${esc.html}`;
+}
+
+// ═══ [COB-MIG-1] LA CAJA ÚNICA · los que deben, de los DOS mundos ══════════
+//
+// POR QUÉ EXISTE. Memo lo descubrió en vivo: la gente de calle24 empezó a
+// depositar y NO HABÍA DÓNDE CAPTURARLO. El formulario de abono existe desde
+// VJ-3 y el endpoint `abono_crear` está construido y validado — pero **nadie
+// podía llegarles**: el bloque colgaba de `_vjAbrir(alertaId)`, y la única
+// puerta era una alerta `datos_viajero`. Medido en la base: existen 3 alertas
+// accionables en toda la historia y **las 3 son de `melanie`**, un evento
+// borrado. Para `calle24`, con 10 migrados vivos, había CERO puertas. Por eso
+// `abonos_viajero` lleva 0 filas: no es que nadie haya pagado, es que nadie
+// podía registrarlo.
+//
+// Es la hermana de "una función sin llamadores es una función muerta", pero con
+// una pantalla entera detrás — y del candado inalcanzable de KMS-SIMP-5: aquí
+// no era una guarda la que no podía dispararse, era una puerta que no se podía
+// abrir.
+//
+// QUÉ NO HACE: no calcula un solo peso. La resta la manda el servidor con la
+// fórmula sellada de VJ-3 (`saldoMigrado`, en `_lib/cuenta-evento`); esta
+// pantalla ordena, filtra y pinta. Cada `reduce` de dinero que apareciera aquí
+// sería la fórmula número doce.
+let _cobCajaDeudores = null;   // los migrados que deben, del servidor
+let _cobCajaUltimos = [];      // el feed de actividad
+let _cobCajaTotal = 0;         // cuántos abonos hay en total (no solo el feed)
+let _cobCajaEvMap = {};        // slug -> nombre bonito, del catálogo del index
+
+// ⚠️ No existe ningún `_evNombre` en esta casa — lo di por hecho y lo escribí
+// tres veces antes de comprobarlo. El patrón real (el de `_gastosEVMap` y el de
+// la tabla de utilidad) es pedir el catálogo con `_fetchEVFromIndex()` y armar
+// el mapa `id -> e.a`. Un helper inventado con guarda `typeof` no truena: se
+// queda callado pintando slugs, que es peor.
+function _cobCajaEvNombre(slug) {
+  return _cobCajaEvMap[String(slug || '').split('#')[0]] || slug || '';
+}
+
+function _cobCajaMostrar(ver) {
+  const caja = document.getElementById('cob-caja');
+  if (!caja) return;
+  // Los hermanos de la pestaña: todo lo que vive en page-pagos MENOS la barra
+  // de tabs y la caja. Se apagan por exclusión y no por lista, para que sumar
+  // un bloque a Cobranza mañana no lo deje huérfano fuera del interruptor.
+  const page = document.getElementById('page-pagos');
+  if (page) {
+    [...page.children].forEach((el) => {
+      if (el.id === 'cob-caja' || el.id === 'pg-tabs-pagos' || el.classList.contains('page-header')) return;
+      el.style.display = ver ? 'none' : '';
+    });
+  }
+  caja.style.display = ver ? '' : 'none';
+  document.querySelectorAll('#pg-tabs-pagos .pg-tab-btn').forEach((b) => {
+    b.classList.toggle('active', ver ? b.dataset.tab === 'caja' : b.dataset.tab === 'pagos');
+  });
+  if (ver) _cobCajaCargar();
+}
+
+async function _cobCajaCargar() {
+  const cont = document.getElementById('cob-caja-lista');
+  try {
+    // El catálogo se pide en PARALELO con los deudores: es la misma espera.
+    const [j, ev] = await Promise.all([
+      khViajeros._call({ accion: 'deudores_migrados' }),
+      (typeof _fetchEVFromIndex === 'function' ? _fetchEVFromIndex() : Promise.resolve([])).catch(() => []),
+    ]);
+    _cobCajaEvMap = {};
+    (ev || []).forEach((e) => { if (e && e.id) _cobCajaEvMap[e.id] = e.a || e.id; });
+    _cobCajaDeudores = j.deudores || [];
+    _cobCajaUltimos = j.ultimos || [];
+    _cobCajaTotal = Number(j.total_abonos) || 0;
+    _cobCajaPoblarEventos();
+    _cobCajaPintar();
+    _cobCajaFeed();
+  } catch (e) {
+    if (cont) cont.innerHTML = `<div class="alert alert-error">${_esfEsc(e.message)}</div>`;
+  }
+}
+
+// El selector de evento se llena con los eventos QUE TIENEN deudores, no con el
+// catálogo entero: 101 opciones para filtrar entre dos es la pantalla vieja.
+function _cobCajaPoblarEventos() {
+  const sel = document.getElementById('cob-caja-ev');
+  if (!sel) return;
+  const antes = sel.value;
+  const evs = [...new Set((_cobCajaDeudores || []).map((d) => d.evento_id).filter(Boolean))];
+  const nom = (slug) => _cobCajaEvNombre(slug);
+  sel.innerHTML = '<option value="">Todos los eventos</option>'
+    + evs.sort().map((e) => `<option value="${_esfEsc(e)}">${_esfEsc(nom(e))}</option>`).join('');
+  if (antes && evs.includes(antes)) sel.value = antes;
+}
+
+// [ORD-1] El orden: por EVENTO y, dentro, por quien más debe. La regla de la
+// casa dice que el orden lo decide una sola fuente; aquí el criterio es de
+// cobranza —a quién hay que llamar primero— y se declara entero en un lugar.
+function _cobCajaOrden(a, b) {
+  const ea = String(a.evento_id || ''), eb = String(b.evento_id || '');
+  if (ea !== eb) return ea.localeCompare(eb);
+  if (b.resta !== a.resta) return b.resta - a.resta;
+  return String(a.nombre || '').localeCompare(String(b.nombre || ''));
+}
+
+function _cobCajaPintar() {
+  const cont = document.getElementById('cob-caja-lista');
+  if (!cont || !_cobCajaDeudores) return;
+  const q = _kmNorm(((document.getElementById('cob-caja-q') || {}).value || '').trim());
+  const ev = (document.getElementById('cob-caja-ev') || {}).value || '';
+  const soloDeben = !!(document.getElementById('cob-caja-solo-deben') || {}).checked;
+
+  let lista = _cobCajaDeudores.slice();
+  if (ev) lista = lista.filter((d) => d.evento_id === ev);
+  if (q) lista = lista.filter((d) => _kmNorm(String(d.nombre || '')).indexOf(q) >= 0);
+  if (soloDeben) lista = lista.filter((d) => Number(d.resta) > 0);
+  lista.sort(_cobCajaOrden);
+
+  // Los contadores salen de la lista VISIBLE: si dijeran el total de la base
+  // mientras la pantalla muestra un filtro, serían dos verdades a la vez.
+  const deuda = lista.reduce((s, d) => s + Math.max(0, Number(d.resta) || 0), 0);
+  const cobrado = lista.reduce((s, d) => s + (Number(d.abonado) || 0), 0);
+  const set = (id, v) => { const e = document.getElementById(id); if (e) e.textContent = v; };
+  set('cob-caja-cnt', String(lista.length));
+  set('cob-caja-deuda', _spFmtMxn(deuda));
+  set('cob-caja-cobrado', _spFmtMxn(cobrado));
+  set('cob-caja-abonos', String(_cobCajaTotal));
+  const badge = document.getElementById('cob-caja-badge');
+  if (badge) {
+    const deben = (_cobCajaDeudores || []).filter((d) => Number(d.resta) > 0).length;
+    badge.textContent = String(deben);
+    badge.style.display = deben ? '' : 'none';
+  }
+
+  if (!lista.length) {
+    cont.innerHTML = `<div class="empty-state"><div class="empty-icon"></div>${
+      _cobCajaDeudores.length ? 'Nadie coincide con el filtro.' : 'Todavía no hay viajeros con contrato capturado.'}</div>`;
+    return;
+  }
+
+  let evActual = null;
+  cont.innerHTML = lista.map((d) => {
+    const cabecera = (d.evento_id !== evActual)
+      ? `<div class="cob-caja-ev">${_esfEsc(_cobCajaEvNombre(d.evento_id))}</div>` : '';
+    evActual = d.evento_id;
+    const wa = _cobCajaWaHref(d);
+    const neg = Number(d.resta) < 0;
+    return cabecera + `
+      <div class="cob-caja-fila" id="cbf-${_esfEsc(d.id)}">
+        <div class="cob-caja-h">
+          <div>
+            <div class="cob-caja-n">${_esfEsc(d.nombre || 'sin nombre')}</div>
+            <div class="cob-caja-z">${_esfEsc(d.zona_boleto || 'sin zona')}${d.tipo_paquete ? ' · ' + _esfEsc(String(d.tipo_paquete).toUpperCase()) : ''}${d.abonos ? ` · ${d.abonos} abono${d.abonos === 1 ? '' : 's'}` : ''}</div>
+          </div>
+          <div class="cob-caja-m">
+            <div class="cob-caja-resta ${neg ? 'cob-caja-favor' : ''}">${_spFmtMxn(Math.abs(Number(d.resta) || 0))}</div>
+            <div class="cob-caja-sub">${neg ? 'a favor' : 'debe'} · de ${_spFmtMxn(d.total)}</div>
+          </div>
+        </div>
+        <div class="cob-caja-acc">
+          <button class="btn btn-primary btn-sm" type="button" onclick="_cobCajaAbrir('${_attrJs(d.id)}')">Registrar abono</button>
+          ${wa ? `<a class="btn btn-ghost btn-sm" href="${_esfEsc(wa)}" target="_blank" rel="noopener">WhatsApp</a>`
+               : '<span class="cob-caja-nowa">sin celular</span>'}
+        </div>
+        <div class="cob-caja-form" id="cbform-${_esfEsc(d.id)}" style="display:none"></div>
+      </div>`;
+  }).join('');
+}
+
+// El WhatsApp REUSA `_cobWaHref`: no se escribe un segundo redactor. Lo que se
+// arma es el objeto que esa función espera (`clientes`, `pago.proximo`,
+// `evento_nombre`) — adaptar la entrada es reuso; copiar el texto sería la
+// segunda copia que acaba divergiendo.
+function _cobCajaWaHref(d) {
+  if (!d || !d.celular) return null;
+  const resta = Number(d.resta) || 0;
+  return _cobWaHref({
+    clientes: { celular: d.celular, nombre_completo: d.nombre },
+    evento_nombre: _cobCajaEvNombre(d.evento_id),
+    pago: resta > 0 ? { proximo: { monto: resta, fecha_esperada: 'la fecha acordada' } } : {},
+  });
+}
+
+// El formulario de captura, desplegado EN LA FILA. Mismos campos y mismas
+// reglas que el bloque de VJ-3 —monto > 0, fecha opcional, nota, foto
+// opcional— porque le pega al MISMO endpoint validado.
+function _cobCajaAbrir(id) {
+  const caja = document.getElementById(`cbform-${id}`);
+  if (!caja) return;
+  if (caja.style.display !== 'none') { caja.style.display = 'none'; caja.innerHTML = ''; return; }
+  caja.style.display = '';
+  caja.innerHTML = `
+    <div class="cob-caja-campos">
+      <label class="cob-caja-c"><span>MONTO</span>
+        <input class="cot-input" id="cbm-${_esfEsc(id)}" type="number" min="0" step="0.01" placeholder="0.00"></label>
+      <label class="cob-caja-c"><span>FECHA</span>
+        <input class="cot-input" id="cbf2-${_esfEsc(id)}" type="date" value="${_esfEsc(_mxFechaStr ? _mxFechaStr() : '')}"></label>
+      <label class="cob-caja-c" style="flex:1;min-width:150px"><span>NOTA</span>
+        <input class="cot-input" id="cbn-${_esfEsc(id)}" placeholder="opcional — ej. depósito BBVA" maxlength="500"></label>
+      <label class="cob-caja-c"><span>COMPROBANTE</span>
+        <input class="cot-input" id="cbfoto-${_esfEsc(id)}" type="file" accept="image/*"></label>
+    </div>
+    <div class="cob-caja-acc" style="margin-top:8px">
+      <button class="btn btn-primary btn-sm" type="button" id="cbbtn-${_esfEsc(id)}" onclick="_cobCajaGuardar('${_attrJs(id)}')">Guardar abono</button>
+      <button class="btn btn-ghost btn-sm" type="button" onclick="_cobCajaAbrir('${_attrJs(id)}')">Cancelar</button>
+    </div>`;
+  const m = document.getElementById(`cbm-${id}`); if (m) { try { m.focus(); } catch (_) {} }
+}
+
+async function _cobCajaGuardar(id) {
+  const al = document.getElementById('cob-caja-alert');
+  const mal = (msg) => { if (al) al.innerHTML = `<div class="alert alert-error">${_esfEsc(msg)}</div>`; };
+  if (al) al.innerHTML = '';
+  const monto = Number((document.getElementById(`cbm-${id}`) || {}).value);
+  // > 0 estricto, ESPEJO del servidor (`abono_crear` rechaza <= 0). El servidor
+  // sigue siendo la autoridad; esto solo evita el viaje.
+  if (!Number.isFinite(monto) || monto <= 0) return mal('El monto del abono tiene que ser mayor que cero.');
+  const fecha = String((document.getElementById(`cbf2-${id}`) || {}).value || '').trim();
+  const nota = String((document.getElementById(`cbn-${id}`) || {}).value || '').trim();
+  // La foto se lee con el MISMO helper de VJ-3: un segundo lector sería otra
+  // forma de leer el mismo archivo, y ya sabemos cómo termina eso.
+  const foto = await _vj3LeerFoto(document.getElementById(`cbfoto-${id}`));
+
+  const btn = document.getElementById(`cbbtn-${id}`);
+  if (btn) { btn.disabled = true; btn.textContent = 'Guardando…'; }
+  try {
+    await khViajeros.abonoCrear({
+      viajero_id: id, monto,
+      fecha: fecha || undefined, nota: nota || undefined, foto: foto || undefined,
+    });
+    showToast(`Abono de ${_spFmtMxn(monto)} registrado`, 'success');
+    // Se RECARGA todo desde el servidor: la resta que queda en pantalla sale de
+    // los datos, no de restar aquí y confiar. Es la misma decisión de VJ-3.
+    await _cobCajaCargar();
+  } catch (e) {
+    mal(e.message);
+    if (btn) { btn.disabled = false; btn.textContent = 'Guardar abono'; }
+  }
+}
+
+// El feed: Memo quiere VER la actividad, no solo capturarla. Va tal como lo
+// manda el servidor (`created_at.desc`), sin re-ordenar aquí.
+function _cobCajaFeed() {
+  const cont = document.getElementById('cob-caja-feed');
+  if (!cont) return;
+  if (!_cobCajaUltimos.length) {
+    cont.innerHTML = '<div class="cob-feed-vacio">Todavía no se registra ningún pago.</div>';
+    return;
+  }
+  cont.innerHTML = _cobCajaUltimos.map((a) => `
+    <div class="cob-feed-i">
+      <div class="cob-feed-m">${_spFmtMxn(a.monto)}${a.tiene_foto ? ' <span class="cob-feed-foto" title="Tiene comprobante">📎</span>' : ''}</div>
+      <div class="cob-feed-n">${_esfEsc(a.nombre || 'viajero')}</div>
+      <div class="cob-feed-d">${_esfEsc(a.fecha || (a.created_at || '').slice(0, 10))}${a.capturado_por ? ' · ' + _esfEsc(a.capturado_por) : ''}</div>
+      ${a.nota ? `<div class="cob-feed-x">${_esfEsc(a.nota)}</div>` : ''}
+    </div>`).join('');
 }
 
 // ═══ [UTIL-C-2] EL PANEL DE ESCENARIOS ═════════════════════════════════════

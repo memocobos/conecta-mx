@@ -359,6 +359,11 @@
   <div class="pg-tabs" style="display:flex;gap:8px;margin-bottom:16px" id="pg-tabs-pagos">
    <button class="btn btn-ghost btn-sm pg-tab-btn" data-tab="solicitudes_portal" onclick="showPage('solicitudes_portal')" style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.08em">POR APROBAR<span class="sp-nav-badge" id="sp-nav-badge-pagos" style="display:none">0</span></button>
    <button class="btn btn-ghost btn-sm pg-tab-btn active" data-tab="pagos" onclick="showPage('pagos')" style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.08em">COBRANZA</button>
+   <!-- [COB-MIG-1] LA CAJA: los que deben, de los DOS mundos. Vive DENTRO de
+        page-pagos y se enciende por JS, no como página nueva: así hereda los
+        permisos de `pagos` tal cual. Restar tabs de PERMISOS_TABS para meter uno
+        nuevo es como se abrió el hoyo de E5-4. -->
+   <button class="btn btn-ghost btn-sm pg-tab-btn" data-tab="caja" id="cob-tab-caja" onclick="_cobCajaMostrar(true)" style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.08em">CAJA<span class="sp-nav-badge" id="cob-caja-badge" style="display:none">0</span></button>
   </div>
 
  <!-- Contadores de la lista filtrada -->
@@ -421,6 +426,31 @@
  <tr><td colspan="10"><div class="loading-state"><div class="spinner"></div>Cargando…</div></td></tr>
  </tbody>
  </table>
+ </div>
+
+ <!-- ═══ [COB-MIG-1] LA CAJA ÚNICA ═══════════════════════════════════════ -->
+ <div id="cob-caja" style="display:none">
+  <div class="cob-stats">
+   <div class="cob-stat"><div class="cob-stat-lbl">Deben</div><div class="cob-stat-val" id="cob-caja-cnt">—</div></div>
+   <div class="cob-stat"><div class="cob-stat-lbl">Por cobrar</div><div class="cob-stat-val orange" id="cob-caja-deuda">—</div></div>
+   <div class="cob-stat"><div class="cob-stat-lbl">Ya cobrado</div><div class="cob-stat-val green" id="cob-caja-cobrado">—</div></div>
+   <div class="cob-stat"><div class="cob-stat-lbl">Abonos</div><div class="cob-stat-val" id="cob-caja-abonos">—</div></div>
+  </div>
+  <div class="cob-filtros" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:12px 0">
+   <input class="cot-input" id="cob-caja-q" placeholder="Buscar por nombre…" oninput="_cobCajaPintar()" style="flex:1;min-width:180px">
+   <select class="cot-input" id="cob-caja-ev" onchange="_cobCajaPintar()" style="min-width:170px"><option value="">Todos los eventos</option></select>
+   <label style="display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--ts)">
+    <input type="checkbox" id="cob-caja-solo-deben" checked onchange="_cobCajaPintar()"> solo los que deben
+   </label>
+  </div>
+  <div id="cob-caja-alert" style="margin-bottom:10px"></div>
+  <div class="cob-caja-cols">
+   <div id="cob-caja-lista"><div class="loading-state"><div class="spinner"></div>Cargando…</div></div>
+   <aside class="cob-feed">
+    <div class="cob-feed-t">// últimos pagos registrados</div>
+    <div id="cob-caja-feed"><div class="loading-state"><div class="spinner"></div></div></div>
+   </aside>
+  </div>
  </div>
  </div>
 

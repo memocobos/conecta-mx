@@ -3639,3 +3639,42 @@ input[type="search"],.kh-buscar,.buscador{border-radius:var(--r-sm,8px)}
 .kmc-e-nd { color: var(--ts); }
 
 @media (max-width: 640px) { .kmc-hero-v { font-size: 30px; } }
+
+/* ═══ [COB-MIG-1] LA CAJA ÚNICA · los que deben, de los dos mundos ═════════ */
+.cob-caja-cols { display: grid; gap: 14px; grid-template-columns: minmax(0, 1fr) minmax(0, 300px); align-items: start; }
+@media (max-width: 900px) { .cob-caja-cols { grid-template-columns: 1fr; } }
+
+.cob-caja-ev { font-family: 'JetBrains Mono', monospace; font-size: 9.5px; letter-spacing: .12em;
+  text-transform: uppercase; color: var(--ts); margin: 14px 0 6px; }
+.cob-caja-ev:first-child { margin-top: 0; }
+
+.cob-caja-fila { border: 1px solid var(--border); border-radius: var(--r-sm, 8px); padding: 11px 13px; margin-bottom: 8px; }
+.cob-caja-h { display: flex; gap: 12px; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; }
+.cob-caja-n { font-weight: 700; font-size: 13.5px; }
+.cob-caja-z { font-size: 10.5px; color: var(--ts); margin-top: 2px; }
+.cob-caja-m { text-align: right; }
+.cob-caja-resta { font-family: 'Rajdhani', sans-serif; font-weight: 700; font-size: 20px; line-height: 1.1;
+  color: var(--orange); font-variant-numeric: tabular-nums; }
+.cob-caja-favor { color: var(--green); }
+.cob-caja-sub { font-size: 10px; color: var(--ts); margin-top: 1px; }
+.cob-caja-acc { display: flex; gap: 7px; align-items: center; flex-wrap: wrap; margin-top: 9px; }
+.cob-caja-nowa { font-size: 10.5px; color: var(--ts); }
+
+.cob-caja-form { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); }
+.cob-caja-campos { display: flex; gap: 9px; flex-wrap: wrap; }
+.cob-caja-c { display: flex; flex-direction: column; gap: 3px; }
+.cob-caja-c > span { font-family: 'JetBrains Mono', monospace; font-size: 9px; letter-spacing: .1em;
+  text-transform: uppercase; color: var(--ts); }
+
+.cob-feed { border: 1px solid var(--border); border-radius: var(--r-sm, 8px); padding: 11px 13px; }
+.cob-feed-t { font-family: 'JetBrains Mono', monospace; font-size: 9.5px; letter-spacing: .1em;
+  color: var(--ts); margin-bottom: 9px; }
+.cob-feed-i { padding: 8px 0; border-bottom: 1px solid var(--border); }
+.cob-feed-i:last-child { border-bottom: 0; padding-bottom: 0; }
+.cob-feed-m { font-family: 'Rajdhani', sans-serif; font-weight: 700; font-size: 15px; color: var(--green);
+  font-variant-numeric: tabular-nums; }
+.cob-feed-n { font-size: 12px; margin-top: 1px; }
+.cob-feed-d { font-size: 10px; color: var(--ts); margin-top: 1px; }
+.cob-feed-x { font-size: 10.5px; color: var(--ts); margin-top: 3px; font-style: italic; }
+.cob-feed-vacio { font-size: 11.5px; color: var(--ts); line-height: 1.5; }
+.cob-feed-foto { font-size: 11px; }

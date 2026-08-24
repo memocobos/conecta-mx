@@ -30,6 +30,36 @@
 const VIAJAN = ['plus', 'ride'];
 const DUERMEN = ['plus', 'ride', 'stay'];
 
+// ── [MIG-1b] ¿CONSUME UN BOLETO DE LA BODEGA? ────────────────────────────────
+// Esta regla NO estaba escrita en ningún módulo: vivía suelta dentro de
+// `_lib/disponibilidad`, en un `String(row.paquete).toUpperCase() === 'RIDE'`.
+// MIG-1b necesita la MISMA regla para un segundo origen (los viajeros migrados),
+// y dos copias de una regla acaban divergiendo — así que vive aquí, con las
+// otras dos preguntas que se le hacen a un paquete, y los dos orígenes la LEEN.
+//
+// RIDE no consume: es solo transporte, el boleto lo trae la persona.
+// Todo lo demás sí — incluido el paquete VACÍO, y eso es a propósito: en el
+// Portal una solicitud sin paquete es un cliente sin clasificar, y no contarlo
+// sería sub-reportar lo vendido, o sea SOBREVENDER. Ante la duda, cuenta.
+const NO_CONSUMEN_BOLETO = ['ride'];
+
+// El STAFF no consume de la bodega comprada: entra por otra puerta. Se decide
+// por `tipo_viajero`, no por el paquete — `contrato-firmar` inserta al staff con
+// `tipo_paquete:'PLUS'`, así que mirar el paquete lo contaría como cliente.
+// ⚠️ Sin `tipo_viajero` (el caso del Portal: `solicitudes_tour` no tiene esa
+// columna) se asume CLIENTE. Cambiar ese default sub-reportaría lo vendido.
+function esCliente(tipoViajero) {
+  const tv = String(tipoViajero == null ? '' : tipoViajero).trim().toLowerCase();
+  return tv === '' || tv === 'cliente';
+}
+
+function consumeBoleto(tipoPaquete, tipoViajero) {
+  if (!esCliente(tipoViajero)) return false;
+  const p = normPaquete(tipoPaquete);
+  if (p === null) return true;
+  return !NO_CONSUMEN_BOLETO.includes(p);
+}
+
 // Normaliza el paquete. Vacío/nulo → null (que NO es lo mismo que desconocido:
 // aquí null significa "sin paquete asignado" y por regla se incluye).
 function normPaquete(tp) {
@@ -58,4 +88,8 @@ function motivoNoDuerme(tp) {
   return p ? `no duerme: ${p}` : 'no duerme';
 }
 
-module.exports = { VIAJAN, DUERMEN, normPaquete, viaja, duerme, motivoNoViaja, motivoNoDuerme };
+module.exports = {
+  VIAJAN, DUERMEN, NO_CONSUMEN_BOLETO,
+  normPaquete, viaja, duerme, esCliente, consumeBoleto,
+  motivoNoViaja, motivoNoDuerme,
+};

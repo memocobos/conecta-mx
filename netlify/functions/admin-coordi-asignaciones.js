@@ -515,7 +515,46 @@ exports.handler = async (event) => {
         return upstream(headers, t, 'alta');
       }
       const creado = (await r.json())[0] || null;
-      return ok(headers, { viajero: creado });
+
+      // ═══ [MIG-1b] EL DOBLE DESCUENTO DE LA TRANSICIÓN ═══════════════════
+      // Memo capturó su corte del Excel como `vendidos_fuera` (p.ej. 20) para
+      // que el semáforo no sobrevendiera mientras no existía la migración.
+      // Ahora migra a ESA MISMA gente: cada uno pasa a descontar por su cuenta
+      // como cuarto término. Si `vendidos_fuera` se queda en 20, los mismos 20
+      // boletos se restan DOS VECES y el semáforo cierra zonas que sí tienen.
+      //
+      // NO se ajusta solo: `vendidos_fuera` es un dato que Memo escribió a mano
+      // y bajarlo sin permiso sería decidir por él —y en el sentido peligroso,
+      // porque ABRE stock—. Se DICE, con el número exacto, y el ajuste lo
+      // confirma él desde la pantalla. Lo que no puede es quedarse en silencio.
+      let avisoDoble = null;
+      try {
+        const zq = String(fila.zona_boleto || '').trim();
+        if (zq) {
+          const [aj, mg] = await Promise.all([
+            fetch(`${env.KH_SB_URL}/rest/v1/stock_ajustes?evento_id=eq.${encodeURIComponent(eventoId)}&zona=eq.${encodeURIComponent(zq)}&select=vendidos_fuera&limit=1`, { headers: sbHeaders }),
+            fetch(`${env.KH_SB_URL}/rest/v1/viajeros_evento?evento_id=eq.${encodeURIComponent(eventoId)}&zona_boleto=eq.${encodeURIComponent(zq)}&select=id&limit=10000`, { headers: sbHeaders }),
+          ]);
+          if (aj.ok && mg.ok) {
+            const fuera = parseInt(((await aj.json())[0] || {}).vendidos_fuera, 10) || 0;
+            const migrados = (await mg.json()).length;
+            if (fuera > 0) {
+              avisoDoble = {
+                zona: zq,
+                vendidos_fuera: fuera,
+                migrados_en_zona: migrados,
+                // Lo que quedaría si estos migrados YA estaban dentro de ese corte.
+                sugerido: Math.max(0, fuera - migrados),
+                mensaje: `Esta zona tiene ${fuera} marcados como "vendidos fuera del sistema" y ahora ${migrados} migrado(s). `
+                       + 'Si esa gente ya estaba en tu corte del Excel, se está descontando DOS veces: '
+                       + `baja "vendidos fuera" a ${Math.max(0, fuera - migrados)}. Si son personas distintas, déjalo como está.`,
+              };
+            }
+          }
+        }
+      } catch (_) { /* el aviso es best-effort: jamás tumba una alta que YA se guardó */ }
+
+      return ok(headers, { viajero: creado, aviso_doble_descuento: avisoDoble });
     }
 
     // ── [MIG-1a] Buscar parecidos ANTES de dar de alta ─────────────────────

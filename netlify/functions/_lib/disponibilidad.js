@@ -1,6 +1,12 @@
 // =============================================================================
 // _lib/disponibilidad  —  Stock (KH `compras`) − vendidos_fuera (KH `stock_ajustes`)
-// − vendidos que cuentan (Portal `solicitudes_tour`) por zona.
+// − vendidos que cuentan (Portal `solicitudes_tour`) − MIGRADOS (KH
+// `viajeros_evento`) por zona.
+//
+// [MIG-1b] EL CUARTO TÉRMINO SUMA, NO REEMPLAZA. Los migrados son gente que ya
+// ocupa un boleto y que NO pasó por el Portal: sin este término, el semáforo
+// creía que su lugar seguía libre. El camino del Portal queda INTACTO — se
+// carea en el arnés fila por fila.
 //
 // Fuente única de verdad de la disponibilidad (la usan disponibilidad-evento,
 // VENDEDORES F2 y el candado del Portal). `restante = stock − vendidos_fuera − vendidos`.
@@ -10,10 +16,15 @@
 //   Ó  hold NULL (conservador para filas viejas sin reloj).
 //   `en_pagos` y `pagado` cuentan siempre; `cancelado` libera (no cuenta).
 //   RIDE queda FUERA del control (no consume boleto) → nunca cuenta.
+// [MIG-1b] Quién consume boleto se LEE de `_lib/paquete-viaje.consumeBoleto`,
+// que ahora es su dueño: los DOS orígenes (Portal y migrados) preguntan a la
+// misma función. Antes la regla vivía suelta aquí en un `=== 'RIDE'`.
 // Una zona está GESTIONADA si tiene compras registradas (igual que hoy); solo
 // esas se controlan por inventario. Conservador para no SOBREVENDER: ante datos
 // que no se pueden calcular, el caller debe fallar-ruidoso (mejor no vender).
 // =============================================================================
+
+const { consumeBoleto } = require('./paquete-viaje');
 
 const ESTADOS_CUENTAN = ['pendiente', 'en_pagos', 'pagado']; // cancelado excluido en el query
 
@@ -120,8 +131,10 @@ function claseFila(row, nowMs) {
   if (!row) return 'no-cuenta';
   const estado = row.estado;
   if (estado === 'cancelado') return 'no-cuenta';
-  // RIDE no consume boleto: queda fuera del control de stock.
-  if (String(row.paquete || '').toUpperCase() === 'RIDE') return 'no-cuenta';
+  // [MIG-1b] La regla se LEE, no se copia. Antes: `=== 'RIDE'` aquí mismo.
+  // `solicitudes_tour` no tiene `tipo_viajero`, y `consumeBoleto` trata su
+  // ausencia como CLIENTE — así este camino se comporta EXACTAMENTE igual.
+  if (!consumeBoleto(row.paquete)) return 'no-cuenta';
   if (estado === 'en_pagos' || estado === 'pagado') return 'segura';
   if (estado === 'pendiente') {
     const comp = row.comprobante_separo_url;
@@ -169,16 +182,28 @@ async function cargarDisponibilidad({ khUrl, khKey, portalUrl, portalKey, evento
   vp.append('estado', `in.(${ESTADOS_CUENTAN.join(',')})`);
   vp.set('limit', '10000');
 
-  const [cRes, aRes, vRes] = await Promise.all([
+  // [MIG-1b] EL CUARTO TÉRMINO. Un migrado ocupa UN boleto (una fila = una
+  // persona), y su zona vive en `zona_boleto`. `tipo_viajero` viaja porque el
+  // staff NO consume de la bodega: `contrato-firmar` lo inserta con
+  // `tipo_paquete:'PLUS'`, así que mirar solo el paquete lo contaría de más.
+  const mp = new URLSearchParams();
+  mp.set('select', 'zona_boleto,tipo_paquete,tipo_viajero');
+  mp.append('evento_id', `eq.${evento_id}`);
+  mp.set('limit', '10000');
+
+  const [cRes, aRes, vRes, mRes] = await Promise.all([
     _fetch(`${khUrl}/rest/v1/compras?${cp.toString()}`, { headers: khHeaders }),
     _fetch(`${khUrl}/rest/v1/stock_ajustes?${ap.toString()}`, { headers: khHeaders }),
     _fetch(`${portalUrl}/rest/v1/solicitudes_tour?${vp.toString()}`, { headers: portalHeaders }),
+    _fetch(`${khUrl}/rest/v1/viajeros_evento?${mp.toString()}`, { headers: khHeaders }),
   ]);
-  if (!cRes.ok || !aRes.ok || !vRes.ok) return { error: 'no se pudo calcular la disponibilidad' };
+  // Un parcial sub-reportaría lo vendido → sobreventa. Los CUATRO o ninguno.
+  if (!cRes.ok || !aRes.ok || !vRes.ok || !mRes.ok) return { error: 'no se pudo calcular la disponibilidad' };
 
   const compras = await cRes.json();
   const ajustes = await aRes.json();
   const ventas = await vRes.json();
+  const migrados = await mRes.json();
 
   const stockPorZona = {};
   // [MER-1] Lo invertido por zona y CUÁNTOS boletos respaldan ese número. Las dos
@@ -227,14 +252,32 @@ async function cargarDisponibilidad({ khUrl, khKey, portalUrl, portalKey, evento
     else segurasPorZona[z] = (segurasPorZona[z] || 0) + n;
   });
 
+  // [MIG-1b] Migrados por zona. UNA FILA = UNA PERSONA = UN BOLETO: aquí no hay
+  // `num_personas` que multiplicar, y suponerlo contaría de más.
+  const migradosPorZona = {};
+  (Array.isArray(migrados) ? migrados : []).forEach((m) => {
+    if (!m) return;
+    if (!consumeBoleto(m.tipo_paquete, m.tipo_viajero)) return;
+    const z = (m.zona_boleto != null) ? String(m.zona_boleto).trim() : '';
+    if (!z) return;   // sin zona no se le puede descontar a ninguna
+    migradosPorZona[z] = (migradosPorZona[z] || 0) + 1;
+  });
+
+  // `vendidosPorZona` = lo que ocupa lugar por CUALQUIER camino. El cuarto
+  // término entra aquí para que `evaluarZona` —el candado anti-sobreventa del
+  // Portal y del cotizador— lo respete sin enterarse de que existe.
   const vendidosPorZona = {};
-  Object.keys(stockPorZona).concat(Object.keys(segurasPorZona), Object.keys(apartadasPorZona))
-    .forEach((z) => { vendidosPorZona[z] = (segurasPorZona[z] || 0) + (apartadasPorZona[z] || 0); });
+  Object.keys(stockPorZona)
+    .concat(Object.keys(segurasPorZona), Object.keys(apartadasPorZona), Object.keys(migradosPorZona))
+    .forEach((z) => {
+      vendidosPorZona[z] = (segurasPorZona[z] || 0) + (apartadasPorZona[z] || 0) + (migradosPorZona[z] || 0);
+    });
 
   return {
     gestionado: Array.isArray(compras) && compras.length > 0,
     stockPorZona, vendidosPorZona, ajustesPorZona,
     segurasPorZona, apartadasPorZona, ajustesMetaPorZona,
+    migradosPorZona,                     // [MIG-1b]
     inversionPorZona, conCostoPorZona,   // [MER-1]
   };
 }
@@ -244,11 +287,31 @@ async function cargarDisponibilidad({ khUrl, khKey, portalUrl, portalKey, evento
 //   verde (sobra) · amarillo (≤5) · rojo (0) · negativo (sobreventa → que grite).
 function desgloseZona(disp, zona) {
   const z = String(zona || '').trim();
-  const compradas = (disp.stockPorZona && disp.stockPorZona[z]) || 0;
+  const stock = (disp && disp.stockPorZona) || {};
+  const compradas = stock[z] || 0;
   const fuera = (disp.ajustesPorZona && disp.ajustesPorZona[z]) || 0;
   const seguras = (disp.segurasPorZona && disp.segurasPorZona[z]) || 0;
   const apartadas = (disp.apartadasPorZona && disp.apartadasPorZona[z]) || 0;
-  const disponibles = compradas - fuera - seguras - apartadas;
+  const migrados = (disp.migradosPorZona && disp.migradosPorZona[z]) || 0;
+
+  // [MIG-1b] ⚠️ ZONA SIN STOCK CARGADO = ESTADO DICHO, NO NÚMERO ROTO.
+  // Migrar viajeros a un evento cuyas compras Memo todavía no captura da
+  // `0 − migrados` = un NEGATIVO que no significa sobreventa: significa que
+  // falta cargar el pedido. `evaluarZona` ya distinguía zona GESTIONADA (la que
+  // tiene compras) y no la controlaba; el semáforo no lo hacía y habría pintado
+  // un rojo de sobreventa mintiendo. Ahora lo dice: `sinStock`, disponibles
+  // null. Un número negativo mudo es peor que no dar número.
+  const gestionada = Object.prototype.hasOwnProperty.call(stock, z);
+  if (!gestionada) {
+    return {
+      zona: z, compradas: 0, fuera, seguras, apartadas, migrados,
+      disponibles: null, estado: 'sin-stock', gestionada: false,
+      ajuste: (disp.ajustesMetaPorZona && disp.ajustesMetaPorZona[z]) || null,
+      inversion: 0, costo_unit: null,
+    };
+  }
+
+  const disponibles = compradas - fuera - seguras - apartadas - migrados;
   let estado;
   if (disponibles < 0) estado = 'negativo';
   else if (disponibles === 0) estado = 'rojo';
@@ -261,12 +324,13 @@ function desgloseZona(disp, zona) {
   const inv = (disp.inversionPorZona && disp.inversionPorZona[z]) || 0;
   const conCosto = (disp.conCostoPorZona && disp.conCostoPorZona[z]) || 0;
   const costo_unit = conCosto > 0 ? inv / conCosto : null;
-  return { zona: z, compradas, fuera, seguras, apartadas, disponibles, estado, ajuste: meta, inversion: inv, costo_unit };
+  return { zona: z, compradas, fuera, seguras, apartadas, migrados, disponibles, estado, gestionada: true, ajuste: meta, inversion: inv, costo_unit };
 }
 
 // PURO: evalúa una zona para un cupo `num`. Si la zona NO está gestionada (sin
 // compras), el Palacio no la controla → se puede vender (sinCupo=false). Si está
-// gestionada: restante = stock − vendidos_fuera − vendidos; agotada = restante<=0;
+// gestionada: restante = stock − vendidos_fuera − vendidos (que desde MIG-1b ya
+// incluye a los MIGRADOS); agotada = restante<=0;
 // sinCupo = no alcanza para `num` (incluye el caso agotada). Anti-sobreventa.
 function evaluarZona(disp, zona, num) {
   const z = String(zona || '').trim();

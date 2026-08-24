@@ -998,6 +998,10 @@
           <div style="margin-top:10px"><label class="mig-lbl">NOTAS</label><input class="cot-input" id="mig-notas" placeholder="opcional" autocomplete="off" style="width:100%"></div>
           <div id="mig-cuenta" style="margin-top:8px;font-size:11px;color:var(--ts);min-height:16px"></div>
           <div id="mig-error" style="margin-top:8px;font-size:11px;color:#ff5f56;display:none"></div>
+          <!-- [MIG-1b] El aviso del DOBLE DESCUENTO. Aparece solo cuando la zona
+               tiene "vendidos fuera" > 0: esa gente pudo ser la misma que se
+               acaba de migrar, y entonces se está descontando dos veces. -->
+          <div id="mig-aviso-doble" style="display:none;margin-top:10px"></div>
           <div style="display:flex;gap:8px;margin-top:12px;align-items:center;flex-wrap:wrap">
            <button class="btn btn-primary btn-sm" id="mig-guardar" onclick="migGuardar()">Guardar y seguir →</button>
            <span style="font-size:10px;color:var(--ts)">o presiona Enter</span>

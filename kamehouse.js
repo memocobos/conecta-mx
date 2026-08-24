@@ -4009,6 +4009,17 @@ function _audUtilidadPintar(utilidad, cta, util) {
   const elUtil = document.getElementById('m-utilidad');
   if (elUtil) elUtil.className = 'metric-value ' + (neg ? 'red' : 'green');
 
+  // [UTIL-B-3] "En mano": la caja, subordinada al margen. Se pinta SIEMPRE que
+  // se sepa; si no se sabe, se dice — un guion es una afirmación menos peligrosa
+  // que un cero.
+  const mano = document.getElementById('m-enmano');
+  if (mano) {
+    const v = (cta || {}).en_mano;
+    mano.innerHTML = (v == null)
+      ? 'en mano: <b>—</b>'
+      : `en mano: <b>${_spFmtMxn(Number(v))}</b>`;
+  }
+
   const bod = document.getElementById('m-bodega');
   if (!bod) return;
   const b = cta || {};
@@ -4033,18 +4044,39 @@ function _audUtilidadPintar(utilidad, cta, util) {
   }
   const partes = [];
   // La ESPERANZA: solo de eventos por venir, y solo ahí vive el "si se vende
-  // todo". La utilidad de arriba ya trae el costo de TODO lo comprado dentro de
-  // gastos, así que sumarle el valor de venta de lo que aún se puede vender sigue
-  // siendo la cuenta correcta — pero únicamente con lo vendible.
+  // todo".
+  //
+  // ⚠️ [UTIL-B-3] ESTE COMENTARIO DECÍA LO CONTRARIO, y era cierto bajo la
+  // fórmula A: "la utilidad de arriba ya trae el costo de TODO lo comprado
+  // dentro de gastos, así que sumarle el valor de venta de lo que aún se puede
+  // vender sigue siendo la cuenta correcta". Bajo B **el costo de lo NO vendido
+  // ya no está en la utilidad** —es inventario, y espera a venderse—, así que
+  // sumar solo el precio prometería una ganancia sin su costo. Ahora se suma el
+  // MARGEN: valor de venta − lo que costaron.
+  //
+  // Y la bodega cambia de papel: bajo A existía como CONTRAPESO (AUD-1c, "el
+  // rojo nunca solo") porque un boleto comprado y no vendido hacía rojo a la
+  // ganancia sin ser una pérdida. Bajo B ese rojo YA NO NACE. La bodega deja de
+  // ser una disculpa y pasa a ser INFORMACIÓN: cuánto te queda por vender y
+  // cuánto ganarías si lo vendieras.
   // Va SIN envolver, exactamente el markup de AUD-1c: en un evento por venir esta
   // pantalla tiene que quedar byte a byte como estaba. La merma que viene abajo
   // es un <div> —bloque— así que cuando existen las dos se separan solas.
   if (boletos) {
-    const siTodo = (valor == null) ? null : Number(utilidad) + valor;
+    // [UTIL-B-3] margen = valor de venta − lo que costaron. Si el costo no se
+    // conoce NO se resta un cero (diría que fueron gratis): se dice que la
+    // estimación va sin costo.
+    const bCosto = b.bodega_costo;
+    const conCosto = Number.isFinite(Number(bCosto));
+    const margen = (valor == null) ? null : (valor - (conCosto ? Number(bCosto) : 0));
+    const siTodo = (valor == null) ? null : Number(utilidad) + margen;
     partes.push(`<b>${boletos}</b> boleto${boletos === 1 ? '' : 's'} por vender`
       + (valor == null
           ? ' <span class="aud-bod-mudo">— sin precio en el catálogo, no se puede estimar</span>'
           : ` ≈ <b>${_spFmtMxn(valor)}</b> <span class="aud-bod-est">a precio de hoy (estimado)</span>`
+            + (conCosto
+                ? ` · costaron <b>${_spFmtMxn(Number(bCosto))}</b>`
+                : ' <span class="aud-bod-mudo">— sin costo capturado, el margen va sin restarlo</span>')
             + ` · Si se vende todo: <b class="${siTodo < 0 ? 'aud-neg' : 'aud-pos'}">${_spFmtMxn(siTodo)}</b>`));
   }
   // La MERMA: eventos que ya ocurrieron. Se mide en lo que COSTARON, no en lo
@@ -8939,13 +8971,20 @@ function _kmsCuentaPintar() {
     <div class="kmc-grid">
       <div class="kmc-c"><div class="kmc-l">VENDIDO</div><div class="kmc-v">${_kmcVal(c.facturado)}</div>
         <div class="kmc-s">cobrado ${_kmcVal(c.ventas)}</div></div>
+      <div class="kmc-c"><div class="kmc-l">COSTO DE LO VENDIDO</div><div class="kmc-v">${_kmcVal(c.costo_vendido)}</div>
+        <div class="kmc-s">${c.costo_parcial ? 'INCOMPLETO: hay zonas sin costo capturado' : 'lo que costaron los boletos ya vendidos'}</div></div>
       <div class="kmc-c"><div class="kmc-l">GASTOS</div><div class="kmc-v">${_kmcVal(c.gastos)}</div>
         <div class="kmc-s">del evento, sin boletos</div></div>
       <div class="kmc-c"><div class="kmc-l">DEUDA A PROVEEDORES</div><div class="kmc-v">${_kmcVal(c.deuda_proveedores)}</div>
         <div class="kmc-s">boletos y servicios por pagar</div></div>
       <div class="kmc-c ${c.ganancia == null ? '' : (c.ganancia >= 0 ? 'kmc-ok' : 'kmc-mal')}">
         <div class="kmc-l">UTILIDAD</div><div class="kmc-v">${_kmcVal(c.ganancia)}</div>
-        <div class="kmc-s">cobrado − gastos</div></div>
+        <!-- [UTIL-B-3] La fórmula, escrita: el número cambió de significado y la
+             pantalla lo dice, en vez de dejar que se deduzca. Y "en mano" debajo:
+             la caja no se pierde, se subordina — bajo B la utilidad puede ser
+             positiva sin un peso en la cuenta, y las dos juntas lo explican. -->
+        <div class="kmc-s">vendido − costo − gastos${c.costo_parcial ? ' · <b>incompleta</b>' : ''}</div>
+        <div class="kmc-mano">en mano: ${_kmcVal(c.en_mano)}</div></div>
     </div>
     ${q.html}`;
 }
@@ -8953,13 +8992,25 @@ function _kmsCuentaPintar() {
 // ═══ EL PUNTO DE QUIEBRE, EN PALABRAS ══════════════════════════════════════
 // Ésta SÍ es una cuenta propia, y por eso se declara entera:
 //
-//   falta por recuperar = (gastos + inversión en boletos) − cobrado
+//   falta por COBRAR = (gastos + inversión en boletos) − cobrado
 //
-// ⚠️ Se suma la inversión en boletos A PROPÓSITO, y no es doble conteo:
-// `gastos` vive en el PORTAL y el mundo de proveedores vive en KH — ninguna
-// función de proveedores escribe en `gastos` (es la regla de "los dos mundos").
-// Sin sumarla, el punto de quiebre diría que ya estás en verdes cuando todavía
-// no has pagado los boletos.
+// [UTIL-B-3] Es una cuenta de CAJA, no de margen. La utilidad de arriba
+// contesta "¿estoy ganando?"; ésta contesta "¿ya recuperé lo que saqué del
+// bolsillo?". Bajo la fórmula A las dos daban casi lo mismo y se confundían;
+// bajo B son claramente distintas y cada una dice cuál es.
+//
+// ⚠️ [UTIL-B-3] ESTE COMENTARIO YA NO ES CIERTO Y HAY QUE DECIRLO. Decía,
+// textual: "Se suma la inversión en boletos A PROPÓSITO, y no es doble conteo:
+// `gastos` vive en el PORTAL y el mundo de proveedores vive en KH". Era verdad
+// bajo la fórmula A.
+//
+// Bajo B el costo de los boletos VENDIDOS ya está dentro de la utilidad. Pero
+// este número NO es la utilidad: mide CAJA, y por eso sigue sumando la
+// inversión — lo que saliste a pagar salió de tu bolsillo, se haya vendido el
+// boleto o no. Lo que cambia es el RÓTULO: dejó de ser "cuánto falta para
+// ganar" (que ahora contesta la utilidad, arriba) y es "cuánto falta COBRAR
+// para haber recuperado lo que ya pagaste". Dos preguntas distintas que antes
+// se veían iguales, y ésta es la que de verdad se hace frente a esta pantalla.
 //
 // Y es una PROYECCIÓN, no un saldo: se dice con palabras y con el precio de
 // lista a la vista, para que nadie la lea como dinero que ya existe.
@@ -8970,9 +9021,10 @@ function _kmsQuiebre(c, d) {
   if (cobrado == null) {
     return { html: '<div class="kmc-q kmc-q-nd">No se puede calcular el punto de quiebre sin ver el dinero de los migrados.</div>' };
   }
+  // Caja: lo que salió (gastos + inversión) contra lo que entró (cobrado).
   const falta = (gastos + inversion) - cobrado;
   if (falta <= 0) {
-    return { html: `<div class="kmc-q kmc-q-ok">Ya recuperaste lo invertido. Cada boleto que vendas de aquí en adelante es ganancia.</div>` };
+    return { html: `<div class="kmc-q kmc-q-ok">Ya <b>cobraste</b> todo lo que saliste a pagar. De aquí en adelante, cada boleto que cobres es dinero libre.<div class="kmc-q-nota">Esto es CAJA: si quieres saber si el evento GANA, mira la utilidad de arriba.</div></div>` };
   }
   // Lo que QUEDA por vender, con su precio de lista. Las dos cosas ya las tiene
   // la pantalla: los disponibles del semáforo y los precios del catálogo.

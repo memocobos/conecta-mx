@@ -239,7 +239,11 @@
   <div class="res-big" id="resumen-utilidad">
    <div class="metric-label" id="m-utilidad-lbl">Utilidad</div>
    <div class="metric-value green" id="m-utilidad">—</div>
-   <div class="metric-sub">Ventas − gastos · al momento</div>
+   <div class="metric-sub">Vendido − costo de lo vendido − gastos</div>
+   <!-- [UTIL-B-3] La caja NO se pierde, se subordina. Bajo la fórmula B la
+        utilidad puede ser positiva sin un peso en la cuenta, y este renglón
+        es lo que impide leer el número grande como liquidez. -->
+   <div class="res-big-mano" id="m-enmano">en mano: <b>—</b></div>
    <div id="m-bodega" class="aud-bodega" style="display:none"></div>
   </div>
  </div>

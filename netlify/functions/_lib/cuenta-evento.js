@@ -716,6 +716,11 @@ async function cuentasDeTodos(opts) {
   //   bodega_* → SOLO eventos por venir. Es esperanza y se puede realizar.
   //   merma_*  → SOLO eventos pasados. Es costo hundido y ya se perdió.
   let boletos = 0, valor = 0, algo = false, algoValor = false;
+  // [UTIL-B-3] Y lo que COSTARON los vendibles. Bajo la fórmula B, el costo de un
+  // boleto NO vendido todavía no entró a la utilidad — es inventario. Sin esta
+  // cifra, el "si se vende todo" sumaría el precio de venta sin restar su costo,
+  // y prometería una ganancia que no existe.
+  let bCosto = 0, bAlgoCosto = false;
   let mBoletos = 0, mCosto = 0, mAlgo = false, mAlgoCosto = false;
   slugs.forEach((s) => {
     const b = eventos[s].bodega || {};
@@ -726,9 +731,11 @@ async function cuentasDeTodos(opts) {
     }
     if (b.boletos != null) { boletos += b.boletos; algo = true; }
     if (b.valor_estimado != null) { valor += b.valor_estimado; algoValor = true; }
+    if (b.costo_hundido != null) { bCosto += b.costo_hundido; bAlgoCosto = true; }
   });
   tot.bodega_boletos = algo ? boletos : null;
   tot.bodega_valor = algoValor ? valor : null;
+  tot.bodega_costo = bAlgoCosto ? bCosto : null;   // [UTIL-B-3]
   tot.merma_boletos = mAlgo ? mBoletos : null;
   tot.merma_costo = mAlgoCosto ? mCosto : null;
   // Facturado de empresa, para la tarjeta del Resumen.

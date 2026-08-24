@@ -20,7 +20,9 @@
 const { verifyAdminAuthLive, corsCheck } = require('./_lib/verify-admin');
 const { validarMonto } = require('./_lib/monto-limites');
 
-const CUENTAS = ['BBVA', 'Banamex', 'Efectivo', 'Otro'];
+// [UTIL-C-3] La lista, de su dueño. La regla del evento NO aplica a un
+// ingreso: lo que se exige aquí es lo mismo de siempre.
+const { normCuenta, errorCuentaDeIngreso } = require('./_lib/cuentas-dinero');
 const UUID_RE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
 
 exports.handler = async (event) => {
@@ -74,8 +76,9 @@ exports.handler = async (event) => {
   // Cuenta a la que entró el ingreso (para el futuro visor de saldos). Opcional,
   // pero si viene debe ser uno de los 4 valores permitidos.
   const cuenta = (typeof body.cuenta === 'string' && body.cuenta.trim()) ? body.cuenta.trim() : null;
-  if (cuenta && !CUENTAS.includes(cuenta)) {
-    return { statusCode: 400, headers, body: JSON.stringify({ error: 'cuenta inválida' }) };
+  const errCuenta = errorCuentaDeIngreso(cuenta);
+  if (errCuenta) {
+    return { statusCode: 400, headers, body: JSON.stringify({ error: errCuenta }) };
   }
   const notas      = (typeof body.notas === 'string' && body.notas.trim()) ? body.notas.trim().slice(0, 1000) : null;
 

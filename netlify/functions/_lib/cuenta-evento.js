@@ -78,7 +78,10 @@
 //
 //   cuentasDeTodos({ portalUrl, portalService, khUrl, khService, rol,
 //                    preciosPorEvento?, eventosPasados?, fetchImpl? })
-//     → { eventos: { "<slug>": {…sin bodega…} }, totales: {…} } | { error, detail }
+//     → { eventos: { "<slug>": {…sin bodega…} }, totales: {…},
+//         sin_evento: { gastos } } | { error, detail }
+//       `totales.ganancia` = suma de los eventos · `totales.ganancia_empresa` =
+//       esa suma MENOS los gastos sin evento. Dos nombres porque son dos cosas.
 //     (sin bodega: la bodega pide una consulta de stock POR evento, y este otro
 //      camino existe justo para los tableros que miran TODOS los eventos.)
 // =============================================================================
@@ -719,6 +722,27 @@ async function cuentasDeTodos(opts) {
   slugs.forEach((s) => { const f = eventos[s].facturado; if (f == null) factOk = false; else fact += f; });
   tot.facturado = factOk ? fact : null;
   tot.pendiente = (tot.facturado == null || tot.ventas == null) ? null : tot.facturado - tot.ventas;
+  // [UTIL-C-3] LA UTILIDAD DE LA EMPRESA, aquí y no en la pantalla.
+  //
+  // `tot.ganancia` es y sigue siendo la SUMA DE LAS UTILIDADES POR EVENTO —
+  // tiene que serlo, porque es el renglón "Total" de una tabla por evento y las
+  // partes tienen que dar el total. Los gastos sin evento (renta, salarios,
+  // redes) no cuelgan de ninguno, así que van en su propio término:
+  //
+  //   ganancia_empresa = Σ utilidades por evento − gastos sin evento
+  //
+  // Son DOS cifras con DOS nombres a propósito. Meter los gastos generales
+  // dentro de `ganancia` haría que la tabla no cuadrara consigo misma.
+  //
+  // ⚠️ ESTO YA SE CALCULABA EN EL NAVEGADOR, y en un solo lado: la tabla del
+  // Resumen hacía `totGan -= sinG` mientras el panel de tres números pintaba
+  // `cta.ganancia` a secas. Las dos cifras salían de la misma pantalla y NO
+  // coincidían — otra divergencia dormida, invisible solo porque hoy hay CERO
+  // gastos sin evento (medido en la base, no supuesto). En cuanto Memo capture
+  // la primera renta, el número de arriba y el de abajo se habrían separado sin
+  // que nada avisara.
+  tot.gastos_sin_evento = n(p.data.gastosSinEvento);
+  tot.ganancia_empresa = (tot.ganancia == null) ? null : tot.ganancia - tot.gastos_sin_evento;
   // Los gastos "General" (sin evento) NO están en ningún evento: se dan aparte
   // para que quien quiera el total de la empresa los sume a sabiendas.
   return {

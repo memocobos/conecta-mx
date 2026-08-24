@@ -364,6 +364,45 @@ está caduco antes de escribirse.
   Un gasto con cuenta `Otro` **sí entra** en su `caja_total` (por el acumulador
   `otrosTotal`); lo que no tiene es cubeta propia. **No se pierde dinero, se
   pierde el renglón.** Ya se midió: la nota vive en el encabezado del lib.
+- **UN SELECTOR DE DATO NACE VACÍO, Y EL GUARDADO LO EXIGE.** Si un `<select>`
+  representa una ELECCIÓN —a quién, de qué caja, de qué tipo, con qué permisos—
+  su primera opción es `— elige … —` y el botón de guardar no deja pasar sin
+  ella. **Un default silencioso no ahorra un clic: INVENTA un dato**, y lo
+  inventa con la respuesta que impuso el ORDEN DE LAS OPCIONES, no una persona.
+  **El costo real, ya pagado:** `admin-proveedores` lista con `order=nombre.asc`,
+  así que el primer proveedor del catálogo es **Hotel**. El selector de la tabla
+  de tanda no tenía opción vacía, y **3 compras de `calle24` nacieron a nombre de
+  Hotel siendo de Matriz** — con la deuda a proveedores apuntando al que no era.
+  Jane tuvo que corregir el dato en la base (KMS-SIMP-5, #556).
+  Dos corolarios que costaron encontrarse:
+  - ⚠️ **El candado del guardado YA EXISTÍA y era INALCANZABLE**: `if (!prov)
+    return _kmtError(…)` no podía dispararse nunca, porque `prov` siempre traía
+    al primero. Es la hermana de la rama `force` bajo un `schedule` de WL-2 —
+    **una guarda que no puede fallar se lee como protección y no protege nada**.
+    Al poner la opción vacía, revisar si ya hay una guarda dormida esperándola.
+  - ⚠️ **El servidor NO era el hoyo, y no podía serlo**: `admin-compras` valida
+    que el `proveedor_id` sea UUID y que exista. Lo que recibía era un id
+    **válido pero equivocado**, y eso ningún servidor lo distingue. Hay datos
+    que solo puede afirmar quien captura.
+  **Un default SÍ está bien en dos casos, y solo en dos** (DEFAULTS-1, #557):
+  (a) es una **FORMA**, no una atribución — no le imputa dinero a un tercero, no
+  cambia si un gasto entra en la utilidad, no reparte permisos (`gasto-metodo` e
+  `ingreso-metodo` en «Transferencia» se quedan por esto); o (b) está
+  **ANUNCIADO** en la etiqueta (`ev-banco` dice literalmente "BBVA (Default)" —
+  el problema nunca fue que hubiera un valor, sino que nadie supiera que lo
+  había). Las dos razones están escritas EN el código para que nadie los
+  "arregle" por simetría; re-litigarlas pide medir capturas reales, no simetría.
+  Los que sí murieron por la regla: `kmt-prov` (Hotel) · `gasto-categoria`
+  (Transporte — **y la categoría decide si el gasto entra en la utilidad**, ver
+  la fórmula UTIL-C) · `ingreso-categoria` (Vuelo) · `inv-rol` (**Bulma**, el de
+  casi-máximos permisos: invitar sin mirar repartía privilegios que nadie
+  eligió).
+  **Y el barrido se hace en la PÁGINA, no con grep**: los 44 `<select>` del
+  Palacio se midieron abriendo cada pantalla y leyendo qué queda elegido al
+  nacer. Hoy no queda ninguno de dato con default silencioso.
+  ⏳ Anotado sin urgencia: `admin-ingreso-crear/editar` **no validan la categoría
+  contra ningún catálogo** (solo la recortan a 60), así que ahí el navegador es
+  la ÚNICA guarda. El catálogo de ingresos vive en el markup y no tiene lib.
 - **El CSS/JS de KameHouse vive en `kamehouse.css/js/recibos.js`**, no inline en
   el HTML.
 - **Los arneses miden lo de una tuerca ENTRE DOS COMMITS**, no contra el árbol de

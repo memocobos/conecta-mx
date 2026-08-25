@@ -170,6 +170,55 @@ function parseZonas(raw) {
   return out;
 }
 
+// [ESF-E1c] LA LISTA CHEAP ES SUYA, NO UN REFLEJO.
+// Hasta hoy `cheapZonas` se DERIVABA de las mismas zonas PLUS: mismo nombre,
+// mismo orden, `p:pc`. Medido sobre los 78 eventos que la tienen, eso alcanza
+// para 64 — pero **14 divergen de verdad**: 5 tienen otro NÚMERO de zonas
+// (machaca 3 vs 2, mendivil 11 vs 4, solomun 0 vs 3, youngmiko 9 vs 8), 8
+// tienen otros nombres u otro orden, y 1 tiene los `ag` cruzados. Más 2 zonas
+// cheap con `sepEspecial` propio, que un espejo no puede expresar.
+//
+// Un modelo que solo puede decir "lo mismo que PLUS" no describe el catálogo,
+// así que la lista pasa a ser INDEPENDIENTE. El botón "copiar de PLUS" de la
+// pantalla es conveniencia de captura, no el modelo.
+function parseCheapZonas(raw) {
+  let arr = raw;
+  if (typeof raw === 'string') {
+    if (!raw.trim()) return null;              // vacío ≠ lista vacía
+    try { arr = JSON.parse(raw); } catch (_) { return null; }
+  }
+  if (!Array.isArray(arr)) return null;
+  const out = [];
+  for (const z of arr) {
+    if (!z || typeof z !== 'object') continue;
+    const n = (typeof z.n === 'string' ? z.n : '').trim();
+    if (!n) continue;
+    const p = Number(z.p);
+    const prox = (z.prox === 1 || z.prox === true || z.prox === '1') ? 1 : 0;
+    const ag = (z.ag === 1 || z.ag === true || z.ag === '1') ? 1 : 0;
+    const vip = (z.vip === 1 || z.vip === true || z.vip === '1') ? 1 : 0;
+    const se = Number(z.sepEspecial);
+    const rv = Number(z.requiereViajeros);
+    out.push({
+      n, p: (Number.isFinite(p) && p > 0) ? Math.round(p) : 0,
+      ag: prox ? 0 : ag, prox, vip,
+      sepEspecial: (Number.isFinite(se) && se > 0) ? Math.round(se) : null,
+      requiereViajeros: (Number.isFinite(rv) && rv > 0) ? Math.round(rv) : null,
+    });
+  }
+  return out;
+}
+
+// El texto de UNA zona cheap, en el orden del catálogo: n · p · vip · ag/prox ·
+// sepEspecial · requiereViajeros.
+function cheapZonaTexto(z) {
+  return "{n:'" + escStr(z.n) + "',p:" + z.p +
+    (z.vip ? ',vip:1' : '') +
+    (z.prox ? ',prox:1' : (z.ag ? ',ag:1' : '')) +
+    (z.sepEspecial != null ? ',sepEspecial:' + z.sepEspecial : '') +
+    (z.requiereViajeros != null ? ',requiereViajeros:' + z.requiereViajeros : '') + '}';
+}
+
 // B1 — emite el segmento "zonas:[...]" (+ ",cheapZonas:[...]" si alguna zona
 // tiene pc>0) byte-exacto: comillas simples, sin espacios, ag:1 solo si truthy.
 // Sin zonas válidas → "zonas:[]" (byte-igual a hoy). NO emite vip nunca.
@@ -188,6 +237,26 @@ function zonasSegmento(esfera) {
     (z.prox ? ',prox:1' : (z.ag ? ',ag:1' : '')) + '}'
   ).join(',');
   let seg = 'zonas:[' + plus + ']';
+  // [ESF-E1c] LA LISTA PROPIA MANDA. Si Esferas capturó una, se emite tal cual
+  // y no se mira `pc` para nada.
+  const propia = parseCheapZonas(esfera.cheap_zonas);
+  if (propia) {
+    return propia.length
+      ? (seg + ',cheapZonas:[' + propia.map(cheapZonaTexto).join(',') + ']')
+      : seg;                                  // lista vacía capturada = sin cheap
+  }
+
+  // ⚠️ RAMPA DE MIGRACIÓN, NO UN SEGUNDO CAMINO. Mientras un evento no tenga su
+  // lista capturada, se sigue derivando del `pc` de las zonas PLUS como hasta
+  // hoy — si no, los 7 eventos ya gobernados que tienen cheapZonas las perderían
+  // en su próxima publicación, y los que se creen desde cero en Esferas nacerían
+  // sin cheap aunque el capturista pusiera precios.
+  //
+  // SE RETIRA cuando E2 haya sembrado `cheap_zonas` en todos los eventos: a
+  // partir de ahí "sin lista" significa de verdad "sin cheap". La condición está
+  // escrita aquí para que no se quede como una rama eterna que nadie se atreve a
+  // borrar.
+  //
   // cheapZonas SOLO si alguna zona tiene precio cheap. Espeja TODAS las zonas:
   // disponible (no ag y pc>0) → p:pc; el resto → p:0,ag:1 (patrón legacy).
   // [E1] Una zona prox se espeja como prox también en cheap: si todavía no hay
@@ -1027,6 +1096,7 @@ module.exports = {
   // Helpers puros expuestos para el arnés (patrón de la casa).
   _escStr: escStr,
   _parseZonas: parseZonas,
+  _parseCheapZonas: parseCheapZonas,
   _generarObj: generarObj,
   _fusionarConViejo: fusionarConViejo,
   _extraerEVKamehouse: extraerEVKamehouse,

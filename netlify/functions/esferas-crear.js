@@ -20,7 +20,7 @@
 
 const { verifyAdminAuthLive, corsCheck } = require('./_lib/verify-admin');
 const { revisarSepCheap } = require('./_lib/separo-techo');
-const { _parseZonas: parseZonas } = require('./_lib/esferas-compile');
+const { _parseZonas: parseZonas, _parseCheapZonas: parseCheapZonas } = require('./_lib/esferas-compile');
 
 const SB_URL = 'https://npgnhsmwpcipxgvfxrho.supabase.co';
 const SB_KEY = process.env.SUPABASE_SERVICE_KEY_KAMEHOUSE;
@@ -32,6 +32,8 @@ const CAMPOS_PERMITIDOS = new Set([
   'inc', 'sep', 'sep_cheap', 'nota', 'festival', 'foto',
   // [ESF-E1a] el precio del paquete RIDE y su separo
   'ride', 'sep_ride',
+  // [ESF-E1c] la lista CHEAP, independiente de las zonas PLUS
+  'cheap_zonas',
 ]);
 
 // festival: JSON del festival (lineup/switches/paquetes) o null = concierto.
@@ -223,6 +225,14 @@ exports.handler = async (event) => {
     // [ESF-E1a] `ride` pasa por el MISMO saneador: entero >= 0 o null. Un
     // precio que llega como texto no se guarda "a ver qué pasa".
     if (k === 'ride') { sane[k] = saneInt(v); continue; }
+    // [ESF-E1c] La lista CHEAP se sanea con el MISMO parser que la compila
+    // (`_parseCheapZonas` del lib): un segundo saneador aquí sería la copia que
+    // acaba divergiendo. `null` significa "no capturada" y se guarda como null.
+    if (k === 'cheap_zonas') {
+      const filas = parseCheapZonas(v);
+      sane[k] = (filas == null) ? null : JSON.stringify(filas);
+      continue;
+    }
     if (k === 'nota') { sane[k] = saneNota(v); continue; }
     if (k === 'festival') { sane[k] = saneFestival(v); continue; }
     if (v === null || v === '') sane[k] = (k === 'status') ? '' : null;

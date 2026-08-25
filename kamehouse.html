@@ -1532,6 +1532,19 @@
      </div>
      <div id="esf-venue-cat-msg" style="font-size:11px;margin-top:4px"></div>
      <div style="font-size:11px;color:var(--ts);margin-top:4px">El precio CHEAP es opcional. Si ninguna zona tiene CHEAP, el evento solo ofrece paquete PLUS.</div>
+     </div>
+     <!-- [ESF-E1c] LAS ZONAS CHEAP SON SU PROPIA LISTA, no un reflejo de las de
+          arriba. 14 de los 78 eventos con cheap divergen de verdad: otro número de
+          zonas, otros nombres, otro orden o `sepEspecial` propio. El botón de
+          copiar es conveniencia de captura, no el modelo. -->
+     <div class="form-group" id="esf-grp-cheapzonas">
+      <label>Zonas CHEAP <span style="font-weight:400;color:var(--ts);font-size:11px">— solo boleto</span></label>
+      <div id="esf-cheapzonas"></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
+       <button class="btn btn-ghost" type="button" onclick="_esfAddCheapZona()">+ Agregar zona CHEAP</button>
+       <button class="btn btn-ghost" type="button" onclick="_esfCopiarDePlus()" title="Pre-llena esta lista con las zonas de arriba y su precio CHEAP. Después se edita libre.">Copiar de zonas PLUS</button>
+      </div>
+      <div style="font-size:11px;color:var(--ts);margin-top:4px">Vacía = el evento <b>no vende CHEAP</b>. Las zonas de aquí son independientes de las de arriba: pueden tener otros nombres, otro orden y otros agotados.</div>
     </div>
     <div class="form-group" id="esf-grp-hotel">
      <label>Hotel</label>

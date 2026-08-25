@@ -18097,6 +18097,9 @@ async function crearEsferaEvento() {
     music:        document.getElementById('esf-music')?.value.trim() || null,
     fechas_extra: _esfGetFechasExtra(),
     zonas: _esfGetZonas(),
+    // [ESF-E1c] `null` = sin lista capturada (el compilador usa su rampa).
+    // Una lista, aunque sea vacía, es una afirmación sobre el evento.
+    cheap_zonas: (() => { const c = _esfGetCheapZonas(); return c == null ? null : JSON.stringify(c); })(),
     hotel: _esfGetHotel(),
     mapa: _esfGetMapa(),
     foto: _esfGetFoto(),
@@ -18345,6 +18348,7 @@ function _esfSeedDefaults() {
   const sepC = document.getElementById('esf-sep-cheap'); if (sepC) sepC.value = 500;
   // [ESF-E1a] Los de RIDE arrancan VACÍOS, no en un número: un evento nuevo no
   // vende RIDE hasta que alguien diga que sí y a cuánto.
+  if (typeof _esfClearCheapZonas === 'function') _esfClearCheapZonas();
   const rd = document.getElementById('esf-ride'); if (rd) rd.value = '';
   const sr = document.getElementById('esf-sep-ride'); if (sr) sr.value = '';
   const nota = document.getElementById('esf-nota'); if (nota) nota.value = _esfIsCDMX() ? _ESF_NOTA_CDMX : '';
@@ -18579,6 +18583,88 @@ function _esfProxPintaFila(row) {
       ? (inp.classList.contains('esf-zona-p') ? 'sin costo aún' : 'sin costo aún')
       : (inp.classList.contains('esf-zona-p') ? '$ PLUS' : '$ CHEAP');
   });
+}
+
+// ═══ [ESF-E1c] LAS ZONAS CHEAP · su propia lista ═══════════════════════════
+// No es un reflejo de las de arriba. Medido sobre los 78 eventos que tienen
+// cheap: 64 son espejo perfecto, pero 14 divergen de verdad —otro número de
+// zonas (machaca 3 vs 2, mendivil 11 vs 4), otros nombres, otro orden, o
+// `sepEspecial` propio— y un espejo no puede decir nada de eso.
+//
+// Deliberadamente MÁS SIMPLE que la fila PLUS: aquí no hay `pc` (el precio ES el
+// cheap) ni sugeridor de venue. Lo que sí lleva es lo que el catálogo usa:
+// precio, VIP, agotada, próximamente y el separo especial.
+function _esfAddCheapZona(data) {
+  const cont = document.getElementById('esf-cheapzonas');
+  if (!cont) return;
+  const d = data || {};
+  const row = document.createElement('div');
+  row.className = 'esf-cz-row';
+  row.style.cssText = 'display:flex;gap:6px;margin-top:6px;align-items:center;flex-wrap:wrap';
+  row.innerHTML =
+    '<input class="cot-input esf-cz-n" placeholder="Zona" style="flex:2;min-width:110px" autocomplete="off">' +
+    '<input class="cot-input esf-cz-p" type="number" min="0" placeholder="$ CHEAP" style="flex:1;min-width:82px">' +
+    '<label style="font-size:11px;display:flex;align-items:center;gap:3px;white-space:nowrap" title="Zona preferente"><input type="checkbox" class="esf-cz-vip">VIP</label>' +
+    '<label style="font-size:11px;display:flex;align-items:center;gap:3px;white-space:nowrap"><input type="checkbox" class="esf-cz-ag">Agotada</label>' +
+    '<label style="font-size:11px;display:flex;align-items:center;gap:3px;white-space:nowrap" title="Se anuncia sin precio"><input type="checkbox" class="esf-cz-prox">Próx.</label>' +
+    '<input class="cot-input esf-cz-sep" type="number" min="0" placeholder="separo esp." title="Separo especial de esta zona. Vacío = el separo normal del evento." style="flex:1;min-width:92px">' +
+    '<button type="button" class="btn btn-ghost esf-cz-del" title="Quitar zona">✕</button>';
+  row.querySelector('.esf-cz-n').value = (typeof d.n === 'string') ? d.n : '';
+  if (d.p) row.querySelector('.esf-cz-p').value = d.p;
+  if (d.vip) row.querySelector('.esf-cz-vip').checked = true;
+  if (d.ag) row.querySelector('.esf-cz-ag').checked = true;
+  if (d.prox) row.querySelector('.esf-cz-prox').checked = true;
+  if (d.sepEspecial) row.querySelector('.esf-cz-sep').value = d.sepEspecial;
+  row.querySelectorAll('input').forEach((el) => {
+    el.addEventListener('input', renderEsferaPreview);
+    el.addEventListener('change', renderEsferaPreview);
+  });
+  // Agotada y Próximamente son excluyentes, igual que arriba: una nunca estuvo
+  // a la venta y la otra se acabó.
+  const cbA = row.querySelector('.esf-cz-ag'), cbP = row.querySelector('.esf-cz-prox');
+  cbA.addEventListener('change', () => { if (cbA.checked) cbP.checked = false; });
+  cbP.addEventListener('change', () => { if (cbP.checked) cbA.checked = false; });
+  row.querySelector('.esf-cz-del').addEventListener('click', () => { row.remove(); renderEsferaPreview(); });
+  cont.appendChild(row);
+}
+
+// Lee la lista. Devuelve `null` cuando NO hay ni una fila: null significa "este
+// evento no tiene lista capturada" y deja que el compilador use su rampa de
+// derivación. Una lista con filas —aunque queden todas sin nombre— es una
+// afirmación: "estas son las zonas cheap".
+function _esfGetCheapZonas() {
+  const filas = Array.from(document.querySelectorAll('#esf-cheapzonas .esf-cz-row'));
+  if (!filas.length) return null;
+  return filas.map((row) => {
+    const n = (row.querySelector('.esf-cz-n')?.value || '').trim();
+    const p = parseInt(row.querySelector('.esf-cz-p')?.value || '0', 10) || 0;
+    const prox = row.querySelector('.esf-cz-prox')?.checked ? 1 : 0;
+    const ag = (!prox && row.querySelector('.esf-cz-ag')?.checked) ? 1 : 0;
+    const vip = row.querySelector('.esf-cz-vip')?.checked ? 1 : 0;
+    const se = parseInt(row.querySelector('.esf-cz-sep')?.value || '', 10);
+    const o = { n, p, ag, prox, vip };
+    if (Number.isFinite(se) && se > 0) o.sepEspecial = se;
+    return o;
+  }).filter((z) => z.n);
+}
+
+function _esfClearCheapZonas() {
+  const c = document.getElementById('esf-cheapzonas');
+  if (c) c.innerHTML = '';
+}
+
+// El botón: PRE-LLENA con las zonas de arriba y su precio CHEAP. Es conveniencia
+// de captura — después se edita libre y la lista es suya. Se pregunta antes de
+// pisar lo que ya hubiera: copiar no debe borrar trabajo.
+function _esfCopiarDePlus() {
+  const plus = (typeof _esfGetZonas === 'function') ? _esfGetZonas() : [];
+  if (!plus.length) { showToast('Primero captura las zonas PLUS', 'error'); return; }
+  const hay = document.querySelectorAll('#esf-cheapzonas .esf-cz-row').length;
+  if (hay && !confirm('Esto reemplaza las ' + hay + ' zona(s) CHEAP que ya capturaste. ¿Seguir?')) return;
+  _esfClearCheapZonas();
+  plus.forEach((z) => _esfAddCheapZona({ n: z.n, p: z.pc || 0, vip: z.vip, ag: z.ag, prox: z.prox }));
+  renderEsferaPreview();
+  showToast(plus.length + ' zona(s) copiadas — ahora edítalas libremente', 'success');
 }
 
 function _esfAddZona(data) {
@@ -18969,6 +19055,12 @@ function editarEsfera(slug) {
   let _zs = row.zonas;
   if (typeof _zs === 'string') { try { _zs = JSON.parse(_zs); } catch { _zs = []; } }
   if (Array.isArray(_zs)) _zs.forEach((z) => { if (z && typeof z === 'object') _esfAddZona(z); });
+  // [ESF-E1c] La lista CHEAP se llena de su PROPIA columna. Si la fila no la
+  // tiene, la lista queda vacía y el compilador sigue derivando — la rampa.
+  if (typeof _esfClearCheapZonas === 'function') _esfClearCheapZonas();
+  let _cz = row.cheap_zonas;
+  if (typeof _cz === 'string') { try { _cz = JSON.parse(_cz); } catch (_) { _cz = null; } }
+  if (Array.isArray(_cz)) _cz.forEach((z) => { if (z && typeof z === 'object') _esfAddCheapZona(z); });
   // Hotel custom: re-poblar desde `hotel` (texto JSON u objeto); custom:false → off.
   _esfHotelPopulate(row.hotel);
   // Mapa: re-poblar preview desde la URL guardada (o limpiar si no hay).
@@ -19041,6 +19133,9 @@ async function guardarCambiosEsfera() {
     music:        document.getElementById('esf-music')?.value.trim() || null,
     fechas_extra: _esfGetFechasExtra(),
     zonas: _esfGetZonas(),
+    // [ESF-E1c] `null` = sin lista capturada (el compilador usa su rampa).
+    // Una lista, aunque sea vacía, es una afirmación sobre el evento.
+    cheap_zonas: (() => { const c = _esfGetCheapZonas(); return c == null ? null : JSON.stringify(c); })(),
     hotel: _esfGetHotel(),
     mapa: _esfGetMapa(),
     foto: _esfGetFoto(),

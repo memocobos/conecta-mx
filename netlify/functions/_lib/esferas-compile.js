@@ -988,6 +988,26 @@ function _bancoIdentificador(objText) {
   return m ? m[1] : null;
 }
 
+// [FIX] Inserta `texto` justo antes del `zonas:` DE NIVEL SUPERIOR del objeto.
+// Camina el texto contando llaves/corchetes y saltándose el contenido de las
+// comillas, igual que el cortador del EV: un regex no puede distinguir el
+// `zonas:` de arriba del que vive dentro de `multifecha[0]`, y esa distinción
+// es justo la que hacía falta.
+function _insertarAntesDeZonasNivel1(objText, texto) {
+  let d = 0;
+  for (let i = 0; i < objText.length; i++) {
+    const ch = objText[i];
+    if (ch === "'") { i++; while (i < objText.length && objText[i] !== "'") { if (objText[i] === '\\') i++; i++; } continue; }
+    if (ch === '{' || ch === '[') { d++; continue; }
+    if (ch === '}' || ch === ']') { d--; continue; }
+    // Nivel 1 = dentro del objeto del evento y fuera de todo lo demás.
+    if (d === 1 && (objText[i - 1] === ',' || objText[i - 1] === '{') && objText.startsWith('zonas:', i)) {
+      return objText.slice(0, i) + texto + objText.slice(i);
+    }
+  }
+  return objText;   // no se encontró: quien llama decide (hoy, lanza)
+}
+
 // fusionarConViejo(objTextViejo, objNuevo) → objNuevo enriquecido.
 // Lanza si hay un campo que se perdería y no se puede re-emitir.
 function fusionarConViejo(objTextViejo, objNuevo, slug) {
@@ -1036,10 +1056,14 @@ function fusionarConViejo(objTextViejo, objNuevo, slug) {
   if (bancoViejo) {
     const bancoNuevo = _bancoIdentificador(objNuevo);
     if (bancoNuevo == null) {
-      // Se inserta donde el compilador lo ponía: después de `nota`/`inc`, antes
-      // de `zonas`. Anclamos a `,zonas:` porque SIEMPRE se emite.
+      // ⚠️ [FIX] Se inserta antes de `zonas:` DEL NIVEL SUPERIOR. Un `replace`
+      // sobre el primer `,zonas:` que aparezca es incorrecto: en un evento
+      // multifecha el primero vive DENTRO de `multifecha[0]`, y el banco acaba
+      // metido en la primera noche. Pasó de verdad —weeknd, bts y alvarodiaz
+      // salieron publicados con `multifecha[0].banco` y SIN banco de nivel
+      // superior— y los tres dejaron de ser gobernables.
       const antes = salida;
-      salida = salida.replace(/([,{])zonas:/, '$1banco:' + bancoViejo + ',zonas:');
+      salida = _insertarAntesDeZonasNivel1(salida, 'banco:' + bancoViejo + ',');
       if (salida === antes) {
         throw new Error(`No pude conservar el banco (${bancoViejo}) de "${slug}". No se actualiza a ciegas.`);
       }
@@ -1310,7 +1334,7 @@ function fechaDisplayDeEsfera(esfera) {
 
 module.exports = {
   compilarEV, quitarDelEV, reemplazarEnEV, todayMx, fechaDisplayDeEsfera,
-  bancoValido, BANCOS_VALIDOS,
+  bancoValido, BANCOS_VALIDOS, _insertarAntesDeZonasNivel1,
   // Helpers puros expuestos para el arnés (patrón de la casa).
   _escStr: escStr,
   _parseZonas: parseZonas,

@@ -1451,6 +1451,13 @@
      <label style="display:flex;align-items:center;gap:8px;font-size:12px;cursor:pointer;margin-top:4px">
       <input type="checkbox" id="esf-promo"> Va en <b>promociones</b> del sitio
      </label>
+     <!-- [ESF-PROMO-PAR] El badge de la promo. Va debajo de la casilla porque
+          solo tiene sentido con ella encendida, pero NO se esconde: un campo que
+          aparece y desaparece se olvida al editar. -->
+     <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap">
+      <input class="cot-input" id="esf-promo-code" placeholder="Código (ej. TINI)" autocomplete="off" style="flex:1;min-width:120px">
+      <input class="cot-input" id="esf-promo-label" placeholder="Badge de la tarjeta (ej. PROMO DE PAREJA · CÓDIGO: TINI · HASTA EL 24 AGO)" autocomplete="off" style="flex:3;min-width:200px">
+     </div>
      <label style="display:flex;align-items:center;gap:8px;font-size:12px;cursor:pointer;margin-top:6px">
       <input type="checkbox" id="esf-deporte"> Es un evento <b>deportivo</b>
      </label>

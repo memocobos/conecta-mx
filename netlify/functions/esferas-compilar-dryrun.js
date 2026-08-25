@@ -53,7 +53,24 @@ exports.handler = async (event) => {
       const detail = await sbRes.text();
       return { statusCode: 502, headers, body: JSON.stringify({ ok: false, error: 'Supabase rechazó la query', detail }) };
     }
-    const esferas = await sbRes.json();
+    const todas = await sbRes.json();
+    // ═══ [ESF-ARCHIVO-1] EL VETO DE PUBLICAR ═══════════════════════════════
+    // Un evento ARCHIVADO es un registro, no una fuente de verdad. Entró a
+    // Esferas SIN pasar el juez —cerrar brechas de eventos muertos no paga— así
+    // que su fila está incompleta a propósito, y compilarla DEGRADARÍA su
+    // entrada del index.
+    //
+    // Lo que se degradaría, medido: no las promos (`fusionarConViejo` conserva
+    // los campos de primer nivel que el compilador no conoce), sino lo que vive
+    // DENTRO de un campo gobernado — `zonas[].requiereViajeros`,
+    // `hotel[].k/pp/desc`, `multifecha[].noches/music/hotel`— y cualquier campo
+    // gobernado cuyo valor en Esferas difiera del index.
+    //
+    // El veto vive EN EL SERVIDOR. Esconder el botón no basta: un endpoint
+    // abierto detrás de una UI muda es la trampa de COB-MIG-1 al revés.
+    const archivados = todas.filter((e) => e && e.archivado === true).map((e) => e.slug);
+    const esferas = todas.filter((e) => !(e && e.archivado === true));
+
 
     // 2. GET index.html del repo por GitHub API y decodificar (patrón github-publish).
     const fileRes = await fetch(`https://api.github.com/repos/${REPO}/contents/${FILE}`, {
@@ -82,6 +99,8 @@ exports.handler = async (event) => {
         sin_cambios,
         validacion,
         preview,
+        // [ESF-ARCHIVO-1] Se dice SIEMPRE, aunque sea 0.
+        archivados,
       }),
     };
   } catch (e) {

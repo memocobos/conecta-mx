@@ -1719,9 +1719,10 @@
     <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.15em;color:var(--ts);margin-bottom:8px">// IMPORTAR DEL CATÁLOGO</div>
     <div style="font-size:12px;color:var(--ts);margin-bottom:14px;line-height:1.5">Trae a Esferas los eventos que todavía viven a mano en <code>index.html</code>. <b>Solo entra lo que el compilador sabe reproducir sin perder un dato</b>; lo demás se queda a mano y se dice cuál y por qué. Lo sembrado nace <b>sin publicar</b> y <b>no pisa</b> nada que ya esté aquí.</div>
     <button class="btn btn-primary" type="button" id="esf-import-diag" onclick="importarDelCatalogo()"><svg class="ic"><use href="#ic-lupa"/></svg> Ver qué se puede importar</button>
-    <label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--ts);margin-left:12px;cursor:pointer" title="Los eventos que ya ocurrieron no se traen: no hay nada que gobernarles. Enciéndelo solo si los quieres para historia.">
-     <input type="checkbox" id="esf-import-pasados" onchange="importarDelCatalogo()"> incluir pasados
-    </label>
+    <!-- [ESF-ARCHIVO-1] Los pasados tienen su propia puerta. La casilla vieja
+         "incluir pasados" SE FUE: metía pasados como filas normales, publicables,
+         que es justo lo que el veto de archivo existe para impedir. -->
+    <button class="btn btn-ghost" type="button" id="esf-archivar" style="margin-left:8px" onclick="archivarPasados()" title="Trae los eventos ya ocurridos como ARCHIVO: sin pasar el juez y bloqueados para publicar. El index sigue siendo su fuente de verdad."><svg class="ic"><use href="#ic-eventos"/></svg> Archivar los pasados</button>
     <div id="esf-import-panel" style="margin-top:14px"></div>
    </div>
 

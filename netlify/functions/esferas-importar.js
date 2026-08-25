@@ -58,11 +58,15 @@ exports.handler = async (event) => {
   let body = {};
   try { body = JSON.parse(event.body || '{}'); } catch (_) { /* queda {} */ }
   const accion = String(body.accion || 'diagnostico');
-  // [ESF-LISTA-1] Los pasados NO se traen por default: un evento que ya ocurrió
-  // no se gobierna, se recuerda — y 42 de los 102 del catálogo son pasados, así
-  // que traerlos ensucia la lista sin que nadie los vaya a tocar. La casilla
-  // existe por si algún día se quieren para historia.
-  const incluirPasados = body.incluir_pasados === true;
+  // [ESF-ARCHIVO-1] Los pasados tienen su PROPIA PUERTA: `archivar`. Ya no hay
+  // casilla "incluir pasados" en `sembrar`, y es a propósito — esa casilla los
+  // metía como filas NORMALES, publicables, que es justo lo que el veto de
+  // archivo existe para impedir. Dos caminos para el mismo evento, uno de ellos
+  // capaz de degradarle su entrada del index, no es una opción: es un hoyo.
+  //
+  //   sembrar   → gobernables VIVOS, pasan el juez, publicables
+  //   archivar  → PASADOS, sin juez, `archivado:true`, NO publicables
+  const modoArchivo = (accion === 'archivar');
   // [SIEMBRA-DIAG] Lo que la PANTALLA prometió, tal como lo vio quien apretó.
   // El diagnóstico y la siembra son DOS llamadas distintas, y entre una y otra
   // el mundo cambia: un deploy, una publicación de Memo, otra pestaña sembrando.
@@ -72,7 +76,7 @@ exports.handler = async (event) => {
   const esperados = Array.isArray(body.esperados)
     ? body.esperados.filter((x) => typeof x === 'string').map((x) => x.trim()).filter(Boolean)
     : null;
-  if (accion !== 'diagnostico' && accion !== 'sembrar') {
+  if (accion !== 'diagnostico' && accion !== 'sembrar' && accion !== 'archivar') {
     return { statusCode: 400, headers, body: JSON.stringify({ ok: false, error: 'acción inválida' }) };
   }
 
@@ -101,9 +105,14 @@ exports.handler = async (event) => {
     const ya = new Set((await yaRes.json()).map((r) => r.slug));
 
     const dia = todayMx();
-    const nuevosTodos = dg.gobernables.filter((g) => !ya.has(g.slug));
-    const pasadosOmitidos = incluirPasados ? [] : nuevosTodos.filter((g) => esPasadoFila(g.fila, dia));
-    const nuevos = incluirPasados ? nuevosTodos : nuevosTodos.filter((g) => !esPasadoFila(g.fila, dia));
+    // En modo archivo el universo es OTRO: TODOS los pasados del catálogo —
+    // gobernables o no— que aún no estén en Esferas.
+    const todosLosObjetos = dg.gobernables.concat(dg.conBrecha.filter((b) => b.fila));
+    const nuevosTodos = modoArchivo
+      ? todosLosObjetos.filter((g) => !ya.has(g.slug) && esPasadoFila(g.fila, dia))
+      : dg.gobernables.filter((g) => !ya.has(g.slug));
+    const pasadosOmitidos = modoArchivo ? [] : nuevosTodos.filter((g) => esPasadoFila(g.fila, dia));
+    const nuevos = modoArchivo ? nuevosTodos : nuevosTodos.filter((g) => !esPasadoFila(g.fila, dia));
     const resumen = {
       total: dg.total,
       gobernables: dg.gobernables.length,
@@ -114,7 +123,7 @@ exports.handler = async (event) => {
       // Se dice SIEMPRE lo que se dejó fuera, aunque sea 0. Un tope silencioso
       // se lee como "los trajo todos" cuando no lo hizo.
       pasados_omitidos: pasadosOmitidos.length,
-      incluye_pasados: incluirPasados,
+      modo_archivo: modoArchivo,
       con_brecha: dg.conBrecha.length,
     };
 
@@ -138,7 +147,11 @@ exports.handler = async (event) => {
     //     los que faltan: lo que ya está en Esferas no se toca.
     const insertados = [], fallidos = [];
     for (const g of nuevos) {
-      const fila = Object.assign({}, g.fila, { publicado: false });
+      // [ESF-ARCHIVO-1] `archivado` viaja con la fila, no se deduce después: es
+      // una DECISIÓN ("esto es un registro"), no una propiedad calculable — la
+      // fecha se edita y el veredicto del juez cambia cada vez que el compilador
+      // aprende algo.
+      const fila = Object.assign({}, g.fila, { publicado: false, archivado: modoArchivo });
       // `created_at` lo pone la base si no lo sabemos; mandar null lo rompería
       // (es NOT NULL con default).
       if (!fila.created_at) delete fila.created_at;
@@ -169,7 +182,7 @@ exports.handler = async (event) => {
       if (f) return { slug: sl, motivo: 'el insert falló', detail: f.detail };
       if (ya.has(sl)) return { slug: sl, motivo: 'ya estaba en Esferas — no se pisa' };
       const g = dg.gobernables.find((x) => x.slug === sl);
-      if (g && !incluirPasados && esPasadoFila(g.fila, dia)) {
+      if (g && !modoArchivo && esPasadoFila(g.fila, dia)) {
         return { slug: sl, motivo: 'ya pasó, y los pasados no se traen — enciende «incluir pasados» si lo quieres' };
       }
       if (dg.conBrecha.some((b) => b.slug === sl)) {
@@ -188,7 +201,8 @@ exports.handler = async (event) => {
       // éxitos se lee como completo cuando no lo es.
       nota: `${insertados.length} sembrados sin publicar · ${fallidos.length} fallidos · ` +
         `${dg.conBrecha.length} se quedan a mano` +
-        (pasadosOmitidos.length ? ` · ${pasadosOmitidos.length} pasados no se trajeron` : ''),
+        (pasadosOmitidos.length ? ` · ${pasadosOmitidos.length} pasados no se trajeron` : '') +
+        (modoArchivo ? ' · como ARCHIVO: sin juez y bloqueados para publicar' : ''),
     }) };
   } catch (e) {
     return { statusCode: 500, headers, body: JSON.stringify({ ok: false, error: e.message }) };

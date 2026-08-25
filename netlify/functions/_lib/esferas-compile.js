@@ -231,6 +231,25 @@ function cheapZonaTexto(z) {
 // Las dos familias del catálogo NO se mezclan: la de FECHA (lbl · ds? · zonas ·
 // cheapZonas? · ride? · rideAgotado?) es ésta; la de PAQUETE —con `noches`,
 // `music` y `hotel` por entrada— es la del festival y sigue por su camino.
+// ═══ [ESF-E1g] EL BANCO · una lista CERRADA, y por una razón dura ══════════
+// `banco` sale al `index.html` como un IDENTIFICADOR CRUDO (`banco:BANCO_HEY`),
+// no como texto entre comillas. Cualquier cosa que no sea uno de los nombres
+// conocidos sería CÓDIGO inyectado en el catálogo público. Por eso no basta con
+// validar la forma: la lista es cerrada.
+//
+// Medido sobre el catálogo: solo existen dos. 87 eventos BANCO_DEFAULT (BBVA),
+// 3 BANCO_HEY (Banamex: acdc, soad, harry) y 12 SIN banco.
+//
+// Y por eso `banco` necesitaba COLUMNA en vez de "no emitirlo nunca": 90 de 102
+// eventos SÍ lo traen, así que dejar de emitirlo se lo habría BORRADO a los 90.
+// El default es legítimo y está ANUNCIADO (todos los lectores hacen
+// `ev.banco || BANCO_DEFAULT`), pero eso no autoriza a inventarlo ni a perderlo.
+const BANCOS_VALIDOS = ['BANCO_DEFAULT', 'BANCO_HEY'];
+function bancoValido(v) {
+  const s = (typeof v === 'string') ? v.trim() : '';
+  return BANCOS_VALIDOS.includes(s) ? s : null;
+}
+
 function parseMultifecha(raw) {
   let arr = raw;
   if (typeof raw === 'string') {
@@ -604,6 +623,12 @@ function generarObjFestival(esfera, fest, hoy) {
     ? ('musicList:[' + musIds.map((id) => "'" + escStr(id) + "'").join(',') + '],')
     : '';
 
+  // [ESF-E1g] El banco: solo si la esfera lo trae y está en la lista cerrada.
+  // Ausente = el evento no dice banco, y todos los lectores caen a BANCO_DEFAULT
+  // por su cuenta (`ev.banco || BANCO_DEFAULT`, medido en index, rol,
+  // catalogo-index, cuenta-deposito y cuenta-evento).
+  const _bk = bancoValido(esfera.banco);
+  const bancoSeg = _bk ? (',banco:' + _bk) : '';
   return "{id:'" + escStr(esfera.slug) + "'," + addedSeg + musicListSeg + flags +
     "c:'" + color +
     "'," + imgSeg + lineupSeg +
@@ -612,8 +637,8 @@ function generarObjFestival(esfera, fest, hoy) {
     "',ds:'" + escStr(dsFinal) +
     "',v:'" + venue +
     "',st:'" + escStr(status) +
-    "'," + incSeg + ',sep:' + sepN + notaSeg +
-    ',banco:BANCO_DEFAULT,multifecha:[' + mfStr + '],' + topZonas + pagosSegmento() + '}';
+    "'," + incSeg + sepSeg + notaSeg +
+    bancoSeg + ',multifecha:[' + mfStr + '],' + topZonas + pagosSegmento() + '}';
 }
 
 // Byte-exacto: comillas simples, sin espacios extra. banco:BANCO_DEFAULT SIN
@@ -678,9 +703,20 @@ function generarObj(esfera, hoy) {
   const incSeg = incRows.length
     ? ("inc:[" + incRows.map((s) => "'" + escStr(s) + "'").join(',') + ']')
     : 'inc:[]';
-  // sep: separo PLUS. SIEMPRE presente (como los eventos reales). null/ausente → 500.
-  const sepN = (esfera.sep != null && Number.isFinite(Number(esfera.sep)) && Number(esfera.sep) >= 0)
-    ? Math.round(Number(esfera.sep)) : 500;
+  // [ESF-E1g] sep: el separo PLUS. NO SE INVENTA — misma regla que `added` y las
+  // banderas de hotel en E1d: solo se emite si la esfera lo trae.
+  //
+  // Antes caía a 500 cuando faltaba, y eso no era un default: era una AFIRMACIÓN
+  // sobre un evento que no la hacía. 13 objetos del catálogo no tienen `sep`
+  // (agotados y "por confirmar", con `zonas:[]`) y el compilador les añadía uno,
+  // así que ninguno era gobernable.
+  //
+  // No emitirlo NO cambia el sitio: `precio-zona` ya trata el separo ausente como
+  // INDETERMINADO a propósito (AUD-2: "el separo ES la ganancia; mejor que no se
+  // venda a que se venda sin ella"), portal lee `ev.sep || 500` y rol `ev.sep||0`.
+  // Lo que cambia es que el compilador deja de decir algo que el evento no dice.
+  const sepSeg = (esfera.sep != null && Number.isFinite(Number(esfera.sep)) && Number(esfera.sep) >= 0)
+    ? (',sep:' + Math.round(Number(esfera.sep))) : '';
   // sepCheap: SOLO si el evento tiene cheapZonas (alguna pc>0) Y sep_cheap definido.
   const tieneCheap = parseZonas(esfera.zonas).some((z) => z.pc > 0);
   const sepCheapSeg = (tieneCheap && esfera.sep_cheap != null
@@ -741,6 +777,12 @@ function generarObj(esfera, hoy) {
   if (esfera.cheap_soon) _f.push('cheapSoon:true');
   const flagsSeg = _f.length ? (_f.join(',') + ',') : '';
 
+  // [ESF-E1g] El banco: solo si la esfera lo trae y está en la lista cerrada.
+  // Ausente = el evento no dice banco, y todos los lectores caen a BANCO_DEFAULT
+  // por su cuenta (`ev.banco || BANCO_DEFAULT`, medido en index, rol,
+  // catalogo-index, cuenta-deposito y cuenta-evento).
+  const _bk = bancoValido(esfera.banco);
+  const bancoSeg = _bk ? (',banco:' + _bk) : '';
   return "{id:'" + escStr(esfera.slug) + "'," + addedSeg + music +
     "c:'" + color +
     "'," + imgSeg +
@@ -751,8 +793,8 @@ function generarObj(esfera, hoy) {
     "v:'" + venue +
     "',st:'" + escStr(status) +
     "'," + cdmx + mapa + flagsSeg +
-    incSeg + ",sep:" + sepN + sepCheapSeg + rideSeg + notaSeg +
-    ",banco:BANCO_DEFAULT," +
+    incSeg + sepSeg + sepCheapSeg + rideSeg + notaSeg +
+    bancoSeg + ',' +
     // [ESF-E1f] La multifecha va ANTES de las zonas, igual que en el camino de
     // festival y que en los 8 conciertos del catálogo.
     (mfFilas ? ('multifecha:[' + mfFilas.map(multifechaTexto).join(',') + '],') : '') +
@@ -983,13 +1025,30 @@ function fusionarConViejo(objTextViejo, objNuevo, slug) {
   }
 
   // Banco: si el viejo apuntaba a otra referencia, se respeta.
+  //
+  // [ESF-E1g] Desde que `banco` es opcional hay DOS casos, y antes solo existía
+  // uno. Si el objeto nuevo ya trae un banco, se sustituye como siempre. Si NO
+  // lo trae —porque la esfera no tiene el dato— se INSERTA el viejo: dejar de
+  // emitirlo no puede significar borrárselo a los 90 eventos que sí lo tienen.
+  // Sin esta rama, republicar acdc/soad/harry TRONABA.
   const bancoViejo = _bancoIdentificador(objTextViejo);
   let salida = objNuevo;
-  if (bancoViejo && bancoViejo !== 'BANCO_DEFAULT') {
-    const antes = salida;
-    salida = salida.replace(/([,{])banco:BANCO_DEFAULT/, '$1banco:' + bancoViejo);
-    if (salida === antes) {
-      throw new Error(`No pude conservar el banco (${bancoViejo}) de "${slug}". No se actualiza a ciegas.`);
+  if (bancoViejo) {
+    const bancoNuevo = _bancoIdentificador(objNuevo);
+    if (bancoNuevo == null) {
+      // Se inserta donde el compilador lo ponía: después de `nota`/`inc`, antes
+      // de `zonas`. Anclamos a `,zonas:` porque SIEMPRE se emite.
+      const antes = salida;
+      salida = salida.replace(/([,{])zonas:/, '$1banco:' + bancoViejo + ',zonas:');
+      if (salida === antes) {
+        throw new Error(`No pude conservar el banco (${bancoViejo}) de "${slug}". No se actualiza a ciegas.`);
+      }
+    } else if (bancoNuevo !== bancoViejo && bancoViejo !== 'BANCO_DEFAULT') {
+      const antes = salida;
+      salida = salida.replace(/([,{])banco:[A-Za-z_$][A-Za-z0-9_$]*/, '$1banco:' + bancoViejo);
+      if (salida === antes) {
+        throw new Error(`No pude conservar el banco (${bancoViejo}) de "${slug}". No se actualiza a ciegas.`);
+      }
     }
   }
 
@@ -1251,6 +1310,7 @@ function fechaDisplayDeEsfera(esfera) {
 
 module.exports = {
   compilarEV, quitarDelEV, reemplazarEnEV, todayMx, fechaDisplayDeEsfera,
+  bancoValido, BANCOS_VALIDOS,
   // Helpers puros expuestos para el arnés (patrón de la casa).
   _escStr: escStr,
   _parseZonas: parseZonas,

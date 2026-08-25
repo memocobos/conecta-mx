@@ -92,6 +92,11 @@ function evAEsfera(ev) {
   const mfConcierto = Array.isArray(ev.multifecha) && ev.multifecha.length
     && !ev.multifecha.some((f) => f && (f.noches != null || f.hotel));
   return {
+    // [ESF-E1g] El banco viaja con el evento. `evaluar()` ata BANCO_DEFAULT y
+    // BANCO_HEY a sus NOMBRES (strings), no a {}, así que aquí `ev.banco` ya es
+    // el identificador — que es justo lo que hay que guardar para re-emitirlo.
+    // Ausente = el evento no dice banco, y así se queda.
+    banco: (typeof ev.banco === 'string' && ev.banco) ? ev.banco : null,
     slug: ev.id,
     nombre: (ev.img && ev.img !== false) ? ev.img : (ev.a || ev.id),
     titulo: ev.a || '',

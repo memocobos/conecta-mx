@@ -21,7 +21,7 @@
 const { verifyAdminAuthLive, corsCheck } = require('./_lib/verify-admin');
 const { revisarSepCheap } = require('./_lib/separo-techo');
 const { _parseZonas: parseZonas, _parseCheapZonas: parseCheapZonas,
-  _parseMultifecha: parseMultifecha, fechaAbsurda } = require('./_lib/esferas-compile');
+  _parseMultifecha: parseMultifecha, fechaAbsurda, bancoValido } = require('./_lib/esferas-compile');
 // [ESF-E1e] Las banderas de paquete, en un Set para que el saneador no las
 // enumere a mano en dos archivos.
 const PKG_FLAGS = new Set(['ride_only', 'cheap_only', 'no_stay', 'no_cheap', 'no_bus', 'cheap_soon', 'cheap_also_ok']);
@@ -48,6 +48,7 @@ const CAMPOS_PERMITIDOS = new Set([
   'cheap_zonas',
   // [ESF-E1f] las fechas con sus zonas (nivel 4 de la granularidad)
   'multifecha',
+  'banco',   // [ESF-E1g] identificador del banco; lista CERRADA (ver abajo).
   // [ESF-E1e] las banderas de paquete (nivel 3 de la granularidad)
   'ride_only', 'cheap_only', 'no_stay', 'no_cheap', 'no_bus', 'cheap_soon', 'cheap_also_ok',
 ]);
@@ -250,6 +251,11 @@ exports.handler = async (event) => {
     if (PKG_FLAGS.has(k)) { sane[k] = (v === true || v === 1 || v === 'true' || v === '1'); continue; }
     // [ESF-E1f] La multifecha se sanea con el MISMO parser que la compila.
     // `null` = el evento no tiene fechas propias.
+    // [ESF-E1g] El banco sale al index como IDENTIFICADOR CRUDO
+    // (`banco:BANCO_HEY`), no entre comillas: cualquier cosa fuera de la lista
+    // conocida sería CÓDIGO inyectado en el catálogo público. Validar la forma
+    // no basta — la lista es cerrada.
+    if (k === 'banco') { sane[k] = bancoValido(v); continue; }
     if (k === 'multifecha') {
       const filas = parseMultifecha(v);
       sane[k] = (filas == null) ? null : JSON.stringify(filas);

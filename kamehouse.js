@@ -18328,6 +18328,7 @@ async function crearEsferaEvento() {
     banco: document.getElementById('esf-banco')?.value || null,
     // [ESF-CAMPOS-1] Los tres apuntes.
     promo: !!document.getElementById('esf-promo')?.checked,
+    flash_promo: _esfGetFlash(),
     promo_code: document.getElementById('esf-promo-code')?.value.trim() || null,
     promo_label: document.getElementById('esf-promo-label')?.value.trim() || null,
     deporte: !!document.getElementById('esf-deporte')?.checked,
@@ -18367,7 +18368,8 @@ async function crearEsferaEvento() {
       const d = document.getElementById('esf-deporte'); if (d) d.checked = false;
       const m = document.getElementById('esf-music-search'); if (m) m.value = '';
       const pc = document.getElementById('esf-promo-code'); if (pc) pc.value = '';
-      const pl = document.getElementById('esf-promo-label'); if (pl) pl.value = ''; }
+      const pl = document.getElementById('esf-promo-label'); if (pl) pl.value = ''; 
+      _esfFlashClear(); }
     _esfClearHotel();
     _esfMapaClear();
     _esfFotoClear();
@@ -19412,6 +19414,101 @@ function _esfHotelToggle() {
   }
 }
 // Devuelve el objeto {custom,total,items} o null (toggle apagado = default ciudad).
+// ═══ [ESF-FLASH-1] EL CÓDIGO DE DESCUENTO FLASH ═══════════════════════════
+// 🔒 LA REGLA DEL HUSO, que es de donde salen los errores: lo que Memo teclea se
+// lee en hora de REYNOSA (−05:00), que sigue el horario de EE.UU. y NO el de
+// Monterrey. Es la regla que quedó escrita al borrar melanie, y aquí es donde
+// aplica — el compilador solo guarda el instante ya resuelto.
+//
+// Careado contra el COMPA de arre: su `expiresTs` 1778427681035 son las
+// 10:41:21 del 10-may en Reynosa. Teclear esa fecha y esa hora tiene que dar
+// ese número exacto.
+//
+// Los literales `-06:00` que quedan en el catálogo son de mayo y son LEGACY;
+// los nuevos (agosto) ya llevan −05:00.
+const ESF_FLASH_TZ = '-05:00';   // Reynosa
+
+// El objeto completo tal como llegó, para no perder las llaves que este
+// formulario NO expone (`expiresHours`, `onlyEvent`). Mismo patrón que
+// `window._esfFestival`: se reescribe solo lo que el formulario gobierna.
+window._esfFlashCache = null;
+
+function _esfFlashInstante() {
+  const f = (document.getElementById('esf-flash-fecha')?.value || '').trim();
+  const h = (document.getElementById('esf-flash-hora')?.value || '').trim();
+  if (!f) return null;
+  const ts = Date.parse(f + 'T' + (h || '00:00:00') + ESF_FLASH_TZ);
+  return Number.isFinite(ts) ? ts : null;
+}
+
+function _esfGetFlash() {
+  const code = (document.getElementById('esf-flash-code')?.value || '').trim();
+  const valor = parseInt(document.getElementById('esf-flash-valor')?.value || '', 10);
+  const ts = _esfFlashInstante();
+  // Sin código, sin valor o sin vencimiento NO hay promo: `null`, que es
+  // distinto de un objeto a medias. El servidor lo rechazaría igual, pero
+  // mandarlo sería pedirle que adivine.
+  if (!code || !(Number.isFinite(valor) && valor > 0) || ts == null) return null;
+  const base = (window._esfFlashCache && typeof window._esfFlashCache === 'object')
+    ? Object.assign({}, window._esfFlashCache) : {};
+  delete base.pct; delete base.amount;              // son excluyentes: se reescribe el elegido
+  base.code = code;
+  base[(document.getElementById('esf-flash-tipo')?.value === 'amount') ? 'amount' : 'pct'] = valor;
+  // Los MILISEGUNDOS del original se conservan si el reloj de pared no cambió.
+  // Un `input type="time"` solo llega al segundo, así que el redondo de un
+  // vencimiento importado (`…035`) devolvía `…000` y editar CUALQUIER otro
+  // campo le movía el vencimiento a un evento que nadie tocó. Si Memo sí cambia
+  // la fecha o la hora, manda lo que tecleó — al segundo, como lo escribió.
+  const previo = Number(base.expiresTs);
+  base.expiresTs = (Number.isFinite(previo) && Math.floor(previo / 1000) === Math.floor(ts / 1000))
+    ? previo : ts;
+  if (document.getElementById('esf-flash-soloplus')?.checked) base.excludePkg = ['ride', 'stay', 'cheap'];
+  else delete base.excludePkg;
+  return JSON.stringify(base);
+}
+
+// Puebla desde la fila y GUARDA el objeto entero en el cache.
+function _esfFlashPopulate(raw) {
+  let o = raw;
+  if (typeof o === 'string') { try { o = JSON.parse(o); } catch (_) { o = null; } }
+  window._esfFlashCache = (o && typeof o === 'object' && !Array.isArray(o)) ? o : null;
+  const set = (id, v) => { const e = document.getElementById(id); if (e) e.value = v; };
+  const c = window._esfFlashCache;
+  set('esf-flash-code', c ? (c.code || '') : '');
+  set('esf-flash-tipo', (c && c.amount != null && c.pct == null) ? 'amount' : 'pct');
+  set('esf-flash-valor', c ? String((c.amount != null && c.pct == null) ? c.amount : (c.pct || '')) : '');
+  const cb = document.getElementById('esf-flash-soloplus');
+  if (cb) cb.checked = !!(c && Array.isArray(c.excludePkg) && c.excludePkg.length);
+  if (c && Number.isFinite(Number(c.expiresTs))) {
+    // El instante se vuelve a mostrar EN REYNOSA, no en la hora del navegador:
+    // si se pintara en local, alguien en otro huso vería otra hora y al guardar
+    // movería el vencimiento sin tocarlo.
+    const d = new Date(Number(c.expiresTs));
+    const en = d.toLocaleString('sv-SE', { timeZone: 'America/Cancun' });  // Cancún = −05:00 todo el año
+    set('esf-flash-fecha', en.slice(0, 10));
+    set('esf-flash-hora', en.slice(11, 19));
+  } else { set('esf-flash-fecha', ''); set('esf-flash-hora', ''); }
+  _esfFlashPreview();
+}
+
+function _esfFlashClear() { window._esfFlashCache = null; _esfFlashPopulate(null); }
+
+// Dice EN PALABRAS qué se va a guardar. Un epoch de 13 cifras no se puede
+// revisar de un vistazo, y este campo apaga descuentos.
+function _esfFlashPreview() {
+  const el = document.getElementById('esf-flash-preview');
+  if (!el) return;
+  const j = _esfGetFlash();
+  if (!j) { el.innerHTML = 'Vacío = <b>este evento no tiene código flash</b>. Hacen falta código, valor y vencimiento.'; return; }
+  const o = JSON.parse(j);
+  const d = new Date(o.expiresTs);
+  const en = d.toLocaleString('sv-SE', { timeZone: 'America/Cancun' });
+  el.innerHTML = 'Código <b>' + _esfEsc(o.code) + '</b> · ' +
+    (o.pct != null ? o.pct + '% de descuento' : '$' + o.amount + ' de descuento') +
+    (o.excludePkg ? ' · <b>solo PLUS</b>' : '') +
+    '<br>vence el <b>' + en.slice(0, 10) + '</b> a las <b>' + en.slice(11, 19) + '</b> hora de Reynosa (−05:00)';
+}
+
 function _esfGetHotel() {
   if (!document.getElementById('esf-hotel-custom')?.checked) return null;
   const total = parseInt(document.getElementById('esf-hotel-total')?.value || '0', 10) || 0;
@@ -19683,6 +19780,7 @@ function editarEsfera(slug) {
   if (Array.isArray(_cz)) _cz.forEach((z) => { if (z && typeof z === 'object') _esfAddCheapZona(z); });
   set('esf-banco', row.banco || '');
   { const p = document.getElementById('esf-promo'); if (p) p.checked = !!row.promo; }
+  _esfFlashPopulate(row.flash_promo);
   set('esf-promo-code', row.promo_code || '');
   set('esf-promo-label', row.promo_label || '');
   { const d = document.getElementById('esf-deporte'); if (d) d.checked = !!row.deporte; }
@@ -19735,7 +19833,8 @@ function cancelarEdicionEsfera() {
       const d = document.getElementById('esf-deporte'); if (d) d.checked = false;
       const m = document.getElementById('esf-music-search'); if (m) m.value = '';
       const pc = document.getElementById('esf-promo-code'); if (pc) pc.value = '';
-      const pl = document.getElementById('esf-promo-label'); if (pl) pl.value = ''; }
+      const pl = document.getElementById('esf-promo-label'); if (pl) pl.value = ''; 
+      _esfFlashClear(); }
   _esfClearHotel();
   _esfMapaClear();
   _esfFotoClear();
@@ -19779,6 +19878,7 @@ async function guardarCambiosEsfera() {
     banco: document.getElementById('esf-banco')?.value || null,
     // [ESF-CAMPOS-1] Los tres apuntes.
     promo: !!document.getElementById('esf-promo')?.checked,
+    flash_promo: _esfGetFlash(),
     promo_code: document.getElementById('esf-promo-code')?.value.trim() || null,
     promo_label: document.getElementById('esf-promo-label')?.value.trim() || null,
     deporte: !!document.getElementById('esf-deporte')?.checked,

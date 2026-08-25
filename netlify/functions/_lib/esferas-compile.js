@@ -334,6 +334,70 @@ function musicSearchSeg(esfera) {
   return v ? ("musicSearch:'" + escStr(v) + "',") : '';
 }
 
+// ═══ [ESF-FLASH-1] EL CÓDIGO DE DESCUENTO FLASH ═══════════════════════════
+// El último campo grande del mapa: bloqueaba a 14 eventos vivos.
+//
+// EL CATÁLOGO TIENE DOS FORMAS, medidas sobre los 15 que lo traen:
+//   corta (10):  {code, pct|amount, expiresTs}
+//   larga  (5):  {code, pct, expiresHours, expiresTs, excludePkg, onlyEvent}
+// Por eso viaja como UN objeto en una columna JSON —igual que `hotel`,
+// `multifecha` y `cheap_zonas`— y no como cuatro columnas sueltas: cuatro
+// columnas habrían dejado fuera a los 5 de la forma larga.
+//
+// ⚠️ `expiresTs` SE GUARDA COMO INSTANTE (epoch ms), no como texto con huso.
+// En el catálogo aparece de las dos maneras —número crudo en 10, y
+// `Date.parse('...-06:00')` en 5— y las dos evalúan a lo mismo. Guardar el
+// instante quita la pregunta: no hay literal que escribir mal.
+//
+// LA REGLA DEL HUSO vive en la CAPTURA, no aquí: lo que Memo teclea se lee en
+// hora de REYNOSA (-05:00), que sigue el horario de EE.UU. Careado contra el
+// COMPA de arre: 1778427681035 son las 10:41:21 del 10-may en Reynosa. Los
+// literales `-06:00` del catálogo son de mayo y son LEGACY; los nuevos
+// (`-05:00`, agosto) ya siguen esta regla.
+//
+// `pct` y `amount` son EXCLUYENTES: un porcentaje o unos pesos, nunca los dos.
+const FLASH_PKGS = ['plus', 'ride', 'stay', 'cheap'];
+
+function parseFlashPromo(raw) {
+  let o = raw;
+  if (typeof raw === 'string') {
+    if (!raw.trim()) return null;
+    try { o = JSON.parse(raw); } catch (_) { return null; }
+  }
+  if (!o || typeof o !== 'object' || Array.isArray(o)) return null;
+  const code = (typeof o.code === 'string') ? o.code.trim() : '';
+  if (!code) return null;                       // sin código no hay promo que aplicar
+  const ts = Number(o.expiresTs);
+  if (!Number.isFinite(ts) || ts <= 0) return null;   // sin vencimiento tampoco
+  const out = { code, expiresTs: Math.round(ts) };
+  const pct = Number(o.pct), amount = Number(o.amount);
+  if (Number.isFinite(pct) && pct > 0) out.pct = Math.round(pct);
+  else if (Number.isFinite(amount) && amount > 0) out.amount = Math.round(amount);
+  else return null;                             // un descuento de nada no es un descuento
+  const hrs = Number(o.expiresHours);
+  if (Number.isFinite(hrs) && hrs > 0) out.expiresHours = Math.round(hrs);
+  if (Array.isArray(o.excludePkg)) {
+    const ex = o.excludePkg.map((x) => String(x).trim().toLowerCase()).filter((x) => FLASH_PKGS.includes(x));
+    if (ex.length) out.excludePkg = ex;
+  }
+  if (typeof o.onlyEvent === 'string' && o.onlyEvent.trim()) out.onlyEvent = o.onlyEvent.trim();
+  return out;
+}
+
+// El orden de las llaves es el del catálogo:
+//   code · pct|amount · expiresHours? · expiresTs · excludePkg? · onlyEvent?
+function flashPromoSeg(esfera) {
+  const f = parseFlashPromo(esfera.flash_promo);
+  if (!f) return '';
+  return "flashPromo:{code:'" + escStr(f.code) + "'" +
+    (f.pct != null ? ',pct:' + f.pct : ',amount:' + f.amount) +
+    (f.expiresHours != null ? ',expiresHours:' + f.expiresHours : '') +
+    ',expiresTs:' + f.expiresTs +
+    (f.excludePkg ? ",excludePkg:['" + f.excludePkg.join("','") + "']" : '') +
+    (f.onlyEvent ? ",onlyEvent:'" + escStr(f.onlyEvent) + "'" : '') +
+    '},';
+}
+
 function zonasSegmento(esfera) {
   const rows = parseZonas(esfera.zonas);
   if (!rows.length) return 'zonas:[]';
@@ -672,7 +736,7 @@ function generarObjFestival(esfera, fest, hoy) {
   const bancoSeg = _bk ? (',banco:' + _bk) : '';
   return "{id:'" + escStr(esfera.slug) + "'," + promoSeg(esfera) + promoCodeSeg(esfera) + promoLabelSeg(esfera) + deporteSeg(esfera) + addedSeg + musicListSeg + flags +
     "c:'" + color +
-    "'," + imgSeg + musicSearchSeg(esfera) + lineupSeg +
+    "'," + imgSeg + musicSearchSeg(esfera) + lineupSeg + flashPromoSeg(esfera) +
     "a:'" + escStr(esfera.titulo || nombre) +
     "',f:'" + escStr(fStr) +
     "',ds:'" + escStr(dsFinal) +
@@ -833,7 +897,7 @@ function generarObj(esfera, hoy) {
     "'," + dsListStr +
     "v:'" + venue +
     "',st:'" + escStr(status) +
-    "'," + cdmx + mapa + flagsSeg +
+    "'," + cdmx + mapa + flashPromoSeg(esfera) + flagsSeg +
     incSeg + sepSeg + sepCheapSeg + rideSeg + notaSeg +
     bancoSeg + ',' +
     // [ESF-E1f] La multifecha va ANTES de las zonas, igual que en el camino de
@@ -971,7 +1035,9 @@ const CAMPOS_DEL_COMPILADOR = new Set([
   // se escribe pero no se puede borrar.
   'noBus', 'noStay', 'noCheap', 'cheapSoon', 'rideOnly', 'cheapOnly', 'cheapAlsoOk',
   // [ESF-CAMPOS-1] Se emiten, así que se declaran — la regla de ESF-FLAGS.
-  'promo', 'promoCode', 'promoLabel', 'deporte', 'musicSearch', 'lineup', 'multifecha',
+  'promo', 'promoCode', 'promoLabel', 'deporte', 'musicSearch',
+  // [ESF-FLASH-1] Se emite, se declara.
+  'flashPromo', 'lineup', 'multifecha',
   // [ESF-E1a] Desde que Esferas sabe emitirlos, los GOBIERNA: si no entraran
   // aquí, `fusionarConViejo` los conservaría del index viejo y habría dos
   // fuentes para el mismo número — justo lo que esta serie viene a cerrar.
@@ -1387,7 +1453,7 @@ function fechaDisplayDeEsfera(esfera) {
 
 module.exports = {
   compilarEV, quitarDelEV, reemplazarEnEV, todayMx, fechaDisplayDeEsfera,
-  bancoValido, BANCOS_VALIDOS, _insertarAntesDeZonasNivel1,
+  bancoValido, BANCOS_VALIDOS, _insertarAntesDeZonasNivel1, _parseFlashPromo: parseFlashPromo,
   // Helpers puros expuestos para el arnés (patrón de la casa).
   _escStr: escStr,
   _parseZonas: parseZonas,

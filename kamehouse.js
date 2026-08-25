@@ -18181,6 +18181,8 @@ async function crearEsferaEvento() {
     cheap_zonas: (() => { const c = _esfGetCheapZonas(); return c == null ? null : JSON.stringify(c); })(),
     // [ESF-E3a] NIVEL 4. `null` = el evento no es multifecha.
     multifecha: (() => { const m = _esfGetMultifecha(); return m == null ? null : JSON.stringify(m); })(),
+    // [ESF-E1g] `null` = el evento no dice banco (y el sitio cae a BBVA solo).
+    banco: document.getElementById('esf-banco')?.value || null,
     hotel: _esfGetHotel(),
     mapa: _esfGetMapa(),
     foto: _esfGetFoto(),
@@ -18211,6 +18213,7 @@ async function crearEsferaEvento() {
     _esfClearFechasExtra();
     _esfClearZonas();
     _esfClearMultifecha();
+    { const b = document.getElementById('esf-banco'); if (b) b.value = ''; }
     _esfClearHotel();
     _esfMapaClear();
     _esfFotoClear();
@@ -19478,6 +19481,7 @@ function editarEsfera(slug) {
   let _cz = row.cheap_zonas;
   if (typeof _cz === 'string') { try { _cz = JSON.parse(_cz); } catch (_) { _cz = null; } }
   if (Array.isArray(_cz)) _cz.forEach((z) => { if (z && typeof z === 'object') _esfAddCheapZona(z); });
+  set('esf-banco', row.banco || '');
   // [ESF-E3a] Las fechas del nivel 4. Poblarlas es OBLIGATORIO, no cosmético:
   // sin esto, abrir un evento multifecha y guardarlo mandaría `multifecha:null`
   // y le borraría las noches con sus zonas.
@@ -19521,6 +19525,7 @@ function cancelarEdicionEsfera() {
   _esfClearFechasExtra();
   _esfClearZonas();
   _esfClearMultifecha();
+  { const b = document.getElementById('esf-banco'); if (b) b.value = ''; }
   _esfClearHotel();
   _esfMapaClear();
   _esfFotoClear();
@@ -19560,6 +19565,8 @@ async function guardarCambiosEsfera() {
     cheap_zonas: (() => { const c = _esfGetCheapZonas(); return c == null ? null : JSON.stringify(c); })(),
     // [ESF-E3a] NIVEL 4. `null` = el evento no es multifecha.
     multifecha: (() => { const m = _esfGetMultifecha(); return m == null ? null : JSON.stringify(m); })(),
+    // [ESF-E1g] `null` = el evento no dice banco (y el sitio cae a BBVA solo).
+    banco: document.getElementById('esf-banco')?.value || null,
     hotel: _esfGetHotel(),
     mapa: _esfGetMapa(),
     foto: _esfGetFoto(),

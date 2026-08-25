@@ -1439,6 +1439,19 @@
      </div>
      <div style="font-size:11px;color:var(--ts);margin-top:4px">Incluye la ciudad en el venue (ej. "Auditorio Telmex, Guadalajara") para que el sitio la ubique bien.</div>
     </div>
+    <!-- [ESF-E1g] El banco. Un campo GOBERNADO sin boca de captura BORRA
+         —la lección de E3— y desde esta tuerca el compilador emite `banco`
+         desde la columna. Sin este selector, un evento de Banamex editado
+         aquí se publicaría en BBVA. -->
+    <div class="form-group">
+     <label>Banco de depósito</label>
+     <select class="cot-input" id="esf-banco" style="width:100%">
+      <option value="">— el estándar (BBVA) —</option>
+      <option value="BANCO_DEFAULT">BBVA Bancomer</option>
+      <option value="BANCO_HEY">Banamex</option>
+     </select>
+     <div style="font-size:11px;color:var(--ts);margin-top:4px">Vacío = el evento no dice banco y el sitio usa <b>BBVA</b>, que es su default de siempre. Elegirlo explícitamente solo hace falta para <b>Banamex</b>.</div>
+    </div>
     <div class="form-group">
      <label>Status</label>
      <select class="cot-input" id="esf-status" style="width:100%">

@@ -293,6 +293,26 @@ function multifechaTexto(f) {
 // B1 — emite el segmento "zonas:[...]" (+ ",cheapZonas:[...]" si alguna zona
 // tiene pc>0) byte-exacto: comillas simples, sin espacios, ag:1 solo si truthy.
 // Sin zonas válidas → "zonas:[]" (byte-igual a hoy). NO emite vip nunca.
+// ═══ [ESF-CAMPOS-1] TRES CAMPOS CHICOS QUE BLOQUEABAN A 13 EVENTOS VIVOS ═══
+// Medidos sobre el catálogo del 25-ago: `promo` en 22 eventos (12 vivos),
+// `deporte` en 4 (3 vivos) y `musicSearch` en 2 (1 vivo). Ninguno es complicado
+// —dos banderas y una cadena— y entre los tres desbloquean 13 eventos vivos que
+// solo los tenían a ellos como brecha.
+//
+// El SITIO de cada uno sale de contar el catálogo, no de elegirlo: `promo` va
+// después de `id` (19 de 22), `deporte` después de `id` (3 de 4) y `musicSearch`
+// después de `img` (2 de 2). El juez es semántico y no mira el orden, pero
+// emitir en el sitio mayoritario deja byte-idénticos a los que ya estaban.
+//
+// `promo:true` y `deporte:1` — cada uno con SU literal, que es como vive en el
+// catálogo. Escribir `promo:1` sería semánticamente otra cosa para el juez.
+function promoSeg(esfera) { return esfera.promo ? 'promo:true,' : ''; }
+function deporteSeg(esfera) { return esfera.deporte ? 'deporte:1,' : ''; }
+function musicSearchSeg(esfera) {
+  const v = (typeof esfera.music_search === 'string') ? esfera.music_search.trim() : '';
+  return v ? ("musicSearch:'" + escStr(v) + "',") : '';
+}
+
 function zonasSegmento(esfera) {
   const rows = parseZonas(esfera.zonas);
   if (!rows.length) return 'zonas:[]';
@@ -629,9 +649,9 @@ function generarObjFestival(esfera, fest, hoy) {
   // catalogo-index, cuenta-deposito y cuenta-evento).
   const _bk = bancoValido(esfera.banco);
   const bancoSeg = _bk ? (',banco:' + _bk) : '';
-  return "{id:'" + escStr(esfera.slug) + "'," + addedSeg + musicListSeg + flags +
+  return "{id:'" + escStr(esfera.slug) + "'," + promoSeg(esfera) + deporteSeg(esfera) + addedSeg + musicListSeg + flags +
     "c:'" + color +
-    "'," + imgSeg + lineupSeg +
+    "'," + imgSeg + musicSearchSeg(esfera) + lineupSeg +
     "a:'" + escStr(esfera.titulo || nombre) +
     "',f:'" + escStr(fStr) +
     "',ds:'" + escStr(dsFinal) +
@@ -783,9 +803,9 @@ function generarObj(esfera, hoy) {
   // catalogo-index, cuenta-deposito y cuenta-evento).
   const _bk = bancoValido(esfera.banco);
   const bancoSeg = _bk ? (',banco:' + _bk) : '';
-  return "{id:'" + escStr(esfera.slug) + "'," + addedSeg + music +
+  return "{id:'" + escStr(esfera.slug) + "'," + promoSeg(esfera) + deporteSeg(esfera) + addedSeg + music +
     "c:'" + color +
-    "'," + imgSeg +
+    "'," + imgSeg + musicSearchSeg(esfera) +
     "a:'" + escStr(esfera.titulo || nombre) +
     "',f:'" + escStr(fStr) +
     "',ds:'" + escStr(dsFinal) +
@@ -928,7 +948,9 @@ const CAMPOS_DEL_COMPILADOR = new Set([
   // La regla, para que no se repita: si el compilador puede EMITIR una llave,
   // esa llave va en este Set. Lo contrario deja el campo en tierra de nadie —
   // se escribe pero no se puede borrar.
-  'noBus', 'noStay', 'noCheap', 'cheapSoon', 'rideOnly', 'cheapOnly', 'cheapAlsoOk', 'lineup', 'multifecha',
+  'noBus', 'noStay', 'noCheap', 'cheapSoon', 'rideOnly', 'cheapOnly', 'cheapAlsoOk',
+  // [ESF-CAMPOS-1] Se emiten, así que se declaran — la regla de ESF-FLAGS.
+  'promo', 'deporte', 'musicSearch', 'lineup', 'multifecha',
   // [ESF-E1a] Desde que Esferas sabe emitirlos, los GOBIERNA: si no entraran
   // aquí, `fusionarConViejo` los conservaría del index viejo y habría dos
   // fuentes para el mismo número — justo lo que esta serie viene a cerrar.

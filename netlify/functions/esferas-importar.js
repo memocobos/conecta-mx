@@ -63,6 +63,15 @@ exports.handler = async (event) => {
   // que traerlos ensucia la lista sin que nadie los vaya a tocar. La casilla
   // existe por si algún día se quieren para historia.
   const incluirPasados = body.incluir_pasados === true;
+  // [SIEMBRA-DIAG] Lo que la PANTALLA prometió, tal como lo vio quien apretó.
+  // El diagnóstico y la siembra son DOS llamadas distintas, y entre una y otra
+  // el mundo cambia: un deploy, una publicación de Memo, otra pestaña sembrando.
+  // Pasó de verdad el 25-ago: el botón decía "Traer los 10", ESF-LISTA-1 se
+  // desplegó en medio, y la siembra —correctamente— metió 8. Nadie mintió; nadie
+  // reconcilió. Con esta lista el servidor puede decir QUIÉN faltó y POR QUÉ.
+  const esperados = Array.isArray(body.esperados)
+    ? body.esperados.filter((x) => typeof x === 'string').map((x) => x.trim()).filter(Boolean)
+    : null;
   if (accion !== 'diagnostico' && accion !== 'sembrar') {
     return { statusCode: 400, headers, body: JSON.stringify({ ok: false, error: 'acción inválida' }) };
   }
@@ -133,16 +142,48 @@ exports.handler = async (event) => {
       // `created_at` lo pone la base si no lo sabemos; mandar null lo rompería
       // (es NOT NULL con default).
       if (!fila.created_at) delete fila.created_at;
-      const r = await fetch(`${SB_URL}/rest/v1/esferas_eventos`, {
-        method: 'POST',
-        headers: Object.assign({}, sb, { 'Content-Type': 'application/json', Prefer: 'return=minimal' }),
-        body: JSON.stringify(fila),
-      });
-      if (r.ok) insertados.push(g.slug);
-      else fallidos.push({ slug: g.slug, detail: (await r.text()).slice(0, 200) });
+      // [SIEMBRA-DIAG] try/catch POR FILA. Antes, si `fetch` tronaba en la
+      // fila 5 —red, DNS, timeout— el catch de afuera devolvía un 500 pelón y
+      // las 4 que YA estaban en la base no se mencionaban en ninguna parte: la
+      // pantalla decía error y quien apretaba creía que no había pasado nada.
+      // Una tanda que se cae a la mitad tiene que decir por dónde se cayó.
+      try {
+        const r = await fetch(`${SB_URL}/rest/v1/esferas_eventos`, {
+          method: 'POST',
+          headers: Object.assign({}, sb, { 'Content-Type': 'application/json', Prefer: 'return=minimal' }),
+          body: JSON.stringify(fila),
+        });
+        if (r.ok) insertados.push(g.slug);
+        else fallidos.push({ slug: g.slug, detail: (await r.text()).slice(0, 200) });
+      } catch (err) {
+        fallidos.push({ slug: g.slug, detail: 'no pude escribir: ' + (err && err.message) });
+      }
     }
+    // [SIEMBRA-DIAG] La reconciliación. No basta con contar los que entraron:
+    // hay que carear contra lo que la pantalla prometió y NOMBRAR a los que no
+    // llegaron, con su razón. Un número que baja sin explicación se lee como un
+    // fallo del sistema cuando casi siempre es una regla haciendo su trabajo.
+    const entraron = new Set(insertados);
+    const noTraidos = (esperados || []).filter((sl) => !entraron.has(sl)).map((sl) => {
+      const f = fallidos.find((x) => x.slug === sl);
+      if (f) return { slug: sl, motivo: 'el insert falló', detail: f.detail };
+      if (ya.has(sl)) return { slug: sl, motivo: 'ya estaba en Esferas — no se pisa' };
+      const g = dg.gobernables.find((x) => x.slug === sl);
+      if (g && !incluirPasados && esPasadoFila(g.fila, dia)) {
+        return { slug: sl, motivo: 'ya pasó, y los pasados no se traen — enciende «incluir pasados» si lo quieres' };
+      }
+      if (dg.conBrecha.some((b) => b.slug === sl)) {
+        return { slug: sl, motivo: 'dejó de ser gobernable: el catálogo cambió desde que miraste' };
+      }
+      return { slug: sl, motivo: 'ya no aparece en el catálogo' };
+    });
+
     return { statusCode: 200, headers, body: JSON.stringify({
       ok: true, resumen, insertados, fallidos,
+      // Se manda SIEMPRE que el cliente haya dicho qué esperaba, aunque esté
+      // vacía: "no faltó ninguno" es una afirmación que vale la pena leer.
+      esperados: esperados ? esperados.length : null,
+      no_traidos: esperados ? noTraidos : null,
       // Se dice SIEMPRE, aunque no haya fallidos: un import que solo cuenta
       // éxitos se lee como completo cuando no lo es.
       nota: `${insertados.length} sembrados sin publicar · ${fallidos.length} fallidos · ` +

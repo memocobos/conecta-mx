@@ -918,7 +918,17 @@ const CAMPOS_DEL_COMPILADOR = new Set([
   'v', 'st', 'cdmx', 'mapa', 'inc', 'sep', 'sepCheap', 'nota', 'banco',
   'zonas', 'cheapZonas', 'hotel', 'hotelOverride', 'hotelPP', 'pagos',
   // extras del formato festival
-  'musicList', 'noBus', 'noStay', 'noCheap', 'cheapSoon', 'lineup', 'multifecha',
+  'musicList', // [ESF-FLAGS] Las SIETE banderas de paquete, no cuatro. `rideOnly`,
+  // `cheapOnly` y `cheapAlsoOk` se EMITÍAN pero no estaban aquí, y este Set es
+  // el que le dice a `fusionarConViejo` "esto lo administra el compilador". Al
+  // faltar, el fusionador las trataba como campo ajeno y las RE-INSERTABA desde
+  // el objeto viejo: apagarlas en Esferas no servía de nada. Medido en vivo
+  // sobre straykids (rideOnly) y wwemexico (cheapOnly).
+  //
+  // La regla, para que no se repita: si el compilador puede EMITIR una llave,
+  // esa llave va en este Set. Lo contrario deja el campo en tierra de nadie —
+  // se escribe pero no se puede borrar.
+  'noBus', 'noStay', 'noCheap', 'cheapSoon', 'rideOnly', 'cheapOnly', 'cheapAlsoOk', 'lineup', 'multifecha',
   // [ESF-E1a] Desde que Esferas sabe emitirlos, los GOBIERNA: si no entraran
   // aquí, `fusionarConViejo` los conservaría del index viejo y habría dos
   // fuentes para el mismo número — justo lo que esta serie viene a cerrar.

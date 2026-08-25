@@ -759,6 +759,36 @@ function generarObj(esfera, hoy) {
     zonasSegmento(esfera) + "," + hotelSegmento(esfera) + pagosSegmento() + "}";
 }
 
+// ═══ [ESF-FECHA] LA FECHA IMPOSIBLE SE RECHAZA EN LA PUERTA ═════════════════
+// Memo capturó `0026-08-18` en titodoble —un dedazo de 2026— y Esferas lo
+// aceptó sin decir nada. El evento pasó a estar "agotado hace dos mil años":
+// desapareció del sitio, sin error, sin aviso y sin nada que mirar. La fecha
+// tenía la FORMA correcta (`\d{4}-\d{2}-\d{2}`), y eso era lo único que se
+// comprobaba.
+//
+// Es la misma familia que el techo del separo: el formato está bien, lo que no
+// puede existir es el HECHO. Por eso el rechazo es 422 y no 400.
+//
+// La ventana es deliberadamente ancha —2020 a 2100— porque no está aquí para
+// adivinar si una fecha es "razonable", sino para cazar el dedazo que cambia el
+// siglo. Un evento de 2031 se captura sin fricción; uno de 0026 o de 20260 no.
+const ANIO_MIN = 2020;
+const ANIO_MAX = 2100;
+
+// Devuelve `null` si la fecha sirve, o el texto del error si no.
+// `''`/null se consideran "sin fecha", que es legítimo (un evento por confirmar).
+function fechaAbsurda(v, campo) {
+  if (v == null || v === '') return null;
+  const s = String(v).trim();
+  if (!FECHA_RE.test(s)) return `${campo || 'La fecha'} no tiene la forma AAAA-MM-DD: "${s.slice(0, 20)}".`;
+  const anio = Number(s.slice(0, 4));
+  if (!(anio >= ANIO_MIN && anio <= ANIO_MAX)) {
+    return `${campo || 'La fecha'} dice el año ${anio}, que no puede ser: se aceptan de ${ANIO_MIN} a ${ANIO_MAX}. ` +
+      'Revisa si se te fue un dígito — un año como 0026 hace que el evento desaparezca del sitio por "pasado".';
+  }
+  return null;
+}
+
 // ── Parsers de validación (idénticos a los consumidores) ──────────────────────
 
 // ⚠️ NOTA SOBRE LOS BALANCEADORES (extraerEVKamehouse y _localizarObjeto):
@@ -1224,6 +1254,7 @@ module.exports = {
   // Helpers puros expuestos para el arnés (patrón de la casa).
   _escStr: escStr,
   _parseZonas: parseZonas,
+  fechaAbsurda, ANIO_MIN, ANIO_MAX,
   _parseCheapZonas: parseCheapZonas,
   _parseMultifecha: parseMultifecha,
   _generarObj: generarObj,

@@ -18,7 +18,7 @@
 const { verifyAdminAuthLive, corsCheck } = require('./_lib/verify-admin');
 const { revisarSepCheap } = require('./_lib/separo-techo');
 const { _parseZonas: parseZonas, _parseCheapZonas: parseCheapZonas,
-  _parseMultifecha: parseMultifecha } = require('./_lib/esferas-compile');
+  _parseMultifecha: parseMultifecha, fechaAbsurda } = require('./_lib/esferas-compile');
 // [ESF-E1e] Las banderas de paquete, en un Set para que el saneador no las
 // enumere a mano en dos archivos.
 const PKG_FLAGS = new Set(['ride_only', 'cheap_only', 'no_stay', 'no_cheap', 'no_bus', 'cheap_soon', 'cheap_also_ok']);
@@ -304,6 +304,25 @@ exports.handler = async (event) => {
     const _zonasFinal = ('zonas' in sane) ? sane.zonas : _fila.zonas;
     const _techo = revisarSepCheap(_sepFinal, parseZonas(_zonasFinal));
     if (_techo) return { statusCode: 422, headers, body: JSON.stringify(_techo) };
+
+    // [ESF-FECHA] LA FECHA IMPOSIBLE, misma familia que el techo de arriba: el
+    // formato está bien, lo que no puede existir es el hecho. Memo capturó
+    // `0026-08-18` (dedazo de 2026) y el evento desapareció del sitio por
+    // "pasado hace dos mil años", sin un solo error.
+    //
+    // Se miran la fecha principal Y las extra: una fecha absurda escondida en
+    // las adicionales rompe el display y el orden igual de bien.
+    const _fechas = [['fecha_inicio', 'La fecha del evento']];
+    let _errFecha = null;
+    for (const [k, etiqueta] of _fechas) {
+      if (k in sane) { _errFecha = fechaAbsurda(sane[k], etiqueta); if (_errFecha) break; }
+    }
+    if (!_errFecha && 'fechas_extra' in sane && sane.fechas_extra) {
+      let _ex = [];
+      try { _ex = JSON.parse(sane.fechas_extra) || []; } catch (_) { _ex = []; }
+      for (const d of _ex) { _errFecha = fechaAbsurda(d, 'Una de las fechas adicionales'); if (_errFecha) break; }
+    }
+    if (_errFecha) return { statusCode: 422, headers, body: JSON.stringify({ ok: false, error: _errFecha }) };
 
     // PATCH por slug. return=representation para devolver la fila actualizada.
     const patchRes = await fetch(`${SB_URL}/rest/v1/esferas_eventos?slug=eq.${encodeURIComponent(slug)}`, {

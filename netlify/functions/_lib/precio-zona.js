@@ -7,7 +7,7 @@
 // cálculo del sitio (calcular() de index.html): total, costo por persona y el
 // SEPARO, que ES la ganancia garantizada de Memo (regla del módulo — D1).
 //
-// STAY: el descuento de stay = `ev.sep` (única verdad, igual que calcular() del
+// STAY: el descuento es FIJO (`STAY_DESCUENTO` = 500), igual que calcular() del
 // sitio y la tarjeta). Decisión de Memo: el descuento anunciado no vive en el EV.
 //
 // El precio total con hotel/transporte requiere que el caller pase el hotel
@@ -19,6 +19,15 @@
 // [COT-FIX-2] El default del separo CHEAP, con nombre y exportado. Es la
 // definición del lado SERVIDOR; index.html, rol.html y kamehouse.js tienen la
 // suya porque no pueden importar de aquí. El arnés carea las cuatro.
+// [STAY-500] REGLA FIRMADA POR MEMO, 25-ago-2026: el STAY cuesta
+// PLUS − $500 FIJOS, siempre, en cualquier evento, SIN IMPORTAR EL SEPARO.
+// Antes era `ev.sep || 500` y por eso Omar Courtz (sep 300) salía solo $300
+// abajo: se le cobraba de más. El separo es cuánto adelantas, no cuánto te
+// descuentan — dos cosas que nunca debieron ser la misma.
+// Gemelo con nombre en los 4 runtimes que no pueden importarse entre sí
+// (index · _lib/precio-zona · portal · rol), careados por el arnés. Patrón de
+// SEPARO_CHEAP_DEFAULT.
+const STAY_DESCUENTO = 500;
 const SEPARO_CHEAP_DEFAULT = 1000;
 
 const { fetchEventosRaw, fetchHotelesGlobales } = require('./catalogo-index');
@@ -191,7 +200,7 @@ function _buscarHotel(lista, nombre) {
   const hotelTotal = ev.hotelPP ? (hotelRaw * selViaj) : hotelRaw;
   const _mfR = (ev.multifecha && ev.multifecha[fechaIdx] && ev.multifecha[fechaIdx].ride) || 0;
   const rideBase = _mfR || ev.ride || (cdmx ? 2900 : 2700);
-  const stayDiscount = ev.sep || 500; // sep es la única verdad del descuento STAY.
+  const stayDiscount = STAY_DESCUENTO; // [STAY-500] fijo, no `sep`.
 
   let total = 0, costoXPersona = 0;
   if (paquete === 'plus') {
@@ -307,4 +316,4 @@ async function resolverPrecioVenta(opts) {
   });
 }
 
-module.exports = { SEPARO_CHEAP_DEFAULT, resolverPrecioVenta, _calcularPrecio, esCDMX, _diasEvento, hoyMx, PAQUETES };
+module.exports = { SEPARO_CHEAP_DEFAULT, STAY_DESCUENTO, resolverPrecioVenta, _calcularPrecio, esCDMX, _diasEvento, hoyMx, PAQUETES };

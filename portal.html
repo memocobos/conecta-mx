@@ -4717,6 +4717,15 @@ function eventoAgendable(ev){
 // Fechas PURAS (Date.UTC de los tres números), no restas de timestamps: así la
 // frontera de 15 días cae el mismo día acá y en el servidor.
 // ═══════════════════════════════════════════════════════════════════════════
+// [STAY-500] REGLA FIRMADA POR MEMO, 25-ago-2026: el STAY cuesta
+// PLUS − $500 FIJOS, siempre, en cualquier evento, SIN IMPORTAR EL SEPARO.
+// Antes era `ev.sep || 500` y por eso Omar Courtz (sep 300) salía solo $300
+// abajo: se le cobraba de más. El separo es cuánto adelantas, no cuánto te
+// descuentan — dos cosas que nunca debieron ser la misma.
+// Gemelo con nombre en los 4 runtimes que no pueden importarse entre sí
+// (index · _lib/precio-zona · portal · rol), careados por el arnés. Patrón de
+// SEPARO_CHEAP_DEFAULT.
+var STAY_DESCUENTO = 500;
 function _hoyMx(){ return new Date().toLocaleDateString('en-CA', { timeZone: 'America/Monterrey' }); }
 function _diasEventoMx(evISO, hoyISO){
   var m1 = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(evISO || ''));
@@ -4733,7 +4742,7 @@ function calcularPrecio(){
   // días (corona 1/2/3 días = 2900/4800/6700). Igual que _mfR del index.
   const _mfRide = (ev.multifecha && multifechaIdx != null && ev.multifecha[multifechaIdx] && ev.multifecha[multifechaIdx].ride) || 0;
   const rideBase = _mfRide || ev.ride || (cdmx ? 2900 : 2700);
-  const stayDiscount = ev.sep || 500;
+  const stayDiscount = STAY_DESCUENTO;   // [STAY-500] fijo, no `sep`.
   const habE = (pkg === 'CHEAP') ? 0 : habCostPP(hab, ev);
   const zonaP = (zona && zona.p > 0) ? zona.p : 0;
 

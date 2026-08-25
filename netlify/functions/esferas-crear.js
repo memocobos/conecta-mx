@@ -21,7 +21,7 @@
 const { verifyAdminAuthLive, corsCheck } = require('./_lib/verify-admin');
 const { revisarSepCheap } = require('./_lib/separo-techo');
 const { _parseZonas: parseZonas, _parseCheapZonas: parseCheapZonas,
-  _parseMultifecha: parseMultifecha, fechaAbsurda, bancoValido } = require('./_lib/esferas-compile');
+  _parseMultifecha: parseMultifecha, fechaAbsurda, bancoValido, _parseFlashPromo: parseFlashPromo } = require('./_lib/esferas-compile');
 // [ESF-E1e] Las banderas de paquete, en un Set para que el saneador no las
 // enumere a mano en dos archivos.
 const PKG_FLAGS = new Set(['ride_only', 'cheap_only', 'no_stay', 'no_cheap', 'no_bus', 'cheap_soon', 'cheap_also_ok']);
@@ -51,6 +51,7 @@ const CAMPOS_PERMITIDOS = new Set([
   'banco',   // [ESF-E1g] identificador del banco; lista CERRADA (ver abajo).
   // [ESF-CAMPOS-1] Tres campos chicos que bloqueaban a 13 eventos vivos.
   'promo', 'promo_code', 'promo_label', 'deporte', 'music_search',
+  'flash_promo',   // [ESF-FLASH-1] el objeto entero, en JSON.
   // [ESF-E1e] las banderas de paquete (nivel 3 de la granularidad)
   'ride_only', 'cheap_only', 'no_stay', 'no_cheap', 'no_bus', 'cheap_soon', 'cheap_also_ok',
 ]);
@@ -267,6 +268,15 @@ exports.handler = async (event) => {
     // [ESF-PROMO-PAR] El código y la etiqueta del badge. Se recortan: los
     // reales miden 9 y 53 caracteres, y un tope generoso evita que un pegado
     // accidental acabe impreso sobre la tarjeta del evento.
+    // [ESF-FLASH-1] Se sanea con el MISMO parser que lo compila: si el
+    // compilador no sabría emitirlo, no se guarda. `null` = sin código, que es
+    // distinto de un objeto vacío.
+    if (k === 'flash_promo') {
+      if (v == null || v === '') { sane[k] = null; continue; }
+      const f = parseFlashPromo(v);
+      sane[k] = f ? JSON.stringify(f) : null;
+      continue;
+    }
     if (k === 'promo_code') { sane[k] = (typeof v === 'string' && v.trim()) ? v.trim().slice(0, 40) : null; continue; }
     if (k === 'promo_label') { sane[k] = (typeof v === 'string' && v.trim()) ? v.trim().slice(0, 160) : null; continue; }
     if (k === 'music_search') { sane[k] = (typeof v === 'string' && v.trim()) ? v.trim().slice(0, 120) : null; continue; }
@@ -326,6 +336,18 @@ exports.handler = async (event) => {
     let _ex = [];
     try { _ex = JSON.parse(sane.fechas_extra) || []; } catch (_) { _ex = []; }
     for (const d of _ex) { _errFecha = fechaAbsurda(d, 'Una de las fechas adicionales'); if (_errFecha) break; }
+  }
+  // [ESF-FLASH-1] El vencimiento del código flash entra al mismo candado: un
+  // `expiresTs` de 1970 o del año 3000 apaga (o eterniza) la promo en silencio.
+  // Se mira como FECHA, que es como se captura.
+  if (!_errFecha && 'flash_promo' in sane && sane.flash_promo) {
+    let _fp = null;
+    try { _fp = JSON.parse(sane.flash_promo); } catch (_) { _fp = null; }
+    if (_fp && Number.isFinite(Number(_fp.expiresTs))) {
+      const _d = new Date(Number(_fp.expiresTs));
+      const _iso = Number.isFinite(_d.getTime()) ? _d.toISOString().slice(0, 10) : 'x';
+      _errFecha = fechaAbsurda(_iso, 'El vencimiento del código flash');
+    }
   }
   if (_errFecha) return { statusCode: 422, headers, body: JSON.stringify({ ok: false, error: _errFecha }) };
 

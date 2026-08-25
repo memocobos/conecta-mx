@@ -1464,6 +1464,25 @@
      <input class="cot-input" id="esf-music-search" placeholder="Buscar música como… (ej. «Siddhartha»)" autocomplete="off" style="width:100%;margin-top:8px">
      <div style="font-size:11px;color:var(--ts);margin-top:4px">El texto de música solo hace falta cuando el <b>nombre del evento no da con el artista</b> — como «Siddharta - Tú y Yo Tour», que se busca como «Siddhartha». Vacío = se busca por el nombre.</div>
     </div>
+    <!-- [ESF-FLASH-1] El código de descuento flash. Bloqueaba a 14 eventos
+         vivos y era el último campo grande del mapa. -->
+    <div class="form-group">
+     <label>Código de descuento flash</label>
+     <div style="display:flex;gap:6px;flex-wrap:wrap">
+      <input class="cot-input" id="esf-flash-code" placeholder="Código (ej. COMPA)" autocomplete="off" style="flex:2;min-width:130px" oninput="_esfFlashPreview()">
+      <select class="cot-input" id="esf-flash-tipo" style="flex:1;min-width:110px" onchange="_esfFlashPreview()">
+       <option value="pct">% de descuento</option>
+       <option value="amount">$ de descuento</option>
+      </select>
+      <input class="cot-input" id="esf-flash-valor" type="number" min="0" placeholder="5" style="flex:1;min-width:80px" oninput="_esfFlashPreview()">
+     </div>
+     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;align-items:center">
+      <input class="cot-input" id="esf-flash-fecha" type="date" style="flex:1;min-width:150px" oninput="_esfFlashPreview()">
+      <input class="cot-input" id="esf-flash-hora" type="time" step="1" style="flex:1;min-width:120px" oninput="_esfFlashPreview()">
+      <label style="font-size:11px;display:flex;align-items:center;gap:4px;white-space:nowrap" title="El descuento aplica SOLO al paquete PLUS"><input type="checkbox" id="esf-flash-soloplus" onchange="_esfFlashPreview()">solo PLUS</label>
+     </div>
+     <div id="esf-flash-preview" style="font-size:11px;color:var(--ts);margin-top:6px;line-height:1.5">Vacío = <b>este evento no tiene código flash</b>.</div>
+    </div>
     <div class="form-group">
      <label>Banco de depósito</label>
      <select class="cot-input" id="esf-banco" style="width:100%">

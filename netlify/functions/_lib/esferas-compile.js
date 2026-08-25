@@ -219,6 +219,58 @@ function cheapZonaTexto(z) {
     (z.requiereViajeros != null ? ',requiereViajeros:' + z.requiereViajeros : '') + '}';
 }
 
+// ═══ [ESF-E1f] MULTIFECHA EN CONCIERTOS · el NIVEL 4 de Memo ════════════════
+// Cada fecha con SUS PROPIAS zonas, agotables una por una. Hasta hoy
+// `multifecha:` solo se emitía en el camino de FESTIVAL —2 de las 2 apariciones
+// del compilador— así que un concierto multifecha (straykids, weeknd, bts,
+// karolg, morat, caifanes, harry, alvarodiaz: OCHO eventos) no se podía
+// gobernar: `multifecha` YA estaba en CAMPOS_DEL_COMPILADOR, y publicarlo le
+// habría borrado las fechas con sus zonas. La misma trampa que `noStay` en
+// ESF-E1e, pero borrando bastante más.
+//
+// Las dos familias del catálogo NO se mezclan: la de FECHA (lbl · ds? · zonas ·
+// cheapZonas? · ride? · rideAgotado?) es ésta; la de PAQUETE —con `noches`,
+// `music` y `hotel` por entrada— es la del festival y sigue por su camino.
+function parseMultifecha(raw) {
+  let arr = raw;
+  if (typeof raw === 'string') {
+    if (!raw.trim()) return null;
+    try { arr = JSON.parse(raw); } catch (_) { return null; }
+  }
+  if (!Array.isArray(arr) || !arr.length) return null;
+  const out = [];
+  for (const f of arr) {
+    if (!f || typeof f !== 'object') continue;
+    const lbl = (typeof f.lbl === 'string' ? f.lbl : '').trim();
+    if (!lbl) continue;                       // sin etiqueta no hay fecha que mostrar
+    const ds = (typeof f.ds === 'string' && FECHA_RE.test(f.ds.trim())) ? f.ds.trim() : null;
+    // Las zonas de la fecha se leen con el MISMO parser que las de arriba: una
+    // zona es una zona, esté donde esté. Un tercer parser sería la copia que
+    // acaba divergiendo.
+    const zonas = parseCheapZonas(f.zonas) || [];
+    const cheap = parseCheapZonas(f.cheapZonas);
+    const ride = Number(f.ride);
+    out.push({
+      lbl, ds, zonas,
+      cheapZonas: cheap,
+      ride: (Number.isFinite(ride) && ride > 0) ? Math.round(ride) : null,
+      rideAgotado: (f.rideAgotado === 1 || f.rideAgotado === true || f.rideAgotado === '1') ? 1 : 0,
+    });
+  }
+  return out.length ? out : null;
+}
+
+// El texto de UNA fecha, en el orden del catálogo:
+//   lbl · ds? · zonas · cheapZonas? · ride? · rideAgotado?
+function multifechaTexto(f) {
+  return "{lbl:'" + escStr(f.lbl) + "'" +
+    (f.ds ? ",ds:'" + f.ds + "'" : '') +
+    ',zonas:[' + f.zonas.map(cheapZonaTexto).join(',') + ']' +
+    (f.cheapZonas ? ',cheapZonas:[' + f.cheapZonas.map(cheapZonaTexto).join(',') + ']' : '') +
+    (f.ride != null ? ',ride:' + f.ride : '') +
+    (f.rideAgotado ? ',rideAgotado:1' : '') + '}';
+}
+
 // B1 — emite el segmento "zonas:[...]" (+ ",cheapZonas:[...]" si alguna zona
 // tiene pc>0) byte-exacto: comillas simples, sin espacios, ag:1 solo si truthy.
 // Sin zonas válidas → "zonas:[]" (byte-igual a hoy). NO emite vip nunca.
@@ -586,8 +638,19 @@ function generarObj(esfera, hoy) {
   }
   fechas.sort();
   const esMulti = fechas.length >= 2;
+  // [ESF-E1f] Las fechas con sus zonas. Si el evento las trae y NO tiene
+  // `fechas_extra`, las fechas del display salen de aquí — es el caso de morat y
+  // caifanes, que llevan `ds` en cada entrada y no tienen `dsList`.
+  const mfFilas = parseMultifecha(esfera.multifecha);
+  const mfDs = mfFilas ? mfFilas.map((f) => f.ds).filter(Boolean) : [];
   const dsFinal = fechas.length ? fechas[0] : ds;        // primera cronológica
-  const fStr = esMulti ? fDisplayMulti(fechas) : fDisplay(dsFinal || fi);
+  // [ESF-E1f] El display: mandan las `fechas_extra` si las hay; si no, las `ds`
+  // de las entradas de multifecha. NO se inventa `dsList` a partir de ellas —
+  // morat y caifanes no lo tienen, y añadírselo les estrenaría el selector de
+  // día en el sitio: eso es un cambio de PANTALLA, no de dato.
+  const fDeMulti = (!esMulti && mfDs.length >= 2) ? [...new Set(mfDs)].sort() : null;
+  const fStr = esMulti ? fDisplayMulti(fechas)
+    : (fDeMulti ? fDisplayMulti(fDeMulti) : fDisplay(dsFinal || fi));
   const dsListStr = esMulti
     ? ('dsList:[' + fechas.map((d) => "'" + d + "'").join(',') + '],')
     : '';
@@ -689,7 +752,11 @@ function generarObj(esfera, hoy) {
     "',st:'" + escStr(status) +
     "'," + cdmx + mapa + flagsSeg +
     incSeg + ",sep:" + sepN + sepCheapSeg + rideSeg + notaSeg +
-    ",banco:BANCO_DEFAULT," + zonasSegmento(esfera) + "," + hotelSegmento(esfera) + pagosSegmento() + "}";
+    ",banco:BANCO_DEFAULT," +
+    // [ESF-E1f] La multifecha va ANTES de las zonas, igual que en el camino de
+    // festival y que en los 8 conciertos del catálogo.
+    (mfFilas ? ('multifecha:[' + mfFilas.map(multifechaTexto).join(',') + '],') : '') +
+    zonasSegmento(esfera) + "," + hotelSegmento(esfera) + pagosSegmento() + "}";
 }
 
 // ── Parsers de validación (idénticos a los consumidores) ──────────────────────
@@ -1158,6 +1225,7 @@ module.exports = {
   _escStr: escStr,
   _parseZonas: parseZonas,
   _parseCheapZonas: parseCheapZonas,
+  _parseMultifecha: parseMultifecha,
   _generarObj: generarObj,
   _fusionarConViejo: fusionarConViejo,
   _extraerEVKamehouse: extraerEVKamehouse,

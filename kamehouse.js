@@ -17453,6 +17453,100 @@ function _esfAcciones(e) {
     <button class="btn btn-ghost btn-sm" style="font-size:10px;color:var(--red)" onclick="cancelarEventoCompleto('${s}')"><svg class="ic"><use href="#ic-prohibido"/></svg> Cancelar</button>`;
 }
 
+// ═══ [ESF-LISTA-1] LA LISTA, SIN LOS QUE YA PASARON ════════════════════════
+// Memo: los pasados "no sirven pa nada" ahí. Medido sobre el catálogo del
+// 25-ago-2026: 42 de 102 ya ocurrieron — casi la mitad de la lista era ruido.
+//
+// No se borran: un pasado sembrado no le estorba al sitio (nace sin publicar y
+// el index ya lo tiene). Solo queda detrás del filtro.
+let _esfFiltroFecha = 'proximo';   // al abrir, Memo ve SOLO próximos
+
+// El orden lo pone `_evOrdenarPorFecha`, la fuente de ORD-1 — no un sort nuevo.
+// Pero esa función lee `dsList`/`ds`/`fecha`, y una fila de Esferas trae
+// `fecha_inicio`/`fechas_extra`/`multifecha`: pasarla tal cual las mandaría a
+// TODAS al grupo "sin fecha" y las ordenaría por nombre. Por eso se adapta la
+// fila a la forma que la regla ya sabe leer, en vez de escribir una regla nueva.
+function _esfComoEvento(e) {
+  const f = [];
+  const add = (v) => { if (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v.trim())) f.push(v.trim()); };
+  add((e.fecha_inicio || '').slice(0, 10));
+  let ex = e.fechas_extra;
+  if (typeof ex === 'string') { try { ex = JSON.parse(ex); } catch (_) { ex = null; } }
+  if (Array.isArray(ex)) ex.forEach(add);
+  let mf = e.multifecha;
+  if (typeof mf === 'string') { try { mf = JSON.parse(mf); } catch (_) { mf = null; } }
+  if (Array.isArray(mf)) mf.forEach((m) => add(m && m.ds));
+  return { dsList: f.sort(), nombre: e.nombre || e.slug, __slug: e.slug };
+}
+
+// El veredicto sale de `_evGrupoOrden`, el MISMO que usa el orden: si el filtro
+// juzgara distinto que el sort, un "pasado" podría aparecer entre los próximos.
+// 0 = próximo · 1 = sin fecha · 2 = pasado.
+//
+// SIN FECHA CUENTA COMO PRÓXIMO. Un evento por confirmar está pendiente, no es
+// historia — y esconderlo detrás de "pasados" es donde se pierde.
+function _esfPasaFiltro(adaptado, filtro, hoy) {
+  const g = _evGrupoOrden(adaptado, hoy);
+  if (filtro === 'pasado') return g === 2;
+  if (filtro === 'proximo') return g !== 2;
+  return true;
+}
+
+function filtrarEsferasFecha(filtro, btn) {
+  document.querySelectorAll('#page-esferas .gz-filter[id^="esff-"]').forEach((b) => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  _esfFiltroFecha = filtro;
+  _esfPintarLista();
+}
+
+function _esfPintarLista() {
+  const cont = document.getElementById('esf-listado');
+  if (!cont) return;
+  const filas = window._esfRows || [];
+  const hoy = _mxFechaStr();
+  const porSlug = {};
+  filas.forEach((e) => { porSlug[e.slug] = e; });
+  const ordenados = _evOrdenarPorFecha(filas.map(_esfComoEvento), hoy);
+  const visibles = ordenados.filter((a) => _esfPasaFiltro(a, _esfFiltroFecha, hoy)).map((a) => porSlug[a.__slug]).filter(Boolean);
+
+  // Los conteos van EN los chips: sin ellos, "próximos" vacío se lee como "la
+  // lista no cargó" en vez de "no hay ninguno".
+  const cuenta = { proximo: 0, pasado: 0 };
+  ordenados.forEach((a) => { (_evGrupoOrden(a, hoy) === 2 ? cuenta.pasado++ : cuenta.proximo++); });
+  const rot = (id, txt, n) => { const b = document.getElementById(id); if (b) b.textContent = txt + ' (' + n + ')'; };
+  rot('esff-proximos', '// próximos', cuenta.proximo);
+  rot('esff-pasados', '// pasados', cuenta.pasado);
+  rot('esff-todos', '// todos', ordenados.length);
+
+  if (!filas.length) {
+    cont.innerHTML = '<div class="empty-state"><div class="empty-icon">·</div>Sin eventos registrados</div>';
+    return;
+  }
+  if (!visibles.length) {
+    // Se dice CUÁNTOS hay del otro lado: una lista vacía es una afirmación, y
+    // sin el número no se sabe si no hay o si el filtro los tapó.
+    const otros = _esfFiltroFecha === 'pasado' ? cuenta.proximo : cuenta.pasado;
+    cont.innerHTML = '<div class="empty-state"><div class="empty-icon">·</div>Ningún evento ' +
+      (_esfFiltroFecha === 'pasado' ? 'pasado' : 'próximo') +
+      (otros ? ' — hay ' + otros + ' del otro lado del filtro.' : '.') + '</div>';
+    return;
+  }
+  cont.innerHTML = `<div class="table-wrap"><table>
+    <thead><tr><th>Slug</th><th>Nombre</th><th>Fecha</th><th>Ciudad</th><th>Status</th><th>Publicación</th><th>Acciones</th></tr></thead>
+    <tbody>${visibles.map(e => `<tr>
+      <td style="font-family:'JetBrains Mono',monospace;font-size:12px">${_esfEsc(e.slug)}</td>
+      <td style="font-weight:600">${_esfEsc(e.nombre)}${e.venue ? `<br><span style="font-size:10px;color:var(--ts);font-weight:400">${_esfEsc(e.venue)}</span>` : ''}</td>
+      <td style="font-size:12px">${_esfEsc(e.fecha_inicio) || '—'}</td>
+      <td style="font-size:12px">${_esfEsc(e.ciudad) || '—'}</td>
+      <td style="font-size:11px;color:var(--orange)">${_esfEsc(e.status) || 'Disponible'}</td>
+      <td>${e.publicado
+        ? `<span class="badge badge-green">publicado</span> <button class="btn btn-ghost btn-sm" style="font-size:10px" onclick="despublicarEsfera('${_esfEsc(e.slug)}')"><svg class="ic"><use href="#ic-basura"/></svg> Despublicar</button>`
+        : `<span class="badge badge-gray">borrador</span> <button class="btn btn-ghost btn-sm" style="font-size:10px;color:var(--red)" onclick="eliminarEsfera('${_esfEsc(e.slug)}')"><svg class="ic"><use href="#ic-basura"/></svg> Eliminar</button>`}</td>
+      <td>${_esfAcciones(e)}</td>
+    </tr>`).join('')}</tbody>
+  </table></div>`;
+}
+
 async function loadEsferasEventos() {
   _esfPreviewInit();
   _esfLoadVenuesCat(); // best-effort, no bloquea el listado
@@ -17468,24 +17562,9 @@ async function loadEsferasEventos() {
     const { eventos } = await r.json();
     const filas = eventos || [];
     window._esfRows = filas; // cache para el modo edición
-    if (!filas.length) {
-      cont.innerHTML = '<div class="empty-state"><div class="empty-icon">·</div>Sin eventos registrados</div>';
-      return;
-    }
-    cont.innerHTML = `<div class="table-wrap"><table>
-      <thead><tr><th>Slug</th><th>Nombre</th><th>Fecha</th><th>Ciudad</th><th>Status</th><th>Publicación</th><th>Acciones</th></tr></thead>
-      <tbody>${filas.map(e => `<tr>
-        <td style="font-family:'JetBrains Mono',monospace;font-size:12px">${_esfEsc(e.slug)}</td>
-        <td style="font-weight:600">${_esfEsc(e.nombre)}${e.venue ? `<br><span style="font-size:10px;color:var(--ts);font-weight:400">${_esfEsc(e.venue)}</span>` : ''}</td>
-        <td style="font-size:12px">${_esfEsc(e.fecha_inicio) || '—'}</td>
-        <td style="font-size:12px">${_esfEsc(e.ciudad) || '—'}</td>
-        <td style="font-size:11px;color:var(--orange)">${_esfEsc(e.status) || 'Disponible'}</td>
-        <td>${e.publicado
-          ? `<span class="badge badge-green">publicado</span> <button class="btn btn-ghost btn-sm" style="font-size:10px" onclick="despublicarEsfera('${_esfEsc(e.slug)}')"><svg class="ic"><use href="#ic-basura"/></svg> Despublicar</button>`
-          : `<span class="badge badge-gray">borrador</span> <button class="btn btn-ghost btn-sm" style="font-size:10px;color:var(--red)" onclick="eliminarEsfera('${_esfEsc(e.slug)}')"><svg class="ic"><use href="#ic-basura"/></svg> Eliminar</button>`}</td>
-        <td>${_esfAcciones(e)}</td>
-      </tr>`).join('')}</tbody>
-    </table></div>`;
+    // El pintado vive aparte para que los chips repinten sin volver a pedir la
+    // lista al servidor.
+    _esfPintarLista();
   } catch(e) {
     cont.innerHTML = `<div class="alert alert-error">${e.message}</div>`;
   }
@@ -18725,6 +18804,11 @@ function _esfCopiarDePlus() {
 //   · un slug que ya está en Esferas se SALTA, no se pisa
 let _esfImportDiag = null;   // el último diagnóstico, para que Sembrar diga cuántos
 
+// [ESF-LISTA-1] Los pasados no se traen por default: un evento que ya ocurrió no
+// se gobierna, se recuerda. La casilla existe por si un día se quieren para
+// historia — y al moverla se re-diagnostica solo, porque el número cambia.
+function _esfImportPasados() { return !!document.getElementById('esf-import-pasados')?.checked; }
+
 function _esfImportPanel() { return document.getElementById('esf-import-panel'); }
 
 async function importarDelCatalogo() {
@@ -18732,7 +18816,7 @@ async function importarDelCatalogo() {
   if (panel) panel.innerHTML = '<div class="loading-state"><div class="spinner"></div>Leyendo el catálogo…</div>';
   try {
     const r = await khAdminFetch('/.netlify/functions/esferas-importar', {
-      method: 'POST', body: JSON.stringify({ accion: 'diagnostico' }),
+      method: 'POST', body: JSON.stringify({ accion: 'diagnostico', incluir_pasados: _esfImportPasados() }),
     });
     const d = await r.json().catch(() => ({}));
     if (!r.ok || !d.ok) throw new Error(d.error || ('Error ' + r.status));
@@ -18756,7 +18840,12 @@ function _esfImportPintar(d) {
     cel(R.por_sembrar || 0, 'se pueden traer') +
     cel(R.ya_en_esferas || 0, 'ya están aquí') +
     cel(R.con_brecha || 0, 'se quedan a mano') +
-    '</div>';
+    '</div>' +
+    // Lo que se dejó fuera se DICE, no se calla: sin esta línea, "19 se pueden
+    // traer" se lee como "eso es todo lo que hay".
+    (R.pasados_omitidos ? '<div style="font-size:11px;color:var(--ts);margin-top:8px">' + R.pasados_omitidos +
+      ' evento(s) <b>ya pasaron</b> y no se traen. Un evento pasado no se gobierna, se recuerda — enciende <b>incluir pasados</b> si los quieres para historia.</div>' : '') +
+    (R.incluye_pasados ? '<div style="font-size:11px;color:var(--orange);margin-top:8px">Estás incluyendo los <b>pasados</b>.</div>' : '');
 
   if (nuevos.length) {
     h += '<div style="margin-top:14px;font-size:12px"><b>Se traerían ' + nuevos.length + ':</b> ' +
@@ -18799,7 +18888,9 @@ async function sembrarDelCatalogo() {
   if (btn) { btn.disabled = true; btn.textContent = 'Trayendo…'; }
   try {
     const r = await khAdminFetch('/.netlify/functions/esferas-importar', {
-      method: 'POST', body: JSON.stringify({ accion: 'sembrar' }),
+      // La casilla viaja TAMBIÉN en el sembrado: si solo fuera en el
+      // diagnóstico, la pantalla diría 19 y el servidor traería otros.
+      method: 'POST', body: JSON.stringify({ accion: 'sembrar', incluir_pasados: _esfImportPasados() }),
     });
     const d = await r.json().catch(() => ({}));
     if (!r.ok || !d.ok) throw new Error(d.error || ('Error ' + r.status));

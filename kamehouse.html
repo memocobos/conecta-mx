@@ -1664,6 +1664,14 @@
    <!-- Listado -->
    <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:20px">
     <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.15em;color:var(--ts);margin-bottom:14px">// EVENTOS REGISTRADOS</div>
+    <!-- [ESF-LISTA-1] Los mismos chips que Cápsula, con UNA diferencia: aquí el
+         default es // próximos. Un evento pasado no se gobierna, se recuerda —
+         y 42 de los 102 del catálogo ya pasaron. -->
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">
+     <button class="gz-filter active" id="esff-proximos" onclick="filtrarEsferasFecha('proximo',this)">// próximos</button>
+     <button class="gz-filter" id="esff-pasados" onclick="filtrarEsferasFecha('pasado',this)">// pasados</button>
+     <button class="gz-filter" id="esff-todos" onclick="filtrarEsferasFecha('todos',this)">// todos</button>
+    </div>
     <div id="esf-listado"><div class="loading-state"><div class="spinner"></div>Cargando…</div></div>
    </div>
 
@@ -1676,6 +1684,9 @@
     <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.15em;color:var(--ts);margin-bottom:8px">// IMPORTAR DEL CATÁLOGO</div>
     <div style="font-size:12px;color:var(--ts);margin-bottom:14px;line-height:1.5">Trae a Esferas los eventos que todavía viven a mano en <code>index.html</code>. <b>Solo entra lo que el compilador sabe reproducir sin perder un dato</b>; lo demás se queda a mano y se dice cuál y por qué. Lo sembrado nace <b>sin publicar</b> y <b>no pisa</b> nada que ya esté aquí.</div>
     <button class="btn btn-primary" type="button" id="esf-import-diag" onclick="importarDelCatalogo()"><svg class="ic"><use href="#ic-lupa"/></svg> Ver qué se puede importar</button>
+    <label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--ts);margin-left:12px;cursor:pointer" title="Los eventos que ya ocurrieron no se traen: no hay nada que gobernarles. Enciéndelo solo si los quieres para historia.">
+     <input type="checkbox" id="esf-import-pasados" onchange="importarDelCatalogo()"> incluir pasados
+    </label>
     <div id="esf-import-panel" style="margin-top:14px"></div>
    </div>
 

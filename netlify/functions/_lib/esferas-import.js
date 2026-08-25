@@ -175,4 +175,43 @@ function diagnosticar({ indexHtml, hoy }) {
   return { gobernables, conBrecha, total: gobernables.length + conBrecha.length };
 }
 
-module.exports = { diagnosticar, evAEsfera, juzgar, _objetosDelEV: objetosDelEV, _aplanar: aplanar };
+// ═══ [ESF-LISTA-1] ¿ESTE EVENTO YA PASÓ? ═══════════════════════════════════
+// Un evento pasado no se gobierna: se recuerda. No tiene sentido traerlo a
+// Esferas para poder agotarle una zona.
+//
+// ⚠️ LA REGLA ES UNA SOLA Y ES LA DE ORD-1: manda la PRIMERA fecha, igual que
+// `_evFechaOrden` en el navegador. No porque sea obviamente la mejor, sino
+// porque el filtro de la lista y este candado tienen que estar de acuerdo: dos
+// definiciones de "pasado" en la misma tuerca es la divergencia que UTIL-C
+// destapó cinco veces.
+//
+// EL FILO, DICHO: un evento de varias noches cuya PRIMERA ya pasó cuenta como
+// pasado aunque le queden noches vendiendo. Medido sobre el catálogo del
+// 25-ago-2026: 102 objetos, 56 próximos, 42 pasados, 4 sin fecha, y NINGUNO
+// partido por hoy — hoy las dos lecturas coinciden. Si algún día uno se parte,
+// se cambia AQUÍ y en `_evFechaOrden`, juntas.
+//
+// Sin fecha NO es pasado: un evento por confirmar está pendiente, no es
+// historia.
+function fechasDeFila(fila) {
+  const f = [];
+  const add = (v) => { if (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v.trim())) f.push(v.trim()); };
+  if (fila) {
+    add(fila.fecha_inicio);
+    let ex = fila.fechas_extra;
+    if (typeof ex === 'string') { try { ex = JSON.parse(ex); } catch (_) { ex = null; } }
+    if (Array.isArray(ex)) ex.forEach(add);
+    let mf = fila.multifecha;
+    if (typeof mf === 'string') { try { mf = JSON.parse(mf); } catch (_) { mf = null; } }
+    if (Array.isArray(mf)) mf.forEach((m) => add(m && m.ds));
+  }
+  return f.sort();
+}
+
+function esPasadoFila(fila, dia) {
+  const f = fechasDeFila(fila);
+  if (!f.length) return false;
+  return f[0] < (dia || todayMx());
+}
+
+module.exports = { diagnosticar, evAEsfera, juzgar, esPasadoFila, fechasDeFila, _objetosDelEV: objetosDelEV, _aplanar: aplanar };

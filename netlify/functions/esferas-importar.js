@@ -25,7 +25,8 @@
 // =============================================================================
 
 const { verifyAdminAuthLive, corsCheck } = require('./_lib/verify-admin');
-const { diagnosticar } = require('./_lib/esferas-import');
+const { diagnosticar, esPasadoFila } = require('./_lib/esferas-import');
+const { todayMx } = require('./_lib/esferas-compile');
 
 const SB_URL = process.env.SUPABASE_URL_KAMEHOUSE;
 const SB_KEY = process.env.SUPABASE_SERVICE_KEY_KAMEHOUSE;
@@ -57,6 +58,11 @@ exports.handler = async (event) => {
   let body = {};
   try { body = JSON.parse(event.body || '{}'); } catch (_) { /* queda {} */ }
   const accion = String(body.accion || 'diagnostico');
+  // [ESF-LISTA-1] Los pasados NO se traen por default: un evento que ya ocurrió
+  // no se gobierna, se recuerda — y 42 de los 102 del catálogo son pasados, así
+  // que traerlos ensucia la lista sin que nadie los vaya a tocar. La casilla
+  // existe por si algún día se quieren para historia.
+  const incluirPasados = body.incluir_pasados === true;
   if (accion !== 'diagnostico' && accion !== 'sembrar') {
     return { statusCode: 400, headers, body: JSON.stringify({ ok: false, error: 'acción inválida' }) };
   }
@@ -85,7 +91,10 @@ exports.handler = async (event) => {
     if (!yaRes.ok) return { statusCode: 502, headers, body: JSON.stringify({ ok: false, error: 'No pude leer esferas_eventos', detail: await yaRes.text() }) };
     const ya = new Set((await yaRes.json()).map((r) => r.slug));
 
-    const nuevos = dg.gobernables.filter((g) => !ya.has(g.slug));
+    const dia = todayMx();
+    const nuevosTodos = dg.gobernables.filter((g) => !ya.has(g.slug));
+    const pasadosOmitidos = incluirPasados ? [] : nuevosTodos.filter((g) => esPasadoFila(g.fila, dia));
+    const nuevos = incluirPasados ? nuevosTodos : nuevosTodos.filter((g) => !esPasadoFila(g.fila, dia));
     const resumen = {
       total: dg.total,
       gobernables: dg.gobernables.length,
@@ -93,13 +102,20 @@ exports.handler = async (event) => {
       solo_orden: dg.gobernables.filter((g) => !g.byteIgual).length,
       ya_en_esferas: dg.gobernables.length - nuevos.length,
       por_sembrar: nuevos.length,
+      // Se dice SIEMPRE lo que se dejó fuera, aunque sea 0. Un tope silencioso
+      // se lee como "los trajo todos" cuando no lo hizo.
+      pasados_omitidos: pasadosOmitidos.length,
+      incluye_pasados: incluirPasados,
       con_brecha: dg.conBrecha.length,
     };
 
     if (accion === 'diagnostico') {
       return { statusCode: 200, headers, body: JSON.stringify({
         ok: true, resumen,
-        gobernables: dg.gobernables.map((g) => ({ slug: g.slug, byte_igual: g.byteIgual, ya_esta: ya.has(g.slug) })),
+        gobernables: dg.gobernables.map((g) => ({
+          slug: g.slug, byte_igual: g.byteIgual, ya_esta: ya.has(g.slug),
+          pasado: esPasadoFila(g.fila, dia),
+        })),
         // La lista de brechas VIVA: por evento, qué se perdería. Se recorta a 6
         // por evento para que el cuerpo no explote; el conteo va completo.
         con_brecha: dg.conBrecha.map((b) => ({
@@ -129,7 +145,9 @@ exports.handler = async (event) => {
       ok: true, resumen, insertados, fallidos,
       // Se dice SIEMPRE, aunque no haya fallidos: un import que solo cuenta
       // éxitos se lee como completo cuando no lo es.
-      nota: `${insertados.length} sembrados sin publicar · ${fallidos.length} fallidos · ${dg.conBrecha.length} se quedan a mano`,
+      nota: `${insertados.length} sembrados sin publicar · ${fallidos.length} fallidos · ` +
+        `${dg.conBrecha.length} se quedan a mano` +
+        (pasadosOmitidos.length ? ` · ${pasadosOmitidos.length} pasados no se trajeron` : ''),
     }) };
   } catch (e) {
     return { statusCode: 500, headers, body: JSON.stringify({ ok: false, error: e.message }) };

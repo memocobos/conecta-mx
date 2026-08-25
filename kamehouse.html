@@ -1682,9 +1682,19 @@
          y 42 de los 102 del catálogo ya pasaron. -->
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">
      <button class="gz-filter active" id="esff-proximos" onclick="filtrarEsferasFecha('proximo',this)">// próximos</button>
+     <!-- [ESF-LISTA-2] Agotados, SOLO entre los próximos: Memo lo usa para
+          decidir si revive el evento o compra más boletos, y eso solo tiene
+          sentido si el evento aún no ocurre. -->
+     <button class="gz-filter" id="esff-agotados" onclick="filtrarEsferasFecha('agotado',this)" title="Próximos que están agotados — los que se pueden revivir o resurtir">// agotados</button>
      <button class="gz-filter" id="esff-pasados" onclick="filtrarEsferasFecha('pasado',this)">// pasados</button>
      <button class="gz-filter" id="esff-todos" onclick="filtrarEsferasFecha('todos',this)">// todos</button>
     </div>
+    <!-- [ESF-LISTA-2] El buscador, mismo patrón que el de Kamisama: filtra en
+         vivo lo que ya está pintado, no pide nada al servidor. Se COMBINA con
+         el chip; no lo reemplaza. -->
+    <input type="search" id="esf-buscar" class="cot-input" placeholder="Buscar por nombre o slug…"
+           autocomplete="off" oninput="_esfBuscarEnLista()" aria-label="Buscar evento en la lista"
+           style="width:100%;font-size:13px;margin-bottom:10px">
     <div id="esf-listado"><div class="loading-state"><div class="spinner"></div>Cargando…</div></div>
    </div>
 

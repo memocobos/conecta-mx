@@ -17460,6 +17460,9 @@ function _esfAcciones(e) {
 // No se borran: un pasado sembrado no le estorba al sitio (nace sin publicar y
 // el index ya lo tiene). Solo queda detrás del filtro.
 let _esfFiltroFecha = 'proximo';   // al abrir, Memo ve SOLO próximos
+// [ESF-LISTA-2] El buscador. Se combina con el chip, igual que en Cápsula: son
+// dos cortes distintos del mismo padrón, no dos modos que se pisen.
+let _esfBusca = '';
 
 // El orden lo pone `_evOrdenarPorFecha`, la fuente de ORD-1 — no un sort nuevo.
 // Pero esa función lee `dsList`/`ds`/`fecha`, y una fila de Esferas trae
@@ -17485,11 +17488,43 @@ function _esfComoEvento(e) {
 //
 // SIN FECHA CUENTA COMO PRÓXIMO. Un evento por confirmar está pendiente, no es
 // historia — y esconderlo detrás de "pasados" es donde se pierde.
-function _esfPasaFiltro(adaptado, filtro, hoy) {
+function _esfPasaFiltro(adaptado, filtro, hoy, fila) {
   const g = _evGrupoOrden(adaptado, hoy);
   if (filtro === 'pasado') return g === 2;
   if (filtro === 'proximo') return g !== 2;
+  // [ESF-LISTA-2] AGOTADOS, y SOLO entre los próximos: un pasado agotado es
+  // historia, no una decisión pendiente. Memo lo usa para revisar si revive el
+  // evento o compra más boletos — y eso solo tiene sentido si aún no ocurre.
+  if (filtro === 'agotado') return g !== 2 && String((fila && fila.status) || '') === 'agotado';
   return true;
+}
+
+// [ESF-LISTA-2] La coincidencia del buscador. Mira NOMBRE, SLUG y TÍTULO: son
+// los tres textos con los que Memo llama a un evento, y buscar "arre" tiene que
+// encontrarlo aunque el nombre en la tabla sea "Festival Arre".
+function _esfCoincide(fila, q) {
+  if (!q) return true;
+  const t = (String(fila.nombre || '') + ' ' + String(fila.slug || '') + ' ' + String(fila.titulo || '')).toLowerCase();
+  return t.includes(q);
+}
+
+function _esfBuscarEnLista() {
+  _esfBusca = (document.getElementById('esf-buscar')?.value || '').trim().toLowerCase();
+  _esfPintarLista();
+}
+
+// [ESF-LISTA-2] Colapsar / desplegar una fila. El detalle vive en su PROPIO
+// <tr>, no dentro de la celda: así las columnas del resumen siguen alineadas y
+// el alto del contenedor lo manda el navegador, no un número calculado a mano.
+function _esfFilaToggle(slug) {
+  const det = document.querySelector('#esf-listado .esf-detalle[data-slug="' + slug + '"]');
+  const res = document.querySelector('#esf-listado .esf-fila[data-slug="' + slug + '"]');
+  if (!det || !res) return;
+  const abierto = det.style.display !== 'none';
+  det.style.display = abierto ? 'none' : '';
+  res.setAttribute('aria-expanded', abierto ? 'false' : 'true');
+  const ch = res.querySelector('.esf-chev');
+  if (ch) ch.textContent = abierto ? '▸' : '▾';
 }
 
 function filtrarEsferasFecha(filtro, btn) {
@@ -17507,14 +17542,26 @@ function _esfPintarLista() {
   const porSlug = {};
   filas.forEach((e) => { porSlug[e.slug] = e; });
   const ordenados = _evOrdenarPorFecha(filas.map(_esfComoEvento), hoy);
-  const visibles = ordenados.filter((a) => _esfPasaFiltro(a, _esfFiltroFecha, hoy)).map((a) => porSlug[a.__slug]).filter(Boolean);
+  // [ESF-LISTA-2] Dos cortes que se COMBINAN: primero el chip, después el
+  // texto. Aplicarlos por separado haría que "agotados" ignorara la búsqueda.
+  const visibles = ordenados
+    .filter((a) => _esfPasaFiltro(a, _esfFiltroFecha, hoy, porSlug[a.__slug]))
+    .map((a) => porSlug[a.__slug]).filter(Boolean)
+    .filter((e) => _esfCoincide(e, _esfBusca));
 
   // Los conteos van EN los chips: sin ellos, "próximos" vacío se lee como "la
-  // lista no cargó" en vez de "no hay ninguno".
-  const cuenta = { proximo: 0, pasado: 0 };
-  ordenados.forEach((a) => { (_evGrupoOrden(a, hoy) === 2 ? cuenta.pasado++ : cuenta.proximo++); });
+  // lista no cargó" en vez de "no hay ninguno". Se cuentan SIN el buscador:
+  // el chip dice cuántos hay de cada clase, no cuántos sobreviven al texto.
+  const cuenta = { proximo: 0, pasado: 0, agotado: 0 };
+  ordenados.forEach((a) => {
+    const g = _evGrupoOrden(a, hoy);
+    if (g === 2) { cuenta.pasado++; return; }
+    cuenta.proximo++;
+    if (String((porSlug[a.__slug] || {}).status || '') === 'agotado') cuenta.agotado++;
+  });
   const rot = (id, txt, n) => { const b = document.getElementById(id); if (b) b.textContent = txt + ' (' + n + ')'; };
   rot('esff-proximos', '// próximos', cuenta.proximo);
+  rot('esff-agotados', '// agotados', cuenta.agotado);
   rot('esff-pasados', '// pasados', cuenta.pasado);
   rot('esff-todos', '// todos', ordenados.length);
 
@@ -17524,26 +17571,54 @@ function _esfPintarLista() {
   }
   if (!visibles.length) {
     // Se dice CUÁNTOS hay del otro lado: una lista vacía es una afirmación, y
-    // sin el número no se sabe si no hay o si el filtro los tapó.
-    const otros = _esfFiltroFecha === 'pasado' ? cuenta.proximo : cuenta.pasado;
-    cont.innerHTML = '<div class="empty-state"><div class="empty-icon">·</div>Ningún evento ' +
-      (_esfFiltroFecha === 'pasado' ? 'pasado' : 'próximo') +
-      (otros ? ' — hay ' + otros + ' del otro lado del filtro.' : '.') + '</div>';
+    // sin el número no se sabe si no hay, o si el filtro o el texto los taparon.
+    const etq = { pasado: 'pasado', agotado: 'próximo y agotado', proximo: 'próximo', todos: '' };
+    const total = cuenta.proximo + cuenta.pasado;
+    cont.innerHTML = '<div class="empty-state"><div class="empty-icon">·</div>' +
+      (_esfBusca
+        ? 'Ningún evento ' + (etq[_esfFiltroFecha] ? etq[_esfFiltroFecha] + ' ' : '') + 'dice "' + _esfEsc(_esfBusca) + '" — hay ' + total + ' en total.'
+        : 'Ningún evento ' + (etq[_esfFiltroFecha] || 'registrado') + '.') +
+      '</div>';
     return;
   }
+
+  // [ESF-LISTA-2] FILAS DESPLEGABLES. La página era larguísima: cada evento
+  // ocupaba una fila con siete columnas y cuatro botones. Ahora el resumen es
+  // un renglón —nombre · fecha · status · publicado— y el detalle vive en su
+  // PROPIO <tr>, oculto, que se abre al picar.
+  //
+  // ⚠️ Lo de adentro NO desaparece: sigue en el DOM y sigue funcionando. Por eso
+  // el arnés no se conforma con `click()` —que dispara igual sobre lo oculto,
+  // como enseñó COB-MIG-1— sino que mide el ALTO REAL de la fila de detalle y
+  // pregunta a `elementFromPoint` si de verdad se ve.
   cont.innerHTML = `<div class="table-wrap"><table>
-    <thead><tr><th>Slug</th><th>Nombre</th><th>Fecha</th><th>Ciudad</th><th>Status</th><th>Publicación</th><th>Acciones</th></tr></thead>
-    <tbody>${visibles.map(e => `<tr>
-      <td style="font-family:'JetBrains Mono',monospace;font-size:12px">${_esfEsc(e.slug)}</td>
-      <td style="font-weight:600">${_esfEsc(e.nombre)}${e.venue ? `<br><span style="font-size:10px;color:var(--ts);font-weight:400">${_esfEsc(e.venue)}</span>` : ''}</td>
-      <td style="font-size:12px">${_esfEsc(e.fecha_inicio) || '—'}</td>
-      <td style="font-size:12px">${_esfEsc(e.ciudad) || '—'}</td>
-      <td style="font-size:11px;color:var(--orange)">${_esfEsc(e.status) || 'Disponible'}</td>
-      <td>${e.publicado
-        ? `<span class="badge badge-green">publicado</span> <button class="btn btn-ghost btn-sm" style="font-size:10px" onclick="despublicarEsfera('${_esfEsc(e.slug)}')"><svg class="ic"><use href="#ic-basura"/></svg> Despublicar</button>`
-        : `<span class="badge badge-gray">borrador</span> <button class="btn btn-ghost btn-sm" style="font-size:10px;color:var(--red)" onclick="eliminarEsfera('${_esfEsc(e.slug)}')"><svg class="ic"><use href="#ic-basura"/></svg> Eliminar</button>`}</td>
-      <td>${_esfAcciones(e)}</td>
-    </tr>`).join('')}</tbody>
+    <thead><tr><th style="width:34px"></th><th>Nombre</th><th>Fecha</th><th>Status</th><th>Publicado</th></tr></thead>
+    <tbody>${visibles.map(e => {
+      const s = _esfEsc(e.slug);
+      const pasado = _evGrupoOrden(_esfComoEvento(e), hoy) === 2;
+      return `<tr class="esf-fila" data-slug="${s}" tabindex="0" role="button" aria-expanded="false"
+          style="cursor:pointer" onclick="_esfFilaToggle('${s}')"
+          onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();_esfFilaToggle('${s}')}">
+        <td class="esf-chev" style="color:var(--ts);font-size:13px">▸</td>
+        <td style="font-weight:600">${_esfEsc(e.nombre)}</td>
+        <td style="font-size:12px${pasado ? ';color:var(--ts)' : ''}">${_esfEsc(e.fecha_inicio) || '—'}</td>
+        <td style="font-size:11px;color:${(e.status === 'agotado') ? 'var(--red)' : 'var(--orange)'}">${_esfEsc(e.status) || 'Disponible'}</td>
+        <td>${e.publicado ? '<span class="badge badge-green">publicado</span>' : '<span class="badge badge-gray">borrador</span>'}</td>
+      </tr>
+      <tr class="esf-detalle" data-slug="${s}" style="display:none">
+        <td colspan="5" style="background:var(--bg);padding:12px 16px">
+          <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--ts);margin-bottom:8px">
+            ${s}${e.ciudad ? ' · ' + _esfEsc(e.ciudad) : ''}${e.venue ? ' · ' + _esfEsc(e.venue) : ''}
+          </div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+            ${_esfAcciones(e)}
+            ${e.publicado
+              ? `<button class="btn btn-ghost btn-sm" style="font-size:10px" onclick="despublicarEsfera('${s}')"><svg class="ic"><use href="#ic-basura"/></svg> Despublicar</button>`
+              : `<button class="btn btn-ghost btn-sm" style="font-size:10px;color:var(--red)" onclick="eliminarEsfera('${s}')"><svg class="ic"><use href="#ic-basura"/></svg> Eliminar</button>`}
+          </div>
+        </td>
+      </tr>`;
+    }).join('')}</tbody>
   </table></div>`;
 }
 

@@ -18108,6 +18108,7 @@ async function crearEsferaEvento() {
     sep_cheap: _esfGetSepCheap(),
     ride: _esfGetRide(),
     sep_ride: _esfGetSepRide(),
+    ...(_esfGetPaquetes()),
     nota: _esfGetNota(),
     festival: _esfGetFestival(),
   };
@@ -18256,6 +18257,39 @@ function _esfGetSepCheap() {
 // está vacío, no un default. Un separo sin capturar vale 500 con toda razón;
 // un RIDE sin capturar significa que el evento NO VENDE ese paquete, y
 // rellenarlo con un número lo pondría a la venta solo.
+// [ESF-E1e] Las banderas de paquete. `cheapAlsoOk` solo viaja con `rideOnly`:
+// suelta no significa nada, igual que en el compilador.
+const _ESF_PKG = {
+  ride_only: 'esf-pkg-rideonly', cheap_only: 'esf-pkg-cheaponly',
+  no_stay: 'esf-pkg-nostay', no_cheap: 'esf-pkg-nocheap',
+  no_bus: 'esf-pkg-nobus', cheap_soon: 'esf-pkg-cheapsoon',
+  cheap_also_ok: 'esf-pkg-alsook',
+};
+function _esfGetPaquetes() {
+  const o = {};
+  Object.keys(_ESF_PKG).forEach((k) => { o[k] = !!document.getElementById(_ESF_PKG[k])?.checked; });
+  if (!o.ride_only) o.cheap_also_ok = false;
+  if (o.ride_only) o.cheap_only = false;      // excluyentes, igual que el servidor
+  return o;
+}
+function _esfSetPaquetes(row) {
+  Object.keys(_ESF_PKG).forEach((k) => {
+    const el = document.getElementById(_ESF_PKG[k]); if (el) el.checked = !!(row && row[k]);
+  });
+  _esfPkgSync();
+}
+// «Solo RIDE» y «Solo CHEAP» se desmarcan entre sí, y el matiz de CHEAP solo
+// aparece cuando tiene sentido.
+function _esfPkgSync() {
+  const r = document.getElementById('esf-pkg-rideonly');
+  const c = document.getElementById('esf-pkg-cheaponly');
+  if (r && c) { if (r.checked) c.checked = false; }
+  const w = document.getElementById('esf-pkg-alsook-wrap');
+  if (w) w.style.display = (r && r.checked) ? 'flex' : 'none';
+  if (r && !r.checked) { const a = document.getElementById('esf-pkg-alsook'); if (a) a.checked = false; }
+  if (typeof renderEsferaPreview === 'function') renderEsferaPreview();
+}
+
 function _esfGetRide() {
   const v = document.getElementById('esf-ride')?.value;
   const n = parseInt(v, 10);
@@ -18349,6 +18383,7 @@ function _esfSeedDefaults() {
   // [ESF-E1a] Los de RIDE arrancan VACÍOS, no en un número: un evento nuevo no
   // vende RIDE hasta que alguien diga que sí y a cuánto.
   if (typeof _esfClearCheapZonas === 'function') _esfClearCheapZonas();
+  _esfSetPaquetes(null);
   const rd = document.getElementById('esf-ride'); if (rd) rd.value = '';
   const sr = document.getElementById('esf-sep-ride'); if (sr) sr.value = '';
   const nota = document.getElementById('esf-nota'); if (nota) nota.value = _esfIsCDMX() ? _ESF_NOTA_CDMX : '';
@@ -18368,6 +18403,7 @@ function _esfIncSepNotaPopulate(row) {
   // [ESF-E1a] Al editar, se refleja lo que la fila TIENE. Vacío = sin RIDE, y
   // se pinta vacío: rellenarlo con 0 haría que el evento anunciara un RIDE
   // gratis en cuanto alguien guardara sin mirar.
+  _esfSetPaquetes(row);
   const rd = document.getElementById('esf-ride');
   if (rd) rd.value = (row.ride != null && row.ride !== '') ? row.ride : '';
   const sr = document.getElementById('esf-sep-ride');
@@ -19144,6 +19180,7 @@ async function guardarCambiosEsfera() {
     sep_cheap: _esfGetSepCheap(),
     ride: _esfGetRide(),
     sep_ride: _esfGetSepRide(),
+    ...(_esfGetPaquetes()),
     nota: _esfGetNota(),
     festival: _esfGetFestival(),
   };

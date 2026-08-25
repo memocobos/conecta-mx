@@ -18,6 +18,17 @@
 const { verifyAdminAuthLive, corsCheck } = require('./_lib/verify-admin');
 const { revisarSepCheap } = require('./_lib/separo-techo');
 const { _parseZonas: parseZonas, _parseCheapZonas: parseCheapZonas } = require('./_lib/esferas-compile');
+// [ESF-E1e] Las banderas de paquete, en un Set para que el saneador no las
+// enumere a mano en dos archivos.
+const PKG_FLAGS = new Set(['ride_only', 'cheap_only', 'no_stay', 'no_cheap', 'no_bus', 'cheap_soon', 'cheap_also_ok']);
+// El servidor NO confía en que el navegador haya respetado la excluyencia: si
+// llegan las dos, manda `rideOnly` — la misma regla que el compilador, dicha en
+// los dos lados porque son dos puertas distintas a la misma tabla.
+function _sanePkg(sane) {
+  if (sane.ride_only) sane.cheap_only = false;
+  if (!sane.ride_only) sane.cheap_also_ok = false;
+  return sane;
+}
 
 const SB_URL = 'https://npgnhsmwpcipxgvfxrho.supabase.co';
 const SB_KEY = process.env.SUPABASE_SERVICE_KEY_KAMEHOUSE;
@@ -27,7 +38,9 @@ const CAMPOS_EDITABLES = new Set(['nombre', 'titulo', 'fecha_inicio', 'ciudad', 
   // [ESF-E1a] el precio del paquete RIDE y su separo
   'ride', 'sep_ride',
   // [ESF-E1c] la lista CHEAP, independiente de las zonas PLUS
-  'cheap_zonas']);
+  'cheap_zonas',
+  // [ESF-E1e] las banderas de paquete (nivel 3 de la granularidad)
+  'ride_only', 'cheap_only', 'no_stay', 'no_cheap', 'no_bus', 'cheap_soon', 'cheap_also_ok']);
 
 // festival: JSON del festival (lineup/switches/paquetes) o null = concierto.
 // Acepta string JSON o objeto; vacío/basura → null (nunca rompe). Igual que zonas.
@@ -218,6 +231,10 @@ exports.handler = async (event) => {
     // [ESF-E1c] La lista CHEAP se sanea con el MISMO parser que la compila
     // (`_parseCheapZonas` del lib): un segundo saneador aquí sería la copia que
     // acaba divergiendo. `null` significa "no capturada" y se guarda como null.
+    // [ESF-E1e] Las banderas son BOOLEANAS y se guardan como tales: nada de
+    // 'true' en texto, que Postgres aceptaría y el compilador leería como
+    // verdadero para siempre aunque después llegara 'false'.
+    if (PKG_FLAGS.has(k)) { sane[k] = (v === true || v === 1 || v === 'true' || v === '1'); continue; }
     if (k === 'cheap_zonas') {
       const filas = parseCheapZonas(v);
       sane[k] = (filas == null) ? null : JSON.stringify(filas);
@@ -228,6 +245,11 @@ exports.handler = async (event) => {
     if (v === null || v === '') sane[k] = (k === 'status') ? '' : null;
     else sane[k] = String(v);
   }
+
+  // [ESF-E1e] La excluyencia se aplica DESPUÉS del bucle, sobre el objeto ya
+  // saneado: dentro no se puede, porque `ride_only` y `cheap_only` pueden
+  // llegar en cualquier orden y el que llegara segundo ganaría.
+  _sanePkg(sane);
 
   // nombre, si viene, no puede quedar vacío.
   if ('nombre' in sane && !sane.nombre) {

@@ -648,6 +648,36 @@ function generarObj(esfera, hoy) {
   const imgSeg = esfera.foto
     ? ("staticImg:'" + escStr(esfera.foto) + "',img:false,")
     : ("img:'" + escStr(nombre) + "',");
+  // ═══ [ESF-E1e] LAS BANDERAS DE PAQUETE, EN EL CAMINO DE CONCIERTO ═══════════
+  // Hasta hoy este bloque SOLO existía en el camino de festival. Un concierto
+  // gobernado no podía decir "este evento no vende STAY" — y `noStay` YA estaba
+  // en CAMPOS_DEL_COMPILADOR, así que publicar un concierto que la trajera se la
+  // habría llevado. La bandera estaba en la lista de gobernadas y el compilador
+  // no sabía escribirla: la peor combinación posible.
+  //
+  // Es el NIVEL 3 de la granularidad que pidió Memo —apagar paquete por paquete—
+  // y son las mismas banderas que CAT-AGOT-1 acaba de arreglar en el index
+  // (`rideOnly` en Stray Kids, `cheapOnly` en WWE Mexico).
+  //
+  // ⚠️ `cheapAlsoOk` solo significa algo junto a `rideOnly`: es su matiz ("solo
+  // RIDE, pero el CHEAP también se puede"). Suelta no dice nada, así que suelta
+  // no se emite.
+  const _f = [];
+  if (esfera.no_bus) _f.push('noBus:true');
+  if (esfera.ride_only) {
+    _f.push('rideOnly:true');
+    if (esfera.cheap_also_ok) _f.push('cheapAlsoOk:true');
+  } else if (esfera.cheap_only) {
+    // Excluyentes por definición: "solo RIDE" y "solo CHEAP" no pueden ser las
+    // dos ciertas. Si llegaran juntas manda `rideOnly`, y se decide AQUÍ en vez
+    // de dejar que lo decida el orden en que se escriban.
+    _f.push('cheapOnly:true');
+  }
+  if (esfera.no_stay) _f.push('noStay:true');
+  if (esfera.no_cheap) _f.push('noCheap:true');
+  if (esfera.cheap_soon) _f.push('cheapSoon:true');
+  const flagsSeg = _f.length ? (_f.join(',') + ',') : '';
+
   return "{id:'" + escStr(esfera.slug) + "'," + addedSeg + music +
     "c:'" + color +
     "'," + imgSeg +
@@ -657,7 +687,7 @@ function generarObj(esfera, hoy) {
     "'," + dsListStr +
     "v:'" + venue +
     "',st:'" + escStr(status) +
-    "'," + cdmx + mapa +
+    "'," + cdmx + mapa + flagsSeg +
     incSeg + ",sep:" + sepN + sepCheapSeg + rideSeg + notaSeg +
     ",banco:BANCO_DEFAULT," + zonasSegmento(esfera) + "," + hotelSegmento(esfera) + pagosSegmento() + "}";
 }

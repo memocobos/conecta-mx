@@ -23,7 +23,9 @@ const SB_URL = 'https://npgnhsmwpcipxgvfxrho.supabase.co';
 const SB_KEY = process.env.SUPABASE_SERVICE_KEY_KAMEHOUSE;
 
 // Whitelist EDITABLE. slug AUSENTE a propósito (identidad / PK, no se edita).
-const CAMPOS_EDITABLES = new Set(['nombre', 'titulo', 'fecha_inicio', 'ciudad', 'tipo', 'status', 'venue', 'music', 'fechas_extra', 'zonas', 'hotel', 'mapa', 'inc', 'sep', 'sep_cheap', 'nota', 'festival', 'foto']);
+const CAMPOS_EDITABLES = new Set(['nombre', 'titulo', 'fecha_inicio', 'ciudad', 'tipo', 'status', 'venue', 'music', 'fechas_extra', 'zonas', 'hotel', 'mapa', 'inc', 'sep', 'sep_cheap', 'nota', 'festival', 'foto',
+  // [ESF-E1a] el precio del paquete RIDE y su separo
+  'ride', 'sep_ride']);
 
 // festival: JSON del festival (lineup/switches/paquetes) o null = concierto.
 // Acepta string JSON o objeto; vacío/basura → null (nunca rompe). Igual que zonas.
@@ -202,7 +204,10 @@ exports.handler = async (event) => {
     if (k === 'mapa') { sane[k] = saneMapa(v); continue; }
     if (k === 'foto') { sane[k] = saneFoto(v); continue; }
     if (k === 'inc') { sane[k] = saneInc(v); continue; }
-    if (k === 'sep' || k === 'sep_cheap') { sane[k] = saneInt(v); continue; }
+    if (k === 'sep' || k === 'sep_cheap' || k === 'sep_ride') { sane[k] = saneInt(v); continue; }
+    // [ESF-E1a] `ride` pasa por el MISMO saneador: entero >= 0 o null. Un
+    // precio que llega como texto no se guarda "a ver qué pasa".
+    if (k === 'ride') { sane[k] = saneInt(v); continue; }
     if (k === 'nota') { sane[k] = saneNota(v); continue; }
     if (k === 'festival') { sane[k] = saneFestival(v); continue; }
     if (v === null || v === '') sane[k] = (k === 'status') ? '' : null;

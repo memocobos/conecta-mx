@@ -1584,7 +1584,13 @@
       <div style="flex:1;min-width:130px"><label style="font-size:11px">Separo PLUS $</label><input class="cot-input esf-sep" type="number" min="0" id="esf-sep" placeholder="500" style="width:100%"></div>
       <div style="flex:1;min-width:130px"><label style="font-size:11px">Separo CHEAP $</label><input class="cot-input esf-sep" type="number" min="0" id="esf-sep-cheap" placeholder="500" style="width:100%"></div>
      </div>
-     <div style="font-size:11px;color:var(--ts);margin-top:4px">Default 500. El CHEAP solo aplica si alguna zona tiene precio CHEAP.</div>
+     <!-- [ESF-E1a] RIDE: el paquete sin boleto. Va junto a los separos porque es
+          el mismo bloque de dinero del evento, y su separo pegado a él. -->
+     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
+      <div style="flex:1;min-width:130px"><label style="font-size:11px">Precio RIDE $</label><input class="cot-input esf-sep" type="number" min="0" id="esf-ride" placeholder="sin RIDE" style="width:100%"></div>
+      <div style="flex:1;min-width:130px"><label style="font-size:11px">Separo RIDE $</label><input class="cot-input esf-sep" type="number" min="0" id="esf-sep-ride" placeholder="usa el de PLUS" style="width:100%"></div>
+     </div>
+     <div style="font-size:11px;color:var(--ts);margin-top:4px">Default 500. El CHEAP solo aplica si alguna zona tiene precio CHEAP.<br>El <b>RIDE vacío</b> = el evento no vende ese paquete. No se publica como $0: ausente no es gratis.</div>
     </div>
     <div class="form-group">
      <label>Nota / aviso</label>

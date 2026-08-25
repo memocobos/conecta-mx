@@ -505,6 +505,24 @@ function generarObj(esfera, hoy) {
   const sepCheapSeg = (tieneCheap && esfera.sep_cheap != null
     && Number.isFinite(Number(esfera.sep_cheap)) && Number(esfera.sep_cheap) >= 0)
     ? (',sepCheap:' + Math.round(Number(esfera.sep_cheap))) : '';
+  // [ESF-E1a] RIDE: el precio del paquete sin boleto. Es el campo que más
+  // eventos bloqueaba —68 de 95 lo traen— y sin él dos tercios del catálogo no se
+  // podían gobernar desde Esferas.
+  //
+  // Se emite SOLO si viene: un evento sin RIDE no debe estrenar `ride:0`, que el
+  // index leería como "el RIDE cuesta cero". Ausente ≠ gratis.
+  //
+  // `sepRide` va PEGADO a él y con la misma regla: solo si hay `ride`. El separo
+  // de un paquete que no se vende no significa nada, y los 5 eventos que lo traen
+  // lo ponen siempre junto al ride.
+  const rideN = (esfera.ride != null && esfera.ride !== '' && Number.isFinite(Number(esfera.ride)) && Number(esfera.ride) > 0)
+    ? Math.round(Number(esfera.ride)) : null;
+  const sepRideN = (rideN != null && esfera.sep_ride != null && esfera.sep_ride !== ''
+    && Number.isFinite(Number(esfera.sep_ride)) && Number(esfera.sep_ride) >= 0)
+    ? Math.round(Number(esfera.sep_ride)) : null;
+  const rideSeg = (rideN == null) ? ''
+    : ((sepRideN != null ? ',sepRide:' + sepRideN : '') + ',ride:' + rideN);
+
   // nota: aviso especial. Si hay → nota:'<esc>'; si vacío → no emitir.
   const notaSeg = esfera.nota ? (",nota:'" + escStr(esfera.nota) + "'") : '';
   // Foto (portada manual del concierto) → staticImg + img:false; si no → img:'<nombre>'
@@ -524,7 +542,7 @@ function generarObj(esfera, hoy) {
     "v:'" + venue +
     "',st:'" + escStr(status) +
     "'," + cdmx + mapa +
-    incSeg + ",sep:" + sepN + sepCheapSeg + notaSeg +
+    incSeg + ",sep:" + sepN + sepCheapSeg + rideSeg + notaSeg +
     ",banco:BANCO_DEFAULT," + zonasSegmento(esfera) + "," + hotelSegmento(esfera) + pagosSegmento() + "}";
 }
 
@@ -616,6 +634,10 @@ const CAMPOS_DEL_COMPILADOR = new Set([
   'zonas', 'cheapZonas', 'hotel', 'hotelOverride', 'hotelPP', 'pagos',
   // extras del formato festival
   'musicList', 'noBus', 'noStay', 'noCheap', 'cheapSoon', 'lineup', 'multifecha',
+  // [ESF-E1a] Desde que Esferas sabe emitirlos, los GOBIERNA: si no entraran
+  // aquí, `fusionarConViejo` los conservaría del index viejo y habría dos
+  // fuentes para el mismo número — justo lo que esta serie viene a cerrar.
+  'ride', 'sepRide',
 ]);
 
 // Serializa un valor primitivo al formato del EV. null si no es serializable.

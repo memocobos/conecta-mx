@@ -17441,6 +17441,14 @@ function _esfEsc(s) {
 // error de dinero silencioso, así que sólo aparece como REINTENTO de lo que falló.
 function _esfAcciones(e) {
   const s = _esfEsc(e.slug);
+  // [ESF-ARCHIVO-1] Un archivado es un registro de algo que YA PASÓ. Posponer una
+  // fecha vencida no significa nada, y Cancelar manda correos de reembolso a
+  // clientes de un evento que ya ocurrió. "Solo consulta" tiene que ser verdad
+  // en los botones, no solo en el letrero. Editar SÍ se queda: corregir un
+  // nombre en un registro es legítimo — el veto es publicar, no tocar.
+  if (e.archivado) {
+    return `<button class="btn btn-ghost btn-sm" style="font-size:10px" onclick="editarEsfera('${s}')"><svg class="ic"><use href="#ic-lapiz"/></svg> Editar</button>`;
+  }
   const pos = e.pos || null;
   const faltaAvisar = !!(pos && pos.aviso_pendiente);
   const atoradas = pos ? (pos.pagos_fallidos_n || 0) : 0;
@@ -17653,7 +17661,9 @@ function _esfPintarLista() {
         <td style="font-weight:600">${_esfEsc(e.nombre)}</td>
         <td style="font-size:12px${pasado ? ';color:var(--ts)' : ''}">${_esfEsc(e.fecha_inicio) || '—'}</td>
         <td style="font-size:11px;color:${(e.status === 'agotado') ? 'var(--red)' : 'var(--orange)'}">${_esfEsc(e.status) || 'Disponible'}</td>
-        <td>${e.publicado ? '<span class="badge badge-green">publicado</span>' : '<span class="badge badge-gray">borrador</span>'}</td>
+        <td>${e.archivado
+          ? '<span class="badge badge-gray" style="border-color:var(--orange);color:var(--orange)" title="Registro de un evento ya ocurrido. No se puede publicar.">archivo</span>'
+          : (e.publicado ? '<span class="badge badge-green">publicado</span>' : '<span class="badge badge-gray">borrador</span>')}</td>
       </tr>
       <tr class="esf-detalle" data-slug="${s}" style="display:none">
         <td colspan="5" style="background:var(--bg);padding:12px 16px">
@@ -17662,9 +17672,13 @@ function _esfPintarLista() {
           </div>
           <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
             ${_esfAcciones(e)}
-            ${e.publicado
-              ? `<button class="btn btn-ghost btn-sm" style="font-size:10px" onclick="despublicarEsfera('${s}')"><svg class="ic"><use href="#ic-basura"/></svg> Despublicar</button>`
-              : `<button class="btn btn-ghost btn-sm" style="font-size:10px;color:var(--red)" onclick="eliminarEsfera('${s}')"><svg class="ic"><use href="#ic-basura"/></svg> Eliminar</button>`}
+            ${e.archivado
+              // [ESF-ARCHIVO-1] TEXTO, no un botón apagado. Un control deshabilitado
+              // invita a picarlo y no explica nada; una frase dice qué es y por qué.
+              ? `<span style="font-size:11px;color:var(--orange)">archivo — solo consulta. El <code>index.html</code> sigue siendo la fuente de verdad de este evento.</span>`
+              : (e.publicado
+                ? `<button class="btn btn-ghost btn-sm" style="font-size:10px" onclick="despublicarEsfera('${s}')"><svg class="ic"><use href="#ic-basura"/></svg> Despublicar</button>`
+                : `<button class="btn btn-ghost btn-sm" style="font-size:10px;color:var(--red)" onclick="eliminarEsfera('${s}')"><svg class="ic"><use href="#ic-basura"/></svg> Eliminar</button>`)}
           </div>
         </td>
       </tr>`;
@@ -18936,10 +18950,45 @@ function _esfCopiarDePlus() {
 //   · un slug que ya está en Esferas se SALTA, no se pisa
 let _esfImportDiag = null;   // el último diagnóstico, para que Sembrar diga cuántos
 
-// [ESF-LISTA-1] Los pasados no se traen por default: un evento que ya ocurrió no
-// se gobierna, se recuerda. La casilla existe por si un día se quieren para
-// historia — y al moverla se re-diagnostica solo, porque el número cambia.
-function _esfImportPasados() { return !!document.getElementById('esf-import-pasados')?.checked; }
+// [ESF-ARCHIVO-1] Traer los PASADOS como archivo. Es otra puerta, no una
+// variante de sembrar: entran SIN pasar el juez —cerrar brechas de eventos
+// muertos no paga— y nacen bloqueados para publicar, porque su fila está
+// incompleta a propósito y compilarla degradaría su entrada del index.
+//
+// El index sigue siendo la fuente de verdad de un pasado. Esferas guarda el 94%
+// de sus campos (medido sobre los 42 del catálogo) para poder consultarlos.
+async function archivarPasados() {
+  const btn = document.getElementById('esf-archivar');
+  if (!confirm('Se traerán los eventos YA OCURRIDOS a Esferas como ARCHIVO.\n\n' +
+               '· NO pasan el juez: su ficha queda incompleta a propósito.\n' +
+               '· Quedan BLOQUEADOS para publicar — el index sigue siendo su fuente de verdad.\n' +
+               '· No se toca ninguno de los que ya están aquí.')) return;
+  if (btn) { btn.disabled = true; btn.textContent = 'Archivando…'; }
+  try {
+    const r = await khAdminFetch('/.netlify/functions/esferas-importar', {
+      method: 'POST', body: JSON.stringify({ accion: 'archivar' }),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok || !d.ok) throw new Error(d.error || ('Error ' + r.status));
+    const panel = _esfImportPanel();
+    const fall = d.fallidos || [];
+    if (panel) {
+      panel.innerHTML = '<div style="padding:14px;border:1px solid var(--border);border-radius:var(--r-sm,8px);font-size:12px;line-height:1.6">' +
+        '<div style="font-size:20px;font-weight:800">' + (d.insertados || []).length + ' archivados</div>' +
+        '<div style="color:var(--ts);margin-top:4px">Sin publicar y <b>bloqueados para publicar</b>. Aparecen en la lista con el sello <b>archivo</b>.</div>' +
+        ((d.insertados || []).length ? '<div style="color:var(--ts);margin-top:8px">' + d.insertados.map(_esfEsc).join(' · ') + '</div>' : '') +
+        (fall.length ? '<div style="color:var(--red);margin-top:10px"><b>' + fall.length + ' no se pudieron traer:</b>' +
+          fall.map((f) => '<div style="margin-top:2px">· ' + _esfEsc(f.slug) + ' — ' + _esfEsc(f.detail || '') + '</div>').join('') + '</div>' : '') +
+        '</div>';
+    }
+    showToast((d.insertados || []).length + ' evento(s) archivados', 'success');
+    if (typeof loadEsferasEventos === 'function') loadEsferasEventos();
+  } catch (e) {
+    showToast(e.message, 'error');
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = '<svg class="ic"><use href="#ic-eventos"/></svg> Archivar los pasados'; }
+  }
+}
 
 function _esfImportPanel() { return document.getElementById('esf-import-panel'); }
 
@@ -18948,7 +18997,7 @@ async function importarDelCatalogo() {
   if (panel) panel.innerHTML = '<div class="loading-state"><div class="spinner"></div>Leyendo el catálogo…</div>';
   try {
     const r = await khAdminFetch('/.netlify/functions/esferas-importar', {
-      method: 'POST', body: JSON.stringify({ accion: 'diagnostico', incluir_pasados: _esfImportPasados() }),
+      method: 'POST', body: JSON.stringify({ accion: 'diagnostico' }),
     });
     const d = await r.json().catch(() => ({}));
     if (!r.ok || !d.ok) throw new Error(d.error || ('Error ' + r.status));
@@ -18977,7 +19026,7 @@ function _esfImportPintar(d) {
     // traer" se lee como "eso es todo lo que hay".
     (R.pasados_omitidos ? '<div style="font-size:11px;color:var(--ts);margin-top:8px">' + R.pasados_omitidos +
       ' evento(s) <b>ya pasaron</b> y no se traen. Un evento pasado no se gobierna, se recuerda — enciende <b>incluir pasados</b> si los quieres para historia.</div>' : '') +
-    (R.incluye_pasados ? '<div style="font-size:11px;color:var(--orange);margin-top:8px">Estás incluyendo los <b>pasados</b>.</div>' : '');
+    (R.pasados_omitidos ? '<div style="font-size:11px;color:var(--ts);margin-top:4px">Para traerlos como registro, usa <b>Archivar los pasados</b>.</div>' : '');
 
   if (nuevos.length) {
     h += '<div style="margin-top:14px;font-size:12px"><b>Se traerían ' + nuevos.length + ':</b> ' +
@@ -19020,12 +19069,10 @@ async function sembrarDelCatalogo() {
   if (btn) { btn.disabled = true; btn.textContent = 'Trayendo…'; }
   try {
     const r = await khAdminFetch('/.netlify/functions/esferas-importar', {
-      // La casilla viaja TAMBIÉN en el sembrado: si solo fuera en el
-      // diagnóstico, la pantalla diría 19 y el servidor traería otros.
       // [SIEMBRA-DIAG] Viaja LO QUE ESTA PANTALLA PROMETIÓ. Sin eso el servidor
       // no puede saber que prometí 10, y "entraron 8" se queda sin explicación.
       method: 'POST', body: JSON.stringify({
-        accion: 'sembrar', incluir_pasados: _esfImportPasados(),
+        accion: 'sembrar',
         esperados: nuevos.map((g) => g.slug),
       }),
     });

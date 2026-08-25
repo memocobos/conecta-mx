@@ -172,10 +172,14 @@ function diagnosticar({ indexHtml, hoy }) {
     const fila = evAEsfera(e);
     let generado;
     try { generado = generarObj(fila, dia); }
-    catch (err) { conBrecha.push({ slug: e.id, motivo: 'el compilador no pudo: ' + err.message, brechas: [] }); return; }
+    // [ESF-ARCHIVO-1] La fila viaja TAMBIÉN en los con-brecha: el archivo los
+    // siembra sin pasar el juez, y sin la fila no habría qué sembrar. Que no
+    // pase el juez no significa que no se pueda guardar — significa que no se
+    // puede PUBLICAR, y de eso se encarga el veto.
+    catch (err) { conBrecha.push({ slug: e.id, fila, motivo: 'el compilador no pudo: ' + err.message, brechas: [] }); return; }
     const v = juzgar(t, generado);
     if (v.ok) gobernables.push({ slug: e.id, fila, byteIgual: generado === t });
-    else conBrecha.push({ slug: e.id, motivo: v.motivo || null, brechas: v.brechas });
+    else conBrecha.push({ slug: e.id, fila, motivo: v.motivo || null, brechas: v.brechas });
   });
   return { gobernables, conBrecha, total: gobernables.length + conBrecha.length };
 }

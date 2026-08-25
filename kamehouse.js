@@ -17513,6 +17513,53 @@ function _esfBuscarEnLista() {
   _esfPintarLista();
 }
 
+// ═══ [ESF-LISTA-3] LA SECCIÓN ENTERA SE COLAPSA ═══════════════════════════
+// #577 encogió cada FILA; esto quita la LISTA de en medio. La página de Esferas
+// es captura arriba, lista en medio, e importador/publicar/noticias abajo: con
+// la lista plegada se llega a lo de abajo sin bajar dos mil pixeles.
+//
+// ⚠️ EL CONTEO SE VE TAMBIÉN CERRADA. Una sección plegada que no dice cuánto
+// guarda se lee como una sección vacía — y "Eventos registrados" en blanco
+// asusta más que una lista larga.
+//
+// NACE CERRADA, pero se RECUERDA: la preferencia de Memo gana desde el segundo
+// día. Mismo patrón que `toggleNavGroup` del nav (localStorage por clave, y
+// envuelto en try/catch porque un navegador con el storage bloqueado no puede
+// tirar la pantalla).
+const _ESF_SEC_KEY = 'esfcol:listado';
+
+function _esfSeccionAbierta() {
+  try {
+    const v = localStorage.getItem(_ESF_SEC_KEY);
+    // Sin preferencia guardada → CERRADA, que es para lo que Memo la pidió.
+    // En cuanto la abre o la cierra una vez, manda su elección.
+    return v === null ? false : v !== '1';
+  } catch (_) { return true; }   // storage bloqueado: mejor verla que perderla
+}
+
+function _esfSeccionPintar(abierta) {
+  const body = document.getElementById('esf-listado-body');
+  const head = document.getElementById('esf-listado-head');
+  const chev = document.getElementById('esf-listado-chev');
+  if (body) body.style.display = abierta ? '' : 'none';
+  if (head) head.setAttribute('aria-expanded', abierta ? 'true' : 'false');
+  if (chev) chev.textContent = abierta ? '▾' : '▸';
+}
+
+function _esfSeccionToggle() {
+  const abierta = !_esfSeccionAbierta();
+  try { localStorage.setItem(_ESF_SEC_KEY, abierta ? '0' : '1'); } catch (_) {}
+  _esfSeccionPintar(abierta);
+}
+
+// El número del encabezado. Es el TOTAL registrado, no el filtrado: los chips ya
+// dicen cuántos hay de cada clase, y aquí la pregunta es otra —"¿cuántos eventos
+// guarda esta sección?"— que no debe cambiar al mover un filtro.
+function _esfSeccionConteo(n) {
+  const el = document.getElementById('esf-listado-n');
+  if (el) el.textContent = '(' + n + ')';
+}
+
 // [ESF-LISTA-2] Colapsar / desplegar una fila. El detalle vive en su PROPIO
 // <tr>, no dentro de la celda: así las columnas del resumen siguen alineadas y
 // el alto del contenedor lo manda el navegador, no un número calculado a mano.
@@ -17559,6 +17606,9 @@ function _esfPintarLista() {
     cuenta.proximo++;
     if (String((porSlug[a.__slug] || {}).status || '') === 'agotado') cuenta.agotado++;
   });
+  // [ESF-LISTA-3] El conteo del encabezado, visible aun con la sección cerrada.
+  _esfSeccionConteo(filas.length);
+  _esfSeccionPintar(_esfSeccionAbierta());
   const rot = (id, txt, n) => { const b = document.getElementById(id); if (b) b.textContent = txt + ' (' + n + ')'; };
   rot('esff-proximos', '// próximos', cuenta.proximo);
   rot('esff-agotados', '// agotados', cuenta.agotado);
@@ -17627,6 +17677,10 @@ async function loadEsferasEventos() {
   _esfLoadVenuesCat(); // best-effort, no bloquea el listado
   const cont = document.getElementById('esf-listado');
   if (!cont) return;
+  // [ESF-LISTA-3] El estado guardado se aplica ANTES del fetch. Si esperara al
+  // pintado, la sección aparecería abierta y se plegaría sola medio segundo
+  // después — un parpadeo que se lee como un error de la pantalla.
+  _esfSeccionPintar(_esfSeccionAbierta());
   cont.innerHTML = '<div class="loading-state"><div class="spinner"></div>Cargando…</div>';
   try {
     const r = await khAdminFetch('/.netlify/functions/esferas-listar', { method:'POST' });

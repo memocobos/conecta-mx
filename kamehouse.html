@@ -1676,7 +1676,18 @@
   <div class="esf-below">
    <!-- Listado -->
    <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:20px">
-    <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.15em;color:var(--ts);margin-bottom:14px">// EVENTOS REGISTRADOS</div>
+    <!-- [ESF-LISTA-3] La SECCIÓN ENTERA se colapsa. #577 encogió cada fila; esto
+         quita la lista de en medio para llegar al importador, al publicar y a
+         las noticias sin bajar dos mil pixeles.
+         ⚠️ El conteo vive EN el encabezado y se ve TAMBIÉN cerrada: una sección
+         plegada que no dice cuánto guarda se lee como una sección vacía. -->
+    <div id="esf-listado-head" role="button" tabindex="0" aria-expanded="true" aria-controls="esf-listado-body"
+         onclick="_esfSeccionToggle()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();_esfSeccionToggle()}"
+         style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.15em;color:var(--ts);margin-bottom:14px;cursor:pointer;display:flex;align-items:center;gap:8px;user-select:none">
+     <span id="esf-listado-chev" style="font-size:13px">▾</span>
+     <span>// EVENTOS REGISTRADOS <span id="esf-listado-n"></span></span>
+    </div>
+    <div id="esf-listado-body">
     <!-- [ESF-LISTA-1] Los mismos chips que Cápsula, con UNA diferencia: aquí el
          default es // próximos. Un evento pasado no se gobierna, se recuerda —
          y 42 de los 102 del catálogo ya pasaron. -->
@@ -1696,6 +1707,7 @@
            autocomplete="off" oninput="_esfBuscarEnLista()" aria-label="Buscar evento en la lista"
            style="width:100%;font-size:13px;margin-bottom:10px">
     <div id="esf-listado"><div class="loading-state"><div class="spinner"></div>Cargando…</div></div>
+    </div><!-- /esf-listado-body -->
    </div>
 
    <!-- ─── [ESF-E3b] IMPORTAR DEL CATÁLOGO ──────────────────────────────

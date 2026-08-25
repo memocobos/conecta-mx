@@ -43,6 +43,8 @@ const CAMPOS_EDITABLES = new Set(['nombre', 'titulo', 'fecha_inicio', 'ciudad', 
   // [ESF-E1f] las fechas con sus zonas (nivel 4 de la granularidad)
   'multifecha',
   'banco',   // [ESF-E1g] identificador del banco; lista CERRADA (ver abajo).
+  // [ESF-CAMPOS-1] Tres campos chicos que bloqueaban a 13 eventos vivos.
+  'promo', 'deporte', 'music_search',
   // [ESF-E1e] las banderas de paquete (nivel 3 de la granularidad)
   'ride_only', 'cheap_only', 'no_stay', 'no_cheap', 'no_bus', 'cheap_soon', 'cheap_also_ok']);
 
@@ -246,6 +248,13 @@ exports.handler = async (event) => {
     // conocida sería CÓDIGO inyectado en el catálogo público. Validar la forma
     // no basta — la lista es cerrada.
     if (k === 'banco') { sane[k] = bancoValido(v); continue; }
+    // promo/deporte son BANDERAS: se guardan como booleano, no como el literal
+    // del catálogo. El compilador se encarga de emitir `promo:true` y
+    // `deporte:1` — cada uno con el suyo, que es como viven en el EV.
+    if (k === 'promo' || k === 'deporte') { sane[k] = (v === true || v === 1 || v === '1' || v === 'true'); continue; }
+    // musicSearch es el texto con el que se busca la música cuando el nombre
+    // del evento no da con ella. Se recorta: es una consulta, no un ensayo.
+    if (k === 'music_search') { sane[k] = (typeof v === 'string' && v.trim()) ? v.trim().slice(0, 120) : null; continue; }
     if (k === 'multifecha') {
       const filas = parseMultifecha(v);
       sane[k] = (filas == null) ? null : JSON.stringify(filas);

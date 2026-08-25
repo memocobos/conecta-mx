@@ -97,6 +97,10 @@ function evAEsfera(ev) {
     // el identificador — que es justo lo que hay que guardar para re-emitirlo.
     // Ausente = el evento no dice banco, y así se queda.
     banco: (typeof ev.banco === 'string' && ev.banco) ? ev.banco : null,
+    // [ESF-CAMPOS-1] Los tres viajan con el evento al importarlo.
+    promo: ev.promo === true,
+    deporte: !!ev.deporte,
+    music_search: (typeof ev.musicSearch === 'string' && ev.musicSearch.trim()) ? ev.musicSearch.trim() : null,
     slug: ev.id,
     nombre: (ev.img && ev.img !== false) ? ev.img : (ev.a || ev.id),
     titulo: ev.a || '',

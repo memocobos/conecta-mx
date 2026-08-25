@@ -18326,6 +18326,10 @@ async function crearEsferaEvento() {
     multifecha: (() => { const m = _esfGetMultifecha(); return m == null ? null : JSON.stringify(m); })(),
     // [ESF-E1g] `null` = el evento no dice banco (y el sitio cae a BBVA solo).
     banco: document.getElementById('esf-banco')?.value || null,
+    // [ESF-CAMPOS-1] Los tres apuntes.
+    promo: !!document.getElementById('esf-promo')?.checked,
+    deporte: !!document.getElementById('esf-deporte')?.checked,
+    music_search: document.getElementById('esf-music-search')?.value.trim() || null,
     hotel: _esfGetHotel(),
     mapa: _esfGetMapa(),
     foto: _esfGetFoto(),
@@ -18357,6 +18361,9 @@ async function crearEsferaEvento() {
     _esfClearZonas();
     _esfClearMultifecha();
     { const b = document.getElementById('esf-banco'); if (b) b.value = ''; }
+    { const p = document.getElementById('esf-promo'); if (p) p.checked = false;
+      const d = document.getElementById('esf-deporte'); if (d) d.checked = false;
+      const m = document.getElementById('esf-music-search'); if (m) m.value = ''; }
     _esfClearHotel();
     _esfMapaClear();
     _esfFotoClear();
@@ -19671,6 +19678,9 @@ function editarEsfera(slug) {
   if (typeof _cz === 'string') { try { _cz = JSON.parse(_cz); } catch (_) { _cz = null; } }
   if (Array.isArray(_cz)) _cz.forEach((z) => { if (z && typeof z === 'object') _esfAddCheapZona(z); });
   set('esf-banco', row.banco || '');
+  { const p = document.getElementById('esf-promo'); if (p) p.checked = !!row.promo; }
+  { const d = document.getElementById('esf-deporte'); if (d) d.checked = !!row.deporte; }
+  set('esf-music-search', row.music_search || '');
   // [ESF-E3a] Las fechas del nivel 4. Poblarlas es OBLIGATORIO, no cosmético:
   // sin esto, abrir un evento multifecha y guardarlo mandaría `multifecha:null`
   // y le borraría las noches con sus zonas.
@@ -19715,6 +19725,9 @@ function cancelarEdicionEsfera() {
   _esfClearZonas();
   _esfClearMultifecha();
   { const b = document.getElementById('esf-banco'); if (b) b.value = ''; }
+    { const p = document.getElementById('esf-promo'); if (p) p.checked = false;
+      const d = document.getElementById('esf-deporte'); if (d) d.checked = false;
+      const m = document.getElementById('esf-music-search'); if (m) m.value = ''; }
   _esfClearHotel();
   _esfMapaClear();
   _esfFotoClear();
@@ -19756,6 +19769,10 @@ async function guardarCambiosEsfera() {
     multifecha: (() => { const m = _esfGetMultifecha(); return m == null ? null : JSON.stringify(m); })(),
     // [ESF-E1g] `null` = el evento no dice banco (y el sitio cae a BBVA solo).
     banco: document.getElementById('esf-banco')?.value || null,
+    // [ESF-CAMPOS-1] Los tres apuntes.
+    promo: !!document.getElementById('esf-promo')?.checked,
+    deporte: !!document.getElementById('esf-deporte')?.checked,
+    music_search: document.getElementById('esf-music-search')?.value.trim() || null,
     hotel: _esfGetHotel(),
     mapa: _esfGetMapa(),
     foto: _esfGetFoto(),

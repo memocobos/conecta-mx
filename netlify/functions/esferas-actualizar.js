@@ -44,7 +44,7 @@ const CAMPOS_EDITABLES = new Set(['nombre', 'titulo', 'fecha_inicio', 'ciudad', 
   'multifecha',
   'banco',   // [ESF-E1g] identificador del banco; lista CERRADA (ver abajo).
   // [ESF-CAMPOS-1] Tres campos chicos que bloqueaban a 13 eventos vivos.
-  'promo', 'deporte', 'music_search',
+  'promo', 'promo_code', 'promo_label', 'deporte', 'music_search',
   // [ESF-E1e] las banderas de paquete (nivel 3 de la granularidad)
   'ride_only', 'cheap_only', 'no_stay', 'no_cheap', 'no_bus', 'cheap_soon', 'cheap_also_ok']);
 
@@ -254,6 +254,11 @@ exports.handler = async (event) => {
     if (k === 'promo' || k === 'deporte') { sane[k] = (v === true || v === 1 || v === '1' || v === 'true'); continue; }
     // musicSearch es el texto con el que se busca la música cuando el nombre
     // del evento no da con ella. Se recorta: es una consulta, no un ensayo.
+    // [ESF-PROMO-PAR] El código y la etiqueta del badge. Se recortan: los
+    // reales miden 9 y 53 caracteres, y un tope generoso evita que un pegado
+    // accidental acabe impreso sobre la tarjeta del evento.
+    if (k === 'promo_code') { sane[k] = (typeof v === 'string' && v.trim()) ? v.trim().slice(0, 40) : null; continue; }
+    if (k === 'promo_label') { sane[k] = (typeof v === 'string' && v.trim()) ? v.trim().slice(0, 160) : null; continue; }
     if (k === 'music_search') { sane[k] = (typeof v === 'string' && v.trim()) ? v.trim().slice(0, 120) : null; continue; }
     if (k === 'multifecha') {
       const filas = parseMultifecha(v);

@@ -307,6 +307,27 @@ function multifechaTexto(f) {
 // `promo:true` y `deporte:1` — cada uno con SU literal, que es como vive en el
 // catálogo. Escribir `promo:1` sería semánticamente otra cosa para el juez.
 function promoSeg(esfera) { return esfera.promo ? 'promo:true,' : ''; }
+
+// [ESF-PROMO-PAR] El código de la promo y su etiqueta. Nacieron con CAT-1 (la
+// promo de pareja) y son el badge que el index pinta sobre la tarjeta:
+//   promoCode:'TINI'
+//   promoLabel:'PROMO DE PAREJA · CÓDIGO: TINI · HASTA EL 24 AGO'
+// Medido: los 6 eventos que los tienen los tienen LOS DOS, y en el mismo orden
+// (promoCode tras `promo`, promoLabel tras `promoCode`). Aun así se guardan por
+// SEPARADO: que hoy vayan juntos no los convierte en un solo dato, y un par
+// acoplado a la fuerza es lo que hay que desacoplar cuando uno cambie.
+//
+// Son los últimos que le faltaban a calle24, tini, enjambre, alejandrosanz y
+// badgyal — los cinco que mi tabla de diseño contó de más al meter `promo`,
+// `promoCode` y `promoLabel` en el mismo cubo.
+function promoCodeSeg(esfera) {
+  const v = (typeof esfera.promo_code === 'string') ? esfera.promo_code.trim() : '';
+  return v ? ("promoCode:'" + escStr(v) + "',") : '';
+}
+function promoLabelSeg(esfera) {
+  const v = (typeof esfera.promo_label === 'string') ? esfera.promo_label.trim() : '';
+  return v ? ("promoLabel:'" + escStr(v) + "',") : '';
+}
 function deporteSeg(esfera) { return esfera.deporte ? 'deporte:1,' : ''; }
 function musicSearchSeg(esfera) {
   const v = (typeof esfera.music_search === 'string') ? esfera.music_search.trim() : '';
@@ -649,7 +670,7 @@ function generarObjFestival(esfera, fest, hoy) {
   // catalogo-index, cuenta-deposito y cuenta-evento).
   const _bk = bancoValido(esfera.banco);
   const bancoSeg = _bk ? (',banco:' + _bk) : '';
-  return "{id:'" + escStr(esfera.slug) + "'," + promoSeg(esfera) + deporteSeg(esfera) + addedSeg + musicListSeg + flags +
+  return "{id:'" + escStr(esfera.slug) + "'," + promoSeg(esfera) + promoCodeSeg(esfera) + promoLabelSeg(esfera) + deporteSeg(esfera) + addedSeg + musicListSeg + flags +
     "c:'" + color +
     "'," + imgSeg + musicSearchSeg(esfera) + lineupSeg +
     "a:'" + escStr(esfera.titulo || nombre) +
@@ -803,7 +824,7 @@ function generarObj(esfera, hoy) {
   // catalogo-index, cuenta-deposito y cuenta-evento).
   const _bk = bancoValido(esfera.banco);
   const bancoSeg = _bk ? (',banco:' + _bk) : '';
-  return "{id:'" + escStr(esfera.slug) + "'," + promoSeg(esfera) + deporteSeg(esfera) + addedSeg + music +
+  return "{id:'" + escStr(esfera.slug) + "'," + promoSeg(esfera) + promoCodeSeg(esfera) + promoLabelSeg(esfera) + deporteSeg(esfera) + addedSeg + music +
     "c:'" + color +
     "'," + imgSeg + musicSearchSeg(esfera) +
     "a:'" + escStr(esfera.titulo || nombre) +
@@ -950,7 +971,7 @@ const CAMPOS_DEL_COMPILADOR = new Set([
   // se escribe pero no se puede borrar.
   'noBus', 'noStay', 'noCheap', 'cheapSoon', 'rideOnly', 'cheapOnly', 'cheapAlsoOk',
   // [ESF-CAMPOS-1] Se emiten, así que se declaran — la regla de ESF-FLAGS.
-  'promo', 'deporte', 'musicSearch', 'lineup', 'multifecha',
+  'promo', 'promoCode', 'promoLabel', 'deporte', 'musicSearch', 'lineup', 'multifecha',
   // [ESF-E1a] Desde que Esferas sabe emitirlos, los GOBIERNA: si no entraran
   // aquí, `fusionarConViejo` los conservaría del index viejo y habría dos
   // fuentes para el mismo número — justo lo que esta serie viene a cerrar.

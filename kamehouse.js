@@ -18328,6 +18328,8 @@ async function crearEsferaEvento() {
     banco: document.getElementById('esf-banco')?.value || null,
     // [ESF-CAMPOS-1] Los tres apuntes.
     promo: !!document.getElementById('esf-promo')?.checked,
+    promo_code: document.getElementById('esf-promo-code')?.value.trim() || null,
+    promo_label: document.getElementById('esf-promo-label')?.value.trim() || null,
     deporte: !!document.getElementById('esf-deporte')?.checked,
     music_search: document.getElementById('esf-music-search')?.value.trim() || null,
     hotel: _esfGetHotel(),
@@ -18363,7 +18365,9 @@ async function crearEsferaEvento() {
     { const b = document.getElementById('esf-banco'); if (b) b.value = ''; }
     { const p = document.getElementById('esf-promo'); if (p) p.checked = false;
       const d = document.getElementById('esf-deporte'); if (d) d.checked = false;
-      const m = document.getElementById('esf-music-search'); if (m) m.value = ''; }
+      const m = document.getElementById('esf-music-search'); if (m) m.value = '';
+      const pc = document.getElementById('esf-promo-code'); if (pc) pc.value = '';
+      const pl = document.getElementById('esf-promo-label'); if (pl) pl.value = ''; }
     _esfClearHotel();
     _esfMapaClear();
     _esfFotoClear();
@@ -19679,6 +19683,8 @@ function editarEsfera(slug) {
   if (Array.isArray(_cz)) _cz.forEach((z) => { if (z && typeof z === 'object') _esfAddCheapZona(z); });
   set('esf-banco', row.banco || '');
   { const p = document.getElementById('esf-promo'); if (p) p.checked = !!row.promo; }
+  set('esf-promo-code', row.promo_code || '');
+  set('esf-promo-label', row.promo_label || '');
   { const d = document.getElementById('esf-deporte'); if (d) d.checked = !!row.deporte; }
   set('esf-music-search', row.music_search || '');
   // [ESF-E3a] Las fechas del nivel 4. Poblarlas es OBLIGATORIO, no cosmético:
@@ -19727,7 +19733,9 @@ function cancelarEdicionEsfera() {
   { const b = document.getElementById('esf-banco'); if (b) b.value = ''; }
     { const p = document.getElementById('esf-promo'); if (p) p.checked = false;
       const d = document.getElementById('esf-deporte'); if (d) d.checked = false;
-      const m = document.getElementById('esf-music-search'); if (m) m.value = ''; }
+      const m = document.getElementById('esf-music-search'); if (m) m.value = '';
+      const pc = document.getElementById('esf-promo-code'); if (pc) pc.value = '';
+      const pl = document.getElementById('esf-promo-label'); if (pl) pl.value = ''; }
   _esfClearHotel();
   _esfMapaClear();
   _esfFotoClear();
@@ -19771,6 +19779,8 @@ async function guardarCambiosEsfera() {
     banco: document.getElementById('esf-banco')?.value || null,
     // [ESF-CAMPOS-1] Los tres apuntes.
     promo: !!document.getElementById('esf-promo')?.checked,
+    promo_code: document.getElementById('esf-promo-code')?.value.trim() || null,
+    promo_label: document.getElementById('esf-promo-label')?.value.trim() || null,
     deporte: !!document.getElementById('esf-deporte')?.checked,
     music_search: document.getElementById('esf-music-search')?.value.trim() || null,
     hotel: _esfGetHotel(),

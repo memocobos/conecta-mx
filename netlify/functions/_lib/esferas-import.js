@@ -99,6 +99,8 @@ function evAEsfera(ev) {
     banco: (typeof ev.banco === 'string' && ev.banco) ? ev.banco : null,
     // [ESF-CAMPOS-1] Los tres viajan con el evento al importarlo.
     promo: ev.promo === true,
+    promo_code: (typeof ev.promoCode === 'string' && ev.promoCode.trim()) ? ev.promoCode.trim() : null,
+    promo_label: (typeof ev.promoLabel === 'string' && ev.promoLabel.trim()) ? ev.promoLabel.trim() : null,
     deporte: !!ev.deporte,
     music_search: (typeof ev.musicSearch === 'string' && ev.musicSearch.trim()) ? ev.musicSearch.trim() : null,
     slug: ev.id,

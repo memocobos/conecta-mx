@@ -18100,6 +18100,8 @@ async function crearEsferaEvento() {
     // [ESF-E1c] `null` = sin lista capturada (el compilador usa su rampa).
     // Una lista, aunque sea vacía, es una afirmación sobre el evento.
     cheap_zonas: (() => { const c = _esfGetCheapZonas(); return c == null ? null : JSON.stringify(c); })(),
+    // [ESF-E3a] NIVEL 4. `null` = el evento no es multifecha.
+    multifecha: (() => { const m = _esfGetMultifecha(); return m == null ? null : JSON.stringify(m); })(),
     hotel: _esfGetHotel(),
     mapa: _esfGetMapa(),
     foto: _esfGetFoto(),
@@ -18129,6 +18131,7 @@ async function crearEsferaEvento() {
     ['esf-slug','esf-nombre','esf-titulo','esf-fecha','esf-venue','esf-music'].forEach(id => { const el=document.getElementById(id); if (el) el.value=''; });
     _esfClearFechasExtra();
     _esfClearZonas();
+    _esfClearMultifecha();
     _esfClearHotel();
     _esfMapaClear();
     _esfFotoClear();
@@ -18310,7 +18313,11 @@ function _esfToggleFestival() {
   if (box) box.style.display = on ? '' : 'none';
   // R1: en festival, ocultar los grupos de CONCIERTO (música/zonas/hotel) — el
   // festival los tiene en sus paquetes. '' = display natural del form-group.
-  ['esf-grp-music', 'esf-grp-zonas', 'esf-grp-hotel'].forEach((id) => {
+  // [ESF-E3a] `esf-grp-multifecha` entra a la lista: en festival las fechas
+  // viven en `festival.paquetes`, que es OTRA familia (noches, música, hotel
+  // por entrada). Dejar las dos bocas abiertas invita a capturar la misma
+  // fecha en dos modelos que no se hablan.
+  ['esf-grp-music', 'esf-grp-zonas', 'esf-grp-hotel', 'esf-grp-multifecha'].forEach((id) => {
     const g = document.getElementById(id);
     if (g) g.style.display = on ? 'none' : '';
   });
@@ -18701,6 +18708,289 @@ function _esfCopiarDePlus() {
   plus.forEach((z) => _esfAddCheapZona({ n: z.n, p: z.pc || 0, vip: z.vip, ag: z.ag, prox: z.prox }));
   renderEsferaPreview();
   showToast(plus.length + ' zona(s) copiadas — ahora edítalas libremente', 'success');
+}
+
+// ═══ [ESF-E3b] IMPORTAR DEL CATÁLOGO ══════════════════════════════════════
+// La otra mitad de "todos los eventos viven en Esferas": traer los que todavía
+// viven a mano en `index.html`.
+//
+// Dos pasos SEPARADOS a propósito. Diagnosticar no escribe nada y es lo que se
+// mira; sembrar escribe y hay que pedirlo aparte. Un solo botón que hiciera las
+// dos cosas convertiría "a ver qué hay" en una escritura al catálogo.
+//
+// Lo que el endpoint garantiza y esta pantalla REPITE en voz alta, porque una
+// promesa que solo vive en el servidor no tranquiliza a quien aprieta:
+//   · solo entra lo que el juez semántico aprueba —lo demás se queda a mano—
+//   · lo sembrado nace SIN PUBLICAR
+//   · un slug que ya está en Esferas se SALTA, no se pisa
+let _esfImportDiag = null;   // el último diagnóstico, para que Sembrar diga cuántos
+
+function _esfImportPanel() { return document.getElementById('esf-import-panel'); }
+
+async function importarDelCatalogo() {
+  const panel = _esfImportPanel();
+  if (panel) panel.innerHTML = '<div class="loading-state"><div class="spinner"></div>Leyendo el catálogo…</div>';
+  try {
+    const r = await khAdminFetch('/.netlify/functions/esferas-importar', {
+      method: 'POST', body: JSON.stringify({ accion: 'diagnostico' }),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok || !d.ok) throw new Error(d.error || ('Error ' + r.status));
+    _esfImportDiag = d;
+    _esfImportPintar(d);
+  } catch (e) {
+    _esfImportDiag = null;
+    if (panel) panel.innerHTML = '<div style="color:var(--red);font-size:12px">' + _esfEsc(e.message) + '</div>';
+  }
+}
+
+function _esfImportPintar(d) {
+  const panel = _esfImportPanel();
+  if (!panel) return;
+  const R = d.resumen || {};
+  const nuevos = (d.gobernables || []).filter((g) => !g.ya_esta);
+  const cel = (n, t) => '<div style="flex:1;min-width:104px"><div style="font-size:22px;font-weight:800;line-height:1.1">' + n +
+    '</div><div style="font-size:10px;color:var(--ts);text-transform:uppercase;letter-spacing:.08em;margin-top:2px">' + t + '</div></div>';
+  let h = '<div style="display:flex;gap:14px;flex-wrap:wrap;padding:14px;border:1px solid var(--border);border-radius:var(--r-sm,8px)">' +
+    cel(R.total || 0, 'en el catálogo') +
+    cel(R.por_sembrar || 0, 'se pueden traer') +
+    cel(R.ya_en_esferas || 0, 'ya están aquí') +
+    cel(R.con_brecha || 0, 'se quedan a mano') +
+    '</div>';
+
+  if (nuevos.length) {
+    h += '<div style="margin-top:14px;font-size:12px"><b>Se traerían ' + nuevos.length + ':</b> ' +
+      nuevos.map((g) => '<span style="display:inline-block;padding:2px 8px;margin:2px 3px 0 0;border-radius:var(--r-sm,8px);background:var(--bg);border:1px solid var(--border);font-size:11px">' +
+        _esfEsc(g.slug) + (g.byte_igual ? '' : ' <span title="El compilador lo reproduce con los mismos valores, en otro orden de llaves. Publicar lo canonicaliza." style="color:var(--ts)">≈</span>') +
+        '</span>').join('') + '</div>' +
+      // El `≈` se explica A LA VISTA, no solo en un tooltip: un símbolo que hay
+      // que descubrir pasando el mouse es un símbolo que nadie lee.
+      (nuevos.some((g) => !g.byte_igual) ? '<div style="font-size:11px;color:var(--ts);margin-top:6px">Los marcados <b>≈</b> se reproducen con los <b>mismos valores</b> en otro orden de llaves; publicar los deja parejos.</div>' : '') +
+      '<div style="font-size:11px;color:var(--ts);margin-top:8px;line-height:1.5">Nacen <b>sin publicar</b>: aparecen en la lista de arriba para revisarlos, y el sitio no cambia hasta que tú publiques. Los que ya están aquí <b>no se tocan</b>.</div>' +
+      '<button class="btn btn-primary" type="button" id="esf-import-sembrar" style="margin-top:12px" onclick="sembrarDelCatalogo()">Traer los ' + nuevos.length + ' a Esferas</button>';
+  } else {
+    h += '<div style="margin-top:14px;font-size:12px;color:var(--ts)">No hay nada nuevo que traer: los ' + (R.gobernables || 0) +
+      ' eventos que el compilador sabe reproducir ya están en Esferas.</div>';
+  }
+
+  // Las brechas se PINTAN, no se resumen en un número. "75 se quedan a mano" no
+  // dice nada; "harry pierde las fechas del texto" sí, y es lo que se arregla
+  // en la siguiente tuerca.
+  if ((d.con_brecha || []).length) {
+    h += '<div style="margin-top:18px"><div style="font-family:\'JetBrains Mono\',monospace;font-size:10px;letter-spacing:.15em;color:var(--ts);margin-bottom:6px">// SE QUEDAN A MANO — QUÉ SE PERDERÍA</div>' +
+      '<div style="max-height:280px;overflow:auto;border:1px solid var(--border);border-radius:var(--r-sm,8px)">' +
+      d.con_brecha.map((b) =>
+        '<div style="padding:8px 10px;border-bottom:1px solid var(--border);font-size:11px">' +
+        '<b>' + _esfEsc(b.slug) + '</b> <span style="color:var(--ts)">— ' + (b.cuantas || 0) + ' dato(s)</span>' +
+        (b.motivo ? ' <span style="color:var(--orange)">' + _esfEsc(b.motivo) + '</span>' : '') +
+        (b.brechas || []).map((x) => '<div style="color:var(--ts);margin-top:2px">· <code>' + _esfEsc(x.campo) + '</code> — ' + _esfEsc(x.que) + '</div>').join('') +
+        ((b.cuantas || 0) > (b.brechas || []).length ? '<div style="color:var(--ts);margin-top:2px">· …y ' + (b.cuantas - b.brechas.length) + ' más</div>' : '') +
+        '</div>').join('') + '</div></div>';
+  }
+  panel.innerHTML = h;
+}
+
+async function sembrarDelCatalogo() {
+  const nuevos = ((_esfImportDiag || {}).gobernables || []).filter((g) => !g.ya_esta);
+  if (!nuevos.length) { showToast('No hay nada que traer', 'error'); return; }
+  if (!confirm('Se van a traer ' + nuevos.length + ' evento(s) a Esferas, SIN publicar.\n\n' +
+               'No se toca ninguno de los que ya están aquí, y el sitio no cambia hasta que publiques.')) return;
+  const btn = document.getElementById('esf-import-sembrar');
+  if (btn) { btn.disabled = true; btn.textContent = 'Trayendo…'; }
+  try {
+    const r = await khAdminFetch('/.netlify/functions/esferas-importar', {
+      method: 'POST', body: JSON.stringify({ accion: 'sembrar' }),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok || !d.ok) throw new Error(d.error || ('Error ' + r.status));
+    const panel = _esfImportPanel();
+    const fall = d.fallidos || [];
+    if (panel) {
+      panel.innerHTML =
+        '<div style="padding:14px;border:1px solid var(--border);border-radius:var(--r-sm,8px);font-size:12px;line-height:1.6">' +
+        '<div style="font-size:20px;font-weight:800">' + (d.insertados || []).length + ' traídos, sin publicar</div>' +
+        ((d.insertados || []).length ? '<div style="color:var(--ts);margin-top:4px">' + d.insertados.map(_esfEsc).join(' · ') + '</div>' : '') +
+        // Los fallidos se dicen SIEMPRE que los haya, con su detalle. Un import
+        // que solo cuenta éxitos se lee como completo cuando no lo es.
+        (fall.length ? '<div style="color:var(--red);margin-top:10px"><b>' + fall.length + ' no se pudieron traer:</b>' +
+          fall.map((f) => '<div style="margin-top:2px">· ' + _esfEsc(f.slug) + ' — ' + _esfEsc(f.detail || '') + '</div>').join('') + '</div>' : '') +
+        '<div style="color:var(--ts);margin-top:10px">' + _esfEsc(d.nota || '') + '</div></div>';
+    }
+    showToast((d.insertados || []).length + ' evento(s) traídos sin publicar', 'success');
+    if (typeof loadEsferasEventos === 'function') loadEsferasEventos();
+  } catch (e) {
+    if (btn) { btn.disabled = false; btn.textContent = 'Traer los ' + nuevos.length + ' a Esferas'; }
+    showToast(e.message, 'error');
+  }
+}
+
+// ═══ [ESF-E3a] NIVEL 4 · LA FECHA, UNA POR UNA ═════════════════════════════
+// El cuarto nivel de la decisión de Memo: un concierto de tres noches no se
+// agota entero — se agota la del viernes y sigue viva la del sábado.
+//
+// ESF-E1f le enseñó al compilador a EMITIR `multifecha` en conciertos, pero
+// nadie lo CAPTURABA: el navegador nunca mandaba el campo. Ocho conciertos
+// (straykids, weeknd, bts, karolg, morat, caifanes, harry, alvarodiaz) tenían
+// sus fechas gobernadas por un campo que no tenía boca.
+//
+// ⚠️ SE CAPTURA COMPLETO. Etiqueta, fecha, zonas, cheap, ride y su agotado.
+// Guardar a medias no "guarda menos": REEMPLAZA la columna con una versión
+// degradada, porque `fusionarConViejo` solo protege el primer nivel. Es la
+// misma trampa que E1 midió ocho veces.
+//
+// Las zonas de una fecha se leen y se escriben con la MISMA forma que las
+// CHEAP de arriba (n · p · vip · ag · prox) porque el compilador usa el mismo
+// parser para las dos: `parseCheapZonas(f.zonas)`. Un tercer formato aquí
+// sería la copia que acaba divergiendo.
+
+// Una fila de zona dentro de un bloque de fecha. Sirve para las dos listas
+// —PLUS y CHEAP— porque en el modelo de la fecha son la misma forma.
+function _esfMfZonaRow(cont, data) {
+  if (!cont) return;
+  const d = data || {};
+  const row = document.createElement('div');
+  row.className = 'esf-mfz-row';
+  row.style.cssText = 'display:flex;gap:6px;margin-top:6px;align-items:center;flex-wrap:wrap';
+  row.innerHTML =
+    '<input class="cot-input esf-mfz-n" placeholder="Zona" style="flex:2;min-width:100px" autocomplete="off">' +
+    '<input class="cot-input esf-mfz-p" type="number" min="0" placeholder="$" style="flex:1;min-width:74px">' +
+    '<label style="font-size:11px;display:flex;align-items:center;gap:3px;white-space:nowrap" title="Zona preferente"><input type="checkbox" class="esf-mfz-vip">VIP</label>' +
+    '<label style="font-size:11px;display:flex;align-items:center;gap:3px;white-space:nowrap"><input type="checkbox" class="esf-mfz-ag">Agotada</label>' +
+    '<label style="font-size:11px;display:flex;align-items:center;gap:3px;white-space:nowrap" title="Se anuncia sin precio"><input type="checkbox" class="esf-mfz-prox">Próx.</label>' +
+    '<button type="button" class="btn btn-ghost esf-mfz-del" title="Quitar zona">✕</button>';
+  row.querySelector('.esf-mfz-n').value = (typeof d.n === 'string') ? d.n : '';
+  if (d.p) row.querySelector('.esf-mfz-p').value = d.p;
+  if (d.vip) row.querySelector('.esf-mfz-vip').checked = true;
+  if (d.ag) row.querySelector('.esf-mfz-ag').checked = true;
+  if (d.prox) row.querySelector('.esf-mfz-prox').checked = true;
+  // Agotada y Próximamente son excluyentes, igual que en las otras dos listas:
+  // una nunca estuvo a la venta y la otra se acabó.
+  const cbA = row.querySelector('.esf-mfz-ag'), cbP = row.querySelector('.esf-mfz-prox');
+  cbA.addEventListener('change', () => { if (cbA.checked) cbP.checked = false; });
+  cbP.addEventListener('change', () => { if (cbP.checked) cbA.checked = false; });
+  row.querySelector('.esf-mfz-del').addEventListener('click', () => { row.remove(); });
+  cont.appendChild(row);
+}
+
+function _esfMfLeerZonas(cont) {
+  if (!cont) return [];
+  return Array.from(cont.querySelectorAll('.esf-mfz-row')).map((row) => {
+    const n = (row.querySelector('.esf-mfz-n')?.value || '').trim();
+    const p = parseInt(row.querySelector('.esf-mfz-p')?.value || '0', 10) || 0;
+    const prox = row.querySelector('.esf-mfz-prox')?.checked ? 1 : 0;
+    const ag = (!prox && row.querySelector('.esf-mfz-ag')?.checked) ? 1 : 0;
+    const vip = row.querySelector('.esf-mfz-vip')?.checked ? 1 : 0;
+    return { n, p, ag, prox, vip };
+  }).filter((z) => z.n);
+}
+
+// Un bloque = una noche.
+function _esfMfAddFecha(data) {
+  const cont = document.getElementById('esf-multifecha');
+  if (!cont) return;
+  const d = data || {};
+  const box = document.createElement('div');
+  box.className = 'esf-mf-fecha';
+  box.style.cssText = 'margin-top:10px;padding:12px;border:1px solid var(--border);border-radius:var(--r-sm,8px);background:var(--bg)';
+  box.innerHTML =
+    '<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">' +
+      '<input class="cot-input esf-mf-lbl" placeholder="Etiqueta (ej. 20 Abril)" style="flex:2;min-width:150px" autocomplete="off">' +
+      '<input class="cot-input esf-mf-ds" type="date" title="Fecha real de esta noche. Vacía = el sitio solo muestra la etiqueta." style="flex:1;min-width:140px">' +
+      '<button type="button" class="btn btn-ghost esf-mf-agotar" style="font-size:11px" title="Marca agotadas TODAS las zonas de esta noche, y el RIDE si lo tiene">Agotar la noche</button>' +
+      '<button type="button" class="btn btn-ghost esf-mf-reabrir" style="font-size:11px" title="Quita el agotado de todas las zonas de esta noche">Reabrir</button>' +
+      // `margin-left:auto` lo manda al extremo: borrar la noche entera no puede
+      // quedar pegado a Reabrir, que es lo contrario y se aprieta seguido.
+      '<button type="button" class="btn btn-ghost esf-mf-del" style="color:var(--red);margin-left:auto" title="Quitar esta fecha">✕</button>' +
+    '</div>' +
+    '<div style="font-size:10px;font-family:\'JetBrains Mono\',monospace;letter-spacing:.1em;color:var(--ts);margin:12px 0 2px">ZONAS DE ESTA NOCHE</div>' +
+    '<div class="esf-mf-zonas"></div>' +
+    '<button type="button" class="btn btn-ghost esf-mf-addz" style="font-size:11px;margin-top:6px">+ Zona</button>' +
+    '<button type="button" class="btn btn-ghost esf-mf-copiar" style="font-size:11px;margin-top:6px;margin-left:6px" title="Pre-llena con las zonas PLUS del evento. Después se edita libre.">Copiar de arriba</button>' +
+    '<div style="font-size:10px;font-family:\'JetBrains Mono\',monospace;letter-spacing:.1em;color:var(--ts);margin:12px 0 2px">ZONAS CHEAP DE ESTA NOCHE <span style="font-family:inherit;letter-spacing:0;text-transform:none">— vacías = usa las de arriba</span></div>' +
+    '<div class="esf-mf-cheap"></div>' +
+    '<button type="button" class="btn btn-ghost esf-mf-addc" style="font-size:11px;margin-top:6px">+ Zona CHEAP</button>' +
+    '<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:10px">' +
+      '<input class="cot-input esf-mf-ride" type="number" min="0" placeholder="$ RIDE de esta noche" style="flex:1;min-width:150px">' +
+      '<label style="font-size:11px;display:flex;align-items:center;gap:3px;white-space:nowrap"><input type="checkbox" class="esf-mf-rideag">RIDE agotado</label>' +
+    '</div>';
+  box.querySelector('.esf-mf-lbl').value = (typeof d.lbl === 'string') ? d.lbl : '';
+  if (typeof d.ds === 'string' && d.ds) box.querySelector('.esf-mf-ds').value = d.ds.slice(0, 10);
+  if (d.ride) box.querySelector('.esf-mf-ride').value = d.ride;
+  if (d.rideAgotado) box.querySelector('.esf-mf-rideag').checked = true;
+  const cz = box.querySelector('.esf-mf-zonas'), cc = box.querySelector('.esf-mf-cheap');
+  (Array.isArray(d.zonas) ? d.zonas : []).forEach((z) => _esfMfZonaRow(cz, z));
+  (Array.isArray(d.cheapZonas) ? d.cheapZonas : []).forEach((z) => _esfMfZonaRow(cc, z));
+  box.querySelector('.esf-mf-addz').addEventListener('click', () => _esfMfZonaRow(cz));
+  box.querySelector('.esf-mf-addc').addEventListener('click', () => _esfMfZonaRow(cc));
+  box.querySelector('.esf-mf-del').addEventListener('click', () => box.remove());
+  // Copiar de arriba: conveniencia de captura, igual que en las CHEAP. Pregunta
+  // antes de pisar — copiar no debe borrar trabajo.
+  box.querySelector('.esf-mf-copiar').addEventListener('click', () => {
+    const plus = (typeof _esfGetZonas === 'function') ? _esfGetZonas() : [];
+    if (!plus.length) { showToast('Primero captura las zonas del evento', 'error'); return; }
+    const hay = cz.querySelectorAll('.esf-mfz-row').length;
+    if (hay && !confirm('Esto reemplaza las ' + hay + ' zona(s) de esta noche. ¿Seguir?')) return;
+    cz.innerHTML = '';
+    plus.forEach((z) => _esfMfZonaRow(cz, z));
+  });
+  // Agotar / reabrir la noche entera. Dos verbos explícitos en vez de un botón
+  // que adivine el modo: un control que cambia de significado según un estado
+  // que no se ve es un control que miente la mitad de las veces.
+  box.querySelector('.esf-mf-agotar').addEventListener('click', () => {
+    box.querySelectorAll('.esf-mfz-row').forEach((r) => {
+      r.querySelector('.esf-mfz-prox').checked = false;
+      r.querySelector('.esf-mfz-ag').checked = true;
+    });
+    if (box.querySelector('.esf-mf-ride').value) box.querySelector('.esf-mf-rideag').checked = true;
+  });
+  box.querySelector('.esf-mf-reabrir').addEventListener('click', () => {
+    box.querySelectorAll('.esf-mfz-ag').forEach((c) => { c.checked = false; });
+    box.querySelector('.esf-mf-rideag').checked = false;
+  });
+  cont.appendChild(box);
+}
+
+// Devuelve `null` cuando no hay ni un bloque: null significa "este evento no es
+// multifecha" y el compilador no emite el campo. Un arreglo, aunque sea de una
+// sola noche, es una afirmación sobre el evento.
+function _esfGetMultifecha() {
+  const bloques = Array.from(document.querySelectorAll('#esf-multifecha .esf-mf-fecha'));
+  if (!bloques.length) return null;
+  const out = bloques.map((b) => {
+    const lbl = (b.querySelector('.esf-mf-lbl')?.value || '').trim();
+    const ds = (b.querySelector('.esf-mf-ds')?.value || '').trim();
+    const cheap = _esfMfLeerZonas(b.querySelector('.esf-mf-cheap'));
+    const ride = parseInt(b.querySelector('.esf-mf-ride')?.value || '', 10);
+    // Las llaves se arman en el ORDEN DEL CATÁLOGO —lbl · ds · zonas ·
+    // cheapZonas · ride— para que la columna se lea igual que lo compilado. No
+    // cambia nada: el juez es semántico y `multifechaTexto` emite en su propio
+    // orden pase lo que pase. Es legibilidad, no contrato.
+    const o = { lbl };
+    if (ds) o.ds = ds;
+    o.zonas = _esfMfLeerZonas(b.querySelector('.esf-mf-zonas'));
+    if (cheap.length) o.cheapZonas = cheap;
+    if (Number.isFinite(ride) && ride > 0) o.ride = ride;
+    if (b.querySelector('.esf-mf-rideag')?.checked) o.rideAgotado = 1;
+    return o;
+  // Sin etiqueta el compilador descarta la fecha (`if (!lbl) continue`), así que
+  // se descarta aquí también: mandar una que el otro lado tira es mentirle a
+  // quien captura.
+  }).filter((f) => f.lbl);
+  return out.length ? out : null;
+}
+
+function _esfClearMultifecha() {
+  const c = document.getElementById('esf-multifecha');
+  if (c) c.innerHTML = '';
+}
+
+// Puebla desde la fila (texto JSON o arreglo). Sin esto, abrir un evento
+// sembrado y guardarlo le BORRARÍA las fechas: el payload mandaría null.
+function _esfMfPopulate(raw) {
+  _esfClearMultifecha();
+  let m = raw;
+  if (typeof m === 'string') { try { m = JSON.parse(m); } catch (_) { m = null; } }
+  if (Array.isArray(m)) m.forEach((f) => { if (f && typeof f === 'object') _esfMfAddFecha(f); });
 }
 
 function _esfAddZona(data) {
@@ -19097,6 +19387,10 @@ function editarEsfera(slug) {
   let _cz = row.cheap_zonas;
   if (typeof _cz === 'string') { try { _cz = JSON.parse(_cz); } catch (_) { _cz = null; } }
   if (Array.isArray(_cz)) _cz.forEach((z) => { if (z && typeof z === 'object') _esfAddCheapZona(z); });
+  // [ESF-E3a] Las fechas del nivel 4. Poblarlas es OBLIGATORIO, no cosmético:
+  // sin esto, abrir un evento multifecha y guardarlo mandaría `multifecha:null`
+  // y le borraría las noches con sus zonas.
+  _esfMfPopulate(row.multifecha);
   // Hotel custom: re-poblar desde `hotel` (texto JSON u objeto); custom:false → off.
   _esfHotelPopulate(row.hotel);
   // Mapa: re-poblar preview desde la URL guardada (o limpiar si no hay).
@@ -19135,6 +19429,7 @@ function cancelarEdicionEsfera() {
   ['esf-nombre','esf-titulo','esf-fecha','esf-venue','esf-music'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
   _esfClearFechasExtra();
   _esfClearZonas();
+  _esfClearMultifecha();
   _esfClearHotel();
   _esfMapaClear();
   _esfFotoClear();
@@ -19172,6 +19467,8 @@ async function guardarCambiosEsfera() {
     // [ESF-E1c] `null` = sin lista capturada (el compilador usa su rampa).
     // Una lista, aunque sea vacía, es una afirmación sobre el evento.
     cheap_zonas: (() => { const c = _esfGetCheapZonas(); return c == null ? null : JSON.stringify(c); })(),
+    // [ESF-E3a] NIVEL 4. `null` = el evento no es multifecha.
+    multifecha: (() => { const m = _esfGetMultifecha(); return m == null ? null : JSON.stringify(m); })(),
     hotel: _esfGetHotel(),
     mapa: _esfGetMapa(),
     foto: _esfGetFoto(),

@@ -18595,6 +18595,9 @@ function _esfAddZona(data) {
     '</div>' +
     '<input class="cot-input esf-zona-p" type="number" min="0" placeholder="$ PLUS" style="flex:1;min-width:78px">' +
     '<input class="cot-input esf-zona-pc" type="number" min="0" placeholder="$ CHEAP" style="flex:1;min-width:78px">' +
+    // [ESF-E1b] VIP va ANTES de Agotada, igual que en el EV (`n·p·vip·ag`). Es
+    // propiedad de la ZONA: dónde te sientas, no cómo lo compraste.
+    '<label style="font-size:11px;display:flex;align-items:center;gap:3px;white-space:nowrap" title="Zona preferente: el sitio la marca VIP en PLUS y en CHEAP"><input type="checkbox" class="esf-zona-vip">VIP</label>' +
     '<label style="font-size:11px;display:flex;align-items:center;gap:3px;white-space:nowrap"><input type="checkbox" class="esf-zona-ag">Agotada</label>' +
     // [E1] PRÓXIMAMENTE: la zona se anuncia sin costo todavía. El index ya la
     // pinta deshabilitada en cursiva y minP la ignora, así que "desde $X" no la
@@ -18605,6 +18608,7 @@ function _esfAddZona(data) {
   row.querySelector('.esf-zona-n').value = (typeof d.n === 'string') ? d.n : '';
   if (d.p) row.querySelector('.esf-zona-p').value = d.p;
   if (d.pc) row.querySelector('.esf-zona-pc').value = d.pc;
+  if (d.vip) row.querySelector('.esf-zona-vip').checked = true;
   if (d.ag) row.querySelector('.esf-zona-ag').checked = true;
   if (d.prox) row.querySelector('.esf-zona-prox').checked = true;
   row.querySelectorAll('input').forEach((el) => {
@@ -18639,7 +18643,10 @@ function _esfGetZonas() {
     // prox manda: nunca se guardan las dos (la UI ya lo impide, esto es el
     // cinturón por si alguien llega con datos viejos).
     const ag = (!prox && row.querySelector('.esf-zona-ag')?.checked) ? 1 : 0;
-    return { n, p, pc, ag, prox };
+    // [ESF-E1b] VIP es INDEPENDIENTE de agotada y de próximamente: una zona
+    // preferente lo sigue siendo aunque se haya acabado.
+    const vip = row.querySelector('.esf-zona-vip')?.checked ? 1 : 0;
+    return { n, p, pc, ag, prox, vip };
   }).filter((z) => z.n);
 }
 

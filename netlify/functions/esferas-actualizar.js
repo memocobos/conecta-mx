@@ -114,6 +114,11 @@ function saneZonas(v) {
     const prox = (z.prox === 1 || z.prox === true || z.prox === '1') ? 1 : 0;
     if (prox) row.prox = 1;
     else if (z.ag === 1 || z.ag === true || z.ag === '1') row.ag = 1;
+    // [ESF-E1b] VIP, por la MISMA razón que dice el comentario de arriba:
+    // `saneZonas` reconstruye la fila campo por campo, así que lo que no se
+    // nombra aquí muere en silencio entre el editor y la base. Es independiente
+    // de `ag` y de `prox`: una zona preferente lo sigue siendo aunque se acabe.
+    if (z.vip === 1 || z.vip === true || z.vip === '1') row.vip = 1;
     out.push(row);
   }
   if (!out.length) return null;

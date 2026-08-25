@@ -151,6 +151,12 @@ function parseZonas(raw) {
         'Escríbelo sin comas ni símbolos (ej. 1800) o déjalo vacío.'
       );
     }
+    // [ESF-E1b] VIP: la zona lleva marca de preferente. Se PERDÍA hasta hoy —53
+    // eventos la usan en `zonas` y 51 en `cheapZonas`, 131 zonas en total— y el
+    // candado de `fusionarConViejo` NO la protegía: protege campos de PRIMER
+    // NIVEL, y `zonas` es uno que el compilador SÍ gobierna, así que el array se
+    // reemplazaba entero y lo de adentro se iba sin que nada avisara.
+    const vip = (z.vip === 1 || z.vip === true || z.vip === '1') ? 1 : 0;
     out.push({
       n,
       p: (Number.isFinite(p) && p > 0) ? Math.round(p) : 0,
@@ -158,6 +164,7 @@ function parseZonas(raw) {
       // prox manda: si vinieran las dos, la zona se publica como próximamente
       ag: prox ? 0 : ag,
       prox,
+      vip,
     });
   }
   return out;
@@ -172,8 +179,13 @@ function zonasSegmento(esfera) {
   // [E1] El orden de las llaves espeja el de los EV que ya viven en el index
   // (p.ej. coronacapital: {n:'General',p:0,prox:1}), para que el compilado siga
   // siendo byte-exacto contra lo capturado a mano.
+  // [ESF-E1b] El orden es `n · p · vip · ag`, medido sobre las 1,910 zonas del
+  // catálogo: 119 lo escriben así y solo 12 al revés (`ag · vip`). Se emite el
+  // mayoritario; esos 12 quedan semánticamente idénticos y se canonicalizan al
+  // publicar, que es lo que ya pasa con los eventos gobernados.
   const plus = rows.map((z) =>
-    "{n:'" + escStr(z.n) + "',p:" + z.p + (z.prox ? ',prox:1' : (z.ag ? ',ag:1' : '')) + '}'
+    "{n:'" + escStr(z.n) + "',p:" + z.p + (z.vip ? ',vip:1' : '') +
+    (z.prox ? ',prox:1' : (z.ag ? ',ag:1' : '')) + '}'
   ).join(',');
   let seg = 'zonas:[' + plus + ']';
   // cheapZonas SOLO si alguna zona tiene precio cheap. Espeja TODAS las zonas:
@@ -182,9 +194,13 @@ function zonasSegmento(esfera) {
   // costo PLUS, tampoco lo hay CHEAP — anunciarla "agotada" mentiría igual.
   if (rows.some((z) => z.pc > 0)) {
     const cheap = rows.map((z) => {
-      if (z.prox) return "{n:'" + escStr(z.n) + "',p:0,prox:1}";
+      const v = z.vip ? ',vip:1' : '';
+      if (z.prox) return "{n:'" + escStr(z.n) + "',p:0" + v + ',prox:1}';
       const avail = !z.ag && z.pc > 0;
-      return "{n:'" + escStr(z.n) + "',p:" + (avail ? z.pc : 0) +
+      // [ESF-E1b] La marca VIP viaja al espejo cheap: es propiedad de la ZONA
+      // (dónde te sientas), no del paquete. Una zona VIP sigue siendo VIP
+      // aunque se compre sin transporte.
+      return "{n:'" + escStr(z.n) + "',p:" + (avail ? z.pc : 0) + v +
         (avail ? '' : ',ag:1') + '}';
     }).join(',');
     seg += ',cheapZonas:[' + cheap + ']';

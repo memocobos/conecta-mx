@@ -18890,7 +18890,12 @@ async function sembrarDelCatalogo() {
     const r = await khAdminFetch('/.netlify/functions/esferas-importar', {
       // La casilla viaja TAMBIÉN en el sembrado: si solo fuera en el
       // diagnóstico, la pantalla diría 19 y el servidor traería otros.
-      method: 'POST', body: JSON.stringify({ accion: 'sembrar', incluir_pasados: _esfImportPasados() }),
+      // [SIEMBRA-DIAG] Viaja LO QUE ESTA PANTALLA PROMETIÓ. Sin eso el servidor
+      // no puede saber que prometí 10, y "entraron 8" se queda sin explicación.
+      method: 'POST', body: JSON.stringify({
+        accion: 'sembrar', incluir_pasados: _esfImportPasados(),
+        esperados: nuevos.map((g) => g.slug),
+      }),
     });
     const d = await r.json().catch(() => ({}));
     if (!r.ok || !d.ok) throw new Error(d.error || ('Error ' + r.status));
@@ -18901,6 +18906,14 @@ async function sembrarDelCatalogo() {
         '<div style="padding:14px;border:1px solid var(--border);border-radius:var(--r-sm,8px);font-size:12px;line-height:1.6">' +
         '<div style="font-size:20px;font-weight:800">' + (d.insertados || []).length + ' traídos, sin publicar</div>' +
         ((d.insertados || []).length ? '<div style="color:var(--ts);margin-top:4px">' + d.insertados.map(_esfEsc).join(' · ') + '</div>' : '') +
+        // [SIEMBRA-DIAG] Los que NO llegaron van ARRIBA y en color, no en la
+        // línea gris del final. El 25-ago el botón prometió 10, entraron 8, y la
+        // única pista vivía en una nota gris que nadie tenía por qué leer.
+        (((d.no_traidos || []).length) ? '<div style="margin-top:12px;padding:10px;border:1px solid var(--orange);border-radius:var(--r-sm,8px);background:rgba(255,165,0,.08)">' +
+          '<b style="color:var(--orange)">Prometí ' + (d.esperados || 0) + ' y entraron ' + (d.insertados || []).length + '. Los ' + d.no_traidos.length + ' que faltan:</b>' +
+          d.no_traidos.map((x) => '<div style="margin-top:4px">· <b>' + _esfEsc(x.slug) + '</b> — ' + _esfEsc(x.motivo) +
+            (x.detail ? ' <span style="color:var(--ts)">(' + _esfEsc(x.detail) + ')</span>' : '') + '</div>').join('') +
+          '</div>' : '') +
         // Los fallidos se dicen SIEMPRE que los haya, con su detalle. Un import
         // que solo cuenta éxitos se lee como completo cuando no lo es.
         (fall.length ? '<div style="color:var(--red);margin-top:10px"><b>' + fall.length + ' no se pudieron traer:</b>' +

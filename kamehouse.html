@@ -1603,6 +1603,21 @@
       <div style="flex:1;min-width:130px"><label style="font-size:11px">Precio RIDE $</label><input class="cot-input esf-sep" type="number" min="0" id="esf-ride" placeholder="sin RIDE" style="width:100%"></div>
       <div style="flex:1;min-width:130px"><label style="font-size:11px">Separo RIDE $</label><input class="cot-input esf-sep" type="number" min="0" id="esf-sep-ride" placeholder="usa el de PLUS" style="width:100%"></div>
      </div>
+     <!-- [ESF-E1e] NIVEL 3 de la granularidad: apagar PAQUETE por paquete. Son las
+          mismas banderas que CAT-AGOT-1 arregló en el index. -->
+     <div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--border)">
+      <label style="font-size:11px">Paquetes que este evento NO vende</label>
+      <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:5px;font-size:11.5px">
+       <label style="display:flex;align-items:center;gap:4px"><input type="checkbox" id="esf-pkg-rideonly" onchange="_esfPkgSync()">Solo RIDE</label>
+       <label id="esf-pkg-alsook-wrap" style="display:none;align-items:center;gap:4px"><input type="checkbox" id="esf-pkg-alsook">…pero CHEAP sí</label>
+       <label style="display:flex;align-items:center;gap:4px"><input type="checkbox" id="esf-pkg-cheaponly" onchange="_esfPkgSync()">Solo CHEAP</label>
+       <label style="display:flex;align-items:center;gap:4px"><input type="checkbox" id="esf-pkg-nostay">Sin STAY</label>
+       <label style="display:flex;align-items:center;gap:4px"><input type="checkbox" id="esf-pkg-nocheap">Sin CHEAP</label>
+       <label style="display:flex;align-items:center;gap:4px"><input type="checkbox" id="esf-pkg-nobus">Sin camión</label>
+       <label style="display:flex;align-items:center;gap:4px"><input type="checkbox" id="esf-pkg-cheapsoon">CHEAP próximamente</label>
+      </div>
+      <div style="font-size:11px;color:var(--ts);margin-top:4px">«Solo RIDE» y «Solo CHEAP» son excluyentes: marcar una desmarca la otra.</div>
+     </div>
      <div style="font-size:11px;color:var(--ts);margin-top:4px">Default 500. El CHEAP solo aplica si alguna zona tiene precio CHEAP.<br>El <b>RIDE vacío</b> = el evento no vende ese paquete. No se publica como $0: ausente no es gratis.</div>
     </div>
     <div class="form-group">

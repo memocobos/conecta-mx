@@ -1546,6 +1546,23 @@
       </div>
       <div style="font-size:11px;color:var(--ts);margin-top:4px">Vacía = el evento <b>no vende CHEAP</b>. Las zonas de aquí son independientes de las de arriba: pueden tener otros nombres, otro orden y otros agotados.</div>
     </div>
+    <!-- ─── [ESF-E3a] NIVEL 4 · FECHA POR FECHA ──────────────────────────
+          El cuarto nivel de Memo. Un concierto de varias noches no se agota
+          entero: se agota la del viernes y sigue viva la del sábado. Hasta
+          ESF-E1f el compilador ni siquiera emitía `multifecha` en conciertos;
+          desde E1f lo emite, pero NADIE lo capturaba — el navegador jamás
+          mandaba el campo. Esto es esa boca.
+          ⚠️ Se captura COMPLETO (etiqueta, fecha, zonas, cheap, ride) porque
+          guardar a medias REEMPLAZA la columna con una versión degradada:
+          la trampa que E1 midió ocho veces. -->
+    <div class="form-group" id="esf-grp-multifecha">
+     <label>Fechas del evento <span style="font-weight:400;color:var(--ts);font-size:11px">— una noche por bloque, con sus zonas</span></label>
+     <div id="esf-multifecha"></div>
+     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
+      <button class="btn btn-ghost" type="button" onclick="_esfMfAddFecha()">+ Agregar fecha</button>
+     </div>
+     <div style="font-size:11px;color:var(--ts);margin-top:4px">Vacío = <b>una sola fecha</b> (la de arriba). Con bloques, el sitio deja elegir noche y cada una se agota por separado.</div>
+    </div>
     <div class="form-group" id="esf-grp-hotel">
      <label>Hotel</label>
      <label style="display:flex;align-items:center;gap:8px;font-size:12px;cursor:pointer">
@@ -1648,6 +1665,18 @@
    <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:20px">
     <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.15em;color:var(--ts);margin-bottom:14px">// EVENTOS REGISTRADOS</div>
     <div id="esf-listado"><div class="loading-state"><div class="spinner"></div>Cargando…</div></div>
+   </div>
+
+   <!-- ─── [ESF-E3b] IMPORTAR DEL CATÁLOGO ──────────────────────────────
+        La otra mitad de la decisión "todos los eventos viven en Esferas": los
+        que todavía viven a mano en el index se traen aquí. Diagnosticar NO
+        escribe. Sembrar solo trae los que el juez aprueba, nacen SIN PUBLICAR
+        y no pisa ningún slug que ya esté. -->
+   <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:20px;margin-bottom:20px" id="esf-import-caja">
+    <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.15em;color:var(--ts);margin-bottom:8px">// IMPORTAR DEL CATÁLOGO</div>
+    <div style="font-size:12px;color:var(--ts);margin-bottom:14px;line-height:1.5">Trae a Esferas los eventos que todavía viven a mano en <code>index.html</code>. <b>Solo entra lo que el compilador sabe reproducir sin perder un dato</b>; lo demás se queda a mano y se dice cuál y por qué. Lo sembrado nace <b>sin publicar</b> y <b>no pisa</b> nada que ya esté aquí.</div>
+    <button class="btn btn-primary" type="button" id="esf-import-diag" onclick="importarDelCatalogo()"><svg class="ic"><use href="#ic-lupa"/></svg> Ver qué se puede importar</button>
+    <div id="esf-import-panel" style="margin-top:14px"></div>
    </div>
 
    <!-- Dry-run del compilador (Pieza 2a · solo lectura/preview, NO escribe al repo) -->

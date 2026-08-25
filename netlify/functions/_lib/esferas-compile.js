@@ -317,6 +317,15 @@ function parseHotel(raw) {
     items.push({ n, e: (Number.isFinite(e) && e > 0) ? Math.round(e) : 0, viaj });
   }
   if (!items.length) return null;
+  // [ESF-E1e] Las DOS banderas viajan con la lista, no se dan por hechas. Medido
+  // sobre los 33 eventos con hotel propio: 100 filas son `{n,e}` a secas —sin
+  // `viaj`, sin `hotelPP`, sin `hotelOverride`— y 32 son la forma del festival.
+  // El emisor forzaba `hotelOverride:true,hotelPP:true` SIEMPRE, así que a los
+  // primeros les habría estrenado dos banderas: `hotelPP` cambia el costo de
+  // "total" a "POR PERSONA" y `hotelOverride` le quita al evento el default de
+  // su ciudad. Dos precios distintos por una bandera que nadie pidió.
+  items.pp = (obj.pp === undefined) ? true : !!obj.pp;
+  items.override = (obj.override === undefined) ? true : !!obj.override;
   return items;
 }
 
@@ -330,7 +339,11 @@ function hotelSegmento(esfera) {
     const viajStr = it.viaj.length ? (',viaj:[' + it.viaj.join(',') + ']') : '';
     return "{n:'" + escStr(it.n) + "',e:" + it.e + viajStr + '}';
   }).join(',');
-  return 'hotelOverride:true,hotelPP:true,hotel:[' + arr + ']';
+  // [ESF-E1e] Las banderas SOLO si la lista las trae. El default sigue siendo
+  // `true` para no mover a los eventos ya gobernados ni a los festivales, que es
+  // como se capturan hoy; lo que cambia es que ahora se pueden apagar.
+  const flags = (items.override ? 'hotelOverride:true,' : '') + (items.pp ? 'hotelPP:true,' : '');
+  return flags + 'hotel:[' + arr + ']';
 }
 
 // Display combinado para 2+ fechas (ya ordenadas y validadas 'YYYY-MM-DD').
@@ -458,7 +471,18 @@ function generarObjFestival(esfera, fest, hoy) {
   const dsFinal = fechas.length ? fechas[0] : dsRaw;
   const fStr = (fechas.length >= 2) ? fDisplayMulti(fechas) : fDisplay(dsFinal || fi);
 
-  const added = esfera.created_at ? String(esfera.created_at).slice(0, 10) : hoy;
+  // [ESF-E1d] `added` SOLO si la fila trae fecha. Antes caía en `hoy`, y eso NO
+  // es un default inocuo: `added` alimenta el filtro **NUEVOS** del catálogo
+  // ("agregado en los últimos 30 días"). Los 54 eventos del EV que no lo traen
+  // habrían aparecido como recién llegados el día que se gobernaran — 54
+  // conciertos viejos amontonados en la pestaña de novedades.
+  //
+  // Quitar el relleno es seguro para lo que se crea en Esferas: `created_at` es
+  // NOT NULL con `now()` (medido en la base: 0 nulos de 13 filas), así que un
+  // evento nuevo SIEMPRE lo tendrá. Lo único que cambia es lo importado sin fecha
+  // conocida, que es justo lo que no debe estrenar una.
+  const _addedRaw = esfera.created_at ? String(esfera.created_at).slice(0, 10) : '';
+  const addedSeg = FECHA_RE.test(_addedRaw) ? ("added:'" + _addedRaw + "',") : '';
   const color = escStr(esfera.color || 'azul');
   const venue = escStr(esfera.venue || '');
   const incRows = parseInc(esfera.inc);
@@ -528,9 +552,7 @@ function generarObjFestival(esfera, fest, hoy) {
     ? ('musicList:[' + musIds.map((id) => "'" + escStr(id) + "'").join(',') + '],')
     : '';
 
-  return "{id:'" + escStr(esfera.slug) +
-    "',added:'" + added +
-    "'," + musicListSeg + flags +
+  return "{id:'" + escStr(esfera.slug) + "'," + addedSeg + musicListSeg + flags +
     "c:'" + color +
     "'," + imgSeg + lineupSeg +
     "a:'" + escStr(esfera.titulo || nombre) +
@@ -569,7 +591,18 @@ function generarObj(esfera, hoy) {
   const dsListStr = esMulti
     ? ('dsList:[' + fechas.map((d) => "'" + d + "'").join(',') + '],')
     : '';
-  const added = esfera.created_at ? String(esfera.created_at).slice(0, 10) : hoy;
+  // [ESF-E1d] `added` SOLO si la fila trae fecha. Antes caía en `hoy`, y eso NO
+  // es un default inocuo: `added` alimenta el filtro **NUEVOS** del catálogo
+  // ("agregado en los últimos 30 días"). Los 54 eventos del EV que no lo traen
+  // habrían aparecido como recién llegados el día que se gobernaran — 54
+  // conciertos viejos amontonados en la pestaña de novedades.
+  //
+  // Quitar el relleno es seguro para lo que se crea en Esferas: `created_at` es
+  // NOT NULL con `now()` (medido en la base: 0 nulos de 13 filas), así que un
+  // evento nuevo SIEMPRE lo tendrá. Lo único que cambia es lo importado sin fecha
+  // conocida, que es justo lo que no debe estrenar una.
+  const _addedRaw = esfera.created_at ? String(esfera.created_at).slice(0, 10) : '';
+  const addedSeg = FECHA_RE.test(_addedRaw) ? ("added:'" + _addedRaw + "',") : '';
   const music = esfera.music ? ("music:'" + escStr(esfera.music) + "',") : '';
   const color = escStr(esfera.color || 'azul');
   const venue = escStr(esfera.venue || '');
@@ -615,9 +648,7 @@ function generarObj(esfera, hoy) {
   const imgSeg = esfera.foto
     ? ("staticImg:'" + escStr(esfera.foto) + "',img:false,")
     : ("img:'" + escStr(nombre) + "',");
-  return "{id:'" + escStr(esfera.slug) +
-    "',added:'" + added +
-    "'," + music +
+  return "{id:'" + escStr(esfera.slug) + "'," + addedSeg + music +
     "c:'" + color +
     "'," + imgSeg +
     "a:'" + escStr(esfera.titulo || nombre) +

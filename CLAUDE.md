@@ -34,7 +34,13 @@
 ## Reglas de Negocio — Paquetes
 - PLUS: Todo incluido (transporte + hotel + boleto + kit)
 - RIDE: Sin boleto — MTY $2,700 / CDMX $2,900
-- STAY: Sin transporte — Solo en MTY = PLUS - sep
+- STAY: Sin transporte — Solo en MTY = **PLUS − $500 FIJOS** 🔒 firmado por Memo
+  el **25-ago-2026**. Es 500 SIEMPRE, en cualquier evento, **sin importar el
+  separo**. La regla vieja era `PLUS − sep` y por eso Omar Courtz (sep 300)
+  salía solo $300 abajo: se le cobraba de más. **El separo es cuánto adelantas,
+  no cuánto te descuentan.** Vive con nombre (`STAY_DESCUENTO`) en los CUATRO
+  runtimes: `index.html` · `_lib/precio-zona.js` · `portal.html` · `rol.html`.
+  Tocar uno obliga a tocar los cuatro + el arnés de equivalencia.
 - CHEAP: Solo boleto — separo siempre $1,000
 - Eventos CDMX: NO tienen paquete STAY
 - sep = costo del transporte

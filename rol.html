@@ -1556,6 +1556,15 @@ window.MAPAS = window.MAPAS || {};
 window.LINEUPS = window.LINEUPS || {};
 // [COT-FIX-2] El default del separo CHEAP tenía DOS copias sueltas en este
 // mismo archivo. Una definición, dos usos.
+// [STAY-500] REGLA FIRMADA POR MEMO, 25-ago-2026: el STAY cuesta
+// PLUS − $500 FIJOS, siempre, en cualquier evento, SIN IMPORTAR EL SEPARO.
+// Antes era `ev.sep || 500` y por eso Omar Courtz (sep 300) salía solo $300
+// abajo: se le cobraba de más. El separo es cuánto adelantas, no cuánto te
+// descuentan — dos cosas que nunca debieron ser la misma.
+// Gemelo con nombre en los 4 runtimes que no pueden importarse entre sí
+// (index · _lib/precio-zona · portal · rol), careados por el arnés. Patrón de
+// SEPARO_CHEAP_DEFAULT.
+var STAY_DESCUENTO=500;
 var SEPARO_CHEAP_DEFAULT=1000;
 var EV=[], BANCO_DEFAULT={}, BANCO_HEY={}, HOTEL_STD=[], HOTEL_CDM=[], HOTEL_MTY=[], MESES={}, WA='528119771072', PROMOS={};
 
@@ -2451,7 +2460,7 @@ function computeDefaultSep(){
   var ev=state.ev, pkg=state.pkg;
   var habE = (pkg==='cheap')?0:(state.hab?(state.hab.pp!=null?state.hab.pp:state.hab.e):0);
   var rideBase = ev.ride || (isCDMX(ev)?2900:2700);
-  var stayDiscount = ev.sep||500;
+  var stayDiscount = STAY_DESCUENTO;   // [STAY-500] fijo, no `sep`.
   var transpCost = (pkg !== 'cheap' && state.transporte && state.transporte.cost > 0) ? state.transporte.cost : 0;
   var perP=0;
   if(pkg==='plus')      perP = state.precio + habE + transpCost;
@@ -2685,7 +2694,7 @@ function computeStatePlan(){
   var zonaP = (state.precio!=null && state.precio>0) ? state.precio : (z.p||0);
   var rideBase=ev.ride||(cdmx?2900:2700);
   // Descuento STAY = sep (única verdad; el descuento anunciado no vive en el EV).
-  var stayDiscount=ev.sep||500;
+  var stayDiscount = STAY_DESCUENTO;   // [STAY-500] fijo, no `sep`.
   // Transporte CDMX: solo cuenta para paquetes no-cheap; el wizard de index.html
   // fuerza Sin transporte $0 para cheap, mismo aquí.
   var transpCost = (pkg !== 'cheap' && state.transporte && state.transporte.cost > 0) ? state.transporte.cost : 0;
@@ -3095,7 +3104,7 @@ function buildPlanForTour(t){
   var habE=(pkg==='cheap')?0:(t.habE||0);
   var zonaP=t.precio||0;
   var rideBase=ev.ride||(isCDMX(ev)?2900:2700);
-  var stayDiscount=ev.sep||500;
+  var stayDiscount = STAY_DESCUENTO;   // [STAY-500] fijo, no `sep`.
   var transpCost = (pkg !== 'cheap' && t.transp && t.transp.cost > 0) ? t.transp.cost : 0;
   var perP=0;
   if(pkg==='plus')      perP=zonaP+habE+transpCost;

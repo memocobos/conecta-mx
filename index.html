@@ -2806,6 +2806,15 @@ var MESES={'03':'Marzo','04':'Abril','05':'Mayo','06':'Junio','07':'Julio','08':
 // veces en rol.html): el catálogo en dos <select> otra vez. Ahora cada runtime
 // tiene UNA definición con nombre y el arnés las carea — no pueden importarse
 // entre sí, así que la equivalencia se assertea en vez de suponerse.
+// [STAY-500] REGLA FIRMADA POR MEMO, 25-ago-2026: el STAY cuesta
+// PLUS − $500 FIJOS, siempre, en cualquier evento, SIN IMPORTAR EL SEPARO.
+// Antes era `ev.sep || 500` y por eso Omar Courtz (sep 300) salía solo $300
+// abajo: se le cobraba de más. El separo es cuánto adelantas, no cuánto te
+// descuentan — dos cosas que nunca debieron ser la misma.
+// Gemelo con nombre en los 4 runtimes que no pueden importarse entre sí
+// (index · _lib/precio-zona · portal · rol), careados por el arnés. Patrón de
+// SEPARO_CHEAP_DEFAULT.
+var STAY_DESCUENTO=500;
 var SEPARO_CHEAP_DEFAULT=1000;
 
 var STATIC_IMGS=window.STATIC_IMGS||{};
@@ -3224,9 +3233,13 @@ function getPaquetes(ev) {
     { id:'stay', name:'Stay', badge:'STAY',
       desc: cdmx ? 'Boleto + Hospedaje + Kit Conecta · sin transporte a CDMX'
                  : 'Boleto + Hospedaje + Kit Conecta · sin transporte',
-      basePrice: 0, stayDiscount: cdmx ? 0 : 500, cdmx: cdmx,
+      // `stayDiscount` aquí es metadata que NADIE consume (medido: 0 lecturas de
+      // `.stayDiscount` en este archivo) — el precio de la tarjeta lo pinta
+      // `stayDsc` más abajo. Se deja alineado con la constante para que no
+      // vuelva a leerse como una segunda regla.
+      basePrice: 0, stayDiscount: cdmx ? 0 : STAY_DESCUENTO, cdmx: cdmx,
       includesBoleto: true, includesHotel: true,
-      priceLabel: cdmx ? 'Cotizar' : (plusMin ? 'Desde ' + fmt(Math.max(0, plusMin - 500)) : 'Cotizar') },
+      priceLabel: cdmx ? 'Cotizar' : (plusMin ? 'Desde ' + fmt(Math.max(0, plusMin - STAY_DESCUENTO)) : 'Cotizar') },
 
     { id:'cheap', name:'Cheap', badge:'CHEAP',
       desc: 'Boleto + Kit Conecta · sin transporte ni hospedaje',
@@ -5002,13 +5015,14 @@ function updatePkgCards(){
     if(plusBtn){plusBtn.classList.remove('disabled');plusBtn.disabled=false;}
     if(stayBtn){stayBtn.classList.remove('disabled');stayBtn.disabled=false;}
   }
-  // STAY: plus - sep. sep es la única verdad del descuento (igual que calcular()
-  // y _lib/precio-zona); la tarjeta anuncia exactamente lo que el cotizador cobra.
+  // [STAY-500] STAY = plus − STAY_DESCUENTO. La tarjeta anuncia exactamente lo
+  // que el cotizador cobra, y las dos leen la MISMA constante — antes las dos
+  // leían `sep`, que es otra cosa.
   // [CAT-2] `noStay` también aquí: sin esto el botón queda apagado pero la
   // tarjeta sigue anunciando un precio de STAY, que es peor que no ofrecerlo —
   // dice un número que nadie puede comprar.
   if(!cur.rideOnly&&!cur.cheapOnly&&!cur.noStay&&!isCDMX(cur)){
-    var stayDsc=cur.sep||500;
+    var stayDsc=STAY_DESCUENTO;
     var stayCost=plusMin>0?(plusMin-stayDsc):0;
     $$('pi-stay').textContent='Hospedaje · Boleto · Kit';
     $$('pp-stay').textContent=stayCost>0?fmt(stayCost):'Cotizar';
@@ -5350,7 +5364,7 @@ function buildZonaButtons(zonas){
       h+='<button class="z-btn ag" disabled style="opacity:.6;font-style:italic"><div class="z-name">'+z.n+'</div><div class="z-ag">Próximamente</div></button>';
     } else if(effAg){
       var agP=z.p;
-      if(selPkg==='stay'&&cur){agP=z.p-(cur.sep||500);if(agP<0)agP=z.p;}
+      if(selPkg==='stay'&&cur){agP=z.p-STAY_DESCUENTO;if(agP<0)agP=z.p;}
       // [A5] DOS COSAS QUE VIO COWORK EN VIVO, y las dos estaban en esta línea:
       //
       // 1. "PLATINO$0 AGOTADO". Una zona sin precio capturado (p=0) enseñaba
@@ -5370,7 +5384,7 @@ function buildZonaButtons(zonas){
       h+='<button class="z-btn" data-p="0" data-n="'+z.n+'"><div class="z-name">'+z.n+'</div><div class="z-price" style="color:#9eff5d;font-weight:800;letter-spacing:.1em">GRATIS</div></button>';
     } else {
       var showP=z.p;
-      if(selPkg==='stay'&&cur){showP=z.p-(cur.sep||500);if(showP<0)showP=z.p;}
+      if(selPkg==='stay'&&cur){showP=z.p-STAY_DESCUENTO;if(showP<0)showP=z.p;}
       var reqV=z.requiereViajeros||0;
       var reqAttr=reqV?' data-reqviaj="'+reqV+'"':'';
       var notaH=reqV?'<div class="z-nota">Solo grupos de '+reqV+' · '+fmt(z.p*reqV)+' total</div>':'';
@@ -5962,7 +5976,7 @@ function calcular(){
   // tiene su propio ride (escala con días), si no cae a ev.ride.
   var _mfR=(cur.multifecha&&cur.multifecha[selFechaIdx]&&cur.multifecha[selFechaIdx].ride)||0;
   var rideBase=_mfR||cur.ride||(cdmx?2900:2700);
-  var stayDiscount=cur.sep||500;
+  var stayDiscount=STAY_DESCUENTO;
   total=0;
   costoXPersona=0;
 

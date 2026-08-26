@@ -60,6 +60,14 @@
 - id, a, f, ds, v, st, cdmx, sep, ride, zonas, cheapZonas, hotel, mapa, lineup, staticImg
 - st: '' | 'ultimos' | 'agotado' | 'proceso' | 'pronto' | 'por-confirmar'
 - rideOnly, cheapOnly, diaFirst, hotelPP, hotelOverride, waChannel, _past
+- 🔒 **Esta lista NO es la fuente: la fuente es `CAMPOS_DEL_COMPILADOR` en
+  `_lib/esferas-compile.js`.** Una lista de campos escrita a mano al lado de la
+  de verdad envejece sola — ésta ya se había quedado corta. Si hace falta saber
+  qué campos existen, se leen de ahí.
+- 🔒 **El `index.html` sigue siendo la FUENTE COMPILADA** — lo que el sitio lee.
+  Lo que cambió es quién lo escribe: desde ESF-CIERRE, **los 102 eventos se
+  gobiernan desde Esferas** y el index se genera. Editarlo a mano sigue siendo
+  posible y sigue siendo la salida de emergencia, pero ya no es el camino.
 
 ## Flujo Cliente Actual
 1. Ve post en redes → contacta WhatsApp/Messenger
@@ -140,6 +148,49 @@ está caduco antes de escribirse.
   login (**SES-1**, #489) · la lista de espera que avisa al publicar (**WL-1**,
   #490) · el catálogo de agosto y la contraofensiva 2x1 (**CAT-1/2/2b/3/3c**,
   #485, #486, #491, #492). Cada una tiene su arnés y su reporte en la PR.
+- ✅ **ÉPOCA ESF CERRADA (26-ago-2026, #571-#590) — el catálogo COMPLETO se
+  gobierna desde Esferas: 102 de 102.** Empezó en 27. Careado sobre el árbol
+  publicado: **0 con brecha, 102 reproducen su objeto, 102 parsean, y el juez
+  semántico sigue vivo** (se le siembra un cambio y lo caza en 20 de 20
+  probados). 60 vivos · 42 pasados.
+  **Los pasados entran como ARCHIVO**: sin pasar el juez —cerrar brechas de
+  eventos muertos no paga— y **vetados para publicar EN EL SERVIDOR**, en los dos
+  caminos que compilan. Su ficha está incompleta a propósito y el index sigue
+  siendo su fuente de verdad; la lista lo dice con un sello y una frase, no con
+  un botón apagado.
+  ⚠️ **No re-excavar** "qué campos faltan por gobernar": no falta ninguno. Si un
+  evento nuevo no es gobernable, es un campo NUEVO en el catálogo, no una brecha
+  vieja — y el diagnóstico del importador lo dice por su nombre.
+
+- 🔒 **LAS DOS REGLAS QUE DEJÓ LA ÉPOCA ESF.** Las dos nacieron de un bug real y
+  las dos se comprueban con un careo, no con buena voluntad:
+
+  **1. Lo que el compilador EMITE va en `CAMPOS_DEL_COMPILADOR`.** Ese `Set` le
+  dice a `fusionarConViejo` qué administra el compilador. Una llave que se emite
+  pero no se declara queda **en tierra de nadie: se escribe y NO SE PUEDE
+  BORRAR**, porque el fusionador la re-inserta desde el objeto viejo. Mordió dos
+  veces —`noStay` en E1e y las tres banderas de #580, vivas en straykids y
+  wwemexico— y una tercera casi: un comentario al final de la línea se comió
+  `'lineup','multifecha'` del Set.
+  **El careo es el BARRIDO DE DOS RAMAS**: generar un objeto con todo encendido
+  —por las **dos** ramas del emisor, porque `rideOnly` gana sobre `cheapOnly` y
+  una sola pasada no las saca las dos— y comparar sus llaves de nivel 1 contra el
+  Set. ⚠️ **El Set se EVALÚA, no se lee con regex**: un regex sobre el texto
+  crudo cuenta lo comentado como declarado, y por eso el arnés dijo "no falta
+  ninguna" mientras dos faltaban.
+
+  **2. Los vencimientos se teclean en REYNOSA (−05:00) y se guardan como
+  INSTANTE.** Reynosa sigue el horario de EE.UU., **no el de Monterrey**.
+  Careado contra un `expiresTs` real: el COMPA de `arre`, `1778427681035`, son
+  las **10:41:21 del 10-may en Reynosa**; en Monterrey serían otro instante, una
+  hora después. Guardar el instante —y no un texto con huso— quita la pregunta:
+  no hay literal que escribir mal. Los `-06:00` que quedan en el catálogo son de
+  mayo y son **legacy**.
+  ⚠️ **La pantalla pinta en Reynosa, no en la hora del navegador**, y los
+  milisegundos se conservan si el reloj de pared no cambió: un `input type=time`
+  solo llega al segundo, así que sin ese candado editar cualquier otro campo le
+  movía el vencimiento a un evento que nadie tocó.
+
 - **El Palacio (KameHouse) ya está en el sistema visual de la casa**: serie KH
   completa en prod (KH-1 cimientos · KH-2 Guerreros Z · KH-3 las mesas ·
   KH-4 barrido). Lo que **NO se toca** y no hay que re-litigar: los 7 temas

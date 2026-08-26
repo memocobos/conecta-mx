@@ -47,6 +47,10 @@ const CAMPOS_EDITABLES = new Set(['nombre', 'titulo', 'fecha_inicio', 'ciudad', 
   'promo', 'promo_code', 'promo_label', 'deporte', 'music_search',
   'flash_promo',   // [ESF-FLASH-1] el objeto entero, en JSON.
   'lineup',        // [ESF-CIERRE-LINEUP] llave de lineups.js o URL.
+  // [ESF-CIERRE-FECHA] El evento de corrido: inicio + fin, sin selector de día.
+  // `f_texto` es el override para cuando el cartel dice algo que ninguna regla
+  // genera (warped escribe "12-13", no "12 y 13").
+  'fecha_fin', 'f_texto',
   // [ESF-E1e] las banderas de paquete (nivel 3 de la granularidad)
   'ride_only', 'cheap_only', 'no_stay', 'no_cheap', 'no_bus', 'cheap_soon', 'cheap_also_ok']);
 
@@ -272,6 +276,7 @@ exports.handler = async (event) => {
     if (k === 'promo_label') { sane[k] = (typeof v === 'string' && v.trim()) ? v.trim().slice(0, 160) : null; continue; }
     // El cartel: llave corta o URL. Se recorta largo, no forma — validar que
     // "parece URL" rechazaría las llaves, que son la mitad de los casos.
+    if (k === 'f_texto') { sane[k] = (typeof v === 'string' && v.trim()) ? v.trim().slice(0, 80) : null; continue; }
     if (k === 'lineup') { sane[k] = (typeof v === 'string' && v.trim()) ? v.trim().slice(0, 300) : null; continue; }
     if (k === 'music_search') { sane[k] = (typeof v === 'string' && v.trim()) ? v.trim().slice(0, 120) : null; continue; }
     if (k === 'multifecha') {
@@ -346,7 +351,7 @@ exports.handler = async (event) => {
     //
     // Se miran la fecha principal Y las extra: una fecha absurda escondida en
     // las adicionales rompe el display y el orden igual de bien.
-    const _fechas = [['fecha_inicio', 'La fecha del evento']];
+    const _fechas = [['fecha_inicio', 'La fecha del evento'], ['fecha_fin', 'La fecha de fin']];
     let _errFecha = null;
     for (const [k, etiqueta] of _fechas) {
       if (k in sane) { _errFecha = fechaAbsurda(sane[k], etiqueta); if (_errFecha) break; }
@@ -367,6 +372,11 @@ exports.handler = async (event) => {
       const _iso = Number.isFinite(_d.getTime()) ? _d.toISOString().slice(0, 10) : 'x';
       _errFecha = fechaAbsurda(_iso, 'El vencimiento del código flash');
     }
+  }
+  // [ESF-CIERRE-FECHA] Un fin ANTES del inicio no es un rango: es un dedazo, y
+  // en silencio dejaría al evento anunciando un solo día.
+  if (!_errFecha && sane.fecha_fin && sane.fecha_inicio && String(sane.fecha_fin) < String(sane.fecha_inicio)) {
+    _errFecha = `El evento terminaría (${sane.fecha_fin}) ANTES de empezar (${sane.fecha_inicio}). Revisa cuál de las dos está al revés.`;
   }
   if (_errFecha) return { statusCode: 422, headers, body: JSON.stringify({ ok: false, error: _errFecha }) };
 

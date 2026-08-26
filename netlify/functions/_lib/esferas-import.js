@@ -103,6 +103,12 @@ function evAEsfera(ev) {
     flash_promo: (ev.flashPromo && typeof ev.flashPromo === 'object') ? JSON.stringify(ev.flashPromo) : null,
     // [ESF-CIERRE-LINEUP] La llave o la URL del cartel, tal cual viene.
     lineup: (typeof ev.lineup === 'string' && ev.lineup.trim()) ? ev.lineup.trim() : null,
+    // [ESF-CIERRE-FECHA] El EV no tiene `fecha_fin`: sus días viven en el texto
+    // de `f`. Al importar se guarda ese texto COMO OVERRIDE —es la única forma
+    // de reproducirlo sin adivinar— y Memo puede cambiarlo a rango después,
+    // que es más honesto que un texto suelto.
+    fecha_fin: null,
+    f_texto: (typeof ev.f === 'string' && ev.f.trim()) ? ev.f.trim() : null,
     promo: ev.promo === true,
     promo_code: (typeof ev.promoCode === 'string' && ev.promoCode.trim()) ? ev.promoCode.trim() : null,
     promo_label: (typeof ev.promoLabel === 'string' && ev.promoLabel.trim()) ? ev.promoLabel.trim() : null,

@@ -665,7 +665,15 @@ function generarObjFestival(esfera, fest, hoy) {
   }
   fechas.sort();
   const dsFinal = fechas.length ? fechas[0] : dsRaw;
-  const fStr = (fechas.length >= 2) ? fDisplayMulti(fechas) : fDisplay(dsFinal || fi);
+  // [ESF-CIERRE-FECHA] El override y el rango, ANTES de todo lo demás. Los dos
+  // emisores calculaban `f` EN LÍNEA —dos gemelas de la misma regla— así que
+  // arreglarlo en `fechaDisplayDeEsfera` no servía de nada: nadie la llamaba
+  // desde aquí. Se enchufa el override donde el valor se decide, en los dos.
+  const _libre1 = (typeof esfera.f_texto === 'string') ? esfera.f_texto.trim() : '';
+  const _rango1 = _diasDelRango(dsRaw, esfera.fecha_fin ? String(esfera.fecha_fin).slice(0, 10) : '');
+  const fStr = _libre1 ? _libre1
+    : (_rango1.length >= 2 ? fDisplayMulti(_rango1)
+      : ((fechas.length >= 2) ? fDisplayMulti(fechas) : fDisplay(dsFinal || fi)));
 
   // [ESF-E1d] `added` SOLO si la fila trae fecha. Antes caía en `hoy`, y eso NO
   // es un default inocuo: `added` alimenta el filtro **NUEVOS** del catálogo
@@ -799,8 +807,16 @@ function generarObj(esfera, hoy) {
   // morat y caifanes no lo tienen, y añadírselo les estrenaría el selector de
   // día en el sitio: eso es un cambio de PANTALLA, no de dato.
   const fDeMulti = (!esMulti && mfDs.length >= 2) ? [...new Set(mfDs)].sort() : null;
-  const fStr = esMulti ? fDisplayMulti(fechas)
-    : (fDeMulti ? fDisplayMulti(fDeMulti) : fDisplay(dsFinal || fi));
+  // [ESF-CIERRE-FECHA] El override y el rango, ANTES de todo lo demás. Los dos
+  // emisores calculaban `f` EN LÍNEA —dos gemelas de la misma regla— así que
+  // arreglarlo en `fechaDisplayDeEsfera` no servía de nada: nadie la llamaba
+  // desde aquí. Se enchufa el override donde el valor se decide, en los dos.
+  const _libre2 = (typeof esfera.f_texto === 'string') ? esfera.f_texto.trim() : '';
+  const _rango2 = _diasDelRango(ds, esfera.fecha_fin ? String(esfera.fecha_fin).slice(0, 10) : '');
+  const fStr = _libre2 ? _libre2
+    : (_rango2.length >= 2 ? fDisplayMulti(_rango2)
+      : (esMulti ? fDisplayMulti(fechas)
+        : (fDeMulti ? fDisplayMulti(fDeMulti) : fDisplay(dsFinal || fi))));
   const dsListStr = esMulti
     ? ('dsList:[' + fechas.map((d) => "'" + d + "'").join(',') + '],')
     : '';
@@ -1473,9 +1489,52 @@ function quitarDelEV({ indexHtml, slug }) {
 // ordenar, y multi si son 2 o más). No se copia el resultado de nadie: el arnés
 // de WL-1 la carea contra el objeto REALMENTE compilado, evento por evento, así
 // que si algún día divergen, truena en vez de mentir en un correo.
+// ═══ [ESF-CIERRE-FECHA] LOS EVENTOS DE CORRIDO ════════════════════════════
+// Ocho eventos traían sus días SOLO en el texto de `f` —"20, 21 y 22 nov
+// 2026"— sin `dsList` que los respaldara. El compilador solo veía `ds` y
+// generaba "20 nov 2026": un festival de tres días anunciado como de uno.
+//
+// SON DE CORRIDO, NO DE ESCOGER DÍA: se va a los tres, no se elige uno. Por eso
+// se modelan como RANGO (inicio + fin) y NO como multifecha — un selector de
+// noche aquí sería una pregunta que el cliente no tiene que contestar.
+//
+// ⚠️ `fecha_fin` NO emite `dsList`. Es la diferencia entre "el evento dura tres
+// días" y "elige uno de tres", y el catálogo distingue las dos: dsList es de los
+// que se eligen.
+//
+// MEDIDO CONTRA LOS 8 REALES: el rango reproduce SEIS. Los otros dos no son
+// fallas del modelo, son otra cosa:
+//   · harry  "1, 7 y 8 ago 2026" — NO es un rango: son días SUELTOS. De los que
+//     se eligen, no de corrido. (Y ya pasó: entra por archivo.)
+//   · warped "12-13 sep 2026"   — es un rango, pero escrito con GUION en vez
+//     de "y". El formato del catálogo no es uno solo.
+// Para esos dos existe `f_texto`: un override que gana sobre todo. No es una
+// grieta del diseño — es el reconocimiento de que `f` es TEXTO PARA UN HUMANO y
+// alguna vez va a decir algo que ninguna regla genera.
+function _diasDelRango(ini, fin) {
+  if (!FECHA_RE.test(ini || '') || !FECHA_RE.test(fin || '')) return [];
+  if (fin < ini) return [];
+  const out = [];
+  const d = new Date(ini + 'T12:00:00Z');
+  const tope = new Date(fin + 'T12:00:00Z');
+  // Tope de cordura: un "rango" de más de 60 días es un dedazo, no un festival.
+  while (d <= tope && out.length < 60) { out.push(d.toISOString().slice(0, 10)); d.setUTCDate(d.getUTCDate() + 1); }
+  return out;
+}
+
 function fechaDisplayDeEsfera(esfera) {
+  // El override gana sobre todo: si alguien lo escribió, es porque ninguna regla
+  // daba con lo que el cartel dice.
+  const libre = (esfera && typeof esfera.f_texto === 'string') ? esfera.f_texto.trim() : '';
+  if (libre) return libre;
+
   const fi = (esfera && esfera.fecha_inicio) || null;
   const ds = fi ? String(fi).slice(0, 10) : '';
+
+  // El RANGO: de corrido, sin selector de día.
+  const rango = _diasDelRango(ds, (esfera && esfera.fecha_fin) ? String(esfera.fecha_fin).slice(0, 10) : '');
+  if (rango.length >= 2) return fDisplayMulti(rango);
+
   const fechas = [];
   const vistas = new Set();
   for (const d of [ds].concat(parseFechasExtra(esfera && esfera.fechas_extra))) {
@@ -1489,6 +1548,7 @@ function fechaDisplayDeEsfera(esfera) {
 module.exports = {
   compilarEV, quitarDelEV, reemplazarEnEV, todayMx, fechaDisplayDeEsfera,
   bancoValido, BANCOS_VALIDOS, _insertarAntesDeZonasNivel1, _parseFlashPromo: parseFlashPromo,
+  _diasDelRango,
   // Helpers puros expuestos para el arnés (patrón de la casa).
   _escStr: escStr,
   _parseZonas: parseZonas,

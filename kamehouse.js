@@ -18328,6 +18328,8 @@ async function crearEsferaEvento() {
     banco: document.getElementById('esf-banco')?.value || null,
     // [ESF-CAMPOS-1] Los tres apuntes.
     promo: !!document.getElementById('esf-promo')?.checked,
+    fecha_fin: document.getElementById('esf-fecha-fin')?.value || null,
+    f_texto: document.getElementById('esf-f-texto')?.value.trim() || null,
     lineup: document.getElementById('esf-lineup')?.value.trim() || null,
     flash_promo: _esfGetFlash(),
     promo_code: document.getElementById('esf-promo-code')?.value.trim() || null,
@@ -18370,7 +18372,10 @@ async function crearEsferaEvento() {
       const m = document.getElementById('esf-music-search'); if (m) m.value = '';
       const pc = document.getElementById('esf-promo-code'); if (pc) pc.value = '';
       const pl = document.getElementById('esf-promo-label'); if (pl) pl.value = ''; 
-      _esfFlashClear(); _esfLineupClear(); }
+      _esfFlashClear(); _esfLineupClear();
+      const ff = document.getElementById('esf-fecha-fin'); if (ff) ff.value = '';
+      const ft = document.getElementById('esf-f-texto'); if (ft) ft.value = '';
+      _esfCorridoPreview(); }
     _esfClearHotel();
     _esfMapaClear();
     _esfFotoClear();
@@ -19415,6 +19420,31 @@ function _esfHotelToggle() {
   }
 }
 // Devuelve el objeto {custom,total,items} o null (toggle apagado = default ciudad).
+// ═══ [ESF-CIERRE-FECHA] EL EVENTO DE CORRIDO ══════════════════════════════
+// Dura varios días SEGUIDOS y no se elige noche: se va a los tres. Es distinto
+// de las "fechas adicionales", que SÍ estrenan selector de día en el sitio —
+// por eso el rango NO emite `dsList`.
+//
+// El campo de texto libre es el override para cuando el cartel dice algo que
+// ninguna regla genera (`warped` escribe "12-13 sep 2026", no "12 y 13"). Gana
+// sobre el rango, y la vista previa lo dice para que no se use sin querer.
+function _esfCorridoPreview() {
+  const el = document.getElementById('esf-corrido-preview');
+  if (!el) return;
+  const ini = (document.getElementById('esf-fecha')?.value || '').trim();
+  const fin = (document.getElementById('esf-fecha-fin')?.value || '').trim();
+  const txt = (document.getElementById('esf-f-texto')?.value || '').trim();
+  if (txt) { el.innerHTML = 'El sitio dirá <b>' + _esfEsc(txt) + '</b> — texto tal cual, <b>gana sobre el rango</b>.'; return; }
+  if (!fin) { el.innerHTML = 'Vacío = el evento es de <b>un solo día</b> (o usa las fechas adicionales de arriba, que sí dejan elegir noche).'; return; }
+  if (!ini) { el.innerHTML = '<span style="color:var(--orange)">Falta la fecha de inicio.</span>'; return; }
+  if (fin < ini) { el.innerHTML = '<span style="color:var(--red)">El fin es <b>antes</b> del inicio. Revisa cuál está al revés.</span>'; return; }
+  const dias = [];
+  const d = new Date(ini + 'T12:00:00Z'), tope = new Date(fin + 'T12:00:00Z');
+  while (d <= tope && dias.length < 60) { dias.push(d.getUTCDate()); d.setUTCDate(d.getUTCDate() + 1); }
+  el.innerHTML = 'Dura <b>' + dias.length + ' día(s) seguidos</b>. El sitio lo anunciará con los días ' +
+    dias.join(', ') + ' — <b>sin</b> selector de noche.';
+}
+
 // ═══ [ESF-CIERRE-LINEUP] EL CARTEL ════════════════════════════════════════
 // Un solo campo que acepta las DOS formas del catálogo: una llave de
 // `lineups.js` o una URL. Subir una imagen solo RELLENA el campo con su URL —
@@ -19828,6 +19858,9 @@ function editarEsfera(slug) {
   if (Array.isArray(_cz)) _cz.forEach((z) => { if (z && typeof z === 'object') _esfAddCheapZona(z); });
   set('esf-banco', row.banco || '');
   { const p = document.getElementById('esf-promo'); if (p) p.checked = !!row.promo; }
+  set('esf-fecha-fin', (row.fecha_fin || '').slice(0, 10));
+  set('esf-f-texto', row.f_texto || '');
+  _esfCorridoPreview();
   { const l = document.getElementById('esf-lineup'); if (l) l.value = row.lineup || ''; _esfLineupShow(row.lineup || ''); }
   _esfFlashPopulate(row.flash_promo);
   set('esf-promo-code', row.promo_code || '');
@@ -19883,7 +19916,10 @@ function cancelarEdicionEsfera() {
       const m = document.getElementById('esf-music-search'); if (m) m.value = '';
       const pc = document.getElementById('esf-promo-code'); if (pc) pc.value = '';
       const pl = document.getElementById('esf-promo-label'); if (pl) pl.value = ''; 
-      _esfFlashClear(); _esfLineupClear(); }
+      _esfFlashClear(); _esfLineupClear();
+      const ff = document.getElementById('esf-fecha-fin'); if (ff) ff.value = '';
+      const ft = document.getElementById('esf-f-texto'); if (ft) ft.value = '';
+      _esfCorridoPreview(); }
   _esfClearHotel();
   _esfMapaClear();
   _esfFotoClear();
@@ -19927,6 +19963,8 @@ async function guardarCambiosEsfera() {
     banco: document.getElementById('esf-banco')?.value || null,
     // [ESF-CAMPOS-1] Los tres apuntes.
     promo: !!document.getElementById('esf-promo')?.checked,
+    fecha_fin: document.getElementById('esf-fecha-fin')?.value || null,
+    f_texto: document.getElementById('esf-f-texto')?.value.trim() || null,
     lineup: document.getElementById('esf-lineup')?.value.trim() || null,
     flash_promo: _esfGetFlash(),
     promo_code: document.getElementById('esf-promo-code')?.value.trim() || null,

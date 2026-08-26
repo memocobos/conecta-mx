@@ -17591,7 +17591,11 @@ function _esfPromoFlashVence(o) { return _esfEnReynosa(o && o.expiresTs); }
 // Devuelve [] si no trae promo, o los pedazos de letrero que la fila enseña.
 // El texto es el CAPTURADO, recortado, nunca un veredicto: esta función no
 // sabe —ni puede saber— si la promo sigue viva.
-function _esfPromoPartes(fila) {
+// `opts.sinVence` quita el vencimiento del pedacito del flash: cuando arriba ya
+// va el renglón de ESTADO (que lo dice con todas sus letras), repetirlo abajo
+// es la misma fecha dos veces en dos renglones pegados. Se midió mirando la
+// captura, no el diff.
+function _esfPromoPartes(fila, opts) {
   if (!fila) return [];
   const partes = [];
   const code = String(fila.promo_code == null ? '' : fila.promo_code).trim();
@@ -17604,7 +17608,7 @@ function _esfPromoPartes(fila) {
     let t = '⚡ ' + (fc || 'flash');
     if (Number.isFinite(Number(flash.pct)) && Number(flash.pct)) t += ' −' + Number(flash.pct) + '%';
     else if (Number.isFinite(Number(flash.amount)) && Number(flash.amount)) t += ' −$' + Number(flash.amount);
-    const v = _esfPromoFlashVence(flash);
+    const v = (opts && opts.sinVence) ? '' : _esfPromoFlashVence(flash);
     if (v) t += ' · vence ' + v;
     partes.push(t);
   }
@@ -17754,7 +17758,7 @@ const _ESF_PROMO_PINTA = {
 // que es para lo que se pidió el chip.
 function _esfPromoFila(e) {
   if (_esfFiltroFecha !== 'promo') return '';
-  const partes = _esfPromoPartes(e);
+  const partes = _esfPromoPartes(e, { sinVence: true });
   if (!partes.length) return '';
   // [ESF-UX-3] El ESTADO va primero y en su propio renglón. Antes del código:
   // la pregunta de Memo al abrir esta vista es "¿cuál sigue viva?", no "¿cómo

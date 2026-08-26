@@ -1393,36 +1393,54 @@
    <!-- Form: nuevo evento -->
    <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:20px">
     <div id="esf-form-titulo" style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.15em;color:var(--ts);margin-bottom:16px">// NUEVO EVENTO</div>
-    <div class="form-group">
+    <!-- ═══ [ESF-UX-1c] PESTAÑAS, NO PASOS ═══════════════════════════════════
+         El número lo decidió: EDITAR es el trabajo frecuente y un asistente por
+         pasos lo castiga —obliga a caminar por pantallas que no se van a tocar
+         para cambiar un precio—. Con pestañas se salta directo a "Zonas".
+         ⚠️ GUARDAR queda FUERA de las pestañas, siempre visible: se usa siempre,
+         y meterlo dentro de "Revisar" convertiría cada edición de un campo en
+         un viaje de ida y vuelta. -->
+    <div class="esf-tabs" role="tablist">
+     <button type="button" class="esf-tab active" data-ir="datos" role="tab" aria-selected="true" onclick="_esfTab('datos')">Datos</button>
+     <button type="button" class="esf-tab" data-ir="vende" role="tab" aria-selected="false" onclick="_esfTab('vende')">Qué vende</button>
+     <button type="button" class="esf-tab" data-ir="zonas" role="tab" aria-selected="false" onclick="_esfTab('zonas')">Zonas y precios</button>
+     <button type="button" class="esf-tab" data-ir="extras" role="tab" aria-selected="false" onclick="_esfTab('extras')">Extras<span id="esf-tab-extras-n" class="esf-tab-badge"></span></button>
+     <button type="button" class="esf-tab" data-ir="revisar" role="tab" aria-selected="false" onclick="_esfTab('revisar')">Revisar<span id="esf-tab-revisar-n" class="esf-tab-badge"></span></button>
+    </div>
+    <div class="form-group" data-esf="revisar" id="esf-grp-revisar">
+     <label>Lo que falta</label>
+     <div id="esf-revisar" style="font-size:12.5px;line-height:1.6"></div>
+    </div>
+    <div class="form-group" data-esf="datos">
      <label>Slug</label>
      <input class="cot-input" id="esf-slug" placeholder="ej. alvaro-diaz (minúsculas, números, guiones)" style="width:100%">
     </div>
-    <div class="form-group">
+    <div class="form-group" data-esf="datos">
      <label>Nombre / Artista (para buscar foto)</label>
      <input class="cot-input" id="esf-nombre" placeholder="ej. Morat" style="width:100%">
     </div>
-    <div class="form-group">
+    <div class="form-group" data-esf="datos">
      <label>Título del tour (opcional)</label>
      <input class="cot-input" id="esf-titulo" placeholder="ej. Morat - Ya Es Mañana Tour" style="width:100%">
     </div>
-    <div class="form-group">
+    <div class="form-group" data-esf="datos">
      <label>Tipo</label>
      <select class="cot-input" id="esf-tipo" style="width:100%" onchange="_esfTipoChange()">
       <option value="concierto">Concierto</option>
       <option value="festival">Festival</option>
      </select>
     </div>
-    <div class="form-group">
-     <label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="esf-es-festival" onchange="_esfToggleFestival()"> ¿Es festival?</label>
+    <div class="form-group" data-esf="datos">
+     <label class="chk-linea"><input type="checkbox" id="esf-es-festival" onchange="_esfToggleFestival()"><span>¿Es festival?</span></label>
     </div>
-    <div class="form-group">
+    <div class="form-group" data-esf="datos">
      <label>Fecha inicio</label>
      <input class="cot-input" type="date" id="esf-fecha" style="width:100%">
      <div id="esf-fechas-extra"></div>
      <button class="btn btn-ghost" type="button" onclick="_esfAddFechaExtra()" style="margin-top:8px">+ Agregar otra fecha</button>
      <div style="font-size:11px;color:var(--ts);margin-top:4px">Para eventos con varias fechas (ej. 2da fecha por agotarse). Los precios por fecha vienen en otra etapa.</div>
     </div>
-    <div class="form-group">
+    <div class="form-group" data-esf="datos">
      <label>Ciudad</label>
      <select class="cot-input" id="esf-ciudad" style="width:100%" onchange="_esfCiudadToggle()">
       <option value="MTY">MTY</option>
@@ -1431,7 +1449,7 @@
      </select>
      <input class="cot-input" id="esf-ciudad-otra" placeholder="ej. Guadalajara" style="width:100%;margin-top:8px;display:none" oninput="_esfCityChanged()">
     </div>
-    <div class="form-group">
+    <div class="form-group" data-esf="datos">
      <label>Venue</label>
      <div style="position:relative">
       <input class="cot-input" id="esf-venue" placeholder="ej. Estadio GNP, CDMX" style="width:100%" autocomplete="off" oninput="_esfCityChanged();_esfVenueSugg()" onblur="setTimeout(_esfVenueSuggHide,150)">
@@ -1454,7 +1472,7 @@
          servir. Lo que sí hace es ANUNCIAR si trae contenido — la lección de
          `promo_code`: lo plegado SE OLVIDA al editar, así que el encabezado
          tiene que decir que hay algo dentro. -->
-    <div class="esf-plegable">
+    <div class="esf-plegable" data-esf="extras">
      <div id="esf-extras-head" class="esf-plegable-head" role="button" tabindex="0"
           aria-expanded="false" aria-controls="esf-extras-body"
           onclick="_esfExtrasToggle()"
@@ -1555,7 +1573,7 @@
     </div>
          </div>
     </div>
-<div class="form-group">
+<div class="form-group" data-esf="vende">
      <label>Status</label>
      <select class="cot-input" id="esf-status" style="width:100%">
       <option value="">Disponible</option>
@@ -1564,8 +1582,13 @@
       <option value="agotado">Agotado</option>
      </select>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.15em;color:var(--ts);margin:24px 0 16px">// FESTIVAL</div>
-    <div id="esf-festival-box" style="display:none;margin-top:8px;padding:12px;border:1px dashed var(--border);border-radius:var(--r-sm,8px)">
+    <!-- [ESF-UX-1c] El rótulo de sección se retira: la PESTAÑA ya dice dónde
+         estás, y dos títulos para lo mismo se contradicen en cuanto uno cambie. -->
+    <!-- [ESF-UX-1c] El envoltorio lleva la PESTAÑA y la caja conserva SU display.
+         Ponerle `data-esf` a la caja misma hacía que `_esfTab('datos')` le pisara
+         el `display:none` que le pone `_esfToggleFestival` — y el bloque de
+         festival salía abierto en un concierto. Dos dueños del mismo estilo. -->
+    <div data-esf="datos"><div id="esf-festival-box" style="display:none;margin-top:8px;padding:12px;border:1px dashed var(--border);border-radius:var(--r-sm,8px)">
       <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ts);font-weight:700;margin:18px 0 8px">Apariencia</div>
       <!-- 2c: portada + lineup -->
       <div style="margin-bottom:10px">
@@ -1627,9 +1650,10 @@
        <div id="esf-fest-paq-list"></div>
        <div style="font-size:11px;color:var(--ts);margin-top:4px">Las zonas y hoteles de cada paquete se agregan en el siguiente paso.</div>
       </div>
-     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.15em;color:var(--ts);margin:24px 0 16px">// BOLETOS · HOTEL · MÚSICA</div>
-    <div class="form-group" id="esf-grp-music">
+     </div></div>
+    <!-- [ESF-UX-1c] El rótulo de sección se retira: la PESTAÑA ya dice dónde
+         estás, y dos títulos para lo mismo se contradicen en cuanto uno cambie. -->
+    <div class="form-group" data-esf="datos" id="esf-grp-music">
      <label>Música (Deezer)</label>
      <div style="display:flex;gap:8px">
       <input class="cot-input" id="esf-music" placeholder="track ID (ej. 2893837431)" style="flex:1">
@@ -1639,7 +1663,7 @@
      <div id="esf-music-chosen" style="font-size:11px;color:var(--green);margin-top:4px"></div>
      <div id="esf-music-results" style="margin-top:8px"></div>
     </div>
-    <div class="form-group" id="esf-grp-zonas">
+    <div class="form-group" data-esf="zonas" id="esf-grp-zonas">
      <label>Zonas y precios</label>
      <div id="esf-zonas"></div>
      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
@@ -1653,7 +1677,7 @@
           arriba. 14 de los 78 eventos con cheap divergen de verdad: otro número de
           zonas, otros nombres, otro orden o `sepEspecial` propio. El botón de
           copiar es conveniencia de captura, no el modelo. -->
-     <div class="form-group" id="esf-grp-cheapzonas">
+     <div class="form-group" data-esf="zonas" id="esf-grp-cheapzonas">
       <label>Zonas CHEAP <span style="font-weight:400;color:var(--ts);font-size:11px">— solo boleto</span></label>
       <div id="esf-cheapzonas"></div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
@@ -1671,7 +1695,7 @@
           ⚠️ Se captura COMPLETO (etiqueta, fecha, zonas, cheap, ride) porque
           guardar a medias REEMPLAZA la columna con una versión degradada:
           la trampa que E1 midió ocho veces. -->
-    <div class="form-group" id="esf-grp-multifecha">
+    <div class="form-group" data-esf="zonas" id="esf-grp-multifecha">
      <label>Fechas del evento <span style="font-weight:400;color:var(--ts);font-size:11px">— una noche por bloque, con sus zonas</span></label>
      <div id="esf-multifecha"></div>
      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
@@ -1679,7 +1703,7 @@
      </div>
      <div style="font-size:11px;color:var(--ts);margin-top:4px">Vacío = <b>una sola fecha</b> (la de arriba). Con bloques, el sitio deja elegir noche y cada una se agota por separado.</div>
     </div>
-    <div class="form-group" id="esf-grp-hotel">
+    <div class="form-group" data-esf="vende" id="esf-grp-hotel">
      <label>Hotel</label>
      <label class="chk-linea">
       <input type="checkbox" id="esf-hotel-custom" onchange="_esfHotelToggle()"><span>Personalizar hotel de este evento</span>
@@ -1701,8 +1725,9 @@
       <div style="font-size:11px;color:var(--ts);margin-top:4px">Extras POR PERSONA (ya descuentan el lugar del PLUS). Se calculan solos; puedes ajustar cualquiera a mano.</div>
      </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.15em;color:var(--ts);margin:24px 0 16px">// EXTRAS</div>
-    <div class="form-group">
+    <!-- [ESF-UX-1c] El rótulo de sección se retira: la PESTAÑA ya dice dónde
+         estás, y dos títulos para lo mismo se contradicen en cuanto uno cambie. -->
+    <div class="form-group" data-esf="extras">
      <label>Foto de portada (concierto)</label>
      <input type="file" id="esf-foto-file" accept="image/*" style="display:none" onchange="_esfFotoPick(event)">
      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
@@ -1713,7 +1738,7 @@
      <div id="esf-foto-preview" style="margin-top:8px;display:none"><img id="esf-foto-img" src="" alt="Foto de portada" style="max-width:240px;max-height:180px;border:1px solid var(--border);border-radius:var(--r-sm,8px)"></div>
      <div style="font-size:11px;color:var(--ts);margin-top:4px">Portada manual del concierto (reemplaza la foto de Deezer). Los festivales usan su propia portada en el panel de festival.</div>
     </div>
-    <div class="form-group">
+    <div class="form-group" data-esf="extras">
      <label>Mapa del venue</label>
      <input type="file" id="esf-mapa-file" accept="image/*" style="display:none" onchange="_esfMapaPick(event)">
      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
@@ -1724,7 +1749,7 @@
      <div id="esf-mapa-preview" style="margin-top:8px;display:none"><img id="esf-mapa-img" src="" alt="Mapa del venue" style="max-width:240px;max-height:180px;border:1px solid var(--border);border-radius:var(--r-sm,8px)"></div>
      <div style="font-size:11px;color:var(--ts);margin-top:4px">Imagen del mapa de zonas (conciertos). Sin mapa → el sitio muestra "Mapa próximamente".</div>
     </div>
-    <div class="form-group">
+    <div class="form-group" data-esf="vende">
      <label>Qué incluye</label>
      <div id="esf-inc"></div>
      <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
@@ -1733,7 +1758,7 @@
      </div>
      <div style="font-size:11px;color:var(--ts);margin-top:4px">Lista "qué incluye" del paquete. Se pre-llena por ciudad; puedes editarla a mano.</div>
     </div>
-    <div class="form-group">
+    <div class="form-group" data-esf="vende">
      <label>Separo</label>
      <div style="display:flex;gap:8px;flex-wrap:wrap">
       <div style="flex:1;min-width:130px"><label style="font-size:11px">Separo PLUS $</label><input class="cot-input esf-sep" type="number" min="0" id="esf-sep" placeholder="500" style="width:100%"></div>
@@ -1762,7 +1787,7 @@
      </div>
      <div style="font-size:11px;color:var(--ts);margin-top:4px">Default 500. El CHEAP solo aplica si alguna zona tiene precio CHEAP.<br>El <b>RIDE vacío</b> = el evento no vende ese paquete. No se publica como $0: ausente no es gratis.</div>
     </div>
-    <div class="form-group">
+    <div class="form-group" data-esf="vende">
      <label>Nota / aviso</label>
      <input class="cot-input" id="esf-nota" placeholder="ej. NO incluye transporte a CDMX." style="width:100%">
      <div style="font-size:11px;color:var(--ts);margin-top:4px">Opcional. En CDMX se pre-llena con "NO incluye transporte a CDMX." (editable).</div>

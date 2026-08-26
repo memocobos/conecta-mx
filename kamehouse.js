@@ -18381,7 +18381,8 @@ async function crearEsferaEvento() {
       const si = document.getElementById('esf-static-img'); if (si) si.value = '';
       const it = document.getElementById('esf-img-texto'); if (it) it.value = '';
       const io_ = document.getElementById('esf-img-omitir'); if (io_) io_.checked = false;
-      _esfCorridoPreview(); _esfExtrasCerrar(); _esfExtrasContar(); }
+      _esfCorridoPreview(); _esfExtrasCerrar(); _esfExtrasContar();
+      _esfTabsVigilar(); _esfTab('datos'); _esfSyncGuardar(); }
     _esfClearHotel();
     _esfMapaClear();
     _esfFotoClear();
@@ -19433,6 +19434,102 @@ function _esfHotelToggle() {
   }
 }
 // Devuelve el objeto {custom,total,items} o null (toggle apagado = default ciudad).
+// ═══ [ESF-UX-1c] LAS PESTAÑAS DEL FORMULARIO ══════════════════════════════
+// Pestañas y NO pasos, y el número lo decidió: ESF-UX-1 midió que EDITAR es el
+// trabajo frecuente (b) y CREAR el raro (a). Un asistente por pasos ayuda a
+// crear y castiga a editar —obliga a caminar por pantallas que no se van a
+// tocar para cambiar un precio—. Con pestañas se salta directo a "Zonas".
+//
+// ⚠️ GUARDAR VIVE FUERA de las pestañas, siempre visible. Meterlo dentro de
+// "Revisar" convertiría cada edición de un campo en un viaje de ida y vuelta,
+// y "lo que se usa siempre, siempre visible" es la regla que Memo firmó.
+let _esfTabActual = 'datos';
+
+function _esfTab(cual) {
+  _esfTabActual = cual;
+  document.querySelectorAll('#page-esferas .esf-tab').forEach((b) => {
+    const on = b.dataset.ir === cual;
+    b.classList.toggle('active', on);
+    b.setAttribute('aria-selected', on ? 'true' : 'false');
+  });
+  document.querySelectorAll('#page-esferas [data-esf]').forEach((g) => {
+    g.style.display = (g.dataset.esf === cual) ? '' : 'none';
+  });
+  if (cual === 'revisar') _esfRevisarPintar();
+}
+
+// Lo que FALTA para poder guardar. Es la razón de que "Revisar" exista, y por eso
+// NO se apaga: apagar la pestaña que dice qué falta es esconder la respuesta.
+//
+// 🔒 AQUÍ ME APARTÉ DE LO FIRMADO, y lo digo: el diseño decía "Revisar apagada
+// hasta que lo mínimo esté puesto". Al construirlo se ve que es al revés — quien
+// no sabe qué le falta necesita JUSTO esa pestaña. Lo que sí se apaga es el
+// botón de GUARDAR, que es lo que la concesión quería evitar: crear medio evento.
+const _ESF_MINIMO = [
+  { id: 'esf-slug', q: 'el slug (el nombre corto del evento)' },
+  { id: 'esf-nombre', q: 'el nombre / artista' },
+  { id: 'esf-venue', q: 'el venue' },
+];
+
+function _esfFalta() {
+  const faltan = _ESF_MINIMO.filter((c) => !(document.getElementById(c.id)?.value || '').trim());
+  // Una zona sin capturar no impide guardar un evento "por confirmar", así que
+  // se AVISA sin bloquear: son dos cosas distintas y mezclarlas obligaría a
+  // inventar precios para poder guardar.
+  const sinZonas = document.querySelectorAll('#esf-zonas .esf-zona-row').length === 0;
+  return { faltan, sinZonas };
+}
+
+function _esfRevisarPintar() {
+  const el = document.getElementById('esf-revisar');
+  if (!el) return;
+  const { faltan, sinZonas } = _esfFalta();
+  let h = '';
+  if (faltan.length) {
+    h += '<div style="color:var(--red);font-weight:700;margin-bottom:6px">No se puede guardar todavía:</div>' +
+      faltan.map((c) => '<div>· falta <b>' + c.q + '</b></div>').join('');
+  } else {
+    h += '<div style="color:var(--green,#3ddc84);font-weight:700">Lo mínimo está puesto.</div>';
+  }
+  if (sinZonas) {
+    h += '<div style="margin-top:10px;color:var(--ts)">· <b>sin zonas capturadas</b> — se puede guardar igual ' +
+      '(un evento por confirmar no tiene precios todavía), pero el sitio no lo va a poder vender.</div>';
+  }
+  const n = (typeof _esfExtrasContar === 'function') ? _esfExtrasContar() : 0;
+  if (n) h += '<div style="margin-top:10px;color:var(--ts)">· <b>' + n + '</b> grupo(s) con dato en <b>Extras</b>.</div>';
+  el.innerHTML = h;
+}
+
+// El botón de guardar se apaga si falta lo mínimo, y DICE por qué: un botón
+// apagado sin explicación manda a adivinar.
+function _esfSyncGuardar() {
+  const btn = document.getElementById('esf-submit-btn');
+  if (!btn) return;
+  const { faltan } = _esfFalta();
+  btn.disabled = faltan.length > 0;
+  btn.style.opacity = faltan.length ? '.5' : '';
+  btn.title = faltan.length ? ('Falta ' + faltan.map((c) => c.q).join(', ')) : '';
+  const bd = document.getElementById('esf-tab-revisar-n');
+  if (bd) { bd.textContent = faltan.length ? ('(' + faltan.length + ')') : ''; bd.classList.toggle('falta', faltan.length > 0); }
+  const be = document.getElementById('esf-tab-extras-n');
+  if (be && typeof _esfExtrasContar === 'function') {
+    const n = _esfExtrasContar();
+    be.textContent = n ? ('(' + n + ')') : '';
+    be.classList.toggle('hay', n > 0);
+  }
+  if (_esfTabActual === 'revisar') _esfRevisarPintar();
+}
+
+// Se vigila TODO el formulario: el estado del botón tiene que seguir al dato,
+// no a que alguien se acuerde de llamarlo.
+function _esfTabsVigilar() {
+  const col = document.querySelector('#page-esferas .esf-col-form');
+  if (!col || col.dataset.vigilado) return;
+  col.dataset.vigilado = '1';
+  col.addEventListener('input', _esfSyncGuardar);
+  col.addEventListener('change', _esfSyncGuardar);
+}
+
 // ═══ [ESF-UX-1b] EL PLIEGUE DE LO AVANZADO ════════════════════════════════
 // Seis grupos —apuntes, imagen, corrido, cartel, flash, banco— que ESF-UX-1
 // midió como 849px y 18 de los 48 campos, y que casi nunca se tocan.
@@ -19991,6 +20088,7 @@ function editarEsfera(slug) {
   { const l = document.getElementById('esf-lineup'); if (l) l.value = row.lineup || ''; _esfLineupShow(row.lineup || ''); }
   _esfFlashPopulate(row.flash_promo);
   { _esfExtrasCerrar(); _esfExtrasContar(); }   // [ESF-UX-1b] cerrado, pero anunciando
+  { _esfTabsVigilar(); _esfTab('datos'); _esfSyncGuardar(); }   // [ESF-UX-1c] editar SIEMPRE abre en Datos
   set('esf-promo-code', row.promo_code || '');
   set('esf-promo-label', row.promo_label || '');
   { const d = document.getElementById('esf-deporte'); if (d) d.checked = !!row.deporte; }
@@ -20050,7 +20148,8 @@ function cancelarEdicionEsfera() {
       const si = document.getElementById('esf-static-img'); if (si) si.value = '';
       const it = document.getElementById('esf-img-texto'); if (it) it.value = '';
       const io_ = document.getElementById('esf-img-omitir'); if (io_) io_.checked = false;
-      _esfCorridoPreview(); _esfExtrasCerrar(); _esfExtrasContar(); }
+      _esfCorridoPreview(); _esfExtrasCerrar(); _esfExtrasContar();
+      _esfTabsVigilar(); _esfTab('datos'); _esfSyncGuardar(); }
   _esfClearHotel();
   _esfMapaClear();
   _esfFotoClear();

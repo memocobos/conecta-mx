@@ -1654,6 +1654,15 @@
       <label style="font-size:11px">Costo total de la habitación</label>
       <input class="cot-input" type="number" min="0" id="esf-hotel-total" placeholder="ej. 2600" oninput="_esfHotelRecalc()" style="width:100%">
       <div id="esf-hotel-items" style="margin-top:8px"></div>
+      <!-- [ESF-CIERRE-HOTEL] El detalle es OPT-IN: emitirlo siempre le
+           estrenaría k/pp/desc a las 109 filas simples del catálogo. -->
+      <label style="display:flex;align-items:center;gap:8px;font-size:12px;cursor:pointer;margin-top:10px">
+       <input type="checkbox" id="esf-hotel-fino"> Detallar el tipo de cuarto (el sitio explica cada uno)
+      </label>
+      <div style="display:flex;gap:6px;align-items:center;margin-top:6px">
+       <span style="font-size:12px;color:var(--ts)">noches incluidas</span>
+       <input class="cot-input" id="esf-hotel-noches" type="number" min="1" max="14" value="1" style="flex:0 0 90px">
+      </div>
       <div style="font-size:11px;color:var(--ts);margin-top:4px">Extras POR PERSONA (ya descuentan el lugar del PLUS). Se calculan solos; puedes ajustar cualquiera a mano.</div>
      </div>
     </div>

@@ -19373,11 +19373,16 @@ function _esfClearZonas() {
 // Toggle apagado → default de ciudad (no se captura nada). Encendido → costo
 // total + 4 tipos FIJOS con su viaj interno; el extra POR PERSONA se autocalcula
 // con la fórmula (base=total/4; extra=ceil((4-pers)*base/pers)) y es editable.
+// [ESF-CIERRE-HOTEL] Cada tipo con su LLAVE y su FRASE, tal como viven en el
+// catálogo. Medido sobre las 36 filas finas: `k` son exactamente estos cuatro,
+// `desc` es una frase fija por tipo, y `pp` es SIEMPRE igual a `e` (36 de 36).
+// Por eso el hotel fino no necesita tres campos nuevos de captura: se DERIVA del
+// tipo más un número de noches.
 const _ESF_HOTEL_TIPOS = [
-  { n: 'Compartida', pers: 4, viaj: [1, 2, 3, 4] },
-  { n: 'Individual', pers: 1, viaj: [1] },
-  { n: 'Doble', pers: 2, viaj: [2] },
-  { n: 'Triple', pers: 3, viaj: [3] },
+  { n: 'Compartida', pers: 4, viaj: [1, 2, 3, 4], k: 'compartida', desc: 'Compartes cuarto con otros viajeros' },
+  { n: 'Individual', pers: 1, viaj: [1], k: 'individual', desc: 'Cuarto solo para ti' },
+  { n: 'Doble', pers: 2, viaj: [2], k: 'doble', desc: 'Tu parte del cuarto doble' },
+  { n: 'Triple', pers: 3, viaj: [3], k: 'triple', desc: 'Tu parte del cuarto triple' },
 ];
 function _esfHotelExtra(total, pers) {
   const base = (total || 0) / 4;
@@ -19392,6 +19397,8 @@ function _esfHotelRenderRows() {
     row.className = 'esf-hotel-row';
     row.dataset.n = t.n;
     row.dataset.viaj = t.viaj.join(',');
+    row.dataset.k = t.k;
+    row.dataset.desc = t.desc;
     row.style.cssText = 'display:flex;gap:8px;margin-top:6px;align-items:center';
     row.innerHTML =
       '<div style="flex:1;font-size:12px">' + t.n + ' <span style="color:var(--ts)">(' + t.pers + 'p)</span></div>' +
@@ -19590,11 +19597,25 @@ function _esfFlashPreview() {
 function _esfGetHotel() {
   if (!document.getElementById('esf-hotel-custom')?.checked) return null;
   const total = parseInt(document.getElementById('esf-hotel-total')?.value || '0', 10) || 0;
-  const items = Array.from(document.querySelectorAll('#esf-hotel-items .esf-hotel-row')).map((row) => ({
-    n: row.dataset.n,
-    e: parseInt(row.querySelector('.esf-hotel-e')?.value || '0', 10) || 0,
-    viaj: row.dataset.viaj.split(',').map((x) => parseInt(x, 10)).filter((x) => !isNaN(x)),
-  }));
+  // [ESF-CIERRE-HOTEL] El detalle es OPT-IN. Emitirlo siempre le estrenaría
+  // `k`/`pp`/`desc` a las 109 filas simples del catálogo — la lección de #585:
+  // una condición más laxa cambia datos que nadie pidió cambiar.
+  const fino = !!document.getElementById('esf-hotel-fino')?.checked;
+  const noches = parseInt(document.getElementById('esf-hotel-noches')?.value || '1', 10) || 1;
+  const items = Array.from(document.querySelectorAll('#esf-hotel-items .esf-hotel-row')).map((row) => {
+    const e = parseInt(row.querySelector('.esf-hotel-e')?.value || '0', 10) || 0;
+    const base = {
+      n: row.dataset.n, e,
+      viaj: row.dataset.viaj.split(',').map((x) => parseInt(x, 10)).filter((x) => !isNaN(x)),
+    };
+    if (!fino) return base;
+    // `pp` es el mismo número que `e` (medido: 36 de 36) y `desc` sale del tipo,
+    // con el sufijo de noches cuando el paquete trae más de una.
+    return Object.assign({ k: row.dataset.k }, base, {
+      pp: e,
+      desc: row.dataset.desc + (noches > 1 ? (' · ' + noches + ' noches') : ''),
+    });
+  });
   return { custom: true, total, items };
 }
 function _esfClearHotel() {
@@ -19604,6 +19625,10 @@ function _esfClearHotel() {
   if (total) total.value = '';
   const items = document.getElementById('esf-hotel-items');
   if (items) items.innerHTML = '';
+  // [ESF-CIERRE-HOTEL] El detalle y las noches también se limpian: si no, el
+  // siguiente evento nacería con el detalle del anterior.
+  const fino = document.getElementById('esf-hotel-fino'); if (fino) fino.checked = false;
+  const noches = document.getElementById('esf-hotel-noches'); if (noches) noches.value = '1';
   _esfHotelToggle();
 }
 // Re-poblar en modo editar desde `hotel` (texto JSON u objeto). custom:false → off.
@@ -19622,6 +19647,22 @@ function _esfHotelPopulate(raw) {
   document.querySelectorAll('#esf-hotel-items .esf-hotel-row').forEach((row) => {
     if (byName[row.dataset.n] != null) row.querySelector('.esf-hotel-e').value = byName[row.dataset.n];
   });
+  // [ESF-CIERRE-HOTEL] El detalle y las noches se re-pueblan, o abrir un hotel
+  // fino y guardarlo lo DEGRADARÍA a simple sin que nadie lo pidiera — la misma
+  // trampa que E3 con las noches de multifecha.
+  const fino = h.items.some((it) => it && typeof it.k === 'string' && it.k);
+  const chkF = document.getElementById('esf-hotel-fino');
+  if (chkF) chkF.checked = fino;
+  const nEl = document.getElementById('esf-hotel-noches');
+  if (nEl) {
+    // Las noches se LEEN del sufijo de la descripción, que es donde viven hoy.
+    let noches = 1;
+    for (const it of h.items) {
+      const m = (it && typeof it.desc === 'string') ? /· (\d+) noches/.exec(it.desc) : null;
+      if (m) { noches = parseInt(m[1], 10) || 1; break; }
+    }
+    nEl.value = String(noches);
+  }
 }
 
 // ── Mapa del venue (imagen → bucket público mapas-eventos) ───────────────────

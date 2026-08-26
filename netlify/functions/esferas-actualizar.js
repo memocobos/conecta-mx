@@ -26,6 +26,19 @@ const PKG_FLAGS = new Set(['ride_only', 'cheap_only', 'no_stay', 'no_cheap', 'no
 // llegan las dos, manda `rideOnly` — la misma regla que el compilador, dicha en
 // los dos lados porque son dos puertas distintas a la misma tabla.
 function _sanePkg(sane) {
+  // [ESF-UX-1f] Estas dos reglas hablan de un CONJUNTO de banderas capturado
+  // junto — las que manda el formulario, que siempre van las siete. En un
+  // PATCH PARCIAL que ni menciona las banderas, `sane.ride_only` es
+  // `undefined`, y la segunda línea ESCRIBÍA `cheap_also_ok = false` sin que
+  // nadie lo hubiera pedido: el patch salía con una llave que no llegó.
+  //
+  // Nunca disparó porque hasta hoy había UN solo llamador y manda todo.
+  // "Agotar desde la fila" es el primero que manda `{slug, status}` a secas, y
+  // habría apagado la bandera en los 4 eventos del catálogo que la traen.
+  //
+  // El saneador solo normaliza cuando el que llama TRAJO las banderas. Un
+  // patch que no las menciona sale igual que entró.
+  if (!('ride_only' in sane)) return sane;
   if (sane.ride_only) sane.cheap_only = false;
   if (!sane.ride_only) sane.cheap_also_ok = false;
   return sane;

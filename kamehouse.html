@@ -1464,6 +1464,18 @@
      <input class="cot-input" id="esf-music-search" placeholder="Buscar música como… (ej. «Siddhartha»)" autocomplete="off" style="width:100%;margin-top:8px">
      <div style="font-size:11px;color:var(--ts);margin-top:4px">El texto de música solo hace falta cuando el <b>nombre del evento no da con el artista</b> — como «Siddharta - Tú y Yo Tour», que se busca como «Siddhartha». Vacío = se busca por el nombre.</div>
     </div>
+    <!-- [ESF-CIERRE-FECHA] El evento DE CORRIDO: dura varios días seguidos y no
+         se elige noche. Es distinto de las "fechas adicionales" de arriba, que
+         SÍ estrenan selector de día en el sitio. -->
+    <div class="form-group" id="esf-grp-corrido">
+     <label>¿Dura varios días seguidos?</label>
+     <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+      <span style="font-size:12px;color:var(--ts)">termina el</span>
+      <input class="cot-input" id="esf-fecha-fin" type="date" style="flex:1;min-width:150px" oninput="_esfCorridoPreview()">
+     </div>
+     <input class="cot-input" id="esf-f-texto" placeholder="…o escribe la fecha tal cual (ej. 12-13 sep 2026)" autocomplete="off" style="width:100%;margin-top:6px" oninput="_esfCorridoPreview()">
+     <div id="esf-corrido-preview" style="font-size:11px;color:var(--ts);margin-top:6px;line-height:1.5"></div>
+    </div>
     <!-- [ESF-CIERRE-LINEUP] El cartel. Acepta las DOS formas que el catálogo
          ya usa: una llave de `lineups.js` (los 12 de siempre) o una imagen
          subida aquí. Reusa `esferas-subir-imagen` tipo:'lineup', que el panel

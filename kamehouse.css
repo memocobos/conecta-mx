@@ -656,6 +656,26 @@ tr:hover td{background:var(--bg3)}
    (0,1,0) PIERDE contra `.form-group label` (0,1,1) y no pasa nada: el cuadrito
    se va a otra línea y el texto sigue en versalitas. Se vio en la captura, no
    en el DOM — la clase SÍ estaba puesta. */
+/* [ESF-UX-1b] El pliegue de lo avanzado. Mismo gesto que el de la lista
+   (chevron + rótulo en mono + aria-expanded) para que las dos cosas plegables
+   de la pantalla se sientan la misma cosa. */
+.esf-plegable{border:1px solid var(--border);border-radius:var(--r-sm,8px);margin-bottom:16px;overflow:hidden}
+.esf-plegable-head{
+ display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none;
+ padding:11px 14px;background:var(--bg);
+ font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.15em;color:var(--ts);
+}
+.esf-plegable-head:hover{color:var(--text)}
+.esf-plegable-head:focus-visible{outline:2px solid var(--orange);outline-offset:-2px}
+/* El badge de "trae contenido". Va a la DERECHA y con el ACENTO de la casa:
+   es lo único que avisa de que hay datos escondidos ahí dentro.
+   ⚠️ `--orange` NO es naranja: vale #c8e23a, un lima-amarillo. La variable está
+   mal nombrada desde antes; se usa porque es EL acento del Palacio, no por su
+   nombre. Quien busque naranja aquí no lo va a encontrar. */
+.esf-plegable-badge{margin-left:auto;letter-spacing:.05em}
+.esf-plegable-badge.hay{color:var(--orange);font-weight:700}
+.esf-plegable>div:last-child{padding:14px 14px 2px;border-top:1px solid var(--border)}
+
 .form-group label.chk-linea,
 .chk-linea{
  display:flex;align-items:center;gap:8px;

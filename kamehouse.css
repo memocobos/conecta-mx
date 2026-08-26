@@ -667,6 +667,43 @@ tr:hover td{background:var(--bg3)}
 .esf-barra-sep{width:1px;height:22px;background:var(--border)}
 @media(max-width:640px){.esf-barra-sep{display:none}}
 
+/* [ESF-UX-1e] El editor en panel, encima de la lista.
+   Clases propias y no `.modal`: aquél es `max-width:520px` —medida de
+   confirmación— y este editor es de dos columnas. El porqué de no reusar
+   `.modal-overlay` está escrito en el markup: los cerradores globales. */
+.esf-panel-ov{
+ position:fixed;inset:0;z-index:520;
+ background:rgba(0,0,0,.72);backdrop-filter:blur(4px);
+ display:none;align-items:flex-start;justify-content:center;padding:24px;
+}
+.esf-panel-ov.open{display:flex}
+.esf-panel{
+ background:var(--bg2);border:1px solid var(--border2);
+ border-radius:var(--r-card,16px);
+ width:100%;max-width:940px;max-height:calc(100vh - 48px);
+ display:flex;flex-direction:column;box-shadow:var(--shadow);
+}
+.esf-panel-head{
+ display:flex;align-items:center;justify-content:space-between;gap:12px;
+ padding:16px 20px;border-bottom:1px solid var(--border);flex:0 0 auto;
+}
+.esf-panel-tit{
+ font-family:'JetBrains Mono',monospace;
+ font-size:11px;letter-spacing:.15em;color:var(--ts);
+}
+.esf-panel-x{
+ background:none;border:1px solid var(--border);color:var(--ts);
+ border-radius:8px;font-size:15px;line-height:1;cursor:pointer;padding:7px 11px;
+}
+.esf-panel-x:hover{color:var(--text);border-color:var(--border2)}
+/* El cuerpo es el que se desplaza — de él cuelga el `sticky` de la vista
+   previa, que así sigue a la vista mientras se baja por el formulario. */
+.esf-panel-body{flex:1 1 auto;overflow-y:auto;padding:20px}
+/* El rótulo del formulario sigue en el DOM (es la fuente del título del
+   panel y lo escriben editar/cancelar), pero ya no se pinta dos veces. */
+.esf-panel #esf-form-titulo{display:none}
+@media(max-width:640px){.esf-panel-ov{padding:0}.esf-panel{max-height:100vh;border-radius:0}}
+
 /* [ESF-UX-1c] Las pestañas del formulario. Se apoyan en `.gz-filter` en
    espíritu pero no en clase: aquéllas son FILTROS de una lista y éstas son
    SECCIONES de un formulario — parecidas de ver, distintas de significado. */

@@ -111,7 +111,13 @@ function evAEsfera(ev) {
     // llave de `imgs.js` no es una foto subida y no debe entrar por ahí.
     // [ESF-CIERRE-FINAL] Los últimos cuatro que el importador recortaba.
     mapa_null: (ev.mapa === null),
-    musicList: Array.isArray(ev.musicList) ? JSON.stringify(ev.musicList) : null,
+    // ⚠️ La COLUMNA se llama `music_list`, con guion bajo, como todas sus
+    // hermanas. Nació aquí como `musicList` —el nombre de la llave del EV— y
+    // PostgREST rechazaba la fila ENTERA con PGRST204: la llave viaja en las
+    // 102 filas (con null en 101), así que la siembra no fallaba en el evento
+    // que la usa, fallaba en TODOS. Lo que sigue siendo camello es la llave del
+    // OBJETO EV compilado; el nombre con el que viaja a la base es este.
+    music_list: Array.isArray(ev.musicList) ? JSON.stringify(ev.musicList) : null,
     static_img: (typeof ev.staticImg === 'string' && ev.staticImg.trim() && !/^https?:|^data:/.test(ev.staticImg))
       ? ev.staticImg.trim() : null,
     // `img` con texto se guarda SOLO si difiere del nombre que el compilador

@@ -517,7 +517,11 @@ function extrasSegmento(esfera) {
 // de festival (desde `festival.musica`), pero tecatecomuna es un CONCIERTO que
 // lleva su propia lista de canciones y no tenía de dónde sacarla.
 function musicListConcSeg(esfera) {
-  let l = esfera.musicList;
+  // ⚠️ Se lee de la COLUMNA `music_list`. Lo que se EMITE abajo sigue siendo
+  // `musicList:` — es la llave del objeto EV, y ésa no cambia. Aquí se lee la
+  // fila; ahí se escribe el catálogo. Son dos nombres para el mismo dato a
+  // propósito, y confundirlos fue el PGRST204 de la siembra.
+  let l = esfera.music_list;
   if (typeof l === 'string') { if (!l.trim()) return ''; try { l = JSON.parse(l); } catch (_) { return ''; } }
   if (!Array.isArray(l) || !l.length) return '';
   const ids = l.map((x) => String(x).trim()).filter(Boolean);

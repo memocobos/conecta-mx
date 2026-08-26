@@ -135,7 +135,11 @@ function evAEsfera(ev) {
     cheap_zonas: ev.cheapZonas ? JSON.stringify(cheap) : '',
     hotel: (Array.isArray(ev.hotel) && ev.hotel.length)
       ? JSON.stringify({ custom: true, pp: !!ev.hotelPP, override: !!ev.hotelOverride,
-          items: ev.hotel.map((r) => ({ n: r.n, e: r.e, viaj: r.viaj })) })
+          // [ESF-CIERRE-HOTEL] La fila viaja ENTERA: `k`, `pp` y `desc`
+          // también. Antes se recortaba a {n,e,viaj} y por eso 8 eventos
+          // perdían el tipo de cuarto, su costo por persona y la frase que lee
+          // el cliente.
+          items: ev.hotel.map((r) => ({ k: r.k, n: r.n, e: r.e, pp: r.pp, viaj: r.viaj, desc: r.desc })) })
       : '',
     multifecha: mfConcierto ? JSON.stringify(ev.multifecha) : '',
     ride: (ev.ride != null) ? ev.ride : null,

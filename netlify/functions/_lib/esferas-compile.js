@@ -510,7 +510,23 @@ function parseHotel(raw) {
     const viaj = Array.isArray(it.viaj)
       ? it.viaj.map((x) => parseInt(x, 10)).filter((x) => Number.isInteger(x) && x >= 1 && x <= 4)
       : [];
-    items.push({ n, e: (Number.isFinite(e) && e > 0) ? Math.round(e) : 0, viaj });
+    // [ESF-CIERRE-HOTEL] El hotel FINO. 36 de las 145 filas del catálogo traen
+    // `k` (la llave del tipo de cuarto), `pp` (su costo POR PERSONA) y `desc`
+    // (la frase que lee el cliente: "Tu parte del cuarto doble"). El compilador
+    // emitía solo `{n,e,viaj}`, así que 8 eventos perdían las tres.
+    //
+    // ⚠️ OJO CON `pp`: el de la FILA es un NÚMERO (el costo por persona de ese
+    // cuarto) y el del ARREGLO es una BANDERA (`hotelPP:true`). Mismo nombre,
+    // dos cosas. Se leen por separado y no se tocan entre sí.
+    const k = (typeof it.k === 'string' && it.k.trim()) ? it.k.trim() : null;
+    const ppFila = Number(it.pp);
+    const desc = (typeof it.desc === 'string' && it.desc.trim()) ? it.desc.trim() : null;
+    items.push({
+      n, e: (Number.isFinite(e) && e > 0) ? Math.round(e) : 0, viaj,
+      k,
+      pp: (Number.isFinite(ppFila) && ppFila >= 0 && it.pp != null) ? Math.round(ppFila) : null,
+      desc,
+    });
   }
   if (!items.length) return null;
   // [ESF-E1e] Las DOS banderas viajan con la lista, no se dan por hechas. Medido
@@ -531,9 +547,15 @@ function parseHotel(raw) {
 function hotelSegmento(esfera) {
   const items = parseHotel(esfera.hotel);
   if (!items) return 'hotel:[]';
+  // [ESF-CIERRE-HOTEL] El orden es el del catálogo: k · n · e · pp · viaj · desc.
+  // Cada uno SOLO si la fila lo trae — las 109 filas simples (`{n,e}`) siguen
+  // saliendo idénticas, que es el candado de #585.
   const arr = items.map((it) => {
+    const kStr = it.k ? ("k:'" + escStr(it.k) + "',") : '';
+    const ppStr = (it.pp != null) ? (',pp:' + it.pp) : '';
     const viajStr = it.viaj.length ? (',viaj:[' + it.viaj.join(',') + ']') : '';
-    return "{n:'" + escStr(it.n) + "',e:" + it.e + viajStr + '}';
+    const descStr = it.desc ? (",desc:'" + escStr(it.desc) + "'") : '';
+    return '{' + kStr + "n:'" + escStr(it.n) + "',e:" + it.e + ppStr + viajStr + descStr + '}';
   }).join(',');
   // [ESF-E1e] Las banderas SOLO si la lista las trae. El default sigue siendo
   // `true` para no mover a los eventos ya gobernados ni a los festivales, que es

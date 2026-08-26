@@ -1427,6 +1427,12 @@
           decidir si revive el evento o compra más boletos, y eso solo tiene
           sentido si el evento aún no ocurre. -->
      <button class="gz-filter" id="esff-agotados" onclick="filtrarEsferasFecha('agotado',this)" title="Próximos que están agotados — los que se pueden revivir o resurtir">// agotados</button>
+     <!-- [ESF-UX-2] Promos: los que traen promo CAPTURADA en Esferas (promo_code,
+          promo_label o flash_promo con dato). Es un corte de captura, NO de
+          vigencia: el vencimiento de las promos de pareja vive en el `PROMOS`
+          del index.html, no en esta tabla — por eso el chip promete "trae
+          promo", que es lo único que estos tres campos saben. -->
+     <button class="gz-filter" id="esff-promos" onclick="filtrarEsferasFecha('promo',this)" title="Eventos con promo capturada en Esferas. Es lo capturado, no lo vigente: el vencimiento de las promos de pareja vive en el PROMOS del index.html.">// promos</button>
      <button class="gz-filter" id="esff-pasados" onclick="filtrarEsferasFecha('pasado',this)">// pasados</button>
      <button class="gz-filter" id="esff-todos" onclick="filtrarEsferasFecha('todos',this)">// todos</button>
     </div>

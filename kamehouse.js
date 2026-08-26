@@ -18381,7 +18381,7 @@ async function crearEsferaEvento() {
       const si = document.getElementById('esf-static-img'); if (si) si.value = '';
       const it = document.getElementById('esf-img-texto'); if (it) it.value = '';
       const io_ = document.getElementById('esf-img-omitir'); if (io_) io_.checked = false;
-      _esfCorridoPreview(); }
+      _esfCorridoPreview(); _esfExtrasCerrar(); _esfExtrasContar(); }
     _esfClearHotel();
     _esfMapaClear();
     _esfFotoClear();
@@ -19433,6 +19433,83 @@ function _esfHotelToggle() {
   }
 }
 // Devuelve el objeto {custom,total,items} o null (toggle apagado = default ciudad).
+// ═══ [ESF-UX-1b] EL PLIEGUE DE LO AVANZADO ════════════════════════════════
+// Seis grupos —apuntes, imagen, corrido, cartel, flash, banco— que ESF-UX-1
+// midió como 849px y 18 de los 48 campos, y que casi nunca se tocan.
+//
+// ⚠️ NACE CERRADO Y NO RECUERDA su estado, al revés que el pliegue de la lista.
+// Si recordara, la primera vez que alguien lo abriera quedaría abierto para
+// siempre y el pliegue dejaría de servir. Un pliegue de FORMULARIO se cierra
+// con cada evento; uno de SECCIÓN es una preferencia de pantalla. No son lo
+// mismo aunque se vean igual.
+//
+// 🔒 Y ANUNCIA SI TRAE CONTENIDO. Es la lección de `promo_code`: lo plegado SE
+// OLVIDA al editar, y un evento con promo que se guarda sin que nadie mire el
+// pliegue sale igual — pero el que lo edita no tiene forma de saber que estaba.
+// El encabezado dice "(2 con dato)" y el badge se pinta con el acento de la casa.
+function _esfExtrasToggle() {
+  const body = document.getElementById('esf-extras-body');
+  const head = document.getElementById('esf-extras-head');
+  const chev = document.getElementById('esf-extras-chev');
+  if (!body) return;
+  const abierto = body.style.display !== 'none';
+  body.style.display = abierto ? 'none' : '';
+  if (head) head.setAttribute('aria-expanded', abierto ? 'false' : 'true');
+  if (chev) chev.textContent = abierto ? '▸' : '▾';
+}
+
+function _esfExtrasCerrar() {
+  const body = document.getElementById('esf-extras-body');
+  if (body) body.style.display = 'none';
+  const head = document.getElementById('esf-extras-head');
+  if (head) head.setAttribute('aria-expanded', 'false');
+  const chev = document.getElementById('esf-extras-chev');
+  if (chev) chev.textContent = '▸';
+}
+
+// Cuenta GRUPOS con dato, no campos: "3 con dato" se lee como "hay tres cosas
+// puestas ahí dentro", que es la pregunta que se hace quien edita. Contar
+// campos daría números grandes que no dicen nada ("7 con dato").
+const _ESF_EXTRAS_GRUPOS = [
+  { n: 'apuntes', txt: ['esf-promo-code', 'esf-promo-label', 'esf-music-search'], chk: ['esf-promo', 'esf-deporte'] },
+  { n: 'imagen', txt: ['esf-static-img', 'esf-img-texto'], chk: ['esf-img-omitir'] },
+  { n: 'corrido', txt: ['esf-fecha-fin', 'esf-f-texto'], chk: [] },
+  { n: 'cartel', txt: ['esf-lineup'], chk: [] },
+  { n: 'flash', txt: ['esf-flash-code', 'esf-flash-valor', 'esf-flash-fecha'], chk: [] },
+  { n: 'banco', txt: ['esf-banco'], chk: [] },
+];
+
+function _esfExtrasContar() {
+  _esfExtrasVigilar();
+  let n = 0;
+  for (const g of _ESF_EXTRAS_GRUPOS) {
+    const conTexto = g.txt.some((id) => (document.getElementById(id)?.value || '').trim() !== '');
+    const conChk = g.chk.some((id) => !!document.getElementById(id)?.checked);
+    if (conTexto || conChk) n++;
+  }
+  const el = document.getElementById('esf-extras-cuenta');
+  if (el) {
+    el.textContent = n ? ('(' + n + ' con dato)') : '';
+    el.classList.toggle('hay', n > 0);
+  }
+  return n;
+}
+
+// Se recuenta con CUALQUIER cambio dentro del pliegue: si no, el badge diría
+// una cosa mientras el formulario dice otra.
+//
+// ⚠️ Se engancha PEREZOSAMENTE, desde el primer conteo, y no en un IIFE al
+// cargar el script: cuando `kamehouse.js` se evalúa, el markup de Esferas puede
+// no existir todavía, y un vigilante que no encuentra su nodo no vuelve a
+// intentarlo — se quedaría mudo para siempre sin decir nada.
+function _esfExtrasVigilar() {
+  const body = document.getElementById('esf-extras-body');
+  if (!body || body.dataset.vigilado) return;
+  body.dataset.vigilado = '1';
+  body.addEventListener('input', _esfExtrasContar);
+  body.addEventListener('change', _esfExtrasContar);
+}
+
 // ═══ [ESF-CIERRE-FECHA] EL EVENTO DE CORRIDO ══════════════════════════════
 // Dura varios días SEGUIDOS y no se elige noche: se va a los tres. Es distinto
 // de las "fechas adicionales", que SÍ estrenan selector de día en el sitio —
@@ -19913,6 +19990,7 @@ function editarEsfera(slug) {
   _esfCorridoPreview();
   { const l = document.getElementById('esf-lineup'); if (l) l.value = row.lineup || ''; _esfLineupShow(row.lineup || ''); }
   _esfFlashPopulate(row.flash_promo);
+  { _esfExtrasCerrar(); _esfExtrasContar(); }   // [ESF-UX-1b] cerrado, pero anunciando
   set('esf-promo-code', row.promo_code || '');
   set('esf-promo-label', row.promo_label || '');
   { const d = document.getElementById('esf-deporte'); if (d) d.checked = !!row.deporte; }
@@ -19972,7 +20050,7 @@ function cancelarEdicionEsfera() {
       const si = document.getElementById('esf-static-img'); if (si) si.value = '';
       const it = document.getElementById('esf-img-texto'); if (it) it.value = '';
       const io_ = document.getElementById('esf-img-omitir'); if (io_) io_.checked = false;
-      _esfCorridoPreview(); }
+      _esfCorridoPreview(); _esfExtrasCerrar(); _esfExtrasContar(); }
   _esfClearHotel();
   _esfMapaClear();
   _esfFotoClear();

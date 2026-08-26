@@ -1443,7 +1443,28 @@
          —la lección de E3— y desde esta tuerca el compilador emite `banco`
          desde la columna. Sin este selector, un evento de Banamex editado
          aquí se publicaría en BBVA. -->
-    <!-- [ESF-CAMPOS-1] Tres campos chicos que bloqueaban a 13 eventos vivos.
+        <!-- ═══ [ESF-UX-1b] LO AVANZADO, PLEGADO ═══════════════════════════════
+         Medido en ESF-UX-1: estos seis grupos son 849px y 18 de los 48 campos,
+         y estaban plantados ENTRE "dónde es" y "cómo está". No fue una decisión
+         de diseño: cada tuerca de ESF-CIERRE entró antes de `esf-status`, que
+         era el punto de inserción cómodo.
+
+         ⚠️ NACE CERRADO Y NO RECUERDA. Si recordara, quedaría abierto para
+         siempre a la primera vez que alguien lo abre, y el pliegue dejaría de
+         servir. Lo que sí hace es ANUNCIAR si trae contenido — la lección de
+         `promo_code`: lo plegado SE OLVIDA al editar, así que el encabezado
+         tiene que decir que hay algo dentro. -->
+    <div class="esf-plegable">
+     <div id="esf-extras-head" class="esf-plegable-head" role="button" tabindex="0"
+          aria-expanded="false" aria-controls="esf-extras-body"
+          onclick="_esfExtrasToggle()"
+          onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();_esfExtrasToggle()}">
+      <span id="esf-extras-chev">▸</span>
+      <span>// EXTRAS</span>
+      <span id="esf-extras-cuenta" class="esf-plegable-badge"></span>
+     </div>
+     <div id="esf-extras-body" style="display:none">
+<!-- [ESF-CAMPOS-1] Tres campos chicos que bloqueaban a 13 eventos vivos.
          Van juntos porque son la misma clase de cosa: apuntes del evento que
          el sitio lee, no precios ni fechas. -->
     <div class="form-group">
@@ -1532,7 +1553,9 @@
      </select>
      <div style="font-size:11px;color:var(--ts);margin-top:4px">Vacío = el evento no dice banco y el sitio usa <b>BBVA</b>, que es su default de siempre. Elegirlo explícitamente solo hace falta para <b>Banamex</b>.</div>
     </div>
-    <div class="form-group">
+         </div>
+    </div>
+<div class="form-group">
      <label>Status</label>
      <select class="cot-input" id="esf-status" style="width:100%">
       <option value="">Disponible</option>

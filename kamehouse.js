@@ -17756,6 +17756,37 @@ const _ESF_PROMO_PINTA = {
 // otras cuatro cada vez que Memo cambia de chip. El texto va debajo del nombre,
 // en la misma celda: la tabla no se mueve y el dato se ve sin abrir la fila —
 // que es para lo que se pidió el chip.
+// ═══ [ESF-UX-3c] LA COLUMNA HABLA DE LA PROMO ═════════════════════════════
+// ESF-UX-3 puso el estado bajo el nombre, y la captura enseñó lo que faltaba:
+// la columna Status seguía diciendo "Disponible" a la derecha de un "○ VENCIDA"
+// — los dos hechos ciertos, uno al lado del otro, y justo la confusión que la
+// tuerca venía a quitar.
+//
+// En ESTA vista la columna habla de la PROMO y el tour baja a un renglón chico.
+// No se agrega una sexta columna: se le cambia el CONTENIDO a la que ya está,
+// así las cinco siguen alineadas al cambiar de chip.
+//
+// ⚠️ EL DEL TOUR NO SE BORRA, se subordina. Sigue siendo un dato que Memo
+// necesita —una promo viva sobre un evento agotado es una decisión— y esconderlo
+// sería cambiar una confusión por una pérdida.
+function _esfPromoColumna(e) {
+  const tour = (e.status === 'agotado') ? 'agotado' : (e.status || 'disponible');
+  const arriba = _esfPromoEstados(e).map((s) => {
+    const p = _ESF_PROMO_PINTA[s.k] || _ESF_PROMO_PINTA.nose;
+    // El veredicto arriba, en grande; el "hasta cuándo" abajo, en gris. Leído
+    // en columna, lo que se escanea es la primera palabra.
+    const t = String(s.t).split(' · ');
+    return '<div data-esf-promo-estado="' + s.k + '" data-esf-promo-fuente="' + s.fuente + '"' +
+      ' style="color:' + p.color + ';font-weight:700;white-space:nowrap">' +
+      p.punto + ' ' + _esfEsc(t[0]) + '</div>' +
+      (t.length > 1
+        ? '<div style="color:var(--ts);font-weight:400;font-size:10px;white-space:nowrap">' + _esfEsc(t.slice(1).join(' · ')) + '</div>'
+        : '');
+  }).join('');
+  return arriba +
+    '<div data-esf-tour style="color:var(--ts2);font-size:10px;margin-top:5px;white-space:nowrap">tour: ' + _esfEsc(tour) + '</div>';
+}
+
 function _esfPromoFila(e) {
   if (_esfFiltroFecha !== 'promo') return '';
   const partes = _esfPromoPartes(e, { sinVence: true });
@@ -17771,8 +17802,9 @@ function _esfPromoFila(e) {
       ' style="color:' + p.color + ';font-weight:700;margin-right:10px;white-space:nowrap">' +
       p.punto + ' ' + quien + (s.code ? ' ' + _esfEsc(s.code) : '') + ' ' + _esfEsc(s.t) + '</span>';
   }).join('');
-  return (estados ? '<div style="' + mono + ';margin-top:4px">' + estados + '</div>' : '') +
-    '<div style="' + mono + ';color:var(--orange);margin-top:2px">' + partes.map(_esfEsc).join(' · ') + '</div>';
+  // [ESF-UX-3c] El estado se MUDÓ a la columna. Dejarlo también aquí sería el
+  // mismo veredicto dos veces en la misma fila.
+  return '<div style="' + mono + ';color:var(--orange);margin-top:3px">' + partes.map(_esfEsc).join(' · ') + '</div>';
 }
 
 // [ESF-LISTA-2] La coincidencia del buscador. Mira NOMBRE, SLUG y TÍTULO: son
@@ -17929,7 +17961,7 @@ function _esfPintarLista() {
   // como enseñó COB-MIG-1— sino que mide el ALTO REAL de la fila de detalle y
   // pregunta a `elementFromPoint` si de verdad se ve.
   cont.innerHTML = `<div class="table-wrap"><table>
-    <thead><tr><th style="width:34px"></th><th>Nombre</th><th>Fecha</th><th>Status</th><th>Publicado</th></tr></thead>
+    <thead><tr><th style="width:34px"></th><th>Nombre</th><th>Fecha</th><th>${_esfFiltroFecha === 'promo' ? 'Promo' : 'Status'}</th><th>Publicado</th></tr></thead>
     <tbody>${visibles.map(e => {
       const s = _esfEsc(e.slug);
       const pasado = _evGrupoOrden(_esfComoEvento(e), hoy) === 2;
@@ -17939,7 +17971,7 @@ function _esfPintarLista() {
         <td class="esf-chev" style="color:var(--ts);font-size:13px">▸</td>
         <td style="font-weight:600">${_esfEsc(e.nombre)}${_esfPromoFila(e)}</td>
         <td style="font-size:12px${pasado ? ';color:var(--ts)' : ''}">${_esfEsc(e.fecha_inicio) || '—'}</td>
-        <td style="font-size:11px;color:${(e.status === 'agotado') ? 'var(--red)' : 'var(--orange)'}">${_esfEsc(e.status) || 'Disponible'}</td>
+        <td style="font-size:11px;color:${(e.status === 'agotado') ? 'var(--red)' : 'var(--orange)'}">${_esfFiltroFecha === 'promo' ? _esfPromoColumna(e) : (_esfEsc(e.status) || 'Disponible')}</td>
         <td>${e.archivado
           ? '<span class="badge badge-gray" style="border-color:var(--orange);color:var(--orange)" title="Registro de un evento ya ocurrido. No se puede publicar.">archivo</span>'
           : (e.publicado ? '<span class="badge badge-green">publicado</span>' : '<span class="badge badge-gray">borrador</span>')}</td>

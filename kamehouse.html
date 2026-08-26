@@ -1464,6 +1464,22 @@
      <input class="cot-input" id="esf-music-search" placeholder="Buscar música como… (ej. «Siddhartha»)" autocomplete="off" style="width:100%;margin-top:8px">
      <div style="font-size:11px;color:var(--ts);margin-top:4px">El texto de música solo hace falta cuando el <b>nombre del evento no da con el artista</b> — como «Siddharta - Tú y Yo Tour», que se busca como «Siddhartha». Vacío = se busca por el nombre.</div>
     </div>
+    <!-- [ESF-CIERRE-LINEUP] El cartel. Acepta las DOS formas que el catálogo
+         ya usa: una llave de `lineups.js` (los 12 de siempre) o una imagen
+         subida aquí. Reusa `esferas-subir-imagen` tipo:'lineup', que el panel
+         de festival ya usaba — no hay endpoint nuevo. -->
+    <div class="form-group" id="esf-grp-lineup">
+     <label>Cartel / Line Up</label>
+     <input type="file" id="esf-lineup-file" accept="image/*" style="display:none" onchange="_esfLineupPick(event)">
+     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <button class="btn btn-ghost" type="button" onclick="document.getElementById('esf-lineup-file').click()">Subir cartel</button>
+      <button class="btn btn-ghost" type="button" id="esf-lineup-clear" style="display:none" onclick="_esfLineupClear()">Quitar</button>
+      <span id="esf-lineup-status" style="font-size:11px;color:var(--ts)"></span>
+     </div>
+     <input class="cot-input" id="esf-lineup" placeholder="…o la llave de lineups.js (ej. machaca)" autocomplete="off" style="width:100%;margin-top:8px" oninput="_esfLineupShow(this.value)">
+     <div id="esf-lineup-preview" style="display:none;margin-top:8px"><img id="esf-lineup-img" alt="" style="max-width:100%;border-radius:var(--r-sm,8px)"></div>
+     <div style="font-size:11px;color:var(--ts);margin-top:4px">Vacío = <b>este evento no tiene cartel</b> y el sitio no pinta el botón «Ver Line Up».</div>
+    </div>
     <!-- [ESF-FLASH-1] El código de descuento flash. Bloqueaba a 14 eventos
          vivos y era el último campo grande del mapa. -->
     <div class="form-group">

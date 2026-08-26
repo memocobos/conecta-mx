@@ -18328,6 +18328,7 @@ async function crearEsferaEvento() {
     banco: document.getElementById('esf-banco')?.value || null,
     // [ESF-CAMPOS-1] Los tres apuntes.
     promo: !!document.getElementById('esf-promo')?.checked,
+    lineup: document.getElementById('esf-lineup')?.value.trim() || null,
     flash_promo: _esfGetFlash(),
     promo_code: document.getElementById('esf-promo-code')?.value.trim() || null,
     promo_label: document.getElementById('esf-promo-label')?.value.trim() || null,
@@ -18369,7 +18370,7 @@ async function crearEsferaEvento() {
       const m = document.getElementById('esf-music-search'); if (m) m.value = '';
       const pc = document.getElementById('esf-promo-code'); if (pc) pc.value = '';
       const pl = document.getElementById('esf-promo-label'); if (pl) pl.value = ''; 
-      _esfFlashClear(); }
+      _esfFlashClear(); _esfLineupClear(); }
     _esfClearHotel();
     _esfMapaClear();
     _esfFotoClear();
@@ -19414,6 +19415,53 @@ function _esfHotelToggle() {
   }
 }
 // Devuelve el objeto {custom,total,items} o null (toggle apagado = default ciudad).
+// ═══ [ESF-CIERRE-LINEUP] EL CARTEL ════════════════════════════════════════
+// Un solo campo que acepta las DOS formas del catálogo: una llave de
+// `lineups.js` o una URL. Subir una imagen solo RELLENA el campo con su URL —
+// el dato sigue siendo uno, y así los 12 eventos que hoy usan llave siguen
+// funcionando sin tocarse.
+function _esfLineupShow(v) {
+  const val = (v || '').trim();
+  const prev = document.getElementById('esf-lineup-preview');
+  const img = document.getElementById('esf-lineup-img');
+  const clr = document.getElementById('esf-lineup-clear');
+  const esUrl = /^(https?:|data:)/.test(val);
+  if (img) img.src = esUrl ? val : '';
+  if (prev) prev.style.display = esUrl ? '' : 'none';
+  if (clr) clr.style.display = val ? '' : 'none';
+}
+
+function _esfLineupClear() {
+  const el = document.getElementById('esf-lineup'); if (el) el.value = '';
+  const st = document.getElementById('esf-lineup-status'); if (st) st.textContent = '';
+  _esfLineupShow('');
+}
+
+// Reusa `esferas-subir-imagen` tipo:'lineup' —el mismo del panel de festival— y
+// su re-escalado. No hay endpoint nuevo que auditar.
+async function _esfLineupPick(event) {
+  const f = event && event.target && event.target.files && event.target.files[0];
+  if (!f) return;
+  const slug = (document.getElementById('esf-slug')?.value || '').trim().toLowerCase();
+  if (!slug) { showToast('Primero pon el slug del evento', 'error'); event.target.value = ''; return; }
+  const st = document.getElementById('esf-lineup-status');
+  if (st) st.textContent = 'Subiendo…';
+  try {
+    const dataUrl = await _esfMapaResize(f);
+    const r = await khAdminFetch('/.netlify/functions/esferas-subir-imagen', {
+      method: 'POST', body: JSON.stringify({ slug, dataUrl, tipo: 'lineup' }),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok || !d.url) throw new Error(d.error || ('Error ' + r.status));
+    const el = document.getElementById('esf-lineup'); if (el) el.value = d.url;
+    _esfLineupShow(d.url);
+    if (st) st.textContent = 'Listo';
+  } catch (e) {
+    if (st) st.textContent = '';
+    showToast(e.message, 'error');
+  } finally { event.target.value = ''; }
+}
+
 // ═══ [ESF-FLASH-1] EL CÓDIGO DE DESCUENTO FLASH ═══════════════════════════
 // 🔒 LA REGLA DEL HUSO, que es de donde salen los errores: lo que Memo teclea se
 // lee en hora de REYNOSA (−05:00), que sigue el horario de EE.UU. y NO el de
@@ -19780,6 +19828,7 @@ function editarEsfera(slug) {
   if (Array.isArray(_cz)) _cz.forEach((z) => { if (z && typeof z === 'object') _esfAddCheapZona(z); });
   set('esf-banco', row.banco || '');
   { const p = document.getElementById('esf-promo'); if (p) p.checked = !!row.promo; }
+  { const l = document.getElementById('esf-lineup'); if (l) l.value = row.lineup || ''; _esfLineupShow(row.lineup || ''); }
   _esfFlashPopulate(row.flash_promo);
   set('esf-promo-code', row.promo_code || '');
   set('esf-promo-label', row.promo_label || '');
@@ -19834,7 +19883,7 @@ function cancelarEdicionEsfera() {
       const m = document.getElementById('esf-music-search'); if (m) m.value = '';
       const pc = document.getElementById('esf-promo-code'); if (pc) pc.value = '';
       const pl = document.getElementById('esf-promo-label'); if (pl) pl.value = ''; 
-      _esfFlashClear(); }
+      _esfFlashClear(); _esfLineupClear(); }
   _esfClearHotel();
   _esfMapaClear();
   _esfFotoClear();
@@ -19878,6 +19927,7 @@ async function guardarCambiosEsfera() {
     banco: document.getElementById('esf-banco')?.value || null,
     // [ESF-CAMPOS-1] Los tres apuntes.
     promo: !!document.getElementById('esf-promo')?.checked,
+    lineup: document.getElementById('esf-lineup')?.value.trim() || null,
     flash_promo: _esfGetFlash(),
     promo_code: document.getElementById('esf-promo-code')?.value.trim() || null,
     promo_label: document.getElementById('esf-promo-label')?.value.trim() || null,

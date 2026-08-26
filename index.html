@@ -3176,7 +3176,7 @@ function renderCatalog(){
         // texto libre del catálogo, no solo el código.
         (ev.promo&&ev.promoCode&&!isPast&&!isAg?'<div class="ev-promo-badge">'+escHtml(ev.promoLabel||('USA CÓDIGO: '+ev.promoCode))+'</div>':'')+
         (ev.flashPromo&&!isPast&&!isAg&&Date.now()<ev.flashPromo.expiresTs?'<div class="ev-flash-badge" data-flash-expires="'+ev.flashPromo.expiresTs+'">USA CÓDIGO: '+ev.flashPromo.code+' · <span class="flash-timer"></span></div>':'')+
-        (ev.lineup&&LINEUPS[ev.lineup]?'<button class="ev-lineup-btn" data-lineup="'+ev.lineup+'" onclick="event.stopPropagation();abrirLineup(\''+ev.lineup+'\',\''+ev.a.replace(/'/g,"\\'")+'\')">Ver Line Up</button>':'')+
+        (ev.lineup&&(_lineupSrc(ev.lineup))?'<button class="ev-lineup-btn" data-lineup="'+ev.lineup+'" onclick="event.stopPropagation();abrirLineup(\''+ev.lineup+'\',\''+ev.a.replace(/'/g,"\\'")+'\')">Ver Line Up</button>':'')+
       '</div>';
     if(!isPast&&!isAg){
       (function(evv,sv,proc,nf,proxi){
@@ -5758,13 +5758,23 @@ function cerrarModalPago(){
   document.getElementById('pago-modal-bg').style.display='none';
 }
 
+// [ESF-CIERRE-LINEUP] El cartel puede venir de DOS maneras: una llave de
+// `lineups.js` (los 12 de siempre) o una URL directa (lo que sube Esferas).
+// Es EXACTAMENTE el mismo truco que `staticImg` ya usa unas líneas arriba —
+// `http`/`data:` es la imagen, lo demás es llave— y no un patrón nuevo.
+function _lineupSrc(v){
+  if(!v||typeof v!=='string')return null;
+  if(v.indexOf('http')===0||v.indexOf('data:')===0)return v;
+  return (typeof LINEUPS!=='undefined'&&LINEUPS)?(LINEUPS[v]||null):null;
+}
 function abrirLineup(id,nombre){
-  // Guards: LINEUPS disponible + id válido
-  if(typeof LINEUPS==='undefined'||!LINEUPS||!id||!LINEUPS[id])return;
+  // Guards: id resoluble (llave conocida o URL directa)
+  var src=_lineupSrc(id);
+  if(!src)return;
   var img=document.getElementById('lineup-img');
   var title=document.getElementById('lineup-title');
   var modal=document.getElementById('lineup-modal');
-  if(img) img.src=LINEUPS[id];
+  if(img) img.src=src;
   if(title) title.textContent='Line Up — '+(nombre||'');
   if(modal) modal.style.display='flex';
 }

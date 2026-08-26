@@ -46,6 +46,7 @@ const CAMPOS_EDITABLES = new Set(['nombre', 'titulo', 'fecha_inicio', 'ciudad', 
   // [ESF-CAMPOS-1] Tres campos chicos que bloqueaban a 13 eventos vivos.
   'promo', 'promo_code', 'promo_label', 'deporte', 'music_search',
   'flash_promo',   // [ESF-FLASH-1] el objeto entero, en JSON.
+  'lineup',        // [ESF-CIERRE-LINEUP] llave de lineups.js o URL.
   // [ESF-E1e] las banderas de paquete (nivel 3 de la granularidad)
   'ride_only', 'cheap_only', 'no_stay', 'no_cheap', 'no_bus', 'cheap_soon', 'cheap_also_ok']);
 
@@ -269,6 +270,9 @@ exports.handler = async (event) => {
     }
     if (k === 'promo_code') { sane[k] = (typeof v === 'string' && v.trim()) ? v.trim().slice(0, 40) : null; continue; }
     if (k === 'promo_label') { sane[k] = (typeof v === 'string' && v.trim()) ? v.trim().slice(0, 160) : null; continue; }
+    // El cartel: llave corta o URL. Se recorta largo, no forma — validar que
+    // "parece URL" rechazaría las llaves, que son la mitad de los casos.
+    if (k === 'lineup') { sane[k] = (typeof v === 'string' && v.trim()) ? v.trim().slice(0, 300) : null; continue; }
     if (k === 'music_search') { sane[k] = (typeof v === 'string' && v.trim()) ? v.trim().slice(0, 120) : null; continue; }
     if (k === 'multifecha') {
       const filas = parseMultifecha(v);

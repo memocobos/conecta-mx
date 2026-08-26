@@ -17541,7 +17541,89 @@ function _esfPasaFiltro(adaptado, filtro, hoy, fila) {
   // historia, no una decisión pendiente. Memo lo usa para revisar si revive el
   // evento o compra más boletos — y eso solo tiene sentido si aún no ocurre.
   if (filtro === 'agotado') return g !== 2 && String((fila && fila.status) || '') === 'agotado';
+  // [ESF-UX-2] PROMOS. Corte de CAPTURA: trae promo escrita en Esferas.
+  //
+  // ⚠️ Los ARCHIVADOS quedan fuera, y no por estética: un archivo es el registro
+  // de un evento cuyo `index.html` sigue siendo la fuente de verdad — no se
+  // puede publicar ni gobernar desde aquí, así que ofrecer "edita su promo"
+  // sería ofrecer una edición que no llega a ninguna parte.
+  //
+  // Los PASADOS no archivados SÍ entran: son filas gobernables de verdad, y una
+  // promo colgada de un evento que ya ocurrió es justo lo que hay que ver para
+  // retirarla. Si algún día estorban, el chip // pasados ya existe para eso.
+  if (filtro === 'promo') return !(fila && fila.archivado) && _esfTienePromo(fila);
   return true;
+}
+
+// ═══ [ESF-UX-2] QUÉ PROMO TRAE UNA FILA ═══════════════════════════════════
+// UNA sola función contesta las dos preguntas del chip —¿cuenta? y ¿qué dice?—
+// porque son la misma pregunta: si hay algo que enseñar, cuenta. Partirlas en
+// un "tienePromo" y un "pintaPromo" independientes es como se llega a un chip
+// que dice (6) y a una lista que enseña 5 letreros.
+//
+// Tres campos, tres formas: `promo_code` es texto, `promo_label` es texto, y
+// `flash_promo` es un JSON que llega como string desde Supabase y como objeto
+// recién guardado desde el formulario. Los tres se leen aquí; nadie más los
+// interpreta para la lista.
+function _esfPromoFlashObj(raw) {
+  let o = raw;
+  if (typeof o === 'string') {
+    const t = o.trim();
+    if (!t || t === 'null') return null;
+    try { o = JSON.parse(t); } catch (_) { return null; }
+  }
+  if (!o || typeof o !== 'object' || Array.isArray(o)) return null;
+  return Object.keys(o).length ? o : null;
+}
+
+// El vencimiento del flash se lee EN REYNOSA (−05:00 todo el año), la misma
+// regla con la que se teclea en el formulario. Pintarlo en la hora del
+// navegador enseñaría un vencimiento distinto al que Memo escribió.
+function _esfPromoFlashVence(o) {
+  const ts = Number(o && o.expiresTs);
+  if (!Number.isFinite(ts)) return '';
+  try {
+    return new Date(ts).toLocaleString('sv-SE', { timeZone: 'America/Cancun' }).slice(0, 16);
+  } catch (_) { return ''; }
+}
+
+// Devuelve [] si no trae promo, o los pedazos de letrero que la fila enseña.
+// El texto es el CAPTURADO, recortado, nunca un veredicto: esta función no
+// sabe —ni puede saber— si la promo sigue viva.
+function _esfPromoPartes(fila) {
+  if (!fila) return [];
+  const partes = [];
+  const code = String(fila.promo_code == null ? '' : fila.promo_code).trim();
+  const label = String(fila.promo_label == null ? '' : fila.promo_label).trim();
+  const flash = _esfPromoFlashObj(fila.flash_promo);
+  if (code) partes.push('⚑ ' + code);
+  if (label) partes.push(label.length > 72 ? label.slice(0, 71) + '…' : label);
+  if (flash) {
+    const fc = String(flash.code == null ? '' : flash.code).trim();
+    let t = '⚡ ' + (fc || 'flash');
+    if (Number.isFinite(Number(flash.pct)) && Number(flash.pct)) t += ' −' + Number(flash.pct) + '%';
+    else if (Number.isFinite(Number(flash.amount)) && Number(flash.amount)) t += ' −$' + Number(flash.amount);
+    const v = _esfPromoFlashVence(flash);
+    if (v) t += ' · vence ' + v;
+    partes.push(t);
+  }
+  return partes;
+}
+
+function _esfTienePromo(fila) { return _esfPromoPartes(fila).length > 0; }
+
+// El letrero DENTRO de la fila, y SOLO en la vista de promos. La lista tiene
+// cinco columnas fijas; meter una sexta que aparece y desaparece movería las
+// otras cuatro cada vez que Memo cambia de chip. El texto va debajo del nombre,
+// en la misma celda: la tabla no se mueve y el dato se ve sin abrir la fila —
+// que es para lo que se pidió el chip.
+function _esfPromoFila(e) {
+  if (_esfFiltroFecha !== 'promo') return '';
+  const partes = _esfPromoPartes(e);
+  if (!partes.length) return '';
+  return '<div style="font-family:\'JetBrains Mono\',monospace;font-size:10px;font-weight:400;' +
+    'color:var(--orange);margin-top:3px;line-height:1.5;white-space:normal">' +
+    partes.map(_esfEsc).join(' · ') + '</div>';
 }
 
 // [ESF-LISTA-2] La coincidencia del buscador. Mira NOMBRE, SLUG y TÍTULO: son
@@ -17644,12 +17726,17 @@ function _esfPintarLista() {
   // Los conteos van EN los chips: sin ellos, "próximos" vacío se lee como "la
   // lista no cargó" en vez de "no hay ninguno". Se cuentan SIN el buscador:
   // el chip dice cuántos hay de cada clase, no cuántos sobreviven al texto.
-  const cuenta = { proximo: 0, pasado: 0, agotado: 0 };
+  const cuenta = { proximo: 0, pasado: 0, agotado: 0, promo: 0 };
   ordenados.forEach((a) => {
     const g = _evGrupoOrden(a, hoy);
+    const fila = porSlug[a.__slug] || {};
+    // [ESF-UX-2] El conteo de promos sale del MISMO juez que el filtro
+    // (`_esfPasaFiltro`), no de una copia de la regla escrita aquí: dos reglas
+    // gemelas es como el chip acaba diciendo un número que la lista no enseña.
+    if (_esfPasaFiltro(a, 'promo', hoy, fila)) cuenta.promo++;
     if (g === 2) { cuenta.pasado++; return; }
     cuenta.proximo++;
-    if (String((porSlug[a.__slug] || {}).status || '') === 'agotado') cuenta.agotado++;
+    if (String(fila.status || '') === 'agotado') cuenta.agotado++;
   });
   // [ESF-LISTA-3] El conteo del encabezado, visible aun con la sección cerrada.
   _esfSeccionConteo(filas.length);
@@ -17657,6 +17744,7 @@ function _esfPintarLista() {
   const rot = (id, txt, n) => { const b = document.getElementById(id); if (b) b.textContent = txt + ' (' + n + ')'; };
   rot('esff-proximos', '// próximos', cuenta.proximo);
   rot('esff-agotados', '// agotados', cuenta.agotado);
+  rot('esff-promos', '// promos', cuenta.promo);
   rot('esff-pasados', '// pasados', cuenta.pasado);
   rot('esff-todos', '// todos', ordenados.length);
 
@@ -17667,7 +17755,7 @@ function _esfPintarLista() {
   if (!visibles.length) {
     // Se dice CUÁNTOS hay del otro lado: una lista vacía es una afirmación, y
     // sin el número no se sabe si no hay, o si el filtro o el texto los taparon.
-    const etq = { pasado: 'pasado', agotado: 'próximo y agotado', proximo: 'próximo', todos: '' };
+    const etq = { pasado: 'pasado', agotado: 'próximo y agotado', proximo: 'próximo', promo: 'con promo capturada', todos: '' };
     const total = cuenta.proximo + cuenta.pasado;
     cont.innerHTML = '<div class="empty-state"><div class="empty-icon">·</div>' +
       (_esfBusca
@@ -17695,7 +17783,7 @@ function _esfPintarLista() {
           style="cursor:pointer" onclick="_esfFilaToggle('${s}')"
           onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();_esfFilaToggle('${s}')}">
         <td class="esf-chev" style="color:var(--ts);font-size:13px">▸</td>
-        <td style="font-weight:600">${_esfEsc(e.nombre)}</td>
+        <td style="font-weight:600">${_esfEsc(e.nombre)}${_esfPromoFila(e)}</td>
         <td style="font-size:12px${pasado ? ';color:var(--ts)' : ''}">${_esfEsc(e.fecha_inicio) || '—'}</td>
         <td style="font-size:11px;color:${(e.status === 'agotado') ? 'var(--red)' : 'var(--orange)'}">${_esfEsc(e.status) || 'Disponible'}</td>
         <td>${e.archivado

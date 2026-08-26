@@ -18328,6 +18328,9 @@ async function crearEsferaEvento() {
     banco: document.getElementById('esf-banco')?.value || null,
     // [ESF-CAMPOS-1] Los tres apuntes.
     promo: !!document.getElementById('esf-promo')?.checked,
+    static_img: document.getElementById('esf-static-img')?.value.trim() || null,
+    img_texto: document.getElementById('esf-img-texto')?.value.trim() || null,
+    img_omitir: !!document.getElementById('esf-img-omitir')?.checked,
     fecha_fin: document.getElementById('esf-fecha-fin')?.value || null,
     f_texto: document.getElementById('esf-f-texto')?.value.trim() || null,
     lineup: document.getElementById('esf-lineup')?.value.trim() || null,
@@ -18375,6 +18378,9 @@ async function crearEsferaEvento() {
       _esfFlashClear(); _esfLineupClear();
       const ff = document.getElementById('esf-fecha-fin'); if (ff) ff.value = '';
       const ft = document.getElementById('esf-f-texto'); if (ft) ft.value = '';
+      const si = document.getElementById('esf-static-img'); if (si) si.value = '';
+      const it = document.getElementById('esf-img-texto'); if (it) it.value = '';
+      const io_ = document.getElementById('esf-img-omitir'); if (io_) io_.checked = false;
       _esfCorridoPreview(); }
     _esfClearHotel();
     _esfMapaClear();
@@ -19899,6 +19905,9 @@ function editarEsfera(slug) {
   if (Array.isArray(_cz)) _cz.forEach((z) => { if (z && typeof z === 'object') _esfAddCheapZona(z); });
   set('esf-banco', row.banco || '');
   { const p = document.getElementById('esf-promo'); if (p) p.checked = !!row.promo; }
+  set('esf-static-img', row.static_img || '');
+  set('esf-img-texto', row.img_texto || '');
+  { const io_ = document.getElementById('esf-img-omitir'); if (io_) io_.checked = !!row.img_omitir; }
   set('esf-fecha-fin', (row.fecha_fin || '').slice(0, 10));
   set('esf-f-texto', row.f_texto || '');
   _esfCorridoPreview();
@@ -19960,6 +19969,9 @@ function cancelarEdicionEsfera() {
       _esfFlashClear(); _esfLineupClear();
       const ff = document.getElementById('esf-fecha-fin'); if (ff) ff.value = '';
       const ft = document.getElementById('esf-f-texto'); if (ft) ft.value = '';
+      const si = document.getElementById('esf-static-img'); if (si) si.value = '';
+      const it = document.getElementById('esf-img-texto'); if (it) it.value = '';
+      const io_ = document.getElementById('esf-img-omitir'); if (io_) io_.checked = false;
       _esfCorridoPreview(); }
   _esfClearHotel();
   _esfMapaClear();
@@ -20004,6 +20016,9 @@ async function guardarCambiosEsfera() {
     banco: document.getElementById('esf-banco')?.value || null,
     // [ESF-CAMPOS-1] Los tres apuntes.
     promo: !!document.getElementById('esf-promo')?.checked,
+    static_img: document.getElementById('esf-static-img')?.value.trim() || null,
+    img_texto: document.getElementById('esf-img-texto')?.value.trim() || null,
+    img_omitir: !!document.getElementById('esf-img-omitir')?.checked,
     fecha_fin: document.getElementById('esf-fecha-fin')?.value || null,
     f_texto: document.getElementById('esf-f-texto')?.value.trim() || null,
     lineup: document.getElementById('esf-lineup')?.value.trim() || null,

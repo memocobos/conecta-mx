@@ -1464,6 +1464,18 @@
      <input class="cot-input" id="esf-music-search" placeholder="Buscar música como… (ej. «Siddhartha»)" autocomplete="off" style="width:100%;margin-top:8px">
      <div style="font-size:11px;color:var(--ts);margin-top:4px">El texto de música solo hace falta cuando el <b>nombre del evento no da con el artista</b> — como «Siddharta - Tú y Yo Tour», que se busca como «Siddhartha». Vacío = se busca por el nombre.</div>
     </div>
+    <!-- [ESF-CIERRE-COLAS] La imagen del evento. Son DOS cosas: la IMAGEN
+         (subida arriba, o una llave de `imgs.js`) y el NOMBRE con el que el
+         sitio busca una portada cuando no hay estática. -->
+    <div class="form-group" id="esf-grp-img">
+     <label>Imagen del catálogo <span style="font-weight:400;color:var(--ts);font-size:11px">— avanzado</span></label>
+     <input class="cot-input" id="esf-static-img" placeholder="Llave de imgs.js (ej. machaca) — vacío si subiste foto arriba" autocomplete="off" style="width:100%">
+     <input class="cot-input" id="esf-img-texto" placeholder="Nombre con el que buscar la portada (si difiere del nombre)" autocomplete="off" style="width:100%;margin-top:6px">
+     <label style="display:flex;align-items:center;gap:8px;font-size:12px;cursor:pointer;margin-top:6px">
+      <input type="checkbox" id="esf-img-omitir"> No buscar portada automática
+     </label>
+     <div style="font-size:11px;color:var(--ts);margin-top:4px">Casi ningún evento necesita esto: si subiste una foto arriba, ya está. Sirve para los que usan una imagen del repo (<code>imgs/</code>).</div>
+    </div>
     <!-- [ESF-CIERRE-FECHA] El evento DE CORRIDO: dura varios días seguidos y no
          se elige noche. Es distinto de las "fechas adicionales" de arriba, que
          SÍ estrenan selector de día en el sitio. -->

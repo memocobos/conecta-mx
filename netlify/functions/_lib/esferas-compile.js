@@ -920,9 +920,31 @@ function generarObj(esfera, hoy) {
   const notaSeg = esfera.nota ? (",nota:'" + escStr(esfera.nota) + "'") : '';
   // Foto (portada manual del concierto) → staticImg + img:false; si no → img:'<nombre>'
   // (byte-igual a hoy). Mismo molde que el branch de festival (fest.portada).
-  const imgSeg = esfera.foto
-    ? ("staticImg:'" + escStr(esfera.foto) + "',img:false,")
-    : ("img:'" + escStr(nombre) + "',");
+  // ═══ [ESF-CIERRE-COLAS] `staticImg` e `img` SON DOS CAMPOS, no uno ═════════
+  // El compilador los derivaba los dos de `foto`, y por eso solo sabía escribir
+  // DOS de las SEIS combinaciones que el catálogo usa de verdad:
+  //
+  //   88  img:'<nombre>'                          ← el default de siempre
+  //    2  staticImg:'<URL>',img:false             ← `foto` (julionrodep, natanael)
+  //    6  staticImg:'<llave>'   (SIN img)         ← machaca, emblema, t3r…
+  //    2  staticImg:'<llave>',img:false           ← soyluna, knotfest
+  //    2  staticImg:'<llave>',img:'<texto>'       ← arre, pulsoquetaro
+  //    2  (ninguno de los dos)                    ← mendivil, miloj
+  //
+  // Qué es cada uno: `staticImg` es la IMAGEN (una llave de `imgs.js` o una URL);
+  // `img` es el NOMBRE CON EL QUE SE BUSCA una portada cuando no hay estática, y
+  // `img:false` significa "no busques". Ausente y `false` se comportan IGUAL en
+  // el sitio cuando hay imagen estática —lo dice la línea 3129 del index— pero el
+  // juez es semántico y una llave ausente no es una llave en `false`: por eso
+  // hacen falta los dos casos, y por eso `img_omitir` existe.
+  const _stat = (typeof esfera.foto === 'string' && esfera.foto.trim()) ? esfera.foto.trim()
+    : ((typeof esfera.static_img === 'string' && esfera.static_img.trim()) ? esfera.static_img.trim() : '');
+  const _imgTxt = (typeof esfera.img_texto === 'string' && esfera.img_texto.trim()) ? esfera.img_texto.trim() : '';
+  const _statSeg = _stat ? ("staticImg:'" + escStr(_stat) + "',") : '';
+  const imgSeg = _statSeg + (
+    esfera.img_omitir ? ''
+      : (_imgTxt ? ("img:'" + escStr(_imgTxt) + "',")
+        : (_stat ? 'img:false,' : ("img:'" + escStr(nombre) + "',"))));
   // ═══ [ESF-E1e] LAS BANDERAS DE PAQUETE, EN EL CAMINO DE CONCIERTO ═══════════
   // Hasta hoy este bloque SOLO existía en el camino de festival. Un concierto
   // gobernado no podía decir "este evento no vende STAY" — y `noStay` YA estaba

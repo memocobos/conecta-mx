@@ -53,6 +53,8 @@ const CAMPOS_PERMITIDOS = new Set([
   'promo', 'promo_code', 'promo_label', 'deporte', 'music_search',
   'flash_promo',   // [ESF-FLASH-1] el objeto entero, en JSON.
   'lineup',        // [ESF-CIERRE-LINEUP] llave de lineups.js o URL.
+  // [ESF-CIERRE-COLAS] La imagen y el nombre de búsqueda son DOS cosas.
+  'static_img', 'img_texto', 'img_omitir',
   // [ESF-CIERRE-FECHA] El evento de corrido: inicio + fin, sin selector de día.
   // `f_texto` es el override para cuando el cartel dice algo que ninguna regla
   // genera (warped escribe "12-13", no "12 y 13").
@@ -287,6 +289,9 @@ exports.handler = async (event) => {
     // El cartel: llave corta o URL. Se recorta largo, no forma — validar que
     // "parece URL" rechazaría las llaves, que son la mitad de los casos.
     if (k === 'f_texto') { sane[k] = (typeof v === 'string' && v.trim()) ? v.trim().slice(0, 80) : null; continue; }
+    if (k === 'static_img') { sane[k] = (typeof v === 'string' && v.trim()) ? v.trim().slice(0, 300) : null; continue; }
+    if (k === 'img_texto') { sane[k] = (typeof v === 'string' && v.trim()) ? v.trim().slice(0, 120) : null; continue; }
+    if (k === 'img_omitir') { sane[k] = (v === true || v === 1 || v === '1' || v === 'true'); continue; }
     if (k === 'lineup') { sane[k] = (typeof v === 'string' && v.trim()) ? v.trim().slice(0, 300) : null; continue; }
     if (k === 'music_search') { sane[k] = (typeof v === 'string' && v.trim()) ? v.trim().slice(0, 120) : null; continue; }
     if (k === 'multifecha') {

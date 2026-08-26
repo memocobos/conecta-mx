@@ -101,6 +101,8 @@ function evAEsfera(ev) {
     // [ESF-FLASH-1] El código flash viaja entero. Se serializa aquí y el
     // compilador lo vuelve a parsear: una sola forma de leerlo.
     flash_promo: (ev.flashPromo && typeof ev.flashPromo === 'object') ? JSON.stringify(ev.flashPromo) : null,
+    // [ESF-CIERRE-LINEUP] La llave o la URL del cartel, tal cual viene.
+    lineup: (typeof ev.lineup === 'string' && ev.lineup.trim()) ? ev.lineup.trim() : null,
     promo: ev.promo === true,
     promo_code: (typeof ev.promoCode === 'string' && ev.promoCode.trim()) ? ev.promoCode.trim() : null,
     promo_label: (typeof ev.promoLabel === 'string' && ev.promoLabel.trim()) ? ev.promoLabel.trim() : null,

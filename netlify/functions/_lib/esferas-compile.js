@@ -398,6 +398,26 @@ function flashPromoSeg(esfera) {
     '},';
 }
 
+// ═══ [ESF-CIERRE-LINEUP] EL CARTEL DEL FESTIVAL ═══════════════════════════
+// Bloqueaba a 9 eventos vivos. Ya se emitía en el camino de FESTIVAL (desde
+// `festival.lineup`), pero un CONCIERTO que lo trae —machaca, straykids,
+// knotfest, dalemix…— no tenía de dónde sacarlo.
+//
+// ⚠️ NO ES UNA URL, o no siempre: en el catálogo `lineup:'machaca'` es una LLAVE
+// del archivo `lineups.js`, que se mantiene a mano. Guardar solo URLs habría
+// roto los 12 que ya existen; guardar solo llaves habría dejado a Esferas sin
+// poder cerrar el círculo (subir una imagen y usarla).
+//
+// Se guardan LAS DOS COSAS en el mismo campo, que es exactamente lo que
+// `staticImg` ya hace en este catálogo desde hace tiempo: si empieza por `http`
+// o `data:` es la imagen; si no, es una llave de LINEUPS. El index aprende el
+// mismo truco en `abrirLineup` — no es un patrón nuevo, es el que ya vivía al
+// lado.
+function lineupConcSeg(esfera) {
+  const v = (typeof esfera.lineup === 'string') ? esfera.lineup.trim() : '';
+  return v ? ("lineup:'" + escStr(v) + "',") : '';
+}
+
 function zonasSegmento(esfera) {
   const rows = parseZonas(esfera.zonas);
   if (!rows.length) return 'zonas:[]';
@@ -910,7 +930,7 @@ function generarObj(esfera, hoy) {
     "'," + dsListStr +
     "v:'" + venue +
     "',st:'" + escStr(status) +
-    "'," + cdmx + mapa + flashPromoSeg(esfera) + flagsSeg +
+    "'," + cdmx + mapa + lineupConcSeg(esfera) + flashPromoSeg(esfera) + flagsSeg +
     incSeg + sepSeg + sepCheapSeg + rideSeg + notaSeg +
     bancoSeg + ',' +
     // [ESF-E1f] La multifecha va ANTES de las zonas, igual que en el camino de
@@ -1050,6 +1070,8 @@ const CAMPOS_DEL_COMPILADOR = new Set([
   // [ESF-CAMPOS-1] Se emiten, así que se declaran — la regla de ESF-FLAGS.
   'promo', 'promoCode', 'promoLabel', 'deporte', 'musicSearch',
   // [ESF-FLASH-1] Se emite, se declara.
+  // [ESF-CIERRE-LINEUP] `lineup` ya vivía aquí por el camino de festival; el
+  // concierto solo aprendió a emitirlo. NO se toca la lista.
   'flashPromo', 'lineup', 'multifecha',
   // [ESF-E1a] Desde que Esferas sabe emitirlos, los GOBIERNA: si no entraran
   // aquí, `fusionarConViejo` los conservaría del index viejo y habría dos

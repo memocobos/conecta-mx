@@ -19434,6 +19434,35 @@ function _esfHotelToggle() {
   }
 }
 // Devuelve el objeto {custom,total,items} o null (toggle apagado = default ciudad).
+// ═══ [ESF-UX-1d] LOS TRES VERBOS DE LA BARRA ══════════════════════════════
+// ESF-UX-1 midió que traer del catálogo costaba 7 pantallas de scroll y publicar
+// otras 7. No eran trabajos difíciles: estaban LEJOS, debajo de todo.
+//
+// ⚠️ ESTOS BOTONES NO DUPLICAN LÓGICA. Llaman a las mismas funciones de siempre
+// y bajan a su panel para que el resultado se VEA — un botón que dispara algo
+// cuyo resultado se pinta 5,000px más abajo se siente roto aunque funcione.
+// Duplicar el disparador está bien; duplicar la regla, nunca.
+function _esfIrAlFormulario() {
+  const col = document.querySelector('#page-esferas .esf-col-form');
+  if (col) col.scrollIntoView({ block: 'start', behavior: 'smooth' });
+  // Si venía de editar, se limpia: "Nuevo evento" tiene que dar un evento nuevo.
+  if (window._esfEditSlug && typeof cancelarEdicionEsfera === 'function') cancelarEdicionEsfera();
+  const slug = document.getElementById('esf-slug');
+  if (slug) setTimeout(() => slug.focus(), 350);
+}
+
+function _esfBarraTraer() {
+  const caja = document.getElementById('esf-import-caja');
+  if (caja) caja.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  if (typeof importarDelCatalogo === 'function') importarDelCatalogo();
+}
+
+function _esfBarraPublicar() {
+  const panel = document.getElementById('esf-dryrun-panel');
+  if (panel) panel.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  if (typeof publicarEsferas === 'function') publicarEsferas();
+}
+
 // ═══ [ESF-UX-1c] LAS PESTAÑAS DEL FORMULARIO ══════════════════════════════
 // Pestañas y NO pasos, y el número lo decidió: ESF-UX-1 midió que EDITAR es el
 // trabajo frecuente (b) y CREAR el raro (a). Un asistente por pasos ayuda a

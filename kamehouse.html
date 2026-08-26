@@ -1388,6 +1388,82 @@
   </div>
 
   
+  <!-- ═══ [ESF-UX-1d] LA BARRA DE TRABAJO ═══════════════════════════════════
+       ESF-UX-1 midió que traer del catálogo costaba 7 pantallas de scroll y
+       publicar otras 7: los dos botones vivían DEBAJO de todo. No eran trabajos
+       difíciles — estaban lejos.
+       Los botones de aquí NO duplican lógica: llaman a las mismas funciones de
+       siempre y bajan a su panel para que el resultado se vea. Duplicar el
+       disparador está bien; duplicar la regla, nunca. -->
+  <div class="esf-barra">
+   <button class="btn btn-ghost" type="button" onclick="_esfIrAlFormulario()"><svg class="ic"><use href="#ic-mas"/></svg> Nuevo evento</button>
+   <span class="esf-barra-sep"></span>
+   <button class="btn btn-ghost" type="button" onclick="_esfBarraTraer()"><svg class="ic"><use href="#ic-eventos"/></svg> Traer del catálogo</button>
+   <button class="btn btn-primary" type="button" style="margin-left:auto" onclick="_esfBarraPublicar()">Publicar al sitio</button>
+  </div>
+<div class="esf-below">
+   <!-- Listado -->
+   <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:20px">
+    <!-- [ESF-LISTA-3] La SECCIÓN ENTERA se colapsa. #577 encogió cada fila; esto
+         quita la lista de en medio para llegar al importador, al publicar y a
+         las noticias sin bajar dos mil pixeles.
+         ⚠️ El conteo vive EN el encabezado y se ve TAMBIÉN cerrada: una sección
+         plegada que no dice cuánto guarda se lee como una sección vacía. -->
+    <div id="esf-listado-head" role="button" tabindex="0" aria-expanded="true" aria-controls="esf-listado-body"
+         onclick="_esfSeccionToggle()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();_esfSeccionToggle()}"
+         style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.15em;color:var(--ts);margin-bottom:14px;cursor:pointer;display:flex;align-items:center;gap:8px;user-select:none">
+     <span id="esf-listado-chev" style="font-size:13px">▾</span>
+     <span>// EVENTOS REGISTRADOS <span id="esf-listado-n"></span></span>
+    </div>
+    <div id="esf-listado-body">
+    <!-- [ESF-LISTA-1] Los mismos chips que Cápsula, con UNA diferencia: aquí el
+         default es // próximos. Un evento pasado no se gobierna, se recuerda —
+         y 42 de los 102 del catálogo ya pasaron. -->
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">
+     <button class="gz-filter active" id="esff-proximos" onclick="filtrarEsferasFecha('proximo',this)">// próximos</button>
+     <!-- [ESF-LISTA-2] Agotados, SOLO entre los próximos: Memo lo usa para
+          decidir si revive el evento o compra más boletos, y eso solo tiene
+          sentido si el evento aún no ocurre. -->
+     <button class="gz-filter" id="esff-agotados" onclick="filtrarEsferasFecha('agotado',this)" title="Próximos que están agotados — los que se pueden revivir o resurtir">// agotados</button>
+     <button class="gz-filter" id="esff-pasados" onclick="filtrarEsferasFecha('pasado',this)">// pasados</button>
+     <button class="gz-filter" id="esff-todos" onclick="filtrarEsferasFecha('todos',this)">// todos</button>
+    </div>
+    <!-- [ESF-LISTA-2] El buscador, mismo patrón que el de Kamisama: filtra en
+         vivo lo que ya está pintado, no pide nada al servidor. Se COMBINA con
+         el chip; no lo reemplaza. -->
+    <input type="search" id="esf-buscar" class="cot-input" placeholder="Buscar por nombre o slug…"
+           autocomplete="off" oninput="_esfBuscarEnLista()" aria-label="Buscar evento en la lista"
+           style="width:100%;font-size:13px;margin-bottom:10px">
+    <div id="esf-listado"><div class="loading-state"><div class="spinner"></div>Cargando…</div></div>
+    </div><!-- /esf-listado-body -->
+   </div>
+
+   <!-- ─── [ESF-E3b] IMPORTAR DEL CATÁLOGO ──────────────────────────────
+        La otra mitad de la decisión "todos los eventos viven en Esferas": los
+        que todavía viven a mano en el index se traen aquí. Diagnosticar NO
+        escribe. Sembrar solo trae los que el juez aprueba, nacen SIN PUBLICAR
+        y no pisa ningún slug que ya esté. -->
+   <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:20px;margin-bottom:20px" id="esf-import-caja">
+    <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.15em;color:var(--ts);margin-bottom:8px">// IMPORTAR DEL CATÁLOGO</div>
+    <div style="font-size:12px;color:var(--ts);margin-bottom:14px;line-height:1.5">Trae a Esferas los eventos que todavía viven a mano en <code>index.html</code>. <b>Solo entra lo que el compilador sabe reproducir sin perder un dato</b>; lo demás se queda a mano y se dice cuál y por qué. Lo sembrado nace <b>sin publicar</b> y <b>no pisa</b> nada que ya esté aquí.</div>
+    <button class="btn btn-primary" type="button" id="esf-import-diag" onclick="importarDelCatalogo()"><svg class="ic"><use href="#ic-lupa"/></svg> Ver qué se puede importar</button>
+    <!-- [ESF-ARCHIVO-1] Los pasados tienen su propia puerta. La casilla vieja
+         "incluir pasados" SE FUE: metía pasados como filas normales, publicables,
+         que es justo lo que el veto de archivo existe para impedir. -->
+    <button class="btn btn-ghost" type="button" id="esf-archivar" style="margin-left:8px" onclick="archivarPasados()" title="Trae los eventos ya ocurridos como ARCHIVO: sin pasar el juez y bloqueados para publicar. El index sigue siendo su fuente de verdad."><svg class="ic"><use href="#ic-eventos"/></svg> Archivar los pasados</button>
+    <div id="esf-import-panel" style="margin-top:14px"></div>
+   </div>
+
+   <!-- Dry-run del compilador (Pieza 2a · solo lectura/preview, NO escribe al repo) -->
+   <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:20px">
+    <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.15em;color:var(--ts);margin-bottom:8px">// COMPILADOR · DRY-RUN (no escribe al repo)</div>
+    <div style="font-size:12px;color:var(--ts);margin-bottom:14px;line-height:1.5">Construye en memoria el objeto-evento de cada Esfera que aún no esté en el array EV de index.html y valida que parsea igual en portal y kamehouse. Solo lectura: no toca el repo.</div>
+    <button class="btn btn-primary" onclick="probarCompiladoDryRun()"><svg class="ic"><use href="#ic-lupa"/></svg> Probar compilado (dry-run)</button>
+    <button class="btn btn-primary" style="margin-left:8px;background:var(--green);border-color:var(--green);color:#04210f" onclick="publicarEsferas()">Publicar al sitio</button>
+    <div id="esf-dryrun-panel" style="margin-top:14px"></div>
+   </div>
+  </div>
+
   <div class="esf-2col">
    <div class="esf-col-form">
    <!-- Form: nuevo evento -->
@@ -1810,68 +1886,7 @@
    </div><!-- /esf-col-preview -->
   </div><!-- /esf-2col -->
 
-  <div class="esf-below">
-   <!-- Listado -->
-   <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:20px">
-    <!-- [ESF-LISTA-3] La SECCIÓN ENTERA se colapsa. #577 encogió cada fila; esto
-         quita la lista de en medio para llegar al importador, al publicar y a
-         las noticias sin bajar dos mil pixeles.
-         ⚠️ El conteo vive EN el encabezado y se ve TAMBIÉN cerrada: una sección
-         plegada que no dice cuánto guarda se lee como una sección vacía. -->
-    <div id="esf-listado-head" role="button" tabindex="0" aria-expanded="true" aria-controls="esf-listado-body"
-         onclick="_esfSeccionToggle()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();_esfSeccionToggle()}"
-         style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.15em;color:var(--ts);margin-bottom:14px;cursor:pointer;display:flex;align-items:center;gap:8px;user-select:none">
-     <span id="esf-listado-chev" style="font-size:13px">▾</span>
-     <span>// EVENTOS REGISTRADOS <span id="esf-listado-n"></span></span>
-    </div>
-    <div id="esf-listado-body">
-    <!-- [ESF-LISTA-1] Los mismos chips que Cápsula, con UNA diferencia: aquí el
-         default es // próximos. Un evento pasado no se gobierna, se recuerda —
-         y 42 de los 102 del catálogo ya pasaron. -->
-    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">
-     <button class="gz-filter active" id="esff-proximos" onclick="filtrarEsferasFecha('proximo',this)">// próximos</button>
-     <!-- [ESF-LISTA-2] Agotados, SOLO entre los próximos: Memo lo usa para
-          decidir si revive el evento o compra más boletos, y eso solo tiene
-          sentido si el evento aún no ocurre. -->
-     <button class="gz-filter" id="esff-agotados" onclick="filtrarEsferasFecha('agotado',this)" title="Próximos que están agotados — los que se pueden revivir o resurtir">// agotados</button>
-     <button class="gz-filter" id="esff-pasados" onclick="filtrarEsferasFecha('pasado',this)">// pasados</button>
-     <button class="gz-filter" id="esff-todos" onclick="filtrarEsferasFecha('todos',this)">// todos</button>
-    </div>
-    <!-- [ESF-LISTA-2] El buscador, mismo patrón que el de Kamisama: filtra en
-         vivo lo que ya está pintado, no pide nada al servidor. Se COMBINA con
-         el chip; no lo reemplaza. -->
-    <input type="search" id="esf-buscar" class="cot-input" placeholder="Buscar por nombre o slug…"
-           autocomplete="off" oninput="_esfBuscarEnLista()" aria-label="Buscar evento en la lista"
-           style="width:100%;font-size:13px;margin-bottom:10px">
-    <div id="esf-listado"><div class="loading-state"><div class="spinner"></div>Cargando…</div></div>
-    </div><!-- /esf-listado-body -->
-   </div>
-
-   <!-- ─── [ESF-E3b] IMPORTAR DEL CATÁLOGO ──────────────────────────────
-        La otra mitad de la decisión "todos los eventos viven en Esferas": los
-        que todavía viven a mano en el index se traen aquí. Diagnosticar NO
-        escribe. Sembrar solo trae los que el juez aprueba, nacen SIN PUBLICAR
-        y no pisa ningún slug que ya esté. -->
-   <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:20px;margin-bottom:20px" id="esf-import-caja">
-    <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.15em;color:var(--ts);margin-bottom:8px">// IMPORTAR DEL CATÁLOGO</div>
-    <div style="font-size:12px;color:var(--ts);margin-bottom:14px;line-height:1.5">Trae a Esferas los eventos que todavía viven a mano en <code>index.html</code>. <b>Solo entra lo que el compilador sabe reproducir sin perder un dato</b>; lo demás se queda a mano y se dice cuál y por qué. Lo sembrado nace <b>sin publicar</b> y <b>no pisa</b> nada que ya esté aquí.</div>
-    <button class="btn btn-primary" type="button" id="esf-import-diag" onclick="importarDelCatalogo()"><svg class="ic"><use href="#ic-lupa"/></svg> Ver qué se puede importar</button>
-    <!-- [ESF-ARCHIVO-1] Los pasados tienen su propia puerta. La casilla vieja
-         "incluir pasados" SE FUE: metía pasados como filas normales, publicables,
-         que es justo lo que el veto de archivo existe para impedir. -->
-    <button class="btn btn-ghost" type="button" id="esf-archivar" style="margin-left:8px" onclick="archivarPasados()" title="Trae los eventos ya ocurridos como ARCHIVO: sin pasar el juez y bloqueados para publicar. El index sigue siendo su fuente de verdad."><svg class="ic"><use href="#ic-eventos"/></svg> Archivar los pasados</button>
-    <div id="esf-import-panel" style="margin-top:14px"></div>
-   </div>
-
-   <!-- Dry-run del compilador (Pieza 2a · solo lectura/preview, NO escribe al repo) -->
-   <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:20px">
-    <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.15em;color:var(--ts);margin-bottom:8px">// COMPILADOR · DRY-RUN (no escribe al repo)</div>
-    <div style="font-size:12px;color:var(--ts);margin-bottom:14px;line-height:1.5">Construye en memoria el objeto-evento de cada Esfera que aún no esté en el array EV de index.html y valida que parsea igual en portal y kamehouse. Solo lectura: no toca el repo.</div>
-    <button class="btn btn-primary" onclick="probarCompiladoDryRun()"><svg class="ic"><use href="#ic-lupa"/></svg> Probar compilado (dry-run)</button>
-    <button class="btn btn-primary" style="margin-left:8px;background:var(--green);border-color:var(--green);color:#04210f" onclick="publicarEsferas()">Publicar al sitio</button>
-    <div id="esf-dryrun-panel" style="margin-top:14px"></div>
-   </div>
-  </div>
+  
 
   <!-- ─── [N1] NOTICIAS DEL BANNER ────────────────────────────────────────
        El banner azul del index deja de armarse solo desde el catálogo: lo

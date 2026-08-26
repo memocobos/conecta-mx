@@ -17439,6 +17439,40 @@ function _esfEsc(s) {
 // se ve igual desde cualquier equipo.
 // El ↻ dejó de ser un botón de siempre: volver a mover cuotas ya movidas es un
 // error de dinero silencioso, así que sólo aparece como REINTENTO de lo que falló.
+// ═══ [ESF-UX-1f] AGOTAR DESDE LA FILA ═════════════════════════════════════
+// Agotar era: abrir el evento, ir a la pestaña "Qué vende", bajar al selector
+// de status, elegir Agotado y guardar. Aquí es un clic.
+//
+// Dos verbos explícitos —Agotar y Reabrir— en vez de un botón que alterna,
+// que es como ya lo resuelve el bloque de multifecha. Un botón que cambia de
+// significado según un estado que no se ve obliga a leerlo dos veces.
+//
+// ⚠️ Manda `{slug, status}` Y NADA MÁS. Es la primera llamada PARCIAL a
+// `esferas-actualizar`; el saneador del servidor tuvo que dejar de inventar
+// una llave que nadie mandó (ver `_sanePkg` allá).
+async function agotarEsferaFila(slug, agotar, btn) {
+  if (!slug || (btn && btn.disabled)) return;
+  const antes = btn ? btn.innerHTML : '';
+  if (btn) { btn.disabled = true; btn.textContent = agotar ? 'Agotando…' : 'Reabriendo…'; }
+  try {
+    const r = await khAdminFetch('/.netlify/functions/esferas-actualizar', {
+      method: 'POST',
+      body: JSON.stringify({ slug: slug, status: agotar ? 'agotado' : '' }),
+    });
+    if (!r.ok) {
+      const d = await r.json().catch(() => ({ error: r.statusText }));
+      throw new Error(d.error || 'No se pudo cambiar el status');
+    }
+    _esfAviso(agotar
+      ? '✓ <b>' + slug + '</b> quedó agotado. Se ve en el sitio al publicar.'
+      : '✓ <b>' + slug + '</b> volvió a la venta. Se ve en el sitio al publicar.');
+    loadEsferasEventos();
+  } catch (err) {
+    if (btn) { btn.disabled = false; btn.innerHTML = antes; }
+    _esfAviso(err.message, 'error');
+  }
+}
+
 function _esfAcciones(e) {
   const s = _esfEsc(e.slug);
   // [ESF-ARCHIVO-1] Un archivado es un registro de algo que YA PASÓ. Posponer una
@@ -17454,6 +17488,9 @@ function _esfAcciones(e) {
   const atoradas = pos ? (pos.pagos_fallidos_n || 0) : 0;
   return `
     <button class="btn btn-ghost btn-sm" style="font-size:10px" onclick="editarEsfera('${s}')"><svg class="ic"><use href="#ic-lapiz"/></svg> Editar</button>
+    ${e.status === 'agotado'
+      ? `<button class="btn btn-ghost btn-sm" data-agotar="reabrir" style="font-size:10px" onclick="agotarEsferaFila('${s}', false, this)" title="Vuelve a ponerlo a la venta">↺ Reabrir</button>`
+      : `<button class="btn btn-ghost btn-sm" data-agotar="agotar" style="font-size:10px" onclick="agotarEsferaFila('${s}', true, this)" title="Marca el evento agotado. Se ve en el sitio al publicar. Se deshace con Reabrir.">● Agotar</button>`}
     <button class="btn btn-ghost btn-sm" style="font-size:10px" onclick="posponerEsfera('${s}')"><svg class="ic"><use href="#ic-eventos"/></svg> Posponer</button>
     <button class="btn btn-ghost btn-sm" style="font-size:10px" onclick="avisarPosposicion('${s}')"><svg class="ic"><use href="#ic-correo"/></svg> Avisar</button>
     ${faltaAvisar ? `<span data-seg1="falta-avisar" style="display:inline-block;padding:2px 8px;border-radius:var(--r-sm,8px);background:rgba(255,165,0,.15);color:var(--orange);font-size:11px;font-weight:700" title="Se pospuso al ${_esfEsc(pos.fecha_nueva)} y todavía no se avisa a los clientes">⚠ falta avisar</span>` : ''}

@@ -18360,7 +18360,9 @@ async function crearEsferaEvento() {
       const detail = await r.json().catch(()=>({ error: r.statusText }));
       throw new Error(detail.error || 'Error creando');
     }
-    alertEl.innerHTML='<div class="alert alert-success">✓ Evento creado</div>';
+    alertEl.innerHTML = '';   // un error de un intento anterior no sobrevive
+    _esfPanelCerrar();
+    _esfAviso('✓ Evento creado');   // [ESF-UX-1e] fuera del panel: se cerró
     setTimeout(()=>alertEl.innerHTML='', 2000);
     // Auto-guardado a la libreta: suma a venues_catalogo los NOMBRES de zona usados
     // (best-effort; usa body porque el DOM se limpia abajo). Nunca precios.
@@ -19442,14 +19444,74 @@ function _esfHotelToggle() {
 // y bajan a su panel para que el resultado se VEA — un botón que dispara algo
 // cuyo resultado se pinta 5,000px más abajo se siente roto aunque funcione.
 // Duplicar el disparador está bien; duplicar la regla, nunca.
+// ═══ [ESF-UX-1e] El editor en panel ═══════════════════════════════════════
+// Abrir y cerrar son SOLO eso: mover el panel. Ninguno de los dos toca un
+// campo. Lo que borra el formulario sigue siendo `cancelarEdicionEsfera`, y se
+// llama desde donde el usuario lo pidió — nunca desde un cierre.
+function _esfPanelAbrir() {
+  const ov = document.getElementById('esf-panel-ov');
+  if (!ov) return;
+  // El título del panel se LEE del rótulo del formulario, que ya lo escriben
+  // editar y cancelar: un solo dueño del texto, no dos que se desincronizan.
+  const src = document.getElementById('esf-form-titulo');
+  const tit = document.getElementById('esf-panel-tit');
+  if (src && tit) tit.textContent = src.textContent;
+  ov.classList.add('open');
+  ov.setAttribute('aria-hidden', 'false');
+  const body = document.getElementById('esf-panel-body');
+  if (body) body.scrollTop = 0;
+}
+
+function _esfPanelCerrar() {
+  const ov = document.getElementById('esf-panel-ov');
+  if (!ov) return;
+  ov.classList.remove('open');
+  ov.setAttribute('aria-hidden', 'true');
+}
+
+function _esfPanelAbierto() {
+  const ov = document.getElementById('esf-panel-ov');
+  return !!(ov && ov.classList.contains('open'));
+}
+
+// El aviso de PÁGINA. Con el editor en panel, un "✓ guardado" escrito dentro
+// del formulario se escribiría en una caja que acaba de cerrarse: nadie lo
+// vería. El éxito sale aquí, junto a la lista que se acaba de refrescar; el
+// error se queda DENTRO del panel, que es donde está el campo a corregir.
+function _esfAviso(msg, tipo) {
+  const el = document.getElementById('esf-aviso');
+  if (!el) return;
+  el.innerHTML = '<div class="alert alert-' + (tipo || 'success') + '">' + msg + '</div>';
+  clearTimeout(window._esfAvisoT);
+  window._esfAvisoT = setTimeout(() => { const e = document.getElementById('esf-aviso'); if (e) e.innerHTML = ''; }, 4000);
+}
+
 function _esfIrAlFormulario() {
-  const col = document.querySelector('#page-esferas .esf-col-form');
-  if (col) col.scrollIntoView({ block: 'start', behavior: 'smooth' });
   // Si venía de editar, se limpia: "Nuevo evento" tiene que dar un evento nuevo.
   if (window._esfEditSlug && typeof cancelarEdicionEsfera === 'function') cancelarEdicionEsfera();
+  _esfPanelAbrir();
   const slug = document.getElementById('esf-slug');
-  if (slug) setTimeout(() => slug.focus(), 350);
+  if (slug) setTimeout(() => slug.focus(), 60);
 }
+
+// Cancelar edición = "ya no estoy editando": limpia Y cierra. Son dos actos y
+// se llaman los dos, en vez de darle a `cancelarEdicionEsfera` un segundo
+// oficio que nadie esperaría al llamarla desde otro lado.
+function _esfCancelarYCerrar() {
+  cancelarEdicionEsfera();
+  _esfPanelCerrar();
+}
+
+// Cerrar por clic en el fondo y por Escape. Aquí SÍ se puede, porque cerrar no
+// descarta nada; en `.modal-overlay` no se podría. Se enganchan tarde (el
+// markup del panel puede no existir cuando corre este archivo).
+document.addEventListener('click', (e) => {
+  const ov = document.getElementById('esf-panel-ov');
+  if (ov && e.target === ov) _esfPanelCerrar();
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && _esfPanelAbierto()) _esfPanelCerrar();
+});
 
 function _esfBarraTraer() {
   const caja = document.getElementById('esf-import-caja');
@@ -20154,7 +20216,7 @@ function editarEsfera(slug) {
   const cancel = document.getElementById('esf-cancel-edit'); if (cancel) cancel.style.display = '';
   const al = document.getElementById('esf-alert'); if (al) al.innerHTML = '';
   renderEsferaPreview();
-  if (sEl) sEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  _esfPanelAbrir();   // [ESF-UX-1e] antes bajaba 3,165px hasta el formulario
 }
 
 function cancelarEdicionEsfera() {
@@ -20253,10 +20315,8 @@ async function guardarCambiosEsfera() {
       throw new Error(detail.error || 'Error guardando');
     }
     cancelarEdicionEsfera();
-    if (alertEl) {
-      alertEl.innerHTML = '<div class="alert alert-success">✓ Cambios guardados</div>';
-      setTimeout(()=>{ if (alertEl) alertEl.innerHTML = ''; }, 2000);
-    }
+    _esfPanelCerrar();
+    _esfAviso('✓ Cambios guardados');   // [ESF-UX-1e] fuera del panel: se cerró
     loadEsferasEventos();
   } catch(e) { if (alertEl) alertEl.innerHTML = `<div class="alert alert-error">${e.message}</div>`; }
 }

@@ -1401,6 +1401,8 @@
    <button class="btn btn-ghost" type="button" onclick="_esfBarraTraer()"><svg class="ic"><use href="#ic-eventos"/></svg> Traer del catálogo</button>
    <button class="btn btn-primary" type="button" style="margin-left:auto" onclick="_esfBarraPublicar()">Publicar al sitio</button>
   </div>
+<div id="esf-aviso"></div>
+
 <div class="esf-below">
    <!-- Listado -->
    <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:20px">
@@ -1464,6 +1466,25 @@
    </div>
   </div>
 
+  <!-- ═══ [ESF-UX-1e] EL EDITOR EN PANEL ═══════════════════════════════════
+       El editor deja de vivir en la página y se abre ENCIMA de la lista. Con
+       1d la lista subió y el formulario quedó a 3,165px: aquí esa distancia
+       desaparece, porque "Nuevo evento" ABRE, no baja.
+
+       ⚠️ NO usa `.modal-overlay` a propósito. Los dos cerradores globales de
+       la casa (clic en el fondo · Escape) cierran CUALQUIER `.modal-overlay`
+       sin preguntar, y se enganchan al cargar a los que estén en el markup.
+       Están bien para una confirmación de 520px; este formulario tiene 48
+       campos. Aquí cerrar es SEGURO por construcción: cerrar NO borra — al
+       reabrir está todo lo tecleado. Lo que borra sigue siendo explícito
+       (Cancelar edición · Nuevo evento). -->
+  <div class="esf-panel-ov" id="esf-panel-ov" aria-hidden="true">
+   <div class="esf-panel" role="dialog" aria-modal="true" aria-labelledby="esf-panel-tit">
+    <div class="esf-panel-head">
+     <div class="esf-panel-tit" id="esf-panel-tit">// NUEVO EVENTO</div>
+     <button class="esf-panel-x" type="button" onclick="_esfPanelCerrar()" title="Cerrar — no borra lo tecleado">&#10005;</button>
+    </div>
+    <div class="esf-panel-body" id="esf-panel-body">
   <div class="esf-2col">
    <div class="esf-col-form">
    <!-- Form: nuevo evento -->
@@ -1869,7 +1890,7 @@
      <div style="font-size:11px;color:var(--ts);margin-top:4px">Opcional. En CDMX se pre-llena con "NO incluye transporte a CDMX." (editable).</div>
     </div>
     <button class="btn btn-primary" id="esf-submit-btn" onclick="submitEsferaForm()">Crear evento</button>
-    <button class="btn btn-ghost" id="esf-cancel-edit" style="margin-left:8px;display:none" onclick="cancelarEdicionEsfera()">Cancelar edición</button>
+    <button class="btn btn-ghost" id="esf-cancel-edit" style="margin-left:8px;display:none" onclick="_esfCancelarYCerrar()">Cancelar edición</button>
     <div id="esf-alert" style="margin-top:10px"></div>
    </div>
    </div><!-- /esf-col-form -->
@@ -1885,6 +1906,9 @@
    </div>
    </div><!-- /esf-col-preview -->
   </div><!-- /esf-2col -->
+    </div><!-- /esf-panel-body -->
+   </div><!-- /esf-panel -->
+  </div><!-- /esf-panel-ov -->
 
   
 

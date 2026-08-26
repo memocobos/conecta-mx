@@ -656,6 +656,26 @@ tr:hover td{background:var(--bg3)}
    (0,1,0) PIERDE contra `.form-group label` (0,1,1) y no pasa nada: el cuadrito
    se va a otra línea y el texto sigue en versalitas. Se vio en la captura, no
    en el DOM — la clase SÍ estaba puesta. */
+/* [ESF-UX-1c] Las pestañas del formulario. Se apoyan en `.gz-filter` en
+   espíritu pero no en clase: aquéllas son FILTROS de una lista y éstas son
+   SECCIONES de un formulario — parecidas de ver, distintas de significado. */
+.esf-tabs{display:flex;gap:3px;flex-wrap:wrap;margin:0 0 16px;border-bottom:1px solid var(--border)}
+.esf-tab{
+ font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.06em;
+ padding:9px 14px;border:1px solid var(--border);border-bottom:0;
+ border-radius:var(--r-sm,8px) var(--r-sm,8px) 0 0;background:var(--bg);
+ color:var(--ts);cursor:pointer;margin-bottom:-1px;position:relative;
+ display:inline-flex;align-items:center;gap:6px;
+}
+.esf-tab:hover{color:var(--text)}
+.esf-tab.active{background:var(--bg2);color:var(--orange);border-color:var(--orange);font-weight:700}
+.esf-tab:focus-visible{outline:2px solid var(--orange);outline-offset:2px}
+.esf-tab-badge{font-size:10px;letter-spacing:0}
+.esf-tab-badge.hay{color:var(--orange);font-weight:700}
+.esf-tab.active .esf-tab-badge.hay{color:var(--text)}
+/* Falta algo → el badge avisa en rojo, que es distinto de "tiene dato". */
+.esf-tab-badge.falta{color:var(--red);font-weight:700}
+
 /* [ESF-UX-1b] El pliegue de lo avanzado. Mismo gesto que el de la lista
    (chevron + rótulo en mono + aria-expanded) para que las dos cosas plegables
    de la pantalla se sientan la misma cosa. */

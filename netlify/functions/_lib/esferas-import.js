@@ -103,6 +103,16 @@ function evAEsfera(ev) {
     flash_promo: (ev.flashPromo && typeof ev.flashPromo === 'object') ? JSON.stringify(ev.flashPromo) : null,
     // [ESF-CIERRE-LINEUP] La llave o la URL del cartel, tal cual viene.
     lineup: (typeof ev.lineup === 'string' && ev.lineup.trim()) ? ev.lineup.trim() : null,
+    // [ESF-CIERRE-COLAS] `staticImg` e `img` viajan por separado, con sus tres
+    // estados cada uno. `foto` se queda SOLO para las URL que sube Esferas; una
+    // llave de `imgs.js` no es una foto subida y no debe entrar por ahí.
+    static_img: (typeof ev.staticImg === 'string' && ev.staticImg.trim() && !/^https?:|^data:/.test(ev.staticImg))
+      ? ev.staticImg.trim() : null,
+    // `img` con texto se guarda SOLO si difiere del nombre que el compilador
+    // derivaría; si es igual, el default ya lo produce y guardarlo sería ruido.
+    img_texto: (typeof ev.img === 'string' && ev.img.trim()) ? ev.img.trim() : null,
+    // Ausente de verdad: ni texto ni `false`.
+    img_omitir: (ev.img === undefined),
     // [ESF-CIERRE-FECHA] El EV no tiene `fecha_fin`: sus días viven en el texto
     // de `f`. Al importar se guarda ese texto COMO OVERRIDE —es la única forma
     // de reproducirlo sin adivinar— y Memo puede cambiarlo a rango después,
@@ -130,7 +140,11 @@ function evAEsfera(ev) {
     sep: (ev.sep != null) ? ev.sep : null,
     sep_cheap: (ev.sepCheap != null) ? ev.sepCheap : null,
     nota: ev.nota || '',
-    foto: ev.staticImg || '',
+    // [ESF-CIERRE-COLAS] `foto` es la portada SUBIDA por Esferas: solo URLs. Una
+    // llave de `imgs.js` va en `static_img`. Antes entraban las dos por aquí y
+    // funcionaba por coincidencia —el compilador emitía el string tal cual— pero
+    // son dos cosas: una vive en el bucket y la otra en el repo.
+    foto: (typeof ev.staticImg === 'string' && /^https?:|^data:/.test(ev.staticImg)) ? ev.staticImg : '',
     zonas: JSON.stringify(zonas),
     cheap_zonas: ev.cheapZonas ? JSON.stringify(cheap) : '',
     hotel: (Array.isArray(ev.hotel) && ev.hotel.length)

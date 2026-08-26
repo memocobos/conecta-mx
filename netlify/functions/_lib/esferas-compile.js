@@ -823,7 +823,20 @@ function generarObj(esfera, hoy) {
   const sepSeg = (esfera.sep != null && Number.isFinite(Number(esfera.sep)) && Number(esfera.sep) >= 0)
     ? (',sep:' + Math.round(Number(esfera.sep))) : '';
   // sepCheap: SOLO si el evento tiene cheapZonas (alguna pc>0) Y sep_cheap definido.
-  const tieneCheap = parseZonas(esfera.zonas).some((z) => z.pc > 0);
+  // [ESF-SEPCHEAP] "¿Este evento vende CHEAP?" se preguntaba SOLO por
+  // `zonas[].pc > 0` — la forma vieja, anterior a que ESF-E1c le diera a CHEAP
+  // su lista propia. Un evento capturado con el modelo NUEVO (lista
+  // independiente, sin `pc` en las zonas PLUS) vendía CHEAP y aun así perdía su
+  // `sepCheap`, en silencio.
+  //
+  // Hoy muerde a UNO —karolcdmx, 14 cheap_zonas y cero `pc`— pero el filo es a
+  // FUTURO: desde E1c el modelo es la lista propia, así que cada evento nuevo
+  // que Memo capture así habría perdido el separo cheap.
+  //
+  // Las DOS vías cuentan, porque las dos son maneras legítimas de vender CHEAP.
+  const _czLista = parseCheapZonas(esfera.cheap_zonas);
+  const tieneCheap = parseZonas(esfera.zonas).some((z) => z.pc > 0)
+    || (Array.isArray(_czLista) && _czLista.length > 0);
   const sepCheapSeg = (tieneCheap && esfera.sep_cheap != null
     && Number.isFinite(Number(esfera.sep_cheap)) && Number(esfera.sep_cheap) >= 0)
     ? (',sepCheap:' + Math.round(Number(esfera.sep_cheap))) : '';

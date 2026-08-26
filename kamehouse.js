@@ -19835,25 +19835,46 @@ function _esfTab(cual) {
 // hasta que lo mínimo esté puesto". Al construirlo se ve que es al revés — quien
 // no sabe qué le falta necesita JUSTO esa pestaña. Lo que sí se apaga es el
 // botón de GUARDAR, que es lo que la concesión quería evitar: crear medio evento.
+// 🔒 [ESF-UX-4] EL VENUE NO ES MÍNIMO EN UN "PRÓXIMAMENTE".
+// Un evento por confirmar legítimamente todavía no tiene sede: `jisoo` y `muse`
+// viven así en el padrón —los dos publicados, los dos gobernables— y hasta hoy
+// el candado le pedía a Memo INVENTAR un venue para poder guardarles cualquier
+// otra cosa. Es la misma razón por la que las zonas avisan sin bloquear: un
+// dato que todavía no existe no se exige, se anuncia.
+//
+// ⚠️ EN CUALQUIER OTRO STATUS SIGUE SIENDO MÍNIMO. Un evento a la venta sin
+// sede es un error de captura, no una etapa; ahí el candado se queda.
+//
+// Medido el 26-ago sobre las 103 filas: 2 sin venue, las DOS `proximamente`,
+// CERO con otro status. La regla no le abre la puerta a nadie más.
+function _esfEsPorConfirmar() {
+  return (document.getElementById('esf-status')?.value || '').trim() === 'proximamente';
+}
+
 const _ESF_MINIMO = [
   { id: 'esf-slug', q: 'el slug (el nombre corto del evento)' },
   { id: 'esf-nombre', q: 'el nombre / artista' },
-  { id: 'esf-venue', q: 'el venue' },
+  { id: 'esf-venue', q: 'el venue', salvoSi: _esfEsPorConfirmar },
 ];
 
 function _esfFalta() {
-  const faltan = _ESF_MINIMO.filter((c) => !(document.getElementById(c.id)?.value || '').trim());
+  const faltan = _ESF_MINIMO.filter((c) =>
+    !(c.salvoSi && c.salvoSi()) && !(document.getElementById(c.id)?.value || '').trim());
   // Una zona sin capturar no impide guardar un evento "por confirmar", así que
   // se AVISA sin bloquear: son dos cosas distintas y mezclarlas obligaría a
   // inventar precios para poder guardar.
   const sinZonas = document.querySelectorAll('#esf-zonas .esf-zona-row').length === 0;
-  return { faltan, sinZonas };
+  // [ESF-UX-4] El venue exonerado NO se calla. Que no bloquee no quiere decir
+  // que esté bien: es un pendiente, y un pendiente que nadie enseña se olvida.
+  const venuePendiente = _esfEsPorConfirmar() &&
+    !(document.getElementById('esf-venue')?.value || '').trim();
+  return { faltan, sinZonas, venuePendiente };
 }
 
 function _esfRevisarPintar() {
   const el = document.getElementById('esf-revisar');
   if (!el) return;
-  const { faltan, sinZonas } = _esfFalta();
+  const { faltan, sinZonas, venuePendiente } = _esfFalta();
   let h = '';
   if (faltan.length) {
     h += '<div style="color:var(--red);font-weight:700;margin-bottom:6px">No se puede guardar todavía:</div>' +
@@ -19861,8 +19882,12 @@ function _esfRevisarPintar() {
   } else {
     h += '<div style="color:var(--green,#3ddc84);font-weight:700">Lo mínimo está puesto.</div>';
   }
+  if (venuePendiente) {
+    h += '<div data-esf-aviso="venue" style="margin-top:10px;color:var(--ts)">· <b>sin venue</b> — se puede guardar igual ' +
+      'porque el status es <b>Próximamente</b>. En cualquier otro status el venue es obligatorio.</div>';
+  }
   if (sinZonas) {
-    h += '<div style="margin-top:10px;color:var(--ts)">· <b>sin zonas capturadas</b> — se puede guardar igual ' +
+    h += '<div data-esf-aviso="zonas" style="margin-top:10px;color:var(--ts)">· <b>sin zonas capturadas</b> — se puede guardar igual ' +
       '(un evento por confirmar no tiene precios todavía), pero el sitio no lo va a poder vender.</div>';
   }
   const n = (typeof _esfExtrasContar === 'function') ? _esfExtrasContar() : 0;
@@ -19875,10 +19900,17 @@ function _esfRevisarPintar() {
 function _esfSyncGuardar() {
   const btn = document.getElementById('esf-submit-btn');
   if (!btn) return;
-  const { faltan } = _esfFalta();
+  const { faltan, venuePendiente } = _esfFalta();
   btn.disabled = faltan.length > 0;
   btn.style.opacity = faltan.length ? '.5' : '';
-  btn.title = faltan.length ? ('Falta ' + faltan.map((c) => c.q).join(', ')) : '';
+  // [ESF-UX-4] El tooltip DICE LA REGLA, no solo el veredicto. Un botón que se
+  // enciende sin venue después de haber estado apagado por el venue se lee como
+  // un bug si no explica qué cambió.
+  btn.title = faltan.length
+    ? ('Falta ' + faltan.map((c) => c.q).join(', '))
+    : (venuePendiente
+      ? 'Se guarda sin venue porque el status es Próximamente. En cualquier otro status el venue es obligatorio.'
+      : '');
   const bd = document.getElementById('esf-tab-revisar-n');
   if (bd) { bd.textContent = faltan.length ? ('(' + faltan.length + ')') : ''; bd.classList.toggle('falta', faltan.length > 0); }
   const be = document.getElementById('esf-tab-extras-n');

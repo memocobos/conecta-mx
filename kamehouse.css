@@ -646,6 +646,29 @@ tr:hover td{background:var(--bg3)}
  display:block;font-size:9px;font-weight:700;letter-spacing:.18em;
  text-transform:uppercase;color:var(--ts);margin-bottom:6px;
 }
+
+/* [ESF-UX-1a] UNA CASILLA NO ES UN RÓTULO. La regla de arriba pinta TODO
+   <label> del form-group como encabezado —9px, VERSALITAS, letter-spacing de
+   .18em— y eso también le caía a las etiquetas de las casillas, que son frases
+   para leer, no títulos. Se leían como "VA EN PROMOCIONES DEL SITIO".
+   Esta clase las devuelve a texto normal y las alinea con su cuadrito.
+   ⚠️ VA CON `.form-group label.chk-linea` A PROPÓSITO. Con `.chk-linea` a secas
+   (0,1,0) PIERDE contra `.form-group label` (0,1,1) y no pasa nada: el cuadrito
+   se va a otra línea y el texto sigue en versalitas. Se vio en la captura, no
+   en el DOM — la clase SÍ estaba puesta. */
+.form-group label.chk-linea,
+.chk-linea{
+ display:flex;align-items:center;gap:8px;
+ font-size:12px;font-weight:400;letter-spacing:normal;text-transform:none;
+ color:var(--ink);margin-bottom:0;cursor:pointer;
+}
+.form-group label.chk-linea input[type="checkbox"],
+.chk-linea input[type="checkbox"]{flex:0 0 auto;margin:0;width:auto}
+/* ⚠️ El texto va SIEMPRE dentro de UN <span>. Un <label> flex convierte cada
+   nodo de texto y cada <b> en un ÍTEM INDEPENDIENTE, y el gap los separa: por
+   eso "Va en <b>promociones</b> del sitio" salía partido en tres pedazos. */
+.form-group label.chk-linea>span,
+.chk-linea>span{flex:1 1 auto;min-width:0}
 .form-group input,
 .form-group select,
 .form-group textarea{

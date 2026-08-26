@@ -165,6 +165,10 @@ function parseZonas(raw) {
       ag: prox ? 0 : ag,
       prox,
       vip,
+      // [ESF-CIERRE-FINAL] La zona que SOLO se vende en grupo (juniorh: mesas
+      // de 4). Vive en la ZONA, no en el evento.
+      requiereViajeros: (Number.isFinite(Number(z.requiereViajeros)) && Number(z.requiereViajeros) > 0)
+        ? Math.round(Number(z.requiereViajeros)) : 0,
     });
   }
   return out;
@@ -269,11 +273,28 @@ function parseMultifecha(raw) {
     const zonas = parseCheapZonas(f.zonas) || [];
     const cheap = parseCheapZonas(f.cheapZonas);
     const ride = Number(f.ride);
+    // [ESF-CIERRE-FINAL] La familia FESTIVAL dentro de un concierto. E1f la
+    // dejó fuera a propósito —"ésa se captura como festival"— pero flowfest y
+    // coronacapital son conciertos con entradas de esa forma: `sublbl` (el
+    // "28 o 29 nov" bajo la etiqueta), `noches`, su propia `music` y su propio
+    // `hotel`. No hacían falta dos parsers: hacía falta que éste no recortara.
+    const sublbl = (typeof f.sublbl === 'string' && f.sublbl.trim()) ? f.sublbl.trim() : null;
+    const nochesN = Number(f.noches);
+    const musicF = (typeof f.music === 'string' && f.music.trim()) ? f.music.trim() : null;
+    const hotelF = Array.isArray(f.hotel) ? f.hotel : null;
     out.push({
-      lbl, ds, zonas,
+      lbl, sublbl, ds,
+      noches: (Number.isFinite(nochesN) && nochesN > 0) ? Math.round(nochesN) : null,
+      music: musicF,
+      zonas,
       cheapZonas: cheap,
+      hotel: hotelF,
       ride: (Number.isFinite(ride) && ride > 0) ? Math.round(ride) : null,
-      rideAgotado: (f.rideAgotado === 1 || f.rideAgotado === true || f.rideAgotado === '1') ? 1 : 0,
+      // [ESF-CIERRE-FINAL] El TIPO se conserva: el catálogo escribe `1` en unos
+      // (weeknd, bts) y `true` en otros (morat). Para el juez semántico 1 y true
+      // son valores DISTINTOS, así que normalizarlos rompía a morat.
+      rideAgotado: (f.rideAgotado === true) ? true
+        : ((f.rideAgotado === 1 || f.rideAgotado === '1') ? 1 : 0),
     });
   }
   return out.length ? out : null;
@@ -281,13 +302,33 @@ function parseMultifecha(raw) {
 
 // El texto de UNA fecha, en el orden del catálogo:
 //   lbl · ds? · zonas · cheapZonas? · ride? · rideAgotado?
+// [ESF-CIERRE-FINAL] Una fila de hotel, en el orden del catálogo. Se extrae para
+// que la multifecha la use IGUAL que `hotelSegmento` — dos escrituras del mismo
+// formato acaban divergiendo.
+function _hotelFilaTexto(it) {
+  const k = (typeof it.k === 'string' && it.k.trim()) ? ("k:'" + escStr(it.k.trim()) + "',") : '';
+  const e = Number(it.e);
+  const pp = Number(it.pp);
+  const viaj = Array.isArray(it.viaj) ? it.viaj.map((x) => parseInt(x, 10)).filter(Number.isInteger) : [];
+  const desc = (typeof it.desc === 'string' && it.desc.trim()) ? (",desc:'" + escStr(it.desc.trim()) + "'") : '';
+  return '{' + k + "n:'" + escStr(String(it.n || '')) + "',e:" + (Number.isFinite(e) ? Math.round(e) : 0) +
+    ((it.pp != null && Number.isFinite(pp)) ? (',pp:' + Math.round(pp)) : '') +
+    (viaj.length ? (',viaj:[' + viaj.join(',') + ']') : '') + desc + '}';
+}
+
 function multifechaTexto(f) {
+  // Orden del catálogo: lbl · sublbl? · ds · noches? · music? · zonas ·
+  // cheapZonas? · ride? · hotel? · rideAgotado?
   return "{lbl:'" + escStr(f.lbl) + "'" +
+    (f.sublbl ? ",sublbl:'" + escStr(f.sublbl) + "'" : '') +
     (f.ds ? ",ds:'" + f.ds + "'" : '') +
+    (f.noches != null ? ',noches:' + f.noches : '') +
+    (f.music ? ",music:'" + escStr(f.music) + "'" : '') +
     ',zonas:[' + f.zonas.map(cheapZonaTexto).join(',') + ']' +
     (f.cheapZonas ? ',cheapZonas:[' + f.cheapZonas.map(cheapZonaTexto).join(',') + ']' : '') +
     (f.ride != null ? ',ride:' + f.ride : '') +
-    (f.rideAgotado ? ',rideAgotado:1' : '') + '}';
+    (f.hotel ? ',hotel:[' + f.hotel.map(_hotelFilaTexto).join(',') + ']' : '') +
+    (f.rideAgotado ? (',rideAgotado:' + (f.rideAgotado === true ? 'true' : '1')) : '') + '}';
 }
 
 // B1 — emite el segmento "zonas:[...]" (+ ",cheapZonas:[...]" si alguna zona
@@ -418,9 +459,83 @@ function lineupConcSeg(esfera) {
   return v ? ("lineup:'" + escStr(v) + "',") : '';
 }
 
+// ═══ [ESF-CIERRE-FINAL] LOS CAMPOS QUE ESFERAS NO MODELA ══════════════════
+// El catálogo tiene campos escritos a mano que no valía la pena convertir en
+// columna con formulario: `promoModal` (un modal de itinerario con emojis y
+// saltos de línea), `sepZonas` (separo por nombre de zona), `preventa`,
+// `diasAntes`, `forceZona`, `noHotel`, `onlyCheap`. Siete campos en siete
+// eventos — darle a cada uno su columna y su control sería más pantalla que
+// valor.
+//
+// Viajan JUNTOS en `extras`: un objeto JSON llave→valor que el compilador
+// re-emite al final. El objetivo aquí no es CAPTURARLOS, es REPRODUCIRLOS para
+// que el evento entero sea gobernable; editarlos sigue siendo a mano en el
+// index, y `fusionarConViejo` ya los conservaba al publicar.
+//
+// ⚠️ NO SE EMITE TEXTO CRUDO. Los valores se re-serializan desde su forma JSON
+// —nunca se pega lo que venga— porque esto sale al catálogo público y un string
+// crudo sería código. Y solo entran llaves que NO son del compilador: si fuera
+// una suya, saldría la llave dos veces.
+function _serializarExtra(v) {
+  if (v === null) return 'null';
+  const t = typeof v;
+  if (t === 'number') return Number.isFinite(v) ? String(v) : null;
+  if (t === 'boolean') return v ? 'true' : 'false';
+  if (t === 'string') return "'" + escStr(v) + "'";
+  if (Array.isArray(v)) {
+    const partes = v.map(_serializarExtra);
+    return partes.some((x) => x == null) ? null : '[' + partes.join(',') + ']';
+  }
+  if (t === 'object') {
+    const partes = [];
+    for (const k of Object.keys(v)) {
+      if (!IDENT_RE.test(k)) return null;
+      const sv = _serializarExtra(v[k]);
+      if (sv == null) return null;
+      partes.push(k + ':' + sv);
+    }
+    return '{' + partes.join(',') + '}';
+  }
+  return null;
+}
+
+function extrasSegmento(esfera) {
+  let o = esfera.extras;
+  if (typeof o === 'string') { if (!o.trim()) return ''; try { o = JSON.parse(o); } catch (_) { return ''; } }
+  if (!o || typeof o !== 'object' || Array.isArray(o)) return '';
+  const partes = [];
+  for (const k of Object.keys(o)) {
+    if (!IDENT_RE.test(k)) continue;              // una llave rara no entra al catálogo
+    if (CAMPOS_DEL_COMPILADOR.has(k)) continue;   // el compilador manda sobre las suyas
+    const sv = _serializarExtra(o[k]);
+    if (sv != null) partes.push(k + ':' + sv);
+  }
+  return partes.length ? (partes.join(',') + ',') : '';
+}
+
+// [ESF-CIERRE-FINAL] `musicList` en el camino de CONCIERTO. Ya se emitía en el
+// de festival (desde `festival.musica`), pero tecatecomuna es un CONCIERTO que
+// lleva su propia lista de canciones y no tenía de dónde sacarla.
+function musicListConcSeg(esfera) {
+  let l = esfera.musicList;
+  if (typeof l === 'string') { if (!l.trim()) return ''; try { l = JSON.parse(l); } catch (_) { return ''; } }
+  if (!Array.isArray(l) || !l.length) return '';
+  const ids = l.map((x) => String(x).trim()).filter(Boolean);
+  return ids.length ? ("musicList:['" + ids.map(escStr).join("','") + "'],") : '';
+}
+
 function zonasSegmento(esfera) {
   const rows = parseZonas(esfera.zonas);
-  if (!rows.length) return 'zonas:[]';
+  // [ESF-CIERRE-FINAL] Sin zonas PLUS NO se corta aquí: un evento puede vender
+  // SOLO cheap (solomun: `zonas:[]` y tres cheapZonas), y el `return` temprano
+  // se comía su lista propia. Es la misma familia que el `sepCheap` de #585 —
+  // preguntas escritas antes de que CHEAP tuviera lista propia.
+  if (!rows.length) {
+    const soloCheap = parseCheapZonas(esfera.cheap_zonas);
+    return (soloCheap && soloCheap.length)
+      ? ('zonas:[],cheapZonas:[' + soloCheap.map(cheapZonaTexto).join(',') + ']')
+      : 'zonas:[]';
+  }
   // [E1] El orden de las llaves espeja el de los EV que ya viven en el index
   // (p.ej. coronacapital: {n:'General',p:0,prox:1}), para que el compilado siga
   // siendo byte-exacto contra lo capturado a mano.
@@ -430,7 +545,8 @@ function zonasSegmento(esfera) {
   // publicar, que es lo que ya pasa con los eventos gobernados.
   const plus = rows.map((z) =>
     "{n:'" + escStr(z.n) + "',p:" + z.p + (z.vip ? ',vip:1' : '') +
-    (z.prox ? ',prox:1' : (z.ag ? ',ag:1' : '')) + '}'
+    (z.prox ? ',prox:1' : (z.ag ? ',ag:1' : '')) +
+    (z.requiereViajeros ? ',requiereViajeros:' + z.requiereViajeros : '') + '}'
   ).join(',');
   let seg = 'zonas:[' + plus + ']';
   // [ESF-E1c] LA LISTA PROPIA MANDA. Si Esferas capturó una, se emite tal cual
@@ -528,7 +644,19 @@ function parseHotel(raw) {
       desc,
     });
   }
-  if (!items.length) return null;
+  // [ESF-CIERRE-FINAL] Una lista VACÍA con banderas puestas NO es "sin hotel":
+  // es "usa el hotel de la ciudad, pero por persona y sobrescribiendo el
+  // default" — que es justo lo que dice coronacapital (`hotelOverride:true,
+  // hotelPP:true,hotel:[]`). Devolver null aquí le borraba las dos banderas.
+  if (!items.length) {
+    if (obj.pp === true || obj.override === true) {
+      const vacio = [];
+      vacio.pp = obj.pp === true;
+      vacio.override = obj.override === true;
+      return vacio;
+    }
+    return null;
+  }
   // [ESF-E1e] Las DOS banderas viajan con la lista, no se dan por hechas. Medido
   // sobre los 33 eventos con hotel propio: 100 filas son `{n,e}` a secas —sin
   // `viaj`, sin `hotelPP`, sin `hotelOverride`— y 32 son la forma del festival.
@@ -860,7 +988,11 @@ function generarObj(esfera, hoy) {
   const cdmx = (ciudad === 'CDMX') ? 'cdmx:true,' : '';
   // mapa: URL pública de la imagen subida (bucket mapas-eventos). Si vacío, NO se
   // emite → byte-igual a hoy. El render de index.html acepta URL directa o clave.
-  const mapa = esfera.mapa ? ("mapa:'" + escStr(esfera.mapa) + "',") : '';
+  // [ESF-CIERRE-FINAL] `mapa:null` EXPLÍCITO. Dos eventos lo traen escrito y en
+  // el sitio se comporta igual que ausente — pero el juez es semántico y una
+  // llave ausente no es una llave en null.
+  const mapa = esfera.mapa ? ("mapa:'" + escStr(esfera.mapa) + "',")
+    : (esfera.mapa_null ? 'mapa:null,' : '');
   // inc: lista "qué incluye". Array no vacío → inc:['<esc>',...]; vacío → inc:[].
   const incRows = parseInc(esfera.inc);
   const incSeg = incRows.length
@@ -981,7 +1113,7 @@ function generarObj(esfera, hoy) {
   // catalogo-index, cuenta-deposito y cuenta-evento).
   const _bk = bancoValido(esfera.banco);
   const bancoSeg = _bk ? (',banco:' + _bk) : '';
-  return "{id:'" + escStr(esfera.slug) + "'," + promoSeg(esfera) + promoCodeSeg(esfera) + promoLabelSeg(esfera) + deporteSeg(esfera) + addedSeg + music +
+  return "{id:'" + escStr(esfera.slug) + "'," + promoSeg(esfera) + promoCodeSeg(esfera) + promoLabelSeg(esfera) + deporteSeg(esfera) + addedSeg + musicListConcSeg(esfera) + music +
     "c:'" + color +
     "'," + imgSeg + musicSearchSeg(esfera) +
     "a:'" + escStr(esfera.titulo || nombre) +
@@ -990,7 +1122,7 @@ function generarObj(esfera, hoy) {
     "'," + dsListStr +
     "v:'" + venue +
     "',st:'" + escStr(status) +
-    "'," + cdmx + mapa + lineupConcSeg(esfera) + flashPromoSeg(esfera) + flagsSeg +
+    "'," + cdmx + mapa + lineupConcSeg(esfera) + flashPromoSeg(esfera) + flagsSeg + extrasSegmento(esfera) +
     incSeg + sepSeg + sepCheapSeg + rideSeg + notaSeg +
     bancoSeg + ',' +
     // [ESF-E1f] La multifecha va ANTES de las zonas, igual que en el camino de
@@ -1592,6 +1724,7 @@ function fechaDisplayDeEsfera(esfera) {
 module.exports = {
   compilarEV, quitarDelEV, reemplazarEnEV, todayMx, fechaDisplayDeEsfera,
   bancoValido, BANCOS_VALIDOS, _insertarAntesDeZonasNivel1, _parseFlashPromo: parseFlashPromo,
+  _extrasSegmento: extrasSegmento, _serializarExtra, CAMPOS_DEL_COMPILADOR,
   _diasDelRango,
   // Helpers puros expuestos para el arnés (patrón de la casa).
   _escStr: escStr,

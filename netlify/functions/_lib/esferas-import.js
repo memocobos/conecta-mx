@@ -23,7 +23,7 @@
 // gobernable.
 // =============================================================================
 
-const { _generarObj: generarObj, todayMx } = require('./esferas-compile');
+const { _generarObj: generarObj, todayMx, CAMPOS_DEL_COMPILADOR } = require('./esferas-compile');
 
 const FECHA_RE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -77,6 +77,7 @@ function evAEsfera(ev) {
       n: z.n, p: Number(z.p) || 0,
       pc: (cz && !cz.ag && Number(cz.p) > 0) ? Number(cz.p) : 0,
       ag: z.ag ? 1 : 0, prox: z.prox ? 1 : 0, vip: z.vip ? 1 : 0,
+      requiereViajeros: (z.requiereViajeros != null) ? z.requiereViajeros : 0,
     };
   });
   // La lista CHEAP viaja ENTERA, no como reflejo: desde ESF-E1c es su propia
@@ -89,8 +90,10 @@ function evAEsfera(ev) {
   });
   // La multifecha de CONCIERTO. La de festival —con `noches`/`hotel` por
   // entrada— no entra aquí: ésa se captura como festival.
-  const mfConcierto = Array.isArray(ev.multifecha) && ev.multifecha.length
-    && !ev.multifecha.some((f) => f && (f.noches != null || f.hotel));
+  // [ESF-CIERRE-FINAL] Ya NO se excluye la familia festival: el parser aprendió
+  // a llevar `sublbl`, `noches`, `music` y `hotel` por entrada, así que flowfest
+  // y coronacapital —conciertos con entradas de esa forma— ya caben.
+  const mfConcierto = Array.isArray(ev.multifecha) && ev.multifecha.length;
   return {
     // [ESF-E1g] El banco viaja con el evento. `evaluar()` ata BANCO_DEFAULT y
     // BANCO_HEY a sus NOMBRES (strings), no a {}, así que aquí `ev.banco` ya es
@@ -106,6 +109,9 @@ function evAEsfera(ev) {
     // [ESF-CIERRE-COLAS] `staticImg` e `img` viajan por separado, con sus tres
     // estados cada uno. `foto` se queda SOLO para las URL que sube Esferas; una
     // llave de `imgs.js` no es una foto subida y no debe entrar por ahí.
+    // [ESF-CIERRE-FINAL] Los últimos cuatro que el importador recortaba.
+    mapa_null: (ev.mapa === null),
+    musicList: Array.isArray(ev.musicList) ? JSON.stringify(ev.musicList) : null,
     static_img: (typeof ev.staticImg === 'string' && ev.staticImg.trim() && !/^https?:|^data:/.test(ev.staticImg))
       ? ev.staticImg.trim() : null,
     // `img` con texto se guarda SOLO si difiere del nombre que el compilador
@@ -147,13 +153,18 @@ function evAEsfera(ev) {
     foto: (typeof ev.staticImg === 'string' && /^https?:|^data:/.test(ev.staticImg)) ? ev.staticImg : '',
     zonas: JSON.stringify(zonas),
     cheap_zonas: ev.cheapZonas ? JSON.stringify(cheap) : '',
-    hotel: (Array.isArray(ev.hotel) && ev.hotel.length)
+    // [ESF-CIERRE-FINAL] Las banderas viajan aunque la lista esté VACÍA: son un
+    // dato del evento, no de los cuartos.
+    // coronacapital trae las banderas SIN ningún `hotel` de nivel 1: sus cuartos
+    // viven en cada entrada de multifecha. Las banderas son del EVENTO, no de la
+    // lista, así que viajan aunque no haya lista.
+    hotel: (ev.hotelPP || ev.hotelOverride || (Array.isArray(ev.hotel) && ev.hotel.length))
       ? JSON.stringify({ custom: true, pp: !!ev.hotelPP, override: !!ev.hotelOverride,
           // [ESF-CIERRE-HOTEL] La fila viaja ENTERA: `k`, `pp` y `desc`
           // también. Antes se recortaba a {n,e,viaj} y por eso 8 eventos
           // perdían el tipo de cuarto, su costo por persona y la frase que lee
           // el cliente.
-          items: ev.hotel.map((r) => ({ k: r.k, n: r.n, e: r.e, pp: r.pp, viaj: r.viaj, desc: r.desc })) })
+          items: (Array.isArray(ev.hotel) ? ev.hotel : []).map((r) => ({ k: r.k, n: r.n, e: r.e, pp: r.pp, viaj: r.viaj, desc: r.desc })) })
       : '',
     multifecha: mfConcierto ? JSON.stringify(ev.multifecha) : '',
     ride: (ev.ride != null) ? ev.ride : null,
@@ -161,6 +172,21 @@ function evAEsfera(ev) {
     ride_only: !!ev.rideOnly, cheap_only: !!ev.cheapOnly,
     no_stay: !!ev.noStay, no_cheap: !!ev.noCheap, no_bus: !!ev.noBus,
     cheap_soon: !!ev.cheapSoon, cheap_also_ok: !!ev.cheapAlsoOk,
+    // [ESF-CIERRE-FINAL] Todo lo que el compilador NO modela viaja junto, para
+    // poder REPRODUCIRLO. No se captura: se conserva. Sin esto, siete eventos
+    // seguían fuera solo por campos que nadie va a editar desde una pantalla.
+    extras: (() => {
+      const ex = {};
+      for (const k of Object.keys(ev)) {
+        if (CAMPOS_DEL_COMPILADOR.has(k)) continue;
+        // `promo*`, `deporte`, `musicSearch`, `flashPromo`, `lineup` ya tienen
+        // su columna: si entraran aquí saldrían dos veces.
+        const v = ev[k];
+        if (v === undefined || typeof v === 'function') continue;
+        ex[k] = v;
+      }
+      return Object.keys(ex).length ? JSON.stringify(ex) : null;
+    })(),
     festival: '', pagos: '',
   };
 }

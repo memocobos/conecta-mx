@@ -17579,13 +17579,14 @@ function _esfPromoFlashObj(raw) {
 // El vencimiento del flash se lee EN REYNOSA (−05:00 todo el año), la misma
 // regla con la que se teclea en el formulario. Pintarlo en la hora del
 // navegador enseñaría un vencimiento distinto al que Memo escribió.
-function _esfPromoFlashVence(o) {
-  const ts = Number(o && o.expiresTs);
-  if (!Number.isFinite(ts)) return '';
+function _esfEnReynosa(ts) {
+  const n = Number(ts);
+  if (!Number.isFinite(n)) return '';
   try {
-    return new Date(ts).toLocaleString('sv-SE', { timeZone: 'America/Cancun' }).slice(0, 16);
+    return new Date(n).toLocaleString('sv-SE', { timeZone: 'America/Cancun' }).slice(0, 16);
   } catch (_) { return ''; }
 }
+function _esfPromoFlashVence(o) { return _esfEnReynosa(o && o.expiresTs); }
 
 // Devuelve [] si no trae promo, o los pedazos de letrero que la fila enseña.
 // El texto es el CAPTURADO, recortado, nunca un veredicto: esta función no
@@ -17612,6 +17613,140 @@ function _esfPromoPartes(fila) {
 
 function _esfTienePromo(fila) { return _esfPromoPartes(fila).length > 0; }
 
+// ═══ [ESF-UX-3] EL ESTADO DE LA PROMO, QUE NO ES EL DEL EVENTO ════════════
+// Memo leía "Disponible" en la columna Status y lo entendía de la PROMO. Es el
+// del tour. Los cinco eventos con promo de pareja decían "Disponible" con su
+// promo muerta desde el 25-ago.
+//
+// 🔒 EL VEREDICTO SALE DEL DATO, NO DEL LETRERO. `promo_label` dice "HASTA EL
+// 24 AGO" y adivinarlo de ahí sería heurística sobre un texto que Memo teclea a
+// mano. El vencimiento REAL de una promo de pareja vive en el registro `PROMOS`
+// del catálogo publicado; el de un flash vive en la propia fila de Esferas.
+//
+// 🔒 Y LA REGLA ES LA DEL SITIO, copiada de `validarPromo` en index.html — no
+// una nueva. Si el admin juzgara distinto que el cotizador, Memo vería ACTIVA
+// una promo que al cliente le rebota:
+//     sin `expiresTs`  → NO vence (la retira Memo cuando quiera)
+//     `startTs` futuro → todavía no arranca
+//     `now > expiresTs`→ expirada
+// `usos/maxUsos` y `singleUse` NO entran: el contador vive en la memoria de
+// CADA navegador y se reinicia al recargar, y `singleUse` se marca en el
+// localStorage DEL CLIENTE. Ninguno de los dos es un estado que este panel
+// pueda ver, y fingir que sí sería inventar.
+
+// ── El registro PROMOS del catálogo publicado ─────────────────────────────
+// Mismo camino que usan `rol.html` y `_fetchEVFromIndex`: se pide el
+// `index.html` de verdad y se recorta el literal. NO se cachea entre sesiones:
+// Memo edita ese registro a mano y un caché viejo diría "vencida" de una promo
+// que acaba de renovar.
+let _esfPromosCat = null;
+let _esfPromosCarga = 'no';   // 'no' · 'cargando' · 'listo' · 'error'
+
+// El cortador de literales, contando llaves y saltando comillas. Un regex no
+// sabe dónde termina un objeto con objetos adentro.
+// ⏳ Anotado: `_fetchEVFromIndex` y `_evDeclaracionesHotel` traen su propia
+// copia de este mismo caminado. Unificarlas es una chiquita aparte — no se
+// toca la ruta de contratos en esta tuerca.
+function _khCortarLiteral(html, re, abre, cierra) {
+  const m = String(html).match(re);
+  if (!m) return null;
+  const ini = m.index + m[0].length - 1;
+  let hondo = 0, enTexto = false, comilla = '', escapa = false;
+  for (let i = ini; i < html.length; i++) {
+    const ch = html[i];
+    if (escapa) { escapa = false; continue; }
+    if (enTexto) { if (ch === '\\') { escapa = true; continue; } if (ch === comilla) enTexto = false; continue; }
+    if (ch === '"' || ch === "'") { enTexto = true; comilla = ch; continue; }
+    if (ch === abre) hondo++;
+    else if (ch === cierra) { hondo--; if (!hondo) return html.slice(ini, i + 1); }
+  }
+  return null;
+}
+
+async function _esfPromosAsegurar() {
+  if (_esfPromosCarga === 'listo' || _esfPromosCarga === 'cargando') return;
+  _esfPromosCarga = 'cargando';
+  _esfPintarLista();
+  try {
+    const r = await fetch('/index.html?p=' + Date.now(), { cache: 'no-store' });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const txt = _khCortarLiteral(await r.text(), /var\s+PROMOS\s*=\s*\{/, '{', '}');
+    if (!txt) throw new Error('no encontré var PROMOS en index.html');
+    // El literal usa `Date.parse(...)` en varios vencimientos; es global, así
+    // que no hace falta ningún stub. Nada más se evalúa de esa página.
+    const obj = new Function('return ' + txt + ';')();
+    if (!obj || typeof obj !== 'object') throw new Error('PROMOS no es un objeto');
+    _esfPromosCat = obj;
+    _esfPromosCarga = 'listo';
+  } catch (e) {
+    console.warn('[Esferas] no pude leer PROMOS del catálogo:', e.message);
+    _esfPromosCat = null;
+    _esfPromosCarga = 'error';
+  }
+  _esfPintarLista();
+}
+
+// El veredicto de UN código de pareja contra el registro.
+// ⚠️ Si el catálogo no se pudo leer NO se dice "sin registro": eso sería acusar
+// a una promo buena de estar mal dada de alta por una falla de red.
+function _esfEstadoPareja(code, slug, ahora) {
+  if (_esfPromosCarga === 'cargando') return { k: 'cargando', t: 'leyendo el catálogo…' };
+  if (_esfPromosCarga !== 'listo' || !_esfPromosCat) return { k: 'nose', t: 'catálogo no leído' };
+  const p = _esfPromosCat[String(code).toUpperCase().trim()];
+  if (!p) return { k: 'malo', t: 'SIN REGISTRO en PROMOS' };
+  // El código existe pero está amarrado a OTRO evento: al cliente de ESTE le
+  // rebota igual que si no existiera. Misma familia que "sin registro".
+  const soloEn = p.onlyEvents || (p.onlyEvent ? [p.onlyEvent] : null);
+  if (soloEn && slug && soloEn.indexOf(slug) < 0) {
+    return { k: 'malo', t: 'REGISTRADO PARA ' + String(soloEn.join(', ')).toUpperCase() };
+  }
+  if (Number.isFinite(Number(p.startTs)) && ahora < Number(p.startTs)) {
+    return { k: 'pronto', t: 'PROGRAMADA · desde ' + _esfEnReynosa(p.startTs) };
+  }
+  if (Number.isFinite(Number(p.expiresTs))) {
+    return Number(p.expiresTs) < ahora
+      ? { k: 'muerta', t: 'VENCIDA · el ' + _esfEnReynosa(p.expiresTs) }
+      : { k: 'viva', t: 'ACTIVA · hasta ' + _esfEnReynosa(p.expiresTs) };
+  }
+  return { k: 'viva', t: 'ACTIVA · sin vencimiento' };
+}
+
+// El del flash sale de la propia fila: su `expiresTs` ya vive en Esferas.
+// Misma regla que el sitio (`!fp.expiresTs || fp.expiresTs > Date.now()`).
+function _esfEstadoFlash(flash, ahora) {
+  const ts = Number(flash && flash.expiresTs);
+  if (!Number.isFinite(ts)) return { k: 'viva', t: 'ACTIVA · sin vencimiento' };
+  return ts < ahora
+    ? { k: 'muerta', t: 'VENCIDA · el ' + _esfEnReynosa(ts) }
+    : { k: 'viva', t: 'ACTIVA · hasta ' + _esfEnReynosa(ts) };
+}
+
+// Los estados de una fila: uno por promo que traiga. Una fila puede traer las
+// dos (pareja y flash) y entonces enseña las dos — hoy ninguna lo hace, pero
+// enseñar solo la primera sería esconder media verdad.
+function _esfPromoEstados(fila, ahora) {
+  const t = Number.isFinite(Number(ahora)) ? Number(ahora) : Date.now();
+  const out = [];
+  const code = String((fila && fila.promo_code) == null ? '' : fila.promo_code).trim();
+  const label = String((fila && fila.promo_label) == null ? '' : fila.promo_label).trim();
+  const flash = _esfPromoFlashObj(fila && fila.flash_promo);
+  // El letrero SIN código no se puede carear contra nada: no hay llave que
+  // buscar en PROMOS. Se dice, en vez de callarlo o de inventarle un estado.
+  if (code) out.push(Object.assign({ fuente: 'pareja', code: code }, _esfEstadoPareja(code, fila && fila.slug, t)));
+  else if (label) out.push({ fuente: 'pareja', code: '', k: 'nose', t: 'letrero SIN código — no hay qué verificar' });
+  if (flash) out.push(Object.assign({ fuente: 'flash', code: String(flash.code || '').trim() }, _esfEstadoFlash(flash, t)));
+  return out;
+}
+
+const _ESF_PROMO_PINTA = {
+  viva:     { punto: '●', color: 'var(--green)' },
+  muerta:   { punto: '○', color: 'var(--ts)' },     // gris: vencer es normal, no es una falla
+  pronto:   { punto: '◷', color: 'var(--blue)' },
+  malo:     { punto: '⚠', color: 'var(--red)' },    // rojo: el cliente teclea el código y REBOTA
+  nose:     { punto: '·', color: 'var(--ts2)' },
+  cargando: { punto: '·', color: 'var(--ts2)' },
+};
+
 // El letrero DENTRO de la fila, y SOLO en la vista de promos. La lista tiene
 // cinco columnas fijas; meter una sexta que aparece y desaparece movería las
 // otras cuatro cada vez que Memo cambia de chip. El texto va debajo del nombre,
@@ -17621,9 +17756,19 @@ function _esfPromoFila(e) {
   if (_esfFiltroFecha !== 'promo') return '';
   const partes = _esfPromoPartes(e);
   if (!partes.length) return '';
-  return '<div style="font-family:\'JetBrains Mono\',monospace;font-size:10px;font-weight:400;' +
-    'color:var(--orange);margin-top:3px;line-height:1.5;white-space:normal">' +
-    partes.map(_esfEsc).join(' · ') + '</div>';
+  // [ESF-UX-3] El ESTADO va primero y en su propio renglón. Antes del código:
+  // la pregunta de Memo al abrir esta vista es "¿cuál sigue viva?", no "¿cómo
+  // se llama?". El letrero capturado va debajo, en el lime de siempre.
+  const mono = 'font-family:\'JetBrains Mono\',monospace;font-size:10px;font-weight:400;line-height:1.5;white-space:normal';
+  const estados = _esfPromoEstados(e).map((s) => {
+    const p = _ESF_PROMO_PINTA[s.k] || _ESF_PROMO_PINTA.nose;
+    const quien = s.fuente === 'flash' ? '⚡' : '⚑';
+    return '<span data-esf-promo-estado="' + s.k + '" data-esf-promo-fuente="' + s.fuente + '"' +
+      ' style="color:' + p.color + ';font-weight:700;margin-right:10px;white-space:nowrap">' +
+      p.punto + ' ' + quien + (s.code ? ' ' + _esfEsc(s.code) : '') + ' ' + _esfEsc(s.t) + '</span>';
+  }).join('');
+  return (estados ? '<div style="' + mono + ';margin-top:4px">' + estados + '</div>' : '') +
+    '<div style="' + mono + ';color:var(--orange);margin-top:2px">' + partes.map(_esfEsc).join(' · ') + '</div>';
 }
 
 // [ESF-LISTA-2] La coincidencia del buscador. Mira NOMBRE, SLUG y TÍTULO: son
@@ -17706,6 +17851,11 @@ function filtrarEsferasFecha(filtro, btn) {
   if (btn) btn.classList.add('active');
   _esfFiltroFecha = filtro;
   _esfPintarLista();
+  // [ESF-UX-3] El registro `PROMOS` se pide al ENTRAR a esta vista, no al abrir
+  // la pantalla: es una descarga del `index.html` entero y las otras cuatro
+  // vistas no la necesitan. La lista se pinta ya (con "leyendo…") y se repinta
+  // sola al llegar — nunca se queda esperando.
+  if (filtro === 'promo') _esfPromosAsegurar();
 }
 
 function _esfPintarLista() {

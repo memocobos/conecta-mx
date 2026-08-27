@@ -23378,7 +23378,15 @@ let _ctrReenvio = null;   // { token, paso }
 function _ctrLimiteTexto(iso) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(String(iso || ''))) return '';
   try {
-    return new Date(iso + 'T12:00:00-05:00').toLocaleDateString('es-MX', {
+    const d = new Date(iso + 'T12:00:00-05:00');
+    if (!Number.isFinite(d.getTime())) return '';
+    // ⚠️ IDA Y VUELTA. La forma no basta: `2026-13-45` pasa el regex y sale
+    // "Invalid Date" —que se iría ESCRITA en el correo—, y `2026-02-31` es peor
+    // todavía: JavaScript lo rueda EN SILENCIO a "3 de marzo", así que un
+    // dedazo se convierte en otra fecha que parece buena. Si la fecha no vuelve
+    // a escribirse igual, no es la fecha que alguien tecleó.
+    if (d.toLocaleDateString('en-CA', { timeZone: 'America/Cancun' }) !== iso) return '';
+    return d.toLocaleDateString('es-MX', {
       weekday: 'long', day: 'numeric', month: 'long', timeZone: 'America/Cancun',
     });
   } catch (_) { return ''; }

@@ -2289,6 +2289,9 @@
      <!-- [HER-1b] El buscador, mismo patrón que el de Esferas: filtra EN VIVO lo
           que ya está pintado, no le pide nada al servidor. Con 25 contratos y
           cero filtros, encontrar uno era leerse la tabla. -->
+     <!-- [HER-1d] La alerta de pendientes atorados. Nace VACÍA y se esconde sola
+          cuando no hay nada que apurar: una alerta permanente es decoración. -->
+     <div id="ctr-alerta" style="display:none;background:rgba(255,176,32,.10);border:1px solid rgba(255,176,32,.38);border-left:4px solid #ffb020;border-radius:var(--r-sm,8px);padding:14px 18px;margin-bottom:14px"></div>
      <!-- [HER-1c] Los mismos `.gz-filter` de Esferas. Arranca en PENDIENTES: 23
           de 25 están firmados y no piden nada. Y // vencidos vive APARTE — no
           sale en pendientes ni en firmados, como el archivo de Esferas. -->

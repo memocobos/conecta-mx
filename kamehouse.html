@@ -2289,6 +2289,15 @@
      <!-- [HER-1b] El buscador, mismo patrón que el de Esferas: filtra EN VIVO lo
           que ya está pintado, no le pide nada al servidor. Con 25 contratos y
           cero filtros, encontrar uno era leerse la tabla. -->
+     <!-- [HER-1c] Los mismos `.gz-filter` de Esferas. Arranca en PENDIENTES: 23
+          de 25 están firmados y no piden nada. Y // vencidos vive APARTE — no
+          sale en pendientes ni en firmados, como el archivo de Esferas. -->
+     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">
+      <button class="gz-filter active" id="ctrf-pendientes" onclick="filtrarContratos('pendiente',this)">// pendientes</button>
+      <button class="gz-filter" id="ctrf-firmados" onclick="filtrarContratos('firmado',this)">// firmados</button>
+      <button class="gz-filter" id="ctrf-vencidos" onclick="filtrarContratos('vencido',this)" title="Vigencia terminada. Se calcula de vigencia_fin — hoy solo la llena la plantilla coordinador.">// vencidos</button>
+      <button class="gz-filter" id="ctrf-todos" onclick="filtrarContratos('todos',this)">// todos</button>
+     </div>
      <input type="search" id="ctr-buscar" class="cot-input" placeholder="Buscar por nombre, correo o evento…"
             autocomplete="off" oninput="_ctrBuscarEnLista()" aria-label="Buscar contrato"
             style="width:100%;font-size:13px;margin-bottom:12px">

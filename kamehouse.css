@@ -1832,6 +1832,48 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
 .rdr-ventana b{color:var(--text);font-weight:600}
 .rdr-ventana .rdr-encurso{color:var(--rdr-yel)}
 
+/* ── [RAD-1c] LA FRANJA DEL DÍA ───────────────────────── */
+.rdia{margin:0 0 22px}
+.rdia-head{display:flex;align-items:center;gap:12px;margin:0 0 12px}
+.rdia-tit{
+  font-family:'Zen Dots',sans-serif;font-size:13px;letter-spacing:.04em;
+  color:var(--rdr-yel);white-space:nowrap;
+}
+.rdia-linea{flex:1;height:1px;background:var(--rdr-border)}
+.rdia-meta{
+  font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--ts);white-space:nowrap;
+}
+.rdia-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+.rdia-card{
+  background:var(--rdr-card);border:1px solid var(--rdr-border);
+  border-radius:var(--radius);padding:16px 18px;
+}
+.rdia-rot{
+  font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--ts);margin-bottom:8px;
+}
+.rdia-val{
+  font-family:'Zen Dots',sans-serif;font-size:30px;line-height:1;color:#fff;
+  display:flex;align-items:baseline;gap:10px;font-variant-numeric:tabular-nums;
+}
+/* Los tokens son los del Radar (`--rdr-grn`/`--rdr-red`), no unos nuevos: casi
+   invento `--rdr-ok`/`--rdr-bad` y habrían sido dos nombres para el mismo
+   color. La flecha de la franja se ve igual que la de las tarjetas de abajo
+   porque ES la misma decisión. */
+.rdia-tr{font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;letter-spacing:.04em}
+.rdia-tr.up{color:var(--rdr-grn)}
+.rdia-tr.down{color:var(--rdr-red)}
+.rdia-tr.flat{color:var(--ts)}
+.rdia-pie{margin-top:9px;font-size:11px;color:var(--ts);line-height:1.4}
+.rdia-error{
+  background:rgba(255,40,59,.08);border:1px solid rgba(255,40,59,.38);
+  border-radius:var(--radius);padding:14px 18px;font-size:13px;font-weight:700;color:#ff7d88;
+}
+.rdia-error span{display:block;margin-top:4px;font-weight:400;font-size:11px;color:var(--ts)}
+@media (max-width:1100px){.rdia-grid{grid-template-columns:repeat(2,1fr)}}
+@media (max-width:560px){.rdia-grid{grid-template-columns:1fr}.rdia-meta{display:none}}
+
 /* ── KPI grid ────────────────────────────────────────── */
 .rdr-kpis{
   display:grid;grid-template-columns:repeat(3, minmax(0, 1fr));

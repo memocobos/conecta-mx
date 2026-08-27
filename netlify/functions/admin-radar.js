@@ -12,6 +12,7 @@
 //
 // Body JSON: { accion, ... }   (Rol: maestro_roshi — el Radar es solo de él)
 //   - 'metricas' { rango } → reenvía radar_metricas(p_rango) tal cual (KPIs/embudo/tops).
+//   - 'dia'                → reenvía radar_dia() tal cual: la franja del día [RAD-1c].
 //   - 'fetch' { table, select?, since, until? } → lectura paginada (Range + Content-Range,
 //        created_at gte since [lt until], order created_at.desc) → { ok, rows:[...] }.
 //        table ∈ main_eventos_uso | pagos_eventos_uso | rol_eventos_uso | eventos_waitlist.
@@ -116,6 +117,28 @@ exports.handler = async (event) => {
       let metricas;
       try { metricas = JSON.parse(text); } catch { metricas = text; }
       return { statusCode: 200, headers, body: JSON.stringify({ ok: true, metricas }) };
+    }
+
+    // ── dia (RPC radar_dia — LA FRANJA DEL DÍA de RAD-1c) ────────────────────
+    //
+    // 🔒 Sin parámetros a propósito: el día y su tramo los decide la BASE, no
+    // quien llama. Si el cliente pudiera mandar la fecha, tendríamos otra vez
+    // dos ideas de «hoy» — y esta pantalla ya tuvo cinco.
+    //
+    // La agregación vive en el RPC, no aquí: son ~15,000 filas para ocho días.
+    // Es el patrón de `event-clicks.js`, que ya decía «LA AGREGACIÓN VIVE AQUÍ,
+    // no en el cliente».
+    if (accion === 'dia') {
+      const r = await fetch(`${restBase}/rpc/radar_dia`, {
+        method: 'POST', headers: sbHeaders, body: '{}',
+      });
+      const text = await r.text();
+      if (!r.ok) {
+        return { statusCode: 502, headers, body: JSON.stringify({ error: 'KH rechazó radar_dia', detail: text }) };
+      }
+      let dia;
+      try { dia = JSON.parse(text); } catch { dia = text; }
+      return { statusCode: 200, headers, body: JSON.stringify({ ok: true, dia }) };
     }
 
     // ── main_metrics (RPC radar_main_metrics con ventana explícita — comparativas) ──

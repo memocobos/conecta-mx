@@ -939,6 +939,8 @@ const khRadar = {
   },
   // metricas(rango) → respuesta del RPC radar_metricas TAL CUAL
   metricas(rango) { return this._call({ accion: 'metricas', rango }).then(j => j.metricas); },
+  // [RAD-1c] dia() → la franja del día. Sin parámetros: el día lo decide la base.
+  dia() { return this._call({ accion: 'dia' }).then(j => j.dia); },
   // mainMetrics(sinceISO, untilISO|null) → RPC radar_main_metrics TAL CUAL (comparativas)
   mainMetrics(since, until) { return this._call({ accion: 'main_metrics', since, until: until || undefined }).then(j => j.metricas); },
   // fetch({ table, select?, since, until? }) → array de filas (paginado server-side)
@@ -24046,7 +24048,11 @@ async function loadRolAnalytics(silent){
     // KPIs, tops, paquetes, embudo y métodos de compartir salen del RPC (cacheado por rango).
     const data = await _radarGetMetricas(_radarRange);
     // Sparklines (7d) y actividad por hora (24h) siguen de un fetch liviano de 7 días.
-    const since7d = new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString();
+    // [RAD-1c] LA SEXTA aritmética de calendario de esta pantalla, encontrada al
+  // construir la franja del día: `now − 7×24h` arranca a la hora del clic, así
+  // que la cubeta más vieja del sparkline salía siempre a medias. Se pide al
+  // calendario, y se traen OCHO días para que la franja tenga con qué comparar.
+  const since7d = _radCalMasDias(_radCalHoy(), -7).toISOString();
     const select = 'select=session_id,accion,created_at';
     const rows7 = await _radarFetch('rol_eventos_uso?' + select, since7d).catch(() => []);
     renderRolAnalytics(data, rows7 || []);
@@ -24981,7 +24987,80 @@ function _rdrPaintDonut(svgGroupId, items, palette){
 }
 
 // ── RESUMEN GENERAL ────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════
+// [RAD-1c] LA FRANJA DEL DÍA
+//
+// 🔒 NINGÚN CONTADOR NUEVO. Las visitas se miden desde el 19-may-2026 en
+// `main_eventos_uso` —33,563 filas de `main_visita`— y el Radar ya las leía:
+// «Visitas totales» es la primera tarjeta del Resumen. Lo que faltaba era la
+// lectura DE HOY, porque esa tarjeta enseña el RANGO ELEGIDO y el default es el
+// mes: decía 11,779 y nunca 190. Un contador nuevo habría sido una segunda
+// fuente del mismo número.
+//
+// 🔒 Y LA COMPARACIÓN VA CONTRA EL MISMO TRAMO HORARIO. Medido hoy a las 14:35
+// de Reynosa: 285 visitas. Contra la media de 7 días COMPLETOS son −53% («día
+// desastroso»); contra la media al MISMO TRAMO son +8% («día por encima»). El
+// signo se invierte. Es la lección de RAD-1a-FIX aplicada antes de repetirla —
+// y la maqueta del diagnóstico decía −76% justamente por calcularlo mal.
+//
+// El número lo computa el RPC, no esta función: son ~15,000 filas para ocho
+// días. Aquí solo se pinta.
+// ═══════════════════════════════════════════════════════════════════════════
+function _radPct(hoy, media) {
+  if (!media || media <= 0) return null;
+  return Math.round((hoy - media) * 100 / media);
+}
+function _radDiaTarjeta(rot, valor, pct, pie) {
+  const flecha = pct == null ? ''
+    : `<span class="rdia-tr ${pct > 0 ? 'up' : pct < 0 ? 'down' : 'flat'}">${pct > 0 ? '↑' : pct < 0 ? '↓' : '→'} ${Math.abs(pct)}%</span>`;
+  return `<div class="rdia-card">
+      <div class="rdia-rot">${_radarEsc(rot)}</div>
+      <div class="rdia-val">${valor == null ? '—' : Number(valor).toLocaleString('es-MX')}${flecha}</div>
+      <div class="rdia-pie">${pie}</div>
+    </div>`;
+}
+async function _radDiaCargar() {
+  const el = document.getElementById('radar-dia');
+  if (!el) return null;
+  let d;
+  try { d = await khRadar.dia(); }
+  catch (e) {
+    // 🔒 Falla RUIDOSO y con el porqué. Un cero silencioso aquí diría «hoy no
+    // vino nadie», que es una afirmación, no un dato que falta.
+    el.innerHTML = `<div class="rdia-error">No pude leer el día de hoy. <span>${_radarEsc(e.message || '')}</span></div>`;
+    return null;
+  }
+  if (!d) { el.innerHTML = ''; return null; }
+  const m = d.media7 || {};
+  const cl = d.clicks || {};
+  el.innerHTML = `
+    <div class="rdia-head">
+      <span class="rdia-tit">EL DÍA DE HOY</span>
+      <span class="rdia-linea"></span>
+      <span class="rdia-meta">${_radarEsc(String(d.hoy || ''))} · corte 00:00 Reynosa · van ${_radarEsc(String(d.corrido || ''))}</span>
+    </div>
+    <div class="rdia-grid">
+      ${_radDiaTarjeta('Visitas hoy', d.visitas, _radPct(d.visitas, m.visitas),
+        `vs ${Number(m.visitas || 0).toLocaleString('es-MX')} de media · ${_radarEsc(String(m.tramo || ''))}`)}
+      ${_radDiaTarjeta('Vieron un evento', d.vieron, _radPct(d.vieron, m.vieron),
+        d.visitas ? `${Math.round((d.vieron || 0) * 100 / d.visitas)}% de las visitas` : '—')}
+      ${_radDiaTarjeta('Cotizaron', d.cotizaron, _radPct(d.cotizaron, m.cotizaron),
+        d.visitas ? `${Math.round((d.cotizaron || 0) * 100 / d.visitas)}% de las visitas` : '—')}
+      ${/* 🔒 Los clicks van SIN flecha. `event_clicks_diario` guarda un total por
+            día sin marca de tiempo, así que no hay forma de recortarlo al tramo
+            corrido: solo se podría comparar hoy-a-medias contra días enteros,
+            que es justo lo que esta tuerca prohíbe. Se enseña el número y ya. */''}
+      ${_radDiaTarjeta('Clicks en eventos', cl.n, null,
+        `${Number(cl.eventos || 0)} eventos distintos · sin comparación`)}
+    </div>`;
+  return d;
+}
+
 async function loadRadarResumen(){
+  // [RAD-1c] La franja del día va PRIMERO y en paralelo: es lo que Memo mira al
+  // entrar, y no depende del rango elegido — «hoy» es hoy aunque estés viendo
+  // el mes. Falla en blando: si el día no carga, el resto del Resumen entra.
+  _radDiaCargar();
   // KPIs, top de eventos y donut de orígenes salen del RPC agregado (cacheado por rango).
   // Esto reemplaza la descarga de ~52k filas + conteo client-side que hacía timeout.
   const data  = await _radarGetMetricas(_radarRange);
@@ -24992,7 +25071,11 @@ async function loadRadarResumen(){
 
   // Sparklines (7 días) y actividad por hora (24h) son series temporales: siguen
   // saliendo de un fetch liviano de los últimos 7 días (nunca fue el cuello de botella).
-  const since7d = new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString();
+  // [RAD-1c] LA SEXTA aritmética de calendario de esta pantalla, encontrada al
+  // construir la franja del día: `now − 7×24h` arranca a la hora del clic, así
+  // que la cubeta más vieja del sparkline salía siempre a medias. Se pide al
+  // calendario, y se traen OCHO días para que la franja tenga con qué comparar.
+  const since7d = _radCalMasDias(_radCalHoy(), -7).toISOString();
   const [waitlist, main7, rol7] = await Promise.all([
     _radarFetch('eventos_waitlist?select=evento_id,evento_nombre,created_at', '1970-01-01T00:00:00Z').catch(() => []),
     _radarFetch('main_eventos_uso', since7d).catch(() => []),

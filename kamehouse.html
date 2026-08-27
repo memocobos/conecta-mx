@@ -2582,6 +2582,9 @@
 
    <!-- ═══════════ SUB-PESTAÑA: Resumen general ═══════════ -->
    <section class="radar-sub" data-sub="resumen" style="display:block">
+     <!-- [RAD-1c] La franja del día. NO depende del rango elegido: «hoy» es hoy
+          aunque estés viendo el mes. La llena `_radDiaCargar` desde el RPC. -->
+     <div id="radar-dia" class="rdia"></div>
      <!-- KPI cards con sparklines individuales -->
      <div class="rdr-kpis">
        <div class="rdr-kpi">

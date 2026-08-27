@@ -24460,10 +24460,44 @@ function _radCalMasDias(fecha, n) {
   return _radCalMedianoche(d.getUTCFullYear(), d.getUTCMonth() + 1, d.getUTCDate());
 }
 
+// 🔒 [RAD-1a-FIX] LAS DOS VENTANAS, DEL MISMO LARGO.
+//
+// RAD-1a cambió los cortes rodantes por cortes de calendario — y con eso ROMPIÓ
+// algo que antes estaba bien por accidente. El corte viejo comparaba `ahora−7d`
+// contra `ahora−14d..ahora−7d`: dos ventanas de EXACTAMENTE 7 días. Injustas de
+// otra manera, pero del mismo largo. Con el calendario, el tramo actual va del
+// lunes a AHORA (jueves = 3.57 días) y el previo era la semana pasada ENTERA.
+//
+// Medido en producción el 27-ago sobre `main_visita`:
+//   actual 3.57 días → 2,454 sesiones
+//   previo 7.00 días → 4,450 sesiones     → la tarjeta pintaba **−45%**
+//   previo del mismo largo → 2,674        → lo honesto es **−8%**
+// Treinta y siete puntos, en cada KPI del Resumen.
+//
+// ⚠️ De dónde salió: la regla «ventanas del mismo largo» la escribí yo para
+// Giru, en el diagnóstico de esta misma serie, y la rompí en la tuerca que la
+// estableció. Cambiar un corte no es solo mover el `since`: mueve también CON
+// QUÉ se compara. Un cambio de ventana tiene dos lados y solo miré uno.
+//
+// El ajuste está en UNA puerta —no repetido en cada rango— porque cinco copias
+// de una regla es exactamente cómo este archivo llegó a tener cinco calendarios.
+function _radCalMismoLargo(v) {
+  if (!v || !v.prevSince || !v.prevUntil) return v;
+  const fin = v.until ? v.until.getTime() : Date.now();
+  const largo = fin - v.since.getTime();
+  if (!(largo > 0)) return v;                 // 'all' y cualquier ventana vacía
+  v.prevUntil = new Date(v.prevSince.getTime() + largo);
+  v.largoMs = largo;
+  return v;
+}
+
 // 🔒 LA VENTANA. Todo el Radar la pide aquí y a nadie más.
 // Devuelve instantes (Date) + la leyenda que la pantalla imprime, para que el
 // rótulo NO pueda decir algo distinto de lo que el corte hace.
-function _radCalVentana(rango) {
+// La cruda arma el tramo actual; el envoltorio iguala el previo. Una sola
+// puerta: quien añada un rango mañana entra por aquí y hereda la regla.
+function _radCalVentana(rango) { return _radCalMismoLargo(_radCalVentanaCruda(rango)); }
+function _radCalVentanaCruda(rango) {
   const hoy = _radCalHoy();
   const p = _radCalPartes(Date.now());
   const finDeHoy = _radCalMasDias(hoy, 1);
@@ -25385,9 +25419,15 @@ function _rcmRangosPara(modo, opts){
     const actSince  = _radCalMedianoche(p.y, mes, 1);
     const actUntil  = _radCalMedianoche(p.y + sig.y, sig.m, 1);
     const prevSince = _radCalMedianoche(p.y - 1, mes, 1);
-    const prevUntil = _radCalMedianoche(p.y - 1 + sig.y, sig.m, 1);
-    return { actSince, actUntil, prevSince, prevUntil,
-             leyenda: `${_RCM_MESES[mes - 1]} ${p.y} vs ${_RCM_MESES[mes - 1]} ${p.y - 1}` };
+    let   prevUntil = _radCalMedianoche(p.y - 1 + sig.y, sig.m, 1);
+    // [RAD-1a-FIX] El MES EN CURSO también arrastraba el sesgo: agosto de este
+    // año va hasta HOY, y el de el año pasado iba COMPLETO. Un mes pasado se
+    // compara entero contra entero —eso está bien— pero el actual se recorta.
+    const enCurso = (mes === p.m && actUntil.getTime() > Date.now());
+    if (enCurso) prevUntil = new Date(prevSince.getTime() + (Date.now() - actSince.getTime()));
+    return { actSince, actUntil: enCurso ? null : actUntil, prevSince, prevUntil,
+             leyenda: `${_RCM_MESES[mes - 1]} ${p.y} vs ${_RCM_MESES[mes - 1]} ${p.y - 1}` +
+                      (enCurso ? ' (mismo tramo)' : '') };
   }
   const v = _radCalVentana('rolling30');
   return { actSince: v.since, actUntil: null, prevSince: v.prevSince, prevUntil: v.prevUntil,

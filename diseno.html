@@ -2183,6 +2183,10 @@
     return ps.length ? Math.min.apply(null, ps) : null;
   }
 
+  // Una fecha de verdad trae dígitos. Es lo que separa "7 sep 2026" de
+  // "Por confirmar", y sale de medir el catálogo, no de adivinar el literal.
+  function _evEsFecha(f) { return /\d/.test(String(f || '')); }
+
   const _SUB_POR_ST = {
     '': 'YA|A LA VENTA',
     proximamente: 'PRÓXIMAMENTE|EN MÉXICO',
@@ -2208,12 +2212,17 @@
       return { name: nombre, sub: _SUB_POR_ST[st] || _SUB_POR_ST[''] };
     }
     if (plantilla === 'news') {
-      // Sin fecha o sin venue NO se inventa la frase: se dice lo que se sabe.
-      const donde = v ? (' en ' + v) : '';
-      const cuando = f ? (' el ' + f) : '';
-      return { text: (cuando || donde)
-        ? (_evNombreCorto(ev) + ' se presenta' + cuando + donde + '.')
-        : (_evNombreCorto(ev) + ': fecha por confirmar.') };
+      // ⚠️ `f` NO siempre es una fecha: 4 eventos vivos traen "Por confirmar",
+      // y pegarlo en la oración produce "se presenta el Por confirmar". Medido
+      // sobre las 103: "Por confirmar" es el ÚNICO valor de `f` sin dígitos,
+      // así que la pregunta es «¿trae dígitos?», no «¿es igual a este texto?».
+      // La NOTICIA es la única plantilla que arma una oración; en Promoción
+      // "POR CONFIRMAR — ESTADIO BBVA, MTY" se lee bien y dice la verdad.
+      const nom = _evNombreCorto(ev);
+      if (_evEsFecha(f) && v) return { text: nom + ' se presenta el ' + f + ' en ' + v + '.' };
+      if (_evEsFecha(f)) return { text: nom + ' se presenta el ' + f + '.' };
+      if (v) return { text: nom + ' llega a ' + v + '. Fecha por confirmar.' };
+      return { text: nom + ': fecha por confirmar.' };
     }
     // promo
     const fecha = [f, v].filter(Boolean).join(' — ').toUpperCase();

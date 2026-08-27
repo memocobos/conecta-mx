@@ -1009,12 +1009,14 @@
   .poster.tpl-disponibilidad.fmt-story-ig .dp-sello{font-size:calc(78px * var(--text-scale))}
   .poster.tpl-disponibilidad.fmt-story-ig .dp-name{font-size:calc(104px * var(--text-scale))}
   .poster.tpl-disponibilidad.fmt-post-fb  .dp-name{font-size:calc(74px * var(--text-scale))}
-  /* El botón de la variante activa toma su propio color: el semáforo se ve
-     también en el panel, no solo en el cartel. */
-  .dp-var-btn.active[data-dp="disponible"]{border-color:#88ea4e; color:#88ea4e}
-  .dp-var-btn.active[data-dp="poca"]{border-color:#e8ff4c; color:#e8ff4c}
-  .dp-var-btn.active[data-dp="ultimos"]{border-color:#ff283b; color:#ff283b}
-  .dp-var-btn.active[data-dp="agotado"]{border-color:rgba(255,255,255,.4); color:rgba(255,255,255,.65)}
+  /* El botón de la variante activa toma SU color, no el azul de
+     `.toggle-btn.active`: el semáforo tiene que leerse también en el panel, y
+     un "Disponible" en azul no es un semáforo. Se pisa el `background`, no solo
+     el borde — la regla base lo declara y ganaba. */
+  .dp-var-btn.active[data-dp="disponible"]{background:#88ea4e; border-color:#88ea4e; color:#04240f}
+  .dp-var-btn.active[data-dp="poca"]{background:#e8ff4c; border-color:#e8ff4c; color:#161a00}
+  .dp-var-btn.active[data-dp="ultimos"]{background:#ff283b; border-color:#ff283b; color:#fff}
+  .dp-var-btn.active[data-dp="agotado"]{background:rgba(255,255,255,.22); border-color:rgba(255,255,255,.45); color:#fff}
 </style>
 </head>
 <body data-theme="dark">

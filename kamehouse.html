@@ -2928,6 +2928,41 @@
  MODALES
 ═══════════════════════════════════════════════ -->
 
+<!-- [HER-1e] Modal de REENVÍO, dos pasos. Nada sale hasta el paso 2. -->
+<div class="modal-overlay" id="modal-contrato-reenviar">
+ <div class="modal" style="max-width:640px">
+  <div class="modal-header">
+   <div>
+    <div id="ctr-re-paso" style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.18em;color:var(--ts)">// REENVIAR CONTRATO · PASO 1 DE 2</div>
+    <div id="ctr-re-nombre" style="font-size:20px;font-weight:900;margin-top:4px"></div>
+    <div id="ctr-re-sub" style="font-size:12px;color:var(--ts);margin-top:2px"></div>
+   </div>
+   <button class="modal-close" onclick="closeModal('modal-contrato-reenviar')" aria-label="Cerrar"></button>
+  </div>
+  <div class="modal-body">
+   <div id="ctr-re-p1">
+    <div class="form-group">
+     <label>Fecha límite para firmar</label>
+     <input class="cot-input" type="date" id="ctr-re-fecha" style="width:220px" onchange="_ctrReenvioPintar()" oninput="_ctrReenvioPintar()">
+     <div style="font-size:11px;color:var(--ts);margin-top:6px">Llega sugerida a 5 días y se puede cambiar. Se escribe en el correo; <b>no cancela nada</b> — dar de baja sigue siendo tuyo, a mano.</div>
+    </div>
+    <div style="background:var(--bg);border:1px solid var(--border);border-radius:var(--r-sm,8px);padding:14px 16px;margin-top:14px">
+     <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.14em;color:var(--ts);margin-bottom:8px">// LO QUE VA A LEER</div>
+     <div id="ctr-re-cuerpo" style="font-size:13px;line-height:1.6"></div>
+    </div>
+   </div>
+   <div id="ctr-re-p2" style="display:none">
+    <div id="ctr-re-destino" style="font-size:14px;line-height:1.65"></div>
+   </div>
+  </div>
+  <div class="modal-footer">
+   <button class="btn btn-ghost btn-sm" id="ctr-re-atras" style="display:none" onclick="_ctrReenvioAtras()">← Atrás</button>
+   <button class="btn btn-ghost btn-sm" onclick="closeModal('modal-contrato-reenviar')">Cancelar</button>
+   <button class="btn btn-primary btn-sm" id="ctr-re-seguir" onclick="_ctrReenvioSeguir()">Continuar →</button>
+  </div>
+ </div>
+</div>
+
 <!-- Modal: Reporte Post-Evento (contenido dinámico) -->
 <div class="modal-overlay" id="modal-reporte">
 </div>

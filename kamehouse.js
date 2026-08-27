@@ -11822,6 +11822,11 @@ function showHerramienta(name) {
   document.getElementById('nav-herramientas').classList.add('active');
   const item = document.getElementById('nav-' + name);
   if (item) item.classList.add('active');
+  // [HER-1a] Y se DESPLIEGA el grupo si estaba plegado. Es la misma cortesía que
+  // `showPage` le hace a los otros cuatro: marcar como activo un item escondido
+  // deja la pantalla abierta y el menú sin decir dónde estás.
+  const grpHerr = document.getElementById('nav-dropdown-herramientas');
+  if (grpHerr) grpHerr.classList.remove('collapsed');
 
   if (name === 'recibos') {
     if (!recibosLoaded) {

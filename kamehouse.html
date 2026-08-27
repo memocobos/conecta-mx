@@ -153,7 +153,8 @@
   </div>
 
   <div class="nav-group" id="nav-dropdown-herramientas">
-   <div class="nav-group-title" id="nav-herramientas">Herramientas</div>
+   <div class="nav-group-title" id="nav-herramientas" onclick="toggleNavGroup(this)" role="button" tabindex="0"
+        onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleNavGroup(this)}">Herramientas</div>
    <button class="nav-dropdown-item" id="nav-recibos" onclick="showHerramienta('recibos')"><svg class="nav-ic"><use href="#ic-recibos"/></svg><span>Recibos</span></button>
    <button class="nav-dropdown-item" id="nav-contratos" onclick="showHerramienta('contratos')"><svg class="nav-ic"><use href="#ic-contratos"/></svg><span>Contratos</span></button>
    <button class="nav-dropdown-item" id="nav-waitlist" onclick="showHerramienta('waitlist')"><svg class="nav-ic"><use href="#ic-waitlist"/></svg><span>Lista de espera</span></button>

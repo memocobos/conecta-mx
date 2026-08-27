@@ -1071,14 +1071,19 @@
 
      Y `top: 340px` a secas, no `var(--pr-handle-y, 340px)`: esa variable SÍ
      está puesta (50), así que un fallback nunca se usaría. */
-  .poster.tpl-promo.fmt-wa-status .promo-block,
+  /* ⚠️ LA ZONA SEGURA ES UN PISO, NO UN NÚMERO. Poner 340px fijo EMPEORABA a
+     Promoción, que en story ya vive a 430px del borde: la habría subido menos
+     y metido debajo de la interfaz. Con `max()` cada plantilla conserva su
+     composición y solo se mueve la que no llegaba. Medido: promo 430→430,
+     disponibilidad 220→340. */
+  .poster.tpl-promo.fmt-wa-status .promo-block { bottom: max(340px, calc(var(--pr-y) + 150px)); }
+  .poster.tpl-proximamente.fmt-wa-status .text-block { bottom: max(340px, calc(var(--px-y) + 150px)); }
   .poster.tpl-disponibilidad.fmt-wa-status .dp-block,
   .poster.tpl-espera.fmt-wa-status .es-block { bottom: 340px; }
-  .poster.tpl-promo.fmt-wa-status .handle,
+  .poster.tpl-promo.fmt-wa-status .handle { top: max(340px, var(--pr-handle-y, 340px)); }
+  .poster.tpl-proximamente.fmt-wa-status .handle { top: max(340px, var(--handle-y, 340px)); }
   .poster.tpl-disponibilidad.fmt-wa-status .handle,
   .poster.tpl-espera.fmt-wa-status .handle { top: 340px; }
-  .poster.tpl-proximamente.fmt-wa-status .text-block { bottom: 340px; }
-  .poster.tpl-proximamente.fmt-wa-status .handle { top: 340px; }
   .poster.tpl-news.layout-1.fmt-wa-status .news-bottom { padding-bottom: 340px; }
   .poster.tpl-news.layout-2.fmt-wa-status .news-bottom-2 { padding-bottom: 340px; }
 </style>

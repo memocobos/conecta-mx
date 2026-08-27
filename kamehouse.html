@@ -2486,6 +2486,13 @@
      </div>
    </div>
    <div id="wl-summary" style="font-size:12px;color:var(--ts);letter-spacing:.06em;text-transform:uppercase;margin-bottom:14px">Cargando…</div>
+   <!-- [HER-1g] Los chips, mismos `.gz-filter` de Esferas y Contratos. El
+        conteo va en PERSONAS, que es la unidad del resumen de arriba. -->
+   <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">
+    <button class="gz-filter active" id="wlf-activos" onclick="filtrarWaitlist('activos',this)">// activos</button>
+    <button class="gz-filter" id="wlf-archivo" onclick="filtrarWaitlist('archivo',this)" title="Eventos cuya gente YA fue notificada. Nada se borra: los correos siguen ahí para las promos que vienen.">// archivo</button>
+    <button class="gz-filter" id="wlf-todos" onclick="filtrarWaitlist('todos',this)">// todos</button>
+   </div>
    <!-- [HER-1f] El buscador: 438 personas en 12 eventos y ni una caja. Filtra en
         vivo lo pintado; no le pide nada al servidor. -->
    <input type="search" id="wl-buscar" class="cot-input" placeholder="Buscar por evento, nombre o correo…"

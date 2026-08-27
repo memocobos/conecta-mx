@@ -23585,6 +23585,48 @@ async function loadWaitlist() {
 // servidor. Por eso `loadWaitlist` se partió en traer y `_wlPintar` en dibujar.
 let _wlBusca = '';
 
+// ═══ [HER-1g] EL ARCHIVO DE LA LISTA DE ESPERA ════════════════════════════
+// Un evento cuya gente YA fue notificada no pide nada: ocupa el mismo espacio
+// que los que sí esperan una decisión. Se va al archivo solo.
+//
+// 🔒 NADA SE BORRA. Los 400 correos únicos son el activo para las promos que
+// vienen — decisión de Memo. Archivar es una VISTA, no un `delete`: las 438
+// filas siguen en el caché y en la base después de archivar, y «Volver a
+// activos» está a un clic.
+//
+// 🔒 SE CALCULA AL PINTAR. Cero columnas nuevas, cero migraciones:
+// `eventos_waitlist` ya tiene `notificado`, y "archivado" es simplemente
+// "todas sus filas lo traen". Un evento a medio notificar NO se archiva —
+// todavía le debe correos a alguien.
+//
+// ⚠️ UN EVENTO SIN GENTE no se archiva: no hay a quién haber notificado.
+// `[].every(...)` es `true` y sin este candado un grupo vacío entraría al
+// archivo por una regla de lógica, no por un hecho.
+let _wlFiltro = 'activos';
+
+function _wlArchivado(g) {
+  return g.rows.length > 0 && g.rows.every((r) => !!r.notificado);
+}
+
+function filtrarWaitlist(filtro, btn) {
+  document.querySelectorAll('#page-waitlist .gz-filter[id^="wlf-"]').forEach((b) => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  _wlFiltro = filtro;
+  _wlPintar();
+}
+
+// «Volver a activos» es de la VISTA, no de los datos: reabre el evento en la
+// pantalla sin tocar una fila. Marcarlos como no-notificados sería reescribir
+// la historia de a quién ya se le escribió.
+let _wlReabiertos = new Set();
+function wlVolverAActivos(eventoId) {
+  _wlReabiertos.add(eventoId);
+  _wlFiltro = 'activos';
+  document.querySelectorAll('#page-waitlist .gz-filter[id^="wlf-"]').forEach((b) =>
+    b.classList.toggle('active', b.id === 'wlf-activos'));
+  _wlPintar();
+}
+
 // Mira EVENTO, NOMBRE y CORREO. Buscar el nombre del evento trae a toda su
 // gente; buscar un correo lo encuentra sin importar en qué evento esté.
 function _wlCoincide(r, q) {
@@ -23610,28 +23652,49 @@ function _wlPintar() {
     byEv[r.evento_id].rows.push(r);
   }
   const todos = Object.values(byEv).sort((a,b) => b.rows.length - a.rows.length);
-  // El corte por texto se hace sobre las FILAS, y el grupo sobrevive si le queda
-  // alguien. Filtrar por nombre de evento cae solo: `_wlCoincide` lo mira.
-  const eventos = todos
+  // [HER-1g] El veredicto de archivo, y el veto manual de «Volver a activos».
+  todos.forEach((g) => { g.arch = _wlArchivado(g) && !_wlReabiertos.has(g.evento_id); });
+  const nArch = todos.filter((g) => g.arch).reduce((a, g) => a + g.rows.length, 0);
+  const nAct = _waitlistCache.length - nArch;
+
+  // [HER-1g] Los conteos van en PERSONAS, que es la unidad del resumen de
+  // arriba, y se cuentan SIN el buscador: el chip dice cuántos hay de cada
+  // clase, no cuántos sobreviven al texto.
+  const rot = (id, txt, n) => { const b = document.getElementById(id); if (b) b.textContent = txt + ' (' + n + ')'; };
+  rot('wlf-activos', '// activos', nAct);
+  rot('wlf-archivo', '// archivo', nArch);
+  rot('wlf-todos', '// todos', _waitlistCache.length);
+
+  // Dos cortes que se COMBINAN: primero el chip, luego el texto.
+  const delChip = todos.filter((g) => _wlFiltro === 'todos' || (_wlFiltro === 'archivo' ? g.arch : !g.arch));
+  const eventos = delChip
     .map((g) => Object.assign({}, g, { hit: g.rows.filter((r) => _wlCoincide(r, _wlBusca)) }))
     .filter((g) => g.hit.length);
   const total = _waitlistCache.length;
+  const enCorte = delChip.reduce((a, g) => a + g.rows.length, 0);
 
   if (summary) {
+    const etq = { activos: 'Activos', archivo: 'Archivo', todos: 'Total' };
     summary.textContent = _wlBusca
-      ? `${eventos.reduce((a, g) => a + g.hit.length, 0)} de ${total} personas · ${eventos.length} ${eventos.length === 1 ? 'evento' : 'eventos'}`
-      : `Total: ${total} ${total === 1 ? 'persona' : 'personas'} en ${todos.length} ${todos.length === 1 ? 'evento' : 'eventos'}`;
+      ? `${eventos.reduce((a, g) => a + g.hit.length, 0)} de ${enCorte} personas · ${eventos.length} ${eventos.length === 1 ? 'evento' : 'eventos'}`
+      : `${etq[_wlFiltro]}: ${enCorte} ${enCorte === 1 ? 'persona' : 'personas'} en ${delChip.length} ${delChip.length === 1 ? 'evento' : 'eventos'}` +
+        (_wlFiltro === 'activos' && nArch ? ` · ${nArch} archivadas` : '');
   }
 
   if (_wlBusca && !eventos.length) {
     // Una lista vacía es una afirmación: se dice cuántos hay del otro lado.
     groups.innerHTML = '<div class="empty-state" style="padding:34px;text-align:center;color:var(--ts);border:1px dashed var(--border);border-radius:var(--r-sm,8px)">' +
-      'Nadie dice "' + _wlEsc(_wlBusca) + '" — hay ' + total + ' en total.</div>';
+      'Nadie dice "' + _wlEsc(_wlBusca) + '" — hay ' + enCorte + ' en este corte y ' + total + ' en total.</div>';
     return;
   }
 
   if (!eventos.length) {
-    groups.innerHTML = '<div class="empty-state" style="padding:40px;text-align:center;color:var(--ts);border:1px dashed var(--border);border-radius:var(--r-sm,8px)"><div style="font-size:36px;margin-bottom:8px"><svg class="ic"><use href="#ic-campana"/></svg></div><div style="font-size:13px;letter-spacing:.06em">No hay registros todavía. Cuando alguien se registre en un evento &laquo;Próximamente&raquo;, aparecerá aquí.</div></div>';
+    const dice = _wlFiltro === 'archivo'
+      ? 'Nada en el archivo todavía. Un evento se archiva solo cuando TODA su gente ya fue notificada — y nada se borra.'
+      : (_wlFiltro === 'activos' && nArch
+        ? 'Ningún evento activo: los ' + nArch + ' registros que hay están en el archivo.'
+        : 'No hay registros todavía. Cuando alguien se registre en un evento &laquo;Próximamente&raquo;, aparecerá aquí.');
+    groups.innerHTML = '<div class="empty-state" style="padding:40px;text-align:center;color:var(--ts);border:1px dashed var(--border);border-radius:var(--r-sm,8px)"><div style="font-size:36px;margin-bottom:8px"><svg class="ic"><use href="#ic-campana"/></svg></div><div style="font-size:13px;letter-spacing:.06em">' + dice + '</div></div>';
     return;
   }
 
@@ -23649,20 +23712,22 @@ function _wlPintar() {
     const tagColor = estadoSnap === 'proximamente' ? '#e8ff4c' : '#88ea4e';
     const tagText = estadoSnap === 'proximamente' ? 'PRÓXIMAMENTE' : (isActivo ? 'ACTIVO ✓' : (estadoSnap || '—').toUpperCase());
     const notifLabel = (pendientes > 0) ? `Notificar a ${pendientes} ahora` : 'Reenviar notificación';
-    return `<div style="background:var(--bg2,#0a0a0a);border:1px solid var(--border);border-left:4px solid #e8ff4c;border-radius:var(--r-sm,8px);padding:18px 20px">
+    return `<div data-wl-archivado="${g.arch ? '1' : '0'}" style="background:var(--bg2,#0a0a0a);border:1px solid var(--border);border-left:4px solid ${g.arch ? 'var(--ts2)' : '#e8ff4c'};border-radius:var(--r-sm,8px);padding:18px 20px${g.arch ? ';opacity:.65' : ''}">
       <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:6px">
         <div style="font-size:15px;font-weight:800;color:#fff;flex:1 1 auto"><svg class="ic"><use href="#ic-eventos"/></svg> ${_wlEsc(g.evento_nombre)}</div>
-        <span style="font-size:10px;letter-spacing:.14em;padding:4px 10px;border-radius:4px;background:${tagBg};border:1px solid ${tagBorder};color:${tagColor};font-weight:800">${tagText}</span>
+        <span style="font-size:10px;letter-spacing:.14em;padding:4px 10px;border-radius:4px;background:${g.arch ? 'rgba(255,255,255,.06)' : tagBg};border:1px solid ${g.arch ? 'var(--border)' : tagBorder};color:${g.arch ? 'var(--ts)' : tagColor};font-weight:800">${g.arch ? 'ARCHIVADO' : tagText}</span>
       </div>
       <div style="font-size:12px;color:var(--ts);margin-bottom:12px;letter-spacing:.04em">
         ${hit.length === g.rows.length
           ? `${g.rows.length} ${g.rows.length === 1 ? 'persona registrada' : 'personas registradas'}`
           : `<b style="color:var(--text)">${hit.length}</b> de ${g.rows.length} personas coinciden`}
-        ${pendientes > 0 ? ` · <span style="color:#e8ff4c;font-weight:700">${pendientes} sin notificar</span>` : ' · <span style="color:#88ea4e">todos notificados</span>'}
+        ${pendientes > 0 ? ` · <span style="color:#e8ff4c;font-weight:700">${pendientes} sin notificar</span>` : (g.arch ? ' · <span style="color:var(--ts)">todos notificados · archivado</span>' : ' · <span style="color:#88ea4e">todos notificados</span>')}
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         <button class="btn btn-ghost btn-sm" onclick="wlVerRegistrados('${_wlEsc(g.evento_id)}')">Ver registrados</button>
-        <button class="btn btn-primary btn-sm" onclick="wlNotificar('${_wlEsc(g.evento_id)}', ${g.rows.length}, ${pendientes})">${notifLabel}</button>
+        ${g.arch
+          ? `<button class="btn btn-ghost btn-sm" data-wl-volver onclick="wlVolverAActivos('${_wlEsc(g.evento_id)}')">↩ Volver a activos</button>`
+          : `<button class="btn btn-primary btn-sm" onclick="wlNotificar('${_wlEsc(g.evento_id)}', ${g.rows.length}, ${pendientes})">${notifLabel}</button>`}
         ${['maestro_roshi','bulma'].includes(currentUser?.rol) ? `<button class="btn btn-ghost btn-sm" style="color:#ff6666;border-color:rgba(255,68,68,.3)" onclick="wlEliminarEvento('${_wlEsc(g.evento_id)}', ${g.rows.length})"><svg class="ic"><use href="#ic-basura"/></svg> Eliminar evento de la lista</button>` : ''}
       </div>
     </div>`;

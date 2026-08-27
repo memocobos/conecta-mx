@@ -1277,6 +1277,22 @@
   <div class="block" id="block6" data-status="pending">
     <div class="block-title"><div class="block-num">6</div>Contenido<span class="block-status-icon" id="block6Icon">○</span></div>
 
+    <!-- [HER-1h-A1] TRAER DEL CATÁLOGO.
+         Los datos del cartel ya existen en conectareynosa.mx: artista, fecha,
+         venue y precio. Tecleárlos a mano es copiar lo que la casa ya sabe —
+         y un dedazo aquí es un dedazo PUBLICADO.
+         Llena los MISMOS campos que los ejemplos rápidos, por el MISMO camino
+         (`applyExample`): no hay una segunda forma de escribir el cartel. -->
+    <div class="section" id="evCatalogo">
+      <div class="section-label">Traer del catálogo</div>
+      <select id="evPicker" aria-label="Elegir evento del catálogo">
+        <option value="">— cargando el catálogo… —</option>
+      </select>
+      <div class="hint" id="evHint" style="font-size:11px;opacity:.6;margin-top:6px">
+        Llena artista, fecha, venue y precio con lo que dice el sitio. Todo se puede editar después.
+      </div>
+    </div>
+
     <!-- Ejemplos rápidos -->
     <div class="examples-banner">
       <div class="examples-title">⚡ Ejemplos rápidos</div>
@@ -2105,11 +2121,157 @@
   $('pr-headline').addEventListener('input', (e) => { $('prHeadlineDisplay').textContent = e.target.value; markChanged(); });
   $('pr-cta').addEventListener('input', (e) => { $('prCtaDisplay').innerHTML = e.target.value.replace(/\n/g, '<br>'); markChanged(); });
 
+  $('evPicker').addEventListener('change', (e) => traerDelCatalogo(e.target.value));
+
   $$('.preset').forEach(btn => btn.addEventListener('click', () => {
     const target = $(btn.dataset.target);
     target.value = btn.dataset.val;
     target.dispatchEvent(new Event('input'));
   }));
+
+  // ═══ [HER-1h-A1] EL CATÁLOGO ═══════════════════════════════════════════
+  // Se lee del PROPIO sitio: `/index.html`, mismo origen (el CSP dice
+  // `connect-src 'self'`) y dato público — es literalmente lo que cualquiera ve
+  // al entrar. Ni credenciales, ni datos de nadie: el catálogo de eventos.
+  //
+  // Se recorta el literal contando corchetes y saltando comillas, como ya lo
+  // hacen `rol.html`, `_fetchEVFromIndex` y el lector de PROMOS de Esferas. Un
+  // regex no sabe dónde termina un arreglo con objetos adentro.
+  let EV_CAT = null;
+
+  function _cortarLiteral(html, re, abre, cierra) {
+    const m = String(html).match(re);
+    if (!m) return null;
+    const ini = m.index + m[0].length - 1;
+    let hondo = 0, enTexto = false, comilla = '', escapa = false;
+    for (let i = ini; i < html.length; i++) {
+      const ch = html[i];
+      if (escapa) { escapa = false; continue; }
+      if (enTexto) { if (ch === '\\') { escapa = true; continue; } if (ch === comilla) enTexto = false; continue; }
+      if (ch === '"' || ch === "'") { enTexto = true; comilla = ch; continue; }
+      if (ch === abre) hondo++;
+      else if (ch === cierra) { hondo--; if (!hondo) return html.slice(ini, i + 1); }
+    }
+    return null;
+  }
+
+  // Los eventos que escriben `hotel: HOTEL_CDM` revientan el `new Function` si
+  // esas declaraciones no están: se toman del MISMO index, no se stubbean a [].
+  function _declsHotel(html) {
+    return ['HOTEL_STD', 'HOTEL_MTY', 'HOTEL_CDM'].map((n) => {
+      const t = _cortarLiteral(html, new RegExp('var\\s+' + n + '\\s*=\\s*\\['), '[', ']');
+      return t ? ('var ' + n + '=' + t + ';') : '';
+    }).join('');
+  }
+
+  const _hoyMx = () => new Date().toLocaleDateString('en-CA', { timeZone: 'America/Cancun' });
+
+  // El nombre CORTO para el cartel. `a` trae la gira pegada en 38 de 103
+  // ("Tini - Futttura World Tour") y el cartel quiere "TINI"; `img` es el nombre
+  // corto en 91 de 103. Se prefiere `img`, y si no está se corta en el guion.
+  function _evNombreCorto(ev) {
+    if (typeof ev.img === 'string' && ev.img.trim()) return ev.img.trim();
+    return String(ev.a || '').split(/\s+[-–]\s+/)[0].trim();
+  }
+
+  // El precio MÁS BARATO del paquete PLUS. Se nombra el paquete a propósito:
+  // "desde $X" a secas es ambiguo cuando existen CHEAP, RIDE y STAY, y un
+  // número ambiguo en un cartel público es una promesa que alguien va a cobrar.
+  function _evDesde(ev) {
+    const ps = (Array.isArray(ev.zonas) ? ev.zonas : [])
+      .map((z) => Number(z && z.p)).filter((n) => Number.isFinite(n) && n > 0);
+    return ps.length ? Math.min.apply(null, ps) : null;
+  }
+
+  const _SUB_POR_ST = {
+    '': 'YA|A LA VENTA',
+    proximamente: 'PRÓXIMAMENTE|EN MÉXICO',
+    ultimos: 'ÚLTIMOS|LUGARES',
+    agotado: '¡SOLD|OUT!',
+  };
+  const _HEAD_POR_ST = {
+    '': '¡YA A LA VENTA!',
+    proximamente: 'PRÓXIMAMENTE.',
+    ultimos: '¡ÚLTIMOS PAQUETES!',
+    agotado: 'AGOTADO.',
+  };
+
+  // El evento → la MISMA forma que un ejemplo rápido. Ni una llave nueva: si
+  // `applyExample` sabe pintarlo, esto sabe llenarlo.
+  function _evAEjemplo(ev, plantilla) {
+    const nombre = _evNombreCorto(ev).toUpperCase();
+    const st = String(ev.st == null ? '' : ev.st);
+    const f = String(ev.f || '').trim();
+    const v = String(ev.v || '').trim();
+    const desde = _evDesde(ev);
+    if (plantilla === 'proximamente') {
+      return { name: nombre, sub: _SUB_POR_ST[st] || _SUB_POR_ST[''] };
+    }
+    if (plantilla === 'news') {
+      // Sin fecha o sin venue NO se inventa la frase: se dice lo que se sabe.
+      const donde = v ? (' en ' + v) : '';
+      const cuando = f ? (' el ' + f) : '';
+      return { text: (cuando || donde)
+        ? (_evNombreCorto(ev) + ' se presenta' + cuando + donde + '.')
+        : (_evNombreCorto(ev) + ': fecha por confirmar.') };
+    }
+    // promo
+    const fecha = [f, v].filter(Boolean).join(' — ').toUpperCase();
+    const cta = 'PAQUETES CON ACCESO, TRANSPORTE Y HOSPEDAJE.' +
+      (desde ? (' DESDE $' + desde.toLocaleString('es-MX') + ' EN PAQUETE PLUS.') : '') +
+      ' ¡ASEGURA TU LUGAR!';
+    return { date: fecha, name: nombre, headline: _HEAD_POR_ST[st] || _HEAD_POR_ST[''], cta: cta };
+  }
+
+  async function cargarCatalogo() {
+    const sel = $('evPicker');
+    const hint = $('evHint');
+    try {
+      const r = await fetch('/index.html?d=' + Date.now(), { cache: 'no-store' });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      const html = await r.text();
+      const arr = _cortarLiteral(html, /var\s+EV\s*=\s*\[/, '[', ']');
+      if (!arr) throw new Error('no encontré el arreglo EV');
+      const stubs = 'var BANCO_DEFAULT={},BANCO_HEY={},PROMOS={};' + _declsHotel(html);
+      const ev = new Function(stubs + 'return ' + arr + ';')();
+      if (!Array.isArray(ev) || !ev.length) throw new Error('el catálogo llegó vacío');
+      EV_CAT = ev;
+      pintarPicker();
+    } catch (e) {
+      EV_CAT = null;
+      sel.innerHTML = '<option value="">— no pude leer el catálogo —</option>';
+      // ⚠️ Se DICE que falló y se sigue trabajando a mano. Que el catálogo no
+      // conteste no puede dejar la herramienta inservible: el cartel se hacía
+      // a mano antes de esto y se sigue pudiendo.
+      if (hint) hint.textContent = 'No pude leer el catálogo (' + e.message + '). Puedes escribir los campos a mano como siempre.';
+    }
+  }
+
+  function pintarPicker() {
+    const sel = $('evPicker');
+    if (!sel || !EV_CAT) return;
+    const hoy = _hoyMx();
+    // Los que YA PASARON no se ofrecen: un cartel de un evento de abril no es
+    // una pieza que alguien vaya a publicar. Sin fecha cuenta como vivo — está
+    // por confirmar, no es historia. Es la regla de ORD-1, la misma de Esferas.
+    const vivos = EV_CAT.filter((e) => !e.ds || String(e.ds) >= hoy)
+      .sort((a, b) => String(a.ds || '9999').localeCompare(String(b.ds || '9999')));
+    sel.innerHTML = '<option value="">— elegir evento —</option>' +
+      vivos.map((e) => '<option value="' + String(e.id).replace(/"/g, '&quot;') + '">' +
+        _evNombreCorto(e).replace(/[&<>]/g, '') + (e.f ? ' · ' + String(e.f).replace(/[&<>]/g, '') : '') +
+        '</option>').join('');
+    const hint = $('evHint');
+    if (hint) hint.textContent = vivos.length + ' eventos vivos en el catálogo. Llena artista, fecha, venue y precio; todo se puede editar después.';
+  }
+
+  function traerDelCatalogo(id) {
+    if (!id || !EV_CAT) return;
+    const ev = EV_CAT.find((e) => String(e.id) === String(id));
+    if (!ev) return;
+    // El MISMO camino que los ejemplos rápidos. Una segunda forma de escribir
+    // el cartel sería una segunda forma de que se desincronicen.
+    applyExample(_evAEjemplo(ev, state.template));
+  }
 
   // === EJEMPLOS RÁPIDOS ===
   function buildExamples() {
@@ -2360,6 +2522,10 @@
   loadSession();
   initBranches();
   buildFilters();
+  // [HER-1h-A1] El catálogo se pide al arrancar y no bloquea nada: la
+  // herramienta ya está usable mientras llega, y si no llega se dice y se
+  // sigue a mano.
+  cargarCatalogo();
   buildColorPalette('colorPaletteNews', 'colorNews', applyNewsColor);
   buildColorPalette('colorPaletteNewsHeader', 'colorNewsHeader', applyNewsHeaderColor);
   buildColorPalette('colorPalettePxName', 'colorPxName', applyPxNameColor);

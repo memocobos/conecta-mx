@@ -943,6 +943,8 @@ const khRadar = {
   dia() { return this._call({ accion: 'dia' }).then(j => j.dia); },
   // [RAD-1d] tops(n) → los tres tops. Las ventanas las decide la base.
   tops(n) { return this._call({ accion: 'tops', n: n || 5 }).then(j => j.tops); },
+  // [RAD-1e] giru() → las lecturas. Sin parámetros: los umbrales viven en la base.
+  giru() { return this._call({ accion: 'giru' }).then(j => j.giru); },
   // mainMetrics(sinceISO, untilISO|null) → RPC radar_main_metrics TAL CUAL (comparativas)
   mainMetrics(since, until) { return this._call({ accion: 'main_metrics', since, until: until || undefined }).then(j => j.metricas); },
   // fetch({ table, select?, since, until? }) → array de filas (paginado server-side)
@@ -25121,12 +25123,66 @@ async function _radTopsCargar() {
   return t;
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// [RAD-1e] GIRU 🤖 · LA CARA
+//
+// 🔒 GIRU NO OPINA, GIRU LEE. Aquí no se calcula NADA: el motor vive en el RPC
+// y esto solo pinta lo que llegó, con su fuente debajo. Si la lectura y su
+// fuente se calcularan en sitios distintos, la fuente dejaría de ser una
+// prueba y pasaría a ser una etiqueta.
+//
+// 🔒 Y SI NO HAY NADA QUE DECIR, GIRU SE CALLA — pero lo DICE. Una tarjeta que
+// desaparece se lee como «se rompió»; una que dice «hoy no hay nada que
+// señalar» es información. Medido: hoy dispara 3 de 5 reglas; con umbrales
+// imposibles, 0.
+// ═══════════════════════════════════════════════════════════════════════════
+async function _radGiruCargar() {
+  const el = document.getElementById('radar-giru');
+  if (!el) return null;
+  let g;
+  try { g = await khRadar.giru(); }
+  catch (e) {
+    el.innerHTML = `<div class="rdia-error">Giru no pudo leer el radar. <span>${_radarEsc(e.message || '')}</span></div>`;
+    return null;
+  }
+  if (!g) { el.innerHTML = ''; return null; }
+  const L = Array.isArray(g.lecturas) ? g.lecturas : [];
+  const cuerpo = L.length
+    ? L.map((l) => `<div class="rgiru-fila">
+          <span class="rgiru-ico">${_radarEsc(l.icono || '•')}</span>
+          <div class="rgiru-txt">
+            <div class="rgiru-frase">${_radarEsc(l.texto || '')}</div>
+            <div class="rgiru-fuente">↳ ${_radarEsc(l.fuente || '')}</div>
+          </div>
+        </div>`).join('')
+    : `<div class="rgiru-callado">Hoy no hay nada que señalar. Los números van dentro de lo normal.</div>`;
+  // ⚠️ «Semana en curso» se dice cuando la semana no ha cerrado, porque las
+  // lecturas de eventos comparan lun→hoy contra lun→el mismo día. El tramo es
+  // el mismo a los dos lados —eso lo garantiza el RPC— pero el lector merece
+  // saber que está mirando media semana.
+  const curso = g.semana_en_curso
+    ? `<span class="rgiru-curso">semana en curso · se compara contra el mismo tramo</span>` : '';
+  el.innerHTML = `
+    <div class="rgiru">
+      <div class="rgiru-head">
+        <span class="rgiru-bot">🤖</span>
+        <span class="rgiru-nom">GIRU</span>
+        <span class="rgiru-meta">lee el radar · ${L.length} ${L.length === 1 ? 'lectura' : 'lecturas'} · ${_radarEsc(String(g.corrido || ''))}</span>
+        <span class="rgiru-sello">computado, no opinado</span>
+      </div>
+      ${curso ? `<div class="rgiru-aviso">${curso}</div>` : ''}
+      <div class="rgiru-body">${cuerpo}</div>
+    </div>`;
+  return g;
+}
+
 async function loadRadarResumen(){
   // [RAD-1c] La franja del día va PRIMERO y en paralelo: es lo que Memo mira al
   // entrar, y no depende del rango elegido — «hoy» es hoy aunque estés viendo
   // el mes. Falla en blando: si el día no carga, el resto del Resumen entra.
   _radDiaCargar();
   _radTopsCargar();   // [RAD-1d] los tres tops, también independientes del rango
+  _radGiruCargar();   // [RAD-1e] las lecturas de Giru
   // KPIs, top de eventos y donut de orígenes salen del RPC agregado (cacheado por rango).
   // Esto reemplaza la descarga de ~52k filas + conteo client-side que hacía timeout.
   const data  = await _radarGetMetricas(_radarRange);

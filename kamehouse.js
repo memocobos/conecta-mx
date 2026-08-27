@@ -23087,6 +23087,95 @@ function _ctrVigenciaAviso(c) {
 // el caché ya estaba ahí (`_contratosCache`), solo que nadie lo repintaba.
 let _ctrBusca = '';
 
+// ═══ [HER-1d] LA ANTIGÜEDAD DE UN PENDIENTE ═══════════════════════════════
+// "21-jul" no grita nada. "hace 37 días" sí. Un contrato pendiente no se vuelve
+// urgente por su fecha de envío sino por lo que lleva esperando, y eso hay que
+// restarlo, no leerlo.
+//
+// 🔒 EN HORA DE REYNOSA (−05:00), firmado por Memo. Es el mismo huso con el que
+// se teclean los vencimientos en Esferas. `America/Cancun` es el proxy de la
+// casa para −05:00 todo el año — Monterrey es −06:00 y NO sirve aquí.
+//
+// ⏳ ANOTADO, no cambiado: `_ctrDiasVigencia` (HER-1c, heredado del badge que ya
+// existía) calcula en Monterrey. Son dos "hoy" distintos en la misma pantalla y
+// vale la pena unificarlos, pero cambiar la vigencia no está firmado y a un año
+// de distancia la hora no mueve el veredicto. Queda dicho.
+const _CTR_DIAS_ALERTA = 7;
+
+function _ctrHoyReynosa() {
+  return new Date(new Date().toLocaleDateString('en-CA', { timeZone: 'America/Cancun' }) + 'T00:00:00');
+}
+
+// Días completos desde que se envió. `null` si no hay fecha — que no es cero.
+// Se pasa por `_tsToDate` porque `enviado_at` es un `timestamp` SIN zona y
+// Postgres lo serializa sin sufijo: sin eso, el navegador lo lee como hora
+// local y el conteo se corre un día en media república.
+function _ctrDiasEnviado(c) {
+  const d = _tsToDate(c && c.enviado_at);
+  if (!d || !Number.isFinite(d.getTime())) return null;
+  const env = new Date(d.toLocaleDateString('en-CA', { timeZone: 'America/Cancun' }) + 'T00:00:00');
+  const dias = Math.round((_ctrHoyReynosa() - env) / 86400000);
+  return Number.isFinite(dias) ? dias : null;
+}
+
+// 🔒 La alerta SE ENCIENDE A LOS 7 DÍAS (firmado). Antes de eso el contrato está
+// en camino, no atorado: avisar el día uno enseña a ignorar el aviso.
+// Un vencido no alerta — ya vive en su propio chip y no hay nada que apurar.
+function _ctrAlerta(c) {
+  if (!c || String(c.estado || '') !== 'pendiente' || _ctrVencido(c)) return false;
+  const d = _ctrDiasEnviado(c);
+  return d !== null && d >= _CTR_DIAS_ALERTA;
+}
+
+// La antigüedad DENTRO de la fila. Solo para pendientes: en un firmado el dato
+// no dice nada. Ámbar únicamente si cruzó el umbral — si todo fuera ámbar, el
+// ámbar dejaría de señalar.
+function _ctrAntiguedadFila(c) {
+  if (!c || String(c.estado || '') !== 'pendiente') return '';
+  const d = _ctrDiasEnviado(c);
+  if (d === null) return '';
+  const alerta = _ctrAlerta(c);
+  return '<br><span data-ctr-antiguedad="' + (alerta ? 'alerta' : 'normal') + '"' +
+    ' style="font-size:11px;' + (alerta ? 'color:#ffb020;font-weight:700' : 'color:var(--ts)') + '">' +
+    _escCtr(_ctrDiasTexto(d)) + '</span>';
+}
+
+function _ctrDiasTexto(d) {
+  if (d === null) return '';
+  if (d <= 0) return 'hoy';
+  return 'hace ' + d + (d === 1 ? ' día' : ' días');
+}
+
+// La tarjeta de arriba. NO lista todos los pendientes: solo los que cruzaron el
+// umbral. Los de esta semana ya se ven en el chip `// pendientes` — repetirlos
+// aquí convertiría la alerta en una segunda lista.
+function _ctrAlertaPintar() {
+  const el = document.getElementById('ctr-alerta');
+  if (!el) return;
+  const alertados = (_contratosCache || []).filter(_ctrAlerta)
+    .sort((a, b) => (_ctrDiasEnviado(b) || 0) - (_ctrDiasEnviado(a) || 0));
+  if (!alertados.length) {
+    // Sin nada que apurar la tarjeta DESAPARECE. Una alerta permanente deja de
+    // ser una alerta y se vuelve decoración.
+    el.style.display = 'none';
+    el.innerHTML = '';
+    return;
+  }
+  el.style.display = '';
+  const n = alertados.length;
+  el.innerHTML =
+    '<div style="font-size:13px;font-weight:800;color:#ffb020;margin-bottom:8px">' +
+      '<svg class="ic"><use href="#ic-alerta"/></svg> ' + n +
+      (n === 1 ? ' contrato lleva ' : ' contratos llevan ') + _CTR_DIAS_ALERTA + '+ días sin firmar</div>' +
+    '<div style="font-size:12px;color:var(--ts);margin-bottom:12px;line-height:1.7">' +
+      alertados.map((c) =>
+        '<div data-ctr-alerta="' + _escCtr(c.token) + '"><b style="color:var(--text)">' + _escCtr(c.creador_nombre) +
+        '</b> · ' + _escCtr(c.evento_nombre) + ' — enviado <b style="color:#ffb020">' +
+        _escCtr(_ctrDiasTexto(_ctrDiasEnviado(c))) + '</b></div>').join('') +
+    '</div>' +
+    '<span style="font-size:11px;color:var(--ts2)">La alerta sugiere; el reenvío lo decides tú, desde el botón de su fila.</span>';
+}
+
 // ═══ [HER-1c] LOS CHIPS ═══════════════════════════════════════════════════
 // Arranca en PENDIENTES: de 25 contratos, 23 están firmados y no piden nada.
 // Lo que Memo abre esta pantalla a buscar son los 2 que sí.
@@ -23149,6 +23238,7 @@ function _ctrPintarLista() {
   if (!tbody) return;
   {
     if (!_contratosCache.length) {
+      _ctrAlertaPintar();
       tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--ts);padding:30px;font-size:12px;letter-spacing:.1em;text-transform:uppercase">Sin contratos todavía. Crea el primero en "+ Nuevo".</td></tr>`;
       return;
     }
@@ -23169,6 +23259,7 @@ function _ctrPintarLista() {
     rot('ctrf-firmados', '// firmados', cuenta.firmado);
     rot('ctrf-vencidos', '// vencidos', cuenta.vencido);
     rot('ctrf-todos', '// todos', _contratosCache.length);
+    _ctrAlertaPintar();
     if (!visibles.length) {
       // Una lista vacía es una AFIRMACIÓN: se dice cuántos hay del otro lado,
       // porque si no, no se sabe si no existe o si el texto lo tapó.
@@ -23204,7 +23295,7 @@ function _ctrPintarLista() {
       return `<tr>
         <td><b>${nombreSafe}</b> ${_ctrPlantillaChip(c.plantilla)}${_ctrCuidadorChip(c)}<br><span style="color:var(--ts);font-size:11px">${_escCtr(c.creador_email)}</span></td>
         <td>${_escCtr(c.evento_nombre)}<br><span style="color:var(--ts);font-size:11px">${_fmtFechaCortaCtr(c.evento_fecha)}</span></td>
-        <td>${fechaEnviado}</td>
+        <td>${fechaEnviado}${_ctrAntiguedadFila(c)}</td>
         <td>${badge}${_ctrVigenciaAviso(c)}${_ctrStrikesChip(c)}</td>
         <td style="text-align:right;white-space:nowrap">${acciones}</td>
       </tr>`;

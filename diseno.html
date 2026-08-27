@@ -622,6 +622,21 @@
   .poster.fmt-post-ig { width: 1080px; height: 1350px; }
   .poster.fmt-story-ig { width: 1080px; height: 1920px; }
   .poster.fmt-post-fb { width: 1080px; height: 1080px; }
+  /* [HER-1h-F] Estado de WhatsApp: MISMO lienzo que la story (1080×1920) —de ahí
+     que herede sus reglas—, pero con la ZONA SEGURA metida. WhatsApp encima su
+     propia interfaz arriba y abajo del estado, y lo que caiga ahí se tapa: el
+     nombre de quien publica, la barra de progreso y la caja de responder. Es al
+     revés de "sin márgenes": necesita MÁS. */
+  .poster.fmt-wa-status { width: 1080px; height: 1920px; }
+  /* [HER-1h-F] Flyer para imprimir: carta 8.5×11 in. El LIENZO sigue viviendo en
+     el mundo de 1080 —así todas las reglas de tipografía de las cuatro
+     plantillas siguen valiendo tal cual— y lo que sube a 300 dpi es la
+     EXPORTACIÓN (`scale` de html2canvas), no el elemento. 1080 × 11/8.5 ≈ 1398. */
+  /* ⚠️ 1398px daba 3301, no 3300: 1398 × (2550/1080) = 3300.99. El alto exacto
+     de carta en este mundo de 1080 es 1080 × 11/8.5 = 1397.647…, y con esa
+     fracción la exportación cae en 3300 clavados. Un píxel no se ve en papel,
+     pero un número que no cuadra invita a que alguien lo "arregle" mal. */
+  .poster.fmt-flyer-carta { width: 1080px; height: 1397.647px; }
 
   /* FIX BUG FONDO: photo-fill como capa de fondo limpia */
   .photo-fill {
@@ -655,7 +670,8 @@
     display: flex; align-items: center; gap: 16px; z-index: 10;
   }
   .poster.tpl-promo .handle { top: var(--pr-handle-y, 50px); left: 50px; gap: 14px; }
-  .poster.tpl-promo.fmt-story-ig .handle { top: var(--pr-handle-y, 280px); left: 60px; }
+  .poster.tpl-promo.fmt-story-ig .handle,
+    .poster.tpl-promo.fmt-wa-status .handle { top: var(--pr-handle-y, 280px); left: 60px; }
 
   .poster .handle-dot {
     border-radius: 50%; flex-shrink: 0;
@@ -684,7 +700,8 @@
     display: flex; align-items: center; gap: 14px; z-index: 10;
     top: var(--handle-y, 56px); left: 60px;
   }
-  .poster.tpl-proximamente.fmt-story-ig .handle { top: var(--handle-y, 280px); left: 70px; }
+  .poster.tpl-proximamente.fmt-story-ig .handle,
+    .poster.tpl-proximamente.fmt-wa-status .handle { top: var(--handle-y, 280px); left: 70px; }
   .poster.tpl-proximamente .handle-dot {
     width: 28px; height: 28px;
     border-radius: 50%; flex-shrink: 0;
@@ -707,7 +724,8 @@
     gap: 0px; align-items: flex-start;
     bottom: var(--px-y); left: 60px; right: 60px;
   }
-  .poster.tpl-proximamente.fmt-story-ig .text-block { bottom: calc(var(--px-y) + 150px); left: 70px; right: 70px; }
+  .poster.tpl-proximamente.fmt-story-ig .text-block,
+    .poster.tpl-proximamente.fmt-wa-status .text-block { bottom: calc(var(--px-y) + 150px); left: 70px; right: 70px; }
   .poster.tpl-proximamente.fmt-post-fb .text-block { bottom: calc(var(--px-y) - 50px); }
 
   .poster.tpl-proximamente .name-tag {
@@ -716,7 +734,8 @@
     margin-top: var(--m-px-name);
     box-shadow: none;
   }
-  .poster.tpl-proximamente.fmt-story-ig .name-tag { padding: 28px 44px 32px 44px; }
+  .poster.tpl-proximamente.fmt-story-ig .name-tag,
+    .poster.tpl-proximamente.fmt-wa-status .name-tag { padding: 28px 44px 32px 44px; }
 
   .poster.tpl-proximamente .name-tag span {
     font-family: 'Kaneda Gothic', sans-serif; font-weight: 900;
@@ -726,7 +745,8 @@
     display: block; white-space: nowrap;
     font-size: calc(140px * var(--s-px-name) * var(--text-scale));
   }
-  .poster.tpl-proximamente.fmt-story-ig .name-tag span { font-size: calc(170px * var(--s-px-name) * var(--text-scale)); }
+  .poster.tpl-proximamente.fmt-story-ig .name-tag span,
+    .poster.tpl-proximamente.fmt-wa-status .name-tag span { font-size: calc(170px * var(--s-px-name) * var(--text-scale)); }
   .poster.tpl-proximamente.fmt-post-fb .name-tag span { font-size: calc(120px * var(--s-px-name) * var(--text-scale)); }
 
   /* SUBTÍTULO: relleno sólido del color seleccionado */
@@ -736,7 +756,8 @@
     padding: 14px 26px 16px 26px;
     margin-top: var(--m-px-sub);
   }
-  .poster.tpl-proximamente.fmt-story-ig .subtitle { padding: 16px 30px 18px 30px; }
+  .poster.tpl-proximamente.fmt-story-ig .subtitle,
+    .poster.tpl-proximamente.fmt-wa-status .subtitle { padding: 16px 30px 18px 30px; }
 
   .poster.tpl-proximamente .subtitle span {
     font-family: 'Montserrat', sans-serif; font-weight: 700;
@@ -746,7 +767,8 @@
     white-space: nowrap;
     font-size: calc(26px * var(--s-px-sub) * var(--text-scale));
   }
-  .poster.tpl-proximamente.fmt-story-ig .subtitle span { font-size: calc(32px * var(--s-px-sub) * var(--text-scale)); }
+  .poster.tpl-proximamente.fmt-story-ig .subtitle span,
+    .poster.tpl-proximamente.fmt-wa-status .subtitle span { font-size: calc(32px * var(--s-px-sub) * var(--text-scale)); }
   .poster.tpl-proximamente .subtitle .ital { font-style: italic; font-weight: 700; }
 
   /* NEWS LAYOUT 1 */
@@ -783,7 +805,8 @@
     padding: 40px 50px 50px 50px; z-index: 5;
     min-height: 250px; text-align: center;
   }
-  .poster.tpl-news.layout-1.fmt-story-ig .news-bottom { padding: 50px 60px 80px 60px; min-height: 380px; }
+  .poster.tpl-news.layout-1.fmt-story-ig .news-bottom,
+    .poster.tpl-news.layout-1.fmt-wa-status .news-bottom { padding: 50px 60px 80px 60px; min-height: 380px; }
 
   .poster.tpl-news .news-header {
     background: var(--news-header-bg);
@@ -805,7 +828,8 @@
     letter-spacing: calc(var(--letter-spacing) + var(--ls-news-text));
     line-height: 1.25; margin-top: -14px;
   }
-  .poster.tpl-news.layout-1.fmt-story-ig .news-text { font-size: calc(44px * var(--s-news-text) * var(--text-scale)); }
+  .poster.tpl-news.layout-1.fmt-story-ig .news-text,
+    .poster.tpl-news.layout-1.fmt-wa-status .news-text { font-size: calc(44px * var(--s-news-text) * var(--text-scale)); }
 
   /* NEWS LAYOUT 2 */
   .poster.tpl-news.layout-2 { background: #000; }
@@ -814,7 +838,8 @@
   }
   .poster.tpl-news.layout-2 > .photo-fill { height: 78%; bottom: auto; top: 0; }
   .poster.tpl-news.layout-2.fmt-story-ig .photo,
-  .poster.tpl-news.layout-2.fmt-story-ig > .photo-fill { height: 73%; top: 0; }
+  .poster.tpl-news.layout-2.fmt-story-ig > .photo-fill,
+    .poster.tpl-news.layout-2.fmt-wa-status > .photo-fill { height: 73%; top: 0; }
   .poster.tpl-news.layout-2.fmt-post-fb .photo,
   .poster.tpl-news.layout-2.fmt-post-fb > .photo-fill { height: 70%; }
 
@@ -836,7 +861,8 @@
     height: 22%;
     display: flex; flex-direction: column; align-items: center; text-align: center;
   }
-  .poster.tpl-news.layout-2.fmt-story-ig .news-bottom-2 { height: 27%; padding-bottom: 290px; }
+  .poster.tpl-news.layout-2.fmt-story-ig .news-bottom-2,
+    .poster.tpl-news.layout-2.fmt-wa-status .news-bottom-2 { height: 27%; padding-bottom: 290px; }
   .poster.tpl-news.layout-2.fmt-post-fb .news-bottom-2 { height: 30%; }
 
   .poster.tpl-news.layout-2 .news-header-2 {
@@ -858,7 +884,8 @@
     letter-spacing: calc(var(--letter-spacing) + var(--ls-news-text));
     line-height: 1.2; width: 100%;
   }
-  .poster.tpl-news.layout-2.fmt-story-ig .news-text-2 { font-size: calc(50px * var(--s-news-text) * var(--text-scale)); }
+  .poster.tpl-news.layout-2.fmt-story-ig .news-text-2,
+    .poster.tpl-news.layout-2.fmt-wa-status .news-text-2 { font-size: calc(50px * var(--s-news-text) * var(--text-scale)); }
 
   /* PROMOCIÓN */
   .poster.tpl-promo .photo-overlay {
@@ -876,7 +903,8 @@
     align-items: flex-start; gap: var(--pr-gap);
     bottom: var(--pr-y); left: 50px; right: 50px;
   }
-  .poster.tpl-promo.fmt-story-ig .promo-block { bottom: calc(var(--pr-y) + 150px); left: 60px; right: 60px; }
+  .poster.tpl-promo.fmt-story-ig .promo-block,
+    .poster.tpl-promo.fmt-wa-status .promo-block { bottom: calc(var(--pr-y) + 150px); left: 60px; right: 60px; }
   .poster.tpl-promo.fmt-post-fb .promo-block { bottom: calc(var(--pr-y) - 60px); }
 
   .poster.tpl-promo .promo-date {
@@ -901,7 +929,8 @@
     font-size: calc(82px * var(--s-pr-name) * var(--text-scale));
     margin-top: var(--m-pr-name);
   }
-  .poster.tpl-promo.fmt-story-ig .promo-name { font-size: calc(98px * var(--s-pr-name) * var(--text-scale)); }
+  .poster.tpl-promo.fmt-story-ig .promo-name,
+    .poster.tpl-promo.fmt-wa-status .promo-name { font-size: calc(98px * var(--s-pr-name) * var(--text-scale)); }
 
   .poster.tpl-promo .promo-headline {
     color: var(--tone-text, #fff);
@@ -914,7 +943,8 @@
     margin-top: var(--m-pr-headline);
     margin-bottom: 12px;
   }
-  .poster.tpl-promo.fmt-story-ig .promo-headline { font-size: calc(98px * var(--s-pr-headline) * var(--text-scale)); }
+  .poster.tpl-promo.fmt-story-ig .promo-headline,
+    .poster.tpl-promo.fmt-wa-status .promo-headline { font-size: calc(98px * var(--s-pr-headline) * var(--text-scale)); }
 
   .poster.tpl-promo .promo-cta {
     color: var(--tone-text, #fff);
@@ -987,10 +1017,12 @@
     display:flex; flex-direction:column; align-items:flex-start; gap:16px;
     bottom:70px; left:50px; right:50px;
   }
-  .poster.tpl-disponibilidad.fmt-story-ig .dp-block{bottom:220px; left:60px; right:60px}
+  .poster.tpl-disponibilidad.fmt-story-ig .dp-block,
+    .poster.tpl-disponibilidad.fmt-wa-status .dp-block{bottom:220px; left:60px; right:60px}
   .poster.tpl-disponibilidad.fmt-post-fb .dp-block{bottom:56px}
   .poster.tpl-disponibilidad .handle{top:50px; left:50px; gap:14px}
-  .poster.tpl-disponibilidad.fmt-story-ig .handle{top:280px; left:60px}
+  .poster.tpl-disponibilidad.fmt-story-ig .handle,
+    .poster.tpl-disponibilidad.fmt-wa-status .handle{top:280px; left:60px}
   .poster.tpl-disponibilidad .handle-dot{width:30px; height:30px; background:var(--c-green)}
   .poster.tpl-disponibilidad .dp-sello{
     font-family:'Archivo Black',Impact,sans-serif; font-weight:900;
@@ -1015,8 +1047,10 @@
     font-size:calc(24px * var(--text-scale)); font-weight:700; color:rgba(255,255,255,.6);
     text-transform:uppercase; letter-spacing:calc(.5px + var(--letter-spacing)); line-height:1.35;
   }
-  .poster.tpl-disponibilidad.fmt-story-ig .dp-sello{font-size:calc(78px * var(--text-scale))}
-  .poster.tpl-disponibilidad.fmt-story-ig .dp-name{font-size:calc(104px * var(--text-scale))}
+  .poster.tpl-disponibilidad.fmt-story-ig .dp-sello,
+    .poster.tpl-disponibilidad.fmt-wa-status .dp-sello{font-size:calc(78px * var(--text-scale))}
+  .poster.tpl-disponibilidad.fmt-story-ig .dp-name,
+    .poster.tpl-disponibilidad.fmt-wa-status .dp-name{font-size:calc(104px * var(--text-scale))}
   .poster.tpl-disponibilidad.fmt-post-fb  .dp-name{font-size:calc(74px * var(--text-scale))}
   /* El botón de la variante activa toma SU color, no el azul de
      `.toggle-btn.active`: el semáforo tiene que leerse también en el panel, y
@@ -1064,6 +1098,41 @@
   }
   .poster.tpl-espera.fmt-story-ig .es-n{font-size:calc(180px * var(--text-scale))}
   .poster.tpl-espera.fmt-post-fb .es-n{font-size:calc(126px * var(--text-scale))}
+  /* ═══ [HER-1h-F] LA ZONA SEGURA DE WHATSAPP · AL FINAL A PROPÓSITO ══════
+     `fmt-wa-status` hereda las 19 reglas de la story y ésas van calificadas
+     con la plantilla (`.poster.tpl-promo.fmt-wa-status .promo-block`), o sea
+     con la MISMA especificidad que éstas. Cuando dos reglas pesan igual gana
+     la ÚLTIMA — así que estas viven al final del archivo, no junto al tamaño
+     del lienzo. Escritas allá arriba perdían EN SILENCIO: medido, el bloque
+     se quedaba a 280px en vez de irse a 340.
+
+     Y `top: 340px` a secas, no `var(--pr-handle-y, 340px)`: esa variable SÍ
+     está puesta (50), así que un fallback nunca se usaría.
+
+     ⚠️ Y ES UN PISO, NO UN NÚMERO. 340px fijo EMPEORABA a Promoción, que en
+     story ya vive a 430px del borde: la habría BAJADO hacia la interfaz. Con
+     `max()` cada plantilla conserva su composición y solo se mueve la que no
+     llegaba. Medido: promo 430→430, disponibilidad 220→340. */
+  .poster.tpl-promo.fmt-wa-status .promo-block { bottom: max(340px, calc(var(--pr-y) + 150px)); }
+  .poster.tpl-proximamente.fmt-wa-status .text-block { bottom: max(340px, calc(var(--px-y) + 150px)); }
+  .poster.tpl-disponibilidad.fmt-wa-status .dp-block,
+  .poster.tpl-espera.fmt-wa-status .es-block { bottom: 340px; }
+  .poster.tpl-promo.fmt-wa-status .handle { top: max(340px, var(--pr-handle-y, 340px)); }
+  .poster.tpl-proximamente.fmt-wa-status .handle { top: max(340px, var(--handle-y, 340px)); }
+  .poster.tpl-disponibilidad.fmt-wa-status .handle,
+  .poster.tpl-espera.fmt-wa-status .handle { top: 340px; }
+  .poster.tpl-news.layout-1.fmt-wa-status .news-bottom { padding-bottom: 340px; }
+  .poster.tpl-news.layout-2.fmt-wa-status .news-bottom-2 { padding-bottom: 340px; }
+
+  /* ⚠️ HUECO QUE ABRE EL MERGE, cerrado a mano. HER-1h-F generó los gemelos
+     `fmt-wa-status` de cada regla de story recorriendo la hoja — pero corrió
+     sobre un árbol que TODAVÍA NO TENÍA la plantilla `espera` (venía en la otra
+     rama). Sin estas líneas, «Lista de espera» en WA Estado se quedaría con los
+     tamaños del post 4:5 dentro de un lienzo 9:16: nada truena, solo se ve mal.
+     Es lo que dos ramas que no se ven producen aunque las dos estén bien. */
+  .poster.tpl-espera.fmt-wa-status .es-block{left:60px; right:60px}
+  .poster.tpl-espera.fmt-wa-status .handle{left:60px}
+  .poster.tpl-espera.fmt-wa-status .es-n{font-size:calc(180px * var(--text-scale))}
 </style>
 </head>
 <body data-theme="dark">
@@ -1145,6 +1214,8 @@
         <button class="format-btn active" data-format="post-ig">IG Post 4:5</button>
         <button class="format-btn" data-format="story-ig">IG Story 9:16</button>
         <button class="format-btn" data-format="post-fb">FB 1:1</button>
+        <button class="format-btn" data-format="wa-status" title="1080×1920 con la zona segura de WhatsApp: su interfaz tapa arriba y abajo.">WA Estado</button>
+        <button class="format-btn" data-format="flyer-carta" title="Carta 8.5×11 in a 300 dpi (2550×3300) para imprimir.">Flyer carta</button>
       </div>
     </div>
     <div class="section template-only" data-only="news">
@@ -1898,11 +1969,22 @@
   }
   function applyHandleTone() { poster.dataset.handleTone = state.handleTone; }
 
+  // El tamaño del ELEMENTO. Todo vive en el mundo de 1080 de ancho.
   function getDims() {
     if (state.format === 'post-ig') return [1080, 1350];
     if (state.format === 'story-ig') return [1080, 1920];
     if (state.format === 'post-fb') return [1080, 1080];
+    if (state.format === 'wa-status') return [1080, 1920];
+    if (state.format === 'flyer-carta') return [1080, 1397.647];
     return [1080, 1350];
+  }
+
+  // [HER-1h-F] Lo que sube a 300 dpi es la EXPORTACIÓN, no el lienzo. Si el
+  // elemento midiera 2550px, las tipografías —todas calibradas a 1080— saldrían
+  // diminutas en el papel y habría que reescribir las cuatro plantillas.
+  // 2550/1080 = 2.3611… → el PNG sale 2550×3300, carta a 300 dpi exactos.
+  function getEscalaExport() {
+    return state.format === 'flyer-carta' ? (2550 / 1080) : 1;
   }
 
   function fitPoster() {
@@ -1949,7 +2031,10 @@
   }
 
   function updateFormat() {
-    poster.classList.remove('fmt-post-ig', 'fmt-story-ig', 'fmt-post-fb');
+    // [HER-1h-F] Los cinco formatos se quitan antes de poner el nuevo. Olvidar
+    // uno aquí deja DOS clases puestas y gana la que el CSS declare después —
+    // un lienzo del tamaño equivocado sin que nada truene.
+    poster.classList.remove('fmt-post-ig', 'fmt-story-ig', 'fmt-post-fb', 'fmt-wa-status', 'fmt-flyer-carta');
     poster.classList.add('fmt-' + state.format);
     fitPoster();
   }
@@ -2234,6 +2319,15 @@
     let tagTop, frameTop, frameHeight, frameWidth, prY, pxY, handleY, prHandleY;
     if (state.format === 'story-ig') {
       tagTop = 230; frameTop = 320; frameHeight = 65; frameWidth = 80;
+      prY = 280; pxY = 280;
+      handleY = 280; prHandleY = 280;
+    } else if (state.format === 'wa-status') {
+      // [HER-1h-F] WA Estado es el lienzo de la story, así que hereda SUS
+      // defaults de deslizador. Sin esta rama caía al `else` genérico (130) y
+      // la composición se venía abajo AUNQUE el CSS fuera el de story: los
+      // números viven en el JS, no solo en la hoja. Medido: `--pr-y` daba 130
+      // en WA y 280 en story, con la misma regla de CSS aplicada.
+      tagTop = 200; frameTop = 260; frameHeight = 55; frameWidth = 80;
       prY = 280; pxY = 280;
       handleY = 280; prHandleY = 280;
     } else if (state.format === 'post-fb') {
@@ -2818,12 +2912,13 @@
     downloadBtn.textContent = 'Generando...';
     downloadBtn.disabled = true;
     const [pw, ph] = getDims();
+    const esc = getEscalaExport();
     const originalTransform = posterStage.style.transform;
     posterStage.style.transform = 'scale(1)';
     try {
       await document.fonts.ready;
       const canvas = await html2canvas(poster, {
-        width: pw, height: ph, scale: 1,
+        width: pw, height: ph, scale: esc,
         useCORS: true, backgroundColor: '#ffffff', allowTaint: true
       });
       const link = document.createElement('a');
@@ -2850,8 +2945,8 @@
     if (e.ctrlKey || e.metaKey) {
       if (e.key === 's') { e.preventDefault(); downloadBtn.click(); return; }
     }
-    const tplMap = { '1': 'proximamente', '2': 'news', '3': 'promo' };
-    const fmtMap = { 'q': 'post-ig', 'w': 'story-ig', 'e': 'post-fb' };
+    const tplMap = { '1': 'proximamente', '2': 'news', '3': 'promo', '4': 'disponibilidad', '5': 'espera' };
+    const fmtMap = { 'q': 'post-ig', 'w': 'story-ig', 'e': 'post-fb', 'r': 'wa-status', 't': 'flyer-carta' };
     const k = e.key.toLowerCase();
     if (tplMap[k]) {
       const btn = document.querySelector(`.tpl-tab-btn[data-tpl="${tplMap[k]}"]`);

@@ -23576,6 +23576,32 @@ async function loadWaitlist() {
   _waitlistCache = rows || [];
   _snapshotCache = {};
   for (const s of (snap || [])) _snapshotCache[s.evento_id] = s.estado;
+  _wlPintar();
+}
+
+// ═══ [HER-1f] EL BUSCADOR DE LA LISTA DE ESPERA ═══════════════════════════
+// 438 personas en 12 eventos y ni una caja de búsqueda. Mismo patrón que el de
+// Contratos y el de Esferas: filtra EN VIVO lo pintado, sin pedir nada al
+// servidor. Por eso `loadWaitlist` se partió en traer y `_wlPintar` en dibujar.
+let _wlBusca = '';
+
+// Mira EVENTO, NOMBRE y CORREO. Buscar el nombre del evento trae a toda su
+// gente; buscar un correo lo encuentra sin importar en qué evento esté.
+function _wlCoincide(r, q) {
+  if (!q) return true;
+  return (String(r.evento_nombre || '') + ' ' + String(r.nombre || '') + ' ' + String(r.email || ''))
+    .toLowerCase().includes(q);
+}
+
+function _wlBuscarEnLista() {
+  _wlBusca = (document.getElementById('wl-buscar')?.value || '').trim().toLowerCase();
+  _wlPintar();
+}
+
+function _wlPintar() {
+  const groups = document.getElementById('wl-groups');
+  const summary = document.getElementById('wl-summary');
+  if (!groups) return;
 
   // Agrupar por evento_id, usar el evento_nombre más reciente por evento
   const byEv = {};
@@ -23583,10 +23609,26 @@ async function loadWaitlist() {
     if (!byEv[r.evento_id]) byEv[r.evento_id] = { evento_id: r.evento_id, evento_nombre: r.evento_nombre, rows: [] };
     byEv[r.evento_id].rows.push(r);
   }
-  const eventos = Object.values(byEv).sort((a,b) => b.rows.length - a.rows.length);
+  const todos = Object.values(byEv).sort((a,b) => b.rows.length - a.rows.length);
+  // El corte por texto se hace sobre las FILAS, y el grupo sobrevive si le queda
+  // alguien. Filtrar por nombre de evento cae solo: `_wlCoincide` lo mira.
+  const eventos = todos
+    .map((g) => Object.assign({}, g, { hit: g.rows.filter((r) => _wlCoincide(r, _wlBusca)) }))
+    .filter((g) => g.hit.length);
   const total = _waitlistCache.length;
 
-  if (summary) summary.textContent = `Total: ${total} ${total === 1 ? 'persona' : 'personas'} en ${eventos.length} ${eventos.length === 1 ? 'evento' : 'eventos'}`;
+  if (summary) {
+    summary.textContent = _wlBusca
+      ? `${eventos.reduce((a, g) => a + g.hit.length, 0)} de ${total} personas · ${eventos.length} ${eventos.length === 1 ? 'evento' : 'eventos'}`
+      : `Total: ${total} ${total === 1 ? 'persona' : 'personas'} en ${todos.length} ${todos.length === 1 ? 'evento' : 'eventos'}`;
+  }
+
+  if (_wlBusca && !eventos.length) {
+    // Una lista vacía es una afirmación: se dice cuántos hay del otro lado.
+    groups.innerHTML = '<div class="empty-state" style="padding:34px;text-align:center;color:var(--ts);border:1px dashed var(--border);border-radius:var(--r-sm,8px)">' +
+      'Nadie dice "' + _wlEsc(_wlBusca) + '" — hay ' + total + ' en total.</div>';
+    return;
+  }
 
   if (!eventos.length) {
     groups.innerHTML = '<div class="empty-state" style="padding:40px;text-align:center;color:var(--ts);border:1px dashed var(--border);border-radius:var(--r-sm,8px)"><div style="font-size:36px;margin-bottom:8px"><svg class="ic"><use href="#ic-campana"/></svg></div><div style="font-size:13px;letter-spacing:.06em">No hay registros todavía. Cuando alguien se registre en un evento &laquo;Próximamente&raquo;, aparecerá aquí.</div></div>';
@@ -23596,7 +23638,12 @@ async function loadWaitlist() {
   groups.innerHTML = eventos.map(g => {
     const estadoSnap = _snapshotCache[g.evento_id];
     const isActivo = estadoSnap === '' || estadoSnap == null;
+    // ⚠️ LOS PENDIENTES SE CUENTAN SOBRE EL GRUPO COMPLETO, NO SOBRE LO FILTRADO.
+    // El botón notifica al EVENTO entero; si el número siguiera al buscador,
+    // diría "Notificar a 3" y mandaría 269 correos. Filtrar cambia lo que se ve,
+    // nunca lo que el botón hace.
     const pendientes = g.rows.filter(r => !r.notificado).length;
+    const hit = g.hit || g.rows;
     const tagBg = estadoSnap === 'proximamente' ? 'rgba(232,255,76,.15)' : 'rgba(136,234,78,.15)';
     const tagBorder = estadoSnap === 'proximamente' ? 'rgba(232,255,76,.5)' : 'rgba(136,234,78,.5)';
     const tagColor = estadoSnap === 'proximamente' ? '#e8ff4c' : '#88ea4e';
@@ -23608,7 +23655,9 @@ async function loadWaitlist() {
         <span style="font-size:10px;letter-spacing:.14em;padding:4px 10px;border-radius:4px;background:${tagBg};border:1px solid ${tagBorder};color:${tagColor};font-weight:800">${tagText}</span>
       </div>
       <div style="font-size:12px;color:var(--ts);margin-bottom:12px;letter-spacing:.04em">
-        ${g.rows.length} ${g.rows.length === 1 ? 'persona registrada' : 'personas registradas'}
+        ${hit.length === g.rows.length
+          ? `${g.rows.length} ${g.rows.length === 1 ? 'persona registrada' : 'personas registradas'}`
+          : `<b style="color:var(--text)">${hit.length}</b> de ${g.rows.length} personas coinciden`}
         ${pendientes > 0 ? ` · <span style="color:#e8ff4c;font-weight:700">${pendientes} sin notificar</span>` : ' · <span style="color:#88ea4e">todos notificados</span>'}
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
@@ -23659,10 +23708,17 @@ function wlVerRegistrados(eventoId) {
       <div style="flex:1 1 auto">
         <div style="font-size:10px;letter-spacing:.16em;color:var(--ts);text-transform:uppercase;margin-bottom:4px">Lista de espera</div>
         <div style="font-size:16px;font-weight:800;color:#fff">${_wlEsc(nombreEv)}</div>
-        <div style="font-size:11px;color:var(--ts);margin-top:4px">${rows.length} registro${rows.length===1?'':'s'}</div>
+        <div style="font-size:11px;color:var(--ts);margin-top:4px" id="wl-mod-conteo">${rows.length} registro${rows.length===1?'':'s'}</div>
       </div>
       <button class="btn btn-ghost btn-sm" onclick="wlExportarCSV('${_wlEsc(eventoId)}')">Exportar CSV</button>
       <button onclick="this.closest('[data-wl-overlay]').remove()" style="background:rgba(255,255,255,.1);border:none;color:#fff;font-size:18px;width:32px;height:32px;border-radius:50%;cursor:pointer">✕</button>
+    </div>
+    <!-- [HER-1f] El buscador DENTRO del modal. Aquí es donde de verdad duele:
+         badbunny solo tiene 269 filas en esta tabla. -->
+    <div style="padding:12px 22px 0">
+      <input type="search" id="wl-mod-buscar" class="cot-input" placeholder="Buscar por nombre o correo…"
+             autocomplete="off" oninput="_wlModBuscar()" aria-label="Buscar en los registrados"
+             style="width:100%;font-size:13px">
     </div>
     <div style="padding:0">
       <table style="width:100%;border-collapse:collapse;font-size:13px">
@@ -23672,7 +23728,7 @@ function wlVerRegistrados(eventoId) {
           <th style="text-align:left;padding:10px 16px;font-size:10px;color:var(--ts);letter-spacing:.12em;text-transform:uppercase">Registro</th>
           <th style="text-align:center;padding:10px 16px;font-size:10px;color:var(--ts);letter-spacing:.12em;text-transform:uppercase">Notificado</th>
         </tr></thead>
-        <tbody>
+        <tbody id="wl-mod-tbody">
           ${rows.map(r => `<tr style="border-bottom:1px solid rgba(255,255,255,.06)">
             <td style="padding:10px 16px;color:#fff;font-weight:600">${_wlEsc(r.nombre)}</td>
             <td style="padding:10px 16px;color:rgba(255,255,255,.75)"><a href="mailto:${_wlEsc(r.email)}" style="color:inherit;text-decoration:none">${_wlEsc(r.email)}</a></td>
@@ -23684,7 +23740,36 @@ function wlVerRegistrados(eventoId) {
     </div>
   </div>`;
   overlay.setAttribute('data-wl-overlay', '1');
+  overlay.dataset.wlEvento = eventoId;
   document.body.appendChild(overlay);
+}
+
+// [HER-1f] Re-pinta las filas del modal con el texto tecleado. Vive del caché,
+// como todo lo demás: no le pide nada al servidor.
+function _wlModBuscar() {
+  const ov = document.querySelector('[data-wl-overlay]');
+  if (!ov) return;
+  const q = (document.getElementById('wl-mod-buscar')?.value || '').trim().toLowerCase();
+  const rows = _waitlistCache.filter(r => r.evento_id === ov.dataset.wlEvento);
+  const vis = rows.filter(r => !q ||
+    (String(r.nombre || '') + ' ' + String(r.email || '')).toLowerCase().includes(q));
+  const tb = document.getElementById('wl-mod-tbody');
+  const cn = document.getElementById('wl-mod-conteo');
+  if (cn) cn.textContent = q
+    ? (vis.length + ' de ' + rows.length + ' registros')
+    : (rows.length + ' registro' + (rows.length === 1 ? '' : 's'));
+  if (!tb) return;
+  if (!vis.length) {
+    tb.innerHTML = '<tr><td colspan="4" style="padding:26px;text-align:center;color:var(--ts);font-size:12px">' +
+      'Nadie dice "' + _wlEsc(q) + '" — hay ' + rows.length + ' en esta lista.</td></tr>';
+    return;
+  }
+  tb.innerHTML = vis.map(r => `<tr style="border-bottom:1px solid rgba(255,255,255,.06)">
+    <td style="padding:10px 16px;color:#fff;font-weight:600">${_wlEsc(r.nombre)}</td>
+    <td style="padding:10px 16px;color:rgba(255,255,255,.75)"><a href="mailto:${_wlEsc(r.email)}" style="color:inherit;text-decoration:none">${_wlEsc(r.email)}</a></td>
+    <td style="padding:10px 16px;color:rgba(255,255,255,.6);font-size:11px">${_wlFmtDate(r.created_at)}</td>
+    <td style="padding:10px 16px;text-align:center">${r.notificado ? '<span style="color:#88ea4e">✓</span>' : '<span style="color:rgba(255,255,255,.3)">✗</span>'}</td>
+  </tr>`).join('');
 }
 
 function wlExportarCSV(eventoId) {

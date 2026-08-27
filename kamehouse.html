@@ -2286,6 +2286,12 @@
 
    <!-- ── Vista B: Listado ── -->
    <div id="ctr-view-listado" class="contratos-view">
+     <!-- [HER-1b] El buscador, mismo patrón que el de Esferas: filtra EN VIVO lo
+          que ya está pintado, no le pide nada al servidor. Con 25 contratos y
+          cero filtros, encontrar uno era leerse la tabla. -->
+     <input type="search" id="ctr-buscar" class="cot-input" placeholder="Buscar por nombre, correo o evento…"
+            autocomplete="off" oninput="_ctrBuscarEnLista()" aria-label="Buscar contrato"
+            style="width:100%;font-size:13px;margin-bottom:12px">
      <div class="table-wrap">
        <table>
          <thead>

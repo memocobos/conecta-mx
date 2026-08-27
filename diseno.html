@@ -2398,9 +2398,18 @@
     }
     const fecha0 = [f, v].filter(Boolean).join(' — ').toUpperCase();
     if (plantilla === 'disponibilidad') {
-      return { dpName: nombre, dpDate: fecha0,
-        dpCta: 'PAQUETES CON ACCESO, TRANSPORTE Y HOSPEDAJE.' +
-          (desde ? (' DESDE $' + desde.toLocaleString('es-MX') + ' EN PAQUETE PLUS.') : '') };
+      // ⚠️ LA LÍNEA DE CIERRE SIGUE AL SEMÁFORO. Un cartel de AGOTADO que dice
+      // "paquetes desde $4,950" es una oferta de algo que ya no existe: se ve
+      // en la captura y es de las que se publican sin que nadie las relea.
+      // En agotado NO va el precio; va la lista de espera, que es lo que sí se
+      // puede hacer con ese evento.
+      const dp = _dpVariante(ev);
+      const precio = desde ? (' DESDE $' + desde.toLocaleString('es-MX') + ' EN PAQUETE PLUS.') : '';
+      const cta = dp === 'agotado'
+        ? 'ESTE EVENTO YA SE AGOTÓ. ESCRÍBENOS Y TE AVISAMOS SI SE LIBERA UN LUGAR.'
+        : (dp === 'ultimos' ? 'ÚLTIMOS PAQUETES CON ACCESO, TRANSPORTE Y HOSPEDAJE.' + precio
+          : 'PAQUETES CON ACCESO, TRANSPORTE Y HOSPEDAJE.' + precio);
+      return { dpName: nombre, dpDate: fecha0, dpCta: cta };
     }
     // promo
     const fecha = fecha0;

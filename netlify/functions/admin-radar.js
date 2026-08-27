@@ -14,6 +14,7 @@
 //   - 'metricas' { rango } → reenvía radar_metricas(p_rango) tal cual (KPIs/embudo/tops).
 //   - 'dia'                → reenvía radar_dia() tal cual: la franja del día [RAD-1c].
 //   - 'tops' { n? }        → reenvía radar_tops(p_n): los tres tops [RAD-1d].
+//   - 'giru'               → reenvía radar_giru(): las lecturas de Giru [RAD-1e].
 //   - 'fetch' { table, select?, since, until? } → lectura paginada (Range + Content-Range,
 //        created_at gte since [lt until], order created_at.desc) → { ok, rows:[...] }.
 //        table ∈ main_eventos_uso | pagos_eventos_uso | rol_eventos_uso | eventos_waitlist.
@@ -158,6 +159,22 @@ exports.handler = async (event) => {
       let tops;
       try { tops = JSON.parse(text); } catch { tops = text; }
       return { statusCode: 200, headers, body: JSON.stringify({ ok: true, tops }) };
+    }
+
+    // ── giru (RPC radar_giru — las lecturas de RAD-1e) ───────────────────────
+    // Sin parámetros: los umbrales y las ventanas viven en la función. Que el
+    // cliente pudiera mandar un umbral sería poder fabricar la lectura.
+    if (accion === 'giru') {
+      const r = await fetch(`${restBase}/rpc/radar_giru`, {
+        method: 'POST', headers: sbHeaders, body: '{}',
+      });
+      const text = await r.text();
+      if (!r.ok) {
+        return { statusCode: 502, headers, body: JSON.stringify({ error: 'KH rechazó radar_giru', detail: text }) };
+      }
+      let giru;
+      try { giru = JSON.parse(text); } catch { giru = text; }
+      return { statusCode: 200, headers, body: JSON.stringify({ ok: true, giru }) };
     }
 
     // ── main_metrics (RPC radar_main_metrics con ventana explícita — comparativas) ──

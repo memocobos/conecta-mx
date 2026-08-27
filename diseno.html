@@ -628,21 +628,6 @@
      nombre de quien publica, la barra de progreso y la caja de responder. Es al
      revés de "sin márgenes": necesita MÁS. */
   .poster.fmt-wa-status { width: 1080px; height: 1920px; }
-  /* ⚠️ LA ESPECIFICIDAD IMPORTA. `fmt-wa-status` hereda las 19 reglas de la
-     story, y ésas van calificadas con la plantilla
-     (`.poster.tpl-promo.fmt-wa-status .promo-block`). Una regla genérica
-     `.poster.fmt-wa-status .promo-block` tiene MENOS peso y pierde en silencio:
-     medido, el bloque se quedaba a 280px en vez de irse a 330. La zona segura
-     se escribe con la MISMA calificación por plantilla. */
-  .poster.tpl-promo.fmt-wa-status .promo-block,
-  .poster.tpl-disponibilidad.fmt-wa-status .dp-block,
-  .poster.tpl-espera.fmt-wa-status .es-block { bottom: 340px; }
-  .poster.tpl-promo.fmt-wa-status .handle,
-  .poster.tpl-disponibilidad.fmt-wa-status .handle,
-  .poster.tpl-espera.fmt-wa-status .handle { top: 340px; }
-  .poster.tpl-proximamente.fmt-wa-status .text-block,
-  .poster.tpl-news.fmt-wa-status .news-bottom,
-  .poster.tpl-news.fmt-wa-status .news-bottom-2 { margin-bottom: 180px; }
   /* [HER-1h-F] Flyer para imprimir: carta 8.5×11 in. El LIENZO sigue viviendo en
      el mundo de 1080 —así todas las reglas de tipografía de las cuatro
      plantillas siguen valiendo tal cual— y lo que sube a 300 dpi es la
@@ -1075,6 +1060,27 @@
   .dp-var-btn.active[data-dp="poca"]{background:#e8ff4c; border-color:#e8ff4c; color:#161a00}
   .dp-var-btn.active[data-dp="ultimos"]{background:#ff283b; border-color:#ff283b; color:#fff}
   .dp-var-btn.active[data-dp="agotado"]{background:rgba(255,255,255,.22); border-color:rgba(255,255,255,.45); color:#fff}
+
+  /* ═══ [HER-1h-F] LA ZONA SEGURA DE WHATSAPP · AL FINAL A PROPÓSITO ══════
+     `fmt-wa-status` hereda las 19 reglas de la story y ésas van calificadas
+     con la plantilla (`.poster.tpl-promo.fmt-wa-status .promo-block`), o sea
+     con la MISMA especificidad que éstas. Cuando dos reglas pesan igual gana
+     la ÚLTIMA — así que estas viven al final del archivo, no junto al tamaño
+     del lienzo. Escritas allá arriba perdían EN SILENCIO: medido, el bloque
+     se quedaba a 280px en vez de irse a 340.
+
+     Y `top: 340px` a secas, no `var(--pr-handle-y, 340px)`: esa variable SÍ
+     está puesta (50), así que un fallback nunca se usaría. */
+  .poster.tpl-promo.fmt-wa-status .promo-block,
+  .poster.tpl-disponibilidad.fmt-wa-status .dp-block,
+  .poster.tpl-espera.fmt-wa-status .es-block { bottom: 340px; }
+  .poster.tpl-promo.fmt-wa-status .handle,
+  .poster.tpl-disponibilidad.fmt-wa-status .handle,
+  .poster.tpl-espera.fmt-wa-status .handle { top: 340px; }
+  .poster.tpl-proximamente.fmt-wa-status .text-block { bottom: 340px; }
+  .poster.tpl-proximamente.fmt-wa-status .handle { top: 340px; }
+  .poster.tpl-news.layout-1.fmt-wa-status .news-bottom { padding-bottom: 340px; }
+  .poster.tpl-news.layout-2.fmt-wa-status .news-bottom-2 { padding-bottom: 340px; }
 </style>
 </head>
 <body data-theme="dark">

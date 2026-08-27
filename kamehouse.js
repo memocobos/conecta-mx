@@ -13,6 +13,31 @@ const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJ
 // ═══════════════════════════════════════════════════════════════
 // AUTH — Multi-usuario con roles
 // ═══════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════════
+// 🔒 [TZ-UNIF-1] EL RELOJ DE REYNOSA, EN UNA SOLA CONSTANTE
+//
+// `America/Matamoros`. No es un proxy: **es** el huso de Reynosa. Matamoros
+// está a 90 km y las dos ciudades siguen el horario de EE.UU. por su condición
+// fronteriza.
+//
+// ⚠️ LA CREENCIA QUE HABÍA ERA AL REVÉS. La casa usaba `America/Cancun` como
+// «proxy de −05:00 todo el año», suponiendo que la frontera ya no cambia de
+// horario. Es Monterrey la que dejó de cambiar (decreto de 2022); Reynosa SÍ
+// cambia — su ayuntamiento anunció el horario de verano el 8-mar y su fin el
+// 1-nov, y la base de husos coincide **al día**:
+//
+//     dom 8-mar-2026   Matamoros pasa de −06:00 a −05:00   ← arranca el verano
+//     dom 1-nov-2026   Matamoros pasa de −05:00 a −06:00   ← termina
+//
+// Del 1-nov-2026 al 13-mar-2027 —133 días— Cancún se habría quedado una hora
+// adelantado respecto al reloj de la pared en Reynosa. Hoy las dos dan lo
+// mismo, que es justo por lo que el error era invisible.
+//
+// 🔒 LOS INSTANTES GUARDADOS NO SE TOCAN. Un `expiresTs` es un epoch: no tiene
+// huso. Lo único que cambia es CÓMO SE PINTA. Nada en la base se reescribe.
+// ═══════════════════════════════════════════════════════════════════════════
+const TZ_REYNOSA = 'America/Matamoros';
+
 const SESSION_KEY = 'kh_session_v2';
 const SESSION_HOURS = 8;
 
@@ -17598,7 +17623,7 @@ function _esfEnReynosa(ts) {
   const n = Number(ts);
   if (!Number.isFinite(n)) return '';
   try {
-    return new Date(n).toLocaleString('sv-SE', { timeZone: 'America/Cancun' }).slice(0, 16);
+    return new Date(n).toLocaleString('sv-SE', { timeZone: TZ_REYNOSA }).slice(0, 16);
   } catch (_) { return ''; }
 }
 function _esfPromoFlashVence(o) { return _esfEnReynosa(o && o.expiresTs); }
@@ -20198,7 +20223,7 @@ function _esfFlashPopulate(raw) {
     // si se pintara en local, alguien en otro huso vería otra hora y al guardar
     // movería el vencimiento sin tocarlo.
     const d = new Date(Number(c.expiresTs));
-    const en = d.toLocaleString('sv-SE', { timeZone: 'America/Cancun' });  // Cancún = −05:00 todo el año
+    const en = d.toLocaleString('sv-SE', { timeZone: TZ_REYNOSA });  // [TZ-UNIF-1] el reloj real de Reynosa
     set('esf-flash-fecha', en.slice(0, 10));
     set('esf-flash-hora', en.slice(11, 19));
   } else { set('esf-flash-fecha', ''); set('esf-flash-hora', ''); }
@@ -20216,7 +20241,7 @@ function _esfFlashPreview() {
   if (!j) { el.innerHTML = 'Vacío = <b>este evento no tiene código flash</b>. Hacen falta código, valor y vencimiento.'; return; }
   const o = JSON.parse(j);
   const d = new Date(o.expiresTs);
-  const en = d.toLocaleString('sv-SE', { timeZone: 'America/Cancun' });
+  const en = d.toLocaleString('sv-SE', { timeZone: TZ_REYNOSA });
   el.innerHTML = 'Código <b>' + _esfEsc(o.code) + '</b> · ' +
     (o.pct != null ? o.pct + '% de descuento' : '$' + o.amount + ' de descuento') +
     (o.excludePkg ? ' · <b>solo PLUS</b>' : '') +
@@ -23102,9 +23127,12 @@ let _ctrBusca = '';
 // urgente por su fecha de envío sino por lo que lleva esperando, y eso hay que
 // restarlo, no leerlo.
 //
-// 🔒 EN HORA DE REYNOSA (−05:00), firmado por Memo. Es el mismo huso con el que
-// se teclean los vencimientos en Esferas. `America/Cancun` es el proxy de la
-// casa para −05:00 todo el año — Monterrey es −06:00 y NO sirve aquí.
+// 🔒 EN HORA DE REYNOSA, firmado por Memo. Es el mismo huso con el que se
+// teclean los vencimientos en Esferas.
+// ⚠️ [TZ-UNIF-1] Aquí decía «`America/Cancun`, el proxy de la casa para −05:00
+// todo el año». Estaba mal por partida doble: Reynosa NO es −05:00 todo el año
+// —cambia con EE.UU., 8-mar a 1-nov— y la que dejó de cambiar es Monterrey.
+// La constante es `TZ_REYNOSA`, y no es un proxy: es el huso de la ciudad.
 //
 // ⏳ ANOTADO, no cambiado: `_ctrDiasVigencia` (HER-1c, heredado del badge que ya
 // existía) calcula en Monterrey. Son dos "hoy" distintos en la misma pantalla y
@@ -23113,7 +23141,7 @@ let _ctrBusca = '';
 const _CTR_DIAS_ALERTA = 7;
 
 function _ctrHoyReynosa() {
-  return new Date(new Date().toLocaleDateString('en-CA', { timeZone: 'America/Cancun' }) + 'T00:00:00');
+  return new Date(new Date().toLocaleDateString('en-CA', { timeZone: TZ_REYNOSA }) + 'T00:00:00');
 }
 
 // Días completos desde que se envió. `null` si no hay fecha — que no es cero.
@@ -23123,7 +23151,7 @@ function _ctrHoyReynosa() {
 function _ctrDiasEnviado(c) {
   const d = _tsToDate(c && c.enviado_at);
   if (!d || !Number.isFinite(d.getTime())) return null;
-  const env = new Date(d.toLocaleDateString('en-CA', { timeZone: 'America/Cancun' }) + 'T00:00:00');
+  const env = new Date(d.toLocaleDateString('en-CA', { timeZone: TZ_REYNOSA }) + 'T00:00:00');
   const dias = Math.round((_ctrHoyReynosa() - env) / 86400000);
   return Number.isFinite(dias) ? dias : null;
 }
@@ -23395,16 +23423,16 @@ function _ctrLimiteTexto(iso) {
     // todavía: JavaScript lo rueda EN SILENCIO a "3 de marzo", así que un
     // dedazo se convierte en otra fecha que parece buena. Si la fecha no vuelve
     // a escribirse igual, no es la fecha que alguien tecleó.
-    if (d.toLocaleDateString('en-CA', { timeZone: 'America/Cancun' }) !== iso) return '';
+    if (d.toLocaleDateString('en-CA', { timeZone: TZ_REYNOSA }) !== iso) return '';
     return d.toLocaleDateString('es-MX', {
-      weekday: 'long', day: 'numeric', month: 'long', timeZone: 'America/Cancun',
+      weekday: 'long', day: 'numeric', month: 'long', timeZone: TZ_REYNOSA,
     });
   } catch (_) { return ''; }
 }
 
 function _ctrLimiteDefault() {
   const d = new Date(_ctrHoyReynosa().getTime() + _CTR_LIMITE_DIAS * 86400000);
-  return d.toLocaleDateString('en-CA', { timeZone: 'America/Cancun' });
+  return d.toLocaleDateString('en-CA', { timeZone: TZ_REYNOSA });
 }
 
 function reenviarContratoEmail(token) {
@@ -23412,7 +23440,7 @@ function reenviarContratoEmail(token) {
   if (!c) { alert('No encontré ese contrato en la lista. Recarga e intenta de nuevo.'); return; }
   _ctrReenvio = { token: token, paso: 1 };
   const f = document.getElementById('ctr-re-fecha');
-  if (f) { f.value = _ctrLimiteDefault(); f.min = _ctrHoyReynosa().toLocaleDateString('en-CA', { timeZone: 'America/Cancun' }); }
+  if (f) { f.value = _ctrLimiteDefault(); f.min = _ctrHoyReynosa().toLocaleDateString('en-CA', { timeZone: TZ_REYNOSA }); }
   _ctrReenvioPintar();
   openModal('modal-contrato-reenviar');
 }
@@ -24429,7 +24457,9 @@ async function _radarContarEventosActivos(){
 // Monterrey: reescribir historia es peor que anotarla. Es legacy, como los
 // `-06:00` de mayo en el catálogo.
 // ═══════════════════════════════════════════════════════════════════════════
-const RAD_TZ = 'America/Matamoros';   // Reynosa. No es Monterrey. No es Cancún.
+// [TZ-UNIF-1] El mismo reloj que el resto de la casa. Se conserva el nombre
+// porque el Radar y sus arneses lo citan, pero ya no es un segundo literal.
+const RAD_TZ = TZ_REYNOSA;   // Reynosa. No es Monterrey. No es Cancún.
 
 // El desfase de la zona EN ESE INSTANTE (los husos con horario de verano no
 // tienen UN desfase: tienen el de ese día). Se pregunta al motor de Intl, que

@@ -2580,7 +2580,13 @@
     return null;
   }
 
-  const _hoyMx = () => new Date().toLocaleDateString('en-CA', { timeZone: 'America/Cancun' });
+  // 🔒 [TZ-UNIF-1] El reloj de Reynosa. Antes `America/Cancun`, que suponía
+  // −05:00 todo el año; Reynosa SÍ cambia con EE.UU. (8-mar → 1-nov) y la que
+  // dejó de cambiar es Monterrey. Aquí decide qué eventos son «pasados», así
+  // que del 1-nov al 13-mar un evento del día podía caer del lado equivocado
+  // durante una hora.
+  const TZ_REYNOSA = 'America/Matamoros';
+  const _hoyMx = () => new Date().toLocaleDateString('en-CA', { timeZone: TZ_REYNOSA });
 
   // El nombre CORTO para el cartel. `a` trae la gira pegada en 38 de 103
   // ("Tini - Futttura World Tour") y el cartel quiere "TINI"; `img` es el nombre

@@ -973,6 +973,48 @@
   .toast.show { transform: translateX(-50%) translateY(0); }
 
   .hidden { display: none !important; }
+
+  /* ═══ [HER-1h-B] EL CARTEL DE DISPONIBILIDAD ═══════════════════════════
+     Los cuatro colores son los MISMOS del semáforo del sitio, copiados de
+     `index.html`: verde #88ea4e (.td), lima #e8ff4c (.tpoca), rojo #ff283b
+     (.tu) y gris (.tag). Si el semáforo cambia de color, esto se ve distinto
+     al sitio — pero el VEREDICTO no se copia, se ejecuta. */
+  .poster.tpl-disponibilidad .dp-block{
+    position:absolute; left:var(--pad); right:var(--pad); bottom:var(--pad);
+    display:flex; flex-direction:column; align-items:flex-start; gap:14px; z-index:4;
+  }
+  .poster.tpl-disponibilidad .dp-sello{
+    font-family:'Archivo Black',Impact,sans-serif; font-weight:900;
+    font-size:calc(64px * var(--text-scale)); line-height:.9;
+    letter-spacing:calc(-1px + var(--letter-spacing)); text-transform:uppercase;
+    padding:14px 22px; color:#000;
+  }
+  .poster.tpl-disponibilidad.dp-disponible .dp-sello{background:#88ea4e}
+  .poster.tpl-disponibilidad.dp-poca      .dp-sello{background:#e8ff4c}
+  .poster.tpl-disponibilidad.dp-ultimos   .dp-sello{background:#ff283b; color:#fff}
+  .poster.tpl-disponibilidad.dp-agotado   .dp-sello{background:rgba(255,255,255,.22); color:#fff}
+  .poster.tpl-disponibilidad .dp-name{
+    font-family:'Archivo Black',Impact,sans-serif; font-weight:900; color:#fff;
+    font-size:calc(88px * var(--text-scale)); line-height:.92; text-transform:uppercase;
+    letter-spacing:calc(-1.5px + var(--letter-spacing));
+  }
+  .poster.tpl-disponibilidad .dp-date{
+    font-size:calc(30px * var(--text-scale)); font-weight:800; color:rgba(255,255,255,.85);
+    text-transform:uppercase; letter-spacing:calc(.5px + var(--letter-spacing));
+  }
+  .poster.tpl-disponibilidad .dp-cta{
+    font-size:calc(24px * var(--text-scale)); font-weight:700; color:rgba(255,255,255,.6);
+    text-transform:uppercase; letter-spacing:calc(.5px + var(--letter-spacing)); line-height:1.35;
+  }
+  .poster.tpl-disponibilidad.fmt-story-ig .dp-sello{font-size:calc(78px * var(--text-scale))}
+  .poster.tpl-disponibilidad.fmt-story-ig .dp-name{font-size:calc(104px * var(--text-scale))}
+  .poster.tpl-disponibilidad.fmt-post-fb  .dp-name{font-size:calc(74px * var(--text-scale))}
+  /* El botón de la variante activa toma su propio color: el semáforo se ve
+     también en el panel, no solo en el cartel. */
+  .dp-var-btn.active[data-dp="disponible"]{border-color:#88ea4e; color:#88ea4e}
+  .dp-var-btn.active[data-dp="poca"]{border-color:#e8ff4c; color:#e8ff4c}
+  .dp-var-btn.active[data-dp="ultimos"]{border-color:#ff283b; color:#ff283b}
+  .dp-var-btn.active[data-dp="agotado"]{border-color:rgba(255,255,255,.4); color:rgba(255,255,255,.65)}
 </style>
 </head>
 <body data-theme="dark">
@@ -1018,6 +1060,11 @@
       </button>
       <button class="tpl-tab-btn" data-tpl="promo">
         <span class="tpl-tab-label">Promoción</span>
+      </button>
+      <!-- [HER-1h-B] El cartel de DISPONIBILIDAD. Su estado no lo escribe nadie:
+           lo dicta el MISMO semáforo que pinta los tags del sitio. -->
+      <button class="tpl-tab-btn" data-tpl="disponibilidad">
+        <span class="tpl-tab-label">Disponibilidad</span>
       </button>
     </div>
   </div>
@@ -1329,6 +1376,27 @@
         <textarea id="pr-cta" maxlength="180" placeholder="CTA con paquetes">PAQUETES CON ACCESO, TRANSPORTE Y HOSPEDAJE. ¡ASEGURA TU LUGAR!</textarea>
       </div>
     </div>
+    <div class="template-fields hidden" id="fields-disponibilidad">
+      <div class="section">
+        <div class="section-label">Estado del semáforo</div>
+        <div class="toggle-grid cols-2" id="dpVariantes">
+          <button class="toggle-btn dp-var-btn" data-dp="disponible">Disponible</button>
+          <button class="toggle-btn dp-var-btn" data-dp="poca">Poca disponibilidad</button>
+          <button class="toggle-btn dp-var-btn" data-dp="ultimos">Últimos lugares</button>
+          <button class="toggle-btn dp-var-btn" data-dp="agotado">Agotado</button>
+        </div>
+        <div class="hint" id="dpDetectado" style="font-size:11px;opacity:.7;margin-top:8px">
+          Elige un evento arriba y el semáforo del sitio dice cuál toca.
+        </div>
+      </div>
+      <div class="section">
+        <div class="section-label">Texto del cartel</div>
+        <input type="text" id="dp-name" value="TINI" placeholder="Nombre del artista">
+        <input type="text" id="dp-date" value="7 SEP 2026 — ARENA MONTERREY, MTY" placeholder="Fecha — venue">
+        <input type="text" id="dp-sello" value="DISPONIBLE" placeholder="El sello grande">
+        <textarea id="dp-cta" maxlength="180" placeholder="Línea de cierre">PAQUETES CON ACCESO, TRANSPORTE Y HOSPEDAJE.</textarea>
+      </div>
+    </div>
   </div>
 
   <!-- ACCIONES -->
@@ -1403,6 +1471,17 @@
         <div class="promo-name" id="prNameDisplay">A PERFECT CIRCLE</div>
         <div class="promo-headline" id="prHeadlineDisplay">VUELVE A MÉXICO.</div>
         <div class="promo-cta" id="prCtaDisplay">PAQUETES CON ACCESO, TRANSPORTE Y HOSPEDAJE.<br>¡ASEGURA TU LUGAR!</div>
+      </div>
+
+      <div class="handle tpl-content hidden" data-tpl="disponibilidad">
+        <div class="handle-dot"></div>
+        <div class="handle-text" id="dpHandle">@CONECTA_MEXICO</div>
+      </div>
+      <div class="dp-block tpl-content hidden" data-tpl="disponibilidad">
+        <div class="dp-sello" id="dpSelloDisplay">DISPONIBLE</div>
+        <div class="dp-name" id="dpNameDisplay">TINI</div>
+        <div class="dp-date" id="dpDateDisplay">7 SEP 2026 — ARENA MONTERREY, MTY</div>
+        <div class="dp-cta" id="dpCtaDisplay">PAQUETES CON ACCESO, TRANSPORTE Y HOSPEDAJE.</div>
       </div>
 
       <div class="empty-state" id="emptyState">
@@ -1780,6 +1859,11 @@
     updateProgress();
   }
 
+  function _dpInit() {
+    if (!poster.className.match(/\bdp-/)) poster.classList.add('dp-disponible');
+    $$('.dp-var-btn').forEach((b) => b.classList.toggle('active', b.dataset.dp === 'disponible'));
+  }
+
   function updateFormat() {
     poster.classList.remove('fmt-post-ig', 'fmt-story-ig', 'fmt-post-fb');
     poster.classList.add('fmt-' + state.format);
@@ -2121,7 +2205,22 @@
   $('pr-headline').addEventListener('input', (e) => { $('prHeadlineDisplay').textContent = e.target.value; markChanged(); });
   $('pr-cta').addEventListener('input', (e) => { $('prCtaDisplay').innerHTML = e.target.value.replace(/\n/g, '<br>'); markChanged(); });
 
-  $('evPicker').addEventListener('change', (e) => traerDelCatalogo(e.target.value));
+  $('dp-name').addEventListener('input', (e) => { $('dpNameDisplay').textContent = e.target.value || 'ARTISTA'; markChanged(); });
+  $('dp-date').addEventListener('input', (e) => { $('dpDateDisplay').textContent = e.target.value; markChanged(); });
+  $('dp-sello').addEventListener('input', (e) => { $('dpSelloDisplay').textContent = e.target.value; markChanged(); });
+  $('dp-cta').addEventListener('input', (e) => { $('dpCtaDisplay').innerHTML = e.target.value.replace(/\n/g, '<br>'); markChanged(); });
+
+  $$('.dp-var-btn').forEach((b) => b.addEventListener('click', () => {
+    // Escoger a mano APAGA la sugerencia para el resto de la sesión de este
+    // cartel: si el juez volviera a pisarlo al cambiar de evento, la elección
+    // de Memo duraría hasta el siguiente clic y eso se lee como un bug.
+    _dpManual = true;
+    _dpAplicarVariante(b.dataset.dp, true);
+    const ev = EV_CAT && EV_CAT.find((x) => String(x.id) === $('evPicker').value);
+    if (ev) _dpDetectar(ev);
+  }));
+
+  $('evPicker').addEventListener('change', (e) => { _dpManual = false; traerDelCatalogo(e.target.value); });
 
   $$('.preset').forEach(btn => btn.addEventListener('click', () => {
     const target = $(btn.dataset.target);
@@ -2138,6 +2237,13 @@
   // hacen `rol.html`, `_fetchEVFromIndex` y el lector de PROMOS de Esferas. Un
   // regex no sabe dónde termina un arreglo con objetos adentro.
   let EV_CAT = null;
+  // [HER-1h-B] El JUEZ del semáforo. NO se re-escribe aquí: se saca el TEXTO de
+  // `_evVeredicto` del propio `index.html` y se evalúa. Es la trampa de las tres
+  // copias de precios, y la única forma de no caer es no tener copia.
+  //
+  // Si el sitio cambia sus umbrales (hoy <40 es "últimos", 40-60 es "poca"),
+  // este cartel cambia el mismo día, sin que nadie toque `diseno.html`.
+  let EV_JUEZ = null;
 
   function _cortarLiteral(html, re, abre, cierra) {
     const m = String(html).match(re);
@@ -2162,6 +2268,26 @@
       const t = _cortarLiteral(html, new RegExp('var\\s+' + n + '\\s*=\\s*\\['), '[', ']');
       return t ? ('var ' + n + '=' + t + ';') : '';
     }).join('');
+  }
+
+  // Recorta una declaración `function nombre(...){...}` completa contando
+  // llaves y saltando comillas. Igual que el cortador de literales, pero
+  // arrancando en la `{` del cuerpo.
+  function _cortarFuncion(html, nombre) {
+    const m = String(html).match(new RegExp('function\\s+' + nombre + '\\s*\\('));
+    if (!m) return null;
+    const abre = html.indexOf('{', m.index);
+    if (abre < 0) return null;
+    let hondo = 0, enTexto = false, comilla = '', escapa = false;
+    for (let i = abre; i < html.length; i++) {
+      const ch = html[i];
+      if (escapa) { escapa = false; continue; }
+      if (enTexto) { if (ch === '\\') { escapa = true; continue; } if (ch === comilla) enTexto = false; continue; }
+      if (ch === '"' || ch === "'") { enTexto = true; comilla = ch; continue; }
+      if (ch === '{') hondo++;
+      else if (ch === '}') { hondo--; if (!hondo) return html.slice(m.index, i + 1); }
+    }
+    return null;
   }
 
   const _hoyMx = () => new Date().toLocaleDateString('en-CA', { timeZone: 'America/Cancun' });
@@ -2200,6 +2326,41 @@
     agotado: 'AGOTADO.',
   };
 
+  // [HER-1h-B] El veredicto del sitio → una de las CUATRO variantes del cartel.
+  // El orden es el mismo del tag de la tarjeta (`isAg` primero, luego `isUlt`,
+  // luego `isPoca`, y si no, disponible), y los estados que NO son del semáforo
+  // —próximamente, en proceso, solo viaje, por confirmar, nueva fecha, pasado—
+  // devuelven null: para ésos no hay cartel de disponibilidad, y decirlo es más
+  // honesto que pintar uno que miente.
+  const _DP_TXT = { disponible: 'DISPONIBLE', poca: 'POCA DISPONIBILIDAD', ultimos: 'ÚLTIMOS LUGARES', agotado: 'AGOTADO' };
+  const _DP_ETQ = { disponible: 'Disponible', poca: 'Poca disponibilidad', ultimos: 'Últimos lugares', agotado: 'Agotado' };
+
+  function _dpVariante(ev) {
+    if (!EV_JUEZ) return null;
+    const v = EV_JUEZ(ev);
+    if (v.isPast) return null;
+    if (v.isAg) return 'agotado';
+    if (v.isProxi || v.isPronto || v.isNF || v.isProc || v.isSV || v.isPC2) return null;
+    if (v.isUlt) return 'ultimos';
+    if (v.isPoca) return 'poca';
+    return 'disponible';
+  }
+
+  let _dpManual = false;   // Memo escogió a mano: el juez ya no le pisa la elección
+
+  function _dpAplicarVariante(dp, porElJuez) {
+    if (!_DP_TXT[dp]) return;
+    poster.classList.remove('dp-disponible', 'dp-poca', 'dp-ultimos', 'dp-agotado');
+    poster.classList.add('dp-' + dp);
+    $$('.dp-var-btn').forEach((b) => b.classList.toggle('active', b.dataset.dp === dp));
+    if (porElJuez) {
+      const i = $('dp-sello');
+      i.value = _DP_TXT[dp];
+      i.dispatchEvent(new Event('input'));
+    }
+    markChanged();
+  }
+
   // El evento → la MISMA forma que un ejemplo rápido. Ni una llave nueva: si
   // `applyExample` sabe pintarlo, esto sabe llenarlo.
   function _evAEjemplo(ev, plantilla) {
@@ -2224,8 +2385,14 @@
       if (v) return { text: nom + ' llega a ' + v + '. Fecha por confirmar.' };
       return { text: nom + ': fecha por confirmar.' };
     }
+    const fecha0 = [f, v].filter(Boolean).join(' — ').toUpperCase();
+    if (plantilla === 'disponibilidad') {
+      return { dpName: nombre, dpDate: fecha0,
+        dpCta: 'PAQUETES CON ACCESO, TRANSPORTE Y HOSPEDAJE.' +
+          (desde ? (' DESDE $' + desde.toLocaleString('es-MX') + ' EN PAQUETE PLUS.') : '') };
+    }
     // promo
-    const fecha = [f, v].filter(Boolean).join(' — ').toUpperCase();
+    const fecha = fecha0;
     const cta = 'PAQUETES CON ACCESO, TRANSPORTE Y HOSPEDAJE.' +
       (desde ? (' DESDE $' + desde.toLocaleString('es-MX') + ' EN PAQUETE PLUS.') : '') +
       ' ¡ASEGURA TU LUGAR!';
@@ -2245,9 +2412,15 @@
       const ev = new Function(stubs + 'return ' + arr + ';')();
       if (!Array.isArray(ev) || !ev.length) throw new Error('el catálogo llegó vacío');
       EV_CAT = ev;
+      // El juez viaja con el catálogo: si uno llegó, el otro también tiene que
+      // llegar. Un catálogo sin juez daría carteles con estado inventado.
+      const txtJuez = _cortarFuncion(html, '_evVeredicto');
+      if (!txtJuez) throw new Error('no encontré _evVeredicto en index.html');
+      EV_JUEZ = new Function(txtJuez + '; return _evVeredicto;')();
+      if (typeof EV_JUEZ !== 'function') throw new Error('_evVeredicto no evaluó a una función');
       pintarPicker();
     } catch (e) {
-      EV_CAT = null;
+      EV_CAT = null; EV_JUEZ = null;
       sel.innerHTML = '<option value="">— no pude leer el catálogo —</option>';
       // ⚠️ Se DICE que falló y se sigue trabajando a mano. Que el catálogo no
       // conteste no puede dejar la herramienta inservible: el cartel se hacía
@@ -2280,6 +2453,31 @@
     // El MISMO camino que los ejemplos rápidos. Una segunda forma de escribir
     // el cartel sería una segunda forma de que se desincronicen.
     applyExample(_evAEjemplo(ev, state.template));
+    if (state.template === 'disponibilidad') _dpDetectar(ev);
+  }
+
+  // [HER-1h-B] Enseña el veredicto del sitio y, si Memo no ha escogido a mano,
+  // aplica el que toca. EL JUEZ SUGIERE, NO ENCIERRA.
+  function _dpDetectar(ev) {
+    const hint = $('dpDetectado');
+    const dp = _dpVariante(ev);
+    if (!dp) {
+      // Fuera del semáforo. Se DICE cuál es su estado en vez de inventarle uno.
+      const v = EV_JUEZ ? EV_JUEZ(ev) : null;
+      const cual = !v ? 'sin catálogo'
+        : v.isPast ? 'ya pasó' : v.isProxi || v.isPronto ? 'próximamente'
+        : v.isNF ? 'nueva fecha' : v.isProc ? 'en proceso'
+        : v.isSV ? 'solo viaje' : v.isPC2 ? 'por confirmar' : 'sin estado';
+      hint.innerHTML = '<b>' + _evNombreCorto(ev) + '</b> no está en el semáforo (' + cual +
+        '). Escoge el cartel a mano si de todos modos lo quieres.';
+      return;
+    }
+    const v = EV_JUEZ(ev);
+    const libres = Math.round(v.pct) + '% de sus zonas libres';
+    hint.innerHTML = 'El sitio dice <b style="color:var(--accent,#e8ff4c)">' + _DP_ETQ[dp] + '</b> · ' +
+      (v.total ? libres : 'sin zonas capturadas') +
+      (_dpManual ? ' · <b>escogiste otro a mano</b>, no te lo cambio.' : '. Puedes escoger otro.');
+    if (!_dpManual) _dpAplicarVariante(dp, true);
   }
 
   // === EJEMPLOS RÁPIDOS ===
@@ -2301,6 +2499,10 @@
       $('px-sub').value = ex.sub; $('px-sub').dispatchEvent(new Event('input'));
     } else if (state.template === 'news') {
       $('news-text').value = ex.text; $('news-text').dispatchEvent(new Event('input'));
+    } else if (state.template === 'disponibilidad') {
+      $('dp-name').value = ex.dpName || ''; $('dp-name').dispatchEvent(new Event('input'));
+      $('dp-date').value = ex.dpDate || ''; $('dp-date').dispatchEvent(new Event('input'));
+      $('dp-cta').value = ex.dpCta || ''; $('dp-cta').dispatchEvent(new Event('input'));
     } else if (state.template === 'promo') {
       $('pr-date').value = ex.date; $('pr-date').dispatchEvent(new Event('input'));
       $('pr-name').value = ex.name; $('pr-name').dispatchEvent(new Event('input'));
@@ -2535,6 +2737,7 @@
   // herramienta ya está usable mientras llega, y si no llega se dice y se
   // sigue a mano.
   cargarCatalogo();
+  _dpInit();
   buildColorPalette('colorPaletteNews', 'colorNews', applyNewsColor);
   buildColorPalette('colorPaletteNewsHeader', 'colorNewsHeader', applyNewsHeaderColor);
   buildColorPalette('colorPalettePxName', 'colorPxName', applyPxNameColor);

@@ -23041,12 +23041,33 @@ function _ctrStrikesChip(c) {
   return `<span style="display:inline-flex;align-items:center;gap:6px;margin-left:6px;font-size:9px;letter-spacing:.08em;text-transform:uppercase;font-weight:800;color:${s >= 3 ? 'var(--red)' : 'var(--ts)'}" title="Strikes del sistema (usuarios.strikes). La baja al llegar a 3 es decisión manual de Memo."><span class="gz-strike-dots" style="display:inline-flex;gap:2px">${dots}</span> ${s}/3</span>`;
 }
 // Aviso "vence en N días" para coordinadores/team firmados cuando falten ≤30 días.
+// ═══ [HER-1c] CUÁNTO LE QUEDA A LA VIGENCIA ═══════════════════════════════
+// UNA sola aritmética, dos consumidores: el badge de la fila (que ya existía) y
+// el chip // vencidos. Escribir un segundo juez es como se llega a un chip que
+// dice (3) sobre una lista que enseña (1).
+//
+// Devuelve los días que faltan (negativo = ya venció) o `null` cuando el
+// contrato no tiene vigencia — que NO es lo mismo que estar vigente. Hoy 12 de
+// 25 contratos caen en ese `null`: `creadora` y `auxiliar_admin` nunca llenan
+// `vigencia_fin`. Un contrato sin fecha no se puede juzgar, y por eso no cuenta
+// como vencido en vez de contarse como bueno por descuido.
+function _ctrDiasVigencia(c) {
+  if (!c || !c.vigencia_fin) return null;
+  const hoy = new Date(new Date().toLocaleDateString('en-CA', { timeZone: 'America/Monterrey' }) + 'T00:00:00');
+  const fin = new Date(String(c.vigencia_fin).slice(0, 10) + 'T00:00:00');
+  const dias = Math.round((fin - hoy) / 86400000);
+  return Number.isFinite(dias) ? dias : null;
+}
+
+function _ctrVencido(c) {
+  const d = _ctrDiasVigencia(c);
+  return d !== null && d < 0;
+}
+
 function _ctrVigenciaAviso(c) {
   if (!c || (c.plantilla !== 'coordinador' && c.plantilla !== 'creadora_team') || !c.vigencia_fin) return '';
-  const hoy = new Date(new Date().toLocaleDateString('en-CA', { timeZone: 'America/Monterrey' }) + 'T00:00:00');
-  const fin = new Date(String(c.vigencia_fin).slice(0,10) + 'T00:00:00');
-  const dias = Math.round((fin - hoy) / 86400000);
-  if (!Number.isFinite(dias) || dias > 30) return '';
+  const dias = _ctrDiasVigencia(c);
+  if (dias === null || dias > 30) return '';
   const vencido = dias < 0;
   const col = vencido ? { c:'#ff6666', bg:'rgba(255,68,68,.14)', bd:'rgba(255,68,68,.4)' }
                       : { c:'#ffb020', bg:'rgba(255,176,32,.14)', bd:'rgba(255,176,32,.4)' };
@@ -23060,6 +23081,35 @@ function _ctrVigenciaAviso(c) {
 // y PINTAR se parten en dos — teclear no puede costar un viaje al servidor, y
 // el caché ya estaba ahí (`_contratosCache`), solo que nadie lo repintaba.
 let _ctrBusca = '';
+
+// ═══ [HER-1c] LOS CHIPS ═══════════════════════════════════════════════════
+// Arranca en PENDIENTES: de 25 contratos, 23 están firmados y no piden nada.
+// Lo que Memo abre esta pantalla a buscar son los 2 que sí.
+//
+// 🔒 LOS VENCIDOS VIVEN APARTE. No salen en pendientes ni en firmados — es el
+// patrón del archivo de Esferas: lo que ya no se gobierna se recuerda en su
+// propia vista, no estorbando en la principal. En `// todos` salen todos.
+//
+// ⚠️ HOY EL CHIP DICE (0) Y VA A SEGUIR DICIENDO (0) casi un año: solo la
+// plantilla `coordinador` llena `vigencia_fin` (13 de 13) y todas vencen en
+// ago-2027. No es que la regla falle: es que 12 de 25 contratos no tienen con
+// qué juzgarse. Firmado por Memo sabiéndolo.
+let _ctrFiltro = 'pendiente';
+
+function _ctrPasaFiltro(c, filtro) {
+  const vencido = _ctrVencido(c);
+  if (filtro === 'vencido') return vencido;
+  if (filtro === 'todos') return true;
+  if (vencido) return false;                 // fuera de la vista principal
+  return String(c.estado || '') === filtro;
+}
+
+function filtrarContratos(filtro, btn) {
+  document.querySelectorAll('#page-contratos .gz-filter[id^="ctrf-"]').forEach((b) => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  _ctrFiltro = filtro;
+  _ctrPintarLista();
+}
 
 // Mira NOMBRE, CORREO y EVENTO: son los tres con los que Memo llama a un
 // contrato. Buscar "soy luna" tiene que encontrarlo aunque no recuerde de quién
@@ -23097,11 +23147,33 @@ function _ctrPintarLista() {
       tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--ts);padding:30px;font-size:12px;letter-spacing:.1em;text-transform:uppercase">Sin contratos todavía. Crea el primero en "+ Nuevo".</td></tr>`;
       return;
     }
-    const visibles = _contratosCache.filter(c => _ctrCoincide(c, _ctrBusca));
+    // [HER-1c] Dos cortes que se COMBINAN: primero el chip, luego el texto.
+    const visibles = _contratosCache
+      .filter(c => _ctrPasaFiltro(c, _ctrFiltro))
+      .filter(c => _ctrCoincide(c, _ctrBusca));
+    // Los conteos se cuentan SIN el buscador: el chip dice cuántos hay de cada
+    // clase, no cuántos sobreviven al texto.
+    const cuenta = { pendiente: 0, firmado: 0, vencido: 0 };
+    _contratosCache.forEach((c) => {
+      if (_ctrPasaFiltro(c, 'vencido')) { cuenta.vencido++; return; }
+      if (_ctrPasaFiltro(c, 'pendiente')) cuenta.pendiente++;
+      else if (_ctrPasaFiltro(c, 'firmado')) cuenta.firmado++;
+    });
+    const rot = (id, txt, n) => { const b = document.getElementById(id); if (b) b.textContent = txt + ' (' + n + ')'; };
+    rot('ctrf-pendientes', '// pendientes', cuenta.pendiente);
+    rot('ctrf-firmados', '// firmados', cuenta.firmado);
+    rot('ctrf-vencidos', '// vencidos', cuenta.vencido);
+    rot('ctrf-todos', '// todos', _contratosCache.length);
     if (!visibles.length) {
       // Una lista vacía es una AFIRMACIÓN: se dice cuántos hay del otro lado,
       // porque si no, no se sabe si no existe o si el texto lo tapó.
-      tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--ts);padding:30px;font-size:12px">Ningún contrato dice "${_escCtr(_ctrBusca)}" — hay ${_contratosCache.length} en total.</td></tr>`;
+      const etq = { pendiente: 'pendiente', firmado: 'firmado', vencido: 'vencido', todos: '' };
+      const q = etq[_ctrFiltro] ? etq[_ctrFiltro] + ' ' : '';
+      tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--ts);padding:30px;font-size:12px">` +
+        (_ctrBusca
+          ? `Ningún contrato ${q}dice "${_escCtr(_ctrBusca)}" — hay ${_contratosCache.length} en total.`
+          : `Ningún contrato ${q || 'registrado'} — hay ${_contratosCache.length} en total.`) +
+        `</td></tr>`;
       return;
     }
     tbody.innerHTML = visibles.map(c => {

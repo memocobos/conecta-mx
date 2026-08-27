@@ -417,11 +417,16 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Montse
 }
 /* Grupos colapsables por título (clic en el título → oculta/muestra sus botones).
    El colapso es por CLASE + CSS, nunca tocando el style.display de cada botón,
-   así el gating por rol (display:none inline) se respeta al expandir. La flecha y
-   el cursor se excluyen del título de Herramientas (no es colapsable). */
-.nav-group.collapsed .nav-btn{display:none !important}
-.nav-group-title:not(#nav-herramientas){cursor:pointer;display:flex;align-items:center;justify-content:space-between}
-.nav-group-title:not(#nav-herramientas)::after{content:'▾';font-size:10px;opacity:.6;transition:transform .15s}
+   así el gating por rol (display:none inline) se respeta al expandir.
+   [HER-1a] Herramientas también se pliega, y son DOS piezas: se le quitó la
+   exclusión al chevron, y la regla que esconde aprendió la OTRA clase. Sus
+   items son `.nav-dropdown-item`, no `.nav-btn`: con solo la primera pieza el
+   chevron giraba y no escondía nada — medido, 4 items visibles antes y 4
+   después. */
+.nav-group.collapsed .nav-btn,
+.nav-group.collapsed .nav-dropdown-item{display:none !important}
+.nav-group-title{cursor:pointer;display:flex;align-items:center;justify-content:space-between}
+.nav-group-title::after{content:'▾';font-size:10px;opacity:.6;transition:transform .15s}
 .nav-group.collapsed .nav-group-title::after{transform:rotate(-90deg)}
 
 /* Items: pestañas (.nav-btn) + herramientas (.nav-dropdown-item) */
@@ -448,7 +453,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Montse
  color:var(--gold);background:rgba(232,255,76,.08);border-left-color:var(--gold);
 }
 /* Encabezado del grupo Herramientas (conserva id #nav-herramientas para showHerramienta) */
-#nav-herramientas{cursor:default}
+/* [HER-1a] Ya no lleva `cursor:default`: se pliega como los otros cuatro. */
 #nav-herramientas.active{color:var(--ts2)}
 
 /* ── BARRA INFERIOR + SCRIM (solo móvil; ocultos en desktop) ── */

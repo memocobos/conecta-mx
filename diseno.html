@@ -2473,9 +2473,16 @@
       return;
     }
     const v = EV_JUEZ(ev);
-    const libres = Math.round(v.pct) + '% de sus zonas libres';
-    hint.innerHTML = 'El sitio dice <b style="color:var(--accent,#e8ff4c)">' + _DP_ETQ[dp] + '</b> · ' +
-      (v.total ? libres : 'sin zonas capturadas') +
+    // ⚠️ EL PORCENTAJE SOLO SE DICE CUANDO ES LA RAZÓN. `arre` está marcado
+    // `st:'agotado'` a mano y ninguna de sus zonas trae `ag`, así que el juez
+    // dice Agotado con `pct=100` — y "Agotado · 100% de sus zonas libres" se
+    // lee como una contradicción. Cuando el `st` es el que manda, se dice ESO.
+    const st = String(ev.st == null ? '' : ev.st);
+    const porElSt = (st === 'agotado' && dp === 'agotado') || (st === 'ultimos' && dp === 'ultimos');
+    const razon = porElSt
+      ? ('está marcado «' + st + '» en el catálogo')
+      : (v.total ? (Math.round(v.pct) + '% de sus zonas libres') : 'sin zonas capturadas');
+    hint.innerHTML = 'El sitio dice <b style="color:var(--accent,#e8ff4c)">' + _DP_ETQ[dp] + '</b> · ' + razon +
       (_dpManual ? ' · <b>escogiste otro a mano</b>, no te lo cambio.' : '. Puedes escoger otro.');
     if (!_dpManual) _dpAplicarVariante(dp, true);
   }

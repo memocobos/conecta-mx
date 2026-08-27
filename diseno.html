@@ -958,22 +958,50 @@
   }
 
   /* ALINEACIÓN */
-  .poster[data-align="left"] .text-block,
-  .poster[data-align="left"] .promo-block { align-items: flex-start; text-align: left; }
-  .poster[data-align="left"] .news-text,
-  .poster[data-align="left"] .news-text-2 { text-align: left; }
-  .poster[data-align="center"] .text-block,
-  .poster[data-align="center"] .promo-block { align-items: center; text-align: center; }
-  .poster[data-align="center"] .news-text,
-  .poster[data-align="center"] .news-text-2 { text-align: center; }
-  .poster[data-align="right"] .text-block,
-  .poster[data-align="right"] .promo-block { align-items: flex-end; text-align: right; }
-  .poster[data-align="right"] .news-text,
-  .poster[data-align="right"] .news-text-2 { text-align: right; }
-  .poster[data-align="justify"] .text-block,
-  .poster[data-align="justify"] .promo-block { align-items: flex-start; text-align: justify; }
-  .poster[data-align="justify"] .news-text,
-  .poster[data-align="justify"] .news-text-2 { text-align: justify; }
+  /* 🔒 LA ALINEACIÓN SE APLICA AL BLOQUE, NO A UNA LISTA DE BLOQUES.
+     Aquí estaban enumerados `.text-block`, `.promo-block`, `.news-text` y
+     `.news-text-2` — los de las tres plantillas que existían. `.dp-block` y
+     `.es-block` nunca entraron, así que en «Disponibilidad» y «Lista de espera»
+     el botón se marcaba activo y el cartel se quedaba en `start`. Medido en
+     producción: las cuatro alineaciones daban `start` en las dos.
+
+     Ahora se alinea CUALQUIER bloque de contenido de la plantilla activa, y lo
+     que NO se alinea lo dice por su cuenta, abajo. El default es «sí se
+     alinea», que es el lado seguro: una plantilla nueva queda alineable sin que
+     nadie se acuerde de añadirla. La sexta entra sola. */
+  .poster[data-align="left"]    .tpl-content:not(.handle) { align-items: flex-start; text-align: left; }
+  .poster[data-align="center"]  .tpl-content:not(.handle) { align-items: center;     text-align: center; }
+  .poster[data-align="right"]   .tpl-content:not(.handle) { align-items: flex-end;   text-align: right; }
+  .poster[data-align="justify"] .tpl-content:not(.handle) { align-items: flex-start; text-align: justify; }
+
+  /* ⚠️ EL CROMO DE «NEWS» NO SE ALINEA, y hasta hoy eso funcionaba POR
+     ACCIDENTE: nadie le declaraba `text-align`, así que heredaba y la regla
+     enumerada no lo alcanzaba. Con la regla genérica sí lo alcanzaría — medido
+     antes de escribirla: el rótulo pasaba de `start` a seguir la alineación, y
+     el «CONECTA NEWS» de `center` a `left`. Se declara lo que siempre se quiso,
+     para que no dependa de que ninguna regla los toque nunca. */
+  /* ⚠️ Y LA ESPECIFICIDAD IMPORTA, otra vez. La primera versión de estas dos
+     reglas pesaba 30 (`.poster.tpl-news .news-tag-1`) contra los 40 de la
+     genérica de arriba (`.poster[data-align] .tpl-content:not(.handle)`), así
+     que el rótulo SEGUÍA la alineación igual. Lo cazó el arnés, no la lectura:
+     left→left, center→center, right→right.
+     Se le suma `[data-align]` para empatar en 40 y ganar por ir después. El
+     `.news-header` nunca estuvo en peligro —no es `.tpl-content`, así que la
+     genérica no lo alcanza— pero se deja declarado por la misma razón: que no
+     dependa de que nadie lo toque. */
+  .poster.tpl-news[data-align] .news-tag-1,
+  .poster.tpl-news[data-align] .news-tag-2  { text-align: left; }
+  .poster.tpl-news[data-align] .news-header,
+  .poster.tpl-news[data-align] .news-header-2 { text-align: center; }
+
+  /* [HER-1h-FIX-2] El control que no aplica se apaga Y LO DICE. Un botón que
+     se marca activo sin cambiar nada es peor que uno apagado: el apagado se
+     entiende, el otro parece roto. */
+  #toneSection .nota-no-aplica { display: none; color: var(--c-yellow); }
+  #toneSection.no-aplica .nota-no-aplica { display: block; }
+  #toneSection.no-aplica .toggle-grid { opacity: .38; }
+  #toneSection.no-aplica .helper-text:not(.nota-no-aplica) { display: none; }
+  .text-tone-btn:disabled { cursor: not-allowed; }
 
   .empty-state {
     position: absolute; inset: 0;
@@ -1035,16 +1063,16 @@
   .poster.tpl-disponibilidad.dp-ultimos   .dp-sello{background:#ff283b; color:#fff}
   .poster.tpl-disponibilidad.dp-agotado   .dp-sello{background:rgba(255,255,255,.22); color:#fff}
   .poster.tpl-disponibilidad .dp-name{
-    font-family:'Archivo Black',Impact,sans-serif; font-weight:900; color:#fff;
+    font-family:'Archivo Black',Impact,sans-serif; font-weight:900; color:var(--tone-text,#fff);
     font-size:calc(88px * var(--text-scale)); line-height:.92; text-transform:uppercase;
     letter-spacing:calc(-1.5px + var(--letter-spacing));
   }
   .poster.tpl-disponibilidad .dp-date{
-    font-size:calc(30px * var(--text-scale)); font-weight:800; color:rgba(255,255,255,.85);
+    font-size:calc(30px * var(--text-scale)); font-weight:800; color:var(--tone-text-2,rgba(255,255,255,.85));
     text-transform:uppercase; letter-spacing:calc(.5px + var(--letter-spacing));
   }
   .poster.tpl-disponibilidad .dp-cta{
-    font-size:calc(24px * var(--text-scale)); font-weight:700; color:rgba(255,255,255,.6);
+    font-size:calc(24px * var(--text-scale)); font-weight:700; color:var(--tone-text-3,rgba(255,255,255,.6));
     text-transform:uppercase; letter-spacing:calc(.5px + var(--letter-spacing)); line-height:1.35;
   }
   .poster.tpl-disponibilidad.fmt-story-ig .dp-sello,
@@ -1074,26 +1102,35 @@
   .poster.tpl-espera .handle{top:50px; left:50px; gap:14px}
   .poster.tpl-espera.fmt-story-ig .handle{top:280px; left:60px}
   .poster.tpl-espera .handle-dot{width:30px; height:30px; background:var(--c-yellow)}
+  /* 🔒 `es-n` NO SIGUE EL TONO, A PROPÓSITO — y queda asertado para que sea una
+     decisión y no una omisión que se descubra sola. Es el amarillo de marca y
+     es el punto entero del cartel; pasarlo a negro con «Oscuro» borraría la
+     identidad. Sus hermanos (`es-lbl`, `es-name`, `es-date`, `es-cta`) SÍ lo
+     siguen.
+     ⏳ Lo que esto deja abierto y es de Memo: sobre una foto CLARA, amarillo
+     sobre blanco se lee mal — que es justo lo que el control existe para
+     resolver. Si Memo quiere que el número también cambie, es una línea; hoy
+     no se decide solo. */
   .poster.tpl-espera .es-n{
     font-family:'Archivo Black',Impact,sans-serif; font-weight:900; color:var(--c-yellow,#e8ff4c);
     font-size:calc(150px * var(--text-scale)); line-height:.82;
     letter-spacing:calc(-4px + var(--letter-spacing));
   }
   .poster.tpl-espera .es-lbl{
-    font-size:calc(30px * var(--text-scale)); font-weight:900; color:#fff;
+    font-size:calc(30px * var(--text-scale)); font-weight:900; color:var(--tone-text,#fff);
     text-transform:uppercase; letter-spacing:calc(1px + var(--letter-spacing)); margin-bottom:10px;
   }
   .poster.tpl-espera .es-name{
-    font-family:'Archivo Black',Impact,sans-serif; font-weight:900; color:#fff;
+    font-family:'Archivo Black',Impact,sans-serif; font-weight:900; color:var(--tone-text,#fff);
     font-size:calc(74px * var(--text-scale)); line-height:.92; text-transform:uppercase;
     letter-spacing:calc(-1.5px + var(--letter-spacing));
   }
   .poster.tpl-espera .es-date{
-    font-size:calc(28px * var(--text-scale)); font-weight:800; color:rgba(255,255,255,.85);
+    font-size:calc(28px * var(--text-scale)); font-weight:800; color:var(--tone-text-2,rgba(255,255,255,.85));
     text-transform:uppercase; letter-spacing:calc(.5px + var(--letter-spacing));
   }
   .poster.tpl-espera .es-cta{
-    font-size:calc(24px * var(--text-scale)); font-weight:700; color:rgba(255,255,255,.6);
+    font-size:calc(24px * var(--text-scale)); font-weight:700; color:var(--tone-text-3,rgba(255,255,255,.6));
     text-transform:uppercase; letter-spacing:calc(.5px + var(--letter-spacing)); line-height:1.35; margin-top:6px;
   }
   .poster.tpl-espera.fmt-story-ig .es-n{font-size:calc(180px * var(--text-scale))}
@@ -1280,13 +1317,14 @@
   <!-- BLOQUE 4: TEXTO Y ESTILO -->
   <div class="block" id="block4" data-status="pending">
     <div class="block-title"><div class="block-num">4</div>Texto y estilo<span class="block-status-icon" id="block4Icon">○</span></div>
-    <div class="section">
+    <div class="section" id="toneSection">
       <div class="section-label">Color de texto sobre foto</div>
       <div class="toggle-grid cols-2">
         <button class="toggle-btn text-tone-btn tone-yellow active" data-tone="light">Claro</button>
         <button class="toggle-btn text-tone-btn" data-tone="dark">Oscuro</button>
       </div>
       <p class="helper-text">Claro: para fotos oscuras (texto blanco). Oscuro: para fotos claras (texto negro).</p>
+      <p class="helper-text nota-no-aplica">En esta plantilla el texto no va sobre la foto: va sobre pastillas y bandas de color, que traen su propio contraste.</p>
     </div>
     <div class="section">
       <div class="section-label">Alineación</div>
@@ -1609,7 +1647,7 @@
         <div class="handle-dot"></div>
         <div class="handle-text" id="prHandle">@CONECTA_MEXICO</div>
       </div>
-      <div class="promo-block tpl-content hidden" data-tpl="promo">
+      <div class="promo-block tpl-content on-photo hidden" data-tpl="promo">
         <div class="promo-date" id="prDateDisplay">25 DE NOVIEMBRE — ESTADIO FRAY NANO, CDMX.</div>
         <div class="promo-name" id="prNameDisplay">A PERFECT CIRCLE</div>
         <div class="promo-headline" id="prHeadlineDisplay">VUELVE A MÉXICO.</div>
@@ -1620,7 +1658,7 @@
         <div class="handle-dot"></div>
         <div class="handle-text" id="dpHandle">@CONECTA_MEXICO</div>
       </div>
-      <div class="dp-block tpl-content hidden" data-tpl="disponibilidad">
+      <div class="dp-block tpl-content on-photo hidden" data-tpl="disponibilidad">
         <div class="dp-sello" id="dpSelloDisplay">DISPONIBLE</div>
         <div class="dp-name" id="dpNameDisplay">TINI</div>
         <div class="dp-date" id="dpDateDisplay">7 SEP 2026 — ARENA MONTERREY, MTY</div>
@@ -1631,7 +1669,7 @@
         <div class="handle-dot"></div>
         <div class="handle-text" id="esHandle">@CONECTA_MEXICO</div>
       </div>
-      <div class="es-block tpl-content hidden" data-tpl="espera">
+      <div class="es-block tpl-content on-photo hidden" data-tpl="espera">
         <div class="es-n" id="esNDisplay">—</div>
         <div class="es-lbl" id="esLblDisplay">YA ESTAMOS ESPERANDO</div>
         <div class="es-name" id="esNameDisplay">BAD BUNNY</div>
@@ -1970,15 +2008,51 @@
   function applyPxSubColor(col) { poster.style.setProperty('--px-sub-bg', col.hex); poster.style.setProperty('--px-sub-text', col.text); }
   function applyImageBgColor(col) { state.colorImageBg = col.id; updatePhoto(); }
 
+  // 🔒 LA FAMILIA DEL TONO, EN UNA SOLA FUENTE. Antes se ponían dos variables
+  // y el texto de las plantillas no las leía: `--tone-text` tenía TRES
+  // consumidores en todo el archivo, los tres de `promo`. Por eso el control se
+  // marcaba activo y el cartel no cambiaba.
+  //
+  // Son cuatro tokens porque el texto sobre foto no es de un solo color: hay
+  // principal, secundario al 85% y terciario al 60%. Poner `#000` a los tres
+  // aplastaría la jerarquía que ya tienen. El tono cambia la FAMILIA, no apaga
+  // la escala.
+  const TONOS = {
+    light: { t1: '#fff', t2: 'rgba(255,255,255,.85)', t3: 'rgba(255,255,255,.60)', sombra: '0 2px 8px rgba(0,0,0,0.6)' },
+    dark:  { t1: '#000', t2: 'rgba(0,0,0,.85)',       t3: 'rgba(0,0,0,.60)',       sombra: 'none' },
+  };
   function applyTextTone() {
     poster.dataset.textTone = state.textTone;
-    if (state.textTone === 'dark') {
-      poster.style.setProperty('--tone-text', '#000');
-      poster.style.setProperty('--tone-shadow', 'none');
-    } else {
-      poster.style.setProperty('--tone-text', '#fff');
-      poster.style.setProperty('--tone-shadow', '0 2px 8px rgba(0,0,0,0.6)');
-    }
+    const c = TONOS[state.textTone] || TONOS.light;
+    poster.style.setProperty('--tone-text', c.t1);
+    poster.style.setProperty('--tone-text-2', c.t2);
+    poster.style.setProperty('--tone-text-3', c.t3);
+    poster.style.setProperty('--tone-shadow', c.sombra);
+    _tonoAplicable();
+  }
+
+  // 🔒 Y EL CONTROL DEJA DE MENTIR CUANDO NO APLICA.
+  //
+  // Se llama «Color de texto sobre foto», y medido: en `proximamente` y en
+  // `news` NINGÚN texto va sobre la foto — van sobre pastillas y bandas
+  // OPACAS, con su propio par de colores (`--px-name-bg`/`--px-name-text`,
+  // `--news-header-bg`/`--news-header-text`). Forzarles el tono pondría texto
+  // negro sobre una pastilla negra: rompería el contraste que su propio sistema
+  // de color ya resuelve.
+  //
+  // Así que ahí el control no debe cambiar el cartel — pero TAMPOCO debe
+  // fingir. Se apaga y dice por qué. «El botón se marca activo y no pasa nada»
+  // se cura de dos maneras y ésta es la honesta cuando la otra sería un bug.
+  //
+  // ⚠️ No hay lista de plantillas: se pregunta al documento si la plantilla
+  // activa tiene algún bloque marcado `on-photo`. Una plantilla nueva que ponga
+  // su texto sobre la foto se marca y el control se enciende solo.
+  function _tonoAplicable() {
+    const hay = !!poster.querySelector('.tpl-content.on-photo:not(.hidden)');
+    const cont = document.getElementById('toneSection');
+    if (cont) cont.classList.toggle('no-aplica', !hay);
+    $$('.text-tone-btn').forEach((b) => { b.disabled = !hay; });
+    return hay;
   }
   function applyHandleTone() { poster.dataset.handleTone = state.handleTone; }
 
@@ -2011,8 +2085,23 @@
     dimsLabel.textContent = `${pw} × ${ph}`;
   }
 
+  // 🔒 LAS CLASES A QUITAR SE LEEN DEL PÓSTER, NO SE LISTAN.
+  //
+  // Aquí estaban escritas las TRES que existían. `tpl-disponibilidad` y
+  // `tpl-espera` nunca se quitaban, así que en cuanto pasabas por una de esas
+  // dos su clase se quedaba PEGADA PARA SIEMPRE y todo su CSS seguía aplicando
+  // encima de las demás plantillas. Medido en producción:
+  //
+  //   elijo disponibilidad → ["tpl-disponibilidad"]
+  //   elijo espera         → ["tpl-disponibilidad","tpl-espera"]
+  //   elijo promo          → ["tpl-disponibilidad","tpl-espera","tpl-promo"]
+  //
+  // No es cosmético: las reglas de zona segura de WhatsApp están llaveadas por
+  // `.tpl-disponibilidad`/`.tpl-espera`, así que se colaban en carteles que no
+  // eran suyos. Es la MISMA lista escrita a mano que el handle, los formatos de
+  // Duplicar y la alineación — la cuarta de la misma familia en esta pantalla.
   function updateTemplate() {
-    poster.classList.remove('tpl-proximamente', 'tpl-news', 'tpl-promo');
+    [...poster.classList].filter((c) => c.startsWith('tpl-')).forEach((c) => poster.classList.remove(c));
     poster.classList.add('tpl-' + state.template);
     poster.classList.remove('layout-1', 'layout-2');
     if (state.template === 'news') poster.classList.add('layout-' + state.layout);
@@ -2024,6 +2113,7 @@
     });
 
     photoOverlay.style.display = state.template === 'promo' ? 'block' : 'none';
+    _tonoAplicable();   // el control se enciende o se apaga según la plantilla
 
     $$('.template-fields').forEach(el => el.classList.add('hidden'));
     $('fields-' + state.template).classList.remove('hidden');

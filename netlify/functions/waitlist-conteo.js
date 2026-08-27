@@ -23,8 +23,12 @@ const SB_URL = 'https://npgnhsmwpcipxgvfxrho.supabase.co';
 const SB_KEY = process.env.SUPABASE_SERVICE_KEY_KAMEHOUSE;
 
 exports.handler = async function (event) {
+  // `corsCheck` devuelve TRES cosas: '' (misma-origen, sin header), el origen
+  // (permitido) o null (prohibido). Ver el contrato en `_lib/verify-admin`.
   const __origin = corsCheck(event);
   const H = {
+    // Solo hay eco cuando hay un origen real que hacerle eco. En misma-origen
+    // el navegador ni siquiera mira esta cabecera.
     'Access-Control-Allow-Origin': __origin || 'null',
     'Access-Control-Allow-Headers': 'Content-Type',
     'Access-Control-Allow-Methods': 'GET, OPTIONS',
@@ -34,7 +38,12 @@ exports.handler = async function (event) {
     'Cache-Control': 'public, max-age=60',
   };
   if (event.httpMethod === 'OPTIONS') return { statusCode: 204, headers: H, body: '' };
-  if (!__origin) return { statusCode: 403, headers: H, body: JSON.stringify({ ok: false, error: 'Origen no permitido' }) };
+  // 🔒 `=== null`, NO `!__origin`. Éste era el bug: `diseno.html` pide el conteo
+  // con un GET mismo-origen, y el navegador NO manda `Origin` en un GET
+  // mismo-origen — así que `!__origin` rechazaba a la única página que lo usa.
+  // Reproducido en producción: GET → 403, POST al MISMO endpoint → 405 con el
+  // origen de vuelta. Cambiando solo el método pasaba la guarda.
+  if (__origin === null) return { statusCode: 403, headers: H, body: JSON.stringify({ ok: false, error: 'Origen no permitido' }) };
   if (event.httpMethod !== 'GET') {
     return { statusCode: 405, headers: H, body: JSON.stringify({ ok: false, error: 'Method not allowed' }) };
   }

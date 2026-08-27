@@ -94,11 +94,38 @@ function jwtVerify(token, secret) {
 // Origen permitido. Devuelve el origin para usar en CORS, o null si bloquea.
 // En dev (NETLIFY_DEV=true seteado por `netlify dev`) acepta localhost.
 // También acepta deploy previews y branch deploys del site Netlify (regex).
+// 🔒 TRES ESTADOS, NO DOS. Aquí estuvo el bug de HER-1h-FIX:
+//
+//   ''      → la petición NO trae header `Origin`. Es MISMA-ORIGEN.
+//   <origen>→ trae `Origin` y está permitido. Se devuelve para hacerle eco.
+//   null    → trae `Origin` y NO está permitido. Se rechaza.
+//
+// ⚠️ Por qué importa: **el navegador NO manda `Origin` en un GET mismo-origen.**
+// Sí lo manda en un POST mismo-origen, y siempre en cualquier cosa cruzada. Con
+// solo dos estados, "sin header" caía en el mismo cajón que "origen prohibido",
+// así que la guarda rechazaba EXACTAMENTE a su propia página: `waitlist-conteo`
+// devolvía 403 a `/diseno`. Se midió cambiando SOLO el método contra el mismo
+// endpoint — GET 403, POST 405 con el origen de vuelta en la cabecera.
+//
+// Y no se pierde nada de seguridad: lo que esta guarda protege es que OTRO SITIO
+// llame desde el navegador de un usuario, y en ese caso el `Origin` SIEMPRE
+// viaja. Un cliente que no es navegador (curl, un servidor) puede inventarse el
+// header, así que nunca estuvo tapado por aquí.
+//
+// Este contrato NO es nuevo: es el que `_lib/giveaway.js` ya usaba —y por eso
+// los seis endpoints del giveaway nunca tuvieron este problema—. Lo que se
+// arregla es que había DOS contratos en la casa y este archivo tenía el malo.
+//
+// ⚠️ Los 100 llamadores que gatean con `if (!__origin)` NO cambian de conducta:
+// `''` es falsy, así que siguen exigiendo un `Origin` de navegador. Quien quiera
+// aceptar mismo-origen compara `=== null`. Las dos políticas son legítimas; lo
+// que no era legítimo es que no se pudieran distinguir.
 function corsCheck(event) {
-  const origin = (event.headers && (event.headers.origin || event.headers.Origin)) || '';
-  if (ALLOWED_ORIGINS.includes(origin)) return origin;
-  if (NETLIFY_PREVIEW_RE.test(origin)) return origin;
-  if (process.env.NETLIFY_DEV === 'true' && ALLOWED_ORIGINS_DEV.includes(origin)) return origin;
+  const crudo = (event && event.headers && (event.headers.origin || event.headers.Origin));
+  if (crudo == null || crudo === '') return '';   // misma-origen
+  if (ALLOWED_ORIGINS.includes(crudo)) return crudo;
+  if (NETLIFY_PREVIEW_RE.test(crudo)) return crudo;
+  if (process.env.NETLIFY_DEV === 'true' && ALLOWED_ORIGINS_DEV.includes(crudo)) return crudo;
   return null;
 }
 

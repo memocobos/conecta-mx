@@ -1894,10 +1894,23 @@
     updateBranchDisplay();
   }
 
+  // 🔒 SE RECORREN LOS HANDLES, NO SE LISTAN. Aquí estaban escritos a mano
+  // `pxHandle` y `prHandle`, las dos plantillas que existían el día que se
+  // escribió. HER-1h-B y HER-1h-E añadieron `dpHandle` y `esHandle` copiando el
+  // markup — y ninguna se registró aquí, así que «Disponibilidad» y «Lista de
+  // espera» IGNORABAN el selector de sucursal y se quedaban con el literal del
+  // HTML: @CONECTA_MEXICO. Medido con sucursal = Monterrey: próximamente y
+  // promoción decían @CONECTA_MONTERREY; las dos nuevas, @CONECTA_MEXICO.
+  //
+  // ⚠️ Es el MISMO defecto que el gemelo `fmt-wa-status` del merge de F: una
+  // lista escrita a mano al lado de la realidad envejece sola y no avisa. La
+  // cura no es añadir dos renglones —eso deja la tercera lista esperando a la
+  // sexta plantilla—, es preguntarle al documento quién tiene handle.
   function updateBranchDisplay() {
     const handle = state.customHandle || defaultHandle(state.branch.slug);
-    $('pxHandle').textContent = handle;
-    $('prHandle').textContent = handle;
+    const nodos = document.querySelectorAll('#poster .handle .handle-text');
+    nodos.forEach((n) => { n.textContent = handle; });
+    return nodos.length;   // el arnés lo usa para exigir que sean TODOS
   }
 
   customHandle.addEventListener('input', (e) => {
@@ -2888,21 +2901,30 @@
   });
 
   // === DUPLICAR FORMATO ===
+  // 🔒 LOS FORMATOS SE LEEN DE LOS BOTONES, NO SE LISTAN. Estaban escritos a
+  // mano los TRES que existían; HER-1h-F añadió `wa-status` y `flyer-carta` y
+  // no los metió aquí. Dos consecuencias medidas en el barrido de botones:
+  //   · parado en WA Estado, el diálogo decía literalmente «Actual: undefined»
+  //     (`labels[state.format]` no existía para el formato nuevo);
+  //   · y los dos formatos nuevos eran INALCANZABLES desde Duplicar.
+  // Leyendo la barra de formatos, el que se añada mañana entra solo. Es la
+  // misma cura que la del handle, veinte líneas más arriba.
   $('duplicateBtn').addEventListener('click', () => {
-    const formats = ['post-ig', 'story-ig', 'post-fb'];
-    const labels = { 'post-ig': 'IG Post 4:5', 'story-ig': 'IG Story 9:16', 'post-fb': 'FB 1:1' };
-    const others = formats.filter(f => f !== state.format);
+    const botones = [...document.querySelectorAll('.format-btn')];
+    const labels = {};
+    botones.forEach((b) => { labels[b.dataset.format] = (b.textContent || b.dataset.format).trim(); });
+    const others = botones.map((b) => b.dataset.format).filter((f) => f !== state.format);
+    if (!others.length) return;
+    const menu = others.map((f, i) => `${i + 1}. ${labels[f]}`).join('\n');
+    const actual = labels[state.format] || state.format;
     const choice = prompt(
-      `Duplicar este diseño en otro formato.\n\nActual: ${labels[state.format]}\n\nEscribe el número:\n1. ${labels[others[0]]}\n2. ${labels[others[1]]}`
+      `Duplicar este diseño en otro formato.\n\nActual: ${actual}\n\nEscribe el número:\n${menu}`
     );
-    if (choice === '1' || choice === '2') {
-      const target = others[parseInt(choice) - 1];
-      const btn = document.querySelector(`.format-btn[data-format="${target}"]`);
-      if (btn) {
-        btn.click();
-        showToast(`Cambiado a ${labels[target]}`);
-      }
-    }
+    const n = parseInt(choice, 10);
+    if (!(n >= 1 && n <= others.length)) return;
+    const target = others[n - 1];
+    const btn = document.querySelector(`.format-btn[data-format="${target}"]`);
+    if (btn) { btn.click(); showToast(`Cambiado a ${labels[target]}`); }
   });
 
   // === DOWNLOAD ===

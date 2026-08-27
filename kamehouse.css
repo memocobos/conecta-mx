@@ -1821,6 +1821,16 @@ body.tema-axel ::selection { background: #94A3C8 !important; color: #07090f !imp
   background:var(--rdr-yel);color:#000;
   box-shadow:0 0 18px rgba(232,255,76,.25);
 }
+/* [RAD-1b] Las fechas reales de la ventana activa, debajo de los chips.
+   El margen inferior de `.rdr-range` baja a 8px para que la línea quede
+   pegada a sus chips y no flotando entre ellos y las tarjetas. */
+.rdr-range{margin-bottom:8px}
+.rdr-ventana{
+  margin:0 0 20px 6px;font-family:'JetBrains Mono',monospace;font-size:10px;
+  letter-spacing:.1em;text-transform:uppercase;color:var(--ts);
+}
+.rdr-ventana b{color:var(--text);font-weight:600}
+.rdr-ventana .rdr-encurso{color:var(--rdr-yel)}
 
 /* ── KPI grid ────────────────────────────────────────── */
 .rdr-kpis{

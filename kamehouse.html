@@ -2563,13 +2563,22 @@
    </div>
 
    <!-- SELECTOR DE RANGO -->
+   <!-- [RAD-1b] Los chips NO traen su texto escrito aquí: se lo pide
+        `_radChipsPintar` al calendario, que es quien hizo el corte. Un rótulo
+        que vive aparte del corte es un rótulo que puede mentir — y mintió:
+        «Esta semana» era `ahora − 7 días`. -->
    <div class="rdr-range" id="radar-range">
-     <button data-r="today"   type="button">Hoy</button>
-     <button data-r="week"    type="button">Esta semana</button>
-     <button data-r="month"   type="button" class="active">Este mes</button>
-     <button data-r="3months" type="button">Últimos 3M</button>
-     <button data-r="all"     type="button">Todo</button>
+     <button data-r="today"     type="button"></button>
+     <button data-r="week"      type="button"></button>
+     <button data-r="month"     type="button" class="active"></button>
+     <button data-r="3months"   type="button"></button>
+     <button data-r="rolling7"  type="button"></button>
+     <button data-r="rolling30" type="button"></button>
+     <button data-r="all"       type="button"></button>
    </div>
+   <!-- Las fechas de verdad de la ventana activa. No es adorno: es lo que
+        permite carear el rótulo contra el corte de un vistazo. -->
+   <div class="rdr-ventana" id="radar-ventana"></div>
 
    <!-- ═══════════ SUB-PESTAÑA: Resumen general ═══════════ -->
    <section class="radar-sub" data-sub="resumen" style="display:block">

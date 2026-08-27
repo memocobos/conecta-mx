@@ -66,6 +66,21 @@ async function countSessions(tabla, sinceISO, untilISO) {
   return new Set((rows || []).map(r => r.session_id)).size;
 }
 
+// [RAD-1i] Para pedirle la ventana al calendario. No hay otra forma de que un
+// cron en Node use una fuente que vive en PL/pgSQL — y esa es exactamente la
+// alternativa a copiar la fórmula.
+async function sbRpc(fn, body) {
+  try {
+    const r = await fetch(`${SB_URL}/rest/v1/rpc/${fn}`, {
+      method: 'POST',
+      headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(body || {}),
+    });
+    if (!r.ok) return null;
+    return await r.json();
+  } catch (e) { return null; }
+}
+
 async function countByAccion(tabla, accion, sinceISO, untilISO) {
   const rows = await sb(
     `${tabla}?accion=eq.${encodeURIComponent(accion)}` +
@@ -234,26 +249,54 @@ async function detectarWaitlist(resumen) {
 async function detectarCotizacionesCaida(resumen) {
   // Compara cotizaciones de la semana corriente (lun-dom hasta hoy) vs la
   // semana anterior. Si caen 30%+ con base mínima de 5, alerta.
-  const dayMs = 24 * 3600 * 1000;
-  const hoy = new Date();
-  const lunes = new Date(hoy); lunes.setDate(hoy.getDate() - ((hoy.getDay() + 6) % 7));
-  lunes.setHours(0, 0, 0, 0);
-  const lunesPrev = new Date(lunes.getTime() - 7 * dayMs);
-
-  const semActual = await countByAccion('main_eventos_uso', 'main_cotizacion_generada', lunes.toISOString(), hoy.toISOString());
-  const semPrev   = await countByAccion('main_eventos_uso', 'main_cotizacion_generada', lunesPrev.toISOString(), lunes.toISOString());
-  resumen.cotizaciones = { sem_actual: semActual, sem_prev: semPrev };
+  //
+  // 🔒 [RAD-1i] LA VENTANA SE PIDE, NO SE CALCULA. Copiar aquí la fórmula
+  // queda VETADO: es exactamente cómo el Radar llegó a tener siete aritméticas
+  // de calendario. `radar_ventana` es la misma función que sirve a la pantalla.
+  //
+  // 🔴 LO QUE HABÍA AQUÍ, y lo que costó:
+  //     const lunes = new Date(hoy); lunes.setDate(hoy.getDate()-((hoy.getDay()+6)%7));
+  //     semActual = cotizaciones(lunes → AHORA);        // parcial
+  //     semPrev   = cotizaciones(lunesPrev → lunes);    // 7 días COMPLETOS
+  //
+  //   Dos bugs a la vez: ventanas de distinto largo, y la semana cortada con
+  //   `getDay()` en el huso del SERVIDOR (UTC). A las 02:00 UTC del lunes ya es
+  //   lunes en UTC pero TODAVÍA ES DOMINGO 21:00 en Reynosa, así que
+  //   `semActual` eran DOS HORAS contra 168.
+  //
+  //   Resultado: CINCO alertas `cotizacion_caida` de severidad ALTA, cinco
+  //   domingos seguidos, todas entre −97% y −100%. Y el dedup por semana
+  //   garantizaba que disparara en la corrida de las 02:00 — el instante de
+  //   MÁXIMA distorsión.
+  //
+  //   Careado contra el dato real en esos cinco instantes exactos: CUATRO eran
+  //   falsas (+30%, +169%, +10%, +173% con la ventana buena) y **la del 9-ago
+  //   era REAL** (−58%, 871→366). El cron viejo la reportó como −99%, idéntica
+  //   a las otras cuatro: había un lobo de verdad y era indistinguible.
+  const ven = await sbRpc('radar_ventana', { p_rango: 'week' });
+  if (!ven || !ven.since) {
+    // Falla RUIDOSO: sin ventana no se inventa una. Mejor no alertar que
+    // alertar con un corte adivinado — es lo que produjo las cinco falsas.
+    resumen.errores.push('cotizacion_caida: radar_ventana no respondió; sección saltada');
+    return;
+  }
+  const semActual = await countByAccion('main_eventos_uso', 'main_cotizacion_generada', ven.since, new Date().toISOString());
+  const semPrev   = await countByAccion('main_eventos_uso', 'main_cotizacion_generada', ven.prev_since, ven.prev_until);
+  resumen.cotizaciones = { sem_actual: semActual, sem_prev: semPrev, ventana: ven.leyenda,
+                           tz: ven.tz, largo_seg: ven.largo_seg, dias_corridos: ven.dias };
 
   if (semPrev >= 5) {
     const ratio = semActual / semPrev;
     if (ratio <= 0.7) {
-      const ctx = `cotizacion_caida-${lunes.toISOString().slice(0, 10)}`;
-      if (!(await yaInsertada('cotizacion_caida', ctx, lunes.toISOString()))) {
+      const ctx = `cotizacion_caida-${String(ven.since).slice(0, 10)}`;
+      if (!(await yaInsertada('cotizacion_caida', ctx, ven.since))) {
         const a = {
           tipo: 'cotizacion_caida', severidad: 'alta',
           titulo: 'Caída de cotizaciones esta semana',
-          mensaje: `Llevamos ${semActual} cotizaciones esta semana vs ${semPrev} la anterior (-${Math.round((1 - ratio) * 100)}%).`,
-          datos: { contextoKey: ctx, sem_actual: semActual, sem_prev: semPrev, ratio: +ratio.toFixed(2) },
+          mensaje: `Llevamos ${semActual} cotizaciones esta semana vs ${semPrev} en el MISMO tramo de la anterior (-${Math.round((1 - ratio) * 100)}%). Ventana: ${ven.leyenda}, hora de Reynosa.`,
+          datos: { contextoKey: ctx, sem_actual: semActual, sem_prev: semPrev, ratio: +ratio.toFixed(2),
+                   ventana: { since: ven.since, prev_since: ven.prev_since, prev_until: ven.prev_until,
+                              tz: ven.tz, largo_seg: ven.largo_seg } },
         };
         await insertarAlerta(a);
         await mandarEmailAdmin(a);

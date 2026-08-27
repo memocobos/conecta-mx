@@ -5262,10 +5262,14 @@ function _resumenUtilCSV() {
 const RADAR_HOME_DIAS = 14;
 const RADAR_HOME_TOP = 5;
 
+// [RAD-1a] Pide la ventana al calendario, no se la inventa. Era la cuarta
+// aritmética de la pantalla: `ahora − 14×24h` con `toISOString()`.
+// Sigue siendo una RODANTE a propósito —la portada enseña «los últimos 14
+// días», no «esta quincena»— pero ahora arranca a MEDIANOCHE DE REYNOSA, no a
+// la hora en que abriste el panel.
 function _radarHomeSince() {
-  const d = new Date();
-  d.setDate(d.getDate() - RADAR_HOME_DIAS);
-  return d.toISOString();
+  const hoy = _radCalHoy();
+  return _radCalMasDias(hoy, -(RADAR_HOME_DIAS - 1)).toISOString();
 }
 
 // Barra proporcional al mayor, como la del Radar. El divisor nunca es 0.
@@ -24379,15 +24383,136 @@ async function _radarContarEventosActivos(){
   }
 }
 
-function _radarSinceISO(r){
-  r = r || _radarRange;
-  const now = new Date();
-  if (r === 'today')   { const d=new Date(now.getFullYear(),now.getMonth(),now.getDate()); return d.toISOString(); }
-  if (r === 'week')    { const d=new Date(now); d.setDate(d.getDate()-7);   return d.toISOString(); }
-  if (r === 'month')   { const d=new Date(now); d.setDate(d.getDate()-30);  return d.toISOString(); }
-  if (r === '3months') { const d=new Date(now); d.setDate(d.getDate()-90);  return d.toISOString(); }
-  return '1970-01-01T00:00:00Z';
+// ═══════════════════════════════════════════════════════════════════════════
+// [RAD-1a] EL CALENDARIO DEL RADAR · LA ÚNICA FUENTE
+//
+// Antes había CUATRO aritméticas de ventana en esta pantalla, y ninguna
+// coincidía con el calendario:
+//   · `_radarSinceISO`  → «semana» = ahora−7d, «mes» = ahora−30d, y el «hoy»
+//                          cortado a la medianoche DE LA MÁQUINA de quien mira.
+//   · `radar_metricas`  → la misma aritmética otra vez, en PL/pgSQL.
+//   · `_radarHomeSince` → ahora−14d con toISOString.
+//   · `_rcmRangosPara`  → meses y años de calendario… en hora local del navegador.
+//
+// Medido el 27-ago (jueves), sobre los clicks del diario: la «semana» del radar
+// traía 3,090 clicks y la semana de verdad (lun 24→hoy) 1,990. **55% de más.**
+// Y el RPC devolvía la ventana del «mes» arrancando a las 17:51 de un 28 de
+// julio, porque contaba 30×24 horas hacia atrás desde el instante del clic.
+//
+// 🔒 LA NORMA, FIRMADA POR MEMO (27-ago-2026):
+//   · Semanas de LUNES a domingo. Meses del día 1 al último.
+//   · Todo en hora de REYNOSA, y Reynosa es `America/Matamoros`.
+//   · JAMÁS `toISOString()` como «hoy»: es la fecha de Greenwich, y aquí se
+//     trabaja de noche. Tres mordidas ya.
+//   · Las ventanas rodantes NO se borran: se RENOMBRAN. «Últimos 7 días» es un
+//     corte legítimo; lo que no puede es llamarse «Esta semana».
+//
+// ⚠️ POR QUÉ `America/Matamoros` Y NO `America/Cancun`. Las dos dan −05:00 HOY,
+// así que hoy son indistinguibles — y **divergen del 1-nov-2026 al 13-mar-2027,
+// 133 días**: Matamoros sigue el horario de EE.UU. (pasa a −06:00 en invierno) y
+// Cancun es −05:00 fijo. Reynosa es zona FRONTERIZA y sigue a EE.UU., que es
+// justo lo que ya razonaron `giveaway-consuelo`, `giveaway-recordatorio` y el
+// propio `index.html`. Elegir por lo que se ve hoy habría metido una
+// divergencia dormida a 66 días de distancia.
+//
+// ⚠️ Y no se toca la cubeta `event_clicks_diario`, que lleva 9 días cortados en
+// Monterrey: reescribir historia es peor que anotarla. Es legacy, como los
+// `-06:00` de mayo en el catálogo.
+// ═══════════════════════════════════════════════════════════════════════════
+const RAD_TZ = 'America/Matamoros';   // Reynosa. No es Monterrey. No es Cancún.
+
+// El desfase de la zona EN ESE INSTANTE (los husos con horario de verano no
+// tienen UN desfase: tienen el de ese día). Se pregunta al motor de Intl, que
+// es quien tiene la tabla, en vez de escribir un número.
+function _radCalDesfase(instante) {
+  const iso = new Date(instante).toLocaleString('sv-SE', { timeZone: RAD_TZ });
+  return Date.parse(iso + 'Z') - new Date(instante).getTime();
 }
+// Las piezas del reloj de pared de Reynosa en ese instante.
+function _radCalPartes(instante) {
+  const s = new Date(instante).toLocaleString('sv-SE', { timeZone: RAD_TZ });
+  const [f, h] = s.split(' ');
+  const [y, m, d] = f.split('-').map(Number);
+  return { y, m, d, hora: h, dow: new Date(f + 'T00:00:00Z').getUTCDay() };  // 0=dom
+}
+// El INSTANTE en que empieza ese día de pared en Reynosa.
+// ⚠️ Dos pasadas: el desfase que aplica al resultado puede no ser el del punto
+// de partida — es justo lo que pasa el día que cambia el horario.
+function _radCalMedianoche(y, m, d) {
+  const tentativa = Date.UTC(y, m - 1, d, 0, 0, 0, 0);
+  let t = tentativa - _radCalDesfase(tentativa);
+  t = tentativa - _radCalDesfase(t);
+  return new Date(t);
+}
+function _radCalHoy() { const p = _radCalPartes(Date.now()); return _radCalMedianoche(p.y, p.m, p.d); }
+// ⚠️ LA ARITMÉTICA DE DÍAS VA EN EL CALENDARIO, NO EN MILISEGUNDOS.
+// Esto sumaba `n * 86400000` y lo cazó el careo contra Postgres en UN solo
+// instante de los 18: el 15-mar-2027, el día después de que entra el horario
+// de verano. Seis días de 24 horas hacia atrás desde el 15 caen una hora
+// CORTOS —porque uno de esos días duró 23— y aterrizan a las 23:00 del día
+// anterior: «últimos 7 días» arrancaba el 8 en vez del 9.
+// Un día al año, invisible el resto. Sumando componentes de fecha en UTC (que
+// no tiene horario de verano) y pidiendo después la medianoche de Reynosa, el
+// salto es exacto siempre.
+function _radCalMasDias(fecha, n) {
+  const p = _radCalPartes(fecha.getTime());
+  const d = new Date(Date.UTC(p.y, p.m - 1, p.d + n));
+  return _radCalMedianoche(d.getUTCFullYear(), d.getUTCMonth() + 1, d.getUTCDate());
+}
+
+// 🔒 LA VENTANA. Todo el Radar la pide aquí y a nadie más.
+// Devuelve instantes (Date) + la leyenda que la pantalla imprime, para que el
+// rótulo NO pueda decir algo distinto de lo que el corte hace.
+function _radCalVentana(rango) {
+  const hoy = _radCalHoy();
+  const p = _radCalPartes(Date.now());
+  const finDeHoy = _radCalMasDias(hoy, 1);
+  if (rango === 'today') {
+    const ayer = _radCalMasDias(hoy, -1);
+    return { since: hoy, until: null, prevSince: ayer, prevUntil: hoy,
+             leyenda: 'Hoy', completa: false, dias: 1 };
+  }
+  if (rango === 'week') {
+    // Lunes de ESTA semana. dow: 0=domingo → el lunes queda 6 días atrás.
+    const atras = (p.dow + 6) % 7;
+    const lunes = _radCalMasDias(hoy, -atras);
+    return { since: lunes, until: null,
+             prevSince: _radCalMasDias(lunes, -7), prevUntil: lunes,
+             leyenda: 'Esta semana (lun→hoy)', completa: p.dow === 0, dias: atras + 1 };
+  }
+  if (rango === 'month') {
+    const primero = _radCalMedianoche(p.y, p.m, 1);
+    const mesPrev = p.m === 1 ? { y: p.y - 1, m: 12 } : { y: p.y, m: p.m - 1 };
+    return { since: primero, until: null,
+             prevSince: _radCalMedianoche(mesPrev.y, mesPrev.m, 1), prevUntil: primero,
+             leyenda: 'Este mes (1→hoy)', completa: false, dias: p.d };
+  }
+  if (rango === '3months') {
+    // Los TRES meses de calendario que terminan en el actual, no 90×24 horas.
+    let y = p.y, m = p.m - 2; while (m < 1) { m += 12; y -= 1; }
+    const ini = _radCalMedianoche(y, m, 1);
+    let y2 = y, m2 = m - 3; while (m2 < 1) { m2 += 12; y2 -= 1; }
+    return { since: ini, until: null, prevSince: _radCalMedianoche(y2, m2, 1), prevUntil: ini,
+             leyenda: '3 meses (calendario)', completa: false, dias: null };
+  }
+  if (rango === 'rolling7' || rango === 'rolling30') {
+    // 🔒 Las rodantes SIGUEN EXISTIENDO y son útiles. Solo dejan de mentir con
+    // el nombre: se llaman por lo que son.
+    const n = rango === 'rolling7' ? 7 : 30;
+    const ini = _radCalMasDias(hoy, -(n - 1));
+    return { since: ini, until: null, prevSince: _radCalMasDias(ini, -n), prevUntil: ini,
+             leyenda: `Últimos ${n} días`, completa: true, dias: n };
+  }
+  return { since: new Date(0), until: null, prevSince: new Date(0), prevUntil: new Date(0),
+           leyenda: 'Todo', completa: true, dias: null };
+}
+
+// Compatibilidad: lo que el resto de la pantalla ya llamaba. Una sola fuente
+// debajo — si alguien añade un quinto consumidor, cae aquí y no en su propia
+// aritmética.
+function _radarSinceISO(r){ return _radCalVentana(r || _radarRange).since.toISOString(); }
+function _radarPrevSinceISO(r){ return _radCalVentana(r || _radarRange).prevSince.toISOString(); }
+function _radarLeyenda(r){ return _radCalVentana(r || _radarRange).leyenda; }
 function _trendArrow(actual, anterior){
   if (!anterior || anterior === 0) return { html: '', cls: 'flat' };
   const diff = ((actual - anterior) / anterior) * 100;
@@ -24695,17 +24820,24 @@ async function _radarFetch(table, sinceISO, untilISO){
 
 // ── Helpers visuales del Radar ────────────────────────────
 // Bucketing por día: devuelve array de N valores (uno por día) terminando en HOY.
+// [RAD-1a] LA QUINTA aritmética de calendario que tenía esta pantalla, y la
+// más escondida: los sparklines agrupaban por día usando la medianoche DEL
+// NAVEGADOR, tanto para «hoy» como para cada fila. Desde un teléfono en otro
+// huso, las barritas se corrían de cubeta sin que nada se viera roto.
+// Ahora el día es el de Reynosa, el mismo que el resto del Radar.
 function _rdrSeries7d(rows, predicate, days){
   days = days || 7;
-  const now = new Date();
-  const today0 = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const clave = (t) => { const p = _radCalPartes(t); return p.y * 10000 + p.m * 100 + p.d; };
+  // Las N claves de día que terminan en HOY, en orden.
+  const hoy = _radCalHoy();
+  const orden = [];
+  for (let i = days - 1; i >= 0; i--) orden.push(clave(_radCalMasDias(hoy, -i).getTime()));
+  const idx = new Map(orden.map((k, i) => [k, i]));
   const buckets = new Array(days).fill(0);
   for (const r of rows || []) {
     if (predicate && !predicate(r)) continue;
-    const t = new Date(r.created_at);
-    const d = new Date(t.getFullYear(), t.getMonth(), t.getDate());
-    const diff = Math.round((today0 - d) / (24 * 3600 * 1000));
-    if (diff >= 0 && diff < days) buckets[days - 1 - diff]++;
+    const i = idx.get(clave(new Date(r.created_at).getTime()));
+    if (i != null) buckets[i]++;
   }
   return buckets;
 }
@@ -25170,36 +25302,46 @@ async function markAllAlertsRead(){
 // ── COMPARATIVAS ───────────────────────────────────────────
 const _RCM_MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 
+// [RAD-1a] Comparativas ya usaba meses y años de CALENDARIO —bien— pero los
+// construía con `new Date(y, mes, 1)`, que es medianoche EN LA MÁQUINA de quien
+// mira. Desde Reynosa y desde un teléfono en otro huso salían dos «1 de agosto»
+// distintos. Ahora las fechas se piden al calendario de la casa.
+//
+// 🔒 Y AQUÍ VIVE LA REGLA DE LAS VENTANAS DEL MISMO LARGO, que es de lo que
+// depende que Giru (RAD-1e) no mienta: al comparar un periodo EN CURSO contra
+// el anterior, el anterior se recorta al MISMO número de días. Medido el
+// 27-ago (jueves): comparando 4 días contra 7, «el que más subió» salía −9%;
+// con tramos iguales, el mismo evento con el mismo dato sale +26%.
 function _rcmRangosPara(modo, opts){
   // Devuelve { actSince, actUntil, prevSince, prevUntil, leyenda }
-  // actUntil/prevUntil pueden ser null (= ahora / abierto al final).
-  const now = new Date();
+  const p = _radCalPartes(Date.now());
+  const hoy = _radCalHoy();
+  const finHoy = _radCalMasDias(hoy, 1);   // el periodo en curso incluye HOY entero
   if (modo === 'week') {
-    const actSince = new Date(now); actSince.setDate(now.getDate()-7);
-    const prevSince = new Date(actSince); prevSince.setDate(actSince.getDate()-7);
-    return { actSince, actUntil: now, prevSince, prevUntil: actSince,
+    const v = _radCalVentana('rolling7');
+    return { actSince: v.since, actUntil: null, prevSince: v.prevSince, prevUntil: v.prevUntil,
              leyenda: 'Últimos 7 días vs los 7 anteriores' };
   }
   if (modo === 'year') {
-    const actSince = new Date(now.getFullYear(), 0, 1);
-    const prevSince = new Date(now.getFullYear()-1, 0, 1);
-    const prevUntil = new Date(now.getFullYear()-1, now.getMonth(), now.getDate(), now.getHours(), now.getMinutes());
-    return { actSince, actUntil: now, prevSince, prevUntil,
-             leyenda: `${now.getFullYear()} (a la fecha) vs ${now.getFullYear()-1} (mismo periodo)` };
+    const actSince  = _radCalMedianoche(p.y, 1, 1);
+    const prevSince = _radCalMedianoche(p.y - 1, 1, 1);
+    // MISMO LARGO: el año pasado se corta el mismo día y mes, no el 31-dic.
+    const prevUntil = _radCalMedianoche(p.y - 1, p.m, p.d);
+    return { actSince, actUntil: null, prevSince, prevUntil,
+             leyenda: `${p.y} (a la fecha) vs ${p.y - 1} (mismo periodo)` };
   }
   if (modo === 'month_yoy') {
-    const mes = opts?.mesIdx != null ? opts.mesIdx : now.getMonth();
-    const actSince  = new Date(now.getFullYear(),     mes, 1);
-    const actUntil  = new Date(now.getFullYear(),     mes + 1, 1);
-    const prevSince = new Date(now.getFullYear() - 1, mes, 1);
-    const prevUntil = new Date(now.getFullYear() - 1, mes + 1, 1);
+    const mes = (opts && opts.mesIdx != null) ? opts.mesIdx + 1 : p.m;
+    const sig = mes === 12 ? { y: 1, m: 1 } : { y: 0, m: mes + 1 };
+    const actSince  = _radCalMedianoche(p.y, mes, 1);
+    const actUntil  = _radCalMedianoche(p.y + sig.y, sig.m, 1);
+    const prevSince = _radCalMedianoche(p.y - 1, mes, 1);
+    const prevUntil = _radCalMedianoche(p.y - 1 + sig.y, sig.m, 1);
     return { actSince, actUntil, prevSince, prevUntil,
-             leyenda: `${_RCM_MESES[mes]} ${now.getFullYear()} vs ${_RCM_MESES[mes]} ${now.getFullYear()-1}` };
+             leyenda: `${_RCM_MESES[mes - 1]} ${p.y} vs ${_RCM_MESES[mes - 1]} ${p.y - 1}` };
   }
-  // Default: 'month' — últimos 30 días vs los 30 anteriores
-  const actSince  = new Date(now); actSince.setDate(now.getDate()-30);
-  const prevSince = new Date(actSince); prevSince.setDate(actSince.getDate()-30);
-  return { actSince, actUntil: now, prevSince, prevUntil: actSince,
+  const v = _radCalVentana('rolling30');
+  return { actSince: v.since, actUntil: null, prevSince: v.prevSince, prevUntil: v.prevUntil,
            leyenda: 'Últimos 30 días vs los 30 anteriores' };
 }
 

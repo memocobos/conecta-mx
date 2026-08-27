@@ -628,15 +628,30 @@
      nombre de quien publica, la barra de progreso y la caja de responder. Es al
      revés de "sin márgenes": necesita MÁS. */
   .poster.fmt-wa-status { width: 1080px; height: 1920px; }
-  .poster.fmt-wa-status .dp-block,
-  .poster.fmt-wa-status .es-block,
-  .poster.fmt-wa-status .promo-block { bottom: 330px; }
-  .poster.fmt-wa-status .handle { top: 330px; }
+  /* ⚠️ LA ESPECIFICIDAD IMPORTA. `fmt-wa-status` hereda las 19 reglas de la
+     story, y ésas van calificadas con la plantilla
+     (`.poster.tpl-promo.fmt-wa-status .promo-block`). Una regla genérica
+     `.poster.fmt-wa-status .promo-block` tiene MENOS peso y pierde en silencio:
+     medido, el bloque se quedaba a 280px en vez de irse a 330. La zona segura
+     se escribe con la MISMA calificación por plantilla. */
+  .poster.tpl-promo.fmt-wa-status .promo-block,
+  .poster.tpl-disponibilidad.fmt-wa-status .dp-block,
+  .poster.tpl-espera.fmt-wa-status .es-block { bottom: 340px; }
+  .poster.tpl-promo.fmt-wa-status .handle,
+  .poster.tpl-disponibilidad.fmt-wa-status .handle,
+  .poster.tpl-espera.fmt-wa-status .handle { top: 340px; }
+  .poster.tpl-proximamente.fmt-wa-status .text-block,
+  .poster.tpl-news.fmt-wa-status .news-bottom,
+  .poster.tpl-news.fmt-wa-status .news-bottom-2 { margin-bottom: 180px; }
   /* [HER-1h-F] Flyer para imprimir: carta 8.5×11 in. El LIENZO sigue viviendo en
      el mundo de 1080 —así todas las reglas de tipografía de las cuatro
      plantillas siguen valiendo tal cual— y lo que sube a 300 dpi es la
      EXPORTACIÓN (`scale` de html2canvas), no el elemento. 1080 × 11/8.5 ≈ 1398. */
-  .poster.fmt-flyer-carta { width: 1080px; height: 1398px; }
+  /* ⚠️ 1398px daba 3301, no 3300: 1398 × (2550/1080) = 3300.99. El alto exacto
+     de carta en este mundo de 1080 es 1080 × 11/8.5 = 1397.647…, y con esa
+     fracción la exportación cae en 3300 clavados. Un píxel no se ve en papel,
+     pero un número que no cuadra invita a que alguien lo "arregle" mal. */
+  .poster.fmt-flyer-carta { width: 1080px; height: 1397.647px; }
 
   /* FIX BUG FONDO: photo-fill como capa de fondo limpia */
   .photo-fill {
@@ -1867,7 +1882,7 @@
     if (state.format === 'story-ig') return [1080, 1920];
     if (state.format === 'post-fb') return [1080, 1080];
     if (state.format === 'wa-status') return [1080, 1920];
-    if (state.format === 'flyer-carta') return [1080, 1398];
+    if (state.format === 'flyer-carta') return [1080, 1397.647];
     return [1080, 1350];
   }
 

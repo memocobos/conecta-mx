@@ -2589,10 +2589,22 @@
      <div id="radar-tops" class="rtops"></div>
      <!-- [RAD-1e] Giru. Como la franja y los tops, no depende del rango. -->
      <div id="radar-giru"></div>
+     <!-- [RAD-1g] EL BLOQUE ACUMULADO DICE DE QUÉ VENTANA ES.
+          Sin este encabezado, Memo bajaba y veía «VISITAS HOY 285» y justo
+          debajo «VISITAS TOTALES 11,779» sin nada que dijera que la segunda es
+          del rango — su ventana estaba 700px más arriba, en los chips.
+          El texto sale del MISMO calendario que los chips (RAD-1b), así que no
+          puede decir una cosa distinta del corte. -->
+     <div class="rdia-head" id="radar-rango-head">
+       <span class="rdia-tit">EN ESTE RANGO</span>
+       <span class="rdia-linea"></span>
+       <span class="rdia-meta" id="radar-rango-meta"></span>
+     </div>
      <!-- KPI cards con sparklines individuales -->
      <div class="rdr-kpis">
        <div class="rdr-kpi">
-         <div class="rdr-kpi-lbl">Visitas totales</div>
+         <!-- «totales» prometía histórico y era el rango. Lo dice el encabezado. -->
+         <div class="rdr-kpi-lbl">Visitas</div>
          <div class="rdr-kpi-num">
            <span class="rdr-kpi-val" id="rgr-visitas">—</span>
            <span class="rdr-kpi-trend" id="rgr-visitas-tr"></span>
@@ -2624,7 +2636,8 @@
          <svg class="rdr-kpi-spark" id="rgr-comprobante-spark" viewBox="0 0 240 32" preserveAspectRatio="none"></svg>
        </div>
        <div class="rdr-kpi">
-         <div class="rdr-kpi-lbl">Conversión global</div>
+         <!-- «global» prometía histórico y era el rango. -->
+         <div class="rdr-kpi-lbl">Conversión</div>
          <div class="rdr-kpi-num">
            <span class="rdr-kpi-val" id="rgr-conv">—</span>
            <span class="rdr-kpi-trend" id="rgr-conv-tr"></span>
@@ -2632,7 +2645,7 @@
          <svg class="rdr-kpi-spark" id="rgr-conv-spark" viewBox="0 0 240 32" preserveAspectRatio="none"></svg>
        </div>
        <div class="rdr-kpi">
-         <div class="rdr-kpi-lbl">Eventos activos</div>
+         <div class="rdr-kpi-lbl">Eventos activos <span class="rdr-kpi-fuera">ahora</span></div>
          <div class="rdr-kpi-num">
            <span class="rdr-kpi-val" id="rgr-eventos-act">—</span>
            <span class="rdr-kpi-trend"></span>
@@ -2640,7 +2653,7 @@
          <svg class="rdr-kpi-spark" viewBox="0 0 240 32" preserveAspectRatio="none"></svg>
        </div>
        <div class="rdr-kpi">
-         <div class="rdr-kpi-lbl">Lista de espera</div>
+         <div class="rdr-kpi-lbl">Lista de espera <span class="rdr-kpi-fuera">histórico</span></div>
          <div class="rdr-kpi-num">
            <span class="rdr-kpi-val" id="rgr-waitlist">—</span>
          </div>

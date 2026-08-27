@@ -24570,6 +24570,19 @@ function _radFechaCorta(d) {
   const M = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
   return p.d + ' ' + M[p.m - 1];
 }
+// [RAD-1g] El encabezado del bloque acumulado. Se llena del MISMO
+// `_radCalVentana` que los chips, así que el rótulo, las fechas y el corte son
+// el mismo objeto — la lección de RAD-1b aplicada al segundo bloque.
+function _radRangoHeadPintar() {
+  const el = document.getElementById('radar-rango-meta');
+  if (!el) return '';
+  const v = _radCalVentana(_radarRange);
+  if (_radarRange === 'all') { el.textContent = 'Todo lo que hay medido'; return el.textContent; }
+  const hasta = v.until ? _radFechaCorta(new Date(v.until.getTime() - 1)) : _radFechaCorta(_radCalHoy());
+  el.textContent = `${v.leyenda} · ${_radFechaCorta(v.since)} → ${hasta}`;
+  return el.textContent;
+}
+
 function _radChipsPintar() {
   const cont = document.getElementById('radar-range');
   if (!cont) return 0;
@@ -24580,6 +24593,7 @@ function _radChipsPintar() {
     b.title = v.leyenda;
     n++;
   });
+  _radRangoHeadPintar();
   const el = document.getElementById('radar-ventana');
   if (el) {
     const v = _radCalVentana(_radarRange);

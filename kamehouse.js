@@ -24507,6 +24507,53 @@ function _radCalVentana(rango) {
            leyenda: 'Todo', completa: true, dias: null };
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// [RAD-1b] EL RÓTULO LO ESCRIBE EL CALENDARIO
+//
+// Los chips tenían su texto escrito a mano en el HTML: «Esta semana», «Este
+// mes». El corte estaba en otro archivo y hacía otra cosa —`ahora − 7 días`,
+// `ahora − 30 días`— así que el rótulo llevaba meses mintiendo sin que nada
+// pudiera cazarlo: son dos objetos distintos y nadie los carea.
+//
+// 🔒 Ahora el texto SALE DE `_radCalVentana(r).leyenda`, el mismo objeto que
+// trae el `since`. No es que coincidan: es que son lo mismo. Para que el chip
+// vuelva a mentir habría que hacer mentir al corte, y eso el arnés lo caza.
+//
+// Y debajo van las FECHAS de verdad. Un rótulo se puede leer por encima; una
+// fecha no: «1 ago → 27 ago» se carea de un vistazo con lo que uno esperaba.
+function _radFechaCorta(d) {
+  const p = _radCalPartes(d.getTime());
+  const M = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+  return p.d + ' ' + M[p.m - 1];
+}
+function _radChipsPintar() {
+  const cont = document.getElementById('radar-range');
+  if (!cont) return 0;
+  let n = 0;
+  cont.querySelectorAll('button[data-r]').forEach((b) => {
+    const v = _radCalVentana(b.dataset.r);
+    b.textContent = v.leyenda;
+    b.title = v.leyenda;
+    n++;
+  });
+  const el = document.getElementById('radar-ventana');
+  if (el) {
+    const v = _radCalVentana(_radarRange);
+    if (_radarRange === 'all') {
+      el.innerHTML = 'Todo lo que hay medido';
+    } else {
+      const hasta = v.until ? _radFechaCorta(new Date(v.until.getTime() - 1)) : _radFechaCorta(_radCalHoy());
+      // «En curso» no es un adorno: es la advertencia de que este tramo NO se
+      // puede comparar contra uno completo. Es de lo que depende que Giru
+      // (RAD-1e) no diga que todo bajó cuando la semana apenas va en el jueves.
+      const curso = (v.completa === false && v.dias)
+        ? ` · <span class="rdr-encurso">en curso · ${v.dias} ${v.dias === 1 ? 'día' : 'días'}</span>` : '';
+      el.innerHTML = `<b>${_radFechaCorta(v.since)} → ${hasta}</b> · hora de Reynosa${curso}`;
+    }
+  }
+  return n;
+}
+
 // Compatibilidad: lo que el resto de la pantalla ya llamaba. Una sola fuente
 // debajo — si alguien añade un quinto consumidor, cae aquí y no en su propia
 // aritmética.
@@ -24700,10 +24747,12 @@ function initRadarTab(){
         btn.classList.add('active');
         _radarRange = btn.dataset.r;
         _radarRpcCache = {};   // rango nuevo → datos frescos
+        _radChipsPintar();
         loadRadar();
       });
     });
   }
+  _radChipsPintar();
   // Filtros de alertas
   const af = document.querySelector('#page-radar .radar-sub[data-sub="alertas"] .radar-range');
   if (af && !af.dataset.wired) {

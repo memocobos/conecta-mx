@@ -1026,6 +1026,44 @@
   .dp-var-btn.active[data-dp="poca"]{background:#e8ff4c; border-color:#e8ff4c; color:#161a00}
   .dp-var-btn.active[data-dp="ultimos"]{background:#ff283b; border-color:#ff283b; color:#fff}
   .dp-var-btn.active[data-dp="agotado"]{background:rgba(255,255,255,.22); border-color:rgba(255,255,255,.45); color:#fff}
+
+  /* ═══ [HER-1h-E] LISTA DE ESPERA ══════════════════════════════════════
+     Misma caja que el cartel de disponibilidad —números de `.tpl-promo`,
+     resueltos para los tres formatos— con el NÚMERO como protagonista. */
+  .poster.tpl-espera .es-block{
+    position:absolute; z-index:10;
+    display:flex; flex-direction:column; align-items:flex-start; gap:6px;
+    bottom:70px; left:50px; right:50px;
+  }
+  .poster.tpl-espera.fmt-story-ig .es-block{bottom:220px; left:60px; right:60px}
+  .poster.tpl-espera.fmt-post-fb .es-block{bottom:56px}
+  .poster.tpl-espera .handle{top:50px; left:50px; gap:14px}
+  .poster.tpl-espera.fmt-story-ig .handle{top:280px; left:60px}
+  .poster.tpl-espera .handle-dot{width:30px; height:30px; background:var(--c-yellow)}
+  .poster.tpl-espera .es-n{
+    font-family:'Archivo Black',Impact,sans-serif; font-weight:900; color:var(--c-yellow,#e8ff4c);
+    font-size:calc(150px * var(--text-scale)); line-height:.82;
+    letter-spacing:calc(-4px + var(--letter-spacing));
+  }
+  .poster.tpl-espera .es-lbl{
+    font-size:calc(30px * var(--text-scale)); font-weight:900; color:#fff;
+    text-transform:uppercase; letter-spacing:calc(1px + var(--letter-spacing)); margin-bottom:10px;
+  }
+  .poster.tpl-espera .es-name{
+    font-family:'Archivo Black',Impact,sans-serif; font-weight:900; color:#fff;
+    font-size:calc(74px * var(--text-scale)); line-height:.92; text-transform:uppercase;
+    letter-spacing:calc(-1.5px + var(--letter-spacing));
+  }
+  .poster.tpl-espera .es-date{
+    font-size:calc(28px * var(--text-scale)); font-weight:800; color:rgba(255,255,255,.85);
+    text-transform:uppercase; letter-spacing:calc(.5px + var(--letter-spacing));
+  }
+  .poster.tpl-espera .es-cta{
+    font-size:calc(24px * var(--text-scale)); font-weight:700; color:rgba(255,255,255,.6);
+    text-transform:uppercase; letter-spacing:calc(.5px + var(--letter-spacing)); line-height:1.35; margin-top:6px;
+  }
+  .poster.tpl-espera.fmt-story-ig .es-n{font-size:calc(180px * var(--text-scale))}
+  .poster.tpl-espera.fmt-post-fb .es-n{font-size:calc(126px * var(--text-scale))}
 </style>
 </head>
 <body data-theme="dark">
@@ -1076,6 +1114,10 @@
            lo dicta el MISMO semáforo que pinta los tags del sitio. -->
       <button class="tpl-tab-btn" data-tpl="disponibilidad">
         <span class="tpl-tab-label">Disponibilidad</span>
+      </button>
+      <!-- [HER-1h-E] La prueba social: cuánta gente ya está esperando. -->
+      <button class="tpl-tab-btn" data-tpl="espera">
+        <span class="tpl-tab-label">Lista de espera</span>
       </button>
     </div>
   </div>
@@ -1408,6 +1450,25 @@
         <textarea id="dp-cta" maxlength="180" placeholder="Línea de cierre">PAQUETES CON ACCESO, TRANSPORTE Y HOSPEDAJE.</textarea>
       </div>
     </div>
+    <div class="template-fields hidden" id="fields-espera">
+      <div class="section">
+        <div class="section-label">Cuánta gente espera</div>
+        <!-- 🔒 SOLO LECTURA. El número lo pone la lista, no la mano: un
+             "ya somos 300" escrito a ojo es una cifra inventada en una pieza
+             publicada. Postura firmada. -->
+        <input type="text" id="es-n" value="—" readonly aria-readonly="true"
+               style="opacity:.75;cursor:not-allowed" title="Sale de la lista de espera. No se escribe a mano.">
+        <div class="hint" id="esFuente" style="font-size:11px;opacity:.7;margin-top:6px">
+          Elige un evento arriba: el número sale de la lista de espera, no se teclea.
+        </div>
+      </div>
+      <div class="section">
+        <div class="section-label">Texto del cartel</div>
+        <input type="text" id="es-name" value="BAD BUNNY" placeholder="Nombre del artista">
+        <input type="text" id="es-date" value="POR CONFIRMAR — ESTADIO BBVA, MTY" placeholder="Fecha — venue">
+        <textarea id="es-cta" maxlength="180" placeholder="Línea de cierre">APÚNTATE Y TE AVISAMOS EN CUANTO SALGAN LOS PAQUETES.</textarea>
+      </div>
+    </div>
   </div>
 
   <!-- ACCIONES -->
@@ -1493,6 +1554,18 @@
         <div class="dp-name" id="dpNameDisplay">TINI</div>
         <div class="dp-date" id="dpDateDisplay">7 SEP 2026 — ARENA MONTERREY, MTY</div>
         <div class="dp-cta" id="dpCtaDisplay">PAQUETES CON ACCESO, TRANSPORTE Y HOSPEDAJE.</div>
+      </div>
+
+      <div class="handle tpl-content hidden" data-tpl="espera">
+        <div class="handle-dot"></div>
+        <div class="handle-text" id="esHandle">@CONECTA_MEXICO</div>
+      </div>
+      <div class="es-block tpl-content hidden" data-tpl="espera">
+        <div class="es-n" id="esNDisplay">—</div>
+        <div class="es-lbl" id="esLblDisplay">YA ESTAMOS ESPERANDO</div>
+        <div class="es-name" id="esNameDisplay">BAD BUNNY</div>
+        <div class="es-date" id="esDateDisplay">POR CONFIRMAR — ESTADIO BBVA, MTY</div>
+        <div class="es-cta" id="esCtaDisplay">APÚNTATE Y TE AVISAMOS EN CUANTO SALGAN LOS PAQUETES.</div>
       </div>
 
       <div class="empty-state" id="emptyState">
@@ -2221,6 +2294,10 @@
   $('dp-sello').addEventListener('input', (e) => { $('dpSelloDisplay').textContent = e.target.value; markChanged(); });
   $('dp-cta').addEventListener('input', (e) => { $('dpCtaDisplay').innerHTML = e.target.value.replace(/\n/g, '<br>'); markChanged(); });
 
+  $('es-name').addEventListener('input', (e) => { $('esNameDisplay').textContent = e.target.value || 'ARTISTA'; markChanged(); });
+  $('es-date').addEventListener('input', (e) => { $('esDateDisplay').textContent = e.target.value; markChanged(); });
+  $('es-cta').addEventListener('input', (e) => { $('esCtaDisplay').innerHTML = e.target.value.replace(/\n/g, '<br>'); markChanged(); });
+
   $$('.dp-var-btn').forEach((b) => b.addEventListener('click', () => {
     // Escoger a mano APAGA la sugerencia para el resto de la sesión de este
     // cartel: si el juez volviera a pisarlo al cambiar de evento, la elección
@@ -2255,6 +2332,11 @@
   // Si el sitio cambia sus umbrales (hoy <40 es "últimos", 40-60 es "poca"),
   // este cartel cambia el mismo día, sin que nadie toque `diseno.html`.
   let EV_JUEZ = null;
+  // [HER-1h-E] Los conteos de la lista de espera. SOLO números: el endpoint
+  // proyecta `evento_id` y `notificado`, nada más. El nombre y el correo de la
+  // gente no salen de KameHouse, y este archivo es público.
+  let WL_CONTEO = null;
+  let WL_ERROR = null;
 
   function _cortarLiteral(html, re, abre, cierra) {
     const m = String(html).match(re);
@@ -2416,6 +2498,14 @@
       return { text: nom + ': fecha por confirmar.' };
     }
     const fecha0 = [f, v].filter(Boolean).join(' — ').toUpperCase();
+    if (plantilla === 'espera') {
+      const n = _esEsperando(ev.id);
+      return { esName: nombre, esDate: fecha0,
+        // `null` (no se pudo leer) y 0 (nadie) se ven distinto en el cartel:
+        // un guion no es un cero.
+        esN: (n === null || n === 0) ? '—' : String(n),
+        esCta: 'APÚNTATE Y TE AVISAMOS EN CUANTO SALGAN LOS PAQUETES.' };
+    }
     if (plantilla === 'disponibilidad') {
       // ⚠️ LA LÍNEA DE CIERRE SIGUE AL SEMÁFORO. Un cartel de AGOTADO que dice
       // "paquetes desde $4,950" es una oferta de algo que ya no existe: se ve
@@ -2436,6 +2526,48 @@
       (desde ? (' DESDE $' + desde.toLocaleString('es-MX') + ' EN PAQUETE PLUS.') : '') +
       ' ¡ASEGURA TU LUGAR!';
     return { date: fecha, name: nombre, headline: _HEAD_POR_ST[st] || _HEAD_POR_ST[''], cta: cta };
+  }
+
+  // Se pide APARTE del catálogo: si la lista no contesta, el picker y las otras
+  // tres plantillas siguen funcionando. Una plantilla caída no tumba la
+  // herramienta.
+  async function cargarConteos() {
+    try {
+      const r = await fetch('/.netlify/functions/waitlist-conteo', { cache: 'no-store' });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      const j = await r.json();
+      if (!j || j.ok !== true || !j.conteos || typeof j.conteos !== 'object') throw new Error('respuesta inesperada');
+      WL_CONTEO = j.conteos; WL_ERROR = null;
+    } catch (e) {
+      WL_CONTEO = null; WL_ERROR = e.message;
+    }
+  }
+
+  // 🔒 El número SALE de la lista o NO SALE. `null` cuando no se pudo leer y 0
+  // cuando de verdad no hay nadie: son cosas distintas y el cartel las dice
+  // distinto. Devolver 0 en una falla sería publicar "ya somos 0 esperando".
+  function _esEsperando(id) {
+    if (!WL_CONTEO) return null;
+    const c = WL_CONTEO[String(id)];
+    return c ? Number(c.esperando) || 0 : 0;
+  }
+
+  function _esPintarFuente(ev) {
+    const f = $('esFuente');
+    if (!f) return;
+    if (WL_CONTEO === null) {
+      f.innerHTML = '<b style="color:#ff283b">No pude leer la lista de espera' +
+        (WL_ERROR ? ' (' + WL_ERROR + ')' : '') + '.</b> El cartel NO trae número — y no se teclea a mano.';
+      return;
+    }
+    if (!ev) { f.textContent = 'Elige un evento arriba: el número sale de la lista de espera, no se teclea.'; return; }
+    const n = _esEsperando(ev.id);
+    if (n === 0) {
+      f.innerHTML = '<b>Nadie está esperando este evento todavía.</b> Este cartel no aplica — escoge otro evento.';
+      return;
+    }
+    f.innerHTML = '<b>' + n + '</b> personas esperando, según la lista de espera de KameHouse.' +
+      (n < 10 ? ' <b style="color:#e8ff4c">Son pocas: piénsalo antes de publicarlo.</b>' : '');
   }
 
   async function cargarCatalogo() {
@@ -2507,6 +2639,7 @@
     // el cartel sería una segunda forma de que se desincronicen.
     applyExample(_evAEjemplo(ev, state.template));
     if (state.template === 'disponibilidad') _dpDetectar(ev);
+    if (state.template === 'espera') _esPintarFuente(ev);
   }
 
   // [HER-1h-B] Enseña el veredicto del sitio y, si Memo no ha escogido a mano,
@@ -2566,6 +2699,15 @@
       $('px-sub').value = ex.sub; $('px-sub').dispatchEvent(new Event('input'));
     } else if (state.template === 'news') {
       $('news-text').value = ex.text; $('news-text').dispatchEvent(new Event('input'));
+    } else if (state.template === 'espera') {
+      $('es-name').value = ex.esName || ''; $('es-name').dispatchEvent(new Event('input'));
+      $('es-date').value = ex.esDate || ''; $('es-date').dispatchEvent(new Event('input'));
+      $('es-cta').value = ex.esCta || ''; $('es-cta').dispatchEvent(new Event('input'));
+      // El número NO pasa por un `input` que alguien pueda teclear: se escribe
+      // en el campo de solo lectura y en el cartel, de una vez.
+      $('es-n').value = ex.esN || '—';
+      $('esNDisplay').textContent = ex.esN || '—';
+      markChanged();
     } else if (state.template === 'disponibilidad') {
       $('dp-name').value = ex.dpName || ''; $('dp-name').dispatchEvent(new Event('input'));
       $('dp-date').value = ex.dpDate || ''; $('dp-date').dispatchEvent(new Event('input'));
@@ -2804,6 +2946,7 @@
   // herramienta ya está usable mientras llega, y si no llega se dice y se
   // sigue a mano.
   cargarCatalogo();
+  cargarConteos().then(() => _esPintarFuente(null));
   _dpInit();
   buildColorPalette('colorPaletteNews', 'colorNews', applyNewsColor);
   buildColorPalette('colorPaletteNewsHeader', 'colorNewsHeader', applyNewsHeaderColor);

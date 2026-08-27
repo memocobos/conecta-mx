@@ -979,10 +979,19 @@
      `index.html`: verde #88ea4e (.td), lima #e8ff4c (.tpoca), rojo #ff283b
      (.tu) y gris (.tag). Si el semáforo cambia de color, esto se ve distinto
      al sitio — pero el VEREDICTO no se copia, se ejecuta. */
+  /* ⚠️ `--pad` NO existe en esta hoja: la usé de memoria y el bloque se fue
+     arriba, encimado con el handle. Los números y el z-index son los mismos
+     que usa `.tpl-promo`, que es la plantilla hermana. */
   .poster.tpl-disponibilidad .dp-block{
-    position:absolute; left:var(--pad); right:var(--pad); bottom:var(--pad);
-    display:flex; flex-direction:column; align-items:flex-start; gap:14px; z-index:4;
+    position:absolute; z-index:10;
+    display:flex; flex-direction:column; align-items:flex-start; gap:16px;
+    bottom:70px; left:50px; right:50px;
   }
+  .poster.tpl-disponibilidad.fmt-story-ig .dp-block{bottom:220px; left:60px; right:60px}
+  .poster.tpl-disponibilidad.fmt-post-fb .dp-block{bottom:56px}
+  .poster.tpl-disponibilidad .handle{top:50px; left:50px; gap:14px}
+  .poster.tpl-disponibilidad.fmt-story-ig .handle{top:280px; left:60px}
+  .poster.tpl-disponibilidad .handle-dot{width:30px; height:30px; background:var(--c-green)}
   .poster.tpl-disponibilidad .dp-sello{
     font-family:'Archivo Black',Impact,sans-serif; font-weight:900;
     font-size:calc(64px * var(--text-scale)); line-height:.9;

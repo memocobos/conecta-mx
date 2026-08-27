@@ -25532,7 +25532,13 @@ function renderAlertasFiltered(filtro){
   if (!list) return;
   if (arr.length === 0) { list.innerHTML = '<div class="rdr-empty">Sin alertas en este filtro</div>'; return; }
   list.innerHTML = arr.map(a => {
-    const fecha = new Date(a.created_at).toLocaleString('es-MX', { dateStyle:'medium', timeStyle:'short' });
+    // 🔒 [RAD-1i] LA SÉPTIMA ARITMÉTICA DE CALENDARIO de esta pantalla, y la
+    // más callada: sin `timeZone`, `toLocaleString` usa el huso de LA MÁQUINA
+    // de quien mira. La alerta del 24-ago 02:00 UTC se veía como «23 ago, 8:00
+    // p.m.» (Monterrey) cuando en Reynosa fueron las 9:00 p.m. — y desde otra
+    // computadora se habría visto otra hora distinta.
+    // `RAD_TZ` es la MISMA constante del calendario del Radar, no un literal.
+    const fecha = new Date(a.created_at).toLocaleString('es-MX', { dateStyle:'medium', timeStyle:'short', timeZone: RAD_TZ });
     const dest = _radarAlertaDestino(a.tipo);
     return `<div class="rdr-alert sev-${a.severidad} ${a.vista?'vista':'no-vista'}" data-id="${a.id}" data-tipo="${_radarEsc(a.tipo)}"${dest ? ' style="cursor:pointer"' : ''}>
       <div class="dot"></div>

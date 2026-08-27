@@ -2239,6 +2239,15 @@
       tagTop = 230; frameTop = 320; frameHeight = 65; frameWidth = 80;
       prY = 280; pxY = 280;
       handleY = 280; prHandleY = 280;
+    } else if (state.format === 'wa-status') {
+      // [HER-1h-F] WA Estado es el lienzo de la story, así que hereda SUS
+      // defaults de deslizador. Sin esta rama caía al `else` genérico (130) y
+      // la composición se venía abajo AUNQUE el CSS fuera el de story: los
+      // números viven en el JS, no solo en la hoja. Medido: `--pr-y` daba 130
+      // en WA y 280 en story, con la misma regla de CSS aplicada.
+      tagTop = 200; frameTop = 260; frameHeight = 55; frameWidth = 80;
+      prY = 280; pxY = 280;
+      handleY = 280; prHandleY = 280;
     } else if (state.format === 'post-fb') {
       tagTop = 50; frameTop = 130; frameHeight = 60; frameWidth = 80;
       prY = 70; pxY = 80;

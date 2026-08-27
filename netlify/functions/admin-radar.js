@@ -13,6 +13,7 @@
 // Body JSON: { accion, ... }   (Rol: maestro_roshi — el Radar es solo de él)
 //   - 'metricas' { rango } → reenvía radar_metricas(p_rango) tal cual (KPIs/embudo/tops).
 //   - 'dia'                → reenvía radar_dia() tal cual: la franja del día [RAD-1c].
+//   - 'tops' { n? }        → reenvía radar_tops(p_n): los tres tops [RAD-1d].
 //   - 'fetch' { table, select?, since, until? } → lectura paginada (Range + Content-Range,
 //        created_at gte since [lt until], order created_at.desc) → { ok, rows:[...] }.
 //        table ∈ main_eventos_uso | pagos_eventos_uso | rol_eventos_uso | eventos_waitlist.
@@ -139,6 +140,24 @@ exports.handler = async (event) => {
       let dia;
       try { dia = JSON.parse(text); } catch { dia = text; }
       return { statusCode: 200, headers, body: JSON.stringify({ ok: true, dia }) };
+    }
+
+    // ── tops (RPC radar_tops — los tres tops de RAD-1d) ──────────────────────
+    // El único parámetro es CUÁNTOS, y va acotado en la propia función (1..20).
+    // Las ventanas las decide la base, como en 'dia'.
+    if (accion === 'tops') {
+      const nRaw = Number(body.n);
+      const p_n = Number.isFinite(nRaw) ? Math.max(1, Math.min(20, Math.trunc(nRaw))) : 5;
+      const r = await fetch(`${restBase}/rpc/radar_tops`, {
+        method: 'POST', headers: sbHeaders, body: JSON.stringify({ p_n }),
+      });
+      const text = await r.text();
+      if (!r.ok) {
+        return { statusCode: 502, headers, body: JSON.stringify({ error: 'KH rechazó radar_tops', detail: text }) };
+      }
+      let tops;
+      try { tops = JSON.parse(text); } catch { tops = text; }
+      return { statusCode: 200, headers, body: JSON.stringify({ ok: true, tops }) };
     }
 
     // ── main_metrics (RPC radar_main_metrics con ventana explícita — comparativas) ──

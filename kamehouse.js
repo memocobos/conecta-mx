@@ -941,6 +941,8 @@ const khRadar = {
   metricas(rango) { return this._call({ accion: 'metricas', rango }).then(j => j.metricas); },
   // [RAD-1c] dia() → la franja del día. Sin parámetros: el día lo decide la base.
   dia() { return this._call({ accion: 'dia' }).then(j => j.dia); },
+  // [RAD-1d] tops(n) → los tres tops. Las ventanas las decide la base.
+  tops(n) { return this._call({ accion: 'tops', n: n || 5 }).then(j => j.tops); },
   // mainMetrics(sinceISO, untilISO|null) → RPC radar_main_metrics TAL CUAL (comparativas)
   mainMetrics(since, until) { return this._call({ accion: 'main_metrics', since, until: until || undefined }).then(j => j.metricas); },
   // fetch({ table, select?, since, until? }) → array de filas (paginado server-side)
@@ -25056,11 +25058,75 @@ async function _radDiaCargar() {
   return d;
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// [RAD-1d] LOS TRES TOPS, CON SU VENTANA EN LA CARA
+//
+// 🔒 «AÑO» NO SE PUEDE DECIR: el diario de clicks tiene 10 días y los eventos
+// vistos 102. El tercer top se llama «desde que medimos» y sus DÍAS SE COMPUTAN
+// del `min()` real — el diagnóstico escribió «101» leyendo la fecha en UTC, y
+// en Reynosa la medición arranca el 18-may: son **102**. Un rótulo a mano ya
+// nació equivocado una vez.
+//
+// 🔒 EL RPC MANDA EL DATO, LA PANTALLA LO ESCRIBE. Las fechas vienen
+// estructuradas porque el `to_char` de Postgres devolvía «27 de August»: su
+// locale es inglés. Los meses en español ya viven aquí (`_radFechaCorta`, de
+// RAD-1b) y tenerlos también en el SQL sería la séptima lista a mano de esta
+// pantalla.
+// ═══════════════════════════════════════════════════════════════════════════
+const _RAD_TOPS = [
+  ['hoy',    'Más vistos HOY'],
+  ['mes',    'Top del MES'],
+  ['medido', 'Top DESDE QUE MEDIMOS'],
+];
+// El detalle de la ventana, compuesto DEL DATO que mandó el RPC. Si el rótulo
+// y las fechas se separaran, volveríamos al problema que arregló RAD-1b.
+function _radTopDetalle(v) {
+  if (!v || !v.desde) return '';
+  const d0 = _radFechaCorta(new Date(v.desde + 'T12:00:00Z'));
+  const d1 = _radFechaCorta(new Date(v.hasta + 'T12:00:00Z'));
+  if (v.tipo === 'hoy')  return d0;
+  if (v.tipo === 'mes')  return `${d0} → ${d1}`;
+  return `${d0} → hoy · ${v.dias} días`;
+}
+async function _radTopsCargar() {
+  const el = document.getElementById('radar-tops');
+  if (!el) return null;
+  let t;
+  try { t = await khRadar.tops(5); }
+  catch (e) {
+    el.innerHTML = `<div class="rdia-error">No pude leer los tops. <span>${_radarEsc(e.message || '')}</span></div>`;
+    return null;
+  }
+  if (!t) { el.innerHTML = ''; return null; }
+  const ven = t.ventanas || {}, tops = t.tops || {};
+  el.innerHTML = _RAD_TOPS.map(([k, rot]) => {
+    const filas = tops[k] || [];
+    const cuerpo = filas.length
+      ? filas.map((f) => `<div class="rtop-fila">
+            <span class="rtop-pos">${f.pos}</span>
+            <span class="rtop-nom" title="${_radarEsc(f.nombre || f.id)}">${_radarEsc(f.nombre || f.id)}</span>
+            <span class="rtop-n">${Number(f.sesiones).toLocaleString('es-MX')}</span>
+          </div>`).join('')
+      // 🔒 Un top vacío es un HECHO, no un hueco: hoy a las 6am nadie ha visto
+      // nada todavía, y eso hay que decirlo en vez de dejar la caja en blanco.
+      : '<div class="rtop-vacio">Todavía nadie · sesiones únicas</div>';
+    return `<div class="rtop-caja">
+        <div class="rtop-head">
+          <span class="rtop-rot">${_radarEsc(rot)}</span>
+          <span class="rtop-ven">${_radarEsc(_radTopDetalle(ven[k]))}</span>
+        </div>
+        <div class="rtop-body">${cuerpo}</div>
+      </div>`;
+  }).join('');
+  return t;
+}
+
 async function loadRadarResumen(){
   // [RAD-1c] La franja del día va PRIMERO y en paralelo: es lo que Memo mira al
   // entrar, y no depende del rango elegido — «hoy» es hoy aunque estés viendo
   // el mes. Falla en blando: si el día no carga, el resto del Resumen entra.
   _radDiaCargar();
+  _radTopsCargar();   // [RAD-1d] los tres tops, también independientes del rango
   // KPIs, top de eventos y donut de orígenes salen del RPC agregado (cacheado por rango).
   // Esto reemplaza la descarga de ~52k filas + conteo client-side que hacía timeout.
   const data  = await _radarGetMetricas(_radarRange);

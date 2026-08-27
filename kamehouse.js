@@ -23055,6 +23055,27 @@ function _ctrVigenciaAviso(c) {
 }
 
 // — Tabla listado + acciones ——————————————————————————
+// ═══ [HER-1b] EL BUSCADOR DE CONTRATOS ════════════════════════════════════
+// Mismo patrón que el de Esferas: filtra EN VIVO lo ya pintado. Por eso CARGAR
+// y PINTAR se parten en dos — teclear no puede costar un viaje al servidor, y
+// el caché ya estaba ahí (`_contratosCache`), solo que nadie lo repintaba.
+let _ctrBusca = '';
+
+// Mira NOMBRE, CORREO y EVENTO: son los tres con los que Memo llama a un
+// contrato. Buscar "soy luna" tiene que encontrarlo aunque no recuerde de quién
+// era, y buscar un correo tiene que encontrarlo aunque el nombre esté distinto.
+function _ctrCoincide(c, q) {
+  if (!q) return true;
+  const t = (String(c.creador_nombre || '') + ' ' + String(c.creador_email || '') + ' ' +
+             String(c.evento_nombre || '')).toLowerCase();
+  return t.includes(q);
+}
+
+function _ctrBuscarEnLista() {
+  _ctrBusca = (document.getElementById('ctr-buscar')?.value || '').trim().toLowerCase();
+  _ctrPintarLista();
+}
+
 async function loadContratosList() {
   const tbody = document.getElementById('ctr-tbody');
   if (!tbody) return;
@@ -23062,11 +23083,28 @@ async function loadContratosList() {
     // [sec-contratos] antes db.get('contratos_creadores', ...) con anon key.
     const rows = await khContratos.listar({ limit: 200 });
     _contratosCache = rows || [];
+    _ctrPintarLista();
+  } catch (e) {
+    tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--red);padding:30px;font-size:12px">Error: ${_escCtr(e.message)}</td></tr>`;
+  }
+}
+
+function _ctrPintarLista() {
+  const tbody = document.getElementById('ctr-tbody');
+  if (!tbody) return;
+  {
     if (!_contratosCache.length) {
       tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--ts);padding:30px;font-size:12px;letter-spacing:.1em;text-transform:uppercase">Sin contratos todavía. Crea el primero en "+ Nuevo".</td></tr>`;
       return;
     }
-    tbody.innerHTML = _contratosCache.map(c => {
+    const visibles = _contratosCache.filter(c => _ctrCoincide(c, _ctrBusca));
+    if (!visibles.length) {
+      // Una lista vacía es una AFIRMACIÓN: se dice cuántos hay del otro lado,
+      // porque si no, no se sabe si no existe o si el texto lo tapó.
+      tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--ts);padding:30px;font-size:12px">Ningún contrato dice "${_escCtr(_ctrBusca)}" — hay ${_contratosCache.length} en total.</td></tr>`;
+      return;
+    }
+    tbody.innerHTML = visibles.map(c => {
       const firmado = c.estado === 'firmado';
       const badge = firmado
         ? `<span style="background:rgba(61,220,132,.18);color:#3ddc84;border:1px solid rgba(61,220,132,.35);padding:3px 9px;border-radius:4px;font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;font-weight:700">✓ Firmado</span>`
@@ -23094,8 +23132,6 @@ async function loadContratosList() {
         <td style="text-align:right;white-space:nowrap">${acciones}</td>
       </tr>`;
     }).join('');
-  } catch (e) {
-    tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--red);padding:30px;font-size:12px">Error: ${_escCtr(e.message)}</td></tr>`;
   }
 }
 

@@ -30,11 +30,41 @@ function escapeHtml(s) {
     ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 }
 
-function invitationEmail({ creador_nombre, evento_nombre, evento_fecha, link }) {
+// [HER-1e] La fecha límite, escrita como la lee una persona: "miércoles 2 de
+// septiembre". Se ancla a MEDIODÍA en −05:00 (Reynosa) para que ningún huso la
+// corra de día: `new Date('2026-09-02')` a secas es medianoche UTC, que en
+// México todavía es el 1.
+//
+// ⚠️ ESTA MISMA REGLA VIVE TAMBIÉN EN EL NAVEGADOR, para la vista previa del
+// paso 1. Son dos runtimes y no hay forma de compartir la función, así que el
+// arnés las CAREA letra por letra sobre un abanico de fechas. Lo que NO se hace
+// es dejar que el cliente mande el texto ya armado: eso sería meter texto de
+// fuera en un correo.
+function _limiteTexto(iso) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(iso || ''))) return '';
+  try {
+    return new Date(iso + 'T12:00:00-05:00').toLocaleDateString('es-MX', {
+      weekday: 'long', day: 'numeric', month: 'long', timeZone: 'America/Cancun',
+    });
+  } catch (_) { return ''; }
+}
+
+function invitationEmail({ creador_nombre, evento_nombre, evento_fecha, link, fecha_limite }) {
   const firstName = (creador_nombre || "").split(" ")[0];
   const fechaTxt = evento_fecha
     ? new Date(evento_fecha + "T12:00:00").toLocaleDateString("es-MX", { day: "numeric", month: "long", year: "numeric" })
     : "";
+  // [HER-1e] Los dos párrafos que Memo aprobó, palabra por palabra. Solo salen
+  // si vino una fecha: sin ella el correo es el de siempre.
+  //
+  // 🔒 DICE "DAMOS DE BAJA", NO "SE CANCELA AUTOMÁTICAMENTE". Cancelar sigue
+  // siendo manual de Memo, y el correo no promete un automatismo que no existe.
+  // La última línea abre la puerta de salida: sin ella, la única respuesta
+  // posible al aviso es el silencio.
+  const limiteTxt = _limiteTexto(fecha_limite);
+  const bloqueLimite = limiteTxt ? `
+        <p style="font-size:15px;line-height:1.55;color:rgba(255,255,255,.85);margin:0 0 14px 0"><strong style="color:#ffb020">Para poder apartarte el lugar necesitamos tu firma antes del ${escapeHtml(limiteTxt)}.</strong> Si para esa fecha no está firmado, damos de baja la colaboración y liberamos el lugar.</p>
+        <p style="font-size:15px;line-height:1.55;color:rgba(255,255,255,.85);margin:0 0 14px 0">¿Ya no puedes? Contéstanos este correo y lo vemos.</p>` : '';
   return `<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Tu contrato Conecta Reynosa</title></head>
 <body style="margin:0;padding:0;background:#000;font-family:Helvetica,Arial,sans-serif;color:#fff;-webkit-font-smoothing:antialiased">
 <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#000">
@@ -49,7 +79,7 @@ function invitationEmail({ creador_nombre, evento_nombre, evento_fecha, link }) 
       <tr><td style="padding:32px 26px 6px 26px">
         <div style="font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:rgba(255,255,255,.55);margin-bottom:10px">📝 Te re-enviamos tu contrato</div>
         <h1 style="font-family:Arial Black,Arial,sans-serif;font-size:36px;line-height:.95;letter-spacing:-.01em;color:#e8ff4c;text-transform:uppercase;margin:0 0 14px 0">Hola, ${escapeHtml(firstName)}</h1>
-        <p style="font-size:15px;line-height:1.55;color:rgba(255,255,255,.85);margin:0 0 14px 0">Notamos que aún no has firmado tu contrato de colaboración para <strong style="color:#e8ff4c">${escapeHtml(evento_nombre)}</strong>${fechaTxt ? ` (${escapeHtml(fechaTxt)})` : ""}. Te volvemos a mandar el link por si se te traspapeló.</p>
+        <p style="font-size:15px;line-height:1.55;color:rgba(255,255,255,.85);margin:0 0 14px 0">Notamos que aún no has firmado tu contrato de colaboración para <strong style="color:#e8ff4c">${escapeHtml(evento_nombre)}</strong>${fechaTxt ? ` (${escapeHtml(fechaTxt)})` : ""}. Te volvemos a mandar el link por si se te traspapeló.</p>${bloqueLimite}
       </td></tr>
       <tr><td style="padding:8px 26px 28px 26px">
         <a href="${link}" style="display:block;width:100%;background:#e8ff4c;color:#000;padding:18px 20px;text-align:center;font-weight:900;font-size:16px;letter-spacing:.06em;text-transform:uppercase;text-decoration:none;font-family:Arial,sans-serif;box-sizing:border-box">→ Ver y firmar contrato</a>
@@ -62,6 +92,10 @@ function invitationEmail({ creador_nombre, evento_nombre, evento_fecha, link }) 
   </td></tr>
 </table></body></html>`;
 }
+
+// Se expone SOLO para el arnés: es la mitad servidor del careo del texto.
+exports._limiteTexto = _limiteTexto;
+exports._invitationEmail = invitationEmail;
 
 exports.handler = async function (event) {
   // ─── Origin + Admin auth (Stop the Bleed) ───
@@ -91,6 +125,21 @@ exports.handler = async function (event) {
 
   const token = String(data.token || "").trim();
   if (!/^[a-f0-9]{20,80}$/.test(token)) return bad(400, "Token inválido");
+
+  // [HER-1e] La fecha límite es OPCIONAL: sin ella el correo es el de siempre.
+  // Con ella se valida EN LA PUERTA — una fecha imposible no se acomoda, se
+  // rechaza, y el mensaje nombra el dedazo.
+  const fecha_limite = String(data.fecha_limite || "").trim();
+  if (fecha_limite) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha_limite)) {
+      return bad(422, "La fecha límite debe venir como AAAA-MM-DD; llegó: " + fecha_limite);
+    }
+    const hoyMx = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Cancun' });
+    if (fecha_limite < hoyMx) {
+      return bad(422, "La fecha límite ya pasó (" + fecha_limite + ", hoy es " + hoyMx + "): un plazo vencido no es un plazo.");
+    }
+    if (!_limiteTexto(fecha_limite)) return bad(422, "No pude leer la fecha límite: " + fecha_limite);
+  }
 
   let row;
   try {
@@ -122,6 +171,7 @@ exports.handler = async function (event) {
           evento_nombre: row.evento_nombre,
           evento_fecha: row.evento_fecha,
           link,
+          fecha_limite,
         }),
       }),
     });

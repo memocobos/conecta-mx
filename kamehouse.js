@@ -23289,7 +23289,7 @@ function _ctrPintarLista() {
           ${_puedeBorrarAdmin() ? `<button class="btn btn-ghost" style="padding:5px 10px;font-size:11px;color:#ff6666;border-color:rgba(255,68,68,.3)" onclick="eliminarContrato('${tokenSafe}','${nombreSafe}',this)">Eliminar</button>` : ''}`
         : `
           <button class="btn btn-ghost" style="padding:5px 10px;font-size:11px" onclick="editarContrato('${tokenSafe}')">Editar</button>
-          <button class="btn btn-ghost" style="padding:5px 10px;font-size:11px" onclick="reenviarContratoEmail('${tokenSafe}',this)">Reenviar</button>
+          <button class="btn btn-ghost" style="padding:5px 10px;font-size:11px;color:#ffb020;border-color:rgba(255,176,32,.4)" onclick="reenviarContratoEmail('${tokenSafe}')">✉ Reenviar…</button>
           <button class="btn btn-ghost" style="padding:5px 10px;font-size:11px" onclick="copiarLinkContrato('${tokenSafe}',this)">Copiar link</button>
           ${_puedeBorrarAdmin() ? `<button class="btn btn-ghost" style="padding:5px 10px;font-size:11px;color:#ff6666;border-color:rgba(255,68,68,.3)" onclick="eliminarContrato('${tokenSafe}','${nombreSafe}',this)">Eliminar</button>` : ''}`;
       return `<tr>
@@ -23355,25 +23355,115 @@ async function verAnexoC(id, nombre) {
   }
 }
 
-async function reenviarContratoEmail(token, btn) {
-  if (!confirm('¿Reenviar email de invitación a la creadora?')) return;
-  const original = btn.textContent;
+// ═══ [HER-1e] EL REENVÍO, EN DOS PASOS ════════════════════════════════════
+// Antes era un `confirm()` de una línea que mandaba el correo de inmediato.
+// `CORREOS_MODO` está en REAL desde el 31-jul: lo que se manda, se manda — a
+// una persona, a su bandeja. Un botón así merece la misma ceremonia que
+// posponer un evento.
+//
+// 🔒 PASO 1 · se elige la fecha límite y se lee el correo ENTERO antes de que
+//    exista un correo. La fecha llega pre-llenada a HOY + 5 DÍAS (firmado) y es
+//    EDITABLE: el default es una sugerencia, no una decisión.
+// 🔒 PASO 2 · se confirma a quién se le va a escribir. Hasta aquí no ha salido
+//    ni una petición.
+// 🔒 MANUAL SIEMPRE. Ni `schedule`, ni cron, ni una rama que mande sola. La
+//    alerta de 1d sugiere; esto lo aprieta Memo.
+const _CTR_LIMITE_DIAS = 5;
+let _ctrReenvio = null;   // { token, paso }
+
+// La MITAD NAVEGADOR del texto de la fecha. La otra vive en
+// `contrato-reenviar.js` y el arnés las carea letra por letra sobre un abanico
+// de fechas: son dos runtimes, no hay forma de compartir la función, y dos
+// copias que nadie carea es como se llega a una vista previa que miente.
+function _ctrLimiteTexto(iso) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(iso || ''))) return '';
+  try {
+    return new Date(iso + 'T12:00:00-05:00').toLocaleDateString('es-MX', {
+      weekday: 'long', day: 'numeric', month: 'long', timeZone: 'America/Cancun',
+    });
+  } catch (_) { return ''; }
+}
+
+function _ctrLimiteDefault() {
+  const d = new Date(_ctrHoyReynosa().getTime() + _CTR_LIMITE_DIAS * 86400000);
+  return d.toLocaleDateString('en-CA', { timeZone: 'America/Cancun' });
+}
+
+function reenviarContratoEmail(token) {
+  const c = (_contratosCache || []).find((x) => x && x.token === token);
+  if (!c) { alert('No encontré ese contrato en la lista. Recarga e intenta de nuevo.'); return; }
+  _ctrReenvio = { token: token, paso: 1 };
+  const f = document.getElementById('ctr-re-fecha');
+  if (f) { f.value = _ctrLimiteDefault(); f.min = _ctrHoyReynosa().toLocaleDateString('en-CA', { timeZone: 'America/Cancun' }); }
+  _ctrReenvioPintar();
+  openModal('modal-contrato-reenviar');
+}
+
+function _ctrReenvioPintar() {
+  if (!_ctrReenvio) return;
+  const c = (_contratosCache || []).find((x) => x && x.token === _ctrReenvio.token);
+  if (!c) return;
+  const el = (id) => document.getElementById(id);
+  const paso = _ctrReenvio.paso;
+  const dias = _ctrDiasEnviado(c);
+  el('ctr-re-paso').textContent = '// REENVIAR CONTRATO · PASO ' + paso + ' DE 2';
+  el('ctr-re-nombre').textContent = c.creador_nombre || '';
+  el('ctr-re-sub').textContent = [c.creador_email, c.evento_nombre, dias === null ? '' : ('enviado ' + _ctrDiasTexto(dias))]
+    .filter(Boolean).join(' · ');
+  el('ctr-re-p1').style.display = paso === 1 ? '' : 'none';
+  el('ctr-re-p2').style.display = paso === 2 ? '' : 'none';
+  el('ctr-re-atras').style.display = paso === 2 ? '' : 'none';
+  el('ctr-re-seguir').textContent = paso === 1 ? 'Continuar →' : 'Sí, mandar el correo';
+  el('ctr-re-seguir').disabled = false;
+  if (paso === 1) {
+    const iso = el('ctr-re-fecha').value;
+    const txt = _ctrLimiteTexto(iso);
+    // Sin fecha legible NO se avanza: el paso 2 prometería un correo que el
+    // servidor va a rechazar en la puerta.
+    el('ctr-re-seguir').disabled = !txt;
+    el('ctr-re-cuerpo').innerHTML = txt
+      ? ('Notamos que aún no has firmado tu contrato de colaboración para <b style="color:var(--orange)">' +
+         _escCtr(c.evento_nombre) + '</b>. Te volvemos a mandar el link por si se te traspapeló.<br><br>' +
+         '<b style="color:#ffb020">Para poder apartarte el lugar necesitamos tu firma antes del ' + _escCtr(txt) +
+         '.</b> Si para esa fecha no está firmado, damos de baja la colaboración y liberamos el lugar.<br><br>' +
+         '¿Ya no puedes? Contéstanos este correo y lo vemos.')
+      : '<span style="color:var(--red)">Escribe una fecha válida para poder continuar.</span>';
+  } else {
+    el('ctr-re-destino').innerHTML =
+      'Se va a mandar UN correo, ahora, a <b style="color:var(--text)">' + _escCtr(c.creador_email) + '</b>' +
+      ' con fecha límite <b style="color:#ffb020">' + _escCtr(_ctrLimiteTexto(el('ctr-re-fecha').value)) + '</b>.' +
+      '<br><br>Esto NO cancela nada: si no firma, dar de baja la colaboración sigue siendo tuyo y a mano.';
+  }
+}
+
+function _ctrReenvioAtras() { if (_ctrReenvio) { _ctrReenvio.paso = 1; _ctrReenvioPintar(); } }
+
+async function _ctrReenvioSeguir() {
+  if (!_ctrReenvio) return;
+  // PASO 1 → PASO 2. Aquí NO sale nada: solo se avanza la ceremonia.
+  if (_ctrReenvio.paso === 1) { _ctrReenvio.paso = 2; _ctrReenvioPintar(); return; }
+  const btn = document.getElementById('ctr-re-seguir');
+  const fecha = document.getElementById('ctr-re-fecha').value;
   btn.disabled = true;
-  btn.textContent = '…';
+  btn.textContent = 'Mandando…';
   try {
     const r = await khAdminFetch('/.netlify/functions/contrato-reenviar', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token }),
+      body: JSON.stringify({ token: _ctrReenvio.token, fecha_limite: fecha }),
     });
-    const j = await r.json();
+    const j = await r.json().catch(() => ({}));
     if (!r.ok || !j.ok) throw new Error(j.error || 'Error al reenviar');
-    btn.textContent = '✓ Enviado';
-    setTimeout(() => { btn.textContent = original; btn.disabled = false; }, 2000);
+    closeModal('modal-contrato-reenviar');
+    _ctrReenvio = null;
+    showToast('Correo reenviado con fecha límite', 'success');
   } catch (e) {
-    alert('No se pudo reenviar: ' + e.message);
-    btn.textContent = original;
+    // El error se dice DENTRO del modal, no en un alert que tapa lo que se
+    // estaba haciendo: aquí se puede corregir la fecha y reintentar.
+    document.getElementById('ctr-re-destino').innerHTML =
+      '<span style="color:var(--red)">No se pudo mandar: ' + _escCtr(e.message) + '</span>';
     btn.disabled = false;
+    btn.textContent = 'Sí, mandar el correo';
   }
 }
 

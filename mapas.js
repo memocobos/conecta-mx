@@ -38,6 +38,7 @@ window.MAPAS={
   'aitana':'mapas/aitana.jpg',
   'babymetal':'mapas/babymetal.jpg',
   'miloj':'mapas/miloj.jpg',
+  'melanie':'mapas/melanie.jpg',
   'edsheeran':'mapas/edsheeran.webp',
   'karolg':'mapas/karolg.webp',
   'edenmunoz':'mapas/edenmunoz.webp',

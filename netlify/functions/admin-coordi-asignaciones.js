@@ -41,7 +41,11 @@
 const { verifyAdminAuthLive, corsCheck } = require('./_lib/verify-admin');
 const { resolverPrecioVenta } = require('./_lib/precio-zona');
 // [VJ-5] La regla de quién duerme es la MISMA de VJ-4, importada — no copiada.
-const { duerme, motivoNoDuerme } = require('./_lib/paquete-viaje');
+// [CREA-1c] `consumeBoleto` viene de su DUEÑO. La cortesía suma a
+// `vendidos_fuera`, y esa contabilidad DESCANSA en que la fila del viajero no
+// descuente por su cuenta: si descontara, el mismo boleto se restaría dos
+// veces. Preguntárselo a la función en vez de copiar la regla.
+const { duerme, motivoNoDuerme, consumeBoleto } = require('./_lib/paquete-viaje');
 // [COB-MIG-1] La fórmula sellada de VJ-3, de su dueño. NO se re-escribe aquí:
 // `resta = total_contrato − abonado_previo − Σ abonos` ya vive en el lib del
 // dinero y la usan la cuenta del evento y los saldos. Una cuarta copia sería la
@@ -424,6 +428,20 @@ exports.handler = async (event) => {
         tallaOrigen = 'capturada_al_asignar';
       }
 
+      // 🔒 [CREA-1c] EL CANDADO DEL DOBLE DESCUENTO. Se le pregunta a la
+      // función dueña, no a una lista de tipos escrita aquí: si la fila que
+      // vamos a dejar DESCONTARA boleto por su cuenta, sumar a `vendidos_fuera`
+      // restaría el mismo boleto dos veces y el semáforo cerraría zonas que sí
+      // tienen lugar. Es exactamente el doble descuento que MIG-1b avisa en el
+      // alta de migrados — ahí se DICE porque el dato lo escribió Memo a mano;
+      // aquí se IMPIDE, porque el que lo escribiría es este botón.
+      if (consumeBoleto(paquete.tipo_paquete, paquete.tipo_viajero)) {
+        return { statusCode: 409, headers, body: JSON.stringify({
+          error: `Un ${paquete.tipo_viajero} con paquete ${paquete.tipo_paquete} descuenta boleto por su cuenta: sumarlo también a "vendidos fuera" restaría el mismo boleto dos veces. Revisa la tabla de paquetes antes de asignar.`,
+          doble_descuento: true,
+        }) };
+      }
+
       const acomp = (body.acompanante && typeof body.acompanante === 'object') ? body.acompanante : {};
       const acompNombre = cleanText(acomp.nombre, 120) || cleanText(datos.acompanante && datos.acompanante.nombre, 120);
 
@@ -452,9 +470,17 @@ exports.handler = async (event) => {
 
       let viajero = null;
       if (existente) {
+        // [CREA-1c] Sella TAMBIÉN el tipo. El `viajero_upsert_staff` tiene un
+        // reintento que inserta SIN `tipo_viajero` si la columna no está en
+        // prod, y una fila con el tipo en NULL SÍ descuenta boleto: darle zona
+        // sin sellarla la haría descontar además del `vendidos_fuera` que
+        // sumamos abajo. El mismo boleto, restado dos veces.
         const up = await fetch(`${baseVE}?id=eq.${existente.id}`, {
           method: 'PATCH', headers: { ...sbHeaders, Prefer: 'return=representation' },
-          body: JSON.stringify({ zona_boleto: zona, talla_playera: talla }),
+          body: JSON.stringify({
+            zona_boleto: zona, talla_playera: talla,
+            tipo_paquete: paquete.tipo_paquete, tipo_viajero: paquete.tipo_viajero,
+          }),
         });
         if (!up.ok) return upstream(headers, await up.text(), 'update');
         viajero = (await up.json())[0] || null;

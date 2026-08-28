@@ -141,6 +141,58 @@ está caduco antes de escribirse.
 
 ### 🟡 Vivos
 
+- ✅ **ÉPOCA DE AGOSTO CERRADA (26-28 ago 2026, #603-#630): cinco series, todas
+  en producción, cada una con su arnés anclado a dos commits y su careo doble
+  de la casa.**
+  - **HER-UX-1** (#603-#613 + FIX #614 y FIX-2 #615) — las Herramientas, 11
+    tuercas y 310 aserciones. Los tres síntomas del uso real eran **la misma
+    forma**: una lista escrita a mano al lado de la realidad que describe.
+  - **RAD-UX-1** (#616-#623) — el Radar del Dragón, 8 tuercas y 165 aserciones.
+    **SIETE aritméticas de calendario en una sola pantalla.** Más
+    **RAD-FIX-CAMINO** (#625) y **RAD-GIRU-R4-FIX** (#626).
+  - **TZ-UNIF-1** (#624) — los 14 `America/Cancun` unificados a
+    **`America/Matamoros`**. Los instantes guardados NO se tocaron: cambia solo
+    cómo se pintan. Quedan **64 usos de `America/Monterrey` en 36 archivos**, anotados
+    sin urgencia y **sin triar**: Monterrey es una ciudad real del negocio
+    (Arena Monterrey), así que algunos serán correctos y otros el mismo error
+    de suponer el reloj de Reynosa. Son tuerca propia **con su medición**, no
+    un cambio de contrabando. (El número que la memoria traía —19— era falso:
+    medido el 28-ago dan 64.)
+  - **CREA-1** (#627-#629) — las cortesías, de contrato a kit. 183 aserciones,
+    **cero SQL**.
+  - **MEL-REGRESA-1** (#630) — la tarjeta de melanie vuelve como pasado.
+
+- 🎟 **CORTESÍAS (CREA-1, 28-ago-2026): el camino manual de Jane, hecho botón.**
+  Un **🎟 Cortesía** en cada contrato **firmado** del panel de Contratos
+  (`cortesia_asignar`, en `admin-coordi-asignaciones`).
+  - **La PLANTILLA del contrato decide el paquete**, tabla explícita y **sin
+    default**: `creadora`→CHEAP · `coordinador` y `auxiliar_admin`→PLUS. Una
+    plantilla que no esté en la tabla se **rechaza** y ni siquiera pinta el
+    botón. Y con el paquete cambia **la lista de zonas**: `cheapZonas` vs
+    `zonas` — no son la misma.
+  - 🔒 **NINGÚN GASTO SE CAPTURA POR UNA CORTESÍA.** La inversión en boletos ya
+    pesa completa en la utilidad desde el día uno (**UTIL-C**). El boleto ya
+    está comprado: la cortesía solo lo saca del inventario. Capturar un gasto
+    aquí lo contaría **dos veces**. El aviso va **a la vista en el panel**.
+  - 🔒 **La talla se pide en el contrato** (CREA-1a) y **su procedencia viaja
+    con el dato**: `talla_origen` distingue `'contrato'` de
+    `'capturada_al_asignar'`. El predicado es **`datos->>'talla'`, NO el objeto
+    `datos`**: hoy 26 de 26 firmados traen `datos` y **ninguno** trae talla.
+  - 🔒 **`stock_ajustes` SUMA** (UNIQUE en `evento_id,zona`), así que el segundo
+    clic duplicaría boletos: la cortesía queda **sellada en `datos.cortesia`**
+    del contrato y no vuelve a tocar nada. Cero SQL — `datos` ya era jsonb.
+  - 🔒 **El candado del doble descuento** (CREA-1c): una fila de
+    `viajeros_evento` puede descontar stock **por su cuenta** si
+    `consumeBoleto(paquete, tipo)` lo dice — solo `cliente` y **`tipo_viajero`
+    en NULL** lo hacen. Como la cortesía suma a `vendidos_fuera`, una fila que
+    además descontara restaría **el mismo boleto dos veces**. Se le **pregunta
+    a `consumeBoleto`** (su dueño) y el PATCH **sella el tipo**.
+  - **Si la persona ya viaja, el botón COMPLETA, no inserta** (el caso Victor:
+    `viajero_upsert_staff` ya le había creado la fila al aceptar el tour).
+  - ⚠️ **NO se aprieta para `calle24`.** Day y Victor ya están hechos a mano y
+    sus filas no casan con el contrato (Day sin correo, con apodo): insertaría
+    un duplicado y sumaría boletos de más. De ahí en adelante, el botón.
+
 - ✅ **CERRADO en esta época (jul-ago 2026), no volver a abrirlo:** el dinero del
   Palacio (**FIN-1**, #473-#476) · la cuenta por evento en una sola fuente
   (**AUD-1**, #477-#482) · la merma (**MER-1**, #483) · los saldos con migrados
@@ -341,7 +393,27 @@ está caduco antes de escribirse.
   siguen SIN commitear a propósito.
 
 ### ⚠️ Reglas que cuestan caro olvidar
-- **Nunca `gh pr merge`.** Flujo: `pull main` → `merge --no-ff` → `push`.
+- **Nunca `gh pr merge`.** Flujo: `pull main` → `merge --no-ff` → `push`. **Verificar el
+  push contra el ref TRAÍDO DE VUELTA (`fetch` + `rev-parse origin/main`), no
+  contra su propia salida — y solo entonces borrar la rama.**
+- 🔒 **El reloj de Reynosa es `America/Matamoros`, NO Cancún ni Monterrey.**
+  Reynosa **sí** cambia con EE.UU. (8-mar → 1-nov); la que dejó de cambiar es
+  Monterrey (decreto de 2022). Son **133 días al año** de diferencia con Cancún,
+  invisibles en verano. Unificado en #624.
+- **Todo careo de pantalla-a-servidor invoca el handler REAL** y simula un salto
+  más adentro. **Un mock de ruta salta al portero**: tres tuercas llegaron
+  ROTAS a producción con el careo en verde (RAD-FIX-CAMINO, #625). Y una acción
+  nueva **va en `ACCIONES` o no existe** para el despacho.
+- **Un arnés que se CAE no reporta**: deja las secciones de abajo sin ejercitar
+  y esconde qué candado habría cazado el fallo. La aserción atrapa la excepción
+  y la cuenta como rojo **con nombre**.
+- **Una sonda de sabotaje comprueba que MUTÓ** (sha1 antes/después) antes de
+  creerse el resultado: un `replace` cuyo ancla no existe no cambia un byte y se
+  lee como «el candado no muerde».
+- **No buscar la PALABRA: buscar el hecho.** Una aserción de ausencia por `grep`
+  se caza sola —el comentario que explica por qué X no está CONTIENE X—, y ya
+  van cuatro. Si se puede medir el hecho (qué tablas tocó el handler), el grep
+  sobra.
 - **El código de salida de un pipe es el del ÚLTIMO comando**: `git push | tail`
   SIEMPRE sale en éxito, aunque el push haya sido rechazado. Verificar el push
   leyendo el resultado real (o con `set -o pipefail`), y **JAMÁS borrar la rama

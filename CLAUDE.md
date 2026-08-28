@@ -42,7 +42,21 @@
   no cuánto te descuentan.** Vive con nombre (`STAY_DESCUENTO`) en los CUATRO
   runtimes: `index.html` · `_lib/precio-zona.js` · `portal.html` · `rol.html`.
   Tocar uno obliga a tocar los cuatro + el arnés de equivalencia.
-- CHEAP: Solo boleto — separo siempre $1,000
+- CHEAP: Solo boleto — **el separo lo decide Memo POR EVENTO (`sepCheap`), igual
+  que en todos los paquetes.** La regla vieja del $1,000 fijo **murió el
+  28-ago-2026** (REGLA-SEP-1). En código el $1,000 queda **solo como RESPALDO**
+  para cuando un evento no trae `sepCheap`: la constante `SEPARO_CHEAP_DEFAULT`.
+  **No se toca.**
+  Está DECLARADA en **cuatro runtimes que no pueden importarse entre sí** —
+  `index.html` · `kamehouse.js` · `rol.html` · `_lib/precio-zona.js` (que la
+  exporta)—, las cuatro en `1000`, y el arnés las carea. La LEEN `index.html`,
+  `rol.html` (en dos sitios) y `_lib/precio-zona.js`; `kamehouse.js` la declara
+  como gemela con nombre pero **no la usa**, a propósito, para que el careo la
+  vea. ⚠️ **`portal.html` NO la tiene**: solo la nombra en un comentario, como
+  el patrón del que copió `STAY_DESCUENTO`.
+  La forma es la misma en todos: `ev.sepCheap !== undefined ? ev.sepCheap :
+  SEPARO_CHEAP_DEFAULT` — así un `sepCheap: 0` **sí vale cero** y no cae al
+  respaldo.
 - Eventos CDMX: NO tienen paquete STAY
 - sep = costo del transporte
 - Hotel costos son POR PERSONA (hotelPP:true)

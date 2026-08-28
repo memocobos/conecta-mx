@@ -52,6 +52,22 @@ const UUID_RE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0
 const SLUG_RE = /^[A-Za-z0-9_#.\-]+$/; // evento_id (slug del EV, p.ej. 'karolg#2')
 const ROLES_ADMIN = ['maestro_roshi', 'bulma', 'milk'];
 
+// [CREA-1b] Cortesías. La lista de tallas es la MISMA de la casa (perfil,
+// alta de viajero, contrato) — asertada contra kamehouse.js en el arnés.
+const TALLAS_CORTESIA = ['XS', 'S', 'M', 'L', 'XL', 'XXL'];
+// Tope de cordura: Day llevó 2 (ella + acompañante). Cuatro ya es un grupo,
+// y un grupo no es una cortesía — que lo capture el alta normal.
+const MAX_BOLETOS_CORTESIA = 4;
+// 🔒 EL PAQUETE SALE DE LA PLANTILLA DEL CONTRATO, firmado por Jane:
+// creadora → CHEAP · coordinador/staff → PLUS (el caso Victor). Es una tabla
+// EXPLÍCITA y sin default: una plantilla que no esté aquí se rechaza, en vez
+// de colarse con el paquete de otro.
+const PAQUETE_POR_PLANTILLA = {
+  creadora:       { tipo_paquete: 'CHEAP', tipo_viajero: 'creadora',    nota: 'Cortesía creadora de contenido',  notaStock: 'solo boleto + kit' },
+  coordinador:    { tipo_paquete: 'PLUS',  tipo_viajero: 'coordinador', nota: 'Boleto de coordinador',           notaStock: 'asignado de bodega, no es venta' },
+  auxiliar_admin: { tipo_paquete: 'PLUS',  tipo_viajero: 'staff',       nota: 'Boleto de staff',                 notaStock: 'asignado de bodega, no es venta' },
+};
+
 // Acciones válidas → roles permitidos (null = cualquier rol logueado; la
 // anti-escalación fina se hace en código por coordi_id===jwt).
 // [VJ-1] Editar datos del viajero. RESUELTO POR MEMO (6-ago-2026): milk TAMBIÉN
@@ -72,6 +88,10 @@ const ACCIONES = {
   viajero_listar: null,
   viajero_eliminar: ROLES_ADMIN,
   viajero_editar: ROLES_EDITA_VIAJERO,
+  // [CREA-1b] Regalar un boleto es mover inventario: mismos roles que capturan
+  // viajeros. Y la entrada VA AQUÍ o la acción no existe para el portero —
+  // ésa fue RAD-FIX-CAMINO: tres RPC vivos y 'accion inválida' en pantalla.
+  cortesia_asignar: ROLES_EDITA_VIAJERO,
   // [VJ-3] Dinero de los migrados. Mismos roles que editar: quien captura los
   // datos captura los abonos.
   abono_crear: ROLES_EDITA_VIAJERO,
@@ -175,6 +195,9 @@ exports.handler = async (event) => {
   const baseEC = `${env.KH_SB_URL}/rest/v1/eventos_coordi`;
   const baseVE = `${env.KH_SB_URL}/rest/v1/viajeros_evento`;
   const baseUsuarios = `${env.KH_SB_URL}/rest/v1/usuarios`;
+  // [CREA-1b] La cortesía nace del contrato y aterriza en el stock.
+  const baseContratos = `${env.KH_SB_URL}/rest/v1/contratos_creadores`;
+  const baseStock = `${env.KH_SB_URL}/rest/v1/stock_ajustes`;
 
   try {
     // ── eventos_coordi: listar ───────────────────────────────────────────
@@ -326,6 +349,178 @@ exports.handler = async (event) => {
       }
       const insRows = await ins.json();
       return ok(headers, { viajero: insRows[0] || null });
+    }
+
+    // ── [CREA-1b] cortesía: boleto de cortesía a un evento ────────────────
+    // El camino manual de Jane (Day Escamilla en calle24, Victor Gael en
+    // calle24), hecho botón. NACE GENÉRICO: creadoras Y staff, con el paquete
+    // parametrizado por la plantilla del contrato — no dos caminos gemelos.
+    //
+    // 🔒 NINGÚN GASTO SE CAPTURA POR UNA CORTESÍA. La inversión en boletos ya
+    // pesa COMPLETA en la utilidad desde el día uno (UTIL-C: `cobrado −
+    // inversión total en boletos − gastos`). Un boleto de cortesía es un
+    // boleto YA COMPRADO que se entrega sin cobrar: lo que cambia es que ese
+    // asiento deja de estar disponible para vender, no que salga dinero.
+    // Capturar un gasto aquí lo contaría DOS VECES. Por eso esta acción toca
+    // `viajeros_evento` y `stock_ajustes`, y NADA de dinero.
+    if (accion === 'cortesia_asignar') {
+      const contratoId = String(body.contrato_id || '').trim();
+      if (!UUID_RE.test(contratoId)) return bad(headers, 'contrato_id inválido');
+      const evento_id = String(body.evento_id || '').trim();
+      if (!evento_id || !SLUG_RE.test(evento_id) || evento_id.length > 120) return bad(headers, 'evento_id inválido');
+      const zona = cleanText(body.zona, 120);
+      if (!zona) return bad(headers, 'Falta la zona del boleto');
+      const boletos = Number(body.boletos);
+      if (!Number.isInteger(boletos) || boletos < 1 || boletos > MAX_BOLETOS_CORTESIA) {
+        return bad(headers, `Los boletos de cortesía van de 1 a ${MAX_BOLETOS_CORTESIA}`);
+      }
+
+      // PUERTA: sin contrato FIRMADO no hay cortesía. Es el par negativo del
+      // careo — y la razón de que la acción cuelgue del contrato y no de un
+      // formulario libre: el contrato es lo que prueba el acuerdo.
+      const cr = await fetch(
+        `${baseContratos}?id=eq.${contratoId}&select=id,creador_nombre,creador_email,plantilla,estado,datos&limit=1`,
+        { headers: sbHeaders });
+      if (!cr.ok) return upstream(headers, await cr.text(), 'consulta');
+      const contrato = (await cr.json())[0];
+      if (!contrato) return bad(headers, 'Ese contrato no existe');
+      if (contrato.estado !== 'firmado') {
+        return { statusCode: 409, headers, body: JSON.stringify({ error: 'El contrato no está firmado: no hay cortesía que asignar' }) };
+      }
+
+      // El paquete SALE DE LA PLANTILLA, y la tabla es explícita: una plantilla
+      // desconocida se RECHAZA en vez de caer a un default. Un selector que
+      // elige solo inventa un dato (la mordida de `kmt-prov`).
+      const paquete = PAQUETE_POR_PLANTILLA[contrato.plantilla];
+      if (!paquete) return bad(headers, `No sé qué paquete le toca a un contrato "${contrato.plantilla}"`);
+
+      // IDEMPOTENCIA, y va en el contrato: `stock_ajustes` SUMA, así que un
+      // segundo clic duplicaría boletos en silencio. La cortesía queda anotada
+      // en `datos.cortesia` (jsonb que ya es nuestro — cero SQL) y el segundo
+      // clic no toca nada.
+      const datos = (contrato.datos && typeof contrato.datos === 'object') ? contrato.datos : {};
+      const yaCort = datos.cortesia;
+      if (yaCort && yaCort.evento_id === evento_id) {
+        return ok(headers, { ya: true, cortesia: yaCort });
+      }
+
+      // TALLA. El predicado NO es "el contrato no tiene `datos`": hoy 26 de 26
+      // contratos firmados traen `datos` y NINGUNO trae talla (CREA-1a acaba
+      // de nacer). Preguntar por el objeto en vez de por el campo habría dejado
+      // pasar 22 con talla nula.
+      let talla = cleanText(datos.talla, 8);
+      let tallaOrigen = 'contrato';
+      if (!talla) {
+        talla = cleanText(body.talla, 8);
+        if (talla) talla = talla.toUpperCase();
+        if (!TALLAS_CORTESIA.includes(talla)) {
+          return { statusCode: 409, headers, body: JSON.stringify({
+            error: 'Este contrato es anterior a la talla en el formulario: captúrala a mano',
+            falta_talla: true,
+          }) };
+        }
+        // 🔒 LA PROCEDENCIA VIAJA CON EL DATO: nadie debe creer después que el
+        // contrato la traía. CREA-1a la marca 'contrato'; ésta, distinto.
+        tallaOrigen = 'capturada_al_asignar';
+      }
+
+      const acomp = (body.acompanante && typeof body.acompanante === 'object') ? body.acompanante : {};
+      const acompNombre = cleanText(acomp.nombre, 120) || cleanText(datos.acompanante && datos.acompanante.nombre, 120);
+
+      // Mismo patrón que `abono_crear` en este archivo — el contrato de
+      // verifyAdminAuthLive es {valid, user:{id,correo,rol}}, NO auth.nombre.
+      const quien = (auth.user && (auth.user.nombre || auth.user.correo)) || jwtUserId || 'panel';
+      const notaViajero = [
+        paquete.nota,
+        'solo boleto + kit',
+        acompNombre ? `acompañante: ${acompNombre}` : null,
+        tallaOrigen === 'capturada_al_asignar' ? 'talla capturada al asignar (el contrato no la traía)' : null,
+      ].filter(Boolean).join(' · ');
+
+      // ¿Ya hay fila? El caso Victor: `viajero_upsert_staff` YA lo registró al
+      // aceptar el tour. Ahí la cortesía no inserta — COMPLETA la zona. Insertar
+      // sería duplicar a una persona que ya viaja.
+      const claveCorreo = contrato.creador_email || null;
+      let existente = null;
+      if (claveCorreo) {
+        const ex = await fetch(
+          `${baseVE}?evento_id=eq.${encodeURIComponent(evento_id)}&correo=eq.${encodeURIComponent(claveCorreo)}&select=id,nombre,zona_boleto,talla_playera&limit=1`,
+          { headers: sbHeaders });
+        if (!ex.ok) return upstream(headers, await ex.text(), 'consulta');
+        existente = (await ex.json())[0] || null;
+      }
+
+      let viajero = null;
+      if (existente) {
+        const up = await fetch(`${baseVE}?id=eq.${existente.id}`, {
+          method: 'PATCH', headers: { ...sbHeaders, Prefer: 'return=representation' },
+          body: JSON.stringify({ zona_boleto: zona, talla_playera: talla }),
+        });
+        if (!up.ok) return upstream(headers, await up.text(), 'update');
+        viajero = (await up.json())[0] || null;
+      } else {
+        const fila = {
+          evento_id,
+          nombre: contrato.creador_nombre,
+          correo: claveCorreo,
+          zona_boleto: zona,
+          talla_playera: talla,
+          tipo_paquete: paquete.tipo_paquete,
+          tipo_viajero: paquete.tipo_viajero,
+          total_contrato: 0,   // no debe nada: es cortesía
+          abonado_previo: 0,
+          notas: notaViajero,
+        };
+        const ins = await fetch(baseVE, {
+          method: 'POST', headers: { ...sbHeaders, Prefer: 'return=representation' },
+          body: JSON.stringify(fila),
+        });
+        if (!ins.ok) return upstream(headers, await ins.text(), 'insert');
+        viajero = (await ins.json())[0] || null;
+      }
+
+      // STOCK: SUMA sobre la fila (evento_id, zona) — hay UNIQUE ahí, un insert
+      // a secas reventaría en la segunda cortesía de la misma zona.
+      const stR = await fetch(
+        `${baseStock}?evento_id=eq.${encodeURIComponent(evento_id)}&zona=eq.${encodeURIComponent(zona)}&select=id,vendidos_fuera,nota&limit=1`,
+        { headers: sbHeaders });
+      if (!stR.ok) return upstream(headers, await stR.text(), 'consulta');
+      const stock = (await stR.json())[0] || null;
+      const notaStock = `${paquete.nota} ${contrato.creador_nombre} (contrato en KameHouse) — ${paquete.notaStock}`;
+      let stockFinal;
+      if (stock) {
+        const suma = Number(stock.vendidos_fuera || 0) + boletos;
+        const up = await fetch(`${baseStock}?id=eq.${stock.id}`, {
+          method: 'PATCH', headers: { ...sbHeaders, Prefer: 'return=representation' },
+          body: JSON.stringify({ vendidos_fuera: suma, nota: notaStock, updated_por: quien, updated_at: new Date().toISOString() }),
+        });
+        if (!up.ok) return upstream(headers, await up.text(), 'update');
+        stockFinal = (await up.json())[0] || null;
+      } else {
+        const ins = await fetch(baseStock, {
+          method: 'POST', headers: { ...sbHeaders, Prefer: 'return=representation' },
+          body: JSON.stringify({ evento_id, zona, vendidos_fuera: boletos, nota: notaStock, updated_por: quien }),
+        });
+        if (!ins.ok) return upstream(headers, await ins.text(), 'insert');
+        stockFinal = (await ins.json())[0] || null;
+      }
+
+      // Sello en el contrato: cierra la idempotencia Y deja el rastro de qué se
+      // asignó, sin columna nueva.
+      const cortesia = {
+        evento_id, zona, boletos,
+        talla, talla_origen: tallaOrigen,
+        acompanante: acompNombre || null,
+        asignado_en: new Date().toISOString(),
+        asignado_por: quien,
+      };
+      const selloR = await fetch(`${baseContratos}?id=eq.${contratoId}`, {
+        method: 'PATCH', headers: { ...sbHeaders, Prefer: 'return=representation' },
+        body: JSON.stringify({ datos: { ...datos, talla, talla_origen: datos.talla ? (datos.talla_origen || 'contrato') : tallaOrigen, cortesia } }),
+      });
+      if (!selloR.ok) return upstream(headers, await selloR.text(), 'update');
+
+      return ok(headers, { viajero, stock: stockFinal, cortesia, creada: !existente });
     }
 
     // ── viajeros_evento: listar (descarga) — admin o coordi del evento ────

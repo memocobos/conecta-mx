@@ -54,6 +54,12 @@ const COLS = [
   // "cuidador"). PostgREST proyecta datos->cuidador_bodega SIN exponer el resto
   // del jsonb — el Anexo C confidencial del team NO viaja en el listado.
   'cuidador_bodega:datos->cuidador_bodega',
+  // [CREA-1b] Dos sub-campos más, MISMO patrón de proyección puntual: el
+  // botón de cortesía necesita saber si ya se asignó una (para no ofrecerla
+  // dos veces) y si el contrato trae talla (para pedirla a mano si no). Sigue
+  // sin viajar el jsonb entero.
+  'cortesia_evento:datos->cortesia->>evento_id',
+  'talla_contrato:datos->>talla',
 ].join(',');
 // Detalle (accion 'obtener'): whitelist + datos jsonb. Solo admins llegan aquí.
 const COLS_DETALLE = COLS + ',datos';

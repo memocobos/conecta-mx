@@ -23323,6 +23323,7 @@ function _ctrPintarLista() {
       const acciones = firmado
         ? `
           <button class="btn btn-ghost" style="padding:5px 10px;font-size:11px" onclick="verContratoFirmado('${tokenSafe}','${nombreSafe}')">Ver</button>
+          ${CORT_PAQUETE[c.plantilla] ? `<button class="btn btn-ghost" style="padding:5px 10px;font-size:11px;color:#3ddc84;border-color:rgba(61,220,132,.35)" onclick="cortAbrir('${_escCtr(c.id)}')">${c.cortesia_evento ? '🎟 ✓' : '🎟 Cortesía'}</button>` : ''}
           ${c.plantilla === 'creadora_team' ? `<button class="btn btn-ghost" style="padding:5px 10px;font-size:11px;color:#c9a2ff;border-color:rgba(201,162,255,.3)" onclick="verAnexoC('${_escCtr(c.id)}','${nombreSafe}')">Anexo C</button>` : ''}
           ${_puedeBorrarAdmin() ? `<button class="btn btn-ghost" style="padding:5px 10px;font-size:11px;color:#ff6666;border-color:rgba(255,68,68,.3)" onclick="eliminarContrato('${tokenSafe}','${nombreSafe}',this)">Eliminar</button>` : ''}`
         : `
@@ -23338,6 +23339,155 @@ function _ctrPintarLista() {
         <td style="text-align:right;white-space:nowrap">${acciones}</td>
       </tr>`;
     }).join('');
+  }
+}
+
+// ═══ [CREA-1b] Cortesías: de contrato firmado a boleto apartado ═══════════
+// El camino manual de Jane, hecho botón. Nace GENÉRICO: la plantilla del
+// contrato decide el paquete (creadora→CHEAP, coordinador/auxiliar→PLUS) y con
+// él la lista de zonas — que NO es la misma en los dos (`cheapZonas` vs
+// `zonas`). Elegir de la lista equivocada guardaría una zona que el stock no
+// reconoce.
+let _cortCtr = null;   // el contrato abierto en el panel
+let _cortEV = null;    // el catálogo del index, cacheado por _fetchEVFromIndex
+
+// 🔒 La misma tabla del servidor. Si divergen, el arnés lo canta: se asertan
+// una contra otra, no contra un número recordado.
+const CORT_PAQUETE = {
+  creadora:       { paquete: 'CHEAP', etq: 'creadora',    zonasDe: 'cheapZonas' },
+  coordinador:    { paquete: 'PLUS',  etq: 'coordinador', zonasDe: 'zonas' },
+  auxiliar_admin: { paquete: 'PLUS',  etq: 'staff',       zonasDe: 'zonas' },
+};
+
+function _cortEl(id) { return document.getElementById(id); }
+
+async function cortAbrir(contratoId) {
+  const c = (_contratosCache || []).find(x => x && x.id === contratoId);
+  if (!c) return;
+  _cortCtr = c;
+  const panel = _cortEl('cort-panel');
+  if (!panel) return;
+  panel.style.display = '';
+  _cortEl('cort-alert').innerHTML = '';
+  _cortEl('cort-quien').textContent = c.creador_nombre || '';
+
+  const cfg = CORT_PAQUETE[c.plantilla];
+  const sub = _cortEl('cort-sub');
+  if (!cfg) {
+    // Sin default: una plantilla que no está en la tabla se DICE, no se asume.
+    sub.innerHTML = `No sé qué paquete le toca a un contrato «${_escCtr(c.plantilla)}». Captúralo a mano por ahora.`;
+    sub.style.color = '#ff5f56';
+    _cortEl('cort-guardar').disabled = true;
+    return;
+  }
+  _cortEl('cort-guardar').disabled = false;
+  sub.style.color = '';
+  sub.innerHTML = `Paquete <b>${cfg.paquete}</b> (${cfg.etq}) · contrato de «${_escCtr(c.evento_nombre)}».`;
+
+  // La talla: se pide a mano SOLO si el contrato no la trae. El predicado es el
+  // CAMPO, no el objeto — hoy 26 de 26 firmados traen `datos` y ninguno trae
+  // talla, así que preguntar por el objeto dejaría pasar 22 con talla nula.
+  const faltaTalla = !c.talla_contrato;
+  _cortEl('cort-talla-wrap').style.display = faltaTalla ? '' : 'none';
+  if (!faltaTalla) sub.innerHTML += ` Talla <b>${_escCtr(c.talla_contrato)}</b> del contrato.`;
+
+  // Ya asignada: se dice y no se ofrece de nuevo. `stock_ajustes` SUMA — un
+  // segundo clic duplicaría boletos en silencio.
+  if (c.cortesia_evento) {
+    sub.innerHTML = `Ya tiene cortesía asignada en <b>${_escCtr(c.cortesia_evento)}</b>. No se asigna dos veces.`;
+    sub.style.color = '#ffb020';
+    _cortEl('cort-guardar').disabled = true;
+    return;
+  }
+
+  // Eventos: los gobernables del catálogo, y el del contrato ADIVINADO arriba
+  // — derivado, nunca aplicado solo. El humano confirma.
+  const selEv = _cortEl('cort-evento');
+  selEv.innerHTML = '<option value="">— cargando catálogo… —</option>';
+  try { _cortEV = await _fetchEVFromIndex(); } catch (_) { _cortEV = null; }
+  if (!_cortEV || !_cortEV.length) {
+    selEv.innerHTML = '<option value="">— no se pudo leer el catálogo —</option>';
+    _cortEl('cort-guardar').disabled = true;
+    return;
+  }
+  const sug = _cortSugerido(c, _cortEV);
+  selEv.innerHTML = '<option value="">— elegir evento —</option>' + _cortEV
+    .filter(e => e && e.id)
+    .map(e => `<option value="${_escCtr(e.id)}"${e.id === sug ? ' selected' : ''}>${_escCtr(e.a || e.id)}${e.f ? ' · ' + _escCtr(e.f) : ''}</option>`)
+    .join('');
+  _cortEl('cort-evento-hint').textContent = sug
+    ? 'Derivado del contrato — confírmalo o cámbialo.'
+    : 'El contrato no nombra un evento del catálogo: elígelo.';
+  _cortEl('cort-boletos').value = '1';
+  cortEventoElegido();
+}
+
+// El evento se DERIVA del nombre del contrato, y se derive o no, el humano
+// confirma. Cotejar por nombre normalizado: "Calle 24" ↔ artista del catálogo.
+function _cortSugerido(c, EV) {
+  const norm = s => String(s || '').toLowerCase()
+    .normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-z0-9]+/g, ' ').trim();
+  const meta = norm(c.evento_nombre);
+  if (!meta) return '';
+  const exacto = EV.find(e => e && norm(e.a) === meta);
+  if (exacto) return exacto.id;
+  const contiene = EV.find(e => e && meta && norm(e.a) && (norm(e.a).startsWith(meta) || meta.startsWith(norm(e.a))));
+  return contiene ? contiene.id : '';
+}
+
+function cortEventoElegido() {
+  const id = (_cortEl('cort-evento') || {}).value || '';
+  const sel = _cortEl('cort-zona');
+  const hint = _cortEl('cort-zona-hint');
+  const cfg = _cortCtr ? CORT_PAQUETE[_cortCtr.plantilla] : null;
+  if (!id || !cfg) { sel.innerHTML = '<option value="">— elige evento primero —</option>'; hint.textContent = ''; return; }
+  const ev = (_cortEV || []).find(e => e && e.id === id);
+  const fuente = (ev && ev[cfg.zonasDe]) || [];
+  if (!fuente.length) {
+    sel.innerHTML = '<option value="">— sin zonas en el catálogo —</option>';
+    hint.textContent = `Este evento no tiene lista ${cfg.zonasDe} — revisa el catálogo antes de asignar.`;
+    return;
+  }
+  sel.innerHTML = '<option value="">— elegir —</option>' + fuente.map(z =>
+    `<option value="${_escCtr(z.n)}">${_escCtr(z.n)}${z.ag ? ' (agotada)' : ''}</option>`).join('');
+  hint.textContent = `Zonas del paquete ${cfg.paquete}.`;
+}
+
+function cortCerrar() {
+  const p = _cortEl('cort-panel');
+  if (p) p.style.display = 'none';
+  _cortCtr = null;
+}
+
+async function cortGuardar() {
+  if (!_cortCtr) return;
+  const btn = _cortEl('cort-guardar');
+  const alert = _cortEl('cort-alert');
+  const evento_id = (_cortEl('cort-evento') || {}).value || '';
+  const zona = (_cortEl('cort-zona') || {}).value || '';
+  const boletos = parseInt((_cortEl('cort-boletos') || {}).value || '0', 10);
+  const talla = (_cortEl('cort-talla') || {}).value || '';
+  const faltaTalla = !_cortCtr.talla_contrato;
+  const falta = !evento_id ? 'el evento' : !zona ? 'la zona' : (faltaTalla && !talla) ? 'la talla' : '';
+  if (falta) { alert.innerHTML = `<div style="color:#ff5f56;font-size:12px;margin-bottom:8px">Falta ${falta}.</div>`; return; }
+
+  btn.disabled = true; btn.textContent = 'Asignando…';
+  try {
+    const r = await khAdminFetch('/.netlify/functions/admin-coordi-asignaciones', {
+      method: 'POST',
+      body: JSON.stringify({ accion: 'cortesia_asignar', contrato_id: _cortCtr.id, evento_id, zona, boletos, talla: talla || undefined }),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || j.ok === false) throw new Error(j.error || ('HTTP ' + r.status));
+    alert.innerHTML = j.ya
+      ? `<div style="color:#ffb020;font-size:12px;margin-bottom:8px">Ya estaba asignada — no se tocó nada.</div>`
+      : `<div style="color:#3ddc84;font-size:12px;margin-bottom:8px">Listo: ${boletos} boleto${boletos > 1 ? 's' : ''} apartado${boletos > 1 ? 's' : ''} en ${_escCtr(zona)}${j.creada ? ' y viajero registrado' : ' (el viajero ya existía: se le puso la zona)'}.</div>`;
+    if (typeof cargarContratos === 'function') cargarContratos();
+  } catch (e) {
+    alert.innerHTML = `<div style="color:#ff5f56;font-size:12px;margin-bottom:8px">No se pudo: ${_escCtr(e.message)}</div>`;
+  } finally {
+    btn.disabled = false; btn.textContent = 'Asignar cortesía';
   }
 }
 

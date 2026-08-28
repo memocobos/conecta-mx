@@ -3,6 +3,14 @@
 // que sigue en estado 'pendiente'. Usa el mismo template y `from:` que
 // contrato-crear.js para mantener consistencia.
 
+// 🔒 [TZ-UNIF-1] El reloj de Reynosa. `America/Matamoros` no es un proxy: es el
+// huso de la ciudad, y cambia con EE.UU. (8-mar → 1-nov). Aquí decía
+// `America/Cancun` suponiendo −05:00 todo el año; la que dejó de cambiar es
+// Monterrey, no la frontera.
+// ⚠️ Este texto viaja EN UN CORREO FIRMABLE. Del 1-nov al 13-mar, Cancún habría
+// puesto una fecha límite corrida una hora respecto al reloj de quien la lee.
+const TZ_REYNOSA = 'America/Matamoros';
+
 const { verifyAdminAuthLive, corsCheck } = require('./_lib/verify-admin');
 const { aplicarModoPrueba } = require('./_lib/correo-guard');
 
@@ -50,9 +58,9 @@ function _limiteTexto(iso) {
     // todavía: JavaScript lo rueda EN SILENCIO a "3 de marzo", así que un
     // dedazo se convierte en otra fecha que parece buena. Si la fecha no vuelve
     // a escribirse igual, no es la fecha que alguien tecleó.
-    if (d.toLocaleDateString('en-CA', { timeZone: 'America/Cancun' }) !== iso) return '';
+    if (d.toLocaleDateString('en-CA', { timeZone: TZ_REYNOSA }) !== iso) return '';
     return d.toLocaleDateString('es-MX', {
-      weekday: 'long', day: 'numeric', month: 'long', timeZone: 'America/Cancun',
+      weekday: 'long', day: 'numeric', month: 'long', timeZone: TZ_REYNOSA,
     });
   } catch (_) { return ''; }
 }
@@ -142,7 +150,7 @@ exports.handler = async function (event) {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha_limite)) {
       return bad(422, "La fecha límite debe venir como AAAA-MM-DD; llegó: " + fecha_limite);
     }
-    const hoyMx = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Cancun' });
+    const hoyMx = new Date().toLocaleDateString('en-CA', { timeZone: TZ_REYNOSA });
     if (fecha_limite < hoyMx) {
       return bad(422, "La fecha límite ya pasó (" + fecha_limite + ", hoy es " + hoyMx + "): un plazo vencido no es un plazo.");
     }

@@ -3384,6 +3384,12 @@ var PROMOS={
   'ENJAMBRE': {segundoPax:{plus:2700}, exactPersonas:2, expiresTs:Date.parse('2026-08-25T00:00:00-05:00'), maxUsos:9999, usos:0, desc:'Promo de pareja: la segunda persona paga $2,700 en el paquete PLUS', customMsg:'Promo de pareja aplicada — la 2ª persona paga $2,700 en PLUS', onlyEvent:'enjambre', excludePkg:['ride','stay','cheap']},
   'BADGYAL': {segundoPax:{plus:2700}, exactPersonas:2, expiresTs:Date.parse('2026-08-25T00:00:00-05:00'), maxUsos:9999, usos:0, desc:'Promo de pareja: la segunda persona paga $2,700 en el paquete PLUS', customMsg:'Promo de pareja aplicada — la 2ª persona paga $2,700 en PLUS', onlyEvent:'badgyal', excludePkg:['ride','stay','cheap']},
   'SCORPIONS': {segundoPax:{plus:2700}, exactPersonas:2, expiresTs:Date.parse('2026-08-25T00:00:00-05:00'), maxUsos:9999, usos:0, desc:'Promo de pareja: la segunda persona paga $2,700 en el paquete PLUS', customMsg:'Promo de pareja aplicada — la 2ª persona paga $2,700 en PLUS', onlyEvent:'scorpions', excludePkg:['ride','stay','cheap']},
+  // [PROMO-NATA] El badge de la tarjeta de `natanael` YA prometía este código
+  // —promoCode:'NATA', «USA CODIGO NATA $500 DE DESCUENTO»— pero el código NO
+  // existía en este registro: quien lo tecleaba se topaba con «código inválido».
+  // Solo PLUS, y el descuento es POR PERSONA (total − amount × viajeros), igual
+  // que KENIAOS. El literal va en -05:00 porque es la hora de REYNOSA.
+  'NATA': {amount:500, expiresTs:Date.parse('2026-09-01T23:59:59-05:00'), maxUsos:9999, usos:0, desc:'$500 de descuento con código NATA', onlyEvent:'natanael', excludePkg:['ride','stay','cheap']},
 };
 var _promoActivo=null;
 

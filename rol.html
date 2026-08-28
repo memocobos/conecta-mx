@@ -2147,7 +2147,7 @@ function validateCodigoLocal(rawCode){
   // Lo que se omite se omite CON SU RAZÓN ESCRITA. Lo que no estaba escrito
   // eran omisiones silenciosas, y una de ellas cobraba de más.
   //
-  // NO se valida expiresTs / expires / singleUse / maxUsos / startTs:
+  // NO se valida expiresTs / expires / startTs / singleUse / maxUsos / usos:
   // este flujo reconstruye el rol HISTÓRICO — si el cliente usó el código
   // cuando estaba vigente, debe ver su precio real aunque hoy esté vencido,
   // agotado o (startTs) aún no hubiera arrancado. `startTs` es de esta misma

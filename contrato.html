@@ -1294,6 +1294,43 @@ function renderDoc(c, opts) {
             <label style="display:block;font-size:12px;color:rgba(255,255,255,.7)">Contacto de emergencia — teléfono
               <input type="tel" id="emTelInput" maxlength="30" placeholder="10 dígitos" style="display:block;width:100%;margin-top:5px;padding:11px 12px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.22);border-radius:6px;color:#fff;font-size:14px;box-sizing:border-box">
             </label>
+            <!-- [CREA-1a] LA TALLA. Memo la declara dato vital: sin ella el kit
+                 no se puede preparar, y hoy se consigue por WhatsApp evento a
+                 evento. Se pide aquí, donde la persona ya está tecleando sus
+                 datos, y se congela con los otros dos (columna datos).
+                 OJO: este bloque vive DENTRO de un template literal de JS: aquí
+                 NO se pueden escribir backticks, cierran la cadena.
+                 La lista es la MISMA de la casa (perfil y alta de viajero), no
+                 una nueva: XS·S·M·L·XL·XXL. -->
+            <label style="display:block;font-size:12px;color:rgba(255,255,255,.7)">Talla de playera <span style="color:#e8ff4c">·  para tu kit</span>
+              <select id="tallaInput" onchange="checkSubmit()" style="display:block;width:100%;margin-top:5px;padding:11px 12px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.22);border-radius:6px;color:#fff;font-size:14px;box-sizing:border-box">
+                <option value="">— Elige tu talla —</option>
+                <option>XS</option><option>S</option><option>M</option>
+                <option>L</option><option>XL</option><option>XXL</option>
+              </select>
+            </label>
+          </div>
+        </div>
+
+        <!-- [CREA-1a] EL ACOMPAÑANTE, OPCIONAL. «A veces trae acompañante» —
+             cuando lo trae, su kit necesita talla igual que el de ella. Los dos
+             campos van juntos: un nombre sin talla deja el kit a medias, y una
+             talla sin nombre no se sabe de quién es. Por eso se exigen EN
+             PAREJA (o los dos, o ninguno), no cada uno por su lado. -->
+        <div class="datos-firma-section">
+          <div class="panel-title" style="font-size:18px;margin-top:24px">👥 ¿Vienes acompañada?</div>
+          <p class="panel-sub">Opcional. Si ya sabes quién te acompaña, dinos su nombre y su talla para preparar su kit. Si todavía no lo sabes, déjalo en blanco — se puede capturar después.</p>
+          <div style="display:grid;gap:12px">
+            <label style="display:block;font-size:12px;color:rgba(255,255,255,.7)">Nombre del acompañante
+              <input type="text" id="acompNombreInput" maxlength="120" placeholder="Nombre completo" oninput="checkSubmit()" style="display:block;width:100%;margin-top:5px;padding:11px 12px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.22);border-radius:6px;color:#fff;font-size:14px;box-sizing:border-box">
+            </label>
+            <label style="display:block;font-size:12px;color:rgba(255,255,255,.7)">Talla de playera del acompañante
+              <select id="acompTallaInput" onchange="checkSubmit()" style="display:block;width:100%;margin-top:5px;padding:11px 12px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.22);border-radius:6px;color:#fff;font-size:14px;box-sizing:border-box">
+                <option value="">— Sin acompañante —</option>
+                <option>XS</option><option>S</option><option>M</option>
+                <option>L</option><option>XL</option><option>XXL</option>
+              </select>
+            </label>
           </div>
         </div>
 
@@ -1723,7 +1760,19 @@ function _datosFirmaOk() {
   if (!f) return _teamDatosOk();
   const n = document.getElementById("emNomInput");
   const t = document.getElementById("emTelInput");
-  return !!(f.value && n && n.value.trim() && t && t.value.trim());
+  // [CREA-1a] La talla es OBLIGATORIA, como fnac y emergencia.
+  const ta = document.getElementById("tallaInput");
+  if (!(f.value && n && n.value.trim() && t && t.value.trim())) return false;
+  if (ta && !String(ta.value || "").trim()) return false;
+  // El acompañante es opcional pero VA EN PAREJA: medio acompañante deja un kit
+  // a medias o una talla huérfana. O los dos campos, o ninguno.
+  const an = document.getElementById("acompNombreInput");
+  const at = document.getElementById("acompTallaInput");
+  if (an && at) {
+    const hayN = !!String(an.value || "").trim(), hayT = !!String(at.value || "").trim();
+    if (hayN !== hayT) return false;
+  }
+  return true;
 }
 
 // Captura al firmar de CREADORA_TEAM: datos del proemio que falten + Anexo C
@@ -1756,12 +1805,21 @@ function _datosFirmaPayload() {
   if (f) {
     const n = document.getElementById("emNomInput");
     const t = document.getElementById("emTelInput");
+    const ta = document.getElementById("tallaInput");
+    const an = document.getElementById("acompNombreInput");
+    const at = document.getElementById("acompTallaInput");
+    const acompN = ((an && an.value) || "").trim();
+    const acompT = ((at && at.value) || "").trim();
     return {
       fecha_nacimiento: f.value || "",
       emergencia: {
         nombre: ((n && n.value) || "").trim(),
         telefono: ((t && t.value) || "").trim(),
       },
+      // [CREA-1a] La talla y, si la hay, el acompañante. El servidor vuelve a
+      // validar: esto es comodidad, no el candado.
+      talla: ((ta && ta.value) || "").trim(),
+      acompanante: (acompN && acompT) ? { nombre: acompN, talla: acompT } : null,
     };
   }
   // CREADORA_TEAM: proemio (solo inputs presentes) + Anexo C.

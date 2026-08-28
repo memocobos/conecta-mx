@@ -11,7 +11,8 @@
 > - **El cobro en línea va por Mercado Pago con 3D Secure obligatorio.**
 >   Stripe está DESCARTADO (ver el bloque 💳 más abajo).
 > - **El módulo de vendedores va en PAUSA**, no en el arranque (**VEN-PAUSA-1**).
-> - **melanie está borrada por completo**, bases y frente.
+> - **melanie: las bases siguen en $0; la TARJETA volvió al index** como evento
+>   pasado agotado (MEL-REGRESA-1, 28-ago). El sorteo NO vuelve.
 
 ## El Negocio
 - Nombre: Conecta Reynosa (sucursal de la franquicia Conecta MX)
@@ -209,23 +210,35 @@ está caduco antes de escribirse.
   montos pagados, así que la barra no existe **a propósito** (inferirla sería
   inventar una cifra de dinero). Entra cuando la Fase C amplíe los datos de
   pagos. No re-proponerla antes.
-- **melanie: BORRADA POR COMPLETO** (19-ago-2026). El evento `HADES: THE
-  SACRIFICE` ya no existe en ningún lado — las dos bases las vació Jane
-  (respaldos en `bkp_mel_*`, incluido el giveaway) y el frente público salió en
-  **MEL-FRENTE-1** (#508): tarjeta del EV, códigos `HADES`/`MELANIE`, banner del
-  sorteo con su script, la línea de `mapas.js` y el archivo `mapas/melanie.jpg`.
-  El diseño llevaba dos asientos de ajuste para sostener los saldos, **pero YA NO
-  EXISTEN**: Memo pidió "todo a ceros, nada de rastro" y Jane los retiró después
-  de crearlos.
-  **La verdad de hoy: el libro del Portal está VACÍO — 0 gastos, 0 ingresos y
-  saldos en $0 en las tres cuentas, A PROPÓSITO.** La plataforma arranca en
-  blanco el 1-sep. Si Memo quiere que "cuánto tengo" diga su banco real,
-  **capturará un ingreso de "saldo inicial" por cuenta al arrancar** — no es un
-  dato que falte, es el primer asiento de la época nueva.
-  ⚠️ **La nota de "la caja de melanie es −$10,781, sellado" YA NO APLICA y se
-  retira**: no hay caja de melanie que defender. Si alguien la cita, está
-  citando una época anterior.
-  Dos cosas que dejó aprendidas y valen para el próximo borrado de evento:
+- **melanie: ÉPOCA NUEVA — la tarjeta volvió al index** (**MEL-REGRESA-1**,
+  28-ago-2026, orden de Memo). Revierte UNA parte de MEL-FRENTE-1 (#508): la
+  tarjeta jamás debió salir de la vitrina. Vive otra vez en el EV como **evento
+  pasado agotado** (`st:'agotado'`, 6-ago-2026), con sus 15 zonas y sus precios
+  históricos, y el mapa restaurado (`mapas.js` + `mapas/melanie.jpg`).
+  **LO QUE NO REVIVIÓ, y no revive:** el sorteo, el banner del giveaway, los
+  códigos `HADES` y `MELANIE`, y el `flashPromo` — murió con el sorteo.
+  Tres podas medidas al recuperarla: sin `flashPromo`, **sin `pagos`** (ESF-E0 lo
+  mató del catálogo entero: 0 de 105 lo llevan) y **sin `added`** (la sacaría en
+  el filtro *Nuevos*, que mira los últimos 30 días).
+  🔒 **El libro del Portal sigue VACÍO a propósito** — 0 gastos, 0 ingresos y
+  saldos en $0 en las tres cuentas. La plataforma arranca en blanco el 1-sep. Si
+  Memo quiere que "cuánto tengo" diga su banco real, **capturará un ingreso de
+  "saldo inicial" por cuenta al arrancar**: no es un dato que falte, es el primer
+  asiento de la época nueva. La nota de "la caja de melanie es −$10,781" **NO
+  APLICA**: quien la cite está citando una época anterior.
+  **Los 22 viajeros del Excel ya viven en `viajeros_evento`**, incluida la
+  ganadora del giveaway (anotada como tal).
+  ⚠️ **melanie NO tiene fila en `esferas_eventos`** (104 filas, ninguna suya), así
+  que **no sale en la lista de Esferas** — la lista lee solo la tabla, sin mezclar
+  con el index; no es un error, simplemente no aparece. **Medido: sobrevive una
+  publicación completa, byte a byte** — `compilarEV` es un UPSERT que nunca borra.
+  Si se quiere gobernarla desde Esferas, se siembra con *Traer del catálogo*.
+  ⚠️ **El módulo del sorteo sigue entero en el árbol** y MEL-FRENTE-1 nunca lo
+  tocó: `giveaway.html`, `sorteo.html` y 7 funciones, de las cuales
+  `giveaway-consuelo.js` todavía trae `CODIGO='MELANIE'` y un enlace a `/melanie`.
+  **Nadie la llama y no existe esa ruta**, así que está muerto — pero está.
+  Limpiarlo es decisión aparte, sin firma.
+  Dos cosas que dejó aprendidas el borrado y valen para el próximo:
   **las 15 tablas satélite llavean por SLUG** (el uuid solo vive en `eventos`), y
   **`compilarEV` es un UPSERT que nunca borra** — un evento ausente de
   `esferas_eventos` NO se puede despublicar publicando.

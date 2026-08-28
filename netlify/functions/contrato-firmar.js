@@ -210,7 +210,37 @@ exports.handler = async function (event) {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(fnac)) return bad(400, "Falta tu fecha de nacimiento");
     if (!emNom) return bad(400, "Falta el nombre de tu contacto de emergencia");
     if (!emTel) return bad(400, "Falta el teléfono de tu contacto de emergencia");
-    datosFirma = { fecha_nacimiento: fnac, emergencia: { nombre: emNom, telefono: emTel } };
+    // ═══ [CREA-1a] LA TALLA, OBLIGATORIA ═══════════════════════════════════
+    // Memo la declara dato vital: sin ella el kit no se puede preparar, y hoy
+    // se consigue por WhatsApp evento a evento (así se hizo con Day Escamilla).
+    // Se pide donde la persona YA está tecleando sus datos y se congela con los
+    // otros dos — mismo patrón, ni una columna nueva: vive en `datos`.
+    //
+    // 🔒 La lista se valida contra la MISMA de la casa (perfil del Palacio y
+    // alta de viajero). Una talla libre por texto acabaría en «mediana», «M/L»
+    // y «la de siempre», que no sirven para pedir playeras.
+    const TALLAS = ["XS", "S", "M", "L", "XL", "XXL"];
+    const talla = String(df.talla || "").trim().toUpperCase();
+    if (!TALLAS.includes(talla)) return bad(400, "Elige tu talla de playera");
+    // El acompañante es OPCIONAL pero va EN PAREJA: un nombre sin talla deja el
+    // kit a medias y una talla sin nombre no se sabe de quién es. El servidor lo
+    // exige igual que el navegador — la validación del cliente es comodidad.
+    const ac = (df.acompanante && typeof df.acompanante === "object") ? df.acompanante : {};
+    const acNom = String(ac.nombre || "").trim().slice(0, 120);
+    const acTalla = String(ac.talla || "").trim().toUpperCase();
+    if (acNom && !TALLAS.includes(acTalla)) return bad(400, "Falta la talla de tu acompañante");
+    if (acTalla && !acNom) return bad(400, "Falta el nombre de tu acompañante");
+    datosFirma = {
+      fecha_nacimiento: fnac,
+      emergencia: { nombre: emNom, telefono: emTel },
+      talla,
+      // 🔒 De dónde salió el dato viaja CON el dato. Los contratos viejos no
+      // traen talla y se capturará a mano al asignar la cortesía (CREA-1b);
+      // marcarla aquí como «del contrato» permite que allá se distinga y que
+      // nadie crea que el contrato la traía cuando no.
+      talla_origen: "contrato",
+      acompanante: acNom ? { nombre: acNom, talla: acTalla, talla_origen: "contrato" } : null,
+    };
   }
 
   // CREADORA_TEAM: captura al firmar = datos del PROEMIO (si no vienen ya en

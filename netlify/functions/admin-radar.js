@@ -45,6 +45,33 @@ const ISO_RE = /^\d{4}-\d{2}-\d{2}[T0-9:.Z+\-]*$/; // timestamptz ISO (since/unt
 const RANGO_RE = /^[a-z0-9_]{1,20}$/;            // p_rango del RPC
 const UUID_RE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
 
+// 🔒 [RAD-FIX-CAMINO] ESTA LISTA ES EL PORTERO, Y HAY QUE TOCARLA.
+//
+// No es solo una lista blanca: `ACCIONES[accion]` es lo que le dice a
+// `verifyAdminAuthLive` QUÉ ROLES pueden ejecutar cada acción. Se valida ANTES
+// de autenticar, así que una acción que no esté aquí ni siquiera llega a pedir
+// token: sale con 400 «accion inválida».
+//
+// 🔴 LO QUE PASÓ. RAD-1c, RAD-1d y RAD-1e añadieron `dia`, `tops` y `giru` al
+// despachador de abajo… y NADIE las añadió aquí. Sus tres bloques
+// `if (accion === '…')` eran **código inalcanzable en producción**: la pantalla
+// pedía, el portero contestaba 400, y el Radar pintaba sus tres fallos
+// ruidosos. Medido contra producción, sin credenciales —la lista se comprueba
+// antes que el token, así que las conocidas dan 401 y las nuevas 400—:
+//
+//     accion=metricas   → 401 «Falta Authorization»   ← pasa el portero
+//     accion=dia        → 400 «accion inválida»       ← no pasa
+//     accion=tops       → 400 «accion inválida»
+//     accion=giru       → 400 «accion inválida»
+//
+// ⚠️ Y POR QUÉ NINGÚN ARNÉS LO CAZÓ: los tres mockeaban
+// `**/.netlify/functions/**` POR RUTA, así que el handler real nunca corrió.
+// **Un mock por ruta esconde justo al portero.** El careo de camino real
+// —pantalla → handler de verdad → RPC— entra al arsenal de la serie.
+//
+// 🔒 SON DOS LISTAS QUE TIENEN QUE COINCIDIR (ésta y el despachador de abajo),
+// y el arnés las carea de forma estática: lo que despache y no esté aquí es
+// inalcanzable; lo que esté aquí y no se despache es un permiso sin destino.
 const ACCIONES = {
   metricas: ROLES_RADAR,
   main_metrics: ROLES_RADAR,
@@ -54,6 +81,9 @@ const ACCIONES = {
   alertas_no_vistas: ROLES_RADAR,
   alerta_vista: ROLES_RADAR,
   alertas_vista_todas: ROLES_RADAR,
+  dia: ROLES_RADAR,    // [RAD-1c] la franja del día
+  tops: ROLES_RADAR,   // [RAD-1d] los tres tops
+  giru: ROLES_RADAR,   // [RAD-1e] las lecturas de Giru
 };
 
 const PAGE_SIZE = 5000;

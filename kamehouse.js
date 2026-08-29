@@ -23641,6 +23641,7 @@ function _babaPintar() {
         <span class="baba-estado ${e.k}">${e.t}</span>
         <span style="flex:1"></span>
         <button class="btn btn-ghost" style="padding:4px 10px;font-size:11px" onclick="babaFichaAbrir('${_escCtr(c.codigo)}')">Editar</button>
+        <button class="btn btn-ghost" style="padding:4px 10px;font-size:11px;color:var(--baba2);border-color:rgba(160,107,255,.35)" onclick="babaLetrero('${_escCtr(c.codigo)}')">Encender letrero</button>
         <button class="btn btn-ghost" style="padding:4px 10px;font-size:11px;color:var(--ts)" onclick="babaArchivar('${_escCtr(c.codigo)}',${!c.archivado})">${c.archivado ? 'Revivir' : 'Archivar'}</button>
       </div>
       <div style="font-size:12.5px;color:var(--ts);line-height:1.6">
@@ -23955,6 +23956,63 @@ async function babaImportar() {
   } finally {
     btn.disabled = false; btn.textContent = 'Traer del catálogo';
   }
+}
+
+// ── [UB-3] LAS TRES PIEZAS JUNTAS ──────────────────────────────────────────
+// Una promoción vive en tres sitios: el CAJERO (`var PROMOS`, que es lo que
+// cobra), el LETRERO (`flash_promo` de Esferas → el badge con cronómetro) y el
+// BADGE (`promo`/`promoCode`/`promoLabel`). NATA nació con letrero y badge y
+// sin cajero: 47 minutos y 6 clientes rechazados.
+//
+// 🔒 DOS REGLAS DE ESTA FUNCIÓN, y las dos son de la casa:
+//   1. LA UNIDAD NO SE RECAPTURA. El payload lo DERIVA EL SERVIDOR desde la
+//      fila de `promos_codigos`. Aquí no hay ni un campo que teclear: volver a
+//      escribir el monto para el letrero es la puerta de vuelta de la mordida
+//      NATA.
+//   2. QUIEN ESCRIBE ES `esferas-actualizar`, el mismo endpoint que usa
+//      Esferas. Baba no toca `esferas_eventos`: un segundo escritor sobre la
+//      misma tabla es la fórmula número doce esperando a divergir.
+async function babaLetrero(codigo) {
+  try {
+    const r = await khAdminFetch('/.netlify/functions/admin-promos', {
+      method: 'POST', body: JSON.stringify({ accion: 'letrero_payload', codigo }),
+    });
+    const j = await r.json();
+    if (!r.ok || j.ok === false) {
+      // Un «no cabe» NO es un error del sistema: es una respuesta con su razón.
+      showToast(j.error || ('HTTP ' + r.status), j.no_cabe ? 'info' : 'error');
+      return;
+    }
+    const fp = j.flashPromo;
+    const cifra = fp.pct != null ? fp.pct + '%' : '$' + Number(fp.amount).toLocaleString('es-MX');
+    const donde = j.payloads.map(p => p.slug).join(', ');
+    const cuando = new Date(fp.expiresTs).toLocaleString('es-MX', {
+      timeZone: BABA_TZ, day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+    if (!confirm(
+      `Encender el letrero de ${codigo}\n\n` +
+      `· ${cifra} de descuento\n· en: ${donde}\n· hasta el ${cuando} (Reynosa)\n\n` +
+      `Se escribe en la ficha de Esferas. El badge y el cronómetro salen al sitio ` +
+      `en la próxima publicación de Esferas.`)) return;
+
+    const fallos = [];
+    // try/catch POR EVENTO: un lote que revienta por uno pierde los buenos y no
+    // dice cuál falló.
+    for (const p of j.payloads) {
+      try {
+        const rr = await khAdminFetch('/.netlify/functions/esferas-actualizar', {
+          method: 'POST', body: JSON.stringify(p),
+        });
+        const jj = await rr.json();
+        if (!rr.ok || jj.ok === false) fallos.push(`${p.slug}: ${jj.error || rr.status}`);
+      } catch (e) { fallos.push(`${p.slug}: ${e.message}`); }
+    }
+    if (fallos.length) {
+      showToast(`Letrero encendido a medias — falló: ${fallos.join(' · ')}`, 'error');
+      console.error('[baba] letrero:', fallos);
+    } else {
+      showToast(`Letrero de ${codigo} encendido en ${j.payloads.length} evento(s). Publica Esferas para que salga.`, 'ok');
+    }
+  } catch (e) { showToast('No pude: ' + e.message, 'error'); }
 }
 
 function verContratoFirmado(token, nombre) {

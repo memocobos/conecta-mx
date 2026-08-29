@@ -26,6 +26,10 @@
 // =============================================================================
 
 const { verifyAdminAuthLive, corsCheck } = require('./_lib/verify-admin');
+// [UB-3] La derivación fila → letrero vive en el lib del compilador: UNA sola
+// fuente. Aquí solo se lee la fila y se devuelve el payload; QUIEN ESCRIBE es
+// `esferas-actualizar`, el mismo endpoint que usa Esferas.
+const { filaALetrero } = require('./_lib/promos-compile');
 
 const SB_URL = 'https://npgnhsmwpcipxgvfxrho.supabase.co';
 const SB_KEY = process.env.SUPABASE_SERVICE_KEY_KAMEHOUSE;
@@ -42,6 +46,10 @@ const ACCIONES = {
   editar: SOLO_ROSHI,
   archivar: SOLO_ROSHI,
   importar: SOLO_ROSHI,
+  // [UB-3] Devuelve el payload del letrero. NO escribe: el escritor es
+  // `esferas-actualizar`. Un segundo escritor sobre `esferas_eventos` sería
+  // la fórmula número doce esperando a divergir.
+  letrero_payload: SOLO_ROSHI,
 };
 
 const CODIGO_RE = /^[A-Z0-9_]{2,32}$/;
@@ -133,6 +141,23 @@ exports.handler = async (event) => {
       const filas = await r.json();
       if (!filas.length) return resp(404, headers, { error: `El código ${codigo} no existe` });
       return resp(200, headers, { ok: true, codigo: filas[0] });
+    }
+
+    if (accion === 'letrero_payload') {
+      const codigo = String(body.codigo || '').trim().toUpperCase();
+      if (!CODIGO_RE.test(codigo)) return resp(400, headers, { error: 'código inválido' });
+      const r = await fetch(`${BASE}?codigo=eq.${encodeURIComponent(codigo)}&select=*&limit=1`, { headers: sb });
+      if (!r.ok) return upstream(headers, await r.text(), 'consulta');
+      const fila = (await r.json())[0];
+      if (!fila) return resp(404, headers, { error: `El código ${codigo} no existe` });
+      if (fila.archivado) return resp(409, headers, { error: 'Un código archivado no enciende letreros' });
+
+      // 🔒 LA UNIDAD SALE DE LA FILA, jamás del cuerpo de la petición. Si el
+      // navegador pudiera mandar el monto, volveríamos a tener dos sitios donde
+      // se teclea la misma cifra — y de ahí salió el «500%».
+      const l = filaALetrero(fila);
+      if (!l.ok) return resp(409, headers, { error: l.motivo, no_cabe: true });
+      return resp(200, headers, { ok: true, payloads: l.payloads, flashPromo: l.flashPromo });
     }
 
     if (accion === 'importar') {

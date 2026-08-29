@@ -19508,7 +19508,11 @@ async function sembrarDelCatalogo() {
 
 // Una fila de zona dentro de un bloque de fecha. Sirve para las dos listas
 // —PLUS y CHEAP— porque en el modelo de la fecha son la misma forma.
-function _esfMfZonaRow(cont, data) {
+// [ESF-UX-1] `esCheap` enciende el separo especial, igual que en la lista CHEAP
+// de arriba (`esf-cz-sep`). Sin esa boca, straykids perdía el sepEspecial de
+// 4000 de su Box Oro en las DOS fechas: la misma enfermedad del bloque de
+// fecha, un nivel más adentro.
+function _esfMfZonaRow(cont, data, esCheap) {
   if (!cont) return;
   const d = data || {};
   const row = document.createElement('div');
@@ -19520,12 +19524,18 @@ function _esfMfZonaRow(cont, data) {
     '<label style="font-size:11px;display:flex;align-items:center;gap:3px;white-space:nowrap" title="Zona preferente"><input type="checkbox" class="esf-mfz-vip">VIP</label>' +
     '<label style="font-size:11px;display:flex;align-items:center;gap:3px;white-space:nowrap"><input type="checkbox" class="esf-mfz-ag">Agotada</label>' +
     '<label style="font-size:11px;display:flex;align-items:center;gap:3px;white-space:nowrap" title="Se anuncia sin precio"><input type="checkbox" class="esf-mfz-prox">Próx.</label>' +
+    (esCheap ? '<input class="cot-input esf-mfz-sep" type="number" min="0" placeholder="separo esp." title="Separo especial de esta zona. Vacío = el separo normal del evento." style="flex:1;min-width:92px">' : '') +
     '<button type="button" class="btn btn-ghost esf-mfz-del" title="Quitar zona">✕</button>';
   row.querySelector('.esf-mfz-n').value = (typeof d.n === 'string') ? d.n : '';
   if (d.p) row.querySelector('.esf-mfz-p').value = d.p;
   if (d.vip) row.querySelector('.esf-mfz-vip').checked = true;
   if (d.ag) row.querySelector('.esf-mfz-ag').checked = true;
   if (d.prox) row.querySelector('.esf-mfz-prox').checked = true;
+  const _sep = row.querySelector('.esf-mfz-sep');
+  if (_sep && d.sepEspecial) _sep.value = d.sepEspecial;
+  // La zona original se guarda tal cual: lo que esta fila no administra vuelve
+  // intacto (`requiereViajeros` hoy, lo que el parser aprenda mañana).
+  row._esfZOrig = (data && typeof data === 'object') ? data : {};
   // Agotada y Próximamente son excluyentes, igual que en las otras dos listas:
   // una nunca estuvo a la venta y la otra se acabó.
   const cbA = row.querySelector('.esf-mfz-ag'), cbP = row.querySelector('.esf-mfz-prox');
@@ -19535,6 +19545,10 @@ function _esfMfZonaRow(cont, data) {
   cont.appendChild(row);
 }
 
+// [ESF-UX-1] Las llaves CON boca en la fila de zona. `parseCheapZonas` conserva
+// siete; esta fila gobierna seis (`sepEspecial` solo en las CHEAP). La séptima
+// —`requiereViajeros`, que hoy solo usa juniorh a nivel evento— se preserva.
+const Z_ADMINISTRADAS = new Set(['n', 'p', 'ag', 'prox', 'vip', 'sepEspecial']);
 function _esfMfLeerZonas(cont) {
   if (!cont) return [];
   return Array.from(cont.querySelectorAll('.esf-mfz-row')).map((row) => {
@@ -19543,11 +19557,75 @@ function _esfMfLeerZonas(cont) {
     const prox = row.querySelector('.esf-mfz-prox')?.checked ? 1 : 0;
     const ag = (!prox && row.querySelector('.esf-mfz-ag')?.checked) ? 1 : 0;
     const vip = row.querySelector('.esf-mfz-vip')?.checked ? 1 : 0;
-    return { n, p, ag, prox, vip };
+    const se = parseInt(row.querySelector('.esf-mfz-sep')?.value || '', 10);
+    const o = { n, p, ag, prox, vip };
+    if (Number.isFinite(se) && se > 0) o.sepEspecial = se;
+    // [ESF-UX-1] Preservación al nivel de la ZONA, igual que en el de la fecha.
+    const previa = row._esfZOrig || {};
+    Object.keys(previa).forEach((k) => {
+      if (!Z_ADMINISTRADAS.has(k) && !(k in o)) o[k] = previa[k];
+    });
+    return o;
   }).filter((z) => z.n);
 }
 
 // Un bloque = una noche.
+// [ESF-UX-1] EL HOTEL POR FECHA. Lo único que Memo edita es el precio por
+// persona; `k`, `n`, `viaj` y el texto base de `desc` son de la fila y vuelven
+// intactos. Derivarlos de `_ESF_HOTEL_TIPOS` habría cambiado datos que nadie
+// pidió cambiar: la tabla dice 'Compartida' y el catálogo dice 'Compartida (4)',
+// y el orden tampoco coincide.
+const _MF_DESC_NOCHES = / · \d+ noches?$/;
+function _esfMfHotelPintar(cont, hotel) {
+  if (!cont) return;
+  cont.innerHTML = '';
+  const filas = Array.isArray(hotel) ? hotel.filter((h) => h && typeof h === 'object') : [];
+  cont._esfFilas = filas.map((h) => Object.assign({}, h));
+  if (!filas.length) return;   // sin hotel capturado no se inventa uno
+  const tit = document.createElement('div');
+  tit.style.cssText = "font-size:10px;font-family:'JetBrains Mono',monospace;letter-spacing:.1em;color:var(--ts);margin:0 0 2px";
+  tit.textContent = 'HOTEL DE ESTA NOCHE — $ POR PERSONA';
+  cont.appendChild(tit);
+  filas.forEach((h) => {
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex;gap:8px;margin-top:6px;align-items:center';
+    const et = document.createElement('div');
+    et.style.cssText = 'flex:1;font-size:12px';
+    et.textContent = (h && h.n) ? String(h.n) : '—';   // textContent: el nombre es dato, no HTML
+    const inp = document.createElement('input');
+    inp.className = 'cot-input esf-mf-hotel-e';
+    inp.type = 'number'; inp.min = '0'; inp.placeholder = '$ por persona';
+    inp.style.cssText = 'flex:0 0 120px';
+    const e = Number(h && h.e);
+    if (Number.isFinite(e)) inp.value = e;
+    row.appendChild(et); row.appendChild(inp);
+    cont.appendChild(row);
+  });
+}
+// Devuelve las filas con el precio tecleado, o null si la fecha no traía hotel.
+function _esfMfLeerHotel(cont, noches) {
+  if (!cont || !Array.isArray(cont._esfFilas) || !cont._esfFilas.length) return null;
+  const inputs = Array.from(cont.querySelectorAll('.esf-mf-hotel-e'));
+  return cont._esfFilas.map((h, i) => {
+    const out = Object.assign({}, h);
+    const e = parseInt((inputs[i] && inputs[i].value) || '', 10);
+    // `pp` es SIEMPRE igual a `e` (medido: 36 de 36 filas finas del catálogo),
+    // pero solo se toca si la fila ya lo traía.
+    if (Number.isFinite(e) && e >= 0) { out.e = e; if ('pp' in out) out.pp = e; }
+    // El sufijo de noches se recalcula desde el texto base: si Memo cambia las
+    // noches la descripción lo sigue; si no las toca, vuelve byte-igual.
+    if (typeof out.desc === 'string') {
+      out.desc = out.desc.replace(_MF_DESC_NOCHES, '') + ((noches > 1) ? (' · ' + noches + ' noches') : '');
+    }
+    return out;
+  });
+}
+// [ESF-UX-1] Las llaves CON boca de captura en el bloque de fecha. Lo que no
+// esté aquí no se administra y por lo tanto no se pisa —el mismo espíritu de
+// CAMPOS_DEL_COMPILADOR: lo que no gobiernas, lo devuelves como venía.
+const MF_ADMINISTRADAS = new Set(
+  ['lbl', 'sublbl', 'ds', 'noches', 'music', 'zonas', 'cheapZonas', 'ride', 'hotel', 'rideAgotado']);
+
 function _esfMfAddFecha(data) {
   const cont = document.getElementById('esf-multifecha');
   if (!cont) return;
@@ -19565,6 +19643,17 @@ function _esfMfAddFecha(data) {
       // quedar pegado a Reabrir, que es lo contrario y se aprieta seguido.
       '<button type="button" class="btn btn-ghost esf-mf-del" style="color:var(--red);margin-left:auto" title="Quitar esta fecha">✕</button>' +
     '</div>' +
+    // [ESF-UX-1] Las cuatro llaves que `parseMultifecha` conserva y este bloque
+    // no pintaba: `sublbl`, `noches`, `music` y `hotel`. Sin boca de captura,
+    // abrir y guardar las BORRABA —24 valores vivos entre coronacapital y
+    // flowfest, que son CONCIERTOS con entradas de forma festival (el propio
+    // compilador lo dice en ESF-CIERRE-FINAL). El parser dejó de recortar ahí;
+    // faltaba que el editor dejara de borrar.
+    '<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:6px">' +
+      '<input class="cot-input esf-mf-sublbl" placeholder="Subtítulo (ej. 28 o 29 nov)" title="Renglón chico bajo la etiqueta. Vacío = no se muestra." style="flex:2;min-width:150px" autocomplete="off">' +
+      '<input class="cot-input esf-mf-noches" type="number" min="1" placeholder="Noches" title="Noches de hotel de esta entrada. Vacío = el sitio no las anuncia." style="flex:0 0 105px">' +
+      '<input class="cot-input esf-mf-music" placeholder="ID de música" title="Pista propia de esta noche. Vacío = usa la del evento." style="flex:1;min-width:130px" autocomplete="off">' +
+    '</div>' +
     '<div style="font-size:10px;font-family:\'JetBrains Mono\',monospace;letter-spacing:.1em;color:var(--ts);margin:12px 0 2px">ZONAS DE ESTA NOCHE</div>' +
     '<div class="esf-mf-zonas"></div>' +
     '<button type="button" class="btn btn-ghost esf-mf-addz" style="font-size:11px;margin-top:6px">+ Zona</button>' +
@@ -19572,6 +19661,7 @@ function _esfMfAddFecha(data) {
     '<div style="font-size:10px;font-family:\'JetBrains Mono\',monospace;letter-spacing:.1em;color:var(--ts);margin:12px 0 2px">ZONAS CHEAP DE ESTA NOCHE <span style="font-family:inherit;letter-spacing:0;text-transform:none">— vacías = usa las de arriba</span></div>' +
     '<div class="esf-mf-cheap"></div>' +
     '<button type="button" class="btn btn-ghost esf-mf-addc" style="font-size:11px;margin-top:6px">+ Zona CHEAP</button>' +
+    '<div class="esf-mf-hotelbox" style="margin-top:12px"></div>' +
     '<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:10px">' +
       '<input class="cot-input esf-mf-ride" type="number" min="0" placeholder="$ RIDE de esta noche" style="flex:1;min-width:150px">' +
       '<label style="font-size:11px;display:flex;align-items:center;gap:3px;white-space:nowrap"><input type="checkbox" class="esf-mf-rideag">RIDE agotado</label>' +
@@ -19580,11 +19670,24 @@ function _esfMfAddFecha(data) {
   if (typeof d.ds === 'string' && d.ds) box.querySelector('.esf-mf-ds').value = d.ds.slice(0, 10);
   if (d.ride) box.querySelector('.esf-mf-ride').value = d.ride;
   if (d.rideAgotado) box.querySelector('.esf-mf-rideag').checked = true;
+  // [ESF-UX-1] La ficha original se guarda TAL CUAL. Al leer de vuelta, toda
+  // llave que este bloque no administre se re-emite intacta: el editor no borra
+  // lo que no entiende.
+  box._esfMfOrig = (data && typeof data === 'object') ? data : {};
+  const _mfSet = (sel, v) => {
+    const el = box.querySelector(sel);
+    if (el && v !== null && v !== undefined && v !== '') el.value = v;
+  };
+  _mfSet('.esf-mf-sublbl', (typeof d.sublbl === 'string') ? d.sublbl : '');
+  const _mfN = Number(d.noches);
+  _mfSet('.esf-mf-noches', (Number.isFinite(_mfN) && _mfN > 0) ? _mfN : '');
+  _mfSet('.esf-mf-music', (typeof d.music === 'string') ? d.music : '');
+  _esfMfHotelPintar(box.querySelector('.esf-mf-hotelbox'), d.hotel);
   const cz = box.querySelector('.esf-mf-zonas'), cc = box.querySelector('.esf-mf-cheap');
   (Array.isArray(d.zonas) ? d.zonas : []).forEach((z) => _esfMfZonaRow(cz, z));
-  (Array.isArray(d.cheapZonas) ? d.cheapZonas : []).forEach((z) => _esfMfZonaRow(cc, z));
+  (Array.isArray(d.cheapZonas) ? d.cheapZonas : []).forEach((z) => _esfMfZonaRow(cc, z, true));
   box.querySelector('.esf-mf-addz').addEventListener('click', () => _esfMfZonaRow(cz));
-  box.querySelector('.esf-mf-addc').addEventListener('click', () => _esfMfZonaRow(cc));
+  box.querySelector('.esf-mf-addc').addEventListener('click', () => _esfMfZonaRow(cc, null, true));
   box.querySelector('.esf-mf-del').addEventListener('click', () => box.remove());
   // Copiar de arriba: conveniencia de captura, igual que en las CHEAP. Pregunta
   // antes de pisar — copiar no debe borrar trabajo.
@@ -19624,16 +19727,41 @@ function _esfGetMultifecha() {
     const ds = (b.querySelector('.esf-mf-ds')?.value || '').trim();
     const cheap = _esfMfLeerZonas(b.querySelector('.esf-mf-cheap'));
     const ride = parseInt(b.querySelector('.esf-mf-ride')?.value || '', 10);
-    // Las llaves se arman en el ORDEN DEL CATÁLOGO —lbl · ds · zonas ·
-    // cheapZonas · ride— para que la columna se lea igual que lo compilado. No
-    // cambia nada: el juez es semántico y `multifechaTexto` emite en su propio
-    // orden pase lo que pase. Es legibilidad, no contrato.
+    const sublbl = (b.querySelector('.esf-mf-sublbl')?.value || '').trim();
+    const nochesN = parseInt(b.querySelector('.esf-mf-noches')?.value || '', 10);
+    const noches = (Number.isFinite(nochesN) && nochesN > 0) ? nochesN : null;
+    const music = (b.querySelector('.esf-mf-music')?.value || '').trim();
+    const hotel = _esfMfLeerHotel(b.querySelector('.esf-mf-hotelbox'), noches || 1);
+    // Las llaves se arman en el ORDEN DEL CATÁLOGO —lbl · sublbl · ds · noches ·
+    // music · zonas · cheapZonas · ride · hotel · rideAgotado— para que la
+    // columna se lea igual que lo compilado. No cambia nada: el juez es
+    // semántico y `multifechaTexto` emite en su propio orden pase lo que pase.
+    // Es legibilidad, no contrato.
     const o = { lbl };
+    if (sublbl) o.sublbl = sublbl;
     if (ds) o.ds = ds;
+    if (noches != null) o.noches = noches;
+    if (music) o.music = music;
     o.zonas = _esfMfLeerZonas(b.querySelector('.esf-mf-zonas'));
     if (cheap.length) o.cheapZonas = cheap;
     if (Number.isFinite(ride) && ride > 0) o.ride = ride;
-    if (b.querySelector('.esf-mf-rideag')?.checked) o.rideAgotado = 1;
+    if (hotel) o.hotel = hotel;
+    if (b.querySelector('.esf-mf-rideag')?.checked) {
+      // [ESF-UX-1] El TIPO se conserva. El catálogo escribe `true` en morat#3 y
+      // `1` en los demás, y `multifechaTexto` los emite DISTINTO
+      // (`=== true ? 'true' : '1'`). Si la casilla ya venía prendida, vuelve el
+      // valor original; si Memo la prendió ahora, es 1.
+      const previo = (b._esfMfOrig || {}).rideAgotado;
+      o.rideAgotado = previo ? previo : 1;
+    }
+    // [ESF-UX-1] PRESERVACIÓN. Toda llave de la ficha que este bloque no
+    // administra vuelve intacta. Sin esto, una llave que el parser aprenda
+    // mañana la borraría el primer guardado —que es justo lo que pasó con
+    // `sublbl`, `noches`, `music` y `hotel` desde ESF-CIERRE-FINAL.
+    const previa = b._esfMfOrig || {};
+    Object.keys(previa).forEach((k) => {
+      if (!MF_ADMINISTRADAS.has(k) && !(k in o)) o[k] = previa[k];
+    });
     return o;
   // Sin etiqueta el compilador descarta la fecha (`if (!lbl) continue`), así que
   // se descarta aquí también: mandar una que el otro lado tira es mentirle a

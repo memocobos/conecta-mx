@@ -1675,9 +1675,13 @@ function toast(msg){
 }
 
 // ── State ────────────────────────────────────
-// [ROL-FALLBACK-1] `promosOk` nace en null —«todavía no sé»— y NO en true: un
-// default optimista haría que un fallo de carga se leyera como catálogo sano.
-// Solo el `=== false` explícito dispara el aviso.
+// [ROL-FALLBACK-1] `promosOk` nace en null: «todavía no sé», distinto de `false`
+// («lo intenté y no llegaron»). Solo el `=== false` explícito dispara el aviso.
+// ⚠️ MEDIDO, para que nadie lo 'arregle' creyendo que es un candado: hoy este
+// valor inicial NO es alcanzable — el campo del código vive en `codigo-wrap`,
+// que está oculto hasta que `loadEV` termina. Es documentación de intención y
+// red para un camino futuro, no una guarda viva. Por eso una sonda que lo
+// cambia a `true` no rompe ninguna aserción, y eso es correcto.
 var state = { promosOk:null, ev:null, fi:null, pkg:null, zona:null, hab:null, transporte:null, sepDate:null, precio:null, sepMonto:null, sepTouched:false, plan:null, user:null, tours:[], view:'onboarding' };
 
 // ── User & tours (multi-tour persistence) ────

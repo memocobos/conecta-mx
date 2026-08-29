@@ -56,7 +56,7 @@ let disenoLoaded = false;
 // el hueco se cierra en la fuente: la lista del barrido se DERIVA de las
 // pantallas que existen, no se escribe a mano al lado.
 const PERMISOS_TABS = {
-  maestro_roshi: ['resumen','pagos','eventos','gastos','ingresos','saldos','inventario','reportes','capsule','solicitudes_portal','equipo','kamisama','herramientas','radar','montana','yamcha','radio','esferas','contratos','waitlist','recibos','diseno'],
+  maestro_roshi: ['resumen','pagos','eventos','gastos','ingresos','saldos','inventario','reportes','capsule','solicitudes_portal','equipo','kamisama','herramientas','radar','montana','yamcha','radio','esferas','baba','contratos','waitlist','recibos','diseno'],
   bulma:         ['resumen','pagos','eventos','gastos','ingresos','saldos','inventario','reportes','capsule','solicitudes_portal','equipo','herramientas'],
   mister_popo:   ['inventario','reportes','equipo'],
   coordinador:   ['inventario','reportes','equipo'],
@@ -2505,6 +2505,7 @@ function loadPage(name) {
  if (name === 'montana') loadMontana();
  if (name === 'radar') initRadarTab();
  if (name === 'esferas') { loadEsferasEventos(); n1Cargar(); }
+ if (name === 'baba') babaCargar();
  if (name === 'yamcha') loadYamcha();
  if (name === 'radio') loadRadio();
 }
@@ -23488,6 +23489,471 @@ async function cortGuardar() {
     alert.innerHTML = `<div style="color:#ff5f56;font-size:12px;margin-bottom:8px">No se pudo: ${_escCtr(e.message)}</div>`;
   } finally {
     btn.disabled = false; btn.textContent = 'Asignar cortesía';
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// [UB-1] LA CASA DE URANAI BABA — los códigos de promoción, gobernados.
+//
+// Hoy una promoción vive partida en tres —el CAJERO (`var PROMOS` del index),
+// el LETRERO (`flash_promo` de Esferas) y el BADGE— y solo el cajero cobra.
+// NATA nació con letrero y badge y sin cajero: 47 minutos y 6 clientes
+// rechazados. Esta pantalla gobierna el cajero.
+//
+// 🔒 LAS TRES UNIDADES SON EXCLUYENTES, y la base ya lo exige
+// (`num_nonnulls(monto, pct, segundo_pax) = 1`). La pantalla no lo repite por
+// desconfianza: lo DICE, con tres tarjetas y una sola encendida, porque un
+// candado que el usuario no ve se siente como un error del sistema cuando
+// muerde. De ahí salió el «500% de descuento»: dos campos numéricos hermanos
+// sin nada que dijera «elige uno».
+// ═══════════════════════════════════════════════════════════════════════════
+
+let _babaCodigos = [];
+let _babaFiltro = 'vigentes';
+let _babaEditando = null;   // el código abierto en la ficha, o null si es nuevo
+let _babaUnidad = null;     // 'pesos' | 'pct' | 'pareja'
+let _babaReintento = false; // freno del reintento del catálogo
+
+// 🔒 EL RELOJ DE REYNOSA. Las vigencias se TECLEAN en hora de Reynosa y se
+// GUARDAN como instante. Reynosa sigue el horario de EE.UU. (America/Matamoros),
+// no el de Monterrey: son 133 días al año de diferencia con Cancún, invisibles
+// en verano. Guardar el instante quita la pregunta — no hay literal que
+// escribir mal.
+const BABA_TZ = 'America/Matamoros';
+
+// `datetime-local` → instante. Se calcula el desfase de Reynosa EN ESA FECHA,
+// no hoy: un vencimiento de diciembre tecleado en agosto lleva otro offset.
+function _babaLocalAInstante(txt) {
+  if (!txt) return null;
+  const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(txt);
+  if (!m) return null;
+  const [, Y, M, D, h, mi] = m.map(Number);
+  const comoUTC = Date.UTC(Y, M - 1, D, h, mi);
+  // Cuánto se corre Reynosa respecto a UTC en ese instante aproximado.
+  const p = new Intl.DateTimeFormat('en-CA', {
+    timeZone: BABA_TZ, hour12: false,
+    year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit',
+  }).formatToParts(new Date(comoUTC)).reduce((a, x) => (a[x.type] = x.value, a), {});
+  const leidoUTC = Date.UTC(+p.year, +p.month - 1, +p.day, +(p.hour === '24' ? 0 : p.hour), +p.minute);
+  return new Date(comoUTC + (comoUTC - leidoUTC)).toISOString();
+}
+// instante → lo que el `datetime-local` debe mostrar, EN REYNOSA.
+function _babaInstanteALocal(iso) {
+  if (!iso) return '';
+  const p = new Intl.DateTimeFormat('en-CA', {
+    timeZone: BABA_TZ, hour12: false,
+    year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit',
+  }).formatToParts(new Date(iso)).reduce((a, x) => (a[x.type] = x.value, a), {});
+  const hh = p.hour === '24' ? '00' : p.hour;
+  return `${p.year}-${p.month}-${p.day}T${hh}:${p.minute}`;
+}
+function _babaFechaTxt(iso) {
+  if (!iso) return 'sin vencimiento';
+  return new Date(iso).toLocaleString('es-MX', {
+    timeZone: BABA_TZ, day: '2-digit', month: 'short', year: 'numeric',
+    hour: '2-digit', minute: '2-digit',
+  }) + ' (Reynosa)';
+}
+
+// El estado de un código, en una sola función: la lista y la ficha preguntan
+// aquí, para que no haya dos criterios de «vigente».
+function _babaEstado(c) {
+  const ahora = Date.now();
+  if (c.archivado) return { k: 'murio', t: 'archivado' };
+  if (c.starts_at && Date.parse(c.starts_at) > ahora) return { k: 'pronto', t: 'por empezar' };
+  if (!c.expires_at) return { k: 'siempre', t: 'sin vencimiento' };
+  return Date.parse(c.expires_at) > ahora
+    ? { k: 'vive', t: 'vigente' }
+    : { k: 'murio', t: 'vencido' };
+}
+function _babaUnidadDe(c) {
+  if (c.segundo_pax) return { k: 'pareja', t: 'pareja' };
+  if (c.monto != null) return { k: 'pesos', t: '$' + Number(c.monto).toLocaleString('es-MX') };
+  return { k: 'pct', t: Number(c.pct) + '%' };
+}
+
+async function babaCargar() {
+  const cont = document.getElementById('baba-lista');
+  cont.innerHTML = '<div class="loading-state"><div class="spinner"></div>Consultando las esferas…</div>';
+  try {
+    const r = await khAdminFetch('/.netlify/functions/admin-promos', {
+      method: 'POST', body: JSON.stringify({ accion: 'listar' }),
+    });
+    const j = await r.json();
+    if (!r.ok || j.ok === false) throw new Error(j.error || ('HTTP ' + r.status));
+    _babaCodigos = j.codigos || [];
+    _babaPintar();
+  } catch (e) {
+    cont.innerHTML = `<div class="empty-state">No pude leer los códigos: ${_escCtr(e.message)}</div>`;
+  }
+}
+
+function babaFiltrar(f, btn) {
+  _babaFiltro = f;
+  document.querySelectorAll('#page-baba .gz-filter').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  _babaPintar();
+}
+
+function _babaPintar() {
+  const cont = document.getElementById('baba-lista');
+  const cuenta = { vigentes: 0, pronto: 0, sinfecha: 0, vencidos: 0 };
+  for (const c of _babaCodigos) {
+    const k = _babaEstado(c).k;
+    if (k === 'vive') cuenta.vigentes++;
+    else if (k === 'pronto') cuenta.pronto++;
+    else if (k === 'siempre') cuenta.sinfecha++;
+    else cuenta.vencidos++;
+  }
+  const rot = (id, txt, n) => { const b = document.getElementById(id); if (b) b.textContent = `${txt} (${n})`; };
+  rot('babaf-vigentes', '// vigentes', cuenta.vigentes);
+  rot('babaf-pronto', '// por empezar', cuenta.pronto);
+  rot('babaf-sinfecha', '// sin vencimiento', cuenta.sinfecha);
+  rot('babaf-vencidos', '// vencidos', cuenta.vencidos);
+  rot('babaf-todos', '// todos', _babaCodigos.length);
+
+  const mapa = { vigentes: 'vive', pronto: 'pronto', sinfecha: 'siempre', vencidos: 'murio' };
+  const visibles = _babaFiltro === 'todos'
+    ? _babaCodigos
+    : _babaCodigos.filter(c => _babaEstado(c).k === mapa[_babaFiltro]);
+
+  if (!visibles.length) {
+    // Una lista vacía es una AFIRMACIÓN: se dice cuántos hay del otro lado,
+    // porque si no, no se sabe si no existe o si el filtro lo tapó.
+    cont.innerHTML = `<div class="empty-state">` +
+      (_babaCodigos.length
+        ? `Ningún código en este filtro — hay ${_babaCodigos.length} en total.`
+        : `La casa está vacía. Aprieta <b>Traer del catálogo</b> para sembrar los que el sitio ya usa.`) +
+      `</div>`;
+    return;
+  }
+
+  cont.innerHTML = '<div style="display:grid;gap:10px">' + visibles.map(c => {
+    const e = _babaEstado(c), u = _babaUnidadDe(c);
+    const alcance = c.all_events
+      ? 'todos los eventos'
+      : (c.only_events || []).join(' · ') || '—';
+    const pkg = (c.exclude_pkg || []).length ? `sin ${(c.exclude_pkg || []).join('/')}` : 'todos los paquetes';
+    return `<div class="baba-card"><div class="baba-card-in">
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px">
+        <span class="baba-codigo">${_escCtr(c.codigo)}</span>
+        <span class="baba-unidad ${u.k}">${_escCtr(u.t)}</span>
+        <span class="baba-estado ${e.k}">${e.t}</span>
+        <span style="flex:1"></span>
+        <button class="btn btn-ghost" style="padding:4px 10px;font-size:11px" onclick="babaFichaAbrir('${_escCtr(c.codigo)}')">Editar</button>
+        <button class="btn btn-ghost" style="padding:4px 10px;font-size:11px;color:var(--ts)" onclick="babaArchivar('${_escCtr(c.codigo)}',${!c.archivado})">${c.archivado ? 'Revivir' : 'Archivar'}</button>
+      </div>
+      <div style="font-size:12.5px;color:var(--ts);line-height:1.6">
+        ${_escCtr(c.desc_texto || '')}<br>
+        <span style="font-size:11.5px">${_escCtr(alcance)} · ${_escCtr(pkg)} · ${_escCtr(_babaFechaTxt(c.expires_at))}</span>
+      </div>
+    </div></div>`;
+  }).join('') + '</div>';
+}
+
+async function babaArchivar(codigo, archivar) {
+  try {
+    const r = await khAdminFetch('/.netlify/functions/admin-promos', {
+      method: 'POST', body: JSON.stringify({ accion: 'archivar', codigo, archivado: archivar }),
+    });
+    const j = await r.json();
+    if (!r.ok || j.ok === false) throw new Error(j.error || ('HTTP ' + r.status));
+    showToast(archivar ? `${codigo} archivado` : `${codigo} de vuelta`, 'ok');
+    babaCargar();
+  } catch (e) { showToast(e.message, 'error'); }
+}
+
+// ── LA FICHA ───────────────────────────────────────────────────────────────
+// Panel EN LÍNEA, no `.modal-overlay`: los cerradores globales de esa clase
+// borran campos al vuelo (la mordida de ESF-UX-1) y aquí hay una ficha larga.
+function babaFichaAbrir(codigo) {
+  const c = codigo ? _babaCodigos.find(x => x.codigo === codigo) : null;
+  _babaEditando = c ? c.codigo : null;
+  _babaUnidad = c ? _babaUnidadDe(c).k : null;
+
+  // ⚠️ `_contratosEVCache` es un `let` DE NIVEL SUPERIOR: NO vive en `window`.
+  // Leerlo como `window._contratosEVCache` daba siempre null y la ficha se
+  // llamaba a sí misma para siempre. Tercera vez que muerde en esta casa —
+  // la variable, a secas.
+  const evs = (typeof _contratosEVCache !== 'undefined' && (_contratosEVCache || []).length)
+    ? _contratosEVCache : null;
+  const cont = document.getElementById('baba-lista');
+  cont.innerHTML = `
+   <div class="baba-card" style="margin-bottom:14px"><div class="baba-card-in" style="padding:20px">
+    <div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-bottom:14px">
+      <div class="baba-codigo" style="font-size:17px">${c ? _escCtr(c.codigo) : 'CÓDIGO NUEVO'}</div>
+      <button class="btn btn-ghost" style="padding:4px 10px;font-size:11px" onclick="babaCargar()">Cerrar</button>
+    </div>
+
+    <div class="form-row">
+     <div class="form-group">
+      <label>Código</label>
+      <input id="baba-codigo" value="${c ? _escCtr(c.codigo) : ''}" ${c ? 'disabled' : ''}
+             placeholder="NATA" oninput="this.value=this.value.toUpperCase()" autocomplete="off">
+      <div style="font-size:11px;color:var(--ts);margin-top:5px">Mayúsculas, sin espacios. Es la llave: no se puede cambiar después.</div>
+     </div>
+     <div class="form-group">
+      <label>Lo que lee el cliente</label>
+      <input id="baba-desc" value="${c ? _escCtr(c.desc_texto || '') : ''}" placeholder="$500 de descuento con código NATA" autocomplete="off">
+     </div>
+    </div>
+
+    <label style="display:block;margin:16px 0 8px">¿Cómo descuenta?</label>
+    <div class="baba-unidades">
+     <button type="button" class="baba-uni" id="baba-uni-pesos" onclick="babaUnidad('pesos')">
+       <span class="baba-uni-t">💵 Pesos</span>
+       <span class="baba-uni-d">Una cantidad fija, por persona. Como NATA: $500.</span></button>
+     <button type="button" class="baba-uni" id="baba-uni-pct" onclick="babaUnidad('pct')">
+       <span class="baba-uni-t">% Porcentaje</span>
+       <span class="baba-uni-d">Sobre el precio de la zona. Como CAIFAN: 5%.</span></button>
+     <button type="button" class="baba-uni" id="baba-uni-pareja" onclick="babaUnidad('pareja')">
+       <span class="baba-uni-t">👥 Pareja</span>
+       <span class="baba-uni-d">El segundo viajero paga un precio fijo. Como TINI: $2,700.</span></button>
+    </div>
+    <div class="baba-aviso" style="margin-bottom:14px">
+     🔒 <b>Una sola forma por código.</b> Elegir una apaga las otras dos — y la base también lo exige.
+     Así nació el «500% de descuento»: alguien escribió 500 en el campo del porcentaje queriendo decir $500.
+    </div>
+
+    <div id="baba-campo-pesos" style="display:none" class="form-group">
+      <label>Pesos de descuento (por persona)</label>
+      <input id="baba-monto" type="number" min="1" step="1" value="${c && c.monto != null ? c.monto : ''}" autocomplete="off">
+    </div>
+    <div id="baba-campo-pct" style="display:none">
+     <div class="form-row">
+      <div class="form-group"><label>Porcentaje</label>
+       <input id="baba-pct" type="number" min="1" max="100" step="1" value="${c && c.pct != null ? c.pct : ''}" autocomplete="off"></div>
+      <div class="form-group"><label>Porcentaje para CHEAP <span style="color:var(--ts);font-weight:400">(opcional)</span></label>
+       <input id="baba-pctcheap" type="number" min="1" max="100" step="1" value="${c && c.pct_cheap != null ? c.pct_cheap : ''}" autocomplete="off"></div>
+     </div>
+    </div>
+    <div id="baba-campo-pareja" style="display:none">
+     <div class="form-row">
+      <div class="form-group"><label>El segundo paga, en PLUS</label>
+       <input id="baba-sp-plus" type="number" min="0" step="1" value="${c && c.segundo_pax ? (c.segundo_pax.plus ?? '') : ''}" autocomplete="off"></div>
+      <div class="form-group"><label>El segundo paga, en CHEAP <span style="color:var(--ts);font-weight:400">(opcional)</span></label>
+       <input id="baba-sp-cheap" type="number" min="0" step="1" value="${c && c.segundo_pax && c.segundo_pax.cheap != null ? c.segundo_pax.cheap : ''}" autocomplete="off"></div>
+      <div class="form-group"><label>Para grupos de exactamente</label>
+       <select id="baba-exact">${[2,3,4,5,6,7,8,9].map(n => `<option value="${n}"${c && c.exact_personas === n ? ' selected' : ''}>${n} personas</option>`).join('')}</select></div>
+     </div>
+    </div>
+
+    <div class="form-row" style="margin-top:6px">
+     <div class="form-group">
+      <label>Evento</label>
+      <select id="baba-evento" ${c && c.all_events ? 'disabled' : ''}>
+        <option value="">— elegir evento —</option>
+        ${(evs || []).filter(e => e && e.id).map(e =>
+          `<option value="${_escCtr(e.id)}"${c && (c.only_events || []).includes(e.id) ? ' selected' : ''}>${_escCtr(e.a || e.id)}</option>`).join('')}
+      </select>
+      <div style="font-size:11px;color:var(--ts);margin-top:5px">
+        ${evs ? 'Nace vacío a propósito: el evento se elige, no se hereda del orden de la lista.' : '⚠️ No pude leer el catálogo — abre y cierra la pestaña.'}
+      </div>
+     </div>
+     <div class="form-group" style="align-self:end">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+        <input type="checkbox" id="baba-todos" style="width:auto;margin:0" ${c && c.all_events ? 'checked' : ''} onchange="babaTodosEventos()">
+        <span>Vale en TODOS los eventos</span></label>
+      <div style="font-size:11px;color:var(--ts);margin-top:5px">Elección deliberada, nunca el default. Hoy solo GOL la usa.</div>
+     </div>
+    </div>
+
+    <div class="form-row">
+     <div class="form-group">
+      <label>Vence el <span style="color:var(--ts);font-weight:400">— hora de Reynosa</span></label>
+      <input id="baba-vence" type="datetime-local" value="${c ? _babaInstanteALocal(c.expires_at) : ''}" ${c && !c.expires_at ? 'disabled' : ''}>
+     </div>
+     <div class="form-group" style="align-self:end">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+        <input type="checkbox" id="baba-sinvence" style="width:auto;margin:0" ${c && !c.expires_at ? 'checked' : ''} onchange="babaSinVence()">
+        <span>Sin vencimiento</span></label>
+      <div style="font-size:11px;color:var(--ts);margin-top:5px">Elección legítima: AIT-1 no tiene fecha a propósito.</div>
+     </div>
+    </div>
+
+    <details style="margin:14px 0 12px">
+     <summary style="cursor:pointer;font-family:Rajdhani,sans-serif;font-weight:700;letter-spacing:.08em;text-transform:uppercase;font-size:12.5px;color:var(--baba2)">Avanzado</summary>
+     <div style="padding:12px 0 0">
+      <div class="form-row">
+       <div class="form-group"><label>Paquetes donde NO aplica</label>
+        <div style="display:flex;gap:14px;flex-wrap:wrap;padding-top:6px">
+        ${['plus','ride','stay','cheap'].map(pk => `<label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px">
+          <input type="checkbox" class="baba-pkg" value="${pk}" style="width:auto;margin:0"${c && (c.exclude_pkg || []).includes(pk) ? ' checked' : ''}>${pk.toUpperCase()}</label>`).join('')}
+        </div></div>
+       <div class="form-group"><label>Empieza el <span style="color:var(--ts);font-weight:400">— opcional, hora de Reynosa</span></label>
+        <input id="baba-inicia" type="datetime-local" value="${c ? _babaInstanteALocal(c.starts_at) : ''}"></div>
+      </div>
+      <div class="form-row">
+       <div class="form-group"><label>Tope de usos</label>
+        <input id="baba-maxusos" type="number" min="1" step="1" value="${c ? (c.max_usos ?? 9999) : 9999}"></div>
+       <div class="form-group" style="align-self:end">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+          <input type="checkbox" id="baba-single" style="width:auto;margin:0" ${c && c.single_use ? 'checked' : ''}>
+          <span>Una vez por navegador</span></label></div>
+      </div>
+      <div class="form-group"><label>Mensaje a medida al aplicarlo <span style="color:var(--ts);font-weight:400">(opcional)</span></label>
+       <input id="baba-custom" value="${c ? _escCtr(c.custom_msg || '') : ''}" autocomplete="off"></div>
+     </div>
+    </details>
+
+    <div id="baba-alert"></div>
+    <button class="btn" id="baba-guardar" onclick="babaGuardar()" style="width:100%">${c ? 'Guardar cambios' : 'Crear código'}</button>
+   </div></div>`;
+
+  if (_babaUnidad) babaUnidad(_babaUnidad);
+  // Y con freno: si tras traer el catálogo sigue vacío, se pinta el aviso y se
+  // para. Un reintento sin condición de salida es el bucle de arriba otra vez.
+  if (!evs && !_babaReintento) {
+    _babaReintento = true;
+    _fetchEVFromIndex().then(() => { _babaReintento = false; babaFichaAbrir(codigo); })
+                       .catch(() => { _babaReintento = false; });
+  }
+}
+
+// 🔒 LA ELECCIÓN EXCLUYENTE, hecha visible: encender una APAGA las otras dos y
+// LIMPIA sus campos. Si solo se escondieran, un valor viejo viajaría al
+// servidor y el CHECK lo rebotaría con un mensaje que nadie entiende.
+function babaUnidad(cual) {
+  _babaUnidad = cual;
+  for (const k of ['pesos', 'pct', 'pareja']) {
+    const btn = document.getElementById('baba-uni-' + k);
+    const campo = document.getElementById('baba-campo-' + k);
+    const on = k === cual;
+    if (btn) btn.classList.toggle('on', on);
+    if (campo) campo.style.display = on ? '' : 'none';
+    if (!on) {
+      const ids = { pesos: ['baba-monto'], pct: ['baba-pct', 'baba-pctcheap'], pareja: ['baba-sp-plus', 'baba-sp-cheap'] }[k];
+      ids.forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+    }
+  }
+}
+function babaTodosEventos() {
+  const on = document.getElementById('baba-todos').checked;
+  const sel = document.getElementById('baba-evento');
+  sel.disabled = on;
+  if (on) sel.value = '';
+}
+function babaSinVence() {
+  const on = document.getElementById('baba-sinvence').checked;
+  const inp = document.getElementById('baba-vence');
+  inp.disabled = on;
+  if (on) inp.value = '';
+}
+
+async function babaGuardar() {
+  const g = id => (document.getElementById(id) || {}).value || '';
+  const chk = id => !!(document.getElementById(id) || {}).checked;
+  const alert = document.getElementById('baba-alert');
+  const btn = document.getElementById('baba-guardar');
+  const err = m => { alert.innerHTML = `<div style="color:var(--red);font-size:12px;margin-bottom:8px">${_escCtr(m)}</div>`; };
+  alert.innerHTML = '';
+
+  if (!_babaUnidad) return err('Elige cómo descuenta: pesos, porcentaje o pareja.');
+  const sp = {};
+  if (_babaUnidad === 'pareja') {
+    if (g('baba-sp-plus') === '') return err('Di cuánto paga el segundo viajero en PLUS.');
+    sp.plus = Number(g('baba-sp-plus'));
+    if (g('baba-sp-cheap') !== '') sp.cheap = Number(g('baba-sp-cheap'));
+  }
+  const cuerpo = {
+    accion: _babaEditando ? 'editar' : 'crear',
+    codigo: _babaEditando || g('baba-codigo').trim().toUpperCase(),
+    desc_texto: g('baba-desc'),
+    custom_msg: g('baba-custom') || null,
+    monto: _babaUnidad === 'pesos' ? Number(g('baba-monto')) : null,
+    pct: _babaUnidad === 'pct' ? Number(g('baba-pct')) : null,
+    pct_cheap: _babaUnidad === 'pct' && g('baba-pctcheap') ? Number(g('baba-pctcheap')) : null,
+    segundo_pax: _babaUnidad === 'pareja' ? sp : null,
+    exact_personas: _babaUnidad === 'pareja' ? Number(g('baba-exact')) : null,
+    all_events: chk('baba-todos'),
+    only_events: chk('baba-todos') ? [] : (g('baba-evento') ? [g('baba-evento')] : []),
+    exclude_pkg: [...document.querySelectorAll('.baba-pkg:checked')].map(x => x.value),
+    starts_at: _babaLocalAInstante(g('baba-inicia')),
+    expires_at: chk('baba-sinvence') ? null : _babaLocalAInstante(g('baba-vence')),
+    max_usos: Number(g('baba-maxusos')) || 9999,
+    single_use: chk('baba-single'),
+  };
+  if (!cuerpo.desc_texto.trim()) return err('Falta el texto que ve el cliente.');
+  if (!cuerpo.all_events && !cuerpo.only_events.length) return err('Elige el evento, o marca «todos los eventos».');
+  if (!chk('baba-sinvence') && !cuerpo.expires_at) return err('Pon la fecha de vencimiento, o marca «sin vencimiento».');
+
+  btn.disabled = true; btn.textContent = 'Guardando…';
+  try {
+    const r = await khAdminFetch('/.netlify/functions/admin-promos', { method: 'POST', body: JSON.stringify(cuerpo) });
+    const j = await r.json();
+    if (!r.ok || j.ok === false) throw new Error(j.error || ('HTTP ' + r.status));
+    showToast(`${cuerpo.codigo} guardado`, 'ok');
+    babaCargar();
+  } catch (e) { err(e.message); }
+  finally { btn.disabled = false; btn.textContent = _babaEditando ? 'Guardar cambios' : 'Crear código'; }
+}
+
+// ── TRAER DEL CATÁLOGO ─────────────────────────────────────────────────────
+// Lee el `var PROMOS` del index publicado con `_khCortarLiteral`, EL MISMO
+// cortador que usa Esferas (balance de llaves, respetando literales de texto).
+// No se llama a `_esfPromosAsegurar` aunque haga justo esto: esa función
+// REPINTA la lista de Esferas como efecto colateral, y traer códigos aquí no
+// tiene por qué mover otra pantalla. Se comparte el cortador, no el efecto.
+async function _babaPromosDelIndex() {
+  const r = await fetch('/index.html?p=' + Date.now(), { cache: 'no-store' });
+  if (!r.ok) throw new Error('no pude bajar el index (HTTP ' + r.status + ')');
+  const txt = _khCortarLiteral(await r.text(), /var\s+PROMOS\s*=\s*\{/, '{', '}');
+  if (!txt) throw new Error('no encontré `var PROMOS` en index.html');
+  // El literal usa `Date.parse(...)` en varios vencimientos; es global, así que
+  // no hace falta stub. Nada más de esa página se evalúa.
+  const obj = new Function('return ' + txt + ';')();
+  if (!obj || typeof obj !== 'object') throw new Error('PROMOS no es un objeto');
+  return obj;
+}
+
+// Lee el `var PROMOS` del index PUBLICADO —la misma fuente que Esferas usa para
+// su diagnóstico— y siembra los que aquí faltan. No pisa los que ya están: el
+// que manda, una vez sembrado, es esta pantalla.
+async function babaImportar() {
+  const btn = document.getElementById('baba-btn-traer');
+  btn.disabled = true; btn.textContent = 'Leyendo el catálogo…';
+  try {
+    const P = await _babaPromosDelIndex();
+    const codigos = Object.entries(P).map(([codigo, v]) => ({
+      codigo,
+      monto: v.amount ?? null,
+      pct: v.pct ?? null,
+      pct_cheap: v.pctCheap ?? null,
+      desc_texto: v.desc || codigo,
+      custom_msg: v.customMsg ?? null,
+      hide_amount: v.hideAmount === true,
+      only_events: v.onlyEvents || (v.onlyEvent ? [v.onlyEvent] : []),
+      all_events: v.allEvents === true,
+      only_zones: v.onlyZones || null,
+      exclude_zones: v.excludeZones || null,
+      exclude_pkg: v.excludePkg || [],
+      // 🔒 Los instantes viajan TAL CUAL. El catálogo ya los guarda como epoch,
+      // así que no hay huso que reinterpretar — y reinterpretarlo sería moverlos.
+      starts_at: v.startTs ? new Date(v.startTs).toISOString() : null,
+      expires_at: v.expiresTs ? new Date(v.expiresTs).toISOString() : null,
+      max_usos: v.maxUsos ?? 9999,
+      single_use: v.singleUse === true,
+      segundo_pax: v.segundoPax || null,
+      exact_personas: v.exactPersonas ?? null,
+    }));
+    if (!codigos.length) throw new Error('El catálogo no trae códigos');
+    const r = await khAdminFetch('/.netlify/functions/admin-promos', {
+      method: 'POST', body: JSON.stringify({ accion: 'importar', codigos }),
+    });
+    const j = await r.json();
+    if (!r.ok || j.ok === false) throw new Error(j.error || ('HTTP ' + r.status));
+    // La promesa de una pantalla no es un contrato: se dice lo que ENTRÓ, lo que
+    // ya estaba y lo que falló, con su motivo.
+    const partes = [`${j.creados.length} nuevos`];
+    if (j.saltados.length) partes.push(`${j.saltados.length} ya estaban`);
+    if (j.fallidos.length) partes.push(`${j.fallidos.length} FALLARON`);
+    showToast(`De ${j.pedidos} del catálogo: ${partes.join(' · ')}`, j.fallidos.length ? 'error' : 'ok');
+    if (j.fallidos.length) console.error('[baba] no entraron:', j.fallidos);
+    babaCargar();
+  } catch (e) {
+    showToast('No pude traerlos: ' + e.message, 'error');
+  } finally {
+    btn.disabled = false; btn.textContent = 'Traer del catálogo';
   }
 }
 

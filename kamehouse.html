@@ -82,6 +82,7 @@
   <symbol id="ic-equipo" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><path d="M3 20c0-3.3 2.7-5 6-5s6 1.7 6 5"/><path d="M16 6a3 3 0 0 1 0 6"/></symbol>
   <symbol id="ic-montana" viewBox="0 0 24 24"><path d="M3 20h18L14 7l-3 5-2-3z"/></symbol>
   <symbol id="ic-radar" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/><path d="M12 12l6-4"/></symbol>
+  <symbol id="ic-baba" viewBox="0 0 24 24"><circle cx="12" cy="10" r="6.5"/><path d="M6.5 18.5h11l-1.5 2.5h-8z"/><circle cx="9.7" cy="7.8" r="1.4" opacity=".55"/></symbol>
   <symbol id="ic-esferas" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7l1.4 3.6L17 12l-3.6 1.4L12 17l-1.4-3.6L7 12l3.6-1.4z"/></symbol>
   <symbol id="ic-kamisama" viewBox="0 0 24 24"><path d="M3 9l9-5 9 5"/><path d="M5 9v10M19 9v10M3 20h18"/><path d="M9 20v-6h6v6"/></symbol>
   <symbol id="ic-recibos" viewBox="0 0 24 24"><path d="M6 2h12v20l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6"/></symbol>
@@ -147,6 +148,7 @@
    <div class="nav-group-title" onclick="toggleNavGroup(this)">Eventos</div>
    <button class="nav-btn" onclick="showPage('kamisama')" id="nav-kamisama"><svg class="nav-ic"><use href="#ic-kamisama"/></svg><span>Palacio de Kamisama</span></button>
    <button class="nav-btn" onclick="showPage('esferas')" id="nav-esferas"><svg class="nav-ic"><use href="#ic-esferas"/></svg><span>Esferas del Dragón</span></button>
+   <button class="nav-btn" onclick="showPage('baba')" id="nav-baba"><svg class="nav-ic"><use href="#ic-baba"/></svg><span>La Casa de Uranai Baba</span></button>
    <button class="nav-btn" onclick="showPage('yamcha')" id="nav-yamcha"><svg class="nav-ic"><use href="#ic-saldos"/></svg><span>La derrota de Yamcha</span></button>
    <button class="nav-btn" onclick="showPage('radar')" id="nav-radar"><svg class="nav-ic"><use href="#ic-radar"/></svg><span>Radar del Dragón</span></button>
    <button class="nav-btn" onclick="showPage('radio')" id="nav-radio"><svg class="nav-ic"><use href="#ic-radar"/></svg><span>Kaio-sama</span></button>
@@ -1378,6 +1380,55 @@
   </div>
   <div id="yamcha-totales" style="margin-bottom:16px"></div>
   <div id="yamcha-lista"><div class="loading-state"><div class="spinner"></div>Cargando…</div></div>
+ </div>
+
+
+ <!-- ─── LA CASA DE URANAI BABA (UB-1 · el cajero de las promociones) ───────
+      Hermana de Esferas, NO parte de ella: Esferas gobierna eventos y ya carga
+      con 56 campos. Los códigos son otra cosa y tienen su propia puerta.
+      El acento violeta vive en `#page-baba` (kamehouse.css), al estilo de GZ.
+ -->
+ <div class="page" id="page-baba">
+  <div class="page-hero">
+   <div style="display:flex;align-items:center;gap:14px">
+    <svg class="baba-orbe" viewBox="0 0 60 60" aria-hidden="true">
+     <defs><radialGradient id="baba-g" cx="36%" cy="30%">
+       <stop offset="0%" stop-color="#e6d4ff" stop-opacity=".95"/>
+       <stop offset="55%" stop-color="#a06bff" stop-opacity=".6"/>
+       <stop offset="100%" stop-color="#3b1d78" stop-opacity=".9"/>
+     </radialGradient></defs>
+     <path d="M18 50h24l-4 7H22z" fill="#4a2a8c"/>
+     <circle cx="30" cy="28" r="21" fill="url(#baba-g)"/>
+     <circle class="baba-orbe-luz" cx="30" cy="28" r="21" fill="none" stroke="#e6d4ff" stroke-width="1.2"/>
+     <ellipse cx="23" cy="20" rx="6.5" ry="4" fill="#fff" opacity=".3" transform="rotate(-28 23 20)"/>
+    </svg>
+    <div>
+     <div class="page-title">LA CASA DE URANAI BABA</div>
+     <div class="page-sub">// los códigos de promoción · tabla promos_codigos</div>
+    </div>
+   </div>
+   <div style="display:flex;gap:8px;flex-wrap:wrap">
+    <button class="btn btn-ghost" onclick="babaImportar()" id="baba-btn-traer">Traer del catálogo</button>
+    <button class="btn" onclick="babaFichaAbrir(null)">+ Código nuevo</button>
+   </div>
+  </div>
+
+  <!-- 🔒 Lo que esta pantalla NO hace todavía, dicho a la vista: la tabla es el
+       cajero, pero el index sigue leyendo su propio `var PROMOS` hasta UB-2. -->
+  <div class="baba-aviso" style="margin-bottom:14px">
+   Aquí se gobiernan los códigos. <b>Todavía no se publican al sitio</b> — eso llega en UB-2.
+   Por ahora el cliente sigue viendo el registro que vive en el <code>index.html</code>.
+  </div>
+
+  <div class="gz-filters" style="margin-bottom:14px">
+   <button class="gz-filter active" id="babaf-vigentes" onclick="babaFiltrar('vigentes',this)">// vigentes</button>
+   <button class="gz-filter" id="babaf-pronto" onclick="babaFiltrar('pronto',this)">// por empezar</button>
+   <button class="gz-filter" id="babaf-sinfecha" onclick="babaFiltrar('sinfecha',this)">// sin vencimiento</button>
+   <button class="gz-filter" id="babaf-vencidos" onclick="babaFiltrar('vencidos',this)">// vencidos</button>
+   <button class="gz-filter" id="babaf-todos" onclick="babaFiltrar('todos',this)">// todos</button>
+  </div>
+
+  <div id="baba-lista"><div class="loading-state"><div class="spinner"></div>Consultando las esferas…</div></div>
  </div>
 
  <div class="page" id="page-esferas">

@@ -3925,3 +3925,89 @@ input[type="search"],.kh-buscar,.buscador{border-radius:var(--r-sm,8px)}
 .cob-feed-x { font-size: 10.5px; color: var(--ts); margin-top: 3px; font-style: italic; }
 .cob-feed-vacio { font-size: 11.5px; color: var(--ts); line-height: 1.5; }
 .cob-feed-foto { font-size: 11px; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   [UB-1] LA CASA DE URANAI BABA — el acento propio de la adivina.
+   Mismo patrón que Guerreros Z: la pantalla tiene SU color y su textura, sobre
+   los mismos huesos de la casa. NO toca los 7 temas personales ni la tipografía
+   (Rajdhani/Zen Dots siguen mandando en todo el Palacio).
+   🔒 Lo que anima POR FRAME usa solo `transform` y `opacity` — la regla de la
+   casa. El resplandor de la bola es `opacity`; el flotar es `translateY`.
+   ═══════════════════════════════════════════════════════════════════════════ */
+#page-baba{
+  --baba:#a06bff; --baba2:#c9a2ff; --baba3:#6d3bd4;
+}
+/* ⚠️ AQUÍ HABÍA UN `#page-baba .page-title{color:…}` Y SE RETIRÓ. Por
+   especificidad (1 id + 1 clase) le GANABA a `body.tema-x .page-title`, así
+   que en esta pantalla el rosa de Ximena o el lila de Luis se perdían: eso
+   SÍ es tocar los 7 temas personales. GZ no lo hace —su acento vive en las
+   clases `.gz-*`, nunca en el título— y Baba hace lo mismo: el violeta va
+   en la bola, las fichas y los chips; el título es de quien lo mira.
+   Medido: era la ÚNICA regla `#page-* .page-title` del archivo. */
+
+/* La bola de cristal del encabezado. Decorativa: se marca aria-hidden. */
+.baba-orbe{
+  width:56px;height:56px;flex:0 0 56px;position:relative;
+  animation:babaFlota 5.5s ease-in-out infinite;
+}
+@keyframes babaFlota{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}
+.baba-orbe-luz{animation:babaLuz 4s ease-in-out infinite}
+@keyframes babaLuz{0%,100%{opacity:.35}50%{opacity:.9}}
+@media (prefers-reduced-motion:reduce){
+  .baba-orbe{animation:none}
+  .baba-orbe-luz{animation:none;opacity:.6}
+}
+
+/* La ficha de un código. Hermana de .gz-card: mismo bisel, otro color. */
+.baba-card{
+  position:relative;background:var(--bg2);border:1px solid var(--border);
+  transition:border-color .2s, transform .2s, box-shadow .2s;
+  clip-path:polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 12px 100%, 0 calc(100% - 12px));
+}
+.baba-card::before{
+  content:'';position:absolute;inset:0;pointer-events:none;
+  background:radial-gradient(90% 130% at 100% 0%, rgba(160,107,255,.10), transparent 62%);
+}
+.baba-card:hover{border-color:rgba(160,107,255,.38);transform:translateY(-2px);
+  box-shadow:0 8px 30px rgba(109,59,212,.20)}
+.baba-card-in{position:relative;z-index:1;padding:14px 16px}
+.baba-codigo{
+  font-family:'Zen Dots',Rajdhani,sans-serif;font-size:15px;letter-spacing:.06em;
+  color:var(--baba2);word-break:break-all;
+}
+.baba-unidad{
+  font-family:Rajdhani,sans-serif;font-weight:700;font-size:12px;letter-spacing:.1em;
+  text-transform:uppercase;padding:2px 9px;border:1px solid rgba(160,107,255,.4);
+  color:var(--baba2);background:rgba(160,107,255,.10);white-space:nowrap;
+}
+.baba-unidad.pesos{border-color:rgba(136,234,78,.45);color:var(--green);background:rgba(136,234,78,.10)}
+.baba-unidad.pareja{border-color:rgba(255,183,3,.45);color:var(--gold);background:rgba(255,183,3,.10)}
+.baba-estado{font-family:Rajdhani,sans-serif;font-weight:700;font-size:11px;
+  letter-spacing:.12em;text-transform:uppercase;white-space:nowrap}
+.baba-estado.vive{color:var(--green)}
+.baba-estado.pronto{color:var(--gold)}
+.baba-estado.murio{color:var(--ts)}
+.baba-estado.siempre{color:var(--baba2)}
+
+/* Las tres formas de descontar, como elección EXCLUYENTE. El motor ya lo exige
+   (`num_nonnulls(monto,pct,segundo_pax)=1`); esta pantalla lo tiene que DECIR:
+   tres tarjetas grandes, una sola encendida, y los campos de las otras dos
+   apagados. No dos casillas que se puedan marcar juntas. */
+.baba-unidades{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:0 0 4px}
+@media (max-width:640px){.baba-unidades{grid-template-columns:1fr}}
+.baba-uni{
+  background:var(--bg3);border:1px solid var(--border);padding:12px 14px;cursor:pointer;
+  text-align:left;font-family:inherit;color:var(--ts);transition:border-color .2s, color .2s, background .2s;
+}
+.baba-uni:hover{border-color:rgba(160,107,255,.3)}
+.baba-uni.on{border-color:var(--baba);background:rgba(160,107,255,.10);color:var(--text)}
+.baba-uni-t{font-family:Rajdhani,sans-serif;font-weight:700;font-size:13.5px;letter-spacing:.06em;
+  text-transform:uppercase;display:block;margin-bottom:3px}
+.baba-uni.on .baba-uni-t{color:var(--baba2)}
+.baba-uni-d{font-size:11px;line-height:1.45;display:block}
+
+.baba-aviso{
+  border:1px solid rgba(160,107,255,.28);background:rgba(160,107,255,.07);
+  padding:10px 13px;font-size:11.5px;line-height:1.55;color:var(--ts);
+}
+.baba-aviso b{color:var(--baba2)}

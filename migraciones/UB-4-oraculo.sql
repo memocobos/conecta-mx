@@ -159,6 +159,24 @@ comment on function promos_oraculo() is
   'split_part(evento_id,'':'',1); códigos solo con codigo_aplicado no nulo; hoy en Reynosa. '
   'Una lectura sin dato sale nublada con su motivo, nunca rellena.';
 
+-- ═══ EL CANDADO ═══════════════════════════════════════════════════════════
+-- 🔒 AGREGADO POR JANE AL CORRERLA, y hacía falta: un `create function` en el
+-- esquema `public` nace EJECUTABLE POR PUBLIC, y en Supabase eso significa que
+-- `anon` la alcanza por `/rest/v1/rpc/`. La anon key vive en el `index.html`
+-- —es pública por diseño—, así que sin este bloque cualquiera que viera el
+-- código fuente podía pedirle sus lecturas al oráculo.
+--
+-- No es que el oráculo devuelva datos personales (no devuelve: son agregados),
+-- es que es el tablero del negocio. Y el candado no cuesta nada.
+--
+-- El patrón de la casa: `increment_event_click` ya vivía así —solo
+-- `service_role`—, y todo lo que se llame desde una función de Netlify debe
+-- hacerlo, porque esas funciones usan la service key y no necesitan más.
+revoke execute on function promos_oraculo() from public;
+revoke execute on function promos_oraculo() from anon;
+revoke execute on function promos_oraculo() from authenticated;
+grant  execute on function promos_oraculo() to service_role;
+
 -- ═══ HUMO ═══════════════════════════════════════════════════════════════════
 do $$
 declare j jsonb; n int; nub int;
@@ -184,5 +202,13 @@ begin
                and (jsonb_array_length(x->'items')=0 or coalesce(x->>'fuente','')='')) then
     raise exception 'FALLA: una lectura que habla sin items o sin fuente';
   end if;
-  raise notice 'HUMO OK · 6 lecturas · % nubladas con motivo y sin items · las que hablan traen fuente', nub;
+  -- 🔒 y el candado, comprobado en la misma sesión: si `anon` la alcanza, la
+  -- migración NO se queda.
+  if has_function_privilege('anon', 'promos_oraculo()', 'EXECUTE') then
+    raise exception 'FALLA: anon TODAVÍA puede ejecutar promos_oraculo()';
+  end if;
+  if not has_function_privilege('service_role', 'promos_oraculo()', 'EXECUTE') then
+    raise exception 'FALLA: service_role NO puede ejecutar promos_oraculo() — la función queda muerta';
+  end if;
+  raise notice 'HUMO OK · 6 lecturas · % nubladas con motivo y sin items · las que hablan traen fuente · anon NO alcanza el RPC', nub;
 end $$;

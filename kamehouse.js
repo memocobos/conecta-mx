@@ -24053,10 +24053,30 @@ const BABA_VOZ = {
     pre: null,   // no se propone un código nuevo: se arregla el que rebota
     revisar: it.codigo,
   }),
+  // [ORACULO-FIX-1] La lectura honesta de lo que AÚN NO SE VENDE. No es una
+  // promo —no hay precio que descontar— sino la acción que SÍ existe: publicarlo,
+  // y entonces la lista de espera avisa sola (WL-1). Ni se omite ni se le receta
+  // un código imposible.
+  // 🔒 Y «no se vende» son DOS cosas: la voz cambia según cuál. Decirle «cuando
+  // lo publiques» a un evento AGOTADO sería la misma mentira que Jane cazó, un
+  // piso más abajo — ya está publicado.
+  R2B: it => ({
+    dice: it.fase === 'aun_no'
+      ? `Veo ${it.espera} almas esperando a ${it.nombre || it.slug}, y todavía no sale a la venta` +
+        (it.status ? ` (${it.status})` : '') + `. ` +
+        `Aquí no hay precio que descontar: cuando lo publiques, la lista de espera les avisará sola.`
+      : `Veo ${it.espera} almas esperando a ${it.nombre || it.slug}, pero ya no se está vendiendo` +
+        (it.status ? ` (${it.status})` : ' — sin una sola zona libre') + `. ` +
+        `Un código no les serviría de nada: lo que esperan es lugar, no descuento.`,
+    cifras: `${it.espera} en lista de espera · ${it.sin_notif} sin notificar · ${it.vistas} vistas 7d`,
+    pre: null,   // 🔒 NUNCA una propuesta de código sobre algo que no se vende
+    esperar: it.slug,
+  }),
   R4: it => ({
     dice: `${it.nombre || it.slug} canta en ${it.dias} ${it.dias === 1 ? 'día' : 'días'} y quedan ` +
           `${it.inventario} ${it.inventario === 1 ? 'boleto' : 'boletos'} sin dueño. El tiempo ya no está de tu lado.`,
-    cifras: `faltan ${it.dias} días · ${it.inventario} boletos en inventario`,
+    cifras: `faltan ${it.dias} días · ${it.inventario} boletos disponibles` +
+            (it.zonas_con_lugar ? ` en ${it.zonas_con_lugar} ${it.zonas_con_lugar === 1 ? 'zona' : 'zonas'}` : ''),
     pre: { unidad: 'pesos', monto: 300, evento: it.slug, desc: `$300 de descuento` },
   }),
 };
@@ -24097,7 +24117,9 @@ function _babaPintarOraculo(o) {
           ${_escCtr(v.cifras)}</div>
         <div style="margin-top:8px">${
           v.pre ? `<button class="btn btn-ghost" style="padding:4px 12px;font-size:11px;color:var(--baba2);border-color:rgba(160,107,255,.35)" onclick="babaPreparar('${id}')">Preparar el código…</button>`
-                : `<button class="btn btn-ghost" style="padding:4px 12px;font-size:11px" onclick="babaFichaAbrir('${_escCtr(v.revisar)}')">Revisar ${_escCtr(v.revisar)}</button>`
+          : v.revisar ? `<button class="btn btn-ghost" style="padding:4px 12px;font-size:11px" onclick="babaFichaAbrir('${_escCtr(v.revisar)}')">Revisar ${_escCtr(v.revisar)}</button>`
+          : v.esperar ? `<button class="btn btn-ghost" style="padding:4px 12px;font-size:11px" onclick="showPage('esferas')">Ver ${_escCtr(v.esperar)} en Esferas</button>`
+          : ''
         }</div></div>`;
     }).join('');
     return `<div class="baba-card" style="margin-bottom:12px"><div class="baba-card-in">

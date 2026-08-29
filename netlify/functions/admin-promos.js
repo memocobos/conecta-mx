@@ -30,6 +30,13 @@ const { verifyAdminAuthLive, corsCheck } = require('./_lib/verify-admin');
 // fuente. Aquí solo se lee la fila y se devuelve el payload; QUIEN ESCRIBE es
 // `esferas-actualizar`, el mismo endpoint que usa Esferas.
 const { filaALetrero } = require('./_lib/promos-compile');
+// [ORACULO-FIX-1] LA CUENTA DE INVENTARIO SE LE PIDE A SU DUEÑO. R4 decía
+// «Calle 24: 17 boletos» y quedan 7: restaba `vendidos_fuera` pero no a los
+// viajeros que consumen boleto. El dueño de esa cuenta es `_lib/disponibilidad`
+// —`compradas − fuera − seguras − apartadas − migrados`, y su término de
+// migrados ya pasa por `consumeBoleto`—, así que se le pide, no se recalcula.
+// Es la misma regla que rige a las pantallas: ninguna calcula su propia cuenta.
+const { cargarDisponibilidad, desgloseZona } = require('./_lib/disponibilidad');
 
 const SB_URL = 'https://npgnhsmwpcipxgvfxrho.supabase.co';
 const SB_KEY = process.env.SUPABASE_SERVICE_KEY_KAMEHOUSE;
@@ -161,7 +168,13 @@ exports.handler = async (event) => {
         }
         return upstream(headers, t, 'consulta al oráculo');
       }
-      return resp(200, headers, { ok: true, oraculo: await r.json() });
+      const oraculo = await r.json();
+      // 🔒 R4 llega del SQL SIN inventario, marcada `pendiente_inventario`. Se
+      // completa aquí con el lib dueño, evento por evento. Si un evento no
+      // tiene stock cargado, `desgloseZona` devuelve `disponibles: null` y esa
+      // zona NO suma: un número negativo mudo es peor que no dar número.
+      await _oraculoInventario(oraculo, sb);
+      return resp(200, headers, { ok: true, oraculo });
     }
 
     if (accion === 'letrero_payload') {
@@ -299,6 +312,36 @@ function recortar(s) {
   try { const j = JSON.parse(t); return (j.message || j.details || t).slice(0, 160); }
   catch (e) { return t.slice(0, 160); }
 }
+// [ORACULO-FIX-1] Completa R4 con la cuenta del dueño.
+async function _oraculoInventario(oraculo, sb) {
+  const r4 = (oraculo.lecturas || []).find(l => l && l.regla === 'R4');
+  if (!r4 || !r4.pendiente_inventario) return;
+  const cand = Array.isArray(r4.items) ? r4.items : [];
+  const vivos = [];
+  for (const it of cand) {
+    try {
+      const disp = await cargarDisponibilidad({
+        khUrl: SB_URL, khKey: SB_KEY,
+        portalUrl: process.env.PORTAL_SUPABASE_URL, portalKey: process.env.PORTAL_SUPABASE_SERVICE,
+        evento_id: it.slug,
+      });
+      if (!disp || disp.error || !disp.gestionado) continue;   // sin stock cargado: no se opina
+      let total = 0, zonas = 0;
+      for (const z of Object.keys(disp.stockPorZona || {})) {
+        const d = desgloseZona(disp, z);
+        if (d && Number.isFinite(d.disponibles) && d.disponibles > 0) { total += d.disponibles; zonas++; }
+      }
+      if (total > 0) vivos.push({ ...it, inventario: total, zonas_con_lugar: zonas });
+    } catch (e) { /* un evento que no se puede contar no inventa un número */ }
+  }
+  r4.items = vivos;
+  r4.pendiente_inventario = false;
+  r4.ciegos = cand.length - vivos.length;
+  r4.nublado = vivos.length === 0;
+  if (r4.nublado) r4.motivo = 'no hay inventario capturado en los eventos que se acercan';
+  r4.fuente = 'esferas_eventos.fecha_inicio + _lib/disponibilidad (el dueño de la cuenta)';
+}
+
 function resp(statusCode, headers, obj) {
   return { statusCode, headers, body: JSON.stringify(obj) };
 }

@@ -219,7 +219,17 @@ function compilarPROMOS({ codigos, indexHtml }) {
     nuevo = nuevo.slice(0, corte) + texto + nuevo.slice(corte);
   }
 
-  // 3) 🔒 el update no puede fallar en silencio
+  // 3) 🔒 EL UPDATE NO PUEDE FALLAR EN SILENCIO.
+  //
+  // ⚠️ HOY ESTA GUARDA ES INALCANZABLE, y se deja a propósito. El escritor hace
+  // un empalme exacto sobre el tramo que `localizarCodigo` devolvió, así que
+  // re-localizar y comparar siempre casa; y si no localizara, ya habría
+  // tronado arriba. Medido: una sonda que la apaga no rompe ninguna aserción.
+  // Se queda porque es la red del día que alguien cambie el escritor —a
+  // Esferas le hace falta de verdad, porque su `reemplazarEnEV` devuelve el
+  // contenido INTACTO cuando no localiza, y eso pasaba por éxito—. Está
+  // anotado para que nadie la "limpie" creyendo que sobra, y para que nadie
+  // crea que protege algo hoy.
   for (const it of aActualizar) {
     const b = localizarBloque(nuevo);
     const p = localizarCodigo(nuevo.slice(b.start, b.end), it.codigo);

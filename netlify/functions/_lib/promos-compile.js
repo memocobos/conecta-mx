@@ -295,7 +295,66 @@ function validar(html, antes, gobernados) {
   return { ok: problemas.length === 0, problemas, total: Object.keys(ahora).length };
 }
 
+// ═══ [UB-3] LA FILA → EL LETRERO ═══════════════════════════════════════════
+// Deriva el `flash_promo` de Esferas desde LA MISMA FILA de `promos_codigos`.
+//
+// 🔒 JAMÁS SE RECAPTURA. Volver a teclear el monto para el letrero es la puerta
+// de vuelta de la mordida NATA: alguien escribiría 500 en el campo del
+// porcentaje y el letrero prometería 500% mientras el cajero cobra $500. La
+// unidad SALE DE LA FILA, y de ningún otro sitio.
+//
+// Y hay DOS LETREROS QUE NO SE PUEDEN ESCRIBIR — se dicen, no se silencian:
+//   · una promo de PAREJA no cabe: `parseFlashPromo` exige `pct` o `amount`, y
+//     «el segundo paga $2,700» no es ninguno de los dos;
+//   · una promo SIN VENCIMIENTO tampoco: exige `expiresTs`, y el letrero lleva
+//     cronómetro. AIT-1 y MEMODALE están en ese caso a propósito.
+function filaALetrero(fila) {
+  if (!fila || !fila.codigo) return { ok: false, motivo: 'fila vacía' };
+  if (fila.segundo_pax) {
+    return { ok: false, motivo: 'Las promos de pareja no caben en el letrero: el badge lleva un descuento (pesos o %), y «el segundo paga X» no es ninguno de los dos.' };
+  }
+  if (!fila.expires_at) {
+    return { ok: false, motivo: 'El letrero lleva cronómetro, así que necesita vencimiento. Este código no tiene, a propósito.' };
+  }
+  const ts = Date.parse(fila.expires_at);
+  if (!Number.isFinite(ts) || ts <= 0) return { ok: false, motivo: 'el vencimiento no se entiende' };
+
+  const fp = { code: fila.codigo, expiresTs: ts };
+  if (fila.pct != null) fp.pct = Math.round(Number(fila.pct));
+  else if (fila.monto != null) fp.amount = Math.round(Number(fila.monto));
+  else return { ok: false, motivo: 'el código no tiene ni pesos ni porcentaje' };
+  if (Array.isArray(fila.exclude_pkg) && fila.exclude_pkg.length) fp.excludePkg = fila.exclude_pkg;
+
+  // El badge: se DERIVA de la misma unidad, con la misma cifra.
+  const cifra = fp.pct != null ? `${fp.pct}% DE DESCUENTO` : `$${Number(fp.amount).toLocaleString('es-MX')} DE DESCUENTO`;
+  const label = `USA CODIGO ${fila.codigo} ${cifra}`;
+
+  // A qué eventos. `all_events` no puede encender letreros: sería poner el badge
+  // en los 105 eventos del catálogo de un clic, y eso no se hace sin decirlo.
+  if (fila.all_events) {
+    return { ok: false, motivo: 'Este código vale en TODOS los eventos: encender el letrero pondría el badge en el catálogo entero. Enciéndelo evento por evento desde Esferas si lo quieres.' };
+  }
+  const slugs = Array.isArray(fila.only_events) ? fila.only_events.filter(Boolean) : [];
+  if (!slugs.length) return { ok: false, motivo: 'el código no nombra ningún evento' };
+  if (fila.only_events && fila.only_events.length > 1) fp.onlyEvent = slugs[0];
+
+  return {
+    ok: true,
+    flashPromo: fp,
+    // lo que se le manda a `esferas-actualizar`, por evento. Se escribe POR SU
+    // CAMINO: este lib solo arma el payload, no toca la tabla.
+    payloads: slugs.map(slug => ({
+      slug,
+      flash_promo: JSON.stringify(fp),
+      promo: true,
+      promo_code: fila.codigo,
+      promo_label: label,
+    })),
+  };
+}
+
 module.exports = {
+  filaALetrero,
   compilarPROMOS, generarEntrada, filaAObjeto, localizarCodigo, localizarBloque,
   evaluarPROMOS, validar, CAMPOS_DEL_COMPILADOR, ORDEN, _ser: ser, _escStr: escStr,
 };

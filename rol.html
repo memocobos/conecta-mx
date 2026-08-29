@@ -1675,7 +1675,10 @@ function toast(msg){
 }
 
 // ── State ────────────────────────────────────
-var state = { ev:null, fi:null, pkg:null, zona:null, hab:null, transporte:null, sepDate:null, precio:null, sepMonto:null, sepTouched:false, plan:null, user:null, tours:[], view:'onboarding' };
+// [ROL-FALLBACK-1] `promosOk` nace en null —«todavía no sé»— y NO en true: un
+// default optimista haría que un fallo de carga se leyera como catálogo sano.
+// Solo el `=== false` explícito dispara el aviso.
+var state = { promosOk:null, ev:null, fi:null, pkg:null, zona:null, hab:null, transporte:null, sepDate:null, precio:null, sepMonto:null, sepTouched:false, plan:null, user:null, tours:[], view:'onboarding' };
 
 // ── User & tours (multi-tour persistence) ────
 function loadUser(){
@@ -1715,11 +1718,21 @@ async function loadEV(){
     var res = await fetch('/index.html',{cache:'no-store'});
     if(!res.ok) throw new Error('HTTP '+res.status);
     var html = await res.text();
-    // El bloque debe llegar hasta DESPUÉS de PROMOS (línea ~1976). El marcador `var _promoActivo=null;`
-    // está justo después de PROMOS, así que ahí cortamos.
+    // El bloque debe llegar hasta DESPUÉS de PROMOS. El marcador
+    // `var _promoActivo=null;` está justo después de PROMOS, así que ahí cortamos.
+    //
+    // ⚠️ [ROL-FALLBACK-1] EL FALLBACK NO ALCANZA A PROMOS, Y ANTES NO LO DECÍA.
+    // `function $$(` vive ANTES del registro (medido: línea 2950 contra 3281),
+    // así que si el marcador final faltara, el bloque se evaluaría SIN PROMOS,
+    // el guardia `typeof PROMOS!=="undefined"?PROMOS:{}` devolvería un objeto
+    // vacío, y la pantalla contestaría «Código no válido» a TODOS los códigos
+    // del catálogo — culpando al cliente de una carga rota. Sigue habiendo
+    // fallback, porque el EV sí se salva y el rol sirve sin códigos; lo que
+    // cambia es que ahora SE DICE.
     var startIdx = html.indexOf("var WA='");
     var endIdx   = html.indexOf('var _promoActivo');
-    if(endIdx < 0) endIdx = html.indexOf('function $$('); // fallback al boundary viejo
+    var recorteCorto = false;
+    if(endIdx < 0){ endIdx = html.indexOf('function $$('); recorteCorto = true; }
     if(startIdx<0 || endIdx<0) throw new Error('Bloque EV no localizado en index.html');
     var block = html.slice(startIdx, endIdx);
     // Eval inside a function. Pass stub window for STATIC_IMGS / MAPAS / LINEUPS fallbacks.
@@ -1745,6 +1758,23 @@ async function loadEV(){
     EV=out.EV; BANCO_DEFAULT=out.BANCO_DEFAULT; BANCO_HEY=out.BANCO_HEY;
     HOTEL_STD=out.HOTEL_STD; HOTEL_CDM=out.HOTEL_CDM; HOTEL_MTY=out.HOTEL_MTY;
     PROMOS=out.PROMOS||{};
+
+    // 🔒 [ROL-FALLBACK-1] ¿Llegaron los códigos? Se le PREGUNTA AL DOCUMENTO en
+    // vez de suponerlo: si el index trae al menos un código y aquí quedaron
+    // cero, algo se rompió en el recorte. `state.promosOk` distingue después
+    // «no pude leer el catálogo» de «ese código no existe», que es justo la
+    // confusión que costaba.
+    var indexTraeCodigos = /var\s+PROMOS\s*=\s*\{\s*['"][A-Z0-9_]+['"]\s*:/.test(html);
+    state.promosOk = Object.keys(PROMOS).length > 0;
+    if(!state.promosOk && indexTraeCodigos){
+      console.error('[rol] NO SE LEYERON LOS CÓDIGOS del index.' +
+        (recorteCorto
+          ? ' El marcador `var _promoActivo` no está: el recorte cayó en `function $$(`, que va ANTES de PROMOS.'
+          : ' El recorte llegó hasta el marcador, pero PROMOS salió vacío.') +
+        ' El rol funciona; los códigos no se van a poder validar.');
+    } else if(recorteCorto){
+      console.warn('[rol] El marcador `var _promoActivo` no está en index.html: se usó el recorte de respaldo.');
+    }
     MESES=out.MESES; WA=out.WA;
     document.getElementById('ev-loading').style.display='none';
     document.getElementById('ev-search').style.display='block';
@@ -2177,6 +2207,15 @@ function revalidateCodigo(){
   if(!raw){
     msg.textContent=''; msg.className='codigo-msg';
     state.codigoPromo=null;
+    return;
+  }
+  // 🔒 [ROL-FALLBACK-1] Si el catálogo no se pudo leer, NO se dice «código no
+  // válido»: eso culpa al cliente de una falla nuestra, y con el catálogo
+  // vacío TODOS los códigos darían ese mismo mensaje.
+  if(state.promosOk === false){
+    msg.textContent = '✗ No pudimos cargar el catálogo de códigos. Escríbenos y lo aplicamos a mano.';
+    msg.className = 'codigo-msg err';
+    state.codigoPromo = null;
     return;
   }
   var result = validateCodigoLocal(raw);

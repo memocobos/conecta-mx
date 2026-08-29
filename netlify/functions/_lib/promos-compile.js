@@ -109,12 +109,41 @@ function generarEntrada(fila) {
   return `'${escStr(fila.codigo)}': {${partes.join(', ')}}`;
 }
 
-// Localiza `'CODIGO': {…}` por BALANCE, respetando literales de texto.
+// Localiza `'CODIGO': {…}` por BALANCE, respetando literales de texto Y
+// SALTANDO COMENTARIOS.
+//
+// ⚠️ LO DE LOS COMENTARIOS NO ES ADORNO: sin eso, un `// ojo con 'NATA': {…}`
+// dentro del bloque se lleva el reemplazo. Medido — el compilador escribía la
+// entrada compilada DENTRO del comentario y dejaba la entrada real intacta, así
+// que el código se quedaba con su valor viejo y nadie se enteraba. Ni siquiera
+// la guarda de «el update no puede fallar en silencio» lo veía: al re-localizar
+// volvía a encontrar el mismo sitio equivocado y casaba consigo misma.
+// Es la familia de «un prefijo no es un ancla»: la primera aparición no es la
+// entrada.
 function localizarCodigo(txt, codigo) {
-  const re = new RegExp(`'${codigo.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}'\\s*:\\s*\\{`);
-  const m = re.exec(txt);
-  if (!m) return null;
-  const ini = m.index;
+  const marca = `'${codigo}'`;
+  let ini = -1;
+  {
+    let S = false, q = '', esc = false, linea = false, bloque = false;
+    for (let i = 0; i < txt.length; i++) {
+      const c = txt[i], d = txt[i + 1];
+      if (linea) { if (c === '\n') linea = false; continue; }
+      if (bloque) { if (c === '*' && d === '/') { bloque = false; i++; } continue; }
+      if (S) { if (esc) { esc = false; continue; } if (c === '\\') { esc = true; continue; } if (c === q) S = false; continue; }
+      if (c === '/' && d === '/') { linea = true; i++; continue; }
+      if (c === '/' && d === '*') { bloque = true; i++; continue; }
+      if (c === '"') { S = true; q = c; continue; }
+      if (c === "'") {
+        // ¿es el literal del código, seguido de `:` y `{`?
+        if (txt.startsWith(marca, i)) {
+          const resto = txt.slice(i + marca.length);
+          if (/^\s*:\s*\{/.test(resto)) { ini = i; break; }
+        }
+        S = true; q = c; continue;
+      }
+    }
+  }
+  if (ini < 0) return null;
   let d = 0, S = false, q = '', esc = false;
   for (let i = txt.indexOf('{', ini); i < txt.length; i++) {
     const c = txt[i];

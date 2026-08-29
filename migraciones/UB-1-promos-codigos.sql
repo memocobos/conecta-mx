@@ -6,9 +6,17 @@
 -- index.html), el letrero (`flash_promo` en Esferas) y el badge— y solo la
 -- primera cobra. Esta tabla es el cajero, gobernado desde el Palacio.
 --
--- FIRMADO POR JANE (28-ago-2026) con dos correcciones suyas, ambas incorporadas:
---   1. el CHECK de unidad contempla a las promos de PAREJA;
+-- ✅ CORRIDA POR JANE EL 28-ago-2026 EN KAMEHOUSE. Humo en verde, 0 filas.
+-- Este archivo es el ACTA de lo que corrió, no una propuesta.
+--
+-- Dos correcciones de Jane sobre mi borrador, incorporadas:
+--   1. el CHECK de unidad tenía que contemplar a las promos de PAREJA — mi
+--      `num_nonnulls(monto,pct)=1` a secas habría rechazado los 7 códigos de
+--      pareja al traerlos del catálogo (medido: 5 de 12 pasaban);
 --   2. `hide_amount` existe como columna (dormida, sin interfaz).
+-- Y una corrección mía sobre la suya, que ella firmó al correrla: la unidad se
+-- expresa con `num_nonnulls(monto, pct, segundo_pax) = 1`, que además cierra
+-- las dos hermanas de la mordida (pareja+monto y pareja+pct).
 -- ═══════════════════════════════════════════════════════════════════════════
 
 create table if not exists promos_codigos (
@@ -73,23 +81,16 @@ create table if not exists promos_codigos (
   -- 7 códigos de pareja al traerlos del catálogo —ninguno trae monto ni pct—.
   -- Un constraint que describe la expectativa en vez de la realidad se descubre
   -- el día de la migración, con los datos en la mano.
-  constraint una_sola_unidad check (
-    num_nonnulls(monto, pct) = 1
-    or (segundo_pax is not null and num_nonnulls(monto, pct) = 0)
-  ),
-  -- ⚠️ JANE: UN HUECO QUE ENCONTRÉ AL CAREAR ESTA MISMA LÍNEA, decide tú.
-  -- La forma de arriba —la que firmaste— deja pasar una PAREJA CON MONTO
-  -- (`monto:500` + `segundo_pax`) y una PAREJA CON PCT. Ningún código real las
-  -- tiene, pero son la MISMA familia que la mordida de NATA: dos unidades de
-  -- descuento en un código, y `calcular()` tendría que adivinar cuál manda.
-  -- Medido en Postgres contra los 28 códigos reales y 4 sintéticos malos:
-  --     tu forma                                    → 28/28 reales · 2/4 malos PASAN
-  --     num_nonnulls(monto, pct, segundo_pax) = 1   → 28/28 reales · 0/4 malos pasan
-  -- La segunda es más simple, más estricta y dice exactamente lo que pediste
-  -- («pesos y porcentaje jamás juntos, y sin unidad tampoco»), con segundo_pax
-  -- tratado como la tercera unidad que es. Si la quieres, se cambia la línea de
-  -- arriba por ésta y se borra este comentario:
-  --   constraint una_sola_unidad check (num_nonnulls(monto, pct, segundo_pax) = 1),
+  -- 🔒 UNA SOLA UNIDAD DE DESCUENTO, y `segundo_pax` ES LA TERCERA.
+  -- No es «monto XOR pct con una excepción para parejas»: son tres formas de
+  -- decir cuánto se descuenta —pesos, porcentaje, o el precio fijo del segundo
+  -- viajero— y un código elige EXACTAMENTE UNA. Así la mordida de NATA
+  -- (`pct:500` queriendo decir «$500») es imposible desde el motor, y también
+  -- lo son sus hermanas: una pareja con monto, una pareja con pct, y un código
+  -- sin ninguna unidad.
+  -- Careado en Postgres contra los 28 códigos REALES del index y 4 sintéticos
+  -- malos: 28/28 reales pasan · 0/4 malos pasan.
+  constraint una_sola_unidad check (num_nonnulls(monto, pct, segundo_pax) = 1),
   -- `pct_cheap` es un matiz de `pct`: sin porcentaje base no significa nada.
   constraint cheap_pide_pct check (pct_cheap is null or pct is not null),
   -- Alcance explícito: o nombra sus eventos o dice `all_events`. Nunca los dos,
@@ -162,6 +163,24 @@ begin
     ('_HUMO_ENJAMBRE', 'humo', array['enjambre'],      '{"plus":2700}'::jsonb, 2, to_timestamp(1787634000)),
     ('_HUMO_BADGYAL',  'humo', array['badgyal'],       '{"plus":2700}'::jsonb, 2, to_timestamp(1787634000)),
     ('_HUMO_SCORP',    'humo', array['scorpions'],     '{"plus":2700}'::jsonb, 2, to_timestamp(1787634000));
+  -- (5b) PAREJA CON MONTO: DEBE reventar. Es EL caso que distingue este
+  --      constraint del anterior —aquél la dejaba pasar— y por eso lleva sonda
+  --      propia: dos unidades de descuento en un código, y `calcular()`
+  --      tendría que adivinar cuál manda.
+  begin
+    insert into promos_codigos (codigo, monto, desc_texto, only_events, segundo_pax, exact_personas)
+      values ('_HUMO_PAREJA_MONTO', 500, 'humo', array['calle24'], '{"plus":2700}'::jsonb, 2);
+    raise exception 'FALLA: el constraint dejó pasar una PAREJA CON MONTO';
+  exception when check_violation then null;
+  end;
+  -- (5c) y una PAREJA CON PCT, la hermana del caso de arriba
+  begin
+    insert into promos_codigos (codigo, pct, desc_texto, only_events, segundo_pax, exact_personas)
+      values ('_HUMO_PAREJA_PCT', 10, 'humo', array['calle24'], '{"plus":2700}'::jsonb, 2);
+    raise exception 'FALLA: el constraint dejó pasar una PAREJA CON PCT';
+  exception when check_violation then null;
+  end;
+
   -- (6) GOL, el único `all_events`, y AIT-1/MEMODALE, los únicos SIN vencimiento
   insert into promos_codigos (codigo, monto, desc_texto, all_events, starts_at, expires_at)
     values ('_HUMO_GOL', 500, 'humo', true, to_timestamp(1782882000), to_timestamp(1782968400));
@@ -169,5 +188,5 @@ begin
     values ('_HUMO_SINFECHA', 10, 'humo', array['dalemix']);
 
   delete from promos_codigos where codigo like '\_HUMO\_%';
-  raise notice 'HUMO OK · pesos pasa · pareja pasa · monto+pct revienta · sin unidad revienta · los 7 de pareja reales entran · GOL (all_events) entra · un codigo SIN vencimiento entra';
+  raise notice 'HUMO OK · pesos pasa · pareja pasa · los 7 de pareja reales entran · GOL (all_events) entra · un codigo SIN vencimiento entra · REVIENTAN: monto+pct, sin unidad, pareja+monto, pareja+pct';
 end $$;

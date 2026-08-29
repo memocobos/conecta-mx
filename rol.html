@@ -2143,16 +2143,37 @@ function validateCodigoLocal(rawCode){
   var c = String(rawCode).toUpperCase().trim();
   var p = PROMOS && PROMOS[c];
   if(!p) return {ok:false,msg:'Código no válido'};
-  // NO validamos expiresTs / expires / singleUse / maxUsos:
-  // este flujo reconstruye el rol histórico — si el cliente usó el código cuando estaba vigente,
-  // debe poder ver su precio real aunque el código ya haya expirado o se haya agotado.
-  // Restricciones por evento
+  // ═══ [ROL-PROMO-1] ESTE ESPEJO SE ALINEA CON `validarPromo` DEL index ═══
+  // Lo que se omite se omite CON SU RAZÓN ESCRITA. Lo que no estaba escrito
+  // eran omisiones silenciosas, y una de ellas cobraba de más.
+  //
+  // NO se valida expiresTs / expires / startTs / singleUse / maxUsos / usos:
+  // este flujo reconstruye el rol HISTÓRICO — si el cliente usó el código
+  // cuando estaba vigente, debe ver su precio real aunque hoy esté vencido,
+  // agotado o (startTs) aún no hubiera arrancado. `startTs` es de esta misma
+  // familia y hasta hoy faltaba sin decirlo.
+
+  // 🔒 PROMOS DE GRUPO: aquí se RECHAZAN, y ésa es la corrección.
+  // `segundoPax` y `exactPersonas` describen un trato de DOS personas ("el
+  // segundo paga $2,700"), y este rol es POR PERSONA: no existe un segundo
+  // pasajero al que aplicarle nada. Antes pasaban la validación y caían al
+  // descuento cero —`disc = amount||0` con ambos ausentes— así que la pantalla
+  // decía "código aplicado" y cobraba el precio COMPLETO. Son 7 códigos.
+  // El index ya tenía escrita esta misma regla: un código que dice "sí" sin
+  // mover un peso es PEOR que uno que dice "no".
+  if(p.segundoPax || p.exactPersonas){
+    return {ok:false,msg:'El código '+c+' es una promoción de pareja: aplícala en el sitio, no en el rol por persona'};
+  }
+
+  // Restricciones por evento. `allEvents` salta la comprobación, igual que en
+  // el index — sin esto, GOL (el único allEvents) se rechazaba en todo evento
+  // que no tuviera `promo:true`.
   if(p.onlyEvent || p.onlyEvents){
     var allowed = p.onlyEvents || [p.onlyEvent];
     if(!state.ev || allowed.indexOf(state.ev.id)<0){
       return {ok:false,msg:'Este código no aplica a este evento'};
     }
-  } else {
+  } else if(!p.allEvents){
     // Código general (sin onlyEvent): el evento debe tener flag promo:true
     if(state.ev && !state.ev.promo) return {ok:false,msg:'Este código no aplica a este evento'};
   }
@@ -2166,7 +2187,21 @@ function validateCodigoLocal(rawCode){
       return {ok:false,msg:'Código exclusivo para zona: '+p.onlyZones.join(' / ')};
     }
   }
-  return {ok:true, pct:p.pct||0, amount:p.amount||0, desc:p.desc, customMsg:p.customMsg||null, code:c};
+  // Zonas VETADAS por evento. Hoy ningún código la usa, pero la rama existe en
+  // el index y el compilador puede emitirla: sin esto, el rol daría descuento
+  // en una zona que el sitio veta.
+  if(p.excludeZones && state.zona && state.ev){
+    var _exz = p.excludeZones[state.ev.id];
+    if(_exz && _exz.indexOf(state.zona.n)>=0){
+      return {ok:false,msg:'El código '+c+' no aplica en la zona '+state.zona.n};
+    }
+  }
+  // `pctCheap`: porcentaje distinto para CHEAP. Dormida hoy (0 códigos), viva
+  // en `calcular()` del index. Si se ignora, un código con pctCheap daría en el
+  // rol el porcentaje de PLUS sobre un precio CHEAP.
+  var _pct = (state.pkg === 'cheap' && p.pctCheap) ? p.pctCheap : (p.pct || 0);
+  return {ok:true, pct:_pct, amount:p.amount||0, desc:p.desc,
+          customMsg:p.customMsg||null, code:c, hideAmount:p.hideAmount||false};
 }
 
 function revalidateCodigo(){

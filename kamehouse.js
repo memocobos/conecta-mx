@@ -23512,6 +23512,7 @@ let _babaCodigos = [];
 let _babaFiltro = 'vigentes';
 let _babaEditando = null;   // el código abierto en la ficha, o null si es nuevo
 let _babaUnidad = null;     // 'pesos' | 'pct' | 'pareja'
+let _babaReintento = false; // freno del reintento del catálogo
 
 // 🔒 EL RELOJ DE REYNOSA. Las vigencias se TECLEAN en hora de Reynosa y se
 // GUARDAN como instante. Reynosa sigue el horario de EE.UU. (America/Matamoros),
@@ -23670,7 +23671,12 @@ function babaFichaAbrir(codigo) {
   _babaEditando = c ? c.codigo : null;
   _babaUnidad = c ? _babaUnidadDe(c).k : null;
 
-  const evs = (window._contratosEVCache || []).length ? window._contratosEVCache : null;
+  // ⚠️ `_contratosEVCache` es un `let` DE NIVEL SUPERIOR: NO vive en `window`.
+  // Leerlo como `window._contratosEVCache` daba siempre null y la ficha se
+  // llamaba a sí misma para siempre. Tercera vez que muerde en esta casa —
+  // la variable, a secas.
+  const evs = (typeof _contratosEVCache !== 'undefined' && (_contratosEVCache || []).length)
+    ? _contratosEVCache : null;
   const cont = document.getElementById('baba-lista');
   cont.innerHTML = `
    <div class="baba-card" style="margin-bottom:14px"><div class="baba-card-in" style="padding:20px">
@@ -23795,7 +23801,13 @@ function babaFichaAbrir(codigo) {
    </div></div>`;
 
   if (_babaUnidad) babaUnidad(_babaUnidad);
-  if (!evs) _fetchEVFromIndex().then(() => babaFichaAbrir(codigo)).catch(() => {});
+  // Y con freno: si tras traer el catálogo sigue vacío, se pinta el aviso y se
+  // para. Un reintento sin condición de salida es el bucle de arriba otra vez.
+  if (!evs && !_babaReintento) {
+    _babaReintento = true;
+    _fetchEVFromIndex().then(() => { _babaReintento = false; babaFichaAbrir(codigo); })
+                       .catch(() => { _babaReintento = false; });
+  }
 }
 
 // 🔒 LA ELECCIÓN EXCLUYENTE, hecha visible: encender una APAGA las otras dos y

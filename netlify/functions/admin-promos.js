@@ -50,6 +50,8 @@ const ACCIONES = {
   // `esferas-actualizar`. Un segundo escritor sobre `esferas_eventos` sería
   // la fórmula número doce esperando a divergir.
   letrero_payload: SOLO_ROSHI,
+  // [UB-4] Las lecturas del oráculo. SOLO LEE: Baba propone, jamás crea.
+  oraculo: SOLO_ROSHI,
 };
 
 const CODIGO_RE = /^[A-Z0-9_]{2,32}$/;
@@ -141,6 +143,25 @@ exports.handler = async (event) => {
       const filas = await r.json();
       if (!filas.length) return resp(404, headers, { error: `El código ${codigo} no existe` });
       return resp(200, headers, { ok: true, codigo: filas[0] });
+    }
+
+    if (accion === 'oraculo') {
+      // 🔒 BABA PROPONE, JAMÁS CREA. Esta acción es de LECTURA PURA: llama al
+      // RPC y devuelve lo que dijo. No inserta, no publica, no enciende nada —
+      // el clic siempre es de Memo, sobre la ficha pre-llenada.
+      const r = await fetch(`${SB_URL}/rest/v1/rpc/promos_oraculo`, {
+        method: 'POST', headers: { ...sb, Accept: 'application/json' }, body: '{}',
+      });
+      if (!r.ok) {
+        const t = await r.text();
+        // Si el RPC no existe todavía, se DICE con su nombre en vez de un 502
+        // opaco: es la diferencia entre «falta correr el SQL» y «algo se rompió».
+        if (/promos_oraculo|PGRST202|function .* does not exist/i.test(t)) {
+          return resp(503, headers, { error: 'Las esferas aún no están talladas: falta correr `promos_oraculo()` en la base.', falta_rpc: true });
+        }
+        return upstream(headers, t, 'consulta al oráculo');
+      }
+      return resp(200, headers, { ok: true, oraculo: await r.json() });
     }
 
     if (accion === 'letrero_payload') {

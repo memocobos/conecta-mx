@@ -24015,6 +24015,144 @@ async function babaLetrero(codigo) {
   } catch (e) { showToast('No pude: ' + e.message, 'error'); }
 }
 
+// ═══ [UB-4] EL ORÁCULO ══════════════════════════════════════════════════════
+// Baba habla como adivina pero JURA COMO NOTARIO: cada frase se arma con los
+// números que el RPC devolvió, y debajo va su fuente. No hay ni un adjetivo que
+// no venga de un dato.
+//
+// 🔒 BABA PROPONE, JAMÁS CREA NI PUBLICA. Cada lectura ofrece «Preparar», que
+// abre la ficha de UB-1 PRE-LLENADA — y el clic de Crear sigue siendo de Memo.
+// Sin IA: son reglas medibles sobre datos de la casa.
+//
+// 🔒 Y SI EL DATO NO ALCANZA, SE DICE. Una lectura nublada trae su motivo y
+// CERO propuestas: rellenar sería inventarle a Memo un consejo sin respaldo.
+
+// Las frases. Cada una recibe su item y devuelve texto + la propuesta que
+// abriría la ficha. El TEXTO es donde vive el misticismo — no en el CSS.
+const BABA_VOZ = {
+  R1: it => ({
+    dice: `Mmm… ${it.slug} tiene ${it.vistas} miradas en siete días y solo ${it.comprob} ` +
+          `${it.comprob === 1 ? 'comprobante' : 'comprobantes'} (${it.pct}%). ` +
+          `Tanta mirada sin compra huele a precio… un código podría destrabarlo.`,
+    cifras: `${it.vistas} vistas · ${it.cotiz} cotizaciones · ${it.comprob} comprobantes`,
+    pre: { unidad: 'pct', pct: 5, evento: it.slug,
+           desc: `5% de descuento` },
+  }),
+  R2: it => ({
+    dice: `Veo ${it.espera} almas esperando a ${it.slug}` +
+          (it.sin_notif ? `, y ${it.sin_notif} sin avisar todavía` : ', todas ya avisadas') +
+          `. Con ${it.vistas} ${it.vistas === 1 ? 'mirada' : 'miradas'} esta semana, un código las traería de vuelta.`,
+    cifras: `${it.espera} en lista de espera · ${it.sin_notif} sin notificar · ${it.vistas} vistas 7d`,
+    pre: { unidad: 'pct', pct: 5, evento: it.slug, desc: `5% de descuento` },
+  }),
+  R3: it => ({
+    dice: `El código ${it.codigo} se intentó ${it.intentos} veces y solo ${it.validos} ` +
+          `${it.validos === 1 ? 'sirvió' : 'sirvieron'} (${it.pct}%). ` +
+          `Algo prometido no está cobrando — revísalo antes de prometer más.`,
+    cifras: `${it.intentos} intentos · ${it.validos} válidos · ${it.pct}% de acierto`,
+    pre: null,   // no se propone un código nuevo: se arregla el que rebota
+    revisar: it.codigo,
+  }),
+  R4: it => ({
+    dice: `${it.nombre || it.slug} canta en ${it.dias} ${it.dias === 1 ? 'día' : 'días'} y quedan ` +
+          `${it.inventario} ${it.inventario === 1 ? 'boleto' : 'boletos'} sin dueño. El tiempo ya no está de tu lado.`,
+    cifras: `faltan ${it.dias} días · ${it.inventario} boletos en inventario`,
+    pre: { unidad: 'pesos', monto: 300, evento: it.slug, desc: `$300 de descuento` },
+  }),
+};
+
+async function babaOraculo() {
+  const btn = document.getElementById('baba-btn-oraculo');
+  const cont = document.getElementById('baba-lista');
+  btn.disabled = true; btn.textContent = '🔮 Mirando…';
+  try {
+    const r = await khAdminFetch('/.netlify/functions/admin-promos', {
+      method: 'POST', body: JSON.stringify({ accion: 'oraculo' }),
+    });
+    const j = await r.json();
+    if (!r.ok || j.ok === false) throw new Error(j.error || ('HTTP ' + r.status));
+    _babaPintarOraculo(j.oraculo);
+  } catch (e) {
+    cont.innerHTML = `<div class="empty-state">Las esferas no contestaron: ${_escCtr(e.message)}</div>`;
+  } finally {
+    btn.disabled = false; btn.textContent = '🔮 Consultar a Baba';
+  }
+}
+
+function _babaPintarOraculo(o) {
+  const cont = document.getElementById('baba-lista');
+  const lecturas = (o && o.lecturas) || [];
+  const hablan = lecturas.filter(l => !l.nublado);
+  const nubladas = lecturas.filter(l => l.nublado);
+
+  const tarjeta = (l) => {
+    const items = (l.items || []).map((it, i) => {
+      const v = BABA_VOZ[l.regla] && BABA_VOZ[l.regla](it);
+      if (!v) return '';
+      const id = `${l.regla}-${i}`;
+      _babaPropuestas[id] = v.pre || null;
+      return `<div style="padding:12px 0;border-top:1px solid var(--border)">
+        <div style="font-size:14px;line-height:1.6;color:var(--text)">🔮 ${_escCtr(v.dice)}</div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--ts);margin-top:6px;letter-spacing:.04em">
+          ${_escCtr(v.cifras)}</div>
+        <div style="margin-top:8px">${
+          v.pre ? `<button class="btn btn-ghost" style="padding:4px 12px;font-size:11px;color:var(--baba2);border-color:rgba(160,107,255,.35)" onclick="babaPreparar('${id}')">Preparar el código…</button>`
+                : `<button class="btn btn-ghost" style="padding:4px 12px;font-size:11px" onclick="babaFichaAbrir('${_escCtr(v.revisar)}')">Revisar ${_escCtr(v.revisar)}</button>`
+        }</div></div>`;
+    }).join('');
+    return `<div class="baba-card" style="margin-bottom:12px"><div class="baba-card-in">
+      <div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap">
+        <span class="baba-codigo" style="font-size:13px">${_escCtr(l.titulo)}</span>
+        <span class="baba-estado ${l.nublado ? 'murio' : 'vive'}">${l.nublado ? 'nublado' : (l.items || []).length + ' ' + ((l.items||[]).length === 1 ? 'señal' : 'señales')}</span>
+      </div>
+      ${l.nublado
+        ? `<div style="font-size:13.5px;color:var(--ts);line-height:1.6;margin-top:8px;font-style:italic">🔮 ${_escCtr(l.motivo || 'mis esferas están nubladas')}</div>`
+        : items}
+      ${l.regla === 'R4' && l.ciegos ? `<div style="font-size:11.5px;color:var(--gold);margin-top:8px">⚠️ Y de otros ${l.ciegos} eventos que se acercan no puedo decir nada: no tienen inventario capturado.</div>` : ''}
+      <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--ts);margin-top:10px;opacity:.75">
+        fuente: ${_escCtr(l.fuente || '—')}</div>
+    </div></div>`;
+  };
+
+  cont.innerHTML =
+    `<div class="baba-aviso" style="margin-bottom:14px">
+      🔮 <b>Baba propone, nunca crea.</b> Cada lectura sale de datos de la casa —sin inventar nada— y
+      «Preparar» solo abre la ficha con los campos llenos: el botón de crear sigue siendo tuyo.
+      <span style="color:var(--ts)">Leído el ${_escCtr(new Date(o.generado_en).toLocaleString('es-MX',{timeZone:BABA_TZ,day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}))} (Reynosa).</span>
+     </div>
+     ${hablan.map(tarjeta).join('')}
+     ${nubladas.length ? `<div style="font-family:Rajdhani,sans-serif;font-weight:700;letter-spacing:.1em;text-transform:uppercase;font-size:12px;color:var(--ts);margin:18px 0 10px">Lo que Baba no puede ver todavía</div>` : ''}
+     ${nubladas.map(tarjeta).join('')}
+     <button class="btn btn-ghost" style="width:100%;margin-top:10px" onclick="babaCargar()">← Volver a los códigos</button>`;
+}
+
+// Las propuestas vivas, por id. Se guardan aparte para no meter un objeto
+// entero dentro de un `onclick` — donde una comilla del texto rompería el HTML.
+let _babaPropuestas = {};
+
+// 🔒 PREPARAR NO CREA. Abre la ficha de UB-1 con los campos puestos y ahí se
+// queda: el clic de «Crear código» es de Memo, con todo a la vista y editable.
+function babaPreparar(id) {
+  const p = _babaPropuestas[id];
+  if (!p) return;
+  babaFichaAbrir(null);
+  setTimeout(() => {
+    babaUnidad(p.unidad);
+    const set = (el, v) => { const e = document.getElementById(el); if (e && v != null) e.value = v; };
+    if (p.unidad === 'pct') set('baba-pct', p.pct);
+    if (p.unidad === 'pesos') set('baba-monto', p.monto);
+    set('baba-desc', p.desc);
+    const sel = document.getElementById('baba-evento');
+    if (sel) sel.value = p.evento;
+    // El código y la fecha los pone Memo: son las dos decisiones que no se
+    // adivinan, y un default ahí sería inventarle un dato.
+    const inp = document.getElementById('baba-codigo');
+    if (inp) inp.focus();
+    const al = document.getElementById('baba-alert');
+    if (al) al.innerHTML = `<div class="baba-aviso" style="margin-bottom:10px">🔮 Baba dejó la ficha lista para <b>${_escCtr(p.evento)}</b>. Falta que le pongas <b>código</b> y <b>vencimiento</b> — ésas no las adivina.</div>`;
+  }, 120);
+}
+
 function verContratoFirmado(token, nombre) {
   document.getElementById('ctr-ver-titulo').textContent = nombre || '';
   document.getElementById('ctr-ver-iframe').src = '/contrato?t=' + encodeURIComponent(token);

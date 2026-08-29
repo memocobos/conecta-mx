@@ -3937,7 +3937,13 @@ input[type="search"],.kh-buscar,.buscador{border-radius:var(--r-sm,8px)}
 #page-baba{
   --baba:#a06bff; --baba2:#c9a2ff; --baba3:#6d3bd4;
 }
-#page-baba .page-title{color:var(--baba2)}
+/* ⚠️ AQUÍ HABÍA UN `#page-baba .page-title{color:…}` Y SE RETIRÓ. Por
+   especificidad (1 id + 1 clase) le GANABA a `body.tema-x .page-title`, así
+   que en esta pantalla el rosa de Ximena o el lila de Luis se perdían: eso
+   SÍ es tocar los 7 temas personales. GZ no lo hace —su acento vive en las
+   clases `.gz-*`, nunca en el título— y Baba hace lo mismo: el violeta va
+   en la bola, las fichas y los chips; el título es de quien lo mira.
+   Medido: era la ÚNICA regla `#page-* .page-title` del archivo. */
 
 /* La bola de cristal del encabezado. Decorativa: se marca aria-hidden. */
 .baba-orbe{

@@ -6626,9 +6626,22 @@ function showOnboarding(ev){
   var fp=ev.flashPromo;
   var active=fp&&fp.code&&(!fp.expiresTs||fp.expiresTs>Date.now());
   if(active){
-    var pct=fp.pct||0;
-    pr.innerHTML='Tienes un código de descuento disponible: <b>'+fp.code+'</b> — aplícalo antes de cotizar para obtener '+pct+'% de descuento.';
-    pr.style.display='block';
+    // [NATA-1b] EL DESCUENTO SE DICE EN SU PROPIA UNIDAD. Antes esta línea era
+    // `var pct=fp.pct||0` y punto: si la promo venía en PESOS (`amount`), el
+    // `||0` la convertía en «0% de descuento» y el modal le prometía NADA a
+    // todo el que abriera el evento. Pasó de verdad con NATA: la tarjeta trae
+    // `amount:500` y el cliente leía «obtener 0% de descuento».
+    // Dos unidades, dos textos. Y si no hay ninguna cifra que prometer, NO se
+    // promete: la línea se esconde, porque un cero es peor que el silencio.
+    var frase = fp.amount ? fmt(fp.amount)+' de descuento'
+              : fp.pct    ? fp.pct+'% de descuento'
+              : null;
+    if(frase){
+      pr.innerHTML='Tienes un código de descuento disponible: <b>'+fp.code+'</b> — aplícalo antes de cotizar para obtener '+frase+'.';
+      pr.style.display='block';
+    } else {
+      pr.style.display='none';
+    }
   } else {
     pr.style.display='none';
   }

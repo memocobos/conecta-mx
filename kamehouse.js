@@ -18919,13 +18919,17 @@ function _esfToggleFestival() {
   const on = !!document.getElementById('esf-es-festival')?.checked;
   const box = document.getElementById('esf-festival-box');
   if (box) box.style.display = on ? '' : 'none';
+  if (typeof _esfTabSync === 'function') setTimeout(_esfTabSync, 0);
   // R1: en festival, ocultar los grupos de CONCIERTO (música/zonas/hotel) — el
   // festival los tiene en sus paquetes. '' = display natural del form-group.
   // [ESF-E3a] `esf-grp-multifecha` entra a la lista: en festival las fechas
   // viven en `festival.paquetes`, que es OTRA familia (noches, música, hotel
   // por entrada). Dejar las dos bocas abiertas invita a capturar la misma
   // fecha en dos modelos que no se hablan.
-  ['esf-grp-music', 'esf-grp-zonas', 'esf-grp-hotel', 'esf-grp-multifecha'].forEach((id) => {
+  // [ESF-UX-2b] `esf-grp-zonas` y `esf-grp-cheapzonas` salieron de esta lista:
+  // los gobierna `_esfTabSync`, que también los esconde cuando hay fechas. Dos
+  // dueños del mismo `display` es una pelea que gana el último que corre.
+  ['esf-grp-music', 'esf-grp-hotel', 'esf-grp-multifecha'].forEach((id) => {
     const g = document.getElementById(id);
     if (g) g.style.display = on ? 'none' : '';
   });
@@ -19511,6 +19515,291 @@ async function sembrarDelCatalogo() {
 
 // Una fila de zona dentro de un bloque de fecha. Sirve para las dos listas
 // —PLUS y CHEAP— porque en el modelo de la fecha son la misma forma.
+// ═══ [ESF-UX-2b] EL TABLERO DE ZONAS ═══════════════════════════════════════
+// Un solo tablero por evento multifecha: filas = unión de zonas, columnas =
+// fechas, y en cada intersección PLUS y CHEAP juntos y a la vista. Antes había
+// dos listas por fecha más el mago de arriba —karolg pedía recorrer OCHO listas
+// y 128 casillas para prender un semáforo, y la sección CHEAP vivía al fondo de
+// cada bloque: Memo batalló media hora sin encontrarla y su CHEAP por fecha se
+// terminó escribiendo por SQL. Una capacidad que el dueño no encuentra en 30
+// minutos no existe.
+//
+// EL TABLERO ES VISTA, NO ALMACÉN. Las zonas siguen viviendo en cada bloque de
+// fecha (`box._esfZonas` / `box._esfCheap`), con sus objetos ORIGINALES: se
+// mutan en su sitio, así que las llaves desconocidas, el orden y hasta la forma
+// (`ag` ausente vs `ag:0`) sobreviven. Y el orden importa de verdad: morat/PLUS
+// NO es subsecuencia de la unión —medido—, así que pintar en orden de unión y
+// guardar en ese orden le habría reordenado las zonas a tres eventos.
+//
+// `prox` y `sepEspecial` viven en el ENCABEZADO DE FILA porque no varían nunca
+// entre fechas (medido: 0 de 12 eventos). `vip` sí varía en 3 zonas, así que su
+// casilla nace indeterminada cuando difiere y solo escribe si Memo la toca.
+function _esfTabBloques() {
+  return Array.from(document.querySelectorAll('#esf-multifecha .esf-mf-fecha'));
+}
+// Una fecha HEREDA su CHEAP cuando no declara lista propia (index.html:5498:
+// `mf.cheapZonas || cur.cheapZonas || mf.zonas`). No es lo mismo que no tener
+// la zona: por eso la celda lo DICE en vez de dejarlo en blanco.
+function _esfTabHereda(box) { return !Array.isArray(box._esfCheap) || !box._esfCheap.length; }
+function _esfTabLista(box, cual) {
+  if (cual === 'zonas') { if (!Array.isArray(box._esfZonas)) box._esfZonas = []; return box._esfZonas; }
+  if (!Array.isArray(box._esfCheap)) box._esfCheap = [];
+  return box._esfCheap;
+}
+function _esfTabZona(box, cual, n) {
+  const l = (cual === 'zonas') ? box._esfZonas : box._esfCheap;
+  return Array.isArray(l) ? l.find((z) => z && z.n === n) : null;
+}
+// La unión, en orden de aparición: primero lo que trae cada fecha en PLUS y
+// luego lo que solo existe en CHEAP.
+function _esfTabUnion() {
+  const orden = [], vistas = new Set();
+  const meter = (z) => { if (z && z.n && !vistas.has(z.n)) { vistas.add(z.n); orden.push(z.n); } };
+  _esfTabBloques().forEach((b) => (b._esfZonas || []).forEach(meter));
+  _esfTabBloques().forEach((b) => (b._esfCheap || []).forEach(meter));
+  return orden;
+}
+const _TAB_CSS = {
+  th: 'padding:5px 7px;font-size:10px;font-family:\'JetBrains Mono\',monospace;letter-spacing:.08em;color:var(--ts);text-align:center;white-space:nowrap',
+  zn: 'padding:5px 7px;font-size:12px;text-align:left;white-space:nowrap;position:sticky;left:0;background:var(--bg);z-index:1',
+  td: 'padding:3px 5px;border-left:1px solid var(--border);vertical-align:middle',
+};
+function _esfTableroPintar() {
+  const cont = document.getElementById('esf-tablero');
+  if (!cont) return;
+  const bloques = _esfTabBloques();
+  const grp = document.getElementById('esf-grp-tablero');
+  if (grp) grp.style.display = bloques.length ? '' : 'none';
+  cont.innerHTML = '';
+  if (!bloques.length) return;
+  const union = _esfTabUnion();
+  const etq = (b, i) => (b.querySelector('.esf-mf-lbl')?.value || '').trim() || ('Fecha ' + (i + 1));
+
+  const wrap = document.createElement('div');
+  wrap.style.cssText = 'overflow-x:auto;border:1px solid var(--border);border-radius:var(--r-sm,8px)';
+  const t = document.createElement('table');
+  t.style.cssText = 'border-collapse:collapse;width:100%;min-width:' + (170 + bloques.length * 210) + 'px';
+
+  // ── encabezados: una columna por fecha, partida en PLUS y CHEAP
+  const h1 = document.createElement('tr');
+  h1.innerHTML = '<th style="' + _TAB_CSS.zn + '"></th>';
+  bloques.forEach((b, i) => {
+    const th = document.createElement('th');
+    th.colSpan = 2;
+    th.style.cssText = _TAB_CSS.th + ';border-left:1px solid var(--border);border-bottom:1px solid var(--border)';
+    const nom = document.createElement('div');
+    nom.style.cssText = 'font-size:11px;color:var(--tx);text-transform:uppercase';
+    nom.textContent = etq(b, i);
+    const acc = document.createElement('div');
+    acc.style.cssText = 'display:flex;gap:4px;justify-content:center;margin-top:3px';
+    const mk = (txt, tit, fn) => {
+      const x = document.createElement('button');
+      x.type = 'button'; x.className = 'btn btn-ghost';
+      x.style.cssText = 'font-size:10px;padding:2px 6px'; x.textContent = txt; x.title = tit;
+      x.addEventListener('click', fn); return x;
+    };
+    acc.appendChild(mk('Agotar', 'Marca agotadas todas las zonas de esta fecha, y el RIDE si lo tiene', () => _esfTabAgotarFecha(b, true)));
+    acc.appendChild(mk('Reabrir', 'Quita el agotado de todas las zonas de esta fecha', () => _esfTabAgotarFecha(b, false)));
+    th.appendChild(nom); th.appendChild(acc);
+    h1.appendChild(th);
+  });
+  const h2 = document.createElement('tr');
+  h2.innerHTML = '<th style="' + _TAB_CSS.zn + ';font-size:10px;font-family:\'JetBrains Mono\',monospace;letter-spacing:.08em;color:var(--ts)">ZONA</th>';
+  bloques.forEach((b) => {
+    const a = document.createElement('th'); a.style.cssText = _TAB_CSS.th + ';border-left:1px solid var(--border)'; a.textContent = 'PLUS';
+    const c = document.createElement('th'); c.style.cssText = _TAB_CSS.th; c.textContent = _esfTabHereda(b) ? 'CHEAP · hereda' : 'CHEAP';
+    if (_esfTabHereda(b)) c.title = 'Esta fecha no declara zonas CHEAP propias: el sitio usa las del evento. Captura un precio para darle las suyas.';
+    h2.appendChild(a); h2.appendChild(c);
+  });
+  const thead = document.createElement('thead');
+  thead.appendChild(h1); thead.appendChild(h2);
+  t.appendChild(thead);
+
+  const tb = document.createElement('tbody');
+  union.forEach((n) => tb.appendChild(_esfTabFila(n, bloques)));
+  t.appendChild(tb);
+  wrap.appendChild(t);
+  cont.appendChild(wrap);
+  const pie = document.createElement('div');
+  pie.style.cssText = 'font-size:11px;color:var(--ts);margin-top:6px';
+  pie.textContent = union.length + ' zona(s) × ' + bloques.length + ' fecha(s). Las zonas del evento se calculan de aquí: una zona se vende si se vende en alguna fecha.';
+  cont.appendChild(pie);
+}
+function _esfTabFila(n, bloques) {
+  const tr = document.createElement('tr');
+  tr.style.cssText = 'border-top:1px solid var(--border)';
+  // ── encabezado de la fila: nombre + los tres que no varían entre fechas
+  const th = document.createElement('td');
+  th.style.cssText = _TAB_CSS.zn;
+  const nom = document.createElement('div');
+  nom.style.cssText = 'font-weight:600;font-size:12px';
+  nom.textContent = n;
+  th.appendChild(nom);
+  const fila = document.createElement('div');
+  fila.style.cssText = 'display:flex;gap:6px;align-items:center;margin-top:2px';
+  const todas = () => {
+    const out = [];
+    bloques.forEach((b) => { ['zonas', 'cheapZonas'].forEach((c) => { const z = _esfTabZona(b, c, n); if (z) out.push(z); }); });
+    return out;
+  };
+  const tri = (etiqueta, llave, titulo) => {
+    const lab = document.createElement('label');
+    lab.style.cssText = 'font-size:10px;display:flex;align-items:center;gap:2px;color:var(--ts)';
+    lab.title = titulo;
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    const vals = [...new Set(todas().map((z) => (z[llave] ? 1 : 0)))];
+    cb.checked = vals.length === 1 && vals[0] === 1;
+    // Indeterminada = las fechas no dicen lo mismo. Mientras no se toque, cada
+    // fecha conserva el suyo: el tablero no promedia lo que no gobierna.
+    cb.indeterminate = vals.length > 1;
+    cb.addEventListener('change', () => {
+      cb.indeterminate = false;
+      todas().forEach((z) => { if (cb.checked) z[llave] = 1; else delete z[llave]; });
+      _esfTableroPintar();
+    });
+    lab.appendChild(cb); lab.appendChild(document.createTextNode(etiqueta));
+    return lab;
+  };
+  fila.appendChild(tri('VIP', 'vip', 'Zona preferente. Si las fechas no coinciden, la casilla nace a medias y no las toca hasta que la aprietes.'));
+  fila.appendChild(tri('Próx.', 'prox', 'Se anuncia sin precio. No varía entre fechas en ningún evento del catálogo.'));
+  const sep = document.createElement('input');
+  sep.className = 'cot-input'; sep.type = 'number'; sep.min = '0';
+  sep.placeholder = 'separo esp.';
+  sep.title = 'Separo especial de esta zona en CHEAP. Vacío = el separo normal del evento.';
+  sep.style.cssText = 'flex:0 0 88px;font-size:11px;padding:2px 5px';
+  const conSep = bloques.map((b) => _esfTabZona(b, 'cheapZonas', n)).filter(Boolean).find((z) => z.sepEspecial);
+  if (conSep) sep.value = conSep.sepEspecial;
+  sep.addEventListener('change', () => {
+    const v = parseInt(sep.value || '', 10);
+    bloques.forEach((b) => {
+      const z = _esfTabZona(b, 'cheapZonas', n);
+      if (!z) return;
+      if (Number.isFinite(v) && v > 0) z.sepEspecial = v; else delete z.sepEspecial;
+    });
+  });
+  fila.appendChild(sep);
+  th.appendChild(fila);
+  tr.appendChild(th);
+
+  bloques.forEach((b) => {
+    tr.appendChild(_esfTabCelda(b, 'zonas', n));
+    tr.appendChild(_esfTabCelda(b, 'cheapZonas', n));
+  });
+  return tr;
+}
+// Una media celda. Tres estados VISIBLES, y el que falta dicho con todas sus
+// letras: libre · agotada · hereda. Un switch que no distingue "apagado" de
+// "hereda" repetiría la trampa que este tablero viene a quitar.
+function _esfTabCelda(box, cual, n) {
+  const td = document.createElement('td');
+  td.style.cssText = _TAB_CSS.td;
+  const hereda = (cual === 'cheapZonas') && _esfTabHereda(box);
+  const z = _esfTabZona(box, cual, n);
+  if (hereda || !z) {
+    const vacia = document.createElement('button');
+    vacia.type = 'button'; vacia.className = 'btn btn-ghost';
+    vacia.style.cssText = 'width:100%;font-size:10px;padding:3px;color:var(--ts);opacity:.75';
+    vacia.textContent = hereda ? 'hereda' : '— agregar';
+    vacia.title = hereda
+      ? 'Esta fecha no tiene lista CHEAP propia: usa la del evento. Apriétalo para darle la suya, copiada de sus zonas PLUS.'
+      : 'Esta zona no existe en esta fecha. Apriétalo para agregarla.';
+    vacia.addEventListener('click', () => {
+      if (hereda) _esfTabEstrenarCheap(box); else _esfTabLista(box, cual).push({ n: n, p: 0 });
+      _esfTableroPintar();
+    });
+    td.appendChild(vacia);
+    return td;
+  }
+  const caja = document.createElement('div');
+  caja.style.cssText = 'display:flex;gap:4px;align-items:center';
+  const p = document.createElement('input');
+  p.className = 'cot-input'; p.type = 'number'; p.min = '0'; p.placeholder = '$';
+  p.style.cssText = 'flex:1;min-width:62px;font-size:11px;padding:2px 5px';
+  if (z.p) p.value = z.p;
+  p.addEventListener('input', () => { z.p = parseInt(p.value || '0', 10) || 0; });
+  const lab = document.createElement('label');
+  lab.style.cssText = 'font-size:10px;display:flex;align-items:center;gap:2px;white-space:nowrap';
+  lab.title = 'Agotada en esta fecha';
+  const cb = document.createElement('input');
+  cb.type = 'checkbox';
+  cb.checked = !!z.ag;
+  const pinta = () => {
+    td.style.background = z.ag ? 'color-mix(in srgb, var(--red) 12%, transparent)' : 'transparent';
+    lab.style.color = z.ag ? 'var(--red)' : 'var(--ts)';
+  };
+  cb.addEventListener('change', () => {
+    if (cb.checked) { z.ag = 1; delete z.prox; } else { delete z.ag; }
+    pinta();
+  });
+  lab.appendChild(cb); lab.appendChild(document.createTextNode('ag'));
+  caja.appendChild(p); caja.appendChild(lab);
+  td.appendChild(caja);
+  pinta();
+  return td;
+}
+// Darle a una fecha su propia lista CHEAP: nace copiada de sus PLUS, que es de
+// donde el sitio la sacaba por herencia. Copiar no inventa precios nuevos.
+function _esfTabEstrenarCheap(box) {
+  box._esfCheap = (box._esfZonas || []).map((z) => {
+    const o = { n: z.n, p: z.p || 0 };
+    if (z.ag) o.ag = 1;
+    if (z.vip) o.vip = 1;
+    return o;
+  });
+}
+function _esfTabAgotarFecha(box, agotar) {
+  ['zonas', 'cheapZonas'].forEach((c) => {
+    const l = (c === 'zonas') ? box._esfZonas : box._esfCheap;
+    (Array.isArray(l) ? l : []).forEach((z) => {
+      if (agotar) { z.ag = 1; delete z.prox; } else { delete z.ag; }
+    });
+  });
+  const ride = box.querySelector('.esf-mf-ride'), rag = box.querySelector('.esf-mf-rideag');
+  if (agotar) { if (ride && ride.value && rag) rag.checked = true; } else if (rag) rag.checked = false;
+  _esfTableroPintar();
+}
+// Agregar una zona nueva: entra en TODAS las fechas, que es lo que un tablero
+// de filas significa. Si alguna no la quiere, se le quita en su celda.
+function _esfTabAddZona() {
+  const bloques = _esfTabBloques();
+  if (!bloques.length) { showToast('Primero agrega una fecha', 'error'); return; }
+  const n = (prompt('Nombre de la zona nueva') || '').trim();
+  if (!n) return;
+  if (_esfTabUnion().includes(n)) { showToast('Esa zona ya está en el tablero', 'error'); return; }
+  bloques.forEach((b) => {
+    _esfTabLista(b, 'zonas').push({ n: n, p: 0 });
+    if (!_esfTabHereda(b)) _esfTabLista(b, 'cheapZonas').push({ n: n, p: 0 });
+  });
+  _esfTableroPintar();
+}
+// Quita la zona de todas las fechas. Se pregunta: borrar una fila del tablero
+// borra tantas casillas como fechas haya.
+function _esfTabQuitarZona() {
+  const union = _esfTabUnion();
+  if (!union.length) return;
+  const n = (prompt('¿Qué zona quitas de TODAS las fechas?\n\n' + union.join(' · ')) || '').trim();
+  if (!n || !union.includes(n)) return;
+  _esfTabBloques().forEach((b) => {
+    ['_esfZonas', '_esfCheap'].forEach((k) => {
+      if (Array.isArray(b[k])) b[k] = b[k].filter((z) => z.n !== n);
+    });
+  });
+  _esfTableroPintar();
+}
+// El mago de arriba deja de ser editable en cuanto el evento tiene fechas: es
+// la raíz de la confusión ("hasta arriba hay un wizard de precios y luego abajo
+// uno por fecha") y del bug de las dos verdades. Desde UX-2a se DERIVA.
+function _esfTabSync() {
+  const hayFechas = _esfTabBloques().length > 0;
+  const fest = !!document.getElementById('esf-es-festival')?.checked;
+  ['esf-grp-zonas', 'esf-grp-cheapzonas'].forEach((id) => {
+    const g = document.getElementById(id);
+    if (g) g.style.display = (hayFechas || fest) ? 'none' : '';
+  });
+  _esfTableroPintar();
+}
+
 // [ESF-UX-1] `esCheap` enciende el separo especial, igual que en la lista CHEAP
 // de arriba (`esf-cz-sep`). Sin esa boca, straykids perdía el sepEspecial de
 // 4000 de su Box Oro en las DOS fechas: la misma enfermedad del bloque de
@@ -19657,13 +19946,6 @@ function _esfMfAddFecha(data) {
       '<input class="cot-input esf-mf-noches" type="number" min="1" placeholder="Noches" title="Noches de hotel de esta entrada. Vacío = el sitio no las anuncia." style="flex:0 0 105px">' +
       '<input class="cot-input esf-mf-music" placeholder="ID de música" title="Pista propia de esta noche. Vacío = usa la del evento." style="flex:1;min-width:130px" autocomplete="off">' +
     '</div>' +
-    '<div style="font-size:10px;font-family:\'JetBrains Mono\',monospace;letter-spacing:.1em;color:var(--ts);margin:12px 0 2px">ZONAS DE ESTA NOCHE</div>' +
-    '<div class="esf-mf-zonas"></div>' +
-    '<button type="button" class="btn btn-ghost esf-mf-addz" style="font-size:11px;margin-top:6px">+ Zona</button>' +
-    '<button type="button" class="btn btn-ghost esf-mf-copiar" style="font-size:11px;margin-top:6px;margin-left:6px" title="Pre-llena con las zonas PLUS del evento. Después se edita libre.">Copiar de arriba</button>' +
-    '<div style="font-size:10px;font-family:\'JetBrains Mono\',monospace;letter-spacing:.1em;color:var(--ts);margin:12px 0 2px">ZONAS CHEAP DE ESTA NOCHE <span style="font-family:inherit;letter-spacing:0;text-transform:none">— vacías = usa las de arriba</span></div>' +
-    '<div class="esf-mf-cheap"></div>' +
-    '<button type="button" class="btn btn-ghost esf-mf-addc" style="font-size:11px;margin-top:6px">+ Zona CHEAP</button>' +
     '<div class="esf-mf-hotelbox" style="margin-top:12px"></div>' +
     '<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:10px">' +
       '<input class="cot-input esf-mf-ride" type="number" min="0" placeholder="$ RIDE de esta noche" style="flex:1;min-width:150px">' +
@@ -19686,37 +19968,24 @@ function _esfMfAddFecha(data) {
   _mfSet('.esf-mf-noches', (Number.isFinite(_mfN) && _mfN > 0) ? _mfN : '');
   _mfSet('.esf-mf-music', (typeof d.music === 'string') ? d.music : '');
   _esfMfHotelPintar(box.querySelector('.esf-mf-hotelbox'), d.hotel);
-  const cz = box.querySelector('.esf-mf-zonas'), cc = box.querySelector('.esf-mf-cheap');
-  (Array.isArray(d.zonas) ? d.zonas : []).forEach((z) => _esfMfZonaRow(cz, z));
-  (Array.isArray(d.cheapZonas) ? d.cheapZonas : []).forEach((z) => _esfMfZonaRow(cc, z, true));
-  box.querySelector('.esf-mf-addz').addEventListener('click', () => _esfMfZonaRow(cz));
-  box.querySelector('.esf-mf-addc').addEventListener('click', () => _esfMfZonaRow(cc, null, true));
-  box.querySelector('.esf-mf-del').addEventListener('click', () => box.remove());
-  // Copiar de arriba: conveniencia de captura, igual que en las CHEAP. Pregunta
-  // antes de pisar — copiar no debe borrar trabajo.
-  box.querySelector('.esf-mf-copiar').addEventListener('click', () => {
-    const plus = (typeof _esfGetZonas === 'function') ? _esfGetZonas() : [];
-    if (!plus.length) { showToast('Primero captura las zonas del evento', 'error'); return; }
-    const hay = cz.querySelectorAll('.esf-mfz-row').length;
-    if (hay && !confirm('Esto reemplaza las ' + hay + ' zona(s) de esta noche. ¿Seguir?')) return;
-    cz.innerHTML = '';
-    plus.forEach((z) => _esfMfZonaRow(cz, z));
-  });
+  // [ESF-UX-2b] Las zonas de la fecha ya no se pintan aquí: viven en el bloque
+  // como los objetos ORIGINALES y el tablero las edita en su sitio. Mutarlos
+  // en vez de reconstruirlos es lo que conserva llaves desconocidas, el orden
+  // propio de cada fecha (morat NO sigue el de la unión) y la forma exacta.
+  box._esfZonas = Array.isArray(d.zonas) ? d.zonas : [];
+  box._esfCheap = Array.isArray(d.cheapZonas) ? d.cheapZonas : null;
+  box.querySelector('.esf-mf-del').addEventListener('click', () => { box.remove(); _esfTabSync(); });
+  box.querySelector('.esf-mf-lbl').addEventListener('input', () => _esfTableroPintar());
+  // [ESF-UX-2b] «Copiar de arriba» se retiró con el mago: en un multifecha ya
+  // no hay una lista de arriba que copiar —se DERIVA de estas fechas—. El
+  // tablero trae en su lugar «hereda», que copia las PLUS de la propia fecha.
   // Agotar / reabrir la noche entera. Dos verbos explícitos en vez de un botón
   // que adivine el modo: un control que cambia de significado según un estado
   // que no se ve es un control que miente la mitad de las veces.
-  box.querySelector('.esf-mf-agotar').addEventListener('click', () => {
-    box.querySelectorAll('.esf-mfz-row').forEach((r) => {
-      r.querySelector('.esf-mfz-prox').checked = false;
-      r.querySelector('.esf-mfz-ag').checked = true;
-    });
-    if (box.querySelector('.esf-mf-ride').value) box.querySelector('.esf-mf-rideag').checked = true;
-  });
-  box.querySelector('.esf-mf-reabrir').addEventListener('click', () => {
-    box.querySelectorAll('.esf-mfz-ag').forEach((c) => { c.checked = false; });
-    box.querySelector('.esf-mf-rideag').checked = false;
-  });
+  box.querySelector('.esf-mf-agotar').addEventListener('click', () => _esfTabAgotarFecha(box, true));
+  box.querySelector('.esf-mf-reabrir').addEventListener('click', () => _esfTabAgotarFecha(box, false));
   cont.appendChild(box);
+  _esfTabSync();
 }
 
 // Devuelve `null` cuando no hay ni un bloque: null significa "este evento no es
@@ -19779,7 +20048,8 @@ function _esfGetMultifecha() {
   const out = bloques.map((b) => {
     const lbl = (b.querySelector('.esf-mf-lbl')?.value || '').trim();
     const ds = (b.querySelector('.esf-mf-ds')?.value || '').trim();
-    const cheap = _esfMfLeerZonas(b.querySelector('.esf-mf-cheap'));
+    // [ESF-UX-2b] Del estado del bloque, que es donde el tablero las edita.
+    const cheap = (Array.isArray(b._esfCheap) ? b._esfCheap : []).filter((z) => z && z.n);
     const ride = parseInt(b.querySelector('.esf-mf-ride')?.value || '', 10);
     const sublbl = (b.querySelector('.esf-mf-sublbl')?.value || '').trim();
     const nochesN = parseInt(b.querySelector('.esf-mf-noches')?.value || '', 10);
@@ -19796,7 +20066,7 @@ function _esfGetMultifecha() {
     if (ds) o.ds = ds;
     if (noches != null) o.noches = noches;
     if (music) o.music = music;
-    o.zonas = _esfMfLeerZonas(b.querySelector('.esf-mf-zonas'));
+    o.zonas = (Array.isArray(b._esfZonas) ? b._esfZonas : []).filter((z) => z && z.n);
     if (cheap.length) o.cheapZonas = cheap;
     if (Number.isFinite(ride) && ride > 0) o.ride = ride;
     if (hotel) o.hotel = hotel;
@@ -19825,6 +20095,8 @@ function _esfGetMultifecha() {
 }
 
 function _esfClearMultifecha() {
+  // [ESF-UX-2b] Al vaciarse las fechas, el tablero se va y el mago vuelve.
+  setTimeout(_esfTabSync, 0);
   const c = document.getElementById('esf-multifecha');
   if (c) c.innerHTML = '';
 }
@@ -19836,6 +20108,7 @@ function _esfMfPopulate(raw) {
   let m = raw;
   if (typeof m === 'string') { try { m = JSON.parse(m); } catch (_) { m = null; } }
   if (Array.isArray(m)) m.forEach((f) => { if (f && typeof f === 'object') _esfMfAddFecha(f); });
+  _esfTabSync();
 }
 
 function _esfAddZona(data) {

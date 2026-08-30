@@ -1859,6 +1859,23 @@
      </div>
      <div style="font-size:11px;color:var(--ts);margin-top:4px">Vacío = <b>una sola fecha</b> (la de arriba). Con bloques, el sitio deja elegir noche y cada una se agota por separado.</div>
     </div>
+    <!-- ─── [ESF-UX-2b] EL TABLERO DE ZONAS ───────────────────────────────
+          Un solo tablero por evento multifecha: filas = unión de zonas,
+          columnas = fechas, y PLUS y CHEAP juntos en cada intersección. Antes
+          eran dos listas por fecha más el mago de arriba: karolg pedía
+          recorrer OCHO listas y 128 casillas, y la sección CHEAP vivía al
+          fondo de cada bloque —Memo batalló media hora sin encontrarla—.
+          El mago de arriba se esconde en cuanto hay fechas: desde UX-2a el
+          global se DERIVA de estas celdas. -->
+    <div class="form-group" data-esf="zonas" id="esf-grp-tablero" style="display:none">
+     <label>Tablero de zonas <span style="font-weight:400;color:var(--ts);font-size:11px">— cada zona en cada fecha, PLUS y CHEAP</span></label>
+     <div id="esf-tablero"></div>
+     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
+      <button class="btn btn-ghost" type="button" onclick="_esfTabAddZona()">+ Agregar zona</button>
+      <button class="btn btn-ghost" type="button" onclick="_esfTabQuitarZona()">Quitar zona</button>
+     </div>
+     <div style="font-size:11px;color:var(--ts);margin-top:4px">Las <b>zonas del evento</b> ya no se capturan: se calculan de aquí. Una zona se vende arriba si se vende en <b>alguna</b> fecha, con el precio de esa fecha.</div>
+    </div>
     <div class="form-group" data-esf="vende" id="esf-grp-hotel">
      <label>Hotel</label>
      <label class="chk-linea">

@@ -130,11 +130,22 @@ exports.handler = async (event) => {
 
   // 5. SELLAR el candado. Va DESPUÉS de aplicar: si el marcado falla, el separo
   // sigue sin aplicar y se puede reintentar. Al revés se perdería el pago.
+  // [CONC-3] El sello también lleva su condición: solo sella si SIGUE sin sellar.
+  // El candado de arriba lo decide en JS sobre una lectura de hace tres llamadas
+  // de red, y dos admins con la ficha abierta lo cruzan sin esfuerzo. Cero filas
+  // aquí significa que otro selló primero — y NO se responde error: el pago de
+  // este ya aterrizó bien, y desde CONC-2 el segundo ni siquiera pudo aplicarlo
+  // dos veces (su cuota 1 ya no está 'pendiente'). Solo queda dicho en el log.
   try {
-    await fetch(`${SB_URL}/rest/v1/solicitudes_tour?id=eq.${encodeURIComponent(solicitudId)}`, {
-      method: 'PATCH', headers: { ...sb, Prefer: 'return=minimal' },
+    const selloR = await fetch(`${SB_URL}/rest/v1/solicitudes_tour?id=eq.${encodeURIComponent(solicitudId)}`
+      + `&separo_aplicado_pago_id=is.null`, {
+      method: 'PATCH', headers: { ...sb, Prefer: 'return=representation' },
       body: JSON.stringify({ separo_aplicado_pago_id: cuota.id }),
     });
+    const filas = selloR.ok ? await selloR.json().catch(() => null) : null;
+    if (selloR.ok && (!Array.isArray(filas) || filas.length === 0)) {
+      console.error('[separo-aplicar] otro admin selló primero:', solicitudId, cuota.id);
+    }
   } catch (e) {
     console.error('[separo-aplicar] no se pudo sellar el candado:', e.message);
   }

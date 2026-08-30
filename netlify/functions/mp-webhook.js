@@ -180,9 +180,23 @@ exports.handler = async (event) => {
   }
 
   // ── 5. MARCAR EL SEPARO ────────────────────────────────────────────────────
-  // READ-THEN-WRITE: si ya tiene separo_pagado_at, otro camino ganó (una
-  // transferencia con comprobante, por ejemplo). No se pisa la marca original:
-  // la primera confirmación es la buena.
+  // La primera confirmación es la buena: no se pisa la marca original.
+  //
+  // [CONC-3] Eso lo decía la lectura de aquí abajo, y una lectura no lo puede
+  // garantizar: entre leer «está en null» y escribir pasa una llamada de red
+  // entera. La guarda de verdad viaja AHORA en la URL del PATCH
+  // (`separo_pagado_at=is.null`), donde la evalúa Postgres en el instante de
+  // escribir. La lectura se queda porque sirve para otra cosa: responder rápido
+  // y sin escribir en el caso normal.
+  //
+  // ⚠️ Y el contrincante no es el que decía el comentario viejo. NADIE marca
+  // este campo a mano —se midió: los únicos que lo escriben son este webhook y
+  // el de Stripe—. Los choques reales son DOS PAGOS DISTINTOS de la misma
+  // solicitud: la idempotencia de arriba es por `payment_id`, pero lo que se
+  // está protegiendo es por SOLICITUD. Un cliente que reintenta con otro método
+  // genera dos payment_id, los dos pasan el índice único, y sin esta condición
+  // el segundo pisa `separo_mp_payment_id` — justo el dato con el que se
+  // devuelve el cobro duplicado.
   try {
     const yaR = await fetch(`${SB_URL}/rest/v1/solicitudes_tour?id=eq.${encodeURIComponent(solicitudId)}&select=id,separo_pagado_at`, { headers: sb });
     const ya = yaR.ok ? await yaR.json() : [];
@@ -193,8 +207,9 @@ exports.handler = async (event) => {
     if (ya[0].separo_pagado_at) {
       return res(200, { ok: true, separo_ya_marcado: true, payment_id: paymentId });
     }
-    await fetch(`${SB_URL}/rest/v1/solicitudes_tour?id=eq.${encodeURIComponent(solicitudId)}`, {
-      method: 'PATCH', headers: { ...sb, Prefer: 'return=minimal' },
+    const upR = await fetch(`${SB_URL}/rest/v1/solicitudes_tour?id=eq.${encodeURIComponent(solicitudId)}`
+      + `&separo_pagado_at=is.null`, {
+      method: 'PATCH', headers: { ...sb, Prefer: 'return=representation' },
       body: JSON.stringify({
         separo_pagado_at: new Date().toISOString(),
         separo_mp_payment_id: paymentId,
@@ -204,6 +219,15 @@ exports.handler = async (event) => {
         // impide aplicarlo dos veces cuando Memo acepte. Igual que en C2.
       }),
     });
+    // Cero filas = otro pago llegó primero. NO es un error: es el candado
+    // haciendo su trabajo. 200 para que MP no reintente, y queda en la bitácora
+    // como 'aplicado' con el separo marcado por el OTRO pago — que es el caso
+    // que hay que mirar a mano: hay un cobro duplicado que devolver.
+    const filas = upR.ok ? await upR.json().catch(() => null) : null;
+    if (upR.ok && (!Array.isArray(filas) || filas.length === 0)) {
+      console.error('[mp-webhook] OTRO PAGO ganó la carrera del separo — revisar duplicado:', solicitudId, paymentId);
+      return res(200, { ok: true, separo_ya_marcado: true, gano_otro_pago: true, payment_id: paymentId });
+    }
   } catch (e) {
     console.error('[mp-webhook] no se pudo marcar el separo:', e.message, paymentId);
     // 200: el evento YA quedó registrado, así que un reintento de MP no volvería

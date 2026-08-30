@@ -152,16 +152,21 @@ exports.handler = async (event) => {
     if (marcaS.duplicado) {
       return { statusCode: 200, headers, body: JSON.stringify({ ok: true, duplicado: true, event_id: eventId }) };
     }
-    // READ-THEN-WRITE: si ya tiene separo_pagado_at, otro evento ganó. No se
-    // pisa la marca original — la primera confirmación es la buena.
+    // La primera confirmación es la buena: no se pisa la marca original.
+    // [CONC-3] La guarda de verdad viaja en la URL del PATCH; la lectura de
+    // abajo se queda solo para responder rápido y sin escribir en el caso
+    // normal. Gemelo exacto de mp-webhook — y el contrincante es el mismo: DOS
+    // PAGOS DISTINTOS de la misma solicitud (el otro webhook, u otra sesión),
+    // porque la idempotencia es por evento y lo protegido es por solicitud.
     try {
       const yaR = await fetch(`${SB_URL}/rest/v1/solicitudes_tour?id=eq.${encodeURIComponent(solicitudId)}&select=id,separo_pagado_at`, { headers: sb });
       const ya = yaR.ok ? await yaR.json() : [];
       if (Array.isArray(ya) && ya[0] && ya[0].separo_pagado_at) {
         return { statusCode: 200, headers, body: JSON.stringify({ ok: true, separo_ya_marcado: true }) };
       }
-      await fetch(`${SB_URL}/rest/v1/solicitudes_tour?id=eq.${encodeURIComponent(solicitudId)}`, {
-        method: 'PATCH', headers: { ...sb, Prefer: 'return=minimal' },
+      const upR = await fetch(`${SB_URL}/rest/v1/solicitudes_tour?id=eq.${encodeURIComponent(solicitudId)}`
+        + `&separo_pagado_at=is.null`, {
+        method: 'PATCH', headers: { ...sb, Prefer: 'return=representation' },
         body: JSON.stringify({
           separo_pagado_at: new Date().toISOString(),
           separo_session_id: sesion.id || null,
@@ -170,6 +175,13 @@ exports.handler = async (event) => {
           // se aplique dos veces cuando Memo acepte.
         }),
       });
+      // Cero filas = otro pago ganó la carrera. El candado funcionando, no un
+      // error — pero hay un cobro duplicado que mirar a mano.
+      const filas = upR.ok ? await upR.json().catch(() => null) : null;
+      if (upR.ok && (!Array.isArray(filas) || filas.length === 0)) {
+        console.error('[stripe-webhook] OTRO PAGO ganó la carrera del separo — revisar duplicado:', solicitudId, eventId);
+        return { statusCode: 200, headers, body: JSON.stringify({ ok: true, separo_ya_marcado: true, gano_otro_pago: true }) };
+      }
     } catch (e) {
       console.error('[stripe-webhook] no se pudo marcar el separo:', e.message);
     }

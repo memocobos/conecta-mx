@@ -21,12 +21,12 @@
 
 const { verifyAdminAuthLive, corsCheck } = require('./_lib/verify-admin');
 const { aplicarModoPrueba } = require('./_lib/correo-guard');
+const { reconciliarSolicitud } = require('./_lib/reconciliar-solicitud');
 
 const UUID_RE = /^[0-9a-f-]{36}$/i;
 const ROLES = ['maestro_roshi', 'bulma', 'milk'];
 const MAX_MOTIVO = 500;
 const ESTADO_ANULADO = 'cancelado'; // valor de anulación en `pagos` (ver cabecera)
-const TOLERANCIA_MXN = 1; // absorbe centavos del reparto (igual que admin-marcar-pago)
 
 const PORTAL_URL = process.env.PORTAL_SUPABASE_URL;
 const PORTAL_KEY = process.env.PORTAL_SUPABASE_SERVICE_KEY;
@@ -172,60 +172,39 @@ exports.handler = async (event) => {
 
     // ---- 6. Reconciliar el estado de la solicitud tras la baja (F5-t1b, best-effort).
     //         Cubre "todos los vivos ya habían liquidado y la baja era lo único que
-    //         estorbaba" → el grupo pasa a 'pagado' en el momento. MISMA lógica de
-    //         cuotas VIVAS que admin-marcar-pago / admin-aplicar-pago-grupo. Un fallo
-    //         aquí NO revierte la baja (ya hecha arriba).
+    //         estorbaba" → el grupo pasa a 'pagado' en el momento. Un fallo aquí NO
+    //         revierte la baja (ya hecha arriba).
+    //         [CONC-4a] La lógica de cuotas vivas vive en
+    //         `_lib/reconciliar-solicitud`, una sola vez para los cuatro caminos.
+    //         El correo se queda: este endpoint le escribe al titular con su
+    //         propio texto, distinto del de los otros tres.
     let solicitudEstado = solicitud.estado;
     try {
-      const allR = await fetch(
-        `${PORTAL_URL}/rest/v1/pagos?solicitud_id=eq.${enc(lugar.solicitud_id)}&select=estado,monto,monto_pagado`,
-        { headers: sbHeaders }
-      );
-      if (allR.ok) {
-        const todos = await allR.json();
-        const vivas = (Array.isArray(todos) ? todos : []).filter(p => p && p.estado !== 'cancelado');
-        const sumaReal = vivas.reduce((acc, p) => {
-          if (p.estado !== 'pagado') return acc;
-          const real = (p.monto_pagado == null) ? Number(p.monto || 0) : Number(p.monto_pagado || 0);
-          return acc + (Number.isFinite(real) ? real : 0);
-        }, 0);
-        const esperado = vivas.reduce((acc, p) => acc + (Number(p.monto || 0) || 0), 0);
-        const dineroCuadra = sumaReal >= (esperado - TOLERANCIA_MXN);
-        const todosPagados = vivas.length > 0 && vivas.every(p => p.estado === 'pagado');
-        const estadoPrevio = solicitud.estado;
-        let nuevoEstadoSol = null;
-        if (todosPagados && dineroCuadra && estadoPrevio !== 'pagado') nuevoEstadoSol = 'pagado';
-        else if ((!todosPagados || !dineroCuadra) && estadoPrevio === 'pagado') nuevoEstadoSol = 'en_pagos';
-
-        if (nuevoEstadoSol) {
-          const pS = await fetch(`${PORTAL_URL}/rest/v1/solicitudes_tour?id=eq.${enc(lugar.solicitud_id)}`, {
-            method: 'PATCH',
-            headers: { ...sbHeaders, Prefer: 'return=minimal' },
-            body: JSON.stringify({ estado: nuevoEstadoSol }),
-          });
-          if (pS.ok) {
-            solicitudEstado = nuevoEstadoSol;
-            // Felicitación al titular si el grupo quedó liquidado (solo 'pagado').
-            if (nuevoEstadoSol === 'pagado') {
-              try {
-                const cliR = await fetch(
-                  `${PORTAL_URL}/rest/v1/clientes?id=eq.${enc(solicitud.cliente_id)}&select=nombre_completo,correo`,
-                  { headers: sbHeaders }
-                );
-                if (cliR.ok) {
-                  const c = (await cliR.json())[0] || {};
-                  const correo = c.correo && String(c.correo).trim();
-                  if (correo && correo.includes('@')) {
-                    const nombre = String(c.nombre_completo || 'cliente').trim().split(/\s+/)[0] || 'cliente';
-                    const asunto = `🎉 ¡Listo! Tu viaje a ${eventoNombre} está pagado`;
-                    const cuerpo = `<p style="margin:0 0 14px 0">¡Felicidades! Tu viaje a <strong>${escapeHtml(eventoNombre)}</strong> quedó <strong>100% pagado</strong>. Tu lugar está asegurado.</p>
+      const rec = await reconciliarSolicitud({
+        sbUrl: PORTAL_URL, sbHeaders, solicitudId: lugar.solicitud_id,
+      });
+      if (!rec.ok) throw new Error(rec.error);
+      if (rec.cambio) {
+        solicitudEstado = rec.cambio;
+        // Felicitación al titular si el grupo quedó liquidado (solo 'pagado').
+        if (rec.cambio === 'pagado') {
+          try {
+            const cliR = await fetch(
+              `${PORTAL_URL}/rest/v1/clientes?id=eq.${enc(solicitud.cliente_id)}&select=nombre_completo,correo`,
+              { headers: sbHeaders }
+            );
+            if (cliR.ok) {
+              const c = (await cliR.json())[0] || {};
+              const correo = c.correo && String(c.correo).trim();
+              if (correo && correo.includes('@')) {
+                const nombre = String(c.nombre_completo || 'cliente').trim().split(/\s+/)[0] || 'cliente';
+                const asunto = `🎉 ¡Listo! Tu viaje a ${eventoNombre} está pagado`;
+                const cuerpo = `<p style="margin:0 0 14px 0">¡Felicidades! Tu viaje a <strong>${escapeHtml(eventoNombre)}</strong> quedó <strong>100% pagado</strong>. Tu lugar está asegurado.</p>
                     <p style="margin:0">Pronto te compartimos los detalles finales. ¡Nos vemos!</p>`;
-                    await enviarCorreo(correo, asunto, wrapHtml(nombre, cuerpo));
-                  }
-                }
-              } catch (e) { console.error('[lugar-baja] correo liquidado falló (no crítico):', e.message); }
+                await enviarCorreo(correo, asunto, wrapHtml(nombre, cuerpo));
+              }
             }
-          }
+          } catch (e) { console.error('[lugar-baja] correo liquidado falló (no crítico):', e.message); }
         }
       }
     } catch (e) {

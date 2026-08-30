@@ -19515,48 +19515,139 @@ async function sembrarDelCatalogo() {
 
 // Una fila de zona dentro de un bloque de fecha. Sirve para las dos listas
 // —PLUS y CHEAP— porque en el modelo de la fecha son la misma forma.
-// ═══ [ESF-UX-2b] EL TABLERO DE ZONAS ═══════════════════════════════════════
-// Un solo tablero por evento multifecha: filas = unión de zonas, columnas =
-// fechas, y en cada intersección PLUS y CHEAP juntos y a la vista. Antes había
-// dos listas por fecha más el mago de arriba —karolg pedía recorrer OCHO listas
-// y 128 casillas para prender un semáforo, y la sección CHEAP vivía al fondo de
-// cada bloque: Memo batalló media hora sin encontrarla y su CHEAP por fecha se
-// terminó escribiendo por SQL. Una capacidad que el dueño no encuentra en 30
-// minutos no existe.
+// ═══ [ESF-UX-2b · ESF-UX-3-1b] EL TABLERO DE ZONAS ═════════════════════════
+// UN solo tablero de precios para CUALQUIER evento: filas = unión de zonas,
+// columnas = fechas, y en cada intersección PLUS y CHEAP juntos y a la vista.
+// Un evento de una sola fecha usa el MISMO tablero con UNA columna — mismo
+// modelo mental en las 23 sucursales, que es el requisito de producto.
 //
-// EL TABLERO ES VISTA, NO ALMACÉN. Las zonas siguen viviendo en cada bloque de
-// fecha (`box._esfZonas` / `box._esfCheap`), con sus objetos ORIGINALES: se
-// mutan en su sitio, así que las llaves desconocidas, el orden y hasta la forma
-// (`ag` ausente vs `ag:0`) sobreviven. Y el orden importa de verdad: morat/PLUS
-// NO es subsecuencia de la unión —medido—, así que pintar en orden de unión y
-// guardar en ese orden le habría reordenado las zonas a tres eventos.
+// Antes había dos listas por fecha más el mago de arriba: karolg pedía recorrer
+// OCHO listas y 128 casillas, y la sección CHEAP vivía al fondo de cada bloque
+// —Memo batalló media hora sin encontrarla y su CHEAP por fecha se terminó
+// escribiendo por SQL. Una capacidad que el dueño no encuentra en 30 minutos no
+// existe.
 //
-// `prox` y `sepEspecial` viven en el ENCABEZADO DE FILA porque no varían nunca
-// entre fechas (medido: 0 de 12 eventos). `vip` sí varía en 3 zonas, así que su
-// casilla nace indeterminada cuando difiere y solo escribe si Memo la toca.
+// EL TABLERO ES VISTA, NO ALMACÉN, y ahora sobre DOS almacenes:
+//   · multifecha → los bloques de fecha (`box._esfZonas` / `box._esfCheap`),
+//     con sus objetos ORIGINALES, mutados en su sitio. Eso conserva llaves
+//     desconocidas, la forma exacta (`ag` ausente vs `ag:0`) y el ORDEN propio
+//     de cada fecha: morat/PLUS no es subsecuencia de la unión —medido—, así
+//     que guardar en orden de unión le reordenaría las zonas a tres eventos.
+//   · una fecha  → el mago que ya existía, escondido pero VIVO. Sigue siendo el
+//     único lector (`_esfGetZonas`), así que el sugeridor de venue, el preview
+//     y «guardar zonas de este venue» no se enteran del cambio. Convertirlo en
+//     multifecha-de-1 habría sido lo cómodo, y está MEDIDO que no se puede: le
+//     agrega el campo `multifecha` al catálogo (130 → 214 bytes) y el index le
+//     estrena el paso de elegir día a 73 eventos que tienen uno solo.
 function _esfTabBloques() {
   return Array.from(document.querySelectorAll('#esf-multifecha .esf-mf-fecha'));
 }
+// Las COLUMNAS del tablero. Con fechas, una por fecha; sin fechas, una sola
+// respaldada por el mago. Todo lo de abajo habla con columnas, no con bloques.
+function _esfTabColumnas() {
+  const b = _esfTabBloques();
+  if (b.length) return b.map((box, i) => ({ box: box, i: i, fecha: true }));
+  return [{ mago: true, i: 0 }];
+}
+function _esfTabEtq(col) {
+  if (col.mago) return 'Precios del evento';
+  return (col.box.querySelector('.esf-mf-lbl')?.value || '').trim() || ('Fecha ' + (col.i + 1));
+}
+// Filas del mago: `#esf-zonas` para PLUS, `#esf-cheapzonas` para la lista CHEAP
+// propia (la que manda cuando existe: ESF-E1c).
+function _esfMagoFilas(cual) {
+  return Array.from(document.querySelectorAll(
+    cual === 'zonas' ? '#esf-zonas .esf-zona-row' : '#esf-cheapzonas .esf-cz-row'));
+}
+function _esfMagoNombre(row) {
+  return (row.querySelector('.esf-zona-n, .esf-cz-n')?.value || '').trim();
+}
+// ESPEJO: un evento de una fecha SIN lista CHEAP propia deriva su cheap del
+// `pc` de la fila PLUS, y el compilador copia de ahí `vip`, `prox` y `ag`
+// (la rampa de ESF-E1c). O sea: el CHEAP no se puede agotar aparte. El tablero
+// lo DICE en la celda en vez de fingir un switch que arrastraría al PLUS.
+function _esfTabEspejo(col) {
+  return !!col.mago && _esfMagoFilas('cheapZonas').length === 0;
+}
 // Una fecha HEREDA su CHEAP cuando no declara lista propia (index.html:5498:
 // `mf.cheapZonas || cur.cheapZonas || mf.zonas`). No es lo mismo que no tener
-// la zona: por eso la celda lo DICE en vez de dejarlo en blanco.
-function _esfTabHereda(box) { return !Array.isArray(box._esfCheap) || !box._esfCheap.length; }
-function _esfTabLista(box, cual) {
-  if (cual === 'zonas') { if (!Array.isArray(box._esfZonas)) box._esfZonas = []; return box._esfZonas; }
-  if (!Array.isArray(box._esfCheap)) box._esfCheap = [];
-  return box._esfCheap;
+// la zona: por eso la celda lo dice.
+function _esfTabHereda(col) {
+  if (col.mago) return false;               // el mago tiene su propio nombre: espejo
+  return !Array.isArray(col.box._esfCheap) || !col.box._esfCheap.length;
 }
-function _esfTabZona(box, cual, n) {
-  const l = (cual === 'zonas') ? box._esfZonas : box._esfCheap;
-  return Array.isArray(l) ? l.find((z) => z && z.n === n) : null;
+// Puente al mago: un objeto que se LEE y se ESCRIBE como una zona normal, pero
+// que por debajo toca los campos del formulario. Así `_esfTabCelda` no sabe con
+// cuál de los dos almacenes está hablando, y el mago sigue siendo la fuente.
+function _esfProxyZona(row, campos) {
+  const el = (k) => (campos[k] ? row.querySelector(campos[k]) : null);
+  const disparar = (e) => {
+    e.dispatchEvent(new Event('input', { bubbles: true }));
+    e.dispatchEvent(new Event('change', { bubbles: true }));
+  };
+  return new Proxy({}, {
+    get(_, k) {
+      const e = el(k);
+      if (!e) return undefined;
+      if (e.type === 'checkbox') return e.checked ? 1 : 0;
+      if (k === 'n') return e.value.trim();
+      const v = parseInt(e.value || '', 10);
+      return Number.isFinite(v) ? v : 0;
+    },
+    set(_, k, v) {
+      const e = el(k);
+      if (!e) return true;
+      if (e.type === 'checkbox') e.checked = !!v; else e.value = v;
+      disparar(e);
+      return true;
+    },
+    deleteProperty(_, k) {
+      const e = el(k);
+      if (!e) return true;
+      if (e.type === 'checkbox') e.checked = false; else e.value = '';
+      disparar(e);
+      return true;
+    },
+    has(_, k) { return !!el(k); },
+    ownKeys() { return Object.keys(campos); },
+    getOwnPropertyDescriptor() { return { enumerable: true, configurable: true }; },
+  });
 }
-// La unión, en orden de aparición: primero lo que trae cada fecha en PLUS y
+const _MAGO_PLUS  = { n: '.esf-zona-n', p: '.esf-zona-p', ag: '.esf-zona-ag', prox: '.esf-zona-prox', vip: '.esf-zona-vip' };
+// En espejo, el PRECIO cheap es `pc` de la misma fila y los estados son los del
+// PLUS: no se inventa un switch propio (los campos apuntan a los mismos inputs).
+const _MAGO_ESPEJO = { n: '.esf-zona-n', p: '.esf-zona-pc', ag: '.esf-zona-ag', prox: '.esf-zona-prox', vip: '.esf-zona-vip' };
+const _MAGO_CHEAP  = { n: '.esf-cz-n', p: '.esf-cz-p', ag: '.esf-cz-ag', prox: '.esf-cz-prox', vip: '.esf-cz-vip', sepEspecial: '.esf-cz-sep' };
+function _esfTabZona(col, cual, n) {
+  if (!col.mago) {
+    const l = (cual === 'zonas') ? col.box._esfZonas : col.box._esfCheap;
+    return Array.isArray(l) ? l.find((z) => z && z.n === n) : null;
+  }
+  if (cual === 'zonas') {
+    const row = _esfMagoFilas('zonas').find((r) => _esfMagoNombre(r) === n);
+    return row ? _esfProxyZona(row, _MAGO_PLUS) : null;
+  }
+  if (_esfTabEspejo(col)) {
+    const row = _esfMagoFilas('zonas').find((r) => _esfMagoNombre(r) === n);
+    return row ? _esfProxyZona(row, _MAGO_ESPEJO) : null;
+  }
+  const row = _esfMagoFilas('cheapZonas').find((r) => _esfMagoNombre(r) === n);
+  return row ? _esfProxyZona(row, _MAGO_CHEAP) : null;
+}
+function _esfTabLista(col, cual) {
+  if (col.mago) return null;                       // el mago se agrega por su propia boca
+  if (cual === 'zonas') { if (!Array.isArray(col.box._esfZonas)) col.box._esfZonas = []; return col.box._esfZonas; }
+  if (!Array.isArray(col.box._esfCheap)) col.box._esfCheap = [];
+  return col.box._esfCheap;
+}
+// La unión, en orden de aparición: primero lo que trae cada columna en PLUS y
 // luego lo que solo existe en CHEAP.
 function _esfTabUnion() {
   const orden = [], vistas = new Set();
-  const meter = (z) => { if (z && z.n && !vistas.has(z.n)) { vistas.add(z.n); orden.push(z.n); } };
-  _esfTabBloques().forEach((b) => (b._esfZonas || []).forEach(meter));
-  _esfTabBloques().forEach((b) => (b._esfCheap || []).forEach(meter));
+  const meter = (n) => { if (n && !vistas.has(n)) { vistas.add(n); orden.push(n); } };
+  const cols = _esfTabColumnas();
+  cols.forEach((c) => (c.mago ? _esfMagoFilas('zonas').map(_esfMagoNombre) : (c.box._esfZonas || []).map((z) => z && z.n)).forEach(meter));
+  cols.forEach((c) => (c.mago ? _esfMagoFilas('cheapZonas').map(_esfMagoNombre) : (c.box._esfCheap || []).map((z) => z && z.n)).forEach(meter));
   return orden;
 }
 const _TAB_CSS = {
@@ -19567,29 +19658,23 @@ const _TAB_CSS = {
 function _esfTableroPintar() {
   const cont = document.getElementById('esf-tablero');
   if (!cont) return;
-  const bloques = _esfTabBloques();
-  const grp = document.getElementById('esf-grp-tablero');
-  if (grp) grp.style.display = bloques.length ? '' : 'none';
+  const cols = _esfTabColumnas();
   cont.innerHTML = '';
-  if (!bloques.length) return;
   const union = _esfTabUnion();
-  const etq = (b, i) => (b.querySelector('.esf-mf-lbl')?.value || '').trim() || ('Fecha ' + (i + 1));
-
   const wrap = document.createElement('div');
   wrap.style.cssText = 'overflow-x:auto;border:1px solid var(--border);border-radius:var(--r-sm,8px)';
   const t = document.createElement('table');
-  t.style.cssText = 'border-collapse:collapse;width:100%;min-width:' + (170 + bloques.length * 210) + 'px';
+  t.style.cssText = 'border-collapse:collapse;width:100%;min-width:' + (170 + cols.length * 210) + 'px';
 
-  // ── encabezados: una columna por fecha, partida en PLUS y CHEAP
   const h1 = document.createElement('tr');
   h1.innerHTML = '<th style="' + _TAB_CSS.zn + '"></th>';
-  bloques.forEach((b, i) => {
+  cols.forEach((c) => {
     const th = document.createElement('th');
     th.colSpan = 2;
     th.style.cssText = _TAB_CSS.th + ';border-left:1px solid var(--border);border-bottom:1px solid var(--border)';
     const nom = document.createElement('div');
     nom.style.cssText = 'font-size:11px;color:var(--tx);text-transform:uppercase';
-    nom.textContent = etq(b, i);
+    nom.textContent = _esfTabEtq(c);
     const acc = document.createElement('div');
     acc.style.cssText = 'display:flex;gap:4px;justify-content:center;margin-top:3px';
     const mk = (txt, tit, fn) => {
@@ -19598,48 +19683,89 @@ function _esfTableroPintar() {
       x.style.cssText = 'font-size:10px;padding:2px 6px'; x.textContent = txt; x.title = tit;
       x.addEventListener('click', fn); return x;
     };
-    acc.appendChild(mk('Agotar', 'Marca agotadas todas las zonas de esta fecha, y el RIDE si lo tiene', () => _esfTabAgotarFecha(b, true)));
-    acc.appendChild(mk('Reabrir', 'Quita el agotado de todas las zonas de esta fecha', () => _esfTabAgotarFecha(b, false)));
+    acc.appendChild(mk('Agotar', 'Marca agotadas todas las zonas de esta columna, y el RIDE si lo tiene', () => _esfTabAgotar(c, true)));
+    acc.appendChild(mk('Reabrir', 'Quita el agotado de todas las zonas de esta columna', () => _esfTabAgotar(c, false)));
     th.appendChild(nom); th.appendChild(acc);
     h1.appendChild(th);
   });
   const h2 = document.createElement('tr');
   h2.innerHTML = '<th style="' + _TAB_CSS.zn + ';font-size:10px;font-family:\'JetBrains Mono\',monospace;letter-spacing:.08em;color:var(--ts)">ZONA</th>';
-  bloques.forEach((b) => {
+  cols.forEach((c) => {
     const a = document.createElement('th'); a.style.cssText = _TAB_CSS.th + ';border-left:1px solid var(--border)'; a.textContent = 'PLUS';
-    const c = document.createElement('th'); c.style.cssText = _TAB_CSS.th; c.textContent = _esfTabHereda(b) ? 'CHEAP · hereda' : 'CHEAP';
-    if (_esfTabHereda(b)) c.title = 'Esta fecha no declara zonas CHEAP propias: el sitio usa las del evento. Captura un precio para darle las suyas.';
-    h2.appendChild(a); h2.appendChild(c);
+    const ch = document.createElement('th'); ch.style.cssText = _TAB_CSS.th;
+    if (_esfTabHereda(c)) { ch.textContent = 'CHEAP · hereda'; ch.title = 'Esta fecha no declara zonas CHEAP propias: el sitio usa las del evento.'; }
+    else if (_esfTabEspejo(c)) { ch.textContent = 'CHEAP · espejo'; ch.title = 'Sin lista CHEAP propia, el sitio copia el estado del PLUS y solo cambia el precio. Dale lista propia para poder agotar el CHEAP aparte.'; }
+    else ch.textContent = 'CHEAP';
+    h2.appendChild(a); h2.appendChild(ch);
   });
   const thead = document.createElement('thead');
   thead.appendChild(h1); thead.appendChild(h2);
   t.appendChild(thead);
-
   const tb = document.createElement('tbody');
-  union.forEach((n) => tb.appendChild(_esfTabFila(n, bloques)));
+  union.forEach((n) => tb.appendChild(_esfTabFila(n, cols)));
   t.appendChild(tb);
   wrap.appendChild(t);
   cont.appendChild(wrap);
+
   const pie = document.createElement('div');
-  pie.style.cssText = 'font-size:11px;color:var(--ts);margin-top:6px';
-  pie.textContent = union.length + ' zona(s) × ' + bloques.length + ' fecha(s). Las zonas del evento se calculan de aquí: una zona se vende si se vende en alguna fecha.';
+  pie.style.cssText = 'font-size:11px;color:var(--ts);margin-top:6px;display:flex;gap:10px;align-items:center;flex-wrap:wrap';
+  const txt = document.createElement('span');
+  txt.textContent = union.length + ' zona(s) × ' + cols.length + ' ' + (cols[0].mago ? 'columna' : 'fecha(s)') +
+    (cols[0].mago ? '. Agrega una fecha y esta columna se convierte en la primera noche.'
+                  : '. Las zonas del evento se calculan de aquí: una zona se vende si se vende en alguna fecha.');
+  pie.appendChild(txt);
+  if (_esfTabEspejo(cols[0])) {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'btn btn-ghost';
+    b.style.cssText = 'font-size:11px';
+    b.textContent = 'Dar lista CHEAP propia';
+    b.title = 'Copia las zonas PLUS a una lista CHEAP independiente, para poder agotarla aparte.';
+    b.addEventListener('click', () => { _esfTabEstrenarCheapMago(); _esfTabSync(); });
+    pie.appendChild(b);
+  }
   cont.appendChild(pie);
 }
-function _esfTabFila(n, bloques) {
+function _esfTabFila(n, cols) {
   const tr = document.createElement('tr');
   tr.style.cssText = 'border-top:1px solid var(--border)';
-  // ── encabezado de la fila: nombre + los tres que no varían entre fechas
   const th = document.createElement('td');
   th.style.cssText = _TAB_CSS.zn;
-  const nom = document.createElement('div');
-  nom.style.cssText = 'font-weight:600;font-size:12px';
-  nom.textContent = n;
-  th.appendChild(nom);
+  // [ESF-UX-3-1b] El nombre se teclea AQUÍ. Antes vivía en un `prompt()`, que
+  // para dar de alta un evento de diez zonas son diez ventanitas: en 23
+  // sucursales eso no se aguanta. Renombrar cambia la zona en TODAS las
+  // columnas —es lo que significa una fila de tablero.
+  const nom = document.createElement('input');
+  nom.className = 'cot-input';
+  nom.style.cssText = 'font-weight:600;font-size:12px;padding:2px 5px;width:100%;min-width:150px';
+  nom.placeholder = 'Nombre de la zona';
+  nom.value = n;
+  nom.addEventListener('change', () => {
+    const nuevo = (nom.value || '').trim();
+    if (nuevo === n) return;
+    if (!nuevo) { nom.value = n; return; }                       // vaciar no borra: para eso está la ✕
+    if (_esfTabUnion().includes(nuevo)) { showToast('Ya hay una zona con ese nombre', 'error'); nom.value = n; return; }
+    cols.forEach((c) => ['zonas', 'cheapZonas'].forEach((k) => {
+      const z = _esfTabZona(c, k, n);
+      if (z) z.n = nuevo;
+    }));
+    _esfTableroPintar();
+  });
+  const cab = document.createElement('div');
+  cab.style.cssText = 'display:flex;gap:4px;align-items:center';
+  cab.appendChild(nom);
+  const quitar = document.createElement('button');
+  quitar.type = 'button'; quitar.className = 'btn btn-ghost';
+  quitar.style.cssText = 'font-size:11px;padding:2px 6px;color:var(--red)';
+  quitar.textContent = '✕';
+  quitar.title = 'Quitar esta zona de TODAS las columnas';
+  quitar.addEventListener('click', () => _esfTabQuitarZona(n));
+  cab.appendChild(quitar);
+  th.appendChild(cab);
   const fila = document.createElement('div');
   fila.style.cssText = 'display:flex;gap:6px;align-items:center;margin-top:2px';
   const todas = () => {
     const out = [];
-    bloques.forEach((b) => { ['zonas', 'cheapZonas'].forEach((c) => { const z = _esfTabZona(b, c, n); if (z) out.push(z); }); });
+    cols.forEach((c) => { ['zonas', 'cheapZonas'].forEach((k) => { const z = _esfTabZona(c, k, n); if (z) out.push(z); }); });
     return out;
   };
   const tri = (etiqueta, llave, titulo) => {
@@ -19650,8 +19776,8 @@ function _esfTabFila(n, bloques) {
     cb.type = 'checkbox';
     const vals = [...new Set(todas().map((z) => (z[llave] ? 1 : 0)))];
     cb.checked = vals.length === 1 && vals[0] === 1;
-    // Indeterminada = las fechas no dicen lo mismo. Mientras no se toque, cada
-    // fecha conserva el suyo: el tablero no promedia lo que no gobierna.
+    // Indeterminada = las columnas no dicen lo mismo. Mientras no se toque, cada
+    // una conserva el suyo: el tablero no promedia lo que no gobierna.
     cb.indeterminate = vals.length > 1;
     cb.addEventListener('change', () => {
       cb.indeterminate = false;
@@ -19661,41 +19787,40 @@ function _esfTabFila(n, bloques) {
     lab.appendChild(cb); lab.appendChild(document.createTextNode(etiqueta));
     return lab;
   };
-  fila.appendChild(tri('VIP', 'vip', 'Zona preferente. Si las fechas no coinciden, la casilla nace a medias y no las toca hasta que la aprietes.'));
+  fila.appendChild(tri('VIP', 'vip', 'Zona preferente. Si las columnas no coinciden, la casilla nace a medias y no las toca hasta que la aprietes.'));
   fila.appendChild(tri('Próx.', 'prox', 'Se anuncia sin precio. No varía entre fechas en ningún evento del catálogo.'));
   const sep = document.createElement('input');
   sep.className = 'cot-input'; sep.type = 'number'; sep.min = '0';
   sep.placeholder = 'separo esp.';
   sep.title = 'Separo especial de esta zona en CHEAP. Vacío = el separo normal del evento.';
   sep.style.cssText = 'flex:0 0 88px;font-size:11px;padding:2px 5px';
-  const conSep = bloques.map((b) => _esfTabZona(b, 'cheapZonas', n)).filter(Boolean).find((z) => z.sepEspecial);
+  const conSep = cols.map((c) => _esfTabZona(c, 'cheapZonas', n)).filter(Boolean).find((z) => z.sepEspecial);
   if (conSep) sep.value = conSep.sepEspecial;
   sep.addEventListener('change', () => {
     const v = parseInt(sep.value || '', 10);
-    bloques.forEach((b) => {
-      const z = _esfTabZona(b, 'cheapZonas', n);
-      if (!z) return;
+    cols.forEach((c) => {
+      const z = _esfTabZona(c, 'cheapZonas', n);
+      if (!z || !('sepEspecial' in z)) return;
       if (Number.isFinite(v) && v > 0) z.sepEspecial = v; else delete z.sepEspecial;
     });
   });
   fila.appendChild(sep);
   th.appendChild(fila);
   tr.appendChild(th);
-
-  bloques.forEach((b) => {
-    tr.appendChild(_esfTabCelda(b, 'zonas', n));
-    tr.appendChild(_esfTabCelda(b, 'cheapZonas', n));
+  cols.forEach((c) => {
+    tr.appendChild(_esfTabCelda(c, 'zonas', n));
+    tr.appendChild(_esfTabCelda(c, 'cheapZonas', n));
   });
   return tr;
 }
-// Una media celda. Tres estados VISIBLES, y el que falta dicho con todas sus
-// letras: libre · agotada · hereda. Un switch que no distingue "apagado" de
-// "hereda" repetiría la trampa que este tablero viene a quitar.
-function _esfTabCelda(box, cual, n) {
+// Una media celda. Los estados VISIBLES, cada uno dicho con todas sus letras:
+// libre · agotada · hereda · espejo · «— agregar». Un switch que no distingue
+// «apagado» de «no aplica» repetiría la trampa que este tablero vino a quitar.
+function _esfTabCelda(col, cual, n) {
   const td = document.createElement('td');
   td.style.cssText = _TAB_CSS.td;
-  const hereda = (cual === 'cheapZonas') && _esfTabHereda(box);
-  const z = _esfTabZona(box, cual, n);
+  const hereda = (cual === 'cheapZonas') && _esfTabHereda(col);
+  const z = _esfTabZona(col, cual, n);
   if (hereda || !z) {
     const vacia = document.createElement('button');
     vacia.type = 'button'; vacia.className = 'btn btn-ghost';
@@ -19703,14 +19828,17 @@ function _esfTabCelda(box, cual, n) {
     vacia.textContent = hereda ? 'hereda' : '— agregar';
     vacia.title = hereda
       ? 'Esta fecha no tiene lista CHEAP propia: usa la del evento. Apriétalo para darle la suya, copiada de sus zonas PLUS.'
-      : 'Esta zona no existe en esta fecha. Apriétalo para agregarla.';
+      : 'Esta zona no existe en esta columna. Apriétalo para agregarla.';
     vacia.addEventListener('click', () => {
-      if (hereda) _esfTabEstrenarCheap(box); else _esfTabLista(box, cual).push({ n: n, p: 0 });
+      if (hereda) _esfTabEstrenarCheap(col);
+      else if (col.mago) { if (cual === 'zonas') _esfAddZona({ n: n }); else _esfAddCheapZona({ n: n }); }
+      else _esfTabLista(col, cual).push({ n: n, p: 0 });
       _esfTableroPintar();
     });
     td.appendChild(vacia);
     return td;
   }
+  const espejo = (cual === 'cheapZonas') && _esfTabEspejo(col);
   const caja = document.createElement('div');
   caja.style.cssText = 'display:flex;gap:4px;align-items:center';
   const p = document.createElement('input');
@@ -19718,9 +19846,22 @@ function _esfTabCelda(box, cual, n) {
   p.style.cssText = 'flex:1;min-width:62px;font-size:11px;padding:2px 5px';
   if (z.p) p.value = z.p;
   p.addEventListener('input', () => { z.p = parseInt(p.value || '0', 10) || 0; });
+  caja.appendChild(p);
+  if (espejo) {
+    // Sin lista propia el estado del CHEAP lo pone el PLUS: se dice, no se
+    // finge un switch que arrastraría a la otra mitad de la fila.
+    const marca = document.createElement('span');
+    marca.style.cssText = 'font-size:10px;color:var(--ts);white-space:nowrap;opacity:.8';
+    marca.textContent = z.ag ? 'espejo·ag' : 'espejo';
+    marca.title = 'El agotado del CHEAP sigue al del PLUS. Para agotarlo aparte, dale lista CHEAP propia (botón abajo).';
+    caja.appendChild(marca);
+    td.style.background = z.ag ? 'color-mix(in srgb, var(--red) 12%, transparent)' : 'transparent';
+    td.appendChild(caja);
+    return td;
+  }
   const lab = document.createElement('label');
   lab.style.cssText = 'font-size:10px;display:flex;align-items:center;gap:2px;white-space:nowrap';
-  lab.title = 'Agotada en esta fecha';
+  lab.title = 'Agotada en esta columna';
   const cb = document.createElement('input');
   cb.type = 'checkbox';
   cb.checked = !!z.ag;
@@ -19733,70 +19874,107 @@ function _esfTabCelda(box, cual, n) {
     pinta();
   });
   lab.appendChild(cb); lab.appendChild(document.createTextNode('ag'));
-  caja.appendChild(p); caja.appendChild(lab);
+  caja.appendChild(lab);
   td.appendChild(caja);
   pinta();
   return td;
 }
-// Darle a una fecha su propia lista CHEAP: nace copiada de sus PLUS, que es de
+// Darle a una FECHA su propia lista CHEAP: nace copiada de sus PLUS, que es de
 // donde el sitio la sacaba por herencia. Copiar no inventa precios nuevos.
-function _esfTabEstrenarCheap(box) {
-  box._esfCheap = (box._esfZonas || []).map((z) => {
+function _esfTabEstrenarCheap(col) {
+  if (col.mago) return _esfTabEstrenarCheapMago();
+  col.box._esfCheap = (col.box._esfZonas || []).map((z) => {
     const o = { n: z.n, p: z.p || 0 };
     if (z.ag) o.ag = 1;
     if (z.vip) o.vip = 1;
     return o;
   });
 }
-function _esfTabAgotarFecha(box, agotar) {
+// Y al EVENTO de una fecha: su lista CHEAP propia nace del `pc` que ya tenían
+// sus zonas —el mismo número que el sitio venía usando por la rampa—, así que
+// estrenarla no cambia un solo precio publicado.
+function _esfTabEstrenarCheapMago() {
+  const filas = _esfMagoFilas('zonas');
+  if (!filas.length) { showToast('Primero captura las zonas', 'error'); return; }
+  filas.forEach((r) => {
+    const z = _esfProxyZona(r, _MAGO_PLUS);
+    const pc = parseInt(r.querySelector('.esf-zona-pc')?.value || '0', 10) || 0;
+    _esfAddCheapZona({ n: z.n, p: pc, ag: z.ag, prox: z.prox, vip: z.vip });
+  });
+}
+function _esfTabAgotar(col, agotar) {
+  if (col.mago) {
+    _esfMagoFilas('zonas').concat(_esfMagoFilas('cheapZonas')).forEach((r) => {
+      const ag = r.querySelector('.esf-zona-ag, .esf-cz-ag');
+      const px = r.querySelector('.esf-zona-prox, .esf-cz-prox');
+      if (!ag) return;
+      ag.checked = !!agotar;
+      if (agotar && px) px.checked = false;
+      ag.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    _esfTableroPintar();
+    return;
+  }
   ['zonas', 'cheapZonas'].forEach((c) => {
-    const l = (c === 'zonas') ? box._esfZonas : box._esfCheap;
+    const l = (c === 'zonas') ? col.box._esfZonas : col.box._esfCheap;
     (Array.isArray(l) ? l : []).forEach((z) => {
       if (agotar) { z.ag = 1; delete z.prox; } else { delete z.ag; }
     });
   });
-  const ride = box.querySelector('.esf-mf-ride'), rag = box.querySelector('.esf-mf-rideag');
+  const ride = col.box.querySelector('.esf-mf-ride'), rag = col.box.querySelector('.esf-mf-rideag');
   if (agotar) { if (ride && ride.value && rag) rag.checked = true; } else if (rag) rag.checked = false;
   _esfTableroPintar();
 }
-// Agregar una zona nueva: entra en TODAS las fechas, que es lo que un tablero
-// de filas significa. Si alguna no la quiere, se le quita en su celda.
+// Agregar una zona nueva: entra en TODAS las columnas, que es lo que una fila
+// de tablero significa. Si alguna no la quiere, se le quita en su celda.
 function _esfTabAddZona() {
-  const bloques = _esfTabBloques();
-  if (!bloques.length) { showToast('Primero agrega una fecha', 'error'); return; }
-  const n = (prompt('Nombre de la zona nueva') || '').trim();
-  if (!n) return;
-  if (_esfTabUnion().includes(n)) { showToast('Esa zona ya está en el tablero', 'error'); return; }
-  bloques.forEach((b) => {
-    _esfTabLista(b, 'zonas').push({ n: n, p: 0 });
-    if (!_esfTabHereda(b)) _esfTabLista(b, 'cheapZonas').push({ n: n, p: 0 });
+  // Nace SIN nombre y con el cursor listo: se teclea en la fila. Una zona sin
+  // nombre no se guarda (los lectores ya filtran por `n`), así que una fila a
+  // medias no ensucia nada.
+  const n = '';
+  _esfTabColumnas().forEach((c) => {
+    if (c.mago) {
+      _esfAddZona({ n: n });
+      if (!_esfTabEspejo(c)) _esfAddCheapZona({ n: n });
+      return;
+    }
+    _esfTabLista(c, 'zonas').push({ n: n, p: 0 });
+    if (!_esfTabHereda(c)) _esfTabLista(c, 'cheapZonas').push({ n: n, p: 0 });
   });
   _esfTableroPintar();
+  const filas = document.querySelectorAll('#esf-tablero tbody tr');
+  const ult = filas[filas.length - 1];
+  if (ult) ult.querySelector('input')?.focus();
 }
-// Quita la zona de todas las fechas. Se pregunta: borrar una fila del tablero
-// borra tantas casillas como fechas haya.
-function _esfTabQuitarZona() {
-  const union = _esfTabUnion();
-  if (!union.length) return;
-  const n = (prompt('¿Qué zona quitas de TODAS las fechas?\n\n' + union.join(' · ')) || '').trim();
-  if (!n || !union.includes(n)) return;
-  _esfTabBloques().forEach((b) => {
+// Quita la zona de todas las columnas. Se pregunta: borrar una fila del tablero
+// borra tantas casillas como columnas haya.
+function _esfTabQuitarZona(n) {
+  const cuantas = _esfTabColumnas().length;
+  if (n && cuantas > 1 && !confirm('Quitar «' + n + '» la borra en las ' + cuantas + ' fechas. ¿Seguir?')) return;
+  _esfTabColumnas().forEach((c) => {
+    if (c.mago) {
+      _esfMagoFilas('zonas').concat(_esfMagoFilas('cheapZonas'))
+        .filter((r) => _esfMagoNombre(r) === n).forEach((r) => r.remove());
+      return;
+    }
     ['_esfZonas', '_esfCheap'].forEach((k) => {
-      if (Array.isArray(b[k])) b[k] = b[k].filter((z) => z.n !== n);
+      if (Array.isArray(c.box[k])) c.box[k] = c.box[k].filter((z) => z.n !== n);
     });
   });
   _esfTableroPintar();
 }
-// El mago de arriba deja de ser editable en cuanto el evento tiene fechas: es
-// la raíz de la confusión ("hasta arriba hay un wizard de precios y luego abajo
-// uno por fecha") y del bug de las dos verdades. Desde UX-2a se DERIVA.
+// El mago de arriba deja de pintarse SIEMPRE: con fechas porque el global se
+// deriva (UX-2a/2c), y sin fechas porque el tablero lo edita por dentro. Es la
+// raíz de lo que Memo describió —"hay 3 listas de precios… ¿en cuál hago los
+// cambios?"— y de las dos verdades que mordieron a Omar.
 function _esfTabSync() {
-  const hayFechas = _esfTabBloques().length > 0;
   const fest = !!document.getElementById('esf-es-festival')?.checked;
   ['esf-grp-zonas', 'esf-grp-cheapzonas'].forEach((id) => {
     const g = document.getElementById(id);
-    if (g) g.style.display = (hayFechas || fest) ? 'none' : '';
+    if (g) g.style.display = 'none';
   });
+  const grp = document.getElementById('esf-grp-tablero');
+  if (grp) grp.style.display = fest ? 'none' : '';   // en festival mandan sus paquetes
   _esfTableroPintar();
 }
 
@@ -20011,8 +20189,9 @@ function _esfMfAddFecha(data) {
   // Agotar / reabrir la noche entera. Dos verbos explícitos en vez de un botón
   // que adivine el modo: un control que cambia de significado según un estado
   // que no se ve es un control que miente la mitad de las veces.
-  box.querySelector('.esf-mf-agotar').addEventListener('click', () => _esfTabAgotarFecha(box, true));
-  box.querySelector('.esf-mf-reabrir').addEventListener('click', () => _esfTabAgotarFecha(box, false));
+  const _col = () => ({ box: box, fecha: true, i: _esfTabBloques().indexOf(box) });
+  box.querySelector('.esf-mf-agotar').addEventListener('click', () => _esfTabAgotar(_col(), true));
+  box.querySelector('.esf-mf-reabrir').addEventListener('click', () => _esfTabAgotar(_col(), false));
   cont.appendChild(box);
   _esfTabSync();
 }

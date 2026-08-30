@@ -19703,6 +19703,8 @@ function _esfTableroPintar() {
   t.appendChild(thead);
   const tb = document.createElement('tbody');
   union.forEach((n) => tb.appendChild(_esfTabFila(n, cols)));
+  tb.appendChild(_esfTabFilaStay(cols));
+  tb.appendChild(_esfTabFilaRide(cols));
   t.appendChild(tb);
   wrap.appendChild(t);
   cont.appendChild(wrap);
@@ -19724,6 +19726,145 @@ function _esfTableroPintar() {
     pie.appendChild(b);
   }
   cont.appendChild(pie);
+}
+// ═══ [ESF-UX-3-1c] LOS DOS RENGLONES DE ABAJO ══════════════════════════════
+// El tablero cierra con lo que faltaba para no salirse de la pantalla: el STAY,
+// que no se captura, y el RIDE, que sí.
+//
+// STAY es SOLO LECTURA por regla sellada (25-ago): cuesta `PLUS − $500` fijos,
+// y ese 500 vive idéntico en los cuatro runtimes (`precio-zona.js`, `rol.html`,
+// `portal.html`, `index.html` — verificado). No se vuelve editable por zona: lo
+// único que se decide es si el evento lo vende, y eso es `noStay`, uno por
+// evento, aquí a la vista.
+const _TAB_STAY_DESC = 500;
+function _esfTabStayDesde(col) {
+  const libres = _esfTabUnion()
+    .map((n) => _esfTabZona(col, 'zonas', n))
+    .filter((z) => z && !z.ag && !z.prox && z.p > 0)
+    .map((z) => z.p);
+  return libres.length ? (Math.min.apply(null, libres) - _TAB_STAY_DESC) : 0;
+}
+function _esfTabFilaStay(cols) {
+  const tr = document.createElement('tr');
+  tr.style.cssText = 'border-top:2px solid var(--border);background:var(--bg2,transparent)';
+  const th = document.createElement('td');
+  th.style.cssText = _TAB_CSS.zn;
+  const t1 = document.createElement('div');
+  t1.style.cssText = 'font-weight:600;font-size:12px';
+  t1.textContent = 'STAY';
+  const t2 = document.createElement('div');
+  t2.style.cssText = 'font-size:10px;color:var(--ts);margin-top:1px';
+  t2.textContent = 'se calcula solo: PLUS − $' + _TAB_STAY_DESC;
+  th.appendChild(t1); th.appendChild(t2);
+  // `noStay` no se duplica: esta casilla ESCRIBE en la del bloque de paquetes,
+  // que sigue siendo su casa. Es la misma pieza vista desde donde se necesita.
+  const chk = document.getElementById('esf-pkg-nostay');
+  // `.chk-linea` es la clase que esta casa ya tiene para esto: sin ella,
+  // `.form-group label` la pinta como RÓTULO (block, 9px, mayúsculas) y el
+  // texto suelto se despega del cuadrito. Y el texto va dentro de UN <span>,
+  // porque un label flex hace de cada nodo de texto un ítem y el gap los separa
+  // —está escrito en kamehouse.css y aun así caí.
+  const lab = document.createElement('label');
+  lab.className = 'chk-linea';
+  lab.style.cssText = 'font-size:11px;margin-top:4px';
+  lab.title = 'Este evento no vende STAY. Es la misma casilla que «Sin STAY» del bloque de paquetes.';
+  const cb = document.createElement('input');
+  cb.type = 'checkbox';
+  cb.checked = !!(chk && chk.checked);
+  cb.addEventListener('change', () => {
+    if (chk) { chk.checked = cb.checked; chk.dispatchEvent(new Event('change', { bubbles: true })); }
+    _esfTableroPintar();
+  });
+  const sp = document.createElement('span'); sp.textContent = 'No vende STAY';
+  lab.appendChild(cb); lab.appendChild(sp);
+  th.appendChild(lab);
+  tr.appendChild(th);
+  const apagado = !!(chk && chk.checked);
+  cols.forEach((c) => {
+    const td = document.createElement('td');
+    td.colSpan = 2;
+    td.style.cssText = _TAB_CSS.td + ';text-align:center;font-size:11px;color:var(--ts)';
+    if (apagado) { td.textContent = 'no se vende'; td.style.opacity = '.6'; }
+    else {
+      const v = _esfTabStayDesde(c);
+      td.textContent = v > 0 ? ('desde $' + v.toLocaleString('en-US')) : '—';
+      td.title = v > 0 ? 'La zona PLUS más barata que se vende en esta columna, menos $' + _TAB_STAY_DESC : 'Sin zonas PLUS a la venta en esta columna';
+    }
+    tr.appendChild(td);
+  });
+  return tr;
+}
+// RIDE: éste SÍ se captura, y por fecha. El global NO es un duplicado: el index
+// lo usa como BASE de las fechas que no traen el suyo —`m.ride || cur.ride` en
+// index.html:4956 y :5998, medido—, así que ni se esconde ni se deriva; se
+// ANUNCIA, para que una celda vacía no parezca un cero.
+function _esfTabFilaRide(cols) {
+  const tr = document.createElement('tr');
+  tr.style.cssText = 'border-top:1px solid var(--border)';
+  const th = document.createElement('td');
+  th.style.cssText = _TAB_CSS.zn;
+  const t1 = document.createElement('div');
+  t1.style.cssText = 'font-weight:600;font-size:12px';
+  t1.textContent = 'RIDE';
+  const global = parseInt(document.getElementById('esf-ride')?.value || '', 10);
+  const t2 = document.createElement('div');
+  t2.style.cssText = 'font-size:10px;color:var(--ts);margin-top:1px';
+  t2.textContent = Number.isFinite(global) && global > 0
+    ? ('vacío = el del evento, $' + global.toLocaleString('en-US'))
+    : 'sin precio del evento: captúralo en Separo';
+  th.appendChild(t1); th.appendChild(t2);
+  tr.appendChild(th);
+  cols.forEach((c) => {
+    const td = document.createElement('td');
+    td.colSpan = 2;
+    td.style.cssText = _TAB_CSS.td;
+    if (c.mago) {
+      // Un evento de una fecha no tiene RIDE por noche ni `rideAgotado`: el
+      // catálogo no lo conoce a nivel evento (medido: 0 de 107). Se dice dónde
+      // vive en vez de estrenar un control que el sitio no leería.
+      td.style.cssText += ';text-align:center;font-size:11px;color:var(--ts)';
+      td.textContent = (Number.isFinite(global) && global > 0)
+        ? ('$' + global.toLocaleString('en-US') + ' · se captura en Separo')
+        : 'sin RIDE';
+      td.title = 'El precio del RIDE del evento vive en el bloque Separo. Un evento de una sola fecha no tiene RIDE por noche.';
+      tr.appendChild(td);
+      return;
+    }
+    const caja = document.createElement('div');
+    caja.style.cssText = 'display:flex;gap:4px;align-items:center';
+    const inp = c.box.querySelector('.esf-mf-ride');
+    const rag = c.box.querySelector('.esf-mf-rideag');
+    const p = document.createElement('input');
+    p.className = 'cot-input'; p.type = 'number'; p.min = '0';
+    p.placeholder = (Number.isFinite(global) && global > 0) ? String(global) : '$ RIDE';
+    p.style.cssText = 'flex:1;min-width:62px;font-size:11px;padding:2px 5px';
+    if (inp && inp.value) p.value = inp.value;
+    p.addEventListener('input', () => {
+      if (!inp) return;
+      inp.value = p.value;
+      inp.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    const lab = document.createElement('label');
+    lab.style.cssText = 'font-size:10px;display:flex;align-items:center;gap:2px;white-space:nowrap';
+    lab.title = 'RIDE agotado en esta fecha';
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.checked = !!(rag && rag.checked);
+    const pinta = () => {
+      td.style.background = cb.checked ? 'color-mix(in srgb, var(--red) 12%, transparent)' : 'transparent';
+      lab.style.color = cb.checked ? 'var(--red)' : 'var(--ts)';
+    };
+    cb.addEventListener('change', () => {
+      if (rag) { rag.checked = cb.checked; rag.dispatchEvent(new Event('change', { bubbles: true })); }
+      pinta();
+    });
+    lab.appendChild(cb); lab.appendChild(document.createTextNode('ag'));
+    caja.appendChild(p); caja.appendChild(lab);
+    td.appendChild(caja);
+    pinta();
+    tr.appendChild(td);
+  });
+  return tr;
 }
 function _esfTabFila(n, cols) {
   const tr = document.createElement('tr');
@@ -20154,7 +20295,10 @@ function _esfMfAddFecha(data) {
       '<input class="cot-input esf-mf-music" placeholder="ID de música" title="Pista propia de esta noche. Vacío = usa la del evento." style="flex:1;min-width:130px" autocomplete="off">' +
     '</div>' +
     '<div class="esf-mf-hotelbox" style="margin-top:12px"></div>' +
-    '<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:10px">' +
+    // [ESF-UX-3-1c] Los inputs del RIDE se quedan como ALMACÉN pero dejan de
+    // verse aquí: el tablero es el único editor visible, y les escribe por
+    // dentro. Igual que el mago en 1b — una sola fuente, una sola pantalla.
+    '<div style="display:none">' +
       '<input class="cot-input esf-mf-ride" type="number" min="0" placeholder="$ RIDE de esta noche" style="flex:1;min-width:150px">' +
       '<label style="font-size:11px;display:flex;align-items:center;gap:3px;white-space:nowrap"><input type="checkbox" class="esf-mf-rideag">RIDE agotado</label>' +
     '</div>';

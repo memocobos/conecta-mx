@@ -1824,9 +1824,7 @@
      <div id="esf-zonas"></div>
      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
       <button class="btn btn-ghost" type="button" onclick="_esfAddZona()">+ Agregar zona</button>
-      <button class="btn btn-ghost" type="button" onclick="_esfGuardarVenueZonas()" title="Guarda los NOMBRES de zona (sin precios) para este venue"><svg class="ic"><use href="#ic-guardar"/></svg> Guardar zonas de este venue</button>
      </div>
-     <div id="esf-venue-cat-msg" style="font-size:11px;margin-top:4px"></div>
      <div style="font-size:11px;color:var(--ts);margin-top:4px">El precio CHEAP es opcional. Si ninguna zona tiene CHEAP, el evento solo ofrece paquete PLUS.</div>
      </div>
      <!-- [ESF-E1c] LAS ZONAS CHEAP SON SU PROPIA LISTA, no un reflejo de las de
@@ -1872,9 +1870,17 @@
      <div id="esf-tablero"></div>
      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
       <button class="btn btn-ghost" type="button" onclick="_esfTabAddZona()">+ Agregar zona</button>
-      <button class="btn btn-ghost" type="button" onclick="_esfTabQuitarZona()">Quitar zona</button>
+      <!-- [ESF-UX-3-1b] Se mudó con su mensaje desde `esf-grp-zonas`, que ahora
+           se esconde siempre: esconder un contenedor se lleva los botones de
+           adentro, y éste guarda los nombres de zona del venue. -->
+      <button class="btn btn-ghost" type="button" onclick="_esfGuardarVenueZonas()" title="Guarda los NOMBRES de zona (sin precios) para este venue"><svg class="ic"><use href="#ic-guardar"/></svg> Guardar zonas de este venue</button>
      </div>
-     <div style="font-size:11px;color:var(--ts);margin-top:4px">Las <b>zonas del evento</b> ya no se capturan: se calculan de aquí. Una zona se vende arriba si se vende en <b>alguna</b> fecha, con el precio de esa fecha.</div>
+     <div id="esf-venue-cat-msg" style="font-size:11px;margin-top:4px"></div>
+     <!-- [ESF-UX-3-1b] La nota fija tiene que ser cierta en los DOS casos: la
+          de multifecha ("se vende si se vende en alguna fecha") le mentía a un
+          evento de una sola columna. Lo que cambia según el caso lo dice el pie
+          del tablero, que se pinta con la cuenta real de columnas. -->
+     <div style="font-size:11px;color:var(--ts);margin-top:4px">Éste es el <b>único</b> lugar donde se capturan precios de zona, tenga el evento una fecha o varias.</div>
     </div>
     <div class="form-group" data-esf="vende" id="esf-grp-hotel">
      <label>Hotel</label>

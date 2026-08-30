@@ -18,6 +18,7 @@
 // =============================================================================
 
 const { verifyAdminAuthLive, corsCheck } = require('./_lib/verify-admin');
+const { condicionVersion, noAlcanzo, respuestaChoque } = require('./_lib/candado-optimista');
 const { ensureLugares } = require('./_lib/portal-lugares');
 const { generarContratosDeSolicitud } = require('./_lib/contratos-viajeros');
 const { aplicarModoPrueba } = require('./_lib/correo-guard');
@@ -67,12 +68,31 @@ exports.handler = async (event) => {
     return { statusCode: 400, headers, body: JSON.stringify({ error: 'notas_admin demasiado largas (máx 2000)' }) };
   }
 
+  // [CONC-4b] `version` es el `updated_at` que la ficha tenía delante. Es
+  // OBLIGATORIA: ésta es la única escritura de `solicitudes_tour` donde un
+  // humano tuvo la pantalla abierta un rato, y es justo donde dos admins se
+  // pisan sin enterarse — uno cancela, el otro aprueba, gana el último clic.
+  // La pantalla la manda desde el mismo commit que esta función; faltarla solo
+  // puede ser una pestaña vieja, y ahí vale más un mensaje que se puede obedecer
+  // que un candado que se apaga solo cuando más falta hace.
+  const version = body.version;
+  if (typeof version !== 'string' || !version.trim()) {
+    return { statusCode: 400, headers, body: JSON.stringify({
+      error: 'Falta la versión de la solicitud. Recarga la pantalla y vuelve a intentarlo.',
+      falta_version: true,
+    }) };
+  }
+
   const patch = { estado: nuevoEstado };
   // Solo tocamos notas_admin si el admin escribió algo (string vacío equivale a "no cambiar").
   if (notas.length > 0) patch.notas_admin = notas;
 
   try {
-    const url = `${env.PORTAL_SB_URL}/rest/v1/solicitudes_tour?id=eq.${solicitudId}`;
+    // [CONC-4b] Se escribe SOLO si la solicitud sigue como la pantalla la leyó.
+    // La versión la mueve un TRIGGER (migraciones/CONC-4b-solicitudes-updated-at.sql),
+    // no los endpoints: ninguno de los 14 la escribía a mano, y así se queda.
+    const url = `${env.PORTAL_SB_URL}/rest/v1/solicitudes_tour?id=eq.${solicitudId}`
+              + condicionVersion(version);
     const r = await fetch(url, {
       method: 'PATCH',
       headers: {
@@ -88,6 +108,16 @@ exports.handler = async (event) => {
       return { statusCode: 502, headers, body: JSON.stringify({ error: 'Supabase rechazó la actualización', detail }) };
     }
     const arr = await r.json();
+    // Cero filas con condición son DOS cosas distintas y no se pueden confundir:
+    // decirle «no existe» a quien fue ganado por otro admin lo manda a buscar una
+    // solicitud que sí está.
+    if (noAlcanzo(arr)) {
+      const vivoR = await fetch(`${env.PORTAL_SB_URL}/rest/v1/solicitudes_tour?id=eq.${solicitudId}&select=id&limit=1`, {
+        headers: { apikey: env.PORTAL_SB_SERVICE, Authorization: `Bearer ${env.PORTAL_SB_SERVICE}` },
+      });
+      const vivo = vivoR.ok ? (await vivoR.json().catch(() => []))[0] : null;
+      if (vivo) return respuestaChoque(headers, 'esta solicitud');
+    }
     const actualizada = Array.isArray(arr) ? arr[0] : null;
     if (!actualizada) {
       return { statusCode: 404, headers, body: JSON.stringify({ error: 'Solicitud no encontrada' }) };

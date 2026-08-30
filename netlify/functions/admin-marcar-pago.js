@@ -7,7 +7,7 @@
 // el cliente lo ve en portal.html (que suma los pagos 'pagado' como "abonado").
 //
 // Body JSON:
-//   { pago_id: uuid, accion: 'pagar'|'revertir',
+//   { pago_id: uuid, accion: 'pagar'|'revertir', version: <updated_at leído>,
 //     fecha_pagada?: 'YYYY-MM-DD', metodo?, referencia? }
 //
 // Lógica (service_role):
@@ -76,6 +76,20 @@ exports.handler = async (event) => {
     return { statusCode: 400, headers, body: JSON.stringify({ error: "accion debe ser 'pagar' o 'revertir'" }) };
   }
 
+  // [CONC-2] `version` es el `updated_at` que la pantalla leyó del plan de pagos.
+  // Es OBLIGATORIA y se rehúsa el guardado sin ella, a propósito: este es el caso
+  // que Memo teme —dos personas con el mismo plan abierto— y la pantalla la manda
+  // siempre desde el mismo commit que esta función. Faltarla solo puede ser una
+  // pestaña vieja, y ahí vale mucho más un mensaje que se puede obedecer que un
+  // candado que se apaga solo justo cuando más falta hace.
+  const version = body.version;
+  if (typeof version !== 'string' || !version.trim()) {
+    return { statusCode: 400, headers, body: JSON.stringify({
+      error: 'Falta la versión de la cuota. Recarga la pantalla y vuelve a intentarlo.',
+      falta_version: true,
+    }) };
+  }
+
   // ── Construir el patch según la acción ───────────────────────────────────
   let patch;
   if (accion === 'pagar') {
@@ -139,7 +153,7 @@ exports.handler = async (event) => {
   // 'stripe:evt_...'. La extracción es un movimiento, no un cambio — el arnés
   // de T4 lo prueba antes y después.
   const actorEtiqueta = (auth.user && (auth.user.correo || auth.user.rol)) || 'admin';
-  const r = await aplicarNucleo({ env, headers, pagoId, accion, patch, actorEtiqueta });
+  const r = await aplicarNucleo({ env, headers, pagoId, accion, patch, actorEtiqueta, version });
   // El bloque `admin` de la respuesta se queda AQUÍ: es del endpoint admin, no
   // del núcleo (un webhook no tiene admin que reportar).
   if (r.statusCode === 200) {

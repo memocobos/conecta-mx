@@ -205,8 +205,12 @@ exports.handler = async (event) => {
   }).format(new Date());
 
   let montoCuota = null;
+  // [CONC-2] La versión de la cuota, leída en el mismo select. `null` significa
+  // «no pude leerla» y el núcleo escribe sin candado DICIÉNDOLO — un webhook que
+  // se cae por no poder leer una versión pierde un pago cobrado, y eso es peor.
+  let versionCuota = null;
   try {
-    const pR = await fetch(`${SB_URL}/rest/v1/pagos?id=eq.${encodeURIComponent(pagoId)}&select=monto,estado`, { headers: sb });
+    const pR = await fetch(`${SB_URL}/rest/v1/pagos?id=eq.${encodeURIComponent(pagoId)}&select=monto,estado,updated_at`, { headers: sb });
     if (pR.ok) {
       const arr = await pR.json();
       const p = Array.isArray(arr) ? arr[0] : null;
@@ -214,7 +218,7 @@ exports.handler = async (event) => {
         // Alguien ya la marcó (a mano, o un evento hermano). No se re-marca.
         return { statusCode: 200, headers, body: JSON.stringify({ ok: true, ya_pagada: true }) };
       }
-      if (p) montoCuota = p.monto;
+      if (p) { montoCuota = p.monto; versionCuota = p.updated_at != null ? p.updated_at : null; }
     }
   } catch (e) {
     console.error('[stripe-webhook] no pude leer la cuota:', e.message);
@@ -233,6 +237,8 @@ exports.handler = async (event) => {
   const r = await aplicarNucleo({
     env, headers, pagoId, accion: 'pagar', patch,
     actorEtiqueta: 'stripe:' + eventId,
+    version: versionCuota,
+    motivoSinVersion: versionCuota === null ? 'webhook: no se pudo leer la cuota antes de marcarla' : undefined,
   });
 
   // Se cierra la sesión de checkout (cosmético para el tablero).

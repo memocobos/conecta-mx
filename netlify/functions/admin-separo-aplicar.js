@@ -89,7 +89,7 @@ exports.handler = async (event) => {
   let cuota;
   try {
     const r = await fetch(`${SB_URL}/rest/v1/pagos?solicitud_id=eq.${encodeURIComponent(solicitudId)}` +
-      `&numero_pago=eq.1&estado=eq.pendiente&select=id,monto,estado&order=id&limit=1`, { headers: sb });
+      `&numero_pago=eq.1&estado=eq.pendiente&select=id,monto,estado,updated_at&order=id&limit=1`, { headers: sb });
     if (!r.ok) return { statusCode: 502, headers, body: JSON.stringify({ error: 'No se pudo leer el plan' }) };
     const arr = await r.json();
     cuota = Array.isArray(arr) ? arr[0] : null;
@@ -121,6 +121,10 @@ exports.handler = async (event) => {
       registrado_por: 'stripe', monto_pagado: montoPesos,
     },
     actorEtiqueta: 'stripe:separo:' + (sol.separo_session_id || solicitudId),
+    // [CONC-2] La versión es la que acaba de traer la lectura de arriba: aquí no
+    // hay pantalla abierta, la ventana es de milisegundos — pero es justo la
+    // ventana en la que el admin puede estar marcando esa misma cuota a mano.
+    version: cuota.updated_at,
   });
   if (r.statusCode !== 200) return r;   // el núcleo ya trae su propio mensaje
 

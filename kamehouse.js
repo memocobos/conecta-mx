@@ -6597,6 +6597,24 @@ function _spNumLugar(solicitudId, lugarId) {
   return (lg && lg.numero != null) ? Number(lg.numero) : 9999;
 }
 // Mismo lenguaje que el plan por lugar: nombre real, o "Titular" para el #1.
+// [CONC-2] La versión de una cuota, sacada del MISMO caché que pintó la fila que
+// el admin está viendo. Ese es el punto del candado: no vale releerla del
+// servidor justo antes de escribir —eso solo mediría el último medio segundo—,
+// vale la que el admin tenía delante cuando decidió. `null` = no la tengo, y
+// entonces el guardado se detiene con un mensaje en vez de escribir a ciegas.
+function _spVersionPago(solicitudId, pagoId) {
+  const p = (_spPlanCache[solicitudId] || []).find(x => x && x.id === pagoId);
+  return (p && p.updated_at) ? p.updated_at : null;
+}
+
+// [CONC-2] Un 409 del candado no es un error del admin: alguien más movió la
+// cuota. Se refresca lo que está viendo y se le dice qué pasó, para que repita
+// lo suyo sobre el dato nuevo.
+async function _spAvisarChoque(solicitudId, data) {
+  showToast(data && data.error ? data.error : 'Alguien más movió esta cuota — se recargó el plan', 'error');
+  try { await _spRefrescarPlanYLista(solicitudId, null); } catch (e) { /* el aviso ya salió */ }
+}
+
 function _spEtiquetaLugar(solicitudId, lugarId) {
   if (!lugarId) return 'Separo del grupo';
   const lg = (_spLugaresCache[solicitudId] || []).find(x => x.id === lugarId) || {};
@@ -6656,6 +6674,7 @@ async function _spSeparoMarcar() {
         body: JSON.stringify({
           pago_id: e.pago.id,
           accion: 'pagar',
+          version: e.pago.updated_at,   // [CONC-2] la fila que se está viendo
           fecha_pagada: fecha || undefined,
           metodo,
           cuenta: cuenta || undefined,
@@ -7320,6 +7339,14 @@ async function marcarPagoSP(solicitudId, pagoId) {
     }
   }
 
+  // [CONC-2] Sin versión no se manda nada: mejor pedir una recarga que pisar el
+  // cambio de otro sin enterarse.
+  const version = _spVersionPago(solicitudId, pagoId);
+  if (!version) {
+    showToast('No tengo la versión de esta cuota — recarga el plan y vuelve a intentarlo', 'error');
+    return;
+  }
+
   if (btn) { btn.disabled = true; btn.textContent = 'Guardando…'; }
   try {
     const r = await khAdminFetch('/.netlify/functions/admin-marcar-pago', {
@@ -7328,6 +7355,7 @@ async function marcarPagoSP(solicitudId, pagoId) {
       body: JSON.stringify({
         pago_id: pagoId,
         accion: 'pagar',
+        version,
         fecha_pagada: fecha || undefined,
         metodo,
         cuenta: cuenta || undefined,
@@ -7336,6 +7364,7 @@ async function marcarPagoSP(solicitudId, pagoId) {
       }),
     });
     const data = await r.json();
+    if (r.status === 409 && data && data.choque) { await _spAvisarChoque(solicitudId, data); return; }
     if (!r.ok) throw new Error(data.error || 'No se pudo marcar el pago');
     if (data.solicitud_estado_cambio === 'pagado') {
       showToast('Pago registrado — la solicitud quedó totalmente pagada', 'success');
@@ -7414,13 +7443,19 @@ async function verComprobantePagoSP(pagoId) {
 
 async function revertirPagoSP(solicitudId, pagoId) {
   if (!confirm('¿Revertir este pago? Volverá a "pendiente" y se borrarán método, referencia y fecha de pago.')) return;
+  const version = _spVersionPago(solicitudId, pagoId);   // [CONC-2]
+  if (!version) {
+    showToast('No tengo la versión de esta cuota — recarga el plan y vuelve a intentarlo', 'error');
+    return;
+  }
   try {
     const r = await khAdminFetch('/.netlify/functions/admin-marcar-pago', {
       method: 'POST',
       headers: _spAdminHeaders(),
-      body: JSON.stringify({ pago_id: pagoId, accion: 'revertir' }),
+      body: JSON.stringify({ pago_id: pagoId, accion: 'revertir', version }),
     });
     const data = await r.json();
+    if (r.status === 409 && data && data.choque) { await _spAvisarChoque(solicitudId, data); return; }
     if (!r.ok) throw new Error(data.error || 'No se pudo revertir el pago');
     if (data.solicitud_estado_cambio === 'en_pagos') {
       showToast('Pago revertido — la solicitud volvió a "En pagos"', 'success');

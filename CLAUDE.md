@@ -1,18 +1,30 @@
 # Conecta Reynosa — Contexto Completo para Claude Code
 
-> ## 🎯 EL RUMBO: la plataforma arranca el 1 de SEPTIEMBRE de 2026
+> ## 🎯 EL RUMBO (30-ago-2026): KameHouse sólido, rápido y con flujo
 >
-> Con los **eventos de septiembre**. Todo lo que se haga de aquí al 1-sep se
-> mide contra esa fecha: lo que no sirva para que la plataforma abra ese día es
-> ruido, y lo que la ponga en riesgo no entra aunque esté bien hecho.
+> **El arranque del 1-sep YA NO manda.** Se retiró como vara de medir: dejó de
+> ser la fecha contra la que se decide qué entra y qué no. Lo que manda ahora es
+> que **KameHouse sea sólido, rápido y con flujo** — que aguante el uso diario y
+> que dos personas puedan trabajar en él a la vez sin pisarse.
 >
-> Tres cosas que ya quedaron decididas rumbo a ese arranque, y que **no se
-> re-litigan**:
+> Tres cosas que fija esta orden:
+> - **El Excel sigue en paralelo**, con **careo diario** contra el sistema hasta
+>   la paridad. No se apaga por decreto: se apaga cuando los números coincidan.
+> - **Las sucursales quedan CONGELADAS** hasta nueva orden. La replicación a las
+>   23 no es el objetivo de hoy; sigue siendo el destino, y por eso lo sencillo
+>   se sigue prefiriendo — pero ya no se construye *para* ellas.
+> - **La prioridad es el sistema, no la fecha.** Solidez, velocidad y flujo de
+>   trabajo por encima de cualquier módulo nuevo.
+>
+> Y dos decisiones anteriores que **no se re-litigan** (siguen firmes):
 > - **El cobro en línea va por Mercado Pago con 3D Secure obligatorio.**
 >   Stripe está DESCARTADO (ver el bloque 💳 más abajo).
-> - **El módulo de vendedores va en PAUSA**, no en el arranque (**VEN-PAUSA-1**).
 > - **melanie: las bases siguen en $0; la TARJETA volvió al index** como evento
 >   pasado agotado (MEL-REGRESA-1, 28-ago). El sorteo NO vuelve.
+>
+> ⚰️ *Lo que decía este bloque antes —«todo se mide contra el 1-sep, lo que no
+> sirva para esa fecha es ruido»— queda superado. Se deja dicho para que nadie
+> lo reviva leyendo un commit viejo.*
 
 ## El Negocio
 - Nombre: Conecta Reynosa (sucursal de la franquicia Conecta MX)
@@ -287,7 +299,7 @@ está caduco antes de escribirse.
   mató del catálogo entero: 0 de 105 lo llevan) y **sin `added`** (la sacaría en
   el filtro *Nuevos*, que mira los últimos 30 días).
   🔒 **El libro del Portal sigue VACÍO a propósito** — 0 gastos, 0 ingresos y
-  saldos en $0 en las tres cuentas. La plataforma arranca en blanco el 1-sep. Si
+  saldos en $0 en las tres cuentas. El libro arranca en blanco a propósito (el 1-sep dejó de ser la vara; el hecho no cambia). Si
   Memo quiere que "cuánto tengo" diga su banco real, **capturará un ingreso de
   "saldo inicial" por cuenta al arrancar**: no es un dato que falte, es el primer
   asiento de la época nueva. La nota de "la caja de melanie es −$10,781" **NO

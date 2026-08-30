@@ -126,13 +126,38 @@ async function leerClientes(cliIds) {
 // en la próxima corrida mientras siga dentro de la ventana de barrido.
 async function marcarAvisado(id, nowISO) {
   try {
-    await fetch(`${SB_URL}/rest/v1/solicitudes_tour?id=eq.${id}`, {
+    // [CONC-4b] La marca solo se pone si SIGUE sin ponerse. Dos corridas
+    // encimadas del cron —o una reintentada— mandaban dos veces el mismo aviso
+    // al mismo cliente: la idempotencia se decidía en la consulta de arriba, que
+    // es de antes de mandar el correo.
+    const r = await fetch(`${SB_URL}/rest/v1/solicitudes_tour?id=eq.${id}&hold_avisado_at=is.null`, {
       method: 'PATCH',
-      headers: { ...HEADERS, Prefer: 'return=minimal' },
+      headers: { ...HEADERS, Prefer: 'return=representation' },
       body: JSON.stringify({ hold_avisado_at: nowISO }),
     });
+    if (r.ok) {
+      const filas = await r.json().catch(() => null);
+      if (!Array.isArray(filas) || filas.length === 0) {
+        console.error('[apartados-vencidos] otra corrida ya había avisado:', id);
+        return false;
+      }
+    }
     return true;
   } catch (e) { console.error('[apartados-vencidos] marca falló', id, e.message); return false; }
+}
+
+// [CONC-4b] Soltar la marca cuando el correo no salió: devuelve la fila a la
+// cola de la próxima corrida. Condicionada a que la marca siga siendo LA NUESTRA
+// no hace falta —solo llega aquí quien acaba de ganarla—, pero sí a que no esté
+// ya en null, para no escribir por escribir.
+async function soltarAviso(id) {
+  try {
+    await fetch(`${SB_URL}/rest/v1/solicitudes_tour?id=eq.${id}&hold_avisado_at=not.is.null`, {
+      method: 'PATCH',
+      headers: { ...HEADERS, Prefer: 'return=minimal' },
+      body: JSON.stringify({ hold_avisado_at: null }),
+    });
+  } catch (e) { console.error('[apartados-vencidos] no se pudo soltar la marca', id, e.message); }
 }
 
 exports.handler = async function () {
@@ -174,10 +199,20 @@ exports.handler = async function () {
     <p style="margin:0 0 14px 0"><strong>Pero si todavía hay lugares, puedes retomarlo</strong> subiendo tu comprobante en tu portal — apenas lo recibamos, tu lugar queda seguro.</p>
     <p style="margin:0 0 20px 0"><a href="${PORTAL_URL}" style="display:inline-block;background:#ff283b;color:#fff;text-decoration:none;font-weight:700;padding:12px 22px;border-radius:8px">Ir a mi portal →</a></p>
     <p style="margin:0;font-size:13px;color:rgba(255,255,255,.6)">Si ya lo subiste o cambiaste de opinión, ignora este mensaje. — Conecta Reynosa</p>`;
+    // [CONC-4b] RECLAMAR ANTES DE MANDAR. El orden importaba y estaba al revés:
+    // se mandaba el correo y DESPUÉS se marcaba, así que dos corridas encimadas
+    // —o una reintentada— le mandaban dos veces el mismo aviso al mismo cliente.
+    // La condición `hold_avisado_at=is.null` sola no lo arreglaba: protegía la
+    // marca, no el correo. Se midió, y por eso el orden cambia.
+    //
+    // Y NO se pierde el «fails-soft» de antes: si el correo truena después de
+    // reclamar, la marca se SUELTA y la próxima corrida lo reintenta mientras
+    // siga dentro de la ventana. Mandar de más es peor que mandar tarde.
+    const reclamado = await marcarAvisado(row.id, nowISO);
+    if (!reclamado) return { sent: false, marcado: false, yaAvisado: true, evento };
     const enviado = await enviarCorreo(correo, asunto, wrapHtml(nombre, cuerpo));
-    let marcado = false;
-    if (enviado) marcado = await marcarAvisado(row.id, nowISO);
-    return { sent: enviado, marcado, evento };
+    if (!enviado) await soltarAviso(row.id);
+    return { sent: enviado, marcado: enviado, evento };
   }));
 
   let avisados = 0, fallidos = 0, sinCorreo = 0;

@@ -7757,12 +7757,26 @@ async function guardarCambioEstadoSP(solicitudId) {
       if (btn) btn.textContent = 'Guardando…';
     }
 
+    // [CONC-4b] La versión que la ficha tenía delante. Como en el plan de pagos:
+    // no se relee al vuelo —eso solo mediría el último medio segundo—, se manda
+    // la que el admin estaba viendo cuando decidió.
+    const version = s && s.updated_at;
+    if (!version) {
+      showToast('No tengo la versión de esta solicitud — recarga la lista y vuelve a intentarlo', 'error');
+      return;
+    }
     const r = await khAdminFetch('/.netlify/functions/admin-solicitud-update-estado', {
       method: 'POST',
       headers: _spAdminHeaders(),
-      body: JSON.stringify({ solicitud_id: solicitudId, nuevo_estado: estado, notas_admin: notasParaEnviar }),
+      body: JSON.stringify({ solicitud_id: solicitudId, nuevo_estado: estado, notas_admin: notasParaEnviar, version }),
     });
     const data = await r.json();
+    if (r.status === 409 && data && data.choque) {
+      showToast(data.error, 'error');
+      cerrarModal('sp-cambiar-estado');
+      try { await _spRefrescarLista(); } catch (e) { /* el aviso ya salió */ }
+      return;
+    }
     if (!r.ok) throw new Error(data.error || 'Error guardando');
     // [Bandeja-T2] Al aprobar (→ en_pagos) la fila deja la bandeja: el toast dice
     // a dónde se fue. Otros cambios (p.ej. cancelar) conservan el toast genérico.

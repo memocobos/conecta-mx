@@ -117,11 +117,25 @@ exports.handler = async (event) => {
   // fuerte para que no se repita a ciegas.
   let sellado = true;
   try {
-    const pr = await fetch(`${SB_URL}/rest/v1/solicitudes_tour?id=eq.${encodeURIComponent(solicitudId)}`, {
-      method: 'PATCH', headers: { ...sb, Prefer: 'return=minimal' },
+    // [CONC-4b] La guarda que arriba se decide en JS —«¿ya está reembolsado?»—
+    // viaja también en la URL, donde la evalúa Postgres al escribir. Entre leer
+    // y escribir hay tres llamadas de red y un reembolso de Stripe en medio.
+    const pr = await fetch(`${SB_URL}/rest/v1/solicitudes_tour?id=eq.${encodeURIComponent(solicitudId)}`
+      + `&separo_reembolsado_at=is.null`, {
+      method: 'PATCH', headers: { ...sb, Prefer: 'return=representation' },
       body: JSON.stringify({ separo_reembolsado_at: new Date().toISOString() }),
     });
     if (!pr.ok) sellado = false;
+    else {
+      const filas = await pr.json().catch(() => null);
+      // Cero filas = otro ya lo había sellado. El reembolso de ESTE ya salió, así
+      // que no se pisa la marca del primero y se reporta fuerte: hay dos
+      // reembolsos que mirar a mano.
+      if (!Array.isArray(filas) || filas.length === 0) {
+        sellado = false;
+        console.error('[separo-reembolso] OTRO reembolso selló primero — revisar duplicado:', solicitudId);
+      }
+    }
   } catch (e) { sellado = false; }
 
   // 5. Correo al cliente. ⚠️ PLANTILLA PROVISIONAL — el copy final lo escribe

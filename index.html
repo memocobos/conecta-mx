@@ -3285,12 +3285,13 @@ function goBack(_skipHistory) {
 //  vacío y crashea — dejando la página en "header vacío".)
 
 var PROMOS={
+  'FIN': {amount:500, expiresTs:1788238740000, maxUsos:9999, usos:0, desc:'$500 de descuento con código FIN', onlyEvents:['juniorh','caifanes'], excludePkg:['ride','stay','cheap']},
   'ARMADO': {pct:5, expiresTs:1780181504000, maxUsos:9999, usos:0, desc:'Eslabón Armado — 5% descuento 24h', onlyEvent:'eslabon'},
   'PULSOGNP': {pct:8, expiresTs:1776382739338, maxUsos:9999, usos:0, desc:'8% de descuento con código PULSOGNP', onlyEvent:'pulsoquetaro'},
   'LOOP': {pct:5, expiresTs:1776617509451, maxUsos:9999, usos:0, desc:'5% de descuento con código LOOP', onlyEvent:'edsheeran', excludePkg:['ride']},
   'KAROLG': {pct:5, expiresTs:1776902004420, maxUsos:9999, usos:0, desc:'5% de descuento con código KAROLG', onlyEvents:['karolg','karolcdmx'], excludePkg:['ride','stay','cheap']},
-  'KENIAOS': {amount:700, expiresTs:1778911199000, maxUsos:9999, usos:0, desc:'$700 de descuento con código KENIAOS', onlyEvent:'keniaos', onlyZones:['GNP A'], excludePkg:['ride','stay','cheap'], customMsg:'Código aplicado, disfruta tu descuento'},
-  'MEMODALE': {pct:10, singleUse:true, onlyEvent:'dalemix', excludePkg:['ride','stay','cheap'], desc:'10% de descuento con código MEMODALE'},
+  'KENIAOS': {amount:700, expiresTs:1778911199000, maxUsos:9999, usos:0, desc:'$700 de descuento con código KENIAOS', customMsg:'Código aplicado, disfruta tu descuento', onlyEvent:'keniaos', onlyZones:['GNP A'], excludePkg:['ride','stay','cheap']},
+  'MEMODALE': {pct:10, maxUsos:9999, usos:0, singleUse:true, desc:'10% de descuento con código MEMODALE', onlyEvent:'dalemix', excludePkg:['ride','stay','cheap']},
   'CIRCLE': {pct:5, expiresTs:1777509774543, maxUsos:9999, usos:0, desc:'5% de descuento con código CIRCLE', onlyEvent:'aperfectcircle', excludePkg:['ride','stay','cheap']},
   'BAD': {pct:5, expiresTs:1777615199000, maxUsos:9999, usos:0, desc:'5% de descuento con código BAD', onlyEvent:'badgyal', excludePkg:['ride','stay','cheap']},
   'INTOCABLE': {pct:5, expiresTs:1777615199000, maxUsos:9999, usos:0, desc:'5% de descuento con código INTOCABLE', onlyEvent:'intocable', excludePkg:['ride','stay','cheap']},
@@ -3298,13 +3299,13 @@ var PROMOS={
   'BEELE': {pct:5, expiresTs:1778185453000, maxUsos:9999, usos:0, desc:'5% de descuento con código BEELE', onlyEvent:'beele', excludePkg:['ride','stay','cheap']},
   'COMPA': {pct:5, expiresTs:1778427681035, maxUsos:9999, usos:0, desc:'5% de descuento con código COMPA', onlyEvent:'arre', excludePkg:['ride','stay','cheap']},
   'ANUEL': {pct:5, expiresTs:1778796229099, maxUsos:9999, usos:0, desc:'5% de descuento con código ANUEL', onlyEvent:'anuelaa', excludePkg:['ride','stay','cheap']},
-  'LAFERTE': {pct:5, expiresTs:Date.parse('2026-05-19T14:00:00-06:00'), maxUsos:9999, usos:0, desc:'5% de descuento con código LAFERTE', onlyEvent:'monlaferte', excludePkg:['ride','stay','cheap']},
-  'CC2026': {pct:5, expiresTs:Date.parse('2026-05-20T20:00:00-06:00'), maxUsos:9999, usos:0, desc:'5% de descuento con código CC2026', onlyEvent:'coronacapital', excludePkg:['ride','stay','cheap']},
-  'CAIFAN': {pct:5, expiresTs:Date.parse('2026-05-20T20:00:00-06:00'), maxUsos:9999, usos:0, desc:'5% de descuento con código CAIFAN', onlyEvent:'caifanes', excludePkg:['ride','stay','cheap']},
-  'HURRICANE': {pct:5, expiresTs:Date.parse('2026-05-21T20:00:00-06:00'), maxUsos:9999, usos:0, desc:'5% de descuento con código HURRICANE', onlyEvent:'scorpions', excludePkg:['ride','stay','cheap']},
-  'TRUENO': {pct:5, expiresTs:Date.parse('2026-05-22T20:00:00-06:00'), maxUsos:9999, usos:0, desc:'5% de descuento con código TRUENO', onlyEvent:'trueno', excludePkg:['ride','stay','cheap']},
-  'ULTRA': {pct:5, expiresTs:Date.parse('2026-05-26T20:00:00-06:00'), maxUsos:9999, usos:0, desc:'5% de descuento con código ULTRA', onlyEvent:'ultramexico', excludePkg:['ride','stay','cheap']},
-  'GOL': {amount:500, allEvents:true, startTs:Date.parse('2026-06-30T23:00:00-06:00'), expiresTs:Date.parse('2026-07-01T23:00:00-06:00'), maxUsos:9999, usos:0, desc:'$500 de descuento con código GOL — ¡México a octavos! 24h', excludePkg:['ride','stay','cheap']},
+  'LAFERTE': {pct:5, expiresTs:1779220800000, maxUsos:9999, usos:0, desc:'5% de descuento con código LAFERTE', onlyEvent:'monlaferte', excludePkg:['ride','stay','cheap']},
+  'CC2026': {pct:5, expiresTs:1779328800000, maxUsos:9999, usos:0, desc:'5% de descuento con código CC2026', onlyEvent:'coronacapital', excludePkg:['ride','stay','cheap']},
+  'CAIFAN': {pct:5, expiresTs:1779328800000, maxUsos:9999, usos:0, desc:'5% de descuento con código CAIFAN', onlyEvent:'caifanes', excludePkg:['ride','stay','cheap']},
+  'HURRICANE': {pct:5, expiresTs:1779415200000, maxUsos:9999, usos:0, desc:'5% de descuento con código HURRICANE', onlyEvent:'scorpions', excludePkg:['ride','stay','cheap']},
+  'TRUENO': {pct:5, expiresTs:1779501600000, maxUsos:9999, usos:0, desc:'5% de descuento con código TRUENO', onlyEvent:'trueno', excludePkg:['ride','stay','cheap']},
+  'ULTRA': {pct:5, expiresTs:1779847200000, maxUsos:9999, usos:0, desc:'5% de descuento con código ULTRA', onlyEvent:'ultramexico', excludePkg:['ride','stay','cheap']},
+  'GOL': {amount:500, startTs:1782882000000, expiresTs:1782968400000, maxUsos:9999, usos:0, desc:'$500 de descuento con código GOL — ¡México a octavos! 24h', allEvents:true, excludePkg:['ride','stay','cheap']},
   // ⏰ POR QUÉ LOS LITERALES DE ESTA TABLA VAN EN -05:00 (regla de la casa).
   // Reynosa es zona fronteriza y sigue el horario de verano de EE.UU.
   // (America/Matamoros = UTC-5 en verano), NO el de Monterrey (UTC-6 todo el
@@ -3331,7 +3332,7 @@ var PROMOS={
   // un vencimiento que estaba pactado. Se deja la entrada viva (y no se borra)
   // para que quien todavía traiga el código lea "Código expirado" y no el
   // "código no válido" que suena a error de la página.
-  'AITANA': {segundoPax:{plus:2000, cheap:0}, exactPersonas:2, expiresTs:Date.parse('2026-08-13T00:00:00-05:00'), maxUsos:9999, usos:0, desc:'Promo de pareja: la segunda persona paga $2,000 en PLUS y $0 en CHEAP', customMsg:'Promo de pareja aplicada — la 2ª persona paga $2,000 en PLUS o $0 en CHEAP', onlyEvent:'aitana', excludePkg:['ride','stay']},
+  'AITANA': {segundoPax:{plus:2000,cheap:0}, exactPersonas:2, expiresTs:1786597200000, maxUsos:9999, usos:0, desc:'Promo de pareja: la segunda persona paga $2,000 en PLUS y $0 en CHEAP', customMsg:'Promo de pareja aplicada — la 2ª persona paga $2,000 en PLUS o $0 en CHEAP', onlyEvent:'aitana', excludePkg:['ride','stay']},
   // La MISMA promo de pareja, ahora en TINI. Se mudó el trato completo, no solo
   // el nombre: mismo `segundoPax`, mismo `exactPersonas:2`, mismos paquetes
   // excluidos. Lo único que cambia es `onlyEvent`.
@@ -3347,7 +3348,7 @@ var PROMOS={
   // Nació sin fecha porque su retiro lo decidía Memo; ahora entra a una
   // campaña con fin pactado, así que el vencimiento pasa a ser parte del
   // trato, como en las otras cinco. Mismo instante que ellas.
-  'TINI': {segundoPax:{plus:2700}, exactPersonas:2, expiresTs:Date.parse('2026-08-25T00:00:00-05:00'), maxUsos:9999, usos:0, desc:'Promo de pareja: la segunda persona paga $2,700 en el paquete PLUS', customMsg:'Promo de pareja aplicada — la 2ª persona paga $2,700 en PLUS', onlyEvent:'tini', excludePkg:['ride','stay','cheap']},
+  'TINI': {segundoPax:{plus:2700}, exactPersonas:2, expiresTs:1787634000000, maxUsos:9999, usos:0, desc:'Promo de pareja: la segunda persona paga $2,700 en el paquete PLUS', customMsg:'Promo de pareja aplicada — la 2ª persona paga $2,700 en PLUS', onlyEvent:'tini', excludePkg:['ride','stay','cheap']},
   // ── CAT-3 · CONTRAOFENSIVA 2x1 (17-ago-2026) ─────────────────────────────
   // La venta en línea sacó 2x1 en varios eventos. La respuesta es la MISMA promo
   // de pareja de AITANA y TINI —mismo `segundoPax`, mismo `exactPersonas:2`,
@@ -3385,17 +3386,17 @@ var PROMOS={
   // vencido se coma la promo de pareja SIN ERROR NI AVISO. Se BORRARON las
   // viejas: no caben las dos, y el arnés cuenta que cada código aparezca UNA
   // sola vez en el literal.
-  'CALLE24': {segundoPax:{plus:2700}, exactPersonas:2, expiresTs:Date.parse('2026-08-25T00:00:00-05:00'), maxUsos:9999, usos:0, desc:'Promo de pareja: la segunda persona paga $2,700 en el paquete PLUS', customMsg:'Promo de pareja aplicada — la 2ª persona paga $2,700 en PLUS', onlyEvent:'calle24', excludePkg:['ride','stay','cheap']},
-  'SANZ': {segundoPax:{plus:2700}, exactPersonas:2, expiresTs:Date.parse('2026-08-25T00:00:00-05:00'), maxUsos:9999, usos:0, desc:'Promo de pareja: la segunda persona paga $2,700 en el paquete PLUS', customMsg:'Promo de pareja aplicada — la 2ª persona paga $2,700 en PLUS', onlyEvent:'alejandrosanz', excludePkg:['ride','stay','cheap']},
-  'ENJAMBRE': {segundoPax:{plus:2700}, exactPersonas:2, expiresTs:Date.parse('2026-08-25T00:00:00-05:00'), maxUsos:9999, usos:0, desc:'Promo de pareja: la segunda persona paga $2,700 en el paquete PLUS', customMsg:'Promo de pareja aplicada — la 2ª persona paga $2,700 en PLUS', onlyEvent:'enjambre', excludePkg:['ride','stay','cheap']},
-  'BADGYAL': {segundoPax:{plus:2700}, exactPersonas:2, expiresTs:Date.parse('2026-08-25T00:00:00-05:00'), maxUsos:9999, usos:0, desc:'Promo de pareja: la segunda persona paga $2,700 en el paquete PLUS', customMsg:'Promo de pareja aplicada — la 2ª persona paga $2,700 en PLUS', onlyEvent:'badgyal', excludePkg:['ride','stay','cheap']},
-  'SCORPIONS': {segundoPax:{plus:2700}, exactPersonas:2, expiresTs:Date.parse('2026-08-25T00:00:00-05:00'), maxUsos:9999, usos:0, desc:'Promo de pareja: la segunda persona paga $2,700 en el paquete PLUS', customMsg:'Promo de pareja aplicada — la 2ª persona paga $2,700 en PLUS', onlyEvent:'scorpions', excludePkg:['ride','stay','cheap']},
+  'CALLE24': {segundoPax:{plus:2700}, exactPersonas:2, expiresTs:1787634000000, maxUsos:9999, usos:0, desc:'Promo de pareja: la segunda persona paga $2,700 en el paquete PLUS', customMsg:'Promo de pareja aplicada — la 2ª persona paga $2,700 en PLUS', onlyEvent:'calle24', excludePkg:['ride','stay','cheap']},
+  'SANZ': {segundoPax:{plus:2700}, exactPersonas:2, expiresTs:1787634000000, maxUsos:9999, usos:0, desc:'Promo de pareja: la segunda persona paga $2,700 en el paquete PLUS', customMsg:'Promo de pareja aplicada — la 2ª persona paga $2,700 en PLUS', onlyEvent:'alejandrosanz', excludePkg:['ride','stay','cheap']},
+  'ENJAMBRE': {segundoPax:{plus:2700}, exactPersonas:2, expiresTs:1787634000000, maxUsos:9999, usos:0, desc:'Promo de pareja: la segunda persona paga $2,700 en el paquete PLUS', customMsg:'Promo de pareja aplicada — la 2ª persona paga $2,700 en PLUS', onlyEvent:'enjambre', excludePkg:['ride','stay','cheap']},
+  'BADGYAL': {segundoPax:{plus:2700}, exactPersonas:2, expiresTs:1787634000000, maxUsos:9999, usos:0, desc:'Promo de pareja: la segunda persona paga $2,700 en el paquete PLUS', customMsg:'Promo de pareja aplicada — la 2ª persona paga $2,700 en PLUS', onlyEvent:'badgyal', excludePkg:['ride','stay','cheap']},
+  'SCORPIONS': {segundoPax:{plus:2700}, exactPersonas:2, expiresTs:1787634000000, maxUsos:9999, usos:0, desc:'Promo de pareja: la segunda persona paga $2,700 en el paquete PLUS', customMsg:'Promo de pareja aplicada — la 2ª persona paga $2,700 en PLUS', onlyEvent:'scorpions', excludePkg:['ride','stay','cheap']},
   // [PROMO-NATA] El badge de la tarjeta de `natanael` YA prometía este código
   // —promoCode:'NATA', «USA CODIGO NATA $500 DE DESCUENTO»— pero el código NO
   // existía en este registro: quien lo tecleaba se topaba con «código inválido».
   // Solo PLUS, y el descuento es POR PERSONA (total − amount × viajeros), igual
   // que KENIAOS. El literal va en -05:00 porque es la hora de REYNOSA.
-  'NATA': {amount:500, expiresTs:Date.parse('2026-09-01T23:59:59-05:00'), maxUsos:9999, usos:0, desc:'$500 de descuento con código NATA', onlyEvent:'natanael', excludePkg:['ride','stay','cheap']},
+  'NATA': {amount:500, expiresTs:1788325199000, maxUsos:9999, usos:0, desc:'$500 de descuento con código NATA', onlyEvent:'natanael', excludePkg:['ride','stay','cheap']},
 };
 var _promoActivo=null;
 

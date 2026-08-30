@@ -193,12 +193,24 @@ function saneFechasExtra(v) {
   return JSON.stringify(out);
 }
 // mapa: URL pública del mapa del venue (subido a bucket mapas-eventos). Acepta
-// URL http(s) o ruta absoluta; cualquier otra cosa → '' (limpia / sin mapa). El
-// compilador solo emite mapa si no está vacío. Devuelve string ('' = limpiar).
-function saneMapa(v) {
+// URL http(s) o ruta absoluta. Devuelve string ('' = limpiar / sin mapa).
+//
+// [ESF-MAPA-1] Y una tercera forma que ANTES se borraba: la CLAVE CORTA heredada
+// (`caifanes`, `calle24`…), que apunta a la tabla vieja de `mapas.js`. No es una
+// URL, así que caía en el «cualquier otra cosa → ''» y el guardado la mataba.
+// Le mordió a Memo dos veces en dos días. Es la ley de UX-1 llegando al
+// servidor: EL EDITOR NO BORRA LO QUE NO ENTIENDE.
+//
+// Se conserva SOLO si es exactamente lo que la fila ya tenía. La distinción
+// importa: «no borro lo que no entiendo» no es lo mismo que «acepto cualquier
+// cosa». Una clave corta NUEVA —que nadie puede haber subido, porque el editor
+// solo produce URLs— sigue cayendo a ''.
+function saneMapa(v, mapaGuardado) {
   const s = (typeof v === 'string') ? v.trim() : '';
   if (!s) return '';
-  return (/^https?:\/\//.test(s) || s.charAt(0) === '/') ? s : '';
+  if (/^https?:\/\//.test(s) || s.charAt(0) === '/') return s;
+  const heredado = (typeof mapaGuardado === 'string') ? mapaGuardado.trim() : '';
+  return (heredado && s === heredado) ? heredado : '';
 }
 
 // foto: URL pública de la portada del CONCIERTO (bucket mapas-eventos, tipo
@@ -248,7 +260,9 @@ exports.handler = async (event) => {
     if (k === 'fechas_extra') { sane[k] = saneFechasExtra(v); continue; }
     if (k === 'zonas') { sane[k] = saneZonas(v); continue; }
     if (k === 'hotel') { sane[k] = saneHotel(v); continue; }
-    if (k === 'mapa') { sane[k] = saneMapa(v); continue; }
+    // [ESF-MAPA-1] `mapa` se sanea MÁS ABAJO, cuando ya se leyó la fila: para
+    // saber si una clave corta es la heredada hay que tener contra qué compararla.
+    if (k === 'mapa') { continue; }
     if (k === 'foto') { sane[k] = saneFoto(v); continue; }
     if (k === 'inc') { sane[k] = saneInc(v); continue; }
     if (k === 'sep' || k === 'sep_cheap' || k === 'sep_ride') { sane[k] = saneInt(v); continue; }
@@ -326,7 +340,12 @@ exports.handler = async (event) => {
   if ('status' in sane && !STATUS_PERMITIDOS.has(sane.status)) {
     return { statusCode: 400, headers, body: JSON.stringify({ error: 'Status no permitido' }) };
   }
-  if (Object.keys(sane).length === 0) {
+  // [ESF-MAPA-1] `mapa` cuenta como campo aunque todavía no esté en `sane`: su
+  // saneado se difiere hasta tener la fila, y sin esto un guardado que SOLO
+  // cambia el mapa se caía con «no hay campos editables» — que es el 400 que
+  // cazó el careo, y que además hacía pasar en vacío la aserción de que la
+  // clave sobrevive: no sobrevivía, es que no se escribía nada.
+  if (Object.keys(sane).length === 0 && !Object.prototype.hasOwnProperty.call(body, 'mapa')) {
     return { statusCode: 400, headers, body: JSON.stringify({ error: 'No hay campos editables en el body' }) };
   }
 
@@ -339,7 +358,9 @@ exports.handler = async (event) => {
     // editar SOLO el separo (que es justo como nació el dedazo de yandel) no
     // manda las zonas en el body, y sin la fila guardada el techo no tendría
     // contra qué comparar y dejaría pasar el dato imposible.
-    const chkRes = await fetch(`${SB_URL}/rest/v1/esferas_eventos?slug=eq.${encodeURIComponent(slug)}&select=slug,zonas,sep_cheap`, {
+    // [ESF-MAPA-1] `mapa` entra al MISMO select — sin consulta extra, igual que
+    // hizo COT-FIX-1 con zonas y sep_cheap.
+    const chkRes = await fetch(`${SB_URL}/rest/v1/esferas_eventos?slug=eq.${encodeURIComponent(slug)}&select=slug,zonas,sep_cheap,mapa`, {
       headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` },
     });
     if (!chkRes.ok) {
@@ -357,6 +378,13 @@ exports.handler = async (event) => {
     // volver imposible un separo que ya estaba bien) y cambiar los dos.
     // 422 y no 400: el formato está bien; lo que no puede existir es el hecho.
     const _fila = existentes[0] || {};
+
+    // [ESF-MAPA-1] Ahora sí: el mapa, sabiendo qué había. Si el body no trae
+    // `mapa`, no se toca — este es un PATCH y la ausencia significa «no cambies
+    // esto», no «bórralo».
+    if (Object.prototype.hasOwnProperty.call(body, 'mapa')) {
+      sane.mapa = saneMapa(body.mapa, _fila.mapa);
+    }
     const _sepFinal   = ('sep_cheap' in sane) ? sane.sep_cheap : _fila.sep_cheap;
     const _zonasFinal = ('zonas' in sane) ? sane.zonas : _fila.zonas;
     const _techo = revisarSepCheap(_sepFinal, parseZonas(_zonasFinal));

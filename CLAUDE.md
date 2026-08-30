@@ -407,6 +407,16 @@ está caduco antes de escribirse.
   siguen SIN commitear a propósito.
 
 ### ⚠️ Reglas que cuestan caro olvidar
+- 🚌 **Para dejar un evento vendiendo SOLO VIAJE: agota sus zonas Y prende
+  `rideOnly`.** Las dos cosas, no una. Agotar las zonas a secas hace que el
+  auto-semáforo marque la tarjeta AGOTADO y la cierre —aunque el RIDE siga a la
+  venta—, porque solo cuenta zonas de boleto. Con `rideOnly` prendido la
+  tarjeta dice **«Solo viaje»**, muestra el precio del RIDE y abre el flujo
+  directo (RIDE-VIVO-1). Es lo que Memo hizo por instinto en straykids.
+  **El estado se apaga solo** cuando el viaje de verdad se acaba: en multifecha,
+  cuando TODAS las fechas tienen `rideAgotado`. Y ojo: `st:solo-viaje` es
+  OTRA cosa —manda a WhatsApp y cierra la venta—; de él solo se hereda la
+  etiqueta.
 - 🔒 **Los medios se cargan EN LA FICHA, jamás a mano al index.** `mapa`,
   `staticImg` y `lineup` están en `CAMPOS_DEL_COMPILADOR`: si la ficha no los
   trae, el siguiente publish los **borra**, porque «no lo emitió» se lee como

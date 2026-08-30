@@ -491,3 +491,92 @@ function _evtExportCSV() {
   _cobFiltrados = _evtFiltrados || [];
   _cobExportCSV();
 }
+// ═══ [EXCEL-BOTÓN-1b] EL CAREO CONTRA EL EXCEL ═══════════════════════════════
+// La herramienta que pone parejos al Excel y al sistema para poder apagar el
+// Excel. Pinta cuatro montones por nombre: NUEVOS · PAGOS · BAJAS · IGUALES.
+//
+// SOLO LEE. Ni marca las bajas ni aplica los pagos: aplicar es otra tuerca, y
+// tiene que serlo — una baja es una persona.
+//
+// Todo el protocolo (el encabezado, el separo sin nombre, los pagos 1…10, la
+// chatarra, los nombres normalizados) vive en el servidor, en `_lib/excel-careo`,
+// donde un arnés puede carearlo contra filas reales. Aquí solo se pinta.
+async function excelCarear() {
+  const eventoId = (document.getElementById('selector-evento') || {}).value || '';
+  const panel = document.getElementById('excel-careo-panel');
+  const btn = document.getElementById('excel-careo-btn');
+  if (!eventoId) { showToast('Elige primero un evento', 'error'); return; }
+  if (btn) { btn.disabled = true; btn.textContent = 'Comparando…'; }
+  if (panel) panel.innerHTML = '<div class="loading-state"><div class="spinner"></div>Leyendo el Excel…</div>';
+  try {
+    const r = await khAdminFetch('/.netlify/functions/admin-excel-careo', {
+      method: 'POST', body: JSON.stringify({ evento_id: eventoId }),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok || !d.ok) {
+      // El error se pinta ENTERO, con su código: «no hay pestaña mapeada» y «no
+      // pude leer la hoja» se arreglan en lugares distintos, y un mensaje
+      // genérico manda a buscar en el equivocado.
+      panel.innerHTML = `<div class="alert alert-error">${_evtEsc(d.error || ('Error ' + r.status))}`
+        + (d.codigo ? ` <span style="opacity:.7">[${_evtEsc(d.codigo)}]</span>` : '')
+        + (Array.isArray(d.pestanas) && d.pestanas.length
+            ? `<div style="margin-top:8px;font-size:12px">Pestañas que sí hay: ${d.pestanas.slice(0, 40).map(_evtEsc).join(' · ')}</div>` : '')
+        + `</div>`;
+      return;
+    }
+    panel.innerHTML = _excelCareoHtml(d);
+  } catch (e) {
+    panel.innerHTML = `<div class="alert alert-error">${_evtEsc(e.message)}</div>`;
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Comparar con Excel'; }
+  }
+}
+function _evtEsc(s) {
+  return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+function _evtMxn(n) {
+  return '$' + Number(n || 0).toLocaleString('es-MX', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+}
+// Los cuatro montones. IGUALES va colapsado y con su cuenta: es el montón que
+// no hay que mirar, y ocupar la pantalla con él escondería los otros tres.
+function _excelCareoHtml(d) {
+  const t = d.totales || {};
+  const cab = (titulo, n, color) =>
+    `<div style="display:flex;align-items:baseline;gap:8px;margin:14px 0 6px">
+       <span style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:${color}">${titulo}</span>
+       <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--ts)">${n}</span></div>`;
+  const lista = (arr, pinta) => arr.length
+    ? `<div style="display:grid;gap:4px">${arr.map(pinta).join('')}</div>`
+    : `<div style="font-size:12px;color:var(--ts)">— ninguno</div>`;
+  const fila = (izq, der) =>
+    `<div style="display:flex;justify-content:space-between;gap:12px;font-size:13px;padding:3px 0;border-bottom:1px solid rgba(255,255,255,.05)">
+       <span>${izq}</span><span style="font-family:'JetBrains Mono',monospace;white-space:nowrap">${der}</span></div>`;
+
+  // El mapa de columnas de cada pestaña, a la vista: si una pestaña se leyó con
+  // el mapa raro, se ve aquí en vez de dar números mal en silencio.
+  const pest = (d.pestanas || []).map(p =>
+    `<div style="font-size:12px;color:var(--ts);padding:2px 0">
+       <b style="color:var(--tp)">${_evtEsc(p.pestana)}</b>${p.regla_zona ? ` <span style="color:var(--orange)">· solo zona «${_evtEsc(p.regla_zona)}»</span>` : ''}
+       — ${p.personas} persona(s) · columnas de dinero: ${(p.mapa && p.mapa.dinero || []).length}
+       · descartes: ${p.descartes.chatarra} chatarra, ${p.descartes.sinNombre} sin nombre${p.descartes.otraZona ? `, ${p.descartes.otraZona} de otra zona` : ''}
+     </div>`).join('');
+
+  return `<div class="card" style="padding:16px">
+    <div style="font-size:12px;color:var(--ts);margin-bottom:4px">
+      Excel: <b style="color:var(--tp)">${d.excel.personas}</b> persona(s) · Sistema: <b style="color:var(--tp)">${d.base.viajeros}</b> viajero(s)
+    </div>
+    ${pest}
+    ${cab('nuevos — en el Excel, no en el sistema', t.nuevos, 'var(--green)')}
+    ${lista(d.nuevos, n => fila(`${_evtEsc(n.nombre)} <span style="color:var(--ts);font-size:11px">${_evtEsc(n.zona || '')} ${_evtEsc(n.paquete || '')}</span>`, _evtMxn(n.abonado)))}
+    ${cab('pagos — montos distintos', t.pagos, 'var(--orange)')}
+    ${lista(d.pagos, p => fila(_evtEsc(p.nombre), `${_evtMxn(p.base)} → ${_evtMxn(p.excel)} <b style="color:${p.diferencia > 0 ? 'var(--green)' : 'var(--red)'}">${p.diferencia > 0 ? '+' : ''}${_evtMxn(p.diferencia)}</b>`))}
+    ${cab('bajas — en el sistema, ya no en el Excel', t.bajas, 'var(--red)')}
+    ${lista(d.bajas, b => fila(_evtEsc(b.nombre), _evtMxn(b.abonado)))}
+    <div style="font-size:11px;color:var(--ts);margin-top:4px">Una baja NO se borra ni se marca desde aquí: se nombra y espera firma.</div>
+    <details style="margin-top:14px">
+      <summary style="cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--ts)">iguales · ${t.iguales}</summary>
+      <div style="padding-top:8px">${lista(d.iguales, i => fila(_evtEsc(i.nombre), _evtMxn(i.abonado)))}</div>
+    </details>
+  </div>`;
+}

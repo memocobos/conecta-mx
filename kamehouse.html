@@ -493,7 +493,11 @@
  </div>
  <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:8px">
  <button class="btn btn-ghost btn-sm" onclick="_evtExportCSV()">Exportar CSV</button>
+ <!-- [EXCEL-BOTÓN-1b] El careo contra el Excel. SOLO LEE: pinta las diferencias
+      nombre por nombre y no toca una sola fila. Aplicarlas es otra tuerca. -->
+ <button class="btn btn-ghost btn-sm" id="excel-careo-btn" onclick="excelCarear()">Comparar con Excel</button>
  </div>
+ <div id="excel-careo-panel" style="margin-top:12px"></div>
  </div>
 
  <!-- [SAL-1] LA CAJA DE LA EMPRESA SE RETIRA DE AQUÍ (decisión de Jane).

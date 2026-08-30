@@ -15,6 +15,7 @@
 
 const { verifyAdminAuthLive, corsCheck } = require('./_lib/verify-admin');
 const { compilarEV } = require('./_lib/esferas-compile');
+const { derivarLetreros } = require('./_lib/letrero-derivado');
 
 const SB_URL = 'https://npgnhsmwpcipxgvfxrho.supabase.co';
 const SB_KEY = process.env.SUPABASE_SERVICE_KEY_KAMEHOUSE;
@@ -69,7 +70,32 @@ exports.handler = async (event) => {
     // El veto vive EN EL SERVIDOR. Esconder el botón no basta: un endpoint
     // abierto detrás de una UI muda es la trampa de COB-MIG-1 al revés.
     const archivados = todas.filter((e) => e && e.archivado === true).map((e) => e.slug);
-    const esferas = todas.filter((e) => !(e && e.archivado === true));
+    const esferasCrudas = todas.filter((e) => !(e && e.archivado === true));
+
+    // [BABA-UX-2] EL LETRERO SE DERIVA AQUÍ, no se cree lo guardado. El
+    // `flash_promo` de la ficha es solo la MARCA de qué código es el letrero de
+    // este evento; sus números salen de la fila viva de `promos_codigos`. Antes
+    // era una copia escrita al encenderlo que nunca se re-sincronizaba, y el
+    // sitio podía prometerle al cliente una cifra que el cajero no iba a dar.
+    let avisosLetrero = [];
+    let esferas = esferasCrudas;
+    try {
+      const cr = await fetch(`${SB_URL}/rest/v1/promos_codigos?select=*`, {
+        headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` },
+      });
+      if (!cr.ok) throw new Error(await cr.text());
+      const codigos = await cr.json();
+      if (!Array.isArray(codigos)) throw new Error('la lista de códigos no vino como lista');
+      const d = derivarLetreros(esferasCrudas, codigos);
+      esferas = d.esferas; avisosLetrero = d.avisos;
+    } catch (e) {
+      // 🔒 SI NO SE PUEDEN LEER LOS CÓDIGOS, NO SE PUBLICA. Seguir con la copia
+      // vieja sería exactamente el defecto que esta tuerca viene a matar, y
+      // encima disfrazado de éxito.
+      return { statusCode: 502, headers, body: JSON.stringify({ ok: false,
+        error: 'No pude leer los códigos de Baba para derivar los letreros; no se publicó nada.',
+        detail: String(e && e.message || e) }) };
+    }
 
 
     // 2. GET index.html del repo por GitHub API y decodificar (patrón github-publish).

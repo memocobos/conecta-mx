@@ -18659,6 +18659,9 @@ async function desmarcarReembolso(id) {
 }
 
 async function crearEsferaEvento() {
+  // [ESF-UX-2a] Una sola lectura de las zonas por guardado: derivada si el
+  // evento tiene fechas, del mago si no.
+  const _esfZG = _esfZonasParaGuardar();
   const body = {
     slug:         document.getElementById('esf-slug')?.value.trim().toLowerCase() || '',
     nombre:       document.getElementById('esf-nombre')?.value.trim() || '',
@@ -18670,10 +18673,10 @@ async function crearEsferaEvento() {
     venue:        document.getElementById('esf-venue')?.value.trim() || null,
     music:        document.getElementById('esf-music')?.value.trim() || null,
     fechas_extra: _esfGetFechasExtra(),
-    zonas: _esfGetZonas(),
+    zonas: _esfZG.zonas,
     // [ESF-E1c] `null` = sin lista capturada (el compilador usa su rampa).
     // Una lista, aunque sea vacía, es una afirmación sobre el evento.
-    cheap_zonas: (() => { const c = _esfGetCheapZonas(); return c == null ? null : JSON.stringify(c); })(),
+    cheap_zonas: (() => { const c = _esfZG.cheapZonas; return c == null ? null : JSON.stringify(c); })(),
     // [ESF-E3a] NIVEL 4. `null` = el evento no es multifecha.
     multifecha: (() => { const m = _esfGetMultifecha(); return m == null ? null : JSON.stringify(m); })(),
     // [ESF-E1g] `null` = el evento no dice banco (y el sitio cae a BBVA solo).
@@ -19719,6 +19722,57 @@ function _esfMfAddFecha(data) {
 // Devuelve `null` cuando no hay ni un bloque: null significa "este evento no es
 // multifecha" y el compilador no emite el campo. Un arreglo, aunque sea de una
 // sola noche, es una afirmación sobre el evento.
+// ═══ [ESF-UX-2a] EL GLOBAL DE UN MULTIFECHA SE DERIVA, NO SE CAPTURA ═══════
+// Dos listas que dicen cosas distintas sobre la misma zona son dos verdades, y
+// el catálogo tenía 32 contradicciones vivas en 5 eventos: 23 zonas que ARRIBA
+// se venden y están agotadas en TODAS sus fechas, y 9 al revés —inventario
+// escondido—. Eso no lo arregla capturar mejor: lo arregla no capturarlo.
+//
+// El index nunca mira el global solo. Para el semáforo y para el "desde $X"
+// CONCATENA `ev.zonas` con las zonas de todas las fechas (index.html:3686,
+// 3951, `minP`), así que una mentira arriba infla la disponibilidad de la
+// tarjeta. La compra, en cambio, sí usa la fecha (index.html:5341-5344): nadie
+// podía comprar lo inexistente, pero la tarjeta lo ofrecía.
+//
+// La regla, con sus tres salidas —medidas sobre el catálogo, no supuestas:
+//   · libre en ALGUNA fecha             → libre, con el precio de esa fecha
+//   · nunca libre pero `prox` en alguna → prox (coronacapital/General, 5 de 6)
+//   · en ninguna                        → agotada
+function _esfDerivarZonasGlobales(mf, cual) {
+  const orden = [], vistas = new Set();
+  const de = (f) => ((cual === 'zonas' ? f.zonas : f.cheapZonas) || []);
+  (mf || []).forEach((f) => de(f).forEach((z) => {
+    if (z && z.n && !vistas.has(z.n)) { vistas.add(z.n); orden.push(z.n); }
+  }));
+  return orden.map((n) => {
+    const filas = (mf || []).map((f) => de(f).find((z) => z && z.n === n)).filter(Boolean);
+    const libre = filas.find((z) => !z.ag && !z.prox);
+    const prox  = libre ? null : filas.find((z) => z.prox);
+    const src   = libre || prox || filas[0];
+    const o = { n, p: src.p || 0, ag: (libre || prox) ? 0 : 1, prox: (prox ? 1 : 0), vip: src.vip || 0 };
+    // El separo especial viaja con la zona de la que se leyó el precio.
+    if (src.sepEspecial) o.sepEspecial = src.sepEspecial;
+    return o;
+  });
+}
+
+// Lo que se GUARDA como global. Fuente única: si el evento tiene fechas, sale
+// de ellas; si no, del mago de arriba, que ahí no confunde a nadie.
+//
+// El CHEAP tiene un matiz MEDIDO: cuando ninguna fecha declara `cheapZonas`, la
+// lista de arriba NO es una segunda verdad —es LA verdad, porque la fecha
+// hereda de ella ("vacías = usa las de arriba"). Derivar ahí borraría las 14
+// zonas cheap de karolcdmx, que es justo el único evento en ese caso.
+function _esfZonasParaGuardar() {
+  const mf = _esfGetMultifecha();
+  if (!mf) return { zonas: _esfGetZonas(), cheapZonas: _esfGetCheapZonas() };
+  const hayCheapPorFecha = mf.some((f) => Array.isArray(f.cheapZonas) && f.cheapZonas.length);
+  return {
+    zonas: _esfDerivarZonasGlobales(mf, 'zonas'),
+    cheapZonas: hayCheapPorFecha ? _esfDerivarZonasGlobales(mf, 'cheapZonas') : _esfGetCheapZonas(),
+  };
+}
+
 function _esfGetMultifecha() {
   const bloques = Array.from(document.querySelectorAll('#esf-multifecha .esf-mf-fecha'));
   if (!bloques.length) return null;
@@ -20640,7 +20694,13 @@ async function _esfMapaPick(event) {
 function _esfPreviewMinP() {
   // [E1] !z.prox espeja a minP() de index.html: una zona sin costo todavía no
   // puede ser el "desde $X" de la tarjeta.
-  const avail = _esfGetZonas().filter((z) => !z.ag && !z.prox && z.p > 0);
+  // [ESF-UX-2a] En multifecha el index concatena el global con las zonas de
+  // TODAS las fechas (`minP` de index.html). El preview miraba solo el mago y
+  // por eso podía anunciar otro "desde $X" que la tarjeta.
+  const _mf = _esfGetMultifecha();
+  const _base = _mf ? _esfDerivarZonasGlobales(_mf, 'zonas') : _esfGetZonas();
+  const _todas = _mf ? _mf.reduce((a, f) => a.concat(f.zonas || []), _base.slice()) : _base;
+  const avail = _todas.filter((z) => !z.ag && !z.prox && z.p > 0);
   if (!avail.length) return 0;
   return Math.min.apply(null, avail.map((z) => z.p));
 }
@@ -20773,6 +20833,7 @@ function cancelarEdicionEsfera() {
 }
 
 async function guardarCambiosEsfera() {
+  const _esfZG = _esfZonasParaGuardar();
   const slug = window._esfEditSlug;
   if (!slug) return;
   const body = {
@@ -20786,10 +20847,10 @@ async function guardarCambiosEsfera() {
     venue:        document.getElementById('esf-venue')?.value.trim() || null,
     music:        document.getElementById('esf-music')?.value.trim() || null,
     fechas_extra: _esfGetFechasExtra(),
-    zonas: _esfGetZonas(),
+    zonas: _esfZG.zonas,
     // [ESF-E1c] `null` = sin lista capturada (el compilador usa su rampa).
     // Una lista, aunque sea vacía, es una afirmación sobre el evento.
-    cheap_zonas: (() => { const c = _esfGetCheapZonas(); return c == null ? null : JSON.stringify(c); })(),
+    cheap_zonas: (() => { const c = _esfZG.cheapZonas; return c == null ? null : JSON.stringify(c); })(),
     // [ESF-E3a] NIVEL 4. `null` = el evento no es multifecha.
     multifecha: (() => { const m = _esfGetMultifecha(); return m == null ? null : JSON.stringify(m); })(),
     // [ESF-E1g] `null` = el evento no dice banco (y el sitio cae a BBVA solo).

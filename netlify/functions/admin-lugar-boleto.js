@@ -18,6 +18,8 @@
 // =============================================================================
 
 const { verifyAdminAuthLive, corsCheck } = require('./_lib/verify-admin');
+// [CONC-1] El candado optimista de `lugares`: ver _lib/candado-optimista.
+const { condicionVersion, noAlcanzo, respuestaChoque, PREFER_VER_FILAS } = require('./_lib/candado-optimista');
 
 const MSG_SIN_FIRMA = '⛔ Sin contrato firmado no se entrega boleto.';
 
@@ -59,7 +61,9 @@ exports.handler = async (event) => {
 
   try {
     // ---- El lugar (notas para la auditoría) ----
-    const lr = await fetch(`${PORTAL_URL}/rest/v1/lugares?id=eq.${enc(lugarId)}&select=id,notas,solicitud_id&limit=1`, { headers: sb });
+    // [CONC-1] `updated_at` viaja con la fila: es la versión que se va a exigir
+    // de vuelta al escribir.
+    const lr = await fetch(`${PORTAL_URL}/rest/v1/lugares?id=eq.${enc(lugarId)}&select=id,notas,solicitud_id,updated_at&limit=1`, { headers: sb });
     if (!lr.ok) return { statusCode: 502, headers, body: JSON.stringify({ error: 'Supabase rechazó la consulta del lugar', detail: await lr.text() }) };
     const lugar = (await lr.json().catch(() => []))[0];
     if (!lugar) return { statusCode: 404, headers, body: JSON.stringify({ error: 'Lugar no encontrado' }) };
@@ -96,12 +100,19 @@ exports.handler = async (event) => {
       notas: notasNuevas,
       updated_at: nowISO,
     };
-    const up = await fetch(`${PORTAL_URL}/rest/v1/lugares?id=eq.${enc(lugarId)}`, {
-      method: 'PATCH',
-      headers: { ...sb, Prefer: 'return=minimal' },
-      body: JSON.stringify(patch),
-    });
+    // [CONC-1] Se escribe SOLO si el lugar sigue como se leyó. Este endpoint es
+    // el caso de libro: releyó `notas`, le pegó un renglón de auditoría y
+    // reescribe el campo entero — dos admins a la vez y una nota desaparece.
+    const up = await fetch(
+      `${PORTAL_URL}/rest/v1/lugares?id=eq.${enc(lugarId)}${condicionVersion(lugar.updated_at)}`, {
+        method: 'PATCH',
+        headers: { ...sb, Prefer: PREFER_VER_FILAS },
+        body: JSON.stringify(patch),
+      });
     if (!up.ok) return { statusCode: 502, headers, body: JSON.stringify({ error: 'No se pudo actualizar el boleto', detail: await up.text() }) };
+    // Un PATCH que no alcanzó a nadie NO es un éxito silencioso: alguien más
+    // movió el lugar entre la lectura y la escritura.
+    if (noAlcanzo(await up.json().catch(() => null))) return respuestaChoque(headers, 'este lugar');
 
     return { statusCode: 200, headers, body: JSON.stringify({ ok: true, boleto_entregado_at: entregado ? nowISO : null }) };
   } catch (e) {

@@ -528,8 +528,62 @@ function musicListConcSeg(esfera) {
   return ids.length ? ("musicList:['" + ids.map(escStr).join("','") + "'],") : '';
 }
 
+// ═══ [ESF-UX-2c] LA DERIVACIÓN, TAMBIÉN EN EL COMPILADOR ═══════════════════
+// UX-2a la puso en el guardado del editor, y eso dejó una VENTANA: la columna
+// `zonas` de un multifecha sigue con su valor viejo hasta que alguien abre la
+// ficha y la guarda. Memo publicó straykids dentro de esa ventana y el sitio
+// re-publicó la contradicción (portada 12 zonas y "desde $4,800" contra unas
+// fechas que solo vendían 3 y desde $9,400).
+//
+// Publicar recompila el catálogo ENTERO (`esferas-publicar.js` trae
+// `esferas_eventos?select=*`), así que bajar la regla aquí no cierra la
+// ventana: la elimina. El siguiente publish aplana los 4 eventos que aún
+// arrastran contradicción, sin que nadie tenga que acordarse — y se auto-cura
+// también contra el SQL escrito a mano.
+//
+// LA EXCEPCIÓN VIAJA CON LA REGLA. Se deriva `cheapZonas` SOLO cuando las
+// fechas declaran las suyas: si el cheap del evento vive en el global porque
+// las fechas heredan de él ("vacías = usa las de arriba"), derivar lo BORRA.
+// Hoy eso es karolcdmx y sus 14 zonas. Es la misma excepción que en
+// `_esfZonasParaGuardar` de kamehouse.js: dos calculadores, una regla — y un
+// careo de equivalencia que no los deja divergir dormidos.
+//
+// La rampa de `pc` no aplica a un global derivado: las zonas de una fecha no
+// traen `pc`, y el cheap de un multifecha sale de sus fechas o de su lista
+// capturada, nunca de un precio inventado sobre un global que ya no se captura.
+function derivarGlobalDeFechas(mf, cual) {
+  const orden = [], vistas = new Set();
+  const de = (f) => ((cual === 'zonas' ? f.zonas : f.cheapZonas) || []);
+  (mf || []).forEach((f) => de(f).forEach((z) => {
+    if (z && z.n && !vistas.has(z.n)) { vistas.add(z.n); orden.push(z.n); }
+  }));
+  return orden.map((n) => {
+    const filas = (mf || []).map((f) => de(f).find((z) => z && z.n === n)).filter(Boolean);
+    const libre = filas.find((z) => !z.ag && !z.prox);
+    const prox  = libre ? null : filas.find((z) => z.prox);
+    const src   = libre || prox || filas[0];
+    const o = { n: n, p: src.p || 0, ag: (libre || prox) ? 0 : 1, prox: (prox ? 1 : 0), vip: src.vip || 0 };
+    if (src.sepEspecial != null) o.sepEspecial = src.sepEspecial;
+    if (src.requiereViajeros != null) o.requiereViajeros = src.requiereViajeros;
+    return o;
+  });
+}
+// ¿Las fechas declaran su propio CHEAP? El nombre se comparte con el
+// calculador del editor a propósito: es la llave del careo de equivalencia.
+function hayCheapPorFecha(mf) {
+  return !!(mf || []).some((f) => Array.isArray(f.cheapZonas) && f.cheapZonas.length);
+}
+// El texto de una zona PLUS. Estaba en línea dentro de `zonasSegmento`; se
+// nombra para que el camino derivado emita EXACTAMENTE los mismos bytes.
+function plusZonaTexto(z) {
+  return "{n:'" + escStr(z.n) + "',p:" + z.p + (z.vip ? ',vip:1' : '') +
+    (z.prox ? ',prox:1' : (z.ag ? ',ag:1' : '')) +
+    (z.requiereViajeros ? ',requiereViajeros:' + z.requiereViajeros : '') + '}';
+}
 function zonasSegmento(esfera) {
-  const rows = parseZonas(esfera.zonas);
+  // [ESF-UX-2c] Con fechas, el global no se lee: se deriva de ellas.
+  const mfD = parseMultifecha(esfera.multifecha);
+  const rows = mfD ? derivarGlobalDeFechas(mfD, 'zonas') : parseZonas(esfera.zonas);
   // [ESF-CIERRE-FINAL] Sin zonas PLUS NO se corta aquí: un evento puede vender
   // SOLO cheap (solomun: `zonas:[]` y tres cheapZonas), y el `return` temprano
   // se comía su lista propia. Es la misma familia que el `sepCheap` de #585 —
@@ -547,12 +601,15 @@ function zonasSegmento(esfera) {
   // catálogo: 119 lo escriben así y solo 12 al revés (`ag · vip`). Se emite el
   // mayoritario; esos 12 quedan semánticamente idénticos y se canonicalizan al
   // publicar, que es lo que ya pasa con los eventos gobernados.
-  const plus = rows.map((z) =>
-    "{n:'" + escStr(z.n) + "',p:" + z.p + (z.vip ? ',vip:1' : '') +
-    (z.prox ? ',prox:1' : (z.ag ? ',ag:1' : '')) +
-    (z.requiereViajeros ? ',requiereViajeros:' + z.requiereViajeros : '') + '}'
-  ).join(',');
+  const plus = rows.map(plusZonaTexto).join(',');
   let seg = 'zonas:[' + plus + ']';
+  // [ESF-UX-2c] Con fechas que declaran su CHEAP, ése manda sobre la columna:
+  // es el mismo orden de mando que arriba. Si NINGUNA lo declara, se cae al
+  // camino de siempre —la lista capturada—, que es la que heredan (karolcdmx).
+  if (mfD && hayCheapPorFecha(mfD)) {
+    const dc = derivarGlobalDeFechas(mfD, 'cheapZonas');
+    return dc.length ? (seg + ',cheapZonas:[' + dc.map(cheapZonaTexto).join(',') + ']') : seg;
+  }
   // [ESF-E1c] LA LISTA PROPIA MANDA. Si Esferas capturó una, se emite tal cual
   // y no se mira `pc` para nada.
   const propia = parseCheapZonas(esfera.cheap_zonas);
@@ -1737,6 +1794,10 @@ module.exports = {
   _parseCheapZonas: parseCheapZonas,
   _parseMultifecha: parseMultifecha,
   _generarObj: generarObj,
+  // [ESF-UX-2c] Expuestas para el careo de equivalencia contra el calculador
+  // gemelo del editor: dos calculadores con una regla no se vigilan solos.
+  _derivarGlobalDeFechas: derivarGlobalDeFechas,
+  _hayCheapPorFecha: hayCheapPorFecha,
   _fusionarConViejo: fusionarConViejo,
   _extraerEVKamehouse: extraerEVKamehouse,
   _extraerEVPortal: extraerEVPortal,

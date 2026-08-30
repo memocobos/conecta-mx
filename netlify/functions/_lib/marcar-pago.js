@@ -28,6 +28,9 @@
 //     lectura que envejece. La guarda viaja en la URL y hay una pasada de
 //     verificación después de escribir. El defecto que cierra estaba medido: una
 //     solicitud quedaba 'pagado' con una cuota viva, en silencio.
+//     [CONC-4a] Ese arreglo YA NO VIVE AQUÍ: se movió a
+//     `_lib/reconciliar-solicitud`, porque el mismo bloque existía en cuatro
+//     copias y sólo ésta estaba arreglada. Aquí queda el correo.
 //
 // Las SEIS escrituras DE CONJUNTO sobre `pagos` quedan fuera a propósito: una
 // versión por fila no cabe en un PATCH que toca veinte. Están nombradas una por
@@ -36,9 +39,8 @@
 // =============================================================================
 
 const { aplicarModoPrueba } = require('./correo-guard');
-const { condicionVersion, noAlcanzo, respuestaChoque, PREFER_VER_FILAS } = require('./candado-optimista');
-
-const TOLERANCIA_MXN = 1; // absorbe redondeos de centavos en el reparto del plan
+const { condicionVersion, respuestaChoque, PREFER_VER_FILAS } = require('./candado-optimista');
+const { reconciliarSolicitud, TOLERANCIA_MXN } = require('./reconciliar-solicitud');
 
 // [CONC-2] `version` es OBLIGATORIA de nombrar, aunque valga null. Un candado
 // que se puede olvidar es un candado que se olvida: si un caller no dice nada,
@@ -157,89 +159,18 @@ async function aplicarNucleo({ env, headers, pagoId, accion, patch, actorEtiquet
     // `solicitudes_tour.vendedor_id`, la columna que VEN-BORRA-1d suelta: dejarla
     // habría hecho fallar el `select` entero de PostgREST, y con él marcar un pago.
 
-    // [F5] Reconciliación sobre CUOTAS VIVAS (estado !== 'cancelado'). Tras una baja
-    // de lugar (#239) sus cuotas no pagadas quedan 'cancelado'; se EXCLUYEN para que
-    // el grupo pueda liquidar lo de los lugares vivos. Sin bajas, las vivas ≡ el plan
-    // completo (Σ vivas ≈ precio_total, misma tolerancia de $1 por centavos).
-    // MISMA transformación en admin-aplicar-pago-grupo y admin-lugar-baja (las 3 idénticas).
-    // [CONC-2] La decisión sale SOLO de las cuotas. Antes miraba también
-    // `estadoPrevio` —la lectura de arriba— y ahí estaba el defecto: esa lectura
-    // envejece mientras otro escritor cambia la misma fila. El caso medido: A marca
-    // la última cuota, B revierte otra, y B se calla porque su `estadoPrevio` decía
-    // 'en_pagos' cuando A ya la había puesto en 'pagado'. Quedaba una solicitud
-    // LIQUIDADA con una cuota viva, sin un solo error a la vista.
-    const decidir = (cuotas) => {
-      // [F5] Sobre CUOTAS VIVAS (estado !== 'cancelado'). Tras una baja de lugar
-      // (#239) sus cuotas no pagadas quedan 'cancelado'; se EXCLUYEN para que el
-      // grupo pueda liquidar lo de los lugares vivos.
-      const vivas = (Array.isArray(cuotas) ? cuotas : []).filter(p => p && p.estado !== 'cancelado');
-      // Dinero REAL cobrado de las VIVAS pagadas = COALESCE(monto_pagado, monto). Lo
-      // pagado de un lugar dado de baja es historia contable (se retuvo) pero NO
-      // cuenta aquí — simetría con excluirlo del esperado.
-      const sumaReal = vivas.reduce((acc, p) => {
-        if (p.estado !== 'pagado') return acc;
-        const real = (p.monto_pagado == null) ? Number(p.monto || 0) : Number(p.monto_pagado || 0);
-        return acc + (Number.isFinite(real) ? real : 0);
-      }, 0);
-      // Esperado = Σ monto de las VIVAS (ya no precio_total: tras una baja, lo
-      // esperado es lo de los lugares vivos).
-      const esperado = vivas.reduce((acc, p) => acc + (Number(p.monto || 0) || 0), 0);
-      const dineroCuadra = sumaReal >= (esperado - TOLERANCIA_MXN);
-      // 'pagado' exige AMBAS: todas las cuotas VIVAS con palomita Y que el dinero
-      // real cuadre contra lo esperado (tol $1).
-      const todosPagados = vivas.length > 0 && vivas.every(p => p.estado === 'pagado');
-      return (todosPagados && dineroCuadra) ? 'pagado' : 'en_pagos';
-    };
-
-    // La guarda que ANTES vivía en JS ahora viaja en la URL, y por eso ya no puede
-    // envejecer: la evalúa Postgres en el instante de escribir.
-    //   promover  ⇔ `estadoPrevio !== 'pagado'`  →  &estado=neq.pagado
-    //   degradar  ⇔ `estadoPrevio === 'pagado'`  →  &estado=eq.pagado
-    // Las dos condiciones son las de siempre, palabra por palabra. Lo único que
-    // cambió es CUÁNDO se leen. Si no alcanzan a nadie, la solicitud ya estaba como
-    // queríamos (o en un estado ajeno, p.ej. 'cancelado') y no se escribe: mismo
-    // comportamiento que el `if (nuevoEstadoSol)` de antes.
-    const CONDICION_DESTINO = { pagado: '&estado=neq.pagado', en_pagos: '&estado=eq.pagado' };
-    const escribirEstado = async (destino) => {
-      const r = await fetch(
-        `${env.PORTAL_SB_URL}/rest/v1/solicitudes_tour?id=eq.${solicitudId}${CONDICION_DESTINO[destino]}`, {
-          method: 'PATCH',
-          headers: { ...sbHeaders, Prefer: PREFER_VER_FILAS },
-          body: JSON.stringify({ estado: destino }),
-        });
-      if (!r.ok) return { ok: false, detail: await r.text() };
-      return { ok: true, aterrizo: !noAlcanzo(await r.json().catch(() => null)) };
-    };
-
-    const destino = decidir(todos);
-    let nuevoEstadoSol = null;
-    let esc = await escribirEstado(destino);
-    if (!esc.ok) {
-      return { statusCode: 502, headers, body: JSON.stringify({ error: 'Pago actualizado, pero falló la reconciliación del estado de la solicitud', detail: esc.detail }) };
+    // [CONC-4a] La reconciliación se MOVIÓ a `_lib/reconciliar-solicitud`: este
+    // bloque vivía aquí en cuatro copias con el mismo sha1 y CONC-2 solo arregló
+    // ésta. El comportamiento no se movió con él — el arnés lo carea en los
+    // cuatro caminos. Lo que se queda aquí es el correo, que cada llamador
+    // escribe distinto.
+    const rec = await reconciliarSolicitud({
+      sbUrl: env.PORTAL_SB_URL, sbHeaders, solicitudId, cuotas: todos,
+    });
+    if (!rec.ok) {
+      return { statusCode: 502, headers, body: JSON.stringify({ error: 'Pago actualizado, pero falló la reconciliación del estado de la solicitud', detail: rec.error }) };
     }
-    if (esc.aterrizo) nuevoEstadoSol = destino;
-
-    // [CONC-2] PASADA DE VERIFICACIÓN. Cierra el hueco que la condición de estado
-    // sola no puede cerrar: la lectura de cuotas de arriba puede ser anterior a la
-    // escritura de otro, y entonces la decisión nace vieja. Esta relectura ocurre
-    // DESPUÉS de nuestra propia escritura, así que ve todo lo que aterrizó antes.
-    // Es UNA sola pasada, a propósito: no es un reintento en bucle, y su límite se
-    // dice en voz alta — un escritor que aterrice después de esta relectura queda
-    // para SU propia reconciliación, que corre después de la suya.
-    const verifR = await fetch(allUrl, { headers: sbHeaders });
-    if (verifR.ok) {
-      const todosAhora = await verifR.json().catch(() => null);
-      if (Array.isArray(todosAhora) && todosAhora.length) {
-        const destino2 = decidir(todosAhora);
-        if (destino2 !== destino) {
-          const esc2 = await escribirEstado(destino2);
-          if (!esc2.ok) {
-            return { statusCode: 502, headers, body: JSON.stringify({ error: 'Pago actualizado, pero falló la reconciliación del estado de la solicitud', detail: esc2.detail }) };
-          }
-          if (esc2.aterrizo) nuevoEstadoSol = destino2;
-        }
-      }
-    }
+    const nuevoEstadoSol = rec.cambio;
 
     if (nuevoEstadoSol) {
       estadoSolicitud = nuevoEstadoSol;

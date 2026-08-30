@@ -19,6 +19,7 @@
 
 const crypto = require('crypto');
 const { aplicarModoPrueba } = require('./_lib/correo-guard');
+const { reconciliarSolicitud } = require('./_lib/reconciliar-solicitud');
 const { verifyAdminAuthLive, corsCheck } = require('./_lib/verify-admin');
 const { fetchCatalogo } = require('./_lib/catalogo-index');
 
@@ -32,7 +33,6 @@ const ROLES = ['maestro_roshi', 'bulma', 'milk'];
 const MAX_NOMBRE = 120;
 const MAX_CORREO = 200;
 const MAX_MOTIVO = 500;
-const TOLERANCIA_MXN = 1; // igual que admin-marcar-pago / admin-lugar-baja
 const PORTAL_BASE = 'https://conectareynosa.mx/portal.html';
 
 const PORTAL_URL = process.env.PORTAL_SUPABASE_URL;
@@ -287,36 +287,16 @@ exports.handler = async (event) => {
     // ---- 5. Reconciliación de la solicitud (best-effort, lógica de #240 "cuotas
     //         vivas"). Reactivar cuotas puede degradar un 'pagado' → 'en_pagos'.
     //         Ya cuenta el cargo recién insertado (una cuota pendiente más). ----
+    //         [CONC-4a] La lógica de cuotas vivas vive en
+    //         `_lib/reconciliar-solicitud`, una sola vez para los cuatro caminos.
+    //         Éste es el único de los cuatro que no manda correo al liquidar.
     let solicitudEstado = solicitud.estado;
     try {
-      const allR = await fetch(
-        `${PORTAL_URL}/rest/v1/pagos?solicitud_id=eq.${enc(lugar.solicitud_id)}&select=estado,monto,monto_pagado`,
-        { headers: sbHeaders }
-      );
-      if (allR.ok) {
-        const todos = await allR.json();
-        const vivas = (Array.isArray(todos) ? todos : []).filter(p => p && p.estado !== 'cancelado');
-        const sumaReal = vivas.reduce((acc, p) => {
-          if (p.estado !== 'pagado') return acc;
-          const real = (p.monto_pagado == null) ? Number(p.monto || 0) : Number(p.monto_pagado || 0);
-          return acc + (Number.isFinite(real) ? real : 0);
-        }, 0);
-        const esperado = vivas.reduce((acc, p) => acc + (Number(p.monto || 0) || 0), 0);
-        const dineroCuadra = sumaReal >= (esperado - TOLERANCIA_MXN);
-        const todosPagados = vivas.length > 0 && vivas.every(p => p.estado === 'pagado');
-        const estadoPrevio = solicitud.estado;
-        let nuevoEstadoSol = null;
-        if (todosPagados && dineroCuadra && estadoPrevio !== 'pagado') nuevoEstadoSol = 'pagado';
-        else if ((!todosPagados || !dineroCuadra) && estadoPrevio === 'pagado') nuevoEstadoSol = 'en_pagos';
-        if (nuevoEstadoSol) {
-          const pS = await fetch(`${PORTAL_URL}/rest/v1/solicitudes_tour?id=eq.${enc(lugar.solicitud_id)}`, {
-            method: 'PATCH',
-            headers: { ...sbHeaders, Prefer: 'return=minimal' },
-            body: JSON.stringify({ estado: nuevoEstadoSol }),
-          });
-          if (pS.ok) solicitudEstado = nuevoEstadoSol;
-        }
-      }
+      const rec = await reconciliarSolicitud({
+        sbUrl: PORTAL_URL, sbHeaders, solicitudId: lugar.solicitud_id,
+      });
+      if (!rec.ok) throw new Error(rec.error);
+      if (rec.cambio) solicitudEstado = rec.cambio;
     } catch (e) {
       console.error('[lugar-traspasar] reconciliación falló (no crítica):', e.message);
     }

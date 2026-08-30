@@ -43,13 +43,21 @@ create trigger trg_pagos_updated_at
   for each row execute function pagos_touch_updated_at();
 
 -- ── lo que este candado NO cubre, dicho para que nadie lo "arregle" ──────────
--- SEIS escrituras sobre `pagos` son DE CONJUNTO, no de una fila:
+-- SIETE escrituras sobre `pagos` son DE CONJUNTO, no de una fila:
 --     admin-aplicar-pago-grupo   pagos?id=in.(…)
 --     admin-lugar-baja           pagos?lugar_id=eq.⟨x⟩&estado=neq.pagado
 --     admin-lugar-traspasar      pagos?lugar_id=eq.⟨x⟩&estado=eq.cancelado
 --     admin-lugar-traspasar      pagos?lugar_id=eq.⟨x⟩&estado=neq.pagado
+--     portal-invitacion-aceptar  pagos?lugar_id=eq.⟨x⟩&estado=neq.pagado
 --     portal-reclamar-cuenta     pagos?cliente_id=eq.⟨x⟩&auth_user_id=is.null
 --     marcar-vencidos-diario     pagos?id=in.(…)  →  estado='vencido'   (CRON)
+--
+-- ⚠️ [CONC-4a] Esta lista decía SEIS y faltaba `portal-invitacion-aceptar`. El
+-- SQL de arriba no cambia — corrió bien y sigue bien—, pero esta lista existe
+-- para impedir que alguien las "arregle" por simetría, y una lista que existe
+-- para eso no puede estar incompleta. Se contó de nuevo con el barrido por
+-- ayudante Y por cadena, y el control de siempre: las que YA SÉ que están ahí
+-- tienen que aparecer.
 --
 -- ⚠️ La SEXTA no estaba en el reporte que Jane firmó, y vale decir por qué: mi
 -- inventario buscaba la cadena `rest/v1/pagos`, y ese cron arma la URL con un
@@ -60,7 +68,7 @@ create trigger trg_pagos_updated_at
 -- de una sola las volvería imposibles de guardar. Su candado natural es el que
 -- ya usan sin nombrarlo — el filtro de estado (`estado=neq.pagado` se niega a
 -- pisar lo pagado). Quedan FUERA de CONC-2 a propósito, firmado por Jane.
--- No las "completes" por simetría: romperías seis caminos vivos.
+-- No las "completes" por simetría: romperías siete caminos vivos.
 --
 -- ⚠️ Consecuencia honesta del trigger, para que no sorprenda: cuando el cron de
 -- medianoche marca una cuota 'vencido', le mueve la versión. Un admin que dejó

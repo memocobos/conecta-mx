@@ -1937,6 +1937,10 @@
       <span id="esf-mapa-status" style="font-size:11px;color:var(--ts)"></span>
      </div>
      <div id="esf-mapa-preview" style="margin-top:8px;display:none"><img id="esf-mapa-img" src="" alt="Mapa del venue" style="max-width:240px;max-height:180px;border:1px solid var(--border);border-radius:var(--r-sm,8px)"></div>
+     <!-- [ESF-MAPA-2] La clave corta heredada NO va en un <img>: se resuelve
+          contra nuestro origen, da 404, y la ficha enseñaba una imagen rota
+          junto al botón de «Quitar». Se dice lo que es. -->
+     <div id="esf-mapa-heredado" style="margin-top:8px;display:none;font-size:12px;color:var(--ts);border-left:3px solid var(--orange);padding:8px 10px;background:rgba(255,255,255,.03);border-radius:0 6px 6px 0"></div>
      <div style="font-size:11px;color:var(--ts);margin-top:4px">Imagen del mapa de zonas (conciertos). Sin mapa → el sitio muestra "Mapa próximamente".</div>
     </div>
     <div class="form-group" data-esf="vende">

@@ -137,7 +137,7 @@ exports.handler = async (event) => {
 
     // 4. Compilar + validar (lógica compartida; UPSERT: inserta nuevos, reemplaza
     //    existentes en su lugar).
-    const { contenidoNuevo, aInsertar, aActualizar, validacion, sin_cambios } = compilarEV({ esferas, indexHtml: content });
+    const { contenidoNuevo, aInsertar, aActualizar, validacion, sin_cambios, medios_en_riesgo } = compilarEV({ esferas, indexHtml: content });
 
     // 5. CANDADO DURO: sin validación perfecta de AMBOS parsers, NO se escribe.
     //    No se omite por ningún flag.
@@ -146,6 +146,34 @@ exports.handler = async (event) => {
         statusCode: 422,
         headers,
         body: JSON.stringify({ ok: false, error: 'Validación falló — no se escribió nada', validacion }),
+      };
+    }
+
+    // 5-bis. [MEDIA-GUARD] CANDADO DE MEDIOS: si este publish se llevaría un
+    //        mapa, una portada o un lineup que el index vivo SÍ tiene y la
+    //        ficha no menciona, se REHÚSA con los nombres.
+    //
+    //        Se rehúsa, no se avisa. Estas pérdidas ya venían con aviso —el
+    //        diff de cada publish las mostró un mes— y nadie las vio: un aviso
+    //        ignorable se ignora, el que se rehúsa educa. La salida es escribir
+    //        la intención donde vive el dato: cargar el medio EN LA FICHA, o
+    //        marcarlo apagado ahí mismo (`mapa_null` y sus hermanos).
+    if (Array.isArray(medios_en_riesgo) && medios_en_riesgo.length) {
+      const porEvento = {};
+      for (const m of medios_en_riesgo) {
+        (porEvento[m.slug] = porEvento[m.slug] || []).push(m.campo);
+      }
+      const nombres = Object.keys(porEvento)
+        .map((s) => s + ' (' + porEvento[s].join(', ') + ')').join(' · ');
+      return {
+        statusCode: 409,
+        headers,
+        body: JSON.stringify({
+          ok: false,
+          error: 'Este publish borraría medios que el sitio SÍ tiene y la ficha no: ' + nombres +
+            '. No se escribió nada. Cárgalos en la ficha del evento, o si de verdad van fuera, márcalo en la ficha.',
+          medios_en_riesgo,
+        }),
       };
     }
 

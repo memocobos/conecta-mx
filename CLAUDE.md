@@ -407,6 +407,14 @@ está caduco antes de escribirse.
   siguen SIN commitear a propósito.
 
 ### ⚠️ Reglas que cuestan caro olvidar
+- 🔒 **Los medios se cargan EN LA FICHA, jamás a mano al index.** `mapa`,
+  `staticImg` y `lineup` están en `CAMPOS_DEL_COMPILADOR`: si la ficha no los
+  trae, el siguiente publish los **borra**, porque «no lo emitió» se lee como
+  «dejó de tenerlo». Medido el 29-ago sobre 80 commits: **once mapas
+  desaparecidos, diez de ellos en eventos EN VENTA**, el último ese mismo día.
+  Desde MEDIA-GUARD el publish **se rehúsa** (409) nombrando los eventos, en vez
+  de borrarlos en silencio. Para quitar un medio a propósito, la ficha tiene que
+  decirlo (`mapa_null` y sus hermanos), no basta con vaciarlo.
 - **Nunca `gh pr merge`.** Flujo: `pull main` → `merge --no-ff` → `push`. **Verificar el
   push contra el ref TRAÍDO DE VUELTA (`fetch` + `rev-parse origin/main`), no
   contra su propia salida — y solo entonces borrar la rama.**

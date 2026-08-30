@@ -1423,9 +1423,53 @@ function _insertarAntesDeZonasNivel1(objText, texto) {
   return objText;   // no se encontró: quien llama decide (hoy, lanza)
 }
 
+// ═══ [MEDIA-GUARD] EL BORRADO SILENCIOSO DE MEDIOS ═════════════════════════
+// Un medio que se agregó A MANO al index muere en el siguiente publish, porque
+// el compilador manda sobre lo que administra y `mapa`/`staticImg`/`lineup`
+// están en CAMPOS_DEL_COMPILADOR: si la ficha no los trae, «no lo emitió» se
+// lee como «dejó de tenerlo».
+//
+// No es una hipótesis. Barrido de los 80 últimos commits de index.html: ONCE
+// desapariciones, todas de `mapa`, diez dentro de un publish. Diez seguían
+// perdidas —todas en eventos EN VENTA— y la última se borró el 29-ago en el
+// publish de 68. El cliente elegía zona sin poder ver dónde se sienta.
+//
+// La ironía es que esta misma función YA se niega a perder un campo que NO
+// gobierna (unas líneas abajo lanza error antes que publicar sin él). El hueco
+// era exactamente el de los gobernados.
+//
+// `img` queda FUERA a propósito, y no por la razón que primero escribí: el
+// compilador lo emite SIEMPRE (del nombre del evento, salvo `img_omitir`), así
+// que vigilarlo casi nunca sonaría. Queda fuera porque no es un medio que
+// alguien cargue: es un derivado. Un medio es lo que se sube.
+const MEDIOS_VIGILADOS = ['mapa', 'staticImg', 'lineup'];
+// La salida explícita: para borrar un medio de verdad, la ficha tiene que
+// DECIRLO. Así la intención queda escrita donde vive el dato, no en un clic que
+// nadie vuelve a ver.
+//
+// Para el MAPA la puerta ya está abierta y no pasa por aquí: con `mapa_null` el
+// compilador emite `mapa:null` EXPLÍCITO, así que la llave existe en el objeto
+// nuevo y el candado ni la mira. Lo descubrió una sonda que no mordía.
+// Esta tabla es para los otros dos, que no emiten nada cuando van fuera y por
+// eso necesitan que la ficha lo diga (migraciones/MEDIA-GUARD-1.sql). Hasta que
+// esas columnas existan, `staticImg` y `lineup` se cuidan sin puerta —han
+// perdido cero medios en 80 commits, así que si suenan, es de veras.
+const MEDIO_APAGADO = { mapa: 'mapa_null', staticImg: 'static_img_null', lineup: 'lineup_null' };
+function _mediosEnRiesgo(viejo, nuevo, esfera, slug) {
+  const out = [];
+  for (const k of MEDIOS_VIGILADOS) {
+    const tenia = viejo && viejo[k] != null && viejo[k] !== '' && viejo[k] !== false;
+    if (!tenia) continue;
+    if (nuevo && Object.prototype.hasOwnProperty.call(nuevo, k)) continue;
+    // ¿La ficha dice «este evento NO lleva esto»? Entonces es una decisión.
+    if (esfera && esfera[MEDIO_APAGADO[k]]) continue;
+    out.push({ slug: slug, campo: k, valor: String(viejo[k]).slice(0, 120) });
+  }
+  return out;
+}
 // fusionarConViejo(objTextViejo, objNuevo) → objNuevo enriquecido.
 // Lanza si hay un campo que se perdería y no se puede re-emitir.
-function fusionarConViejo(objTextViejo, objNuevo, slug) {
+function fusionarConViejo(objTextViejo, objNuevo, slug, esfera, riesgos) {
   let viejo, nuevo;
   try { viejo = _parseObjeto(objTextViejo); } catch (e) {
     throw new Error(`No pude leer el evento "${slug}" que ya está en index.html (${e.message}). No se actualiza a ciegas.`);
@@ -1434,6 +1478,10 @@ function fusionarConViejo(objTextViejo, objNuevo, slug) {
     throw new Error(`El objeto generado para "${slug}" no parsea (${e.message}).`);
   }
   if (!viejo || typeof viejo !== 'object') return objNuevo;
+
+  // [MEDIA-GUARD] Antes de fusionar: ¿este publish se llevaría un medio que
+  // el index vivo SÍ tiene y la ficha no menciona?
+  if (Array.isArray(riesgos)) riesgos.push(..._mediosEnRiesgo(viejo, nuevo, esfera, slug));
 
   const extras = [];
   for (const k of Object.keys(viejo)) {
@@ -1514,6 +1562,8 @@ function compilarEV({ esferas, indexHtml }) {
   const hoy = todayMx();
   const aInsertar = [];
   const aActualizar = [];
+  // [MEDIA-GUARD] Se llena en `fusionarConViejo`, evento por evento.
+  const medios_en_riesgo = [];
   const slugsVistos = new Set(); // 🔒 AUD-1: un slug repetido en el lote se
                                  // insertaría/actualizaría dos veces.
   for (const esf of (Array.isArray(esferas) ? esferas : [])) {
@@ -1531,7 +1581,7 @@ function compilarEV({ esferas, indexHtml }) {
       if (!loc) {
         throw new Error(`El evento "${slug}" aparece en el EV pero no pude localizar su objeto para actualizarlo.`);
       }
-      obj = fusionarConViejo(content.slice(loc.start, loc.end), obj, slug);
+      obj = fusionarConViejo(content.slice(loc.start, loc.end), obj, slug, esf, medios_en_riesgo);
       aActualizar.push({ slug, obj });
     } else {
       aInsertar.push({ slug, obj });
@@ -1607,7 +1657,7 @@ function compilarEV({ esferas, indexHtml }) {
     if (!validacion.error) validacion.error = 'portal parser: ' + e.message;
   }
 
-  return { contenidoNuevo, aInsertar, aActualizar, validacion, sin_cambios };
+  return { contenidoNuevo, aInsertar, aActualizar, validacion, sin_cambios, medios_en_riesgo };
 }
 
 // ── Despublicar: quitar un objeto del EV por id (balanceo de llaves) ───────────

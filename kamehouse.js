@@ -19922,6 +19922,35 @@ function _esfMfAddFecha(data) {
   const cont = document.getElementById('esf-multifecha');
   if (!cont) return;
   const d = data || {};
+  // [ESF-UX-3-1a] LA CONVERSIÓN MIGRA LOS DATOS. Convertir un evento sencillo
+  // en multifecha es apretar «+ Agregar fecha» con el mago lleno: la fecha 1
+  // NACE con las zonas que ya tenía el evento, en vez de nacer vacía. Sin esto,
+  // la fecha nueva no tiene nada que decir y el candado de ESF-FECHA-VACIA la
+  // deja fuera del gobierno —el evento no se rompe, pero tampoco se convierte:
+  // Memo capturaría a mano las mismas zonas que ya estaban dos centímetros
+  // arriba, y en 23 sucursales eso se hace mal una de cada tres veces.
+  //
+  // Solo al CONVERTIR: si ya hay bloques de fecha, la fecha nueva nace limpia
+  // (es una noche más, no la misma), y si el mago está vacío no hay nada que
+  // migrar.
+  if (!data && !_esfTabBloques().length && typeof _esfGetZonas === 'function') {
+    // `pc` se queda fuera a propósito: el CHEAP de una fecha vive en su
+    // `cheapZonas`, no en un precio colgado de la zona PLUS.
+    const limpia = (z) => {
+      const o = { n: z.n, p: z.p || 0 };
+      if (z.ag) o.ag = 1;
+      if (z.prox) o.prox = 1;
+      if (z.vip) o.vip = 1;
+      if (z.sepEspecial) o.sepEspecial = z.sepEspecial;
+      return o;
+    };
+    const gz = _esfGetZonas().filter((z) => z && z.n);
+    if (gz.length) {
+      d.zonas = gz.map(limpia);
+      const gc = (typeof _esfGetCheapZonas === 'function') ? _esfGetCheapZonas() : null;
+      if (gc && gc.length) d.cheapZonas = gc.filter((z) => z && z.n).map(limpia);
+    }
+  }
   const box = document.createElement('div');
   box.className = 'esf-mf-fecha';
   box.style.cssText = 'margin-top:10px;padding:12px;border:1px solid var(--border);border-radius:var(--r-sm,8px);background:var(--bg)';

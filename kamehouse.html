@@ -3725,4 +3725,12 @@
 
 <script src="kamehouse-recibos.js"></script>
 <script src="frases-cine.js"></script>
+<!-- [MONO-1] Esferas vive en su propio archivo desde el 30-ago, y va ANTES
+     del tronco: NO es cosmético. El nivel superior del tronco referencia
+     `_esfEsPorConfirmar` como VALOR al construir `_ESF_MINIMO`, y una función
+     declarada en un script posterior todavía no existe para el anterior. Lo
+     cazó el humo de navegador —mi detector estático dijo dos veces que no había
+     dependencia de evaluación, y las dos veces se equivocó—. El orden se
+     comprueba en el arnés cargando la página: cero errores o la tuerca no pasa. -->
+<script src="kamehouse-esferas.js"></script>
 <script src="kamehouse.js"></script>

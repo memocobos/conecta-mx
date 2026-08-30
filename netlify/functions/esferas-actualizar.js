@@ -58,6 +58,13 @@ const CAMPOS_EDITABLES = new Set(['nombre', 'titulo', 'fecha_inicio', 'ciudad', 
   'banco',   // [ESF-E1g] identificador del banco; lista CERRADA (ver abajo).
   // [ESF-CAMPOS-1] Tres campos chicos que bloqueaban a 13 eventos vivos.
   'promo', 'promo_code', 'promo_label', 'deporte', 'music_search',
+  // [ESF-MAPA-2] La puerta de salida del mapa. La columna existía y el
+  // compilador la respetaba desde MEDIA-GUARD —emite `mapa:null` EXPLÍCITO—
+  // pero NADIE podía escribirla: no estaba aquí, así que «Quitar mapa» dejaba
+  // la ficha en `mapa:''` con el índice todavía trayendo el mapa, y el publish
+  // se rehusaba PARA SIEMPRE sin salida desde la pantalla. MEDIA-GUARD hacía lo
+  // suyo; lo que faltaba era la puerta que su propio comentario describe.
+  'mapa_null',
   'flash_promo',   // [ESF-FLASH-1] el objeto entero, en JSON.
   'lineup',        // [ESF-CIERRE-LINEUP] llave de lineups.js o URL.
   // [ESF-CIERRE-COLAS] La imagen y el nombre de búsqueda son DOS cosas.
@@ -287,6 +294,9 @@ exports.handler = async (event) => {
     // del catálogo. El compilador se encarga de emitir `promo:true` y
     // `deporte:1` — cada uno con el suyo, que es como viven en el EV.
     if (k === 'promo' || k === 'deporte') { sane[k] = (v === true || v === 1 || v === '1' || v === 'true'); continue; }
+    // [ESF-MAPA-2] Bandera, igual que las de arriba: «este evento NO lleva mapa»,
+    // dicho donde vive el dato y no en un clic que nadie vuelve a ver.
+    if (k === 'mapa_null') { sane[k] = (v === true || v === 1 || v === '1' || v === 'true'); continue; }
     // musicSearch es el texto con el que se busca la música cuando el nombre
     // del evento no da con ella. Se recorta: es una consulta, no un ensayo.
     // [ESF-PROMO-PAR] El código y la etiqueta del badge. Se recortan: los

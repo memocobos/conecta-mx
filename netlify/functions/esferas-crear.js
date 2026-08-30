@@ -41,6 +41,10 @@ const SB_KEY = process.env.SUPABASE_SERVICE_KEY_KAMEHOUSE;
 const CAMPOS_PERMITIDOS = new Set([
   'slug', 'nombre', 'titulo', 'fecha_inicio', 'ciudad', 'tipo', 'status',
   'venue', 'music', 'fechas_extra', 'zonas', 'hotel', 'mapa',
+  // [ESF-MAPA-2] La bandera de «este evento NO lleva mapa». En un evento nuevo
+  // casi siempre es false, pero se acepta para que la pantalla no mande un
+  // campo que el servidor tira en silencio: los dos caminos dicen lo mismo.
+  'mapa_null',
   'inc', 'sep', 'sep_cheap', 'nota', 'festival', 'foto',
   // [ESF-E1a] el precio del paquete RIDE y su separo
   'ride', 'sep_ride',
@@ -270,6 +274,7 @@ exports.handler = async (event) => {
     // del catálogo. El compilador se encarga de emitir `promo:true` y
     // `deporte:1` — cada uno con el suyo, que es como viven en el EV.
     if (k === 'promo' || k === 'deporte') { sane[k] = (v === true || v === 1 || v === '1' || v === 'true'); continue; }
+    if (k === 'mapa_null') { sane[k] = (v === true || v === 1 || v === '1' || v === 'true'); continue; }
     // musicSearch es el texto con el que se busca la música cuando el nombre
     // del evento no da con ella. Se recorta: es una consulta, no un ensayo.
     // [ESF-PROMO-PAR] El código y la etiqueta del badge. Se recortan: los

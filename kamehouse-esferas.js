@@ -908,6 +908,7 @@ async function crearEsferaEvento() {
     music_search: document.getElementById('esf-music-search')?.value.trim() || null,
     hotel: _esfGetHotel(),
     mapa: _esfGetMapa(),
+    mapa_null: _esfMapaApagado,
     foto: _esfGetFoto(),
     inc: _esfGetInc(),
     sep: _esfGetSep(),
@@ -3033,27 +3034,57 @@ function _esfHotelPopulate(raw) {
     nEl.value = String(noches);
   }
 }
+// [ESF-MAPA-2] ¿Esto es una imagen que el navegador puede pintar, o una CLAVE
+// CORTA heredada de la tabla vieja de `mapas.js` (`caifanes`, `calle24`)?
+function _esfMapaEsUrl(v) {
+  const s = String(v == null ? '' : v).trim();
+  return /^https?:\/\//.test(s) || s.charAt(0) === '/' || s.startsWith('data:');
+}
 function _esfMapaShow(url) {
   _esfMapaUrl = url || '';
   const prev = document.getElementById('esf-mapa-preview');
   const img = document.getElementById('esf-mapa-img');
   const clr = document.getElementById('esf-mapa-clear');
-  if (_esfMapaUrl) {
+  const her = document.getElementById('esf-mapa-heredado');
+  // [ESF-MAPA-2] Una clave corta NO se mete en un `<img>`: el navegador la
+  // resuelve contra nuestro origen, da 404, y la ficha enseña una imagen rota
+  // JUNTO A UN BOTÓN DE «QUITAR». El mapa está bien; lo que estaba mal era la
+  // pantalla — y esa invitación a borrar es la mejor explicación que hay de los
+  // mapas que se perdieron. Se pinta como lo que es: una clave heredada, que
+  // el sitio sabe resolver y el editor no sabe dibujar.
+  const esUrl = _esfMapaEsUrl(_esfMapaUrl);
+  if (_esfMapaUrl && esUrl) {
     if (img) img.src = _esfMapaUrl;
     if (prev) prev.style.display = '';
+    if (her) her.style.display = 'none';
+    if (clr) clr.style.display = '';
+  } else if (_esfMapaUrl) {
+    if (img) img.src = '';
+    if (prev) prev.style.display = 'none';
+    if (her) {
+      her.textContent = 'Mapa heredado: «' + _esfMapaUrl + '» — lo resuelve el sitio con la tabla vieja. Se conserva al guardar; sube una imagen si quieres reemplazarlo.';
+      her.style.display = '';
+    }
     if (clr) clr.style.display = '';
   } else {
     if (img) img.src = '';
     if (prev) prev.style.display = 'none';
+    if (her) her.style.display = 'none';
     if (clr) clr.style.display = 'none';
   }
 }
+// [ESF-MAPA-2] «Quitar» APAGA el mapa de verdad: además de vaciar la URL,
+// levanta `mapa_null`, que es lo que hace que el compilador emita `mapa:null`
+// EXPLÍCITO y MEDIA-GUARD deje pasar el publish. Antes vaciaba y nada más, y el
+// publish se rehusaba sin salida: el botón decía «quitar» y no podía quitar.
+let _esfMapaApagado = false;
 function _esfMapaClear() {
   _esfMapaShow('');
+  _esfMapaApagado = true;
   const f = document.getElementById('esf-mapa-file');
   if (f) f.value = '';
   const st = document.getElementById('esf-mapa-status');
-  if (st) st.textContent = '';
+  if (st) st.textContent = 'Sin mapa. Al guardar queda dicho que este evento NO lleva — así el sitio lo puede quitar.';
 }
 function _esfGetMapa() { return _esfMapaUrl || ''; }
 function _esfFotoShow(url) {
@@ -3115,7 +3146,8 @@ function _esfFestPortadaClear() { _esfFestImgClear('portada'); }
 function _esfFestLineupPick(event) { return _esfFestImgPick('lineup', event); }
 function _esfFestLineupClear() { _esfFestImgClear('lineup'); }
 // Modo editar: re-poblar preview desde el `mapa` guardado (URL) o limpiar.
-function _esfMapaPopulate(url) {
+function _esfMapaPopulate(url, apagado) {
+  _esfMapaApagado = !!apagado;   // [ESF-MAPA-2] el apagado nace del dato, no del clic anterior
   _esfMapaShow((typeof url === 'string' && url.trim()) ? url.trim() : '');
 }
 // Redimensiona el archivo a máx 1400px de ancho y devuelve un dataUrl webp ~0.85.
@@ -3160,6 +3192,7 @@ async function _esfMapaPick(event) {
     if (!r.ok || !data.ok || !data.url) throw new Error(data.error || 'No se pudo subir el mapa');
     // Cache-bust en el preview: el bucket hace upsert sobre el mismo path.
     _esfMapaShow(data.url);
+    _esfMapaApagado = false;   // [ESF-MAPA-2] subir un mapa deshace el apagado
     const img = document.getElementById('esf-mapa-img');
     if (img) img.src = data.url + '?t=' + (img._t = (img._t || 0) + 1);
     if (st) st.textContent = 'Mapa subido ✓';
@@ -3240,7 +3273,7 @@ function editarEsfera(slug) {
   // Hotel custom: re-poblar desde `hotel` (texto JSON u objeto); custom:false → off.
   _esfHotelPopulate(row.hotel);
   // Mapa: re-poblar preview desde la URL guardada (o limpiar si no hay).
-  _esfMapaPopulate(row.mapa);
+  _esfMapaPopulate(row.mapa, row.mapa_null);
   // Foto de portada (concierto): re-poblar preview desde `foto` (o limpiar).
   _esfFotoPopulate(row.foto);
   // Qué incluye + separo + nota: re-poblar desde la fila.
@@ -3345,6 +3378,7 @@ async function guardarCambiosEsfera() {
     music_search: document.getElementById('esf-music-search')?.value.trim() || null,
     hotel: _esfGetHotel(),
     mapa: _esfGetMapa(),
+    mapa_null: _esfMapaApagado,
     foto: _esfGetFoto(),
     inc: _esfGetInc(),
     sep: _esfGetSep(),

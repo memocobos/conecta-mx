@@ -53,10 +53,21 @@ create trigger trg_lugares_updated_at
 -- ── humo ─────────────────────────────────────────────────────────────────────
 -- El fixture arma la CADENA COMPLETA porque el esquema real lo exige y porque
 -- hoy no hay de dónde prestar: `lugares` tiene DOS columnas NOT NULL sin default
--- —`solicitud_id` y `numero`, leídas de information_schema, no adivinadas— y
--- tanto `lugares` como `solicitudes_tour` están VACÍAS. Así que: se toma el
--- único cliente real, se inserta una solicitud de humo, y sobre ella el lugar.
--- Todo se borra en la MISMA transacción.
+-- —`solicitud_id` y `numero`— y `solicitudes_tour` tiene SIETE. Las dos están
+-- VACÍAS hoy, así que no hay solicitud que prestar: se toma el único cliente
+-- real, se inserta una solicitud de humo, y sobre ella el lugar. Todo se borra
+-- en la MISMA transacción.
+--
+-- ⚠️ Y las columnas NO se adivinan: antes de insertar, el humo se CAREA contra
+-- `information_schema` y revienta si el esquema tiene un NOT NULL sin default
+-- que el fixture no cubre. La primera versión de esta acta se escribió a ojo y
+-- decía algo que no corría —dos veces, una por tabla—: un fixture inventado es
+-- la misma familia que una lista a mano al lado de la realidad.
+--
+-- ⚠️ NO hay `pg_sleep` y está bien así: con `clock_timestamp()` el reloj de
+-- pared avanza entre statements, así que dos updates seguidos ya traen versiones
+-- distintas. Los `pg_sleep` de la primera versión existían para tapar el hueco
+-- de `now()` y ya no hacen falta — no los vuelvas a agregar.
 --
 -- Tres preguntas, y las tres se responden con datos:
 --   1. ¿no quedó una sola fila sin `updated_at`?
@@ -66,7 +77,7 @@ create trigger trg_lugares_updated_at
 do $$
 declare
   n int; v1 timestamptz; v2 timestamptz; v3 timestamptz;
-  cli_ uuid; sol_ uuid; lug_ uuid;
+  cli_ uuid; sol_ uuid; lug_ uuid; faltan text;
 begin
   select count(*) into n from lugares where updated_at is null;
   if n <> 0 then raise exception 'CONC-1: quedaron % filas sin updated_at', n; end if;
@@ -74,8 +85,29 @@ begin
   select id into cli_ from clientes limit 1;
   if cli_ is null then raise exception 'CONC-1: no hay un solo cliente del que colgar el humo'; end if;
 
-  insert into solicitudes_tour (id, cliente_id)
-    values (gen_random_uuid(), cli_) returning id into sol_;
+  -- El careo del fixture contra el esquema, tabla por tabla.
+  select string_agg(column_name, ', ') into faltan
+    from information_schema.columns
+   where table_schema = 'public' and table_name = 'solicitudes_tour'
+     and is_nullable = 'NO' and column_default is null
+     and column_name <> all (array['id','cliente_id','evento_id','evento_nombre',
+                                   'paquete','zona','precio_total','monto_separo']);
+  if faltan is not null then
+    raise exception 'CONC-1: el fixture de solicitudes_tour no cubre NOT NULL sin default: %', faltan;
+  end if;
+
+  select string_agg(column_name, ', ') into faltan
+    from information_schema.columns
+   where table_schema = 'public' and table_name = 'lugares'
+     and is_nullable = 'NO' and column_default is null
+     and column_name <> all (array['id','solicitud_id','numero']);
+  if faltan is not null then
+    raise exception 'CONC-1: el fixture de lugares no cubre NOT NULL sin default: %', faltan;
+  end if;
+
+  insert into solicitudes_tour (id, cliente_id, evento_id, evento_nombre, paquete, zona, precio_total, monto_separo)
+    values (gen_random_uuid(), cli_, '_humo_conc1', 'HUMO CONC-1 (se borra)', 'PLUS', 'Humo', 1, 1)
+    returning id into sol_;
   insert into lugares (id, solicitud_id, numero)
     values (gen_random_uuid(), sol_, 999) returning id into lug_;
   select updated_at into v1 from lugares where id = lug_;

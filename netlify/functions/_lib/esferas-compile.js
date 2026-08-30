@@ -568,6 +568,10 @@ function derivarGlobalDeFechas(mf, cual) {
     return o;
   });
 }
+// ¿Alguna fecha trae zonas? Si ninguna, no gobiernan: se lee la columna.
+function hayZonasPorFecha(mf) {
+  return !!(mf || []).some((f) => Array.isArray(f.zonas) && f.zonas.length);
+}
 // ¿Las fechas declaran su propio CHEAP? El nombre se comparte con el
 // calculador del editor a propósito: es la llave del careo de equivalencia.
 function hayCheapPorFecha(mf) {
@@ -582,7 +586,11 @@ function plusZonaTexto(z) {
 }
 function zonasSegmento(esfera) {
   // [ESF-UX-2c] Con fechas, el global no se lee: se deriva de ellas.
-  const mfD = parseMultifecha(esfera.multifecha);
+  // [ESF-FECHA-VACIA] Con fechas que no traen zonas no hay de dónde derivar:
+  // se lee la columna, como en un evento sencillo. El gemelo de este candado
+  // vive en `_esfZonasParaGuardar` de kamehouse.js, con el mismo nombre.
+  const mfBruto = parseMultifecha(esfera.multifecha);
+  const mfD = (mfBruto && hayZonasPorFecha(mfBruto)) ? mfBruto : null;
   const rows = mfD ? derivarGlobalDeFechas(mfD, 'zonas') : parseZonas(esfera.zonas);
   // [ESF-CIERRE-FINAL] Sin zonas PLUS NO se corta aquí: un evento puede vender
   // SOLO cheap (solomun: `zonas:[]` y tres cheapZonas), y el `return` temprano
@@ -1798,6 +1806,7 @@ module.exports = {
   // gemelo del editor: dos calculadores con una regla no se vigilan solos.
   _derivarGlobalDeFechas: derivarGlobalDeFechas,
   _hayCheapPorFecha: hayCheapPorFecha,
+  _hayZonasPorFecha: hayZonasPorFecha,
   _fusionarConViejo: fusionarConViejo,
   _extraerEVKamehouse: extraerEVKamehouse,
   _extraerEVPortal: extraerEVPortal,

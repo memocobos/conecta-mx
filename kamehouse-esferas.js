@@ -3774,6 +3774,16 @@ async function publicarEsferas() {
     } else {
       panel.innerHTML = `<div class="alert alert-success">✓ Publicados ${pub.length}: ${pub.map(_esfEsc).join(', ')} · commit ${_esfEsc(data.commit || '')}</div>`;
     }
+    // [BABA-UX-2] Los letreros que no se emitieron se dicen SIEMPRE, aunque la
+    // publicación haya salido bien: uno que desaparece en silencio es un
+    // descuento que el cliente deja de ver sin que nadie se entere.
+    if (Array.isArray(data.avisos_letrero) && data.avisos_letrero.length) {
+      panel.innerHTML += `<div class="alert alert-error" style="margin-top:8px">`
+        + `<b>${data.avisos_letrero.length} letrero(s) NO se emitieron:</b>`
+        + `<div style="margin-top:6px;font-size:12px;display:grid;gap:3px">`
+        + data.avisos_letrero.map(a => `<div>· ${_esfEsc(a)}</div>`).join('')
+        + `</div></div>`;
+    }
     loadEsferasEventos();
   } catch(e) {
     panel.innerHTML = `<div class="alert alert-error">${e.message}</div>`;

@@ -3119,16 +3119,19 @@ function renderCatalog(){
     } else {
     isAg=_v.isAg; isSV=_v.isSV; isProc=_v.isProc; isPC2=_v.isPC2;
     var isNF=_v.isNF, isPronto=_v.isPronto, isProxi=_v.isProxi;
-    var isUlt=_v.isUlt, isPoca=_v.isPoca;
+    var isUlt=_v.isUlt, isPoca=_v.isPoca, isRide=_v.isRide;
     hasZ=ev.zonas.length>0;
-    var tagTxt=isAg?'Agotado':isProxi?'Próximamente':isPronto?'Próximamente':isNF?'↻ Próximamente nueva fecha':isProc?'En Proceso':isUlt?'Últimos lugares':isPoca?'Poca disponibilidad':isSV?'Solo viaje':isPC2?'Por confirmar':'Disponible';
-    var tagCls=isAg?'tag':isProxi?'tpronto':isPronto?'tpronto':isNF?'tnf':isProc?'tproc':isUlt?'tu':isPoca?'tpoca':isSV?'tsv':isPC2?'tpc':'td';
+    var tagTxt=isAg?'Agotado':isProxi?'Próximamente':isPronto?'Próximamente':isNF?'↻ Próximamente nueva fecha':isProc?'En Proceso':isUlt?'Últimos lugares':isPoca?'Poca disponibilidad':isRide?'Solo viaje':isSV?'Solo viaje':isPC2?'Por confirmar':'Disponible';
+    var tagCls=isAg?'tag':isProxi?'tpronto':isPronto?'tpronto':isNF?'tnf':isProc?'tproc':isUlt?'tu':isPoca?'tpoca':isRide?'tsv':isSV?'tsv':isPC2?'tpc':'td';
     }
     var priceH='';
     if(isPast){priceH='<div style="height:4px"></div>';}
     else if(isAg){priceH='<div style="height:4px"></div>';}
     else if(isNF){priceH='<div><div class="ev-price-lbl">Informes</div><div class="ev-price-wa">Cotiza por WA</div></div>';}
-    else if(!hasZ||isSV||isProc){priceH='<div><div class="ev-price-lbl">Informes</div><div class="ev-price-wa">Cotiza por WA</div></div>';}
+    // [RIDE-VIVO-1] Un `rideOnly` sin zonas capturadas SÍ tiene precio: minP()
+    // ya devuelve `ev.ride` en ese caso. Sin este `&&!isRide` caería en
+    // "Informes" y taparía un número que el sitio conoce.
+    else if((!hasZ&&!isRide)||isSV||isProc){priceH='<div><div class="ev-price-lbl">Informes</div><div class="ev-price-wa">Cotiza por WA</div></div>';}
     else{priceH='<div><div class="ev-price-lbl">Desde</div><div class="ev-price">'+fmt(minP(ev))+'</div></div>';}
     var staticSrc=(ev.staticImg&&(ev.staticImg.indexOf('http')===0||ev.staticImg.indexOf('data:')===0))?ev.staticImg:(STATIC_IMGS[ev.id]||STATIC_IMGS[ev.staticImg]);
     if(!ev.img&&ev.img!==false&&!staticSrc&&ev.a) ev.img=ev.a.replace(/ - .*/,'').replace(/ en .*/,'').replace(/ Mexico.*/,'');
@@ -3155,7 +3158,7 @@ function renderCatalog(){
     var ctaH='';
     if(!isPast&&!isAg&&!isProc&&!isPronto&&!isProxi){
       if(isNF)ctaH='<span class="ev-cta">Notificarme</span>';
-      else if(isSV||!hasZ)ctaH='<span class="ev-cta ev-cta-wa">WhatsApp</span>';
+      else if(isSV||(!hasZ&&!isRide))ctaH='<span class="ev-cta ev-cta-wa">WhatsApp</span>';
       else if(isPC2)ctaH='';
       else ctaH='<span class="ev-cta">Cotizar</span>';
     }
@@ -3687,13 +3690,32 @@ function _evVeredicto(ev){
   var _total=_z.length;
   var _avail=_z.filter(function(z){return !z.ag;}).length;
   var _pct=_total>0?(_avail/_total*100):100;
+  // [RIDE-VIVO-1] SOLO VIAJE. Un evento `rideOnly` no vende zonas: vende el
+  // camión. Que sus zonas estén agotadas no dice nada de si hay viaje, y el
+  // auto-semáforo —que solo cuenta zonas de boleto— lo apagaba entero. A
+  // straykids le pasó con el RIDE vivo a $2,900 y las dos fechas disponibles:
+  // la tarjeta decía AGOTADO, perdía su onclick y encima el CSS le ponía
+  // pointer-events:none. Doblemente cerrada sobre un flujo que sí vende.
+  //
+  // La regla es ESTRECHA a propósito: solo `rideOnly`. En un evento normal con
+  // todo agotado, el wizard deja PLUS y STAY en "Cotizar" sin una zona detrás
+  // —medido—, así que abrirle la tarjeta sería ofrecer paquetes fantasma.
+  //
+  // Y "RIDE vivo" en multifecha es que ALGUNA fecha lo tenga disponible, no
+  // que todas: así el estado se apaga solo el día que el viaje de verdad se
+  // acaba.
+  var _rideVivo=(Number(ev.ride)>0)&&(ev.multifecha
+    ? ev.multifecha.some(function(f){return !f.rideAgotado;})
+    : !ev.rideAgotado);
+  var isRide=!!ev.rideOnly&&_rideVivo;
   // Auto-semáforo: sin una sola zona libre, agotado aunque el st no lo diga.
-  if(!isAg&&!isNF&&!isPronto&&!isProxi&&_total>0&&_avail===0)isAg=true;
+  if(!isAg&&!isNF&&!isPronto&&!isProxi&&!isRide&&_total>0&&_avail===0)isAg=true;
   var libre=!isAg&&!isSV&&!isPC2&&!isProc&&!isNF&&!isPronto&&!isProxi;
   var isUlt=st==='ultimos'||(libre&&_pct<40&&_pct>0);
   var isPoca=libre&&!isUlt&&_pct>=40&&_pct<60;
   return{isPast:isPast,isAg:isAg,isSV:isSV,isProc:isProc,isPC2:isPC2,isNF:isNF,
-    isPronto:isPronto,isProxi:isProxi,isUlt:isUlt,isPoca:isPoca,pct:_pct,total:_total};
+    isPronto:isPronto,isProxi:isProxi,isUlt:isUlt,isPoca:isPoca,isRide:isRide,
+    pct:_pct,total:_total};
 }
 
 function filterEvents(){

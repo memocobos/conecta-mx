@@ -20032,9 +20032,24 @@ function _esfDerivarZonasGlobales(mf, cual) {
 // lista de arriba NO es una segunda verdad —es LA verdad, porque la fecha
 // hereda de ella ("vacías = usa las de arriba"). Derivar ahí borraría las 14
 // zonas cheap de karolcdmx, que es justo el único evento en ese caso.
+// [ESF-FECHA-VACIA] Una fecha SIN zonas no gobierna nada. Antes de este
+// candado, apretar «+ Agregar fecha» en un evento sencillo y ponerle nombre a
+// la fecha nueva dejaba el global derivado en CERO zonas —la fecha nace vacía—
+// y el siguiente guardado le borraba al evento sus zonas PLUS. Medido con
+// emmanuel: 8 PLUS antes, 0 después, y el CHEAP sobreviviendo, que es lo que lo
+// hacía difícil de ver: el estado quedaba inconsistente, no roto.
+//
+// Es la MISMA forma que la excepción del cheap (`hayCheapPorFecha`): se deriva
+// de las fechas solo cuando las fechas tienen algo que decir. Va en los dos
+// calculadores —aquí y en `zonasSegmento` del compilador— porque si solo se
+// arregla éste, la ficha queda con una fecha vacía y el compilador la deriva
+// igual en el próximo publish.
+function hayZonasPorFecha(mf) {
+  return !!(mf || []).some((f) => Array.isArray(f.zonas) && f.zonas.length);
+}
 function _esfZonasParaGuardar() {
   const mf = _esfGetMultifecha();
-  if (!mf) return { zonas: _esfGetZonas(), cheapZonas: _esfGetCheapZonas() };
+  if (!mf || !hayZonasPorFecha(mf)) return { zonas: _esfGetZonas(), cheapZonas: _esfGetCheapZonas() };
   const hayCheapPorFecha = mf.some((f) => Array.isArray(f.cheapZonas) && f.cheapZonas.length);
   return {
     zonas: _esfDerivarZonasGlobales(mf, 'zonas'),

@@ -70,6 +70,19 @@ create trigger trg_solicitudes_tour_updated_at
 -- `information_schema` y revienta con nombres si aparece un NOT NULL sin default
 -- que el fixture no cubra.
 --
+-- ⚠️ EL POKE ES `zona`, Y NO ES UN CAPRICHO. La primera versión de este humo
+-- empujaba `notas_admin` y MORDIÓ al correrse: esta tabla tiene un guardián
+-- propio de la casa —el trigger **`solicitudes_bloquear_columnas_sensibles`**—
+-- que rechaza la escritura de CINCO columnas para todo rol que no sea
+-- `service_role`:
+--
+--     cliente_id · auth_user_id · estado · notas_admin · created_at
+--
+-- El acta tiene que poder correrla cualquiera, así que el poke usa una columna
+-- que el guardián no vigila. Queda escrito por dos razones: es lo primero que va
+-- a necesitar el próximo que escriba un humo sobre `solicitudes_tour`, y de paso
+-- este rojo fue la PRUEBA de que ese guardián sigue vivo y mordiendo.
+--
 -- ⚠️ NO hay `pg_sleep` y está bien así: con `clock_timestamp()` el reloj de pared
 -- avanza entre statements. No lo vuelvas a agregar.
 --
@@ -104,13 +117,13 @@ begin
     returning id into sol_;
   select updated_at into v1 from solicitudes_tour where id = sol_;
 
-  update solicitudes_tour set notas_admin = coalesce(notas_admin,'') || '.' where id = sol_;
+  update solicitudes_tour set zona = coalesce(zona,'') || '.' where id = sol_;
   select updated_at into v2 from solicitudes_tour where id = sol_;
   if v2 is null or v2 <= v1 then
     raise exception 'CONC-4b: el trigger NO movió updated_at en un update que no la menciona (% -> %)', v1, v2;
   end if;
 
-  update solicitudes_tour set notas_admin = notas_admin || '.', updated_at = v1 where id = sol_;
+  update solicitudes_tour set zona = zona || '.', updated_at = v1 where id = sol_;
   select updated_at into v3 from solicitudes_tour where id = sol_;
   if v3 <= v2 then
     raise exception 'CONC-4b: un valor viejo escrito a mano GANÓ al trigger (% -> %)', v2, v3;

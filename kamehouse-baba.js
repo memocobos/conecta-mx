@@ -39,6 +39,34 @@ function _khCortarLiteral(html, re, abre, cierra) {
 }
 // `datetime-local` → instante. Se calcula el desfase de Reynosa EN ESA FECHA,
 // no hoy: un vencimiento de diciembre tecleado en agosto lleva otro offset.
+// [BABA-UX-1] Los eventos elegidos en el selector múltiple. Se lee del DOM y no
+// de `.value` —que en un `multiple` devuelve solo el PRIMERO seleccionado, y ese
+// era exactamente el defecto: la base guardaba una lista de uno.
+// [BABA-UX-1] El control de paquetes NO faltaba: estaba dentro de «Avanzado»,
+// cerrado, y por eso Memo no lo encontró. No se duplica —eso habría dejado dos
+// controles del mismo dato—: se ANUNCIA, que es el patrón que ESF-UX-1 dejó en
+// la casa («cerrado, pero anunciando»). Y si el código YA trae algo ahí dentro,
+// el bloque nace abierto: un ajuste que existe y no se ve es un ajuste perdido.
+function _babaAvanzadoTiene(c) {
+  if (!c) return false;
+  return (c.exclude_pkg || []).length > 0 || !!c.starts_at || !!c.single_use
+      || (c.max_usos != null && c.max_usos !== 9999);
+}
+function _babaAvanzadoResumen(c) {
+  if (!c) return '';
+  const partes = [];
+  if ((c.exclude_pkg || []).length) partes.push('sin ' + c.exclude_pkg.join('/').toUpperCase());
+  if (c.starts_at) partes.push('con fecha de inicio');
+  if (c.single_use) partes.push('un solo uso');
+  if (c.max_usos != null && c.max_usos !== 9999) partes.push('tope ' + c.max_usos);
+  if (!partes.length) return '';
+  return ` <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--ts)">· ${_escCtr(partes.join(' · '))}</span>`;
+}
+function _babaEventosElegidos() {
+  const sel = document.getElementById('baba-evento');
+  if (!sel) return [];
+  return [...sel.selectedOptions].map(o => o.value).filter(Boolean);
+}
 function _babaLocalAInstante(txt) {
   if (!txt) return null;
   const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(txt);
@@ -99,6 +127,46 @@ async function babaCargar() {
     _babaPintar();
   } catch (e) {
     cont.innerHTML = `<div class="empty-state">No pude leer los códigos: ${_escCtr(e.message)}</div>`;
+  }
+}
+// [BABA-UX-1] EL BOTÓN QUE NO EXISTÍA. `promos-publicar` se entregó en UB-2 y
+// se quedó SIN UN SOLO LLAMADOR en ninguna pantalla — medido con grep sobre
+// todo el repo: la única mención era su propio archivo. En la serie UB lo
+// disparábamos nosotros y nadie notó que el usuario no podía. Un código creado
+// aquí no llegaba al sitio sin Jane.
+//
+// Copia el molde de `publicarEsferas`: confirmar, mostrar el resultado, y dejar
+// que el candado duro viva en la function (422 si la validación no sale
+// perfecta — ahí NO se escribe nada).
+async function babaPublicar() {
+  const panel = document.getElementById('baba-publicar-panel');
+  const btn = document.getElementById('baba-btn-publicar');
+  // Cuántos van es un dato que la pantalla YA tiene: los no archivados.
+  const n = (_babaCodigos || []).filter(c => c && !c.archivado).length;
+  if (!window.confirm(`Esto escribirá los ${n} código(s) vivos al index.html de producción y hará un commit. ¿Continuar?`)) return;
+  if (btn) { btn.disabled = true; btn.textContent = 'Publicando…'; }
+  if (panel) panel.innerHTML = '<div class="loading-state"><div class="spinner"></div>Publicando…</div>';
+  try {
+    const r = await khAdminFetch('/.netlify/functions/promos-publicar', { method: 'POST', body: JSON.stringify({}) });
+    const data = await r.json().catch(() => ({}));
+    if (r.status === 422) {
+      const v = data.validacion || {};
+      // El 422 NO es un error del admin: es el candado duro. Se dice completo,
+      // porque «falló la validación» a secas no se puede obedecer.
+      panel.innerHTML = `<div class="alert alert-error">Validación falló — <b>no se escribió nada</b>.${v.error ? (' ' + _escCtr(v.error)) : ''}</div>`;
+      return;
+    }
+    if (!r.ok || !data.ok) throw new Error(data.error || ('Error ' + r.status));
+    const pub = data.publicados || [];
+    if (data.sin_cambios || !pub.length) {
+      panel.innerHTML = '<div class="alert alert-success">Sin cambios — el sitio ya estaba al día.</div>';
+    } else {
+      panel.innerHTML = `<div class="alert alert-success">✓ Publicados ${pub.length}: ${pub.map(_escCtr).join(', ')} · commit ${_escCtr(String(data.commit || '').slice(0, 7))}</div>`;
+    }
+  } catch (e) {
+    panel.innerHTML = `<div class="alert alert-error">${_escCtr(e.message)}</div>`;
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Publicar al sitio'; }
   }
 }
 function babaFiltrar(f, btn) {
@@ -251,14 +319,13 @@ function babaFichaAbrir(codigo) {
 
     <div class="form-row" style="margin-top:6px">
      <div class="form-group">
-      <label>Evento</label>
-      <select id="baba-evento" ${c && c.all_events ? 'disabled' : ''}>
-        <option value="">— elegir evento —</option>
+      <label>Eventos <span style="color:var(--ts);font-weight:400">— uno o varios</span></label>
+      <select id="baba-evento" multiple size="6" ${c && c.all_events ? 'disabled' : ''} style="height:auto">
         ${(evs || []).filter(e => e && e.id).map(e =>
           `<option value="${_escCtr(e.id)}"${c && (c.only_events || []).includes(e.id) ? ' selected' : ''}>${_escCtr(e.a || e.id)}</option>`).join('')}
       </select>
       <div style="font-size:11px;color:var(--ts);margin-top:5px">
-        ${evs ? 'Nace vacío a propósito: el evento se elige, no se hereda del orden de la lista.' : '⚠️ No pude leer el catálogo — abre y cierra la pestaña.'}
+        ${evs ? 'Nace vacío a propósito: el evento se elige, no se hereda del orden de la lista. Para varios, Cmd/Ctrl + clic — la base siempre guardó una LISTA, y hasta hoy la pantalla solo dejaba meter uno.' : '⚠️ No pude leer el catálogo — abre y cierra la pestaña.'}
       </div>
      </div>
      <div class="form-group" style="align-self:end">
@@ -282,11 +349,11 @@ function babaFichaAbrir(codigo) {
      </div>
     </div>
 
-    <details style="margin:14px 0 12px">
-     <summary style="cursor:pointer;font-family:Rajdhani,sans-serif;font-weight:700;letter-spacing:.08em;text-transform:uppercase;font-size:12.5px;color:var(--baba2)">Avanzado</summary>
+    <details style="margin:14px 0 12px"${_babaAvanzadoTiene(c) ? ' open' : ''}>
+     <summary style="cursor:pointer;font-family:Rajdhani,sans-serif;font-weight:700;letter-spacing:.08em;text-transform:uppercase;font-size:12.5px;color:var(--baba2)">Avanzado${_babaAvanzadoResumen(c)}</summary>
      <div style="padding:12px 0 0">
       <div class="form-row">
-       <div class="form-group"><label>Paquetes donde NO aplica</label>
+       <div class="form-group"><label>Paquetes donde NO aplica <span style="color:var(--ts);font-weight:400">— marca los que el código NO debe tocar</span></label>
         <div style="display:flex;gap:14px;flex-wrap:wrap;padding-top:6px">
         ${['plus','ride','stay','cheap'].map(pk => `<label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px">
           <input type="checkbox" class="baba-pkg" value="${pk}" style="width:auto;margin:0"${c && (c.exclude_pkg || []).includes(pk) ? ' checked' : ''}>${pk.toUpperCase()}</label>`).join('')}
@@ -375,7 +442,10 @@ async function babaGuardar() {
     segundo_pax: _babaUnidad === 'pareja' ? sp : null,
     exact_personas: _babaUnidad === 'pareja' ? Number(g('baba-exact')) : null,
     all_events: chk('baba-todos'),
-    only_events: chk('baba-todos') ? [] : (g('baba-evento') ? [g('baba-evento')] : []),
+    // [BABA-UX-1] Todas las elegidas, no la primera. `only_events` SIEMPRE fue un
+    // array en la base y el compilador ya sabe emitir `onlyEvents` cuando hay
+    // más de uno — lo único que faltaba era que la pantalla dejara elegirlos.
+    only_events: chk('baba-todos') ? [] : _babaEventosElegidos(),
     exclude_pkg: [...document.querySelectorAll('.baba-pkg:checked')].map(x => x.value),
     starts_at: _babaLocalAInstante(g('baba-inicia')),
     expires_at: chk('baba-sinvence') ? null : _babaLocalAInstante(g('baba-vence')),
@@ -383,7 +453,7 @@ async function babaGuardar() {
     single_use: chk('baba-single'),
   };
   if (!cuerpo.desc_texto.trim()) return err('Falta el texto que ve el cliente.');
-  if (!cuerpo.all_events && !cuerpo.only_events.length) return err('Elige el evento, o marca «todos los eventos».');
+  if (!cuerpo.all_events && !cuerpo.only_events.length) return err('Elige al menos un evento, o marca «todos los eventos».');
   if (!chk('baba-sinvence') && !cuerpo.expires_at) return err('Pon la fecha de vencimiento, o marca «sin vencimiento».');
 
   btn.disabled = true; btn.textContent = 'Guardando…';

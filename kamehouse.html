@@ -1410,16 +1410,23 @@
    <div style="display:flex;gap:8px;flex-wrap:wrap">
     <button class="btn btn-ghost" onclick="babaOraculo()" id="baba-btn-oraculo" style="color:var(--baba2);border-color:rgba(160,107,255,.4)">🔮 Consultar a Baba</button>
     <button class="btn btn-ghost" onclick="babaImportar()" id="baba-btn-traer">Traer del catálogo</button>
+    <button class="btn btn-ghost" onclick="babaPublicar()" id="baba-btn-publicar" style="color:var(--baba2);border-color:rgba(160,107,255,.4)">Publicar al sitio</button>
     <button class="btn" onclick="babaFichaAbrir(null)">+ Código nuevo</button>
    </div>
   </div>
 
-  <!-- 🔒 Lo que esta pantalla NO hace todavía, dicho a la vista: la tabla es el
-       cajero, pero el index sigue leyendo su propio `var PROMOS` hasta UB-2. -->
+  <!-- [BABA-UX-1] Este aviso decía «todavía no se publican al sitio — eso llega
+       en UB-2». UB-2 entregó `promos-publicar`… y nadie puso el botón ni quitó
+       el aviso, así que la frase siguió siendo verdad por accidente: un código
+       creado aquí NO llegaba al sitio sin que alguien disparara el publish a
+       mano. El botón existe desde hoy; el aviso dice lo que de verdad pasa. -->
   <div class="baba-aviso" style="margin-bottom:14px">
-   Aquí se gobiernan los códigos. <b>Todavía no se publican al sitio</b> — eso llega en UB-2.
-   Por ahora el cliente sigue viendo el registro que vive en el <code>index.html</code>.
+   Aquí se gobiernan los códigos. Guardar un código lo deja <b>en la tabla</b>;
+   el cliente lo ve cuando aprietas <b>Publicar al sitio</b>, que escribe el
+   <code>var PROMOS</code> del <code>index.html</code> y hace un commit.
+   Archivar <b>no</b> despublica: quitar un código del sitio es otra cosa.
   </div>
+  <div id="baba-publicar-panel"></div>
 
   <div class="gz-filters" style="margin-bottom:14px">
    <button class="gz-filter active" id="babaf-vigentes" onclick="babaFiltrar('vigentes',this)">// vigentes</button>

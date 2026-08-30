@@ -1,3 +1,14 @@
+// ⚠️ [MEDIA-GUARD] ESTA TABLA ES HERENCIA, NO EL CAMINO.
+// Un mapa NUEVO se carga EN LA FICHA del evento (Esferas → Mapa), jamás
+// agregándolo aquí y a mano al index: el compilador gobierna `mapa`, así que un
+// mapa que la ficha no menciona MUERE en el siguiente publish. Pasó once veces
+// entre el 24 y el 29 de agosto —diez de ellas en eventos que se estaban
+// vendiendo—, y por eso el publish ahora se REHÚSA con los nombres en vez de
+// borrarlos en silencio.
+//
+// Las 48 claves de aquí siguen sirviendo y se emiten tal cual; se van retirando
+// conforme cada evento sube su mapa desde el editor.
+//
 // IMPORTANTE: NO agregar imágenes como base64 aquí.
 // Guardar el archivo en mapas/ y referenciar la ruta.
 // Ejemplo: { nombreEvento: 'mapas/nombreEvento.webp' }

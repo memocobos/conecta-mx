@@ -21,7 +21,8 @@
 // =============================================================================
 
 const { verifyAdminAuthLive, corsCheck } = require('./_lib/verify-admin');
-const { compilarEV, fechaDisplayDeEsfera } = require('./_lib/esferas-compile');
+const { compilarEV, fechaDisplayDeEsfera, extraerEV } = require('./_lib/esferas-compile');
+const { zonasDelObjeto, filasDelPublish, _llave } = require('./_lib/precios-vigentes');
 const { derivarLetreros } = require('./_lib/letrero-derivado');
 // [WL-1] El aviso a la lista de espera es del núcleo compartido: el mismo
 // correo, el mismo ritmo y el mismo marcado que usan el cron y el botón.
@@ -237,6 +238,87 @@ exports.handler = async (event) => {
     }
     const commit = putData.commit.sha.slice(0, 7);
 
+    // 6-bis. [ROL-HIST-1] EL HISTORIAL DE PRECIOS.
+    //
+    // Va DESPUÉS del PUT y solo si el PUT salió: el historial anota lo que se
+    // publicó, no lo que se intentó. Cubre LOS DOS CAMINOS que compilan —
+    // `aInsertar` (el evento entra al index) y `aActualizar` (se reemplaza en su
+    // lugar)—, porque los dos escriben precios que un cliente va a ver.
+    //
+    // Las zonas se leen del EV COMPILADO y del EV VIEJO con el MISMO parser que
+    // usa el compilador, no de los objetos serializados: comparar textos sería
+    // un tercer criterio al lado de los dos que ya existen.
+    //
+    // Best-effort en el sentido de que un tropiezo NO deshace el commit — pero
+    // NO callado: lo que falle sale en la respuesta. Un hueco en el historial
+    // que nadie sabe que existe es peor que uno anunciado, porque el día que
+    // /rol conteste «sin historial» nadie va a saber si es que nunca cambió o
+    // que este publish no lo anotó.
+    let historial = { filas: 0, zonas_miradas: 0 };
+    try {
+      const evViejo = extraerEV(content);
+      const evNuevo = extraerEV(contenidoNuevo);
+      const porId = (arr) => new Map((arr || []).filter((e) => e && e.id).map((e) => [e.id, e]));
+      const viejoPorId = porId(evViejo);
+      const nuevoPorId = porId(evNuevo);
+
+      const nuevas = [], previas = new Map();
+      for (const slug of slugs) {
+        const objNuevo = nuevoPorId.get(slug);
+        if (!objNuevo) continue;                       // no debería, pero no se inventa
+        nuevas.push(...zonasDelObjeto(objNuevo, slug));
+        const objViejo = viejoPorId.get(slug);
+        if (objViejo) {
+          for (const z of zonasDelObjeto(objViejo, slug)) previas.set(_llave(z), z.precio);
+        }
+      }
+      historial.zonas_miradas = nuevas.length;
+
+      if (nuevas.length) {
+        // La ÚLTIMA fila de cada zona tocada. Se pide acotado a los eventos de
+        // este publish: traerse el historial entero para comparar en memoria
+        // crecería con la tabla y no con el trabajo.
+        const ids = [...new Set(nuevas.map((z) => z.evento_id))];
+        const inVal = '(' + ids.map((x) => '"' + String(x).replace(/"/g, '') + '"') + ')';
+        const hr = await fetch(`${SB_URL}/rest/v1/precios_historial?select=evento_id,ambito,zona,precio,vigente_desde` +
+          `&evento_id=in.${encodeURIComponent(inVal)}&order=vigente_desde.asc&limit=5000`, {
+          headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` },
+        });
+        if (!hr.ok) throw new Error('no pude leer el historial: ' + await hr.text());
+        const filasHist = await hr.json();
+        if (!Array.isArray(filasHist)) throw new Error('el historial no vino como lista');
+        const ultimas = new Map();
+        for (const f of filasHist) ultimas.set(_llave(f), f);   // asc → la última gana
+
+        const ahora = new Date();
+        const aInsertarHist = filasDelPublish({
+          nuevas, ultimas, previas,
+          ahoraISO: ahora.toISOString(),
+          // ⚠️ LA LÍNEA BASE NO AFIRMA CUÁNDO EMPEZÓ EL PRECIO VIEJO — eso no se
+          // sabe, y el historial no tiene dónde decir «no sé». Se pone un
+          // segundo antes del cambio y se marca `fuente:'publish-base'`. Con eso
+          // una consulta de una fecha anterior contesta ese precio CON la
+          // bandera `anterior_al_historial`, que es exactamente «esto es lo más
+          // viejo que sabemos», no «esto regía ese día».
+          vigenteDesdeBase: new Date(ahora.getTime() - 1000).toISOString(),
+        });
+
+        if (aInsertarHist.length) {
+          const ins = await fetch(`${SB_URL}/rest/v1/precios_historial`, {
+            method: 'POST',
+            headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`,
+                       'Content-Type': 'application/json', Prefer: 'return=minimal' },
+            body: JSON.stringify(aInsertarHist),
+          });
+          if (!ins.ok) throw new Error('no pude escribir el historial: ' + await ins.text());
+        }
+        historial.filas = aInsertarHist.length;
+      }
+    } catch (e) {
+      historial.error = String(e && e.message || e);
+      console.error('[esferas-publicar] historial de precios:', historial.error);
+    }
+
     // 7. PATCH best-effort publicado=true SOLO en main. Si falla, NO error: el
     //    commit ya quedó. En ramas de prueba NO se marca publicado.
     if (branch === 'main') {
@@ -306,7 +388,7 @@ exports.handler = async (event) => {
       // [BABA-UX-2] Los letreros que NO se emitieron van EN LA RESPUESTA, con su
       // motivo y su slug. Un letrero que desaparece en silencio es la misma
       // familia que un medio perdido: se dice, aunque la publicación salga bien.
-      body: JSON.stringify({ ok: true, branch, publicados: slugs, commit, validacion, aviso, archivados, avisos_letrero: avisosLetrero }),
+      body: JSON.stringify({ ok: true, branch, publicados: slugs, commit, validacion, aviso, archivados, avisos_letrero: avisosLetrero, historial }),
     };
   } catch (e) {
     return { statusCode: 500, headers, body: JSON.stringify({ ok: false, error: e.message }) };

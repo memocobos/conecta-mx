@@ -22,13 +22,25 @@ function normalizarNombre(s) {
 // La chatarra: filas que no son viajeros sino reventa o control interno. Se
 // mira sobre el nombre YA normalizado, porque en el Excel viene de todas las
 // formas («Vendido Memo», «VENDIDO», «Coordi Sofía»).
-// [EXCEL-CAREO-FIX-1] 'creadora': salió «Marietta Barrera creadora» como alta
-// nueva en el careo del 31-ago. Como el resto, se mira por `includes` sobre el
-// nombre normalizado — la misma apuesta que ya corre 'coordi', que muerde
-// «Ana Coordinadora». Queda dicho el costo: un apellido que CONTENGA la
-// palabra (p.ej. «Recreadora») se descartaría. No hay ninguno en el padrón hoy,
-// y el precio de dejar pasar una creadora es meterla como viajera.
-const CHATARRA = ['vendido', 'coordinador', 'coordi', 'hubb', 'viagogo', 'creadora'];
+// [EXCEL-CAREO-FIX-1] CUATRO ENTRADAS NUEVAS, salidas del barrido completo del
+// 31-ago: son las ÚNICAS cuatro filas que el careo reportaba como «nuevos» en
+// las 58 pestañas, y ninguna es una persona. Ruido puro en la pantalla de Bulma.
+//
+//   · 'creadora'      → «Marietta Barrera creadora»
+//   · 'tours reynosa' → la agencia, no un viajero
+//   · 'cambio por oro'→ control interno
+//   · 'coodinador'    → EL TYPO, y necesita entrada propia: `coodinador` NO
+//                       contiene `coordi` (le falta la r), así que la entrada
+//                       que ya existía no lo alcanzaba. Medido, no supuesto.
+//
+// Todas se miran por `includes` sobre el nombre YA normalizado — la misma
+// apuesta que ya corría 'coordi', que muerde «Ana Coordinadora». Queda dicho el
+// costo: un nombre que CONTENGA una de estas cadenas se descartaría. Las tres
+// nuevas de varias palabras casi no tienen con qué chocar; la de una palabra
+// ('creadora') es la que corre el riesgo real, y el precio de no ponerla es
+// meter a una creadora como viajera.
+const CHATARRA = ['vendido', 'coordinador', 'coordi', 'coodinador', 'hubb',
+                  'viagogo', 'creadora', 'tours reynosa', 'cambio por oro'];
 function esChatarra(nombre) {
   const n = normalizarNombre(nombre);
   if (!n) return true;                       // una fila sin nombre no es nadie
@@ -184,11 +196,19 @@ function carear(personasExcel, viajerosBase) {
     const v = mismos[0];
 
     // APARTADO: el Excel no le registra UN PESO, y el sistema tampoco (o ni
-    // siquiera lo tiene). Es gente REAL que separó y todavía no abona —Jane lo
-    // verificó contra el crudo, caso Arian: 2 filas CHEAP Platino por pagar—,
-    // así que no puede ir revuelta con las altas que sí pagaron, ni caer en
-    // «iguales», que es donde se volvía invisible: dos ceros cuadran, y un
-    // renglón que cuadra deja de leerse aunque la persona deba.
+    // siquiera lo tiene).
+    //
+    // 🔒 LA REGLA, FIRMADA POR MEMO: SI ESTÁ EN EL EXCEL, VA. La clase «zona
+    // real + $0 + sin talla» no es ruido ni un apartado a medias: es GENTE, y
+    // Memo la dio de alta —144 personas— por esa regla. Que no haya abonado un
+    // peso todavía no la hace menos viajera; el Excel es el padrón, y este
+    // montón NO es una sala de espera ni una puerta que haya que aprobar.
+    //
+    // Entonces ¿por qué separarlas? Porque revueltas se pierden dos veces: en
+    // «nuevos» se confunden con altas que sí pagaron, y —peor— una vez dadas de
+    // alta con $0 caen en «iguales», donde dos ceros cuadran y el renglón deja
+    // de leerse aunque la persona deba. El montón existe para que SIGAN
+    // VIÉNDOSE, que es lo contrario de filtrarlas.
     //
     // La llave del montón es EL DINERO EN CERO, no la regla compuesta «zona
     // real + $0 + sin talla» con que se descubrió la clase: quien no pagó pero

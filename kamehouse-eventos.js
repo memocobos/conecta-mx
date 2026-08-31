@@ -575,13 +575,15 @@ function _excelCareoHtml(d) {
     ${lista(d.bajas, b => fila(_evtEsc(b.nombre), _evtMxn(b.abonado)))}
     <div style="font-size:11px;color:var(--ts);margin-top:4px">Una baja NO se borra ni se marca desde aquí: se nombra y espera firma.</div>
 
-    ${cab('apartados — separaron y no han abonado un peso', t.apartados, 'var(--yellow,#e8ff4c)')}
+    ${cab('sin abonar — en el padrón, sin un peso todavía', t.apartados, 'var(--yellow,#e8ff4c)')}
     ${lista(d.apartados || [], a => fila(
       `${_evtEsc(a.nombre)} <span style="color:var(--ts);font-size:11px">${_evtEsc(a.zona || 'sin zona')} ${_evtEsc(a.paquete || '')}${a.filas > 1 ? ` · ${a.filas} filas` : ''}${a.talla ? ` · talla ${_evtEsc(a.talla)}` : ' · sin talla'}</span>`,
       a.en_sistema ? 'ya en el sistema' : 'no está en el sistema'))}
     <div style="font-size:11px;color:var(--ts);margin-top:4px">
-      Gente REAL que separó. Salen aparte para que no se confundan con altas que sí pagaron —
-      y para que sigan viéndose cuando entren al sistema con $0, donde antes se volvían «iguales».
+      <b style="color:var(--tp)">Si está en el Excel, va.</b> Son viajeros, no una lista por aprobar:
+      simplemente no han abonado todavía. Salen aparte para que no se confundan con altas que sí pagaron —
+      y para que <b style="color:var(--tp)">sigan viéndose</b> ya dados de alta con $0, que es donde antes
+      caían en «iguales» y dejaban de leerse aunque debieran.
       ${t.apartados ? `De los ${t.apartados}, <b style="color:var(--tp)">${t.apartados_zona_sin_talla}</b> traen zona y no traen talla (${t.apartados_filas} filas en total).` : ''}
     </div>
 

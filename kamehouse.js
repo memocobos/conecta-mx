@@ -6356,7 +6356,10 @@ async function cargarComprobanteSP(solicitudId) {
 // `metodo` = CÓMO pagó (forma de pago). Ya no mezcla bancos. Los valores viejos
 // (bbva/hey/otro) siguen mapeados para mostrar pagos antiguos, pero el <select>
 // solo ofrece los 3 nuevos (ver _SP_METODOS_UI).
-const _SP_METODO_LBL = { transferencia:'Transferencia', deposito:'Depósito', efectivo:'Efectivo', bbva:'BBVA', hey:'Banamex', otro:'Otro' };
+// [SEP-ETIQUETA-1a] `mercadopago` entra al mapa. Sin él, el renglón del plan
+// caía al `|| p.metodo` y le enseñaba a Memo el valor crudo de la columna — que
+// es exactamente cómo se veía el viejo «stripe_credito».
+const _SP_METODO_LBL = { transferencia:'Transferencia', deposito:'Depósito', efectivo:'Efectivo', mercadopago:'Mercado Pago', bbva:'BBVA', hey:'Banamex', otro:'Otro' };
 const _SP_METODOS_UI = ['transferencia','deposito','efectivo'];
 
 // `cuenta`/banco = a qué cuenta ENTRÓ el dinero (visor de saldos), DISTINTO de
@@ -6499,8 +6502,13 @@ async function _spAbrirSeparoAlAceptar(solicitudId, s) {
       if (r.ok && d.ya_aplicado) {
         showToast('El separo pagado ya estaba aplicado a la cuota 1 ✓', 'success');
       } else if (r.ok && d.aplicado) {
-        const metodo = String(d.metodo || '').replace('stripe_', '');
-        showToast('Separo pagado por ' + (metodo === 'oxxo' ? 'OXXO' : 'tarjeta') + ' ✓ — aplicado a la cuota 1', 'success');
+        // [SEP-ETIQUETA-1a] Aquí había un `replace('stripe_','')`: un parche que
+        // limpiaba la etiqueta mentirosa al vuelo, y que se habría roto en
+        // silencio en cuanto la etiqueta cambiara. Ya no hace falta — el
+        // servidor manda el nombre bueno. Y si no sabe cuál fue, no se inventa:
+        // se dice «aplicado» sin nombrar una forma de pago.
+        const comoPago = _SP_METODO_LBL[d.metodo] || null;
+        showToast('Separo pagado' + (comoPago ? ' por ' + comoPago : '') + ' ✓ — aplicado a la cuota 1', 'success');
       } else if (!r.ok) {
         showToast('El separo está pagado pero no se pudo aplicar: ' + (d.error || r.status), 'error');
       }

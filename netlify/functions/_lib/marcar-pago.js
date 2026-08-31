@@ -42,6 +42,28 @@ const { aplicarModoPrueba } = require('./correo-guard');
 const { condicionVersion, respuestaChoque, PREFER_VER_FILAS } = require('./candado-optimista');
 const { reconciliarSolicitud, TOLERANCIA_MXN } = require('./reconciliar-solicitud');
 
+// [SEP-ETIQUETA-1a] LOS MÉTODOS QUE PUEDE LLEVAR UN PAGO, EN UN SOLO LUGAR.
+// `METODOS_VALIDOS` de `admin-marcar-pago` valida el BODY de ese endpoint, no la
+// columna: el embudo escribía el `patch` que le dieran sin mirar. Por ahí entró
+// `stripe_credito` a etiquetar separos de Mercado Pago —`admin-separo-aplicar`
+// no «se saltó» la validación, es que nunca pasó por ella—.
+//
+// Ahora se valida aquí, que es por donde pasan TODOS. La lista tiene dos mitades
+// y las dos se dicen: lo que un humano elige en la pantalla, y lo que escribe
+// una máquina. `mercadopago` se HEREDA del nombre que ya usa
+// `solicitudes_tour.metodo_separo` — inventar un nombre nuevo para el mismo
+// hecho es cómo nacen dos vocabularios.
+//
+// `null` es un valor legítimo y NO se rellena: si no se sabe cómo se pagó, el
+// campo se queda vacío. Un campo vacío se ve y se pregunta; una etiqueta
+// inventada se cree.
+const METODOS_DE_HUMANO = ['transferencia', 'deposito', 'efectivo'];
+const METODOS_DE_MAQUINA = ['mercadopago'];
+// Los de antes de todo esto. Se aceptan para no rechazar una fila vieja al
+// tocarla, pero no se escriben nunca de nuevo.
+const METODOS_LEGADO = ['bbva', 'hey', 'otro'];
+const METODOS_ACEPTADOS = [...METODOS_DE_HUMANO, ...METODOS_DE_MAQUINA, ...METODOS_LEGADO];
+
 // [CONC-2] `version` es OBLIGATORIA de nombrar, aunque valga null. Un candado
 // que se puede olvidar es un candado que se olvida: si un caller no dice nada,
 // esto revienta con nombre en vez de escribir a ciegas en silencio. Para
@@ -67,6 +89,15 @@ async function aplicarNucleo({ env, headers, pagoId, accion, patch, actorEtiquet
   const faltaContrato = exigirContratoDeVersion({ version, motivoSinVersion });
   if (faltaContrato) {
     return { statusCode: 500, headers, body: JSON.stringify({ error: faltaContrato }) };
+  }
+  // [SEP-ETIQUETA-1a] El candado del método. Se rehúsa ANTES de escribir: una
+  // etiqueta desconocida no se guarda «a ver qué pasa», porque después se copia
+  // sola a `pagos_auditoria` y ya son dos filas que hay que corregir.
+  if (patch && patch.metodo != null && !METODOS_ACEPTADOS.includes(patch.metodo)) {
+    return { statusCode: 500, headers, body: JSON.stringify({
+      error: 'Método de pago desconocido: "' + patch.metodo + '". Los aceptados son: '
+           + METODOS_ACEPTADOS.join(', ') + '. Si es uno nuevo, agrégalo a la lista de _lib/marcar-pago.',
+      metodo_desconocido: patch.metodo }) };
   }
   const sbHeaders = {
     apikey: env.PORTAL_SB_SERVICE,
@@ -217,7 +248,8 @@ async function aplicarNucleo({ env, headers, pagoId, accion, patch, actorEtiquet
   }
 }
 
-module.exports = { aplicarNucleo, TOLERANCIA_MXN };
+module.exports = { aplicarNucleo, TOLERANCIA_MXN,
+                   METODOS_ACEPTADOS, METODOS_DE_HUMANO, METODOS_DE_MAQUINA, METODOS_LEGADO };
 
 // ----- helpers (movidos junto con el núcleo que los usa) -----
 

@@ -2188,9 +2188,13 @@ function _esfTabQuitarZona(n) {
 // cambios?"— y de las dos verdades que mordieron a Omar.
 function _esfTabSync() {
   const fest = !!document.getElementById('esf-es-festival')?.checked;
+  // [ESF-UX-4] Los dos almacenes ya nacen `hidden` en el marcado y salieron de
+  // `data-esf`, así que la pestaña no los toca. Se les sigue poniendo el
+  // `display:none` aquí por si alguien los abre a mano desde la consola o desde
+  // un camino viejo: dos candados baratos para lo que hoy solo tiene uno.
   ['esf-grp-zonas', 'esf-grp-cheapzonas'].forEach((id) => {
     const g = document.getElementById(id);
-    if (g) g.style.display = 'none';
+    if (g) { g.style.display = 'none'; g.hidden = true; }
   });
   const grp = document.getElementById('esf-grp-tablero');
   if (grp) grp.style.display = fest ? 'none' : '';   // en festival mandan sus paquetes

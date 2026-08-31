@@ -1830,7 +1830,19 @@
      <div id="esf-music-chosen" style="font-size:11px;color:var(--green);margin-top:4px"></div>
      <div id="esf-music-results" style="margin-top:8px"></div>
     </div>
-    <div class="form-group" data-esf="zonas" id="esf-grp-zonas">
+    <!-- [ESF-UX-4] ⚠️ ESTO NO ES UNA PANTALLA: ES EL ALMACÉN.
+         Desde UX-2a el global se DERIVA de las celdas del tablero, y desde
+         UX-3-1b el tablero es el único editor. Estas filas siguen existiendo
+         porque SEIS lugares del código las leen para armar lo que se guarda
+         (`#esf-zonas .esf-zona-row`): borrarlas rompería el guardado.
+
+         Se les quita `data-esf` a propósito. Con él, `_esfTab('zonas')` las
+         volvía a MOSTRAR —escribe `style.display` sobre lo mismo que
+         `_esfTabSync` acababa de esconder, y gana el último que escribe—, así
+         que el entierro duraba hasta el primer clic. Y ese clic es justo el que
+         da quien va a mover precios: de ahí los TRES editores que vio Memo.
+         Sin `data-esf`, la pestaña ya no tiene opinión sobre ellas. -->
+    <div class="form-group" id="esf-grp-zonas" hidden>
      <label>Zonas y precios</label>
      <div id="esf-zonas"></div>
      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
@@ -1842,7 +1854,8 @@
           arriba. 14 de los 78 eventos con cheap divergen de verdad: otro número de
           zonas, otros nombres, otro orden o `sepEspecial` propio. El botón de
           copiar es conveniencia de captura, no el modelo. -->
-     <div class="form-group" data-esf="zonas" id="esf-grp-cheapzonas">
+     <!-- [ESF-UX-4] Almacén, igual que su hermana de arriba. Ver el comentario. -->
+     <div class="form-group" id="esf-grp-cheapzonas" hidden>
       <label>Zonas CHEAP <span style="font-weight:400;color:var(--ts);font-size:11px">— solo boleto</span></label>
       <div id="esf-cheapzonas"></div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">

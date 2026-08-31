@@ -4301,11 +4301,21 @@ function _khNavSync(name) {
   document.querySelectorAll('.nav-dropdown-item.active, #nav-herramientas.active')
     .forEach(b => b.classList.remove('active'));
   // Barra inferior: marcar destino activo + ocultar los que el rol no permite.
+  // [EVT-NAV-2] EL PERMISO SE LE PREGUNTA A `_puedeVerTab`, NO A OTRO BOTÓN.
+  // Antes esta línea leía el `style.display` de `#nav-<tab>`, o sea que un item
+  // de la barra sólo se veía si su GEMELO del sidebar existía. E5-6 borró
+  // `#nav-solicitudes_portal` — y con él, en silencio, el botón «Portal» de la
+  // barra inferior: medido, salía `visible=false` con `permitido=true` para
+  // roshi, bulma y milk. En el celular, las solicitudes POR APROBAR no tenían
+  // puerta. Es la cuarta pérdida colgada de un `nav-*`, y la misma lección de
+  // SEG-2: derivar de la FUENTE del permiso, no de otro pedazo de la UI.
+  // Para los items que sí tienen gemelo esto es byte-igual —medido: su
+  // visibilidad ya era exactamente `_puedeVerTab`—; lo que cambia es que un
+  // destino sin botón en el sidebar deja de heredar una ausencia.
   document.querySelectorAll('.kh-bb-item[data-tab]').forEach(b => {
     const tab = b.dataset.tab;
     b.classList.toggle('active', tab === name);
-    const src = document.getElementById('nav-' + tab);
-    b.style.display = (src && src.style.display !== 'none') ? '' : 'none';
+    b.style.display = _puedeVerTab(tab) ? '' : 'none';
   });
   // Ocultar encabezado de grupos del sidebar que quedaron sin items visibles.
   // El grupo Herramientas se omite: su visibilidad la maneja aplicarPermisosUI.

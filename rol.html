@@ -1277,6 +1277,17 @@ body.hsale-on .nav{top:var(--hsb-h,0px)}
       <label for="zona-select">Zona / boleto</label>
       <select id="zona-select"><option value="">— Elige una zona —</option></select>
     </div>
+    <!-- [ROL-HIST-2] LA FECHA SUBIÓ AQUÍ, y no es cosmético: desde ROL-HIST-1 el
+         precio de la zona SALE DE ELLA, así que no puede vivir en un paso
+         posterior al que lo pinta. NO es un campo nuevo — es el mismo
+         `#sep-date` de siempre, mudado; duplicarlo habría estrenado dos fechas
+         que todavía no divergen. -->
+    <div class="fld date" id="sep-date-wrap" style="display:none">
+      <label for="sep-date">Fecha del separo</label>
+      <input type="date" id="sep-date">
+      <div class="fld-help">La del comprobante. El precio de la zona es el que regía ESE día.</div>
+    </div>
+    <div id="precio-hist" style="display:none"></div>
     <div id="precio-wrap" style="display:none">
       <div class="bt-wrap">
         <div class="bt-title">¿Cómo compraste tu boleto?</div>
@@ -1329,11 +1340,7 @@ body.hsale-on .nav{top:var(--hsb-h,0px)}
   </section>
 
   <section class="step locked" id="step4">
-    <div class="step-hd"><span class="n">04</span><span class="t">Fecha de separo</span><span class="hint">¿Cuándo pagaste?</span></div>
-    <div class="fld date">
-      <label for="sep-date">Fecha del separo</label>
-      <input type="date" id="sep-date">
-    </div>
+    <div class="step-hd"><span class="n">04</span><span class="t">Monto del separo</span><span class="hint">¿Cuánto pagó?</span></div>
     <div id="sep-monto-wrap" style="display:none">
       <div class="fld num">
         <label for="sep-monto">Monto de tu separo</label>
@@ -1651,6 +1658,11 @@ var HABS_STD = [
 
 // ── Helpers ──────────────────────────────────
 function fmt(n){return '$'+Math.round(n).toLocaleString('es-MX');}
+// [ROL-HIST-2] rol.html NO tenía escapador —lo di por hecho copiando el
+// patrón de otras pantallas y habría tronado en cuanto se pintara el primer
+// mensaje—. Vive junto a `fmt`, que es su hermana.
+function esc(x){ return String(x==null?'':x).replace(/&/g,'&amp;').replace(/</g,'&lt;')
+  .replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
 function isCDMX(ev){return ev.v && (ev.v.toUpperCase().includes('CDMX')||ev.v.toUpperCase().includes('CIUDAD DE MEXICO'));}
 function ymd(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
 function fmtFecha(d){
@@ -2097,6 +2109,14 @@ document.getElementById('zona-select').addEventListener('change', function(){
     state.zona = getZonaList()[parseInt(v,10)];
   } else state.zona=null;
   if(state.zona) trackRolEvent('rol_zona_elegida', { zona: state.zona.n, precio_zona: state.zona.p });
+  // [ROL-HIST-2] La fecha del separo se descubre AL ELEGIR ZONA, porque el
+  // precio de esa zona sale de ella. Y cambiar de zona invalida lo consultado:
+  // el historial es por zona, no por evento.
+  (function(){
+    var w = document.getElementById('sep-date-wrap');
+    if(w) w.style.display = state.zona ? '' : 'none';
+    pedirPrecioVigente();
+  })();
 
   var pwrap=document.getElementById('precio-wrap');
   var pin=document.getElementById('zona-precio');
@@ -2277,6 +2297,148 @@ document.getElementById('codigo-input').addEventListener('input', function(){
   refreshPrecioFromBuyType();
 });
 
+// ═══ [ROL-HIST-2] EL PRECIO SALE DE LA FECHA DEL SEPARO ══════════════════════
+// La fórmula NO se toca: STAY, CHEAP y los derivados siguen igual. Lo único que
+// cambia es de dónde sale el precio de la zona — antes `state.zona.p`, que es el
+// del catálogo de HOY; ahora el que regía el día que el cliente separó.
+//
+// `precioHist` es lo que el servidor contestó, con su estado:
+//   pidiendo | listo | error | ninguna   (ninguna = falta zona o falta fecha)
+// `opciones` son el precio al ABRIR el día más cada cambio de ese día. Cuando
+// hay más de uno NO SE ELIGE: `elegido` se queda en null y `checkReady` no deja
+// avanzar. Elegir por quien captura sería inventar cuál de los dos le tocó.
+state.precioHist = { estado: 'ninguna', opciones: [], elegido: null, sinHistorial: false, anterior: false, msg: '' };
+
+function _ymdInput(){ var e = document.getElementById('sep-date'); return e && e.value ? e.value : ''; }
+
+// El ámbito del historial es el de la LISTA de la que salió la zona: un CHEAP
+// cotiza contra `cheapZonas`, no contra `zonas`. Confundirlos daría el precio de
+// otro paquete con cara de dato bueno.
+function _ambitoDeZona(){ return state.pkg === 'cheap' ? 'cheapZonas' : 'zonas'; }
+
+// El evento_id lleva el índice de la fecha cuando es multifecha (`slug#0`), que
+// es como llavea el historial — y como lo sembró Jane.
+function _eventoIdHist(){
+  if(!state.ev) return '';
+  var mf = state.ev.multifecha;
+  if(Array.isArray(mf) && mf.length && state.fi != null) return state.ev.id + '#' + state.fi;
+  return state.ev.id;
+}
+
+var _histSeq = 0;
+function pedirPrecioVigente(){
+  var fecha = _ymdInput();
+  if(!state.zona || !fecha || state.zona.n === 'Paquete RIDE'){
+    // El RIDE no tiene zona de boleto: su precio es el del transporte y no vive
+    // en el historial. Se sale sin pedir nada, no se pide y se ignora.
+    state.precioHist = { estado: 'ninguna', opciones: [], elegido: null, sinHistorial: false, anterior: false, msg: '' };
+    pintarPrecioHist(); refreshPrecioFromBuyType(); return;
+  }
+  var mio = ++_histSeq;
+  state.precioHist = { estado: 'pidiendo', opciones: [], elegido: null, sinHistorial: false, anterior: false, msg: '' };
+  pintarPrecioHist(); refreshPrecioFromBuyType();
+  fetch('/.netlify/functions/precios-vigentes', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ evento_id: _eventoIdHist(), ambito: _ambitoDeZona(), zona: state.zona.n, fecha: fecha }),
+  }).then(function(r){ return r.json(); }).then(function(j){
+    // Una respuesta que llega tarde NO pisa a la de una zona o fecha más nueva.
+    if(mio !== _histSeq) return;
+    if(!j || j.ok !== true){
+      state.precioHist = { estado: 'error', opciones: [], elegido: null, sinHistorial: false, anterior: false,
+                           msg: (j && j.error) || 'No pude consultar el precio de esa fecha' };
+    } else {
+      var ops = [];
+      if(j.al_abrir) ops.push({ precio: j.al_abrir.precio, cerrada: !!j.al_abrir.cerrada,
+                                aplicable: !!j.al_abrir.aplicable, hora: null });
+      (j.cambios || []).forEach(function(c){
+        ops.push({ precio: c.precio, cerrada: !!c.cerrada, aplicable: !!c.aplicable, hora: c.hora });
+      });
+      state.precioHist = {
+        estado: 'listo', opciones: ops,
+        // UN SOLO precio se aplica solo; VARIOS esperan a que alguien elija.
+        elegido: (ops.length === 1 && ops[0].aplicable) ? 0 : null,
+        sinHistorial: !!j.sin_historial, anterior: !!j.anterior_al_historial,
+        msg: j.catalogo_error || '',
+      };
+    }
+    pintarPrecioHist(); refreshPrecioFromBuyType();
+  }).catch(function(e){
+    if(mio !== _histSeq) return;
+    state.precioHist = { estado: 'error', opciones: [], elegido: null, sinHistorial: false, anterior: false,
+                         msg: 'No pude consultar el precio de esa fecha' };
+    pintarPrecioHist(); refreshPrecioFromBuyType();
+  });
+}
+
+// El precio de la zona QUE MANDA. `null` significa «todavía no se sabe», y eso
+// mantiene el botón apagado — no cae al precio de hoy, que es justo el error.
+function precioZonaVigente(){
+  var h = state.precioHist;
+  if(!state.zona) return null;
+  if(state.zona.n === 'Paquete RIDE') return state.zona.p || 0;   // el RIDE no lleva historial
+  if(!h || h.estado !== 'listo') return null;
+  if(h.elegido == null) return null;
+  var op = h.opciones[h.elegido];
+  if(!op || !op.aplicable) return null;                            // un 0 es zona CERRADA, no un precio
+  return op.precio;
+}
+
+function _fechaCorta(ymdStr){
+  var M = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+  var p = String(ymdStr || '').split('-');
+  if(p.length !== 3) return ymdStr || '';
+  return parseInt(p[2],10) + '-' + (M[parseInt(p[1],10)-1] || '');
+}
+
+function pintarPrecioHist(){
+  var box = document.getElementById('precio-hist');
+  if(!box) return;
+  var h = state.precioHist, fecha = _ymdInput();
+  if(!state.zona || state.zona.n === 'Paquete RIDE' || !h || h.estado === 'ninguna'){ box.style.display='none'; box.innerHTML=''; return; }
+  box.style.display = '';
+  if(h.estado === 'pidiendo'){ box.innerHTML = '<div class="fld-help">Buscando el precio de esa fecha…</div>'; return; }
+  if(h.estado === 'error'){
+    box.innerHTML = '<div class="fld-help" style="color:var(--red)">'+esc(h.msg)+'. Corrige la fecha o vuelve a intentar; no se cotiza a ciegas.</div>';
+    return;
+  }
+  // SIN HISTORIAL: el catálogo nunca cambió para esa zona.
+  if(h.sinHistorial){
+    if(!h.opciones.length){
+      box.innerHTML = '<div class="fld-help" style="color:var(--red)">No sé qué precio tenía esa zona y el catálogo tampoco lo trae. No se cotiza a ciegas.</div>';
+      return;
+    }
+    box.innerHTML = '<div class="fld-help"><b>Precio único</b> — esta zona nunca ha cambiado de precio.</div>';
+    return;
+  }
+  if(h.opciones.length === 1){
+    var o = h.opciones[0];
+    if(!o.aplicable){
+      box.innerHTML = '<div class="fld-help" style="color:var(--red)">Esa zona estaba <b>cerrada</b> el '+esc(_fechaCorta(fecha))+' (precio 0). Revisa la fecha o la zona.</div>';
+      return;
+    }
+    box.innerHTML = '<div class="fld-help">Precio del <b>'+esc(_fechaCorta(fecha))+'</b>'+
+      (h.anterior ? ' <span style="color:var(--red)">— es lo más viejo que sabemos, no hay registro anterior</span>' : '')+'</div>';
+    return;
+  }
+  // VARIOS ESE DÍA: chips con hora, y NADIE elige por quien captura.
+  var html = '<div class="fld-help">Ese día hubo <b>'+h.opciones.length+' precios</b>. Elige el que dice el comprobante:</div>'+
+             '<div class="bt-pills" id="hist-pills" style="margin-top:6px">';
+  h.opciones.forEach(function(o, i){
+    var etq = (o.hora ? 'desde las '+esc(o.hora) : 'al abrir el día');
+    html += '<button type="button" class="pill'+(h.elegido===i?' sel':'')+'" data-hist="'+i+'"'+
+            (o.aplicable?'':' disabled')+'>'+
+            (o.aplicable ? fmt(o.precio) : 'cerrada')+' · '+etq+'</button>';
+  });
+  html += '</div>';
+  box.innerHTML = html;
+  box.querySelectorAll('[data-hist]').forEach(function(b){
+    b.addEventListener('click', function(){
+      state.precioHist.elegido = parseInt(this.dataset.hist, 10);
+      pintarPrecioHist(); refreshPrecioFromBuyType();
+    });
+  });
+}
+
 // Recomputa state.precio según el modo activo (llamado en cualquier cambio relevante)
 function refreshPrecioFromBuyType(){
   if(!state.zona){
@@ -2286,7 +2448,17 @@ function refreshPrecioFromBuyType(){
     checkReady();
     return;
   }
-  var base = state.zona.p || 0;
+  // [ROL-HIST-2] EL PRECIO DE LA ZONA, EN LA FECHA DEL SEPARO. Antes era
+  // `state.zona.p` — el del catálogo de HOY. `null` significa «todavía no se
+  // sabe» (falta fecha, o hay varios precios ese día y nadie ha elegido) y se
+  // propaga como null hasta `checkReady`, que apaga el botón. NO cae al precio
+  // de hoy: caer a un valor plausible es cómo se cobra de más en silencio.
+  var base = precioZonaVigente();
+  if(base == null){
+    state.precio = null;
+    updatePrecioDisplay(); recomputeDefaultSepMonto(); checkReady(); refreshPlanIfActive();
+    return;
+  }
   if(state.buyType === 'preventa'){
     var v = parseNum(document.getElementById('zona-precio').value);
     state.precio = v > 0 ? v : base;
@@ -2521,6 +2693,9 @@ document.getElementById('transp-monto').addEventListener('input', function(){
 // ── Date + Separo ────────────────────────────
 document.getElementById('sep-date').addEventListener('change', function(){
   state.sepDate = this.value ? new Date(this.value+'T12:00:00') : null;
+  // [ROL-HIST-2] La fecha decide el PRECIO, no solo el calendario: al cambiarla
+  // se vuelve a preguntar. `pedirPrecioVigente` ya llama a recompute+checkReady.
+  pedirPrecioVigente();
   recomputeDefaultSepMonto();
   checkReady();
   refreshPlanIfActive();
@@ -2585,10 +2760,15 @@ function checkReady(){
   document.getElementById('btn-calc').disabled = !(state.zona && habOK && state.sepDate && precioOK && sepOK);
 }
 (function(){
-  var t=new Date();
-  document.getElementById('sep-date').value=ymd(t);
-  state.sepDate=t;
-  document.getElementById('b-fecha').textContent=fmtFecha(t).toUpperCase();
+  // [ROL-HIST-2] LA FECHA NACE VACÍA. Antes se pre-llenaba con HOY, y eso era un
+  // default silencioso de los que la casa mató en los 44 selectores del Palacio:
+  // no ahorraba un clic, INVENTABA un dato. Mientras la fecha solo movía el
+  // calendario de pagos el costo era bajo; desde ROL-HIST-1 decide QUÉ PRECIO SE
+  // COBRA, y un separo capturado tres días después se cotizaba con el precio de
+  // hoy sin que nadie lo notara — el caso Omar, por la otra punta.
+  // `b-fecha` (el rótulo del encabezado) SÍ sigue diciendo hoy: ése es la fecha
+  // de la pantalla, no la del separo, y confundirlos fue el origen del enredo.
+  document.getElementById('b-fecha').textContent=fmtFecha(new Date()).toUpperCase();
 })();
 
 // ── Step UI ──────────────────────────────────

@@ -254,8 +254,16 @@ exports.handler = async (event) => {
     // que nadie sabe que existe es peor que uno anunciado, porque el día que
     // /rol conteste «sin historial» nadie va a saber si es que nunca cambió o
     // que este publish no lo anotó.
+    //
+    // 🔒 SOLO EN `main`. Una publicación a rama de prueba compila precios que
+    // NADIE VE: el sitio sirve `main`. Escribirlos al historial los volvería
+    // «precios que el cliente vio ese día» —que es literalmente lo que /rol le
+    // va a cobrar a alguien— por haber probado algo. El PATCH de `publicado` y
+    // el aviso a la lista de espera ya estaban compuertados igual; a este se me
+    // fue, y la consecuencia es peor que las otras dos: ésas no inventan dinero.
     let historial = { filas: 0, zonas_miradas: 0 };
-    try {
+    if (branch !== 'main') historial.omitido = 'rama de prueba: no se escribe historial';
+    else try {
       const evViejo = extraerEV(content);
       const evNuevo = extraerEV(contenidoNuevo);
       const porId = (arr) => new Map((arr || []).filter((e) => e && e.id).map((e) => [e.id, e]));

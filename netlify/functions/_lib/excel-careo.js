@@ -22,7 +22,13 @@ function normalizarNombre(s) {
 // La chatarra: filas que no son viajeros sino reventa o control interno. Se
 // mira sobre el nombre YA normalizado, porque en el Excel viene de todas las
 // formas («Vendido Memo», «VENDIDO», «Coordi Sofía»).
-const CHATARRA = ['vendido', 'coordinador', 'coordi', 'hubb', 'viagogo'];
+// [EXCEL-CAREO-FIX-1] 'creadora': salió «Marietta Barrera creadora» como alta
+// nueva en el careo del 31-ago. Como el resto, se mira por `includes` sobre el
+// nombre normalizado — la misma apuesta que ya corre 'coordi', que muerde
+// «Ana Coordinadora». Queda dicho el costo: un apellido que CONTENGA la
+// palabra (p.ej. «Recreadora») se descartaría. No hay ninguno en el padrón hoy,
+// y el precio de dejar pasar una creadora es meterla como viajera.
+const CHATARRA = ['vendido', 'coordinador', 'coordi', 'hubb', 'viagogo', 'creadora'];
 function esChatarra(nombre) {
   const n = normalizarNombre(nombre);
   if (!n) return true;                       // una fila sin nombre no es nadie
@@ -114,10 +120,15 @@ function parsearPestana(filas, encabezado, reglaZona) {
       ya.abonado += abonado;
       ya.filas += 1;
       if (!ya.zona && zona) ya.zona = zona;
+      if (!ya.talla && mapa.talla >= 0) ya.talla = String(f[mapa.talla] == null ? '' : f[mapa.talla]).trim();
     } else {
       out.set(clave, {
         nombre: nombreCrudo, clave, abonado, filas: 1, zona,
         paquete: mapa.paquete >= 0 ? String(f[mapa.paquete] == null ? '' : f[mapa.paquete]).trim() : '',
+        // [EXCEL-CAREO-FIX-1] La talla no se usa para decidir nada: viaja como
+        // EVIDENCIA, para poder cuadrar el montón de apartados contra las 141
+        // filas que Jane contó a mano («zona real + $0 + sin talla»).
+        talla: mapa.talla >= 0 ? String(f[mapa.talla] == null ? '' : f[mapa.talla]).trim() : '',
       });
     }
   }
@@ -125,20 +136,72 @@ function parsearPestana(filas, encabezado, reglaZona) {
 }
 
 // ── el careo ────────────────────────────────────────────────────────────────
-// Cuatro montones, por nombre normalizado. `base` son los viajeros del sistema,
+// SEIS montones, por nombre normalizado. `base` son los viajeros del sistema,
 // ya con su abonado sumado.
 //
 // La tolerancia es de UN PESO, la misma que usa la reconciliación del dinero en
 // el Portal: un centavo de redondeo no es una diferencia de pagos.
 const TOLERANCIA_MXN = 1;
 
+// [EXCEL-CAREO-FIX-1] LA BASE YA NO SE COLAPSA POR NOMBRE.
+//
+// Antes: `new Map(viajeros.map(v => [norm(v.nombre), v]))`. Un Map con la misma
+// llave se queda con el ÚLTIMO, así que dos viajeros DISTINTOS que se llaman
+// igual entraban como uno y el otro DEJABA DE EXISTIR para el careo: no salía
+// como igual, ni como baja, ni como nuevo. Medido: con dos «Jorge Rivera» en el
+// sistema, el careo reportaba pagos sobre uno y el otro desaparecía — con su
+// deuda dentro. Es la misma familia que la convención del Excel («dos filas
+// iguales son la misma persona»), pero al revés y silenciosa: allá SUMA de más,
+// aquí PIERDE de menos.
+//
+// Ahora la base se llavea a LISTA. Un nombre con más de un viajero no se
+// resuelve solo: el careo lo DICE en su propio montón y no lo mete a ninguno de
+// los otros. Adivinar cuál de los dos es sería inventar el dato que falta.
+function agruparBase(viajerosBase) {
+  const m = new Map();
+  for (const v of (viajerosBase || [])) {
+    const k = normalizarNombre(v.nombre);
+    if (!m.has(k)) m.set(k, []);
+    m.get(k).push(v);
+  }
+  return m;
+}
+
 function carear(personasExcel, viajerosBase) {
-  const enBase = new Map((viajerosBase || []).map((v) => [normalizarNombre(v.nombre), v]));
+  const enBase = agruparBase(viajerosBase);
   const enExcel = new Map((personasExcel || []).map((p) => [p.clave, p]));
 
-  const nuevos = [], pagos = [], iguales = [];
+  const nuevos = [], pagos = [], iguales = [], apartados = [], ambiguos = [];
   for (const p of enExcel.values()) {
-    const v = enBase.get(p.clave);
+    const mismos = enBase.get(p.clave) || [];
+
+    // AMBIGUO: el nombre trae más de un viajero en el sistema. No se decide.
+    if (mismos.length > 1) {
+      ambiguos.push({ nombre: p.nombre, excel: p.abonado, filas: p.filas,
+        viajeros: mismos.map((v) => ({ viajero_id: v.id, abonado: Number(v.abonado || 0) })) });
+      continue;
+    }
+    const v = mismos[0];
+
+    // APARTADO: el Excel no le registra UN PESO, y el sistema tampoco (o ni
+    // siquiera lo tiene). Es gente REAL que separó y todavía no abona —Jane lo
+    // verificó contra el crudo, caso Arian: 2 filas CHEAP Platino por pagar—,
+    // así que no puede ir revuelta con las altas que sí pagaron, ni caer en
+    // «iguales», que es donde se volvía invisible: dos ceros cuadran, y un
+    // renglón que cuadra deja de leerse aunque la persona deba.
+    //
+    // La llave del montón es EL DINERO EN CERO, no la regla compuesta «zona
+    // real + $0 + sin talla» con que se descubrió la clase: quien no pagó pero
+    // sí puso talla es exactamente igual de moroso, y una regla de tres partes
+    // lo dejaría fuera en silencio. `zona` y `talla` viajan como evidencia para
+    // poder cuadrar el conteo contra las 141 filas que se contaron a mano.
+    if (p.abonado === 0 && (!v || Math.abs(Number(v.abonado || 0)) <= TOLERANCIA_MXN)) {
+      apartados.push({ nombre: p.nombre, zona: p.zona, paquete: p.paquete,
+        talla: p.talla || '', filas: p.filas,
+        en_sistema: !!v, viajero_id: v ? v.id : null });
+      continue;
+    }
+
     if (!v) { nuevos.push({ nombre: p.nombre, abonado: p.abonado, zona: p.zona, paquete: p.paquete, filas: p.filas }); continue; }
     const dif = Math.round((p.abonado - Number(v.abonado || 0)) * 100) / 100;
     if (Math.abs(dif) > TOLERANCIA_MXN) {
@@ -149,16 +212,22 @@ function carear(personasExcel, viajerosBase) {
   }
   // BAJA: está en el sistema y ya no en el Excel. NO SE BORRA NADA — se nombra
   // y espera firma. Marcar es otra tuerca, y tiene que serlo.
+  //
+  // [EXCEL-CAREO-FIX-1] Se recorre la LISTA de viajeros, no las llaves del
+  // agrupado: si dos homónimos se dieron de baja, son DOS bajas. Antes el Map
+  // colapsado reportaba una sola y la otra persona se iba sin que nadie la
+  // nombrara.
   const bajas = [];
-  for (const v of enBase.values()) {
+  for (const v of (viajerosBase || [])) {
     if (!enExcel.has(normalizarNombre(v.nombre))) {
       bajas.push({ nombre: v.nombre, viajero_id: v.id, abonado: Number(v.abonado || 0) });
     }
   }
   const porNombre = (a, b) => a.nombre.localeCompare(b.nombre, 'es');
   return { nuevos: nuevos.sort(porNombre), pagos: pagos.sort(porNombre),
-           bajas: bajas.sort(porNombre), iguales: iguales.sort(porNombre) };
+           bajas: bajas.sort(porNombre), iguales: iguales.sort(porNombre),
+           apartados: apartados.sort(porNombre), ambiguos: ambiguos.sort(porNombre) };
 }
 
 module.exports = { normalizarNombre, esChatarra, leerDinero, mapearColumnas,
-                   parsearPestana, carear, CHATARRA, TOLERANCIA_MXN };
+                   parsearPestana, carear, agruparBase, CHATARRA, TOLERANCIA_MXN };

@@ -574,6 +574,25 @@ function _excelCareoHtml(d) {
     ${cab('bajas — en el sistema, ya no en el Excel', t.bajas, 'var(--red)')}
     ${lista(d.bajas, b => fila(_evtEsc(b.nombre), _evtMxn(b.abonado)))}
     <div style="font-size:11px;color:var(--ts);margin-top:4px">Una baja NO se borra ni se marca desde aquí: se nombra y espera firma.</div>
+
+    ${cab('apartados — separaron y no han abonado un peso', t.apartados, 'var(--yellow,#e8ff4c)')}
+    ${lista(d.apartados || [], a => fila(
+      `${_evtEsc(a.nombre)} <span style="color:var(--ts);font-size:11px">${_evtEsc(a.zona || 'sin zona')} ${_evtEsc(a.paquete || '')}${a.filas > 1 ? ` · ${a.filas} filas` : ''}${a.talla ? ` · talla ${_evtEsc(a.talla)}` : ' · sin talla'}</span>`,
+      a.en_sistema ? 'ya en el sistema' : 'no está en el sistema'))}
+    <div style="font-size:11px;color:var(--ts);margin-top:4px">
+      Gente REAL que separó. Salen aparte para que no se confundan con altas que sí pagaron —
+      y para que sigan viéndose cuando entren al sistema con $0, donde antes se volvían «iguales».
+      ${t.apartados ? `De los ${t.apartados}, <b style="color:var(--tp)">${t.apartados_zona_sin_talla}</b> traen zona y no traen talla (${t.apartados_filas} filas en total).` : ''}
+    </div>
+
+    ${cab('ambiguos — un nombre, varios viajeros en el sistema', t.ambiguos, 'var(--orange)')}
+    ${lista(d.ambiguos || [], a => fila(
+      `${_evtEsc(a.nombre)} <span style="color:var(--ts);font-size:11px">${a.viajeros.length} viajeros con ese nombre</span>`,
+      `Excel ${_evtMxn(a.excel)} · sistema ${a.viajeros.map(v => _evtMxn(v.abonado)).join(' / ')}`))}
+    <div style="font-size:11px;color:var(--ts);margin-top:4px">
+      El careo NO elige por ti: adivinar cuál de los dos es sería inventar el dato que falta.
+      Antes, el sistema se quedaba con UNO y el otro desaparecía del careo — con su deuda dentro.
+    </div>
     <details style="margin-top:14px">
       <summary style="cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--ts)">iguales · ${t.iguales}</summary>
       <div style="padding-top:8px">${lista(d.iguales, i => fila(_evtEsc(i.nombre), _evtMxn(i.abonado)))}</div>

@@ -25,16 +25,35 @@
 // ya la había puesto en 'pagado'. Quedaba una solicitud LIQUIDADA con una cuota
 // viva, sin un solo error a la vista. Las dos guardas son las de siempre,
 // palabra por palabra — lo único que cambió es CUÁNDO se leen:
-//     promover  ⇔ `estadoPrevio !== 'pagado'`  →  &estado=neq.pagado
+//     promover  ⇔ el estado está en la lista de PROMOVIBLES  →  &estado=in.(…)
 //     degradar  ⇔ `estadoPrevio === 'pagado'`  →  &estado=eq.pagado
 //
-// ❓ PREGUNTA ABIERTA PARA MEMO (Jane, 30-ago): `&estado=neq.pagado` alcanza a
-// CUALQUIER estado que no sea 'pagado', `'cancelado'` incluido. Es decir: marcar
-// una cuota de una solicitud CANCELADA la pondría en 'pagado'. Es regla de
-// dinero ANTERIOR a toda la serie —BASE hacía exactamente lo mismo— y se
-// preserva a propósito: un refactor promete que el sistema es EL MISMO, no que
-// es bueno. La pregunta con nombre es de Memo: ¿debe poder? El instinto de Jane
-// dice que no y que ahí hay un bug de negocio dormido. NO SE TOCA HASTA LA FIRMA.
+// ✅ RESPONDIDA POR MEMO (30-ago) — CONC-CANCELADO-1.
+//
+// La pregunta era: `&estado=neq.pagado` alcanzaba a CUALQUIER estado que no
+// fuera 'pagado', `'cancelado'` incluido, así que marcar una cuota de una
+// solicitud CANCELADA la ponía en 'pagado'. Era regla de dinero anterior a toda
+// la serie y se preservó a propósito hasta tener firma.
+//
+// LA REGLA DE NEGOCIO, DE MEMO: **revivir un cancelado es un TRÁMITE, no un
+// efecto de marcar una cuota.** Después de TRES fechas de pago vencidas la
+// solicitud se cancela, y volver de ahí cuesta **$350 extra y ponerse al
+// corriente**. Un clic en «marcar pagado» no puede disparar ese trámite por su
+// cuenta: la promoción automática deja de alcanzar a 'cancelado'.
+//
+// ⚠️ LO QUE ESTO **NO** HACE, PARA QUE NADIE LO BUSQUE: no existe todavía el
+// botón de RESUCITAR. Esta tuerca solo cierra la puerta de atrás. Cuando ese
+// botón se construya, la regla que tiene que implementar es LA DE ARRIBA — y no
+// se repite aquí la cifra a propósito: dos copias del mismo número en el mismo
+// archivo son dos listas que pueden divergir, y esta serie ya vio lo que eso
+// cuesta. Su lugar natural es un endpoint propio con su auth, no un efecto
+// colateral de la cobranza.
+//
+// ⚠️ Y UNA CONSECUENCIA HONESTA: si una solicitud cancelada llega a liquidar sus
+// cuotas vivas, se queda en 'cancelado'. Eso es lo correcto ahora —el dinero
+// entró, pero el lugar no vuelve solo—, y es visible: la cobranza la enseña
+// pagada por dentro y cancelada por fuera. Antes se «arreglaba» sola y en
+// silencio, que es justo lo que Memo no quiere.
 // =============================================================================
 
 const { noAlcanzo, PREFER_VER_FILAS } = require('./candado-optimista');
@@ -65,7 +84,25 @@ function decidirEstado(cuotas) {
   return (todosPagados && dineroCuadra) ? 'pagado' : 'en_pagos';
 }
 
-const CONDICION_DESTINO = { pagado: '&estado=neq.pagado', en_pagos: '&estado=eq.pagado' };
+// [CONC-CANCELADO-1] La promoción ya NO alcanza a los estados TERMINALES. Se
+// escribe con la lista de los que SÍ se pueden promover, no con una negación:
+// `neq.pagado` decía «todos menos uno» y por eso barría 'cancelado' sin que
+// nadie lo hubiera decidido. Una lista dice a quién alcanza, y el día que
+// aparezca un estado nuevo no lo adopta sola.
+// ⚠️ Esta lista NO se escribió de memoria: sale de `ESTADOS_VALIDOS` de
+// `admin-solicitud-update-estado`, que son los cuatro que existen —pendiente,
+// en_pagos, pagado, cancelado—. La primera versión decía también 'apartado', que
+// NO es un estado de solicitud: es de los holds del cron, y se me coló por
+// parecido. Una lista a mano al lado de la realidad, otra vez.
+//
+// Y si algún día apareciera un estado nuevo, esta lista NO lo adopta sola: se
+// quedaría sin promover hasta que alguien lo decida. Es lo contrario de
+// `neq.pagado`, que adoptaba todo lo que no conociera — así entró 'cancelado'.
+const ESTADOS_PROMOVIBLES = ['pendiente', 'en_pagos'];
+const CONDICION_DESTINO = {
+  pagado: '&estado=in.(' + ESTADOS_PROMOVIBLES.join(',') + ')',
+  en_pagos: '&estado=eq.pagado',
+};
 
 // reconciliarSolicitud({ sbUrl, sbHeaders, solicitudId, cuotas? })
 //   → { ok: true,  cambio: 'pagado' | 'en_pagos' | null }
@@ -124,4 +161,4 @@ async function reconciliarSolicitud({ sbUrl, sbHeaders, solicitudId, cuotas }) {
   return { ok: true, cambio };
 }
 
-module.exports = { reconciliarSolicitud, decidirEstado, CONDICION_DESTINO, TOLERANCIA_MXN };
+module.exports = { reconciliarSolicitud, decidirEstado, CONDICION_DESTINO, ESTADOS_PROMOVIBLES, TOLERANCIA_MXN };

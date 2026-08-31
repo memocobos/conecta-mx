@@ -2938,6 +2938,14 @@ var EV=[
   {id:'trueno',added:'2026-08-26',c:'azul',img:'Trueno',a:'Trueno',f:'26 nov 2026',ds:'2026-11-26',v:'Auditorio Banamex, MTY',st:'',mapa:'trueno',inc:['Boleto zona elegida','Transporte Reynosa-Mty','Hospedaje compartido','Kit Conecta'],sep:300,sepCheap:500,ride:2700,banco:BANCO_DEFAULT,zonas:[{n:'Beyond General',p:4450},{n:'Platino',p:5250,vip:1},{n:'Platino B',p:4700},{n:'Platino C',p:4150,ag:1},{n:'Perfil A',p:4050},{n:'Perfil B',p:3900,ag:1},{n:'Perfil C',p:3650,ag:1},{n:'Perfil D',p:3800,ag:1}],cheapZonas:[{n:'Beyond General',p:2650},{n:'Platino',p:3450,vip:1},{n:'Platino B',p:2900},{n:'Platino C',p:2350,ag:1},{n:'Perfil A',p:2250},{n:'Perfil B',p:2100,ag:1},{n:'Perfil C',p:1850,ag:1},{n:'Perfil D',p:2000,ag:1}],hotel:[{n:'Compartida',e:0},{n:'Doble',e:650},{n:'Triple',e:250},{n:'Individual',e:1960}]}];
 
 var cur=null,selZ=null,selH=null,selViaj=0,selPkg=null,selFechaIdx=0,selBoleto=null,selTransporte=null,costoXPersona=0,total=0,sepActualCalc=0,resto=0;
+// [STAY-COPY-1] EL PRECIO DE ZONA QUE SE ANUNCIA, ya en el paquete que se
+// cotiza. NO se re-deriva en cada imprenta: lo FIJA `calcular()` con la misma
+// decisión que usó para la cuenta, y las tres imprentas lo copian. Re-derivarlo
+// («selZ.p − 500») abriría una cuarta fuente que puede discrepar de la cuenta —
+// y de hecho discreparía: la guarda del STAY mira `costoXPersona<0`, que INCLUYE
+// el hotel, así que hay casos donde `selZ.p − 500` es negativo y la cuenta SÍ
+// aplica el descuento. El papel tiene que sumar solo.
+var precioZonaImpreso=0;
 var HOTEL_MTY=[
   {n:'Compartida (4 personas)',e:0,viaj:[1,2,3,4]},
   {n:'Individual',e:1960,viaj:[1]},
@@ -5829,7 +5837,7 @@ function generarImagenCotizacion(){
   var rows=[];
   rows.push({l:'Viajeros',v:selViaj+(selViaj===1?' persona':' personas')});
   rows.push({l:'Paquete',v:pkgNames[selPkg]||selPkg});
-  if(selZ)rows.push({l:cur.diaFirst?'Boleto':'Zona',v:selZ.n+' — '+fmt(selZ.p)});
+  if(selZ)rows.push({l:cur.diaFirst?'Boleto':'Zona',v:selZ.n+' — '+fmt(precioZonaImpreso)});   // [STAY-COPY-1]
   if(selH){var hv=selH.n;if(selH.e>0)hv+=' (+'+fmt(selH.e)+(cur.hotelPP?'/persona':'')+')';else hv+=' (incluida)';rows.push({l:'Habitación',v:hv});}
   if(selTransporte&&selTransporte.cost>0)rows.push({l:'Transporte',v:selTransporte.n+' — '+fmt(selTransporte.cost)+'/persona'});
 
@@ -6024,6 +6032,7 @@ function calcular(){
   var stayDiscount=STAY_DESCUENTO;
   total=0;
   costoXPersona=0;
+  precioZonaImpreso=zonaP;
 
   if(selPkg==='plus'){
     if(cur.diaFirst){
@@ -6040,6 +6049,22 @@ function calcular(){
   } else if(selPkg==='stay'){
     costoXPersona=zonaP-stayDiscount+hotelPP;
     if(costoXPersona<0)costoXPersona=zonaP+hotelPP;
+    // [STAY-COPY-1] El precio anunciado se DESPEJA de la cuenta ya hecha, en vez
+    // de recalcularse: así lo impreso y lo cobrado no pueden divergir ni en el
+    // caso raro donde la guarda de arriba tira el descuento. `transportCost` se
+    // suma DESPUÉS de este bloque, así que aquí `costoXPersona` es todavía
+    // zona+hotel y la resta deja exactamente la parte de zona.
+    //
+    // ⚠️ TRAMPA ANOTADA, HOY INALCANZABLE: si una zona costara MENOS que
+    // STAY_DESCUENTO y el hotel lo compensara, la guarda de arriba conservaría
+    // el descuento y este despeje imprimiría un precio NEGATIVO. Medido sobre el
+    // catálogo vivo: 595 zonas, la más barata $850 — ninguna bajo los $500. No se
+    // pone guarda porque una guarda que no puede dispararse se lee como
+    // protección y no protege nada (la lección de `kmt-prov`); y porque en ese
+    // caso el papel tampoco cuadraría imprimiendo el precio pleno: lo que habría
+    // que arreglar es que las DOS guardas del STAY miren lo mismo. Si alguna vez
+    // entra una zona bajo el descuento, ésa es la tuerca.
+    precioZonaImpreso=costoXPersona-hotelPP;
     total=costoXPersona*selViaj;
   } else if(selPkg==='cheap'){
     if(cur.diaFirst){
@@ -6251,7 +6276,7 @@ function calcular(){
   if(zonaRow) zonaRow.style.display=selZ?'flex':'none';
   if(selZ){
     $$('r-zona-lbl').textContent=cur.diaFirst?'Boleto':'Zona';
-    $$('r-zona').textContent=selZ.n+' — '+fmt(selZ.p);
+    $$('r-zona').textContent=selZ.n+' — '+fmt(precioZonaImpreso);   // [STAY-COPY-1] la TERCERA imprenta: el resumen en pantalla tenía el mismo defecto
   }
 
   var hotelRow=$$('r-hotel-row');
@@ -6378,7 +6403,7 @@ function buildCotizacionMsg(quincenas,pagoQ){
     '\n📍 '+cur.v+
     '\n\n📦 *Paquete:* '+pkgNames[selPkg]+
     '\n👥 *Viajeros:* '+selViaj+(selViaj===1?' persona':' personas');
-  if(selZ) msg+='\n🎫 *Zona:* '+selZ.n+' ('+fmt(selZ.p)+')';
+  if(selZ) msg+='\n🎫 *Zona:* '+selZ.n+' ('+fmt(precioZonaImpreso)+')';   // [STAY-COPY-1]
   if(selH&&selH.e>0) msg+='\n🏨 *Habitación:* '+selH.n+' (+'+fmt(selH.e)+(cur.hotelPP?'/persona':'')+')';
   else if(selH) msg+='\n🏨 *Habitación:* '+selH.n+' (incluida)';
   if(selTransporte&&selTransporte.cost>0) msg+='\n🚌 *Transporte:* '+selTransporte.n+' (+'+fmt(selTransporte.cost)+'/persona)';

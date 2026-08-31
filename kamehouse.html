@@ -127,6 +127,12 @@
    <div class="nav-group-title" onclick="toggleNavGroup(this)">Operación</div>
    <button class="nav-btn" onclick="showPage('resumen')" id="nav-resumen"><svg class="nav-ic"><use href="#ic-resumen"/></svg><span>Resumen</span></button>
    <button class="nav-btn" onclick="showPage('pagos')" id="nav-pagos"><svg class="nav-ic"><use href="#ic-pagos"/></svg><span>Pagos</span></button>
+   <!-- [EVT-NAV-1] Vuelve el botón que E5-4 quitó. Sin él, POR EVENTO solo se
+        alcanzaba clicando un evento en el Resumen (`_evtIrA`), y una pantalla
+        que solo se abre desde otra es una pantalla que nadie encuentra: Memo
+        no dio con el botón del careo contra el Excel por esto. El propio
+        diseño de ETAPA 5 lo dejó anotado como el riesgo reversible. -->
+   <button class="nav-btn" onclick="showPage('eventos')" id="nav-eventos"><svg class="nav-ic"><use href="#ic-eventos"/></svg><span>Por Evento</span></button>
    <button class="nav-btn" onclick="showPage('capsule')" id="nav-capsule"><svg class="nav-ic"><use href="#ic-capsule"/></svg><span>Capsule Corp</span></button>
   </div>
 

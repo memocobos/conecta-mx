@@ -2005,10 +2005,15 @@ let _eventosCache = [];
 // ═══════════════════════════════════════════════════════════════
 // NAVEGACIÓN
 // ═══════════════════════════════════════════════════════════════
-// `etiqueta`: nombre legible del destino, para las pantallas que YA NO tienen
-// botón de menú (Saldos y Por Evento, desde E5-4). Sin botón no hay de dónde
-// sacar el rótulo de la barra móvil, y no vamos a escribir una lista de nombres
-// al lado: lo pone quien navega, que es el único que sabe a dónde va.
+// `etiqueta`: nombre legible del destino, para las pantallas que NO tienen
+// botón de menú. Sin botón no hay de dónde sacar el rótulo de la barra móvil, y
+// no vamos a escribir una lista de nombres al lado: lo pone quien navega, que es
+// el único que sabe a dónde va.
+// [EVT-NAV-1] Hoy la única así es SALDOS. «Por Evento» recuperó su botón, así
+// que su llamador (`_evtIrA`) pasa una etiqueta que ya no se usa: con botón,
+// showPage saca el rótulo del <span>, que dice lo mismo. Se deja pasar a
+// propósito —quitarla obligaría a que el llamador sepa si su destino tiene
+// botón, que es justo el acoplamiento que E5-4 vino a romper.
 function showPage(name, etiqueta) {
  // [SEG-2] Mismo candado que showHerramienta, misma fuente.
  // [E5-4] La pregunta "¿esta pantalla lleva candado?" se le hace a

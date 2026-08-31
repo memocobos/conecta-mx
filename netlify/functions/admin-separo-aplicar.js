@@ -5,7 +5,8 @@
 // Cuando Memo acepta una solicitud cuyo separo YA se pagó por Stripe, esta
 // function marca la cuota 1 como pagada por la MISMA vía auditada que usa el
 // Palacio (_lib/marcar-pago): update + bitácora pagos_auditoria + reconciliación
-// + correo. Una sola ruta al dinero, con actor 'stripe:evt_...'.
+// + correo. Una sola ruta al dinero, con actor '<metodo>:<referencia del cobro>'
+// — decía 'stripe:evt_...' y ya no es cierto: hoy quien cobra es Mercado Pago.
 //
 // EL CANDADO DE LA DOBLE APLICACIÓN es `separo_aplicado_pago_id`:
 //   · null  → el separo está pagado pero NO aplicado. Se puede aplicar.
@@ -56,7 +57,7 @@ exports.handler = async (event) => {
   let sol;
   try {
     const r = await fetch(`${SB_URL}/rest/v1/solicitudes_tour?id=eq.${encodeURIComponent(solicitudId)}` +
-      `&select=id,estado,separo_pagado_at,separo_session_id,separo_aplicado_pago_id`, { headers: sb });
+      `&select=id,estado,separo_pagado_at,separo_session_id,separo_aplicado_pago_id,metodo_separo,separo_mp_payment_id`, { headers: sb });
     if (!r.ok) return { statusCode: 502, headers, body: JSON.stringify({ error: 'No se pudo leer la solicitud' }) };
     const arr = await r.json();
     sol = Array.isArray(arr) ? arr[0] : null;
@@ -75,15 +76,19 @@ exports.handler = async (event) => {
     return { statusCode: 200, headers, body: JSON.stringify({ ok: true, ya_aplicado: true, pago_id: sol.separo_aplicado_pago_id }) };
   }
 
-  // 2. La sesión que lo pagó: de ahí sale el MONTO BASE (sin cargo de servicio).
-  let ses = null;
-  try {
-    const q = sol.separo_session_id
-      ? `session_id=eq.${encodeURIComponent(sol.separo_session_id)}`
-      : `solicitud_id=eq.${encodeURIComponent(solicitudId)}&tipo=eq.separo&estado=eq.pagada`;
-    const r = await fetch(`${SB_URL}/rest/v1/stripe_checkout_sesiones?${q}&select=session_id,metodo,monto_base_cent,payment_intent_id&limit=1`, { headers: sb });
-    if (r.ok) { const arr = await r.json(); ses = Array.isArray(arr) ? arr[0] : null; }
-  } catch (e) { /* se sigue: el monto puede salir de la cuota */ }
+  // [SEP-ETIQUETA-1a] Aquí se consultaba `stripe_checkout_sesiones` para sacar el
+  // MONTO BASE —lo que entró al viaje, sin el cargo de servicio de la
+  // procesadora—. Esa tabla tiene CERO filas (medido): la consulta devolvía null
+  // siempre y el monto caía al de la cuota. Se retira con la vía de Stripe.
+  //
+  // ⚠️ Y el respaldo NO es un apaño, es la respuesta correcta: el monto de la
+  // cuota 1 ES el dinero del viaje. Mercado Pago le suma su cargo al cliente
+  // encima (`_lib/mp-tarifas`), y ese cargo no debe entrar al plan — que es
+  // exactamente lo que buscaba la lógica del monto base.
+  //
+  // MP no persiste su `base_pesos` en ningún lado: se calcula al crear el cobro
+  // y viaja al cliente, pero no se guarda. Si algún día hace falta el desglose,
+  // es columna nueva y por tanto SQL de Jane.
 
   // 3. La cuota 1 del plan (que la aceptación acaba de generar).
   let cuota;
@@ -104,23 +109,38 @@ exports.handler = async (event) => {
   }
 
   // 4. LA VÍA AUDITADA. El monto es el BASE (lo que entró al viaje), no el total.
-  const montoPesos = ses && Number(ses.monto_base_cent) > 0
-    ? Math.round(Number(ses.monto_base_cent)) / 100
-    : Number(cuota.monto);
+  const montoPesos = Number(cuota.monto);
   const hoyMx = new Intl.DateTimeFormat('en-CA', {
     timeZone: 'America/Monterrey', year: 'numeric', month: '2-digit', day: '2-digit',
   }).format(new Date());
-  const metodoBd = ses && ses.metodo === 'oxxo' ? 'stripe_oxxo' : 'stripe_credito';
+  // [SEP-ETIQUETA-1a] LA ETIQUETA SALE DE LA SOLICITUD, no de una suposición.
+  // Esta línea preguntaba a `stripe_checkout_sesiones` —que está VACÍA— y el
+  // ternario caía SIEMPRE del lado `stripe_credito`: un separo cobrado por
+  // Mercado Pago se guardaba etiquetado como Stripe, y de ahí se copiaba solo a
+  // `pagos_auditoria`. El dinero estaba bien; la etiqueta no.
+  //
+  // `metodo_separo` lo escribe `mp-webhook` al confirmar el cobro, y es la única
+  // fuente que sabe de verdad por dónde entró el dinero. Se hereda ese nombre.
+  //
+  // ⚠️ Y si no lo sabe, NO SE INVENTA: `null`. El campo queda vacío, se ve en el
+  // renglón del plan y alguien pregunta. Una etiqueta inventada nadie la
+  // pregunta, porque parece un dato.
+  const metodoBd = sol.metodo_separo === 'mercadopago' ? 'mercadopago' : null;
 
   const r = await aplicarNucleo({
     env: { PORTAL_SB_URL: SB_URL, PORTAL_SB_SERVICE: SB_SERVICE },
     headers, pagoId: cuota.id, accion: 'pagar',
     patch: {
       estado: 'pagado', fecha_pagada: hoyMx, metodo: metodoBd, cuenta: 'BBVA',
-      referencia: (ses && (ses.payment_intent_id || ses.session_id)) || sol.separo_session_id || 'stripe',
-      registrado_por: 'stripe', monto_pagado: montoPesos,
+      // [SEP-ETIQUETA-1a] La referencia y el actor tampoco pueden decir «stripe»
+      // cuando el cobro fue de Mercado Pago. `separo_mp_payment_id` es el rastro
+      // que deja el webhook de MP; el `separo_session_id` se queda como respaldo
+      // para las filas viejas, y si no hay ninguno se dice `separo` a secas en
+      // vez de nombrar una procesadora que no cobró.
+      referencia: sol.separo_mp_payment_id || sol.separo_session_id || 'separo',
+      registrado_por: metodoBd || 'separo', monto_pagado: montoPesos,
     },
-    actorEtiqueta: 'stripe:separo:' + (sol.separo_session_id || solicitudId),
+    actorEtiqueta: (metodoBd || 'separo') + ':' + (sol.separo_mp_payment_id || sol.separo_session_id || solicitudId),
     // [CONC-2] La versión es la que acaba de traer la lectura de arriba: aquí no
     // hay pantalla abierta, la ventana es de milisegundos — pero es justo la
     // ventana en la que el admin puede estar marcando esa misma cuota a mano.

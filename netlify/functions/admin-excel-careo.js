@@ -1,9 +1,9 @@
 // =============================================================================
-// admin-excel-careo — los cuatro montones (EXCEL-BOTÓN-1b)
+// admin-excel-careo — los seis montones (EXCEL-BOTÓN-1b · EXCEL-CAREO-FIX-1)
 // =============================================================================
 // Body: { evento_id: 'straykids#0' }
 // → { ok, evento_id, pestanas:[...], excel:{personas,descartes,mapa}, base:{n},
-//     nuevos:[], pagos:[], bajas:[], iguales:[] }
+//     nuevos:[], pagos:[], bajas:[], iguales:[], apartados:[], ambiguos:[] }
 //
 // FASE 1: SOLO LEE Y COMPARA. No escribe una sola fila, ni marca las bajas.
 // Aplicar es tuerca aparte, y tiene que serlo — una baja es una persona.
@@ -140,14 +140,24 @@ exports.handler = async (event) => {
   const base = await leerBase(eventoId);
   if (base.error) return { statusCode: 502, headers, body: JSON.stringify({ error: base.error }) };
 
-  // 4. Los cuatro montones.
+  // 4. Los seis montones.
   const r = carear([...personas.values()], base.viajeros);
+  // [EXCEL-CAREO-FIX-1] EL CUADRE CONTRA EL CONTEO A MANO. La clase se
+  // descubrió como «zona real + $0 + sin talla» (141 filas contadas a mano el
+  // 31-ago), pero el montón se llavea SOLO por el dinero en cero: quien no pagó
+  // pero sí puso talla debe igual. Este número dice cuántos apartados cumplen
+  // además las otras dos condiciones, para poder carear un conteo contra el
+  // otro en vez de suponer que hablan de lo mismo.
+  const zonaSinTalla = r.apartados.filter((a) => a.zona && !a.talla);
   return { statusCode: 200, headers, body: JSON.stringify({
     ok: true, evento_id: eventoId,
     pestanas: detallePestanas,
     excel: { personas: personas.size },
     base: { viajeros: base.viajeros.length },
     ...r,
-    totales: { nuevos: r.nuevos.length, pagos: r.pagos.length, bajas: r.bajas.length, iguales: r.iguales.length },
+    totales: { nuevos: r.nuevos.length, pagos: r.pagos.length, bajas: r.bajas.length,
+               iguales: r.iguales.length, apartados: r.apartados.length, ambiguos: r.ambiguos.length,
+               apartados_zona_sin_talla: zonaSinTalla.length,
+               apartados_filas: r.apartados.reduce((a, x) => a + (x.filas || 0), 0) },
   }) };
 };

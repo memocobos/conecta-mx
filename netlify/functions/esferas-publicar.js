@@ -295,11 +295,23 @@ exports.handler = async (event) => {
           nuevas, ultimas, previas,
           ahoraISO: ahora.toISOString(),
           // ⚠️ LA LÍNEA BASE NO AFIRMA CUÁNDO EMPEZÓ EL PRECIO VIEJO — eso no se
-          // sabe, y el historial no tiene dónde decir «no sé». Se pone un
-          // segundo antes del cambio y se marca `fuente:'publish-base'`. Con eso
-          // una consulta de una fecha anterior contesta ese precio CON la
-          // bandera `anterior_al_historial`, que es exactamente «esto es lo más
-          // viejo que sabemos», no «esto regía ese día».
+          // sabe, y el historial no tiene dónde decir «no sé». Lo único que se
+          // afirma es que ese precio seguía puesto hasta este publish, así que
+          // se pone UN SEGUNDO antes del cambio: lo mínimo que la ordena antes
+          // sin inventar una fecha de inicio.
+          //
+          // Va con `fuente:'publish'`, IGUAL que el cambio, y no con un valor
+          // propio: la tabla tiene `CHECK (fuente IN ('backfill-git','publish'))`
+          // y cualquier otra cosa la rechaza fila por fila. O sea que la línea
+          // base y el cambio observado NO se distinguen por su fuente — se
+          // distinguen por el orden y por ese segundo. Recuperar la distinción
+          // cuesta un ALTER de una línea; mientras no exista, no se emite un
+          // valor que la tabla no acepta.
+          //
+          // Quien la LEA no se confunde igualmente: una consulta de una fecha
+          // anterior contesta ese precio CON la bandera `anterior_al_historial`,
+          // que es exactamente «esto es lo más viejo que sabemos», no «esto
+          // regía ese día».
           vigenteDesdeBase: new Date(ahora.getTime() - 1000).toISOString(),
         });
 

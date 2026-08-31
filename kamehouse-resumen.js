@@ -638,7 +638,7 @@ async function _renderResumenDinero(porCobrar) {
   // stat de cuenta → navega a Saldos (click-through).
   const stat = (lbl, val) => {
     const color = Number(val) < 0 ? 'var(--red)' : '';
-    return `<div class="cob-stat dash-click" onclick="showPage('saldos','Saldos')" title="Ver Saldos"><div class="cob-stat-lbl">${lbl}</div><div class="cob-stat-val" style="${color ? 'color:' + color : ''}">${_spFmtMxn(Number(val || 0))}</div></div>`;
+    return `<div class="cob-stat dash-click" onclick="showPage('saldos')" title="Ver Saldos"><div class="cob-stat-lbl">${lbl}</div><div class="cob-stat-val" style="${color ? 'color:' + color : ''}">${_spFmtMxn(Number(val || 0))}</div></div>`;
   };
   const cuentasHTML = orden.map(n => stat(n, (cuentas[n] || {}).saldo || 0)).join('') +
     // [AUD-1c] El signo, en palabras también aquí: con el neto de los dos mundos
@@ -650,7 +650,7 @@ async function _renderResumenDinero(porCobrar) {
   if (heroEl) {
     heroEl.style.display = '';
     heroEl.className = 'res-big dash-click';
-    heroEl.setAttribute('onclick', "showPage('saldos','Saldos')");
+    heroEl.setAttribute('onclick', "showPage('saldos')");
     heroEl.setAttribute('title', 'Ver Saldos');
     heroEl.innerHTML = `
       <div class="metric-label">Caja total de la empresa</div>
@@ -1267,7 +1267,7 @@ function _renderResumenRiesgoBaja(activos) {
   }).join('');
   el.innerHTML = header + filas;
 }
-function _evtIrA(slug) { _evtPendingSelect = slug || null; showPage('eventos', 'Por Evento'); }
+function _evtIrA(slug) { _evtPendingSelect = slug || null; showPage('eventos'); }
 // El desfase de la zona EN ESE INSTANTE (los husos con horario de verano no
 // tienen UN desfase: tienen el de ese día). Se pregunta al motor de Intl, que
 // es quien tiene la tabla, en vez de escribir un número.

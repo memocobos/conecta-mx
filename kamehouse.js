@@ -2005,16 +2005,19 @@ let _eventosCache = [];
 // ═══════════════════════════════════════════════════════════════
 // NAVEGACIÓN
 // ═══════════════════════════════════════════════════════════════
-// `etiqueta`: nombre legible del destino, para las pantallas que NO tienen
-// botón de menú. Sin botón no hay de dónde sacar el rótulo de la barra móvil, y
-// no vamos a escribir una lista de nombres al lado: lo pone quien navega, que es
-// el único que sabe a dónde va.
-// [EVT-NAV-1] Hoy la única así es SALDOS. «Por Evento» recuperó su botón, así
-// que su llamador (`_evtIrA`) pasa una etiqueta que ya no se usa: con botón,
-// showPage saca el rótulo del <span>, que dice lo mismo. Se deja pasar a
-// propósito —quitarla obligaría a que el llamador sepa si su destino tiene
-// botón, que es justo el acoplamiento que E5-4 vino a romper.
-function showPage(name, etiqueta) {
+// [EVT-NAV-3] AQUÍ VIVÍA `etiqueta`, y se fue completo. E5-4 lo inventó para
+// escribirle el nombre del destino al rótulo `#nav-mobile-section-label` de la
+// barra móvil — pero D2 (sidebar + barra inferior) YA HABÍA BORRADO ese
+// elemento y su CSS. O sea: un parámetro, una función y tres llamadores
+// alimentando a nadie, y ni un error que lo dijera.
+// No revive: medido a 390×844, TODA pantalla trae su `.page-title` visible
+// («SALDOS», «POR EVENTO», «RESUMEN»), así que el rótulo era una segunda voz
+// diciendo lo que la pantalla ya dice. Devolverlo sería estrenar un duplicado
+// que hay que mantener sincronizado; borrarlo deja un solo dueño de «dónde
+// estoy». Es la lección de la guarda inalcanzable: «no configurado» no es
+// «apagado a propósito», y un mecanismo entero sin destinatario se mata, no se
+// documenta.
+function showPage(name) {
  // [SEG-2] Mismo candado que showHerramienta, misma fuente.
  // [E5-4] La pregunta "¿esta pantalla lleva candado?" se le hace a
  // PERMISOS_TABS, no al menú. Las pantallas que no aparecen en NINGÚN rol son
@@ -2029,10 +2032,8 @@ function showPage(name, etiqueta) {
  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
  document.getElementById(`page-${name}`).classList.add('active');
  const navBtn = document.getElementById(`nav-${name}`);
- if (!navBtn && etiqueta) actualizarLabelNavMobile(etiqueta);
  if (navBtn) {
    navBtn.classList.add('active');
-   actualizarLabelNavMobile(navBtn.textContent.trim());
    // No esconder dónde estás: si la vista activa cae en un grupo colapsado, ábrelo.
    const grp = navBtn.closest('.nav-group');
    if (grp) grp.classList.remove('collapsed');
@@ -4283,13 +4284,6 @@ function showHerramienta(name) {
   stopRolAnalyticsAutoRefresh();
 }
 
-
-
-// Actualizar label de sección activa en mobile
-function actualizarLabelNavMobile(nombre) {
-  const label = document.getElementById('nav-mobile-section-label');
-  if (label) label.textContent = nombre.toUpperCase();
-}
 
 
 // Sincroniza la barra inferior y limpia grupos vacíos del sidebar.

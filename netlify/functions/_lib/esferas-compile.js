@@ -1858,6 +1858,11 @@ module.exports = {
   _hayCheapPorFecha: hayCheapPorFecha,
   _hayZonasPorFecha: hayZonasPorFecha,
   _fusionarConViejo: fusionarConViejo,
+  // [ROL-HIST-1] El gancho del historial de precios necesita leer el EV del
+  // árbol VIEJO y del compilado para comparar zona por zona. Se expone la
+  // función que ya existía en vez de escribir un segundo parser al lado: dos
+  // parsers del mismo array son dos listas que todavía no divergen.
+  extraerEV: extraerEVKamehouse,
   _extraerEVKamehouse: extraerEVKamehouse,
   _extraerEVPortal: extraerEVPortal,
 };

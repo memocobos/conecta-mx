@@ -1958,6 +1958,10 @@ function _esfTabFila(n, cols) {
   nom.style.cssText = 'font-weight:600;font-size:12px;padding:2px 5px;width:100%;min-width:150px';
   nom.placeholder = 'Nombre de la zona';
   nom.value = n;
+  // [ESF-UX-5] El gancho para llegar a ESTA fila desde fuera. Sin él, «agregar
+  // zona» tenía que adivinar cuál es la fila nueva contando filas — y contaba
+  // mal: la última del tbody es RIDE, no una zona.
+  nom.dataset.zona = n;
   nom.addEventListener('change', () => {
     const nuevo = (nom.value || '').trim();
     if (nuevo === n) return;
@@ -2144,13 +2148,29 @@ function _esfTabAgotar(col, agotar) {
   if (agotar) { if (ride && ride.value && rag) rag.checked = true; } else if (rag) rag.checked = false;
   _esfTableroPintar();
 }
+// [ESF-UX-5] El primer «Zona N» que no choque con lo que ya hay. El tablero
+// DEDUPLICA por nombre —dos zonas que se llaman igual son una sola fila—, así
+// que un nombre repetido volvería a tragarse el clic por otra puerta.
+function _esfTabNombreLibre() {
+  const usados = new Set(_esfTabUnion());
+  let i = 1;
+  while (usados.has('Zona ' + i)) i++;
+  return 'Zona ' + i;
+}
 // Agregar una zona nueva: entra en TODAS las columnas, que es lo que una fila
 // de tablero significa. Si alguna no la quiere, se le quita en su celda.
 function _esfTabAddZona() {
-  // Nace SIN nombre y con el cursor listo: se teclea en la fila. Una zona sin
-  // nombre no se guarda (los lectores ya filtran por `n`), así que una fila a
-  // medias no ensucia nada.
-  const n = '';
+  // [ESF-UX-5] NACE CON NOMBRE, y no es cosmético: el tablero se pinta desde
+  // `_esfTabUnion()`, cuyo `meter` descarta los nombres vacíos. Una fila sin
+  // nombre NO SE PUEDE REPRESENTAR en un tablero llaveado por nombre, así que
+  // el «nace sin nombre y se teclea en la fila» que decía aquí describía una
+  // fila que nunca existió: el clic escribía `{n:'',p:0}` en cada fecha —eso
+  // sí funcionaba— y el pintado la tiraba, sin error y sin aviso. En multifecha
+  // y en single por igual; el mago de single la recibía, pero UX-3 lo dejó
+  // escondido para siempre, así que ahí tampoco había dónde teclearla.
+  // Con nombre provisional la fila aparece, se puede renombrar encima, y el
+  // botón deja de tragarse el clic.
+  const n = _esfTabNombreLibre();
   _esfTabColumnas().forEach((c) => {
     if (c.mago) {
       _esfAddZona({ n: n });
@@ -2161,9 +2181,13 @@ function _esfTabAddZona() {
     if (!_esfTabHereda(c)) _esfTabLista(c, 'cheapZonas').push({ n: n, p: 0 });
   });
   _esfTableroPintar();
-  const filas = document.querySelectorAll('#esf-tablero tbody tr');
-  const ult = filas[filas.length - 1];
-  if (ult) ult.querySelector('input')?.focus();
+  // [ESF-UX-5] El cursor va al NOMBRE de la fila que se acaba de crear, y de
+  // paso lo deja seleccionado para teclear encima. Antes agarraba
+  // `filas[filas.length-1]`, que es la fila RIDE —STAY y RIDE van después de
+  // las zonas—: el clic mandaba el cursor al precio del transporte.
+  const inp = Array.from(document.querySelectorAll('#esf-tablero tbody input'))
+    .find((i) => i.dataset.zona === n);
+  if (inp) { inp.focus(); inp.select(); }
 }
 // Quita la zona de todas las columnas. Se pregunta: borrar una fila del tablero
 // borra tantas casillas como columnas haya.

@@ -3516,6 +3516,21 @@ function openTour(idx){
   state.hab = (t.pkg==='cheap') ? {k:'na',n:'No aplica',e:0} : findHabByKey(t.hab) || (getHabs()[0] || HABS_STD[0]);
   // Precio + separo
   state.precio = (t.precio!=null && t.precio>0) ? t.precio : (state.zona.p||0);
+  // [ROL-HIST-2b] AL RESTAURAR SE SIEMBRA EL HISTORIAL CON EL PRECIO GUARDADO.
+  //
+  // Sin esto, `precioHist` se quedaba en 'ninguna' y bastaba con que el usuario
+  // tocara las pastillas de «cómo compraste» para que `refreshPrecioFromBuyType`
+  // pidiera el precio, no lo tuviera y dejara `state.precio` en null: el plan
+  // restaurado perdía su precio y el botón se apagaba. Medido: 4400 → null.
+  //
+  // Se siembra CON EL PRECIO GUARDADO y no se re-consulta el historial, a
+  // propósito: ese tour YA se cotizó y el cliente ya tiene ese plan en la mano.
+  // Volver a preguntar podría cambiarle el número a un trato cerrado. Si quien
+  // captura TOCA LA FECHA, ahí sí se re-consulta y manda el historial — que es
+  // exactamente cuando está diciendo «esto estaba mal».
+  state.precioHist = { estado: 'listo', sinHistorial: false, anterior: false, msg: '',
+    opciones: [{ precio: state.precio, cerrada: false, aplicable: state.precio > 0, hora: null }],
+    elegido: state.precio > 0 ? 0 : null };
   // [COT-FIX-3 · N2] sin fecha guardada, el separo es HOY EN MÉXICO.
   state.sepDate = t.sep ? new Date(t.sep+'T12:00:00') : new Date(_hoyMxRol()+'T12:00:00');
   state.sepTouched = false;

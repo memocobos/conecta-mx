@@ -3001,10 +3001,21 @@ function _utilC3CuentaSegunEvento(ev) {
 //
 // Muestra/oculta el selector de Banco según el método (igual que pagos): Transferencia
 // y Depósito lo muestran (el dinero entra a un banco); Efectivo lo oculta (cuenta = 'Efectivo').
+// [BANCO-SELECT-1] EL BANCO YA NO SE ESCONDE, y la razón está medida: MÉTODO y
+// CUENTA son dos preguntas distintas sobre el mismo movimiento.
+//   · `metodo_pago` se guarda y se pinta en la tabla, y NINGÚN cálculo de
+//     dinero lo lee — es descriptivo (cómo se movió).
+//   · `cuenta` es lo ÚNICO que hace cubeta: `admin-saldos` reparte con
+//     `CUENTAS.includes(cuenta)` y todo lo demás cae en `otrosTotal`.
+// Acopladas, la cubeta **Efectivo** de Saldos NO SE PODÍA LLENAR desde la
+// pantalla: elegir método Efectivo escondía el único campo capaz de decirlo, y
+// el gasto salía con `cuenta` nula → a `otrosTotal`. El dinero entraba al
+// `caja_total` igual, pero perdía su renglón, que es justo lo que el encabezado
+// de `cuentas-dinero` advierte («no se pierde dinero, se pierde el renglón»).
+// Decisión de Memo, 1-sep: la cuenta se elige SIEMPRE.
 function _gastoOnMetodoChange() {
- const metodo = (document.getElementById('gasto-metodo') || {}).value || '';
  const wrap = document.getElementById('gasto-banco-wrap');
- if (wrap) wrap.style.display = (metodo === 'Efectivo') ? 'none' : '';
+ if (wrap) wrap.style.display = '';
 }
 
 
@@ -3109,10 +3120,11 @@ let _ingresoEditId = null;     // id del ingreso en edición; null = modo crear
 
 // Muestra/oculta el selector de Banco según el método (igual que gastos): Transferencia
 // y Depósito lo muestran; Efectivo lo oculta (cuenta = 'Efectivo').
+// [BANCO-SELECT-1] Gemelo del de gastos: la cuenta se elige siempre. Ver ahí el
+// porqué medido — método describe, cuenta hace cubeta.
 function _ingresoOnMetodoChange() {
- const metodo = (document.getElementById('ingreso-metodo') || {}).value || '';
  const wrap = document.getElementById('ingreso-banco-wrap');
- if (wrap) wrap.style.display = (metodo === 'Efectivo') ? 'none' : '';
+ if (wrap) wrap.style.display = '';
 }
 
 

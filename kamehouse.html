@@ -3240,10 +3240,12 @@
       un banco que nadie eligió. En un gasto de evento la cuenta sigue siendo
       opcional y BBVA sigue siendo el default; en uno sin evento, que resta de
       la utilidad de toda la empresa, hay que decirlo. Es la misma lección de
-      ETAPA 4: quitar el default OBLIGÓ a exigirla al guardar. -->
+      ETAPA 4: quitar el default OBLIGÓ a exigirla al guardar.
+      [BANCO-SELECT-1] SIN opciones aquí: las llena `_poblarCuentas` con el
+      catálogo que manda el servidor (`_lib/cuentas-dinero`), igual que las
+      categorías. Tenerlas también en el HTML era la segunda copia — y ya
+      había divergido: faltaban `Efectivo` y `Otro`. -->
  <option value="">— elige la cuenta —</option>
- <option>BBVA</option>
- <option>Banamex</option>
  </select>
  <!-- [FLUJO-UX-3] El estilo en línea pasa a `.fld-help` — esta pista ERA el
       patrón, sólo que sin nombre. El `display:none` se queda en línea porque
@@ -3354,9 +3356,9 @@
  <div class="form-group" id="ingreso-banco-wrap">
  <label>Banco</label>
  <select id="ingreso-cuenta">
+ <!-- [BANCO-SELECT-1] SIN opciones aquí: las llena `_poblarCuentas` con el
+      catálogo del servidor. Ver el gemelo en el modal de gastos. -->
            <option value="">— elige la cuenta —</option>
- <option>BBVA</option>
- <option>Banamex</option>
  </select>
  <!-- [FLUJO-UX-3] La asimetría es real y está en `_lib/cuentas-dinero`:
       `errorCuentaDeGasto` EXIGE cuenta cuando no hay evento;

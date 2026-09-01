@@ -26,6 +26,12 @@ const { verifyAdminAuthLive, corsCheck } = require('./_lib/verify-admin');
 // MISMA fuente que valida el servidor. Dos copias de un catálogo son dos
 // catálogos, y divergen el día que alguien agrega una categoría en un solo sitio.
 const { CATEGORIAS } = require('./_lib/categorias-gasto');
+// [BANCO-SELECT-1] Y LAS CUENTAS, POR EL MISMO CAMINO. El `<select>` de Banco
+// tenía BBVA y Banamex escritos a mano en el HTML mientras el lib aceptaba
+// CUATRO: es literalmente el defecto que `cuentas-dinero` nació para matar —el
+// catálogo con dos dueños— reaparecido en la punta que nadie miró. Se manda
+// junto a `categorias` para que el navegador no tenga NINGUNA lista propia.
+const { CUENTAS } = require('./_lib/cuentas-dinero');
 
 exports.handler = async (event) => {
   const __origin = corsCheck(event);
@@ -96,7 +102,7 @@ exports.handler = async (event) => {
     return {
       statusCode: 200,
       headers,
-      body: JSON.stringify({ ok: true, count: gastos.length, gastos, total, total_mes: totalMes, categorias: CATEGORIAS }),
+      body: JSON.stringify({ ok: true, count: gastos.length, gastos, total, total_mes: totalMes, categorias: CATEGORIAS, cuentas: CUENTAS }),
     };
   } catch (e) {
     return { statusCode: 502, headers, body: JSON.stringify({ error: 'Error consultando gastos', detail: e.message }) };

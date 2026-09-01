@@ -182,10 +182,15 @@ async function loadEquipo() {
     // perfil, generar contrato) GANAN con esto: antes el perfil de un pausado
     // no abría.
     _gzCache = await khUsuarios.listar({ orden: 'nombre' }); // [sec-usuarios]
-    // [FLUJO-UX-1b] Una lista VACÍA de usuarios no es «no hay equipo»: con 14
-    // usuarios activos medidos, un cero aquí sólo puede ser un fallo que alguien
-    // se tragó. Se dice, en vez de pintar el estado vacío de siempre.
-    if (!Array.isArray(_gzCache) || !_gzCache.length) throw new Error('la lista del equipo vino vacía');
+    _gzFalloCarga = null;                                   // cargó: se limpia la marca
+    // [FLUJO-UX-1c] AQUÍ HABÍA UNA GUARDA QUE SOBRABA. En 1b traté una lista
+    // vacía como fallo, y el control positivo la cazó: con backend SANO ésta era
+    // la única pantalla que cambiaba de conducta. Y era innecesaria — medido,
+    // `khUsuarios.listar` YA LANZA con un 500 (`_call` mira `r.ok`), así que el
+    // aviso no dependía de ella. Lo que faltaba era que el aviso SOBREVIVIERA al
+    // repintado, y eso se resolvió en `renderGZ`. Una guarda que no hace falta no
+    // es gratis: cambia la conducta del caso sano por un caso que ya estaba
+    // cubierto.
     renderGZ();
   } catch(e) {
     // [FLUJO-UX-1] EL ERROR SE PINTABA Y SE BORRABA TRES LÍNEAS DESPUÉS.
@@ -203,7 +208,10 @@ async function loadEquipo() {
   const tabInicial = gzPermitidas.includes('lista') ? 'lista' : 'miperfil';
   const btnInicial = document.querySelector(`.gz-tab-btn[onclick*="${tabInicial}"]`);
   showGZTab(tabInicial, btnInicial);
-  if (_gzFalloCarga) { khErrorCarga(grid, 'el equipo', 'loadEquipo', _gzFalloCarga); _gzFalloCarga = null; }
+  // La marca NO se borra aquí: se borra cuando una carga BUENA la limpie. Si se
+  // borrara al pintar, el repintado siguiente volvería a tapar el aviso — que es
+  // exactamente el defecto que esta tuerca vino a cerrar.
+  if (_gzFalloCarga) renderGZ();
 }
 // El fallo de la última carga, para pintarlo cuando el contenedor ya es suyo.
 let _gzFalloCarga = null;
@@ -359,6 +367,15 @@ function gzVerPrestado(userId) {
 async function renderGZ() {
   const grid = document.getElementById('gz-grid');
   if (!grid) return;
+  // [FLUJO-UX-1c] EL FALLO SE PINTA AQUÍ, no fuera, porque AQUÍ es donde se
+  // repinta. `renderGZ` es ASYNC y arranca con dos `await`: quien la llama sin
+  // esperarla —`showGZTab`— sigue de largo, el aviso se pinta después… y cuando
+  // estos `await` resuelven, este render escribe su estado vacío ENCIMA.
+  // Es el mismo «se pinta y se borra» que ya se cazó en la #699, pero por
+  // carrera asíncrona en vez de por orden de líneas: por eso pintar más tarde no
+  // bastaba. Preguntando aquí, el aviso sobrevive a CUALQUIER repintado, venga
+  // de donde venga.
+  if (_gzFalloCarga) { khErrorCarga(grid, 'el equipo', 'loadEquipo', _gzFalloCarga); return; }
   if (_gzContratos === null) await _gzCargarContratos();
   if (_gzPrestado === null) await _gzCargarPrestado(); // [O4] fails-soft: {} = sin chips
   // [EQ-2] La vista de pausados es solo de admins. El botón escondido no es un

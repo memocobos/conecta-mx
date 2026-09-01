@@ -2452,7 +2452,8 @@ function _evOrdenarPorFecha(lista, hoyISO) {
 // divergen — y estas ya iban por cuatro.
 //
 // 🔒 TRES VOCES, UNA POR PAPEL, y no es una concesión: EL VACÍO NO SIGNIFICA LO
-// MISMO EN LOS TRES (decisión de Memo, 1-sep).
+// MISMO EN LOS TRES (decisión de esta tuerca, firmada por Jane en la revisión
+// del 1-sep — Memo no la tomó, y una cita del libro vale porque es verdad).
 //   · FILTRO     → el vacío es un VALOR: «no filtres por evento».
 //   · MANDO      → el vacío es AUSENCIA: la pantalla no funciona hasta elegir.
 //   · ATRIBUCIÓN → el vacío es una ELECCIÓN con consecuencia: un gasto sin

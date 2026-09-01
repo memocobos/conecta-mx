@@ -24,7 +24,7 @@
 // revisó todos».
 //
 // ⚠️ Y DENTRO DE UN EVENTO QUE SÍ SE GOBIERNA, una zona sin fila de compra es
-// una zona con CERO boletos. Firmado por Memo el 1-sep. `_lib/disponibilidad`
+// una zona con CERO boletos. Firmado por Memo el 31-ago. `_lib/disponibilidad`
 // marca esas zonas como `gestionada:false` («no sé» en vez de «cero»), y esa
 // cautela es correcta EN SU CASO: se escribió para la MIGRACIÓN —viajeros
 // movidos a un evento cuyo pedido nadie capturó—, que es un caso de evento
@@ -47,6 +47,29 @@ function _disp(mapa, zona) {
   return v;
 }
 
+// 🔒 EL CANDADO MULTIFECHA. Un evento con `multifecha` NO SE DERIVA, y no es
+// cautela de más: MEDIDO en la base el 1-sep-2026,
+//   · `viajeros_evento` SÍ llavea por `slug#idx` — 27 filas en 13 eventos
+//     (omar#0/#1, karolg#0/#1/#2, morat#0/#1…).
+//   · `compras` tiene CERO filas con `#`, y cero también sin `#` para esos
+//     eventos. `stock_ajustes`, igual.
+// O sea que NINGÚN multifecha tiene pedido capturado todavía, y por eso la
+// convención de llaves no está definida: nunca se ha ejercitado.
+//
+// El día que se capture el primero, el consumo de sus viajeros —que vive bajo
+// `omar#0`— no se restaría de un stock guardado bajo `omar`, y el resultado
+// saldría INFLADO: zonas abiertas que no deberían estarlo. Ésa es exactamente
+// la dirección peligrosa que esta tuerca vino a cerrar, así que derivar con un
+// stock que PUEDE estar inflado es peor que no derivar.
+//
+// Se excluye y SE NOMBRA, en el mismo montón que los eventos sin compras. El
+// candado se quita cuando la convención se MIDA, no cuando se suponga.
+function esDerivable(obj) {
+  const mf = obj && obj.multifecha;
+  if (Array.isArray(mf) && mf.length) return { ok: false, motivo: 'multifecha: llaves sin definir' };
+  return { ok: true, motivo: null };
+}
+
 // PURO. Recibe el objeto del evento (ya compilado o su ficha) y devuelve qué
 // zonas hay que forzar. NO muta: quien escribe decide.
 //
@@ -58,6 +81,8 @@ function _disp(mapa, zona) {
 // Devuelve { forzar:Set<nombre>, detalle:[{zona,disponibles,motivo}], gestionado }
 function zonasAForzar({ obj, gestionado, disponibles }) {
   if (!gestionado) return { forzar: new Set(), detalle: [], gestionado: false };
+  const der = esDerivable(obj);
+  if (!der.ok) return { forzar: new Set(), detalle: [], gestionado: true, excluido: der.motivo };
   const nombres = new Set();
   const meter = (lista) => (Array.isArray(lista) ? lista : []).forEach((z) => {
     if (z && z.n) nombres.add(String(z.n));
@@ -162,4 +187,4 @@ function disponiblesPorEvento({ compras, ajustes, viajeros, consumeBoleto }) {
   return stock;
 }
 
-module.exports = { zonasAForzar, aplicarAgotados, aplicarALista, disponiblesPorEvento, AGOTADA };
+module.exports = { zonasAForzar, aplicarAgotados, aplicarALista, disponiblesPorEvento, esDerivable, AGOTADA };

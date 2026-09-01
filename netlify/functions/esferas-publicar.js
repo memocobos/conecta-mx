@@ -193,7 +193,11 @@ exports.handler = async (event) => {
           };
         } catch (_) { agotado.sin_stock.push(e.slug + ' (ficha ilegible)'); return e; }
 
-        const { forzar } = zonasAForzar({ obj, gestionado: true, disponibles: stock.get(e.slug) });
+        const { forzar, excluido } = zonasAForzar({ obj, gestionado: true, disponibles: stock.get(e.slug) });
+        // 🔒 EXCLUIDO POR EL CANDADO (hoy: multifecha con llaves sin definir).
+        // Se nombra en el MISMO montón que los que no tienen compras: lo que
+        // importa para quien lee es «a éste no se le derivó», y el motivo.
+        if (excluido) { agotado.sin_stock.push(e.slug + ' (' + excluido + ')'); return e; }
         const { obj: nuevo, cambiadas } = aplicarAgotados(obj, forzar);
         if (!cambiadas.length) return e;
         agotado.eventos.push({ slug: e.slug, zonas: cambiadas });

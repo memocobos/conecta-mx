@@ -2396,8 +2396,14 @@
 
  <!-- ─── CONTRATOS ─── -->
  <div class="page" id="page-contratos">
-   <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px;flex-wrap:wrap">
-     <h2 style="margin:0;font-family:'Zen Dots',sans-serif;font-size:22px;letter-spacing:.02em"><svg class="ic"><use href="#ic-lapiz"/></svg> Contratos del equipo</h2>
+   <!-- [FLUJO-UX-5] Al patrón de la casa. Tenía título (un `h2` suelto) pero
+        NINGUNA línea que dijera qué se hace aquí — y la línea es la mitad del
+        encabezado: el nombre te dice dónde estás, el subtítulo para qué. -->
+   <div class="page-hero">
+    <div>
+     <div class="page-title">CONTRATOS</div>
+     <div class="page-sub">// contratos del equipo · alta, firma y seguimiento</div>
+    </div>
      <div class="contratos-tabs" style="display:inline-flex;gap:0;border:1px solid var(--border);border-radius:var(--r-sm,8px);overflow:hidden">
        <button id="ctr-tab-listado" class="ctr-tab active" onclick="switchContratoView('listado')" style="background:transparent;border:0;color:var(--ts);padding:8px 16px;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;font-family:inherit">Listado</button>
        <button id="ctr-tab-nuevo" class="ctr-tab" onclick="switchContratoView('nuevo')" style="background:transparent;border:0;color:var(--ts);padding:8px 16px;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;font-family:inherit;border-left:1px solid var(--border)">+ Nuevo</button>
@@ -2652,8 +2658,12 @@
 
  <!-- ─── LISTA DE ESPERA ─── -->
  <div class="page" id="page-waitlist">
-   <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px;flex-wrap:wrap">
-     <h2 style="margin:0;font-family:'Zen Dots',sans-serif;font-size:22px;letter-spacing:.02em"><svg class="ic"><use href="#ic-campana"/></svg> Lista de espera</h2>
+   <!-- [FLUJO-UX-5] Al patrón de la casa, por lo mismo que Contratos. -->
+   <div class="page-hero">
+    <div>
+     <div class="page-title">LISTA DE ESPERA</div>
+     <div class="page-sub">// quién avisa cuando un evento sale a la venta</div>
+    </div>
      <div style="display:flex;gap:8px;flex-wrap:wrap">
        <button class="btn btn-sm" id="btn-copiar-proximos" onclick="copiarLinkProximos(this)" style="background:#e8ff4c;color:#000;font-weight:900"><svg class="ic"><use href="#ic-portapapeles"/></svg> Copiar link de próximos tours</button>
        <button class="btn btn-ghost btn-sm" onclick="loadWaitlist()">↻ Refrescar</button>
@@ -3128,13 +3138,32 @@
  </div>
 
  <!-- ─── RECIBOS ─── -->
+ <!-- [FLUJO-UX-5] LOS DOS ÚNICOS QUE ENTRABAS Y NO SABÍAS DÓNDE ESTABAS: un
+      iframe a pantalla completa, sin una palabra del Palacio alrededor. El
+      encabezado va FUERA del marco (es de la pantalla, no del documento) y el
+      alto del iframe se descuenta para que no aparezca una segunda barra de
+      desplazamiento — medido, no supuesto: el hero de la casa mide 68px + 20 de
+      aire. -->
  <div class="page" id="page-recibos" style="height:100%;margin:-20px;padding:0;">
- <iframe id="frame-recibos" style="width:100%;height:calc(100vh - 96px);border:none;display:block;" src="about:blank"></iframe>
+ <div class="page-hero" style="margin:20px 20px 0;padding-bottom:14px">
+  <div>
+   <div class="page-title">RECIBOS</div>
+   <div class="page-sub">// generador de recibos para clientes</div>
+  </div>
+ </div>
+ <iframe id="frame-recibos" style="width:100%;height:calc(100vh - 190px);border:none;display:block;" src="about:blank"></iframe>
  </div>
 
  <!-- ─── DISENO ─── -->
+ <!-- [FLUJO-UX-5] Gemelo de Recibos: ver ahí el porqué. -->
  <div class="page" id="page-diseno" style="height:100%;margin:-20px;padding:0;">
- <iframe id="frame-diseno" style="width:100%;height:calc(100vh - 96px);border:none;display:block;" src="about:blank"></iframe>
+ <div class="page-hero" style="margin:20px 20px 0;padding-bottom:14px">
+  <div>
+   <div class="page-title">DISEÑO</div>
+   <div class="page-sub">// las plantillas gráficas del catálogo</div>
+  </div>
+ </div>
+ <iframe id="frame-diseno" style="width:100%;height:calc(100vh - 190px);border:none;display:block;" src="about:blank"></iframe>
  </div>
 </div><!-- /content -->
 </div><!-- /app -->

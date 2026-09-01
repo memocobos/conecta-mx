@@ -3893,7 +3893,8 @@ async function publicarEsferas() {
         + `<div style="margin-top:4px;font-size:11px;opacity:.8">Aviso, no cierre: se venden sobre pedido. Compra cuando te las pidan.</div>`
         + `<div style="margin-top:6px;font-size:12px;display:grid;gap:3px">`
         + av.eventos.map(x => `<div>· <b>${_esfEsc(x.slug)}</b>: `
-            + x.zonas.map(z => _esfEsc(z.zona) + (z.motivo === 'sin pedido capturado' ? '' : ` (${_esfEsc(z.motivo)})`)).join(', ')
+            + x.zonas.map(z => (z.fecha ? _esfEsc(z.fecha) + ' — ' : '') + _esfEsc(z.zona)
+            + (z.motivo === 'sin pedido capturado' ? '' : ` (${_esfEsc(z.motivo)})`)).join(', ')
             + `</div>`).join('')
         + `</div></div>`;
     }

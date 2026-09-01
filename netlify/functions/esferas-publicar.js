@@ -23,6 +23,8 @@
 const { verifyAdminAuthLive, corsCheck } = require('./_lib/verify-admin');
 const { compilarEV, fechaDisplayDeEsfera, extraerEV } = require('./_lib/esferas-compile');
 const { zonasDelObjeto, filasDelPublish, _llave } = require('./_lib/precios-vigentes');
+const { zonasAForzar, aplicarAgotados, disponiblesPorEvento } = require('./_lib/agotado-derivado');
+const { consumeBoleto } = require('./_lib/paquete-viaje');
 const { derivarLetreros } = require('./_lib/letrero-derivado');
 // [WL-1] El aviso a la lista de espera es del núcleo compartido: el mismo
 // correo, el mismo ritmo y el mismo marcado que usan el cron y el botón.
@@ -146,6 +148,70 @@ exports.handler = async (event) => {
     }
 
 
+    // ═══ [AG-STOCK-1] EL AGOTADO SE DERIVA DEL STOCK ═══════════════════════
+    // Caso real (calle24, 31-ago): nueve zonas agotadas A MANO en PLUS y su
+    // lista CHEAP entera «a la venta» — el cliente compró boletos de zonas sin
+    // inventario. La zona física es UNA y las listas son DOS; el agotado tiene
+    // que valer para las dos.
+    //
+    // TRES CONSULTAS PARA TODO EL LOTE, no tres por evento: un publish compila
+    // los ~100 eventos, y pedirle a `_lib/disponibilidad` uno por uno serían
+    // trescientas. La REGLA es la misma que la de ese lib —compras −
+    // vendidos_fuera − viajeros que consumen— y quién consume se le sigue
+    // preguntando a `consumeBoleto`, su dueño, en vez de copiarla.
+    //
+    // 🔒 UN EVENTO SIN COMPRAS CAPTURADAS NO SE TOCA. Su stock todavía no vive
+    // en el Palacio, así que derivar ahí no sería medir sino inventar un cero.
+    // Se REPORTA por nombre, como los letreros no emitidos: una omisión callada
+    // se lee como «los revisó todos».
+    let agotado = { eventos: [], cerradas: 0, sin_stock: [] };
+    try {
+      const q = (tabla, sel) => fetch(`${SB_URL}/rest/v1/${tabla}?select=${sel}&limit=20000`,
+        { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` } }).then((r) => {
+          if (!r.ok) throw new Error(tabla + ': ' + r.status);
+          return r.json();
+        });
+      const [compras, ajustes, viajeros] = await Promise.all([
+        q('compras', 'evento_id,zona,cantidad'),
+        q('stock_ajustes', 'evento_id,zona,vendidos_fuera'),
+        q('viajeros_evento', 'evento_id,zona_boleto,tipo_paquete,tipo_viajero'),
+      ]);
+      const stock = disponiblesPorEvento({ compras, ajustes, viajeros, consumeBoleto });
+
+      esferas = esferas.map((e) => {
+        if (!e || !e.slug) return e;
+        if (!stock.has(e.slug)) { agotado.sin_stock.push(e.slug); return e; }
+        // Las listas de la ficha son texto JSON: se leen, se les aplica y se
+        // vuelven a escribir. Si alguna no parsea, ESE evento se deja intacto y
+        // se dice — mejor no derivar que derivar sobre una lectura a medias.
+        let obj;
+        try {
+          obj = {
+            zonas: e.zonas ? JSON.parse(e.zonas) : null,
+            cheapZonas: e.cheap_zonas ? JSON.parse(e.cheap_zonas) : null,
+            multifecha: e.multifecha ? JSON.parse(e.multifecha) : null,
+          };
+        } catch (_) { agotado.sin_stock.push(e.slug + ' (ficha ilegible)'); return e; }
+
+        const { forzar } = zonasAForzar({ obj, gestionado: true, disponibles: stock.get(e.slug) });
+        const { obj: nuevo, cambiadas } = aplicarAgotados(obj, forzar);
+        if (!cambiadas.length) return e;
+        agotado.eventos.push({ slug: e.slug, zonas: cambiadas });
+        agotado.cerradas += cambiadas.length;
+        const out = Object.assign({}, e);
+        if (nuevo.zonas) out.zonas = JSON.stringify(nuevo.zonas);
+        if (nuevo.cheapZonas) out.cheap_zonas = JSON.stringify(nuevo.cheapZonas);
+        if (nuevo.multifecha) out.multifecha = JSON.stringify(nuevo.multifecha);
+        return out;
+      });
+    } catch (e) {
+      // 🔒 SI NO SE PUEDE LEER EL STOCK, NO SE DERIVA — pero SE PUBLICA, con el
+      // aviso. Rehusar el publish entero por esto dejaría a Memo sin poder
+      // corregir nada; seguir en silencio sería peor que no derivar.
+      agotado.error = String((e && e.message) || e);
+      console.error('[esferas-publicar] agotado derivado:', agotado.error);
+    }
+
     // 2. Si es rama de prueba, asegurar que exista (sin tocar main).
     if (branch !== 'main') {
       await ensureBranch(branch);
@@ -210,7 +276,7 @@ exports.handler = async (event) => {
       return {
         statusCode: 200,
         headers,
-        body: JSON.stringify({ ok: true, branch, sin_cambios: true, publicados: [], commit: null, validacion, archivados, avisos_letrero: avisosLetrero }),
+        body: JSON.stringify({ ok: true, branch, sin_cambios: true, publicados: [], commit: null, validacion, archivados, avisos_letrero: avisosLetrero, agotado }),
       };
     }
 
@@ -408,7 +474,7 @@ exports.handler = async (event) => {
       // [BABA-UX-2] Los letreros que NO se emitieron van EN LA RESPUESTA, con su
       // motivo y su slug. Un letrero que desaparece en silencio es la misma
       // familia que un medio perdido: se dice, aunque la publicación salga bien.
-      body: JSON.stringify({ ok: true, branch, publicados: slugs, commit, validacion, aviso, archivados, avisos_letrero: avisosLetrero, historial }),
+      body: JSON.stringify({ ok: true, branch, publicados: slugs, commit, validacion, aviso, archivados, avisos_letrero: avisosLetrero, historial, agotado }),
     };
   } catch (e) {
     return { statusCode: 500, headers, body: JSON.stringify({ ok: false, error: e.message }) };

@@ -4266,6 +4266,36 @@ document.addEventListener('click', function(e) {
 // RECIBOS_HTML → base64
 
 
+// [FLUJO-UX-1b] El aviso de un iframe que no cargó va COMO HERMANO del iframe,
+// nunca dentro: dentro es otra página y no es nuestra para escribirla.
+function _avisoIframe(frame, queEs, reintentar) {
+  if (!frame || frame.dataset.avisado === '1' || !frame.parentElement) return;
+  frame.dataset.avisado = '1';
+  const caja = document.createElement('div');
+  caja.className = 'err-box';
+  const btn = document.createElement('button');
+  btn.type = 'button'; btn.className = 'btn btn-ghost btn-sm err-btn'; btn.textContent = '↻ Reintentar';
+  btn.addEventListener('click', () => { caja.remove(); frame.dataset.avisado = ''; reintentar(); });
+  caja.innerHTML = '<strong class="err-titulo">No se pudo cargar ' + _esfEsc(queEs) + '.</strong><br>'
+    + 'La pantalla no respondió. Puede ser la conexión.<div class="err-pie"></div>';
+  caja.querySelector('.err-pie').appendChild(btn);
+  frame.parentElement.insertBefore(caja, frame);
+}
+
+// El reloj del iframe. `reintentar` es una FUNCIÓN, no una cadena con `onclick`:
+// un onclick que se arma con texto es la puerta por la que entra un nombre mal
+// escrito sin que nadie lo note hasta que alguien lo aprieta.
+function _vigilarIframe(frame, url, queEs, reintentarNombre) {
+  if (!frame) return;
+  let listo = false;
+  const reintentar = () => { frame.src = url; };
+  frame.addEventListener('load', () => { listo = true; }, { once: true });
+  frame.addEventListener('error', () => _avisoIframe(frame, queEs, reintentar), { once: true });
+  frame.removeAttribute('srcdoc');
+  frame.src = url;
+  setTimeout(() => { if (!listo) _avisoIframe(frame, queEs, reintentar); }, 8000);
+}
+
 function showHerramienta(name) {
   // [SEG-2] ESCONDER NO ES IMPEDIR. El botón oculto solo tapa el camino del
   // ratón; showHerramienta('recibos') desde la consola, un enlace viejo o el
@@ -4293,25 +4323,16 @@ function showHerramienta(name) {
   const grpHerr = document.getElementById('nav-dropdown-herramientas');
   if (grpHerr) grpHerr.classList.remove('collapsed');
 
+  // [FLUJO-UX-1b] LOS IFRAMES SE VIGILAN DESDE AFUERA. Lo que pasa dentro es
+  // otra página y desde aquí no se ve: ni su error ni su blanco. Lo que SÍ se
+  // puede saber es si terminó de cargar, así que se le pone un reloj: si a los
+  // 8 s no disparó `load`, se dice, con el `.err-box` de la casa y su reintento.
+  // Es lo mínimo honesto — no fingimos saber qué pasó adentro, sólo que no llegó.
   if (name === 'recibos') {
-    if (!recibosLoaded) {
-      const frame = document.getElementById('frame-recibos');
-      if (frame) {
-        frame.removeAttribute('srcdoc');
-        frame.src = './recibos_v6.html';
-        recibosLoaded = true;
-      }
-    }
+    if (!recibosLoaded) { _vigilarIframe(document.getElementById('frame-recibos'), './recibos_v6.html', 'Recibos', "showHerramienta('recibos')"); recibosLoaded = true; }
   }
   if (name === 'diseno') {
-    if (!disenoLoaded) {
-      const frame = document.getElementById('frame-diseno');
-      if (frame) {
-        frame.removeAttribute('srcdoc');
-        frame.src = './diseno.html';
-        disenoLoaded = true;
-      }
-    }
+    if (!disenoLoaded) { _vigilarIframe(document.getElementById('frame-diseno'), './diseno.html', 'Diseño', "showHerramienta('diseno')"); disenoLoaded = true; }
   }
   if (name === 'contratos') {
     loadContratos();
@@ -4418,6 +4439,10 @@ async function loadCapsule() {
   const g = document.getElementById('cc-eventos-grid');
   try {
     const ev = await _fetchEVFromIndex();
+    // [FLUJO-UX-1b] El vacío puede ser «no cargó»: se pregunta antes de pintarlo
+    // como si fuera «no hay eventos».
+    const _fallo = (typeof evCatalogoFallo === 'function') ? evCatalogoFallo() : null;
+    if (_fallo) throw _fallo;
     _ccEventosCache = (ev || [])
       .filter(e => e && e.id && e.a)
       .map(_ccEvFromEV);
@@ -8882,6 +8907,24 @@ function _evDeclaracionesHotel(html) {
   return out.join('');
 }
 
+// [FLUJO-UX-1b] EL FALLO DEL CATÁLOGO, EN UN CANAL APARTE.
+//
+// `_fetchEVFromIndex` NO LANZA: ante un fallo devuelve `[]` y lo manda a
+// `console.warn`. Eso hacía INALCANZABLES los `catch` de las pantallas que lo
+// usan —Por Evento, Capsule, Guerreros Z—: recibían «catálogo vacío», que es
+// indistinguible de «no hay eventos». La guarda estaba escrita y no podía
+// ejecutarse: la hermana de `kmt-prov`.
+//
+// NO se cambia a que lance. Tiene 27 llamadores y varios ya hacen
+// `.catch(() => [])` contando con lo suave; convertirla sería auditar los 27 y
+// arriesgar la conducta de todos por el aviso de tres. Lo que se añade es la
+// pregunta que faltaba: «¿este vacío es que no hay, o que no cargó?» — que es
+// exactamente la lección de AUD-1, donde un cero era una afirmación falsa.
+//
+// El fallo NO se cachea (nunca se cacheó): la siguiente llamada reintenta sola.
+let _evCatalogoFallo = null;
+function evCatalogoFallo() { return _evCatalogoFallo; }
+
 async function _fetchEVFromIndex() {
   if (_contratosEVCache) return _contratosEVCache;
   try {
@@ -8912,9 +8955,11 @@ async function _fetchEVFromIndex() {
     const ev = new Function(stubs + 'return ' + arrText + ';')();
     if (!Array.isArray(ev)) throw new Error('EV no es array');
     _contratosEVCache = ev;
+    _evCatalogoFallo = null;   // cargó: se borra el fallo viejo
     return ev;
   } catch (e) {
     console.warn('[Contratos] No se pudo cargar EV de index.html:', e.message);
+    _evCatalogoFallo = e;      // el vacío que sigue NO es «no hay»: es «no cargó»
     return [];
   }
 }

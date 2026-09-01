@@ -145,6 +145,28 @@ function khErrorCarga(cont, queEs, reintentar, e) {
   return true;
 }
 
+// ── [FLUJO-UX-2] LA SEÑAL DE VIDA, EN UNA SOLA FUENTE ───────────────────────
+//
+// Tampoco es un patrón nuevo: es el `loading-state` + `spinner` que ya usan doce
+// pantallas, con su CSS ya escrito. Se muda a función para que las que faltan lo
+// COPIEN en vez de reinventarlo — y para que no haya ocho `innerHTML` con el
+// mismo string esperando a divergir.
+//
+// POR QUÉ IMPORTA, y es la mitad que le faltaba a FLUJO-UX-1: en una conexión
+// lenta, una pantalla que no avisa que carga se ve IGUAL que una rota. Acabamos
+// de hacer hablar a los errores; sin esto, el que espera no puede distinguir
+// «todavía viene» de «ya falló y no me lo dijo».
+//
+// Devuelve `false` si no encontró dónde pintar, para que quien llame pueda
+// decirlo en vez de creerse que avisó.
+function khCargando(cont, queEs) {
+  const el = (typeof cont === 'string') ? document.getElementById(cont) : cont;
+  if (!el) return false;
+  el.innerHTML = '<div class="loading-state"><div class="spinner"></div>'
+    + (queEs ? 'Cargando ' + _esfEsc(queEs) + '…' : 'Cargando…') + '</div>';
+  return true;
+}
+
 // ── TOAST ──
 function showToast(msg, tipo) {
   tipo = tipo || 'error';
@@ -4289,11 +4311,21 @@ function _vigilarIframe(frame, url, queEs, reintentarNombre) {
   if (!frame) return;
   let listo = false;
   const reintentar = () => { frame.src = url; };
+  // [FLUJO-UX-2] SEÑAL DE VIDA JUNTO AL IFRAME. Un iframe en blanco mientras
+  // carga es indistinguible de uno que no llegó — y su reloj tarda 8 s en
+  // hablar, que es una eternidad mirando nada. El spinner va COMO HERMANO, por
+  // la misma razón que el aviso: adentro es otra página.
+  const senal = document.createElement('div');
+  senal.className = 'loading-state';
+  senal.innerHTML = '<div class="spinner"></div>Cargando ' + _esfEsc(queEs) + '…';
+  if (frame.parentElement) frame.parentElement.insertBefore(senal, frame);
+  const quitarSenal = () => { if (senal.parentElement) senal.remove(); };
+  frame.addEventListener('load', quitarSenal, { once: true });
   frame.addEventListener('load', () => { listo = true; }, { once: true });
-  frame.addEventListener('error', () => _avisoIframe(frame, queEs, reintentar), { once: true });
+  frame.addEventListener('error', () => { quitarSenal(); _avisoIframe(frame, queEs, reintentar); }, { once: true });
   frame.removeAttribute('srcdoc');
   frame.src = url;
-  setTimeout(() => { if (!listo) _avisoIframe(frame, queEs, reintentar); }, 8000);
+  setTimeout(() => { if (!listo) { quitarSenal(); _avisoIframe(frame, queEs, reintentar); } }, 8000);
 }
 
 function showHerramienta(name) {
@@ -4437,6 +4469,7 @@ const TIPOS_EVENTO = {
 
 async function loadCapsule() {
   const g = document.getElementById('cc-eventos-grid');
+  khCargando(g, 'los eventos');   // [FLUJO-UX-2]
   try {
     const ev = await _fetchEVFromIndex();
     // [FLUJO-UX-1b] El vacío puede ser «no cargó»: se pregunta antes de pintarlo
@@ -9575,6 +9608,10 @@ function _ctrCoincide(c, q) {
 async function loadContratosList() {
   const tbody = document.getElementById('ctr-tbody');
   if (!tbody) return;
+  // [FLUJO-UX-2] La tabla vive en un <tbody>: el `loading-state` va DENTRO de una
+  // fila, no suelto — un div hijo de tbody es marcado inválido y el navegador lo
+  // saca de la tabla sin avisar. Por eso aquí no se usa `khCargando`.
+  tbody.innerHTML = '<tr><td colspan="6"><div class="loading-state"><div class="spinner"></div>Cargando contratos…</div></td></tr>';
   try {
     // [sec-contratos] antes db.get('contratos_creadores', ...) con anon key.
     const rows = await khContratos.listar({ limit: 200 });

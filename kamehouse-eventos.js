@@ -59,6 +59,11 @@ async function _evtPoblarSelector() {
   if (_evtSelectorPoblado) { _evtAplicarPendiente(); return; }
   const sel = document.getElementById('selector-evento');
   if (!sel) return;
+  // [FLUJO-UX-2] Señal de vida mientras baja el catálogo. Su contenedor nace
+  // oculto —igual que para el error— así que se destapa; si no, el spinner se
+  // pinta donde nadie lo ve, que es justo lo que le pasaba a Esferas.
+  const _caja = document.getElementById('evt-desglose');
+  if (_caja) { _caja.style.display = ''; khCargando(_caja, 'los eventos'); }
   // [FLUJO-UX-1] NO TENÍA CATCH. Si el catálogo no bajaba, la promesa se
   // rechazaba sin dueño y el selector se quedaba con su «Selecciona un
   // evento…» para siempre: indistinguible de un catálogo vacío.

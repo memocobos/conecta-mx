@@ -132,6 +132,7 @@ async function loadGastos() {
  // [AUD-1g] El catálogo llega del servidor, de la MISMA fuente que valida el
  // alta. El <select> del modal está vacío en el HTML a propósito.
  _gastoPoblarCategorias(d.categorias);
+ _poblarCuentas(d.cuentas);
  const gastos = Array.isArray(d.gastos) ? d.gastos : [];
  _gastosListCache = gastos;   // para que editarGasto pre-llene desde memoria
 
@@ -186,6 +187,44 @@ function _gastoPoblarCategorias(cats) {
     if (antes) filtro.value = antes;
   }
 }
+// [BANCO-SELECT-1] EL POBLADOR DE CUENTAS — hermano de `_gastoPoblarCategorias`
+// y por la misma razón. El HTML traía `BBVA` y `Banamex` a mano en los DOS
+// modales mientras `_lib/cuentas-dinero` aceptaba CUATRO (`Efectivo` y `Otro`
+// además): el catálogo con dos dueños, que es EXACTAMENTE el defecto que ese
+// lib nació para matar. Ya había divergido, sólo que del lado callado — no
+// rebotaba nada, simplemente no se podían elegir dos de las cuatro.
+//
+// 🔒 LO QUE **NO** SE UNIFICA, y está escrito en el encabezado del lib: las
+// listas de TRES de `admin-saldos` y `admin-reembolsos`. Para ellas la lista
+// son las CUBETAS QUE SE PINTAN, no los valores que se aceptan — un gasto con
+// cuenta `Otro` sí entra en su `caja_total` (por `otrosTotal`); lo que no tiene
+// es cubeta propia. Son dos preguntas distintas sobre la misma columna y
+// unificarlas por simetría cambiaría una pantalla de dinero sin medirla.
+// 🔒 Tampoco se toca `ev-banco`: ése es OTRO catálogo (`default`/`hey`, los
+// BANCOS_VALIDOS del evento) y su etiqueta DICE «BBVA (Default)» — un default
+// anunciado, firmado por DEFAULTS-1.
+let _cuentasDinero = null;
+function _poblarCuentas(cuentas) {
+  if (Array.isArray(cuentas) && cuentas.length) _cuentasDinero = cuentas.slice();
+  const lista = _cuentasDinero || [];
+  if (!lista.length) return;                  // sin catálogo no se toca nada
+  ['gasto-cuenta', 'ingreso-cuenta'].forEach((id) => {
+    const sel = document.getElementById(id);
+    if (!sel) return;
+    const antes = sel.value;
+    // [UTIL-C-3] La opción extra de una edición sobrevive al repoblado: es la
+    // cuenta que ESE movimiento tiene y que el catálogo ya no representa.
+    const extra = sel.querySelector('option[data-extra]');
+    // [DEFAULTS-1] La primera va VACÍA. Un selector de dato nace vacío: aquí la
+    // cuenta decide de qué caja sale el dinero, que es una atribución, no una
+    // forma.
+    sel.innerHTML = '<option value="">— elige la cuenta —</option>'
+      + lista.map((c) => `<option>${_esfEsc(c)}</option>`).join('');
+    if (extra) sel.appendChild(extra);
+    sel.value = (antes && (lista.includes(antes) || (extra && extra.value === antes))) ? antes : '';
+  });
+}
+
 function nuevoGasto() {
  _gastoEditId = null;
  ['gasto-concepto', 'gasto-monto', 'gasto-fecha', 'gasto-notas'].forEach(id => {
@@ -243,12 +282,20 @@ async function editarGasto(id) {
  const _prev = _ctaEl.querySelector('option[data-extra]');
  if (_prev) _prev.remove();
  const _c = (typeof g.cuenta === 'string') ? g.cuenta.trim() : '';
- if (_c && !['BBVA', 'Banamex'].includes(_c) && _c !== 'Efectivo') {
+ // 🔴 [BANCO-SELECT-1] AQUÍ VIVÍA LA TERCERA COPIA DE LA LISTA, y mordía:
+ // `!['BBVA','Banamex'].includes(_c) && _c !== 'Efectivo'` dejaba a `Efectivo`
+ // sin opción extra Y sin poder seleccionarse, así que editar un gasto pagado
+ // en efectivo lo VACIABA en silencio — el defecto exacto que UTIL-C-3 vino a
+ // matar («la edición no puede cambiar un dato que nadie tocó»), reaparecido
+ // en el único valor que la lista de dos no podía nombrar. Sin víctimas vivas:
+ // el Portal tiene UNA fila y es BBVA. Ahora se le pregunta al catálogo.
+ const _lista = _cuentasDinero || [];
+ if (_c && !_lista.includes(_c)) {
  const o = document.createElement('option');
  o.value = _c; o.textContent = _c; o.setAttribute('data-extra', '1');
  _ctaEl.appendChild(o);
  }
- _ctaEl.value = _c && _c !== 'Efectivo' ? _c : '';
+ _ctaEl.value = _c;
  // Se marca como elegida a mano para que abrir el modal no la vacíe.
  _ctaEl.dataset.tocado = _ctaEl.value ? '1' : '';
  }
@@ -363,6 +410,7 @@ async function loadIngresos() {
  });
  const d = await r.json();
  if (!r.ok) throw new Error(d.error || 'No se pudieron cargar los ingresos');
+ _poblarCuentas(d.cuentas);          // [BANCO-SELECT-1] el catálogo, del servidor
  const ingresos = Array.isArray(d.ingresos) ? d.ingresos : [];
  _ingresosListCache = ingresos;   // para que editarIngreso pre-llene desde memoria
 

@@ -23,6 +23,9 @@
 // service_role SOLO aquí. Reusa PORTAL_SUPABASE_* — sin env vars nuevas.
 // =============================================================================
 
+// [BANCO-SELECT-1] El catálogo de cuentas viaja con la lista, igual que las
+// categorías en `admin-gastos-list`: el navegador no tiene lista propia.
+const { CUENTAS } = require('./_lib/cuentas-dinero');
 const { verifyAdminAuthLive, corsCheck } = require('./_lib/verify-admin');
 
 const UUID_RE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
@@ -101,7 +104,7 @@ exports.handler = async (event) => {
     return {
       statusCode: 200,
       headers,
-      body: JSON.stringify({ ok: true, count: ingresos.length, ingresos, total, total_mes: totalMes }),
+      body: JSON.stringify({ ok: true, count: ingresos.length, ingresos, total, total_mes: totalMes, cuentas: CUENTAS }),
     };
   } catch (e) {
     return { statusCode: 502, headers, body: JSON.stringify({ error: 'Error consultando ingresos', detail: e.message }) };

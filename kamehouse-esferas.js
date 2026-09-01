@@ -492,6 +492,13 @@ async function loadEsferasEventos() {
   // pintado, la sección aparecería abierta y se plegaría sola medio segundo
   // después — un parpadeo que se lee como un error de la pantalla.
   _esfSeccionPintar(_esfSeccionAbierta());
+  // [FLUJO-UX-2] EL SPINNER YA EXISTÍA — lo que faltaba era que se viera.
+  // `#esf-listado-body` está en `display:none` con la lista plegada, así que
+  // esto se pintaba donde nadie lo ve y la pantalla salía como «sin indicador».
+  // Agregarle un spinner nuevo habría sido duplicar el que ya tenía: lo dijo la
+  // VALIDACIÓN DEL INSTRUMENTO, no la lectura del código.
+  const _cuerpo = document.getElementById('esf-listado-body');
+  if (_cuerpo) _cuerpo.style.display = '';
   cont.innerHTML = '<div class="loading-state"><div class="spinner"></div>Cargando…</div>';
   try {
     const r = await khAdminFetch('/.netlify/functions/esferas-listar', { method:'POST' });

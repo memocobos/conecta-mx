@@ -532,6 +532,12 @@ function initRadarTab(){
     return;
   }
   // Wire sub-tabs (idempotente)
+  // [FLUJO-UX-2] AQUÍ NO VA LA SEÑAL, y la razón está medida. Poner el
+  // `loading-state` en `radar-subs` lo dejaba PEGADO: ese contenedor no lo
+  // repinta su cargador, así que el spinner se quedaba para siempre y la
+  // pantalla perdía 6 de sus 25 botones. Lo cazó el control positivo con
+  // respuesta rápida. El Radar necesita que primero se mida QUÉ contenedor
+  // repinta de verdad — es tuerca propia, no una línea aquí.
   const subs = document.getElementById('radar-subs');
   if (subs && !subs.dataset.wired) {
     subs.dataset.wired = '1';

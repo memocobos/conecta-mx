@@ -40,6 +40,11 @@ function copiarLinkProximos(btn) {
 async function loadWaitlist() {
   const summary = document.getElementById('wl-summary');
   const groups = document.getElementById('wl-groups');
+  // [FLUJO-UX-2] Señal de vida ANTES de esperar. Sin esto, en conexión lenta
+  // esta pantalla se veía igual que una rota — y desde WL-1 ya sabe decir su
+  // error, así que callar mientras carga era lo único que la volvía ambigua.
+  if (summary) summary.textContent = 'Cargando…';
+  khCargando(groups, 'la lista de espera');
   if (summary) summary.textContent = 'Cargando…';
   if (groups) groups.innerHTML = '';
 

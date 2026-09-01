@@ -23,7 +23,7 @@
 const { verifyAdminAuthLive, corsCheck } = require('./_lib/verify-admin');
 const { compilarEV, fechaDisplayDeEsfera, extraerEV } = require('./_lib/esferas-compile');
 const { zonasDelObjeto, filasDelPublish, _llave } = require('./_lib/precios-vigentes');
-const { zonasAForzar, aplicarAgotados, disponiblesPorEvento } = require('./_lib/agotado-derivado');
+const { simetrizarLote, avisosDelLote, soltarFichas, disponiblesPorEvento } = require('./_lib/agotado-derivado');
 const { consumeBoleto } = require('./_lib/paquete-viaje');
 const { derivarLetreros } = require('./_lib/letrero-derivado');
 // [WL-1] El aviso a la lista de espera es del núcleo compartido: el mismo
@@ -148,23 +148,36 @@ exports.handler = async (event) => {
     }
 
 
-    // ═══ [AG-STOCK-1] EL AGOTADO SE DERIVA DEL STOCK ═══════════════════════
-    // Caso real (calle24, 31-ago): nueve zonas agotadas A MANO en PLUS y su
-    // lista CHEAP entera «a la venta» — el cliente compró boletos de zonas sin
-    // inventario. La zona física es UNA y las listas son DOS; el agotado tiene
-    // que valer para las dos.
+    // ═══ [AG-STOCK-2] LA SIMETRÍA DE LAS GEMELAS, Y EL AVISO DE STOCK ══════
+    // EL NEGOCIO VENDE SOBRE PEDIDO (firmado por Memo, 1-sep): «primero vendo
+    // lo comprado, y luego voy comprando más según me van pidiendo». Por eso se
+    // retira AG-STOCK-1: cerrar por falta de pedido capturado mata la venta.
+    //
+    // Lo que SÍ se fuerza es la SIMETRÍA — la mordida real de calle24: nueve
+    // zonas agotadas a mano en PLUS con el CHEAP entero a la venta. La zona
+    // física es UNA aunque las listas sean dos. Se AGREGA `ag`, jamás se quita.
+    //
+    // 🔒 EL LAZO VIVE EN LA PIEZA, NO AQUÍ. Un lazo dentro del handler sólo se
+    // puede probar copiándolo al arnés, y una copia del código bajo prueba
+    // prueba la copia. Aquí queda lo que es de verdad del handler: la red.
+    //
+    // 🔒 Y LA SIMETRÍA NO NECESITA LA BASE, así que va FUERA del try del stock:
+    // si el Palacio no contesta, el aviso se pierde pero la simetría se aplica
+    // igual. Meterla dentro la habría atado a una consulta que no usa.
+    const sim = simetrizarLote(esferas);
+    esferas = sim.filas;
+    const simetria = sim.reporte;
+
+    // ── EL AVISO: INFORMACIÓN, NO ACCIÓN ──────────────────────────────────
+    // Zonas que quedan A LA VENTA sin pedido capturado o con stock ≤0, POR
+    // NOMBRE, en los eventos que SÍ tienen compras en el Palacio. Nadie se
+    // cierra: es la lista de lo que Memo tendría que comprar si se lo piden.
     //
     // TRES CONSULTAS PARA TODO EL LOTE, no tres por evento: un publish compila
-    // los ~100 eventos, y pedirle a `_lib/disponibilidad` uno por uno serían
-    // trescientas. La REGLA es la misma que la de ese lib —compras −
+    // los ~100 eventos. La REGLA es la de `_lib/disponibilidad` —compras −
     // vendidos_fuera − viajeros que consumen— y quién consume se le sigue
     // preguntando a `consumeBoleto`, su dueño, en vez de copiarla.
-    //
-    // 🔒 UN EVENTO SIN COMPRAS CAPTURADAS NO SE TOCA. Su stock todavía no vive
-    // en el Palacio, así que derivar ahí no sería medir sino inventar un cero.
-    // Se REPORTA por nombre, como los letreros no emitidos: una omisión callada
-    // se lee como «los revisó todos».
-    let agotado = { eventos: [], cerradas: 0, sin_stock: [] };
+    let avisos_stock = { eventos: [], total: 0, sin_compras: [] };
     try {
       const q = (tabla, sel) => fetch(`${SB_URL}/rest/v1/${tabla}?select=${sel}&limit=20000`,
         { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` } }).then((r) => {
@@ -177,44 +190,15 @@ exports.handler = async (event) => {
         q('viajeros_evento', 'evento_id,zona_boleto,tipo_paquete,tipo_viajero'),
       ]);
       const stock = disponiblesPorEvento({ compras, ajustes, viajeros, consumeBoleto });
-
-      esferas = esferas.map((e) => {
-        if (!e || !e.slug) return e;
-        if (!stock.has(e.slug)) { agotado.sin_stock.push(e.slug); return e; }
-        // Las listas de la ficha son texto JSON: se leen, se les aplica y se
-        // vuelven a escribir. Si alguna no parsea, ESE evento se deja intacto y
-        // se dice — mejor no derivar que derivar sobre una lectura a medias.
-        let obj;
-        try {
-          obj = {
-            zonas: e.zonas ? JSON.parse(e.zonas) : null,
-            cheapZonas: e.cheap_zonas ? JSON.parse(e.cheap_zonas) : null,
-            multifecha: e.multifecha ? JSON.parse(e.multifecha) : null,
-          };
-        } catch (_) { agotado.sin_stock.push(e.slug + ' (ficha ilegible)'); return e; }
-
-        const { forzar, excluido } = zonasAForzar({ obj, gestionado: true, disponibles: stock.get(e.slug) });
-        // 🔒 EXCLUIDO POR EL CANDADO (hoy: multifecha con llaves sin definir).
-        // Se nombra en el MISMO montón que los que no tienen compras: lo que
-        // importa para quien lee es «a éste no se le derivó», y el motivo.
-        if (excluido) { agotado.sin_stock.push(e.slug + ' (' + excluido + ')'); return e; }
-        const { obj: nuevo, cambiadas } = aplicarAgotados(obj, forzar);
-        if (!cambiadas.length) return e;
-        agotado.eventos.push({ slug: e.slug, zonas: cambiadas });
-        agotado.cerradas += cambiadas.length;
-        const out = Object.assign({}, e);
-        if (nuevo.zonas) out.zonas = JSON.stringify(nuevo.zonas);
-        if (nuevo.cheapZonas) out.cheap_zonas = JSON.stringify(nuevo.cheapZonas);
-        if (nuevo.multifecha) out.multifecha = JSON.stringify(nuevo.multifecha);
-        return out;
-      });
+      avisos_stock = avisosDelLote({ filas: esferas, stock });
     } catch (e) {
-      // 🔒 SI NO SE PUEDE LEER EL STOCK, NO SE DERIVA — pero SE PUBLICA, con el
-      // aviso. Rehusar el publish entero por esto dejaría a Memo sin poder
-      // corregir nada; seguir en silencio sería peor que no derivar.
-      agotado.error = String((e && e.message) || e);
-      console.error('[esferas-publicar] agotado derivado:', agotado.error);
+      // 🔒 SI NO SE PUEDE LEER EL STOCK, NO HAY AVISO — pero SE PUBLICA, con el
+      // aviso del aviso. El stock ya no decide nada del catálogo: rehusar el
+      // publish por una consulta informativa sería peor que publicar sin ella.
+      avisos_stock.error = String((e && e.message) || e);
+      console.error('[esferas-publicar] avisos de stock:', avisos_stock.error);
     }
+    soltarFichas(esferas);        // el andamio no viaja al compilador
 
     // 2. Si es rama de prueba, asegurar que exista (sin tocar main).
     if (branch !== 'main') {
@@ -280,7 +264,7 @@ exports.handler = async (event) => {
       return {
         statusCode: 200,
         headers,
-        body: JSON.stringify({ ok: true, branch, sin_cambios: true, publicados: [], commit: null, validacion, archivados, avisos_letrero: avisosLetrero, agotado }),
+        body: JSON.stringify({ ok: true, branch, sin_cambios: true, publicados: [], commit: null, validacion, archivados, avisos_letrero: avisosLetrero, simetria, avisos_stock }),
       };
     }
 
@@ -478,7 +462,7 @@ exports.handler = async (event) => {
       // [BABA-UX-2] Los letreros que NO se emitieron van EN LA RESPUESTA, con su
       // motivo y su slug. Un letrero que desaparece en silencio es la misma
       // familia que un medio perdido: se dice, aunque la publicación salga bien.
-      body: JSON.stringify({ ok: true, branch, publicados: slugs, commit, validacion, aviso, archivados, avisos_letrero: avisosLetrero, historial, agotado }),
+      body: JSON.stringify({ ok: true, branch, publicados: slugs, commit, validacion, aviso, archivados, avisos_letrero: avisosLetrero, historial, simetria, avisos_stock }),
     };
   } catch (e) {
     return { statusCode: 500, headers, body: JSON.stringify({ ok: false, error: e.message }) };

@@ -114,6 +114,16 @@ function _vacio(v) {
 // zona se publicaba DISPONIBLE A $0. Ahora una zona NO agotada con precio
 // inválido o ≤0 LANZA, y el error sube al dryrun/publicar para que se corrija
 // la captura. Una zona agotada (ag) sí puede ir en 0: no se vende.
+// [AG-STOCK-2] QUÉ CUENTA COMO «AGOTADA» Y COMO «PRÓXIMAMENTE», con nombre.
+// Las dos expresiones estaban escritas IDÉNTICAS en `parseZonas` y en
+// `parseCheapZonas` —dos listas iguales que todavía no habían divergido— y
+// ahora las lee además `_lib/agotado-derivado`, que sincroniza las gemelas. Un
+// tercer sitio con el literal habría sido la divergencia esperando a ocurrir:
+// aceptar `ag:2` en un lado y no en el otro cierra una zona en una lista y no
+// en la otra, que es justo el defecto que la simetría vino a matar.
+function _esAg(z) { return (z && (z.ag === 1 || z.ag === true || z.ag === '1')) ? 1 : 0; }
+function _esProx(z) { return (z && (z.prox === 1 || z.prox === true || z.prox === '1')) ? 1 : 0; }
+
 function parseZonas(raw) {
   let arr = raw;
   if (typeof raw === 'string') {
@@ -125,14 +135,14 @@ function parseZonas(raw) {
     if (!z || typeof z !== 'object') continue;
     const n = (typeof z.n === 'string' ? z.n : '').trim();
     if (!n) continue;
-    const ag = (z.ag === 1 || z.ag === true || z.ag === '1') ? 1 : 0;
+    const ag = _esAg(z);
     // [E1] PRÓXIMAMENTE: la zona existe pero todavía no tiene costo. El index ya
     // sabe pintarla (botón deshabilitado en cursiva) y minP la ignora; lo único
     // que faltaba era que el campo sobreviviera el viaje editor → EV.
     // PROX MANDA sobre AGOTADA: si por lo que sea llegaran las dos, se publica
     // prox (una zona sin precio anunciada como "agotada" le miente al cliente
     // sobre algo que nunca estuvo a la venta).
-    const prox = (z.prox === 1 || z.prox === true || z.prox === '1') ? 1 : 0;
+    const prox = _esProx(z);
     const p = Number(z.p);
     // El candado AUD-1 no aplica a una zona prox: no tener precio todavía es
     // EXACTAMENTE su caso de uso, no un error de captura.
@@ -198,8 +208,8 @@ function parseCheapZonas(raw) {
     const n = (typeof z.n === 'string' ? z.n : '').trim();
     if (!n) continue;
     const p = Number(z.p);
-    const prox = (z.prox === 1 || z.prox === true || z.prox === '1') ? 1 : 0;
-    const ag = (z.ag === 1 || z.ag === true || z.ag === '1') ? 1 : 0;
+    const prox = _esProx(z);
+    const ag = _esAg(z);
     const vip = (z.vip === 1 || z.vip === true || z.vip === '1') ? 1 : 0;
     const se = Number(z.sepEspecial);
     const rv = Number(z.requiereViajeros);
@@ -1850,6 +1860,9 @@ module.exports = {
   _parseZonas: parseZonas,
   fechaAbsurda, ANIO_MIN, ANIO_MAX,
   _parseCheapZonas: parseCheapZonas,
+  // [AG-STOCK-2] Los dos predicados del `ag`/`prox`, para que la simetría de
+  // las listas gemelas los PREGUNTE en vez de re-escribirlos.
+  _esAg, _esProx,
   _parseMultifecha: parseMultifecha,
   _generarObj: generarObj,
   // [ESF-UX-2c] Expuestas para el careo de equivalencia contra el calculador

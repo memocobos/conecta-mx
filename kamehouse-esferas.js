@@ -3862,6 +3862,46 @@ async function publicarEsferas() {
         + data.avisos_letrero.map(a => `<div>· ${_esfEsc(a)}</div>`).join('')
         + `</div></div>`;
     }
+    // ═══ [AG-STOCK-2] LO QUE EL PUBLISH HIZO CON LAS ZONAS, Y LO QUE HAY QUE
+    // COMPRAR ══════════════════════════════════════════════════════════════
+    // AG-STOCK-1 ya mandaba su reporte en el JSON y NADIE LO PINTABA: un
+    // informe que sólo vive en la respuesta es un informe que no existe. Va
+    // aquí, junto al de los letreros, con la misma forma.
+    //
+    // Los dos hablan de cosas distintas a propósito:
+    //   · SIMETRÍA = lo que este publish CERRÓ. Es una acción, y una acción
+    //     sobre el catálogo se dice.
+    //   · AVISOS = lo que sigue A LA VENTA sin pedido capturado. NO es una
+    //     acción: es la lista de compras del negocio que vende sobre pedido.
+    if (data.simetria && data.simetria.cerradas) {
+      const sm = data.simetria;
+      panel.innerHTML += `<div class="alert alert-success" style="margin-top:8px">`
+        + `<b>Simetría: ${sm.cerradas} zona(s) cerradas para emparejar PLUS y CHEAP</b>`
+        + `<div style="margin-top:6px;font-size:12px;display:grid;gap:3px">`
+        + sm.eventos.map(x => `<div>· <b>${_esfEsc(x.slug)}</b>: ${_esfEsc(x.zonas.join(', '))}</div>`).join('')
+        + `</div></div>`;
+    }
+    if (data.simetria && Array.isArray(data.simetria.ilegibles) && data.simetria.ilegibles.length) {
+      panel.innerHTML += `<div class="alert alert-error" style="margin-top:8px">`
+        + `<b>${data.simetria.ilegibles.length} ficha(s) con zonas ILEGIBLES — no se sincronizaron:</b> `
+        + _esfEsc(data.simetria.ilegibles.join(', ')) + `</div>`;
+    }
+    const av = data.avisos_stock;
+    if (av && av.total) {
+      panel.innerHTML += `<div class="alert alert-info" style="margin-top:8px">`
+        + `<b>📣 ${av.total} zona(s) a la venta sin boletos comprados</b>`
+        + `<div style="margin-top:4px;font-size:11px;opacity:.8">Aviso, no cierre: se venden sobre pedido. Compra cuando te las pidan.</div>`
+        + `<div style="margin-top:6px;font-size:12px;display:grid;gap:3px">`
+        + av.eventos.map(x => `<div>· <b>${_esfEsc(x.slug)}</b>: `
+            + x.zonas.map(z => _esfEsc(z.zona) + (z.motivo === 'sin pedido capturado' ? '' : ` (${_esfEsc(z.motivo)})`)).join(', ')
+            + `</div>`).join('')
+        + `</div></div>`;
+    }
+    if (av && av.error) {
+      panel.innerHTML += `<div class="alert alert-error" style="margin-top:8px">`
+        + `No pude leer el stock del Palacio, así que esta vez no hay aviso de compras: `
+        + _esfEsc(av.error) + `</div>`;
+    }
     loadEsferasEventos();
   } catch(e) {
     panel.innerHTML = `<div class="alert alert-error">${e.message}</div>`;

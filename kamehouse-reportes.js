@@ -194,7 +194,11 @@ function renderReportes(lista, filtro) {
   const filtrada = filtro === 'todos' ? lista : lista.filter(r => r.status === filtro);
 
   if (!filtrada.length) {
-    container.innerHTML = `<div class="empty-state" style="margin-top:40px"><div class="empty-icon">·</div>Sin reportes${filtro === 'todos' ? '' : ' con este estado'}</div>`;
+    // [FLUJO-UX-5] Esta pantalla YA distinguía los dos casos con un ternario;
+    // la pieza lo hace con el TIPO, que es lo mismo dicho una sola vez.
+    khVacio(container, 'reportes', filtro === 'todos'
+      ? { }
+      : { tipo: 'filtro', frase: 'Ningún reporte con este estado' });
     return;
   }
 

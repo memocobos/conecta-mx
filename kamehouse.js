@@ -167,6 +167,55 @@ function khCargando(cont, queEs) {
   return true;
 }
 
+// ── [FLUJO-UX-5] EL VACÍO, EN UNA SOLA FUENTE ──────────────────────────────
+//
+// La tercera hermana de `khErrorCarga` y `khCargando`, y por la misma razón:
+// medido con fixture SIN datos y por la puerta que usa la gente, había ONCE
+// voces distintas para «no hay nada». Tampoco inventa un patrón: es el
+// `empty-state` + `empty-icon` que ya usan doce archivos, con su CSS escrito.
+//
+// 🔒 DOS TIPOS, PORQUE UN VACÍO NO ES UN VACÍO. Es la misma forma que las tres
+// voces del selector de evento (FLUJO-UX-4), y aquí la enseñó Pagos:
+//   · DATOS  → no hay nada capturado. La acción que lo llena, si existe.
+//   · FILTRO → SÍ hay datos; tus filtros no casan. Mandar a capturar aquí es
+//              mentir: puede haber cientos de filas debajo del filtro.
+//
+// ⚠️ Y HAY VACÍOS QUE NO SE TOCAN, medidos uno por uno (decisión de esta
+// tuerca, firmada por Jane el 1-sep):
+//   · «Nadie atrasado — todos al corriente» es BUENA NOTICIA, no una falta.
+//   · «Selecciona un evento para ver los viajeros» es el vacío del MANDO, y
+//     FLUJO-UX-4 acaba de darle voz.
+//   · «La casa está vacía · Traer del catálogo» YA es voz + acción: es el
+//     modelo del que sale esta pieza, no una víctima de ella.
+//
+// El botón sólo se pinta si su función EXISTE — el mismo candado que
+// `khErrorCarga` usa con `reintentar`. Una acción muerta en un vacío es peor
+// que ninguna: promete una salida que no lleva a ningún lado.
+const KHVACIO_TIPOS = {
+  datos:  (q) => 'Sin ' + q + ' todavía',
+  filtro: (q) => 'Ningún ' + q + ' coincide con los filtros',
+};
+function khVacio(cont, queEs, opts) {
+  const o = opts || {};
+  const el = (typeof cont === 'string') ? document.getElementById(cont) : cont;
+  if (!el) return false;
+  const tipo = KHVACIO_TIPOS[o.tipo] ? o.tipo : 'datos';
+  const frase = (typeof o.frase === 'string' && o.frase) ? o.frase : KHVACIO_TIPOS[tipo](queEs || 'datos');
+  const fn = o.accion && o.accion.fn;
+  const hayBoton = typeof fn === 'string' && typeof window[fn] === 'function';
+  const cuerpo = '<div class="empty-state">'
+    + '<div class="empty-icon">' + (tipo === 'filtro' ? '·' : '·') + '</div>'
+    + '<div class="vacio-que">' + _esfEsc(frase) + '</div>'
+    + (o.nota ? '<div class="vacio-nota">' + _esfEsc(o.nota) + '</div>' : '')
+    + (hayBoton ? '<div class="vacio-pie"><button class="btn btn-ghost btn-sm vacio-btn" onclick="' + fn + '()">'
+        + _esfEsc(o.accion.texto || 'Empezar') + '</button></div>' : '')
+    + '</div>';
+  // Varias tablas escriben su vacío DENTRO del tbody: ahí hay que envolver en
+  // una fila, o el navegador se come el div y la tabla queda… vacía de verdad.
+  el.innerHTML = o.colspan ? ('<tr><td colspan="' + o.colspan + '">' + cuerpo + '</td></tr>') : cuerpo;
+  return true;
+}
+
 // ── TOAST ──
 function showToast(msg, tipo) {
   tipo = tipo || 'error';
@@ -2882,7 +2931,10 @@ function _renderCobranza() {
   if (arr) arr.textContent = _cobSortDir === 'asc' ? '▲' : '▼';
 
   if (!lista.length) {
-    tbody.innerHTML = '<tr><td colspan="10"><div class="empty-state"><div class="empty-icon">·</div>Sin tours que coincidan con los filtros</div></td></tr>';
+    // 🔒 [FLUJO-UX-5] TIPO **FILTRO**, y es la pantalla que enseñó por qué hace
+    // falta el tipo: aquí SÍ puede haber cientos de tours debajo del filtro.
+    // Mandar a «capturar un tour» sería mentir sobre el estado de la base.
+    khVacio(tbody, 'tour', { tipo: 'filtro', colspan: 10 });
     return;
   }
 

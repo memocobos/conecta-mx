@@ -120,7 +120,10 @@ async function loadGastos() {
  document.getElementById('g-mes').textContent = _spFmtMxn(d.total_mes || 0);
 
  if (!gastos.length) {
- tbody.innerHTML = '<tr><td colspan="8"><div class="empty-state"><div class="empty-icon"></div>Sin gastos registrados</div></td></tr>';
+ // [FLUJO-UX-5] A la pieza de la casa, con su salida: el botón de capturar
+ // vive en el encabezado, lejos de la tabla vacía que te está diciendo que no
+ // hay nada. `khVacio` sólo lo pinta si la función existe.
+ khVacio(tbody, 'gastos capturados', { colspan: 8, accion: { fn: 'nuevoGasto', texto: '+ Registrar gasto' } });
  return;
  }
 
@@ -376,7 +379,8 @@ async function loadIngresos() {
  document.getElementById('i-mes').textContent = _spFmtMxn(d.total_mes || 0);
 
  if (!ingresos.length) {
- tbody.innerHTML = '<tr><td colspan="9"><div class="empty-state"><div class="empty-icon"></div>Sin ingresos registrados</div></td></tr>';
+ // [FLUJO-UX-5] Gemelo del de gastos.
+ khVacio(tbody, 'ingresos capturados', { colspan: 9, accion: { fn: 'nuevoIngreso', texto: '+ Registrar ingreso' } });
  return;
  }
 
@@ -510,7 +514,8 @@ async function loadInventario() {
  }
 
  if (!items.length) {
- tbody.innerHTML = `<tr><td colspan="${verCostos ? 7 : 5}"><div class="empty-state"><div class="empty-icon"></div>Sin items en inventario</div></td></tr>`;
+ // [FLUJO-UX-5] Sin acción: el alta de bodega no cuelga de esta tabla.
+ khVacio(tbody, 'items en la bodega', { colspan: verCostos ? 7 : 5 });
  return;
  }
  const puedeEditarKarin = ['maestro_roshi','bulma','mister_popo','milk'].includes(currentUser?.rol);

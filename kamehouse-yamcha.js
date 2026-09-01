@@ -46,7 +46,9 @@ async function loadYamcha() {
       </div>`;
 
     if (!filas.length) {
-      lista.innerHTML = '<div class="empty-state"><div class="empty-icon">✓</div>Sin reembolsos registrados</div>';
+      // [FLUJO-UX-5] SIN ACCIÓN a propósito: un reembolso no se captura, NACE
+      // de una cancelación. Un botón aquí prometería una salida que no existe.
+      khVacio(lista, 'reembolsos', { nota: 'Los reembolsos nacen al cancelar una solicitud; no se capturan a mano.' });
       return;
     }
 

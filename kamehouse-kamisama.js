@@ -502,7 +502,9 @@ async function _kamProveedoresLoad() {
     // día divergieran, el paso ① mostraría un proveedor que el ② no ofrece.
     _kamProvCache = provs;
     if (!provs.length) {
-      cont.innerHTML = '<div class="empty-state"><div class="empty-icon"></div>Sin proveedores todavía</div>';
+      // [FLUJO-UX-5] SIN BOTÓN: el alta («Agregar proveedor») está a la vista
+      // justo encima de esta lista. Repetirla aquí sería ruido, no una salida.
+      khVacio(cont, 'proveedores', { nota: 'Agrega el primero con el campo de arriba.' });
       return;
     }
     cont.innerHTML =

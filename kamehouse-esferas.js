@@ -506,7 +506,9 @@ async function loadEsferasEventos() {
     // lista al servidor.
     _esfPintarLista();
   } catch(e) {
-    cont.innerHTML = `<div class="alert alert-error">${e.message}</div>`;
+    // [FLUJO-UX-1] Mismo cambio que en Capsule: el mensaje crudo pasa a ser el
+    // patrón con nombre y reintento.
+    khErrorCarga(cont, 'la lista de Esferas', 'loadEsferasEventos', e);
   }
 }
 // ── Posponer evento (SEG-1: preview + confirmación con slug) ─────────────────
